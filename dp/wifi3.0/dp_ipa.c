@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2017-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -54,7 +54,7 @@
 #define DP_IPA_WAR_WBM2SW_REL_RING_NO_BUF_ENTRIES 16
 
 /**
- *struct dp_ipa_reo_remap_record - history for dp ipa reo remaps
+ * struct dp_ipa_reo_remap_record - history for dp ipa reo remaps
  * @timestamp: Timestamp when remap occurs
  * @ix0_reg: reo destination ring IX0 value
  * @ix2_reg: reo destination ring IX2 value
@@ -176,7 +176,7 @@ QDF_STATUS dp_ipa_handle_rx_buf_smmu_mapping(struct dp_soc *soc,
 	    !qdf_mem_smmu_s1_enabled(soc->osdev))
 		return QDF_STATUS_SUCCESS;
 
-	/**
+	/*
 	 * Even if ipa pipes is disabled, but if it's unmap
 	 * operation and nbuf has done ipa smmu map before,
 	 * do ipa smmu unmap as well.
@@ -406,7 +406,7 @@ static QDF_STATUS dp_ipa_get_shared_mem_info(qdf_device_t osdev,
 }
 
 /**
- * dp_ipa_get_tx_bank_id - API to get TCL bank id
+ * dp_ipa_get_tx_bank_id() - API to get TCL bank id
  * @soc: dp_soc handle
  * @bank_id: out parameter for bank id
  *
@@ -1122,7 +1122,7 @@ static void dp_ipa_set_pipe_db(struct dp_ipa_resources *res,
 
 #ifdef IPA_WDS_EASYMESH_FEATURE
 /**
- * dp_ipa_setup_iface_session_id - Pass vdev id to IPA
+ * dp_ipa_setup_iface_session_id() - Pass vdev id to IPA
  * @in: ipa in params
  * @session_id: vdev id
  *
@@ -1192,7 +1192,7 @@ static QDF_STATUS dp_ipa_reset_tx_doorbell_pa(struct dp_soc *soc,
 #endif /* IPA_WDI3_TX_TWO_PIPES */
 
 /**
- * dp_tx_ipa_uc_detach - Free autonomy TX resources
+ * dp_tx_ipa_uc_detach() - Free autonomy TX resources
  * @soc: data path instance
  * @pdev: core txrx pdev context
  *
@@ -1229,7 +1229,7 @@ static void dp_tx_ipa_uc_detach(struct dp_soc *soc, struct dp_pdev *pdev)
 }
 
 /**
- * dp_rx_ipa_uc_detach - free autonomy RX resources
+ * dp_rx_ipa_uc_detach() - free autonomy RX resources
  * @soc: data path instance
  * @pdev: core txrx pdev context
  *
@@ -1246,8 +1246,8 @@ static void dp_rx_ipa_uc_detach(struct dp_soc *soc, struct dp_pdev *pdev)
 	qdf_mem_free_sgtable(&ipa_res->rx_refill_ring.sgtable);
 }
 
-/*
- * dp_rx_alt_ipa_uc_detach - free autonomy RX resources
+/**
+ * dp_rx_alt_ipa_uc_detach() - free autonomy RX resources
  * @soc: data path instance
  * @pdev: core txrx pdev context
  *
@@ -1294,7 +1294,7 @@ int dp_ipa_uc_detach(struct dp_soc *soc, struct dp_pdev *pdev)
 }
 
 /**
- * dp_tx_ipa_uc_attach - Allocate autonomy TX resources
+ * dp_tx_ipa_uc_attach() - Allocate autonomy TX resources
  * @soc: data path instance
  * @pdev: Physical device handle
  *
@@ -1412,7 +1412,7 @@ static int dp_tx_ipa_uc_attach(struct dp_soc *soc, struct dp_pdev *pdev)
 }
 
 /**
- * dp_rx_ipa_uc_attach - Allocate autonomy RX resources
+ * dp_rx_ipa_uc_attach() - Allocate autonomy RX resources
  * @soc: data path instance
  * @pdev: core txrx pdev context
  *
@@ -1468,7 +1468,7 @@ int dp_ipa_uc_attach(struct dp_soc *soc, struct dp_pdev *pdev)
 }
 
 #ifdef IPA_WDI3_VLAN_SUPPORT
-/*
+/**
  * dp_ipa_rx_alt_ring_resource_setup() - setup IPA 2nd RX ring resources
  * @soc: data path SoC handle
  * @pdev: data path pdev handle
@@ -1546,12 +1546,6 @@ static inline
 void dp_ipa_rx_alt_ring_resource_setup(struct dp_soc *soc, struct dp_pdev *pdev)
 { }
 #endif
-/*
- * dp_ipa_ring_resource_setup() - setup IPA ring resources
- * @soc: data path SoC handle
- *
- * Return: none
- */
 int dp_ipa_ring_resource_setup(struct dp_soc *soc,
 		struct dp_pdev *pdev)
 {
@@ -1705,7 +1699,7 @@ int dp_ipa_ring_resource_setup(struct dp_soc *soc,
 }
 
 #ifdef IPA_WDI3_VLAN_SUPPORT
-/*
+/**
  * dp_ipa_rx_alt_ring_get_resource() - get IPA 2nd RX ring resources
  * @pdev: data path pdev handle
  *
@@ -1810,7 +1804,7 @@ QDF_STATUS dp_ipa_get_resource(struct cdp_soc_t *soc_hdl, uint8_t pdev_id)
 #endif
 
 #ifdef IPA_WDI3_VLAN_SUPPORT
-/*
+/**
  * dp_ipa_map_rx_alt_ring_doorbell_paddr() - Map 2nd rx ring doorbell paddr
  * @pdev: data path pdev handle
  *
@@ -1842,7 +1836,7 @@ static void dp_ipa_map_rx_alt_ring_doorbell_paddr(struct dp_pdev *pdev)
 					  ipa_res->rx_alt_ready_doorbell_paddr);
 }
 
-/*
+/**
  * dp_ipa_unmap_rx_alt_ring_doorbell_paddr() - Unmap 2nd rx ring doorbell paddr
  * @pdev: data path pdev handle
  *
@@ -2001,14 +1995,6 @@ QDF_STATUS dp_ipa_get_stat(struct cdp_soc_t *soc_hdl, uint8_t pdev_id)
 	return QDF_STATUS_SUCCESS;
 }
 
-/**
- * dp_tx_send_ipa_data_frame() - send IPA data frame
- * @soc_hdl: datapath soc handle
- * @vdev_id: id of the virtual device
- * @skb: skb to transmit
- *
- * Return: skb/ NULL is for success
- */
 qdf_nbuf_t dp_tx_send_ipa_data_frame(struct cdp_soc_t *soc_hdl, uint8_t vdev_id,
 				     qdf_nbuf_t skb)
 {
@@ -2371,7 +2357,7 @@ dp_ipa_wdi_rx_smmu_params(struct dp_soc *soc,
 }
 
 #ifdef IPA_WDI3_VLAN_SUPPORT
-/*
+/**
  * dp_ipa_wdi_rx_alt_pipe_smmu_params() - Setup 2nd rx pipe smmu params
  * @soc: data path soc handle
  * @ipa_res: ipa resource pointer
@@ -2430,8 +2416,8 @@ dp_ipa_wdi_rx_alt_pipe_smmu_params(struct dp_soc *soc,
 		soc->rx_pkt_tlv_size + L3_HEADER_PADDING;
 }
 
-/*
- * dp_ipa_wdi_rx_alt_pipe_smmu_params() - Setup 2nd rx pipe params
+/**
+ * dp_ipa_wdi_rx_alt_pipe_params() - Setup 2nd rx pipe params
  * @soc: data path soc handle
  * @ipa_res: ipa resource pointer
  * @rx: pipe info handle
@@ -2489,7 +2475,7 @@ static void dp_ipa_wdi_rx_alt_pipe_params(struct dp_soc *soc,
 		soc->rx_pkt_tlv_size + L3_HEADER_PADDING;
 }
 
-/*
+/**
  * dp_ipa_setup_rx_alt_pipe() - Setup 2nd rx pipe for IPA offload
  * @soc: data path soc handle
  * @res: ipa resource pointer
@@ -2539,7 +2525,7 @@ static void dp_ipa_setup_rx_alt_pipe(struct dp_soc *soc,
 	QDF_IPA_EP_CFG_HDR_LITTLE_ENDIAN(rx_cfg) = true;
 }
 
-/*
+/**
  * dp_ipa_set_rx_alt_pipe_db() - Setup 2nd rx pipe doorbell
  * @res: ipa resource pointer
  * @out: pipe out handle
@@ -2635,7 +2621,7 @@ QDF_STATUS dp_ipa_setup(struct cdp_soc_t *soc_hdl, uint8_t pdev_id,
 	QDF_IPA_EP_CFG_MODE(tx_cfg) = IPA_BASIC;
 	QDF_IPA_EP_CFG_HDR_LITTLE_ENDIAN(tx_cfg) = true;
 
-	/**
+	/*
 	 * Transfer Ring: WBM Ring
 	 * Transfer Ring Doorbell PA: WBM Tail Pointer Address
 	 * Event Ring: TCL ring
@@ -2671,7 +2657,7 @@ QDF_STATUS dp_ipa_setup(struct cdp_soc_t *soc_hdl, uint8_t pdev_id,
 	QDF_IPA_EP_CFG_MODE(rx_cfg) = IPA_BASIC;
 	QDF_IPA_EP_CFG_HDR_LITTLE_ENDIAN(rx_cfg) = true;
 
-	/**
+	/*
 	 * Transfer Ring: REO Ring
 	 * Transfer Ring Doorbell PA: REO Tail Pointer Address
 	 * Event Ring: FW ring
@@ -2722,7 +2708,7 @@ QDF_STATUS dp_ipa_setup(struct cdp_soc_t *soc_hdl, uint8_t pdev_id,
 }
 
 #ifdef IPA_WDI3_VLAN_SUPPORT
-/*
+/**
  * dp_ipa_set_rx1_used() - Set rx1 used flag for 2nd rx offload ring
  * @in: pipe in handle
  *
@@ -2734,10 +2720,10 @@ void dp_ipa_set_rx1_used(qdf_ipa_wdi_reg_intf_in_params_t *in)
 	QDF_IPA_WDI_REG_INTF_IN_PARAMS_IS_RX1_USED(in) = true;
 }
 
-/*
+/**
  * dp_ipa_set_v4_vlan_hdr() - Set v4 vlan hdr
  * @in: pipe in handle
- * hdr: pointer to hdr
+ * @hdr: pointer to hdr
  *
  * Return: none
  */
@@ -2749,10 +2735,10 @@ void dp_ipa_set_v4_vlan_hdr(qdf_ipa_wdi_reg_intf_in_params_t *in,
 		     hdr, sizeof(qdf_ipa_wdi_hdr_info_t));
 }
 
-/*
+/**
  * dp_ipa_set_v6_vlan_hdr() - Set v6 vlan hdr
  * @in: pipe in handle
- * hdr: pointer to hdr
+ * @hdr: pointer to hdr
  *
  * Return: none
  */
@@ -2827,18 +2813,6 @@ dp_ipa_set_wdi_vlan_hdr_type(qdf_ipa_wdi_hdr_info_t *hdr_info)
 { }
 #endif
 
-/**
- * dp_ipa_setup_iface() - Setup IPA header and register interface
- * @ifname: Interface name
- * @mac_addr: Interface MAC address
- * @prod_client: IPA prod client type
- * @cons_client: IPA cons client type
- * @session_id: Session ID
- * @is_ipv6_enabled: Is IPV6 enabled or not
- * @hdl: IPA handle
- *
- * Return: QDF_STATUS
- */
 QDF_STATUS dp_ipa_setup_iface(char *ifname, uint8_t *mac_addr,
 			      qdf_ipa_client_type_t prod_client,
 			      qdf_ipa_client_type_t cons_client,
@@ -2977,7 +2951,7 @@ QDF_STATUS dp_ipa_setup(struct cdp_soc_t *soc_hdl, uint8_t pdev_id,
 	qdf_mem_zero(&pipe_out, sizeof(pipe_out));
 
 	/* TX PIPE */
-	/**
+	/*
 	 * Transfer Ring: WBM Ring
 	 * Transfer Ring Doorbell PA: WBM Tail Pointer Address
 	 * Event Ring: TCL ring
@@ -3023,7 +2997,7 @@ QDF_STATUS dp_ipa_setup(struct cdp_soc_t *soc_hdl, uint8_t pdev_id,
 	tcl_desc_ptr->packet_offset = 2;	/* padding for alignment */
 
 	/* RX PIPE */
-	/**
+	/*
 	 * Transfer Ring: REO Ring
 	 * Transfer Ring Doorbell PA: REO Tail Pointer Address
 	 * Event Ring: FW ring
@@ -3130,18 +3104,6 @@ QDF_STATUS dp_ipa_setup(struct cdp_soc_t *soc_hdl, uint8_t pdev_id,
 	return QDF_STATUS_SUCCESS;
 }
 
-/**
- * dp_ipa_setup_iface() - Setup IPA header and register interface
- * @ifname: Interface name
- * @mac_addr: Interface MAC address
- * @prod_client: IPA prod client type
- * @cons_client: IPA cons client type
- * @session_id: Session ID
- * @is_ipv6_enabled: Is IPV6 enabled or not
- * @hdl: IPA handle
- *
- * Return: QDF_STATUS
- */
 QDF_STATUS dp_ipa_setup_iface(char *ifname, uint8_t *mac_addr,
 			      qdf_ipa_client_type_t prod_client,
 			      qdf_ipa_client_type_t cons_client,
@@ -3200,16 +3162,6 @@ QDF_STATUS dp_ipa_setup_iface(char *ifname, uint8_t *mac_addr,
 
 #endif /* CONFIG_IPA_WDI_UNIFIED_API */
 
-/**
- * dp_ipa_cleanup() - Disconnect IPA pipes
- * @soc_hdl: dp soc handle
- * @pdev_id: dp pdev id
- * @tx_pipe_handle: Tx pipe handle
- * @rx_pipe_handle: Rx pipe handle
- * @hdl: IPA handle
- *
- * Return: QDF_STATUS
- */
 QDF_STATUS dp_ipa_cleanup(struct cdp_soc_t *soc_hdl, uint8_t pdev_id,
 			  uint32_t tx_pipe_handle, uint32_t rx_pipe_handle,
 			  qdf_ipa_wdi_hdl_t hdl)
@@ -3244,14 +3196,6 @@ exit:
 	return status;
 }
 
-/**
- * dp_ipa_cleanup_iface() - Cleanup IPA header and deregister interface
- * @ifname: Interface name
- * @is_ipv6_enabled: Is IPV6 enabled or not
- * @hdl: IPA handle
- *
- * Return: QDF_STATUS
- */
 QDF_STATUS dp_ipa_cleanup_iface(char *ifname, bool is_ipv6_enabled,
 				qdf_ipa_wdi_hdl_t hdl)
 {
@@ -3359,14 +3303,6 @@ QDF_STATUS dp_ipa_disable_pipes(struct cdp_soc_t *soc_hdl, uint8_t pdev_id,
 	return result ? QDF_STATUS_E_FAILURE : QDF_STATUS_SUCCESS;
 }
 
-/**
- * dp_ipa_set_perf_level() - Set IPA clock bandwidth based on data rates
- * @client: Client type
- * @max_supported_bw_mbps: Maximum bandwidth needed (in Mbps)
- * @hdl: IPA handle
- *
- * Return: QDF_STATUS
- */
 QDF_STATUS dp_ipa_set_perf_level(int client, uint32_t max_supported_bw_mbps,
 				 qdf_ipa_wdi_hdl_t hdl)
 {
@@ -3388,7 +3324,7 @@ QDF_STATUS dp_ipa_set_perf_level(int client, uint32_t max_supported_bw_mbps,
 }
 
 /**
- * dp_ipa_intrabss_send - send IPA RX intra-bss frames
+ * dp_ipa_intrabss_send() - send IPA RX intra-bss frames
  * @pdev: pdev
  * @vdev: vdev
  * @nbuf: skb
@@ -3573,7 +3509,7 @@ bool dp_ipa_is_mdm_platform(void)
 #endif
 
 /**
- * dp_ipa_frag_nbuf_linearize - linearize nbuf for IPA
+ * dp_ipa_frag_nbuf_linearize() - linearize nbuf for IPA
  * @soc: soc
  * @nbuf: source skb
  *
@@ -3636,13 +3572,6 @@ static qdf_nbuf_t dp_ipa_frag_nbuf_linearize(struct dp_soc *soc,
 	return dst_nbuf;
 }
 
-/**
- * dp_ipa_handle_rx_reo_reinject - Handle RX REO reinject skb buffer
- * @soc: soc
- * @nbuf: skb
- *
- * Return: nbuf if success and otherwise NULL
- */
 qdf_nbuf_t dp_ipa_handle_rx_reo_reinject(struct dp_soc *soc, qdf_nbuf_t nbuf)
 {
 
@@ -3751,16 +3680,6 @@ QDF_STATUS dp_ipa_ast_create(struct cdp_soc_t *soc_hdl,
 #endif
 
 #ifdef QCA_ENHANCED_STATS_SUPPORT
-/**
- * dp_ipa_update_peer_rx_stats - update peer rx stats
- * @soc: soc handle
- * @vdev_id: vdev id
- * @peer_mac: Peer Mac Address
- * @nbuf: data nbuf
- *
- * Return: status success/failure
- */
-
 QDF_STATUS dp_ipa_update_peer_rx_stats(struct cdp_soc_t *soc,
 				       uint8_t vdev_id, uint8_t *peer_mac,
 				       qdf_nbuf_t nbuf)
@@ -3798,12 +3717,6 @@ QDF_STATUS dp_ipa_update_peer_rx_stats(struct cdp_soc_t *soc,
 	return QDF_STATUS_SUCCESS;
 }
 
-/**
- * dp_peer_aggregate_tid_stats - aggregate rx tid stats
- * @peer: Data Path peer
- *
- * Return: void
- */
 void
 dp_peer_aggregate_tid_stats(struct dp_peer *peer)
 {
@@ -3930,6 +3843,7 @@ void dp_ipa_aggregate_pdev_stats(struct dp_pdev *pdev)
  *
  * Return: void
  */
+static
 void dp_ipa_get_peer_stats(struct dp_peer *peer,
 			   struct cdp_peer_stats *peer_stats)
 {
@@ -3954,14 +3868,6 @@ void dp_ipa_get_peer_stats(struct dp_peer *peer,
 						peer_stats->rx.multicast.bytes;
 }
 
-/**
- * dp_ipa_txrx_get_pdev_stats - fetch pdev stats
- * @soc: DP soc handle
- * @pdev_id: id of DP pdev handle
- * @pdev_stats: buffer to hold pdev stats
- *
- * Return : status success/failure
- */
 QDF_STATUS
 dp_ipa_txrx_get_pdev_stats(struct cdp_soc_t *soc, uint8_t pdev_id,
 			   struct cdp_pdev_stats *pdev_stats)
@@ -3978,15 +3884,6 @@ dp_ipa_txrx_get_pdev_stats(struct cdp_soc_t *soc, uint8_t pdev_id,
 	return QDF_STATUS_SUCCESS;
 }
 
-/**
- * dp_ipa_txrx_get_vdev_stats - fetch vdev stats
- * @soc_hdl: soc handle
- * @vdev_id: id of vdev handle
- * @buf: buffer to hold vdev stats
- * @is_aggregate: for aggregation
- *
- * Return : int
- */
 int dp_ipa_txrx_get_vdev_stats(struct cdp_soc_t *soc_hdl, uint8_t vdev_id,
 			       void *buf, bool is_aggregate)
 {
@@ -4005,15 +3902,6 @@ int dp_ipa_txrx_get_vdev_stats(struct cdp_soc_t *soc_hdl, uint8_t vdev_id,
 	return 0;
 }
 
-/**
- * dp_ipa_txrx_get_peer_stats - fetch peer stats
- * @soc: soc handle
- * @vdev_id: id of vdev handle
- * @peer_mac: peer mac address
- * @peer_stats: buffer to hold peer stats
- *
- * Return : status success/failure
- */
 QDF_STATUS dp_ipa_txrx_get_peer_stats(struct cdp_soc_t *soc, uint8_t vdev_id,
 				      uint8_t *peer_mac,
 				      struct cdp_peer_stats *peer_stats)
