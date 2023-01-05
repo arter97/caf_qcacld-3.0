@@ -65,6 +65,102 @@ int wlan_cfg80211_lite_monitor_config(struct wiphy *wiphy,
 				      struct wlan_cfg8011_genric_params *params);
 void *monitor_osif_get_vdev_by_name(char *name);
 
+#ifdef QCA_SUPPORT_LITE_MONITOR
+static int ol_ath_set_rx_monitor_filter_mon_2_0(struct ieee80211com *ic,
+						struct cdp_monitor_filter *filter_val,
+						uint64_t value)
+{
+	ol_txrx_soc_handle soc_txrx_handle;
+	struct ol_ath_softc_net80211 *scn = OL_ATH_SOFTC_NET80211(ic);
+	struct wlan_objmgr_psoc *psoc = wlan_pdev_get_psoc(ic->ic_pdev_obj);
+	struct lite_mon_config *mon_config = NULL;
+	uint8_t pdev_id = wlan_objmgr_pdev_get_pdev_id(ic->ic_pdev_obj);
+	int filter_type = MON_FILTER_TYPE_GET(value);
+
+	soc_txrx_handle = wlan_psoc_get_dp_handle(psoc);
+
+	mon_config = qdf_mem_malloc(sizeof(struct lite_mon_config));
+	if (!mon_config) {
+		qdf_err("Memory allocation failed");
+		return A_NO_MEMORY;
+	}
+
+	mon_config->direction = LITE_MON_DIRECTION_RX;
+	mon_config->cmdtype = LITE_MON_SET_FILTER;
+	mon_config->debug = LITE_MON_TRACE_INFO;
+
+	if (cdp_is_lite_mon_enabled(soc_txrx_handle,
+				    pdev_id,
+				    LITE_MON_DIRECTION_RX)) {
+		if (cdp_get_lite_mon_legacy_feature_enabled(soc_txrx_handle,
+							    pdev_id,
+							    LITE_MON_DIRECTION_RX) ==
+							    LEGACY_FILTER_ADV_MON_FILTER) {
+			mon_config->data.filter_config.disable = 1;
+			monitor_set_lite_monitor_config(scn, mon_config);
+		} else {
+			qdf_err("Lite mon filter is already enabled, disable it");
+			qdf_mem_free(mon_config);
+			mon_config = NULL;
+			return A_ERROR;
+		}
+	}
+
+	if (filter_type != MON_FILTER_ALL_DISABLE) {
+		mon_config->data.filter_config.disable = 0;
+		mon_config->data.filter_config.metadata = 0x0001;
+		mon_config->data.filter_config.level = LITE_MON_LEVEL_MSDU;
+
+		if (filter_val->mode & RX_MON_FILTER_PASS) {
+			mon_config->data.filter_config.mgmt_filter[LITE_MON_MODE_FILTER_FP] = filter_val->fp_mgmt;
+			mon_config->data.filter_config.data_filter[LITE_MON_MODE_FILTER_FP] = filter_val->fp_data;
+			mon_config->data.filter_config.ctrl_filter[LITE_MON_MODE_FILTER_FP] = filter_val->fp_ctrl;
+#ifdef FIRMWARE_SUPPORT_PENDING
+			if (ic->mon_filter_osif_mac) {
+				mon_config->data.filter_config.mgmt_filter[LITE_MON_MODE_FILTER_FPMO] = LITE_MON_FILTER_ALL;
+				mon_config->data.filter_config.data_filter[LITE_MON_MODE_FILTER_FPMO] = LITE_MON_FILTER_ALL;
+				mon_config->data.filter_config.ctrl_filter[LITE_MON_MODE_FILTER_FPMO] = LITE_MON_FILTER_ALL;
+			}
+#endif
+		}
+
+		if (filter_val->mode & RX_MON_FILTER_OTHER) {
+			mon_config->data.filter_config.mgmt_filter[LITE_MON_MODE_FILTER_MO] = filter_val->mo_mgmt;
+			mon_config->data.filter_config.data_filter[LITE_MON_MODE_FILTER_MO] = filter_val->mo_data;
+			mon_config->data.filter_config.ctrl_filter[LITE_MON_MODE_FILTER_MO] = filter_val->mo_ctrl;
+#ifdef FIRMWARE_SUPPORT_PENDING
+			if (ic->mon_filter_osif_mac) {
+				mon_config->data.filter_config.mgmt_filter[LITE_MON_MODE_FILTER_MD] = LITE_MON_FILTER_ALL;
+				mon_config->data.filter_config.data_filter[LITE_MON_MODE_FILTER_MD] = LITE_MON_FILTER_ALL;
+				mon_config->data.filter_config.ctrl_filter[LITE_MON_MODE_FILTER_MD] = LITE_MON_FILTER_ALL;
+			}
+#endif
+		}
+
+		mon_config->data.filter_config.len[LITE_MON_TYPE_DATA] = LITE_MON_LEN_ALL;
+		mon_config->data.filter_config.len[LITE_MON_TYPE_MGMT] = LITE_MON_LEN_ALL;
+		mon_config->data.filter_config.len[LITE_MON_TYPE_CTRL] = LITE_MON_LEN_ALL;
+
+		mon_config->data.filter_config.legacy_filter_enabled = LEGACY_FILTER_ADV_MON_FILTER;
+
+		monitor_set_lite_monitor_config(scn, mon_config);
+	}
+
+	qdf_mem_free(mon_config);
+	mon_config = NULL;
+
+	return A_OK;
+}
+#else
+static int ol_ath_set_rx_monitor_filter_mon_2_0(struct ieee80211com *ic,
+						struct cdp_monitor_filter *filter_val,
+						uint64_t value)
+{
+	qdf_err("Couldn't send command. Lite mon is disabled");
+	return -EINVAL;
+}
+#endif
+
 /*
  * expected values for filter (val) 0, 1, 2, 4, 8
  * these values could be for FP, MO, or both by using first 16 bits.
@@ -73,7 +169,7 @@ void *monitor_osif_get_vdev_by_name(char *name);
 static int ol_ath_set_rx_monitor_filter(struct ieee80211com *ic)
 {
 	struct wlan_objmgr_psoc *psoc = wlan_pdev_get_psoc(ic->ic_pdev_obj);
-	struct cdp_monitor_filter filter_val;
+	struct cdp_monitor_filter filter_val = {0};
 	ol_txrx_soc_handle soc_txrx_handle;
 	uint64_t val = ic->ic_os_monrxfilter;
 	uint32_t filter_mode;
@@ -82,6 +178,7 @@ static int ol_ath_set_rx_monitor_filter(struct ieee80211com *ic)
 	filter_val.mode = RX_MON_FILTER_PASS | RX_MON_FILTER_OTHER;
 
 	filter_mode = FILTER_MODE(val);
+
 	if (filter_mode == FILTER_PASS_ONLY)
 		filter_val.mode = RX_MON_FILTER_PASS;
 	else if (filter_mode == MONITOR_OTHER_ONLY)
@@ -97,6 +194,9 @@ static int ol_ath_set_rx_monitor_filter(struct ieee80211com *ic)
 		filter_val.mo_ctrl = SET_MON_FILTER_CTRL(val);
 		filter_val.mo_data = SET_MON_FILTER_DATA(val);
 	}
+
+	if (ic->ic_monitor_version == MONITOR_VERSION_2)
+		return ol_ath_set_rx_monitor_filter_mon_2_0(ic, &filter_val, val);
 
 	return cdp_set_monitor_filter(soc_txrx_handle,
 				      wlan_objmgr_pdev_get_pdev_id(ic->ic_pdev_obj),
@@ -842,7 +942,7 @@ int ol_set_lite_mode_rx_2_0(struct ol_ath_softc_net80211 *scn, int val)
 int ol_set_lite_mode_rx_2_0(struct ol_ath_softc_net80211 *scn, int val)
 {
 	qdf_err("Couldn't send command. Lite mon is not supported");
-	return A_EEROR;
+	return A_ERROR;
 }
 #endif
 

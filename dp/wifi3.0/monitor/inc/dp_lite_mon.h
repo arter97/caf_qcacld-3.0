@@ -189,6 +189,14 @@ dp_lite_mon_get_peer_config(struct cdp_soc_t *soc_hdl,
 void dp_lite_mon_disable_rx(struct dp_pdev *pdev);
 
 /**
+ * dp_lite_mon_is_rx_adv_filter_enable
+ *  - checks if advance monitor filter is enabled
+ * @pdev: dp_pdev
+ *
+ * Return: bool
+ */
+bool dp_lite_mon_is_rx_adv_filter_enable(struct dp_pdev *pdev);
+/**
  * dp_lite_mon_is_level_msdu - check if level is msdu
  * @mon_pdev: monitor pdev handle
  *
@@ -326,5 +334,36 @@ dp_lite_mon_rx_mpdu_process(struct dp_pdev *pdev,
 			    struct hal_rx_ppdu_info *ppdu_info,
 			    qdf_nbuf_t mon_mpdu, uint16_t mpdu_id,
 			    uint8_t user);
+
+/**
+ * dp_lite_mon_get_filter_ucast_data - get uncast filter status
+ *					for mon 2.0
+ * @pdev_handle
+ *
+ * Return: True/False
+ **/
+bool
+dp_lite_mon_get_filter_ucast_data(struct cdp_pdev *pdev_handle);
+
+/**
+ * dp_lite_mon_get_filter_mcast_data - get mcast filter status
+ *					for mon 2.0
+ * @pdev_handle
+ *
+ * Return: True/False
+ **/
+bool
+dp_lite_mon_get_filter_mcast_data(struct cdp_pdev *pdev_handle);
+
+/**
+ * dp_lite_mon_get_filter_non_data - get non_data filter status
+ *					for mon 2.0
+ * @pdev_handle
+ *
+ * Return: True/False
+ **/
+bool
+dp_lite_mon_get_filter_non_data(struct cdp_pdev *pdev_handle);
+
 #endif
 #endif /* _DP_LITE_MON_H_ */
