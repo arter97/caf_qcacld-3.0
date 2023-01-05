@@ -509,6 +509,14 @@ static QDF_STATUS dp_vdev_set_monitor_mode(struct cdp_soc_t *dp_soc,
 
 	mon_pdev->monitor_configured = true;
 
+	/* If advance monitor filter is applied using lite_mon
+	 * via vap configuration, required filters are already applied
+	 * hence returning SUCCESS from here.
+	 */
+	if (dp_monitor_lite_mon_is_rx_adv_filter_enable(pdev)) {
+		status = QDF_STATUS_SUCCESS;
+		goto fail;
+	}
 	/* disable lite mon if configured, monitor vap takes
 	 * priority over lite mon when its created. Lite mon
 	 * can be configured later again.

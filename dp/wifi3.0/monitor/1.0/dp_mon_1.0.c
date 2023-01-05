@@ -1295,6 +1295,7 @@ struct dp_mon_ops monitor_ops_1_0 = {
 	.mon_lite_mon_dealloc = NULL,
 	.mon_lite_mon_vdev_delete = NULL,
 	.mon_lite_mon_disable_rx = NULL,
+	.mon_lite_mon_is_rx_adv_filter_enable = NULL,
 };
 
 struct cdp_mon_ops dp_ops_mon_1_0 = {

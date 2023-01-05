@@ -1333,9 +1333,12 @@ dp_mon_register_feature_ops_2_0(struct dp_soc *soc)
 	mon_ops->mon_htt_ppdu_stats_detach = dp_htt_ppdu_stats_detach;
 	mon_ops->mon_print_pdev_rx_mon_stats = dp_print_pdev_rx_mon_stats;
 	mon_ops->mon_set_bsscolor = dp_mon_set_bsscolor;
-	mon_ops->mon_pdev_get_filter_ucast_data = NULL;
-	mon_ops->mon_pdev_get_filter_mcast_data = NULL;
-	mon_ops->mon_pdev_get_filter_non_data = NULL;
+	mon_ops->mon_pdev_get_filter_ucast_data =
+					dp_lite_mon_get_filter_ucast_data;
+	mon_ops->mon_pdev_get_filter_mcast_data =
+					dp_lite_mon_get_filter_mcast_data;
+	mon_ops->mon_pdev_get_filter_non_data =
+					dp_lite_mon_get_filter_non_data;
 	mon_ops->mon_neighbour_peer_add_ast = NULL;
 #ifndef DISABLE_MON_CONFIG
 	mon_ops->mon_tx_process = dp_tx_mon_process_2_0;
@@ -1537,6 +1540,7 @@ struct dp_mon_ops monitor_ops_2_0 = {
 	.mon_lite_mon_dealloc = dp_lite_mon_dealloc,
 	.mon_lite_mon_vdev_delete = dp_lite_mon_vdev_delete,
 	.mon_lite_mon_disable_rx = dp_lite_mon_disable_rx,
+	.mon_lite_mon_is_rx_adv_filter_enable = dp_lite_mon_is_rx_adv_filter_enable,
 	.mon_rx_ppdu_info_cache_create = dp_rx_mon_ppdu_info_cache_create,
 	.mon_rx_ppdu_info_cache_destroy = dp_rx_mon_ppdu_info_cache_destroy,
 };

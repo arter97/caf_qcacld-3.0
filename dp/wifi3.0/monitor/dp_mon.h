@@ -827,6 +827,7 @@ struct dp_mon_ops {
 	void (*mon_lite_mon_vdev_delete)(struct dp_pdev *pdev,
 					 struct dp_vdev *vdev);
 	void (*mon_lite_mon_disable_rx)(struct dp_pdev *pdev);
+	bool (*mon_lite_mon_is_rx_adv_filter_enable)(struct dp_pdev *pdev);
 	/* Print advanced monitor stats */
 	void (*mon_rx_print_advanced_stats)
 		(struct dp_soc *soc, struct dp_pdev *pdev);
@@ -4260,6 +4261,34 @@ dp_monitor_lite_mon_disable_rx(struct dp_pdev *pdev)
 	return monitor_ops->mon_lite_mon_disable_rx(pdev);
 }
 
+/*
+ * dp_monitor_lite_mon_is_rx_adv_filter_enable()
+ *   - check if advance mon filter is already applied
+ * @pdev: dp pdev
+ *
+ * Return: bool
+ */
+static inline bool
+dp_monitor_lite_mon_is_rx_adv_filter_enable(struct dp_pdev *pdev)
+{
+	struct dp_mon_ops *monitor_ops;
+	struct dp_mon_soc *mon_soc = pdev->soc->monitor_soc;
+
+	if (!mon_soc) {
+		dp_mon_debug("monitor soc is NULL");
+		return false;
+	}
+
+	monitor_ops = mon_soc->mon_ops;
+	if (!monitor_ops ||
+	    !monitor_ops->mon_lite_mon_disable_rx) {
+		dp_mon_debug("callback not registered");
+		return false;
+	}
+
+	return monitor_ops->mon_lite_mon_is_rx_adv_filter_enable(pdev);
+}
+
 #ifndef QCA_SUPPORT_LITE_MONITOR
 static inline void
 dp_lite_mon_disable_rx(struct dp_pdev *pdev)
@@ -4269,6 +4298,30 @@ dp_lite_mon_disable_rx(struct dp_pdev *pdev)
 static inline void
 dp_lite_mon_disable_tx(struct dp_pdev *pdev)
 {
+}
+
+static inline bool
+dp_lite_mon_is_rx_adv_filter_enable(struct dp_pdev *pdev)
+{
+	return false;
+}
+
+static inline bool
+dp_lite_mon_get_filter_ucast_data(struct cdp_pdev *pdev_handle)
+{
+	return false;
+}
+
+static inline bool
+dp_lite_mon_get_filter_mcast_data(struct cdp_pdev *pdev_handle)
+{
+	return false;
+}
+
+static inline bool
+dp_lite_mon_get_filter_non_data(struct cdp_pdev *pdev_handle)
+{
+	return false;
 }
 
 static inline int
