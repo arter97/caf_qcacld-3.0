@@ -20008,6 +20008,27 @@ send_set_mac_addr_rx_filter_cmd_tlv(wmi_unified_t wmi_handle,
 	return QDF_STATUS_SUCCESS;
 }
 
+static QDF_STATUS
+extract_sap_coex_fix_chan_caps(wmi_unified_t wmi_handle,
+			       uint8_t *event,
+			       struct wmi_host_coex_fix_chan_cap *cap)
+{
+	WMI_SERVICE_READY_EXT2_EVENTID_param_tlvs *param_buf;
+	WMI_COEX_FIX_CHANNEL_CAPABILITIES *fw_cap;
+
+	param_buf = (WMI_SERVICE_READY_EXT2_EVENTID_param_tlvs *)event;
+	if (!param_buf)
+		return QDF_STATUS_E_INVAL;
+
+	fw_cap = param_buf->coex_fix_channel_caps;
+	if (!fw_cap)
+		return QDF_STATUS_E_INVAL;
+
+	cap->fix_chan_priority = fw_cap->fix_channel_priority;
+
+	return QDF_STATUS_SUCCESS;
+}
+
 struct wmi_ops tlv_ops =  {
 	.send_vdev_create_cmd = send_vdev_create_cmd_tlv,
 	.send_vdev_delete_cmd = send_vdev_delete_cmd_tlv,
@@ -20490,6 +20511,8 @@ struct wmi_ops tlv_ops =  {
 	.set_mac_addr_rx_filter = send_set_mac_addr_rx_filter_cmd_tlv,
 	.send_update_edca_pifs_param_cmd =
 			send_update_edca_pifs_param_cmd_tlv,
+	.extract_sap_coex_cap_service_ready_ext2 =
+			extract_sap_coex_fix_chan_caps,
 };
 
 #ifdef WLAN_FEATURE_11BE_MLO

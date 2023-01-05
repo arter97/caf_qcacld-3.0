@@ -9580,4 +9580,12 @@ struct edca_pifs_vparam {
 	uint8_t vdev_id;
 	struct wlan_edca_pifs_param_ie param;
 };
+
+/**
+ * struct wmi_host_coex_fix_chan_cap - fw capability to support fixed chan SAP
+ * @fix_chan_priority: Fix channel priority, set to 1 if firmware supports it
+ */
+struct wmi_host_coex_fix_chan_cap {
+	uint32_t fix_chan_priority;
+};
 #endif /* _WMI_UNIFIED_PARAM_H_ */

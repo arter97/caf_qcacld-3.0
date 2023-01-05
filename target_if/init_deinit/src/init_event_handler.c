@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2018-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -517,6 +517,11 @@ static int init_deinit_service_ext2_ready_event_handler(ol_scn_t scn_handle,
 							    event, info);
 	if (err_code)
 		target_if_debug("failed to populate dbs_or_sbs cap ext2");
+
+	err_code = init_deinit_populate_sap_coex_capability(psoc, wmi_handle,
+							    event);
+	if (err_code)
+		target_if_debug("failed to populate sap_coex_capability ext2");
 
 	legacy_callback = target_if_get_psoc_legacy_service_ready_cb();
 	if (legacy_callback)

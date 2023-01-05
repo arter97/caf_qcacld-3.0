@@ -5082,4 +5082,18 @@ QDF_STATUS
 wmi_unified_update_edca_pifs_param(
 			wmi_unified_t wmi_handle,
 			struct edca_pifs_vparam *edca_pifs_param);
+
+/**
+ * wmi_extract_sap_coex_cap_service_ready_ext2() - extract sap coex capability
+ * @wmi_handle: wmi handle
+ * @evt_buf: pointer to event buffer
+ * @cap: It's set to 1 if fixed chan SAP is supported by firmware even when the
+ *       channel is unsafe due to coex.
+ *
+ * Return: QDF_STATUS_SUCCESS on success, QDF_STATUS_E_** on error
+ */
+QDF_STATUS wmi_extract_sap_coex_cap_service_ready_ext2(
+			wmi_unified_t wmi_handle,
+			uint8_t *evt_buf,
+			struct wmi_host_coex_fix_chan_cap *cap);
 #endif /* _WMI_UNIFIED_API_H_ */
