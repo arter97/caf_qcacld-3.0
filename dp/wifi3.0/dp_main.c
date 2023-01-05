@@ -268,10 +268,6 @@ static QDF_STATUS dp_alloc_tx_ring_pair_by_index(struct dp_soc *soc,
 static uint8_t dp_soc_ring_if_nss_offloaded(struct dp_soc *soc,
 					    enum hal_ring_type ring_type,
 					    int ring_num);
-#ifdef FEATURE_AST
-void dp_print_mlo_ast_stats(struct dp_soc *soc);
-#endif
-
 #ifdef DP_UMAC_HW_RESET_SUPPORT
 static QDF_STATUS dp_umac_reset_handle_pre_reset(struct dp_soc *soc);
 static QDF_STATUS dp_umac_reset_handle_post_reset(struct dp_soc *soc);
@@ -1738,7 +1734,7 @@ configure_msi2:
  *
  * Return: void
  */
-void dp_print_mlo_ast_stats(struct dp_soc *soc)
+static void dp_print_mlo_ast_stats(struct dp_soc *soc)
 {
 	if (soc->arch_ops.print_mlo_ast_stats)
 		soc->arch_ops.print_mlo_ast_stats(soc);
