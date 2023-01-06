@@ -245,4 +245,6 @@ void target_if_spatial_reuse_register_tx_ops(struct wlan_lmac_if_tx_ops *tx_ops)
 					spatial_reuse_send_sr_prohibit_cfg;
 	tx_ops->spatial_reuse_tx_ops.target_if_set_sr_enable_disable =
 					spatial_reuse_set_sr_enable_disable;
+	tx_ops->spatial_reuse_tx_ops.target_if_sr_update =
+					spatial_reuse_send_pd_threshold;
 }
