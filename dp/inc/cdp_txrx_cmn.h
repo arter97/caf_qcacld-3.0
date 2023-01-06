@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2011-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -59,7 +59,7 @@ extern bool is_dp_verbose_debug_enabled;
 
 #ifdef ENABLE_VERBOSE_DEBUG
 /**
- * @enum verbose_debug_module:
+ * enum verbose_debug_module -
  * if INI "enable_verbose_debug" has to set following bit positions to enable
  * respective module's excessive logging,
  *
@@ -68,10 +68,13 @@ extern bool is_dp_verbose_debug_enabled;
  * @dp_verbose_debug_mask:  3rd bit [2nd index] is for DP module
  */
 enum verbose_debug_module {
-	hif_vebose_debug_mask    = 1 << 0,
+	hif_verbose_debug_mask   = 1 << 0,
 	hal_verbose_debug_mask   = 1 << 1,
 	dp_verbose_debug_mask    = 1 << 2,
 };
+
+/* legacy misspelled enumerator */
+#define hif_vebose_debug_mask hif_verbose_debug_mask
 
 #define dp_verbose_debug(params...) \
 		if (unlikely(is_dp_verbose_debug_enabled)) \
