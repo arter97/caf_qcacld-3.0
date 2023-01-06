@@ -205,13 +205,6 @@ dp_tx_flow_ctrl_reset_subqueues(struct dp_soc *soc,
 
 #endif
 
-/**
- * dp_tx_dump_flow_pool_info() - dump global_pool and flow_pool info
- *
- * @ctx: Handle to struct dp_soc.
- *
- * Return: none
- */
 void dp_tx_dump_flow_pool_info(struct cdp_soc_t *soc_hdl)
 {
 	struct dp_soc *soc = cdp_soc_t_to_dp_soc(soc_hdl);
@@ -665,7 +658,7 @@ void dp_tx_flow_pool_unmap_handler(struct dp_pdev *pdev, uint8_t flow_id,
 
 /**
  * dp_tx_flow_control_init() - Initialize tx flow control
- * @tx_desc_pool: Handle to flow_pool
+ * @soc: Handle to struct dp_soc
  *
  * Return: none
  */
@@ -676,7 +669,7 @@ void dp_tx_flow_control_init(struct dp_soc *soc)
 
 /**
  * dp_tx_desc_pool_dealloc() - De-allocate tx desc pool
- * @tx_desc_pool: Handle to flow_pool
+ * @soc: Handle to struct dp_soc
  *
  * Return: none
  */
@@ -697,7 +690,7 @@ static inline void dp_tx_desc_pool_dealloc(struct dp_soc *soc)
 
 /**
  * dp_tx_flow_control_deinit() - Deregister fw based tx flow control
- * @tx_desc_pool: Handle to flow_pool
+ * @soc: Handle to struct dp_soc
  *
  * Return: none
  */
@@ -710,7 +703,7 @@ void dp_tx_flow_control_deinit(struct dp_soc *soc)
 
 /**
  * dp_txrx_register_pause_cb() - Register pause callback
- * @ctx: Handle to struct dp_soc
+ * @handle: Handle to struct dp_soc
  * @pause_cb: Tx pause_cb
  *
  * Return: none

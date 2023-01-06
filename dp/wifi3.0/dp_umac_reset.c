@@ -177,7 +177,8 @@ QDF_STATUS dp_soc_umac_reset_deinit(struct cdp_soc_t *txrx_soc)
 }
 
 /**
- * dp_umac_reset_get_rx_event() - Extract the Rx event from the shared memory
+ * dp_umac_reset_get_rx_event_from_shmem() - Extract the Rx event from the
+ *                                           shared memory
  * @umac_reset_ctx: UMAC reset context
  *
  * Return: Extracted Rx event in the form of enumeration umac_reset_rx_event
