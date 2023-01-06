@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2016-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
  * above copyright notice and this permission notice appear in all
@@ -678,7 +678,7 @@ struct wlan_objmgr_peer *wlan_objmgr_get_peer_debug(
 #else
 struct wlan_objmgr_peer *wlan_objmgr_get_peer(
 			struct wlan_objmgr_psoc *psoc, uint8_t pdev_id,
-			uint8_t *macaddr, wlan_objmgr_ref_dbgid dbg_id);
+			const uint8_t *macaddr, wlan_objmgr_ref_dbgid dbg_id);
 #endif
 
 /**

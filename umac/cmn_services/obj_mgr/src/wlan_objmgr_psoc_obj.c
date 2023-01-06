@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2016-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -1390,7 +1390,7 @@ static struct wlan_objmgr_peer
 }
 #else
 static struct wlan_objmgr_peer *wlan_obj_psoc_peerlist_get_peer_by_pdev_id(
-				qdf_list_t *obj_list, uint8_t *macaddr,
+				qdf_list_t *obj_list, const uint8_t *macaddr,
 				uint8_t pdev_id, wlan_objmgr_ref_dbgid dbg_id)
 {
 	struct wlan_objmgr_peer *peer;
@@ -2116,7 +2116,7 @@ qdf_export_symbol(wlan_objmgr_get_peer_debug);
 #else
 struct wlan_objmgr_peer *wlan_objmgr_get_peer(
 			struct wlan_objmgr_psoc *psoc, uint8_t pdev_id,
-			uint8_t *macaddr, wlan_objmgr_ref_dbgid dbg_id)
+			const uint8_t *macaddr, wlan_objmgr_ref_dbgid dbg_id)
 {
 	struct wlan_objmgr_psoc_objmgr *objmgr;
 	uint8_t hash_index;
