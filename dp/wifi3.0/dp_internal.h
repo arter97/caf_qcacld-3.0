@@ -1072,14 +1072,26 @@ void DP_PRINT_STATS(const char *fmt, ...);
 #define DP_STATS_INIT(_handle) \
 	qdf_mem_zero(&((_handle)->stats), sizeof((_handle)->stats))
 
+#define DP_TXRX_PEER_STATS_INIT(_handle, size) \
+	qdf_mem_zero(&((_handle)->stats[0]), size)
+
 #define DP_STATS_CLR(_handle) \
 	qdf_mem_zero(&((_handle)->stats), sizeof((_handle)->stats))
+
+#define DP_TXRX_PEER_STATS_CLR(_handle, size) \
+	qdf_mem_zero(&((_handle)->stats[0]), size)
 
 #ifndef DISABLE_DP_STATS
 #define DP_STATS_INC(_handle, _field, _delta) \
 { \
 	if (likely(_handle)) \
 		_handle->stats._field += _delta; \
+}
+
+#define DP_PEER_LINK_STATS_INC(_handle, _field, _delta, _link) \
+{ \
+	if (likely(_handle)) \
+		_handle->stats[_link]._field += _delta; \
 }
 
 #define DP_PEER_STATS_FLAT_INC(_handle, _field, _delta) \
@@ -1092,6 +1104,12 @@ void DP_PRINT_STATS(const char *fmt, ...);
 { \
 	if (_cond && likely(_handle)) \
 		_handle->stats._field += _delta; \
+}
+
+#define DP_PEER_LINK_STATS_INCC(_handle, _field, _delta, _cond, _link) \
+{ \
+	if (_cond && likely(_handle)) \
+		_handle->stats[_link]._field += _delta; \
 }
 
 #define DP_STATS_DEC(_handle, _field, _delta) \
@@ -1110,6 +1128,12 @@ void DP_PRINT_STATS(const char *fmt, ...);
 { \
 	if (likely(_handle)) \
 		_handle->stats._field = _delta; \
+}
+
+#define DP_PEER_LINK_STATS_UPD(_handle, _field, _delta, _link) \
+{ \
+	if (likely(_handle)) \
+		_handle->stats[_link]._field = _delta; \
 }
 
 #define DP_STATS_INC_PKT(_handle, _field, _count, _bytes) \
@@ -1148,11 +1172,14 @@ void DP_PRINT_STATS(const char *fmt, ...);
 
 #else
 #define DP_STATS_INC(_handle, _field, _delta)
+#define DP_PEER_LINK_STATS_INC(_handle, _field, _delta, _link)
 #define DP_PEER_STATS_FLAT_INC(_handle, _field, _delta)
 #define DP_STATS_INCC(_handle, _field, _delta, _cond)
+#define DP_PEER_LINK_STATS_INCC(_handle, _field, _delta, _cond, _link)
 #define DP_STATS_DEC(_handle, _field, _delta)
 #define DP_PEER_STATS_FLAT_DEC(_handle, _field, _delta)
 #define DP_STATS_UPD(_handle, _field, _delta)
+#define DP_PEER_LINK_STATS_UPD(_handle, _field, _delta, _link)
 #define DP_STATS_INC_PKT(_handle, _field, _count, _bytes)
 #define DP_PEER_STATS_FLAT_INC_PKT(_handle, _field, _count, _bytes)
 #define DP_STATS_INCC_PKT(_handle, _field, _count, _bytes, _cond)
@@ -1160,47 +1187,47 @@ void DP_PRINT_STATS(const char *fmt, ...);
 #define DP_STATS_AGGR_PKT(_handle_a, _handle_b, _field)
 #endif
 
-#define DP_PEER_PER_PKT_STATS_INC(_handle, _field, _delta) \
+#define DP_PEER_PER_PKT_STATS_INC(_handle, _field, _delta, _link) \
 { \
-	DP_STATS_INC(_handle, per_pkt_stats._field, _delta); \
+	DP_PEER_LINK_STATS_INC(_handle, per_pkt_stats._field, _delta, _link); \
 }
 
-#define DP_PEER_PER_PKT_STATS_INCC(_handle, _field, _delta, _cond) \
+#define DP_PEER_PER_PKT_STATS_INCC(_handle, _field, _delta, _cond, _link) \
 { \
-	DP_STATS_INCC(_handle, per_pkt_stats._field, _delta, _cond); \
+	DP_PEER_LINK_STATS_INCC(_handle, per_pkt_stats._field, _delta, _cond, _link); \
 }
 
-#define DP_PEER_PER_PKT_STATS_INC_PKT(_handle, _field, _count, _bytes) \
+#define DP_PEER_PER_PKT_STATS_INC_PKT(_handle, _field, _count, _bytes, _link) \
 { \
-	DP_PEER_PER_PKT_STATS_INC(_handle, _field.num, _count); \
-	DP_PEER_PER_PKT_STATS_INC(_handle, _field.bytes, _bytes) \
+	DP_PEER_PER_PKT_STATS_INC(_handle, _field.num, _count, _link); \
+	DP_PEER_PER_PKT_STATS_INC(_handle, _field.bytes, _bytes, _link) \
 }
 
-#define DP_PEER_PER_PKT_STATS_INCC_PKT(_handle, _field, _count, _bytes, _cond) \
+#define DP_PEER_PER_PKT_STATS_INCC_PKT(_handle, _field, _count, _bytes, _cond, _link) \
 { \
-	DP_PEER_PER_PKT_STATS_INCC(_handle, _field.num, _count, _cond); \
-	DP_PEER_PER_PKT_STATS_INCC(_handle, _field.bytes, _bytes, _cond) \
+	DP_PEER_PER_PKT_STATS_INCC(_handle, _field.num, _count, _cond, _link); \
+	DP_PEER_PER_PKT_STATS_INCC(_handle, _field.bytes, _bytes, _cond, _link) \
 }
 
-#define DP_PEER_PER_PKT_STATS_UPD(_handle, _field, _delta) \
+#define DP_PEER_PER_PKT_STATS_UPD(_handle, _field, _delta, _link) \
 { \
-	DP_STATS_UPD(_handle, per_pkt_stats._field, _delta); \
+	DP_PEER_LINK_STATS_UPD(_handle, per_pkt_stats._field, _delta, _link); \
 }
 
 #ifndef QCA_ENHANCED_STATS_SUPPORT
-#define DP_PEER_EXTD_STATS_INC(_handle, _field, _delta) \
+#define DP_PEER_EXTD_STATS_INC(_handle, _field, _delta, _link) \
 { \
-	DP_STATS_INC(_handle, extd_stats._field, _delta); \
+	DP_PEER_LINK_STATS_INC(_handle, extd_stats._field, _delta, _link); \
 }
 
-#define DP_PEER_EXTD_STATS_INCC(_handle, _field, _delta, _cond) \
+#define DP_PEER_EXTD_STATS_INCC(_handle, _field, _delta, _cond, _link) \
 { \
-	DP_STATS_INCC(_handle, extd_stats._field, _delta, _cond); \
+	DP_PEER_LINK_STATS_INCC(_handle, extd_stats._field, _delta, _cond, _link); \
 }
 
-#define DP_PEER_EXTD_STATS_UPD(_handle, _field, _delta) \
+#define DP_PEER_EXTD_STATS_UPD(_handle, _field, _delta, _link) \
 { \
-	DP_STATS_UPD(_handle, extd_stats._field, _delta); \
+	DP_PEER_LINK_STATS_UPD(_handle, extd_stats._field, _delta, _link); \
 }
 #endif
 
@@ -1218,16 +1245,22 @@ void DP_PRINT_STATS(const char *fmt, ...);
 		DP_PEER_STATS_FLAT_DEC(_handle, to_stack.num, _count); \
 }
 
-#define DP_PEER_MC_INCC_PKT(_handle, _count, _bytes, _cond) \
+#define DP_PEER_MC_INCC_PKT(_handle, _count, _bytes, _cond, _link) \
 { \
 	if (_cond || !(_handle->hw_txrx_stats_en)) \
-		DP_PEER_PER_PKT_STATS_INC_PKT(_handle, rx.multicast, _count, _bytes); \
+		DP_PEER_PER_PKT_STATS_INC_PKT(_handle, rx.multicast, _count, _bytes, _link); \
 }
 
-#define DP_PEER_BC_INCC_PKT(_handle, _count, _bytes, _cond) \
+#define DP_PEER_BC_INCC_PKT(_handle, _count, _bytes, _cond, _link) \
 { \
 	if (_cond || !(_handle->hw_txrx_stats_en)) \
-		DP_PEER_PER_PKT_STATS_INC_PKT(_handle, rx.bcast, _count, _bytes); \
+		DP_PEER_PER_PKT_STATS_INC_PKT(_handle, rx.bcast, _count, _bytes, _link); \
+}
+
+#define DP_PEER_UC_INCC_PKT(_handle, _count, _bytes, _cond, _link) \
+{ \
+	if (_cond || !(_handle->hw_txrx_stats_en)) \
+		DP_PEER_PER_PKT_STATS_INC_PKT(_handle, rx.unicast, _count, _bytes, _link); \
 }
 #elif defined(QCA_VDEV_STATS_HW_OFFLOAD_SUPPORT)
 #define DP_PEER_TO_STACK_INCC_PKT(_handle, _count, _bytes, _cond) \
@@ -1242,16 +1275,22 @@ void DP_PRINT_STATS(const char *fmt, ...);
 		DP_PEER_STATS_FLAT_DEC(_handle, to_stack.num, _count); \
 }
 
-#define DP_PEER_MC_INCC_PKT(_handle, _count, _bytes, _cond) \
+#define DP_PEER_MC_INCC_PKT(_handle, _count, _bytes, _cond, _link) \
 { \
 	if (!(_handle->hw_txrx_stats_en)) \
-		DP_PEER_PER_PKT_STATS_INC_PKT(_handle, rx.multicast, _count, _bytes); \
+		DP_PEER_PER_PKT_STATS_INC_PKT(_handle, rx.multicast, _count, _bytes, _link); \
 }
 
-#define DP_PEER_BC_INCC_PKT(_handle, _count, _bytes, _cond) \
+#define DP_PEER_BC_INCC_PKT(_handle, _count, _bytes, _cond, _link) \
 { \
 	if (!(_handle->hw_txrx_stats_en)) \
-		DP_PEER_PER_PKT_STATS_INC_PKT(_handle, rx.bcast, _count, _bytes); \
+		DP_PEER_PER_PKT_STATS_INC_PKT(_handle, rx.bcast, _count, _bytes, _link); \
+}
+
+#define DP_PEER_UC_INCC_PKT(_handle, _count, _bytes, _cond, _link) \
+{ \
+	if (!(_handle->hw_txrx_stats_en)) \
+		DP_PEER_PER_PKT_STATS_INC_PKT(_handle, rx.unicast, _count, _bytes, _link); \
 }
 #else
 #define DP_PEER_TO_STACK_INCC_PKT(_handle, _count, _bytes, _cond) \
@@ -1260,11 +1299,14 @@ void DP_PRINT_STATS(const char *fmt, ...);
 #define DP_PEER_TO_STACK_DECC(_handle, _count, _cond) \
 	DP_PEER_STATS_FLAT_DEC(_handle, to_stack.num, _count);
 
-#define DP_PEER_MC_INCC_PKT(_handle, _count, _bytes, _cond) \
-	DP_PEER_PER_PKT_STATS_INC_PKT(_handle, rx.multicast, _count, _bytes);
+#define DP_PEER_MC_INCC_PKT(_handle, _count, _bytes, _cond, _link) \
+	DP_PEER_PER_PKT_STATS_INC_PKT(_handle, rx.multicast, _count, _bytes, _link);
 
-#define DP_PEER_BC_INCC_PKT(_handle, _count, _bytes, _cond) \
-	DP_PEER_PER_PKT_STATS_INC_PKT(_handle, rx.bcast, _count, _bytes);
+#define DP_PEER_BC_INCC_PKT(_handle, _count, _bytes, _cond, _link) \
+	DP_PEER_PER_PKT_STATS_INC_PKT(_handle, rx.bcast, _count, _bytes, _link);
+
+#define DP_PEER_UC_INCC_PKT(_handle, _count, _bytes, _cond, _link) \
+	DP_PEER_PER_PKT_STATS_INC_PKT(_handle, rx.unicast, _count, _bytes, _link);
 #endif
 
 #ifdef ENABLE_DP_HIST_STATS

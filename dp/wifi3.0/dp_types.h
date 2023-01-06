@@ -4174,6 +4174,8 @@ struct dp_mld_link_peers {
 	struct dp_peer *link_peers[DP_MAX_MLO_LINKS];
 	uint8_t num_links;
 };
+#else
+#define DP_MAX_MLO_LINKS 0
 #endif
 
 typedef void *dp_txrx_ref_handle;
@@ -4583,11 +4585,10 @@ struct dp_peer_stats {
  * @authorize: Set when authorized
  * @in_twt: in TWT session
  * @hw_txrx_stats_en: Indicate HW offload vdev stats
- * @mld_peer:1: MLD peer
+ * @is_mld_peer:1: MLD peer
  * @tx_failed: Total Tx failure
  * @comp_pkt: Pkt Info for which completions were received
  * @to_stack: Total packets sent up the stack
- * @stats: Peer stats
  * @delay_stats: Peer delay stats
  * @jitter_stats: Peer jitter stats
  * @security: Security credentials
@@ -4606,6 +4607,8 @@ struct dp_peer_stats {
  * @sawf_stats:
  * @bw: bandwidth of peer connection
  * @mpdu_retry_threshold: MPDU retry threshold to increment tx bad count
+ * @stats_arr_size: peer stats array size
+ * @stats: Peer link and mld statistics
  */
 struct dp_txrx_peer {
 	struct dp_vdev *vdev;
@@ -4613,12 +4616,10 @@ struct dp_txrx_peer {
 	uint8_t authorize:1,
 		in_twt:1,
 		hw_txrx_stats_en:1,
-		mld_peer:1;
+		is_mld_peer:1;
 	uint32_t tx_failed;
 	struct cdp_pkt_info comp_pkt;
 	struct cdp_pkt_info to_stack;
-
-	struct dp_peer_stats stats;
 
 	struct dp_peer_delay_stats *delay_stats;
 
@@ -4656,6 +4657,10 @@ struct dp_txrx_peer {
 	enum cdp_peer_bw bw;
 	uint8_t mpdu_retry_threshold;
 #endif
+	uint8_t stats_arr_size;
+
+	/* dp_peer_stats should be the last member in the structure */
+	struct dp_peer_stats stats[];
 };
 
 /* Peer structure for data path state */

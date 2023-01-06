@@ -7871,13 +7871,27 @@ static QDF_STATUS dp_txrx_peer_detach(struct dp_soc *soc, struct dp_peer *peer)
 	return QDF_STATUS_SUCCESS;
 }
 
+static inline
+uint8_t dp_txrx_peer_calculate_stats_size(struct dp_peer *peer)
+{
+	if (IS_MLO_DP_MLD_PEER(peer)) {
+		return (DP_MAX_MLO_LINKS + 1);
+	}
+	return 1;
+}
+
 static QDF_STATUS dp_txrx_peer_attach(struct dp_soc *soc, struct dp_peer *peer)
 {
 	struct dp_txrx_peer *txrx_peer;
 	struct dp_pdev *pdev;
 	struct cdp_txrx_peer_params_update params = {0};
+	uint8_t stats_arr_size = 0;
 
-	txrx_peer = (struct dp_txrx_peer *)qdf_mem_malloc(sizeof(*txrx_peer));
+	stats_arr_size = dp_txrx_peer_calculate_stats_size(peer);
+
+	txrx_peer = (struct dp_txrx_peer *)qdf_mem_malloc(sizeof(*txrx_peer) +
+							  (stats_arr_size *
+							   sizeof(struct dp_peer_stats)));
 
 	if (!txrx_peer)
 		return QDF_STATUS_E_NOMEM; /* failure */
@@ -7886,8 +7900,14 @@ static QDF_STATUS dp_txrx_peer_attach(struct dp_soc *soc, struct dp_peer *peer)
 	/* initialize the peer_id */
 	txrx_peer->vdev = peer->vdev;
 	pdev = peer->vdev->pdev;
+	txrx_peer->stats_arr_size = stats_arr_size;
 
-	DP_STATS_INIT(txrx_peer);
+	DP_TXRX_PEER_STATS_INIT(txrx_peer,
+				(txrx_peer->stats_arr_size *
+				sizeof(struct dp_peer_stats)));
+
+	if (!IS_DP_LEGACY_PEER(peer))
+		txrx_peer->is_mld_peer = 1;
 
 	dp_wds_ext_peer_init(txrx_peer);
 	dp_peer_rx_bufq_resources_init(txrx_peer);
@@ -7943,7 +7963,9 @@ void dp_txrx_peer_stats_clr(struct dp_txrx_peer *txrx_peer)
 	txrx_peer->to_stack.num = 0;
 	txrx_peer->to_stack.bytes = 0;
 
-	DP_STATS_CLR(txrx_peer);
+	DP_TXRX_PEER_STATS_CLR(txrx_peer,
+			       (txrx_peer->stats_arr_size *
+			       sizeof(struct dp_peer_stats)));
 	dp_peer_delay_stats_ctx_clr(txrx_peer);
 	dp_peer_jitter_stats_ctx_clr(txrx_peer);
 }
@@ -8308,7 +8330,7 @@ QDF_STATUS dp_peer_mlo_setup(
 		dp_link_peer_add_mld_peer(peer, mld_peer);
 		dp_mld_peer_add_link_peer(mld_peer, peer);
 
-		mld_peer->txrx_peer->mld_peer = 1;
+		mld_peer->txrx_peer->is_mld_peer = 1;
 		dp_peer_unref_delete(mld_peer, DP_MOD_ID_CDP);
 	} else {
 		peer->mld_peer = NULL;
