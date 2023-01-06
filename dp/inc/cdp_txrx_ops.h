@@ -1528,6 +1528,9 @@ void (*peer_send_wds_disconnect)(struct cdp_ctrl_objmgr_psoc *psoc,
 					  uint8_t vdev_id, uint8_t use_ppe,
 					  uint8_t routing_enabled);
 #endif /* WLAN_SUPPORT_PPEDS */
+#ifdef CONFIG_SAWF_DEF_QUEUES
+	int (*disable_sawf_svc)(uint8_t svc_id);
+#endif
 };
 
 #ifdef DP_PEER_EXTENDED_API
