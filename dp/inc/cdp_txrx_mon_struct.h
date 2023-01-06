@@ -17,9 +17,9 @@
  * PERFORMANCE OF THIS SOFTWARE.
  */
 
- /**
- * @file cdp_txrx_mon_struct.h
- * @brief Define the monitor mode API structure
+/**
+ * DOC: cdp_txrx_mon_struct.h
+ * Define the monitor mode API structure
  * shared by data path and the OS interface module
  */
 
@@ -44,7 +44,7 @@
 #define CDP_LITE_MON_PEER_MAC_TYPE_CLIENT 2
 
 /**
- * enum cdp_lite_mon legacy_filter: legacy filters for tx/rx
+ * enum cdp_lite_mon_legacy_filter - legacy filters for tx/rx
  * @LEGACY_FILTER_DISABLED: No filter / filter disabled
  * @LEGACY_FILTER_MCOPY: M_Copy filter
  * @LEGACY_FILTER_TX_CAPTURE: Tx_Capture filter
@@ -61,31 +61,37 @@ enum cdp_lite_mon_legacy_filter {
 	LEGACY_FILTER_ADV_MON_FILTER = 4,
 };
 
-/* lite mon frame levels */
+/**
+ * enum cdp_lite_mon_level- lite mon frame levels
+ * @CDP_LITE_MON_LEVEL_INVALID: level invalid
+ * @CDP_LITE_MON_LEVEL_MSDU: level msdu
+ * @CDP_LITE_MON_LEVEL_MPDU: level mpdu
+ * @CDP_LITE_MON_LEVEL_PPDU: level ppdu
+ */
 enum cdp_lite_mon_level {
-	/* level invalid */
 	CDP_LITE_MON_LEVEL_INVALID = 0,
-	/* level msdu */
 	CDP_LITE_MON_LEVEL_MSDU = 1,
-	/* level mpdu */
 	CDP_LITE_MON_LEVEL_MPDU = 2,
-	/* level ppdu */
 	CDP_LITE_MON_LEVEL_PPDU = 3,
 };
 
-/* lite mon peer action */
+/**
+ * enum cdp_lite_mon_peer_action- lite mon peer action
+ * @CDP_LITE_MON_PEER_ADD: peer add
+ * @CDP_LITE_MON_PEER_REMOVE: peer remove
+ */
 enum cdp_lite_mon_peer_action {
-	/* peer add */
 	CDP_LITE_MON_PEER_ADD = 0,
-	/* peer remove */
 	CDP_LITE_MON_PEER_REMOVE = 1,
 };
 
-/* lite mon config direction */
+/**
+ * enum cdp_lite_mon_direction - lite mon config direction
+ * @CDP_LITE_MON_DIRECTION_RX: lite mon config direction rx
+ * @CDP_LITE_MON_DIRECTION_TX: lite mon config direction tx
+ */
 enum cdp_lite_mon_direction {
-	/* lite mon config direction rx */
 	CDP_LITE_MON_DIRECTION_RX = 1,
-	/* lite mon config direction tx */
 	CDP_LITE_MON_DIRECTION_TX = 2,
 };
 #endif
@@ -309,7 +315,7 @@ enum {
 };
 
 #ifdef QCA_UNDECODED_METADATA_SUPPORT
-/**
+/*
  * enum cdp_mon_phyrx_abort_reason_code: Phy err code to store the reason
  * why PHY generated an abort request.
  */
@@ -400,8 +406,13 @@ enum cdp_mon_phyrx_abort_reason_code {
  * @status_ppdu_done: status ring PPDU done TLV count
  * @dest_ppdu_done: destination ring PPDU count
  * @dest_mpdu_done: destination ring MPDU count
+ * @dest_mpdu_drop:
  * @dup_mon_linkdesc_cnt: duplicate link descriptor indications from HW
  * @dup_mon_buf_cnt: duplicate buffer indications from HW
+ * @stat_ring_ppdu_id_hist:
+ * @dest_ring_ppdu_id_hist:
+ * @ppdu_id_hist_idx:
+ * @mon_rx_dest_stuck:
  * @tlv_tag_status_err: status not correct in the tlv tag
  * @status_buf_done_war: Number of status ring buffers for which DMA not done
  *  WAR is applied.
@@ -415,6 +426,7 @@ enum cdp_mon_phyrx_abort_reason_code {
  * @dest_ppdu_drop: Number of ppdu dropped from monitor destination ring
  * @mon_link_desc_invalid: msdu link desc invalid count
  * @mon_rx_desc_invalid: rx_desc invalid count
+ * @mon_nbuf_sanity_err:
  * @mpdu_ppdu_id_mismatch_drop: mpdu's ppdu id did not match destination
  *  ring ppdu id
  * @mpdu_decap_type_invalid: mpdu decap type invalid count
@@ -424,7 +436,7 @@ enum cdp_mon_phyrx_abort_reason_code {
  * @parent_buf_alloc: Numder of parent nbuf allocated for MPDU
  * @parent_buf_free: Number of parent nbuf freed
  * @pkt_buf_count: Number of packet buffers received
- * @mpdus_to_stack: Number of MPDUs delivered to stack
+ * @mpdus_buf_to_stack: Number of MPDUs delivered to stack
  * @status_buf_count: Number of status buffer received
  * @empty_desc_ppdu: Number of empty desc received
  * @total_ppdu_info_enq: Number of PPDUs enqueued to wq
@@ -498,7 +510,7 @@ struct cdp_pdev_mon_stats {
 
 #ifdef QCA_SUPPORT_LITE_MONITOR
 /**
- * cdp_lite_mon_filter_config - lite mon set/get filter config
+ * struct cdp_lite_mon_filter_config - lite mon set/get filter config
  * @direction: direction tx/rx
  * @disable: disables lite mon
  * @level: MSDU/MPDU/PPDU levels
@@ -526,7 +538,7 @@ struct cdp_lite_mon_filter_config {
 };
 
 /**
- * cdp_lite_mon_peer_config - lite mon set peer config
+ * struct cdp_lite_mon_peer_config - lite mon set peer config
  * @direction: direction tx/rx
  * @action: add/del
  * @vdev_id: peer vdev id
@@ -540,7 +552,7 @@ struct cdp_lite_mon_peer_config {
 };
 
 /**
- * cdp_lite_mon_peer_info - lite mon get peer config
+ * struct cdp_lite_mon_peer_info - lite mon get peer config
  * @direction: direction tx/rx
  * @count: no of peers
  * @mac: peer macs
@@ -567,7 +579,8 @@ enum cdp_channel_width {
 	CHAN_WIDTH_MAX,
 };
 
-/* struct cdp_rssi_temp_off_param_dp
+/**
+ * struct cdp_rssi_temp_off_param_dp
  * @rssi_temp_offset: Temperature based rssi offset , send every 30 secs
  */
 
@@ -575,14 +588,14 @@ struct cdp_rssi_temp_off_param_dp {
 	int32_t rssi_temp_offset;
 };
 
-/*
+/**
  * struct cdp_rssi_dbm_conv_param_dp
  * @curr_bw: Current bandwidth
  * @curr_rx_chainmask: Current rx chainmask
  * @xbar_config: 4 bytes, used for BB to RF Chain mapping
  * @xlna_bypass_offset: Low noise amplifier bypass offset
  * @xlna_bypass_threshold: Low noise amplifier bypass threshold
- * @nfHwDbm: HW noise floor in dBm per chain, per 20MHz subband
+ * @nf_hw_dbm: HW noise floor in dBm per chain, per 20MHz subband
  */
 struct cdp_rssi_dbm_conv_param_dp {
 	uint32_t curr_bw;
@@ -593,7 +606,7 @@ struct cdp_rssi_dbm_conv_param_dp {
 	int8_t nf_hw_dbm[CDP_MAX_NUM_ANTENNA][CDP_MAX_20MHZ_SEGS];
 };
 
-/*
+/**
  * struct cdp_rssi_db2dbm_param_dp
  * @pdev_id: pdev_id
  * @rssi_temp_off_present: to check temp offset values present or not
@@ -610,8 +623,8 @@ struct cdp_rssi_db2dbm_param_dp {
 	struct cdp_rssi_dbm_conv_param_dp rssi_dbm_param;
 };
 
-/*
- * enum cdp_mon_reap_source: trigger source of the reap timer of
+/**
+ * enum cdp_mon_reap_source - trigger source of the reap timer of
  * monitor status ring
  * @CDP_MON_REAP_SOURCE_PKTLOG: pktlog
  * @CDP_MON_REAP_SOURCE_CFR: CFR

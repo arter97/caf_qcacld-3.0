@@ -18,8 +18,8 @@
  */
 
 /**
- * @file cdp_txrx_mon.h
- * @brief Define the monitor mode API functions
+ * DOC: cdp_txrx_mon.h
+ * Define the monitor mode API functions
  * called by the host control SW and the OS interface module
  */
 
@@ -70,12 +70,12 @@ cdp_deliver_tx_mgmt(ol_txrx_soc_handle soc, uint8_t pdev_id,
 }
 
 #ifdef QCA_SUPPORT_LITE_MONITOR
-/*
+/**
  * cdp_set_lite_mon_config() - Set lite monitor config/filter
  *
- *@soc: dp soc handle
- *@config: lite monitor config
- *@pdev_id: pdev id
+ * @soc: dp soc handle
+ * @config: lite monitor config
+ * @pdev_id: pdev id
  *
  * This API is used to enable/disable lite monitor feature
  *
@@ -100,12 +100,12 @@ cdp_set_lite_mon_config(ol_txrx_soc_handle soc,
 							   pdev_id);
 }
 
-/*
+/**
  * cdp_get_lite_mon_config() - Get lite monitor config
  *
- *@soc: dp soc handle
- *@config: lite monitor config
- *@pdev_id: pdev id
+ * @soc: dp soc handle
+ * @config: lite monitor config
+ * @pdev_id: pdev id
  *
  * This API is used to get lite monitor feature config
  *
@@ -130,12 +130,12 @@ cdp_get_lite_mon_config(ol_txrx_soc_handle soc,
 							   pdev_id);
 }
 
-/*
+/**
  * cdp_set_lite_mon_peer_config() - Set lite monitor peer config
  *
- *@soc: dp soc handle
- *@config: lite monitor peer config
- *@pdev_id: pdev id
+ * @soc: dp soc handle
+ * @config: lite monitor peer config
+ * @pdev_id: pdev id
  *
  * This API is used to add/del lite monitor peers
  *
@@ -160,12 +160,12 @@ cdp_set_lite_mon_peer_config(ol_txrx_soc_handle soc,
 								pdev_id);
 }
 
-/*
+/**
  * cdp_get_lite_mon_peer_config() - Get lite monitor peer list
  *
- *@soc: dp soc handle
- *@info: lite monitor peer info
- *@pdev_id: pdev id
+ * @soc: dp soc handle
+ * @info: lite monitor peer info
+ * @pdev_id: pdev id
  *
  * This API is used to get lite monitor peers
  *
@@ -190,12 +190,12 @@ cdp_get_lite_mon_peer_config(ol_txrx_soc_handle soc,
 								pdev_id);
 }
 
-/*
+/**
  * cdp_is_lite_mon_enabled() - Get lite monitor enable status
  *
- *@soc: dp soc handle
- *@pdev_id: pdev id
- *@dir: direction tx/rx
+ * @soc: dp soc handle
+ * @pdev_id: pdev id
+ * @dir: direction tx/rx
  *
  * This API is used to get lite monitor enable status
  *
@@ -249,7 +249,7 @@ cdp_get_lite_mon_legacy_feature_enabled(ol_txrx_soc_handle soc,
 #endif
 
 #ifdef QCA_RSSI_DB2DBM
-/*
+/**
  * cdp_set_params_rssi_dbm_conversion - Set the rssi dbm conversion params
  *					into dp_pdev structure
  * @soc: soc txrx handler

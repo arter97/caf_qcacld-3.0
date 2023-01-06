@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -80,7 +80,7 @@ cdp_sawf_peer_get_map_conf(ol_txrx_soc_handle soc,
 /**
  * cdp_get_peer_sawf_delay_stats() - Call to get SAWF delay stats
  * @soc: soc handle
- * @svc_class_id: service class ID
+ * @svc_id: service class ID
  * @mac: peer mac address
  * @data: opaque pointer
  *
@@ -107,7 +107,7 @@ cdp_get_peer_sawf_delay_stats(ol_txrx_soc_handle soc, uint32_t svc_id,
 /**
  * cdp_get_peer_sawf_tx_stats() - Call to get SAWF Tx stats
  * @soc: soc handle
- * @svc_class_id: service class ID
+ * @svc_id: service class ID
  * @mac: peer mac address
  * @data: opaque pointer
  *
@@ -179,6 +179,7 @@ cdp_sawf_mpdu_details_stats_req(ol_txrx_soc_handle soc, uint8_t enable)
 
 /**
  * cdp_sawf_set_mov_avg_params - Set moving average pararms
+ * @soc: SOC handle
  * @num_pkt: No of packets per window to calucalte moving average
  * @num_win: No of windows to calucalte moving average
  *
@@ -205,6 +206,7 @@ cdp_sawf_set_mov_avg_params(ol_txrx_soc_handle soc,
 
 /**
  * cdp_sawf_set_sla_params - Set SLA pararms
+ * @soc: SOC handle
  * @num_pkt: No of packets to detect SLA breach
  * @time_secs: Time ins secs to detect breach
  *
@@ -230,7 +232,8 @@ cdp_sawf_set_sla_params(ol_txrx_soc_handle soc,
 }
 
 /**
- * cdp_sawf_init_telemetry_param - Initialize telemetry pararms
+ * cdp_sawf_init_telemtery_params() - Initialize telemetry pararms
+ * @soc: SOC handle
  *
  * Return: none
  */
@@ -340,9 +343,9 @@ cdp_sawf_peer_config_ul(ol_txrx_soc_handle soc, uint8_t *mac_addr, uint8_t tid,
 						  add_or_sub);
 }
 
-/*
+/**
  * cdp_swaf_peer_is_sla_configured() - Check if sla is configured for a peer
- * @soc_hdl: SOC handle
+ * @soc: SOC handle
  * @mac_addr: peer mac address
  *
  * Return: true is peer is sla configured

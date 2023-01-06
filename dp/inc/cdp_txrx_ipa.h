@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2016-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -18,8 +18,8 @@
  */
 
 /**
- * @file cdp_txrx_ipa.h
- * @brief Define the host data path IP Acceleraor API functions
+ * DOC: cdp_txrx_ipa.h
+ *      Define the host data path IP Acceleraor API functions
  */
 #ifndef _CDP_TXRX_IPA_H_
 #define _CDP_TXRX_IPA_H_
@@ -36,8 +36,8 @@
 
 /**
  * cdp_ipa_get_resource() - Get allocated WLAN resources for IPA data path
- * @soc - data path soc handle
- * @pdev_id - device instance id
+ * @soc: data path soc handle
+ * @pdev_id: device instance id
  *
  * Get allocated WLAN resources for IPA data path
  *
@@ -60,8 +60,8 @@ cdp_ipa_get_resource(ol_txrx_soc_handle soc, uint8_t pdev_id)
 
 /**
  * cdp_ipa_set_doorbell_paddr() - give IPA db paddr to FW
- * @soc - data path soc handle
- * @pdev_id - device instance id
+ * @soc: data path soc handle
+ * @pdev_id: device instance id
  *
  * give IPA db paddr to FW
  *
@@ -84,8 +84,8 @@ cdp_ipa_set_doorbell_paddr(ol_txrx_soc_handle soc, uint8_t pdev_id)
 
 /**
  * cdp_ipa_iounmap_doorbell_vaddr() - unmap IPA RX db vaddr
- * @soc - data path soc handle
- * @pdev_id - device instance id
+ * @soc: data path soc handle
+ * @pdev_id: device instance id
  *
  * Unmap IPA RX db vaddr
  *
@@ -109,10 +109,10 @@ cdp_ipa_iounmap_doorbell_vaddr(ol_txrx_soc_handle soc, uint8_t pdev_id)
 
 /**
  * cdp_ipa_set_active() - activate/de-ctivate IPA offload path
- * @soc - data path soc handle
- * @pdev_id - device instance id
- * @uc_active - activate or de-activate
- * @is_tx - toggle tx or rx data path
+ * @soc: data path soc handle
+ * @pdev_id: device instance id
+ * @uc_active: activate or de-activate
+ * @is_tx: toggle tx or rx data path
  *
  * activate/de-ctivate IPA offload path
  *
@@ -137,9 +137,9 @@ cdp_ipa_set_active(ol_txrx_soc_handle soc, uint8_t pdev_id, bool uc_active,
 
 /**
  * cdp_ipa_op_response() - event handler from FW
- * @soc - data path soc handle
- * @pdev_id - device instance id
- * @op_msg - event contents from firmware
+ * @soc: data path soc handle
+ * @pdev_id: device instance id
+ * @op_msg: event contents from firmware
  *
  * event handler from FW
  *
@@ -162,10 +162,10 @@ cdp_ipa_op_response(ol_txrx_soc_handle soc, uint8_t pdev_id, uint8_t *op_msg)
 
 /**
  * cdp_ipa_register_op_cb() - register event handler function pointer
- * @soc - data path soc handle
- * @pdev_id - device instance id
- * @op_cb - event handler callback function pointer
- * @usr_ctxt - user context to registered
+ * @soc: data path soc handle
+ * @pdev_id: device instance id
+ * @op_cb: event handler callback function pointer
+ * @usr_ctxt: user context to registered
  *
  * register event handler function pointer
  *
@@ -190,8 +190,8 @@ cdp_ipa_register_op_cb(ol_txrx_soc_handle soc, uint8_t pdev_id,
 
 /**
  * cdp_ipa_deregister_op_cb() - deregister event handler function pointer
- * @soc - data path soc handle
- * @pdev_id - device instance id
+ * @soc: data path soc handle
+ * @pdev_id: device instance id
  *
  * Deregister event handler function pointer from pdev
  *
@@ -212,8 +212,8 @@ void cdp_ipa_deregister_op_cb(ol_txrx_soc_handle soc, uint8_t pdev_id)
 
 /**
  * cdp_ipa_get_stat() - get IPA data path stats from FW
- * @soc - data path soc handle
- * @pdev_id - device instance id
+ * @soc: data path soc handle
+ * @pdev_id: device instance id
  *
  * get IPA data path stats from FW async
  *
@@ -235,8 +235,8 @@ cdp_ipa_get_stat(ol_txrx_soc_handle soc, uint8_t pdev_id)
 }
 
 /**
- * cdp_tx_send_ipa_data_frame() - send IPA data frame
- * @soc - data path soc handle
+ * cdp_ipa_tx_send_data_frame() - send IPA data frame
+ * @soc: data path soc handle
  * @vdev_id: vdev id
  * @skb: skb
  *
@@ -260,7 +260,7 @@ static inline qdf_nbuf_t cdp_ipa_tx_send_data_frame(ol_txrx_soc_handle soc,
 
 /**
  * cdp_ipa_set_uc_tx_partition_base() - set tx packet partition base
- * @soc - data path soc handle
+ * @soc: data path soc handle
  * @cfg_pdev: physical device instance config
  * @value: partition base value
  *
@@ -286,7 +286,7 @@ cdp_ipa_set_uc_tx_partition_base(ol_txrx_soc_handle soc,
 #ifdef FEATURE_METERING
 /**
  * cdp_ipa_uc_get_share_stats() - get Tx/Rx byte stats from FW
- * @soc - data path soc handle
+ * @soc: data path soc handle
  * @pdev_id: physical device instance number
  * @value: reset stats
  *
@@ -311,7 +311,7 @@ cdp_ipa_uc_get_share_stats(ol_txrx_soc_handle soc, uint8_t pdev_id,
 
 /**
  * cdp_ipa_uc_set_quota() - set quota limit to FW
- * @soc - data path soc handle
+ * @soc: data path soc handle
  * @pdev_id: physical device instance number
  * @value: quota limit bytes
  *
@@ -575,8 +575,8 @@ cdp_ipa_cleanup_iface(ol_txrx_soc_handle soc, char *ifname,
 
  /**
  * cdp_ipa_uc_enable_pipes() - Enable and resume traffic on Tx/Rx pipes
- * @soc - data path soc handle
- * @pdev_id - device instance id
+ * @soc: data path soc handle
+ * @pdev_id: device instance id
  * @hdl: IPA handle
  *
  * Return: QDF_STATUS
@@ -598,9 +598,9 @@ cdp_ipa_enable_pipes(ol_txrx_soc_handle soc, uint8_t pdev_id,
 }
 
 /**
- * cdp_ipa_uc_disable_pipes() - Suspend traffic and disable Tx/Rx pipes
+ * cdp_ipa_disable_pipes() - Suspend traffic and disable Tx/Rx pipes
  * @soc: data path soc handle
- * @pdev_id - device instance id
+ * @pdev_id: device instance id
  * @hdl: IPA handle
  *
  * Return: QDF_STATUS
@@ -768,7 +768,7 @@ cdp_ipa_ast_create(ol_txrx_soc_handle soc, qdf_ipa_ast_info_type_t *data)
 #endif
 
 /**
- * cdp_ipa_update_peer_rx_stats - update peer rx stats
+ * cdp_ipa_update_peer_rx_stats() - update peer rx stats
  * @soc: data path soc handle
  * @vdev_id: vdev id
  * @peer_mac: Peer Mac Address
