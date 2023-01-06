@@ -89,6 +89,7 @@
 #include "wlan_cm_roam_api.h"
 #include "wlan_cm_api.h"
 #include "wlan_mlo_link_force.h"
+#include <target_if_spatial_reuse.h>
 
 /* Max debug string size for WMM in bytes */
 #define WMA_WMM_DEBUG_STRING_SIZE    512
@@ -2552,7 +2553,7 @@ QDF_STATUS wma_set_ap_vdev_up(tp_wma_handle wma, uint8_t vdev_id)
 	wma_set_sap_keepalive(wma, vdev_id);
 	wma_set_vdev_mgmt_rate(wma, vdev_id);
 	wma_vdev_set_he_bss_params(wma, vdev_id, &mlme_obj->proto.he_ops_info);
-	wma_sr_update(wma, vdev_id, true);
+	mlme_sr_update(vdev, true);
 
 	return status;
 }

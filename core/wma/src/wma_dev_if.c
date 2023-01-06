@@ -2507,7 +2507,8 @@ void wma_send_del_bss_response(tp_wma_handle wma, struct del_bss_resp *resp)
 	}
 }
 
-void wma_send_vdev_down(tp_wma_handle wma, struct del_bss_resp *resp)
+QDF_STATUS
+wma_send_vdev_down(tp_wma_handle wma, struct del_bss_resp *resp)
 {
 	uint8_t vdev_id;
 	struct wma_txrx_node *iface = &wma->interfaces[resp->vdev_id];
@@ -2515,8 +2516,8 @@ void wma_send_vdev_down(tp_wma_handle wma, struct del_bss_resp *resp)
 	QDF_STATUS status;
 
 	if (!resp) {
-		wma_err("req is NULL");
-		return;
+		wma_err("resp is NULL");
+		return QDF_STATUS_E_NULL_VALUE;
 	}
 
 	vdev_id = resp->vdev_id;
@@ -2524,19 +2525,21 @@ void wma_send_vdev_down(tp_wma_handle wma, struct del_bss_resp *resp)
 	if (QDF_IS_STATUS_ERROR(status)) {
 		wma_err("Failed to get vdev stop type");
 		qdf_mem_free(resp);
-		return;
+		return status;
 	}
 
 	if (vdev_stop_type != WMA_DELETE_BSS_HO_FAIL_REQ) {
-		if (wma_send_vdev_down_to_fw(wma, vdev_id) !=
-		    QDF_STATUS_SUCCESS)
+		status = wma_send_vdev_down_to_fw(wma, vdev_id);
+		if (QDF_IS_STATUS_ERROR(status))
 			wma_err("Failed to send vdev down cmd: vdev %d", vdev_id);
 		else
 			wma_check_and_find_mcc_ap(wma, vdev_id);
 	}
+
 	wlan_vdev_mlme_sm_deliver_evt(iface->vdev,
 				      WLAN_VDEV_SM_EV_DOWN_COMPLETE,
 				      sizeof(*resp), resp);
+	return status;
 }
 
 /**
