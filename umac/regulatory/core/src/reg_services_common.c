@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2014-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -4873,6 +4873,10 @@ QDF_STATUS reg_apply_puncture(struct wlan_objmgr_pdev *pdev,
 		is_puncture = BIT(i) & puncture_bitmap;
 		if (is_puncture) {
 			chan_enum = reg_get_chan_enum_for_freq(chan_cfreq);
+			if (reg_is_chan_enum_invalid(chan_enum)) {
+				reg_debug_rl("Invalid chan enum %d", chan_enum);
+				return QDF_STATUS_E_FAILURE;
+			}
 			mas_chan_list[chan_enum].is_static_punctured = true;
 		}
 		i++;
