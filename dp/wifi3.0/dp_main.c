@@ -8265,8 +8265,8 @@ QDF_STATUS dp_peer_mlo_setup(
 	if (!setup_info || !setup_info->mld_peer_mac)
 		return QDF_STATUS_SUCCESS;
 
-	dp_info("link peer:" QDF_MAC_ADDR_FMT "mld peer:" QDF_MAC_ADDR_FMT
-		"assoc_link %d, primary_link %d",
+	dp_info("link peer: " QDF_MAC_ADDR_FMT "mld peer: " QDF_MAC_ADDR_FMT
+		"first_link %d, primary_link %d",
 		QDF_MAC_ADDR_REF(peer->mac_addr.raw),
 		QDF_MAC_ADDR_REF(setup_info->mld_peer_mac),
 		setup_info->is_first_link,
@@ -8542,9 +8542,11 @@ dp_peer_setup_wifi3(struct cdp_soc_t *soc_hdl, uint8_t vdev_id,
 				   &reo_dest, &hash_based,
 				   &lmac_peer_id_msb);
 
-	dp_info("pdev: %d vdev :%d opmode:%u hash-based-steering:%d default-reo_dest:%u",
+	dp_info("pdev: %d vdev :%d opmode:%u peer %pK (" QDF_MAC_ADDR_FMT ") "
+		"hash-based-steering:%d default-reo_dest:%u",
 		pdev->pdev_id, vdev->vdev_id,
-		vdev->opmode, hash_based, reo_dest);
+		vdev->opmode, peer,
+		QDF_MAC_ADDR_REF(peer->mac_addr.raw), hash_based, reo_dest);
 
 	/*
 	 * There are corner cases where the AD1 = AD2 = "VAPs address"
