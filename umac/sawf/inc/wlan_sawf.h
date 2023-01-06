@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -456,4 +456,12 @@ void wlan_service_id_dec_peer_count(uint8_t svc_id);
  * Return: void
  */
 void wlan_service_id_inc_peer_count(uint8_t svc_id);
+
+/* wlan_disable_service_class() - Disable service class
+ *
+ * @svc_id : service-class id
+ *
+ * Return: void
+ */
+void wlan_disable_service_class(uint8_t svc_id);
 #endif
