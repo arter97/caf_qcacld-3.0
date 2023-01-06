@@ -4720,6 +4720,10 @@ __wlan_hdd_cfg80211_get_features(struct wiphy *wiphy,
 			MAX_CONCURRENT_CHAN_ON_5G))
 		goto nla_put_failure;
 
+	hdd_debug("feature flags:");
+	QDF_TRACE_HEX_DUMP(QDF_MODULE_ID_HDD, QDF_TRACE_LEVEL_DEBUG,
+			   feature_flags, sizeof(feature_flags));
+
 	return wlan_cfg80211_vendor_cmd_reply(skb);
 
 nla_put_failure:
