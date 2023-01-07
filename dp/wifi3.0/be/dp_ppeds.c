@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -142,6 +142,130 @@ static QDF_STATUS dp_ppeds_init_ppe_vp_tbl_be(struct dp_soc_be *be_soc)
 }
 
 /**
+ * dp_ppeds_deinit_ppe_vp_search_idx_tbl_be - PPE VP search index table dealoc
+ * @be_soc: BE SoC
+ *
+ * Deallocate the search index table
+ *
+ * Return: QDF_STATUS
+ */
+static void dp_ppeds_deinit_ppe_vp_search_idx_tbl_be(struct dp_soc_be *be_soc)
+{
+	if (be_soc->ppe_vp_search_idx_tbl)
+		qdf_mem_free(be_soc->ppe_vp_search_idx_tbl);
+}
+
+/**
+ * dp_ppeds_init_search_idx_tbl_be - PPE VP search index table  alloc
+ * @be_soc: BE SoC
+ *
+ * Allocate the search index table
+ *
+ * Return: QDF_STATUS
+ */
+static QDF_STATUS dp_ppeds_init_ppe_vp_search_idx_tbl_be(struct dp_soc_be *be_soc)
+{
+	int num_vp_search_idx_entries, i;
+
+	num_vp_search_idx_entries =
+		hal_tx_get_num_ppe_vp_search_idx_tbl_entries(be_soc->soc.hal_soc);
+
+	be_soc->ppe_vp_search_idx_tbl =
+		qdf_mem_malloc(num_vp_search_idx_entries *
+			       sizeof(*be_soc->ppe_vp_search_idx_tbl));
+
+	if (!be_soc->ppe_vp_search_idx_tbl)
+		return QDF_STATUS_E_NOMEM;
+
+	for (i = 0; i < num_vp_search_idx_entries; i++)
+		be_soc->ppe_vp_search_idx_tbl[i].is_configured = false;
+
+	return QDF_STATUS_SUCCESS;
+}
+
+/**
+ * dp_ppeds_alloc_vp_search_idx_tbl_entry_be() - allocate search idx table
+ * @be_soc: BE SoC
+ * @be_vdev: BE VAP
+ *
+ * PPE VP seach index table entry alloc
+ *
+ * Return: Return PPE VP index to be used
+ */
+static int dp_ppeds_alloc_vp_search_idx_tbl_entry_be(struct dp_soc_be *be_soc,
+					   struct dp_vdev_be *be_vdev)
+{
+	int num_ppe_vp_search_idx_max, i;
+
+	num_ppe_vp_search_idx_max =
+		hal_tx_get_num_ppe_vp_search_idx_tbl_entries(be_soc->soc.hal_soc);
+
+	qdf_mutex_acquire(&be_soc->ppe_vp_tbl_lock);
+	if (be_soc->num_ppe_vp_entries == num_ppe_vp_search_idx_max) {
+		qdf_mutex_release(&be_soc->ppe_vp_tbl_lock);
+		dp_err("Maximum ppe_vp search idx count reached for vap");
+		return -ENOSPC;
+	}
+
+	/*
+	 * Increase the count in atomic context.
+	 */
+	be_soc->num_ppe_vp_search_idx_entries++;
+
+	for (i = 0; i < num_ppe_vp_search_idx_max; i++) {
+		if (!be_soc->ppe_vp_search_idx_tbl[i].is_configured)
+			break;
+	}
+
+	/*
+	 * As we already found the current count not maxed out, we should
+	 * always find an non configured entry.
+	 */
+	qdf_assert_always(!(i == num_ppe_vp_search_idx_max));
+
+	be_soc->ppe_vp_search_idx_tbl[i].is_configured = true;
+	qdf_mutex_release(&be_soc->ppe_vp_tbl_lock);
+	return i;
+}
+
+/**
+ * dp_ppeds_dealloc_search_idx_tbl_entry_be() - PPE VP search idx table dealloc
+ * @be_soc: BE SoC
+ * @ppe_vp_search_idx: PPE VP search index number
+ *
+ * PPE VP search index table entry dealloc
+ *
+ * Return: void
+ */
+static void dp_ppeds_dealloc_vp_search_idx_tbl_entry_be(struct dp_soc_be *be_soc,
+					      int ppe_vp_search_idx)
+{
+	int num_ppe_vp_search_idx_max;
+
+	num_ppe_vp_search_idx_max =
+		hal_tx_get_num_ppe_vp_search_idx_tbl_entries(be_soc->soc.hal_soc);
+
+	if (ppe_vp_search_idx < 0 || ppe_vp_search_idx >= num_ppe_vp_search_idx_max) {
+		dp_err("INvalid PPE VP search table free index");
+		return;
+	}
+
+	/*
+	 * Release the current index for reuse.
+	 */
+	qdf_mutex_acquire(&be_soc->ppe_vp_tbl_lock);
+	if (!be_soc->ppe_vp_search_idx_tbl[ppe_vp_search_idx].is_configured) {
+		qdf_mutex_release(&be_soc->ppe_vp_tbl_lock);
+		dp_err("PPE VP search idx table is not configured at idx:%d", ppe_vp_search_idx);
+		return;
+	}
+
+	be_soc->ppe_vp_search_idx_tbl[ppe_vp_search_idx].is_configured = false;
+	be_soc->num_ppe_vp_search_idx_entries--;
+	qdf_mutex_release(&be_soc->ppe_vp_tbl_lock);
+}
+
+/**
  * dp_ppeds_get_vdev_vp_config_be() - Get the PPE vp config
  * @be_vdev: BE vdev
  * @vp_cfg: VP config
@@ -187,6 +311,7 @@ void dp_tx_ppeds_cfg_astidx_cache_mapping(struct dp_soc *soc,
 					  struct dp_vdev *vdev, bool peer_map)
 {
 	union hal_tx_ppe_idx_map_config ppeds_idx_mapping = {0};
+	struct dp_vdev_be *be_vdev = dp_get_be_vdev_from_dp_vdev(vdev);
 
 	if (vdev->opmode == wlan_op_mode_sta) {
 		/*
@@ -199,7 +324,7 @@ void dp_tx_ppeds_cfg_astidx_cache_mapping(struct dp_soc *soc,
 		}
 
 		hal_ppeds_cfg_ast_override_map_reg(soc->hal_soc,
-						   DP_PPEDS_STAMODE_ASTIDX_MAP_REG_IDX,
+						   be_vdev->ppe_vp_profile.search_idx_reg_num,
 						   &ppeds_idx_mapping);
 	}
 }
@@ -1069,15 +1194,29 @@ QDF_STATUS dp_ppeds_attach_vdev_be(struct cdp_soc_t *soc_hdl, uint8_t vdev_id,
 		return QDF_STATUS_E_RESOURCES;
 	}
 
+	/*
+	 * For STA mode AST override is used; So a index register table would be needed
+	 */
+	if (vdev->opmode == wlan_op_mode_sta) {
+		int ppe_vp_search_tbl_idx = dp_ppeds_alloc_vp_search_idx_tbl_entry_be(be_soc, be_vdev);
+		if (ppe_vp_search_tbl_idx < 0) {
+			dp_err("%p: Failed to allocate PPE VP search table idx for vdev_id:%d",
+				be_soc, vdev->vdev_id);
+			dp_ppeds_dealloc_vp_tbl_entry_be(be_soc, ppe_vp_idx);
+			ppe_ds_wlan_vp_free(be_soc->ppeds_handle, *ppe_vp_num);
+			be_vdev->ppe_vp_enabled = 0;
+			dp_vdev_unref_delete(soc, vdev, DP_MOD_ID_CDP);
+			return QDF_STATUS_E_RESOURCES;
+		}
+		vp_profile->search_idx_reg_num = ppe_vp_search_tbl_idx;
+	}
+
 	vp_profile->vp_num = *ppe_vp_num;
 	vp_profile->ppe_vp_num_idx = ppe_vp_idx;
 	vp_profile->to_fw = 0;
 	vp_profile->use_ppe_int_pri = 0;
 	vp_profile->drop_prec_enable = 0;
 
-	if (vdev->opmode == wlan_op_mode_sta)
-		be_vdev->ppe_vp_profile.search_idx_reg_num =
-					DP_PPEDS_STAMODE_ASTIDX_MAP_REG_IDX;
 
 	/*
 	 * For the sta mode fill up the index reg number.
@@ -1130,6 +1269,14 @@ void dp_ppeds_detach_vdev_be(struct cdp_soc_t *soc_hdl, uint8_t vdev_id)
 	}
 
 	ppe_ds_wlan_vp_free(be_soc->ppeds_handle, vp_profile->vp_num);
+
+
+	/*
+	 * For STA mode ast index table reg also needs to be cleaned
+	 */
+	if (vdev->opmode == wlan_op_mode_sta) {
+		dp_ppeds_dealloc_vp_search_idx_tbl_entry_be(be_soc, vp_profile->search_idx_reg_num);
+	}
 
 	dp_ppeds_dealloc_vp_tbl_entry_be(be_soc, vp_profile->ppe_vp_num_idx);
 
@@ -1415,6 +1562,8 @@ void dp_ppeds_detach_soc_be(struct dp_soc_be *be_soc)
 	ppe_ds_wlan_inst_free(be_soc->ppeds_handle);
 	be_soc->ppeds_handle = NULL;
 
+	dp_ppeds_deinit_ppe_vp_search_idx_tbl_be(be_soc);
+
 	dp_ppeds_deinit_ppe_vp_tbl_be(be_soc);
 }
 
@@ -1492,12 +1641,17 @@ QDF_STATUS dp_ppeds_attach_soc_be(struct dp_soc_be *be_soc)
 		goto fail3;
 	}
 
+	if (dp_ppeds_init_ppe_vp_search_idx_tbl_be(be_soc) != QDF_STATUS_SUCCESS) {
+		dp_err("%p: Failed to init ppe vp tbl", be_soc);
+		goto fail4;
+	}
+
 	be_soc->ppeds_handle =
 			ppe_ds_wlan_inst_alloc(&ppeds_ops,
 						   sizeof(struct dp_soc_be *));
 	if (!be_soc->ppeds_handle) {
 		dp_err("%p: Failed to allocate ppeds soc instance", be_soc);
-		goto fail4;
+		goto fail5;
 	}
 
 	dp_ppeds_add_napi_ctxt(be_soc);
@@ -1508,6 +1662,9 @@ QDF_STATUS dp_ppeds_attach_soc_be(struct dp_soc_be *be_soc)
 	dp_info("Allocated PPEDS handle\n");
 
 	return QDF_STATUS_SUCCESS;
+
+fail5:
+	dp_ppeds_deinit_ppe_vp_search_idx_tbl_be(be_soc);
 
 fail4:
 	dp_ppeds_deinit_ppe_vp_tbl_be(be_soc);
