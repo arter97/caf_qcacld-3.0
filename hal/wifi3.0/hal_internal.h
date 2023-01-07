@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2016-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -1211,6 +1211,8 @@ struct hal_hw_txrx_ops {
 	void (*hal_tx_ring_halt_set)(hal_soc_handle_t hal_soc_hdl);
 	void (*hal_tx_ring_halt_reset)(hal_soc_handle_t hal_soc_hdl);
 	bool (*hal_tx_ring_halt_poll)(hal_soc_handle_t hal_soc_hdl);
+	uint32_t (*hal_tx_get_num_ppe_vp_search_idx_tbl_entries)(
+					hal_soc_handle_t hal_soc_hdl);
 };
 
 /**

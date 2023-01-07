@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -784,6 +784,8 @@ static void hal_get_tqm_scratch_reg_qcn9224(hal_soc_handle_t hal_soc_hdl,
 
 #define LINK_DESC_SIZE (NUM_OF_DWORDS_RX_MSDU_LINK << 2)
 #define HAL_PPE_VP_ENTRIES_MAX 32
+#define HAL_PPE_VP_SEARCH_IDX_REG_MAX 8
+
 /**
  * hal_get_link_desc_size_9224(): API to get the link desc size
  *
@@ -1941,7 +1943,7 @@ static uint32_t hal_qcn9224_get_reo_qdesc_size(uint32_t ba_window_size, int tid)
 }
 
 /*
- * hal_tx_dump_ppe_vp_entry_9224()
+ * hal_tx_get_num_ppe_vp_tbl_entries_9224()
  * @hal_soc_hdl: HAL SoC handle
  *
  * Return: Number of PPE VP entries
@@ -1950,6 +1952,18 @@ static
 uint32_t hal_tx_get_num_ppe_vp_tbl_entries_9224(hal_soc_handle_t hal_soc_hdl)
 {
 	return HAL_PPE_VP_ENTRIES_MAX;
+}
+
+/*
+ * hal_tx_get_num_ppe_vp_search_idx_reg_entries_9224()
+ * @hal_soc_hdl: HAL SoC handle
+ *
+ * Return: Number of PPE VP search index registers
+ */
+static
+uint32_t hal_tx_get_num_ppe_vp_search_idx_reg_entries_9224(hal_soc_handle_t hal_soc_hdl)
+{
+	return HAL_PPE_VP_SEARCH_IDX_REG_MAX;
 }
 
 /**
@@ -2237,6 +2251,8 @@ static void hal_hw_txrx_ops_attach_qcn9224(struct hal_soc *hal_soc)
 					hal_tx_ppe2tcl_ring_halt_reset_9224;
 	hal_soc->ops->hal_tx_ring_halt_poll =
 					hal_tx_ppe2tcl_ring_halt_done_9224;
+	hal_soc->ops->hal_tx_get_num_ppe_vp_search_idx_tbl_entries =
+			hal_tx_get_num_ppe_vp_search_idx_reg_entries_9224;
 };
 
 /**
