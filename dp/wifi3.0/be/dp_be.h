@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -219,6 +219,14 @@ struct dp_ppe_vp_tbl_entry {
 };
 
 /**
+ * struct dp_ppe_vp_search_idx_tbl_entry - PPE Virtual search table entry
+ * @is_configured: Boolean that the entry is configured.
+ */
+struct dp_ppe_vp_search_idx_tbl_entry {
+	bool is_configured;
+};
+
+/**
  * struct dp_ppe_vp_profile - PPE direct switch profiler per vdev
  * @vp_num: Virtual port number
  * @ppe_vp_num_idx: Index to the PPE VP table entry
@@ -288,12 +296,17 @@ struct dp_ppeds_napi {
  * @reo2ppe_ring: REO2PPE ring
  * @ppe2tcl_ring: PPE2TCL ring
  * @ppe_vp_tbl: PPE VP table
+ * @ppe_vp_search_idx_tbl: PPE VP search idx table
  * @ppe_vp_tbl_lock: PPE VP table lock
  * @num_ppe_vp_entries : Number of PPE VP entries
  * @ipa_bank_id: TCL bank id used by IPA
  * @ppeds_tx_cc_ctx: Cookie conversion context for ppeds tx desc pool
  * @ppeds_tx_desc: PPEDS tx desc pool
  * @ppeds_handle: PPEDS soc instance handle
+ * @ppe_vp_tbl_lock: PPEDS VP table lock
+ * @num_ppe_vp_entries: PPEDS number of VP entries
+ * @num_ppe_vp_search_idx_entries: PPEDS VP search idx entries
+ * @irq_name: PPEDS VP irq names
  */
 struct dp_soc_be {
 	struct dp_soc soc;
@@ -315,12 +328,14 @@ struct dp_soc_be {
 	struct dp_srng ppe2tcl_ring;
 	struct dp_srng ppeds_wbm_release_ring;
 	struct dp_ppe_vp_tbl_entry *ppe_vp_tbl;
+	struct dp_ppe_vp_search_idx_tbl_entry *ppe_vp_search_idx_tbl;
 	struct dp_hw_cookie_conversion_t ppeds_tx_cc_ctx;
 	struct dp_ppeds_tx_desc_pool_s ppeds_tx_desc;
 	struct dp_ppeds_napi ppeds_napi_ctxt;
 	void *ppeds_handle;
 	qdf_mutex_t ppe_vp_tbl_lock;
 	uint8_t num_ppe_vp_entries;
+	uint8_t num_ppe_vp_search_idx_entries;
 	char irq_name[DP_PPE_INTR_MAX][DP_PPE_INTR_STRNG_LEN];
 #endif
 #ifdef WLAN_FEATURE_11BE_MLO
