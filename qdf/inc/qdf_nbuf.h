@@ -105,6 +105,7 @@
 #define EAPOL_PKT_LEN_OFFSET			16
 #define EAPOL_KEY_LEN_OFFSET			21
 #define EAPOL_KEY_DATA_LENGTH_OFFSET		111
+#define EAPOL_WPA_KEY_NONCE_OFFSET		31
 
 #define EAPOL_PACKET_TYPE_EAP                   0
 #define EAPOL_PACKET_TYPE_START                 1

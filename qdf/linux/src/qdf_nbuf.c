@@ -1524,7 +1524,7 @@ __qdf_nbuf_data_get_dhcp_subtype(uint8_t *data)
  * --------------------------------------
  *
  * Then, we can differentiate M1 from M3, M2 from M4 by below methods:
- * M2/M4: by keyDataLength being AES_BLOCK_SIZE for FILS and 0 otherwise.
+ * M2/M4: by keyDataLength or Nonce value being 0 for M4.
  * M1/M3: by the mic/encrKeyData bit in the keyinfo field.
  *
  * Return: subtype of the EAPOL packet.
@@ -1534,12 +1534,14 @@ __qdf_nbuf_data_get_eapol_key(uint8_t *data)
 {
 	uint16_t key_info, key_data_length;
 	enum qdf_proto_subtype subtype;
+	uint64_t *key_nonce;
 
 	key_info = qdf_ntohs((uint16_t)(*(uint16_t *)
 			(data + EAPOL_KEY_INFO_OFFSET)));
 
 	key_data_length = qdf_ntohs((uint16_t)(*(uint16_t *)
 				(data + EAPOL_KEY_DATA_LENGTH_OFFSET)));
+	key_nonce = (uint64_t *)(data + EAPOL_WPA_KEY_NONCE_OFFSET);
 
 	if (key_info & EAPOL_WPA_KEY_INFO_ACK)
 		if (key_info &
@@ -1549,9 +1551,8 @@ __qdf_nbuf_data_get_eapol_key(uint8_t *data)
 			subtype = QDF_PROTO_EAPOL_M1;
 	else
 		if (key_data_length == 0 ||
-		    (!(key_info & EAPOL_WPA_KEY_INFO_MIC) &&
-		     (key_info & EAPOL_WPA_KEY_INFO_ENCR_KEY_DATA) &&
-		     key_data_length == AES_BLOCK_SIZE))
+		    !((*key_nonce) || (*(key_nonce + 1)) ||
+		      (*(key_nonce + 2)) || (*(key_nonce + 3))))
 			subtype = QDF_PROTO_EAPOL_M4;
 		else
 			subtype = QDF_PROTO_EAPOL_M2;
