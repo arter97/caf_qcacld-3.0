@@ -964,6 +964,20 @@ static QDF_STATUS dp_pdev_detach_be(struct dp_pdev *pdev)
 	return QDF_STATUS_SUCCESS;
 }
 
+#ifdef INTRA_BSS_FWD_OFFLOAD
+static
+void dp_vdev_set_intra_bss(struct dp_soc *soc, uint16_t vdev_id, bool enable)
+{
+	soc->cdp_soc.ol_ops->vdev_set_intra_bss(soc->ctrl_psoc, vdev_id,
+						enable);
+}
+#else
+static
+void dp_vdev_set_intra_bss(struct dp_soc *soc, uint16_t vdev_id, bool enable)
+{
+}
+#endif
+
 static QDF_STATUS dp_vdev_attach_be(struct dp_soc *soc, struct dp_vdev *vdev)
 {
 	struct dp_soc_be *be_soc = dp_get_be_soc_from_dp_soc(soc);
@@ -996,6 +1010,8 @@ static QDF_STATUS dp_vdev_attach_be(struct dp_soc *soc, struct dp_vdev *vdev)
 		else
 			hal_tx_vdev_mcast_ctrl_set(soc->hal_soc, vdev->vdev_id,
 						   HAL_TX_MCAST_CTRL_MEC_NOTIFY);
+	} else if (vdev->ap_bridge_enabled) {
+		dp_vdev_set_intra_bss(soc, vdev->vdev_id, true);
 	}
 
 	dp_mlo_mcast_init(soc, vdev);

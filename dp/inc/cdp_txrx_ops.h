@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2017-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -1383,6 +1383,10 @@ struct ol_if_ops {
 	QDF_STATUS(*set_mec_timer)(struct cdp_ctrl_objmgr_psoc *psoc,
 				   uint8_t vdev_id, uint16_t mec_timer_val);
 
+#ifdef INTRA_BSS_FWD_OFFLOAD
+	void (*vdev_set_intra_bss)(struct cdp_ctrl_objmgr_psoc *psoc,
+				   uint16_t vdev_id, bool enable);
+#endif
 #ifdef ATH_SUPPORT_NAC_RSSI
 	int (*config_fw_for_nac_rssi)(struct cdp_ctrl_objmgr_psoc *psoc,
 				      uint8_t pdev_id,
