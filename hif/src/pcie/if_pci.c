@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2013-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -239,7 +239,7 @@ static void hif_pci_route_adrastea_interrupt(struct hif_pci_softc *sc)
 
 
 /**
- * pci_dispatch_ce_irq() - pci_dispatch_ce_irq
+ * pci_dispatch_interrupt() - PCI interrupt dispatcher
  * @scn: scn
  *
  * Return: N/A
@@ -487,6 +487,7 @@ inline void hif_pci_cancel_deferred_target_sleep(struct hif_softc *scn)
 /**
  * hif_targ_is_awake() - check to see if the target is awake
  * @hif_ctx: hif context
+ * @mem:
  *
  * emulation never goes to sleep
  *
@@ -499,7 +500,8 @@ static bool hif_targ_is_awake(struct hif_softc *hif_ctx, void *__iomem *mem)
 #else
 /**
  * hif_targ_is_awake() - check to see if the target is awake
- * @hif_ctx: hif context
+ * @scn: hif context
+ * @mem:
  *
  * Return: true if the targets clocks are on
  */
@@ -932,8 +934,8 @@ static void __hif_pci_dump_registers(struct hif_softc *scn)
 }
 
 /**
- * hif_dump_registers(): dump bus debug registers
- * @scn: struct hif_opaque_softc
+ * hif_pci_dump_registers(): dump bus debug registers
+ * @hif_ctx: struct hif_opaque_softc
  *
  * This function dumps hif bus debug registers
  *
@@ -1037,7 +1039,7 @@ static void hif_disable_power_gating(struct hif_opaque_softc *hif_ctx)
 
 /**
  * hif_enable_power_gating() - enable HW power gating
- * @hif_ctx: hif context
+ * @sc: hif context
  *
  * enables pcie L1 power states
  */
@@ -1053,8 +1055,9 @@ static void hif_enable_power_gating(struct hif_pci_softc *sc)
 }
 
 /**
- * hif_enable_power_management() - enable power management
- * @hif_ctx: hif context
+ * hif_pci_enable_power_management() - enable power management
+ * @hif_sc: hif context
+ * @is_packet_log_enabled:
  *
  * Enables runtime pm, aspm(PCI.. hif_enable_power_gating) and re-enabling
  * soc-sleep after driver load (hif_pci_target_sleep_state_adjust).
@@ -1095,7 +1098,7 @@ void hif_pci_enable_power_management(struct hif_softc *hif_sc,
 }
 
 /**
- * hif_disable_power_management() - disable power management
+ * hif_pci_disable_power_management() - disable power management
  * @hif_ctx: hif context
  *
  * Currently disables runtime pm. Should be updated to behave
@@ -1140,8 +1143,8 @@ void hif_pci_clear_stats(struct hif_softc *hif_ctx)
 
 #define ATH_PCI_PROBE_RETRY_MAX 3
 /**
- * hif_bus_open(): hif_bus_open
- * @scn: scn
+ * hif_pci_open(): hif_bus_open
+ * @hif_ctx: scn
  * @bus_type: bus type
  *
  * Return: n/a
@@ -1672,7 +1675,7 @@ done:
 }
 
 /**
- * hif_bus_configure() - configure the pcie bus
+ * hif_pci_bus_configure() - configure the pcie bus
  * @hif_sc: pointer to the hif context.
  *
  * return: 0 for success. nonzero for failure.
@@ -1788,7 +1791,8 @@ timer_free:
 }
 
 /**
- * hif_bus_close(): hif_bus_close
+ * hif_pci_close(): hif_bus_close
+ * @hif_sc: HIF context
  *
  * Return: n/a
  */
@@ -2153,11 +2157,10 @@ void hif_pci_deconfigure_grp_irq(struct hif_softc *scn)
 }
 
 /**
- * hif_nointrs(): disable IRQ
+ * hif_pci_nointrs(): disable IRQ
+ * @scn: struct hif_softc
  *
  * This function stops interrupt(s)
- *
- * @scn: struct hif_softc
  *
  * Return: none
  */
@@ -2206,11 +2209,10 @@ bool hif_pci_default_link_up(struct hif_target_info *tgt_info)
 		return false;
 }
 /**
- * hif_disable_bus(): hif_disable_bus
+ * hif_pci_disable_bus(): hif_disable_bus
+ * @scn: hif context
  *
  * This function disables the bus
- *
- * @bdev: bus dev
  *
  * Return: none
  */
@@ -2267,6 +2269,7 @@ void hif_pci_disable_bus(struct hif_softc *scn)
 #ifdef CONFIG_PLD_PCIE_CNSS
 /**
  * hif_pci_prevent_linkdown(): allow or permit linkdown
+ * @scn: hif context
  * @flag: true prevents linkdown, false allows
  *
  * Calls into the platform driver to vote against taking down the
@@ -2293,8 +2296,9 @@ void hif_pci_prevent_linkdown(struct hif_softc *scn, bool flag)
 
 #ifdef CONFIG_PCI_LOW_POWER_INT_REG
 /**
- * hif_pci_config_low_power_int_register(): configure pci low power
- * interrupt  register.
+ * hif_pci_config_low_power_int_register() - configure pci low power
+ *                                           interrupt register.
+ * @scn: hif context
  * @enable: true to enable the bits, false clear.
  *
  * Configure the bits INTR_L1SS and INTR_CLKPM of
@@ -2352,6 +2356,7 @@ static inline void hif_pci_config_low_power_int_register(struct hif_softc *scn,
 
 /**
  * hif_pci_bus_suspend(): prepare hif for suspend
+ * @scn: hif context
  *
  * Return: Errno
  */
@@ -2477,6 +2482,7 @@ bool hif_log_pcie_info(struct hif_softc *scn, uint8_t *data,
 
 /**
  * hif_pci_bus_resume(): prepare hif for resume
+ * @scn: hif context
  *
  * Return: Errno
  */
@@ -2675,8 +2681,9 @@ static int hif_log_soc_wakeup_timeout(struct hif_pci_softc *sc)
  *
  * Note: parameter wait_for_it has meaning only when waking (when sleep_ok==0).
  */
+
 /**
- * hif_target_sleep_state_adjust() - on-demand sleep/wake
+ * hif_pci_target_sleep_state_adjust() - on-demand sleep/wake
  * @scn: hif_softc pointer.
  * @sleep_ok: bool
  * @wait_for_it: bool
@@ -3528,11 +3535,9 @@ void hif_pci_reg_write32(struct hif_softc *hif_sc,
 
 /**
  * hif_configure_irq() - configure interrupt
+ * @scn: HIF context
  *
  * This function configures interrupt(s)
- *
- * @sc: PCIe control struct
- * @hif_hdl: struct HIF_CE_state
  *
  * Return: 0 - for success
  */
@@ -3767,15 +3772,15 @@ static void hif_pci_init_reg_windowing_support(struct hif_pci_softc *sc,
 #endif
 
 /**
- * hif_enable_bus(): enable bus
- *
- * This function enables the bus
- *
+ * hif_pci_enable_bus(): enable bus
  * @ol_sc: soft_sc struct
  * @dev: device pointer
  * @bdev: bus dev pointer
- * bid: bus id pointer
- * type: enum hif_enable_type such as HIF_ENABLE_TYPE_PROBE
+ * @bid: bus id pointer
+ * @type: enum hif_enable_type such as HIF_ENABLE_TYPE_PROBE
+ *
+ * This function enables the bus
+ *
  * Return: QDF_STATUS
  */
 QDF_STATUS hif_pci_enable_bus(struct hif_softc *ol_sc,
@@ -4007,7 +4012,7 @@ bool hif_pci_needs_bmi(struct hif_softc *scn)
 #ifdef FORCE_WAKE
 #if defined(DEVICE_FORCE_WAKE_ENABLE) && !defined(CONFIG_PLD_PCIE_FW_SIM)
 
-/**
+/*
  * HIF_POLL_UMAC_WAKE poll value to indicate if UMAC is powered up
  * Update the below macro with FW defined one.
  */

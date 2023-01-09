@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2016-2018, 2020-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -37,6 +37,7 @@
 
 /**
  * hif_initialize_default_ops() - initializes default operations values
+ * @hif_sc: hif_context
  *
  * bus specific features should assign their dummy implementations here.
  */
@@ -76,9 +77,10 @@ static void hif_initialize_default_ops(struct hif_softc *hif_sc)
 
 /**
  * hif_verify_basic_ops() - ensure required bus apis are defined
+ * @hif_sc: hif_context
  *
  * all bus operations must be defined to avoid crashes
- * itterate over the structure and ensure all function pointers
+ * iterate over the structure and ensure all function pointers
  * are non null.
  *
  * Return: QDF_STATUS_SUCCESS if all the operations are defined
@@ -101,6 +103,7 @@ static QDF_STATUS hif_verify_basic_ops(struct hif_softc *hif_sc)
 
 /**
  * hif_bus_get_context_size - API to return size of the bus specific structure
+ * @bus_type: bus type
  *
  * Return: sizeof of hif_pci_softc
  */
@@ -126,8 +129,8 @@ int hif_bus_get_context_size(enum qdf_bus_type bus_type)
 
 /**
  * hif_bus_open() - initialize the bus_ops and call the bus specific open
- * hif_sc: hif_context
- * bus_type: type of bus being enumerated
+ * @hif_sc: hif_context
+ * @bus_type: type of bus being enumerated
  *
  * Return: QDF_STATUS_SUCCESS or error
  */
@@ -185,7 +188,7 @@ void hif_bus_close(struct hif_softc *hif_sc)
 
 /**
  * hif_bus_prevent_linkdown() - prevent linkdown
- * @hif_ctx: hif context
+ * @hif_sc: hif context
  * @flag: true = keep bus alive false = let bus go to sleep
  *
  * Keeps the bus awake during suspend.
@@ -398,7 +401,7 @@ void hif_clear_bus_stats(struct hif_opaque_softc *scn)
 /**
  * hif_enable_power_management() - enable power management after driver load
  * @hif_hdl: opaque pointer to the hif context
- * is_packet_log_enabled: true if packet log is enabled
+ * @is_packet_log_enabled: true if packet log is enabled
  *
  * Driver load and firmware download are done in a high performance mode.
  * Enable power management after the driver is loaded.

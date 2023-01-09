@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2013-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -52,7 +52,7 @@ static struct hif_rtpm_ctx *gp_hif_rtpm_ctx;
 
 /**
  * hif_rtpm_id_to_string() - Convert dbgid to respective string
- * @id -  debug id
+ * @id: debug id
  *
  * Debug support function to convert  dbgid to string.
  * Please note to add new string in the array at index equal to
@@ -81,7 +81,6 @@ static const char *hif_rtpm_id_to_string(enum hif_rtpm_client_id id)
 
 /**
  * hif_rtpm_read_usage_count() - Read device usage count
- * @dev: device structure
  *
  * Return: current usage count
  */
@@ -178,8 +177,8 @@ static int hif_rtpm_debugfs_show(struct seq_file *s, void *data)
 
 /**
  * hif_rtpm_debugfs_open() - open a debug fs file to access the runtime pm stats
- * @inode
- * @file
+ * @inode:
+ * @file:
  *
  * Return: linux error code of single_open.
  */
@@ -199,7 +198,6 @@ static const struct file_operations hif_rtpm_fops = {
 
 /**
  * hif_rtpm_debugfs_create() - creates runtimepm debugfs entry
- * @scn: hif context
  *
  * creates a debugfs entry to debug the runtime pm feature.
  */
@@ -214,7 +212,6 @@ static void hif_rtpm_debugfs_create(void)
 
 /**
  * hif_rtpm_debugfs_remove() - removes runtimepm debugfs entry
- * @scn: pci context
  *
  * removes the debugfs entry to debug the runtime pm feature.
  */
@@ -350,7 +347,7 @@ static void hif_rtpm_sanitize_exit(void)
 }
 
 /**
- * hif_rtpm_sanitize_on_ssr_exit() - Empty the suspend list on SSR
+ * hif_rtpm_sanitize_ssr_exit() - Empty the suspend list on SSR
  *
  * API is used to empty the runtime pm prevent suspend list.
  *

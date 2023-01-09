@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2013-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -48,8 +48,13 @@ enum hif_rtpm_state {
  * @suspend_ts: Last suspend call timestamp
  * @suspend_err_ts: Last suspend call fail timestamp
  * @last_busy_ts: Last busy timestamp marked
+ * @last_busy_id:
+ * @last_busy_marker:
  * @request_resume_ts: Last request resume done timestamp
- * @request_resume_ts: Client ID requesting resume
+ * @request_resume_id: Client ID requesting resume
+ * @prevent_suspend:
+ * @allow_suspend:
+ * @runtime_get_err:
  */
 struct hif_rtpm_state_stats {
 	uint32_t resume_count;
@@ -86,14 +91,13 @@ struct hif_rtpm_last_busy_hist {
 /**
  * struct hif_rtpm_client - Runtime PM client structure
  * @hif_rtpm_cbk: Callback during resume if get called at suspend and failed
- * @prevent_multiple_get: Client restricted to not calling get and put calls
- *                        simultaneously
  * @active_count: current active status of client
  * @get_count: count of get calls by this client
  * @put_count: count of put calls by this client
+ * @last_busy_cnt:
  * @get_ts: Last get called timestamp
  * @put_ts: Last put called timestamp
- * @request_resume_ts: client request resume timestamp
+ * @last_busy_ts:
  */
 struct hif_rtpm_client {
 	void (*hif_rtpm_cbk)(void);
@@ -108,15 +112,23 @@ struct hif_rtpm_client {
 
 /**
  * struct hif_rtpm_ctx - Runtime power management context
+ * @enable_rpm:
+ * @dev:
  * @runtime_lock: Lock to sync state changes with get calls
  * @runtime_suspend_lock: Suspend lock
  * @client_count: Number of clients currently registered
  * @clients: clients registered to use runtime PM module
+ * @prevent_list_lock:
+ * @prevent_list:
+ * @prevent_cnt:
  * @pm_state: Current runtime pm state
  * @pending_job: bitmap to set the client job to be called at resume
  * @monitor_wake_intr: Monitor waking MSI for runtime PM
  * @stats: Runtime PM stats
- * @pm_entry: debug fs entry
+ * @pm_dentry: debug fs entry
+ * @cfg_delay:
+ * @delay:
+ * @busy_hist: busy histogram
  */
 struct hif_rtpm_ctx {
 	bool enable_rpm;
@@ -251,7 +263,7 @@ static inline void __hif_rtpm_mark_last_busy(struct device *dev)
 
 /**
  * __hif_rtpm_resume() - Do Runtime PM Resume of bus
- * dev: device structure
+ * @dev: device structure
  *
  * Return: 0 if success. Error otherwise
  */
@@ -262,7 +274,7 @@ static inline int __hif_rtpm_resume(struct device *dev)
 
 /**
  * __hif_rtpm_request_resume() - Queue resume work
- * dev: device structure
+ * @dev: device structure
  *
  * Return: 1 if already active. 0 if successfully queued. Error otherwise
  */

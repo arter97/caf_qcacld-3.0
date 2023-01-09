@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2015-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -110,12 +110,11 @@ static void hif_deinit_rx_thread_napi(struct qca_napi_info *napii)
 
 /**
  * hif_napi_create() - creates the NAPI structures for a given CE
- * @hif    : pointer to hif context
- * @pipe_id: the CE id on which the instance will be created
- * @poll   : poll function to be used for this NAPI instance
- * @budget : budget to be registered with the NAPI instance
- * @scale  : scale factor on the weight (to scaler budget to 1000)
- * @flags  : feature flags
+ * @hif_ctx: pointer to hif context
+ * @poll: poll function to be used for this NAPI instance
+ * @budget: budget to be registered with the NAPI instance
+ * @scale: scale factor on the weight (to scaler budget to 1000)
+ * @flags: feature flags
  *
  * Description:
  *    Creates NAPI instances. This function is called
@@ -314,11 +313,10 @@ void hif_napi_rx_offld_flush_cb_deregister(struct hif_opaque_softc *hif_hdl)
 #endif /* RECEIVE_OFFLOAD */
 
 /**
- *
  * hif_napi_destroy() - destroys the NAPI structures for a given instance
- * @hif   : pointer to hif context
- * @ce_id : the CE id whose napi instance will be destroyed
- * @force : if set, will destroy even if entry is active (de-activates)
+ * @hif_ctx: pointer to hif context
+ * @id: the CE id whose napi instance will be destroyed
+ * @force: if set, will destroy even if entry is active (de-activates)
  *
  * Description:
  *    Destroy a given NAPI instance. This function is called
@@ -430,9 +428,8 @@ void *hif_napi_get_lro_info(struct hif_opaque_softc *hif_hdl, int napi_id)
 #endif
 
 /**
- *
  * hif_napi_get_all() - returns the address of the whole HIF NAPI structure
- * @hif: pointer to hif context
+ * @hif_ctx: pointer to hif context
  *
  * Description:
  *    Returns the address of the whole structure
@@ -455,10 +452,9 @@ struct qca_napi_info *hif_get_napi(int napi_id, struct qca_napi_data *napid)
 }
 
 /**
- *
  * hif_napi_event() - reacts to events that impact NAPI
- * @hif : pointer to hif context
- * @evnt: event that has been detected
+ * @hif_ctx: pointer to hif context
+ * @event: event that has been detected
  * @data: more data regarding the event
  *
  * Description:
@@ -701,8 +697,8 @@ qdf_export_symbol(hif_napi_event);
 
 /**
  * hif_napi_enabled() - checks whether NAPI is enabled for given ce or not
- * @hif: hif context
- * @ce : CE instance (or -1, to check if any CEs are enabled)
+ * @hif_ctx: hif context
+ * @ce: CE instance (or -1, to check if any CEs are enabled)
  *
  * Return: bool
  */
@@ -722,8 +718,8 @@ qdf_export_symbol(hif_napi_enabled);
 
 /**
  * hif_napi_created() - checks whether NAPI is created for given ce or not
- * @hif: hif context
- * @ce : CE instance
+ * @hif_ctx: hif context
+ * @ce: CE instance
  *
  * Return: bool
  */
@@ -742,7 +738,7 @@ qdf_export_symbol(hif_napi_created);
  * hif_napi_enable_irq() - enables bus interrupts after napi_complete
  *
  * @hif: hif context
- * @id : id of NAPI instance calling this (used to determine the CE)
+ * @id: id of NAPI instance calling this (used to determine the CE)
  *
  * Return: void
  */
@@ -756,7 +752,7 @@ inline void hif_napi_enable_irq(struct hif_opaque_softc *hif, int id)
 
 /**
  * hif_napi_schedule() - schedules napi, updates stats
- * @scn:  hif context
+ * @hif_ctx:  hif context
  * @ce_id: index of napi instance
  *
  * Return: false if napi didn't enable or already scheduled, otherwise true
@@ -858,7 +854,8 @@ static void hif_napi_offld_flush_cb(struct qca_napi_info *napi_info)
 
 /**
  * hif_napi_poll() - NAPI poll routine
- * @napi  : pointer to NAPI struct as kernel holds it
+ * @hif_ctx: HIF context
+ * @napi: pointer to NAPI struct as kernel holds it
  * @budget:
  *
  * This is the body of the poll function.
@@ -1008,10 +1005,8 @@ qdf_export_symbol(hif_update_napi_max_poll_time);
 
 #ifdef HIF_IRQ_AFFINITY
 /**
- *
  * hif_napi_update_yield_stats() - update NAPI yield related stats
- * @cpu_id: CPU ID for which stats needs to be updates
- * @ce_id: Copy Engine ID for which yield stats needs to be updates
+ * @ce_state: CE state structure
  * @time_limit_reached: indicates whether the time limit was reached
  * @rxpkt_thresh_reached: indicates whether rx packet threshold was reached
  *
@@ -1060,7 +1055,6 @@ void hif_napi_update_yield_stats(struct CE_state *ce_state,
 }
 
 /**
- *
  * hif_napi_stats() - display NAPI CPU statistics
  * @napid: pointer to qca_napi_data
  *
@@ -1107,6 +1101,10 @@ static void hnc_dump_cpus(struct qca_napi_data *napid)
 #else
 static void hnc_dump_cpus(struct qca_napi_data *napid) { /* no-op */ };
 #endif /* FEATURE_NAPI_DEBUG */
+
+#define HNC_MIN_CLUSTER 0
+#define HNC_MAX_CLUSTER 1
+
 /**
  * hnc_link_clusters() - partitions to cpu table into clusters
  * @napid: pointer to NAPI data
@@ -1127,8 +1125,6 @@ static void hnc_dump_cpus(struct qca_napi_data *napid) { /* no-op */ };
  * Return: 0 : OK
  *         !0: error (at least one of lil/big clusters could not be found)
  */
-#define HNC_MIN_CLUSTER 0
-#define HNC_MAX_CLUSTER 1
 static int hnc_link_clusters(struct qca_napi_data *napid)
 {
 	int rc = 0;
@@ -1304,8 +1300,8 @@ static void hnc_hotplug_unregister(struct hif_softc *hif_sc)
 }
 
 /**
- * hnc_install_tput() - installs a callback in the throughput detector
- * @register: !0 => register; =0: unregister
+ * hnc_tput_hook() - installs a callback in the throughput detector
+ * @install: !0 => install; =0: uninstall
  *
  * installs a callback to be called when wifi driver throughput (tx+rx)
  * crosses a threshold. Currently, we are using the same criteria as
@@ -1346,7 +1342,7 @@ static inline void record_sibling_cpumask(struct qca_napi_cpu *cpus, int i)
 
 /**
  * hif_napi_cpu_init() - initialization of irq affinity block
- * @ctx: pointer to qca_napi_data
+ * @hif: HIF context
  *
  * called by hif_napi_create, after the first instance is called
  * - builds napi_rss_cpus table from cpu topology
@@ -1414,6 +1410,7 @@ lab_rss_init:
 
 /**
  * hif_napi_cpu_deinit() - clean-up of irq affinity block
+ * @hif: HIF context
  *
  * called by hif_napi_destroy, when the last instance is removed
  * - uninstalls throughput and hotplug notifiers
@@ -1444,8 +1441,8 @@ int hif_napi_cpu_deinit(struct hif_opaque_softc *hif)
 /**
  * hncm_migrate_to() - migrates a NAPI to a CPU
  * @napid: pointer to NAPI block
- * @ce_id: CE_id of the NAPI instance
- * @didx : index in the CPU topology table for the CPU to migrate to
+ * @napi_ce: CE_id of the NAPI instance
+ * @didx: index in the CPU topology table for the CPU to migrate to
  *
  * Migrates NAPI (identified by the CE_id) to the destination core
  * Updates the napi_map of the destination entry
@@ -1487,7 +1484,7 @@ static int hncm_migrate_to(struct qca_napi_data *napid,
 /**
  * hncm_dest_cpu() - finds a destination CPU for NAPI
  * @napid: pointer to NAPI block
- * @act  : RELOCATE | COLLAPSE | DISPERSE
+ * @act: RELOCATE | COLLAPSE | DISPERSE
  *
  * Finds the designated destination for the next IRQ.
  * RELOCATE: translated to either COLLAPSE or DISPERSE based
@@ -1560,8 +1557,9 @@ retry_disperse:
 }
 /**
  * hif_napi_cpu_migrate() - migrate IRQs away
+ * @napid: pointer to NAPI block
  * @cpu: -1: all CPUs <n> specific CPU
- * @act: COLLAPSE | DISPERSE
+ * @action: COLLAPSE | DISPERSE
  *
  * Moves IRQs/NAPIs from specific or all CPUs (specified by @cpu) to eligible
  * cores. Eligible cores are:
@@ -1736,6 +1734,7 @@ out:
 	return rc;
 }
 
+static unsigned long napi_serialize_reqs;
 /**
  * hif_napi_serialize() - [de-]serialize NAPI operations
  * @hif:   context
@@ -1751,7 +1750,6 @@ out:
  * - at the end of the timer, check the current throughput state and
  *   implement it.
  */
-static unsigned long napi_serialize_reqs;
 int hif_napi_serialize(struct hif_opaque_softc *hif, int is_on)
 {
 	int rc = -EINVAL;

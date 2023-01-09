@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2013-2018, 2020 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -28,11 +29,9 @@
 
 #ifdef WLAN_FEATURE_FASTPATH
 /**
- * hif_send_fast() - API to access hif specific function
- * ce_send_fast.
+ * hif_send_fast() - API to access hif specific function ce_send_fast().
  * @osc: HIF Context
- * @msdu : array of msdus to be sent
- * @num_msdus : number of msdus in an array
+ * @nbuf: netork buffer to send
  * @transfer_id: transfer id
  * @download_len: download length
  *
@@ -51,6 +50,7 @@ qdf_export_symbol(hif_send_fast);
 
 /**
  * hif_ce_fastpath_cb_register() - Register callback for fastpath msg handler
+ * @hif_ctx: HIF context
  * @handler: Callback funtcion
  * @context: handle for callback function
  *

@@ -1,7 +1,6 @@
 /*
  * Copyright (c) 2013-2019 The Linux Foundation. All rights reserved.
- *
- *
+ * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -45,7 +44,7 @@
 /**
  * hif_dev_rw_completion_handler() - Completion routine
  * for ALL HIF layer async I/O
- * @context: hif send context
+ * @ctx: hif send context
  * @status: completion routine sync/async context
  *
  * Return: 0 for success and non-zero for failure
@@ -76,7 +75,7 @@ QDF_STATUS hif_dev_rw_completion_handler(void *ctx, QDF_STATUS status)
 
 /**
  * hif_dev_send_buffer() - send buffer to sdio device
- * @pDev: HIf device object
+ * @pdev: HIf device object
  * @xfer_id: transfer id
  * @pipe: ul/dl pipe
  * @nbytes: no of bytes to transfer
@@ -700,7 +699,7 @@ QDF_STATUS hif_dev_process_recv_header(struct hif_sdio_device *pdev,
 }
 
 /**
- * hif_dev_free_recv_pkt() - Free the allocated recv packets in the queue
+ * hif_dev_free_recv_pkt_queue() - Free the allocated recv packets in the queue
  * @recv_pkt_queue : The queue that contains the packets to be queued
  *
  * Return : NONE

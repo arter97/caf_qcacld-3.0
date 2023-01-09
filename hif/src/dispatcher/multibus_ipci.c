@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2020-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -25,7 +25,7 @@
 
 /**
  * hif_initialize_ipci_ops() - initialize the pci ops
- * @bus_ops: hif_bus_ops table pointer to initialize
+ * @hif_sc: hif_context
  *
  * Return: QDF_STATUS_SUCCESS
  */
@@ -98,7 +98,7 @@ QDF_STATUS hif_initialize_ipci_ops(struct hif_softc *hif_sc)
 /**
  * hif_ipci_get_context_size() - return the size of the ipci context
  *
- * Return the size of the context.  (0 for invalid bus)
+ * Return: the size of the context.  (0 for invalid bus)
  */
 int hif_ipci_get_context_size(void)
 {

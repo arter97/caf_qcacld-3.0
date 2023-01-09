@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2016-2018, 2020-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021, 2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -26,7 +26,7 @@
 #include "ce_api.h"
 
 /**
- * hif_initialize_pci_ops() - initialize the pci ops
+ * hif_initialize_snoc_ops() - initialize the pci ops
  * @bus_ops: hif_bus_ops table pointer to initialize
  *
  * Return: QDF_STATUS_SUCCESS

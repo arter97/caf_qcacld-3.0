@@ -109,11 +109,12 @@ const char *ic_irqname[HIF_IC_MAX_IRQ] = {
 "umac_reset"
 };
 
-/** hif_ahb_get_irq_name() - get irqname
+/**
+ * hif_ahb_get_irq_name() - get irqname
+ * @irq_no: irq number
+ *
  * This function gives irqnumber to irqname
  * mapping.
- *
- * @irq_no: irq number
  *
  * Return: irq name
  */
@@ -123,11 +124,10 @@ const char *hif_ahb_get_irq_name(int irq_no)
 }
 
 /**
- * hif_disable_isr() - disable isr
+ * hif_ahb_disable_isr() - disable isr
+ * @scn: struct hif_softc
  *
  * This function disables isr and kills tasklets
- *
- * @hif_ctx: struct hif_softc
  *
  * Return: void
  */
@@ -143,8 +143,8 @@ void hif_ahb_disable_isr(struct hif_softc *scn)
 }
 
 /**
- * hif_dump_registers() - dump bus debug registers
- * @scn: struct hif_opaque_softc
+ * hif_ahb_dump_registers() - dump bus debug registers
+ * @hif_ctx: struct hif_opaque_softc
  *
  * This function dumps hif bus debug registers
  *
@@ -177,13 +177,13 @@ void hif_ahb_close(struct hif_softc *scn)
 }
 
 /**
- * hif_bus_open() - hif_ahb open
+ * hif_ahb_open() - hif_ahb open
  * @hif_ctx: hif context
  * @bus_type: bus type
  *
  * This is a callback function for hif_bus_open.
  *
- * Return: n/a
+ * Return: QDF_STATUS
  */
 QDF_STATUS hif_ahb_open(struct hif_softc *hif_ctx, enum qdf_bus_type bus_type)
 {
@@ -195,12 +195,12 @@ QDF_STATUS hif_ahb_open(struct hif_softc *hif_ctx, enum qdf_bus_type bus_type)
 }
 
 /**
- * hif_bus_configure() - Configure the bus
+ * hif_ahb_bus_configure() - Configure the bus
  * @scn: pointer to the hif context.
  *
  * This function configure the ahb bus
  *
- * return: 0 for success. nonzero for failure.
+ * Return: 0 for success. nonzero for failure.
  */
 int hif_ahb_bus_configure(struct hif_softc *scn)
 {
@@ -382,7 +382,7 @@ irqreturn_t hif_ahb_interrupt_handler(int irq, void *context)
 }
 
 /**
- * hif_disable_bus() - Disable the bus
+ * hif_ahb_disable_bus() - Disable the bus
  * @scn : pointer to the hif context
  *
  * This function disables the bus and helds the target in reset state
@@ -444,7 +444,8 @@ void hif_ahb_disable_bus(struct hif_softc *scn)
 }
 
 /**
- * hif_enable_bus() - Enable the bus
+ * hif_ahb_enable_bus() - Enable the bus
+ * @ol_sc: HIF context
  * @dev: dev
  * @bdev: bus dev
  * @bid: bus id
@@ -610,7 +611,7 @@ err_cleanup1:
 }
 
 /**
- * hif_nointrs() - disable IRQ
+ * hif_ahb_nointrs() - disable IRQ
  *
  * @scn: struct hif_softc
  *
@@ -660,7 +661,7 @@ void hif_ahb_nointrs(struct hif_softc *scn)
 }
 
 /**
- * ce_irq_enable() - enable copy engine IRQ
+ * hif_ahb_irq_enable() - enable copy engine IRQ
  * @scn: struct hif_softc
  * @ce_id: ce_id
  *
@@ -716,7 +717,7 @@ void hif_ahb_irq_enable(struct hif_softc *scn, int ce_id)
 }
 
 /**
- * ce_irq_disable() - disable copy engine IRQ
+ * hif_ahb_irq_disable() - disable copy engine IRQ
  * @scn: struct hif_softc
  * @ce_id: ce_id
  *

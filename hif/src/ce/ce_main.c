@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2013-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -1368,6 +1368,8 @@ void hif_select_ce_map_qcn9224(struct service_to_pipe **tgt_svc_map_to_use,
  * hif_select_service_to_pipe_map_kiwi() - Select service to CE map
  *  configuration for Kiwi
  * @scn: HIF context
+ * @tgt_svc_map_to_use: returned service map
+ * @sz_tgt_svc_map_to_use: returned length of the service map
  *
  * Return: None
  */
@@ -1607,7 +1609,7 @@ static void ce_ring_test_initial_indexes(int ce_id, struct CE_ring_state *ring,
 /**
  * ce_alloc_desc_ring() - Allocate copyengine descriptor ring
  * @scn: softc instance
- * @ce_id: ce in question
+ * @CE_id: ce in question
  * @base_addr: pointer to copyengine ring base address
  * @ce_ring: copyengine instance
  * @nentries: number of entries should be allocated
@@ -1658,7 +1660,7 @@ static QDF_STATUS ce_alloc_desc_ring(struct hif_softc *scn, unsigned int CE_id,
 /**
  * ce_free_desc_ring() - Frees copyengine descriptor ring
  * @scn: softc instance
- * @ce_id: ce in question
+ * @CE_id: ce in question
  * @ce_ring: copyengine instance
  * @desc_size: ce desc size
  *
@@ -1738,7 +1740,7 @@ qdf_export_symbol(ce_service_register_module);
 
 /**
  * ce_srng_based() - Does this target use srng
- * @ce_state : pointer to the state context of the CE
+ * @scn: pointer to the state context of the CE
  *
  * Description:
  *   returns true if the target is SRNG based
@@ -2041,7 +2043,7 @@ static void ce_oom_recovery(void *context)
  * the CE descriptors.
  * Allocate HIF_CE_HISTORY_MAX records by CE_DEBUG_MAX_DATA_BUF_SIZE
  * @scn: hif scn handle
- * ce_id: Copy Engine Id
+ * @ce_id: Copy Engine Id
  *
  * Return: QDF_STATUS
  */
@@ -2075,7 +2077,7 @@ QDF_STATUS alloc_mem_ce_debug_hist_data(struct hif_softc *scn, uint32_t ce_id)
  * free_mem_ce_debug_hist_data() - Free mem of the data pointed by
  * the CE descriptors.
  * @scn: hif scn handle
- * ce_id: Copy Engine Id
+ * @ce_id: Copy Engine Id
  *
  * Return:
  */
@@ -2109,7 +2111,7 @@ void free_mem_ce_debug_hist_data(struct hif_softc *scn, uint32_t ce_id)
 struct hif_ce_desc_event *hif_ce_desc_history[CE_COUNT_MAX];
 uint32_t hif_ce_history_max = HIF_CE_HISTORY_MAX;
 
-/**
+/*
  * for debug build, it will enable ce history for all ce, but for
  * perf build(if CONFIG_SLUB_DEBUG_ON is N), it only enable for
  * ce2(wmi event) & ce3(wmi cmd) history.
@@ -2569,7 +2571,7 @@ static int hif_get_pktlog_ce_num(struct hif_softc *scn)
 
 #ifdef WLAN_FEATURE_FASTPATH
 /**
- * hif_enable_fastpath() Update that we have enabled fastpath mode
+ * hif_enable_fastpath() - Update that we have enabled fastpath mode
  * @hif_ctx: HIF context
  *
  * For use in data path
@@ -2621,7 +2623,7 @@ void *hif_get_ce_handle(struct hif_opaque_softc *hif_ctx, int id)
 qdf_export_symbol(hif_get_ce_handle);
 
 /**
- * ce_h2t_tx_ce_cleanup() Place holder function for H2T CE cleanup.
+ * ce_h2t_tx_ce_cleanup() - Place holder function for H2T CE cleanup.
  * No processing is required inside this function.
  * @ce_hdl: Cope engine handle
  * Using an assert, this function makes sure that,
@@ -3035,7 +3037,7 @@ hif_pci_ce_send_done(struct CE_handle *copyeng, void *ce_context,
 /**
  * hif_ce_do_recv(): send message from copy engine to upper layers
  * @msg_callbacks: structure containing callback and callback context
- * @netbuff: skb containing message
+ * @netbuf: skb containing message
  * @nbytes: number of bytes in the message
  * @pipe_info: used for the pipe_number info
  *
@@ -3677,6 +3679,7 @@ static void hif_get_shadow_reg_cfg(struct hif_softc *scn,
 
 /**
  * hif_get_target_ce_config() - get copy engine configuration
+ * @scn: HIF context
  * @target_ce_config_ret: basic copy engine configuration
  * @target_ce_config_sz_ret: size of the basic configuration in bytes
  * @target_service_to_ce_map_ret: service mapping for the copy engines
@@ -4645,7 +4648,7 @@ err:
 
 /**
  * hif_config_ce_pktlog() - configure copy engines
- * @scn: hif context
+ * @hif_hdl: hif context
  *
  * Prepares fw, copy engine hardware and host sw according
  * to the attributes selected by hif_ce_prepare_config.
@@ -4710,7 +4713,7 @@ err:
 /**
  * hif_ce_ipa_get_ce_resource() - get uc resource on hif
  * @scn: bus context
- * @ce_sr_base_paddr: copyengine source ring base physical address
+ * @ce_sr: copyengine source ring base physical address
  * @ce_sr_ring_size: copyengine source ring size
  * @ce_reg_paddr: copyengine register physical address
  *
@@ -4957,7 +4960,7 @@ void *hif_ce_get_lro_ctx(struct hif_opaque_softc *hif_hdl, int ctx_id)
 /**
  * hif_map_service_to_pipe() - returns  the ce ids pertaining to
  * this service
- * @scn: hif_softc pointer.
+ * @hif_hdl: hif_softc pointer.
  * @svc_id: Service ID for which the mapping is needed.
  * @ul_pipe: address of the container in which ul pipe is returned.
  * @dl_pipe: address of the container in which dl pipe is returned.

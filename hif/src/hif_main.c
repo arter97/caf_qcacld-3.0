@@ -63,6 +63,7 @@ void hif_dump(struct hif_opaque_softc *hif_ctx, uint8_t cmd_id, bool start)
 
 /**
  * hif_get_target_id(): hif_get_target_id
+ * @scn: scn
  *
  * Return the virtual memory base address to the caller
  *
@@ -77,7 +78,7 @@ A_target_id_t hif_get_target_id(struct hif_softc *scn)
 
 /**
  * hif_get_targetdef(): hif_get_targetdef
- * @scn: scn
+ * @hif_ctx: hif context
  *
  * Return: void *
  */
@@ -110,6 +111,7 @@ void hif_shutdown_notifier_cb(void *hif_ctx)
 
 /**
  * hif_vote_link_down(): unvote for link up
+ * @hif_ctx: hif context
  *
  * Call hif_vote_link_down to release a previous request made using
  * hif_vote_link_up. A hif_vote_link_down call should only be made
@@ -139,6 +141,7 @@ void hif_vote_link_down(struct hif_opaque_softc *hif_ctx)
 
 /**
  * hif_vote_link_up(): vote to prevent bus from suspending
+ * @hif_ctx: hif context
  *
  * Makes hif guarantee that fw can message the host normally
  * during suspend.
@@ -161,6 +164,7 @@ void hif_vote_link_up(struct hif_opaque_softc *hif_ctx)
 
 /**
  * hif_can_suspend_link(): query if hif is permitted to suspend the link
+ * @hif_ctx: hif context
  *
  * Hif will ensure that the link won't be suspended if the upperlayers
  * don't want it to.
@@ -485,6 +489,7 @@ static const char *hif_get_hw_name(struct hif_target_info *info)
  * @scn: scn
  * @version: version
  * @revision: revision
+ * @target_name: target name
  *
  * Return: n/a
  */
@@ -504,11 +509,9 @@ void hif_get_hw_info(struct hif_opaque_softc *scn, u32 *version, u32 *revision,
 
 /**
  * hif_get_dev_ba(): API to get device base address.
- * @scn: scn
- * @version: version
- * @revision: revision
+ * @hif_handle: hif handle
  *
- * Return: n/a
+ * Return: device base address
  */
 void *hif_get_dev_ba(struct hif_opaque_softc *hif_handle)
 {
@@ -520,7 +523,7 @@ qdf_export_symbol(hif_get_dev_ba);
 
 /**
  * hif_get_dev_ba_ce(): API to get device ce base address.
- * @scn: scn
+ * @hif_handle: hif handle
  *
  * Return: dev mem base address for CE
  */
@@ -535,7 +538,7 @@ qdf_export_symbol(hif_get_dev_ba_ce);
 
 /**
  * hif_get_dev_ba_pmm(): API to get device pmm base address.
- * @scn: scn
+ * @hif_handle: scn
  *
  * Return: dev mem base address for PMM
  */
@@ -560,7 +563,7 @@ qdf_export_symbol(hif_get_soc_version);
 
 /**
  * hif_get_dev_ba_cmem(): API to get device ce base address.
- * @scn: scn
+ * @hif_handle: hif handle
  *
  * Return: dev mem base address for CMEM
  */
@@ -754,6 +757,7 @@ QDF_STATUS hif_unregister_recovery_notifier(struct hif_softc *hif_handle)
 #ifdef HIF_CPU_PERF_AFFINE_MASK
 /**
  * __hif_cpu_hotplug_notify() - CPU hotplug event handler
+ * @context: HIF context
  * @cpu: CPU Id of the CPU generating the event
  * @cpu_up: true if the CPU is online
  *
@@ -780,6 +784,7 @@ static void __hif_cpu_hotplug_notify(void *context,
 /**
  * hif_cpu_hotplug_notify - cpu core up/down notification
  * handler
+ * @context: HIF context
  * @cpu: CPU generating the event
  * @cpu_up: true if the CPU is online
  *
@@ -1602,7 +1607,6 @@ void hif_crash_shutdown(struct hif_opaque_softc *hif_ctx)
 /**
  * hif_check_fw_reg(): hif_check_fw_reg
  * @scn: scn
- * @state:
  *
  * Return: int
  */
@@ -1831,6 +1835,7 @@ end:
 
 /**
  * hif_get_bus_type() - return the bus type
+ * @hif_hdl: HIF Context
  *
  * Return: enum qdf_bus_type
  */
@@ -1841,7 +1846,7 @@ enum qdf_bus_type hif_get_bus_type(struct hif_opaque_softc *hif_hdl)
 	return scn->bus_type;
 }
 
-/**
+/*
  * Target info and ini parameters are global to the driver
  * Hence these structures are exposed to all the modules in
  * the driver and they don't need to maintains multiple copies
@@ -2183,9 +2188,10 @@ void hif_mem_free_consistent_unaligned(struct hif_softc *scn,
  * hif_batch_send() - API to access hif specific function
  * ce_batch_send.
  * @osc: HIF Context
- * @msdu : list of msdus to be sent
- * @transfer_id : transfer id
- * @len : downloaded length
+ * @msdu: list of msdus to be sent
+ * @transfer_id: transfer id
+ * @len: downloaded length
+ * @sendhead:
  *
  * Return: list of msds not sent
  */
@@ -2206,7 +2212,7 @@ qdf_export_symbol(hif_batch_send);
  * hif_update_tx_ring() - API to access hif specific function
  * ce_update_tx_ring.
  * @osc: HIF Context
- * @num_htt_cmpls : number of htt compl received.
+ * @num_htt_cmpls: number of htt compl received.
  *
  * Return: void
  */

@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2013-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -425,6 +425,9 @@ bool ce_get_rx_pending(struct hif_softc *scn);
 
 /**
  * war_ce_src_ring_write_idx_set() - Set write index for CE source ring
+ * @scn: HIF context
+ * @ctrl_addr: address
+ * @write_index: write index
  *
  * Return: None
  */

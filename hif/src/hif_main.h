@@ -413,7 +413,7 @@ static inline int hif_get_num_active_tasklets(struct hif_softc *scn)
 	return qdf_atomic_read(&scn->active_tasklet_cnt);
 }
 
-/**
+/*
  * Max waiting time during Runtime PM suspend to finish all
  * the tasks. This is in the multiple of 10ms.
  */
@@ -510,7 +510,7 @@ bool hif_is_target_ready(struct hif_softc *scn);
 
 /**
  * hif_get_bandwidth_level() - API to get the current bandwidth level
- * @scn: HIF Context
+ * @hif_handle: HIF Context
  *
  * Return: PLD bandwidth level
  */

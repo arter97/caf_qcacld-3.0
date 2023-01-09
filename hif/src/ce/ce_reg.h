@@ -319,7 +319,7 @@ unsigned int hif_get_dst_ring_read_index(struct hif_softc *scn,
 #define CE_DEST_RING_READ_IDX_GET(scn, CE_ctrl_addr)\
 	CE_DEST_RING_READ_IDX_GET_FROM_REGISTER(scn, CE_ctrl_addr)
 
-/**
+/*
  * if RRI on DDR is not enabled, get idx from ddr defaults to
  * using the register value & force wake must be used for
  * non interrupt processing.

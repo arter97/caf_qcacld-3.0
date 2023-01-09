@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2013-2020 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -236,6 +236,7 @@ bool hif_dev_get_mailbox_swap(struct hif_sdio_dev *pdev)
  * hif_dev_get_fifo_address() - get the fifo addresses for dma
  * @pdev:  SDIO HIF object
  * @config: mbox address config pointer
+ * @config_len: config length
  *
  * Return : 0 for success, non-zero for error
  */
@@ -275,10 +276,10 @@ void hif_dev_get_block_size(void *config)
 
 /**
  * hif_dev_map_service_to_pipe() - maps ul/dl pipe to service id.
- * @pDev: SDIO HIF object
- * @ServiceId: service index
- * @ULPipe: uplink pipe id
- * @DLPipe: down-linklink pipe id
+ * @pdev: SDIO HIF object
+ * @svc: service index
+ * @ul_pipe: uplink pipe id
+ * @dl_pipe: down-linklink pipe id
  *
  * Return: 0 on success, error value on invalid map
  */
@@ -524,7 +525,7 @@ static uint8_t hif_dev_map_pipe_to_mail_box(struct hif_sdio_device *pdev,
 /**
  * hif_dev_map_mail_box_to_pipe() - map sdio mailbox to htc pipe.
  * @pdev: The pointer to the hif device object
- * @mboxIndex: mailbox index
+ * @mbox_index: mailbox index
  * @upload: boolean to decide mailbox index
  *
  * Return: Invalid pipe index
@@ -546,9 +547,10 @@ static uint8_t hif_dev_map_mail_box_to_pipe(struct hif_sdio_device *pdev,
 }
 
 /**
- * hif_get_send_addr() - Get the transfer pipe address
+ * hif_get_send_address() - Get the transfer pipe address
  * @pdev: The pointer to the hif device object
  * @pipe: The pipe identifier
+ * @addr:
  *
  * Return 0 for success and non-zero for failure to map
  */
@@ -573,6 +575,7 @@ int hif_get_send_address(struct hif_sdio_device *pdev,
 /**
  * hif_fixup_write_param() - Tweak the address and length parameters
  * @pdev: The pointer to the hif device object
+ * @req:
  * @length: The length pointer
  * @addr: The addr pointer
  *
@@ -1026,7 +1029,7 @@ QDF_STATUS hif_dev_recv_message_pending_handler(struct hif_sdio_device *pdev,
  * hif_dev_service_cpu_interrupt() - service fatal interrupts
  * synchronously
  *
- * @pDev: hif sdio device context
+ * @pdev: hif sdio device context
  *
  * Return: QDF_STATUS_SUCCESS for success
  */
@@ -1085,7 +1088,7 @@ static QDF_STATUS hif_dev_service_cpu_interrupt(struct hif_sdio_device *pdev)
  * hif_dev_service_error_interrupt() - service error interrupts
  * synchronously
  *
- * @pDev: hif sdio device context
+ * @pdev: hif sdio device context
  *
  * Return: QDF_STATUS_SUCCESS for success
  */
@@ -1135,7 +1138,7 @@ static QDF_STATUS hif_dev_service_error_interrupt(struct hif_sdio_device *pdev)
  * hif_dev_service_debug_interrupt() - service debug interrupts
  * synchronously
  *
- * @pDev: hif sdio device context
+ * @pdev: hif sdio device context
  *
  * Return: QDF_STATUS_SUCCESS for success
  */
@@ -1161,9 +1164,8 @@ static QDF_STATUS hif_dev_service_debug_interrupt(struct hif_sdio_device *pdev)
 
 /**
  * hif_dev_service_counter_interrupt() - service counter interrupts
- * synchronously
- *
- * @pDev: hif sdio device context
+ *                                       synchronously
+ * @pdev: hif sdio device context
  *
  * Return: QDF_STATUS_SUCCESS for success
  */
@@ -1196,9 +1198,9 @@ QDF_STATUS hif_dev_service_counter_interrupt(struct hif_sdio_device *pdev)
 	mboxProcRegs(pdev).rx_lookahead[MAILBOX_LOOKAHEAD_SIZE_IN_WORD * i]
 /**
  * hif_dev_process_pending_irqs() - process pending interrupts
- * @pDev: hif sdio device context
- * @pDone: pending irq completion status
- * @pASyncProcessing: sync/async processing flag
+ * @pdev: hif sdio device context
+ * @done: pending irq completion status
+ * @async_processing: sync/async processing flag
  *
  * Return: QDF_STATUS_SUCCESS for success
  */
@@ -1570,7 +1572,7 @@ hif_read_write(struct hif_sdio_dev *device,
 
 /**
  * hif_sdio_func_enable() - Handle device enabling as per device
- * @device: HIF device object
+ * @ol_sc: HIF device object
  * @func: function pointer
  *
  * Return QDF_STATUS
@@ -1943,7 +1945,7 @@ QDF_STATUS hif_disable_func(struct hif_sdio_dev *device,
  *
  * @ol_sc: HIF object pointer
  * @device: HIF device pointer
- * @sdio_func: SDIO function pointer
+ * @func: SDIO function pointer
  * @resume: If this is called from resume or probe
  *
  * Return: 0 in case of success, else error value

@@ -71,13 +71,16 @@ struct hang_event_bus_info {
 	uint16_t dev_id;
 } qdf_packed;
 
-/**
+/*
  * struct hif_msi_info - Structure to hold msi info
  * @magic: cookie
  * @magic_da: dma address
- * @dmaContext: dma address
+ * @dmacontext: dma address
  *
  * Structure to hold MSI information for PCIe interrupts
+ *
+ * NB: Intentionally not using kernel-doc comment since the kernel-doc
+ *     script doesn't handle the OS_DMA_MEM_CONTEXT() macro
  */
 struct hif_msi_info {
 	void *magic;
@@ -93,6 +96,7 @@ struct hif_msi_info {
  * @soc_force_wake_register_write_success: write to soc wake
  * @soc_force_wake_failure: soc force wake failure
  * @soc_force_wake_success: soc force wake success
+ * @mhi_force_wake_release_failure: mhi force wake release failure
  * @mhi_force_wake_release_success: mhi force wake release success
  * @soc_force_wake_release_success: soc force wake release
  */
@@ -200,7 +204,7 @@ int hif_pci_addr_in_boundary(struct hif_softc *scn, uint32_t offset);
 #ifdef FORCE_WAKE
 /**
  * hif_print_pci_stats() - Display HIF PCI stats
- * @hif_ctx - HIF pci handle
+ * @pci_scn: HIF pci handle
  *
  * Return: None
  */

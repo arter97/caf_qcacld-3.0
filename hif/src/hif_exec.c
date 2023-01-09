@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2017-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -499,10 +499,10 @@ static void hif_exec_tasklet_schedule(struct hif_exec_context *ctx)
 }
 
 /**
- * hif_exec_tasklet() - grp tasklet
- * data: context
+ * hif_exec_tasklet_fn() - grp tasklet
+ * @data: context
  *
- * return: void
+ * Return: void
  */
 static void hif_exec_tasklet_fn(unsigned long data)
 {
@@ -526,9 +526,9 @@ static void hif_exec_tasklet_fn(unsigned long data)
 
 /**
  * hif_latency_profile_measure() - calculate latency and update histogram
- * hif_ext_group: hif exec context
+ * @hif_ext_group: hif exec context
  *
- * return: None
+ * Return: None
  */
 #ifdef HIF_LATENCY_PROFILE_ENABLE
 static void hif_latency_profile_measure(struct hif_exec_context *hif_ext_group)
@@ -571,9 +571,9 @@ void hif_latency_profile_measure(struct hif_exec_context *hif_ext_group)
 
 /**
  * hif_latency_profile_start() - Update the start timestamp for HIF ext group
- * hif_ext_group: hif exec context
+ * @hif_ext_group: hif exec context
  *
- * return: None
+ * Return: None
  */
 #ifdef HIF_LATENCY_PROFILE_ENABLE
 static void hif_latency_profile_start(struct hif_exec_context *hif_ext_group)
@@ -630,8 +630,8 @@ hif_irq_disabled_time_limit_reached(struct hif_exec_context *hif_ext_group)
 
 /**
  * hif_exec_poll() - napi poll
- * napi: napi struct
- * budget: budget for napi
+ * @napi: napi struct
+ * @budget: budget for napi
  *
  * Return: mapping of internal budget to napi
  */
@@ -788,7 +788,7 @@ struct hif_execution_ops tasklet_sched_ops = {
 };
 
 /**
- * hif_exec_tasklet_schedule() -  allocate and initialize a tasklet exec context
+ * hif_exec_tasklet_create() -  allocate and initialize a tasklet exec context
  */
 static struct hif_exec_context *hif_exec_tasklet_create(void)
 {
@@ -992,7 +992,7 @@ irqreturn_t hif_ext_group_interrupt_handler(int irq, void *context)
 
 /**
  * hif_exec_kill() - grp tasklet kill
- * scn: hif_softc
+ * @hif_ctx: hif_softc
  *
  * return: void
  */
@@ -1029,7 +1029,9 @@ hif_init_force_napi_complete(struct hif_exec_context *hif_ext_group)
  * @irq: array of irq values
  * @handler: callback interrupt handler function
  * @cb_ctx: context to passed in callback
+ * @context_name: context name
  * @type: napi vs tasklet
+ * @scale:
  *
  * Return: QDF_STATUS
  */
@@ -1084,6 +1086,7 @@ qdf_export_symbol(hif_register_ext_group);
 /**
  * hif_exec_create() - create an execution context
  * @type: the type of execution context to create
+ * @scale:
  */
 struct hif_exec_context *hif_exec_create(enum hif_exec_type type,
 						uint32_t scale)

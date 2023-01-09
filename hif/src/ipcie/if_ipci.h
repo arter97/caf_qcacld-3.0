@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2020-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -31,13 +31,14 @@
 
 #ifdef FORCE_WAKE
 /**
- * struct hif_pci_stats - Account for hif pci based statistics
+ * struct hif_ipci_stats - Account for hif pci based statistics
  * @mhi_force_wake_request_vote: vote for mhi
  * @mhi_force_wake_failure: mhi force wake failure
  * @mhi_force_wake_success: mhi force wake success
  * @soc_force_wake_register_write_success: write to soc wake
  * @soc_force_wake_failure: soc force wake failure
  * @soc_force_wake_success: soc force wake success
+ * @mhi_force_wake_release_failure: mhi force wake release failure
  * @mhi_force_wake_release_success: mhi force wake release success
  * @soc_force_wake_release_success: soc force wake release
  */
@@ -122,7 +123,7 @@ int hif_configure_irq(struct hif_softc *sc);
 #ifdef FORCE_WAKE
 /**
  * hif_print_ipci_stats() - Display HIF IPCI stats
- * @ipci_scn - HIF ipci handle
+ * @ipci_scn: HIF ipci handle
  *
  * Return: None
  */

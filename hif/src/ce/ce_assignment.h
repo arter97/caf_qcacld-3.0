@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2014-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -35,7 +35,7 @@
 #if defined(QCA_LOWMEM_CONFIG) || defined(QCA_512M_CONFIG)
 #define WMI_CE_BUF_SIZE 2048
 #else
-/**
+/*
  * WMI_CE_BUF_SIZE = (SKB_SIZE - 64BIT_SH_INFO -
  *		      NETBUF_FIXED_MIN_HEADROOM - WMI_HEADROOM)
  * 3520 = (4096 - 384 - 128 - 64)

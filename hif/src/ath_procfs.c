@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2013-2014, 2016-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -50,7 +50,7 @@
 #define PROCFS_DIR              "cld"
 #endif
 
-/**
+/*
  * Get op_type, mem_type and offset fields from pos of procfs
  * It will reuse pos, which is long long type
  *
@@ -70,7 +70,7 @@
 #define ATH_DIAG_EXT_OFFSET_BITS         32
 #define ATH_DIAG_EXT_OFFSET_INDEX        0
 
-/**
+/*
  * This structure hold information about the /proc file
  *
  */

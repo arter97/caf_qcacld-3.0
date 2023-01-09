@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2013-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -383,6 +383,8 @@ struct ce_srng_dest_status_desc {
 
 /**
  * union ce_desc - unified data type for ce descriptors
+ * @src_desc: source descriptor
+ * @dest_desc: destination descriptor
  *
  * Both src and destination descriptors follow the same format.
  * They use different data structures for different access semantics.
@@ -424,6 +426,7 @@ union ce_srng_desc {
  *	the write index in fastpath
  * @FAST_TX_SOFTWARE_INDEX_UPDATE: event recorded before updating the software
  *	index of the RX ring in fastpath
+ * @RESUME_WRITE_INDEX_UPDATE:
  * @HIF_IRQ_EVENT: event recorded in the irq before scheduling the bh
  * @HIF_CE_TASKLET_ENTRY: records the start of the ce_tasklet
  * @HIF_CE_TASKLET_RESCHEDULE: records the rescheduling of the wlan_tasklet
@@ -444,6 +447,7 @@ union ce_srng_desc {
  * @HIF_RX_DESC_PRE_NBUF_ALLOC: record the packet before nbuf allocation
  * @HIF_RX_DESC_PRE_NBUF_MAP: record the packet before nbuf map
  * @HIF_RX_DESC_POST_NBUF_MAP: record the packet after nbuf map
+ * @HIF_EVENT_TYPE_MAX: max event
  */
 enum hif_ce_event_type {
 	HIF_RX_DESC_POST,
@@ -582,6 +586,7 @@ int hif_get_fw_diag_ce_id(struct hif_softc *scn, uint8_t *ce_id);
  * @index: location of the descriptor in the ce ring;
  * @type: what the event was
  * @time: when it happened
+ * @cpu_id:
  * @current_hp: holds the current ring hp value
  * @current_tp: holds the current ring tp value
  * @descriptor: descriptor enqueued or dequeued
@@ -715,7 +720,7 @@ void hif_ce_desc_data_record(struct hif_ce_desc_event *event, int len)
  * ce_validate_nbytes() - validate nbytes for slub builds on tx descriptors
  * @nbytes: nbytes value being written into a send descriptor
  * @ce_state: context of the copy engine
-
+ *
  * nbytes should be non-zero and less than max configured for the copy engine
  *
  * Return: none
@@ -738,6 +743,7 @@ static inline void ce_validate_nbytes(uint32_t nbytes,
  * hif_ce_desc_record_rx_paddr() - record physical address for IOMMU
  * IOVA addr and MMU virtual addr for Rx
  * @scn: hif_softc
+ * @event: event details
  * @nbuf: buffer posted to fw
  *
  * record physical address for ce_event_type HIF_RX_DESC_POST and
