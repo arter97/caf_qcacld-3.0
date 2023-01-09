@@ -209,3 +209,15 @@ wlan_twt_enable_event_handler(struct wlan_objmgr_psoc *psoc,
 QDF_STATUS
 wlan_twt_disable_event_handler(struct wlan_objmgr_psoc *psoc,
 			       struct twt_disable_complete_event_param *event);
+
+/**
+ * wlan_twt_tgt_caps_get_restricted_support() - Get tgt restricted-twt
+ *                                              support caps
+ * @psoc: psoc handle
+ * @val: pointer to get caps enabled/disabled
+ *
+ * return: QDF_STATUS
+ */
+QDF_STATUS
+wlan_twt_tgt_caps_get_restricted_support(struct wlan_objmgr_psoc *psoc,
+					 bool *val);

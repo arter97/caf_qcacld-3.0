@@ -21783,6 +21783,7 @@ static void populate_tlv_service(uint32_t *wmi_service)
 			WMI_SERVICE_TWT_ALL_DIALOG_ID;
 	wmi_service[wmi_service_twt_statistics] =
 			WMI_SERVICE_TWT_STATS;
+	wmi_service[wmi_service_restricted_twt] = WMI_SERVICE_RESTRICTED_TWT;
 #endif
 	wmi_service[wmi_service_spectral_scan_disabled] =
 			WMI_SERVICE_SPECTRAL_SCAN_DISABLED;

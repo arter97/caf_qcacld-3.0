@@ -6126,6 +6126,7 @@ typedef enum {
 	wmi_service_twt_nudge,
 	wmi_service_all_twt,
 	wmi_service_twt_statistics,
+	wmi_service_restricted_twt,
 #endif
 	wmi_service_wapi_concurrency_supported,
 	wmi_service_sap_connected_d3_wow,

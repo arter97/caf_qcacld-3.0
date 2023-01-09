@@ -105,3 +105,9 @@ ucfg_twt_get_peer_capabilities(struct wlan_objmgr_psoc *psoc,
 {
 	return wlan_twt_get_peer_capabilities(psoc, peer_mac, peer_cap);
 }
+
+QDF_STATUS ucfg_twt_get_restricted_twt_supported(struct wlan_objmgr_psoc *psoc,
+						 bool *val)
+{
+	return wlan_twt_tgt_caps_get_restricted_support(psoc, val);
+}
