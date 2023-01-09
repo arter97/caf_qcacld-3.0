@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -1362,11 +1362,11 @@ void dp_tx_mon_filter_set_all(struct dp_mon_pdev_be *mon_pdev_be,
 			      struct htt_tx_ring_tlv_filter *filter)
 {
 	qdf_mem_zero(&filter->dtlvs,
-		     sizeof(struct dp_tx_mon_downstream_tlv_config));
-	qdf_mem_zero(&filter->dtlvs,
-		     sizeof(struct dp_tx_mon_upstream_tlv_config));
+		     sizeof(filter->dtlvs));
+	qdf_mem_zero(&filter->utlvs,
+		     sizeof(filter->utlvs));
 	qdf_mem_zero(&filter->wmask,
-		     sizeof(struct dp_tx_mon_upstream_tlv_config));
+		     sizeof(filter->wmask));
 
 	dp_tx_mon_filter_set_downstream_tlvs(filter);
 	dp_tx_mon_filter_set_upstream_tlvs(filter);
