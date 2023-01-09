@@ -1,6 +1,6 @@
-/**
+/*
  * Copyright (c) 2020 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -35,7 +35,7 @@
 #define WLAN_CFG_CE_STATUS_RING_BATCH_COUNT_THRESH_DEFAULT 1
 
 #ifdef WLAN_CE_INTERRUPT_THRESHOLD_CONFIG
-/**
+/*
  * <ini>
  * ce_status_ring_timer_thresh - ce status srng timer threshold
  * @Min: 0
@@ -62,7 +62,7 @@
 
 #define CFG_RING_TIMER_THRESHOLD CFG(CFG_CE_STATUS_RING_TIMER_THRESHOLD)
 
-/**
+/*
  * <ini>
  * ce_status_ring_batch_count_thresh - ce status srng batch count threshold
  * @Min: 0

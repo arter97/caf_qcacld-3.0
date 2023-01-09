@@ -279,17 +279,18 @@ struct CE_state;
 #define QCA_NAPI_NUM_BUCKETS 4
 
 /**
- * qca_napi_stat - stats structure for execution contexts
- * @napi_schedules - number of times the schedule function is called
- * @napi_polls - number of times the execution context runs
- * @napi_completes - number of times that the generating interrupt is re-enabled
- * @napi_workdone - cumulative of all work done reported by handler
- * @cpu_corrected - incremented when execution context runs on a different core
+ * struct qca_napi_stat - stats structure for execution contexts
+ * @napi_schedules: number of times the schedule function is called
+ * @napi_polls: number of times the execution context runs
+ * @napi_completes: number of times that the generating interrupt is re-enabled
+ * @napi_workdone: cumulative of all work done reported by handler
+ * @cpu_corrected: incremented when execution context runs on a different core
  *			than the one that its irq is affined to.
- * @napi_budget_uses - histogram of work done per execution run
- * @time_limit_reache - count of yields due to time limit thresholds
- * @rxpkt_thresh_reached - count of yields due to a work limit
- * @poll_time_buckets - histogram of poll times for the napi
+ * @napi_budget_uses: histogram of work done per execution run
+ * @time_limit_reached: count of yields due to time limit thresholds
+ * @rxpkt_thresh_reached: count of yields due to a work limit
+ * @napi_max_poll_time:
+ * @poll_time_buckets: histogram of poll times for the napi
  *
  */
 struct qca_napi_stat {
@@ -309,7 +310,21 @@ struct qca_napi_stat {
 
 
 /**
- * per NAPI instance data structure
+ * struct qca_napi_info - per NAPI instance data structure
+ * @netdev: dummy net_dev
+ * @hif_ctx:
+ * @napi:
+ * @scale:
+ * @id:
+ * @cpu:
+ * @irq:
+ * @cpumask:
+ * @stats:
+ * @offld_flush_cb:
+ * @rx_thread_napi:
+ * @rx_thread_netdev:
+ * @lro_ctx:
+ *
  * This data structure holds stuff per NAPI instance.
  * Note that, in the current implementation, though scale is
  * an instance variable, it is set to the same value for all
@@ -346,6 +361,7 @@ enum qca_napi_cpu_state {
 
 /**
  * struct qca_napi_cpu - an entry of the napi cpu table
+ * @state:
  * @core_id:     physical core id of the core
  * @cluster_id:  cluster this core belongs to
  * @core_mask:   mask to match all core of this cluster
@@ -354,7 +370,7 @@ enum qca_napi_cpu_state {
  *               same for all cpus of the same core.
  * @napis:       bitmap of napi instances on this core
  * @execs:       bitmap of execution contexts on this core
- * cluster_nxt:  chain to link cores within the same cluster
+ * @cluster_nxt: chain to link cores within the same cluster
  *
  * This structure represents a single entry in the napi cpu
  * table. The table is part of struct qca_napi_data.
@@ -382,12 +398,14 @@ struct qca_napi_cpu {
  * @state: state variable used in the napi stat machine
  * @ce_map: bit map indicating which ce's have napis running
  * @exec_map: bit map of instantiated exec contexts
- * @user_cpu_affin_map: CPU affinity map from INI config.
+ * @user_cpu_affin_mask: CPU affinity mask from INI config.
+ * @napis:
  * @napi_cpu: cpu info for irq affinty
  * @lilcl_head:
  * @bigcl_head:
  * @napi_mode: irq affinity & clock voting mode
  * @cpuhp_handler: CPU hotplug event registration handle
+ * @flags:
  */
 struct qca_napi_data {
 	struct               hif_softc *hif_softc;
@@ -506,12 +524,12 @@ enum hif_event_type {
 
 /**
  * enum hif_system_pm_state - System PM state
- * HIF_SYSTEM_PM_STATE_ON: System in active state
- * HIF_SYSTEM_PM_STATE_BUS_RESUMING: bus resume in progress as part of
+ * @HIF_SYSTEM_PM_STATE_ON: System in active state
+ * @HIF_SYSTEM_PM_STATE_BUS_RESUMING: bus resume in progress as part of
  *  system resume
- * HIF_SYSTEM_PM_STATE_BUS_SUSPENDING: bus suspend in progress as part of
+ * @HIF_SYSTEM_PM_STATE_BUS_SUSPENDING: bus suspend in progress as part of
  *  system suspend
- * HIF_SYSTEM_PM_STATE_BUS_SUSPENDED: bus suspended as part of system suspend
+ * @HIF_SYSTEM_PM_STATE_BUS_SUSPENDED: bus suspended as part of system suspend
  */
 enum hif_system_pm_state {
 	HIF_SYSTEM_PM_STATE_ON,
@@ -581,6 +599,7 @@ struct hif_event_misc {
 /**
  * struct hif_event_history - history for one interrupt group
  * @index: index to store new event
+ * @misc: event misc information
  * @event: event entry
  *
  * This structure represents the datapath history for one
@@ -705,6 +724,7 @@ enum HIF_DEVICE_POWER_CHANGE_TYPE {
  *
  * @HIF_ENABLE_TYPE_PROBE: probe triggered enable
  * @HIF_ENABLE_TYPE_REINIT: reinit triggered enable
+ * @HIF_ENABLE_TYPE_MAX: Max value
  */
 enum hif_enable_type {
 	HIF_ENABLE_TYPE_PROBE,
@@ -719,6 +739,7 @@ enum hif_enable_type {
  * @HIF_DISABLE_TYPE_REINIT_ERROR: reinit error triggered disable
  * @HIF_DISABLE_TYPE_REMOVE: remove triggered disable
  * @HIF_DISABLE_TYPE_SHUTDOWN: shutdown triggered disable
+ * @HIF_DISABLE_TYPE_MAX: Max value
  */
 enum hif_disable_type {
 	HIF_DISABLE_TYPE_PROBE_ERROR,
@@ -727,12 +748,13 @@ enum hif_disable_type {
 	HIF_DISABLE_TYPE_SHUTDOWN,
 	HIF_DISABLE_TYPE_MAX
 };
+
 /**
  * enum hif_device_config_opcode: configure mode
  *
  * @HIF_DEVICE_POWER_STATE: device power state
  * @HIF_DEVICE_GET_BLOCK_SIZE: get block size
- * @HIF_DEVICE_GET_ADDR: get block address
+ * @HIF_DEVICE_GET_FIFO_ADDR: get block address
  * @HIF_DEVICE_GET_PENDING_EVENTS_FUNC: get pending events functions
  * @HIF_DEVICE_GET_IRQ_PROC_MODE: get irq proc mode
  * @HIF_DEVICE_GET_RECV_EVENT_MASK_UNMASK_FUNC: receive event function
@@ -780,11 +802,11 @@ uint32_t hif_reg_read(struct hif_opaque_softc *hif_ctx, uint32_t offset);
 #define HIF_MAX_DEVICES                 1
 /**
  * struct htc_callbacks - Structure for HTC Callbacks methods
- * @context:             context to pass to the dsrhandler
- *                       note : rwCompletionHandler is provided the context
+ * @context:             context to pass to the @dsr_handler
+ *                       note : @rw_compl_handler is provided the context
  *                       passed to hif_read_write
- * @rwCompletionHandler: Read / write completion handler
- * @dsrHandler:          DSR Handler
+ * @rw_compl_handler:    Read / write completion handler
+ * @dsr_handler:         DSR Handler
  */
 struct htc_callbacks {
 	void *context;
@@ -799,9 +821,10 @@ struct htc_callbacks {
  * @is_recovery_in_progress: Query if driver state is recovery in progress
  * @is_load_unload_in_progress: Query if driver state Load/Unload in Progress
  * @is_driver_unloading: Query if driver is unloading.
+ * @is_target_ready:
  * @get_bandwidth_level: Query current bandwidth level for the driver
- * @prealloc_get_consistent_mem_unligned: get prealloc unaligned consistent mem
- * @prealloc_put_consistent_mem_unligned: put unaligned consistent mem to pool
+ * @prealloc_get_consistent_mem_unaligned: get prealloc unaligned consistent mem
+ * @prealloc_put_consistent_mem_unaligned: put unaligned consistent mem to pool
  * This Structure provides callback pointer for HIF to query hdd for driver
  * states.
  */
@@ -924,7 +947,8 @@ void *hif_get_ce_handle(struct hif_opaque_softc *hif_ctx, int ret);
 
 /**
  * hif_ce_fastpath_cb_register() - Register callback for fastpath msg handler
- * @handler: Callback funtcion
+ * @hif_ctx: HIF opaque context
+ * @handler: Callback function
  * @context: handle for callback function
  *
  * Return: QDF_STATUS_SUCCESS on success or QDF_STATUS_E_FAILURE
@@ -960,7 +984,13 @@ void hif_ipa_get_ce_resource(struct hif_opaque_softc *hif_ctx,
 			     qdf_dma_addr_t *ce_reg_paddr);
 
 /**
- * @brief List of callbacks - filled in by HTC.
+ * struct hif_msg_callbacks - List of callbacks - filled in by HTC.
+ * @Context: context meaningful to HTC
+ * @txCompletionHandler:
+ * @rxCompletionHandler:
+ * @txResourceAvailHandler:
+ * @fwEventHandler:
+ * @update_bundle_stats:
  */
 struct hif_msg_callbacks {
 	void *Context;
@@ -1112,8 +1142,8 @@ void hif_offld_flush_cb_deregister(struct hif_opaque_softc *scn);
 #ifdef WLAN_FEATURE_RX_SOFTIRQ_TIME_LIMIT
 /**
  * hif_exec_should_yield() - Check if hif napi context should yield
- * @hif_ctx - HIF opaque context
- * @grp_id - grp_id of the napi for which check needs to be done
+ * @hif_ctx: HIF opaque context
+ * @grp_id: grp_id of the napi for which check needs to be done
  *
  * The function uses grp_id to look for NAPI and checks if NAPI needs to
  * yield. HIF_EXT_GROUP_MAX_YIELD_DURATION_NS is the duration used for
@@ -1181,9 +1211,9 @@ void hif_clear_stats(struct hif_opaque_softc *hif_ctx);
 
 /**
  * enum hif_pm_wake_irq_type - Wake interrupt type for Power Management
- * HIF_PM_INVALID_WAKE: Wake irq is invalid or not configured
- * HIF_PM_MSI_WAKE: Wake irq is MSI interrupt
- * HIF_PM_CE_WAKE: Wake irq is CE interrupt
+ * @HIF_PM_INVALID_WAKE: Wake irq is invalid or not configured
+ * @HIF_PM_MSI_WAKE: Wake irq is MSI interrupt
+ * @HIF_PM_CE_WAKE: Wake irq is CE interrupt
  */
 typedef enum {
 	HIF_PM_INVALID_WAKE,
@@ -1201,8 +1231,8 @@ hif_pm_wake_irq_type hif_pm_get_wake_irq_type(struct hif_opaque_softc *hif_ctx);
 
 /**
  * enum hif_ep_vote_type - hif ep vote type
- * HIF_EP_VOTE_DP_ACCESS: vote type is specific DP
- * HIF_EP_VOTE_NONDP_ACCESS: ep vote for over all access
+ * @HIF_EP_VOTE_DP_ACCESS: vote type is specific DP
+ * @HIF_EP_VOTE_NONDP_ACCESS: ep vote for over all access
  */
 enum hif_ep_vote_type {
 	HIF_EP_VOTE_DP_ACCESS,
@@ -1211,9 +1241,9 @@ enum hif_ep_vote_type {
 
 /**
  * enum hif_ep_vote_access - hif ep vote access
- * HIF_EP_VOTE_ACCESS_ENABLE: Enable ep voting
- * HIF_EP_VOTE_INTERMEDIATE_ACCESS: allow during transition
- * HIF_EP_VOTE_ACCESS_DISABLE: disable ep voting
+ * @HIF_EP_VOTE_ACCESS_ENABLE: Enable ep voting
+ * @HIF_EP_VOTE_INTERMEDIATE_ACCESS: allow during transition
+ * @HIF_EP_VOTE_ACCESS_DISABLE: disable ep voting
  */
 enum hif_ep_vote_access {
 	HIF_EP_VOTE_ACCESS_ENABLE,
@@ -1222,17 +1252,17 @@ enum hif_ep_vote_access {
 };
 
 /**
- * enum hif_rpm_id - modules registered with runtime pm module
+ * enum hif_rtpm_client_id - modules registered with runtime pm module
  * @HIF_RTPM_ID_RESERVED: Reserved ID
  * @HIF_RTPM_ID_HAL_REO_CMD: HAL REO commands
  * @HIF_RTPM_ID_WMI: WMI commands Tx
  * @HIF_RTPM_ID_HTT: HTT commands Tx
- * @HIF_RTPM_ID_DP_TX: Datapath Tx path
+ * @HIF_RTPM_ID_DP: Datapath Tx path
  * @HIF_RTPM_ID_DP_RING_STATS: Datapath ring stats
- * @HIF_RTPM_ID_CE_SEND_FAST: CE Tx buffer posting
+ * @HIF_RTPM_ID_CE: CE Tx buffer posting
  * @HIF_RTPM_ID_FORCE_WAKE: Force wake request
- * @HIF_RTPM_ID_PREVENT_LINKDOWN: Prevent linkdown by not allowing runtime PM
- * @HIF_RTPM_ID_PREVENT_ALLOW_LOCK: Generic ID for runtime PM lock contexts
+ * @HIF_RTPM_ID_PM_QOS_NOTIFY:
+ * @HIF_RTPM_ID_WIPHY_SUSPEND:
  * @HIF_RTPM_ID_MAX: Max id
  */
 enum  hif_rtpm_client_id {
@@ -1250,19 +1280,19 @@ enum  hif_rtpm_client_id {
 };
 
 /**
- * enum hif_rpm_type - Get and Put calls types
- * HIF_RTPM_GET_ASYNC: Increment usage count and when system is suspended
+ * enum rpm_type - Get and Put calls types
+ * @HIF_RTPM_GET_ASYNC: Increment usage count and when system is suspended
  *		      schedule resume process, return depends on pm state.
- * HIF_RTPM_GET_FORCE: Increment usage count and when system is suspended
+ * @HIF_RTPM_GET_FORCE: Increment usage count and when system is suspended
  *		      schedule resume process, returns success irrespective of
  *		      pm_state.
- * HIF_RTPM_GET_SYNC: Increment usage count and when system is suspended,
+ * @HIF_RTPM_GET_SYNC: Increment usage count and when system is suspended,
  *		     wait till process is resumed.
- * HIF_RTPM_GET_NORESUME: Only increments usage count.
- * HIF_RTPM_PUT_ASYNC: Decrements usage count and puts system in idle state.
- * HIF_RTPM_PUT_SYNC_SUSPEND: Decrements usage count and puts system in
+ * @HIF_RTPM_GET_NORESUME: Only increments usage count.
+ * @HIF_RTPM_PUT_ASYNC: Decrements usage count and puts system in idle state.
+ * @HIF_RTPM_PUT_SYNC_SUSPEND: Decrements usage count and puts system in
  *			     suspended state.
- * HIF_RTPM_PUT_NOIDLE: Decrements usage count.
+ * @HIF_RTPM_PUT_NOIDLE: Decrements usage count.
  */
 enum rpm_type {
 	HIF_RTPM_GET_ASYNC,
@@ -1276,9 +1306,9 @@ enum rpm_type {
 
 /**
  * struct hif_pm_runtime_lock - data structure for preventing runtime suspend
- * @list - global list of runtime locks
- * @active - true if this lock is preventing suspend
- * @name - character string for tracking this lock
+ * @list: global list of runtime locks
+ * @active: true if this lock is preventing suspend
+ * @name: character string for tracking this lock
  */
 struct hif_pm_runtime_lock {
 	struct list_head list;
@@ -1291,7 +1321,6 @@ struct hif_pm_runtime_lock {
  * hif_rtpm_register() - Register a module with runtime PM.
  * @id: ID of the module which needs to be registered
  * @hif_rpm_cbk: callback to be called when get was called in suspended state.
- * @prevent_multiple_get: not allow simultaneous get calls or put calls
  *
  * Return: success status if successfully registered
  */
@@ -1361,7 +1390,7 @@ void hif_runtime_lock_deinit(struct hif_pm_runtime_lock *data);
 QDF_STATUS hif_rtpm_get(uint8_t type, uint32_t id);
 
 /**
- * hif_pm_runtime_put() - do a put operation on the device
+ * hif_rtpm_put() - do a put operation on the device
  * @type: put call types from hif_rpm_type
  * @id: ID of the module calling put()
  *
@@ -1515,7 +1544,7 @@ void hif_process_runtime_suspend_success(void);
 void hif_process_runtime_suspend_failure(void);
 
 /**
- * hif_process_runtime_suspend_failure() - bookkeeping of resuming link up
+ * hif_process_runtime_resume_linkup() - bookkeeping of resuming link up
  *
  * update the runtime_pm state to RESUMING_LINKUP
  * Return: void
@@ -1597,7 +1626,8 @@ void hif_rtpm_display_last_busy_hist(struct hif_opaque_softc *hif_ctx);
 
 /**
  * hif_rtpm_record_ce_last_busy_evt() - Record CE runtimepm last busy event
- * @hif_ctx: HIF context
+ * @scn: HIF context
+ * @ce_id: CE id
  *
  * Return: None
  */
@@ -1616,7 +1646,8 @@ void hif_rtpm_display_last_busy_hist(struct hif_opaque_softc *hif_ctx) { }
 
 /**
  * hif_rtpm_record_ce_last_busy_evt() - Record CE runtimepm last busy event
- * @hif_ctx: HIF context
+ * @scn: HIF context
+ * @ce_id: CE id
  *
  * Return: None
  */
@@ -1752,15 +1783,16 @@ bool hif_get_ipa_present(void)
 }
 #endif
 int hif_bus_resume(struct hif_opaque_softc *hif_ctx);
+
 /**
- * hif_bus_ealry_suspend() - stop non wmi tx traffic
- * @context: hif context
+ * hif_bus_early_suspend() - stop non wmi tx traffic
+ * @hif_ctx: hif context
  */
 int hif_bus_early_suspend(struct hif_opaque_softc *hif_ctx);
 
 /**
  * hif_bus_late_resume() - resume non wmi traffic
- * @context: hif context
+ * @hif_ctx: hif context
  */
 int hif_bus_late_resume(struct hif_opaque_softc *hif_ctx);
 int hif_bus_suspend(struct hif_opaque_softc *hif_ctx);
@@ -1940,7 +1972,9 @@ void hif_deconfigure_ext_group_interrupts(struct hif_opaque_softc *hif_ctx);
  * @irq: array of irq values
  * @handler: callback interrupt handler function
  * @cb_ctx: context to passed in callback
+ * @context_name: text name of the context
  * @type: napi vs tasklet
+ * @scale:
  *
  * Return: QDF_STATUS
  */
@@ -1959,15 +1993,16 @@ void hif_update_pipe_callback(struct hif_opaque_softc *osc,
 
 /**
  * hif_print_napi_stats() - Display HIF NAPI stats
- * @hif_ctx - HIF opaque context
+ * @hif_ctx: HIF opaque context
  *
  * Return: None
  */
 void hif_print_napi_stats(struct hif_opaque_softc *hif_ctx);
 
-/* hif_clear_napi_stats() - function clears the stats of the
+/**
+ * hif_clear_napi_stats() - function clears the stats of the
  * latency when called.
- * @hif_ctx - the HIF context to assign the callback to
+ * @hif_ctx: the HIF context to assign the callback to
  *
  * Return: None
  */
@@ -2024,7 +2059,7 @@ int hif_force_wake_release(struct hif_opaque_softc *handle)
 #ifdef FEATURE_HAL_DELAYED_REG_WRITE
 /**
  * hif_prevent_link_low_power_states() - Prevent from going to low power states
- * @hif - HIF opaque context
+ * @hif: HIF opaque context
  *
  * Return: 0 on success. Error code on failure.
  */
@@ -2032,7 +2067,7 @@ int hif_prevent_link_low_power_states(struct hif_opaque_softc *hif);
 
 /**
  * hif_allow_link_low_power_states() - Allow link to go to low power states
- * @hif - HIF opaque context
+ * @hif: HIF opaque context
  *
  * Return: None
  */
@@ -2058,14 +2093,14 @@ void *hif_get_dev_ba_pmm(struct hif_opaque_softc *hif_handle);
 
 /**
  * hif_get_dev_ba_cmem() - get base address of CMEM
- * @hif_ctx - the HIF context
+ * @hif_handle: the HIF context
  *
  */
 void *hif_get_dev_ba_cmem(struct hif_opaque_softc *hif_handle);
 
 /**
  * hif_get_soc_version() - get soc major version from target info
- * @hif_ctx - the HIF context
+ * @hif_handle: the HIF context
  *
  * Return: version number
  */
@@ -2073,9 +2108,9 @@ uint32_t hif_get_soc_version(struct hif_opaque_softc *hif_handle);
 
 /**
  * hif_set_initial_wakeup_cb() - set the initial wakeup event handler function
- * @hif_ctx - the HIF context to assign the callback to
- * @callback - the callback to assign
- * @priv - the private data to pass to the callback when invoked
+ * @hif_ctx: the HIF context to assign the callback to
+ * @callback: the callback to assign
+ * @priv: the private data to pass to the callback when invoked
  *
  * Return: None
  */
@@ -2135,9 +2170,9 @@ void hif_set_ce_service_max_rx_ind_flush(struct hif_opaque_softc *hif,
 					 uint8_t ce_service_max_rx_ind_flush);
 
 #ifdef OL_ATH_SMART_LOGGING
-/*
- * hif_log_ce_dump() - Copy all the CE DEST ring to buf
- * @scn : HIF handler
+/**
+ * hif_log_dump_ce() - Copy all the CE DEST ring to buf
+ * @scn: HIF handler
  * @buf_cur: Current pointer in ring buffer
  * @buf_init:Start of the ring buffer
  * @buf_sz: Size of the ring buffer
@@ -2154,10 +2189,10 @@ uint8_t *hif_log_dump_ce(struct hif_softc *scn, uint8_t *buf_cur,
 			 uint32_t ce, uint32_t skb_sz);
 #endif /* OL_ATH_SMART_LOGGING */
 
-/*
- * hif_softc_to_hif_opaque_softc - API to convert hif_softc handle
+/**
+ * hif_softc_to_hif_opaque_softc() - API to convert hif_softc handle
  * to hif_opaque_softc handle
- * @hif_handle - hif_softc type
+ * @hif_handle: hif_softc type
  *
  * Return: hif_opaque_softc type
  */
@@ -2282,7 +2317,7 @@ static inline void hif_config_irq_set_perf_affinity_hint(
 
 /**
  * hif_apps_grp_irqs_enable() - enable ext grp irqs
- * @hif - HIF opaque context
+ * @hif_ctx: HIF opaque context
  *
  * Return: 0 on success. Error code on failure.
  */
@@ -2290,7 +2325,7 @@ int hif_apps_grp_irqs_enable(struct hif_opaque_softc *hif_ctx);
 
 /**
  * hif_apps_grp_irqs_disable() - disable ext grp irqs
- * @hif - HIF opaque context
+ * @hif_ctx: HIF opaque context
  *
  * Return: 0 on success. Error code on failure.
  */
@@ -2298,7 +2333,7 @@ int hif_apps_grp_irqs_disable(struct hif_opaque_softc *hif_ctx);
 
 /**
  * hif_disable_grp_irqs() - disable ext grp irqs
- * @hif - HIF opaque context
+ * @scn: HIF opaque context
  *
  * Return: 0 on success. Error code on failure.
  */
@@ -2306,7 +2341,7 @@ int hif_disable_grp_irqs(struct hif_opaque_softc *scn);
 
 /**
  * hif_enable_grp_irqs() - enable ext grp irqs
- * @hif - HIF opaque context
+ * @scn: HIF opaque context
  *
  * Return: 0 on success. Error code on failure.
  */
@@ -2497,7 +2532,7 @@ void hif_set_grp_intr_affinity(struct hif_opaque_softc *scn,
 #endif
 /**
  * hif_get_max_wmi_ep() - Get max WMI EPs configured in target svc map
- * @hif_ctx: hif opaque handle
+ * @scn: hif opaque handle
  *
  * Description:
  *   Gets number of WMI EPs configured in target svc map. Since EP map
@@ -2564,7 +2599,7 @@ hif_set_irq_config_by_ceid(struct hif_opaque_softc *scn, uint8_t ce_id,
 /**
  * hif_get_direct_link_ce_dest_srng_buffers() - Get Direct Link ce dest srng
  *  buffer information
- * @hif_ctx: hif opaque handle
+ * @scn: hif opaque handle
  * @dma_addr: pointer to array of dma addresses
  * @buf_size: ce dest ring buffer size
  *
@@ -2576,7 +2611,7 @@ uint16_t hif_get_direct_link_ce_dest_srng_buffers(struct hif_opaque_softc *scn,
 
 /**
  * hif_get_direct_link_ce_srng_info() - Get Direct Link CE srng information
- * @hif_ctx: hif opaque handle
+ * @scn: hif opaque handle
  * @info: Direct Link CEs information
  * @max_ce_info_len: max array size of ce info
  *
