@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2016-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -844,7 +844,11 @@ struct mgmt_rx_event_ext_params {
 
 #ifdef WLAN_FEATURE_11BE_MLO
 #define CU_VDEV_MAP_MASK 0xFFFF
-#define CU_MAX_MLO_LINKS 6
+/*
+ * Maximum number of CU LINKS across the system.
+ * this is not the CU links within and AP MLD.
+ */
+#define CU_MAX_MLO_LINKS 7
 #define MAX_AP_MLDS_PER_LINK 16
 /**
  * struct mlo_mgmt_ml_info - Ongoing Critical Update information.

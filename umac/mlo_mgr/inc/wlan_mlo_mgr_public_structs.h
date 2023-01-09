@@ -120,7 +120,13 @@ enum MLO_SOC_LIST {
  * @qdf_event_t: event for teardown completion
  * @dp_handle: pointer to DP ML context
  */
-#define MAX_MLO_LINKS 6
+
+/*
+ * Maximum number of MLO LINKS across the system,
+ * this is not the MLO links within and AP-MLD.
+ */
+
+#define MAX_MLO_LINKS 7
 #define MAX_MLO_CHIPS 5
 struct mlo_setup_info {
 	uint8_t ml_grp_id;
