@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2017-2020 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -42,6 +42,24 @@
 
 /* This should align with nac mac type enumerations in ieee80211_ioctl.h */
 #define CDP_LITE_MON_PEER_MAC_TYPE_CLIENT 2
+
+/**
+ * enum cdp_lite_mon legacy_filter: legacy filters for tx/rx
+ * @LEGACY_FILTER_DISABLED: No filter / filter disabled
+ * @LEGACY_FILTER_MCOPY: M_Copy filter
+ * @LEGACY_FILTER_TX_CAPTURE: Tx_Capture filter
+ * @LEGACY_FILTER_RX_ENH_CAPTURE: Rx Enhance capture filter
+ * @LEGACY_FILTER_ADV_MON_FILTER: Advance Monitor filter
+ *
+ * Use to identify which filter is currently enabled using lite mon
+ */
+enum cdp_lite_mon_legacy_filter {
+	LEGACY_FILTER_DISABLED = 0,
+	LEGACY_FILTER_MCOPY = 1,
+	LEGACY_FILTER_TX_CAPTURE = 2,
+	LEGACY_FILTER_RX_ENH_CAPTURE = 3,
+	LEGACY_FILTER_ADV_MON_FILTER = 4,
+};
 
 /* lite mon frame levels */
 enum cdp_lite_mon_level {
@@ -491,6 +509,7 @@ struct cdp_pdev_mon_stats {
  * @len: mgmt/ctrl/data frame lens
  * @debug: debug options
  * @vdev_id: output vdev id
+ * @legacy_filter_enabled: legacy filter currently enabled
  */
 struct cdp_lite_mon_filter_config {
 	uint8_t direction;
@@ -503,6 +522,7 @@ struct cdp_lite_mon_filter_config {
 	uint16_t len[CDP_MON_FRM_TYPE_MAX];
 	uint8_t debug;
 	uint8_t vdev_id;
+	uint8_t legacy_filter_enabled;
 };
 
 /**

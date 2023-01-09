@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2016-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -4310,6 +4310,14 @@ dp_lite_mon_rx_mpdu_process(struct dp_pdev *pdev,
 			    uint8_t user)
 {
 	return QDF_STATUS_E_FAILURE;
+}
+
+static inline int
+dp_lite_mon_get_legacy_feature_enabled(struct cdp_soc_t *soc,
+				       uint8_t pdev_id,
+				       uint8_t direction)
+{
+	return 0;
 }
 #endif
 

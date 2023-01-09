@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2016-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -216,6 +216,35 @@ cdp_is_lite_mon_enabled(ol_txrx_soc_handle soc,
 		return 0;
 
 	return soc->ops->mon_ops->txrx_is_lite_mon_enabled(soc, pdev_id, dir);
+}
+
+/*
+ * cdp_get_lite_mon_legacy_feature_enabled() - Get the legacy feature enabled
+ *
+ * @soc: dp soc handle
+ * @pdev_id: pdev id
+ * @dir: direction tx/rx
+ *
+ *  This API is used to get the legacy feature enabled using lite_mon
+ *
+ * Return: legacy feature enabled
+ */
+static inline int
+cdp_get_lite_mon_legacy_feature_enabled(ol_txrx_soc_handle soc,
+					uint8_t pdev_id, uint8_t dir)
+{
+	if (!soc || !soc->ops) {
+		dp_cdp_debug("Invalid Instance");
+		return 0;
+	}
+
+	if (!soc->ops->mon_ops ||
+	    !soc->ops->mon_ops->txrx_get_lite_mon_legacy_feature_enabled)
+		return 0;
+
+	return soc->ops->mon_ops->txrx_get_lite_mon_legacy_feature_enabled(soc,
+									   pdev_id,
+									   dir);
 }
 #endif
 

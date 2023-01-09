@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -1312,6 +1312,7 @@ struct cdp_mon_ops dp_ops_mon_1_0 = {
 	.txrx_set_lite_mon_peer_config = NULL,
 	.txrx_get_lite_mon_peer_config = NULL,
 	.txrx_is_lite_mon_enabled = NULL,
+	.txrx_get_lite_mon_legacy_feature_enabled = NULL,
 #endif
 	.txrx_set_mon_pdev_params_rssi_dbm_conv =
 				dp_mon_pdev_params_rssi_dbm_conv,
