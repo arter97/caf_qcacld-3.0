@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2014-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -959,38 +959,6 @@ static void reg_find_high_limit_chan_enum(
 			break;
 	}
 }
-
-#ifdef REG_DISABLE_JP_CH144
-/**
- * reg_modify_chan_list_for_japan() - Disable channel 144 for MKK17_MKKC
- * regdomain by default.
- * @pdev: Pointer to pdev
- *
- * Return: None
- */
-static void
-reg_modify_chan_list_for_japan(struct wlan_objmgr_pdev *pdev)
-{
-#define MKK17_MKKC 0xE1
-	struct wlan_regulatory_pdev_priv_obj *pdev_priv_obj;
-
-	pdev_priv_obj = reg_get_pdev_obj(pdev);
-	if (!IS_VALID_PDEV_REG_OBJ(pdev_priv_obj)) {
-		reg_err("reg pdev priv obj is NULL");
-		return;
-	}
-
-	if (pdev_priv_obj->reg_dmn_pair == MKK17_MKKC)
-		pdev_priv_obj->en_chan_144 = false;
-
-#undef MKK17_MKKC
-}
-#else
-static inline void
-reg_modify_chan_list_for_japan(struct wlan_objmgr_pdev *pdev)
-{
-}
-#endif
 
 #ifdef CONFIG_AFC_SUPPORT
 /**
@@ -3246,7 +3214,6 @@ void reg_propagate_mas_chan_list_to_pdev(struct wlan_objmgr_psoc *psoc,
 	reg_save_reg_rules_to_pdev(psoc_reg_rules, pdev_priv_obj);
 	reg_set_ap_pwr_type(pdev_priv_obj);
 	reg_init_pdev_super_chan_list(pdev_priv_obj);
-	reg_modify_chan_list_for_japan(pdev);
 	pdev_priv_obj->chan_list_recvd =
 		psoc_priv_obj->chan_list_recvd[phy_id];
 
