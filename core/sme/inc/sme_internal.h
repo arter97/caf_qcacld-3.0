@@ -506,6 +506,8 @@ struct sme_context {
 			(const struct oem_data *oem_event_data);
 #endif
 
+	void (*ssr_on_pagefault_cb)(void);
+
 #ifdef MULTI_CLIENT_LL_SUPPORT
 	void (*latency_level_event_handler_cb)
 			(const struct latency_level_data *event_data,

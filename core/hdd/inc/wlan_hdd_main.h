@@ -1915,6 +1915,8 @@ enum wlan_state_ctrl_str_id {
  * @oem_data_len:
  * @file_name:
  * @dbam_mode:
+ * @last_pagefault_ssr_time: Time when last recovery was triggered because of
+ * @host wakeup from fw with reason as pagefault
  */
 struct hdd_context {
 	struct wlan_objmgr_psoc *psoc;
@@ -2197,6 +2199,7 @@ struct hdd_context {
 #ifdef WLAN_FEATURE_DBAM_CONFIG
 	enum coex_dbam_config_mode dbam_mode;
 #endif
+	qdf_time_t last_pagefault_ssr_time;
 };
 
 /**
