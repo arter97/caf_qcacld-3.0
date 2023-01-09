@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2015,2020-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -579,8 +579,10 @@ QDF_STATUS osif_update_mlo_partner_info(
 			return status;
 		}
 
-		if (partner_info.num_partner_links >= 2) {
-			osif_err("Rejecting connect for 3 or more link MLD");
+		if (partner_info.num_partner_links + 1 >
+			WLAN_UMAC_MLO_ASSOC_MAX_SUPPORTED_LINKS) {
+			osif_err("Rejecting connect for more than %d Assoc links",
+				 WLAN_UMAC_MLO_ASSOC_MAX_SUPPORTED_LINKS);
 			return QDF_STATUS_E_FAILURE;
 		}
 
