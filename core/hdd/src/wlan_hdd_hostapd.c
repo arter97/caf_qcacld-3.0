@@ -2852,6 +2852,8 @@ QDF_STATUS hdd_hostapd_sap_event_cb(struct sap_event *sap_event,
 				hdd_debug("set hw mode change not done");
 		}
 
+		hdd_son_deliver_chan_change_event(
+			adapter, sap_event->sapevt.sap_ch_selected.pri_ch_freq);
 		return hdd_hostapd_chan_change(adapter, sap_event);
 	case eSAP_ACS_SCAN_SUCCESS_EVENT:
 		return hdd_handle_acs_scan_event(sap_event, adapter);

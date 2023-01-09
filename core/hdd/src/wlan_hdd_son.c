@@ -2696,6 +2696,39 @@ void hdd_son_deliver_peer_authorize_event(struct hdd_adapter *adapter,
 	hdd_objmgr_put_vdev_by_user(vdev, WLAN_SON_ID);
 }
 
+int hdd_son_deliver_chan_change_event(struct hdd_adapter *adapter,
+				      qdf_freq_t freq)
+{
+	int ret = -EINVAL;
+	struct wlan_objmgr_vdev *vdev;
+	struct son_ald_chan_change_info chan_info;
+	struct wlan_objmgr_pdev *pdev;
+
+	if (!adapter) {
+		hdd_err("null adapter");
+		return ret;
+	}
+	vdev = hdd_objmgr_get_vdev_by_user(adapter, WLAN_SON_ID);
+	if (!vdev) {
+		hdd_err("null vdev");
+		return ret;
+	}
+	pdev = wlan_vdev_get_pdev(vdev);
+	if (!pdev) {
+		hdd_err("null pdev");
+		hdd_objmgr_put_vdev_by_user(vdev, WLAN_SON_ID);
+		return ret;
+	}
+	chan_info.freq = freq;
+	chan_info.chan_num = wlan_reg_freq_to_chan(pdev, freq);
+	ret = os_if_son_deliver_ald_event(vdev, NULL,
+					  MLME_EVENT_CHAN_CHANGE,
+					  &chan_info);
+	hdd_objmgr_put_vdev_by_user(vdev, WLAN_SON_ID);
+
+	return ret;
+}
+
 int hdd_son_send_set_wifi_generic_command(struct wiphy *wiphy,
 					  struct wireless_dev *wdev,
 					  struct nlattr **tb)
