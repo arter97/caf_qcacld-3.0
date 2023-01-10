@@ -836,10 +836,10 @@ enum {
 	IEEE80211_PARAM_EHT_MAX_SUPP_LTF = 790, /* Set 11be - EHT Max LTF Support */
 #endif /* WLAN_FEATURE_11BE */
 #ifdef QCA_SUPPORT_WDS_EXTENDED
-	IEEE80211_PARAM_DROP_TX_MCAST  = 790,  /* Flag to enable/disable tx mcast pkt drops */
+	IEEE80211_PARAM_DROP_TX_MCAST  = 791,  /* Flag to enable/disable tx mcast pkt drops */
 #endif
 #if ATH_SUPPORT_DSCP_OVERRIDE
-	IEEE80211_PARAM_GDSCP_TID_MAP = 791, /* Get dscp-tid map */
+	IEEE80211_PARAM_GDSCP_TID_MAP = 792, /* Get dscp-tid map */
 #endif
 };
 
