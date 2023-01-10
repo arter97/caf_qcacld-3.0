@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2011,2017-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  *
  * Permission to use, copy, modify, and/or distribute this software for
@@ -491,7 +491,7 @@ bad:
 
 /**
  * spectral_ctx_deinit() - De-initialize function pointers from spectral context
- * @sc - Reference to spectral_context object
+ * @sc: Reference to spectral_context object
  *
  * Return: None
  */
