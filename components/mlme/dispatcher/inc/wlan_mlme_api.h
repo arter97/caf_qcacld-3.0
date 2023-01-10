@@ -1101,6 +1101,18 @@ bool wlan_mlme_get_usr_disable_sta_eht(struct wlan_objmgr_psoc *psoc);
  */
 void wlan_mlme_set_usr_disable_sta_eht(struct wlan_objmgr_psoc *psoc,
 				       bool disable);
+#else
+static inline
+bool wlan_mlme_get_usr_disable_sta_eht(struct wlan_objmgr_psoc *psoc)
+{
+	return true;
+}
+
+static inline
+void wlan_mlme_set_usr_disable_sta_eht(struct wlan_objmgr_psoc *psoc,
+				       bool disable)
+{
+}
 #endif
 
 /**
@@ -3766,6 +3778,27 @@ uint8_t wlan_mlme_get_sta_mlo_simultaneous_links(struct wlan_objmgr_psoc *psoc);
  */
 QDF_STATUS wlan_mlme_set_sta_mlo_conn_band_bmp(struct wlan_objmgr_psoc *psoc,
 					       uint8_t value);
+#else
+static inline QDF_STATUS
+wlan_mlme_set_sta_mlo_conn_max_num(struct wlan_objmgr_psoc *psoc,
+				   uint8_t value)
+{
+	return QDF_STATUS_SUCCESS;
+}
+
+static inline QDF_STATUS
+wlan_mlme_set_sta_mlo_simultaneous_links(struct wlan_objmgr_psoc *psoc,
+					 uint8_t value)
+{
+	return QDF_STATUS_SUCCESS;
+}
+
+static inline QDF_STATUS
+wlan_mlme_set_sta_mlo_conn_band_bmp(struct wlan_objmgr_psoc *psoc,
+				    uint8_t value)
+{
+	return QDF_STATUS_SUCCESS;
+}
 #endif
 
 /**
@@ -4074,4 +4107,26 @@ wlan_mlme_get_peer_ch_width(struct wlan_objmgr_psoc *psoc, uint8_t *mac);
 void
 wlan_mlme_get_sr_enable_modes(struct wlan_objmgr_psoc *psoc, uint8_t *val);
 #endif
+
+/**
+ * wlan_mlme_set_edca_pifs_param() - set edca/pifs param for ll sap
+ * @ep: pointer to wlan_edca_pifs_param_ie
+ * @type: edca_param_type
+ *
+ * Return: None
+ */
+void
+wlan_mlme_set_edca_pifs_param(struct wlan_edca_pifs_param_ie *ep,
+			      enum host_edca_param_type type);
+/**
+ * wlan_mlme_stats_get_periodic_display_time() - get display time
+ * @psoc: pointer to psoc object
+ * @periodic_display_time: buffer to hold value
+ *
+ * Return: QDF Status
+ */
+QDF_STATUS
+wlan_mlme_stats_get_periodic_display_time(struct wlan_objmgr_psoc *psoc,
+					  uint32_t *periodic_display_time);
+
 #endif /* _WLAN_MLME_API_H_ */

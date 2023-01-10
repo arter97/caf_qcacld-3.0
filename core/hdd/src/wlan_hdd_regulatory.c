@@ -506,7 +506,8 @@ static void hdd_modify_wiphy(struct wiphy  *wiphy,
 
 /**
  * hdd_set_dfs_region() - set the dfs_region
- * @dfs_region: the dfs_region to set
+ * @hdd_ctx: HDD context
+ * @dfs_reg: the dfs_region to set
  *
  * Return: void
  */
@@ -701,8 +702,11 @@ static int hdd_regulatory_init_no_offload(struct hdd_context *hdd_ctx,
 
 /**
  * hdd_modify_indoor_channel_state_flags() - modify wiphy flags and cds state
+ * @hdd_ctx: HDD context
  * @wiphy_chan: wiphy channel number
  * @cds_chan: cds channel structure
+ * @chan_enum: enumerated value of the channel
+ * @chan_num: channel number
  * @disable: Disable/enable the flags
  *
  * Modify wiphy flags and cds state if channel is indoor.
@@ -999,6 +1003,7 @@ static void hdd_restore_custom_reg_settings(struct wiphy *wiphy,
 
 /**
  * hdd_restore_reg_flags() - restore regulatory flags
+ * @wiphy: device wiphy
  * @flags: regulatory flags
  *
  * Return: void
@@ -1270,8 +1275,9 @@ static void fill_wiphy_band_channels(struct wiphy *wiphy,
 #ifdef FEATURE_WLAN_CH_AVOID
 /**
  * hdd_ch_avoid_ind() - Avoid notified channels from FW handler
- * @adapter:	HDD adapter pointer
- * @indParam:	Channel avoid notification parameter
+ * @hdd_ctxt: HDD context
+ * @unsafe_chan_list: Channels that are unsafe
+ * @avoid_freq_list: Frequencies to avoid
  *
  * Avoid channel notification from FW handler.
  * FW will send un-safe channel list to avoid over wrapping.
@@ -1408,6 +1414,7 @@ static enum nl80211_dfs_regions dfs_reg_to_nl80211_dfs_regions(
 
 /**
  * hdd_set_dfs_pri_multiplier() - Set dfs_pri_multiplier for ETSI region
+ * @hdd_ctx: HDD context
  * @dfs_region: DFS region
  *
  * Return: none
@@ -1903,16 +1910,26 @@ static void hdd_regulatory_dyn_cbk(struct wlan_objmgr_psoc *psoc,
 	struct hdd_context *hdd_ctx;
 	enum country_src cc_src;
 	uint8_t alpha2[REG_ALPHA2_LEN + 1];
+	bool nb_flag;
+	bool reg_flag;
 
 	pdev_priv = wlan_pdev_get_ospriv(pdev);
 	wiphy = pdev_priv->wiphy;
 	hdd_ctx = wiphy_priv(wiphy);
+
+	nb_flag = ucfg_mlme_get_coex_unsafe_chan_nb_user_prefer(hdd_ctx->psoc);
+	reg_flag = ucfg_mlme_get_coex_unsafe_chan_reg_disable(hdd_ctx->psoc);
+
+	if (avoid_freq_ind && nb_flag && reg_flag)
+		goto sync_chanlist;
 
 	if (avoid_freq_ind) {
 		hdd_ch_avoid_ind(hdd_ctx, &avoid_freq_ind->chan_list,
 				 &avoid_freq_ind->freq_list);
 		return;
 	}
+
+sync_chanlist:
 
 	hdd_debug("process channel list update from regulatory");
 	hdd_regulatory_chanlist_dump(chan_list);

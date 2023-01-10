@@ -86,6 +86,7 @@
 #include "wlan_mlo_mgr_sta.h"
 #include "wlan_mlo_mgr_peer.h"
 #include <wlan_twt_api.h>
+#include "spatial_reuse_api.h"
 
 struct pe_hang_event_fixed_param {
 	uint16_t tlv_header;
@@ -1907,13 +1908,16 @@ static void pe_update_crypto_params(struct mac_context *mac_ctx,
 		lim_get_connected_akm(ft_session, crypto_params->ucastcipherset,
 				      crypto_params->authmodeset,
 				      crypto_params->key_mgmt);
-	pe_nofl_debug("vdev %d roam auth 0x%x akm 0x%0x rsn_caps 0x%x ucastcipher 0x%x akm %d",
+	ft_session->encryptType =
+		lim_get_encrypt_ed_type(crypto_params->ucastcipherset);
+	pe_nofl_debug("vdev %d roam auth 0x%x akm 0x%0x rsn_caps 0x%x ucastcipher 0x%x akm %d enc: %d",
 		      ft_session->vdev_id,
 		      crypto_params->authmodeset,
 		      crypto_params->key_mgmt,
 		      crypto_params->rsn_caps,
 		      crypto_params->ucastcipherset,
-		      ft_session->connected_akm);
+		      ft_session->connected_akm,
+		      ft_session->encryptType);
 }
 
 /**
@@ -2700,6 +2704,110 @@ static inline void pe_roam_fill_obss_scan_param(struct pe_session *src_session,
 }
 #endif
 
+#ifdef WLAN_FEATURE_SR
+/**
+ * lim_handle_sr_cap() - To handle SR(Spatial Reuse) capability
+ * of roamed AP
+ * @vdev: objmgr vdev
+ *
+ * This function is to check and compare SR cap of previous and
+ * roamed AP and takes decision to send event to userspace.
+ *
+ * Return: None
+ */
+static void lim_handle_sr_cap(struct wlan_objmgr_vdev *vdev)
+{
+	int32_t non_srg_pd_threshold = 0;
+	int32_t srg_pd_threshold = 0;
+	uint8_t non_srg_pd_offset = 0;
+	uint8_t srg_max_pd_offset = 0;
+	uint8_t srg_min_pd_offset = 0;
+	uint8_t sr_ctrl;
+	bool is_pd_threshold_present = false;
+	struct wlan_objmgr_pdev *pdev;
+	enum sr_status_of_roamed_ap sr_status;
+
+	pdev = wlan_vdev_get_pdev(vdev);
+	if (!pdev) {
+		pe_err("invalid pdev");
+		return;
+	}
+	non_srg_pd_offset = wlan_vdev_mlme_get_non_srg_pd_offset(vdev);
+	wlan_vdev_mlme_get_srg_pd_offset(vdev, &srg_max_pd_offset,
+					 &srg_min_pd_offset);
+	wlan_vdev_mlme_get_current_non_srg_pd_threshold(vdev,
+							&non_srg_pd_threshold);
+	wlan_vdev_mlme_get_current_srg_pd_threshold(vdev,
+						    &srg_pd_threshold);
+
+	sr_ctrl = wlan_vdev_mlme_get_sr_ctrl(vdev);
+	if ((sr_ctrl & NON_SRG_PD_SR_DISALLOWED) &&
+	    (!(sr_ctrl & SRG_INFO_PRESENT))) {
+		sr_status = SR_DISALLOW;
+	} else {
+		if ((!(sr_ctrl & NON_SRG_PD_SR_DISALLOWED) &&
+		     (non_srg_pd_threshold > non_srg_pd_offset +
+		      SR_PD_THRESHOLD_MIN)) ||
+		     ((sr_ctrl & SRG_INFO_PRESENT) &&
+		      ((srg_pd_threshold > srg_max_pd_offset +
+		     SR_PD_THRESHOLD_MIN) ||
+		      (srg_pd_threshold < srg_min_pd_offset +
+		       SR_PD_THRESHOLD_MIN))))
+			sr_status = SR_THRESHOLD_NOT_IN_RANGE_OF_ROAMED_AP;
+		else
+			sr_status = SR_THRESHOLD_IN_RANGE_OF_ROAMED_AP;
+	}
+	pe_debug("sr status of roamed AP %d existing thresholds srg: %d non-srg: %d roamed AP sr offset srg: max %d min %d non-srg: %d",
+		 sr_status, srg_pd_threshold, non_srg_pd_threshold,
+		 srg_max_pd_offset, srg_min_pd_offset, non_srg_pd_offset);
+	switch (sr_status) {
+	case SR_DISALLOW:
+		/** clear thresholds set by previous AP **/
+		wlan_vdev_mlme_set_current_non_srg_pd_threshold(vdev, 0);
+		wlan_vdev_mlme_set_current_srg_pd_threshold(vdev, 0);
+		wlan_spatial_reuse_osif_event(vdev,
+					      SR_OPERATION_SUSPEND,
+					      SR_REASON_CODE_ROAMING);
+	break;
+	case SR_THRESHOLD_NOT_IN_RANGE_OF_ROAMED_AP:
+		wlan_vdev_mlme_get_pd_threshold_present(
+						vdev, &is_pd_threshold_present);
+		/*
+		 * if userspace gives pd threshold then check if its within
+		 * range of roamed AP's min and max thresholds, if not in
+		 * range disable and let userspace decide to re-enable.
+		 * if userspace dosesnt give PD threshold then always enable
+		 * SRG based on AP's recommendation of thresholds.
+		 */
+		if (is_pd_threshold_present) {
+			wlan_vdev_mlme_set_current_non_srg_pd_threshold(vdev,
+									0);
+			wlan_vdev_mlme_set_current_srg_pd_threshold(vdev, 0);
+			wlan_spatial_reuse_osif_event(vdev,
+						      SR_OPERATION_SUSPEND,
+						      SR_REASON_CODE_ROAMING);
+		} else {
+			wlan_sr_setup_req(
+				vdev, pdev, true,
+				srg_max_pd_offset + SR_PD_THRESHOLD_MIN,
+				non_srg_pd_threshold + SR_PD_THRESHOLD_MIN);
+			wlan_spatial_reuse_osif_event(vdev,
+						      SR_OPERATION_RESUME,
+						      SR_REASON_CODE_ROAMING);
+		}
+	break;
+	case SR_THRESHOLD_IN_RANGE_OF_ROAMED_AP:
+		/* Send enable command to fw, as fw disables SR on roaming */
+		wlan_sr_setup_req(vdev, pdev, true, srg_pd_threshold,
+				  non_srg_pd_threshold);
+	break;
+	}
+}
+#else
+static void lim_handle_sr_cap(struct wlan_objmgr_vdev *vdev)
+{}
+#endif
+
 QDF_STATUS
 pe_roam_synch_callback(struct mac_context *mac_ctx,
 		       uint8_t vdev_id,
@@ -2903,7 +3011,6 @@ pe_roam_synch_callback(struct mac_context *mac_ctx,
 
 	lim_copy_and_free_hlp_data_from_session(ft_session_ptr,
 						roam_sync_ind_ptr);
-
 	roam_sync_ind_ptr->aid = ft_session_ptr->limAID;
 	curr_sta_ds->mlmStaContext.mlmState = eLIM_MLM_LINK_ESTABLISHED_STATE;
 	curr_sta_ds->nss = ft_session_ptr->nss;
@@ -2913,6 +3020,7 @@ pe_roam_synch_callback(struct mac_context *mac_ctx,
 	lim_init_tdls_data(mac_ctx, ft_session_ptr);
 	ric_tspec_len = ft_session_ptr->RICDataLen;
 	pe_debug("LFR3: Session RicLength: %d", ft_session_ptr->RICDataLen);
+	lim_handle_sr_cap(ft_session_ptr->vdev);
 #ifdef FEATURE_WLAN_ESE
 	ric_tspec_len += ft_session_ptr->tspecLen;
 	pe_debug("LFR3: tspecLen: %d", ft_session_ptr->tspecLen);
@@ -2954,7 +3062,6 @@ pe_roam_synch_callback(struct mac_context *mac_ctx,
 	ft_session_ptr->limSmeState = eLIM_SME_LINK_EST_STATE;
 	ft_session_ptr->limPrevSmeState = ft_session_ptr->limSmeState;
 	ft_session_ptr->bRoamSynchInProgress = false;
-
 	return QDF_STATUS_SUCCESS;
 }
 #endif
@@ -3347,7 +3454,8 @@ lim_cm_fill_link_session(struct mac_context *mac_ctx,
 
 	if (!assoc_vdev) {
 		pe_err("Assoc vdev is NULL");
-		return QDF_STATUS_E_FAILURE;
+		status = QDF_STATUS_E_FAILURE;
+		goto end;
 	}
 
 	status = wlan_vdev_mlme_get_ssid(assoc_vdev,
@@ -3357,31 +3465,26 @@ lim_cm_fill_link_session(struct mac_context *mac_ctx,
 	if (QDF_IS_STATUS_ERROR(status)) {
 		pe_err("Failed to get ssid vdev id %d",
 		       vdev_id);
-		return QDF_STATUS_E_FAILURE;
+		status = QDF_STATUS_E_FAILURE;
+		goto end;
 	}
 
 	sir_copy_mac_addr(pe_session->bssId, sync_ind->bssid.bytes);
 
 	pe_session->lim_join_req =
 		qdf_mem_malloc(sizeof(*pe_session->lim_join_req) + bss_len);
-	if (!pe_session->lim_join_req)
-		return QDF_STATUS_E_NOMEM;
+	if (!pe_session->lim_join_req) {
+		status = QDF_STATUS_E_NOMEM;
+		goto end;
+	}
 
 	pe_join_req = pe_session->lim_join_req;
 	bss_desc = &pe_session->lim_join_req->bssDescription;
-
-	bss_desc = qdf_mem_malloc(sizeof(struct bss_description) + ie_len);
-	if (!bss_desc) {
-		QDF_ASSERT(bss_desc);
-		status = -QDF_STATUS_E_NOMEM;
-		goto end;
-	}
 
 	status = lim_roam_fill_bss_descr(mac_ctx, sync_ind, bss_desc,
 					 pe_session);
 	if (!QDF_IS_STATUS_SUCCESS(status)) {
 		pe_err("LFR3:Failed to fill Bss Descr");
-		qdf_mem_free(bss_desc);
 		goto end;
 	}
 
@@ -3389,7 +3492,6 @@ lim_cm_fill_link_session(struct mac_context *mac_ctx,
 	if (QDF_IS_STATUS_ERROR(status)) {
 		pe_err("Failed to fill pe session vdev id %d",
 		       pe_session->vdev_id);
-		qdf_mem_free(bss_desc);
 		goto end;
 	}
 
@@ -3402,6 +3504,8 @@ end:
 		qdf_mem_free(pe_session->lim_join_req);
 		pe_session->lim_join_req = NULL;
 	}
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_MAC_ID);
+
 	return status;
 }
 
@@ -3491,7 +3595,7 @@ void lim_roam_mlo_create_peer(struct mac_context *mac,
 		return;
 
 	if (!wlan_vdev_mlme_is_mlo_vdev(vdev))
-		return;
+		goto end;
 
 	link_id = mlo_roam_get_link_id(vdev_id, sync_ind);
 	/* currently only 2 link MLO supported */
@@ -3748,7 +3852,7 @@ lim_gen_link_specific_probe_rsp(struct mac_context *mac_ctx,
 	struct mlo_partner_info *partner_info;
 	uint8_t chan;
 	uint8_t op_class;
-	uint16_t chan_freq;
+	uint16_t chan_freq, gen_frame_len;
 
 	if (!session_entry)
 		return QDF_STATUS_E_NULL_VALUE;
@@ -3776,20 +3880,33 @@ lim_gen_link_specific_probe_rsp(struct mac_context *mac_ctx,
 			goto end;
 		}
 
-		link_probe_rsp.ptr = qdf_mem_malloc(probe_rsp_len);
+		/*
+		 * When an MLO probe response is received from a link,
+		 * the other link might be superior in features compared to the
+		 * link that sent ML probe rsp and the per-STA profile
+		 * info may carry corresponding IEs. These IEs are extracted
+		 * and added to IE list of link probe response while generating
+		 * it. So, the new link probe response generated might be of
+		 * more size than the original link probe rsp. Allocate buffer
+		 * for the scan entry to accommodate all of the IEs got
+		 * generated as part of link probe rsp generation. Allocate
+		 * MAX_MGMT_MPDU_LEN bytes for IEs as the max frame size that
+		 * can be received from AP is MAX_MGMT_MPDU_LEN bytes.
+		 */
+		gen_frame_len = MAX_MGMT_MPDU_LEN;
+
+		link_probe_rsp.ptr = qdf_mem_malloc(gen_frame_len);
 		if (!link_probe_rsp.ptr)
 			return QDF_STATUS_E_NOMEM;
 
 		qdf_mem_copy(&sta_link_addr, session_entry->self_mac_addr,
 			     QDF_MAC_ADDR_SIZE);
 
-		link_probe_rsp.len = probe_rsp_len;
+		link_probe_rsp.len = gen_frame_len;
 		status = util_gen_link_probe_rsp(probe_rsp,
-						 probe_rsp_len,
-						 sta_link_addr,
-						 link_probe_rsp.ptr,
-						 probe_rsp_len,
-						 (qdf_size_t *)&link_probe_rsp.len);
+				probe_rsp_len, sta_link_addr,
+				link_probe_rsp.ptr, gen_frame_len,
+				(qdf_size_t *)&link_probe_rsp.len);
 
 		if (QDF_IS_STATUS_ERROR(status)) {
 			pe_err("MLO: Link probe response generation failed %d", status);
@@ -3797,6 +3914,8 @@ lim_gen_link_specific_probe_rsp(struct mac_context *mac_ctx,
 			status = QDF_STATUS_E_FAILURE;
 			goto end;
 		}
+		pe_debug("MLO: link probe rsp size:%u original probe rsp :%u",
+			 link_probe_rsp.len, probe_rsp_len);
 
 		/* Currently only 2 link mlo is supported */
 		link_info = &partner_info->partner_link_info[0];
@@ -3841,9 +3960,10 @@ lim_gen_link_probe_rsp_roam(struct mac_context *mac_ctx,
 	struct qdf_mac_addr sta_link_addr;
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
 	tSirProbeRespBeacon *probe_rsp;
-	uint8_t *frame;
+	uint8_t *frame, *src_addr;
 	uint32_t frame_len;
 	struct wlan_frame_hdr *hdr;
+	uint16_t gen_frame_len;
 
 	if (!session || !roam_sync_ind)
 		return QDF_STATUS_E_NULL_VALUE;
@@ -3880,7 +4000,22 @@ lim_gen_link_probe_rsp_roam(struct mac_context *mac_ctx,
 	}
 
 	if (probe_rsp->mlo_ie.mlo_ie_present) {
-		link_probe_rsp.ptr = qdf_mem_malloc(frame_len);
+		/*
+		 * When STA roams to an MLO AP, non-assoc link might be superior
+		 * in features compared to  assoc link and the per-STA profile
+		 * info may carry corresponding IEs. These IEs are extracted
+		 * and added to IE list of link probe response while generating
+		 * it. So, the link probe response generated from assoc link
+		 * probe response might be of more size than assoc link probe
+		 * rsp. Allocate buffer for the bss descriptor to accommodate
+		 * all of the IEs got generated as part of link probe rsp
+		 * generation. Allocate MAX_MGMT_MPDU_LEN bytes for IEs as the
+		 * max frame size that can be received from AP is
+		 * MAX_MGMT_MPDU_LEN bytes.
+		 */
+		gen_frame_len = MAX_MGMT_MPDU_LEN;
+
+		link_probe_rsp.ptr = qdf_mem_malloc(gen_frame_len);
 		if (!link_probe_rsp.ptr)
 			return QDF_STATUS_E_NOMEM;
 
@@ -3892,21 +4027,30 @@ lim_gen_link_probe_rsp_roam(struct mac_context *mac_ctx,
 		qdf_mem_copy(&sta_link_addr, session->self_mac_addr,
 			     QDF_MAC_ADDR_SIZE);
 
-		link_probe_rsp.len = frame_len;
+		link_probe_rsp.len = gen_frame_len;
 		status = util_gen_link_probe_rsp(frame, frame_len,
 				sta_link_addr, link_probe_rsp.ptr,
-				frame_len, (qdf_size_t *)&link_probe_rsp.len);
+				gen_frame_len,
+				(qdf_size_t *)&link_probe_rsp.len);
 		if (QDF_IS_STATUS_ERROR(status)) {
 			pe_err("MLO: Link probe response generation failed %d",
 			       status);
 			status = QDF_STATUS_E_FAILURE;
 			goto end;
 		}
+		pe_debug("MLO: link probe rsp size:%u original probe rsp :%u",
+			 link_probe_rsp.len, frame_len);
 
+		src_addr = lim_get_src_addr_from_frame(&link_probe_rsp);
+		if (!src_addr) {
+			pe_err("MLO: Failed to fetch src address");
+			status = QDF_STATUS_E_FAILURE;
+			goto end;
+		}
 		lim_add_bcn_probe(session->vdev, link_probe_rsp.ptr,
 				  link_probe_rsp.len,
-				  mlo_roam_get_link_freq(session->vdev_id,
-							 roam_sync_ind),
+				  mlo_roam_get_link_freq_from_mac_addr(
+						 roam_sync_ind, src_addr),
 				  roam_sync_ind->rssi);
 	} else {
 		qdf_mem_free(probe_rsp);
@@ -3922,11 +4066,31 @@ end:
 #endif
 
 #ifdef WLAN_FEATURE_SR
+static
+void lim_store_array_to_bit_map(uint64_t *val, uint8_t array[8])
+{
+	uint32_t bit_map_0 = 0;
+	uint32_t bit_map_1 = 0;
+
+	QDF_SET_BITS(bit_map_0, 0, SR_PADDING_BYTE, array[0]);
+	QDF_SET_BITS(bit_map_0, 8, SR_PADDING_BYTE, array[1]);
+	QDF_SET_BITS(bit_map_0, 16, SR_PADDING_BYTE, array[2]);
+	QDF_SET_BITS(bit_map_0, 24, SR_PADDING_BYTE, array[3]);
+	QDF_SET_BITS(bit_map_1, 0, SR_PADDING_BYTE, array[4]);
+	QDF_SET_BITS(bit_map_1, 8, SR_PADDING_BYTE, array[5]);
+	QDF_SET_BITS(bit_map_1, 16, SR_PADDING_BYTE, array[6]);
+	QDF_SET_BITS(bit_map_1, 24, SR_PADDING_BYTE, array[7]);
+	*val = (uint64_t) bit_map_0 |
+	       (((uint64_t)bit_map_1) << 32);
+}
+
 void lim_update_vdev_sr_elements(struct pe_session *session_entry,
 				 tpDphHashNode sta_ds)
 {
 	uint8_t sr_ctrl;
 	uint8_t non_srg_max_pd_offset, srg_min_pd_offset, srg_max_pd_offset;
+	uint64_t srg_color_bit_map = 0;
+	uint64_t srg_partial_bssid_bit_map = 0;
 	tDot11fIEspatial_reuse *srp_ie = &sta_ds->parsed_ies.srp_ie;
 
 	sr_ctrl = srp_ie->sr_value15_allow << 4 |
@@ -3938,14 +4102,23 @@ void lim_update_vdev_sr_elements(struct pe_session *session_entry,
 		srp_ie->non_srg_offset.info.non_srg_pd_max_offset;
 	srg_min_pd_offset = srp_ie->srg_info.info.srg_pd_min_offset;
 	srg_max_pd_offset = srp_ie->srg_info.info.srg_pd_max_offset;
-	pe_debug("Spatial Reuse Control field: %x Non-SRG Max PD Offset: %x SRG range %d - %d",
+	lim_store_array_to_bit_map(&srg_color_bit_map,
+				   srp_ie->srg_info.info.srg_color);
+	lim_store_array_to_bit_map(&srg_partial_bssid_bit_map,
+				   srp_ie->srg_info.info.srg_partial_bssid);
+	pe_debug("Spatial Reuse Control field: %x Non-SRG Max PD Offset: %x SRG range %d - %d srg_color_bit_map:%lu srg_partial_bssid_bit_map: %lu",
 		 sr_ctrl, non_srg_max_pd_offset, srg_min_pd_offset,
-		 srg_max_pd_offset);
-
+		 srg_max_pd_offset, srg_color_bit_map,
+		 srg_partial_bssid_bit_map);
+	wlan_vdev_mlme_set_srg_partial_bssid_bit_map(session_entry->vdev,
+						     srg_partial_bssid_bit_map);
+	wlan_vdev_mlme_set_srg_bss_color_bit_map(session_entry->vdev,
+						 srg_color_bit_map);
 	wlan_vdev_mlme_set_sr_ctrl(session_entry->vdev, sr_ctrl);
-	wlan_vdev_mlme_set_pd_offset(session_entry->vdev,
-				     non_srg_max_pd_offset);
+	wlan_vdev_mlme_set_non_srg_pd_offset(session_entry->vdev,
+					     non_srg_max_pd_offset);
 	wlan_vdev_mlme_set_srg_pd_offset(session_entry->vdev, srg_max_pd_offset,
 					 srg_min_pd_offset);
+
 }
 #endif

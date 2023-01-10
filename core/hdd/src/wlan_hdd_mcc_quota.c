@@ -315,7 +315,7 @@ wlan_cfg80211_indicate_mcc_quota(struct wlan_objmgr_psoc *psoc,
 							QCA_NL80211_VENDOR_SUBCMD_MCC_QUOTA_INDEX,
 							GFP_KERNEL);
 	if (!vendor_event) {
-		hdd_debug("cfg80211_vendor_event_alloc failed");
+		hdd_debug("wlan_cfg80211_vendor_event_alloc failed");
 		return QDF_STATUS_E_NOMEM;
 	}
 	if (nla_put_u32(vendor_event,

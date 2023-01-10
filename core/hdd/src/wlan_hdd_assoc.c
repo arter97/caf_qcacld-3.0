@@ -237,22 +237,21 @@ void wlan_hdd_sae_copy_ta_addr(struct cfg80211_external_auth_params *params,
 			       struct sir_sae_info *sae_info)
 {
 	struct qdf_mac_addr ta = QDF_MAC_ADDR_ZERO_INIT;
-	bool roaming;
+	QDF_STATUS status = QDF_STATUS_SUCCESS;
 
-	roaming = wlan_cm_roaming_in_progress(adapter->hdd_ctx->pdev,
-					      sae_info->vdev_id);
-	if (roaming) {
-		ucfg_cm_get_sae_auth_ta(adapter->hdd_ctx->pdev,
-					sae_info->vdev_id,
-					&ta);
+	status = ucfg_cm_get_sae_auth_ta(adapter->hdd_ctx->pdev,
+					 sae_info->vdev_id,
+					 &ta);
+	if (QDF_IS_STATUS_SUCCESS(status))
 		qdf_mem_copy(params->tx_addr, ta.bytes, QDF_MAC_ADDR_SIZE);
-		hdd_debug("ta:" QDF_MAC_ADDR_FMT,
-			  QDF_MAC_ADDR_REF(params->tx_addr));
-	} else if (wlan_vdev_mlme_is_mlo_vdev(adapter->vdev)) {
+	else if (wlan_vdev_mlme_is_mlo_vdev(adapter->vdev))
 		qdf_mem_copy(params->tx_addr,
 			     wlan_vdev_mlme_get_linkaddr(adapter->vdev),
 			     QDF_MAC_ADDR_SIZE);
-	}
+
+	hdd_debug("status:%d ta:" QDF_MAC_ADDR_FMT, status,
+		  QDF_MAC_ADDR_REF(params->tx_addr));
+
 }
 #else
 static inline
@@ -407,6 +406,7 @@ enum band_info hdd_conn_get_connected_band(struct hdd_adapter *adapter)
 
 /**
  * hdd_conn_get_connected_cipher_algo() - get current connection cipher type
+ * @adapter: pointer to the hdd adapter
  * @sta_ctx: pointer to global HDD Station context
  * @pConnectedCipherAlgo: pointer to connected cipher algo
  *
@@ -1568,9 +1568,6 @@ bool hdd_any_valid_peer_present(struct hdd_adapter *adapter)
  * hdd_roam_mic_error_indication_handler() - MIC error indication handler
  * @adapter: pointer to adapter
  * @roam_info: pointer to roam info
- * @roam_id: roam id
- * @roam_status: roam status
- * @roam_result: roam result
  *
  * This function indicates the Mic failure to the supplicant
  *

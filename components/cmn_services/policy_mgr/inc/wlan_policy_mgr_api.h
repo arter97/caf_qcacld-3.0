@@ -930,6 +930,15 @@ void policy_mgr_do_go_plus_go_force_scc(
 #endif
 
 /**
+ * policy_mgr_process_force_scc_for_nan () - force SAP scc on nan freq
+ *
+ * @psoc: PSOC object information
+ *
+ * Return: None
+ */
+void policy_mgr_process_force_scc_for_nan(struct wlan_objmgr_psoc *psoc);
+
+/**
  * policy_mgr_check_sap_go_force_scc() - Check SAP GO MCC and save interface
  * information
  * @psoc: pointer to psoc
@@ -1806,7 +1815,6 @@ typedef void (*policy_mgr_nss_update_cback)(struct wlan_objmgr_psoc *psoc,
 /**
  * struct policy_mgr_sme_cbacks - SME Callbacks to be invoked
  * from policy manager
- * @sme_get_valid_channels: Get valid channel list
  * @sme_get_nss_for_vdev: Get the allowed nss value for the vdev
  * @sme_soc_set_dual_mac_config: Set the dual MAC scan & FW
  *                             config
@@ -2773,14 +2781,14 @@ bool policy_mgr_current_concurrency_is_scc(struct wlan_objmgr_psoc *psoc);
 bool policy_mgr_current_concurrency_is_mcc(struct wlan_objmgr_psoc *psoc);
 
 /**
- * policy_mgr_concurrent_sta_doing_dbs() - To check the current
- * concurrency STA combination if it is doing DBS
+ * policy_mgr_concurrent_sta_on_different_mac() - To check if
+ * sta concurrency on different mac
  * @psoc: PSOC object information
- * This routine is called to check if it is doing DBS
+ * This routine is called to check if sta concurrency on different mac
  *
- * Return: True - DBS, False - Otherwise
+ * Return: True - sta concurrency on different mac, False - Otherwise
  */
-bool policy_mgr_concurrent_sta_doing_dbs(struct wlan_objmgr_psoc *psoc);
+bool policy_mgr_concurrent_sta_on_different_mac(struct wlan_objmgr_psoc *psoc);
 
 /**
  * policy_mgr_is_sap_p2pgo_on_dfs() - check if there is a P2PGO or SAP

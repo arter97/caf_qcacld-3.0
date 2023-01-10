@@ -1221,6 +1221,7 @@ wlan_hdd_fill_connectivity_logging_data(struct sk_buff *skb,
  * wlan_hdd_send_connectivity_log_to_user  - Send the connectivity log buffer
  * to userspace
  * @rec: Pointer to the log record
+ * @hdd_context: HDD global context
  * @num_records: Number of records
  *
  * Return: QDF_STATUS
@@ -1244,12 +1245,12 @@ wlan_hdd_send_connectivity_log_to_user(struct wlan_log_record *rec,
 
 	len = wlan_hdd_get_connectivity_log_event_len(rec, num_records);
 
-	vendor_event = cfg80211_vendor_event_alloc(
+	vendor_event = wlan_cfg80211_vendor_event_alloc(
 			hdd_ctx->wiphy, NULL, len + NLMSG_HDRLEN,
 			QCA_NL80211_VENDOR_SUBCMD_DIAG_EVENT_INDEX,
 			GFP_ATOMIC);
 	if (!vendor_event) {
-		hdd_err("cfg80211_vendor_event_alloc failed");
+		hdd_err("wlan_cfg80211_vendor_event_alloc failed");
 		return QDF_STATUS_E_NOMEM;
 	}
 
@@ -1275,14 +1276,14 @@ wlan_hdd_send_connectivity_log_to_user(struct wlan_log_record *rec,
 	}
 
 	nla_nest_end(vendor_event, attr);
-	cfg80211_vendor_event(vendor_event, GFP_ATOMIC);
+	wlan_cfg80211_vendor_event(vendor_event, GFP_ATOMIC);
 
 	hdd_exit();
 
 	return QDF_STATUS_SUCCESS;
 failure:
 	hdd_err("NLA fill failed num_records:%d", num_records);
-	kfree_skb(vendor_event);
+	wlan_cfg80211_vendor_free_skb(vendor_event);
 
 	return QDF_STATUS_E_FAILURE;
 }

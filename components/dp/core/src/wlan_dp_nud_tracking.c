@@ -26,7 +26,7 @@
 #include "wlan_dp_cfg.h"
 #include <cdp_txrx_misc.h>
 #include "wlan_cm_roam_ucfg_api.h"
-#include <wlan_cm_ucfg_api.h>
+#include <wlan_cm_api.h>
 #include "wlan_dp_nud_tracking.h"
 #include "wlan_vdev_mgr_ucfg_api.h"
 
@@ -334,7 +334,7 @@ static void dp_nud_process_failure_event(struct wlan_dp_intf *dp_intf)
 
 /**
  * dp_nud_filter_netevent() - filter netevents for STA interface
- * @neighbour: Pointer to neighbour
+ * @netdev_addr: Pointer to neighbour
  * @gw_mac_addr: Gateway MAC address
  * @nud_state: Current NUD state
  *
@@ -377,7 +377,7 @@ static void dp_nud_filter_netevent(struct qdf_mac_addr *netdev_addr,
 	if (!vdev)
 		return;
 
-	if (!ucfg_cm_is_vdev_active(vdev)) {
+	if (!wlan_cm_is_vdev_active(vdev)) {
 		dp_objmgr_put_vdev_by_user(vdev, WLAN_DP_ID);
 		dp_info("Not in Connected State");
 		return;

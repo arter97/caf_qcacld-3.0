@@ -16,7 +16,7 @@
  */
 
 /**
- * DOC : contains son hdd API implementation
+ * DOC: contains son hdd API implementation
  */
 
 #include <qdf_types.h>
@@ -1114,7 +1114,7 @@ static uint32_t hdd_son_get_sta_space(struct wlan_objmgr_vdev *vdev)
 }
 
 /**
- * hdd_son_get_stalist() - get connected station list
+ * hdd_son_get_sta_list() - get connected station list
  * @vdev: vdev
  * @si: pointer to ieee80211req_sta_info
  * @space: space left
@@ -1408,7 +1408,7 @@ static int hdd_son_del_acl_mac(struct wlan_objmgr_vdev *vdev,
 /**
  * hdd_son_kickout_mac() - kickout sta with given mac
  * @vdev: vdev
- * @acl_mac: sta mac to kickout
+ * @mac: sta mac to kickout
  *
  * Return: 0 on success, negative errno on failure
  */
@@ -1529,11 +1529,9 @@ static int hdd_son_send_cfg_event(struct wlan_objmgr_vdev *vdev,
 			nla_total_size(event_len) +
 			NLMSG_HDRLEN;
 	idx = QCA_NL80211_VENDOR_SUBCMD_GET_WIFI_CONFIGURATION_INDEX;
-	skb = cfg80211_vendor_event_alloc(adapter->hdd_ctx->wiphy,
-					  &adapter->wdev,
-					  len,
-					  idx,
-					  GFP_KERNEL);
+	skb = wlan_cfg80211_vendor_event_alloc(adapter->hdd_ctx->wiphy,
+					       &adapter->wdev,
+					       len, idx, GFP_KERNEL);
 	if (!skb) {
 		hdd_err("failed to alloc cfg80211 vendor event");
 		return -EINVAL;
@@ -1543,7 +1541,7 @@ static int hdd_son_send_cfg_event(struct wlan_objmgr_vdev *vdev,
 			QCA_WLAN_VENDOR_ATTR_CONFIG_GENERIC_COMMAND,
 			event_id)) {
 		hdd_err("failed to put attr config generic command");
-		kfree_skb(skb);
+		wlan_cfg80211_vendor_free_skb(skb);
 		return -EINVAL;
 	}
 
@@ -1552,11 +1550,11 @@ static int hdd_son_send_cfg_event(struct wlan_objmgr_vdev *vdev,
 		    event_len,
 		    event_buf)) {
 		hdd_err("failed to put attr config generic data");
-		kfree_skb(skb);
+		wlan_cfg80211_vendor_free_skb(skb);
 		return -EINVAL;
 	}
 
-	cfg80211_vendor_event(skb, GFP_KERNEL);
+	wlan_cfg80211_vendor_event(skb, GFP_KERNEL);
 
 	return 0;
 }
@@ -2519,7 +2517,7 @@ uint32_t hdd_son_get_peer_max_mcs_idx(struct wlan_objmgr_vdev *vdev,
 }
 
 /**
- * hdd_son_sta_stats() - get connected sta rssi and estimated data rate
+ * hdd_son_get_sta_stats() - get connected sta rssi and estimated data rate
  * @vdev: pointer to vdev
  * @mac_addr: connected sta mac addr
  * @stats: pointer to ieee80211_nodestats

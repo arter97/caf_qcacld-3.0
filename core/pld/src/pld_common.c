@@ -3251,6 +3251,31 @@ void pld_thermal_unregister(struct device *dev, int mon_id)
 	}
 }
 
+int pld_set_wfc_mode(struct device *dev, enum pld_wfc_mode wfc_mode)
+{
+	int errno = -ENOTSUPP;
+	enum pld_bus_type type;
+
+	type = pld_get_bus_type(dev);
+	switch (type) {
+	case PLD_BUS_TYPE_SDIO:
+	case PLD_BUS_TYPE_USB:
+	case PLD_BUS_TYPE_SNOC:
+	case PLD_BUS_TYPE_IPCI_FW_SIM:
+	case PLD_BUS_TYPE_SNOC_FW_SIM:
+	case PLD_BUS_TYPE_IPCI:
+	case PLD_BUS_TYPE_PCIE_FW_SIM:
+		break;
+	case PLD_BUS_TYPE_PCIE:
+		errno = pld_pcie_set_wfc_mode(dev, wfc_mode);
+		break;
+	default:
+		pr_err("Invalid device type %d\n", type);
+		break;
+	}
+
+	return errno;
+}
 const char *pld_bus_width_type_to_str(enum pld_bus_width_type level)
 {
 	switch (level) {
@@ -3436,3 +3461,33 @@ bool pld_is_one_msi(struct device *dev)
 
 	return ret;
 }
+
+#ifdef FEATURE_DIRECT_LINK
+int pld_audio_smmu_map(struct device *dev, phys_addr_t paddr, dma_addr_t iova,
+		       size_t size)
+{
+	int ret;
+
+	switch (pld_get_bus_type(dev)) {
+	case PLD_BUS_TYPE_PCIE:
+		ret = pld_pcie_audio_smmu_map(dev, paddr, iova, size);
+		break;
+	default:
+		ret = -EINVAL;
+		break;
+	}
+
+	return ret;
+}
+
+void pld_audio_smmu_unmap(struct device *dev, dma_addr_t iova, size_t size)
+{
+	switch (pld_get_bus_type(dev)) {
+	case PLD_BUS_TYPE_PCIE:
+		pld_pcie_audio_smmu_unmap(dev, iova, size);
+		break;
+	default:
+		break;
+	}
+}
+#endif

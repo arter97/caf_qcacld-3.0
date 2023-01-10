@@ -29,7 +29,7 @@
 #include <wlan_nlink_common.h>
 #include <qdf_net_types.h>
 #include "wlan_objmgr_vdev_obj.h"
-#include <wlan_cm_ucfg_api.h>
+#include "wlan_cm_api.h"
 #include "wlan_dp_nud_tracking.h"
 #include "target_if_dp_comp.h"
 #include "wlan_dp_txrx.h"
@@ -231,7 +231,7 @@ void dp_wait_complete_tasks(struct wlan_dp_psoc_context *dp_ctx)
 
 #ifdef CONFIG_DP_TRACE
 /**
- * dp_convert_string_to_u8_array() - used to convert string into u8 array
+ * dp_convert_string_to_array() - used to convert string into u8 array
  * @str: String to be converted
  * @array: Array where converted value is stored
  * @len: Length of the populated array
@@ -672,7 +672,7 @@ __dp_process_mic_error(struct wlan_dp_intf *dp_intf)
 
 	if ((dp_intf->device_mode == QDF_STA_MODE ||
 	     dp_intf->device_mode == QDF_P2P_CLIENT_MODE) &&
-	    ucfg_cm_is_vdev_active(vdev))
+	    wlan_cm_is_vdev_active(vdev))
 		ops->osif_dp_process_mic_error(dp_intf->mic_work.info,
 						   vdev);
 	else if (dp_intf->device_mode == QDF_SAP_MODE ||
@@ -1646,7 +1646,7 @@ dp_direct_link_refill_ring_init(struct dp_direct_link_context *direct_link_ctx)
 /**
  * dp_direct_link_refill_ring_deinit() - De-initialize refill ring that would be
  *  used for Direct Link DP
- * @direct_link_ctx: DP Direct Link context
+ * @dlink_ctx: DP Direct Link context
  *
  * Return: None
  */

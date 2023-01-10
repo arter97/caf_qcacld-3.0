@@ -54,9 +54,9 @@
 
 /**
  * hdd_vendor_scan_callback() - Scan completed callback event
- * @hddctx: HDD context
- * @req : Scan request
- * @aborted : true scan aborted false scan success
+ * @adapter: HDD adapter
+ * @req: Scan request
+ * @aborted: true scan aborted false scan success
  *
  * This function sends scan completed callback event to NL.
  *
@@ -72,6 +72,8 @@ static void hdd_vendor_scan_callback(struct hdd_adapter *adapter,
 	int i;
 	uint8_t scan_status;
 	uint64_t cookie;
+	enum qca_nl80211_vendor_subcmds_index index =
+		QCA_NL80211_VENDOR_SUBCMD_SCAN_DONE_INDEX;
 
 	hdd_enter();
 
@@ -80,11 +82,10 @@ static void hdd_vendor_scan_callback(struct hdd_adapter *adapter,
 		qdf_mem_free(req);
 		return;
 	}
-	skb = cfg80211_vendor_event_alloc(hddctx->wiphy, &(adapter->wdev),
-			SCAN_DONE_EVENT_BUF_SIZE + 4 + NLMSG_HDRLEN,
-			QCA_NL80211_VENDOR_SUBCMD_SCAN_DONE_INDEX,
-			GFP_KERNEL);
-
+	skb = wlan_cfg80211_vendor_event_alloc(hddctx->wiphy, &adapter->wdev,
+					       SCAN_DONE_EVENT_BUF_SIZE +
+					       4 + NLMSG_HDRLEN,
+					       index, GFP_KERNEL);
 	if (!skb) {
 		hdd_err("skb alloc failed");
 		qdf_mem_free(req);
@@ -137,13 +138,13 @@ static void hdd_vendor_scan_callback(struct hdd_adapter *adapter,
 		hdd_err("Failed to add scan status");
 		goto nla_put_failure;
 	}
-	cfg80211_vendor_event(skb, GFP_KERNEL);
+	wlan_cfg80211_vendor_event(skb, GFP_KERNEL);
 	hdd_info("scan complete event sent to NL");
 	qdf_mem_free(req);
 	return;
 
 nla_put_failure:
-	kfree_skb(skb);
+	wlan_cfg80211_vendor_free_skb(skb);
 	qdf_mem_free(req);
 }
 
@@ -429,7 +430,6 @@ wlan_hdd_enqueue_blocked_scan_request(struct net_device *dev,
 /**
  * __wlan_hdd_cfg80211_scan() - API to process cfg80211 scan request
  * @wiphy: Pointer to wiphy
- * @dev: Pointer to net device
  * @request: Pointer to scan request
  * @source: scan request source(NL/Vendor scan)
  *
@@ -686,7 +686,6 @@ error:
 /**
  * wlan_hdd_cfg80211_scan() - API to process cfg80211 scan request
  * @wiphy: Pointer to wiphy
- * @dev: Pointer to net device
  * @request: Pointer to scan request
  *
  * This API responds to scan trigger and update cfg80211 scan database
@@ -757,8 +756,10 @@ static int wlan_hdd_send_scan_start_event(struct wiphy *wiphy,
 {
 	struct sk_buff *skb;
 	int ret;
+	enum qca_nl80211_vendor_subcmds_index index =
+		QCA_NL80211_VENDOR_SUBCMD_SCAN_INDEX;
 
-	skb = cfg80211_vendor_cmd_alloc_reply_skb(wiphy, sizeof(u64) +
+	skb = wlan_cfg80211_vendor_cmd_alloc_reply_skb(wiphy, sizeof(u64) +
 			NLA_HDRLEN + NLMSG_HDRLEN);
 	if (!skb) {
 		hdd_err(" reply skb alloc failed");
@@ -768,16 +769,16 @@ static int wlan_hdd_send_scan_start_event(struct wiphy *wiphy,
 	if (hdd_wlan_nla_put_u64(skb, QCA_WLAN_VENDOR_ATTR_SCAN_COOKIE,
 				 cookie)) {
 		hdd_err("nla put fail");
-		kfree_skb(skb);
+		wlan_cfg80211_vendor_free_skb(skb);
 		return -EINVAL;
 	}
 
-	ret = cfg80211_vendor_cmd_reply(skb);
+	ret = wlan_cfg80211_vendor_cmd_reply(skb);
 
 	/* Send a scan started event to supplicant */
-	skb = cfg80211_vendor_event_alloc(wiphy, wdev,
-		sizeof(u64) + 4 + NLMSG_HDRLEN,
-		QCA_NL80211_VENDOR_SUBCMD_SCAN_INDEX, GFP_KERNEL);
+	skb = wlan_cfg80211_vendor_event_alloc(wiphy, wdev,
+					       sizeof(u64) + 4 + NLMSG_HDRLEN,
+					       index, GFP_KERNEL);
 	if (!skb) {
 		hdd_err("skb alloc failed");
 		return -ENOMEM;
@@ -785,11 +786,11 @@ static int wlan_hdd_send_scan_start_event(struct wiphy *wiphy,
 
 	if (hdd_wlan_nla_put_u64(skb, QCA_WLAN_VENDOR_ATTR_SCAN_COOKIE,
 				 cookie)) {
-		kfree_skb(skb);
+		wlan_cfg80211_vendor_free_skb(skb);
 		return -EINVAL;
 	}
-	cfg80211_vendor_event(skb, GFP_KERNEL);
 
+	wlan_cfg80211_vendor_event(skb, GFP_KERNEL);
 	return ret;
 }
 
@@ -1164,9 +1165,9 @@ error:
 /**
  * wlan_hdd_cfg80211_vendor_scan() -API to process venor scan request
  * @wiphy: Pointer to wiphy
- * @dev: Pointer to net device
- * @data : Pointer to the data
- * @data_len : length of the data
+ * @wdev: Pointer to wireless device
+ * @data: Pointer to the data
+ * @data_len: length of the data
  *
  * This is called from userspace to request scan.
  *
@@ -1194,9 +1195,8 @@ int wlan_hdd_cfg80211_vendor_scan(struct wiphy *wiphy,
  * __wlan_hdd_vendor_abort_scan() - API to process vendor command for
  * abort scan
  * @wiphy: Pointer to wiphy
- * @wdev: Pointer to net device
- * @data : Pointer to the data
- * @data_len : length of the data
+ * @data: Pointer to the data
+ * @data_len: length of the data
  *
  * API to process vendor abort scan
  *

@@ -945,6 +945,8 @@ QDF_STATUS hdd_chan_change_notify(struct hdd_adapter *adapter,
 	enum nl80211_channel_type channel_type;
 	uint32_t freq;
 	mac_handle_t mac_handle = adapter->hdd_ctx->mac_handle;
+	struct wlan_objmgr_vdev *vdev;
+	uint16_t link_id = 0;
 
 	if (!mac_handle) {
 		hdd_err("mac_handle is NULL");
@@ -1015,10 +1017,20 @@ QDF_STATUS hdd_chan_change_notify(struct hdd_adapter *adapter,
 				chan_change.chan_params.mhz_freq_seg0;
 	}
 
+	vdev = hdd_objmgr_get_vdev_by_user(adapter, WLAN_OSIF_ID);
+	if (!vdev)
+		return -EINVAL;
+
+	if (wlan_vdev_mlme_is_mlo_vdev(vdev))
+		link_id = wlan_vdev_get_link_id(vdev);
+
+	hdd_debug("link_id is %d", link_id);
+
+	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
 	hdd_debug("notify: chan:%d width:%d freq1:%d freq2:%d",
 		  chandef.chan->center_freq, chandef.width,
 		  chandef.center_freq1, chandef.center_freq2);
-	wlan_cfg80211_ch_switch_notify(dev, &chandef, 0);
+	wlan_cfg80211_ch_switch_notify(dev, &chandef, link_id);
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -1074,13 +1086,14 @@ static QDF_STATUS hdd_send_radar_event(struct hdd_context *hdd_context,
 		return QDF_STATUS_E_FAILURE;
 	}
 
-	vendor_event = cfg80211_vendor_event_alloc(hdd_context->wiphy,
-			wdev,
-			data_size + NLMSG_HDRLEN,
-			index,
-			GFP_KERNEL);
+	vendor_event = wlan_cfg80211_vendor_event_alloc(hdd_context->wiphy,
+							wdev,
+							data_size +
+							NLMSG_HDRLEN,
+							index, GFP_KERNEL);
 	if (!vendor_event) {
-		hdd_err("cfg80211_vendor_event_alloc failed for %d", index);
+		hdd_err("wlan_cfg80211_vendor_event_alloc failed for %d",
+			index);
 		return QDF_STATUS_E_FAILURE;
 	}
 
@@ -1088,11 +1101,11 @@ static QDF_STATUS hdd_send_radar_event(struct hdd_context *hdd_context,
 
 	if (ret) {
 		hdd_err("NL80211_ATTR_WIPHY_FREQ put fail");
-		kfree_skb(vendor_event);
+		wlan_cfg80211_vendor_free_skb(vendor_event);
 		return QDF_STATUS_E_FAILURE;
 	}
 
-	cfg80211_vendor_event(vendor_event, GFP_KERNEL);
+	wlan_cfg80211_vendor_event(vendor_event, GFP_KERNEL);
 	return QDF_STATUS_SUCCESS;
 }
 
@@ -2036,6 +2049,9 @@ QDF_STATUS hdd_hostapd_sap_event_cb(struct sap_event *sap_event,
 			      ap_ctx->operating_chan_freq,
 			      sap_config->ch_params.ch_width);
 
+		if (hdd_medium_access_state() == true)
+			hdd_medium_assess_init();
+
 		sap_config->ch_params = ap_ctx->sap_context->ch_params;
 		sap_config->sec_ch_freq = ap_ctx->sap_context->sec_ch_freq;
 
@@ -2172,7 +2188,7 @@ QDF_STATUS hdd_hostapd_sap_event_cb(struct sap_event *sap_event,
 		wrqu.data.length = strlen(startBssEvent);
 		we_event = IWEVCUSTOM;
 		we_custom_event_generic = we_custom_start_event;
-		hdd_ipa_set_tx_flow_info();
+		wlan_hdd_set_tx_flow_info();
 		sap_ctx = WLAN_HDD_GET_SAP_CTX_PTR(adapter);
 		if (!sap_ctx) {
 			hdd_err("sap ctx is null");
@@ -2239,15 +2255,6 @@ QDF_STATUS hdd_hostapd_sap_event_cb(struct sap_event *sap_event,
 		}
 		hdd_nofl_info("Ap stopped vid %d reason=%d", adapter->vdev_id,
 			      ap_ctx->bss_stop_reason);
-
-		qdf_status =
-			policy_mgr_get_mac_id_by_session_id(hdd_ctx->psoc,
-							    adapter->vdev_id,
-							    &pdev_id);
-		if (QDF_IS_STATUS_SUCCESS(qdf_status))
-			hdd_medium_assess_stop_timer(pdev_id, hdd_ctx);
-
-		hdd_medium_assess_deinit();
 
 		/* clear the reason code in case BSS is stopped
 		 * in another place
@@ -3015,6 +3022,15 @@ stopbss:
 		       sap_event->sapevt.sapStopBssCompleteEvent.status ?
 		       "eSAP_STATUS_FAILURE" : "eSAP_STATUS_SUCCESS");
 
+		qdf_status =
+			policy_mgr_get_mac_id_by_session_id(hdd_ctx->psoc,
+							    adapter->vdev_id,
+							    &pdev_id);
+		if (QDF_IS_STATUS_SUCCESS(qdf_status))
+			hdd_medium_assess_stop_timer(pdev_id, hdd_ctx);
+
+		hdd_medium_assess_deinit();
+
 		/* Change the BSS state now since, as we are shutting
 		 * things down, we don't want interfaces to become
 		 * re-enabled
@@ -3083,7 +3099,7 @@ stopbss:
 			ucfg_dp_bus_bw_compute_timer_try_stop(hdd_ctx->psoc);
 		}
 
-		hdd_ipa_set_tx_flow_info();
+		wlan_hdd_set_tx_flow_info();
 	}
 	return QDF_STATUS_SUCCESS;
 }
@@ -3747,6 +3763,7 @@ QDF_STATUS wlan_hdd_get_channel_for_sap_restart(
 	    !policy_mgr_is_go_scc_strict(psoc) &&
 	    (wlan_vdev_get_peer_count(sap_context->vdev) == 1)) {
 		hdd_debug("p2p go liberal mode enabled. Skipping CSA");
+		wlansap_context_put(sap_context);
 		return QDF_STATUS_E_FAILURE;
 	}
 
@@ -3974,7 +3991,8 @@ uint32_t hdd_get_ap_6ghz_capable(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id)
 	if ((keymgmt & (1 << WLAN_CRYPTO_KEY_MGMT_SAE |
 			1 << WLAN_CRYPTO_KEY_MGMT_IEEE8021X_SUITE_B |
 			1 << WLAN_CRYPTO_KEY_MGMT_IEEE8021X_SUITE_B_192 |
-			1 << WLAN_CRYPTO_KEY_MGMT_OWE))) {
+			1 << WLAN_CRYPTO_KEY_MGMT_OWE |
+			1 << WLAN_CRYPTO_KEY_MGMT_SAE_EXT_KEY))) {
 		capable |= CONN_6GHZ_FLAG_SECURITY_ALLOWED;
 	}
 	capable |= CONN_6GHZ_FLAG_VALID;
@@ -4303,7 +4321,6 @@ struct hdd_adapter *hdd_wlan_create_ap_dev(struct hdd_context *hdd_ctx,
 {
 	struct net_device *dev;
 	struct hdd_adapter *adapter;
-	QDF_STATUS qdf_status;
 
 	hdd_debug("iface_name = %s", iface_name);
 
@@ -4349,14 +4366,6 @@ struct hdd_adapter *hdd_wlan_create_ap_dev(struct hdd_context *hdd_ctx,
 	dev->ieee80211_ptr = &adapter->wdev;
 	adapter->wdev.wiphy = hdd_ctx->wiphy;
 	adapter->wdev.netdev = dev;
-
-	qdf_status = qdf_event_create(
-			&adapter->qdf_session_open_event);
-	if (!QDF_IS_STATUS_SUCCESS(qdf_status)) {
-		hdd_err("failed to create session open QDF event!");
-		free_netdev(adapter->dev);
-		return NULL;
-	}
 
 	init_completion(&adapter->vdev_destroy_event);
 
@@ -6787,7 +6796,7 @@ int wlan_hdd_cfg80211_start_bss(struct hdd_adapter *adapter,
 					    FTM_TIME_SYNC_BSS_STARTED);
 
 	hdd_set_connection_in_progress(false);
-	policy_mgr_nan_sap_post_enable_conc_check(hdd_ctx->psoc);
+	policy_mgr_process_force_scc_for_nan(hdd_ctx->psoc);
 	ret = 0;
 	goto free;
 
@@ -7544,6 +7553,8 @@ static int __wlan_hdd_cfg80211_start_ap(struct wiphy *wiphy,
 	enum QDF_OPMODE vdev_opmode;
 	uint8_t vdev_id_list[MAX_NUMBER_OF_CONC_CONNECTIONS], i;
 	enum policy_mgr_con_mode intf_pm_mode;
+	struct wlan_objmgr_vdev *vdev;
+	uint16_t link_id = 0;
 
 	hdd_enter();
 
@@ -7844,10 +7855,18 @@ static int __wlan_hdd_cfg80211_start_ap(struct wiphy *wiphy,
 			hdd_err("Error Start bss Failed");
 			goto err_start_bss;
 		}
+		vdev = hdd_objmgr_get_vdev_by_user(adapter, WLAN_OSIF_ID);
+		if (!vdev)
+			return -EINVAL;
 
-		if (wlan_util_get_centre_freq(wdev, 0) !=
+		if (wlan_vdev_mlme_is_mlo_vdev(vdev))
+			link_id = wlan_vdev_get_link_id(vdev);
+
+		hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
+
+		if (wlan_util_get_centre_freq(wdev, link_id) !=
 				params->chandef.chan->center_freq)
-			params->chandef = wlan_util_get_chan_def(wdev, 0);
+			params->chandef = wlan_util_get_chan_def(wdev, link_id);
 		/*
 		 * If Do_Not_Break_Stream enabled send avoid channel list
 		 * to application.
@@ -7874,7 +7893,6 @@ static int __wlan_hdd_cfg80211_start_ap(struct wiphy *wiphy,
 		}
 	}
 
-	hdd_medium_assess_init();
 	goto success;
 
 err_start_bss:

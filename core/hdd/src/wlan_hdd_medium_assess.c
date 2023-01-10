@@ -16,7 +16,7 @@
  */
 
 /**
- * DOC : wlan_hdd_medium_assess.c
+ * DOC: wlan_hdd_medium_assess.c
  *
  * WLAN Host Device Driver medium assess related implementation
  *
@@ -143,13 +143,13 @@ static void hdd_cca_notification_cb(uint8_t vdev_id,
 		return;
 	}
 
-	event = cfg80211_vendor_event_alloc(
+	event = wlan_cfg80211_vendor_event_alloc(
 				hdd_ctx->wiphy, &adapter->wdev,
 				get_cca_report_len(),
 				QCA_NL80211_VENDOR_SUBCMD_MEDIUM_ASSESS_INDEX,
 				GFP_KERNEL);
 	if (!event) {
-		hdd_err("cfg80211_vendor_event_alloc failed");
+		hdd_err("wlan_cfg80211_vendor_event_alloc failed");
 		return;
 	}
 
@@ -164,11 +164,11 @@ static void hdd_cca_notification_cb(uint8_t vdev_id,
 	    nla_put_u32(event, MAX_IBSS_RSSI, stats->max_rssi) ||
 	    nla_put_u32(event, MIN_IBSS_RSSI, stats->min_rssi)) {
 		hdd_err("nla put failed");
-		kfree_skb(event);
+		wlan_cfg80211_vendor_free_skb(event);
 		return;
 	}
 
-	cfg80211_vendor_event(event, GFP_KERNEL);
+	wlan_cfg80211_vendor_event(event, GFP_KERNEL);
 }
 
 /**
@@ -254,7 +254,7 @@ static int get_congestion_report_len(void)
 
 /**
  * hdd_congestion_reset_data() - reset/invalid the previous data
- * @vdev_id: vdev id
+ * @pdev_id: pdev id
  *
  * Return: None
  */
@@ -340,6 +340,8 @@ static void hdd_congestion_notification_report(uint8_t vdev_id,
 	struct hdd_context *hdd_ctx = cds_get_context(QDF_MODULE_ID_HDD);
 	struct hdd_adapter *adapter;
 	struct sk_buff *event;
+	enum qca_nl80211_vendor_subcmds_index index =
+		QCA_NL80211_VENDOR_SUBCMD_MEDIUM_ASSESS_INDEX;
 
 	if (wlan_hdd_validate_context(hdd_ctx))
 		return;
@@ -350,12 +352,12 @@ static void hdd_congestion_notification_report(uint8_t vdev_id,
 		return;
 	}
 
-	event = cfg80211_vendor_event_alloc(hdd_ctx->wiphy, &(adapter->wdev),
-				  get_congestion_report_len(),
-				  QCA_NL80211_VENDOR_SUBCMD_MEDIUM_ASSESS_INDEX,
-				  GFP_KERNEL);
+	event = wlan_cfg80211_vendor_event_alloc(hdd_ctx->wiphy,
+						 &adapter->wdev,
+						 get_congestion_report_len(),
+						 index, GFP_KERNEL);
 	if (!event) {
-		hdd_err("cfg80211_vendor_event_alloc failed");
+		hdd_err("wlan_cfg80211_vendor_event_alloc failed");
 		return;
 	}
 
@@ -363,11 +365,11 @@ static void hdd_congestion_notification_report(uint8_t vdev_id,
 		       QCA_WLAN_MEDIUM_ASSESS_CONGESTION_REPORT) ||
 	    nla_put_u8(event, CONGESTION_PERCENTAGE, congestion)) {
 		hdd_err("nla put failed");
-		kfree_skb(event);
+		wlan_cfg80211_vendor_free_skb(event);
 		return;
 	}
 
-	cfg80211_vendor_event(event, GFP_KERNEL);
+	wlan_cfg80211_vendor_event(event, GFP_KERNEL);
 }
 
 void hdd_medium_assess_ssr_enable_flag(void)
@@ -777,4 +779,11 @@ void hdd_medium_assess_deinit(void)
 
 		qdf_mc_timer_destroy(&hdd_medium_assess_timer);
 	}
+}
+
+bool hdd_medium_access_state(void)
+{
+	if (!timer_enable)
+		return true;
+	return false;
 }

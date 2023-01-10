@@ -18,7 +18,7 @@
  */
 
 /**
- * wlan_hdd_tsf.c - WLAN Host Device Driver tsf related implementation
+ * DOC: wlan_hdd_tsf.c - WLAN Host Device Driver tsf related implementation
  */
 
 #include "osif_sync.h"
@@ -94,9 +94,8 @@ struct hdd_tsf_report {
 
 /**
  * enum hdd_tsf_op_result - result of tsf operation
- *
- * HDD_TSF_OP_SUCC:  succeed
- * HDD_TSF_OP_FAIL:  fail
+ * @HDD_TSF_OP_SUCC:  succeed
+ * @HDD_TSF_OP_FAIL:  fail
  */
 enum hdd_tsf_op_result {
 	HDD_TSF_OP_SUCC,
@@ -586,13 +585,10 @@ static inline int hdd_tsf_reg_is_details_valid(struct hdd_adapter *adapter)
 static inline void
 wlan_hdd_tsf_reg_update_details(struct hdd_adapter *adapter, struct stsf *ptsf)
 {
-	if (adapter->tsf_id != ptsf->tsf_id ||
-	    adapter->tsf_mac_id != ptsf->mac_id) {
-		if (ptsf->tsf_id_valid) {
-			adapter->tsf_id = ptsf->tsf_id;
-			adapter->tsf_mac_id = ptsf->mac_id;
-			qdf_atomic_set(&adapter->tsf_details_valid, 1);
-		}
+	if (ptsf->tsf_id_valid) {
+		adapter->tsf_id = ptsf->tsf_id;
+		adapter->tsf_mac_id = ptsf->mac_id;
+		qdf_atomic_set(&adapter->tsf_details_valid, 1);
 	}
 	hdd_info("vdev_id %u tsf_id %u tsf_id_valid %u mac_id %u",
 		 adapter->vdev_id, ptsf->tsf_id, ptsf->tsf_id_valid,
@@ -853,12 +849,10 @@ static enum hdd_tsf_op_result hdd_indicate_tsf_internal(
 #define CAP_TSF_TIMER_FIX_SEC 1
 
 /**
- * TS_STATUS - timestamp status
- *
- * HDD_TS_STATUS_WAITING:  one of the stamp-pair
- *    is not updated
- * HDD_TS_STATUS_READY:  valid tstamp-pair
- * HDD_TS_STATUS_INVALID: invalid tstamp-pair
+ * enum hdd_ts_status - timestamp status
+ * @HDD_TS_STATUS_WAITING:  one of the stamp-pair is not updated
+ * @HDD_TS_STATUS_READY:  valid tstamp-pair
+ * @HDD_TS_STATUS_INVALID: invalid tstamp-pair
  */
 enum hdd_ts_status {
 	HDD_TS_STATUS_WAITING,
@@ -2378,7 +2372,7 @@ enum hdd_tsf_op_result hdd_netbuf_timestamp(qdf_nbuf_t netbuf,
 
 /**
  * hdd_tx_timestamp() - time stamp TX netbuf
- *
+ * @status: TX status
  * @netbuf: pointer to a TX netbuf
  * @target_time: TX time for the netbuf
  *
@@ -3229,6 +3223,8 @@ static int __wlan_hdd_cfg80211_handle_tsf_cmd(struct wiphy *wiphy,
 	QDF_STATUS ret;
 	struct sk_buff *reply_skb;
 	uint32_t tsf_cmd;
+	enum qca_nl80211_vendor_subcmds_index index =
+		QCA_NL80211_VENDOR_SUBCMD_TSF_INDEX;
 
 	hdd_enter_dev(wdev->netdev);
 
@@ -3287,6 +3283,8 @@ static int __wlan_hdd_cfg80211_handle_tsf_cmd(struct wiphy *wiphy,
 		status = hdd_handle_tsf_dynamic_start(adapter, attr);
 	} else if (tsf_cmd == QCA_TSF_SYNC_STOP) {
 		status = hdd_handle_tsf_dynamic_stop(adapter);
+	} else {
+		status = 0;
 	}
 
 	if (status < 0)
@@ -3306,12 +3304,13 @@ static int __wlan_hdd_cfg80211_handle_tsf_cmd(struct wiphy *wiphy,
 		if (status != 0)
 			goto end;
 
-		reply_skb = cfg80211_vendor_event_alloc(hdd_ctx->wiphy, NULL,
-					sizeof(uint64_t) * 2 + NLMSG_HDRLEN,
-					QCA_NL80211_VENDOR_SUBCMD_TSF_INDEX,
-					GFP_KERNEL);
+		reply_skb =
+			wlan_cfg80211_vendor_event_alloc(hdd_ctx->wiphy, NULL,
+							 sizeof(uint64_t) * 2 +
+							 NLMSG_HDRLEN,
+							 index, GFP_KERNEL);
 		if (!reply_skb) {
-			hdd_err("cfg80211_vendor_cmd_alloc_reply_skb failed");
+			hdd_err("wlan_cfg80211_vendor_cmd_alloc_reply_skb failed");
 			status = -ENOMEM;
 			goto end;
 		}
@@ -3322,11 +3321,11 @@ static int __wlan_hdd_cfg80211_handle_tsf_cmd(struct wiphy *wiphy,
 				QCA_WLAN_VENDOR_ATTR_TSF_SOC_TIMER_VALUE,
 				tsf_op_resp.soc_time)) {
 			hdd_err("nla put fail");
-			kfree_skb(reply_skb);
+			wlan_cfg80211_vendor_free_skb(reply_skb);
 			status = -EINVAL;
 			goto end;
 		}
-		status = cfg80211_vendor_cmd_reply(reply_skb);
+		status = wlan_cfg80211_vendor_cmd_reply(reply_skb);
 	}
 
 end:

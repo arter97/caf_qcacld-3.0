@@ -370,7 +370,7 @@ hdd_update_action_oui_for_connect(struct hdd_context *hdd_ctx,
 	uint8_t *str;
 	bool usr_disable_eht;
 
-	if (!hdd_ctx->config->action_oui_enable)
+	if (!ucfg_action_oui_enabled(hdd_ctx->psoc))
 		return;
 
 	usr_disable_eht = ucfg_mlme_get_usr_disable_sta_eht(hdd_ctx->psoc);
@@ -406,8 +406,8 @@ hdd_update_action_oui_for_connect(struct hdd_context *hdd_ctx,
 				ACTION_OUI_11BE_OUI_ALLOW);
 			return;
 		}
-		str =
-		hdd_ctx->config->action_oui_str[ACTION_OUI_11BE_OUI_ALLOW];
+		str = ucfg_action_oui_get_config(hdd_ctx->psoc,
+						 ACTION_OUI_11BE_OUI_ALLOW);
 		if (!qdf_str_len(str))
 			goto send_oui;
 
@@ -1372,7 +1372,7 @@ hdd_cm_connect_success_pre_user_update(struct wlan_objmgr_vdev *vdev,
 	 * hdd_send_ft_assoc_response,
 	 */
 
-	hdd_ipa_set_tx_flow_info();
+	wlan_hdd_set_tx_flow_info();
 	hdd_place_marker(adapter, "ASSOCIATION COMPLETE", NULL);
 
 	if (policy_mgr_is_mcc_in_24G(hdd_ctx->psoc)) {

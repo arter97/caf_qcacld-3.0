@@ -343,6 +343,7 @@ enum mlme_ts_info_ack_policy {
  * @mlme_edca_ac_vi: value for edca_ac_vi
  * @mlme_edca_ac_bk: value for edca_ac_bk
  * @mlme_edca_ac_be: value for edca_ac_be
+ * @edca_param_type: Edca param type
  */
 struct wlan_mlme_edca_params {
 	struct mlme_cfg_str ani_acbk_l;
@@ -378,7 +379,20 @@ struct wlan_mlme_edca_params {
 	struct mlme_edca_ac_vi edca_ac_vi;
 	struct mlme_edca_ac_bk edca_ac_bk;
 	struct mlme_edca_ac_be edca_ac_be;
+
+	enum host_edca_param_type edca_param_type;
 };
+
+/* To configure EDCA/PIFS param for LL SAP */
+#define CFG_EDCA_PARAM_ACM         0
+#define CFG_EDCA_PARAM_AIFSN       1
+#define CFG_EDCA_PARAM_ACI         3
+#define CFG_EDCA_PARAM_CWMIN       2
+#define CFG_EDCA_PARAM_CWMAX       3
+#define CFG_EDCA_PARAM_TXOP        47
+#define CFG_PIFS_PARAM_SAP_OFFSET  0
+#define CFG_PIFS_PARAM_LEB_OFFSET  1
+#define CFG_PIFS_PARAM_REB_OFFSET  2
 
 #define WLAN_CFG_MFR_NAME_LEN (63)
 #define WLAN_CFG_MODEL_NUMBER_LEN (31)
@@ -1766,6 +1780,7 @@ struct bss_load_trigger {
 #define AKM_SAE              3
 #define AKM_OWE              4
 #define AKM_SUITEB           5
+#define AKM_SAE_EXT          6
 
 #define LFR3_STA_ROAM_DISABLE_BY_P2P BIT(0)
 #define LFR3_STA_ROAM_DISABLE_BY_NAN BIT(1)
@@ -1850,6 +1865,7 @@ struct fw_scan_channels {
  * @roam_preauth_retry_count:       Configure the max number of preauth retry
  * @roam_preauth_no_ack_timeout:    Configure the no ack timeout period
  * @roam_rssi_diff:                 Enable roam based on rssi
+ * @roam_rssi_diff_6ghz: RSSI diff value to be used for roaming to 6 GHz AP.
  * @roam_scan_offload_enabled:      Enable Roam Scan Offload
  * @neighbor_scan_timer_period:     Neighbor scan timer period
  * @neighbor_scan_min_timer_period: Min neighbor scan timer period
@@ -1904,6 +1920,10 @@ struct fw_scan_channels {
  * @beaconloss_timeout_onsleep: time in sec to configure FW BMISS event
  * during sleep.
  * @roam_ho_delay_config: Roam HO delay value
+ * @exclude_rm_partial_scan_freq: Exclude the channels in roam full scan that
+ * are already scanned as part of partial scan.
+ * @roam_full_scan_6ghz_on_disc: Include the 6 GHz channels in roam full scan
+ * only on prior discovery of any 6 GHz support in the environment.
  */
 struct wlan_mlme_lfr_cfg {
 	bool mawc_roam_enabled;
@@ -1972,6 +1992,7 @@ struct wlan_mlme_lfr_cfg {
 	uint32_t roam_preauth_retry_count;
 	uint32_t roam_preauth_no_ack_timeout;
 	uint8_t roam_rssi_diff;
+	uint8_t roam_rssi_diff_6ghz;
 	uint8_t bg_rssi_threshold;
 	bool roam_scan_offload_enabled;
 	uint32_t neighbor_scan_timer_period;
@@ -2027,6 +2048,8 @@ struct wlan_mlme_lfr_cfg {
 	uint8_t beaconloss_timeout_onwakeup;
 	uint8_t beaconloss_timeout_onsleep;
 	uint16_t roam_ho_delay_config;
+	uint8_t exclude_rm_partial_scan_freq;
+	uint8_t roam_full_scan_6ghz_on_disc;
 };
 
 /**

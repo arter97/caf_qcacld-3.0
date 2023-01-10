@@ -1250,6 +1250,8 @@ static void os_if_ndp_initiator_rsp_handler(struct wlan_objmgr_vdev *vdev,
 	struct sk_buff *vendor_event;
 	struct wlan_objmgr_pdev *pdev = wlan_vdev_get_pdev(vdev);
 	struct pdev_osif_priv *os_priv = wlan_pdev_get_ospriv(pdev);
+	enum qca_nl80211_vendor_subcmds_index index =
+		QCA_NL80211_VENDOR_SUBCMD_NDP_INDEX;
 
 	if (!rsp) {
 		osif_err("Invalid NDP Initator response");
@@ -1257,11 +1259,11 @@ static void os_if_ndp_initiator_rsp_handler(struct wlan_objmgr_vdev *vdev,
 	}
 
 	data_len = osif_ndp_get_ndp_initiator_rsp_len();
-	vendor_event = cfg80211_vendor_event_alloc(os_priv->wiphy, NULL,
-				data_len, QCA_NL80211_VENDOR_SUBCMD_NDP_INDEX,
-				GFP_ATOMIC);
+	vendor_event = wlan_cfg80211_vendor_event_alloc(os_priv->wiphy, NULL,
+							data_len, index,
+							GFP_ATOMIC);
 	if (!vendor_event) {
-		osif_err("cfg80211_vendor_event_alloc failed");
+		osif_err("wlan_cfg80211_vendor_event_alloc failed");
 		return;
 	}
 
@@ -1290,11 +1292,11 @@ static void os_if_ndp_initiator_rsp_handler(struct wlan_objmgr_vdev *vdev,
 	osif_debug("NDP Initiator rsp sent, tid:%d, instance id:%d, status:%d, reason: %d",
 		   rsp->transaction_id, rsp->ndp_instance_id, rsp->status,
 		   rsp->reason);
-	cfg80211_vendor_event(vendor_event, GFP_ATOMIC);
+	wlan_cfg80211_vendor_event(vendor_event, GFP_ATOMIC);
 	return;
 ndp_initiator_rsp_nla_failed:
 	osif_err("nla_put api failed");
-	kfree_skb(vendor_event);
+	wlan_cfg80211_vendor_free_skb(vendor_event);
 }
 
 static inline uint32_t osif_ndp_get_ndp_responder_rsp_len(void)
@@ -1334,6 +1336,8 @@ static void os_if_ndp_responder_rsp_handler(struct wlan_objmgr_vdev *vdev,
 	struct sk_buff *vendor_event;
 	struct wlan_objmgr_pdev *pdev = wlan_vdev_get_pdev(vdev);
 	struct pdev_osif_priv *os_priv = wlan_pdev_get_ospriv(pdev);
+	enum qca_nl80211_vendor_subcmds_index index =
+		QCA_NL80211_VENDOR_SUBCMD_NDP_INDEX;
 
 	if (!rsp) {
 		osif_err("Invalid NDP Responder response");
@@ -1341,11 +1345,11 @@ static void os_if_ndp_responder_rsp_handler(struct wlan_objmgr_vdev *vdev,
 	}
 
 	data_len = osif_ndp_get_ndp_responder_rsp_len();
-	vendor_event = cfg80211_vendor_event_alloc(os_priv->wiphy, NULL,
-				data_len, QCA_NL80211_VENDOR_SUBCMD_NDP_INDEX,
-				GFP_ATOMIC);
+	vendor_event = wlan_cfg80211_vendor_event_alloc(os_priv->wiphy, NULL,
+							data_len, index,
+							GFP_ATOMIC);
 	if (!vendor_event) {
-		osif_err("cfg80211_vendor_event_alloc failed");
+		osif_err("wlan_cfg80211_vendor_event_alloc failed");
 		return;
 	}
 
@@ -1367,11 +1371,11 @@ static void os_if_ndp_responder_rsp_handler(struct wlan_objmgr_vdev *vdev,
 	   rsp->reason))
 		goto ndp_responder_rsp_nla_failed;
 
-	cfg80211_vendor_event(vendor_event, GFP_ATOMIC);
+	wlan_cfg80211_vendor_event(vendor_event, GFP_ATOMIC);
 	return;
 ndp_responder_rsp_nla_failed:
 	osif_err("nla_put api failed");
-	kfree_skb(vendor_event);
+	wlan_cfg80211_vendor_free_skb(vendor_event);
 }
 
 static inline uint32_t osif_ndp_get_ndp_req_ind_len(
@@ -1441,6 +1445,8 @@ static void os_if_ndp_indication_handler(struct wlan_objmgr_vdev *vdev,
 	enum nan_datapath_state state;
 	struct wlan_objmgr_pdev *pdev = wlan_vdev_get_pdev(vdev);
 	struct pdev_osif_priv *os_priv = wlan_pdev_get_ospriv(pdev);
+	enum qca_nl80211_vendor_subcmds_index index =
+		QCA_NL80211_VENDOR_SUBCMD_NDP_INDEX;
 
 	if (!event) {
 		osif_err("Invalid NDP Indication");
@@ -1472,12 +1478,11 @@ static void os_if_ndp_indication_handler(struct wlan_objmgr_vdev *vdev,
 
 	data_len = osif_ndp_get_ndp_req_ind_len(event);
 	/* notify response to the upper layer */
-	vendor_event = cfg80211_vendor_event_alloc(os_priv->wiphy,
-					NULL, data_len,
-					QCA_NL80211_VENDOR_SUBCMD_NDP_INDEX,
-					GFP_ATOMIC);
+	vendor_event = wlan_cfg80211_vendor_event_alloc(os_priv->wiphy,
+							NULL, data_len,
+							index, GFP_ATOMIC);
 	if (!vendor_event) {
-		osif_err("cfg80211_vendor_event_alloc failed");
+		osif_err("wlan_cfg80211_vendor_event_alloc failed");
 		return;
 	}
 
@@ -1553,11 +1558,11 @@ static void os_if_ndp_indication_handler(struct wlan_objmgr_vdev *vdev,
 			goto ndp_indication_nla_failed;
 	}
 
-	cfg80211_vendor_event(vendor_event, GFP_ATOMIC);
+	wlan_cfg80211_vendor_event(vendor_event, GFP_ATOMIC);
 	return;
 ndp_indication_nla_failed:
 	osif_err("nla_put api failed");
-	kfree_skb(vendor_event);
+	wlan_cfg80211_vendor_free_skb(vendor_event);
 }
 
 static inline uint32_t osif_ndp_get_ndp_confirm_ind_len(
@@ -1675,6 +1680,8 @@ os_if_ndp_confirm_ind_handler(struct wlan_objmgr_vdev *vdev,
 	struct sk_buff *vendor_event;
 	struct wlan_objmgr_pdev *pdev = wlan_vdev_get_pdev(vdev);
 	struct pdev_osif_priv *os_priv = wlan_pdev_get_ospriv(pdev);
+	enum qca_nl80211_vendor_subcmds_index index =
+		QCA_NL80211_VENDOR_SUBCMD_NDP_INDEX;
 
 	if (!ndp_confirm) {
 		osif_err("Invalid NDP Initator response");
@@ -1693,11 +1700,11 @@ os_if_ndp_confirm_ind_handler(struct wlan_objmgr_vdev *vdev,
 	}
 
 	data_len = osif_ndp_get_ndp_confirm_ind_len(ndp_confirm);
-	vendor_event = cfg80211_vendor_event_alloc(os_priv->wiphy, NULL,
-				data_len, QCA_NL80211_VENDOR_SUBCMD_NDP_INDEX,
-				GFP_ATOMIC);
+	vendor_event = wlan_cfg80211_vendor_event_alloc(os_priv->wiphy, NULL,
+							data_len, index,
+							GFP_ATOMIC);
 	if (!vendor_event) {
-		osif_err("cfg80211_vendor_event_alloc failed");
+		osif_err("wlan_cfg80211_vendor_event_alloc failed");
 		return;
 	}
 
@@ -1758,7 +1765,7 @@ os_if_ndp_confirm_ind_handler(struct wlan_objmgr_vdev *vdev,
 			       ndp_confirm->protocol))
 			goto ndp_confirm_nla_failed;
 
-	cfg80211_vendor_event(vendor_event, GFP_ATOMIC);
+	wlan_cfg80211_vendor_event(vendor_event, GFP_ATOMIC);
 	osif_debug("NDP confim sent, ndp instance id: %d, peer addr: "QDF_MAC_ADDR_FMT" rsp_code: %d, reason_code: %d",
 		   ndp_confirm->ndp_instance_id,
 		   QDF_MAC_ADDR_REF(ndp_confirm->peer_ndi_mac_addr.bytes),
@@ -1767,7 +1774,7 @@ os_if_ndp_confirm_ind_handler(struct wlan_objmgr_vdev *vdev,
 	return;
 ndp_confirm_nla_failed:
 	osif_err("nla_put api failed");
-	kfree_skb(vendor_event);
+	wlan_cfg80211_vendor_free_skb(vendor_event);
 }
 
 static inline uint32_t osif_ndp_get_ndp_end_rsp_len(void)
@@ -1807,6 +1814,8 @@ static void os_if_ndp_end_rsp_handler(struct wlan_objmgr_vdev *vdev,
 	struct sk_buff *vendor_event;
 	struct wlan_objmgr_pdev *pdev = wlan_vdev_get_pdev(vdev);
 	struct pdev_osif_priv *os_priv = wlan_pdev_get_ospriv(pdev);
+	enum qca_nl80211_vendor_subcmds_index index =
+		QCA_NL80211_VENDOR_SUBCMD_NDP_INDEX;
 
 	if (!rsp) {
 		osif_err("Invalid ndp end response");
@@ -1814,11 +1823,11 @@ static void os_if_ndp_end_rsp_handler(struct wlan_objmgr_vdev *vdev,
 	}
 
 	data_len = osif_ndp_get_ndp_end_rsp_len();
-	vendor_event = cfg80211_vendor_event_alloc(os_priv->wiphy, NULL,
-				data_len, QCA_NL80211_VENDOR_SUBCMD_NDP_INDEX,
-				GFP_ATOMIC);
+	vendor_event = wlan_cfg80211_vendor_event_alloc(os_priv->wiphy, NULL,
+							data_len, index,
+							GFP_ATOMIC);
 	if (!vendor_event) {
-		osif_err("cfg80211_vendor_event_alloc failed");
+		osif_err("wlan_cfg80211_vendor_event_alloc failed");
 		return;
 	}
 
@@ -1841,12 +1850,12 @@ static void os_if_ndp_end_rsp_handler(struct wlan_objmgr_vdev *vdev,
 
 	osif_debug("NDP End rsp sent, transaction id: %u, status: %u, reason: %u",
 		   rsp->transaction_id, rsp->status, rsp->reason);
-	cfg80211_vendor_event(vendor_event, GFP_ATOMIC);
+	wlan_cfg80211_vendor_event(vendor_event, GFP_ATOMIC);
 	return;
 
 ndp_end_rsp_nla_failed:
 	osif_err("nla_put api failed");
-	kfree_skb(vendor_event);
+	wlan_cfg80211_vendor_free_skb(vendor_event);
 }
 
 static inline uint32_t osif_ndp_get_ndp_end_ind_len(
@@ -1883,6 +1892,8 @@ static void os_if_ndp_end_ind_handler(struct wlan_objmgr_vdev *vdev,
 	struct sk_buff *vendor_event;
 	struct wlan_objmgr_pdev *pdev = wlan_vdev_get_pdev(vdev);
 	struct pdev_osif_priv *os_priv = wlan_pdev_get_ospriv(pdev);
+	enum qca_nl80211_vendor_subcmds_index index =
+		QCA_NL80211_VENDOR_SUBCMD_NDP_INDEX;
 
 	if (!end_ind) {
 		osif_err("Invalid ndp end indication");
@@ -1898,12 +1909,12 @@ static void os_if_ndp_end_ind_handler(struct wlan_objmgr_vdev *vdev,
 		ndp_instance_array[i] = end_ind->ndp_map[i].ndp_instance_id;
 
 	data_len = osif_ndp_get_ndp_end_ind_len(end_ind);
-	vendor_event = cfg80211_vendor_event_alloc(os_priv->wiphy, NULL,
-				data_len, QCA_NL80211_VENDOR_SUBCMD_NDP_INDEX,
-				GFP_ATOMIC);
+	vendor_event = wlan_cfg80211_vendor_event_alloc(os_priv->wiphy, NULL,
+							data_len, index,
+							GFP_ATOMIC);
 	if (!vendor_event) {
 		qdf_mem_free(ndp_instance_array);
-		osif_err("cfg80211_vendor_event_alloc failed");
+		osif_err("wlan_cfg80211_vendor_event_alloc failed");
 		return;
 	}
 
@@ -1916,13 +1927,13 @@ static void os_if_ndp_end_ind_handler(struct wlan_objmgr_vdev *vdev,
 			ndp_instance_array))
 		goto ndp_end_ind_nla_failed;
 
-	cfg80211_vendor_event(vendor_event, GFP_ATOMIC);
+	wlan_cfg80211_vendor_event(vendor_event, GFP_ATOMIC);
 	qdf_mem_free(ndp_instance_array);
 	return;
 
 ndp_end_ind_nla_failed:
 	osif_err("nla_put api failed");
-	kfree_skb(vendor_event);
+	wlan_cfg80211_vendor_free_skb(vendor_event);
 	qdf_mem_free(ndp_instance_array);
 }
 
@@ -2054,6 +2065,8 @@ static void os_if_ndp_iface_create_rsp_handler(struct wlan_objmgr_psoc *psoc,
 	uint32_t create_reason = NAN_DATAPATH_NAN_DATA_IFACE_CREATE_FAILED;
 	struct nan_datapath_inf_create_rsp *ndi_rsp =
 			(struct nan_datapath_inf_create_rsp *)rsp_params;
+	enum qca_nl80211_vendor_subcmds_index index =
+		QCA_NL80211_VENDOR_SUBCMD_NDP_INDEX;
 
 	status = ucfg_nan_get_callbacks(psoc, &cb_obj);
 	if (QDF_IS_STATUS_ERROR(status)) {
@@ -2072,13 +2085,11 @@ static void os_if_ndp_iface_create_rsp_handler(struct wlan_objmgr_psoc *psoc,
 	create_transaction_id = ucfg_nan_get_ndp_create_transaction_id(vdev);
 	data_len = osif_ndp_get_ndi_create_rsp_len();
 	/* notify response to the upper layer */
-	vendor_event = cfg80211_vendor_event_alloc(os_priv->wiphy,
-				NULL,
-				data_len,
-				QCA_NL80211_VENDOR_SUBCMD_NDP_INDEX,
-				GFP_KERNEL);
+	vendor_event = wlan_cfg80211_vendor_event_alloc(os_priv->wiphy, NULL,
+							data_len, index,
+							GFP_KERNEL);
 	if (!vendor_event) {
-		osif_err("cfg80211_vendor_event_alloc failed");
+		osif_err("wlan_cfg80211_vendor_event_alloc failed");
 		create_fail = true;
 		goto close_ndi;
 	}
@@ -2120,18 +2131,18 @@ static void os_if_ndp_iface_create_rsp_handler(struct wlan_objmgr_psoc *psoc,
 		/* update txrx queues and register self sta */
 		cb_obj.drv_ndi_create_rsp_handler(wlan_vdev_get_id(vdev),
 						  ndi_rsp);
-		cfg80211_vendor_event(vendor_event, GFP_KERNEL);
+		wlan_cfg80211_vendor_event(vendor_event, GFP_KERNEL);
 	} else {
 		osif_err("NDI interface creation failed with reason %d",
 			 create_reason);
-		cfg80211_vendor_event(vendor_event, GFP_KERNEL);
+		wlan_cfg80211_vendor_event(vendor_event, GFP_KERNEL);
 		goto close_ndi;
 	}
 
 	return;
 
 nla_put_failure:
-	kfree_skb(vendor_event);
+	wlan_cfg80211_vendor_free_skb(vendor_event);
 close_ndi:
 	cb_obj.ndi_close(wlan_vdev_get_id(vdev));
 	return;
@@ -2270,6 +2281,8 @@ static void os_if_ndp_sch_update_ind_handler(struct wlan_objmgr_vdev *vdev,
 	struct nan_datapath_sch_update_event *sch_update = ind;
 	struct wlan_objmgr_pdev *pdev = wlan_vdev_get_pdev(vdev);
 	struct pdev_osif_priv *os_priv = wlan_pdev_get_ospriv(pdev);
+	enum qca_nl80211_vendor_subcmds_index index =
+		QCA_NL80211_VENDOR_SUBCMD_NDP_INDEX;
 
 	if (!sch_update) {
 		osif_err("Invalid sch update params");
@@ -2288,11 +2301,11 @@ static void os_if_ndp_sch_update_ind_handler(struct wlan_objmgr_vdev *vdev,
 	}
 
 	data_len = osif_ndp_get_ndp_sch_update_ind_len(sch_update);
-	vendor_event = cfg80211_vendor_event_alloc(os_priv->wiphy, NULL,
-				data_len, QCA_NL80211_VENDOR_SUBCMD_NDP_INDEX,
-				GFP_ATOMIC);
+	vendor_event = wlan_cfg80211_vendor_event_alloc(os_priv->wiphy, NULL,
+							data_len, index,
+							GFP_ATOMIC);
 	if (!vendor_event) {
-		osif_err("cfg80211_vendor_event_alloc failed");
+		osif_err("wlan_cfg80211_vendor_event_alloc failed");
 		return;
 	}
 
@@ -2330,12 +2343,12 @@ static void os_if_ndp_sch_update_ind_handler(struct wlan_objmgr_vdev *vdev,
 		osif_debug("ndp_instance[%d]: %d", idx,
 			   sch_update->ndp_instances[idx]);
 
-	cfg80211_vendor_event(vendor_event, GFP_ATOMIC);
+	wlan_cfg80211_vendor_event(vendor_event, GFP_ATOMIC);
 	return;
 
 ndp_sch_ind_nla_failed:
 	osif_err("nla_put api failed");
-	kfree_skb(vendor_event);
+	wlan_cfg80211_vendor_free_skb(vendor_event);
 }
 
 /**
@@ -2501,6 +2514,8 @@ void os_if_nan_ndi_session_end(struct wlan_objmgr_vdev *vdev)
 	struct wlan_objmgr_pdev *pdev = wlan_vdev_get_pdev(vdev);
 	struct pdev_osif_priv *os_priv = wlan_pdev_get_ospriv(pdev);
 	enum nan_datapath_state state;
+	enum qca_nl80211_vendor_subcmds_index index =
+		QCA_NL80211_VENDOR_SUBCMD_NDP_INDEX;
 
 	/*
 	 * The virtual adapters are stopped and closed even during
@@ -2516,12 +2531,11 @@ void os_if_nan_ndi_session_end(struct wlan_objmgr_vdev *vdev)
 
 	data_len = osif_ndp_get_ndi_delete_rsp_len();
 	/* notify response to the upper layer */
-	vendor_event = cfg80211_vendor_event_alloc(os_priv->wiphy, NULL,
-			data_len, QCA_NL80211_VENDOR_SUBCMD_NDP_INDEX,
-			GFP_KERNEL);
-
+	vendor_event = wlan_cfg80211_vendor_event_alloc(os_priv->wiphy, NULL,
+							data_len, index,
+							GFP_KERNEL);
 	if (!vendor_event) {
-		osif_err("cfg80211_vendor_event_alloc failed");
+		osif_err("wlan_cfg80211_vendor_event_alloc failed");
 		return;
 	}
 
@@ -2563,12 +2577,43 @@ void os_if_nan_ndi_session_end(struct wlan_objmgr_vdev *vdev)
 	ucfg_nan_set_ndp_delete_transaction_id(vdev, 0);
 	ucfg_nan_set_ndi_state(vdev, NAN_DATA_NDI_DELETED_STATE);
 	ucfg_ndi_remove_entry_from_policy_mgr(vdev);
-	cfg80211_vendor_event(vendor_event, GFP_KERNEL);
+	wlan_cfg80211_vendor_event(vendor_event, GFP_KERNEL);
 
 	return;
 failure:
-	kfree_skb(vendor_event);
+	wlan_cfg80211_vendor_free_skb(vendor_event);
 }
+
+/**
+ * os_if_nan_handle_sr_nan_concurrency() - Handle NAN concurrency for Spatial
+ * Reuse
+ * @nan_evt: NAN Event parameters
+ *
+ * Module calls callback to send SR event to userspace.
+ *
+ * Return: none
+ */
+#ifdef WLAN_FEATURE_SR
+static void
+os_if_nan_handle_sr_nan_concurrency(struct nan_event_params *nan_evt) {
+	void (*nan_sr_conc_callback)(struct nan_event_params *nan_evt);
+	struct nan_psoc_priv_obj *psoc_obj =
+				nan_get_psoc_priv_obj(nan_evt->psoc);
+
+	if (!psoc_obj) {
+		nan_err("nan psoc priv object is NULL");
+		return;
+	}
+
+	nan_sr_conc_callback = psoc_obj->cb_obj.nan_sr_concurrency_update;
+	if (nan_sr_conc_callback)
+		nan_sr_conc_callback(nan_evt);
+}
+#else
+static void
+os_if_nan_handle_sr_nan_concurrency(struct nan_event_params *nan_evt)
+{}
+#endif
 
 /**
  * os_if_nan_discovery_event_handler() - NAN Discovery Interface event handler
@@ -2583,6 +2628,8 @@ static void os_if_nan_discovery_event_handler(struct nan_event_params *nan_evt)
 	struct sk_buff *vendor_event;
 	struct wlan_objmgr_pdev *pdev;
 	struct pdev_osif_priv *os_priv;
+	enum qca_nl80211_vendor_subcmds_index index =
+		QCA_NL80211_VENDOR_SUBCMD_NAN_INDEX;
 
 	/*
 	 * Since Partial Offload chipsets have only one pdev per psoc, the first
@@ -2593,26 +2640,27 @@ static void os_if_nan_discovery_event_handler(struct nan_event_params *nan_evt)
 		osif_err("null pdev");
 		return;
 	}
+	os_if_nan_handle_sr_nan_concurrency(nan_evt);
+
 	os_priv = wlan_pdev_get_ospriv(pdev);
 
-	vendor_event =
-		cfg80211_vendor_event_alloc(os_priv->wiphy, NULL,
-					    nan_evt->buf_len + NLMSG_HDRLEN,
-					    QCA_NL80211_VENDOR_SUBCMD_NAN_INDEX,
-					    GFP_KERNEL);
-
+	vendor_event = wlan_cfg80211_vendor_event_alloc(os_priv->wiphy, NULL,
+							nan_evt->buf_len +
+							NLMSG_HDRLEN,
+							index, GFP_KERNEL);
 	if (!vendor_event) {
-		osif_err("cfg80211_vendor_event_alloc failed");
+		osif_err("wlan_cfg80211_vendor_event_alloc failed");
 		goto fail;
 	}
 
 	if (nla_put(vendor_event, QCA_WLAN_VENDOR_ATTR_NAN, nan_evt->buf_len,
 		    nan_evt->buf)) {
 		osif_err("QCA_WLAN_VENDOR_ATTR_NAN put failed");
+		wlan_cfg80211_vendor_free_skb(vendor_event);
 		goto fail;
 	}
 
-	cfg80211_vendor_event(vendor_event, GFP_KERNEL);
+	wlan_cfg80211_vendor_event(vendor_event, GFP_KERNEL);
 fail:
 	wlan_objmgr_pdev_release_ref(pdev, WLAN_NAN_ID);
 }

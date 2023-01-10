@@ -1289,10 +1289,17 @@ enum conn_6ghz_flag {
 	CONN_6GHZ_FLAG_NO_LEGACY_CLIENT = 0x0008,
 };
 
-#define CONN_6GHZ_CAPABLIE (CONN_6GHZ_FLAG_VALID | \
+#ifdef WLAN_FEATURE_AFC_DCS_SKIP_ACS_RANGE
+/* To support DCS to 6 Ghz channel when AFC response receive */
+#define CONN_6GHZ_CAPABLE (CONN_6GHZ_FLAG_VALID | \
+			     CONN_6GHZ_FLAG_SECURITY_ALLOWED | \
+			     CONN_6GHZ_FLAG_NO_LEGACY_CLIENT)
+#else
+#define CONN_6GHZ_CAPABLE (CONN_6GHZ_FLAG_VALID | \
 			     CONN_6GHZ_FLAG_ACS_OR_USR_ALLOWED | \
 			     CONN_6GHZ_FLAG_SECURITY_ALLOWED | \
 			     CONN_6GHZ_FLAG_NO_LEGACY_CLIENT)
+#endif
 
 /**
  * struct policy_mgr_conc_connection_info - information of all existing
@@ -1642,11 +1649,13 @@ struct sap_plus_go_force_scc {
  * @go_plus_go_force_scc: structure to hold params of
  *			  curr and first p2p go ctx
  * @sap_plus_go_force_scc: sap p2p force SCC ctx
+ * @nan_force_scc_in_progress: NAN force scc in progress
  */
 struct sta_ap_intf_check_work_ctx {
 	struct wlan_objmgr_psoc *psoc;
 	struct go_plus_go_force_scc go_plus_go_force_scc;
 	struct sap_plus_go_force_scc sap_plus_go_force_scc;
+	uint8_t nan_force_scc_in_progress;
 };
 
 /**
