@@ -1354,6 +1354,7 @@ static void hal_hw_txrx_ops_attach_qca5332(struct hal_soc *hal_soc)
 	hal_soc->ops->hal_tx_dump_ppe_vp_entry = NULL;
 	hal_soc->ops->hal_tx_get_num_ppe_vp_tbl_entries = NULL;
 	hal_soc->ops->hal_tx_enable_pri2tid_map = NULL;
+	hal_soc->ops->hal_ppeds_cfg_ast_override_map_reg = NULL;
 	hal_soc->ops->hal_tx_config_rbm_mapping_be =
 				hal_tx_config_rbm_mapping_be_5332;
 
