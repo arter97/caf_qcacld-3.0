@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2019-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -475,7 +475,7 @@ target_if_cfr_deinit_pdev(struct wlan_objmgr_psoc *psoc,
 #endif
 
 #ifdef WLAN_ENH_CFR_ENABLE
-#if defined(QCA_WIFI_QCA6490) || defined(QCA_WIFI_KIWI)
+#if defined(QCA_WIFI_QCA6490)
 static uint8_t target_if_cfr_get_mac_id(struct wlan_objmgr_pdev *pdev)
 {
 	struct wlan_objmgr_vdev *vdev;
@@ -529,7 +529,7 @@ static uint8_t target_if_cfr_get_pdev_id(struct wlan_objmgr_pdev *pdev)
 {
 	return target_if_cfr_get_mac_id(pdev);
 }
-#elif defined(QCA_WIFI_QCA6750)
+#elif defined(QCA_WIFI_KIWI)
 static uint8_t target_if_cfr_get_pdev_id(struct wlan_objmgr_pdev *pdev)
 {
 	/* Host and FW have agreement about using fixed pdev id for
