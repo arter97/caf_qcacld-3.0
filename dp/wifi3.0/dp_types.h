@@ -446,6 +446,7 @@ struct dp_rx_nbuf_frag_info {
  * @DP_MON_SOC_TYPE: Datapath monitor soc context
  * @DP_MON_PDEV_TYPE: Datapath monitor pdev context
  * @DP_MON_STATUS_BUF_HIST_TYPE: DP monitor status buffer history
+ * @DP_CFG_EVENT_HIST_TYPE: DP config events history
  */
 enum dp_ctxt_type {
 	DP_PDEV_TYPE,
@@ -460,6 +461,7 @@ enum dp_ctxt_type {
 	DP_MON_SOC_TYPE,
 	DP_MON_PDEV_TYPE,
 	DP_MON_STATUS_BUF_HIST_TYPE,
+	DP_CFG_EVENT_HIST_TYPE,
 };
 
 /**
@@ -1570,6 +1572,206 @@ struct dp_rx_refill_history {
 
 #endif
 
+/**
+ * enum dp_cfg_event_type - Datapath config events type
+ * @DP_CFG_EVENT_VDEV_ATTACH: vdev attach
+ * @DP_CFG_EVENT_VDEV_DETACH: vdev detach
+ * @DP_CFG_EVENT_VDEV_UNREF_DEL: vdev memory free after last ref is released
+ * @DP_CFG_EVENT_PEER_CREATE: peer create
+ * @DP_CFG_EVENT_PEER_DELETE: peer delete
+ * @DP_CFG_EVENT_PEER_UNREF_DEL: peer memory free after last ref is released
+ * @DP_CFG_EVENT_PEER_SETUP: peer setup
+ * @DP_CFG_EVENT_MLO_ADD_LINK: add link peer to mld peer
+ * @DP_CFG_EVENT_MLO_DEL_LINK: delete link peer from mld peer
+ * @DP_CFG_EVENT_MLO_SETUP: MLO peer setup
+ * @DP_CFG_EVENT_MLO_SETUP_VDEV_UPDATE: MLD peer vdev update
+ * @DP_CFG_EVENT_PEER_MAP: peer map
+ * @DP_CFG_EVENT_PEER_UNMAP: peer unmap
+ * @DP_CFG_EVENT_MLO_PEER_MAP: MLD peer map
+ * @DP_CFG_EVENT_MLO_PEER_UNMAP: MLD peer unmap
+ */
+enum dp_cfg_event_type {
+	DP_CFG_EVENT_VDEV_ATTACH,
+	DP_CFG_EVENT_VDEV_DETACH,
+	DP_CFG_EVENT_VDEV_UNREF_DEL,
+	DP_CFG_EVENT_PEER_CREATE,
+	DP_CFG_EVENT_PEER_DELETE,
+	DP_CFG_EVENT_PEER_UNREF_DEL,
+	DP_CFG_EVENT_PEER_SETUP,
+	DP_CFG_EVENT_MLO_ADD_LINK,
+	DP_CFG_EVENT_MLO_DEL_LINK,
+	DP_CFG_EVENT_MLO_SETUP,
+	DP_CFG_EVENT_MLO_SETUP_VDEV_UPDATE,
+	DP_CFG_EVENT_PEER_MAP,
+	DP_CFG_EVENT_PEER_UNMAP,
+	DP_CFG_EVENT_MLO_PEER_MAP,
+	DP_CFG_EVENT_MLO_PEER_UNMAP,
+};
+
+#ifdef WLAN_FEATURE_DP_CFG_EVENT_HISTORY
+/* Size must be in 2 power, for bitwise index rotation */
+#define DP_CFG_EVT_HISTORY_SIZE 0x800
+#define DP_CFG_EVT_HIST_PER_SLOT_MAX 256
+#define DP_CFG_EVT_HIST_MAX_SLOTS 8
+#define DP_CFG_EVT_HIST_SLOT_SHIFT 8
+
+/**
+ * struct dp_vdev_attach_detach_desc - vdev ops descriptor
+ * @vdev: DP vdev handle
+ * @mac_addr: vdev mac address
+ * @vdev_id: vdev id
+ * @ref_count: vdev ref count
+ */
+struct dp_vdev_attach_detach_desc {
+	struct dp_vdev *vdev;
+	union dp_align_mac_addr mac_addr;
+	uint8_t vdev_id;
+	int32_t ref_count;
+};
+
+/**
+ * struct dp_peer_cmn_ops_desc - peer events descriptor
+ * @vdev_id: vdev_id of the vdev on which peer exists
+ * @is_reuse: indicates if its a peer reuse case, during peer create
+ * @peer: DP peer handle
+ * @vdev: DP vdev handle on which peer exists
+ * @mac_addr: peer mac address
+ * @vdev_mac_addr: vdev mac address
+ * @vdev_ref_count: vdev ref count
+ * @peer_ref_count: peer ref count
+ */
+struct dp_peer_cmn_ops_desc {
+	uint8_t vdev_id : 5,
+		is_reuse : 1;
+	struct dp_peer *peer;
+	struct dp_vdev *vdev;
+	union dp_align_mac_addr mac_addr;
+	union dp_align_mac_addr vdev_mac_addr;
+	int32_t vdev_ref_count;
+	int32_t peer_ref_count;
+};
+
+/**
+ * struct dp_mlo_add_del_link_desc - MLO add/del link event descriptor
+ * @idx: index at which link peer got added in MLD peer's list
+ * @num_links: num links added in the MLD peer's list
+ * @action_result: add/del was success or not
+ * @link_peer: link peer handle
+ * @mld_peer: MLD peer handle
+ * @link_mac_addr: link peer mac address
+ * @mld_mac_addr: MLD peer mac address
+ */
+struct dp_mlo_add_del_link_desc {
+	uint8_t idx : 3,
+		num_links : 3,
+		action_result : 1,
+		reserved : 1;
+	struct dp_peer *link_peer;
+	struct dp_peer *mld_peer;
+	union dp_align_mac_addr link_mac_addr;
+	union dp_align_mac_addr mld_mac_addr;
+};
+
+/**
+ * struct dp_mlo_setup_vdev_update_desc - MLD peer vdev update event desc
+ * @mld_peer: MLD peer handle
+ * @prev_vdev: previous vdev handle
+ * @new_vdev: new vdev handle
+ */
+struct dp_mlo_setup_vdev_update_desc {
+	struct dp_peer *mld_peer;
+	struct dp_vdev *prev_vdev;
+	struct dp_vdev *new_vdev;
+};
+
+/**
+ * struct dp_rx_peer_map_unmap_desc - peer map/unmap event descriptor
+ * @peer_id: peer id
+ * @ml_peer_id: ML peer id, if its an MLD peer
+ * @hw_peer_id: hw peer id
+ * @vdev_id: vdev id of the peer
+ * @is_ml_peer: is this MLD peer
+ * @mac_addr: mac address of the peer
+ * @peer: peer handle
+ */
+struct dp_rx_peer_map_unmap_desc {
+	uint16_t peer_id;
+	uint16_t ml_peer_id;
+	uint16_t hw_peer_id;
+	uint8_t vdev_id;
+	uint8_t is_ml_peer;
+	union dp_align_mac_addr mac_addr;
+	struct dp_peer *peer;
+};
+
+/**
+ * struct dp_peer_setup_desc - peer setup event descriptor
+ * @peer: DP peer handle
+ * @vdev: vdev handle on which peer exists
+ * @vdev_ref_count: vdev ref count
+ * @mac_addr: peer mac address
+ * @mld_mac_addr: MLD mac address
+ * @is_first_link: is the current link the first link created
+ * @is_primary_link: is the current link primary link
+ * @vdev_id: vdev id of the vdev on which the current link peer exists
+ */
+struct dp_peer_setup_desc {
+	struct dp_peer *peer;
+	struct dp_vdev *vdev;
+	int32_t vdev_ref_count;
+	union dp_align_mac_addr mac_addr;
+	union dp_align_mac_addr mld_mac_addr;
+	uint8_t is_first_link : 1,
+		is_primary_link : 1,
+		vdev_id : 5,
+		reserved : 1;
+};
+
+/**
+ * union dp_cfg_event_desc - DP config event descriptor
+ * @vdev_evt: vdev events desc
+ * @peer_cmn_evt: common peer events desc
+ * @peer_setup_evt: peer setup event desc
+ * @mlo_link_delink_evt: MLO link/delink event desc
+ * @mlo_setup_vdev_update: MLD peer vdev update event desc
+ * @peer_map_unmap_evt: peer map/unmap event desc
+ */
+union dp_cfg_event_desc {
+	struct dp_vdev_attach_detach_desc vdev_evt;
+	struct dp_peer_cmn_ops_desc peer_cmn_evt;
+	struct dp_peer_setup_desc peer_setup_evt;
+	struct dp_mlo_add_del_link_desc mlo_link_delink_evt;
+	struct dp_mlo_setup_vdev_update_desc mlo_setup_vdev_update;
+	struct dp_rx_peer_map_unmap_desc peer_map_unmap_evt;
+};
+
+/**
+ * struct dp_cfg_event - DP config event descriptor
+ * @timestamp: timestamp at which event was recorded
+ * @type: event type
+ * @event_desc: event descriptor
+ */
+struct dp_cfg_event {
+	uint64_t timestamp;
+	enum dp_cfg_event_type type;
+	union dp_cfg_event_desc event_desc;
+};
+
+/**
+ * struct dp_cfg_event_history - DP config event history
+ * @index: current index
+ * @num_entries_per_slot: number of entries per slot
+ * @allocated: Is the history allocated or not
+ * @entry: event history descriptors
+ */
+struct dp_cfg_event_history {
+	qdf_atomic_t index;
+	uint16_t num_entries_per_slot;
+	uint16_t allocated;
+	struct dp_cfg_event *entry[DP_CFG_EVT_HIST_MAX_SLOTS];
+};
+#endif
+
 enum dp_tx_event_type {
 	DP_TX_DESC_INVAL_EVT = 0,
 	DP_TX_DESC_MAP,
@@ -2403,6 +2605,10 @@ struct dp_soc {
 #ifdef WLAN_FEATURE_DP_TX_DESC_HISTORY
 	struct dp_tx_tcl_history tx_tcl_history;
 	struct dp_tx_comp_history tx_comp_history;
+#endif
+
+#ifdef WLAN_FEATURE_DP_CFG_EVENT_HISTORY
+	struct dp_cfg_event_history cfg_event_history;
 #endif
 
 	qdf_spinlock_t ast_lock;

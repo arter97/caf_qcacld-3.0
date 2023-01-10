@@ -5549,6 +5549,47 @@ static void dp_free_ipa_rx_alt_refill_buf_ring(struct dp_soc *soc,
 }
 #endif
 
+#ifdef WLAN_FEATURE_DP_CFG_EVENT_HISTORY
+
+/**
+ * dp_soc_cfg_history_attach() - Allocate and attach datapath config events
+ *				 history
+ * @soc: DP soc handle
+ *
+ * Return: None
+ */
+static void dp_soc_cfg_history_attach(struct dp_soc *soc)
+{
+	dp_soc_frag_history_attach(soc, &soc->cfg_event_history,
+				   DP_CFG_EVT_HIST_MAX_SLOTS,
+				   DP_CFG_EVT_HIST_PER_SLOT_MAX,
+				   sizeof(struct dp_cfg_event),
+				   true, DP_CFG_EVENT_HIST_TYPE);
+}
+
+/**
+ * dp_soc_cfg_history_detach() - Detach and free DP config events history
+ * @soc: DP soc handle
+ *
+ * Return: none
+ */
+static void dp_soc_cfg_history_detach(struct dp_soc *soc)
+{
+	dp_soc_frag_history_detach(soc, &soc->cfg_event_history,
+				   DP_CFG_EVT_HIST_MAX_SLOTS,
+				   true, DP_CFG_EVENT_HIST_TYPE);
+}
+
+#else
+static void dp_soc_cfg_history_attach(struct dp_soc *soc)
+{
+}
+
+static void dp_soc_cfg_history_detach(struct dp_soc *soc)
+{
+}
+#endif
+
 #ifdef DP_TX_HW_DESC_HISTORY
 /**
  * dp_soc_tx_hw_desc_history_attach - Attach TX HW descriptor history
@@ -6561,6 +6602,7 @@ static void dp_soc_detach(struct cdp_soc_t *txrx_soc)
 	dp_soc_tx_history_detach(soc);
 	dp_soc_mon_status_ring_history_detach(soc);
 	dp_soc_rx_history_detach(soc);
+	dp_soc_cfg_history_detach(soc);
 
 	if (!dp_monitor_modularized_enable()) {
 		dp_mon_soc_detach_wrapper(soc);
@@ -7385,6 +7427,7 @@ static QDF_STATUS dp_vdev_attach_wifi3(struct cdp_soc_t *cdp_soc,
 			dp_err("LRO hash setup failure!");
 	}
 
+	dp_cfg_event_record_vdev_evt(soc, DP_CFG_EVENT_VDEV_ATTACH, vdev);
 	dp_info("Created vdev %pK ("QDF_MAC_ADDR_FMT") vdev_id %d", vdev,
 		QDF_MAC_ADDR_REF(vdev->mac_addr.raw), vdev->vdev_id);
 	DP_STATS_INIT(vdev);
@@ -7780,6 +7823,7 @@ static QDF_STATUS dp_vdev_detach_wifi3(struct cdp_soc_t *cdp_soc,
 	TAILQ_INSERT_TAIL(&soc->inactive_vdev_list, vdev, inactive_list_elem);
 	qdf_spin_unlock_bh(&soc->inactive_vdev_list_lock);
 
+	dp_cfg_event_record_vdev_evt(soc, DP_CFG_EVENT_VDEV_DETACH, vdev);
 	dp_info("detach vdev %pK id %d pending refs %d",
 		vdev, vdev->vdev_id, qdf_atomic_read(&vdev->ref_cnt));
 
@@ -8097,6 +8141,8 @@ dp_peer_create_wifi3(struct cdp_soc_t *soc_hdl, uint8_t vdev_id,
 			dp_peer_hw_txrx_stats_init(soc, peer->txrx_peer);
 		}
 
+		dp_cfg_event_record_peer_evt(soc, DP_CFG_EVENT_PEER_CREATE,
+					     peer, vdev, 1);
 		dp_info("vdev %pK Reused peer %pK ("QDF_MAC_ADDR_FMT
 			") vdev_ref_cnt "
 			"%d peer_ref_cnt: %d",
@@ -8189,6 +8235,8 @@ dp_peer_create_wifi3(struct cdp_soc_t *soc_hdl, uint8_t vdev_id,
 	/* Initialize the peer state */
 	peer->state = OL_TXRX_PEER_STATE_DISC;
 
+	dp_cfg_event_record_peer_evt(soc, DP_CFG_EVENT_PEER_CREATE,
+				     peer, vdev, 0);
 	dp_info("vdev %pK created peer %pK ("QDF_MAC_ADDR_FMT") vdev_ref_cnt "
 		"%d peer_ref_cnt: %d",
 		vdev, peer, QDF_MAC_ADDR_REF(peer->mac_addr.raw),
@@ -8265,6 +8313,8 @@ QDF_STATUS dp_peer_mlo_setup(
 	if (!setup_info || !setup_info->mld_peer_mac)
 		return QDF_STATUS_SUCCESS;
 
+	dp_cfg_event_record_peer_setup_evt(soc, DP_CFG_EVENT_MLO_SETUP,
+					   peer, NULL, vdev_id, setup_info);
 	dp_info("link peer: " QDF_MAC_ADDR_FMT "mld peer: " QDF_MAC_ADDR_FMT
 		"first_link %d, primary_link %d",
 		QDF_MAC_ADDR_REF(peer->mac_addr.raw),
@@ -8302,12 +8352,14 @@ QDF_STATUS dp_peer_mlo_setup(
 
 		if (setup_info->is_primary_link &&
 		    !setup_info->is_first_link) {
+			struct dp_vdev *prev_vdev;
 			/*
 			 * if first link is not the primary link,
 			 * then need to change mld_peer->vdev as
 			 * primary link dp_vdev is not same one
 			 * during mld peer creation.
 			 */
+			prev_vdev = mld_peer->vdev;
 			dp_info("Primary link is not the first link. vdev: %pK,"
 				"vdev_id %d vdev_ref_cnt %d",
 				mld_peer->vdev, vdev_id,
@@ -8322,6 +8374,11 @@ QDF_STATUS dp_peer_mlo_setup(
 			mld_peer->vdev = dp_vdev_get_ref_by_id(soc, vdev_id,
 							       DP_MOD_ID_CHILD);
 			mld_peer->txrx_peer->vdev = mld_peer->vdev;
+
+			dp_cfg_event_record_mlo_setup_vdev_update_evt(
+					soc, mld_peer, prev_vdev,
+					mld_peer->vdev);
+
 		}
 
 		/* associate mld and link peer */
@@ -8542,6 +8599,9 @@ dp_peer_setup_wifi3(struct cdp_soc_t *soc_hdl, uint8_t vdev_id,
 				   &reo_dest, &hash_based,
 				   &lmac_peer_id_msb);
 
+	dp_cfg_event_record_peer_setup_evt(soc, DP_CFG_EVENT_PEER_SETUP,
+					   peer, vdev, vdev->vdev_id,
+					   setup_info);
 	dp_info("pdev: %d vdev :%d opmode:%u peer %pK (" QDF_MAC_ADDR_FMT ") "
 		"hash-based-steering:%d default-reo_dest:%u",
 		pdev->pdev_id, vdev->vdev_id,
@@ -8990,6 +9050,8 @@ free_vdev:
 	/* delete this peer from the list */
 	qdf_spin_unlock_bh(&soc->inactive_vdev_list_lock);
 
+	dp_cfg_event_record_vdev_evt(soc, DP_CFG_EVENT_VDEV_UNREF_DEL,
+				     vdev);
 	dp_info("deleting vdev object %pK ("QDF_MAC_ADDR_FMT")",
 		vdev, QDF_MAC_ADDR_REF(vdev->mac_addr.raw));
 	wlan_minidump_remove(vdev, sizeof(*vdev), soc->ctrl_psoc,
@@ -9073,6 +9135,8 @@ void dp_peer_unref_delete(struct dp_peer *peer, enum dp_mod_id mod_id)
 		qdf_spinlock_destroy(&peer->peer_state_lock);
 
 		dp_txrx_peer_detach(soc, peer);
+		dp_cfg_event_record_peer_evt(soc, DP_CFG_EVENT_PEER_UNREF_DEL,
+					     peer, vdev, 0);
 		qdf_mem_free(peer);
 
 		/*
@@ -9146,6 +9210,8 @@ static QDF_STATUS dp_peer_delete_wifi3(struct cdp_soc_t *soc_hdl,
 
 	peer->valid = 0;
 
+	dp_cfg_event_record_peer_evt(soc, DP_CFG_EVENT_PEER_DELETE, peer,
+				     vdev, 0);
 	dp_init_info("%pK: peer %pK (" QDF_MAC_ADDR_FMT ") pending-refs %d",
 		     soc, peer, QDF_MAC_ADDR_REF(peer->mac_addr.raw),
 		     qdf_atomic_read(&peer->ref_cnt));
@@ -15544,6 +15610,7 @@ dp_soc_attach(struct cdp_ctrl_objmgr_psoc *ctrl_psoc,
 	/* Reset wbm sg list and flags */
 	dp_rx_wbm_sg_list_reset(soc);
 
+	dp_soc_cfg_history_attach(soc);
 	dp_soc_tx_hw_desc_history_attach(soc);
 	dp_soc_rx_history_attach(soc);
 	dp_soc_mon_status_ring_history_attach(soc);

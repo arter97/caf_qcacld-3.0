@@ -22,6 +22,7 @@
 #include <qdf_types.h>
 #include <qdf_lock.h>
 #include "dp_types.h"
+#include "dp_internal.h"
 
 #ifdef DUMP_REO_QUEUE_INFO_IN_DDR
 #include "hal_reo.h"
@@ -1312,6 +1313,7 @@ void dp_mld_peer_add_link_peer(struct dp_peer *mld_peer,
 	int i;
 	struct dp_peer_link_info *link_peer_info;
 	bool action_done = false;
+	struct dp_soc *soc = mld_peer->vdev->pdev->soc;
 
 	qdf_spin_lock_bh(&mld_peer->link_peers_info_lock);
 	for (i = 0; i < DP_MAX_MLO_LINKS; i++) {
@@ -1342,6 +1344,10 @@ void dp_mld_peer_add_link_peer(struct dp_peer *mld_peer,
 			     mld_peer, QDF_MAC_ADDR_REF(mld_peer->mac_addr.raw),
 			     link_peer, QDF_MAC_ADDR_REF(link_peer->mac_addr.raw),
 			     i, mld_peer->num_links);
+
+	dp_cfg_event_record_mlo_link_delink_evt(soc, DP_CFG_EVENT_MLO_ADD_LINK,
+						mld_peer, link_peer, i,
+						action_done ? 1 : 0);
 }
 
 /**
@@ -1359,6 +1365,7 @@ uint8_t dp_mld_peer_del_link_peer(struct dp_peer *mld_peer,
 	struct dp_peer_link_info *link_peer_info;
 	uint8_t num_links;
 	bool action_done = false;
+	struct dp_soc *soc = mld_peer->vdev->pdev->soc;
 
 	qdf_spin_lock_bh(&mld_peer->link_peers_info_lock);
 	for (i = 0; i < DP_MAX_MLO_LINKS; i++) {
@@ -1387,6 +1394,9 @@ uint8_t dp_mld_peer_del_link_peer(struct dp_peer *mld_peer,
 			     link_peer, QDF_MAC_ADDR_REF(link_peer->mac_addr.raw),
 			     i, mld_peer->num_links);
 
+	dp_cfg_event_record_mlo_link_delink_evt(soc, DP_CFG_EVENT_MLO_DEL_LINK,
+						mld_peer, link_peer, i,
+						action_done ? 1 : 0);
 
 	return num_links;
 }

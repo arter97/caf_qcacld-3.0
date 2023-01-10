@@ -4400,6 +4400,250 @@ void dp_destroy_direct_link_refill_ring(struct cdp_soc_t *soc_hdl,
 }
 #endif
 
+#ifdef WLAN_FEATURE_DP_CFG_EVENT_HISTORY
+static inline
+void dp_cfg_event_record(struct dp_soc *soc,
+			 enum dp_cfg_event_type event,
+			 union dp_cfg_event_desc *cfg_event_desc)
+{
+	struct dp_cfg_event_history *cfg_event_history =
+						&soc->cfg_event_history;
+	struct dp_cfg_event *entry;
+	uint32_t idx;
+	uint16_t slot;
+
+	dp_get_frag_hist_next_atomic_idx(&cfg_event_history->index, &idx,
+					 &slot,
+					 DP_CFG_EVT_HIST_SLOT_SHIFT,
+					 DP_CFG_EVT_HIST_PER_SLOT_MAX,
+					 DP_CFG_EVT_HISTORY_SIZE);
+
+	entry = &cfg_event_history->entry[slot][idx];
+
+	entry->timestamp = qdf_get_log_timestamp();
+	entry->type = event;
+	qdf_mem_copy(&entry->event_desc, cfg_event_desc,
+		     sizeof(entry->event_desc));
+}
+
+static inline void
+dp_cfg_event_record_vdev_evt(struct dp_soc *soc, enum dp_cfg_event_type event,
+			     struct dp_vdev *vdev)
+{
+	union dp_cfg_event_desc cfg_evt_desc = {0};
+	struct dp_vdev_attach_detach_desc *vdev_evt =
+						&cfg_evt_desc.vdev_evt;
+
+	if (qdf_unlikely(event != DP_CFG_EVENT_VDEV_ATTACH &&
+			 event != DP_CFG_EVENT_VDEV_UNREF_DEL &&
+			 event != DP_CFG_EVENT_VDEV_DETACH)) {
+		qdf_assert_always(0);
+		return;
+	}
+
+	vdev_evt->vdev = vdev;
+	vdev_evt->vdev_id = vdev->vdev_id;
+	vdev_evt->ref_count = qdf_atomic_read(&vdev->ref_cnt);
+	vdev_evt->mac_addr = vdev->mac_addr;
+
+	dp_cfg_event_record(soc, event, &cfg_evt_desc);
+}
+
+static inline void
+dp_cfg_event_record_peer_evt(struct dp_soc *soc, enum dp_cfg_event_type event,
+			     struct dp_peer *peer, struct dp_vdev *vdev,
+			     uint8_t is_reuse)
+{
+	union dp_cfg_event_desc cfg_evt_desc = {0};
+	struct dp_peer_cmn_ops_desc *peer_evt = &cfg_evt_desc.peer_cmn_evt;
+
+	if (qdf_unlikely(event != DP_CFG_EVENT_PEER_CREATE &&
+			 event != DP_CFG_EVENT_PEER_DELETE &&
+			 event != DP_CFG_EVENT_PEER_UNREF_DEL)) {
+		qdf_assert_always(0);
+		return;
+	}
+
+	peer_evt->peer = peer;
+	peer_evt->vdev = vdev;
+	peer_evt->vdev_id = vdev->vdev_id;
+	peer_evt->is_reuse = is_reuse;
+	peer_evt->peer_ref_count = qdf_atomic_read(&peer->ref_cnt);
+	peer_evt->vdev_ref_count = qdf_atomic_read(&vdev->ref_cnt);
+	peer_evt->mac_addr = peer->mac_addr;
+	peer_evt->vdev_mac_addr = vdev->mac_addr;
+
+	dp_cfg_event_record(soc, event, &cfg_evt_desc);
+}
+
+static inline void
+dp_cfg_event_record_mlo_link_delink_evt(struct dp_soc *soc,
+					enum dp_cfg_event_type event,
+					struct dp_peer *mld_peer,
+					struct dp_peer *link_peer,
+					uint8_t idx, uint8_t result)
+{
+	union dp_cfg_event_desc cfg_evt_desc = {0};
+	struct dp_mlo_add_del_link_desc *mlo_link_delink_evt =
+					&cfg_evt_desc.mlo_link_delink_evt;
+
+	if (qdf_unlikely(event != DP_CFG_EVENT_MLO_ADD_LINK &&
+			 event != DP_CFG_EVENT_MLO_DEL_LINK)) {
+		qdf_assert_always(0);
+		return;
+	}
+
+	mlo_link_delink_evt->link_peer = link_peer;
+	mlo_link_delink_evt->mld_peer = mld_peer;
+	mlo_link_delink_evt->link_mac_addr = link_peer->mac_addr;
+	mlo_link_delink_evt->mld_mac_addr = mld_peer->mac_addr;
+	mlo_link_delink_evt->num_links = mld_peer->num_links;
+	mlo_link_delink_evt->action_result = result;
+	mlo_link_delink_evt->idx = idx;
+
+	dp_cfg_event_record(soc, event, &cfg_evt_desc);
+}
+
+static inline void
+dp_cfg_event_record_mlo_setup_vdev_update_evt(struct dp_soc *soc,
+					      struct dp_peer *mld_peer,
+					      struct dp_vdev *prev_vdev,
+					      struct dp_vdev *new_vdev)
+{
+	union dp_cfg_event_desc cfg_evt_desc = {0};
+	struct dp_mlo_setup_vdev_update_desc *vdev_update_evt =
+					&cfg_evt_desc.mlo_setup_vdev_update;
+
+	vdev_update_evt->mld_peer = mld_peer;
+	vdev_update_evt->prev_vdev = prev_vdev;
+	vdev_update_evt->new_vdev = new_vdev;
+
+	dp_cfg_event_record(soc, DP_CFG_EVENT_MLO_SETUP_VDEV_UPDATE,
+			    &cfg_evt_desc);
+}
+
+static inline void
+dp_cfg_event_record_peer_map_unmap_evt(struct dp_soc *soc,
+				       enum dp_cfg_event_type event,
+				       struct dp_peer *peer,
+				       uint8_t *mac_addr,
+				       uint8_t is_ml_peer,
+				       uint16_t peer_id, uint16_t ml_peer_id,
+				       uint16_t hw_peer_id, uint8_t vdev_id)
+{
+	union dp_cfg_event_desc cfg_evt_desc = {0};
+	struct dp_rx_peer_map_unmap_desc *peer_map_unmap_evt =
+					&cfg_evt_desc.peer_map_unmap_evt;
+
+	if (qdf_unlikely(event != DP_CFG_EVENT_PEER_MAP &&
+			 event != DP_CFG_EVENT_PEER_UNMAP &&
+			 event != DP_CFG_EVENT_MLO_PEER_MAP &&
+			 event != DP_CFG_EVENT_MLO_PEER_UNMAP)) {
+		qdf_assert_always(0);
+		return;
+	}
+
+	peer_map_unmap_evt->peer_id = peer_id;
+	peer_map_unmap_evt->ml_peer_id = ml_peer_id;
+	peer_map_unmap_evt->hw_peer_id = hw_peer_id;
+	peer_map_unmap_evt->vdev_id = vdev_id;
+	/* Peer may be NULL at times, but its not an issue. */
+	peer_map_unmap_evt->peer = peer;
+	peer_map_unmap_evt->is_ml_peer = is_ml_peer;
+	qdf_mem_copy(&peer_map_unmap_evt->mac_addr.raw, mac_addr,
+		     QDF_MAC_ADDR_SIZE);
+
+	dp_cfg_event_record(soc, event, &cfg_evt_desc);
+}
+
+static inline void
+dp_cfg_event_record_peer_setup_evt(struct dp_soc *soc,
+				   enum dp_cfg_event_type event,
+				   struct dp_peer *peer,
+				   struct dp_vdev *vdev,
+				   uint8_t vdev_id,
+				   struct cdp_peer_setup_info *peer_setup_info)
+{
+	union dp_cfg_event_desc cfg_evt_desc = {0};
+	struct dp_peer_setup_desc *peer_setup_evt =
+					&cfg_evt_desc.peer_setup_evt;
+
+	if (qdf_unlikely(event != DP_CFG_EVENT_PEER_SETUP &&
+			 event != DP_CFG_EVENT_MLO_SETUP)) {
+		qdf_assert_always(0);
+		return;
+	}
+
+	peer_setup_evt->peer = peer;
+	peer_setup_evt->vdev = vdev;
+	if (vdev)
+		peer_setup_evt->vdev_ref_count = qdf_atomic_read(&vdev->ref_cnt);
+	peer_setup_evt->mac_addr = peer->mac_addr;
+	peer_setup_evt->vdev_id = vdev_id;
+	if (peer_setup_info) {
+		peer_setup_evt->is_first_link = peer_setup_info->is_first_link;
+		peer_setup_evt->is_primary_link = peer_setup_info->is_primary_link;
+		qdf_mem_copy(peer_setup_evt->mld_mac_addr.raw,
+			     peer_setup_info->mld_peer_mac,
+			     QDF_MAC_ADDR_SIZE);
+	}
+
+	dp_cfg_event_record(soc, event, &cfg_evt_desc);
+}
+#else
+
+static inline void
+dp_cfg_event_record_vdev_evt(struct dp_soc *soc, enum dp_cfg_event_type event,
+			     struct dp_vdev *vdev)
+{
+}
+
+static inline void
+dp_cfg_event_record_peer_evt(struct dp_soc *soc, enum dp_cfg_event_type event,
+			     struct dp_peer *peer, struct dp_vdev *vdev,
+			     uint8_t is_reuse)
+{
+}
+
+static inline void
+dp_cfg_event_record_mlo_link_delink_evt(struct dp_soc *soc,
+					enum dp_cfg_event_type event,
+					struct dp_peer *mld_peer,
+					struct dp_peer *link_peer,
+					uint8_t idx, uint8_t result)
+{
+}
+
+static inline void
+dp_cfg_event_record_mlo_setup_vdev_update_evt(struct dp_soc *soc,
+					      struct dp_peer *mld_peer,
+					      struct dp_vdev *prev_vdev,
+					      struct dp_vdev *new_vdev)
+{
+}
+
+static inline void
+dp_cfg_event_record_peer_map_unmap_evt(struct dp_soc *soc,
+				       enum dp_cfg_event_type event,
+				       struct dp_peer *peer,
+				       uint8_t *mac_addr,
+				       uint8_t is_ml_peer,
+				       uint16_t peer_id, uint16_t ml_peer_id,
+				       uint16_t hw_peer_id, uint8_t vdev_id)
+{
+}
+
+static inline void
+dp_cfg_event_record_peer_setup_evt(struct dp_soc *soc,
+				   enum dp_cfg_event_type event,
+				   struct dp_peer *peer,
+				   struct dp_vdev *vdev,
+				   uint8_t vdev_id,
+				   struct cdp_peer_setup_info *peer_setup_info)
+{
+}
+#endif
+
 /*
  * dp_soc_interrupt_detach() - Deregister any allocations done for interrupts
  * @txrx_soc: DP SOC handle
