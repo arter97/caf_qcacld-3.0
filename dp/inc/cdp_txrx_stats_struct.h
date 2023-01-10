@@ -2937,6 +2937,16 @@ struct cdp_peer_tx_ul_deter {
 	uint32_t trigger_success;
 	uint32_t trigger_fail;
 };
+
+/**
+ * struct cdp_peer_rx_deter- Structure to hold peer rx deterministic stats
+ * @avg_rate: Average RX rate
+ * @mode_cnt: RX mode count
+ */
+struct cdp_peer_rx_deter {
+	uint64_t avg_rate;
+	uint32_t mode_cnt;
+};
 #endif
 
 /* struct cdp_pdev_stats - pdev stats

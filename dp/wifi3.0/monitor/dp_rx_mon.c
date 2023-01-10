@@ -843,12 +843,62 @@ dp_ppdu_desc_user_rx_time_update(struct dp_pdev *pdev,
 	DP_STATS_INC(mon_peer, airtime_stats.rx_airtime_consumption[ac].consumption,
 		     user->rx_time_us);
 }
+
+/**
+ * dp_rx_mon_update_user_deter_stats() - Update per-peer deterministic stats
+ * @pdev: Datapath pdev handle
+ * @peer: Datapath peer handle
+ * @ppdu: PPDU Descriptor
+ * @user: Per user RX stats
+ *
+ * Return: None
+ */
+static inline
+void dp_rx_mon_update_user_deter_stats(struct dp_pdev *pdev,
+				       struct dp_peer *peer,
+				       struct cdp_rx_indication_ppdu *ppdu,
+				       struct cdp_rx_stats_ppdu_user *user)
+{
+	struct dp_mon_peer *mon_peer;
+	uint8_t tid;
+
+	if (!pdev || !ppdu || !user || !peer)
+		return;
+
+	if (!dp_is_subtype_data(ppdu->frame_ctrl))
+		return;
+
+	if (ppdu->u.ppdu_type != HAL_RX_TYPE_SU)
+		return;
+
+	mon_peer = peer->monitor_peer;
+	if (!mon_peer)
+		return;
+
+	tid = user->tid;
+	if (tid >= CDP_DATA_TID_MAX)
+		return;
+
+	DP_STATS_INC(mon_peer,
+		     deter_stats[tid].rx_det.mode_cnt,
+		     1);
+	DP_STATS_UPD(mon_peer,
+		     deter_stats[tid].rx_det.avg_rate,
+		     mon_peer->stats.rx.avg_rx_rate);
+}
 #else
 static inline void
 dp_ppdu_desc_user_rx_time_update(struct dp_pdev *pdev,
 				 struct dp_peer *peer,
 				 struct cdp_rx_indication_ppdu *ppdu_desc,
 				 struct cdp_rx_stats_ppdu_user *user)
+{ }
+
+static inline
+void dp_rx_mon_update_user_deter_stats(struct dp_pdev *pdev,
+				       struct dp_peer *peer,
+				       struct cdp_rx_indication_ppdu *ppdu,
+				       struct cdp_rx_stats_ppdu_user *user)
 { }
 #endif
 
@@ -1063,6 +1113,7 @@ static void dp_rx_stats_update(struct dp_pdev *pdev,
 		dp_send_stats_event(pdev, peer, ppdu_user->peer_id);
 
 		dp_ppdu_desc_user_rx_time_update(pdev, peer, ppdu, ppdu_user);
+		dp_rx_mon_update_user_deter_stats(pdev, peer, ppdu, ppdu_user);
 		dp_peer_unref_delete(peer, DP_MOD_ID_RX_PPDU_STATS);
 	}
 }

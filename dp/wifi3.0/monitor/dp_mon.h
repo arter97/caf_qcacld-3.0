@@ -916,10 +916,12 @@ struct dp_mon_peer_airtime_stats {
  * struct dp_mon_peer_deterministic - Monitor peer deterministic stats
  * @dl_det: Downlink deterministic stats
  * @ul_det: Uplink deterministic stats
+ * @rx_det: RX deterministic stats
  */
 struct dp_mon_peer_deterministic {
 	struct cdp_peer_tx_dl_deter dl_det[MSDUQ_INDEX_MAX][TX_MODE_DL_MAX];
 	struct cdp_peer_tx_ul_deter ul_det[TX_MODE_UL_MAX];
+	struct cdp_peer_rx_deter rx_det;
 };
 #endif
 
