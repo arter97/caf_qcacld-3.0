@@ -747,7 +747,6 @@ QDF_STATUS dp_rx_fst_attach(struct dp_soc *soc, struct dp_pdev *pdev)
 
 	pdev->rx_fst = fst;
 
-	dp_rx_ppe_fse_register();
 	if (soc->is_rx_fse_full_cache_invalidate_war_enabled) {
 		QDF_STATUS status;
 
@@ -770,6 +769,8 @@ QDF_STATUS dp_rx_fst_attach(struct dp_soc *soc, struct dp_pdev *pdev)
 
 	qdf_atomic_init(&soc->ipv4_fse_cnt);
 	qdf_atomic_init(&soc->ipv6_fse_cnt);
+
+	dp_rx_ppe_fse_register();
 
 	QDF_TRACE(QDF_MODULE_ID_ANY, QDF_TRACE_LEVEL_INFO,
 		  "Rx FST attach successful, #entries:%d\n",
@@ -797,6 +798,7 @@ void dp_rx_fst_detach(struct dp_soc *soc, struct dp_pdev *pdev)
 		soc->rx_fst = NULL;
 	}
 
+	dp_rx_ppe_fse_unregister();
 	if (qdf_likely(dp_fst)) {
 		hal_rx_fst_detach(soc->hal_soc, dp_fst->hal_rx_fst,
 				  soc->osdev, 0);
@@ -809,7 +811,6 @@ void dp_rx_fst_detach(struct dp_soc *soc, struct dp_pdev *pdev)
 		qdf_mem_free(dp_fst);
 	}
 
-	dp_rx_ppe_fse_unregister();
 	QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_DEBUG,
 		  "Rx FST detached for pdev %u\n", pdev->pdev_id);
 }
