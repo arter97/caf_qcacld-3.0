@@ -2056,9 +2056,7 @@ QDF_STATUS mlo_process_link_add(struct wlan_objmgr_psoc *psoc,
 				uint16_t vdev_count)
 {
 	struct wlan_mlo_dev_context *ml_ctx = vdev->mlo_dev_ctx;
-	struct wlan_objmgr_vdev *inactive_vdev[WLAN_UMAC_MLO_MAX_VDEVS];
-	uint8_t i = 0, j = 0, k = 0;
-	struct scan_cache_entry *scan_entry = NULL;
+
 	/* Check if ini to support dynamic link add is enable
 	 * or not
 	 */
@@ -2072,10 +2070,6 @@ QDF_STATUS mlo_process_link_add(struct wlan_objmgr_psoc *psoc,
 		return QDF_STATUS_E_INVAL;
 	}
 
-	for (i = 0; i < WLAN_UMAC_MLO_MAX_VDEVS; i++) {
-		if (wlan_cm_is_vdev_disconnected(ml_ctx->wlan_vdev_list[i]))
-			inactive_vdev[j++] = ml_ctx->wlan_vdev_list[i];
-	}
 	/* check if any new link in scan entry */
 	if (partner_info->num_partner_links ==
 	    cache_partner_info->num_partner_links) {
@@ -2086,24 +2080,17 @@ QDF_STATUS mlo_process_link_add(struct wlan_objmgr_psoc *psoc,
 		}
 	}
 
+	/* mlo connected on all links already */
+	if (partner_info->num_partner_links <= (vdev_count - 1))
+		return QDF_STATUS_E_INVAL;
+
 	/* Partner info changed compared to the cached scan entry.
 	 * Process link add
 	 */
-	for (i = 0; i < j; i++) {
-		for (k = 0; k < partner_info->num_partner_links; k++) {
-			scan_entry = wlan_scan_get_entry_by_bssid(
-					wlan_vdev_get_pdev(inactive_vdev[i]),
-					&partner_info->partner_link_info[k].link_addr);
-			if (scan_entry) {
-				mlo_err("Link addition detected, issue disconnect");
-				mlo_disconnect(vdev, CM_SB_DISCONNECT,
-					       REASON_UNSPEC_FAILURE, NULL);
-				return QDF_STATUS_SUCCESS;
-			}
-		}
-	}
-
-	return QDF_STATUS_E_INVAL;
+	mlo_err("Link addition detected, issue disconnect");
+	mlo_disconnect(vdev, CM_SB_DISCONNECT,
+		       REASON_UNSPEC_FAILURE, NULL);
+	return QDF_STATUS_SUCCESS;
 }
 #endif
 
