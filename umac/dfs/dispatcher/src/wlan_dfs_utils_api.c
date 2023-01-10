@@ -809,6 +809,7 @@ static void utils_dfs_get_channel_list(struct wlan_objmgr_pdev *pdev,
 	struct wlan_objmgr_psoc *psoc;
 	uint32_t conn_count = 0;
 	enum policy_mgr_con_mode mode;
+	uint8_t vdev_id = WLAN_INVALID_VDEV_ID;
 
 	psoc = wlan_pdev_get_psoc(pdev);
 	if (!psoc) {
@@ -820,20 +821,22 @@ static void utils_dfs_get_channel_list(struct wlan_objmgr_pdev *pdev,
 	len = QDF_ARRAY_SIZE(pcl_ch);
 	weight_len = QDF_ARRAY_SIZE(weight_list);
 
-	if (vdev)
+	if (vdev) {
 		mode = policy_mgr_convert_device_mode_to_qdf_type(
 				wlan_vdev_mlme_get_opmode(vdev));
-	else
+		vdev_id = wlan_vdev_get_id(vdev);
+	} else {
 		mode = PM_SAP_MODE;
+	}
 	conn_count = policy_mgr_mode_specific_connection_count(
 			psoc, mode, NULL);
 	if (0 == conn_count)
 		policy_mgr_get_pcl(psoc, mode, pcl_ch,
-				   &len, weight_list, weight_len);
+				   &len, weight_list, weight_len, vdev_id);
 	else
 		policy_mgr_get_pcl_for_existing_conn(
 			psoc, mode, pcl_ch, &len, weight_list,
-			weight_len, true);
+			weight_len, true, vdev_id);
 
 	if (*num_chan < len) {
 		dfs_err(NULL, WLAN_DEBUG_DFS_ALWAYS,

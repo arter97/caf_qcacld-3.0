@@ -1526,22 +1526,26 @@ wlan_cm_id cm_get_cm_id_by_scan_id(struct cnx_mgr *cm_ctx,
 #ifdef WLAN_POLICY_MGR_ENABLE
 static void
 cm_get_pcl_chan_weigtage_for_sta(struct wlan_objmgr_pdev *pdev,
-				 struct pcl_freq_weight_list *pcl_lst)
+				 struct pcl_freq_weight_list *pcl_lst,
+				 struct wlan_objmgr_vdev *vdev)
 {
 	enum QDF_OPMODE opmode = QDF_STA_MODE;
 	enum policy_mgr_con_mode pm_mode;
 	uint32_t num_entries = 0;
+	uint8_t vdev_id;
 	QDF_STATUS status;
 
-	if (!pcl_lst)
+	if (!pcl_lst || !vdev)
 		return;
+
+	vdev_id = wlan_vdev_get_id(vdev);
 
 	if (policy_mgr_map_concurrency_mode(&opmode, &pm_mode)) {
 		status = policy_mgr_get_pcl(wlan_pdev_get_psoc(pdev), pm_mode,
 					    pcl_lst->pcl_freq_list,
 					    &num_entries,
 					    pcl_lst->pcl_weight_list,
-					    NUM_CHANNELS);
+					    NUM_CHANNELS, vdev_id);
 		if (QDF_IS_STATUS_ERROR(status))
 			return;
 		pcl_lst->num_of_pcl_channels = num_entries;
@@ -1556,7 +1560,7 @@ void cm_calculate_scores(struct cnx_mgr *cm_ctx,
 
 	if (!filter->num_of_bssid) {
 		pcl_lst = qdf_mem_malloc(sizeof(*pcl_lst));
-		cm_get_pcl_chan_weigtage_for_sta(pdev, pcl_lst);
+		cm_get_pcl_chan_weigtage_for_sta(pdev, pcl_lst, cm_ctx->vdev);
 		if (pcl_lst && !pcl_lst->num_of_pcl_channels) {
 			qdf_mem_free(pcl_lst);
 			pcl_lst = NULL;

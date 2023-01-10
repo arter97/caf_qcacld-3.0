@@ -3698,7 +3698,8 @@ reg_update_conn_chan_list(struct wlan_objmgr_pdev *pdev,
 	weight_len = NUM_CHANNELS;
 
 	status = policy_mgr_get_pcl(psoc, mode, pcl_ch, &len,
-				    weight_list, weight_len);
+				    weight_list, weight_len,
+				    WLAN_INVALID_VDEV_ID);
 	if (QDF_IS_STATUS_ERROR(status)) {
 		reg_err("get pcl failed for mode: %d", mode);
 		goto err;
