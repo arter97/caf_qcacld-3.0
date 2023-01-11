@@ -181,6 +181,20 @@ init_deinit_update_vendor_handoff_control_caps(struct wmi_unified *wmi_handle,
 {}
 #endif
 
+#ifdef FEATURE_WLAN_TDLS
+static void init_deinit_update_tdls_caps(struct wmi_unified *wmi,
+					 struct wlan_objmgr_psoc *psoc)
+{
+	if (wmi_service_enabled(wmi, wmi_service_tdls_concurrency_support))
+		wlan_psoc_nif_fw_ext2_cap_set(psoc,
+					      WLAN_TDLS_CONCURRENCIES_SUPPORT);
+}
+#else
+static inline void init_deinit_update_tdls_caps(struct wmi_unified *wmi_handle,
+						struct wlan_objmgr_psoc *psoc)
+{}
+#endif
+
 static int init_deinit_service_ready_event_handler(ol_scn_t scn_handle,
 							uint8_t *event,
 							uint32_t data_len)
@@ -335,6 +349,7 @@ static int init_deinit_service_ready_event_handler(ol_scn_t scn_handle,
 	init_deinit_update_roam_stats_cap(wmi_handle, psoc);
 
 	init_deinit_update_wifi_pos_caps(wmi_handle, psoc);
+	init_deinit_update_tdls_caps(wmi_handle, psoc);
 
 	/* override derived value, if it exceeds max peer count */
 	if ((wlan_psoc_get_max_peer_count(psoc) >

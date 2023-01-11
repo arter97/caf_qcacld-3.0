@@ -6299,6 +6299,7 @@ typedef enum {
 	wmi_service_tdls_6g_support,
 #endif
 	wmi_service_tdls_wideband_support,
+	wmi_service_tdls_concurrency_support,
 #endif
 	wmi_service_is_my_mgmt_frame,
 	wmi_service_linkspeed_roam_trigger_support,

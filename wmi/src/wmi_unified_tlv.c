@@ -21891,6 +21891,8 @@ static void populate_tlv_service(uint32_t *wmi_service)
 #endif
 	wmi_service[wmi_service_tdls_wideband_support] =
 			WMI_SERVICE_TDLS_WIDEBAND_SUPPORT;
+	wmi_service[wmi_service_tdls_concurrency_support] =
+			WMI_SERVICE_TDLS_CONCURRENCY_SUPPORT;
 #endif
 
 #ifdef WLAN_SUPPORT_TWT
