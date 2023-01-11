@@ -4052,6 +4052,113 @@ static void reg_set_socpriv_vars(struct wlan_regulatory_psoc_priv_obj *soc_reg,
 	}
 }
 
+/**
+ * reg_validate_reg_rules() - Function to validate reg rules
+ * @num_reg_rules: number of reg rules
+ * @reg_rule: Current reg rule object
+ * @max_bw: max bandwidth of cur reg rules
+ *
+ * This function validates regulatory rules. The reg rule start-frequency must
+ * not exceed end-frequency. And the band between start and end must not be
+ * more than allowed country/regdomain bandwidth.
+ *
+ * Return: QDF_STATUS
+ */
+static
+QDF_STATUS reg_validate_reg_rules(uint32_t num_reg_rules,
+				  struct cur_reg_rule *reg_rule,
+				  uint16_t max_bw)
+{
+	uint32_t itr, cur_max_bw;
+
+	for (itr = 0; itr < num_reg_rules; itr++) {
+		cur_max_bw = QDF_MIN(reg_rule[itr].max_bw, max_bw);
+		if (reg_rule[itr].end_freq - cur_max_bw <
+		    reg_rule[itr].start_freq) {
+			reg_err("start freq = %u, end_freq = %u, max_bw = %u",
+				reg_rule[itr].start_freq,
+				reg_rule[itr].end_freq,
+				cur_max_bw);
+			return QDF_STATUS_E_INVAL;
+		}
+	}
+	return QDF_STATUS_SUCCESS;
+}
+
+/**
+ * reg_validate_master_chan_list_ext() - Function to validate master chan list
+ *					 ext
+ * @regulat_info: current regulatory info object
+ *
+ * This function validates master channel list ext.
+ *
+ * Return: QDF_STATUS
+ */
+static
+QDF_STATUS reg_validate_master_chan_list_ext(
+		struct cur_regulatory_info *regulat_info)
+{
+	uint32_t j, k;
+	uint32_t num_2g_reg_rules, num_5g_reg_rules;
+	uint32_t num_6g_reg_rules_ap[REG_CURRENT_MAX_AP_TYPE];
+	uint32_t *num_6g_reg_rules_client[REG_CURRENT_MAX_AP_TYPE];
+	struct cur_reg_rule *reg_rule_2g, *reg_rule_5g,
+		*reg_rule_6g_ap[REG_CURRENT_MAX_AP_TYPE],
+		**reg_rule_6g_client[REG_CURRENT_MAX_AP_TYPE];
+	uint32_t max_bw_2g, max_bw_5g,
+		max_bw_6g_ap[REG_CURRENT_MAX_AP_TYPE],
+		*max_bw_6g_client[REG_CURRENT_MAX_AP_TYPE];
+
+	max_bw_2g = regulat_info->max_bw_2g;
+	reg_rule_2g = regulat_info->reg_rules_2g_ptr;
+	num_2g_reg_rules = regulat_info->num_2g_reg_rules;
+	if (QDF_IS_STATUS_ERROR(reg_validate_reg_rules(num_2g_reg_rules,
+						       reg_rule_2g,
+						       max_bw_2g))) {
+		reg_err("Invalid 2GHz reg rules received from fw");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	max_bw_5g = regulat_info->max_bw_5g;
+	reg_rule_5g = regulat_info->reg_rules_5g_ptr;
+	num_5g_reg_rules = regulat_info->num_5g_reg_rules;
+	if (QDF_IS_STATUS_ERROR(reg_validate_reg_rules(num_5g_reg_rules,
+						       reg_rule_5g,
+						       max_bw_5g))) {
+		reg_err("Invalid 5GHz reg rules received from fw");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	for (j = 0; j < REG_CURRENT_MAX_AP_TYPE; j++) {
+		max_bw_6g_ap[j] = regulat_info->max_bw_6g_ap[j];
+		reg_rule_6g_ap[j] = regulat_info->reg_rules_6g_ap_ptr[j];
+		num_6g_reg_rules_ap[j] = regulat_info->num_6g_reg_rules_ap[j];
+		if (QDF_IS_STATUS_ERROR(reg_validate_reg_rules(
+						num_6g_reg_rules_ap[j],
+						reg_rule_6g_ap[j],
+						max_bw_6g_ap[j]))) {
+			reg_err("Invalid 6GHz AP reg rules received from fw");
+			return QDF_STATUS_E_INVAL;
+		}
+
+		max_bw_6g_client[j] = regulat_info->max_bw_6g_client[j];
+		reg_rule_6g_client[j] =
+			regulat_info->reg_rules_6g_client_ptr[j];
+		num_6g_reg_rules_client[j] =
+			regulat_info->num_6g_reg_rules_client[j];
+		for (k = 0; k < REG_MAX_CLIENT_TYPE; k++) {
+			if (QDF_IS_STATUS_ERROR(reg_validate_reg_rules(
+						num_6g_reg_rules_client[j][k],
+						reg_rule_6g_client[j][k],
+						max_bw_6g_client[j][k]))) {
+				reg_err("Invalid 6GHz AP reg rules received from fw");
+				return QDF_STATUS_E_INVAL;
+			}
+		}
+	}
+	return QDF_STATUS_SUCCESS;
+}
+
 QDF_STATUS reg_process_master_chan_list_ext(
 		struct cur_regulatory_info *regulat_info)
 {
@@ -4086,6 +4193,10 @@ QDF_STATUS reg_process_master_chan_list_ext(
 		tx_ops->get_pdev_id_from_phy_id(psoc, phy_id, &pdev_id);
 	else
 		pdev_id = phy_id;
+
+	status = reg_validate_master_chan_list_ext(regulat_info);
+	if (QDF_IS_STATUS_ERROR(status))
+		return status;
 
 	if (reg_ignore_default_country(soc_reg, regulat_info)) {
 		status = reg_set_curr_country(soc_reg, regulat_info, tx_ops);
