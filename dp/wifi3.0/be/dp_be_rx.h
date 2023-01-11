@@ -594,6 +594,7 @@ dp_rx_wbm_err_reap_desc_be(struct dp_intr *int_ctx, struct dp_soc *soc,
  * @pool_id: mac id
  * @txrx_peer: txrx peer handle
  * @is_reo_exception: flag to check if the error is from REO or WBM
+ * @link_id: link Id on which the packet is received
  *
  * This function handles NULL queue descriptor violations arising out
  * a missing REO queue for a given peer or a given TID. This typically
@@ -610,7 +611,7 @@ QDF_STATUS
 dp_rx_null_q_desc_handle_be(struct dp_soc *soc, qdf_nbuf_t nbuf,
 			    uint8_t *rx_tlv_hdr, uint8_t pool_id,
 			    struct dp_txrx_peer *txrx_peer,
-			    bool is_reo_exception);
+			    bool is_reo_exception, uint8_t link_id);
 
 #if defined(DP_PKT_STATS_PER_LMAC) && defined(WLAN_FEATURE_11BE_MLO)
 static inline void

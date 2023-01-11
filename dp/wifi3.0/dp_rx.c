@@ -1019,7 +1019,7 @@ qdf_export_symbol(__dp_rx_buffers_replenish);
 
 void
 dp_rx_deliver_raw(struct dp_vdev *vdev, qdf_nbuf_t nbuf_list,
-		  struct dp_txrx_peer *txrx_peer)
+		  struct dp_txrx_peer *txrx_peer, uint8_t link_id)
 {
 	qdf_nbuf_t deliver_list_head = NULL;
 	qdf_nbuf_t deliver_list_tail = NULL;
@@ -1033,7 +1033,7 @@ dp_rx_deliver_raw(struct dp_vdev *vdev, qdf_nbuf_t nbuf_list,
 
 		DP_STATS_INC(vdev->pdev, rx_raw_pkts, 1);
 		DP_PEER_PER_PKT_STATS_INC_PKT(txrx_peer, rx.raw, 1,
-					      qdf_nbuf_len(nbuf));
+					      qdf_nbuf_len(nbuf), link_id);
 		/*
 		 * reset the chfrag_start and chfrag_end bits in nbuf cb
 		 * as this is a non-amsdu pkt and RAW mode simulation expects

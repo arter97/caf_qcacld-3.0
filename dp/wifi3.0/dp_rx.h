@@ -1041,12 +1041,13 @@ void dp_rx_desc_pool_free(struct dp_soc *soc,
  *				decapsulate the pkt.
  * @vdev: vdev on which RAW mode is enabled
  * @nbuf_list: list of RAW pkts to process
- * @txrx_peer: peer object from which the pkt is rx
+ * @peer: peer object from which the pkt is rx
+ * @link_id: link Id on which the packet is received
  *
  * Return: void
  */
 void dp_rx_deliver_raw(struct dp_vdev *vdev, qdf_nbuf_t nbuf_list,
-				struct dp_txrx_peer *txrx_peer);
+		       struct dp_txrx_peer *peer, uint8_t link_id);
 
 #ifdef RX_DESC_LOGGING
 /**
@@ -3018,13 +3019,14 @@ dp_rxdma_err_process(struct dp_intr *int_ctx, struct dp_soc *soc,
  * @err_code: rxdma err code
  * @mac_id: mac_id which is one of 3 mac_ids(Assuming mac_id and
  * pool_id has same mapping)
+ * @link_id: link Id on which the packet is received
  *
  * Return: None
  */
 void
 dp_rx_process_rxdma_err(struct dp_soc *soc, qdf_nbuf_t nbuf,
 			uint8_t *rx_tlv_hdr, struct dp_txrx_peer *txrx_peer,
-			uint8_t err_code, uint8_t mac_id);
+			uint8_t err_code, uint8_t mac_id, uint8_t link_id);
 
 /**
  * dp_rx_process_mic_error(): Function to pass mic error indication to umac

@@ -2420,7 +2420,8 @@ struct dp_arch_ops {
 					       uint8_t *rx_tlv_hdr,
 					       uint8_t pool_id,
 					       struct dp_txrx_peer *txrx_peer,
-					       bool is_reo_exception);
+					       bool is_reo_exception,
+					       uint8_t link_id);
 };
 
 /**
