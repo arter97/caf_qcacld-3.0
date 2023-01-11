@@ -2236,6 +2236,7 @@ wlansap_son_update_sap_config_phymode(struct wlan_objmgr_vdev *vdev,
 {
 	struct wlan_objmgr_pdev *pdev;
 	struct wlan_objmgr_psoc *psoc;
+	struct wlan_channel *des_chan;
 
 	if (!vdev || !config) {
 		sap_err("Invalid input parameters");
@@ -2250,6 +2251,11 @@ wlansap_son_update_sap_config_phymode(struct wlan_objmgr_vdev *vdev,
 	psoc = wlan_pdev_get_psoc(pdev);
 	if (!psoc) {
 		sap_err("Invalid psoc parameters");
+		return QDF_STATUS_E_FAULT;
+	}
+	des_chan = wlan_vdev_mlme_get_des_chan(vdev);
+	if (!des_chan) {
+		sap_err("Invalid desired channel");
 		return QDF_STATUS_E_FAULT;
 	}
 	config->sap_orig_hw_mode = config->SapHw_mode;
@@ -2342,6 +2348,16 @@ wlansap_son_update_sap_config_phymode(struct wlan_objmgr_vdev *vdev,
 		}
 	}
 
+	config->chan_freq = des_chan->ch_freq;
+	config->sec_ch_freq = 0;
+	if (WLAN_REG_IS_24GHZ_CH_FREQ(des_chan->ch_freq) &&
+	    (config->ch_params.ch_width == CH_WIDTH_40MHZ) &&
+	    (des_chan->ch_width == CH_WIDTH_40MHZ)) {
+		if (des_chan->ch_cfreq1 == des_chan->ch_freq + BW_10_MHZ)
+			config->sec_ch_freq = des_chan->ch_freq + BW_20_MHZ;
+		if (des_chan->ch_cfreq1 == des_chan->ch_freq - BW_10_MHZ)
+			config->sec_ch_freq = des_chan->ch_freq - BW_20_MHZ;
+	}
 	wlan_reg_set_channel_params_for_freq(pdev, config->chan_freq,
 					     config->sec_ch_freq,
 					     &config->ch_params);
