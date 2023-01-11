@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2017-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -4299,7 +4299,8 @@ static void dp_print_rx_pdev_fw_mpdu_drop_tlv_v(uint32_t *tag_buf)
  * tag_buf - Buffer
  * Return - NULL
  */
-static void dp_print_rx_soc_fw_refill_ring_num_rxdma_err_tlv(uint32_t *tag_buf)
+static uint64_t
+dp_print_rx_soc_fw_refill_ring_num_rxdma_err_tlv(uint32_t *tag_buf)
 {
 	htt_rx_soc_fw_refill_ring_num_rxdma_err_tlv_v *dp_stats_buf =
 		(htt_rx_soc_fw_refill_ring_num_rxdma_err_tlv_v *)tag_buf;
@@ -4308,6 +4309,7 @@ static void dp_print_rx_soc_fw_refill_ring_num_rxdma_err_tlv(uint32_t *tag_buf)
 	uint16_t index = 0;
 	char rxdma_err_cnt[DP_MAX_STRING_LEN];
 	uint32_t tag_len = (HTT_STATS_TLV_LENGTH_GET(*tag_buf) >> 2);
+	uint64_t total_rxdma_err_cnt = 0;
 
 	tag_len = qdf_min(tag_len, (uint32_t)HTT_RX_RXDMA_MAX_ERR_CODE);
 
@@ -4318,9 +4320,12 @@ static void dp_print_rx_soc_fw_refill_ring_num_rxdma_err_tlv(uint32_t *tag_buf)
 				DP_MAX_STRING_LEN - index,
 				" %u:%u,", i,
 				dp_stats_buf->rxdma_err[i]);
+		total_rxdma_err_cnt += dp_stats_buf->rxdma_err[i];
 	}
 
 	DP_PRINT_STATS("rxdma_err = %s\n", rxdma_err_cnt);
+
+	return total_rxdma_err_cnt;
 }
 
 /*
@@ -4716,6 +4721,7 @@ void dp_htt_stats_print_tag(struct dp_pdev *pdev,
 		break;
 
 	case HTT_STATS_RX_REFILL_RXDMA_ERR_TAG:
+		pdev->stats.err.fw_reported_rxdma_error =
 		dp_print_rx_soc_fw_refill_ring_num_rxdma_err_tlv(tag_buf);
 		break;
 

@@ -14849,14 +14849,18 @@ dp_txrx_ext_stats_request(struct cdp_soc_t *soc_hdl, uint8_t pdev_id,
 
 	req->tx_msdu_enqueue = pdev->stats.tx_i.processed.num;
 	req->tx_msdu_overflow = tcl_ring_full;
-	req->rx_mpdu_received = soc->ext_stats.rx_mpdu_received;
+	/* Error rate at LMAC */
+	req->rx_mpdu_received = soc->ext_stats.rx_mpdu_received +
+				pdev->stats.err.fw_reported_rxdma_error;
+	/* only count error source from RXDMA */
+	req->rx_mpdu_error = pdev->stats.err.fw_reported_rxdma_error;
+
+	/* Error rate at above the MAC */
 	req->rx_mpdu_delivered = soc->ext_stats.rx_mpdu_received;
 	req->rx_mpdu_missed = pdev->stats.err.reo_error;
-	/* only count error source from RXDMA */
-	req->rx_mpdu_error = pdev->stats.err.rxdma_error;
 
 	dp_info("ext stats: tx_msdu_enq = %u, tx_msdu_overflow = %u, "
-		"tx_mpdu_recieve = %u, rx_mpdu_delivered = %u, "
+		"rx_mpdu_receive = %u, rx_mpdu_delivered = %u, "
 		"rx_mpdu_missed = %u, rx_mpdu_error = %u",
 		req->tx_msdu_enqueue,
 		req->tx_msdu_overflow,
@@ -14959,6 +14963,7 @@ dp_request_rx_hw_stats(struct cdp_soc_t *soc_hdl, uint8_t vdev_id)
 	last_rx_mpdu_received = soc->ext_stats.rx_mpdu_received;
 	last_rx_mpdu_missed = soc->ext_stats.rx_mpdu_missed;
 	soc->ext_stats.rx_mpdu_received = 0;
+	soc->ext_stats.rx_mpdu_missed = 0;
 
 	dp_debug("HW stats query start");
 	rx_stats_sent_cnt =

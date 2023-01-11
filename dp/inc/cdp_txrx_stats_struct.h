@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2016-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -2934,6 +2934,7 @@ struct cdp_pdev_stats {
 		uint32_t ip_csum_err;
 		uint32_t tcp_udp_csum_err;
 		uint32_t rxdma_error;
+		uint32_t fw_reported_rxdma_error;
 		uint32_t reo_error;
 	} err;
 
