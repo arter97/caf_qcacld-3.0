@@ -840,7 +840,7 @@ dp_ppdu_desc_user_rx_time_update(struct dp_pdev *pdev,
 		return;
 
 	ac = TID_TO_WME_AC(user->tid);
-	DP_STATS_INC(mon_peer, airtime_consumption[ac].consumption,
+	DP_STATS_INC(mon_peer, airtime_stats.rx_airtime_consumption[ac].consumption,
 		     user->rx_time_us);
 }
 #else

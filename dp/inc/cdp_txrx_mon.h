@@ -274,4 +274,34 @@ cdp_set_params_rssi_dbm_conversion(ol_txrx_soc_handle soc,
 							    (soc, params);
 }
 #endif
+
+#ifdef WLAN_TELEMETRY_STATS_SUPPORT
+/*
+ * cdp_update_pdev_mon_telemetry_airtime_stats() - update telemetry airtime
+ * stats in monitor pdev
+ *
+ *@soc: dp soc handle
+ *@pdev_id: pdev id
+ *
+ * This API is used to update telemetry airtime stats in monitor pdev
+ *
+ * Return: Success if stats are updated, else failure
+ */
+static inline QDF_STATUS
+cdp_update_pdev_mon_telemetry_airtime_stats(ol_txrx_soc_handle soc,
+					    uint8_t pdev_id)
+{
+	if (!soc || !soc->ops) {
+		dp_cdp_debug("Invalid Instance");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	if (!soc->ops->mon_ops ||
+	    !soc->ops->mon_ops->txrx_update_pdev_mon_telemetry_airtime_stats)
+		return QDF_STATUS_E_FAILURE;
+
+	return soc->ops->mon_ops->txrx_update_pdev_mon_telemetry_airtime_stats(
+						soc, pdev_id);
+}
+#endif
 #endif

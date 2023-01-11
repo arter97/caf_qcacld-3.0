@@ -972,6 +972,8 @@ struct cdp_me_ops {
  * @config_full_mon_mode: configure full monitor mode
  * @txrx_enable_mon_reap_timer: Enable/Disable reap timer of monitor status ring
  * @txrx_get_lite_mon_legacy_feature_enabled: returns the legacy filter enabled
+ * @txrx_update_pdev_mon_telemetry_airtime_stats: update telemetry airtime
+ * stats in monitor pdev
  */
 struct cdp_mon_ops {
 
@@ -1047,6 +1049,13 @@ struct cdp_mon_ops {
 	QDF_STATUS (*txrx_set_mon_pdev_params_rssi_dbm_conv)
 		(struct cdp_soc_t *soc,
 		 struct cdp_rssi_db2dbm_param_dp *params);
+
+#ifdef WLAN_TELEMETRY_STATS_SUPPORT
+	/*To update telemetry airtime stats in monitor pdev */
+	QDF_STATUS (*txrx_update_pdev_mon_telemetry_airtime_stats)
+		(struct cdp_soc_t *soc,
+		 uint8_t pdev_id);
+#endif
 };
 
 struct cdp_host_stats_ops {

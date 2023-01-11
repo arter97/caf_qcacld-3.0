@@ -2276,7 +2276,7 @@ QDF_STATUS dp_rx_populate_cbf_hdr(struct dp_soc *soc,
 #ifdef ATH_SUPPORT_EXT_STAT
 #ifdef WLAN_TELEMETRY_STATS_SUPPORT
 /**
- * dp_pdev_clear_link_airtime_stats() - clear pdev airtime stats for given peer
+ * dp_pdev_clear_link_airtime_stats() - clear airtime stats for given pdev
  * @pdev: DP PDEV handle
  */
 static inline
@@ -2290,15 +2290,20 @@ void dp_pdev_clear_link_airtime_stats(struct dp_pdev *pdev)
 
 /**
  * dp_peer_update_telemetry_stats() - update peer telemetry stats
+ * @soc: Datapath soc
  * @peer: Datapath peer
+ * @arg: argument to callback function
  */
 static inline
-void dp_peer_update_telemetry_stats(struct dp_peer *peer)
+void dp_peer_update_telemetry_stats(struct dp_soc *soc,
+				    struct dp_peer *peer,
+				    void *arg)
 {
 	struct dp_pdev *pdev;
 	struct dp_vdev *vdev;
 	struct dp_mon_peer *mon_peer = NULL;
 	uint8_t ac;
+	uint64_t current_time = qdf_get_log_timestamp();
 
 	vdev = peer->vdev;
 	if (!vdev)
@@ -2311,8 +2316,13 @@ void dp_peer_update_telemetry_stats(struct dp_peer *peer)
 	mon_peer = peer->monitor_peer;
 	if (qdf_likely(mon_peer)) {
 		for (ac = 0; ac < WME_AC_MAX; ac++) {
-			mon_peer->stats.airtime_consumption[ac].avg_consumption_per_sec =
-					mon_peer->stats.airtime_consumption[ac].consumption;
+			mon_peer->stats.airtime_stats.tx_airtime_consumption[ac].avg_consumption_per_sec =
+				(uint8_t)qdf_do_div((uint64_t)(mon_peer->stats.airtime_stats.tx_airtime_consumption[ac].consumption * 100),
+						    (uint32_t)(current_time - mon_peer->stats.airtime_stats.last_update_time));
+			mon_peer->stats.airtime_stats.rx_airtime_consumption[ac].avg_consumption_per_sec =
+				(uint8_t)qdf_do_div((uint64_t)(mon_peer->stats.airtime_stats.rx_airtime_consumption[ac].consumption * 100),
+						    (uint32_t)(current_time - mon_peer->stats.airtime_stats.last_update_time));
+			mon_peer->stats.airtime_stats.last_update_time = current_time;
 			/* Store each peer airtime consumption in pdev
 			 * link_airtime to calculate pdev's total airtime
 			 * consumption
@@ -2320,19 +2330,35 @@ void dp_peer_update_telemetry_stats(struct dp_peer *peer)
 			DP_STATS_INC(
 				pdev,
 				telemetry_stats.link_airtime[ac],
-				mon_peer->stats.airtime_consumption[ac].consumption);
-			mon_peer->stats.airtime_consumption[ac].consumption = 0;
+				mon_peer->stats.airtime_stats.tx_airtime_consumption[ac].consumption);
+			DP_STATS_INC(
+				pdev,
+				telemetry_stats.link_airtime[ac],
+				mon_peer->stats.airtime_stats.rx_airtime_consumption[ac].consumption);
+			mon_peer->stats.airtime_stats.tx_airtime_consumption[ac].consumption = 0;
+			mon_peer->stats.airtime_stats.rx_airtime_consumption[ac].consumption = 0;
 		}
 	}
 }
-#else
-static inline
-void dp_pdev_clear_link_airtime_stats(struct dp_pdev *pdev)
-{ }
 
-static inline
-void dp_peer_update_telemetry_stats(struct dp_peer *peer)
-{ }
+QDF_STATUS dp_pdev_update_telemetry_airtime_stats(struct cdp_soc_t *soc,
+						  uint8_t pdev_id)
+{
+	struct dp_pdev *pdev =
+		dp_get_pdev_from_soc_pdev_id_wifi3(cdp_soc_t_to_dp_soc(soc),
+						   pdev_id);
+	if (!pdev)
+		return QDF_STATUS_E_FAILURE;
+
+	/* Clear current airtime stats as the below API will increment the stats
+	 * for all peers on top of current value
+	 */
+	dp_pdev_clear_link_airtime_stats(pdev);
+	dp_pdev_iterate_peer(pdev, dp_peer_update_telemetry_stats, NULL,
+			     DP_MOD_ID_CDP);
+
+	return QDF_STATUS_SUCCESS;
+}
 #endif
 
 /**
@@ -2350,8 +2376,6 @@ dp_peer_cal_clients_stats_update(struct dp_soc *soc,
 	struct cdp_calibr_stats_intf peer_stats_intf = {0};
 	struct dp_peer *tgt_peer = NULL;
 	struct dp_txrx_peer *txrx_peer = NULL;
-
-	dp_peer_update_telemetry_stats(peer);
 
 	if (!dp_peer_is_primary_link_peer(peer))
 		return;
@@ -2381,8 +2405,6 @@ dp_peer_cal_clients_stats_update(struct dp_soc *soc,
 	struct dp_peer *tgt_peer = NULL;
 	struct dp_txrx_peer *txrx_peer = NULL;
 
-	dp_peer_update_telemetry_stats(peer);
-
 	if (!dp_peer_is_primary_link_peer(peer))
 		return;
 
@@ -2410,10 +2432,6 @@ static void dp_iterate_update_peer_list(struct cdp_pdev *pdev_hdl)
 {
 	struct dp_pdev *pdev = (struct dp_pdev *)pdev_hdl;
 
-	/* Clear current airtime stats as the below API will increment the stats
-	 * for all peers on top of current value
-	 */
-	dp_pdev_clear_link_airtime_stats(pdev);
 	dp_pdev_iterate_peer(pdev, dp_peer_cal_clients_stats_update, NULL,
 			     DP_MOD_ID_CDP);
 }
@@ -4368,7 +4386,7 @@ void dp_ppdu_desc_user_airtime_consumption_update(
 		return;
 
 	ac = TID_TO_WME_AC(user->tid);
-	DP_STATS_INC(mon_peer, airtime_consumption[ac].consumption,
+	DP_STATS_INC(mon_peer, airtime_stats.tx_airtime_consumption[ac].consumption,
 		     user->phy_tx_time_us);
 }
 #else

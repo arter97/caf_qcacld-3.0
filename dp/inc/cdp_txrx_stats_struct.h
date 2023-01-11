@@ -2841,7 +2841,8 @@ struct cdp_pdev_telemetry_stats {
  * @tx_mpdu_total: Total tx mpdus
  * @rx_mpdu_retried: Rx mpdus retried
  * @rx_mpdu_total: Total rx mpdus
- * @airtime_consumption: airtime consumption of that peer
+ * @tx_airtime_consumption: tx airtime consumption of that peer
+ * @rx_airtime_consumption: rx airtime consumption of that peer
  * @snr: peer average snr
  */
 struct cdp_peer_telemetry_stats {
@@ -2849,7 +2850,8 @@ struct cdp_peer_telemetry_stats {
 	uint32_t tx_mpdu_total;
 	uint32_t rx_mpdu_retried;
 	uint32_t rx_mpdu_total;
-	uint8_t airtime_consumption[WME_AC_MAX];
+	uint16_t tx_airtime_consumption[WME_AC_MAX];
+	uint16_t rx_airtime_consumption[WME_AC_MAX];
 	uint8_t snr;
 };
 #endif

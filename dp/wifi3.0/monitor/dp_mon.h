@@ -897,7 +897,19 @@ struct dp_mon_soc {
 #ifdef WLAN_TELEMETRY_STATS_SUPPORT
 struct dp_mon_peer_airtime_consumption {
 	uint32_t consumption;
-	uint32_t avg_consumption_per_sec;
+	uint16_t avg_consumption_per_sec;
+};
+
+/**
+ * struct dp_mon_peer_airtime_stats - Monitor peer airtime stats
+ * @tx_airtime_consumption: tx artime consumption of peer
+ * @rx_airtime_consumption: rx airtime consumption of peer
+ * @last_update_time: Time when last avergae of airtime is done
+ */
+struct dp_mon_peer_airtime_stats {
+	struct dp_mon_peer_airtime_consumption tx_airtime_consumption[WME_AC_MAX];
+	struct dp_mon_peer_airtime_consumption rx_airtime_consumption[WME_AC_MAX];
+	uint64_t last_update_time;
 };
 #endif
 
@@ -905,14 +917,14 @@ struct dp_mon_peer_airtime_consumption {
  * struct dp_mon_peer_stats - Monitor peer stats
  * @tx: tx stats
  * @rx: rx stats
- * @airtime_consumption: airtime consumption per access category
+ * @airtime_stats: mon peer airtime stats
  */
 struct dp_mon_peer_stats {
 #ifdef QCA_ENHANCED_STATS_SUPPORT
 	dp_mon_peer_tx_stats tx;
 	dp_mon_peer_rx_stats rx;
 #ifdef WLAN_TELEMETRY_STATS_SUPPORT
-	struct dp_mon_peer_airtime_consumption airtime_consumption[WME_AC_MAX];
+	struct dp_mon_peer_airtime_stats airtime_stats;
 #endif
 #endif
 };
@@ -4415,12 +4427,10 @@ void dp_monitor_peer_telemetry_stats(struct dp_peer *peer,
 
 	mon_peer_stats = &peer->monitor_peer->stats;
 	for (ac = 0; ac < WME_AC_MAX; ac++) {
-		/* consumption is in micro seconds, convert it to seconds and
-		 * then calculate %age per sec
-		 */
-		stats->airtime_consumption[ac] =
-			((mon_peer_stats->airtime_consumption[ac].avg_consumption_per_sec * 100) /
-			(1000000));
+		stats->tx_airtime_consumption[ac] =
+			mon_peer_stats->airtime_stats.tx_airtime_consumption[ac].avg_consumption_per_sec;
+		stats->rx_airtime_consumption[ac] =
+			mon_peer_stats->airtime_stats.rx_airtime_consumption[ac].avg_consumption_per_sec;
 	}
 	stats->tx_mpdu_retried = mon_peer_stats->tx.retries;
 	stats->tx_mpdu_total = mon_peer_stats->tx.tx_mpdus_tried;
@@ -4500,4 +4510,21 @@ dp_mon_rx_print_advanced_stats(struct dp_soc *soc,
 	}
 	return monitor_ops->mon_rx_print_advanced_stats(soc, pdev);
 }
+
+#ifdef WLAN_TELEMETRY_STATS_SUPPORT
+/*
+ * dp_update_pdev_mon_telemetry_airtime_stats() - update telemetry airtime
+ * stats in monitor pdev
+ *
+ *@soc: dp soc handle
+ *@pdev_id: pdev id
+ *
+ * This API is used to update telemetry airtime stats in monitor pdev
+ *
+ * Return: Success if stats are updated, else failure
+ */
+
+QDF_STATUS dp_pdev_update_telemetry_airtime_stats(struct cdp_soc_t *soc,
+						  uint8_t pdev_id);
+#endif
 #endif /* _DP_MON_H_ */
