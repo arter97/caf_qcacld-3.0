@@ -527,9 +527,27 @@ static void mlme_init_emlsr_mode(struct wlan_objmgr_psoc *psoc,
 {
 	gen->enable_emlsr_mode = cfg_default(CFG_EMLSR_MODE_ENABLE);
 }
+
+/**
+ * mlme_init_tl2m_negotiation_support() - initialize t2lm support
+ * @psoc: Pointer to PSOC
+ * @gen: pointer to generic CFG items
+ *
+ * Return: None
+ */
+static void mlme_init_tl2m_negotiation_support(struct wlan_objmgr_psoc *psoc,
+						 struct wlan_mlme_generic *gen)
+{
+	gen->t2lm_negotiation_support = cfg_default(CFG_T2LM_NEGOTIATION_SUPPORT);
+}
 #else
 static void mlme_init_emlsr_mode(struct wlan_objmgr_psoc *psoc,
 				 struct wlan_mlme_generic *gen)
+{
+}
+
+static void mlme_init_tl2m_negotiation_support(struct wlan_objmgr_psoc *psoc,
+						 struct wlan_mlme_generic *gen)
 {
 }
 #endif
@@ -622,6 +640,7 @@ static void mlme_init_generic_cfg(struct wlan_objmgr_psoc *psoc,
 	mlme_init_mgmt_hw_tx_retry_count_cfg(psoc, gen);
 	mlme_init_relaxed_6ghz_conn_policy(psoc, gen);
 	mlme_init_emlsr_mode(psoc, gen);
+	mlme_init_tl2m_negotiation_support(psoc, gen);
 }
 
 static void mlme_init_edca_ani_cfg(struct wlan_objmgr_psoc *psoc,
@@ -828,6 +847,9 @@ mlme_init_qos_edca_params(struct wlan_objmgr_psoc *psoc,
 			cfg_get(psoc, CFG_EDCA_BE_CWMAX);
 	edca_params->edca_ac_be.be_aifs =
 			cfg_get(psoc, CFG_EDCA_BE_AIFS);
+
+	edca_params->edca_param_type =
+			cfg_get(psoc, CFG_EDCA_PIFS_PARAM_TYPE);
 }
 
 static void mlme_init_edca_params(struct wlan_objmgr_psoc *psoc,
@@ -845,6 +867,7 @@ static void mlme_init_timeout_cfg(struct wlan_objmgr_psoc *psoc,
 	timeouts->join_failure_timeout =
 			cfg_get(psoc, CFG_JOIN_FAILURE_TIMEOUT);
 	timeouts->join_failure_timeout_ori = timeouts->join_failure_timeout;
+	timeouts->probe_req_retry_timeout = JOIN_PROBE_REQ_TIMER_MS;
 	timeouts->auth_failure_timeout =
 			cfg_get(psoc, CFG_AUTH_FAILURE_TIMEOUT);
 	timeouts->auth_rsp_timeout =
@@ -1772,6 +1795,7 @@ static void mlme_init_sta_cfg(struct wlan_objmgr_psoc *psoc,
 		cfg_get(psoc, CFG_MAX_LI_MODULATED_DTIM_MS);
 
 	mlme_init_sta_mlo_cfg(psoc, sta);
+	wlan_mlme_set_usr_disable_sta_eht(psoc, false);
 }
 
 static void mlme_init_stats_cfg(struct wlan_objmgr_psoc *psoc,
@@ -2108,6 +2132,7 @@ static void mlme_init_lfr_cfg(struct wlan_objmgr_psoc *psoc,
 	lfr->roam_preauth_retry_count =
 		cfg_get(psoc, CFG_LFR3_ROAM_PREAUTH_RETRY_COUNT);
 	lfr->roam_rssi_diff = cfg_get(psoc, CFG_LFR_ROAM_RSSI_DIFF);
+	lfr->roam_rssi_diff_6ghz = cfg_get(psoc, CFG_LFR_ROAM_RSSI_DIFF_6GHZ);
 	lfr->bg_rssi_threshold = cfg_get(psoc, CFG_LFR_ROAM_BG_RSSI_TH);
 	lfr->roam_scan_offload_enabled =
 		cfg_get(psoc, CFG_LFR_ROAM_SCAN_OFFLOAD_ENABLED);
@@ -2719,6 +2744,24 @@ static void mlme_init_powersave_params(struct wlan_objmgr_psoc *psoc,
 				cfg_get(psoc, CFG_DTIM_SELECTION_DIVERSITY);
 }
 
+#if defined(CONFIG_AFC_SUPPORT) && defined(CONFIG_BAND_6GHZ)
+static void mlme_init_afc_cfg(struct wlan_mlme_reg *reg)
+{
+	reg->enable_6ghz_sp_pwrmode_supp =
+		cfg_default(CFG_6GHZ_SP_POWER_MODE_SUPP);
+	reg->afc_disable_timer_check =
+		cfg_default(CFG_AFC_TIMER_CHECK_DIS);
+	reg->afc_disable_request_id_check =
+		cfg_default(CFG_AFC_REQ_ID_CHECK_DIS);
+	reg->is_afc_reg_noaction =
+		cfg_default(CFG_AFC_REG_NO_ACTION);
+}
+#else
+static inline void mlme_init_afc_cfg(struct wlan_mlme_reg *reg)
+{
+}
+#endif
+
 #ifdef MWS_COEX
 static void mlme_init_mwc_cfg(struct wlan_objmgr_psoc *psoc,
 			      struct wlan_mlme_mwc *mwc)
@@ -2814,6 +2857,7 @@ static void mlme_init_reg_cfg(struct wlan_objmgr_psoc *psoc,
 	reg->enable_nan_on_indoor_channels =
 		cfg_get(psoc, CFG_INDOOR_CHANNEL_SUPPORT_FOR_NAN);
 
+	mlme_init_afc_cfg(reg);
 	mlme_init_acs_avoid_freq_list(psoc, reg);
 	mlme_init_coex_unsafe_chan_cfg(psoc, reg);
 	mlme_init_coex_unsafe_chan_reg_disable_cfg(psoc, reg);
@@ -2933,7 +2977,7 @@ end:
 }
 
 /**
- * mlme_iot_parse_aggr_info - parse IOT related items in ini
+ * mlme_init_iot_cfg() - parse IOT related items in ini
  * @psoc: PSOC pointer
  * @iot: IOT related CFG items
  *
@@ -3848,6 +3892,8 @@ const char *mlme_roam_state_to_string(enum roam_offload_state state)
 		return "ROAMING_IN_PROG";
 	case WLAN_ROAM_SYNCH_IN_PROG:
 		return "ROAM_SYNCH_IN_PROG";
+	case WLAN_MLO_ROAM_SYNCH_IN_PROG:
+		return "MLO_ROAM_SYNCH_IN_PROG";
 	default:
 		return "";
 	}

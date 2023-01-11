@@ -34,6 +34,9 @@
 #include "wlan_connectivity_logging.h"
 
 #define MAC_MAX_ADD_IE_LENGTH       2048
+/* Join probe request Retry  timer default (200)ms */
+#define JOIN_PROBE_REQ_TIMER_MS              200
+#define MAX_JOIN_PROBE_REQ                   5
 
 /*
  * Following time is used to program WOW_TIMER_PATTERN to FW so that FW will
@@ -226,6 +229,7 @@ struct wlan_mlme_roaming_config {
  * @sae_single_pmk: Details for sae roaming using single pmk
  * @set_pmk_pending: RSO update status of PMK from set_key
  * @sae_auth_ta: SAE pre-auth tx address
+ * @sae_auth_pending:  Roaming SAE auth pending
  */
 struct wlan_mlme_roam {
 	struct wlan_mlme_roam_state_info roam_sm;
@@ -235,6 +239,7 @@ struct wlan_mlme_roam {
 #endif
 	bool set_pmk_pending;
 	struct qdf_mac_addr sae_auth_ta;
+	uint8_t sae_auth_pending;
 };
 
 #ifdef WLAN_FEATURE_MSCS

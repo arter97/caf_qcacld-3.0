@@ -391,7 +391,7 @@ hdd_get_curr_thermal_stats_val(struct wiphy *wiphy,
 	skb = wlan_cfg80211_vendor_cmd_alloc_reply_skb(wiphy,
 						       skb_len);
 	if (!skb) {
-		hdd_err_rl("cfg80211_vendor_cmd_alloc_reply_skb failed");
+		hdd_err_rl("wlan_cfg80211_vendor_cmd_alloc_reply_skb failed");
 		ret = -ENOMEM;
 		goto completed;
 	}
@@ -427,10 +427,8 @@ hdd_get_curr_thermal_stats_val(struct wiphy *wiphy,
 		    nla_put_u32(skb, THERMAL_LVL_COUNT,
 				get_tt_stats->level_info[i].num_entry)) {
 			hdd_err("nla put failure");
-			kfree_skb(skb);
 			ret =  -EINVAL;
-			hdd_ctx->is_therm_stats_in_progress = false;
-			break;
+			goto nla_failed;
 		}
 		nla_nest_end(skb, tt_levels);
 	}
@@ -439,7 +437,7 @@ hdd_get_curr_thermal_stats_val(struct wiphy *wiphy,
 	goto completed;
 
 nla_failed:
-	kfree_skb(skb);
+	wlan_cfg80211_vendor_free_skb(skb);
 completed:
 	hdd_ctx->is_therm_stats_in_progress = false;
 	osif_request_put(request);
@@ -758,7 +756,7 @@ hdd_notify_thermal_throttle_handler(struct wlan_objmgr_psoc *psoc,
 				QCA_NL80211_VENDOR_SUBCMD_THERMAL_INDEX,
 				GFP_KERNEL);
 	if (!vendor_event) {
-		hdd_err("cfg80211_vendor_event_alloc failed");
+		hdd_err("wlan_cfg80211_vendor_event_alloc failed");
 		return QDF_STATUS_E_NOMEM;
 	}
 	level = convert_level_to_vendor_thermal_level(info->level);

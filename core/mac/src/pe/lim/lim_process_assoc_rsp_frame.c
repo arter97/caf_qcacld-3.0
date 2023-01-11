@@ -313,6 +313,8 @@ void lim_update_assoc_sta_datas(struct mac_context *mac_ctx,
 		 */
 		pe_debug("OMN IE is present in the assoc rsp, update NSS/Ch width");
 	}
+	if (lim_process_srp_ie(assoc_rsp, sta_ds) == QDF_STATUS_SUCCESS)
+		lim_update_vdev_sr_elements(session_entry, sta_ds);
 }
 
 /**
@@ -574,7 +576,7 @@ static inline void lim_process_he_info(tpSirProbeRespBeacon beacon,
 #endif
 
 #ifdef WLAN_FEATURE_SR
-static QDF_STATUS lim_process_srp_ie(tpSirAssocRsp ar, tpDphHashNode sta_ds)
+QDF_STATUS lim_process_srp_ie(tpSirAssocRsp ar, tpDphHashNode sta_ds)
 {
 	QDF_STATUS status = QDF_STATUS_E_NOSUPPORT;
 
@@ -584,12 +586,6 @@ static QDF_STATUS lim_process_srp_ie(tpSirAssocRsp ar, tpDphHashNode sta_ds)
 	}
 
 	return status;
-}
-#else
-static inline QDF_STATUS
-lim_process_srp_ie(tpSirAssocRsp ar, tpDphHashNode sta_ds)
-{
-	return QDF_STATUS_SUCCESS;
 }
 #endif
 
@@ -924,9 +920,13 @@ lim_update_vdev_rate_set(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 		mlme_set_ext_opr_rate(vdev,
 				      assoc_resp->extendedRates.rate,
 				      assoc_resp->extendedRates.numRates);
+	else
+		mlme_clear_ext_opr_rate(vdev);
 
 	if (assoc_resp->HTCaps.present)
 		lim_update_mcs_rate_set(vdev, &assoc_resp->HTCaps);
+	else
+		mlme_clear_mcs_rate(vdev);
 
 	wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_MAC_ID);
 }

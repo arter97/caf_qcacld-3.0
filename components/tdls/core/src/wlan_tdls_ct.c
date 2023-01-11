@@ -183,8 +183,8 @@ void tdls_implicit_enable(struct tdls_vdev_priv_obj *tdls_vdev)
 
 /**
  * tdls_ct_sampling_tx_rx() - collect tx/rx traffic sample
- * @tdls_vdev_obj: tdls vdev object
- * @tdls_soc_obj: tdls soc object
+ * @tdls_vdev: tdls vdev object
+ * @tdls_soc: tdls soc object
  *
  * Function to update data traffic information in tdls connection
  * tracker data structure for connection tracker operation
@@ -743,8 +743,8 @@ tdls_ct_process_idle_and_discovery(struct tdls_peer *curr_peer,
 /**
  * tdls_ct_process_connected_link() - process the traffic
  * @curr_peer: tdls peer needs to be examined
- * @tdls_vdev_obj: tdls vdev
- * @tdls_soc_obj: tdls soc context
+ * @tdls_vdev: tdls vdev
+ * @tdls_soc: tdls soc context
  *
  * Function to check the peer traffic data in active STA
  * session
@@ -795,7 +795,7 @@ static void tdls_ct_process_connected_link(
 /**
  * tdls_ct_process_cap_supported() - process TDLS supported peer.
  * @curr_peer: tdls peer needs to be examined
- * @tdls_vdev_obj: tdls vdev context
+ * @tdls_vdev: tdls vdev context
  * @tdls_soc_obj: tdls soc context
  *
  * Function to check the peer traffic data  for tdls supported peer
@@ -835,8 +835,8 @@ static void tdls_ct_process_cap_supported(struct tdls_peer *curr_peer,
 /**
  * tdls_ct_process_cap_unknown() - process unknown peer
  * @curr_peer: tdls peer needs to be examined
- * @tdls_vdev_obj: tdls vdev object
- * @tdls_soc_obj: tdls soc object
+ * @tdls_vdev: tdls vdev object
+ * @tdls_soc: tdls soc object
  *
  * Function check the peer traffic data , when tdls capability is unknown
  *
@@ -844,10 +844,10 @@ static void tdls_ct_process_cap_supported(struct tdls_peer *curr_peer,
  */
 static void tdls_ct_process_cap_unknown(struct tdls_peer *curr_peer,
 					struct tdls_vdev_priv_obj *tdls_vdev,
-					struct tdls_soc_priv_obj *tdlsa_soc)
+					struct tdls_soc_priv_obj *tdls_soc)
 {
 	if (TDLS_IS_EXTERNAL_CONTROL_ENABLED(
-			tdlsa_soc->tdls_configs.tdls_feature_flags) &&
+			tdls_soc->tdls_configs.tdls_feature_flags) &&
 			(!curr_peer->is_forced_peer))
 			return;
 

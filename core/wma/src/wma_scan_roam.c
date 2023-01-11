@@ -296,7 +296,8 @@ cm_handle_auth_offload(struct auth_offload_event *auth_event)
 				auth_event->vdev_id,
 				auth_event->ta);
 	status = wma->csr_roam_auth_event_handle_cb(mac_ctx, auth_event->vdev_id,
-						    auth_event->ap_bssid);
+						    auth_event->ap_bssid,
+						    auth_event->akm);
 	if (QDF_IS_STATUS_ERROR(status)) {
 		wma_err_rl("Trigger pre-auth failed");
 		return QDF_STATUS_E_FAILURE;
@@ -560,11 +561,17 @@ wma_roam_update_vdev(tp_wma_handle wma,
 
 	vdev_id = roamed_vdev_id;
 	wma->interfaces[vdev_id].nss = roam_synch_ind_ptr->nss;
-	/* update freq and channel width */
-	wma->interfaces[vdev_id].ch_freq =
-		roam_synch_ind_ptr->chan_freq;
+
+	/* update channel width */
 	wma->interfaces[vdev_id].chan_width =
 		roam_synch_ind_ptr->chan_width;
+	/* Fill link freq from roam_synch_ind */
+	if (is_multi_link_roam(roam_synch_ind_ptr))
+		wma->interfaces[vdev_id].ch_freq =
+			mlo_roam_get_chan_freq(vdev_id, roam_synch_ind_ptr);
+	else
+		wma->interfaces[vdev_id].ch_freq =
+			roam_synch_ind_ptr->chan_freq;
 
 	del_sta_params = qdf_mem_malloc(sizeof(*del_sta_params));
 	if (!del_sta_params) {
@@ -1519,7 +1526,7 @@ int wma_extscan_hotlist_match_event_handler(void *handle,
 		return -ENOMEM;
 
 	dest_ap = &dest_hotlist->ap[0];
-	dest_hotlist->numOfAps = event->total_entries;
+	dest_hotlist->numOfAps = numap;
 	dest_hotlist->requestId = event->config_request_id;
 
 	if (event->first_entry_index +
@@ -1685,6 +1692,7 @@ static int wma_group_num_bss_to_scan_id(const u_int8_t *cmd_param_info,
 	struct extscan_cached_scan_results *t_cached_result;
 	struct extscan_cached_scan_result *t_scan_id_grp;
 	int i, j;
+	uint32_t total_scan_num_results = 0;
 	tSirWifiScanResult *ap;
 
 	param_buf = (WMI_EXTSCAN_CACHED_RESULTS_EVENTID_param_tlvs *)
@@ -1695,16 +1703,19 @@ static int wma_group_num_bss_to_scan_id(const u_int8_t *cmd_param_info,
 	t_cached_result = cached_result;
 	t_scan_id_grp = &t_cached_result->result[0];
 
-	if ((t_cached_result->num_scan_ids *
-	     QDF_MIN(t_scan_id_grp->num_results,
-		     param_buf->num_bssid_list)) > param_buf->num_bssid_list) {
-		wma_err("num_scan_ids %d, num_results %d num_bssid_list %d",
-			 t_cached_result->num_scan_ids,
-			 t_scan_id_grp->num_results,
-			 param_buf->num_bssid_list);
+	for (i = 0; i < t_cached_result->num_scan_ids; i++) {
+		total_scan_num_results += t_scan_id_grp->num_results;
+		t_scan_id_grp++;
+	}
+
+	if (total_scan_num_results > param_buf->num_bssid_list) {
+		wma_err("total_scan_num_results %d, num_bssid_list %d",
+			total_scan_num_results,
+			param_buf->num_bssid_list);
 		return -EINVAL;
 	}
 
+	t_scan_id_grp = &t_cached_result->result[0];
 	wma_debug("num_scan_ids:%d",
 			t_cached_result->num_scan_ids);
 	for (i = 0; i < t_cached_result->num_scan_ids; i++) {
@@ -1715,8 +1726,7 @@ static int wma_group_num_bss_to_scan_id(const u_int8_t *cmd_param_info,
 			return -ENOMEM;
 
 		ap = &t_scan_id_grp->ap[0];
-		for (j = 0; j < QDF_MIN(t_scan_id_grp->num_results,
-					param_buf->num_bssid_list); j++) {
+		for (j = 0; j < t_scan_id_grp->num_results; j++) {
 			ap->channel = src_hotlist->channel;
 			ap->ts = WMA_MSEC_TO_USEC(src_rssi->tstamp);
 			ap->rtt = src_hotlist->rtt;

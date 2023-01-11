@@ -85,7 +85,7 @@ bool mlme_is_twt_setup_done(struct wlan_objmgr_psoc *psoc,
 /**
  * mlme_set_twt_session_state() - Set the TWT session state for the given dialog
  * id in TWT context
- * @peer: Pointer to peer object
+ * @psoc: Pointer to psoc object
  * @peer_mac: Pointer to peer mac address
  * @dialog_id: Dialog id
  * @state: TWT session state

@@ -32,7 +32,7 @@ struct wlan_fwol_psoc_obj *fwol_get_psoc_obj(struct wlan_objmgr_psoc *psoc)
 }
 
 /**
- * fwol_mpta_helper_config_get: Populate btc_mpta_helper_enable from cfg
+ * fwol_mpta_helper_config_get() - Populate btc_mpta_helper_enable from cfg
  * @psoc: The global psoc handler
  * @coex_config: The cfg structure
  *
@@ -55,7 +55,7 @@ fwol_mpta_helper_config_get(struct wlan_objmgr_psoc *psoc,
 #endif
 
 /**
- * fwol_three_way_coex_config_legacy_config_get: Populate
+ * fwol_three_way_coex_config_legacy_config_get() - Populate
  * btc_three_way_coex_config_legacy_enable from cfg
  * @psoc: The global psoc handler
  * @coex_config: The cfg structure
@@ -180,8 +180,8 @@ fwol_init_thermal_temp_in_cfg(struct wlan_objmgr_psoc *psoc,
 }
 
 /**
- * fwol_set_neighbor_report_offload_params: set neighbor report parameters
- *                                          for rso user config
+ * fwol_set_neighbor_report_offload_params() - set neighbor report parameters
+ *                                             for rso user config
  * @psoc: The global psoc handler
  * @fwol_neighbor_report_cfg: neighbor report config params
  *
@@ -292,7 +292,7 @@ fwol_set_adaptive_dwelltime_config(
 	return status;
 }
 /**
- * fwol_parse_probe_req_ouis - form ouis from ini gProbeReqOUIs
+ * fwol_parse_probe_req_ouis() - form ouis from ini gProbeReqOUIs
  * @psoc: Pointer to struct wlan_objmgr_psoc context
  * @allowlist: Pointer to struct wlan_fwol_ie_allowlist
  *
@@ -403,8 +403,8 @@ fwol_init_ie_whiltelist_in_cfg(struct wlan_objmgr_psoc *psoc,
 }
 
 /**
- * ucfg_fwol_fetch_dhcp_server_settings: Populate the enable_dhcp_server_offload
- * and dhcp_max_num_clients from cfg
+ * ucfg_fwol_fetch_dhcp_server_settings() - Populate the DHCP server settings
+ *                                          from cfg
  * @psoc: The global psoc handler
  * @fwol_cfg: The cfg structure
  *
@@ -427,7 +427,7 @@ static void ucfg_fwol_fetch_dhcp_server_settings(struct wlan_objmgr_psoc *psoc,
 #endif
 
 /**
- * ucfg_fwol_fetch_tsf_gpio_pin: Populate the tsf_gpio_pin from cfg
+ * ucfg_fwol_fetch_tsf_gpio_pin() - Populate the tsf_gpio_pin from cfg
  * @psoc: The global psoc handler
  * @fwol_cfg: The cfg structure
  *
@@ -446,17 +446,10 @@ static void ucfg_fwol_fetch_tsf_gpio_pin(struct wlan_objmgr_psoc *psoc,
 }
 #endif
 
-/**
- * ucfg_fwol_init_tsf_ptp_options: Populate the tsf_ptp_options from cfg
- * @psoc: The global psoc handler
- * @fwol_cfg: The cfg structure
- *
- * Return: none
- */
 #if defined(WLAN_FEATURE_TSF) && defined(WLAN_FEATURE_TSF_PLUS)
 #ifdef WLAN_FEATURE_TSF_ACCURACY
 /**
- * fwol_init_tsf_accuracy_configs: Populate the TSF Accuracy configs from cfg
+ * fwol_init_tsf_accuracy_configs() - Populate the TSF Accuracy configs from cfg
  * @psoc: The global psoc handler
  * @fwol_cfg: The cfg structure
  *
@@ -491,6 +484,14 @@ static void fwol_init_tsf_accuracy_configs(struct wlan_objmgr_psoc *psoc,
 {
 }
 #endif
+
+/**
+ * ucfg_fwol_init_tsf_ptp_options() - Populate the tsf_ptp_options from cfg
+ * @psoc: The global psoc handler
+ * @fwol_cfg: The cfg structure
+ *
+ * Return: none
+ */
 static void ucfg_fwol_init_tsf_ptp_options(struct wlan_objmgr_psoc *psoc,
 					   struct wlan_fwol_cfg *fwol_cfg)
 {
@@ -507,8 +508,8 @@ static void ucfg_fwol_init_tsf_ptp_options(struct wlan_objmgr_psoc *psoc,
 
 #ifdef WLAN_FEATURE_TSF_PLUS_EXT_GPIO_IRQ
 /**
- * ucfg_fwol_fetch_tsf_irq_host_gpio_pin: Populate the
- * tsf_irq_host_gpio_pin from cfg
+ * ucfg_fwol_fetch_tsf_irq_host_gpio_pin() - Populate the tsf_irq_host_gpio_pin
+ *                                           from cfg
  * @psoc: The global psoc handler
  * @fwol_cfg: The cfg structure
  *
@@ -534,8 +535,8 @@ ucfg_fwol_fetch_tsf_irq_host_gpio_pin(struct wlan_objmgr_psoc *psoc,
 
 #ifdef WLAN_FEATURE_TSF_PLUS_EXT_GPIO_SYNC
 /**
- * ucfg_fwol_fetch_tsf_sync_host_gpio_pin: Populate the
- * tsf_sync_host_gpio_pin from cfg
+ * ucfg_fwol_fetch_tsf_sync_host_gpio_pin() - Populate the
+ *                                            tsf_sync_host_gpio_pin from cfg
  * @psoc: The global psoc handler
  * @fwol_cfg: The cfg structure
  *
@@ -559,7 +560,7 @@ ucfg_fwol_fetch_tsf_sync_host_gpio_pin(struct wlan_objmgr_psoc *psoc,
 }
 #endif
 /**
- * ucfg_fwol_init_sae_cfg: Populate the sae control config from cfg
+ * ucfg_fwol_init_sae_cfg() - Populate the sae control config from cfg
  * @psoc: The global psoc handler
  * @fwol_cfg: The cfg structure
  *
@@ -579,7 +580,7 @@ static void ucfg_fwol_init_sae_cfg(struct wlan_objmgr_psoc *psoc,
 #endif
 
 /**
- * ucfg_fwol_fetch_ra_filter: Populate the RA filter enabled or not from cfg
+ * ucfg_fwol_fetch_ra_filter() - Populate the RA filter enabled or not from cfg
  * @psoc: The global psoc handler
  * @fwol_cfg: The cfg structure
  *
