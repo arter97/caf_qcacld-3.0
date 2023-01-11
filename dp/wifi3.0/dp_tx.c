@@ -4594,6 +4594,8 @@ void dp_tx_compute_delay(struct dp_vdev *vdev, struct dp_tx_desc_s *tx_desc,
 	fwhw_transmit_delay = (uint32_t)(current_timestamp -
 					 timestamp_hw_enqueue);
 
+	if (!timestamp_hw_enqueue)
+		return;
 	/*
 	 * Delay between packet enqueued to HW and Tx completion in ms
 	 */
