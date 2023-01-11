@@ -200,7 +200,7 @@ static int dp_ppeds_alloc_vp_search_idx_tbl_entry_be(struct dp_soc_be *be_soc,
 		hal_tx_get_num_ppe_vp_search_idx_tbl_entries(be_soc->soc.hal_soc);
 
 	qdf_mutex_acquire(&be_soc->ppe_vp_tbl_lock);
-	if (be_soc->num_ppe_vp_entries == num_ppe_vp_search_idx_max) {
+	if (be_soc->num_ppe_vp_search_idx_entries == num_ppe_vp_search_idx_max) {
 		qdf_mutex_release(&be_soc->ppe_vp_tbl_lock);
 		dp_err("Maximum ppe_vp search idx count reached for vap");
 		return -ENOSPC;
@@ -1121,6 +1121,7 @@ QDF_STATUS dp_ppeds_attach_vdev_be(struct cdp_soc_t *soc_hdl, uint8_t vdev_id,
 	struct dp_vdev_be *be_vdev;
 	struct dp_ppe_vp_profile *vp_profile;
 	int8_t ppe_vp_idx;
+	int16_t vp_num;
 
 	be_soc = dp_get_be_soc_from_dp_soc(soc);
 
@@ -1157,8 +1158,8 @@ QDF_STATUS dp_ppeds_attach_vdev_be(struct cdp_soc_t *soc_hdl, uint8_t vdev_id,
 		return QDF_STATUS_E_INVAL;
 	}
 
-	*ppe_vp_num = ppe_ds_wlan_vp_alloc(be_soc->ppeds_handle, dev, vp_arg);
-	if (*ppe_vp_num < 0) {
+	vp_num = ppe_ds_wlan_vp_alloc(be_soc->ppeds_handle, dev, vp_arg);
+	if (vp_num < 0) {
 		dp_err("vp alloc failed\n");
 		dp_vdev_unref_delete(soc, vdev, DP_MOD_ID_CDP);
 		return QDF_STATUS_E_FAULT;
@@ -1176,7 +1177,7 @@ QDF_STATUS dp_ppeds_attach_vdev_be(struct cdp_soc_t *soc_hdl, uint8_t vdev_id,
 	if (be_vdev->ppe_vp_enabled == PPE_VP_USER_TYPE_DS) {
 		dp_err("%p: PPE DS is already enabled on this vdev_id:%d",
 		       be_soc, vdev_id);
-		ppe_ds_wlan_vp_free(be_soc->ppeds_handle, *ppe_vp_num);
+		ppe_ds_wlan_vp_free(be_soc->ppeds_handle, vp_num);
 		dp_vdev_unref_delete(soc, vdev, DP_MOD_ID_CDP);
 		return QDF_STATUS_E_ALREADY;
 	} else
@@ -1186,7 +1187,7 @@ QDF_STATUS dp_ppeds_attach_vdev_be(struct cdp_soc_t *soc_hdl, uint8_t vdev_id,
 	if (ppe_vp_idx < 0) {
 		dp_err("%p: Failed to allocate PPE VP idx for vdev_id:%d",
 		       be_soc, vdev->vdev_id);
-		ppe_ds_wlan_vp_free(be_soc->ppeds_handle, *ppe_vp_num);
+		ppe_ds_wlan_vp_free(be_soc->ppeds_handle, vp_num);
 		be_vdev->ppe_vp_enabled = 0;
 		dp_vdev_unref_delete(soc, vdev, DP_MOD_ID_CDP);
 		return QDF_STATUS_E_RESOURCES;
@@ -1201,7 +1202,7 @@ QDF_STATUS dp_ppeds_attach_vdev_be(struct cdp_soc_t *soc_hdl, uint8_t vdev_id,
 			dp_err("%p: Failed to allocate PPE VP search table idx for vdev_id:%d",
 				be_soc, vdev->vdev_id);
 			dp_ppeds_dealloc_vp_tbl_entry_be(be_soc, ppe_vp_idx);
-			ppe_ds_wlan_vp_free(be_soc->ppeds_handle, *ppe_vp_num);
+			ppe_ds_wlan_vp_free(be_soc->ppeds_handle, vp_num);
 			be_vdev->ppe_vp_enabled = 0;
 			dp_vdev_unref_delete(soc, vdev, DP_MOD_ID_CDP);
 			return QDF_STATUS_E_RESOURCES;
@@ -1209,18 +1210,19 @@ QDF_STATUS dp_ppeds_attach_vdev_be(struct cdp_soc_t *soc_hdl, uint8_t vdev_id,
 		vp_profile->search_idx_reg_num = ppe_vp_search_tbl_idx;
 	}
 
-	vp_profile->vp_num = *ppe_vp_num;
+	vp_profile->vp_num = vp_num;
 	vp_profile->ppe_vp_num_idx = ppe_vp_idx;
 	vp_profile->to_fw = 0;
 	vp_profile->use_ppe_int_pri = 0;
 	vp_profile->drop_prec_enable = 0;
-
 
 	/*
 	 * For the sta mode fill up the index reg number.
 	 */
 	dp_ppeds_setup_vp_entry_be(be_soc, be_vdev);
 	dp_vdev_unref_delete(soc, vdev, DP_MOD_ID_CDP);
+
+	*ppe_vp_num = vp_num;
 	return QDF_STATUS_SUCCESS;
 }
 
@@ -1259,7 +1261,7 @@ void dp_ppeds_detach_vdev_be(struct cdp_soc_t *soc_hdl, uint8_t vdev_id)
 	be_vdev = dp_get_be_vdev_from_dp_vdev(vdev);
 	vp_profile = &be_vdev->ppe_vp_profile;
 
-	if (vp_profile->ppe_vp_num_idx == -1) {
+	if (vp_profile->vp_num <= 0) {
 		dp_err("%p: Invalid PPE VP num for vdev_id:%d",
 			be_vdev, vdev_id);
 		dp_vdev_unref_delete(soc, vdev, DP_MOD_ID_CDP);
