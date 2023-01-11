@@ -660,8 +660,10 @@ void wlan_scan_get_last_scan_ageout_time(struct wlan_objmgr_psoc *psoc,
 	struct wlan_scan_obj *scan_obj;
 
 	scan_obj = wlan_psoc_get_scan_obj(psoc);
-	if (!scan_obj)
+	if (!scan_obj) {
 		*last_scan_ageout_time = 0;
+		return;
+	}
 	*last_scan_ageout_time =
 	scan_obj->scan_def.last_scan_ageout_time;
 }

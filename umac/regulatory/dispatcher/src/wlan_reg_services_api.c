@@ -1077,6 +1077,15 @@ enum channel_enum wlan_reg_get_chan_enum_for_freq(qdf_freq_t freq)
 	return reg_get_chan_enum_for_freq(freq);
 }
 
+QDF_STATUS
+wlan_reg_get_min_max_bw_for_chan_index(struct wlan_objmgr_pdev *pdev,
+				       enum channel_enum chan_idx,
+				       uint16_t *min_bw, uint16_t *max_bw)
+{
+	return reg_get_min_max_bw_on_cur_chan_list(pdev,
+						   chan_idx, min_bw, max_bw);
+}
+
 bool wlan_reg_is_freq_present_in_cur_chan_list(struct wlan_objmgr_pdev *pdev,
 					       qdf_freq_t freq)
 {

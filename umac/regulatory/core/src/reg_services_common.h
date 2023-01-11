@@ -962,6 +962,21 @@ reg_is_freq_present_in_cur_chan_list(struct wlan_objmgr_pdev *pdev,
 enum channel_enum reg_get_chan_enum_for_freq(qdf_freq_t freq);
 
 /**
+ * reg_get_min_max_bw_on_cur_chan_list() - To get min and max BW supported
+ * by channel enum
+ * @pdev: pointer to pdev
+ * @chn_idx: enum channel_enum
+ * @min bw: min bw
+ * @max bw: max bw
+ *
+ * Return: SUCCESS/FAILURE
+ */
+QDF_STATUS
+reg_get_min_max_bw_on_cur_chan_list(struct wlan_objmgr_pdev *pdev,
+				    enum channel_enum chan_idx,
+				    uint16_t *min_bw, uint16_t *max_bw);
+
+/**
  * reg_get_channel_list_with_power_for_freq() - Provides the channel list with
  * power
  * @pdev: Pointer to pdev

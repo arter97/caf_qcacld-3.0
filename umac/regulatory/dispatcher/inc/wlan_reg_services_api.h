@@ -1423,6 +1423,21 @@ bool wlan_reg_is_same_band_freqs(qdf_freq_t freq1, qdf_freq_t freq2);
 enum channel_enum wlan_reg_get_chan_enum_for_freq(qdf_freq_t freq);
 
 /**
+ * wlan_reg_get_min_max_bw_for_chan_index() - To get min and max BW supported
+ * by channel enum
+ * @pdev: pointer to pdev
+ * @chn_idx: enum channel_enum
+ * @min bw: min bw
+ * @max bw: max bw
+ *
+ * Return: SUCCESS/FAILURE
+ */
+QDF_STATUS
+wlan_reg_get_min_max_bw_for_chan_index(struct wlan_objmgr_pdev *pdev,
+				       enum channel_enum chan_idx,
+				       uint16_t *min_bw, uint16_t *max_bw);
+
+/**
  * wlan_reg_is_freq_present_in_cur_chan_list() - Check if channel is present
  * in the current channel list
  * @pdev: pdev pointer
