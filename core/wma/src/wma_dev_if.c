@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2013-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -6509,11 +6509,12 @@ wma_validate_txrx_chain_mask(uint32_t id, uint32_t value)
 {
 	tp_wma_handle wma_handle =
 			cds_get_context(QDF_MODULE_ID_WMA);
-	struct target_psoc_info *tgt_hdl =
-			wlan_psoc_get_tgt_if_handle(wma_handle->psoc);
+	struct target_psoc_info *tgt_hdl;
+
 	if (!wma_handle)
 		return QDF_STATUS_E_FAILURE;
 
+	tgt_hdl = wlan_psoc_get_tgt_if_handle(wma_handle->psoc);
 	if (!tgt_hdl)
 		return QDF_STATUS_E_FAILURE;
 
@@ -6544,7 +6545,14 @@ QDF_STATUS wma_send_multi_pdev_vdev_set_params(enum mlme_dev_setparam param_type
 	struct mac_context *mac = cds_get_context(QDF_MODULE_ID_PE);
 	struct set_multiple_pdev_vdev_param params = {};
 	QDF_STATUS status;
-	wmi_unified_t wmi_handle = get_wmi_unified_hdl_from_psoc(mac->psoc);
+	wmi_unified_t wmi_handle;
+
+	if (!mac)
+		return QDF_STATUS_E_FAILURE;
+
+	wmi_handle = get_wmi_unified_hdl_from_psoc(mac->psoc);
+	if (!wmi_handle)
+		return QDF_STATUS_E_FAILURE;
 
 	params.param_type = param_type;
 	params.dev_id = dev_id;
