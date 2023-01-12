@@ -304,6 +304,7 @@ static void dp_mlo_soc_teardown(struct cdp_soc_t *soc_hdl,
 				   NULL);
 
 	dp_mlo_set_soc_by_chip_id(mlo_ctxt, NULL, be_soc->mlo_chip_id);
+	be_soc->ml_ctxt = NULL;
 }
 
 static QDF_STATUS dp_mlo_add_ptnr_vdev(struct dp_vdev *vdev1,
