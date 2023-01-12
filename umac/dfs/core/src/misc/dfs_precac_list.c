@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2016-2020 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  * Copyright (c) 2007-2008 Sam Leffler, Errno Consulting
  * All rights reserved.
  *
@@ -1510,7 +1510,7 @@ void dfs_mark_precac_done_for_freq(struct wlan_dfs *dfs,
 				   enum phy_ch_width ch_width)
 {
 	struct dfs_precac_entry *precac_entry = NULL, *tmp_precac_entry = NULL;
-	uint16_t channels[NUM_CHANNELS_160MHZ];
+	uint16_t channels[MAX_20MHZ_SUBCHANS];
 	uint8_t i, nchannels = 0;
 
 	if (!pri_ch_freq)
@@ -1920,7 +1920,7 @@ void dfs_unmark_precac_nol_for_freq(struct wlan_dfs *dfs, uint16_t chan_freq)
 void dfs_unmark_rcac_done(struct wlan_dfs *dfs)
 {
 	struct dfs_precac_entry *precac_entry = NULL, *tmp_precac_entry = NULL;
-	qdf_freq_t channels[NUM_CHANNELS_160MHZ];
+	qdf_freq_t channels[MAX_20MHZ_SUBCHANS];
 	uint8_t i, nchannels = 0;
 	qdf_freq_t pri_ch_freq =
 		dfs->dfs_rcac_param.rcac_ch_params.mhz_freq_seg0;
