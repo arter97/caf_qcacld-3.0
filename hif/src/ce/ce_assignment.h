@@ -1144,8 +1144,12 @@ static struct CE_attr host_ce_config_wlan_qca5332[] = {
 	{/*CE7*/ (CE_ATTR_FLAGS | CE_ATTR_DISABLE_INTR), 0, 0, 0, 0, NULL,},
 	/* Target HIF memcpy (Generic HIF memcypy) */
 	{/*CE8*/ (CE_ATTR_FLAGS | CE_ATTR_DISABLE_INTR), 0, 0, 0, 0, NULL,},
+	#ifdef WLAN_DIAG_AND_DBR_OVER_SEPARATE_CE
 	/* WMI logging/CFR/Spectral/Radar/ */
 	{/*CE9*/ (CE_ATTR_FLAGS), 0, 0, 2048, 128, NULL,},
+	#else
+	{/*CE9*/ (CE_ATTR_FLAGS | CE_ATTR_DISABLE_INTR), 0, 0, 0, 0, NULL,},
+	#endif
 	/* Customer reserve */
 	{/*CE10*/ (CE_ATTR_FLAGS | CE_ATTR_DISABLE_INTR), 0, 0, 0, 0, NULL,},
 	/* Un-assigned */
