@@ -1802,6 +1802,15 @@ wlan_reg_set_ap_pwr_and_update_chan_list(struct wlan_objmgr_pdev *pdev,
 
 qdf_export_symbol(wlan_reg_set_ap_pwr_and_update_chan_list);
 
+uint8_t
+wlan_reg_get_num_rules_of_ap_pwr_type(struct wlan_objmgr_pdev *pdev,
+				      enum reg_6g_ap_type ap_pwr_type)
+{
+	return reg_get_num_rules_of_ap_pwr_type(pdev, ap_pwr_type);
+}
+
+qdf_export_symbol(wlan_reg_get_num_rules_of_ap_pwr_type);
+
 QDF_STATUS wlan_reg_get_superchan_entry(
 		struct wlan_objmgr_pdev *pdev,
 		enum channel_enum chan_enum,

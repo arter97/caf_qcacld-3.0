@@ -2852,4 +2852,15 @@ wlan_reg_display_super_chan_list(struct wlan_objmgr_pdev *pdev)
 
 #endif
 
+/**
+ * wlan_reg_get_num_rules_of_ap_pwr_type() - Get the number of reg rules
+ * present for a given ap power type
+ * @pdev: Pointer to pdev
+ * @ap_pwr_type: AP power type
+ *
+ * Return: Return the number of reg rules for a given ap power type
+ */
+uint8_t
+wlan_reg_get_num_rules_of_ap_pwr_type(struct wlan_objmgr_pdev *pdev,
+				      enum reg_6g_ap_type ap_pwr_type);
 #endif

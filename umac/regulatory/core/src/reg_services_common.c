@@ -7229,15 +7229,7 @@ reg_get_reg_rules_for_pdev(struct wlan_objmgr_pdev *pdev)
 	return psoc_reg_rules;
 }
 
-/**
- * reg_get_num_rules_of_ap_pwr_type() - Get the number of reg rules present
- * for a given ap power type
- * @pdev: Pointer to pdev
- * @ap_pwr_type: AP power type
- *
- * Return: Return the number of reg rules for a given ap power type
- */
-static uint8_t
+uint8_t
 reg_get_num_rules_of_ap_pwr_type(struct wlan_objmgr_pdev *pdev,
 				 enum reg_6g_ap_type ap_pwr_type)
 {

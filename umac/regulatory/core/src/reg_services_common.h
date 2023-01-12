@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2017-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  *
  * Permission to use, copy, modify, and/or distribute this software for
@@ -3025,4 +3025,16 @@ reg_get_num_afc_freq_obj(struct wlan_objmgr_pdev *pdev, uint8_t *num_freq_obj);
  * Return: max bw
  */
 uint16_t reg_get_max_bw_5G_for_fo(struct wlan_objmgr_pdev *pdev);
+
+/**
+ * reg_get_num_rules_of_ap_pwr_type() - Get the number of reg rules present
+ * for a given ap power type
+ * @pdev: Pointer to pdev
+ * @ap_pwr_type: AP power type
+ *
+ * Return: Return the number of reg rules for a given ap power type
+ */
+uint8_t
+reg_get_num_rules_of_ap_pwr_type(struct wlan_objmgr_pdev *pdev,
+				 enum reg_6g_ap_type ap_pwr_type);
 #endif
