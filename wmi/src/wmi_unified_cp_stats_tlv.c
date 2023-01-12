@@ -22,7 +22,61 @@
 #include "target_if_cp_stats.h"
 #include <wlan_cp_stats_public_structs.h>
 
-#ifdef WLAN_SUPPORT_INFRA_CTRL_PATH_STATS
+#if defined(WLAN_SUPPORT_INFRA_CTRL_PATH_STATS) || \
+	defined(WLAN_TELEMETRY_STATS_SUPPORT)
+/**
+ * get_infra_cp_stats_id() - convert from to wmi_ctrl_path_stats_id
+ * @type: type from enum infra_cp_stats_id
+ *
+ * Return: wmi_ctrl_path_stats_id code for success or -EINVAL
+ * for failure
+ */
+static uint32_t get_infra_cp_stats_id(enum infra_cp_stats_id type)
+{
+	switch (type) {
+	case TYPE_REQ_CTRL_PATH_PDEV_TX_STAT:
+		return WMI_REQUEST_CTRL_PATH_PDEV_TX_STAT;
+	case TYPE_REQ_CTRL_PATH_VDEV_EXTD_STAT:
+		return WMI_REQUEST_CTRL_PATH_VDEV_EXTD_STAT;
+	case TYPE_REQ_CTRL_PATH_MEM_STAT:
+		return WMI_REQUEST_CTRL_PATH_MEM_STAT;
+	case TYPE_REQ_CTRL_PATH_TWT_STAT:
+		return WMI_REQUEST_CTRL_PATH_TWT_STAT;
+	case TYPE_REQ_CTRL_PATH_BMISS_STAT:
+		return WMI_REQUEST_CTRL_PATH_BMISS_STAT;
+	case TYPE_REQ_CTRL_PATH_PMLO_STAT:
+		return WMI_REQUEST_CTRL_PATH_PMLO_STAT;
+	default:
+		return -EINVAL;
+	}
+}
+
+/**
+ * get_infra_cp_stats_action() - convert action codes from
+ * enum infra_cp_stats_action to wmi_ctrl_path_stats_action
+ * @action: action code from enum infra_cp_stats_action
+ *
+ * Return: wmi_ctrl_path_stats_action code for success or -EINVAL
+ * for failure
+ */
+static uint32_t get_infra_cp_stats_action(enum infra_cp_stats_action action)
+{
+	switch (action) {
+	case ACTION_REQ_CTRL_PATH_STAT_GET:
+		return WMI_REQUEST_CTRL_PATH_STAT_GET;
+	case ACTION_REQ_CTRL_PATH_STAT_RESET:
+		return WMI_REQUEST_CTRL_PATH_STAT_RESET;
+	case ACTION_REQ_CTRL_PATH_STAT_START:
+		return WMI_REQUEST_CTRL_PATH_STAT_START;
+	case ACTION_REQ_CTRL_PATH_STAT_STOP:
+		return WMI_REQUEST_CTRL_PATH_STAT_STOP;
+	case ACTION_REQ_CTRL_PATH_STAT_PERIODIC_PUBLISH:
+		return WMI_REQUEST_CTRL_PATH_STAT_PERIODIC_PUBLISH;
+	default:
+		return -EINVAL;
+	}
+}
+
 #ifdef WLAN_SUPPORT_TWT
 static uint32_t
 get_stats_req_twt_dialog_id(struct infra_cp_stats_cmd_info *req)
@@ -356,6 +410,7 @@ prepare_infra_cp_stats_buf(wmi_unified_t wmi_handle,
 
 	cmd_fixed_param->request_id = stats_req->action;
 	cmd_fixed_param->action = get_infra_cp_stats_action(stats_req->action);
+	cmd_fixed_param->stat_periodicity = stats_req->stat_periodicity;
 
 	buf_ptr = (uint8_t *)cmd_fixed_param;
 	/* Setting tlv header for pdev id arrays*/
@@ -385,8 +440,12 @@ prepare_infra_cp_stats_buf(wmi_unified_t wmi_handle,
 	WMITLV_SET_HDR(buf_ptr, WMITLV_TAG_ARRAY_UINT32,
 		       sizeof(A_UINT32) * num_dialog_ids);
 
-	for (index = 0; index < num_pdev_ids; index++)
-		pdev_id_array[index] = stats_req->pdev_id[index];
+	for (index = 0; index < num_pdev_ids; index++) {
+		pdev_id_array[index] =
+			wmi_handle->ops->convert_pdev_id_host_to_target(
+					wmi_handle,
+					stats_req->pdev_id[index]);
+	}
 
 	for (index = 0; index < num_vdev_ids; index++)
 		vdev_id_array[index] = stats_req->vdev_id[index];
@@ -1010,7 +1069,8 @@ extract_pmf_bcn_protect_stats_tlv(wmi_unified_t wmi_handle, void *evt_buf,
 	return QDF_STATUS_SUCCESS;
 }
 
-#ifdef WLAN_SUPPORT_INFRA_CTRL_PATH_STATS
+#if defined(WLAN_SUPPORT_INFRA_CTRL_PATH_STATS) || \
+	defined(WLAN_TELEMETRY_STATS_SUPPORT)
 static void wmi_infra_cp_stats_ops_attach_tlv(struct wmi_ops *ops)
 {
 	ops->send_infra_cp_stats_request_cmd =

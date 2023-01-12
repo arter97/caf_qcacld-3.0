@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -155,6 +155,7 @@ enum infra_cp_stats_action {
 	ACTION_REQ_CTRL_PATH_STAT_RESET,
 	ACTION_REQ_CTRL_PATH_STAT_START,
 	ACTION_REQ_CTRL_PATH_STAT_STOP,
+	ACTION_REQ_CTRL_PATH_STAT_PERIODIC_PUBLISH,
 };
 
 enum infra_cp_stats_id {
@@ -163,6 +164,7 @@ enum infra_cp_stats_id {
 	TYPE_REQ_CTRL_PATH_MEM_STAT,
 	TYPE_REQ_CTRL_PATH_TWT_STAT,
 	TYPE_REQ_CTRL_PATH_BMISS_STAT,
+	TYPE_REQ_CTRL_PATH_PMLO_STAT,
 };
 
 /**
@@ -199,5 +201,6 @@ struct infra_cp_stats_cmd_info {
 #endif
 	void (*infra_cp_stats_resp_cb)(struct infra_cp_stats_event *ev,
 				       void *cookie);
+	uint32_t stat_periodicity;
 };
 #endif

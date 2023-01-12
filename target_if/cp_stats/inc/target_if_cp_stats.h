@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2018, 2020-2021 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -119,27 +120,6 @@ target_if_cp_stats_unregister_legacy_event_handler(
 	return QDF_STATUS_SUCCESS;
 }
 #endif  /* WLAN_SUPPORT_LEGACY_CP_STATS_HANDLERS */
-
-#ifdef WLAN_SUPPORT_INFRA_CTRL_PATH_STATS
-/**
- * get_infra_cp_stats_id() - convert from to wmi_ctrl_path_stats_id
- * @type: type from enum infra_cp_stats_id
- *
- * Return: wmi_ctrl_path_stats_id code for success or -EINVAL
- * for failure
- */
-uint32_t get_infra_cp_stats_id(enum infra_cp_stats_id type);
-
-/**
- * get_infra_cp_stats_action() - convert action codes from
- * enum infra_cp_stats_action to wmi_ctrl_path_stats_action
- * @action: action code from enum infra_cp_stats_action
- *
- * Return: wmi_ctrl_path_stats_action code for success or -EINVAL
- * for failure
- */
-uint32_t get_infra_cp_stats_action(enum infra_cp_stats_action action);
-#endif /* WLAN_SUPPORT_INFRA_CTRL_PATH_STATS */
 
 #else
 static inline QDF_STATUS

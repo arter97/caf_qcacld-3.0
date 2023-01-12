@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2018-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -465,6 +465,27 @@ wlan_cp_stats_send_infra_cp_req(struct wlan_objmgr_psoc *psoc,
 	return tx_ops->send_req_infra_cp_stats(psoc, req);
 }
 #endif /* WLAN_SUPPORT_INFRA_CTRL_PATH_STATS */
+
+#ifdef WLAN_TELEMETRY_STATS_SUPPORT
+QDF_STATUS
+wlan_cp_stats_send_telemetry_cp_req(struct wlan_objmgr_pdev *pdev,
+				    struct infra_cp_stats_cmd_info *req)
+{
+	struct wlan_lmac_if_cp_stats_tx_ops *tx_ops;
+
+	tx_ops = target_if_cp_stats_get_tx_ops(wlan_pdev_get_psoc(pdev));
+	if (!tx_ops) {
+		cp_stats_err("could not get tx_ops");
+		return QDF_STATUS_E_NULL_VALUE;
+	}
+
+	if (!tx_ops->send_req_telemetry_cp_stats) {
+		cp_stats_err("could not get send_req_infra_twt_stats");
+		return QDF_STATUS_E_NULL_VALUE;
+	}
+	return tx_ops->send_req_telemetry_cp_stats(pdev, req);
+}
+#endif
 
 #if defined(WLAN_SUPPORT_TWT) && defined (WLAN_TWT_CONV_SUPPORTED)
 /**

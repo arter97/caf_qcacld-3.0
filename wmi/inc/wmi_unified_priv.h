@@ -2910,7 +2910,8 @@ QDF_STATUS (*extract_halphy_stats_end_of_event)(wmi_unified_t wmi_handle,
 QDF_STATUS (*extract_halphy_stats_event_count)(wmi_unified_t wmi_handle,
 					       void *evt_buf,
 					       uint32_t *event_count_flag);
-#ifdef WLAN_SUPPORT_INFRA_CTRL_PATH_STATS
+#if defined(WLAN_SUPPORT_INFRA_CTRL_PATH_STATS) || \
+	defined(WLAN_TELEMETRY_STATS_SUPPORT)
 QDF_STATUS
 (*extract_infra_cp_stats)(wmi_unified_t wmi_handle,
 			  void *evt_buf, uint32_t evt_buf_len,

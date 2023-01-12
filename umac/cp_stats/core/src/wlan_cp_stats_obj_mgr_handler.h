@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2018, 2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -166,6 +166,21 @@ QDF_STATUS
 wlan_cp_stats_send_infra_cp_req(struct wlan_objmgr_psoc *psoc,
 				struct infra_cp_stats_cmd_info *req);
 #endif /* WLAN_SUPPORT_INFRA_CTRL_PATH_STATS */
+
+#ifdef WLAN_TELEMETRY_STATS_SUPPORT
+/**
+ * wlan_cp_stats_send_telemetry_cp_req() - API to send telemetry cp stats
+ * request to lmac
+ * @pdev: pointer to pdev object
+ * @req: pointer to telemetry cp stats request
+ *
+ * Return: QDF_STATUS_SUCCESS on Success, other QDF_STATUS error codes on
+ * failure
+ */
+QDF_STATUS
+wlan_cp_stats_send_telemetry_cp_req(struct wlan_objmgr_pdev *pdev,
+				    struct infra_cp_stats_cmd_info *req);
+#endif
 
 #if defined(WLAN_SUPPORT_TWT) && defined (WLAN_TWT_CONV_SUPPORTED)
 /**
