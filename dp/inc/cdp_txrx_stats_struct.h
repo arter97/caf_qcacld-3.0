@@ -43,6 +43,7 @@
 #define TXRX_STATS_LEVEL TXRX_STATS_LEVEL_BASIC
 #endif
 
+#define CDP_MU_MAX_USERS 37
 /* 1 additional MCS is for invalid values */
 #ifdef WLAN_FEATURE_11BE
 #define MAX_MCS (16 + 1)
@@ -2959,6 +2960,28 @@ struct cdp_peer_deter_stats {
 	struct cdp_peer_tx_ul_deter ul_det[TX_MODE_UL_MAX];
 	struct cdp_peer_rx_deter rx_det;
 };
+
+/**
+ * struct cdp_pdev_deter_stats- Structure to hold pdev deterministic stats
+ * @dl_ofdma_usr: num_user counter for dl ofdma
+ * @ul_ofdma_usr: num_user counter for ul ofdma
+ * @dl_mimo_usr: num_user counter for dl mimo
+ * @ul_mimo_usr: num_user counter for ul mimo
+ * @dl_mode_cnt: DL tx mode counter
+ * @ul_mode_cnt: UL tx mode counter
+ * @ch_access_delay
+ */
+struct cdp_pdev_deter_stats {
+	uint64_t dl_ofdma_usr[CDP_MU_MAX_USERS];
+	uint64_t ul_ofdma_usr[CDP_MU_MAX_USERS];
+	uint64_t dl_mimo_usr[CDP_MU_MAX_USERS];
+	uint64_t ul_mimo_usr[CDP_MU_MAX_USERS];
+	uint64_t dl_mode_cnt[TX_MODE_DL_MAX];
+	uint64_t ul_mode_cnt[TX_MODE_UL_MAX];
+	uint32_t ch_access_delay[WME_AC_MAX];
+	uint64_t trigger_success;
+	uint64_t trigger_fail;
+};
 #endif
 
 /* struct cdp_pdev_stats - pdev stats
@@ -3112,6 +3135,7 @@ struct cdp_pdev_stats {
 	uint32_t peer_unauth_rx_pkt_drop;
 #ifdef WLAN_TELEMETRY_STATS_SUPPORT
 	struct cdp_pdev_telemetry_stats telemetry_stats;
+	struct cdp_pdev_deter_stats deter_stats;
 #endif
 };
 

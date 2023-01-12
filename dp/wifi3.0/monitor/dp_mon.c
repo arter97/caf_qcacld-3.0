@@ -3066,6 +3066,79 @@ void dp_ppdu_desc_get_txmode(struct cdp_tx_completion_ppdu *ppdu)
 }
 
 /*
+ * dp_pdev_update_deter_stats() - Update pdev deterministic stats
+ * @pdev: Datapath pdev handle
+ * @ppdu: PPDU Descriptor
+ *
+ * Return: None
+ */
+static inline void
+dp_pdev_update_deter_stats(struct dp_pdev *pdev,
+			   struct cdp_tx_completion_ppdu *ppdu)
+{
+	if (!pdev || !ppdu)
+		return;
+
+	if (ppdu->frame_type != CDP_PPDU_FTYPE_DATA)
+		return;
+
+	if (ppdu->txmode_type == TX_MODE_TYPE_UNKNOWN)
+		return;
+
+	if (ppdu->backoff_ac_valid)
+		DP_STATS_UPD(pdev,
+			     deter_stats.ch_access_delay[ppdu->backoff_ac],
+			     ppdu->ch_access_delay);
+
+	if (ppdu->num_ul_user_resp_valid &&
+	    (ppdu->txmode_type == TX_MODE_TYPE_UL)) {
+		if (ppdu->num_ul_user_resp) {
+			DP_STATS_INC(pdev,
+				     deter_stats.trigger_success,
+				     1);
+		} else {
+			DP_STATS_INC(pdev,
+				     deter_stats.trigger_fail,
+				     1);
+		}
+	}
+
+	if (ppdu->txmode_type == TX_MODE_TYPE_DL) {
+		DP_STATS_INC(pdev,
+			     deter_stats.dl_mode_cnt[ppdu->txmode],
+			     1);
+		switch (ppdu->txmode) {
+		case TX_MODE_DL_OFDMA_DATA:
+			DP_STATS_INC(pdev,
+				     deter_stats.dl_ofdma_usr[ppdu->num_users],
+				     1);
+			break;
+		case TX_MODE_DL_MUMIMO_DATA:
+			DP_STATS_INC(pdev,
+				     deter_stats.dl_mimo_usr[ppdu->num_users],
+				     1);
+			break;
+		}
+	} else {
+		DP_STATS_INC(pdev,
+			     deter_stats.ul_mode_cnt[ppdu->txmode],
+			     1);
+		switch (ppdu->txmode) {
+		case TX_MODE_UL_OFDMA_BASIC_TRIGGER_DATA:
+			DP_STATS_INC(pdev,
+				     deter_stats.ul_ofdma_usr[ppdu->num_ul_users],
+				     1);
+			break;
+		case TX_MODE_UL_MUMIMO_BASIC_TRIGGER_DATA:
+			DP_STATS_INC(pdev,
+				     deter_stats.ul_mimo_usr[ppdu->num_ul_users],
+				     1);
+			break;
+		}
+	}
+}
+
+/*
  * dp_ppdu_desc_get_msduq() - Get msduq index from bitmap
  * @ppdu: PPDU Descriptor
  * @msduq_index: MSDUQ index
@@ -3185,6 +3258,11 @@ static inline void
 dp_pdev_telemetry_stats_update(
 		struct dp_pdev *pdev,
 		struct cdp_tx_completion_ppdu_user *ppdu)
+{ }
+
+static inline void
+dp_pdev_update_deter_stats(struct dp_pdev *pdev,
+			   struct cdp_tx_completion_ppdu *ppdu)
 { }
 #endif
 
@@ -3430,7 +3508,9 @@ dp_process_ppdu_stats_common_tlv(struct dp_pdev *pdev,
 	struct dp_soc *soc = NULL;
 	struct cdp_tx_completion_ppdu *ppdu_desc = NULL;
 	uint64_t ppdu_start_timestamp;
+	uint32_t eval_start_timestamp;
 	uint32_t *start_tag_buf;
+	uint32_t *ts_tag_buf;
 
 	start_tag_buf = tag_buf;
 	ppdu_desc =
@@ -3483,6 +3563,10 @@ dp_process_ppdu_stats_common_tlv(struct dp_pdev *pdev,
 	tag_buf = start_tag_buf + HTT_GET_STATS_CMN_INDEX(FES_DUR_US);
 	ppdu_desc->tx_duration = *tag_buf;
 
+	tag_buf = start_tag_buf +
+			HTT_GET_STATS_CMN_INDEX(SCH_EVAL_START_TSTMP_L32_US);
+	eval_start_timestamp = *tag_buf;
+
 	tag_buf = start_tag_buf + HTT_GET_STATS_CMN_INDEX(START_TSTMP_L32_US);
 	ppdu_desc->ppdu_start_timestamp = *tag_buf;
 
@@ -3516,6 +3600,8 @@ dp_process_ppdu_stats_common_tlv(struct dp_pdev *pdev,
 		HTT_PPDU_STATS_COMMON_TLV_DOPPLER_INDICATION_GET(*tag_buf);
 	ppdu_desc->spatial_reuse =
 		HTT_PPDU_STATS_COMMON_TLV_SPATIAL_REUSE_GET(*tag_buf);
+	ppdu_desc->num_ul_users =
+		HTT_PPDU_STATS_COMMON_TLV_NUM_UL_EXPECTED_USERS_GET(*tag_buf);
 
 	dp_tx_capture_htt_frame_counter(pdev, frame_type);
 
@@ -3543,6 +3629,26 @@ dp_process_ppdu_stats_common_tlv(struct dp_pdev *pdev,
 	tag_buf = start_tag_buf + HTT_GET_STATS_CMN_INDEX(BSSCOLOR_OBSS_PSR);
 	ppdu_desc->bss_color =
 		HTT_PPDU_STATS_COMMON_TLV_BSS_COLOR_ID_GET(*tag_buf);
+
+	ppdu_desc->backoff_ac_valid =
+		HTT_PPDU_STATS_COMMON_TLV_BACKOFF_AC_VALID_GET(*tag_buf);
+	if (ppdu_desc->backoff_ac_valid) {
+		ppdu_desc->backoff_ac =
+			HTT_PPDU_STATS_COMMON_TLV_BACKOFF_AC_GET(*tag_buf);
+		ts_tag_buf = start_tag_buf +
+			HTT_GET_STATS_CMN_INDEX(SCH_EVAL_START_TSTMP_L32_US);
+		eval_start_timestamp = *ts_tag_buf;
+
+		ts_tag_buf = start_tag_buf +
+			HTT_GET_STATS_CMN_INDEX(START_TSTMP_L32_US);
+		ppdu_desc->ch_access_delay =
+			*ts_tag_buf - eval_start_timestamp;
+	}
+	ppdu_desc->num_ul_user_resp_valid =
+		HTT_PPDU_STATS_COMMON_TLV_NUM_UL_USER_RESPONSES_VALID_GET(*tag_buf);
+	if (ppdu_desc->num_ul_user_resp_valid)
+		ppdu_desc->num_ul_user_resp =
+			HTT_PPDU_STATS_COMMON_TLV_NUM_UL_USER_RESPONSES_GET(*tag_buf);
 }
 
 /**
@@ -4720,6 +4826,7 @@ dp_ppdu_desc_user_stats_update(struct dp_pdev *pdev,
 	qdf_assert_always(ppdu_desc->num_users <= ppdu_desc->max_users);
 
 	dp_ppdu_desc_get_txmode(ppdu_desc);
+	dp_pdev_update_deter_stats(pdev, ppdu_desc);
 
 	for (i = 0; i < num_users; i++) {
 		ppdu_desc->num_mpdu += ppdu_desc->user[i].num_mpdu;

@@ -2318,6 +2318,12 @@ struct cdp_tx_mgmt_comp_info {
  * @htt_seq_type: Seq type
  * @txmode_type: tx mode type UL/DL
  * @txmode: tx mode
+ * @num_ul_users: Number of UL expected users
+ * @ch_access_delay: Channel access delay
+ * @backoff_ac_valid: Backoff AC valid
+ * @backoff_ac: Backoff AC
+ * @num_ul_user_resp_valid: Number of UL users response valid
+ * @num_ul_user_resp: Number of UL users response
  * @user: per-User stats (array of per-user structures)
  */
 struct cdp_tx_completion_ppdu {
@@ -2366,6 +2372,12 @@ struct cdp_tx_completion_ppdu {
 	uint8_t htt_seq_type;
 	uint8_t txmode_type;
 	uint8_t txmode;
+	uint32_t num_ul_users;
+	uint32_t ch_access_delay;
+	uint32_t backoff_ac_valid;
+	uint32_t backoff_ac;
+	uint32_t num_ul_user_resp_valid;
+	uint32_t num_ul_user_resp;
 	struct cdp_tx_completion_ppdu_user user[];
 };
 
