@@ -214,6 +214,7 @@ uint32_t dp_rx_process_be(struct dp_intr *int_ctx,
 	uint32_t peer_ext_stats;
 	uint32_t dsf;
 	uint32_t l3_pad;
+	uint8_t link_id = 0;
 
 	DP_HIST_INIT();
 
@@ -651,7 +652,8 @@ done:
 				DP_STATS_INC(vdev->pdev, rx_raw_pkts, 1);
 				DP_PEER_PER_PKT_STATS_INC_PKT(txrx_peer,
 							      rx.raw, 1,
-							      msdu_len);
+							      msdu_len,
+							      link_id);
 			} else {
 				DP_STATS_INC(soc, rx.err.scatter_msdu, 1);
 
@@ -677,7 +679,8 @@ done:
 		if (!dp_wds_rx_policy_check(rx_tlv_hdr, vdev, txrx_peer)) {
 			dp_rx_err("%pK: Policy Check Drop pkt", soc);
 			DP_PEER_PER_PKT_STATS_INC(txrx_peer,
-						  rx.policy_check_drop, 1);
+						  rx.policy_check_drop,
+						  1, link_id);
 			tid_stats->fail_cnt[POLICY_CHECK_DROP]++;
 			/* Drop & free packet */
 			dp_rx_nbuf_free(nbuf);
@@ -698,7 +701,7 @@ done:
 			if (!is_eapol) {
 				DP_PEER_PER_PKT_STATS_INC(txrx_peer,
 							  rx.peer_unauth_rx_pkt_drop,
-							  1);
+							  1, link_id);
 				dp_rx_nbuf_free(nbuf);
 				nbuf = next;
 				continue;
@@ -717,7 +720,8 @@ done:
 							    tid) == false) {
 					DP_PEER_PER_PKT_STATS_INC
 						(txrx_peer,
-						 rx.multipass_rx_pkt_drop, 1);
+						 rx.multipass_rx_pkt_drop,
+						 1, link_id);
 					dp_rx_nbuf_free(nbuf);
 					nbuf = next;
 					continue;
@@ -731,7 +735,7 @@ done:
 				tid_stats->fail_cnt[NAWDS_MCAST_DROP]++;
 				DP_PEER_PER_PKT_STATS_INC(txrx_peer,
 							  rx.nawds_mcast_drop,
-							  1);
+							  1, link_id);
 				dp_rx_nbuf_free(nbuf);
 				nbuf = next;
 				continue;
@@ -775,7 +779,7 @@ done:
 		}
 
 		dp_rx_msdu_stats_update(soc, nbuf, rx_tlv_hdr, txrx_peer,
-					reo_ring_num, tid_stats);
+					reo_ring_num, tid_stats, link_id);
 
 		if (qdf_likely(vdev->rx_decap_type ==
 			       htt_cmn_pkt_type_ethernet) &&
@@ -784,7 +788,9 @@ done:
 			if (dp_rx_check_ap_bridge(vdev))
 				if (dp_rx_intrabss_fwd_be(soc, txrx_peer,
 							  rx_tlv_hdr,
-							  nbuf)) {
+							  nbuf,
+							  msdu_metadata,
+							  link_id)) {
 					nbuf = next;
 					tid_stats->intrabss_cnt++;
 					continue; /* Get next desc */
@@ -811,7 +817,8 @@ done:
 		if (qdf_unlikely(txrx_peer->in_twt))
 			DP_PEER_PER_PKT_STATS_INC_PKT(txrx_peer,
 						      rx.to_stack_twt, 1,
-						      QDF_NBUF_CB_RX_PKT_LEN(nbuf));
+						      QDF_NBUF_CB_RX_PKT_LEN(nbuf),
+						      link_id);
 
 		tid_stats->delivered_to_stack++;
 		nbuf = next;
@@ -1121,7 +1128,8 @@ static inline bool dp_rx_mlo_igmp_wds_ext_handler(struct dp_txrx_peer *peer)
 bool dp_rx_mlo_igmp_handler(struct dp_soc *soc,
 			    struct dp_vdev *vdev,
 			    struct dp_txrx_peer *peer,
-			    qdf_nbuf_t nbuf)
+			    qdf_nbuf_t nbuf,
+			    uint8_t link_id)
 {
 	struct dp_vdev *mcast_primary_vdev = NULL;
 	struct dp_vdev_be *be_vdev = dp_get_be_vdev_from_dp_vdev(vdev);
@@ -1137,13 +1145,15 @@ bool dp_rx_mlo_igmp_handler(struct dp_soc *soc,
 	if (qdf_unlikely(vdev->multipass_en)) {
 		if (dp_rx_multipass_process(peer, nbuf, tid) == false) {
 			DP_PEER_PER_PKT_STATS_INC(peer,
-						  rx.multipass_rx_pkt_drop, 1);
+						  rx.multipass_rx_pkt_drop,
+						  1, link_id);
 			return false;
 		}
 	}
 
 	if (!peer->bss_peer) {
-		if (dp_rx_intrabss_mcbc_fwd(soc, peer, NULL, nbuf, tid_stats))
+		if (dp_rx_intrabss_mcbc_fwd(soc, peer, NULL, nbuf,
+					    tid_stats, link_id))
 			dp_rx_err("forwarding failed");
 	}
 
@@ -1204,7 +1214,8 @@ send_pkt:
 bool dp_rx_mlo_igmp_handler(struct dp_soc *soc,
 			    struct dp_vdev *vdev,
 			    struct dp_txrx_peer *peer,
-			    qdf_nbuf_t nbuf)
+			    qdf_nbuf_t nbuf,
+			    uint8_t link_id)
 {
 	return false;
 }
@@ -1577,7 +1588,8 @@ bool
 dp_rx_intrabss_mcast_handler_be(struct dp_soc *soc,
 				struct dp_txrx_peer *ta_txrx_peer,
 				qdf_nbuf_t nbuf_copy,
-				struct cdp_tid_rx_stats *tid_stats)
+				struct cdp_tid_rx_stats *tid_stats,
+				uint8_t link_id)
 {
 	if (qdf_unlikely(ta_txrx_peer->vdev->nawds_enabled)) {
 		struct cdp_tx_exception_metadata tx_exc_metadata = {0};
@@ -1593,13 +1605,13 @@ dp_rx_intrabss_mcast_handler_be(struct dp_soc *soc,
 					  &tx_exc_metadata)) {
 			DP_PEER_PER_PKT_STATS_INC_PKT(ta_txrx_peer,
 						      rx.intra_bss.fail, 1,
-						      len);
+						      len, link_id);
 			tid_stats->fail_cnt[INTRABSS_DROP]++;
 			qdf_nbuf_free(nbuf_copy);
 		} else {
 			DP_PEER_PER_PKT_STATS_INC_PKT(ta_txrx_peer,
 						      rx.intra_bss.pkts, 1,
-						      len);
+						      len, link_id);
 			tid_stats->intrabss_cnt++;
 		}
 		return true;
@@ -1613,7 +1625,9 @@ dp_rx_intrabss_mcast_handler_be(struct dp_soc *soc,
 }
 
 bool dp_rx_intrabss_fwd_be(struct dp_soc *soc, struct dp_txrx_peer *ta_peer,
-			   uint8_t *rx_tlv_hdr, qdf_nbuf_t nbuf)
+			   uint8_t *rx_tlv_hdr, qdf_nbuf_t nbuf,
+			   struct hal_rx_msdu_metadata msdu_metadata,
+			   uint8_t link_id)
 {
 	uint8_t tid = qdf_nbuf_get_tid_val(nbuf);
 	uint8_t ring_id = QDF_NBUF_CB_RX_CTX_ID(nbuf);
@@ -1633,7 +1647,7 @@ bool dp_rx_intrabss_fwd_be(struct dp_soc *soc, struct dp_txrx_peer *ta_peer,
 	 */
 	if (qdf_nbuf_is_da_mcbc(nbuf) && !ta_peer->bss_peer) {
 		return dp_rx_intrabss_mcbc_fwd(soc, ta_peer, rx_tlv_hdr,
-					       nbuf, tid_stats);
+					       nbuf, tid_stats, link_id);
 	}
 
 	if (dp_rx_intrabss_eapol_drop_check(soc, ta_peer, rx_tlv_hdr,
@@ -1646,7 +1660,8 @@ bool dp_rx_intrabss_fwd_be(struct dp_soc *soc, struct dp_txrx_peer *ta_peer,
 					  &msdu_metadata, &params)) {
 		ret = dp_rx_intrabss_ucast_fwd(params.dest_soc, ta_peer,
 					       params.tx_vdev_id,
-					       rx_tlv_hdr, nbuf, tid_stats);
+					       rx_tlv_hdr, nbuf, tid_stats,
+					       link_id);
 	}
 
 	return ret;

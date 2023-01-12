@@ -358,12 +358,13 @@ bool dp_rx_data_is_specific(hal_soc_handle_t hal_soc_hdl,
 #ifdef DP_RX_DISABLE_NDI_MDNS_FORWARDING
 static inline
 bool dp_rx_check_ndi_mdns_fwding(struct dp_txrx_peer *ta_txrx_peer,
-				 qdf_nbuf_t nbuf)
+				 qdf_nbuf_t nbuf, uint8_t link_id)
 {
 	if (ta_txrx_peer->vdev->opmode == wlan_op_mode_ndi &&
 	    qdf_nbuf_is_ipv6_mdns_pkt(nbuf)) {
 		DP_PEER_PER_PKT_STATS_INC(ta_txrx_peer,
-					  rx.intra_bss.mdns_no_fwd, 1);
+					  rx.intra_bss.mdns_no_fwd,
+					  1, link_id);
 		return false;
 	}
 	return true;
@@ -371,7 +372,7 @@ bool dp_rx_check_ndi_mdns_fwding(struct dp_txrx_peer *ta_txrx_peer,
 #else
 static inline
 bool dp_rx_check_ndi_mdns_fwding(struct dp_txrx_peer *ta_txrx_peer,
-				 qdf_nbuf_t nbuf)
+				 qdf_nbuf_t nbuf, uint8_t link_id)
 {
 	return true;
 }
@@ -1434,13 +1435,15 @@ bool dp_rx_intrabss_eapol_drop_check(struct dp_soc *soc,
  * @rx_tlv_hdr: start address of rx tlvs
  * @nbuf: nbuf that has to be intrabss forwarded
  * @tid_stats: tid stats pointer
+ * @link_id: link Id on which packet is received
  *
  * Return: bool: true if it is forwarded else false
  */
 bool dp_rx_intrabss_mcbc_fwd(struct dp_soc *soc,
 			     struct dp_txrx_peer *ta_peer,
 			     uint8_t *rx_tlv_hdr, qdf_nbuf_t nbuf,
-			     struct cdp_tid_rx_stats *tid_stats);
+			     struct cdp_tid_rx_stats *tid_stats,
+			     uint8_t link_id);
 
 /**
  * dp_rx_intrabss_ucast_fwd() - Does intrabss forward for unicast packets
@@ -1450,6 +1453,7 @@ bool dp_rx_intrabss_mcbc_fwd(struct dp_soc *soc,
  * @rx_tlv_hdr: start address of rx tlvs
  * @nbuf: nbuf that has to be intrabss forwarded
  * @tid_stats: tid stats pointer
+ * @link_id: link Id on which packet is received
  *
  * Return: bool: true if it is forwarded else false
  */
@@ -1457,7 +1461,8 @@ bool dp_rx_intrabss_ucast_fwd(struct dp_soc *soc,
 			      struct dp_txrx_peer *ta_peer,
 			      uint8_t tx_vdev_id,
 			      uint8_t *rx_tlv_hdr, qdf_nbuf_t nbuf,
-			      struct cdp_tid_rx_stats *tid_stats);
+			      struct cdp_tid_rx_stats *tid_stats,
+			      uint8_t link_id);
 
 /**
  * dp_rx_defrag_concat() - Concatenate the fragments
@@ -2143,6 +2148,7 @@ void dp_rx_fill_gro_info(struct dp_soc *soc, uint8_t *rx_tlv,
  * @txrx_peer: pointer to the txrx peer object.
  * @ring_id: reo dest ring number on which pkt is reaped.
  * @tid_stats: per tid rx stats.
+ * @link_id: link Id on which packet is received
  *
  * update all the per msdu stats for that nbuf.
  *
@@ -2152,7 +2158,8 @@ void dp_rx_msdu_stats_update(struct dp_soc *soc, qdf_nbuf_t nbuf,
 			     uint8_t *rx_tlv_hdr,
 			     struct dp_txrx_peer *txrx_peer,
 			     uint8_t ring_id,
-			     struct cdp_tid_rx_stats *tid_stats);
+			     struct cdp_tid_rx_stats *tid_stats,
+			     uint8_t link_id);
 
 /**
  * dp_rx_deliver_to_stack_no_peer() - try deliver rx data even if

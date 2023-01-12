@@ -515,7 +515,8 @@ static QDF_STATUS dp_txrx_set_vdev_param_li(struct dp_soc *soc,
 bool
 dp_rx_intrabss_handle_nawds_li(struct dp_soc *soc, struct dp_txrx_peer *ta_peer,
 			       qdf_nbuf_t nbuf_copy,
-			       struct cdp_tid_rx_stats *tid_stats)
+			       struct cdp_tid_rx_stats *tid_stats,
+			       uint8_t link_id)
 {
 	return false;
 }

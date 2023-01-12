@@ -47,13 +47,17 @@ struct dp_be_intrabss_params {
  * @ta_txrx_peer: source peer entry
  * @rx_tlv_hdr: start address of rx tlvs
  * @nbuf: nbuf that has to be intrabss forwarded
+ * @msdu_metadata: msdu metadata
+ * @link_id: link id on which the packet is received
  *
  * Return: true if it is forwarded else false
  */
 bool dp_rx_intrabss_fwd_be(struct dp_soc *soc,
 			   struct dp_txrx_peer *ta_txrx_peer,
 			   uint8_t *rx_tlv_hdr,
-			   qdf_nbuf_t nbuf);
+			   qdf_nbuf_t nbuf,
+			   struct hal_rx_msdu_metadata msdu_metadata,
+			   uint8_t link_id);
 #endif
 
 /**
@@ -62,6 +66,7 @@ bool dp_rx_intrabss_fwd_be(struct dp_soc *soc,
  * @ta_txrx_peer: source txrx_peer entry
  * @nbuf_copy: nbuf that has to be intrabss forwarded
  * @tid_stats: tid_stats structure
+ * @link_id: link id on which the packet is received
  *
  * Return: true if it is forwarded else false
  */
@@ -69,7 +74,8 @@ bool
 dp_rx_intrabss_mcast_handler_be(struct dp_soc *soc,
 				struct dp_txrx_peer *ta_txrx_peer,
 				qdf_nbuf_t nbuf_copy,
-				struct cdp_tid_rx_stats *tid_stats);
+				struct cdp_tid_rx_stats *tid_stats,
+				uint8_t link_id);
 
 void dp_rx_word_mask_subscribe_be(struct dp_soc *soc,
 				  uint32_t *msg_word,
@@ -281,13 +287,15 @@ dp_soc_get_num_soc_be(struct dp_soc *soc)
  * @vdev: DP vdev handle
  * @peer: DP peer handle
  * @nbuf: nbuf to be enqueued
+ * @link_id: link id on which the packet is received
  *
  * Return: true when packet sent to stack, false failure
  */
 bool dp_rx_mlo_igmp_handler(struct dp_soc *soc,
 			    struct dp_vdev *vdev,
 			    struct dp_txrx_peer *peer,
-			    qdf_nbuf_t nbuf);
+			    qdf_nbuf_t nbuf,
+			    uint8_t link_id);
 
 /**
  * dp_peer_rx_reorder_queue_setup_be() - Send reo queue setup wmi cmd to FW

@@ -2286,7 +2286,8 @@ struct dp_arch_ops {
 	(*dp_rx_intrabss_mcast_handler)(struct dp_soc *soc,
 					struct dp_txrx_peer *ta_txrx_peer,
 					qdf_nbuf_t nbuf_copy,
-					struct cdp_tid_rx_stats *tid_stats);
+					struct cdp_tid_rx_stats *tid_stats,
+					uint8_t link_id);
 
 	void (*dp_rx_word_mask_subscribe)(
 				struct dp_soc *soc,
@@ -2329,7 +2330,8 @@ struct dp_arch_ops {
 	void (*dp_tx_mcast_handler)(struct dp_soc *soc, struct dp_vdev *vdev,
 				    qdf_nbuf_t nbuf);
 	bool (*dp_rx_mcast_handler)(struct dp_soc *soc, struct dp_vdev *vdev,
-				    struct dp_txrx_peer *peer, qdf_nbuf_t nbuf);
+				    struct dp_txrx_peer *peer, qdf_nbuf_t nbuf,
+				    uint8_t link_id);
 	bool (*dp_tx_is_mcast_primary)(struct dp_soc *soc,
 				       struct dp_vdev *vdev);
 #endif
