@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2020, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  *
  * Permission to use, copy, modify, and/or distribute this software for any
@@ -315,10 +315,12 @@ wlan_reg_get_first_valid_freq(struct wlan_objmgr_pdev *pdev,
 			      in_6g_pwr_mode,
 			      qdf_freq_t *first_valid_freq,
 			      int bw,
-			      int sec_40_offset)
+			      int sec_40_offset,
+			      enum channel_enum start_chan,
+			      enum channel_enum end_chan)
 {
 	return reg_get_first_valid_freq(pdev, in_6g_pwr_mode, first_valid_freq,
-					bw, sec_40_offset);
+					bw, sec_40_offset, start_chan, end_chan);
 }
 
 bool wlan_reg_is_6g_domain_jp(struct wlan_objmgr_pdev *pdev)

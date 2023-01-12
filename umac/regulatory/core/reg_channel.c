@@ -1582,7 +1582,9 @@ reg_get_first_valid_freq(struct wlan_objmgr_pdev *pdev,
 			 enum supported_6g_pwr_types
 			 in_6g_pwr_mode,
 			 qdf_freq_t *first_valid_freq,
-			 int bw, int sec_40_offset)
+			 int bw, int sec_40_offset,
+			 enum channel_enum start_chan,
+			 enum channel_enum end_chan)
 {
 	struct wlan_regulatory_pdev_priv_obj *pdev_priv_obj;
 	struct regulatory_channel *cur_chan_list;
@@ -1601,7 +1603,7 @@ reg_get_first_valid_freq(struct wlan_objmgr_pdev *pdev,
 
 	cur_chan_list = pdev_priv_obj->cur_chan_list;
 
-	for (freq_idx = 0; freq_idx < NUM_CHANNELS; freq_idx++) {
+	for (freq_idx = start_chan; freq_idx <= end_chan; freq_idx++) {
 	    reg_get_first_valid_frequency(pdev_priv_obj, freq_idx,
 					  in_6g_pwr_mode,
 					  first_valid_freq, bw);
