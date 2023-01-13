@@ -2185,6 +2185,7 @@ static void mlo_process_link_remove(struct wlan_objmgr_vdev *vdev,
 	struct wlan_objmgr_peer *bss_peer = NULL;
 	uint16_t bcn_int = 0;
 	uint16_t tbtt_count = 0;
+	QDF_STATUS status;
 
 	vdev_mlme = wlan_vdev_mlme_get_cmpt_obj(vdev);
 	if (!vdev_mlme)
@@ -2206,6 +2207,14 @@ static void mlo_process_link_remove(struct wlan_objmgr_vdev *vdev,
 			wlan_peer_get_macaddr(bss_peer));
 	if (!bcn_int)
 		return;
+
+	if (vdev_mlme->ops &&
+	    vdev_mlme->ops->mlme_vdev_reconfig_notify) {
+		status = vdev_mlme->ops->mlme_vdev_reconfig_notify(
+				vdev_mlme, &tbtt_count, bcn_int);
+		if (QDF_IS_STATUS_ERROR(status))
+			return;
+	}
 
 	vdev_mlme->ml_reconfig_started = true;
 	qdf_timer_mod(&vdev_mlme->ml_reconfig_timer,
