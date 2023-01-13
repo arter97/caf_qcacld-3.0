@@ -1148,6 +1148,10 @@ static int dp_process_lmac_rings(struct dp_intr *int_ctx, int total_budget)
 	uint32_t work_done  = 0;
 	int budget = total_budget;
 	int ring = 0;
+	bool rx_refill_lt_disable;
+
+	rx_refill_lt_disable =
+		wlan_cfg_get_dp_soc_rxdma_refill_lt_disable(soc->wlan_cfg_ctx);
 
 	/* Process LMAC interrupts */
 	for  (ring = 0 ; ring < MAX_NUM_LMAC_HW; ring++) {
@@ -1208,7 +1212,10 @@ static int dp_process_lmac_rings(struct dp_intr *int_ctx, int total_budget)
 					&soc->rx_refill_buf_ring[pdev->lmac_id];
 
 			intr_stats->num_host2rxdma_ring_masks++;
-			dp_rx_buffers_lt_replenish_simple(soc, mac_for_pdev,
+
+			if (!rx_refill_lt_disable)
+				dp_rx_buffers_lt_replenish_simple(soc,
+							  mac_for_pdev,
 							  rx_refill_buf_ring,
 							  rx_desc_pool,
 							  0,
