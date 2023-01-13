@@ -3223,6 +3223,8 @@ static int __wlan_hdd_cfg80211_handle_tsf_cmd(struct wiphy *wiphy,
 	QDF_STATUS ret;
 	struct sk_buff *reply_skb;
 	uint32_t tsf_cmd;
+	enum qca_nl80211_vendor_subcmds_index index =
+		QCA_NL80211_VENDOR_SUBCMD_TSF_INDEX;
 
 	hdd_enter_dev(wdev->netdev);
 
@@ -3302,12 +3304,13 @@ static int __wlan_hdd_cfg80211_handle_tsf_cmd(struct wiphy *wiphy,
 		if (status != 0)
 			goto end;
 
-		reply_skb = cfg80211_vendor_event_alloc(hdd_ctx->wiphy, NULL,
-					sizeof(uint64_t) * 2 + NLMSG_HDRLEN,
-					QCA_NL80211_VENDOR_SUBCMD_TSF_INDEX,
-					GFP_KERNEL);
+		reply_skb =
+			wlan_cfg80211_vendor_event_alloc(hdd_ctx->wiphy, NULL,
+							 sizeof(uint64_t) * 2 +
+							 NLMSG_HDRLEN,
+							 index, GFP_KERNEL);
 		if (!reply_skb) {
-			hdd_err("cfg80211_vendor_cmd_alloc_reply_skb failed");
+			hdd_err("wlan_cfg80211_vendor_cmd_alloc_reply_skb failed");
 			status = -ENOMEM;
 			goto end;
 		}
@@ -3318,11 +3321,11 @@ static int __wlan_hdd_cfg80211_handle_tsf_cmd(struct wiphy *wiphy,
 				QCA_WLAN_VENDOR_ATTR_TSF_SOC_TIMER_VALUE,
 				tsf_op_resp.soc_time)) {
 			hdd_err("nla put fail");
-			kfree_skb(reply_skb);
+			wlan_cfg80211_vendor_free_skb(reply_skb);
 			status = -EINVAL;
 			goto end;
 		}
-		status = cfg80211_vendor_cmd_reply(reply_skb);
+		status = wlan_cfg80211_vendor_cmd_reply(reply_skb);
 	}
 
 end:

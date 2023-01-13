@@ -231,7 +231,7 @@ void dp_wait_complete_tasks(struct wlan_dp_psoc_context *dp_ctx)
 
 #ifdef CONFIG_DP_TRACE
 /**
- * dp_convert_string_to_u8_array() - used to convert string into u8 array
+ * dp_convert_string_to_array() - used to convert string into u8 array
  * @str: String to be converted
  * @array: Array where converted value is stored
  * @len: Length of the populated array
@@ -1646,7 +1646,7 @@ dp_direct_link_refill_ring_init(struct dp_direct_link_context *direct_link_ctx)
 /**
  * dp_direct_link_refill_ring_deinit() - De-initialize refill ring that would be
  *  used for Direct Link DP
- * @direct_link_ctx: DP Direct Link context
+ * @dlink_ctx: DP Direct Link context
  *
  * Return: None
  */

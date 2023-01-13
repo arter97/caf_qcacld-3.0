@@ -370,7 +370,7 @@ wma_set_tx_rx_aggr_size_per_ac(WMA_HANDLE wma_handle,
 			       wmi_vdev_custom_aggr_type_t aggr_type);
 
 /**
- * wma_set_sw_retry_threshold() - set sw retry threshold per vdev
+ * wma_set_vdev_sw_retry_th() - set sw retry threshold per vdev
  * @vdev_id: vdev id
  * @sw_retry_count: sw retry number
  * @retry_type: SW vdev retry type
@@ -396,18 +396,16 @@ QDF_STATUS wma_set_vdev_sw_retry_th(uint8_t vdev_id, uint8_t sw_retry_count,
 QDF_STATUS wma_set_sw_retry_threshold_per_ac
 	(WMA_HANDLE handle,
 	 uint8_t vdev_id, struct wlan_mlme_qos *qos_aggr);
+
 /**
  * wma_set_sw_retry_threshold() - set sw retry threshold for tx
- * @vdev_id: vdev
- * @retry: retry number
- * @param_id: aggregrate sw retry threshold param id
+ * @qos_aggr: pointer to wlan_mlme_qos
  *
  * This function sends WMI command to set the sw retry threshold for Tx.
  *
  * Return: QDF_STATUS.
  */
-QDF_STATUS wma_set_sw_retry_threshold(uint8_t vdev_id, uint32_t retry,
-				      uint32_t param_id);
+QDF_STATUS wma_set_sw_retry_threshold(struct wlan_mlme_qos *qos_aggr);
 
 /**
  * wma_get_sar_limit() - get SAR limits from the target
@@ -684,6 +682,45 @@ QDF_STATUS wma_sta_mlme_vdev_down_send(struct vdev_mlme_obj *vdev_mlme,
  *         fails due to any
  */
 QDF_STATUS wma_post_vdev_create_setup(struct wlan_objmgr_vdev *vdev);
+
+/**
+ * wma_vdev_create_set_param() - vdev_create_set_param
+ * @vdev: vdev obj
+ *
+ * This API is invoked after vdev is created to perform post
+ * vdev create operations i.e. creating peer and setting vdev params.
+ *
+ * Return: SUCCESS on successful post vdev operations, FAILURE, if it
+ *         fails due to any
+ */
+QDF_STATUS wma_vdev_create_set_param(struct wlan_objmgr_vdev *vdev);
+
+/**
+ * wma_send_multi_pdev_vdev_set_params - sends dev(vdev/pdev) set params
+ * @param_type: enum of type mlme_dev_setparam
+ * @dev_id: id of the perticular vdev/pdev
+ * @param: Array of structure dev_set_param with @n_params combined
+ * @n_params: number of params that are combined in @param
+ *
+ * Return: SUCCESS on successful post vdev operations, FAILURE, if it
+ *         fails due to any
+ */
+QDF_STATUS
+wma_send_multi_pdev_vdev_set_params(enum mlme_dev_setparam param_type,
+				    uint8_t dev_id,
+				    struct dev_set_param *param,
+				    uint8_t n_params);
+
+/**
+ * wma_validate_txrx_chain_mask - validates tx/rx chain mask set params
+ * @paramid: paramid of chainmask
+ * @paramvalue: param value
+ *
+ * Return: SUCCESS on successful post vdev operations, FAILURE, if it
+ *         fails due to any
+ */
+QDF_STATUS
+wma_validate_txrx_chain_mask(uint32_t paramid, uint32_t paramvalue);
 
 /**
  * wma_vdev_set_data_tx_callback() - Set dp vdev tx callback

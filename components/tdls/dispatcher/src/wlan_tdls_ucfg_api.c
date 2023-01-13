@@ -236,7 +236,8 @@ static QDF_STATUS tdls_object_init_params(
 
 #ifdef TDLS_WOW_ENABLED
 /**
- * tdls_wow_init(): Create/init wake lock for TDLS
+ * tdls_wow_init() - Create/init wake lock for TDLS
+ * @soc_obj: TDLS private soc object
  *
  * Create/init wake lock for TDLS if DVR isn't supported
  *
@@ -253,7 +254,8 @@ static void tdls_wow_init(struct tdls_soc_priv_obj *soc_obj)
 }
 
 /**
- * tdls_wow_deinit(): Destroy/deinit wake lock for TDLS
+ * tdls_wow_deinit() - Destroy/deinit wake lock for TDLS
+ * @soc_obj: TDLS private soc object
  *
  * Destroy/deinit wake lock for TDLS if DVR isn't supported
  *

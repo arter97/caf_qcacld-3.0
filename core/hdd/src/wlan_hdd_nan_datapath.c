@@ -623,11 +623,11 @@ int hdd_init_nan_data_mode(struct hdd_adapter *adapter)
 		hdd_err("Failed to get sifs burst value, use default");
 
 	ret_val = wma_cli_set_command((int)adapter->vdev_id,
-				      (int)WMI_PDEV_PARAM_BURST_ENABLE,
+				      (int)wmi_pdev_param_burst_enable,
 				      enable_sifs_burst,
 				      PDEV_CMD);
 	if (0 != ret_val)
-		hdd_err("WMI_PDEV_PARAM_BURST_ENABLE set failed %d", ret_val);
+		hdd_err("wmi_pdev_param_burst_enable set failed %d", ret_val);
 
 	/* RTS CTS PARAM  */
 	status = ucfg_fwol_get_rts_profile(hdd_ctx->psoc, &rts_profile);
@@ -635,7 +635,7 @@ int hdd_init_nan_data_mode(struct hdd_adapter *adapter)
 		hdd_err("FAILED TO GET RTSCTS Profile status:%d", status);
 
 	ret_val = sme_cli_set_command(adapter->vdev_id,
-				      WMI_VDEV_PARAM_ENABLE_RTSCTS, rts_profile,
+				      wmi_vdev_param_enable_rtscts, rts_profile,
 				      VDEV_CMD);
 	if (ret_val)
 		hdd_err("FAILED TO SET RTSCTS Profile ret:%d", ret_val);
@@ -659,18 +659,23 @@ error_init_txrx:
 	return ret_val;
 }
 
-int hdd_ndi_open(const char *iface_name, bool is_add_virtual_iface)
+/**
+ * hdd_is_max_ndi_count_reached() - Check the NDI max limit
+ * @hdd_ctx: Pointer to HDD context
+ *
+ * This function does not allow to create more than ndi_max_support
+ *
+ * Return: false if max value not reached otherwise true
+ */
+static bool hdd_is_max_ndi_count_reached(struct hdd_context *hdd_ctx)
 {
 	struct hdd_adapter *adapter, *next_adapter = NULL;
-	struct qdf_mac_addr random_ndi_mac;
-	struct hdd_context *hdd_ctx = cds_get_context(QDF_MODULE_ID_HDD);
 	uint8_t ndi_adapter_count = 0;
-	uint8_t *ndi_mac_addr;
-	struct hdd_adapter_create_param params = {0};
+	QDF_STATUS status;
+	uint32_t max_ndi;
 
-	hdd_enter();
 	if (!hdd_ctx)
-		return -EINVAL;
+		return true;
 
 	hdd_for_each_adapter_dev_held_safe(hdd_ctx, adapter, next_adapter,
 					   NET_DEV_HOLD_NDI_OPEN) {
@@ -678,11 +683,34 @@ int hdd_ndi_open(const char *iface_name, bool is_add_virtual_iface)
 			ndi_adapter_count++;
 		hdd_adapter_dev_put_debug(adapter, NET_DEV_HOLD_NDI_OPEN);
 	}
-	if (ndi_adapter_count >= MAX_NDI_ADAPTERS) {
-		hdd_err("Can't allow more than %d NDI adapters",
-			MAX_NDI_ADAPTERS);
-		return -EINVAL;
+
+	status = cfg_nan_get_max_ndi(hdd_ctx->psoc, &max_ndi);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		hdd_err(" Unable to fetch Max NDI");
+		return true;
 	}
+
+	if (ndi_adapter_count >= max_ndi) {
+		hdd_err("Can't allow more than %d NDI adapters",
+			max_ndi);
+		return true;
+	}
+
+	return false;
+}
+
+int hdd_ndi_open(const char *iface_name, bool is_add_virtual_iface)
+{
+	struct hdd_adapter *adapter;
+	struct qdf_mac_addr random_ndi_mac;
+	struct hdd_context *hdd_ctx = cds_get_context(QDF_MODULE_ID_HDD);
+	uint8_t *ndi_mac_addr;
+	struct hdd_adapter_create_param params = {0};
+
+	hdd_enter();
+
+	if (hdd_is_max_ndi_count_reached(hdd_ctx))
+		return -EINVAL;
 
 	params.is_add_virtual_iface = is_add_virtual_iface;
 
@@ -726,7 +754,7 @@ int hdd_ndi_set_mode(const char *iface_name)
 	uint8_t *ndi_mac_addr = NULL;
 
 	hdd_enter();
-	if (!hdd_ctx)
+	if (hdd_is_max_ndi_count_reached(hdd_ctx))
 		return -EINVAL;
 
 	adapter = hdd_get_adapter_by_iface_name(hdd_ctx, iface_name);
@@ -889,6 +917,12 @@ int hdd_ndi_delete(uint8_t vdev_id, const char *iface_name,
 	return ret;
 }
 
+#define MAX_VDEV_NDP_PARAMS 2
+/* params being sent:
+ * wmi_vdev_param_ndp_inactivity_timeout
+ * wmi_vdev_param_ndp_keepalive_timeout
+ */
+
 void hdd_ndi_drv_ndi_create_rsp_handler(uint8_t vdev_id,
 				struct nan_datapath_inf_create_rsp *ndi_rsp)
 {
@@ -900,6 +934,9 @@ void hdd_ndi_drv_ndi_create_rsp_handler(uint8_t vdev_id,
 	uint16_t ndp_keep_alive_period;
 	struct qdf_mac_addr bc_mac_addr = QDF_MAC_ADDR_BCAST_INIT;
 	struct wlan_objmgr_vdev *vdev;
+	struct dev_set_param setparam[MAX_VDEV_NDP_PARAMS] = {};
+	uint8_t index = 0;
+	QDF_STATUS status;
 
 	hdd_ctx = cds_get_context(QDF_MODULE_ID_HDD);
 	if (!hdd_ctx)
@@ -941,18 +978,35 @@ void hdd_ndi_drv_ndi_create_rsp_handler(uint8_t vdev_id,
 		if (QDF_IS_STATUS_ERROR(cfg_nan_get_ndp_inactivity_timeout(
 		    hdd_ctx->psoc, &ndp_inactivity_timeout)))
 			hdd_err("Failed to fetch inactivity timeout value");
-
-		sme_cli_set_command(adapter->vdev_id,
-				    WMI_VDEV_PARAM_NDP_INACTIVITY_TIMEOUT,
-				    ndp_inactivity_timeout, VDEV_CMD);
+		status = mlme_check_index_setparam(
+					setparam,
+					wmi_vdev_param_ndp_inactivity_timeout,
+					ndp_inactivity_timeout, index++,
+					MAX_VDEV_NDP_PARAMS);
+		if (QDF_IS_STATUS_ERROR(status)) {
+			hdd_err("failed at wmi_vdev_param_ndp_inactivity_timeout");
+			goto error;
+		}
 
 		if (QDF_IS_STATUS_SUCCESS(cfg_nan_get_ndp_keepalive_period(
 						hdd_ctx->psoc,
-						&ndp_keep_alive_period)))
-			sme_cli_set_command(
-				adapter->vdev_id,
-				WMI_VDEV_PARAM_NDP_KEEPALIVE_TIMEOUT,
-				ndp_keep_alive_period, VDEV_CMD);
+						&ndp_keep_alive_period))) {
+			status = mlme_check_index_setparam(
+					setparam,
+					wmi_vdev_param_ndp_keepalive_timeout,
+					ndp_keep_alive_period, index++,
+					MAX_VDEV_NDP_PARAMS);
+			if (QDF_IS_STATUS_ERROR(status)) {
+				hdd_err("failed at wmi_vdev_param_ndp_keepalive_timeout");
+				goto error;
+			}
+		}
+		status = sme_send_multi_pdev_vdev_set_params(MLME_VDEV_SETPARAM,
+							     adapter->vdev_id,
+							     setparam,
+							     index);
+		if (QDF_IS_STATUS_ERROR(status))
+			hdd_err("failed to send vdev set params");
 	} else {
 		hdd_alert("NDI interface creation failed with reason %d",
 			ndi_rsp->reason /* create_reason */);
@@ -963,6 +1017,7 @@ void hdd_ndi_drv_ndi_create_rsp_handler(uint8_t vdev_id,
 	hdd_roam_register_sta(adapter, &roam_info->bssid,
 			      roam_info->fAuthRequired);
 
+error:
 	qdf_mem_free(roam_info);
 }
 

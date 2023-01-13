@@ -89,7 +89,7 @@ enum nan_disc_state {
  * @max_ndi: max number of ndi host supports
  * @nan_feature_config: Bitmap to enable/disable a particular NAN feature
  *                      configuration in firmware. It's sent to firmware through
- *                      WMI_VDEV_PARAM_ENABLE_DISABLE_NAN_CONFIG_FEATURES
+ *                      wmi_vdev_param_enable_disable_nan_config_features
  * @disable_6g_nan: Disable NAN in 6GHz frequency band
  */
 struct nan_cfg_params {

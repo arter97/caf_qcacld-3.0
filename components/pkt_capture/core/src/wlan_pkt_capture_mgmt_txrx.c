@@ -57,11 +57,13 @@ pkt_capture_mgmt_status_map(uint8_t status)
  * pkt_capture_mgmtpkt_cb() - callback to process management packets
  * for pkt capture mode
  * @context: vdev handler
+ * @ppdev: unused param
  * @nbuf_list: netbuf list
  * @vdev_id: vdev id for which packet is captured
  * @tid:  tid number
  * @ch_freq: channel frequency
  * @pkt_format: Frame format
+ * @bssid:
  * @tx_retry_cnt: tx retry count
  *
  * Return: none
@@ -622,9 +624,12 @@ pkt_capture_is_beacon_forward_enable(struct wlan_objmgr_vdev *vdev,
 #endif
 
 /**
- * process_pktcapture_mgmt_rx_data_cb() -  process management rx packets
- * @rx_params: mgmt rx event params
+ * pkt_capture_mgmt_rx_data_cb() -  process management rx packets
+ * @psoc: psoc object
+ * @peer: Peer object
  * @wbuf: netbuf
+ * @rx_params: mgmt rx event params
+ * @frm_type: frame type
  *
  * Return: none
  */

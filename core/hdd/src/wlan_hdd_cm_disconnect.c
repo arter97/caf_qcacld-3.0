@@ -206,7 +206,7 @@ void __hdd_cm_disconnect_handler_post_user_update(struct hdd_adapter *adapter,
 	ucfg_dp_remove_conn_info(vdev);
 
 	/* Setting the RTS profile to original value */
-	if (sme_cli_set_command(adapter->vdev_id, WMI_VDEV_PARAM_ENABLE_RTSCTS,
+	if (sme_cli_set_command(adapter->vdev_id, wmi_vdev_param_enable_rtscts,
 				cfg_get(hdd_ctx->psoc,
 					CFG_ENABLE_FW_RTS_PROFILE),
 				VDEV_CMD))

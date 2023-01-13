@@ -194,7 +194,7 @@ wlan_cm_tgt_send_roam_vendor_handoff_config(struct wlan_objmgr_psoc *psoc,
 #define CFG_DISABLE_4WAY_HS_OFFLOAD_DEFAULT BIT(0)
 
 /**
- * wlan_cm_tgt_send_roam_offload_init()  - Send WMI_VDEV_PARAM_ROAM_FW_OFFLOAD
+ * wlan_cm_tgt_send_roam_offload_init()  - Send wmi_vdev_param_roam_fw_offload
  * to init/deinit roaming module at firmware
  * @psoc: PSOC pointer
  * @vdev_id: vdev id
