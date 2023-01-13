@@ -84,7 +84,7 @@ void mlo_peer_setup_failed_notify(struct wlan_objmgr_vdev *vdev);
  * mlo_peer_disconnect_notify - Notify MLO manager that peer has disconnected
  * and to clean up by deleting partner peers
  *
- * @vdev: pointer to vdev
+ * @peer: pointer to peer context
  *
  * Return: none
  */
@@ -184,7 +184,7 @@ bool wlan_mlo_peer_is_assoc_peer(struct wlan_mlo_peer_context *ml_peer,
 
 /**
  * wlan_mlo_partner_peer_assoc_post() - Notify partner peer assoc
- * @peer: Link peer
+ * @assoc_peer: Link peer
  *
  * This function notifies link peers to send peer assoc command to FW
  *
@@ -220,7 +220,7 @@ void wlan_mlo_partner_peer_create_failed_notify(
 
 /**
  * wlan_mlo_partner_peer_disconnect_notify() - Notify peer disconnect
- * @peer: Link peer
+ * @src_peer: Link peer
  *
  * This function notifies about disconnect is being initilated on link peer
  *
@@ -314,7 +314,7 @@ QDF_STATUS wlan_mlo_link_peer_delete(struct wlan_objmgr_peer *peer);
 
 /**
  * mlo_peer_get_link_peer_assoc_req_buf() - API to get link assoc req buffer
- * @peer: Object manager peer
+ * @ml_peer: Object manager peer
  * @link_ix: link id of vdev
  *
  * Return: assoc req buffer
@@ -384,8 +384,8 @@ uint8_t wlan_mlo_peer_get_primary_peer_link_id(struct wlan_objmgr_peer *peer);
 void wlan_mlo_peer_get_partner_links_info(struct wlan_objmgr_peer *peer,
 					  struct mlo_partner_info *ml_links);
 
-/**
- ** APIs to operations on ML peer object
+/*
+ * APIs to operations on ML peer object
  */
 typedef QDF_STATUS (*wlan_mlo_op_handler)(struct wlan_mlo_dev_context *ml_dev,
 				    void *ml_peer,
@@ -437,7 +437,7 @@ struct wlan_mlo_peer_context *wlan_mlo_get_mlpeer_by_mld_mac(
 /**
  * wlan_mlo_get_mlpeer_by_aid() - find ML peer by AID
  * @ml_dev: MLO DEV object
- * @aid:  AID
+ * @assoc_id:  AID
  *
  * API to get ML peer using AID
  *

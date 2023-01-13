@@ -41,7 +41,7 @@ QDF_STATUS mlo_connect(struct wlan_objmgr_vdev *vdev,
  * mlo_sta_link_connect_notify - Called by connection manager to notify the
  * STA link connect is complete
  * @vdev: pointer to vdev
- * @mlo_ie: MLO information element
+ * @rsp: MLO connect response
  *
  * Connection manager will notify the MLO manager when the link has started
  * and MLO manager will start the subsequent connections, if necessary
@@ -154,7 +154,7 @@ void ucfg_mlo_mld_clear_mlo_cap(struct wlan_objmgr_vdev *vdev);
 
 /**
  * ucfg_mlo_get_assoc_link_vdev - API to get assoc link vdev
- * @mlo_dev_ctx: mlo dev ctx
+ * @vdev: vdev object
  *
  * Return: MLD assoc link vdev
  */
@@ -163,7 +163,7 @@ ucfg_mlo_get_assoc_link_vdev(struct wlan_objmgr_vdev *vdev);
 
 /**
  * wlan_mlo_get_assoc_link_vdev - API to get assoc link vdev
- * @mlo_dev_ctx: mlo dev ctx
+ * @vdev: vdev object
  *
  * Return: MLD assoc link vdev
  */
@@ -179,10 +179,10 @@ wlan_mlo_get_assoc_link_vdev(struct wlan_objmgr_vdev *vdev);
  */
 void
 mlo_update_connected_links_bmap(struct wlan_mlo_dev_context *mlo_dev_ctx,
-				struct mlo_partner_info ml_parnter_info);
+				struct mlo_partner_info ml_partner_info);
 
 /**
- * mlo_clear_connected_links: clear connected links bitmap
+ * mlo_clear_connected_links_bmap() - clear connected links bitmap
  * @vdev: vdev object
  *
  * Return: none
@@ -230,7 +230,9 @@ void mlo_init_cu_bpcc(struct wlan_mlo_dev_context *mlo_dev_ctx,
 void mlo_clear_cu_bpcc(struct wlan_objmgr_vdev *vdev);
 
 /**
- * API to have operation on ml vdevs
+ * typedef mlo_vdev_op_handler() - API to have operation on ml vdevs
+ * @vdev: vdev object
+ * @arg: operation-specific argument
  */
 typedef void (*mlo_vdev_op_handler)(struct wlan_objmgr_vdev *vdev,
 				    void *arg);
@@ -273,7 +275,7 @@ void mlo_iterate_connected_vdev_list(struct wlan_objmgr_vdev *vdev,
  * call_handler_for_standalone_ap: Iterate on all standalone ML vdevs in
  * ML AP context and call handler only for standalone AP
  *
- * @vdev: vdev object
+ * @ap_dev_ctx: AP vdev context
  * @handler: the handler will be called for each object in ML list
  * @arg: argument to be passed to handler
  *
@@ -298,7 +300,7 @@ call_handler_for_standalone_ap(struct wlan_mlo_dev_context *ap_dev_ctx,
 	}
 }
 
-/*
+/**
  * mlo_iterate_ml_standalone_vdev_list: Iterate on all standalone ML vdevs in
  * ML link
  *
@@ -422,7 +424,7 @@ mlo_is_vdev_connect_req_link(struct wlan_objmgr_vdev *vdev)
 }
 
 /**
- * mlo_clear_connect_req_links: clear connect req links bitmap
+ * mlo_clear_connect_req_links_bmap() - clear connect req links bitmap
  * @vdev: vdev object
  *
  * Return: none

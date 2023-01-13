@@ -175,7 +175,7 @@ QDF_STATUS mlo_mlme_validate_conn_req(struct wlan_objmgr_vdev *vdev,
 				      void *ext_data);
 
 /**
- * mlo_mlme_ext_create_link_vdev() - Create link vdev for ML STA
+ * mlo_mlme_create_link_vdev() - Create link vdev for ML STA
  * @vdev: Object manager vdev
  * @ext_data: Data object to be passed to callback
  *
@@ -252,7 +252,7 @@ void mlo_mlme_peer_deauth(struct wlan_objmgr_peer *peer, uint8_t is_disassoc);
 #ifdef UMAC_MLO_AUTH_DEFER
 /**
  * mlo_mlme_peer_process_auth() - Process deferred auth request
- * @auth_params: deferred auth params
+ * @auth_param: deferred auth params
  *
  * Return: void
  */
@@ -266,7 +266,7 @@ mlo_mlme_peer_process_auth(struct mlpeer_auth_params *auth_param)
 
 /**
  * mlo_get_link_vdev_ix() - Get index of link VDEV in MLD
- * @ml_dev: ML device context
+ * @mldev: ML device context
  * @vdev: VDEV object
  *
  * Return: link index
@@ -371,7 +371,7 @@ struct hw_link_id_iterator {
 };
 
 /**
- * wlan_objmgr_get_pdev_by_hw_link_id() - Get pdev object from hw_link_id
+ * wlan_mlo_get_pdev_by_hw_link_id() - Get pdev object from hw_link_id
  * @hw_link_id: HW link id of the pdev
  * @ml_grp_id: MLO Group id which it belongs to
  * @refdbgid: dbgid of module used for taking reference to pdev object
@@ -449,8 +449,10 @@ mlo_process_link_set_active_resp(struct wlan_objmgr_psoc *psoc,
  */
 QDF_STATUS mlo_ser_set_link_req(struct mlo_link_set_active_req *req);
 
-/*
- * API to have operation on ml vdevs
+/**
+ * typedef mlo_vdev_ops_handler() - API to have operation on ml vdevs
+ * @vdev: vdev object
+ * @arg: operation-specific argument
  */
 typedef void (*mlo_vdev_ops_handler)(struct wlan_objmgr_vdev *vdev,
 				     void *arg);

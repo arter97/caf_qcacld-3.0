@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -435,13 +435,13 @@ uint16_t wlan_mlme_get_aid_count(struct wlan_objmgr_vdev *vdev);
  * This function allocates MLO peer ID
  *
  * Return: mlo_peer_id on success,
-	 MLO_INVALID_PEER_ID on failure
+ *	 MLO_INVALID_PEER_ID on failure
  */
 uint16_t mlo_ap_ml_peerid_alloc(void);
 
 /**
  * mlo_ap_ml_peerid_free() - public API to free MLO peer id
- * @ml_peer_id: ML peer id
+ * @mlo_peer_id: ML peer id
  *
  * This function frees MLO peer ID
  *
@@ -467,7 +467,7 @@ void mlo_peer_assign_primary_umac(
  * mlo_peer_allocate_primary_umac() - Allocate Primary UMAC
  * @ml_dev: MLO DEV context
  * @ml_peer: MLO peer object
- * @link_vdev: link vdev array
+ * @link_vdevs: link vdev array
  *
  * This function allocates primary UMAC for a MLO peer
  *
