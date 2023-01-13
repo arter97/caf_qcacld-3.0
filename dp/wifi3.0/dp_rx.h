@@ -131,6 +131,7 @@ struct dp_rx_desc_dbg_info {
  *			steering
  * @chip_id:		chip_id indicating MLO chip_id
  *			valid or used only in case of multi-chip MLO
+ * @reuse_nbuf:		VA of the "skb" which is being reused
  * @magic:
  * @nbuf_data_addr:	VA of nbuf data posted
  * @dbg_info:
@@ -138,9 +139,14 @@ struct dp_rx_desc_dbg_info {
  * @unmapped:		used to mark rx_desc an unmapped if the corresponding
  *			nbuf is already unmapped
  * @in_err_state:	Nbuf sanity failed for this descriptor.
+ * @has_reuse_nbuf:	the nbuf associated with this desc is also saved in
+ *			reuse_nbuf field
  */
 struct dp_rx_desc {
 	qdf_nbuf_t nbuf;
+#ifdef WLAN_SUPPORT_PPEDS
+	qdf_nbuf_t reuse_nbuf;
+#endif
 	uint8_t *rx_buf_start;
 	qdf_dma_addr_t paddr_buf_start;
 	uint32_t cookie;
@@ -153,7 +159,8 @@ struct dp_rx_desc {
 #endif
 	uint8_t	in_use:1,
 		unmapped:1,
-		in_err_state:1;
+		in_err_state:1,
+		has_reuse_nbuf:1;
 };
 
 #ifndef QCA_HOST_MODE_WIFI_DISABLED
@@ -208,6 +215,9 @@ struct dp_rx_desc {
 
 #define dp_rx_add_to_free_desc_list(head, tail, new) \
 	__dp_rx_add_to_free_desc_list(head, tail, new, __func__)
+
+#define dp_rx_add_to_free_desc_list_reuse(head, tail, new) \
+	__dp_rx_add_to_free_desc_list_reuse(head, tail, new, __func__)
 
 #define dp_rx_buffers_replenish(soc, mac_id, rxdma_srng, rx_desc_pool, \
 				num_buffers, desc_list, tail, req_only) \
@@ -1711,6 +1721,33 @@ __dp_rx_buffers_no_map_replenish(struct dp_soc *dp_soc, uint32_t mac_id,
 				 union dp_rx_desc_list_elem_t **tail);
 
 /**
+ * __dp_rx_comp2refill_replenish() - replenish rxdma ring with rx nbufs
+ *					use direct APIs to get invalidate
+ *					and get the physical address of the
+ *					nbuf instead of map api,called during
+ *					dp rx initialization and at the end
+ *					of dp_rx_process.
+ *
+ * @dp_soc: core txrx main context
+ * @mac_id: mac_id which is one of 3 mac_ids
+ * @dp_rxdma_srng: dp rxdma circular ring
+ * @rx_desc_pool: Pointer to free Rx descriptor pool
+ * @num_req_buffers: number of buffer to be replenished
+ * @desc_list: list of descs if called from dp_rx_process
+ *	       or NULL during dp rx initialization or out of buffer
+ *	       interrupt.
+ * @tail: tail of descs list
+ * Return: return success or failure
+ */
+QDF_STATUS
+__dp_rx_comp2refill_replenish(struct dp_soc *dp_soc, uint32_t mac_id,
+			      struct dp_srng *dp_rxdma_srng,
+			      struct rx_desc_pool *rx_desc_pool,
+			      uint32_t num_req_buffers,
+			      union dp_rx_desc_list_elem_t **desc_list,
+			      union dp_rx_desc_list_elem_t **tail);
+
+/**
  * __dp_rx_buffers_no_map_lt_replenish() - replenish rxdma ring with rx nbufs
  *					use direct APIs to get invalidate
  *					and get the physical address of the
@@ -1825,6 +1862,58 @@ void dp_rx_compute_tid_delay(struct cdp_delay_tid_stats *stats,
 			     qdf_nbuf_t nbuf);
 #endif /* QCA_PEER_EXT_STATS */
 
+#ifdef WLAN_SUPPORT_PPEDS
+static inline
+void dp_rx_set_reuse_nbuf(struct dp_rx_desc *rx_desc, qdf_nbuf_t nbuf)
+{
+	rx_desc->reuse_nbuf = nbuf;
+	rx_desc->has_reuse_nbuf = true;
+}
+
+/**
+ * __dp_rx_add_to_free_desc_list_reuse() - Adds to a local free descriptor list
+ *					   this list will reused
+ *
+ * @head: pointer to the head of local free list
+ * @tail: pointer to the tail of local free list
+ * @new: new descriptor that is added to the free list
+ * @func_name: caller func name
+ *
+ * Return: void:
+ */
+static inline
+void __dp_rx_add_to_free_desc_list_reuse(union dp_rx_desc_list_elem_t **head,
+					 union dp_rx_desc_list_elem_t **tail,
+					 struct dp_rx_desc *new,
+					 const char *func_name)
+{
+	qdf_assert(head && new);
+
+	dp_rx_desc_update_dbg_info(new, func_name, RX_DESC_IN_FREELIST);
+
+	new->nbuf = NULL;
+
+	((union dp_rx_desc_list_elem_t *)new)->next = *head;
+	*head = (union dp_rx_desc_list_elem_t *)new;
+	/* reset tail if head->next is NULL */
+	if (!*tail || !(*head)->next)
+		*tail = *head;
+}
+#else
+static inline
+void dp_rx_set_reuse_nbuf(struct dp_rx_desc *rx_desc, qdf_nbuf_t nbuf)
+{
+}
+
+static inline
+void __dp_rx_add_to_free_desc_list_reuse(union dp_rx_desc_list_elem_t **head,
+					 union dp_rx_desc_list_elem_t **tail,
+					 struct dp_rx_desc *new,
+					 const char *func_name)
+{
+}
+#endif
+
 #ifdef RX_DESC_DEBUG_CHECK
 /**
  * dp_rx_desc_check_magic() - check the magic value in dp_rx_desc
@@ -1858,6 +1947,8 @@ void dp_rx_desc_prep(struct dp_rx_desc *rx_desc,
 	rx_desc->nbuf = (nbuf_frag_info_t->virt_addr).nbuf;
 	rx_desc->unmapped = 0;
 	rx_desc->nbuf_data_addr = (uint8_t *)qdf_nbuf_data(rx_desc->nbuf);
+	dp_rx_set_reuse_nbuf(rx_desc, rx_desc->nbuf);
+	rx_desc->paddr_buf_start = nbuf_frag_info_t->paddr;
 }
 
 /**
@@ -1913,6 +2004,8 @@ void dp_rx_desc_prep(struct dp_rx_desc *rx_desc,
 		     struct dp_rx_nbuf_frag_info *nbuf_frag_info_t)
 {
 	rx_desc->nbuf = (nbuf_frag_info_t->virt_addr).nbuf;
+	dp_rx_set_reuse_nbuf(rx_desc, rx_desc->nbuf);
+	rx_desc->paddr_buf_start = nbuf_frag_info_t->paddr;
 	rx_desc->unmapped = 0;
 }
 
@@ -2437,6 +2530,18 @@ void dp_rx_buffers_replenish_simple(struct dp_soc *soc, uint32_t mac_id,
 }
 
 static inline
+void dp_rx_comp2refill_replenish(struct dp_soc *soc, uint32_t mac_id,
+				 struct dp_srng *rxdma_srng,
+				 struct rx_desc_pool *rx_desc_pool,
+				 uint32_t num_req_buffers,
+				 union dp_rx_desc_list_elem_t **desc_list,
+				 union dp_rx_desc_list_elem_t **tail)
+{
+	__dp_rx_comp2refill_replenish(soc, mac_id, rxdma_srng, rx_desc_pool,
+				      num_req_buffers, desc_list, tail);
+}
+
+static inline
 void dp_rx_buffers_lt_replenish_simple(struct dp_soc *soc, uint32_t mac_id,
 				       struct dp_srng *rxdma_srng,
 				       struct rx_desc_pool *rx_desc_pool,
@@ -2466,10 +2571,8 @@ qdf_dma_addr_t dp_rx_nbuf_sync_no_dsb(struct dp_soc *dp_soc,
 				      qdf_nbuf_t nbuf,
 				      uint32_t buf_size)
 {
-	if (nbuf->recycled_for_ds) {
-		nbuf->recycled_for_ds = 0;
+	if (nbuf->recycled_for_ds)
 		return (qdf_dma_addr_t)qdf_mem_virt_to_phys(nbuf->data);
-	}
 
 	if (unlikely(!nbuf->fast_recycled)) {
 		qdf_nbuf_dma_inv_range_no_dsb((void *)nbuf->data,
@@ -2491,6 +2594,7 @@ qdf_dma_addr_t dp_rx_nbuf_sync_no_dsb(struct dp_soc *dp_soc,
 	}
 
 	nbuf->fast_recycled = 0;
+
 	return (qdf_dma_addr_t)qdf_mem_virt_to_phys(nbuf->data);
 }
 #endif

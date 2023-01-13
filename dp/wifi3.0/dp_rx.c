@@ -458,7 +458,9 @@ __dp_rx_buffers_no_map_lt_replenish(struct dp_soc *soc, uint32_t mac_id,
 		qdf_assert_always(rxdma_ring_entry);
 
 		desc_list->rx_desc.nbuf = nbuf;
+		dp_rx_set_reuse_nbuf(&desc_list->rx_desc, nbuf);
 		desc_list->rx_desc.rx_buf_start = nbuf->data;
+		desc_list->rx_desc.paddr_buf_start = paddr;
 		desc_list->rx_desc.unmapped = 0;
 
 		/* rx_desc.in_use should be zero at this time*/
@@ -560,7 +562,9 @@ __dp_rx_buffers_no_map_replenish(struct dp_soc *soc, uint32_t mac_id,
 			break;
 
 		(*desc_list)->rx_desc.nbuf = nbuf;
+		dp_rx_set_reuse_nbuf(&(*desc_list)->rx_desc, nbuf);
 		(*desc_list)->rx_desc.rx_buf_start = nbuf->data;
+		(*desc_list)->rx_desc.paddr_buf_start = QDF_NBUF_CB_PADDR(nbuf);
 		(*desc_list)->rx_desc.unmapped = 0;
 
 		/* rx_desc.in_use should be zero at this time*/
@@ -599,6 +603,99 @@ __dp_rx_buffers_no_map_replenish(struct dp_soc *soc, uint32_t mac_id,
 
 	return QDF_STATUS_SUCCESS;
 }
+
+#ifdef WLAN_SUPPORT_PPEDS
+QDF_STATUS
+__dp_rx_comp2refill_replenish(struct dp_soc *soc, uint32_t mac_id,
+			      struct dp_srng *dp_rxdma_srng,
+			      struct rx_desc_pool *rx_desc_pool,
+			      uint32_t num_req_buffers,
+			      union dp_rx_desc_list_elem_t **desc_list,
+			      union dp_rx_desc_list_elem_t **tail)
+{
+	struct dp_pdev *dp_pdev = dp_get_pdev_for_lmac_id(soc, mac_id);
+	uint32_t count;
+	void *rxdma_ring_entry;
+	union dp_rx_desc_list_elem_t *next;
+	union dp_rx_desc_list_elem_t *cur;
+	void *rxdma_srng;
+	qdf_nbuf_t nbuf;
+
+	rxdma_srng = dp_rxdma_srng->hal_srng;
+
+	if (qdf_unlikely(!dp_pdev)) {
+		dp_rx_err("%pK: pdev is null for mac_id = %d",
+			  soc, mac_id);
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	if (qdf_unlikely(!rxdma_srng)) {
+		dp_rx_debug("%pK: rxdma srng not initialized", soc);
+		DP_STATS_INC(dp_pdev, replenish.rxdma_err, num_req_buffers);
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	hal_srng_access_start(soc->hal_soc, rxdma_srng);
+
+	for (count = 0; count < num_req_buffers; count++) {
+		next = (*desc_list)->next;
+		qdf_prefetch(next);
+
+		rxdma_ring_entry = (struct dp_buffer_addr_info *)
+			hal_srng_src_get_next(soc->hal_soc, rxdma_srng);
+
+		if (!rxdma_ring_entry)
+			break;
+
+		(*desc_list)->rx_desc.in_use = 1;
+		(*desc_list)->rx_desc.in_err_state = 0;
+		(*desc_list)->rx_desc.nbuf = (*desc_list)->rx_desc.reuse_nbuf;
+
+		hal_rxdma_buff_addr_info_set(soc->hal_soc, rxdma_ring_entry,
+				     (*desc_list)->rx_desc.paddr_buf_start,
+				     (*desc_list)->rx_desc.cookie,
+				     rx_desc_pool->owner);
+
+		*desc_list = next;
+	}
+	hal_srng_access_end(soc->hal_soc, rxdma_srng);
+
+	/* No need to count the number of bytes received during replenish.
+	 * Therefore set replenish.pkts.bytes as 0.
+	 */
+	DP_STATS_INC_PKT(dp_pdev, replenish.pkts, count, 0);
+	DP_STATS_INC(dp_pdev, buf_freelist, (num_req_buffers - count));
+
+	/*
+	 * add any available free desc back to the free list
+	 */
+	cur = *desc_list;
+	for ( ; count < num_req_buffers; count++) {
+		next = cur->next;
+		qdf_prefetch(next);
+
+		nbuf = cur->rx_desc.reuse_nbuf;
+
+		cur->rx_desc.nbuf = NULL;
+		cur->rx_desc.in_use = 0;
+		cur->rx_desc.has_reuse_nbuf = false;
+		cur->rx_desc.reuse_nbuf = NULL;
+		if (!nbuf->recycled_for_ds)
+			dp_rx_nbuf_unmap_pool(soc, rx_desc_pool, nbuf);
+
+		nbuf->recycled_for_ds = 0;
+		nbuf->fast_recycled = 0;
+		qdf_nbuf_free(nbuf);
+		cur = next;
+	}
+
+	if (*desc_list)
+		dp_rx_add_desc_list_to_free_list(soc, desc_list, tail,
+						 mac_id, rx_desc_pool);
+
+	return QDF_STATUS_SUCCESS;
+}
+#endif
 
 QDF_STATUS __dp_pdev_rx_buffers_no_map_attach(struct dp_soc *soc,
 					      uint32_t mac_id,
@@ -665,7 +762,9 @@ QDF_STATUS __dp_pdev_rx_buffers_no_map_attach(struct dp_soc *soc,
 		qdf_assert_always(rxdma_ring_entry);
 
 		desc_list->rx_desc.nbuf = nbuf;
+		dp_rx_set_reuse_nbuf(&desc_list->rx_desc, nbuf);
 		desc_list->rx_desc.rx_buf_start = nbuf->data;
+		desc_list->rx_desc.paddr_buf_start = paddr;
 		desc_list->rx_desc.unmapped = 0;
 
 		/* rx_desc.in_use should be zero at this time*/
