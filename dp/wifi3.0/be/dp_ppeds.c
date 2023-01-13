@@ -1105,23 +1105,26 @@ static void dp_ppeds_release_rx_desc(ppe_ds_wlan_handle_t *ppeds_handle,
 	struct dp_soc *replenish_soc;
 	uint32_t i, mac_id;
 	uint8_t chip_id;
-	qdf_nbuf_queue_head_t h;
 
-	qdf_nbuf_queue_head_init(&h);
 	for (i = 0; i < count; i++) {
+		if ((i + 1) != count)
+			qdf_prefetch((struct dp_rx_desc *)arr[i + 1].cookie);
+
 		rx_desc = (struct dp_rx_desc *)arr[i].cookie;
 		if (rx_desc == NULL) {
 			dp_err("Rx descriptor is NULL\n");
 			continue;
 		}
+
 		rx_bufs_reaped[rx_desc->chip_id][rx_desc->pool_id]++;
 
-		qdf_nbuf_dev_queue_head(&h, rx_desc->nbuf);
+		dp_rx_add_to_free_desc_list_reuse(&head[rx_desc->chip_id][rx_desc->pool_id],
+						  &tail[rx_desc->chip_id][rx_desc->pool_id],
+						  rx_desc);
 
-		dp_rx_add_to_free_desc_list(&head[rx_desc->chip_id][rx_desc->pool_id],
-				&tail[rx_desc->chip_id][rx_desc->pool_id], rx_desc);
+		if ((i + 2) != count)
+			qdf_prefetch((struct dp_rx_desc *)arr[i + 2].cookie);
 	}
-	qdf_nbuf_dev_kfree_list(&h);
 
 	for (chip_id = 0; chip_id < WLAN_MAX_MLO_CHIPS; chip_id++) {
 		for (mac_id = 0; mac_id < MAX_PDEV_CNT; mac_id++) {
@@ -1134,9 +1137,11 @@ static void dp_ppeds_release_rx_desc(ppe_ds_wlan_handle_t *ppeds_handle,
 			dp_rxdma_srng = &replenish_soc->rx_refill_buf_ring[mac_id];
 			rx_desc_pool = &replenish_soc->rx_desc_buf[mac_id];
 
-			dp_rx_buffers_replenish_simple(replenish_soc, mac_id, dp_rxdma_srng,
-					rx_desc_pool, rx_bufs_reaped[chip_id][mac_id],
-					&head[chip_id][mac_id], &tail[chip_id][mac_id]);
+			dp_rx_comp2refill_replenish(replenish_soc, mac_id,
+						    dp_rxdma_srng, rx_desc_pool,
+						    rx_bufs_reaped[chip_id][mac_id],
+						    &head[chip_id][mac_id],
+						    &tail[chip_id][mac_id]);
 		}
 	}
 }
