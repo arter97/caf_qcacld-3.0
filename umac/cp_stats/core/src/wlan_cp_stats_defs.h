@@ -51,12 +51,14 @@ typedef void (*get_infra_cp_stats_cb)(struct infra_cp_stats_event *ev,
 /**
  * struct psoc_cp_stats - defines cp stats at psoc object
  * @psoc_obj: pointer to psoc
- * @psoc_comp_priv_obj[]: component's private object pointers
+ * @psoc_comp_priv_obj: component's private object pointers
  * @psoc_cp_stats_lock: lock to protect object
  * @cmn_stats: stats common for AP and STA devices
  * @obj_stats: stats specific to AP or STA devices
  * @legacy_stats_cb: callback to update the stats received from FW through
  * asynchronous events.
+ * @get_infra_cp_stats: callback to update infra CP stats
+ * @infra_cp_stats_req_context: context to pass @get_infra_cp_stats
  */
 struct psoc_cp_stats {
 	struct wlan_objmgr_psoc *psoc_obj;
@@ -76,8 +78,8 @@ struct psoc_cp_stats {
  * struct pdev_cp_stats - defines cp stats at pdev object
  * @pdev_obj: pointer to pdev
  * @pdev_stats: pointer to ic/mc specific stats
- * @pdev_comp_priv_obj[]: component's private object pointers
- * @pdev_cp_stats_lock:	lock to protect object
+ * @pdev_comp_priv_obj: component's private object pointers
+ * @pdev_cp_stats_lock: lock to protect object
  */
 struct pdev_cp_stats {
 	struct wlan_objmgr_pdev  *pdev_obj;
@@ -90,7 +92,7 @@ struct pdev_cp_stats {
  * struct vdev_cp_stats - defines cp stats at vdev object
  * @vdev_obj: pointer to vdev
  * @vdev_stats: pointer to ic/mc specific stats
- * @vdev_comp_priv_obj[]: component's private object pointers
+ * @vdev_comp_priv_obj: component's private object pointers
  * @vdev_cp_stats_lock:	lock to protect object
  * @mcast_rx_pnerr_stats_inc: callback function to update rx PN error stats
  */
@@ -108,7 +110,7 @@ struct vdev_cp_stats {
  * struct peer_cp_stats - defines cp stats at peer object
  * @peer_obj: pointer to peer
  * @peer_stats: pointer to ic/mc specific stats
- * @peer_comp_priv_obj[]: component's private object pointers
+ * @peer_comp_priv_obj: component's private object pointers
  * @peer_cp_stats_lock:	lock to protect object
  * @rx_pnerr_stats_inc: callback function to update rx PN error stats
  * @twt_param: Pointer to peer twt session parameters

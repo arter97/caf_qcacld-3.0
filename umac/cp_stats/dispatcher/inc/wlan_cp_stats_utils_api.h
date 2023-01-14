@@ -75,7 +75,7 @@ enum wlan_cp_stats_comp_id {
 QDF_STATUS wlan_cp_stats_init(void);
 
 /**
- * wlan_cp_stats_init(): API to deinit stats component
+ * wlan_cp_stats_deinit(): API to deinit stats component
  *
  * This API is invoked from dispatcher deinit during all component deinit.
  * This API will unregister all required handlers for psoc, pdev,vdev
@@ -130,14 +130,13 @@ QDF_STATUS wlan_cp_stats_enable(struct wlan_objmgr_psoc *psoc);
 QDF_STATUS wlan_cp_stats_disable(struct wlan_objmgr_psoc *psoc);
 
 /**
- * wlan_cp_stats_comp_obj_cfg() - public API to umac for
- * attach/detach
+ * wlan_cp_stats_comp_obj_cfg() - public API to umac for attach/detach
  * component specific stat obj to cp stats obj
  * @obj_type: common object type
  * @cfg_state: config state either to attach of detach
  * @comp_id: umac component id
  * @cmn_obj: pointer to common object
- * @comp_priv_obj: pointer to component specific cp stats object
+ * @data: pointer to component specific cp stats object
  *
  * Return: QDF_STATUS_SUCCESS on success, QDF_STATUS_E_** on error
  */

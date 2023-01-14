@@ -18,7 +18,7 @@
  */
 
 /**
- * Doc: wlan_cp_stats_om_handler.c
+ * DOC: wlan_cp_stats_om_handler.c
  *
  * This file provide definitions to APIs invoked on receiving common object
  * respective create/destroy event notifications, which further
@@ -491,9 +491,9 @@ wlan_cp_stats_send_telemetry_cp_req(struct wlan_objmgr_pdev *pdev,
 /**
  * wlan_cp_stats_twt_get_peer_session_param() - Obtains twt session parameters
  * of a peer if twt session is valid
- * @mc_cp_stats: pointer to peer specific stats
- * @param: Pointer to copy twt session parameters
- * @num_twt_sessions Pointer holding total number of valid twt sessions
+ * @peer_cp_stat_prv: pointer to peer specific stats
+ * @params: Pointer to copy twt session parameters
+ * @num_twt_session: Pointer holding total number of valid twt sessions
  *
  * Return: QDF_STATUS success if valid twt session parameters are obtained
  * else other qdf error values
@@ -533,7 +533,7 @@ wlan_cp_stats_twt_get_peer_session_param(struct peer_cp_stats *peer_cp_stat_prv,
  * wlan_cp_stats_twt_get_all_peer_session_params()- Retrieves twt session
  * parameters of all peers with valid twt session
  * @psoc_obj: psoc object
- * @vdvev_id: vdev_id
+ * @vdev_id: vdev_id
  * @params: array of pointer to store peer twt session parameters
  *
  * Return: total number of valid twt sessions

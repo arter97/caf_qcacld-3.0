@@ -42,8 +42,9 @@
 /**
  * struct twt_infra_cp_stats_event - TWT statistics event structure
  * @vdev_id: virtual interface id
- * @peer_mac_addr: peer mac address corresponding to a TWT session
+ * @peer_macaddr: peer mac address corresponding to a TWT session
  * @dialog_id: Represents dialog_id of the TWT session
+ * @status:
  * @num_sp_cycles: Number of TWT service period elapsed so far
  * @avg_sp_dur_us: Average of actual wake duration observed so far
  * @min_sp_dur_us: Minimum value of wake duration observed across
@@ -96,7 +97,7 @@ struct consecutive_bmiss_stats {
 /**
  * struct bmiss_infra_cp_stats_event -  bmiss statistics event structure
  * @vdev_id: virtual interface id
- * @peer_mac_addr: peer mac address
+ * @peer_macaddr: peer mac address
  * @num_pre_bmiss: number of pre_bmiss
  * @rssi_samples: Rssi samples at pre bmiss
  * @rssi_sample_curr_index: current index of Rssi sampelse at pre bmiss
@@ -182,8 +183,9 @@ struct ctrl_path_pmlo_telemetry_stats_struct {
  * @num_twt_infra_cp_stats: number of twt_infra_cp_stats buffers
  *                          available
  * @twt_infra_cp_stats: pointer to TWT session statistics structures
- * @ctrl_path_pmlo_telemetry_stats_struct - pointer to pmlo
- * telemetry stats struct
+ * @bmiss_infra_cp_stats: pointer to beacon miss statistics
+ * @ctrl_path_pmlo_telemetry_stats_struct: pointer to pmlo telemetry
+ *                                         stats struct
  *
  * This structure is used to store the statistics information
  * extracted from firmware event(wmi_pdev_cp_fwstats_eventid)

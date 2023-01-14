@@ -32,7 +32,7 @@
 #include "../../core/src/wlan_cp_stats_cmn_api_i.h"
 
 /**
- * @ucfg_infra_cp_stats_register_resp_cb() - Register the response callback
+ * ucfg_infra_cp_stats_register_resp_cb() - Register the response callback
  * and cookie in the psoc mc_stats object
  * @psoc: pointer to psoc object
  * @req: pointer to request parameter structure
@@ -45,7 +45,7 @@ ucfg_infra_cp_stats_register_resp_cb(struct wlan_objmgr_psoc *psoc,
 				     struct infra_cp_stats_cmd_info *req);
 
 /**
- * @ucfg_send_infra_cp_stats_request() - send a infra cp stats command
+ * ucfg_send_infra_cp_stats_request() - send a infra cp stats command
  * @vdev: pointer to vdev object
  * @req: pointer to request parameter structure
  *
