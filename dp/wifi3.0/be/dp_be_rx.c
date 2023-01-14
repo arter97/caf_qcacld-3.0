@@ -1286,6 +1286,9 @@ bool dp_rx_mlo_igmp_handler(struct dp_soc *soc,
 	if (qdf_nbuf_is_ipv4_igmp_leave_pkt(nbuf) ||
 	    qdf_nbuf_is_ipv6_igmp_leave_pkt(nbuf)) {
 		qdf_nbuf_free(nbuf);
+		dp_vdev_unref_delete(mcast_primary_vdev->pdev->soc,
+				     mcast_primary_vdev,
+				     DP_MOD_ID_RX);
 		return true;
 	}
 
