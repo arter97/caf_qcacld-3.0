@@ -10802,7 +10802,8 @@ QDF_STATUS lim_pre_vdev_start(struct mac_context *mac,
 		if (ch_params.mhz_freq_seg0 ==  session->curr_op_freq - 10)
 			sec_chan_freq = session->curr_op_freq - 20;
 	}
-	if (LIM_IS_AP_ROLE(session))
+	if (LIM_IS_AP_ROLE(session) &&
+	    !mlme_is_chan_switch_in_progress(mlme_obj->vdev))
 		lim_apply_puncture(mac, session, ch_params.mhz_freq_seg1);
 
 	if (IS_DOT11_MODE_EHT(session->dot11mode))

@@ -8556,6 +8556,27 @@ static void lim_change_channel(
 					      session_entry);
 }
 
+#ifdef WLAN_FEATURE_11BE
+static bool
+lim_is_puncture_bitmap_changed(struct pe_session *session,
+			       struct channel_change_req *ch_change_req)
+{
+	uint16_t ori_puncture_bitmap;
+
+	ori_puncture_bitmap =
+		*(uint16_t *)session->eht_op.disabled_sub_chan_bitmap;
+
+	return ori_puncture_bitmap != ch_change_req->target_punc_bitmap;
+}
+#else
+static inline bool
+lim_is_puncture_bitmap_changed(struct pe_session *session,
+			       struct channel_change_req *ch_change_req)
+{
+	return false;
+}
+#endif
+
 /**
  * lim_process_sme_channel_change_request() - process sme ch change req
  *
@@ -8600,8 +8621,10 @@ static void lim_process_sme_channel_change_request(struct mac_context *mac_ctx,
 		return;
 	}
 
-	if (session_entry->curr_op_freq == target_freq &&
-	    session_entry->ch_width == ch_change_req->ch_width) {
+	if ((session_entry->curr_op_freq == target_freq &&
+	     session_entry->ch_width == ch_change_req->ch_width) &&
+	    (!IS_DOT11_MODE_EHT(session_entry->dot11mode) ||
+	     !lim_is_puncture_bitmap_changed(session_entry, ch_change_req))) {
 		pe_err("Target channel and mode is same as current channel and mode channel freq %d and mode %d",
 		       session_entry->curr_op_freq, session_entry->ch_width);
 		return;
@@ -9165,6 +9188,14 @@ static void lim_process_sme_dfs_csa_ie_request(struct mac_context *mac_ctx,
 	session_entry->dfsIncludeChanSwIe = true;
 	session_entry->gLimChannelSwitch.switchCount =
 		 dfs_csa_ie_req->ch_switch_beacon_cnt;
+
+	wlan_reg_set_create_punc_bitmap(&dfs_csa_ie_req->ch_params, false);
+	wlan_reg_set_channel_params_for_pwrmode(mac_ctx->pdev,
+						dfs_csa_ie_req->target_chan_freq,
+						0,
+						&dfs_csa_ie_req->ch_params,
+						REG_CURRENT_PWR_MODE);
+
 	ch_width = dfs_csa_ie_req->ch_params.ch_width;
 	if (ch_width >= CH_WIDTH_160MHZ &&
 	    wma_get_vht_ch_width() < WNI_CFG_VHT_CHANNEL_WIDTH_160MHZ) {

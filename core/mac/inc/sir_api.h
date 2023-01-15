@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -5253,6 +5253,7 @@ struct sir_update_session_txq_edca_param {
  * @sec_ch_offset: second channel offset
  * @center_freq_seg0: channel center freq 0
  * @center_freq_seg1: channel center freq 1
+ * @target_punc_bitmap: New channel puncturing bitmap
  * @dot11mode: dot11 mode
  * @nw_type: nw type
  * @cac_duration_ms:  cac duration in ms
@@ -5267,6 +5268,9 @@ struct channel_change_req {
 	enum phy_ch_width ch_width;
 	uint8_t center_freq_seg0;
 	uint8_t center_freq_seg1;
+#ifdef WLAN_FEATURE_11BE
+	uint16_t target_punc_bitmap;
+#endif
 	uint32_t dot11mode;
 	tSirNwType nw_type;
 	uint32_t cac_duration_ms;

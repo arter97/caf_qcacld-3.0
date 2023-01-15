@@ -1824,6 +1824,21 @@ void wlansap_get_sec_channel(uint8_t sec_ch_offset,
 	}
 }
 
+#ifdef WLAN_FEATURE_11BE
+static void
+wlansap_fill_channel_change_puncture(struct channel_change_req *req,
+				     struct ch_params *ch_param)
+{
+	req->target_punc_bitmap = ch_param->reg_punc_bitmap;
+}
+#else
+static inline void
+wlansap_fill_channel_change_puncture(struct channel_change_req *req,
+				     struct ch_params *ch_param)
+{
+}
+#endif
+
 /**
  * wlansap_fill_channel_change_request() - Fills the channel change request
  * @sap_ctx: sap context
@@ -1868,6 +1883,8 @@ wlansap_fill_channel_change_request(struct sap_context *sap_ctx,
 	req->ch_width =  sap_ctx->ch_params.ch_width;
 	req->center_freq_seg0 = sap_ctx->ch_params.center_freq_seg0;
 	req->center_freq_seg1 = sap_ctx->ch_params.center_freq_seg1;
+	wlansap_fill_channel_change_puncture(req, &sap_ctx->ch_params);
+
 	req->dot11mode = dot11_cfg.dot11_mode;
 	req->nw_type = dot11_cfg.nw_type;
 
