@@ -230,15 +230,96 @@ void wmi_bmiss_extract_stats_struct(void *tag_buf,
 
 #endif/* CONFIG_WLAN_BMISS */
 
+#ifdef WLAN_TELEMETRY_STATS_SUPPORT
+static void
+wmi_extract_ctrl_path_pmlo_stats_tlv(wmi_unified_t wmi_handle, void *tag_buf,
+				     struct ctrl_path_pmlo_telemetry_stats_struct *param)
+{
+	int idx = 0;
+	wmi_ctrl_path_pmlo_stats_struct *wmi_stats_buf = tag_buf;
+
+	param->pdev_id =
+	     wmi_handle->ops->convert_target_pdev_id_to_host(wmi_handle,
+							wmi_stats_buf->pdev_id);
+	param->dl_inbss_airtime_ac_be =
+		WMI_PMLO_UL_DL_INBSS_AT_GET_BE(wmi_stats_buf->dl_inbss_airtime_per_ac);
+	param->dl_inbss_airtime_ac_bk =
+		WMI_PMLO_UL_DL_INBSS_AT_GET_BK(wmi_stats_buf->dl_inbss_airtime_per_ac);
+	param->dl_inbss_airtime_ac_vi =
+		WMI_PMLO_UL_DL_INBSS_AT_GET_VI(wmi_stats_buf->dl_inbss_airtime_per_ac);
+	param->dl_inbss_airtime_ac_vo =
+		WMI_PMLO_UL_DL_INBSS_AT_GET_VO(wmi_stats_buf->dl_inbss_airtime_per_ac);
+	param->ul_inbss_airtime_ac_be =
+		WMI_PMLO_UL_DL_INBSS_AT_GET_BE(wmi_stats_buf->ul_inbss_airtime_per_ac);
+	param->ul_inbss_airtime_ac_bk =
+		WMI_PMLO_UL_DL_INBSS_AT_GET_BK(wmi_stats_buf->ul_inbss_airtime_per_ac);
+	param->ul_inbss_airtime_ac_vi =
+		WMI_PMLO_UL_DL_INBSS_AT_GET_VI(wmi_stats_buf->ul_inbss_airtime_per_ac);
+	param->ul_inbss_airtime_ac_vo =
+		WMI_PMLO_UL_DL_INBSS_AT_GET_VO(wmi_stats_buf->ul_inbss_airtime_per_ac);
+	param->estimated_air_time_ac_be =
+		WMI_PMLO_UL_DL_INBSS_AT_GET_BE(wmi_stats_buf->estimated_air_time_per_ac);
+	param->estimated_air_time_ac_bk =
+		WMI_PMLO_UL_DL_INBSS_AT_GET_BK(wmi_stats_buf->estimated_air_time_per_ac);
+	param->estimated_air_time_ac_vi =
+		WMI_PMLO_UL_DL_INBSS_AT_GET_VI(wmi_stats_buf->estimated_air_time_per_ac);
+	param->estimated_air_time_ac_vo =
+		WMI_PMLO_UL_DL_INBSS_AT_GET_VO(wmi_stats_buf->estimated_air_time_per_ac);
+	param->link_obss_airtime =
+		WMI_PMLO_LINK_OBSS_AT_GET(wmi_stats_buf->ul_dl_obss_free_aa_word32);
+	param->link_idle_airtime =
+		WMI_PMLO_LINK_AA_GET(wmi_stats_buf->ul_dl_obss_free_aa_word32);
+	param->ul_inbss_airtime_non_ac =
+		WMI_PMLO_UL_AIRTIME_NON_AC_GET(wmi_stats_buf->ul_dl_obss_free_aa_word32);
+	param->dl_inbss_airtime_non_ac =
+		WMI_PMLO_DL_AIRTIME_NON_AC_GET(wmi_stats_buf->ul_dl_obss_free_aa_word32);
+	for (idx = 0; idx < WMI_AC_MAX; idx++) {
+		param->avg_chan_lat_per_ac[idx] =
+				wmi_stats_buf->avg_chan_lat_per_ac[idx];
+	}
+
+	wmi_debug("pdev_id = %u", wmi_stats_buf->pdev_id);
+	wmi_debug("dl_inbss_airtime_per_ac = %u, ul_inbss_airtime_per_ac = %u, estimated_air_time_per_ac = %u, ul_dl_obss_free_aa_word32 = %u",
+		  wmi_stats_buf->dl_inbss_airtime_per_ac,
+		  wmi_stats_buf->ul_inbss_airtime_per_ac,
+		  wmi_stats_buf->estimated_air_time_per_ac,
+		  wmi_stats_buf->ul_dl_obss_free_aa_word32);
+
+	for (idx = 0; idx < WMI_AC_MAX; idx++) {
+		wmi_debug("avg_chan_lat_per_ac_sample-%u: avg_chan_lat_per_ac=%u",
+			  idx,
+			  wmi_stats_buf->avg_chan_lat_per_ac[idx]);
+	}
+}
+
+static void wmi_pmlo_extract_stats_struct(wmi_unified_t wmi_handle,
+					  void *tag_buf,
+					  struct infra_cp_stats_event *params)
+{
+	struct ctrl_path_pmlo_telemetry_stats_struct *pmlo_params;
+
+	pmlo_params = params->telemetry_stats;
+	wmi_debug("PMLO TELEMETRY stats struct found");
+	wmi_extract_ctrl_path_pmlo_stats_tlv(wmi_handle, tag_buf, pmlo_params);
+}
+#else
+static void wmi_pmlo_extract_stats_struct(wmi_unified_t wmi_handle,
+					  void *tag_buf,
+					  struct infra_cp_stats_event *params)
+{ }
+#endif
+
 /**
  * wmi_stats_extract_tag_struct: function to extract tag structs
+ * @wmi_handle: wmi handle
  * @tag_type: tag type that is to be printed
  * @tag_buf: pointer to the tag structure
  * @params: buffer to hold parameters extracted from response event
  *
  * Return: None
  */
-static void wmi_stats_extract_tag_struct(uint32_t tag_type, void *tag_buf,
+static void wmi_stats_extract_tag_struct(wmi_unified_t wmi_handle,
+					 uint32_t tag_type, void *tag_buf,
 					 struct infra_cp_stats_event *params)
 {
 	wmi_debug("tag_type %d", tag_type);
@@ -258,20 +339,16 @@ static void wmi_stats_extract_tag_struct(uint32_t tag_type, void *tag_buf,
 		wmi_bmiss_extract_stats_struct(tag_buf, params);
 		break;
 
+	case WMITLV_TAG_STRUC_wmi_ctrl_path_pmlo_stats_struct:
+		wmi_pmlo_extract_stats_struct(wmi_handle, tag_buf, params);
+		break;
+
 	default:
 		break;
 	}
 }
 
-/*
- * wmi_stats_handler: parse the wmi event and fill the stats values
- * @buff: Buffer containing wmi event
- * @len: length of event buffer
- * @params: buffer to hold parameters extracted from response event
- *
- * Return: QDF_STATUS_SUCCESS on success, else other qdf error values
- */
-QDF_STATUS wmi_stats_handler(void *buff, int32_t len,
+QDF_STATUS wmi_stats_handler(wmi_unified_t wmi_handle, void *buff, int32_t len,
 			     struct infra_cp_stats_event *params)
 {
 	WMI_CTRL_PATH_STATS_EVENTID_param_tlvs *param_buf;
@@ -325,7 +402,7 @@ QDF_STATUS wmi_stats_handler(void *buff, int32_t len,
 			tag_start_ptr = buf_ptr + WMI_TLV_HDR_SIZE;
 			curr_tlv_tag = WMITLV_GET_TLVTAG(
 						WMITLV_GET_HDR(tag_start_ptr));
-			wmi_stats_extract_tag_struct(curr_tlv_tag,
+			wmi_stats_extract_tag_struct(wmi_handle, curr_tlv_tag,
 						     (void *)tag_start_ptr,
 						     params);
 			/* Move to next tag */
@@ -354,7 +431,7 @@ extract_infra_cp_stats_tlv(wmi_unified_t wmi_handle, void *evt_buf,
 			   uint32_t evt_buf_len,
 			   struct infra_cp_stats_event *params)
 {
-	wmi_stats_handler(evt_buf, evt_buf_len, params);
+	wmi_stats_handler(wmi_handle, evt_buf, evt_buf_len, params);
 	return QDF_STATUS_SUCCESS;
 }
 
@@ -408,7 +485,7 @@ prepare_infra_cp_stats_buf(wmi_unified_t wmi_handle,
 	index = get_infra_cp_stats_id(stats_req->stats_id);
 	cmd_fixed_param->stats_id_mask = (1 << index);
 
-	cmd_fixed_param->request_id = stats_req->action;
+	cmd_fixed_param->request_id = stats_req->request_id;
 	cmd_fixed_param->action = get_infra_cp_stats_action(stats_req->action);
 	cmd_fixed_param->stat_periodicity = stats_req->stat_periodicity;
 
@@ -512,6 +589,14 @@ send_infra_cp_stats_request_cmd_tlv(wmi_unified_t wmi_handle,
 #endif
 
 #ifdef QCA_WIFI_EMULATION
+/**
+ * send_stats_request_cmd_tlv() - WMI request stats function
+ * @wmi_handle: handle to WMI.
+ * @macaddr: MAC address
+ * @param: pointer to hold stats request parameter
+ *
+ * Return: QDF_STATUS on success, else failure.
+ */
 static QDF_STATUS
 send_stats_request_cmd_tlv(wmi_unified_t wmi_handle,
 			   uint8_t macaddr[QDF_MAC_ADDR_SIZE],
@@ -520,14 +605,6 @@ send_stats_request_cmd_tlv(wmi_unified_t wmi_handle,
 	return QDF_STATUS_SUCCESS;
 }
 #else
-/**
- * send_stats_request_cmd_tlv() - WMI request stats function
- * @wmi_handle: handle to WMI.
- * @macaddr: MAC address
- * @param: pointer to hold stats request parameter
- *
- * Return: 0  on success and -ve on failure.
- */
 static QDF_STATUS
 send_stats_request_cmd_tlv(wmi_unified_t wmi_handle,
 			   uint8_t macaddr[QDF_MAC_ADDR_SIZE],

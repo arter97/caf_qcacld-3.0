@@ -58,7 +58,16 @@ wmi_unified_extract_infra_cp_stats(wmi_unified_t wmi_handle,
 				   void *evt_buf, uint32_t evt_buf_len,
 				   struct infra_cp_stats_event *params);
 
-QDF_STATUS wmi_stats_handler(void *buff, int32_t len,
+/**
+ * wmi_stats_handler() - parse the wmi event and fill the stats values
+ * @wmi_handle: wmi handle
+ * @buff: Buffer containing wmi event
+ * @len: length of event buffer
+ * @params: buffer to hold parameters extracted from response event
+ *
+ * Return: QDF_STATUS_SUCCESS on success, else other qdf error values
+ */
+QDF_STATUS wmi_stats_handler(wmi_unified_t wmi_handle, void *buff, int32_t len,
 			     struct infra_cp_stats_event *params);
 
 QDF_STATUS
