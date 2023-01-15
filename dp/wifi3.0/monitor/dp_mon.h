@@ -4452,6 +4452,21 @@ void dp_monitor_peer_telemetry_stats(struct dp_peer *peer,
 	stats->rx_mpdu_total = mon_peer_stats->rx.rx_mpdus;
 	stats->snr = CDP_SNR_OUT(mon_peer_stats->rx.avg_snr);
 }
+
+static inline
+void dp_monitor_peer_deter_stats(struct dp_peer *peer,
+				 struct cdp_peer_deter_stats *stats)
+{
+	struct dp_mon_peer_stats *mon_peer_stats = NULL;
+	struct dp_mon_peer_deterministic *deter_stats;
+
+	if (qdf_unlikely(!peer->monitor_peer))
+		return;
+
+	mon_peer_stats = &peer->monitor_peer->stats;
+	deter_stats = mon_peer_stats->deter_stats;
+	qdf_mem_copy(stats, deter_stats, sizeof(*stats) * CDP_DATA_TID_MAX);
+}
 #endif
 
 /**

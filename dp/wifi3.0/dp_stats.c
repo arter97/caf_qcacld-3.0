@@ -9286,4 +9286,21 @@ dp_get_peer_telemetry_stats(struct cdp_soc_t *soc_hdl, uint8_t *addr,
 
 	return QDF_STATUS_SUCCESS;
 }
+
+QDF_STATUS
+dp_get_peer_deter_stats(struct cdp_soc_t *soc_hdl, uint8_t *addr,
+			struct cdp_peer_deter_stats *stats)
+{
+	struct dp_soc *soc = (struct dp_soc *)soc_hdl;
+	struct dp_peer *peer = dp_peer_find_hash_find(soc, addr, 0, DP_VDEV_ALL,
+						      DP_MOD_ID_MISC);
+
+	if (!peer)
+		return QDF_STATUS_E_FAILURE;
+
+	dp_monitor_peer_deter_stats(peer, stats);
+	dp_peer_unref_delete(peer, DP_MOD_ID_MISC);
+
+	return QDF_STATUS_SUCCESS;
+}
 #endif

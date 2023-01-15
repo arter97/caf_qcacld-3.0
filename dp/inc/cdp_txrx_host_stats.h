@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2016-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -1032,6 +1032,33 @@ static inline QDF_STATUS cdp_get_peer_telemetry_stats(
 		return QDF_STATUS_E_FAILURE;
 
 	return soc->ops->host_stats_ops->txrx_peer_telemetry_stats(
+					soc, addr, stats);
+}
+
+/**
+ * cdp_get_peer_deter_stats(): function to get peer deterministic stats
+ * @soc: soc handle
+ * @addr: peer address
+ * @stats: pointer to peer telemetry stats
+ *
+ * return: status
+ */
+static inline QDF_STATUS cdp_get_peer_deter_stats(
+				ol_txrx_soc_handle soc,
+				uint8_t *addr,
+				struct cdp_peer_deter_stats *stats)
+{
+	if (!soc || !soc->ops) {
+		dp_cdp_debug("Invalid Instance");
+		QDF_BUG(0);
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	if (!soc->ops->host_stats_ops ||
+	    !soc->ops->host_stats_ops->txrx_peer_deter_stats)
+		return QDF_STATUS_E_FAILURE;
+
+	return soc->ops->host_stats_ops->txrx_peer_deter_stats(
 					soc, addr, stats);
 }
 #endif

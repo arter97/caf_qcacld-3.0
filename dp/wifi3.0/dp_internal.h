@@ -966,6 +966,12 @@ void dp_monitor_peer_telemetry_stats(struct dp_peer *peer,
 				     struct cdp_peer_telemetry_stats *stats)
 {
 }
+
+static inline
+void dp_monitor_peer_deter_stats(struct dp_peer *peer,
+				 struct cdp_peer_telemetry_stats *stats)
+{
+}
 #endif /* WLAN_TELEMETRY_STATS_SUPPORT */
 #endif /* !WIFI_MONITOR_SUPPORT */
 
@@ -4221,6 +4227,19 @@ dp_get_pdev_telemetry_stats(struct cdp_soc_t *soc_hdl, uint8_t pdev_id,
 QDF_STATUS
 dp_get_peer_telemetry_stats(struct cdp_soc_t *soc_hdl, uint8_t *addr,
 			    struct cdp_peer_telemetry_stats *stats);
+
+/*
+ * dp_get_peer_deter_stats- API to get peer deterministic stats
+ * @soc_hdl: soc handle
+ * @addr: peer mac
+ * @stats: pointer to peer deterministic stats
+ *
+ * Return: QDF_STATUS_SUCCESS: Success
+ *         QDF_STATUS_E_FAILURE: Error
+ */
+QDF_STATUS
+dp_get_peer_deter_stats(struct cdp_soc_t *soc_hdl, uint8_t *addr,
+			struct cdp_peer_deter_stats *stats);
 #endif /* WLAN_TELEMETRY_STATS_SUPPORT */
 
 #ifdef CONNECTIVITY_PKTLOG

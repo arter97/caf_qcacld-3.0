@@ -1244,6 +1244,11 @@ struct cdp_host_stats_ops {
 				struct cdp_soc_t *soc,
 				uint8_t *addr,
 				struct cdp_peer_telemetry_stats *stats);
+	QDF_STATUS
+		(*txrx_peer_deter_stats)(
+				struct cdp_soc_t *soc,
+				uint8_t *addr,
+				struct cdp_peer_deter_stats *stats);
 #endif
 	QDF_STATUS
 		(*txrx_get_peer_extd_rate_link_stats)

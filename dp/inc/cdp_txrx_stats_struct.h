@@ -2947,6 +2947,18 @@ struct cdp_peer_rx_deter {
 	uint64_t avg_rate;
 	uint32_t mode_cnt;
 };
+
+/**
+ * struct cdp_peer_deter_stats- Structure to hold peer deterministic stats
+ * @dl_det: TX DL deterministic stats
+ * @ul_det: TX UL deterministic stats
+ * @rx_det: RX deterministic stats
+ */
+struct cdp_peer_deter_stats {
+	struct cdp_peer_tx_dl_deter dl_det[MSDUQ_INDEX_MAX][TX_MODE_DL_MAX];
+	struct cdp_peer_tx_ul_deter ul_det[TX_MODE_UL_MAX];
+	struct cdp_peer_rx_deter rx_det;
+};
 #endif
 
 /* struct cdp_pdev_stats - pdev stats
