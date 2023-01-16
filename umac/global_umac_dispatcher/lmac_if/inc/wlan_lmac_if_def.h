@@ -730,15 +730,15 @@ struct wlan_lmac_if_fd_tx_ops {
 
 /**
  * struct wlan_lmac_if_sa_api_tx_ops - SA API specific tx function pointers
- * @sa_api_register_event_handler:
- * @sa_api_unregister_event_handler:
- * @sa_api_enable_sa:
- * @sa_api_set_rx_antenna:
- * @sa_api_set_tx_antenna:
- * @sa_api_set_tx_default_antenna:
- * @sa_api_set_training_info:
- * @sa_api_prepare_rateset:
- * @sa_api_set_node_config_ops:
+ * @sa_api_register_event_handler: Register event handler for Smart Antenna
+ * @sa_api_unregister_event_handler: Unregister event handler for Smart Antenna
+ * @sa_api_enable_sa: Enable Smart Antenna
+ * @sa_api_set_rx_antenna: Set Rx antenna
+ * @sa_api_set_tx_antenna: Set Tx antenna
+ * @sa_api_set_tx_default_antenna: Set default Tx antenna
+ * @sa_api_set_training_info: Set Smart Antenna training metrics
+ * @sa_api_prepare_rateset: Prepare rest set
+ * @sa_api_set_node_config_ops: Set Peer config operations structure
  */
 struct wlan_lmac_if_sa_api_tx_ops {
 	void (*sa_api_register_event_handler)(struct wlan_objmgr_psoc *psoc);
@@ -754,7 +754,9 @@ struct wlan_lmac_if_sa_api_tx_ops {
 	void (*sa_api_set_training_info) (struct wlan_objmgr_peer *peer,
 			uint32_t *rate_array,
 			uint32_t *antenna_array,
-			uint32_t numpkts);
+			uint32_t numpkts,
+			uint16_t minpkts,
+			uint16_t per_threshold);
 	void (*sa_api_prepare_rateset)(struct wlan_objmgr_pdev *pdev,
 			struct wlan_objmgr_peer *peer,
 			struct sa_rate_info *rate_info);

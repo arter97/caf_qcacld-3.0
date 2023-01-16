@@ -4133,6 +4133,14 @@ static void dp_process_ppdu_stats_user_cmpltn_common_tlv(
 	tag_buf += CDP_NUM_SA_BW;
 	ppdu_user_desc->current_rate_per =
 		HTT_PPDU_STATS_USER_CMPLTN_COMMON_TLV_CURRENT_RATE_PER_GET(*tag_buf);
+
+	tag_buf++;
+	/* Skip SW RTS */
+
+	tag_buf++;
+	/* Extract 320MHz MAX PHY ratecode */
+	ppdu_user_desc->sa_max_rates[bw_iter] =
+		HTT_PPDU_STATS_USER_CMPLTN_COMMON_TLV_MAX_RATES_GET(*tag_buf);
 }
 
 /**

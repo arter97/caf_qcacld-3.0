@@ -2129,22 +2129,22 @@ struct cdp_tx_completion_ppdu_user {
 	uint8_t sa_is_training;
 	uint32_t rssi_chain[CDP_RSSI_CHAIN_LEN];
 	uint32_t sa_tx_antenna;
-	/*Max rates for BW: 20MHZ, 40MHZ and 80MHZ and 160MHZ
-	 * |---------------------------------------|
-	 * | 16 bits | 16 bits | 16 bits | 16 bits |
-	 * |   BW-1  |   BW-2  |   BW-3  |   BW-4  |
-	 * |      /\  \                            |
-	 * |     /  \  \                           |
-	 * |    /    \  \                          |
-	 * |   /      \  \                         |
-	 * |  /        \  \                        |
-	 * | /          \  \                       |
-	 * |/            \  \                      |
-	 * |[11|8]     [5|8] \                     |
-	 * | BW1      PADDED  \                    |
-	 * |---------------------------------------|
+	/*Max rates for BW: 20MHZ, 40MHZ and 80MHZ and 160MHZ and 320MHZ
+	 * |-------------------------------------------------|
+	 * | 16 bits | 16 bits | 16 bits | 16 bits | 16 bits |
+	 * |   BW-1  |   BW-2  |   BW-3  |   BW-4  |   BW-5  |
+	 * |      /\  \                                      |
+	 * |     /  \  \                                     |
+	 * |    /    \  \                                    |
+	 * |   /      \  \                                   |
+	 * |  /        \  \                                  |
+	 * | /          \  \                                 |
+	 * |/            \  \                                |
+	 * |[11|8]     [5|8] \                               |
+	 * | BW1      PADDED  \                              |
+	 * |-------------------------------------------------|
 	 */
-	uint16_t sa_max_rates[CDP_NUM_SA_BW];
+	uint16_t sa_max_rates[CDP_NUM_SA_BW + 1];
 	uint32_t sa_goodput;
 	/* below field is used to calculate goodput in non-training period
 	 * Note: As host is exposing goodput and hence current_rate_per is

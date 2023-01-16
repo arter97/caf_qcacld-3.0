@@ -7026,7 +7026,8 @@ typedef struct {
 /* Maximum MCS rates supported; 4 rates in each dword */
 /* Maximum MCS ratecodes with 11ax */
 #define WMI_SA_MAX_MCS_RATES 96
-#define WMI_SA_MAX_RATE_COUNTERS 4
+/* Maximum ratecode per BW supported legacy, 20, 40, 80, 160 and 320 MHz */
+#define WMI_SA_MAX_RATE_COUNTERS 6
 /* Maximum rate series used for transmission */
 #define SA_MAX_RATE_SERIES 2
 
@@ -7043,14 +7044,21 @@ typedef struct {
 #define SA_MAX_LEGACY_RATE_WORDS 6
 #define SA_MAX_HT_RATE_WORDS 48
 
-/* TODO: ratecode_160 needs to add for future chips */
+#define SA_INVALID_PARAM_VALUE 0xffff
+/* Mask to check PER threshold */
+#define SA_MASK_PER_TH         0xff
+/* Mask to check Minimum packets for Smart Antenna Training */
+#define SA_MASK_MIN_PKTS       0xffff
+
 /**
  * struct wmi_sa_rate_cap - smart antenna rat capabilities
  * @pdev_id: pdev_id
  * @ratecode_legacy: Rate code array for CCK OFDM
- * @ratecode_20: Rate code array for 20MHz BW
- * @ratecode_40: Rate code array for 40MHz BW
- * @ratecode_80: Rate code array for 80MHz BW
+ * @ratecode_20: Rate code array for 20 MHz BW
+ * @ratecode_40: Rate code array for 40 MHz BW
+ * @ratecode_80: Rate code array for 80 MHz BW
+ * @ratecode_160: Rate code array for 160 MHz BW
+ * @ratecode_320: Rate code array for 320 MHz BW
  * @ratecount: Max Rate count for each mode
  */
 typedef struct {
@@ -7058,6 +7066,8 @@ typedef struct {
 	uint16_t ratecode_20[WMI_SA_MAX_MCS_RATES];
 	uint16_t ratecode_40[WMI_SA_MAX_MCS_RATES];
 	uint16_t ratecode_80[WMI_SA_MAX_MCS_RATES];
+	uint16_t ratecode_160[WMI_SA_MAX_MCS_RATES];
+	uint16_t ratecode_320[WMI_SA_MAX_MCS_RATES];
 	uint8_t ratecount[WMI_SA_MAX_RATE_COUNTERS];
 } wmi_sa_rate_cap;
 
