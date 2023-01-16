@@ -296,8 +296,7 @@ cm_handle_auth_offload(struct auth_offload_event *auth_event)
 				auth_event->vdev_id,
 				auth_event->ta);
 	status = wma->csr_roam_auth_event_handle_cb(mac_ctx, auth_event->vdev_id,
-						    auth_event->ap_bssid,
-						    auth_event->akm);
+						    auth_event->ap_bssid);
 	if (QDF_IS_STATUS_ERROR(status)) {
 		wma_err_rl("Trigger pre-auth failed");
 		return QDF_STATUS_E_FAILURE;
