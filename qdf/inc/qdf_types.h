@@ -1557,6 +1557,7 @@ enum qdf_suspend_type {
  * @QDF_STATS_REQ_TIMEDOUT: Stats request timedout
  * @QDF_TX_DESC_LEAK: tx desc leak
  * @QDF_HOST_WAKEUP_REASON_PAGEFAULT: Host wakeup because of pagefault
+ * @QDF_SCHED_TIMEOUT: Scheduler watchdog timedout
  */
 enum qdf_hang_reason {
 	QDF_REASON_UNSPECIFIED,
@@ -1589,6 +1590,7 @@ enum qdf_hang_reason {
 	QDF_STATS_REQ_TIMEDOUT,
 	QDF_TX_DESC_LEAK,
 	QDF_HOST_WAKEUP_REASON_PAGEFAULT,
+	QDF_SCHED_TIMEOUT,
 };
 
 /**
