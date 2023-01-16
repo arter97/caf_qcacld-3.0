@@ -595,12 +595,6 @@ wlan_rptr_vdev_ucfg_config(struct wlan_objmgr_vdev *vdev, int param,
 	opmode = wlan_vdev_mlme_get_opmode(vdev);
 	switch (param) {
 	case IEEE80211_PARAM_EXTAP:
-#ifdef QCA_SUPPORT_WDS_EXTENDED
-		if (wlan_psoc_nif_feat_cap_get(psoc, WLAN_SOC_F_WDS_EXTENDED)) {
-			RPTR_LOGE("RPTR EXTAP can't coexist with WDSEXT mode");
-			break;
-		}
-#endif
 		if (value) {
 			if (value == 3 /* dbg */) {
 				dp_extap_mitbl_dump(dp_get_extap_handle
