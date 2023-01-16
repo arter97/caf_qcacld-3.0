@@ -567,6 +567,7 @@ static QDF_STATUS dp_peer_ppeds_default_route_be(struct dp_soc *soc,
 	return QDF_STATUS_SUCCESS;
 }
 
+#ifdef WLAN_FEATURE_11BE_MLO
 static QDF_STATUS dp_peer_setup_ppeds_be(struct dp_soc *soc,
 					 struct dp_peer *peer,
 					 struct dp_vdev_be *be_vdev)
@@ -637,6 +638,27 @@ static QDF_STATUS dp_peer_setup_ppeds_be(struct dp_soc *soc,
 
 	return qdf_status;
 }
+#else
+static QDF_STATUS dp_peer_setup_ppeds_be(struct dp_soc *soc,
+					 struct dp_peer *peer,
+					 struct dp_vdev_be *be_vdev)
+{
+	struct dp_ppe_vp_profile *ppe_vp_profile = &be_vdev->ppe_vp_profile;
+	struct dp_peer_be *be_peer = dp_get_be_peer_from_dp_peer(peer);
+	QDF_STATUS qdf_status = QDF_STATUS_SUCCESS;
+
+	if (!be_peer) {
+		dp_err("BE peer is null");
+		return QDF_STATUS_E_NULL_VALUE;
+	}
+
+	qdf_status = dp_peer_ppeds_default_route_be(soc, be_peer,
+						    be_vdev->vdev.vdev_id,
+						    ppe_vp_profile->vp_num);
+
+	return qdf_status;
+}
+#endif
 #else
 static QDF_STATUS dp_ppeds_init_soc_be(struct dp_soc *soc)
 {
