@@ -1148,6 +1148,8 @@ __lim_handle_sme_start_bss_request(struct mac_context *mac_ctx, uint32_t *msg_bu
 		if (QDF_IS_STATUS_ERROR(qdf_status))
 			goto free;
 		qdf_mem_free(mlm_start_req);
+		lim_update_rrm_capability(mac_ctx);
+
 		return;
 	} else {
 
