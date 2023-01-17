@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2016-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  *
  * Permission to use, copy, modify, and/or distribute this software for
@@ -705,7 +705,7 @@ void utils_dfs_get_chan_list(struct wlan_objmgr_pdev *pdev,
  * on current channel list.
  * @pdev: Pointer to pdev structure.
  * @vdev: vdev of request
- * @chan: Pointer to channel list.
+ * @chan_list: Pointer to channel list.
  * @num_chan: number of channels.
  *
  * Get regdb channel list based on dfs current channel.
@@ -1461,7 +1461,7 @@ static void utils_dfs_convert_freq_to_index(qdf_freq_t freq, int8_t *index)
 /**
  * utils_dfs_update_chan_state_array_element() - Update the per dfs channel
  * state array element indexed by the frequency with the new state.
- *
+ * @dfs: DFS context
  * @freq: Input DFS Channel frequency which will converted to channel state
  * array index.
  * @state: Input DFS state with which the value indexed by frequency will be

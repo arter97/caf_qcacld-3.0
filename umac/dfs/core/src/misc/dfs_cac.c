@@ -2,7 +2,7 @@
  * Copyright (c) 2016-2021 The Linux Foundation. All rights reserved.
  * Copyright (c) 2007-2008 Sam Leffler, Errno Consulting
  * All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -42,9 +42,12 @@
 #define CH100_START_FREQ                 5490
 #define CH100                            100
 
-/**
+/*
  * dfs_cac_valid_timeout() - Timeout function for dfs_cac_valid_timer
  *                           cac_valid bit will be reset in this function.
+ *
+ * NB: not using kernel-doc format since the kernel-doc script doesn't
+ *     handle the os_timer_func() macro
  */
 static os_timer_func(dfs_cac_valid_timeout)
 {
@@ -161,6 +164,7 @@ void dfs_process_cac_completion(struct wlan_dfs *dfs)
 
 /**
  * dfs_cac_timeout() - DFS cactimeout function.
+ * @arg: Container of dfs object.
  *
  * Sets dfs_cac_timer_running to 0  and dfs_cac_valid_timer.
  */

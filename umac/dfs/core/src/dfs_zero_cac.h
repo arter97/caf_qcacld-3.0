@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2016-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  * Copyright (c) 2007-2008 Sam Leffler, Errno Consulting
  * All rights reserved.
  *
@@ -359,7 +359,7 @@ static inline bool dfs_is_precac_done(struct wlan_dfs *dfs,
  *                                      precac status of configured
  *                                      DFS channel.
  * @dfs: Pointer to wlan_dfs structure.
- * @pref_chan: Configured DFS channel frequency
+ * @pref_chan_freq: Configured DFS channel frequency
  * @mode: Configured PHY mode.
  *
  * Return: True if intermediate channel needs to configure. False otherwise.
@@ -587,8 +587,7 @@ dfs_set_fw_adfs_support(struct wlan_dfs *dfs,
 /**
  * dfs_agile_soc_obj_init() - Initialize soc obj for agile precac.
  * @dfs: Pointer to wlan_dfs structure.
- * @precac_chan: Start thr precac timer in this channel.
- * @ocac_status: Status of the off channel CAC.
+ * @psoc: Pointer to psoc object
  */
 void dfs_agile_soc_obj_init(struct wlan_dfs *dfs,
 			    struct wlan_objmgr_psoc *psoc);
@@ -715,8 +714,8 @@ static inline uint32_t dfs_get_intermediate_chan(struct wlan_dfs *dfs)
 
 /**
  * dfs_get_precac_chan_state_for_freq() - Get precac status of a given channel.
- * @dfs:         Pointer to wlan_dfs structure.
- * @precac_chan: Channel freq for which precac state need to be checked.
+ * @dfs: Pointer to wlan_dfs structure.
+ * @precac_chan_freq: Channel freq for which precac state need to be checked.
  */
 
 #ifdef CONFIG_CHAN_FREQ_API
@@ -766,8 +765,8 @@ static inline void dfs_reinit_precac_lists(struct wlan_dfs *src_dfs,
 /**
  * dfs_is_precac_done_on_non_80p80_chan_for_freq() - Is precac done on
  * a 20/40/80/160/165/320 MHz channel.
- *@dfs: Pointer to wlan_dfs structure.
- *@chan: Channel frequency
+ * @dfs: Pointer to wlan_dfs structure.
+ * @chan_freq: Channel frequency
  *
  * Return:
  * * True:  If CAC is done on channel.
@@ -844,7 +843,7 @@ void dfs_mark_precac_nol_for_freq(struct wlan_dfs *dfs,
 /**
  * dfs_unmark_precac_nol_for_freq() - Unmark the precac channel as radar.
  * @dfs:      Pointer to wlan_dfs structure.
- * @channel:  channel freq marked as radar.
+ * @chan_freq:  channel freq marked as radar.
  */
 #ifdef CONFIG_CHAN_FREQ_API
 void dfs_unmark_precac_nol_for_freq(struct wlan_dfs *dfs, uint16_t chan_freq);

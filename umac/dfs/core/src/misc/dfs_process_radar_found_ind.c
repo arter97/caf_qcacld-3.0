@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2017-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -31,7 +31,7 @@
 #include <wlan_dfs_tgt_api.h>
 #include "wlan_dfs_mlme_api.h"
 #include "../dfs_internal.h"
-/**
+/*
  * TODO: The code is not according to the following description needs
  * modification and correction. Code always adds left and right channels to
  * NOL even if it is not a chirp radar.
@@ -404,14 +404,15 @@ dfs_find_radar_affected_subchans_for_freq(struct wlan_dfs *dfs,
 #endif
 
 /**
- * dfs_calc_bonding_freqs: Calculate bonding channel frequencies from the
- * channel width's center frequency and channel width.
- * It is assumed that the caller has allocated sufficient memory for 'freq_list'
- * so that it can hold all the output subchannels.
+ * dfs_calc_bonding_freqs() - Calculate bonding channel frequencies
+ * @center_freq: Center frequency of the channel width.
+ * @ch_width: Channel width.
+ * @freq_list: output array of sub-channel frequencies.
  *
- * center_freq: Center frequency of the channel width.
- * ch_width: Channel width.
- * freq_list: output array of sub-channel frequencies.
+ * Calculate bonding channel frequencies from the channel width's
+ * center frequency and channel width.  It is assumed that the caller
+ * has allocated sufficient memory for @freq_list so that it can hold
+ * all the output subchannels.
  *
  * Return: void
  */
@@ -496,10 +497,11 @@ void dfs_get_160mhz_bonding_channels(uint16_t center_freq, uint16_t *freq_list)
 }
 
 /**
- * dfs_get_320mhz_bonding_channels() - Get bonding frequency list of 320MHz
+ * dfs_get_320mhz_bonding_channels() - Get bonding frequency list of 320 MHz
  * channel.
- * @center_freq: Center frequency of the 320MHz channel.
+ * @center_freq: Center frequency of the 320 MHz channel.
  * @freq_list: Pointer to frequency list.
+ * @nchannels: Number of channels in @freq_list
  *
  * Return: void
  */
@@ -511,9 +513,9 @@ void dfs_get_320mhz_bonding_channels(uint16_t center_freq, uint16_t *freq_list,
 	uint16_t chwidth = 320;
 
 	/*
-	 * In 5Ghz band, the 320Mhz channel is always 80Mhz punctured
-	 * to the right. Therefore, it is actually a 240Mhz channel and
-	 * has twelve 20Mhz subchannels.
+	 * In 5 GHz band, the 320 MHz channel is always 80 MHz punctured
+	 * to the right. Therefore, it is actually a 240 MHz channel and
+	 * has twelve 20 MHz subchannels.
 	 */
 	*nchannels = NUM_CHANNELS_240MHZ;
 	dfs_calc_bonding_freqs(center_freq, chwidth, freq_list);
@@ -529,7 +531,7 @@ void dfs_get_320mhz_bonding_channels(uint16_t center_freq, uint16_t *freq_list,
 }
 #endif
 
-/*
+/**
  * dfs_get_bonding_channel_without_seg_info_for_freq() - Get bonding frequency
  * list.
  * @chan: Pointer to dfs_channel.
@@ -579,7 +581,7 @@ dfs_get_bonding_channel_without_seg_info_for_freq(struct dfs_channel *chan,
 #endif
 
 #ifdef CONFIG_CHAN_FREQ_API
-/*
+/**
  * dfs_get_agile_subchans_for_curchan_160() - Get bonding frequency list of
  * agile channels when current operating channel is 160MHz.
  *
@@ -634,7 +636,7 @@ dfs_get_agile_subchans_for_curchan_160(struct wlan_dfs *dfs,
 	}
 }
 
-/*
+/**
  * dfs_get_bonding_channels_for_freq() - Get bonding channel frequency.
  * @dfs: Pointer to wlan_dfs.
  * @curchan: Pointer to dfs_channel.
@@ -1012,14 +1014,14 @@ dfs_process_radar_ind(struct wlan_dfs *dfs,
 
 #if defined(QCA_DFS_BW_PUNCTURE) && defined(WLAN_FEATURE_11BE)
 /**
- * dfs_is_ignore_radar_for_punctured_chans: Store the radar bitmap and check if
- *                                          radar is found in already punctured
- *                                          channel and ignore the radar.
- *
- * dfs: Wlan_dfs structure
- * dfs_radar_bitmap: Variable to store radar bitmap.
- * freq_list: output array of sub-channel frequencies.
- * num_channels: Number of sub-channels in target DFS channel.
+ * dfs_is_ignore_radar_for_punctured_chans() - Store the radar bitmap and check
+ *                                             if radar is found in already
+ *                                             punctured channel and ignore the
+ *                                             radar.
+ * @dfs: Wlan_dfs structure
+ * @dfs_radar_bitmap: Variable to store radar bitmap.
+ * @freq_list: output array of sub-channel frequencies.
+ * @num_channels: Number of sub-channels in target DFS channel.
  *
  * Return: If radar is found on punctured channel then return true.
  * Else return false.

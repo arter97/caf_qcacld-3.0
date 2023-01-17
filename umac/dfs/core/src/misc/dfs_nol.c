@@ -1,7 +1,7 @@
 /*
  * Copyright (c) 2016-2021 The Linux Foundation. All rights reserved.
  * Copyright (c) 2002-2010, Atheros Communications Inc.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -54,7 +54,8 @@ bool dfs_get_update_nol_flag(struct wlan_dfs *dfs)
 }
 
 /**
- * dfs_nol_elem_free_work_cb -  Free NOL element
+ * dfs_nol_elem_free_work_cb() -  Free NOL element
+ * @context: work context (wlan_dfs)
  *
  * Free the NOL element memory
  */

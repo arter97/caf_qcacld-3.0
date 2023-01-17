@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2017-2020 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -129,7 +130,7 @@ struct dfs_radar_found_params {
  * enum adfs_ocac_mode - Various Off-Channel CAC modes.
  * @QUICK_OCAC_MODE: Used for OCAC where the CAC timeout value is finite.
  *                   This is also known as PreCAC.
- * @EXTENSIVE_OCAC:  Extensive OCAC.
+ * @EXTENSIVE_OCAC_MODE:  Extensive OCAC.
  * @QUICK_RCAC_MODE: Used for RollingCAC where the timeout value is assumed to
  *                   be infinite by the Firmware code, that is, the FW has to
  *                   be on the agile channel until host stop/aborts the agile

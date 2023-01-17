@@ -1,7 +1,7 @@
 /*
  * Copyright (c) 2016-2021 The Linux Foundation. All rights reserved.
  * Copyright (c) 2002-2006, Atheros Communications Inc.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -38,7 +38,7 @@
 #define DISABLE_NOL_FW 0
 
 #ifndef WLAN_DFS_STATIC_MEM_ALLOC
-/*
+/**
  * dfs_alloc_wlan_dfs() - allocate wlan_dfs buffer
  *
  * Return: buffer, null on failure.
@@ -48,7 +48,7 @@ static inline struct wlan_dfs *dfs_alloc_wlan_dfs(void)
 	return qdf_mem_malloc(sizeof(struct wlan_dfs));
 }
 
-/*
+/**
  * dfs_free_wlan_dfs() - Free wlan_dfs buffer
  * @dfs: wlan_dfs buffer pointer
  *
@@ -59,7 +59,7 @@ static inline void dfs_free_wlan_dfs(struct wlan_dfs *dfs)
 	qdf_mem_free(dfs);
 }
 
-/*
+/**
  * dfs_alloc_dfs_curchan() - allocate dfs_channel buffer
  *
  * Return: buffer, null on failure.
@@ -74,7 +74,7 @@ static inline struct dfs_channel *dfs_alloc_dfs_prevchan(void)
 	return qdf_mem_malloc(sizeof(struct dfs_channel));
 }
 
-/*
+/**
  * dfs_free_dfs_chan() - Free dfs_channel buffer
  * @dfs_chan: dfs_channel buffer pointer
  *
@@ -116,12 +116,15 @@ static inline void dfs_free_dfs_chan(struct dfs_channel *dfs_chan)
 }
 #endif
 
-/**
+/*
  * dfs_testtimer_task() - Sends CSA in the current channel.
  *
  * When the user sets usenol to 0 and inject the RADAR, AP does not mark the
  * channel as RADAR and does not add the channel to NOL. It sends the CSA in
  * the current channel.
+ *
+ * NB: not using kernel-doc format since the kernel-doc script doesn't
+ *     handle the os_timer_func() macro
  */
 #ifdef CONFIG_CHAN_FREQ_API
 static os_timer_func(dfs_testtimer_task)
@@ -703,6 +706,7 @@ dfs_is_chan_punc_same_as_given_punc(struct dfs_channel *dfs_curchan,
  * @dfs_ch_flagext: New curchan's channel flags extension.
  * @dfs_ch_vhtop_ch_freq_seg1: New curchan's primary centre IEEE.
  * @dfs_ch_vhtop_ch_freq_seg2: New curchan's secondary centre IEEE.
+ * @dfs_chan_punc_pattern: Channel puncture pattern
  *
  * Return: True if curchan has the same channel parameters of the given channel,
  * else false.
@@ -865,7 +869,7 @@ uint8_t dfs_get_agile_detector_id(struct wlan_dfs *dfs)
 #endif
 
 /**
- * dfs_chan_to_ch_width: Outputs the channel width in MHz of the given input
+ * dfs_chan_to_ch_width() - Outputs the channel width in MHz of the given input
  * dfs_channel.
  * @chan: Pointer to the input dfs_channel structure.
  *

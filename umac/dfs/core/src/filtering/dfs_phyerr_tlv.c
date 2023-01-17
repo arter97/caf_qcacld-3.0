@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012, 2016-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -166,11 +166,11 @@ static void dfs_radar_summary_parse(struct wlan_dfs *dfs,
 }
 
 /**
- * dfs_radar_fft_search_report_parse () - Parse FFT report.
+ * dfs_radar_fft_search_report_parse() - Parse FFT report.
  * @dfs: pointer to wlan_dfs structure.
  * @buf: Phyerr buffer.
  * @len: Phyerr buflen.
- * @rsu: Pointer to rx_radar_status structure.
+ * @rsfr: Pointer to rx_search_fft_report structure.
  */
 static void dfs_radar_fft_search_report_parse(struct wlan_dfs *dfs,
 		const char *buf,
