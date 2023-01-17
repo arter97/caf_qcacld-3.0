@@ -2767,10 +2767,12 @@ QDF_STATUS wma_process_ll_stats_get_req(tp_wma_handle wma,
 	}
 	qdf_mem_copy(cmd.peer_macaddr.bytes, addr, QDF_MAC_ADDR_SIZE);
 
-	status = wma_update_params_for_mlo_stats(wma, getReq, &cmd);
-	if (QDF_IS_STATUS_ERROR(status)) {
-		wma_err("Failed to update params for mlo_stats");
-		return status;
+	if (getReq->mlo_vdev_id_bitmap) {
+		status = wma_update_params_for_mlo_stats(wma, getReq, &cmd);
+		if (QDF_IS_STATUS_ERROR(status)) {
+			wma_err("Failed to update params for mlo_stats");
+			return status;
+		}
 	}
 
 	ret = wma_send_ll_stats_get_cmd(wma, &cmd);
@@ -2908,16 +2910,18 @@ int wma_unified_link_iface_stats_event_handler(void *handle,
 		iface_link_stats->rssi_data += WMA_TGT_NOISE_FLOOR_DBM;
 		iface_link_stats->rssi_ack += WMA_TGT_NOISE_FLOOR_DBM;
 	}
-	wma_debug("db2dbm: %d, rssi_mgmt: %d, rssi_data: %d, rssi_ack: %d, beacon_rx %u",
-		  db2dbm_enabled, iface_link_stats->rssi_mgmt,
-		  iface_link_stats->rssi_data, iface_link_stats->rssi_ack,
-		  iface_link_stats->beacon_rx);
 
 	/* Copy roaming state */
 	iface_stat->info.roaming = link_stats->roam_state;
 	/* Copy time slicing duty cycle */
 	iface_stat->info.time_slice_duty_cycle =
 		link_stats->time_slice_duty_cycle;
+
+	wma_debug("db2dbm: %d, rssi_mgmt: %d, rssi_data: %d, rssi_ack: %d, beacon_rx %u, time_slice_duty_cycle %u",
+		  db2dbm_enabled, iface_link_stats->rssi_mgmt,
+		  iface_link_stats->rssi_data, iface_link_stats->rssi_ack,
+		  iface_link_stats->beacon_rx,
+		  iface_stat->info.time_slice_duty_cycle);
 
 	iface_ac_stats = &iface_stat->ac_stats[0];
 	for (count = 0; count < link_stats->num_ac; count++) {

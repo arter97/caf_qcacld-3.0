@@ -206,7 +206,7 @@ void __hdd_cm_disconnect_handler_post_user_update(struct hdd_adapter *adapter,
 	ucfg_dp_remove_conn_info(vdev);
 
 	/* Setting the RTS profile to original value */
-	if (sme_cli_set_command(adapter->vdev_id, WMI_VDEV_PARAM_ENABLE_RTSCTS,
+	if (sme_cli_set_command(adapter->vdev_id, wmi_vdev_param_enable_rtscts,
 				cfg_get(hdd_ctx->psoc,
 					CFG_ENABLE_FW_RTS_PROFILE),
 				VDEV_CMD))
@@ -354,7 +354,7 @@ hdd_cm_disconnect_complete_pre_user_update(struct wlan_objmgr_vdev *vdev,
 			   rsp->req.cm_id,
 			   rsp->req.req.reason_code << 16 |
 			   rsp->req.req.source);
-	hdd_ipa_set_tx_flow_info();
+	wlan_hdd_set_tx_flow_info();
 	/*
 	 * Convert and cache internal reason code in adapter. This can be
 	 * sent to userspace with a vendor event.

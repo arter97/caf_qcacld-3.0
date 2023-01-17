@@ -114,7 +114,7 @@ QDF_STATUS ucfg_mlme_global_deinit(void);
 void ucfg_mlme_cfg_chan_to_freq(struct wlan_objmgr_pdev *pdev);
 
 /**
- * wlan_mlme_get_power_usage() - Get the power usage info
+ * ucfg_mlme_get_power_usage() - Get the power usage info
  * @psoc: pointer to psoc object
  *
  * Return: pointer to character array of power usage
@@ -141,7 +141,7 @@ uint8_t ucfg_get_tx_power(struct wlan_objmgr_psoc *psoc, uint8_t band)
 /**
  * ucfg_mlme_get_ht_cap_info() - Get the HT cap info config
  * @psoc: pointer to psoc object
- * @value: pointer to the value which will be filled for the caller
+ * @ht_cap_info: pointer to the value which will be filled for the caller
  *
  * Inline UCFG API to be used by HDD/OSIF callers
  *
@@ -158,7 +158,7 @@ QDF_STATUS ucfg_mlme_get_ht_cap_info(struct wlan_objmgr_psoc *psoc,
 /**
  * ucfg_mlme_set_ht_cap_info() - Set the HT cap info config
  * @psoc: pointer to psoc object
- * @value: Value that needs to be set from the caller
+ * @ht_cap_info: Value that needs to be set from the caller
  *
  * Inline UCFG API to be used by HDD/OSIF callers
  *
@@ -561,7 +561,7 @@ ucfg_mlme_get_external_acs_policy(struct wlan_objmgr_psoc *psoc,
 }
 
 /**
- * ucfg_mlme_set_ht_cap_info() - Set the HT cap info config
+ * ucfg_mlme_get_acs_support_for_dfs_ltecoex() - Is DFS LTE CoEx ACS supported
  * @psoc: pointer to psoc object
  * @value: Value that needs to be set from the caller
  *
@@ -695,11 +695,10 @@ ucfg_mlme_get_wmm_uapsd_vo_sus_intv(struct wlan_objmgr_psoc *psoc,
 }
 
 /**
- *
  * ucfg_mlme_get_sap_inactivity_override() - Check if sap max inactivity
- * override flag is set.
+ *                                           override flag is set.
  * @psoc: pointer to psoc object
- * @sme_config - Sme config struct
+ * @value: Value that needs to be set from the caller
  *
  * Inline UCFG API to be used by HDD/OSIF callers to call
  * the mlme function wlan_mlme_get_sap_inactivity_override
@@ -2082,10 +2081,8 @@ QDF_STATUS ucfg_mlme_set_primary_interface(struct wlan_objmgr_psoc *psoc,
 
 /**
  * ucfg_mlme_get_mcc_duty_cycle_percentage() - Get primary STA iface MCC
- * duty-cycle
- *
- * @psoc: pointer to psoc object
- * @value: value that needs to be set from the caller
+ *                                             duty-cycle
+ * @pdev: pointer to pdev object
  *
  * primary and secondary STA iface MCC duty-cycle value in below format
  * ******************************************************
@@ -2745,7 +2742,7 @@ ucfg_mlme_get_vendor_vht_for_24ghz(struct wlan_objmgr_psoc *psoc, bool *value)
 /**
  * ucfg_mlme_update_vht_cap() - Update vht capabilities
  * @psoc: psoc context
- * @value: data to be set
+ * @cfg: data to be set
  *
  * Inline UCFG API to be used by HDD/OSIF callers to get the
  * ignore_peer_ht_opmode flag value
@@ -2760,10 +2757,9 @@ QDF_STATUS ucfg_mlme_update_vht_cap(struct wlan_objmgr_psoc *psoc,
 }
 
 /**
- * ucfg_mlme_update_nss_vht_cap() -Update the number of spatial
- * streams supported for vht
+ * ucfg_mlme_update_nss_vht_cap() - Update the number of spatial
+ *                                  streams supported for vht
  * @psoc: psoc context
- * @value: data to be set
  *
  * Inline UCFG API to be used by HDD/OSIF callers to get the
  * ignore_peer_ht_opmode flag value
@@ -2932,7 +2928,7 @@ ucfg_mlme_set_emlsr_mode_enabled(struct wlan_objmgr_psoc *psoc, bool value)
 
 /**
  * ucfg_mlme_get_opr_rate() - Get operational rate set
- * @psoc: pointer to vdev object
+ * @vdev: pointer to vdev object
  * @buf: buffer to get rates set
  * @len: length of the buffer
  *
@@ -2947,7 +2943,7 @@ ucfg_mlme_get_opr_rate(struct wlan_objmgr_vdev *vdev, uint8_t *buf,
 
 /**
  * ucfg_mlme_get_ext_opr_rate() - Get extended operational rate set
- * @psoc: pointer to vdev object
+ * @vdev: pointer to vdev object
  * @buf: buffer to get rates set
  * @len: length of the buffer
  *
@@ -2962,7 +2958,7 @@ ucfg_mlme_get_ext_opr_rate(struct wlan_objmgr_vdev *vdev, uint8_t *buf,
 
 /**
  * ucfg_mlme_get_mcs_rate() - Get MCS based rate set
- * @psoc: pointer to vdev object
+ * @vdev: pointer to vdev object
  * @buf: buffer to get rates set
  * @len: length of the buffer
  *
@@ -3058,8 +3054,7 @@ bool
 ucfg_mlme_stats_is_link_speed_report_actual(struct wlan_objmgr_psoc *psoc);
 
 /**
- * ucfg_mlme_stats_is_link_speed_report_max() - is link speed report set
- * max
+ * ucfg_mlme_stats_is_link_speed_report_max() - is link speed report set max
  * @psoc: pointer to psoc object
  *
  * Return: True is report set to max
@@ -3069,7 +3064,7 @@ ucfg_mlme_stats_is_link_speed_report_max(struct wlan_objmgr_psoc *psoc);
 
 /**
  * ucfg_mlme_stats_is_link_speed_report_max_scaled() - is link speed report set
- * max scaled
+ *                                                     max scaled
  * @psoc: pointer to psoc object
  *
  * Return: True is report set to max scaled
@@ -3079,7 +3074,7 @@ ucfg_mlme_stats_is_link_speed_report_max_scaled(struct wlan_objmgr_psoc *psoc);
 
 /**
  * ucfg_mlme_get_tl_delayed_trgr_frm_int() - Get delay interval(in ms)
- * of UAPSD auto trigger.
+ *                                           of UAPSD auto trigger.
  * @psoc: pointer to psoc object
  * @value: Value that needs to be set from the caller
  *
@@ -3095,8 +3090,7 @@ void ucfg_mlme_get_tl_delayed_trgr_frm_int(struct wlan_objmgr_psoc *psoc,
 }
 
 /**
- * ucfg_mlme_get_wmm_dir_ac_vi() - Get TSPEC direction
- * for VI
+ * ucfg_mlme_get_wmm_dir_ac_vi() - Get TSPEC direction for VI
  * @psoc: pointer to psoc object
  * @value: Value that needs to be set from the caller
  *
@@ -3111,8 +3105,7 @@ ucfg_mlme_get_wmm_dir_ac_vi(struct wlan_objmgr_psoc *psoc, uint8_t *value)
 }
 
 /**
- * ucfg_mlme_get_wmm_nom_msdu_size_ac_vi() - Get normal
- * MSDU size for VI
+ * ucfg_mlme_get_wmm_nom_msdu_size_ac_vi() - Get normal MSDU size for VI
  * @psoc: pointer to psoc object
  * @value: Value that needs to be set from the caller
  *
@@ -3128,8 +3121,7 @@ QDF_STATUS ucfg_mlme_get_wmm_nom_msdu_size_ac_vi(struct wlan_objmgr_psoc *psoc,
 }
 
 /**
- * ucfg_mlme_get_wmm_mean_data_rate_ac_vi() - mean data
- * rate for VI
+ * ucfg_mlme_get_wmm_mean_data_rate_ac_vi() - mean data rate for VI
  * @psoc: pointer to psoc object
  * @value: Value that needs to be set from the caller
  *
@@ -3145,8 +3137,7 @@ QDF_STATUS ucfg_mlme_get_wmm_mean_data_rate_ac_vi(struct wlan_objmgr_psoc *psoc,
 }
 
 /**
- * ucfg_mlme_get_wmm_min_phy_rate_ac_vi() - min PHY
- * rate for VI
+ * ucfg_mlme_get_wmm_min_phy_rate_ac_vi() - min PHY rate for VI
  * @psoc: pointer to psoc object
  * @value: Value that needs to be set from the caller
  *
@@ -3162,8 +3153,7 @@ QDF_STATUS ucfg_mlme_get_wmm_min_phy_rate_ac_vi(struct wlan_objmgr_psoc *psoc,
 }
 
 /**
- * ucfg_mlme_get_wmm_sba_ac_vi() - surplus bandwidth
- * allowance for VI
+ * ucfg_mlme_get_wmm_sba_ac_vi() - surplus bandwidth allowance for VI
  * @psoc: pointer to psoc object
  * @value: Value that needs to be set from the caller
  *
@@ -3179,7 +3169,7 @@ ucfg_mlme_get_wmm_sba_ac_vi(struct wlan_objmgr_psoc *psoc, uint16_t *value)
 
 /**
  * ucfg_mlme_get_wmm_uapsd_vi_srv_intv() - Get Uapsd service
- * interval for video
+ *                                         interval for video
  * @psoc: pointer to psoc object
  * @value: pointer to the value which will be filled for the caller
  *
@@ -3196,7 +3186,7 @@ ucfg_mlme_get_wmm_uapsd_vi_srv_intv(struct wlan_objmgr_psoc *psoc,
 
 /**
  * ucfg_mlme_get_wmm_uapsd_vi_sus_intv() - Get Uapsd suspension
- * interval for video
+ *                                         interval for video
  * @psoc: pointer to psoc object
  * @value: Value that needs to be set from the caller
  *
@@ -3212,8 +3202,7 @@ ucfg_mlme_get_wmm_uapsd_vi_sus_intv(struct wlan_objmgr_psoc *psoc,
 }
 
 /**
- * ucfg_mlme_get_wmm_dir_ac_be() - Get TSPEC direction
- * for BE
+ * ucfg_mlme_get_wmm_dir_ac_be() - Get TSPEC direction for BE
  * @psoc: pointer to psoc object
  * @value: Value that needs to be set from the caller
  *
@@ -3228,8 +3217,7 @@ ucfg_mlme_get_wmm_dir_ac_be(struct wlan_objmgr_psoc *psoc, uint8_t *value)
 }
 
 /**
- * ucfg_mlme_get_wmm_nom_msdu_size_ac_be() - Get normal
- * MSDU size for BE
+ * ucfg_mlme_get_wmm_nom_msdu_size_ac_be() - Get normal MSDU size for BE
  * @psoc: pointer to psoc object
  * @value: Value that needs to be set from the caller
  *
@@ -3245,8 +3233,7 @@ QDF_STATUS ucfg_mlme_get_wmm_nom_msdu_size_ac_be(struct wlan_objmgr_psoc *psoc,
 }
 
 /**
- * ucfg_mlme_get_wmm_mean_data_rate_ac_be() - mean data
- * rate for BE
+ * ucfg_mlme_get_wmm_mean_data_rate_ac_be() - mean data rate for BE
  * @psoc: pointer to psoc object
  * @value: Value that needs to be set from the caller
  *
@@ -3262,8 +3249,7 @@ QDF_STATUS ucfg_mlme_get_wmm_mean_data_rate_ac_be(struct wlan_objmgr_psoc *psoc,
 }
 
 /**
- * ucfg_mlme_get_wmm_min_phy_rate_ac_be() - min PHY
- * rate for BE
+ * ucfg_mlme_get_wmm_min_phy_rate_ac_be() - min PHY rate for BE
  * @psoc: pointer to psoc object
  * @value: Value that needs to be set from the caller
  *
@@ -3279,8 +3265,7 @@ QDF_STATUS ucfg_mlme_get_wmm_min_phy_rate_ac_be(struct wlan_objmgr_psoc *psoc,
 }
 
 /**
- * ucfg_mlme_get_wmm_sba_ac_be() - surplus bandwidth
- * allowance for BE
+ * ucfg_mlme_get_wmm_sba_ac_be() - surplus bandwidth allowance for BE
  * @psoc: pointer to psoc object
  * @value: Value that needs to be set from the caller
  *
@@ -3295,8 +3280,7 @@ ucfg_mlme_get_wmm_sba_ac_be(struct wlan_objmgr_psoc *psoc, uint16_t *value)
 }
 
 /**
- * ucfg_mlme_get_wmm_uapsd_be_srv_intv() - Get Uapsd service
- * interval for BE
+ * ucfg_mlme_get_wmm_uapsd_be_srv_intv() - Get Uapsd service interval for BE
  * @psoc: pointer to psoc object
  * @value: pointer to the value which will be filled for the caller
  *
@@ -3312,8 +3296,7 @@ ucfg_mlme_get_wmm_uapsd_be_srv_intv(struct wlan_objmgr_psoc *psoc,
 }
 
 /**
- * ucfg_mlme_get_wmm_uapsd_be_sus_intv() - Get Uapsd suspension
- * interval for BE
+ * ucfg_mlme_get_wmm_uapsd_be_sus_intv() - Get Uapsd suspension interval for BE
  * @psoc: pointer to psoc object
  * @value: Value that needs to be set from the caller
  *
@@ -3329,8 +3312,7 @@ ucfg_mlme_get_wmm_uapsd_be_sus_intv(struct wlan_objmgr_psoc *psoc,
 }
 
 /**
- * ucfg_mlme_get_wmm_dir_ac_bk() - Get TSPEC direction
- * for BK
+ * ucfg_mlme_get_wmm_dir_ac_bk() - Get TSPEC direction for BK
  * @psoc: pointer to psoc object
  * @value: Value that needs to be set from the caller
  *
@@ -3345,8 +3327,7 @@ ucfg_mlme_get_wmm_dir_ac_bk(struct wlan_objmgr_psoc *psoc, uint8_t *value)
 }
 
 /**
- * ucfg_mlme_get_wmm_nom_msdu_size_ac_be() - Get normal
- * MSDU size for BE
+ * ucfg_mlme_get_wmm_nom_msdu_size_ac_bk() - Get normal MSDU size for BK
  * @psoc: pointer to psoc object
  * @value: Value that needs to be set from the caller
  *
@@ -3362,8 +3343,7 @@ QDF_STATUS ucfg_mlme_get_wmm_nom_msdu_size_ac_bk(struct wlan_objmgr_psoc *psoc,
 }
 
 /**
- * ucfg_mlme_get_wmm_mean_data_rate_ac_bk() - mean data
- * rate for BK
+ * ucfg_mlme_get_wmm_mean_data_rate_ac_bk() - mean data rate for BK
  * @psoc: pointer to psoc object
  * @value: Value that needs to be set from the caller
  *
@@ -3379,8 +3359,7 @@ QDF_STATUS ucfg_mlme_get_wmm_mean_data_rate_ac_bk(struct wlan_objmgr_psoc *psoc,
 }
 
 /**
- * ucfg_mlme_get_wmm_min_phy_rate_ac_bk() - min PHY
- * rate for BE
+ * ucfg_mlme_get_wmm_min_phy_rate_ac_bk() - min PHY rate for BE
  * @psoc: pointer to psoc object
  * @value: Value that needs to be set from the caller
  *
@@ -3396,8 +3375,7 @@ QDF_STATUS ucfg_mlme_get_wmm_min_phy_rate_ac_bk(struct wlan_objmgr_psoc *psoc,
 }
 
 /**
- * ucfg_mlme_get_wmm_sba_ac_bk() - surplus bandwidth
- * allowance for BE
+ * ucfg_mlme_get_wmm_sba_ac_bk() - surplus bandwidt allowance for BE
  * @psoc: pointer to psoc object
  * @value: Value that needs to be set from the caller
  *
@@ -3412,8 +3390,7 @@ ucfg_mlme_get_wmm_sba_ac_bk(struct wlan_objmgr_psoc *psoc, uint16_t *value)
 }
 
 /**
- * ucfg_mlme_get_wmm_uapsd_bk_srv_intv() - Get Uapsd service
- * interval for BK
+ * ucfg_mlme_get_wmm_uapsd_bk_srv_intv() - Get Uapsd service interval for BK
  * @psoc: pointer to psoc object
  * @value: pointer to the value which will be filled for the caller
  *
@@ -3429,8 +3406,7 @@ ucfg_mlme_get_wmm_uapsd_bk_srv_intv(struct wlan_objmgr_psoc *psoc,
 }
 
 /**
- * ucfg_mlme_get_wmm_uapsd_bk_sus_intv() - Get Uapsd suspension
- * interval for BK
+ * ucfg_mlme_get_wmm_uapsd_bk_sus_intv() - Get Uapsd suspension interval for BK
  * @psoc: pointer to psoc object
  * @value: Value that needs to be set from the caller
  *
@@ -4187,7 +4163,8 @@ ucfg_mlme_get_11d_in_world_mode(struct wlan_objmgr_psoc *psoc,
 				bool *value);
 
 /**
- * ucfg_mlme_restart_beaconing_on_ch_avoid() - get restart beaconing on ch avoid
+ * ucfg_mlme_get_restart_beaconing_on_ch_avoid() - get restart beaconing on
+ *                                                 channel avoid
  * @psoc:   pointer to psoc object
  * @value:  pointer to the value which will be filled for the caller
  *
@@ -4249,7 +4226,7 @@ ucfg_mlme_get_valid_channel_freq_list(struct wlan_objmgr_psoc *psoc,
  * ucfg_mlme_is_subnet_detection_enabled() - check if sub net detection is
  * enabled/disabled
  * @psoc: pointer to psoc object
- * @value: value that is requested by the caller
+ * @val: value that is requested by the caller
  *
  * Inline UCFG API to be used by HDD/OSIF callers
  *
@@ -4637,7 +4614,6 @@ ucfg_mlme_cfg_get_ht_smps(struct wlan_objmgr_psoc *psoc,
  * ucfg_mlme_get_coex_unsafe_chan_nb_user_prefer() - get coex unsafe nb
  * support
  * @psoc:   pointer to psoc object
- * @value:  pointer to the value which will be filled for the caller
  *
  * Return: coex_unsafe_chan_nb_user_prefer
  */
@@ -4648,7 +4624,6 @@ bool ucfg_mlme_get_coex_unsafe_chan_nb_user_prefer(
  * ucfg_mlme_get_coex_unsafe_chan_reg_disable() - get reg disable cap for
  * coex unsafe channels support
  * @psoc:   pointer to psoc object
- * @value:  pointer to the value which will be filled for the caller
  *
  * Return: coex_unsafe_chan_reg_disable
  */
@@ -4932,4 +4907,19 @@ ucfg_mlme_get_sr_enable_modes(struct wlan_objmgr_psoc *psoc,
 	*val = 0;
 }
 #endif
+
+/**
+ * ucfg_mlme_get_valid_channels  - get valid channels for
+ * current regulatory domain
+ * @psoc: pointer to psoc object
+ * @ch_freq_list: list of the valid channel frequencies
+ * @list_len: length of the channel list
+ *
+ * This function will get valid channels for current regulatory domain
+ *
+ * Return: QDF_STATUS_SUCCESS or non-zero on failure
+ */
+QDF_STATUS
+ucfg_mlme_get_valid_channels(struct wlan_objmgr_psoc *psoc,
+			     uint32_t *ch_freq_list, uint32_t *list_len);
 #endif /* _WLAN_MLME_UCFG_API_H_ */

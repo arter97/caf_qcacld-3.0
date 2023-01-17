@@ -105,7 +105,7 @@ void hdd_get_apf_capabilities_cb(void *context,
 
 /**
  * hdd_post_get_apf_capabilities_rsp() - Callback function to APF Offload
- * @hdd_context: hdd_context
+ * @hdd_ctx: hdd_context
  * @apf_get_offload: struct for get offload
  *
  * Return: 0 on success, error number otherwise.
@@ -123,10 +123,10 @@ hdd_post_get_apf_capabilities_rsp(struct hdd_context *hdd_ctx,
 	nl_buf_len +=
 		(sizeof(apf_get_offload->max_bytes_for_apf_inst) + NLA_HDRLEN) +
 		(sizeof(apf_get_offload->apf_version) + NLA_HDRLEN);
-
-	skb = cfg80211_vendor_cmd_alloc_reply_skb(hdd_ctx->wiphy, nl_buf_len);
+	skb = wlan_cfg80211_vendor_cmd_alloc_reply_skb(hdd_ctx->wiphy,
+						       nl_buf_len);
 	if (!skb) {
-		hdd_err("cfg80211_vendor_cmd_alloc_reply_skb failed");
+		hdd_err("wlan_cfg80211_vendor_cmd_alloc_reply_skb failed");
 		return -ENOMEM;
 	}
 
@@ -142,12 +142,12 @@ hdd_post_get_apf_capabilities_rsp(struct hdd_context *hdd_ctx,
 		goto nla_put_failure;
 	}
 
-	cfg80211_vendor_cmd_reply(skb);
+	wlan_cfg80211_vendor_cmd_reply(skb);
 	hdd_exit();
 	return 0;
 
 nla_put_failure:
-	kfree_skb(skb);
+	wlan_cfg80211_vendor_free_skb(skb);
 	return -EINVAL;
 }
 
@@ -412,7 +412,7 @@ hdd_apf_write_memory(struct hdd_adapter *adapter, struct nlattr **tb)
 /**
  * hdd_apf_read_memory_callback - HDD Callback for the APF read memory
  *	operation
- * @context: Hdd context
+ * @hdd_context: Hdd context
  * @evt: APF read memory event response parameters
  *
  * Return: 0 on success, errno on failure
@@ -557,10 +557,10 @@ static int hdd_apf_read_memory(struct hdd_adapter *adapter, struct nlattr **tb)
 
 	nl_buf_len += sizeof(uint32_t) + NLA_HDRLEN;
 	nl_buf_len += context->buf_len + NLA_HDRLEN;
-
-	skb = cfg80211_vendor_cmd_alloc_reply_skb(hdd_ctx->wiphy, nl_buf_len);
+	skb = wlan_cfg80211_vendor_cmd_alloc_reply_skb(hdd_ctx->wiphy,
+						       nl_buf_len);
 	if (!skb) {
-		hdd_err("cfg80211_vendor_cmd_alloc_reply_skb failed");
+		hdd_err("wlan_cfg80211_vendor_cmd_alloc_reply_skb failed");
 		ret = -ENOMEM;
 		goto fail;
 	}
@@ -568,12 +568,12 @@ static int hdd_apf_read_memory(struct hdd_adapter *adapter, struct nlattr **tb)
 	if (nla_put_u32(skb, APF_SUBCMD, QCA_WLAN_READ_PACKET_FILTER) ||
 	    nla_put(skb, APF_PROGRAM, read_mem_params.length, context->buf)) {
 		hdd_err("put fail");
-		kfree_skb(skb);
+		wlan_cfg80211_vendor_free_skb(skb);
 		ret = -EINVAL;
 		goto fail;
 	}
 
-	cfg80211_vendor_cmd_reply(skb);
+	wlan_cfg80211_vendor_cmd_reply(skb);
 
 	hdd_debug("Reading APF work memory from offset 0x%X:",
 		  read_mem_params.addr_offset);
@@ -589,7 +589,7 @@ fail:
 }
 
 /**
- * wlan_hdd_cfg80211_apf_offload() - Set/Reset to APF Offload
+ * __wlan_hdd_cfg80211_apf_offload() - Set/Reset to APF Offload
  * @wiphy:    wiphy structure pointer
  * @wdev:     Wireless device structure pointer
  * @data:     Pointer to the data received

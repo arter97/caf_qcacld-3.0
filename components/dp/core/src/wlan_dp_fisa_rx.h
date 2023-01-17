@@ -95,7 +95,7 @@ QDF_STATUS dp_rx_dump_fisa_stats(struct dp_soc *soc);
  *
  * Return: QDF_STATUS
  */
-QDF_STATUS dp_fisa_rx(struct dp_soc *dp_fisa_rx_hdl, struct dp_vdev *vdev,
+QDF_STATUS dp_fisa_rx(struct dp_soc *soc, struct dp_vdev *vdev,
 		      qdf_nbuf_t nbuf_list);
 
 /**

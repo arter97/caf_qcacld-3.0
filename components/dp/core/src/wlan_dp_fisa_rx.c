@@ -155,6 +155,8 @@ static void nbuf_skip_rx_pkt_tlv(struct dp_soc *soc, qdf_nbuf_t nbuf)
 /**
  * print_flow_tuple() - Debug function to dump flow tuple
  * @flow_tuple: flow tuple containing tuple info
+ * @str: destination buffer
+ * @size: size of @str
  *
  * Return: NONE
  */
@@ -339,6 +341,7 @@ static void dp_rx_fisa_record_ft_lock_event(uint8_t reo_id, const char *func,
  * __dp_rx_fisa_acquire_ft_lock() - Acquire lock which protects SW FT entries
  * @fisa_hdl: Handle to fisa context
  * @reo_id: REO ID
+ * @func: calling function name
  *
  * Return: None
  */
@@ -357,6 +360,7 @@ __dp_rx_fisa_acquire_ft_lock(struct dp_rx_fst *fisa_hdl,
  * __dp_rx_fisa_release_ft_lock() - Release lock which protects SW FT entries
  * @fisa_hdl: Handle to fisa context
  * @reo_id: REO ID
+ * @func: calling function name
  *
  * Return: None
  */
@@ -453,6 +457,7 @@ dp_rx_fisa_setup_cmem_fse(struct dp_rx_fst *fisa_hdl, uint32_t hashed_flow_idx,
  * @sw_ft_entry: Pointer to softerware flow table entry
  * @flow_hash: flow_hash for the flow
  * @vdev: Saving dp_vdev in FT later used in the flushing the flow
+ * @soc_hdl: HAL soc handle
  * @flow_id: Flow ID of the flow
  *
  * Return: NONE
@@ -667,8 +672,9 @@ static bool is_flow_idx_valid(bool flow_invalid, bool flow_timeout)
 
 #ifdef WLAN_SUPPORT_RX_FISA_HIST
 /**
- * dp_rx_fisa_get_pkt_hist() - Get ptr to pkt history from rx sw ft entry
+ * dp_rx_fisa_save_pkt_hist() - Save pkt history from rx sw ft entry
  * @ft_entry: sw ft entry
+ * @pkt_hist: pkt history ptr
  *
  * Return: None
  */
@@ -681,7 +687,7 @@ dp_rx_fisa_save_pkt_hist(struct dp_fisa_rx_sw_ft *ft_entry,
 }
 
 /**
- * dp_rx_fisa_set_pkt_hist() - Set rx sw ft entry pkt history
+ * dp_rx_fisa_restore_pkt_hist() - Restore rx sw ft entry pkt history
  * @ft_entry: sw ft entry
  * @pkt_hist: pkt history ptr
  *
@@ -1268,7 +1274,8 @@ dp_rx_fisa_aggr_tcp(struct dp_rx_fst *fisa_hdl,
 /**
  * get_transport_payload_offset() - Get offset to payload
  * @fisa_hdl: Handle to FISA context
- * @rx_tlv_hdr: TLV hdr pointer
+ * @l3_hdr_offset: layer 3 header offset
+ * @l4_hdr_offset: layer 4 header offset
  *
  * Return: Offset value to transport payload
  */
@@ -1283,7 +1290,8 @@ static inline int get_transport_payload_offset(struct dp_rx_fst *fisa_hdl,
 /**
  * get_transport_header_offset() - Get transport header offset
  * @fisa_flow: Handle to FISA sw flow entry
- * @rx_tlv_hdr: TLV hdr pointer
+ * @l3_hdr_offset: layer 3 header offset
+ * @l4_hdr_offset: layer 4 header offset
  *
  * Return: Offset value to transport header
  */
@@ -1299,6 +1307,7 @@ int get_transport_header_offset(struct dp_fisa_rx_sw_ft *fisa_flow,
 
 /**
  * dp_rx_fisa_aggr_udp() - Aggregate incoming to UDP nbuf
+ * @fisa_hdl: Handle fisa context
  * @fisa_flow: Handle to SW flow entry, which holds the aggregated nbuf
  * @nbuf: Incoming nbuf
  *
@@ -1609,7 +1618,7 @@ dp_rx_fisa_flush_tcp_flow(struct dp_vdev *vdev,
 /**
  * dp_rx_fisa_flush_flow() - Flush all aggregated nbuf of the flow
  * @vdev: handle to dp_vdev
- * @fisa_flow: Flow for which aggregates to be flushed
+ * @flow: Flow for which aggregates to be flushed
  *
  * Return: None
  */
@@ -1632,7 +1641,7 @@ static void dp_rx_fisa_flush_flow(struct dp_vdev *vdev,
  * @rx_tlv_hdr: current msdu RX PKT TLV
  *
  * Return: true - current flow aggregation should stop,
-	   false - continue to aggregate.
+ *	   false - continue to aggregate.
  */
 static bool dp_fisa_aggregation_should_stop(
 				struct dp_fisa_rx_sw_ft *fisa_flow,

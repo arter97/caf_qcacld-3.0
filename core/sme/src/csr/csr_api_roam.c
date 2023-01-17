@@ -1522,17 +1522,6 @@ bool csr_roam_is_ese_assoc(struct mac_context *mac_ctx, uint32_t session_id)
 
 
 /**
- * csr_roam_is_ese_ini_feature_enabled() - is ese feature enabled
- * @mac_ctx: Global MAC context
- *
- * Return: true if ese feature is enabled; false otherwise
- */
-bool csr_roam_is_ese_ini_feature_enabled(struct mac_context *mac)
-{
-	return mac->mlme_cfg->lfr.ese_enabled;
-}
-
-/**
  * csr_tsm_stats_rsp_processor() - tsm stats response processor
  * @mac: Global MAC context
  * @pMsg: Message pointer
@@ -2576,6 +2565,7 @@ static void csr_get_peer_stats(struct mac_context *mac, uint32_t session_id,
 	qdf_mem_copy(info.peer_mac_addr, &peer_mac, QDF_MAC_ADDR_SIZE);
 	sme_debug("peer_mac" QDF_MAC_ADDR_FMT,
 		  QDF_MAC_ADDR_REF(peer_mac.bytes));
+	mlme_obj->disconnect_stats_param.vdev_id = info.vdev_id;
 	status = ucfg_mc_cp_stats_send_stats_request(vdev, TYPE_PEER_STATS,
 						     &info);
 	if (QDF_IS_STATUS_ERROR(status)) {
@@ -2588,7 +2578,6 @@ static void csr_get_peer_stats(struct mac_context *mac, uint32_t session_id,
 	qdf_mc_timer_start(
 		&mlme_obj->disconnect_stats_param.disconn_stats_timer,
 		SME_CMD_GET_DISCONNECT_STATS_TIMEOUT);
-	mlme_obj->disconnect_stats_param.vdev_id = info.vdev_id;
 
 	wma_get_rx_retry_cnt(mac, session_id, info.peer_mac_addr);
 	wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_SME_ID);
@@ -7637,6 +7626,7 @@ fail:
  * @mac_ctx: Global mac context pointer
  * @vdev_id: vdev id
  * @roam_bssid: Candidate BSSID to roam
+ * @akm: Candidate AKM
  *
  * This function calls the hdd_sme_roam_callback with reason
  * eCSR_ROAM_SAE_COMPUTE to trigger SAE auth to supplicant.
@@ -7644,7 +7634,8 @@ fail:
 static QDF_STATUS
 csr_process_roam_auth_sae_callback(struct mac_context *mac_ctx,
 				   uint8_t vdev_id,
-				   struct qdf_mac_addr roam_bssid)
+				   struct qdf_mac_addr roam_bssid,
+				   uint32_t akm)
 {
 	struct csr_roam_info *roam_info;
 	struct sir_sae_info sae_info;
@@ -7662,6 +7653,7 @@ csr_process_roam_auth_sae_callback(struct mac_context *mac_ctx,
 
 	sae_info.msg_len = sizeof(sae_info);
 	sae_info.vdev_id = vdev_id;
+	sae_info.akm = akm;
 	wlan_cm_get_roam_offload_ssid(mac_ctx->psoc, vdev_id,
 				      sae_info.ssid.ssId,
 				      &sae_info.ssid.length);
@@ -7681,15 +7673,16 @@ csr_process_roam_auth_sae_callback(struct mac_context *mac_ctx,
 static inline QDF_STATUS
 csr_process_roam_auth_sae_callback(struct mac_context *mac_ctx,
 				   uint8_t vdev_id,
-				   struct qdf_mac_addr roam_bssid)
+				   struct qdf_mac_addr roam_bssid,
+				   uint32_t akm)
 {
 	return QDF_STATUS_E_NOSUPPORT;
 }
 #endif
 
 QDF_STATUS
-csr_roam_auth_offload_callback(struct mac_context *mac_ctx,
-			       uint8_t vdev_id, struct qdf_mac_addr bssid)
+csr_roam_auth_offload_callback(struct mac_context *mac_ctx, uint8_t vdev_id,
+			       struct qdf_mac_addr bssid, uint32_t akm)
 {
 	QDF_STATUS status;
 
@@ -7697,7 +7690,8 @@ csr_roam_auth_offload_callback(struct mac_context *mac_ctx,
 	if (!QDF_IS_STATUS_SUCCESS(status))
 		return status;
 
-	status = csr_process_roam_auth_sae_callback(mac_ctx, vdev_id, bssid);
+	status = csr_process_roam_auth_sae_callback(mac_ctx, vdev_id,
+						    bssid, akm);
 
 	sme_release_global_lock(&mac_ctx->sme);
 
@@ -7869,7 +7863,7 @@ QDF_STATUS csr_roam_issue_stop_bss_cmd(struct mac_context *mac,
 	sme_debug("Stop BSS vdev_id: %d bss_type %d", vdev_id, bss_type);
 	stop_bss_req = qdf_mem_malloc(sizeof(*stop_bss_req));
 	if (!stop_bss_req)
-		return QDF_STATUS_E_FAILURE;
+		goto error;
 
 	stop_bss_req->vdev_id = vdev_id;
 	stop_bss_req->cmd_id = csr_get_monotonous_number(mac);

@@ -79,7 +79,7 @@ struct dp_consistent_prealloc {
 
 /**
  * struct dp_multi_page_prealloc -  element representing DP pre-alloc multiple
-				    pages memory
+ *				    pages memory
  * @desc_type: source descriptor type for memory allocation
  * @element_size: single element size
  * @element_num: total number of elements should be allocated
@@ -98,7 +98,7 @@ struct dp_multi_page_prealloc {
 
 /**
  * struct dp_consistent_prealloc_unaligned - element representing DP pre-alloc
-					     unaligned memory
+ *					     unaligned memory
  * @ring_type: HAL ring type
  * @size: size of pre-alloc memory
  * @in_use: whether this element is in use (occupied)

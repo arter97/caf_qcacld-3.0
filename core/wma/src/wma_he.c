@@ -1376,7 +1376,7 @@ void wma_vdev_set_he_bss_params(tp_wma_handle wma, uint8_t vdev_id,
 	if (!he_info->he_ops)
 		return;
 	ret = wma_vdev_set_param(wma->wmi_handle, vdev_id,
-			WMI_VDEV_PARAM_HEOPS_0_31, he_info->he_ops);
+			wmi_vdev_param_set_heop, he_info->he_ops);
 
 	if (QDF_IS_STATUS_ERROR(ret))
 		wma_err("Failed to set HE OPs");
@@ -1389,7 +1389,7 @@ void wma_vdev_set_he_config(tp_wma_handle wma, uint8_t vdev_id,
 	int8_t pd_min, pd_max, sec_ch_ed, tx_pwr;
 
 	ret = wma_vdev_set_param(wma->wmi_handle, vdev_id,
-				 WMI_VDEV_PARAM_OBSSPD, add_bss->he_sta_obsspd);
+				 wmi_vdev_param_obsspd, add_bss->he_sta_obsspd);
 	if (QDF_IS_STATUS_ERROR(ret))
 		wma_err("Failed to set HE Config");
 	pd_min = add_bss->he_sta_obsspd & 0xff,
@@ -1397,7 +1397,7 @@ void wma_vdev_set_he_config(tp_wma_handle wma, uint8_t vdev_id,
 	sec_ch_ed = (add_bss->he_sta_obsspd & 0xff0000) >> 16,
 	tx_pwr = (add_bss->he_sta_obsspd & 0xff000000) >> 24;
 	wma_debug("HE_STA_OBSSPD: PD_MIN: %d PD_MAX: %d SEC_CH_ED: %d TX_PWR: %d",
-		 pd_min, pd_max, sec_ch_ed, tx_pwr);
+		  pd_min, pd_max, sec_ch_ed, tx_pwr);
 }
 
 QDF_STATUS wma_update_he_ops_ie(tp_wma_handle wma, uint8_t vdev_id,
@@ -1418,7 +1418,7 @@ QDF_STATUS wma_update_he_ops_ie(tp_wma_handle wma, uint8_t vdev_id,
 
 	wma_debug("vdev_id: %d HE_OPs: 0x%x", vdev_id, dword_he_op);
 	ret = wma_vdev_set_param(wma->wmi_handle, vdev_id,
-			WMI_VDEV_PARAM_HEOPS_0_31, dword_he_op);
+			wmi_vdev_param_set_heop, dword_he_op);
 
 	if (QDF_IS_STATUS_ERROR(ret))
 		wma_err("Failed to set HE OPs");
@@ -1464,7 +1464,7 @@ void wma_set_he_txbf_params(uint8_t vdev_id, bool su_bfer,
 	 *  6  | UL MUMIMO
 	 */
 	status = wma_vdev_set_param(wma->wmi_handle, vdev_id,
-				    WMI_VDEV_PARAM_SET_HEMU_MODE, hemu_mode);
+				    wmi_vdev_param_set_hemu_mode, hemu_mode);
 	wma_debug("set HEMU_MODE (hemu_mode = 0x%x)", hemu_mode);
 
 	if (QDF_IS_STATUS_ERROR(status))
@@ -1494,14 +1494,15 @@ QDF_STATUS wma_get_he_capabilities(struct he_capability *he_cap)
 	return QDF_STATUS_SUCCESS;
 }
 
-void wma_set_he_vdev_param(struct wma_txrx_node *intr, WMI_VDEV_PARAM param_id,
+void wma_set_he_vdev_param(struct wma_txrx_node *intr,
+			   wmi_conv_vdev_param_id param_id,
 			   uint32_t value)
 {
 	switch (param_id) {
-	case WMI_VDEV_PARAM_HE_DCM:
+	case wmi_vdev_param_he_dcm_enable:
 		intr->config.dcm = value;
 		break;
-	case WMI_VDEV_PARAM_HE_RANGE_EXT:
+	case wmi_vdev_param_he_range_ext:
 		intr->config.range_ext = value;
 		break;
 	default:
@@ -1511,16 +1512,45 @@ void wma_set_he_vdev_param(struct wma_txrx_node *intr, WMI_VDEV_PARAM param_id,
 }
 
 uint32_t wma_get_he_vdev_param(struct wma_txrx_node *intr,
-			       WMI_VDEV_PARAM param_id)
+			       wmi_conv_vdev_param_id param_id)
 {
 	switch (param_id) {
-	case WMI_VDEV_PARAM_HE_DCM:
+	case wmi_vdev_param_he_dcm_enable:
 		return intr->config.dcm;
-	case WMI_VDEV_PARAM_HE_RANGE_EXT:
+	case wmi_vdev_param_he_range_ext:
 		return intr->config.range_ext;
 	default:
 		wma_err("Unhandled HE vdev param: %0x", param_id);
 		break;
 	}
 	return 0;
+}
+
+QDF_STATUS wma_get_hemu_mode(uint32_t *hemumode, struct mac_context *mac)
+{
+	if (!hemumode || !mac)
+		return QDF_STATUS_E_FAILURE;
+
+	*hemumode = DOT11AX_HEMU_MODE;
+	*hemumode |= ((mac->mlme_cfg->he_caps.dot11_he_cap.su_beamformer << HE_SUBFER) |
+		      (mac->mlme_cfg->he_caps.dot11_he_cap.su_beamformee << HE_SUBFEE) |
+		      (mac->mlme_cfg->he_caps.dot11_he_cap.mu_beamformer << HE_MUBFER) |
+		      (mac->mlme_cfg->he_caps.dot11_he_cap.su_beamformee << HE_MUBFEE));
+	/*
+	 * Enable / disable trigger access for a AP vdev's peers.
+	 * For a STA mode vdev this will enable/disable triggered
+	 * access and enable/disable Multi User mode of operation.
+	 * A value of 0 in a given bit disables corresponding mode.
+	 * bit | hemu mode
+	 * ---------------
+	 *  0  | HE SUBFEE
+	 *  1  | HE SUBFER
+	 *  2  | HE MUBFEE
+	 *  3  | HE MUBFER
+	 *  4  | DL OFDMA, for AP its DL Tx OFDMA for Sta its Rx OFDMA
+	 *  5  | UL OFDMA, for AP its Tx OFDMA trigger for Sta its
+	 *                Rx OFDMA trigger receive & UL response
+	 *  6  | UL MUMIMO
+	 */
+	return QDF_STATUS_SUCCESS;
 }
