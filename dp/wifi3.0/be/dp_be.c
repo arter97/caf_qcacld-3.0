@@ -2686,9 +2686,21 @@ static int8_t dp_ipa_get_bank_id_be(struct dp_soc *soc)
 	return be_soc->ipa_bank_id;
 }
 
+#ifdef QCA_IPA_LL_TX_FLOW_CONTROL
+static void dp_ipa_get_wdi_version_be(uint8_t *wdi_ver)
+{
+	*wdi_ver = IPA_WDI_4;
+}
+#else
+static inline void dp_ipa_get_wdi_version_be(uint8_t *wdi_ver)
+{
+}
+#endif
+
 static inline void dp_initialize_arch_ops_be_ipa(struct dp_arch_ops *arch_ops)
 {
 	arch_ops->ipa_get_bank_id = dp_ipa_get_bank_id_be;
+	arch_ops->ipa_get_wdi_ver = dp_ipa_get_wdi_version_be;
 }
 #else /* !IPA_OFFLOAD */
 static inline void dp_initialize_arch_ops_be_ipa(struct dp_arch_ops *arch_ops)

@@ -15464,6 +15464,7 @@ static struct cdp_ipa_ops dp_ops_ipa = {
 #ifdef IPA_WDS_EASYMESH_FEATURE
 	.ipa_ast_create = dp_ipa_ast_create,
 #endif
+	.ipa_get_wdi_version = dp_ipa_get_wdi_version,
 };
 #endif
 

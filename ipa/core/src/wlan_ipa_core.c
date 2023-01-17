@@ -519,7 +519,7 @@ drop_pkt:
  */
 #if defined(QCA_WIFI_QCA6290) || defined(QCA_WIFI_QCA6390) || \
     defined(QCA_WIFI_QCA6490) || defined(QCA_WIFI_QCA6750) || \
-    defined(QCA_WIFI_WCN7850) || defined(QCA_WIFI_QCN9000)
+    defined(QCA_WIFI_WCN7850)
 static inline void wlan_ipa_wdi_get_wdi_version(struct wlan_ipa_priv *ipa_ctx)
 {
 	ipa_ctx->wdi_version = IPA_WDI_3;
@@ -528,6 +528,14 @@ static inline void wlan_ipa_wdi_get_wdi_version(struct wlan_ipa_priv *ipa_ctx)
 static inline void wlan_ipa_wdi_get_wdi_version(struct wlan_ipa_priv *ipa_ctx)
 {
 	ipa_ctx->wdi_version = IPA_WDI_3_V2;
+}
+#elif defined(QCA_WIFI_QCN9000) || defined(QCA_WIFI_QCN9224)
+static inline void wlan_ipa_wdi_get_wdi_version(struct wlan_ipa_priv *ipa_ctx)
+{
+	uint8_t wdi_ver;
+
+	cdp_ipa_get_wdi_version(ipa_ctx->dp_soc, &wdi_ver);
+	ipa_ctx->wdi_version = wdi_ver;
 }
 #elif defined(QCA_WIFI_3_0)
 static inline void wlan_ipa_wdi_get_wdi_version(struct wlan_ipa_priv *ipa_ctx)
@@ -2181,7 +2189,8 @@ end:
 #if defined(QCA_WIFI_QCA6290) || defined(QCA_WIFI_QCA6390) || \
     defined(QCA_WIFI_QCA6490) || defined(QCA_WIFI_QCA6750) || \
     defined(QCA_WIFI_WCN7850) || defined(QCA_WIFI_QCN9000) || \
-    defined(QCA_WIFI_KIWI) || defined(QCA_WIFI_KIWI_V2)
+    defined(QCA_WIFI_KIWI) || defined(QCA_WIFI_KIWI_V2)    || \
+    defined(QCA_WIFI_QCN9224)
 
 #ifdef QCA_CONFIG_RPS
 void ipa_set_rps(struct wlan_ipa_priv *ipa_ctx, enum QDF_OPMODE mode,
