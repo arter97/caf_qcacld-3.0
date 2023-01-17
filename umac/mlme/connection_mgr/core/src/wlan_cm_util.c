@@ -1647,8 +1647,8 @@ void cm_req_history_del(struct cnx_mgr *cm_ctx,
 
 void cm_req_history_init(struct cnx_mgr *cm_ctx)
 {
-	qdf_spinlock_create(&cm_ctx->req_history.cm_req_hist_lock);
 	qdf_mem_zero(&cm_ctx->req_history, sizeof(struct cm_req_history));
+	qdf_spinlock_create(&cm_ctx->req_history.cm_req_hist_lock);
 }
 
 void cm_req_history_deinit(struct cnx_mgr *cm_ctx)
