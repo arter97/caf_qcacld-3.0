@@ -4240,6 +4240,19 @@ dp_get_peer_telemetry_stats(struct cdp_soc_t *soc_hdl, uint8_t *addr,
 QDF_STATUS
 dp_get_peer_deter_stats(struct cdp_soc_t *soc_hdl, uint8_t *addr,
 			struct cdp_peer_deter_stats *stats);
+
+/*
+ * dp_get_pdev_deter_stats- API to get pdev deterministic stats
+ * @soc_hdl: soc handle
+ * @pdev_id: id of pdev handle
+ * @stats: pointer to pdev deterministic stats
+ *
+ * Return: QDF_STATUS_SUCCESS: Success
+ *         QDF_STATUS_E_FAILURE: Error
+ */
+QDF_STATUS
+dp_get_pdev_deter_stats(struct cdp_soc_t *soc_hdl, uint8_t pdev_id,
+			struct cdp_pdev_deter_stats *stats);
 #endif /* WLAN_TELEMETRY_STATS_SUPPORT */
 
 #ifdef CONNECTIVITY_PKTLOG

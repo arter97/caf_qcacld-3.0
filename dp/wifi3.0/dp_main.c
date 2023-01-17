@@ -14202,6 +14202,7 @@ static struct cdp_host_stats_ops dp_ops_host_stats = {
 #ifdef WLAN_TELEMETRY_STATS_SUPPORT
 	.txrx_pdev_telemetry_stats = dp_get_pdev_telemetry_stats,
 	.txrx_peer_telemetry_stats = dp_get_peer_telemetry_stats,
+	.txrx_pdev_deter_stats = dp_get_pdev_deter_stats,
 	.txrx_peer_deter_stats = dp_get_peer_deter_stats,
 #endif
 	.txrx_get_peer_extd_rate_link_stats =

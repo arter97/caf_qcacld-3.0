@@ -9288,6 +9288,39 @@ dp_get_peer_telemetry_stats(struct cdp_soc_t *soc_hdl, uint8_t *addr,
 }
 
 QDF_STATUS
+dp_get_pdev_deter_stats(struct cdp_soc_t *soc_hdl, uint8_t pdev_id,
+			struct cdp_pdev_deter_stats *stats)
+{
+	struct dp_soc *soc = (struct dp_soc *)soc_hdl;
+	struct dp_pdev *pdev = dp_get_pdev_from_soc_pdev_id_wifi3(soc, pdev_id);
+
+	if (!pdev)
+		return QDF_STATUS_E_FAILURE;
+
+	qdf_mem_copy(stats->dl_ofdma_usr, pdev->stats.deter_stats.dl_ofdma_usr,
+		     sizeof(stats->dl_ofdma_usr[0]) * CDP_MU_MAX_USERS);
+	qdf_mem_copy(stats->ul_ofdma_usr, pdev->stats.deter_stats.ul_ofdma_usr,
+		     sizeof(stats->ul_ofdma_usr[0]) * CDP_MU_MAX_USERS);
+	qdf_mem_copy(stats->dl_mimo_usr, pdev->stats.deter_stats.dl_mimo_usr,
+		     sizeof(stats->dl_mimo_usr[0]) * CDP_MU_MAX_USERS);
+	qdf_mem_copy(stats->ul_mimo_usr, pdev->stats.deter_stats.ul_mimo_usr,
+		     sizeof(stats->ul_mimo_usr[0]) * CDP_MU_MAX_USERS);
+
+	qdf_mem_copy(stats->ul_mode_cnt, pdev->stats.deter_stats.ul_mode_cnt,
+		     sizeof(stats->ul_mode_cnt[0]) * TX_MODE_UL_MAX);
+	qdf_mem_copy(stats->dl_mode_cnt, pdev->stats.deter_stats.dl_mode_cnt,
+		     sizeof(stats->dl_mode_cnt[0]) * TX_MODE_DL_MAX);
+	qdf_mem_copy(stats->ch_access_delay,
+		     pdev->stats.deter_stats.ch_access_delay,
+		     sizeof(stats->ch_access_delay[0]) * WME_AC_MAX);
+
+	stats->trigger_success = pdev->stats.deter_stats.trigger_success;
+	stats->trigger_fail = pdev->stats.deter_stats.trigger_fail;
+
+	return QDF_STATUS_SUCCESS;
+}
+
+QDF_STATUS
 dp_get_peer_deter_stats(struct cdp_soc_t *soc_hdl, uint8_t *addr,
 			struct cdp_peer_deter_stats *stats)
 {
