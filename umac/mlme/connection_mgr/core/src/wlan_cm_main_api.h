@@ -137,6 +137,7 @@ QDF_STATUS cm_connect_scan_start(struct cnx_mgr *cm_ctx,
 /**
  * cm_connect_scan_resp() - Handle the connect scan resp and next action
  * scan if no candidate are found in scan db.
+ * @cm_ctx: connection manager context
  * @scan_id: scan id of the req
  * @status: Connect scan status
  *
@@ -270,7 +271,7 @@ QDF_STATUS cm_connect_complete(struct cnx_mgr *cm_ctx,
 /**
  * cm_add_connect_req_to_list() - add connect req to the connection manager
  * req list
- * @vdev: vdev on which connect is received
+ * @cm_ctx: connection manager context
  * @req: Connection req provided
  *
  * Return: QDF status
@@ -386,7 +387,7 @@ QDF_STATUS cm_disconnect_complete(struct cnx_mgr *cm_ctx,
 /**
  * cm_add_disconnect_req_to_list() - add disconnect req to the connection
  * manager req list
- * @vdev: vdev on which connect is received
+ * @cm_ctx: connection manager context
  * @req: Disconnection req provided
  *
  * Return: QDF status
@@ -451,9 +452,9 @@ QDF_STATUS cm_vdev_down_req(struct wlan_objmgr_vdev *vdev, uint32_t status);
 /**
  * cm_disconnect_rsp() - Connection manager api to post connect event
  * @vdev: VDEV object
- * @cm_discon_rsp: Disconnect response
+ * @resp: Disconnect response
  *
- * This function is called when disconnecte response is received, to deliver
+ * This function is called when disconnect response is received, to deliver
  * disconnect event to SM
  *
  * Context: Any context.
@@ -855,6 +856,7 @@ cm_fill_disconnect_resp_from_cm_id(struct cnx_mgr *cm_ctx, wlan_cm_id cm_id,
  * @cm_ctx: connection manager context
  * @bcn_probe: beacon or probe resp received during connect
  * @len: beacon or probe resp length
+ * @freq: scan frequency in MHz
  * @rssi: rssi of the beacon or probe resp
  * @cm_id: cm id of connect/disconnect req
  *
@@ -1025,7 +1027,7 @@ bool cm_get_active_connect_req(struct wlan_objmgr_vdev *vdev,
 bool cm_get_active_disconnect_req(struct wlan_objmgr_vdev *vdev,
 				  struct wlan_cm_vdev_discon_req *req);
 
-/*
+/**
  * cm_connect_handle_event_post_fail() - initiate connect failure if msg posting
  * to SM fails
  * @cm_ctx: connection manager context
@@ -1132,7 +1134,7 @@ void cm_req_history_del(struct cnx_mgr *cm_ctx,
 			enum cm_req_del_type del_type);
 
 /**
- * cm_history_init() - Initialize the history data struct
+ * cm_req_history_init() - Initialize the history data struct
  * @cm_ctx: Connection manager context
  *
  * Return: void
@@ -1140,7 +1142,7 @@ void cm_req_history_del(struct cnx_mgr *cm_ctx,
 void cm_req_history_init(struct cnx_mgr *cm_ctx);
 
 /**
- * cm_history_deinit() - Deinitialize the history data struct
+ * cm_req_history_deinit() - Deinitialize the history data struct
  * @cm_ctx: Connection manager context
  *
  * Return: void
@@ -1148,7 +1150,7 @@ void cm_req_history_init(struct cnx_mgr *cm_ctx);
 void cm_req_history_deinit(struct cnx_mgr *cm_ctx);
 
 /**
- * cm_history_print() - Print the history data struct
+ * cm_req_history_print() - Print the history data struct
  * @cm_ctx: Connection manager context
  *
  * Return: void

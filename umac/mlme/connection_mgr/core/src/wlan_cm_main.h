@@ -183,6 +183,7 @@ struct cm_req {
  * @CM_REQ_DEL_ACTIVE: Remove request from active queue
  * @CM_REQ_DEL_PENDING: Remove request from pending queue
  * @CM_REQ_DEL_FLUSH: Request removed due to request list flush
+ * @CM_REQ_DEL_MAX: Maximum enumeration
  */
 enum cm_req_del_type {
 	CM_REQ_DEL_ACTIVE,
@@ -247,7 +248,9 @@ struct cm_req_history {
  * @scan_requester_id: scan requester id.
  * @disconnect_complete: disconnect completion wait event
  * @ext_cm_ptr: connection manager ext pointer
- * @history: Holds the connection manager history
+ * @req_history: Holds the connection manager history
+ * @cm_candidate_advance_filter:
+ * @cm_candidate_list_custom_sort:
  */
 struct cnx_mgr {
 	struct wlan_objmgr_vdev *vdev;
@@ -294,7 +297,7 @@ struct vdev_op_search_arg {
 
 /**
  * wlan_cm_init() - Invoke connection manager init
- * @vdev_mlme_obj:  VDEV MLME comp object
+ * @vdev_mlme:  VDEV MLME comp object
  *
  * API allocates CM and init
  *
@@ -305,7 +308,7 @@ QDF_STATUS wlan_cm_init(struct vdev_mlme_obj *vdev_mlme);
 
 /**
  * wlan_cm_deinit() - Invoke connection manager deinit
- * @vdev_mlme_obj:  VDEV MLME comp object
+ * @vdev_mlme:  VDEV MLME comp object
  *
  * API destroys CM
  *

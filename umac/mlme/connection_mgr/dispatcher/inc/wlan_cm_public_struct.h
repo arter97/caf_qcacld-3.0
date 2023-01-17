@@ -114,6 +114,7 @@ enum wlan_fils_auth_type {
  * @next_seq_num: next seq number
  * @rrk_len: rrk length
  * @rrk: rrk
+ * @auth_type: FILS authentication type
  */
 struct wlan_fils_con_info {
 	bool is_fils_connection;
@@ -310,6 +311,7 @@ struct wlan_cm_roam_req {
  * @vdev_id: vdev id
  * @cm_id: Connect manager id
  * @self_reassoc: if self reassoc
+ * @prev_bssid: previous BSSID
  * @bss: scan entry for the candidate
  */
 struct wlan_cm_vdev_reassoc_req {
@@ -429,12 +431,13 @@ struct fils_connect_rsp_params {
 #endif
 
 /**
- * struct connect_rsp_ies - connect rsp ies stored in vdev filled during connect
+ * struct wlan_connect_rsp_ies - connect rsp ies stored in vdev filled during
+ *                               connect
  * @bcn_probe_rsp: Raw beacon or probe rsp of connected AP
  * @link_bcn_probe_rsp: Raw beacon or probe rsp of connected non-assoc link
  * @assoc_req: assoc req IE pointer send during connect
- * @assoc_rsq: assoc rsp IE received during connection
- * @fills_ie: fills connection ie received during connection
+ * @assoc_rsp: assoc rsp IE received during connection
+ * @fils_ie: fills connection ie received during connection
  */
 struct wlan_connect_rsp_ies {
 	struct element_info bcn_probe_rsp;
@@ -485,7 +488,7 @@ struct wlan_roam_sync_info {
 #endif
 
 /**
- * struct wlan_cm_connect_rsp - connect resp from VDEV mgr and will be sent to
+ * struct wlan_cm_connect_resp - connect resp from VDEV mgr and will be sent to
  * OSIF
  * @vdev_id: vdev id
  * @is_wps_connection: if its wps connection

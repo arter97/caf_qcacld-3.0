@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2019-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -45,8 +45,8 @@
 #ifdef QCA_VDEV_STATS_HW_OFFLOAD_SUPPORT
 /**
  * vdev_mgr_alloc_vdev_stats_id() - Allocate vdev stats id for vdev
- * @vdev - pointer to vdev
- * @param - pointer to vdev create params
+ * @vdev: pointer to vdev
+ * @param: pointer to vdev create params
  *
  * Return: none
  */
@@ -78,8 +78,8 @@ static void vdev_mgr_alloc_vdev_stats_id(struct wlan_objmgr_vdev *vdev,
 
 /**
  * vdev_mgr_reset_vdev_stats_id() -Reset vdev stats id
- * @vdev - pointer to vdev
- * @vdev_stats_id - Value of vdev_stats_id
+ * @vdev: pointer to vdev
+ * @vdev_stats_id: Value of vdev_stats_id
  *
  * Return: none
  */

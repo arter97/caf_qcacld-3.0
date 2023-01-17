@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2019-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -35,7 +35,7 @@
 			+ 2   /* RNR header bytes */)
 
 /**
- * struct wlan_rnr_global_cache - RNR cache buffer per soc
+ * struct wlan_6ghz_rnr_global_cache - 6 GHz RNR cache buffer per soc
  * @rnr_buf: RNR cache buffer
  * @rnr_cnt: Count of APs in cache
  * @rnr_size: Size of RNR cache (RNR IE)

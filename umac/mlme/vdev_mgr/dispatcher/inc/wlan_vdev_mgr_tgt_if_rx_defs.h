@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2019-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -37,12 +37,13 @@
 
 /**
  * enum wlan_vdev_mgr_tgt_if_rsp_bit - response status bit
- * START_RESPONSE_BIT: vdev start response bit
- * RESTART_RESPONSE_BIT: vdev restart response bit
- * STOP_RESPONSE_BIT: vdev stop response bit
- * DELETE_RESPONSE_BIT:  vdev delete response bit
- * PEER_DELETE_ALL_RESPONSE_BIT: vdev peer delete all response bit
- * RSO_STOP_RESPONSE_BIT : RSO stop response bit
+ * @START_RESPONSE_BIT: vdev start response bit
+ * @RESTART_RESPONSE_BIT: vdev restart response bit
+ * @STOP_RESPONSE_BIT: vdev stop response bit
+ * @DELETE_RESPONSE_BIT:  vdev delete response bit
+ * @PEER_DELETE_ALL_RESPONSE_BIT: vdev peer delete all response bit
+ * @RSO_STOP_RESPONSE_BIT: RSO stop response bit
+ * @RESPONSE_BIT_MAX: Max enumeration
  */
 enum wlan_vdev_mgr_tgt_if_rsp_bit {
 	START_RESPONSE_BIT = 0,
@@ -56,7 +57,7 @@ enum wlan_vdev_mgr_tgt_if_rsp_bit {
 
 /**
  * string_from_rsp_bit() - Convert response bit to string
- * @bit - response bit as in wlan_vdev_mgr_tgt_if_rsp_bit
+ * @bit: response bit as in wlan_vdev_mgr_tgt_if_rsp_bit
  *
  * Please note to add new string in the array at index equal to
  * its enum value in wlan_vdev_mgr_tgt_if_rsp_bit.
@@ -175,12 +176,15 @@ struct peer_delete_all_response {
 	uint32_t peer_type_bitmap;
 };
 
-/**
+/*
  * struct multi_vdev_restart_resp - multi-vdev restart response structure
  * @pdev_id: pdev id
  * @status: FW status for multi vdev restart request
  * @vdev_id_bmap: Bitmap of vdev_ids
  * @timestamp: Time stamp corresponding to the start of event processing
+ *
+ * NB: not using kernel-doc format since the kernel-doc script doesn't
+ *     handle the qdf_bitmap() macro
  */
 struct multi_vdev_restart_resp {
 	uint8_t pdev_id;

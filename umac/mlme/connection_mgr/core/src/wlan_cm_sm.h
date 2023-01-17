@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2015,2020-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -66,7 +66,7 @@
  * @WLAN_CM_SM_EV_ROAM_DONE:              Roam done
  * @WLAN_CM_SM_EV_PREAUTH_ACTIVE:         Preauth active
  * @WLAN_CM_SM_EV_PREAUTH_RESP:           Preauth response
- * @WLAN_CM_SM_EV_REASSOC_TIMER：         Reassoc timer expired
+ * @WLAN_CM_SM_EV_REASSOC_TIMER:          Reassoc timer expired
  * @WLAN_CM_SM_EV_HO_ROAM_DISCONNECT_DONE: Disconnect done for hands off/roaming
  * @WLAN_CM_SM_EV_RSO_STOP_RSP:           Event to continue disconnect after
  *                                        RSO stop response is received
@@ -138,7 +138,7 @@ QDF_STATUS cm_sm_destroy(struct cnx_mgr *cm_ctx);
 
 /**
  * cm_sm_history_print() - Prints SM history
- * @cm_ctx:  connection manager ctx
+ * @vdev:  vdev object
  *
  * API to print CM SM history
  *
@@ -154,7 +154,7 @@ void cm_sm_history_print(struct wlan_objmgr_vdev *vdev)
 
 #ifdef WLAN_CM_USE_SPINLOCK
 /**
- * cm_lock_create - Create CM SM mutex/spinlock
+ * cm_lock_create() - Create CM SM mutex/spinlock
  * @cm_ctx:  connection manager ctx
  *
  * Creates CM SM mutex/spinlock
@@ -168,7 +168,7 @@ cm_lock_create(struct cnx_mgr *cm_ctx)
 }
 
 /**
- * cm_lock_destroy - Destroy CM SM mutex/spinlock
+ * cm_lock_destroy() - Destroy CM SM mutex/spinlock
  * @cm_ctx:  connection manager ctx
  *
  * Destroy CM SM mutex/spinlock
@@ -182,7 +182,7 @@ cm_lock_destroy(struct cnx_mgr *cm_ctx)
 }
 
 /**
- * cm_lock_acquire - acquire CM SM mutex/spinlock
+ * cm_lock_acquire() - acquire CM SM mutex/spinlock
  * @cm_ctx:  connection manager ctx
  *
  * acquire CM SM mutex/spinlock
@@ -195,7 +195,7 @@ static inline void cm_lock_acquire(struct cnx_mgr *cm_ctx)
 }
 
 /**
- * cm_lock_release - release CM SM mutex/spinlock
+ * cm_lock_release() - release CM SM mutex/spinlock
  * @cm_ctx:  connection manager ctx
  *
  * release CM SM mutex/spinlock
@@ -275,6 +275,7 @@ enum wlan_cm_sm_state cm_get_sub_state(struct cnx_mgr *cm_ctx);
  * Return: void
  */
 void cm_set_state(struct cnx_mgr *cm_ctx, enum wlan_cm_sm_state state);
+
 /**
  * cm_set_substate() - set cm mlme sub state
  * @cm_ctx: connection manager SM ctx

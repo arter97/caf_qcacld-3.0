@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2018-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -171,7 +171,7 @@ enum wlan_vdev_sm_evt {
 };
 
 /**
- * wlan_vdev_mlme_init - Initializes VDEV MLME component
+ * wlan_vdev_mlme_init() - Initializes VDEV MLME component
  *
  * Registers callbacks with object manager for create/destroy
  *
@@ -181,7 +181,7 @@ enum wlan_vdev_sm_evt {
 QDF_STATUS wlan_vdev_mlme_init(void);
 
 /**
- * wlan_vdev_mlme_deinit - Uninitializes VDEV MLME component
+ * wlan_vdev_mlme_deinit() - Uninitializes VDEV MLME component
  *
  * Unregisters callbacks with object manager for create/destroy
  *
@@ -191,9 +191,10 @@ QDF_STATUS wlan_vdev_mlme_init(void);
 QDF_STATUS wlan_vdev_mlme_deinit(void);
 
 /**
- * wlan_mlme_psoc_enable - MLME initializations on PSOC enable
+ * wlan_mlme_psoc_enable() - MLME initializations on PSOC enable
+ * @psoc: pointer to psoc object
  *
- * Initializes MLME params on PSOC eable
+ * Initializes MLME params on PSOC enable
  *
  * Return: SUCCESS on successful initialization
  *         FAILURE, if initialization fails
@@ -201,9 +202,10 @@ QDF_STATUS wlan_vdev_mlme_deinit(void);
 QDF_STATUS wlan_mlme_psoc_enable(struct wlan_objmgr_psoc *psoc);
 
 /**
- * wlan_mlme_psoc_disable - MLME clean up on PSOC disable
+ * wlan_mlme_psoc_disable() - MLME clean up on PSOC disable
+ * @psoc: pointer to psoc object
  *
- * cleanup MLME params on PSOC eable
+ * cleanup MLME params on PSOC disable
  *
  * Return: SUCCESS on successful cleanup
  *         FAILURE, if cleanup fails

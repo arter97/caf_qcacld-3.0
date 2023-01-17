@@ -15,7 +15,7 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
-/*
+/**
  * DOC: contains bss scoring logic
  */
 
@@ -84,7 +84,7 @@
 #define CM_MAX_INDEX_PER_INI 4
 #define CM_SLO_CONGESTION_MAX_SCORE 80
 
-/**
+/*
  * This macro give percentage value of security_weightage to be used as per
  * security Eg if AP security is WPA 10% will be given for AP.
  *
@@ -250,7 +250,6 @@ static int32_t cm_calculate_rssi_score(struct rssi_config_score *score_param,
 /**
  * cm_rssi_is_same_bucket() - check if both rssi fall in same bucket
  * @rssi_top_thresh: high rssi threshold of the the window
- * @low_rssi_threshold: low rssi of the window
  * @rssi_ref1: rssi ref one
  * @rssi_ref2: rssi ref two
  * @bucket_size: bucket size of the window
@@ -392,6 +391,7 @@ static int32_t cm_get_congestion_pct(struct scan_cache_entry *entry)
  * @entry: bss information
  * @score_params: bss score params
  * @congestion_pct: congestion pct
+ * @rssi_bad_zone:
  *
  * Return: congestion score
  */
@@ -460,6 +460,7 @@ static int32_t cm_calculate_congestion_score(struct scan_cache_entry *entry,
  * @score_config: scoring config
  * @ap_nss: ap nss
  * @prorated_pct: prorated % to return dependent on RSSI
+ * @sta_nss: Sta NSS
  *
  * Return: nss score
  */
@@ -1396,7 +1397,7 @@ cm_calculate_etp_score(struct wlan_objmgr_psoc *psoc,
 
 /**
  * cm_get_band_score() - Get band preference weightage
- * freq: Operating frequency of the AP
+ * @freq: Operating frequency of the AP
  * @score_config: Score configuration
  *
  * Return: Band score for AP.
@@ -1586,6 +1587,7 @@ static struct mlo_rssi_pct mlo_rssi_pcnt[CM_RSSI_BUCKET_NUM] = {
  * @rssi_weightage: rssi weightage
  * @link1_rssi: link1 rssi
  * @link2_rssi: link2 rssi
+ * @prorate_pcnt: pointer to store RSSI prorated percent
  *
  * Return: MLO AP joint rssi score
  */
@@ -1686,6 +1688,7 @@ static inline bool is_freq_dbs_or_sbs(struct wlan_objmgr_psoc *psoc,
  * cm_bss_mlo_type() - Get mlo type of bss scan entry
  * @psoc: Pointer of psoc object
  * @entry: Bss scan entry
+ * @scan_list:
  *
  * Return: MLO AP type: SLO, MLMR or EMLSR.
  */

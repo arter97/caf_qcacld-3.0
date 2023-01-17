@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2019-2020 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -28,13 +29,16 @@
  * struct pdev_restart_attr - Pdev restart attributes
  * @vdev: vdev on which the pdev restart cmd was enqueued
  * @restart_bmap: Bitmap for vdev requesting multivdev restart
+ *
+ * NB: Not using kernel-doc comment since the kernel-doc script
+ *     doesn't handle the qdf_bitmap() macro.
  */
 struct pdev_restart_attr {
 	struct wlan_objmgr_vdev *vdev;
 	qdf_bitmap(restart_bmap, WLAN_UMAC_PSOC_MAX_VDEVS);
 };
 
-/**
+/*
  * struct pdev_mlme_obj -  PDEV MLME component object
  * @pdev:                  PDEV object
  * @ext_pdev_ptr:          PDEV MLME legacy pointer
@@ -44,6 +48,11 @@ struct pdev_restart_attr {
  * @restart_pend_vdev_bmap: Bitmap for VDEV RESTART command pending
  * @restart_send_vdev_bmap: Bitmap for VDEV RESTART command sending
  * @start_send_vdev_arr:   Bitmap for VDEV START command sending
+ * @pdev_restart:
+ * @multivdev_restart_wait_cnt:
+ *
+ * NB: Not using kernel-doc comment since the kernel-doc script
+ *     doesn't handle the qdf_bitmap() macro.
  */
 struct pdev_mlme_obj {
 	struct wlan_objmgr_pdev *pdev;

@@ -503,7 +503,7 @@ QDF_STATUS wlan_cm_sta_set_chan_param(struct wlan_objmgr_vdev *vdev,
 				      struct ch_params *chan_param);
 
 /**
- * wlan_cm_sta_update_puncture() - update puncture and channel width for sta
+ * wlan_cm_sta_update_bw_puncture() - update puncture and channel width for sta
  * @vdev: vdev
  * @peer_mac: peer mac address
  * @ori_punc: original puncture bitmap from EHT operation IE

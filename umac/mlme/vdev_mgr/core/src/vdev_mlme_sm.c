@@ -140,6 +140,9 @@ static void mlme_vdev_state_init_exit(void *ctx)
 /**
  * mlme_vdev_state_init_event() - Init State event handler
  * @ctx: VDEV MLME object
+ * @event: MLME event
+ * @event_data_len: data size
+ * @event_data: event data
  *
  * API to handle events in INIT state
  *
@@ -256,6 +259,9 @@ static void mlme_vdev_state_start_exit(void *ctx)
 /**
  * mlme_vdev_state_start_event() - Start State event handler
  * @ctx: VDEV MLME object
+ * @event: MLME event
+ * @event_data_len: data size
+ * @event_data: event data
  *
  * API to handle events in START state
  *
@@ -335,6 +341,9 @@ static void mlme_vdev_state_dfs_cac_wait_exit(void *ctx)
 /**
  * mlme_vdev_state_dfs_cac_wait_event() - DFS CAC WAIT State event handler
  * @ctx: VDEV MLME object
+ * @event: MLME event
+ * @event_data_len: data size
+ * @event_data: event data
  *
  * API to handle events in DFS CAC WAIT state
  *
@@ -443,6 +452,9 @@ static void mlme_vdev_state_up_exit(void *ctx)
 /**
  * mlme_vdev_state_up_event() - UP State event handler
  * @ctx: VDEV MLME object
+ * @event: MLME event
+ * @event_data_len: data size
+ * @event_data: event data
  *
  * API to handle events in UP state
  *
@@ -545,6 +557,9 @@ static void mlme_vdev_state_suspend_exit(void *ctx)
 /**
  * mlme_vdev_state_suspend_event() - Suspend State event handler
  * @ctx: VDEV MLME object
+ * @event: MLME event
+ * @event_data_len: data size
+ * @event_data: event data
  *
  * API to handle events in SUSPEND state
  *
@@ -640,6 +655,9 @@ static void mlme_vdev_state_stop_exit(void *ctx)
 /**
  * mlme_vdev_state_stop_event() - Stop State event handler
  * @ctx: VDEV MLME object
+ * @event: MLME event
+ * @event_data_len: data size
+ * @event_data: event data
  *
  * API to handle events in STOP state
  *
@@ -694,6 +712,9 @@ static void mlme_vdev_subst_start_start_progress_exit(void *ctx)
  * mlme_vdev_subst_start_start_progress_event() - Event handler API for Start
  *                                                Progress substate
  * @ctx: VDEV MLME object
+ * @event: MLME event
+ * @event_data_len: data size
+ * @event_data: event data
  *
  * API to handle events in START-PROGRESS substate
  *
@@ -798,6 +819,9 @@ static void mlme_vdev_subst_start_restart_progress_exit(void *ctx)
  * mlme_vdev_subst_start_restart_progress_event() - Event handler API for
  *                                                  Restart Progress substate
  * @ctx: VDEV MLME object
+ * @event: MLME event
+ * @event_data_len: data size
+ * @event_data: event data
  *
  * API to handle events in RESTART-PROGRESS substate
  *
@@ -905,6 +929,9 @@ static void mlme_vdev_subst_start_conn_progress_exit(void *ctx)
  * mlme_vdev_subst_start_conn_progress_event() - Event handler API for Conn.
  *                                                Progress substate
  * @ctx: VDEV MLME object
+ * @event: MLME event
+ * @event_data_len: data size
+ * @event_data: event data
  *
  * API to handle events in CONN-PROGRESS substate
  *
@@ -1030,6 +1057,9 @@ static void mlme_vdev_subst_start_disconn_progress_exit(void *ctx)
  * mlme_vdev_subst_start_disconn_progress_event() - Event handler API for Discon
  *                                                Progress substate
  * @ctx: VDEV MLME object
+ * @event: MLME event
+ * @event_data_len: data size
+ * @event_data: event data
  *
  * API to handle events in DISCONN-PROGRESS substate
  *
@@ -1120,6 +1150,9 @@ static void mlme_vdev_subst_suspend_suspend_down_exit(void *ctx)
  * mlme_vdev_subst_suspend_suspend_down_event() - Event handler API for Suspend
  *                                                down substate
  * @ctx: VDEV MLME object
+ * @event: MLME event
+ * @event_data_len: data size
+ * @event_data: event data
  *
  * API to handle events in SUSPEND-DOWN substate
  *
@@ -1196,6 +1229,9 @@ static void mlme_vdev_subst_suspend_suspend_restart_exit(void *ctx)
  * mlme_vdev_subst_suspend_suspend_restart_event() - Event handler API for
  *                                                   Suspend restart substate
  * @ctx: VDEV MLME object
+ * @event: MLME event
+ * @event_data_len: data size
+ * @event_data: event data
  *
  * API to handle events in SUSPEND-RESTART substate
  *
@@ -1284,9 +1320,12 @@ static void mlme_vdev_subst_suspend_host_restart_exit(void *ctx)
 }
 
 /**
- * mlme_vdev_subst_suspend_host_restart_entry() - Event handler API for Host
+ * mlme_vdev_subst_suspend_host_restart_event() - Event handler API for Host
  *                                                restart substate
  * @ctx: VDEV MLME object
+ * @event: MLME event
+ * @event_data_len: data size
+ * @event_data: event data
  *
  * API to handle events in HOST-RESTART substate
  *
@@ -1377,6 +1416,9 @@ static void mlme_vdev_subst_suspend_csa_restart_exit(void *ctx)
  * mlme_vdev_subst_suspend_csa_restart_event() - Event handler API for CSA
  *                                               restart substate
  * @ctx: VDEV MLME object
+ * @event: MLME event
+ * @event_data_len: data size
+ * @event_data: event data
  *
  * API to handle events in CSA-RESTART substate
  *
@@ -1492,6 +1534,9 @@ static void mlme_vdev_subst_stop_stop_progress_exit(void *ctx)
  * mlme_vdev_subst_stop_stop_progress_event() - Event handler API for Stop
  *                                                Progress substate
  * @ctx: VDEV MLME object
+ * @event: MLME event
+ * @event_data_len: data size
+ * @event_data: event data
  *
  * API to handle events in STOP-PROGRESS substate
  *
@@ -1590,6 +1635,9 @@ static void mlme_vdev_subst_stop_down_progress_exit(void *ctx)
  * mlme_vdev_subst_stop_down_progress_event() - Event handler API for Down
  *                                                Progress substate
  * @ctx: VDEV MLME object
+ * @event: MLME event
+ * @event_data_len: data size
+ * @event_data: event data
  *
  * API to handle events in DOWN-PROGRESS substate
  *
@@ -1678,6 +1726,9 @@ static void mlme_vdev_subst_mlo_sync_wait_exit(void *ctx)
  * mlme_vdev_subst_mlo_sync_wait_event() - Event handler API for mlo sync wait
  *                                         substate
  * @ctx: VDEV MLME object
+ * @event: MLME event
+ * @event_data_len: data size
+ * @event_data: event data
  *
  * API to handle events in MLO-SYNC-WAIT substate
  *
@@ -1769,6 +1820,9 @@ static void mlme_vdev_subst_up_active_exit(void *ctx)
 /**
  * mlme_vdev_subst_up_active_event() - Event handler API for up active substate
  * @ctx: VDEV MLME object
+ * @event: MLME event
+ * @event_data_len: data size
+ * @event_data: event data
  *
  * API to handle events in UP-ACTIVE substate
  *

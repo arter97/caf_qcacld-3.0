@@ -1315,7 +1315,7 @@
 #endif
 
 #ifdef WLAN_FEATURE_11BE_MLO
-/**
+/*
  * <ini>
  * eht_caps_weightage - EHT caps Weightage to calculate best candidate
  * @Min: 0
@@ -1342,7 +1342,7 @@
 	CFG_VALUE_OR_DEFAULT, \
 	"EHT Caps Weightage")
 
-/**
+/*
  * <ini>
  * mlo_weightage - MLO Weightage to calculate best candidate
  * @Min: 0
@@ -1369,7 +1369,7 @@
 	CFG_VALUE_OR_DEFAULT, \
 	"MLO Weightage")
 
-/**
+/*
  * <ini>
  * emlsr_weightage - eMLSR Weightage to calculate best candidate
  * @Min: 0
@@ -1396,7 +1396,7 @@
 	CFG_VALUE_OR_DEFAULT, \
 	"eMLSR Weightage")
 
-/**
+/*
  * <ini>
  * wlm_indication_weightage - WLM indication Weightage to calculate best
  *                            candidate
@@ -1424,7 +1424,7 @@
 	CFG_VALUE_OR_DEFAULT, \
 	"WLM indication Weightage")
 
-/**
+/*
  * <ini>
  * mlsr_link_selection - MLSR link selection criteria
  * @Min: 0
@@ -1453,7 +1453,7 @@
 	CFG_VALUE_OR_DEFAULT, \
 	"MLSR link selection")
 
-/**
+/*
  * <ini>
  * joint_rssi_alpha - Joint RSSI alpha to select best ML candidate
  * @Min: 0
@@ -1482,7 +1482,7 @@
 	CFG_VALUE_OR_DEFAULT, \
 	"Joint RSSI alpha")
 
-/**
+/*
  * <ini>
  * low_band_rssi_boost - Low band RSSI boost in joint RSSI calculation
  * @Min: 0
@@ -1514,7 +1514,7 @@
 				1, \
 				"Low band RSSI boost ")
 
-/**
+/*
  * <ini>
  * joint_esp_alpha - Joint ESP alpha to select best ML candidate
  * @Min: 0
@@ -1543,7 +1543,7 @@
 	CFG_VALUE_OR_DEFAULT, \
 	"Joint ESP alpha")
 
-/**
+/*
  * <ini>
  * low_band_esp_boost - Low band ESP boost in joint ESP calculation
  * @Min: 0
@@ -1575,7 +1575,7 @@
 				1, \
 				"Low band ESP boost ")
 
-/**
+/*
  * <ini>
  * joint_oce_alpha - Joint OCE alpha to select best ML candidate
  * @Min: 0
@@ -1604,7 +1604,7 @@
 	CFG_VALUE_OR_DEFAULT, \
 	"Joint OCE alpha")
 
-/**
+/*
  * <ini>
  * low_band_oce_boost - Low band OCE boost in joint OCE calculation
  * @Min: 0

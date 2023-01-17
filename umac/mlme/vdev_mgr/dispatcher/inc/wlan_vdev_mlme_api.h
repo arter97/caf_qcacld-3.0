@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2018-2019, 2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -52,6 +52,7 @@
 /**
  * enum wlan_mlme_peer_param_id - peer param id in mlme layer
  * @WLAN_MLME_PEER_BW_PUNCTURE: update puncture 20 MHz bitmap
+ * @WLAN_MLME_PEER_MAX: max enumeration
  */
 enum wlan_mlme_peer_param_id {
 	WLAN_MLME_PEER_BW_PUNCTURE,
@@ -230,7 +231,7 @@ QDF_STATUS wlan_vdev_is_dfs_cac_wait(struct wlan_objmgr_vdev *vdev);
 
 /**
  * wlan_vdev_mlme_cmd_lock - Acquire lock for command queuing atomicity
- * vdev: Object manager VDEV object
+ * @vdev: Object manager VDEV object
  *
  * API to take VDEV MLME command lock
  *
@@ -240,7 +241,7 @@ void wlan_vdev_mlme_cmd_lock(struct wlan_objmgr_vdev *vdev);
 
 /**
  * wlan_vdev_mlme_cmd_unlock - Release lock for command queuing atomicity
- * vdev: Object manager VDEV object
+ * @vdev: Object manager VDEV object
  *
  * API to release VDEV MLME command lock
  *
