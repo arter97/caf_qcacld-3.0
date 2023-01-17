@@ -940,5 +940,24 @@ cdp_ipa_opt_dp_enable_disable_low_power_mode(struct wlan_objmgr_pdev *pdev,
 }
 #endif /* IPA_OPT_WIFI_DP */
 
+/**
+ * cdp_ipa_get_wdi_version - Get WDI version
+ * @soc: data path soc handle
+ * @wdi_ver: Out param for wdi version
+ *
+ * Return: None
+ */
+static inline void
+cdp_ipa_get_wdi_version(ol_txrx_soc_handle soc, uint8_t *wdi_ver)
+{
+	if (!soc || !soc->ops || !soc->ops->ipa_ops) {
+		QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_FATAL,
+			  "%s invalid instance", __func__);
+		return;
+	}
+
+	if (soc->ops->ipa_ops->ipa_get_wdi_version)
+		soc->ops->ipa_ops->ipa_get_wdi_version(soc, wdi_ver);
+}
 #endif /* IPA_OFFLOAD */
 #endif /* _CDP_TXRX_IPA_H_ */
