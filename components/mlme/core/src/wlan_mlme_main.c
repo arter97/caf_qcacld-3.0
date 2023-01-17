@@ -2977,7 +2977,7 @@ end:
 }
 
 /**
- * mlme_iot_parse_aggr_info - parse IOT related items in ini
+ * mlme_init_iot_cfg() - parse IOT related items in ini
  * @psoc: PSOC pointer
  * @iot: IOT related CFG items
  *

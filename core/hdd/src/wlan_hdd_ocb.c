@@ -1389,9 +1389,9 @@ hdd_ocb_get_tsf_timer_reply(struct wiphy *wiphy,
 	/* Allocate the buffer for the response. */
 	nl_buf_len = NLMSG_HDRLEN;
 	nl_buf_len += 2 * (NLA_HDRLEN + sizeof(uint32_t));
-	nl_resp = cfg80211_vendor_cmd_alloc_reply_skb(wiphy, nl_buf_len);
+	nl_resp = wlan_cfg80211_vendor_cmd_alloc_reply_skb(wiphy, nl_buf_len);
 	if (!nl_resp) {
-		hdd_err("cfg80211_vendor_cmd_alloc_reply_skb failed");
+		hdd_err("wlan_cfg80211_vendor_cmd_alloc_reply_skb failed");
 		return -ENOMEM;
 	}
 
@@ -1408,16 +1408,14 @@ hdd_ocb_get_tsf_timer_reply(struct wiphy *wiphy,
 		goto end;
 
 	/* Send the response. */
-	rc = cfg80211_vendor_cmd_reply(nl_resp);
+	rc = wlan_cfg80211_vendor_cmd_reply(nl_resp);
 	nl_resp = NULL;
 	if (rc) {
-		hdd_err("cfg80211_vendor_cmd_reply failed: %d", rc);
+		hdd_err("wlan_cfg80211_vendor_cmd_reply failed: %d", rc);
 		goto end;
 	}
 end:
-	if (nl_resp)
-		kfree_skb(nl_resp);
-
+	wlan_cfg80211_vendor_free_skb(nl_resp);
 	return rc;
 }
 
@@ -1624,9 +1622,9 @@ hdd_dcc_get_stats_send_reply(struct wiphy *wiphy,
 	nl_buf_len = NLMSG_HDRLEN;
 	nl_buf_len += NLA_HDRLEN + sizeof(uint32_t);
 	nl_buf_len += NLA_HDRLEN + response->channel_stats_array_len;
-	nl_resp = cfg80211_vendor_cmd_alloc_reply_skb(wiphy, nl_buf_len);
+	nl_resp = wlan_cfg80211_vendor_cmd_alloc_reply_skb(wiphy, nl_buf_len);
 	if (!nl_resp) {
-		hdd_err("cfg80211_vendor_cmd_alloc_reply_skb failed");
+		hdd_err("wlan_cfg80211_vendor_cmd_alloc_reply_skb failed");
 		return -ENOMEM;
 	}
 
@@ -1644,16 +1642,14 @@ hdd_dcc_get_stats_send_reply(struct wiphy *wiphy,
 		goto end;
 
 	/* Send the response. */
-	rc = cfg80211_vendor_cmd_reply(nl_resp);
+	rc = wlan_cfg80211_vendor_cmd_reply(nl_resp);
 	nl_resp = NULL;
 	if (rc) {
-		hdd_err("cfg80211_vendor_cmd_reply failed: %d", rc);
+		hdd_err("wlan_cfg80211_vendor_cmd_reply failed: %d", rc);
 		goto end;
 	}
 end:
-	if (nl_resp)
-		kfree_skb(nl_resp);
-
+	wlan_cfg80211_vendor_free_skb(nl_resp);
 	return rc;
 }
 
@@ -2135,18 +2131,20 @@ static void wlan_hdd_dcc_stats_event_callback(void *context_ptr,
 	struct hdd_context *hdd_ctx = (struct hdd_context *)context_ptr;
 	struct ocb_dcc_get_stats_response *resp = response_ptr;
 	struct sk_buff *vendor_event;
+	enum qca_nl80211_vendor_subcmds_index index =
+		QCA_NL80211_VENDOR_SUBCMD_DCC_STATS_EVENT_INDEX;
 
 	hdd_enter();
 
 	vendor_event =
-		cfg80211_vendor_event_alloc(hdd_ctx->wiphy,
-			NULL, sizeof(uint32_t) + resp->channel_stats_array_len +
-			NLMSG_HDRLEN,
-			QCA_NL80211_VENDOR_SUBCMD_DCC_STATS_EVENT_INDEX,
-			GFP_KERNEL);
+		wlan_cfg80211_vendor_event_alloc(hdd_ctx->wiphy, NULL,
+						 sizeof(uint32_t) +
+						 resp->channel_stats_array_len +
+						 NLMSG_HDRLEN,
+						 index, GFP_KERNEL);
 
 	if (!vendor_event) {
-		hdd_err("cfg80211_vendor_event_alloc failed");
+		hdd_err("wlan_cfg80211_vendor_event_alloc failed");
 		return;
 	}
 
@@ -2158,11 +2156,11 @@ static void wlan_hdd_dcc_stats_event_callback(void *context_ptr,
 			resp->channel_stats_array_len,
 			resp->channel_stats_array)) {
 		hdd_err("nla put failed");
-		kfree_skb(vendor_event);
+		wlan_cfg80211_vendor_free_skb(vendor_event);
 		return;
 	}
 
-	cfg80211_vendor_event(vendor_event, GFP_KERNEL);
+	wlan_cfg80211_vendor_event(vendor_event, GFP_KERNEL);
 }
 
 /**

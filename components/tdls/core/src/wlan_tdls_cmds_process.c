@@ -194,6 +194,7 @@ void tdls_update_6g_power(struct wlan_objmgr_vdev *vdev,
 
 /**
  * tdls_decrement_peer_count() - decrement connected TDLS peer counter
+ * @vdev: vdev object
  * @soc_obj: TDLS soc object
  *
  * Used in scheduler thread context, no lock needed.
@@ -1413,7 +1414,7 @@ free_req:
 }
 
 /**
- * tdls_process_add_peer_rsp() - handle response for update TDLS peer
+ * tdls_update_peer_rsp() - handle response for update TDLS peer
  * @rsp: TDLS add peer response
  *
  * Return: QDF_STATUS_SUCCESS for success; other values if failed

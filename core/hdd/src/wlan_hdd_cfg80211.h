@@ -34,6 +34,12 @@
 
 struct hdd_context;
 
+#ifdef WLAN_FEATURE_11BE_MLO
+#define EHT_OPMODE_SUPPORTED 2
+#else
+#define EHT_OPMODE_SUPPORTED 1
+#endif
+
 /* QCA_NL80211_VENDOR_SUBCMD_ROAM policy */
 extern const struct nla_policy wlan_hdd_set_roam_param_policy[
 			QCA_WLAN_VENDOR_ATTR_ROAMING_PARAM_MAX + 1];
@@ -180,6 +186,10 @@ extern const struct nla_policy wlan_hdd_wisa_cmd_policy[
 
 #ifndef WLAN_AKM_SUITE_FT_EAP_SHA_384
 #define WLAN_AKM_SUITE_FT_EAP_SHA_384 0x000FAC0D
+#endif
+
+#ifndef WLAN_AKM_SUITE_SAE_EXT_KEY
+#define WLAN_AKM_SUITE_SAE_EXT_KEY 0x000FAC18
 #endif
 
 #ifdef FEATURE_WLAN_TDLS
@@ -998,6 +1008,18 @@ int hdd_send_dbam_config(struct hdd_adapter *adapter,
 QDF_STATUS wlan_hdd_send_key_vdev(struct wlan_objmgr_vdev *vdev,
 				  u8 key_index, bool pairwise,
 				  enum wlan_crypto_cipher_type cipher_type);
+
+/**
+ * wlan_hdd_mlo_copy_partner_addr_from_mlie  - Copy the Partner link mac
+ * address from the ML IE
+ * @vdev: vdev pointer
+ * @partner_mac: pointer to the mac address to be filled
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+wlan_hdd_mlo_copy_partner_addr_from_mlie(struct wlan_objmgr_vdev *vdev,
+					 struct qdf_mac_addr *partner_mac);
 #else
 static inline
 QDF_STATUS wlan_hdd_send_key_vdev(struct wlan_objmgr_vdev *vdev,
@@ -1006,5 +1028,31 @@ QDF_STATUS wlan_hdd_send_key_vdev(struct wlan_objmgr_vdev *vdev,
 {
 	return QDF_STATUS_E_NOSUPPORT;
 }
+
+static inline QDF_STATUS
+wlan_hdd_mlo_copy_partner_addr_from_mlie(struct wlan_objmgr_vdev *vdev,
+					 struct qdf_mac_addr *partner_mac)
+{
+	return QDF_STATUS_E_NOSUPPORT;
+}
 #endif /* WLAN_FEATURE_11BE_MLO */
+
+#if defined(WLAN_FEATURE_11BE_MLO) && \
+	defined(CFG80211_SINGLE_NETDEV_MULTI_LINK_SUPPORT)
+/**
+ * wlan_hdd_ml_sap_get_peer  - Get ML SAP peer
+ * @vdev: vdev pointer
+ * @peer_mld: Peer MLD address
+ *
+ * Return: Peer object
+ */
+struct wlan_objmgr_peer *
+wlan_hdd_ml_sap_get_peer(struct wlan_objmgr_vdev *vdev, uint8_t *peer_mld);
+#else
+static inline struct wlan_objmgr_peer *
+wlan_hdd_ml_sap_get_peer(struct wlan_objmgr_vdev *vdev, uint8_t *peer_mld)
+{
+	return NULL;
+}
+#endif /* WLAN_FEATURE_11BE_MLO && CFG80211_SINGLE_NETDEV_MULTI_LINK_SUPPORT */
 #endif
