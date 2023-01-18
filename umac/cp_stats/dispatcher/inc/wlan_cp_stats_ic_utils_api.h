@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2018, 2020-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -170,6 +170,7 @@ VDEV_MCAST_CP_STATS_SET_FUNCS(rx_decryptcrc);
 VDEV_MCAST_CP_STATS_SET_FUNCS(rx_decryptok);
 VDEV_MCAST_CP_STATS_SET_FUNCS(rx_wepfail);
 VDEV_MCAST_CP_STATS_SET_FUNCS(rx_tkipicv);
+VDEV_MCAST_CP_STATS_SET_FUNCS(rx_pnerr);
 VDEV_MCAST_CP_STATS_SET_FUNCS(rx_tkipreplay);
 VDEV_MCAST_CP_STATS_SET_FUNCS(rx_tkipformat);
 VDEV_MCAST_CP_STATS_SET_FUNCS(rx_ccmpmic);
@@ -194,6 +195,7 @@ VDEV_MCAST_CP_STATS_GET_FUNCS(rx_wepfail);
 VDEV_MCAST_CP_STATS_GET_FUNCS(rx_decryptok);
 VDEV_MCAST_CP_STATS_GET_FUNCS(rx_ccmpmic);
 VDEV_MCAST_CP_STATS_GET_FUNCS(rx_ccmpreplay);
+VDEV_MCAST_CP_STATS_GET_FUNCS(rx_pnerr);
 
 #define VDEV_CP_STATS_SET_FUNCS(field) \
 	static inline void \
