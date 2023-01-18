@@ -993,6 +993,7 @@ int dp_ppeds_tx_comp_handler(struct dp_soc_be *be_soc, uint32_t quota)
 	struct dp_soc *soc = &be_soc->soc;
 	void *last_prefetch_hw_desc = NULL;
 	struct dp_tx_desc_s *last_prefetch_sw_desc = NULL;
+	qdf_nbuf_t  nbuf;
 	hal_soc_handle_t hal_soc = soc->hal_soc;
 	hal_ring_handle_t hal_ring_hdl =
 				be_soc->ppeds_wbm_release_ring.hal_srng;
@@ -1050,8 +1051,8 @@ int dp_ppeds_tx_comp_handler(struct dp_soc_be *be_soc, uint32_t quota)
 			if (status != HTT_TX_FW2WBM_TX_STATUS_OK)
 				dp_ppeds_stats(soc, tx_desc->peer_id);
 
-			qdf_nbuf_free(tx_desc->nbuf);
-			dp_ppeds_tx_desc_free(soc, tx_desc);
+			nbuf = dp_ppeds_tx_desc_free(soc, tx_desc);
+			qdf_nbuf_free(nbuf);
 		} else {
 			tx_desc->tx_status =
 				hal_tx_comp_get_tx_status(tx_comp_hal_desc);

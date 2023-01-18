@@ -5421,6 +5421,19 @@ dp_tx_nbuf_dev_queue_free(qdf_nbuf_queue_head_t *nbuf_queue_head,
 }
 
 static inline void
+dp_tx_nbuf_dev_queue_free_no_flag(qdf_nbuf_queue_head_t *nbuf_queue_head,
+				  qdf_nbuf_t nbuf)
+{
+	if (!nbuf)
+		return;
+
+	if (nbuf->is_from_recycler)
+		qdf_nbuf_dev_queue_head(nbuf_queue_head, nbuf);
+	else
+		qdf_nbuf_free(nbuf);
+}
+
+static inline void
 dp_tx_nbuf_dev_kfree_list(qdf_nbuf_queue_head_t *nbuf_queue_head)
 {
 	qdf_nbuf_dev_kfree_list(nbuf_queue_head);
@@ -5436,6 +5449,13 @@ dp_tx_nbuf_dev_queue_free(qdf_nbuf_queue_head_t *nbuf_queue_head,
 			  struct dp_tx_desc_s *desc)
 {
 	qdf_nbuf_free(desc->nbuf);
+}
+
+static inline void
+dp_tx_nbuf_dev_queue_free_no_flag(qdf_nbuf_queue_head_t *nbuf_queue_head,
+				  qdf_nbuf_t nbuf)
+{
+	qdf_nbuf_free(nbuf);
 }
 
 static inline void
@@ -5481,13 +5501,15 @@ dp_tx_comp_process_desc_list(struct dp_soc *soc,
 		}
 
 		if (desc->flags & DP_TX_DESC_FLAG_PPEDS) {
+			qdf_nbuf_t nbuf;
+
 			if (qdf_likely(txrx_peer))
 				dp_tx_update_peer_basic_stats(txrx_peer,
 							      desc->length,
 							      desc->tx_status,
 							      false);
-			dp_tx_nbuf_dev_queue_free(&h, desc);
-			dp_ppeds_tx_desc_free(soc, desc);
+			nbuf = dp_ppeds_tx_desc_free(soc, desc);
+			dp_tx_nbuf_dev_queue_free_no_flag(&h, nbuf);
 			desc = next;
 			continue;
 		}

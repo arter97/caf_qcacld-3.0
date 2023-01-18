@@ -1787,11 +1787,10 @@ static QDF_STATUS dp_soc_ppeds_srng_init(struct dp_soc *soc)
 		goto fail;
 	}
 
-	wlan_minidump_remove(be_soc->ppeds_wbm_release_ring.base_vaddr_unaligned,
-			     be_soc->ppeds_wbm_release_ring.alloc_size,
-			     soc->ctrl_psoc,
-			     WLAN_MD_DP_SRNG_PPE_WBM2SW_RELEASE,
-			     "ppeds_wbm_release_ring");
+	wlan_minidump_log(be_soc->ppeds_wbm_release_ring.base_vaddr_unaligned,
+			  be_soc->ppeds_wbm_release_ring.alloc_size,
+			  soc->ctrl_psoc, WLAN_MD_DP_SRNG_PPE_WBM2SW_RELEASE,
+			  "ppeds_wbm_release_ring");
 
 	return QDF_STATUS_SUCCESS;
 fail:

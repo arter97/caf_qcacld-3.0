@@ -252,8 +252,10 @@ struct dp_ppe_vp_profile {
 /**
  * struct dp_ppeds_tx_desc_pool_s - PPEDS Tx Descriptor Pool
  * @elem_size: Size of each descriptor
+ * @hot_list_len: Length of hotlist chain
  * @num_allocated: Number of used descriptors
  * @freelist: Chain of free descriptors
+ * @hotlist: Chain of descriptors with attached nbufs
  * @desc_pages: multiple page allocation information for actual descriptors
  * @elem_count: Number of descriptors in the pool
  * @num_free: Number of free descriptors
@@ -262,7 +264,9 @@ struct dp_ppe_vp_profile {
 struct dp_ppeds_tx_desc_pool_s {
 	uint16_t elem_size;
 	uint32_t num_allocated;
+	uint32_t hot_list_len;
 	struct dp_tx_desc_s *freelist;
+	struct dp_tx_desc_s *hotlist;
 	struct qdf_mem_multi_page_t desc_pages;
 	uint16_t elem_count;
 	uint32_t num_free;
@@ -303,6 +307,7 @@ struct dp_ppeds_napi {
  * @ppeds_tx_desc: PPEDS tx desc pool
  * @ppeds_napi_ctxt:
  * @ppeds_handle: PPEDS soc instance handle
+ * @dp_ppeds_txdesc_hotlist_len: PPEDS tx desc hotlist length
  * @ppe_vp_tbl_lock: PPE VP table lock
  * @num_ppe_vp_entries: Number of PPE VP entries
  * @num_ppe_vp_search_idx_entries: PPEDS VP search idx entries
@@ -342,6 +347,7 @@ struct dp_soc_be {
 	struct dp_ppeds_tx_desc_pool_s ppeds_tx_desc;
 	struct dp_ppeds_napi ppeds_napi_ctxt;
 	void *ppeds_handle;
+	int dp_ppeds_txdesc_hotlist_len;
 	qdf_mutex_t ppe_vp_tbl_lock;
 	uint8_t num_ppe_vp_entries;
 	uint8_t num_ppe_vp_search_idx_entries;
