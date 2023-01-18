@@ -119,5 +119,13 @@ void qca_sawf_config_ul(uint8_t *dst_mac, uint8_t *src_mac,
 {}
 #endif
 
+uint16_t qca_sawf_get_msdu_queue(struct net_device *netdev,
+				 uint8_t *peer_mac, uint32_t service_id,
+				 uint32_t dscp, uint32_t rule_id)
+{
+	return qca_sawf_get_msduq(netdev, peer_mac, service_id);
+}
+
 qdf_export_symbol(qca_sawf_get_msduq);
+qdf_export_symbol(qca_sawf_get_msdu_queue);
 qdf_export_symbol(qca_sawf_config_ul);

@@ -20,6 +20,10 @@
 uint16_t qca_sawf_get_msduq(struct net_device *netdev,
 			    uint8_t *peer_mac, uint32_t service_id);
 
+uint16_t qca_sawf_get_msdu_queue(struct net_device *netdev,
+				 uint8_t *peer_mac, uint32_t service_id,
+				 uint32_t dscp, uint32_t rule_id);
+
 /*
  * qca_sawf_config_ul() - Set Uplink QoS parameters
  *
