@@ -822,7 +822,6 @@ static void dp_ppeds_release_rx_desc(ppe_ds_wlan_handle_t *ppeds_handle,
 		rx_bufs_reaped[rx_desc->chip_id][rx_desc->pool_id]++;
 
 		qdf_nbuf_dev_queue_head(&h, rx_desc->nbuf);
-		rx_desc->nbuf->recycled_for_ds = 1;
 
 		dp_rx_add_to_free_desc_list(&head[rx_desc->chip_id][rx_desc->pool_id],
 				&tail[rx_desc->chip_id][rx_desc->pool_id], rx_desc);
