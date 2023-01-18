@@ -2025,6 +2025,37 @@ dp_mlo_peer_find_hash_remove_be(struct dp_soc *soc, struct dp_peer *peer)
 
 }
 
+#ifdef ATH_SUPPORT_WRAP
+static void
+dp_mlo_peer_find_hash_add_be(struct dp_soc *soc, struct dp_peer *peer)
+{
+	uint32_t index;
+	dp_mld_peer_hash_obj_t mld_hash_obj;
+
+	mld_hash_obj = dp_mlo_get_peer_hash_obj(soc);
+
+	if (!mld_hash_obj)
+		return;
+
+	index = dp_mlo_peer_find_hash_index(mld_hash_obj, &peer->mac_addr);
+
+	qdf_spin_lock_bh(&mld_hash_obj->mld_peer_hash_lock);
+
+	if (QDF_IS_STATUS_ERROR(dp_peer_get_ref(NULL, peer,
+						DP_MOD_ID_CONFIG))) {
+		dp_err("fail to get peer ref:" QDF_MAC_ADDR_FMT,
+		       QDF_MAC_ADDR_REF(peer->mac_addr.raw));
+		qdf_spin_unlock_bh(&mld_hash_obj->mld_peer_hash_lock);
+		return;
+	}
+	TAILQ_INSERT_TAIL(&mld_hash_obj->mld_peer_hash.bins[index], peer,
+			  hash_list_elem);
+	qdf_spin_unlock_bh(&mld_hash_obj->mld_peer_hash_lock);
+
+	dp_info("Peer %pK (" QDF_MAC_ADDR_FMT ") added",
+		peer, QDF_MAC_ADDR_REF(peer->mac_addr.raw));
+}
+#else
 static void
 dp_mlo_peer_find_hash_add_be(struct dp_soc *soc, struct dp_peer *peer)
 {
@@ -2062,6 +2093,7 @@ dp_mlo_peer_find_hash_add_be(struct dp_soc *soc, struct dp_peer *peer)
 	dp_info("Peer %pK (" QDF_MAC_ADDR_FMT ") added",
 		peer, QDF_MAC_ADDR_REF(peer->mac_addr.raw));
 }
+#endif
 
 void dp_print_mlo_ast_stats_be(struct dp_soc *soc)
 {
