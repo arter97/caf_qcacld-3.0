@@ -2,7 +2,7 @@
  * Copyright (c) 2016-2020 The Linux Foundation. All rights reserved.
  * Copyright (c) 2007-2008 Sam Leffler, Errno Consulting
  * All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -618,7 +618,12 @@ dfs_find_curchwidth_and_center_chan_for_freq(struct wlan_dfs *dfs,
 		if (primary_chan_freq)
 			*primary_chan_freq =
 				curchan->dfs_ch_mhz_freq_seg2;
+	} else if (WLAN_IS_CHAN_MODE_320(curchan)) {
+		*chwidth = CH_WIDTH_320MHZ;
+		if (primary_chan_freq)
+			*primary_chan_freq = curchan->dfs_ch_mhz_freq_seg2;
 	}
+
 }
 #endif
 
@@ -795,6 +800,25 @@ uint8_t dfs_find_subchannels_for_center_freq(qdf_freq_t pri_center_freq,
 		channels[5] = pri_center_freq + DFS_5GHZ_2ND_CHAN_FREQ_OFFSET;
 		channels[6] = pri_center_freq + DFS_5GHZ_3RD_CHAN_FREQ_OFFSET;
 		channels[7] = pri_center_freq + DFS_5GHZ_4TH_CHAN_FREQ_OFFSET;
+		break;
+	case CH_WIDTH_320MHZ:
+		nchannels = 16;
+		channels[0] = pri_center_freq - DFS_5GHZ_8TH_CHAN_FREQ_OFFSET;
+		channels[1] = pri_center_freq - DFS_5GHZ_7TH_CHAN_FREQ_OFFSET;
+		channels[2] = pri_center_freq - DFS_5GHZ_6TH_CHAN_FREQ_OFFSET;
+		channels[3] = pri_center_freq - DFS_5GHZ_5TH_CHAN_FREQ_OFFSET;
+		channels[4] = pri_center_freq - DFS_5GHZ_4TH_CHAN_FREQ_OFFSET;
+		channels[5] = pri_center_freq - DFS_5GHZ_3RD_CHAN_FREQ_OFFSET;
+		channels[6] = pri_center_freq - DFS_5GHZ_2ND_CHAN_FREQ_OFFSET;
+		channels[7] = pri_center_freq - DFS_5GHZ_NEXT_CHAN_FREQ_OFFSET;
+		channels[8] = pri_center_freq + DFS_5GHZ_NEXT_CHAN_FREQ_OFFSET;
+		channels[9] = pri_center_freq + DFS_5GHZ_2ND_CHAN_FREQ_OFFSET;
+		channels[10] = pri_center_freq + DFS_5GHZ_3RD_CHAN_FREQ_OFFSET;
+		channels[11] = pri_center_freq + DFS_5GHZ_4TH_CHAN_FREQ_OFFSET;
+		channels[12] = pri_center_freq + DFS_5GHZ_5TH_CHAN_FREQ_OFFSET;
+		channels[13] = pri_center_freq + DFS_5GHZ_6TH_CHAN_FREQ_OFFSET;
+		channels[14] = pri_center_freq + DFS_5GHZ_7TH_CHAN_FREQ_OFFSET;
+		channels[15] = pri_center_freq + DFS_5GHZ_8TH_CHAN_FREQ_OFFSET;
 		break;
 	default:
 		dfs_err(NULL, WLAN_DEBUG_DFS_ALWAYS, "invalid channel width");
@@ -1573,7 +1597,7 @@ void dfs_start_agile_precac_timer(struct wlan_dfs *dfs,
 	struct dfs_soc_priv_obj *dfs_soc_obj;
 	uint8_t n_sub_chans;
 	uint8_t i;
-	qdf_freq_t sub_chans[N_SUBCHANS_FOR_160BW];
+	qdf_freq_t sub_chans[MAX_20MHZ_SUBCHANS];
 
 
 	dfs_soc_obj = dfs->dfs_soc_obj;
@@ -1639,7 +1663,7 @@ void dfs_start_precac_timer_for_freq(struct wlan_dfs *dfs,
 	int precac_timeout;
 	struct dfs_soc_priv_obj *dfs_soc_obj;
 	uint8_t n_sub_chans;
-	qdf_freq_t sub_chans[N_SUBCHANS_FOR_160BW];
+	qdf_freq_t sub_chans[MAX_20MHZ_SUBCHANS];
 	uint8_t i;
 
 	dfs_soc_obj = dfs->dfs_soc_obj;
