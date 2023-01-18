@@ -467,6 +467,21 @@ void dp_clr_mlo_ptnr_list(struct dp_soc *soc, struct dp_vdev *vdev)
 	}
 }
 
+static QDF_STATUS
+dp_clear_mlo_ptnr_list(struct cdp_soc_t *soc_hdl, uint8_t self_vdev_id)
+{
+	struct dp_soc *soc = cdp_soc_t_to_dp_soc(soc_hdl);
+	struct dp_vdev *vdev;
+
+	vdev = dp_vdev_get_ref_by_id(soc, self_vdev_id, DP_MOD_ID_RX);
+	if (!vdev)
+		return QDF_STATUS_E_FAILURE;
+
+	dp_clr_mlo_ptnr_list(soc, vdev);
+	dp_vdev_unref_delete(soc, vdev, DP_MOD_ID_RX);
+	return QDF_STATUS_SUCCESS;
+}
+
 static void dp_mlo_setup_complete(struct cdp_mlo_ctxt *cdp_ml_ctxt)
 {
 	struct dp_mlo_ctxt *mlo_ctxt = cdp_mlo_ctx_to_dp(cdp_ml_ctxt);
@@ -535,6 +550,7 @@ static struct cdp_mlo_ops dp_mlo_ops = {
 	.mlo_soc_setup = dp_mlo_soc_setup,
 	.mlo_soc_teardown = dp_mlo_soc_teardown,
 	.update_mlo_ptnr_list = dp_update_mlo_ptnr_list,
+	.clear_mlo_ptnr_list = dp_clear_mlo_ptnr_list,
 	.mlo_setup_complete = dp_mlo_setup_complete,
 	.mlo_update_delta_tsf2 = dp_mlo_update_delta_tsf2,
 	.mlo_update_delta_tqm = dp_mlo_update_delta_tqm,

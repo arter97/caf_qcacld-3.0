@@ -166,6 +166,8 @@ struct cdp_mlo_ops {
 	QDF_STATUS (*update_mlo_ptnr_list)(struct cdp_soc_t *soc_hdl,
 					   int8_t *vdev_ids, uint8_t num_vdevs,
 					   uint8_t vdev_id);
+	QDF_STATUS (*clear_mlo_ptnr_list)(struct cdp_soc_t *soc_hdl,
+					  uint8_t vdev_id);
 	void (*mlo_setup_complete)(struct cdp_mlo_ctxt *mlo_ctxt);
 	struct cdp_mlo_ctxt *(*mlo_ctxt_attach)(struct cdp_ctrl_mlo_mgr *m_ctx);
 	void (*mlo_ctxt_detach)(struct cdp_mlo_ctxt *mlo_ctxt);
