@@ -647,6 +647,7 @@ static QDF_STATUS dp_ppeds_tx_desc_pool_init(struct dp_soc *soc)
 	tx_desc_pool->freelist = (struct dp_tx_desc_s *)
 		*tx_desc_pool->desc_pages.cacheable_pages;
 
+	tx_desc_pool->hotlist = NULL;
 	/* Set unique IDs for each Tx descriptor */
 	if (dp_ppeds_tx_desc_pool_setup(soc, num_elem, DP_TX_PPEDS_POOL_ID) !=
 					QDF_STATUS_SUCCESS) {
@@ -657,6 +658,7 @@ static QDF_STATUS dp_ppeds_tx_desc_pool_init(struct dp_soc *soc)
 	tx_desc_pool->elem_size = desc_size;
 	tx_desc_pool->num_free = num_elem;
 	tx_desc_pool->num_allocated = 0;
+	tx_desc_pool->hot_list_len = 0;
 
 	TX_DESC_LOCK_CREATE(&tx_desc_pool->lock);
 
@@ -735,6 +737,8 @@ dp_ppeds_tx_desc_pool_cleanup(struct dp_soc_be *be_soc,
 					   NULL);
 
 		pool->freelist = NULL;
+		pool->hotlist = NULL;
+
 		TX_DESC_LOCK_UNLOCK(&pool->lock);
 	}
 
@@ -780,20 +784,31 @@ struct dp_tx_desc_s *dp_ppeds_tx_desc_alloc(struct dp_soc_be *be_soc)
 
 	TX_DESC_LOCK_LOCK(&pool->lock);
 
-	tx_desc = pool->freelist;
+	if (pool->hotlist) {
+		tx_desc = pool->hotlist;
+		pool->hotlist = pool->hotlist->next;
+		pool->hot_list_len--;
+		if (pool->hot_list_len)
+			dp_tx_prefetch_desc(pool->hotlist);
+		else
+			dp_tx_prefetch_desc(pool->freelist);
+	} else {
+		tx_desc = pool->freelist;
 
-	/* Pool is exhausted */
-	if (!tx_desc) {
-		TX_DESC_LOCK_UNLOCK(&pool->lock);
-		return NULL;
+		/* Pool is exhausted */
+		if (!tx_desc) {
+			TX_DESC_LOCK_UNLOCK(&pool->lock);
+			return NULL;
+		}
+
+		pool->freelist = pool->freelist->next;
+		dp_tx_prefetch_desc(pool->freelist);
+		pool->num_allocated++;
+		pool->num_free--;
 	}
 
-	pool->freelist = pool->freelist->next;
-	pool->num_allocated++;
-	pool->num_free--;
-	dp_tx_prefetch_desc(pool->freelist);
-
 	tx_desc->flags = DP_TX_DESC_FLAG_ALLOCATED;
+	tx_desc->flags |= DP_TX_DESC_FLAG_PPEDS;
 
 	TX_DESC_LOCK_UNLOCK(&pool->lock);
 
@@ -807,23 +822,35 @@ struct dp_tx_desc_s *dp_ppeds_tx_desc_alloc(struct dp_soc_be *be_soc)
  *
  * PPE DS tx desc free
  *
- * Return: void
+ * Return: nbuf to free
  */
-void dp_ppeds_tx_desc_free(struct dp_soc *soc, struct dp_tx_desc_s *tx_desc)
+qdf_nbuf_t dp_ppeds_tx_desc_free(struct dp_soc *soc, struct dp_tx_desc_s *tx_desc)
 {
 	struct dp_soc_be *be_soc = dp_get_be_soc_from_dp_soc(soc);
 	struct dp_ppeds_tx_desc_pool_s *pool = NULL;
-
-	tx_desc->nbuf = NULL;
-	tx_desc->flags = 0;
+	qdf_nbuf_t nbuf = NULL;
 
 	pool = &be_soc->ppeds_tx_desc;
+
 	TX_DESC_LOCK_LOCK(&pool->lock);
-	tx_desc->next = pool->freelist;
-	pool->freelist = tx_desc;
-	pool->num_allocated--;
-	pool->num_free++;
+	if (pool->hot_list_len < be_soc->dp_ppeds_txdesc_hotlist_len &&
+			tx_desc->nbuf) {
+		tx_desc->next = pool->hotlist;
+		pool->hotlist = tx_desc;
+		pool->hot_list_len++;
+	} else {
+		nbuf = tx_desc->nbuf;
+		tx_desc->nbuf = NULL;
+		tx_desc->flags = 0;
+		tx_desc->next = pool->freelist;
+
+		pool->freelist = tx_desc;
+		pool->num_allocated--;
+		pool->num_free++;
+	}
 	TX_DESC_LOCK_UNLOCK(&pool->lock);
+
+	return nbuf;
 }
 
 /**
@@ -855,61 +882,54 @@ uint32_t dp_ppeds_get_batched_tx_desc(ppe_ds_wlan_handle_t *ppeds_handle,
 	/*
 	 * If the tx desc pool is empty, we need to return.
 	 */
-	if (!pool->freelist) {
+	if (!pool->freelist && !pool->hotlist) {
 		dp_err("ran out of txdesc");
 		return 0;
 	}
 
 	for (i = 0; i < num_buff_req; i++) {
 		qdf_nbuf_t nbuf = NULL;
-		/*
-		 * Get a free skb.
-		 */
-		nbuf = dp_nbuf_alloc_ppe_ds(soc->osdev, buff_size, 0, 0, 0);
-		if (qdf_unlikely(!nbuf)) {
-			break;
-		}
-
-		/*
-		 * Reserve headrrom
-		 */
-		qdf_nbuf_reserve(nbuf, headroom);
-
-		/*
-		 * Map(Get Phys address)
-		 */
-		if (!nbuf->recycled_for_ds) {
-			qdf_nbuf_dma_inv_range_no_dsb((void *)nbuf->data,
-				(void *)(nbuf->data + buff_size - headroom));
-			nbuf->recycled_for_ds = 1;
-		}
-		paddr = (qdf_dma_addr_t)qdf_mem_virt_to_phys(nbuf->data);
 
 		tx_desc = dp_ppeds_tx_desc_alloc(be_soc);
 		if (!tx_desc) {
-			qdf_nbuf_free_simple(nbuf);
 			dp_err("ran out of txdesc");
 			qdf_dsb();
 			break;
 		}
 
-		tx_desc->flags |= DP_TX_DESC_FLAG_PPEDS;
-		tx_desc->pdev = NULL;
-		tx_desc->nbuf = nbuf;
+		if (!tx_desc->nbuf) {
+			/*
+			 * Get a free skb.
+			 */
+			nbuf = dp_nbuf_alloc_ppe_ds(soc->osdev, buff_size, 0, 0, 0);
+			if (qdf_unlikely(!nbuf)) {
+				dp_ppeds_tx_desc_free(soc, tx_desc);
+				break;
+			}
 
-		/*
-		 * If the skb is from recycler, then add the FAST flag in
-		 * the Tx descriptor so that at the skb's can be freed in
-		 * the batched mode rather than the conventional mode (freed
-		 * one at a time).
-		 */
-		if (nbuf->is_from_recycler) {
-			tx_desc->flags |= DP_TX_DESC_FLAG_FAST;
+			/*
+			 * Reserve headrrom
+			 */
+			qdf_nbuf_reserve(nbuf, headroom);
+
+			/*
+			 * Map(Get Phys address)
+			 */
+			if (!nbuf->recycled_for_ds) {
+				qdf_nbuf_dma_inv_range_no_dsb((void *)nbuf->data,
+						(void *)(nbuf->data + buff_size - headroom));
+				nbuf->recycled_for_ds = 1;
+			}
+			paddr = (qdf_dma_addr_t)qdf_mem_virt_to_phys(nbuf->data);
+
+			tx_desc->pdev = NULL;
+			tx_desc->nbuf = nbuf;
+			tx_desc->dma_addr = paddr;
 		}
 
 		arr[i].opaque_lo = tx_desc->id;
 		arr[i].opaque_hi = 0;
-		arr[i].buff_addr = paddr;
+		arr[i].buff_addr = tx_desc->dma_addr;
 	}
 
 	qdf_dsb();
@@ -1597,6 +1617,9 @@ QDF_STATUS dp_ppeds_init_soc_be(struct dp_soc *soc)
 
 	if (!wlan_cfg_get_dp_soc_is_ppeds_enabled(soc->wlan_cfg_ctx))
 		return QDF_STATUS_SUCCESS;
+
+	be_soc->dp_ppeds_txdesc_hotlist_len =
+	wlan_cfg_get_dp_soc_ppeds_tx_desc_hotlist_len(soc->wlan_cfg_ctx);
 
 	return dp_hw_cookie_conversion_init(be_soc, &be_soc->ppeds_tx_cc_ctx);
 }
