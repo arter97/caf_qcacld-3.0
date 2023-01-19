@@ -37,8 +37,6 @@
 #include <wlan_mlo_mgr_peer.h>
 #endif
 #include <wlan_telemetry_agent.h>
-#include <wlan_pdev_mlme_api.h>
-#include <ieee80211_var.h>
 
 static struct sawf_ctx *g_wlan_sawf_ctx;
 
@@ -879,46 +877,3 @@ err:
 }
 
 qdf_export_symbol(wlan_service_id_get_peer_count);
-
-int wlan_sawf_configure_tgt_svc_class(struct wlan_objmgr_psoc *psoc)
-{
-	struct sawf_ctx *sawf_ctx;
-	struct wlan_sawf_scv_class_params *svc_class_param;
-	struct wlan_objmgr_pdev *pdev;
-	struct ieee80211com *ic;
-	uint8_t i;
-
-	pdev = wlan_objmgr_get_pdev_by_id(psoc, 0, WLAN_MLME_NB_ID);
-	ic = wlan_pdev_mlme_get_ext_hdl(pdev);
-	if (!ic) {
-		qdf_err("ic is NULL!");
-		return -EINVAL;
-	}
-
-	sawf_ctx = wlan_get_sawf_ctx();
-	if (!sawf_ctx) {
-		qdf_err("SAWF context is NULL!");
-		return -EINVAL;
-	}
-
-	for (i = 0; i < SAWF_SVC_CLASS_MAX; i++) {
-		if (wlan_service_id_configured(sawf_ctx->svc_classes[i].
-					       svc_id)) {
-			svc_class_param = &sawf_ctx->svc_classes[i];
-			if (ic->ic_cfg80211_radio_handler.set_sawf_params) {
-				if (ic->ic_cfg80211_radio_handler.
-				    set_sawf_params((void *)pdev,
-						    svc_class_param, true)) {
-					qdf_err("set failed for svc-class: %d",
-						sawf_ctx->svc_classes[i].
-						svc_id);
-				}
-			}
-		}
-	}
-	wlan_objmgr_pdev_release_ref(pdev, WLAN_MLME_NB_ID);
-
-	return 0;
-}
-
-qdf_export_symbol(wlan_sawf_configure_tgt_svc_class);

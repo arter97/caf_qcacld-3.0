@@ -26,7 +26,6 @@
 #include <qdf_status.h>
 #include "qdf_atomic.h"
 #include "qdf_lock.h"
-#include <wlan_objmgr_psoc_obj.h>
 
 #define SAWF_SVC_CLASS_MIN 1
 #define SAWF_SVC_CLASS_MAX 128
@@ -457,12 +456,4 @@ void wlan_service_id_dec_peer_count(uint8_t svc_id);
  * Return: void
  */
 void wlan_service_id_inc_peer_count(uint8_t svc_id);
-
-/* wlan_sawf_configure_tgt_svc_class() - Push service-class config to target
- *
- * @psoc: pointer to objmgr psoc
- *
- * Return: 0 on success
- */
-int wlan_sawf_configure_tgt_svc_class(struct wlan_objmgr_psoc *psoc);
 #endif
