@@ -98,7 +98,8 @@ static int is_bigtk(uint16_t keyix)
  */
 static struct wlan_crypto_params *wlan_crypto_vdev_get_comp_params(
 				struct wlan_objmgr_vdev *vdev,
-				struct wlan_crypto_comp_priv **crypto_priv){
+				struct wlan_crypto_comp_priv **crypto_priv)
+{
 	*crypto_priv = (struct wlan_crypto_comp_priv *)
 					wlan_get_vdev_crypto_obj(vdev);
 	if (!(*crypto_priv)) {
@@ -119,7 +120,8 @@ static struct wlan_crypto_params *wlan_crypto_vdev_get_comp_params(
  */
 static struct wlan_crypto_params *wlan_crypto_peer_get_comp_params(
 				struct wlan_objmgr_peer *peer,
-				struct wlan_crypto_comp_priv **crypto_priv){
+				struct wlan_crypto_comp_priv **crypto_priv)
+{
 
 	*crypto_priv = (struct wlan_crypto_comp_priv *)
 					wlan_get_peer_crypto_obj(peer);
@@ -148,7 +150,8 @@ static QDF_STATUS wlan_crypto_set_igtk_key(struct wlan_crypto_key *key)
  */
 static QDF_STATUS wlan_crypto_set_param(struct wlan_crypto_params *crypto_params,
 					wlan_crypto_param_type param,
-					uint32_t value){
+					uint32_t value)
+{
 	QDF_STATUS status = QDF_STATUS_E_INVAL;
 
 	crypto_debug("param %d, value %d", param, value);
@@ -192,7 +195,8 @@ static QDF_STATUS wlan_crypto_set_param(struct wlan_crypto_params *crypto_params
  */
 QDF_STATUS wlan_crypto_set_vdev_param(struct wlan_objmgr_vdev *vdev,
 					wlan_crypto_param_type param,
-					uint32_t value){
+					uint32_t value)
+{
 	QDF_STATUS status = QDF_STATUS_E_INVAL;
 	struct wlan_crypto_comp_priv *crypto_priv;
 	struct wlan_crypto_params *crypto_params;
@@ -225,7 +229,8 @@ QDF_STATUS wlan_crypto_set_vdev_param(struct wlan_objmgr_vdev *vdev,
  */
 QDF_STATUS wlan_crypto_set_peer_param(struct wlan_objmgr_peer *peer,
 				wlan_crypto_param_type param,
-				uint32_t value){
+				uint32_t value)
+{
 	QDF_STATUS status = QDF_STATUS_E_INVAL;
 	struct wlan_crypto_comp_priv *crypto_priv;
 	struct wlan_crypto_params *crypto_params;
@@ -759,8 +764,8 @@ qdf_export_symbol(wlan_crypto_is_htallowed);
  * Return: QDF_STATUS_SUCCESS - in case of success
  */
 QDF_STATUS wlan_crypto_setkey(struct wlan_objmgr_vdev *vdev,
-				struct wlan_crypto_req_key *req_key){
-
+				struct wlan_crypto_req_key *req_key)
+{
 	QDF_STATUS status = QDF_STATUS_E_INVAL;
 	struct wlan_crypto_comp_priv *crypto_priv;
 	struct wlan_crypto_params *crypto_params;
@@ -1172,8 +1177,8 @@ qdf_export_symbol(store_def_keyix_peer);
  *
  * Return: keytype
  */
-wlan_crypto_cipher_type wlan_crypto_get_key_type(
-						struct wlan_crypto_key *key){
+wlan_crypto_cipher_type wlan_crypto_get_key_type(struct wlan_crypto_key *key)
+{
 	if (key && key->cipher_table) {
 		return ((struct wlan_crypto_cipher *)
 						(key->cipher_table))->cipher;
@@ -1191,7 +1196,8 @@ qdf_export_symbol(wlan_crypto_get_key_type);
  * Return: key or NULL
  */
 struct wlan_crypto_key *wlan_crypto_vdev_getkey(struct wlan_objmgr_vdev *vdev,
-						uint16_t keyix){
+						uint16_t keyix)
+{
 	struct wlan_crypto_comp_priv *crypto_priv;
 	struct wlan_crypto_params *crypto_params;
 	struct wlan_crypto_key *key = NULL;
@@ -1234,7 +1240,8 @@ qdf_export_symbol(wlan_crypto_vdev_getkey);
  * Return: key or NULL
  */
 struct wlan_crypto_key *wlan_crypto_peer_getkey(struct wlan_objmgr_peer *peer,
-						uint16_t keyix){
+						uint16_t keyix)
+{
 	struct wlan_crypto_comp_priv *crypto_priv;
 	struct wlan_crypto_params *crypto_params;
 	struct wlan_crypto_key *key = NULL;
@@ -1281,7 +1288,8 @@ qdf_export_symbol(wlan_crypto_peer_getkey);
  */
 QDF_STATUS wlan_crypto_getkey(struct wlan_objmgr_vdev *vdev,
 				struct wlan_crypto_req_key *req_key,
-				uint8_t *mac_addr){
+				uint8_t *mac_addr)
+{
 	struct wlan_crypto_cipher *cipher_table;
 	struct wlan_crypto_key *key;
 	struct wlan_objmgr_psoc *psoc;
@@ -1418,7 +1426,8 @@ err:
  */
 QDF_STATUS wlan_crypto_delkey(struct wlan_objmgr_vdev *vdev,
 				uint8_t *macaddr,
-				uint8_t key_idx){
+				uint8_t key_idx)
+{
 	struct wlan_crypto_comp_priv *crypto_priv;
 	struct wlan_crypto_params *crypto_params;
 	struct wlan_crypto_key *key;
@@ -1584,7 +1593,8 @@ static QDF_STATUS wlan_crypto_set_default_key(struct wlan_objmgr_vdev *vdev,
 QDF_STATUS wlan_crypto_default_key(struct wlan_objmgr_vdev *vdev,
 					uint8_t *macaddr,
 					uint8_t key_idx,
-					bool unicast){
+					bool unicast)
+{
 	struct wlan_crypto_comp_priv *crypto_priv;
 	struct wlan_crypto_params *crypto_params;
 	struct wlan_crypto_key *key;
@@ -1672,7 +1682,8 @@ QDF_STATUS wlan_crypto_default_key(struct wlan_objmgr_vdev *vdev,
 QDF_STATUS wlan_crypto_encap(struct wlan_objmgr_vdev *vdev,
 				qdf_nbuf_t wbuf,
 				uint8_t *mac_addr,
-				uint8_t encapdone){
+				uint8_t encapdone)
+{
 	struct wlan_crypto_comp_priv *crypto_priv;
 	struct wlan_crypto_params *crypto_params;
 	struct wlan_crypto_key *key;
@@ -1780,7 +1791,8 @@ qdf_export_symbol(wlan_crypto_encap);
 QDF_STATUS wlan_crypto_decap(struct wlan_objmgr_vdev *vdev,
 				qdf_nbuf_t wbuf,
 				uint8_t *mac_addr,
-				uint8_t tid){
+				uint8_t tid)
+{
 	struct wlan_crypto_comp_priv *crypto_priv;
 	struct wlan_crypto_params *crypto_params;
 	struct wlan_crypto_key *key;
@@ -1898,7 +1910,8 @@ qdf_export_symbol(wlan_crypto_decap);
 QDF_STATUS wlan_crypto_enmic(struct wlan_objmgr_vdev *vdev,
 				qdf_nbuf_t wbuf,
 				uint8_t *mac_addr,
-				uint8_t encapdone){
+				uint8_t encapdone)
+{
 	struct wlan_crypto_comp_priv *crypto_priv;
 	struct wlan_crypto_params *crypto_params;
 	struct wlan_crypto_key *key;
@@ -1991,7 +2004,8 @@ QDF_STATUS wlan_crypto_demic(struct wlan_objmgr_vdev *vdev,
 			     qdf_nbuf_t wbuf,
 			     uint8_t *mac_addr,
 			     uint8_t tid,
-			     uint8_t keyid){
+			     uint8_t keyid)
+{
 	struct wlan_crypto_comp_priv *crypto_priv;
 	struct wlan_crypto_params *crypto_params;
 	struct wlan_crypto_key *key;
@@ -2139,8 +2153,8 @@ bool wlan_crypto_vdev_is_pmf_required(struct wlan_objmgr_vdev *vdev)
  * Return: true or false
  */
 bool wlan_crypto_is_pmf_enabled(struct wlan_objmgr_vdev *vdev,
-				struct wlan_objmgr_peer *peer){
-
+				struct wlan_objmgr_peer *peer)
+{
 	struct wlan_crypto_comp_priv *crypto_priv;
 	struct wlan_crypto_params *vdev_crypto_params;
 	struct wlan_crypto_params *peer_crypto_params;
@@ -2224,7 +2238,8 @@ static void wlan_crypto_gmac_pn_swap(uint8_t *a, uint8_t *b)
  */
 uint8_t *wlan_crypto_add_mmie(struct wlan_objmgr_vdev *vdev,
 				uint8_t *bfrm,
-				uint32_t len) {
+				uint32_t len)
+{
 	struct wlan_crypto_key *key;
 	struct wlan_crypto_mmie *mmie;
 	uint8_t *pn, *aad, *buf, *efrm, nonce[12];
@@ -2359,7 +2374,8 @@ uint8_t *wlan_crypto_add_mmie(struct wlan_objmgr_vdev *vdev,
  */
 bool wlan_crypto_is_mmie_valid(struct wlan_objmgr_vdev *vdev,
 					uint8_t *frm,
-					uint8_t *efrm){
+					uint8_t *efrm)
+{
 	struct wlan_crypto_mmie   *mmie = NULL;
 	uint8_t *ipn, *aad, *buf, *mic, nonce[12];
 	struct wlan_crypto_key *key;
@@ -3036,7 +3052,8 @@ QDF_STATUS wlan_crypto_rsnie_check(struct wlan_crypto_params *crypto_params,
  * Return: end of buffer
  */
 uint8_t *wlan_crypto_build_wpaie(struct wlan_objmgr_vdev *vdev,
-					uint8_t *iebuf){
+					uint8_t *iebuf)
+{
 	uint8_t *frm = iebuf;
 	uint8_t *selcnt;
 	struct wlan_crypto_comp_priv *crypto_priv;
@@ -3329,7 +3346,8 @@ uint8_t *wlan_crypto_build_rsnie(struct wlan_objmgr_vdev *vdev,
 }
 
 bool wlan_crypto_rsn_info(struct wlan_objmgr_vdev *vdev,
-				struct wlan_crypto_params *crypto_params){
+				struct wlan_crypto_params *crypto_params)
+{
 	struct wlan_crypto_params *my_crypto_params;
 	my_crypto_params = wlan_crypto_vdev_get_crypto_params(vdev);
 
@@ -3565,7 +3583,8 @@ uint8_t *wlan_crypto_build_wapiie(struct wlan_objmgr_vdev *vdev,
  * Return: QDF_STATUS
  */
 QDF_STATUS wlan_crypto_pn_check(struct wlan_objmgr_vdev *vdev,
-				qdf_nbuf_t wbuf){
+				qdf_nbuf_t wbuf)
+{
 	/* Need to check is there real requirement for this function
 	 * as PN check is already handled in decap function.
 	 */
@@ -3581,7 +3600,8 @@ QDF_STATUS wlan_crypto_pn_check(struct wlan_objmgr_vdev *vdev,
  * Return: wlan_crypto_params or NULL in case of failure
  */
 struct wlan_crypto_params *wlan_crypto_vdev_get_crypto_params(
-						struct wlan_objmgr_vdev *vdev){
+						struct wlan_objmgr_vdev *vdev)
+{
 	struct wlan_crypto_comp_priv *crypto_priv;
 
 	return wlan_crypto_vdev_get_comp_params(vdev, &crypto_priv);
@@ -3596,7 +3616,8 @@ struct wlan_crypto_params *wlan_crypto_vdev_get_crypto_params(
  * Return: wlan_crypto_params or NULL in case of failure
  */
 struct wlan_crypto_params *wlan_crypto_peer_get_crypto_params(
-						struct wlan_objmgr_peer *peer){
+						struct wlan_objmgr_peer *peer)
+{
 	struct wlan_crypto_comp_priv *crypto_priv;
 
 	return wlan_crypto_peer_get_comp_params(peer, &crypto_priv);
@@ -3741,7 +3762,8 @@ exit:
  * Return: QDF_STATUS
  */
 QDF_STATUS wlan_crypto_register_crypto_rx_ops(
-			struct wlan_lmac_if_crypto_rx_ops *crypto_rx_ops) {
+			struct wlan_lmac_if_crypto_rx_ops *crypto_rx_ops)
+{
 	crypto_rx_ops->crypto_encap      = wlan_crypto_encap;
 	crypto_rx_ops->crypto_decap      = wlan_crypto_decap;
 	crypto_rx_ops->crypto_enmic      = wlan_crypto_enmic;
@@ -4112,7 +4134,8 @@ qdf_export_symbol(wlan_crypto_get_keyid);
  * Return: void
  */
 static void crypto_plumb_peer_keys(struct wlan_objmgr_vdev *vdev,
-				   void *object, void *arg) {
+				   void *object, void *arg)
+{
 	struct wlan_objmgr_peer *peer = (struct wlan_objmgr_peer *)object;
 	struct wlan_objmgr_psoc *psoc = (struct wlan_objmgr_psoc *)arg;
 	struct wlan_crypto_comp_priv *crypto_priv;
