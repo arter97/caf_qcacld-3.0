@@ -10176,7 +10176,8 @@ dp_get_host_peer_stats(struct cdp_soc_t *soc, uint8_t *mac_addr)
 	dp_get_peer_stats(peer, peer_stats);
 	dp_print_peer_stats(peer, peer_stats);
 
-	dp_peer_rxtid_stats(peer, dp_rx_tid_stats_cb, NULL);
+	dp_peer_rxtid_stats(dp_get_tgt_peer_from_peer(peer),
+			    dp_rx_tid_stats_cb, NULL);
 
 	qdf_mem_free(peer_stats);
 	dp_peer_unref_delete(peer, DP_MOD_ID_CDP);

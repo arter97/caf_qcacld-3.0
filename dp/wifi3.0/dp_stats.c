@@ -7380,10 +7380,11 @@ dp_peer_ctrl_frames_stats_get(struct dp_soc *soc,
 			      void *arg)
 {
 	uint32_t waitcnt;
-	struct dp_pdev *pdev = peer->vdev->pdev;
+	struct dp_peer *tgt_peer = dp_get_tgt_peer_from_peer(peer);
+	struct dp_pdev *pdev = tgt_peer->vdev->pdev;
 
 	waitcnt = 0;
-	dp_peer_rxtid_stats(peer, dp_rx_bar_stats_cb, pdev);
+	dp_peer_rxtid_stats(tgt_peer, dp_rx_bar_stats_cb, pdev);
 	while (!(qdf_atomic_read(&pdev->stats_cmd_complete)) &&
 	       waitcnt < 10) {
 		schedule_timeout_interruptible(
