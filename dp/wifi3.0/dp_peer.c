@@ -3956,9 +3956,7 @@ void dp_rx_tid_delete_cb(struct dp_soc *soc, void *cb_ctxt,
 	uint32_t list_size;
 	struct reo_desc_list_node *desc;
 	unsigned long curr_ts = qdf_get_system_timestamp();
-	uint32_t desc_size, tot_desc_size;
 	struct hal_reo_cmd_params params;
-	bool flush_failure = false;
 
 	DP_RX_REO_QDESC_UPDATE_EVT(freedesc);
 
@@ -4014,52 +4012,15 @@ void dp_rx_tid_delete_cb(struct dp_soc *soc, void *cb_ctxt,
 				continue;
 		}
 
-		/* Flush and invalidate REO descriptor from HW cache: Base and
-		 * extension descriptors should be flushed separately */
-		if (desc->pending_ext_desc_size)
-			tot_desc_size = desc->pending_ext_desc_size;
-		else
-			tot_desc_size = rx_tid->hw_qdesc_alloc_size;
-		/* Get base descriptor size by passing non-qos TID */
-		desc_size = hal_get_reo_qdesc_size(soc->hal_soc, 0,
-						   DP_NON_QOS_TID);
-
-		/* Flush reo extension descriptors */
-		while ((tot_desc_size -= desc_size) > 0) {
-			qdf_mem_zero(&params, sizeof(params));
-			params.std.addr_lo =
-				((uint64_t)(rx_tid->hw_qdesc_paddr) +
-				tot_desc_size) & 0xffffffff;
-			params.std.addr_hi =
-				(uint64_t)(rx_tid->hw_qdesc_paddr) >> 32;
-
-			if (QDF_STATUS_SUCCESS != dp_reo_send_cmd(soc,
-							CMD_FLUSH_CACHE,
-							&params,
-							NULL,
-							NULL)) {
-				dp_info_rl("fail to send CMD_CACHE_FLUSH:"
-					   "tid %d desc %pK", rx_tid->tid,
-					   (void *)(rx_tid->hw_qdesc_paddr));
-				desc->pending_ext_desc_size = tot_desc_size +
-								      desc_size;
-				dp_reo_desc_clean_up(soc, desc, reo_status);
-				flush_failure = true;
-				break;
-			}
-		}
-
-		if (flush_failure)
-			break;
-		else
-			desc->pending_ext_desc_size = desc_size;
-
 		/* Flush base descriptor */
 		qdf_mem_zero(&params, sizeof(params));
 		params.std.need_status = 1;
 		params.std.addr_lo =
 			(uint64_t)(rx_tid->hw_qdesc_paddr) & 0xffffffff;
 		params.std.addr_hi = (uint64_t)(rx_tid->hw_qdesc_paddr) >> 32;
+		if (rx_tid->ba_win_size > 256)
+			params.u.fl_cache_params.flush_q_1k_desc = 1;
+		params.u.fl_cache_params.fwd_mpdus_in_queue = 1;
 
 		if (QDF_STATUS_SUCCESS != dp_reo_send_cmd(soc,
 							  CMD_FLUSH_CACHE,
@@ -4100,6 +4061,7 @@ static int dp_rx_tid_delete_wifi3(struct dp_peer *peer, int tid)
 {
 	struct dp_rx_tid *rx_tid = &(peer->rx_tid[tid]);
 	struct dp_soc *soc = peer->vdev->pdev->soc;
+	union hal_reo_status reo_status;
 	struct hal_reo_cmd_params params;
 	struct reo_desc_list_node *freedesc =
 		qdf_mem_malloc(sizeof(*freedesc));
@@ -4118,25 +4080,8 @@ static int dp_rx_tid_delete_wifi3(struct dp_peer *peer, int tid)
 
 	DP_RX_REO_QDESC_GET_MAC(freedesc, peer);
 
-	params.std.need_status = 1;
-	params.std.addr_lo = rx_tid->hw_qdesc_paddr & 0xffffffff;
-	params.std.addr_hi = (uint64_t)(rx_tid->hw_qdesc_paddr) >> 32;
-	params.u.upd_queue_params.update_vld = 1;
-	params.u.upd_queue_params.vld = 0;
-
-	if (dp_reo_send_cmd(soc, CMD_UPDATE_RX_REO_QUEUE, &params,
-			    dp_rx_tid_delete_cb, (void *)freedesc)
-		!= QDF_STATUS_SUCCESS) {
-		/* Defer the clean up to the call back context */
-		qdf_spin_lock_bh(&soc->reo_desc_freelist_lock);
-		freedesc->free_ts = qdf_get_system_timestamp();
-		freedesc->resend_update_reo_cmd = true;
-		qdf_list_insert_front(&soc->reo_desc_freelist,
-				      (qdf_list_node_t *)freedesc);
-		DP_STATS_INC(soc, rx.err.reo_cmd_send_fail, 1);
-		qdf_spin_unlock_bh(&soc->reo_desc_freelist_lock);
-		dp_info("Failed to send CMD_UPDATE_RX_REO_QUEUE");
-	}
+	reo_status.rx_queue_status.header.status = HAL_REO_CMD_SUCCESS;
+	dp_rx_tid_delete_cb(soc, freedesc, &reo_status);
 
 	rx_tid->hw_qdesc_vaddr_unaligned = NULL;
 	rx_tid->hw_qdesc_alloc_size = 0;
@@ -6092,6 +6037,11 @@ void dp_send_cache_flush_for_rx_tid(
 			params.std.addr_hi =
 				(uint64_t)(rx_tid->hw_qdesc_paddr) >> 32;
 			params.u.fl_cache_params.flush_no_inval = 0;
+
+			if (rx_tid->ba_win_size > 256)
+				params.u.fl_cache_params.flush_q_1k_desc = 1;
+			params.u.fl_cache_params.fwd_mpdus_in_queue = 1;
+
 			if (QDF_STATUS_SUCCESS !=
 				dp_reo_send_cmd(
 					soc, CMD_FLUSH_CACHE,
