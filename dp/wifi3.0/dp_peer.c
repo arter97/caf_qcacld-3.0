@@ -3645,6 +3645,7 @@ static void dp_reo_desc_free(struct dp_soc *soc, void *cb_ctxt,
 
 	DP_RX_REO_QDESC_FREE_EVT(freedesc);
 
+	hal_reo_shared_qaddr_cache_clear(soc->hal_soc);
 	qdf_mem_unmap_nbytes_single(soc->osdev,
 		rx_tid->hw_qdesc_paddr,
 		QDF_DMA_BIDIRECTIONAL,
