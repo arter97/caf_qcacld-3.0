@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2016-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -33,8 +33,8 @@
 #include "wlan_objmgr_pdev_obj_i.h"
 #include <wlan_utility.h>
 
-/**
- ** APIs to Create/Delete Global object APIs
+/*
+ * APIs to Create/Delete Global object APIs
  */
 static QDF_STATUS wlan_objmgr_pdev_object_status(
 		struct wlan_objmgr_pdev *pdev)
@@ -274,8 +274,8 @@ QDF_STATUS wlan_objmgr_pdev_obj_delete(struct wlan_objmgr_pdev *pdev)
 }
 qdf_export_symbol(wlan_objmgr_pdev_obj_delete);
 
-/**
- ** APIs to attach/detach component objects
+/*
+ * APIs to attach/detach component objects
  */
 QDF_STATUS wlan_objmgr_pdev_component_obj_attach(
 		struct wlan_objmgr_pdev *pdev,
@@ -308,7 +308,7 @@ QDF_STATUS wlan_objmgr_pdev_component_obj_attach(
 
 	if (pdev->obj_state != WLAN_OBJ_STATE_PARTIALLY_CREATED)
 		return QDF_STATUS_SUCCESS;
-	/**
+	/*
 	 * If PDEV object status is partially created means, this API is
 	 * invoked with different context, this block should be executed for
 	 * async components only
@@ -405,8 +405,8 @@ QDF_STATUS wlan_objmgr_pdev_component_obj_detach(
 }
 qdf_export_symbol(wlan_objmgr_pdev_component_obj_detach);
 
-/**
- ** APIs to operations on pdev objects
+/*
+ * APIs to operations on pdev objects
  */
 static void wlan_objmgr_pdev_vdev_iterate_peers(struct wlan_objmgr_pdev *pdev,
 				struct wlan_objmgr_vdev *vdev,
@@ -837,7 +837,7 @@ struct wlan_objmgr_vdev *wlan_objmgr_get_vdev_by_id_from_pdev_debug(
 	vdev_list = &objmgr->wlan_vdev_list;
 	/* Get first vdev */
 	vdev = wlan_pdev_vdev_list_peek_head(vdev_list);
-	/**
+	/*
 	 * Iterate through pdev's vdev list, till vdev id matches with
 	 * entry of vdev list
 	 */
@@ -876,7 +876,7 @@ struct wlan_objmgr_vdev *wlan_objmgr_get_vdev_by_id_from_pdev(
 	vdev_list = &objmgr->wlan_vdev_list;
 	/* Get first vdev */
 	vdev = wlan_pdev_vdev_list_peek_head(vdev_list);
-	/**
+	/*
 	 * Iterate through pdev's vdev list, till vdev id matches with
 	 * entry of vdev list
 	 */
@@ -917,7 +917,7 @@ struct wlan_objmgr_vdev *wlan_objmgr_get_vdev_by_id_from_pdev_no_state_debug(
 	vdev_list = &objmgr->wlan_vdev_list;
 	/* Get first vdev */
 	vdev = wlan_pdev_vdev_list_peek_head(vdev_list);
-	/**
+	/*
 	 * Iterate through pdev's vdev list, till vdev id matches with
 	 * entry of vdev list
 	 */
@@ -955,7 +955,7 @@ struct wlan_objmgr_vdev *wlan_objmgr_get_vdev_by_id_from_pdev_no_state(
 	vdev_list = &objmgr->wlan_vdev_list;
 	/* Get first vdev */
 	vdev = wlan_pdev_vdev_list_peek_head(vdev_list);
-	/**
+	/*
 	 * Iterate through pdev's vdev list, till vdev id matches with
 	 * entry of vdev list
 	 */
@@ -994,7 +994,7 @@ struct wlan_objmgr_vdev *wlan_objmgr_get_vdev_by_macaddr_from_pdev_debug(
 	vdev_list = &objmgr->wlan_vdev_list;
 	/* Get first vdev */
 	vdev = wlan_pdev_vdev_list_peek_head(vdev_list);
-	/**
+	/*
 	 * Iterate through pdev's vdev list, till vdev macaddr matches with
 	 * entry of vdev list
 	 */
@@ -1031,7 +1031,7 @@ struct wlan_objmgr_vdev *wlan_objmgr_get_vdev_by_macaddr_from_pdev(
 	vdev_list = &objmgr->wlan_vdev_list;
 	/* Get first vdev */
 	vdev = wlan_pdev_vdev_list_peek_head(vdev_list);
-	/**
+	/*
 	 * Iterate through pdev's vdev list, till vdev macaddr matches with
 	 * entry of vdev list
 	 */
@@ -1071,7 +1071,7 @@ struct wlan_objmgr_vdev
 	vdev_list = &objmgr->wlan_vdev_list;
 	/* Get first vdev */
 	vdev = wlan_pdev_vdev_list_peek_head(vdev_list);
-	/**
+	/*
 	 * Iterate through pdev's vdev list, till vdev macaddr matches with
 	 * entry of vdev list
 	 */
@@ -1107,7 +1107,7 @@ struct wlan_objmgr_vdev *wlan_objmgr_get_vdev_by_macaddr_from_pdev_no_state(
 	vdev_list = &objmgr->wlan_vdev_list;
 	/* Get first vdev */
 	vdev = wlan_pdev_vdev_list_peek_head(vdev_list);
-	/**
+	/*
 	 * Iterate through pdev's vdev list, till vdev macaddr matches with
 	 * entry of vdev list
 	 */

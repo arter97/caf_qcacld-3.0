@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2016-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -13,11 +13,10 @@
  * WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
  * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
-
  */
- /**
-  * DOC: Public APIs to perform operations on Global objects
-  */
+/**
+ * DOC: Public APIs to perform operations on Global objects
+ */
 #include <wlan_objmgr_cmn.h>
 #include <wlan_objmgr_global_obj.h>
 #include <wlan_objmgr_psoc_obj.h>
@@ -35,8 +34,8 @@
 #include <wlan_osif_priv.h>
 
 
-/**
- ** APIs to Create/Delete Global object APIs
+/*
+ * APIs to Create/Delete Global object APIs
  */
 
 static QDF_STATUS wlan_objmgr_vdev_object_status(
@@ -383,8 +382,8 @@ QDF_STATUS wlan_objmgr_vdev_obj_delete(struct wlan_objmgr_vdev *vdev)
 }
 qdf_export_symbol(wlan_objmgr_vdev_obj_delete);
 
-/**
- ** APIs to attach/detach component objects
+/*
+ * APIs to attach/detach component objects
  */
 QDF_STATUS wlan_objmgr_vdev_component_obj_attach(
 		struct wlan_objmgr_vdev *vdev,
@@ -466,7 +465,7 @@ QDF_STATUS wlan_objmgr_vdev_component_obj_detach(
 	vdev->obj_status[id] = QDF_STATUS_SUCCESS;
 	wlan_vdev_obj_unlock(vdev);
 
-	/**
+	/*
 	 *If VDEV object status is partially destroyed means, this API is
 	 * invoked with different context, this block should be executed for
 	 * async components only
@@ -516,8 +515,8 @@ QDF_STATUS wlan_objmgr_vdev_component_obj_detach(
 }
 qdf_export_symbol(wlan_objmgr_vdev_component_obj_detach);
 
-/**
- ** APIs to operations on vdev objects
+/*
+ * APIs to operations on vdev objects
  */
 QDF_STATUS wlan_objmgr_iterate_peerobj_list(
 		struct wlan_objmgr_vdev *vdev,
@@ -566,8 +565,8 @@ QDF_STATUS wlan_objmgr_iterate_peerobj_list(
 
 qdf_export_symbol(wlan_objmgr_iterate_peerobj_list);
 
-/**
- ** APIs to get a peer with given mac in a vdev
+/*
+ * APIs to get a peer with given mac in a vdev
  */
 struct wlan_objmgr_peer *
 wlan_objmgr_vdev_find_peer_by_mac(struct wlan_objmgr_vdev *vdev,

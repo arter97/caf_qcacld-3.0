@@ -117,8 +117,8 @@ enum wlan_objmgr_obj_type {
 };
 
 /**
- * struct wlan_peer_list {
- * @peer_hash[]:    peer sub lists
+ * struct wlan_peer_list - peer list hash
+ * @peer_hash:      peer sub lists
  * @peer_list_lock: List lock, this has to be acquired on
  *		    accessing/updating the list
  *
@@ -216,6 +216,7 @@ typedef void (*wlan_objmgr_peer_status_handler)(
  * @WLAN_NAN_ID:                nan operations
  * @WLAN_REGULATORY_SB_ID:      SB regulatory operations
  * @WLAN_REGULATORY_NB_ID:      NB regulatory operations
+ * @WLAN_OFFCHAN_TXRX_ID:       Offchannel TxRx
  * @WLAN_POLICY_MGR_ID:         Policy Manager operations
  * @WLAN_SON_ID:                SON
  * @WLAN_SA_API_ID:             SA PAI
@@ -264,12 +265,12 @@ typedef void (*wlan_objmgr_peer_status_handler)(
  * @WLAN_MISC_ID:               power manager, PAPI, rate set, etc.
  * @WLAN_FWOL_NB_ID:            fw offload northbound operations
  * @WLAN_FWOL_SB_ID:            fw offload southbound operations
- * @WLAN_PSOC_TARGET_IF_ID      PSOC related target_if operations
+ * @WLAN_PSOC_TARGET_IF_ID:     PSOC related target_if operations
  * @FTM_TIME_SYNC_ID:           ftm time sync operations
- * @WLAN_PKT_CAPTURE_ID         Packet capture operations
+ * @WLAN_PKT_CAPTURE_ID:        Packet capture operations
  * @WLAN_DCS_ID:                DCS operations
  * @WLAN_IOT_SIM_ID:            IOT Simulation feature
- * @WLAN_MLME_CM_ID             Connection Manager reference ID
+ * @WLAN_MLME_CM_ID:            Connection Manager reference ID
  * @WLAN_IF_MGR_ID:             Interface manager reference ID
  * @WLAN_OSIF_SCAN_ID:          SCAN operations in OS IF
  * @WLAN_OSIF_MGMT_ID:          MGMT frame operations in OS IF
@@ -283,8 +284,10 @@ typedef void (*wlan_objmgr_peer_status_handler)(
  * @WLAN_OSIF_CM_ID:            Connection manager osif reference id
  * @WLAN_TXRX_STREAMS_ID:       Preferred TX & RX streams operations
  * @WLAN_MLO_MGR_ID:            MLO manager reference id
+ * @WLAN_MBSS_ID:               MBSS reference ID
  * @WLAN_MGMT_RX_REO_ID:        Management rx reorder reference id
  * @WLAN_MGMT_RX_REO_SIM_ID:    Management rx reorder simulation reference id
+ * @WLAN_TWT_ID:                TWT component id
  * @WLAN_LITE_MON_ID:           Lite monitor operations
  * @WLAN_PRE_CAC_ID:            Pre-CAC operations
  * @WLAN_DP_ID:                 DP component
@@ -410,7 +413,7 @@ typedef enum {
 
 /**
  * string_from_dbgid() - Convert Refcnt dbgid to respective string
- * @id - Reference count debug id
+ * @id: Reference count debug id
  *
  * Debug support function to convert refcnt dbgid to string.
  * Please note to add new string in the array at index equal to

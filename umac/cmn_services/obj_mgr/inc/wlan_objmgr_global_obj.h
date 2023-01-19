@@ -514,7 +514,7 @@ QDF_STATUS wlan_objmgr_unregister_peer_status_handler(
 		wlan_objmgr_peer_status_handler handler,
 		void *args);
 
-/**
+/*
  * APIs to operations on psoc
  */
 typedef void (*wlan_objmgr_psoc_handler)(struct wlan_objmgr_psoc *psoc,
@@ -569,6 +569,7 @@ struct mlo_mgr_context *wlan_objmgr_get_mlo_ctx(void);
 
 /**
  * wlan_objmgr_set_mlo_ctx() - Set MLO context at global umac object
+ * @ctx: MLO context
  *
  * This API is used to set MLO context object at the global umac object
  *
