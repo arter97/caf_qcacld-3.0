@@ -4963,7 +4963,7 @@ end:
  */
 
 QDF_STATUS
-dp_set_pn_check_wifi3(struct cdp_soc_t *soc, uint8_t vdev_id,
+dp_set_pn_check_wifi3(struct cdp_soc_t *soc_t, uint8_t vdev_id,
 		      uint8_t *peer_mac, enum cdp_sec_type sec_type,
 		      uint32_t *rx_pn)
 {
@@ -4973,10 +4973,11 @@ dp_set_pn_check_wifi3(struct cdp_soc_t *soc, uint8_t vdev_id,
 	struct hal_reo_cmd_params params;
 	struct dp_peer *peer = NULL;
 	struct dp_vdev *vdev = NULL;
+	struct dp_soc *soc = NULL;
 
-	peer = dp_peer_find_hash_find((struct dp_soc *)soc,
-				      peer_mac, 0, vdev_id,
-				      DP_MOD_ID_CDP);
+	peer = dp_peer_get_tgt_peer_hash_find((struct dp_soc *)soc_t,
+					      peer_mac, 0, vdev_id,
+					      DP_MOD_ID_CDP);
 
 	if (!peer) {
 		dp_peer_debug("%pK: Peer is NULL!\n", soc);
@@ -4992,6 +4993,7 @@ dp_set_pn_check_wifi3(struct cdp_soc_t *soc, uint8_t vdev_id,
 	}
 
 	pdev = vdev->pdev;
+	soc = pdev->soc;
 	qdf_mem_zero(&params, sizeof(params));
 
 	params.std.need_status = 1;
@@ -5051,14 +5053,14 @@ dp_set_pn_check_wifi3(struct cdp_soc_t *soc, uint8_t vdev_id,
 				params.u.upd_queue_params.pn_127_96 = rx_pn[3];
 			}
 			rx_tid->pn_size = pn_size;
-			if (dp_reo_send_cmd(cdp_soc_t_to_dp_soc(soc),
+			if (dp_reo_send_cmd(soc,
 					    CMD_UPDATE_RX_REO_QUEUE,
 					    &params, dp_rx_tid_update_cb,
 					    rx_tid)) {
 				dp_err_log("fail to send CMD_UPDATE_RX_REO_QUEUE"
 					   "tid %d desc %pK", rx_tid->tid,
 					   (void *)(rx_tid->hw_qdesc_paddr));
-				DP_STATS_INC(cdp_soc_t_to_dp_soc(soc),
+				DP_STATS_INC(soc,
 					     rx.err.reo_cmd_send_fail, 1);
 			}
 		} else {
