@@ -4253,6 +4253,19 @@ dp_get_peer_deter_stats(struct cdp_soc_t *soc_hdl, uint8_t *addr,
 QDF_STATUS
 dp_get_pdev_deter_stats(struct cdp_soc_t *soc_hdl, uint8_t pdev_id,
 			struct cdp_pdev_deter_stats *stats);
+
+/*
+ * dp_update_pdev_chan_util_stats- API to update channel utilization stats
+ * @soc_hdl: soc handle
+ * @pdev_id: id of pdev handle
+ * @ch_util: Pointer to channel util stats
+ *
+ * Return: QDF_STATUS_SUCCESS: Success
+ *         QDF_STATUS_E_FAILURE: Error
+ */
+QDF_STATUS
+dp_update_pdev_chan_util_stats(struct cdp_soc_t *soc_hdl, uint8_t pdev_id,
+			       struct cdp_pdev_chan_util_stats *ch_util);
 #endif /* WLAN_TELEMETRY_STATS_SUPPORT */
 
 #ifdef CONNECTIVITY_PKTLOG

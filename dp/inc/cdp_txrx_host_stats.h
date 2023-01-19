@@ -1088,6 +1088,33 @@ static inline QDF_STATUS cdp_get_peer_deter_stats(
 	return soc->ops->host_stats_ops->txrx_peer_deter_stats(
 					soc, addr, stats);
 }
+
+/**
+ * cdp_update_pdev_chan_util_stats(): function to update pdev channel util stats
+ * @soc: soc handle
+ * @pdev_id: pdev id
+ * @ch_util: pointer to pdev ch util stats
+ *
+ * return: status
+ */
+static inline QDF_STATUS cdp_update_pdev_chan_util_stats(
+				ol_txrx_soc_handle soc,
+				uint8_t pdev_id,
+				struct cdp_pdev_chan_util_stats *ch_util)
+{
+	if (!soc || !soc->ops) {
+		dp_cdp_debug("Invalid Instance");
+		QDF_BUG(0);
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	if (!soc->ops->host_stats_ops ||
+	    !soc->ops->host_stats_ops->txrx_update_pdev_chan_util_stats)
+		return QDF_STATUS_E_FAILURE;
+
+	return soc->ops->host_stats_ops->txrx_update_pdev_chan_util_stats(
+					soc, pdev_id, ch_util);
+}
 #endif
 
 /**

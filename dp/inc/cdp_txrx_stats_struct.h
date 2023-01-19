@@ -2963,6 +2963,18 @@ struct cdp_peer_deter_stats {
 
 /**
  * struct cdp_pdev_deter_stats- Structure to hold pdev deterministic stats
+ * @ap_chan_util: Channel utilization
+ * @ap_tx_util: TX utilization
+ * @ap_rx_util: RX utilization
+ */
+struct cdp_pdev_chan_util_stats {
+	uint8_t ap_chan_util;
+	uint8_t ap_tx_util;
+	uint8_t ap_rx_util;
+};
+
+/**
+ * struct cdp_pdev_deter_stats- Structure to hold pdev deterministic stats
  * @dl_ofdma_usr: num_user counter for dl ofdma
  * @ul_ofdma_usr: num_user counter for ul ofdma
  * @dl_mimo_usr: num_user counter for dl mimo
@@ -2970,6 +2982,7 @@ struct cdp_peer_deter_stats {
  * @dl_mode_cnt: DL tx mode counter
  * @ul_mode_cnt: UL tx mode counter
  * @ch_access_delay
+ * @ch_util: channel congestion stats
  */
 struct cdp_pdev_deter_stats {
 	uint64_t dl_ofdma_usr[CDP_MU_MAX_USERS];
@@ -2981,6 +2994,7 @@ struct cdp_pdev_deter_stats {
 	uint32_t ch_access_delay[WME_AC_MAX];
 	uint64_t trigger_success;
 	uint64_t trigger_fail;
+	struct cdp_pdev_chan_util_stats ch_util;
 };
 #endif
 

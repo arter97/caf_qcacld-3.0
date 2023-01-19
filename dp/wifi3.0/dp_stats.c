@@ -9317,6 +9317,11 @@ dp_get_pdev_deter_stats(struct cdp_soc_t *soc_hdl, uint8_t pdev_id,
 	stats->trigger_success = pdev->stats.deter_stats.trigger_success;
 	stats->trigger_fail = pdev->stats.deter_stats.trigger_fail;
 
+	stats->ch_util.ap_tx_util = pdev->stats.deter_stats.ch_util.ap_tx_util;
+	stats->ch_util.ap_rx_util = pdev->stats.deter_stats.ch_util.ap_rx_util;
+	stats->ch_util.ap_chan_util =
+			pdev->stats.deter_stats.ch_util.ap_chan_util;
+
 	return QDF_STATUS_SUCCESS;
 }
 
@@ -9333,6 +9338,23 @@ dp_get_peer_deter_stats(struct cdp_soc_t *soc_hdl, uint8_t *addr,
 
 	dp_monitor_peer_deter_stats(peer, stats);
 	dp_peer_unref_delete(peer, DP_MOD_ID_MISC);
+
+	return QDF_STATUS_SUCCESS;
+}
+
+QDF_STATUS
+dp_update_pdev_chan_util_stats(struct cdp_soc_t *soc_hdl, uint8_t pdev_id,
+			       struct cdp_pdev_chan_util_stats *ch_util)
+{
+	struct dp_soc *soc = (struct dp_soc *)soc_hdl;
+	struct dp_pdev *pdev = dp_get_pdev_from_soc_pdev_id_wifi3(soc, pdev_id);
+
+	if (!pdev)
+		return QDF_STATUS_E_FAILURE;
+
+	pdev->stats.deter_stats.ch_util.ap_tx_util = ch_util->ap_tx_util;
+	pdev->stats.deter_stats.ch_util.ap_rx_util = ch_util->ap_rx_util;
+	pdev->stats.deter_stats.ch_util.ap_chan_util = ch_util->ap_chan_util;
 
 	return QDF_STATUS_SUCCESS;
 }
