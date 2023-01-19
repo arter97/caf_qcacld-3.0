@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2020-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -1024,7 +1024,7 @@ wlan_dcs_get_available_chan_for_bw(struct wlan_objmgr_pdev *pdev,
 		if (!WLAN_REG_IS_SAME_BAND_FREQS(freq, awgn_info->center_freq))
 			continue;
 
-		/**
+		/*
 		 * DFS channel may need CAC during restart, which costs time
 		 * and may cause failure.
 		 */
@@ -1096,7 +1096,7 @@ wlan_dcs_get_available_chan_for_bw(struct wlan_objmgr_pdev *pdev,
 }
 
 /**
- * wlan_dcs_sap_get_available_chan() - get available channel for sap
+ * wlan_dcs_sap_select_chan() - get available channel for sap
  * @vdev: vdev ptr
  * @awgn_info: pointer to awgn info
  * @tgt_freq: frequency of the selected channel
@@ -1329,7 +1329,7 @@ static void wlan_dcs_process_awgn_sap(struct wlan_objmgr_pdev *pdev,
 }
 
 /**
- * wlan_dcs_awgnim_process() - process awgn IM
+ * wlan_dcs_awgn_process() - process awgn IM
  * @psoc: psoc ptr
  * @pdev_id: pdev id
  * @awgn_info: pointer to awgn info
