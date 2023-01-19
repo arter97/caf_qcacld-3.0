@@ -406,6 +406,9 @@ hal_reo_cmd_flush_cache_be(hal_ring_handle_t hal_ring_hdl,
 			      FLUSH_WITHOUT_INVALIDATE, cp->flush_no_inval);
 
 	HAL_DESC_64_SET_FIELD(reo_desc, REO_FLUSH_CACHE,
+			      FLUSH_QUEUE_1K_DESC, cp->flush_q_1k_desc);
+
+	HAL_DESC_64_SET_FIELD(reo_desc, REO_FLUSH_CACHE,
 			      BLOCK_CACHE_USAGE_AFTER_FLUSH,
 			      cp->block_use_after_flush);
 
