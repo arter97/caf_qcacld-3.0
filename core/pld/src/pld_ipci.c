@@ -617,4 +617,33 @@ int pld_ipci_get_soc_info(struct device *dev, struct pld_soc_info *info)
 
 	return 0;
 }
+
+/*
+ * pld_ipci_get_irq() - Get irq by ce_id
+ * @dev: device
+ * @ce_id: CE id for which irq is requested
+ *
+ * Return irq number.
+ *
+ * Return: irq number for success
+ *		Non zero failure code for errors
+ */
+int pld_ipci_get_irq(struct device *dev, int ce_id)
+{
+	uint32_t msi_data_start;
+	uint32_t msi_data_count;
+	uint32_t msi_irq_start;
+	uint32_t msi_data;
+	int ret;
+
+	ret = icnss_get_user_msi_assignment(dev, "CE", &msi_data_count,
+					    &msi_data_start, &msi_irq_start);
+	if (ret)
+		return ret;
+
+	msi_data = (ce_id % msi_data_count) + msi_irq_start;
+	ret = icnss_get_msi_irq(dev, msi_data);
+
+	return ret;
+}
 #endif

@@ -1350,9 +1350,12 @@ int pld_get_irq(struct device *dev, int ce_id)
 		ret = pld_snoc_fw_sim_get_irq(dev, ce_id);
 		break;
 	case PLD_BUS_TYPE_IPCI:
+		ret = pld_ipci_get_irq(dev, ce_id);
 		break;
 	case PLD_BUS_TYPE_PCIE_FW_SIM:
 	case PLD_BUS_TYPE_IPCI_FW_SIM:
+		ret = pld_pcie_fw_sim_get_irq(dev, ce_id);
+		break;
 	case PLD_BUS_TYPE_PCIE:
 	default:
 		ret = -EINVAL;
