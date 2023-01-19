@@ -1951,12 +1951,8 @@ void dp_update_vdev_stats_on_peer_unmap(struct dp_vdev *vdev,
 		_tgtobj->rx.multicast.bytes += _srcobj->rx.multicast.bytes; \
 		_tgtobj->rx.bcast.num += _srcobj->rx.bcast.num; \
 		_tgtobj->rx.bcast.bytes += _srcobj->rx.bcast.bytes; \
-		if (_tgtobj->rx.to_stack.num >= _tgtobj->rx.multicast.num) \
-			_tgtobj->rx.unicast.num = \
-				_tgtobj->rx.to_stack.num - _tgtobj->rx.multicast.num; \
-		if (_tgtobj->rx.to_stack.bytes >= _tgtobj->rx.multicast.bytes) \
-			_tgtobj->rx.unicast.bytes = \
-				_tgtobj->rx.to_stack.bytes - _tgtobj->rx.multicast.bytes; \
+		_tgtobj->rx.unicast.num += _srcobj->rx.unicast.num; \
+		_tgtobj->rx.unicast.bytes += _srcobj->rx.unicast.bytes; \
 		_tgtobj->rx.raw.num += _srcobj->rx.raw.num; \
 		_tgtobj->rx.raw.bytes += _srcobj->rx.raw.bytes; \
 		_tgtobj->rx.nawds_mcast_drop += _srcobj->rx.nawds_mcast_drop; \
@@ -5230,4 +5226,20 @@ void dp_soc_interrupt_detach(struct cdp_soc_t *txrx_soc);
 void dp_get_peer_stats(struct dp_peer *peer,
 		       struct cdp_peer_stats *peer_stats);
 
+/**
+ * dp_get_peer_hw_link_id() - get peer hardware link id
+ * @soc: soc handle
+ * @pdev: data path pdev
+ *
+ * Return: link_id
+ */
+static inline int
+dp_get_peer_hw_link_id(struct dp_soc *soc,
+		       struct dp_pdev *pdev)
+{
+	if (wlan_cfg_is_peer_link_stats_enabled(soc->wlan_cfg_ctx))
+		return soc->arch_ops.get_hw_link_id(pdev);
+
+	return 0;
+}
 #endif /* #ifndef _DP_INTERNAL_H_ */

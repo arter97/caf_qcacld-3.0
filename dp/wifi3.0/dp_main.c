@@ -10025,6 +10025,7 @@ void dp_get_peer_basic_stats(struct dp_peer *peer,
 	peer_stats->rx.to_stack.bytes += txrx_peer->to_stack.bytes;
 }
 
+#ifdef QCA_ENHANCED_STATS_SUPPORT
 /**
  * dp_get_peer_per_pkt_stats()- Get peer per pkt stats
  * @peer: Datapath peer
@@ -10038,15 +10039,33 @@ void dp_get_peer_per_pkt_stats(struct dp_peer *peer,
 {
 	struct dp_txrx_peer *txrx_peer;
 	struct dp_peer_per_pkt_stats *per_pkt_stats;
+	uint8_t inx = 0, link_id = 0;
+	struct dp_pdev *pdev;
+	struct dp_soc *soc;
+	uint8_t stats_arr_size;
 
 	txrx_peer = dp_get_txrx_peer(peer);
+	pdev = peer->vdev->pdev;
+
 	if (!txrx_peer)
 		return;
 
-	per_pkt_stats = &txrx_peer->stats.per_pkt_stats;
-	DP_UPDATE_PER_PKT_STATS(peer_stats, per_pkt_stats);
+	if (!IS_MLO_DP_LINK_PEER(peer)) {
+		stats_arr_size = txrx_peer->stats_arr_size;
+		for (inx = 0; inx < stats_arr_size; inx++) {
+			per_pkt_stats = &txrx_peer->stats[inx].per_pkt_stats;
+			DP_UPDATE_PER_PKT_STATS(peer_stats, per_pkt_stats);
+		}
+	} else {
+		soc = pdev->soc;
+		link_id = dp_get_peer_hw_link_id(soc, pdev);
+		per_pkt_stats =
+			&txrx_peer->stats[link_id].per_pkt_stats;
+		DP_UPDATE_PER_PKT_STATS(peer_stats, per_pkt_stats);
+	}
 }
 
+#ifdef WLAN_FEATURE_11BE_MLO
 /**
  * dp_get_peer_extd_stats()- Get peer extd stats
  * @peer: Datapath peer
@@ -10054,8 +10073,6 @@ void dp_get_peer_per_pkt_stats(struct dp_peer *peer,
  *
  * Return: none
  */
-#ifdef QCA_ENHANCED_STATS_SUPPORT
-#ifdef WLAN_FEATURE_11BE_MLO
 static inline
 void dp_get_peer_extd_stats(struct dp_peer *peer,
 			    struct cdp_peer_stats *peer_stats)
@@ -10096,6 +10113,21 @@ void dp_get_peer_extd_stats(struct dp_peer *peer,
 #endif
 #else
 static inline
+void dp_get_peer_per_pkt_stats(struct dp_peer *peer,
+			       struct cdp_peer_stats *peer_stats)
+{
+	struct dp_txrx_peer *txrx_peer;
+	struct dp_peer_per_pkt_stats *per_pkt_stats;
+
+	txrx_peer = dp_get_txrx_peer(peer);
+	if (!txrx_peer)
+		return;
+
+	per_pkt_stats = &txrx_peer->stats[0].per_pkt_stats;
+	DP_UPDATE_PER_PKT_STATS(peer_stats, per_pkt_stats);
+}
+
+static inline
 void dp_get_peer_extd_stats(struct dp_peer *peer,
 			    struct cdp_peer_stats *peer_stats)
 {
@@ -10108,7 +10140,7 @@ void dp_get_peer_extd_stats(struct dp_peer *peer,
 		return;
 	}
 
-	extd_stats = &txrx_peer->stats.extd_stats;
+	extd_stats = &txrx_peer->stats[0].extd_stats;
 	DP_UPDATE_EXTD_STATS(peer_stats, extd_stats);
 }
 #endif
