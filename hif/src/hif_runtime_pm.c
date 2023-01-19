@@ -169,6 +169,7 @@ static int hif_rtpm_debugfs_show(struct seq_file *s, void *data)
 		seq_puts(s, " ");
 	}
 	qdf_spin_unlock_bh(&gp_hif_rtpm_ctx->prevent_list_lock);
+	seq_puts(s, "\n");
 
 	return 0;
 }
