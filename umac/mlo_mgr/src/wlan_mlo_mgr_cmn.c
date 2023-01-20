@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -259,7 +259,7 @@ qdf_nbuf_t mlo_mlme_get_link_assoc_req(struct wlan_objmgr_peer *peer,
 	return mlo_ctx->mlme_ops->mlo_mlme_get_link_assoc_req(peer, link_ix);
 }
 
-void mlo_mlme_peer_deauth(struct wlan_objmgr_peer *peer)
+void mlo_mlme_peer_deauth(struct wlan_objmgr_peer *peer, uint8_t is_disassoc)
 {
 	struct mlo_mgr_context *mlo_ctx = wlan_objmgr_get_mlo_ctx();
 
@@ -267,7 +267,7 @@ void mlo_mlme_peer_deauth(struct wlan_objmgr_peer *peer)
 	    !mlo_ctx->mlme_ops->mlo_mlme_ext_deauth)
 		return;
 
-	mlo_ctx->mlme_ops->mlo_mlme_ext_deauth(peer);
+	mlo_ctx->mlme_ops->mlo_mlme_ext_deauth(peer, is_disassoc);
 }
 
 #ifdef UMAC_MLO_AUTH_DEFER
@@ -301,7 +301,7 @@ uint8_t mlo_get_link_vdev_ix(struct wlan_mlo_dev_context *ml_dev,
 }
 
 #ifdef WLAN_MLO_MULTI_CHIP
-int8_t wlan_mlo_get_max_num_links(void)
+int8_t wlan_mlo_get_max_num_links(uint8_t grp_id)
 {
 	struct mlo_mgr_context *mlo_ctx;
 
@@ -309,21 +309,35 @@ int8_t wlan_mlo_get_max_num_links(void)
 	if (!mlo_ctx)
 		return WLAN_MLO_INVALID_NUM_LINKS;
 
-	return mlo_ctx->setup_info.tot_socs * WLAN_MAX_MLO_LINKS_PER_SOC;
+	if (grp_id >= mlo_ctx->total_grp) {
+		mlo_err("Invalid grp id %d, total no of groups %d",
+			grp_id, mlo_ctx->total_grp);
+		return WLAN_MLO_INVALID_NUM_LINKS;
+	}
+
+	return (mlo_ctx->setup_info[grp_id].tot_socs *
+		WLAN_MAX_MLO_LINKS_PER_SOC);
 }
 
-int8_t wlan_mlo_get_num_active_links(void)
+int8_t wlan_mlo_get_num_active_links(uint8_t grp_id)
 {
 	struct mlo_mgr_context *mlo_ctx;
 
 	mlo_ctx = wlan_objmgr_get_mlo_ctx();
+
 	if (!mlo_ctx)
 		return WLAN_MLO_INVALID_NUM_LINKS;
 
-	return mlo_ctx->setup_info.tot_links;
+	if (grp_id >= mlo_ctx->total_grp) {
+		qdf_err("Invalid grp id %d, total no of groups %d",
+			grp_id, mlo_ctx->total_grp);
+		return WLAN_MLO_INVALID_NUM_LINKS;
+	}
+
+	return mlo_ctx->setup_info[grp_id].tot_links;
 }
 
-uint16_t wlan_mlo_get_valid_link_bitmap(void)
+uint16_t wlan_mlo_get_valid_link_bitmap(uint8_t grp_id)
 {
 	struct mlo_mgr_context *mlo_ctx;
 
@@ -331,7 +345,54 @@ uint16_t wlan_mlo_get_valid_link_bitmap(void)
 	if (!mlo_ctx)
 		return 0;
 
-	return mlo_ctx->setup_info.valid_link_bitmap;
+	if (grp_id >= mlo_ctx->total_grp) {
+		qdf_err("Invalid grp id %d, total no of groups %d",
+			grp_id, mlo_ctx->total_grp);
+		return 0;
+	}
+
+	return mlo_ctx->setup_info[grp_id].valid_link_bitmap;
+}
+
+uint8_t wlan_mlo_get_psoc_group_id(struct wlan_objmgr_psoc *psoc)
+{
+	struct wlan_lmac_if_tx_ops *tx_ops;
+	uint8_t ml_grp_id = WLAN_MLO_GROUP_INVALID;
+
+	if (!psoc) {
+		qdf_err("PSOC is NULL");
+		return -EINVAL;
+	}
+
+	tx_ops = wlan_psoc_get_lmac_if_txops(psoc);
+	if (tx_ops && tx_ops->mops.get_psoc_mlo_group_id)
+		ml_grp_id = tx_ops->mops.get_psoc_mlo_group_id(psoc);
+
+	return ml_grp_id;
+}
+
+qdf_export_symbol(wlan_mlo_get_psoc_group_id);
+
+bool wlan_mlo_get_psoc_capable(struct wlan_objmgr_psoc *psoc)
+{
+	struct target_psoc_info *tgt_hdl;
+
+	if (!psoc) {
+		qdf_err("PSOC is NULL");
+		return false;
+	}
+
+	tgt_hdl = wlan_psoc_get_tgt_if_handle(psoc);
+	if (!tgt_hdl) {
+		target_if_err("target_psoc_info is null");
+		return false;
+	}
+
+	if ((tgt_hdl->tif_ops) &&
+	    (tgt_hdl->tif_ops->mlo_capable))
+		return tgt_hdl->tif_ops->mlo_capable(psoc);
+
+	return false;
 }
 
 uint16_t wlan_mlo_get_pdev_hw_link_id(struct wlan_objmgr_pdev *pdev)
@@ -358,8 +419,16 @@ static void wlan_pdev_hw_link_iterator(struct wlan_objmgr_psoc *psoc,
 	struct hw_link_id_iterator *itr = (struct hw_link_id_iterator *)arg;
 	struct wlan_objmgr_pdev *pdev = (struct wlan_objmgr_pdev *)obj;
 	uint16_t hw_link_id;
+	uint8_t ml_grp_id;
 
 	if (itr->pdev)
+		return;
+
+	ml_grp_id = wlan_mlo_get_psoc_group_id(psoc);
+	if (ml_grp_id > WLAN_MAX_MLO_GROUPS)
+		return;
+
+	if (ml_grp_id != itr->mlo_grp_id)
 		return;
 
 	hw_link_id = wlan_mlo_get_pdev_hw_link_id(pdev);
@@ -382,13 +451,14 @@ static void wlan_mlo_find_hw_link_id(struct wlan_objmgr_psoc *psoc,
 }
 
 struct wlan_objmgr_pdev *
-wlan_mlo_get_pdev_by_hw_link_id(uint16_t hw_link_id,
+wlan_mlo_get_pdev_by_hw_link_id(uint16_t hw_link_id, uint8_t ml_grp_id,
 				wlan_objmgr_ref_dbgid refdbgid)
 {
 	struct hw_link_id_iterator itr;
 
 	itr.hw_link_id = hw_link_id;
 	itr.pdev = NULL;
+	itr.mlo_grp_id = ml_grp_id;
 	itr.dbgid = refdbgid;
 
 	wlan_objmgr_iterate_psoc_list(wlan_mlo_find_hw_link_id,

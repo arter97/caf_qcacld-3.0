@@ -971,6 +971,7 @@ struct get_usable_chan_req_params {
  *                   intolerance.
  * @psd_flag: is PSD channel or not
  * @psd_eirp: PSD power level
+ * @is_static_punctured: is static punctured
  */
 struct regulatory_channel {
 	qdf_freq_t center_freq;
@@ -990,6 +991,9 @@ struct regulatory_channel {
 #ifdef CONFIG_BAND_6GHZ
 	bool psd_flag;
 	uint16_t psd_eirp;
+#endif
+#ifdef CONFIG_REG_CLIENT
+	uint8_t is_static_punctured;
 #endif
 };
 
@@ -1526,6 +1530,10 @@ enum restart_beaconing_on_ch_avoid_rule {
  * userspace
  * @coex_unsafe_chan_reg_disable: To disable reg channels for received coex
  * unsafe channels list
+ * @enable_6ghz_sp_pwrmode_supp: Enable target 6 GHz Standard Power mode support
+ * @afc_disable_timer_check: Disable target AFC timer check
+ * @afc_disable_request_id_check: Disable target AFC request id check
+ * @is_afc_reg_noaction: Whether no action to AFC power event
  * @sta_sap_scc_on_indoor_channel: Value of sap+sta scc on indoor support
  */
 struct reg_config_vars {
@@ -1544,6 +1552,12 @@ struct reg_config_vars {
 #ifdef FEATURE_WLAN_CH_AVOID_EXT
 	bool coex_unsafe_chan_nb_user_prefer;
 	bool coex_unsafe_chan_reg_disable;
+#endif
+#if defined(CONFIG_AFC_SUPPORT) && defined(CONFIG_BAND_6GHZ)
+	bool enable_6ghz_sp_pwrmode_supp;
+	bool afc_disable_timer_check;
+	bool afc_disable_request_id_check;
+	bool is_afc_reg_noaction;
 #endif
 	bool sta_sap_scc_on_indoor_channel;
 };

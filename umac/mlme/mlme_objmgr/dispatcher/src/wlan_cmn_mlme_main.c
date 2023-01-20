@@ -836,3 +836,32 @@ mlme_twt_vdev_destroy_notification(struct wlan_objmgr_vdev *vdev)
 
 #endif
 
+void mlme_vdev_reconfig_timer_cb(void *arg)
+{
+	struct vdev_mlme_obj *vdev_mlme;
+
+	vdev_mlme = (struct vdev_mlme_obj *)arg;
+	if (!vdev_mlme)
+		return;
+
+	if ((vdev_mlme->ops) &&
+	    vdev_mlme->ops->mlme_vdev_reconfig_timer_complete)
+		vdev_mlme->ops->mlme_vdev_reconfig_timer_complete(vdev_mlme);
+}
+
+bool mlme_mlo_is_reconfig_reassoc_enable(struct wlan_objmgr_psoc *psoc)
+{
+	struct psoc_mlme_obj *mlme_psoc_obj;
+	struct psoc_mlo_config *mlo_config;
+
+	if (!psoc)
+		return false;
+
+	mlme_psoc_obj = wlan_psoc_mlme_get_cmpt_obj(psoc);
+	if (!mlme_psoc_obj)
+		return false;
+
+	mlo_config = &mlme_psoc_obj->psoc_cfg.mlo_config;
+
+	return mlo_config->reconfig_reassoc_en;
+}

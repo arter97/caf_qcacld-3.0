@@ -227,6 +227,15 @@
  * Broadcast TWT element
  */
 #define WLAN_VDEV_OP_CU_CAT2                0x00100000
+  /* for mlo reconfig link removal functionality */
+#define WLAN_VDEV_OP_MLO_STOP_LINK_DEL      0x00200000
+  /* for mlo reconfig link add functionality */
+#define WLAN_VDEV_OP_MLO_LINK_ADD           0x00400000
+  /* for mlo reconfig link removal TBTT complete */
+#define WLAN_VDEV_OP_MLO_LINK_TBTT_COMPLETE 0x00800000
+
+/* MLO link removal is in progress on this VDEV */
+#define WLAN_VDEV_OP_MLO_LINK_REMOVAL_IN_PROGRESS 0x01000000
 
  /* CAPABILITY: IBSS available */
 #define WLAN_VDEV_C_IBSS                    0x00000001
@@ -1563,6 +1572,17 @@ static inline void wlan_vdev_reset_ospriv(struct wlan_objmgr_vdev *vdev)
 static inline uint16_t wlan_vdev_get_peer_count(struct wlan_objmgr_vdev *vdev)
 {
 	return vdev->vdev_objmgr.wlan_peer_count;
+}
+
+/**
+ * wlan_vdev_mlme_is_ap() - Check whether @vdev is an AP or not
+ * @vdev: VDEV object
+ *
+ * Return: True if @vdev is ap, otherwise false.
+ */
+static inline bool wlan_vdev_mlme_is_ap(struct wlan_objmgr_vdev *vdev)
+{
+	return (wlan_vdev_mlme_get_opmode(vdev) == QDF_SAP_MODE);
 }
 
 #ifdef WLAN_FEATURE_11BE_MLO

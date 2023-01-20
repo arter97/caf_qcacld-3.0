@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -27,17 +27,38 @@
 #include <wlan_mgmt_txrx_tgt_api.h>
 #include<wlan_mgmt_txrx_rx_reo_tgt_api.h>
 #include <wlan_mlo_mgr_cmn.h>
+#include <wlan_mlo_mgr_setup.h>
 
 QDF_STATUS
 wlan_mgmt_rx_reo_deinit(void)
 {
-	return mgmt_rx_reo_deinit_context();
+	uint8_t ml_grp;
+	uint8_t total_mlo_grps = WLAN_MAX_MLO_GROUPS;
+
+	if (total_mlo_grps > WLAN_MAX_MLO_GROUPS)
+		return QDF_STATUS_E_INVAL;
+
+	for (ml_grp = 0; ml_grp < total_mlo_grps; ml_grp++)
+		if (mgmt_rx_reo_deinit_context(ml_grp))
+			return QDF_STATUS_E_INVAL;
+
+	return QDF_STATUS_SUCCESS;
 }
 
 QDF_STATUS
 wlan_mgmt_rx_reo_init(void)
 {
-	return mgmt_rx_reo_init_context();
+	uint8_t ml_grp;
+	uint8_t total_mlo_grps = WLAN_MAX_MLO_GROUPS;
+
+	if (total_mlo_grps > WLAN_MAX_MLO_GROUPS)
+		return QDF_STATUS_E_INVAL;
+
+	for (ml_grp = 0; ml_grp < total_mlo_grps; ml_grp++)
+		if (mgmt_rx_reo_init_context(ml_grp))
+			return QDF_STATUS_E_INVAL;
+
+	return QDF_STATUS_SUCCESS;
 }
 
 #ifndef WLAN_MGMT_RX_REO_SIM_SUPPORT
@@ -83,20 +104,45 @@ wlan_get_mlo_link_id_from_pdev(struct wlan_objmgr_pdev *pdev)
 
 qdf_export_symbol(wlan_get_mlo_link_id_from_pdev);
 
+int8_t
+wlan_get_mlo_grp_id_from_pdev(struct wlan_objmgr_pdev *pdev)
+{
+	uint8_t ml_grp_id;
+	struct wlan_objmgr_psoc *psoc = wlan_pdev_get_psoc(pdev);
+
+	if (!psoc) {
+		mgmt_rx_reo_err("PSOC is NUll");
+		return -EINVAL;
+	}
+
+	ml_grp_id = wlan_mlo_get_psoc_group_id(psoc);
+
+	if (ml_grp_id >= WLAN_MAX_MLO_GROUPS) {
+		mgmt_rx_reo_debug("Invalid MLO Group ID for the pdev");
+		return -EINVAL;
+	}
+
+	return ml_grp_id;
+}
+
+qdf_export_symbol(wlan_get_mlo_grp_id_from_pdev);
+
 /**
  * wlan_get_pdev_from_mlo_link_id() - Helper API to get the pdev
  * object from the MLO HW link id.
  * @mlo_link_id: MLO HW link id
+ * @ml_grp_id: MLO Group id which it belongs to
  * @refdbgid: Reference debug id
  *
  * Return: On success returns the pdev object from the MLO HW link_id.
  * On failure returns NULL.
  */
 struct wlan_objmgr_pdev *
-wlan_get_pdev_from_mlo_link_id(uint8_t mlo_link_id,
+wlan_get_pdev_from_mlo_link_id(uint8_t mlo_link_id, uint8_t ml_grp_id,
 			       wlan_objmgr_ref_dbgid refdbgid)
 {
-	return wlan_mlo_get_pdev_by_hw_link_id(mlo_link_id, refdbgid);
+	return wlan_mlo_get_pdev_by_hw_link_id(
+			mlo_link_id, ml_grp_id, refdbgid);
 }
 
 qdf_export_symbol(wlan_get_pdev_from_mlo_link_id);
@@ -127,7 +173,19 @@ wlan_mgmt_rx_reo_get_snapshot_info
 			 enum mgmt_rx_reo_shared_snapshot_id id,
 			 struct mgmt_rx_reo_snapshot_info *snapshot_info)
 {
-	return mgmt_rx_reo_sim_get_snapshot_info(pdev, id, snapshot_info);
+	QDF_STATUS status;
+
+	status = mgmt_rx_reo_sim_get_snapshot_address(pdev, id,
+						      &snapshot_info->address);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		mgmt_rx_reo_err("Failed to get snapshot address for ID = %d",
+				id);
+		return status;
+	}
+
+	snapshot_info->version = 1;
+
+	return QDF_STATUS_SUCCESS;
 }
 
 /**
@@ -150,16 +208,18 @@ qdf_export_symbol(wlan_get_mlo_link_id_from_pdev);
  * wlan_get_pdev_from_mlo_link_id() - Helper API to get the pdev
  * object from the MLO HW link id.
  * @mlo_link_id: MLO HW link id
+ * @ml_grp_id: MLO Group id which it belongs to
  * @refdbgid: Reference debug id
  *
  * Return: On success returns the pdev object from the MLO HW link_id.
  * On failure returns NULL.
  */
 struct wlan_objmgr_pdev *
-wlan_get_pdev_from_mlo_link_id(uint8_t mlo_link_id,
+wlan_get_pdev_from_mlo_link_id(uint8_t mlo_link_id, uint8_t ml_grp_id,
 			       wlan_objmgr_ref_dbgid refdbgid)
 {
-	return mgmt_rx_reo_sim_get_pdev_from_mlo_link_id(mlo_link_id, refdbgid);
+	return mgmt_rx_reo_sim_get_pdev_from_mlo_link_id(
+			mlo_link_id, ml_grp_id, refdbgid);
 }
 
 qdf_export_symbol(wlan_get_pdev_from_mlo_link_id);
@@ -290,49 +350,61 @@ wlan_mgmt_rx_reo_is_feature_enabled_at_pdev(struct wlan_objmgr_pdev *pdev)
 	return true;
 }
 
+qdf_export_symbol(wlan_mgmt_rx_reo_is_feature_enabled_at_pdev);
+
 QDF_STATUS
-wlan_mgmt_rx_reo_sim_start(void)
+wlan_mgmt_rx_reo_sim_start(uint8_t ml_grp_id)
 {
-	return mgmt_rx_reo_sim_start();
+	return mgmt_rx_reo_sim_start(ml_grp_id);
 }
 
 qdf_export_symbol(wlan_mgmt_rx_reo_sim_start);
 
 QDF_STATUS
-wlan_mgmt_rx_reo_sim_stop(void)
+wlan_mgmt_rx_reo_sim_stop(uint8_t ml_grp_id)
 {
-	return mgmt_rx_reo_sim_stop();
+	return mgmt_rx_reo_sim_stop(ml_grp_id);
 }
 
 qdf_export_symbol(wlan_mgmt_rx_reo_sim_stop);
 #endif /* WLAN_MGMT_RX_REO_SIM_SUPPORT */
 
+#ifdef WLAN_MLO_MULTI_CHIP
 bool
-wlan_mgmt_rx_reo_is_simulation_in_progress(void)
+wlan_mgmt_rx_reo_is_simulation_in_progress(uint8_t ml_grp_id)
 {
-	return mgmt_rx_reo_is_simulation_in_progress();
+	return mgmt_rx_reo_is_simulation_in_progress(ml_grp_id);
+}
+
+#else
+bool
+wlan_mgmt_rx_reo_is_simulation_in_progress(uint8_t ml_grp_id)
+{
+	return false;
+}
+#endif
+
+QDF_STATUS
+wlan_mgmt_rx_reo_print_ingress_frame_stats(uint8_t ml_grp_id)
+{
+	return mgmt_rx_reo_print_ingress_frame_stats(ml_grp_id);
 }
 
 QDF_STATUS
-wlan_mgmt_rx_reo_print_ingress_frame_stats(void)
+wlan_mgmt_rx_reo_print_ingress_frame_info(uint8_t ml_grp_id,
+					  uint16_t num_frames)
 {
-	return mgmt_rx_reo_print_ingress_frame_stats();
+	return mgmt_rx_reo_print_ingress_frame_info(ml_grp_id, num_frames);
 }
 
 QDF_STATUS
-wlan_mgmt_rx_reo_print_ingress_frame_info(uint16_t num_frames)
+wlan_mgmt_rx_reo_print_egress_frame_stats(uint8_t ml_grp_id)
 {
-	return mgmt_rx_reo_print_ingress_frame_info(num_frames);
+	return mgmt_rx_reo_print_egress_frame_stats(ml_grp_id);
 }
 
 QDF_STATUS
-wlan_mgmt_rx_reo_print_egress_frame_stats(void)
+wlan_mgmt_rx_reo_print_egress_frame_info(uint8_t ml_grp_id, uint16_t num_frames)
 {
-	return mgmt_rx_reo_print_egress_frame_stats();
-}
-
-QDF_STATUS
-wlan_mgmt_rx_reo_print_egress_frame_info(uint16_t num_frames)
-{
-	return mgmt_rx_reo_print_egress_frame_info(num_frames);
+	return mgmt_rx_reo_print_egress_frame_info(ml_grp_id, num_frames);
 }

@@ -100,6 +100,21 @@ struct ctry_change_cbk_entry {
 	reg_ctry_change_callback cbk;
 };
 
+#ifdef CONFIG_REG_CLIENT
+#define MAX_INDOOR_LIST_SIZE 3
+
+/**
+ * struct indoor_concurrency_list - Active indoor station list
+ * @vdev_id: vdev ID
+ * @freq: frequency of the interface
+ * @chan_range: Range of channels based on bandwidth
+ */
+struct indoor_concurrency_list {
+	uint8_t vdev_id;
+	uint32_t freq;
+	const struct bonded_channel_freq *chan_range;
+};
+#endif
 /**
  * struct wlan_regulatory_psoc_priv_obj - wlan regulatory psoc private object
  * @mas_chan_params: master channel parameters list
@@ -138,6 +153,11 @@ struct ctry_change_cbk_entry {
  * @reg_afc_dev_type: AFC device deployment type from BDF
  * @reg_is_eirp_support_preferred: Whether target prefers EIRP format for
  * WMI Set TPC command
+ * @enable_6ghz_sp_pwrmode_supp: Whether enable target Standard Power mode
+ *	support
+ * @afc_disable_timer_check: Whether disable target AFC timer check
+ * @afc_disable_request_id_check: Whether disable target AFC request id check
+ * @is_afc_reg_noaction: Whether no action to AFC power event
  * @sta_sap_scc_on_indoor_channel: Value of sap+sta scc on indoor support
  * @fcc_rules_ptr : Value of fcc channel frequency and tx_power list received
  * from firmware
@@ -213,6 +233,10 @@ struct wlan_regulatory_psoc_priv_obj {
 #ifdef CONFIG_AFC_SUPPORT
 	enum reg_afc_dev_deploy_type reg_afc_dev_type;
 	bool reg_is_eirp_support_preferred;
+	bool enable_6ghz_sp_pwrmode_supp;
+	bool afc_disable_timer_check;
+	bool afc_disable_request_id_check;
+	bool is_afc_reg_noaction;
 #endif
 	bool sta_sap_scc_on_indoor_channel;
 #ifdef CONFIG_REG_CLIENT
@@ -240,6 +264,8 @@ struct wlan_regulatory_psoc_priv_obj {
  * @pdev_opened: whether pdev has been opened by application
  * @reg_cur_6g_ap_pwr_type: 6G AP type ie VLP/SP/LPI.
  * @reg_cur_6g_client_mobility_type: 6G client type ie Default/Subordinate.
+ * @reg_target_client_type: 6 GHz client type received from target. The Client
+ *	type can be Default/Subordinate.
  * @reg_rnr_tpe_usable: Indicates whether RNR IE is applicable for current reg
  * domain.
  * @reg_unspecified_ap_usable: Indicates if the AP type mentioned is not part of
@@ -267,6 +293,7 @@ struct wlan_regulatory_psoc_priv_obj {
  * priority during channel selection by upper layer
  * @reg_afc_dev_deployment_type: AFC device deployment type from BDF
  * @sta_sap_scc_on_indoor_channel: Value of sap+sta scc on indoor support
+ * @indoor_concurrency_list: List of current indoor station interfaces
  * @fcc_rules_ptr : Value of fcc channel frequency and tx_power list received
  * from firmware
  */
@@ -320,6 +347,7 @@ struct wlan_regulatory_pdev_priv_obj {
 #if defined(CONFIG_BAND_6GHZ)
 	enum reg_6g_ap_type reg_cur_6g_ap_pwr_type;
 	enum reg_6g_client_type reg_cur_6g_client_mobility_type;
+	enum reg_6g_client_type reg_target_client_type;
 	bool reg_rnr_tpe_usable;
 	bool reg_unspecified_ap_usable;
 	qdf_freq_t reg_6g_thresh_priority_freq;
@@ -347,6 +375,7 @@ struct wlan_regulatory_pdev_priv_obj {
 	bool sta_sap_scc_on_indoor_channel;
 #ifdef CONFIG_REG_CLIENT
 	struct cur_fcc_rule fcc_rules_ptr[MAX_NUM_FCC_RULES];
+	struct indoor_concurrency_list indoor_list[MAX_INDOOR_LIST_SIZE];
 #endif
 };
 

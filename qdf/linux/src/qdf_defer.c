@@ -159,4 +159,18 @@ void qdf_flush_workqueue(qdf_handle_t hdl, qdf_workqueue_t *wqueue)
 }
 
 qdf_export_symbol(qdf_flush_workqueue);
+
+void qdf_local_bh_disable(void)
+{
+	__qdf_local_bh_disable();
+}
+
+qdf_export_symbol(qdf_local_bh_disable);
+
+void qdf_local_bh_enable(void)
+{
+	__qdf_local_bh_enable();
+}
+
+qdf_export_symbol(qdf_local_bh_enable);
 #endif

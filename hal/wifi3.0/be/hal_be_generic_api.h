@@ -26,6 +26,7 @@
 #include <hal_api_mon.h>
 #include <hal_generic_api.h>
 #include <hal_be_api_mon.h>
+#include "txmon_tlvs.h"
 
 /**
  * Debug macro to print the TLV header tag
@@ -681,6 +682,59 @@ uint8_t get_ru_offset_from_start_index(uint8_t ru_size, uint8_t start_idx)
 }
 
 /**
+ * hal_txmon_parse_fw2sw() - parse firmware to software tlv
+ *
+ * @tx_tlv: pointer to firmware to software tlvmpdu start tlv header
+ * @type: place where this tlv is generated
+ * @tx_status_info: pointer to hal_tx_status_info
+ *
+ * Return: void
+ */
+static inline void
+hal_txmon_parse_fw2sw(void *tx_tlv, uint8_t type,
+		      struct hal_tx_status_info *status_info)
+{
+	uint32_t *msg = (uint32_t *)tx_tlv;
+
+	switch (type) {
+	case TXMON_FW2SW_TYPE_FES_SETUP:
+	{
+		uint32_t schedule_id;
+		uint16_t c_freq1;
+		uint16_t c_freq2;
+		uint16_t freq_mhz;
+		uint8_t phy_mode;
+
+		c_freq1 = TXMON_FW2SW_MON_FES_SETUP_BAND_CENTER_FREQ1_GET(*msg);
+		c_freq2 = TXMON_FW2SW_MON_FES_SETUP_BAND_CENTER_FREQ2_GET(*msg);
+
+		msg++;
+		phy_mode = TXMON_FW2SW_MON_FES_SETUP_PHY_MODE_GET(*msg);
+		freq_mhz = TXMON_FW2SW_MON_FES_SETUP_MHZ_GET(*msg);
+
+		msg++;
+		schedule_id = TXMON_FW2SW_MON_FES_SETUP_SCHEDULE_ID_GET(*msg);
+
+		TXMON_STATUS_INFO(status_info, band_center_freq1) = c_freq1;
+		TXMON_STATUS_INFO(status_info, band_center_freq2) = c_freq2;
+		TXMON_STATUS_INFO(status_info, freq) = freq_mhz;
+		TXMON_STATUS_INFO(status_info, phy_mode) = phy_mode;
+		TXMON_STATUS_INFO(status_info, schedule_id) = schedule_id;
+
+		break;
+	}
+	case TXMON_FW2SW_TYPE_FES_SETUP_USER:
+	{
+		break;
+	}
+	case TXMON_FW2SW_TYPE_FES_SETUP_EXT:
+	{
+		break;
+	}
+	};
+}
+
+/**
  * hal_txmon_status_get_num_users_generic_be() - api to get num users
  * from start of fes window
  *
@@ -808,13 +862,12 @@ hal_txmon_status_parse_tlv_generic_be(void *data_ppdu_info,
 	struct hal_tx_ppdu_info *ppdu_info;
 	struct hal_tx_status_info *tx_status_info;
 	struct hal_mon_packet_info *packet_info = NULL;
-	uint32_t tlv_tag, user_id, tlv_len;
+	uint32_t tlv_tag, user_id, tlv_len, tlv_user_id;
 	uint32_t status = HAL_MON_TX_STATUS_PPDU_NOT_DONE;
 	void *tx_tlv;
 
 	tlv_tag = HAL_RX_GET_USER_TLV64_TYPE(tx_tlv_hdr);
-	/* user_id start with 1, decrement by 1 to start from 0 */
-	user_id = HAL_RX_GET_USER_TLV64_USERID(tx_tlv_hdr);
+	tlv_user_id = HAL_RX_GET_USER_TLV64_USERID(tx_tlv_hdr);
 	tlv_len = HAL_RX_GET_USER_TLV64_LEN(tx_tlv_hdr);
 
 	tx_tlv = (uint8_t *)tx_tlv_hdr + HAL_RX_TLV64_HDR_SIZE;
@@ -825,7 +878,7 @@ hal_txmon_status_parse_tlv_generic_be(void *data_ppdu_info,
 	tx_status_info = (ppdu_info->is_data ? data_status_info :
 			  prot_status_info);
 
-	user_id = user_id > ppdu_info->num_users ? 0 : user_id;
+	user_id = (tlv_user_id > ppdu_info->num_users ? 0 : tlv_user_id);
 
 	switch (tlv_tag) {
 	/* start of initiator FES window */
@@ -2824,6 +2877,9 @@ hal_txmon_status_parse_tlv_generic_be(void *data_ppdu_info,
 	}
 	case WIFIFW2SW_MON_E:
 	{
+		/* parse fw2sw tlv */
+		hal_txmon_parse_fw2sw(tx_tlv, tlv_user_id, data_status_info);
+		status = HAL_MON_TX_FW2SW;
 		SHOW_DEFINED(WIFIFW2SW_MON_E);
 		break;
 	}
@@ -2917,9 +2973,9 @@ static void hal_reo_shared_qaddr_write_be(hal_soc_handle_t hal_soc_hdl,
  *
  * @hal_soc: HAL Soc handle
  *
- * Return: None
+ * Return: QDF_STATUS_SUCCESS on success else a QDF error.
  */
-static void hal_reo_shared_qaddr_setup_be(hal_soc_handle_t hal_soc_hdl)
+static QDF_STATUS hal_reo_shared_qaddr_setup_be(hal_soc_handle_t hal_soc_hdl)
 {
 	struct hal_soc *hal = (struct hal_soc *)hal_soc_hdl;
 
@@ -2930,11 +2986,23 @@ static void hal_reo_shared_qaddr_setup_be(hal_soc_handle_t hal_soc_hdl)
 				hal->qdf_dev, hal->qdf_dev->dev,
 				REO_QUEUE_REF_ML_TABLE_SIZE,
 				&hal->reo_qref.mlo_reo_qref_table_paddr);
+	if (!hal->reo_qref.mlo_reo_qref_table_vaddr)
+		return QDF_STATUS_E_NOMEM;
+
 	hal->reo_qref.non_mlo_reo_qref_table_vaddr =
 		(uint64_t *)qdf_mem_alloc_consistent(
 				hal->qdf_dev, hal->qdf_dev->dev,
 				REO_QUEUE_REF_NON_ML_TABLE_SIZE,
 				&hal->reo_qref.non_mlo_reo_qref_table_paddr);
+	if (!hal->reo_qref.non_mlo_reo_qref_table_vaddr) {
+		qdf_mem_free_consistent(
+				hal->qdf_dev, hal->qdf_dev->dev,
+				REO_QUEUE_REF_ML_TABLE_SIZE,
+				hal->reo_qref.mlo_reo_qref_table_vaddr,
+				hal->reo_qref.mlo_reo_qref_table_paddr,
+				0);
+		return QDF_STATUS_E_NOMEM;
+	}
 
 	hal_verbose_debug("MLO table start paddr:%pK,"
 			  "Non-MLO table start paddr:%pK,"
@@ -2944,6 +3012,8 @@ static void hal_reo_shared_qaddr_setup_be(hal_soc_handle_t hal_soc_hdl)
 			  (void *)hal->reo_qref.non_mlo_reo_qref_table_paddr,
 			  hal->reo_qref.mlo_reo_qref_table_vaddr,
 			  hal->reo_qref.non_mlo_reo_qref_table_vaddr);
+
+	return QDF_STATUS_SUCCESS;
 }
 
 /**

@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2013-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -44,7 +44,7 @@
 #endif
 
 #define HIF_IC_CE0_IRQ_OFFSET 4
-#define HIF_IC_MAX_IRQ 53
+#define HIF_IC_MAX_IRQ 58
 
 static uint16_t ic_irqnum[HIF_IC_MAX_IRQ];
 /* integrated chip irq names */
@@ -102,6 +102,11 @@ const char *ic_irqname[HIF_IC_MAX_IRQ] = {
 "wbm2host-tx-completions-ring2",
 "wbm2host-tx-completions-ring1",
 "tcl2host-status-ring",
+"txmon2host-monitor-destination-mac3",
+"txmon2host-monitor-destination-mac2",
+"txmon2host-monitor-destination-mac1",
+"host2tx-monitor-ring1",
+"umac_reset"
 };
 
 /** hif_ahb_get_irq_name() - get irqname
@@ -416,9 +421,15 @@ void hif_ahb_disable_bus(struct hif_softc *scn)
 			sc->mem_ce = NULL;
 			scn->mem_ce = NULL;
 		}
+		if (sc->mem_pmm_base) {
+			iounmap(sc->mem_pmm_base);
+			sc->mem_pmm_base = NULL;
+			scn->mem_pmm_base = NULL;
+		}
 		if (sc->mem_cmem) {
 			iounmap(sc->mem_cmem);
 			sc->mem_cmem = NULL;
+			scn->mem_cmem = NULL;
 		}
 		mem = (void __iomem *)sc->mem;
 		if (mem) {
@@ -563,13 +574,13 @@ QDF_STATUS hif_ahb_enable_bus(struct hif_softc *ol_sc,
 		ol_sc->mem_ce = sc->mem_ce;
 	}
 
-	/*
-	 * In QCA5332 CMEM region is outside WCSS block.
-	 * Allocate separate I/O remap to access CMEM address.
-	 */
 	if (tgt_info->target_type == TARGET_TYPE_QCA5332) {
 		struct hif_softc *scn = HIF_GET_SOFTC(sc);
 
+		/*
+		 * In QCA5332 CMEM region is outside WCSS block.
+		 * Allocate separate I/O remap to access CMEM address.
+		 */
 		sc->mem_cmem = ioremap_nocache(HOST_CMEM_ADDRESS,
 					       HOST_CMEM_SIZE);
 		if (IS_ERR(sc->mem_cmem)) {
@@ -577,6 +588,17 @@ QDF_STATUS hif_ahb_enable_bus(struct hif_softc *ol_sc,
 			return QDF_STATUS_E_IO;
 		}
 		ol_sc->mem_cmem = sc->mem_cmem;
+
+		/*
+		 * PMM SCRATCH Register for QCA5332
+		 */
+		sc->mem_pmm_base = ioremap_nocache(PMM_SCRATCH_BASE,
+						   PMM_SCRATCH_SIZE);
+		if (IS_ERR(sc->mem_pmm_base)) {
+			hif_err("CE: ioremap failed");
+			return QDF_STATUS_E_IO;
+		}
+		ol_sc->mem_pmm_base = sc->mem_pmm_base;
 	}
 
 	hif_info("X - hif_type = 0x%x, target_type = 0x%x",

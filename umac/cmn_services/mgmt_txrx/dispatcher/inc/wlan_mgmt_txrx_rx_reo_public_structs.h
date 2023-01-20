@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -50,19 +50,25 @@ enum mgmt_rx_reo_shared_snapshot_id {
 struct mgmt_rx_reo_shared_snapshot {
 	union {
 		uint32_t mgmt_rx_reo_snapshot_low;
-		uint32_t mgmt_pkt_ctr_ver_a:16,
-			 global_timestamp_redundant_ver_a:15,
-			 valid_ver_a:1;
-		uint32_t global_timestamp_low_ver_b:15,
-			 mgmt_pkt_ctr_ver_b:16,
-			 valid_ver_b:1;
+		struct {
+			uint32_t mgmt_pkt_ctr_ver_a:16;
+			uint32_t global_timestamp_redundant_ver_a:15;
+			uint32_t valid_ver_a:1;
+		};
+		struct {
+			uint32_t global_timestamp_low_ver_b:15;
+			uint32_t mgmt_pkt_ctr_ver_b:16;
+			uint32_t valid_ver_b:1;
+		};
 	};
 
 	union {
 		uint32_t mgmt_rx_reo_snapshot_high;
 		uint32_t global_timestamp_ver_a;
-		uint32_t mgmt_pkt_ctr_redundant_ver_b:15,
-			 global_timestamp_high_ver_b:17;
+		struct {
+			uint32_t mgmt_pkt_ctr_redundant_ver_b:15;
+			uint32_t global_timestamp_high_ver_b:17;
+		};
 	};
 };
 
@@ -103,6 +109,7 @@ struct mgmt_rx_reo_snapshot_info {
  * @valid: Whether these params are valid
  * @pdev_id: pdev ID for which FW consumed event is received
  * @link_id: link ID for which FW consumed event is received
+ * @mlo_grp_id: MLO group ID which it belongs to
  * @mgmt_pkt_ctr: MGMT packet counter of the frame that is consumed
  * @global_timestamp: Global timestamp of the frame that is consumed
  * @duration_us: duration in us
@@ -113,6 +120,7 @@ struct mgmt_rx_reo_params {
 	bool valid;
 	uint8_t pdev_id;
 	uint8_t link_id;
+	uint8_t mlo_grp_id;
 	uint16_t mgmt_pkt_ctr;
 	uint32_t global_timestamp;
 	uint16_t duration_us;

@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2014-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -146,6 +146,9 @@ typedef union {
  * @rx.dev.priv_cb_w.peer_id: peer_id for RX packet
  * @rx.dev.priv_cb_w.flag_intra_bss: flag to indicate this is intra bss packet
  * @rx.dev.priv_cb_w.protocol_tag: protocol tag set by app for rcvd packet type
+ * @rx.dev.priv_cb_w.flow_idx_invalid: flow entry is not found
+ * @rx.dev.priv_cb_w.flow_idx_timeout: flow entry search timed out
+ * @rx.dev.priv_cb_w.rsvd: rerserved bits
  * @rx.dev.priv_cb_w.flow_tag: flow tag set by application for 5 tuples rcvd
  *
  * @rx.dev.priv_cb_m.peer_cached_buf_frm: peer cached buffer
@@ -263,7 +266,10 @@ struct qdf_nbuf_cb {
 						 flag_intra_bss : 1,
 						 ipa_smmu_map : 1;
 					uint16_t peer_id;
-					uint16_t protocol_tag;
+					uint8_t protocol_tag;
+					uint8_t flow_idx_invalid: 1,
+						flow_idx_timeout: 1,
+						rsvd:6;
 					uint16_t flow_tag;
 				} priv_cb_w;
 				struct {
@@ -815,6 +821,28 @@ __qdf_nbuf_alloc(__qdf_device_t osdev, size_t size, int reserve, int align,
 __qdf_nbuf_t __qdf_nbuf_alloc_simple(__qdf_device_t osdev, size_t size,
 				     const char *func, uint32_t line);
 
+#if defined(QCA_DP_NBUF_FAST_PPEDS)
+/**
+ * __qdf_nbuf_alloc_ppe_ds() - Allocates nbuf
+ * @osdev: Device handle
+ * @size: Netbuf requested size
+ * @func: Function name of the call site
+ * @line: line number of the call site
+ *
+ * This allocates an nbuf for wifi module
+ * in DS mode and uses __netdev_alloc_skb_no_skb_reset API.
+ * The netdev API invokes skb_recycler_alloc with reset_skb
+ * as false. Hence, recycler pool will not do reset_struct
+ * when it allocates DS used buffer to DS module, which will
+ * helps to improve the performance
+ *
+ * Return: nbuf or %NULL if no memory
+ */
+
+__qdf_nbuf_t __qdf_nbuf_alloc_ppe_ds(__qdf_device_t osdev, size_t size,
+				     const char *func, uint32_t line);
+#endif /* QCA_DP_NBUF_FAST_PPEDS */
+
 /**
  * __qdf_nbuf_alloc_no_recycler() - Allocates skb
  * @size: Size to be allocated for skb
@@ -894,6 +922,8 @@ bool __qdf_nbuf_data_is_ipv6_mdns_pkt(uint8_t *data);
 bool __qdf_nbuf_data_is_ipv4_eapol_pkt(uint8_t *data);
 bool __qdf_nbuf_data_is_ipv4_igmp_pkt(uint8_t *data);
 bool __qdf_nbuf_data_is_ipv6_igmp_pkt(uint8_t *data);
+bool __qdf_nbuf_is_ipv4_igmp_leave_pkt(__qdf_nbuf_t buf);
+bool __qdf_nbuf_is_ipv6_igmp_leave_pkt(__qdf_nbuf_t buf);
 bool __qdf_nbuf_data_is_ipv4_arp_pkt(uint8_t *data);
 bool __qdf_nbuf_is_bcast_pkt(__qdf_nbuf_t nbuf);
 bool __qdf_nbuf_is_mcast_replay(__qdf_nbuf_t nbuf);
@@ -1805,12 +1835,21 @@ __qdf_nbuf_queue_insert_head(__qdf_nbuf_queue_t *qhead, __qdf_nbuf_t skb)
 	qhead->qlen++;
 }
 
+/**
+ * __qdf_nbuf_queue_remove_last() - remove a skb from the tail of the queue
+ * @qhead: Queue head
+ *
+ * This is a lockless version. Driver should take care of the locks
+ *
+ * Return: skb or NULL
+ */
 static inline struct sk_buff *
 __qdf_nbuf_queue_remove_last(__qdf_nbuf_queue_t *qhead)
 {
 	__qdf_nbuf_t tmp_tail, node = NULL;
 
 	if (qhead->head) {
+		qhead->qlen--;
 		tmp_tail = qhead->tail;
 		node = qhead->head;
 		if (qhead->head == qhead->tail) {
@@ -2595,6 +2634,12 @@ void __qdf_nbuf_queue_head_purge(struct sk_buff_head *skb_queue_head)
 	return skb_queue_purge(skb_queue_head);
 }
 
+static inline
+int __qdf_nbuf_queue_empty(__qdf_nbuf_queue_head_t *nbuf_queue_head)
+{
+	return skb_queue_empty(nbuf_queue_head);
+}
+
 /**
  * __qdf_nbuf_queue_head_lock() - Acquire the skb list lock
  * @head: skb list for which lock is to be acquired
@@ -2903,6 +2948,33 @@ __qdf_nbuf_set_gso_size(struct sk_buff *skb, unsigned int val)
 static inline void __qdf_nbuf_kfree(struct sk_buff *skb)
 {
 	kfree_skb(skb);
+}
+
+/**
+ * __qdf_nbuf_dev_kfree_list() - Free nbuf list using dev based os call
+ * @skb_queue_head: Pointer to nbuf queue head
+ *
+ * This function is called to free the nbuf list on failure cases
+ *
+ * Return: None
+ */
+void
+__qdf_nbuf_dev_kfree_list(__qdf_nbuf_queue_head_t *nbuf_queue_head);
+
+/**
+ * __qdf_nbuf_dev_queue_head() - queue a buffer using dev at the list head
+ * @skb_queue_head: Pointer to skb list head
+ * @buff: Pointer to nbuf
+ *
+ * This function is called to queue buffer at the skb list head
+ *
+ * Return: None
+ */
+static inline void
+__qdf_nbuf_dev_queue_head(__qdf_nbuf_queue_head_t *nbuf_queue_head,
+			  __qdf_nbuf_t buff)
+{
+	 __skb_queue_head(nbuf_queue_head, buff);
 }
 
 /**

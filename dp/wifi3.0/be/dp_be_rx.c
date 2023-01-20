@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2016-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -40,6 +40,22 @@
 #endif
 #include "dp_hist.h"
 #include "dp_rx_buffer_pool.h"
+
+#ifdef WLAN_SUPPORT_RX_FLOW_TAG
+static inline void
+dp_rx_update_flow_info(qdf_nbuf_t nbuf, uint8_t *rx_tlv_hdr)
+{
+	qdf_nbuf_set_rx_flow_idx_invalid(nbuf,
+				 hal_rx_msdu_flow_idx_invalid_be(rx_tlv_hdr));
+	qdf_nbuf_set_rx_flow_idx_timeout(nbuf,
+				 hal_rx_msdu_flow_idx_invalid_be(rx_tlv_hdr));
+}
+#else
+static inline void
+dp_rx_update_flow_info(qdf_nbuf_t nbuf, uint8_t *rx_tlv_hdr)
+{
+}
+#endif
 
 #ifndef AST_OFFLOAD_ENABLE
 static void
@@ -149,7 +165,7 @@ dp_rx_set_msdu_lmac_id(qdf_nbuf_t nbuf, uint32_t peer_mdata)
  * dp_rx_process_be() - Brain of the Rx processing functionality
  *		     Called from the bottom half (tasklet/NET_RX_SOFTIRQ)
  * @int_ctx: per interrupt context
- * @hal_ring: opaque pointer to the HAL Rx Ring, which will be serviced
+ * @hal_ring_hdl: opaque pointer to the HAL Rx Ring, which will be serviced
  * @reo_ring_num: ring number (0, 1, 2 or 3) of the reo ring.
  * @quota: No. of units (packets) that can be serviced in one shot.
  *
@@ -783,6 +799,7 @@ done:
 		}
 
 		dp_rx_cksum_offload(vdev->pdev, nbuf, rx_tlv_hdr);
+		dp_rx_update_flow_info(nbuf, rx_tlv_hdr);
 
 		if (qdf_unlikely(!rx_pdev->rx_fast_flag)) {
 			/*
@@ -1266,6 +1283,15 @@ bool dp_rx_mlo_igmp_handler(struct dp_soc *soc,
 					       NULL);
 	}
 
+	if (qdf_nbuf_is_ipv4_igmp_leave_pkt(nbuf) ||
+	    qdf_nbuf_is_ipv6_igmp_leave_pkt(nbuf)) {
+		qdf_nbuf_free(nbuf);
+		dp_vdev_unref_delete(mcast_primary_vdev->pdev->soc,
+				     mcast_primary_vdev,
+				     DP_MOD_ID_RX);
+		return true;
+	}
+
 	dp_rx_dummy_src_mac(vdev, nbuf);
 	dp_rx_deliver_to_stack(mcast_primary_vdev->pdev->soc,
 			       mcast_primary_vdev,
@@ -1329,13 +1355,6 @@ static inline bool
 dp_rx_intrabss_fwd_mlo_allow(struct dp_txrx_peer *ta_peer,
 			     struct dp_txrx_peer *da_peer)
 {
-	/* one of TA/DA peer should belong to MLO connection peer,
-	 * only MLD peer type is as expected
-	 */
-	if (!IS_MLO_DP_MLD_TXRX_PEER(ta_peer) &&
-	    !IS_MLO_DP_MLD_TXRX_PEER(da_peer))
-		return false;
-
 	/* TA peer and DA peer's vdev should be partner MLO vdevs */
 	if (dp_peer_find_mac_addr_cmp(&ta_peer->vdev->mld_mac_addr,
 				      &da_peer->vdev->mld_mac_addr))
@@ -1355,38 +1374,51 @@ dp_rx_intrabss_fwd_mlo_allow(struct dp_txrx_peer *ta_peer,
 #ifdef INTRA_BSS_FWD_OFFLOAD
 /**
  * dp_rx_intrabss_ucast_check_be() - Check if intrabss is allowed
-				     for unicast frame
- * @soc: SOC handle
+ *				     for unicast frame
  * @nbuf: RX packet buffer
  * @ta_peer: transmitter DP peer handle
+ * @rx_tlv_hdr: Rx TLV header
  * @msdu_metadata: MSDU meta data info
- * @p_tx_vdev_id: get vdev id for Intra-BSS TX
+ * @params: params to be filled in
  *
  * Return: true - intrabss allowed
-	   false - not allow
+ *	   false - not allow
  */
 static bool
 dp_rx_intrabss_ucast_check_be(qdf_nbuf_t nbuf,
 			      struct dp_txrx_peer *ta_peer,
+			      uint8_t *rx_tlv_hdr,
 			      struct hal_rx_msdu_metadata *msdu_metadata,
 			      struct dp_be_intrabss_params *params)
 {
-	uint16_t da_peer_id;
-	struct dp_txrx_peer *da_peer;
-	dp_txrx_ref_handle txrx_ref_handle = NULL;
+	uint8_t dest_chip_id, dest_chip_pmac_id;
+	struct dp_vdev_be *be_vdev =
+		dp_get_be_vdev_from_dp_vdev(ta_peer->vdev);
+	struct dp_soc_be *be_soc =
+		dp_get_be_soc_from_dp_soc(params->dest_soc);
 
 	if (!qdf_nbuf_is_intra_bss(nbuf))
 		return false;
 
-	da_peer_id = dp_rx_peer_metadata_peer_id_get_be(
-						params->dest_soc,
-						msdu_metadata->da_idx);
-	da_peer = dp_txrx_peer_get_ref_by_id(params->dest_soc, da_peer_id,
-					     &txrx_ref_handle, DP_MOD_ID_RX);
-	if (!da_peer)
+	hal_rx_tlv_get_dest_chip_pmac_id(rx_tlv_hdr,
+					 &dest_chip_id,
+					 &dest_chip_pmac_id);
+	qdf_assert_always(dest_chip_id <= (DP_MLO_MAX_DEST_CHIP_ID - 1));
+
+	if (dest_chip_id == be_soc->mlo_chip_id) {
+		/* TODO: adding to self list is better */
+		params->tx_vdev_id = ta_peer->vdev->vdev_id;
+		return true;
+	}
+
+	params->dest_soc =
+		dp_mlo_get_soc_ref_by_chip_id(be_soc->ml_ctxt,
+					      dest_chip_id);
+	if (!params->dest_soc)
 		return false;
-	params->tx_vdev_id = da_peer->vdev->vdev_id;
-	dp_txrx_peer_unref_delete(txrx_ref_handle, DP_MOD_ID_RX);
+
+	params->tx_vdev_id =
+		be_vdev->partner_vdev_list[dest_chip_id][dest_chip_pmac_id];
 
 	return true;
 }
@@ -1395,6 +1427,7 @@ dp_rx_intrabss_ucast_check_be(qdf_nbuf_t nbuf,
 static bool
 dp_rx_intrabss_ucast_check_be(qdf_nbuf_t nbuf,
 			      struct dp_txrx_peer *ta_peer,
+			      uint8_t *rx_tlv_hdr,
 			      struct hal_rx_msdu_metadata *msdu_metadata,
 			      struct dp_be_intrabss_params *params)
 {
@@ -1492,6 +1525,7 @@ rel_da_peer:
 static bool
 dp_rx_intrabss_ucast_check_be(qdf_nbuf_t nbuf,
 			      struct dp_txrx_peer *ta_peer,
+			      uint8_t *rx_tlv_hdr,
 			      struct hal_rx_msdu_metadata *msdu_metadata,
 			      struct dp_be_intrabss_params *params)
 {
@@ -1588,8 +1622,50 @@ void dp_rx_word_mask_subscribe_be(struct dp_soc *soc,
 {
 }
 #endif
-/*
- * dp_rx_intrabss_handle_nawds_be() - Forward mcbc intrabss pkts in nawds case
+
+#if defined(WLAN_MCAST_MLO) && defined(CONFIG_MLO_SINGLE_DEV)
+static inline
+bool dp_rx_intrabss_mlo_mcbc_fwd(struct dp_soc *soc, struct dp_vdev *vdev,
+				 qdf_nbuf_t nbuf_copy)
+{
+	struct dp_vdev *mcast_primary_vdev = NULL;
+	struct dp_vdev_be *be_vdev = dp_get_be_vdev_from_dp_vdev(vdev);
+	struct dp_soc_be *be_soc = dp_get_be_soc_from_dp_soc(soc);
+	struct cdp_tx_exception_metadata tx_exc_metadata = {0};
+
+	if (!vdev->mlo_vdev)
+		return false;
+
+	tx_exc_metadata.is_mlo_mcast = 1;
+	mcast_primary_vdev = dp_mlo_get_mcast_primary_vdev(be_soc,
+							   be_vdev,
+							   DP_MOD_ID_RX);
+
+	if (!mcast_primary_vdev)
+		return false;
+
+	nbuf_copy = dp_tx_send_exception((struct cdp_soc_t *)
+					 mcast_primary_vdev->pdev->soc,
+					 mcast_primary_vdev->vdev_id,
+					 nbuf_copy, &tx_exc_metadata);
+
+	if (nbuf_copy)
+		qdf_nbuf_free(nbuf_copy);
+
+	dp_vdev_unref_delete(mcast_primary_vdev->pdev->soc,
+			     mcast_primary_vdev, DP_MOD_ID_RX);
+	return true;
+}
+#else
+static inline
+bool dp_rx_intrabss_mlo_mcbc_fwd(struct dp_soc *soc, struct dp_vdev *vdev,
+				 qdf_nbuf_t nbuf_copy)
+{
+	return false;
+}
+#endif
+/**
+ * dp_rx_intrabss_mcast_handler_be() - handler for mcast packets
  * @soc: core txrx main context
  * @ta_txrx_peer: source txrx_peer entry
  * @nbuf_copy: nbuf that has to be intrabss forwarded
@@ -1598,10 +1674,10 @@ void dp_rx_word_mask_subscribe_be(struct dp_soc *soc,
  * Return: true if it is forwarded else false
  */
 bool
-dp_rx_intrabss_handle_nawds_be(struct dp_soc *soc,
-			       struct dp_txrx_peer *ta_txrx_peer,
-			       qdf_nbuf_t nbuf_copy,
-			       struct cdp_tid_rx_stats *tid_stats)
+dp_rx_intrabss_mcast_handler_be(struct dp_soc *soc,
+				struct dp_txrx_peer *ta_txrx_peer,
+				qdf_nbuf_t nbuf_copy,
+				struct cdp_tid_rx_stats *tid_stats)
 {
 	if (qdf_unlikely(ta_txrx_peer->vdev->nawds_enabled)) {
 		struct cdp_tx_exception_metadata tx_exc_metadata = {0};
@@ -1610,10 +1686,11 @@ dp_rx_intrabss_handle_nawds_be(struct dp_soc *soc,
 		tx_exc_metadata.peer_id = ta_txrx_peer->peer_id;
 		tx_exc_metadata.is_intrabss_fwd = 1;
 		tx_exc_metadata.tid = HTT_TX_EXT_TID_INVALID;
+
 		if (dp_tx_send_exception((struct cdp_soc_t *)soc,
-					 ta_txrx_peer->vdev->vdev_id,
-					 nbuf_copy,
-					 &tx_exc_metadata)) {
+					  ta_txrx_peer->vdev->vdev_id,
+					  nbuf_copy,
+					  &tx_exc_metadata)) {
 			DP_PEER_PER_PKT_STATS_INC_PKT(ta_txrx_peer,
 						      rx.intra_bss.fail, 1,
 						      len);
@@ -1627,6 +1704,11 @@ dp_rx_intrabss_handle_nawds_be(struct dp_soc *soc,
 		}
 		return true;
 	}
+
+	if (dp_rx_intrabss_mlo_mcbc_fwd(soc, ta_txrx_peer->vdev,
+					nbuf_copy))
+		return true;
+
 	return false;
 }
 
@@ -1670,7 +1752,7 @@ bool dp_rx_intrabss_fwd_be(struct dp_soc *soc, struct dp_txrx_peer *ta_peer,
 		return true;
 
 	params.dest_soc = soc;
-	if (dp_rx_intrabss_ucast_check_be(nbuf, ta_peer,
+	if (dp_rx_intrabss_ucast_check_be(nbuf, ta_peer, rx_tlv_hdr,
 					  &msdu_metadata, &params)) {
 		ret = dp_rx_intrabss_ucast_fwd(params.dest_soc, ta_peer,
 					       params.tx_vdev_id,

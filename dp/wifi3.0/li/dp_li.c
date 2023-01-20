@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -583,6 +583,18 @@ static struct dp_soc *dp_rx_replensih_soc_get_li(struct dp_soc *soc,
 	return soc;
 }
 
+static uint8_t dp_soc_get_num_soc_li(struct dp_soc *soc)
+{
+	return 1;
+}
+
+static QDF_STATUS dp_txrx_get_vdev_mcast_param_li(struct dp_soc *soc,
+						  struct dp_vdev *vdev,
+						  cdp_config_param_type *val)
+{
+	return QDF_STATUS_SUCCESS;
+}
+
 void dp_initialize_arch_ops_li(struct dp_arch_ops *arch_ops)
 {
 #ifndef QCA_HOST_MODE_WIFI_DISABLED
@@ -624,10 +636,15 @@ void dp_initialize_arch_ops_li(struct dp_arch_ops *arch_ops)
 	arch_ops->txrx_peer_map_attach = dp_peer_map_attach_li;
 	arch_ops->txrx_peer_map_detach = dp_peer_map_detach_li;
 	arch_ops->get_rx_hash_key = dp_get_rx_hash_key_li;
+	arch_ops->dp_set_rx_fst = NULL;
+	arch_ops->dp_get_rx_fst = NULL;
+	arch_ops->dp_rx_fst_ref = NULL;
+	arch_ops->dp_rx_fst_deref = NULL;
 	arch_ops->txrx_peer_setup = dp_peer_setup_li;
 	arch_ops->dp_rx_desc_cookie_2_va =
 			dp_rx_desc_cookie_2_va_li;
-	arch_ops->dp_rx_intrabss_handle_nawds = dp_rx_intrabss_handle_nawds_li;
+	arch_ops->dp_rx_intrabss_mcast_handler =
+					dp_rx_intrabss_handle_nawds_li;
 	arch_ops->dp_rx_word_mask_subscribe = dp_rx_word_mask_subscribe_li;
 	arch_ops->dp_rxdma_ring_sel_cfg = dp_rxdma_ring_sel_cfg_li;
 	arch_ops->dp_rx_peer_metadata_peer_id_get =
@@ -642,10 +659,9 @@ void dp_initialize_arch_ops_li(struct dp_arch_ops *arch_ops)
 	arch_ops->peer_get_reo_hash = dp_peer_get_reo_hash_li;
 	arch_ops->reo_remap_config = dp_reo_remap_config_li;
 	arch_ops->dp_rx_replenish_soc_get = dp_rx_replensih_soc_get_li;
-	arch_ops->dp_txrx_ppeds_rings_status = NULL;
-	arch_ops->txrx_soc_ppeds_start = NULL;
-	arch_ops->txrx_soc_ppeds_stop = NULL;
+	arch_ops->dp_soc_get_num_soc = dp_soc_get_num_soc_li;
 	arch_ops->get_reo_qdesc_addr = dp_rx_get_reo_qdesc_addr_li;
+	arch_ops->txrx_get_vdev_mcast_param = dp_txrx_get_vdev_mcast_param_li;
 }
 
 #ifdef QCA_DP_TX_HW_SW_NBUF_DESC_PREFETCH

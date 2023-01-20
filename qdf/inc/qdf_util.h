@@ -328,8 +328,8 @@ typedef __qdf_wait_queue_head_t qdf_wait_queue_head_t;
  * Return: true if the MacAddress's are equal
  * not true if the MacAddress's are not equal
  */
-static inline bool qdf_is_macaddr_equal(struct qdf_mac_addr *mac_addr1,
-					struct qdf_mac_addr *mac_addr2)
+static inline bool qdf_is_macaddr_equal(const struct qdf_mac_addr *mac_addr1,
+					const struct qdf_mac_addr *mac_addr2)
 {
 	return __qdf_is_macaddr_equal(mac_addr1, mac_addr2);
 }
@@ -345,7 +345,7 @@ static inline bool qdf_is_macaddr_equal(struct qdf_mac_addr *mac_addr1,
  * Return: true if the MacAddress is all Zeros
  * false if the MacAddress is not all Zeros.
  */
-static inline bool qdf_is_macaddr_zero(struct qdf_mac_addr *mac_addr)
+static inline bool qdf_is_macaddr_zero(const struct qdf_mac_addr *mac_addr)
 {
 	struct qdf_mac_addr zero_mac_addr = QDF_MAC_ADDR_ZERO_INIT;
 
@@ -394,7 +394,7 @@ static inline bool qdf_is_macaddr_group(struct qdf_mac_addr *mac_addr)
  * Return: true if the input MacAddress is a broadcast address
  * flase if the input MacAddress is not a broadcast address
  */
-static inline bool qdf_is_macaddr_broadcast(struct qdf_mac_addr *mac_addr)
+static inline bool qdf_is_macaddr_broadcast(const struct qdf_mac_addr *mac_addr)
 {
 	struct qdf_mac_addr broadcast_mac_addr = QDF_MAC_ADDR_BCAST_INIT;
 	return qdf_is_macaddr_equal(mac_addr, &broadcast_mac_addr);
@@ -410,7 +410,7 @@ static inline bool qdf_is_macaddr_broadcast(struct qdf_mac_addr *mac_addr)
  * Return: none
  */
 static inline void qdf_copy_macaddr(struct qdf_mac_addr *dst_addr,
-				    struct qdf_mac_addr *src_addr)
+				    const struct qdf_mac_addr *src_addr)
 {
 	*dst_addr = *src_addr;
 }

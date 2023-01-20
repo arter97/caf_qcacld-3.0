@@ -98,9 +98,11 @@ struct peer_discon_notify_s {
 /*
  * struct peer_deauth_notify_s - MLO partner peer deauth notification
  * @peer: Link peer on which Peer deauth to be sent
+ * @is_disassoc: flag indicates that disassoc frame needs to be sent
  */
 struct peer_deauth_notify_s {
 	struct wlan_objmgr_peer *peer;
+	uint8_t is_disassoc;
 };
 
 /*

@@ -315,7 +315,7 @@ ce_sendlist_send_srng(struct CE_handle *copyeng,
 #endif
 /**
  * ce_recv_buf_enqueue_srng() - enqueue a recv buffer into a copy engine
- * @coyeng: copy engine handle
+ * @copyeng: copy engine handle
  * @per_recv_context: virtual address of the nbuf
  * @buffer: physical address of the nbuf
  *
@@ -1156,7 +1156,8 @@ ce_set_srng_msi_irq_config_by_ceid(struct hif_softc *scn, uint8_t ce_id,
 
 static
 uint16_t ce_get_direct_link_dest_srng_buffers(struct hif_softc *scn,
-					      uint64_t **dma_addr)
+					      uint64_t **dma_addr,
+					      uint32_t *buf_size)
 {
 	struct HIF_CE_state *hif_state = HIF_GET_CE_STATE(scn);
 	struct CE_state *ce_state;
@@ -1192,6 +1193,8 @@ uint16_t ce_get_direct_link_dest_srng_buffers(struct hif_softc *scn,
 
 			nbuf_dmaaddr[j] = QDF_NBUF_CB_PADDR(nbuf);
 		}
+
+		*buf_size = ce_state->src_sz_max;
 
 		break;
 	}
@@ -1317,7 +1320,7 @@ static struct ce_ops ce_service_srng = {
 #endif
 };
 
-struct ce_ops *ce_services_srng()
+struct ce_ops *ce_services_srng(void)
 {
 	return &ce_service_srng;
 }

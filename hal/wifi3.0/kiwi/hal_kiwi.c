@@ -133,27 +133,6 @@
 #define PMM_REG_BASE 0xB500FC
 
 #define FW_QTIME_CYCLES_PER_10_USEC 192
-
-/* enum to indicate which scratch registers hold which value*/
-/* Obtain from pcie_reg_scratch.h? */
-enum hal_scratch_reg_enum {
-	PMM_QTIMER_GLOBAL_OFFSET_LO_US,
-	PMM_QTIMER_GLOBAL_OFFSET_HI_US,
-	PMM_MAC0_TSF1_OFFSET_LO_US,
-	PMM_MAC0_TSF1_OFFSET_HI_US,
-	PMM_MAC0_TSF2_OFFSET_LO_US,
-	PMM_MAC0_TSF2_OFFSET_HI_US,
-	PMM_MAC1_TSF1_OFFSET_LO_US,
-	PMM_MAC1_TSF1_OFFSET_HI_US,
-	PMM_MAC1_TSF2_OFFSET_LO_US,
-	PMM_MAC1_TSF2_OFFSET_HI_US,
-	PMM_MLO_OFFSET_LO_US,
-	PMM_MLO_OFFSET_HI_US,
-	PMM_TQM_CLOCK_OFFSET_LO_US,
-	PMM_TQM_CLOCK_OFFSET_HI_US,
-	PMM_Q6_CRASH_REASON,
-	PMM_PMM_REG_MAX
-};
 #endif
 
 static uint32_t hal_get_link_desc_size_kiwi(void)
@@ -1925,30 +1904,6 @@ static uint32_t hal_get_reo_qdesc_size_kiwi(uint32_t ba_window_size, int tid)
 }
 
 #ifdef QCA_GET_TSF_VIA_REG
-static inline void
-hal_get_tsf_enum(uint32_t tsf_id, uint32_t mac_id,
-		 enum hal_scratch_reg_enum *tsf_enum_low,
-		 enum hal_scratch_reg_enum *tsf_enum_hi)
-{
-	if (mac_id == 0) {
-		if (tsf_id == 0) {
-			*tsf_enum_low = PMM_MAC0_TSF1_OFFSET_LO_US;
-			*tsf_enum_hi = PMM_MAC0_TSF1_OFFSET_HI_US;
-		} else if (tsf_id == 1) {
-			*tsf_enum_low = PMM_MAC0_TSF2_OFFSET_LO_US;
-			*tsf_enum_hi = PMM_MAC0_TSF2_OFFSET_HI_US;
-		}
-	} else	if (mac_id == 1) {
-		if (tsf_id == 0) {
-			*tsf_enum_low = PMM_MAC1_TSF1_OFFSET_LO_US;
-			*tsf_enum_hi = PMM_MAC1_TSF1_OFFSET_HI_US;
-		} else if (tsf_id == 1) {
-			*tsf_enum_low = PMM_MAC1_TSF2_OFFSET_LO_US;
-			*tsf_enum_hi = PMM_MAC1_TSF2_OFFSET_HI_US;
-		}
-	}
-}
-
 static inline uint32_t
 hal_tsf_read_scratch_reg(struct hal_soc *soc,
 			 enum hal_scratch_reg_enum reg_enum)

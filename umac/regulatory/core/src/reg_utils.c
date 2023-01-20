@@ -884,6 +884,28 @@ static void reg_change_pdev_for_config(struct wlan_objmgr_psoc *psoc,
 	reg_send_scheduler_msg_sb(psoc, pdev);
 }
 
+#if defined(CONFIG_BAND_6GHZ) && defined(CONFIG_AFC_SUPPORT)
+static inline void
+reg_set_afc_vars(struct wlan_regulatory_psoc_priv_obj *psoc_priv_obj,
+		 struct reg_config_vars *config_vars)
+{
+	psoc_priv_obj->enable_6ghz_sp_pwrmode_supp =
+		config_vars->enable_6ghz_sp_pwrmode_supp;
+	psoc_priv_obj->afc_disable_timer_check =
+		config_vars->afc_disable_timer_check;
+	psoc_priv_obj->afc_disable_request_id_check =
+		config_vars->afc_disable_request_id_check;
+	psoc_priv_obj->is_afc_reg_noaction =
+		config_vars->is_afc_reg_noaction;
+}
+#else
+static inline void
+reg_set_afc_vars(struct wlan_regulatory_psoc_priv_obj *psoc_priv_obj,
+		 struct reg_config_vars *config_vars)
+{
+}
+#endif
+
 QDF_STATUS reg_set_config_vars(struct wlan_objmgr_psoc *psoc,
 			       struct reg_config_vars config_vars)
 {
@@ -918,6 +940,7 @@ QDF_STATUS reg_set_config_vars(struct wlan_objmgr_psoc *psoc,
 	reg_get_coex_unsafe_chan_reg_disable(psoc_priv_obj, config_vars);
 	psoc_priv_obj->sta_sap_scc_on_indoor_channel =
 		config_vars.sta_sap_scc_on_indoor_channel;
+	reg_set_afc_vars(psoc_priv_obj, &config_vars);
 
 	status = wlan_objmgr_psoc_try_get_ref(psoc, WLAN_REGULATORY_SB_ID);
 	if (QDF_IS_STATUS_ERROR(status)) {

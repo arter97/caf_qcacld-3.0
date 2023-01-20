@@ -411,7 +411,9 @@ struct vdev_mlme_mvr_param {
  * @num_vdevs: No. of vdevs that need to be restarted
  * @ch_param: Pointer to channel_param
  * @vdev_ids: Pointer to array of vdev_ids
- * @mvr_param: array holding multi vdev restart param
+ * @mvr_param: Pointer to array of multi vdev restart param
+ * @max_vdevs: Maximum vdev count of this pdev
+ * @mvr_bmap_enabled: flag indicating mvr-bitmap support
  */
 struct multiple_vdev_restart_params {
 	uint32_t pdev_id;
@@ -420,8 +422,10 @@ struct multiple_vdev_restart_params {
 	uint32_t cac_duration_ms;
 	uint32_t num_vdevs;
 	struct mlme_channel_param ch_param;
-	uint32_t vdev_ids[WLAN_UMAC_PDEV_MAX_VDEVS];
-	struct vdev_mlme_mvr_param mvr_param[WLAN_UMAC_PDEV_MAX_VDEVS];
+	uint32_t *vdev_ids;
+	struct vdev_mlme_mvr_param *mvr_param;
+	uint32_t max_vdevs;
+	uint8_t mvr_bmap_enabled;
 };
 
 /**
@@ -576,13 +580,15 @@ struct vdev_scan_nac_rssi_params {
  *                  the association of mlo connection
  * @mlo_mcast_vdev: MLO cast vdev
  * @emlsr_support: indicate non AP MLD STA supports eMLSR mode
+ * @mlo_link_add: Dynamic link addition
  */
 struct mlo_vdev_start_flags {
 	uint32_t mlo_enabled:1,
 		 mlo_assoc_link:1,
 		 mlo_mcast_vdev:1,
 		 emlsr_support:1,
-		 rsvd:28;
+		 mlo_link_add:1,
+		 rsvd:27;
 };
 
 /**

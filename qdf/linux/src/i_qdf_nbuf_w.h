@@ -102,6 +102,26 @@
 #define __qdf_nbuf_get_rx_flow_tag(skb) \
 		(QDF_NBUF_CB_RX_FLOW_TAG((skb)))
 
+#define QDF_NBUF_CB_RX_FLOW_IDX_INVALID(skb) \
+		(((struct qdf_nbuf_cb *) \
+		((skb)->cb))->u.rx.dev.priv_cb_w.flow_idx_invalid)
+
+#define __qdf_nbuf_set_rx_flow_idx_invalid(skb, val) \
+		((QDF_NBUF_CB_RX_FLOW_IDX_INVALID((skb))) = val)
+
+#define __qdf_nbuf_get_rx_flow_idx_invalid(skb) \
+		(QDF_NBUF_CB_RX_FLOW_IDX_INVALID((skb)))
+
+#define QDF_NBUF_CB_RX_FLOW_IDX_TIMEOUT(skb) \
+		(((struct qdf_nbuf_cb *) \
+		((skb)->cb))->u.rx.dev.priv_cb_w.flow_idx_timeout)
+
+#define __qdf_nbuf_set_rx_flow_idx_timeout(skb, val) \
+		((QDF_NBUF_CB_RX_FLOW_IDX_TIMEOUT((skb))) = val)
+
+#define __qdf_nbuf_get_rx_flow_idx_timeout(skb) \
+		(QDF_NBUF_CB_RX_FLOW_IDX_TIMEOUT((skb)))
+
 #define  QDF_NBUF_CB_RX_PACKET_IPA_SMMU_MAP(skb) \
 	 (((struct qdf_nbuf_cb *)((skb)->cb))->u.rx.dev.priv_cb_w. \
 	 ipa_smmu_map)

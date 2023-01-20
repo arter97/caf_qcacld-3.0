@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2016-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -165,6 +165,7 @@ typedef struct rx_msdu_desc_info *rx_msdu_desc_info_t;
 union hal_tx_ppe_vp_config;
 union hal_tx_cmn_config_ppe;
 union hal_tx_bank_config;
+union hal_tx_ppe_idx_map_config;
 
 /* TBD: This should be movded to shared HW header file */
 enum hal_srng_ring_id {
@@ -565,6 +566,82 @@ struct hal_srng_high_wm_info {
 };
 #endif
 
+#define DEFAULT_TSF_ID 1
+
+/**
+ * enum hal_scratch_reg_enum - Enum to indicate scratch register values
+ * @PMM_QTIMER_GLOBAL_OFFSET_LO_US - QTIMER GLOBAL OFFSET LOW
+ * @PMM_QTIMER_GLOBAL_OFFSET_HI_US - QTIMER GLOBAL OFFSET HIGH
+ * @PMM_MAC0_TSF1_OFFSET_LO_US - MAC0 TSF1 OFFSET LOW
+ * @PMM_MAC0_TSF1_OFFSET_HI_US - MAC0 TSF1 OFFSET HIGH
+ * @PMM_MAC0_TSF2_OFFSET_LO_US - MAC0 TSF2 OFFSET LOW
+ * @PMM_MAC0_TSF2_OFFSET_HI_US - MAC0 TSF2 OFFSET HIGH
+ * @PMM_MAC1_TSF1_OFFSET_LO_US - MAC1 TSF1 OFFSET LOW
+ * @PMM_MAC1_TSF1_OFFSET_HI_US - MAC1 TSF1 OFFSET HIGH
+ * @PMM_MAC1_TSF2_OFFSET_LO_US - MAC1 TSF2 OFFSET LOW
+ * @PMM_MAC1_TSF2_OFFSET_HI_US - MAC1 TSF2 OFFSET HIGH
+ * @PMM_MLO_OFFSET_LO_US - MLO OFFSET LOW
+ * @PMM_MLO_OFFSET_HI_US - MLO OFFSET HIGH
+ * @PMM_TQM_CLOCK_OFFSET_LO_US - TQM CLOCK OFFSET LOW
+ * @PMM_TQM_CLOCK_OFFSET_HI_US - TQM CLOCK OFFSET HIGH
+ * @PMM_Q6_CRASH_REASON - Q6 CRASH REASON
+ * @PMM_SCRATCH_TWT_OFFSET - TWT OFFSET
+ * @PMM_PMM_REG_MAX - Max PMM REG value
+ */
+enum hal_scratch_reg_enum {
+	PMM_QTIMER_GLOBAL_OFFSET_LO_US,
+	PMM_QTIMER_GLOBAL_OFFSET_HI_US,
+	PMM_MAC0_TSF1_OFFSET_LO_US,
+	PMM_MAC0_TSF1_OFFSET_HI_US,
+	PMM_MAC0_TSF2_OFFSET_LO_US,
+	PMM_MAC0_TSF2_OFFSET_HI_US,
+	PMM_MAC1_TSF1_OFFSET_LO_US,
+	PMM_MAC1_TSF1_OFFSET_HI_US,
+	PMM_MAC1_TSF2_OFFSET_LO_US,
+	PMM_MAC1_TSF2_OFFSET_HI_US,
+	PMM_MLO_OFFSET_LO_US,
+	PMM_MLO_OFFSET_HI_US,
+	PMM_TQM_CLOCK_OFFSET_LO_US,
+	PMM_TQM_CLOCK_OFFSET_HI_US,
+	PMM_Q6_CRASH_REASON,
+	PMM_SCRATCH_TWT_OFFSET,
+	PMM_PMM_REG_MAX
+};
+
+/**
+ * hal_get_tsf_enum(): API to get the enum corresponding to the mac and tsf id
+ *
+ * @tsf_id: tsf id
+ * @mac_id: mac id
+ * @enum_lo: Pointer to update low scratch register
+ * @enum_hi: Pointer to update hi scratch register
+ *
+ * Return: void
+ */
+static inline void
+hal_get_tsf_enum(uint32_t tsf_id, uint32_t mac_id,
+		 enum hal_scratch_reg_enum *tsf_enum_low,
+		 enum hal_scratch_reg_enum *tsf_enum_hi)
+{
+	if (mac_id == 0) {
+		if (tsf_id == 0) {
+			*tsf_enum_low = PMM_MAC0_TSF1_OFFSET_LO_US;
+			*tsf_enum_hi = PMM_MAC0_TSF1_OFFSET_HI_US;
+		} else if (tsf_id == 1) {
+			*tsf_enum_low = PMM_MAC0_TSF2_OFFSET_LO_US;
+			*tsf_enum_hi = PMM_MAC0_TSF2_OFFSET_HI_US;
+		}
+	} else if (mac_id == 1) {
+		if (tsf_id == 0) {
+			*tsf_enum_low = PMM_MAC1_TSF1_OFFSET_LO_US;
+			*tsf_enum_hi = PMM_MAC1_TSF1_OFFSET_HI_US;
+		} else if (tsf_id == 1) {
+			*tsf_enum_low = PMM_MAC1_TSF2_OFFSET_LO_US;
+			*tsf_enum_hi = PMM_MAC1_TSF2_OFFSET_HI_US;
+		}
+	}
+}
+
 /* Common SRNG ring structure for source and destination rings */
 struct hal_srng {
 	/* Unique SRNG ring ID */
@@ -823,9 +900,11 @@ struct hal_rx_pkt_capture_flags {
 struct hal_hw_txrx_ops {
 	/* init and setup */
 	void (*hal_srng_dst_hw_init)(struct hal_soc *hal,
-				     struct hal_srng *srng, bool idle_check);
+				     struct hal_srng *srng, bool idle_check,
+				     uint32_t idx);
 	void (*hal_srng_src_hw_init)(struct hal_soc *hal,
-				     struct hal_srng *srng, bool idle_check);
+				     struct hal_srng *srng, bool idle_check,
+				     uint32_t idx);
 
 	void (*hal_srng_hw_disable)(struct hal_soc *hal,
 				    struct hal_srng *srng);
@@ -887,6 +966,8 @@ struct hal_hw_txrx_ops {
 	void (*hal_tx_set_ppe_vp_entry)(hal_soc_handle_t hal_soc_hdl,
 					union hal_tx_ppe_vp_config *vp_cfg,
 					int ppe_vp_idx);
+	void (*hal_ppeds_cfg_ast_override_map_reg)(hal_soc_handle_t hal_soc_hdl,
+		uint8_t idx, union hal_tx_ppe_idx_map_config *ppeds_idx_map);
 	void (*hal_tx_set_ppe_pri2tid)(hal_soc_handle_t hal_soc_hdl,
 				       uint32_t val,
 				       uint8_t map_no);
@@ -1179,7 +1260,7 @@ struct hal_hw_txrx_ops {
 	uint32_t (*hal_txmon_status_get_num_users)(void *tx_tlv_hdr,
 						   uint8_t *num_users);
 #endif /* QCA_MONITOR_2_0_SUPPORT */
-	void (*hal_reo_shared_qaddr_setup)(hal_soc_handle_t hal_soc_hdl);
+	QDF_STATUS (*hal_reo_shared_qaddr_setup)(hal_soc_handle_t hal_soc_hdl);
 	void (*hal_reo_shared_qaddr_init)(hal_soc_handle_t hal_soc_hdl,
 					  int qref_reset);
 	void (*hal_reo_shared_qaddr_detach)(hal_soc_handle_t hal_soc_hdl);
@@ -1217,6 +1298,9 @@ struct hal_hw_txrx_ops {
 	QDF_STATUS (*hal_srng_set_msi_config)(hal_ring_handle_t ring_hdl,
 					      void *ring_params);
 #endif
+	void (*hal_tx_ring_halt_set)(hal_soc_handle_t hal_soc_hdl);
+	void (*hal_tx_ring_halt_reset)(hal_soc_handle_t hal_soc_hdl);
+	bool (*hal_tx_ring_halt_poll)(hal_soc_handle_t hal_soc_hdl);
 };
 
 /**
@@ -1342,6 +1426,8 @@ struct hal_soc {
 	void *dev_base_addr_ce;
 
 	void *dev_base_addr_cmem;
+
+	void *dev_base_addr_pmm;
 	/* HAL internal state for all SRNG rings.
 	 * TODO: See if this is required
 	 */

@@ -113,6 +113,7 @@
 
 #define CDP_MAX_RX_RINGS 8  /* max rx rings */
 #define CDP_MAX_TX_COMP_RINGS 5 /* max tx/completion rings */
+#define CDP_MAX_TX_COMP_PPE_RING (CDP_MAX_TX_COMP_RINGS - 1)
 #define CDP_MAX_RX_WBM_RINGS 1 /* max rx wbm rings */
 
 #define CDP_MAX_TX_TQM_STATUS 9  /* max tx tqm completion status */
@@ -1430,6 +1431,9 @@ struct protocol_trace_count {
  * @rts_failure: RTS failure count
  * @bar_cnt: Block ACK Request frame count
  * @ndpa_cnt: NDP announcement frame count
+ * @wme_ac_type_bytes: Wireless Multimedia Type Bytes Count
+ * @tx_ucast_total: Total tx unicast count
+ * @tx_ucast_success: Total tx unicast success count
  */
 struct cdp_tx_stats {
 	struct cdp_pkt_info comp_pkt;
@@ -1553,6 +1557,9 @@ struct cdp_tx_stats {
 	uint32_t rts_failure;
 	uint32_t bar_cnt;
 	uint32_t ndpa_cnt;
+	uint64_t wme_ac_type_bytes[WME_AC_MAX];
+	struct cdp_pkt_info tx_ucast_total;
+	struct cdp_pkt_info tx_ucast_success;
 };
 
 /* struct cdp_rx_stats - rx Level Stats
@@ -1644,6 +1651,8 @@ struct cdp_tx_stats {
  * @punc_bw[MAX_PUNCTURED_MODE]: MSDU count for punctured BW
  * @bar_cnt: Block ACK Request frame count
  * @ndpa_cnt: NDP announcement frame count
+ * @wme_ac_type_bytes: Wireless Multimedia type Byte Count
+ * @rx_total: Total rx count
  */
 struct cdp_rx_stats {
 	struct cdp_pkt_info to_stack;
@@ -1735,6 +1744,10 @@ struct cdp_rx_stats {
 	uint32_t mcast_3addr_drop;
 	uint32_t bar_cnt;
 	uint32_t ndpa_cnt;
+	uint64_t wme_ac_type_bytes[WME_AC_MAX];
+#ifdef IPA_OFFLOAD
+	struct cdp_pkt_info rx_total;
+#endif
 };
 
 /* struct cdp_tx_ingress_stats - Tx ingress Stats
@@ -1839,6 +1852,7 @@ struct cdp_tx_ingress_stats {
 		uint32_t fail_per_pkt_vdev_id_check;
 		uint32_t drop_ingress;
 		uint32_t invalid_peer_id_in_exc_path;
+		uint32_t tx_mcast_drop;
 	} dropped;
 
 	/* Mesh packets info */
@@ -2633,6 +2647,7 @@ struct cdp_per_cpu_packets {
  * @tx.desc_in_use: Descriptors in use at soc
  * @tx.dropped_fw_removed: HW_release_reason == FW removed
  * @tx.invalid_release_source: tx completion release_src != HW or FW
+ * @tx.invalid_tx_comp_desc: TX Desc from completion ring Desc is not valid
  * @tx.wifi_internal_error: tx completion wifi_internal_error
  * @tx.non_wifi_internal_err: tx completion non_wifi_internal_error
  * @tx.tx_comp_loop_pkt_limit_hit: TX Comp loop packet limit hit
@@ -2716,6 +2731,7 @@ struct cdp_soc_stats {
 		uint32_t desc_in_use;
 		uint32_t dropped_fw_removed;
 		uint32_t invalid_release_source;
+		uint32_t invalid_tx_comp_desc;
 		uint32_t wifi_internal_error[CDP_MAX_WIFI_INT_ERROR_REASONS];
 		uint32_t non_wifi_internal_err;
 		uint32_t tx_comp_loop_pkt_limit_hit;

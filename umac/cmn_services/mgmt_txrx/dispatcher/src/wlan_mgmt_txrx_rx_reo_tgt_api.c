@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -21,6 +21,7 @@
  *  definitions
  */
 #include <wlan_mgmt_txrx_rx_reo_tgt_api.h>
+#include <wlan_mlo_mgr_cmn.h>
 #include "../../core/src/wlan_mgmt_txrx_rx_reo_i.h"
 #include <../../core/src/wlan_mgmt_txrx_main_i.h>
 
@@ -113,6 +114,7 @@ tgt_mgmt_rx_reo_enter_algo_without_buffer(
 	bool is_frm_queued;
 	QDF_STATUS status;
 	int8_t link_id;
+	uint8_t ml_grp_id;
 
 	if (!pdev) {
 		mgmt_rx_reo_err("pdev is null");
@@ -139,8 +141,15 @@ tgt_mgmt_rx_reo_enter_algo_without_buffer(
 		return QDF_STATUS_E_INVAL;
 	}
 
-	reo_params->link_id = link_id;
+	ml_grp_id = wlan_get_mlo_grp_id_from_pdev(pdev);
+	if (ml_grp_id > WLAN_MAX_MLO_GROUPS) {
+		mgmt_rx_reo_err("Invalid MLO Group  %d for the pdev",
+				ml_grp_id);
+		return QDF_STATUS_E_INVAL;
+	}
 
+	reo_params->link_id = link_id;
+	reo_params->mlo_grp_id = ml_grp_id;
 	mgmt_rx_params.reo_params = reo_params;
 
 	desc.nbuf = NULL; /* No frame buffer */
@@ -219,6 +228,31 @@ tgt_mgmt_rx_reo_get_snapshot_info
 								snapshot_info);
 }
 
+bool
+wlan_mgmt_rx_reo_check_simulation_in_progress(struct wlan_objmgr_pdev *pdev)
+{
+	uint8_t ml_grp_id;
+	struct wlan_objmgr_psoc *psoc;
+
+	psoc = wlan_pdev_get_psoc(pdev);
+	if (!psoc)
+		return false;
+
+	if (!wlan_mlo_get_psoc_capable(psoc))
+		return false;
+
+	ml_grp_id = wlan_get_mlo_grp_id_from_pdev(pdev);
+	if (ml_grp_id > WLAN_MAX_MLO_GROUPS) {
+		mgmt_rx_reo_err("INVALID ML Group ID for the PDEV");
+		return false;
+	}
+
+	if (!wlan_mgmt_rx_reo_is_simulation_in_progress(ml_grp_id))
+		return false;
+
+	return true;
+}
+
 QDF_STATUS tgt_mgmt_rx_reo_frame_handler(
 				struct wlan_objmgr_pdev *pdev,
 				qdf_nbuf_t buf,
@@ -228,6 +262,7 @@ QDF_STATUS tgt_mgmt_rx_reo_frame_handler(
 	struct mgmt_rx_reo_frame_descriptor desc = {0};
 	bool is_queued;
 	int8_t link_id;
+	uint8_t ml_grp_id;
 	uint8_t frame_type;
 	uint8_t frame_subtype;
 	struct ieee80211_frame *wh;
@@ -238,7 +273,7 @@ QDF_STATUS tgt_mgmt_rx_reo_frame_handler(
 		goto cleanup;
 	}
 
-	if (!wlan_mgmt_rx_reo_is_simulation_in_progress() && !buf) {
+	if (!wlan_mgmt_rx_reo_check_simulation_in_progress(pdev) && !buf) {
 		mgmt_rx_reo_err("nbuf is NULL");
 		status = QDF_STATUS_E_NULL_VALUE;
 		goto cleanup;
@@ -274,7 +309,15 @@ QDF_STATUS tgt_mgmt_rx_reo_frame_handler(
 		goto cleanup;
 	}
 
+	ml_grp_id = wlan_get_mlo_grp_id_from_pdev(pdev);
+	if (ml_grp_id > WLAN_MAX_MLO_GROUPS) {
+		mgmt_rx_reo_err("Invalid MGMT rx reo Group id");
+		status = QDF_STATUS_E_INVAL;
+		goto cleanup;
+	}
+
 	mgmt_rx_params->reo_params->link_id = link_id;
+	mgmt_rx_params->reo_params->mlo_grp_id = ml_grp_id;
 
 	/* Populate frame descriptor */
 	desc.type = MGMT_RX_REO_FRAME_DESC_HOST_CONSUMED_FRAME;

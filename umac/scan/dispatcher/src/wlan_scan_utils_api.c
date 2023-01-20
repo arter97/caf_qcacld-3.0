@@ -32,6 +32,8 @@
 #endif
 #ifdef WLAN_FEATURE_11BE_MLO
 #include <wlan_utility.h>
+#include "wlan_mlo_mgr_public_structs.h"
+#include <utils_mlo.h>
 #endif
 #include "wlan_psoc_mlme_api.h"
 #include "reg_services_public_struct.h"
@@ -1149,13 +1151,58 @@ util_scan_parse_rnr_ie(struct scan_cache_entry *scan_entry,
 	return QDF_STATUS_SUCCESS;
 }
 
+#ifdef WLAN_FEATURE_11BE_MLO
+static void
+util_scan_parse_t2lm_ie(struct scan_cache_entry *scan_params,
+			struct extn_ie_header *extn_ie)
+{
+	uint8_t t2lm_idx = 0;
+
+	if (extn_ie->ie_extn_id == WLAN_EXTN_ELEMID_T2LM)
+		for (t2lm_idx = 0; t2lm_idx < WLAN_MAX_T2LM_IE; t2lm_idx++) {
+			if (!scan_params->ie_list.t2lm[t2lm_idx]) {
+				scan_params->ie_list.t2lm[t2lm_idx] =
+					(uint8_t *)extn_ie;
+				return;
+		}
+	}
+}
+#endif
+
 #ifdef WLAN_FEATURE_11BE
 #ifdef WLAN_FEATURE_11BE_MLO
 static void util_scan_parse_ml_ie(struct scan_cache_entry *scan_params,
 				  struct extn_ie_header *extn_ie)
 {
-	if (extn_ie->ie_extn_id == WLAN_EXTN_ELEMID_MULTI_LINK)
+	uint8_t *ml_ie;
+	uint32_t ml_ie_len;
+	enum wlan_ml_variant ml_variant;
+	QDF_STATUS ret;
+
+	if (extn_ie->ie_extn_id != WLAN_EXTN_ELEMID_MULTI_LINK)
+		return;
+
+	ml_ie = (uint8_t *)extn_ie;
+	ml_ie_len = ml_ie[TAG_LEN_POS];
+
+	/* Adding the size of IE header to ML IE length */
+	ml_ie_len += sizeof(struct ie_header);
+	ret = util_get_mlie_variant(ml_ie, ml_ie_len, (int *)&ml_variant);
+	if (ret) {
+		scm_err("Unable to get ml variant");
+		return;
+	}
+
+	switch (ml_variant) {
+	case WLAN_ML_VARIANT_BASIC:
 		scan_params->ie_list.multi_link_bv = (uint8_t *)extn_ie;
+		break;
+	case WLAN_ML_VARIANT_RECONFIG:
+		scan_params->ie_list.multi_link_rv = (uint8_t *)extn_ie;
+		break;
+	default:
+		break;
+	}
 }
 #else
 static void util_scan_parse_ml_ie(struct scan_cache_entry *scan_params,
@@ -1178,6 +1225,7 @@ static void util_scan_parse_eht_ie(struct scan_cache_entry *scan_params,
 	}
 
 	util_scan_parse_ml_ie(scan_params, extn_ie);
+	util_scan_parse_t2lm_ie(scan_params, extn_ie);
 }
 #else
 static void util_scan_parse_eht_ie(struct scan_cache_entry *scan_params,
@@ -1187,14 +1235,10 @@ static void util_scan_parse_eht_ie(struct scan_cache_entry *scan_params,
 #endif
 
 static QDF_STATUS
-util_scan_parse_extn_ie(struct wlan_objmgr_psoc *psoc,
-			struct scan_cache_entry *scan_params,
+util_scan_parse_extn_ie(struct scan_cache_entry *scan_params,
 			struct ie_header *ie)
 {
 	struct extn_ie_header *extn_ie = (struct extn_ie_header *) ie;
-	bool eht_capab;
-
-	wlan_psoc_mlme_get_11be_capab(psoc, &eht_capab);
 
 	switch (extn_ie->ie_extn_id) {
 	case WLAN_EXTN_ELEMID_MAX_CHAN_SWITCH_TIME:
@@ -1231,8 +1275,7 @@ util_scan_parse_extn_ie(struct wlan_objmgr_psoc *psoc,
 	default:
 		break;
 	}
-	if (eht_capab)
-		util_scan_parse_eht_ie(scan_params, extn_ie);
+	util_scan_parse_eht_ie(scan_params, extn_ie);
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -1611,7 +1654,7 @@ util_scan_populate_bcn_ie_list(struct wlan_objmgr_pdev *pdev,
 			scan_params->ie_list.rsnxe = (uint8_t *)ie;
 			break;
 		case WLAN_ELEMID_EXTN_ELEM:
-			status = util_scan_parse_extn_ie(psoc, scan_params, ie);
+			status = util_scan_parse_extn_ie(scan_params, ie);
 			if (QDF_IS_STATUS_ERROR(status))
 				goto err_status;
 			break;
@@ -1716,7 +1759,7 @@ static void util_scan_update_esp_data(struct wlan_esp_ie *esp_information,
 }
 
 /**
- * util_scan_scm_update_bss_with_esp_dataa: calculate estimated air time
+ * util_scan_scm_update_bss_with_esp_data: calculate estimated air time
  * fraction
  * @scan_entry: new received entry
  *
@@ -1766,7 +1809,7 @@ static void util_scan_scm_update_bss_with_esp_data(
 
 /**
  * util_scan_scm_calc_nss_supported_by_ap() - finds out nss from AP
- * @scan_entry: new received entry
+ * @scan_params: new received entry
  *
  * Return: number of nss advertised by AP
  */
@@ -2026,7 +2069,7 @@ static void util_scan_set_security(struct scan_cache_entry *scan_params)
 }
 
 #ifdef WLAN_FEATURE_11BE_MLO
-/**
+/*
  * Multi link IE field offsets
  *  ------------------------------------------------------------------------
  * | EID(1) | Len (1) | EID_EXT (1) | ML_CONTROL (2) | CMN_INFO (var) | ... |
@@ -2043,16 +2086,22 @@ static void util_scan_set_security(struct scan_cache_entry *scan_params)
  * This code is to be revisited for future drafts if the presence bitmap values
  * changes for the beacon, probe response and probe request frames.
  */
-static uint8_t util_get_link_info_offset(uint8_t *ml_ie)
+static uint8_t util_get_link_info_offset(uint8_t *ml_ie, bool *is_ml_ie_valid)
 {
 	qdf_size_t ml_ie_len = 0;
 	qdf_size_t parsed_ie_len = 0;
 	struct wlan_ie_multilink *mlie_fixed;
 	uint16_t mlcontrol;
 	uint16_t presencebm;
+	qdf_size_t actual_len;
 
 	if (!ml_ie) {
 		scm_err("ml_ie is null");
+		return 0;
+	}
+
+	if (!is_ml_ie_valid) {
+		scm_err_rl("is_ml_ie_valid is null");
 		return 0;
 	}
 
@@ -2105,7 +2154,15 @@ static uint8_t util_get_link_info_offset(uint8_t *ml_ie)
 	/* Offset calculation starts from the beginning of the ML IE (including
 	 * EID) hence, adding the size of IE header to ML IE length.
 	 */
-	if (parsed_ie_len < (ml_ie_len + sizeof(struct ie_header)))
+	actual_len = ml_ie_len + sizeof(struct ie_header);
+	if (parsed_ie_len <= actual_len) {
+		*is_ml_ie_valid = true;
+	} else {
+		*is_ml_ie_valid = false;
+		scm_err("Invalid ML IE, expect min len: %zu, actual len: %zu",
+			parsed_ie_len, actual_len);
+	}
+	if (parsed_ie_len < actual_len)
 		return parsed_ie_len;
 
 	return 0;
@@ -2114,7 +2171,8 @@ static uint8_t util_get_link_info_offset(uint8_t *ml_ie)
 static void util_get_ml_bv_partner_link_info(struct scan_cache_entry *scan_entry)
 {
 	uint8_t *ml_ie = scan_entry->ie_list.multi_link_bv;
-	uint8_t offset = util_get_link_info_offset(ml_ie);
+	bool is_ml_ie_valid;
+	uint8_t offset = util_get_link_info_offset(ml_ie, &is_ml_ie_valid);
 	uint16_t sta_ctrl;
 	uint8_t *stactrl_offset = NULL, *ielist_offset;
 	uint8_t perstaprof_len = 0, perstaprof_stainfo_len = 0, ielist_len = 0;
@@ -2231,9 +2289,21 @@ static void util_scan_update_ml_info(struct scan_cache_entry *scan_entry)
 	uint8_t *ml_ie = scan_entry->ie_list.multi_link_bv;
 	uint16_t multi_link_ctrl;
 	uint8_t offset;
+	uint8_t mlie_min_len;
+	bool is_ml_ie_valid = true;
 
+	if (!scan_entry->ie_list.ehtcap && scan_entry->ie_list.multi_link_bv) {
+		scan_entry->ie_list.multi_link_bv = NULL;
+		return;
+	}
 	if (!scan_entry->ie_list.multi_link_bv)
 		return;
+
+	mlie_min_len = util_get_link_info_offset(ml_ie, &is_ml_ie_valid);
+	if (!is_ml_ie_valid) {
+		scan_entry->ie_list.multi_link_bv = NULL;
+		return;
+	}
 
 	multi_link_ctrl = *(uint16_t *)(ml_ie + ML_CONTROL_OFFSET);
 

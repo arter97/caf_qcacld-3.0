@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -42,16 +42,28 @@ int8_t
 wlan_get_mlo_link_id_from_pdev(struct wlan_objmgr_pdev *pdev);
 
 /**
+ * wlan_get_mlo_grp_id_from_pdev() - Helper API to get the MLO Group id
+ * from the pdev object.
+ * @pdev: Pointer to pdev object
+ *
+ * Return: On success returns the MLO Group id corresponding to the pdev
+ * object. On failure returns -1.
+ */
+int8_t
+wlan_get_mlo_grp_id_from_pdev(struct wlan_objmgr_pdev *pdev);
+
+/**
  * wlan_get_pdev_from_mlo_link_id() - Helper API to get the pdev
  * object from the link id.
  * @mlo_link_id: MLO HW link id
+ * @ml_grp_id: MLO Group id which it belongs to
  * @refdbgid: Reference debug id
  *
  * Return: On success returns the pdev object from the link_id.
  * On failure returns NULL.
  */
 struct wlan_objmgr_pdev *
-wlan_get_pdev_from_mlo_link_id(uint8_t mlo_link_id,
+wlan_get_pdev_from_mlo_link_id(uint8_t mlo_link_id, uint8_t ml_grp_id,
 			       wlan_objmgr_ref_dbgid refdbgid);
 
 #ifdef WLAN_MGMT_RX_REO_SUPPORT
@@ -103,15 +115,17 @@ wlan_get_pdev_from_mlo_link_id(uint8_t mlo_link_id,
  * This API starts the simulation framework which mimics the management frame
  * generation by target. MAC HW is modelled as a kthread. FW and host layers
  * are modelled as an ordered work queues.
+ * @ml_grp_id: MLO group id of the required mlo context
  *
  * Return: QDF_STATUS
  */
 QDF_STATUS
-wlan_mgmt_rx_reo_sim_start(void);
+wlan_mgmt_rx_reo_sim_start(uint8_t ml_grp_id);
 
 /**
  * wlan_mgmt_rx_reo_sim_stop() - Helper API to stop management Rx reorder
  * simulation
+ * @ml_grp_id: MLO group id of the required mlo context
  *
  * This API stops the simulation framework which mimics the management frame
  * generation by target. MAC HW is modelled as a kthread. FW and host layers
@@ -120,18 +134,19 @@ wlan_mgmt_rx_reo_sim_start(void);
  * Return: QDF_STATUS
  */
 QDF_STATUS
-wlan_mgmt_rx_reo_sim_stop(void);
+wlan_mgmt_rx_reo_sim_stop(uint8_t ml_grp_id);
 #else
 /**
  * wlan_mgmt_rx_reo_sim_start() - Helper API to start management Rx reorder
  * simulation
+ * @ml_grp_id: MLO group id of the required mlo context
  *
  * Error print is added to indicate that simulation framework is not compiled.
  *
  * Return: QDF_STATUS_E_INVAL
  */
 static inline QDF_STATUS
-wlan_mgmt_rx_reo_sim_start(void)
+wlan_mgmt_rx_reo_sim_start(uint8_t ml_grp_id)
 {
 	mgmt_txrx_err("Mgmt rx reo simulation is not compiled");
 
@@ -141,13 +156,14 @@ wlan_mgmt_rx_reo_sim_start(void)
 /**
  * wlan_mgmt_rx_reo_sim_stop() - Helper API to stop management Rx reorder
  * simulation
+ * @ml_grp_id: MLO group id of the required mlo context
  *
  * Error print is added to indicate that simulation framework is not compiled.
  *
  * Return: QDF_STATUS_E_INVAL
  */
 static inline QDF_STATUS
-wlan_mgmt_rx_reo_sim_stop(void)
+wlan_mgmt_rx_reo_sim_stop(uint8_t ml_grp_id)
 {
 	mgmt_txrx_err("Mgmt rx reo simulation is not compiled");
 
@@ -355,15 +371,17 @@ wlan_mgmt_rx_reo_get_egress_frame_debug_list_size
 /**
  * wlan_mgmt_rx_reo_is_simulation_in_progress() - API to check whether
  * simulation is in progress
+ * @ml_grp_id: MLO group id of the required mlo context
  *
  * Return: true if simulation is in progress, else false
  */
 bool
-wlan_mgmt_rx_reo_is_simulation_in_progress(void);
+wlan_mgmt_rx_reo_is_simulation_in_progress(uint8_t ml_grp_id);
 
 /**
  * wlan_mgmt_rx_reo_print_ingress_frame_stats() - Helper API to print
  * stats related to incoming management frames
+ * @ml_grp_id: MLO group id of the required mlo context
  *
  * This API prints stats related to management frames entering management
  * Rx reorder module.
@@ -371,11 +389,12 @@ wlan_mgmt_rx_reo_is_simulation_in_progress(void);
  * Return: QDF_STATUS
  */
 QDF_STATUS
-wlan_mgmt_rx_reo_print_ingress_frame_stats(void);
+wlan_mgmt_rx_reo_print_ingress_frame_stats(uint8_t ml_grp_id);
 
 /**
  * wlan_mgmt_rx_reo_print_ingress_frame_info() - Print the debug information
  * about the latest frames entered the reorder module
+ * @ml_grp_id: MLO group id of the required mlo context
  * @num_frames: Number of frames for which the debug information is to be
  * printed. If @num_frames is 0, then debug information about all the frames
  * in the ring buffer will be  printed.
@@ -383,11 +402,13 @@ wlan_mgmt_rx_reo_print_ingress_frame_stats(void);
  * Return: QDF_STATUS of operation
  */
 QDF_STATUS
-wlan_mgmt_rx_reo_print_ingress_frame_info(uint16_t num_frames);
+wlan_mgmt_rx_reo_print_ingress_frame_info(uint8_t ml_grp_id,
+					  uint16_t num_frames);
 
 /**
  * wlan_mgmt_rx_reo_print_egress_frame_stats() - Helper API to print
  * stats related to outgoing management frames
+ * @ml_grp_id: MLO group id of the required mlo context
  *
  * This API prints stats related to management frames exiting management
  * Rx reorder module.
@@ -395,7 +416,7 @@ wlan_mgmt_rx_reo_print_ingress_frame_info(uint16_t num_frames);
  * Return: QDF_STATUS
  */
 QDF_STATUS
-wlan_mgmt_rx_reo_print_egress_frame_stats(void);
+wlan_mgmt_rx_reo_print_egress_frame_stats(uint8_t ml_grp_id);
 
 /**
  * wlan_mgmt_rx_reo_print_egress_frame_info() - Print the debug information
@@ -403,11 +424,13 @@ wlan_mgmt_rx_reo_print_egress_frame_stats(void);
  * @num_frames: Number of frames for which the debug information is to be
  * printed. If @num_frames is 0, then debug information about all the frames
  * in the ring buffer will be  printed.
+ * @ml_grp_id: MLO group id of the required mlo context
  *
  * Return: QDF_STATUS of operation
  */
 QDF_STATUS
-wlan_mgmt_rx_reo_print_egress_frame_info(uint16_t num_frames);
+wlan_mgmt_rx_reo_print_egress_frame_info(uint8_t ml_grp_id,
+					 uint16_t num_frames);
 #else
 static inline QDF_STATUS
 wlan_mgmt_rx_reo_validate_mlo_link_info(struct wlan_objmgr_psoc *psoc)

@@ -781,15 +781,17 @@ void hal_reo_init_cmd_ring(hal_soc_handle_t hal_soc_hdl,
  * Allocate MLO and Non MLO table for storing REO queue
  * reference pointers
  *
- * Return: void
+ * Return: QDF_STATUS_SUCCESS on success else a QDF error.
  */
-static inline void
+static inline QDF_STATUS
 hal_reo_shared_qaddr_setup(hal_soc_handle_t hal_soc_hdl)
 {
 	struct hal_soc *hal_soc = (struct hal_soc *)hal_soc_hdl;
 
 	if (hal_soc->ops->hal_reo_shared_qaddr_setup)
 		return hal_soc->ops->hal_reo_shared_qaddr_setup(hal_soc_hdl);
+
+	return QDF_STATUS_SUCCESS;
 }
 
 /**
@@ -810,9 +812,10 @@ hal_reo_shared_qaddr_detach(hal_soc_handle_t hal_soc_hdl)
 }
 
 #else
-static inline void
+static inline QDF_STATUS
 hal_reo_shared_qaddr_setup(hal_soc_handle_t hal_soc_hdl)
 {
+	return QDF_STATUS_SUCCESS;
 }
 
 static inline void

@@ -98,7 +98,9 @@
 #define UNIFIED_WBM_RELEASE_RING_6_TX_RATE_STATS_INFO_TX_RATE_STATS_LSB \
 	WBM_RELEASE_RING_TX_TX_RATE_STATS_PPDU_TRANSMISSION_TSF_LSB
 
+#ifdef QCA_MONITOR_2_0_SUPPORT
 #include "hal_be_api_mon.h"
+#endif
 
 #ifdef CONFIG_WIFI_EMULATION_WIFI_3_0
 #define CMEM_REG_BASE 0x0010e000
@@ -136,26 +138,6 @@
 
 #define PMM_REG_BASE_QCN9224 0xB500F8
 
-/* Enum to indicate which scratch registers hold which value */
-enum hal_scratch_reg_enum {
-	PMM_QTIMER_GLOBAL_OFFSET_LO_US,
-	PMM_QTIMER_GLOBAL_OFFSET_HI_US,
-	PMM_MAC0_TSF1_OFFSET_LO_US,
-	PMM_MAC0_TSF1_OFFSET_HI_US,
-	PMM_MAC0_TSF2_OFFSET_LO_US,
-	PMM_MAC0_TSF2_OFFSET_HI_US,
-	PMM_MAC1_TSF1_OFFSET_LO_US,
-	PMM_MAC1_TSF1_OFFSET_HI_US,
-	PMM_MAC1_TSF2_OFFSET_LO_US,
-	PMM_MAC1_TSF2_OFFSET_HI_US,
-	PMM_MLO_OFFSET_LO_US,
-	PMM_MLO_OFFSET_HI_US,
-	PMM_TQM_CLOCK_OFFSET_LO_US,
-	PMM_TQM_CLOCK_OFFSET_HI_US,
-	PMM_Q6_CRASH_REASON,
-	PMM_PMM_REG_MAX
-};
-
 /**
  * hal_read_pmm_scratch_reg(): API to read PMM Scratch register
  *
@@ -177,29 +159,6 @@ uint32_t hal_read_pmm_scratch_reg(struct hal_soc *soc,
 }
 
 /**
- * hal_get_tsf2_enum(): API to get the enum corresponding to the mac id
- *
- * @mac_id: mac id
- * @enum_lo: Pointer to update low scratch register
- * @enum_hi: Pointer to update hi scratch register
- *
- * Return: void
- */
-static inline
-void hal_get_tsf2_enum(uint8_t mac_id,
-		       enum hal_scratch_reg_enum *enum_lo,
-		       enum hal_scratch_reg_enum *enum_hi)
-{
-	if (mac_id == 1) {
-		*enum_lo = PMM_MAC1_TSF2_OFFSET_LO_US;
-		*enum_hi = PMM_MAC1_TSF2_OFFSET_HI_US;
-	} else {
-		*enum_lo = PMM_MAC0_TSF2_OFFSET_LO_US;
-		*enum_hi = PMM_MAC0_TSF2_OFFSET_HI_US;
-	}
-}
-
-/**
  * hal_get_tsf2_scratch_reg_qcn9224(): API to read tsf2 scratch register
  *
  * @hal_soc_hdl: HAL soc context
@@ -215,7 +174,7 @@ static void hal_get_tsf2_scratch_reg_qcn9224(hal_soc_handle_t hal_soc_hdl,
 	uint32_t offset_lo, offset_hi;
 	enum hal_scratch_reg_enum enum_lo, enum_hi;
 
-	hal_get_tsf2_enum(mac_id, &enum_lo, &enum_hi);
+	hal_get_tsf_enum(DEFAULT_TSF_ID, mac_id, &enum_lo, &enum_hi);
 
 	offset_lo = hal_read_pmm_scratch_reg(soc,
 					     PMM_REG_BASE_QCN9224,
@@ -1244,6 +1203,20 @@ hal_rx_flow_setup_fse_9224(uint8_t *rx_fst, uint32_t table_offset,
 		HAL_SET_FLD_SM(RX_FLOW_SEARCH_ENTRY, L4_PROTOCOL,
 			       flow->tuple_info.l4_protocol);
 
+	HAL_CLR_FLD(fse, RX_FLOW_SEARCH_ENTRY, USE_PPE);
+	HAL_SET_FLD(fse, RX_FLOW_SEARCH_ENTRY, USE_PPE) |=
+		HAL_SET_FLD_SM(RX_FLOW_SEARCH_ENTRY, USE_PPE, flow->use_ppe_ds);
+
+	HAL_CLR_FLD(fse, RX_FLOW_SEARCH_ENTRY, PRIORITY_VALID);
+	HAL_SET_FLD(fse, RX_FLOW_SEARCH_ENTRY, PRIORITY_VALID) |=
+		HAL_SET_FLD_SM(RX_FLOW_SEARCH_ENTRY, PRIORITY_VALID,
+			       flow->priority_vld);
+
+	HAL_CLR_FLD(fse, RX_FLOW_SEARCH_ENTRY, SERVICE_CODE);
+	HAL_SET_FLD(fse, RX_FLOW_SEARCH_ENTRY, SERVICE_CODE) |=
+		HAL_SET_FLD_SM(RX_FLOW_SEARCH_ENTRY, SERVICE_CODE,
+			       flow->service_code);
+
 	HAL_CLR_FLD(fse, RX_FLOW_SEARCH_ENTRY, REO_DESTINATION_HANDLER);
 	HAL_SET_FLD(fse, RX_FLOW_SEARCH_ENTRY, REO_DESTINATION_HANDLER) |=
 		HAL_SET_FLD_SM(RX_FLOW_SEARCH_ENTRY, REO_DESTINATION_HANDLER,
@@ -1580,6 +1553,8 @@ static void hal_hw_txrx_ops_attach_qcn9224(struct hal_soc *hal_soc)
 			hal_tx_set_ppe_cmn_config_9224;
 	hal_soc->ops->hal_tx_set_ppe_vp_entry =
 			hal_tx_set_ppe_vp_entry_9224;
+	hal_soc->ops->hal_ppeds_cfg_ast_override_map_reg =
+			hal_ppeds_cfg_ast_override_map_reg_9224;
 	hal_soc->ops->hal_tx_set_ppe_pri2tid =
 			hal_tx_set_ppe_pri2tid_map_9224;
 	hal_soc->ops->hal_tx_update_ppe_pri2tid =
@@ -1618,8 +1593,10 @@ static void hal_hw_txrx_ops_attach_qcn9224(struct hal_soc *hal_soc)
 					hal_rx_link_desc_msdu0_ptr_9224;
 	hal_soc->ops->hal_reo_status_get_header =
 					hal_reo_status_get_header_9224;
+#ifdef QCA_MONITOR_2_0_SUPPORT
 	hal_soc->ops->hal_rx_status_get_tlv_info =
 					hal_rx_status_get_tlv_info_wrapper_be;
+#endif
 	hal_soc->ops->hal_rx_wbm_err_info_get =
 					hal_rx_wbm_err_info_get_generic_be;
 	hal_soc->ops->hal_tx_set_pcp_tid_map =
@@ -1835,6 +1812,11 @@ static void hal_hw_txrx_ops_attach_qcn9224(struct hal_soc *hal_soc)
 					hal_get_tsf2_scratch_reg_qcn9224;
 	hal_soc->ops->hal_get_tqm_scratch_reg =
 					hal_get_tqm_scratch_reg_qcn9224;
+	hal_soc->ops->hal_tx_ring_halt_set = hal_tx_ppe2tcl_ring_halt_set_9224;
+	hal_soc->ops->hal_tx_ring_halt_reset =
+					hal_tx_ppe2tcl_ring_halt_reset_9224;
+	hal_soc->ops->hal_tx_ring_halt_poll =
+					hal_tx_ppe2tcl_ring_halt_done_9224;
 };
 
 /**

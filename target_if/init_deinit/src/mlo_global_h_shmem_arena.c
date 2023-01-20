@@ -22,10 +22,11 @@
  */
 
 #include<mlo_global_h_shmem_arena.h>
+#include<wlan_mlo_mgr_public_structs.h>
+static struct wlan_host_mlo_glb_h_shmem_arena_ctx
+				g_shmem_arena_ctx[WLAN_MAX_MLO_GROUPS];
 
-static struct wlan_host_mlo_glb_h_shmem_arena_ctx g_shmem_arena_ctx;
-
-#define get_shmem_arena_ctx() (&g_shmem_arena_ctx)
+#define get_shmem_arena_ctx(__grp_id) (&g_shmem_arena_ctx[__grp_id])
 
 /**
  * is_field_present_in_tlv() - Check whether a given field is present
@@ -494,15 +495,19 @@ extract_mlo_glb_rx_reo_snapshot_info(
 /**
  * mlo_glb_h_shmem_arena_get_no_of_chips_from_crash_info() - get the number of
  * chips from crash info
+ * @grp_id: Id of the required MLO Group
  *
  * Return: number of chips participating in MLO from crash info shared by target
  * in case of success, else returns 0
  */
-uint8_t mlo_glb_h_shmem_arena_get_no_of_chips_from_crash_info(void)
+uint8_t mlo_glb_h_shmem_arena_get_no_of_chips_from_crash_info(uint8_t grp_id)
 {
 	struct wlan_host_mlo_glb_h_shmem_arena_ctx *shmem_arena_ctx;
 
-	shmem_arena_ctx = get_shmem_arena_ctx();
+	if (grp_id > WLAN_MAX_MLO_GROUPS)
+		return 0;
+
+	shmem_arena_ctx = get_shmem_arena_ctx(grp_id);
 
 	if (!shmem_arena_ctx) {
 		target_if_err("mlo_glb_h_shmem_arena context is NULL");
@@ -515,18 +520,24 @@ uint8_t mlo_glb_h_shmem_arena_get_no_of_chips_from_crash_info(void)
 /**
  * mlo_glb_h_shmem_arena_get_crash_reason_address() - get the address of crash
  * reason associated with chip_id
+ * @grp_id: Id of the required MLO Group
+ * @chip_id: MLO Chip Id
  *
  * Return: Address of crash_reason field from global shmem arena in case of
  * success, else returns NULL
  */
-void *mlo_glb_h_shmem_arena_get_crash_reason_address(uint8_t chip_id)
+void *mlo_glb_h_shmem_arena_get_crash_reason_address(uint8_t grp_id,
+						     uint8_t chip_id)
 {
 	struct wlan_host_mlo_glb_h_shmem_arena_ctx *shmem_arena_ctx;
 	struct wlan_host_mlo_glb_chip_crash_info *crash_info;
 	struct wlan_host_mlo_glb_per_chip_crash_info *per_chip_crash_info;
 	uint8_t chip;
 
-	shmem_arena_ctx = get_shmem_arena_ctx();
+	if (grp_id > WLAN_MAX_MLO_GROUPS)
+		return NULL;
+
+	shmem_arena_ctx = get_shmem_arena_ctx(grp_id);
 	if (!shmem_arena_ctx) {
 		target_if_err("mlo_glb_h_shmem_arena context is NULL");
 		return NULL;
@@ -780,11 +791,15 @@ static int parse_mlo_glb_h_shmem_arena(
 }
 
 QDF_STATUS mlo_glb_h_shmem_arena_ctx_init(void *arena_vaddr,
-					  size_t arena_len)
+					  size_t arena_len,
+					  uint8_t grp_id)
 {
 	struct wlan_host_mlo_glb_h_shmem_arena_ctx *shmem_arena_ctx;
 
-	shmem_arena_ctx = get_shmem_arena_ctx();
+	if (grp_id > WLAN_MAX_MLO_GROUPS)
+		return QDF_STATUS_E_INVAL;
+
+	shmem_arena_ctx = get_shmem_arena_ctx(grp_id);
 	if (!shmem_arena_ctx) {
 		target_if_err("mlo_glb_h_shmem_arena context is NULL");
 		return QDF_STATUS_E_NULL_VALUE;
@@ -810,11 +825,14 @@ success:
 
 qdf_export_symbol(mlo_glb_h_shmem_arena_ctx_init);
 
-QDF_STATUS mlo_glb_h_shmem_arena_ctx_deinit(void)
+QDF_STATUS mlo_glb_h_shmem_arena_ctx_deinit(uint8_t grp_id)
 {
 	struct wlan_host_mlo_glb_h_shmem_arena_ctx *shmem_arena_ctx;
 
-	shmem_arena_ctx = get_shmem_arena_ctx();
+	if (grp_id > WLAN_MAX_MLO_GROUPS)
+		return QDF_STATUS_E_INVAL;
+
+	shmem_arena_ctx = get_shmem_arena_ctx(grp_id);
 	if (!shmem_arena_ctx) {
 		target_if_err("mlo_glb_h_shmem_arena context is NULL");
 		return QDF_STATUS_E_NULL_VALUE;
@@ -841,11 +859,14 @@ success:
 qdf_export_symbol(mlo_glb_h_shmem_arena_ctx_deinit);
 
 #ifdef WLAN_MGMT_RX_REO_SUPPORT
-uint16_t mgmt_rx_reo_get_valid_link_bitmap(void)
+uint16_t mgmt_rx_reo_get_valid_link_bitmap(uint8_t grp_id)
 {
 	struct wlan_host_mlo_glb_h_shmem_arena_ctx *shmem_arena_ctx;
 
-	shmem_arena_ctx = get_shmem_arena_ctx();
+	if (grp_id > WLAN_MAX_MLO_GROUPS)
+		return 0;
+
+	shmem_arena_ctx = get_shmem_arena_ctx(grp_id);
 	if (!shmem_arena_ctx) {
 		target_if_err("mlo_glb_h_shmem_arena context is NULL");
 		return 0;
@@ -854,11 +875,14 @@ uint16_t mgmt_rx_reo_get_valid_link_bitmap(void)
 	return shmem_arena_ctx->rx_reo_snapshot_info.valid_link_bmap;
 }
 
-int mgmt_rx_reo_get_num_links(void)
+int mgmt_rx_reo_get_num_links(uint8_t grp_id)
 {
 	struct wlan_host_mlo_glb_h_shmem_arena_ctx *shmem_arena_ctx;
 
-	shmem_arena_ctx = get_shmem_arena_ctx();
+	if (grp_id > WLAN_MAX_MLO_GROUPS)
+		return -EINVAL;
+
+	shmem_arena_ctx = get_shmem_arena_ctx(grp_id);
 	if (!shmem_arena_ctx) {
 		target_if_err("mlo_glb_h_shmem_arena context is NULL");
 		return qdf_status_to_os_return(QDF_STATUS_E_FAILURE);
@@ -868,7 +892,9 @@ int mgmt_rx_reo_get_num_links(void)
 }
 
 void *mgmt_rx_reo_get_snapshot_address(
-	uint8_t link_id, enum mgmt_rx_reo_shared_snapshot_id snapshot_id)
+		uint8_t grp_id,
+		uint8_t link_id,
+		enum mgmt_rx_reo_shared_snapshot_id snapshot_id)
 {
 	struct wlan_host_mlo_glb_h_shmem_arena_ctx *shmem_arena_ctx;
 	struct wlan_host_mlo_glb_rx_reo_snapshot_info *snapshot_info;
@@ -880,7 +906,10 @@ void *mgmt_rx_reo_get_snapshot_address(
 		return NULL;
 	}
 
-	shmem_arena_ctx = get_shmem_arena_ctx();
+	if (grp_id > WLAN_MAX_MLO_GROUPS)
+		return NULL;
+
+	shmem_arena_ctx = get_shmem_arena_ctx(grp_id);
 	if (!shmem_arena_ctx) {
 		target_if_err("mlo_glb_h_shmem_arena context is NULL");
 		return NULL;
@@ -918,7 +947,8 @@ void *mgmt_rx_reo_get_snapshot_address(
 	return NULL;
 }
 
-int8_t mgmt_rx_reo_get_snapshot_version(enum mgmt_rx_reo_shared_snapshot_id id)
+int8_t mgmt_rx_reo_get_snapshot_version(uint8_t grp_id,
+					enum mgmt_rx_reo_shared_snapshot_id id)
 {
 	struct wlan_host_mlo_glb_h_shmem_arena_ctx *shmem_arena_ctx;
 	struct wlan_host_mlo_glb_rx_reo_snapshot_info *snapshot_info;
@@ -929,7 +959,10 @@ int8_t mgmt_rx_reo_get_snapshot_version(enum mgmt_rx_reo_shared_snapshot_id id)
 		return MGMT_RX_REO_INVALID_SNAPSHOT_VERSION;
 	}
 
-	shmem_arena_ctx = get_shmem_arena_ctx();
+	if (grp_id > WLAN_MAX_MLO_GROUPS)
+		return MGMT_RX_REO_INVALID_SNAPSHOT_VERSION;
+
+	shmem_arena_ctx = get_shmem_arena_ctx(grp_id);
 	if (!shmem_arena_ctx) {
 		target_if_err("mlo_glb_h_shmem_arena context is NULL");
 		return MGMT_RX_REO_INVALID_SNAPSHOT_VERSION;

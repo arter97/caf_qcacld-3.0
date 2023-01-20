@@ -80,6 +80,7 @@
 #define HAL_TLV_STATUS_MSDU_END 8
 #define HAL_TLV_STATUS_MON_BUF_ADDR 9
 #define HAL_TLV_STATUS_MPDU_START 10
+#define HAL_TLV_STATUS_MON_DROP 11
 
 #define HAL_MAX_UL_MU_USERS	37
 
@@ -340,6 +341,20 @@ struct hal_rx_su_evm_info {
 enum {
 	DP_PPDU_STATUS_START,
 	DP_PPDU_STATUS_DONE,
+};
+
+/**
+ * struct hal_rx_ppdu_drop_cnt - PPDU drop count
+ * @ppdu_drop_cnt: PPDU drop count
+ * @mpdu_drop_cnt: MPDU drop count
+ * @end_of_ppdu_drop_cnt: End of PPDU drop count
+ * @tlv_drop_cnt: TLV drop count
+ */
+struct hal_rx_ppdu_drop_cnt {
+	uint8_t ppdu_drop_cnt;
+	uint16_t mpdu_drop_cnt;
+	uint8_t end_of_ppdu_drop_cnt;
+	uint16_t tlv_drop_cnt;
 };
 
 static inline QDF_STATUS
@@ -1303,6 +1318,8 @@ struct hal_rx_ppdu_info {
 	uint8_t end_user_stats_cnt;
 	/* PPDU start user info count */
 	uint8_t start_user_info_cnt;
+	/* PPDU drop cnt */
+	struct hal_rx_ppdu_drop_cnt drop_cnt;
 };
 
 static inline uint32_t

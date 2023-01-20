@@ -628,6 +628,13 @@ static bool scm_is_fils_config_match(struct scan_filter *filter,
 	indication_ie =
 		(struct fils_indication_ie *)db_entry->ie_list.fils_indication;
 
+	/*
+	 * Don't validate the realm, if AP advertises realm count as 0
+	 * in the FILS indication element
+	 */
+	if (!indication_ie->realm_identifiers_cnt)
+		return true;
+
 	end_ptr = (uint8_t *)indication_ie + indication_ie->len + 2;
 	data = indication_ie->variable_data;
 
@@ -679,6 +686,10 @@ static bool scm_check_dot11mode(struct scan_cache_entry *db_entry,
 		break;
 	case ALLOW_11AX_ONLY:
 		if (!util_scan_entry_hecap(db_entry))
+			return false;
+		break;
+	case ALLOW_11BE_ONLY:
+		if (!util_scan_entry_ehtcap(db_entry))
 			return false;
 		break;
 	default:

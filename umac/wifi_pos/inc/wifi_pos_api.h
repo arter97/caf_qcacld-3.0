@@ -32,6 +32,10 @@
 struct wlan_objmgr_psoc;
 struct wifi_pos_driver_caps;
 
+#ifdef WIFI_POS_CONVERGED
+struct wifi_pos_osif_ops;
+#endif
+
 /**
  * enum RTT_FIELD_ID - identifies which field is being specified
  * @META_DATA_SUB_TYPE: oem data req sub type

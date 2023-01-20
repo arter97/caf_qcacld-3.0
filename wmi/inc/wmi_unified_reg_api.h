@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2017-2021 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -27,7 +28,7 @@
 /**
  * wmi_extract_reg_chan_list_update_event() - function to update channel list
  * @wmi_handle: wmi handle
- * @event_buf: event buffer
+ * @evt_buf: event buffer
  * @reg_info: regulatory info
  * @len: length of buffer
  *

@@ -191,7 +191,23 @@
 #define QCA_OUI_WHC_TYPE  0x00
 #define QCA_OUI_WHC_REPT_TYPE 0x01
 
-/* QCN IE attribute types */
+/**
+ * enum qcn_attribute_id: QCN IE attribute ID
+ * @QCN_ATTRIB_VERSION: QCN version
+ * @QCN_ATTRIB_VHT_MCS10_11_SUPP: VHT MCS 10-11 support
+ * @QCN_ATTRIB_HE_400NS_SGI_SUPP: HE 400 NS SGI support
+ * @QCN_ATTRIB_HE_2XLTF_160_80P80_SUPP: HE 2X LTF 160 80P80 support
+ * @QCN_ATTRIB_HE_DL_OFDMA_SUPP: HE DL OFDMA support
+ * @QCN_ATTRIB_TRANSITION_REASON: Transition reason
+ * @QCN_ATTRIB_TRANSITION_REJECTION: Transition rejection
+ * @QCN_ATTRIB_HE_DL_MUMIMO_SUPP: DL MUMIMO support
+ * @QCN_ATTRIB_HE_MCS12_13_SUPP: MCS 12-13 support
+ * @QCN_ATTRIB_REPEATER_INFO: Repeater information
+ * @QCN_ATTRIB_HE_240_MHZ_SUPP: HE 240 MHZ support
+ * @QCN_ATTRIB_ECSA_SUPP: ECSA support
+ * @QCN_ATTRIB_EDCA_PIFS_PARAM: EDCA PIFS param
+ * @QCN_ATTRIB_MAX: Maximum attribute
+ */
 enum qcn_attribute_id {
 	QCN_ATTRIB_VERSION                  = 0x01,
 	QCN_ATTRIB_VHT_MCS10_11_SUPP        = 0X02,
@@ -204,7 +220,9 @@ enum qcn_attribute_id {
 	QCN_ATTRIB_HE_MCS12_13_SUPP         = 0X09,
 	QCN_ATTRIB_REPEATER_INFO            = 0X0A,
 	QCN_ATTRIB_HE_240_MHZ_SUPP          = 0X0B,
-	QCN_ATTRIB_MAX                      = 0x0C
+	QCN_ATTRIB_ECSA_SUPP                = 0X0C,
+	QCN_ATTRIB_EDCA_PIFS_PARAM          = 0X0D,
+	QCN_ATTRIB_MAX                      = 0x0E
 };
 
 /* Extender vendor specific IE */
@@ -775,6 +793,7 @@ enum extn_element_ie {
  * accordingly.
  *
  * @REASON_PROP_START: Start of prop reason code
+ * @REASON_HOST_TRIGGERED_LINK_DELETE: Dynamic link removal
  * @REASON_OCI_MISMATCH: Reason OCI Mismatch happens
  * @REASON_HOST_TRIGGERED_ROAM_FAILURE: Reason host triggered roam failed
  * @REASON_FW_TRIGGERED_ROAM_FAILURE: Firmware triggered roam failed
@@ -866,7 +885,8 @@ enum wlan_reason_code {
 	 * REASON_PROP_START and decrease the value of REASON_PROP_START
 	 * accordingly.
 	 */
-	REASON_PROP_START = 65517,
+	REASON_PROP_START = 65516,
+	REASON_HOST_TRIGGERED_LINK_DELETE = 65517,
 	REASON_OCI_MISMATCH = 65518,
 	REASON_HOST_TRIGGERED_ROAM_FAILURE  = 65519,
 	REASON_FW_TRIGGERED_ROAM_FAILURE = 65520,
@@ -1109,6 +1129,7 @@ enum wlan_status_code {
 #define WLAN_AKM_FILS_FT_SHA256   0x10
 #define WLAN_AKM_FILS_FT_SHA384   0x11
 #define WLAN_AKM_OWE              0x12
+#define WLAN_AKM_SAE_EXT_KEY      0x18
 
 #define WLAN_ASE_NONE                    0x00
 #define WLAN_ASE_8021X_UNSPEC            0x01
@@ -1622,6 +1643,10 @@ struct wlan_ie_vhtop {
 	uint8_t vht_op_ch_freq_seg2;
 	uint16_t vhtop_basic_mcs_set;
 } qdf_packed;
+
+#define WLAN_HE_PHYCAP_SU_BFER_OFFSET 3
+#define WLAN_HE_PHYCAP_SU_BFER_IDX 7
+#define WLAN_HE_PHYCAP_SU_BFER_BITS 1
 
 #define WLAN_HE_PHYCAP_160_SUPPORT BIT(2)
 #define WLAN_HE_PHYCAP_80_80_SUPPORT BIT(3)
@@ -2577,6 +2602,9 @@ struct wlan_ml_rv_linfo_perstaprof {
 /* All Updates Included */
 #define WLAN_RNR_NBRAPINFO_TBTTINFO_MLDPARAMS_ALLUPDATESINC_IDX          20
 #define WLAN_RNR_NBRAPINFO_TBTTINFO_MLDPARAMS_ALLUPDATESINC_BITS         1
+/* Disabled link indication */
+#define WLAN_RNR_NBRAPINFO_TBTTINFO_MLDPARAMS_DISABLEDLINKIND_IDX        21
+#define WLAN_RNR_NBRAPINFO_TBTTINFO_MLDPARAMS_DISABLEDLINKIND_BITS       1
 
 /*
  * End of definitions related to MLO specific aspects of Reduced Neighbor Report
@@ -2585,7 +2613,6 @@ struct wlan_ml_rv_linfo_perstaprof {
 #endif /* WLAN_FEATURE_11BE_MLO */
 #endif /* WLAN_FEATURE_11BE */
 
-#ifdef WLAN_FEATURE_11BE
 /**
  * struct wlan_ie_tid_to_link_mapping - TID-to-link mapping IE
  * @elem_id: T2LM IE
@@ -2655,7 +2682,34 @@ struct wlan_ie_multi_link_traffic_indication {
 	uint16_t ml_traffic_ind_control;
 	uint16_t per_link_traffic_ind_list[];
 } qdf_packed;
-#endif /* WLAN_FEATURE_11BE */
+
+/**
+ * struct wlan_action - Generic action frame format
+ * @category: Action frame category
+ * @action: action
+ */
+struct wlan_action_frame {
+	int8_t category;
+	int8_t action;
+} __packed;
+
+/**
+ * struct wlan_action_frame_args - Generic action frame arguments
+ * @category: Action frame category
+ * @action: action
+ * @arg1: argument1
+ * @arg2: argument2
+ * @arg3: argument3
+ * @arg4: Pointer to argument4
+ */
+struct wlan_action_frame_args {
+	uint8_t category;
+	uint8_t action;
+	uint32_t arg1;
+	uint32_t arg2;
+	uint32_t arg3;
+	uint8_t *arg4;
+};
 
 /**
  * struct he_oper_6g_param: 6 Ghz params for HE
@@ -3374,6 +3428,52 @@ struct wlan_eht_cap_info_network_endian {
 	uint32_t bw_320_rx_max_nss_for_mcs_10_and_11:4;
 	uint32_t bw_320_tx_max_nss_for_mcs_10_and_11:4;
 	uint8_t bw_320_rx_max_nss_for_mcs_12_and_13:4;
+} qdf_packed;
+
+/**
+ * struct edca_param: struct for edca_param
+ * @acvo_aifsn: ac vo aifsn
+ * @acvo_acm: ac vo acm
+ * @acvo_aci: ac vo aci
+ * @unused: unused bit
+ * @acvo_cwmin: ac vo cwmin
+ * @acvo_cwmax: ac vo cwmax
+ * @acvo_txoplimit: ac vo txoplimit
+ */
+struct edca_param {
+	uint8_t acvo_aifsn:4;
+	uint8_t acvo_acm:1;
+	uint8_t acvo_aci:2;
+	uint8_t unused:1;
+	uint8_t acvo_cwmin:4;
+	uint8_t acvo_cwmax:4;
+	uint16_t acvo_txoplimit;
+};
+
+/**
+ * struct pifs_param: struct for pifs_param
+ * @sap_pifs_offset: sap pifs offset
+ * @leb_pifs_offset: left earbud offset
+ * @reb_pifs_offset: right earbud offset
+ */
+struct pifs_param {
+	uint8_t sap_pifs_offset;
+	uint8_t leb_pifs_offset;
+	uint8_t reb_pifs_offset;
+};
+
+/**
+ * struct wlan_edca_pifs_param_ie: struct for QCN_ATTRIB_EDCA_PIFS_PARAM
+ * @edca_param_type: edca param type
+ * @eparam: structure for edca_param
+ * @pparam: structure for pifs_param
+ */
+struct wlan_edca_pifs_param_ie {
+	uint8_t edca_param_type;
+	union {
+		struct edca_param eparam; /* edca_param_type = 0 */
+		struct pifs_param pparam; /* edca_param_type = 1 */
+	} qdf_packed edca_pifs_param;
 } qdf_packed;
 
 /**

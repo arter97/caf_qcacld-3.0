@@ -116,6 +116,10 @@ static QDF_STATUS mlme_vdev_obj_create_handler(struct wlan_objmgr_vdev *vdev,
 		goto ext_hdl_create_failed;
 	}
 
+	qdf_timer_init(NULL, &vdev_mlme->ml_reconfig_timer,
+		       mlme_vdev_reconfig_timer_cb, (void *)(vdev_mlme),
+		       QDF_TIMER_TYPE_WAKE_APPS);
+
 	wlan_objmgr_vdev_component_obj_attach((struct wlan_objmgr_vdev *)vdev,
 					      WLAN_UMAC_COMP_MLME,
 					      (void *)vdev_mlme,
@@ -134,6 +138,7 @@ static QDF_STATUS mlme_vdev_obj_create_handler(struct wlan_objmgr_vdev *vdev,
 	return QDF_STATUS_SUCCESS;
 
 ext_hdl_post_create_failed:
+	qdf_timer_free(&vdev_mlme->ml_reconfig_timer);
 	mlme_vdev_ops_ext_hdl_destroy(vdev_mlme);
 	wlan_objmgr_vdev_component_obj_detach(vdev, WLAN_UMAC_COMP_MLME,
 					      vdev_mlme);
@@ -165,6 +170,7 @@ static QDF_STATUS mlme_vdev_obj_destroy_handler(struct wlan_objmgr_vdev *vdev,
 		return QDF_STATUS_SUCCESS;
 	}
 
+	qdf_timer_free(&vdev_mlme->ml_reconfig_timer);
 	wlan_cm_deinit(vdev_mlme);
 	mlme_vdev_sm_destroy(vdev_mlme);
 	mlme_vdev_ops_ext_hdl_destroy(vdev_mlme);

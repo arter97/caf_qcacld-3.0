@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2013-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -120,6 +120,7 @@ struct hif_pci_softc {
 	void __iomem *mem;      /* PCI address. */
 	void __iomem *mem_ce;   /* PCI address for CE. */
 	void __iomem *mem_cmem;   /* PCI address for CMEM. */
+	void __iomem *mem_pmm_base;   /* address for PMM. */
 	size_t mem_len;
 
 	struct device *dev;	/* For efficiency, should be first in struct */

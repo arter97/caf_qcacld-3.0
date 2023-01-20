@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -72,12 +72,14 @@
 #define MGMT_RX_REO_EGRESS_FRAME_DEBUG_INFO_WAIT_COUNT_MAX_SIZE   (69)
 #define MGMT_RX_REO_EGRESS_FRAME_DEBUG_INFO_PER_LINK_SNAPSHOTS_MAX_SIZE   (94)
 #define MGMT_RX_REO_EGRESS_FRAME_DEBUG_INFO_SNAPSHOT_MAX_SIZE     (22)
+#define MGMT_RX_REO_EGRESS_FRAME_DEBUG_INFO_PRINT_MAX_FRAMES     (0)
 
 #define MGMT_RX_REO_INGRESS_FRAME_DEBUG_INFO_BOARDER_MAX_SIZE   (785)
 #define MGMT_RX_REO_INGRESS_FRAME_DEBUG_INFO_FLAG_MAX_SIZE   (13)
 #define MGMT_RX_REO_INGRESS_FRAME_DEBUG_INFO_WAIT_COUNT_MAX_SIZE   (69)
 #define MGMT_RX_REO_INGRESS_FRAME_DEBUG_INFO_PER_LINK_SNAPSHOTS_MAX_SIZE   (94)
 #define MGMT_RX_REO_INGRESS_FRAME_DEBUG_INFO_SNAPSHOT_MAX_SIZE     (22)
+#define MGMT_RX_REO_INGRESS_FRAME_DEBUG_INFO_PRINT_MAX_FRAMES     (0)
 #endif /* WLAN_MGMT_RX_REO_DEBUG_SUPPORT*/
 
 /*
@@ -443,15 +445,17 @@ struct mgmt_rx_reo_mac_hw_simulator {
  * @mac_hw_sim:  MAC HW simulation object
  * @snapshot: snapshots required for reo algorithm
  * @link_id_to_pdev_map: link_id to pdev object map
+ * @mlo_grp_id: MLO group id which it belongs to
  */
 struct mgmt_rx_reo_sim_context {
 	struct workqueue_struct *host_mgmt_frame_handler[MAX_MLO_LINKS];
 	struct workqueue_struct *fw_mgmt_frame_handler[MAX_MLO_LINKS];
 	struct mgmt_rx_reo_master_frame_list master_frame_list;
 	struct mgmt_rx_reo_mac_hw_simulator mac_hw_sim;
-	struct mgmt_rx_reo_snapshot snapshot[MAX_MLO_LINKS]
+	struct mgmt_rx_reo_shared_snapshot snapshot[MAX_MLO_LINKS]
 					    [MGMT_RX_REO_SHARED_SNAPSHOT_MAX];
 	struct mgmt_rx_reo_sim_link_id_to_pdev_map link_id_to_pdev_map;
+	uint8_t mlo_grp_id;
 };
 #endif /* WLAN_MGMT_RX_REO_SIM_SUPPORT */
 
@@ -690,6 +694,7 @@ struct reo_egress_debug_info {
  * object @egress_frame_debug_info
  * @simulation_in_progress: Flag to indicate whether simulation is
  * in progress
+ * @mlo_grp_id: MLO Group ID which it belongs to
  */
 struct mgmt_rx_reo_context {
 	struct mgmt_rx_reo_list reo_list;
@@ -705,6 +710,7 @@ struct mgmt_rx_reo_context {
 	struct  reo_egress_debug_info egress_frame_debug_info;
 #endif /* WLAN_MGMT_RX_REO_DEBUG_SUPPORT */
 	bool simulation_in_progress;
+	uint8_t mlo_grp_id;
 };
 
 /**
@@ -871,6 +877,22 @@ mgmt_rx_reo_get_link_id(struct mgmt_rx_event_params *rx_params)
 }
 
 /**
+ * mgmt_rx_reo_get_mlo_grp_id() - Helper API to get MLO Group id
+ * corresponding to the mgmt rx event
+ * @rx_params: Management rx event params
+ *
+ * Return: MLO group id corresponding to the mgmt rx event
+ */
+static inline uint8_t
+mgmt_rx_reo_get_mlo_grp_id(struct mgmt_rx_event_params *rx_params)
+{
+	qdf_assert_always(rx_params);
+	qdf_assert_always(rx_params->reo_params);
+
+	return rx_params->reo_params->mlo_grp_id;
+}
+
+/**
  * mgmt_rx_reo_get_pdev_id() - Helper API to get pdev id corresponding to the
  * mgmt rx event
  * @rx_params: Management rx event params
@@ -888,37 +910,42 @@ mgmt_rx_reo_get_pdev_id(struct mgmt_rx_event_params *rx_params)
 
 /**
  * mgmt_rx_reo_init_context() - Initialize the management rx-reorder context
+ * @ml_grp_id: MLO Group ID to be initialized
  *
- * API to initialize the global management rx-reorder context object.
+ * API to initialize each global management rx-reorder context object per group
  *
  * Return: QDF_STATUS
  */
 QDF_STATUS
-mgmt_rx_reo_init_context(void);
+mgmt_rx_reo_init_context(uint8_t ml_grp_id);
 
 /**
  * mgmt_rx_reo_deinit_context() - De initialize the management rx-reorder
  * context
+ * @ml_grp_id: MLO Group ID to be deinitialized
  *
- * API to de initialize the global management rx-reorder context object.
+ * API to de initialize each global management rx-reorder context object per
+ * group
  *
  * Return: QDF_STATUS
  */
 QDF_STATUS
-mgmt_rx_reo_deinit_context(void);
+mgmt_rx_reo_deinit_context(uint8_t ml_grp_id);
 
 /**
  * mgmt_rx_reo_is_simulation_in_progress() - API to check whether
  * simulation is in progress
+ * @ml_grp_id: MLO group id of mgmt rx reo
  *
  * Return: true if simulation is in progress, else false
  */
 bool
-mgmt_rx_reo_is_simulation_in_progress(void);
+mgmt_rx_reo_is_simulation_in_progress(uint8_t ml_grp_id);
 
 /**
  * mgmt_rx_reo_print_ingress_frame_stats() - Helper API to print
  * stats related to incoming management frames
+ * @ml_grp_id: MLO group id of mgmt rx reo
  *
  * This API prints stats related to management frames entering management
  * Rx reorder module.
@@ -926,11 +953,12 @@ mgmt_rx_reo_is_simulation_in_progress(void);
  * Return: QDF_STATUS
  */
 QDF_STATUS
-mgmt_rx_reo_print_ingress_frame_stats(void);
+mgmt_rx_reo_print_ingress_frame_stats(uint8_t ml_grp_id);
 
 /**
  * mgmt_rx_reo_print_ingress_frame_info() - Print the debug information
  * about the latest frames entered the reorder module
+ * @ml_grp_id: MLO group id of mgmt rx reo
  * @num_frames: Number of frames for which the debug information is to be
  * printed. If @num_frames is 0, then debug information about all the frames
  * in the ring buffer will be  printed.
@@ -938,11 +966,12 @@ mgmt_rx_reo_print_ingress_frame_stats(void);
  * Return: QDF_STATUS of operation
  */
 QDF_STATUS
-mgmt_rx_reo_print_ingress_frame_info(uint16_t num_frames);
+mgmt_rx_reo_print_ingress_frame_info(uint8_t ml_grp_id, uint16_t num_frames);
 
 /**
  * mgmt_rx_reo_print_egress_frame_stats() - Helper API to print
  * stats related to outgoing management frames
+ * @ml_grp_id: MLO group id of mgmt rx reo
  *
  * This API prints stats related to management frames exiting management
  * Rx reorder module.
@@ -950,11 +979,12 @@ mgmt_rx_reo_print_ingress_frame_info(uint16_t num_frames);
  * Return: QDF_STATUS
  */
 QDF_STATUS
-mgmt_rx_reo_print_egress_frame_stats(void);
+mgmt_rx_reo_print_egress_frame_stats(uint8_t ml_grp_id);
 
 /**
  * mgmt_rx_reo_print_egress_frame_info() - Print the debug information
  * about the latest frames leaving the reorder module
+ * @ml_grp_id: MLO group id of mgmt rx reo
  * @num_frames: Number of frames for which the debug information is to be
  * printed. If @num_frames is 0, then debug information about all the frames
  * in the ring buffer will be  printed.
@@ -962,12 +992,13 @@ mgmt_rx_reo_print_egress_frame_stats(void);
  * Return: QDF_STATUS of operation
  */
 QDF_STATUS
-mgmt_rx_reo_print_egress_frame_info(uint16_t num_frames);
+mgmt_rx_reo_print_egress_frame_info(uint8_t ml_grp_id, uint16_t num_frames);
 
 #ifdef WLAN_MGMT_RX_REO_SIM_SUPPORT
 /**
  * mgmt_rx_reo_sim_start() - Helper API to start management Rx reorder
  * simulation
+ * @ml_grp_id: MLO group id of mgmt rx reo
  *
  * This API starts the simulation framework which mimics the management frame
  * generation by target. MAC HW is modelled as a kthread. FW and host layers
@@ -976,11 +1007,12 @@ mgmt_rx_reo_print_egress_frame_info(uint16_t num_frames);
  * Return: QDF_STATUS
  */
 QDF_STATUS
-mgmt_rx_reo_sim_start(void);
+mgmt_rx_reo_sim_start(uint8_t ml_grp_id);
 
 /**
  * mgmt_rx_reo_sim_stop() - Helper API to stop management Rx reorder
  * simulation
+ * @ml_grp_id: MLO group id of mgmt rx reo
  *
  * This API stops the simulation framework which mimics the management frame
  * generation by target. MAC HW is modelled as a kthread. FW and host layers
@@ -989,7 +1021,7 @@ mgmt_rx_reo_sim_start(void);
  * Return: QDF_STATUS
  */
 QDF_STATUS
-mgmt_rx_reo_sim_stop(void);
+mgmt_rx_reo_sim_stop(uint8_t ml_grp_id);
 
 /**
  * mgmt_rx_reo_sim_process_rx_frame() - API to process the management frame
@@ -1022,7 +1054,7 @@ QDF_STATUS
 mgmt_rx_reo_sim_get_snapshot_address(
 			struct wlan_objmgr_pdev *pdev,
 			enum mgmt_rx_reo_shared_snapshot_id id,
-			struct mgmt_rx_reo_snapshot **address);
+			struct mgmt_rx_reo_shared_snapshot **address);
 
 /**
  * mgmt_rx_reo_sim_pdev_object_create_notification() - pdev create handler for

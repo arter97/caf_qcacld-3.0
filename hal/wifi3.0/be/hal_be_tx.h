@@ -487,6 +487,21 @@ hal_tx_desc_set_cache_set_num(hal_soc_handle_t hal_soc_hdl, void *desc,
 		HAL_TX_SM(TCL_DATA_CMD, CACHE_SET_NUM, cache_num);
 }
 
+/**
+ * hal_tx_desc_set_lookup_override_num - set lookup override num
+ * to the descriptor to Hardware
+ * @hal_soc_hdl: hal soc handle
+ * @hal_tx_des_cached: Cached descriptor that software maintains
+ * @cache_num: set numbernumber
+ */
+static inline void
+hal_tx_desc_set_index_lookup_override(hal_soc_handle_t hal_soc_hdl,
+				      void *desc, uint8_t num)
+{
+	HAL_SET_FLD(desc, TCL_DATA_CMD, INDEX_LOOKUP_OVERRIDE) |=
+		HAL_TX_SM(TCL_DATA_CMD, INDEX_LOOKUP_OVERRIDE, num);
+}
+
 /*---------------------------------------------------------------------------
  * WBM Descriptor accessor APIs for Tx completions
  * ---------------------------------------------------------------------------
@@ -571,6 +586,20 @@ static inline uint8_t hal_tx_comp_get_cookie_convert_done(void *hal_desc)
 #endif
 
 /**
+ * hal_tx_comp_set_desc_va_63_32() - Set bit 32~63 value for 64 bit VA
+ * @hal_desc: completion ring descriptor pointer
+ * @val: value to be set
+ *
+ * Return: None
+ */
+static inline void hal_tx_comp_set_desc_va_63_32(void *hal_desc, uint32_t val)
+{
+	HAL_SET_FLD(hal_desc,
+		    WBM2SW_COMPLETION_RING_TX,
+		    BUFFER_VIRT_ADDR_63_32) = val;
+}
+
+/**
  * hal_tx_comp_get_desc_va() - Get Desc virtual address within completion Desc
  * @hal_desc: completion ring descriptor pointer
  *
@@ -578,7 +607,7 @@ static inline uint8_t hal_tx_comp_get_cookie_convert_done(void *hal_desc)
  *
  * Return: TX desc virtual address
  */
-static inline uintptr_t hal_tx_comp_get_desc_va(void *hal_desc)
+static inline uint64_t hal_tx_comp_get_desc_va(void *hal_desc)
 {
 	uint64_t va_from_desc;
 
@@ -590,7 +619,7 @@ static inline uintptr_t hal_tx_comp_get_desc_va(void *hal_desc)
 					WBM2SW_COMPLETION_RING_TX,
 					BUFFER_VIRT_ADDR_63_32)) << 32);
 
-	return (uintptr_t)va_from_desc;
+	return va_from_desc;
 }
 
 /*---------------------------------------------------------------------------
@@ -864,6 +893,24 @@ hal_tx_populate_ppe_vp_entry(hal_soc_handle_t hal_soc_hdl,
 	struct hal_soc *hal_soc = (struct hal_soc *)hal_soc_hdl;
 
 	hal_soc->ops->hal_tx_set_ppe_vp_entry(hal_soc_hdl, vp_cfg, ppe_vp_idx);
+}
+
+/**
+ * hal_ppeds_cfg_ast_override_map_reg - Set ppe index mapping table value
+ * @hal_soc: HAL SoC context
+ * @reg_idx: index into the table
+ * @ppeds_astoveride_map: HAL PPE INDEX MAPPING config
+ *
+ * Return: void
+ */
+static inline void
+hal_ppeds_cfg_ast_override_map_reg(hal_soc_handle_t hal_soc_hdl,
+	uint8_t reg_idx, union hal_tx_ppe_idx_map_config *ppeds_astoveride_map)
+{
+	struct hal_soc *hal_soc = (struct hal_soc *)hal_soc_hdl;
+
+	hal_soc->ops->hal_ppeds_cfg_ast_override_map_reg(hal_soc_hdl, reg_idx,
+							 ppeds_astoveride_map);
 }
 
 /**

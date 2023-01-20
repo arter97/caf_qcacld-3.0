@@ -1565,27 +1565,6 @@ wlan_reg_get_channel_list_with_power(
 
 #ifdef WLAN_FEATURE_11BE
 /**
- * wlan_reg_fill_channel_list() - Fills the reg_channel_list (list of channels)
- * @pdev: Pointer to struct wlan_objmgr_pdev.
- * @freq: Center frequency of the primary channel in MHz
- * @sec_ch_2g_freq: Secondary channel center frequency.
- * @ch_width: Channel width of type 'enum phy_ch_width'.
- * @band_center_320: Center frequency of 320MHZ channel.
- * @chan_list: Pointer to struct reg_channel_list to be filled (Output param).
- * @treat_nol_chan_as_disabled: bool to treat nol channel as enabled or
- * disabled. If set to true, nol chan is considered as disabled in chan search.
- *
- * Return: None
- */
-void wlan_reg_fill_channel_list(struct wlan_objmgr_pdev *pdev,
-				qdf_freq_t freq,
-				qdf_freq_t sec_ch_2g_freq,
-				enum phy_ch_width ch_width,
-				qdf_freq_t band_center_320,
-				struct reg_channel_list *chan_list,
-				bool treat_nol_chan_as_disabled);
-
-/**
  * wlan_reg_is_punc_bitmap_valid() - is puncture bitmap valid or not
  * @bw: Input channel width.
  * @puncture_bitmap Input puncture bitmap.
@@ -1643,6 +1622,58 @@ QDF_STATUS wlan_reg_extract_puncture_by_bw(enum phy_ch_width ori_bw,
  */
 void wlan_reg_set_create_punc_bitmap(struct ch_params *ch_params,
 				     bool is_create_punc_bitmap);
+
+#ifdef CONFIG_REG_CLIENT
+/**
+ * wlan_reg_apply_puncture() - apply puncture to regulatory
+ * @pdev: pdev
+ * @puncture_bitmap: puncture bitmap
+ * @freq: sap operation freq
+ * @bw: band width
+ * @cen320_freq: 320 MHz center freq
+ *
+ * When start ap, apply puncture to regulatory, set static puncture flag
+ * for all 20 MHz sub channels of current bonded channel in master channel list
+ * of pdev, and disable 20 MHz sub channel in current channel list if static
+ * puncture flag is set.
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS wlan_reg_apply_puncture(struct wlan_objmgr_pdev *pdev,
+				   uint16_t puncture_bitmap,
+				   qdf_freq_t freq,
+				   enum phy_ch_width bw,
+				   qdf_freq_t cen320_freq);
+
+/**
+ * wlan_reg_remove_puncture() - Remove puncture from regulatory
+ * @pdev: pdev
+ *
+ * When stop ap, remove puncture from regulatory, clear static puncture flag
+ * for all 20 MHz sub channels in master channel list of pdev, and don't disable
+ * 20 MHz sub channel in current channel list if static puncture flag is not
+ * set.
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS wlan_reg_remove_puncture(struct wlan_objmgr_pdev *pdev);
+#else
+static inline
+QDF_STATUS wlan_reg_apply_puncture(struct wlan_objmgr_pdev *pdev,
+				   uint16_t puncture_bitmap,
+				   qdf_freq_t freq,
+				   enum phy_ch_width bw,
+				   qdf_freq_t cen320_freq)
+{
+	return QDF_STATUS_SUCCESS;
+}
+
+static inline
+QDF_STATUS wlan_reg_remove_puncture(struct wlan_objmgr_pdev *pdev)
+{
+	return QDF_STATUS_SUCCESS;
+}
+#endif
 #ifdef CONFIG_REG_6G_PWRMODE
 /**
  * wlan_reg_fill_channel_list_for_pwrmode() - Fills the reg_channel_list
@@ -1683,6 +1714,22 @@ QDF_STATUS wlan_reg_extract_puncture_by_bw(enum phy_ch_width ori_bw,
 static inline void wlan_reg_set_create_punc_bitmap(struct ch_params *ch_params,
 						   bool is_create_punc_bitmap)
 {
+}
+
+static inline
+QDF_STATUS wlan_reg_apply_puncture(struct wlan_objmgr_pdev *pdev,
+				   uint16_t puncture_bitmap,
+				   qdf_freq_t freq,
+				   enum phy_ch_width bw,
+				   qdf_freq_t cen320_freq)
+{
+	return QDF_STATUS_SUCCESS;
+}
+
+static inline
+QDF_STATUS wlan_reg_remove_puncture(struct wlan_objmgr_pdev *pdev)
+{
+	return QDF_STATUS_SUCCESS;
 }
 
 static inline
@@ -1832,6 +1879,46 @@ bool wlan_reg_is_enable_in_secondary_list_for_freq(
  */
 bool wlan_reg_is_dfs_in_secondary_list_for_freq(struct wlan_objmgr_pdev *pdev,
 						qdf_freq_t freq);
+
+/**
+ * wlan_reg_get_chan_pwr_attr_from_secondary_list_for_freq() - get channel
+ * power attributions from secondary channel list
+ * @pdev: pdev ptr
+ * @freq: channel center frequency
+ * @is_psd: pointer to retrieve value whether channel power is psd
+ * @tx_power: pointer to retrieve value of channel eirp tx power
+ * @psd_eirp: pointer to retrieve value of channel psd eirp power
+ * @flags: pointer to retrieve value of channel flags
+ *
+ * Return: QDF STATUS
+ */
+QDF_STATUS
+wlan_reg_get_chan_pwr_attr_from_secondary_list_for_freq(
+				struct wlan_objmgr_pdev *pdev, qdf_freq_t freq,
+				bool *is_psd, uint16_t *tx_power,
+				uint16_t *psd_eirp, uint32_t *flags);
+
+/**
+ * wlan_reg_decide_6ghz_power_within_bw_for_freq() - decide minimum tx power in
+ * bandwidth and 6 GHz power type
+ * @pdev: pdev ptr
+ * @freq: channel center frequency
+ * @bw: channel bandwidth
+ * @is_psd: pointer to retrieve value whether channel power is psd
+ * @min_tx_power: pointer to retrieve minimum tx power in bandwidth
+ * @min_psd_eirp: pointer to retrieve minimum psd eirp in bandwidth
+ * @power_type: pointer to retrieve 6 GHz power type
+ *
+ * Return: QDF STATUS
+ */
+QDF_STATUS
+wlan_reg_decide_6ghz_power_within_bw_for_freq(struct wlan_objmgr_pdev *pdev,
+					      qdf_freq_t freq,
+					      enum phy_ch_width bw,
+					      bool *is_psd,
+					      uint16_t *min_tx_power,
+					      int16_t *min_psd_eirp,
+					      enum reg_6g_ap_type *power_type);
 #endif
 
 /**
@@ -2136,6 +2223,36 @@ enum band_info wlan_reg_band_bitmap_to_band_info(uint32_t band_bitmap);
 QDF_STATUS
 wlan_reg_update_tx_power_on_ctry_change(struct wlan_objmgr_pdev *pdev,
 					uint8_t vdev_id);
+
+/**
+ * wlan_reg_modify_indoor_concurrency() - Update the indoor concurrency list
+ * in regulatory pdev context
+ *
+ * @pdev: pointer to pdev
+ * @vdev_id: vdev id
+ * @freq: frequency
+ * @width: channel width
+ * @add: add or delete entry
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+wlan_reg_modify_indoor_concurrency(struct wlan_objmgr_pdev *pdev,
+				   uint8_t vdev_id, uint32_t freq,
+				   enum phy_ch_width width, bool add);
+
+/**
+ * wlan_reg_recompute_current_chan_list() - Recompute the current channel list
+ * based on the regulatory change
+ *
+ * @psoc: pointer to psoc
+ * @pdev: pointer to pdev
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+wlan_reg_recompute_current_chan_list(struct wlan_objmgr_psoc *psoc,
+				     struct wlan_objmgr_pdev *pdev);
 #endif
 
 #if defined(CONFIG_BAND_6GHZ)
@@ -2165,6 +2282,29 @@ QDF_STATUS
 wlan_reg_get_cur_6g_client_type(struct wlan_objmgr_pdev *pdev,
 				enum reg_6g_client_type
 				*reg_cur_6g_client_mobility_type);
+
+/**
+ * wlan_reg_set_cur_6ghz_client_type() - Set the cur 6 GHz regulatory client
+ * type to the given value.
+ * @pdev: Pointer to PDEV object.
+ * @in_6ghz_client_type: Input Client type to be set ie. default/subordinate.
+ *
+ * Return: QDF_STATUS.
+ */
+QDF_STATUS
+wlan_reg_set_cur_6ghz_client_type(struct wlan_objmgr_pdev *pdev,
+				  enum reg_6g_client_type in_6ghz_client_type);
+
+/**
+ * wlan_reg_set_6ghz_client_type_from_target() - Set the current 6 GHz
+ * regulatory client type to the value received from target.
+ * @pdev: Pointer to PDEV object.
+ *
+ * Return: QDF_STATUS.
+ */
+QDF_STATUS
+wlan_reg_set_6ghz_client_type_from_target(struct wlan_objmgr_pdev *pdev);
+
 /**
  * wlan_reg_get_rnr_tpe_usable() - Tells if RNR IE is applicable for current
  * domain.
@@ -2338,6 +2478,19 @@ wlan_reg_get_cur_6g_client_type(struct wlan_objmgr_pdev *pdev,
 				*reg_cur_6g_client_mobility_type)
 {
 	*reg_cur_6g_client_mobility_type = REG_SUBORDINATE_CLIENT;
+	return QDF_STATUS_E_NOSUPPORT;
+}
+
+static inline QDF_STATUS
+wlan_reg_set_cur_6ghz_client_type(struct wlan_objmgr_pdev *pdev,
+				  enum reg_6g_client_type in_6ghz_client_type)
+{
+	return QDF_STATUS_E_NOSUPPORT;
+}
+
+static inline QDF_STATUS
+wlan_reg_set_6ghz_client_type_from_target(struct wlan_objmgr_pdev *pdev)
+{
 	return QDF_STATUS_E_NOSUPPORT;
 }
 

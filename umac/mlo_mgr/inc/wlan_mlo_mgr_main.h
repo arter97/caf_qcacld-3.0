@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -517,6 +517,62 @@ void tsf_recalculation_lock_release(struct wlan_mlo_dev_context *mldev)
 {
 	qdf_spin_unlock_bh(&mldev->tsf_recalculation_lock);
 }
+
+/**
+ * mlo_ap_lock_create - Create MLO AP mutex/spinlock
+ * @ap_ctx:  ML device AP context
+ *
+ * Creates mutex/spinlock
+ *
+ * Return: void
+ */
+static inline
+void mlo_ap_lock_create(struct wlan_mlo_ap *ap_ctx)
+{
+	qdf_spinlock_create(&ap_ctx->mlo_ap_lock);
+}
+
+/**
+ * mlo_ap_lock_destroy - Destroy MLO AP mutex/spinlock
+ * @ap_ctx:  ML device AP context
+ *
+ * Destroy mutex/spinlock
+ *
+ * Return: void
+ */
+static inline
+void mlo_ap_lock_destroy(struct wlan_mlo_ap *ap_ctx)
+{
+	qdf_spinlock_destroy(&ap_ctx->mlo_ap_lock);
+}
+
+/**
+ * mlo_ap_lock_acquire - Acquire MLO AP mutex/spinlock
+ * @ap_ctx:  ML device AP context
+ *
+ * acquire mutex/spinlock
+ *
+ * return: void
+ */
+static inline
+void mlo_ap_lock_acquire(struct wlan_mlo_ap *ap_ctx)
+{
+	qdf_spin_lock_bh(&ap_ctx->mlo_ap_lock);
+}
+
+/**
+ * mlo_ap_lock_release - Release MLO AP mutex/spinlock
+ * @ap_ctx:  ML device AP context
+ *
+ * release mutex/spinlock
+ *
+ * return: void
+ */
+static inline
+void mlo_ap_lock_release(struct wlan_mlo_ap *ap_ctx)
+{
+	qdf_spin_unlock_bh(&ap_ctx->mlo_ap_lock);
+}
 #else /* WLAN_MLO_USE_SPINLOCK */
 static inline
 void ml_link_lock_create(struct mlo_mgr_context *mlo_ctx)
@@ -739,6 +795,30 @@ void tsf_recalculation_lock_release(struct wlan_mlo_dev_context *mldev)
 {
 	qdf_mutex_release(&mldev->tsf_recalculation_lock);
 }
+
+static inline
+void mlo_ap_lock_create(struct wlan_mlo_ap *ap_ctx)
+{
+	qdf_mutex_create(&ap_ctx->mlo_ap_lock);
+}
+
+static inline
+void mlo_ap_lock_destroy(struct wlan_mlo_ap *ap_ctx)
+{
+	qdf_mutex_destroy(&ap_ctx->mlo_ap_lock);
+}
+
+static inline
+void mlo_ap_lock_acquire(struct wlan_mlo_ap *ap_ctx)
+{
+	qdf_mutex_acquire(&ap_ctx->mlo_ap_lock);
+}
+
+static inline
+void mlo_ap_lock_release(struct wlan_mlo_ap *ap_ctx)
+{
+	qdf_mutex_release(&ap_ctx->mlo_ap_lock);
+}
 #endif /* WLAN_MLO_USE_SPINLOCK */
 
 /**
@@ -785,6 +865,15 @@ QDF_STATUS wlan_mlo_mgr_update_mld_addr(struct qdf_mac_addr *old_mac,
 bool wlan_mlo_is_mld_ctx_exist(struct qdf_mac_addr *mldaddr);
 
 /**
+ * wlan_mlo_get_sta_mld_ctx_count() - Get number of sta mld device context
+ *
+ * API to get number of sta mld device context
+ *
+ * Return: number of sta mld device context
+ */
+uint8_t wlan_mlo_get_sta_mld_ctx_count(void);
+
+/**
  * wlan_mlo_get_mld_ctx_by_mldaddr() - Get mld device context using mld
  *                                     MAC address
  *
@@ -812,6 +901,17 @@ QDF_STATUS wlan_mlo_check_valid_config(struct wlan_mlo_dev_context *ml_dev,
 				       struct wlan_objmgr_pdev *pdev,
 				       enum QDF_OPMODE opmode);
 
+/**
+ * mlo_mgr_ml_peer_exist() - Check if MAC address matches any MLD address
+ * @peer_addr: Address to search for a match
+ *
+ * The API iterates through all the ML dev ctx in the driver and checks
+ * if MAC address pointed by @peer_addr matches the MLD address of
+ * MLD dev or any of the ML peers in the ML dev ctx.
+ *
+ * Return: True if a matching entity is found else false.
+ */
+bool mlo_mgr_ml_peer_exist(uint8_t *peer_addr);
 #else
 static inline QDF_STATUS wlan_mlo_mgr_init(void)
 {
@@ -828,6 +928,18 @@ wlan_mlo_mgr_update_mld_addr(struct qdf_mac_addr *old_mac,
 			     struct qdf_mac_addr *new_mac)
 {
 	return QDF_STATUS_SUCCESS;
+}
+
+static inline
+bool mlo_mgr_ml_peer_exist(uint8_t *peer_addr)
+{
+	return false;
+}
+
+static inline
+uint8_t wlan_mlo_get_sta_mld_ctx_count(void)
+{
+	return 0;
 }
 #endif
 #endif

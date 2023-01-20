@@ -126,6 +126,8 @@ static void mlme_init_cfg(struct wlan_objmgr_psoc *psoc)
 		cfg_get(psoc, CFG_MLME_MAX_CHAN_SWITCH_IE_ENABLE);
 	mlme_psoc_obj->psoc_cfg.phy_config.eht_cap =
 		cfg_default(CFG_MLME_11BE_TARGET_CAPAB);
+	mlme_psoc_obj->psoc_cfg.mlo_config.reconfig_reassoc_en =
+		cfg_get(psoc, CFG_MLME_MLO_RECONFIG_REASSOC_ENABLE);
 }
 
 QDF_STATUS mlme_psoc_open(struct wlan_objmgr_psoc *psoc)

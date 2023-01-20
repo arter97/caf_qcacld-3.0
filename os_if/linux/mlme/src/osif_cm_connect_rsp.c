@@ -1126,7 +1126,7 @@ QDF_STATUS osif_connect_handler(struct wlan_objmgr_vdev *vdev,
 		 QDF_IS_STATUS_ERROR(rsp->connect_status))
 		osif_cm_indicate_disconnect(vdev, osif_priv->wdev->netdev,
 					    WLAN_REASON_UNSPECIFIED,
-					    false, NULL, 0,
+					    false, NULL, 0, -1,
 					    qdf_mem_malloc_flags());
 	else
 		osif_indcate_connect_results(vdev, osif_priv, rsp);

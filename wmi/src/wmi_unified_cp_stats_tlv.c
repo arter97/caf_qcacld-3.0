@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2016-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -176,7 +176,7 @@ void wmi_bmiss_extract_stats_struct(void *tag_buf,
 
 #endif/* CONFIG_WLAN_BMISS */
 
-/*
+/**
  * wmi_stats_extract_tag_struct: function to extract tag structs
  * @tag_type: tag type that is to be printed
  * @tag_buf: pointer to the tag structure
@@ -463,9 +463,9 @@ send_stats_request_cmd_tlv(wmi_unified_t wmi_handle,
 #else
 /**
  * send_stats_request_cmd_tlv() - WMI request stats function
- * @param wmi_handle: handle to WMI.
- * @param macaddr: MAC address
- * @param param: pointer to hold stats request parameter
+ * @wmi_handle: handle to WMI.
+ * @macaddr: MAC address
+ * @param: pointer to hold stats request parameter
  *
  * Return: 0  on success and -ve on failure.
  */
@@ -520,7 +520,7 @@ send_stats_request_cmd_tlv(wmi_unified_t wmi_handle,
 /**
  * send_big_data_stats_request_cmd_tlv () - send big data stats cmd
  * @wmi_handle: wmi handle
- * @param : pointer to command request param
+ * @param: pointer to command request param
  *
  * Return: QDF_STATUS_SUCCESS for success or error code
  */
@@ -563,9 +563,9 @@ send_big_data_stats_request_cmd_tlv(wmi_unified_t wmi_handle,
 
 /**
  * extract_all_stats_counts_tlv() - extract all stats count from event
- * @param wmi_handle: wmi handle
- * @param evt_buf: pointer to event buffer
- * @param stats_param: Pointer to hold stats count
+ * @wmi_handle: wmi handle
+ * @evt_buf: pointer to event buffer
+ * @stats_param: Pointer to hold stats count
  *
  * Return: QDF_STATUS_SUCCESS for success or error code
  */
@@ -725,6 +725,8 @@ extract_all_stats_counts_tlv(wmi_unified_t wmi_handle, void *evt_buf,
 
 /**
  * extract_pdev_tx_stats() - extract pdev tx stats from event
+ * @tx: destination
+ * @tx_stats: source event data
  */
 static void extract_pdev_tx_stats(wmi_host_dbg_tx_stats *tx,
 				  struct wlan_dbg_tx_stats *tx_stats)
@@ -759,6 +761,8 @@ static void extract_pdev_tx_stats(wmi_host_dbg_tx_stats *tx,
 
 /**
  * extract_pdev_rx_stats() - extract pdev rx stats from event
+ * @rx: destination
+ * @rx_stats: source event data
  */
 static void extract_pdev_rx_stats(wmi_host_dbg_rx_stats *rx,
 				  struct wlan_dbg_rx_stats *rx_stats)
@@ -785,10 +789,10 @@ static void extract_pdev_rx_stats(wmi_host_dbg_rx_stats *rx,
 
 /**
  * extract_pdev_stats_tlv() - extract pdev stats from event
- * @param wmi_handle: wmi handle
- * @param evt_buf: pointer to event buffer
- * @param index: Index into pdev stats
- * @param pdev_stats: Pointer to hold pdev stats
+ * @wmi_handle: wmi handle
+ * @evt_buf: pointer to event buffer
+ * @index: Index into pdev stats
+ * @pdev_stats: Pointer to hold pdev stats
  *
  * Return: QDF_STATUS_SUCCESS for success or error code
  */
@@ -831,10 +835,10 @@ extract_pdev_stats_tlv(wmi_unified_t wmi_handle, void *evt_buf, uint32_t index,
 
 /**
  * extract_vdev_stats_tlv() - extract vdev stats from event
- * @param wmi_handle: wmi handle
- * @param evt_buf: pointer to event buffer
- * @param index: Index into vdev stats
- * @param vdev_stats: Pointer to hold vdev stats
+ * @wmi_handle: wmi handle
+ * @evt_buf: pointer to event buffer
+ * @index: Index into vdev stats
+ * @vdev_stats: Pointer to hold vdev stats
  *
  * Return: QDF_STATUS_SUCCESS for success or error code
  */
@@ -884,10 +888,10 @@ static QDF_STATUS extract_vdev_stats_tlv(wmi_unified_t wmi_handle,
 
 /**
  * extract_peer_stats_tlv() - extract peer stats from event
- * @param wmi_handle: wmi handle
- * @param evt_buf: pointer to event buffer
- * @param index: Index into peer stats
- * @param peer_stats: Pointer to hold peer stats
+ * @wmi_handle: wmi handle
+ * @evt_buf: pointer to event buffer
+ * @index: Index into peer stats
+ * @peer_stats: Pointer to hold peer stats
  *
  * Return: QDF_STATUS_SUCCESS for success or error code
  */
@@ -924,10 +928,10 @@ extract_peer_stats_tlv(wmi_unified_t wmi_handle, void *evt_buf, uint32_t index,
 
 /**
  * extract_peer_extd_stats_tlv() - extract extended peer stats from event
- * @param wmi_handle: wmi handle
- * @param evt_buf: pointer to event buffer
- * @param index: Index into extended peer stats
- * @param peer_extd_stats: Pointer to hold extended peer stats
+ * @wmi_handle: wmi handle
+ * @evt_buf: pointer to event buffer
+ * @index: Index into extended peer stats
+ * @peer_extd_stats: Pointer to hold extended peer stats
  *
  * Return: QDF_STATUS_SUCCESS for success or error code
  */
@@ -1025,7 +1029,7 @@ static void wmi_infra_cp_stats_ops_attach_tlv(struct wmi_ops *ops)
  * @evt_buf: pointer to event buffer
  * @inst_rssi_resp: Pointer to hold inst rssi response
  *
- * @Return: QDF_STATUS_SUCCESS for success or error code
+ * Return: QDF_STATUS_SUCCESS for success or error code
  */
 static QDF_STATUS
 extract_inst_rssi_stats_resp_tlv(wmi_unified_t wmi_handle, void *evt_buf,

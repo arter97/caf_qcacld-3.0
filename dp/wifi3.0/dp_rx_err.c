@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2016-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -3012,9 +3012,14 @@ done:
 							   DP_MOD_ID_RX_ERR);
 
 		if (!txrx_peer)
-			dp_info_rl("peer is null peer_id%u err_src%u err_rsn%u",
+			dp_info_rl("peer is null peer_id %u err_src %u, "
+				   "REO: push_rsn %u err_code %u, "
+				   "RXDMA: push_rsn %u err_code %u",
 				   peer_id, wbm_err_info.wbm_err_src,
-				   wbm_err_info.reo_psh_rsn);
+				   wbm_err_info.reo_psh_rsn,
+				   wbm_err_info.reo_err_code,
+				   wbm_err_info.rxdma_psh_rsn,
+				   wbm_err_info.rxdma_err_code);
 
 		/* Set queue_mapping in nbuf to 0 */
 		dp_set_rx_queue(nbuf, 0);

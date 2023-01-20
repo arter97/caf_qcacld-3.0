@@ -332,6 +332,10 @@ vdev_mgr_start_param_update_mlo(struct vdev_mlme_obj *mlme_obj,
 	}
 
 	if (wlan_vdev_mlme_get_opmode(vdev) == QDF_SAP_MODE) {
+		if (wlan_vdev_mlme_op_flags_get(
+			vdev, WLAN_VDEV_OP_MLO_LINK_ADD))
+			param->mlo_flags.mlo_link_add  = 1;
+
 		vdev_mgr_start_param_update_mlo_mcast(vdev, param);
 		vdev_mgr_start_param_update_mlo_partner(vdev, param);
 	}
@@ -798,12 +802,14 @@ static QDF_STATUS vdev_mgr_multiple_restart_param_update(
 	param->cac_duration_ms = WLAN_DFS_WAIT_MS;
 	param->num_vdevs = num_vdevs;
 
-	qdf_mem_copy(param->vdev_ids, vdev_ids,
-		     sizeof(uint32_t) * (param->num_vdevs));
 	qdf_mem_copy(&param->ch_param, chan,
 		     sizeof(struct mlme_channel_param));
-	qdf_mem_copy(param->mvr_param, mvr_param,
-		     sizeof(*mvr_param) * (param->num_vdevs));
+
+	param->vdev_ids = vdev_ids;
+	param->mvr_param = mvr_param;
+	param->max_vdevs = wlan_pdev_get_max_vdev_count(pdev);
+	param->mvr_bmap_enabled = wlan_pdev_nif_feat_cap_get(pdev,
+				    WLAN_PDEV_F_MULTIVDEV_RESTART_BMAP);
 
 	return QDF_STATUS_SUCCESS;
 }

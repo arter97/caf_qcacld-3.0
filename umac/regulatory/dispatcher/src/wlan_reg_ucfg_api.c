@@ -418,6 +418,67 @@ qdf_export_symbol(ucfg_reg_get_cur_6g_ap_pwr_type);
 #endif
 
 #if defined(CONFIG_AFC_SUPPORT) && defined(CONFIG_BAND_6GHZ)
+bool ucfg_reg_get_enable_6ghz_sp_mode_support(struct wlan_objmgr_psoc *psoc)
+{
+	return reg_get_enable_6ghz_sp_mode_support(psoc);
+}
+
+qdf_export_symbol(ucfg_reg_get_enable_6ghz_sp_mode_support);
+
+void ucfg_reg_set_enable_6ghz_sp_mode_support(struct wlan_objmgr_psoc *psoc,
+					      bool value)
+{
+	reg_set_enable_6ghz_sp_mode_support(psoc, value);
+}
+
+qdf_export_symbol(ucfg_reg_set_enable_6ghz_sp_mode_support);
+
+bool ucfg_reg_get_afc_disable_timer_check(struct wlan_objmgr_psoc *psoc)
+{
+	return reg_get_afc_disable_timer_check(psoc);
+}
+
+qdf_export_symbol(ucfg_reg_get_afc_disable_timer_check);
+
+void ucfg_reg_set_afc_disable_timer_check(struct wlan_objmgr_psoc *psoc,
+					  bool value)
+{
+	reg_set_afc_disable_timer_check(psoc, value);
+}
+
+qdf_export_symbol(ucfg_reg_set_afc_disable_timer_check);
+
+bool ucfg_reg_get_afc_disable_request_id_check(struct wlan_objmgr_psoc *psoc)
+{
+	return reg_get_afc_disable_request_id_check(psoc);
+}
+
+qdf_export_symbol(ucfg_reg_get_afc_disable_request_id_check);
+
+void ucfg_reg_set_afc_disable_request_id_check(struct wlan_objmgr_psoc *psoc,
+					       bool value)
+{
+	reg_set_afc_disable_request_id_check(psoc, value);
+}
+
+qdf_export_symbol(ucfg_reg_set_afc_disable_request_id_check);
+
+bool ucfg_reg_get_afc_no_action(struct wlan_objmgr_psoc *psoc)
+{
+	return reg_get_afc_noaction(psoc);
+}
+
+qdf_export_symbol(ucfg_reg_get_afc_no_action);
+
+void ucfg_reg_set_afc_no_action(struct wlan_objmgr_psoc *psoc, bool value)
+{
+	reg_set_afc_noaction(psoc, value);
+}
+
+qdf_export_symbol(ucfg_reg_set_afc_no_action);
+#endif
+
+#if defined(CONFIG_AFC_SUPPORT) && defined(CONFIG_BAND_6GHZ)
 QDF_STATUS
 ucfg_reg_send_afc_resp_rx_ind(struct wlan_objmgr_pdev *pdev,
 			      struct reg_afc_resp_rx_ind_info *afc_ind_obj)

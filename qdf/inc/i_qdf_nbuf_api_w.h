@@ -112,6 +112,52 @@ static inline uint16_t qdf_nbuf_get_rx_flow_tag(qdf_nbuf_t buf)
 }
 
 /**
+ * qdf_nbuf_set_rx_flow_idx_invalid() - set given value in flow idx invalid
+ * of buf(skb->cb)
+ * @buf: Network buffer
+ * @val: Value of Rx flow tag to be set in the nbuf
+ * Return: None
+ */
+static inline void qdf_nbuf_set_rx_flow_idx_invalid(qdf_nbuf_t buf, uint8_t val)
+{
+	__qdf_nbuf_set_rx_flow_idx_invalid(buf, val);
+}
+
+/**
+ * qdf_nbuf_get_rx_flow_idx_invalid() - Get the value of flow_idx_invalid
+ * field of buf(skb->cb)
+ * @buf: Network buffer
+ * Return: Value of the Rx flow tag in the nbuf
+ */
+static inline uint8_t qdf_nbuf_get_rx_flow_idx_invalid(qdf_nbuf_t buf)
+{
+	return __qdf_nbuf_get_rx_flow_idx_invalid(buf);
+}
+
+/**
+ * qdf_nbuf_set_rx_flow_idx_timeout() - set given value in flow idx timeout
+ * of buf(skb->cb)
+ * @buf: Network buffer
+ * @val: Value of Rx flow tag to be set in the nbuf
+ * Return: None
+ */
+static inline void qdf_nbuf_set_rx_flow_idx_timeout(qdf_nbuf_t buf, uint8_t val)
+{
+	__qdf_nbuf_set_rx_flow_idx_timeout(buf, val);
+}
+
+/**
+ * qdf_nbuf_get_rx_flow_idx_timeout() - Get the value of flow_idx_timeout
+ * field of buf(skb->cb)
+ * @buf: Network buffer
+ * Return: Value of the Rx flow idx timeout in the nbuf
+ */
+static inline uint8_t qdf_nbuf_get_rx_flow_idx_timeout(qdf_nbuf_t buf)
+{
+	return __qdf_nbuf_get_rx_flow_idx_timeout(buf);
+}
+
+/**
  * qdf_nbuf_set_exc_frame() - set exception frame flag
  * @buf: Network buffer whose cb is to set exception frame flag
  * @value: exception frame flag, value 0 or 1.

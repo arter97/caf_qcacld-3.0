@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022, Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -96,7 +96,9 @@
 #define UNIFIED_WBM_RELEASE_RING_6_TX_RATE_STATS_INFO_TX_RATE_STATS_LSB \
 	WBM_RELEASE_RING_TX_TX_RATE_STATS_PPDU_TRANSMISSION_TSF_LSB
 
+#ifdef QCA_MONITOR_2_0_SUPPORT
 #include "hal_be_api_mon.h"
+#endif
 
 #define CMEM_REG_BASE 0x00100000
 
@@ -107,6 +109,76 @@
 #include "hal_5332_tx.h"
 #include "hal_be_rx_tlv.h"
 #include <hal_be_generic_api.h>
+
+
+/**
+ * hal_read_pmm_scratch_reg_5332(): API to read PMM Scratch register
+ *
+ * @soc: HAL soc
+ * @reg_enum: Enum of the scratch register
+ *
+ * Return: uint32_t
+ */
+static inline
+uint32_t hal_read_pmm_scratch_reg_5332(struct hal_soc *soc,
+				       enum hal_scratch_reg_enum reg_enum)
+{
+	uint32_t val = 0;
+
+	pld_reg_read(soc->qdf_dev->dev, (reg_enum * 4), &val,
+		     soc->dev_base_addr_pmm);
+	return val;
+}
+
+/**
+ * hal_get_tsf2_scratch_reg_qca5332(): API to read tsf2 scratch register
+ *
+ * @hal_soc_hdl: HAL soc context
+ * @mac_id: mac id
+ * @value: Pointer to update tsf2 value
+ *
+ * Return: void
+ */
+static void hal_get_tsf2_scratch_reg_qca5332(hal_soc_handle_t hal_soc_hdl,
+					     uint8_t mac_id, uint64_t *value)
+{
+	struct hal_soc *soc = (struct hal_soc *)hal_soc_hdl;
+	uint32_t offset_lo, offset_hi;
+	enum hal_scratch_reg_enum enum_lo, enum_hi;
+
+	hal_get_tsf_enum(DEFAULT_TSF_ID, mac_id, &enum_lo, &enum_hi);
+
+	offset_lo = hal_read_pmm_scratch_reg_5332(soc,
+						  enum_lo);
+
+	offset_hi = hal_read_pmm_scratch_reg_5332(soc,
+						  enum_hi);
+
+	*value = ((uint64_t)(offset_hi) << 32 | offset_lo);
+}
+
+/**
+ * hal_get_tqm_scratch_reg_qca5332(): API to read tqm scratch register
+ *
+ * @hal_soc_hdl: HAL soc context
+ * @value: Pointer to update tqm value
+ *
+ * Return: void
+ */
+static void hal_get_tqm_scratch_reg_qca5332(hal_soc_handle_t hal_soc_hdl,
+					    uint64_t *value)
+{
+	struct hal_soc *soc = (struct hal_soc *)hal_soc_hdl;
+	uint32_t offset_lo, offset_hi;
+
+	offset_lo = hal_read_pmm_scratch_reg_5332(soc,
+						  PMM_TQM_CLOCK_OFFSET_LO_US);
+
+	offset_hi = hal_read_pmm_scratch_reg_5332(soc,
+						  PMM_TQM_CLOCK_OFFSET_HI_US);
+
+	*value = ((uint64_t)(offset_hi) << 32 | offset_lo);
+}
 
 #define LINK_DESC_SIZE (NUM_OF_DWORDS_RX_MSDU_LINK << 2)
 #define HAL_PPE_VP_ENTRIES_MAX 32
@@ -1310,8 +1382,10 @@ static void hal_hw_txrx_ops_attach_qca5332(struct hal_soc *hal_soc)
 					hal_rx_link_desc_msdu0_ptr_5332;
 	hal_soc->ops->hal_reo_status_get_header =
 					hal_reo_status_get_header_5332;
+#ifdef QCA_MONITOR_2_0_SUPPORT
 	hal_soc->ops->hal_rx_status_get_tlv_info =
 					hal_rx_status_get_tlv_info_wrapper_be;
+#endif
 	hal_soc->ops->hal_rx_wbm_err_info_get =
 					hal_rx_wbm_err_info_get_generic_be;
 	hal_soc->ops->hal_tx_set_pcp_tid_map =
@@ -1515,6 +1589,16 @@ static void hal_hw_txrx_ops_attach_qca5332(struct hal_soc *hal_soc)
 		hal_tx_populate_bank_register_be;
 	hal_soc->ops->hal_tx_vdev_mcast_ctrl_set =
 		hal_tx_vdev_mcast_ctrl_set_be;
+	hal_soc->ops->hal_get_tsf2_scratch_reg =
+					hal_get_tsf2_scratch_reg_qca5332;
+	hal_soc->ops->hal_get_tqm_scratch_reg =
+					hal_get_tqm_scratch_reg_qca5332;
+#ifdef CONFIG_WORD_BASED_TLV
+	hal_soc->ops->hal_rx_mpdu_start_wmask_get =
+					hal_rx_mpdu_start_wmask_get_be;
+	hal_soc->ops->hal_rx_msdu_end_wmask_get =
+					hal_rx_msdu_end_wmask_get_be;
+#endif
 };
 
 struct hal_hw_srng_config hw_srng_table_5332[] = {

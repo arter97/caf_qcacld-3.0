@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2016-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -58,8 +58,8 @@ bool dp_rx_intrabss_fwd_be(struct dp_soc *soc,
 			   struct hal_rx_msdu_metadata msdu_metadata);
 #endif
 
-/*
- * dp_rx_intrabss_handle_nawds_be() - Forward mcbc intrabss pkts in nawds case
+/**
+ * dp_rx_intrabss_mcast_handler_be() - intrabss mcast handler
  * @soc: core txrx main context
  * @ta_txrx_peer: source txrx_peer entry
  * @nbuf_copy: nbuf that has to be intrabss forwarded
@@ -68,9 +68,10 @@ bool dp_rx_intrabss_fwd_be(struct dp_soc *soc,
  * Return: true if it is forwarded else false
  */
 bool
-dp_rx_intrabss_handle_nawds_be(struct dp_soc *soc, struct dp_txrx_peer *ta_peer,
-			       qdf_nbuf_t nbuf_copy,
-			       struct cdp_tid_rx_stats *tid_stats);
+dp_rx_intrabss_mcast_handler_be(struct dp_soc *soc,
+				struct dp_txrx_peer *ta_txrx_peer,
+				qdf_nbuf_t nbuf_copy,
+				struct cdp_tid_rx_stats *tid_stats);
 
 void dp_rx_word_mask_subscribe_be(struct dp_soc *soc,
 				  uint32_t *msg_word,
@@ -246,11 +247,19 @@ dp_rx_replensih_soc_get(struct dp_soc *soc, uint8_t chip_id);
 
 struct dp_soc *
 dp_soc_get_by_idle_bm_id(struct dp_soc *soc, uint8_t idle_bm_id);
+
+uint8_t dp_soc_get_num_soc_be(struct dp_soc *soc);
 #else
 static inline struct dp_soc *
 dp_rx_replensih_soc_get(struct dp_soc *soc, uint8_t chip_id)
 {
 	return soc;
+}
+
+static inline uint8_t
+dp_soc_get_num_soc_be(struct dp_soc *soc)
+{
+	return 1;
 }
 #endif
 

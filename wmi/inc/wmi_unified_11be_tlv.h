@@ -194,6 +194,22 @@ uint8_t *peer_delete_add_mlo_params(uint8_t *buf_ptr,
  *  @wmi_handle: WMI handle
  */
 void wmi_11be_attach_tlv(wmi_unified_t wmi_handle);
+
+/**
+ * extract_mgmt_rx_mlo_link_removal_tlv_count() - Extract the number of link
+ * removal TLVs from MGMT Rx event
+ * @num_link_removal_tlvs: Number of link removal TLVs
+ * @hdr: MGMT Rx event parameters to be populated
+ *
+ * Return: None
+ */
+static inline void
+extract_mgmt_rx_mlo_link_removal_tlv_count(
+	int num_link_removal_tlvs,
+	struct mgmt_rx_event_params *hdr)
+{
+	hdr->num_link_removal_info = num_link_removal_tlvs;
+}
 #else
 static uint8_t *vdev_create_add_mlo_params(uint8_t *buf_ptr,
 					   struct vdev_create_params *param)
@@ -323,5 +339,12 @@ static uint8_t *peer_delete_add_mlo_params(uint8_t *buf_ptr,
 
 static void wmi_11be_attach_tlv(wmi_unified_t wmi_handle)
 { }
+
+static inline void
+extract_mgmt_rx_mlo_link_removal_tlv_count(
+	int num_link_removal_tlvs,
+	struct mgmt_rx_event_params *hdr)
+{
+}
 #endif /*WLAN_FEATURE_11BE_MLO*/
 #endif /*_WMI_UNIFIED_11BE_TLV_H_*/

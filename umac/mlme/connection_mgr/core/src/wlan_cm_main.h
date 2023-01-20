@@ -277,6 +277,18 @@ struct cnx_mgr {
 };
 
 /**
+ * struct vdev_op_search_arg - vdev op search arguments
+ * @current_vdev_id: current vdev id
+ * @sap_go_vdev_id: sap/go vdev id
+ * @sta_cli_vdev_id: sta/p2p client vdev id
+ */
+struct vdev_op_search_arg {
+	uint8_t current_vdev_id;
+	uint8_t sap_go_vdev_id;
+	uint8_t sta_cli_vdev_id;
+};
+
+/**
  * wlan_cm_init() - Invoke connection manager init
  * @vdev_mlme_obj:  VDEV MLME comp object
  *

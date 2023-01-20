@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -29,6 +29,7 @@
 #include <wlan_cm_public_struct.h>
 #include "wlan_mlo_mgr_msgq.h"
 #include <target_if_mlo_mgr.h>
+#include <wlan_mlo_t2lm.h>
 
 static void mlo_global_ctx_deinit(void)
 {
@@ -76,7 +77,6 @@ static void mlo_global_ctx_init(void)
 	ml_aid_lock_create(mlo_mgr_ctx);
 	mlo_mgr_ctx->mlo_is_force_primary_umac = 0;
 	mlo_msgq_init();
-	mlo_setup_init();
 }
 
 QDF_STATUS wlan_mlo_mgr_psoc_enable(struct wlan_objmgr_psoc *psoc)
@@ -215,6 +215,34 @@ struct wlan_mlo_dev_context *mlo_get_next_mld_ctx(qdf_list_t *ml_list,
 	return mld_next;
 }
 
+uint8_t wlan_mlo_get_sta_mld_ctx_count(void)
+{
+	struct wlan_mlo_dev_context *mld_cur;
+	struct wlan_mlo_dev_context *mld_next;
+	qdf_list_t *ml_list;
+	struct mlo_mgr_context *mlo_mgr_ctx = wlan_objmgr_get_mlo_ctx();
+	uint8_t count = 0;
+
+	if (!mlo_mgr_ctx)
+		return count;
+
+	ml_link_lock_acquire(mlo_mgr_ctx);
+	ml_list = &mlo_mgr_ctx->ml_dev_list;
+	/* Get first mld context */
+	mld_cur = mlo_list_peek_head(ml_list);
+
+	while (mld_cur) {
+		/* get next mld node */
+		if (mld_cur->sta_ctx)
+			count++;
+		mld_next = mlo_get_next_mld_ctx(ml_list, mld_cur);
+		mld_cur = mld_next;
+	}
+	ml_link_lock_release(mlo_mgr_ctx);
+
+	return count;
+}
+
 struct wlan_mlo_dev_context
 *wlan_mlo_get_mld_ctx_by_mldaddr(struct qdf_mac_addr *mldaddr)
 {
@@ -260,9 +288,64 @@ bool wlan_mlo_is_mld_ctx_exist(struct qdf_mac_addr *mldaddr)
 	return false;
 }
 
+#ifdef WLAN_FEATURE_11BE_MLO
+bool mlo_mgr_ml_peer_exist(uint8_t *peer_addr)
+{
+	qdf_list_t *ml_list;
+	struct wlan_mlo_dev_context *mld_cur, *mld_next;
+	struct wlan_mlo_peer_list *mlo_peer_list;
+	bool ret_status = false;
+	struct mlo_mgr_context *g_mlo_ctx = wlan_objmgr_get_mlo_ctx();
+
+	if (!g_mlo_ctx || !peer_addr ||
+	    qdf_is_macaddr_zero((struct qdf_mac_addr *)peer_addr))
+		return ret_status;
+
+	ml_link_lock_acquire(g_mlo_ctx);
+	ml_list = &g_mlo_ctx->ml_dev_list;
+	if (!qdf_list_size(ml_list))
+		goto g_ml_ref;
+
+	mld_cur = mlo_list_peek_head(ml_list);
+	while (mld_cur) {
+		mlo_dev_lock_acquire(mld_cur);
+		if (qdf_is_macaddr_equal(&mld_cur->mld_addr,
+					 (struct qdf_mac_addr *)peer_addr)) {
+			mlo_dev_lock_release(mld_cur);
+			mlo_err("MLD ID %d exists with mac " QDF_MAC_ADDR_FMT,
+				mld_cur->mld_id, QDF_MAC_ADDR_REF(peer_addr));
+			ret_status = true;
+			goto g_ml_ref;
+		}
+
+		/* Check the peer list for a MAC address match */
+		mlo_peer_list = &mld_cur->mlo_peer_list;
+		ml_peerlist_lock_acquire(mlo_peer_list);
+		if (mlo_get_mlpeer(mld_cur, (struct qdf_mac_addr *)peer_addr)) {
+			ml_peerlist_lock_release(mlo_peer_list);
+			mlo_dev_lock_release(mld_cur);
+			mlo_err("MLD ID %d ML Peer exists with mac " QDF_MAC_ADDR_FMT,
+				mld_cur->mld_id, QDF_MAC_ADDR_REF(peer_addr));
+			ret_status = true;
+			goto g_ml_ref;
+		}
+		ml_peerlist_lock_release(mlo_peer_list);
+
+		mld_next = mlo_get_next_mld_ctx(ml_list, mld_cur);
+		mlo_dev_lock_release(mld_cur);
+		mld_cur = mld_next;
+	}
+
+g_ml_ref:
+	ml_link_lock_release(g_mlo_ctx);
+	return ret_status;
+}
+#endif
+
 static QDF_STATUS mlo_ap_ctx_deinit(struct wlan_mlo_dev_context *ml_dev)
 {
 	wlan_mlo_vdev_aid_mgr_deinit(ml_dev);
+	mlo_ap_lock_destroy(ml_dev->ap_ctx);
 	qdf_mem_free(ml_dev->ap_ctx);
 	ml_dev->ap_ctx = NULL;
 
@@ -280,6 +363,7 @@ static QDF_STATUS mlo_ap_ctx_init(struct wlan_mlo_dev_context *ml_dev)
 	}
 
 	ml_dev->ap_ctx = ap_ctx;
+	mlo_ap_lock_create(ml_dev->ap_ctx);
 	if (wlan_mlo_vdev_aid_mgr_init(ml_dev) != QDF_STATUS_SUCCESS) {
 		mlo_ap_ctx_deinit(ml_dev);
 		return QDF_STATUS_E_NOMEM;
@@ -290,16 +374,43 @@ static QDF_STATUS mlo_ap_ctx_init(struct wlan_mlo_dev_context *ml_dev)
 
 #ifdef CONFIG_AP_PLATFORM
 static inline
+QDF_STATUS wlan_mlo_check_grp_id(uint8_t ref_id,
+				 struct wlan_objmgr_vdev *vdev)
+{
+	struct wlan_objmgr_psoc *psoc;
+	uint8_t grp_id = 0;
+
+	psoc = wlan_vdev_get_psoc(vdev);
+	if (!mlo_psoc_get_grp_id(psoc, &grp_id)) {
+		mlo_err("Unable to get mlo group id");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	if (grp_id != ref_id) {
+		mlo_err("Error : MLD VAP Configuration with different WSI/MLD Groups");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	return QDF_STATUS_SUCCESS;
+}
+
+static inline
 QDF_STATUS wlan_mlo_pdev_check(struct wlan_objmgr_pdev *ref_pdev,
 			       struct wlan_objmgr_vdev *vdev)
 {
-	struct wlan_objmgr_pdev *pdev = NULL;
-	struct wlan_objmgr_psoc *psoc = NULL;
+	struct wlan_objmgr_pdev *pdev;
+	struct wlan_objmgr_psoc *psoc;
+	uint8_t grp_id = 0;
 
 	pdev = wlan_vdev_get_pdev(vdev);
 
 	psoc = wlan_pdev_get_psoc(ref_pdev);
-	if (mlo_check_all_pdev_state(psoc, MLO_LINK_SETUP_DONE)) {
+	if (!mlo_psoc_get_grp_id(psoc, &grp_id)) {
+		mlo_err("Unable to get the MLO Group ID for the vdev");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	if (mlo_check_all_pdev_state(psoc, grp_id, MLO_LINK_SETUP_DONE)) {
 		mlo_err("Pdev link is not in ready state, initial link setup failed");
 		return QDF_STATUS_E_FAILURE;
 	}
@@ -308,6 +419,9 @@ QDF_STATUS wlan_mlo_pdev_check(struct wlan_objmgr_pdev *ref_pdev,
 		mlo_err("MLD vdev for this pdev already found, investigate config");
 		return QDF_STATUS_E_FAILURE;
 	}
+
+	if (wlan_mlo_check_grp_id(grp_id, vdev))
+		return QDF_STATUS_E_FAILURE;
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -346,7 +460,7 @@ QDF_STATUS wlan_mlo_check_valid_config(struct wlan_mlo_dev_context *ml_dev,
 				       enum QDF_OPMODE opmode)
 {
 	uint32_t id = 0;
-	struct wlan_objmgr_vdev *vdev = NULL;
+	struct wlan_objmgr_vdev *vdev;
 
 	if (!ml_dev)
 		return QDF_STATUS_E_FAILURE;
@@ -376,6 +490,29 @@ QDF_STATUS wlan_mlo_check_valid_config(struct wlan_mlo_dev_context *ml_dev,
 
 	mlo_dev_lock_release(ml_dev);
 	return QDF_STATUS_SUCCESS;
+}
+
+/**
+ * mlo_t2lm_ctx_init() - API to initialize the t2lm context with the default
+ * values.
+ * @ml_dev: Pointer to ML Dev context
+ * @vdev: Pointer to vdev structure
+ *
+ * Return: None
+ */
+static inline void mlo_t2lm_ctx_init(struct wlan_mlo_dev_context *ml_dev,
+				     struct wlan_objmgr_vdev *vdev)
+{
+	struct wlan_t2lm_info *t2lm;
+
+	t2lm = &ml_dev->t2lm_ctx.established_t2lm.t2lm;
+
+	qdf_mem_zero(&ml_dev->t2lm_ctx, sizeof(struct wlan_t2lm_context));
+
+	t2lm->direction = WLAN_T2LM_BIDI_DIRECTION;
+	t2lm->default_link_mapping = 1;
+
+	wlan_mlo_t2lm_timer_init(vdev);
 }
 
 static QDF_STATUS mlo_dev_ctx_init(struct wlan_objmgr_vdev *vdev)
@@ -453,7 +590,21 @@ static QDF_STATUS mlo_dev_ctx_init(struct wlan_objmgr_vdev *vdev)
 		qdf_list_insert_back(&g_mlo_ctx->ml_dev_list, &ml_dev->node);
 	ml_link_lock_release(g_mlo_ctx);
 
+	mlo_t2lm_ctx_init(ml_dev, vdev);
+
 	return status;
+}
+
+/**
+ * mlo_t2lm_ctx_deinit() - API to deinitialize the t2lm context with the default
+ * values.
+ * @vdev: Pointer to vdev structure
+ *
+ * Return: None
+ */
+static inline void mlo_t2lm_ctx_deinit(struct wlan_objmgr_vdev *vdev)
+{
+	wlan_mlo_t2lm_timer_deinit(vdev);
 }
 
 static QDF_STATUS mlo_dev_ctx_deinit(struct wlan_objmgr_vdev *vdev)
@@ -531,6 +682,7 @@ static QDF_STATUS mlo_dev_ctx_deinit(struct wlan_objmgr_vdev *vdev)
 		else if (wlan_vdev_mlme_get_opmode(vdev) == QDF_SAP_MODE)
 			qdf_mem_free(ml_dev->ap_ctx);
 
+		mlo_t2lm_ctx_deinit(vdev);
 		tsf_recalculation_lock_destroy(ml_dev);
 		mlo_dev_lock_destroy(ml_dev);
 		qdf_mem_free(ml_dev);

@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -25,14 +25,39 @@
 #include "wlan_mgmt_txrx_main_i.h"
 #include <qdf_util.h>
 #include <wlan_mlo_mgr_cmn.h>
+#include <wlan_mlo_mgr_setup.h>
 
-static struct mgmt_rx_reo_context *g_rx_reo_ctx;
+static struct mgmt_rx_reo_context *g_rx_reo_ctx[WLAN_MAX_MLO_GROUPS];
 
-#define mgmt_rx_reo_get_context()        (g_rx_reo_ctx)
-#define mgmt_rx_reo_set_context(c)       (g_rx_reo_ctx = c)
+#define mgmt_rx_reo_get_context(_grp_id) (g_rx_reo_ctx[_grp_id])
+#define mgmt_rx_reo_set_context(grp_id, c)       (g_rx_reo_ctx[grp_id] = c)
 
 #define MGMT_RX_REO_PKT_CTR_HALF_RANGE (0x8000)
 #define MGMT_RX_REO_PKT_CTR_FULL_RANGE (MGMT_RX_REO_PKT_CTR_HALF_RANGE << 1)
+
+/**
+ * wlan_mgmt_rx_reo_get_ctx_from_pdev - Get MGMT Rx REO Context from pdev
+ * @pdev: Pointer to pdev structure object
+ *
+ * API to get the MGMT RX reo context of the pdev using the appropriate
+ * MLO group id.
+ *
+ * Return: Mgmt rx reo context for the pdev
+ */
+
+static inline struct mgmt_rx_reo_context*
+wlan_mgmt_rx_reo_get_ctx_from_pdev(struct wlan_objmgr_pdev *pdev)
+{
+	uint8_t ml_grp_id;
+
+	ml_grp_id = wlan_get_mlo_grp_id_from_pdev(pdev);
+	if (ml_grp_id >= WLAN_MAX_MLO_GROUPS) {
+		mgmt_rx_reo_err("REO context - Invalid ML Group ID");
+		return NULL;
+	}
+
+	return mgmt_rx_reo_get_context(ml_grp_id);
+}
 
 /**
  * mgmt_rx_reo_compare_pkt_ctrs_gte() - Compare given mgmt packet counters
@@ -170,6 +195,7 @@ mgmt_rx_reo_validate_mlo_link_info(struct wlan_objmgr_psoc *psoc)
 	uint16_t valid_link_bitmap;
 	int8_t num_active_links_shmem;
 	int8_t num_active_links;
+	uint8_t grp_id = 0;
 	QDF_STATUS status;
 
 	if (!psoc) {
@@ -188,7 +214,12 @@ mgmt_rx_reo_validate_mlo_link_info(struct wlan_objmgr_psoc *psoc)
 	}
 	qdf_assert_always(num_active_links_shmem > 0);
 
-	num_active_links = wlan_mlo_get_num_active_links();
+	if (!mlo_psoc_get_grp_id(psoc, &grp_id)) {
+		mgmt_rx_reo_err("Failed to get valid MLO Group id");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	num_active_links = wlan_mlo_get_num_active_links(grp_id);
 	qdf_assert_always(num_active_links > 0);
 
 	qdf_assert_always(num_active_links_shmem == num_active_links);
@@ -201,7 +232,7 @@ mgmt_rx_reo_validate_mlo_link_info(struct wlan_objmgr_psoc *psoc)
 	}
 	qdf_assert_always(valid_link_bitmap_shmem != 0);
 
-	valid_link_bitmap = wlan_mlo_get_valid_link_bitmap();
+	valid_link_bitmap = wlan_mlo_get_valid_link_bitmap(grp_id);
 	qdf_assert_always(valid_link_bitmap_shmem != 0);
 
 	qdf_assert_always(valid_link_bitmap_shmem == valid_link_bitmap);
@@ -212,11 +243,13 @@ mgmt_rx_reo_validate_mlo_link_info(struct wlan_objmgr_psoc *psoc)
 #ifndef WLAN_MGMT_RX_REO_SIM_SUPPORT
 /**
  * mgmt_rx_reo_is_valid_link() - Check whether the given HW link is valid
+ * @link_id: Link id to be checked
+ * @grp_id: MLO Group id which it belongs to
  *
  * Return: true if @link_id is a valid link else false
  */
 static bool
-mgmt_rx_reo_is_valid_link(uint8_t link_id)
+mgmt_rx_reo_is_valid_link(uint8_t link_id, uint8_t grp_id)
 {
 	uint16_t valid_hw_link_bitmap;
 
@@ -225,7 +258,7 @@ mgmt_rx_reo_is_valid_link(uint8_t link_id)
 		return false;
 	}
 
-	valid_hw_link_bitmap = wlan_mlo_get_valid_link_bitmap();
+	valid_hw_link_bitmap = wlan_mlo_get_valid_link_bitmap(grp_id);
 	qdf_assert_always(valid_hw_link_bitmap);
 
 	return (valid_hw_link_bitmap & (1 << link_id));
@@ -235,18 +268,21 @@ mgmt_rx_reo_is_valid_link(uint8_t link_id)
  * mgmt_rx_reo_get_num_mlo_links() - Get number of MLO HW links active in the
  * system
  * @reo_context: Pointer to reo context object
+ * @grp_id: MLO group id which it belongs to
  *
  * Return: On success returns number of active MLO HW links. On failure
  * returns WLAN_MLO_INVALID_NUM_LINKS.
  */
 static int8_t
-mgmt_rx_reo_get_num_mlo_links(struct mgmt_rx_reo_context *reo_context) {
+mgmt_rx_reo_get_num_mlo_links(struct mgmt_rx_reo_context *reo_context,
+			      uint8_t grp_id)
+{
 	if (!reo_context) {
 		mgmt_rx_reo_err("Mgmt reo context is null");
 		return WLAN_MLO_INVALID_NUM_LINKS;
 	}
 
-	return wlan_mlo_get_num_active_links();
+	return wlan_mlo_get_num_active_links(grp_id);
 }
 
 static QDF_STATUS
@@ -297,15 +333,17 @@ mgmt_rx_reo_sim_is_valid_link(struct mgmt_rx_reo_sim_context *sim_context,
 
 /**
  * mgmt_rx_reo_is_valid_link() - Check whether the given HW link is valid
+ * @link_id: HW Link ID to be verified
+ * @grp_id: MLO Group id on which the Link ID  belongs to
  *
  * Return: true if @link_id is a valid link else false
  */
 static bool
-mgmt_rx_reo_is_valid_link(uint8_t link_id)
+mgmt_rx_reo_is_valid_link(uint8_t ml_grp_id, uint8_t link_id)
 {
 	struct mgmt_rx_reo_context *reo_context;
 
-	reo_context = mgmt_rx_reo_get_context();
+	reo_context = mgmt_rx_reo_get_context(ml_grp_id);
 
 	if (!reo_context) {
 		mgmt_rx_reo_err("Mgmt reo context is null");
@@ -356,7 +394,9 @@ mgmt_rx_reo_sim_get_num_mlo_links(struct mgmt_rx_reo_sim_context *sim_context)
  * returns WLAN_MLO_INVALID_NUM_LINKS.
  */
 static int8_t
-mgmt_rx_reo_get_num_mlo_links(struct mgmt_rx_reo_context *reo_context) {
+mgmt_rx_reo_get_num_mlo_links(struct mgmt_rx_reo_context *reo_context,
+			      uint8_t grp_id)
+{
 	if (!reo_context) {
 		mgmt_rx_reo_err("Mgmt reo context is null");
 		return WLAN_MLO_INVALID_NUM_LINKS;
@@ -368,16 +408,17 @@ mgmt_rx_reo_get_num_mlo_links(struct mgmt_rx_reo_context *reo_context) {
 /**
  * mgmt_rx_reo_sim_get_context() - Helper API to get the management
  * rx reorder simulation context
+ * @ml_grp_id: MLO group id for the rx reordering
  *
  * Return: On success returns the pointer to management rx reorder
  * simulation context. On failure returns NULL.
  */
 static struct mgmt_rx_reo_sim_context *
-mgmt_rx_reo_sim_get_context(void)
+mgmt_rx_reo_sim_get_context(uint8_t ml_grp_id)
 {
 	struct mgmt_rx_reo_context *reo_context;
 
-	reo_context = mgmt_rx_reo_get_context();
+	reo_context = mgmt_rx_reo_get_context(ml_grp_id);
 	if (!reo_context) {
 		mgmt_rx_reo_err("Mgmt reo context is null");
 		return NULL;
@@ -710,6 +751,21 @@ mgmt_rx_reo_invalidate_stale_snapshots
 	if (!mac_hw_ss->valid)
 		return QDF_STATUS_SUCCESS;
 
+	if (host_ss->valid) {
+		if (!mgmt_rx_reo_compare_global_timestamps_gte
+					(mac_hw_ss->global_timestamp,
+					 host_ss->global_timestamp) ||
+		    !mgmt_rx_reo_compare_pkt_ctrs_gte
+					(mac_hw_ss->mgmt_pkt_ctr,
+					 host_ss->mgmt_pkt_ctr)) {
+			mgmt_rx_reo_print_snapshots(mac_hw_ss, fw_forwarded_ss,
+						    fw_consumed_ss, host_ss);
+			mgmt_rx_reo_debug("Invalidate host snapshot, link %u",
+					  link);
+			host_ss->valid = false;
+		}
+	}
+
 	if (fw_forwarded_ss->valid) {
 		if (!mgmt_rx_reo_compare_global_timestamps_gte
 					(mac_hw_ss->global_timestamp,
@@ -717,6 +773,20 @@ mgmt_rx_reo_invalidate_stale_snapshots
 		    !mgmt_rx_reo_compare_pkt_ctrs_gte
 					(mac_hw_ss->mgmt_pkt_ctr,
 					 fw_forwarded_ss->mgmt_pkt_ctr)) {
+			mgmt_rx_reo_print_snapshots(mac_hw_ss, fw_forwarded_ss,
+						    fw_consumed_ss, host_ss);
+			mgmt_rx_reo_debug("Invalidate FW forwarded SS, link %u",
+					  link);
+			fw_forwarded_ss->valid = false;
+		}
+
+		if (host_ss->valid && fw_forwarded_ss->valid &&
+		    (mgmt_rx_reo_compare_global_timestamps_gte
+					(host_ss->global_timestamp,
+					 fw_forwarded_ss->global_timestamp) !=
+		     mgmt_rx_reo_compare_pkt_ctrs_gte
+					(host_ss->mgmt_pkt_ctr,
+					 fw_forwarded_ss->mgmt_pkt_ctr))) {
 			mgmt_rx_reo_print_snapshots(mac_hw_ss, fw_forwarded_ss,
 						    fw_consumed_ss, host_ss);
 			mgmt_rx_reo_debug("Invalidate FW forwarded SS, link %u",
@@ -738,20 +808,19 @@ mgmt_rx_reo_invalidate_stale_snapshots
 					  link);
 			fw_consumed_ss->valid = false;
 		}
-	}
 
-	if (host_ss->valid) {
-		if (!mgmt_rx_reo_compare_global_timestamps_gte
-					(mac_hw_ss->global_timestamp,
-					 host_ss->global_timestamp) ||
-		    !mgmt_rx_reo_compare_pkt_ctrs_gte
-					(mac_hw_ss->mgmt_pkt_ctr,
-					 host_ss->mgmt_pkt_ctr)) {
+		if (host_ss->valid && fw_consumed_ss->valid &&
+		    (mgmt_rx_reo_compare_global_timestamps_gte
+					(host_ss->global_timestamp,
+					 fw_consumed_ss->global_timestamp) !=
+		     mgmt_rx_reo_compare_pkt_ctrs_gte
+					(host_ss->mgmt_pkt_ctr,
+					 fw_consumed_ss->mgmt_pkt_ctr))) {
 			mgmt_rx_reo_print_snapshots(mac_hw_ss, fw_forwarded_ss,
 						    fw_consumed_ss, host_ss);
-			mgmt_rx_reo_debug("Invalidate host snapshot, link %u",
+			mgmt_rx_reo_debug("Invalidate FW consumed SS, link %u",
 					  link);
-			host_ss->valid = false;
+			fw_consumed_ss->valid = false;
 		}
 	}
 
@@ -959,6 +1028,7 @@ wlan_mgmt_rx_reo_algo_calculate_wait_count(
 {
 	QDF_STATUS status;
 	uint8_t link;
+	int8_t grp_id;
 	int8_t in_frame_link;
 	int frames_pending, delta_fwd_host;
 	uint8_t snapshot_id;
@@ -998,9 +1068,10 @@ wlan_mgmt_rx_reo_algo_calculate_wait_count(
 
 	/* Get the MLO link ID of incoming frame */
 	in_frame_link = wlan_get_mlo_link_id_from_pdev(in_frame_pdev);
+	grp_id = wlan_get_mlo_grp_id_from_pdev(in_frame_pdev);
 	qdf_assert_always(in_frame_link >= 0);
 	qdf_assert_always(in_frame_link < MAX_MLO_LINKS);
-	qdf_assert_always(mgmt_rx_reo_is_valid_link(in_frame_link));
+	qdf_assert_always(mgmt_rx_reo_is_valid_link(in_frame_link, grp_id));
 
 	in_frame_rx_reo_pdev_ctx =
 			wlan_mgmt_rx_reo_get_priv_object(in_frame_pdev);
@@ -1014,12 +1085,12 @@ wlan_mgmt_rx_reo_algo_calculate_wait_count(
 	/* Iterate over all the valid MLO links */
 	for (link = 0; link < MAX_MLO_LINKS; link++) {
 		/* No need wait for any frames on an invalid link */
-		if (!mgmt_rx_reo_is_valid_link(link)) {
+		if (!mgmt_rx_reo_is_valid_link(link, grp_id)) {
 			frames_pending = 0;
 			goto update_pending_frames;
 		}
 
-		pdev = wlan_get_pdev_from_mlo_link_id(link,
+		pdev = wlan_get_pdev_from_mlo_link_id(link, grp_id,
 						      WLAN_MGMT_RX_REO_ID);
 
 		/* No need to wait for any frames if the pdev is not found */
@@ -2323,6 +2394,7 @@ mgmt_rx_reo_prepare_list_entry(
 	struct mgmt_rx_reo_list_entry *list_entry;
 	struct wlan_objmgr_pdev *pdev;
 	uint8_t link_id;
+	uint8_t ml_grp_id;
 
 	if (!frame_desc) {
 		mgmt_rx_reo_err("frame descriptor is null");
@@ -2335,8 +2407,10 @@ mgmt_rx_reo_prepare_list_entry(
 	}
 
 	link_id = mgmt_rx_reo_get_link_id(frame_desc->rx_params);
+	ml_grp_id = mgmt_rx_reo_get_mlo_grp_id(frame_desc->rx_params);
 
-	pdev = wlan_get_pdev_from_mlo_link_id(link_id, WLAN_MGMT_RX_REO_ID);
+	pdev = wlan_get_pdev_from_mlo_link_id(link_id, ml_grp_id,
+					      WLAN_MGMT_RX_REO_ID);
 	if (!pdev) {
 		mgmt_rx_reo_err("pdev corresponding to link %u is null",
 				link_id);
@@ -2513,6 +2587,9 @@ mgmt_rx_reo_update_list(struct mgmt_rx_reo_list *reo_list,
 			break;
 		}
 
+		qdf_assert_always(!frame_desc->is_stale ||
+				  cur_entry->is_parallel_rx);
+
 		list_insertion_pos++;
 
 		status = mgmt_rx_reo_update_wait_count(
@@ -2525,9 +2602,6 @@ mgmt_rx_reo_update_list(struct mgmt_rx_reo_list *reo_list,
 			cur_entry->status &=
 			      ~MGMT_RX_REO_STATUS_WAIT_FOR_FRAME_ON_OTHER_LINKS;
 	}
-
-	if (frame_desc->is_stale)
-		qdf_assert_always(!list_insertion_pos);
 
 	if (frame_desc->type == MGMT_RX_REO_FRAME_DESC_HOST_CONSUMED_FRAME &&
 	    !frame_desc->is_stale && frame_desc->reo_required) {
@@ -3315,7 +3389,7 @@ wlan_mgmt_rx_reo_algo_entry(struct wlan_objmgr_pdev *pdev,
 		return QDF_STATUS_E_NULL_VALUE;
 	}
 
-	reo_ctx = mgmt_rx_reo_get_context();
+	reo_ctx = wlan_mgmt_rx_reo_get_ctx_from_pdev(pdev);
 	if (!reo_ctx) {
 		mgmt_rx_reo_err("REO context is NULL");
 		return QDF_STATUS_E_NULL_VALUE;
@@ -3461,6 +3535,7 @@ failure:
  * mgmt_rx_reo_sim_init() - Initialize management rx reorder simulation
  * context.
  * @reo_context: Pointer to reo context
+ * @ml_grp_id: MLO group id which it belongs to
  *
  * Return: QDF_STATUS of operation
  */
@@ -3723,7 +3798,7 @@ mgmt_rx_reo_sim_process_rx_frame(struct wlan_objmgr_pdev *pdev, qdf_nbuf_t buf,
 
 	reo_params = mgmt_rx_params->reo_params;
 
-	reo_context = mgmt_rx_reo_get_context();
+	reo_context = wlan_mgmt_rx_reo_get_ctx_from_pdev(pdev);
 	if (!reo_context) {
 		mgmt_rx_reo_err("Mgmt reo context is null");
 		return QDF_STATUS_E_NULL_VALUE;
@@ -3878,6 +3953,7 @@ mgmt_rx_reo_sim_frame_handler_host(void *arg)
 	QDF_STATUS status;
 	struct mgmt_rx_reo_sim_context *sim_context;
 	struct wlan_objmgr_pdev *pdev;
+	uint8_t ml_grp_id;
 
 	if (!frame_fw) {
 		mgmt_rx_reo_err("HOST-%d : Pointer to FW frame struct is null",
@@ -3893,6 +3969,8 @@ mgmt_rx_reo_sim_frame_handler_host(void *arg)
 				link_id);
 		goto error_free_fw_frame;
 	}
+
+	ml_grp_id = sim_context->mlo_grp_id;
 
 	fw_to_host_delay_us = MGMT_RX_REO_SIM_DELAY_FW_TO_HOST_MIN +
 			      mgmt_rx_reo_sim_get_random_unsigned_int(
@@ -3941,7 +4019,8 @@ mgmt_rx_reo_sim_frame_handler_host(void *arg)
 	rx_params->reo_params->mgmt_pkt_ctr = frame_fw->params.mgmt_pkt_ctr;
 	rx_params->reo_params->valid = true;
 
-	pdev = wlan_get_pdev_from_mlo_link_id(link_id, WLAN_MGMT_RX_REO_SIM_ID);
+	pdev = wlan_get_pdev_from_mlo_link_id(
+			link_id, ml_grp_id, WLAN_MGMT_RX_REO_SIM_ID);
 	if (!pdev) {
 		mgmt_rx_reo_err("No pdev corresponding to link_id %d", link_id);
 		goto error_free_mgmt_rx_event_params;
@@ -3985,6 +4064,7 @@ error_print:
  * @link_id: link id
  * @id: snapshot id
  * @value: snapshot value
+ * @ml_grp_id: MLO group id which it belongs to
  *
  * This API writes the snapshots used for management frame reordering. MAC HW
  * and FW can use this API to update the MAC HW/FW consumed/FW forwarded
@@ -3993,7 +4073,7 @@ error_print:
  * Return: QDF_STATUS
  */
 static QDF_STATUS
-mgmt_rx_reo_sim_write_snapshot(uint8_t link_id,
+mgmt_rx_reo_sim_write_snapshot(uint8_t link_id, uint8_t ml_grp_id,
 			       enum mgmt_rx_reo_shared_snapshot_id id,
 			       struct mgmt_rx_reo_shared_snapshot value)
 {
@@ -4001,7 +4081,9 @@ mgmt_rx_reo_sim_write_snapshot(uint8_t link_id,
 	struct mgmt_rx_reo_shared_snapshot *snapshot_address;
 	QDF_STATUS status;
 
-	pdev = wlan_get_pdev_from_mlo_link_id(link_id, WLAN_MGMT_RX_REO_SIM_ID);
+	pdev = wlan_get_pdev_from_mlo_link_id(
+			link_id, ml_grp_id,
+			WLAN_MGMT_RX_REO_SIM_ID);
 
 	if (!pdev) {
 		mgmt_rx_reo_err("pdev is null");
@@ -4102,6 +4184,7 @@ mgmt_rx_reo_sim_frame_handler_fw(void *arg)
 	enum mgmt_rx_reo_shared_snapshot_id snapshot_id;
 	struct mgmt_rx_reo_shared_snapshot snapshot_value;
 	bool ret;
+	uint8_t ml_grp_id;
 
 	if (!frame_hw) {
 		mgmt_rx_reo_err("FW-%d : Pointer to HW frame struct is null",
@@ -4117,6 +4200,8 @@ mgmt_rx_reo_sim_frame_handler_fw(void *arg)
 				link_id);
 		goto error_free_mac_hw_frame;
 	}
+
+	ml_grp_id = sim_context->mlo_grp_id;
 
 	mac_hw_to_fw_delay_us = MGMT_RX_REO_SIM_DELAY_MAC_HW_TO_FW_MIN +
 			mgmt_rx_reo_sim_get_random_unsigned_int(
@@ -4167,8 +4252,9 @@ mgmt_rx_reo_sim_frame_handler_fw(void *arg)
 					frame_hw->params.global_timestamp,
 					frame_hw->params.mgmt_pkt_ctr);
 
-	status = mgmt_rx_reo_sim_write_snapshot(link_id, snapshot_id,
-						snapshot_value);
+	status = mgmt_rx_reo_sim_write_snapshot(
+			link_id, ml_grp_id,
+			snapshot_id, snapshot_value);
 
 	if (QDF_IS_STATUS_ERROR(status)) {
 		mgmt_rx_reo_err("FW-%d : Failed to write snapshot %d",
@@ -4250,7 +4336,6 @@ mgmt_rx_reo_sim_receive_from_air(struct mgmt_rx_reo_sim_mac_hw *mac_hw,
 				 struct mgmt_rx_frame_params *frame)
 {
 	uint8_t valid_link_list_index;
-	QDF_STATUS status;
 	int8_t link_id;
 
 	if (!mac_hw) {
@@ -4345,6 +4430,7 @@ mgmt_rx_reo_sim_mac_hw_thread(void *data)
 		struct mgmt_rx_reo_shared_snapshot snapshot_value;
 		int8_t num_mlo_links;
 		bool ret;
+		uint8_t ml_grp_id;
 
 		num_mlo_links = mgmt_rx_reo_sim_get_num_mlo_links(sim_context);
 		if (num_mlo_links < 0 ||
@@ -4386,6 +4472,7 @@ mgmt_rx_reo_sim_mac_hw_thread(void *data)
 
 		frame_mac_hw->params = frame;
 		frame_mac_hw->sim_context = sim_context;
+		ml_grp_id = sim_context->ml_grp_id;
 
 		status = mgmt_rx_reo_sim_add_frame_to_pending_list(
 				&sim_context->master_frame_list, &frame);
@@ -4408,8 +4495,9 @@ mgmt_rx_reo_sim_mac_hw_thread(void *data)
 						frame.global_timestamp,
 						frame.mgmt_pkt_ctr);
 
-		status = mgmt_rx_reo_sim_write_snapshot(link_id, snapshot_id,
-							snapshot_value);
+		status = mgmt_rx_reo_sim_write_snapshot(
+				link_id, ml_grp_id
+				snapshot_id, snapshot_value);
 		if (QDF_IS_STATUS_ERROR(status)) {
 			mgmt_rx_reo_err("HW-%d : Failed to write snapshot %d",
 					link_id, snapshot_id);
@@ -4515,19 +4603,19 @@ mgmt_rx_reo_sim_deinit_master_frame_list(
  */
 static QDF_STATUS
 mgmt_rx_reo_sim_generate_unique_link_id(
-		struct wlan_objmgr_pdev *link_id_to_pdev_map, uint8_t *link_id)
+		struct wlan_objmgr_pdev **link_id_to_pdev_map, uint8_t *link_id)
 {
 	uint8_t random_link_id;
-	uint8_t link_id;
+	uint8_t link;
 
 	if (!link_id_to_pdev_map || !link_id)
 		return QDF_STATUS_E_NULL_VALUE;
 
-	for (link_id = 0; link_id < MAX_MLO_LINKS; link_id++)
-		if (!link_id_to_pdev_map[link_id])
+	for (link = 0; link < MAX_MLO_LINKS; link++)
+		if (!link_id_to_pdev_map[link])
 			break;
 
-	if (link_id == MAX_MLO_LINKS) {
+	if (link == MAX_MLO_LINKS) {
 		mgmt_rx_reo_err("All link ids are already allocated");
 		return QDF_STATUS_E_FAILURE;
 	}
@@ -4562,6 +4650,7 @@ mgmt_rx_reo_sim_insert_into_link_id_to_pdev_map(
 		struct wlan_objmgr_pdev *pdev)
 {
 	uint8_t link_id;
+	QDF_STATUS status;
 
 	if (!link_id_to_pdev_map) {
 		mgmt_rx_reo_err("Link id to pdev map is null");
@@ -4576,7 +4665,7 @@ mgmt_rx_reo_sim_insert_into_link_id_to_pdev_map(
 	qdf_spin_lock(&link_id_to_pdev_map->lock);
 
 	status = mgmt_rx_reo_sim_generate_unique_link_id(
-					link_id_to_pdev_map->map, &link_id)
+					link_id_to_pdev_map->map, &link_id);
 	if (QDF_IS_STATUS_ERROR(status)) {
 		qdf_spin_unlock(&link_id_to_pdev_map->lock);
 		return QDF_STATUS_E_FAILURE;
@@ -4686,7 +4775,7 @@ mgmt_rx_reo_sim_pdev_object_destroy_notification(struct wlan_objmgr_pdev *pdev)
 }
 
 QDF_STATUS
-mgmt_rx_reo_sim_start(void)
+mgmt_rx_reo_sim_start(uint8_t ml_grp_id)
 {
 	struct mgmt_rx_reo_context *reo_context;
 	struct mgmt_rx_reo_sim_context *sim_context;
@@ -4695,7 +4784,7 @@ mgmt_rx_reo_sim_start(void)
 	uint8_t id;
 	QDF_STATUS status;
 
-	reo_context = mgmt_rx_reo_get_context();
+	reo_context = mgmt_rx_reo_get_context(ml_grp_id);
 	if (!reo_context) {
 		mgmt_rx_reo_err("reo context is null");
 		return QDF_STATUS_E_NULL_VALUE;
@@ -4762,7 +4851,7 @@ error_destroy_fw_and_host_work_queues_till_last_link:
 }
 
 QDF_STATUS
-mgmt_rx_reo_sim_stop(void)
+mgmt_rx_reo_sim_stop(uint8_t ml_grp_id)
 {
 	struct mgmt_rx_reo_context *reo_context;
 	struct mgmt_rx_reo_sim_context *sim_context;
@@ -4770,7 +4859,7 @@ mgmt_rx_reo_sim_stop(void)
 	uint8_t link_id;
 	QDF_STATUS status;
 
-	reo_context = mgmt_rx_reo_get_context();
+	reo_context = mgmt_rx_reo_get_context(ml_grp_id);
 	if (!reo_context) {
 		mgmt_rx_reo_err("reo context is null");
 		return QDF_STATUS_E_NULL_VALUE;
@@ -4797,13 +4886,15 @@ mgmt_rx_reo_sim_stop(void)
 				sim_context->host_mgmt_frame_handler[link_id]);
 	}
 
-	status = mgmt_rx_reo_print_ingress_frame_debug_info();
+	status = mgmt_rx_reo_print_ingress_frame_info
+			(MGMT_RX_REO_INGRESS_FRAME_DEBUG_INFO_PRINT_MAX_FRAMES);
 	if (QDF_IS_STATUS_ERROR(status)) {
 		mgmt_rx_reo_err("Failed to print ingress frame debug info");
 		return status;
 	}
 
-	status = mgmt_rx_reo_print_egress_frame_debug_info();
+	status = mgmt_rx_reo_print_egress_frame_info
+			(MGMT_RX_REO_EGRESS_FRAME_DEBUG_INFO_PRINT_MAX_FRAMES);
 	if (QDF_IS_STATUS_ERROR(status)) {
 		mgmt_rx_reo_err("Failed to print egress frame debug info");
 		return status;
@@ -4834,6 +4925,7 @@ mgmt_rx_reo_sim_stop(void)
  * mgmt_rx_reo_sim_init() - Initialize management rx reorder simulation
  * context.
  * @reo_context: Pointer to reo context
+ * @ml_grp_id: MLO Group ID which it belongs to
  *
  * Return: QDF_STATUS of operation
  */
@@ -4852,6 +4944,7 @@ mgmt_rx_reo_sim_init(struct mgmt_rx_reo_context *reo_context)
 	sim_context = &reo_context->sim_context;
 
 	qdf_mem_zero(sim_context, sizeof(*sim_context));
+	sim_context->mlo_grp_id = reo_context->mlo_grp_id;
 
 	status = mgmt_rx_reo_sim_init_master_frame_list(
 					&sim_context->master_frame_list);
@@ -5074,7 +5167,7 @@ mgmt_rx_reo_debug_info_init(struct wlan_objmgr_pdev *pdev)
 	if (!wlan_mgmt_rx_reo_is_feature_enabled_at_psoc(psoc))
 		return QDF_STATUS_SUCCESS;
 
-	reo_context = mgmt_rx_reo_get_context();
+	reo_context = wlan_mgmt_rx_reo_get_ctx_from_pdev(pdev);
 	if (!reo_context) {
 		mgmt_rx_reo_err("reo context is null");
 		return QDF_STATUS_E_NULL_VALUE;
@@ -5218,7 +5311,7 @@ mgmt_rx_reo_debug_info_deinit(struct wlan_objmgr_pdev *pdev)
 	if (!wlan_mgmt_rx_reo_is_feature_enabled_at_psoc(psoc))
 		return QDF_STATUS_SUCCESS;
 
-	reo_context = mgmt_rx_reo_get_context();
+	reo_context = wlan_mgmt_rx_reo_get_ctx_from_pdev(pdev);
 	if (!reo_context) {
 		mgmt_rx_reo_err("reo context is null");
 		return QDF_STATUS_E_NULL_VALUE;
@@ -5324,12 +5417,12 @@ mgmt_rx_reo_list_deinit(struct mgmt_rx_reo_list *reo_list)
 }
 
 QDF_STATUS
-mgmt_rx_reo_deinit_context(void)
+mgmt_rx_reo_deinit_context(uint8_t ml_grp_id)
 {
 	QDF_STATUS status;
 	struct mgmt_rx_reo_context *reo_context;
 
-	reo_context = mgmt_rx_reo_get_context();
+	reo_context = mgmt_rx_reo_get_context(ml_grp_id);
 	if (!reo_context) {
 		mgmt_rx_reo_err("reo context is null");
 		return QDF_STATUS_E_NULL_VALUE;
@@ -5356,23 +5449,27 @@ mgmt_rx_reo_deinit_context(void)
 	}
 
 	qdf_mem_free(reo_context);
+	mgmt_rx_reo_set_context(ml_grp_id, NULL);
 
 	return QDF_STATUS_SUCCESS;
 }
 
 QDF_STATUS
-mgmt_rx_reo_init_context(void)
+mgmt_rx_reo_init_context(uint8_t ml_grp_id)
 {
 	QDF_STATUS status;
 	QDF_STATUS temp;
 	struct mgmt_rx_reo_context *reo_context;
 
-	reo_context = qdf_mem_malloc(sizeof(*reo_context));
+	reo_context = qdf_mem_malloc(sizeof(struct mgmt_rx_reo_context));
 	if (!reo_context) {
 		mgmt_rx_reo_err("Failed to allocate reo context");
 		return QDF_STATUS_E_NULL_VALUE;
 	}
-	mgmt_rx_reo_set_context(reo_context);
+
+	mgmt_rx_reo_set_context(ml_grp_id, reo_context);
+
+	reo_context->mlo_grp_id = ml_grp_id;
 
 	status = mgmt_rx_reo_list_init(&reo_context->reo_list);
 	if (QDF_IS_STATUS_ERROR(status)) {
@@ -5728,11 +5825,11 @@ mgmt_rx_reo_psoc_obj_destroy_notification(struct wlan_objmgr_psoc *psoc)
 }
 
 bool
-mgmt_rx_reo_is_simulation_in_progress(void)
+mgmt_rx_reo_is_simulation_in_progress(uint8_t ml_grp_id)
 {
 	struct mgmt_rx_reo_context *reo_context;
 
-	reo_context = mgmt_rx_reo_get_context();
+	reo_context = mgmt_rx_reo_get_context(ml_grp_id);
 	if (!reo_context) {
 		mgmt_rx_reo_err("reo context is null");
 		return false;
@@ -5743,12 +5840,12 @@ mgmt_rx_reo_is_simulation_in_progress(void)
 
 #ifdef WLAN_MGMT_RX_REO_DEBUG_SUPPORT
 QDF_STATUS
-mgmt_rx_reo_print_ingress_frame_stats(void)
+mgmt_rx_reo_print_ingress_frame_stats(uint8_t ml_grp_id)
 {
 	struct mgmt_rx_reo_context *reo_context;
 	QDF_STATUS status;
 
-	reo_context = mgmt_rx_reo_get_context();
+	reo_context = mgmt_rx_reo_get_context(ml_grp_id);
 	if (!reo_context) {
 		mgmt_rx_reo_err("reo context is null");
 		return QDF_STATUS_E_NULL_VALUE;
@@ -5764,12 +5861,12 @@ mgmt_rx_reo_print_ingress_frame_stats(void)
 }
 
 QDF_STATUS
-mgmt_rx_reo_print_ingress_frame_info(uint16_t num_frames)
+mgmt_rx_reo_print_ingress_frame_info(uint8_t ml_grp_id, uint16_t num_frames)
 {
 	struct mgmt_rx_reo_context *reo_context;
 	QDF_STATUS status;
 
-	reo_context = mgmt_rx_reo_get_context();
+	reo_context = mgmt_rx_reo_get_context(ml_grp_id);
 	if (!reo_context) {
 		mgmt_rx_reo_err("reo context is null");
 		return QDF_STATUS_E_NULL_VALUE;
@@ -5786,12 +5883,12 @@ mgmt_rx_reo_print_ingress_frame_info(uint16_t num_frames)
 }
 
 QDF_STATUS
-mgmt_rx_reo_print_egress_frame_stats(void)
+mgmt_rx_reo_print_egress_frame_stats(uint8_t ml_grp_id)
 {
 	struct mgmt_rx_reo_context *reo_context;
 	QDF_STATUS status;
 
-	reo_context = mgmt_rx_reo_get_context();
+	reo_context = mgmt_rx_reo_get_context(ml_grp_id);
 	if (!reo_context) {
 		mgmt_rx_reo_err("reo context is null");
 		return QDF_STATUS_E_NULL_VALUE;
@@ -5807,12 +5904,12 @@ mgmt_rx_reo_print_egress_frame_stats(void)
 }
 
 QDF_STATUS
-mgmt_rx_reo_print_egress_frame_info(uint16_t num_frames)
+mgmt_rx_reo_print_egress_frame_info(uint8_t ml_grp_id, uint16_t num_frames)
 {
 	struct mgmt_rx_reo_context *reo_context;
 	QDF_STATUS status;
 
-	reo_context = mgmt_rx_reo_get_context();
+	reo_context = mgmt_rx_reo_get_context(ml_grp_id);
 	if (!reo_context) {
 		mgmt_rx_reo_err("reo context is null");
 		return QDF_STATUS_E_NULL_VALUE;
@@ -5829,25 +5926,25 @@ mgmt_rx_reo_print_egress_frame_info(uint16_t num_frames)
 }
 #else
 QDF_STATUS
-mgmt_rx_reo_print_ingress_frame_stats(void)
+mgmt_rx_reo_print_ingress_frame_stats(uint8_t ml_grp_id)
 {
 	return QDF_STATUS_SUCCESS;
 }
 
 QDF_STATUS
-mgmt_rx_reo_print_ingress_frame_info(uint16_t num_frames)
+mgmt_rx_reo_print_ingress_frame_info(uint8_t ml_grp_id, uint16_t num_frames)
 {
 	return QDF_STATUS_SUCCESS;
 }
 
 QDF_STATUS
-mgmt_rx_reo_print_egress_frame_stats(void)
+mgmt_rx_reo_print_egress_frame_stats(uint8_t ml_grp_id)
 {
 	return QDF_STATUS_SUCCESS;
 }
 
 QDF_STATUS
-mgmt_rx_reo_print_egress_frame_info(uint16_t num_frames)
+mgmt_rx_reo_print_egress_frame_info(uint8_t ml_grp_id, uint16_t num_frames)
 {
 	return QDF_STATUS_SUCCESS;
 }

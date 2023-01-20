@@ -669,7 +669,7 @@ struct wlan_objmgr_peer *wlan_objmgr_get_peer_by_mac(
 #ifdef WLAN_OBJMGR_REF_ID_TRACE
 struct wlan_objmgr_peer *wlan_objmgr_get_peer_debug(
 			struct wlan_objmgr_psoc *psoc, uint8_t pdev_id,
-			uint8_t *macaddr, wlan_objmgr_ref_dbgid dbg_id,
+			const uint8_t *macaddr, wlan_objmgr_ref_dbgid dbg_id,
 			const char *func, int line);
 
 #define wlan_objmgr_get_peer(psoc, pdev_id, macaddr, dbgid) \

@@ -22,6 +22,7 @@
 #ifdef QCA_MONITOR_2_0_SUPPORT
 #include <mon_ingress_ring.h>
 #include <mon_destination_ring.h>
+#include <mon_drop.h>
 #endif
 #include <hal_be_hw_headers.h>
 #include "hal_api_mon.h"
@@ -749,6 +750,7 @@ enum hal_tx_tlv_status {
 	HAL_MON_MACTX_USER_DESC_COMMON,
 	HAL_MON_MACTX_PHY_DESC,
 
+	HAL_MON_TX_FW2SW,
 	HAL_MON_TX_STATUS_PPDU_NOT_DONE,
 };
 
@@ -838,6 +840,12 @@ struct hal_tx_status_info {
 	uint8_t transmission_type;
 	uint8_t medium_prot_type;
 	uint8_t generated_response;
+
+	uint16_t band_center_freq1;
+	uint16_t band_center_freq2;
+	uint16_t freq;
+	uint16_t phy_mode;
+	uint32_t schedule_id;
 
 	uint32_t no_bitmap_avail	:1,
 		explicit_ack		:1,
@@ -1389,8 +1397,8 @@ static inline bool hal_rx_is_non_ofdma(struct hal_soc *hal_soc,
 static inline bool hal_rx_is_mu_mimo_user(struct hal_soc *hal_soc,
 					  struct hal_rx_ppdu_info *ppdu_info)
 {
-	if (ppdu_info->u_sig_info.ppdu_type_comp_mode == 0 &&
-	    ppdu_info->u_sig_info.ul_dl == 2)
+	if (ppdu_info->u_sig_info.ppdu_type_comp_mode == 2 &&
+	    ppdu_info->u_sig_info.ul_dl == 0)
 		return true;
 
 	return false;
@@ -1700,9 +1708,11 @@ hal_rx_parse_receive_user_info(struct hal_soc *hal_soc, uint8_t *tlv,
 	case HAL_RECEPTION_TYPE_DL_MU_OFDMA_MIMO:
 		ppdu_info->rx_status.mu_dl_ul = HAL_RX_TYPE_DL;
 		ppdu_info->rx_status.reception_type = HAL_RX_TYPE_MU_OFDMA_MIMO;
+		break;
 	case HAL_RECEPTION_TYPE_UL_MU_OFDMA_MIMO:
 		ppdu_info->rx_status.mu_dl_ul = HAL_RX_TYPE_UL;
 		ppdu_info->rx_status.reception_type = HAL_RX_TYPE_MU_OFDMA_MIMO;
+		break;
 	}
 
 	ppdu_info->start_user_info_cnt++;
@@ -1874,6 +1884,18 @@ hal_rx_status_get_mon_buf_addr(uint8_t *rx_tlv,
 	ppdu_info->packet_info.truncated = addr->truncated;
 
 }
+
+static inline void
+hal_rx_update_ppdu_drop_cnt(uint8_t *rx_tlv,
+			    struct hal_rx_ppdu_info *ppdu_info)
+{
+	struct mon_drop *drop_cnt = (struct mon_drop *)rx_tlv;
+
+	ppdu_info->drop_cnt.ppdu_drop_cnt = drop_cnt->ppdu_drop_cnt;
+	ppdu_info->drop_cnt.mpdu_drop_cnt = drop_cnt->mpdu_drop_cnt;
+	ppdu_info->drop_cnt.end_of_ppdu_drop_cnt = drop_cnt->end_of_ppdu_seen;
+	ppdu_info->drop_cnt.tlv_drop_cnt = drop_cnt->tlv_drop_cnt;
+}
 #else
 static inline void
 hal_rx_status_get_mpdu_retry_cnt(struct hal_rx_ppdu_info *ppdu_info,
@@ -1884,6 +1906,12 @@ hal_rx_status_get_mpdu_retry_cnt(struct hal_rx_ppdu_info *ppdu_info,
 static inline void
 hal_rx_status_get_mon_buf_addr(uint8_t *rx_tlv,
 			       struct hal_rx_ppdu_info *ppdu_info)
+{
+}
+
+static inline void
+hal_rx_update_ppdu_drop_cnt(uint8_t *rx_tlv,
+			    struct hal_rx_ppdu_info *ppdu_info)
 {
 }
 #endif
@@ -2339,10 +2367,22 @@ hal_rx_status_get_tlv_info_generic_be(void *rx_tlv_hdr, void *ppduinfo,
 			ppdu_info->rx_status.nss = 0;
 #endif
 			break;
-		case TARGET_TYPE_QCA6490:
-		case TARGET_TYPE_QCA6750:
 		case TARGET_TYPE_KIWI:
 		case TARGET_TYPE_MANGO:
+			ppdu_info->rx_status.is_stbc =
+				HAL_RX_GET(vht_sig_a_info,
+					   VHT_SIG_A_INFO, STBC);
+			value =  HAL_RX_GET(vht_sig_a_info,
+					    VHT_SIG_A_INFO, N_STS);
+			value = value & VHT_SIG_SU_NSS_MASK;
+			if (ppdu_info->rx_status.is_stbc && (value > 0))
+				value = ((value + 1) >> 1) - 1;
+			ppdu_info->rx_status.nss =
+				((value & VHT_SIG_SU_NSS_MASK) + 1);
+
+			break;
+		case TARGET_TYPE_QCA6490:
+		case TARGET_TYPE_QCA6750:
 			ppdu_info->rx_status.nss = 0;
 			break;
 		default:
@@ -3049,6 +3089,9 @@ hal_rx_status_get_tlv_info_generic_be(void *rx_tlv_hdr, void *ppduinfo,
 		hal_rx_status_get_mon_buf_addr(rx_tlv, ppdu_info);
 
 		return HAL_TLV_STATUS_MON_BUF_ADDR;
+	case WIFIMON_DROP_E:
+		hal_rx_update_ppdu_drop_cnt(rx_tlv, ppdu_info);
+		return HAL_TLV_STATUS_MON_DROP;
 	case 0:
 		return HAL_TLV_STATUS_PPDU_DONE;
 	case WIFIRX_STATUS_BUFFER_DONE_E:

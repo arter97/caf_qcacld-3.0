@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2013-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -131,6 +131,11 @@ enum hif_ic_irq {
 	wbm2host_tx_completions_ring2,
 	wbm2host_tx_completions_ring1,
 	tcl2host_status_ring,
+	txmon2host_monitor_destination_mac3,
+	txmon2host_monitor_destination_mac2,
+	txmon2host_monitor_destination_mac1,
+	host2tx_monitor_ring1,
+	umac_reset,
 };
 
 #ifdef QCA_SUPPORT_LEGACY_INTERRUPTS
@@ -484,6 +489,7 @@ struct hif_direct_link_ce_info {
  * @HIF_EVENT_SRNG_ACCESS_END: hal ring access end event
  * @HIF_EVENT_BH_COMPLETE: NAPI POLL completion event
  * @HIF_EVENT_BH_FORCE_BREAK: NAPI POLL force break event
+ * @HIF_EVENT_IRQ_DISABLE_EXPIRED: IRQ disable expired event
  */
 enum hif_event_type {
 	HIF_EVENT_IRQ_TRIGGER,
@@ -494,6 +500,7 @@ enum hif_event_type {
 	HIF_EVENT_SRNG_ACCESS_END,
 	HIF_EVENT_BH_COMPLETE,
 	HIF_EVENT_BH_FORCE_BREAK,
+	HIF_EVENT_IRQ_DISABLE_EXPIRED,
 	/* Do check hif_hist_skip_event_record when adding new events */
 };
 
@@ -1579,7 +1586,45 @@ void hif_fastpath_resume(struct hif_opaque_softc *hif_ctx);
  * Return: state
  */
 int hif_rtpm_get_state(void);
+
+/**
+ * hif_rtpm_display_last_busy_hist() - Display runtimepm last busy history
+ * @hif_ctx: HIF context
+ *
+ * Return: None
+ */
+void hif_rtpm_display_last_busy_hist(struct hif_opaque_softc *hif_ctx);
+
+/**
+ * hif_rtpm_record_ce_last_busy_evt() - Record CE runtimepm last busy event
+ * @hif_ctx: HIF context
+ *
+ * Return: None
+ */
+void hif_rtpm_record_ce_last_busy_evt(struct hif_softc *scn,
+				      unsigned long ce_id);
 #else
+
+/**
+ * hif_rtpm_display_last_busy_hist() - Display runtimepm last busy history
+ * @hif_ctx: HIF context
+ *
+ * Return: None
+ */
+static inline
+void hif_rtpm_display_last_busy_hist(struct hif_opaque_softc *hif_ctx) { }
+
+/**
+ * hif_rtpm_record_ce_last_busy_evt() - Record CE runtimepm last busy event
+ * @hif_ctx: HIF context
+ *
+ * Return: None
+ */
+static inline
+void hif_rtpm_record_ce_last_busy_evt(struct hif_softc *scn,
+				      unsigned long ce_id)
+{ }
+
 static inline
 QDF_STATUS hif_rtpm_register(uint32_t id, void (*hif_rpm_cbk)(void))
 { return QDF_STATUS_SUCCESS; }
@@ -2009,6 +2054,7 @@ void hif_allow_link_low_power_states(struct hif_opaque_softc *hif)
 
 void *hif_get_dev_ba(struct hif_opaque_softc *hif_handle);
 void *hif_get_dev_ba_ce(struct hif_opaque_softc *hif_handle);
+void *hif_get_dev_ba_pmm(struct hif_opaque_softc *hif_handle);
 
 /**
  * hif_get_dev_ba_cmem() - get base address of CMEM
@@ -2520,11 +2566,13 @@ hif_set_irq_config_by_ceid(struct hif_opaque_softc *scn, uint8_t ce_id,
  *  buffer information
  * @hif_ctx: hif opaque handle
  * @dma_addr: pointer to array of dma addresses
+ * @buf_size: ce dest ring buffer size
  *
  * Return: Number of buffers attached to the dest srng.
  */
 uint16_t hif_get_direct_link_ce_dest_srng_buffers(struct hif_opaque_softc *scn,
-						  uint64_t **dma_addr);
+						  uint64_t **dma_addr,
+						  uint32_t *buf_size);
 
 /**
  * hif_get_direct_link_ce_srng_info() - Get Direct Link CE srng information
@@ -2547,7 +2595,9 @@ hif_set_irq_config_by_ceid(struct hif_opaque_softc *scn, uint8_t ce_id,
 }
 
 static inline
-uint16_t hif_get_direct_link_ce_dest_srng_buffers(struct hif_opaque_softc *scn)
+uint16_t hif_get_direct_link_ce_dest_srng_buffers(struct hif_opaque_softc *scn,
+						  uint64_t **dma_addr,
+						  uint32_t *buf_size)
 {
 	return 0;
 }

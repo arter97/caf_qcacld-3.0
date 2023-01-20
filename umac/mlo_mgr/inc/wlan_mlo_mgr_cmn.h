@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -243,10 +243,11 @@ qdf_nbuf_t mlo_mlme_get_link_assoc_req(struct wlan_objmgr_peer *peer,
 /**
  * mlo_mlme_peer_deauth() - Initiate deauth on link peer
  * @peer: Object manager peer
+ * @is_disassoc: disassoc frame needs to be sent
  *
  * Return: void
  */
-void mlo_mlme_peer_deauth(struct wlan_objmgr_peer *peer);
+void mlo_mlme_peer_deauth(struct wlan_objmgr_peer *peer, uint8_t is_disassoc);
 
 #ifdef UMAC_MLO_AUTH_DEFER
 /**
@@ -300,30 +301,34 @@ void mlo_mlme_handle_sta_csa_param(struct wlan_objmgr_vdev *vdev,
 #define INVALID_HW_LINK_ID 0xFFFF
 #define WLAN_MLO_INVALID_NUM_LINKS             (-1)
 #ifdef WLAN_MLO_MULTI_CHIP
+#define WLAN_MLO_GROUP_INVALID                 (-1)
 /**
  * wlan_mlo_get_max_num_links() - Get the maximum number of MLO links
  * possible in the system
+ * @grp_id: Id of the required MLO Group
  *
  * Return: Maximum number of MLO links in the system
  */
-int8_t wlan_mlo_get_max_num_links(void);
+int8_t wlan_mlo_get_max_num_links(uint8_t grp_id);
 
 /**
  * wlan_mlo_get_num_active_links() - Get the number of active MLO links
  * in the system
+ * @grp_id: Id of the required MLO Group
  *
  * Return: Number of active MLO links in the system
  */
-int8_t wlan_mlo_get_num_active_links(void);
+int8_t wlan_mlo_get_num_active_links(uint8_t grp_id);
 
 /**
  * wlan_mlo_get_valid_link_bitmap() - Get the bitmap indicating the valid
  * MLO links in the system. If bit position i is set, link with id i is
  * valid.
+ * @grp_id: Id of the required MLO Group
  *
  * Return: Valid link bitmap
  */
-uint16_t wlan_mlo_get_valid_link_bitmap(void);
+uint16_t wlan_mlo_get_valid_link_bitmap(uint8_t grp_id);
 
 /**
  * wlan_mlo_get_pdev_hw_link_id() - Get hw_link_id of pdev
@@ -334,15 +339,33 @@ uint16_t wlan_mlo_get_valid_link_bitmap(void);
 uint16_t wlan_mlo_get_pdev_hw_link_id(struct wlan_objmgr_pdev *pdev);
 
 /**
+ * wlan_mlo_get_psoc_group_id() - Get MLO group id of psoc
+ * @psoc: psoc object
+ *
+ * Return: MLO group id of the psoc
+ */
+uint8_t wlan_mlo_get_psoc_group_id(struct wlan_objmgr_psoc *psoc);
+
+/**
+ * wlan_mlo_get_psoc_capable() - Get if MLO capable psoc
+ * @psoc: Pointer to psoc object
+ *
+ * Return: True if MLO capable else false
+ */
+bool wlan_mlo_get_psoc_capable(struct wlan_objmgr_psoc *psoc);
+
+/**
  * struct hw_link_id_iterator: Argument passed in psoc/pdev iterator to
  *                             find pdev from hw_link_id
  * @hw_link_id: HW link id of pdev to find
+ * @mlo_grp_id: MLO Group id which it belongs to
  * @dbgid: Module ref id used in iterator
  * @pdev: Pointer to pdev. This will be set inside itertor callback
  *        if hw_link_id match is found.
  */
 struct hw_link_id_iterator {
 	uint16_t hw_link_id;
+	uint8_t mlo_grp_id;
 	wlan_objmgr_ref_dbgid dbgid;
 	struct wlan_objmgr_pdev *pdev;
 };
@@ -350,6 +373,7 @@ struct hw_link_id_iterator {
 /**
  * wlan_objmgr_get_pdev_by_hw_link_id() - Get pdev object from hw_link_id
  * @hw_link_id: HW link id of the pdev
+ * @ml_grp_id: MLO Group id which it belongs to
  * @refdbgid: dbgid of module used for taking reference to pdev object
  *
  * Return: Pointer to pdev object if hw_link_id is valid. Else, NULL
@@ -357,30 +381,30 @@ struct hw_link_id_iterator {
  *         Caller should free this reference.
  */
 struct wlan_objmgr_pdev *
-wlan_mlo_get_pdev_by_hw_link_id(uint16_t hw_link_id,
+wlan_mlo_get_pdev_by_hw_link_id(uint16_t hw_link_id, uint8_t ml_grp_id,
 				wlan_objmgr_ref_dbgid refdbgid);
 
 #else
 static inline int8_t
-wlan_mlo_get_max_num_links(void)
+wlan_mlo_get_max_num_links(uint8_t grp_id)
 {
 	return WLAN_MLO_INVALID_NUM_LINKS;
 }
 
 static inline int8_t
-wlan_mlo_get_num_active_links(void)
+wlan_mlo_get_num_active_links(uint8_t grp_id)
 {
 	return WLAN_MLO_INVALID_NUM_LINKS;
 }
 
 static inline uint16_t
-wlan_mlo_get_valid_link_bitmap(void)
+wlan_mlo_get_valid_link_bitmap(uint8_t grp_id)
 {
 	return 0;
 }
 
 static inline struct wlan_objmgr_pdev *
-wlan_mlo_get_pdev_by_hw_link_id(uint16_t hw_link_id,
+wlan_mlo_get_pdev_by_hw_link_id(uint16_t hw_link_id, uint8_t ml_grp_id,
 				wlan_objmgr_ref_dbgid refdbgid)
 {
 	return NULL;
@@ -390,6 +414,18 @@ static inline
 uint16_t wlan_mlo_get_pdev_hw_link_id(struct wlan_objmgr_pdev *pdev)
 {
 	return INVALID_HW_LINK_ID;
+}
+
+static inline
+uint8_t wlan_mlo_get_psoc_group_id(struct wlan_objmgr_psoc *psoc)
+{
+	return -EINVAL;
+}
+
+static inline
+bool wlan_mlo_get_psoc_capable(struct wlan_objmgr_psoc *psoc)
+{
+	return false;
 }
 #endif/*WLAN_MLO_MULTI_CHIP*/
 

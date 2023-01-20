@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2016-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -28,7 +28,8 @@
 #define DP_PEER_WDS_COUNT_INVALID UINT_MAX
 
 #define DP_BLOCKMEM_SIZE 4096
-
+#define WBM2_SW_PPE_REL_RING_ID 6
+#define WBM2_SW_PPE_REL_MAP_ID 11
 /* Alignment for consistent memory for DP rings*/
 #define DP_RING_BASE_ALIGN 32
 
@@ -907,6 +908,12 @@ dp_tx_mon_process(struct dp_soc *soc, struct dp_intr *int_ctx,
 	return 0;
 }
 
+static inline uint32_t
+dp_print_txmon_ring_stat_from_hal(struct dp_pdev *pdev)
+{
+	return 0;
+}
+
 static inline
 uint32_t dp_rx_mon_buf_refill(struct dp_intr *int_ctx)
 {
@@ -1154,6 +1161,11 @@ void DP_PRINT_STATS(const char *fmt, ...);
 { \
 	DP_PEER_PER_PKT_STATS_INCC(_handle, _field.num, _count, _cond); \
 	DP_PEER_PER_PKT_STATS_INCC(_handle, _field.bytes, _bytes, _cond) \
+}
+
+#define DP_PEER_PER_PKT_STATS_UPD(_handle, _field, _delta) \
+{ \
+	DP_STATS_UPD(_handle, per_pkt_stats._field, _delta); \
 }
 
 #ifndef QCA_ENHANCED_STATS_SUPPORT
@@ -1622,6 +1634,23 @@ void dp_update_vdev_stats(struct dp_soc *soc,
 void dp_update_vdev_stats_on_peer_unmap(struct dp_vdev *vdev,
 					struct dp_peer *peer);
 
+#ifdef IPA_OFFLOAD
+#define DP_IPA_UPDATE_RX_STATS(__tgtobj, __srcobj) \
+{ \
+	DP_STATS_AGGR_PKT(__tgtobj, __srcobj, rx.rx_total); \
+}
+
+#define DP_IPA_UPDATE_PER_PKT_RX_STATS(__tgtobj, __srcobj) \
+{ \
+	(__tgtobj)->rx.rx_total.num += (__srcobj)->rx.rx_total.num; \
+	(__tgtobj)->rx.rx_total.bytes += (__srcobj)->rx.rx_total.bytes; \
+}
+#else
+#define DP_IPA_UPDATE_PER_PKT_RX_STATS(tgtobj, srcobj) \
+
+#define DP_IPA_UPDATE_RX_STATS(tgtobj, srcobj)
+#endif
+
 #define DP_UPDATE_STATS(_tgtobj, _srcobj)	\
 	do {				\
 		uint8_t i;		\
@@ -1647,6 +1676,14 @@ void dp_update_vdev_stats_on_peer_unmap(struct dp_vdev *vdev,
 		for (i = 0; i < WME_AC_MAX; i++) { \
 			DP_STATS_AGGR(_tgtobj, _srcobj, tx.wme_ac_type[i]); \
 			DP_STATS_AGGR(_tgtobj, _srcobj, rx.wme_ac_type[i]); \
+			DP_STATS_AGGR(_tgtobj, _srcobj, \
+				      tx.wme_ac_type_bytes[i]); \
+			DP_STATS_AGGR(_tgtobj, _srcobj, \
+				      rx.wme_ac_type_bytes[i]); \
+			DP_STATS_AGGR(_tgtobj, _srcobj, \
+					tx.wme_ac_type_bytes[i]); \
+			DP_STATS_AGGR(_tgtobj, _srcobj, \
+					rx.wme_ac_type_bytes[i]); \
 			DP_STATS_AGGR(_tgtobj, _srcobj, tx.excess_retries_per_ac[i]); \
 		\
 		} \
@@ -1691,6 +1728,8 @@ void dp_update_vdev_stats_on_peer_unmap(struct dp_vdev *vdev,
 		DP_STATS_AGGR(_tgtobj, _srcobj, tx.dropped.mcast_vdev_drop); \
 		DP_STATS_AGGR(_tgtobj, _srcobj, tx.dropped.invalid_rr); \
 		DP_STATS_AGGR(_tgtobj, _srcobj, tx.dropped.age_out); \
+		DP_STATS_AGGR_PKT(_tgtobj, _srcobj, tx.tx_ucast_total); \
+		DP_STATS_AGGR_PKT(_tgtobj, _srcobj, tx.tx_ucast_success); \
 								\
 		DP_STATS_AGGR(_tgtobj, _srcobj, rx.err.mic_err); \
 		DP_STATS_AGGR(_tgtobj, _srcobj, rx.err.decrypt_err); \
@@ -1734,6 +1773,7 @@ void dp_update_vdev_stats_on_peer_unmap(struct dp_vdev *vdev,
 		DP_STATS_AGGR(_tgtobj, _srcobj, rx.multipass_rx_pkt_drop); \
 		DP_STATS_AGGR(_tgtobj, _srcobj, rx.peer_unauth_rx_pkt_drop); \
 		DP_STATS_AGGR(_tgtobj, _srcobj, rx.policy_check_drop); \
+		DP_IPA_UPDATE_RX_STATS(_tgtobj, _srcobj); \
 	}  while (0)
 
 #ifdef VDEV_PEER_PROTOCOL_COUNT
@@ -1905,6 +1945,7 @@ void dp_update_vdev_stats_on_peer_unmap(struct dp_vdev *vdev,
 			_tgtobj->rx.rx_lmac[i].bytes += \
 					_srcobj->rx.rx_lmac[i].bytes; \
 		} \
+		DP_IPA_UPDATE_PER_PKT_RX_STATS(_tgtobj, _srcobj); \
 		DP_UPDATE_PROTOCOL_COUNT_STATS(_tgtobj, _srcobj); \
 	} while (0)
 
@@ -1954,6 +1995,8 @@ void dp_update_vdev_stats_on_peer_unmap(struct dp_vdev *vdev,
 		} \
 		for (i = 0; i < WME_AC_MAX; i++) { \
 			_tgtobj->tx.wme_ac_type[i] += _srcobj->tx.wme_ac_type[i]; \
+			_tgtobj->tx.wme_ac_type_bytes[i] += \
+					_srcobj->tx.wme_ac_type_bytes[i]; \
 			_tgtobj->tx.excess_retries_per_ac[i] += \
 					_srcobj->tx.excess_retries_per_ac[i]; \
 		} \
@@ -1985,6 +2028,14 @@ void dp_update_vdev_stats_on_peer_unmap(struct dp_vdev *vdev,
 		for (i = 0; i < MAX_MU_GROUP_ID; i++) { \
 			_tgtobj->tx.mu_group_id[i] = _srcobj->tx.mu_group_id[i]; \
 		} \
+		_tgtobj->tx.tx_ucast_total.num += \
+				_srcobj->tx.tx_ucast_total.num;\
+		_tgtobj->tx.tx_ucast_total.bytes += \
+				 _srcobj->tx.tx_ucast_total.bytes;\
+		_tgtobj->tx.tx_ucast_success.num += \
+				_srcobj->tx.tx_ucast_success.num; \
+		_tgtobj->tx.tx_ucast_success.bytes += \
+				_srcobj->tx.tx_ucast_success.bytes; \
 		\
 		_tgtobj->rx.mpdu_cnt_fcs_ok += _srcobj->rx.mpdu_cnt_fcs_ok; \
 		_tgtobj->rx.mpdu_cnt_fcs_err += _srcobj->rx.mpdu_cnt_fcs_err; \
@@ -2018,6 +2069,8 @@ void dp_update_vdev_stats_on_peer_unmap(struct dp_vdev *vdev,
 		} \
 		for (i = 0; i < WME_AC_MAX; i++) { \
 			_tgtobj->rx.wme_ac_type[i] += _srcobj->rx.wme_ac_type[i]; \
+			_tgtobj->rx.wme_ac_type_bytes[i] += \
+					_srcobj->rx.wme_ac_type_bytes[i]; \
 		} \
 		for (i = 0; i < MAX_MCS; i++) { \
 			_tgtobj->rx.su_ax_ppdu_cnt.mcs_count[i] += \
@@ -2120,17 +2173,6 @@ QDF_STATUS dp_register_peer(struct cdp_soc_t *soc_hdl, uint8_t pdev_id,
  */
 QDF_STATUS dp_clear_peer(struct cdp_soc_t *soc_hdl, uint8_t pdev_id,
 			 struct qdf_mac_addr peer_addr);
-
-/*
- * dp_find_peer_exist - find peer if already exists
- * @soc: datapath soc handle
- * @pdev_id: physical device instance id
- * @peer_mac_addr: peer mac address
- *
- * Return: true or false
- */
-bool dp_find_peer_exist(struct cdp_soc_t *soc_hdl, uint8_t pdev_id,
-			uint8_t *peer_addr);
 
 /*
  * dp_find_peer_exist_on_vdev - find if peer exists on the given vdev
@@ -2252,6 +2294,17 @@ void dp_set_peer_as_tdls_peer(struct cdp_soc_t *soc_hdl, uint8_t vdev_id,
 }
 #endif
 
+/*
+ * dp_find_peer_exist - find peer if already exists
+ * @soc: datapath soc handle
+ * @pdev_id: physical device instance id
+ * @peer_mac_addr: peer mac address
+ *
+ * Return: true or false
+ */
+bool dp_find_peer_exist(struct cdp_soc_t *soc_hdl, uint8_t pdev_id,
+			uint8_t *peer_addr);
+
 int dp_addba_resp_tx_completion_wifi3(struct cdp_soc_t *cdp_soc,
 				      uint8_t *peer_mac, uint16_t vdev_id,
 				      uint8_t tid,
@@ -2372,6 +2425,13 @@ void dp_peer_update_tid_stats_from_reo(struct dp_soc *soc, void *cb_ctxt,
 				       union hal_reo_status *reo_status);
 int dp_peer_get_rxtid_stats_ipa(struct dp_peer *peer,
 				dp_rxtid_stats_cmd_cb dp_stats_cmd_cb);
+#ifdef QCA_ENHANCED_STATS_SUPPORT
+void dp_peer_aggregate_tid_stats(struct dp_peer *peer);
+#endif
+#else
+static inline void dp_peer_aggregate_tid_stats(struct dp_peer *peer)
+{
+}
 #endif
 QDF_STATUS
 dp_set_pn_check_wifi3(struct cdp_soc_t *soc, uint8_t vdev_id,
@@ -2545,6 +2605,14 @@ void dp_print_soc_tx_stats(struct dp_soc *soc);
  */
 void dp_print_soc_interrupt_stats(struct dp_soc *soc);
 
+/**
+ * dp_print_tx_ppeds_stats() - Print Tx in use stats for the soc in DS
+ * @soc: dp_soc handle
+ *
+ * Return: None
+ */
+
+void dp_print_tx_ppeds_stats(struct dp_soc *soc);
 #ifdef WLAN_DP_SRNG_USAGE_WM_TRACKING
 /**
  * dp_dump_srng_high_wm_stats() - Print the ring usage high watermark stats
@@ -3294,6 +3362,26 @@ void dp_rx_fst_detach(struct dp_soc *soc, struct dp_pdev *pdev)
 {
 }
 #endif
+
+/**
+ * dp_rx_fst_attach_wrapper() - wrapper API for dp_rx_fst_attach
+ * @soc: SoC handle
+ * @pdev: Pdev handle
+ *
+ * Return: Handle to flow search table entry
+ */
+extern QDF_STATUS
+dp_rx_fst_attach_wrapper(struct dp_soc *soc, struct dp_pdev *pdev);
+
+/**
+ * dp_rx_fst_detach_wrapper() - wrapper API for dp_rx_fst_detach
+ * @soc: SoC handle
+ * @pdev: Pdev handle
+ *
+ * Return: None
+ */
+extern void
+dp_rx_fst_detach_wrapper(struct dp_soc *soc, struct dp_pdev *pdev);
 
 /**
  * dp_vdev_get_ref() - API to take a reference for VDEV object
@@ -4311,4 +4399,16 @@ void dp_destroy_direct_link_refill_ring(struct cdp_soc_t *soc_hdl,
 {
 }
 #endif
+
+/*
+ * dp_soc_interrupt_detach() - Deregister any allocations done for interrupts
+ * @txrx_soc: DP SOC handle
+ *
+ * Return: none
+ */
+void dp_soc_interrupt_detach(struct cdp_soc_t *txrx_soc);
+
+void dp_get_peer_stats(struct dp_peer *peer,
+		       struct cdp_peer_stats *peer_stats);
+
 #endif /* #ifndef _DP_INTERNAL_H_ */

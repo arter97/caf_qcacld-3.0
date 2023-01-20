@@ -209,6 +209,7 @@ static inline void wlan_crypto_put_be64(u8 *a, u64 val)
 #define RSN_AUTH_KEY_MGMT_OWE           WLAN_RSN_SEL(18)
 #define RSN_AUTH_KEY_MGMT_FT_PSK_SHA384 WLAN_RSN_SEL(19)
 #define RSN_AUTH_KEY_MGMT_PSK_SHA384    WLAN_RSN_SEL(20)
+#define RSN_AUTH_KEY_MGMT_SAE_EXT_KEY   WLAN_RSN_SEL(24)
 
 #define RSN_AUTH_KEY_MGMT_CCKM          (WLAN_RSN_CCKM_AKM)
 #define RSN_AUTH_KEY_MGMT_OSEN          (0x019a6f50)

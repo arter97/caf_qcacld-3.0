@@ -1224,4 +1224,20 @@ mlme_twt_vdev_destroy_notification(struct wlan_objmgr_vdev *vdev)
 
 #endif /* WLAN_SUPPORT_TWT && WLAN_TWT_CONV_SUPPORTED */
 
+/**
+ * mlme_vdev_reconfig_timer_cb() - vdev ml reconfig timer callback
+ * @arg: timer argument
+ *
+ * Return: None
+ */
+void mlme_vdev_reconfig_timer_cb(void *arg);
+
+/**
+ * mlme_mlo_is_reconfig_reassoc_enable() - Get if reassoc on mlo reconfig link
+ * add is enable
+ * @psoc: Object manager psoc pointer
+ *
+ * Return: True if reassoc on mlo reconfig link add ie enable
+ */
+bool mlme_mlo_is_reconfig_reassoc_enable(struct wlan_objmgr_psoc *psoc);
 #endif

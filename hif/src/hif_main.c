@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2015-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -532,6 +532,22 @@ void *hif_get_dev_ba_ce(struct hif_opaque_softc *hif_handle)
 }
 
 qdf_export_symbol(hif_get_dev_ba_ce);
+
+/**
+ * hif_get_dev_ba_pmm(): API to get device pmm base address.
+ * @scn: scn
+ *
+ * Return: dev mem base address for PMM
+ */
+
+void *hif_get_dev_ba_pmm(struct hif_opaque_softc *hif_handle)
+{
+	struct hif_softc *scn = (struct hif_softc *)hif_handle;
+
+	return scn->mem_pmm_base;
+}
+
+qdf_export_symbol(hif_get_dev_ba_pmm);
 
 uint32_t hif_get_soc_version(struct hif_opaque_softc *hif_handle)
 {

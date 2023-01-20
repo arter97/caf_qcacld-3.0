@@ -32,6 +32,8 @@ typedef __qdf_ktime_t qdf_ktime_t;
 typedef __qdf_timespec_t qdf_timespec_t;
 typedef __qdf_work_struct_t qdf_work_struct_t;
 
+#define qdf_time_uint_to_ms(tu) (((tu) * 1024) / 1000)
+
 #ifdef ENHANCED_OS_ABSTRACTION
 /**
  * qdf_ns_to_ktime - Converts nanoseconds to a qdf_ktime_t object

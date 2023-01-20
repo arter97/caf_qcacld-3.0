@@ -194,6 +194,8 @@ do {                                            \
  *       <enum 1 transmit_bw_40_MHz>
  *       <enum 2 transmit_bw_80_MHz>
  *       <enum 3 transmit_bw_160_MHz>
+ *       <enum 4 transmit_bw_320_MHz>
+ *       <enum 5 transmit_bw_240_MHz>
  * @pkt_type: Transmit Packet Type
  * @stbc: When set, STBC transmission rate was used
  * @ldpc: When set, use LDPC transmission rates
@@ -220,7 +222,7 @@ struct hal_tx_completion_status {
 	uint8_t first_msdu:1,
 		last_msdu:1,
 		msdu_part_of_amsdu:1;
-	uint32_t bw:2,
+	uint32_t bw:3,
 		 pkt_type:4,
 		 stbc:1,
 		 ldpc:1,

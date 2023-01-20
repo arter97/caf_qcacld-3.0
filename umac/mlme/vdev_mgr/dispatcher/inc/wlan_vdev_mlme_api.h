@@ -35,7 +35,7 @@
 #define NON_SRG_PARAM_VAL_DBM_SIZE 1
 #define NON_SRG_MAX_PD_OFFSET_POS 0
 #define NON_SRG_MAX_PD_OFFSET_SIZE 8
-#define NON_SR_PD_THRESHOLD_MIN -82
+#define SR_PD_THRESHOLD_MIN -82
 #define SRG_SPR_ENABLE_POS 30
 #define SRG_THRESHOLD_MAX_PD_POS 8
 #define NON_SRG_PD_SR_DISALLOWED 0x02
@@ -45,11 +45,12 @@
 #define NON_SRG_SPR_ENABLE_POS 31
 #define NON_SRG_SPR_ENABLE 0x80
 #define NON_SR_PD_THRESHOLD_DISABLED 0x80
+#define SR_PADDING_BYTE 8
 #endif
 
 
 /**
- * wlan_mlme_peer_param_id - peer param id in mlme layer
+ * enum wlan_mlme_peer_param_id - peer param id in mlme layer
  * @WLAN_MLME_PEER_BW_PUNCTURE: update puncture 20 MHz bitmap
  */
 enum wlan_mlme_peer_param_id {
@@ -229,6 +230,7 @@ QDF_STATUS wlan_vdev_is_dfs_cac_wait(struct wlan_objmgr_vdev *vdev);
 
 /**
  * wlan_vdev_mlme_cmd_lock - Acquire lock for command queuing atomicity
+ * vdev: Object manager VDEV object
  *
  * API to take VDEV MLME command lock
  *
@@ -238,6 +240,7 @@ void wlan_vdev_mlme_cmd_lock(struct wlan_objmgr_vdev *vdev);
 
 /**
  * wlan_vdev_mlme_cmd_unlock - Release lock for command queuing atomicity
+ * vdev: Object manager VDEV object
  *
  * API to release VDEV MLME command lock
  *

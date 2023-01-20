@@ -157,7 +157,6 @@ dp_rx_wds_add_or_update_ast(struct dp_soc *soc,
 	struct dp_peer *sa_peer;
 	struct dp_ast_entry *ast;
 	uint32_t flags = DP_AST_FLAGS_HM;
-	uint32_t ret = 0;
 	struct dp_pdev *pdev = ta_peer->vdev->pdev;
 	uint8_t wds_src_mac[QDF_MAC_ADDR_SIZE];
 	struct dp_peer *ta_base_peer;
@@ -177,8 +176,8 @@ dp_rx_wds_add_or_update_ast(struct dp_soc *soc,
 			if (ta_peer->vdev->opmode == wlan_op_mode_ap)
 				dp_wds_ext_peer_learn(soc, ta_base_peer);
 
-			ret = dp_peer_add_ast(soc, ta_base_peer, wds_src_mac,
-					      CDP_TXRX_AST_TYPE_WDS, flags);
+			dp_peer_add_ast(soc, ta_base_peer, wds_src_mac,
+					CDP_TXRX_AST_TYPE_WDS, flags);
 
 			dp_peer_unref_delete(ta_base_peer, DP_MOD_ID_RX);
 		}
@@ -213,10 +212,10 @@ dp_rx_wds_add_or_update_ast(struct dp_soc *soc,
 							     DP_MOD_ID_RX);
 
 			if (ta_base_peer) {
-				ret = dp_peer_add_ast(soc, ta_base_peer,
-						      wds_src_mac,
-						      CDP_TXRX_AST_TYPE_WDS,
-						      flags);
+				dp_peer_add_ast(soc, ta_base_peer,
+						wds_src_mac,
+						CDP_TXRX_AST_TYPE_WDS,
+						flags);
 
 				dp_peer_unref_delete(ta_base_peer,
 						     DP_MOD_ID_RX);

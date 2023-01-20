@@ -865,6 +865,7 @@ static void dp_rx_stats_update(struct dp_pdev *pdev,
 	enum cdp_mu_packet_type mu_pkt_type;
 	struct dp_mon_ops *mon_ops;
 	struct dp_mon_pdev *mon_pdev = NULL;
+	uint64_t byte_count;
 
 	if (qdf_likely(pdev))
 		soc = pdev->soc;
@@ -910,6 +911,8 @@ static void dp_rx_stats_update(struct dp_pdev *pdev,
 		}
 
 		num_msdu = ppdu_user->num_msdu;
+		byte_count = ppdu_user->mpdu_ok_byte_count +
+			ppdu_user->mpdu_err_byte_count;
 
 		pkt_bw_offset = dp_get_bw_offset_frm_bw(soc, ppdu->u.bw);
 		DP_STATS_UPD(mon_peer, rx.snr, (ppdu->rssi + pkt_bw_offset));
@@ -1030,8 +1033,11 @@ static void dp_rx_stats_update(struct dp_pdev *pdev,
 		 */
 		ac = TID_TO_WME_AC(ppdu_user->tid);
 
-		if (qdf_likely(ppdu->tid != HAL_TID_INVALID))
+		if (qdf_likely(ppdu->tid != HAL_TID_INVALID)) {
 			DP_STATS_INC(mon_peer, rx.wme_ac_type[ac], num_msdu);
+			DP_STATS_INC(mon_peer, rx.wme_ac_type_bytes[ac],
+				     byte_count);
+		}
 
 		DP_STATS_INC(mon_peer, rx.rx_ppdus, 1);
 		DP_STATS_INC(mon_peer, rx.rx_mpdus,
@@ -2035,6 +2041,8 @@ dp_mon_rx_stats_update_rssi_dbm_params(struct dp_mon_pdev *mon_pdev,
 	ppdu_info->rx_status.rssi_offset = mon_pdev->rssi_offsets.rssi_offset;
 	ppdu_info->rx_status.rssi_dbm_conv_support =
 				mon_pdev->rssi_dbm_conv_support;
+	ppdu_info->rx_status.chan_noise_floor =
+		mon_pdev->rssi_offsets.rssi_offset;
 }
 
 #ifdef WLAN_SUPPORT_CTRL_FRAME_STATS

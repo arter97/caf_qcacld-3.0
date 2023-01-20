@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2013-2019 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -179,6 +179,7 @@ uint32_t wmitlv_get_attributes(uint32_t is_cmd_id, uint32_t cmd_event_id,
  * wmitlv_check_tlv_params() - tlv helper function
  * @os_handle: os context handle
  * @param_struc_ptr: pointer to tlv structure
+ * @param_buf_len: length of input buffer
  * @is_cmd_id: boolean for command attribute
  * @wmi_cmd_event_id: command event id
  *
@@ -424,7 +425,7 @@ Error_wmitlv_check_tlv_params:
  * wmitlv_check_event_tlv_params() - tlv helper function
  * @os_handle: os context handle
  * @param_struc_ptr: pointer to tlv structure
- * @is_cmd_id: boolean for command attribute
+ * @param_buf_len: length of input buffer
  * @wmi_cmd_event_id: command event id
  *
  *
@@ -448,7 +449,7 @@ wmitlv_check_event_tlv_params(void *os_handle, void *param_struc_ptr,
  * wmitlv_check_command_tlv_params() - tlv helper function
  * @os_handle: os context handle
  * @param_struc_ptr: pointer to tlv structure
- * @is_cmd_id: boolean for command attribute
+ * @param_buf_len: length of input buffer
  * @wmi_cmd_event_id: command event id
  *
  *
@@ -661,7 +662,9 @@ wmitlv_check_and_pad_tlvs(void *os_handle, void *param_struc_ptr,
 			    || (WMITLV_TAG_ARRAY_BYTE ==
 				attr_struct_ptr.tag_id)
 			    || (WMITLV_TAG_ARRAY_FIXED_STRUC ==
-				attr_struct_ptr.tag_id)) {
+				attr_struct_ptr.tag_id) ||
+				(WMITLV_TAG_ARRAY_INT16 ==
+					attr_struct_ptr.tag_id)) {
 				tlv_size_diff = 0;
 				num_of_elems =
 					curr_tlv_len /
@@ -1157,6 +1160,7 @@ wmi_versions_are_compatible(wmi_abi_version *vers1, wmi_abi_version *vers2)
 
 /**
  * wmi_versions_can_downgrade() - tlv helper function
+ * @num_allowlist: number of entries in @version_whitelist_table
  * @version_whitelist_table: version table
  * @my_vers: host version
  * @opp_vers: target version
@@ -1272,6 +1276,7 @@ wmi_versions_can_downgrade(int num_allowlist,
 
 /**
  * wmi_cmp_and_set_abi_version() - tlv helper function
+ * @num_allowlist: number of entries in @version_whitelist_table
  * @version_whitelist_table: version table
  * @my_vers: host version
  * @opp_vers: target version

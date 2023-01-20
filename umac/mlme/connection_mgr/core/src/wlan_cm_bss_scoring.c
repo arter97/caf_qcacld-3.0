@@ -528,7 +528,8 @@ static int32_t cm_calculate_security_score(struct scoring_cfg *score_config,
 		    QDF_HAS_PARAM(key_mgmt, WLAN_CRYPTO_KEY_MGMT_OWE) ||
 		    QDF_HAS_PARAM(key_mgmt, WLAN_CRYPTO_KEY_MGMT_DPP) ||
 		    QDF_HAS_PARAM(key_mgmt,
-				  WLAN_CRYPTO_KEY_MGMT_FT_IEEE8021X_SHA384)) {
+				  WLAN_CRYPTO_KEY_MGMT_FT_IEEE8021X_SHA384) ||
+		    QDF_HAS_PARAM(key_mgmt, WLAN_CRYPTO_KEY_MGMT_SAE_EXT_KEY)) {
 			/*If security is WPA3, consider score_pct = 100%*/
 			score_pct = CM_GET_SCORE_PERCENTAGE(
 					score_config->security_weight_per_index,
@@ -1996,6 +1997,7 @@ static int cm_calculate_bss_score(struct wlan_objmgr_psoc *psoc,
 	bool same_bucket = false;
 	bool ap_su_beam_former = false;
 	struct wlan_ie_vhtcaps *vht_cap;
+	struct wlan_ie_hecaps *he_cap;
 	struct scoring_cfg *score_config;
 	struct weight_cfg *weight_config;
 	uint32_t sta_nss;
@@ -2104,10 +2106,18 @@ static int cm_calculate_bss_score(struct wlan_objmgr_psoc *psoc,
 				score_config->rssi_score.bad_rssi_bucket_size);
 
 	vht_cap = (struct wlan_ie_vhtcaps *)util_scan_entry_vhtcap(entry);
-	if (vht_cap && vht_cap->su_beam_former)
+	he_cap = (struct wlan_ie_hecaps *)util_scan_entry_hecap(entry);
+
+	if (vht_cap && vht_cap->su_beam_former) {
 		ap_su_beam_former = true;
-	else
+	} else if (he_cap && QDF_GET_BITS(*(he_cap->he_phy_cap.phy_cap_bytes +
+		   WLAN_HE_PHYCAP_SU_BFER_OFFSET), WLAN_HE_PHYCAP_SU_BFER_IDX,
+		   WLAN_HE_PHYCAP_SU_BFER_BITS)) {
+		ap_su_beam_former = true;
+	} else {
 		ap_su_beam_former = cm_get_su_beam_former(entry);
+	}
+
 	if (phy_config->beamformee_cap && is_vht &&
 	    ap_su_beam_former &&
 	    (entry->rssi_raw > rssi_pref_5g_rssi_thresh) && !same_bucket)
@@ -2488,7 +2498,8 @@ bool wlan_cm_6ghz_allowed_for_akm(struct wlan_objmgr_psoc *psoc,
 
 	/* for SAE we need to check H2E support */
 	if (!(QDF_HAS_PARAM(key_mgmt, WLAN_CRYPTO_KEY_MGMT_SAE) ||
-	    QDF_HAS_PARAM(key_mgmt, WLAN_CRYPTO_KEY_MGMT_FT_SAE)))
+	    QDF_HAS_PARAM(key_mgmt, WLAN_CRYPTO_KEY_MGMT_FT_SAE) ||
+	    QDF_HAS_PARAM(key_mgmt, WLAN_CRYPTO_KEY_MGMT_SAE_EXT_KEY)))
 		return true;
 
 	return (cm_check_h2e_support(rsnxe) ||

@@ -164,8 +164,8 @@ static inline void __qdf_zero_macaddr(struct qdf_mac_addr *mac_addr)
  * Return: true if the MacAddress's are equal
  *      not true if the MacAddress's are not equal
  */
-static inline bool __qdf_is_macaddr_equal(struct qdf_mac_addr *mac_addr1,
-					  struct qdf_mac_addr *mac_addr2)
+static inline bool __qdf_is_macaddr_equal(const struct qdf_mac_addr *mac_addr1,
+					  const struct qdf_mac_addr *mac_addr2)
 {
 	return 0 == memcmp(mac_addr1, mac_addr2, QDF_MAC_ADDR_SIZE);
 }

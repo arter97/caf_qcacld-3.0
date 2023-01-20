@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -105,6 +105,15 @@ bool mlo_is_mld_sta(struct wlan_objmgr_vdev *vdev);
  * Return: true if mld is disconnected, false otherwise
  */
 bool ucfg_mlo_is_mld_disconnected(struct wlan_objmgr_vdev *vdev);
+
+/**
+ * mlo_is_mld_disconnecting_connecting - Check whether MLD is disconnecting or
+ * connecting
+ * @vdev: pointer to vdev
+ *
+ * Return: true if mld is disconnecting or connecting, false otherwise
+ */
+bool mlo_is_mld_disconnecting_connecting(struct wlan_objmgr_vdev *vdev);
 
 #ifndef WLAN_FEATURE_11BE_MLO_ADV_FEATURE
 /**
@@ -561,6 +570,21 @@ void mlo_internal_disconnect_links(struct wlan_objmgr_vdev *vdev);
  */
 void mlo_sta_get_vdev_list(struct wlan_objmgr_vdev *vdev, uint16_t *vdev_count,
 			   struct wlan_objmgr_vdev **wlan_vdev_list);
+
+/**
+ * mlo_process_ml_reconfig_ie() - process ml reconfig ie for vdev
+ * @vdev: vdev pointer
+ * @scan_entry: RootAP scan entry
+ * @ml_ie: Pointer to ML IE
+ * @ml_ie_len: Length of ML IE
+ * @partner_info: Cached partner info
+ *
+ * Return: None
+ */
+void mlo_process_ml_reconfig_ie(struct wlan_objmgr_vdev *vdev,
+				struct scan_cache_entry *scan_entry,
+				uint8_t *ml_ie, qdf_size_t ml_ie_len,
+				struct mlo_partner_info *partner_info);
 #else
 static inline
 QDF_STATUS mlo_connect(struct wlan_objmgr_vdev *vdev,
@@ -616,6 +640,12 @@ bool ucfg_mlo_is_mld_disconnected(struct wlan_objmgr_vdev *vdev)
 	return true;
 }
 #endif
+
+static inline
+bool mlo_is_mld_disconnecting_connecting(struct wlan_objmgr_vdev *vdev)
+{
+	return false;
+}
 
 static inline
 bool mlo_is_mld_sta(struct wlan_objmgr_vdev *vdev)
@@ -707,5 +737,12 @@ bool mlo_get_keys_saved(struct wlan_objmgr_vdev *vdev,
 {
 	return false;
 }
+
+static inline
+void mlo_process_ml_reconfig_ie(struct wlan_objmgr_vdev *vdev,
+				struct scan_cache_entry *scan_entry,
+				uint8_t *ml_ie, qdf_size_t ml_ie_len,
+				struct mlo_partner_info *partner_info)
+{ }
 #endif
 #endif

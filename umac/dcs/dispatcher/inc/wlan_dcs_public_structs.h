@@ -28,12 +28,14 @@
  * @WLAN_HOST_DCS_CWIM: continuous wave interference
  * @WLAN_HOST_DCS_WLANIM: wlan interference stats
  * @WLAN_HOST_DCS_AWGNIM: additive white Gaussian noise (awgn) interference
+ * @WLAN_HOST_DCS_AFC: AFC data update 6 GHz SP channels
  */
 enum wlan_host_dcs_type {
 	WLAN_HOST_DCS_NONE   = 0,      /* 0x0 */
 	WLAN_HOST_DCS_CWIM   = BIT(0), /* 0x1 */
 	WLAN_HOST_DCS_WLANIM = BIT(1), /* 0x2 */
 	WLAN_HOST_DCS_AWGNIM = BIT(2), /* 0x4 */
+	WLAN_HOST_DCS_AFC    = BIT(3), /* 0x8 */
 };
 
 /**

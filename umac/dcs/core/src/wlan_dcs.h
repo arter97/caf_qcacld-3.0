@@ -144,6 +144,52 @@ struct psoc_dcs_cbk {
 	void *arg;
 };
 
+#define WLAN_DCS_MAX_STA_NUM  1
+#define WLAN_DCS_MAX_SAP_NUM  2
+#define WLAN_DCS_AFC_PREFER_BW  CH_WIDTH_80MHZ
+
+/**
+ * struct connection_chan_info - define connection channel information
+ * @freq: channel frequency
+ * @bw: channel bandwidth
+ * @vdev_id: connection vdev id
+ */
+struct connection_chan_info {
+	qdf_freq_t freq;
+	enum phy_ch_width bw;
+	uint8_t vdev_id;
+};
+
+/**
+ * struct wlan_dcs_conn_info - define arguments list for DCS when AFC updated
+ * @sta_cnt: station count
+ * @sap_5ghz_cnt: 5 GHz sap count
+ * @sap_6ghz_cnt: 6 GHz sap count
+ * @sta: connection info of station
+ * @sap_5ghz: connection info of 5 GHz sap
+ * @sap_6ghz: connection info of 6 GHz sap
+ * @exit_condition: flag to exit iteration immediately
+ */
+struct wlan_dcs_conn_info {
+	uint8_t sta_cnt;
+	uint8_t sap_5ghz_cnt;
+	uint8_t sap_6ghz_cnt;
+	struct connection_chan_info sta[WLAN_DCS_MAX_STA_NUM];
+	struct connection_chan_info sap_5ghz[WLAN_DCS_MAX_SAP_NUM];
+	struct connection_chan_info sap_6ghz[WLAN_DCS_MAX_SAP_NUM];
+	bool exit_condition;
+};
+
+/**
+ * struct dcs_afc_select_chan_cbk - define sap afc select channel callback
+ * @cbk: callback
+ * @arg: argument supply by register
+ */
+struct dcs_afc_select_chan_cbk {
+	dcs_afc_select_chan_cb cbk;
+	void *arg;
+};
+
 /**
  * struct dcs_pdev_priv_obj - define dcs pdev priv
  * @dcs_host_params: dcs host configuration parameter
@@ -218,11 +264,13 @@ enum wlan_dcs_chan_seg {
  * @dcs_pdev_priv: dcs pdev priv
  * @dcs_cbk: dcs callback
  * @switch_chan_cb: callback for switching channel
+ * @afc_sel_chan_cbk: callback for afc channel selection
  */
 struct dcs_psoc_priv_obj {
 	struct dcs_pdev_priv_obj dcs_pdev_priv[WLAN_DCS_MAX_PDEVS];
 	struct psoc_dcs_cbk dcs_cbk;
 	dcs_switch_chan_cb switch_chan_cb;
+	struct dcs_afc_select_chan_cbk afc_sel_chan_cbk;
 };
 
 /**

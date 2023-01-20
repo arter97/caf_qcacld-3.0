@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2014-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -1112,7 +1112,7 @@ qdf_shared_mem_t *qdf_mem_shared_mem_alloc(qdf_device_t osdev, uint32_t size);
  * @ctxt: Context to be passed to the cb
  * @pages: Multi page information storage
  * @elem_size: Each element size
- * @elem_count: Total number of elements should be allocated
+ * @elem_count: Total number of elements in the pool.
  * @cacheable: Coherent memory or cacheable memory
  * @cb: Callback to free the elements
  * @elem_list: elem list for delayed free

@@ -503,7 +503,7 @@ cm_handle_connect_flush(struct cnx_mgr *cm_ctx, struct cm_req *cm_req)
 	/* Get bssid and ssid and freq for the cm id from the req list */
 	cm_fill_connect_resp_from_req(resp, cm_req);
 
-	cm_notify_connect_complete(cm_ctx, resp);
+	cm_notify_connect_complete(cm_ctx, resp, 0);
 	qdf_mem_free(resp);
 }
 

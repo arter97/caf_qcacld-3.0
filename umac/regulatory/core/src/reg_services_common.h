@@ -350,6 +350,79 @@ QDF_STATUS reg_modify_chan_144(struct wlan_objmgr_pdev *pdev, bool en_chan_144);
  */
 bool reg_get_en_chan_144(struct wlan_objmgr_pdev *pdev);
 
+#if defined(CONFIG_BAND_6GHZ) && defined(CONFIG_AFC_SUPPORT)
+/**
+ * reg_get_enable_6ghz_sp_mode_support() - Get enable 6 GHz SP mode support
+ * @psoc: pointer to psoc object
+ *
+ * Return: enable 6 GHz SP mode support flag
+ */
+bool reg_get_enable_6ghz_sp_mode_support(struct wlan_objmgr_psoc *psoc);
+
+/**
+ * reg_set_enable_6ghz_sp_mode_support() - Set enable 6 GHz SP mode support
+ * @psoc: pointer to psoc object
+ * @value: value to be set
+ *
+ * Return: None
+ */
+void reg_set_enable_6ghz_sp_mode_support(struct wlan_objmgr_psoc *psoc,
+					 bool value);
+
+/**
+ * reg_get_afc_disable_timer_check() - Get AFC timer check flag
+ * @psoc: pointer to psoc object
+ *
+ * Return: AFC timer check flag
+ */
+bool reg_get_afc_disable_timer_check(struct wlan_objmgr_psoc *psoc);
+
+/**
+ * reg_set_afc_disable_timer_check() - Set AFC disable timer check
+ * @psoc: pointer to psoc object
+ * @value: value to be set
+ *
+ * Return: None
+ */
+void reg_set_afc_disable_timer_check(struct wlan_objmgr_psoc *psoc,
+				     bool value);
+
+/**
+ * reg_get_afc_disable_request_id_check() - Get AFC request id check flag
+ * @psoc: pointer to psoc object
+ *
+ * Return: AFC request id check flag
+ */
+bool reg_get_afc_disable_request_id_check(struct wlan_objmgr_psoc *psoc);
+
+/**
+ * reg_set_afc_disable_request_id_check() - Set AFC disable request id flag
+ * @psoc: pointer to psoc object
+ * @value: value to be set
+ *
+ * Return: None
+ */
+void reg_set_afc_disable_request_id_check(struct wlan_objmgr_psoc *psoc,
+					  bool value);
+
+/**
+ * reg_get_afc_noaction() - Get AFC no action flag
+ * @psoc: pointer to psoc object
+ *
+ * Return: AFC no action flag
+ */
+bool reg_get_afc_noaction(struct wlan_objmgr_psoc *psoc);
+
+/**
+ * reg_set_afc_noaction() - Set AFC no action flag
+ * @psoc: pointer to psoc object
+ * @value: value to be set
+ *
+ * Return: None
+ */
+void reg_set_afc_noaction(struct wlan_objmgr_psoc *psoc, bool value);
+#endif
+
 /**
  * reg_get_hal_reg_cap() - Get HAL REG capabilities
  * @psoc: psoc for country information
@@ -1160,6 +1233,42 @@ QDF_STATUS reg_extract_puncture_by_bw(enum phy_ch_width ori_bw,
  */
 void reg_set_create_punc_bitmap(struct ch_params *ch_params,
 				bool is_create_punc_bitmap);
+
+#ifdef CONFIG_REG_CLIENT
+/**
+ * reg_apply_puncture() - apply puncture to regulatory
+ * @pdev: pdev
+ * @puncture_bitmap: puncture bitmap
+ * @freq: sap operation freq
+ * @bw: band width
+ * @cen320_freq: 320 MHz center freq
+ *
+ * When start ap, apply puncture to regulatory, set static puncture flag
+ * for all 20 MHz sub channels of current bonded channel in master channel list
+ * of pdev, and disable 20 MHz sub channel in current channel list if static
+ * puncture flag is set.
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS reg_apply_puncture(struct wlan_objmgr_pdev *pdev,
+			      uint16_t puncture_bitmap,
+			      qdf_freq_t freq,
+			      enum phy_ch_width bw,
+			      qdf_freq_t cen320_freq);
+
+/**
+ * wlan_reg_remove_puncture() - Remove puncture from regulatory
+ * @pdev: pdev
+ *
+ * When stop ap, remove puncture from regulatory, clear static puncture flag
+ * for all 20 MHz sub channels in master channel list of pdev, and don't disable
+ * 20 MHz sub channel in current channel list if static puncture flag is not
+ * set.
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS reg_remove_puncture(struct wlan_objmgr_pdev *pdev);
+#endif
 #else
 static inline
 QDF_STATUS reg_extract_puncture_by_bw(enum phy_ch_width ori_bw,
@@ -1220,6 +1329,57 @@ bool reg_is_dfs_for_freq(struct wlan_objmgr_pdev *pdev, qdf_freq_t freq);
  */
 bool reg_is_dfs_in_secondary_list_for_freq(struct wlan_objmgr_pdev *pdev,
 					   qdf_freq_t freq);
+
+/**
+ * reg_get_channel_power_attr_from_secondary_list_for_freq() - get channel
+ * power attributions from secondary channel list.
+ * @pdev: pdev pointer
+ * @freq: channel frequency
+ * @is_psd: pointer to retrieve value whether channel power is psd
+ * @tx_power: pointer to retrieve value of channel eirp tx power
+ * @psd_eirp: pointer to retrieve value of channel psd eirp power
+ * @flags: pointer to retrieve value of channel flags
+ *
+ * Return: QDF STATUS
+ */
+QDF_STATUS
+reg_get_channel_power_attr_from_secondary_list_for_freq(
+			struct wlan_objmgr_pdev *pdev,
+			qdf_freq_t freq, bool *is_psd,
+			uint16_t *tx_power, uint16_t *psd_eirp,
+			uint32_t *flags);
+
+#ifdef CONFIG_BAND_6GHZ
+/**
+ * reg_decide_6ghz_power_within_bw_for_freq() - decide tx power and 6 GHz power
+ * type given channel frequency and bandwidth.
+ * @pdev: pdev pointer
+ * @freq: channel frequency
+ * @bw: channel bandwidth
+ * @is_psd: pointer to retrieve value whether channel power is psd
+ * @min_tx_power: pointer to retrieve value of minimum eirp tx power in bw
+ * @min_psd_eirp: pointer to retrieve value of minimum psd eirp power in bw
+ * @power_type: pointer to retrieve value of 6 GHz power type
+ *
+ * Return: QDF STATUS
+ */
+QDF_STATUS
+reg_decide_6ghz_power_within_bw_for_freq(struct wlan_objmgr_pdev *pdev,
+					 qdf_freq_t freq, enum phy_ch_width bw,
+					 bool *is_psd, uint16_t *min_tx_power,
+					 int16_t *min_psd_eirp,
+					 enum reg_6g_ap_type *power_type);
+#else
+static inline QDF_STATUS
+reg_decide_6ghz_power_within_bw_for_freq(struct wlan_objmgr_pdev *pdev,
+					 qdf_freq_t freq, enum phy_ch_width bw,
+					 bool *is_psd, uint16_t *min_tx_power,
+					 int16_t *min_psd_eirp,
+					 enum reg_6g_ap_type *power_type)
+{
+	return QDF_STATUS_E_NOSUPPORT;
+}
+#endif
 #endif
 
 /**
@@ -1533,6 +1693,69 @@ enum band_info reg_band_bitmap_to_band_info(uint32_t band_bitmap);
 QDF_STATUS
 reg_update_tx_power_on_ctry_change(struct wlan_objmgr_pdev *pdev,
 				   uint8_t vdev_id);
+
+/**
+ * reg_add_indoor_concurrency() - Add the frequency to the indoor concurrency
+ * list
+ *
+ * @pdev: pointer to pdev
+ * @vdev_id: vdev id
+ * @freq: frequency
+ * @width: channel width
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+reg_add_indoor_concurrency(struct wlan_objmgr_pdev *pdev, uint8_t vdev_id,
+			   uint32_t freq, enum phy_ch_width width);
+
+/**
+ * reg_remove_indoor_concurrency() - Remove the vdev entry from the indoor
+ * concurrency list
+ *
+ * @pdev: pointer to pdev
+ * @vdev_id: vdev id
+ * @freq: frequency
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+reg_remove_indoor_concurrency(struct wlan_objmgr_pdev *pdev, uint8_t vdev_id,
+			      uint32_t freq);
+
+/**
+ * reg_init_indoor_channel_list() - Initialize the indoor concurrency list
+ *
+ * @pdev: pointer to pdev
+ *
+ * Return: None
+ */
+void
+reg_init_indoor_channel_list(struct wlan_objmgr_pdev *pdev);
+/**
+ * reg_compute_indoor_list_on_cc_change() - Recompute the indoor concurrency
+ * list on a country change
+ *
+ * @psoc: pointer to psoc
+ * @pdev: pointer to pdev
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+reg_compute_indoor_list_on_cc_change(struct wlan_objmgr_psoc *psoc,
+				     struct wlan_objmgr_pdev *pdev);
+#else
+static inline void
+reg_init_indoor_channel_list(struct wlan_objmgr_pdev *pdev)
+{
+}
+
+static inline QDF_STATUS
+reg_compute_indoor_list_on_cc_change(struct wlan_objmgr_psoc *psoc,
+				     struct wlan_objmgr_pdev *pdev)
+{
+	return QDF_STATUS_SUCCESS;
+}
 #endif
 
 #if defined(CONFIG_BAND_6GHZ)
@@ -1736,6 +1959,28 @@ reg_get_cur_6g_client_type(struct wlan_objmgr_pdev *pdev,
 			   *reg_cur_6g_client_mobility_type);
 
 /**
+ * reg_set_cur_6ghz_client_type() - Set the cur 6 GHz regulatory client type to
+ * the given value.
+ * @pdev: Pointer to PDEV object.
+ * @in_6ghz_client_type: Input 6 GHz client type ie. default/subordinate.
+ *
+ * Return: QDF_STATUS.
+ */
+QDF_STATUS
+reg_set_cur_6ghz_client_type(struct wlan_objmgr_pdev *pdev,
+			     enum reg_6g_client_type in_6ghz_client_type);
+
+/**
+ * reg_set_6ghz_client_type_from_target() - Set the current 6 GHz regulatory
+ * client type to the value received from target.
+ * @pdev: Pointer to PDEV object.
+ *
+ * Return: QDF_STATUS.
+ */
+QDF_STATUS
+reg_set_6ghz_client_type_from_target(struct wlan_objmgr_pdev *pdev);
+
+/**
  * reg_get_rnr_tpe_usable() - Tells if RNR IE is applicable for current domain.
  * @pdev: Pointer to PDEV object.
  * @reg_rnr_tpe_usable: Pointer to hold the bool value, true if RNR IE is
@@ -1894,6 +2139,19 @@ reg_get_cur_6g_client_type(struct wlan_objmgr_pdev *pdev,
 			   *reg_cur_6g_client_mobility_type)
 {
 	*reg_cur_6g_client_mobility_type = REG_SUBORDINATE_CLIENT;
+	return QDF_STATUS_E_NOSUPPORT;
+}
+
+static inline QDF_STATUS
+reg_set_cur_6ghz_client_type(struct wlan_objmgr_pdev *pdev,
+			     enum reg_6g_client_type in_6ghz_client_type)
+{
+	return QDF_STATUS_E_NOSUPPORT;
+}
+
+static inline QDF_STATUS
+reg_set_6ghz_client_type_from_target(struct wlan_objmgr_pdev *pdev)
+{
 	return QDF_STATUS_E_NOSUPPORT;
 }
 

@@ -28,7 +28,7 @@
 #include <target_if_mgmt_txrx_rx_reo.h>
 #include <wlan_lmac_if_api.h>
 #include <init_deinit_lmac.h>
-
+#include <wlan_mlo_mgr_setup.h>
 /**
  * target_if_mgmt_rx_reo_fw_consumed_event_handler() - WMI event handler to
  * process MGMT Rx FW consumed event handler
@@ -167,6 +167,7 @@ target_if_mgmt_rx_reo_get_num_active_hw_links(struct wlan_objmgr_psoc *psoc,
 					      int8_t *num_active_hw_links)
 {
 	struct wlan_lmac_if_mgmt_rx_reo_low_level_ops *low_level_ops;
+	uint8_t grp_id;
 
 	if (!psoc) {
 		mgmt_rx_reo_err("psoc is null");
@@ -178,6 +179,11 @@ target_if_mgmt_rx_reo_get_num_active_hw_links(struct wlan_objmgr_psoc *psoc,
 		return QDF_STATUS_E_NULL_VALUE;
 	}
 
+	if (!mlo_psoc_get_grp_id(psoc, &grp_id)) {
+		mgmt_rx_reo_err("Failed to get valid MLO Group id");
+		return QDF_STATUS_E_INVAL;
+	}
+
 	low_level_ops = target_if_get_mgmt_rx_reo_low_level_ops(psoc);
 
 	if (!low_level_ops) {
@@ -187,7 +193,7 @@ target_if_mgmt_rx_reo_get_num_active_hw_links(struct wlan_objmgr_psoc *psoc,
 
 	qdf_assert_always(low_level_ops->implemented);
 
-	*num_active_hw_links = low_level_ops->get_num_links();
+	*num_active_hw_links = low_level_ops->get_num_links(grp_id);
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -207,6 +213,7 @@ target_if_mgmt_rx_reo_get_valid_hw_link_bitmap(struct wlan_objmgr_psoc *psoc,
 					       uint16_t *valid_hw_link_bitmap)
 {
 	struct wlan_lmac_if_mgmt_rx_reo_low_level_ops *low_level_ops;
+	uint8_t grp_id;
 
 	if (!psoc) {
 		mgmt_rx_reo_err("psoc is null");
@@ -218,6 +225,11 @@ target_if_mgmt_rx_reo_get_valid_hw_link_bitmap(struct wlan_objmgr_psoc *psoc,
 		return QDF_STATUS_E_NULL_VALUE;
 	}
 
+	if (!mlo_psoc_get_grp_id(psoc, &grp_id)) {
+		mgmt_rx_reo_err("Failed to get valid MLO Group id");
+		return QDF_STATUS_E_INVAL;
+	}
+
 	low_level_ops = target_if_get_mgmt_rx_reo_low_level_ops(psoc);
 
 	if (!low_level_ops) {
@@ -227,7 +239,7 @@ target_if_mgmt_rx_reo_get_valid_hw_link_bitmap(struct wlan_objmgr_psoc *psoc,
 
 	qdf_assert_always(low_level_ops->implemented);
 
-	*valid_hw_link_bitmap = low_level_ops->get_valid_link_bitmap();
+	*valid_hw_link_bitmap = low_level_ops->get_valid_link_bitmap(grp_id);
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -471,9 +483,17 @@ target_if_mgmt_rx_reo_get_snapshot_info
 	struct wlan_lmac_if_mgmt_rx_reo_low_level_ops *low_level_ops;
 	int8_t link_id;
 	int8_t snapshot_version;
+	uint8_t grp_id;
+	struct wlan_objmgr_psoc *psoc;
 
 	if (!pdev) {
 		mgmt_rx_reo_err("pdev is null");
+		return QDF_STATUS_E_NULL_VALUE;
+	}
+
+	psoc = wlan_pdev_get_psoc(pdev);
+	if (!psoc) {
+		mgmt_rx_reo_err("psoc is null");
 		return QDF_STATUS_E_NULL_VALUE;
 	}
 
@@ -487,8 +507,12 @@ target_if_mgmt_rx_reo_get_snapshot_info
 		return QDF_STATUS_E_NULL_VALUE;
 	}
 
-	low_level_ops = target_if_get_mgmt_rx_reo_low_level_ops(
-				wlan_pdev_get_psoc(pdev));
+	if (!mlo_psoc_get_grp_id(psoc, &grp_id)) {
+		mgmt_rx_reo_err("Failed to get valid MLO Group id");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	low_level_ops = target_if_get_mgmt_rx_reo_low_level_ops(psoc);
 
 	if (!low_level_ops) {
 		mgmt_rx_reo_err("Low level ops of MGMT Rx REO is null");
@@ -501,12 +525,13 @@ target_if_mgmt_rx_reo_get_snapshot_info
 	qdf_assert_always(link_id >= 0);
 
 	snapshot_info->address =
-			low_level_ops->get_snapshot_address(link_id, id);
+			low_level_ops->get_snapshot_address(grp_id,
+							    link_id, id);
 
-	snapshot_version = low_level_ops->get_snapshot_version(id);
+	snapshot_version = low_level_ops->get_snapshot_version(grp_id, id);
 	if (snapshot_version < 0) {
-		mgmt_rx_reo_err("Invalid snapshot version %d",
-				snapshot_version);
+		mgmt_rx_reo_err("Invalid snapshot version %d MLO Group id %d",
+				snapshot_version, grp_id);
 		return QDF_STATUS_E_INVAL;
 	}
 
