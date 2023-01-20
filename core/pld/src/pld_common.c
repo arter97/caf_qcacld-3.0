@@ -2580,6 +2580,8 @@ const char *pld_bus_width_type_to_str(enum pld_bus_width_type level)
 		return "MEDIUM";
 	case PLD_BUS_WIDTH_HIGH:
 		return "HIGH";
+	case PLD_BUS_WIDTH_MID_HIGH:
+		return "MID_HIGH";
 	case PLD_BUS_WIDTH_VERY_HIGH:
 		return "VERY_HIGH";
 	case PLD_BUS_WIDTH_ULTRA_HIGH:
