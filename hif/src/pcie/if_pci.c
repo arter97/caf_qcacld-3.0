@@ -177,7 +177,7 @@ char *legacy_ic_irqname[] = {
  * use TargetCPU warm reset * instead of SOC_GLOBAL_RESET
  */
 #define CPU_WARM_RESET_WAR
-#define WLAN_CFG_MAX_PCIE_GROUPS 4
+#define WLAN_CFG_MAX_PCIE_GROUPS 5
 #ifdef QCA_WIFI_QCN9224
 #define WLAN_CFG_MAX_CE_COUNT 16
 #else
