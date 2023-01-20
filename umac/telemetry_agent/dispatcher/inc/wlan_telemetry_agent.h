@@ -229,6 +229,14 @@ QDF_STATUS telemetry_sawf_get_mov_avg(void *telemetry_ctx, uint8_t tid,
 				      uint8_t queue, uint32_t *nwdelaymov_avg,
 				      uint32_t *swdelaymov_avg,
 				      uint32_t *hwdelaymov_avg);
+
+/**
+ * telemetry_sawf_reset_peer_stats - Reset peer stats
+ * @peer_mac: pointer to peer mac-address
+ *
+ * Return: QDF_STATUS_SUCCESS on success
+ */
+QDF_STATUS telemetry_sawf_reset_peer_stats(uint8_t *peer_mac);
 #else
 #define wlan_telemetry_agent_application_init_notify(param)
 
@@ -359,6 +367,11 @@ QDF_STATUS telemetry_sawf_get_mov_avg(void *telemetry_ctx, uint8_t tid,
 				      uint8_t queue, uint32_t *nwdelay_mov_avg,
 				      uint32_t *swdelay_mov_avg,
 				      uint32_t *hwdelay_mov_avg)
+{
+	return QDF_STATUS_SUCCESS;
+}
+
+QDF_STATUS telemetry_sawf_reset_peer_stats(uint8_t *peer_mac)
 {
 	return QDF_STATUS_SUCCESS;
 }

@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2021, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
 
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -609,6 +610,33 @@ int dp_extap_tx_process(struct wlan_objmgr_vdev *vdev, struct sk_buff **skb,
 #endif
 qdf_export_symbol(dp_extap_tx_process);
 
+#ifdef WLAN_FEATURE_11BE_MLO
+int dp_extap_rx_process(struct wlan_objmgr_vdev *vdev, struct sk_buff *skb)
+{
+	qdf_ether_header_t *eh;
+	uint8_t vdev_mac[ETH_ALEN];
+
+	if (qdf_unlikely(wlan_rptr_vdev_is_extap(vdev) &&
+			 wlan_vdev_mlme_get_opmode(vdev) == QDF_STA_MODE)) {
+
+		if (wlan_vdev_mlme_is_mlo_vdev(vdev)) {
+			wlan_vdev_obj_lock(vdev);
+			qdf_mem_copy(vdev_mac, wlan_vdev_mlme_get_mldaddr(vdev), ETH_ALEN);
+			wlan_vdev_obj_unlock(vdev);
+		} else {
+			wlan_vdev_obj_lock(vdev);
+			qdf_mem_copy(vdev_mac, wlan_vdev_mlme_get_macaddr(vdev), ETH_ALEN);
+			wlan_vdev_obj_unlock(vdev);
+		}
+
+		eh = (qdf_ether_header_t *)skb->data;
+
+		if (dp_extap_input(dp_get_extap_handle(vdev), vdev_mac, eh))
+			return 1;
+	}
+	return 0;
+}
+#else
 int dp_extap_rx_process(struct wlan_objmgr_vdev *vdev, struct sk_buff *skb)
 {
 	qdf_ether_header_t *eh;
@@ -620,6 +648,7 @@ int dp_extap_rx_process(struct wlan_objmgr_vdev *vdev, struct sk_buff *skb)
 		wlan_vdev_obj_lock(vdev);
 		qdf_mem_copy(vdev_mac, wlan_vdev_mlme_get_macaddr(vdev), ETH_ALEN);
 		wlan_vdev_obj_unlock(vdev);
+
 		eh = (qdf_ether_header_t *)skb->data;
 
 		if (dp_extap_input(dp_get_extap_handle(vdev), vdev_mac, eh))
@@ -627,7 +656,7 @@ int dp_extap_rx_process(struct wlan_objmgr_vdev *vdev, struct sk_buff *skb)
 	}
 	return 0;
 }
-
+#endif
 qdf_export_symbol(dp_extap_rx_process);
 
 /**

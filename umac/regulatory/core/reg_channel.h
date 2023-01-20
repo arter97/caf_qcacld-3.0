@@ -358,27 +358,24 @@ reg_get_first_valid_freq(struct wlan_objmgr_pdev *pdev,
 			 qdf_freq_t *first_valid_freq,
 			 int bw, int sec_40_offset);
 
-#ifdef CONFIG_AFC_SUPPORT
+#ifdef CONFIG_BAND_6GHZ
 /**
-* reg_get_power_from_afc_list() - For a given frequency, fetch the EIRP
-* @pdev: Pointer to pdev.
-* power and PSD from the AFC channel list.
-* @freq - Channel frequency in MHz.
-* @reg_eirp: EIRP power.
-* @reg_psd - PSD.
-*
-* Return: QDF_STATUS.
-*/
-QDF_STATUS
-reg_get_power_from_afc_list(struct wlan_objmgr_pdev *pdev,
-			    qdf_freq_t freq, uint16_t *reg_eirp,
-			    uint16_t *reg_psd);
-#else
-static inline QDF_STATUS
-reg_get_power_from_afc_list(struct wlan_objmgr_pdev *pdev,
-			    qdf_freq_t freq, uint16_t *reg_eirp,
-			    uint16_t *reg_psd) {
-	return QDF_STATUS_E_NOSUPPORT;
-}
+ * reg_get_max_reg_eirp_from_list() - Fill the input chan_eirp_list with
+ * max_reg_eirp and channel information based on the input AP and client type.
+ * @pdev: Pointer to pdev
+ * @ap_pwr_type - 6G AP power type
+ * @is_client_power_needed - Flag to indicate if client power is needed
+ * @client_type - 6G client type
+ * @chan_eirp_list - Pointer to chan_eirp_list
+ * @num_6g_chans - Number of 6G channels
+ *
+ * Return: QDF_STATUS.
+ */
+QDF_STATUS reg_get_max_reg_eirp_from_list(struct wlan_objmgr_pdev *pdev,
+					  enum reg_6g_ap_type ap_pwr_type,
+					  bool is_client_power_needed,
+					  enum reg_6g_client_type client_type,
+					  struct channel_power *chan_eirp_list,
+					  uint8_t num_6g_chans);
 #endif
 #endif /* __REG_CHANNEL_H_ */

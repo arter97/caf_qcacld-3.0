@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -595,12 +595,6 @@ wlan_rptr_vdev_ucfg_config(struct wlan_objmgr_vdev *vdev, int param,
 	opmode = wlan_vdev_mlme_get_opmode(vdev);
 	switch (param) {
 	case IEEE80211_PARAM_EXTAP:
-#ifdef QCA_SUPPORT_WDS_EXTENDED
-		if (wlan_psoc_nif_feat_cap_get(psoc, WLAN_SOC_F_WDS_EXTENDED)) {
-			RPTR_LOGE("RPTR EXTAP can't coexist with WDSEXT mode");
-			break;
-		}
-#endif
 		if (value) {
 			if (value == 3 /* dbg */) {
 				dp_extap_mitbl_dump(dp_get_extap_handle
@@ -1124,7 +1118,7 @@ wlan_rptr_conn_up_dbdc_process(struct wlan_objmgr_vdev *vdev,
 	RPTR_GLOBAL_UNLOCK(&g_priv->rptr_global_lock);
 
 	if (wiphy && dev)
-		qca_multi_link_add_station_vap(wiphy, dev);
+		qca_multi_link_add_station_vap(wiphy, dev, wlan_vdev_mlme_get_mldaddr(vdev));
 
 	qca_multi_link_append_num_sta(true);
 

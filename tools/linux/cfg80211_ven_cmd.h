@@ -833,7 +833,14 @@ enum {
 	IEEE80211_PARAM_DROP_3ADDR_MCAST  = 788,  /* Flag to enable/disable 3address multicast pkt drops */
 #ifdef WLAN_FEATURE_11BE
 	IEEE80211_PARAM_EHT_CONFIG_CCFS0 = 789, /* Set 11be - EHT Config CCFS0 in 6GHz */
+	IEEE80211_PARAM_EHT_MAX_SUPP_LTF = 790, /* Set 11be - EHT Max LTF Support */
 #endif /* WLAN_FEATURE_11BE */
+#ifdef QCA_SUPPORT_WDS_EXTENDED
+	IEEE80211_PARAM_DROP_TX_MCAST  = 791,  /* Flag to enable/disable tx mcast pkt drops */
+#endif
+#if ATH_SUPPORT_DSCP_OVERRIDE
+	IEEE80211_PARAM_GDSCP_TID_MAP = 792, /* Get dscp-tid map */
+#endif
 };
 
 enum {
@@ -1417,6 +1424,10 @@ enum _ol_ath_param_t {
 	OL_ATH_PARAM_UMAC_RST_SKEL = 519,
 #endif
 	OL_ATH_PARAM_MON_MAC_FILTER = 520,
+	OL_ATH_PARAM_PUNC_EIRP_THRES = 521,
+	/* Display the current 6G client type */
+	OL_ATH_PARAM_DISPLAY_CLIENT_TYPE = 522,
+	OL_ATH_PARAM_EXCLUDE_EML_IN_SLO = 523,
 };
 
 #ifdef CONFIG_SUPPORT_VENCMDTABLE
@@ -1922,7 +1933,7 @@ struct vendor_commands vap_vendor_cmds[] = {
 	{"set_dscp_ovride",     IEEE80211_PARAM_DSCP_MAP_ID, SET_PARAM, 1},
 	{"get_dscp_ovride",     IEEE80211_PARAM_DSCP_MAP_ID, GET_PARAM, 0},
 	{"s_dscp_tid_map",      IEEE80211_PARAM_DSCP_TID_MAP, SET_PARAM, 2},
-	{"g_dscp_tid_map",      IEEE80211_PARAM_DSCP_TID_MAP, GET_PARAM, 0},
+	{"g_dscp_tid_map",      IEEE80211_PARAM_GDSCP_TID_MAP, SET_PARAM, 1},
 #endif
 	{"set_monrxfilter",     IEEE80211_PARAM_RX_FILTER_MONITOR, SET_PARAM, 2},
 	{"get_monrxfilter",     IEEE80211_PARAM_RX_FILTER_MONITOR, GET_PARAM, 0},
@@ -2075,12 +2086,12 @@ struct vendor_commands vap_vendor_cmds[] = {
 	{"get_he_mu_edca",      IEEE80211_PARAM_HE_MU_EDCA, GET_PARAM, 0},
 	{"he_frag",             IEEE80211_PARAM_HE_FRAGMENTATION, SET_PARAM, 1},
 	{"get_he_frag",         IEEE80211_PARAM_HE_FRAGMENTATION, GET_PARAM, 0},
-	{"he_dlofdma",          IEEE80211_PARAM_HE_DL_MU_OFDMA, SET_PARAM, 1},
-	{"get_he_dlofdma",      IEEE80211_PARAM_HE_DL_MU_OFDMA, GET_PARAM, 0},
-	{"he_ulmumimo",         IEEE80211_PARAM_HE_UL_MU_MIMO, SET_PARAM, 1},
-	{"get_he_ulmumimo",     IEEE80211_PARAM_HE_UL_MU_MIMO, GET_PARAM, 0},
-	{"he_ulofdma",          IEEE80211_PARAM_HE_UL_MU_OFDMA, SET_PARAM, 1},
-	{"get_he_ulofdma",      IEEE80211_PARAM_HE_UL_MU_OFDMA, GET_PARAM, 0},
+	{"he_dl_ofdma",          IEEE80211_PARAM_HE_DL_MU_OFDMA, SET_PARAM, 1},
+	{"get_he_dl_ofdma",      IEEE80211_PARAM_HE_DL_MU_OFDMA, GET_PARAM, 0},
+	{"he_ul_mimo",         IEEE80211_PARAM_HE_UL_MU_MIMO, SET_PARAM, 1},
+	{"get_he_ul_mimo",     IEEE80211_PARAM_HE_UL_MU_MIMO, GET_PARAM, 0},
+	{"he_ul_ofdma",          IEEE80211_PARAM_HE_UL_MU_OFDMA, SET_PARAM, 1},
+	{"get_he_ul_ofdma",      IEEE80211_PARAM_HE_UL_MU_OFDMA, GET_PARAM, 0},
 	{"qwrap_hk_war",        520, SET_PARAM, 1},
 	{"get_qwrap_hk_war",    520, GET_PARAM, 0},
 	{"qdf_cv_lvl",          IEEE80211_PARAM_CONFIG_CATEGORY_VERBOSE, SET_PARAM, 1},
@@ -2504,7 +2515,13 @@ struct vendor_commands vap_vendor_cmds[] = {
 #ifdef WLAN_FEATURE_11BE
 	{"eht_config_ccfs0",	IEEE80211_PARAM_EHT_CONFIG_CCFS0, SET_PARAM, 1},
 	{"get_eht_config_ccfs0",	IEEE80211_PARAM_EHT_CONFIG_CCFS0, GET_PARAM, 0},
+	{"eht_max_supp_ltf", IEEE80211_PARAM_EHT_MAX_SUPP_LTF, SET_PARAM, 1},
+	{"get_eht_max_supp_ltf",   IEEE80211_PARAM_EHT_MAX_SUPP_LTF, GET_PARAM, 0},
 #endif /* WLAN_FEATURE_11BE */
+#ifdef QCA_SUPPORT_WDS_EXTENDED
+	{"drop_tx_mcast",      IEEE80211_PARAM_DROP_TX_MCAST, SET_PARAM, 1},
+	{"get_drop_tx_mcast",  IEEE80211_PARAM_DROP_TX_MCAST, GET_PARAM, 0},
+#endif
 };
 
 struct vendor_commands radio_vendor_cmds[] = {
@@ -3553,6 +3570,9 @@ struct vendor_commands radio_vendor_cmds[] = {
 	{"ap_power_mode",
 		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_SET_AP_PWR_TYPE,
 		SET_PARAM, 1},
+	{"g_client_type",
+		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_DISPLAY_CLIENT_TYPE,
+		GET_PARAM, 0},
 #ifdef CONFIG_AFC_SUPPORT
 	{"dcs_afc_random_chan_en",
 		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_DCS_AFC_RANDOM_CHAN_EN,
@@ -3738,6 +3758,14 @@ struct vendor_commands radio_vendor_cmds[] = {
 		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_MON_MAC_FILTER, SET_PARAM, 1},
 	{"get_mon_mac_filter",
 		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_MON_MAC_FILTER, GET_PARAM, 0},
+	{"punc_eirp_thres",
+		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_PUNC_EIRP_THRES, SET_PARAM, 1},
+	{"g_punc_eirp_thres",
+		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_PUNC_EIRP_THRES, GET_PARAM, 0},
+	{"disable_eml_in_slo",
+		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_EXCLUDE_EML_IN_SLO, SET_PARAM, 1},
+	{"get_disable_eml_in_slo",
+		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_EXCLUDE_EML_IN_SLO, GET_PARAM, 0},
 };
 #endif
 

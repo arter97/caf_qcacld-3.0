@@ -80,9 +80,12 @@ telemetry_agent_peer_create_handler(struct wlan_objmgr_peer *peer,
 	struct wlan_objmgr_vdev *vdev = wlan_peer_get_vdev(peer);
 	struct wlan_objmgr_pdev *pdev = wlan_vdev_get_pdev(vdev);
 
-	if (wlan_peer_get_peer_type(peer) == WLAN_PEER_AP) {
+	if (wlan_peer_get_peer_type(peer) == WLAN_PEER_AP ||
+	    wlan_peer_get_peer_type(peer) == WLAN_PEER_STA_TEMP ||
+	    wlan_peer_get_peer_type(peer) == WLAN_PEER_MLO_TEMP) {
 		return status;
 	}
+
 	peer_obj.peer_back_pointer = peer;
 	peer_obj.pdev_back_pointer = pdev;
 	peer_obj.psoc_back_pointer = psoc;
@@ -146,7 +149,9 @@ telemetry_agent_peer_delete_handler(struct wlan_objmgr_peer *peer,
 	struct wlan_objmgr_vdev *vdev = wlan_peer_get_vdev(peer);
 	struct wlan_objmgr_pdev *pdev = wlan_vdev_get_pdev(vdev);
 
-	if (wlan_peer_get_peer_type(peer) == WLAN_PEER_AP) {
+	if (wlan_peer_get_peer_type(peer) == WLAN_PEER_AP ||
+	    wlan_peer_get_peer_type(peer) == WLAN_PEER_STA_TEMP ||
+	    wlan_peer_get_peer_type(peer) == WLAN_PEER_MLO_TEMP) {
 		return status;
 	}
 
@@ -386,6 +391,17 @@ QDF_STATUS telemetry_sawf_get_mov_avg(void *telemetry_ctx, uint8_t tid,
 }
 
 qdf_export_symbol(telemetry_sawf_get_mov_avg);
+
+QDF_STATUS telemetry_sawf_reset_peer_stats(uint8_t *peer_mac)
+{
+	if (g_agent_ops) {
+		if (g_agent_ops->sawf_reset_peer_stats(peer_mac))
+		return QDF_STATUS_E_FAILURE;
+	}
+	return QDF_STATUS_SUCCESS;
+}
+
+qdf_export_symbol(telemetry_sawf_reset_peer_stats);
 
 int register_telemetry_agent_ops(struct telemetry_agent_ops *agent_ops)
 {

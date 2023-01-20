@@ -17,6 +17,11 @@
 #ifndef _DP_PPEDS_H_
 #define _DP_PPEDS_H_
 
+struct dp_ppe_ds_idxs {
+	uint32_t ppe2tcl_start_idx;
+	uint32_t reo2ppe_start_idx;
+};
+
 /**
  * dp_ppeds_init_ppe_vp_tbl_be - Attach ppeds soc instance
  * @be_soc: BE SoC
@@ -65,7 +70,7 @@ QDF_STATUS dp_ppeds_deinit_soc_be(struct dp_soc *soc);
  *
  * Return: QDF_STATUS
  */
-QDF_STATUS dp_ppeds_register_soc_be(struct dp_soc_be *be_soc);
+QDF_STATUS dp_ppeds_register_soc_be(struct dp_soc_be *be_soc, struct dp_ppe_ds_idxs *idx);
 
 /**
  * dp_ppeds_start_soc_be - Starts ppeds txrx
@@ -158,4 +163,50 @@ void dp_ppeds_dump_ppe_vp_tbl_be(struct cdp_soc_t *soc_hdl);
 QDF_STATUS dp_ppeds_vdev_enable_pri2tid_be(struct cdp_soc_t *soc_hdl,
 				       uint8_t vdev_id,
 				       bool val);
+
+/*
+ * dp_ppeds_handle_tx_comp: Handle tx completions interrupt
+ * @irq: IRQ number
+ * @ctxr: IRQ handler context
+ *
+ * Return: IRQ handle status
+ */
+irqreturn_t dp_ppeds_handle_tx_comp(int irq, void *ctxr);
+
+/*
+ * dp_ppe_ds_ppe2tcl_irq_handler: Handle ppe2tcl ring interrupt
+ * @irq: IRQ number
+ * @ctxr: IRQ handler context
+ *
+ * Return: IRQ handle status
+ */
+irqreturn_t dp_ppe_ds_ppe2tcl_irq_handler(int irq, void *ctxr);
+
+/*
+ * dp_ppe_ds_reo2ppe_irq_handler: Handle reo2ppe ring interrupt
+ * @irq: IRQ number
+ * @ctxr: IRQ handler context
+ *
+ * Return: IRQ handle status
+ */
+irqreturn_t dp_ppe_ds_reo2ppe_irq_handler(int irq, void *ctxr);
+
+/*
+ * dp_get_ppe_ds_ctxt: Get context from ppe ds driver
+ * @soc: CDP SoC Tx/Rx handle
+ *
+ * Return: ppeds handle
+ */
+void *dp_get_ppe_ds_ctxt(struct dp_soc *soc);
+
+/**
+ * dp_tx_ppeds_cfg_astidx_cache_mapping - Set ppe index mapping table value
+ * @soc: DP SoC context
+ * @vdev: DP vdev
+ * @peer_map: map if true, unmap if false
+ *
+ * Return: void
+ */
+void dp_tx_ppeds_cfg_astidx_cache_mapping(struct dp_soc *soc,
+					  struct dp_vdev *vdev, bool peer_map);
 #endif /* _DP_PPEDS_H_ */
