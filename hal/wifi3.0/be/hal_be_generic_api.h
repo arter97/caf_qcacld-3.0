@@ -2974,32 +2974,35 @@ static void hal_reo_shared_qaddr_write_be(hal_soc_handle_t hal_soc_hdl,
  *
  * Return: QDF_STATUS_SUCCESS on success else a QDF error.
  */
-static QDF_STATUS hal_reo_shared_qaddr_setup_be(hal_soc_handle_t hal_soc_hdl)
+static QDF_STATUS
+hal_reo_shared_qaddr_setup_be(hal_soc_handle_t hal_soc_hdl,
+			      struct reo_queue_ref_table *reo_qref)
 {
 	struct hal_soc *hal = (struct hal_soc *)hal_soc_hdl;
 
-	hal->reo_qref.reo_qref_table_en = 1;
+	reo_qref->reo_qref_table_en = 1;
 
-	hal->reo_qref.mlo_reo_qref_table_vaddr =
+	reo_qref->mlo_reo_qref_table_vaddr =
 		(uint64_t *)qdf_mem_alloc_consistent(
 				hal->qdf_dev, hal->qdf_dev->dev,
 				REO_QUEUE_REF_ML_TABLE_SIZE,
-				&hal->reo_qref.mlo_reo_qref_table_paddr);
-	if (!hal->reo_qref.mlo_reo_qref_table_vaddr)
+				&reo_qref->mlo_reo_qref_table_paddr);
+	if (!reo_qref->mlo_reo_qref_table_vaddr)
 		return QDF_STATUS_E_NOMEM;
 
-	hal->reo_qref.non_mlo_reo_qref_table_vaddr =
+	reo_qref->non_mlo_reo_qref_table_vaddr =
 		(uint64_t *)qdf_mem_alloc_consistent(
 				hal->qdf_dev, hal->qdf_dev->dev,
 				REO_QUEUE_REF_NON_ML_TABLE_SIZE,
-				&hal->reo_qref.non_mlo_reo_qref_table_paddr);
-	if (!hal->reo_qref.non_mlo_reo_qref_table_vaddr) {
+				&reo_qref->non_mlo_reo_qref_table_paddr);
+	if (!reo_qref->non_mlo_reo_qref_table_vaddr) {
 		qdf_mem_free_consistent(
 				hal->qdf_dev, hal->qdf_dev->dev,
 				REO_QUEUE_REF_ML_TABLE_SIZE,
-				hal->reo_qref.mlo_reo_qref_table_vaddr,
-				hal->reo_qref.mlo_reo_qref_table_paddr,
+				reo_qref->mlo_reo_qref_table_vaddr,
+				reo_qref->mlo_reo_qref_table_paddr,
 				0);
+		reo_qref->mlo_reo_qref_table_vaddr = NULL;
 		return QDF_STATUS_E_NOMEM;
 	}
 
@@ -3007,10 +3010,10 @@ static QDF_STATUS hal_reo_shared_qaddr_setup_be(hal_soc_handle_t hal_soc_hdl)
 			  "Non-MLO table start paddr:%pK,"
 			  "MLO table start vaddr: %pK,"
 			  "Non MLO table start vaddr: %pK",
-			  (void *)hal->reo_qref.mlo_reo_qref_table_paddr,
-			  (void *)hal->reo_qref.non_mlo_reo_qref_table_paddr,
-			  hal->reo_qref.mlo_reo_qref_table_vaddr,
-			  hal->reo_qref.non_mlo_reo_qref_table_vaddr);
+			  (void *)reo_qref->mlo_reo_qref_table_paddr,
+			  (void *)reo_qref->non_mlo_reo_qref_table_paddr,
+			  reo_qref->mlo_reo_qref_table_vaddr,
+			  reo_qref->non_mlo_reo_qref_table_vaddr);
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -3073,15 +3076,6 @@ static void hal_reo_shared_qaddr_detach_be(hal_soc_handle_t hal_soc_hdl)
 	HAL_REG_WRITE(hal,
 		      HWIO_REO_R0_QDESC_LUT_BASE1_ADDR_ADDR(REO_REG_REG_BASE),
 		      0);
-
-	qdf_mem_free_consistent(hal->qdf_dev, hal->qdf_dev->dev,
-				REO_QUEUE_REF_ML_TABLE_SIZE,
-				hal->reo_qref.mlo_reo_qref_table_vaddr,
-				hal->reo_qref.mlo_reo_qref_table_paddr, 0);
-	qdf_mem_free_consistent(hal->qdf_dev, hal->qdf_dev->dev,
-				REO_QUEUE_REF_NON_ML_TABLE_SIZE,
-				hal->reo_qref.non_mlo_reo_qref_table_vaddr,
-				hal->reo_qref.non_mlo_reo_qref_table_paddr, 0);
 }
 #endif
 

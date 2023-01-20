@@ -1170,17 +1170,9 @@ void *hal_attach(struct hif_opaque_softc *hif_handle, qdf_device_t qdf_dev)
 		goto fail4;
 	}
 
-	if (hal_reo_shared_qaddr_setup((hal_soc_handle_t)hal)
-	    != QDF_STATUS_SUCCESS) {
-		hal_err("unable to setup reo shared qaddr");
-		goto fail5;
-	}
-
 	hif_rtpm_register(HIF_RTPM_ID_HAL_REO_CMD, NULL);
 
 	return (void *)hal;
-fail5:
-	hal_delayed_reg_write_deinit(hal);
 fail4:
 	qdf_ssr_driver_dump_unregister_region("hal_soc");
 	qdf_minidump_remove(hal, sizeof(*hal), "hal_soc");

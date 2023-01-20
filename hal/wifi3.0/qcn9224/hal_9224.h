@@ -1461,6 +1461,7 @@ static void hal_reo_setup_9224(struct hal_soc *soc, void *reoparams,
 	 * GLOBAL_LINK_DESC_COUNT_CTRL
 	 */
 
+	soc->reo_qref = *reo_params->reo_qref;
 	hal_reo_shared_qaddr_init((hal_soc_handle_t)soc, qref_reset);
 }
 

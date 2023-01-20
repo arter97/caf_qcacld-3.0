@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2017-2019, 2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -784,12 +784,14 @@ void hal_reo_init_cmd_ring(hal_soc_handle_t hal_soc_hdl,
  * Return: QDF_STATUS_SUCCESS on success else a QDF error.
  */
 static inline QDF_STATUS
-hal_reo_shared_qaddr_setup(hal_soc_handle_t hal_soc_hdl)
+hal_reo_shared_qaddr_setup(hal_soc_handle_t hal_soc_hdl,
+			   struct reo_queue_ref_table *reo_qref)
 {
 	struct hal_soc *hal_soc = (struct hal_soc *)hal_soc_hdl;
 
 	if (hal_soc->ops->hal_reo_shared_qaddr_setup)
-		return hal_soc->ops->hal_reo_shared_qaddr_setup(hal_soc_hdl);
+		return hal_soc->ops->hal_reo_shared_qaddr_setup(hal_soc_hdl,
+								reo_qref);
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -813,7 +815,8 @@ hal_reo_shared_qaddr_detach(hal_soc_handle_t hal_soc_hdl)
 
 #else
 static inline QDF_STATUS
-hal_reo_shared_qaddr_setup(hal_soc_handle_t hal_soc_hdl)
+hal_reo_shared_qaddr_setup(hal_soc_handle_t hal_soc_hdl,
+			   struct reo_queue_ref_table *reo_qref)
 {
 	return QDF_STATUS_SUCCESS;
 }

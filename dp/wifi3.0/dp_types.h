@@ -3001,6 +3001,8 @@ struct dp_soc {
 	/* number of IPv6 flows inserted */
 	qdf_atomic_t ipv6_fse_cnt;
 #endif
+	/* Reo queue ref table items */
+	struct reo_queue_ref_table reo_qref;
 };
 
 #ifdef IPA_OFFLOAD

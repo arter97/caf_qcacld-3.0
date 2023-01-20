@@ -688,12 +688,25 @@ QDF_STATUS dp_peer_setup_ppeds_be(struct dp_soc *soc, struct dp_peer *peer,
 }
 #endif /* WLAN_SUPPORT_PPEDS */
 
+void dp_reo_shared_qaddr_detach(struct dp_soc *soc)
+{
+	qdf_mem_free_consistent(soc->osdev, soc->osdev->dev,
+				REO_QUEUE_REF_ML_TABLE_SIZE,
+				soc->reo_qref.mlo_reo_qref_table_vaddr,
+				soc->reo_qref.mlo_reo_qref_table_paddr, 0);
+	qdf_mem_free_consistent(soc->osdev, soc->osdev->dev,
+				REO_QUEUE_REF_NON_ML_TABLE_SIZE,
+				soc->reo_qref.non_mlo_reo_qref_table_vaddr,
+				soc->reo_qref.non_mlo_reo_qref_table_paddr, 0);
+}
+
 static QDF_STATUS dp_soc_detach_be(struct dp_soc *soc)
 {
 	struct dp_soc_be *be_soc = dp_get_be_soc_from_dp_soc(soc);
 	int i = 0;
 
 	dp_soc_ppeds_detach_be(soc);
+	dp_reo_shared_qaddr_detach(soc);
 
 	for (i = 0; i < MAX_TXDESC_POOLS; i++)
 		dp_hw_cookie_conversion_detach(be_soc,

@@ -628,6 +628,8 @@ dp_hw_cookie_conversion_attach(struct dp_soc_be *be_soc,
 			       enum dp_desc_type desc_type,
 			       uint8_t desc_pool_id);
 
+void dp_reo_shared_qaddr_detach(struct dp_soc *soc);
+
 QDF_STATUS
 dp_hw_cookie_conversion_detach(struct dp_soc_be *be_soc,
 			       struct dp_hw_cookie_conversion_t *cc_ctx);
