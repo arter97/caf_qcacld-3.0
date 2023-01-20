@@ -2067,14 +2067,6 @@ dp_mlo_peer_find_hash_add_be(struct dp_soc *soc, struct dp_peer *peer)
 	if (!mld_hash_obj)
 		return;
 
-	if (dp_mlo_peer_find_hash_find_be(soc, (uint8_t *)&peer->mac_addr, 1,
-					  DP_MOD_ID_CONFIG, DP_VDEV_ALL)) {
-		dp_info("MLD peer %pK (" QDF_MAC_ADDR_FMT ") already in hash table",
-			peer, QDF_MAC_ADDR_REF(peer->mac_addr.raw));
-		dp_peer_unref_delete(peer, DP_MOD_ID_CONFIG);
-		qdf_assert_always(0);
-	}
-
 	index = dp_mlo_peer_find_hash_index(mld_hash_obj, &peer->mac_addr);
 
 	qdf_spin_lock_bh(&mld_hash_obj->mld_peer_hash_lock);
