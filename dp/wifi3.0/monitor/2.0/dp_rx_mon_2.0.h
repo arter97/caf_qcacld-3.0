@@ -32,10 +32,10 @@
 
 #define DP_RX_MON_TLV_PF_ID 1
 #define DP_RX_MON_TLV_PPDU_ID 2
+#define DP_RX_MON_MAX_TLVS 2
 
 #define DP_RX_MON_TLV_MSDU_CNT 2
 #define DP_RX_MON_MAX_MSDU 16
-#define DP_RX_MON_MAX_TLVS 1
 #define DP_RX_MON_PF_TLV_LEN (((DP_RX_MON_PF_TAG_LEN_PER_FRAG)\
 			       * (DP_RX_MON_MAX_MSDU) * 2)\
 			       + (DP_RX_MON_TLV_MSDU_CNT))
