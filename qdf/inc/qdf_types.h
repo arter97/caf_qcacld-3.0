@@ -1042,15 +1042,30 @@ struct qdf_mac_addr {
  * @QDF_ROAM_EVENTID: roam eventid from fw
  * @QDF_PROTO_DNS_QUERY: dns query
  * @QDF_PROTO_DNS_RES: dns response
- * QDF_PROTO_EAP_REQUEST: EAP Request
- * QDF_PROTO_EAP_RESPONSE: EAP Response
- * QDF_PROTO_EAP_SUCCESS: EAP Success
- * QDF_PROTO_EAP_FAILURE: EAP Filure
- * QDF_PROTO_EAP_INITIATE: EAP Initiate
- * QDF_PROTO_EAP_FINISH: EAP Finish
- * QDF_PROTO_EAPOL_START: EAPOL-Start message
- * QDF_PROTO_EAPOL_LOGOFF: EAPOL Log Off message.
- * QDF_PROTO_EAPOL_ASF: ASF Alert message
+ * @QDF_PROTO_EAP_REQUEST: EAP Request
+ * @QDF_PROTO_EAP_RESPONSE: EAP Response
+ * @QDF_PROTO_EAP_SUCCESS: EAP Success
+ * @QDF_PROTO_EAP_FAILURE: EAP Filure
+ * @QDF_PROTO_EAP_INITIATE: EAP Initiate
+ * @QDF_PROTO_EAP_FINISH: EAP Finish
+ * @QDF_PROTO_EAPOL_START: EAPOL-Start message
+ * @QDF_PROTO_EAPOL_LOGOFF: EAPOL Log Off message.
+ * @QDF_PROTO_EAPOL_ASF: ASF Alert message
+ * @QDF_PROTO_EAP_REQ_ID: EAP identify request
+ * @QDF_PROTO_EAP_RSP_ID: EAP identify response
+ * @QDF_PROTO_EAP_M1: EAP expanded type M1
+ * @QDF_PROTO_EAP_M2: EAP expanded type M2
+ * @QDF_PROTO_EAP_M3: EAP expanded type M3
+ * @QDF_PROTO_EAP_M4: EAP expanded type M4
+ * @QDF_PROTO_EAP_M5: EAP expanded type M5
+ * @QDF_PROTO_EAP_M6: EAP expanded type M6
+ * @QDF_PROTO_EAP_M7: EAP expanded type M7
+ * @QDF_PROTO_EAP_M8: EAP expanded type M8
+ * @QDF_PROTO_EAP_WSC_START: EAP expanded type WSC start
+ * @QDF_PROTO_EAP_WSC_ACK: EAP expanded type WSC ACK
+ * @QDF_PROTO_EAP_WSC_NACK: EAP expanded type WSC NACK
+ * @QDF_PROTO_EAP_WSC_DONE: EAP expanded type WSC DONE
+ * @QDF_PROTO_EAP_WSC_FRAG_ACK: EAP expanded type WSC frag ACK
  * @QDF_PROTO_SUBTYPE_MAX: subtype max
  */
 enum qdf_proto_subtype {
@@ -1099,6 +1114,21 @@ enum qdf_proto_subtype {
 	QDF_PROTO_EAPOL_START,
 	QDF_PROTO_EAPOL_LOGOFF,
 	QDF_PROTO_EAPOL_ASF,
+	QDF_PROTO_EAP_REQ_ID,
+	QDF_PROTO_EAP_RSP_ID,
+	QDF_PROTO_EAP_M1,
+	QDF_PROTO_EAP_M2,
+	QDF_PROTO_EAP_M3,
+	QDF_PROTO_EAP_M4,
+	QDF_PROTO_EAP_M5,
+	QDF_PROTO_EAP_M6,
+	QDF_PROTO_EAP_M7,
+	QDF_PROTO_EAP_M8,
+	QDF_PROTO_EAP_WSC_START,
+	QDF_PROTO_EAP_WSC_ACK,
+	QDF_PROTO_EAP_WSC_NACK,
+	QDF_PROTO_EAP_WSC_DONE,
+	QDF_PROTO_EAP_WSC_FRAG_ACK,
 	QDF_PROTO_SUBTYPE_MAX
 };
 

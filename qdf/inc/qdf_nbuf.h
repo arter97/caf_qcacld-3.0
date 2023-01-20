@@ -130,6 +130,33 @@
 #define QDF_EAP_INITIATE			5
 #define QDF_EAP_FINISH				6
 
+#define EAP_PACKET_TYPE_ID 0x01
+#define EAP_PACKET_TYPE_EXP 0xFE
+
+#define EAP_EXP_TYPE_WSC_START 0x01
+#define EAP_EXP_TYPE_M1 0x04
+#define EAP_EXP_TYPE_M2 0x05
+#define EAP_EXP_TYPE_M3 0x07
+#define EAP_EXP_TYPE_M4 0x08
+#define EAP_EXP_TYPE_M5 0x09
+#define EAP_EXP_TYPE_M6 0x0A
+#define EAP_EXP_TYPE_M7 0x0B
+#define EAP_EXP_TYPE_M8 0x0C
+#define EAP_EXP_TYPE_WSC_DONE 0x0F
+
+#define EAP_EXP_MSG_OPCODE_OFFSET 0x1E
+#define EAP_EXP_MSG_TYPE_OFFSET 0x29
+
+enum wsc_op_code {
+	WSC_UPNP = 0, /* No OP Code in UPnP transport */
+	WSC_START = 0x01,
+	WSC_ACK = 0x02,
+	WSC_NACK = 0x03,
+	WSC_MSG = 0x04,
+	WSC_DONE = 0x05,
+	WSC_FRAG_ACK = 0x06
+};
+
 /* ARP Related MASK */
 #define QDF_NBUF_PKT_ARP_OPCODE_OFFSET	20
 #define QDF_NBUF_PKT_ARPOP_REQ		1

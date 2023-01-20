@@ -1561,6 +1561,102 @@ __qdf_nbuf_data_get_eapol_key(uint8_t *data)
 }
 
 /**
+ * __qdf_nbuf_data_get_exp_msg_type() - Get EAP expanded msg type
+ * @data: Pointer to EAPOL packet data buffer
+ * @code: EAP code
+ *
+ * Return: subtype of the EAPOL packet.
+ */
+static inline enum qdf_proto_subtype
+__qdf_nbuf_data_get_exp_msg_type(uint8_t *data, uint8_t code)
+{
+	uint8_t msg_type;
+	uint8_t opcode = *(data + EAP_EXP_MSG_OPCODE_OFFSET);
+
+	switch (opcode) {
+	case WSC_START:
+		return QDF_PROTO_EAP_WSC_START;
+	case WSC_ACK:
+		return QDF_PROTO_EAP_WSC_ACK;
+	case WSC_NACK:
+		return QDF_PROTO_EAP_WSC_NACK;
+	case WSC_MSG:
+		msg_type = *(data + EAP_EXP_MSG_TYPE_OFFSET);
+		switch (msg_type) {
+		case EAP_EXP_TYPE_M1:
+			return QDF_PROTO_EAP_M1;
+		case EAP_EXP_TYPE_M2:
+			return QDF_PROTO_EAP_M2;
+		case EAP_EXP_TYPE_M3:
+			return QDF_PROTO_EAP_M3;
+		case EAP_EXP_TYPE_M4:
+			return QDF_PROTO_EAP_M4;
+		case EAP_EXP_TYPE_M5:
+			return QDF_PROTO_EAP_M5;
+		case EAP_EXP_TYPE_M6:
+			return QDF_PROTO_EAP_M6;
+		case EAP_EXP_TYPE_M7:
+			return QDF_PROTO_EAP_M7;
+		case EAP_EXP_TYPE_M8:
+			return QDF_PROTO_EAP_M8;
+		default:
+			break;
+		}
+		break;
+	case WSC_DONE:
+		return QDF_PROTO_EAP_WSC_DONE;
+	case WSC_FRAG_ACK:
+		return QDF_PROTO_EAP_WSC_FRAG_ACK;
+	default:
+		break;
+	}
+	switch (code) {
+	case QDF_EAP_REQUEST:
+		return QDF_PROTO_EAP_REQUEST;
+	case QDF_EAP_RESPONSE:
+		return QDF_PROTO_EAP_RESPONSE;
+	default:
+		return QDF_PROTO_INVALID;
+	}
+}
+
+/**
+ * __qdf_nbuf_data_get_eap_type() - Get EAP type
+ * @data: Pointer to EAPOL packet data buffer
+ * @code: EAP code
+ *
+ * Return: subtype of the EAPOL packet.
+ */
+static inline enum qdf_proto_subtype
+__qdf_nbuf_data_get_eap_type(uint8_t *data, uint8_t code)
+{
+	uint8_t type = *(data + EAP_TYPE_OFFSET);
+
+	switch (type) {
+	case EAP_PACKET_TYPE_EXP:
+		return __qdf_nbuf_data_get_exp_msg_type(data, code);
+	case EAP_PACKET_TYPE_ID:
+		switch (code) {
+		case QDF_EAP_REQUEST:
+			return QDF_PROTO_EAP_REQ_ID;
+		case QDF_EAP_RESPONSE:
+			return QDF_PROTO_EAP_RSP_ID;
+		default:
+			return QDF_PROTO_INVALID;
+		}
+	default:
+		switch (code) {
+		case QDF_EAP_REQUEST:
+			return QDF_PROTO_EAP_REQUEST;
+		case QDF_EAP_RESPONSE:
+			return QDF_PROTO_EAP_RESPONSE;
+		default:
+			return QDF_PROTO_INVALID;
+		}
+	}
+}
+
+/**
  * __qdf_nbuf_data_get_eap_code() - Get EAPOL code
  * @data: Pointer to EAPOL packet data buffer
  *
@@ -1573,9 +1669,8 @@ __qdf_nbuf_data_get_eap_code(uint8_t *data)
 
 	switch (code) {
 	case QDF_EAP_REQUEST:
-		return QDF_PROTO_EAP_REQUEST;
 	case QDF_EAP_RESPONSE:
-		return QDF_PROTO_EAP_RESPONSE;
+		return __qdf_nbuf_data_get_eap_type(data, code);
 	case QDF_EAP_SUCCESS:
 		return QDF_PROTO_EAP_SUCCESS;
 	case QDF_EAP_FAILURE:
