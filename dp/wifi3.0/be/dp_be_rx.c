@@ -565,6 +565,14 @@ done:
 
 		rx_bufs_used++;
 
+		if (txrx_peer->is_mld_peer) {
+			link_id = ((dp_rx_get_msdu_hw_link_id(nbuf)) + 1);
+			if (link_id < 1 || link_id > DP_MAX_MLO_LINKS)
+				link_id = 0;
+		} else {
+			link_id = 0;
+		}
+
 		/* when hlos tid override is enabled, save tid in
 		 * skb->priority
 		 */
@@ -789,7 +797,6 @@ done:
 				if (dp_rx_intrabss_fwd_be(soc, txrx_peer,
 							  rx_tlv_hdr,
 							  nbuf,
-							  msdu_metadata,
 							  link_id)) {
 					nbuf = next;
 					tid_stats->intrabss_cnt++;
@@ -1626,7 +1633,6 @@ dp_rx_intrabss_mcast_handler_be(struct dp_soc *soc,
 
 bool dp_rx_intrabss_fwd_be(struct dp_soc *soc, struct dp_txrx_peer *ta_peer,
 			   uint8_t *rx_tlv_hdr, qdf_nbuf_t nbuf,
-			   struct hal_rx_msdu_metadata msdu_metadata,
 			   uint8_t link_id)
 {
 	uint8_t tid = qdf_nbuf_get_tid_val(nbuf);

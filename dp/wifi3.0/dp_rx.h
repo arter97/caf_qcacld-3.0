@@ -2330,6 +2330,12 @@ dp_rx_peer_metadata_peer_id_get(struct dp_soc *soc, uint32_t peer_metadata)
 							     peer_metadata);
 }
 
+static inline uint8_t
+dp_rx_peer_mdata_link_id_get(struct dp_soc *soc, uint32_t peer_metadata)
+{
+	return soc->arch_ops.dp_rx_peer_mdata_link_id_get(peer_metadata);
+}
+
 /**
  * dp_rx_desc_pool_init_generic() - Generic Rx descriptors initialization
  * @soc: SOC handle

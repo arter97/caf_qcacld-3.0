@@ -2472,7 +2472,7 @@ dp_peer_update_rx_pkt_per_lmac(struct dp_txrx_peer *txrx_peer,
 	/* only count stats per lmac for MLO connection*/
 	DP_PEER_PER_PKT_STATS_INCC_PKT(txrx_peer, rx.rx_lmac[lmac_id], 1,
 				       QDF_NBUF_CB_RX_PKT_LEN(nbuf),
-				       txrx_peer->mld_peer, link_id);
+				       txrx_peer->is_mld_peer, link_id);
 }
 #else
 static inline void

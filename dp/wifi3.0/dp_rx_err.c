@@ -2417,6 +2417,15 @@ dp_rx_wbm_err_process(struct dp_intr *int_ctx, struct dp_soc *soc,
 			continue;
 		}
 
+		if (txrx_peer && txrx_peer->is_mld_peer) {
+			link_id = ((dp_rx_peer_mdata_link_id_get(
+							soc,
+							peer_meta_data)) + 1);
+			if (link_id < 1 || link_id > DP_MAX_MLO_LINKS)
+				link_id = 0;
+		} else
+			link_id = 0;
+
 		if (wbm_err_info.wbm_err_src == HAL_RX_WBM_ERR_SRC_REO) {
 			if (wbm_err_info.reo_psh_rsn
 					== HAL_RX_WBM_REO_PSH_RSN_ERROR) {

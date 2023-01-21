@@ -47,7 +47,6 @@ struct dp_be_intrabss_params {
  * @ta_txrx_peer: source peer entry
  * @rx_tlv_hdr: start address of rx tlvs
  * @nbuf: nbuf that has to be intrabss forwarded
- * @msdu_metadata: msdu metadata
  * @link_id: link id on which the packet is received
  *
  * Return: true if it is forwarded else false
@@ -56,7 +55,6 @@ bool dp_rx_intrabss_fwd_be(struct dp_soc *soc,
 			   struct dp_txrx_peer *ta_txrx_peer,
 			   uint8_t *rx_tlv_hdr,
 			   qdf_nbuf_t nbuf,
-			   struct hal_rx_msdu_metadata msdu_metadata,
 			   uint8_t link_id);
 #endif
 
@@ -231,6 +229,15 @@ static inline uint8_t
 dp_rx_peer_metadata_lmac_id_get_be(uint32_t peer_metadata)
 {
 	return HTT_RX_PEER_META_DATA_V1_LMAC_ID_GET(peer_metadata);
+}
+
+static inline uint8_t
+dp_rx_peer_mdata_link_id_get_be(uint32_t peer_metadata)
+{
+#ifdef DP_MLO_LINK_STATS_SUPPORT
+	return HTT_RX_PEER_META_DATA_V1A_LOGICAL_LINK_ID_GET(peer_metadata);
+#endif
+	return 0;
 }
 
 #ifdef WLAN_FEATURE_NEAR_FULL_IRQ
@@ -630,10 +637,36 @@ dp_rx_set_msdu_lmac_id(qdf_nbuf_t nbuf, uint32_t peer_mdata)
 	lmac_id = dp_rx_peer_metadata_lmac_id_get_be(peer_mdata);
 	qdf_nbuf_set_lmac_id(nbuf, lmac_id);
 }
+
+static inline void
+dp_rx_set_msdu_hw_link_id(qdf_nbuf_t nbuf, uint32_t peer_mdata)
+{
+	uint8_t logical_link_id;
+
+	logical_link_id = dp_rx_peer_mdata_link_id_get_be(peer_mdata);
+	QDF_NBUF_CB_RX_LOGICAL_LINK_ID(nbuf) = logical_link_id;
+}
+
+static inline uint8_t
+dp_rx_get_msdu_hw_link_id(qdf_nbuf_t nbuf)
+{
+	return QDF_NBUF_CB_RX_LOGICAL_LINK_ID(nbuf);
+}
 #else
 static inline void
 dp_rx_set_msdu_lmac_id(qdf_nbuf_t nbuf, uint32_t peer_mdata)
 {
+}
+
+static inline void
+dp_rx_set_msdu_hw_link_id(qdf_nbuf_t nbuf, uint32_t peer_mdata)
+{
+}
+
+static inline uint8_t
+dp_rx_get_msdu_hw_link_id(qdf_nbuf_t nbuf)
+{
+	return QDF_NBUF_CB_RX_HW_LINK_ID(nbuf);
 }
 #endif
 
@@ -687,6 +720,7 @@ static inline uint8_t dp_rx_copy_desc_info_in_nbuf_cb(struct dp_soc *soc,
 	QDF_NBUF_CB_RX_VDEV_ID(nbuf) =
 		dp_rx_peer_metadata_vdev_id_get_be(soc, peer_mdata);
 	dp_rx_set_msdu_lmac_id(nbuf, peer_mdata);
+	dp_rx_set_msdu_hw_link_id(nbuf, peer_mdata);
 
 	/* to indicate whether this msdu is rx offload */
 	pkt_capture_offload =
