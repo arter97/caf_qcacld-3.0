@@ -960,7 +960,7 @@ uint16_t dfs_generate_radar_bitmap(struct wlan_dfs *dfs,
 	uint16_t dfs_radar_bitmap = 0x0;
 	uint16_t bits = 0x1;
 	uint8_t i, j;
-	qdf_freq_t cur_freq_list[MAX_20MHZ_SUBCHANS];
+	uint16_t cur_freq_list[MAX_20MHZ_SUBCHANS] = {0};
 
 	n_cur_channels =
 		dfs_get_bonding_channel_without_seg_info_for_freq(dfs->dfs_curchan,

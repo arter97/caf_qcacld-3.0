@@ -187,6 +187,23 @@ int dfs_create_object(struct wlan_dfs **dfs)
 	return 0;
 }
 
+#if defined(QCA_DFS_BW_PUNCTURE) && defined(CONFIG_REG_CLIENT)
+static void dfs_puncture_init(struct wlan_dfs *dfs)
+{
+	/*
+	 * Enable sub chan DFS type if QCA_DFS_BW_PUNCTURE defined, or all
+	 * bonded operation freq will be affected and disabled for nol,
+	 * puncture can't work, always need to switch freq.
+	 */
+	dfs_set_nol_subchannel_marking(dfs, true);
+	dfs->dfs_use_puncture = true;
+}
+#else
+static inline void dfs_puncture_init(struct wlan_dfs *dfs)
+{
+}
+#endif
+
 int dfs_attach(struct wlan_dfs *dfs)
 {
 	int ret;
@@ -217,6 +234,9 @@ int dfs_attach(struct wlan_dfs *dfs)
 	 * and full offload, indicating test mode timer initialization for both.
 	 */
 	dfs_main_task_testtimer_init(dfs);
+
+	dfs_puncture_init(dfs);
+
 	return 0;
 }
 

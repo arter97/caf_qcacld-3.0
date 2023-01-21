@@ -4660,7 +4660,6 @@ bool reg_is_punc_bitmap_valid(enum phy_ch_width bw, uint16_t puncture_bitmap)
 	return is_punc_bitmap_valid;
 }
 
-#ifdef QCA_DFS_BW_PUNCTURE
 uint16_t reg_find_nearest_puncture_pattern(enum phy_ch_width bw,
 					   uint16_t proposed_bitmap)
 {
@@ -4701,7 +4700,6 @@ uint16_t reg_find_nearest_puncture_pattern(enum phy_ch_width bw,
 
 	return final_bitmap;
 }
-#endif /* QCA_DFS_BW_PUNCTURE */
 
 /**
  * reg_update_5g_bonded_channel_state_punc_for_pwrmode() - update channel state
@@ -4723,6 +4721,7 @@ static void reg_update_5g_bonded_channel_state_punc_for_pwrmode(
 	qdf_freq_t chan_cfreq;
 	enum channel_state temp_chan_state;
 	uint16_t puncture_bitmap = 0;
+	uint16_t final_bitmap;
 	int i = 0;
 	enum channel_state update_state = CHANNEL_STATE_ENABLE;
 
@@ -4744,9 +4743,11 @@ static void reg_update_5g_bonded_channel_state_punc_for_pwrmode(
 		i++;
 	}
 	/* Validate puncture bitmap. Update channel state. */
-	if (reg_is_punc_bitmap_valid(ch_params->ch_width, puncture_bitmap)) {
+	final_bitmap = reg_find_nearest_puncture_pattern(ch_params->ch_width,
+							 puncture_bitmap);
+	if (final_bitmap) {
 		*chan_state = update_state;
-		ch_params->reg_punc_bitmap = puncture_bitmap;
+		ch_params->reg_punc_bitmap = final_bitmap;
 	}
 }
 
