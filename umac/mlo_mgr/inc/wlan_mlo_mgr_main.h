@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -517,6 +517,62 @@ void tsf_recalculation_lock_release(struct wlan_mlo_dev_context *mldev)
 {
 	qdf_spin_unlock_bh(&mldev->tsf_recalculation_lock);
 }
+
+/**
+ * mlo_ap_lock_create - Create MLO AP mutex/spinlock
+ * @ap_ctx:  ML device AP context
+ *
+ * Creates mutex/spinlock
+ *
+ * Return: void
+ */
+static inline
+void mlo_ap_lock_create(struct wlan_mlo_ap *ap_ctx)
+{
+	qdf_spinlock_create(&ap_ctx->mlo_ap_lock);
+}
+
+/**
+ * mlo_ap_lock_destroy - Destroy MLO AP mutex/spinlock
+ * @ap_ctx:  ML device AP context
+ *
+ * Destroy mutex/spinlock
+ *
+ * Return: void
+ */
+static inline
+void mlo_ap_lock_destroy(struct wlan_mlo_ap *ap_ctx)
+{
+	qdf_spinlock_destroy(&ap_ctx->mlo_ap_lock);
+}
+
+/**
+ * mlo_ap_lock_acquire - Acquire MLO AP mutex/spinlock
+ * @ap_ctx:  ML device AP context
+ *
+ * acquire mutex/spinlock
+ *
+ * return: void
+ */
+static inline
+void mlo_ap_lock_acquire(struct wlan_mlo_ap *ap_ctx)
+{
+	qdf_spin_lock_bh(&ap_ctx->mlo_ap_lock);
+}
+
+/**
+ * mlo_ap_lock_release - Release MLO AP mutex/spinlock
+ * @ap_ctx:  ML device AP context
+ *
+ * release mutex/spinlock
+ *
+ * return: void
+ */
+static inline
+void mlo_ap_lock_release(struct wlan_mlo_ap *ap_ctx)
+{
+	qdf_spin_unlock_bh(&ap_ctx->mlo_ap_lock);
+}
 #else /* WLAN_MLO_USE_SPINLOCK */
 static inline
 void ml_link_lock_create(struct mlo_mgr_context *mlo_ctx)
@@ -738,6 +794,30 @@ static inline
 void tsf_recalculation_lock_release(struct wlan_mlo_dev_context *mldev)
 {
 	qdf_mutex_release(&mldev->tsf_recalculation_lock);
+}
+
+static inline
+void mlo_ap_lock_create(struct wlan_mlo_ap *ap_ctx)
+{
+	qdf_mutex_create(&ap_ctx->mlo_ap_lock);
+}
+
+static inline
+void mlo_ap_lock_destroy(struct wlan_mlo_ap *ap_ctx)
+{
+	qdf_mutex_destroy(&ap_ctx->mlo_ap_lock);
+}
+
+static inline
+void mlo_ap_lock_acquire(struct wlan_mlo_ap *ap_ctx)
+{
+	qdf_mutex_acquire(&ap_ctx->mlo_ap_lock);
+}
+
+static inline
+void mlo_ap_lock_release(struct wlan_mlo_ap *ap_ctx)
+{
+	qdf_mutex_release(&ap_ctx->mlo_ap_lock);
 }
 #endif /* WLAN_MLO_USE_SPINLOCK */
 
