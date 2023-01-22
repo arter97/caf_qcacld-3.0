@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2014-2016, 2018, 2021 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -99,6 +100,9 @@ static inline uint32_t __qdf_list_max_size(__qdf_list_t *list)
 
 #define  __qdf_list_first_entry_or_null(list_ptr, type, node_field) \
 	list_first_entry_or_null(&(list_ptr)->anchor, type, node_field)
+
+#define  __qdf_list_last_entry(list_ptr, type, node_field) \
+	list_last_entry(&(list_ptr)->anchor, type, node_field)
 
 /**
  * __qdf_init_list_head() - initialize list head
