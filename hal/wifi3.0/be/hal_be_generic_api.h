@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2016-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -2607,31 +2607,48 @@ static void hal_reo_shared_qaddr_write_be(hal_soc_handle_t hal_soc_hdl,
  *
  * Return: None
  */
-static void hal_reo_shared_qaddr_setup_be(hal_soc_handle_t hal_soc_hdl)
+static QDF_STATUS
+hal_reo_shared_qaddr_setup_be(hal_soc_handle_t hal_soc_hdl,
+			      struct reo_queue_ref_table *reo_qref)
 {
 	struct hal_soc *hal = (struct hal_soc *)hal_soc_hdl;
 
-	hal->reo_qref.reo_qref_table_en = 1;
+	reo_qref->reo_qref_table_en = 1;
 
-	hal->reo_qref.mlo_reo_qref_table_vaddr =
+	reo_qref->mlo_reo_qref_table_vaddr =
 		(uint64_t *)qdf_mem_alloc_consistent(
 				hal->qdf_dev, hal->qdf_dev->dev,
 				REO_QUEUE_REF_ML_TABLE_SIZE,
-				&hal->reo_qref.mlo_reo_qref_table_paddr);
-	hal->reo_qref.non_mlo_reo_qref_table_vaddr =
+				&reo_qref->mlo_reo_qref_table_paddr);
+	if (!reo_qref->mlo_reo_qref_table_vaddr)
+		return QDF_STATUS_E_NOMEM;
+
+	reo_qref->non_mlo_reo_qref_table_vaddr =
 		(uint64_t *)qdf_mem_alloc_consistent(
 				hal->qdf_dev, hal->qdf_dev->dev,
 				REO_QUEUE_REF_NON_ML_TABLE_SIZE,
-				&hal->reo_qref.non_mlo_reo_qref_table_paddr);
+				&reo_qref->non_mlo_reo_qref_table_paddr);
+	if (!reo_qref->non_mlo_reo_qref_table_vaddr) {
+		qdf_mem_free_consistent(
+				hal->qdf_dev, hal->qdf_dev->dev,
+				REO_QUEUE_REF_ML_TABLE_SIZE,
+				reo_qref->mlo_reo_qref_table_vaddr,
+				reo_qref->mlo_reo_qref_table_paddr,
+				0);
+		reo_qref->mlo_reo_qref_table_vaddr = NULL;
+		return QDF_STATUS_E_NOMEM;
+	}
 
 	hal_verbose_debug("MLO table start paddr:%pK,"
 			  "Non-MLO table start paddr:%pK,"
 			  "MLO table start vaddr: %pK,"
 			  "Non MLO table start vaddr: %pK",
-			  (void *)hal->reo_qref.mlo_reo_qref_table_paddr,
-			  (void *)hal->reo_qref.non_mlo_reo_qref_table_paddr,
-			  hal->reo_qref.mlo_reo_qref_table_vaddr,
-			  hal->reo_qref.non_mlo_reo_qref_table_vaddr);
+			  (void *)reo_qref->mlo_reo_qref_table_paddr,
+			  (void *)reo_qref->non_mlo_reo_qref_table_paddr,
+			  reo_qref->mlo_reo_qref_table_vaddr,
+			  reo_qref->non_mlo_reo_qref_table_vaddr);
+
+	return QDF_STATUS_SUCCESS;
 }
 
 /**
@@ -2692,15 +2709,6 @@ static void hal_reo_shared_qaddr_detach_be(hal_soc_handle_t hal_soc_hdl)
 	HAL_REG_WRITE(hal,
 		      HWIO_REO_R0_QDESC_LUT_BASE1_ADDR_ADDR(REO_REG_REG_BASE),
 		      0);
-
-	qdf_mem_free_consistent(hal->qdf_dev, hal->qdf_dev->dev,
-				REO_QUEUE_REF_ML_TABLE_SIZE,
-				hal->reo_qref.mlo_reo_qref_table_vaddr,
-				hal->reo_qref.mlo_reo_qref_table_paddr, 0);
-	qdf_mem_free_consistent(hal->qdf_dev, hal->qdf_dev->dev,
-				REO_QUEUE_REF_NON_ML_TABLE_SIZE,
-				hal->reo_qref.non_mlo_reo_qref_table_vaddr,
-				hal->reo_qref.non_mlo_reo_qref_table_paddr, 0);
 }
 #endif
 
