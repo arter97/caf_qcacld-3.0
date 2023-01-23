@@ -1172,6 +1172,8 @@ struct  dp_mon_pdev {
 	bool reset_scan_spcl_vap_stats_enable;
 #endif
 	bool is_tlv_hdr_64_bit;
+	/* TLV header size*/
+	uint8_t tlv_hdr_size;
 
 	/* Invalid monitor peer to account for stats in mcopy mode */
 	struct dp_mon_peer *invalid_mon_peer;
