@@ -12659,14 +12659,14 @@ static QDF_STATUS extract_mgmt_rx_ext_params_tlv(wmi_unified_t wmi_handle,
 		ext_params->ba_win_size = WMI_RX_PARAM_EXT_BA_WIN_SIZE_GET(
 					ext_params_tlv->mgmt_rx_params_ext_dword1);
 		if (ext_params->ba_win_size > 1024) {
-			wmi_err("ba win size from TLV is Invalid");
+			wmi_info("ba win size from TLV is Invalid");
 			return QDF_STATUS_E_INVAL;
 		}
 
 		ext_params->reo_win_size = WMI_RX_PARAM_EXT_REO_WIN_SIZE_GET(
 					ext_params_tlv->mgmt_rx_params_ext_dword1);
 		if (ext_params->reo_win_size > 2048) {
-			wmi_err("reo win size from TLV is Invalid");
+			wmi_info("reo win size from TLV is Invalid");
 			return QDF_STATUS_E_INVAL;
 		}
 	} else {
