@@ -204,18 +204,11 @@ static bool hdd_is_ndp_allowed(struct hdd_context *hdd_ctx)
 }
 #endif /* NDP_SAP_CONCURRENCY_ENABLE */
 
-static void hdd_swap_frequencies(uint32_t *a, uint32_t *b)
-{
-	*b ^= *a;
-	*a ^= *b;
-	*b ^= *a;
-}
-
 /**
- * hdd_ndi_config_ch_list() - Configure the channel list for NDI start
+ * hdd_ndi_select_valid_freq() - Find the valid freq for NDI start
  * @hdd_ctx: hdd context
- * @ch_info: Buffer to fill supported channels, give preference to 5220 and 2437
- * to keep the legacy behavior intact
+ * @freq: pointer to freq, give preference to 5745, 5220 and 2437 to keep the
+ * legacy behavior intact
  *
  * Unlike traditional device modes, where the higher application
  * layer initiates connect / join / start, the NAN data
@@ -229,45 +222,47 @@ static void hdd_swap_frequencies(uint32_t *a, uint32_t *b)
  * start the NDI. Actual channel for NDP data transfer would be negotiated with
  * peer later.
  *
- * Return: SUCCESS if some valid channels are obtained
+ * Return: SUCCESS if valid channel is obtained
  */
-static QDF_STATUS
-hdd_ndi_config_ch_list(struct hdd_context *hdd_ctx,
-		       tCsrChannelInfo *ch_info)
+static QDF_STATUS hdd_ndi_select_valid_freq(struct hdd_context *hdd_ctx,
+					    uint32_t *freq)
 {
+	static const qdf_freq_t valid_freq[] = {NAN_SOCIAL_FREQ_5GHZ_UPPER_BAND,
+						NAN_SOCIAL_FREQ_5GHZ_LOWER_BAND,
+						NAN_SOCIAL_FREQ_2_4GHZ};
+	uint8_t i;
 	struct regulatory_channel *cur_chan_list;
-	int i = 0, swap_index = 0;
 	QDF_STATUS status;
 
-	ch_info->numOfChannels = 0;
+	for (i = 0; i < ARRAY_SIZE(valid_freq); i++) {
+		if (wlan_reg_is_freq_enabled(hdd_ctx->pdev, valid_freq[i],
+					     REG_CURRENT_PWR_MODE)) {
+			*freq = valid_freq[i];
+			return QDF_STATUS_SUCCESS;
+		}
+	}
+
 	cur_chan_list = qdf_mem_malloc(sizeof(*cur_chan_list) *
 							(NUM_CHANNELS + 2));
 	if (!cur_chan_list)
 		return QDF_STATUS_E_NOMEM;
 
 	status = ucfg_reg_get_current_chan_list(hdd_ctx->pdev, cur_chan_list);
-	if (status != QDF_STATUS_SUCCESS) {
+	if (QDF_IS_STATUS_ERROR(status)) {
 		hdd_err_rl("Failed to get the current channel list");
 		qdf_mem_free(cur_chan_list);
 		return QDF_STATUS_E_IO;
 	}
 
-	ch_info->freq_list = qdf_mem_malloc(sizeof(uint32_t) * NUM_CHANNELS);
-	if (!ch_info->freq_list) {
-		qdf_mem_free(cur_chan_list);
-		return QDF_STATUS_E_NOMEM;
-	}
-
 	for (i = 0; i < NUM_CHANNELS; i++) {
-		/**
+		/*
 		 * current channel list includes all channels. Exclude
 		 * disabled channels
 		 */
 		if (cur_chan_list[i].chan_flags & REGULATORY_CHAN_DISABLED ||
 		    cur_chan_list[i].chan_flags & REGULATORY_CHAN_RADAR)
 			continue;
-
-		/**
+		/*
 		 * do not include 6 GHz channels for now as NAN would need
 		 * 2.4 GHz and 5 GHz channels for discovery.
 		 * <TODO> Need to consider the 6GHz channels when there is a
@@ -277,52 +272,19 @@ hdd_ndi_config_ch_list(struct hdd_context *hdd_ctx,
 		if (wlan_reg_is_6ghz_chan_freq(cur_chan_list[i].center_freq))
 			continue;
 
-		ch_info->freq_list[ch_info->numOfChannels++] =
-					cur_chan_list[i].center_freq;
+		/* extracting first valid channel from regulatory list */
+		if (wlan_reg_is_freq_enabled(hdd_ctx->pdev,
+					     cur_chan_list[i].center_freq,
+					     REG_CURRENT_PWR_MODE)) {
+			*freq = cur_chan_list[i].center_freq;
+			qdf_mem_free(cur_chan_list);
+			return QDF_STATUS_SUCCESS;
+		}
 	}
 
-	if (!ch_info->numOfChannels) {
-		status = QDF_STATUS_E_NULL_VALUE;
-		qdf_mem_free(ch_info->freq_list);
-		goto end;
-	}
-
-	/**
-	 * Keep the valid channels in list in below order,
-	 * 149, 44, 6, rest of the channels
-	 */
-	for (i = ch_info->numOfChannels - 1; i >= 0; i--) {
-		if (ch_info->freq_list[i] != NAN_SOCIAL_FREQ_5GHZ_UPPER_BAND)
-			continue;
-		hdd_swap_frequencies(&ch_info->freq_list[i],
-				     &ch_info->freq_list[swap_index]);
-		swap_index++;
-		break;
-	}
-
-	for (i = ch_info->numOfChannels - 1; i >= 0; i--) {
-		if (ch_info->freq_list[i] != NAN_SOCIAL_FREQ_5GHZ_LOWER_BAND)
-			continue;
-
-		hdd_swap_frequencies(&ch_info->freq_list[i],
-				     &ch_info->freq_list[swap_index]);
-		swap_index++;
-		break;
-	}
-
-	for (i = ch_info->numOfChannels - 1; i >= 0; i--) {
-		if (ch_info->freq_list[i] != NAN_SOCIAL_FREQ_2_4GHZ)
-			continue;
-
-		hdd_swap_frequencies(&ch_info->freq_list[i],
-				     &ch_info->freq_list[swap_index]);
-		break;
-	}
-
-end:
 	qdf_mem_free(cur_chan_list);
 
-	return status;
+	return QDF_STATUS_E_FAILURE;
 }
 
 /**
@@ -336,7 +298,7 @@ static int hdd_ndi_start_bss(struct hdd_adapter *adapter)
 	QDF_STATUS status;
 	struct bss_dot11_config dot11_cfg = {0};
 	struct start_bss_config ndi_bss_cfg = {0};
-	tCsrChannelInfo ch_info;
+	qdf_freq_t valid_freq = 0;
 	mac_handle_t mac_handle = hdd_adapter_get_mac_handle(adapter);
 	struct mac_context *mac = MAC_CONTEXT(mac_handle);
 	struct hdd_context *hdd_ctx;
@@ -344,14 +306,14 @@ static int hdd_ndi_start_bss(struct hdd_adapter *adapter)
 	hdd_enter();
 	hdd_ctx = WLAN_HDD_GET_CTX(adapter);
 
-	status = hdd_ndi_config_ch_list(hdd_ctx, &ch_info);
+	status = hdd_ndi_select_valid_freq(hdd_ctx, &valid_freq);
 	if (!QDF_IS_STATUS_SUCCESS(status)) {
 		hdd_err("Unable to retrieve channel list for NAN");
 		return -EINVAL;
 	}
 
 	dot11_cfg.vdev_id = adapter->vdev_id;
-	dot11_cfg.bss_op_ch_freq = ch_info.freq_list[0];
+	dot11_cfg.bss_op_ch_freq = valid_freq;
 	dot11_cfg.phy_mode = eCSR_DOT11_MODE_AUTO;
 	if (!wlan_vdev_id_is_open_cipher(mac->pdev, adapter->vdev_id))
 		dot11_cfg.privacy = 1;
@@ -387,11 +349,8 @@ static int hdd_ndi_start_bss(struct hdd_adapter *adapter)
 		/* change back to NotConnected */
 		hdd_conn_set_connection_state(adapter,
 					      eConnectionState_NotConnected);
-	} else {
-		hdd_info("sme_RoamConnect issued successfully for NDI");
 	}
 
-	qdf_mem_free(ch_info.freq_list);
 	hdd_exit();
 
 	return 0;
@@ -664,11 +623,11 @@ int hdd_init_nan_data_mode(struct hdd_adapter *adapter)
 		hdd_err("Failed to get sifs burst value, use default");
 
 	ret_val = wma_cli_set_command((int)adapter->vdev_id,
-				      (int)WMI_PDEV_PARAM_BURST_ENABLE,
+				      (int)wmi_pdev_param_burst_enable,
 				      enable_sifs_burst,
 				      PDEV_CMD);
 	if (0 != ret_val)
-		hdd_err("WMI_PDEV_PARAM_BURST_ENABLE set failed %d", ret_val);
+		hdd_err("wmi_pdev_param_burst_enable set failed %d", ret_val);
 
 	/* RTS CTS PARAM  */
 	status = ucfg_fwol_get_rts_profile(hdd_ctx->psoc, &rts_profile);
@@ -676,7 +635,7 @@ int hdd_init_nan_data_mode(struct hdd_adapter *adapter)
 		hdd_err("FAILED TO GET RTSCTS Profile status:%d", status);
 
 	ret_val = sme_cli_set_command(adapter->vdev_id,
-				      WMI_VDEV_PARAM_ENABLE_RTSCTS, rts_profile,
+				      wmi_vdev_param_enable_rtscts, rts_profile,
 				      VDEV_CMD);
 	if (ret_val)
 		hdd_err("FAILED TO SET RTSCTS Profile ret:%d", ret_val);
@@ -700,18 +659,23 @@ error_init_txrx:
 	return ret_val;
 }
 
-int hdd_ndi_open(const char *iface_name, bool is_add_virtual_iface)
+/**
+ * hdd_is_max_ndi_count_reached() - Check the NDI max limit
+ * @hdd_ctx: Pointer to HDD context
+ *
+ * This function does not allow to create more than ndi_max_support
+ *
+ * Return: false if max value not reached otherwise true
+ */
+static bool hdd_is_max_ndi_count_reached(struct hdd_context *hdd_ctx)
 {
 	struct hdd_adapter *adapter, *next_adapter = NULL;
-	struct qdf_mac_addr random_ndi_mac;
-	struct hdd_context *hdd_ctx = cds_get_context(QDF_MODULE_ID_HDD);
 	uint8_t ndi_adapter_count = 0;
-	uint8_t *ndi_mac_addr;
-	struct hdd_adapter_create_param params = {0};
+	QDF_STATUS status;
+	uint32_t max_ndi;
 
-	hdd_enter();
 	if (!hdd_ctx)
-		return -EINVAL;
+		return true;
 
 	hdd_for_each_adapter_dev_held_safe(hdd_ctx, adapter, next_adapter,
 					   NET_DEV_HOLD_NDI_OPEN) {
@@ -719,11 +683,34 @@ int hdd_ndi_open(const char *iface_name, bool is_add_virtual_iface)
 			ndi_adapter_count++;
 		hdd_adapter_dev_put_debug(adapter, NET_DEV_HOLD_NDI_OPEN);
 	}
-	if (ndi_adapter_count >= MAX_NDI_ADAPTERS) {
-		hdd_err("Can't allow more than %d NDI adapters",
-			MAX_NDI_ADAPTERS);
-		return -EINVAL;
+
+	status = cfg_nan_get_max_ndi(hdd_ctx->psoc, &max_ndi);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		hdd_err(" Unable to fetch Max NDI");
+		return true;
 	}
+
+	if (ndi_adapter_count >= max_ndi) {
+		hdd_err("Can't allow more than %d NDI adapters",
+			max_ndi);
+		return true;
+	}
+
+	return false;
+}
+
+int hdd_ndi_open(const char *iface_name, bool is_add_virtual_iface)
+{
+	struct hdd_adapter *adapter;
+	struct qdf_mac_addr random_ndi_mac;
+	struct hdd_context *hdd_ctx = cds_get_context(QDF_MODULE_ID_HDD);
+	uint8_t *ndi_mac_addr;
+	struct hdd_adapter_create_param params = {0};
+
+	hdd_enter();
+
+	if (hdd_is_max_ndi_count_reached(hdd_ctx))
+		return -EINVAL;
 
 	params.is_add_virtual_iface = is_add_virtual_iface;
 
@@ -767,7 +754,7 @@ int hdd_ndi_set_mode(const char *iface_name)
 	uint8_t *ndi_mac_addr = NULL;
 
 	hdd_enter();
-	if (!hdd_ctx)
+	if (hdd_is_max_ndi_count_reached(hdd_ctx))
 		return -EINVAL;
 
 	adapter = hdd_get_adapter_by_iface_name(hdd_ctx, iface_name);
@@ -930,6 +917,12 @@ int hdd_ndi_delete(uint8_t vdev_id, const char *iface_name,
 	return ret;
 }
 
+#define MAX_VDEV_NDP_PARAMS 2
+/* params being sent:
+ * wmi_vdev_param_ndp_inactivity_timeout
+ * wmi_vdev_param_ndp_keepalive_timeout
+ */
+
 void hdd_ndi_drv_ndi_create_rsp_handler(uint8_t vdev_id,
 				struct nan_datapath_inf_create_rsp *ndi_rsp)
 {
@@ -941,6 +934,9 @@ void hdd_ndi_drv_ndi_create_rsp_handler(uint8_t vdev_id,
 	uint16_t ndp_keep_alive_period;
 	struct qdf_mac_addr bc_mac_addr = QDF_MAC_ADDR_BCAST_INIT;
 	struct wlan_objmgr_vdev *vdev;
+	struct dev_set_param setparam[MAX_VDEV_NDP_PARAMS] = {};
+	uint8_t index = 0;
+	QDF_STATUS status;
 
 	hdd_ctx = cds_get_context(QDF_MODULE_ID_HDD);
 	if (!hdd_ctx)
@@ -982,18 +978,35 @@ void hdd_ndi_drv_ndi_create_rsp_handler(uint8_t vdev_id,
 		if (QDF_IS_STATUS_ERROR(cfg_nan_get_ndp_inactivity_timeout(
 		    hdd_ctx->psoc, &ndp_inactivity_timeout)))
 			hdd_err("Failed to fetch inactivity timeout value");
-
-		sme_cli_set_command(adapter->vdev_id,
-				    WMI_VDEV_PARAM_NDP_INACTIVITY_TIMEOUT,
-				    ndp_inactivity_timeout, VDEV_CMD);
+		status = mlme_check_index_setparam(
+					setparam,
+					wmi_vdev_param_ndp_inactivity_timeout,
+					ndp_inactivity_timeout, index++,
+					MAX_VDEV_NDP_PARAMS);
+		if (QDF_IS_STATUS_ERROR(status)) {
+			hdd_err("failed at wmi_vdev_param_ndp_inactivity_timeout");
+			goto error;
+		}
 
 		if (QDF_IS_STATUS_SUCCESS(cfg_nan_get_ndp_keepalive_period(
 						hdd_ctx->psoc,
-						&ndp_keep_alive_period)))
-			sme_cli_set_command(
-				adapter->vdev_id,
-				WMI_VDEV_PARAM_NDP_KEEPALIVE_TIMEOUT,
-				ndp_keep_alive_period, VDEV_CMD);
+						&ndp_keep_alive_period))) {
+			status = mlme_check_index_setparam(
+					setparam,
+					wmi_vdev_param_ndp_keepalive_timeout,
+					ndp_keep_alive_period, index++,
+					MAX_VDEV_NDP_PARAMS);
+			if (QDF_IS_STATUS_ERROR(status)) {
+				hdd_err("failed at wmi_vdev_param_ndp_keepalive_timeout");
+				goto error;
+			}
+		}
+		status = sme_send_multi_pdev_vdev_set_params(MLME_VDEV_SETPARAM,
+							     adapter->vdev_id,
+							     setparam,
+							     index);
+		if (QDF_IS_STATUS_ERROR(status))
+			hdd_err("failed to send vdev set params");
 	} else {
 		hdd_alert("NDI interface creation failed with reason %d",
 			ndi_rsp->reason /* create_reason */);
@@ -1004,6 +1017,7 @@ void hdd_ndi_drv_ndi_create_rsp_handler(uint8_t vdev_id,
 	hdd_roam_register_sta(adapter, &roam_info->bssid,
 			      roam_info->fAuthRequired);
 
+error:
 	qdf_mem_free(roam_info);
 }
 

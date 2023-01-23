@@ -187,8 +187,7 @@ __wlan_hdd_cfg80211_get_he_cap(struct wiphy *wiphy,
 
 	hdd_info("11AX: he_supported: %d", he_supported);
 
-	reply_skb = cfg80211_vendor_cmd_alloc_reply_skb(wiphy, nl_buf_len);
-
+	reply_skb = wlan_cfg80211_vendor_cmd_alloc_reply_skb(wiphy, nl_buf_len);
 	if (!reply_skb) {
 		hdd_err("Allocate reply_skb failed");
 		return -EINVAL;
@@ -219,13 +218,13 @@ __wlan_hdd_cfg80211_get_he_cap(struct wiphy *wiphy,
 		    he_cap.ppet.ppet16_ppet8_ru3_ru0))
 		goto nla_put_failure;
 end:
-	ret = cfg80211_vendor_cmd_reply(reply_skb);
+	ret = wlan_cfg80211_vendor_cmd_reply(reply_skb);
 	hdd_exit();
 	return ret;
 
 nla_put_failure:
 	hdd_err("nla put fail");
-	kfree_skb(reply_skb);
+	wlan_cfg80211_vendor_free_skb(reply_skb);
 	return -EINVAL;
 }
 
@@ -433,7 +432,7 @@ static void hdd_sr_osif_events(struct wlan_objmgr_vdev *vdev,
 							       len, idx,
 							       GFP_KERNEL);
 			if (!skb) {
-				hdd_err("cfg80211_vendor_event_alloc failed");
+				hdd_err("wlan_cfg80211_vendor_event_alloc failed");
 				return;
 			}
 			status = hdd_sr_pack_suspend_resume_event(
@@ -441,7 +440,7 @@ static void hdd_sr_osif_events(struct wlan_objmgr_vdev *vdev,
 					srg_max_pd_offset, srg_min_pd_offset,
 					non_srg_max_pd_offset);
 			if (QDF_IS_STATUS_ERROR(status)) {
-				kfree_skb(skb);
+				wlan_cfg80211_vendor_free_skb(skb);
 				return;
 			}
 
@@ -627,6 +626,29 @@ static int hdd_get_sr_stats(struct hdd_context *hdd_ctx, uint8_t mac_id,
 	return 0;
 }
 
+static int hdd_clear_sr_stats(struct hdd_context *hdd_ctx, uint8_t mac_id)
+{
+	QDF_STATUS status;
+	ol_txrx_soc_handle soc;
+	uint8_t pdev_id;
+	struct cdp_txrx_stats_req req = {0};
+
+	soc = cds_get_context(QDF_MODULE_ID_SOC);
+	if (!soc) {
+		hdd_err("invalid soc");
+		return -EINVAL;
+	}
+
+	req.mac_id = mac_id;
+	pdev_id = wlan_objmgr_pdev_get_pdev_id(hdd_ctx->pdev);
+	status = cdp_clear_pdev_obss_pd_stats(soc, pdev_id, &req);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		hdd_err("Unable to clear stats");
+		return -EAGAIN;
+	}
+	return 0;
+}
+
 /**
  * __wlan_hdd_cfg80211_sr_operations: To handle SR operation
  *
@@ -647,10 +669,11 @@ static int __wlan_hdd_cfg80211_sr_operations(struct wiphy *wiphy,
 	int32_t srg_pd_threshold = 0;
 	int32_t non_srg_pd_threshold = 0;
 	uint8_t sr_he_siga_val15_allowed = true;
-	uint8_t pdev_id, mac_id, sr_ctrl, non_srg_max_pd_offset;
+	uint8_t mac_id, sr_ctrl, non_srg_max_pd_offset;
 	uint8_t srg_min_pd_offset = 0, srg_max_pd_offset = 0;
 	uint32_t nl_buf_len;
 	int ret;
+	uint32_t conc_vdev_id;
 	struct hdd_context *hdd_ctx = wiphy_priv(wiphy);
 	struct hdd_adapter *adapter = WLAN_HDD_GET_PRIV_PTR(wdev->netdev);
 	struct nlattr *tb[QCA_WLAN_VENDOR_ATTR_SR_MAX + 1];
@@ -660,7 +683,6 @@ static int __wlan_hdd_cfg80211_sr_operations(struct wiphy *wiphy,
 	struct nlattr *sr_param_attr;
 	struct sk_buff *skb;
 	struct cdp_pdev_obss_pd_stats_tlv stats;
-	ol_txrx_soc_handle soc;
 	uint8_t sr_device_modes;
 
 	hdd_enter_dev(wdev->netdev);
@@ -679,7 +701,16 @@ static int __wlan_hdd_cfg80211_sr_operations(struct wiphy *wiphy,
 		hdd_err("station is not connected to AP that supports SR");
 		return -EPERM;
 	}
-
+	policy_mgr_get_mac_id_by_session_id(hdd_ctx->psoc, adapter->vdev_id,
+					    &mac_id);
+	conc_vdev_id = policy_mgr_get_conc_vdev_on_same_mac(hdd_ctx->psoc,
+							    adapter->vdev_id,
+							    mac_id);
+	if (conc_vdev_id != WLAN_INVALID_VDEV_ID &&
+	    !policy_mgr_sr_same_mac_conc_enabled(hdd_ctx->psoc)) {
+		hdd_err("don't allow SR in SCC/MCC");
+		return -EPERM;
+	}
 	/**
 	 * Reject command if SR concurrency is not allowed and
 	 * only STA mode is set in ini to enable SR.
@@ -795,24 +826,30 @@ static int __wlan_hdd_cfg80211_sr_operations(struct wiphy *wiphy,
 		if (hdd_get_sr_stats(hdd_ctx, mac_id, &stats))
 			return -EINVAL;
 		nl_buf_len = hdd_get_srp_stats_len();
-		skb = cfg80211_vendor_cmd_alloc_reply_skb(hdd_ctx->wiphy,
-							  nl_buf_len);
+		skb = wlan_cfg80211_vendor_cmd_alloc_reply_skb(hdd_ctx->wiphy,
+							       nl_buf_len);
 		if (!skb) {
-			hdd_err("cfg80211_vendor_cmd_alloc_reply_skb failed");
+			hdd_err("wlan_cfg80211_vendor_cmd_alloc_reply_skb failed");
 			return -ENOMEM;
 		}
-		if (hdd_add_stats_info(skb, &stats))
-			return -EINVAL;
-		ret = cfg80211_vendor_cmd_reply(skb);
-		break;
-	case QCA_WLAN_SR_OPERATION_CLEAR_STATS:
-		soc = cds_get_context(QDF_MODULE_ID_SOC);
-		if (!soc) {
-			hdd_err("invalid soc");
+		if (hdd_add_stats_info(skb, &stats)) {
+			wlan_cfg80211_vendor_free_skb(skb);
 			return -EINVAL;
 		}
-		pdev_id = wlan_objmgr_pdev_get_pdev_id(hdd_ctx->pdev);
-		cdp_clear_pdev_obss_pd_stats(soc, pdev_id);
+
+		ret = wlan_cfg80211_vendor_cmd_reply(skb);
+		break;
+	case QCA_WLAN_SR_OPERATION_CLEAR_STATS:
+		status = policy_mgr_get_mac_id_by_session_id(hdd_ctx->psoc,
+							     adapter->vdev_id,
+							     &mac_id);
+		if (QDF_IS_STATUS_ERROR(status)) {
+			hdd_err("Failed to get mac_id for vdev_id: %u",
+				adapter->vdev_id);
+			return -EAGAIN;
+		}
+		if (hdd_clear_sr_stats(hdd_ctx, mac_id))
+			return -EAGAIN;
 		break;
 	case QCA_WLAN_SR_OPERATION_PSR_AND_NON_SRG_OBSS_PD_PROHIBIT:
 		if (tb2[QCA_WLAN_VENDOR_ATTR_SR_PARAMS_HESIGA_VAL15_ENABLE])
@@ -845,18 +882,21 @@ static int __wlan_hdd_cfg80211_sr_operations(struct wiphy *wiphy,
 			wlan_vdev_mlme_get_non_srg_pd_offset(adapter->vdev);
 		sr_ctrl = wlan_vdev_mlme_get_sr_ctrl(adapter->vdev);
 		nl_buf_len = hdd_get_srp_param_len();
-		skb = cfg80211_vendor_cmd_alloc_reply_skb(hdd_ctx->wiphy,
-							  nl_buf_len);
+		skb = wlan_cfg80211_vendor_cmd_alloc_reply_skb(hdd_ctx->wiphy,
+							       nl_buf_len);
 		if (!skb) {
-			hdd_err("cfg80211_vendor_cmd_alloc_reply_skb failed");
+			hdd_err("wlan_cfg80211_vendor_cmd_alloc_reply_skb failed");
 			return -ENOMEM;
 		}
 		if (hdd_add_param_info(skb, srg_max_pd_offset,
 				       srg_min_pd_offset, non_srg_max_pd_offset,
 				       sr_ctrl,
-				       QCA_WLAN_VENDOR_ATTR_SR_PARAMS))
+				       QCA_WLAN_VENDOR_ATTR_SR_PARAMS)) {
+			wlan_cfg80211_vendor_free_skb(skb);
 			return -EINVAL;
-		ret = cfg80211_vendor_cmd_reply(skb);
+		}
+
+		ret = wlan_cfg80211_vendor_cmd_reply(skb);
 		break;
 	default:
 		hdd_err("Invalid SR Operation");

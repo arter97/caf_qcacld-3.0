@@ -213,8 +213,8 @@ static QDF_STATUS sta_mlme_vdev_restart_send(struct vdev_mlme_obj *vdev_mlme,
 /**
  * sta_mlme_vdev_start_req_failed() - MLME start fail callback
  * @vdev_mlme: vdev mlme object
- * @event_data_len: event data length
- * @event_data: event data
+ * @data_len: event data length
+ * @data: event data
  *
  * This function is called to send the vdev stop to firmware
  *
@@ -332,8 +332,8 @@ static QDF_STATUS sta_mlme_vdev_disconnect_bss(struct vdev_mlme_obj *vdev_mlme,
 /**
  * sta_mlme_vdev_stop_send() - MLME vdev stop send callback
  * @vdev_mlme: vdev mlme object
- * @event_data_len: event data length
- * @event_data: event data
+ * @data_len: event data length
+ * @data: event data
  *
  * This function is called to send the vdev stop to firmware
  *
@@ -351,8 +351,8 @@ static QDF_STATUS sta_mlme_vdev_stop_send(struct vdev_mlme_obj *vdev_mlme,
 /**
  * sta_mlme_vdev_sta_disconnect_start() - MLME vdev disconnect send callback
  * @vdev_mlme: vdev mlme object
- * @event_data_len: event data length
- * @event_data: event data
+ * @data_len: event data length
+ * @data: event data
  *
  * This function is called to trigger the vdev stop to firmware when
  * reassoc failure
@@ -372,8 +372,8 @@ sta_mlme_vdev_sta_disconnect_start(struct vdev_mlme_obj *vdev_mlme,
 /**
  * vdevmgr_mlme_stop_continue() - MLME vdev stop send callback
  * @vdev_mlme: vdev mlme object
- * @event_data_len: event data length
- * @event_data: event data
+ * @data_len: event data length
+ * @data: event data
  *
  * This function is called to initiate operations on
  * LMAC/FW stop response such as remove peer.
@@ -408,7 +408,7 @@ static QDF_STATUS ap_mlme_vdev_start_send(struct vdev_mlme_obj *vdev_mlme,
 }
 
 /**
- * ap_start_continue () - vdev start rsp callback
+ * ap_mlme_start_continue () - vdev start rsp callback
  * @vdev_mlme: vdev mlme object
  * @data_len: event data length
  * @data: event data
@@ -569,7 +569,7 @@ ap_mlme_vdev_is_newchan_no_cac(struct vdev_mlme_obj *vdev_mlme)
 }
 
 /**
- * ap_mlme_vdev_down_send() - callback to send vdev down req
+ * vdevmgr_mlme_vdev_down_send() - callback to send vdev down req
  * @vdev_mlme: vdev mlme object
  * @data_len: event data length
  * @data: event data
@@ -624,7 +624,7 @@ static QDF_STATUS ap_mlme_vdev_start_req_failed(struct vdev_mlme_obj *vdev_mlme,
 }
 
 /**
- * ap_mlme_vdev_restart_send() a callback to send vdev restart
+ * ap_mlme_vdev_restart_send() - a callback to send vdev restart
  * @vdev_mlme: vdev mlme object
  * @data_len: event data length
  * @data: event data
@@ -1499,7 +1499,7 @@ QDF_STATUS vdevmgr_mlme_vdev_send_set_mac_addr(struct qdf_mac_addr mac_addr,
 #endif
 
 /**
- * ap_vdev_dfs_cac_timer_stop() – callback to stop cac timer
+ * ap_vdev_dfs_cac_timer_stop() - callback to stop cac timer
  * @vdev_mlme: vdev mlme object
  * @event_data_len: event data length
  * @event_data: event data
@@ -1537,7 +1537,7 @@ static QDF_STATUS mon_mlme_vdev_start_restart_send(
 }
 
 /**
- * mon_start_continue () - vdev start rsp callback
+ * mon_mlme_start_continue () - vdev start rsp callback
  * @vdev_mlme: vdev mlme object
  * @data_len: event data length
  * @data: event data
@@ -1632,7 +1632,7 @@ static QDF_STATUS mon_mlme_vdev_down_send(struct vdev_mlme_obj *vdev_mlme,
 
 /**
  * vdevmgr_vdev_delete_rsp_handle() - callback to handle vdev delete response
- * @vdev_mlme: vdev mlme object
+ * @psoc: psoc object
  * @rsp: pointer to vdev delete response
  *
  * This function is called to handle vdev delete response and send result to
@@ -1737,7 +1737,8 @@ vdevmgr_vdev_start_rsp_handle(struct vdev_mlme_obj *vdev_mlme,
 }
 
 /**
- * vdevmgr_vdev_delete_rsp_handle() - callback to handle vdev delete response
+ * vdevmgr_vdev_peer_delete_all_rsp_handle() - callback to handle vdev delete
+ *                                             all response
  * @vdev_mlme: vdev mlme object
  * @rsp: pointer to vdev delete response
  *
@@ -1905,37 +1906,6 @@ static QDF_STATUS ap_mlme_vdev_csa_complete(struct vdev_mlme_obj *vdev_mlme)
 	return QDF_STATUS_SUCCESS;
 }
 
-/**
- * struct sta_mlme_ops - VDEV MLME operation callbacks structure for sta
- * @mlme_vdev_start_send:               callback to initiate actions of VDEV
- *                                      MLME start operation
- * @mlme_vdev_restart_send:             callback to initiate actions of VDEV
- *                                      MLME restart operation
- * @mlme_vdev_stop_start_send:          callback to block start/restart VDEV
- *                                      request command
- * @mlme_vdev_sta_conn_start:           callback to initiate connection
- * @mlme_vdev_start_continue:           callback to initiate operations on
- *                                      LMAC/FW start response
- * @mlme_vdev_up_send:                  callback to initiate actions of VDEV
- *                                      MLME up operation
- * @mlme_vdev_notify_up_complete:       callback to notify VDEV MLME on moving
- *                                      to UP state
- * @mlme_vdev_update_beacon:            callback to initiate beacon update
- * @mlme_vdev_disconnect_peers:         callback to initiate disconnection of
- *                                      peers
- * @mlme_vdev_stop_send:                callback to initiate actions of VDEV
- *                                      MLME stop operation
- * @mlme_vdev_stop_continue:            callback to initiate operations on
- *                                      LMAC/FW stop response
- * @mlme_vdev_down_send:                callback to initiate actions of VDEV
- *                                      MLME down operation
- * @mlme_vdev_notify_down_complete:     callback to notify VDEV MLME on moving
- *                                      to INIT state
- * @mlme_vdev_sta_disconn_start         callback to trigger vdev stop to
- *                                      firmware when resaaoc failure
- * @mlme_vdev_ext_peer_delete_all_rsp:  Callback to trigger Delete all
- *                                      peers for the given vdev
- */
 static struct vdev_mlme_ops sta_mlme_ops = {
 	.mlme_vdev_start_send = sta_mlme_vdev_start_send,
 	.mlme_vdev_restart_send = sta_mlme_vdev_restart_send,
@@ -1957,38 +1927,6 @@ static struct vdev_mlme_ops sta_mlme_ops = {
 			vdevmgr_vdev_peer_delete_all_rsp_handle,
 };
 
-/**
- * struct ap_mlme_ops - VDEV MLME operation callbacks structure for beaconing
- *                      interface
- * @mlme_vdev_start_send:               callback to initiate actions of VDEV
- *                                      MLME start operation
- * @mlme_vdev_restart_send:             callback to initiate actions of VDEV
- *                                      MLME restart operation
- * @mlme_vdev_stop_start_send:          callback to block start/restart VDEV
- *                                      request command
- * @mlme_vdev_start_continue:           callback to initiate operations on
- *                                      LMAC/FW start response
- * @mlme_vdev_up_send:                  callback to initiate actions of VDEV
- *                                      MLME up operation
- * @mlme_vdev_notify_up_complete:       callback to notify VDEV MLME on moving
- *                                      to UP state
- * @mlme_vdev_update_beacon:            callback to initiate beacon update
- * @mlme_vdev_disconnect_peers:         callback to initiate disconnection of
- *                                      peers
- * @mlme_vdev_dfs_cac_timer_stop:       callback to stop the DFS CAC timer
- * @mlme_vdev_stop_send:                callback to initiate actions of VDEV
- *                                      MLME stop operation
- * @mlme_vdev_stop_continue:            callback to initiate operations on
- *                                      LMAC/FW stop response
- * @mlme_vdev_down_send:                callback to initiate actions of VDEV
- *                                      MLME down operation
- * @mlme_vdev_notify_down_complete:     callback to notify VDEV MLME on moving
- *                                      to INIT state
- * @mlme_vdev_is_newchan_no_cac:        callback to check if new channel is DFS
- *                                      and cac is not required
- * @mlme_vdev_ext_peer_delete_all_rsp:  callback to handle vdev delete all peer
- *                                      response and send result to upper layer
- */
 static struct vdev_mlme_ops ap_mlme_ops = {
 	.mlme_vdev_start_send = ap_mlme_vdev_start_send,
 	.mlme_vdev_restart_send = ap_mlme_vdev_restart_send,

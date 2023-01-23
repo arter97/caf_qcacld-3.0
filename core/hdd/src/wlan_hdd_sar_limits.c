@@ -223,19 +223,19 @@ static int hdd_sar_send_response(struct wiphy *wiphy,
 	int errno;
 
 	len = hdd_sar_get_response_len(event);
-	skb = cfg80211_vendor_cmd_alloc_reply_skb(wiphy, len);
+	skb = wlan_cfg80211_vendor_cmd_alloc_reply_skb(wiphy, len);
 	if (!skb) {
-		hdd_err("cfg80211_vendor_cmd_alloc_reply_skb failed");
+		hdd_err("wlan_cfg80211_vendor_cmd_alloc_reply_skb failed");
 		return -ENOMEM;
 	}
 
 	errno = hdd_sar_fill_response(skb, event);
 	if (errno) {
-		kfree_skb(skb);
+		wlan_cfg80211_vendor_free_skb(skb);
 		return errno;
 	}
 
-	return cfg80211_vendor_cmd_reply(skb);
+	return wlan_cfg80211_vendor_cmd_reply(skb);
 }
 
 /**
@@ -372,23 +372,21 @@ static int hdd_sar_send_capability_response(struct wiphy *wiphy,
 	int errno;
 
 	len = NLMSG_HDRLEN;
-
 	/* QCA_WLAN_VENDOR_ATTR_SAR_CAPABILITY_VERSION */
 	len += NLA_HDRLEN + sizeof(u32);
-
-	skb = cfg80211_vendor_cmd_alloc_reply_skb(wiphy, len);
+	skb = wlan_cfg80211_vendor_cmd_alloc_reply_skb(wiphy, len);
 	if (!skb) {
-		hdd_err("cfg80211_vendor_cmd_alloc_reply_skb failed");
+		hdd_err("wlan_cfg80211_vendor_cmd_alloc_reply_skb failed");
 		return -ENOMEM;
 	}
 
 	errno = hdd_sar_fill_capability_response(skb, hdd_ctx);
 	if (errno) {
-		kfree_skb(skb);
+		wlan_cfg80211_vendor_free_skb(skb);
 		return errno;
 	}
 
-	return cfg80211_vendor_cmd_reply(skb);
+	return wlan_cfg80211_vendor_cmd_reply(skb);
 }
 
 /**
@@ -1133,17 +1131,17 @@ static void hdd_send_sar_unsolicited_event(struct hdd_context *hdd_ctx)
 
 	len = NLMSG_HDRLEN;
 	vendor_event =
-		cfg80211_vendor_event_alloc(
+		wlan_cfg80211_vendor_event_alloc(
 			hdd_ctx->wiphy, NULL, len,
 			QCA_NL80211_VENDOR_SUBCMD_REQUEST_SAR_LIMITS_INDEX,
 			GFP_KERNEL);
 
 	if (!vendor_event) {
-		hdd_err("cfg80211_vendor_event_alloc failed");
+		hdd_err("wlan_cfg80211_vendor_event_alloc failed");
 		return;
 	}
 
-	cfg80211_vendor_event(vendor_event, GFP_KERNEL);
+	wlan_cfg80211_vendor_event(vendor_event, GFP_KERNEL);
 }
 
 static void hdd_sar_unsolicited_work_cb(void *user_data)

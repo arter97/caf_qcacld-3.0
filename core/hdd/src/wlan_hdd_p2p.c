@@ -288,7 +288,7 @@ static int __wlan_hdd_mgmt_tx(struct wiphy *wiphy, struct wireless_dev *wdev,
 	uint16_t auth_algo;
 	QDF_STATUS qdf_status;
 	int ret;
-	uint32_t ft_info_len = 0;
+	uint32_t assoc_resp_len, ft_info_len = 0;
 	const uint8_t  *assoc_resp;
 	void *ft_info;
 	struct hdd_ap_ctx *hdd_ap_ctx;
@@ -358,6 +358,13 @@ static int __wlan_hdd_mgmt_tx(struct wiphy *wiphy, struct wireless_dev *wdev,
 	    (sub_type == SIR_MAC_MGMT_ASSOC_RSP ||
 	     sub_type == SIR_MAC_MGMT_REASSOC_RSP)) {
 		assoc_resp = &((struct ieee80211_mgmt *)buf)->u.assoc_resp.variable[0];
+		assoc_resp_len = len - WLAN_ASSOC_RSP_IES_OFFSET
+			   - sizeof(struct wlan_frame_hdr);
+		if (!wlan_get_ie_ptr_from_eid(DOT11F_EID_FTINFO,
+					      assoc_resp, assoc_resp_len)) {
+			hdd_debug("No FT info in Assoc rsp, send it directly");
+			goto off_chan_tx;
+		}
 		ft_info = hdd_filter_ft_info(assoc_resp, len, &ft_info_len);
 		if (!ft_info || !ft_info_len)
 			return -EINVAL;
@@ -682,26 +689,6 @@ int hdd_set_p2p_ps(struct net_device *dev, void *msgData)
 	return wlan_hdd_set_power_save(adapter, &noa);
 }
 
-#ifdef WLAN_FEATURE_11BE_MLO
-static inline void
-wlan_hdd_set_ml_capab_add_iface(struct hdd_adapter_create_param *create_params,
-				enum QDF_OPMODE mode)
-{
-	if (mode != QDF_SAP_MODE)
-		return;
-
-	create_params->is_single_link = true;
-	create_params->is_ml_adapter = true;
-}
-#else
-static inline void
-wlan_hdd_set_ml_capab_add_iface(struct hdd_adapter_create_param *create_params,
-				enum QDF_OPMODE mode)
-{
-}
-
-#endif
-
 /**
  * __wlan_hdd_add_virtual_intf() - Add virtual interface
  * @wiphy: wiphy pointer
@@ -728,7 +715,6 @@ struct wireless_dev *__wlan_hdd_add_virtual_intf(struct wiphy *wiphy,
 	QDF_STATUS status;
 	struct wlan_objmgr_vdev *vdev;
 	int ret;
-	bool eht_capab;
 	struct hdd_adapter_create_param create_params = {0};
 
 	hdd_enter();
@@ -774,10 +760,6 @@ struct wireless_dev *__wlan_hdd_add_virtual_intf(struct wiphy *wiphy,
 	}
 
 	create_params.is_add_virtual_iface = 1;
-
-	ucfg_psoc_mlme_get_11be_capab(hdd_ctx->psoc, &eht_capab);
-	if (eht_capab)
-		wlan_hdd_set_ml_capab_add_iface(&create_params, mode);
 
 	adapter = hdd_get_adapter(hdd_ctx, QDF_STA_MODE);
 	if (adapter && !wlan_hdd_validate_vdev_id(adapter->vdev_id)) {

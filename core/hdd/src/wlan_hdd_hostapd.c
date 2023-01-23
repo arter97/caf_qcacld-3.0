@@ -1086,13 +1086,14 @@ static QDF_STATUS hdd_send_radar_event(struct hdd_context *hdd_context,
 		return QDF_STATUS_E_FAILURE;
 	}
 
-	vendor_event = cfg80211_vendor_event_alloc(hdd_context->wiphy,
-			wdev,
-			data_size + NLMSG_HDRLEN,
-			index,
-			GFP_KERNEL);
+	vendor_event = wlan_cfg80211_vendor_event_alloc(hdd_context->wiphy,
+							wdev,
+							data_size +
+							NLMSG_HDRLEN,
+							index, GFP_KERNEL);
 	if (!vendor_event) {
-		hdd_err("cfg80211_vendor_event_alloc failed for %d", index);
+		hdd_err("wlan_cfg80211_vendor_event_alloc failed for %d",
+			index);
 		return QDF_STATUS_E_FAILURE;
 	}
 
@@ -1100,11 +1101,11 @@ static QDF_STATUS hdd_send_radar_event(struct hdd_context *hdd_context,
 
 	if (ret) {
 		hdd_err("NL80211_ATTR_WIPHY_FREQ put fail");
-		kfree_skb(vendor_event);
+		wlan_cfg80211_vendor_free_skb(vendor_event);
 		return QDF_STATUS_E_FAILURE;
 	}
 
-	cfg80211_vendor_event(vendor_event, GFP_KERNEL);
+	wlan_cfg80211_vendor_event(vendor_event, GFP_KERNEL);
 	return QDF_STATUS_SUCCESS;
 }
 
@@ -1977,6 +1978,7 @@ QDF_STATUS hdd_hostapd_sap_event_cb(struct sap_event *sap_event,
 	struct wlan_objmgr_vdev *vdev;
 	struct qdf_mac_addr sta_addr = {0};
 	qdf_freq_t dfs_freq;
+	uint8_t sta_cnt;
 
 	dev = context;
 	if (!dev) {
@@ -2047,6 +2049,9 @@ QDF_STATUS hdd_hostapd_sap_event_cb(struct sap_event *sap_event,
 			      adapter->vdev_id,
 			      ap_ctx->operating_chan_freq,
 			      sap_config->ch_params.ch_width);
+
+		if (hdd_medium_access_state() == true)
+			hdd_medium_assess_init();
 
 		sap_config->ch_params = ap_ctx->sap_context->ch_params;
 		sap_config->sec_ch_freq = ap_ctx->sap_context->sec_ch_freq;
@@ -2184,7 +2189,7 @@ QDF_STATUS hdd_hostapd_sap_event_cb(struct sap_event *sap_event,
 		wrqu.data.length = strlen(startBssEvent);
 		we_event = IWEVCUSTOM;
 		we_custom_event_generic = we_custom_start_event;
-		hdd_ipa_set_tx_flow_info();
+		wlan_hdd_set_tx_flow_info();
 		sap_ctx = WLAN_HDD_GET_SAP_CTX_PTR(adapter);
 		if (!sap_ctx) {
 			hdd_err("sap ctx is null");
@@ -2251,15 +2256,6 @@ QDF_STATUS hdd_hostapd_sap_event_cb(struct sap_event *sap_event,
 		}
 		hdd_nofl_info("Ap stopped vid %d reason=%d", adapter->vdev_id,
 			      ap_ctx->bss_stop_reason);
-
-		qdf_status =
-			policy_mgr_get_mac_id_by_session_id(hdd_ctx->psoc,
-							    adapter->vdev_id,
-							    &pdev_id);
-		if (QDF_IS_STATUS_SUCCESS(qdf_status))
-			hdd_medium_assess_stop_timer(pdev_id, hdd_ctx);
-
-		hdd_medium_assess_deinit();
 
 		/* clear the reason code in case BSS is stopped
 		 * in another place
@@ -2994,6 +2990,16 @@ QDF_STATUS hdd_hostapd_sap_event_cb(struct sap_event *sap_event,
 			hdd_dcs_hostapd_set_chan(
 				hdd_ctx, adapter->vdev_id,
 				adapter->session.ap.operating_chan_freq);
+
+		/* Added the sta cnt check as we don't support sta+sap+nan
+		 * today. But this needs to be re-visited when we start
+		 * supporting this combo.
+		 */
+		sta_cnt = policy_mgr_mode_specific_connection_count(hdd_ctx->psoc,
+								    PM_STA_MODE,
+								    NULL);
+		if (!sta_cnt)
+			policy_mgr_nan_sap_post_enable_conc_check(hdd_ctx->psoc);
 		policy_mgr_check_sap_go_force_scc(
 				hdd_ctx->psoc, adapter->vdev,
 				ap_ctx->sap_context->csa_reason);
@@ -3026,6 +3032,15 @@ stopbss:
 		hdd_debug("BSS stop status = %s",
 		       sap_event->sapevt.sapStopBssCompleteEvent.status ?
 		       "eSAP_STATUS_FAILURE" : "eSAP_STATUS_SUCCESS");
+
+		qdf_status =
+			policy_mgr_get_mac_id_by_session_id(hdd_ctx->psoc,
+							    adapter->vdev_id,
+							    &pdev_id);
+		if (QDF_IS_STATUS_SUCCESS(qdf_status))
+			hdd_medium_assess_stop_timer(pdev_id, hdd_ctx);
+
+		hdd_medium_assess_deinit();
 
 		/* Change the BSS state now since, as we are shutting
 		 * things down, we don't want interfaces to become
@@ -3095,7 +3110,7 @@ stopbss:
 			ucfg_dp_bus_bw_compute_timer_try_stop(hdd_ctx->psoc);
 		}
 
-		hdd_ipa_set_tx_flow_info();
+		wlan_hdd_set_tx_flow_info();
 	}
 	return QDF_STATUS_SUCCESS;
 }
@@ -3588,7 +3603,7 @@ QDF_STATUS hdd_sap_restart_with_channel_switch(struct wlan_objmgr_psoc *psoc,
 
 	ret = hdd_softap_set_channel_change(dev, target_chan_freq,
 					    target_bw, forced);
-	if (ret) {
+	if (ret && ret != -EBUSY) {
 		hdd_err("channel switch failed");
 		hdd_stop_sap_set_tx_power(psoc, ap_adapter);
 	}
@@ -3759,6 +3774,7 @@ QDF_STATUS wlan_hdd_get_channel_for_sap_restart(
 	    !policy_mgr_is_go_scc_strict(psoc) &&
 	    (wlan_vdev_get_peer_count(sap_context->vdev) == 1)) {
 		hdd_debug("p2p go liberal mode enabled. Skipping CSA");
+		wlansap_context_put(sap_context);
 		return QDF_STATUS_E_FAILURE;
 	}
 
@@ -3986,7 +4002,8 @@ uint32_t hdd_get_ap_6ghz_capable(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id)
 	if ((keymgmt & (1 << WLAN_CRYPTO_KEY_MGMT_SAE |
 			1 << WLAN_CRYPTO_KEY_MGMT_IEEE8021X_SUITE_B |
 			1 << WLAN_CRYPTO_KEY_MGMT_IEEE8021X_SUITE_B_192 |
-			1 << WLAN_CRYPTO_KEY_MGMT_OWE))) {
+			1 << WLAN_CRYPTO_KEY_MGMT_OWE |
+			1 << WLAN_CRYPTO_KEY_MGMT_SAE_EXT_KEY))) {
 		capable |= CONN_6GHZ_FLAG_SECURITY_ALLOWED;
 	}
 	capable |= CONN_6GHZ_FLAG_VALID;
@@ -4213,11 +4230,11 @@ QDF_STATUS hdd_init_ap_mode(struct hdd_adapter *adapter, bool reinit)
 		hdd_err("Failed to get sifs burst value, use default");
 
 	ret = wma_cli_set_command(adapter->vdev_id,
-				  WMI_PDEV_PARAM_BURST_ENABLE,
+				  wmi_pdev_param_burst_enable,
 				  enable_sifs_burst,
 				  PDEV_CMD);
 	if (0 != ret)
-		hdd_err("WMI_PDEV_PARAM_BURST_ENABLE set failed: %d", ret);
+		hdd_err("wmi_pdev_param_burst_enable set failed: %d", ret);
 
 
 	ucfg_mlme_is_6g_sap_fd_enabled(hdd_ctx->psoc, &is_6g_sap_fd_enabled);
@@ -4315,7 +4332,6 @@ struct hdd_adapter *hdd_wlan_create_ap_dev(struct hdd_context *hdd_ctx,
 {
 	struct net_device *dev;
 	struct hdd_adapter *adapter;
-	QDF_STATUS qdf_status;
 
 	hdd_debug("iface_name = %s", iface_name);
 
@@ -4361,14 +4377,6 @@ struct hdd_adapter *hdd_wlan_create_ap_dev(struct hdd_context *hdd_ctx,
 	dev->ieee80211_ptr = &adapter->wdev;
 	adapter->wdev.wiphy = hdd_ctx->wiphy;
 	adapter->wdev.netdev = dev;
-
-	qdf_status = qdf_event_create(
-			&adapter->qdf_session_open_event);
-	if (!QDF_IS_STATUS_SUCCESS(qdf_status)) {
-		hdd_err("failed to create session open QDF event!");
-		free_netdev(adapter->dev);
-		return NULL;
-	}
 
 	init_completion(&adapter->vdev_destroy_event);
 
@@ -6071,7 +6079,7 @@ hdd_softap_update_pasn_vdev_params(struct hdd_context *hdd_ctx,
 		pasn_vdev_param |= WLAN_CRYPTO_URNM_MFPR;
 
 	wlan_crypto_vdev_set_param(hdd_ctx->psoc, vdev_id,
-				   WMI_VDEV_PARAM_11AZ_SECURITY_CONFIG,
+				   wmi_vdev_param_11az_security_config,
 				   pasn_vdev_param);
 }
 
@@ -7896,7 +7904,6 @@ static int __wlan_hdd_cfg80211_start_ap(struct wiphy *wiphy,
 		}
 	}
 
-	hdd_medium_assess_init();
 	goto success;
 
 err_start_bss:

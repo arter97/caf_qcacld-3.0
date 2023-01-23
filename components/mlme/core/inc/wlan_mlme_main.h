@@ -229,6 +229,7 @@ struct wlan_mlme_roaming_config {
  * @sae_single_pmk: Details for sae roaming using single pmk
  * @set_pmk_pending: RSO update status of PMK from set_key
  * @sae_auth_ta: SAE pre-auth tx address
+ * @sae_auth_pending:  Roaming SAE auth pending
  */
 struct wlan_mlme_roam {
 	struct wlan_mlme_roam_state_info roam_sm;
@@ -238,6 +239,7 @@ struct wlan_mlme_roam {
 #endif
 	bool set_pmk_pending;
 	struct qdf_mac_addr sae_auth_ta;
+	uint8_t sae_auth_pending;
 };
 
 #ifdef WLAN_FEATURE_MSCS
@@ -374,6 +376,7 @@ struct ft_context {
  * @cckm_ie_len: cckm_ie len
  * @ese_tspec_info: ese tspec info
  * @ext_cap_ie: Ext CAP IE
+ * @assoc_btm_cap: BSS transition management cap used in (re)assoc req
  */
 struct mlme_connect_info {
 	uint8_t timing_meas_cap;
@@ -398,6 +401,7 @@ struct mlme_connect_info {
 #endif
 #endif
 	uint8_t ext_cap_ie[DOT11F_IE_EXTCAP_MAX_LEN + 2];
+	bool assoc_btm_cap;
 };
 
 /** struct wait_for_key_timer - wait for key timer object

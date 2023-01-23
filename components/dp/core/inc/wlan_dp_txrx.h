@@ -92,7 +92,7 @@ void dp_softap_check_wait_for_tx_eap_pkt(struct wlan_dp_intf *dp_intf,
  * dp_post_dhcp_ind() - Send DHCP START/STOP indication to FW
  * @dp_intf: pointer to dp interface
  * @mac_addr: mac address
- * @type: WMA message type
+ * @dhcp_start: true if DHCP start, otherwise DHCP stop
  *
  * Return: error number
  */
@@ -102,7 +102,7 @@ int dp_post_dhcp_ind(struct wlan_dp_intf *dp_intf,
 /**
  * dp_softap_inspect_dhcp_packet() - Inspect DHCP packet
  * @dp_intf: pointer to dp interface
- * @skb: pointer to OS packet (sk_buff)
+ * @nbuf: pointer to OS packet (sk_buff)
  * @dir: direction
  *
  * Inspect the Tx/Rx frame, and send DHCP START/STOP notification to the FW
@@ -148,7 +148,7 @@ int dp_softap_inspect_dhcp_packet(struct wlan_dp_intf *dp_intf,
 
 /**
  * dp_rx_flush_packet_cbk() - flush rx packet handler
- * @dp_intf_context: pointer to DP interface context
+ * @dp_intf_ctx: pointer to DP interface context
  * @vdev_id: vdev_id of the packets to be flushed
  *
  * Flush rx packet callback registered with data path. DP will call this to
@@ -182,7 +182,7 @@ void dp_softap_tx_timeout(struct wlan_dp_intf *dp_intf);
 
 /**
  * dp_softap_rx_packet_cbk() - Receive packet handler for SAP
- * @dp_intf_context: pointer to DP interface context
+ * @intf_ctx: pointer to DP interface context
  * @rx_buf: pointer to rx qdf_nbuf
  *
  * Receive callback registered with data path.  DP will call this to notify
@@ -232,19 +232,19 @@ QDF_STATUS dp_rx_packet_cbk(void *dp_intf_context, qdf_nbuf_t rx_buf);
 #if defined(WLAN_SUPPORT_RX_FISA)
 /**
  * wlan_dp_rx_fisa_cbk() - Entry function to FISA to handle aggregation
- * @soc: core txrx main context
- * @vdev: Handle DP vdev
+ * @dp_soc: core txrx main context
+ * @dp_vdev: Handle DP vdev
  * @nbuf_list: List nbufs to be aggregated
  *
  * Return: Success on aggregation
  */
 QDF_STATUS wlan_dp_rx_fisa_cbk(void *dp_soc, void *dp_vdev,
-			       qdf_nbuf_t rxbuf_list);
+			       qdf_nbuf_t nbuf_list);
 
 /**
  * wlan_dp_rx_fisa_flush_by_ctx_id() - Flush function to end of context
  *				   flushing of aggregates
- * @soc: core txrx main context
+ * @dp_soc: core txrx main context
  * @ring_num: REO number to flush the flow Rxed on the REO
  *
  * Return: Success on flushing the flows for the REO
@@ -253,7 +253,7 @@ QDF_STATUS wlan_dp_rx_fisa_flush_by_ctx_id(void *dp_soc, int ring_num);
 
 /**
  * wlan_dp_rx_fisa_flush_by_vdev_id() - Flush fisa aggregates per vdev id
- * @soc: core txrx main context
+ * @dp_soc: core txrx main context
  * @vdev_id: vdev ID
  *
  * Return: Success on flushing the flows for the vdev
@@ -268,8 +268,9 @@ static inline QDF_STATUS wlan_dp_rx_fisa_flush_by_vdev_id(void *dp_soc,
 #endif
 
 /**
- * dp_rx_deliver_to_stack() - DP helper function to deliver RX pkts to stack
- * @dp_intf_context: pointer to DP interface context
+ * wlan_dp_rx_deliver_to_stack() - DP helper function to deliver RX pkts to
+ *                                 stack
+ * @dp_intf: pointer to DP interface context
  * @nbuf: pointer to nbuf
  *
  * The function calls the appropriate stack function depending upon the packet
@@ -283,7 +284,7 @@ QDF_STATUS wlan_dp_rx_deliver_to_stack(struct wlan_dp_intf *dp_intf,
 
 /**
  * dp_rx_thread_gro_flush_ind_cbk() - receive handler to flush GRO packets
- * @dp_intf_context: pointer to DP interface context
+ * @intf_ctx: pointer to DP interface context
  * @rx_ctx_id: RX CTX Id for which flush should happen
  *
  * Receive callback registered with DP layer which flushes GRO packets
@@ -292,11 +293,11 @@ QDF_STATUS wlan_dp_rx_deliver_to_stack(struct wlan_dp_intf *dp_intf,
  * Return: QDF_STATUS_E_FAILURE if any errors encountered,
  *	   QDF_STATUS_SUCCESS otherwise
  */
-QDF_STATUS dp_rx_thread_gro_flush_ind_cbk(void *dp_intf_ctx, int rx_ctx_id);
+QDF_STATUS dp_rx_thread_gro_flush_ind_cbk(void *intf_ctx, int rx_ctx_id);
 
 /**
  * dp_rx_pkt_thread_enqueue_cbk() - receive pkt handler to enqueue into thread
- * @dp_intf_context: pointer to DP interface context
+ * @intf_ctx: pointer to DP interface context
  * @nbuf_list: pointer to qdf_nbuf list
  *
  * Receive callback registered with DP layer which enqueues packets into dp rx
@@ -305,7 +306,7 @@ QDF_STATUS dp_rx_thread_gro_flush_ind_cbk(void *dp_intf_ctx, int rx_ctx_id);
  * Return: QDF_STATUS_E_FAILURE if any errors encountered,
  *	   QDF_STATUS_SUCCESS otherwise
  */
-QDF_STATUS dp_rx_pkt_thread_enqueue_cbk(void *dp_intf_ctx,
+QDF_STATUS dp_rx_pkt_thread_enqueue_cbk(void *intf_ctx,
 					qdf_nbuf_t nbuf_list);
 
 /**
@@ -508,7 +509,7 @@ dp_start_xmit(struct wlan_dp_intf *dp_intf, qdf_nbuf_t nbuf);
 /**
  * dp_mon_rx_packet_cbk() - Receive callback registered with OL layer.
  * @context: pointer to qdf context
- * @rx_buf: pointer to rx qdf_nbuf
+ * @rxbuf: pointer to rx qdf_nbuf
  *
  * TL will call this to notify the HDD when one or more packets were
  * received for a registered STA.
@@ -565,9 +566,9 @@ void dp_rx_monitor_callback(ol_osif_vdev_handle vdev, qdf_nbuf_t mpdu,
 void dp_sta_notify_tx_comp_cb(qdf_nbuf_t nbuf, void *ctx, uint16_t flag);
 
 /**
- * dp_softap_notify_tx_comp_cb() - notify softap tx comp registered with dp
+ * dp_softap_notify_tx_compl_cbk() - notify softap tx comp registered with dp
  * @nbuf: pointer to nbuf
- * @ctx: osif context
+ * @context: osif context
  * @flag: tx status flag
  *
  * Return: None
@@ -589,12 +590,10 @@ static inline bool dp_rx_pkt_tracepoints_enabled(void)
 
 #ifdef CONFIG_DP_PKT_ADD_TIMESTAMP
 /**
- * dp_pkt_add_timestamp() - add timestamp in data payload
- *
- * @dp_intf - DP interface
- * @index - timestamp index which decides offset in payload
- * @time - time to update in payload
- * @nbuf - Network socket buffer
+ * wlan_dp_pkt_add_timestamp() - add timestamp in data payload
+ * @dp_intf: DP interface
+ * @index: timestamp index which decides offset in payload
+ * @nbuf: Network socket buffer
  *
  * Return: none
  */

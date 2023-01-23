@@ -2263,6 +2263,13 @@ wmi_fill_roam_mlo_info(wmi_unified_t wmi_handle,
 
 			WMI_MAC_ADDR_TO_CHAR_ARRAY(&setup_links->link_addr,
 						   link->link_addr.bytes);
+			wmi_debug("link_id: %u vdev_id: %u flags: 0x%x addr:" QDF_MAC_ADDR_FMT,
+				  link->link_id, link->vdev_id,
+				  link->flags, link->link_addr.bytes);
+			wmi_debug("channel: %u mhz center_freq1: %u center_freq2: %u",
+				  link->channel.mhz,
+				  link->channel.band_center_freq1,
+				  link->channel.band_center_freq2);
 			setup_links++;
 		}
 	}
@@ -2280,6 +2287,8 @@ wmi_fill_roam_mlo_info(wmi_unified_t wmi_handle,
 				     WMI_MAX_PN_LEN);
 			qdf_mem_copy(key->key_buff, ml_key_param->key_buff,
 				     WMI_MAX_KEY_LEN);
+			wmi_debug("link_id: %u key_idx: %u key_cipher: %u",
+				  key->link_id, key->key_idx, key->key_cipher);
 			ml_key_param++;
 		}
 	}
@@ -2409,6 +2418,10 @@ wmi_fill_roam_sync_buffer(wmi_unified_t wmi_handle,
 			     REPLAY_CTR_LEN);
 	}
 
+	wmi_debug("ROAM_SYNC kek_len %d kck_len %d",
+		  roam_sync_ind->kek_len,
+		  roam_sync_ind->kck_len);
+
 	if (param_buf->hw_mode_transition_fixed_param) {
 		wmi_extract_pdev_hw_mode_trans_ind(
 		    param_buf->hw_mode_transition_fixed_param,
@@ -2446,9 +2459,10 @@ wmi_fill_roam_sync_buffer(wmi_unified_t wmi_handle,
 		roam_sync_ind->next_erp_seq_num =
 				fils_info->next_erp_seq_num;
 
-		wmi_debug("Update ERP Seq Num %d, Next ERP Seq Num %d",
+		wmi_debug("Update ERP Seq Num %d, Next ERP Seq Num %d KEK len %d",
 			  roam_sync_ind->update_erp_next_seq_num,
-			  roam_sync_ind->next_erp_seq_num);
+			  roam_sync_ind->next_erp_seq_num,
+			  roam_sync_ind->kek_len);
 	}
 
 	pmk_cache_info = param_buf->roam_pmk_cache_synch_info;
@@ -3300,6 +3314,7 @@ extract_auth_offload_event_tlv(wmi_unified_t wmi_handle,
 	}
 
 	auth_event->vdev_id = rso_auth_start_ev->vdev_id;
+	auth_event->akm = rso_auth_start_ev->akm_suite_type;
 
 	WMI_MAC_ADDR_TO_CHAR_ARRAY(&rso_auth_start_ev->candidate_ap_bssid,
 				   auth_event->ap_bssid.bytes);
@@ -3313,10 +3328,10 @@ extract_auth_offload_event_tlv(wmi_unified_t wmi_handle,
 	}
 
 	wmi_debug("Received Roam auth offload event for bss:"
-		  QDF_MAC_ADDR_FMT " ta:" QDF_MAC_ADDR_FMT " vdev_id: %d",
+		  QDF_MAC_ADDR_FMT " ta:" QDF_MAC_ADDR_FMT " vdev_id: %d akm: %d",
 		  QDF_MAC_ADDR_REF(auth_event->ap_bssid.bytes),
 		  QDF_MAC_ADDR_REF(auth_event->ta.bytes),
-		  auth_event->vdev_id);
+		  auth_event->vdev_id, auth_event->akm);
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -3659,8 +3674,6 @@ extract_roam_event(wmi_unified_t wmi_handle, void *evt_buf, uint32_t len,
 	return QDF_STATUS_E_NOSUPPORT;
 }
 #endif /* WLAN_FEATURE_ROAM_OFFLOAD */
-
-#define ROAM_OFFLOAD_PMK_EXT_BYTES 16
 
 #ifdef WLAN_FEATURE_ROAM_OFFLOAD
 /**
@@ -4164,9 +4177,13 @@ wmi_fill_rso_tlvs(wmi_unified_t wmi_handle, uint8_t *buf,
 				     src_11i_info->psk_pmk,
 				     roam_offload_11i->pmk_len);
 
-			roam_offload_11i->pmk_ext_len =
-			    src_11i_info->pmk_len > ROAM_OFFLOAD_PMK_BYTES ?
-			    ROAM_OFFLOAD_PMK_EXT_BYTES : 0;
+			roam_offload_11i->pmk_ext_len = 0;
+			if (src_11i_info->pmk_len > ROAM_OFFLOAD_PMK_BYTES) {
+				roam_offload_11i->pmk_ext_len =
+					QDF_MIN(src_11i_info->pmk_len -
+						ROAM_OFFLOAD_PMK_BYTES,
+						ROAM_OFFLOAD_PMK_BYTES);
+			}
 			qdf_mem_copy(
 				roam_offload_11i->pmk_ext,
 				&src_11i_info->psk_pmk[ROAM_OFFLOAD_PMK_BYTES],
@@ -4202,6 +4219,11 @@ wmi_fill_rso_tlvs(wmi_unified_t wmi_handle, uint8_t *buf,
 				QDF_TRACE_HEX_DUMP(QDF_MODULE_ID_WMI,
 						   QDF_TRACE_LEVEL_DEBUG,
 						   roam_offload_11i->pmk,
+						   WLAN_MAX_PMK_DUMP_BYTES);
+			if (roam_offload_11i->pmk_ext_len)
+				QDF_TRACE_HEX_DUMP(QDF_MODULE_ID_WMI,
+						   QDF_TRACE_LEVEL_DEBUG,
+						   roam_offload_11i->pmk_ext,
 						   WLAN_MAX_PMK_DUMP_BYTES);
 		}
 	} else {

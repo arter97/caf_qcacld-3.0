@@ -245,7 +245,7 @@
  * @Default: 0
  *
  * This ini is used to enable/disable the Co-ex Alternative Chainmask
- * feature via the WMI_PDEV_PARAM_ALTERNATIVE_CHAINMASK_SCHEME
+ * feature via the wmi_pdev_param_alternative_chainmask_scheme
  * firmware parameter.
  *
  * Related: None
@@ -269,7 +269,7 @@
  * @Default: 0
  *
  * This ini is used to enable/disable the Smart Chainmask feature via
- * the WMI_PDEV_PARAM_SMART_CHAINMASK_SCHEME firmware parameter.
+ * the wmi_pdev_param_smart_chainmask_scheme firmware parameter.
  *
  * Related: None
  *

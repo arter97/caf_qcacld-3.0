@@ -691,6 +691,7 @@ void tdls_extract_peer_state_param(struct tdls_peer_update_state *peer_param,
 #ifdef TDLS_WOW_ENABLED
 /**
  * tdls_prevent_suspend(): Prevent suspend for TDLS
+ * @tdls_soc: TDLS soc object
  *
  * Acquire wake lock and prevent suspend for TDLS
  *
@@ -709,6 +710,7 @@ static void tdls_prevent_suspend(struct tdls_soc_priv_obj *tdls_soc)
 
 /**
  * tdls_allow_suspend(): Allow suspend for TDLS
+ * @tdls_soc: TDLS soc object
  *
  * Release wake lock and allow suspend for TDLS
  *

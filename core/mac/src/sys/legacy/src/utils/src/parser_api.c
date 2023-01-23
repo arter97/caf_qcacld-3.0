@@ -1520,20 +1520,51 @@ populate_dot11f_vht_operation(struct mac_context *mac,
 {
 	uint32_t mcs_set;
 	struct mlme_vht_capabilities_info *vht_cap_info;
+	enum reg_wifi_band band;
+	uint8_t band_mask;
+	struct ch_params ch_params = {0};
+	qdf_freq_t sec_chan_freq = 0;
 
 	if (!pe_session || !pe_session->vhtCapability)
 		return QDF_STATUS_SUCCESS;
+
+	band = wlan_reg_freq_to_band(pe_session->curr_op_freq);
+	band_mask = 1 << band;
+
+	ch_params.ch_width = pe_session->ch_width;
+	ch_params.mhz_freq_seg0 =
+		wlan_reg_chan_band_to_freq(mac->pdev,
+					   pe_session->ch_center_freq_seg0,
+					   band_mask);
+
+	if (pe_session->ch_center_freq_seg1)
+		ch_params.mhz_freq_seg1 =
+			wlan_reg_chan_band_to_freq(mac->pdev,
+						   pe_session->ch_center_freq_seg1,
+						   band_mask);
+
+	if (band == (REG_BAND_2G) && ch_params.ch_width == CH_WIDTH_40MHZ) {
+		if (ch_params.mhz_freq_seg0 ==  pe_session->curr_op_freq + 10)
+			sec_chan_freq = pe_session->curr_op_freq + 20;
+		if (ch_params.mhz_freq_seg0 ==  pe_session->curr_op_freq - 10)
+			sec_chan_freq = pe_session->curr_op_freq - 20;
+	}
+
+	wlan_reg_set_channel_params_for_pwrmode(mac->pdev,
+						pe_session->curr_op_freq,
+						sec_chan_freq, &ch_params,
+						REG_CURRENT_PWR_MODE);
 
 	pDot11f->present = 1;
 
 	if (pe_session->ch_width > CH_WIDTH_40MHZ) {
 		pDot11f->chanWidth = 1;
 		pDot11f->chan_center_freq_seg0 =
-			pe_session->ch_center_freq_seg0;
+			ch_params.center_freq_seg0;
 		if (pe_session->ch_width == CH_WIDTH_80P80MHZ ||
 				pe_session->ch_width == CH_WIDTH_160MHZ)
 			pDot11f->chan_center_freq_seg1 =
-				pe_session->ch_center_freq_seg1;
+				ch_params.center_freq_seg1;
 		else
 			pDot11f->chan_center_freq_seg1 = 0;
 	} else {
@@ -1672,6 +1703,34 @@ void populate_dot11f_bss_max_idle(struct mac_context *mac,
 	}
 }
 
+void populate_dot11f_edca_pifs_param_set(struct mac_context *mac,
+					 tDot11fIEqcn_ie *qcn_ie)
+{
+	struct wlan_edca_pifs_param_ie param = {0};
+	struct edca_param *eparam;
+	struct pifs_param *pparam;
+	uint8_t edca_param_type;
+
+	qcn_ie->present = 1;
+	qcn_ie->edca_pifs_param_attr.present = 1;
+
+	edca_param_type = mac->mlme_cfg->edca_params.edca_param_type;
+	wlan_mlme_set_edca_pifs_param(&param, edca_param_type);
+	qcn_ie->edca_pifs_param_attr.edca_param_type = edca_param_type;
+
+	if (edca_param_type == HOST_EDCA_PARAM_TYPE_AGGRESSIVE) {
+		qcn_ie->edca_pifs_param_attr.num_data = sizeof(*eparam);
+		eparam = (struct edca_param *)qcn_ie->edca_pifs_param_attr.data;
+		qdf_mem_copy(eparam, &param.edca_pifs_param.eparam,
+			     sizeof(*eparam));
+	} else if (edca_param_type == HOST_EDCA_PARAM_TYPE_PIFS) {
+		qcn_ie->edca_pifs_param_attr.num_data = sizeof(*pparam);
+		pparam = (struct pifs_param *)qcn_ie->edca_pifs_param_attr.data;
+		qdf_mem_copy(pparam, &param.edca_pifs_param.pparam,
+			     sizeof(*pparam));
+	}
+}
+
 void populate_dot11f_qcn_ie(struct mac_context *mac,
 			    struct pe_session *pe_session,
 			    tDot11fIEqcn_ie *qcn_ie,
@@ -1693,6 +1752,15 @@ void populate_dot11f_qcn_ie(struct mac_context *mac,
 	}
 
 	populate_dot11f_qcn_ie_he_params(mac, pe_session, qcn_ie, attr_id);
+	if (policy_mgr_is_ll_sap_present(
+				mac->psoc,
+				policy_mgr_convert_device_mode_to_qdf_type(
+				pe_session->opmode), pe_session->vdev_id)) {
+		pe_debug("Populate edca/pifs param ie for ll sap");
+		populate_dot11f_edca_pifs_param_set(
+					mac,
+					qcn_ie);
+	}
 }
 
 QDF_STATUS
@@ -5588,6 +5656,16 @@ sir_convert_auth_frame2_struct(struct mac_context *mac,
 
 	/* Copy MLO IE presence flag to pAuth in case of ML connection */
 	pAuth->is_mlo_ie_present = auth.mlo_ie.present;
+	/* The minimum length is set to 9 based on below calculation
+	 * Multi-Link Control Field => 2 Bytes
+	 * Minimum CInfo Field => CInfo Length (1 Byte) + MLD Addr (6 Bytes)
+	 * min_len = 2 + 1 + 6
+	 * MLD Offset = min_len - (2 + 1)
+	 */
+	if (pAuth->is_mlo_ie_present && auth.mlo_ie.num_data >= 9) {
+		qdf_copy_macaddr(&pAuth->peer_mld,
+				 (struct qdf_mac_addr *)(auth.mlo_ie.data + 3));
+	}
 
 	sir_update_auth_frame2_struct_fils_conf(&auth, pAuth);
 
@@ -6876,7 +6954,7 @@ QDF_STATUS populate_dot11f_rrm_ie(struct mac_context *mac,
 
 void populate_mdie(struct mac_context *mac,
 		   tDot11fIEMobilityDomain *pDot11f,
-		   uint8_t mdie[SIR_MDIE_SIZE])
+		   uint8_t mdie[])
 {
 	pDot11f->present = 1;
 	pDot11f->MDID = (uint16_t) ((mdie[1] << 8) | (mdie[0]));
@@ -7190,16 +7268,19 @@ populate_dot11f_he_operation(struct mac_context *mac_ctx,
 	he_op->vht_oper_present = 0;
 	if (session->he_6ghz_band) {
 		he_op->oper_info_6g_present = 1;
-		he_op->oper_info_6g.info.ch_width = session->ch_width;
-		he_op->oper_info_6g.info.center_freq_seg0 =
-					session->ch_center_freq_seg0;
-		if (session->ch_width == CH_WIDTH_80P80MHZ ||
-		    session->ch_width == CH_WIDTH_160MHZ) {
-			he_op->oper_info_6g.info.center_freq_seg1 =
-				session->ch_center_freq_seg1;
-			he_op->oper_info_6g.info.ch_width = CH_WIDTH_160MHZ;
-		} else {
-			he_op->oper_info_6g.info.center_freq_seg1 = 0;
+		if (session->bssType != eSIR_INFRA_AP_MODE) {
+			he_op->oper_info_6g.info.ch_width = session->ch_width;
+			he_op->oper_info_6g.info.center_freq_seg0 =
+						session->ch_center_freq_seg0;
+			if (session->ch_width == CH_WIDTH_80P80MHZ ||
+			    session->ch_width == CH_WIDTH_160MHZ) {
+				he_op->oper_info_6g.info.center_freq_seg1 =
+					session->ch_center_freq_seg1;
+				he_op->oper_info_6g.info.ch_width =
+							CH_WIDTH_160MHZ;
+			} else {
+				he_op->oper_info_6g.info.center_freq_seg1 = 0;
+			}
 		}
 		he_op->oper_info_6g.info.primary_ch =
 			wlan_reg_freq_to_chan(mac_ctx->pdev,
@@ -10963,6 +11044,7 @@ QDF_STATUS populate_dot11f_btm_extended_caps(struct mac_context *mac_ctx,
 		pe_debug("ext ie length become 0, disable the ext caps");
 	}
 
+	wlan_cm_set_assoc_btm_cap(pe_session->vdev, p_ext_cap->bss_transition);
 	return QDF_STATUS_SUCCESS;
 }
 

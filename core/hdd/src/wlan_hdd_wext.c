@@ -108,7 +108,7 @@
 #include "cfg_mlme_threshold.h"
 #include "wlan_pmo_cfg.h"
 #include "wlan_pmo_ucfg_api.h"
-#include "dp_txrx.h"
+#include "wlan_dp_rx_thread.h"
 #include "wlan_fwol_ucfg_api.h"
 #include "wlan_hdd_unit_test.h"
 #include "wlan_hdd_thermal.h"
@@ -3376,7 +3376,7 @@ static int hdd_handle_pdev_reset(struct hdd_adapter *adapter, int value)
 		return ret;
 
 	ret = wma_cli_set_command(adapter->vdev_id,
-				  WMI_PDEV_PARAM_PDEV_RESET,
+				  wmi_pdev_param_pdev_reset,
 				  value, PDEV_CMD);
 
 	return ret;
@@ -3767,7 +3767,7 @@ static int hdd_we_set_rtscts(struct hdd_adapter *adapter, int rtscts)
 	}
 
 	errno = wma_cli_set_command(adapter->vdev_id,
-				    WMI_VDEV_PARAM_ENABLE_RTSCTS,
+				    wmi_vdev_param_enable_rtscts,
 				    rtscts, VDEV_CMD);
 	if (errno) {
 		hdd_err("Failed to set firmware, errno %d", errno);
@@ -3828,11 +3828,11 @@ static int hdd_we_set_11n_rate(struct hdd_adapter *adapter, int rate_code)
 		rate_code = hdd_assemble_rate_code(preamble, nss, rix);
 	}
 
-	hdd_debug("WMI_VDEV_PARAM_FIXED_RATE val %d rix %d preamble %x nss %d",
+	hdd_debug("wmi_vdev_param_fixed_rate val %d rix %d preamble %x nss %d",
 		  rate_code, rix, preamble, nss);
 
 	errno = wma_cli_set_command(adapter->vdev_id,
-				    WMI_VDEV_PARAM_FIXED_RATE,
+				    wmi_vdev_param_fixed_rate,
 				    rate_code, VDEV_CMD);
 	if (errno)
 		hdd_err("Failed to set firmware, errno %d", errno);
@@ -3854,11 +3854,11 @@ static int hdd_we_set_vht_rate(struct hdd_adapter *adapter, int rate_code)
 		rate_code = hdd_assemble_rate_code(preamble, nss, rix);
 	}
 
-	hdd_debug("WMI_VDEV_PARAM_FIXED_RATE val %d rix %d preamble %x nss %d",
+	hdd_debug("wmi_vdev_param_fixed_rate val %d rix %d preamble %x nss %d",
 		  rate_code, rix, preamble, nss);
 
 	errno = wma_cli_set_command(adapter->vdev_id,
-				    WMI_VDEV_PARAM_FIXED_RATE,
+				    wmi_vdev_param_fixed_rate,
 				    rate_code, VDEV_CMD);
 	if (errno)
 		hdd_err("Failed to set firmware, errno %d", errno);
@@ -3938,56 +3938,56 @@ static int hdd_we_set_green_tx_param(struct hdd_adapter *adapter,
 static int hdd_we_set_gtx_ht_mcs(struct hdd_adapter *adapter, int value)
 {
 	return hdd_we_set_green_tx_param(adapter,
-					 WMI_VDEV_PARAM_GTX_HT_MCS,
+					 wmi_vdev_param_gtx_ht_mcs,
 					 value);
 }
 
 static int hdd_we_set_gtx_vht_mcs(struct hdd_adapter *adapter, int value)
 {
 	return hdd_we_set_green_tx_param(adapter,
-					 WMI_VDEV_PARAM_GTX_VHT_MCS,
+					 wmi_vdev_param_gtx_vht_mcs,
 					 value);
 }
 
 static int hdd_we_set_gtx_usrcfg(struct hdd_adapter *adapter, int value)
 {
 	return hdd_we_set_green_tx_param(adapter,
-					 WMI_VDEV_PARAM_GTX_USR_CFG,
+					 wmi_vdev_param_gtx_usr_cfg,
 					 value);
 }
 
 static int hdd_we_set_gtx_thre(struct hdd_adapter *adapter, int value)
 {
 	return hdd_we_set_green_tx_param(adapter,
-					 WMI_VDEV_PARAM_GTX_THRE,
+					 wmi_vdev_param_gtx_thre,
 					 value);
 }
 
 static int hdd_we_set_gtx_margin(struct hdd_adapter *adapter, int value)
 {
 	return hdd_we_set_green_tx_param(adapter,
-					 WMI_VDEV_PARAM_GTX_MARGIN,
+					 wmi_vdev_param_gtx_margin,
 					 value);
 }
 
 static int hdd_we_set_gtx_step(struct hdd_adapter *adapter, int value)
 {
 	return hdd_we_set_green_tx_param(adapter,
-					 WMI_VDEV_PARAM_GTX_STEP,
+					 wmi_vdev_param_gtx_step,
 					 value);
 }
 
 static int hdd_we_set_gtx_mintpc(struct hdd_adapter *adapter, int value)
 {
 	return hdd_we_set_green_tx_param(adapter,
-					 WMI_VDEV_PARAM_GTX_MINTPC,
+					 wmi_vdev_param_gtx_mintpc,
 					 value);
 }
 
 static int hdd_we_set_gtx_bwmask(struct hdd_adapter *adapter, int value)
 {
 	return hdd_we_set_green_tx_param(adapter,
-					 WMI_VDEV_PARAM_GTX_BW_MASK,
+					 wmi_vdev_param_gtx_bw_mask,
 					 value);
 }
 
@@ -4141,7 +4141,7 @@ hdd_we_set_qpower_spec_max_spec_nodata_pspoll(struct hdd_adapter *adapter,
 }
 
 static int hdd_we_set_pdev(struct hdd_adapter *adapter,
-			   WMI_PDEV_PARAM id,
+			   wmi_conv_pdev_params_id id,
 			   const char *id_string,
 			   int value)
 {
@@ -4161,49 +4161,49 @@ static int hdd_we_set_pdev(struct hdd_adapter *adapter,
 static int hdd_we_set_ani_en_dis(struct hdd_adapter *adapter, int value)
 {
 	return hdd_we_set_pdev(adapter,
-			       WMI_PDEV_PARAM_ANI_ENABLE,
+			       wmi_pdev_param_ani_enable,
 			       value);
 }
 
 static int hdd_we_set_ani_poll_period(struct hdd_adapter *adapter, int value)
 {
 	return hdd_we_set_pdev(adapter,
-			       WMI_PDEV_PARAM_ANI_POLL_PERIOD,
+			       wmi_pdev_param_ani_poll_period,
 			       value);
 }
 
 static int hdd_we_set_ani_listen_period(struct hdd_adapter *adapter, int value)
 {
 	return hdd_we_set_pdev(adapter,
-			       WMI_PDEV_PARAM_ANI_LISTEN_PERIOD,
+			       wmi_pdev_param_ani_listen_period,
 			       value);
 }
 
 static int hdd_we_set_ani_ofdm_level(struct hdd_adapter *adapter, int value)
 {
 	return hdd_we_set_pdev(adapter,
-			       WMI_PDEV_PARAM_ANI_OFDM_LEVEL,
+			       wmi_pdev_param_ani_ofdm_level,
 			       value);
 }
 
 static int hdd_we_set_ani_cck_level(struct hdd_adapter *adapter, int value)
 {
 	return hdd_we_set_pdev(adapter,
-			       WMI_PDEV_PARAM_ANI_CCK_LEVEL,
+			       wmi_pdev_param_ani_cck_level,
 			       value);
 }
 
 static int hdd_we_set_dynamic_bw(struct hdd_adapter *adapter, int value)
 {
 	return hdd_we_set_pdev(adapter,
-			       WMI_PDEV_PARAM_DYNAMIC_BW,
+			       wmi_pdev_param_dynamic_bw,
 			       value);
 }
 
 static int hdd_we_set_cts_cbw(struct hdd_adapter *adapter, int value)
 {
 	return hdd_we_set_pdev(adapter,
-			       WMI_PDEV_PARAM_CTS_CBW,
+			       wmi_pdev_param_cts_cbw,
 			       value);
 }
 
@@ -4212,7 +4212,7 @@ static int hdd_we_set_tx_chainmask(struct hdd_adapter *adapter, int value)
 	int errno;
 
 	errno = hdd_we_set_pdev(adapter,
-				WMI_PDEV_PARAM_TX_CHAIN_MASK,
+				wmi_pdev_param_tx_chain_mask,
 				value);
 	if (errno)
 		return errno;
@@ -4225,7 +4225,7 @@ static int hdd_we_set_rx_chainmask(struct hdd_adapter *adapter, int value)
 	int errno;
 
 	errno = hdd_we_set_pdev(adapter,
-				WMI_PDEV_PARAM_RX_CHAIN_MASK,
+				wmi_pdev_param_rx_chain_mask,
 				value);
 	if (errno)
 		return errno;
@@ -4236,14 +4236,14 @@ static int hdd_we_set_rx_chainmask(struct hdd_adapter *adapter, int value)
 static int hdd_we_set_txpow_2g(struct hdd_adapter *adapter, int value)
 {
 	return hdd_we_set_pdev(adapter,
-			       WMI_PDEV_PARAM_TXPOWER_LIMIT2G,
+			       wmi_pdev_param_txpower_limit2g,
 			       value);
 }
 
 static int hdd_we_set_txpow_5g(struct hdd_adapter *adapter, int value)
 {
 	return hdd_we_set_pdev(adapter,
-			       WMI_PDEV_PARAM_TXPOWER_LIMIT5G,
+			       wmi_pdev_param_txpower_limit5g,
 			       value);
 }
 
@@ -4293,7 +4293,7 @@ static int hdd_we_set_early_rx_adjust_enable(struct hdd_adapter *adapter,
 		return -EINVAL;
 
 	return hdd_we_set_vdev(adapter,
-			       WMI_VDEV_PARAM_EARLY_RX_ADJUST_ENABLE,
+			       wmi_vdev_param_early_rx_adjust_enable,
 			       value);
 }
 
@@ -4301,7 +4301,7 @@ static int hdd_we_set_early_rx_tgt_bmiss_num(struct hdd_adapter *adapter,
 					     int value)
 {
 	return hdd_we_set_vdev(adapter,
-			       WMI_VDEV_PARAM_EARLY_RX_TGT_BMISS_NUM,
+			       wmi_vdev_param_early_rx_tgt_bmiss_num,
 			       value);
 }
 
@@ -4309,21 +4309,21 @@ static int hdd_we_set_early_rx_bmiss_sample_cycle(struct hdd_adapter *adapter,
 						  int value)
 {
 	return hdd_we_set_vdev(adapter,
-			       WMI_VDEV_PARAM_EARLY_RX_BMISS_SAMPLE_CYCLE,
+			       wmi_vdev_param_early_rx_bmiss_sample_cycle,
 			       value);
 }
 
 static int hdd_we_set_early_rx_slop_step(struct hdd_adapter *adapter, int value)
 {
 	return hdd_we_set_vdev(adapter,
-			       WMI_VDEV_PARAM_EARLY_RX_SLOP_STEP,
+			       wmi_vdev_param_early_rx_slop_step,
 			       value);
 }
 
 static int hdd_we_set_early_rx_init_slop(struct hdd_adapter *adapter, int value)
 {
 	return hdd_we_set_vdev(adapter,
-			       WMI_VDEV_PARAM_EARLY_RX_INIT_SLOP,
+			       wmi_vdev_param_early_rx_init_slop,
 			       value);
 }
 
@@ -4334,7 +4334,7 @@ static int hdd_we_set_early_rx_adjust_pause(struct hdd_adapter *adapter,
 		return -EINVAL;
 
 	return hdd_we_set_vdev(adapter,
-			       WMI_VDEV_PARAM_EARLY_RX_ADJUST_PAUSE,
+			       wmi_vdev_param_early_rx_adjust_pause,
 			       value);
 }
 
@@ -4342,31 +4342,54 @@ static int hdd_we_set_early_rx_drift_sample(struct hdd_adapter *adapter,
 					    int value)
 {
 	return hdd_we_set_vdev(adapter,
-			       WMI_VDEV_PARAM_EARLY_RX_DRIFT_SAMPLE,
+			       wmi_vdev_param_early_rx_drift_sample,
 			       value);
 }
 
 static int hdd_we_set_dcm(struct hdd_adapter *adapter, int value)
 {
 	return hdd_we_set_vdev(adapter,
-			       WMI_VDEV_PARAM_HE_DCM,
+			       wmi_vdev_param_he_dcm_enable,
 			       value);
 }
+
+#define MAX_VDEV_HE_RANGE_PARAMS 2
+/* params being sent:
+ * wmi_vdev_param_he_range_ext
+ * wmi_vdev_param_non_data_he_range_ext
+ */
 
 static int hdd_we_set_range_ext(struct hdd_adapter *adapter, int value)
 {
 	int status;
+	struct dev_set_param setparam[MAX_VDEV_HE_RANGE_PARAMS] = {};
+	uint8_t index = 0;
 
-	status = hdd_we_set_vdev(adapter, WMI_VDEV_PARAM_HE_RANGE_EXT, value);
-	if (status)
-		hdd_err("Failed to set HE_RANGE_EXT, errno %d", status);
+	status = mlme_check_index_setparam(setparam,
+					   wmi_vdev_param_he_range_ext,
+					   value, index++,
+					   MAX_VDEV_HE_RANGE_PARAMS);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		hdd_err("failed at wmi_vdev_param_he_range_ext");
+		goto error;
+	}
 
-	status = hdd_we_set_vdev(adapter, WMI_VDEV_PARAM_NON_DATA_HE_RANGE_EXT,
-				 value);
-	if (status)
-		hdd_err("Failed to set NON_DATA_HE_RANGE_EXT, errno %d",
-			status);
+	status = mlme_check_index_setparam(setparam,
+					   wmi_vdev_param_non_data_he_range_ext,
+					   value, index++,
+					   MAX_VDEV_HE_RANGE_PARAMS);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		hdd_err("failed at wmi_vdev_param_non_data_he_range_ext");
+		goto error;
+	}
 
+	status = wma_send_multi_pdev_vdev_set_params(MLME_VDEV_SETPARAM,
+						     adapter->vdev_id,
+						     setparam, index);
+	if (QDF_IS_STATUS_ERROR(status))
+		hdd_err("Failed to send vdev set params");
+
+error:
 	return status;
 }
 
@@ -5213,72 +5236,72 @@ static int __iw_setnone_getint(struct net_device *dev,
 
 	case WE_GET_GTX_HT_MCS:
 	{
-		hdd_debug("GET WMI_VDEV_PARAM_GTX_HT_MCS");
+		hdd_debug("GET wmi_vdev_param_gtx_ht_mcs");
 		*value = wma_cli_get_command(adapter->vdev_id,
-					     WMI_VDEV_PARAM_GTX_HT_MCS,
+					     wmi_vdev_param_gtx_ht_mcs,
 					     GTX_CMD);
 		break;
 	}
 
 	case WE_GET_GTX_VHT_MCS:
 	{
-		hdd_debug("GET WMI_VDEV_PARAM_GTX_VHT_MCS");
+		hdd_debug("GET wmi_vdev_param_gtx_vht_mcs");
 		*value = wma_cli_get_command(adapter->vdev_id,
-					     WMI_VDEV_PARAM_GTX_VHT_MCS,
+					     wmi_vdev_param_gtx_vht_mcs,
 					     GTX_CMD);
 		break;
 	}
 
 	case WE_GET_GTX_USRCFG:
 	{
-		hdd_debug("GET WMI_VDEV_PARAM_GTX_USR_CFG");
+		hdd_debug("GET wmi_vdev_param_gtx_usr_cfg");
 		*value = wma_cli_get_command(adapter->vdev_id,
-					     WMI_VDEV_PARAM_GTX_USR_CFG,
+					     wmi_vdev_param_gtx_usr_cfg,
 					     GTX_CMD);
 		break;
 	}
 
 	case WE_GET_GTX_THRE:
 	{
-		hdd_debug("GET WMI_VDEV_PARAM_GTX_THRE");
+		hdd_debug("GET wmi_vdev_param_gtx_thre");
 		*value = wma_cli_get_command(adapter->vdev_id,
-					     WMI_VDEV_PARAM_GTX_THRE,
+					     wmi_vdev_param_gtx_thre,
 					     GTX_CMD);
 		break;
 	}
 
 	case WE_GET_GTX_MARGIN:
 	{
-		hdd_debug("GET WMI_VDEV_PARAM_GTX_MARGIN");
+		hdd_debug("GET wmi_vdev_param_gtx_margin");
 		*value = wma_cli_get_command(adapter->vdev_id,
-					     WMI_VDEV_PARAM_GTX_MARGIN,
+					     wmi_vdev_param_gtx_margin,
 					     GTX_CMD);
 		break;
 	}
 
 	case WE_GET_GTX_STEP:
 	{
-		hdd_debug("GET WMI_VDEV_PARAM_GTX_STEP");
+		hdd_debug("GET wmi_vdev_param_gtx_step");
 		*value = wma_cli_get_command(adapter->vdev_id,
-					     WMI_VDEV_PARAM_GTX_STEP,
+					     wmi_vdev_param_gtx_step,
 					     GTX_CMD);
 		break;
 	}
 
 	case WE_GET_GTX_MINTPC:
 	{
-		hdd_debug("GET WMI_VDEV_PARAM_GTX_MINTPC");
+		hdd_debug("GET wmi_vdev_param_gtx_mintpc");
 		*value = wma_cli_get_command(adapter->vdev_id,
-					     WMI_VDEV_PARAM_GTX_MINTPC,
+					     wmi_vdev_param_gtx_mintpc,
 					     GTX_CMD);
 		break;
 	}
 
 	case WE_GET_GTX_BWMASK:
 	{
-		hdd_debug("GET WMI_VDEV_PARAM_GTX_BW_MASK");
+		hdd_debug("GET wmi_vdev_param_gtx_bw_mask");
 		*value = wma_cli_get_command(adapter->vdev_id,
-					     WMI_VDEV_PARAM_GTX_BW_MASK,
+					     wmi_vdev_param_gtx_bw_mask,
 					     GTX_CMD);
 		break;
 	}
@@ -5303,90 +5326,90 @@ static int __iw_setnone_getint(struct net_device *dev,
 
 	case WE_GET_SHORT_GI:
 	{
-		hdd_debug("GET WMI_VDEV_PARAM_SGI");
+		hdd_debug("GET wmi_vdev_param_sgi");
 		*value = wma_cli_get_command(adapter->vdev_id,
-					     WMI_VDEV_PARAM_SGI,
+					     wmi_vdev_param_sgi,
 					     VDEV_CMD);
 		break;
 	}
 
 	case WE_GET_RTSCTS:
 	{
-		hdd_debug("GET WMI_VDEV_PARAM_ENABLE_RTSCTS");
+		hdd_debug("GET wmi_vdev_param_enable_rtscts");
 		*value = wma_cli_get_command(adapter->vdev_id,
-					     WMI_VDEV_PARAM_ENABLE_RTSCTS,
+					     wmi_vdev_param_enable_rtscts,
 					     VDEV_CMD);
 		break;
 	}
 
 	case WE_GET_CHWIDTH:
 	{
-		hdd_debug("GET WMI_VDEV_PARAM_CHWIDTH");
+		hdd_debug("GET wmi_vdev_param_chwidth");
 		*value = wma_cli_get_command(adapter->vdev_id,
-					     WMI_VDEV_PARAM_CHWIDTH,
+					     wmi_vdev_param_chwidth,
 					     VDEV_CMD);
 		break;
 	}
 
 	case WE_GET_ANI_EN_DIS:
 	{
-		hdd_debug("GET WMI_PDEV_PARAM_ANI_ENABLE");
+		hdd_debug("GET wmi_pdev_param_ani_enable");
 		*value = wma_cli_get_command(adapter->vdev_id,
-					     WMI_PDEV_PARAM_ANI_ENABLE,
+					     wmi_pdev_param_ani_enable,
 					     PDEV_CMD);
 		break;
 	}
 
 	case WE_GET_ANI_POLL_PERIOD:
 	{
-		hdd_debug("GET WMI_PDEV_PARAM_ANI_POLL_PERIOD");
+		hdd_debug("GET wmi_pdev_param_ani_poll_period");
 		*value = wma_cli_get_command(adapter->vdev_id,
-					     WMI_PDEV_PARAM_ANI_POLL_PERIOD,
+					     wmi_pdev_param_ani_poll_period,
 					     PDEV_CMD);
 		break;
 	}
 
 	case WE_GET_ANI_LISTEN_PERIOD:
 	{
-		hdd_debug("GET WMI_PDEV_PARAM_ANI_LISTEN_PERIOD");
+		hdd_debug("GET wmi_pdev_param_ani_listen_period");
 		*value = wma_cli_get_command(adapter->vdev_id,
-					     WMI_PDEV_PARAM_ANI_LISTEN_PERIOD,
+					     wmi_pdev_param_ani_listen_period,
 					     PDEV_CMD);
 		break;
 	}
 
 	case WE_GET_ANI_OFDM_LEVEL:
 	{
-		hdd_debug("GET WMI_PDEV_PARAM_ANI_OFDM_LEVEL");
+		hdd_debug("GET wmi_pdev_param_ani_ofdm_level");
 		*value = wma_cli_get_command(adapter->vdev_id,
-					     WMI_PDEV_PARAM_ANI_OFDM_LEVEL,
+					     wmi_pdev_param_ani_ofdm_level,
 					     PDEV_CMD);
 		break;
 	}
 
 	case WE_GET_ANI_CCK_LEVEL:
 	{
-		hdd_debug("GET WMI_PDEV_PARAM_ANI_CCK_LEVEL");
+		hdd_debug("GET wmi_pdev_param_ani_cck_level");
 		*value = wma_cli_get_command(adapter->vdev_id,
-					     WMI_PDEV_PARAM_ANI_CCK_LEVEL,
+					     wmi_pdev_param_ani_cck_level,
 					     PDEV_CMD);
 		break;
 	}
 
 	case WE_GET_DYNAMIC_BW:
 	{
-		hdd_debug("GET WMI_PDEV_PARAM_ANI_CCK_LEVEL");
+		hdd_debug("GET wmi_pdev_param_ani_cck_level");
 		*value = wma_cli_get_command(adapter->vdev_id,
-					     WMI_PDEV_PARAM_DYNAMIC_BW,
+					     wmi_pdev_param_dynamic_bw,
 					     PDEV_CMD);
 		break;
 	}
 
 	case WE_GET_11N_RATE:
 	{
-		hdd_debug("GET WMI_VDEV_PARAM_FIXED_RATE");
+		hdd_debug("GET wmi_vdev_param_fixed_rate");
 		*value = wma_cli_get_command(adapter->vdev_id,
-					     WMI_VDEV_PARAM_FIXED_RATE,
+					     wmi_vdev_param_fixed_rate,
 					     VDEV_CMD);
 		break;
 	}
@@ -5420,18 +5443,18 @@ static int __iw_setnone_getint(struct net_device *dev,
 
 	case WE_GET_TX_CHAINMASK:
 	{
-		hdd_debug("GET WMI_PDEV_PARAM_TX_CHAIN_MASK");
+		hdd_debug("GET wmi_pdev_param_tx_chain_mask");
 		*value = wma_cli_get_command(adapter->vdev_id,
-					     WMI_PDEV_PARAM_TX_CHAIN_MASK,
+					     wmi_pdev_param_tx_chain_mask,
 					     PDEV_CMD);
 		break;
 	}
 
 	case WE_GET_RX_CHAINMASK:
 	{
-		hdd_debug("GET WMI_PDEV_PARAM_RX_CHAIN_MASK");
+		hdd_debug("GET wmi_pdev_param_rx_chain_mask");
 		*value = wma_cli_get_command(adapter->vdev_id,
-					     WMI_PDEV_PARAM_RX_CHAIN_MASK,
+					     wmi_pdev_param_rx_chain_mask,
 					     PDEV_CMD);
 		break;
 	}
@@ -5440,9 +5463,9 @@ static int __iw_setnone_getint(struct net_device *dev,
 	{
 		uint8_t txpow2g = 0;
 
-		hdd_debug("GET WMI_PDEV_PARAM_TXPOWER_LIMIT2G");
+		hdd_debug("GET wmi_pdev_param_txpower_limit2g");
 		*value = wma_cli_get_command(adapter->vdev_id,
-					     WMI_PDEV_PARAM_TXPOWER_LIMIT2G,
+					     wmi_pdev_param_txpower_limit2g,
 					     PDEV_CMD);
 		ucfg_mlme_get_current_tx_power_level(hdd_ctx->psoc, &txpow2g);
 		hdd_debug("2G tx_power %d", txpow2g);
@@ -5453,9 +5476,9 @@ static int __iw_setnone_getint(struct net_device *dev,
 	{
 		uint8_t txpow5g = 0;
 
-		hdd_debug("GET WMI_PDEV_PARAM_TXPOWER_LIMIT5G");
+		hdd_debug("GET wmi_pdev_param_txpower_limit5g");
 		*value = wma_cli_get_command(adapter->vdev_id,
-					     WMI_PDEV_PARAM_TXPOWER_LIMIT5G,
+					     wmi_pdev_param_txpower_limit5g,
 					     PDEV_CMD);
 		ucfg_mlme_get_current_tx_power_level(hdd_ctx->psoc, &txpow5g);
 		hdd_debug("5G tx_power %d", txpow5g);
@@ -5589,15 +5612,15 @@ static int __iw_setnone_getint(struct net_device *dev,
 		break;
 	}
 	case WE_GET_DCM:
-		hdd_debug("GET WMI_VDEV_PARAM_HE_DCM");
+		hdd_debug("GET wmi_vdev_param_he_dcm");
 		*value = wma_cli_get_command(adapter->vdev_id,
-					     WMI_VDEV_PARAM_HE_DCM,
+					     wmi_vdev_param_he_dcm_enable,
 					     VDEV_CMD);
 		break;
 	case WE_GET_RANGE_EXT:
-		hdd_debug("GET WMI_VDEV_PARAM_HE_RANGE_EXT");
+		hdd_debug("GET wmi_vdev_param_he_range_ext");
 		*value = wma_cli_get_command(adapter->vdev_id,
-					     WMI_VDEV_PARAM_HE_RANGE_EXT,
+					     wmi_vdev_param_he_range_ext,
 					     VDEV_CMD);
 		break;
 	default:

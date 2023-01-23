@@ -641,6 +641,12 @@ static bool wma_verify_rate_code(u_int32_t rate_code, enum cds_band_type band)
 #define TX_MGMT_RATE_2G_OFFSET 0
 #define TX_MGMT_RATE_5G_OFFSET 12
 
+#define MAX_VDEV_MGMT_RATE_PARAMS 2
+/* params being sent:
+ * wmi_vdev_param_mgmt_tx_rate
+ * wmi_vdev_param_per_band_mgmt_tx_rate
+ */
+
 /**
  * wma_set_mgmt_rate() - set vdev mgmt rate.
  * @wma:     wma handle
@@ -651,10 +657,12 @@ static bool wma_verify_rate_code(u_int32_t rate_code, enum cds_band_type band)
 void wma_set_vdev_mgmt_rate(tp_wma_handle wma, uint8_t vdev_id)
 {
 	uint32_t cfg_val;
-	int ret;
 	uint32_t per_band_mgmt_tx_rate = 0;
 	enum cds_band_type band = 0;
 	struct mac_context *mac = cds_get_context(QDF_MODULE_ID_PE);
+	struct dev_set_param setparam[MAX_VDEV_MGMT_RATE_PARAMS] = {};
+	uint8_t index = 0;
+	QDF_STATUS status = QDF_STATUS_E_FAILURE;
 
 	if (!mac) {
 		wma_err("Failed to get mac");
@@ -667,11 +675,14 @@ void wma_set_vdev_mgmt_rate(tp_wma_handle wma, uint8_t vdev_id)
 	    !wma_verify_rate_code(cfg_val, band)) {
 		wma_nofl_debug("default WNI_CFG_RATE_FOR_TX_MGMT, ignore");
 	} else {
-		ret = wma_vdev_set_param(wma->wmi_handle, vdev_id,
-					 WMI_VDEV_PARAM_MGMT_TX_RATE,
-					 cfg_val);
-		if (ret)
-			wma_err("Failed to set WMI_VDEV_PARAM_MGMT_TX_RATE");
+		status = mlme_check_index_setparam(setparam,
+						   wmi_vdev_param_mgmt_tx_rate,
+						   cfg_val, index++,
+						   MAX_VDEV_MGMT_RATE_PARAMS);
+		if (QDF_IS_STATUS_ERROR(status)) {
+			wma_err("failed at wmi_vdev_param_mgmt_tx_rate");
+			goto error;
+		}
 	}
 
 	cfg_val = mac->mlme_cfg->sap_cfg.rate_tx_mgmt_2g;
@@ -702,15 +713,30 @@ void wma_set_vdev_mgmt_rate(tp_wma_handle wma, uint8_t vdev_id)
 		    ((cfg_val & 0x7FF) << TX_MGMT_RATE_5G_OFFSET);
 	}
 
-	ret = wma_vdev_set_param(
-		wma->wmi_handle,
-		vdev_id,
-		WMI_VDEV_PARAM_PER_BAND_MGMT_TX_RATE,
-		per_band_mgmt_tx_rate);
-	if (ret)
-		wma_err("Failed to set WMI_VDEV_PARAM_PER_BAND_MGMT_TX_RATE");
+	status = mlme_check_index_setparam(setparam,
+					   wmi_vdev_param_per_band_mgmt_tx_rate,
+					   per_band_mgmt_tx_rate, index++,
+					   MAX_VDEV_MGMT_RATE_PARAMS);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		wma_err("failed at wmi_vdev_param_per_band_mgmt_tx_rate");
+		goto error;
+	}
 
+	status = wma_send_multi_pdev_vdev_set_params(MLME_VDEV_SETPARAM,
+						     vdev_id, setparam, index);
+	if (QDF_IS_STATUS_ERROR(status))
+		wma_debug("failed to send MGMT_TX_RATE vdev set params stat:%d",
+			  status);
+error:
+	return;
 }
+
+#define MAX_VDEV_SAP_KEEPALIVE_PARAMS 3
+/* params being sent:
+ * wmi_vdev_param_ap_keepalive_min_idle_inactive_time_secs
+ * wmi_vdev_param_ap_keepalive_max_idle_inactive_time_secs
+ * wmi_vdev_param_ap_keepalive_max_unresponsive_time_secs
+ */
 
 /**
  * wma_set_sap_keepalive() - set SAP keep alive parameters to fw
@@ -724,6 +750,8 @@ void wma_set_sap_keepalive(tp_wma_handle wma, uint8_t vdev_id)
 	uint32_t min_inactive_time, max_inactive_time, max_unresponsive_time;
 	struct mac_context *mac = cds_get_context(QDF_MODULE_ID_PE);
 	QDF_STATUS status;
+	struct dev_set_param setparam[MAX_VDEV_SAP_KEEPALIVE_PARAMS] = {};
+	uint8_t index = 0;
 
 	if (!mac) {
 		wma_err("Failed to get mac");
@@ -734,28 +762,44 @@ void wma_set_sap_keepalive(tp_wma_handle wma, uint8_t vdev_id)
 				   &max_inactive_time, &max_unresponsive_time);
 
 	min_inactive_time = max_inactive_time / 2;
+	status = mlme_check_index_setparam(
+			setparam,
+			wmi_vdev_param_ap_keepalive_min_idle_inactive_time_secs,
+			min_inactive_time, index++,
+			MAX_VDEV_SAP_KEEPALIVE_PARAMS);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		wma_err("failed to set wmi_vdev_param_ap_keepalive_min_idle_inactive_time_secs");
+		goto error;
+	}
+	status = mlme_check_index_setparam(
+			setparam,
+			wmi_vdev_param_ap_keepalive_max_idle_inactive_time_secs,
+			max_inactive_time, index++,
+			MAX_VDEV_SAP_KEEPALIVE_PARAMS);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		wma_err("failed to set wmi_vdev_param_ap_keepalive_max_idle_inactive_time_secs");
+		goto error;
+	}
+	status = mlme_check_index_setparam(
+			setparam,
+			wmi_vdev_param_ap_keepalive_max_unresponsive_time_secs,
+			max_unresponsive_time, index++,
+			MAX_VDEV_SAP_KEEPALIVE_PARAMS);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		wma_err("failed to set wmi_vdev_param_ap_keepalive_max_unresponsive_time_secs");
+		goto error;
+	}
 
-	status = wma_vdev_set_param(wma->wmi_handle, vdev_id,
-			WMI_VDEV_PARAM_AP_KEEPALIVE_MIN_IDLE_INACTIVE_TIME_SECS,
-			min_inactive_time);
+	status = wma_send_multi_pdev_vdev_set_params(MLME_PDEV_SETPARAM,
+						     vdev_id, setparam, index);
 	if (QDF_IS_STATUS_ERROR(status))
-		wma_err("Failed to Set AP MIN IDLE INACTIVE TIME");
-
-	status = wma_vdev_set_param(wma->wmi_handle, vdev_id,
-			WMI_VDEV_PARAM_AP_KEEPALIVE_MAX_IDLE_INACTIVE_TIME_SECS,
-			max_inactive_time);
-	if (QDF_IS_STATUS_ERROR(status))
-		wma_err("Failed to Set AP MAX IDLE INACTIVE TIME");
-
-	status = wma_vdev_set_param(wma->wmi_handle, vdev_id,
-			WMI_VDEV_PARAM_AP_KEEPALIVE_MAX_UNRESPONSIVE_TIME_SECS,
-			max_unresponsive_time);
-	if (QDF_IS_STATUS_ERROR(status))
-		wma_err("Failed to Set MAX UNRESPONSIVE TIME");
-
-	wma_debug("vdev_id:%d min_inactive_time: %u max_inactive_time: %u max_unresponsive_time: %u",
-		  vdev_id, min_inactive_time, max_inactive_time,
-		  max_unresponsive_time);
+		wma_err("Failed to Set AP MIN/MAX IDLE INACTIVE TIME, MAX UNRESPONSIVE TIME:%d", status);
+	else
+		wma_debug("vdev_id:%d min_inactive_time: %u max_inactive_time: %u max_unresponsive_time: %u",
+			  vdev_id, min_inactive_time, max_inactive_time,
+			  max_unresponsive_time);
+error:
+	return;
 }
 
 /**
@@ -1657,9 +1701,9 @@ QDF_STATUS wma_send_peer_assoc(tp_wma_handle wma,
 #ifdef FEATURE_WLAN_WAPI
 	if (params->encryptType == eSIR_ED_WPI) {
 		ret = wma_vdev_set_param(wma->wmi_handle, params->smesessionId,
-				      WMI_VDEV_PARAM_DROP_UNENCRY, false);
+				      wmi_vdev_param_drop_unencry, false);
 		if (ret) {
-			wma_err("Set WMI_VDEV_PARAM_DROP_UNENCRY Param status:%d",
+			wma_err("Set wmi_vdev_param_drop_unencry Param status:%d",
 				ret);
 			qdf_mem_free(cmd);
 			return ret;
@@ -1843,7 +1887,7 @@ void wma_update_protection_mode(tp_wma_handle wma, uint8_t vdev_id,
 	prot_mode = llbcoexist ? IEEE80211_PROT_CTSONLY : IEEE80211_PROT_NONE;
 
 	ret = wma_vdev_set_param(wma->wmi_handle, vdev_id,
-					      WMI_VDEV_PARAM_PROTECTION_MODE,
+					      wmi_vdev_param_protection_mode,
 					      prot_mode);
 
 	if (QDF_IS_STATUS_ERROR(ret))
@@ -1860,7 +1904,7 @@ wma_update_beacon_interval(tp_wma_handle wma, uint8_t vdev_id,
 	QDF_STATUS ret;
 
 	ret = wma_vdev_set_param(wma->wmi_handle, vdev_id,
-					      WMI_VDEV_PARAM_BEACON_INTERVAL,
+					      wmi_vdev_param_beacon_interval,
 					      beaconInterval);
 
 	if (QDF_IS_STATUS_ERROR(ret))
@@ -1893,7 +1937,7 @@ wma_update_bss_color(tp_wma_handle wma, uint8_t vdev_id,
 	wma_nofl_debug("vdev: %d, update bss color, HE_OPS: 0x%x",
 		       vdev_id, dword_he_ops);
 	ret = wma_vdev_set_param(wma->wmi_handle, vdev_id,
-			      WMI_VDEV_PARAM_BSS_COLOR, dword_he_ops);
+			      wmi_vdev_param_he_bss_color, dword_he_ops);
 	if (QDF_IS_STATUS_ERROR(ret))
 		wma_err("Failed to update HE operations");
 }
@@ -1951,7 +1995,7 @@ void wma_update_rts_params(tp_wma_handle wma, uint32_t value)
 			continue;
 		ret = wma_vdev_set_param(wma->wmi_handle,
 					 vdev_id,
-					 WMI_VDEV_PARAM_RTS_THRESHOLD,
+					 wmi_vdev_param_rts_threshold,
 					 value);
 		if (QDF_IS_STATUS_ERROR(ret))
 			wma_err("Update cfg param fail for vdevId %d", vdev_id);
@@ -1969,7 +2013,7 @@ void wma_update_frag_params(tp_wma_handle wma, uint32_t value)
 		if (!vdev)
 			continue;
 		ret = wma_vdev_set_param(wma->wmi_handle, vdev_id,
-					 WMI_VDEV_PARAM_FRAGMENTATION_THRESHOLD,
+					 wmi_vdev_param_fragmentation_threshold,
 					 value);
 		if (QDF_IS_STATUS_ERROR(ret))
 			wma_err("Update cfg params failed for vdevId %d",
@@ -3040,7 +3084,7 @@ void wma_process_update_opmode(tp_wma_handle wma_handle,
 
 	wma_debug("opMode = %d", update_vht_opmode->opMode);
 	wma_set_peer_param(wma_handle, update_vht_opmode->peer_mac,
-			   WMI_PEER_CHWIDTH, update_vht_opmode->opMode,
+			   WMI_HOST_PEER_CHWIDTH, update_vht_opmode->opMode,
 			   update_vht_opmode->smesessionId);
 }
 
@@ -3076,7 +3120,7 @@ void wma_process_update_rx_nss(tp_wma_handle wma_handle,
 	wma_debug("Rx Nss = %d", update_rx_nss->rxNss);
 
 	wma_set_peer_param(wma_handle, update_rx_nss->peer_mac,
-			   WMI_PEER_NSS, update_rx_nss->rxNss,
+			   WMI_HOST_PEER_NSS, update_rx_nss->rxNss,
 			   update_rx_nss->smesessionId);
 }
 
@@ -3093,7 +3137,7 @@ void wma_process_update_membership(tp_wma_handle wma_handle,
 	wma_debug("membership = %x ", membership->membership);
 
 	wma_set_peer_param(wma_handle, membership->peer_mac,
-			   WMI_PEER_MEMBERSHIP, membership->membership,
+			   WMI_HOST_PEER_MEMBERSHIP, membership->membership,
 			   membership->smesessionId);
 }
 
@@ -3110,7 +3154,7 @@ void wma_process_update_userpos(tp_wma_handle wma_handle,
 	wma_debug("userPos = %x ", userpos->userPos);
 
 	wma_set_peer_param(wma_handle, userpos->peer_mac,
-			   WMI_PEER_USERPOS, userpos->userPos,
+			   WMI_HOST_PEER_USERPOS, userpos->userPos,
 			   userpos->smesessionId);
 
 	/* Now that membership/userpos is updated in fw,
@@ -3127,7 +3171,7 @@ QDF_STATUS wma_set_cts2self_for_p2p_go(void *wma_handle,
 	tp_wma_handle wma = (tp_wma_handle)wma_handle;
 	struct pdev_params pdevparam = {};
 
-	pdevparam.param_id = WMI_PDEV_PARAM_CTS2SELF_FOR_P2P_GO_CONFIG;
+	pdevparam.param_id = wmi_pdev_param_cts2self_for_p2p_go_config;
 	pdevparam.param_value = cts2self_for_p2p_go;
 
 	ret = wmi_unified_pdev_param_send(wma->wmi_handle,
@@ -3165,17 +3209,17 @@ QDF_STATUS wma_set_htconfig(uint8_t vdev_id, uint16_t ht_capab, int value)
 	switch (ht_capab) {
 	case WNI_CFG_HT_CAP_INFO_ADVANCE_CODING:
 		ret = wma_vdev_set_param(wma->wmi_handle, vdev_id,
-						      WMI_VDEV_PARAM_LDPC,
+						      wmi_vdev_param_ldpc,
 						      value);
 		break;
 	case WNI_CFG_HT_CAP_INFO_TX_STBC:
 		ret = wma_vdev_set_param(wma->wmi_handle, vdev_id,
-						      WMI_VDEV_PARAM_TX_STBC,
+						      wmi_vdev_param_tx_stbc,
 						      value);
 		break;
 	case WNI_CFG_HT_CAP_INFO_RX_STBC:
 		ret = wma_vdev_set_param(wma->wmi_handle, vdev_id,
-						      WMI_VDEV_PARAM_RX_STBC,
+						      wmi_vdev_param_rx_stbc,
 						      value);
 		break;
 	case WNI_CFG_HT_CAP_INFO_SHORT_GI_20MHZ:
@@ -3183,7 +3227,7 @@ QDF_STATUS wma_set_htconfig(uint8_t vdev_id, uint16_t ht_capab, int value)
 		wma_err("ht_capab = %d, value = %d", ht_capab,
 			 value);
 		ret = wma_vdev_set_param(wma->wmi_handle, vdev_id,
-						WMI_VDEV_PARAM_SGI, value);
+						wmi_vdev_param_sgi, value);
 		if (ret == QDF_STATUS_SUCCESS)
 			wma->interfaces[vdev_id].config.shortgi = value;
 		break;
@@ -3984,7 +4028,8 @@ QDF_STATUS wma_de_register_mgmt_frm_client(void)
 QDF_STATUS wma_register_roaming_callbacks(
 	QDF_STATUS (*csr_roam_auth_event_handle_cb)(struct mac_context *mac,
 						    uint8_t vdev_id,
-						    struct qdf_mac_addr bssid),
+						    struct qdf_mac_addr bssid,
+						    uint32_t akm),
 	pe_roam_synch_fn_t pe_roam_synch_cb,
 	QDF_STATUS (*pe_disconnect_cb) (struct mac_context *mac,
 					uint8_t vdev_id,
@@ -4169,5 +4214,21 @@ QDF_STATUS wma_mgmt_frame_fill_peer_cb(struct wlan_objmgr_peer *peer,
 	wlan_objmgr_pdev_release_ref(pdev, WLAN_LEGACY_WMA_ID);
 
 	return QDF_STATUS_SUCCESS;
+}
+
+QDF_STATUS
+wma_update_edca_pifs_param(WMA_HANDLE handle,
+			   struct edca_pifs_vparam *edca_pifs_param)
+{
+	tp_wma_handle wma_handle = (tp_wma_handle) handle;
+	QDF_STATUS status;
+
+	status = wmi_unified_update_edca_pifs_param(wma_handle->wmi_handle,
+						    edca_pifs_param);
+
+	if (QDF_IS_STATUS_ERROR(status))
+		wma_err("Failed to set EDCA/PIFS Parameters");
+
+	return status;
 }
 #endif

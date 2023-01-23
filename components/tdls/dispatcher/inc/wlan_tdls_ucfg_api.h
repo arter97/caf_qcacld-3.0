@@ -66,7 +66,7 @@ QDF_STATUS ucfg_tdls_psoc_open(struct wlan_objmgr_psoc *psoc);
 QDF_STATUS ucfg_tdls_psoc_close(struct wlan_objmgr_psoc *psoc);
 
 /**
- * ucfg_tdls_psoc_start() - TDLS module start
+ * ucfg_tdls_update_config() - TDLS module start
  * @psoc: psoc object
  * @req: tdls start paramets
  *
@@ -120,7 +120,7 @@ void ucfg_update_fw_tdls_6g_capability(struct wlan_objmgr_psoc *psoc,
 				       bool is_fw_tdls_6g_capable);
 
 /**
- * ucfg_tdls_is_fw_11ax_supported() - Get FW TDLS 11ax capability from TLDS
+ * ucfg_tdls_is_fw_11ax_capable() - Get FW TDLS 11ax capability from TLDS
  *                                    component.
  * @psoc: psoc object
  *
@@ -284,7 +284,7 @@ void ucfg_tdls_notify_sta_connect(uint8_t vdev_id,
  * ucfg_tdls_notify_sta_disconnect() - notify sta disconnect
  * @vdev_id: pointer to soc object
  * @lfr_roam: indicate, whether disconnect due to lfr roam
- * @bool user_disconnect: disconnect from user space
+ * @user_disconnect: disconnect from user space
  * @vdev: vdev object manager
  *
  * Notify sta disconnect event to TDLS component

@@ -565,7 +565,7 @@ static uint32_t hdd_son_get_bandwidth(struct wlan_objmgr_vdev *vdev)
 		return NONHT;
 	}
 
-	chwidth = wma_cli_get_command(adapter->vdev_id, WMI_VDEV_PARAM_CHWIDTH,
+	chwidth = wma_cli_get_command(adapter->vdev_id, wmi_vdev_param_chwidth,
 				      VDEV_CMD);
 
 	if (chwidth < 0) {
@@ -1045,7 +1045,7 @@ static enum ieee80211_phymode hdd_son_get_phymode(struct wlan_objmgr_vdev *vdev)
 
 	freq = ucfg_son_get_operation_chan_freq_vdev_id(pdev, adapter->vdev_id);
 
-	chwidth = wma_cli_get_command(adapter->vdev_id, WMI_VDEV_PARAM_CHWIDTH,
+	chwidth = wma_cli_get_command(adapter->vdev_id, wmi_vdev_param_chwidth,
 				      VDEV_CMD);
 
 	if (chwidth < 0) {
@@ -1529,11 +1529,9 @@ static int hdd_son_send_cfg_event(struct wlan_objmgr_vdev *vdev,
 			nla_total_size(event_len) +
 			NLMSG_HDRLEN;
 	idx = QCA_NL80211_VENDOR_SUBCMD_GET_WIFI_CONFIGURATION_INDEX;
-	skb = cfg80211_vendor_event_alloc(adapter->hdd_ctx->wiphy,
-					  &adapter->wdev,
-					  len,
-					  idx,
-					  GFP_KERNEL);
+	skb = wlan_cfg80211_vendor_event_alloc(adapter->hdd_ctx->wiphy,
+					       &adapter->wdev,
+					       len, idx, GFP_KERNEL);
 	if (!skb) {
 		hdd_err("failed to alloc cfg80211 vendor event");
 		return -EINVAL;
@@ -1543,7 +1541,7 @@ static int hdd_son_send_cfg_event(struct wlan_objmgr_vdev *vdev,
 			QCA_WLAN_VENDOR_ATTR_CONFIG_GENERIC_COMMAND,
 			event_id)) {
 		hdd_err("failed to put attr config generic command");
-		kfree_skb(skb);
+		wlan_cfg80211_vendor_free_skb(skb);
 		return -EINVAL;
 	}
 
@@ -1552,11 +1550,11 @@ static int hdd_son_send_cfg_event(struct wlan_objmgr_vdev *vdev,
 		    event_len,
 		    event_buf)) {
 		hdd_err("failed to put attr config generic data");
-		kfree_skb(skb);
+		wlan_cfg80211_vendor_free_skb(skb);
 		return -EINVAL;
 	}
 
-	cfg80211_vendor_event(skb, GFP_KERNEL);
+	wlan_cfg80211_vendor_event(skb, GFP_KERNEL);
 
 	return 0;
 }

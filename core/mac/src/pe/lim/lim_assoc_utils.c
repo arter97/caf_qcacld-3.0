@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2011-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -2376,7 +2376,7 @@ lim_add_sta(struct mac_context *mac_ctx,
 
 	/*
 	 * If HT client is connected to SAP DUT and self cap is NSS = 2 then
-	 * disable ASYNC DBS scan by sending WMI_VDEV_PARAM_SMPS_INTOLERANT
+	 * disable ASYNC DBS scan by sending wmi_vdev_param_smps_intolerant
 	 * to FW, because HT client's can't drop down chain using SMPS frames.
 	 */
 	if (!policy_mgr_is_hw_dbs_2x2_capable(mac_ctx->psoc) &&
@@ -2387,7 +2387,7 @@ lim_add_sta(struct mac_context *mac_ctx,
 		session_entry->ht_client_cnt++;
 		if (session_entry->ht_client_cnt == 1) {
 			wma_cli_set_command(session_entry->smeSessionId,
-				(int)WMI_VDEV_PARAM_SMPS_INTOLERANT,
+				(int)wmi_vdev_param_smps_intolerant,
 				1, VDEV_CMD);
 		}
 	}
@@ -2729,7 +2729,7 @@ lim_del_sta(struct mac_context *mac,
 		if (pe_session->ht_client_cnt == 0) {
 			pe_debug("clearing SMPS intolrent vdev_param");
 			wma_cli_set_command(pe_session->smeSessionId,
-				(int)WMI_VDEV_PARAM_SMPS_INTOLERANT,
+				(int)wmi_vdev_param_smps_intolerant,
 				0, VDEV_CMD);
 		}
 	}
@@ -3564,6 +3564,47 @@ static void lim_update_vht_oper_assoc_resp(struct mac_context *mac_ctx,
 	pAddBssParams->staContext.ch_width = ch_width;
 }
 
+#ifdef WLAN_FEATURE_11BE
+/**
+ * lim_update_eht_oper_assoc_resp : Update BW based on EHT operation IE.
+ * @pe_session : session entry.
+ * @pAddBssParams: parameters required for add bss params.
+ * @eht_op: EHT Oper IE to update.
+ *
+ * Return : void
+ */
+static void lim_update_eht_oper_assoc_resp(struct pe_session *pe_session,
+					   struct bss_params *pAddBssParams,
+					   tDot11fIEeht_op *eht_op)
+{
+	enum phy_ch_width ch_width;
+
+	ch_width = wlan_mlme_convert_eht_op_bw_to_phy_ch_width(
+						eht_op->channel_width);
+
+	/* Due to puncturing, EHT AP's send seg1 in VHT IE as zero which causes
+	 * downgrade to 80 MHz, check EHT IE and if EHT IE supports 160MHz
+	 * then stick to 160MHz only
+	 */
+
+	if (ch_width > pAddBssParams->ch_width &&
+	    ch_width >= pe_session->ch_width) {
+		pe_debug("eht ch_width %d and ch_width of add bss param %d",
+			 ch_width, pAddBssParams->ch_width);
+		ch_width = pe_session->ch_width;
+	}
+
+	pAddBssParams->ch_width = ch_width;
+	pAddBssParams->staContext.ch_width = ch_width;
+}
+#else
+static void lim_update_eht_oper_assoc_resp(struct pe_session *pe_session,
+					   struct bss_params *pAddBssParams,
+					   tDot11fIEeht_op *eht_op)
+{
+}
+#endif
+
 #ifdef WLAN_SUPPORT_TWT
 /**
  * lim_set_sta_ctx_twt() - Save the TWT settings in STA context
@@ -3722,6 +3763,12 @@ QDF_STATUS lim_sta_send_add_bss(struct mac_context *mac, tpSirAssocRsp pAssocRsp
 		lim_add_bss_eht_cap(pAddBssParams, pAssocRsp);
 		lim_add_bss_eht_cfg(pAddBssParams, pe_session);
 	}
+
+	if (lim_is_session_eht_capable(pe_session) &&
+	    pAssocRsp->eht_op.present &&
+	    pAssocRsp->eht_op.eht_op_information_present)
+		lim_update_eht_oper_assoc_resp(pe_session, pAddBssParams,
+					       &pAssocRsp->eht_op);
 
 	if (pAssocRsp->bss_max_idle_period.present) {
 		pAddBssParams->bss_max_idle_period =
@@ -4680,3 +4727,14 @@ void lim_extract_ies_from_deauth_disassoc(struct pe_session *session,
 	mlme_set_peer_disconnect_ies(session->vdev, &ie);
 }
 
+uint8_t *lim_get_src_addr_from_frame(struct element_info *frame)
+{
+	struct wlan_frame_hdr *hdr;
+
+	if (!frame || !frame->len || frame->len < WLAN_MAC_HDR_LEN_3A)
+		return NULL;
+
+	hdr = (struct wlan_frame_hdr *)frame->ptr;
+
+	return hdr->i_addr2;
+}

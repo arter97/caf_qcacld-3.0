@@ -60,7 +60,7 @@ void wlan_tdls_teardown_links_sync(struct wlan_objmgr_psoc *psoc);
  * wlan_tdls_notify_sta_disconnect() - notify sta disconnect
  * @vdev_id: pointer to soc object
  * @lfr_roam: indicate, whether disconnect due to lfr roam
- * @bool user_disconnect: disconnect from user space
+ * @user_disconnect: disconnect from user space
  * @vdev: vdev object manager
  *
  * Notify sta disconnect event to TDLS component
@@ -87,6 +87,28 @@ wlan_tdls_notify_sta_connect(uint8_t vdev_id,
 			     bool tdls_chan_swit_prohibited,
 			     bool tdls_prohibited,
 			     struct wlan_objmgr_vdev *vdev);
+
+/**
+ * wlan_tdls_update_tx_pkt_cnt() - update tx pkt count
+ * @vdev: tdls vdev object
+ * @mac_addr: peer mac address
+ *
+ * Return: None
+ */
+void wlan_tdls_update_tx_pkt_cnt(struct wlan_objmgr_vdev *vdev,
+				 struct qdf_mac_addr *mac_addr);
+
+/**
+ * wlan_tdls_update_rx_pkt_cnt() - update rx pkt count
+ * @vdev: tdls vdev object
+ * @mac_addr: peer mac address
+ * @dest_mac_addr: dest mac address
+ *
+ * Return: None
+ */
+void wlan_tdls_update_rx_pkt_cnt(struct wlan_objmgr_vdev *vdev,
+				 struct qdf_mac_addr *mac_addr,
+				 struct qdf_mac_addr *dest_mac_addr);
 
 #else
 
@@ -117,6 +139,19 @@ wlan_tdls_notify_sta_connect(uint8_t vdev_id,
 			     bool tdls_chan_swit_prohibited,
 			     bool tdls_prohibited,
 			     struct wlan_objmgr_vdev *vdev) {}
+
+static inline void
+wlan_tdls_update_tx_pkt_cnt(struct wlan_objmgr_vdev *vdev,
+			    struct qdf_mac_addr *mac_addr)
+{
+}
+
+static inline
+void wlan_tdls_update_rx_pkt_cnt(struct wlan_objmgr_vdev *vdev,
+				 struct qdf_mac_addr *mac_addr,
+				 struct qdf_mac_addr *dest_mac_addr)
+{
+}
 
 #endif
 #endif

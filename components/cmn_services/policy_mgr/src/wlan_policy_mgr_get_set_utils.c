@@ -1862,7 +1862,9 @@ bool policy_mgr_are_2_freq_on_same_mac(struct wlan_objmgr_psoc *psoc,
 	if (!policy_mgr_is_hw_dbs_capable(psoc))
 		return true;
 
-	policy_mgr_rl_debug("freq_1 %d freq_2 %d", freq_1, freq_2);
+	policy_mgr_rl_debug("freq_1 %d freq_2 %d old_hw_mode_index=%d, new_hw_mode_index=%d",
+			    freq_1, freq_2, pm_ctx->old_hw_mode_index,
+			    pm_ctx->new_hw_mode_index);
 
 	/* HW is DBS/SBS capable */
 	status = policy_mgr_get_current_hw_mode(psoc, &hw_mode);
@@ -2153,7 +2155,10 @@ void policy_mgr_init_dbs_hw_mode(struct wlan_objmgr_psoc *psoc,
 
 void policy_mgr_dump_dbs_hw_mode(struct wlan_objmgr_psoc *psoc)
 {
-	uint32_t i, param;
+	uint32_t i;
+	uint32_t param;
+	uint32_t param1;
+
 	struct policy_mgr_psoc_priv_obj *pm_ctx;
 
 	pm_ctx = policy_mgr_get_context(psoc);
@@ -2161,9 +2166,13 @@ void policy_mgr_dump_dbs_hw_mode(struct wlan_objmgr_psoc *psoc)
 		policy_mgr_err("Invalid Context");
 		return;
 	}
+	policy_mgr_debug("old_hw_mode_index=%d, new_hw_mode_index=%d",
+			 pm_ctx->old_hw_mode_index, pm_ctx->new_hw_mode_index);
 
 	for (i = 0; i < pm_ctx->num_dbs_hw_modes; i++) {
 		param = pm_ctx->hw_mode.hw_mode_list[i];
+		param1 = pm_ctx->hw_mode.hw_mode_list[i] >> 32;
+		policy_mgr_debug("[%d] 0x%x 0x%x", i, param, param1);
 		policy_mgr_debug("[%d]-MAC0: tx_ss:%d rx_ss:%d bw_idx:%d band_cap:%d",
 				 i,
 				 POLICY_MGR_HW_MODE_MAC0_TX_STREAMS_GET(param),
@@ -4814,8 +4823,8 @@ policy_mgr_handle_ml_sta_link_state_allowed(struct wlan_objmgr_psoc *psoc)
 	policy_mgr_get_ml_sta_info(pm_ctx, &num_ml_sta, &num_disabled_ml_sta,
 				   ml_sta_vdev_lst, ml_freq_lst, &num_non_ml,
 				   NULL, NULL);
-	if (!num_ml_sta) {
-		policy_mgr_debug("ml sta num is zero");
+	if (!num_ml_sta || num_ml_sta > MAX_NUMBER_OF_CONC_CONNECTIONS) {
+		policy_mgr_debug("ml sta num is %d", num_ml_sta);
 		return QDF_STATUS_E_INVAL;
 	}
 
@@ -5600,6 +5609,12 @@ policy_mgr_get_disabled_ml_sta_idx(struct wlan_objmgr_psoc *psoc,
 			continue;
 		if (pm_disabled_ml_links[conn_index].mode != PM_STA_MODE)
 			continue;
+		if ((fill_index >= MAX_NUMBER_OF_CONC_CONNECTIONS) ||
+		    (*ml_sta >= MAX_NUMBER_OF_CONC_CONNECTIONS)) {
+			policy_mgr_err("Invalid fill_index: %d or ml_sta: %d",
+				       fill_index, *ml_sta);
+			break;
+		}
 		vdev_id_list[fill_index] =
 				pm_disabled_ml_links[conn_index].vdev_id;
 		freq_list[fill_index] = pm_disabled_ml_links[conn_index].freq;
@@ -8677,7 +8692,7 @@ bool policy_mgr_get_ap_6ghz_capable(struct wlan_objmgr_psoc *psoc,
 					psoc, vdev_id) |
 					CONN_6GHZ_FLAG_NO_LEGACY_CLIENT;
 
-	if ((conn_6ghz_flag & CONN_6GHZ_CAPABLIE) == CONN_6GHZ_CAPABLIE)
+	if ((conn_6ghz_flag & CONN_6GHZ_CAPABLE) == CONN_6GHZ_CAPABLE)
 		is_6g_allowed = true;
 	policy_mgr_debug("vdev %d conn_6ghz_flag %x 6ghz %s", vdev_id,
 			 conn_6ghz_flag, is_6g_allowed ? "allowed" : "deny");

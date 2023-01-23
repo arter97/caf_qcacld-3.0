@@ -907,7 +907,7 @@ void wma_set_vht_txbf_cfg(struct mac_context *mac, uint8_t vdev_id)
 	txbf_en.sutxbfer = mac->mlme_cfg->vht_caps.vht_cap_info.su_bformer;
 
 	status = wma_vdev_set_param(wma->wmi_handle, vdev_id,
-				    WMI_VDEV_PARAM_TXBF,
+				    wmi_vdev_param_txbf,
 				    *((A_UINT8 *)&txbf_en));
 	if (QDF_IS_STATUS_ERROR(status))
 		wma_err("failed to set VHT TXBF(status = %d)", status);
@@ -940,7 +940,7 @@ int32_t wmi_unified_send_txbf(tp_wma_handle wma, tpAddStaParams params)
 
 	return wma_vdev_set_param(wma->wmi_handle,
 						params->smesessionId,
-						WMI_VDEV_PARAM_TXBF,
+						wmi_vdev_param_txbf,
 						*((A_UINT8 *) &txbf_en));
 }
 
@@ -1262,6 +1262,11 @@ QDF_STATUS wma_set_mcc_channel_time_quota(tp_wma_handle wma,
 						chan2_freq);
 }
 
+#define MAX_VDEV_PROCESS_RATE_PARAMS 2
+/* params being sent:
+ * wmi_vdev_param_sgi
+ * wmi_vdev_param_mcast_data_rate
+ */
 QDF_STATUS wma_process_rate_update_indicate(tp_wma_handle wma,
 					    tSirRateUpdateInd *
 					    pRateUpdateParams)
@@ -1269,11 +1274,13 @@ QDF_STATUS wma_process_rate_update_indicate(tp_wma_handle wma,
 	int32_t ret = 0;
 	uint8_t vdev_id = 0;
 	int32_t mbpsx10_rate = -1;
-	uint32_t paramId;
+	uint32_t paramid;
 	uint8_t rate = 0;
 	uint32_t short_gi, rate_flag;
 	struct wma_txrx_node *intr = wma->interfaces;
 	QDF_STATUS status;
+	struct dev_set_param setparam[MAX_VDEV_PROCESS_RATE_PARAMS] = {};
+	uint8_t index = 0;
 
 	/* Get the vdev id */
 	if (wma_find_vdev_id_by_addr(wma, pRateUpdateParams->bssid.bytes,
@@ -1299,16 +1306,16 @@ QDF_STATUS wma_process_rate_update_indicate(tp_wma_handle wma,
 	 */
 	if (pRateUpdateParams->reliableMcastDataRateTxFlag > 0) {
 		mbpsx10_rate = pRateUpdateParams->reliableMcastDataRate;
-		paramId = WMI_VDEV_PARAM_MCAST_DATA_RATE;
+		paramid = wmi_vdev_param_mcast_data_rate;
 		if (pRateUpdateParams->
 		    reliableMcastDataRateTxFlag & TX_RATE_SGI)
 			short_gi = 1;   /* upper layer specified short GI */
 	} else if (pRateUpdateParams->bcastDataRate > -1) {
 		mbpsx10_rate = pRateUpdateParams->bcastDataRate;
-		paramId = WMI_VDEV_PARAM_BCAST_DATA_RATE;
+		paramid = wmi_vdev_param_bcast_data_rate;
 	} else {
 		mbpsx10_rate = pRateUpdateParams->mcastDataRate24GHz;
-		paramId = WMI_VDEV_PARAM_MCAST_DATA_RATE;
+		paramid = wmi_vdev_param_mcast_data_rate;
 		if (pRateUpdateParams->
 		    mcastDataRate24GHzTxFlag & TX_RATE_SGI)
 			short_gi = 1;   /* upper layer specified short GI */
@@ -1327,23 +1334,28 @@ QDF_STATUS wma_process_rate_update_indicate(tp_wma_handle wma,
 		qdf_mem_free(pRateUpdateParams);
 		return ret;
 	}
-	status = wma_vdev_set_param(wma->wmi_handle, vdev_id,
-					      WMI_VDEV_PARAM_SGI, short_gi);
+
+	ret = mlme_check_index_setparam(setparam, wmi_vdev_param_sgi, short_gi,
+					index++, MAX_VDEV_PROCESS_RATE_PARAMS);
 	if (QDF_IS_STATUS_ERROR(status)) {
-		wma_err("Fail to Set WMI_VDEV_PARAM_SGI(%d), status = %d",
-			short_gi, status);
-		qdf_mem_free(pRateUpdateParams);
-		return status;
-	}
-	status = wma_vdev_set_param(wma->wmi_handle,
-					      vdev_id, paramId, rate);
-	qdf_mem_free(pRateUpdateParams);
-	if (QDF_IS_STATUS_ERROR(status)) {
-		wma_err("Fail to Set rate, status = %d", status);
-		return status;
+		wma_debug("failed at wmi_vdev_param_sgi");
+		goto error;
 	}
 
-	return QDF_STATUS_SUCCESS;
+	ret = mlme_check_index_setparam(setparam, paramid, rate, index++,
+					MAX_VDEV_PROCESS_RATE_PARAMS);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		wma_debug("failed at paramid:%d", paramid);
+		goto error;
+	}
+
+	ret = wma_send_multi_pdev_vdev_set_params(MLME_VDEV_SETPARAM,
+						  vdev_id, setparam, index);
+	if (QDF_IS_STATUS_ERROR(ret))
+		wma_debug("failed to send vdev set params");
+error:
+	qdf_mem_free(pRateUpdateParams);
+	return ret;
 }
 
 /**

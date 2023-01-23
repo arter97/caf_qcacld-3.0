@@ -109,9 +109,9 @@ struct tdls_conn_info {
 
 /**
  * enum tdls_nss_transition_state - TDLS NSS transition states
- * @TDLS_NSS_TRANSITION_UNKNOWN: default state
- * @TDLS_NSS_TRANSITION_2x2_to_1x1: transition from 2x2 to 1x1 stream
- * @TDLS_NSS_TRANSITION_1x1_to_2x2: transition from 1x1 to 2x2 stream
+ * @TDLS_NSS_TRANSITION_S_UNKNOWN: default state
+ * @TDLS_NSS_TRANSITION_S_2x2_to_1x1: transition from 2x2 to 1x1 stream
+ * @TDLS_NSS_TRANSITION_S_1x1_to_2x2: transition from 1x1 to 2x2 stream
  */
 enum tdls_nss_transition_state {
 	TDLS_NSS_TRANSITION_S_UNKNOWN = 0,
@@ -134,7 +134,7 @@ struct tdls_conn_tracker_mac_table {
 };
 
 /**
- * struct tdls_set_state_db - to record set tdls state command, we need to
+ * struct tdls_set_state_info - to record set tdls state command, we need to
  * set correct tdls state to firmware:
  * 1. enable tdls in firmware before tdls connection;
  * 2. disable tdls if concurrency happen, before disable tdls, all active peer
@@ -149,7 +149,7 @@ struct tdls_set_state_info {
 };
 
 /**
- * struct tdls_psoc_priv_ctx - tdls context
+ * struct tdls_soc_priv_obj - tdls soc private context
  * @soc: objmgr psoc
  * @tdls_current_mode: current tdls mode
  * @tdls_last_mode: last tdls mode
@@ -171,10 +171,15 @@ struct tdls_set_state_info {
  * @tdls_nss_transition_mode: tdls nss transition mode
  * @tdls_teardown_peers_cnt: tdls tear down peer count
  * @set_state_info: set tdls state info
+ * @tdls_rx_cb: TDLS RX callback
+ * @tdls_rx_cb_data: TDLS RX callback context
+ * @tdls_wmm_cb: TDLS WMM check callback
+ * @tdls_wmm_cb_data: TDLS WMM check callback context
  * @tdls_event_cb: tdls event callback
  * @tdls_evt_cb_data: tdls event user data
  * @tdls_peer_context: userdata for register/deregister TDLS peer
  * @tdls_reg_peer: register tdls peer with datapath
+ * @tdls_dp_vdev_update: notify datapath of vdev updates
  * @tx_q_ack: queue for tx frames waiting for ack
  * @tdls_con_cap: tdls concurrency support
  * @tdls_send_mgmt_req: store eWNI_SME_TDLS_SEND_MGMT_REQ value
@@ -182,7 +187,7 @@ struct tdls_set_state_info {
  * @tdls_del_sta_req: store eWNI_SME_TDLS_DEL_STA_REQ value
  * @tdls_update_peer_state: store WMA_UPDATE_TDLS_PEER_STATE value
  * @tdls_del_all_peers:store eWNI_SME_DEL_ALL_TDLS_PEERS
- * @tdls_update_dp_vdev_flags store CDP_UPDATE_TDLS_FLAGS
+ * @tdls_update_dp_vdev_flags: store CDP_UPDATE_TDLS_FLAGS
  * @tdls_idle_peer_data: provide information about idle peer
  * @tdls_ct_spinlock: connection tracker spin lock
  * @is_prevent_suspend: prevent suspend or not
@@ -196,7 +201,7 @@ struct tdls_set_state_info {
  * @fw_tdls_11ax_capability: bool for tdls 11ax fw capability
  * @fw_tdls_6g_capability: bool for tdls 6g fw capability
  * @bss_sta_power: bss sta power
- * @@bss_sta_power_type: bss sta power type
+ * @bss_sta_power_type: bss sta power type
  * @fw_tdls_wideband_capability: bool for tdls wideband fw capability
  */
 struct tdls_soc_priv_obj {
@@ -269,6 +274,7 @@ struct tdls_soc_priv_obj {
  * @ct_peer_table: linear mac address table for counting the packets
  * @valid_mac_entries: number of valid mac entry in @ct_peer_mac_table
  * @magic: magic
+ * @session_id: vdev ID
  * @tx_queue: tx frame queue
  * @tdls_teardown_comp: tdls teardown completion
  */
@@ -329,6 +335,7 @@ struct tdls_peer_mlme_info {
  * @reason: reason
  * @state_change_notification: state change notification
  * @qos: QOS capability of TDLS link
+ * @tdls_info: MLME info
  */
 struct tdls_peer {
 	qdf_list_node_t node;
@@ -537,7 +544,7 @@ void tdls_timer_restart(struct wlan_objmgr_vdev *vdev,
 				 uint32_t expiration_time);
 
 /**
- * wlan_hdd_tdls_timers_stop() - stop all the tdls timers running
+ * tdls_timers_stop() - stop all the tdls timers running
  * @tdls_vdev: TDLS vdev
  *
  * Return: none
@@ -557,8 +564,8 @@ QDF_STATUS tdls_get_vdev_objects(struct wlan_objmgr_vdev *vdev,
 				   struct tdls_soc_priv_obj **tdls_soc_obj);
 
 /**
- * cds_set_tdls_ct_mode() - Set the tdls connection tracker mode
- * @hdd_ctx: hdd context
+ * tdls_set_ct_mode() - Set the tdls connection tracker mode
+ * @psoc: objmgr psoc object
  *
  * This routine is called to set the tdls connection tracker operation status
  *
@@ -637,6 +644,7 @@ void tdls_notify_decrement_session(struct wlan_objmgr_psoc *psoc);
 /**
  * tdls_send_update_to_fw - update tdls status info
  * @tdls_vdev_obj: tdls vdev private object.
+ * @tdls_soc_obj: TDLS soc private object
  * @tdls_prohibited: indicates whether tdls is prohibited.
  * @tdls_chan_swit_prohibited: indicates whether tdls channel switch
  *                             is prohibited.
@@ -751,14 +759,14 @@ void tdls_scan_complete_event_handler(struct wlan_objmgr_vdev *vdev,
 
 /**
  * tdls_scan_callback() - callback for TDLS scan operation
- * @soc: tdls soc pvt object
+ * @tdls_soc: tdls soc pvt object
  *
  * Return: QDF_STATUS
  */
 QDF_STATUS tdls_scan_callback(struct tdls_soc_priv_obj *tdls_soc);
 
 /**
- * wlan_hdd_tdls_scan_done_callback() - callback for tdls scan done event
+ * tdls_scan_done_callback() - callback for tdls scan done event
  * @tdls_soc: tdls soc object
  *
  * Return: Void
@@ -769,9 +777,9 @@ void tdls_scan_done_callback(struct tdls_soc_priv_obj *tdls_soc);
  * tdls_scan_serialization_comp_info_cb() - callback for scan start
  * @vdev: VDEV on which the scan command is being processed
  * @comp_info: serialize rules info
+ * @cmd: the serialization command
  *
- * Return: negative = caller should stop and return error code immediately
- *         1 = caller can continue to scan
+ * Return: Void
  */
 void tdls_scan_serialization_comp_info_cb(struct wlan_objmgr_vdev *vdev,
 		union wlan_serialization_rules_info *comp_info,

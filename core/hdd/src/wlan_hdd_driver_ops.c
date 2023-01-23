@@ -228,16 +228,16 @@ static void hdd_send_driver_ready_to_user(void)
 		return;
 	}
 
-	nl_event = cfg80211_vendor_event_alloc(
+	nl_event = wlan_cfg80211_vendor_event_alloc(
 			hdd_ctx->wiphy, NULL, 0,
 			QCA_NL80211_VENDOR_SUBCMD_DRIVER_READY_INDEX,
 			flags);
 	if (!nl_event) {
-		hdd_err("cfg80211_vendor_event_alloc failed");
+		hdd_err("wlan_cfg80211_vendor_event_alloc failed");
 		return;
 	}
 
-	cfg80211_vendor_event(nl_event, flags);
+	wlan_cfg80211_vendor_event(nl_event, flags);
 }
 
 /**

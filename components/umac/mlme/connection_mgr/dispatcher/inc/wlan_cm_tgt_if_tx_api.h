@@ -99,6 +99,22 @@ wlan_cm_tgt_exclude_rm_partial_scan_freq(struct wlan_objmgr_psoc *psoc,
 					 uint8_t vdev_id,
 					 uint8_t exclude_rm_partial_scan_freq);
 
+/**
+ * wlan_cm_tgt_send_roam_full_scan_6ghz_on_disc() - Include the 6 GHz channels
+ * in roam full scan only on prior discovery of any 6 GHz support in the
+ * environment.
+ * @psoc: PSOC pointer
+ * @roam_inc_6ghz_if_disc: Include the 6 GHz channels in roam full scan:
+ * 1 - Include only on prior discovery of any 6 GHz support in the environment
+ * 0 - Include all the supported 6 GHz channels by default
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS wlan_cm_tgt_send_roam_full_scan_6ghz_on_disc(
+					struct wlan_objmgr_psoc *psoc,
+					uint8_t vdev_id,
+					uint8_t roam_full_scan_6ghz_on_disc);
+
 #ifdef FEATURE_RX_LINKSPEED_ROAM_TRIGGER
 /**
  * wlan_cm_tgt_send_roam_linkspeed_state() - Send roam link speed state
@@ -148,6 +164,15 @@ wlan_cm_tgt_exclude_rm_partial_scan_freq(struct wlan_objmgr_psoc *psoc,
 {
 	return QDF_STATUS_E_FAILURE;
 }
+
+static inline QDF_STATUS
+wlan_cm_tgt_send_roam_full_scan_6ghz_on_disc(
+					struct wlan_objmgr_psoc *psoc,
+					uint8_t vdev_id,
+					uint8_t roam_full_scan_6ghz_on_disc)
+{
+	return QDF_STATUS_E_FAILURE;
+}
 #endif /* WLAN_FEATURE_ROAM_OFFLOAD */
 
 #ifdef WLAN_VENDOR_HANDOFF_CONTROL
@@ -169,7 +194,7 @@ wlan_cm_tgt_send_roam_vendor_handoff_config(struct wlan_objmgr_psoc *psoc,
 #define CFG_DISABLE_4WAY_HS_OFFLOAD_DEFAULT BIT(0)
 
 /**
- * wlan_cm_tgt_send_roam_offload_init()  - Send WMI_VDEV_PARAM_ROAM_FW_OFFLOAD
+ * wlan_cm_tgt_send_roam_offload_init()  - Send wmi_vdev_param_roam_fw_offload
  * to init/deinit roaming module at firmware
  * @psoc: PSOC pointer
  * @vdev_id: vdev id

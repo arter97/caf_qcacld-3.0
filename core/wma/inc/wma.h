@@ -999,7 +999,8 @@ typedef struct {
 
 	QDF_STATUS (*csr_roam_auth_event_handle_cb)(struct mac_context *mac,
 						    uint8_t vdev_id,
-						    struct qdf_mac_addr bssid);
+						    struct qdf_mac_addr bssid,
+						    uint32_t akm);
 	QDF_STATUS (*pe_roam_synch_cb)(struct mac_context *mac,
 		uint8_t vdev_id,
 		struct roam_offload_synch_ind *roam_synch_data,
@@ -1356,24 +1357,24 @@ typedef enum {
 
 /**
  * enum green_tx_param - green tx parameters
- * @WMI_VDEV_PARAM_GTX_HT_MCS: ht mcs param
- * @WMI_VDEV_PARAM_GTX_VHT_MCS: vht mcs param
- * @WMI_VDEV_PARAM_GTX_USR_CFG: user cfg param
- * @WMI_VDEV_PARAM_GTX_THRE: thre param
- * @WMI_VDEV_PARAM_GTX_MARGIN: green tx margin param
- * @WMI_VDEV_PARAM_GTX_STEP: green tx step param
- * @WMI_VDEV_PARAM_GTX_MINTPC: mintpc param
- * @WMI_VDEV_PARAM_GTX_BW_MASK: bandwidth mask
+ * @wmi_vdev_param_gtx_ht_mcs: ht mcs param
+ * @wmi_vdev_param_gtx_vht_mcs: vht mcs param
+ * @wmi_vdev_param_gtx_usr_cfg: user cfg param
+ * @wmi_vdev_param_gtx_thre: thre param
+ * @wmi_vdev_param_gtx_margin: green tx margin param
+ * @wmi_vdev_param_gtx_step: green tx step param
+ * @wmi_vdev_param_gtx_mintpc: mintpc param
+ * @wmi_vdev_param_gtx_bw_mask: bandwidth mask
  */
 typedef enum {
-	WMI_VDEV_PARAM_GTX_HT_MCS,
-	WMI_VDEV_PARAM_GTX_VHT_MCS,
-	WMI_VDEV_PARAM_GTX_USR_CFG,
-	WMI_VDEV_PARAM_GTX_THRE,
-	WMI_VDEV_PARAM_GTX_MARGIN,
-	WMI_VDEV_PARAM_GTX_STEP,
-	WMI_VDEV_PARAM_GTX_MINTPC,
-	WMI_VDEV_PARAM_GTX_BW_MASK,
+	wmi_vdev_param_gtx_ht_mcs,
+	wmi_vdev_param_gtx_vht_mcs,
+	wmi_vdev_param_gtx_usr_cfg,
+	wmi_vdev_param_gtx_thre,
+	wmi_vdev_param_gtx_margin,
+	wmi_vdev_param_gtx_step,
+	wmi_vdev_param_gtx_mintpc,
+	wmi_vdev_param_gtx_bw_mask,
 } green_tx_param;
 
 /**
@@ -1677,13 +1678,15 @@ QDF_STATUS wma_create_peer(tp_wma_handle wma,
  * @vdev_id: vdev id
  * @peer_addr: peer mac address
  * @wma_peer_type: peer type of enum wmi_peer_type
+ * @peer_mld: peer mld address
  *
  * Return: Pointer to objmgr_peer
  */
 struct wlan_objmgr_peer *wma_create_objmgr_peer(tp_wma_handle wma,
 						uint8_t vdev_id,
 						uint8_t *peer_addr,
-						uint32_t wma_peer_type);
+						uint32_t wma_peer_type,
+						uint8_t *peer_mld);
 
 /**
  * wma_remove_objmgr_peer() - Remove Object manager peer

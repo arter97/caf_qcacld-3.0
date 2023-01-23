@@ -211,10 +211,10 @@ static int hdd_get_station_assoc_fail(struct hdd_context *hdd_ctx,
 
 	nl_buf_len = NLMSG_HDRLEN;
 	nl_buf_len += sizeof(uint32_t);
-	skb = cfg80211_vendor_cmd_alloc_reply_skb(hdd_ctx->wiphy, nl_buf_len);
-
+	skb = wlan_cfg80211_vendor_cmd_alloc_reply_skb(hdd_ctx->wiphy,
+						       nl_buf_len);
 	if (!skb) {
-		hdd_err("cfg80211_vendor_cmd_alloc_reply_skb failed");
+		hdd_err("wlan_cfg80211_vendor_cmd_alloc_reply_skb failed");
 		return -ENOMEM;
 	}
 
@@ -236,10 +236,9 @@ static int hdd_get_station_assoc_fail(struct hdd_context *hdd_ctx,
 		goto fail;
 	}
 
-	return cfg80211_vendor_cmd_reply(skb);
+	return wlan_cfg80211_vendor_cmd_reply(skb);
 fail:
-	if (skb)
-		kfree_skb(skb);
+	wlan_cfg80211_vendor_free_skb(skb);
 	return -EINVAL;
 }
 
@@ -372,6 +371,12 @@ static int hdd_convert_dot11mode(uint32_t dot11mode)
 		break;
 	case eCSR_CFG_DOT11_MODE_11AC:
 		ret_val = QCA_WLAN_802_11_MODE_11AC;
+		break;
+	case eCSR_CFG_DOT11_MODE_11AX:
+		ret_val = QCA_WLAN_802_11_MODE_11AX;
+		break;
+	case eCSR_CFG_DOT11_MODE_11BE:
+		ret_val = QCA_WLAN_802_11_MODE_11BE;
 		break;
 	case eCSR_CFG_DOT11_MODE_AUTO:
 	case eCSR_CFG_DOT11_MODE_ABG:
@@ -712,10 +717,10 @@ static int hdd_get_station_info(struct hdd_context *hdd_ctx,
 		return -EINVAL;
 	}
 
-	skb = cfg80211_vendor_cmd_alloc_reply_skb(hdd_ctx->wiphy,
-						  WLAN_STATS_INFO_LEN);
+	skb = wlan_cfg80211_vendor_cmd_alloc_reply_skb(hdd_ctx->wiphy,
+						       WLAN_STATS_INFO_LEN);
 	if (!skb) {
-		hdd_err("cfg80211_vendor_cmd_alloc_reply_skb failed");
+		hdd_err("wlan_cfg80211_vendor_cmd_alloc_reply_skb failed");
 		return -ENOMEM;
 	}
 
@@ -815,10 +820,9 @@ static int hdd_get_station_info(struct hdd_context *hdd_ctx,
 		hdd_convert_dot11mode(hdd_sta_ctx->cache_conn_info.dot11mode),
 		adapter->last_disconnect_reason);
 
-	return cfg80211_vendor_cmd_reply(skb);
+	return wlan_cfg80211_vendor_cmd_reply(skb);
 fail:
-	if (skb)
-		kfree_skb(skb);
+	wlan_cfg80211_vendor_free_skb(skb);
 	return -EINVAL;
 }
 
@@ -1174,20 +1178,18 @@ static int hdd_get_cached_station_remote(struct hdd_context *hdd_ctx,
 			(sizeof(stainfo->tx_rate) + NLA_HDRLEN) +
 			(sizeof(stainfo->rx_rate) + NLA_HDRLEN) +
 			(sizeof(stainfo->support_mode) + NLA_HDRLEN) +
-
-			(sizeof(stainfo->rx_mc_bc_cnt) +
-			 NLA_HDRLEN) +
-			(sizeof(stainfo->rx_retry_cnt) +
-			 NLA_HDRLEN);
+			(sizeof(stainfo->rx_mc_bc_cnt) + NLA_HDRLEN) +
+			(sizeof(stainfo->rx_retry_cnt) + NLA_HDRLEN);
 	if (stainfo->assoc_req_ies.len)
 		nl_buf_len += stainfo->assoc_req_ies.len + NLA_HDRLEN;
 
-	skb = cfg80211_vendor_cmd_alloc_reply_skb(hdd_ctx->wiphy, nl_buf_len);
+	skb = wlan_cfg80211_vendor_cmd_alloc_reply_skb(hdd_ctx->wiphy,
+						       nl_buf_len);
 	if (!skb) {
 		hdd_put_sta_info_ref(&adapter->cache_sta_info_list,
 				     &stainfo, true,
 				     STA_INFO_GET_CACHED_STATION_REMOTE);
-		hdd_err("cfg80211_vendor_cmd_alloc_reply_skb failed");
+		hdd_err("wlan_cfg80211_vendor_cmd_alloc_reply_skb failed");
 		return -ENOMEM;
 	}
 
@@ -1275,13 +1277,11 @@ static int hdd_get_cached_station_remote(struct hdd_context *hdd_ctx,
 			     STA_INFO_GET_CACHED_STATION_REMOTE);
 	qdf_atomic_dec(&adapter->cache_sta_count);
 
-	return cfg80211_vendor_cmd_reply(skb);
+	return wlan_cfg80211_vendor_cmd_reply(skb);
 fail:
 	hdd_put_sta_info_ref(&adapter->cache_sta_info_list, &stainfo, true,
 			     STA_INFO_GET_CACHED_STATION_REMOTE);
-	if (skb)
-		kfree_skb(skb);
-
+	wlan_cfg80211_vendor_free_skb(skb);
 	return -EINVAL;
 }
 
@@ -1355,10 +1355,10 @@ static int hdd_get_connected_station_info(struct hdd_context *hdd_ctx,
 
 	hdd_info("buflen %d hdrlen %d", nl_buf_len, NLMSG_HDRLEN);
 
-	skb = cfg80211_vendor_cmd_alloc_reply_skb(hdd_ctx->wiphy,
-						  nl_buf_len);
+	skb = wlan_cfg80211_vendor_cmd_alloc_reply_skb(hdd_ctx->wiphy,
+						       nl_buf_len);
 	if (!skb) {
-		hdd_err("cfg80211_vendor_cmd_alloc_reply_skb failed");
+		hdd_err("wlan_cfg80211_vendor_cmd_alloc_reply_skb failed");
 		goto fail;
 	}
 
@@ -1412,12 +1412,10 @@ static int hdd_get_connected_station_info(struct hdd_context *hdd_ctx,
 		}
 	}
 
-	return cfg80211_vendor_cmd_reply(skb);
+	return wlan_cfg80211_vendor_cmd_reply(skb);
 
 fail:
-	if (skb)
-		kfree_skb(skb);
-
+	wlan_cfg80211_vendor_free_skb(skb);
 	return -EINVAL;
 }
 
@@ -2161,7 +2159,6 @@ static int hdd_get_connected_station_info_ex(struct hdd_context *hdd_ctx,
 
 	nl_buf_len = NLMSG_HDRLEN;
 	nl_buf_len += nla_attr_size(QDF_MAC_ADDR_SIZE);
-
 	status = ucfg_mlme_get_sap_get_peer_info(hdd_ctx->psoc,
 						 &sap_get_peer_info);
 	if (status != QDF_STATUS_SUCCESS)
@@ -2174,9 +2171,10 @@ static int hdd_get_connected_station_info_ex(struct hdd_context *hdd_ctx,
 		nl_buf_len += nla_attr_size(sizeof(sta_flags)) +
 			      nla_attr_size(sizeof(guard_interval));
 
-	skb = cfg80211_vendor_cmd_alloc_reply_skb(hdd_ctx->wiphy, nl_buf_len);
+	skb = wlan_cfg80211_vendor_cmd_alloc_reply_skb(hdd_ctx->wiphy,
+						       nl_buf_len);
 	if (!skb) {
-		hdd_err_rl("cfg80211_vendor_cmd_alloc_reply_skb failed");
+		hdd_err_rl("wlan_cfg80211_vendor_cmd_alloc_reply_skb failed");
 		goto fail;
 	}
 
@@ -2236,12 +2234,10 @@ static int hdd_get_connected_station_info_ex(struct hdd_context *hdd_ctx,
 		}
 	}
 
-	return cfg80211_vendor_cmd_reply(skb);
+	return wlan_cfg80211_vendor_cmd_reply(skb);
 
 fail:
-	if (skb)
-		kfree_skb(skb);
-
+	wlan_cfg80211_vendor_free_skb(skb);
 	return -EINVAL;
 }
 
@@ -2329,50 +2325,48 @@ static int hdd_get_station_info_ex(struct hdd_context *hdd_ctx,
 	nl_buf_len += hdd_get_pmf_bcn_protect_stats_len(adapter);
 	connect_fail_rsn_len = hdd_get_connect_fail_reason_code_len(adapter);
 	nl_buf_len += connect_fail_rsn_len;
-
 	nl_buf_len += hdd_get_uplink_delay_len(adapter);
-
 	if (!nl_buf_len) {
 		hdd_err_rl("Failed to get bcn pmf stats");
 		return -EINVAL;
 	}
 
 	nl_buf_len += NLMSG_HDRLEN;
-
-	skb = cfg80211_vendor_cmd_alloc_reply_skb(hdd_ctx->wiphy, nl_buf_len);
+	skb = wlan_cfg80211_vendor_cmd_alloc_reply_skb(hdd_ctx->wiphy,
+						       nl_buf_len);
 	if (!skb) {
-		hdd_err_rl("cfg80211_vendor_cmd_alloc_reply_skb failed");
+		hdd_err_rl("wlan_cfg80211_vendor_cmd_alloc_reply_skb failed");
 		return -ENOMEM;
 	}
 
 	if (hdd_add_pmf_bcn_protect_stats(skb, adapter)) {
 		hdd_err_rl("hdd_add_pmf_bcn_protect_stats fail");
-		kfree_skb(skb);
+		wlan_cfg80211_vendor_free_skb(skb);
 		return -EINVAL;
 	}
 
 	if (connect_fail_rsn_len) {
 		if (hdd_add_connect_fail_reason_code(skb, adapter)) {
 			hdd_err_rl("hdd_add_connect_fail_reason_code fail");
-			kfree_skb(skb);
+			wlan_cfg80211_vendor_free_skb(skb);
 			return -ENOMEM;
 		}
 	}
 
 	if (big_data_stats_req) {
 		if (hdd_big_data_pack_resp_nlmsg(skb, adapter, hdd_ctx)) {
-			kfree_skb(skb);
+			wlan_cfg80211_vendor_free_skb(skb);
 			return -EINVAL;
 		}
 	}
 
 	if (QDF_IS_STATUS_ERROR(hdd_add_uplink_delay(adapter, skb))) {
 		hdd_err_rl("hdd_add_uplink_delay fail");
-		kfree_skb(skb);
+		wlan_cfg80211_vendor_free_skb(skb);
 		return -EINVAL;
 	}
 
-	ret = cfg80211_vendor_cmd_reply(skb);
+	ret = wlan_cfg80211_vendor_cmd_reply(skb);
 	hdd_reset_roam_params(hdd_ctx->psoc, adapter->vdev_id);
 	return ret;
 }
