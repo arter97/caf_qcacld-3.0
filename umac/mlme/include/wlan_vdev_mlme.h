@@ -759,7 +759,8 @@ struct vdev_mlme_ops {
 				uint16_t event_data_len, void *event_data);
 	QDF_STATUS (*mlme_vdev_disconnect_peers)(
 				struct vdev_mlme_obj *vdev_mlme,
-				uint16_t event_data_len, void *event_data);
+				uint16_t event_data_len, void *event_data,
+				bool discon_legacy_only);
 	QDF_STATUS (*mlme_vdev_dfs_cac_timer_stop)(
 				struct vdev_mlme_obj *vdev_mlme,
 				uint16_t event_data_len, void *event_data);
