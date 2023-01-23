@@ -634,21 +634,26 @@ sch_bcn_process_sta_opmode(struct mac_context *mac_ctx,
  * from beacon
  * @bcn: beacon structure
  * @local_constraint: local constraint pointer
+ * @is_power_constraint_abs: is power constraint absolute
  *
  * Return: None
  */
 #ifdef FEATURE_WLAN_ESE
 static void get_local_power_constraint_beacon(
 		tpSchBeaconStruct bcn,
-		int8_t *local_constraint)
+		int8_t *local_constraint,
+		bool *is_power_constraint_abs)
 {
-	if (bcn->eseTxPwr.present)
+	if (bcn->eseTxPwr.present) {
 		*local_constraint = bcn->eseTxPwr.power_limit;
+		*is_power_constraint_abs = true;
+	}
 }
 #else
 static void get_local_power_constraint_beacon(
 		tpSchBeaconStruct bcn,
-		int8_t *local_constraint)
+		int8_t *local_constraint,
+		bool *is_power_constraint_abs)
 {
 
 }
@@ -673,6 +678,7 @@ static void __sch_beacon_process_for_session(struct mac_context *mac_ctx,
 	enum reg_6g_ap_type pwr_type_6g;
 	uint8_t bpcc;
 	bool cu_flag = true;
+	bool is_power_constraint_abs = false;
 
 	if (mlo_is_mld_sta(session->vdev)) {
 		cu_flag = false;
@@ -766,8 +772,9 @@ static void __sch_beacon_process_for_session(struct mac_context *mac_ctx,
 				 &tpe_change);
 
 		if (mac_ctx->mlme_cfg->sta.allow_tpc_from_ap) {
-			get_local_power_constraint_beacon(bcn,
-							  &local_constraint);
+			get_local_power_constraint_beacon(
+						bcn, &local_constraint,
+						&is_power_constraint_abs);
 
 			if (mac_ctx->rrm.rrmPEContext.rrmEnable &&
 			    bcn->powerConstraintPresent)
@@ -779,12 +786,14 @@ static void __sch_beacon_process_for_session(struct mac_context *mac_ctx,
 				mlme_obj->reg_tpc_obj.ap_constraint_power) {
 			mlme_obj->reg_tpc_obj.ap_constraint_power =
 							local_constraint;
+			mlme_obj->reg_tpc_obj.is_power_constraint_abs =
+							is_power_constraint_abs;
 			ap_constraint_change = true;
 		}
 
 		if ((ap_constraint_change && local_constraint) ||
 		    (tpe_change && !skip_tpe)) {
-			lim_calculate_tpc(mac_ctx, session, false);
+			lim_calculate_tpc(mac_ctx, session);
 
 			if (tx_ops->set_tpc_power)
 				tx_ops->set_tpc_power(mac_ctx->psoc,
@@ -798,8 +807,9 @@ static void __sch_beacon_process_for_session(struct mac_context *mac_ctx,
 		local_constraint = regMax;
 
 		if (mac_ctx->mlme_cfg->sta.allow_tpc_from_ap) {
-			get_local_power_constraint_beacon(bcn,
-							  &local_constraint);
+			get_local_power_constraint_beacon(
+						bcn, &local_constraint,
+						&is_power_constraint_abs);
 
 			if (mac_ctx->rrm.rrmPEContext.rrmEnable &&
 			    bcn->powerConstraintPresent) {
@@ -808,6 +818,8 @@ static void __sch_beacon_process_for_session(struct mac_context *mac_ctx,
 				bcn->localPowerConstraint.localPowerConstraints;
 			}
 		}
+		mlme_obj->reg_tpc_obj.is_power_constraint_abs =
+						is_power_constraint_abs;
 		mlme_obj->reg_tpc_obj.reg_max[0] = regMax;
 		mlme_obj->reg_tpc_obj.ap_constraint_power = local_constraint;
 		mlme_obj->reg_tpc_obj.frequency[0] = session->curr_op_freq;

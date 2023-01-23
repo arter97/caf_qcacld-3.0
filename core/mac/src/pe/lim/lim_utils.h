@@ -187,8 +187,6 @@ uint8_t lim_get_max_tx_power(struct mac_context *mac,
  * lim_calculate_tpc() - Utility to get maximum tx power
  * @mac: mac handle
  * @session: PE Session Entry
- * @is_pwr_constraint_absolute: If local power constraint is an absolute
- * value or an offset value.
  *
  * This function is used to get the maximum possible tx power from the list
  * of tx powers mentioned in @attr.
@@ -196,8 +194,7 @@ uint8_t lim_get_max_tx_power(struct mac_context *mac,
  * Return: None
  */
 void lim_calculate_tpc(struct mac_context *mac,
-		       struct pe_session *session,
-		       bool is_pwr_constraint_absolute);
+		       struct pe_session *session);
 
 /* AID pool management functions */
 
