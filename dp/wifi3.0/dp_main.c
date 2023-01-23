@@ -1642,6 +1642,28 @@ static int dp_get_num_msi_available(struct dp_soc *soc, int interrupt_mode)
 }
 #endif
 
+#if defined(IPA_OFFLOAD) && defined(IPA_WDI3_VLAN_SUPPORT)
+static void
+dp_ipa_vlan_srng_msi_setup(struct hal_srng_params *ring_params, int ring_type,
+			   int ring_num)
+{
+	if (wlan_ipa_is_vlan_enabled()) {
+		if ((ring_type == REO_DST) &&
+				(ring_num == IPA_ALT_REO_DEST_RING_IDX)) {
+			ring_params->msi_addr = 0;
+			ring_params->msi_data = 0;
+			ring_params->flags &= ~HAL_SRNG_MSI_INTR;
+		}
+	}
+}
+#else
+static inline void
+dp_ipa_vlan_srng_msi_setup(struct hal_srng_params *ring_params, int ring_type,
+			   int ring_num)
+{
+}
+#endif
+
 static void dp_srng_msi_setup(struct dp_soc *soc, struct dp_srng *srng,
 			      struct hal_srng_params *ring_params,
 			      int ring_type, int ring_num)
@@ -1703,6 +1725,8 @@ static void dp_srng_msi_setup(struct dp_soc *soc, struct dp_srng *srng,
 	ring_params->msi_data = (reg_msi_grp_num % msi_data_count)
 		+ msi_data_start;
 	ring_params->flags |= HAL_SRNG_MSI_INTR;
+
+	dp_ipa_vlan_srng_msi_setup(ring_params, ring_type, ring_num);
 
 	dp_debug("ring type %u ring_num %u msi->data %u msi_addr %llx",
 		 ring_type, ring_num, ring_params->msi_data,
