@@ -1622,7 +1622,6 @@ void dp_mld_peer_add_link_peer(struct dp_peer *mld_peer,
 {
 	int i;
 	struct dp_peer_link_info *link_peer_info;
-	bool action_done = false;
 	struct dp_soc *soc = mld_peer->vdev->pdev->soc;
 
 	qdf_spin_lock_bh(&mld_peer->link_peers_info_lock);
@@ -1637,27 +1636,22 @@ void dp_mld_peer_add_link_peer(struct dp_peer *mld_peer,
 			link_peer_info->chip_id =
 				dp_mlo_get_chip_id(link_peer->vdev->pdev->soc);
 			mld_peer->num_links++;
-			action_done = true;
 			break;
 		}
 	}
 	qdf_spin_unlock_bh(&mld_peer->link_peers_info_lock);
 
-	if (i == DP_MAX_MLO_LINKS)
-		dp_err("fail to add link peer" QDF_MAC_ADDR_FMT "to mld peer",
-		       QDF_MAC_ADDR_REF(link_peer->mac_addr.raw));
-	else
-		dp_peer_info("%s addition of link peer %pK (" QDF_MAC_ADDR_FMT ") "
-			     "to MLD peer %pK (" QDF_MAC_ADDR_FMT "), "
-			     "idx %u num_links %u",
-			     action_done ? "Successful" : "Failed",
-			     mld_peer, QDF_MAC_ADDR_REF(mld_peer->mac_addr.raw),
-			     link_peer, QDF_MAC_ADDR_REF(link_peer->mac_addr.raw),
-			     i, mld_peer->num_links);
+	dp_peer_info("%s addition of link peer %pK (" QDF_MAC_ADDR_FMT ") "
+		     "to MLD peer %pK (" QDF_MAC_ADDR_FMT "), "
+		     "idx %u num_links %u",
+		     (i != DP_MAX_MLO_LINKS) ? "Successful" : "Failed",
+		     link_peer, QDF_MAC_ADDR_REF(link_peer->mac_addr.raw),
+		     mld_peer, QDF_MAC_ADDR_REF(mld_peer->mac_addr.raw),
+		     i, mld_peer->num_links);
 
 	dp_cfg_event_record_mlo_link_delink_evt(soc, DP_CFG_EVENT_MLO_ADD_LINK,
 						mld_peer, link_peer, i,
-						action_done ? 1 : 0);
+						(i != DP_MAX_MLO_LINKS) ? 1 : 0);
 }
 
 /**
@@ -1674,7 +1668,6 @@ uint8_t dp_mld_peer_del_link_peer(struct dp_peer *mld_peer,
 	int i;
 	struct dp_peer_link_info *link_peer_info;
 	uint8_t num_links;
-	bool action_done = false;
 	struct dp_soc *soc = mld_peer->vdev->pdev->soc;
 
 	qdf_spin_lock_bh(&mld_peer->link_peers_info_lock);
@@ -1685,28 +1678,23 @@ uint8_t dp_mld_peer_del_link_peer(struct dp_peer *mld_peer,
 					&link_peer_info->mac_addr)) {
 			link_peer_info->is_valid = false;
 			mld_peer->num_links--;
-			action_done = true;
 			break;
 		}
 	}
 	num_links = mld_peer->num_links;
 	qdf_spin_unlock_bh(&mld_peer->link_peers_info_lock);
 
-	if (i == DP_MAX_MLO_LINKS)
-		dp_err("fail to del link peer" QDF_MAC_ADDR_FMT "to mld peer",
-		       QDF_MAC_ADDR_REF(link_peer->mac_addr.raw));
-	else
-		dp_peer_info("%s deletion of link peer %pK (" QDF_MAC_ADDR_FMT ") "
-			     "from MLD peer %pK (" QDF_MAC_ADDR_FMT "), "
-			     "idx %u num_links %u",
-			     action_done ? "Successful" : "Failed",
-			     mld_peer, QDF_MAC_ADDR_REF(mld_peer->mac_addr.raw),
-			     link_peer, QDF_MAC_ADDR_REF(link_peer->mac_addr.raw),
-			     i, mld_peer->num_links);
+	dp_peer_info("%s deletion of link peer %pK (" QDF_MAC_ADDR_FMT ") "
+		     "from MLD peer %pK (" QDF_MAC_ADDR_FMT "), "
+		     "idx %u num_links %u",
+		     (i != DP_MAX_MLO_LINKS) ? "Successful" : "Failed",
+		     link_peer, QDF_MAC_ADDR_REF(link_peer->mac_addr.raw),
+		     mld_peer, QDF_MAC_ADDR_REF(mld_peer->mac_addr.raw),
+		     i, mld_peer->num_links);
 
 	dp_cfg_event_record_mlo_link_delink_evt(soc, DP_CFG_EVENT_MLO_DEL_LINK,
 						mld_peer, link_peer, i,
-						action_done ? 1 : 0);
+						(i != DP_MAX_MLO_LINKS) ? 1 : 0);
 
 	return num_links;
 }
