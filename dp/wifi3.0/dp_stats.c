@@ -9326,11 +9326,13 @@ dp_get_pdev_deter_stats(struct cdp_soc_t *soc_hdl, uint8_t pdev_id,
 }
 
 QDF_STATUS
-dp_get_peer_deter_stats(struct cdp_soc_t *soc_hdl, uint8_t *addr,
+dp_get_peer_deter_stats(struct cdp_soc_t *soc_hdl,
+			uint8_t vdev_id,
+			uint8_t *addr,
 			struct cdp_peer_deter_stats *stats)
 {
 	struct dp_soc *soc = (struct dp_soc *)soc_hdl;
-	struct dp_peer *peer = dp_peer_find_hash_find(soc, addr, 0, DP_VDEV_ALL,
+	struct dp_peer *peer = dp_peer_find_hash_find(soc, addr, 0, vdev_id,
 						      DP_MOD_ID_MISC);
 
 	if (!peer)

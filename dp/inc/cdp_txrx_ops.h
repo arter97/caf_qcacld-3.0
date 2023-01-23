@@ -1252,6 +1252,7 @@ struct cdp_host_stats_ops {
 	QDF_STATUS
 		(*txrx_peer_deter_stats)(
 				struct cdp_soc_t *soc,
+				uint8_t vdev_id,
 				uint8_t *addr,
 				struct cdp_peer_deter_stats *stats);
 	QDF_STATUS

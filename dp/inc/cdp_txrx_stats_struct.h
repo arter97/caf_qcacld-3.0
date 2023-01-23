@@ -162,6 +162,7 @@
 #define CDP_PPDU_STATS_MAX_TAG 14
 #define CDP_MAX_DATA_TIDS 9
 #define CDP_MAX_VOW_TID 4
+#define CDP_VDEV_ALL 0xff
 
 #define CDP_MAX_TIDS 17
 

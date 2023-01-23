@@ -1065,6 +1065,7 @@ static inline QDF_STATUS cdp_get_pdev_deter_stats(
 /**
  * cdp_get_peer_deter_stats(): function to get peer deterministic stats
  * @soc: soc handle
+ * @vdev_id: id of vdev handle
  * @addr: peer address
  * @stats: pointer to peer telemetry stats
  *
@@ -1072,6 +1073,7 @@ static inline QDF_STATUS cdp_get_pdev_deter_stats(
  */
 static inline QDF_STATUS cdp_get_peer_deter_stats(
 				ol_txrx_soc_handle soc,
+				uint8_t vdev_id,
 				uint8_t *addr,
 				struct cdp_peer_deter_stats *stats)
 {
@@ -1086,7 +1088,7 @@ static inline QDF_STATUS cdp_get_peer_deter_stats(
 		return QDF_STATUS_E_FAILURE;
 
 	return soc->ops->host_stats_ops->txrx_peer_deter_stats(
-					soc, addr, stats);
+					soc, vdev_id, addr, stats);
 }
 
 /**

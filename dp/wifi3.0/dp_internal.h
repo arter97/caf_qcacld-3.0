@@ -4231,6 +4231,7 @@ dp_get_peer_telemetry_stats(struct cdp_soc_t *soc_hdl, uint8_t *addr,
 /*
  * dp_get_peer_deter_stats- API to get peer deterministic stats
  * @soc_hdl: soc handle
+ * @vdev_id: id of vdev handle
  * @addr: peer mac
  * @stats: pointer to peer deterministic stats
  *
@@ -4238,7 +4239,9 @@ dp_get_peer_telemetry_stats(struct cdp_soc_t *soc_hdl, uint8_t *addr,
  *         QDF_STATUS_E_FAILURE: Error
  */
 QDF_STATUS
-dp_get_peer_deter_stats(struct cdp_soc_t *soc_hdl, uint8_t *addr,
+dp_get_peer_deter_stats(struct cdp_soc_t *soc_hdl,
+			uint8_t vdev_id,
+			uint8_t *addr,
 			struct cdp_peer_deter_stats *stats);
 
 /*
