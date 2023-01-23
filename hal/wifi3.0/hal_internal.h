@@ -767,8 +767,8 @@ struct hal_reo_params {
 	uint8_t frag_dst_ring;
 	/* Destination for alternate */
 	uint8_t alt_dst_ind_0;
-	/** padding */
-	uint8_t padding[2];
+	/* reo_qref struct for mlo and non mlo table */
+	struct reo_queue_ref_table *reo_qref;
 };
 
 /**
@@ -817,6 +817,22 @@ struct hal_rx_pkt_capture_flags {
 	uint32_t chan_freq;
 	uint32_t rssi_comb;
 	uint64_t tsft;
+};
+
+/**
+ * struct reo_queue_ref_table - Reo qref LUT addr
+ * @mlo_reo_qref_table_vaddr: MLO table vaddr
+ * @non_mlo_reo_qref_table_vaddr: Non MLO table vaddr
+ * @mlo_reo_qref_table_paddr: MLO table paddr
+ * @non_mlo_reo_qref_table_paddr: Non MLO table paddr
+ * @reo_qref_table_en: Enable flag
+ */
+struct reo_queue_ref_table {
+	uint64_t *mlo_reo_qref_table_vaddr;
+	uint64_t *non_mlo_reo_qref_table_vaddr;
+	qdf_dma_addr_t mlo_reo_qref_table_paddr;
+	qdf_dma_addr_t non_mlo_reo_qref_table_paddr;
+	uint8_t reo_qref_table_en;
 };
 
 struct hal_hw_txrx_ops {
@@ -1177,7 +1193,9 @@ struct hal_hw_txrx_ops {
 	uint32_t (*hal_txmon_status_get_num_users)(void *tx_tlv_hdr,
 						   uint8_t *num_users);
 #endif /* QCA_MONITOR_2_0_SUPPORT */
-	void (*hal_reo_shared_qaddr_setup)(hal_soc_handle_t hal_soc_hdl);
+	QDF_STATUS (*hal_reo_shared_qaddr_setup)(hal_soc_handle_t hal_soc_hdl,
+						 struct reo_queue_ref_table
+						 *reo_qref);
 	void (*hal_reo_shared_qaddr_init)(hal_soc_handle_t hal_soc_hdl,
 					  int qref_reset);
 	void (*hal_reo_shared_qaddr_detach)(hal_soc_handle_t hal_soc_hdl);
@@ -1268,22 +1286,6 @@ struct hal_reg_write_fail_history {
 	struct hal_reg_write_fail_entry record[HAL_REG_WRITE_HIST_SIZE];
 };
 #endif
-
-/**
- * struct reo_queue_ref_table - Reo qref LUT addr
- * @mlo_reo_qref_table_vaddr: MLO table vaddr
- * @non_mlo_reo_qref_table_vaddr: Non MLO table vaddr
- * @mlo_reo_qref_table_paddr: MLO table paddr
- * @non_mlo_reo_qref_table_paddr: Non MLO table paddr
- * @reo_qref_table_en: Enable flag
- */
-struct reo_queue_ref_table {
-	uint64_t *mlo_reo_qref_table_vaddr;
-	uint64_t *non_mlo_reo_qref_table_vaddr;
-	qdf_dma_addr_t mlo_reo_qref_table_paddr;
-	qdf_dma_addr_t non_mlo_reo_qref_table_paddr;
-	uint8_t reo_qref_table_en;
-};
 
 /**
  * union hal_shadow_reg_cfg - Shadow register config

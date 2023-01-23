@@ -6971,6 +6971,7 @@ dp_soc_attach_target_wifi3(struct cdp_soc_t *cdp_soc)
 	if (wlan_cfg_get_dp_soc_nss_cfg(soc->wlan_cfg_ctx))
 		reo_params.alt_dst_ind_0 = REO_REMAP_RELEASE;
 
+	reo_params.reo_qref = &soc->reo_qref;
 	hal_reo_setup(soc->hal_soc, &reo_params, 1);
 
 	hal_reo_set_err_dst_remap(soc->hal_soc);
@@ -13466,6 +13467,7 @@ static void dp_set_umac_regs(struct dp_soc *soc)
 			reo_params.rx_hash_enabled = false;
 	}
 
+	reo_params.reo_qref = &soc->reo_qref;
 	hal_reo_setup(soc->hal_soc, &reo_params, 0);
 
 	soc->arch_ops.dp_cc_reg_cfg_init(soc, true);
@@ -15259,6 +15261,13 @@ dp_soc_attach(struct cdp_ctrl_objmgr_psoc *ctrl_psoc,
 		}
 	}
 
+	if (hal_reo_shared_qaddr_setup((hal_soc_handle_t)soc->hal_soc,
+				       &soc->reo_qref)
+	    != QDF_STATUS_SUCCESS) {
+		dp_err("unable to setup reo shared qaddr");
+		goto fail9;
+       }
+
 	if (dp_sysfs_initialize_stats(soc) != QDF_STATUS_SUCCESS) {
 		dp_err("failed to initialize dp stats sysfs file");
 		dp_sysfs_deinitialize_stats(soc);
@@ -15274,6 +15283,9 @@ dp_soc_attach(struct cdp_ctrl_objmgr_psoc *ctrl_psoc,
 		qdf_skb_total_mem_stats_read());
 
 	return soc;
+fail9:
+       if (!dp_monitor_modularized_enable())
+               dp_mon_soc_detach_wrapper(soc);
 fail8:
 	dp_soc_tx_desc_sw_pools_free(soc);
 fail7:

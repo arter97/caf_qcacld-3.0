@@ -1108,8 +1108,6 @@ void *hal_attach(struct hif_opaque_softc *hif_handle, qdf_device_t qdf_dev)
 	qdf_atomic_init(&hal->active_work_cnt);
 	hal_delayed_reg_write_init(hal);
 
-	hal_reo_shared_qaddr_setup((hal_soc_handle_t)hal);
-
 	hif_rtpm_register(HIF_RTPM_ID_HAL_REO_CMD, NULL);
 
 	return (void *)hal;
