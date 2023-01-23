@@ -1529,27 +1529,6 @@ struct qdf_tso_info_t {
 	uint32_t msdu_stats_idx;
 };
 
-/*
- * Used to set classify bit in CE desc.
- */
-#define QDF_CE_TX_CLASSIFY_BIT_S   5
-
-/**
- * QDF_CE_TX_PKT_TYPE_BIT_S - 2 bits starting at bit 6 in CE desc.
- */
-#define QDF_CE_TX_PKT_TYPE_BIT_S   6
-
-/**
- * QDF_CE_TX_PKT_OFFSET_BIT_S - 12 bits --> 16-27, in the CE descriptor
- *  the length of HTT/HTC descriptor
- */
-#define QDF_CE_TX_PKT_OFFSET_BIT_S  16
-
-/**
- * QDF_CE_TX_PKT_OFFSET_BIT_M - Mask for packet offset in the CE descriptor.
- */
-#define QDF_CE_TX_PKT_OFFSET_BIT_M   0x0fff0000
-
 /**
  * enum qdf_suspend_type - type of suspend
  * @QDF_SYSTEM_SUSPEND: System suspend triggered wlan suspend

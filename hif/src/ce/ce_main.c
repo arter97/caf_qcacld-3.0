@@ -2871,7 +2871,7 @@ hif_send_head(struct hif_opaque_softc *hif_ctx,
 		 * Clear the packet offset for all but the first CE desc.
 		 */
 		if (i++ > 0)
-			data_attr &= ~QDF_CE_TX_PKT_OFFSET_BIT_M;
+			data_attr &= ~CE_DESC_PKT_OFFSET_BIT_M;
 
 		status = ce_sendlist_buf_add(&sendlist, frag_paddr,
 				    frag_bytes >

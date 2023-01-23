@@ -22,6 +22,32 @@
 
 #include <hif.h>                /* A_TARGET_WRITE */
 
+#ifndef QCA_WIFI_WCN6450
+/* Mask for packet offset in the CE descriptor */
+#define CE_DESC_PKT_OFFSET_BIT_M 0x0FFF0000
+
+/* Packet offset start bit position in CE descriptor */
+#define CE_DESC_PKT_OFFSET_BIT_S 16
+
+/* Packet type start bit position in CE descriptor */
+#define CE_DESC_PKT_TYPE_BIT_S 6
+
+/* Tx classify start bit position in CE descriptor */
+#define CE_DESC_TX_CLASSIFY_BIT_S 5
+#else
+/* Mask for packet offset in the CE descriptor */
+#define CE_DESC_PKT_OFFSET_BIT_M 0x7FF80000
+
+/* Packet offset start bit position in CE descriptor */
+#define CE_DESC_PKT_OFFSET_BIT_S  19
+
+/* Packet type start bit position in CE descriptor */
+#define CE_DESC_PKT_TYPE_BIT_S   9
+
+/* Tx classify start bit position in CE descriptor */
+#define CE_DESC_TX_CLASSIFY_BIT_S   8
+#endif
+
 /* Copy Engine operational state */
 enum CE_op_state {
 	CE_UNUSED,
