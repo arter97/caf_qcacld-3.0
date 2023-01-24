@@ -243,7 +243,8 @@ static inline void hal_tx_init_cmd_credit_ring(hal_soc_handle_t hal_soc_hdl,
  *                            that window would be a bug
  */
 #if !defined(QCA_WIFI_QCA6390) && !defined(QCA_WIFI_QCA6490) && \
-    !defined(QCA_WIFI_QCA6750) && !defined(QCA_WIFI_KIWI)
+    !defined(QCA_WIFI_QCA6750) && !defined(QCA_WIFI_KIWI) && \
+    !defined(QCA_WIFI_WCN6450)
 static inline void hal_write32_mb(struct hal_soc *hal_soc, uint32_t offset,
 				  uint32_t value)
 {
@@ -486,7 +487,8 @@ static inline void hal_srng_write_address_32_mb(struct hal_soc *hal_soc,
 #endif
 
 #if !defined(QCA_WIFI_QCA6390) && !defined(QCA_WIFI_QCA6490) && \
-    !defined(QCA_WIFI_QCA6750) && !defined(QCA_WIFI_KIWI)
+    !defined(QCA_WIFI_QCA6750) && !defined(QCA_WIFI_KIWI) && \
+    !defined(QCA_WIFI_WCN6450)
 /**
  * hal_read32_mb() - Access registers to read configuration
  * @hal_soc: hal soc handle

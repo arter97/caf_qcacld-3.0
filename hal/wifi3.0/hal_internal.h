@@ -173,6 +173,7 @@ union hal_tx_cmn_config_ppe;
 union hal_tx_bank_config;
 union hal_tx_ppe_idx_map_config;
 
+#ifndef WLAN_SOFTUMAC_SUPPORT
 /* TBD: This should be movded to shared HW header file */
 enum hal_srng_ring_id {
 	/* UMAC rings */
@@ -317,6 +318,45 @@ enum hal_srng_ring_id {
 	HAL_SRNG_SW2TXMON_BUF0,
 	HAL_SRNG_LMAC1_ID_END = (HAL_SRNG_SW2TXMON_BUF0 + 2),
 };
+#else
+/* lmac rings are remains same for evros */
+enum hal_srng_ring_id {
+	HAL_SRNG_LMAC1_ID_START,
+	HAL_SRNG_WMAC1_SW2RXDMA0_BUF0 = HAL_SRNG_LMAC1_ID_START,
+#ifdef IPA_OFFLOAD
+	HAL_SRNG_WMAC1_SW2RXDMA0_BUF1,
+	HAL_SRNG_WMAC1_SW2RXDMA0_BUF2,
+#ifdef IPA_WDI3_VLAN_SUPPORT
+	HAL_SRNG_WMAC1_SW2RXDMA0_BUF3,
+#endif
+#endif
+	HAL_SRNG_WMAC1_SW2RXDMA1_BUF,
+#ifdef FEATURE_DIRECT_LINK
+	HAL_SRNG_WMAC1_RX_DIRECT_LINK_SW_REFILL_RING,
+#endif
+	HAL_SRNG_WMAC1_SW2RXDMA2_BUF,
+	HAL_SRNG_WMAC1_SW2RXDMA0_STATBUF,
+	HAL_SRNG_WMAC1_SW2RXDMA1_STATBUF,
+	HAL_SRNG_WMAC1_RXDMA2SW0,
+	HAL_SRNG_WMAC1_RXDMA2SW1,
+	HAL_SRNG_WMAC1_RXMON2SW0 = HAL_SRNG_WMAC1_RXDMA2SW1,
+	HAL_SRNG_WMAC1_SW2RXDMA1_DESC,
+#ifdef WLAN_FEATURE_CIF_CFR
+	HAL_SRNG_WIFI_POS_SRC_DMA_RING,
+	HAL_SRNG_DIR_BUF_RX_SRC_DMA_RING,
+	HAL_SRNG_DIR_BUF_RX_SRC_DMA_RING1,
+#else
+	HAL_SRNG_DIR_BUF_RX_SRC_DMA_RING,
+	HAL_SRNG_DIR_BUF_RX_SRC_DMA_RING1,
+#endif
+	HAL_SRNG_WMAC1_TXMON2SW0,
+	HAL_SRNG_SW2TXMON_BUF0,
+	HAL_SRNG_LMAC1_ID_END = (HAL_SRNG_SW2TXMON_BUF0 + 2),
+};
+
+#define HAL_SRNG_DMAC_CMN_ID_END 0
+#define HAL_SRNG_WBM_IDLE_LINK 120
+#endif
 
 #define HAL_RXDMA_MAX_RING_SIZE 0xFFFF
 #define HAL_MAX_LMACS 3
@@ -1554,6 +1594,7 @@ void hal_kiwi_attach(struct hal_soc *hal_soc);
 
 void hal_qcn9224v1_attach(struct hal_soc *hal_soc);
 void hal_qcn9224v2_attach(struct hal_soc *hal_soc);
+void hal_wcn6450_attach(struct hal_soc *hal_soc);
 
 /**
  * hal_soc_to_hal_soc_handle() - API to convert hal_soc to opaque

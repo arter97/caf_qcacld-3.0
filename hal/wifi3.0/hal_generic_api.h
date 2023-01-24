@@ -157,29 +157,6 @@ void hal_get_hw_hptp_generic(struct hal_soc *hal_soc,
 	}
 }
 
-#if defined(WBM_IDLE_LSB_WRITE_CONFIRM_WAR)
-/**
- * hal_wbm_idle_lsb_write_confirm() - Check and update WBM_IDLE_LINK ring LSB
- * @srng: srng handle
- *
- * Return: None
- */
-static void hal_wbm_idle_lsb_write_confirm(struct hal_srng *srng)
-{
-	if (srng->ring_id == HAL_SRNG_WBM_IDLE_LINK) {
-		while (SRNG_SRC_REG_READ(srng, BASE_LSB) !=
-		       ((unsigned int)srng->ring_base_paddr & 0xffffffff))
-				SRNG_SRC_REG_WRITE(srng, BASE_LSB,
-						   srng->ring_base_paddr &
-						   0xffffffff);
-	}
-}
-#else
-static void hal_wbm_idle_lsb_write_confirm(struct hal_srng *srng)
-{
-}
-#endif
-
 #ifdef DP_UMAC_HW_RESET_SUPPORT
 /**
  * hal_srng_src_hw_write_cons_prefetch_timer() - Write cons prefetch timer reg
@@ -229,6 +206,31 @@ void hal_srng_src_hw_write_cons_prefetch_timer(struct hal_srng *srng,
 {
 }
 #endif
+
+#ifndef WLAN_SOFTUMAC_SUPPORT
+#if defined(WBM_IDLE_LSB_WRITE_CONFIRM_WAR)
+/**
+ * hal_wbm_idle_lsb_write_confirm() - Check and update WBM_IDLE_LINK ring LSB
+ * @srng: srng handle
+ *
+ * Return: None
+ */
+static void hal_wbm_idle_lsb_write_confirm(struct hal_srng *srng)
+{
+	if (srng->ring_id == HAL_SRNG_WBM_IDLE_LINK) {
+		while (SRNG_SRC_REG_READ(srng, BASE_LSB) !=
+		       ((unsigned int)srng->ring_base_paddr & 0xffffffff))
+				SRNG_SRC_REG_WRITE(srng, BASE_LSB,
+						   srng->ring_base_paddr &
+						   0xffffffff);
+	}
+}
+#else
+static void hal_wbm_idle_lsb_write_confirm(struct hal_srng *srng)
+{
+}
+#endif
+
 /**
  * hal_srng_src_hw_init_generic() - Private function to initialize SRNG
  *                                  source ring HW
@@ -587,6 +589,7 @@ static inline void hal_srng_hw_reg_offset_init_generic(struct hal_soc *hal_soc)
 				REG_OFFSET(SRC, CONSUMER_PREFETCH_TIMER);
 #endif
 }
+#endif
 
 #ifdef FEATURE_DIRECT_LINK
 /**
