@@ -108,6 +108,9 @@ static inline void qdf_list_create(__qdf_list_t *list, uint32_t max_size)
 #define qdf_list_for_each_from(list_ptr, cursor, node_field) \
 	__qdf_list_for_each_from(list_ptr, cursor, node_field)
 
+#define qdf_list_for_each_continue(list_ptr, cursor, node_field) \
+	__qdf_list_for_each_continue(list_ptr, cursor, node_field)
+
 #define qdf_list_first_entry_or_null(list_ptr, type, node_field) \
 	__qdf_list_first_entry_or_null(list_ptr, type, node_field)
 

@@ -98,6 +98,9 @@ static inline uint32_t __qdf_list_max_size(__qdf_list_t *list)
 #define __qdf_list_for_each_from(list_ptr, cursor, node_field) \
 	list_for_each_entry_from(cursor, &(list_ptr)->anchor, node_field)
 
+#define __qdf_list_for_each_continue(list_ptr, cursor, node_field) \
+	list_for_each_entry_continue(cursor, &(list_ptr)->anchor, node_field)
+
 #define  __qdf_list_first_entry_or_null(list_ptr, type, node_field) \
 	list_first_entry_or_null(&(list_ptr)->anchor, type, node_field)
 
