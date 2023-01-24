@@ -218,7 +218,7 @@ struct mgmt_rx_reo_global_ts_info {
 };
 
 /**
- * struct mgmt_rx_reo_list – Linked list used to reorder the management frames
+ * struct mgmt_rx_reo_list - Linked list used to reorder the management frames
  * received. Each list entry would correspond to a management frame. List
  * entries would be sorted in the same order in which they are received by MAC
  * HW.

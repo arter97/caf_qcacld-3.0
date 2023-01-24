@@ -329,7 +329,7 @@ wlan_mgmt_rx_reo_is_feature_enabled_at_psoc(struct wlan_objmgr_psoc *psoc);
 /**
  * wlan_mgmt_rx_reo_is_feature_enabled_at_pdev() - Check if MGMT Rx REO feature
  * is enabled on a given pdev
- * @psoc: pointer to pdev object
+ * @pdev: pointer to pdev object
  *
  * Return: true if the feature is enabled, else false
  */

@@ -911,6 +911,7 @@ struct mlo_bcast_t2lm_info {
  * @pn_params: Frame PN params
  * @ext_params: Extended params
  * @is_conn_ap: Frame is from connected ap
+ * @cu_params: MLO MGMT Critical Update params
  * @link_removal_info: MLO link removal information array
  * @num_link_removal_info: Number of elements in @link_removal_info
  * @t2lm_params: T2LM related info received from FW
@@ -1026,7 +1027,8 @@ free_mgmt_rx_event_params(struct mgmt_rx_event_params *rx_params)
 #endif
 
 /**
- * mgmt_tx_download_comp_cb - function pointer for tx download completions.
+ * typedef mgmt_tx_download_comp_cb() - function pointer for tx download
+ *                                      completions.
  * @context: caller component specific context
  * @buf: buffer
  * @free: to free/not free the buffer
@@ -1040,7 +1042,7 @@ typedef QDF_STATUS (*mgmt_tx_download_comp_cb)(void *context,
 					 qdf_nbuf_t buf, bool free);
 
 /**
- * mgmt_ota_comp_cb - function pointer for tx ota completions.
+ * typedef mgmt_ota_comp_cb() - function pointer for tx ota completions.
  * @context: caller component specific context
  * @buf: buffer
  * @status: tx completion status
@@ -1054,7 +1056,8 @@ typedef QDF_STATUS (*mgmt_ota_comp_cb)(void *context, qdf_nbuf_t buf,
 				 uint32_t status, void *tx_compl_params);
 
 /**
- * mgmt_frame_rx_callback - function pointer for receiving mgmt rx frames
+ * typedef mgmt_frame_rx_callback() - function pointer for receiving mgmt
+ *                                    rx frames
  * @psoc: psoc context
  * @peer: peer
  * @buf: buffer
@@ -1073,7 +1076,7 @@ typedef QDF_STATUS (*mgmt_frame_rx_callback)(
 			enum mgmt_frame_type frm_type);
 
 /**
- * mgmt_frame_fill_peer_cb - Function pointer to fill peer in the buf
+ * typedef mgmt_frame_fill_peer_cb() - Function pointer to fill peer in the buf
  * @peer: peer
  * @buf: buffer
  *
@@ -1122,8 +1125,8 @@ QDF_STATUS wlan_mgmt_txrx_deinit(void);
  * @peer: peer
  * @context: caller component specific context
  * @buf: buffer to be transmitted
- * @comp_cb: download completion cb function
- * @ota_cb: post processing cb function
+ * @tx_comp_cb: download completion cb function
+ * @tx_ota_comp_cb: post processing cb function
  * @comp_id: umac component id
  * @mgmt_tx_params: mgmt tx params
  *
@@ -1148,7 +1151,7 @@ bool wlan_mgmt_is_rmf_mgmt_action_frame(uint8_t action_category);
 
 /**
  * wlan_mgmt_txrx_beacon_frame_tx() - transmits mgmt. beacon
- * @psoc: psoc context
+ * @peer: peer context
  * @buf: buffer to be transmitted
  * @comp_id: umac component id
  *

@@ -302,6 +302,8 @@ mgmt_rx_reo_handle_stale_frame(struct mgmt_rx_reo_list *reo_list,
 #else
 /**
  * mgmt_rx_reo_sim_is_valid_link() - Check whether the given HW link is valid
+ * @sim_context: Pointer to reo simulation context object
+ * @link_id: Link id to be checked
  *
  * Return: true if @link_id is a valid link, else false
  */
@@ -333,8 +335,8 @@ mgmt_rx_reo_sim_is_valid_link(struct mgmt_rx_reo_sim_context *sim_context,
 
 /**
  * mgmt_rx_reo_is_valid_link() - Check whether the given HW link is valid
+ * @ml_grp_id: MLO Group id on which the Link ID  belongs to
  * @link_id: HW Link ID to be verified
- * @grp_id: MLO Group id on which the Link ID  belongs to
  *
  * Return: true if @link_id is a valid link else false
  */
@@ -389,6 +391,7 @@ mgmt_rx_reo_sim_get_num_mlo_links(struct mgmt_rx_reo_sim_context *sim_context)
  * mgmt_rx_reo_get_num_mlo_links() - Get number of MLO links from the reo
  * context object
  * @reo_context: Pointer to reo context object
+ * @grp_id: MLO Group id which it belongs to
  *
  * Return: On success returns number of MLO HW links. On failure
  * returns WLAN_MLO_INVALID_NUM_LINKS.
@@ -1415,7 +1418,7 @@ print_wait_count:
 	return QDF_STATUS_SUCCESS;
 }
 
-/*
+/**
  * struct mgmt_rx_reo_list_entry_debug_info - This structure holds the necessary
  * information about a reo list entry for debug purposes.
  * @link_id: link id
@@ -1716,6 +1719,7 @@ mgmt_rx_reo_log_egress_frame_before_delivery(
  * delivery to upper layer.
  * @reo_ctx: management rx reorder context
  * @entry: Pointer to reorder list entry
+ * @link_id: multi-link link ID
  *
  * Return: QDF_STATUS of operation
  */
@@ -3535,7 +3539,6 @@ failure:
  * mgmt_rx_reo_sim_init() - Initialize management rx reorder simulation
  * context.
  * @reo_context: Pointer to reo context
- * @ml_grp_id: MLO group id which it belongs to
  *
  * Return: QDF_STATUS of operation
  */
@@ -4547,7 +4550,7 @@ mgmt_rx_reo_sim_mac_hw_thread(void *data)
 /**
  * mgmt_rx_reo_sim_init_master_frame_list() - Initializes the master
  * management frame list
- * @pending_frame_list: Pointer to master frame list
+ * @master_frame_list: Pointer to master frame list
  *
  * This API initializes the master management frame list
  *
@@ -4925,7 +4928,6 @@ mgmt_rx_reo_sim_stop(uint8_t ml_grp_id)
  * mgmt_rx_reo_sim_init() - Initialize management rx reorder simulation
  * context.
  * @reo_context: Pointer to reo context
- * @ml_grp_id: MLO Group ID which it belongs to
  *
  * Return: QDF_STATUS of operation
  */

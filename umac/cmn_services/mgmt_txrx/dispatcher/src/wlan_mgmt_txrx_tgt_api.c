@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2016-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -473,7 +473,7 @@ mgmt_get_wnm_action_subtype(uint8_t action_code)
 }
 
 /**
- * mgmt_get_wnm_action_subtype() - gets tdls action subtype
+ * mgmt_get_tdls_action_subtype() - gets tdls action subtype
  * @action_code: action code
  *
  * This function returns the subtype for tdls action
@@ -1063,8 +1063,8 @@ static QDF_STATUS simulation_frame_update(struct wlan_objmgr_psoc *psoc,
 
 /**
  * wlan_mgmt_rx_beacon_rate_limit() - rate limiting mgmt beacons
- * @psoc - pointer to psoc struct
- * @mgmt_rx_params - rx params
+ * @psoc: pointer to psoc struct
+ * @mgmt_rx_params: rx params
  *
  * This function will drop the beacons if the number of beacons
  * received is greater than the percentage of limit of beacons to max
