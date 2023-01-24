@@ -29,6 +29,7 @@
 #ifdef QCA_SUPPORT_CP_STATS
 
 #include <wlan_cp_stats_ic_dcs_defs.h>
+#include <wlan_cp_stats_public_structs.h>
 
 #if defined(WLAN_SUPPORT_TWT) && defined(WLAN_TWT_CONV_SUPPORTED)
 
@@ -114,6 +115,7 @@ struct pdev_hw_stats {
  *                             BIT[16-23] : AC_VI
  *                             BIT[24-31] : AC_VO
  * @pdev_freetime_per_sec: The link idle time per sec when no tx/rx happens
+ * @telemetry_stats: Airtime related telemetry stats
  */
 struct pdev_80211_stats {
 	uint64_t cs_tx_beacon;
@@ -162,6 +164,7 @@ struct pdev_80211_stats {
 	uint32_t estimated_air_time_per_ac;
 #ifdef WLAN_TELEMETRY_STATS_SUPPORT
 	uint8_t pdev_freetime_per_sec;
+	struct ctrl_path_pmlo_telemetry_stats_struct telemetry_stats;
 #endif
 };
 
