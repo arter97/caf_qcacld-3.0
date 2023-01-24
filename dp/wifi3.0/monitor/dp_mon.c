@@ -1426,15 +1426,21 @@ void dp_peer_get_tx_rx_stats(struct dp_peer *peer,
 {
 	struct dp_txrx_peer *txrx_peer = NULL;
 	struct dp_peer *tgt_peer = NULL;
+	uint8_t inx = 0;
+	uint8_t stats_arr_size;
 
 	tgt_peer = dp_get_tgt_peer_from_peer(peer);
 	txrx_peer = tgt_peer->txrx_peer;
 	peer_stats_intf->rx_packet_count = txrx_peer->to_stack.num;
 	peer_stats_intf->rx_byte_count = txrx_peer->to_stack.bytes;
-	peer_stats_intf->tx_packet_count =
-			txrx_peer->stats.per_pkt_stats.tx.ucast.num;
-	peer_stats_intf->tx_byte_count =
-			txrx_peer->stats.per_pkt_stats.tx.tx_success.bytes;
+	stats_arr_size = txrx_peer->stats_arr_size;
+
+	for (inx = 0; inx < stats_arr_size; inx++) {
+		peer_stats_intf->tx_packet_count +=
+			txrx_peer->stats[inx].per_pkt_stats.tx.ucast.num;
+		peer_stats_intf->tx_byte_count +=
+			txrx_peer->stats[inx].per_pkt_stats.tx.tx_success.bytes;
+	}
 }
 #endif
 
@@ -2404,6 +2410,8 @@ dp_peer_cal_clients_stats_update(struct dp_soc *soc,
 	struct cdp_calibr_stats_intf peer_stats_intf = {0};
 	struct dp_peer *tgt_peer = NULL;
 	struct dp_txrx_peer *txrx_peer = NULL;
+	uint8_t inx = 0;
+	uint8_t stats_arr_size;
 
 	if (!dp_peer_is_primary_link_peer(peer))
 		return;
@@ -2414,10 +2422,18 @@ dp_peer_cal_clients_stats_update(struct dp_soc *soc,
 
 	txrx_peer = tgt_peer->txrx_peer;
 	peer_stats_intf.to_stack = txrx_peer->to_stack;
-	peer_stats_intf.tx_success =
-				txrx_peer->stats.per_pkt_stats.tx.tx_success;
-	peer_stats_intf.tx_ucast =
-				txrx_peer->stats.per_pkt_stats.tx.ucast;
+	stats_arr_size = txrx_peer->stats_arr_size;
+
+	for (inx = 0; inx < stats_arr_size; inx++) {
+		peer_stats_intf.tx_success.num +=
+			txrx_peer->stats[inx].per_pkt_stats.tx.tx_success.num;
+		peer_stats_intf.tx_success.bytes +=
+			txrx_peer->stats[inx].per_pkt_stats.tx.tx_success.bytes;
+		peer_stats_intf.tx_ucast.num +=
+			txrx_peer->stats[inx].per_pkt_stats.tx.ucast.num;
+		peer_stats_intf.tx_ucast.bytes +=
+			txrx_peer->stats[inx].per_pkt_stats.tx.ucast.bytes;
+	}
 
 	dp_cal_client_update_peer_stats_wifi3(&peer_stats_intf,
 					      &tgt_peer->stats);
@@ -2750,6 +2766,8 @@ void dp_send_stats_event(struct dp_pdev *pdev, struct dp_peer *peer,
 	struct cdp_interface_peer_stats peer_stats_intf = {0};
 	struct dp_mon_peer *mon_peer = peer->monitor_peer;
 	struct dp_txrx_peer *txrx_peer = NULL;
+	uint8_t inx = 0;
+	uint8_t stats_arr_size;
 
 	if (qdf_unlikely(!mon_peer))
 		return;
@@ -2759,9 +2777,11 @@ void dp_send_stats_event(struct dp_pdev *pdev, struct dp_peer *peer,
 
 	txrx_peer = dp_get_txrx_peer(peer);
 	if (qdf_likely(txrx_peer)) {
+		stats_arr_size = txrx_peer->stats_arr_size;
 		peer_stats_intf.rx_byte_count = txrx_peer->to_stack.bytes;
-		peer_stats_intf.tx_byte_count =
-			txrx_peer->stats.per_pkt_stats.tx.tx_success.bytes;
+		for (inx = 0; inx < stats_arr_size; inx++)
+			peer_stats_intf.tx_byte_count +=
+			txrx_peer->stats[inx].per_pkt_stats.tx.tx_success.bytes;
 	}
 
 	dp_wdi_event_handler(WDI_EVENT_UPDATE_DP_STATS, pdev->soc,

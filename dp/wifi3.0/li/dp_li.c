@@ -596,6 +596,11 @@ static QDF_STATUS dp_txrx_get_vdev_mcast_param_li(struct dp_soc *soc,
 	return QDF_STATUS_SUCCESS;
 }
 
+static uint8_t dp_get_hw_link_id_li(struct dp_pdev *pdev)
+{
+	return 0;
+}
+
 void dp_initialize_arch_ops_li(struct dp_arch_ops *arch_ops)
 {
 #ifndef QCA_HOST_MODE_WIFI_DISABLED
@@ -665,6 +670,7 @@ void dp_initialize_arch_ops_li(struct dp_arch_ops *arch_ops)
 	arch_ops->dp_soc_get_num_soc = dp_soc_get_num_soc_li;
 	arch_ops->get_reo_qdesc_addr = dp_rx_get_reo_qdesc_addr_li;
 	arch_ops->txrx_get_vdev_mcast_param = dp_txrx_get_vdev_mcast_param_li;
+	arch_ops->get_hw_link_id = dp_get_hw_link_id_li;
 }
 
 #ifdef QCA_DP_TX_HW_SW_NBUF_DESC_PREFETCH
