@@ -60,7 +60,8 @@
 /* WLAN MAC Address length */
 #define USER_MAC_ADDR_LEN     (ETH_ALEN * 3)
 
-static const char *opt_string = "BADarvsdcf:i:m:Rh?";
+static const char *opt_string = "BADarvsdcf:i:m:RIh?";
+static bool g_ipa_mode;
 
 static const struct option long_opts[] = {
 	{ "basic", no_argument, NULL, 'B' },
@@ -76,6 +77,7 @@ static const struct option long_opts[] = {
 	{ "ifname", required_argument, NULL, 'i' },
 	{ "stamacaddr", required_argument, NULL, 'm' },
 	{ "recursive", no_argument, NULL, 'R' },
+	{ "ipa", no_argument, NULL, 'I' },
 	{ "help", no_argument, NULL, 'h' },
 	{ NULL, no_argument, NULL, 0 },
 };
@@ -84,7 +86,7 @@ static void display_help(void)
 {
 	STATS_PRINT("\nstats : Displays Statistics of Access Point\n");
 	STATS_PRINT("\nUsage:\n"
-		    "stats [Level] [Object] [StatsType] [FeatureFlag] [[-i interface_name] | [-m StationMACAddress]] [-R] [-h | ?]\n"
+		    "stats [Level] [Object] [StatsType] [FeatureFlag] [[-i interface_name] | [-m StationMACAddress]] [-R] [-I] [-h | ?]\n"
 		    "\n"
 		    "One of the 3 Levels can be selected. The Levels are as follows (catagorised based on purpose or\n"
 		    "the level of details):\n"
@@ -150,6 +152,8 @@ static void display_help(void)
 		    "OTHER OPTIONS:\n"
 		    "-R or --recursive\n"
 		    "    Recursive display\n"
+		    "-I or --ipa\n"
+		    "    is required to get Tx and Rx stats in IPA architecture\n"
 		    "-h or --help\n"
 		    "    Usage display\n");
 }
@@ -173,19 +177,25 @@ void print_basic_sta_data_tx(struct basic_peer_data_tx *tx)
 {
 	STATS_64(stdout, "Tx Success", tx->tx_success.num);
 	STATS_64(stdout, "Tx Success Bytes", tx->tx_success.bytes);
-	STATS_64(stdout, "Tx Complete", tx->comp_pkt.num);
-	STATS_64(stdout, "Tx Complete Bytes", tx->comp_pkt.bytes);
-	STATS_64(stdout, "Tx Failed", tx->tx_failed);
-	STATS_64(stdout, "Tx Dropped Count", tx->dropped_count);
+
+	if (!g_ipa_mode) {
+		STATS_64(stdout, "Tx Complete", tx->comp_pkt.num);
+		STATS_64(stdout, "Tx Complete Bytes", tx->comp_pkt.bytes);
+		STATS_64(stdout, "Tx Failed", tx->tx_failed);
+		STATS_64(stdout, "Tx Dropped Count", tx->dropped_count);
+	}
 }
 
 void print_basic_sta_data_rx(struct basic_peer_data_rx *rx)
 {
-	STATS_64(stdout, "Rx To Stack", rx->to_stack.num);
-	STATS_64(stdout, "Rx To Stack Bytes", rx->to_stack.bytes);
 	STATS_64(stdout, "Rx Total Packets", rx->total_rcvd.num);
 	STATS_64(stdout, "Rx Total Bytes", rx->total_rcvd.bytes);
 	STATS_64(stdout, "Rx Error Count", rx->rx_error_count);
+
+	if (!g_ipa_mode) {
+		STATS_64(stdout, "Rx To Stack", rx->to_stack.num);
+		STATS_64(stdout, "Rx To Stack Bytes", rx->to_stack.bytes);
+	}
 }
 
 void print_basic_sta_data_link(struct basic_peer_data_link *link)
@@ -230,32 +240,38 @@ void print_basic_vap_data_tx(struct basic_vdev_data_tx *tx)
 {
 	struct pkt_info *pkt = NULL;
 
-	pkt = &tx->ingress;
-	STATS_64(stdout, "Tx Ingress Received", pkt->num);
-	STATS_64(stdout, "Tx Ingress Received Bytes", pkt->bytes);
-	pkt = &tx->processed;
-	STATS_64(stdout, "Tx Ingress Processed", pkt->num);
-	STATS_64(stdout, "Tx Ingress Processed Bytes", pkt->bytes);
-	pkt = &tx->dropped;
-	STATS_64(stdout, "Tx Ingress Dropped", pkt->num);
-	STATS_64(stdout, "Tx Ingress Dropped Bytes", pkt->bytes);
 	pkt = &tx->tx_success;
 	STATS_64(stdout, "Tx Success", pkt->num);
 	STATS_64(stdout, "Tx Success Bytes", pkt->bytes);
-	pkt = &tx->comp_pkt;
-	STATS_64(stdout, "Tx Complete", pkt->num);
-	STATS_64(stdout, "Tx Complete Bytes", pkt->bytes);
-	STATS_64(stdout, "Tx Failed", tx->tx_failed);
-	STATS_64(stdout, "Tx Dropped Count", tx->dropped_count);
+
+	if (!g_ipa_mode) {
+		pkt = &tx->ingress;
+		STATS_64(stdout, "Tx Ingress Received", pkt->num);
+		STATS_64(stdout, "Tx Ingress Received Bytes", pkt->bytes);
+		pkt = &tx->processed;
+		STATS_64(stdout, "Tx Ingress Processed", pkt->num);
+		STATS_64(stdout, "Tx Ingress Processed Bytes", pkt->bytes);
+		pkt = &tx->dropped;
+		STATS_64(stdout, "Tx Ingress Dropped", pkt->num);
+		STATS_64(stdout, "Tx Ingress Dropped Bytes", pkt->bytes);
+		pkt = &tx->comp_pkt;
+		STATS_64(stdout, "Tx Complete", pkt->num);
+		STATS_64(stdout, "Tx Complete Bytes", pkt->bytes);
+		STATS_64(stdout, "Tx Failed", tx->tx_failed);
+		STATS_64(stdout, "Tx Dropped Count", tx->dropped_count);
+	}
 }
 
 void print_basic_vap_data_rx(struct basic_vdev_data_rx *rx)
 {
-	STATS_64(stdout, "Rx To Stack", rx->to_stack.num);
-	STATS_64(stdout, "Rx To Stack Bytes", rx->to_stack.bytes);
 	STATS_64(stdout, "Rx Total Packets", rx->total_rcvd.num);
 	STATS_64(stdout, "Rx Total Bytes", rx->total_rcvd.bytes);
 	STATS_64(stdout, "Rx Error Count", rx->rx_error_count);
+
+	if (!g_ipa_mode) {
+		STATS_64(stdout, "Rx To Stack", rx->to_stack.num);
+		STATS_64(stdout, "Rx To Stack Bytes", rx->to_stack.bytes);
+	}
 }
 
 void print_basic_vap_ctrl_tx(struct basic_vdev_ctrl_tx *tx)
@@ -279,34 +295,40 @@ void print_basic_radio_data_tx(struct basic_pdev_data_tx *tx)
 {
 	struct pkt_info *pkt = NULL;
 
-	pkt = &tx->ingress;
-	STATS_64(stdout, "Tx Ingress Received", pkt->num);
-	STATS_64(stdout, "Tx Ingress Received Bytes", pkt->bytes);
-	pkt = &tx->processed;
-	STATS_64(stdout, "Tx Ingress Processed", pkt->num);
-	STATS_64(stdout, "Tx Ingress Processed Bytes", pkt->bytes);
-	pkt = &tx->dropped;
-	STATS_64(stdout, "Tx Ingress Dropped", pkt->num);
-	STATS_64(stdout, "Tx Ingress Dropped Bytes", pkt->bytes);
 	pkt = &tx->tx_success;
 	STATS_64(stdout, "Tx Success", pkt->num);
 	STATS_64(stdout, "Tx Success Bytes", pkt->bytes);
-	pkt = &tx->comp_pkt;
-	STATS_64(stdout, "Tx Complete", pkt->num);
-	STATS_64(stdout, "Tx Complete Bytes", pkt->bytes);
-	STATS_64(stdout, "Tx Failed", tx->tx_failed);
-	STATS_64(stdout, "Tx Dropped Count", tx->dropped_count);
+
+	if (!g_ipa_mode) {
+		pkt = &tx->ingress;
+		STATS_64(stdout, "Tx Ingress Received", pkt->num);
+		STATS_64(stdout, "Tx Ingress Received Bytes", pkt->bytes);
+		pkt = &tx->processed;
+		STATS_64(stdout, "Tx Ingress Processed", pkt->num);
+		STATS_64(stdout, "Tx Ingress Processed Bytes", pkt->bytes);
+		pkt = &tx->dropped;
+		STATS_64(stdout, "Tx Ingress Dropped", pkt->num);
+		STATS_64(stdout, "Tx Ingress Dropped Bytes", pkt->bytes);
+		pkt = &tx->comp_pkt;
+		STATS_64(stdout, "Tx Complete", pkt->num);
+		STATS_64(stdout, "Tx Complete Bytes", pkt->bytes);
+		STATS_64(stdout, "Tx Failed", tx->tx_failed);
+		STATS_64(stdout, "Tx Dropped Count", tx->dropped_count);
+	}
 }
 
 void print_basic_radio_data_rx(struct basic_pdev_data_rx *rx)
 {
-	STATS_64(stdout, "Rx To Stack", rx->to_stack.num);
-	STATS_64(stdout, "Rx To Stack Bytes", rx->to_stack.bytes);
 	STATS_64(stdout, "Rx Total Packets", rx->total_rcvd.num);
 	STATS_64(stdout, "Rx Total Bytes", rx->total_rcvd.bytes);
 	STATS_64(stdout, "Rx Error Count", rx->rx_error_count);
-	STATS_64(stdout, "Dropped Count", rx->dropped_count);
-	STATS_64(stdout, "Error Count", rx->err_count);
+
+	if (!g_ipa_mode) {
+		STATS_64(stdout, "Rx To Stack", rx->to_stack.num);
+		STATS_64(stdout, "Rx To Stack Bytes", rx->to_stack.bytes);
+		STATS_64(stdout, "Dropped Count", rx->dropped_count);
+		STATS_64(stdout, "Error Count", rx->err_count);
+	}
 }
 
 void print_basic_radio_ctrl_tx(struct basic_pdev_ctrl_tx *tx)
@@ -372,9 +394,32 @@ void print_advance_sta_data_tx(struct advance_peer_data_tx *tx)
 	STATS_32(stdout, "MSDU's Part of AMPDU", tx->ampdu_cnt);
 	STATS_32(stdout, "MSDU's With No MPDU Level Aggregation",
 		 tx->non_ampdu_cnt);
-	STATS_32(stdout, "MSDU's Part of AMSDU", tx->amsdu_cnt);
-	STATS_32(stdout, "MSDU's With No MSDU Level Aggregation",
-		 tx->non_amsdu_cnt);
+
+	STATS_PRINT("\tTx Data Packets per AC\n");
+	STATS_32(stdout, "     Best effort",
+		 tx->wme_ac_type[WME_AC_BE]);
+	STATS_32(stdout, "      Background",
+		 tx->wme_ac_type[WME_AC_BK]);
+	STATS_32(stdout, "           Video",
+		 tx->wme_ac_type[WME_AC_VI]);
+	STATS_32(stdout, "           Voice",
+		 tx->wme_ac_type[WME_AC_VO]);
+
+	STATS_PRINT("\tTx  Data Bytes per AC\n");
+	STATS_64(stdout, "     Best effort",
+		 tx->wme_ac_type_bytes[WME_AC_BE]);
+	STATS_64(stdout, "      Background",
+		 tx->wme_ac_type_bytes[WME_AC_BK]);
+	STATS_64(stdout, "           Video",
+		 tx->wme_ac_type_bytes[WME_AC_VI]);
+	STATS_64(stdout, "           Voice",
+		 tx->wme_ac_type_bytes[WME_AC_VO]);
+
+	if (!g_ipa_mode) {
+		STATS_32(stdout, "MSDU's Part of AMSDU", tx->amsdu_cnt);
+		STATS_32(stdout, "MSDU's With No MSDU Level Aggregation",
+			 tx->non_amsdu_cnt);
+	}
 }
 
 void print_advance_sta_data_rx(struct advance_peer_data_rx *rx)
@@ -388,9 +433,6 @@ void print_advance_sta_data_rx(struct advance_peer_data_rx *rx)
 	STATS_64(stdout, "Rx Multicast Bytes", rx->multicast.bytes);
 	STATS_64(stdout, "Rx Broadcast Packets", rx->bcast.num);
 	STATS_64(stdout, "Rx Broadcast Bytes", rx->bcast.bytes);
-	STATS_32(stdout, "Rx Retries", rx->rx_retries);
-	STATS_32(stdout, "Rx Multipass Packet Drop", rx->multipass_rx_pkt_drop);
-	STATS_32(stdout, "Rx BAR Reaceive Count", rx->bar_recv_cnt);
 	STATS_32(stdout, "Rx MPDU FCS Ok Count", rx->mpdu_cnt_fcs_ok);
 	STATS_32(stdout, "Rx MPDU FCS Error Count", rx->mpdu_cnt_fcs_err);
 	STATS_PRINT("\tRx PPDU Counts\n");
@@ -418,13 +460,30 @@ void print_advance_sta_data_rx(struct advance_peer_data_rx *rx)
 	STATS_32(stdout, "      Background", rx->wme_ac_type[WME_AC_BK]);
 	STATS_32(stdout, "           Video", rx->wme_ac_type[WME_AC_VI]);
 	STATS_32(stdout, "           Voice", rx->wme_ac_type[WME_AC_VO]);
+
+	STATS_PRINT("\tRx Data Bytes per AC\n");
+	STATS_64(stdout, "     Best effort",
+		 rx->wme_ac_type_bytes[WME_AC_BE]);
+	STATS_64(stdout, "      Background",
+		 rx->wme_ac_type_bytes[WME_AC_BK]);
+	STATS_64(stdout, "           Video",
+		 rx->wme_ac_type_bytes[WME_AC_VI]);
+	STATS_64(stdout, "           Voice",
+		 rx->wme_ac_type_bytes[WME_AC_VO]);
 	STATS_PRINT("\tRx Aggregation:\n");
 	STATS_32(stdout, "MSDU's Part of AMPDU", rx->ampdu_cnt);
 	STATS_32(stdout, "MSDU's With No MPDU Level Aggregation",
 		 rx->non_ampdu_cnt);
-	STATS_32(stdout, "MSDU's Part of AMSDU", rx->amsdu_cnt);
-	STATS_32(stdout, "MSDU's With No MSDU Level Aggregation",
-		 rx->non_amsdu_cnt);
+
+	if (!g_ipa_mode) {
+		STATS_32(stdout, "MSDU's Part of AMSDU", rx->amsdu_cnt);
+		STATS_32(stdout, "MSDU's With No MSDU Level Aggregation",
+			 rx->non_amsdu_cnt);
+		STATS_32(stdout, "Rx Retries", rx->rx_retries);
+		STATS_32(stdout, "Rx Multipass Packet Drop",
+			 rx->multipass_rx_pkt_drop);
+		STATS_32(stdout, "Rx BAR Reaceive Count", rx->bar_recv_cnt);
+	}
 }
 
 void print_advance_sta_data_fwd(struct advance_peer_data_fwd *fwd)
@@ -520,10 +579,6 @@ void print_advance_vap_data_tx(struct advance_vdev_data_tx *tx)
 	u_int8_t inx = 0;
 
 	print_basic_vap_data_tx(&tx->b_tx);
-	STATS_64(stdout, "Tx Reinject Packets", tx->reinject_pkts.num);
-	STATS_64(stdout, "Tx Reinject Bytes", tx->reinject_pkts.bytes);
-	STATS_64(stdout, "Tx Inspect Packets", tx->inspect_pkts.num);
-	STATS_64(stdout, "Tx Inspect Bytes", tx->inspect_pkts.bytes);
 	STATS_64(stdout, "Tx Unicast Packets", tx->ucast.num);
 	STATS_64(stdout, "Tx Unicast Bytes", tx->ucast.bytes);
 	STATS_64(stdout, "Tx Multicast Packets", tx->mcast.num);
@@ -543,10 +598,37 @@ void print_advance_vap_data_tx(struct advance_vdev_data_tx *tx)
 	STATS_32(stdout, "MSDU's Part of AMPDU", tx->ampdu_cnt);
 	STATS_32(stdout, "MSDU's With No MPDU Level Aggregation",
 		 tx->non_ampdu_cnt);
-	STATS_32(stdout, "MSDU's Part of AMSDU", tx->amsdu_cnt);
-	STATS_32(stdout, "MSDU's With No MSDU Level Aggregation",
-		 tx->non_amsdu_cnt);
-	STATS_32(stdout, "Tx CCE Classified", tx->cce_classified);
+	STATS_PRINT("\tTx Data Packets per AC\n");
+	STATS_32(stdout, "     Best effort",
+		 tx->wme_ac_type[WME_AC_BE]);
+	STATS_32(stdout, "      Background",
+		 tx->wme_ac_type[WME_AC_BK]);
+	STATS_32(stdout, "           Video",
+		 tx->wme_ac_type[WME_AC_VI]);
+	STATS_32(stdout, "           Voice",
+		 tx->wme_ac_type[WME_AC_VO]);
+
+	STATS_PRINT("\tTx  Data Bytes per AC\n");
+	STATS_64(stdout, "     Best effort",
+		 tx->wme_ac_type_bytes[WME_AC_BE]);
+	STATS_64(stdout, "      Background",
+		 tx->wme_ac_type_bytes[WME_AC_BK]);
+	STATS_64(stdout, "           Video",
+		 tx->wme_ac_type_bytes[WME_AC_VI]);
+	STATS_64(stdout, "           Voice",
+		 tx->wme_ac_type_bytes[WME_AC_VO]);
+
+
+	if (!g_ipa_mode) {
+		STATS_64(stdout, "Tx Reinject Packets", tx->reinject_pkts.num);
+		STATS_64(stdout, "Tx Reinject Bytes", tx->reinject_pkts.bytes);
+		STATS_64(stdout, "Tx Inspect Packets", tx->inspect_pkts.num);
+		STATS_64(stdout, "Tx Inspect Bytes", tx->inspect_pkts.bytes);
+		STATS_32(stdout, "MSDU's Part of AMSDU", tx->amsdu_cnt);
+		STATS_32(stdout, "MSDU's With No MSDU Level Aggregation",
+			 tx->non_amsdu_cnt);
+		STATS_32(stdout, "Tx CCE Classified", tx->cce_classified);
+	}
 }
 
 void print_advance_vap_data_rx(struct advance_vdev_data_rx *rx)
@@ -560,9 +642,6 @@ void print_advance_vap_data_rx(struct advance_vdev_data_rx *rx)
 	STATS_64(stdout, "Rx Multicast Bytes", rx->multicast.bytes);
 	STATS_64(stdout, "Rx Broadcast Packets", rx->bcast.num);
 	STATS_64(stdout, "Rx Broadcast Bytes", rx->bcast.bytes);
-	STATS_32(stdout, "Rx Retries", rx->rx_retries);
-	STATS_32(stdout, "Rx Multipass Packet Drop", rx->multipass_rx_pkt_drop);
-	STATS_32(stdout, "Rx BAR Reaceive Count", rx->bar_recv_cnt);
 	STATS_32(stdout, "Rx MPDU FCS Ok Count", rx->mpdu_cnt_fcs_ok);
 	STATS_32(stdout, "Rx MPDU FCS Error Count", rx->mpdu_cnt_fcs_err);
 	STATS_PRINT("\tRx PPDU Counts\n");
@@ -590,13 +669,30 @@ void print_advance_vap_data_rx(struct advance_vdev_data_rx *rx)
 	STATS_32(stdout, "      Background", rx->wme_ac_type[WME_AC_BK]);
 	STATS_32(stdout, "           Video", rx->wme_ac_type[WME_AC_VI]);
 	STATS_32(stdout, "           Voice", rx->wme_ac_type[WME_AC_VO]);
+
+	STATS_PRINT("\tRx Data Bytes per AC\n");
+	STATS_64(stdout, "     Best effort",
+		 rx->wme_ac_type_bytes[WME_AC_BE]);
+	STATS_64(stdout, "      Background",
+		 rx->wme_ac_type_bytes[WME_AC_BK]);
+	STATS_64(stdout, "           Video",
+		 rx->wme_ac_type_bytes[WME_AC_VI]);
+	STATS_64(stdout, "           Voice",
+		 rx->wme_ac_type_bytes[WME_AC_VO]);
 	STATS_PRINT("\tRx Aggregation:\n");
 	STATS_32(stdout, "MSDU's Part of AMPDU", rx->ampdu_cnt);
 	STATS_32(stdout, "MSDU's With No MPDU Level Aggregation",
 		 rx->non_ampdu_cnt);
-	STATS_32(stdout, "MSDU's Part of AMSDU", rx->amsdu_cnt);
-	STATS_32(stdout, "MSDU's With No MSDU Level Aggregation",
-		 rx->non_amsdu_cnt);
+
+	if (!g_ipa_mode) {
+		STATS_32(stdout, "MSDU's Part of AMSDU", rx->amsdu_cnt);
+		STATS_32(stdout, "MSDU's With No MSDU Level Aggregation",
+			 rx->non_amsdu_cnt);
+		STATS_32(stdout, "Rx Retries", rx->rx_retries);
+		STATS_32(stdout, "Rx Multipass Packet Drop",
+			 rx->multipass_rx_pkt_drop);
+		STATS_32(stdout, "Rx BAR Reaceive Count", rx->bar_recv_cnt);
+	}
 }
 
 void print_advance_vap_data_raw(struct advance_vdev_data_raw *raw)
@@ -697,10 +793,6 @@ void print_advance_radio_data_tx(struct advance_pdev_data_tx *tx)
 	u_int8_t inx = 0;
 
 	print_basic_radio_data_tx(&tx->b_tx);
-	STATS_64(stdout, "Tx Reinject Packets", tx->reinject_pkts.num);
-	STATS_64(stdout, "Tx Reinject Bytes", tx->reinject_pkts.bytes);
-	STATS_64(stdout, "Tx Inspect Packets", tx->inspect_pkts.num);
-	STATS_64(stdout, "Tx Inspect Bytes", tx->inspect_pkts.bytes);
 	STATS_64(stdout, "Tx Unicast Packets", tx->ucast.num);
 	STATS_64(stdout, "Tx Unicast Bytes", tx->ucast.bytes);
 	STATS_64(stdout, "Tx Multicast Packets", tx->mcast.num);
@@ -720,12 +812,38 @@ void print_advance_radio_data_tx(struct advance_pdev_data_tx *tx)
 	STATS_32(stdout, "MSDU's Part of AMPDU", tx->ampdu_cnt);
 	STATS_32(stdout, "MSDU's With No MPDU Level Aggregation",
 		 tx->non_ampdu_cnt);
-	STATS_32(stdout, "MSDU's Part of AMSDU", tx->amsdu_cnt);
-	STATS_32(stdout, "MSDU's With No MSDU Level Aggregation",
-		 tx->non_amsdu_cnt);
-	STATS_32(stdout, "Tx CCE Classified", tx->cce_classified);
-	STATS_PRINT("\tTx packets sent per interrupt\n");
-	print_histogram_stats(&tx->tx_hist);
+	STATS_PRINT("\tTx Data Packets per AC\n");
+	STATS_32(stdout, "     Best effort",
+		 tx->wme_ac_type[WME_AC_BE]);
+	STATS_32(stdout, "      Background",
+		 tx->wme_ac_type[WME_AC_BK]);
+	STATS_32(stdout, "           Video",
+		 tx->wme_ac_type[WME_AC_VI]);
+	STATS_32(stdout, "           Voice",
+		 tx->wme_ac_type[WME_AC_VO]);
+
+	STATS_PRINT("\tTx  Data Bytes per AC\n");
+	STATS_64(stdout, "     Best effort",
+		 tx->wme_ac_type_bytes[WME_AC_BE]);
+	STATS_64(stdout, "      Background",
+		 tx->wme_ac_type_bytes[WME_AC_BK]);
+	STATS_64(stdout, "           Video",
+		 tx->wme_ac_type_bytes[WME_AC_VI]);
+	STATS_64(stdout, "           Voice",
+		 tx->wme_ac_type_bytes[WME_AC_VO]);
+
+	if (!g_ipa_mode) {
+		STATS_64(stdout, "Tx Reinject Packets", tx->reinject_pkts.num);
+		STATS_64(stdout, "Tx Reinject Bytes", tx->reinject_pkts.bytes);
+		STATS_64(stdout, "Tx Inspect Packets", tx->inspect_pkts.num);
+		STATS_64(stdout, "Tx Inspect Bytes", tx->inspect_pkts.bytes);
+		STATS_32(stdout, "MSDU's Part of AMSDU", tx->amsdu_cnt);
+		STATS_32(stdout, "MSDU's With No MSDU Level Aggregation",
+			 tx->non_amsdu_cnt);
+		STATS_32(stdout, "Tx CCE Classified", tx->cce_classified);
+		STATS_PRINT("\tTx packets sent per interrupt\n");
+		print_histogram_stats(&tx->tx_hist);
+	}
 }
 
 void print_advance_radio_data_rx(struct advance_pdev_data_rx *rx)
@@ -739,9 +857,6 @@ void print_advance_radio_data_rx(struct advance_pdev_data_rx *rx)
 	STATS_64(stdout, "Rx Multicast Bytes", rx->multicast.bytes);
 	STATS_64(stdout, "Rx Broadcast Packets", rx->bcast.num);
 	STATS_64(stdout, "Rx Broadcast Bytes", rx->bcast.bytes);
-	STATS_32(stdout, "Rx Retries", rx->rx_retries);
-	STATS_32(stdout, "Rx Multipass Packet Drop", rx->multipass_rx_pkt_drop);
-	STATS_32(stdout, "Rx BAR Reaceive Count", rx->bar_recv_cnt);
 	STATS_32(stdout, "Rx MPDU FCS Ok Count", rx->mpdu_cnt_fcs_ok);
 	STATS_32(stdout, "Rx MPDU FCS Error Count", rx->mpdu_cnt_fcs_err);
 	STATS_PRINT("\tRx PPDU Counts\n");
@@ -769,15 +884,32 @@ void print_advance_radio_data_rx(struct advance_pdev_data_rx *rx)
 	STATS_32(stdout, "      Background", rx->wme_ac_type[WME_AC_BK]);
 	STATS_32(stdout, "           Video", rx->wme_ac_type[WME_AC_VI]);
 	STATS_32(stdout, "           Voice", rx->wme_ac_type[WME_AC_VO]);
+
+	STATS_PRINT("\tRx Data Bytes per AC\n");
+	STATS_64(stdout, "     Best effort",
+		 rx->wme_ac_type_bytes[WME_AC_BE]);
+	STATS_64(stdout, "      Background",
+		 rx->wme_ac_type_bytes[WME_AC_BK]);
+	STATS_64(stdout, "           Video",
+		 rx->wme_ac_type_bytes[WME_AC_VI]);
+	STATS_64(stdout, "           Voice",
+		 rx->wme_ac_type_bytes[WME_AC_VO]);
 	STATS_PRINT("\tRx Aggregation:\n");
 	STATS_32(stdout, "MSDU's Part of AMPDU", rx->ampdu_cnt);
 	STATS_32(stdout, "MSDU's With No MPDU Level Aggregation",
 		 rx->non_ampdu_cnt);
-	STATS_32(stdout, "MSDU's Part of AMSDU", rx->amsdu_cnt);
-	STATS_32(stdout, "MSDU's With No MSDU Level Aggregation",
-		 rx->non_amsdu_cnt);
-	STATS_PRINT("\tRx packets sent per interrupt\n");
-	print_histogram_stats(&rx->rx_hist);
+
+	if (!g_ipa_mode) {
+		STATS_32(stdout, "Rx Multipass Packet Drop",
+			 rx->multipass_rx_pkt_drop);
+		STATS_32(stdout, "Rx BAR Reaceive Count", rx->bar_recv_cnt);
+		STATS_32(stdout, "MSDU's Part of AMSDU", rx->amsdu_cnt);
+		STATS_32(stdout, "MSDU's With No MSDU Level Aggregation",
+			 rx->non_amsdu_cnt);
+		STATS_PRINT("\tRx packets sent per interrupt\n");
+		STATS_32(stdout, "Rx Retries", rx->rx_retries);
+		print_histogram_stats(&rx->rx_hist);
+	}
 }
 
 void print_advance_radio_data_raw(struct advance_pdev_data_raw *raw)
@@ -1689,6 +1821,7 @@ int main(int argc, char *argv[])
 	u_int8_t is_stamacaddr_set = 0;
 	u_int8_t is_option_selected = 0;
 	u_int8_t inx = 0;
+	u_int8_t is_ipa_stats_set = 0;
 	bool recursion_temp = false;
 	char feat_flags[128] = {0};
 	char ifname_temp[IFNAME_LEN] = {0};
@@ -1802,6 +1935,15 @@ int main(int argc, char *argv[])
 			}
 			is_stamacaddr_set  = 1;
 			is_option_selected = 1;
+			break;
+		case 'I':
+			if (is_ipa_stats_set) {
+				STATS_ERR("Multiple Arguments\n");
+				display_help();
+				return -EINVAL;
+			}
+			g_ipa_mode = 1;
+			is_ipa_stats_set = 1;
 			break;
 		case 'f':
 			if (is_feat_set) {
