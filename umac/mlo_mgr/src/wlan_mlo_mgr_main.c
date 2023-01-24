@@ -72,6 +72,7 @@ static void mlo_global_ctx_init(void)
 
 	qdf_list_create(&mlo_mgr_ctx->ml_dev_list, WLAN_UMAC_MLO_MAX_DEV);
 	mlo_mgr_ctx->max_mlo_peer_id = MAX_MLO_PEER_ID;
+	mlo_mgr_ctx->last_mlo_peer_id = 0;
 	ml_peerid_lock_create(mlo_mgr_ctx);
 	ml_link_lock_create(mlo_mgr_ctx);
 	ml_aid_lock_create(mlo_mgr_ctx);
