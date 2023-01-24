@@ -669,7 +669,7 @@ void dp_rx_desc_reuse(struct dp_soc *soc, qdf_nbuf_t *nbuf_list)
 				(struct dp_rx_desc *)&rx_desc_pool->array[i];
 
 			if (rx_desc->in_use) {
-				if (j < dp_rxdma_srng->num_entries) {
+				if (j < (dp_rxdma_srng->num_entries - 1)) {
 					dp_rx_desc_replenish(soc, dp_rxdma_srng,
 							     rx_desc_pool,
 							     rx_desc);
