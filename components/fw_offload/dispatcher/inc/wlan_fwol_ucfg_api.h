@@ -546,7 +546,7 @@ static inline QDF_STATUS ucfg_fwol_get_ofdm_scrambler_seed(
 				struct wlan_objmgr_psoc *psoc,
 				bool *enable_ofdm_scrambler_seed)
 {
-	return QDF_STATUS_SUCCESS;
+	return QDF_STATUS_E_NOSUPPORT;
 }
 #endif
 

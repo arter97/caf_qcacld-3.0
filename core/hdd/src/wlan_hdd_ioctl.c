@@ -4540,7 +4540,7 @@ static int drv_cmd_miracast(struct hdd_adapter *adapter,
 		{
 			wma_cli_set_command(
 				adapter->vdev_id,
-				WMI_PDEV_PARAM_POWER_COLLAPSE_ENABLE,
+				wmi_pdev_param_power_collapse_enable,
 				(filter_type == MIRACAST_CONN_OPT_ENABLED ?
 				 0 : 1), PDEV_CMD);
 			return 0;

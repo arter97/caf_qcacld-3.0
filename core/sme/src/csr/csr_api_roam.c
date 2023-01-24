@@ -5770,9 +5770,9 @@ cm_csr_connect_done_ind(struct wlan_objmgr_vdev *vdev,
 	rsn_cap = wlan_crypto_get_param(vdev, WLAN_CRYPTO_PARAM_RSN_CAP);
 	if (rsn_cap >= 0) {
 		cm_update_rsn_ocv_cap(&rsn_cap, rsp);
-		if (wma_cli_set2_command(vdev_id, WMI_VDEV_PARAM_RSN_CAPABILITY,
+		if (wma_cli_set2_command(vdev_id, wmi_vdev_param_rsn_capability,
 					 rsn_cap, 0, VDEV_CMD))
-			sme_err("Failed to update WMI_VDEV_PARAM_RSN_CAPABILITY for vdev id %d",
+			sme_err("Failed to update wmi_vdev_param_rsn_capability for vdev id %d",
 				vdev_id);
 	}
 

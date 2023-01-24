@@ -565,7 +565,7 @@ static uint32_t hdd_son_get_bandwidth(struct wlan_objmgr_vdev *vdev)
 		return NONHT;
 	}
 
-	chwidth = wma_cli_get_command(adapter->vdev_id, WMI_VDEV_PARAM_CHWIDTH,
+	chwidth = wma_cli_get_command(adapter->vdev_id, wmi_vdev_param_chwidth,
 				      VDEV_CMD);
 
 	if (chwidth < 0) {
@@ -1045,7 +1045,7 @@ static enum ieee80211_phymode hdd_son_get_phymode(struct wlan_objmgr_vdev *vdev)
 
 	freq = ucfg_son_get_operation_chan_freq_vdev_id(pdev, adapter->vdev_id);
 
-	chwidth = wma_cli_get_command(adapter->vdev_id, WMI_VDEV_PARAM_CHWIDTH,
+	chwidth = wma_cli_get_command(adapter->vdev_id, wmi_vdev_param_chwidth,
 				      VDEV_CMD);
 
 	if (chwidth < 0) {

@@ -369,7 +369,7 @@ QDF_STATUS target_if_p2p_set_noa(struct wlan_objmgr_psoc *psoc,
 	target_if_debug("psoc:%pK, vdev_id:%d disable_noa:%d",
 				psoc, vdev_id, disable_noa);
 	param.vdev_id = vdev_id;
-	param.param_id = WMI_VDEV_PARAM_DISABLE_NOA_P2P_GO;
+	param.param_id = wmi_vdev_param_disable_noa_p2p_go;
 	param.param_value = (uint32_t)disable_noa;
 
 	return wmi_unified_vdev_set_param_send(wmi_handle, &param);
