@@ -158,7 +158,6 @@ struct basic_psoc_data {
 
 #if WLAN_ADVANCE_TELEMETRY
 #define STATS_IF_MAX_CHAIN 8
-#define STATS_IF_DATA_TID_MAX 8
 #ifdef WLAN_FEATURE_11BE
 #define STATS_IF_BW_USAGE_MAX_SIZE 6
 #define STATS_IF_PUNC_BW_USAGE_MAX_SIZE 5
@@ -376,6 +375,7 @@ struct debug_peer_data {
 	struct debug_peer_data_link *link;
 	struct debug_peer_data_rate *rate;
 	struct debug_peer_data_txcap *txcap;
+	struct debug_peer_data_deter *deter;
 };
 
 /* Debug peer control stats holder */
@@ -414,6 +414,7 @@ struct debug_pdev_data {
 	struct debug_pdev_data_mesh *mesh;
 	struct debug_pdev_data_txcap *txcap;
 	struct debug_pdev_data_monitor *monitor;
+	struct debug_pdev_data_deter *deter;
 };
 
 /* Debug pdev control stats holder */

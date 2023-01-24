@@ -2794,6 +2794,70 @@ void print_debug_sta_data_txcap(struct debug_peer_data_txcap *txcap)
 	STATS_PRINT(" TO STACK:%u\n", txcap->mpdu[STATS_IF_MPDU_TO_STACK]);
 }
 
+void print_debug_sta_deter_stats(struct debug_peer_data_deter *deter)
+{
+	uint8_t tid, msdu;
+	struct stats_if_deter *deter_stats;
+
+	for (tid = 0; tid < STATS_IF_DATA_TID_MAX; tid++) {
+		deter_stats = &deter->deter_stats[tid];
+		STATS_PRINT("----TID: %u----\n", tid);
+		STATS_PRINT(" Downlink: \n");
+		for (msdu = 0; msdu < STATS_IF_MSDUQ_MAX; msdu++) {
+			STATS_PRINT("MSDUQ[%d]:\n", msdu);
+			STATS_PRINT("DL_SU: \n");
+			STATS_32(stdout, "cnt",
+				 deter_stats->dl[msdu][0].mode_cnt);
+			STATS_64(stdout, "avg rate",
+				 deter_stats->dl[msdu][0].avg_rate);
+			STATS_PRINT("DL_MUOFDMA: \n");
+			STATS_32(stdout, "cnt",
+				 deter_stats->dl[msdu][1].mode_cnt);
+			STATS_64(stdout, "avg rate",
+				    deter_stats->dl[msdu][1].avg_rate);
+			STATS_PRINT("DL_MUMIMO: \n");
+			STATS_32(stdout, "cnt",
+				 deter_stats->dl[msdu][2].mode_cnt);
+			STATS_64(stdout, "avg rate",
+				 deter_stats->dl[msdu][2].avg_rate);
+		}
+		STATS_PRINT("Uplink: \n");
+		STATS_PRINT("UL MUOFDMA: \n");
+		STATS_32(stdout, "cnt",
+			 deter_stats->ul[0].mode_cnt);
+		STATS_64(stdout, "avg rate",
+			 deter_stats->ul[0].avg_rate);
+		STATS_32(stdout, "trigger success",
+			 deter_stats->ul[0].trigger_success);
+		STATS_32(stdout, "trigger fail",
+			 deter_stats->ul[0].trigger_fail);
+		STATS_PRINT("UL MUMIMO: \n");
+		STATS_32(stdout, "cnt",
+			 deter_stats->ul[1].mode_cnt);
+		STATS_64(stdout, "avg rate",
+			 deter_stats->ul[1].avg_rate);
+		STATS_32(stdout, "trigger success",
+			 deter_stats->ul[1].trigger_success);
+		STATS_32(stdout, "trigger fail",
+			 deter_stats->ul[1].trigger_fail);
+		STATS_PRINT("UL MUBAR: \n");
+		STATS_32(stdout, "cnt",
+			 deter_stats->ul[2].mode_cnt);
+		STATS_64(stdout, "avg rate",
+			 deter_stats->ul[2].avg_rate);
+		STATS_32(stdout, "trigger success",
+			 deter_stats->ul[2].trigger_success);
+		STATS_32(stdout, "trigger fail",
+			 deter_stats->ul[2].trigger_fail);
+		STATS_PRINT("RX: \n");
+		STATS_PRINT("SU: \n");
+		STATS_32(stdout, "cnt",
+			 deter_stats->rx_det.mode_cnt);
+		STATS_64(stdout, "avg rate",
+			 deter_stats->rx_det.avg_rate);
+	}
+}
+
 void print_debug_sta_ctrl_tx(struct debug_peer_ctrl_tx *tx)
 {
 	print_basic_sta_ctrl_tx(&tx->b_tx);
@@ -2848,6 +2912,10 @@ void print_debug_sta_data(struct stats_obj *sta)
 	if (data->txcap) {
 		STATS_PRINT("Tx Capture Stats\n");
 		print_debug_sta_data_txcap(data->txcap);
+	}
+	if (data->deter) {
+		STATS_PRINT("Deterministic Stats\n");
+		print_debug_sta_deter_stats(data->deter);
 	}
 }
 
@@ -3327,6 +3395,44 @@ void print_debug_radio_data_monitor(struct debug_pdev_data_monitor *monitor)
 	}
 }
 
+void print_debug_radio_deter_stats(struct debug_pdev_data_deter *deter)
+{
+	uint8_t user;
+
+	STATS_PRINT("----Mode Count: ----\n");
+	STATS_64(stdout, "DL SU:", deter->dl_mode_cnt[0]);
+	STATS_64(stdout, "DL MUOFDMA:", deter->dl_mode_cnt[1]);
+	STATS_64(stdout, "DL MUMIMO:", deter->dl_mode_cnt[2]);
+	STATS_64(stdout, "UL MUOFDMA:", deter->ul_mode_cnt[0]);
+	STATS_64(stdout, "UL_MUMIMO:", deter->ul_mode_cnt[1]);
+	STATS_64(stdout, "UL BAR:", deter->ul_mode_cnt[2]);
+	STATS_PRINT("----DL OFDMA Num Users: ----\n");
+	for (user = 0; user < STATS_IF_MAX_USERS; user++)
+		STATS_PRINT("Num Users [%u]: %ju\n", user, deter->dl_ofdma_usr[user]);
+	STATS_PRINT("----UL OFDMA Num Users: ----\n");
+	for (user = 0; user < STATS_IF_MAX_USERS; user++)
+		STATS_PRINT("Num Users [%u]: %ju\n", user, deter->ul_ofdma_usr[user]);
+	STATS_PRINT("----DL MIMO Num Users: ----\n");
+	for (user = 0; user < STATS_IF_MAX_USERS; user++)
+		STATS_PRINT("Num Users [%u]: %ju\n", user, deter->dl_mimo_usr[user]);
+	STATS_PRINT("----DL MIMO Num Users: ----\n");
+	for (user = 0; user < STATS_IF_MAX_USERS; user++)
+		STATS_PRINT("Num Users [%u]: %ju\n", user, deter->ul_mimo_usr[user]);
+
+	STATS_PRINT("----Trigger Status: ----\n");
+	STATS_64(stdout, "Success:", deter->trigger_success);
+	STATS_64(stdout, "fail:", deter->trigger_fail);
+	STATS_PRINT("----Channel Utilization: ----\n");
+	STATS_32(stdout, "Total_cu:", deter->ch_util.ap_chan_util);
+	STATS_32(stdout, "TX Util:", deter->ch_util.ap_tx_util);
+	STATS_32(stdout, "RX Util:", deter->ch_util.ap_rx_util);
+	STATS_PRINT("----Channel ACCESS DELAY: ----\n");
+	STATS_32(stdout, "delay BE:", deter->ch_access_delay[0]);
+	STATS_32(stdout, "delay BK:", deter->ch_access_delay[1]);
+	STATS_32(stdout, "delay VI:", deter->ch_access_delay[2]);
+	STATS_32(stdout, "delay VO:", deter->ch_access_delay[3]);
+}
+
 void print_debug_radio_ctrl_tx(struct debug_pdev_ctrl_tx *tx)
 {
 	print_basic_radio_ctrl_tx(&tx->b_tx);
@@ -3413,6 +3519,10 @@ void print_debug_radio_data(struct stats_obj *radio)
 	if (data->monitor) {
 		STATS_PRINT("Monitor mode Stats\n");
 		print_debug_radio_data_monitor(data->monitor);
+	}
+	if (data->deter) {
+		STATS_PRINT("Deterministic Stats\n");
+		print_debug_radio_deter_stats(data->deter);
 	}
 }
 

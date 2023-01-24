@@ -3840,6 +3840,38 @@ get_pdev_tx_capture_stats(void *dp_soc_handle, uint8_t pdev_id,
 }
 #endif /* WLAN_TX_PKT_CAPTURE_ENH */
 
+static QDF_STATUS
+get_debug_peer_deter_stats(struct unified_stats *stats,
+			   struct cdp_peer_deter_stats *deter)
+{
+	struct debug_peer_data_deter *data = NULL;
+	uint8_t inx;
+
+	if (!stats || !deter) {
+		qdf_err("Invalid Input!");
+		return QDF_STATUS_E_INVAL;
+	}
+	data = qdf_mem_malloc(sizeof(struct debug_peer_data_deter));
+
+	if (!data) {
+		qdf_err("Allocation Failed!");
+		return QDF_STATUS_E_NOMEM;
+	}
+	for (inx = 0; inx < STATS_IF_DATA_TID_MAX; inx++) {
+		qdf_mem_copy(data->deter_stats[inx].dl, deter[inx].dl_det,
+			     sizeof(data->deter_stats[inx].dl));
+		qdf_mem_copy(data->deter_stats[inx].ul, deter[inx].ul_det,
+			     sizeof(data->deter_stats[inx].ul));
+		qdf_mem_copy(&data->deter_stats[inx].rx_det, &deter[inx].rx_det,
+			     sizeof(data->deter_stats[inx].rx_det));
+	}
+
+	stats->feat[INX_FEAT_DETER] = data;
+	stats->size[INX_FEAT_DETER] = sizeof(struct debug_peer_data_deter);
+
+	return QDF_STATUS_SUCCESS;
+}
+
 static QDF_STATUS get_debug_peer_data(struct wlan_objmgr_psoc *psoc,
 				      struct wlan_objmgr_vdev *vdev,
 				      uint8_t *peer_mac,
@@ -3849,6 +3881,7 @@ static QDF_STATUS get_debug_peer_data(struct wlan_objmgr_psoc *psoc,
 	QDF_STATUS ret = QDF_STATUS_SUCCESS;
 	struct cdp_peer_stats *peer_stats = NULL;
 	struct cdp_peer_tx_capture_stats *cap = NULL;
+	struct cdp_peer_deter_stats *deter = NULL;
 	uint8_t vdev_id = 0;
 	void *dp_soc = NULL;
 	bool stats_collected = false;
@@ -3910,8 +3943,26 @@ static QDF_STATUS get_debug_peer_data(struct wlan_objmgr_psoc *psoc,
 		else
 			stats_collected = true;
 	}
+	if (feat & STATS_FEAT_FLG_DETER) {
+		deter = qdf_mem_malloc(sizeof(struct cdp_peer_deter_stats) *
+				       CDP_DATA_TID_MAX);
+		if (!deter) {
+			ret = QDF_STATUS_E_NOMEM;
+			goto get_failed;
+		}
+		ret = cdp_get_peer_deter_stats(dp_soc, vdev_id,
+					       peer_mac, deter);
+		if (ret == QDF_STATUS_SUCCESS)
+			ret = get_debug_peer_deter_stats(stats, deter);
+		if (ret != QDF_STATUS_SUCCESS)
+			qdf_err("Unable to fetch peer Debug deter Stats!");
+		else
+			stats_collected = true;
+	}
 
 get_failed:
+	if (deter)
+		qdf_mem_free(deter);
 	if (cap)
 		qdf_mem_free(cap);
 	if (peer_stats)
@@ -4979,6 +5030,59 @@ static QDF_STATUS get_debug_pdev_ctrl_link(struct unified_stats *stats,
 	return QDF_STATUS_SUCCESS;
 }
 
+static QDF_STATUS
+get_debug_pdev_deter_stats(struct unified_stats *stats,
+			   struct cdp_pdev_deter_stats *deter)
+{
+	struct debug_pdev_data_deter *data = NULL;
+
+	if (!stats || !deter) {
+		qdf_err("Invalid Input!");
+		return QDF_STATUS_E_INVAL;
+	}
+	data = qdf_mem_malloc(sizeof(struct debug_pdev_data_deter));
+	if (!data) {
+		qdf_err("Allocation Failed!");
+		return QDF_STATUS_E_NOMEM;
+	}
+
+	qdf_mem_copy(data->dl_ofdma_usr,
+		     deter->dl_ofdma_usr,
+		     sizeof(data->dl_ofdma_usr));
+	qdf_mem_copy(data->ul_ofdma_usr,
+		     deter->ul_ofdma_usr,
+		     sizeof(data->ul_ofdma_usr));
+	qdf_mem_copy(data->dl_mimo_usr,
+		     deter->dl_mimo_usr,
+		     sizeof(data->dl_mimo_usr));
+	qdf_mem_copy(data->ul_mimo_usr,
+		     deter->ul_mimo_usr,
+		     sizeof(data->ul_mimo_usr));
+
+	qdf_mem_copy(data->ul_mode_cnt,
+		     deter->ul_mode_cnt,
+		     sizeof(data->ul_mode_cnt));
+	qdf_mem_copy(data->dl_mode_cnt,
+		     deter->dl_mode_cnt,
+		     sizeof(data->dl_mode_cnt));
+	qdf_mem_copy(data->ch_access_delay,
+		     deter->ch_access_delay,
+		     sizeof(data->ch_access_delay));
+
+	data->trigger_success = deter->trigger_success;
+	data->trigger_fail = deter->trigger_fail;
+
+	data->ch_util.ap_tx_util = deter->ch_util.ap_tx_util;
+	data->ch_util.ap_rx_util = deter->ch_util.ap_rx_util;
+	data->ch_util.ap_chan_util = deter->ch_util.ap_chan_util;
+
+
+	stats->feat[INX_FEAT_DETER] = data;
+	stats->size[INX_FEAT_DETER] = sizeof(struct debug_pdev_data_deter);
+
+	return QDF_STATUS_SUCCESS;
+}
+
 static void aggregate_debug_pdev_ctrl_tx(struct debug_pdev_ctrl_tx *tx,
 					 struct vdev_ic_cp_stats *cp_stats)
 {
@@ -5054,6 +5158,7 @@ static QDF_STATUS get_debug_pdev_data(struct wlan_objmgr_psoc *psoc,
 	struct cdp_pdev_stats *pdev_stats = NULL;
 	struct cdp_pdev_mon_stats *mon = NULL;
 	struct cdp_pdev_tx_capture_stats *cap = NULL;
+	struct cdp_pdev_deter_stats *deter = NULL;
 	QDF_STATUS ret = QDF_STATUS_SUCCESS;
 	void *dp_soc = NULL;
 	uint8_t pdev_id;
@@ -5163,8 +5268,23 @@ static QDF_STATUS get_debug_pdev_data(struct wlan_objmgr_psoc *psoc,
 		else
 			stats_collected = true;
 	}
-
+	if (feat & STATS_FEAT_FLG_DETER) {
+		deter = qdf_mem_malloc(sizeof(struct cdp_pdev_deter_stats));
+		if (!deter) {
+			ret = QDF_STATUS_E_NOMEM;
+			goto get_failed;
+		}
+		ret = cdp_get_pdev_deter_stats(dp_soc, pdev_id, deter);
+		if (ret == QDF_STATUS_SUCCESS)
+			ret = get_debug_pdev_deter_stats(stats, deter);
+		if (ret != QDF_STATUS_SUCCESS)
+			qdf_err("Unable to fetch pdev Debug deter Stats!");
+		else
+			stats_collected = true;
+	}
 get_failed:
+	if (deter)
+		qdf_mem_free(deter);
 	if (cap)
 		qdf_mem_free(cap);
 	if (mon)

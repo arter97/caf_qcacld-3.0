@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -49,6 +49,7 @@
 #define STATS_FEAT_FLG_JITTER          0x00200000
 #define STATS_FEAT_FLG_SAWFDELAY       0x00400000
 #define STATS_FEAT_FLG_SAWFTX          0x00800000
+#define STATS_FEAT_FLG_DETER           0x01000000
 
 /* Add new feature flag above and update STATS_FEAT_FLG_ALL */
 #define STATS_FEAT_FLG_ALL             \
@@ -60,7 +61,7 @@
 	 STATS_FEAT_FLG_DELAY | STATS_FEAT_FLG_ME | STATS_FEAT_FLG_NAWDS | \
 	 STATS_FEAT_FLG_TXCAP | STATS_FEAT_FLG_MONITOR | \
 	 STATS_FEAT_FLG_JITTER | STATS_FEAT_FLG_SAWFDELAY | \
-	 STATS_FEAT_FLG_SAWFTX)
+	 STATS_FEAT_FLG_SAWFTX | STATS_FEAT_FLG_DETER)
 
 #define STATS_BASIC_AP_CTRL_MASK       0
 #define STATS_BASIC_AP_DATA_MASK       (STATS_FEAT_FLG_RX | STATS_FEAT_FLG_TX)
@@ -114,7 +115,8 @@
 	 STATS_FEAT_FLG_ME | STATS_FEAT_FLG_RAW |      \
 	 STATS_FEAT_FLG_TSO | STATS_FEAT_FLG_CFR |     \
 	 STATS_FEAT_FLG_TXCAP | STATS_FEAT_FLG_WDI |   \
-	 STATS_FEAT_FLG_MONITOR | STATS_FEAT_FLG_MESH)
+	 STATS_FEAT_FLG_MONITOR | STATS_FEAT_FLG_MESH |\
+	 STATS_FEAT_FLG_DETER)
 #define STATS_DEBUG_VAP_CTRL_MASK                      \
 	(STATS_BASIC_VAP_CTRL_MASK | STATS_FEAT_FLG_WMI)
 #define STATS_DEBUG_VAP_DATA_MASK                      \
@@ -123,7 +125,8 @@
 	 STATS_FEAT_FLG_TSO)
 #define STATS_DEBUG_STA_CTRL_MASK     STATS_BASIC_STA_CTRL_MASK
 #define STATS_DEBUG_STA_DATA_MASK                      \
-	(STATS_BASIC_STA_DATA_MASK | STATS_FEAT_FLG_TXCAP)
+	(STATS_BASIC_STA_DATA_MASK | STATS_FEAT_FLG_TXCAP | \
+	 STATS_FEAT_FLG_DETER)
 #endif /* WLAN_DEBUG_TELEMETRY */
 
 #ifdef WLAN_FEATURE_11BE
@@ -132,6 +135,8 @@
 #define STATS_IF_MAX_MCS             (14 + 1)
 #endif
 #define STATS_IF_SS_COUNT            8
+#define STATS_IF_MAX_USERS           37
+#define STATS_IF_DATA_TID_MAX        8
 
 /**
  * enum stats_level_e: Defines detailing levels
@@ -1061,6 +1066,31 @@ enum stats_if_tx_transmit_type {
 	STATS_IF_MU_MIMO_OFDMA,
 };
 
+enum stats_if_tx_mode_dl {
+	STATS_IF_TXDL_SU_DATA = 0,
+	STATS_IF_TXDL_OFDMA_DATA,
+	STATS_IF_TXDL_MUMIMO_DATA,
+	STATS_IF_TXDL_MAX,
+};
+
+enum stats_if_tx_mode_ul {
+	STATS_IF_TXUL_OFDMA_BASIC_TRIGGER_DATA = 0,
+	STATS_IF_TXUL_MUMIMO_BASIC_TRIGGER_DATA,
+	STATS_IF_TXUL_OFDMA_MU_BAR,
+	STATS_IF_TXUL_MAX,
+};
+
+enum stats_if_msduq_index {
+	STATS_IF_MSDUQ_DEFAULT = 0,
+	STATS_IF_MSDUQ_CUSTOM_PRIO_0,
+	STATS_IF_MSDUQ_CUSTOM_PRIO_1,
+	STATS_IF_MSDUQ_CUSTOM_EXT_PRIO_0,
+	STATS_IF_MSDUQ_CUSTOM_EXT_PRIO_1,
+	STATS_IF_MSDUQ_CUSTOM_EXT_PRIO_2,
+	STATS_IF_MSDUQ_CUSTOM_EXT_PRIO_3,
+	STATS_IF_MSDUQ_MAX,
+};
+
 struct tx_pkt_info {
 	uint32_t num_msdu;
 	uint32_t num_mpdu;
@@ -1166,6 +1196,33 @@ struct debug_peer_data_txcap {
 	uint64_t pending_q_len[STATS_IF_MAX_TIDS];
 	uint32_t mpdu[STATS_IF_MPDU_MAX];
 	uint32_t msdu[STATS_IF_MSDU_MAX];
+};
+
+struct stats_if_tx_dl_deter {
+	uint64_t avg_rate;
+	uint32_t mode_cnt;
+};
+
+struct stats_if_tx_ul_deter {
+	uint64_t avg_rate;
+	uint32_t mode_cnt;
+	uint32_t trigger_success;
+	uint32_t trigger_fail;
+};
+
+struct stats_if_rx_deter {
+	uint64_t avg_rate;
+	uint32_t mode_cnt;
+};
+
+struct stats_if_deter {
+	struct stats_if_tx_dl_deter dl[STATS_IF_MSDUQ_MAX][STATS_IF_TXDL_MAX];
+	struct stats_if_tx_ul_deter ul[STATS_IF_TXUL_MAX];
+	struct stats_if_rx_deter rx_det;
+};
+
+struct debug_peer_data_deter {
+	struct stats_if_deter deter_stats[STATS_IF_DATA_TID_MAX];
 };
 
 /* Debug Peer control */
@@ -1414,6 +1471,25 @@ struct debug_pdev_data_monitor {
 	uint32_t mon_rx_desc_invalid;
 	uint32_t mon_nbuf_sanity_err;
 	uint32_t mpdu_ppdu_id_mismatch_drop;
+};
+
+struct stats_if_chan_util {
+	uint8_t ap_chan_util;
+	uint8_t ap_tx_util;
+	uint8_t ap_rx_util;
+};
+
+struct debug_pdev_data_deter {
+	uint64_t dl_ofdma_usr[STATS_IF_MAX_USERS];
+	uint64_t ul_ofdma_usr[STATS_IF_MAX_USERS];
+	uint64_t dl_mimo_usr[STATS_IF_MAX_USERS];
+	uint64_t ul_mimo_usr[STATS_IF_MAX_USERS];
+	uint64_t dl_mode_cnt[STATS_IF_TXDL_MAX];
+	uint64_t ul_mode_cnt[STATS_IF_TXUL_MAX];
+	uint32_t ch_access_delay[STATS_IF_WME_AC_MAX];
+	uint64_t trigger_success;
+	uint64_t trigger_fail;
+	struct stats_if_chan_util ch_util;
 };
 
 /* Debug pdev control */
