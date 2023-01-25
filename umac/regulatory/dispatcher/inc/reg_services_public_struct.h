@@ -990,7 +990,7 @@ struct regulatory_channel {
 	uint8_t chan_num;
 	enum channel_state state;
 	uint32_t chan_flags;
-	uint32_t tx_power;
+	int32_t tx_power;
 	uint16_t min_bw;
 	uint16_t max_bw;
 	uint8_t ant_gain;
@@ -1395,7 +1395,7 @@ struct afc_freq_obj {
  */
 struct chan_eirp_obj {
 	uint8_t cfi;
-	uint16_t eirp_power;
+	int16_t eirp_power;
 };
 
 /**
@@ -1871,7 +1871,7 @@ enum reg_phymode {
  */
 struct chan_power_info {
 	qdf_freq_t chan_cfreq;
-	uint8_t tx_power;
+	int8_t tx_power;
 };
 
 /**
@@ -1888,7 +1888,7 @@ struct chan_power_info {
  */
 struct reg_tpc_power_info {
 	bool is_psd_power;
-	uint8_t eirp_power;
+	int8_t eirp_power;
 	uint8_t power_type_6g;
 	uint8_t num_pwr_levels;
 	uint8_t reg_max[MAX_NUM_PWR_LEVEL];

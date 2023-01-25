@@ -9356,11 +9356,11 @@ static inline bool reg_is_320_opclass(qdf_freq_t freq, uint8_t op_class)
  *
  * Return: EIRP power
  */
-static uint8_t reg_find_eirp_in_afc_eirp_obj(struct wlan_objmgr_pdev *pdev,
-					     struct chan_eirp_obj *eirp_obj,
-					     qdf_freq_t freq,
-					     qdf_freq_t cen320,
-					     uint8_t op_class)
+static int8_t reg_find_eirp_in_afc_eirp_obj(struct wlan_objmgr_pdev *pdev,
+					    struct chan_eirp_obj *eirp_obj,
+					    qdf_freq_t freq,
+					    qdf_freq_t cen320,
+					    uint8_t op_class)
 {
 	uint8_t k;
 	uint8_t subchannels[NUM_20_MHZ_CHAN_IN_320_MHZ_CHAN];
@@ -9399,11 +9399,11 @@ static uint8_t reg_find_eirp_in_afc_eirp_obj(struct wlan_objmgr_pdev *pdev,
  *
  * Return: EIRP power
  */
-static uint8_t reg_find_eirp_in_afc_chan_obj(struct wlan_objmgr_pdev *pdev,
-					     struct afc_chan_obj *chan_obj,
-					     qdf_freq_t freq,
-					     qdf_freq_t cen320,
-					     uint8_t op_class)
+static int8_t reg_find_eirp_in_afc_chan_obj(struct wlan_objmgr_pdev *pdev,
+					    struct afc_chan_obj *chan_obj,
+					    qdf_freq_t freq,
+					    qdf_freq_t cen320,
+					    uint8_t op_class)
 {
 	uint8_t j;
 
@@ -9411,7 +9411,7 @@ static uint8_t reg_find_eirp_in_afc_chan_obj(struct wlan_objmgr_pdev *pdev,
 		return 0;
 
 	for (j = 0; j < chan_obj->num_chans; j++) {
-		uint8_t afc_eirp;
+		int8_t afc_eirp;
 		struct chan_eirp_obj *eirp_obj = &chan_obj->chan_eirp_info[j];
 
 		afc_eirp = reg_find_eirp_in_afc_eirp_obj(pdev, eirp_obj,
@@ -9617,7 +9617,8 @@ static uint8_t reg_get_sp_eirp(struct wlan_objmgr_pdev *pdev,
 			       bool is_client_list_lookup_needed,
 			       enum reg_6g_client_type client_type)
 {
-	uint8_t i, op_class = 0, chan_num = 0, afc_eirp_pwr = 0;
+	uint8_t i, op_class = 0, chan_num = 0;
+	int8_t afc_eirp_pwr = 0;
 	struct wlan_regulatory_pdev_priv_obj *pdev_priv_obj;
 	struct regulatory_channel *sp_master_chan_list = NULL;
 	struct reg_fw_afc_power_event *power_info;
@@ -9699,7 +9700,7 @@ static uint8_t reg_get_sp_eirp(struct wlan_objmgr_pdev *pdev,
 						       &reg_sp_eirp_pwr);
 
 	if (afc_eirp_pwr)
-		return QDF_MIN(afc_eirp_pwr, reg_sp_eirp_pwr);
+		return QDF_MIN(afc_eirp_pwr, (int8_t)reg_sp_eirp_pwr);
 
 	return 0;
 }
