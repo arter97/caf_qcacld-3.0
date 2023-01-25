@@ -117,7 +117,7 @@ static void sap_acs_set_puncture_bitmap(struct sap_context *sap_ctx,
  * sap_config_acs_result : Generate ACS result params based on ch constraints
  * @sap_ctx: pointer to SAP context data struct
  * @mac_handle: Opaque handle to the global MAC context
- * @sec_ch: Secondary channel
+ * @sec_ch_freq: Secondary channel frequency
  *
  * This function calculates the ACS result params: ht sec channel, vht channel
  * information and channel bonding based on selected ACS channel.
@@ -176,8 +176,7 @@ void sap_config_acs_result(mac_handle_t mac_handle,
 
 /**
  * sap_hdd_signal_event_handler() - routine to inform hostapd via callback
- *
- * ctx: pointer to sap context which was passed to callback
+ * @ctx: pointer to sap context which was passed to callback
  *
  * this routine will be registered as callback to sme_close_session, so upon
  * closure of sap session it notifies the hostapd
@@ -938,15 +937,14 @@ sap_check_and_process_forcescc_for_go_plus_go(
 }
 
 /**
- * sap_check_and_process_go_force_scc() - find if other p2p
- * go/cli/sta is there and needs force scc.
- *
- * @cur_sap_ctx: current sap context
+ * sap_check_and_process_go_force_scc() - find if other p2p go/cli/sta
+ *                                        is there and needs force scc.
+ * @sap_ctx: current sap context
  *
  * Return: None
  */
 static void
-sap_check_and_process_go_force_ssc(struct sap_context *sap_ctx)
+sap_check_and_process_go_force_scc(struct sap_context *sap_ctx)
 {
 	struct mac_context *mac_ctx;
 	uint32_t con_freq;
@@ -989,7 +987,7 @@ sap_check_and_process_forcescc_for_go_plus_go(
 					struct sap_context *cur_sap_ctx)
 {}
 static inline void
-sap_check_and_process_go_force_ssc(struct sap_context *cur_sap_ctx)
+sap_check_and_process_go_force_scc(struct sap_context *sap_ctx)
 {}
 #endif
 
@@ -1364,7 +1362,7 @@ QDF_STATUS wlansap_roam_callback(void *ctx,
 		 * then check for peer count (which is self peer + peer count)
 		 * and take decision for GO+GO, STA+GO and CLI+GO force SCC
 		 */
-			sap_check_and_process_go_force_ssc(sap_ctx);
+			sap_check_and_process_go_force_scc(sap_ctx);
 		}
 		break;
 	case eCSR_ROAM_RESULT_MAX_ASSOC_EXCEEDED:
