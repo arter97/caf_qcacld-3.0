@@ -9269,9 +9269,24 @@ void wmi_copy_resource_config(wmi_resource_config *resource_cfg,
 	if (tgt_res_cfg->reo_qdesc_shared_addr_table_enabled)
 		WMI_RSRC_CFG_HOST_SERVICE_FLAG_REO_QREF_FEATURE_SUPPORT_SET(
 			resource_cfg->host_service_flags, 1);
+	/*
+	 * DP Peer Meta data FW version
+	 */
+	if (tgt_res_cfg->dp_peer_meta_data_ver) {
+#ifdef CONFIG_AP_PLATFORM
+		WMI_RSRC_CFG_FLAGS2_RX_PEER_METADATA_VERSION_SET(
+			resource_cfg->flags2, 3);
+#else
+		WMI_RSRC_CFG_FLAGS2_RX_PEER_METADATA_VERSION_SET(
+			resource_cfg->flags2, 2);
+#endif
+	} else {
+		WMI_RSRC_CFG_FLAGS2_RX_PEER_METADATA_VERSION_SET(
+			resource_cfg->flags2,
+			WMI_TARGET_CAP_FLAGS_RX_PEER_METADATA_VERSION_GET(
+			tgt_res_cfg->target_cap_flags));
+	}
 
-	WMI_RSRC_CFG_FLAGS2_RX_PEER_METADATA_VERSION_SET(resource_cfg->flags2,
-						 tgt_res_cfg->target_cap_flags);
 	if (tgt_res_cfg->notify_frame_support)
 		WMI_RSRC_CFG_FLAGS2_NOTIFY_FRAME_CONFIG_ENABLE_SET(
 			resource_cfg->flags2, 1);
@@ -21901,6 +21916,9 @@ static void populate_tlv_service(uint32_t *wmi_service)
 #endif
 	wmi_service[wmi_service_wpa3_sha384_roam_support] =
 			WMI_SERVICE_WMI_SERVICE_WPA3_SHA384_ROAM_SUPPORT;
+	/* TODO: Assign FW Enum after FW Shared header changes are merged */
+	wmi_service[wmi_service_v1a_v1b_supported] =
+			WMI_SERVICE_UNAVAILABLE;
 }
 
 /**

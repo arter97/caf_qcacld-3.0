@@ -6233,6 +6233,7 @@ typedef enum {
 #endif
 	wmi_service_wpa3_sha384_roam_support,
 	wmi_service_multiple_vdev_restart_bmap,
+	wmi_service_v1a_v1b_supported,
 	wmi_services_max,
 } wmi_conv_service_ids;
 #define WMI_SERVICE_UNAVAILABLE 0xFFFF
@@ -6602,6 +6603,7 @@ struct target_feature_set {
  * @num_max_active_vdevs: max number of active virtual devices (VAPs) to
  * support
  * @notify_frame_support: capability to mark notify frames from host
+ * @dp_peer_meta_data_ver: datapath peer meta data version flag
  */
 typedef struct {
 	uint32_t num_vdevs;
@@ -6729,6 +6731,7 @@ typedef struct {
 	bool reo_qdesc_shared_addr_table_enabled;
 	uint32_t num_max_active_vdevs;
 	uint8_t notify_frame_support;
+	uint8_t dp_peer_meta_data_ver;
 } target_resource_config;
 
 /**
