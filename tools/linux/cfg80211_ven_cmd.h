@@ -845,6 +845,9 @@ enum {
 #ifdef QCA_SUPPORT_WDS_EXTENDED
 	IEEE80211_PARAM_WDS_EXT_EN = 794,
 #endif
+#if QCA_AIRTIME_FAIRNESS
+	IEEE80211_PARAM_ATF_VIP_INFRA = 795,
+#endif
 };
 
 enum {
@@ -1980,6 +1983,8 @@ struct vendor_commands vap_vendor_cmds[] = {
 	{"g_atfmaxclient",      IEEE80211_PARAM_ATF_MAX_CLIENT, GET_PARAM, 0},
 	{"atfssidgroup",        IEEE80211_PARAM_ATF_SSID_GROUP, SET_PARAM, 1},
 	{"g_atfssidgroup",      IEEE80211_PARAM_ATF_SSID_GROUP, GET_PARAM, 0},
+	{"atf_vip_infra",       IEEE80211_PARAM_ATF_VIP_INFRA, SET_PARAM, 1},
+	{"g_atf_vip_infra",     IEEE80211_PARAM_ATF_VIP_INFRA, GET_PARAM, 0},
 #endif
 	{"bss_chan_info",       IEEE80211_PARAM_BSS_CHAN_INFO, SET_PARAM, 1},
 	{"enable_lcr",          IEEE80211_PARAM_LCR_ENABLE, SET_PARAM, 1},
