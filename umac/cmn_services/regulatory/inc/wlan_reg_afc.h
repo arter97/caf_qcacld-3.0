@@ -202,7 +202,7 @@ struct wlan_afc_resp_opclass_info {
  */
 struct wlan_afc_resp_eirp_info {
 	uint32_t channel_cfi;
-	uint32_t max_eirp_pwr;
+	int32_t  max_eirp_pwr;
 } qdf_packed;
 
 /**
