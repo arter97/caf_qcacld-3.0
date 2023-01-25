@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2017-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -196,9 +196,8 @@ typedef enum wlan_crypto_rsn_cap {
  * WLAN_CRYPTO_RSNX_CAP_SAE_PK: SAE PK
  * WLAN_CRYPTO_RSNX_CAP_SECURE_LTF: Secure LTF
  * WLAN_CRYPTO_RSNX_CAP_SECURE_RTT: Secure RTT
- * WLAN_CRYPTO_RSNX_CAP_PROT_RANGE_NEG: Protected Range Negotiation
- * WLAN_CRYPTO_RSNX_CAP_URNM_MFPR: Same as WLAN_CRYPTO_RSNX_CAP_PROT_RANGE_NEG
- *                                 and it's just a spec format.
+ * WLAN_CRYPTO_RSNX_CAP_URNM_MFPR: Unassociated Range
+ * Negotiation and Measurement MFP Required
  *
  * Definition: (IEEE Std 802.11-2020, 9.4.2.241, Table 9-780)
  * The Extended RSN Capabilities field, except its first 4 bits, is a
@@ -213,8 +212,7 @@ enum wlan_crypto_rsnx_cap {
 	WLAN_CRYPTO_RSNX_CAP_SAE_PK = 0x40,
 	WLAN_CRYPTO_RSNX_CAP_SECURE_LTF = 0x100,
 	WLAN_CRYPTO_RSNX_CAP_SECURE_RTT = 0x200,
-	WLAN_CRYPTO_RSNX_CAP_PROT_RANGE_NEG = 0x400,
-	WLAN_CRYPTO_RSNX_CAP_URNM_MFPR = WLAN_CRYPTO_RSNX_CAP_PROT_RANGE_NEG,
+	WLAN_CRYPTO_RSNX_CAP_URNM_MFPR = 0x8000,
 };
 
 /**
