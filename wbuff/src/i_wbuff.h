@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2018 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -80,7 +81,7 @@ struct wbuff_handle {
  * @handle: wbuff handle for the registered module
  * @reserve: nbuf headroom to start with
  * @align: alignment for the nbuf
- * @pool[]: pools for all available buffers for the module
+ * @pool: pools for all available buffers for the module
  */
 struct wbuff_module {
 	bool registered;
@@ -95,6 +96,7 @@ struct wbuff_module {
 /**
  * struct wbuff_holder - allocation holder for wbuff
  * @initialized: to identified whether module is initialized
+ * @mod: list of modules
  */
 struct wbuff_holder {
 	bool initialized;
