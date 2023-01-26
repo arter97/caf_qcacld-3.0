@@ -206,6 +206,21 @@ static bool hdd_is_target_ready(void *data)
 }
 
 /**
+ * hdd_trigger_ssr_from_hif() - API to process SSR from HIF layer
+ * @data: Private Data
+ * @reason: Hang reson
+ * @reason: Hang function name
+ * @line: Hang line number
+ */
+static void hdd_trigger_ssr_from_hif(void *data, enum qdf_hang_reason reason,
+				     const char *func, const uint32_t line)
+{
+	struct hdd_context *hdd_ctx = cds_get_context(QDF_MODULE_ID_HDD);
+
+	return cds_trigger_recovery_psoc(hdd_ctx->psoc, reason, func, line);
+}
+
+/**
  * hdd_hif_init_driver_state_callbacks() - API to initialize HIF callbacks
  * @data: Private Data
  * @cbk: HIF Driver State callbacks
@@ -224,6 +239,7 @@ static void hdd_hif_init_driver_state_callbacks(void *data,
 	cbk->is_load_unload_in_progress = hdd_is_load_or_unload_in_progress;
 	cbk->is_driver_unloading = hdd_is_driver_unloading;
 	cbk->is_target_ready = hdd_is_target_ready;
+	cbk->trigger_ssr_from_hif = hdd_trigger_ssr_from_hif;
 	cbk->get_bandwidth_level = hdd_get_bandwidth_level;
 	cbk->prealloc_get_consistent_mem_unaligned =
 		hdd_get_consistent_mem_unaligned;

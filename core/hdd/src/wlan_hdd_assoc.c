@@ -1576,7 +1576,7 @@ static void hdd_send_association_event(struct net_device *dev,
 		ucfg_tdls_notify_sta_disconnect(adapter->vdev_id, false, false,
 						adapter->vdev);
 	}
-	hdd_ipa_set_tx_flow_info();
+	wlan_hdd_set_tx_flow_info();
 
 	msg = NULL;
 	/* During the WLAN uninitialization,supplicant is stopped before the

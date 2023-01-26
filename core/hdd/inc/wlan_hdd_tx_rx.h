@@ -573,4 +573,19 @@ bool wlan_hdd_rx_rpm_mark_last_busy(struct hdd_context *hdd_ctx,
  * Return: None
  */
 void hdd_sta_notify_tx_comp_cb(qdf_nbuf_t skb, void *ctx, uint16_t flag);
+
+#ifdef QCA_LL_LEGACY_TX_FLOW_CONTROL
+/**
+ * wlan_hdd_set_tx_flow_info() - To set TX flow info
+ *
+ * This routine is called to set TX flow info
+ *
+ * Return: None
+ */
+void wlan_hdd_set_tx_flow_info(void);
+#else
+static inline void wlan_hdd_set_tx_flow_info(void)
+{
+}
+#endif
 #endif /* end #if !defined(WLAN_HDD_TX_RX_H) */
