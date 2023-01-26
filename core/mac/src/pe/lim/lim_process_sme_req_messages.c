@@ -5441,7 +5441,7 @@ uint32_t lim_get_num_pwr_levels(bool is_psd,
 			num_pwr_levels = 8;
 			break;
 		default:
-			pe_err("Invalid channel width");
+			pe_err_rl("Invalid channel width");
 			return 0;
 		}
 	} else {
@@ -5459,7 +5459,7 @@ uint32_t lim_get_num_pwr_levels(bool is_psd,
 			num_pwr_levels = 4;
 			break;
 		default:
-			pe_err("Invalid channel width");
+			pe_err_rl("Invalid channel width");
 			return 0;
 		}
 	}
