@@ -4287,14 +4287,14 @@ static uint32_t reg_get_channel_flags_for_freq(struct wlan_objmgr_pdev *pdev,
 	chan_enum = reg_get_chan_enum_for_freq(freq);
 
 	if (reg_is_chan_enum_invalid(chan_enum)) {
-		reg_err("chan freq is not valid");
+		reg_debug("chan freq is not valid");
 		return REGULATORY_CHAN_INVALID;
 	}
 
 	pdev_priv_obj = reg_get_pdev_obj(pdev);
 
 	if (!IS_VALID_PDEV_REG_OBJ(pdev_priv_obj)) {
-		reg_err("pdev reg obj is NULL");
+		reg_debug("pdev reg obj is NULL");
 		return REGULATORY_CHAN_INVALID;
 	}
 
@@ -5426,7 +5426,8 @@ reg_fill_chan320mhz_seg0_center(struct wlan_objmgr_pdev *pdev,
 				PRIM_SEG_IEEE_CENTER_240MHZ_5G_CHAN;
 		} else {
 			ch_param->ch_width = CH_WIDTH_INVALID;
-			reg_err("Cannot find 160Mhz centers for freq %d", freq);
+			reg_debug("Cannot find 160 MHz centers for freq %d",
+				  freq);
 		}
 	}
 }
@@ -7085,7 +7086,7 @@ reg_init_indoor_channel_list(struct wlan_objmgr_pdev *pdev)
 	pdev_priv_obj = reg_get_pdev_obj(pdev);
 
 	if (!IS_VALID_PDEV_REG_OBJ(pdev_priv_obj)) {
-		reg_err("reg pdev priv obj is NULL");
+		reg_debug("reg pdev priv obj is NULL");
 		return;
 	}
 
