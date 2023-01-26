@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -108,6 +108,15 @@ void wlan_peer_delete_complete(struct wlan_objmgr_peer *peer);
  * Return: none
  */
 void mlo_peer_delete(struct wlan_objmgr_peer *peer);
+
+/**
+ * wlan_mlo_peer_delete - Initiate deletion of MLO peer
+ *
+ * @ml_peer: pointer to ML peer context
+ *
+ * Return: none
+ */
+void wlan_mlo_peer_delete(struct wlan_mlo_peer_context *ml_peer);
 
 /**
  * is_mlo_all_peer_links_deleted - Check if all the peer links are deleted
