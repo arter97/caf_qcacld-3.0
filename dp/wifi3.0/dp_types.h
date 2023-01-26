@@ -3391,7 +3391,8 @@ struct dp_pdev {
 	bool is_pdev_down;
 
 	/* Enhanced Stats is enabled */
-	bool enhanced_stats_en;
+	uint8_t enhanced_stats_en:1,
+		link_peer_stats:1;
 
 	/* Flag to indicate fast RX */
 	bool rx_fast_flag;

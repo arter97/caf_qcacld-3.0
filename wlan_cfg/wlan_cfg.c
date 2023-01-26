@@ -3060,6 +3060,8 @@ wlan_cfg_soc_attach(struct cdp_ctrl_objmgr_psoc *psoc)
 	wlan_cfg_ctx->pext_stats_enabled = cfg_get(psoc, CFG_DP_PEER_EXT_STATS);
 	wlan_cfg_ctx->jitter_stats_enabled =
 			cfg_get(psoc, CFG_DP_PEER_JITTER_STATS);
+	wlan_cfg_ctx->peer_link_stats_enabled =
+			cfg_get(psoc, CFG_DP_PEER_LINK_STATS);
 	wlan_cfg_ctx->is_rx_buff_pool_enabled =
 			cfg_get(psoc, CFG_DP_RX_BUFF_POOL_ENABLE);
 	wlan_cfg_ctx->is_rx_refill_buff_pool_enabled =
@@ -4112,6 +4114,22 @@ bool wlan_cfg_is_peer_jitter_stats_enabled(struct wlan_cfg_dp_soc_ctxt *cfg)
 {
 	return cfg->jitter_stats_enabled;
 }
+
+void
+wlan_cfg_set_peer_link_stats(struct wlan_cfg_dp_soc_ctxt *cfg,
+			     bool val)
+{
+	cfg->peer_link_stats_enabled = val;
+}
+
+qdf_export_symbol(wlan_cfg_set_peer_link_stats);
+
+bool wlan_cfg_is_peer_link_stats_enabled(struct wlan_cfg_dp_soc_ctxt *cfg)
+{
+	return cfg->peer_link_stats_enabled;
+}
+
+qdf_export_symbol(wlan_cfg_is_peer_link_stats_enabled);
 
 #ifdef WLAN_FEATURE_RX_PREALLOC_BUFFER_POOL
 bool wlan_cfg_is_rx_buffer_pool_enabled(struct wlan_cfg_dp_soc_ctxt *cfg)

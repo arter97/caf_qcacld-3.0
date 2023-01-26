@@ -2417,14 +2417,19 @@ dp_rx_wbm_err_process(struct dp_intr *int_ctx, struct dp_soc *soc,
 			continue;
 		}
 
-		if (txrx_peer && txrx_peer->is_mld_peer) {
+		pool_id = wbm_err_info.pool_id;
+		dp_pdev = dp_get_pdev_for_lmac_id(soc, pool_id);
+
+		if (dp_pdev && dp_pdev->link_peer_stats &&
+		    txrx_peer && txrx_peer->is_mld_peer) {
 			link_id = ((dp_rx_peer_mdata_link_id_get(
 							soc,
 							peer_meta_data)) + 1);
 			if (link_id < 1 || link_id > DP_MAX_MLO_LINKS)
 				link_id = 0;
-		} else
+		} else {
 			link_id = 0;
+		}
 
 		if (wbm_err_info.wbm_err_src == HAL_RX_WBM_ERR_SRC_REO) {
 			if (wbm_err_info.reo_psh_rsn
@@ -2434,8 +2439,6 @@ dp_rx_wbm_err_process(struct dp_intr *int_ctx, struct dp_soc *soc,
 					rx.err.reo_error
 					[wbm_err_info.reo_err_code], 1);
 				/* increment @pdev level */
-				pool_id = wbm_err_info.pool_id;
-				dp_pdev = dp_get_pdev_for_lmac_id(soc, pool_id);
 				if (dp_pdev)
 					DP_STATS_INC(dp_pdev, err.reo_error,
 						     1);
@@ -2545,8 +2548,6 @@ dp_rx_wbm_err_process(struct dp_intr *int_ctx, struct dp_soc *soc,
 					rx.err.rxdma_error
 					[wbm_err_info.rxdma_err_code], 1);
 				/* increment @pdev level */
-				pool_id = wbm_err_info.pool_id;
-				dp_pdev = dp_get_pdev_for_lmac_id(soc, pool_id);
 				if (dp_pdev)
 					DP_STATS_INC(dp_pdev,
 						     err.rxdma_error, 1);

@@ -2491,7 +2491,7 @@ void dp_rx_msdu_stats_update(struct dp_soc *soc, qdf_nbuf_t nbuf,
 {
 	bool is_not_amsdu;
 	struct dp_vdev *vdev = txrx_peer->vdev;
-	bool enh_flag;
+	uint8_t enh_flag;
 	qdf_ether_header_t *eh;
 	uint16_t msdu_len = QDF_NBUF_CB_RX_PKT_LEN(nbuf);
 

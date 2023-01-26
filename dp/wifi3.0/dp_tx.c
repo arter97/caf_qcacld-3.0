@@ -5302,6 +5302,7 @@ void dp_tx_comp_process_tx_status(struct dp_soc *soc,
 	if (link_id < 1 || link_id > DP_MAX_MLO_LINKS)
 		link_id = 0;
 #endif
+
 	dp_tx_update_connectivity_stats(soc, vdev, tx_desc, ts->status);
 	dp_tx_update_uplink_delay(soc, vdev, ts);
 

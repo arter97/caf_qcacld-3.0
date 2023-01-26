@@ -1446,6 +1446,16 @@
 		CFG_INI_BOOL("peer_ext_stats", \
 		false, "Peer extended stats")
 
+#ifdef QCA_ENHANCED_STATS_SUPPORT
+#define DEFAULT_PEER_LINK_STATS_VALUE true
+#else
+#define DEFAULT_PEER_LINK_STATS_VALUE false
+#endif /* QCA_ENHANCED_STATS_SUPPORT */
+
+#define CFG_DP_PEER_LINK_STATS \
+		CFG_INI_BOOL("peer_link_stats", \
+		DEFAULT_PEER_LINK_STATS_VALUE, "Peer Link stats")
+
 #define CFG_DP_PEER_JITTER_STATS \
 		CFG_INI_BOOL("peer_jitter_stats", \
 		false, "Peer Jitter stats")
@@ -1973,6 +1983,7 @@
 		CFG(CFG_DP_REO_RINGS_MAP) \
 		CFG(CFG_DP_PEER_EXT_STATS) \
 		CFG(CFG_DP_PEER_JITTER_STATS) \
+		CFG(CFG_DP_PEER_LINK_STATS) \
 		CFG(CFG_DP_RX_BUFF_POOL_ENABLE) \
 		CFG(CFG_DP_RX_REFILL_BUFF_POOL_ENABLE) \
 		CFG(CFG_DP_RX_PENDING_HL_THRESHOLD) \

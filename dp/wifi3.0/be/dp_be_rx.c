@@ -112,7 +112,7 @@ static inline void dp_wds_ext_peer_learn_be(struct dp_soc *soc,
 					    &ta_txrx_peer->wds_ext.init);
 
 		if (qdf_unlikely(ta_txrx_peer->nawds_enabled &&
-				 ta_txrx_peer->mld_peer)) {
+				 ta_txrx_peer->is_mld_peer)) {
 			ta_base_peer = dp_get_primary_link_peer_by_id(
 							soc,
 							ta_txrx_peer->peer_id,
@@ -184,7 +184,7 @@ uint32_t dp_rx_process_be(struct dp_intr *int_ctx,
 	uint32_t rx_bufs_reaped[WLAN_MAX_MLO_CHIPS][MAX_PDEV_CNT];
 	uint8_t mac_id = 0;
 	struct dp_pdev *rx_pdev;
-	bool enh_flag;
+	uint8_t enh_flag;
 	struct dp_srng *dp_rxdma_srng;
 	struct rx_desc_pool *rx_desc_pool;
 	struct dp_soc *soc = int_ctx->soc;
@@ -565,7 +565,8 @@ done:
 
 		rx_bufs_used++;
 
-		if (txrx_peer->is_mld_peer) {
+		/* MLD Link Peer Statistics support */
+		if (txrx_peer->is_mld_peer && rx_pdev->link_peer_stats) {
 			link_id = ((dp_rx_get_msdu_hw_link_id(nbuf)) + 1);
 			if (link_id < 1 || link_id > DP_MAX_MLO_LINKS)
 				link_id = 0;

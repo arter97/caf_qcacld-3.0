@@ -1308,6 +1308,10 @@ struct cdp_mon_ops dp_ops_mon_1_0 = {
 	.soc_config_full_mon_mode = dp_soc_config_full_mon_mode,
 	.get_mon_pdev_rx_stats = dp_pdev_get_rx_mon_stats,
 	.txrx_enable_mon_reap_timer = dp_enable_mon_reap_timer,
+#ifdef QCA_ENHANCED_STATS_SUPPORT
+	.txrx_enable_enhanced_stats = dp_enable_enhanced_stats,
+	.txrx_disable_enhanced_stats = dp_disable_enhanced_stats,
+#endif /* QCA_ENHANCED_STATS_SUPPORT */
 #ifdef QCA_SUPPORT_LITE_MONITOR
 	.txrx_set_lite_mon_config = NULL,
 	.txrx_get_lite_mon_config = NULL,

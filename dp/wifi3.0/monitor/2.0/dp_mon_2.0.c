@@ -1664,6 +1664,10 @@ struct cdp_mon_ops dp_ops_mon_2_0 = {
 	.soc_config_full_mon_mode = NULL,
 	.get_mon_pdev_rx_stats = dp_pdev_get_rx_mon_stats,
 	.txrx_enable_mon_reap_timer = NULL,
+#ifdef QCA_ENHANCED_STATS_SUPPORT
+	.txrx_enable_enhanced_stats = dp_enable_enhanced_stats_2_0,
+	.txrx_disable_enhanced_stats = dp_disable_enhanced_stats_2_0,
+#endif /* QCA_ENHANCED_STATS_SUPPORT */
 #ifdef QCA_SUPPORT_LITE_MONITOR
 	.txrx_set_lite_mon_config = dp_lite_mon_set_config,
 	.txrx_get_lite_mon_config = dp_lite_mon_get_config,
@@ -1750,5 +1754,51 @@ void dp_mon_rx_update_rx_protocol_tag_stats(struct dp_pdev *pdev,
 void dp_mon_rx_update_rx_protocol_tag_stats(struct dp_pdev *pdev,
 					    uint16_t protocol_index)
 {
+}
+#endif
+
+#ifdef QCA_ENHANCED_STATS_SUPPORT
+static void
+dp_enable_enhanced_stats_for_each_pdev(struct dp_soc *soc, void *arg) {
+	uint8_t i = 0;
+
+	for (i = 0; i < MAX_PDEV_CNT; i++)
+		dp_enable_enhanced_stats(dp_soc_to_cdp_soc_t(soc), i);
+}
+
+QDF_STATUS
+dp_enable_enhanced_stats_2_0(struct cdp_soc_t *soc, uint8_t pdev_id)
+{
+	struct dp_soc *dp_soc = cdp_soc_t_to_dp_soc(soc);
+	struct dp_soc_be *be_soc = NULL;
+
+	be_soc = dp_get_be_soc_from_dp_soc(dp_soc);
+
+	dp_mlo_iter_ptnr_soc(be_soc,
+			     dp_enable_enhanced_stats_for_each_pdev,
+			     NULL);
+	return QDF_STATUS_SUCCESS;
+}
+
+static void
+dp_disable_enhanced_stats_for_each_pdev(struct dp_soc *soc, void *arg) {
+	uint8_t i = 0;
+
+	for (i = 0; i < MAX_PDEV_CNT; i++)
+		dp_disable_enhanced_stats(dp_soc_to_cdp_soc_t(soc), i);
+}
+
+QDF_STATUS
+dp_disable_enhanced_stats_2_0(struct cdp_soc_t *soc, uint8_t pdev_id)
+{
+	struct dp_soc *dp_soc = cdp_soc_t_to_dp_soc(soc);
+	struct dp_soc_be *be_soc = NULL;
+
+	be_soc = dp_get_be_soc_from_dp_soc(dp_soc);
+
+	dp_mlo_iter_ptnr_soc(be_soc,
+			     dp_disable_enhanced_stats_for_each_pdev,
+			     NULL);
+	return QDF_STATUS_SUCCESS;
 }
 #endif

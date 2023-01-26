@@ -298,6 +298,7 @@ struct wlan_srng_cfg {
  * @radio2_rx_default_reo:
  * @wow_check_rx_pending_enable: Enable RX frame pending check in WoW
  * @jitter_stats_enabled: true if jitter stats are enabled
+ * @peer_link_stats_enabled: true if MLO Peer Link stats are enabled
  * @ipa_tx_ring_size: IPA tx ring size
  * @ipa_tx_comp_ring_size: IPA tx completion ring size
  * @ipa_tx_alt_ring_size: IPA tx alt ring size
@@ -476,6 +477,7 @@ struct wlan_cfg_dp_soc_ctxt {
 	uint8_t radio2_rx_default_reo;
 	bool wow_check_rx_pending_enable;
 	bool jitter_stats_enabled;
+	bool peer_link_stats_enabled;
 #ifdef IPA_OFFLOAD
 	uint32_t ipa_tx_ring_size;
 	uint32_t ipa_tx_comp_ring_size;
@@ -1993,6 +1995,27 @@ bool wlan_cfg_is_fst_in_cmem_enabled(struct wlan_cfg_dp_soc_ctxt *cfg);
  * Return: true if enabled, false otherwise.
  */
 bool wlan_cfg_is_swlm_enabled(struct wlan_cfg_dp_soc_ctxt *cfg);
+
+/**
+ * wlan_cfg_set_peer_link_stats() - set peer link stats
+ *
+ * @cfg: soc configuration context
+ * @val: Flag value read from INI
+ *
+ * Return: void
+ */
+void
+wlan_cfg_set_peer_link_stats(struct wlan_cfg_dp_soc_ctxt *cfg,
+			     bool val);
+/**
+ * wlan_cfg_is_peer_link_stats_enabled() - check if link peer stats are enabled
+ *
+ * @cfg: soc configuration context
+ *
+ * Return: bool
+ */
+bool
+wlan_cfg_is_peer_link_stats_enabled(struct wlan_cfg_dp_soc_ctxt *cfg);
 
 #ifdef IPA_OFFLOAD
 /**

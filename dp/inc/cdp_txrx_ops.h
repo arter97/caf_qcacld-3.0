@@ -984,6 +984,8 @@ struct cdp_me_ops {
  * @txrx_set_lite_mon_peer_config: set lite monitor peer config
  * @txrx_get_lite_mon_peer_config: get lite monitor peer list
  * @txrx_is_lite_mon_enabled: get lite monitor enable/disable status
+ * @txrx_enable_enhanced_stats: Enable enhanced stats
+ * @txrx_disable_enhanced_stats: Disable enhanced stats
  * @txrx_get_lite_mon_legacy_feature_enabled: returns the legacy filter enabled
  * @txrx_set_mon_pdev_params_rssi_dbm_conv: To set RSSI dbm conversion params
  *                                           in monitor pdev
@@ -1014,6 +1016,12 @@ struct cdp_mon_ops {
 	bool (*txrx_enable_mon_reap_timer)(struct cdp_soc_t *soc_hdl,
 					   enum cdp_mon_reap_source source,
 					   bool enable);
+
+	QDF_STATUS (*txrx_enable_enhanced_stats)(struct cdp_soc_t *soc,
+						 uint8_t pdev_id);
+
+	QDF_STATUS (*txrx_disable_enhanced_stats)(struct cdp_soc_t *soc,
+						  uint8_t pdev_id);
 
 #ifdef QCA_SUPPORT_LITE_MONITOR
 	QDF_STATUS
@@ -1068,8 +1076,6 @@ struct cdp_mon_ops {
  * @txrx_host_stats_clr:
  * @txrx_host_ce_stats:
  * @txrx_stats_publish:
- * @txrx_enable_enhanced_stats: Enable enhanced stats functionality.
- * @txrx_disable_enhanced_stats: Disable enhanced stats functionality.
  * @tx_print_tso_stats:
  * @tx_rst_tso_stats:
  * @tx_print_sg_stats:
@@ -1127,10 +1133,6 @@ struct cdp_host_stats_ops {
 
 	int (*txrx_stats_publish)(struct cdp_soc_t *soc, uint8_t pdev_id,
 				  struct cdp_stats_extd *buf);
-	QDF_STATUS (*txrx_enable_enhanced_stats)(struct cdp_soc_t *soc,
-						 uint8_t pdev_id);
-	QDF_STATUS (*txrx_disable_enhanced_stats)(struct cdp_soc_t *soc,
-						  uint8_t pdev_id);
 
 	QDF_STATUS
 		(*tx_print_tso_stats)(struct cdp_soc_t *soc, uint8_t vdev_id);

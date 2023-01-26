@@ -7872,9 +7872,11 @@ static QDF_STATUS dp_txrx_peer_detach(struct dp_soc *soc, struct dp_peer *peer)
 }
 
 static inline
-uint8_t dp_txrx_peer_calculate_stats_size(struct dp_peer *peer)
+uint8_t dp_txrx_peer_calculate_stats_size(struct dp_soc *soc,
+					  struct dp_peer *peer)
 {
-	if (IS_MLO_DP_MLD_PEER(peer)) {
+	if ((wlan_cfg_is_peer_link_stats_enabled(soc->wlan_cfg_ctx)) &&
+	    IS_MLO_DP_MLD_PEER(peer)) {
 		return (DP_MAX_MLO_LINKS + 1);
 	}
 	return 1;
@@ -7887,7 +7889,7 @@ static QDF_STATUS dp_txrx_peer_attach(struct dp_soc *soc, struct dp_peer *peer)
 	struct cdp_txrx_peer_params_update params = {0};
 	uint8_t stats_arr_size = 0;
 
-	stats_arr_size = dp_txrx_peer_calculate_stats_size(peer);
+	stats_arr_size = dp_txrx_peer_calculate_stats_size(soc, peer);
 
 	txrx_peer = (struct dp_txrx_peer *)qdf_mem_malloc(sizeof(*txrx_peer) +
 							  (stats_arr_size *

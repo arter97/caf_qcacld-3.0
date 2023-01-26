@@ -1941,12 +1941,13 @@ static void dp_mon_tx_enable_enhanced_stats(struct dp_pdev *pdev)
  *
  * Return: QDF_STATUS
  */
-static QDF_STATUS
+QDF_STATUS
 dp_enable_enhanced_stats(struct cdp_soc_t *soc, uint8_t pdev_id)
 {
 	struct dp_pdev *pdev = NULL;
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
 	struct dp_mon_pdev *mon_pdev;
+	struct dp_soc *dp_soc = cdp_soc_t_to_dp_soc(soc);
 
 	pdev = dp_get_pdev_from_soc_pdev_id_wifi3((struct dp_soc *)soc,
 						  pdev_id);
@@ -1963,7 +1964,9 @@ dp_enable_enhanced_stats(struct cdp_soc_t *soc, uint8_t pdev_id)
 		dp_cal_client_timer_start(mon_pdev->cal_client_ctx);
 
 	mon_pdev->enhanced_stats_en = 1;
-	pdev->enhanced_stats_en = true;
+	pdev->enhanced_stats_en = 1;
+	pdev->link_peer_stats = wlan_cfg_is_peer_link_stats_enabled(
+							dp_soc->wlan_cfg_ctx);
 
 	dp_mon_filter_setup_enhanced_stats(pdev);
 	status = dp_mon_filter_update(pdev);
@@ -1972,7 +1975,8 @@ dp_enable_enhanced_stats(struct cdp_soc_t *soc, uint8_t pdev_id)
 		dp_mon_filter_reset_enhanced_stats(pdev);
 		dp_cal_client_timer_stop(mon_pdev->cal_client_ctx);
 		mon_pdev->enhanced_stats_en = 0;
-		pdev->enhanced_stats_en = false;
+		pdev->enhanced_stats_en = 0;
+		pdev->link_peer_stats = 0;
 		return QDF_STATUS_E_FAILURE;
 	}
 
@@ -2005,7 +2009,7 @@ static void dp_mon_tx_disable_enhanced_stats(struct dp_pdev *pdev)
  *
  * Return: QDF_STATUS
  */
-static QDF_STATUS
+QDF_STATUS
 dp_disable_enhanced_stats(struct cdp_soc_t *soc, uint8_t pdev_id)
 {
 	struct dp_pdev *pdev =
@@ -2023,7 +2027,8 @@ dp_disable_enhanced_stats(struct cdp_soc_t *soc, uint8_t pdev_id)
 		dp_cal_client_timer_stop(mon_pdev->cal_client_ctx);
 
 	mon_pdev->enhanced_stats_en = 0;
-	pdev->enhanced_stats_en = false;
+	pdev->enhanced_stats_en = 0;
+	pdev->link_peer_stats = 0;
 
 	dp_mon_tx_disable_enhanced_stats(pdev);
 
@@ -6450,12 +6455,6 @@ void dp_mon_cdp_ops_register(struct dp_soc *soc)
 	ops->ctrl_ops->txrx_update_peer_pkt_capture_params =
 				 dp_peer_update_pkt_capture_params;
 #endif /* WLAN_TX_PKT_CAPTURE_ENH || WLAN_RX_PKT_CAPTURE_ENH */
-#ifdef QCA_ENHANCED_STATS_SUPPORT
-	ops->host_stats_ops->txrx_enable_enhanced_stats =
-					dp_enable_enhanced_stats;
-	ops->host_stats_ops->txrx_disable_enhanced_stats =
-					dp_disable_enhanced_stats;
-#endif /* QCA_ENHANCED_STATS_SUPPORT */
 #ifdef WDI_EVENT_ENABLE
 	ops->ctrl_ops->txrx_get_pldev = dp_get_pldev;
 #endif
@@ -6515,10 +6514,6 @@ void dp_mon_cdp_ops_deregister(struct dp_soc *soc)
 #if defined(WLAN_TX_PKT_CAPTURE_ENH) || defined(WLAN_RX_PKT_CAPTURE_ENH)
 	ops->ctrl_ops->txrx_update_peer_pkt_capture_params = NULL;
 #endif /* WLAN_TX_PKT_CAPTURE_ENH || WLAN_RX_PKT_CAPTURE_ENH */
-#ifdef FEATURE_PERPKT_INFO
-	ops->host_stats_ops->txrx_enable_enhanced_stats = NULL;
-	ops->host_stats_ops->txrx_disable_enhanced_stats = NULL;
-#endif /* FEATURE_PERPKT_INFO */
 #ifdef WDI_EVENT_ENABLE
 	ops->ctrl_ops->txrx_get_pldev = NULL;
 #endif
