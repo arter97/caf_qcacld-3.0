@@ -80,6 +80,11 @@
 #define LITE_MON_LEN_2  0x80
 #define LITE_MON_LEN_ALL  0xFFFF
 
+#define LITE_MON_PEER_ADD     0
+#define LITE_MON_PEER_REMOVE  1
+#define LITE_MON_PEER_LIST    2
+#define LITE_MON_PEER_CMD_MAX 3
+
 #define LITE_MON_TRACE_INFO 2
 
 /**

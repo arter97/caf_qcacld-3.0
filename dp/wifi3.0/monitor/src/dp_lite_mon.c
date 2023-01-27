@@ -630,8 +630,8 @@ dp_lite_mon_update_peers(struct dp_lite_mon_config *config,
 		}
 		if (!peer_deleted) {
 			status = QDF_STATUS_E_FAILURE;
-			dp_mon_err("%pM Cannot find peer to delete",
-					   peer_config->mac);
+			dp_mon_debug("%pM Cannot find peer to delete",
+				     peer_config->mac);
 		}
 	} else {
 		dp_mon_err("invalid peer action");
