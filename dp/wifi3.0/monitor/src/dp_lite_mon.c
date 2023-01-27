@@ -288,6 +288,32 @@ dp_lite_mon_disable_rx(struct dp_pdev *pdev)
 	qdf_spin_unlock_bh(&lite_mon_rx_config->lite_mon_rx_lock);
 }
 
+/*
+ * dp_lite_mon_is_rx_adv_filter_enable - check if advance monitor
+ * filter is enabled
+ * @pdev: dp_pdev
+ *
+ * Return: True/False
+ */
+bool
+dp_lite_mon_is_rx_adv_filter_enable(struct dp_pdev *pdev)
+{
+	struct cdp_soc_t *soc_hdl = NULL;
+
+	if (!pdev || !pdev->soc)
+		return false;
+
+	soc_hdl = dp_soc_to_cdp_soc_t(pdev->soc);
+
+	if (dp_lite_mon_get_legacy_feature_enabled(soc_hdl,
+						   pdev->pdev_id,
+						   CDP_LITE_MON_DIRECTION_RX) ==
+						   LEGACY_FILTER_ADV_MON_FILTER)
+		return true;
+	else
+		return false;
+}
+
 /**
  * dp_lite_mon_set_rx_config - Update rx lite mon config
  * @be_pdev: be dp pdev
@@ -928,6 +954,67 @@ dp_lite_mon_get_peer_config(struct cdp_soc_t *soc_hdl,
 	}
 
 	return status;
+}
+
+/**
+ * dp_lite_mon_get_filter_ucast_data - check if ucast filter is enabled
+ * @pdev_handle: cdp_pdev
+ *
+ * Return: True/False
+ **/
+bool dp_lite_mon_get_filter_ucast_data(struct cdp_pdev *pdev_handle)
+{
+	struct dp_pdev_be *be_pdev = dp_get_be_pdev_from_dp_pdev((struct dp_pdev *)pdev_handle);
+	struct dp_mon_pdev_be *be_mon_pdev = (struct dp_mon_pdev_be *)be_pdev->pdev.monitor_pdev;
+	struct dp_lite_mon_config mon_config = be_mon_pdev->lite_mon_rx_config->rx_config;
+
+	if ((mon_config.data_filter[LITE_MON_MODE_FILTER_FP] & FILTER_DATA_UCAST) ||
+	    (mon_config.data_filter[LITE_MON_MODE_FILTER_MO] & FILTER_DATA_UCAST))
+		return true;
+
+	return false;
+}
+
+/**
+ * dp_lite_mon_get_filter_mcast_data - check if mcast filter is enabled
+ * @pdev_handle: cdp_pdev
+ *
+ * Return: True/False
+ **/
+bool dp_lite_mon_get_filter_mcast_data(struct cdp_pdev *pdev_handle)
+{
+	struct dp_pdev_be *be_pdev = dp_get_be_pdev_from_dp_pdev((struct dp_pdev *)pdev_handle);
+	struct dp_mon_pdev_be *be_mon_pdev = (struct dp_mon_pdev_be *)be_pdev->pdev.monitor_pdev;
+	struct dp_lite_mon_config mon_config = be_mon_pdev->lite_mon_rx_config->rx_config;
+
+	if ((mon_config.data_filter[LITE_MON_MODE_FILTER_FP] & FILTER_DATA_MCAST) ||
+	    (mon_config.data_filter[LITE_MON_MODE_FILTER_MO] & FILTER_DATA_MCAST))
+		return true;
+
+	return false;
+}
+
+/**
+ * dp_lite_mon_get_filter_non_data - check if non data filter is enabled
+ * @pdev_handle: cdp_pdev
+ *
+ * Return: True/False
+ **/
+bool dp_lite_mon_get_filter_non_data(struct cdp_pdev *pdev_handle)
+{
+	struct dp_pdev_be *be_pdev = dp_get_be_pdev_from_dp_pdev((struct dp_pdev *)pdev_handle);
+	struct dp_mon_pdev_be *be_mon_pdev = (struct dp_mon_pdev_be *)be_pdev->pdev.monitor_pdev;
+	struct dp_lite_mon_config mon_config = be_mon_pdev->lite_mon_rx_config->rx_config;
+
+	if ((mon_config.mgmt_filter[LITE_MON_MODE_FILTER_FP] & FILTER_MGMT_ALL) ||
+	    (mon_config.mgmt_filter[LITE_MON_MODE_FILTER_MO] & FILTER_MGMT_ALL)) {
+		if ((mon_config.ctrl_filter[LITE_MON_MODE_FILTER_FP] & FILTER_CTRL_ALL) ||
+		    (mon_config.ctrl_filter[LITE_MON_MODE_FILTER_MO] & FILTER_CTRL_ALL)) {
+			return true;
+		}
+	}
+
+	return false;
 }
 
 /**
