@@ -34,6 +34,7 @@
 #include <qdf_time.h>
 #include <wlan_objmgr_peer_obj.h>
 #include <wlan_scan_api.h>
+#include <wlan_mlo_mgr_peer.h>
 
 #ifdef WLAN_FEATURE_11BE_MLO
 static QDF_STATUS mlo_disconnect_req(struct wlan_objmgr_vdev *vdev,
@@ -391,7 +392,9 @@ mlo_validate_disconn_req(struct wlan_objmgr_vdev *vdev,
 			return QDF_STATUS_E_BUSY;
 		} else if (wlan_cm_is_vdev_connected(mlo_dev->wlan_vdev_list[i]) &&
 			   !wlan_vdev_mlme_is_mlo_link_vdev(
-				mlo_dev->wlan_vdev_list[i])) {
+				mlo_dev->wlan_vdev_list[i]) &&
+			   wlan_peer_is_mlo(wlan_vdev_get_bsspeer(
+						mlo_dev->wlan_vdev_list[i]))) {
 				/* If the vdev is moved to connected state but
 				 * MLO mgr is not yet notified, defer disconnect
 				 * as it can cause race between connect complete
