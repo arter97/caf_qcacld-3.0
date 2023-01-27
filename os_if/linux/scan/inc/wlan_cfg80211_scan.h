@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2017-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -65,8 +65,7 @@ extern const struct nla_policy cfg80211_scan_policy[
 #define SCAN_WAKE_LOCK_SCAN_DURATION (5 * 1000) /* in msec */
 
 /**
- * typedef struct qcom_ie_age - age ie
- *
+ * typedef qcom_ie_age - age ie
  * @element_id: Element id
  * @len: Length
  * @oui_1: OUI 1
@@ -93,11 +92,11 @@ typedef struct {
 
 /**
  * struct osif_scan_pdev - OS scan private structure
- * scan_req_q: Scan request queue
- * scan_req_q_lock: Protect scan request queue
- * req_id: Scan request Id
- * runtime_pm_lock: Runtime suspend lock
- * scan_wake_lock: Scan wake lock
+ * @scan_req_q: Scan request queue
+ * @scan_req_q_lock: Protect scan request queue
+ * @req_id: Scan request Id
+ * @runtime_pm_lock: Runtime suspend lock
+ * @scan_wake_lock: Scan wake lock
  */
 struct osif_scan_pdev{
 	qdf_list_t scan_req_q;
@@ -279,7 +278,7 @@ int wlan_cfg80211_scan(struct wlan_objmgr_vdev *vdev,
 /**
  * wlan_cfg80211_inform_bss_frame_data() - API to inform beacon to cfg80211
  * @wiphy: wiphy
- * @bss_data: bss data
+ * @bss: bss data
  *
  * API to inform beacon to cfg80211
  *
@@ -293,7 +292,6 @@ wlan_cfg80211_inform_bss_frame_data(struct wiphy *wiphy,
  * wlan_cfg80211_inform_bss_frame() - API to inform beacon to cfg80211
  * @pdev: Pointer to pdev
  * @scan_params: scan entry
- * @request: Pointer to scan request
  *
  * API to inform beacon to cfg80211
  *
@@ -401,7 +399,7 @@ void wlan_cfg80211_cleanup_scan_queue(struct wlan_objmgr_pdev *pdev,
 				      struct net_device *dev);
 
 /**
- * wlan_hdd_cfg80211_add_connected_pno_support() - Set connected PNO support
+ * wlan_scan_cfg80211_add_connected_pno_support() - Set connected PNO support
  * @wiphy: Pointer to wireless phy
  *
  * This function is used to set connected PNO support to kernel
@@ -423,9 +421,9 @@ void wlan_scan_cfg80211_add_connected_pno_support(struct wiphy *wiphy)
 		defined(CFG80211_MULTI_SCAN_PLAN_BACKPORT)) && \
 		defined(FEATURE_WLAN_SCAN_PNO)
 /**
- * hdd_config_sched_scan_plans_to_wiphy() - configure sched scan plans to wiphy
+ * wlan_config_sched_scan_plans_to_wiphy() - configure sched scan plans to wiphy
  * @wiphy: pointer to wiphy
- * @config: pointer to config
+ * @psoc: pointer to psoc object
  *
  * Return: None
  */

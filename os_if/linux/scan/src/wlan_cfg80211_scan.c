@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2017-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -166,6 +166,7 @@ static void wlan_scan_rand_attrs(struct wlan_objmgr_vdev *vdev,
 /**
  * wlan_config_sched_scan_plan() - configures the sched scan plans
  *   from the framework.
+ * @psoc: psoc object
  * @pno_req: pointer to PNO scan request
  * @request: pointer to scan request from framework
  *
@@ -756,11 +757,12 @@ wlan_schedule_scan_start_request(struct wlan_objmgr_pdev *pdev,
 
 /**
  * wlan_scan_request_dequeue() - dequeue scan request
- * @nl_ctx: Global HDD context
+ * @pdev: pdev object
  * @scan_id: scan id
  * @req: scan request
- * @dev: net device
  * @source : returns source of the scan request
+ * @dev: returns source net device
+ * @scan_start_timestamp: returns scan start timestamp
  *
  * Return: QDF_STATUS
  */
@@ -875,7 +877,7 @@ void wlan_cfg80211_scan_done(struct net_device *netdev,
  * @netdev: Net device
  * @req : Scan request
  * @aborted : true scan aborted false scan success
- * @osif_priv - OS private structure
+ * @osif_priv: OS private structure
  *
  * This function notifies scan done to cfg80211
  *
@@ -1377,7 +1379,8 @@ void wlan_cfg80211_cleanup_scan_queue(struct wlan_objmgr_pdev *pdev,
 /**
  * wlan_cfg80211_update_scan_policy_type_flags() - Set scan flags according to
  * scan request
- * @scan_req: Pointer to csr scan req
+ * @req: scan request to populate
+ * @scan_req: Pointer to scan request params
  *
  * Return: None
  */
@@ -2007,8 +2010,8 @@ static inline void wlan_add_age_ie(uint8_t *mgmt_frame,
 	defined(CFG80211_INFORM_BSS_FRAME_DATA)
 /**
  * wlan_fill_per_chain_rssi() - fill per chain RSSI in inform bss
- * @data: bss data
- * @per_chain_snr: per chain RSSI
+ * @data: destination bss data
+ * @bss: source bss data containing per chain RSSI
  *
  * Return: void
  */

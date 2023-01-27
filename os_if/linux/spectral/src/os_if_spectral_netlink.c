@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2011, 2017-2021 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  *
  * Permission to use, copy, modify, and/or distribute this software for
@@ -35,7 +36,7 @@
 
 /**
  * os_if_spectral_remove_nbuf_debug_entry() - Remove nbuf from nbuf debug table
- * @nbuf - nbuf to remove from the nbuf debug table
+ * @nbuf: nbuf to remove from the nbuf debug table
  *
  * Remove nbuf from the nbuf debug hash table and decrement the nbuf count
  *

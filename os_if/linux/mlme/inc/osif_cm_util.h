@@ -334,18 +334,18 @@ typedef QDF_STATUS
 #endif
 
 /**
- * osif_cm_ops: connection manager legacy callbacks
- * @osif_cm_connect_comp_cb: callback for connect complete to legacy
+ * struct osif_cm_ops - connection manager legacy callbacks
+ * @connect_complete_cb: callback for connect complete to legacy
  * modules
- * @osif_cm_disconnect_comp_cb: callback for disconnect complete to
+ * @disconnect_complete_cb: callback for disconnect complete to
  * legacy modules
- * @osif_cm_netif_queue_ctrl_cb: callback to legacy module to take
+ * @netif_queue_control_cb: callback to legacy module to take
  * actions on netif queue
- * @os_if_cm_napi_serialize_ctrl_cb: callback to legacy module to take
+ * @napi_serialize_control_cb: callback to legacy module to take
  * actions on napi serialization
  * @save_gtk_cb : callback to legacy module to save gtk
  * @send_vdev_keys_cb: callback to send vdev keys
- * @osif_cm_get_scan_ie_params_cb: callback to get scan ie params
+ * @get_scan_ie_params_cb: callback to get scan ie params
  * @set_hlp_data_cb: callback to legacy module to save hlp data
  * @ft_preauth_complete_cb: callback to legacy module to send fast
  * transition event

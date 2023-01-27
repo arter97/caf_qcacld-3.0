@@ -216,8 +216,8 @@ osif_cm_failed_candidate_cb(struct wlan_objmgr_vdev *vdev,
  * osif_cm_update_id_and_src_cb() - Callback to update id and
  * source of the connect/disconnect request
  * @vdev: vdev pointer
- * @Source: Source of the connect req
- * @id: Connect/disconnect id
+ * @source: Source of the connect req
+ * @cm_id: Connect/disconnect id
  *
  * Context: Any context. Takes and releases cmd id spinlock
  * Return: QDF_STATUS
@@ -244,7 +244,7 @@ osif_cm_update_id_and_src_cb(struct wlan_objmgr_vdev *vdev,
 /**
  * osif_cm_disconnect_complete_cb() - Disconnect done callback
  * @vdev: vdev pointer
- * @disconnect_rsp: Disconnect response
+ * @rsp: Disconnect response
  *
  * Context: Any context
  * Return: QDF_STATUS
@@ -309,7 +309,7 @@ osif_cm_roam_sync_cb(struct wlan_objmgr_vdev *vdev)
 }
 
 /**
- * @osif_pmksa_candidate_notify_cb: Roam pmksa candidate notify callback
+ * osif_pmksa_candidate_notify_cb() - Roam pmksa candidate notify callback
  * @vdev: vdev pointer
  * @bssid: bssid
  * @index: index
@@ -328,6 +328,9 @@ osif_pmksa_candidate_notify_cb(struct wlan_objmgr_vdev *vdev,
 /**
  * osif_cm_send_keys_cb() - Send keys callback
  * @vdev: vdev pointer
+ * @key_index: key index
+ * @pairwise: true if pairwise
+ * @cipher_type: cipher type
  *
  * This callback indicates os_if that
  * so that os_if can stop all the activity on this connection
@@ -406,7 +409,6 @@ osif_cm_roam_abort_cb(struct wlan_objmgr_vdev *vdev)
 /**
  * osif_cm_roam_cmpl_cb() - Roam sync complete callback
  * @vdev: vdev pointer
- * @rsp: connect rsp
  *
  * This callback indicates os_if that roam sync is complete
  * so that os_if can stop all the activity on this connection

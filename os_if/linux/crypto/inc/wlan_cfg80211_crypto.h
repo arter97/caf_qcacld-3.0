@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2019-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -61,7 +61,7 @@ void wlan_cfg80211_translate_key(struct wlan_objmgr_vdev *vdev,
  * @key_index: Index to be set as the default
  * @key_type: denotes if the key is pairwise or group key
  * @mac_addr: BSSID for which the key is to be set
- * @key_params: Params received from the kernel
+ * @params: Key params received from the kernel
  *
  * Return: Zero for success and negative for failure.
  */

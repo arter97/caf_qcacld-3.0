@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2015, 2020-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -141,7 +141,7 @@ osif_get_connect_status_code(struct wlan_cm_connect_resp *rsp)
 
 /**
  * osif_convert_timeout_reason() - Convert to kernel specific enum
- * @timeout_reason: reason for connect timeout
+ * @reason: reason for connect timeout
  *
  * This function is used to convert host timeout
  * reason enum to kernel specific enum.
@@ -199,7 +199,8 @@ osif_connect_timeout(struct net_device *dev, const u8 *bssid,
  * __osif_connect_bss() - API to send connection status to supplicant
  * @dev: network device
  * @bss: bss info
- * @connect_rsp: Connection manager connect response
+ * @rsp: Connection manager connect response
+ * @status: 802.11 status code
  *
  * Context: Any context.
  * Return: void
@@ -266,7 +267,7 @@ static void __osif_connect_bss(struct net_device *dev,
  * osif_connect_bss() - API to send connection status to supplicant
  * @dev: network device
  * @bss: bss info
- * @connect_rsp: Connection manager connect response
+ * @rsp: Connection manager connect response
  *
  * The API is a wrapper to send connection status to supplicant
  *
@@ -314,7 +315,7 @@ static void osif_connect_bss(struct net_device *dev, struct cfg80211_bss *bss,
 #if defined(CFG80211_FILS_SK_OFFLOAD_SUPPORT)
 /**
  * osif_populate_fils_params() - Populate FILS keys to connect response
- * @conn_rsp_params: connect response to supplicant
+ * @rsp_params: connect response to supplicant
  * @connect_ies: Connect response IEs
  *
  * Context: Any context.
@@ -349,7 +350,7 @@ osif_populate_fils_params(struct cfg80211_connect_resp_params *rsp_params,
 #if defined(WLAN_FEATURE_FILS_SK)
 /**
  * osif_populate_fils_params() - Populate FILS keys to connect response
- * @conn_rsp_params: connect response to supplicant
+ * @rsp_params: connect response to supplicant
  * @connect_ies: Connect response IEs
  *
  * Context: Any context.
@@ -802,7 +803,7 @@ osif_connect_done(struct net_device *dev, struct cfg80211_bss *bss,
  * supplicant.
  * @dev: network device
  * @bss: bss info
- * @connect_rsp: Connection manager connect response
+ * @rsp: Connection manager connect response
  * @vdev: pointer to vdev
  *
  * The API is a wrapper to send connection status to supplicant
