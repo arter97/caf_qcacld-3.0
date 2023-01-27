@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -550,6 +550,19 @@ hal_rx_populate_mu_user_info(void *rx_tlv, void *ppduinfo, uint32_t user_id,
 	mon_rx_user_status->ht_flags = ppdu_info->rx_status.ht_flags;
 	mon_rx_user_status->rtap_flags = ppdu_info->rx_status.rtap_flags;
 	mon_rx_user_status->vht_flags = ppdu_info->rx_status.vht_flags;
+	if (mon_rx_user_status->vht_flags) {
+		mon_rx_user_status->vht_flag_values2 =
+			ppdu_info->rx_status.vht_flag_values2;
+		qdf_mem_copy(mon_rx_user_status->vht_flag_values3,
+			     ppdu_info->rx_status.vht_flag_values3,
+			     sizeof(mon_rx_user_status->vht_flag_values3));
+		mon_rx_user_status->vht_flag_values4 =
+			ppdu_info->rx_status.vht_flag_values4;
+		mon_rx_user_status->vht_flag_values5 =
+			ppdu_info->rx_status.vht_flag_values5;
+		mon_rx_user_status->vht_flag_values6 =
+			ppdu_info->rx_status.vht_flag_values6;
+	}
 	mon_rx_user_status->he_flags = ppdu_info->rx_status.he_flags;
 	mon_rx_user_status->rs_flags = ppdu_info->rx_status.rs_flags;
 
