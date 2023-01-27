@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2011,2017-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -3447,18 +3447,22 @@ target_if_consume_spectral_report_gen3(
 	int det = 0;
 	struct sscan_detector_list *det_list;
 	struct spectral_data_stats *spectral_dp_stats;
+	bool print_fail_msg = true;
 
 	if (!spectral) {
 		spectral_err_rl("Spectral LMAC object is null");
-		goto fail_no_print;
+		print_fail_msg = false;
+		goto fail;
 	}
 
+	qdf_spin_lock_bh(&spectral->spectral_lock);
 	spectral_dp_stats = &spectral->data_stats;
 	spectral_dp_stats->consume_spectral_calls++;
 
 	if (!report) {
 		spectral_err_rl("Spectral report is null");
-		goto fail_no_print;
+		print_fail_msg = false;
+		goto fail_unlock;
 	}
 
 	p_sops = GET_TARGET_IF_SPECTRAL_OPS(spectral);
@@ -3469,7 +3473,7 @@ target_if_consume_spectral_report_gen3(
 		ret = p_sops->byte_swap_headers(spectral, data);
 		if (QDF_IS_STATUS_ERROR(ret)) {
 			spectral_err_rl("Byte-swap on Spectral headers failed");
-			goto fail;
+			goto fail_unlock;
 		}
 	}
 
@@ -3479,7 +3483,7 @@ target_if_consume_spectral_report_gen3(
 							  spectral);
 	if (QDF_IS_STATUS_ERROR(ret)) {
 		spectral_err_rl("Failed to process Spectral summary report");
-		goto fail;
+		goto fail_unlock;
 	}
 
 	spectral_mode = target_if_get_spectral_mode(
@@ -3488,13 +3492,14 @@ target_if_consume_spectral_report_gen3(
 	if (spectral_mode >= SPECTRAL_SCAN_MODE_MAX) {
 		spectral_err_rl("No valid Spectral mode for detector id %u",
 				sscan_report_fields.sscan_detector_id);
-		goto fail;
+		goto fail_unlock;
 	}
 
 	/* Drop the sample if Spectral is not active for the current mode */
 	if (!p_sops->is_spectral_active(spectral, spectral_mode)) {
 		spectral_info_rl("Spectral scan is not active");
-		goto fail_no_print;
+		print_fail_msg = false;
+		goto fail_unlock;
 	}
 
 	/* Validate and Process the search FFT report */
@@ -3505,7 +3510,7 @@ target_if_consume_spectral_report_gen3(
 					report->reset_delay);
 	if (QDF_IS_STATUS_ERROR(ret)) {
 		spectral_err_rl("Failed to process search FFT report");
-		goto fail;
+		goto fail_unlock;
 	}
 
 	qdf_spin_lock_bh(&spectral->detector_list_lock);
@@ -3518,7 +3523,8 @@ target_if_consume_spectral_report_gen3(
 			qdf_spin_unlock_bh(&spectral->detector_list_lock);
 			spectral_info("Incorrect det id %d for given scan mode and channel width",
 				      p_sfft->fft_detector_id);
-			goto fail_no_print;
+			print_fail_msg = false;
+			goto fail_unlock;
 		}
 	}
 	qdf_spin_unlock_bh(&spectral->detector_list_lock);
@@ -3530,7 +3536,7 @@ target_if_consume_spectral_report_gen3(
 						spectral_mode);
 	if (QDF_IS_STATUS_ERROR(ret)) {
 		spectral_err_rl("Failed to update per-session info");
-		goto fail;
+		goto fail_unlock;
 	}
 
 	qdf_spin_lock_bh(&spectral->session_report_info_lock);
@@ -3544,7 +3550,7 @@ target_if_consume_spectral_report_gen3(
 		if (ret != QDF_STATUS_SUCCESS) {
 			qdf_spin_unlock_bh(
 					&spectral->session_report_info_lock);
-			goto fail;
+			goto fail_unlock;
 		}
 	}
 	qdf_spin_unlock_bh(&spectral->session_report_info_lock);
@@ -3565,15 +3571,17 @@ target_if_consume_spectral_report_gen3(
 							report, &params);
 	if (QDF_IS_STATUS_ERROR(ret)) {
 		spectral_err_rl("Failed to populate SAMP params");
-		goto fail;
+		goto fail_unlock;
 	}
+
 	/* Fill SAMP message */
 	ret = target_if_spectral_fill_samp_msg(spectral, &params);
 	if (QDF_IS_STATUS_ERROR(ret)) {
 		spectral_err_rl("Failed to fill the SAMP msg");
-		goto fail;
+		goto fail_unlock;
 	}
 
+	qdf_spin_unlock_bh(&spectral->spectral_lock);
 	ret = target_if_spectral_is_finite_scan(spectral, spectral_mode,
 						&finite_scan);
 	if (QDF_IS_STATUS_ERROR(ret)) {
@@ -3591,9 +3599,12 @@ target_if_consume_spectral_report_gen3(
 	}
 
 	return 0;
+fail_unlock:
+	qdf_spin_unlock_bh(&spectral->spectral_lock);
 fail:
-	spectral_err_rl("Error while processing Spectral report");
-fail_no_print:
+	if (print_fail_msg)
+		spectral_err_rl("Error while processing Spectral report");
+
 	if (spectral_mode != SPECTRAL_SCAN_MODE_INVALID)
 		reset_160mhz_delivery_state_machine(spectral, spectral_mode);
 	return -EPERM;
