@@ -848,7 +848,7 @@ struct mgmt_rx_event_ext_params {
  * Maximum number of CU LINKS across the system.
  * this is not the CU links within and AP MLD.
  */
-#define CU_MAX_MLO_LINKS 7
+#define CU_MAX_MLO_LINKS 6
 #define MAX_AP_MLDS_PER_LINK 16
 /**
  * struct mlo_mgmt_ml_info - Ongoing Critical Update information.

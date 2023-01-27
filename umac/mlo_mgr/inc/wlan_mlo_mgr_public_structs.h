@@ -109,7 +109,7 @@ enum MLO_SOC_LIST {
  * this is not the MLO links within and AP-MLD.
  */
 
-#define MAX_MLO_LINKS 7
+#define MAX_MLO_LINKS 6
 #define MAX_MLO_CHIPS 5
 
 /**
