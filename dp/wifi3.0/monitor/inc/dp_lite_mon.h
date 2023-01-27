@@ -58,6 +58,7 @@ struct dp_lite_mon_peer {
  * @debug: debug info
  * @lite_mon_vdev: output vdev ctx
  * @peer_count: assoc/non-assoc peer count
+ * @legacy_filter_enabled: legacy filter currently enabled
  * @peer_list: lite mon peer list
  */
 struct dp_lite_mon_config {
@@ -75,6 +76,7 @@ struct dp_lite_mon_config {
 	uint8_t debug;
 	struct dp_vdev *lite_mon_vdev;
 	uint8_t peer_count;
+	uint8_t legacy_filter_enabled;
 	TAILQ_HEAD(, dp_lite_mon_peer) peer_list;
 };
 
@@ -221,6 +223,19 @@ int dp_lite_mon_is_tx_enabled(struct dp_mon_pdev *mon_pdev);
 int
 dp_lite_mon_is_enabled(struct cdp_soc_t *soc_hdl,
 		       uint8_t pdev_id, uint8_t direction);
+
+/**
+ *dp_lite_mon_get_legacy_feature_enabled - get the legacy filter
+					currently enabled
+ * @soc_hdl: dp soc hdl
+ * @pdev_id: pdev id
+ * @direction: tx/rx
+ *
+ * Return: Currently enabled legacy filter
+ */
+int
+dp_lite_mon_get_legacy_feature_enabled(struct cdp_soc_t *soc_hdl,
+				       uint8_t pdev_id, uint8_t direction);
 
 /**
  * dp_lite_mon_alloc - alloc lite mon tx/rx config

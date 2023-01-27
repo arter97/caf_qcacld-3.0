@@ -66,6 +66,22 @@
 
 #define LITE_MON_MAX_PEER_COUNT 16
 
+#define LITE_MON_LEVEL_MSDU 1
+#define LITE_MON_LEVEL_MPDU 2
+#define LITE_MON_LEVEL_PPDU 3
+
+#define LITE_MON_MGMT_FILTER_INVALID 0x8080
+#define LITE_MON_CTRL_FILTER_INVALID 0x000B
+#define LITE_MON_DATA_FILTER_INVALID 0x3FF6
+#define LITE_MON_FILTER_ALL          0xFFFF
+
+#define LITE_MON_LEN_0  0
+#define LITE_MON_LEN_1  0x40
+#define LITE_MON_LEN_2  0x80
+#define LITE_MON_LEN_ALL  0xFFFF
+
+#define LITE_MON_TRACE_INFO 2
+
 /**
  * struct lite_mon_filter_config - Lite monitor filter configuration
  * @level: Monitor filter level
@@ -77,6 +93,7 @@
  * @len: Length of packet to be filtered in
  * @metadata: Metadata needs to be added
  * @interface_name: interface to output
+ * @legacy_filter_enabled: legacy filter currently enabled
  */
 struct lite_mon_filter_config {
 	uint8_t level;
@@ -88,6 +105,7 @@ struct lite_mon_filter_config {
 	uint16_t len[LITE_MON_TYPE_MAX];
 	uint8_t metadata;
 	char interface_name[IFNAMSIZ];
+	uint8_t legacy_filter_enabled;
 };
 
 /**
