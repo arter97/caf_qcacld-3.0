@@ -883,6 +883,32 @@ QDF_STATUS qdf_bool_parse(const char *bool_str, bool *out_bool);
 QDF_STATUS qdf_int32_parse(const char *int_str, int32_t *out_int);
 
 /**
+ * qdf_uint8_parse() - parse the given string as a 8-bit unsigned integer
+ * @int_str: the input integer string to parse
+ * @out_int: the output integer value, populated on success
+ *
+ * Supports binary (0b), octal (0o), decimal (no prefix), and hexadecimal (0x)
+ * encodings via typical prefix notation. Leading/trailing whitespace is
+ * ignored.
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS qdf_uint8_parse(const char *int_str, uint8_t *out_int);
+
+/**
+ * qdf_uint16_parse() - parse the given string as a 16-bit unsigned integer
+ * @int_str: the input integer string to parse
+ * @out_int: the output integer value, populated on success
+ *
+ * Supports binary (0b), octal (0o), decimal (no prefix), and hexadecimal (0x)
+ * encodings via typical prefix notation. Leading/trailing whitespace is
+ * ignored.
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS qdf_uint16_parse(const char *int_str, uint16_t *out_int);
+
+/**
  * qdf_uint32_parse() - parse the given string as a 32-bit unsigned integer
  * @int_str: the input integer string to parse
  * @out_int: the output integer value, populated on success
