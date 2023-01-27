@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2018-2021 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -49,7 +50,7 @@ QDF_STATUS
 qal_vbus_get_iorsc(int devnum, uint32_t flag, char *devname);
 
 /**
- * qdf_vbus_release_iorsc() - release io resource
+ * qal_vbus_release_iorsc() - release io resource
  * @devnum: Device Number
  *
  * This function will release the io resource attached to a device
@@ -82,7 +83,7 @@ QDF_STATUS
 qal_vbus_disable_devclk(struct qdf_dev_clk *clk);
 
 /**
- * qal_vbus_acquire_dev_rstctl() - get device reset control
+ * qal_vbus_get_dev_rstctl() - get device reset control
  * @pfhndl: Device handle
  * @state: Device state information
  * @rstctl: Device reset control handle
@@ -196,7 +197,8 @@ QDF_STATUS
 qal_vbus_gpio_set_value_cansleep(unsigned int gpio, int value);
 
 /**
- * rcu_read_lock() - mark the beginning of an RCU read-side critical section
+ * qal_vbus_rcu_read_lock() - mark the beginning of an RCU read-side critical
+ *                            section
  *
  * Return: QDF_STATUS_SUCCESS on success
  */
@@ -204,7 +206,8 @@ QDF_STATUS
 qal_vbus_rcu_read_lock(void);
 
 /**
- * rcu_read_unlock() - mark the end of an RCU read-side critical section
+ * qal_vbus_rcu_read_unlock() - mark the end of an RCU read-side critical
+ *                              section
  *
  * Return: QDF_STATUS_SUCCESS on success
  */
