@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2016-2018 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -363,6 +364,15 @@ static QDF_STATUS send_smart_ant_set_training_info_cmd_tlv(
 	cmd->vdev_id = param->vdev_id;
 	WMI_CHAR_ARRAY_TO_MAC_ADDR(macaddr, &cmd->peer_macaddr);
 	cmd->num_pkts = param->numpkts;
+	/* If user has not set valid values, these metrics will be inactive. */
+	if ((param->minpkts != SA_INVALID_PARAM_VALUE) &&
+	    (param->per_threshold != SA_INVALID_PARAM_VALUE)) {
+		WMI_PER_VALID_SET(cmd->per_threshold, 1);
+		WMI_PER_THRESHOLD_SET(cmd->per_threshold,
+				      (param->per_threshold & SA_MASK_PER_TH));
+		WMI_PER_MIN_TX_PKTS_SET(cmd->per_threshold,
+					(param->minpkts & SA_MASK_MIN_PKTS));
+	}
 
 	buf_ptr += sizeof(wmi_peer_smart_ant_set_train_antenna_cmd_fixed_param);
 	WMITLV_SET_HDR(buf_ptr, WMITLV_TAG_ARRAY_STRUC,
@@ -383,12 +393,17 @@ static QDF_STATUS send_smart_ant_set_training_info_cmd_tlv(
 		train_param->train_rate_series_hi =
 			((param->rate_array[itr + 1] & SA_MASK_RCODE) |
 			(param->rate_array[itr + 1] & (SA_MASK_RCODE << 16)));
-		itr += 2;
+		/* Higher 16-bits are Reserved */
+		train_param->train_rate_series_ext =
+			param->rate_array[itr + 2] & SA_MASK_RCODE;
+		itr += 3;
 		train_param->train_antenna_series = param->antenna_array[loop];
 		train_param->rc_flags = 0;
 		wmi_info("Series number:%d", loop);
-		wmi_info("Rate [0x%02x] Tx_Antenna [0x%08x]",
-			 train_param->train_rate_series,
+		wmi_info("Rate [0x%02x] [0x%02x] [0x%02x] Tx_Antenna [0x%08x]",
+			 train_param->train_rate_series_lo,
+			 train_param->train_rate_series_hi,
+			 train_param->train_rate_series_ext,
 			 train_param->train_antenna_series);
 		train_param++;
 	}
@@ -520,6 +535,11 @@ static QDF_STATUS extract_peer_ratecode_list_ev_tlv(
 		rate_cap->ratecount[i] = ((ev->ratecount >> (i*8)) &
 						SA_MASK_BYTE);
 	}
+	/* Rate Code counts for 160 MHz BW */
+	rate_cap->ratecount[i] = ev->ratecount_ext & SA_MASK_BYTE;
+	i++;
+	/* Rate Code counts for 320 MHz BW */
+	rate_cap->ratecount[i] = (ev->ratecount_ext >> 8) & SA_MASK_BYTE;
 
 	htindex = 0;
 	if (rate_cap->ratecount[0]) {
@@ -558,6 +578,10 @@ static QDF_STATUS extract_peer_ratecode_list_ev_tlv(
 			((mcs_rate->ratecode_40 >> (shift)) & SA_MASK_RCODE);
 			rate_cap->ratecode_80[htindex] =
 			((mcs_rate->ratecode_80 >> (shift)) & SA_MASK_RCODE);
+			rate_cap->ratecode_160[htindex] =
+			((mcs_rate->ratecode_160 >> (shift)) & SA_MASK_RCODE);
+			rate_cap->ratecode_320[htindex] =
+			((mcs_rate->ratecode_320 >> (shift)) & SA_MASK_RCODE);
 			htindex++;
 		}
 		mcs_rate++;
