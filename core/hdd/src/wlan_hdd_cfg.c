@@ -2152,7 +2152,7 @@ int hdd_update_channel_width(struct hdd_adapter *adapter,
 	if (!sme_config)
 		return -ENOMEM;
 
-	ret = wma_cli_set_command(adapter->vdev_id, WMI_VDEV_PARAM_CHWIDTH,
+	ret = wma_cli_set_command(adapter->vdev_id, wmi_vdev_param_chwidth,
 				  chwidth, VDEV_CMD);
 	if (ret)
 		goto free_config;

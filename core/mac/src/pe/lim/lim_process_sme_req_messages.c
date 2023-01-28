@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -1784,17 +1784,17 @@ static void lim_check_oui_and_update_session(struct mac_context *mac_ctx,
 
 	/*
 	 * If CCK WAR is set for current AP, update to firmware via
-	 * WMI_VDEV_PARAM_ABG_MODE_TX_CHAIN_NUM
+	 * wmi_vdev_param_abg_mode_tx_chain_num
 	 */
 	is_vendor_ap_present =
 			wlan_action_oui_search(mac_ctx->psoc,
 					       &vendor_ap_search_attr,
 					       ACTION_OUI_CCKM_1X1);
 	if (is_vendor_ap_present) {
-		pe_debug("vdev: %d WMI_VDEV_PARAM_ABG_MODE_TX_CHAIN_NUM 1",
+		pe_debug("vdev: %d wmi_vdev_param_abg_mode_tx_chain_num 1",
 			 session->vdev_id);
 		wma_cli_set_command(session->vdev_id,
-			(int)WMI_VDEV_PARAM_ABG_MODE_TX_CHAIN_NUM, 1,
+			(int)wmi_vdev_param_abg_mode_tx_chain_num, 1,
 			VDEV_CMD);
 	}
 
@@ -2042,6 +2042,7 @@ lim_handle_11a_dot11_mode(enum mlme_dot11_mode bss_dot11_mode,
 	case MLME_DOT11_MODE_11N:
 	case MLME_DOT11_MODE_11AC:
 	case MLME_DOT11_MODE_11AX:
+	case MLME_DOT11_MODE_11BE:
 		*intersected_mode = MLME_DOT11_MODE_11A;
 		break;
 	default:
@@ -2069,6 +2070,7 @@ lim_handle_11b_dot11_mode(enum mlme_dot11_mode bss_dot11_mode,
 	case MLME_DOT11_MODE_11AX:
 	case MLME_DOT11_MODE_11B:
 	case MLME_DOT11_MODE_11G:
+	case MLME_DOT11_MODE_11BE:
 		/* Self 11B and BSS 11A cannot connect */
 		*intersected_mode = MLME_DOT11_MODE_11B;
 		break;
@@ -2100,6 +2102,7 @@ lim_handle_11g_dot11_mode(enum mlme_dot11_mode bss_dot11_mode,
 	case MLME_DOT11_MODE_11AC:
 	case MLME_DOT11_MODE_11AX:
 	case MLME_DOT11_MODE_11G:
+	case MLME_DOT11_MODE_11BE:
 		/* Self 11B and BSS 11A cannot connect */
 		*intersected_mode = MLME_DOT11_MODE_11G;
 		break;
@@ -2189,6 +2192,7 @@ lim_handle_11ac_dot11_mode(enum mlme_dot11_mode bss_dot11_mode,
 		*intersected_mode = MLME_DOT11_MODE_11AC;
 		break;
 	case MLME_DOT11_MODE_11AX:
+	case MLME_DOT11_MODE_11BE:
 		if (vht_capable) {
 			*intersected_mode = MLME_DOT11_MODE_11AC;
 			break;
@@ -2331,6 +2335,7 @@ lim_handle_11g_only_dot11_mode(enum mlme_dot11_mode bss_dot11_mode,
 	case MLME_DOT11_MODE_11AC:
 	case MLME_DOT11_MODE_11AX:
 	case MLME_DOT11_MODE_11G:
+	case MLME_DOT11_MODE_11BE:
 		/* Self 11B and BSS 11A cannot connect */
 		*intersected_mode = MLME_DOT11_MODE_11G;
 		break;
@@ -2365,6 +2370,7 @@ lim_handle_11n_only_dot11_mode(enum mlme_dot11_mode bss_dot11_mode,
 		break;
 	case MLME_DOT11_MODE_11AC:
 	case MLME_DOT11_MODE_11AX:
+	case MLME_DOT11_MODE_11BE:
 		if (ie_struct->HTCaps.present) {
 			*intersected_mode = MLME_DOT11_MODE_11N;
 			break;
@@ -2408,6 +2414,7 @@ lim_handle_11ac_only_dot11_mode(enum mlme_dot11_mode bss_dot11_mode,
 		*intersected_mode = MLME_DOT11_MODE_11AC;
 		break;
 	case MLME_DOT11_MODE_11AX:
+	case MLME_DOT11_MODE_11BE:
 		if (vht_capable) {
 			*intersected_mode = MLME_DOT11_MODE_11AC;
 			break;
@@ -2791,7 +2798,7 @@ lim_fill_ese_params(struct mac_context *mac_ctx, struct pe_session *session,
 }
 #endif
 
-static void lim_get_basic_rates(tSirMacRateSet *b_rates, uint32_t chan_freq)
+void lim_get_basic_rates(tSirMacRateSet *b_rates, uint32_t chan_freq)
 {
 	/*
 	 * Some IOT APs don't send supported rates in

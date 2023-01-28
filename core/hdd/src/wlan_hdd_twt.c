@@ -2173,7 +2173,7 @@ static int hdd_twt_add_ac_config(struct hdd_adapter *adapter,
 
 	if (adapter->device_mode == QDF_SAP_MODE && is_responder_en) {
 		ret = sme_cli_set_command(adapter->vdev_id,
-					  WMI_PDEV_PARAM_TWT_AC_CONFIG,
+					  wmi_pdev_param_twt_ac_config,
 					  twt_ac_param, PDEV_CMD);
 	} else {
 		hdd_err_rl("Undesired device mode. Mode: %d and responder: %d",

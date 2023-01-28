@@ -358,7 +358,7 @@ ucfg_mlme_set_vdev_traffic_type(struct wlan_objmgr_psoc *psoc,
 	}
 	mlme_legacy_debug("vdev %d: vdev_traffic_type 0x%x (set %d with bit_mask 0x%x)",
 			  vdev_id, mlme_priv->vdev_traffic_type, set, bit_mask);
-	param.param_id = WMI_VDEV_PARAM_VDEV_TRAFFIC_CONFIG;
+	param.param_id = wmi_vdev_param_set_traffic_config;
 	param.vdev_id = vdev_id;
 	param.param_value = mlme_priv->vdev_traffic_type;
 	status = tgt_vdev_mgr_set_param_send(vdev_mlme, &param);

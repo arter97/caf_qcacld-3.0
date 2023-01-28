@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -735,7 +735,7 @@ static void policy_mgr_get_hw_mode_params(
 /**
  * policy_mgr_set_hw_mode_params() - sets TX-RX stream,
  * bandwidth and DBS in hw_mode_list
- * @wma_handle: pointer to wma global structure
+ * @psoc: PSOC object information
  * @mac0_ss_bw_info: TX-RX streams, BW for MAC0
  * @mac1_ss_bw_info: TX-RX streams, BW for MAC1
  * @pos: refers to hw_mode_list array index
@@ -4877,7 +4877,7 @@ policy_mgr_validate_set_mlo_link_cb(struct wlan_objmgr_psoc *psoc,
  * @mode: Force reason
  * @num_mlo_vdev: number of mlo vdev
  * @mlo_vdev_lst: MLO STA vdev list
-
+ *
  * Interface manager Set links for MLO STA
  *
  * Return: void
@@ -6908,6 +6908,7 @@ bool policy_mgr_will_freq_lead_to_mcc(struct wlan_objmgr_psoc *psoc,
 /**
  * policy_mgr_is_two_connection_mcc() - Check if MCC scenario
  * when there are two connections
+ * @psoc: PSOC object information
  *
  * If if MCC scenario when there are two connections
  *

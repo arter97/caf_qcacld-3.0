@@ -623,7 +623,7 @@ static __iw_softap_setparam(struct net_device *dev,
 	case QCSAP_PARAM_RTSCTS:
 	{
 		ret = wma_cli_set_command(adapter->vdev_id,
-					  WMI_VDEV_PARAM_ENABLE_RTSCTS,
+					  wmi_vdev_param_enable_rtscts,
 					  set_value, VDEV_CMD);
 		if (ret) {
 			hdd_err("FAILED TO SET RTSCTS at SAP");
@@ -689,7 +689,7 @@ static __iw_softap_setparam(struct net_device *dev,
 		hdd_debug("SET_HT_RATE val %d rix %d preamble %x nss %d",
 		       set_value, rix, preamble, nss);
 		ret = wma_cli_set_command(adapter->vdev_id,
-					  WMI_VDEV_PARAM_FIXED_RATE,
+					  wmi_vdev_param_fixed_rate,
 					  set_value, VDEV_CMD);
 		break;
 	}
@@ -720,7 +720,7 @@ static __iw_softap_setparam(struct net_device *dev,
 		       set_value, rix, preamble, nss);
 
 		ret = wma_cli_set_command(adapter->vdev_id,
-					  WMI_VDEV_PARAM_FIXED_RATE,
+					  wmi_vdev_param_fixed_rate,
 					  set_value, VDEV_CMD);
 		break;
 	}
@@ -753,72 +753,72 @@ static __iw_softap_setparam(struct net_device *dev,
 	}
 	case QCSAP_GTX_HT_MCS:
 	{
-		hdd_debug("WMI_VDEV_PARAM_GTX_HT_MCS %d", set_value);
+		hdd_debug("wmi_vdev_param_gtx_ht_mcs %d", set_value);
 		ret = wma_cli_set_command(adapter->vdev_id,
-					  WMI_VDEV_PARAM_GTX_HT_MCS,
+					  wmi_vdev_param_gtx_ht_mcs,
 					  set_value, GTX_CMD);
 		break;
 	}
 
 	case QCSAP_GTX_VHT_MCS:
 	{
-		hdd_debug("WMI_VDEV_PARAM_GTX_VHT_MCS %d", set_value);
+		hdd_debug("wmi_vdev_param_gtx_vht_mcs %d", set_value);
 		ret = wma_cli_set_command(adapter->vdev_id,
-					  WMI_VDEV_PARAM_GTX_VHT_MCS,
+					  wmi_vdev_param_gtx_vht_mcs,
 						set_value, GTX_CMD);
 		break;
 	}
 
 	case QCSAP_GTX_USRCFG:
 	{
-		hdd_debug("WMI_VDEV_PARAM_GTX_USR_CFG %d", set_value);
+		hdd_debug("wmi_vdev_param_gtx_usr_cfg %d", set_value);
 		ret = wma_cli_set_command(adapter->vdev_id,
-					  WMI_VDEV_PARAM_GTX_USR_CFG,
+					  wmi_vdev_param_gtx_usr_cfg,
 					  set_value, GTX_CMD);
 		break;
 	}
 
 	case QCSAP_GTX_THRE:
 	{
-		hdd_debug("WMI_VDEV_PARAM_GTX_THRE %d", set_value);
+		hdd_debug("wmi_vdev_param_gtx_thre %d", set_value);
 		ret = wma_cli_set_command(adapter->vdev_id,
-					  WMI_VDEV_PARAM_GTX_THRE,
+					  wmi_vdev_param_gtx_thre,
 					  set_value, GTX_CMD);
 		break;
 	}
 
 	case QCSAP_GTX_MARGIN:
 	{
-		hdd_debug("WMI_VDEV_PARAM_GTX_MARGIN %d", set_value);
+		hdd_debug("wmi_vdev_param_gtx_margin %d", set_value);
 		ret = wma_cli_set_command(adapter->vdev_id,
-					  WMI_VDEV_PARAM_GTX_MARGIN,
+					  wmi_vdev_param_gtx_margin,
 					  set_value, GTX_CMD);
 		break;
 	}
 
 	case QCSAP_GTX_STEP:
 	{
-		hdd_debug("WMI_VDEV_PARAM_GTX_STEP %d", set_value);
+		hdd_debug("wmi_vdev_param_gtx_step %d", set_value);
 		ret = wma_cli_set_command(adapter->vdev_id,
-					  WMI_VDEV_PARAM_GTX_STEP,
+					  wmi_vdev_param_gtx_step,
 					  set_value, GTX_CMD);
 		break;
 	}
 
 	case QCSAP_GTX_MINTPC:
 	{
-		hdd_debug("WMI_VDEV_PARAM_GTX_MINTPC %d", set_value);
+		hdd_debug("wmi_vdev_param_gtx_mintpc %d", set_value);
 		ret = wma_cli_set_command(adapter->vdev_id,
-					  WMI_VDEV_PARAM_GTX_MINTPC,
+					  wmi_vdev_param_gtx_mintpc,
 					  set_value, GTX_CMD);
 		break;
 	}
 
 	case QCSAP_GTX_BWMASK:
 	{
-		hdd_debug("WMI_VDEV_PARAM_GTX_BWMASK %d", set_value);
+		hdd_debug("wmi_vdev_param_gtx_bw_mask%d", set_value);
 		ret = wma_cli_set_command(adapter->vdev_id,
-					  WMI_VDEV_PARAM_GTX_BW_MASK,
+					  wmi_vdev_param_gtx_bw_mask,
 					  set_value, GTX_CMD);
 		break;
 	}
@@ -899,7 +899,7 @@ static __iw_softap_setparam(struct net_device *dev,
 	{
 		hdd_debug("QCASAP_TX_CHAINMASK_CMD val %d", set_value);
 		ret = wma_cli_set_command(adapter->vdev_id,
-					  WMI_PDEV_PARAM_TX_CHAIN_MASK,
+					  wmi_pdev_param_tx_chain_mask,
 					  set_value, PDEV_CMD);
 		ret = hdd_set_antenna_mode(adapter, hdd_ctx, set_value);
 		break;
@@ -909,7 +909,7 @@ static __iw_softap_setparam(struct net_device *dev,
 	{
 		hdd_debug("QCASAP_RX_CHAINMASK_CMD val %d", set_value);
 		ret = wma_cli_set_command(adapter->vdev_id,
-					  WMI_PDEV_PARAM_RX_CHAIN_MASK,
+					  wmi_pdev_param_rx_chain_mask,
 					  set_value, PDEV_CMD);
 		ret = hdd_set_antenna_mode(adapter, hdd_ctx, set_value);
 		break;
@@ -920,7 +920,7 @@ static __iw_softap_setparam(struct net_device *dev,
 		hdd_debug("QCASAP_NSS_CMD val %d", set_value);
 		hdd_update_nss(adapter, set_value, set_value);
 		ret = wma_cli_set_command(adapter->vdev_id,
-					  WMI_VDEV_PARAM_NSS,
+					  wmi_vdev_param_nss,
 					  set_value, VDEV_CMD);
 		break;
 	}
@@ -1008,27 +1008,27 @@ static __iw_softap_setparam(struct net_device *dev,
 					sap_config);
 		break;
 	case QCASAP_PARAM_DCM:
-		hdd_debug("Set WMI_VDEV_PARAM_HE_DCM: %d", set_value);
+		hdd_debug("Set wmi_vdev_param_he_dcm_enable: %d", set_value);
 		ret = wma_cli_set_command(adapter->vdev_id,
-					  WMI_VDEV_PARAM_HE_DCM, set_value,
-					  VDEV_CMD);
+					  wmi_vdev_param_he_dcm_enable,
+					  set_value, VDEV_CMD);
 		break;
 	case QCASAP_PARAM_RANGE_EXT:
-		hdd_debug("Set WMI_VDEV_PARAM_HE_RANGE_EXT: %d", set_value);
+		hdd_debug("Set wmi_vdev_param_he_range_ext: %d", set_value);
 		ret = wma_cli_set_command(adapter->vdev_id,
-					  WMI_VDEV_PARAM_HE_RANGE_EXT,
+					  wmi_vdev_param_he_range_ext,
 					  set_value, VDEV_CMD);
 		break;
 	case QCSAP_SET_DEFAULT_AMPDU:
 		hdd_debug("QCSAP_SET_DEFAULT_AMPDU val %d", set_value);
 		ret = wma_cli_set_command((int)adapter->vdev_id,
-				(int)WMI_PDEV_PARAM_MAX_MPDUS_IN_AMPDU,
+				(int)wmi_pdev_param_max_mpdus_in_ampdu,
 				set_value, PDEV_CMD);
 		break;
 	case QCSAP_ENABLE_RTS_BURSTING:
 		hdd_debug("QCSAP_ENABLE_RTS_BURSTING val %d", set_value);
 		ret = wma_cli_set_command((int)adapter->vdev_id,
-				(int)WMI_PDEV_PARAM_ENABLE_RTS_SIFS_BURSTING,
+				(int)wmi_pdev_param_enable_rts_sifs_bursting,
 				set_value, PDEV_CMD);
 		break;
 	case QCSAP_SET_BTCOEX_MODE:
@@ -1183,7 +1183,7 @@ static __iw_softap_getparam(struct net_device *dev,
 	case QCSAP_PARAM_RTSCTS:
 	{
 		*value = wma_cli_get_command(adapter->vdev_id,
-					     WMI_VDEV_PARAM_ENABLE_RTSCTS,
+					     wmi_vdev_param_enable_rtscts,
 					     VDEV_CMD);
 		break;
 	}
@@ -1191,79 +1191,79 @@ static __iw_softap_getparam(struct net_device *dev,
 	case QCASAP_SHORT_GI:
 	{
 		*value = wma_cli_get_command(adapter->vdev_id,
-					     WMI_VDEV_PARAM_SGI,
+					     wmi_vdev_param_sgi,
 					     VDEV_CMD);
 		break;
 	}
 
 	case QCSAP_GTX_HT_MCS:
 	{
-		hdd_debug("GET WMI_VDEV_PARAM_GTX_HT_MCS");
+		hdd_debug("GET wmi_vdev_param_gtx_ht_mcs");
 		*value = wma_cli_get_command(adapter->vdev_id,
-					     WMI_VDEV_PARAM_GTX_HT_MCS,
+					     wmi_vdev_param_gtx_ht_mcs,
 					     GTX_CMD);
 		break;
 	}
 
 	case QCSAP_GTX_VHT_MCS:
 	{
-		hdd_debug("GET WMI_VDEV_PARAM_GTX_VHT_MCS");
+		hdd_debug("GET wmi_vdev_param_gtx_vht_mcs");
 		*value = wma_cli_get_command(adapter->vdev_id,
-					     WMI_VDEV_PARAM_GTX_VHT_MCS,
+					     wmi_vdev_param_gtx_vht_mcs,
 					     GTX_CMD);
 		break;
 	}
 
 	case QCSAP_GTX_USRCFG:
 	{
-		hdd_debug("GET WMI_VDEV_PARAM_GTX_USR_CFG");
+		hdd_debug("GET wmi_vdev_param_gtx_usr_cfg");
 		*value = wma_cli_get_command(adapter->vdev_id,
-					     WMI_VDEV_PARAM_GTX_USR_CFG,
+					     wmi_vdev_param_gtx_usr_cfg,
 					     GTX_CMD);
 		break;
 	}
 
 	case QCSAP_GTX_THRE:
 	{
-		hdd_debug("GET WMI_VDEV_PARAM_GTX_THRE");
+		hdd_debug("GET wmi_vdev_param_gtx_thre");
 		*value = wma_cli_get_command(adapter->vdev_id,
-					     WMI_VDEV_PARAM_GTX_THRE,
+					     wmi_vdev_param_gtx_thre,
 					     GTX_CMD);
 		break;
 	}
 
 	case QCSAP_GTX_MARGIN:
 	{
-		hdd_debug("GET WMI_VDEV_PARAM_GTX_MARGIN");
+		hdd_debug("GET wmi_vdev_param_gtx_margin");
 		*value = wma_cli_get_command(adapter->vdev_id,
-					     WMI_VDEV_PARAM_GTX_MARGIN,
+					     wmi_vdev_param_gtx_margin,
 					     GTX_CMD);
 		break;
 	}
 
 	case QCSAP_GTX_STEP:
 	{
-		hdd_debug("GET WMI_VDEV_PARAM_GTX_STEP");
+		hdd_debug("GET wmi_vdev_param_gtx_step");
 		*value = wma_cli_get_command(adapter->vdev_id,
-					     WMI_VDEV_PARAM_GTX_STEP,
+					     wmi_vdev_param_gtx_step,
 					     GTX_CMD);
 		break;
 	}
 
 	case QCSAP_GTX_MINTPC:
 	{
-		hdd_debug("GET WMI_VDEV_PARAM_GTX_MINTPC");
+		hdd_debug("GET wmi_vdev_param_gtx_mintpc");
 		*value = wma_cli_get_command(adapter->vdev_id,
-					     WMI_VDEV_PARAM_GTX_MINTPC,
+					     wmi_vdev_param_gtx_mintpc,
 					     GTX_CMD);
 		break;
 	}
 
 	case QCSAP_GTX_BWMASK:
 	{
-		hdd_debug("GET WMI_VDEV_PARAM_GTX_BW_MASK");
+		hdd_debug("GET wmi_vdev_param_gtx_bw_mask");
 		*value = wma_cli_get_command(adapter->vdev_id,
-					     WMI_VDEV_PARAM_GTX_BW_MASK,
+					     wmi_vdev_param_gtx_bw_mask,
 					     GTX_CMD);
 		break;
 	}
@@ -1298,7 +1298,7 @@ static __iw_softap_getparam(struct net_device *dev,
 	{
 		hdd_debug("QCASAP_TX_CHAINMASK_CMD");
 		*value = wma_cli_get_command(adapter->vdev_id,
-					     WMI_PDEV_PARAM_TX_CHAIN_MASK,
+					     wmi_pdev_param_tx_chain_mask,
 					     PDEV_CMD);
 		break;
 	}
@@ -1307,7 +1307,7 @@ static __iw_softap_getparam(struct net_device *dev,
 	{
 		hdd_debug("QCASAP_RX_CHAINMASK_CMD");
 		*value = wma_cli_get_command(adapter->vdev_id,
-					     WMI_PDEV_PARAM_RX_CHAIN_MASK,
+					     wmi_pdev_param_rx_chain_mask,
 					     PDEV_CMD);
 		break;
 	}
@@ -1316,7 +1316,7 @@ static __iw_softap_getparam(struct net_device *dev,
 	{
 		hdd_debug("QCASAP_NSS_CMD");
 		*value = wma_cli_get_command(adapter->vdev_id,
-					     WMI_VDEV_PARAM_NSS,
+					     wmi_vdev_param_nss,
 					     VDEV_CMD);
 		break;
 	}
@@ -1358,14 +1358,14 @@ static __iw_softap_getparam(struct net_device *dev,
 	case QCASAP_PARAM_DCM:
 	{
 		*value = wma_cli_get_command(adapter->vdev_id,
-					     WMI_VDEV_PARAM_HE_DCM,
+					     wmi_vdev_param_he_dcm_enable,
 					     VDEV_CMD);
 		break;
 	}
 	case QCASAP_PARAM_RANGE_EXT:
 	{
 		*value = wma_cli_get_command(adapter->vdev_id,
-					     WMI_VDEV_PARAM_HE_RANGE_EXT,
+					     wmi_vdev_param_he_range_ext,
 					     VDEV_CMD);
 		break;
 	}

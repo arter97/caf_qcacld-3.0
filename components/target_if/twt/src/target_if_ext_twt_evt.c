@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -191,8 +191,7 @@ done:
 }
 
 /**
- * target_if_twt_resume_dialog_complete_event_handler - TWT resume dlg
- * complete evt handler
+ * target_if_twt_resume_complete_event_handler - TWT resume complete evt handler
  * @scn: scn
  * @event: buffer with event
  * @len: buffer length
@@ -249,8 +248,7 @@ done:
 }
 
 /**
- * target_if_twt_nudge_dialog_complete_event_handler - TWT nudge dlg
- * complete evt handler
+ * target_if_twt_nudge_complete_event_handler - TWT nudge complete evt handler
  * @scn: scn
  * @event: buffer with event
  * @len: buffer length

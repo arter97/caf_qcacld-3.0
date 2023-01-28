@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2013-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -502,7 +502,7 @@ QDF_STATUS wma_set_tsf_gpio_pin(WMA_HANDLE handle, uint32_t pin)
 
 	wma_debug("set tsf gpio pin: %d", pin);
 
-	pdev_param.param_id = WMI_PDEV_PARAM_WNTS_CONFIG;
+	pdev_param.param_id = wmi_pdev_param_wnts_config;
 	pdev_param.param_value = pin;
 	ret = wmi_unified_pdev_param_send(wmi_handle,
 					 &pdev_param,
@@ -635,7 +635,7 @@ QDF_STATUS wma_process_dhcp_ind(WMA_HANDLE handle,
 
 	/* fill in values */
 	peer_set_param_fp.vdev_id = vdev_id;
-	peer_set_param_fp.param_id = WMI_PEER_CRIT_PROTO_HINT_ENABLED;
+	peer_set_param_fp.param_id = WMI_HOST_PEER_CRIT_PROTO_HINT_ENABLED;
 	if (WMA_DHCP_START_IND == ta_dhcp_ind->msgType)
 		peer_set_param_fp.param_value = 1;
 	else
@@ -661,7 +661,7 @@ static void wma_sr_send_pd_threshold(tp_wma_handle wma,
 
 	if (sr_supported) {
 		vparam.vdev_id = vdev_id;
-		vparam.param_id = WMI_VDEV_PARAM_SET_CMD_OBSS_PD_THRESHOLD;
+		vparam.param_id = wmi_vdev_param_set_cmd_obss_pd_threshold;
 		vparam.param_value = val;
 		wmi_unified_vdev_set_param_send(wmi_handle, &vparam);
 	} else {
@@ -1821,6 +1821,10 @@ static const uint8_t *wma_wow_wake_reason_str(A_INT32 wake_reason)
 		return "DELAYED_WAKEUP_TIMER_ELAPSED";
 	case WOW_REASON_DELAYED_WAKEUP_DATA_STORE_LIST_FULL:
 		return "DELAYED_WAKEUP_DATA_STORE_LIST_FULL";
+#ifndef WLAN_SUPPORT_GAP_LL_PS_MODE
+	case WOW_REASON_XGAP:
+		return "XGAP";
+#endif
 	default:
 		return "unknown";
 	}
@@ -2748,6 +2752,9 @@ static int wma_wake_event_packet(
 	}
 
 	wake_info = event_param->fixed_param;
+
+	wma_debug("Number of delayed packets received = %d",
+		  wake_info->delayed_pkt_count);
 
 	switch (wake_info->wake_reason) {
 	case WOW_REASON_AUTH_REQ_RECV:
@@ -3848,7 +3855,7 @@ void wma_send_regdomain_info_to_fw(uint32_t reg_dmn, uint16_t regdmn2G,
 		cck_mask_val = 1;
 
 	cck_mask_val |= (wma->self_gen_frm_pwr << 16);
-	pdev_param.param_id = WMI_PDEV_PARAM_TX_CHAIN_MASK_CCK;
+	pdev_param.param_id = wmi_pdev_param_tx_chain_mask_cck;
 	pdev_param.param_value = cck_mask_val;
 	ret = wmi_unified_pdev_param_send(wma->wmi_handle,
 					 &pdev_param,
@@ -4663,28 +4670,50 @@ QDF_STATUS wma_set_sw_retry_threshold_per_ac(WMA_HANDLE handle,
 	return QDF_STATUS_SUCCESS;
 }
 
-QDF_STATUS wma_set_sw_retry_threshold(uint8_t vdev_id, uint32_t retry,
-				      uint32_t param_id)
+#define MAX_PDEV_SW_RETRY_PARAMS 2
+/* params being sent:
+ * 1.wmi_pdev_param_agg_sw_retry_th
+ * 2.wmi_pdev_param_non_agg_sw_retry_th
+ */
+
+QDF_STATUS wma_set_sw_retry_threshold(struct wlan_mlme_qos *qos_aggr)
 {
-	uint32_t max, min;
-	uint32_t ret;
+	uint32_t max, min, retry;
+	struct dev_set_param setparam[MAX_PDEV_SW_RETRY_PARAMS];
+	QDF_STATUS ret;
+	uint8_t index = 0;
 
-	if (param_id == WMI_PDEV_PARAM_AGG_SW_RETRY_TH) {
-		max = cfg_max(CFG_TX_AGGR_SW_RETRY);
-		min = cfg_min(CFG_TX_AGGR_SW_RETRY);
-	} else {
-		max = cfg_max(CFG_TX_NON_AGGR_SW_RETRY);
-		min = cfg_min(CFG_TX_NON_AGGR_SW_RETRY);
-	}
-
+	retry = qos_aggr->tx_aggr_sw_retry_threshold;
+	max = cfg_max(CFG_TX_AGGR_SW_RETRY);
+	min = cfg_min(CFG_TX_AGGR_SW_RETRY);
 	retry = (retry > max) ? max : retry;
 	retry = (retry < min) ? min : retry;
 
-	ret = wma_cli_set_command(vdev_id, param_id, retry, PDEV_CMD);
-	if (ret)
-		return QDF_STATUS_E_IO;
-
-	return QDF_STATUS_SUCCESS;
+	ret = mlme_check_index_setparam(setparam,
+					wmi_pdev_param_agg_sw_retry_th,
+					retry, index++,
+					MAX_PDEV_SW_RETRY_PARAMS);
+	if (QDF_IS_STATUS_ERROR(ret)) {
+		wma_debug("failed to set wmi_pdev_param_agg_sw_retry_th");
+		return ret;
+	}
+	retry = qos_aggr->tx_non_aggr_sw_retry_threshold;
+	max = cfg_max(CFG_TX_NON_AGGR_SW_RETRY);
+	min = cfg_min(CFG_TX_NON_AGGR_SW_RETRY);
+	retry = (retry > max) ? max : retry;
+	retry = (retry < min) ? min : retry;
+	ret = mlme_check_index_setparam(setparam,
+					wmi_pdev_param_non_agg_sw_retry_th,
+					retry, index++,
+					MAX_PDEV_SW_RETRY_PARAMS);
+	if (QDF_IS_STATUS_ERROR(ret)) {
+		wma_debug("failed to set wmi_pdev_param_non_agg_sw_retry_th");
+		return ret;
+	}
+	ret = wma_send_multi_pdev_vdev_set_params(MLME_PDEV_SETPARAM,
+						  WMI_PDEV_ID_SOC, setparam,
+						  index);
+	return ret;
 }
 
 /**

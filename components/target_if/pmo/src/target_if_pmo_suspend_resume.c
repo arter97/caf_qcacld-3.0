@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2017-2021 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -62,16 +63,16 @@ QDF_STATUS target_if_pmo_send_vdev_update_param_req(
 
 	switch (param_id) {
 	case pmo_vdev_param_listen_interval:
-		param_id = WMI_VDEV_PARAM_LISTEN_INTERVAL;
+		param_id = wmi_vdev_param_listen_interval;
 		break;
 	case pmo_vdev_param_dtim_policy:
-		param_id = WMI_VDEV_PARAM_DTIM_POLICY;
+		param_id = wmi_vdev_param_dtim_policy;
 		break;
 	case pmo_vdev_param_forced_dtim_count:
-		param_id = WMI_VDEV_PARAM_FORCE_DTIM_CNT;
+		param_id = wmi_vdev_param_force_dtim_cnt;
 		break;
 	case pmo_vdev_param_moddtim:
-		param_id = WMI_VDEV_PARAM_MODDTIM_CNT;
+		param_id = wmi_vdev_param_moddtim_cnt;
 		break;
 	default:
 		target_if_err("invalid vdev param id %d", param_id);

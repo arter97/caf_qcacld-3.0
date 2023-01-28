@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -1083,7 +1083,7 @@ end:
  * cm_roam_init_req() - roam init request handling
  * @psoc: psoc pointer
  * @vdev_id: vdev id
- * @reason: reason for changing roam state for the requested vdev id
+ * @enable: should the offload be enabled
  *
  * Return: QDF_STATUS
  */
@@ -2768,6 +2768,12 @@ cm_update_btm_offload_config(struct wlan_objmgr_psoc *psoc,
 	if (!(*btm_offload_config))
 		return;
 
+	if (!wlan_cm_get_assoc_btm_cap(vdev)) {
+		mlme_debug("BTM not supported, disable BTM offload");
+		*btm_offload_config = 0;
+		return;
+	}
+
 	vdev_id = wlan_vdev_get_id(vdev);
 	wlan_cm_roam_cfg_get_value(psoc, vdev_id, HS_20_AP, &temp);
 	is_hs_20_ap = temp.bool_value;
@@ -2857,8 +2863,7 @@ cm_roam_scan_btm_offload(struct wlan_objmgr_psoc *psoc,
  * cm_roam_mlo_config() - set roam mlo offload parameters
  * @psoc: psoc ctx
  * @vdev: vdev
- * @params:  roam mlo offload parameters
- * @rso_cfg: rso config
+ * @start_req: request to fill
  *
  * This function is used to set roam mlo offload related parameters
  *
@@ -3365,7 +3370,7 @@ free_mem:
 /**
  * cm_roam_fill_per_roam_request() - create PER roam offload config request
  * @psoc: psoc context
- * @vdev_id: vdev id
+ * @req: request to fill
  *
  * Return: QDF_STATUS
  */
@@ -3761,6 +3766,8 @@ QDF_STATUS cm_roam_send_rso_cmd(struct wlan_objmgr_psoc *psoc,
  * @pdev: pdev pointer
  * @vdev_id: vdev id
  * @reason: reason for changing roam state for the requested vdev id
+ * @send_resp:
+ * @start_timer:
  *
  * This function is used for WLAN_ROAM_RSO_STOPPED roam state handling
  *
@@ -4331,6 +4338,7 @@ cm_roam_switch_to_roam_sync(struct wlan_objmgr_pdev *pdev,
 #ifdef FEATURE_ROAM_DEBUG
 /**
  * union rso_rec_arg1 - argument 1 record rso state change
+ * @value: aggregate value of the structured param
  * @request_st: requested rso state
  * @cur_st: current rso state
  * @new_st: new rso state
@@ -4373,6 +4381,7 @@ static uint32_t get_rso_arg1(enum roam_offload_state request_st,
 
 /**
  * union rso_rec_arg2 - argument 2 record rso state change
+ * @value: aggregate value of the structured param
  * @is_up: vdev is up
  * @supp_dis_roam: supplicant disable roam
  * @roam_progress: roam in progress
@@ -4426,7 +4435,7 @@ static uint32_t get_rso_arg2(bool is_up,
  * @pdev: pdev object
  * @vdev_id: vdev id
  * @cur_st: current state
- * @request_state: requested state
+ * @requested_state: requested state
  * @reason: reason
  * @is_up: vdev is up
  * @status: request result code
@@ -4481,7 +4490,7 @@ cm_record_state_change(struct wlan_objmgr_pdev *pdev,
 #ifdef WLAN_FEATURE_11BE_MLO
 /**
  * cm_mlo_roam_switch_for_link() - roam state handling during mlo roam
-  for link/s.
+ *  for link/s.
  * @pdev: pdev pointer
  * @vdev_id: vdev id
  * @reason: reason for changing roam state for the requested vdev id
@@ -4629,6 +4638,18 @@ cm_roam_state_change(struct wlan_objmgr_pdev *pdev,
 	if (is_rso_skip)
 		return status;
 
+	vdev = wlan_objmgr_get_vdev_by_id_from_pdev(pdev, vdev_id,
+						    WLAN_MLME_CM_ID);
+	if (!vdev) {
+		mlme_err("Invalid vdev");
+		goto end;
+	}
+	status = cm_roam_acquire_lock(vdev);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		mlme_err("Fail to acquire lock, status: %d", status);
+		goto release_ref;
+	}
+
 	switch (requested_state) {
 	case WLAN_ROAM_DEINIT:
 		status = cm_roam_switch_to_deinit(pdev, vdev_id, reason);
@@ -4653,9 +4674,15 @@ cm_roam_state_change(struct wlan_objmgr_pdev *pdev,
 		mlme_debug("ROAM: Invalid roam state %d", requested_state);
 		break;
 	}
+
+	cm_roam_release_lock(vdev);
+
+release_ref:
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_CM_ID);
 end:
 	cm_record_state_change(pdev, vdev_id, cur_state, requested_state,
 			       reason, is_up, status);
+
 	return status;
 }
 
@@ -6749,6 +6776,7 @@ cm_roam_btm_resp_event(struct wmi_roam_trigger_info *trigger_info,
  * cm_roam_btm_candidate_event()  - Send BTM roam candidate logging event
  * @btm_data: BTM data
  * @vdev_id: Vdev id
+ * @idx: Candidate instance
  *
  * Return: QDF_STATUS
  */
@@ -7029,6 +7057,7 @@ cm_roam_btm_resp_event(struct wmi_roam_trigger_info *trigger_info,
  * cm_roam_btm_candidate_event()  - Send BTM roam candidate logging event
  * @btm_data: BTM data
  * @vdev_id: Vdev id
+ * @idx: Candidate instance
  *
  * Return: QDF_STATUS
  */

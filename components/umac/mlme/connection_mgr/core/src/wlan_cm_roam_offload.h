@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -221,7 +221,7 @@ QDF_STATUS cm_roam_send_rso_cmd(struct wlan_objmgr_psoc *psoc,
  * cm_rso_set_roam_trigger() - Send roam trigger bitmap firmware
  * @pdev: Pointer to pdev
  * @vdev_id: vdev id
- * @triggers: Carries pointer of the object containing vdev id and
+ * @trigger: Carries pointer of the object containing vdev id and
  *  roam_trigger_bitmap.
  *
  * Return: QDF_STATUS
@@ -279,7 +279,7 @@ void cm_dump_freq_list(struct rso_chan_info *chan_info);
 
 /**
  * cm_start_roam_invoke() - Validate and send Roam invoke req to CM
- * @pdev: Pdev pointer
+ * @psoc: Psoc pointer
  * @vdev: vdev
  * @bssid: Target bssid
  * @chan_freq: channel frequency on which reassoc should be send
@@ -452,7 +452,7 @@ cm_exclude_rm_partial_scan_freq(struct wlan_objmgr_psoc *psoc,
 /**
  * cm_roam_full_scan_6ghz_on_disc() - Include the 6 GHz channels in roam full
  * scan only on prior discovery of any 6 GHz support in the environment
- * @pdev: Pointer to pdev
+ * @psoc: Pointer to psoc
  * @vdev_id: vdev id
  * @param_value: Include the 6 GHz channels in roam full scan:
  * 1 - Include only on prior discovery of any 6 GHz support in the environment

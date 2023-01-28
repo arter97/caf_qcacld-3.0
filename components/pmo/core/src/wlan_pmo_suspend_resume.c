@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2017-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -632,8 +632,9 @@ static void pmo_core_set_resume_dtim(struct wlan_objmgr_psoc *psoc)
 
 #if defined(QCA_LL_LEGACY_TX_FLOW_CONTROL) || defined(QCA_LL_TX_FLOW_CONTROL_V2)
 /**
- * pmo_unpause_vdev - unpause all vdev
+ * pmo_unpause_all_vdev() - unpause all vdev
  * @psoc: objmgr psoc handle
+ * @psoc_ctx: pmo psoc contaxt
  *
  * unpause all vdev aftter resume/coming out of wow mode
  *

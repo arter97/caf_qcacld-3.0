@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -396,17 +396,11 @@ static const struct category_info cinfo[MAX_SUPPORTED_CATEGORY] = {
 	[QDF_MODULE_ID_DP] = {QDF_DATA_PATH_TRACE_LEVEL},
 	[QDF_MODULE_ID_DP_TX_CAPTURE] = {QDF_DATA_PATH_TRACE_LEVEL},
 	[QDF_MODULE_ID_DP_INIT] = {QDF_DATA_PATH_TRACE_LEVEL},
-	[QDF_MODULE_ID_DP_TX] = {QDF_DATA_PATH_TRACE_LEVEL},
-	[QDF_MODULE_ID_DP_RX] = {QDF_DATA_PATH_TRACE_LEVEL},
 	[QDF_MODULE_ID_DP_STATS] = {QDF_DATA_PATH_TRACE_LEVEL},
 	[QDF_MODULE_ID_DP_HTT] = {QDF_DATA_PATH_TRACE_LEVEL},
 	[QDF_MODULE_ID_DP_PEER] = {QDF_DATA_PATH_TRACE_LEVEL},
-	[QDF_MODULE_ID_DP_RX_ERROR] = {QDF_DATA_PATH_TRACE_LEVEL},
 	[QDF_MODULE_ID_DP_HTT_TX_STATS] = {QDF_DATA_PATH_TRACE_LEVEL},
-	[QDF_MODULE_ID_DP_RX_MON_STATUS] = {QDF_DATA_PATH_TRACE_LEVEL},
-	[QDF_MODULE_ID_DP_RX_MON_DEST] = {QDF_DATA_PATH_TRACE_LEVEL},
 	[QDF_MODULE_ID_DP_REO] = {QDF_DATA_PATH_TRACE_LEVEL},
-	[QDF_MODULE_ID_DP_TX_COMP] = {QDF_DATA_PATH_TRACE_LEVEL},
 	[QDF_MODULE_ID_DP_VDEV] = {QDF_DATA_PATH_TRACE_LEVEL},
 	[QDF_MODULE_ID_DP_CDP] = {QDF_DATA_PATH_TRACE_LEVEL},
 	[QDF_MODULE_ID_DP_UMAC_RESET] = {QDF_DATA_PATH_TRACE_LEVEL},
@@ -750,7 +744,8 @@ static int __hdd_netdev_notifier_call(struct net_device *net_dev,
 		return NOTIFY_DONE;
 	}
 
-	hdd_debug("%s New Net Device State = %lu", net_dev->name, state);
+	hdd_debug("%s New Net Device State = %lu, flags 0x%x",
+		  net_dev->name, state, net_dev->flags);
 
 	switch (state) {
 	case NETDEV_REGISTER:
@@ -3521,7 +3516,7 @@ int hdd_set_11ax_rate(struct hdd_adapter *adapter, int set_value,
 		 set_value, rix, preamble, nss);
 
 	ret = wma_cli_set_command(adapter->vdev_id,
-				  WMI_VDEV_PARAM_FIXED_RATE,
+				  wmi_vdev_param_fixed_rate,
 				  set_value, VDEV_CMD);
 
 	return ret;
@@ -3642,6 +3637,25 @@ static void hdd_register_policy_manager_callback(
 #else
 static void hdd_register_policy_manager_callback(
 			struct wlan_objmgr_psoc *psoc)
+{
+}
+#endif
+
+#ifdef WLAN_SUPPORT_GAP_LL_PS_MODE
+static void hdd_register_green_ap_callback(struct wlan_objmgr_pdev *pdev)
+{
+	struct green_ap_hdd_callback hdd_cback;
+	qdf_mem_zero(&hdd_cback, sizeof(hdd_cback));
+
+	hdd_cback.send_event = wlan_hdd_send_green_ap_ll_ps_event;
+
+	if (QDF_STATUS_SUCCESS !=
+			green_ap_register_hdd_callback(pdev, &hdd_cback)) {
+		hdd_err("HDD callback registration for Green AP failed");
+	}
+}
+#else
+static inline void hdd_register_green_ap_callback(struct wlan_objmgr_pdev *pdev)
 {
 }
 #endif
@@ -4850,12 +4864,11 @@ int hdd_stop_no_trans(struct net_device *dev)
 	/* DeInit the adapter. This ensures datapath cleanup as well */
 	hdd_deinit_adapter(hdd_ctx, adapter, true);
 
-	if (!hdd_is_any_interface_open(hdd_ctx))
-		hdd_psoc_idle_timer_start(hdd_ctx);
-
 reset_iface_opened:
 	/* Make sure the interface is marked as closed */
 	clear_bit(DEVICE_IFACE_OPENED, &adapter->event_flags);
+	if (!hdd_is_any_interface_open(hdd_ctx))
+		hdd_psoc_idle_timer_start(hdd_ctx);
 	hdd_exit();
 
 	return 0;
@@ -6547,7 +6560,7 @@ int hdd_vdev_create(struct hdd_adapter *adapter)
 
 		hdd_debug("setting RTT mac randomization param: %d", bval);
 		errno = sme_cli_set_command(adapter->vdev_id,
-			WMI_VDEV_PARAM_ENABLE_DISABLE_RTT_INITIATOR_RANDOM_MAC,
+			wmi_vdev_param_enable_disable_rtt_initiator_random_mac,
 			bval,
 			VDEV_CMD);
 		if (0 != errno)
@@ -6575,7 +6588,7 @@ int hdd_vdev_create(struct hdd_adapter *adapter)
 	if (QDF_NAN_DISC_MODE == adapter->device_mode) {
 		sme_cli_set_command(
 		adapter->vdev_id,
-		WMI_VDEV_PARAM_ALLOW_NAN_INITIAL_DISCOVERY_OF_MP0_CLUSTER,
+		wmi_vdev_param_allow_nan_initial_discovery_of_mp0_cluster,
 		cfg_nan_get_support_mp0_discovery(hdd_ctx->psoc),
 		VDEV_CMD);
 	}
@@ -6595,6 +6608,11 @@ hdd_vdev_destroy_procedure:
 	return errno;
 }
 
+#define MAX_VDEV_RTT_PARAMS 2
+/* params being sent:
+ * wmi_vdev_param_enable_disable_rtt_responder_role
+ * wmi_vdev_param_enable_disable_rtt_initiator_role
+ */
 QDF_STATUS hdd_init_station_mode(struct hdd_adapter *adapter)
 {
 	struct hdd_station_ctx *sta_ctx = &adapter->session.station;
@@ -6605,6 +6623,8 @@ QDF_STATUS hdd_init_station_mode(struct hdd_adapter *adapter)
 	uint8_t enable_sifs_burst = 0;
 	uint32_t fine_time_meas_cap = 0, roam_triggers;
 	struct wlan_objmgr_vdev *vdev;
+	struct dev_set_param vdevsetparam[MAX_VDEV_RTT_PARAMS] = {};
+	uint8_t index = 0;
 
 	hdd_ctx = WLAN_HDD_GET_CTX(adapter);
 	mac_handle = hdd_ctx->mac_handle;
@@ -6616,14 +6636,6 @@ QDF_STATUS hdd_init_station_mode(struct hdd_adapter *adapter)
 	hdd_vdev_set_ht_vht_ies(mac_handle, vdev);
 	hdd_roam_profile_init(adapter);
 	hdd_register_wext(adapter->dev);
-
-	/* set fast roaming capability in sme session */
-	status = ucfg_user_space_enable_disable_rso(hdd_ctx->pdev,
-						    adapter->vdev_id,
-						    true);
-	if (QDF_IS_STATUS_ERROR(status))
-		hdd_err("ROAM_CONFIG: sme_config_fast_roaming failed with status=%d",
-			status);
 
 	/* Set the default operation channel freq*/
 	sta_ctx->conn_info.chan_freq = hdd_ctx->config->operating_chan_freq;
@@ -6651,13 +6663,15 @@ QDF_STATUS hdd_init_station_mode(struct hdd_adapter *adapter)
 	status = ucfg_get_enable_sifs_burst(hdd_ctx->psoc, &enable_sifs_burst);
 	if (!QDF_IS_STATUS_SUCCESS(status))
 		hdd_err("Failed to get sifs burst value, use default");
-
 	ret_val = sme_cli_set_command(adapter->vdev_id,
-				      WMI_PDEV_PARAM_BURST_ENABLE,
+				      wmi_pdev_param_burst_enable,
 				      enable_sifs_burst,
 				      PDEV_CMD);
-	if (ret_val)
-		hdd_err("WMI_PDEV_PARAM_BURST_ENABLE set failed %d", ret_val);
+	if (ret_val) {
+		hdd_err("wmi_pdev_param_burst_enable set failed: %d", ret_val);
+		status = QDF_STATUS_E_FAILURE;
+		goto error_wmm_init;
+	}
 
 	hdd_set_netdev_flags(adapter);
 
@@ -6670,16 +6684,28 @@ QDF_STATUS hdd_init_station_mode(struct hdd_adapter *adapter)
 					     roam_triggers);
 		ucfg_mlme_get_fine_time_meas_cap(hdd_ctx->psoc,
 						 &fine_time_meas_cap);
-		sme_cli_set_command(
-			adapter->vdev_id,
-			WMI_VDEV_PARAM_ENABLE_DISABLE_RTT_RESPONDER_ROLE,
-			(bool)(fine_time_meas_cap & WMI_FW_STA_RTT_RESPR),
-			VDEV_CMD);
-		sme_cli_set_command(
-			adapter->vdev_id,
-			WMI_VDEV_PARAM_ENABLE_DISABLE_RTT_INITIATOR_ROLE,
-			(bool)(fine_time_meas_cap & WMI_FW_STA_RTT_INITR),
-			VDEV_CMD);
+		status = mlme_check_index_setparam(vdevsetparam,
+			wmi_vdev_param_enable_disable_rtt_responder_role,
+			(fine_time_meas_cap & WMI_FW_STA_RTT_RESPR), index++,
+			MAX_VDEV_RTT_PARAMS);
+		if (QDF_IS_STATUS_ERROR(status))
+			goto error_wmm_init;
+
+		status = mlme_check_index_setparam(vdevsetparam,
+			wmi_vdev_param_enable_disable_rtt_initiator_role,
+			(fine_time_meas_cap & WMI_FW_STA_RTT_INITR), index++,
+			MAX_VDEV_RTT_PARAMS);
+		if (QDF_IS_STATUS_ERROR(status))
+			goto error_wmm_init;
+
+		status = sme_send_multi_pdev_vdev_set_params(MLME_VDEV_SETPARAM,
+							     adapter->vdev_id,
+							     vdevsetparam,
+							     index);
+		if (QDF_IS_STATUS_ERROR(status)) {
+			hdd_err("failed to set RTT_RESPONDER,INITIATOR params:%d", status);
+			goto error_wmm_init;
+		}
 	}
 
 	hdd_objmgr_put_vdev_by_user(vdev, WLAN_INIT_DEINIT_ID);
@@ -7213,28 +7239,16 @@ err:
 	return -EINVAL;
 }
 
-#ifdef WLAN_FEATURE_OFDM_SCRAMBLER_SEED
-/**
- * wlan_hdd_set_ofdm_scrambler_seed() - Set OFDM Scrambler Seed config to FW
- * @adapter: HDD adapter
- * @sval: value to be sent for WMI_PDEV_PARAM_EN_UPDATE_SCRAM_SEED command
- *
- * Return: 0 on success or errno on failure
+#define MAX_PDEV_SET_FW_PARAMS 7
+/* params being sent:
+ * 1.wmi_pdev_param_dtim_synth
+ * 2.wmi_pdev_param_1ch_dtim_optimized_chain_selection
+ * 3.wmi_pdev_param_tx_sch_delay
+ * 4.wmi_pdev_param_en_update_scram_seed
+ * 5.wmi_pdev_param_secondary_retry_enable
+ * 6.wmi_pdev_param_set_sap_xlna_bypass
+ * 7.wmi_pdev_param_set_dfs_chan_ageout_time
  */
-static inline int wlan_hdd_set_ofdm_scrambler_seed(struct hdd_adapter *adapter,
-						   int sval)
-{
-	return sme_cli_set_command(adapter->vdev_id,
-				   WMI_PDEV_PARAM_EN_UPDATE_SCRAM_SEED, sval,
-				   PDEV_CMD);
-}
-#else
-static inline int wlan_hdd_set_ofdm_scrambler_seed(struct hdd_adapter *adapter,
-						   int sval)
-{
-	return 0;
-}
-#endif
 
 /**
  * hdd_set_fw_params() - Set parameters to firmware
@@ -7258,6 +7272,8 @@ int hdd_set_fw_params(struct hdd_adapter *adapter)
 	uint32_t dtim_sel_diversity, enable_secondary_rate;
 	bool sap_xlna_bypass;
 	bool enable_ofdm_scrambler_seed = false;
+	struct dev_set_param setparam[MAX_PDEV_SET_FW_PARAMS] = { };
+	uint8_t index = 0;
 
 	hdd_enter_dev(adapter->dev);
 
@@ -7274,84 +7290,80 @@ int hdd_set_fw_params(struct hdd_adapter *adapter)
 	 * is enabled. So, making the variable is_lprx_enabled true.
 	 */
 	is_lprx_enabled = true;
-	ret = sme_cli_set_command(adapter->vdev_id,
-				  WMI_PDEV_PARAM_DTIM_SYNTH,
-				  is_lprx_enabled, PDEV_CMD);
-	if (ret) {
-		hdd_err("Failed to set LPRx");
+
+	ret = mlme_check_index_setparam(setparam, wmi_pdev_param_dtim_synth,
+					is_lprx_enabled, index++,
+					MAX_PDEV_SET_FW_PARAMS);
+	if (QDF_IS_STATUS_ERROR(ret))
 		goto error;
-	}
 
 	ucfg_mlme_get_dtim_selection_diversity(hdd_ctx->psoc,
 					       &dtim_sel_diversity);
-
-	ret = sme_cli_set_command(
-			adapter->vdev_id,
-			WMI_PDEV_PARAM_1CH_DTIM_OPTIMIZED_CHAIN_SELECTION,
-			dtim_sel_diversity, PDEV_CMD);
-	if (ret) {
-		hdd_err("Failed to set DTIM_OPTIMIZED_CHAIN_SELECTION");
+	ret = mlme_check_index_setparam(
+			setparam,
+			wmi_pdev_param_1ch_dtim_optimized_chain_selection,
+			dtim_sel_diversity, index++, MAX_PDEV_SET_FW_PARAMS);
+	if (QDF_IS_STATUS_ERROR(ret))
 		goto error;
-	}
 
-	ret = -1;
 	if (QDF_IS_STATUS_SUCCESS(ucfg_fwol_get_enable_tx_sch_delay(
 				  hdd_ctx->psoc, &enable_tx_sch_delay))) {
-		ret = sme_cli_set_command(adapter->vdev_id,
-					  WMI_PDEV_PARAM_TX_SCH_DELAY,
-					  enable_tx_sch_delay, PDEV_CMD);
-	}
-	if (ret) {
-		hdd_err("Failed to set WMI_PDEV_PARAM_TX_SCH_DELAY");
-		goto error;
+		ret = mlme_check_index_setparam(
+					      setparam,
+					      wmi_pdev_param_tx_sch_delay,
+					      enable_tx_sch_delay, index++,
+					      MAX_PDEV_SET_FW_PARAMS);
+		if (QDF_IS_STATUS_ERROR(ret))
+			goto error;
 	}
 
-	ret = -1;
 	if (QDF_IS_STATUS_SUCCESS(ucfg_fwol_get_ofdm_scrambler_seed(
 				hdd_ctx->psoc, &enable_ofdm_scrambler_seed))) {
-		ret = wlan_hdd_set_ofdm_scrambler_seed(
-						adapter,
-						enable_ofdm_scrambler_seed);
-	}
-	if (ret) {
-		hdd_err("Failed to set WMI_PDEV_PARAM_EN_UPDATE_SCRAM_SEED");
-		goto error;
+		ret = mlme_check_index_setparam(
+					setparam,
+					wmi_pdev_param_en_update_scram_seed,
+					enable_ofdm_scrambler_seed, index++,
+					MAX_PDEV_SET_FW_PARAMS);
+		if (QDF_IS_STATUS_ERROR(ret))
+			goto error;
 	}
 
-	ret = -1;
 	if (QDF_IS_STATUS_SUCCESS(ucfg_fwol_get_enable_secondary_rate(
 				  hdd_ctx->psoc, &enable_secondary_rate))) {
-		ret = sme_cli_set_command(adapter->vdev_id,
-					  WMI_PDEV_PARAM_SECONDARY_RETRY_ENABLE,
-					  enable_secondary_rate, PDEV_CMD);
+		ret = mlme_check_index_setparam(
+					setparam,
+					wmi_pdev_param_secondary_retry_enable,
+					enable_secondary_rate, index++,
+					MAX_PDEV_SET_FW_PARAMS);
+		if (QDF_IS_STATUS_ERROR(ret))
+			goto error;
 	}
-	if (ret) {
-		hdd_err("Failed to set WMI_PDEV_PARAM_SECONDARY_RETRY_ENABLE");
-		goto error;
-	}
-
-	ret = -1;
 	if (QDF_IS_STATUS_SUCCESS(ucfg_fwol_get_sap_xlna_bypass(
 				  hdd_ctx->psoc, &sap_xlna_bypass))) {
-		ret = sme_cli_set_command(adapter->vdev_id,
-					  WMI_PDEV_PARAM_SET_SAP_XLNA_BYPASS,
-					  sap_xlna_bypass, PDEV_CMD);
+		ret = mlme_check_index_setparam(
+					setparam,
+					wmi_pdev_param_set_sap_xlna_bypass,
+					sap_xlna_bypass, index++,
+					MAX_PDEV_SET_FW_PARAMS);
+		if (QDF_IS_STATUS_ERROR(ret))
+			goto error;
 	}
-	if (ret) {
-		hdd_err("Failed to set WMI_PDEV_PARAM_SET_SAP_XLNA_BYPASS");
-		goto error;
-	}
-
 	wlan_mlme_get_dfs_chan_ageout_time(hdd_ctx->psoc,
 					   &dfs_chan_ageout_time);
-	ret = sme_cli_set_command(adapter->vdev_id,
-				  WMI_PDEV_PARAM_SET_DFS_CHAN_AGEOUT_TIME,
-				  dfs_chan_ageout_time, PDEV_CMD);
-	if (ret) {
-		hdd_err("Failed to set DFS_CHAN_AGEOUT_TIME");
+	ret = mlme_check_index_setparam(
+				      setparam,
+				      wmi_pdev_param_set_dfs_chan_ageout_time,
+				      dfs_chan_ageout_time, index++,
+				      MAX_PDEV_SET_FW_PARAMS);
+	if (QDF_IS_STATUS_ERROR(ret))
+		goto error;
+
+	ret = sme_send_multi_pdev_vdev_set_params(MLME_PDEV_SETPARAM,
+						  WMI_PDEV_ID_SOC, setparam,
+						  index);
+	if (QDF_IS_STATUS_ERROR(ret)) {
 		goto error;
 	}
-
 	if (adapter->device_mode == QDF_STA_MODE) {
 		status = ucfg_get_upper_brssi_thresh(hdd_ctx->psoc,
 						     &upper_brssi_thresh);
@@ -7391,7 +7403,7 @@ int hdd_set_fw_params(struct hdd_adapter *adapter)
 		ret = sme_set_cck_tx_fir_override(hdd_ctx->mac_handle,
 						  adapter->vdev_id);
 		if (ret) {
-			hdd_err("WMI_PDEV_PARAM_ENABLE_CCK_TXFIR_OVERRIDE set failed %d",
+			hdd_err("wmi_pdev_param_enable_cck_tfir_override set failed %d",
 				ret);
 			goto error;
 		}
@@ -7427,7 +7439,7 @@ int hdd_set_fw_params(struct hdd_adapter *adapter)
 	ret = sme_set_enable_mem_deep_sleep(hdd_ctx->mac_handle,
 					    adapter->vdev_id);
 	if (ret) {
-		hdd_err("WMI_PDEV_PARAM_HYST_EN set failed %d", ret);
+		hdd_err("wmi_pdev_param_hyst_en set failed %d", ret);
 		goto error;
 	}
 
@@ -7436,7 +7448,7 @@ int hdd_set_fw_params(struct hdd_adapter *adapter)
 		return -EINVAL;
 
 	ret = sme_cli_set_command(adapter->vdev_id,
-				  WMI_VDEV_PARAM_ENABLE_RTSCTS,
+				  wmi_vdev_param_enable_rtscts,
 				  rts_profile,
 				  VDEV_CMD);
 	if (ret) {
@@ -7523,6 +7535,25 @@ static void wlan_hdd_cfg80211_scan_block_cb(struct work_struct *work)
 
 	osif_vdev_sync_op_stop(vdev_sync);
 }
+
+#ifdef WLAN_FEATURE_11BE_MLO
+static inline void
+wlan_hdd_set_ml_cap_for_sap_intf(struct hdd_adapter_create_param *create_params,
+				 enum QDF_OPMODE mode)
+{
+	if (mode != QDF_SAP_MODE)
+		return;
+
+	create_params->is_single_link = true;
+	create_params->is_ml_adapter = true;
+}
+#else
+static inline void
+wlan_hdd_set_ml_cap_for_sap_intf(struct hdd_adapter_create_param *create_params,
+				 enum QDF_OPMODE mode)
+{
+}
+#endif
 
 /**
  * hdd_open_adapter() - open and setup the hdd adapter
@@ -7711,11 +7742,7 @@ struct hdd_adapter *hdd_open_adapter(struct hdd_context *hdd_ctx,
 		INIT_WORK(&adapter->ipv6_notifier_work,
 			  hdd_ipv6_notifier_work_queue);
 #endif
-		if (session_type == QDF_SAP_MODE) {
-			/* Create all SAP mode adapters as ML type */
-			params->is_ml_adapter = true;
-			params->is_single_link = true;
-		}
+		wlan_hdd_set_ml_cap_for_sap_intf(params, session_type);
 
 		break;
 	case QDF_FTM_MODE:
@@ -13112,6 +13139,7 @@ int hdd_start_station_adapter(struct hdd_adapter *adapter)
 	return 0;
 }
 
+#define MAX_VDEV_AP_RTT_PARAMS 2
 /**
  * hdd_start_ap_adapter()- Start AP Adapter
  * @adapter: HDD adapter
@@ -13127,6 +13155,8 @@ int hdd_start_ap_adapter(struct hdd_adapter *adapter)
 	int ret;
 	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
 	uint32_t fine_time_meas_cap = 0;
+	struct dev_set_param setparam[MAX_VDEV_AP_RTT_PARAMS] = {};
+	uint8_t index = 0;
 
 	hdd_enter();
 
@@ -13167,16 +13197,30 @@ int hdd_start_ap_adapter(struct hdd_adapter *adapter)
 	if (adapter->device_mode == QDF_SAP_MODE) {
 		ucfg_mlme_get_fine_time_meas_cap(hdd_ctx->psoc,
 						 &fine_time_meas_cap);
-		sme_cli_set_command(
-			adapter->vdev_id,
-			WMI_VDEV_PARAM_ENABLE_DISABLE_RTT_RESPONDER_ROLE,
-			(bool)(fine_time_meas_cap & WMI_FW_AP_RTT_RESPR),
-			VDEV_CMD);
-		sme_cli_set_command(
-			adapter->vdev_id,
-			WMI_VDEV_PARAM_ENABLE_DISABLE_RTT_INITIATOR_ROLE,
-			(bool)(fine_time_meas_cap & WMI_FW_AP_RTT_INITR),
-			VDEV_CMD);
+		ret = mlme_check_index_setparam(
+			setparam,
+			wmi_vdev_param_enable_disable_rtt_responder_role,
+			(fine_time_meas_cap & WMI_FW_STA_RTT_RESPR), index++,
+			MAX_VDEV_AP_RTT_PARAMS);
+		if (QDF_IS_STATUS_ERROR(ret)) {
+			hdd_err("failed at wmi_vdev_param_enable_disable_rtt_responder_role");
+			goto sap_release_ref;
+		}
+		ret = mlme_check_index_setparam(
+			setparam,
+			wmi_vdev_param_enable_disable_rtt_initiator_role,
+			(fine_time_meas_cap & WMI_FW_STA_RTT_INITR), index++,
+			MAX_VDEV_AP_RTT_PARAMS);
+		if (QDF_IS_STATUS_ERROR(ret)) {
+			hdd_err("failed at wmi_vdev_param_enable_disable_rtt_initiator_role");
+			goto sap_release_ref;
+		}
+		ret = sme_send_multi_pdev_vdev_set_params(MLME_VDEV_SETPARAM,
+							  adapter->vdev_id,
+							  setparam,
+							  index);
+		if (QDF_IS_STATUS_ERROR(ret))
+			hdd_err("failed to send vdev RTT set params");
 	}
 
 	status = hdd_init_ap_mode(adapter, is_ssr);
@@ -13968,71 +14012,16 @@ static int hdd_initialize_mac_address(struct hdd_context *hdd_ctx)
 	return ret;
 }
 
-static int hdd_set_smart_chainmask_enabled(struct hdd_context *hdd_ctx)
-{
-	int vdev_id = 0;
-	QDF_STATUS status;
-	bool smart_chainmask_enabled;
-	int param_id = WMI_PDEV_PARAM_SMART_CHAINMASK_SCHEME;
-	int vpdev = PDEV_CMD;
-	int ret;
-
-	status = ucfg_get_smart_chainmask_enabled(hdd_ctx->psoc,
-						  &smart_chainmask_enabled);
-	if (QDF_IS_STATUS_ERROR(status))
-		return -EINVAL;
-
-	ret = sme_cli_set_command(vdev_id, param_id,
-				  (int)smart_chainmask_enabled, vpdev);
-	if (ret)
-		hdd_err("WMI_PDEV_PARAM_SMART_CHAINMASK_SCHEME failed %d", ret);
-
-	return ret;
-}
-
-static int hdd_set_alternative_chainmask_enabled(struct hdd_context *hdd_ctx)
-{
-	int vdev_id = 0;
-	QDF_STATUS status;
-	int param_id = WMI_PDEV_PARAM_ALTERNATIVE_CHAINMASK_SCHEME;
-	bool alternative_chainmask_enabled;
-	int vpdev = PDEV_CMD;
-	int ret;
-
-	status = ucfg_get_alternative_chainmask_enabled(
-				hdd_ctx->psoc,
-				&alternative_chainmask_enabled);
-	if (QDF_IS_STATUS_ERROR(status))
-		return -EINVAL;
-
-	ret = sme_cli_set_command(vdev_id, param_id,
-				  (int)alternative_chainmask_enabled, vpdev);
-	if (ret)
-		hdd_err("WMI_PDEV_PARAM_ALTERNATIVE_CHAINMASK_SCHEME failed %d",
-			ret);
-
-	return ret;
-}
-
-static int hdd_set_ani_enabled(struct hdd_context *hdd_ctx)
-{
-	QDF_STATUS status;
-	int vdev_id = 0;
-	int param_id = WMI_PDEV_PARAM_ANI_ENABLE;
-	bool value;
-	int vpdev = PDEV_CMD;
-	int ret;
-
-	status = ucfg_fwol_get_ani_enabled(hdd_ctx->psoc, &value);
-	if (QDF_IS_STATUS_ERROR(status))
-		return -EINVAL;
-
-	ret = sme_cli_set_command(vdev_id, param_id, (int)value, vpdev);
-	if (ret)
-		hdd_err("WMI_PDEV_PARAM_ANI_ENABLE failed %d", ret);
-
-	return ret;
-}
+#define MAX_PDEV_PRE_ENABLE_PARAMS 7
+/* params being sent:
+ * wmi_pdev_param_tx_chain_mask_1ss
+ * wmi_pdev_param_mgmt_retry_limit
+ * wmi_pdev_param_default_6ghz_rate
+ * wmi_pdev_param_pdev_stats_tx_xretry_ext
+ * wmi_pdev_param_smart_chainmask_scheme
+ * wmi_pdev_param_alternative_chainmask_scheme
+ * wmi_pdev_param_ani_enable
+ */
 
 /**
  * hdd_pre_enable_configure() - Configurations prior to cds_enable
@@ -14051,6 +14040,9 @@ static int hdd_pre_enable_configure(struct hdd_context *hdd_ctx)
 	uint32_t tx_retry_multiplier;
 	QDF_STATUS status;
 	void *soc = cds_get_context(QDF_MODULE_ID_SOC);
+	struct dev_set_param setparam[MAX_PDEV_PRE_ENABLE_PARAMS] = {};
+	bool check_value;
+	uint8_t index = 0;
 
 	cdp_register_pause_cb(soc, wlan_hdd_txrx_pause_cb);
 	/* Register HL netdev flow control callback */
@@ -14084,18 +14076,23 @@ static int hdd_pre_enable_configure(struct hdd_context *hdd_ctx)
 		ret = qdf_status_to_os_return(status);
 		goto out;
 	}
-	ret = sme_cli_set_command(0, WMI_PDEV_PARAM_TX_CHAIN_MASK_1SS, val,
-				  PDEV_CMD);
-	if (0 != ret) {
-		hdd_err("WMI_PDEV_PARAM_TX_CHAIN_MASK_1SS failed %d", ret);
+	ret = mlme_check_index_setparam(setparam,
+					wmi_pdev_param_tx_chain_mask_1ss,
+					val, index++,
+					MAX_PDEV_PRE_ENABLE_PARAMS);
+	if (QDF_IS_STATUS_ERROR(ret)) {
+		hdd_err("failed at wmi_pdev_param_tx_chain_mask_1ss");
 		goto out;
+
 	}
 
 	wlan_mlme_get_mgmt_max_retry(hdd_ctx->psoc, &max_retry);
-	ret = sme_cli_set_command(0, WMI_PDEV_PARAM_MGMT_RETRY_LIMIT, max_retry,
-				  PDEV_CMD);
-	if (0 != ret) {
-		hdd_err("WMI_PDEV_PARAM_MGMT_RETRY_LIMIT failed %d", ret);
+	ret = mlme_check_index_setparam(setparam,
+					wmi_pdev_param_mgmt_retry_limit,
+					max_retry, index++,
+					MAX_PDEV_PRE_ENABLE_PARAMS);
+	if (QDF_IS_STATUS_ERROR(ret)) {
+		hdd_err("failed at wmi_pdev_param_mgmt_retry_limit");
 		goto out;
 	}
 
@@ -14103,11 +14100,13 @@ static int hdd_pre_enable_configure(struct hdd_context *hdd_ctx)
 					     &enable_he_mcs0_for_6ghz_mgmt);
 	if (enable_he_mcs0_for_6ghz_mgmt) {
 		hdd_debug("HE rates for 6GHz mgmt frames are supported");
-		ret = sme_cli_set_command(0, WMI_PDEV_PARAM_DEFAULT_6GHZ_RATE,
-					  MGMT_DEFAULT_DATA_RATE_6GHZ,
-					  PDEV_CMD);
-		if (0 != ret) {
-			hdd_err("WMI_PDEV_PARAM_DEFAULT_6GHZ_RATE failed %d",
+		ret = mlme_check_index_setparam(
+					setparam,
+					wmi_pdev_param_default_6ghz_rate,
+					MGMT_DEFAULT_DATA_RATE_6GHZ, index++,
+					MAX_PDEV_PRE_ENABLE_PARAMS);
+		if (QDF_IS_STATUS_ERROR(ret)) {
+			hdd_err("wmi_pdev_param_default_6ghz_rate failed %d",
 				ret);
 			goto out;
 		}
@@ -14115,26 +14114,62 @@ static int hdd_pre_enable_configure(struct hdd_context *hdd_ctx)
 
 	wlan_mlme_get_tx_retry_multiplier(hdd_ctx->psoc,
 					  &tx_retry_multiplier);
-	ret = sme_cli_set_command(0, WMI_PDEV_PARAM_PDEV_STATS_TX_XRETRY_EXT,
-				  tx_retry_multiplier, PDEV_CMD);
-	if (0 != ret) {
-		hdd_err("WMI_PDEV_PARAM_PDEV_STATS_TX_XRETRY_EXT failed %d",
-			ret);
+	ret = mlme_check_index_setparam(setparam,
+					wmi_pdev_param_pdev_stats_tx_xretry_ext,
+					tx_retry_multiplier, index++,
+					MAX_PDEV_PRE_ENABLE_PARAMS);
+	if (QDF_IS_STATUS_ERROR(ret)) {
+		hdd_err("failed at wmi_pdev_param_pdev_stats_tx_xretry_ext");
 		goto out;
 	}
 
-	ret = hdd_set_smart_chainmask_enabled(hdd_ctx);
-	if (ret)
-		goto out;
+	ret = ucfg_get_smart_chainmask_enabled(hdd_ctx->psoc,
+					      &check_value);
+	if (QDF_IS_STATUS_SUCCESS(ret)) {
+		ret = mlme_check_index_setparam(
+					 setparam,
+					 wmi_pdev_param_smart_chainmask_scheme,
+					 (int)check_value, index++,
+					 MAX_PDEV_PRE_ENABLE_PARAMS);
+		if (QDF_IS_STATUS_ERROR(ret)) {
+			hdd_err("failed to set wmi_pdev_param_smart_chainmask_scheme");
+			goto out;
+		}
+	}
 
-	ret = hdd_set_alternative_chainmask_enabled(hdd_ctx);
-	if (ret)
-		goto out;
+	ret = ucfg_get_alternative_chainmask_enabled(hdd_ctx->psoc,
+						    &check_value);
+	if (QDF_IS_STATUS_SUCCESS(ret)) {
+		ret = mlme_check_index_setparam(
+				setparam,
+				wmi_pdev_param_alternative_chainmask_scheme,
+				(int)check_value, index++,
+				MAX_PDEV_PRE_ENABLE_PARAMS);
+		if (QDF_IS_STATUS_ERROR(ret)) {
+			hdd_err("failed to set wmi_pdev_param_alternative_chainmask_scheme");
+			goto out;
+		}
+	}
 
-	ret = hdd_set_ani_enabled(hdd_ctx);
-	if (ret)
-		goto out;
+	ret = ucfg_fwol_get_ani_enabled(hdd_ctx->psoc, &check_value);
+	if (QDF_IS_STATUS_SUCCESS(ret)) {
+		ret = mlme_check_index_setparam(setparam,
+						wmi_pdev_param_ani_enable,
+						(int)check_value, index++,
+						MAX_PDEV_PRE_ENABLE_PARAMS);
+		if (QDF_IS_STATUS_ERROR(ret)) {
+			hdd_err("failed to set wmi_pdev_param_ani_enable");
+			goto out;
+		}
+	}
 
+	ret = sme_send_multi_pdev_vdev_set_params(MLME_PDEV_SETPARAM,
+						  WMI_PDEV_ID_SOC, setparam,
+						  index);
+	if (QDF_IS_STATUS_ERROR(ret)) {
+		hdd_err("failed to send pdev set params");
+		goto out;
+	}
 	/* Configure global firmware params */
 	ret = ucfg_fwol_configure_global_params(hdd_ctx->psoc, hdd_ctx->pdev);
 	if (ret)
@@ -14357,6 +14392,14 @@ static int hdd_set_auto_shutdown_cb(struct hdd_context *hdd_ctx)
 #endif
 
 #ifdef MWS_COEX
+#define MAX_PDEV_MWSCOEX_PARAMS 4
+/* params being sent:
+ * wmi_pdev_param_mwscoex_4g_allow_quick_ftdm
+ * wmi_pdev_param_mwscoex_set_5gnr_pwr_limit
+ * wmi_pdev_param_mwscoex_pcc_chavd_delay
+ * wmi_pdev_param_mwscoex_scc_chavd_delay
+ */
+
 /**
  * hdd_init_mws_coex() - Initialize MWS coex configurations
  * @hdd_ctx:   HDD context
@@ -14372,46 +14415,62 @@ static int hdd_init_mws_coex(struct hdd_context *hdd_ctx)
 	uint32_t mws_coex_4g_quick_tdm = 0, mws_coex_5g_nr_pwr_limit = 0;
 	uint32_t mws_coex_pcc_channel_avoid_delay = 0;
 	uint32_t mws_coex_scc_channel_avoid_delay = 0;
+	struct dev_set_param setparam[MAX_PDEV_MWSCOEX_PARAMS] = {};
+	uint8_t index = 0;
 
 	ucfg_mlme_get_mws_coex_4g_quick_tdm(hdd_ctx->psoc,
 					    &mws_coex_4g_quick_tdm);
-
-	ret = sme_cli_set_command(0, WMI_PDEV_PARAM_MWSCOEX_4G_ALLOW_QUICK_FTDM,
-				  mws_coex_4g_quick_tdm,
-				  PDEV_CMD);
-	if (ret) {
-		hdd_warn("Unable to send MWS-COEX 4G quick FTDM policy");
-		return ret;
+	ret = mlme_check_index_setparam(
+				setparam,
+				wmi_pdev_param_mwscoex_4g_allow_quick_ftdm,
+				mws_coex_4g_quick_tdm, index++,
+				MAX_PDEV_MWSCOEX_PARAMS);
+	if (QDF_IS_STATUS_ERROR(ret)) {
+		hdd_err("failed at wmi_pdev_param_mwscoex_4g_allow_quick_ftdm");
+		goto error;
 	}
 
 	ucfg_mlme_get_mws_coex_5g_nr_pwr_limit(hdd_ctx->psoc,
 					       &mws_coex_5g_nr_pwr_limit);
-
-	ret = sme_cli_set_command(0, WMI_PDEV_PARAM_MWSCOEX_SET_5GNR_PWR_LIMIT,
-				  mws_coex_5g_nr_pwr_limit,
-				  PDEV_CMD);
-	if (ret) {
-		hdd_warn("Unable to send MWS-COEX 4G quick FTDM policy");
-		return ret;
+	ret = mlme_check_index_setparam(
+				      setparam,
+				      wmi_pdev_param_mwscoex_set_5gnr_pwr_limit,
+				      mws_coex_5g_nr_pwr_limit, index++,
+				      MAX_PDEV_MWSCOEX_PARAMS);
+	if (QDF_IS_STATUS_ERROR(ret)) {
+		hdd_err("failed at wmi_pdev_param_mwscoex_set_5gnr_pwr_limit");
+		goto error;
 	}
 
 	ucfg_mlme_get_mws_coex_pcc_channel_avoid_delay(
 					hdd_ctx->psoc,
 					&mws_coex_pcc_channel_avoid_delay);
-
-	ret = sme_cli_set_command(0, WMI_PDEV_PARAM_MWSCOEX_PCC_CHAVD_DELAY,
-				  mws_coex_pcc_channel_avoid_delay,
-				  PDEV_CMD);
-	if (ret)
-		return ret;
+	ret = mlme_check_index_setparam(setparam,
+					wmi_pdev_param_mwscoex_pcc_chavd_delay,
+					mws_coex_pcc_channel_avoid_delay,
+					index++, MAX_PDEV_MWSCOEX_PARAMS);
+	if (QDF_IS_STATUS_ERROR(ret)) {
+		hdd_err("failed at wmi_pdev_param_mwscoex_pcc_chavd_delay");
+		goto error;
+	}
 
 	ucfg_mlme_get_mws_coex_scc_channel_avoid_delay(
 					hdd_ctx->psoc,
 					&mws_coex_scc_channel_avoid_delay);
-
-	ret = sme_cli_set_command(0, WMI_PDEV_PARAM_MWSCOEX_SCC_CHAVD_DELAY,
-				  mws_coex_scc_channel_avoid_delay,
-				  PDEV_CMD);
+	ret = mlme_check_index_setparam(setparam,
+					wmi_pdev_param_mwscoex_scc_chavd_delay,
+					mws_coex_scc_channel_avoid_delay,
+					index++, MAX_PDEV_MWSCOEX_PARAMS);
+	if (QDF_IS_STATUS_ERROR(ret)) {
+		hdd_err("failed at wmi_pdev_param_mwscoex_scc_chavd_delay");
+		goto error;
+	}
+	ret = sme_send_multi_pdev_vdev_set_params(MLME_PDEV_SETPARAM,
+						  WMI_PDEV_ID_SOC, setparam,
+						  index);
+	if (QDF_IS_STATUS_ERROR(ret))
+		hdd_err("failed to send pdev MWSCOEX set params");
+error:
 	return ret;
 }
 #else
@@ -14492,7 +14551,7 @@ static int hdd_features_init(struct hdd_context *hdd_ctx)
 	fw_data_stall_evt = ucfg_dp_fw_data_stall_evt_enabled();
 
 	/* Send Enable/Disable data stall detection cmd to FW */
-	sme_cli_set_command(0, WMI_PDEV_PARAM_DATA_STALL_DETECT_ENABLE,
+	sme_cli_set_command(0, wmi_pdev_param_data_stall_detect_enable,
 			    fw_data_stall_evt, PDEV_CMD);
 
 	ucfg_mlme_get_go_cts2self_for_sta(hdd_ctx->psoc, &b_cts2self);
@@ -14664,6 +14723,18 @@ static void hdd_hastings_bt_war_initialize(struct hdd_context *hdd_ctx)
 		hdd_hastings_bt_war_enable_fw(hdd_ctx);
 }
 
+#define MAX_PDEV_CFG_CDS_PARAMS 8
+/* params being sent:
+ * wmi_pdev_param_set_iot_pattern
+ * wmi_pdev_param_max_mpdus_in_ampdu
+ * wmi_pdev_param_enable_rts_sifs_bursting
+ * wmi_pdev_param_peer_stats_info_enable
+ * wmi_pdev_param_abg_mode_tx_chain_num
+ * wmi_pdev_param_gcmp_support_enable
+ * wmi_pdev_auto_detect_power_failure
+ * wmi_pdev_param_fast_pwr_transition
+ */
+
 /**
  * hdd_configure_cds() - Configure cds modules
  * @hdd_ctx:	HDD context
@@ -14688,7 +14759,10 @@ int hdd_configure_cds(struct hdd_context *hdd_ctx)
 	bool value;
 	enum pmo_auto_pwr_detect_failure_mode auto_power_fail_mode;
 	bool bval = false;
-
+	uint8_t max_index = MAX_PDEV_CFG_CDS_PARAMS;
+	struct dev_set_param setparam[MAX_PDEV_CFG_CDS_PARAMS] = {};
+	uint8_t index = 0;
+	uint8_t next_index = 0;
 	mac_handle = hdd_ctx->mac_handle;
 
 	status = ucfg_policy_mgr_get_force_1x1(hdd_ctx->psoc, &is_force_1x1);
@@ -14696,9 +14770,17 @@ int hdd_configure_cds(struct hdd_context *hdd_ctx)
 		hdd_err("Failed to get force 1x1 value");
 		goto out;
 	}
-	if (is_force_1x1)
-		sme_cli_set_command(0, (int)WMI_PDEV_PARAM_SET_IOT_PATTERN,
-				1, PDEV_CMD);
+	if (is_force_1x1) {
+		status = mlme_check_index_setparam(
+						setparam,
+						wmi_pdev_param_set_iot_pattern,
+						1, index++,
+						max_index);
+		if (QDF_IS_STATUS_ERROR(status)) {
+			hdd_err("failed at wmi_pdev_param_set_iot_pattern");
+			goto out;
+		}
+	}
 	/* set chip power save failure detected callback */
 	sme_set_chip_pwr_save_fail_cb(mac_handle,
 				      hdd_chip_pwr_save_fail_detected_cb);
@@ -14712,8 +14794,15 @@ int hdd_configure_cds(struct hdd_context *hdd_ctx)
 
 	if (max_mpdus_inampdu) {
 		set_value = max_mpdus_inampdu;
-		sme_cli_set_command(0, (int)WMI_PDEV_PARAM_MAX_MPDUS_IN_AMPDU,
-				    set_value, PDEV_CMD);
+		status = mlme_check_index_setparam(
+					      setparam,
+					      wmi_pdev_param_max_mpdus_in_ampdu,
+					      set_value, index++,
+					      max_index);
+		if (QDF_IS_STATUS_ERROR(status)) {
+			hdd_err("failed at  wmi_pdev_param_max_mpdus_in_ampdu");
+			goto out;
+		}
 	}
 
 	status = ucfg_get_enable_rts_sifsbursting(hdd_ctx->psoc,
@@ -14725,17 +14814,29 @@ int hdd_configure_cds(struct hdd_context *hdd_ctx)
 
 	if (enable_rts_sifsbursting) {
 		set_value = enable_rts_sifsbursting;
-		sme_cli_set_command(0,
-				    (int)WMI_PDEV_PARAM_ENABLE_RTS_SIFS_BURSTING,
-				    set_value, PDEV_CMD);
+		status = mlme_check_index_setparam(
+					setparam,
+					wmi_pdev_param_enable_rts_sifs_bursting,
+					set_value, index++,
+					max_index);
+		if (QDF_IS_STATUS_ERROR(status)) {
+			hdd_err("Failed at wmi_pdev_param_enable_rts_sifs_bursting");
+			goto out;
+		}
 	}
 
 	ucfg_mlme_get_sap_get_peer_info(hdd_ctx->psoc, &value);
 	if (value) {
 		set_value = value;
-		sme_cli_set_command(0,
-				    (int)WMI_PDEV_PARAM_PEER_STATS_INFO_ENABLE,
-				    set_value, PDEV_CMD);
+		status = mlme_check_index_setparam(
+					setparam,
+					wmi_pdev_param_peer_stats_info_enable,
+					set_value, index++,
+					max_index);
+		if (QDF_IS_STATUS_ERROR(status)) {
+			hdd_err("Failed at wmi_pdev_param_peer_stats_info_enable");
+			goto out;
+		}
 	}
 
 	status = ucfg_mlme_get_num_11b_tx_chains(hdd_ctx->psoc,
@@ -14766,9 +14867,24 @@ int hdd_configure_cds(struct hdd_context *hdd_ctx)
 					    num_11b_tx_chains);
 	WMI_PDEV_PARAM_SET_11AG_TX_CHAIN_NUM(num_abg_tx_chains,
 					     num_11ag_tx_chains);
-	sme_cli_set_command(0, (int)WMI_PDEV_PARAM_ABG_MODE_TX_CHAIN_NUM,
-			    num_abg_tx_chains, PDEV_CMD);
-
+	status = mlme_check_index_setparam(setparam,
+					   wmi_pdev_param_abg_mode_tx_chain_num,
+					   num_abg_tx_chains, index++,
+					   max_index);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		hdd_err("Failed at wmi_pdev_param_abg_mode_tx_chain_num");
+		goto out;
+	}
+	/* Send some pdev params to maintain legacy order of pdev set params
+	 * at hdd_pre_enable_configure
+	 */
+	status = sme_send_multi_pdev_vdev_set_params(MLME_PDEV_SETPARAM,
+						     WMI_PDEV_ID_SOC, setparam,
+						     index);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		hdd_err("Failed to send 1st set of pdev params");
+		goto out;
+	}
 	if (!ucfg_reg_is_regdb_offloaded(hdd_ctx->psoc))
 		ucfg_reg_program_default_cc(hdd_ctx->pdev,
 					    hdd_ctx->reg.reg_domain);
@@ -14847,16 +14963,33 @@ int hdd_configure_cds(struct hdd_context *hdd_ctx)
 	if (hdd_green_ap_enable_egap(hdd_ctx))
 		hdd_debug("enhance green ap is not enabled");
 
+	hdd_register_green_ap_callback(hdd_ctx->pdev);
+
 	if (0 != wlan_hdd_set_wow_pulse(hdd_ctx, true))
 		hdd_debug("Failed to set wow pulse");
 
-	sme_cli_set_command(0, WMI_PDEV_PARAM_GCMP_SUPPORT_ENABLE,
-			    ucfg_fwol_get_gcmp_enable(hdd_ctx->psoc), PDEV_CMD);
+	max_index = max_index - index;
+	status = mlme_check_index_setparam(
+				      setparam + index,
+				      wmi_pdev_param_gcmp_support_enable,
+				      ucfg_fwol_get_gcmp_enable(hdd_ctx->psoc),
+				      next_index++, max_index);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		hdd_err("failed at wmi_pdev_param_gcmp_support_enable");
+		goto out;
+	}
 
-	auto_power_fail_mode =
+	 auto_power_fail_mode =
 		ucfg_pmo_get_auto_power_fail_mode(hdd_ctx->psoc);
-	sme_cli_set_command(0, WMI_PDEV_AUTO_DETECT_POWER_FAILURE,
-			    auto_power_fail_mode, PDEV_CMD);
+	status = mlme_check_index_setparam(
+				      setparam + index,
+				      wmi_pdev_auto_detect_power_failure,
+				      auto_power_fail_mode,
+				      next_index++, max_index);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		hdd_err("failed at wmi_pdev_auto_detect_power_failure");
+		goto out;
+	}
 
 	status = ucfg_get_enable_phy_reg_retention(hdd_ctx->psoc,
 						   &enable_phy_reg_retention);
@@ -14864,9 +14997,26 @@ int hdd_configure_cds(struct hdd_context *hdd_ctx)
 	if (QDF_IS_STATUS_ERROR(status))
 		return -EINVAL;
 
-	if (enable_phy_reg_retention)
-		wma_cli_set_command(0, WMI_PDEV_PARAM_FAST_PWR_TRANSITION,
-			enable_phy_reg_retention, PDEV_CMD);
+	if (enable_phy_reg_retention) {
+		status = mlme_check_index_setparam(
+					setparam + index,
+					wmi_pdev_param_fast_pwr_transition,
+					enable_phy_reg_retention,
+					next_index++, max_index);
+		if (QDF_IS_STATUS_ERROR(status)) {
+			hdd_err("failed at wmi_pdev_param_fast_pwr_transition");
+			goto out;
+		}
+	}
+	/*Send remaining pdev setparams from array*/
+	status = sme_send_multi_pdev_vdev_set_params(MLME_PDEV_SETPARAM,
+						     WMI_PDEV_ID_SOC,
+						     setparam + index,
+						     next_index);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		hdd_err("failed to send 2nd set of pdev set params");
+		goto out;
+	}
 
 	hdd_hastings_bt_war_initialize(hdd_ctx);
 
@@ -19776,7 +19926,7 @@ int hdd_we_set_ch_width(struct hdd_adapter *adapter, int ch_width)
 	int i;
 
 	/* updating channel bonding only on 5Ghz */
-	hdd_debug("WMI_VDEV_PARAM_CHWIDTH val %d", ch_width);
+	hdd_debug("wmi_vdev_param_chwidth val %d", ch_width);
 
 	for (i = 0; i < ARRAY_SIZE(chwidth_info); i++) {
 		if (chwidth_info[i].sir_chwidth_valid &&
@@ -19957,4 +20107,3 @@ static const struct kernel_param_ops timer_multiplier_ops = {
 };
 
 module_param_cb(timer_multiplier, &timer_multiplier_ops, NULL, 0644);
-

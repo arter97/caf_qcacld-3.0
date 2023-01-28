@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2013-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -325,6 +325,22 @@ wma_get_concurrency_support(struct wlan_objmgr_psoc *psoc)
 }
 
 /**
+ * wma_update_set_feature_version() - Update the set feature version
+ *
+ * @fs: Feature set structure in which version needs to be updated.
+ *
+ * Version 1 - Base feature version
+ * Version 2 - WMI_HOST_VENDOR1_REQ1_VERSION_3_30 updated.
+ * Version 3 - min sleep period for TWT and Scheduled PM in FW updated
+ *
+ * Return: None
+ */
+static void wma_update_set_feature_version(struct target_feature_set *fs)
+{
+	fs->feature_set_version = 3;
+}
+
+/**
  * wma_set_feature_set_info() - Set feature set info
  * @wma_handle: WMA handle
  * @feature_set: Feature set structure which needs to be filled
@@ -479,7 +495,9 @@ static void wma_set_feature_set_info(tp_wma_handle wma_handle,
 	feature_set->peer_bigdata_getbssinfo_support = true;
 	feature_set->peer_bigdata_assocreject_info_support = true;
 	feature_set->peer_getstainfo_support = true;
-	feature_set->feature_set_version = 2;
+
+	wma_update_set_feature_version(feature_set);
+
 }
 
 /**
@@ -678,58 +696,58 @@ int wma_cli_get_command(int vdev_id, int param_id, int vpdev)
 
 	if (VDEV_CMD == vpdev) {
 		switch (param_id) {
-		case WMI_VDEV_PARAM_NSS:
+		case wmi_vdev_param_nss:
 			ret = intr[vdev_id].config.nss;
 			break;
 #ifdef QCA_SUPPORT_GTX
-		case WMI_VDEV_PARAM_GTX_HT_MCS:
+		case wmi_vdev_param_gtx_ht_mcs:
 			ret = intr[vdev_id].config.gtx_info.gtxRTMask[0];
 			break;
-		case WMI_VDEV_PARAM_GTX_VHT_MCS:
+		case wmi_vdev_param_gtx_vht_mcs:
 			ret = intr[vdev_id].config.gtx_info.gtxRTMask[1];
 			break;
-		case WMI_VDEV_PARAM_GTX_USR_CFG:
+		case wmi_vdev_param_gtx_usr_cfg:
 			ret = intr[vdev_id].config.gtx_info.gtxUsrcfg;
 			break;
-		case WMI_VDEV_PARAM_GTX_THRE:
+		case wmi_vdev_param_gtx_thre:
 			ret = intr[vdev_id].config.gtx_info.gtxPERThreshold;
 			break;
-		case WMI_VDEV_PARAM_GTX_MARGIN:
+		case wmi_vdev_param_gtx_margin:
 			ret = intr[vdev_id].config.gtx_info.gtxPERMargin;
 			break;
-		case WMI_VDEV_PARAM_GTX_STEP:
+		case wmi_vdev_param_gtx_step:
 			ret = intr[vdev_id].config.gtx_info.gtxTPCstep;
 			break;
-		case WMI_VDEV_PARAM_GTX_MINTPC:
+		case wmi_vdev_param_gtx_mintpc:
 			ret = intr[vdev_id].config.gtx_info.gtxTPCMin;
 			break;
-		case WMI_VDEV_PARAM_GTX_BW_MASK:
+		case wmi_vdev_param_gtx_bw_mask:
 			ret = intr[vdev_id].config.gtx_info.gtxBWMask;
 			break;
 #endif /* QCA_SUPPORT_GTX */
-		case WMI_VDEV_PARAM_LDPC:
+		case wmi_vdev_param_ldpc:
 			ret = intr[vdev_id].config.ldpc;
 			break;
-		case WMI_VDEV_PARAM_TX_STBC:
+		case wmi_vdev_param_tx_stbc:
 			ret = intr[vdev_id].config.tx_stbc;
 			break;
-		case WMI_VDEV_PARAM_RX_STBC:
+		case wmi_vdev_param_rx_stbc:
 			ret = intr[vdev_id].config.rx_stbc;
 			break;
-		case WMI_VDEV_PARAM_SGI:
+		case wmi_vdev_param_sgi:
 			ret = intr[vdev_id].config.shortgi;
 			break;
-		case WMI_VDEV_PARAM_ENABLE_RTSCTS:
+		case wmi_vdev_param_enable_rtscts:
 			ret = intr[vdev_id].config.rtscts_en;
 			break;
-		case WMI_VDEV_PARAM_CHWIDTH:
+		case wmi_vdev_param_chwidth:
 			ret = intr[vdev_id].config.chwidth;
 			break;
-		case WMI_VDEV_PARAM_FIXED_RATE:
+		case wmi_vdev_param_fixed_rate:
 			ret = intr[vdev_id].config.tx_rate;
 			break;
-		case WMI_VDEV_PARAM_HE_DCM:
-		case WMI_VDEV_PARAM_HE_RANGE_EXT:
+		case wmi_vdev_param_he_dcm_enable:
+		case wmi_vdev_param_he_range_ext:
 			ret = wma_get_he_vdev_param(&intr[vdev_id], param_id);
 			break;
 		default:
@@ -739,37 +757,37 @@ int wma_cli_get_command(int vdev_id, int param_id, int vpdev)
 		}
 	} else if (PDEV_CMD == vpdev) {
 		switch (param_id) {
-		case WMI_PDEV_PARAM_ANI_ENABLE:
+		case wmi_pdev_param_ani_enable:
 			ret = wma->pdevconfig.ani_enable;
 			break;
-		case WMI_PDEV_PARAM_ANI_POLL_PERIOD:
+		case wmi_pdev_param_ani_poll_period:
 			ret = wma->pdevconfig.ani_poll_len;
 			break;
-		case WMI_PDEV_PARAM_ANI_LISTEN_PERIOD:
+		case wmi_pdev_param_ani_listen_period:
 			ret = wma->pdevconfig.ani_listen_len;
 			break;
-		case WMI_PDEV_PARAM_ANI_OFDM_LEVEL:
+		case wmi_pdev_param_ani_ofdm_level:
 			ret = wma->pdevconfig.ani_ofdm_level;
 			break;
-		case WMI_PDEV_PARAM_ANI_CCK_LEVEL:
+		case wmi_pdev_param_ani_cck_level:
 			ret = wma->pdevconfig.ani_cck_level;
 			break;
-		case WMI_PDEV_PARAM_DYNAMIC_BW:
+		case wmi_pdev_param_dynamic_bw:
 			ret = wma->pdevconfig.cwmenable;
 			break;
-		case WMI_PDEV_PARAM_CTS_CBW:
+		case wmi_pdev_param_cts_cbw:
 			ret = wma->pdevconfig.cts_cbw;
 			break;
-		case WMI_PDEV_PARAM_TX_CHAIN_MASK:
+		case wmi_pdev_param_tx_chain_mask:
 			ret = wma->pdevconfig.txchainmask;
 			break;
-		case WMI_PDEV_PARAM_RX_CHAIN_MASK:
+		case wmi_pdev_param_rx_chain_mask:
 			ret = wma->pdevconfig.rxchainmask;
 			break;
-		case WMI_PDEV_PARAM_TXPOWER_LIMIT2G:
+		case wmi_pdev_param_txpower_limit2g:
 			ret = wma->pdevconfig.txpow2g;
 			break;
-		case WMI_PDEV_PARAM_TXPOWER_LIMIT5G:
+		case wmi_pdev_param_txpower_limit5g:
 			ret = wma->pdevconfig.txpow5g;
 			break;
 		default:
@@ -864,28 +882,28 @@ int wma_cli_get_command(int vdev_id, int param_id, int vpdev)
 		}
 	} else if (GTX_CMD == vpdev) {
 		switch (param_id) {
-		case WMI_VDEV_PARAM_GTX_HT_MCS:
+		case wmi_vdev_param_gtx_ht_mcs:
 			ret = intr[vdev_id].config.gtx_info.gtxRTMask[0];
 			break;
-		case WMI_VDEV_PARAM_GTX_VHT_MCS:
+		case wmi_vdev_param_gtx_vht_mcs:
 			ret = intr[vdev_id].config.gtx_info.gtxRTMask[1];
 			break;
-		case WMI_VDEV_PARAM_GTX_USR_CFG:
+		case wmi_vdev_param_gtx_usr_cfg:
 			ret = intr[vdev_id].config.gtx_info.gtxUsrcfg;
 			break;
-		case WMI_VDEV_PARAM_GTX_THRE:
+		case wmi_vdev_param_gtx_thre:
 			ret = intr[vdev_id].config.gtx_info.gtxPERThreshold;
 			break;
-		case WMI_VDEV_PARAM_GTX_MARGIN:
+		case wmi_vdev_param_gtx_margin:
 			ret = intr[vdev_id].config.gtx_info.gtxPERMargin;
 			break;
-		case WMI_VDEV_PARAM_GTX_STEP:
+		case wmi_vdev_param_gtx_step:
 			ret = intr[vdev_id].config.gtx_info.gtxTPCstep;
 			break;
-		case WMI_VDEV_PARAM_GTX_MINTPC:
+		case wmi_vdev_param_gtx_mintpc:
 			ret = intr[vdev_id].config.gtx_info.gtxTPCMin;
 			break;
-		case WMI_VDEV_PARAM_GTX_BW_MASK:
+		case wmi_vdev_param_gtx_bw_mask:
 			ret = intr[vdev_id].config.gtx_info.gtxBWMask;
 			break;
 		default:
@@ -1239,8 +1257,8 @@ static void wma_process_cli_set_cmd(tp_wma_handle wma,
 	case PDEV_CMD:
 		wma_debug("pdev pid %d pval %d", privcmd->param_id,
 			 privcmd->param_value);
-		if ((privcmd->param_id == WMI_PDEV_PARAM_RX_CHAIN_MASK) ||
-		    (privcmd->param_id == WMI_PDEV_PARAM_TX_CHAIN_MASK)) {
+		if ((privcmd->param_id == wmi_pdev_param_rx_chain_mask) ||
+		    (privcmd->param_id == wmi_pdev_param_tx_chain_mask)) {
 			if (QDF_STATUS_SUCCESS !=
 					wma_check_txrx_chainmask(
 					target_if_get_num_rf_chains(tgt_hdl),
@@ -1250,7 +1268,7 @@ static void wma_process_cli_set_cmd(tp_wma_handle wma,
 			}
 		}
 
-		if (privcmd->param_id == WMI_PDEV_PARAM_TX_CHAIN_MASK) {
+		if (privcmd->param_id == wmi_pdev_param_tx_chain_mask) {
 			if (!wma_is_tx_chainmask_valid(privcmd->param_value,
 						       tgt_hdl)) {
 				wma_debug("Chainmask value is invalid");
@@ -1259,7 +1277,7 @@ static void wma_process_cli_set_cmd(tp_wma_handle wma,
 		}
 		pdev_param.param_id = privcmd->param_id;
 		pdev_param.param_value = privcmd->param_value;
-		if (privcmd->param_id == WMI_PDEV_PARAM_TWT_AC_CONFIG)
+		if (privcmd->param_id == wmi_pdev_param_twt_ac_config)
 			pdev_param.param_value =
 				wma_convert_ac_value(pdev_param.param_value);
 		ret = wmi_unified_pdev_param_send(wma->wmi_handle,
@@ -1609,14 +1627,14 @@ static void wma_process_cli_set_cmd(tp_wma_handle wma,
 		wma_debug("vdev id %d pid %d pval %d", privcmd->param_vdev_id,
 			 privcmd->param_id, privcmd->param_value);
 		switch (privcmd->param_id) {
-		case WMI_VDEV_PARAM_GTX_HT_MCS:
+		case wmi_vdev_param_gtx_ht_mcs:
 			intr[vid].config.gtx_info.gtxRTMask[0] =
 				privcmd->param_value;
 			ret = wmi_unified_vdev_set_gtx_cfg_send(wma->wmi_handle,
 					privcmd->param_vdev_id,
 					&intr[vid].config.gtx_info);
 			break;
-		case WMI_VDEV_PARAM_GTX_VHT_MCS:
+		case wmi_vdev_param_gtx_vht_mcs:
 			intr[vid].config.gtx_info.gtxRTMask[1] =
 				privcmd->param_value;
 			ret = wmi_unified_vdev_set_gtx_cfg_send(wma->wmi_handle,
@@ -1624,7 +1642,7 @@ static void wma_process_cli_set_cmd(tp_wma_handle wma,
 					&intr[vid].config.gtx_info);
 			break;
 
-		case WMI_VDEV_PARAM_GTX_USR_CFG:
+		case wmi_vdev_param_gtx_usr_cfg:
 			intr[vid].config.gtx_info.gtxUsrcfg =
 				privcmd->param_value;
 			ret = wmi_unified_vdev_set_gtx_cfg_send(wma->wmi_handle,
@@ -1632,7 +1650,7 @@ static void wma_process_cli_set_cmd(tp_wma_handle wma,
 					&intr[vid].config.gtx_info);
 			break;
 
-		case WMI_VDEV_PARAM_GTX_THRE:
+		case wmi_vdev_param_gtx_thre:
 			intr[vid].config.gtx_info.gtxPERThreshold =
 				privcmd->param_value;
 			ret = wmi_unified_vdev_set_gtx_cfg_send(wma->wmi_handle,
@@ -1640,7 +1658,7 @@ static void wma_process_cli_set_cmd(tp_wma_handle wma,
 					&intr[vid].config.gtx_info);
 			break;
 
-		case WMI_VDEV_PARAM_GTX_MARGIN:
+		case wmi_vdev_param_gtx_margin:
 			intr[vid].config.gtx_info.gtxPERMargin =
 				privcmd->param_value;
 			ret = wmi_unified_vdev_set_gtx_cfg_send(wma->wmi_handle,
@@ -1648,7 +1666,7 @@ static void wma_process_cli_set_cmd(tp_wma_handle wma,
 					&intr[vid].config.gtx_info);
 			break;
 
-		case WMI_VDEV_PARAM_GTX_STEP:
+		case wmi_vdev_param_gtx_step:
 			intr[vid].config.gtx_info.gtxTPCstep =
 				privcmd->param_value;
 			ret = wmi_unified_vdev_set_gtx_cfg_send(wma->wmi_handle,
@@ -1656,7 +1674,7 @@ static void wma_process_cli_set_cmd(tp_wma_handle wma,
 					&intr[vid].config.gtx_info);
 			break;
 
-		case WMI_VDEV_PARAM_GTX_MINTPC:
+		case wmi_vdev_param_gtx_mintpc:
 			intr[vid].config.gtx_info.gtxTPCMin =
 				privcmd->param_value;
 			ret = wmi_unified_vdev_set_gtx_cfg_send(wma->wmi_handle,
@@ -1664,7 +1682,7 @@ static void wma_process_cli_set_cmd(tp_wma_handle wma,
 					&intr[vid].config.gtx_info);
 			break;
 
-		case WMI_VDEV_PARAM_GTX_BW_MASK:
+		case wmi_vdev_param_gtx_bw_mask:
 			intr[vid].config.gtx_info.gtxBWMask =
 				privcmd->param_value;
 			ret = wmi_unified_vdev_set_gtx_cfg_send(wma->wmi_handle,
@@ -1686,53 +1704,53 @@ static void wma_process_cli_set_cmd(tp_wma_handle wma,
 	}
 	if (1 == privcmd->param_vp_dev) {
 		switch (privcmd->param_id) {
-		case WMI_VDEV_PARAM_NSS:
+		case wmi_vdev_param_nss:
 			intr[vid].config.nss = privcmd->param_value;
 			break;
-		case WMI_VDEV_PARAM_LDPC:
+		case wmi_vdev_param_ldpc:
 			intr[vid].config.ldpc = privcmd->param_value;
 			break;
-		case WMI_VDEV_PARAM_TX_STBC:
+		case wmi_vdev_param_tx_stbc:
 			intr[vid].config.tx_stbc = privcmd->param_value;
 			break;
-		case WMI_VDEV_PARAM_RX_STBC:
+		case wmi_vdev_param_rx_stbc:
 			intr[vid].config.rx_stbc = privcmd->param_value;
 			break;
-		case WMI_VDEV_PARAM_SGI:
+		case wmi_vdev_param_sgi:
 			intr[vid].config.shortgi = privcmd->param_value;
 			break;
-		case WMI_VDEV_PARAM_ENABLE_RTSCTS:
+		case wmi_vdev_param_enable_rtscts:
 			intr[vid].config.rtscts_en = privcmd->param_value;
 			break;
-		case WMI_VDEV_PARAM_CHWIDTH:
+		case wmi_vdev_param_chwidth:
 			intr[vid].config.chwidth = privcmd->param_value;
 			break;
-		case WMI_VDEV_PARAM_FIXED_RATE:
+		case wmi_vdev_param_fixed_rate:
 			intr[vid].config.tx_rate = privcmd->param_value;
 			break;
-		case WMI_VDEV_PARAM_EARLY_RX_ADJUST_ENABLE:
+		case wmi_vdev_param_early_rx_adjust_enable:
 			intr[vid].config.erx_adjust = privcmd->param_value;
 			break;
-		case WMI_VDEV_PARAM_EARLY_RX_TGT_BMISS_NUM:
+		case wmi_vdev_param_early_rx_tgt_bmiss_num:
 			intr[vid].config.erx_bmiss_num = privcmd->param_value;
 			break;
-		case WMI_VDEV_PARAM_EARLY_RX_BMISS_SAMPLE_CYCLE:
+		case wmi_vdev_param_early_rx_bmiss_sample_cycle:
 			intr[vid].config.erx_bmiss_cycle = privcmd->param_value;
 			break;
-		case WMI_VDEV_PARAM_EARLY_RX_SLOP_STEP:
+		case wmi_vdev_param_early_rx_slop_step:
 			intr[vid].config.erx_slop_step = privcmd->param_value;
 			break;
-		case WMI_VDEV_PARAM_EARLY_RX_INIT_SLOP:
+		case wmi_vdev_param_early_rx_init_slop:
 			intr[vid].config.erx_init_slop = privcmd->param_value;
 			break;
-		case WMI_VDEV_PARAM_EARLY_RX_ADJUST_PAUSE:
+		case wmi_vdev_param_early_rx_adjust_pause:
 			intr[vid].config.erx_adj_pause = privcmd->param_value;
 			break;
-		case WMI_VDEV_PARAM_EARLY_RX_DRIFT_SAMPLE:
+		case wmi_vdev_param_early_rx_drift_sample:
 			intr[vid].config.erx_dri_sample = privcmd->param_value;
 			break;
-		case WMI_VDEV_PARAM_HE_DCM:
-		case WMI_VDEV_PARAM_HE_RANGE_EXT:
+		case wmi_vdev_param_he_dcm_enable:
+		case wmi_vdev_param_he_range_ext:
 			wma_set_he_vdev_param(&intr[vid], privcmd->param_id,
 					      privcmd->param_value);
 			break;
@@ -1743,34 +1761,34 @@ static void wma_process_cli_set_cmd(tp_wma_handle wma,
 		}
 	} else if (2 == privcmd->param_vp_dev) {
 		switch (privcmd->param_id) {
-		case WMI_PDEV_PARAM_ANI_ENABLE:
+		case wmi_pdev_param_ani_enable:
 			wma->pdevconfig.ani_enable = privcmd->param_value;
 			break;
-		case WMI_PDEV_PARAM_ANI_POLL_PERIOD:
+		case wmi_pdev_param_ani_poll_period:
 			wma->pdevconfig.ani_poll_len = privcmd->param_value;
 			break;
-		case WMI_PDEV_PARAM_ANI_LISTEN_PERIOD:
+		case wmi_pdev_param_ani_listen_period:
 			wma->pdevconfig.ani_listen_len = privcmd->param_value;
 			break;
-		case WMI_PDEV_PARAM_ANI_OFDM_LEVEL:
+		case wmi_pdev_param_ani_ofdm_level:
 			wma->pdevconfig.ani_ofdm_level = privcmd->param_value;
 			break;
-		case WMI_PDEV_PARAM_ANI_CCK_LEVEL:
+		case wmi_pdev_param_ani_cck_level:
 			wma->pdevconfig.ani_cck_level = privcmd->param_value;
 			break;
-		case WMI_PDEV_PARAM_DYNAMIC_BW:
+		case wmi_pdev_param_dynamic_bw:
 			wma->pdevconfig.cwmenable = privcmd->param_value;
 			break;
-		case WMI_PDEV_PARAM_CTS_CBW:
+		case wmi_pdev_param_cts_cbw:
 			wma->pdevconfig.cts_cbw = privcmd->param_value;
 			break;
-		case WMI_PDEV_PARAM_TX_CHAIN_MASK:
+		case wmi_pdev_param_tx_chain_mask:
 			wma->pdevconfig.txchainmask = privcmd->param_value;
 			break;
-		case WMI_PDEV_PARAM_RX_CHAIN_MASK:
+		case wmi_pdev_param_rx_chain_mask:
 			wma->pdevconfig.rxchainmask = privcmd->param_value;
 			break;
-		case WMI_PDEV_PARAM_TXPOWER_LIMIT2G:
+		case wmi_pdev_param_txpower_limit2g:
 			wma->pdevconfig.txpow2g = privcmd->param_value;
 			if (mac->mlme_cfg->gen.band_capability & BIT(REG_BAND_2G))
 				mac->mlme_cfg->power.current_tx_power_level =
@@ -1778,7 +1796,7 @@ static void wma_process_cli_set_cmd(tp_wma_handle wma,
 			else
 				wma_err("Current band is not 2G");
 			break;
-		case WMI_PDEV_PARAM_TXPOWER_LIMIT5G:
+		case wmi_pdev_param_txpower_limit5g:
 			wma->pdevconfig.txpow5g = privcmd->param_value;
 			if (mac->mlme_cfg->gen.band_capability & BIT(REG_BAND_5G))
 				mac->mlme_cfg->power.current_tx_power_level =
@@ -1794,7 +1812,7 @@ static void wma_process_cli_set_cmd(tp_wma_handle wma,
 	} else if (5 == privcmd->param_vp_dev) {
 		ret = wma_vdev_set_param(wma->wmi_handle,
 					privcmd->param_vdev_id,
-					WMI_VDEV_PARAM_PACKET_POWERSAVE,
+					wmi_vdev_param_packet_powersave,
 					pps_val);
 		if (ret)
 			wma_err("Failed to send wmi packet power save cmd");
@@ -5756,9 +5774,11 @@ static void wma_green_ap_register_handlers(tp_wma_handle wma_handle)
 		target_if_green_ap_register_egap_event_handler(
 					wma_handle->pdev);
 
+	target_if_green_ap_register_ll_ps_event_handler(wma_handle->pdev);
+
 }
 #else
-static void wma_green_ap_register_handlers(tp_wma_handle wma_handle)
+static inline void wma_green_ap_register_handlers(tp_wma_handle wma_handle)
 {
 }
 #endif
@@ -7426,7 +7446,7 @@ pkt_pwr_save_config:
 		wma_debug("vdev_id:%d val:0x%x pps_val:0x%x", vdev_id,
 			 val, pps_val);
 		ret = wma_vdev_set_param(wma->wmi_handle, vdev_id,
-					      WMI_VDEV_PARAM_PACKET_POWERSAVE,
+					      wmi_vdev_param_packet_powersave,
 					      pps_val);
 		break;
 	default:
@@ -7512,7 +7532,7 @@ static QDF_STATUS wma_config_stats_factor(tp_wma_handle wma,
 
 	ret = wma_vdev_set_param(wma->wmi_handle,
 					    avg_factor->vdev_id,
-					    WMI_VDEV_PARAM_STATS_AVG_FACTOR,
+					    wmi_vdev_param_stats_avg_factor,
 					    avg_factor->stats_avg_factor);
 	if (QDF_IS_STATUS_ERROR(ret)) {
 		wma_err("failed to set avg_factor for vdev_id %d",
@@ -7547,7 +7567,7 @@ static QDF_STATUS wma_config_guard_time(tp_wma_handle wma,
 
 	ret = wma_vdev_set_param(wma->wmi_handle,
 					      guard_time->vdev_id,
-					      WMI_VDEV_PARAM_RX_LEAK_WINDOW,
+					      wmi_vdev_param_rx_leak_window,
 					      guard_time->guard_time);
 	if (QDF_IS_STATUS_ERROR(ret)) {
 		wma_err("failed to set guard time for vdev_id %d",
@@ -7728,7 +7748,7 @@ static QDF_STATUS wma_update_tx_fail_cnt_th(tp_wma_handle wma,
 			vdev_id, tx_fail_disconn_th);
 
 	ret = wma_vdev_set_param(wmi_handle, vdev_id,
-			WMI_VDEV_PARAM_DISCONNECT_TH,
+			wmi_vdev_param_disconnect_th,
 			tx_fail_disconn_th);
 
 	if (ret) {
@@ -7770,8 +7790,8 @@ static QDF_STATUS wma_update_short_retry_limit(tp_wma_handle wma,
 		vdev_id, short_retry_limit);
 
 	ret = wma_vdev_set_param(wmi_handle, vdev_id,
-		WMI_VDEV_PARAM_NON_AGG_SW_RETRY_TH,
-		short_retry_limit);
+				 wmi_vdev_param_non_agg_sw_retry_th,
+				 short_retry_limit);
 
 	if (ret) {
 		wma_err("Failed to send short limit threshold command");
@@ -7811,7 +7831,7 @@ static QDF_STATUS wma_update_long_retry_limit(tp_wma_handle wma,
 		vdev_id, long_retry_limit);
 
 	ret  = wma_vdev_set_param(wmi_handle, vdev_id,
-			WMI_VDEV_PARAM_AGG_SW_RETRY_TH,
+			wmi_vdev_param_agg_sw_retry_th,
 			long_retry_limit);
 
 	if (ret) {
@@ -7821,6 +7841,14 @@ static QDF_STATUS wma_update_long_retry_limit(tp_wma_handle wma,
 
 	return QDF_STATUS_SUCCESS;
 }
+
+#define MAX_VDEV_AP_ALIVE_PARAMS 4
+/* params being sent:
+ * wmi_vdev_param_ap_keepalive_min_idle_inactive_time_secs
+ * wmi_vdev_param_ap_keepalive_max_idle_inactive_secs
+ * wmi_vdev_param_ap_keepalive_min_idle_inactive_time_secs
+ * wmi_vdev_param_ap_keepalive_max_unresponsive_time_secs
+ */
 
 /*
  * wma_update_sta_inactivity_timeout() - Set sta_inactivity_timeout to fw
@@ -7842,6 +7870,9 @@ void wma_update_sta_inactivity_timeout(tp_wma_handle wma,
 	uint32_t max_unresponsive_time;
 	uint32_t min_inactive_time, max_inactive_time;
 	struct wmi_unified *wmi_handle;
+	struct dev_set_param setparam[MAX_VDEV_AP_ALIVE_PARAMS] = {};
+	uint8_t index = 0;
+	QDF_STATUS status = QDF_STATUS_E_FAILURE;
 
 	if (wma_validate_handle(wma))
 		return;
@@ -7854,26 +7885,48 @@ void wma_update_sta_inactivity_timeout(tp_wma_handle wma,
 	max_unresponsive_time = sta_inactivity_timer->sta_inactivity_timeout;
 	max_inactive_time = max_unresponsive_time * TWO_THIRD;
 	min_inactive_time = max_unresponsive_time - max_inactive_time;
+	status = mlme_check_index_setparam(
+			setparam,
+			wmi_vdev_param_ap_keepalive_min_idle_inactive_time_secs,
+			min_inactive_time, index++,
+			MAX_VDEV_AP_ALIVE_PARAMS);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		wma_err("failed to set wmi_vdev_param_ap_keepalive_min_idle_inactive_time_secs");
+		goto error;
+	}
+	status = mlme_check_index_setparam(
+			setparam,
+			wmi_vdev_param_ap_keepalive_max_idle_inactive_secs,
+			min_inactive_time, index++, MAX_VDEV_AP_ALIVE_PARAMS);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		wma_err("failed to set wmi_vdev_param_ap_keepalive_max_idle_inactive_secs");
+		goto error;
+	}
+	status = mlme_check_index_setparam(
+			setparam,
+			wmi_vdev_param_ap_keepalive_min_idle_inactive_time_secs,
+			max_inactive_time, index++, MAX_VDEV_AP_ALIVE_PARAMS);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		wma_err("failed to set wmi_vdev_param_ap_keepalive_min_idle_inactive_time_secs");
+		goto error;
+	}
+	status = mlme_check_index_setparam(
+			setparam,
+			wmi_vdev_param_ap_keepalive_max_unresponsive_time_secs,
+			max_unresponsive_time, index++,
+			MAX_VDEV_AP_ALIVE_PARAMS);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		wma_err("failed to set wmi_vdev_param_ap_keepalive_max_unresponsive_time_secs");
+		goto error;
+	}
 
-	if (wma_vdev_set_param(wmi_handle, vdev_id,
-			WMI_VDEV_PARAM_AP_KEEPALIVE_MIN_IDLE_INACTIVE_TIME_SECS,
-			min_inactive_time))
-		wma_err("Failed to Set AP MIN IDLE INACTIVE TIME");
+	status = wma_send_multi_pdev_vdev_set_params(MLME_VDEV_SETPARAM,
+						     vdev_id, setparam, index);
+	if (QDF_IS_STATUS_ERROR(status))
+		wma_err("Failed to send idle_inactive,unresponsive time vdev set params");
 
-	if (wma_vdev_set_param(wmi_handle, vdev_id,
-			WMI_VDEV_PARAM_AP_KEEPALIVE_MAX_IDLE_INACTIVE_TIME_SECS,
-			max_inactive_time))
-		wma_err("Failed to Set AP MAX IDLE INACTIVE TIME");
-
-	if (wma_vdev_set_param(wmi_handle, vdev_id,
-		WMI_VDEV_PARAM_AP_KEEPALIVE_MAX_UNRESPONSIVE_TIME_SECS,
-		max_unresponsive_time))
-		wma_err("Failed to Set MAX UNRESPONSIVE TIME");
-
-	wma_debug("vdev_id:%d min_inactive_time: %u max_inactive_time: %u max_unresponsive_time: %u",
-			vdev_id,
-			min_inactive_time, max_inactive_time,
-			max_unresponsive_time);
+error:
+	return;
 }
 
 #ifdef WLAN_FEATURE_WOW_PULSE
