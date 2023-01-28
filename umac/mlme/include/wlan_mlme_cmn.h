@@ -74,6 +74,11 @@
  * @mlme_cm_roam_cmpl_cb: Roam sync complete cb
  * @vdev: vdev pointer
  *
+ * @mlme_cm_roam_get_scan_ie_cb: Get scan ie cb
+ * @vdev: vdev pointer
+ * @scan_ie: scan ie element pointer
+ * @dot11mode_filter: dot11mode filter enumn pointer
+ *
  * @mlme_cm_ft_preauth_cmpl_cb: Roam ft preauth complete cb
  * @vdev: vdev pointer
  * @rsp: preauth response pointer
