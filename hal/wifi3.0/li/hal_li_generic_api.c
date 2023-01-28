@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2016-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -102,7 +102,7 @@ void hal_tx_init_data_ring_li(hal_soc_handle_t hal_soc_hdl,
 	}
 }
 
-/*
+/**
  * hal_rx_msdu_is_wlan_mcast_generic_li(): Check if the buffer is for multicast
  *					address
  * @nbuf: Network buffer
@@ -138,8 +138,9 @@ static uint32_t hal_rx_tlv_decap_format_get_li(void *hw_desc_addr)
 /**
  * hal_rx_dump_pkt_tlvs_li(): API to print all member elements of
  *			 RX TLVs
- * @ buf: pointer the pkt buffer.
- * @ dbg_level: log level.
+ * @hal_soc_hdl: hal_soc handle
+ * @buf: pointer the pkt buffer.
+ * @dbg_level: log level.
  *
  * Return: void
  */
@@ -191,8 +192,8 @@ hal_rx_tlv_get_offload_info_li(uint8_t *rx_tlv,
 	return 0;
 }
 
-/*
- * hal_rx_attn_phy_ppdu_id_get(): get phy_ppdu_id value
+/**
+ * hal_rx_attn_phy_ppdu_id_get_li(): get phy_ppdu_id value
  * from rx attention
  * @buf: pointer to rx_pkt_tlvs
  *
@@ -210,10 +211,11 @@ static uint16_t hal_rx_attn_phy_ppdu_id_get_li(uint8_t *buf)
 }
 
 /**
- * hal_rx_msdu_start_msdu_len_get(): API to get the MSDU length
+ * hal_rx_msdu_start_msdu_len_get_li(): API to get the MSDU length
  * from rx_msdu_start TLV
  *
- * @ buf: pointer to the start of RX PKT TLV headers
+ * @buf: pointer to the start of RX PKT TLV headers
+ *
  * Return: msdu length
  */
 static uint32_t hal_rx_msdu_start_msdu_len_get_li(uint8_t *buf)
@@ -386,12 +388,13 @@ uint8_t hal_rx_ret_buf_manager_get_li(hal_ring_desc_t ring_desc)
 }
 
 /**
- * hal_rx_reo_buf_paddr_get_li: Gets the physical address and
+ * hal_rx_reo_buf_paddr_get_li() - Gets the physical address and
  * cookie from the REO destination ring element
  *
- * @ rx_desc: Opaque cookie pointer used by HAL to get to
+ * @rx_desc: Opaque cookie pointer used by HAL to get to
  * the current descriptor
- * @ buf_info: structure to return the buffer information
+ * @buf_info: structure to return the buffer information
+ *
  * Return: void
  */
 static void hal_rx_reo_buf_paddr_get_li(hal_ring_desc_t rx_desc,
@@ -407,12 +410,12 @@ static void hal_rx_reo_buf_paddr_get_li(hal_ring_desc_t rx_desc,
 }
 
 /**
- * hal_rx_msdu_link_desc_set_li: Retrieves MSDU Link Descriptor to WBM
+ * hal_rx_msdu_link_desc_set_li() - Retrieves MSDU Link Descriptor to WBM
  *
- * @ hal_soc_hdl	: HAL version of the SOC pointer
- * @ src_srng_desc	: void pointer to the WBM Release Ring descriptor
- * @ buf_addr_info	: void pointer to the buffer_addr_info
- * @ bm_action		: put in IDLE list or release to MSDU_LIST
+ * @hal_soc_hdl: HAL version of the SOC pointer
+ * @src_srng_desc: void pointer to the WBM Release Ring descriptor
+ * @buf_addr_info: void pointer to the buffer_addr_info
+ * @bm_action: put in IDLE list or release to MSDU_LIST
  *
  * Return: void
  */
@@ -481,14 +484,14 @@ void hal_rx_buf_cookie_rbm_get_li(uint32_t *buf_addr_info_hdl,
 }
 
 /**
- * hal_rx_msdu_link_desc_get(): API to get the MSDU information
+ * hal_rx_msdu_list_get_li(): API to get the MSDU information
  * from the MSDU link descriptor
  *
- * @ hal_soc_hdl	: HAL version of the SOC pointer
+ * @hal_soc_hdl: HAL version of the SOC pointer
  * @msdu_link_desc: Opaque pointer used by HAL to get to the
  * MSDU link descriptor (struct rx_msdu_link)
  *
- * @msdu_list: Return the list of MSDUs contained in this link descriptor
+ * @hal_msdu_list: Return the list of MSDUs contained in this link descriptor
  *
  * @num_msdus: Number of MSDUs in the MPDU
  *
@@ -593,6 +596,7 @@ static uint32_t hal_rx_get_reo_error_code_li(hal_ring_desc_t rx_desc)
 
 /**
  * hal_gen_reo_remap_val_generic_li() - Generate the reo map value
+ * @remap_reg: remap register
  * @ix0_map: mapping values for reo
  *
  * Return: IX0 reo remap register value to be written
@@ -635,7 +639,7 @@ hal_gen_reo_remap_val_generic_li(enum hal_reo_remap_reg remap_reg,
  * hal_rx_tlv_csum_err_get_li() - Get IP and tcp-udp checksum fail flag
  * @rx_tlv_hdr: start address of rx_tlv_hdr
  * @ip_csum_err: buffer to return ip_csum_fail flag
- * @tcp_udp_csum_fail: placeholder to return tcp-udp checksum fail flag
+ * @tcp_udp_csum_err: placeholder to return tcp-udp checksum fail flag
  *
  * Return: None
  */
@@ -974,11 +978,11 @@ hal_rx_tlv_get_is_decrypted_li(uint8_t *buf)
 }
 
 /**
- * hal_rx_msdu_reo_dst_ind_get_li: Gets the REO
+ * hal_rx_msdu_reo_dst_ind_get_li() - Gets the REO
  * destination ring ID from the msdu desc info
  *
- * @ hal_soc_hdl	: HAL version of the SOC pointer
- * @msdu_link_desc : Opaque cookie pointer used by HAL to get to
+ * @hal_soc_hdl: HAL version of the SOC pointer
+ * @msdu_link_desc: Opaque cookie pointer used by HAL to get to
  * the current descriptor
  *
  * Return: dst_ind (REO destination ring ID)
@@ -1155,13 +1159,6 @@ static uint8_t hal_get_idle_link_bm_id_li(uint8_t chip_id)
 	return WBM_IDLE_DESC_LIST;
 }
 
-/**
- * hal_hw_txrx_default_ops_attach_li() - Attach the default hal ops for
- *		lithium chipsets.
- * @hal_soc_hdl: HAL soc handle
- *
- * Return: None
- */
 void hal_hw_txrx_default_ops_attach_li(struct hal_soc *hal_soc)
 {
 	hal_soc->ops->hal_get_reo_qdesc_size = hal_get_reo_qdesc_size_li;
