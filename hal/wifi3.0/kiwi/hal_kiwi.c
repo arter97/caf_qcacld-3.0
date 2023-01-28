@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2019-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -141,10 +141,10 @@ static uint32_t hal_get_link_desc_size_kiwi(void)
 }
 
 /**
- * hal_rx_dump_msdu_end_tlv_kiwi: dump RX msdu_end TLV in structured
+ * hal_rx_dump_msdu_end_tlv_kiwi() - dump RX msdu_end TLV in structured
  *			     human readable format.
- * @ msdu_end: pointer the msdu_end TLV in pkt.
- * @ dbg_level: log level.
+ * @msduend: pointer the msdu_end TLV in pkt.
+ * @dbg_level: log level.
  *
  * Return: void
  */
@@ -805,8 +805,8 @@ static uint8_t *hal_rx_desc_get_80211_hdr_be(void *hw_desc_addr)
 }
 
 /**
- * hal_rx_dump_pkt_hdr_tlv: dump RX pkt header TLV in hex format
- * @pkt_hdr_tlv: pointer the pkt_hdr_tlv in pkt.
+ * hal_rx_dump_pkt_hdr_tlv_kiwi() - dump RX pkt header TLV in hex format
+ * @pkt_tlvs: pointer the pkt_hdr_tlv in pkt.
  * @dbg_level: log level.
  *
  * Return: void
@@ -841,9 +841,9 @@ void hal_register_rx_pkt_hdr_tlv_api_kiwi(struct hal_soc *hal_soc)
 #endif
 
 /**
- * hal_rx_dump_mpdu_start_tlv_generic_be: dump RX mpdu_start TLV in structured
+ * hal_rx_dump_mpdu_start_tlv_kiwi(): dump RX mpdu_start TLV in structured
  *			       human readable format.
- * @mpdu_start: pointer the rx_attention TLV in pkt.
+ * @mpdustart: pointer the rx_attention TLV in pkt.
  * @dbg_level: log level.
  *
  * Return: void
@@ -1145,12 +1145,12 @@ hal_rx_tlv_populate_mpdu_desc_info_kiwi(uint8_t *buf,
 }
 
 /**
- * hal_reo_status_get_header_kiwi - Process reo desc info
- * @d - Pointer to reo descriptor
- * @b - tlv type info
- * @h1 - Pointer to hal_reo_status_header where info to be stored
+ * hal_reo_status_get_header_kiwi() - Process reo desc info
+ * @ring_desc: Pointer to reo descriptor
+ * @b: tlv type info
+ * @h1: Pointer to hal_reo_status_header where info to be stored
  *
- * Return - none.
+ * Return: none.
  *
  */
 static void hal_reo_status_get_header_kiwi(hal_ring_desc_t ring_desc, int b,
@@ -1272,10 +1272,10 @@ void *hal_dst_mpdu_desc_info_kiwi(void *dst_ring_desc)
 	return (void *)HAL_DST_MPDU_DESC_INFO(dst_ring_desc);
 }
 
-/*
- * hal_rx_get_tlv_kiwi(): API to get the tlv
- *
+/**
+ * hal_rx_get_tlv_kiwi() - API to get the tlv
  * @rx_tlv: TLV data extracted from the rx packet
+ *
  * Return: uint8_t
  */
 static uint8_t hal_rx_get_tlv_kiwi(void *rx_tlv)
@@ -1287,7 +1287,7 @@ static uint8_t hal_rx_get_tlv_kiwi(void *rx_tlv)
  * hal_rx_proc_phyrx_other_receive_info_tlv_kiwi()
  *				    - process other receive info TLV
  * @rx_tlv_hdr: pointer to TLV header
- * @ppdu_info: pointer to ppdu_info
+ * @ppdu_info_handle: pointer to ppdu_info
  *
  * Return: None
  */
@@ -1338,9 +1338,9 @@ void hal_reo_config_kiwi(struct hal_soc *soc,
 
 /**
  * hal_rx_msdu_desc_info_get_ptr_kiwi() - Get msdu desc info ptr
- * @msdu_details_ptr - Pointer to msdu_details_ptr
+ * @msdu_details_ptr: Pointer to msdu_details_ptr
  *
- * Return - Pointer to rx_msdu_desc_info structure.
+ * Return: Pointer to rx_msdu_desc_info structure.
  *
  */
 static void *hal_rx_msdu_desc_info_get_ptr_kiwi(void *msdu_details_ptr)
@@ -1349,10 +1349,10 @@ static void *hal_rx_msdu_desc_info_get_ptr_kiwi(void *msdu_details_ptr)
 }
 
 /**
- * hal_rx_link_desc_msdu0_ptr_kiwi - Get pointer to rx_msdu details
- * @link_desc - Pointer to link desc
+ * hal_rx_link_desc_msdu0_ptr_kiwi() - Get pointer to rx_msdu details
+ * @link_desc: Pointer to link desc
  *
- * Return - Pointer to rx_msdu_details structure
+ * Return: Pointer to rx_msdu_details structure
  *
  */
 static void *hal_rx_link_desc_msdu0_ptr_kiwi(void *link_desc)
@@ -1445,9 +1445,9 @@ static uint8_t hal_reo_enable_pn_in_dest_kiwi(void *hal_soc)
 
 /**
  * hal_rx_flow_setup_fse_kiwi() - Setup a flow search entry in HW FST
- * @fst: Pointer to the Rx Flow Search Table
+ * @rx_fst: Pointer to the Rx Flow Search Table
  * @table_offset: offset into the table where the flow is to be setup
- * @flow: Flow Parameters
+ * @rx_flow: Flow Parameters
  *
  * Flow table entry fields are updated in host byte order, little endian order.
  *
@@ -1557,12 +1557,12 @@ hal_rx_flow_setup_fse_kiwi(uint8_t *rx_fst, uint32_t table_offset,
 	return fse;
 }
 
-/*
+/**
  * hal_rx_flow_setup_cmem_fse_kiwi() - Setup a flow search entry in HW CMEM FST
  * @hal_soc: hal_soc reference
  * @cmem_ba: CMEM base address
  * @table_offset: offset into the table where the flow is to be setup
- * @flow: Flow Parameters
+ * @rx_flow: Flow Parameters
  *
  * Return: Success/Failure
  */
@@ -1863,6 +1863,9 @@ static uint16_t hal_get_rx_max_ba_window_kiwi(int tid)
 /**
  * hal_get_reo_qdesc_size_kiwi()- Get the reo queue descriptor size
  *				  from the give Block-Ack window size
+ * @ba_window_size: Block-Ack window size
+ * @tid: TID
+ *
  * Return: reo queue descriptor size
  */
 static uint32_t hal_get_reo_qdesc_size_kiwi(uint32_t ba_window_size, int tid)
@@ -1943,6 +1946,7 @@ uint64_t hal_fw_qtime_to_usecs(uint64_t time)
 /**
  * hal_get_tsf_time_kiwi() - Get tsf time from scratch register
  * @hal_soc_hdl: HAL soc handle
+ * @tsf_id: TSF id
  * @mac_id: mac_id
  * @tsf: pointer to update tsf value
  * @tsf_sync_soc_time: pointer to update tsf sync time
@@ -2704,10 +2708,6 @@ static inline void hal_srng_hw_reg_offset_init_kiwi(struct hal_soc *hal_soc)
 					REG_OFFSET(DST, PRODUCER_INT2_SETUP);
 }
 
-/**
- * hal_kiwi_attach() - Attach kiwi target specific hal_soc ops,
- *			  offset and srng table
- */
 void hal_kiwi_attach(struct hal_soc *hal_soc)
 {
 	hal_soc->hw_srng_table = hw_srng_table_kiwi;
