@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -33,8 +33,8 @@
  *
  * @req_id:        Unique request ID from FW to be used as AFC request ID
  *                 to server.
- * @version_minor  Lower 16 bits for the AFC request version.
- * @version_major  Higher 16 bits for the AFC request version.
+ * @version_minor: Lower 16 bits for the AFC request version.
+ * @version_major: Higher 16 bits for the AFC request version.
  * @req_length:    Length of entire AFC request message.
  * @min_des_power: Minimum desired power(in dbm) for queried spectrum.
  */
@@ -91,6 +91,10 @@ struct wlan_afc_num_opclasses {
 } qdf_packed;
 
 /**
+ * struct wlan_afc_host_partial_request - Structure to send AFC request info
+ *
+ * @fixed_params: AFC request fixed params (req_id, length, min_des_power)
+ *
  * The following is the layout of the AFC host request
  * It is not a C structure as some of the structures are not of fixed size.
  *
@@ -104,10 +108,6 @@ struct wlan_afc_num_opclasses {
  *      <variable-size> struct wlan_afc_opclass_obj obj[opclass_list_size-1];
  *      <fixed-size>    struct wlan_afc_location afc_location;
  * };
- *
- * struct wlan_afc_host_partial_request - Structure to send AFC request info
- *
- * @fixed_params: AFC request fixed params (req_id, length, min_des_power)
  */
 struct wlan_afc_host_partial_request {
 	struct wlan_afc_host_req_fixed_params fixed_params;
@@ -150,6 +150,20 @@ struct wlan_afc_location {
 } qdf_packed;
 
 /**
+ * struct wlan_afc_host_resp - Structure for AFC Host response to FW
+ *
+ * @header:       Header for compatibility.
+ *                Valid value: 0
+ * @status:       Flag to indicate validity of data. To be updated by TZ
+ *                1:  Success
+ *                -1: Failure
+ * @time_to_live: Period(in seconds) the data is valid for
+ * @length:       Length of the response message
+ * @resp_format:  AFC response format.
+ *                0: JSON format
+ *                1: Binary data format
+ * @afc_resp:     Response message from the AFC server for queried parameters
+ *
  * The following is the layout of the AFC response.
  *
  * struct wlan_afc_host_resp {
@@ -180,19 +194,6 @@ struct wlan_afc_location {
  *     }
  * }
  *
- * struct wlan_afc_host_resp - Structure for AFC Host response to FW
- *
- * @header:       Header for compatibility.
- *                Valid value: 0
- * @status:       Flag to indicate validity of data. To be updated by TZ
- *                1:  Success
- *                -1: Failure
- * @time_to_live: Period(in seconds) the data is valid for
- * @length:       Length of the response message
- * @resp_format:  AFC response format.
- *                0: JSON format
- *                1: Binary data format
- * @afc_resp:     Response message from the AFC server for queried parameters
  */
 struct wlan_afc_host_resp {
 	uint32_t header;
@@ -217,7 +218,7 @@ struct wlan_afc_resp_opclass_info {
 } qdf_packed;
 
 /**
- * struct wlan_afc_eirp_info - Structure to update EIRP values for channels
+ * struct wlan_afc_resp_eirp_info - Structure to update EIRP values for channels
  *
  * @channel_cfi:  Channel center frequency index
  * @max_eirp_pwr: Maximum permissible EIRP(in dBm) for the Channel
@@ -228,8 +229,8 @@ struct wlan_afc_resp_eirp_info {
 } qdf_packed;
 
 /**
- * struct wlan_afc_freq_info - Structure to update PSD values for queried
- *                             frequency ranges
+ * struct wlan_afc_resp_freq_psd_info - Structure to update PSD values for
+ *                                      queried frequency ranges
  *
  * @freq_info: Frequency range in MHz:- bits 15:0  = u16 start_freq,
  *                                      bits 31:16 = u16 end_freq
@@ -269,6 +270,7 @@ struct wlan_afc_resp_freq_psd_info {
  * @num_frequency_obj:  Number of frequency objects
  * @num_channel_obj:    Number of channel objects
  * @shortdesc:          Short description corresponding to resp_code field
+ * @reserved:           Reserved for future use
  */
 struct wlan_afc_bin_resp_data {
 	uint32_t local_err_code;
