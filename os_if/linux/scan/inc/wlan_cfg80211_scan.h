@@ -53,42 +53,9 @@ extern const struct nla_policy cfg80211_scan_policy[
 				      QCA_WLAN_VENDOR_ATTR_SCAN_MAX) \
 	},
 
-/* GPS application requirement */
-#define QCOM_VENDOR_IE_ID 221
-#define QCOM_OUI1         0x00
-#define QCOM_OUI2         0xA0
-#define QCOM_OUI3         0xC6
-#define QCOM_VENDOR_IE_AGE_TYPE  0x100
-#define QCOM_VENDOR_IE_AGE_LEN   (sizeof(qcom_ie_age) - 2)
 #define SCAN_DONE_EVENT_BUF_SIZE 4096
 #define SCAN_WAKE_LOCK_CONNECT_DURATION (1 * 1000) /* in msec */
 #define SCAN_WAKE_LOCK_SCAN_DURATION (5 * 1000) /* in msec */
-
-/**
- * typedef qcom_ie_age - age ie
- * @element_id: Element id
- * @len: Length
- * @oui_1: OUI 1
- * @oui_2: OUI 2
- * @oui_3: OUI 3
- * @type: Type
- * @age: Age
- * @tsf_delta: tsf delta from FW
- * @beacon_tsf: original beacon TSF
- * @seq_ctrl: sequence control field
- */
-typedef struct {
-	u8 element_id;
-	u8 len;
-	u8 oui_1;
-	u8 oui_2;
-	u8 oui_3;
-	u32 type;
-	u32 age;
-	u32 tsf_delta;
-	u64 beacon_tsf;
-	u16 seq_ctrl;
-} __attribute__ ((packed)) qcom_ie_age;
 
 /**
  * struct osif_scan_pdev - OS scan private structure
