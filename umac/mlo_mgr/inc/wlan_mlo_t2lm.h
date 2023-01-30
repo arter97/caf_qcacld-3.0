@@ -109,6 +109,42 @@ struct wlan_link_preference {
 	uint8_t pref_order[MAX_PREFERRED_LINKS];
 	uint32_t timeout[WIFI_AC_MAX];
 };
+
+/**
+ * struct wlan_t2lm_of_tids - TID-to-link mapping for a given direction
+ * @direction: direction from 'enum wlan_t2lm_direction'
+ * @t2lm_provisioned_links: Link mapping for all the TIDs.
+ * It is in form of enum wlan_link_band_caps.
+ */
+struct wlan_t2lm_of_tids {
+	enum wlan_t2lm_direction direction;
+	enum wlan_link_band_caps t2lm_provisioned_links[T2LM_MAX_NUM_TIDS];
+};
+
+/**
+ * struct wlan_preferred_links - Preferred link structure
+ * @peer_mld_mac_addr: STA MLD macaddr
+ * @num_t2lm_of_tids: non-zero value indicates that this structure is
+ * carrying the TID-to-link mapping.It indicates for how many directions,
+ * the TID-to-link mapping is present.
+ * @homogeneous_mapping: non-zero value indicates the provided mapping
+ * is homogeneous.
+ * @t2lm: Valid TID-to-link mapping for the directions
+ * @num_pref_links: non-zero values indicate that preferred link order is
+ * present.
+ * @preffered_link_order: Preferred links in order.
+ * The links will be represented interms of wlan_link_band_caps enum.
+ * @timeout: Timeout values for all the access categories.
+ */
+struct wlan_preferred_links {
+	uint8_t peer_mld_mac_addr[6];
+	uint8_t num_t2lm_of_tids;
+	int8_t homogeneous_mapping;
+	struct wlan_t2lm_of_tids t2lm[WLAN_T2LM_MAX_DIRECTION];
+	uint8_t num_pref_links;
+	enum wlan_link_band_caps preffered_link_order[MAX_PREFERRED_LINKS];
+	uint32_t timeout[WIFI_AC_MAX];
+};
 #endif
 
 /**
