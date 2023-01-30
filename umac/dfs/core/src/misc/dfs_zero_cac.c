@@ -1009,6 +1009,8 @@ void dfs_precac_csa(struct wlan_dfs *dfs)
 #endif
 
 #ifdef QCA_DFS_BW_EXPAND
+
+#define NO_PUNCTURE_BITMASK 0x0000
 /**
  * dfs_is_completed_agile_within_target_band() - Check the frequency of last
  * agile completed channel is within the range of User configured channel.
@@ -1034,10 +1036,12 @@ bool dfs_is_completed_agile_within_target_band(struct wlan_dfs *dfs,
 	 * For BW greater than 20Mhz, check if the last completed agile frequency
 	 * is within the range of user configured channel.
 	 */
-	wlan_reg_get_5g_bonded_channel_and_state_for_freq(dfs->dfs_pdev_obj,
+	wlan_reg_get_5g_bonded_channel_and_state_for_pwrmode(dfs->dfs_pdev_obj,
 							  dfs->dfs_bw_expand_target_freq,
 							  target_ch_width,
-							  &target_bonded_chan_ptr);
+							  &target_bonded_chan_ptr,
+							  REG_CURRENT_PWR_MODE,
+							  NO_PUNCTURE_BITMASK);
 
 	if (target_bonded_chan_ptr)
 		return agile_precac_freq >= target_bonded_chan_ptr->start_freq &&
