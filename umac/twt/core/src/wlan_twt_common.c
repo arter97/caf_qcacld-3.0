@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -24,27 +24,6 @@
 #include <wlan_objmgr_peer_obj.h>
 #include <wlan_twt_tgt_if_tx_api.h>
 #include "twt/core/src/wlan_twt_cfg.h"
-
-QDF_STATUS
-wlan_twt_tgt_caps_get_requestor(struct wlan_objmgr_psoc *psoc, bool *val)
-{
-	struct twt_psoc_priv_obj *twt_psoc;
-
-	if (!psoc) {
-		twt_err("null psoc");
-		return QDF_STATUS_E_FAILURE;
-	}
-
-	twt_psoc = wlan_objmgr_psoc_get_comp_private_obj(psoc,
-							 WLAN_UMAC_COMP_TWT);
-	if (!twt_psoc) {
-		twt_err("null twt psoc priv obj");
-		return QDF_STATUS_E_FAILURE;
-	}
-
-	*val = twt_psoc->twt_caps.twt_requestor;
-	return QDF_STATUS_SUCCESS;
-}
 
 QDF_STATUS
 wlan_twt_tgt_caps_get_responder(struct wlan_objmgr_psoc *psoc, bool *val)
@@ -86,50 +65,6 @@ wlan_twt_tgt_caps_get_legacy_bcast_support(struct wlan_objmgr_psoc *psoc,
 	}
 
 	*val = twt_psoc->twt_caps.legacy_bcast_twt_support;
-	return QDF_STATUS_SUCCESS;
-}
-
-QDF_STATUS
-wlan_twt_tgt_caps_get_bcast_req_support(struct wlan_objmgr_psoc *psoc,
-					bool *val)
-{
-	struct twt_psoc_priv_obj *twt_psoc;
-
-	if (!psoc) {
-		twt_err("null psoc");
-		return QDF_STATUS_E_FAILURE;
-	}
-
-	twt_psoc = wlan_objmgr_psoc_get_comp_private_obj(psoc,
-							 WLAN_UMAC_COMP_TWT);
-	if (!twt_psoc) {
-		twt_err("null twt psoc priv obj");
-		return QDF_STATUS_E_FAILURE;
-	}
-
-	*val = twt_psoc->twt_caps.twt_bcast_req_support;
-	return QDF_STATUS_SUCCESS;
-}
-
-QDF_STATUS
-wlan_twt_tgt_caps_get_bcast_res_support(struct wlan_objmgr_psoc *psoc,
-					bool *val)
-{
-	struct twt_psoc_priv_obj *twt_psoc;
-
-	if (!psoc) {
-		twt_err("null psoc");
-		return QDF_STATUS_E_FAILURE;
-	}
-
-	twt_psoc = wlan_objmgr_psoc_get_comp_private_obj(psoc,
-							 WLAN_UMAC_COMP_TWT);
-	if (!twt_psoc) {
-		twt_err("null twt psoc priv obj");
-		return QDF_STATUS_E_FAILURE;
-	}
-
-	*val = twt_psoc->twt_caps.twt_bcast_res_support;
 	return QDF_STATUS_SUCCESS;
 }
 
