@@ -2495,7 +2495,8 @@ lim_process_beacon_tx_success_ind(struct mac_context *mac_ctx, uint16_t msgType,
 				  void *event)
 {
 	struct pe_session *session;
-	bool csa_tx_offload;
+	struct wlan_objmgr_vdev *vdev;
+	bool csa_tx_offload, is_sap_go_moved_before_sta = false;
 	tpSirFirstBeaconTxCompleteInd bcn_ind =
 		(tSirFirstBeaconTxCompleteInd *) event;
 
@@ -2505,11 +2506,21 @@ lim_process_beacon_tx_success_ind(struct mac_context *mac_ctx, uint16_t msgType,
 		return;
 	}
 
-	pe_debug("role: %d swIe: %d opIe: %d switch cnt:%d",
+	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(mac_ctx->psoc,
+						    session->vdev_id,
+						    WLAN_LEGACY_MAC_ID);
+	if (vdev) {
+		is_sap_go_moved_before_sta =
+			wlan_vdev_mlme_is_sap_go_move_before_sta(vdev);
+		wlan_vdev_mlme_set_sap_go_move_before_sta(vdev, false);
+		wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_MAC_ID);
+	}
+	pe_debug("role: %d swIe: %d opIe: %d switch cnt:%d Is SAP / GO Moved before STA: %d",
 		 GET_LIM_SYSTEM_ROLE(session),
 		 session->dfsIncludeChanSwIe,
 		 session->gLimOperatingMode.present,
-		 session->gLimChannelSwitch.switchCount);
+		 session->gLimChannelSwitch.switchCount,
+		 is_sap_go_moved_before_sta);
 
 	if (!LIM_IS_AP_ROLE(session))
 		return;
@@ -2518,7 +2529,8 @@ lim_process_beacon_tx_success_ind(struct mac_context *mac_ctx, uint16_t msgType,
 	if (session->dfsIncludeChanSwIe && !csa_tx_offload &&
 	    ((session->gLimChannelSwitch.switchCount ==
 	      mac_ctx->sap.SapDfsInfo.sap_ch_switch_beacon_cnt) ||
-	     (session->gLimChannelSwitch.switchCount == 1)))
+	     (session->gLimChannelSwitch.switchCount == 1) ||
+	     is_sap_go_moved_before_sta))
 		lim_process_ap_ecsa_timeout(session);
 
 
