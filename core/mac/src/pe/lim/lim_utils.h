@@ -115,6 +115,10 @@
 #else
 #define MAX_NUM_PWR_LEVELS 8
 #endif
+
+/* SR is disabled if NON_SRG is disallowed and SRG INFO is not present */
+#define SR_DISABLE NON_SRG_PD_SR_DISALLOWED & (~SRG_INFO_PRESENT & 0x0F)
+
 typedef union uPmfSaQueryTimerId {
 	struct {
 		uint8_t sessionId;
