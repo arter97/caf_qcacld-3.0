@@ -12914,26 +12914,26 @@ static QDF_STATUS extract_mgmt_rx_params_tlv(wmi_unified_t wmi_handle,
 
 	param_tlvs = (WMI_MGMT_RX_EVENTID_param_tlvs *) evt_buf;
 	if (!param_tlvs) {
-		wmi_err("Get NULL point message from FW");
+		wmi_err_rl("Get NULL point message from FW");
 		return QDF_STATUS_E_INVAL;
 	}
 
 	ev_hdr = param_tlvs->hdr;
 	if (!hdr) {
-		wmi_err("Rx event is NULL");
+		wmi_err_rl("Rx event is NULL");
 		return QDF_STATUS_E_INVAL;
 	}
 
 	if (IS_WMI_RX_MGMT_FRAME_STATUS_INVALID(ev_hdr->status)) {
-		wmi_err("RX mgmt frame decrypt error, discard it");
+		wmi_err_rl("RX mgmt frame decrypt error, discard it");
 		return QDF_STATUS_E_INVAL;
 	}
 	if ((ev_hdr->status) & WMI_RXERR_MIC) {
-		wmi_err("RX mgmt frame MIC mismatch for beacon protected frame");
+		wmi_err_rl("RX mgmt frame MIC mismatch for beacon protected frame");
 	}
 
 	if (ev_hdr->buf_len > param_tlvs->num_bufp) {
-		wmi_err("Rx mgmt frame length mismatch, discard it");
+		wmi_err_rl("Rx mgmt frame length mismatch, discard it");
 		return QDF_STATUS_E_INVAL;
 	}
 
