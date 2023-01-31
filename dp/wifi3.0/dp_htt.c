@@ -2404,6 +2404,105 @@ dp_pktlog_msg_handler(struct htt_soc *soc,
 }
 #endif
 
+#ifdef QCA_SUPPORT_PRIMARY_LINK_MIGRATE
+QDF_STATUS
+dp_h2t_ptqm_migration_msg_send(struct dp_soc *dp_soc, uint16_t vdev_id,
+			       uint8_t pdev_id,
+			       uint8_t chip_id, uint16_t peer_id,
+			       uint16_t ml_peer_id, uint16_t src_info,
+			       QDF_STATUS status)
+{
+	struct htt_soc *soc = dp_soc->htt_handle;
+	struct dp_htt_htc_pkt *pkt;
+	uint8_t *htt_logger_bufp;
+	qdf_nbuf_t msg;
+	uint32_t *msg_word;
+	QDF_STATUS ret = QDF_STATUS_SUCCESS;
+
+	msg = qdf_nbuf_alloc(
+			soc->osdev,
+			HTT_MSG_BUF_SIZE(HTT_H2T_REO_MIGRATION_RESP_MSG_SZ),
+			HTC_HEADER_LEN + HTC_HDR_ALIGNMENT_PADDING, 4, TRUE);
+
+	if (!msg)
+		return QDF_STATUS_E_NOMEM;
+
+	/*
+	 * Set the length of the message.
+	 * The contribution from the HTC_HDR_ALIGNMENT_PADDING is added
+	 * separately during the below call to qdf_nbuf_push_head.
+	 * The contribution from the HTC header is added separately inside HTC.
+	 */
+	if (qdf_nbuf_put_tail(msg, HTT_H2T_REO_MIGRATION_RESP_MSG_SZ)
+			      == NULL) {
+		dp_htt_err("Failed to expand head for"
+			   "HTT_H2T_MSG_TYPE_PRIMARY_LINK_PEER_MIGRATE_RESP");
+		qdf_nbuf_free(msg);
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	msg_word = (uint32_t *)qdf_nbuf_data(msg);
+	memset(msg_word, 0, HTT_H2T_REO_MIGRATION_RESP_MSG_SZ);
+
+	qdf_nbuf_push_head(msg, HTC_HDR_ALIGNMENT_PADDING);
+	htt_logger_bufp = (uint8_t *)msg_word;
+	*msg_word = 0;
+	HTT_H2T_MSG_TYPE_SET(*msg_word,
+			     HTT_H2T_MSG_TYPE_PRIMARY_LINK_PEER_MIGRATE_RESP);
+	HTT_H2T_PRIMARY_LINK_PEER_MIGRATE_PDEV_ID_SET(*msg_word, pdev_id);
+	HTT_H2T_PRIMARY_LINK_PEER_MIGRATE_CHIP_ID_SET(*msg_word, chip_id);
+	HTT_H2T_PRIMARY_LINK_PEER_MIGRATE_VDEV_ID_SET(*msg_word, vdev_id);
+
+	/* word 1 */
+	msg_word++;
+	*msg_word = 0;
+	HTT_H2T_PRIMARY_LINK_PEER_MIGRATE_SW_LINK_PEER_ID_SET(*msg_word,
+							      peer_id);
+	HTT_H2T_PRIMARY_LINK_PEER_MIGRATE_ML_PEER_ID_SET(*msg_word,
+							 ml_peer_id);
+
+	/* word 1 */
+	msg_word++;
+	*msg_word = 0;
+	HTT_H2T_PRIMARY_LINK_PEER_MIGRATE_SRCINFO_SET(*msg_word,
+						      src_info);
+	HTT_H2T_PRIMARY_LINK_PEER_MIGRATE_STATUS_SET(*msg_word,
+						     status);
+
+	pkt = htt_htc_pkt_alloc(soc);
+	if (!pkt) {
+		dp_htt_err("Fail to allocate dp_htt_htc_pkt buffer");
+		qdf_nbuf_free(msg);
+		return QDF_STATUS_E_NOMEM;
+	}
+
+	pkt->soc_ctxt = NULL;
+
+	/* macro to set packet parameters for TX */
+	SET_HTC_PACKET_INFO_TX(
+			&pkt->htc_pkt,
+			dp_htt_h2t_send_complete_free_netbuf,
+			qdf_nbuf_data(msg),
+			qdf_nbuf_len(msg),
+			soc->htc_endpoint,
+			HTC_TX_PACKET_TAG_RUNTIME_PUT);
+
+	SET_HTC_PACKET_NET_BUF_CONTEXT(&pkt->htc_pkt, msg);
+
+	ret = DP_HTT_SEND_HTC_PKT(
+			soc, pkt,
+			HTT_H2T_MSG_TYPE_PRIMARY_LINK_PEER_MIGRATE_RESP,
+			htt_logger_bufp);
+
+	if (ret != QDF_STATUS_SUCCESS) {
+		qdf_nbuf_free(msg);
+		htt_htc_pkt_free(soc, pkt);
+	}
+
+	return ret;
+}
+#endif
+
 #ifdef QCA_VDEV_STATS_HW_OFFLOAD_SUPPORT
 /**
  * dp_vdev_txrx_hw_stats_handler - Handle vdev stats received from FW
@@ -3226,6 +3325,40 @@ static void dp_htt_mlo_peer_map_handler(struct htt_soc *soc,
 				   mlo_flow_info, mlo_link_info);
 }
 
+#ifdef QCA_SUPPORT_PRIMARY_LINK_MIGRATE
+static void dp_htt_t2h_primary_link_migration(struct htt_soc *soc,
+					      uint32_t *msg_word)
+{
+	u_int16_t peer_id;
+	u_int16_t ml_peer_id;
+	u_int16_t vdev_id;
+	u_int8_t pdev_id;
+	u_int8_t chip_id;
+
+	vdev_id = HTT_T2H_PRIMARY_LINK_PEER_MIGRATE_VDEV_ID_GET(
+			*msg_word);
+	pdev_id = HTT_T2H_PRIMARY_LINK_PEER_MIGRATE_PDEV_ID_GET(
+			*msg_word);
+	chip_id = HTT_T2H_PRIMARY_LINK_PEER_MIGRATE_CHIP_ID_GET(
+			*msg_word);
+	ml_peer_id = HTT_T2H_PRIMARY_LINK_PEER_MIGRATE_ML_PEER_ID_GET(
+			*(msg_word + 1));
+	peer_id = HTT_T2H_PRIMARY_LINK_PEER_MIGRATE_SW_LINK_PEER_ID_GET(
+			*(msg_word + 1));
+
+	dp_htt_info("HTT_T2H_MSG_TYPE_PRIMARY_PEER_MIGRATE_IND msg"
+		    "for peer id %d vdev id %d", peer_id, vdev_id);
+
+	dp_htt_reo_migration(soc->dp_soc, peer_id, ml_peer_id,
+			vdev_id, pdev_id, chip_id);
+}
+#else
+static void dp_htt_t2h_primary_link_migration(struct htt_soc *soc,
+					      uint32_t *msg_word)
+{
+}
+#endif
+
 static void dp_htt_mlo_peer_unmap_handler(struct htt_soc *soc,
 					  uint32_t *msg_word)
 {
@@ -3318,6 +3451,11 @@ dp_rx_mlo_timestamp_ind_handler(void *soc_handle,
 				uint32_t *msg_word)
 {
 	qdf_assert_always(0);
+}
+
+static void dp_htt_t2h_primary_link_migration(struct htt_soc *soc,
+					      uint32_t *msg_word)
+{
 }
 #endif
 
@@ -3882,6 +4020,11 @@ void dp_htt_t2h_msg_handler(void *context, HTC_PACKET *pkt)
 				       peer_mac_addr, ast_hash,
 				       is_wds);
 
+		break;
+	}
+	case HTT_T2H_MSG_TYPE_PRIMARY_LINK_PEER_MIGRATE_IND:
+	{
+		dp_htt_t2h_primary_link_migration(soc, msg_word);
 		break;
 	}
 	case HTT_T2H_MSG_TYPE_MLO_RX_PEER_MAP:

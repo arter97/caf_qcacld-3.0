@@ -1464,6 +1464,11 @@ struct ol_if_ops {
 				   qdf_nbuf_t nbuf,
 				   uint16_t hdr_space);
 
+#ifdef QCA_SUPPORT_PRIMARY_LINK_MIGRATE
+	void (*update_primary_link)(struct cdp_ctrl_objmgr_psoc *psoc,
+				    uint8_t *mac_addr);
+#endif
+
 	uint8_t (*freq_to_channel)(struct cdp_ctrl_objmgr_psoc *psoc,
 				   uint8_t pdev_id, uint16_t freq);
 

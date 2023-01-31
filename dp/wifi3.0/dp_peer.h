@@ -2462,4 +2462,14 @@ static inline void dp_peer_rx_reo_shared_qaddr_delete(struct dp_soc *soc,
  * Return: True for WDS ext peer, false otherwise
  */
 bool dp_peer_check_wds_ext_peer(struct dp_peer *peer);
+
+/**
+ * dp_gen_ml_peer_id() - Generate MLD peer id for DP
+ *
+ * @soc: DP soc context
+ * @peer_id: mld peer id
+ *
+ * Return: DP MLD peer id
+ */
+uint16_t dp_gen_ml_peer_id(struct dp_soc *soc, uint16_t peer_id);
 #endif /* _DP_PEER_H_ */

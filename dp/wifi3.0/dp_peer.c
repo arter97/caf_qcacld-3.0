@@ -2704,14 +2704,12 @@ static inline struct dp_peer *dp_peer_find_add_id(struct dp_soc *soc,
 
 #ifdef WLAN_FEATURE_11BE_MLO
 #ifdef DP_USE_REDUCED_PEER_ID_FIELD_WIDTH
-static inline uint16_t dp_gen_ml_peer_id(struct dp_soc *soc,
-					 uint16_t peer_id)
+uint16_t dp_gen_ml_peer_id(struct dp_soc *soc, uint16_t peer_id)
 {
 	return ((peer_id & soc->peer_id_mask) | (1 << soc->peer_id_shift));
 }
 #else
-static inline uint16_t dp_gen_ml_peer_id(struct dp_soc *soc,
-					 uint16_t peer_id)
+uint16_t dp_gen_ml_peer_id(struct dp_soc *soc, uint16_t peer_id)
 {
 	return (peer_id | (1 << HTT_RX_PEER_META_DATA_V1_ML_PEER_VALID_S));
 }

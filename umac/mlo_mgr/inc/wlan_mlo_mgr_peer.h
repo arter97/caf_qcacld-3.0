@@ -649,4 +649,16 @@ mlo_peer_free_auth_param(struct mlpeer_auth_params *auth_params)
  * Return: true, if MLO peer can be deleted
  */
 bool wlan_mlo_partner_peer_delete_is_allowed(struct wlan_objmgr_peer *src_peer);
+
+#ifdef QCA_SUPPORT_PRIMARY_LINK_MIGRATE
+/**
+ * wlan_objmgr_mlo_update_primary_info() - Update is_primary flag
+ * @peer: new primary link peer object
+ *
+ * API to update is_primary flag in peer list
+ *
+ * Return: void
+ */
+void wlan_objmgr_mlo_update_primary_info(struct wlan_objmgr_peer *peer);
+#endif
 #endif

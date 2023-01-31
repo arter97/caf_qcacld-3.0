@@ -1199,4 +1199,51 @@ dp_htt_get_mon_htt_ring_id(struct dp_soc *soc,
 QDF_STATUS htt_h2t_rx_cce_super_rule_setup(struct htt_soc *htt_soc,
 					   void *flt_params);
 #endif
+
+#ifdef QCA_SUPPORT_PRIMARY_LINK_MIGRATE
+/**
+ * struct dp_peer_info - Primary Peer information
+ * @primary_peer_id: Primary peer id
+ * @chip_id: Chip id of primary peer
+ */
+struct dp_peer_info {
+	uint16_t primary_peer_id;
+	uint8_t chip_id;
+};
+
+/**
+ * dp_h2t_ptqm_migration_msg_send() - Send H2T PTQM message to FW
+ * @dp_soc: DP SOC handle
+ * @vdev_id: Vdev id of primary peer
+ * @pdev_id: Pdev id of primary peer
+ * @chip_id: Chip id of primary peer
+ * @peer_id: Peer id of primary peer
+ * @ml_peer_id: Peer id of MLD peer
+ * @src_info: source info for DS
+ * @status: success or failure status of PTQM migration
+ *
+ * Return: Success when HTT message is sent, error on failure
+ */
+QDF_STATUS
+dp_h2t_ptqm_migration_msg_send(struct dp_soc *dp_soc, uint16_t vdev_id,
+			       uint8_t pdev_id,
+			       uint8_t chip_id, uint16_t peer_id,
+			       uint16_t ml_peer_id, uint16_t src_info,
+			       QDF_STATUS status);
+
+/**
+ * dp_htt_reo_migration() - Reo migration API
+ * @soc: DP SOC handle
+ * @peer_id: Peer id of primary peer
+ * @ml_peer_id: Peer id of MLD peer
+ * @vdev_id: Vdev id of primary peer
+ * @pdev_id: Pdev id of primary peer
+ * @chip_id: Chip id of primary peer
+ *
+ * Return: Success if migration completes, error on failure
+ */
+QDF_STATUS dp_htt_reo_migration(struct dp_soc *soc, uint16_t peer_id,
+				uint16_t ml_peer_id, uint16_t vdev_id,
+				uint8_t pdev_id, uint8_t chip_id);
+#endif
 #endif /* _DP_HTT_H_ */
