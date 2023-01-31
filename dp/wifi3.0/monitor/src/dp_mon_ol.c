@@ -76,7 +76,14 @@ static int ol_ath_set_rx_monitor_filter_mon_2_0(struct ieee80211com *ic,
 	struct lite_mon_config *mon_config = NULL;
 	uint8_t pdev_id = wlan_objmgr_pdev_get_pdev_id(ic->ic_pdev_obj);
 	int filter_type = MON_FILTER_TYPE_GET(value);
+	struct ieee80211vap *vap = NULL;
 
+	if (!ic->ic_mon_vap) {
+		qdf_err("Monitor VAP doesn't exist");
+		return -EINVAL;
+	}
+
+	vap = ic->ic_mon_vap;
 	soc_txrx_handle = wlan_psoc_get_dp_handle(psoc);
 
 	mon_config = qdf_mem_malloc(sizeof(struct lite_mon_config));
@@ -88,6 +95,10 @@ static int ol_ath_set_rx_monitor_filter_mon_2_0(struct ieee80211com *ic,
 	mon_config->direction = LITE_MON_DIRECTION_RX;
 	mon_config->cmdtype = LITE_MON_SET_FILTER;
 	mon_config->debug = LITE_MON_TRACE_INFO;
+
+	strlcpy(mon_config->data.filter_config.interface_name,
+		vap->iv_netdev_name,
+		sizeof(mon_config->data.filter_config.interface_name));
 
 	if (cdp_is_lite_mon_enabled(soc_txrx_handle,
 				    pdev_id,
