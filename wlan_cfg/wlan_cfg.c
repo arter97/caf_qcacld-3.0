@@ -3752,6 +3752,22 @@ static void wlan_soc_tx_capt_cfg_attach(struct cdp_ctrl_objmgr_psoc *psoc,
 }
 #endif
 
+#ifdef WLAN_FEATURE_LOCAL_PKT_CAPTURE
+static void
+wlan_soc_local_pkt_capture_cfg_attach(struct cdp_ctrl_objmgr_psoc *psoc,
+				      struct wlan_cfg_dp_soc_ctxt *wlan_cfg_ctx)
+{
+	wlan_cfg_ctx->local_pkt_capture =
+				cfg_get(psoc, CFG_DP_LOCAL_PKT_CAPTURE);
+}
+#else
+static void
+wlan_soc_local_pkt_capture_cfg_attach(struct cdp_ctrl_objmgr_psoc *psoc,
+				      struct wlan_cfg_dp_soc_ctxt *wlan_cfg_ctx)
+{
+}
+#endif
+
 void
 wlan_cfg_soc_update_tgt_params(struct wlan_cfg_dp_soc_ctxt *wlan_cfg_ctx,
 			       struct cdp_ctrl_objmgr_psoc *psoc)
@@ -4243,7 +4259,7 @@ wlan_cfg_soc_attach(struct cdp_ctrl_objmgr_psoc *psoc)
 	wlan_cfg_ctx->pointer_num_threshold_rx =
 			cfg_get(psoc, CFG_DP_POINTER_NUM_THRESHOLD_RX);
 	wlan_soc_tx_packet_inspect_attach(psoc, wlan_cfg_ctx);
-
+	wlan_soc_local_pkt_capture_cfg_attach(psoc, wlan_cfg_ctx);
 	return wlan_cfg_ctx;
 }
 #endif

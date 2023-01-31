@@ -9852,6 +9852,9 @@ static uint32_t dp_get_cfg(struct cdp_soc_t *soc, enum cdp_dp_cfg cfg)
 	case cfg_dp_wow_check_rx_pending:
 		value = dpsoc->wlan_cfg_ctx->wow_check_rx_pending_enable;
 		break;
+	case cfg_dp_local_pkt_capture:
+		value = wlan_cfg_get_local_pkt_capture(dpsoc->wlan_cfg_ctx);
+		break;
 	default:
 		value =  0;
 	}

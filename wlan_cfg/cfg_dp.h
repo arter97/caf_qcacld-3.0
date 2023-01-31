@@ -771,6 +771,31 @@
 #define CFG_DP_SAWF_STATS_CONFIG
 #endif
 
+#ifdef WLAN_FEATURE_LOCAL_PKT_CAPTURE
+/*
+ * <ini>
+ * local_pkt_capture - Enable/Disable Local packet capture
+ * @Default: false
+ *
+ * This ini is used to enable/disable local packet capture.
+ *
+ * Related: None
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
+#define CFG_DP_LOCAL_PKT_CAPTURE \
+		CFG_INI_BOOL( \
+		"local_packet_capture", \
+		false, \
+		"Local packet capture")
+
+#define CFG_DP_LOCAL_PKT_CAPTURE_CONFIG CFG(CFG_DP_LOCAL_PKT_CAPTURE)
+#else
+#define CFG_DP_LOCAL_PKT_CAPTURE_CONFIG
+#endif
+
 /*
  * <ini>
  * dp_rx_pending_hl_threshold - High threshold of frame number to start
@@ -2027,5 +2052,6 @@
 		CFG(CFG_DP_TXMON_SW_PEER_FILTERING) \
 		CFG_TX_PKT_INSPECT_FOR_ILP_CFG \
 		CFG(CFG_DP_POINTER_TIMER_THRESHOLD_RX) \
-		CFG(CFG_DP_POINTER_NUM_THRESHOLD_RX)
+		CFG(CFG_DP_POINTER_NUM_THRESHOLD_RX) \
+		CFG_DP_LOCAL_PKT_CAPTURE_CONFIG
 #endif /* _CFG_DP_H_ */
