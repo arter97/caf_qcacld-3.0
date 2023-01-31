@@ -344,7 +344,6 @@ static void reg_update_max_bw_per_rule(uint32_t num_reg_rules,
 			min(reg_rule_start[count].max_bw, max_bw);
 }
 
-#ifdef CONFIG_REG_CLIENT
 /**
  * reg_bw_floor() - Calculate floor of a given bandwidth. Find the nearest
  * bandwidth, from the set = {5, 10, 20, 40, 80, 160, 320}, which is less
@@ -422,32 +421,6 @@ static void reg_do_auto_bw_correction(uint32_t num_reg_rules,
 		}
 	}
 }
-#else
-/**
- * reg_do_auto_bw_correction() - Calculate and update the maximum bandwidth
- * value.
- * @num_reg_rules: Number of regulatory rules.
- * @reg_rule_ptr: Pointer to regulatory rules.
- * @max_bw: Maximum bandwidth
- */
-static void reg_do_auto_bw_correction(uint32_t num_reg_rules,
-				      struct cur_reg_rule *reg_rule_ptr,
-				      uint16_t max_bw)
-{
-	uint32_t count;
-	uint16_t new_bw;
-
-	for (count = 0; count < num_reg_rules - 1; count++) {
-		if (reg_rule_ptr[count].end_freq ==
-		    reg_rule_ptr[count + 1].start_freq) {
-			new_bw = QDF_MIN(max_bw, reg_rule_ptr[count].max_bw +
-					 reg_rule_ptr[count + 1].max_bw);
-			reg_rule_ptr[count].max_bw = new_bw;
-			reg_rule_ptr[count + 1].max_bw = new_bw;
-		}
-	}
-}
-#endif
 
 /**
  * reg_modify_chan_list_for_dfs_channels() - disable the DFS channels if

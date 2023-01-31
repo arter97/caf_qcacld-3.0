@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2017-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  *
  * Permission to use, copy, modify, and/or distribute this software for
@@ -1275,11 +1275,7 @@ const struct regulatory_rule reg_rules_5g[] = {
 	[CHAN_5735_5895_2] = {5735, 5895, 160, 20, REGULATORY_CHAN_NO_IR},
 	[CHAN_5835_5855_1] = {5835, 5855, 20, 30, 0},
 	[CHAN_5835_5855_2] = {5835, 5855, 20, 14, REGULATORY_CHAN_INDOOR_ONLY},
-#ifdef CONFIG_REG_CLIENT
 	[CHAN_5835_5895_1] = {5835, 5895, 40, 30, REGULATORY_CHAN_INDOOR_ONLY},
-#else
-	[CHAN_5835_5895_1] = {5835, 5895, 80, 30, REGULATORY_CHAN_INDOOR_ONLY},
-#endif
 	[CHAN_5850_5925_1] = {5850, 5925, 20, 24, 0},
 	[CHAN_5850_5925_2] = {5850, 5925, 20, 30, 0},
 #if defined(CONFIG_BAND_6GHZ) && defined(COMPILE_REGDB_6G)
