@@ -362,6 +362,222 @@ void dp_rx_mon_pf_tag_to_buf_headroom_2_0(void *nbuf,
 
 #endif
 
+#ifdef MONITOR_TLV_RECORDING_ENABLE
+/**
+ * dp_mon_record_index_update() - update the indexes of dp_mon_tlv_logger
+ *                                 to store next tlv
+ *
+ * @mon_pdev: pointer to dp_mon_pdev
+ *
+ * Return
+ */
+void
+dp_mon_record_index_update(struct dp_mon_pdev *mon_pdev) {
+	struct dp_mon_tlv_logger *tlv_log = NULL;
+	struct dp_mon_tlv_info *tlv_info = NULL;
+
+	tlv_log = mon_pdev->rx_tlv_log;
+	tlv_info = (struct dp_mon_tlv_info *)tlv_log->buff;
+
+	(tlv_log->curr_ppdu_pos + 1 == MAX_NUM_PPDU_RECORD) ?
+		tlv_log->curr_ppdu_pos = 0 :
+			tlv_log->curr_ppdu_pos++;
+
+	tlv_log->wrap_flag = 0;
+	tlv_log->ppdu_start_idx = tlv_log->curr_ppdu_pos *
+		MAX_TLVS_PER_PPDU;
+	tlv_log->mpdu_idx = tlv_log->ppdu_start_idx +
+		MAX_PPDU_START_TLV_NUM;
+	tlv_log->ppdu_end_idx = tlv_log->mpdu_idx + MAX_MPDU_TLV_NUM;
+	tlv_log->max_ppdu_start_idx = tlv_log->ppdu_start_idx +
+		MAX_PPDU_START_TLV_NUM - 1;
+	tlv_log->max_mpdu_idx = tlv_log->mpdu_idx +
+		MAX_MPDU_TLV_NUM - 1;
+	tlv_log->max_ppdu_end_idx = tlv_log->ppdu_end_idx +
+		MAX_PPDU_END_TLV_NUM - 1;
+}
+
+/**
+ * dp_mon_record_tlv() - Store the contents of the tlv in buffer
+ *
+ * @mon_pdev: pointe to dp_mon_pdev
+ * @ppdu_info: struct hal_rx_ppdu_info
+ *
+ * Return
+ */
+void
+dp_mon_record_tlv(struct dp_mon_pdev *mon_pdev,
+		  struct hal_rx_ppdu_info *ppdu_info) {
+	struct dp_mon_tlv_logger *tlv_log = NULL;
+	struct dp_mon_tlv_info *tlv_info = NULL;
+	uint32_t tlv_tag;
+	uint16_t *ppdu_start_idx = NULL;
+	uint16_t *mpdu_idx = NULL;
+	uint16_t *ppdu_end_idx = NULL;
+
+	if (!mon_pdev || !(mon_pdev->rx_tlv_log))
+		return;
+
+	tlv_log = mon_pdev->rx_tlv_log;
+	if (!tlv_log->tlv_logging_enable || !(tlv_log->buff))
+		return;
+
+	tlv_info = (struct dp_mon_tlv_info *)tlv_log->buff;
+	ppdu_start_idx = &tlv_log->ppdu_start_idx;
+	mpdu_idx = &tlv_log->mpdu_idx;
+	ppdu_end_idx = &tlv_log->ppdu_end_idx;
+
+	tlv_tag = ppdu_info->rx_tlv_info.tlv_tag;
+	if (ppdu_info->rx_tlv_info.tlv_category == CATEGORY_PPDU_START) {
+		tlv_info[*ppdu_start_idx].tlv_tag = tlv_tag;
+		switch (tlv_tag) {
+		case WIFIRX_PPDU_START_E:
+			tlv_info[*ppdu_start_idx].
+				data.ppdu_start.ppdu_id =
+					ppdu_info->com_info.ppdu_id;
+			break;
+		case WIFIRX_PPDU_START_USER_INFO_E:
+			tlv_info[*ppdu_start_idx].
+				data.ppdu_start_user_info.user_id =
+					ppdu_info->user_id;
+			tlv_info[*ppdu_start_idx].
+				data.ppdu_start_user_info.rate_mcs =
+					ppdu_info->rx_status.mcs;
+			tlv_info[*ppdu_start_idx].
+				data.ppdu_start_user_info.nss =
+					ppdu_info->rx_status.nss;
+			tlv_info[*ppdu_start_idx].
+				data.ppdu_start_user_info.reception_type =
+					ppdu_info->rx_status.reception_type;
+			tlv_info[*ppdu_start_idx].
+				data.ppdu_start_user_info.sgi =
+					ppdu_info->rx_status.sgi;
+			break;
+		}
+		if (*ppdu_start_idx < tlv_log->max_ppdu_start_idx)
+			(*ppdu_start_idx)++;
+	} else if (ppdu_info->rx_tlv_info.tlv_category == CATEGORY_MPDU) {
+		tlv_info[*mpdu_idx].tlv_tag = tlv_tag;
+		switch (tlv_tag) {
+		case WIFIRX_MPDU_START_E:
+			tlv_info[*mpdu_idx].
+				data.mpdu_start.user_id =
+					ppdu_info->user_id;
+			tlv_info[*mpdu_idx].
+				data.mpdu_start.wrap_flag =
+					tlv_log->wrap_flag;
+			break;
+		case WIFIRX_MPDU_END_E:
+			tlv_info[*mpdu_idx].
+				data.mpdu_end.user_id =
+					ppdu_info->user_id;
+			tlv_info[*mpdu_idx].
+				data.mpdu_end.fcs_err =
+					ppdu_info->fcs_err;
+			tlv_info[*mpdu_idx].
+				data.mpdu_end.wrap_flag =
+					tlv_log->wrap_flag;
+			break;
+		case WIFIRX_HEADER_E:
+			tlv_info[*mpdu_idx].
+				data.header.wrap_flag =
+					tlv_log->wrap_flag;
+			break;
+		case WIFIRX_MSDU_END_E:
+			tlv_info[*mpdu_idx].
+				data.msdu_end.user_id =
+					ppdu_info->user_id;
+			tlv_info[*mpdu_idx].
+				data.msdu_end.wrap_flag =
+					tlv_log->wrap_flag;
+			break;
+		case WIFIMON_BUFFER_ADDR_E:
+			tlv_info[*mpdu_idx].
+				data.mon_buffer_addr.dma_length =
+					ppdu_info->packet_info.dma_length;
+			tlv_info[*mpdu_idx].
+				data.mon_buffer_addr.truncation =
+					ppdu_info->packet_info.truncated;
+			tlv_info[*mpdu_idx].
+				data.mon_buffer_addr.continuation =
+					ppdu_info->packet_info.msdu_continuation;
+			tlv_info[*mpdu_idx].
+				data.mon_buffer_addr.wrap_flag =
+					tlv_log->wrap_flag;
+			break;
+		}
+		if (*mpdu_idx < tlv_log->max_mpdu_idx) {
+			(*mpdu_idx)++;
+		} else {
+			*mpdu_idx = *mpdu_idx - MAX_MPDU_TLV_NUM + 1;
+			tlv_log->wrap_flag ^= 1;
+		}
+	} else if (ppdu_info->rx_tlv_info.tlv_category == CATEGORY_PPDU_END) {
+		tlv_info[*ppdu_end_idx].tlv_tag = tlv_tag;
+		switch (tlv_tag) {
+		case WIFIRX_USER_PPDU_END_E:
+			break;
+		case WIFIRX_PPDU_END_E:
+			break;
+		case WIFIPHYRX_RSSI_LEGACY_E:
+			break;
+		case WIFIPHYRX_L_SIG_B_E:
+			break;
+		case WIFIPHYRX_COMMON_USER_INFO_E:
+			break;
+		case WIFIPHYRX_DATA_DONE_E:
+			break;
+		case WIFIPHYRX_PKT_END_PART1_E:
+			break;
+		case WIFIPHYRX_PKT_END_E:
+			break;
+		case WIFIRXPCU_PPDU_END_INFO_E:
+			break;
+		case WIFIRX_PPDU_END_USER_STATS_E:
+			break;
+		case WIFIRX_PPDU_END_STATUS_DONE_E:
+			break;
+		}
+		if (*ppdu_end_idx < tlv_log->max_ppdu_end_idx)
+			(*ppdu_end_idx)++;
+	}
+}
+
+/**
+ * dp_mon_record_clear_buffer() - Clear the buffer to record next PPDU
+ *
+ * @mon_pdev: pointer to dp_mon_pdev
+ *
+ * Return
+ */
+void
+dp_mon_record_clear_buffer(struct dp_mon_pdev *mon_pdev) {
+	struct dp_mon_tlv_logger *rx_tlv_log = NULL;
+	struct dp_mon_tlv_info *tlv_info = NULL;
+
+	rx_tlv_log = mon_pdev->rx_tlv_log;
+	tlv_info = (struct dp_mon_tlv_info *)rx_tlv_log->buff;
+	qdf_mem_zero(&tlv_info[rx_tlv_log->ppdu_start_idx],
+		     MAX_TLVS_PER_PPDU * sizeof(struct dp_mon_tlv_info));
+}
+
+#else
+
+void
+dp_mon_record_index_update(struct dp_mon_pdev *mon_pdev) {
+}
+
+void
+dp_mon_record_tlv(struct dp_mon_pdev *mon_pdev,
+		  struct hal_rx_ppdu_info *ppdu_info) {
+}
+
+void
+dp_mon_record_clear_buffer(struct dp_mon_pdev *mon_pdev) {
+}
+
+#endif
+
 /**
  * dp_rx_mon_free_mpdu_queue() - Free MPDU queue
  * @mon_pdev: monitor pdev
@@ -1563,12 +1779,14 @@ dp_rx_mon_process_status_tlv(struct dp_pdev *pdev)
 		rx_tlv = buf;
 		rx_tlv_start = buf;
 
+		dp_mon_record_clear_buffer(mon_pdev);
+
 		do {
 			tlv_status = hal_rx_status_get_tlv_info(rx_tlv,
 								ppdu_info,
 								pdev->soc->hal_soc,
 								buf);
-
+			dp_mon_record_tlv(mon_pdev, ppdu_info);
 			work_done += dp_rx_mon_process_tlv_status(pdev,
 								  ppdu_info,
 								  buf,
@@ -1598,6 +1816,7 @@ dp_rx_mon_process_status_tlv(struct dp_pdev *pdev)
 		qdf_frag_free(buf);
 		DP_STATS_INC(mon_soc, frag_free, 1);
 		mon_pdev->rx_mon_stats.status_buf_count++;
+		dp_mon_record_index_update(mon_pdev);
 	}
 
 	dp_mon_rx_stats_update_rssi_dbm_params(mon_pdev, ppdu_info);

@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2017-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -1248,6 +1248,19 @@ struct hal_rx_user_ctrl_frm_info {
 struct hal_rx_user_ctrl_frm_info {};
 #endif /* WLAN_SUPPORT_CTRL_FRAME_STATS */
 
+#ifdef MONITOR_TLV_RECORDING_ENABLE
+/*
+ * struct hal_rx_tlv_info - TLV info to pass to dp layer
+ * @tlv_tag: Tag of the TLV
+ * @tlv_category: Category of TLV
+ *
+ */
+struct hal_rx_tlv_info {
+	uint32_t tlv_tag;
+	uint8_t tlv_category;
+};
+#endif
+
 struct hal_rx_ppdu_info {
 	struct hal_rx_ppdu_common_info com_info;
 	struct hal_rx_u_sig_info u_sig_info;
@@ -1320,6 +1333,10 @@ struct hal_rx_ppdu_info {
 	uint8_t start_user_info_cnt;
 	/* PPDU drop cnt */
 	struct hal_rx_ppdu_drop_cnt drop_cnt;
+#ifdef MONITOR_TLV_RECORDING_ENABLE
+	/*TLV Recording*/
+	struct hal_rx_tlv_info rx_tlv_info;
+#endif
 };
 
 static inline uint32_t

@@ -38,6 +38,17 @@
 #define DP_MON_DECAP_FORMAT_INVALID 0xff
 #define DP_MON_MIN_FRAGS_FOR_RESTITCH 2
 
+#ifdef MONITOR_TLV_RECORDING_ENABLE
+#define MAX_TLV_LOGGING_SIZE 1024
+
+#define MAX_PPDU_START_TLV_NUM 38
+#define MAX_MPDU_TLV_NUM 160
+#define MAX_PPDU_END_TLV_NUM 57
+
+#define MAX_NUM_PPDU_RECORD 4
+#define MAX_TLVS_PER_PPDU 255
+#endif
+
 /* monitor frame filter modes */
 enum dp_mon_frm_filter_mode {
 	/* mode filter pass */

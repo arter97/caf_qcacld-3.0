@@ -1074,6 +1074,21 @@ enum txmon_generated_response {
 	TXMON_GEN_RESP_SELFGEN_NDP_LMR
 };
 
+#ifdef MONITOR_TLV_RECORDING_ENABLE
+/*
+ * enum ppdu_tlv_category - Categories of TLV
+ * @PPDU_START: PPDU start level TLV
+ * @MPDU: MPDU level TLV
+ * @PPDU_END: PPDU end level TLV
+ *
+ */
+enum ppdu_tlv_category {
+	CATEGORY_PPDU_START = 1,
+	CATEGORY_MPDU,
+	CATEGORY_PPDU_END
+};
+#endif
+
 #define IS_MULTI_USERS(num_users)	(!!(0xFFFE & num_users))
 
 #define TXMON_HAL(hal_tx_ppdu_info, field)		\
@@ -2224,6 +2239,52 @@ hal_update_rx_ctrl_frame_stats(struct hal_rx_ppdu_info *ppdu_info,
 }
 #endif /* WLAN_SUPPORT_CTRL_FRAME_STATS */
 
+#ifdef MONITOR_TLV_RECORDING_ENABLE
+/**
+ * hal_rx_record_tlv_info() - Record received TLV info
+ * @ppdu_info: pointer to ppdu_info
+ * @tlv_tag: TLV tag of the TLV to record
+ *
+ * Return
+ */
+static inline void
+hal_rx_record_tlv_info(struct hal_rx_ppdu_info *ppdu_info, uint32_t tlv_tag) {
+	ppdu_info->rx_tlv_info.tlv_tag = tlv_tag;
+	switch (tlv_tag) {
+	case WIFIRX_PPDU_START_E:
+	case WIFIRX_PPDU_START_USER_INFO_E:
+		ppdu_info->rx_tlv_info.tlv_category = CATEGORY_PPDU_START;
+		break;
+
+	case WIFIRX_HEADER_E:
+	case WIFIRX_MPDU_START_E:
+	case WIFIMON_BUFFER_ADDR_E:
+	case WIFIRX_MSDU_END_E:
+	case WIFIRX_MPDU_END_E:
+		ppdu_info->rx_tlv_info.tlv_category = CATEGORY_MPDU;
+		break;
+
+	case WIFIRX_USER_PPDU_END_E:
+	case WIFIRX_PPDU_END_E:
+	case WIFIPHYRX_RSSI_LEGACY_E:
+	case WIFIPHYRX_L_SIG_B_E:
+	case WIFIPHYRX_COMMON_USER_INFO_E:
+	case WIFIPHYRX_DATA_DONE_E:
+	case WIFIPHYRX_PKT_END_PART1_E:
+	case WIFIPHYRX_PKT_END_E:
+	case WIFIRXPCU_PPDU_END_INFO_E:
+	case WIFIRX_PPDU_END_USER_STATS_E:
+	case WIFIRX_PPDU_END_STATUS_DONE_E:
+		ppdu_info->rx_tlv_info.tlv_category = CATEGORY_PPDU_END;
+		break;
+	}
+}
+#else
+static inline void
+hal_rx_record_tlv_info(struct hal_rx_ppdu_info *ppdu_info, uint32_t tlv_tag) {
+}
+#endif
+
 /**
  * hal_rx_status_get_tlv_info_generic_be() - process receive info TLV
  * @rx_tlv_hdr: pointer to TLV header
@@ -2465,12 +2526,14 @@ hal_rx_status_get_tlv_info_generic_be(void *rx_tlv_hdr, void *ppduinfo,
 		break;
 
 	case WIFIRX_PPDU_END_STATUS_DONE_E:
+		hal_rx_record_tlv_info(ppdu_info, tlv_tag);
 		return HAL_TLV_STATUS_PPDU_DONE;
 
 	case WIFIPHYRX_PKT_END_E:
 		break;
 
 	case WIFIDUMMY_E:
+		hal_rx_record_tlv_info(ppdu_info, tlv_tag);
 		return HAL_TLV_STATUS_BUF_DONE;
 
 	case WIFIPHYRX_HT_SIG_E:
@@ -3258,6 +3321,7 @@ hal_rx_status_get_tlv_info_generic_be(void *rx_tlv_hdr, void *ppduinfo,
 
 		/* for every RX_HEADER TLV increment mpdu_cnt */
 		com_info->mpdu_cnt++;
+		hal_rx_record_tlv_info(ppdu_info, tlv_tag);
 		return HAL_TLV_STATUS_HEADER;
 	}
 	case WIFIRX_MPDU_START_E:
@@ -3327,6 +3391,7 @@ hal_rx_status_get_tlv_info_generic_be(void *rx_tlv_hdr, void *ppduinfo,
 		ppdu_info->mpdu_info[user_id].decap_type =
 			rx_mpdu_start->rx_mpdu_info_details.decap_type;
 
+		hal_rx_record_tlv_info(ppdu_info, tlv_tag);
 		return HAL_TLV_STATUS_MPDU_START;
 	}
 	case WIFIRX_MPDU_END_E:
@@ -3334,6 +3399,8 @@ hal_rx_status_get_tlv_info_generic_be(void *rx_tlv_hdr, void *ppduinfo,
 		ppdu_info->fcs_err =
 			HAL_RX_GET_64(rx_tlv, RX_MPDU_END,
 				      FCS_ERR);
+
+		hal_rx_record_tlv_info(ppdu_info, tlv_tag);
 		return HAL_TLV_STATUS_MPDU_END;
 	case WIFIRX_MSDU_END_E: {
 		hal_rx_mon_msdu_end_t *rx_msdu_end = rx_tlv;
@@ -3360,26 +3427,31 @@ hal_rx_status_get_tlv_info_generic_be(void *rx_tlv_hdr, void *ppduinfo,
 			ppdu_info->msdu[user_id].reception_type =
 				rx_msdu_end->reception_type;
 		}
+		hal_rx_record_tlv_info(ppdu_info, tlv_tag);
 		return HAL_TLV_STATUS_MSDU_END;
 		}
 	case WIFIMON_BUFFER_ADDR_E:
 		hal_rx_status_get_mon_buf_addr(rx_tlv, ppdu_info);
-
+		hal_rx_record_tlv_info(ppdu_info, tlv_tag);
 		return HAL_TLV_STATUS_MON_BUF_ADDR;
 	case WIFIMON_DROP_E:
 		hal_rx_update_ppdu_drop_cnt(rx_tlv, ppdu_info);
+		hal_rx_record_tlv_info(ppdu_info, tlv_tag);
 		return HAL_TLV_STATUS_MON_DROP;
 	case 0:
+		hal_rx_record_tlv_info(ppdu_info, tlv_tag);
 		return HAL_TLV_STATUS_PPDU_DONE;
 	case WIFIRX_STATUS_BUFFER_DONE_E:
 	case WIFIPHYRX_DATA_DONE_E:
 	case WIFIPHYRX_PKT_END_PART1_E:
+		hal_rx_record_tlv_info(ppdu_info, tlv_tag);
 		return HAL_TLV_STATUS_PPDU_NOT_DONE;
 
 	default:
 		hal_debug("unhandled tlv tag %d", tlv_tag);
 	}
 
+	hal_rx_record_tlv_info(ppdu_info, tlv_tag);
 	qdf_trace_hex_dump(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_DEBUG,
 			   rx_tlv, tlv_len);
 
