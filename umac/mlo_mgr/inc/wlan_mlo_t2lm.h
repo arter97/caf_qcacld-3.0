@@ -23,12 +23,20 @@
 
 #include <wlan_cmn_ieee80211.h>
 #include <wlan_mlo_mgr_public_structs.h>
+#ifdef WMI_AP_SUPPORT
+#include <wlan_cmn.h>
+#endif
 
 struct mlo_vdev_host_tid_to_link_map_resp;
 struct wlan_mlo_dev_context;
 
 /* Max T2LM TIDS count */
 #define T2LM_MAX_NUM_TIDS 8
+
+#ifdef WMI_AP_SUPPORT
+/* Max no. of Preferred links */
+#define MAX_PREFERRED_LINKS 4
+#endif
 
 /* Max T2LM callback handlers */
 #define MAX_T2LM_HANDLERS 50
@@ -63,6 +71,45 @@ enum wlan_t2lm_direction {
 	WLAN_T2LM_MAX_DIRECTION,
 	WLAN_T2LM_INVALID_DIRECTION,
 };
+
+#ifdef WMI_AP_SUPPORT
+/**
+ * enum wlan_link_band_caps - Represents the band capability of
+ * a link.
+ *
+ * @WLAN_LINK_BAND_INVALID: Invalid band
+ * @WLAN_LINK_BAND_2GHZ: 2GHz link
+ * @WLAN_LINK_BAND_5GHZ: 5GHz link
+ * @WLAN_LINK_BAND_5GHZ_LOW: 5GHz Low band link
+ * @WLAN_LINK_BAND_5GHZ_HIGH: 5GHz High band link
+ * @WLAN_LINK_BAND_6GHZ: 6GHz link
+ * @WLAN_LINK_BAND_6GHZ_LOW: 6GHz Low band link
+ * @WLAN_LINK_BAND_6GHZ_HIGH: 6GHz High band link
+ */
+enum wlan_link_band_caps {
+	WLAN_LINK_BAND_INVALID = 0,
+	WLAN_LINK_BAND_2GHZ = 1,
+	WLAN_LINK_BAND_5GHZ = 2,
+	WLAN_LINK_BAND_5GHZ_LOW = 3,
+	WLAN_LINK_BAND_5GHZ_HIGH = 4,
+	WLAN_LINK_BAND_6GHZ = 5,
+	WLAN_LINK_BAND_6GHZ_LOW = 6,
+	WLAN_LINK_BAND_6GHZ_HIGH = 7,
+};
+
+/**
+ * struct wlan_link_preference - Preferred link structure
+ * @num_pref_links: non-zero values indicate that preferred link order
+ * is present.
+ * @pref_order: Preferred links in order.it is in form of hardware link id.
+ * @timeout: timeout values for all the access categories.
+ */
+struct wlan_link_preference {
+	uint8_t num_pref_links;
+	uint8_t pref_order[MAX_PREFERRED_LINKS];
+	uint32_t timeout[WIFI_AC_MAX];
+};
+#endif
 
 /**
  * struct wlan_t2lm_info - TID-to-Link mapping information for the frames
@@ -173,10 +220,14 @@ enum wlan_t2lm_enable {
  *
  * @dialog_token: Save the dialog token used in T2LM request and response frame.
  * @t2lm_info: Provides the TID to LINK mapping information
+ * @link_preference: Provides the preferred link information
  */
 struct wlan_prev_t2lm_negotiated_info {
 	uint16_t dialog_token;
 	struct wlan_t2lm_info t2lm_info[WLAN_T2LM_MAX_DIRECTION];
+#ifdef WMI_AP_SUPPORT
+	struct wlan_link_preference link_preference;
+#endif
 };
 
 /**
@@ -188,6 +239,10 @@ struct wlan_prev_t2lm_negotiated_info {
  * @t2lm_info: Provides the TID-to-link mapping info for UL/DL/BiDi
  * @t2lm_tx_status: Status code corresponds to the transmitted T2LM frames
  * @t2lm_resp_type: T2LM status corresponds to T2LM response frame.
+ * @link_preference: Provides the preferred link information
+ * @t2lm_info_present: It will show the t2lm_info present or not
+ * @pref_link_present: It will show the preference link is present or not
+ * @ml_grp_id: MLO Group id which it belongs to
  */
 struct wlan_t2lm_onging_negotiation_info {
 	enum wlan_t2lm_category category;
@@ -195,6 +250,12 @@ struct wlan_t2lm_onging_negotiation_info {
 	struct wlan_t2lm_info t2lm_info[WLAN_T2LM_MAX_DIRECTION];
 	enum wlan_t2lm_tx_status t2lm_tx_status;
 	enum wlan_t2lm_resp_frm_type t2lm_resp_type;
+#ifdef WMI_AP_SUPPORT
+	struct wlan_link_preference link_preference;
+	bool t2lm_info_present;
+	bool pref_link_present;
+	uint8_t ml_grp_id;
+#endif
 };
 
 /**

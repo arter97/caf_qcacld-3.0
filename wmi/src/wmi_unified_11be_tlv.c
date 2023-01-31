@@ -901,6 +901,79 @@ uint8_t *peer_assoc_add_tid_to_link_map(uint8_t *buf_ptr,
 	return buf_ptr;
 }
 
+#ifdef WMI_AP_SUPPORT
+static uint32_t find_buf_len_pref_link(
+		struct wmi_host_tid_to_link_map_params *params)
+{
+	uint32_t buf_len = 0;
+
+	buf_len = sizeof(wmi_peer_tid_to_link_map_fixed_param) +
+		WMI_TLV_HDR_SIZE + (params->num_dir * T2LM_MAX_NUM_TIDS *
+		 sizeof(wmi_tid_to_link_map)) +
+		WMI_TLV_HDR_SIZE + sizeof(wmi_peer_preferred_link_map);
+	return buf_len;
+}
+
+static uint8_t *populate_preferred_link_tlv(
+		uint8_t *buf_ptr,
+		struct wmi_host_tid_to_link_map_params *params)
+{
+	wmi_peer_preferred_link_map *pref_links;
+	uint8_t pref_link = 0;
+	uint8_t latency = 0;
+	uint8_t links = 0;
+
+	WMITLV_SET_HDR(buf_ptr, WMITLV_TAG_ARRAY_STRUC,
+		       sizeof(wmi_peer_preferred_link_map));
+	buf_ptr += sizeof(uint32_t);
+
+	pref_links = (wmi_peer_preferred_link_map *)buf_ptr;
+
+	WMITLV_SET_HDR(&pref_links->tlv_header,
+		       WMITLV_TAG_STRUC_wmi_peer_preferred_link_map,
+		       WMITLV_GET_STRUCT_TLVLEN(wmi_peer_preferred_link_map));
+
+	pref_links->num_preferred_links =
+		params->preferred_links.num_pref_links;
+	links = params->preferred_links.num_pref_links;
+
+	for (pref_link = 0; pref_link < links; pref_link++) {
+		pref_links->preferred_link_order[pref_link] =
+			params->preferred_links.preffered_link_order[pref_link];
+		wmi_debug("Add preference link TLV: preffered_link_order: %d",
+			  pref_links->preferred_link_order[pref_link]);
+	}
+
+	for (latency = 0; latency < WLAN_MAX_AC; latency++) {
+		pref_links->expected_max_latency_ms[latency] =
+			params->preferred_links.timeout[latency];
+		wmi_debug("Add preference link TLV: expected_timeout_ms: %d",
+			  pref_links->expected_max_latency_ms[latency]);
+	}
+
+	buf_ptr += sizeof(wmi_peer_preferred_link_map);
+	return buf_ptr;
+}
+#else
+static uint32_t find_buf_len_pref_link(
+		struct wmi_host_tid_to_link_map_params *params)
+{
+	uint32_t buf_len = 0;
+
+	buf_len = sizeof(wmi_peer_tid_to_link_map_fixed_param) +
+		WMI_TLV_HDR_SIZE + (params->num_dir * T2LM_MAX_NUM_TIDS *
+		 sizeof(wmi_tid_to_link_map));
+	return buf_len;
+}
+
+static uint8_t *populate_preferred_link_tlv(
+		uint8_t *buf_ptr,
+		struct wmi_host_tid_to_link_map_params *params)
+{
+	return buf_ptr;
+}
+#endif
+
 static QDF_STATUS send_mlo_peer_tid_to_link_map_cmd_tlv(
 		wmi_unified_t wmi_handle,
 		struct wmi_host_tid_to_link_map_params *params)
@@ -914,10 +987,7 @@ static QDF_STATUS send_mlo_peer_tid_to_link_map_cmd_tlv(
 	uint8_t dir = 0;
 	uint8_t tid_num = 0;
 
-	buf_len = sizeof(wmi_peer_tid_to_link_map_fixed_param) +
-		WMI_TLV_HDR_SIZE + (params->num_dir * T2LM_MAX_NUM_TIDS *
-		 sizeof(wmi_tid_to_link_map));
-
+	buf_len = find_buf_len_pref_link(params);
 	buf = wmi_buf_alloc(wmi_handle, buf_len);
 	if (!buf) {
 		wmi_err("wmi buf alloc failed for mlo_peer_mac: "
@@ -987,6 +1057,7 @@ static QDF_STATUS send_mlo_peer_tid_to_link_map_cmd_tlv(
 		}
 	}
 
+	buf_ptr = populate_preferred_link_tlv(buf_ptr, params);
 	wmi_mtrace(WMI_MLO_PEER_TID_TO_LINK_MAP_CMDID, cmd->pdev_id, 0);
 	ret = wmi_unified_cmd_send(wmi_handle, buf, buf_len,
 				   WMI_MLO_PEER_TID_TO_LINK_MAP_CMDID);

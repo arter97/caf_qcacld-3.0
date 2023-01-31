@@ -555,6 +555,13 @@
 #define TARGET_GET_INIT_STATUS_MODULE_ID(status) (((status) >> 16) & 0xffff)
 
 #define MAX_ASSOC_IE_LENGTH 1024
+
+/*
+ * The WLAN_MAX_AC macro cannot be changed without breaking
+ * WMI compatibility.
+ * The maximum value of access category
+ */
+#define WMI_HOST_WLAN_MAX_AC  4
 typedef uint32_t TARGET_INIT_STATUS;
 
 /*
@@ -1096,6 +1103,21 @@ typedef struct {
 } wmi_host_mac_addr;
 
 #ifdef WLAN_FEATURE_11BE
+#ifdef WMI_AP_SUPPORT
+/**
+ * struct wlan_host_preferred_links - Preferred link info.
+ * @num_pref_links: non-zero values indicate that preferred link order
+ * is present.
+ * @preffered_link_order: Preferred links in order.
+ * @timeout: timeout values for all the access categories.
+ */
+struct wlan_host_preferred_links {
+	uint8_t num_pref_links;
+	uint8_t  preffered_link_order[MAX_PREFERRED_LINKS];
+	uint32_t timeout[WMI_HOST_WLAN_MAX_AC];
+};
+#endif
+
 /**
  * struct wlan_host_t2lm_of_tids - TID-to-link mapping info
  * @direction:  0 - Downlink, 1 - uplink 2 - Both uplink and downlink
@@ -1116,12 +1138,16 @@ struct wlan_host_t2lm_of_tids {
  * @peer_macaddr: link peer macaddr
  * @num_dir: number of directions for which T2LM info is available
  * @t2lm_info: TID-to-link mapping info for the given directions
+ * @preferred_links: Preferred link info.
  */
 struct wmi_host_tid_to_link_map_params {
 	uint8_t pdev_id;
 	uint8_t peer_macaddr[QDF_MAC_ADDR_SIZE];
 	uint8_t num_dir;
 	struct wlan_host_t2lm_of_tids t2lm_info[WLAN_T2LM_MAX_DIRECTION];
+#ifdef WMI_AP_SUPPORT
+	struct wlan_host_preferred_links preferred_links;
+#endif
 };
 
 /**
@@ -4572,12 +4598,6 @@ typedef struct {
 
 #define WMI_HOST_MAX_TX_RATE_VALUES	10	/*Max Tx Rates */
 #define WMI_HOST_MAX_RSSI_VALUES	10	/*Max Rssi values */
-
-/* The WLAN_MAX_AC macro cannot be changed without breaking
- *  * WMI compatibility.
- *   * The maximum value of access category
- *	*/
-#define WMI_HOST_WLAN_MAX_AC  4
 
 /* The WMI_HOST_MAX_CHAINS macro cannot be changed without breaking WMI
  * compatibility.
