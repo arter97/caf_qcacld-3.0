@@ -207,17 +207,26 @@ int hif_ahb_bus_configure(struct hif_softc *scn)
 	return hif_pci_bus_configure(scn);
 }
 
-static void hif_ahb_get_soc_info_pld(struct hif_pci_softc *sc,
+static void hif_ahb_get_bar_addr_pld(struct hif_pci_softc *sc,
 				     struct device *dev)
+{
+	struct pld_soc_info info;
+	int ret = 0;
+
+	ret = pld_get_soc_info(dev, &info);
+	sc->mem = info.v_addr;
+	sc->ce_sc.ol_sc.mem    = info.v_addr;
+	sc->ce_sc.ol_sc.mem_pa = info.p_addr;
+}
+
+static void hif_ahb_get_soc_cmem_info_pld(struct hif_pci_softc *sc,
+					  struct device *dev)
 {
 	struct pld_soc_info info;
 	int ret = 0;
 	struct hif_softc *scn = HIF_GET_SOFTC(sc);
 
 	ret = pld_get_soc_info(dev, &info);
-	sc->mem = info.v_addr;
-	sc->ce_sc.ol_sc.mem    = info.v_addr;
-	sc->ce_sc.ol_sc.mem_pa = info.p_addr;
 	/* dev_mem_info[0] is for CMEM */
 	scn->cmem_start = info.dev_mem_info[0].start;
 	scn->cmem_size = info.dev_mem_info[0].size;
@@ -488,12 +497,12 @@ QDF_STATUS hif_ahb_enable_bus(struct hif_softc *ol_sc,
 
 	if (target_type == TARGET_TYPE_QCN6122 ||
 	    target_type == TARGET_TYPE_QCN9160) {
-		hif_ahb_get_soc_info_pld(sc, dev);
+		hif_ahb_get_bar_addr_pld(sc, dev);
 	}
 
 	/* 11BE SoC chipsets Need to call this function to get cmem addr */
 	if (target_type == TARGET_TYPE_QCA5332)
-		hif_ahb_get_soc_info_pld(sc, dev);
+		hif_ahb_get_soc_cmem_info_pld(sc, dev);
 
 	if (target_type == TARGET_TYPE_QCN6122 ||
 	    target_type == TARGET_TYPE_QCN9160) {
