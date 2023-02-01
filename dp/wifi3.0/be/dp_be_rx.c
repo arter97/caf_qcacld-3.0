@@ -45,8 +45,8 @@
 static inline void
 dp_rx_update_flow_info(qdf_nbuf_t nbuf, uint8_t *rx_tlv_hdr)
 {
-	qdf_nbuf_set_rx_flow_idx_invalid(nbuf,
-				 hal_rx_msdu_flow_idx_invalid_be(rx_tlv_hdr));
+	qdf_nbuf_set_rx_flow_idx_valid(nbuf,
+				 !hal_rx_msdu_flow_idx_invalid_be(rx_tlv_hdr));
 	qdf_nbuf_set_rx_flow_idx_timeout(nbuf,
 				 hal_rx_msdu_flow_idx_invalid_be(rx_tlv_hdr));
 }

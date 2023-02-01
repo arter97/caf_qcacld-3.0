@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2014-2017,2019-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -112,26 +112,26 @@ static inline uint16_t qdf_nbuf_get_rx_flow_tag(qdf_nbuf_t buf)
 }
 
 /**
- * qdf_nbuf_set_rx_flow_idx_invalid() - set given value in flow idx invalid
+ * qdf_nbuf_set_rx_flow_idx_valid() - set given value in flow idx valid
  * of buf(skb->cb)
  * @buf: Network buffer
  * @val: Value of Rx flow tag to be set in the nbuf
  * Return: None
  */
-static inline void qdf_nbuf_set_rx_flow_idx_invalid(qdf_nbuf_t buf, uint8_t val)
+static inline void qdf_nbuf_set_rx_flow_idx_valid(qdf_nbuf_t buf, uint8_t val)
 {
-	__qdf_nbuf_set_rx_flow_idx_invalid(buf, val);
+	__qdf_nbuf_set_rx_flow_idx_valid(buf, val);
 }
 
 /**
- * qdf_nbuf_get_rx_flow_idx_invalid() - Get the value of flow_idx_invalid
+ * qdf_nbuf_get_rx_flow_idx_valid() - Get the value of flow_idx_valid
  * field of buf(skb->cb)
  * @buf: Network buffer
  * Return: Value of the Rx flow tag in the nbuf
  */
-static inline uint8_t qdf_nbuf_get_rx_flow_idx_invalid(qdf_nbuf_t buf)
+static inline uint8_t qdf_nbuf_get_rx_flow_idx_valid(qdf_nbuf_t buf)
 {
-	return __qdf_nbuf_get_rx_flow_idx_invalid(buf);
+	return __qdf_nbuf_get_rx_flow_idx_valid(buf);
 }
 
 /**
