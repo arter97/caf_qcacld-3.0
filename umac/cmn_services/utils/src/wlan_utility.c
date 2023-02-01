@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2017-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -1820,6 +1820,8 @@ bool wlan_get_connected_vdev_from_psoc_by_bssid(struct wlan_objmgr_psoc *psoc,
 
 	return context.connected;
 }
+
+qdf_export_symbol(wlan_get_connected_vdev_from_psoc_by_bssid);
 
 bool wlan_get_connected_vdev_by_bssid(struct wlan_objmgr_pdev *pdev,
 				      uint8_t *bssid, uint8_t *vdev_id)

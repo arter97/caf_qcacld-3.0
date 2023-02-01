@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2019-2020 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -36,6 +36,7 @@
 #ifdef WLAN_FEATURE_ROAM_OFFLOAD
 #include <target_if_cm_roam_offload.h>
 #endif
+#include <wlan_reg_services_api.h>
 
 static inline
 void target_if_vdev_mgr_handle_recovery(struct wlan_objmgr_psoc *psoc,
@@ -871,6 +872,85 @@ static int target_if_pdev_csa_status_event_handler(
 	return target_if_csa_switch_count_status(psoc, tgt_hdl, csa_status);
 }
 
+/**
+ * target_if_vdev_mgr_csa_ie_received_handler - CSA IE Received event handler
+ * @scn: Pointer to scn structure
+ * @data: pointer to event data
+ * @datalen: event data length
+ *
+ * Return: 0 on success
+ */
+static int target_if_vdev_mgr_csa_ie_received_handler(ol_scn_t scn,
+						      uint8_t *data,
+						      uint32_t datalen)
+{
+	QDF_STATUS status;
+	uint8_t vdev_id = 0;
+	struct wlan_objmgr_psoc *psoc;
+	struct wmi_unified *wmi_handle;
+	struct wlan_objmgr_vdev *vdev;
+	struct wlan_objmgr_pdev *pdev;
+	struct wlan_lmac_if_mlme_rx_ops *rx_ops;
+	struct csa_offload_params csa_event = {0};
+
+	if (!scn || !data) {
+		mlme_err("Invalid input");
+		return -EINVAL;
+	}
+
+	psoc = target_if_get_psoc_from_scn_hdl(scn);
+	if (!psoc) {
+		mlme_err("PSOC is NULL");
+		return -EINVAL;
+	}
+
+	rx_ops = target_if_vdev_mgr_get_rx_ops(psoc);
+/*TODO: Uncomment these changes
+ *	if (!rx_ops || !rx_ops->vdev_mgr_csa_received) {
+ *		mlme_err("No Rx Ops");
+ *		return -EINVAL;
+ *	}
+ */
+
+	wmi_handle = get_wmi_unified_hdl_from_psoc(psoc);
+	if (!wmi_handle) {
+		mlme_err("wmi_handle is null");
+		return -EINVAL;
+	}
+
+	status = wmi_extract_csa_ie_received_event(wmi_handle, data,
+						   &vdev_id, &csa_event);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		mlme_err("Extracting CSA IE Received event failed");
+		return -EINVAL;
+	}
+
+	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, vdev_id,
+						    WLAN_VDEV_TARGET_IF_ID);
+	if (!vdev) {
+		mlme_err("Null Vdev");
+		return -EINVAL;
+	}
+
+	pdev = wlan_vdev_get_pdev(vdev);
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_VDEV_TARGET_IF_ID);
+
+	if (csa_event.new_op_class &&
+	    wlan_reg_is_6ghz_op_class(pdev, csa_event.new_op_class)) {
+		csa_event.csa_chan_freq =
+			wlan_reg_chan_band_to_freq(pdev, csa_event.channel,
+						   BIT(REG_BAND_6G));
+	} else {
+		csa_event.csa_chan_freq =
+			  wlan_reg_legacy_chan_to_freq(pdev, csa_event.channel);
+	}
+
+/*TODO: Uncomment these changes
+ *	return rx_ops->vdev_mgr_csa_received(psoc, vdev_id, &csa_event);
+ */
+	return 0;
+}
+
 #ifdef WLAN_FEATURE_DYNAMIC_MAC_ADDR_UPDATE
 /**
  * target_if_update_macaddr_conf_evt_handler() - Set MAC address confirmation
@@ -1102,6 +1182,14 @@ QDF_STATUS target_if_vdev_mgr_wmi_event_register(
 			mlme_err("failed to register for csa event handler");
 	}
 
+	retval = wmi_unified_register_event_handler
+			(wmi_handle,
+			 wmi_csa_ie_received_event_id,
+			 target_if_vdev_mgr_csa_ie_received_handler,
+			 VDEV_RSP_RX_CTX);
+	if (QDF_IS_STATUS_ERROR(retval))
+		mlme_err("failed to register for CSA IE Received Event");
+
 	target_if_register_set_mac_addr_evt_cbk(wmi_handle);
 
 	target_if_register_quiet_offload_event(wmi_handle);
@@ -1128,6 +1216,9 @@ QDF_STATUS target_if_vdev_mgr_wmi_event_unregister(
 	target_if_unregister_quiet_offload_event(wmi_handle);
 
 	target_if_unregister_set_mac_addr_evt_cbk(wmi_handle);
+
+	wmi_unified_unregister_event_handler(wmi_handle,
+					     wmi_csa_ie_received_event_id);
 
 	wmi_unified_unregister_event_handler(
 			wmi_handle,

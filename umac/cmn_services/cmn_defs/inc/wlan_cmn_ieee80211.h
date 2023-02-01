@@ -3513,6 +3513,40 @@ struct wlan_edca_pifs_param_ie {
 } qdf_packed;
 
 /**
+ * struct csa_ie: Channel Switch Announcement IE
+ * @id: CSA IE
+ * @len: CSA IE len
+ * @switch_mode: Channel Switch Mode
+ * @new_channel: New channel to which CSA is announced
+ * @tbtt_count: CSA count in beacon intervals
+ */
+struct csa_ie {
+	uint8_t id;
+	uint8_t len;
+	uint8_t switch_mode;
+	uint8_t new_channel;
+	uint8_t tbtt_count;
+} qdf_packed;
+
+/**
+ * struct xcsa_ie: Extended Channel Switch Announcement IE
+ * @id: CSA IE
+ * @len: CSA IE len
+ * @switch_mode: Channel Switch Mode
+ * @new_class: New operating class
+ * @new_channel: New channel to which CSA is announced
+ * @tbtt_count: CSA count in beacon intervals
+ */
+struct xcsa_ie {
+	uint8_t id;
+	uint8_t len;
+	uint8_t switch_mode;
+	uint8_t new_class;
+	uint8_t new_channel;
+	uint8_t tbtt_count;
+} qdf_packed;
+
+/**
  * struct oce_reduced_wan_metrics: struct for oce wan metrics
  * @downlink_av_cap: Download available capacity
  * @uplink_av_cap: Upload available capacity

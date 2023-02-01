@@ -5278,6 +5278,7 @@ typedef enum {
 #ifdef QCA_STANDALONE_SOUNDING_TRIGGER
 	wmi_vdev_standalone_sound_complete_eventid,
 #endif
+	wmi_csa_ie_received_event_id,
 	wmi_events_max,
 } wmi_conv_event_id;
 

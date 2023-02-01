@@ -5117,4 +5117,18 @@ QDF_STATUS wmi_extract_sap_coex_cap_service_ready_ext2(
 			wmi_unified_t wmi_handle,
 			uint8_t *evt_buf,
 			struct wmi_host_coex_fix_chan_cap *cap);
+
+/**
+ * wmi_extract_csa_ie_received_event() - extract csa IE received event
+ * @wmi_handle: wmi handle
+ * @evt_buf: pointer to event buffer
+ * @vdev_id: VDEV ID
+ * @csa_event: csa event data
+ *
+ * Return: QDF_STATUS_SUCCESS on success, QDF_STATUS_E_** on error
+ */
+QDF_STATUS
+wmi_extract_csa_ie_received_event(wmi_unified_t wmi_handle,
+				  void *evt_buf, uint8_t *vdev_id,
+				  struct csa_offload_params *csa_event);
 #endif /* _WMI_UNIFIED_API_H_ */

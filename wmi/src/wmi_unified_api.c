@@ -4033,3 +4033,15 @@ QDF_STATUS wmi_extract_sap_coex_cap_service_ready_ext2(
 
 	return QDF_STATUS_E_FAILURE;
 }
+
+QDF_STATUS
+wmi_extract_csa_ie_received_event(wmi_unified_t wmi_handle,
+				  void *evt_buf, uint8_t *vdev_id,
+				  struct csa_offload_params *csa_event)
+{
+	if (wmi_handle->ops->extract_csa_ie_received_ev_params)
+		return wmi_handle->ops->extract_csa_ie_received_ev_params
+				(wmi_handle, evt_buf, vdev_id, csa_event);
+
+	return QDF_STATUS_E_FAILURE;
+}

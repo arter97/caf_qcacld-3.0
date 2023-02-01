@@ -650,6 +650,8 @@ qdf_freq_t wlan_reg_legacy_chan_to_freq(struct wlan_objmgr_pdev *pdev,
 	return reg_legacy_chan_to_freq(pdev, chan_num);
 }
 
+qdf_export_symbol(wlan_reg_legacy_chan_to_freq);
+
 QDF_STATUS wlan_reg_set_country(struct wlan_objmgr_pdev *pdev,
 				       uint8_t *country)
 {
@@ -1515,11 +1517,15 @@ bool wlan_reg_is_2ghz_op_class(const uint8_t *country, uint8_t op_class)
 	return reg_is_2ghz_op_class(country, op_class);
 }
 
+qdf_export_symbol(wlan_reg_is_2ghz_op_class);
+
 bool wlan_reg_is_6ghz_op_class(struct wlan_objmgr_pdev *pdev,
 			       uint8_t op_class)
 {
 	return reg_is_6ghz_op_class(pdev, op_class);
 }
+
+qdf_export_symbol(wlan_reg_is_6ghz_op_class);
 
 #ifdef CONFIG_REG_CLIENT
 bool wlan_reg_is_6ghz_supported(struct wlan_objmgr_psoc *psoc)

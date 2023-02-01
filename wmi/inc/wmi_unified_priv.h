@@ -3275,6 +3275,10 @@ QDF_STATUS
 			      uint8_t *evt_buf,
 			      struct r2p_table_update_status_obj *update_status,
 			      uint32_t len);
+QDF_STATUS
+(*extract_csa_ie_received_ev_params)(wmi_unified_t wmi_handle,
+				     void *evt_buf, uint8_t *vdev_id,
+				     struct csa_offload_params *csa_event);
 };
 
 /* Forward declaration for psoc*/

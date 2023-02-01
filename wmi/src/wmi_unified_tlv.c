@@ -5496,6 +5496,79 @@ fail:
 }
 
 /**
+ * extract_csa_ie_received_ev_params_tlv() - extract csa IE received event
+ * @wmi_handle: wmi handle
+ * @evt_buf: pointer to event buffer
+ * @vdev_id: VDEV ID
+ * @csa_event: csa event data
+ *
+ * Return: QDF_STATUS_SUCCESS on success, QDF_STATUS_E_** on error
+ */
+static QDF_STATUS
+extract_csa_ie_received_ev_params_tlv(wmi_unified_t wmi_handle,
+				      void *evt_buf, uint8_t *vdev_id,
+				      struct csa_offload_params *csa_event)
+{
+	WMI_CSA_IE_RECEIVED_EVENTID_param_tlvs *param_buf;
+	wmi_csa_event_fixed_param *csa_ev;
+	struct xcsa_ie *xcsa_ie;
+	struct csa_ie *csa_ie;
+	uint8_t *bssid;
+	bool ret;
+
+	param_buf = (WMI_CSA_IE_RECEIVED_EVENTID_param_tlvs *)evt_buf;
+	if (!param_buf) {
+		wmi_err("Invalid csa event buffer");
+		return QDF_STATUS_E_FAILURE;
+	}
+	csa_ev = param_buf->fixed_param;
+	WMI_MAC_ADDR_TO_CHAR_ARRAY(&csa_ev->i_addr2,
+				   &csa_event->bssid.bytes[0]);
+
+	bssid = csa_event->bssid.bytes;
+	ret = wlan_get_connected_vdev_from_psoc_by_bssid(wmi_handle->soc->wmi_psoc,
+							 bssid, vdev_id);
+	if (!ret) {
+		wmi_err("VDEV is not connected with BSSID");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	if (csa_ev->ies_present_flag & WMI_CSA_IE_PRESENT) {
+		csa_ie = (struct csa_ie *)(&csa_ev->csa_ie[0]);
+		csa_event->channel = csa_ie->new_channel;
+		csa_event->switch_mode = csa_ie->switch_mode;
+		csa_event->ies_present_flag |= MLME_CSA_IE_PRESENT;
+	} else if (csa_ev->ies_present_flag & WMI_XCSA_IE_PRESENT) {
+		xcsa_ie = (struct xcsa_ie *)(&csa_ev->xcsa_ie[0]);
+		csa_event->channel = xcsa_ie->new_channel;
+		csa_event->switch_mode = xcsa_ie->switch_mode;
+		csa_event->new_op_class = xcsa_ie->new_class;
+		csa_event->ies_present_flag |= MLME_XCSA_IE_PRESENT;
+	} else {
+		wmi_err("CSA Event error: No CSA IE present");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	wmi_debug("CSA IE Received: BSSID " QDF_MAC_ADDR_FMT " chan %d freq %d flag 0x%x width = %d freq1 = %d freq2 = %d op class = %d",
+		  QDF_MAC_ADDR_REF(csa_event->bssid.bytes),
+		  csa_event->channel,
+		  csa_event->csa_chan_freq,
+		  csa_event->ies_present_flag,
+		  csa_event->new_ch_width,
+		  csa_event->new_ch_freq_seg1,
+		  csa_event->new_ch_freq_seg2,
+		  csa_event->new_op_class);
+
+	if (!csa_event->channel) {
+		wmi_err("CSA Event with channel %d. Ignore !!",
+			csa_event->channel);
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	return QDF_STATUS_SUCCESS;
+}
+
+/**
  * send_probe_rsp_tmpl_send_cmd_tlv() - send probe response template to fw
  * @wmi_handle: wmi handle
  * @vdev_id: vdev id
@@ -20985,6 +21058,8 @@ struct wmi_ops tlv_ops =  {
 			extract_sap_coex_fix_chan_caps,
 	.extract_tgtr2p_table_event = extract_tgtr2p_table_event_tlv,
 	.send_egid_info_cmd = send_egid_info_cmd_tlv,
+	.extract_csa_ie_received_ev_params =
+			extract_csa_ie_received_ev_params_tlv,
 };
 
 #ifdef WLAN_FEATURE_11BE_MLO
@@ -21499,6 +21574,8 @@ static void populate_tlv_events_id(WMI_EVT_ID *event_ids)
 	event_ids[wmi_vdev_standalone_sound_complete_eventid] =
 		WMI_VDEV_STANDALONE_SOUND_COMPLETE_EVENTID;
 #endif
+	event_ids[wmi_csa_ie_received_event_id] =
+		WMI_CSA_IE_RECEIVED_EVENTID;
 }
 
 #ifdef WLAN_FEATURE_LINK_LAYER_STATS
