@@ -58,7 +58,8 @@
 #define QDF_RET_IP NULL
 #endif /* __KERNEL__ */
 #include <qdf_status.h>
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 9, 0)) && defined(MSM_PLATFORM)
+#if ((LINUX_VERSION_CODE >= KERNEL_VERSION(5, 9, 0)) && \
+		(IS_ENABLED(CONFIG_ARCH_MSM) || IS_ENABLED(CONFIG_ARCH_QCOM)))
 #include <linux/qcom-iommu-util.h>
 #endif
 
