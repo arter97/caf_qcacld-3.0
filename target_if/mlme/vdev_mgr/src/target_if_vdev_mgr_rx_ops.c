@@ -905,12 +905,10 @@ static int target_if_vdev_mgr_csa_ie_received_handler(ol_scn_t scn,
 	}
 
 	rx_ops = target_if_vdev_mgr_get_rx_ops(psoc);
-/*TODO: Uncomment these changes
- *	if (!rx_ops || !rx_ops->vdev_mgr_csa_received) {
- *		mlme_err("No Rx Ops");
- *		return -EINVAL;
- *	}
- */
+	if (!rx_ops || !rx_ops->vdev_mgr_csa_received) {
+		mlme_err("No Rx Ops");
+		return -EINVAL;
+	}
 
 	wmi_handle = get_wmi_unified_hdl_from_psoc(psoc);
 	if (!wmi_handle) {
@@ -945,10 +943,7 @@ static int target_if_vdev_mgr_csa_ie_received_handler(ol_scn_t scn,
 			  wlan_reg_legacy_chan_to_freq(pdev, csa_event.channel);
 	}
 
-/*TODO: Uncomment these changes
- *	return rx_ops->vdev_mgr_csa_received(psoc, vdev_id, &csa_event);
- */
-	return 0;
+	return rx_ops->vdev_mgr_csa_received(psoc, vdev_id, &csa_event);
 }
 
 #ifdef WLAN_FEATURE_DYNAMIC_MAC_ADDR_UPDATE
