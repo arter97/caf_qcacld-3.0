@@ -9332,13 +9332,15 @@ dp_get_pdev_deter_stats(struct cdp_soc_t *soc_hdl, uint8_t pdev_id,
 		     pdev->stats.deter_stats.ch_access_delay,
 		     sizeof(stats->ch_access_delay[0]) * WME_AC_MAX);
 
-	stats->trigger_success = pdev->stats.deter_stats.trigger_success;
-	stats->trigger_fail = pdev->stats.deter_stats.trigger_fail;
+	qdf_mem_copy(stats->ts,
+		     pdev->stats.deter_stats.ts,
+		     sizeof(stats->ts[0]) * TX_MODE_UL_MAX);
 
 	stats->ch_util.ap_tx_util = pdev->stats.deter_stats.ch_util.ap_tx_util;
 	stats->ch_util.ap_rx_util = pdev->stats.deter_stats.ch_util.ap_rx_util;
 	stats->ch_util.ap_chan_util =
 			pdev->stats.deter_stats.ch_util.ap_chan_util;
+	stats->rx_su_cnt = pdev->stats.deter_stats.rx_su_cnt;
 
 	return QDF_STATUS_SUCCESS;
 }

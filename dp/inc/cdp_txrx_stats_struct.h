@@ -388,6 +388,26 @@ enum cdp_msduq_index {
 };
 
 /*
+ * cdp_ul_trigger_tids: UL trigger tids
+ * CDP_UL_TRIG_BK_TID: Background tid
+ * CDP_UL_TRIG_BE_TID: Best effort tid
+ * CDP_UL_TRIG_VI_TID: Video tid
+ * CDP_UL_TRIG_VO_TID: Voice tid
+ */
+enum cdp_ul_trigger_tids {
+	CDP_UL_TRIG_BK_TID = 25,
+	CDP_UL_TRIG_BE_TID,
+	CDP_UL_TRIG_VI_TID,
+	CDP_UL_TRIG_VO_TID,
+};
+
+#define UL_TRIGGER_TID_TO_DATA_TID(_tid) (      \
+		(((_tid) == CDP_UL_TRIG_BE_TID)) ? 0 : \
+		(((_tid) == CDP_UL_TRIG_BK_TID)) ? 1 : \
+		(((_tid) == CDP_UL_TRIG_VI_TID)) ? 5 : \
+		6)
+
+/*
  * cdp_ru_index: Different RU index
  *
  * RU_26_INDEX : 26-tone Resource Unit index
@@ -2982,6 +3002,16 @@ struct cdp_pdev_chan_util_stats {
 };
 
 /**
+ * struct cdp_pdev_ul_trigger_status- Structure to hold UL trigger status
+ * @trigger_success: Trigger success
+ * @trigger_fail: Trigger fail
+ */
+struct cdp_pdev_ul_trigger_status {
+	uint64_t trigger_success;
+	uint64_t trigger_fail;
+};
+
+/**
  * struct cdp_pdev_deter_stats- Structure to hold pdev deterministic stats
  * @dl_ofdma_usr: num_user counter for dl ofdma
  * @ul_ofdma_usr: num_user counter for ul ofdma
@@ -2989,8 +3019,10 @@ struct cdp_pdev_chan_util_stats {
  * @ul_mimo_usr: num_user counter for ul mimo
  * @dl_mode_cnt: DL tx mode counter
  * @ul_mode_cnt: UL tx mode counter
+ * @rx_su_cnt: RX su counter
  * @ch_access_delay
  * @ch_util: channel congestion stats
+ * @ts: trigger status for ul
  */
 struct cdp_pdev_deter_stats {
 	uint64_t dl_ofdma_usr[CDP_MU_MAX_USERS];
@@ -2999,10 +3031,10 @@ struct cdp_pdev_deter_stats {
 	uint64_t ul_mimo_usr[CDP_MU_MAX_USERS];
 	uint64_t dl_mode_cnt[TX_MODE_DL_MAX];
 	uint64_t ul_mode_cnt[TX_MODE_UL_MAX];
+	uint64_t rx_su_cnt;
 	uint32_t ch_access_delay[WME_AC_MAX];
-	uint64_t trigger_success;
-	uint64_t trigger_fail;
 	struct cdp_pdev_chan_util_stats ch_util;
+	struct cdp_pdev_ul_trigger_status ts[TX_MODE_UL_MAX];
 };
 #endif
 
