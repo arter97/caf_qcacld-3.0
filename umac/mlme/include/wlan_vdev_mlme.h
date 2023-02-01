@@ -363,6 +363,8 @@ struct vdev_mlme_proto {
  * @bssid: bssid
  * @phy_mode: phy mode
  * @special_vdev_mode: indicates special vdev mode
+ * @is_sap_go_moved_1st_on_csa: Indicates if STA receives
+ *				CSA to a DFS channel
  * @he_spr_sr_ctrl:     Spatial reuse SR control
  * @he_spr_non_srg_pd_max_offset: Non-SRG PD max offset
  * @he_spr_srg_max_pd_offset: SRG PD max offset
@@ -401,6 +403,7 @@ struct vdev_mlme_mgmt_generic {
 	uint8_t bssid[QDF_MAC_ADDR_SIZE];
 	uint32_t phy_mode;
 	bool special_vdev_mode;
+	bool is_sap_go_moved_1st_on_csa;
 #ifdef WLAN_FEATURE_SR
 	uint8_t he_spr_sr_ctrl;
 	uint8_t he_spr_non_srg_pd_max_offset;
@@ -1183,6 +1186,56 @@ static inline bool wlan_vdev_mlme_is_special_vdev(
 		return false;
 
 	return vdev_mlme->mgmt.generic.special_vdev_mode;
+}
+
+/**
+ * wlan_vdev_mlme_is_sap_go_move_before_sta() - check if SAP / GO
+ * moved to new channel before STA's movement upon receiving CSA
+ *
+ * @vdev: VDEV object
+ *
+ * API to check in STA+SAP/GO SCC concurrency, whether SAP / GO moved before
+ * STA's movement on receiving CSA from peer AP to connected STA.
+ *
+ * Return: true if SAP / GO moved before STA else false
+ */
+static inline
+bool wlan_vdev_mlme_is_sap_go_move_before_sta(struct wlan_objmgr_vdev *vdev)
+{
+	struct vdev_mlme_obj *vdev_mlme;
+
+	vdev_mlme = wlan_vdev_mlme_get_cmpt_obj(vdev);
+	if (!vdev_mlme)
+		return false;
+
+	return vdev_mlme->mgmt.generic.is_sap_go_moved_1st_on_csa;
+}
+
+/**
+ * wlan_vdev_mlme_set_sap_go_move_before_sta() - Set flag if SAP / GO
+ * moves to new channel before STA's movement upon receiving CSA
+ *
+ * @vdev: VDEV object
+ * @sap_go_moved_before_sta: Flag to indicate True when SAP / GO
+ *  moves before STA
+ *
+ * API to set True in STA+SAP/GO SCC concurrency, when SAP / GO moves before
+ * STA's movement on receiving CSA from peer AP to connected STA.
+ *
+ * Return: void
+ */
+static inline
+void wlan_vdev_mlme_set_sap_go_move_before_sta(struct wlan_objmgr_vdev *vdev,
+					       bool sap_go_moved_before_sta)
+{
+	struct vdev_mlme_obj *vdev_mlme;
+
+	vdev_mlme = wlan_vdev_mlme_get_cmpt_obj(vdev);
+	if (!vdev_mlme)
+		return;
+
+	vdev_mlme->mgmt.generic.is_sap_go_moved_1st_on_csa =
+						sap_go_moved_before_sta;
 }
 
 #ifdef WLAN_FEATURE_11AX
