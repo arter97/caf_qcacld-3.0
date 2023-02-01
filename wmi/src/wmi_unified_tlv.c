@@ -20266,6 +20266,38 @@ send_vdev_pn_mgmt_rxfilter_cmd_tlv(wmi_unified_t wmi_handle,
 }
 
 static QDF_STATUS
+send_egid_info_cmd_tlv(wmi_unified_t wmi_handle,
+		       struct esl_egid_params *param)
+{
+	wmi_esl_egid_cmd_fixed_param *cmd;
+	wmi_buf_t buf;
+
+	uint32_t len = sizeof(*cmd);
+
+	buf = wmi_buf_alloc(wmi_handle, len);
+	if (!buf) {
+		wmi_err("wmi_buf_alloc failed");
+		return QDF_STATUS_E_NOMEM;
+	}
+
+	cmd = (wmi_esl_egid_cmd_fixed_param *)wmi_buf_data(buf);
+	WMITLV_SET_HDR(
+		&cmd->tlv_header,
+		WMITLV_TAG_STRUC_wmi_esl_egid_cmd_fixed_param,
+		WMITLV_GET_STRUCT_TLVLEN(wmi_esl_egid_cmd_fixed_param));
+	qdf_mem_copy(cmd->egid_info,
+		     param->egid_info,
+		     sizeof(param->egid_info));
+	if (wmi_unified_cmd_send(wmi_handle, buf, len, WMI_ESL_EGID_CMDID)) {
+		wmi_err("Failed to send WMI command");
+		wmi_buf_free(buf);
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	return QDF_STATUS_SUCCESS;
+}
+
+static QDF_STATUS
 extract_pktlog_decode_info_event_tlv(wmi_unified_t wmi_handle, void *evt_buf,
 				     uint8_t *pdev_id, uint8_t *software_image,
 				     uint8_t *chip_info,
@@ -20939,6 +20971,7 @@ struct wmi_ops tlv_ops =  {
 	.extract_sap_coex_cap_service_ready_ext2 =
 			extract_sap_coex_fix_chan_caps,
 	.extract_tgtr2p_table_event = extract_tgtr2p_table_event_tlv,
+	.send_egid_info_cmd = send_egid_info_cmd_tlv,
 };
 
 #ifdef WLAN_FEATURE_11BE_MLO

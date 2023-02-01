@@ -1844,6 +1844,10 @@ QDF_STATUS
 			struct btcoex_cfg_params *param);
 
 QDF_STATUS
+(*send_egid_info_cmd)(wmi_unified_t wmi_handle,
+		      struct esl_egid_params *param);
+
+QDF_STATUS
 (*send_coex_ver_cfg_cmd)(wmi_unified_t wmi_handle, coex_ver_cfg_t *param);
 
 QDF_STATUS

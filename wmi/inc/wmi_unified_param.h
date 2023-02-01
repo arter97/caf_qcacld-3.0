@@ -516,6 +516,7 @@
 
 #define WMI_MAX_AOA_PHASE_DELTA 31
 #define WMI_MAX_CHAINS_PHASE 2
+#define EGID_INFO_SIZE 4
 
 #include "qdf_atomic.h"
 
@@ -4061,6 +4062,14 @@ struct btcoex_cfg_params {
 	 * in above period.
 	 */
 	uint32_t wlan_duration;
+};
+
+/**
+ * struct esl_egid_params - Contains the EGID information
+ * @egid_info: egid_info contains the 128-bit ESL EGID information
+ */
+struct esl_egid_params {
+	uint32_t egid_info[EGID_INFO_SIZE];
 };
 
 #define WMI_HOST_COEX_CONFIG_BUF_MAX_LEN 32 /* 128 bytes */

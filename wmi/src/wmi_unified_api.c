@@ -2591,6 +2591,18 @@ wmi_unified_send_btcoex_duty_cycle_cmd(wmi_unified_t wmi_handle,
 	return QDF_STATUS_E_FAILURE;
 }
 
+QDF_STATUS
+wmi_unified_send_egid_info_cmd(wmi_unified_t wmi_handle,
+			       struct esl_egid_params *param)
+{
+	if (wmi_handle->ops->send_egid_info_cmd) {
+		return wmi_handle->ops->send_egid_info_cmd(
+						wmi_handle, param);
+	}
+
+	return QDF_STATUS_E_FAILURE;
+}
+
 QDF_STATUS wmi_extract_service_ready_ext(
 		wmi_unified_t wmi_handle, uint8_t *evt_buf,
 		struct wlan_psoc_host_service_ext_param *param)
