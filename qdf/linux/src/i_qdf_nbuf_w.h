@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2014-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -102,15 +102,15 @@
 #define __qdf_nbuf_get_rx_flow_tag(skb) \
 		(QDF_NBUF_CB_RX_FLOW_TAG((skb)))
 
-#define QDF_NBUF_CB_RX_FLOW_IDX_INVALID(skb) \
+#define QDF_NBUF_CB_RX_FLOW_IDX_VALID(skb) \
 		(((struct qdf_nbuf_cb *) \
-		((skb)->cb))->u.rx.dev.priv_cb_w.flow_idx_invalid)
+		((skb)->cb))->u.rx.dev.priv_cb_w.flow_idx_valid)
 
-#define __qdf_nbuf_set_rx_flow_idx_invalid(skb, val) \
-		((QDF_NBUF_CB_RX_FLOW_IDX_INVALID((skb))) = val)
+#define __qdf_nbuf_set_rx_flow_idx_valid(skb, val) \
+		((QDF_NBUF_CB_RX_FLOW_IDX_VALID((skb))) = val)
 
-#define __qdf_nbuf_get_rx_flow_idx_invalid(skb) \
-		(QDF_NBUF_CB_RX_FLOW_IDX_INVALID((skb)))
+#define __qdf_nbuf_get_rx_flow_idx_valid(skb) \
+		(QDF_NBUF_CB_RX_FLOW_IDX_VALID((skb)))
 
 #define QDF_NBUF_CB_RX_FLOW_IDX_TIMEOUT(skb) \
 		(((struct qdf_nbuf_cb *) \
