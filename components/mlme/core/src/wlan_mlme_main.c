@@ -2046,6 +2046,8 @@ static void mlme_init_roam_offload_cfg(struct wlan_objmgr_psoc *psoc,
 		cfg_get(psoc, CFG_LFR_ENABLE_IDLE_ROAM);
 	lfr->idle_roam_rssi_delta =
 		cfg_get(psoc, CFG_LFR_IDLE_ROAM_RSSI_DELTA);
+	lfr->roam_info_stats_num =
+		cfg_get(psoc, CFG_LFR3_ROAM_INFO_STATS_NUM);
 
 	ucfg_mlme_get_connection_roaming_ini_present(psoc, &val);
 	if (val) {

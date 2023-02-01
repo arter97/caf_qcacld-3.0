@@ -3136,6 +3136,16 @@ wlan_mlme_get_idle_roam_rssi_delta(struct wlan_objmgr_psoc *psoc,
 				   uint32_t *val);
 
 /**
+ * wlan_mlme_get_roam_info_stats_num() - Get roam information statistics number
+ * @psoc: pointer to psoc object
+ * @val:  Pointer to roam_info_stats_num
+ *
+ * Return: QDF Status
+ */
+QDF_STATUS
+wlan_mlme_get_roam_info_stats_num(struct wlan_objmgr_psoc *psoc, uint32_t *val);
+
+/**
  * wlan_mlme_get_idle_roam_inactive_time() - Get idle roam inactive time
  * @psoc: pointer to psoc object
  * @val:  Pointer to idle roam inactive time
