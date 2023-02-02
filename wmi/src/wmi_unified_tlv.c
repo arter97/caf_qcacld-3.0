@@ -362,6 +362,8 @@ static const uint32_t pdev_param_tlv[] = {
 	PARAM_MAP(pdev_param_ctrl_frame_obss_pd_threshold,
 		  PDEV_PARAM_CTRL_FRAME_OBSS_PD_THRESHOLD),
 	PARAM_MAP(pdev_param_rate_upper_cap, PDEV_PARAM_RATE_UPPER_CAP),
+	PARAM_MAP(pdev_param_set_disabled_sched_modes,
+		  PDEV_PARAM_SET_DISABLED_SCHED_MODES),
 	PARAM_MAP(pdev_param_rate_retry_mcs_drop,
 		  PDEV_PARAM_SET_RATE_DROP_DOWN_RETRY_THRESH),
 	PARAM_MAP(pdev_param_mcs_probe_intvl,

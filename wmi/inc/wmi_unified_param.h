@@ -5592,6 +5592,8 @@ typedef enum {
 	PDEV_PARAM(pdev_param_enable_peer_retry_stats, UNAVAILABLE_PARAM),
 	PDEV_PARAM(pdev_param_scan_blanking_mode,
 		   PDEV_PARAM_SET_SCAN_BLANKING_MODE),
+	PDEV_PARAM(pdev_param_set_disabled_sched_modes,
+		   PDEV_PARAM_SET_DISABLED_SCHED_MODES),
 	pdev_param_max,
 } wmi_conv_pdev_params_id;
 
