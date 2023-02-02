@@ -53,6 +53,8 @@ struct mlo_all_link_rssi {
 
 /* Invalid TQM/PSOC ID */
 #define ML_INVALID_PRIMARY_TQM   0xff
+/* Congestion value */
+#define ML_PRIMARY_TQM_CONGESTION 30
 
 static void wlan_mlo_peer_get_rssi(struct wlan_objmgr_psoc *psoc,
 				   void *obj, void *args)
@@ -67,11 +69,14 @@ static void wlan_mlo_peer_get_rssi(struct wlan_objmgr_psoc *psoc,
 	index = rssi_data->current_psoc_id;
 	tqm_params = &rssi_data->psoc_tqm_parms[index];
 
-	if (!wlan_peer_is_mlo(peer) || !mlo_peer_ctx) {
+	if (!wlan_peer_is_mlo(peer) && !mlo_peer_ctx) {
 		if (wlan_peer_get_peer_type(peer) == WLAN_PEER_STA)
 			tqm_params->num_non_ml_peers += 1;
 		return;
 	}
+
+	if (!mlo_peer_ctx)
+		return;
 
 	/* If this psoc is not primary UMAC, don't account RSSI */
 	if (mlo_peer_ctx->primary_umac_psoc_id != rssi_data->current_psoc_id)
@@ -122,11 +127,24 @@ mld_get_best_primary_umac_w_rssi(struct wlan_mlo_peer_context *ml_peer,
 	int32_t diff_rssi[WLAN_OBJMGR_MAX_DEVICES] = {0};
 	int32_t diff_low;
 	bool mld_sta_links[WLAN_OBJMGR_MAX_DEVICES] = {0};
-	uint8_t num_psocs_w_no_sta = 0;
+	bool mld_no_sta[WLAN_OBJMGR_MAX_DEVICES] = {0};
 	struct wlan_objmgr_peer *assoc_peer = NULL;
 	uint8_t prim_link, id;
 	uint8_t num_psocs;
 	struct mlpeer_data *tqm_params = NULL;
+	struct wlan_channel *channel;
+	enum phy_ch_width chwidth;
+	uint8_t cong = ML_PRIMARY_TQM_CONGESTION;
+	uint16_t mld_ml_sta_count[WLAN_OBJMGR_MAX_DEVICES] = {0};
+	enum phy_ch_width mld_ch_width[WLAN_OBJMGR_MAX_DEVICES];
+	uint8_t psoc_w_nosta;
+	uint16_t ml_sta_count = 0;
+	uint32_t total_cap, cap;
+	uint16_t bw;
+	bool group_full[WLAN_OBJMGR_MAX_DEVICES] = {0};
+	uint16_t group_size[WLAN_OBJMGR_MAX_DEVICES] = {0};
+	uint16_t grp_size = 0;
+	uint16_t group_full_count = 0;
 
 	mld_get_link_rssi(&rssi_data);
 
@@ -136,26 +154,6 @@ mld_get_best_primary_umac_w_rssi(struct wlan_mlo_peer_context *ml_peer,
 		if (tqm_params->num_ml_peers)
 			avg_rssi[i] = (tqm_params->total_rssi /
 				       tqm_params->num_ml_peers);
-		else
-			num_psocs_w_no_sta++;
-	}
-
-	assoc_peer = wlan_mlo_peer_get_assoc_peer(ml_peer);
-	if (!assoc_peer) {
-		mlo_err("Assoc peer of ML Peer " QDF_MAC_ADDR_FMT " is invalid",
-			QDF_MAC_ADDR_REF(ml_peer->peer_mld_addr.bytes));
-		QDF_BUG(0);
-		return;
-	}
-
-	/**
-	 * If this is first station, then assign primary umac to
-	 * assoc peer's psoc
-	 */
-	if (num_psocs_w_no_sta == rssi_data.num_psocs) {
-		ml_peer->primary_umac_psoc_id =
-			wlan_peer_get_psoc_id(assoc_peer);
-		return;
 	}
 
 	/**
@@ -163,6 +161,10 @@ mld_get_best_primary_umac_w_rssi(struct wlan_mlo_peer_context *ml_peer,
 	 * from those links only
 	 */
 	num_psocs = 0;
+	psoc_w_nosta = 0;
+	for (i = 0; i < WLAN_UMAC_MLO_MAX_VDEVS; i++)
+		mld_ch_width[i] = CH_WIDTH_INVALID;
+
 	for (i = 0; i < WLAN_UMAC_MLO_MAX_VDEVS; i++) {
 		if (!link_vdevs[i])
 			continue;
@@ -174,13 +176,19 @@ mld_get_best_primary_umac_w_rssi(struct wlan_mlo_peer_context *ml_peer,
 		tqm_params = &rssi_data.psoc_tqm_parms[id];
 		mld_sta_links[id] = true;
 
-		/* If this PSOC has exceeded limit, skip it */
+		channel = wlan_vdev_mlme_get_bss_chan(link_vdevs[i]);
+		mld_ch_width[id] = channel->ch_width;
+
 		if ((tqm_params->num_ml_peers +
-		     tqm_params->num_non_ml_peers) >=
-		     tqm_params->max_ml_peers) {
-			mld_sta_links[id] = false;
-			continue;
+		     tqm_params->num_non_ml_peers) == 0) {
+			/* If this PSOC has no stations */
+			mld_no_sta[id] = true;
+			psoc_w_nosta++;
 		}
+
+		mld_ml_sta_count[id] = tqm_params->num_ml_peers;
+		/* Update total MLO STA count */
+		ml_sta_count += tqm_params->num_ml_peers;
 
 		num_psocs++;
 
@@ -195,31 +203,109 @@ mld_get_best_primary_umac_w_rssi(struct wlan_mlo_peer_context *ml_peer,
 		diff_rssi[id] = (ml_peer->avg_link_rssi >= avg_rssi[id]) ?
 				(ml_peer->avg_link_rssi - avg_rssi[id]) :
 				(avg_rssi[id] - ml_peer->avg_link_rssi);
+
 	}
 
 	prim_link = ML_INVALID_PRIMARY_TQM;
-	diff_low = 0;
 
-	/* find min diff, based on it, allocate primary umac */
-	for (i = 0; i < WLAN_OBJMGR_MAX_DEVICES; i++) {
-		if (!mld_sta_links[i])
-			continue;
+	/* If one of the PSOCs doesn't have any station select that PSOC as
+	 * primary TQM. If more than one PSOC have no stations as Primary TQM
+	 * the vdev with less bw needs to be selected as Primary TQM
+	 */
+	if (psoc_w_nosta == 1) {
+		for (i = 0; i < WLAN_OBJMGR_MAX_DEVICES; i++) {
+			if (mld_no_sta[i]) {
+				prim_link = i;
+				break;
+			}
+		}
+	} else if (psoc_w_nosta > 1) {
+		chwidth = CH_WIDTH_INVALID;
+		for (i = 0; i < WLAN_OBJMGR_MAX_DEVICES; i++) {
+			if (!mld_no_sta[i])
+				continue;
 
-		/* First iteration */
-		if (diff_low == 0) {
-			diff_low = diff_rssi[i];
-			prim_link = i;
-		} else if (diff_low > diff_rssi[i]) {
-			diff_low = diff_rssi[i];
-			prim_link = i;
+			if (chwidth == CH_WIDTH_INVALID) {
+				prim_link = i;
+				chwidth = mld_ch_width[i];
+				continue;
+			}
+
+			/* If bw is less than or equal to 160 MHZ
+			 * and chwidth is less than other link
+			 * Mark this link as primary link
+			 */
+			if ((mld_ch_width[i] <= CH_WIDTH_160MHZ) &&
+			    (chwidth > mld_ch_width[i])) {
+				prim_link = i;
+				chwidth = mld_ch_width[i];
+			}
+		}
+	} else {
+		total_cap = 0;
+		for (i = 0; i < WLAN_OBJMGR_MAX_DEVICES; i++) {
+			bw = wlan_reg_get_bw_value(mld_ch_width[i]);
+			total_cap += bw * (100 - cong);
+		}
+
+		group_full_count = 0;
+		for (i = 0; i < WLAN_OBJMGR_MAX_DEVICES; i++) {
+			if (!mld_sta_links[i])
+				continue;
+
+			bw = wlan_reg_get_bw_value(mld_ch_width[i]);
+			cap = bw * (100 - cong);
+			grp_size = (ml_sta_count) * ((cap * 100) / total_cap);
+			group_size[i] = grp_size / 100;
+			if (group_size[i] <=  mld_ml_sta_count[i]) {
+				group_full[i] = true;
+				group_full_count++;
+			}
+		}
+
+		if ((num_psocs - group_full_count) == 1) {
+			for (i = 0; i < WLAN_OBJMGR_MAX_DEVICES; i++) {
+				if (!mld_sta_links[i])
+					continue;
+
+				if (group_full[i])
+					continue;
+
+				prim_link = i;
+				break;
+			}
+		} else {
+			diff_low = 0;
+			/* find min diff, based on it, allocate primary umac */
+			for (i = 0; i < WLAN_OBJMGR_MAX_DEVICES; i++) {
+				if (!mld_sta_links[i])
+					continue;
+
+				/* First iteration */
+				if (diff_low == 0) {
+					diff_low = diff_rssi[i];
+					prim_link = i;
+				} else if (diff_low > diff_rssi[i]) {
+					diff_low = diff_rssi[i];
+					prim_link = i;
+				}
+			}
 		}
 	}
 
-	if (prim_link != 0xff)
+	if (prim_link != ML_INVALID_PRIMARY_TQM) {
 		ml_peer->primary_umac_psoc_id = prim_link;
-	else
+	} else {
+		assoc_peer = wlan_mlo_peer_get_assoc_peer(ml_peer);
+		if (!assoc_peer) {
+			mlo_err(QDF_MAC_ADDR_FMT ":Assoc peer is NULL",
+				QDF_MAC_ADDR_REF(ml_peer->peer_mld_addr.bytes));
+			QDF_BUG(0);
+			return;
+		}
 		ml_peer->primary_umac_psoc_id =
 			wlan_peer_get_psoc_id(assoc_peer);
+	}
 }
 
 void mlo_peer_assign_primary_umac(
