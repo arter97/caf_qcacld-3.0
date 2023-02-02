@@ -17,7 +17,7 @@
  * PERFORMANCE OF THIS SOFTWARE.
  */
 
- /**
+/**
  * DOC: Public API initialization of crypto service with object manager
  */
 #include <qdf_types.h>
@@ -279,12 +279,7 @@ static QDF_STATUS wlan_crypto_peer_obj_destroy_handler(
 
 	return QDF_STATUS_SUCCESS;
 }
-/**
- * __wlan_crypto_init - Init the crypto service with object manager
- *                    Called from crypto init context.
- *
- * Return: QDF_STATUS_SUCCESS - in case of success
- */
+
 QDF_STATUS __wlan_crypto_init(void)
 {
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
@@ -328,12 +323,6 @@ register_success:
 	return status;
 }
 
-/**
- * __wlan_crypto_deinit - Deinit the crypto service with object manager
- *                         Called from crypto context.
- *
- * Return: QDF_STATUS_SUCCESS - in case of success
- */
 QDF_STATUS __wlan_crypto_deinit(void)
 {
 

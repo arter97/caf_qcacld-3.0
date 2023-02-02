@@ -17,7 +17,7 @@
  * PERFORMANCE OF THIS SOFTWARE.
  */
 
- /**
+/**
  * DOC: Public APIs for crypto service
  */
 
@@ -89,8 +89,9 @@ static int is_bigtk(uint16_t keyix)
 }
 
 /**
- * wlan_crypto_vdev_get_crypto_params - called by mlme to get crypto params
- * @vdev:vdev
+ * wlan_crypto_vdev_get_comp_params() - called by mlme to get crypto params
+ * @vdev: vdev
+ * @crypto_priv: location to store pointer to the crypto private data
  *
  * This function gets called by mlme to get crypto params
  *
@@ -111,8 +112,9 @@ static struct wlan_crypto_params *wlan_crypto_vdev_get_comp_params(
 }
 
 /**
- * wlan_crypto_peer_get_crypto_params - called by mlme to get crypto params
- * @peer:peer
+ * wlan_crypto_peer_get_comp_params() - called by mlme to get crypto params
+ * @peer: peer
+ * @crypto_priv: location to store pointer to the crypto private data
  *
  * This function gets called by mlme to get crypto params
  *
@@ -139,7 +141,7 @@ static QDF_STATUS wlan_crypto_set_igtk_key(struct wlan_crypto_key *key)
 }
 
 /**
- * wlan_crypto_set_param - called by ucfg to set crypto param
+ * wlan_crypto_set_param() - called by ucfg to set crypto param
  * @crypto_params: crypto_params
  * @param: param to be set.
  * @value: value
@@ -183,16 +185,6 @@ static QDF_STATUS wlan_crypto_set_param(struct wlan_crypto_params *crypto_params
 	return status;
 }
 
-/**
- * wlan_crypto_set_vdev_param - called by ucfg to set crypto param
- * @vdev: vdev
- * @param: param to be set.
- * @value: value
- *
- * This function gets called from ucfg to set param
- *
- * Return: QDF_STATUS_SUCCESS - in case of success
- */
 QDF_STATUS wlan_crypto_set_vdev_param(struct wlan_objmgr_vdev *vdev,
 					wlan_crypto_param_type param,
 					uint32_t value)
@@ -216,17 +208,6 @@ QDF_STATUS wlan_crypto_set_vdev_param(struct wlan_objmgr_vdev *vdev,
 	return status;
 }
 
-/**
- * wlan_crypto_set_param - called by ucfg to set crypto param
- *
- * @peer: peer
- * @param: param to be set.
- * @value: value
- *
- * This function gets called from ucfg to set param
- *
- * Return: QDF_STATUS_SUCCESS - in case of success
- */
 QDF_STATUS wlan_crypto_set_peer_param(struct wlan_objmgr_peer *peer,
 				wlan_crypto_param_type param,
 				uint32_t value)
@@ -251,7 +232,7 @@ QDF_STATUS wlan_crypto_set_peer_param(struct wlan_objmgr_peer *peer,
 }
 
 /**
- * wlan_crypto_get_param_value - called by crypto APIs to get value for param
+ * wlan_crypto_get_param_value() - called by crypto APIs to get value for param
  * @param: Crypto param type
  * @crypto_params: Crypto params struct
  *
@@ -293,15 +274,6 @@ static int32_t wlan_crypto_get_param_value(wlan_crypto_param_type param,
 	return value;
 }
 
-/**
- * wlan_crypto_get_param - called to get value for param from vdev
- * @vdev:  vdev
- * @param: Crypto param type
- *
- * This function gets called to get value for param from vdev
- *
- * Return: value or -1 for failure
- */
 int32_t wlan_crypto_get_param(struct wlan_objmgr_vdev *vdev,
 			      wlan_crypto_param_type param)
 {
@@ -321,15 +293,7 @@ int32_t wlan_crypto_get_param(struct wlan_objmgr_vdev *vdev,
 
 	return value;
 }
-/**
- * wlan_crypto_get_peer_param - called to get value for param from peer
- * @peer:  peer
- * @param: Crypto param type
- *
- * This function gets called to get value for param from peer
- *
- * Return: value or -1 for failure
- */
+
 int32_t wlan_crypto_get_peer_param(struct wlan_objmgr_peer *peer,
 				   wlan_crypto_param_type param)
 {
@@ -713,16 +677,6 @@ wlan_crypto_get_fils_pmksa(struct wlan_objmgr_vdev *vdev,
 	return NULL;
 }
 
-/**
- * wlan_crypto_is_htallowed - called to check is HT allowed for cipher
- * @vdev:  vdev
- * @peer:  peer
- *
- * This function gets called to check is HT allowed for cipher.
- * HT is not allowed for wep and tkip.
- *
- * Return: 0 - not allowed or 1 - allowed
- */
 uint8_t wlan_crypto_is_htallowed(struct wlan_objmgr_vdev *vdev,
 				 struct wlan_objmgr_peer *peer)
 {
@@ -754,15 +708,6 @@ uint8_t wlan_crypto_is_htallowed(struct wlan_objmgr_vdev *vdev,
 }
 qdf_export_symbol(wlan_crypto_is_htallowed);
 
-/**
- * wlan_crypto_setkey - called by ucfg to setkey
- * @vdev: vdev
- * @req_key: req_key with cipher type, key macaddress
- *
- * This function gets called from ucfg to sey key
- *
- * Return: QDF_STATUS_SUCCESS - in case of success
- */
 QDF_STATUS wlan_crypto_setkey(struct wlan_objmgr_vdev *vdev,
 				struct wlan_crypto_req_key *req_key)
 {
@@ -1139,16 +1084,6 @@ err:
 	return status;
 }
 
-/**
- * store_def_keyix_peer - store default keyix
- * @vdev: vdev
- * @object: Peer object
- * @arg: Argument passed by caller
- *
- * This function gets called from wlan_crypto_setkey
- *
- * Return: None
- */
 void store_def_keyix_peer(struct wlan_objmgr_vdev *vdev, void *object,
 			  void *arg)
 {
@@ -1169,14 +1104,6 @@ void store_def_keyix_peer(struct wlan_objmgr_vdev *vdev, void *object,
 
 qdf_export_symbol(store_def_keyix_peer);
 
-/**
- * wlan_crypto_get_keytype - get keytype
- * @key: key
- *
- * This function gets keytype from key
- *
- * Return: keytype
- */
 wlan_crypto_cipher_type wlan_crypto_get_key_type(struct wlan_crypto_key *key)
 {
 	if (key && key->cipher_table) {
@@ -1186,15 +1113,7 @@ wlan_crypto_cipher_type wlan_crypto_get_key_type(struct wlan_crypto_key *key)
 	return WLAN_CRYPTO_CIPHER_NONE;
 }
 qdf_export_symbol(wlan_crypto_get_key_type);
-/**
- * wlan_crypto_vdev_getkey - get key from vdev
- * @vdev: vdev
- * @keyix: keyix
- *
- * This function gets key from vdev
- *
- * Return: key or NULL
- */
+
 struct wlan_crypto_key *wlan_crypto_vdev_getkey(struct wlan_objmgr_vdev *vdev,
 						uint16_t keyix)
 {
@@ -1230,15 +1149,6 @@ struct wlan_crypto_key *wlan_crypto_vdev_getkey(struct wlan_objmgr_vdev *vdev,
 }
 qdf_export_symbol(wlan_crypto_vdev_getkey);
 
-/**
- * wlan_crypto_peer_getkey - get key from peer
- * @peer: peer
- * @keyix: keyix
- *
- * This function gets key from peer
- *
- * Return: key or NULL
- */
 struct wlan_crypto_key *wlan_crypto_peer_getkey(struct wlan_objmgr_peer *peer,
 						uint16_t keyix)
 {
@@ -1275,17 +1185,6 @@ struct wlan_crypto_key *wlan_crypto_peer_getkey(struct wlan_objmgr_peer *peer,
 }
 qdf_export_symbol(wlan_crypto_peer_getkey);
 
-/**
- * wlan_crypto_getkey - called by ucfg to get key
- * @vdev: vdev
- * @req_key: key value will be copied in this req_key
- * @mac_address: mac address of the peer for unicast key
- *			       or broadcast address if group key is requested.
- *
- * This function gets called from ucfg to get key
- *
- * Return: QDF_STATUS_SUCCESS - in case of success
- */
 QDF_STATUS wlan_crypto_getkey(struct wlan_objmgr_vdev *vdev,
 				struct wlan_crypto_req_key *req_key,
 				uint8_t *mac_addr)
@@ -1413,17 +1312,6 @@ err:
 	return status;
 }
 
-/**
- * wlan_crypto_delkey - called by ucfg to delete key
- * @vdev: vdev
- * @mac_address: mac address of the peer for unicast key
- *                or broadcast address if group key is deleted.
- * @key_idx: key index to be deleted
- *
- * This function gets called from ucfg to delete key
- *
- * Return: QDF_STATUS_SUCCESS - in case of success
- */
 QDF_STATUS wlan_crypto_delkey(struct wlan_objmgr_vdev *vdev,
 				uint8_t *macaddr,
 				uint8_t key_idx)
@@ -1578,18 +1466,6 @@ static QDF_STATUS wlan_crypto_set_default_key(struct wlan_objmgr_vdev *vdev,
 }
 #endif
 
-/**
- * wlan_crypto_default_key - called by ucfg to set default tx key
- * @vdev: vdev
- * @mac_address: mac address of the peer for unicast key
- *            or broadcast address if group key need to made default.
- * @key_idx: key index to be made as default key
- * @unicast: is key was unicast or group key.
- *
- * This function gets called from ucfg to set default key
- *
- * Return: QDF_STATUS_SUCCESS - in case of success
- */
 QDF_STATUS wlan_crypto_default_key(struct wlan_objmgr_vdev *vdev,
 					uint8_t *macaddr,
 					uint8_t key_idx,
@@ -1668,17 +1544,6 @@ QDF_STATUS wlan_crypto_default_key(struct wlan_objmgr_vdev *vdev,
 	return QDF_STATUS_SUCCESS;
 }
 
-/**
- * wlan_crypto_encap - called by mgmt for encap the frame based on cipher
- * @vdev: vdev
- * @wbuf: wbuf
- * @macaddr: macaddr
- * @encapdone: is encapdone already or not.
- *
- * This function gets called from mgmt txrx to encap frame.
- *
- * Return: QDF_STATUS_SUCCESS - in case of success
- */
 QDF_STATUS wlan_crypto_encap(struct wlan_objmgr_vdev *vdev,
 				qdf_nbuf_t wbuf,
 				uint8_t *mac_addr,
@@ -1777,17 +1642,6 @@ err:
 }
 qdf_export_symbol(wlan_crypto_encap);
 
-/**
- * wlan_crypto_decap - called by mgmt for decap the frame based on cipher
- * @vdev: vdev
- * @wbuf: wbuf
- * @macaddr: macaddr
- * @tid: tid of the frame
- *
- * This function gets called from mgmt txrx to decap frame.
- *
- * Return: QDF_STATUS_SUCCESS - in case of success
- */
 QDF_STATUS wlan_crypto_decap(struct wlan_objmgr_vdev *vdev,
 				qdf_nbuf_t wbuf,
 				uint8_t *mac_addr,
@@ -1896,17 +1750,7 @@ err:
 	return status;
 }
 qdf_export_symbol(wlan_crypto_decap);
-/**
- * wlan_crypto_enmic - called by mgmt for adding mic in frame based on cipher
- * @vdev: vdev
- * @wbuf: wbuf
- * @macaddr: macaddr
- * @encapdone: is encapdone already or not.
- *
- * This function gets called from mgmt txrx to adding mic to the frame.
- *
- * Return: QDF_STATUS_SUCCESS - in case of success
- */
+
 QDF_STATUS wlan_crypto_enmic(struct wlan_objmgr_vdev *vdev,
 				qdf_nbuf_t wbuf,
 				uint8_t *mac_addr,
@@ -1988,18 +1832,6 @@ QDF_STATUS wlan_crypto_enmic(struct wlan_objmgr_vdev *vdev,
 	return status;
 }
 
-/**
- * wlan_crypto_demic - called by mgmt for remove and check mic for
- *			                        the frame based on cipher
- * @vdev: vdev
- * @wbuf: wbuf
- * @macaddr: macaddr
- * @tid: tid of the frame
- * @keyid: keyid in the received frame
- * This function gets called from mgmt txrx to decap frame.
- *
- * Return: QDF_STATUS_SUCCESS - in case of success
- */
 QDF_STATUS wlan_crypto_demic(struct wlan_objmgr_vdev *vdev,
 			     qdf_nbuf_t wbuf,
 			     uint8_t *mac_addr,
@@ -2081,14 +1913,6 @@ QDF_STATUS wlan_crypto_demic(struct wlan_objmgr_vdev *vdev,
 	return status;
 }
 
-/**
- * wlan_crypto_vdev_is_pmf_enabled - called to check is pmf enabled in vdev
- * @vdev: vdev
- *
- * This function gets called to check is pmf enabled or not in vdev.
- *
- * Return: true or false
- */
 bool wlan_crypto_vdev_is_pmf_enabled(struct wlan_objmgr_vdev *vdev)
 {
 
@@ -2114,14 +1938,6 @@ bool wlan_crypto_vdev_is_pmf_enabled(struct wlan_objmgr_vdev *vdev)
 	return false;
 }
 
-/**
- * wlan_crypto_vdev_is_pmf_required - called to check is pmf required in vdev
- * @vdev: vdev
- *
- * This function gets called to check is pmf required or not in vdev.
- *
- * Return: true or false
- */
 bool wlan_crypto_vdev_is_pmf_required(struct wlan_objmgr_vdev *vdev)
 {
 	struct wlan_crypto_comp_priv *crypto_priv;
@@ -2143,15 +1959,6 @@ bool wlan_crypto_vdev_is_pmf_required(struct wlan_objmgr_vdev *vdev)
 	return false;
 }
 
-/**
- * wlan_crypto_is_pmf_enabled - called by mgmt txrx to check is pmf enabled
- * @vdev: vdev
- * @peer: peer
- *
- * This function gets called by mgmt txrx to check is pmf enabled or not.
- *
- * Return: true or false
- */
 bool wlan_crypto_is_pmf_enabled(struct wlan_objmgr_vdev *vdev,
 				struct wlan_objmgr_peer *peer)
 {
@@ -2186,16 +1993,6 @@ bool wlan_crypto_is_pmf_enabled(struct wlan_objmgr_vdev *vdev,
 	return false;
 }
 
-/**
- * wlan_crypto_is_key_valid - called by mgmt txrx to check if key is valid
- * @vdev: vdev
- * @peer: peer
- * @keyidx : key index
- *
- * This function gets called by mgmt txrx to check if key is valid
- *
- * Return: true or false
- */
 bool wlan_crypto_is_key_valid(struct wlan_objmgr_vdev *vdev,
 			      struct wlan_objmgr_peer *peer,
 			      uint16_t keyidx)
@@ -2226,16 +2023,6 @@ static void wlan_crypto_gmac_pn_swap(uint8_t *a, uint8_t *b)
 	a[5] = b[0];
 }
 
-/**
- * wlan_crypto_add_mmie - called by mgmt txrx to add mmie in frame
- * @vdev: vdev
- * @bfrm:  frame starting pointer
- * @len:  length of the frame
- *
- * This function gets called by mgmt txrx to add mmie in frame
- *
- * Return: end of frame or NULL in case failure
- */
 uint8_t *wlan_crypto_add_mmie(struct wlan_objmgr_vdev *vdev,
 				uint8_t *bfrm,
 				uint32_t len)
@@ -2362,16 +2149,6 @@ uint8_t *wlan_crypto_add_mmie(struct wlan_objmgr_vdev *vdev,
 }
 
 #define MAX_MIC_LEN 16
-/**
- * wlan_crypto_is_mmie_valid - called by mgmt txrx to check mmie of the frame
- * @vdev: vdev
- * @frm:  frame starting pointer
- * @efrm: end of frame pointer
- *
- * This function gets called by mgmt txrx to check mmie of the frame
- *
- * Return: true or false
- */
 bool wlan_crypto_is_mmie_valid(struct wlan_objmgr_vdev *vdev,
 					uint8_t *frm,
 					uint8_t *efrm)
@@ -2643,7 +2420,8 @@ wlan_crypto_wpa_keymgmt_to_suite(uint32_t keymgmt)
 
 	return status;
 }
-/**
+
+/*
  * Convert a WPA cipher selector OUI to an internal
  * cipher algorithm.  Where appropriate we also
  * record any key length.
@@ -2856,7 +2634,7 @@ QDF_STATUS wlan_crypto_wpaie_check(struct wlan_crypto_params *crypto_params,
 
 #ifdef WLAN_ADAPTIVE_11R
 /**
- * wlan_crypto_akm_list_in_order - store AMK list in order
+ * wlan_crypto_store_akm_list_in_order() - store AMK list in order
  * @crypto_params: crypto param structure
  * @key_mgmt: key management
  * @akm_index: place at which AMK present in RSN IE of Beacon/Probe response
@@ -3042,15 +2820,6 @@ QDF_STATUS wlan_crypto_rsnie_check(struct wlan_crypto_params *crypto_params,
 	return QDF_STATUS_SUCCESS;
 }
 
-/**
- * wlan_crypto_build_wpaie - called by mlme to build wpaie
- * @vdev: vdev
- * @iebuf: ie buffer
- *
- * This function gets called by mlme to build wpaie from given vdev
- *
- * Return: end of buffer
- */
 uint8_t *wlan_crypto_build_wpaie(struct wlan_objmgr_vdev *vdev,
 					uint8_t *iebuf)
 {
@@ -3494,15 +3263,6 @@ QDF_STATUS wlan_crypto_wapiie_check(struct wlan_crypto_params *crypto_params,
 	return QDF_STATUS_SUCCESS;
 }
 
-/**
- * wlan_crypto_build_wapiie - called by mlme to build wapi ie
- * @vdev: vdev
- * @iebuf: ie buffer
- *
- * This function gets called by mlme to build wapi ie from given vdev
- *
- * Return: end of buffer
- */
 uint8_t *wlan_crypto_build_wapiie(struct wlan_objmgr_vdev *vdev,
 				uint8_t *iebuf)
 {
@@ -3573,15 +3333,6 @@ uint8_t *wlan_crypto_build_wapiie(struct wlan_objmgr_vdev *vdev,
 
 }
 
-/**
- * wlan_crypto_pn_check - called by data patch for PN check
- * @vdev: vdev
- * @wbuf: wbuf
- *
- * This function gets called by data patch for PN check
- *
- * Return: QDF_STATUS
- */
 QDF_STATUS wlan_crypto_pn_check(struct wlan_objmgr_vdev *vdev,
 				qdf_nbuf_t wbuf)
 {
@@ -3591,14 +3342,6 @@ QDF_STATUS wlan_crypto_pn_check(struct wlan_objmgr_vdev *vdev,
 	return QDF_STATUS_SUCCESS;
 }
 
-/**
- * wlan_crypto_vdev_get_crypto_params - called by mlme to get crypto params
- * @vdev:vdev
- *
- * This function gets called by mlme to get crypto params
- *
- * Return: wlan_crypto_params or NULL in case of failure
- */
 struct wlan_crypto_params *wlan_crypto_vdev_get_crypto_params(
 						struct wlan_objmgr_vdev *vdev)
 {
@@ -3607,14 +3350,6 @@ struct wlan_crypto_params *wlan_crypto_vdev_get_crypto_params(
 	return wlan_crypto_vdev_get_comp_params(vdev, &crypto_priv);
 }
 
-/**
- * wlan_crypto_peer_get_crypto_params - called by mlme to get crypto params
- * @peer:peer
- *
- * This function gets called by mlme to get crypto params
- *
- * Return: wlan_crypto_params or NULL in case of failure
- */
 struct wlan_crypto_params *wlan_crypto_peer_get_crypto_params(
 						struct wlan_objmgr_peer *peer)
 {
@@ -3753,14 +3488,6 @@ exit:
 	return status;
 }
 
-/**
- * wlan_crypto_register_crypto_rx_ops - set crypto_rx_ops
- * @crypto_rx_ops: crypto_rx_ops
- *
- * This function gets called by object manager to register crypto rx ops.
- *
- * Return: QDF_STATUS
- */
 QDF_STATUS wlan_crypto_register_crypto_rx_ops(
 			struct wlan_lmac_if_crypto_rx_ops *crypto_rx_ops)
 {
@@ -3773,14 +3500,6 @@ QDF_STATUS wlan_crypto_register_crypto_rx_ops(
 	return QDF_STATUS_SUCCESS;
 }
 
-/**
- * wlan_crypto_get_crypto_rx_ops - get crypto_rx_ops from psoc
- * @psoc: psoc
- *
- * This function gets called by umac to get the crypto_rx_ops
- *
- * Return: crypto_rx_ops
- */
 struct wlan_lmac_if_crypto_rx_ops *wlan_crypto_get_crypto_rx_ops(
 					struct wlan_objmgr_psoc *psoc)
 {
@@ -3797,15 +3516,6 @@ struct wlan_lmac_if_crypto_rx_ops *wlan_crypto_get_crypto_rx_ops(
 }
 qdf_export_symbol(wlan_crypto_get_crypto_rx_ops);
 
-/**
- * wlan_crypto_vdev_has_auth_mode - check authmode for vdev
- * @vdev: vdev
- * @authvalue: authvalue to be checked
- *
- * This function check is authvalue passed is set in vdev or not
- *
- * Return: true or false
- */
 bool wlan_crypto_vdev_has_auth_mode(struct wlan_objmgr_vdev *vdev,
 					wlan_crypto_auth_mode authvalue)
 {
@@ -3819,15 +3529,6 @@ bool wlan_crypto_vdev_has_auth_mode(struct wlan_objmgr_vdev *vdev,
 }
 qdf_export_symbol(wlan_crypto_vdev_has_auth_mode);
 
-/**
- * wlan_crypto_peer_has_auth_mode - check authmode for peer
- * @peer: peer
- * @authvalue: authvalue to be checked
- *
- * This function check is authvalue passed is set in peer or not
- *
- * Return: true or false
- */
 bool wlan_crypto_peer_has_auth_mode(struct wlan_objmgr_peer *peer,
 					wlan_crypto_auth_mode authvalue)
 {
@@ -3842,15 +3543,6 @@ bool wlan_crypto_peer_has_auth_mode(struct wlan_objmgr_peer *peer,
 }
 qdf_export_symbol(wlan_crypto_peer_has_auth_mode);
 
-/**
- * wlan_crypto_vdev_has_ucastcipher - check ucastcipher for vdev
- * @vdev: vdev
- * @ucastcipher: ucastcipher to be checked
- *
- * This function check is ucastcipher passed is set in vdev or not
- *
- * Return: true or false
- */
 bool wlan_crypto_vdev_has_ucastcipher(struct wlan_objmgr_vdev *vdev,
 					wlan_crypto_cipher_type ucastcipher)
 {
@@ -3865,15 +3557,6 @@ bool wlan_crypto_vdev_has_ucastcipher(struct wlan_objmgr_vdev *vdev,
 }
 qdf_export_symbol(wlan_crypto_vdev_has_ucastcipher);
 
-/**
- * wlan_crypto_peer_has_ucastcipher - check ucastcipher for peer
- * @peer: peer
- * @ucastcipher: ucastcipher to be checked
- *
- * This function check is ucastcipher passed is set in peer or not
- *
- * Return: true or false
- */
 bool wlan_crypto_peer_has_ucastcipher(struct wlan_objmgr_peer *peer,
 					wlan_crypto_cipher_type ucastcipher)
 {
@@ -3888,15 +3571,6 @@ bool wlan_crypto_peer_has_ucastcipher(struct wlan_objmgr_peer *peer,
 }
 qdf_export_symbol(wlan_crypto_peer_has_ucastcipher);
 
-/**
- * wlan_crypto_vdev_has_mcastcipher - check mcastcipher for vdev
- * @vdev: vdev
- * @mcastcipher: mcastcipher to be checked
- *
- * This function check is mcastcipher passed is set in vdev or not
- *
- * Return: true or false
- */
 bool wlan_crypto_vdev_has_mcastcipher(struct wlan_objmgr_vdev *vdev,
 					wlan_crypto_cipher_type mcastcipher)
 {
@@ -3911,15 +3585,6 @@ bool wlan_crypto_vdev_has_mcastcipher(struct wlan_objmgr_vdev *vdev,
 }
 qdf_export_symbol(wlan_crypto_vdev_has_mcastcipher);
 
-/**
- * wlan_crypto_peer_has_mcastcipher - check mcastcipher for peer
- * @peer: peer
- * @mcastcipher: mcastcipher to be checked
- *
- * This function check is mcastcipher passed is set in peer or not
- *
- * Return: true or false
- */
 bool wlan_crypto_peer_has_mcastcipher(struct wlan_objmgr_peer *peer,
 					wlan_crypto_cipher_type mcastcipher)
 {
@@ -3934,15 +3599,6 @@ bool wlan_crypto_peer_has_mcastcipher(struct wlan_objmgr_peer *peer,
 }
 qdf_export_symbol(wlan_crypto_peer_has_mcastcipher);
 
-/**
- * wlan_crypto_vdev_has_mgmtcipher - check mgmtcipher for vdev
- * @vdev: vdev
- * @mgmtcipher: mgmtcipher to be checked
- *
- * This function checks any one of mgmtciphers are supported by vdev or not.
- *
- * Return: true or false
- */
 bool wlan_crypto_vdev_has_mgmtcipher(struct wlan_objmgr_vdev *vdev,
 				     uint32_t mgmtcipher)
 {
@@ -3958,15 +3614,6 @@ bool wlan_crypto_vdev_has_mgmtcipher(struct wlan_objmgr_vdev *vdev,
 
 qdf_export_symbol(wlan_crypto_vdev_has_mgmtcipher);
 
-/**
- * wlan_crypto_peer_has_mgmtcipher - check mgmtcipher for peer
- * @peer: peer
- * @mgmtcipher: mgmtcipher to be checked
- *
- * This function checks any one of mgmtciphers are supported by peer or not
- *
- * Return: true or false
- */
 bool wlan_crypto_peer_has_mgmtcipher(struct wlan_objmgr_peer *peer,
 				     uint32_t mgmtcipher)
 {
@@ -4019,14 +3666,6 @@ wlan_crypto_set_peer_fils_aead(struct wlan_objmgr_peer *peer, uint8_t value)
 	crypto_priv->fils_aead_set = value;
 }
 
-/**
- * wlan_crypto_get_key_header - get header length
- * @key: key
- *
- * This function gets header length based on keytype
- *
- * Return: header length
- */
 uint8_t wlan_crypto_get_key_header(struct wlan_crypto_key *key)
 {
 	struct wlan_crypto_cipher *cipher_table;
@@ -4040,14 +3679,6 @@ uint8_t wlan_crypto_get_key_header(struct wlan_crypto_key *key)
 
 qdf_export_symbol(wlan_crypto_get_key_header);
 
-/**
- * wlan_crypto_get_key_trailer - get cipher trailer length
- * @key: key
- *
- * This function gets cipher trailer length based on keytype
- *
- * Return: cipher trailer length
- */
 uint8_t wlan_crypto_get_key_trailer(struct wlan_crypto_key *key)
 {
 	struct wlan_crypto_cipher *cipher_table;
@@ -4061,14 +3692,6 @@ uint8_t wlan_crypto_get_key_trailer(struct wlan_crypto_key *key)
 
 qdf_export_symbol(wlan_crypto_get_key_trailer);
 
-/**
- * wlan_crypto_get_key_miclen - get cipher miclen length
- * @key: key
- *
- * This function gets cipher miclen length based on keytype
- *
- * Return: cipher miclen length
- */
 uint8_t wlan_crypto_get_key_miclen(struct wlan_crypto_key *key)
 {
 	struct wlan_crypto_cipher *cipher_table;
@@ -4082,14 +3705,6 @@ uint8_t wlan_crypto_get_key_miclen(struct wlan_crypto_key *key)
 
 qdf_export_symbol(wlan_crypto_get_key_miclen);
 
-/**
- * wlan_crypto_get_keyid - get keyid from frame
- * @data: frame
- *
- * This function parse frame and returns keyid
- *
- * Return: keyid
- */
 uint16_t wlan_crypto_get_keyid(uint8_t *data, int hdrlen)
 {
 	struct wlan_frame_hdr *hdr = (struct wlan_frame_hdr *)data;
@@ -4124,7 +3739,7 @@ uint16_t wlan_crypto_get_keyid(uint8_t *data, int hdrlen)
 qdf_export_symbol(wlan_crypto_get_keyid);
 
 /**
- * crypto_plumb_peer_keys - called during radio reset
+ * crypto_plumb_peer_keys() - called during radio reset
  * @vdev: vdev
  * @object: peer
  * @arg: psoc
@@ -4179,15 +3794,6 @@ static void crypto_plumb_peer_keys(struct wlan_objmgr_vdev *vdev,
 	}
 }
 
-/**
- * wlan_crypto_restore_keys - called during radio reset
- * @vdev: vdev
- *
- * Clear and restore keycache, needed for some DA chipsets which put
- * random values in keycache when phy reset is triggered
- *
- * Return: void
- */
 void wlan_crypto_restore_keys(struct wlan_objmgr_vdev *vdev)
 {
 	int i;
@@ -4326,18 +3932,6 @@ wlan_get_crypto_params_from_wapi_ie(struct wlan_crypto_params *crypto_params,
 }
 #endif
 
-/**
- * wlan_crypto_check_rsn_match - called by ucfg to check for RSN match
- * @psoc: psoc pointer
- * @vdev_id: vdev id
- * @ie_ptr: pointer to IEs
- * @ie_len: IE length
- * @peer_crypto_params: return peer crypto parameters
- *
- * This function gets called from ucfg to check RSN match.
- *
- * Return: true or false
- */
 bool wlan_crypto_check_rsn_match(struct wlan_objmgr_psoc *psoc,
 				 uint8_t vdev_id, uint8_t *ie_ptr,
 				 uint16_t ie_len, struct wlan_crypto_params *
@@ -4371,18 +3965,6 @@ bool wlan_crypto_check_rsn_match(struct wlan_objmgr_psoc *psoc,
 	return match;
 }
 
-/**
- * wlan_crypto_check_wpa_match - called by ucfg to check for WPA match
- * @psoc: psoc pointer
- * @vdev_id: vdev id
- * @ie_ptr: pointer to IEs
- * @ie_len: IE length
- * @peer_crypto_params: return peer crypto parameters
- *
- * This function gets called from ucfg to check WPA match.
- *
- * Return: true or false
- */
 bool wlan_crypto_check_wpa_match(struct wlan_objmgr_psoc *psoc,
 				 uint8_t vdev_id, uint8_t *ie_ptr,
 				 uint16_t ie_len, struct wlan_crypto_params *

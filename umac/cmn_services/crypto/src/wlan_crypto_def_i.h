@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2017-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -17,7 +17,7 @@
  * PERFORMANCE OF THIS SOFTWARE.
  */
 
- /**
+/**
  * DOC: Private definitions for handling crypto params
  */
 #ifndef _WLAN_CRYPTO_DEF_I_H_
@@ -398,9 +398,9 @@ typedef void (*crypto_add_key_callback)(void *context,
  * @bigtk_key:        bigtk key buffer for this peer
  * @igtk_key_type:    igtk key type
  * @def_tx_keyid:     default key used for this peer
- * @def_igtk_tx_keyid default igtk key used for this peer
- * @def_bigtk_tx_keyid default bigtk key used for this peer
- * @fils_aead_set     fils params for this peer
+ * @def_igtk_tx_keyid: default igtk key used for this peer
+ * @def_bigtk_tx_keyid: default bigtk key used for this peer
+ * @fils_aead_set:    fils params for this peer
  * @add_key_ctx: Opaque context to be used by the caller to associate the
  *  add key request with the response
  * @add_key_cb: Callback function to be called with the add key result
