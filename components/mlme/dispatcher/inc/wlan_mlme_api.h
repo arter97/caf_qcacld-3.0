@@ -4337,4 +4337,14 @@ wlan_mlme_get_src_addr_from_frame(struct element_info *frame);
  */
 bool
 wlan_mlme_get_sap_ps_with_twt(struct wlan_objmgr_psoc *psoc);
+
+/**
+ * wlan_mlme_get_max_bw() - Get max supported bandwidth
+ *
+ * Extract max supported bandwidth
+ *
+ * Return: enum phy_ch_width
+ *
+ */
+enum phy_ch_width wlan_mlme_get_max_bw(void);
 #endif /* _WLAN_MLME_API_H_ */

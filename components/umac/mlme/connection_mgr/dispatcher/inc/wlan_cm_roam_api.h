@@ -2096,4 +2096,17 @@ wlan_cm_roam_is_mlo_ap(struct wlan_objmgr_vdev *vdev)
 	return false;
 }
 #endif /* WLAN_FEATURE_11BE_MLO && WLAN_FEATURE_ROAM_OFFLOAD */
+
+/**
+ * wlan_update_peer_phy_mode() - update phymode in peer object
+ * @des_chan: wlan_channel pointer contain new ch_freq
+ * @vdev: vdev pointer
+ *
+ * Return: QDF_STATUS_SUCCESS if peer object phymode is set otherwise
+ *         QDF_STATUS_E_INVAL
+ */
+QDF_STATUS
+wlan_update_peer_phy_mode(struct wlan_channel *des_chan,
+			  struct wlan_objmgr_vdev *vdev);
+
 #endif  /* WLAN_CM_ROAM_API_H__ */

@@ -3186,3 +3186,10 @@ wlan_cm_fw_to_host_phymode(WMI_HOST_WLAN_PHY_MODE phymode)
 	return wma_fw_to_host_phymode(phymode);
 }
 #endif
+
+QDF_STATUS
+wlan_update_peer_phy_mode(struct wlan_channel *des_chan,
+			  struct wlan_objmgr_vdev *vdev)
+{
+	return wma_update_bss_peer_phy_mode(des_chan, vdev);
+}

@@ -26592,6 +26592,10 @@ static int __wlan_hdd_cfg80211_get_channel(struct wiphy *wiphy,
 	uint32_t chan_freq;
 	struct wlan_hdd_link_info *link_info;
 	uint8_t vdev_id;
+	enum phy_ch_width ch_width;
+	enum wlan_phymode peer_phymode;
+	struct hdd_station_ctx *sta_ctx;
+	struct ch_params ch_params = {0};
 
 	hdd_enter_dev(wdev->netdev);
 
@@ -26604,7 +26608,6 @@ static int __wlan_hdd_cfg80211_get_channel(struct wiphy *wiphy,
 
 	if ((adapter->device_mode == QDF_STA_MODE) ||
 	    (adapter->device_mode == QDF_P2P_CLIENT_MODE)) {
-		struct hdd_station_ctx *sta_ctx;
 
 		if (!hdd_cm_is_vdev_associated(adapter->deflink))
 			return -EINVAL;
@@ -26658,7 +26661,25 @@ static int __wlan_hdd_cfg80211_get_channel(struct wiphy *wiphy,
 	chandef->center_freq2 = 0;
 	chandef->chan = ieee80211_get_channel(wiphy, chan_freq);
 
-	switch (vdev->vdev_mlme.des_chan->ch_width) {
+	ch_width = vdev->vdev_mlme.des_chan->ch_width;
+	if (adapter->device_mode == QDF_STA_MODE ||
+	    adapter->device_mode == QDF_P2P_CLIENT_MODE) {
+		/* For STA/P2P CLI get the peer pymode as, in some IOT
+		 * cases VDEV BW will not be same as peer BW
+		 */
+		mlme_get_peer_phymode(hdd_ctx->psoc,
+				      sta_ctx->conn_info.bssid.bytes,
+				      &peer_phymode);
+		ch_width = wlan_mlme_get_ch_width_from_phymode(peer_phymode);
+	}
+
+	ch_params.ch_width = ch_width;
+	wlan_reg_set_channel_params_for_pwrmode(hdd_ctx->pdev,
+						chan_freq, 0, &ch_params,
+						REG_CURRENT_PWR_MODE);
+	chandef->center_freq1 = ch_params.mhz_freq_seg0;
+
+	switch (ch_width) {
 	case CH_WIDTH_20MHZ:
 		if (is_legacy_phymode)
 			chandef->width = NL80211_CHAN_WIDTH_20_NOHT;

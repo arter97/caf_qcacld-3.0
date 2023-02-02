@@ -1215,6 +1215,35 @@ void wlan_mlme_set_usr_disable_sta_eht(struct wlan_objmgr_psoc *psoc,
 	mlme_obj->cfg.sta.usr_disable_eht = disable;
 }
 
+enum phy_ch_width wlan_mlme_get_max_bw(void)
+{
+	uint32_t max_bw = wma_get_eht_ch_width();
+
+	if (max_bw == WNI_CFG_EHT_CHANNEL_WIDTH_320MHZ)
+		return CH_WIDTH_320MHZ;
+	else if (max_bw == WNI_CFG_VHT_CHANNEL_WIDTH_160MHZ)
+		return CH_WIDTH_160MHZ;
+	else if (max_bw == WNI_CFG_VHT_CHANNEL_WIDTH_80_PLUS_80MHZ)
+		return CH_WIDTH_80P80MHZ;
+	else if (max_bw == WNI_CFG_VHT_CHANNEL_WIDTH_80MHZ)
+		return CH_WIDTH_80MHZ;
+	else
+		return CH_WIDTH_40MHZ;
+}
+#else
+enum phy_ch_width wlan_mlme_get_max_bw(void)
+{
+	uint32_t max_bw = wma_get_vht_ch_width();
+
+	if (max_bw == WNI_CFG_VHT_CHANNEL_WIDTH_160MHZ)
+		return CH_WIDTH_160MHZ;
+	else if (max_bw == WNI_CFG_VHT_CHANNEL_WIDTH_80_PLUS_80MHZ)
+		return CH_WIDTH_80P80MHZ;
+	else if (max_bw == WNI_CFG_VHT_CHANNEL_WIDTH_80MHZ)
+		return CH_WIDTH_80MHZ;
+	else
+		return CH_WIDTH_40MHZ;
+}
 #endif
 
 #ifdef WLAN_FEATURE_11BE_MLO
@@ -6750,6 +6779,7 @@ static QDF_STATUS wlan_mlme_update_ch_width(struct wlan_objmgr_vdev *vdev,
 	uint16_t curr_op_freq;
 	struct ch_params ch_params = {0};
 	struct wlan_objmgr_pdev *pdev;
+	QDF_STATUS status;
 
 	des_chan = wlan_vdev_mlme_get_des_chan(vdev);
 	if (!des_chan)
@@ -6777,6 +6807,12 @@ static QDF_STATUS wlan_mlme_update_ch_width(struct wlan_objmgr_vdev *vdev,
 	des_chan->ch_freq_seg2 = ch_params.center_freq_seg1;
 	des_chan->ch_cfreq1 = ch_params.mhz_freq_seg0;
 	des_chan->ch_cfreq2 = ch_params.mhz_freq_seg1;
+
+	status = wlan_update_peer_phy_mode(des_chan, vdev);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		mlme_err("Failed to update phymode");
+		return QDF_STATUS_E_INVAL;
+	}
 
 	qdf_mem_copy(bss_chan, des_chan, sizeof(struct wlan_channel));
 
