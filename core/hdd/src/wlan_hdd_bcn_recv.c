@@ -131,6 +131,8 @@ static QDF_STATUS hdd_send_bcn_recv_info(hdd_handle_t hdd_handle,
 	uint32_t data_len;
 	int flags = cds_get_gfp_flags();
 	struct hdd_adapter *adapter;
+	enum qca_nl80211_vendor_subcmds_index index =
+		QCA_NL80211_VENDOR_SUBCMD_BEACON_REPORTING_INDEX;
 
 	if (wlan_hdd_validate_context(hdd_ctx))
 		return QDF_STATUS_E_FAILURE;
@@ -141,14 +143,12 @@ static QDF_STATUS hdd_send_bcn_recv_info(hdd_handle_t hdd_handle,
 	if (hdd_validate_adapter(adapter))
 		return QDF_STATUS_E_FAILURE;
 
-	vendor_event =
-		cfg80211_vendor_event_alloc(
-			hdd_ctx->wiphy, &(adapter->wdev),
-			data_len,
-			QCA_NL80211_VENDOR_SUBCMD_BEACON_REPORTING_INDEX,
-			flags);
+	vendor_event = wlan_cfg80211_vendor_event_alloc(hdd_ctx->wiphy,
+							&adapter->wdev,
+							data_len,
+							index, flags);
 	if (!vendor_event) {
-		hdd_err("cfg80211_vendor_event_alloc failed");
+		hdd_err("wlan_cfg80211_vendor_event_alloc failed");
 		return QDF_STATUS_E_FAILURE;
 	}
 
@@ -171,11 +171,11 @@ static QDF_STATUS hdd_send_bcn_recv_info(hdd_handle_t hdd_handle,
 	    wlan_cfg80211_nla_put_u64(vendor_event, BOOTTIME,
 				      beacon_report->boot_time)) {
 		hdd_err("QCA_WLAN_VENDOR_ATTR put fail");
-		kfree_skb(vendor_event);
+		wlan_cfg80211_vendor_free_skb(vendor_event);
 		return QDF_STATUS_E_FAILURE;
 	}
 
-	cfg80211_vendor_event(vendor_event, flags);
+	wlan_cfg80211_vendor_event(vendor_event, flags);
 	return QDF_STATUS_SUCCESS;
 }
 
@@ -453,13 +453,13 @@ void hdd_beacon_recv_pause_indication(hdd_handle_t hdd_handle,
 	flags = cds_get_gfp_flags();
 
 	vendor_event =
-		cfg80211_vendor_event_alloc(
+		wlan_cfg80211_vendor_event_alloc(
 			hdd_ctx->wiphy, &(adapter->wdev),
 			data_len,
 			QCA_NL80211_VENDOR_SUBCMD_BEACON_REPORTING_INDEX,
 			flags);
 	if (!vendor_event) {
-		hdd_err("cfg80211_vendor_event_alloc failed");
+		hdd_err("wlan_cfg80211_vendor_event_alloc failed");
 		return;
 	}
 
@@ -509,7 +509,7 @@ void hdd_beacon_recv_pause_indication(hdd_handle_t hdd_handle,
 			QCA_WLAN_VENDOR_ATTR_BEACON_REPORTING_PAUSE_REASON,
 			abort_reason)) {
 		hdd_err("QCA_WLAN_VENDOR_ATTR put fail");
-		kfree_skb(vendor_event);
+		wlan_cfg80211_vendor_free_skb(vendor_event);
 		return;
 	}
 
@@ -527,11 +527,11 @@ void hdd_beacon_recv_pause_indication(hdd_handle_t hdd_handle,
 		if (nla_put_flag(vendor_event,
 			QCA_WLAN_VENDOR_ATTR_BEACON_REPORTING_AUTO_RESUMES)) {
 			hdd_err("QCA_WLAN_VENDOR_ATTR put fail");
-			kfree_skb(vendor_event);
+			wlan_cfg80211_vendor_free_skb(vendor_event);
 			return;
 		}
 
-	cfg80211_vendor_event(vendor_event, flags);
+	wlan_cfg80211_vendor_event(vendor_event, flags);
 }
 
 int wlan_hdd_cfg80211_bcn_rcv_op(struct wiphy *wiphy,

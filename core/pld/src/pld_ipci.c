@@ -638,6 +638,8 @@ int pld_ipci_get_soc_info(struct device *dev, struct pld_soc_info *info)
 	info->fw_version = icnss_info.fw_version;
 	strlcpy(info->fw_build_timestamp, icnss_info.fw_build_timestamp,
 		sizeof(info->fw_build_timestamp));
+	strlcpy(info->fw_build_id, icnss_info.fw_build_id,
+		sizeof(info->fw_build_id));
 
 	return 0;
 }

@@ -407,6 +407,30 @@ QDF_STATUS sme_vdev_post_vdev_create_setup(mac_handle_t mac_handle,
 					   struct wlan_objmgr_vdev *vdev);
 
 /**
+ * sme_send_multi_pdev_vdev_set_params() - setup lower layers for the new vdev
+ * @param_type: enum of type mlme_dev_setparam
+ * @dev_id: stores device(pdev/vdev) id
+ * @param: points to an array of @n_params
+ * @n_params: stores number params that we are sending together with @param
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+sme_send_multi_pdev_vdev_set_params(enum mlme_dev_setparam param_type,
+				    uint8_t dev_id,
+				    struct dev_set_param *param,
+				    uint8_t n_params);
+
+/**
+ * sme_validate_txrx_chain_mask() - validates txrx chain mask
+ * @paramid: Rx/Tx chain mask param id
+ * @paramvalue: param value
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+sme_validate_txrx_chain_mask(uint32_t paramid, uint32_t paramvalue);
+
+/**
  * sme_vdev_set_data_tx_callback() - Set dp vdev tx callback
  * @vdev: Object manager vdev
  *

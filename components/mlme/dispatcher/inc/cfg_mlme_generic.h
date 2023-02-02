@@ -42,7 +42,7 @@ enum monitor_mode_concurrency {
 };
 
 /**
- * enum wds_mode_type: wds mode
+ * enum wlan_wds_mode - wds mode
  * @WLAN_WDS_MODE_DISABLED: WDS is disabled
  * @WLAN_WDS_MODE_REPEATER: WDS repeater mode
  * @WLAN_WDS_MODE_LAST: last value in enum
@@ -57,13 +57,14 @@ enum wlan_wds_mode {
 	WLAN_WDS_MODE_MAX = WLAN_WDS_MODE_LAST - 1,
 };
 
-/* debug_packet_log_type: Debug packet log type
- * DEBUG_PKTLOG_TYPE_NONE: Debug packet log is disabled
- * DEBUG_PKTLOG_TYPE_MGMT: Management frames logging is enabled.
- * DEBUG_PKTLOG_TYPE_EAPOL: EAPOL packets logging is enabled.
- * DEBUG_PKTLOG_TYPE_DHCP: DHCP packets logging is enabled.
- * DEBUG_PKTLOG_TYPE_ACTION: Action frames logging is enabled.
- * DEBUG_PKTLOG_TYPE_ARP: ARP packets logging is enabled.
+/**
+ * enum debug_packet_log_type - Debug packet log type
+ * @DEBUG_PKTLOG_TYPE_NONE: Debug packet log is disabled
+ * @DEBUG_PKTLOG_TYPE_MGMT: Management frames logging is enabled.
+ * @DEBUG_PKTLOG_TYPE_EAPOL: EAPOL packets logging is enabled.
+ * @DEBUG_PKTLOG_TYPE_DHCP: DHCP packets logging is enabled.
+ * @DEBUG_PKTLOG_TYPE_ACTION: Action frames logging is enabled.
+ * @DEBUG_PKTLOG_TYPE_ARP: ARP packets logging is enabled.
  */
 enum debug_packet_log_type {
 	DEBUG_PKTLOG_TYPE_NONE   = 0x0,
@@ -223,7 +224,7 @@ enum t2lm_negotiation_support {
 		"rf test mode Enable Flag")
 
 #ifdef CONFIG_BAND_6GHZ
-/**
+/*
  * relaxed_6ghz_conn_policy - Enable 6ghz relaxed connection policy
  * @Min: 0
  * @Max: 1

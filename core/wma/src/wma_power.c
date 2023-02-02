@@ -307,7 +307,7 @@ void wma_set_tx_power(WMA_HANDLE handle,
 		/* tx_power changed, Push the tx_power to FW */
 		wma_nofl_debug("TXP[W][set_tx_pwr]: %d", tx_pwr_params->power);
 		ret = wma_vdev_set_param(wma_handle->wmi_handle, vdev_id,
-					 WMI_VDEV_PARAM_TX_PWRLIMIT,
+					 wmi_vdev_param_tx_pwrlimit,
 					 tx_pwr_params->power);
 		if (ret == QDF_STATUS_SUCCESS)
 			mlme_set_tx_power(iface->vdev, tx_pwr_params->power);
@@ -318,7 +318,7 @@ void wma_set_tx_power(WMA_HANDLE handle,
 end:
 	qdf_mem_free(tx_pwr_params);
 	if (QDF_IS_STATUS_ERROR(ret))
-		wma_err("Failed to set vdev param WMI_VDEV_PARAM_TX_PWRLIMIT");
+		wma_err("Failed to set vdev param wmi_vdev_param_tx_pwrlimit");
 }
 
 /**
@@ -374,7 +374,7 @@ void wma_set_max_tx_power(WMA_HANDLE handle,
 	}
 	wma_nofl_debug("TXP[W][set_max_pwr_req]: %d", max_reg_power);
 	ret = wma_vdev_set_param(wma_handle->wmi_handle, vdev_id,
-				WMI_VDEV_PARAM_TX_PWRLIMIT,
+				wmi_vdev_param_tx_pwrlimit,
 				max_reg_power);
 	if (ret == QDF_STATUS_SUCCESS)
 		mlme_set_tx_power(iface->vdev, max_reg_power);
@@ -383,7 +383,7 @@ void wma_set_max_tx_power(WMA_HANDLE handle,
 end:
 	qdf_mem_free(tx_pwr_params);
 	if (QDF_IS_STATUS_ERROR(ret))
-		wma_err("Failed to set vdev param WMI_VDEV_PARAM_TX_PWRLIMIT");
+		wma_err("Failed to set vdev param wmi_vdev_param_tx_pwrlimit");
 }
 
 /**
@@ -587,7 +587,7 @@ static QDF_STATUS wma_set_force_sleep(tp_wma_handle wma,
 	/* Set Listen Interval */
 	cfg_data_val = mac->mlme_cfg->sap_cfg.listen_interval;
 	ret = wma_vdev_set_param(wma->wmi_handle, vdev_id,
-					      WMI_VDEV_PARAM_LISTEN_INTERVAL,
+					      wmi_vdev_param_listen_interval,
 					      cfg_data_val);
 	if (QDF_IS_STATUS_ERROR(ret)) {
 		/* Even it fails continue Fw will take default LI */
@@ -1073,6 +1073,12 @@ int wma_pdev_temperature_evt_handler(void *handle, uint8_t *event,
 	return 0;
 }
 
+#define MAX_PDEV_TXPOWER_PARAMS 2
+/* params being sent:
+ * wmi_pdev_param_txpower_limit2g
+ * wmi_pdev_param_txpower_limit5g
+ */
+
 /**
  * wma_process_tx_power_limits() - sends the power limits for 2g/5g to firmware
  * @handle: wma handle
@@ -1087,8 +1093,9 @@ QDF_STATUS wma_process_tx_power_limits(WMA_HANDLE handle,
 	int32_t ret = 0;
 	uint32_t txpower_params2g = 0;
 	uint32_t txpower_params5g = 0;
-	struct pdev_params pdevparam = {};
 	struct wmi_unified *wmi_handle;
+	struct dev_set_param setparam[MAX_PDEV_TXPOWER_PARAMS] = {};
+	uint8_t index = 0;
 
 	if (wma_validate_handle(wma))
 		return QDF_STATUS_E_INVAL;
@@ -1100,35 +1107,38 @@ QDF_STATUS wma_process_tx_power_limits(WMA_HANDLE handle,
 	/* Set value and reason code for 2g and 5g power limit */
 
 	SET_PDEV_PARAM_TXPOWER_REASON(txpower_params2g,
-				      WMI_PDEV_PARAM_TXPOWER_REASON_SAR);
+				      wmi_pdev_param_txpower_reason_sar);
 	SET_PDEV_PARAM_TXPOWER_VALUE(txpower_params2g, ptxlim->txPower2g);
 
 	SET_PDEV_PARAM_TXPOWER_REASON(txpower_params5g,
-				      WMI_PDEV_PARAM_TXPOWER_REASON_SAR);
+				      wmi_pdev_param_txpower_reason_sar);
 	SET_PDEV_PARAM_TXPOWER_VALUE(txpower_params5g, ptxlim->txPower5g);
 
 	wma_debug("txpower2g: %x txpower5g: %x",
 		 txpower_params2g, txpower_params5g);
-
-	pdevparam.param_id = WMI_PDEV_PARAM_TXPOWER_LIMIT2G;
-	pdevparam.param_value = txpower_params2g;
-	ret = wmi_unified_pdev_param_send(wmi_handle,
-					 &pdevparam,
-					 WMA_WILDCARD_PDEV_ID);
-	if (ret) {
-		wma_err("Failed to set txpower 2g (%d)", ret);
-		return QDF_STATUS_E_FAILURE;
+	ret = mlme_check_index_setparam(setparam,
+					wmi_pdev_param_txpower_limit2g,
+					txpower_params2g, index++,
+					MAX_PDEV_TXPOWER_PARAMS);
+	if (QDF_IS_STATUS_ERROR(ret)) {
+		wma_err("failed at wmi_pdev_param_txpower_limit2g");
+		goto error;
 	}
-	pdevparam.param_id = WMI_PDEV_PARAM_TXPOWER_LIMIT5G;
-	pdevparam.param_value = txpower_params5g;
-	ret = wmi_unified_pdev_param_send(wmi_handle,
-					 &pdevparam,
-					 WMA_WILDCARD_PDEV_ID);
-	if (ret) {
-		wma_err("Failed to set txpower 5g (%d)", ret);
-		return QDF_STATUS_E_FAILURE;
+	ret = mlme_check_index_setparam(setparam,
+					wmi_pdev_param_txpower_limit5g,
+					txpower_params5g, index++,
+					MAX_PDEV_TXPOWER_PARAMS);
+	if (QDF_IS_STATUS_ERROR(ret)) {
+		wma_err("failed at wmi_pdev_param_txpower_limit5g");
+		goto error;
 	}
-	return QDF_STATUS_SUCCESS;
+	ret = wma_send_multi_pdev_vdev_set_params(MLME_PDEV_SETPARAM,
+						  WMI_PDEV_ID_SOC, setparam,
+						  index);
+	if (QDF_IS_STATUS_ERROR(ret))
+		wma_err("failed to send tx power pdev set params");
+error:
+	return ret;
 }
 
 #ifdef WLAN_WMI_BCN
@@ -1395,7 +1405,7 @@ void wma_process_set_mimops_req(tp_wma_handle wma_handle,
 		 QDF_MAC_ADDR_REF(mimops->peerMac));
 
 	wma_set_peer_param(wma_handle, mimops->peerMac,
-			   WMI_PEER_MIMO_PS_STATE, mimops->htMIMOPSState,
+			   WMI_HOST_PEER_MIMO_PS_STATE, mimops->htMIMOPSState,
 			   mimops->sessionId);
 }
 
@@ -1461,7 +1471,7 @@ QDF_STATUS wma_set_idle_ps_config(void *wma_ptr, uint32_t idle_ps)
 	wma_debug("WMA Set Idle Ps Config [1:set 0:clear] val %d", idle_ps);
 
 	/* Set Idle Mode Power Save Config */
-	pdevparam.param_id = WMI_PDEV_PARAM_IDLE_PS_CONFIG;
+	pdevparam.param_id = wmi_pdev_param_idle_ps_config;
 	pdevparam.param_value = idle_ps;
 	ret = wmi_unified_pdev_param_send(wma->wmi_handle,
 					 &pdevparam,
@@ -1525,7 +1535,7 @@ QDF_STATUS wma_set_tx_power_scale(uint8_t vdev_id, int value)
 	}
 
 	ret = wma_vdev_set_param(wma_handle->wmi_handle, vdev_id,
-				WMI_VDEV_PARAM_TXPOWER_SCALE, value);
+				 wmi_vdev_param_txpower_scale, value);
 	if (QDF_IS_STATUS_ERROR(ret))
 		wma_err("Set tx power scale failed");
 
@@ -1553,7 +1563,7 @@ QDF_STATUS wma_set_tx_power_scale_decr_db(uint8_t vdev_id, int value)
 	}
 
 	ret = wma_vdev_set_param(wma_handle->wmi_handle, vdev_id,
-				WMI_VDEV_PARAM_TXPOWER_SCALE_DECR_DB, value);
+				 wmi_vdev_param_txpower_scale_decr_db, value);
 	if (QDF_IS_STATUS_ERROR(ret))
 		wma_err("Decrease tx power value failed");
 

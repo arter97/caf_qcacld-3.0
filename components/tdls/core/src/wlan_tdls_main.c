@@ -480,7 +480,7 @@ static void tdls_get_all_peers_from_list(
 
 /**
  * tdls_process_reset_all_peers() - Reset all tdls peers
- * @delete_all_peers_ind: Delete all peers indication
+ * @vdev: vdev object
  *
  * This function is called to reset all tdls peers and
  * notify upper layers of teardown inidcation
@@ -715,8 +715,8 @@ void tdls_timer_restart(struct wlan_objmgr_vdev *vdev,
 }
 
 /**
- * wlan_hdd_tdls_monitor_timers_stop() - stop all monitoring timers
- * @hdd_tdls_ctx: TDLS context
+ * tdls_monitor_timers_stop() - stop all monitoring timers
+ * @tdls_vdev: TDLS vdev object
  *
  * Return: none
  */
@@ -758,7 +758,7 @@ static void tdls_peer_idle_timers_stop(struct tdls_vdev_priv_obj *tdls_vdev)
 }
 
 /**
- * wlan_hdd_tdls_ct_timers_stop() - stop tdls connection tracker timers
+ * tdls_ct_timers_stop() - stop tdls connection tracker timers
  * @tdls_vdev: TDLS vdev
  *
  * Return: None
@@ -770,7 +770,7 @@ static void tdls_ct_timers_stop(struct tdls_vdev_priv_obj *tdls_vdev)
 }
 
 /**
- * wlan_hdd_tdls_timers_stop() - stop all the tdls timers running
+ * tdls_timers_stop() - stop all the tdls timers running
  * @tdls_vdev: TDLS vdev
  *
  * Return: none
@@ -985,8 +985,8 @@ bool tdls_check_is_tdls_allowed(struct wlan_objmgr_vdev *vdev)
 }
 
 /**
- * cds_set_tdls_ct_mode() - Set the tdls connection tracker mode
- * @hdd_ctx: hdd context
+ * tdls_set_ct_mode() - Set the tdls connection tracker mode
+ * @psoc: psoc context
  *
  * This routine is called to set the tdls connection tracker operation status
  *
@@ -1167,7 +1167,7 @@ static QDF_STATUS tdls_post_msg_flush_cb(struct scheduler_msg *msg)
 /**
  * tdls_process_session_update() - update session count information
  * @psoc: soc object
- * @notification: TDLS os if notification
+ * @cmd_type: type of command
  *
  * update the session information in connection tracker
  *
@@ -1780,8 +1780,8 @@ release_mode_ref:
 }
 
 /**
- * wlan_hdd_tdls_scan_done_callback() - callback for tdls scan done event
- * @pAdapter: HDD adapter
+ * tdls_scan_done_callback() - callback for tdls scan done event
+ * @tdls_soc: tdls soc object
  *
  * Return: Void
  */

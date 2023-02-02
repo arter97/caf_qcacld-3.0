@@ -2910,16 +2910,18 @@ int wma_unified_link_iface_stats_event_handler(void *handle,
 		iface_link_stats->rssi_data += WMA_TGT_NOISE_FLOOR_DBM;
 		iface_link_stats->rssi_ack += WMA_TGT_NOISE_FLOOR_DBM;
 	}
-	wma_debug("db2dbm: %d, rssi_mgmt: %d, rssi_data: %d, rssi_ack: %d, beacon_rx %u",
-		  db2dbm_enabled, iface_link_stats->rssi_mgmt,
-		  iface_link_stats->rssi_data, iface_link_stats->rssi_ack,
-		  iface_link_stats->beacon_rx);
 
 	/* Copy roaming state */
 	iface_stat->info.roaming = link_stats->roam_state;
 	/* Copy time slicing duty cycle */
 	iface_stat->info.time_slice_duty_cycle =
 		link_stats->time_slice_duty_cycle;
+
+	wma_debug("db2dbm: %d, rssi_mgmt: %d, rssi_data: %d, rssi_ack: %d, beacon_rx %u, time_slice_duty_cycle %u",
+		  db2dbm_enabled, iface_link_stats->rssi_mgmt,
+		  iface_link_stats->rssi_data, iface_link_stats->rssi_ack,
+		  iface_link_stats->beacon_rx,
+		  iface_stat->info.time_slice_duty_cycle);
 
 	iface_ac_stats = &iface_stat->ac_stats[0];
 	for (count = 0; count < link_stats->num_ac; count++) {
@@ -4696,7 +4698,7 @@ QDF_STATUS wma_mon_mlme_vdev_start_continue(struct vdev_mlme_obj *vdev_mlme,
 
 	/* Cancel periodic pdev stats update if running for other mac */
 	status = wma_cli_set_command(vdev_mlme->vdev->vdev_objmgr.vdev_id,
-				     WMI_PDEV_PARAM_PDEV_STATS_UPDATE_PERIOD,
+				     wmi_pdev_param_pdev_stats_update_period,
 				     0, PDEV_CMD);
 	if (status != QDF_STATUS_SUCCESS)
 		pe_err("failed to clear fw stats request = %d", status);
@@ -4711,7 +4713,7 @@ QDF_STATUS wma_mon_mlme_vdev_start_continue(struct vdev_mlme_obj *vdev_mlme,
 		pe_err("failed to send fw stats request = %d", status);
 
 	status = wma_cli_set2_command(vdev_mlme->vdev->vdev_objmgr.vdev_id,
-				      WMI_PDEV_PARAM_PDEV_STATS_UPDATE_PERIOD,
+				      wmi_pdev_param_pdev_stats_update_period,
 				      interval * 2000, pdev, PDEV_CMD);
 	if (status != QDF_STATUS_SUCCESS)
 		pe_err("failed to send fw stats request = %d", status);

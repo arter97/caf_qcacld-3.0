@@ -245,7 +245,7 @@ struct noa_descriptor {
  * @opps_ps:           opps ps state of the AP
  * @ct_window:         ct window in TUs
  * @vdev_id:           vdev id
- * @num_descriptors:   number of NOA descriptors
+ * @num_desc:          number of NOA descriptors
  * @noa_desc:          noa descriptors
  */
 struct p2p_noa_info {
@@ -267,7 +267,7 @@ struct p2p_protocol_callbacks {
 
 /**
  * enum p2p_attr_id - enum for P2P attributes ID in P2P IE
- * @P2P_ATTR_STATUS - Attribute Status none
+ * @P2P_ATTR_STATUS: Attribute Status none
  * @P2P_ATTR_MINOR_REASON_CODE: Minor reason code attribute
  * @P2P_ATTR_CAPABILITY: Capability attribute
  * @P2P_ATTR_DEVICE_ID: device ID attribute
@@ -289,13 +289,13 @@ struct p2p_protocol_callbacks {
  * @P2P_ATTR_OOB_GO_NEG_CHANNEL: GO neg channel attribute
  * @P2P_ATTR_SERVICE_HASH: Service HASH attribute
  * @P2P_ATTR_SESSION_INFORMATION_DATA: Session Info data attribute
- * @P2P_ATTR_CONNECTION_CAPABILITY = Connection capability attribute
- * @P2P_ATTR_ADVERTISEMENT_ID = Advertisement ID attribute
- * @P2P_ATTR_ADVERTISED_SERVICE = Advertised Service attribute
- * @P2P_ATTR_SESSION_ID = Session ID attribute
- * @P2P_ATTR_FEATURE_CAPABILITY = Feature capability attribute
- * @P2P_ATTR_PERSISTENT_GROUP -Persistent group attribute
- * @P2P_ATTR_VENDOR_SPECIFIC - Vendor specific attribute
+ * @P2P_ATTR_CONNECTION_CAPABILITY: Connection capability attribute
+ * @P2P_ATTR_ADVERTISEMENT_ID: Advertisement ID attribute
+ * @P2P_ATTR_ADVERTISED_SERVICE: Advertised Service attribute
+ * @P2P_ATTR_SESSION_ID: Session ID attribute
+ * @P2P_ATTR_FEATURE_CAPABILITY: Feature capability attribute
+ * @P2P_ATTR_PERSISTENT_GROUP: Persistent group attribute
+ * @P2P_ATTR_VENDOR_SPECIFIC: Vendor specific attribute
  */
 enum p2p_attr_id {
 	P2P_ATTR_STATUS = 0,

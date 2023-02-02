@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -230,10 +230,16 @@ void lim_process_mlm_start_cnf(struct mac_context *mac, uint32_t *msg_buf)
 		if (!LIM_IS_AP_ROLE(pe_session))
 			return;
 		if (pe_session->ch_width == CH_WIDTH_160MHZ) {
-			if (wlan_reg_get_bonded_channel_state_for_freq(
-					mac->pdev, chan_freq,
-					pe_session->ch_width, 0) !=
-					CHANNEL_STATE_DFS)
+			struct ch_params ch_params = {0};
+
+			if (IS_DOT11_MODE_EHT(pe_session->dot11mode))
+				wlan_reg_set_create_punc_bitmap(&ch_params, true);
+			ch_params.ch_width = pe_session->ch_width;
+			if (wlan_reg_get_5g_bonded_channel_state_for_pwrmode(mac->pdev,
+									     chan_freq,
+									     &ch_params,
+									     REG_CURRENT_PWR_MODE)  !=
+			    CHANNEL_STATE_DFS)
 				send_bcon_ind = true;
 		} else if (pe_session->ch_width == CH_WIDTH_80P80MHZ) {
 			if ((wlan_reg_get_channel_state_for_pwrmode(
@@ -2827,8 +2833,6 @@ lim_process_switch_channel_join_mlo(struct pe_session *session_entry,
 			assoc_cnf.sessionId = session_entry->peSessionId;
 			lim_post_sme_message(mac_ctx, LIM_MLM_ASSOC_CNF,
 					(uint32_t *)&assoc_cnf);
-
-			session_entry->limMlmState = eLIM_MLM_IDLE_STATE;
 			qdf_mem_free(link_assoc_rsp.ptr);
 		}
 	}

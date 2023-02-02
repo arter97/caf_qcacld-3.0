@@ -399,7 +399,7 @@ pkt_capture_process_tx_data(void *soc, void *log_data, u_int16_t vdev_id,
 
 /**
  * pkt_capture_is_frame_filter_set() - Check frame filter is set
- * @nbuf: buffer address
+ * @buf: buffer address
  * @frame_filter: frame filter address
  * @direction: frame direction
  *

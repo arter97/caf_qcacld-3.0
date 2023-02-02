@@ -346,9 +346,8 @@ QDF_STATUS mlme_set_tx_power(struct wlan_objmgr_vdev *vdev,
 /**
  * mlme_get_tx_power() - get tx power
  * @vdev: vdev pointer
- * @tx_power: tx power info
  *
- * Return: None
+ * Return: current tx power
  */
 int8_t mlme_get_tx_power(struct wlan_objmgr_vdev *vdev);
 
@@ -363,7 +362,7 @@ int8_t mlme_get_max_reg_power(struct wlan_objmgr_vdev *vdev);
 /**
  * mlme_set_max_reg_power() - set max reg power
  * @vdev: vdev pointer
- * @max_tx_power: max tx power to be set
+ * @max_reg_power: max regulatory power to be set
  *
  * Return: QDF_STATUS
  */
@@ -478,10 +477,11 @@ QDF_STATUS mlme_vdev_self_peer_create(struct wlan_objmgr_vdev *vdev);
 QDF_STATUS mlme_vdev_self_peer_delete(struct scheduler_msg *self_peer_del_msg);
 
 /**
- * mlme_vdev_uses_self_peer() - send vdev del resp to Upper layer
- * @vdev_type: params of del vdev response
+ * mlme_vdev_uses_self_peer() - does vdev use self peer?
+ * @vdev_type: vdev type
+ * @vdev_subtype: vdev subtype
  *
- * Return: boolean
+ * Return: true if the vdev type/subtype uses the self peer
  */
 bool mlme_vdev_uses_self_peer(uint32_t vdev_type, uint32_t vdev_subtype);
 

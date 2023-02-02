@@ -248,6 +248,17 @@ inline bool wma_is_eht_phymode_supported(enum wlan_phymode bss_phymode)
 {
 	return IS_WLAN_PHYMODE_EHT(bss_phymode);
 }
+
+/**
+ * wma_set_eht_txbf_vdev_params() - set EHT Tx beamforming params to FW
+ * @mac: mac context
+ * @mode: mode address to access mode value
+ *
+ * Return: success
+ */
+QDF_STATUS
+wma_set_eht_txbf_vdev_params(struct mac_context *mac, uint32_t *mode);
+
 #else
 static inline void wma_eht_update_tgt_services(struct wmi_unified *wmi_handle,
 					       struct wma_tgt_services *cfg)
@@ -348,6 +359,12 @@ bool wma_get_bss_eht_capable(struct bss_params *add_bss)
 static inline bool wma_is_eht_phymode_supported(enum wlan_phymode bss_phymode)
 {
 	return false;
+}
+
+static inline
+QDF_STATUS wma_set_eht_txbf_vdev_params(struct mac_context *mac, uint32_t *mode)
+{
+	return QDF_STATUS_E_NOSUPPORT;
 }
 #endif
 #endif

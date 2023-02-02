@@ -565,6 +565,28 @@ static QDF_STATUS target_if_cm_roam_scan_offload_mode(
 						      rso_mode_cfg);
 }
 
+static
+QDF_STATUS target_if_check_index_setparam(struct dev_set_param *param,
+					  uint32_t paramid,
+					  uint32_t paramvalue,
+					  uint8_t index, uint8_t n_params)
+{
+	if (index >= n_params) {
+		target_if_err("Index:%d OOB to fill param", index);
+		return QDF_STATUS_E_FAILURE;
+	}
+	param[index].param_id = paramid;
+	param[index].param_value = paramvalue;
+	return QDF_STATUS_SUCCESS;
+}
+
+#define MAX_PARAMS_CM_ROAM_SCAN_BMISS 2
+/*
+ * params being sent:
+ * wmi_vdev_param_bmiss_first_bcnt
+ * wmi_vdev_param_bmiss_final_bcnt
+ */
+
 /**
  * target_if_cm_roam_scan_bmiss_cnt() - set bmiss count to fw
  * @wmi_handle: wmi handle
@@ -579,37 +601,50 @@ target_if_cm_roam_scan_bmiss_cnt(wmi_unified_t wmi_handle,
 				 struct wlan_roam_beacon_miss_cnt *req)
 {
 	QDF_STATUS status;
-	uint32_t vdev_id;
-	uint8_t first_bcnt;
-	uint8_t final_bcnt;
+	struct dev_set_param setparam[MAX_PARAMS_CM_ROAM_SCAN_BMISS];
+	struct set_multiple_pdev_vdev_param params = {};
+	uint8_t index = 0;
 
-	vdev_id = req->vdev_id;
-	first_bcnt = req->roam_bmiss_first_bcnt;
-	final_bcnt = req->roam_bmiss_final_bcnt;
+	target_if_debug("vdev_id:%d, first_bcnt: %d, final_bcnt: %d",
+			req->vdev_id, req->roam_bmiss_first_bcnt,
+			req->roam_bmiss_final_bcnt);
 
-	target_if_debug("vdev_id %d first_bcnt: %d, final_bcnt: %d", vdev_id,
-			first_bcnt, final_bcnt);
+	status = target_if_check_index_setparam(
+					   setparam,
+					   wmi_vdev_param_bmiss_first_bcnt,
+					   req->roam_bmiss_first_bcnt,
+					   index++,
+					   MAX_PARAMS_CM_ROAM_SCAN_BMISS);
+	if (QDF_IS_STATUS_ERROR(status))
+		goto error;
 
-	status = target_if_vdev_set_param(wmi_handle, vdev_id,
-					  WMI_VDEV_PARAM_BMISS_FIRST_BCNT,
-					  first_bcnt);
-	if (QDF_IS_STATUS_ERROR(status)) {
-		target_if_err("vdev set WMI_VDEV_PARAM_BMISS_FIRST_BCNT params returned error %d",
-			      status);
-		return status;
-	}
+	status = target_if_check_index_setparam(
+					   setparam,
+					   wmi_vdev_param_bmiss_final_bcnt,
+					   req->roam_bmiss_final_bcnt, index++,
+					   MAX_PARAMS_CM_ROAM_SCAN_BMISS);
+	if (QDF_IS_STATUS_ERROR(status))
+		goto error;
 
-	status = target_if_vdev_set_param(wmi_handle, vdev_id,
-					  WMI_VDEV_PARAM_BMISS_FINAL_BCNT,
-					  final_bcnt);
-	if (QDF_IS_STATUS_ERROR(status)) {
-		target_if_err("vdev set WMI_VDEV_PARAM_BMISS_FINAL_BCNT params returned error %d",
-			      status);
-		return status;
-	}
+	params.param_type = MLME_VDEV_SETPARAM;
+	params.dev_id = req->vdev_id;
+	params.n_params = index;
+	params.params = setparam;
 
+	status = wmi_unified_multiple_vdev_param_send(wmi_handle, &params);
+	if (QDF_IS_STATUS_ERROR(status))
+		target_if_err("failed to set bmiss first,final bcntset params");
+
+error:
 	return status;
 }
+
+#define MAX_PARAMS_CM_ROAM_SCAN_BMISS_TIMEOUT 2
+/*
+ * params being sent:
+ * wmi_vdev_param_bmiss_first_bcnt
+ * wmi_vdev_param_bmiss_final_bcnt
+ */
 
 /**
  * target_if_cm_roam_scan_bmiss_timeout() - set conbmiss timeout to fw
@@ -628,6 +663,9 @@ target_if_cm_roam_scan_bmiss_timeout(wmi_unified_t wmi_handle,
 	uint32_t vdev_id;
 	uint8_t bmiss_timeout_onwakeup;
 	uint8_t bmiss_timeout_onsleep;
+	struct dev_set_param setparam[MAX_PARAMS_CM_ROAM_SCAN_BMISS_TIMEOUT];
+	struct set_multiple_pdev_vdev_param params = {};
+	uint8_t index = 0;
 
 	vdev_id = req->vdev_id;
 	bmiss_timeout_onwakeup = req->bmiss_timeout_onwakeup;
@@ -635,21 +673,38 @@ target_if_cm_roam_scan_bmiss_timeout(wmi_unified_t wmi_handle,
 
 	target_if_debug("vdev_id %d bmiss_timeout_onwakeup: %dsec, bmiss_timeout_onsleep: %dsec", vdev_id,
 			bmiss_timeout_onwakeup, bmiss_timeout_onsleep);
+	status = target_if_check_index_setparam(
+					setparam,
+					wmi_vdev_param_final_bmiss_time_sec,
+					req->bmiss_timeout_onwakeup, index++,
+					MAX_PARAMS_CM_ROAM_SCAN_BMISS_TIMEOUT);
+	if (QDF_IS_STATUS_ERROR(status))
+		goto error;
 
-	status = target_if_vdev_set_param(wmi_handle, vdev_id,
-					  WMI_VDEV_PARAM_FINAL_BMISS_TIME_SEC,
-					  bmiss_timeout_onwakeup);
+	status = target_if_check_index_setparam(
+					setparam,
+					wmi_vdev_param_final_bmiss_time_wow_sec,
+					req->bmiss_timeout_onsleep, index++,
+					MAX_PARAMS_CM_ROAM_SCAN_BMISS_TIMEOUT);
+	if (QDF_IS_STATUS_ERROR(status))
+		goto error;
 
-	status = target_if_vdev_set_param(wmi_handle, vdev_id,
-					  WMI_VDEV_PARAM_FINAL_BMISS_TIME_WOW_SEC,
-					  bmiss_timeout_onsleep);
+	params.param_type = MLME_VDEV_SETPARAM;
+	params.dev_id = req->vdev_id;
+	params.n_params = index;
+	params.params = setparam;
+	status = wmi_unified_multiple_vdev_param_send(wmi_handle, &params);
+	if (QDF_IS_STATUS_ERROR(status))
+		target_if_err("failed to set bmiss first,final bcntset params");
 
+error:
 	return status;
 }
 
 #ifdef WLAN_FEATURE_ROAM_OFFLOAD
-/* target_if_cm_roam_reason_vsie(): set vdev param
- * WMI_VDEV_PARAM_ENABLE_DISABLE_ROAM_REASON_VSIE
+/**
+ * target_if_cm_roam_reason_vsie() - set vdev param
+ * wmi_vdev_param_enable_disable_roam_reason_vsie
  * @wmi_handle: handle to WMI
  * @req: roam reason vsie enable parameters
  *
@@ -664,15 +719,16 @@ target_if_cm_roam_reason_vsie(wmi_unified_t wmi_handle,
 	status = target_if_vdev_set_param(
 				wmi_handle,
 				req->vdev_id,
-				WMI_VDEV_PARAM_ENABLE_DISABLE_ROAM_REASON_VSIE,
+				wmi_vdev_param_enable_disable_roam_reason_vsie,
 				req->enable_roam_reason_vsie);
 
 	if (QDF_IS_STATUS_ERROR(status))
 		target_if_err("Failed to set vdev param %d",
-			      WMI_VDEV_PARAM_ENABLE_DISABLE_ROAM_REASON_VSIE);
+			      wmi_vdev_param_enable_disable_roam_reason_vsie);
 }
 
-/* target_if_cm_roam_triggers(): send roam triggers to WMI
+/**
+ * target_if_cm_roam_triggers() - send roam triggers to WMI
  * @vdev: vdev
  * @req: roam triggers parameters
  *
@@ -1221,14 +1277,14 @@ target_if_get_wmi_roam_offload_flag(uint32_t flag)
 
 	if (flag & WLAN_ROAM_SKIP_EAPOL_4WAY_HANDSHAKE)
 		roam_offload_flag |=
-			WMI_VDEV_PARAM_SKIP_ROAM_EAPOL_4WAY_HANDSHAKE;
+			wmi_vdev_param_skip_roam_eapol_4way_handshake;
 
 	if (flag & WLAN_ROAM_BMISS_FINAL_SCAN_TYPE)
 		roam_offload_flag |= WMI_ROAM_BMISS_FINAL_SCAN_TYPE_FLAG;
 
 	if (flag & WLAN_ROAM_SKIP_SAE_ROAM_4WAY_HANDSHAKE)
 		roam_offload_flag |=
-			WMI_VDEV_PARAM_SKIP_SAE_ROAM_4WAY_HANDSHAKE;
+				wmi_vdev_param_skip_sae_roam_4way_handshake;
 
 	return roam_offload_flag;
 }
@@ -1254,7 +1310,7 @@ target_if_cm_roam_send_roam_init(struct wlan_objmgr_vdev *vdev,
 
 	flag = target_if_get_wmi_roam_offload_flag(params->roam_offload_flag);
 	status = target_if_vdev_set_param(wmi_handle, params->vdev_id,
-					  WMI_VDEV_PARAM_ROAM_FW_OFFLOAD, flag);
+					  wmi_vdev_param_roam_fw_offload, flag);
 
 	return status;
 }
@@ -2021,11 +2077,11 @@ target_if_cm_roam_send_disable_config(struct wlan_objmgr_vdev *vdev,
 	status = target_if_vdev_set_param(
 				wmi_handle,
 				req->vdev_id,
-				WMI_VDEV_PARAM_ROAM_11KV_CTRL,
+				wmi_vdev_param_roam_11kv_ctrl,
 				req->cfg);
 
 	if (QDF_IS_STATUS_ERROR(status))
-		target_if_err("Failed to set WMI_VDEV_PARAM_ROAM_11KV_CTRL");
+		target_if_err("Failed to set wmi_vdev_param_roam_11kv_ctrl");
 
 end:
 	return status;

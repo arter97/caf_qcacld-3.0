@@ -84,8 +84,8 @@ wlan_cfg80211_send_interop_issues_ap_cb(
 
 	index = QCA_NL80211_VENDOR_SUBCMD_INTEROP_ISSUES_AP_INDEX;
 	len = nla_total_size(QDF_MAC_ADDR_SIZE + NLMSG_HDRLEN);
-	skb = cfg80211_vendor_event_alloc(os_priv->wiphy, NULL, len, index,
-					  GFP_KERNEL);
+	skb = wlan_cfg80211_vendor_event_alloc(os_priv->wiphy, NULL, len, index,
+					       GFP_KERNEL);
 	if (!skb) {
 		osif_err("skb alloc failed");
 		return;
@@ -98,11 +98,11 @@ wlan_cfg80211_send_interop_issues_ap_cb(
 		    QCA_WLAN_VENDOR_ATTR_INTEROP_ISSUES_AP_BSSID,
 		    QDF_MAC_ADDR_SIZE, data->rap_addr.bytes)) {
 		osif_err("nla put fail");
-		kfree_skb(skb);
+		wlan_cfg80211_vendor_free_skb(skb);
 		return;
 	}
 
-	cfg80211_vendor_event(skb, GFP_KERNEL);
+	wlan_cfg80211_vendor_event(skb, GFP_KERNEL);
 }
 
 static void wlan_interop_issues_ap_register_cbk(struct wlan_objmgr_pdev *pdev)
