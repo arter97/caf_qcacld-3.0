@@ -2664,7 +2664,30 @@ static void
 wlan_soc_ppe_cfg_attach(struct cdp_ctrl_objmgr_psoc *psoc,
 			struct wlan_cfg_dp_soc_ctxt *wlan_cfg_ctx)
 {
+	uint32_t ppeds_cfg;
+	uint8_t psoc_id;
+
+	/*
+	 * The CFG_DP_PPEDS_WIFI_SOC_CFG provides WLAN SoC level PPEDS
+	 * enable/disable support. The bit map position corresponds to
+	 * WLAN SoC position in config/wireless file. With this we can
+	 * configure PPEDS for multiple WLAN SoC having same device ID.
+	 */
+	psoc_id = wlan_psoc_get_id((struct wlan_objmgr_psoc *)psoc);
+	ppeds_cfg = cfg_get(psoc, CFG_DP_PPEDS_WIFI_SOC_CFG);
+	if (!(ppeds_cfg & (1 << psoc_id))) {
+		dp_info("ppeds_cfg is disabled for psoc_id  %d", psoc_id);
+		return;
+	}
+
+	/*
+	 * The CFG_DP_PPEDS_ENABLE provides ppeds enable/disable support
+	 * based on device ID in corresponding INI file.
+	 */
 	wlan_cfg_ctx->ppeds_enable = cfg_get(psoc, CFG_DP_PPEDS_ENABLE);
+	if (!wlan_cfg_ctx->ppeds_enable)
+		return;
+
 	wlan_cfg_ctx->reo2ppe_ring = cfg_get(psoc, CFG_DP_REO2PPE_RING);
 	wlan_cfg_ctx->ppe2tcl_ring = cfg_get(psoc, CFG_DP_PPE2TCL_RING);
 	wlan_cfg_ctx->ppeds_num_tx_desc = cfg_get(psoc, CFG_DP_PPEDS_TX_DESC);
