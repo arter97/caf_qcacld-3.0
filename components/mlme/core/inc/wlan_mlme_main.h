@@ -72,6 +72,7 @@
 #define mlme_legacy_info(params...) QDF_TRACE_INFO(QDF_MODULE_ID_MLME, params)
 #define mlme_legacy_debug(params...) QDF_TRACE_DEBUG(QDF_MODULE_ID_MLME, params)
 #define MAC_B_PR_SSID_OFFSET 12
+
 enum size_of_len_field {
 	ONE_BYTE = 1,
 	TWO_BYTE = 2
@@ -430,6 +431,271 @@ struct mlme_ap_config {
 };
 
 /**
+ * struct roam_trigger_per - per roam trigger related information
+ * @rx_rate_thresh_percent:  percentage of lower than rx rate threshold
+ * @tx_rate_thresh_percent:  percentage of lower than tx rate threshold
+ */
+struct roam_trigger_per {
+	uint8_t rx_rate_thresh_percent;
+	uint8_t tx_rate_thresh_percent;
+};
+
+/**
+ * struct roam_trigger_bmiss - bmiss roam trigger related information
+ * @final_bmiss_cnt:        final beacon miss count
+ * @consecutive_bmiss_cnt:  consecutive beacon miss count
+ * @qos_null_success:       is Qos-Null tx Success: 0: success, 1:fail
+ */
+struct roam_trigger_bmiss {
+	uint32_t final_bmiss_cnt;
+	uint32_t consecutive_bmiss_cnt;
+	bool qos_null_success;
+};
+
+/**
+ * struct roam_trigger_poor_rssi - low rssi roam trigger
+ * related information
+ * @current_rssi:         Connected AP rssi in dBm
+ * @roam_rssi_threshold:  rssi threshold value in dBm
+ * @rx_linkspeed_status:  rx linkspeed status, 0:good linkspeed, 1:bad
+ */
+struct roam_trigger_poor_rssi {
+	int8_t current_rssi;
+	int8_t roam_rssi_threshold;
+	bool rx_linkspeed_status;
+};
+
+/**
+ * struct roam_trigger_better_rssi - high rssi roam trigger
+ * related information
+ * @current_rssi:      Connected AP rssi in dBm
+ * @hi_rssi_threshold:  roam high RSSI threshold
+ */
+struct roam_trigger_better_rssi {
+	int8_t current_rssi;
+	int8_t hi_rssi_threshold;
+};
+
+/**
+ * struct roam_trigger_congestion - congestion roam trigger
+ * related information
+ * @rx_tput:         RX Throughput in bytes per second in dense env
+ * @tx_tput:         TX Throughput in bytes per second in dense env
+ * @roamable_count:  roamable AP count info in dense env
+ */
+struct roam_trigger_congestion {
+	uint32_t rx_tput;
+	uint32_t tx_tput;
+	uint8_t roamable_count;
+};
+
+/**
+ * struct roam_trigger_user_trigger - user roam trigger related information
+ * @invoke_reason: defined in roam_invoke_reason
+ */
+struct roam_trigger_user_trigger {
+	enum roam_invoke_reason invoke_reason;
+};
+
+/**
+ * struct roam_trigger_background -  roam trigger related information
+ * @current_rssi:         Connected AP rssi in dBm
+ * @data_rssi:            data frame rssi in dBm
+ * @data_rssi_threshold:  data rssi threshold in dBm
+ */
+struct roam_trigger_background {
+	int8_t current_rssi;
+	int8_t data_rssi;
+	int8_t data_rssi_threshold;
+};
+
+/**
+ * struct roam_trigger_btm - BTM roam trigger related information
+ * @btm_request_mode: mode values are defined in IEEE Std
+ *  802.11-2020, 9.6.13.9
+ * @disassoc_imminent_timer:     disassoc time in milliseconds
+ * @validity_internal:           Preferred candidate list validity interval in
+ *  milliseconds
+ * @candidate_list_count:        Number of preferred candidates from BTM request
+ * @btm_response_status_code:    Response status values are enumerated in
+ *  IEEE Std 802.11-2020, Table 9-428 (BTM status code definitions)
+ * @btm_bss_termination_timeout: BTM BSS termination timeout value in
+ *  milliseconds
+ * @btm_mbo_assoc_retry_timeout: BTM MBO assoc retry timeout value in
+ *  milliseconds
+ * @btm_req_dialog_token:        btm_req_dialog_token: dialog token number in
+ *  BTM request frame
+ */
+
+struct roam_trigger_btm {
+	uint8_t btm_request_mode;
+	uint32_t disassoc_imminent_timer;
+	uint32_t validity_internal;
+	uint8_t candidate_list_count;
+	uint8_t btm_response_status_code;
+	uint32_t btm_bss_termination_timeout;
+	uint32_t btm_mbo_assoc_retry_timeout;
+	uint8_t btm_req_dialog_token;
+};
+
+/**
+ * struct roam_trigger_bss_load - BSS Load roam trigger parameters
+ * @cu_load: percentage of Connected AP channel congestion utilization
+ */
+struct roam_trigger_bss_load {
+	uint8_t cu_load;
+};
+
+/**
+ * struct roam_trigger_disconnection - Deauth roaming trigger related
+ * parameters
+ * @deauth_type:   1- Deauthentication 2- Disassociation
+ * @deauth_reason: Status code of the Deauth/Disassoc received, Values
+ *  are enumerated in IEEE Std 802.11-2020, Table 9-49 (Reason codes).
+ */
+struct roam_trigger_disconnection {
+	uint8_t deauth_type;
+	uint16_t deauth_reason;
+};
+
+/**
+ * struct roam_trigger_periodic - periodic roam trigger
+ * related information
+ * @periodic_timer_ms: roam scan periodic, milliseconds
+ */
+struct roam_trigger_periodic {
+	uint32_t periodic_timer_ms;
+};
+
+/**
+ * struct roam_trigger_tx_failures - tx failures roam trigger
+ * related information
+ * @kickout_threshold:  consecutive tx failure threshold
+ * @kickout_reason:     defined in roam_tx_failures_reason
+ */
+struct roam_trigger_tx_failures {
+	uint32_t kickout_threshold;
+	enum roam_tx_failures_reason kickout_reason;
+};
+
+/**
+ * union roam_trigger_condition - union of all types roam trigger info
+ * structures
+ * @roam_per: per roam trigger related information
+ * @roam_bmiss: bmiss roam trigger related information
+ * @roam_poor_rssi: low rssi roam trigger related information
+ * @roam_better_rssi: high rssi roam trigger related information
+ * @roam_congestion: congestion roam trigger related information
+ * @roam_user_trigger: user trigger roam related information
+ * @roam_btm: btm roam trigger related information
+ * @roam_bss_load: bss load roam trigger related information
+ * @roam_disconnection: disconnect roam trigger related information
+ * @roam_periodic: periodic roam trigger related information
+ * @roam_background: background roam trigger related information
+ * @roam_tx_failures: tx failures roam trigger related information
+ */
+union roam_trigger_condition {
+	struct roam_trigger_per roam_per;
+	struct roam_trigger_bmiss roam_bmiss;
+	struct roam_trigger_poor_rssi roam_poor_rssi;
+	struct roam_trigger_better_rssi roam_better_rssi;
+	struct roam_trigger_congestion roam_congestion;
+	struct roam_trigger_user_trigger roam_user_trigger;
+	struct roam_trigger_btm roam_btm;
+	struct roam_trigger_bss_load roam_bss_load;
+	struct roam_trigger_disconnection roam_disconnection;
+	struct roam_trigger_periodic roam_periodic;
+	struct roam_trigger_background roam_background;
+	struct roam_trigger_tx_failures roam_tx_failures;
+};
+
+/**
+ * struct roam_trigger_abort_reason - roam abort related information
+ * @abort_reason_code:    detail in roam_abort_reason
+ * @data_rssi:            data rssi in dBm
+ * @data_rssi_threshold:  data rssi threshold in dBm
+ * @rx_linkspeed_status:  rx linkspeed status, 0:good linkspeed, 1:bad
+ */
+struct roam_trigger_abort_reason {
+	enum roam_abort_reason abort_reason_code;
+	int8_t data_rssi;
+	int8_t data_rssi_threshold;
+	bool rx_linkspeed_status;
+};
+
+/**
+ * struct eroam_trigger_info - roam trigger related information
+ * @timestamp: timestamp of roaming start
+ * @trigger_reason: roam trigger reason, enum in roam_trigger_reason
+ * @condition: roam trigger detail information
+ * @abort: roam abort related information
+ * @roam_scan_type: roam scan type, enum in roam_stats_scan_type
+ * @roam_status: roam result, 0 - Roaming is success, 1 - Roaming is failed
+ * @roam_fail_reason: roam fail reason, enum in wlan_roam_failure_reason_code
+ */
+struct eroam_trigger_info {
+	uint64_t timestamp;
+	uint32_t trigger_reason;
+	union roam_trigger_condition condition;
+	struct roam_trigger_abort_reason abort;
+	enum roam_stats_scan_type roam_scan_type;
+	uint8_t roam_status;
+	uint32_t roam_fail_reason;
+};
+
+/**
+ * struct roam_scan_chn - each roam scan channel information
+ * @chan_freq: roam scan channel frequency(MHz)
+ * @dwell_type: indicate channel dwell type, enum in roam_scan_dwell_type
+ * @max_dwell_time: max dwell time of each channel
+ */
+struct roam_scan_chn {
+	uint16_t chan_freq;
+	enum roam_scan_dwell_type dwell_type;
+	uint32_t max_dwell_time;
+};
+
+/**
+ * struct eroam_scan_info - all roam scan channel related information
+ * @num_channels: total number of channels scanned during roam scan
+ * @roam_chn: each roam scan channel information
+ * @total_scan_time: total scan time of all roam channel
+ */
+struct eroam_scan_info {
+	uint8_t num_channels;
+	struct roam_scan_chn *roam_chn;
+	uint32_t total_scan_time;
+};
+
+/**
+ * struct eroam_frame_info - frame information during roaming
+ * @frame_type: frame subtype defined in eroam_frame_subtype
+ * @status: frame status defined in eroam_roam_status
+ * @timestamp: timestamp of the auth/assoc/eapol-M1/M2/M3/M4 frame,
+ *  if status is successful, indicate received or send success,
+ *  if status is failed, timestamp indicate roaming fail at that time
+ */
+struct eroam_frame_info {
+	enum eroam_frame_subtype frame_type;
+	enum eroam_frame_status status;
+	uint64_t timestamp;
+};
+
+#define ROAM_FRAME_NUM 6
+
+/**
+ * struct enhance_roam_info - enhance roam information
+ * @trigger: roam trigger information
+ * @scan: roam scan information
+ * @timestamp: types of frame information during roaming
+ */
+struct enhance_roam_info {
+	struct eroam_trigger_info trigger;
+	struct eroam_scan_info scan;
+	struct eroam_frame_info timestamp[ROAM_FRAME_NUM];
+};
+
+/**
  * struct mlme_legacy_priv - VDEV MLME legacy priv object
  * @chan_switch_in_progress: flag to indicate that channel switch is in progress
  * @hidden_ssid_restart_in_progress: flag to indicate hidden ssid restart is
@@ -449,6 +715,11 @@ struct mlme_ap_config {
  * @cm_roam: Roaming configuration
  * @auth_log: Cached log records for SAE authentication frame
  * related information.
+ * @roam_info: enhanced roam information include trigger, scan and
+ *  frame information.
+ * @roam_cache_num: number of roam information cached in driver
+ * @roam_write_index: indicate current write position of ring buffer
+ * @roam_rd_wr_lock: protect roam buffer write and read
  * @bigtk_vdev_support: BIGTK feature support for this vdev (SAP)
  * @sae_retry: SAE auth retry information
  * @roam_reason_better_ap: roam due to better AP found
@@ -500,6 +771,14 @@ struct mlme_legacy_priv {
 #elif defined(WLAN_FEATURE_ROAM_OFFLOAD) && defined(CONNECTIVITY_DIAG_EVENT)
 	struct wlan_diag_packet_info
 	    auth_log[MAX_ROAM_CANDIDATE_AP][WLAN_ROAM_MAX_CACHED_AUTH_FRAMES];
+#endif
+#ifdef WLAN_FEATURE_ROAM_OFFLOAD
+#ifdef WLAN_FEATURE_ROAM_INFO_STATS
+	struct enhance_roam_info *roam_info;
+	uint32_t roam_cache_num;
+	uint32_t roam_write_index;
+	qdf_mutex_t roam_rd_wr_lock;
+#endif
 #endif
 	bool bigtk_vdev_support;
 	struct sae_auth_retry sae_retry;

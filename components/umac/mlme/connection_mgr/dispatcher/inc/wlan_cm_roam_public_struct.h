@@ -916,6 +916,120 @@ struct scoring_param {
 };
 
 /**
+ * enum roam_invoke_reason - Roam invoke reason.
+ *
+ * @WLAN_ROAM_STATS_INVOKE_REASON_UNDEFINED: Default value when target
+ *  invoke roam.
+ * @WLAN_ROAM_STATS_INVOKE_REASON_NUD_FAILURE: Neighbor unreachable
+ *  detection failed when the roam trigger.
+ * @WLAN_ROAM_STATS_INVOKE_REASON_USER_SPACE: Invoke from user space.
+ */
+enum roam_invoke_reason {
+	WLAN_ROAM_STATS_INVOKE_REASON_UNDEFINED = 0,
+	WLAN_ROAM_STATS_INVOKE_REASON_NUD_FAILURE = 1,
+	WLAN_ROAM_STATS_INVOKE_REASON_USER_SPACE = 2,
+};
+
+/**
+ * enum roam_tx_failures_reason - Roam TX failures reason.
+ *
+ * @WLAN_ROAM_STATS_KICKOUT_REASON_UNSPECIFIED: Default value when
+ *  roam by kickout.
+ * @WLAN_ROAM_STATS_KICKOUT_REASON_XRETRY: Excessive retry when roam
+ *  trigger by kickout.
+ * @WLAN_ROAM_STATS_KICKOUT_REASON_INACTIVITY: Station inactivity when
+ *  roam trigger by kickout.
+ * @WLAN_ROAM_STATS_KICKOUT_REASON_IBSS_DISCONNECT: IBSS disconnect when
+ *  roam trigger by kickout.
+ * @WLAN_ROAM_STATS_KICKOUT_REASON_TDLS_DISCONNECT: TDLS peer has
+ *  disappeared, and all TX is failing when roam trigger by kickout.
+ * @WLAN_ROAM_STATS_KICKOUT_REASON_SA_QUERY_TIMEOUT: SA query process
+ *   timeout when roam trigger by kickout.
+ * @WLAN_ROAM_STATS_KICKOUT_REASON_ROAMING_EVENT: Directly connected
+ *  peer has roamed to a repeater.
+ */
+enum roam_tx_failures_reason {
+	WLAN_ROAM_STATS_KICKOUT_REASON_UNSPECIFIED = 0,
+	WLAN_ROAM_STATS_KICKOUT_REASON_XRETRY = 1,
+	WLAN_ROAM_STATS_KICKOUT_REASON_INACTIVITY = 2,
+	WLAN_ROAM_STATS_KICKOUT_REASON_IBSS_DISCONNECT = 3,
+	WLAN_ROAM_STATS_KICKOUT_REASON_TDLS_DISCONNECT = 4,
+	WLAN_ROAM_STATS_KICKOUT_REASON_SA_QUERY_TIMEOUT = 5,
+	WLAN_ROAM_STATS_KICKOUT_REASON_ROAMING_EVENT = 6,
+};
+
+/**
+ * enum roam_abort_reason - Roam abort reason.
+ *
+ * @WLAN_ROAM_STATS_ABORT_UNSPECIFIED: Target did not specify the
+ *  detailed reason for roam scan being aborted.
+ * @WLAN_ROAM_STATS_ABORT_LOWRSSI_DATA_RSSI_HIGH: Roam scan is not
+ *  started due to high data RSSI during LOW-RSSI roaming.
+ * @WLAN_ROAM_STATS_ABORT_LOWRSSI_LINK_SPEED_GOOD: Roam scan is not
+ *  started due to good link speed during LOW-RSSI roaming.
+ * @WLAN_ROAM_STATS_ABORT_BG_DATA_RSSI_HIGH: Roam scan is not started
+ *  due to high data RSSI during background roaming.
+ * @WLAN_ROAM_STATS_ABORT_BG_RSSI_ABOVE_THRESHOLD: Roam scan is not
+ *  started due to high beacon RSSI during background roaming
+ */
+enum roam_abort_reason {
+	WLAN_ROAM_STATS_ABORT_UNSPECIFIED = 0,
+	WLAN_ROAM_STATS_ABORT_LOWRSSI_DATA_RSSI_HIGH = 1,
+	WLAN_ROAM_STATS_ABORT_LOWRSSI_LINK_SPEED_GOOD = 2,
+	WLAN_ROAM_STATS_ABORT_BG_DATA_RSSI_HIGH = 3,
+	WLAN_ROAM_STATS_ABORT_BG_RSSI_ABOVE_THRESHOLD = 4,
+};
+
+/**
+ * enum roam_scan_dwell_type  - Roam scan dwell type defines
+ * @WLAN_ROAM_DWELL_TYPE_UNSPECIFIED: Target did not specify the
+ *  detailed roam scan type.
+ * @WLAN_ROAM_DWELL_ACTIVE_TYPE: active scan during roam
+ * @WLAN_ROAM_DWELL_PASSIVE_TYPE: passive scan during roam.
+ */
+enum roam_scan_dwell_type {
+	WLAN_ROAM_DWELL_TYPE_UNSPECIFIED = 0,
+	WLAN_ROAM_DWELL_ACTIVE_TYPE = 1,
+	WLAN_ROAM_DWELL_PASSIVE_TYPE = 2,
+};
+
+/**
+ * enum eroam_frame_subtype - Enhanced roam frame subtypes.
+ *
+ * @WLAN_ROAM_STATS_FRAME_SUBTYPE_PREAUTH: Pre-authentication frame
+ * @WLAN_ROAM_STATS_FRAME_SUBTYPE_REASSOC: Reassociation frame
+ * @WLAN_ROAM_STATS_FRAME_SUBTYPE_EAPOL_M1: EAPOL-Key M1 frame
+ * @WLAN_ROAM_STATS_FRAME_SUBTYPE_EAPOL_M2: EAPOL-Key M2 frame
+ * @WLAN_ROAM_STATS_FRAME_SUBTYPE_EAPOL_M3: EAPOL-Key M3 frame
+ * @WLAN_ROAM_STATS_FRAME_SUBTYPE_EAPOL_M4: EAPOL-Key M4 frame
+ * @WLAN_ROAM_STATS_FRAME_SUBTYPE_EAPOL_GTK_M1: EAPOL-Key GTK M1 frame
+ * @WLAN_ROAM_STATS_FRAME_SUBTYPE_EAPOL_GTK_M2: EAPOL-Key GTK M2 frame
+ */
+enum eroam_frame_subtype {
+	WLAN_ROAM_STATS_FRAME_SUBTYPE_PREAUTH = 1,
+	WLAN_ROAM_STATS_FRAME_SUBTYPE_REASSOC = 2,
+	WLAN_ROAM_STATS_FRAME_SUBTYPE_EAPOL_M1 = 3,
+	WLAN_ROAM_STATS_FRAME_SUBTYPE_EAPOL_M2 = 4,
+	WLAN_ROAM_STATS_FRAME_SUBTYPE_EAPOL_M3 = 5,
+	WLAN_ROAM_STATS_FRAME_SUBTYPE_EAPOL_M4 = 6,
+	WLAN_ROAM_STATS_FRAME_SUBTYPE_EAPOL_GTK_M1 = 7,
+	WLAN_ROAM_STATS_FRAME_SUBTYPE_EAPOL_GTK_M2 = 8,
+};
+
+/**
+ * enum eroam_frame_status - Specifies the valid values of roam frame status
+ *
+ * @WLAN_ROAM_STATS_FRAME_STATUS_SUCCESS: indicates the roam frame was
+ *  sent or received successfully.
+ * @WLAN_ROAM_STATS_FRAME_STATUS_FAIL: indicates the roam frame sending or
+ *  receiving failed.
+ */
+enum eroam_frame_status {
+	WLAN_ROAM_STATS_FRAME_STATUS_SUCCESS = 0,
+	WLAN_ROAM_STATS_FRAME_STATUS_FAIL = 1,
+};
+
+/**
  * enum roam_trigger_reason - Reason for triggering roam
  * @ROAM_TRIGGER_REASON_NONE: Roam trigger reason none
  * @ROAM_TRIGGER_REASON_PER:  Roam triggered due to packet error
