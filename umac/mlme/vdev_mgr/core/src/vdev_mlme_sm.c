@@ -156,6 +156,7 @@ static bool mlme_vdev_state_init_event(void *ctx, uint16_t event,
 	struct vdev_mlme_obj *vdev_mlme = (struct vdev_mlme_obj *)ctx;
 	bool status;
 	enum QDF_OPMODE mode;
+	QDF_STATUS sm_status;
 
 	mode = wlan_vdev_mlme_get_opmode(vdev_mlme->vdev);
 
@@ -211,9 +212,17 @@ static bool mlme_vdev_state_init_event(void *ctx, uint16_t event,
 		 */
 		if (wlan_vdev_mlme_is_mlo_link_vdev(vdev_mlme->vdev)) {
 			mlme_vdev_sm_transition_to(vdev_mlme, WLAN_VDEV_S_UP);
-			mlme_vdev_sm_deliver_event(vdev_mlme, event,
-						   event_data_len, event_data);
-			status = true;
+			sm_status = mlme_vdev_sm_deliver_event(vdev_mlme, event,
+							       event_data_len,
+							       event_data);
+			status = !sm_status;
+			/*
+			 * Error in handling link-vdev roam event, move the
+			 * SM back to INIT.
+			 */
+			if (QDF_IS_STATUS_ERROR(sm_status))
+				mlme_vdev_sm_transition_to(vdev_mlme,
+							   WLAN_VDEV_S_INIT);
 		} else {
 			status = false;
 		}
@@ -468,6 +477,7 @@ static bool mlme_vdev_state_up_event(void *ctx, uint16_t event,
 	enum QDF_OPMODE mode;
 	struct wlan_objmgr_vdev *vdev;
 	bool status;
+	QDF_STATUS sm_status;
 
 	vdev = vdev_mlme->vdev;
 	mode = wlan_vdev_mlme_get_opmode(vdev);
@@ -509,9 +519,10 @@ static bool mlme_vdev_state_up_event(void *ctx, uint16_t event,
 		if (wlan_vdev_mlme_is_mlo_link_vdev(vdev_mlme->vdev)) {
 			mlme_vdev_sm_transition_to(vdev_mlme,
 						   WLAN_VDEV_SS_UP_ACTIVE);
-			mlme_vdev_sm_deliver_event(vdev_mlme, event,
-						   event_data_len, event_data);
-			status = true;
+			sm_status = mlme_vdev_sm_deliver_event(vdev_mlme, event,
+							       event_data_len,
+							       event_data);
+			status = !sm_status;
 		} else {
 			status = false;
 		}
@@ -1837,6 +1848,7 @@ static bool mlme_vdev_subst_up_active_event(void *ctx, uint16_t event,
 	enum QDF_OPMODE mode;
 	struct wlan_objmgr_vdev *vdev;
 	bool status;
+	QDF_STATUS sm_status;
 
 	vdev = vdev_mlme->vdev;
 	mode = wlan_vdev_mlme_get_opmode(vdev);
@@ -1915,9 +1927,10 @@ static bool mlme_vdev_subst_up_active_event(void *ctx, uint16_t event,
 		break;
 
 	case WLAN_VDEV_SM_EV_ROAM:
-		mlme_vdev_notify_roam_start(vdev_mlme, event_data_len,
-					    event_data);
-		status = true;
+		sm_status = mlme_vdev_notify_roam_start(vdev_mlme,
+							event_data_len,
+							event_data);
+		status = !sm_status;
 		break;
 
 	default:
