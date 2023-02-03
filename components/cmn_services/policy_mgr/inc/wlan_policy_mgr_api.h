@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2012-2020 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -1571,6 +1572,8 @@ typedef void (*policy_mgr_nss_update_cback)(struct wlan_objmgr_psoc *psoc,
  * @sme_change_mcc_beacon_interval: Set MCC beacon interval to FW
  * @sme_rso_start_cb: Enable roaming offload callback
  * @sme_rso_stop_cb: Disable roaming offload callback
+ * @sme_change_sap_csa_count: Change CSA count for SAP/GO, only one
+ *			      time, needs to set again if used once.
  */
 struct policy_mgr_sme_cbacks {
 	void (*sme_get_nss_for_vdev)(enum QDF_OPMODE,
@@ -1597,6 +1600,7 @@ struct policy_mgr_sme_cbacks {
 	QDF_STATUS (*sme_rso_stop_cb)(
 		mac_handle_t mac_handle, uint8_t vdev_id,
 		uint8_t reason, enum wlan_cm_rso_control_requestor requestor);
+	QDF_STATUS (*sme_change_sap_csa_count)(uint8_t count);
 };
 
 /**
