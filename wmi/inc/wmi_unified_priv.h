@@ -3206,6 +3206,12 @@ QDF_STATUS (*send_update_edca_pifs_param_cmd)(
 QDF_STATUS (*extract_sap_coex_cap_service_ready_ext2)(
 			wmi_unified_t wmi_handle, uint8_t *event,
 			struct wmi_host_coex_fix_chan_cap *cap);
+
+#ifdef WMI_AP_SUPPORT
+QDF_STATUS
+(*send_wmi_tdma_schedule_request_cmd)(wmi_unified_t wmi_handle,
+				      struct wlan_tdma_sched_cmd_param *param);
+#endif
 };
 
 /* Forward declaration for psoc*/
