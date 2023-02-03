@@ -837,3 +837,14 @@ QDF_STATUS wmi_sawf_disable_send(struct wmi_unified *wmi_handle,
 	return QDF_STATUS_E_FAILURE;
 }
 #endif
+
+QDF_STATUS wmi_unified_tdma_schedule_send(
+		struct wmi_unified *wmi_handle,
+		struct wlan_tdma_sched_cmd_param *param)
+{
+	if (wmi_handle->ops->send_wmi_tdma_schedule_request_cmd) {
+		return wmi_handle->ops->send_wmi_tdma_schedule_request_cmd(
+							wmi_handle, param);
+	}
+	return QDF_STATUS_E_FAILURE;
+}

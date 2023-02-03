@@ -213,6 +213,37 @@ struct ctl_table_params {
 };
 
 /**
+ * struct wlan_tdma_sched_cmd_param - TDMA entry update params
+ * @pdev_id: pdev id
+ * @schedule_type: schedule type
+ * @schedule_handle_id: schedule id
+ * @owner_bssid: BSSID or mac address
+ * @start_time_tsf_low: Start time for tsf low
+ * @start_time_tsf_high: Start time for tsf high
+ * @num_busy_slots: Number of busy slots
+ * @busy_slot_dur_ms: Busy slots
+ * @busy_slot_intvl_ms: Interval for busy slots
+ * @edca_params_valid: edca Param valid check
+ * @aifsn: aifsn
+ * @cwmin: cwmin
+ * @cwmax: cwmax
+ */
+struct wlan_tdma_sched_cmd_param {
+	uint32_t pdev_id;
+	uint8_t schedule_type;
+	uint8_t schedule_handle_id;
+	uint8_t  owner_bssid[QDF_MAC_ADDR_SIZE];
+	uint32_t start_time_tsf_low;
+	uint32_t start_time_tsf_high;
+	uint16_t num_busy_slots;
+	uint16_t busy_slot_dur_ms;
+	uint16_t busy_slot_intvl_ms;
+	bool edca_params_valid;
+	uint16_t aifsn[WMI_MAX_NUM_AC];
+	uint16_t cwmin[WMI_MAX_NUM_AC];
+	uint16_t cwmax[WMI_MAX_NUM_AC];
+};
+/**
  * struct mimogain_table_params - MIMO gain table params
  * @array_gain: pointer to array gain table
  * @tbl_len: table length

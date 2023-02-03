@@ -990,3 +990,14 @@ QDF_STATUS wmi_sawf_disable_send(struct wmi_unified *wmi_handle,
 				 uint8_t svc_id);
 #endif
 #endif /* _WMI_UNIFIED_AP_API_H_ */
+
+/**
+ * wmi_unified_tdma_schedule_send() - Send tdma schedule command to FW
+ * @wmi_handle: wmi handle
+ * @param: tdma schedule parameters
+ *
+ * Return: QDF_STATUS_SUCCESS on success and QDF_STATUS_E_FAILURE for failure
+ */
+QDF_STATUS wmi_unified_tdma_schedule_send(
+		struct wmi_unified *wmi_handle,
+		struct wlan_tdma_sched_cmd_param *param);
