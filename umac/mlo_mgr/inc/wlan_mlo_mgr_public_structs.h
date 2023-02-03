@@ -111,6 +111,19 @@ enum MLO_SOC_LIST {
 
 #define MAX_MLO_LINKS 6
 #define MAX_MLO_CHIPS 5
+#define MAX_ADJ_CHIPS 2
+
+/**
+ * struct mlo_chip_info: MLO chip info per link
+ * @info_valid: If the info here is valid or not
+ * @chip_id: Chip ID as assigned by platform
+ * @adj_chip_ids: Chip IDs of Adjacent chips
+ */
+struct mlo_chip_info {
+	uint8_t info_valid;
+	uint8_t chip_id[MAX_MLO_CHIPS];
+	uint8_t adj_chip_ids[MAX_MLO_CHIPS][MAX_ADJ_CHIPS];
+};
 
 /**
  * struct mlo_setup_info: MLO setup status per link
@@ -128,6 +141,7 @@ enum MLO_SOC_LIST {
  * @state_lock: lock to protect access to link state
  * @event: event for teardown completion
  * @dp_handle: pointer to DP ML context
+ * @chip_info: chip specific info of the soc
  */
 struct mlo_setup_info {
 	uint8_t ml_grp_id;
@@ -144,6 +158,7 @@ struct mlo_setup_info {
 	qdf_spinlock_t state_lock;
 	qdf_event_t event;
 	struct cdp_mlo_ctxt *dp_handle;
+	struct mlo_chip_info chip_info;
 };
 
 /**

@@ -458,6 +458,77 @@ void mlo_setup_deinit(void)
 
 qdf_export_symbol(mlo_setup_deinit);
 
+void mlo_setup_update_chip_info(struct wlan_objmgr_psoc *psoc,
+				uint8_t chip_id, uint8_t *adj_chip_id)
+{
+	uint8_t psoc_id, i;
+	struct mlo_mgr_context *mlo_ctx = wlan_objmgr_get_mlo_ctx();
+	struct mlo_chip_info *chip_info;
+
+	if (!mlo_ctx)
+		return;
+
+	chip_info = &mlo_ctx->setup_info->chip_info;
+	/* get psoc_id of a soc */
+	psoc_id = wlan_psoc_get_id(psoc);
+
+	if (psoc_id >= MAX_MLO_CHIPS)
+		return;
+	/* chip id & psoc id need not be same, assign here based on psoc index*/
+	chip_info->chip_id[psoc_id] = chip_id;
+
+	/* For a particular psoc id populate the adjacent chip id's */
+	for (i = 0; i < MAX_ADJ_CHIPS; i++)
+		chip_info->adj_chip_ids[psoc_id][i] = adj_chip_id[i];
+
+	chip_info->info_valid = 1;
+}
+
+qdf_export_symbol(mlo_setup_update_chip_info);
+
+QDF_STATUS mlo_chip_adjacent(uint8_t psoc_id_1, uint8_t psoc_id_2,
+			     uint8_t *is_adjacent)
+{
+	struct mlo_mgr_context *mlo_ctx = wlan_objmgr_get_mlo_ctx();
+	uint8_t chip_id2, i;
+	struct mlo_chip_info *chip_info;
+
+	if (!mlo_ctx)
+		return QDF_STATUS_E_FAILURE;
+
+	if ((psoc_id_1 >= MAX_MLO_CHIPS) || (psoc_id_2 >= MAX_MLO_CHIPS)) {
+		mlo_err("psoc id's greater then max limit of %d",
+			MAX_MLO_CHIPS);
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	chip_info = &mlo_ctx->setup_info->chip_info;
+
+	/* default case is adjacent */
+	*is_adjacent = 1;
+
+	if (!chip_info->info_valid) {
+		/* This is default (non-ini), they are adjacent */
+		return QDF_STATUS_SUCCESS;
+	}
+
+	if (psoc_id_1 == psoc_id_2) {
+		/* this is probably a single soc case, they are adjacent */
+		return QDF_STATUS_SUCCESS;
+	}
+	/* get chip id from psoc */
+	chip_id2 = chip_info->chip_id[psoc_id_2];
+	for (i = 0; i < MAX_ADJ_CHIPS; i++) {
+		if (chip_info->adj_chip_ids[psoc_id_1][i] == chip_id2)
+			return QDF_STATUS_SUCCESS;
+	}
+
+	*is_adjacent = 0;
+	return QDF_STATUS_SUCCESS;
+}
+
+qdf_export_symbol(mlo_chip_adjacent);
+
 void mlo_setup_update_num_links(struct wlan_objmgr_psoc *psoc,
 				uint8_t grp_id, uint8_t num_links)
 {

@@ -117,6 +117,27 @@ void mlo_setup_update_num_links(struct wlan_objmgr_psoc *psoc,
 				uint8_t num_links);
 
 /**
+ * mlo_setup_update_chip_info() - API to update mlo chip info
+ * @psoc: soc to be checked
+ * @chip_id: chip_id to update the info about
+ * @adj_chip_id: adjacent chip ID's
+ *
+ * Return: None.
+ */
+void mlo_setup_update_chip_info(struct wlan_objmgr_psoc *psoc, uint8_t chip_id,
+				uint8_t *adj_chip_id);
+
+/**
+ * mlo_chip_adjacent() - API to return if two chips are adjacent
+ * @psoc_id_1: Psoc id 1
+ * @psoc_id_2: Psoc id 2
+ * @is_adjacent: Are the above 2 psocs adjacent or not
+ * Return: QDF_STATUS: success / failure.
+ */
+QDF_STATUS mlo_chip_adjacent(uint8_t psoc_id_1, uint8_t psoc_id_2,
+			     uint8_t *is_adjacent);
+
+/**
  * mlo_setup_update_soc_ready() - API to notify when FW init done
  * @psoc: soc object of SoC ready
  * @grp_id: ID of the required mlo group
