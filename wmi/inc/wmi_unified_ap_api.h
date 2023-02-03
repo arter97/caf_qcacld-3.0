@@ -101,6 +101,17 @@ QDF_STATUS wmi_unified_set_sta_max_pwr_table_cmd_send(
 		struct sta_max_pwr_table_params *param);
 
 /**
+ *  wmi_unified_set_power_table_cmd_send() - WMI rate2power table set cmd function
+ *  @wmi_handle: handle to WMI.
+ *  @param: pointer to hold rate2power table params
+ *
+ *  Return: QDF_STATUS_SUCCESS on success and QDF_STATUS_E_FAILURE for failure
+ */
+QDF_STATUS wmi_unified_set_power_table_cmd_send(
+					wmi_unified_t wmi_handle,
+					struct rate2power_table_params *param);
+
+/**
  *  wmi_unified_set_mimogain_table_cmd_send() - WMI set mimogain cmd function
  *  @wmi_handle: handle to WMI.
  *  @param: pointer to hold mimogain param

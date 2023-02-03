@@ -100,6 +100,17 @@ QDF_STATUS wmi_unified_set_sta_max_pwr_table_cmd_send(
 	return QDF_STATUS_E_FAILURE;
 }
 
+QDF_STATUS wmi_unified_set_power_table_cmd_send(
+		wmi_unified_t wmi_handle,
+		struct rate2power_table_params *param)
+{
+	if (wmi_handle->ops->send_set_power_table_cmd)
+		return wmi_handle->ops->send_set_power_table_cmd(wmi_handle,
+				param);
+
+	return QDF_STATUS_E_FAILURE;
+}
+
 QDF_STATUS wmi_unified_set_mimogain_table_cmd_send(
 		wmi_unified_t wmi_handle,
 		struct mimogain_table_params *param)
