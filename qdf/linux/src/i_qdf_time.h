@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2014-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -159,6 +159,17 @@ static inline __qdf_time_t __qdf_system_ticks(void)
 static inline uint32_t __qdf_system_ticks_to_msecs(unsigned long ticks)
 {
 	return jiffies_to_msecs(ticks);
+}
+
+/**
+ * __qdf_system_ticks_to_nsecs() - convert system ticks into nano seconds
+ * @ticks: System ticks
+ *
+ * Return: system tick converted into nano seconds
+ */
+static inline uint32_t __qdf_system_ticks_to_nsecs(unsigned long ticks)
+{
+	return jiffies_to_nsecs(ticks);
 }
 
 /**

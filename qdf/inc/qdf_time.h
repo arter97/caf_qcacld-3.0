@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2014-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -118,6 +118,14 @@ qdf_time_t qdf_system_ticks(void);
  * Return: unsigned int Time in milliseconds
  */
 uint32_t qdf_system_ticks_to_msecs(unsigned long clock_ticks);
+
+/**
+ * qdf_system_ticks_to_nsecs - convert ticks to nanoseconds
+ * @clock_ticks: Number of ticks
+ *
+ * Return: unsigned int Time in nanoseconds
+ */
+uint32_t qdf_system_ticks_to_nsecs(unsigned long clock_ticks);
 
 /**
  * qdf_system_msecs_to_ticks - convert milliseconds to ticks
