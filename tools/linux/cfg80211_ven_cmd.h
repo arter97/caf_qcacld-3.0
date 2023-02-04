@@ -841,6 +841,7 @@ enum {
 #if ATH_SUPPORT_DSCP_OVERRIDE
 	IEEE80211_PARAM_GDSCP_TID_MAP = 792, /* Get dscp-tid map */
 #endif
+	IEEE80211_PARAM_PPEVP_TYPE = 793,
 };
 
 enum {
@@ -2523,6 +2524,7 @@ struct vendor_commands vap_vendor_cmds[] = {
 	{"drop_tx_mcast",      IEEE80211_PARAM_DROP_TX_MCAST, SET_PARAM, 1},
 	{"get_drop_tx_mcast",  IEEE80211_PARAM_DROP_TX_MCAST, GET_PARAM, 0},
 #endif
+	{"get_ppevp_type",     IEEE80211_PARAM_PPEVP_TYPE, GET_PARAM, 0},
 };
 
 struct vendor_commands radio_vendor_cmds[] = {
