@@ -33,6 +33,15 @@ void wlan_telemetry_agent_application_init_notify(
 		g_agent_ops->agent_notify_app_event(event);
 }
 
+void wlan_telemetry_emesh_application_init_deinit_notify(
+		enum agent_notification_event event)
+{
+	if (g_agent_ops)
+		g_agent_ops->agent_notify_emesh_event(event);
+}
+
+qdf_export_symbol(wlan_telemetry_emesh_application_init_deinit_notify);
+
 static QDF_STATUS
 telemetry_agent_psoc_create_handler(struct wlan_objmgr_psoc *psoc,
 				    void *arg)

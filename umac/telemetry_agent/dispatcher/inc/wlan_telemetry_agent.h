@@ -19,6 +19,9 @@
 #ifdef WLAN_CONFIG_TELEMETRY
 #include <telemetry_agent_wifi_driver_if.h>
 
+void wlan_telemetry_emesh_application_init_deinit_notify
+	(enum agent_notification_event);
+
 void wlan_telemetry_agent_application_init_notify
 	(enum agent_notification_event);
 QDF_STATUS wlan_telemetry_agent_init(void);
@@ -239,6 +242,7 @@ QDF_STATUS telemetry_sawf_get_mov_avg(void *telemetry_ctx, uint8_t tid,
 QDF_STATUS telemetry_sawf_reset_peer_stats(uint8_t *peer_mac);
 #else
 #define wlan_telemetry_agent_application_init_notify(param)
+#define wlan_telemetry_emesh_application_init_deinit_notify(param)
 
 static inline
 QDF_STATUS wlan_telemetry_agent_init(void)
@@ -371,6 +375,7 @@ QDF_STATUS telemetry_sawf_get_mov_avg(void *telemetry_ctx, uint8_t tid,
 	return QDF_STATUS_SUCCESS;
 }
 
+static inline
 QDF_STATUS telemetry_sawf_reset_peer_stats(uint8_t *peer_mac)
 {
 	return QDF_STATUS_SUCCESS;
