@@ -800,11 +800,24 @@ static void mlo_setup_link_down(struct wlan_objmgr_psoc *psoc,
 		  grp_id, link_idx, setup_info->num_links);
 }
 
+static void mlo_dp_ctxt_detach(struct wlan_objmgr_psoc *psoc,
+			       uint8_t grp_id,
+			       struct cdp_mlo_ctxt *dp_mlo_ctxt)
+{
+	if (!psoc)
+		return;
+
+	wlan_objmgr_set_dp_mlo_ctx(NULL, grp_id);
+	if (dp_mlo_ctxt)
+		cdp_mlo_ctxt_detach(wlan_psoc_get_dp_handle(psoc), dp_mlo_ctxt);
+}
+
 void mlo_setup_update_soc_down(struct wlan_objmgr_psoc *psoc, uint8_t grp_id)
 {
 	struct mlo_mgr_context *mlo_ctx = wlan_objmgr_get_mlo_ctx();
 	struct mlo_setup_info *setup_info;
 	uint8_t chip_idx;
+	struct wlan_objmgr_psoc *soc;
 
 	if (!mlo_ctx)
 		return;
@@ -838,8 +851,16 @@ void mlo_setup_update_soc_down(struct wlan_objmgr_psoc *psoc, uint8_t grp_id)
 		return;
 	}
 
+	soc = setup_info->curr_soc_list[chip_idx];
+	cdp_soc_mlo_soc_teardown(wlan_psoc_get_dp_handle(soc),
+				 setup_info->dp_handle,
+				 false);
+
 	setup_info->curr_soc_list[chip_idx] = NULL;
 	setup_info->num_soc--;
+
+	if (!setup_info->num_soc)
+		mlo_dp_ctxt_detach(soc, grp_id, setup_info->dp_handle);
 
 	mlo_debug("Soc down, mlo group %d num soc %d num links %d",
 		  grp_id, setup_info->num_soc,
@@ -848,26 +869,11 @@ void mlo_setup_update_soc_down(struct wlan_objmgr_psoc *psoc, uint8_t grp_id)
 
 qdf_export_symbol(mlo_setup_update_soc_down);
 
-static void mlo_dp_ctxt_detach(struct wlan_objmgr_psoc *psoc,
-			       uint8_t grp_id,
-			       struct cdp_mlo_ctxt *dp_mlo_ctxt)
-{
-	if (!psoc)
-		return;
-
-	wlan_objmgr_set_dp_mlo_ctx(NULL, grp_id);
-	if (dp_mlo_ctxt)
-		cdp_mlo_ctxt_detach(wlan_psoc_get_dp_handle(psoc), dp_mlo_ctxt);
-}
-
 void mlo_link_teardown_complete(struct wlan_objmgr_pdev *pdev, uint8_t grp_id)
 {
 	struct mlo_mgr_context *mlo_ctx = wlan_objmgr_get_mlo_ctx();
 	struct mlo_setup_info *setup_info;
 	uint8_t link_idx;
-	struct wlan_objmgr_psoc *soc;
-	uint8_t chip_idx;
-	uint8_t num_soc = 0;
 
 	if (!mlo_ctx)
 		return;
@@ -903,19 +909,6 @@ void mlo_link_teardown_complete(struct wlan_objmgr_pdev *pdev, uint8_t grp_id)
 
 	mlo_debug("Teardown complete");
 
-	for (chip_idx = 0; chip_idx < setup_info->tot_socs; chip_idx++) {
-		soc = setup_info->curr_soc_list[chip_idx];
-		if (soc) {
-			num_soc++;
-			cdp_soc_mlo_soc_teardown(wlan_psoc_get_dp_handle(soc),
-						 setup_info->dp_handle,
-						 false);
-			if (num_soc == setup_info->tot_socs)
-				mlo_dp_ctxt_detach(soc, grp_id,
-						   setup_info->dp_handle);
-		}
-	}
-
 	qdf_event_set(&setup_info->event);
 }
 
@@ -924,11 +917,8 @@ qdf_export_symbol(mlo_link_teardown_complete);
 static void mlo_force_teardown(uint8_t grp_id)
 {
 	struct mlo_mgr_context *mlo_ctx = wlan_objmgr_get_mlo_ctx();
-	struct wlan_objmgr_psoc *soc;
 	struct mlo_setup_info *setup_info;
 	uint8_t link_idx;
-	uint8_t chip_idx;
-	uint8_t num_soc = 0;
 
 	if (!mlo_ctx)
 		return;
@@ -943,19 +933,6 @@ static void mlo_force_teardown(uint8_t grp_id)
 
 	for (link_idx = 0; link_idx < setup_info->tot_links; link_idx++)
 		setup_info->state[link_idx] = MLO_LINK_TEARDOWN;
-
-	for (chip_idx = 0; chip_idx < setup_info->tot_socs; chip_idx++) {
-		soc = setup_info->curr_soc_list[chip_idx];
-		if (soc) {
-			num_soc++;
-			cdp_soc_mlo_soc_teardown(wlan_psoc_get_dp_handle(soc),
-						 setup_info->dp_handle,
-						 true);
-			if (num_soc == setup_info->tot_socs)
-				mlo_dp_ctxt_detach(soc, grp_id,
-						   setup_info->dp_handle);
-		}
-	}
 }
 
 #define MLO_MGR_TEARDOWN_TIMEOUT 3000
