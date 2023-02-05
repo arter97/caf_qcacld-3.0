@@ -433,6 +433,8 @@ static const uint32_t pdev_param_tlv[] = {
 		  PDEV_PARAM_CTS2SELF_FOR_P2P_GO_CONFIG),
 	PARAM_MAP(pdev_param_txpower_reason_sar, PDEV_PARAM_TXPOWER_REASON_SAR),
 	PARAM_MAP(pdev_param_default_6ghz_rate, PDEV_PARAM_DEFAULT_6GHZ_RATE),
+	PARAM_MAP(pdev_param_scan_blanking_mode,
+		  PDEV_PARAM_SET_SCAN_BLANKING_MODE),
 };
 
 /* Populate vdev_param array whose index is host param, value is target param */

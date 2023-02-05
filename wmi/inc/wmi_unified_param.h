@@ -5570,6 +5570,8 @@ typedef enum {
 	PDEV_PARAM(pdev_param_btcoex_cfg, UNAVAILABLE_PARAM),
 	PDEV_PARAM(pdev_param_soft_tx_chain_mask, PDEV_PARAM_TX_CHAIN_MASK),
 	PDEV_PARAM(pdev_param_enable_peer_retry_stats, UNAVAILABLE_PARAM),
+	PDEV_PARAM(pdev_param_scan_blanking_mode,
+		   PDEV_PARAM_SET_SCAN_BLANKING_MODE),
 	pdev_param_max,
 } wmi_conv_pdev_params_id;
 
