@@ -1524,6 +1524,9 @@ QDF_STATUS (*extract_mgmt_tx_compl_param)(wmi_unified_t wmi_handle,
 QDF_STATUS (*extract_chan_info_event)(wmi_unified_t wmi_handle, void *evt_buf,
 				   wmi_host_chan_info_event *chan_info);
 
+QDF_STATUS (*extract_scan_blanking_params)(wmi_unified_t wmi_handle,
+	    void *evt_buf, wmi_host_scan_blanking_params *blanking_params);
+
 QDF_STATUS (*extract_channel_hopping_event)(wmi_unified_t wmi_handle,
 		void *evt_buf,
 		wmi_host_pdev_channel_hopping_event *ch_hopping);
