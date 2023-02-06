@@ -1569,8 +1569,8 @@ struct ol_if_ops {
 				      uint8_t vdev_id, uint8_t *peer_mac,
 				      uint8_t tid, uint8_t ac,
 				      uint32_t service_interval,
-				      uint32_t burst_size,
-				      uint8_t add_sub);
+				      uint32_t burst_size, uint32_t min_tput,
+				      uint32_t max_latency, uint8_t add_sub);
 #endif
 	uint32_t (*dp_get_tx_inqueue)(ol_txrx_soc_handle soc);
 	QDF_STATUS(*dp_send_unit_test_cmd)(uint32_t vdev_id,
@@ -2337,6 +2337,7 @@ struct cdp_sawf_ops {
 	QDF_STATUS
 	(*peer_config_ul)(struct cdp_soc_t *hdl, uint8_t *mac_addr, uint8_t tid,
 			  uint32_t service_interval, uint32_t burst_size,
+			  uint32_t min_tput, uint32_t max_latency,
 			  uint8_t add_or_sub);
 	bool
 	(*swaf_peer_is_sla_configured)(struct cdp_soc_t *soc,
