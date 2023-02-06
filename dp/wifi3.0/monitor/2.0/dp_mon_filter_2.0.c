@@ -1398,17 +1398,6 @@ void dp_tx_mon_filter_set_upstream_tlvs(struct htt_tx_ring_tlv_filter *filter)
 	filter->utlvs.eht_sig_usr_ofdma = 1;
 }
 
-void dp_tx_mon_filter_set_word_mask(struct htt_tx_ring_tlv_filter *filter)
-{
-	filter->wmask.tx_fes_setup = 1;
-	filter->wmask.tx_peer_entry = 1;
-	filter->wmask.tx_queue_ext = 1;
-	filter->wmask.tx_msdu_start = 1;
-	filter->wmask.tx_mpdu_start = 1;
-	filter->wmask.pcu_ppdu_setup_init = 1;
-	filter->wmask.rxpcu_user_setup = 1;
-}
-
 void dp_tx_mon_filter_set_all(struct dp_mon_pdev_be *mon_pdev_be,
 			      struct htt_tx_ring_tlv_filter *filter)
 {
@@ -1421,7 +1410,6 @@ void dp_tx_mon_filter_set_all(struct dp_mon_pdev_be *mon_pdev_be,
 
 	dp_tx_mon_filter_set_downstream_tlvs(filter);
 	dp_tx_mon_filter_set_upstream_tlvs(filter);
-	dp_tx_mon_filter_set_word_mask(filter);
 
 	filter->mgmt_filter = 0x1;
 	filter->data_filter = 0x1;
@@ -1446,6 +1434,26 @@ void dp_tx_mon_filter_set_all(struct dp_mon_pdev_be *mon_pdev_be,
 	filter->mgmt_dma_length = mon_pdev_be->tx_mon_filter_length;
 	filter->ctrl_dma_length = mon_pdev_be->tx_mon_filter_length;
 	filter->data_dma_length = mon_pdev_be->tx_mon_filter_length;
+}
+
+void dp_tx_mon_filter_set_word_mask(struct dp_pdev *pdev,
+				    struct htt_tx_ring_tlv_filter *filter)
+{
+	/* invoke hal api to get the word mask */
+
+	filter->wmask.pcu_ppdu_setup_init = 0xFFFFFFFF;
+	filter->wmask.tx_peer_entry = 0xFFFF;
+	filter->wmask.tx_queue_ext = 0xFFFF;
+	filter->wmask.tx_fes_status_end = 0xFFFF;
+	filter->wmask.response_end_status = 0xFFFF;
+	filter->wmask.tx_fes_status_prot = 0xFFFF;
+	filter->wmask.tx_fes_setup = 0xFF;
+	filter->wmask.tx_msdu_start = 0xFF;
+	filter->wmask.tx_mpdu_start = 0xFF;
+	filter->wmask.rxpcu_user_setup = 0xFF;
+
+	/* compaction is disable */
+	filter->compaction_enable = 0;
 }
 
 void dp_mon_filter_setup_tx_mon_mode_2_0(struct dp_pdev *pdev)
@@ -1479,6 +1487,7 @@ void dp_mon_filter_setup_tx_mon_mode_2_0(struct dp_pdev *pdev)
 
 	filter.tx_valid = !!mon_pdev_be->tx_mon_mode;
 	dp_tx_mon_filter_set_all(mon_pdev_be, &filter.tx_tlv_filter);
+	dp_tx_mon_filter_set_word_mask(pdev, &filter.tx_tlv_filter);
 	dp_mon_filter_show_tx_filter_be(mode, &filter);
 	mon_pdev_be->filter_be[mode][srng_type] = filter;
 }
@@ -3156,14 +3165,29 @@ dp_mon_filter_reset_tx_lite_mon(struct dp_mon_pdev_be *be_mon_pdev)
 }
 
 void
-dp_mon_filter_setup_tx_lite_mon(struct dp_mon_pdev_be *be_mon_pdev)
+dp_mon_filter_setup_tx_lite_mon(struct dp_pdev *pdev)
 {
+	struct dp_mon_pdev *mon_pdev = NULL;
+	struct dp_mon_pdev_be *be_mon_pdev = NULL;
 	struct dp_mon_filter_be filter = {0};
 	enum dp_mon_filter_mode mode = DP_MON_FILTER_LITE_MON_MODE;
 	enum dp_mon_filter_srng_type srng_type =
 				DP_MON_FILTER_SRNG_TYPE_TXMON_DEST;
 	struct htt_tx_ring_tlv_filter *tx_tlv_filter = &filter.tx_tlv_filter;
 	struct dp_lite_mon_tx_config *config = NULL;
+
+	if (!pdev) {
+		dp_mon_filter_err("Pdev context is null");
+		return;
+	}
+
+	mon_pdev = pdev->monitor_pdev;
+	if (!mon_pdev) {
+		dp_mon_filter_err("Monitor pdev context is null");
+		return;
+	}
+
+	be_mon_pdev = dp_get_be_mon_pdev_from_dp_mon_pdev(mon_pdev);
 
 	config = be_mon_pdev->lite_mon_tx_config;
 	if (!config)
@@ -3182,7 +3206,7 @@ dp_mon_filter_setup_tx_lite_mon(struct dp_mon_pdev_be *be_mon_pdev)
 
 	dp_tx_mon_filter_set_downstream_tlvs(tx_tlv_filter);
 	dp_tx_mon_filter_set_upstream_tlvs(tx_tlv_filter);
-	dp_tx_mon_filter_set_word_mask(tx_tlv_filter);
+	dp_tx_mon_filter_set_word_mask(pdev, tx_tlv_filter);
 
 	/* configure mgmt filters */
 	if (config->tx_config.mgmt_filter[DP_MON_FRM_FILTER_MODE_FP]) {
