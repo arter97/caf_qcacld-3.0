@@ -81,23 +81,25 @@ qdf_export_symbol(wlan_get_sawf_ctx);
 
 void wlan_print_service_class(struct wlan_sawf_scv_class_params *params)
 {
-	qdf_info(SAWF_LINE_FORMAT);
-	qdf_info("Service ID          :%d", params->svc_id);
-	qdf_info("App Name            :%s", params->app_name);
-	qdf_info("Min througput       :%d", params->min_thruput_rate);
-	qdf_info("Max throughput      :%d", params->max_thruput_rate);
-	qdf_info("Burst Size          :%d", params->burst_size);
-	qdf_info("Service Interval    :%d", params->service_interval);
-	qdf_info("Delay Bound         :%d", params->delay_bound);
-	qdf_info("MSDU TTL            :%d", params->msdu_ttl);
-	qdf_info("Priority            :%d", params->priority);
-	qdf_info("TID                 :%d", params->tid);
-	qdf_info("MSDU Loss Rate      :%d", params->msdu_rate_loss);
-	qdf_info("UL Burst Size       :%d", params->ul_burst_size);
-	qdf_info("UL Service Interval :%d", params->ul_service_interval);
-	qdf_info("Service class type  :%d", params->type);
-	qdf_info("Ref count           :%d", params->ref_count);
-	qdf_info("Peer count          :%d", params->peer_count);
+	qdf_nofl_info(SAWF_LINE_FORMAT);
+	qdf_nofl_info("Service ID          :%d", params->svc_id);
+	qdf_nofl_info("App Name            :%s", params->app_name);
+	qdf_nofl_info("Min througput       :%d", params->min_thruput_rate);
+	qdf_nofl_info("Max throughput      :%d", params->max_thruput_rate);
+	qdf_nofl_info("Burst Size          :%d", params->burst_size);
+	qdf_nofl_info("Service Interval    :%d", params->service_interval);
+	qdf_nofl_info("Delay Bound         :%d", params->delay_bound);
+	qdf_nofl_info("MSDU TTL            :%d", params->msdu_ttl);
+	qdf_nofl_info("Priority            :%d", params->priority);
+	qdf_nofl_info("TID                 :%d", params->tid);
+	qdf_nofl_info("MSDU Loss Rate      :%d", params->msdu_rate_loss);
+	qdf_nofl_info("UL Burst Size       :%d", params->ul_burst_size);
+	qdf_nofl_info("UL Service Interval :%d", params->ul_service_interval);
+	qdf_nofl_info("UL Min throughput   :%d", params->ul_min_tput);
+	qdf_nofl_info("UL Max Latency      :%d", params->ul_max_latency);
+	qdf_nofl_info("Service class type  :%d", params->type);
+	qdf_nofl_info("Ref count           :%d", params->ref_count);
+	qdf_nofl_info("Peer count          :%d", params->peer_count);
 }
 
 qdf_export_symbol(wlan_print_service_class);
@@ -223,6 +225,8 @@ void wlan_update_sawf_params_nolock(struct wlan_sawf_scv_class_params *params)
 	new_param->msdu_rate_loss = params->msdu_rate_loss;
 	new_param->ul_burst_size = params->ul_burst_size;
 	new_param->ul_service_interval = params->ul_service_interval;
+	new_param->ul_min_tput = params->ul_min_tput;
+	new_param->ul_max_latency = params->ul_max_latency;
 }
 
 qdf_export_symbol(wlan_update_sawf_params_nolock);
@@ -301,7 +305,8 @@ qdf_export_symbol(wlan_validate_sawf_params);
 
 QDF_STATUS
 wlan_sawf_get_uplink_params(uint8_t svc_id, uint8_t *tid,
-			    uint32_t *service_interval, uint32_t *burst_size)
+			    uint32_t *service_interval, uint32_t *burst_size,
+			    uint32_t *min_tput, uint32_t *max_latency)
 {
 	struct sawf_ctx *sawf;
 	struct wlan_sawf_scv_class_params *svc_param;
@@ -327,6 +332,12 @@ wlan_sawf_get_uplink_params(uint8_t svc_id, uint8_t *tid,
 
 	if (burst_size)
 		*burst_size = svc_param->ul_burst_size;
+
+	if (min_tput)
+		*min_tput = svc_param->ul_min_tput;
+
+	if (max_latency)
+		*max_latency = svc_param->ul_max_latency;
 
 	qdf_spin_unlock_bh(&sawf->lock);
 	return QDF_STATUS_SUCCESS;
