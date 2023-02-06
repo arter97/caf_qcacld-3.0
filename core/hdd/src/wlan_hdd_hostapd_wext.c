@@ -635,7 +635,7 @@ static __iw_softap_setparam(struct net_device *dev,
 	{
 		uint8_t preamble = 0, nss = 0, rix = 0;
 		struct sap_config *config =
-			&adapter->session.ap.sap_config;
+			&adapter->deflink->session.ap.sap_config;
 
 		hdd_debug("SET_HT_RATE val %d", set_value);
 
@@ -698,7 +698,7 @@ static __iw_softap_setparam(struct net_device *dev,
 	{
 		uint8_t preamble = 0, nss = 0, rix = 0;
 		struct sap_config *config =
-			&adapter->session.ap.sap_config;
+			&adapter->deflink->session.ap.sap_config;
 
 		if (config->SapHw_mode < eCSR_DOT11_MODE_11ac ||
 		    config->SapHw_mode == eCSR_DOT11_MODE_11ax_ONLY ||
@@ -1009,7 +1009,7 @@ static __iw_softap_setparam(struct net_device *dev,
 		break;
 	case QCASAP_SET_11AX_RATE:
 		ret = hdd_set_11ax_rate(adapter, set_value,
-					&adapter->session.ap.
+					&adapter->deflink->session.ap.
 					sap_config);
 		break;
 	case QCASAP_PARAM_DCM:

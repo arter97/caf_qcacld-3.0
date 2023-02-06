@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022, Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -340,18 +340,18 @@ static int __wlan_hdd_request_pre_cac(struct hdd_context *hdd_ctx,
 	 * other active SAP interface. In regular scenarios, these IEs would
 	 * come from the user space entity
 	 */
-	pre_cac_adapter->session.ap.beacon = qdf_mem_malloc(
-			sizeof(*ap_adapter->session.ap.beacon));
-	if (!pre_cac_adapter->session.ap.beacon)
+	pre_cac_adapter->deflink->session.ap.beacon = qdf_mem_malloc(
+			sizeof(*ap_adapter->deflink->session.ap.beacon));
+	if (!pre_cac_adapter->deflink->session.ap.beacon)
 		goto stop_close_pre_cac_adapter;
 
-	qdf_mem_copy(pre_cac_adapter->session.ap.beacon,
-		     ap_adapter->session.ap.beacon,
-		     sizeof(*pre_cac_adapter->session.ap.beacon));
-	pre_cac_adapter->session.ap.sap_config.ch_width_orig =
-			ap_adapter->session.ap.sap_config.ch_width_orig;
-	pre_cac_adapter->session.ap.sap_config.authType =
-			ap_adapter->session.ap.sap_config.authType;
+	qdf_mem_copy(pre_cac_adapter->deflink->session.ap.beacon,
+		     ap_adapter->deflink->session.ap.beacon,
+		     sizeof(*pre_cac_adapter->deflink->session.ap.beacon));
+	pre_cac_adapter->deflink->session.ap.sap_config.ch_width_orig =
+		ap_adapter->deflink->session.ap.sap_config.ch_width_orig;
+	pre_cac_adapter->deflink->session.ap.sap_config.authType =
+			ap_adapter->deflink->session.ap.sap_config.authType;
 
 	/* The original premise is that on moving from 2.4GHz to 5GHz, the SAP
 	 * will continue to operate on the same bandwidth as that of the 2.4GHz
@@ -372,11 +372,11 @@ static int __wlan_hdd_request_pre_cac(struct hdd_context *hdd_ctx,
 		hdd_err("error set pre_cac channel %d", pre_cac_chan_freq);
 		goto close_pre_cac_adapter;
 	}
-	pre_cac_adapter->session.ap.sap_config.ch_width_orig =
+	pre_cac_adapter->deflink->session.ap.sap_config.ch_width_orig =
 					hdd_map_nl_chan_width(chandef.width);
 
 	hdd_debug("existing ap phymode:%d pre cac ch_width:%d freq:%d",
-		  ap_adapter->session.ap.sap_config.SapHw_mode,
+		  ap_adapter->deflink->session.ap.sap_config.SapHw_mode,
 		  cac_ch_width, pre_cac_chan_freq);
 	/*
 	 * Doing update after opening and starting pre-cac adapter will make
@@ -430,8 +430,8 @@ static int __wlan_hdd_request_pre_cac(struct hdd_context *hdd_ctx,
 
 stop_close_pre_cac_adapter:
 	hdd_stop_adapter(hdd_ctx, pre_cac_adapter);
-	qdf_mem_free(pre_cac_adapter->session.ap.beacon);
-	pre_cac_adapter->session.ap.beacon = NULL;
+	qdf_mem_free(pre_cac_adapter->deflink->session.ap.beacon);
+	pre_cac_adapter->deflink->session.ap.beacon = NULL;
 close_pre_cac_adapter:
 	hdd_close_adapter(hdd_ctx, pre_cac_adapter, false);
 release_intf_addr_and_return_failure:

@@ -92,7 +92,8 @@ static uint32_t hdd_son_is_acs_in_progress(struct wlan_objmgr_vdev *vdev)
 		return in_progress;
 	}
 
-	in_progress = qdf_atomic_read(&adapter->session.ap.acs_in_progress);
+	in_progress = qdf_atomic_read(
+			&adapter->deflink->session.ap.acs_in_progress);
 
 	return in_progress;
 }
@@ -1929,12 +1930,12 @@ static int hdd_son_start_acs(struct wlan_objmgr_vdev *vdev, uint8_t enable)
 		hdd_err("null hdd_ctx");
 		return -EINVAL;
 	}
-	if (qdf_atomic_read(&adapter->session.ap.acs_in_progress)) {
+	if (qdf_atomic_read(&adapter->deflink->session.ap.acs_in_progress)) {
 		hdd_err("ACS is in-progress");
 		return -EAGAIN;
 	}
 	wlan_hdd_undo_acs(adapter);
-	sap_config = &adapter->session.ap.sap_config;
+	sap_config = &adapter->deflink->session.ap.sap_config;
 	hdd_debug("ACS Config country %s hw_mode %d ACS_BW: %d START_CH: %d END_CH: %d band %d",
 		  hdd_ctx->reg.alpha2, sap_config->acs_cfg.hw_mode,
 		  sap_config->acs_cfg.ch_width,
@@ -1999,7 +2000,7 @@ static int hdd_son_set_acs_channels(struct wlan_objmgr_vdev *vdev,
 		hdd_err("null hdd_ctx");
 		return -EINVAL;
 	}
-	sap_config = &adapter->session.ap.sap_config;
+	sap_config = &adapter->deflink->session.ap.sap_config;
 	/* initialize with default channels */
 	if (hdd_son_init_acs_channels(adapter, hdd_ctx, &sap_config->acs_cfg)
 						       != QDF_STATUS_SUCCESS) {
@@ -2216,7 +2217,7 @@ static int hdd_son_get_acs_report(struct wlan_objmgr_vdev *vdev,
 		goto end;
 	}
 	sap_ctx = WLAN_HDD_GET_SAP_CTX_PTR(adapter);
-	acs_cfg = &adapter->session.ap.sap_config.acs_cfg;
+	acs_cfg = &adapter->deflink->session.ap.sap_config.acs_cfg;
 	if (!acs_cfg->freq_list &&
 	    (hdd_son_init_acs_channels(adapter, hdd_ctx,
 				       acs_cfg) != QDF_STATUS_SUCCESS)) {

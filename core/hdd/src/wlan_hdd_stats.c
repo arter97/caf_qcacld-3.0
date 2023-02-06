@@ -918,7 +918,7 @@ bool hdd_get_interface_info(struct hdd_adapter *adapter,
 	if ((adapter->device_mode == QDF_SAP_MODE) ||
 	    (adapter->device_mode == QDF_P2P_GO_MODE)) {
 		if (test_bit(SOFTAP_BSS_STARTED, &adapter->event_flags)) {
-			config = &adapter->session.ap.sap_config;
+			config = &adapter->deflink->session.ap.sap_config;
 
 			qdf_copy_macaddr(&info->bssid,
 					 &config->self_macaddr);
@@ -7579,7 +7579,7 @@ void wlan_hdd_get_peer_rx_rate_stats(struct hdd_adapter *adapter)
 	if (!peer_stats)
 		return;
 
-	peer_mac_addr = adapter->session.station.conn_info.bssid.bytes;
+	peer_mac_addr = adapter->deflink->session.station.conn_info.bssid.bytes;
 
 	status = cdp_host_get_peer_stats(soc,
 					 adapter->vdev_id,

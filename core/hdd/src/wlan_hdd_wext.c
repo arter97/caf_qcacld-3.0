@@ -3779,7 +3779,8 @@ static int hdd_we_set_11n_rate(struct hdd_adapter *adapter, int rate_code)
 	QDF_STATUS status;
 	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
 	enum wlan_phymode peer_phymode;
-	uint8_t *peer_mac = adapter->session.station.conn_info.bssid.bytes;
+	uint8_t *peer_mac =
+		adapter->deflink->session.station.conn_info.bssid.bytes;
 
 	hdd_debug("Rate code %d", rate_code);
 

@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -448,6 +448,7 @@ static int __wlan_hdd_cfg80211_scan(struct wiphy *wiphy,
 	int status;
 	struct hdd_scan_info *scan_info = NULL;
 	struct hdd_adapter *con_sap_adapter;
+	struct hdd_ap_ctx *ap_ctx;
 	qdf_freq_t con_dfs_ch_freq;
 	uint8_t curr_vdev_id;
 	enum scan_reject_states curr_reason;
@@ -516,13 +517,11 @@ static int __wlan_hdd_cfg80211_scan(struct wiphy *wiphy,
 
 	con_sap_adapter = hdd_get_con_sap_adapter(adapter, true);
 	if (con_sap_adapter) {
-		con_dfs_ch_freq =
-			con_sap_adapter->session.ap.sap_config.chan_freq;
-		con_dfs_ch_width =
-		      con_sap_adapter->session.ap.sap_config.ch_params.ch_width;
+		ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(con_sap_adapter);
+		con_dfs_ch_freq = ap_ctx->sap_config.chan_freq;
+		con_dfs_ch_width = ap_ctx->sap_config.ch_params.ch_width;
 		if (con_dfs_ch_freq == AUTO_CHANNEL_SELECT)
-			con_dfs_ch_freq =
-				con_sap_adapter->session.ap.operating_chan_freq;
+			con_dfs_ch_freq = ap_ctx->operating_chan_freq;
 
 		if (!policy_mgr_is_hw_dbs_capable(hdd_ctx->psoc) &&
 		    !policy_mgr_is_sta_sap_scc_allowed_on_dfs_chan(
@@ -822,10 +821,10 @@ static void hdd_process_vendor_acs_response(struct hdd_adapter *adapter)
 {
 	if (test_bit(VENDOR_ACS_RESPONSE_PENDING, &adapter->event_flags)) {
 		if (QDF_TIMER_STATE_RUNNING ==
-		    qdf_mc_timer_get_current_state(&adapter->session.
-					ap.vendor_acs_timer)) {
-			qdf_mc_timer_stop(&adapter->session.
-					ap.vendor_acs_timer);
+		    qdf_mc_timer_get_current_state(
+			&adapter->deflink->session.ap.vendor_acs_timer)) {
+			qdf_mc_timer_stop(
+				&adapter->deflink->session.ap.vendor_acs_timer);
 		}
 	}
 }

@@ -6393,7 +6393,7 @@ static void disconnect_sta_and_restart_sap(struct hdd_context *hdd_ctx,
 		if (!hdd_validate_adapter(adapter) &&
 		    adapter->device_mode == QDF_SAP_MODE) {
 			if (check_disable_channels(hdd_ctx,
-				adapter->session.ap.operating_chan_freq))
+			    adapter->deflink->session.ap.operating_chan_freq))
 				policy_mgr_check_sap_restart(hdd_ctx->psoc,
 							     adapter->vdev_id);
 		}

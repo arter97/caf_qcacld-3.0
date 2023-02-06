@@ -288,7 +288,7 @@ hdd_hostapd_init_sap_session(struct hdd_adapter *adapter, bool reinit)
 		return NULL;
 	}
 
-	sap_ctx = adapter->session.ap.sap_context;
+	sap_ctx = adapter->deflink->session.ap.sap_context;
 
 	if (!sap_ctx) {
 		hdd_err("can't allocate the sap_ctx");
@@ -299,7 +299,7 @@ hdd_hostapd_init_sap_session(struct hdd_adapter *adapter, bool reinit)
 			       adapter->vdev_id, reinit);
 	if (QDF_IS_STATUS_ERROR(status)) {
 		hdd_err("wlansap_start failed!! status: %d", status);
-		adapter->session.ap.sap_context = NULL;
+		adapter->deflink->session.ap.sap_context = NULL;
 		goto error;
 	}
 	return sap_ctx;
@@ -1991,7 +1991,7 @@ QDF_STATUS hdd_hostapd_sap_event_cb(struct sap_event *sap_event,
 			hdd_ctx->pdev, ap_ctx->operating_chan_freq);
 	wlan_reg_get_cc_and_src(hdd_ctx->psoc, dfs_info.country_code);
 	sta_id = sap_event->sapevt.sapStartBssCompleteEvent.staId;
-	sap_config = &adapter->session.ap.sap_config;
+	sap_config = &adapter->deflink->session.ap.sap_config;
 
 	switch (event_id) {
 	case eSAP_START_BSS_EVENT:
@@ -2309,7 +2309,7 @@ QDF_STATUS hdd_hostapd_sap_event_cb(struct sap_event *sap_event,
 	{
 		int i;
 		struct sap_config *sap_config =
-				&adapter->session.ap.sap_config;
+				&adapter->deflink->session.ap.sap_config;
 
 		hdd_dfs_indicate_radar(hdd_ctx);
 		wlan_hdd_send_svc_nlink_msg(hdd_ctx->radio_index,
@@ -2862,7 +2862,8 @@ QDF_STATUS hdd_hostapd_sap_event_cb(struct sap_event *sap_event,
 			      ap_ctx->sap_config.acs_cfg.pri_ch_freq,
 			      ap_ctx->sap_config.acs_cfg.ch_width);
 
-		if (qdf_atomic_read(&adapter->session.ap.acs_in_progress) &&
+		if (qdf_atomic_read(
+		    &adapter->deflink->session.ap.acs_in_progress) &&
 		    test_bit(SOFTAP_BSS_STARTED, &adapter->event_flags)) {
 			hdd_dcs_chan_select_complete(adapter);
 		} else {
@@ -2930,7 +2931,7 @@ QDF_STATUS hdd_hostapd_sap_event_cb(struct sap_event *sap_event,
 		else if (ap_ctx->sap_context->csa_reason == CSA_REASON_DCS)
 			hdd_dcs_hostapd_set_chan(
 				hdd_ctx, adapter->vdev_id,
-				adapter->session.ap.operating_chan_freq);
+				ap_ctx->operating_chan_freq);
 
 		/* Added the sta cnt check as we don't support sta+sap+nan
 		 * today. But this needs to be re-visited when we start
@@ -3692,7 +3693,7 @@ QDF_STATUS wlan_hdd_get_channel_for_sap_restart(
 	 */
 	if (policy_mgr_is_sap_restart_required_after_sta_disconnect(
 	    psoc, vdev_id, &intf_ch_freq,
-	    !!ap_adapter->session.ap.sap_config.acs_cfg.acs_mode)) {
+	    !!ap_adapter->deflink->session.ap.sap_config.acs_cfg.acs_mode)) {
 		hdd_debug("Move the sap (vdev %d) to user configured channel %u",
 			  vdev_id, intf_ch_freq);
 		goto sap_restart;
@@ -3811,7 +3812,7 @@ wlan_get_sap_acs_band(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 	 * If acs mode is false, that means acs is disabled and acs band can be
 	 * QCA_ACS_MODE_IEEE80211ANY
 	 */
-	sap_config = &ap_adapter->session.ap.sap_config;
+	sap_config = &ap_adapter->deflink->session.ap.sap_config;
 	if (sap_config->acs_cfg.acs_mode == false) {
 		*acs_band = QCA_ACS_MODE_IEEE80211ANY;
 		return QDF_STATUS_SUCCESS;
@@ -4002,8 +4003,8 @@ void hdd_set_ap_ops(struct net_device *dev)
 bool hdd_sap_create_ctx(struct hdd_adapter *adapter)
 {
 	hdd_debug("creating sap context");
-	adapter->session.ap.sap_context = sap_create_ctx();
-	if (adapter->session.ap.sap_context)
+	adapter->deflink->session.ap.sap_context = sap_create_ctx();
+	if (adapter->deflink->session.ap.sap_context)
 		return true;
 
 	return false;
@@ -4011,11 +4012,11 @@ bool hdd_sap_create_ctx(struct hdd_adapter *adapter)
 
 bool hdd_sap_destroy_ctx(struct hdd_adapter *adapter)
 {
-	struct sap_context *sap_ctx = adapter->session.ap.sap_context;
+	struct sap_context *sap_ctx = adapter->deflink->session.ap.sap_context;
 
-	if (adapter->session.ap.beacon) {
-		qdf_mem_free(adapter->session.ap.beacon);
-		adapter->session.ap.beacon = NULL;
+	if (adapter->deflink->session.ap.beacon) {
+		qdf_mem_free(adapter->deflink->session.ap.beacon);
+		adapter->deflink->session.ap.beacon = NULL;
 	}
 
 	if (!sap_ctx) {
@@ -4028,7 +4029,7 @@ bool hdd_sap_destroy_ctx(struct hdd_adapter *adapter)
 	if (QDF_IS_STATUS_ERROR(sap_destroy_ctx(sap_ctx)))
 		return false;
 
-	adapter->session.ap.sap_context = NULL;
+	adapter->deflink->session.ap.sap_context = NULL;
 
 	return true;
 }
@@ -4088,7 +4089,7 @@ QDF_STATUS hdd_init_ap_mode(struct hdd_adapter *adapter, bool reinit)
 	hdd_enter();
 
 	hdd_debug("SSR in progress: %d", reinit);
-	qdf_atomic_init(&adapter->session.ap.acs_in_progress);
+	qdf_atomic_init(&adapter->deflink->session.ap.acs_in_progress);
 
 	sap_ctx = hdd_hostapd_init_sap_session(adapter, reinit);
 	if (!sap_ctx) {
@@ -4097,10 +4098,10 @@ QDF_STATUS hdd_init_ap_mode(struct hdd_adapter *adapter, bool reinit)
 	}
 
 	if (!reinit) {
-		adapter->session.ap.sap_config.chan_freq =
+		adapter->deflink->session.ap.sap_config.chan_freq =
 					      hdd_ctx->acs_policy.acs_chan_freq;
 		acs_dfs_mode = hdd_ctx->acs_policy.acs_dfs_mode;
-		adapter->session.ap.sap_config.acs_dfs_mode =
+		adapter->deflink->session.ap.sap_config.acs_dfs_mode =
 			wlan_hdd_get_dfs_mode(acs_dfs_mode);
 	}
 
@@ -4185,11 +4186,12 @@ QDF_STATUS hdd_init_ap_mode(struct hdd_adapter *adapter, bool reinit)
 	hdd_set_netdev_flags(adapter);
 
 	if (!reinit) {
-		adapter->session.ap.sap_config.acs_cfg.acs_mode = false;
+		adapter->deflink->session.ap.sap_config.acs_cfg.acs_mode =
+									false;
 		wlansap_dcs_set_vdev_wlan_interference_mitigation(sap_ctx,
 								  false);
 		wlansap_dcs_set_vdev_starting(sap_ctx, false);
-		qdf_mem_zero(&adapter->session.ap.sap_config.acs_cfg,
+		qdf_mem_zero(&adapter->deflink->session.ap.sap_config.acs_cfg,
 			     sizeof(struct sap_acs_cfg));
 	}
 
@@ -4221,7 +4223,7 @@ void hdd_deinit_ap_mode(struct hdd_context *hdd_ctx,
 		hdd_wmm_adapter_close(adapter);
 		clear_bit(WMM_INIT_DONE, &adapter->event_flags);
 	}
-	qdf_atomic_set(&adapter->session.ap.acs_in_progress, 0);
+	qdf_atomic_set(&adapter->deflink->session.ap.acs_in_progress, 0);
 	if (qdf_atomic_read(&adapter->ch_switch_in_progress)) {
 		qdf_atomic_set(&adapter->ch_switch_in_progress, 0);
 		policy_mgr_set_chan_switch_complete_evt(hdd_ctx->psoc);
@@ -4277,6 +4279,7 @@ struct hdd_adapter *hdd_wlan_create_ap_dev(struct hdd_context *hdd_ctx,
 	/* Initialize the adapter context to zeros. */
 	qdf_mem_zero(adapter, sizeof(struct hdd_adapter));
 	adapter->dev = dev;
+	adapter->deflink = &adapter->link_info[0];
 	adapter->hdd_ctx = hdd_ctx;
 	adapter->magic = WLAN_HDD_ADAPTER_MAGIC;
 	adapter->vdev_id = WLAN_UMAC_VDEV_ID_MAX;
@@ -4347,7 +4350,7 @@ static bool wlan_hdd_get_sap_obss(struct hdd_adapter *adapter)
 	uint8_t ht_cap_ie[DOT11F_IE_HTCAPS_MAX_LEN];
 	tDot11fIEHTCaps dot11_ht_cap_ie = {0};
 	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
-	struct hdd_beacon_data *beacon = adapter->session.ap.beacon;
+	struct hdd_beacon_data *beacon = adapter->deflink->session.ap.beacon;
 	mac_handle_t mac_handle;
 
 	mac_handle = hdd_ctx->mac_handle;
@@ -4583,7 +4586,7 @@ static int wlan_hdd_add_extn_ie(struct hdd_adapter *adapter, uint8_t *genie,
 {
 	const uint8_t *ie;
 	uint16_t ielen = 0;
-	struct hdd_beacon_data *beacon = adapter->session.ap.beacon;
+	struct hdd_beacon_data *beacon = adapter->deflink->session.ap.beacon;
 
 	ie = wlan_get_ext_ie_ptr_from_ext_id(oui, oui_size,
 					     beacon->tail,
@@ -4614,7 +4617,7 @@ static void wlan_hdd_add_hostapd_conf_vsie(struct hdd_adapter *adapter,
 					   uint8_t *genie,
 					   uint16_t *total_ielen)
 {
-	struct hdd_beacon_data *beacon = adapter->session.ap.beacon;
+	struct hdd_beacon_data *beacon = adapter->deflink->session.ap.beacon;
 	int left = beacon->tail_len;
 	uint8_t *ptr = beacon->tail;
 	uint8_t elem_id, elem_len;
@@ -4682,7 +4685,7 @@ static void wlan_hdd_add_extra_ie(struct hdd_adapter *adapter,
 				  uint8_t *genie, uint16_t *total_ielen,
 				  uint8_t temp_ie_id)
 {
-	struct hdd_beacon_data *beacon = adapter->session.ap.beacon;
+	struct hdd_beacon_data *beacon = adapter->deflink->session.ap.beacon;
 	int left = beacon->tail_len;
 	uint8_t *ptr = beacon->tail;
 	uint8_t elem_id, elem_len;
@@ -4744,7 +4747,7 @@ wlan_hdd_cfg80211_alloc_new_beacon(struct hdd_adapter *adapter,
 		return -EINVAL;
 	}
 
-	old = adapter->session.ap.beacon;
+	old = adapter->deflink->session.ap.beacon;
 
 	if (!params->head && !old) {
 		hdd_err("session: %d old and new heads points to NULL",
@@ -4820,7 +4823,7 @@ wlan_hdd_cfg80211_alloc_new_beacon(struct hdd_adapter *adapter,
 
 	*out_beacon = beacon;
 
-	adapter->session.ap.beacon = NULL;
+	adapter->deflink->session.ap.beacon = NULL;
 	qdf_mem_free(old);
 
 	return 0;
@@ -4923,8 +4926,8 @@ int wlan_hdd_cfg80211_update_apies(struct hdd_adapter *adapter)
 	uint8_t *proberesp_ies = NULL;
 	mac_handle_t mac_handle;
 
-	config = &adapter->session.ap.sap_config;
-	beacon = adapter->session.ap.beacon;
+	config = &adapter->deflink->session.ap.sap_config;
+	beacon = adapter->deflink->session.ap.beacon;
 	if (!beacon) {
 		hdd_err("Beacon is NULL !");
 		return -EINVAL;
@@ -5068,8 +5071,8 @@ done:
  */
 static void wlan_hdd_set_sap_hwmode(struct hdd_adapter *adapter)
 {
-	struct sap_config *config = &adapter->session.ap.sap_config;
-	struct hdd_beacon_data *beacon = adapter->session.ap.beacon;
+	struct sap_config *config = &adapter->deflink->session.ap.sap_config;
+	struct hdd_beacon_data *beacon = adapter->deflink->session.ap.beacon;
 	struct ieee80211_mgmt *mgmt_frame =
 		(struct ieee80211_mgmt *)beacon->head;
 	u8 checkRatesfor11g = true;
@@ -5148,7 +5151,7 @@ QDF_STATUS wlan_hdd_config_acs(struct hdd_context *hdd_ctx,
 	mac_handle_t mac_handle;
 
 	mac_handle = hdd_ctx->mac_handle;
-	sap_config = &adapter->session.ap.sap_config;
+	sap_config = &adapter->deflink->session.ap.sap_config;
 	ini_config = hdd_ctx->config;
 
 #ifdef FEATURE_WLAN_AP_AP_ACS_OPTIMIZE
@@ -5161,7 +5164,7 @@ QDF_STATUS wlan_hdd_config_acs(struct hdd_context *hdd_ctx,
 
 		if (con_sap_adapter)
 			con_sap_config =
-				&con_sap_adapter->session.ap.sap_config;
+			    &con_sap_adapter->deflink->session.ap.sap_config;
 
 		sap_config->acs_cfg.skip_scan_status = eSAP_DO_NEW_ACS_SCAN;
 
@@ -5278,7 +5281,8 @@ QDF_STATUS wlan_hdd_config_acs(struct hdd_context *hdd_ctx,
  */
 static int wlan_hdd_sap_p2p_11ac_overrides(struct hdd_adapter *ap_adapter)
 {
-	struct sap_config *sap_cfg = &ap_adapter->session.ap.sap_config;
+	struct sap_config *sap_cfg =
+			&ap_adapter->deflink->session.ap.sap_config;
 	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(ap_adapter);
 	uint8_t ch_width;
 	uint8_t sub_20_chan_width;
@@ -5962,9 +5966,9 @@ static QDF_STATUS wlan_hdd_mlo_update(struct hdd_context *hdd_ctx,
 void wlan_hdd_mlo_reset(struct hdd_adapter *adapter)
 {
 	if (wlan_vdev_mlme_is_mlo_ap(adapter->vdev)) {
-		adapter->session.ap.sap_config.mlo_sap = false;
-		adapter->session.ap.sap_config.link_id = 0;
-		adapter->session.ap.sap_config.num_link = 0;
+		adapter->deflink->session.ap.sap_config.mlo_sap = false;
+		adapter->deflink->session.ap.sap_config.link_id = 0;
+		adapter->deflink->session.ap.sap_config.num_link = 0;
 		mlo_ap_vdev_detach(adapter->vdev);
 	}
 }
@@ -6101,7 +6105,7 @@ int wlan_hdd_cfg80211_start_bss(struct hdd_adapter *adapter,
 
 	hostapd_state = WLAN_HDD_GET_HOSTAP_STATE_PTR(adapter);
 
-	config = &adapter->session.ap.sap_config;
+	config = &adapter->deflink->session.ap.sap_config;
 	if (!config->chan_freq) {
 		hdd_err("Invalid channel");
 		ret = -EINVAL;
@@ -6132,7 +6136,7 @@ int wlan_hdd_cfg80211_start_bss(struct hdd_adapter *adapter,
 					REASON_OPER_CHANNEL_DISABLED_INDOOR);
 	}
 
-	beacon = adapter->session.ap.beacon;
+	beacon = adapter->deflink->session.ap.beacon;
 
 	/*
 	 * beacon_fixed_len is the fixed length of beacon
@@ -6749,7 +6753,7 @@ error:
 		sme_update_channel_list(mac_handle);
 	}
 	clear_bit(SOFTAP_INIT_DONE, &adapter->event_flags);
-	qdf_atomic_set(&adapter->session.ap.acs_in_progress, 0);
+	qdf_atomic_set(&adapter->deflink->session.ap.acs_in_progress, 0);
 	wlansap_reset_sap_config_add_ie(config, eUPDATE_IE_ALL);
 
 free:
@@ -6773,27 +6777,27 @@ deliver_start_err:
 
 int hdd_destroy_acs_timer(struct hdd_adapter *adapter)
 {
+	struct hdd_ap_ctx *ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(adapter);
 	QDF_STATUS qdf_status = QDF_STATUS_E_FAILURE;
 
-	if (!adapter->session.ap.vendor_acs_timer_initialized)
+	if (!ap_ctx->vendor_acs_timer_initialized)
 		return 0;
 
-	adapter->session.ap.vendor_acs_timer_initialized = false;
+	ap_ctx->vendor_acs_timer_initialized = false;
 
 	clear_bit(VENDOR_ACS_RESPONSE_PENDING, &adapter->event_flags);
 	if (QDF_TIMER_STATE_RUNNING ==
-			adapter->session.ap.vendor_acs_timer.state) {
+			ap_ctx->vendor_acs_timer.state) {
 		qdf_status =
-			qdf_mc_timer_stop(&adapter->session.ap.
-					vendor_acs_timer);
+			qdf_mc_timer_stop(&ap_ctx->vendor_acs_timer);
 		if (!QDF_IS_STATUS_SUCCESS(qdf_status))
 			hdd_err("Failed to stop ACS timer");
 	}
 
-	if (adapter->session.ap.vendor_acs_timer.user_data)
-		qdf_mem_free(adapter->session.ap.vendor_acs_timer.user_data);
+	if (ap_ctx->vendor_acs_timer.user_data)
+		qdf_mem_free(ap_ctx->vendor_acs_timer.user_data);
 
-	qdf_mc_timer_destroy(&adapter->session.ap.vendor_acs_timer);
+	qdf_mc_timer_destroy(&ap_ctx->vendor_acs_timer);
 
 	return 0;
 }
@@ -6871,9 +6875,9 @@ static int __wlan_hdd_cfg80211_stop_ap(struct wiphy *wiphy,
 	}
 
 	cds_flush_work(&adapter->sap_stop_bss_work);
-	adapter->session.ap.sap_config.acs_cfg.acs_mode = false;
+	adapter->deflink->session.ap.sap_config.acs_cfg.acs_mode = false;
 	hdd_dcs_clear(adapter);
-	qdf_atomic_set(&adapter->session.ap.acs_in_progress, 0);
+	qdf_atomic_set(&adapter->deflink->session.ap.acs_in_progress, 0);
 	hdd_debug("Disabling queues");
 	wlan_hdd_netif_queue_control(adapter,
 				     WLAN_STOP_ALL_NETIF_QUEUE_N_CARRIER,
@@ -6921,9 +6925,9 @@ static int __wlan_hdd_cfg80211_stop_ap(struct wiphy *wiphy,
 			hdd_err("Stopping the BSS failed");
 			goto exit;
 		}
-		if (adapter->session.ap.beacon) {
-			qdf_mem_free(adapter->session.ap.beacon);
-			adapter->session.ap.beacon = NULL;
+		if (adapter->deflink->session.ap.beacon) {
+			qdf_mem_free(adapter->deflink->session.ap.beacon);
+			adapter->deflink->session.ap.beacon = NULL;
 		}
 	} else {
 		hdd_debug("SAP already down");
@@ -6969,9 +6973,9 @@ static int __wlan_hdd_cfg80211_stop_ap(struct wiphy *wiphy,
 					    FTM_TIME_SYNC_BSS_STOPPED);
 
 exit:
-	if (adapter->session.ap.beacon) {
-		qdf_mem_free(adapter->session.ap.beacon);
-		adapter->session.ap.beacon = NULL;
+	if (adapter->deflink->session.ap.beacon) {
+		qdf_mem_free(adapter->deflink->session.ap.beacon);
+		adapter->deflink->session.ap.beacon = NULL;
 	}
 	if (QDF_IS_STATUS_SUCCESS(status))
 		hdd_place_marker(adapter, "STOP with SUCCESS", NULL);
@@ -7090,18 +7094,19 @@ static void hdd_update_beacon_rate(struct hdd_adapter *adapter,
 		struct wiphy *wiphy,
 		struct cfg80211_ap_settings *params)
 {
+	struct hdd_ap_ctx *ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(adapter);
 	struct cfg80211_bitrate_mask *beacon_rate_mask;
 	enum nl80211_band band;
 
 	band = ieee80211_channel_band(params->chandef.chan);
 	beacon_rate_mask = &params->beacon_rate;
 	if (beacon_rate_mask->control[band].legacy) {
-		adapter->session.ap.sap_config.beacon_tx_rate =
+		ap_ctx->sap_config.beacon_tx_rate =
 			hdd_get_data_rate_from_rate_mask(wiphy, band,
 					beacon_rate_mask);
 		hdd_debug("beacon mask value %u, rate %hu",
 			  params->beacon_rate.control[0].legacy,
-			  adapter->session.ap.sap_config.beacon_tx_rate);
+			  ap_ctx->sap_config.beacon_tx_rate);
 	}
 }
 #else
@@ -7378,7 +7383,7 @@ wlan_hdd_update_twt_responder(struct hdd_adapter *adapter,
 {
 	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
 
-	adapter->session.ap.sap_config.cfg80211_twt_responder =
+	adapter->deflink->session.ap.sap_config.cfg80211_twt_responder =
 							params->twt_responder;
 	wlan_hdd_configure_twt_responder(hdd_ctx, params->twt_responder);
 }
@@ -7587,13 +7592,13 @@ static int __wlan_hdd_cfg80211_start_ap(struct wiphy *wiphy,
 		policy_mgr_init_sap_mandatory_chan(hdd_ctx->psoc,
 						   chandef->chan->center_freq);
 
-	adapter->session.ap.sap_config.ch_params.center_freq_seg0 =
+	adapter->deflink->session.ap.sap_config.ch_params.center_freq_seg0 =
 				cds_freq_to_chan(chandef->center_freq1);
-	adapter->session.ap.sap_config.ch_params.center_freq_seg1 =
+	adapter->deflink->session.ap.sap_config.ch_params.center_freq_seg1 =
 				cds_freq_to_chan(chandef->center_freq2);
-	adapter->session.ap.sap_config.ch_params.mhz_freq_seg0 =
+	adapter->deflink->session.ap.sap_config.ch_params.mhz_freq_seg0 =
 							chandef->center_freq1;
-	adapter->session.ap.sap_config.ch_params.mhz_freq_seg1 =
+	adapter->deflink->session.ap.sap_config.ch_params.mhz_freq_seg1 =
 							chandef->center_freq2;
 
 	status = policy_mgr_is_sap_allowed_on_dfs_freq(
@@ -7635,7 +7640,8 @@ static int __wlan_hdd_cfg80211_start_ap(struct wiphy *wiphy,
 	if (cds_is_sub_20_mhz_enabled()) {
 		enum channel_state ch_state;
 		enum phy_ch_width sub_20_ch_width = CH_WIDTH_INVALID;
-		struct sap_config *sap_cfg = &adapter->session.ap.sap_config;
+		struct sap_config *sap_cfg =
+				&adapter->deflink->session.ap.sap_config;
 		struct ch_params ch_params;
 
 		if (CHANNEL_STATE_DFS ==
@@ -7773,7 +7779,7 @@ static int __wlan_hdd_cfg80211_start_ap(struct wiphy *wiphy,
 		struct sap_config *sap_config =
 			&((WLAN_HDD_GET_AP_CTX_PTR(adapter))->sap_config);
 
-		old = adapter->session.ap.beacon;
+		old = adapter->deflink->session.ap.beacon;
 
 		if (old)
 			return -EALREADY;
@@ -7787,7 +7793,7 @@ static int __wlan_hdd_cfg80211_start_ap(struct wiphy *wiphy,
 			hdd_err("Error!!! Allocating the new beacon");
 			return -EINVAL;
 		}
-		adapter->session.ap.beacon = new;
+		adapter->deflink->session.ap.beacon = new;
 
 		if (chandef->width < NL80211_CHAN_WIDTH_80)
 			channel_type = cfg80211_get_chandef_type(
@@ -7805,18 +7811,18 @@ static int __wlan_hdd_cfg80211_start_ap(struct wiphy *wiphy,
 		/* set authentication type */
 		switch (params->auth_type) {
 		case NL80211_AUTHTYPE_OPEN_SYSTEM:
-			adapter->session.ap.sap_config.authType =
+			adapter->deflink->session.ap.sap_config.authType =
 				eSAP_OPEN_SYSTEM;
 			break;
 		case NL80211_AUTHTYPE_SHARED_KEY:
-			adapter->session.ap.sap_config.authType =
+			adapter->deflink->session.ap.sap_config.authType =
 				eSAP_SHARED_KEY;
 			break;
 		default:
-			adapter->session.ap.sap_config.authType =
+			adapter->deflink->session.ap.sap_config.authType =
 				eSAP_AUTO_SWITCH;
 		}
-		adapter->session.ap.sap_config.ch_width_orig =
+		adapter->deflink->session.ap.sap_config.ch_width_orig =
 					hdd_map_nl_chan_width(chandef->width);
 
 		/*
@@ -7881,9 +7887,9 @@ static int __wlan_hdd_cfg80211_start_ap(struct wiphy *wiphy,
 
 err_start_bss:
 	hdd_place_marker(adapter, "START with FAILURE", NULL);
-	if (adapter->session.ap.beacon)
-		qdf_mem_free(adapter->session.ap.beacon);
-	adapter->session.ap.beacon = NULL;
+	if (adapter->deflink->session.ap.beacon)
+		qdf_mem_free(adapter->deflink->session.ap.beacon);
+	adapter->deflink->session.ap.beacon = NULL;
 
 success:
 	if (QDF_IS_STATUS_SUCCESS(status))
@@ -7963,7 +7969,7 @@ static int __wlan_hdd_cfg80211_change_beacon(struct wiphy *wiphy,
 		return -EOPNOTSUPP;
 	}
 
-	old = adapter->session.ap.beacon;
+	old = adapter->deflink->session.ap.beacon;
 
 	if (!old) {
 		hdd_err("session id: %d beacon data points to NULL",
@@ -7978,7 +7984,7 @@ static int __wlan_hdd_cfg80211_change_beacon(struct wiphy *wiphy,
 		return -EINVAL;
 	}
 
-	adapter->session.ap.beacon = new;
+	adapter->deflink->session.ap.beacon = new;
 	hdd_debug("update beacon for P2P GO/SAP");
 	status = wlan_hdd_cfg80211_start_bss(adapter, params, NULL,
 					0, 0, false);
@@ -8121,7 +8127,8 @@ bool hdd_sap_is_acs_in_progress(struct wlan_objmgr_vdev *vdev)
 		return in_progress;
 	}
 
-	in_progress = qdf_atomic_read(&adapter->session.ap.acs_in_progress);
+	in_progress = qdf_atomic_read(
+				&adapter->deflink->session.ap.acs_in_progress);
 
 	return in_progress;
 }

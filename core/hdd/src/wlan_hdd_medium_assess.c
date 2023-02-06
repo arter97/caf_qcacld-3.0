@@ -209,7 +209,7 @@ static int hdd_medium_assess_cca(struct hdd_context *hdd_ctx,
 		goto out;
 	}
 
-	if (qdf_atomic_read(&adapter->session.ap.acs_in_progress)) {
+	if (qdf_atomic_read(&adapter->deflink->session.ap.acs_in_progress)) {
 		hdd_err_rl("ACS is in progress");
 		errno = -EBUSY;
 		goto out;

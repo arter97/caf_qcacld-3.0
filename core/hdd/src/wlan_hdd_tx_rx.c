@@ -501,7 +501,7 @@ static void __hdd_hard_start_xmit(struct sk_buff *skb,
 {
 	struct hdd_adapter *adapter = WLAN_HDD_GET_PRIV_PTR(dev);
 	struct hdd_tx_rx_stats *stats = &adapter->hdd_stats.tx_rx_stats;
-	struct hdd_station_ctx *sta_ctx = &adapter->session.station;
+	struct hdd_station_ctx *sta_ctx = &adapter->deflink->session.station;
 	int cpu = qdf_get_smp_processor_id();
 	bool granted;
 	sme_ac_enum_type ac;

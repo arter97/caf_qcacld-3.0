@@ -2207,8 +2207,9 @@ static void hdd_roam_channel_switch_handler(struct hdd_adapter *adapter,
 	}
 
 	if (!is_sap_go_moved_before_sta)
-		policy_mgr_check_concurrent_intf_and_restart_sap(hdd_ctx->psoc,
-			    !!adapter->session.ap.sap_config.acs_cfg.acs_mode);
+		policy_mgr_check_concurrent_intf_and_restart_sap(
+		   hdd_ctx->psoc,
+		   !!adapter->deflink->session.ap.sap_config.acs_cfg.acs_mode);
 	wlan_twt_concurrency_update(hdd_ctx);
 }
 

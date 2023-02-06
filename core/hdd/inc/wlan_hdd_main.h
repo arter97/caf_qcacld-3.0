@@ -993,6 +993,19 @@ enum udp_qos_upgrade {
 };
 
 /**
+ * struct wlan_hdd_link_info - Data structure to store the link specific info
+ * @session: union of @ap and @station specific structs
+ * @session.station: station mode information
+ * @session.ap: ap mode specific information
+ */
+struct wlan_hdd_link_info {
+	union {
+		struct hdd_station_ctx station;
+		struct hdd_ap_ctx ap;
+	} session;
+};
+
+/**
  * struct hdd_adapter - hdd vdev/net_device context
  * @magic: Magic cookie for adapter sanity verification.  Note that this
  *         needs to be at the beginning of the private data structure so
@@ -1048,9 +1061,6 @@ enum udp_qos_upgrade {
  * @rssi_send:
  * @snr:
  * @sap_stop_bss_work:
- * @session: union of @ap and @station specific structs
- * @session.station: station mode information
- * @session.ap: ap mode specific information
  * @ch_switch_in_progress:
  * @acs_complete_event: acs complete event
  * @tsf: structure containing tsf related information
@@ -1137,6 +1147,8 @@ enum udp_qos_upgrade {
  * @delta_qtime: delta between host qtime and monotonic time
  * @traffic_end_ind_en: traffic end indication feature enable/disable
  * @is_dbam_configured:
+ * @deflink: Default link pointing to the 0th index of the linkinfo array
+ * @link_info: Data structure to hold link specific information
  */
 struct hdd_adapter {
 	uint32_t magic;
@@ -1209,11 +1221,6 @@ struct hdd_adapter {
 	uint8_t snr;
 
 	struct work_struct  sap_stop_bss_work;
-
-	union {
-		struct hdd_station_ctx station;
-		struct hdd_ap_ctx ap;
-	} session;
 
 	qdf_atomic_t ch_switch_in_progress;
 	qdf_event_t acs_complete_event;
@@ -1348,14 +1355,18 @@ struct hdd_adapter {
 #ifdef WLAN_FEATURE_DBAM_CONFIG
 	bool is_dbam_configured;
 #endif
+	struct wlan_hdd_link_info *deflink;
+	struct wlan_hdd_link_info link_info[WLAN_MAX_MLD];
 };
 
-#define WLAN_HDD_GET_STATION_CTX_PTR(adapter) (&(adapter)->session.station)
-#define WLAN_HDD_GET_AP_CTX_PTR(adapter) (&(adapter)->session.ap)
+#define WLAN_HDD_GET_STATION_CTX_PTR(adapter) \
+		(&(adapter)->deflink->session.station)
+#define WLAN_HDD_GET_AP_CTX_PTR(adapter) (&(adapter)->deflink->session.ap)
 #define WLAN_HDD_GET_CTX(adapter) ((adapter)->hdd_ctx)
 #define WLAN_HDD_GET_HOSTAP_STATE_PTR(adapter) \
-				(&(adapter)->session.ap.hostapd_state)
-#define WLAN_HDD_GET_SAP_CTX_PTR(adapter) ((adapter)->session.ap.sap_context)
+				(&(adapter)->deflink->session.ap.hostapd_state)
+#define WLAN_HDD_GET_SAP_CTX_PTR(adapter) \
+			((adapter)->deflink->session.ap.sap_context)
 
 #ifdef WLAN_FEATURE_NAN
 #define WLAN_HDD_IS_NDP_ENABLED(hdd_ctx) ((hdd_ctx)->nan_datapath_enabled)
