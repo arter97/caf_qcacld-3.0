@@ -1556,14 +1556,6 @@ more_msdu_link_desc:
 							err_code);
 		}
 
-		if (qdf_unlikely(mpdu_desc_info->mpdu_flags &
-				 HAL_MPDU_F_RAW_AMPDU)) {
-			dp_err_rl("RAW ampdu in REO error not expected");
-			DP_STATS_INC(soc, rx.err.reo_err_raw_mpdu_drop, 1);
-			qdf_nbuf_list_free(head_nbuf);
-			goto process_next_msdu;
-		}
-
 		rx_tlv_hdr_first = qdf_nbuf_data(head_nbuf);
 		rx_tlv_hdr_last = qdf_nbuf_data(tail_nbuf);
 
