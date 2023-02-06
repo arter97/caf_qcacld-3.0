@@ -932,6 +932,18 @@ typedef struct {
 } wmi_host_chan_info_event;
 
 /**
+ * struct wmi_host_scan_blanking_params - Scan blanking parameters
+ * @valid: Indicates whether the structure is valid
+ * @blanking_count: blanking count
+ * @blanking_duration: blanking duration
+ */
+typedef struct {
+	bool valid;
+	uint32_t blanking_count;
+	uint32_t blanking_duration;
+} wmi_host_scan_blanking_params;
+
+/**
  * struct wmi_host_pdev_channel_hopping_event
  * @pdev_id: pdev_id
  * @noise_floor_report_iter: Noise threshold iterations with high values

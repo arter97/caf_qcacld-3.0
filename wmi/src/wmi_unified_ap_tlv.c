@@ -2714,6 +2714,37 @@ static QDF_STATUS extract_chan_info_event_tlv(wmi_unified_t wmi_handle,
 }
 
 /**
+ * extract_scan_blanking_params_tlv() - extract scan blanking params from event
+ * @wmi_handle: wmi handle
+ * @param evt_buf: pointer to event buffer
+ * @param chan_info: Pointer to hold scan blanking parameters
+ *
+ * Return: QDF_STATUS_SUCCESS for success or error code
+ */
+static QDF_STATUS extract_scan_blanking_params_tlv(wmi_unified_t wmi_handle,
+	void *evt_buf, wmi_host_scan_blanking_params *blanking_params)
+{
+	WMI_CHAN_INFO_EVENTID_param_tlvs *param_buf;
+	wmi_scan_blanking_params_info *ev;
+
+	param_buf = (WMI_CHAN_INFO_EVENTID_param_tlvs *) evt_buf;
+
+	blanking_params->valid = false;
+
+	ev = (wmi_scan_blanking_params_info *) param_buf->scan_blanking_params;
+	if (!ev) {
+		wmi_debug("Scan blanking parameters is null");
+		return QDF_STATUS_SUCCESS;
+	}
+
+	blanking_params->blanking_duration = ev->scan_radio_blanking_duration;
+	blanking_params->blanking_count = ev->scan_radio_blanking_count;
+	blanking_params->valid = true;
+
+	return QDF_STATUS_SUCCESS;
+}
+
+/**
  * extract_channel_hopping_event_tlv() - extract channel hopping param
  * from event
  * @wmi_handle: wmi handle
@@ -3914,6 +3945,7 @@ void wmi_ap_attach_tlv(wmi_unified_t wmi_handle)
 	ops->send_wmm_update_cmd = send_wmm_update_cmd_tlv;
 	ops->extract_mgmt_tx_compl_param = extract_mgmt_tx_compl_param_tlv;
 	ops->extract_chan_info_event = extract_chan_info_event_tlv;
+	ops->extract_scan_blanking_params = extract_scan_blanking_params_tlv;
 	ops->extract_channel_hopping_event = extract_channel_hopping_event_tlv;
 	ops->send_peer_chan_width_switch_cmd =
 					send_peer_chan_width_switch_cmd_tlv;

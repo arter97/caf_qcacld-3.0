@@ -728,6 +728,18 @@ QDF_STATUS wmi_extract_chan_info_event(
 		wmi_host_chan_info_event *chan_info);
 
 /**
+ * wmi_extract_scan_blanking_params() - extract scan blanking params from event
+ * @wmi_handle: wmi handle
+ * @evt_buf: pointer to event buffer
+ * @chan_info: Pointer to hold blanking parameters
+ *
+ * Return: QDF_STATUS_SUCCESS on success and QDF_STATUS_E_FAILURE for failure
+ */
+QDF_STATUS wmi_extract_scan_blanking_params(
+		wmi_unified_t wmi_handle, void *evt_buf,
+		wmi_host_scan_blanking_params *blanking_params);
+
+/**
  * wmi_extract_channel_hopping_event() - extract channel hopping param
  * from event
  * @wmi_handle: wmi handle

@@ -543,6 +543,17 @@ QDF_STATUS wmi_extract_chan_info_event(
 	return QDF_STATUS_E_FAILURE;
 }
 
+QDF_STATUS wmi_extract_scan_blanking_params(
+		wmi_unified_t wmi_handle, void *evt_buf,
+		wmi_host_scan_blanking_params *blanking_params)
+{
+	if (wmi_handle->ops->extract_scan_blanking_params)
+		return wmi_handle->ops->extract_scan_blanking_params(wmi_handle,
+			evt_buf, blanking_params);
+
+	return QDF_STATUS_E_FAILURE;
+}
+
 QDF_STATUS wmi_extract_channel_hopping_event(
 		wmi_unified_t wmi_handle, void *evt_buf,
 		wmi_host_pdev_channel_hopping_event *ch_hopping)
