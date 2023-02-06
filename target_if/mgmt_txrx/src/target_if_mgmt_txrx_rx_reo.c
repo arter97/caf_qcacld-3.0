@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -272,9 +272,9 @@ target_if_mgmt_rx_reo_read_snapshot_raw
 
 	if (snapshot_version == 1) {
 		*mgmt_rx_reo_snapshot_low =
-				snapshot_address->mgmt_rx_reo_snapshot_low;
+		    qdf_le32_to_cpu(snapshot_address->mgmt_rx_reo_snapshot_low);
 		*mgmt_rx_reo_snapshot_high =
-				snapshot_address->mgmt_rx_reo_snapshot_high;
+		   qdf_le32_to_cpu(snapshot_address->mgmt_rx_reo_snapshot_high);
 		raw_snapshot->mgmt_rx_reo_snapshot_low =
 						*mgmt_rx_reo_snapshot_low;
 		raw_snapshot->mgmt_rx_reo_snapshot_high =
@@ -282,15 +282,19 @@ target_if_mgmt_rx_reo_read_snapshot_raw
 		return QDF_STATUS_SUCCESS;
 	}
 
-	prev_snapshot_low = snapshot_address->mgmt_rx_reo_snapshot_low;
-	prev_snapshot_high = snapshot_address->mgmt_rx_reo_snapshot_high;
+	prev_snapshot_low =
+		qdf_le32_to_cpu(snapshot_address->mgmt_rx_reo_snapshot_low);
+	prev_snapshot_high =
+		qdf_le32_to_cpu(snapshot_address->mgmt_rx_reo_snapshot_high);
 	raw_snapshot->mgmt_rx_reo_snapshot_low = prev_snapshot_low;
 	raw_snapshot->mgmt_rx_reo_snapshot_high = prev_snapshot_high;
 
 	for (; retry_count < (MGMT_RX_REO_SNAPSHOT_B2B_READ_SWAR_RETRY_LIMIT - 1);
 	     retry_count++) {
-		cur_snapshot_low = snapshot_address->mgmt_rx_reo_snapshot_low;
-		cur_snapshot_high = snapshot_address->mgmt_rx_reo_snapshot_high;
+		cur_snapshot_low =
+		    qdf_le32_to_cpu(snapshot_address->mgmt_rx_reo_snapshot_low);
+		cur_snapshot_high =
+		   qdf_le32_to_cpu(snapshot_address->mgmt_rx_reo_snapshot_high);
 
 		raw_snapshot[retry_count + 1].mgmt_rx_reo_snapshot_low =
 							cur_snapshot_low;
