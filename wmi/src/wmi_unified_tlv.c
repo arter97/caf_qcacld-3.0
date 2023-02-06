@@ -20402,6 +20402,34 @@ extract_sap_coex_fix_chan_caps(wmi_unified_t wmi_handle,
 	return QDF_STATUS_SUCCESS;
 }
 
+static QDF_STATUS extract_tgtr2p_table_event_tlv(wmi_unified_t wmi_handle,
+		uint8_t *evt_buf,
+		struct r2p_table_update_status_obj *update_status,
+		uint32_t len)
+{
+	WMI_PDEV_SET_TGTR2P_TABLE_EVENTID_param_tlvs *param_buf;
+	wmi_pdev_set_tgtr2p_table_event_fixed_param *event_fixed_hdr;
+
+	param_buf = (WMI_PDEV_SET_TGTR2P_TABLE_EVENTID_param_tlvs *)evt_buf;
+	if (!param_buf) {
+		wmi_err("Invalid TGTR2P event buf");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	event_fixed_hdr = param_buf->fixed_param;
+	update_status->pdev_id = event_fixed_hdr->pdev_id;
+	update_status->status = event_fixed_hdr->status;
+
+	if (update_status->status != WMI_PDEV_TGTR2P_SUCCESS &&
+	    update_status->status !=
+			WMI_PDEV_TGTR2P_SUCCESS_WAITING_FOR_END_OF_UPDATE) {
+		wmi_err("Rate2Power table update failed. Status = %d",
+			update_status->status);
+	}
+
+	return QDF_STATUS_SUCCESS;
+}
+
 struct wmi_ops tlv_ops =  {
 	.send_vdev_create_cmd = send_vdev_create_cmd_tlv,
 	.send_vdev_delete_cmd = send_vdev_delete_cmd_tlv,
@@ -20886,6 +20914,7 @@ struct wmi_ops tlv_ops =  {
 			send_update_edca_pifs_param_cmd_tlv,
 	.extract_sap_coex_cap_service_ready_ext2 =
 			extract_sap_coex_fix_chan_caps,
+	.extract_tgtr2p_table_event = extract_tgtr2p_table_event_tlv,
 };
 
 #ifdef WLAN_FEATURE_11BE_MLO
@@ -21388,6 +21417,8 @@ static void populate_tlv_events_id(WMI_EVT_ID *event_ids)
 	event_ids[wmi_xgap_enable_complete_eventid] =
 		WMI_XGAP_ENABLE_COMPLETE_EVENTID;
 #endif
+	event_ids[wmi_pdev_set_tgtr2p_table_eventid] =
+		WMI_PDEV_SET_TGTR2P_TABLE_EVENTID;
 }
 
 #ifdef WLAN_FEATURE_LINK_LAYER_STATS

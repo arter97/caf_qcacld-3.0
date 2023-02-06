@@ -1405,6 +1405,10 @@ QDF_STATUS
 (*send_set_sta_max_pwr_table_cmd)(wmi_unified_t wmi_handle,
 				  struct sta_max_pwr_table_params *param);
 
+QDF_STATUS
+(*send_set_power_table_cmd)(wmi_unified_t wmi_handle,
+			    struct rate2power_table_params *param);
+
 QDF_STATUS (*send_set_mimogain_table_cmd)(wmi_unified_t wmi_handle,
 		struct mimogain_table_params *param);
 
@@ -3219,6 +3223,12 @@ QDF_STATUS
 (*send_wmi_tdma_schedule_request_cmd)(wmi_unified_t wmi_handle,
 				      struct wlan_tdma_sched_cmd_param *param);
 #endif
+
+QDF_STATUS
+(*extract_tgtr2p_table_event)(wmi_unified_t wmi_handle,
+			      uint8_t *evt_buf,
+			      struct r2p_table_update_status_obj *update_status,
+			      uint32_t len);
 };
 
 /* Forward declaration for psoc*/

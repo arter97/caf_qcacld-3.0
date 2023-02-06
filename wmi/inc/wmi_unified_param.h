@@ -123,6 +123,7 @@
 #define CTL_5G_SIZE 1536
 #define CTL_2G_SIZE 684
 #define MAX_CTL_SIZE (CTL_5G_SIZE > CTL_2G_SIZE ? CTL_5G_SIZE : CTL_2G_SIZE)
+#define MAX_PWTAB_SIZE 3392
 #define IEEE80211_MICBUF_SIZE   (8+8)
 #define IEEE80211_TID_SIZE	17
 #define WME_NUM_AC	4
@@ -5250,6 +5251,7 @@ typedef enum {
 #ifdef WLAN_SUPPORT_GAP_LL_PS_MODE
 	wmi_xgap_enable_complete_eventid,
 #endif
+	wmi_pdev_set_tgtr2p_table_eventid,
 	wmi_events_max,
 } wmi_conv_event_id;
 
