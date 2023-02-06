@@ -1172,7 +1172,8 @@ QDF_STATUS csr_stop(struct mac_context *mac)
 	 */
 	csr_purge_pdev_all_ser_cmd_list(mac);
 	for (sessionId = 0; sessionId < WLAN_MAX_VDEVS; sessionId++)
-		csr_prepare_vdev_delete(mac, sessionId, true);
+		csr_cleanup_vdev_session(mac, sessionId);
+
 	for (sessionId = 0; sessionId < WLAN_MAX_VDEVS; sessionId++)
 		if (CSR_IS_SESSION_VALID(mac, sessionId))
 			ucfg_scan_flush_results(mac->pdev, NULL);
@@ -1368,8 +1369,7 @@ static QDF_STATUS csr_roam_close(struct mac_context *mac)
 		session = CSR_GET_SESSION(mac, sessionId);
 		if (!session)
 			continue;
-
-		csr_prepare_vdev_delete(mac, sessionId, true);
+		csr_cleanup_vdev_session(mac, sessionId);
 	}
 
 	csr_packetdump_timer_deinit(mac);
@@ -6385,10 +6385,11 @@ void csr_cleanup_vdev_session(struct mac_context *mac, uint8_t vdev_id)
 }
 
 QDF_STATUS csr_prepare_vdev_delete(struct mac_context *mac_ctx,
-				   uint8_t vdev_id, bool cleanup)
+				   struct wlan_objmgr_vdev *vdev)
 {
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
 	struct csr_roam_session *session;
+	uint8_t vdev_id = wlan_vdev_get_id(vdev);
 
 	session = CSR_GET_SESSION(mac_ctx, vdev_id);
 	if (!session)
@@ -6397,11 +6398,6 @@ QDF_STATUS csr_prepare_vdev_delete(struct mac_context *mac_ctx,
 	if (!CSR_IS_SESSION_VALID(mac_ctx, vdev_id))
 		return QDF_STATUS_E_INVAL;
 
-	if (cleanup) {
-		csr_cleanup_vdev_session(mac_ctx, vdev_id);
-		return status;
-	}
-
 	if (CSR_IS_WAIT_FOR_KEY(mac_ctx, vdev_id)) {
 		sme_debug("Stop Wait for key timer and change substate to eCSR_ROAM_SUBSTATE_NONE");
 		cm_stop_wait_for_key_timer(mac_ctx->psoc, vdev_id);
@@ -6409,6 +6405,7 @@ QDF_STATUS csr_prepare_vdev_delete(struct mac_context *mac_ctx,
 					 vdev_id);
 	}
 
+	wlan_ser_vdev_queue_disable(vdev);
 	/* Flush all the commands for vdev */
 	wlan_serialization_purge_all_cmd_by_vdev_id(mac_ctx->pdev, vdev_id);
 	if (!mac_ctx->session_close_cb) {

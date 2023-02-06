@@ -6357,8 +6357,6 @@ int hdd_vdev_destroy(struct hdd_adapter *adapter)
 	wlan_hdd_scan_abort(adapter);
 	wlan_cfg80211_cleanup_scan_queue(hdd_ctx->pdev, adapter->dev);
 	ucfg_son_disable_cbs(vdev);
-	/* Disable serialization for vdev before sending vdev delete */
-	wlan_ser_vdev_queue_disable(vdev);
 	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
 
 	qdf_spin_lock_bh(&adapter->deflink->vdev_lock);

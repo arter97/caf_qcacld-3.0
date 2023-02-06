@@ -4886,7 +4886,7 @@ QDF_STATUS sme_vdev_delete(mac_handle_t mac_handle,
 	status = sme_acquire_global_lock(&mac->sme);
 
 	if (QDF_IS_STATUS_SUCCESS(status)) {
-		status = csr_prepare_vdev_delete(mac, vdev_id, false);
+		status = csr_prepare_vdev_delete(mac, vdev);
 		sme_release_global_lock(&mac->sme);
 	}
 
