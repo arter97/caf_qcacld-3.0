@@ -123,11 +123,11 @@ static int dp_update_wds_entry_wrapper(struct dp_soc *soc,
  *
  * Return: None
  */
-static void dp_del_wds_entry_wrapper(struct dp_soc *soc,
-				     uint8_t vdev_id,
-				     uint8_t *wds_macaddr,
-				     uint8_t type,
-				     uint8_t delete_in_fw)
+void dp_del_wds_entry_wrapper(struct dp_soc *soc,
+			      uint8_t vdev_id,
+			      uint8_t *wds_macaddr,
+			      uint8_t type,
+			      uint8_t delete_in_fw)
 {
 	target_if_del_wds_entry(soc->ctrl_psoc, vdev_id,
 				wds_macaddr, type, delete_in_fw);
@@ -171,11 +171,11 @@ static int dp_update_wds_entry_wrapper(struct dp_soc *soc,
 	return status;
 }
 
-static void dp_del_wds_entry_wrapper(struct dp_soc *soc,
-				     uint8_t vdev_id,
-				     uint8_t *wds_macaddr,
-				     uint8_t type,
-				     uint8_t delete_in_fw)
+void dp_del_wds_entry_wrapper(struct dp_soc *soc,
+			      uint8_t vdev_id,
+			      uint8_t *wds_macaddr,
+			      uint8_t type,
+			      uint8_t delete_in_fw)
 {
 	soc->cdp_soc.ol_ops->peer_del_wds_entry(soc->ctrl_psoc,
 						vdev_id,
@@ -183,8 +183,16 @@ static void dp_del_wds_entry_wrapper(struct dp_soc *soc,
 						type,
 						delete_in_fw);
 }
-#endif
-#endif
+#endif /* BYPASS_OL_OPS */
+#else
+void dp_del_wds_entry_wrapper(struct dp_soc *soc,
+			      uint8_t vdev_id,
+			      uint8_t *wds_macaddr,
+			      uint8_t type,
+			      uint8_t delete_in_fw)
+{
+}
+#endif /* FEATURE_AST */
 
 #ifdef FEATURE_WDS
 static inline bool

@@ -1187,6 +1187,37 @@ static QDF_STATUS dp_peer_ast_entry_del_by_pdev(struct cdp_soc_t *soc_handle,
 }
 
 /**
+ * dp_peer_HMWDS_ast_entry_del() - delete the ast entry from soc AST hash
+ *                                 table if HMWDS rem-addr command is issued
+ *
+ * @soc_handle: data path soc handle
+ * @vdev_id: vdev id
+ * @wds_macaddr: AST entry mac address to delete
+ * @type: cdp_txrx_ast_entry_type to send to FW
+ * @delete_in_fw: flag to indicate AST entry deletion in FW
+ *
+ * Return: QDF_STATUS_SUCCESS if ast entry found with ast_mac_addr and delete
+ *         is sent
+ *         QDF_STATUS_E_INVAL false if ast entry not found
+ */
+static QDF_STATUS dp_peer_HMWDS_ast_entry_del(struct cdp_soc_t *soc_handle,
+					      uint8_t vdev_id,
+					      uint8_t *wds_macaddr,
+					      uint8_t type,
+					      uint8_t delete_in_fw)
+{
+	struct dp_soc *soc = (struct dp_soc *)soc_handle;
+
+	if (soc->ast_offload_support) {
+		dp_del_wds_entry_wrapper(soc, vdev_id, wds_macaddr, type,
+					 delete_in_fw);
+		return QDF_STATUS_SUCCESS;
+	}
+
+	return -QDF_STATUS_E_INVAL;
+}
+
+/**
  * dp_srng_find_ring_in_mask() - find which ext_group a ring belongs
  * @ring_num: ring num of the ring being queried
  * @grp_mask: the grp_mask array for the ring type in question.
@@ -14040,6 +14071,7 @@ static struct cdp_cmn_ops dp_ops_cmn = {
 		dp_peer_ast_entry_del_by_soc,
 	.txrx_peer_ast_delete_by_pdev =
 		dp_peer_ast_entry_del_by_pdev,
+	.txrx_peer_HMWDS_ast_delete = dp_peer_HMWDS_ast_entry_del,
 	.txrx_peer_delete = dp_peer_delete_wifi3,
 #ifdef DP_RX_UDP_OVER_PEER_ROAM
 	.txrx_update_roaming_peer = dp_update_roaming_peer_wifi3,

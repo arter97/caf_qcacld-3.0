@@ -276,6 +276,10 @@ struct cdp_cmn_ops {
 		txrx_ast_free_cb callback,
 		void *cookie);
 
+	QDF_STATUS (*txrx_peer_HMWDS_ast_delete)
+		(ol_txrx_soc_handle soc, uint8_t vdev_id, uint8_t *dest_mac,
+		 uint8_t type, uint8_t delete_in_fw);
+
 	QDF_STATUS
 	(*txrx_peer_delete)(struct cdp_soc_t *soc, uint8_t vdev_id,
 			    uint8_t *peer_mac, uint32_t bitmap,
