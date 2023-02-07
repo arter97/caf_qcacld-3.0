@@ -1388,22 +1388,27 @@ dp_rx_intrabss_ucast_check_be(qdf_nbuf_t nbuf,
 	hal_rx_tlv_get_dest_chip_pmac_id(rx_tlv_hdr,
 					 &dest_chip_id,
 					 &dest_chip_pmac_id);
+
 	qdf_assert_always(dest_chip_id <= (DP_MLO_MAX_DEST_CHIP_ID - 1));
 
 	if (dest_chip_id == be_soc->mlo_chip_id) {
-		/* TODO: adding to self list is better */
-		params->tx_vdev_id = ta_peer->vdev->vdev_id;
+		if (dest_chip_pmac_id == ta_peer->vdev->pdev->pdev_id)
+			params->tx_vdev_id = ta_peer->vdev->vdev_id;
+		else
+			params->tx_vdev_id =
+				be_vdev->partner_vdev_list[dest_chip_id]
+							  [dest_chip_pmac_id];
 		return true;
 	}
+
+	params->tx_vdev_id =
+		be_vdev->partner_vdev_list[dest_chip_id][dest_chip_pmac_id];
 
 	params->dest_soc =
 		dp_mlo_get_soc_ref_by_chip_id(be_soc->ml_ctxt,
 					      dest_chip_id);
 	if (!params->dest_soc)
 		return false;
-
-	params->tx_vdev_id =
-		be_vdev->partner_vdev_list[dest_chip_id][dest_chip_pmac_id];
 
 	return true;
 }
