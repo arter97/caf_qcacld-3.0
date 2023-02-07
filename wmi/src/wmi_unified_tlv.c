@@ -708,6 +708,8 @@ static const uint32_t vdev_param_tlv[] = {
 		  VDEV_PARAM_SET_CMD_OBSS_PD_THRESHOLD),
 	PARAM_MAP(vdev_param_set_profile,
 		  VDEV_PARAM_SET_PROFILE),
+	PARAM_MAP(vdev_param_set_disabled_modes,
+		  VDEV_PARAM_SET_DISABLED_SCHED_MODES),
 };
 #endif
 

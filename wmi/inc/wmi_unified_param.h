@@ -5931,6 +5931,8 @@ typedef enum {
 	VDEV_PARAM(vdev_param_ap_keepalive_max_idle_inactive_secs,
 		   VDEV_PARAM_AP_KEEPALIVE_MAX_IDLE_INACTIVE_TIME_SECS),
 	VDEV_PARAM(vdev_param_set_extra_eht_ltf, VDEV_PARAM_EXTRA_EHT_LTF),
+	VDEV_PARAM(vdev_param_set_disabled_modes,
+		   VDEV_PARAM_SET_DISABLED_SCHED_MODES),
 	vdev_param_max,
 } wmi_conv_vdev_param_id;
 
