@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2017-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -566,12 +566,14 @@ QDF_STATUS tdls_get_vdev_objects(struct wlan_objmgr_vdev *vdev,
 /**
  * tdls_set_ct_mode() - Set the tdls connection tracker mode
  * @psoc: objmgr psoc object
+ * @vdev: Pointer to vdev object
  *
  * This routine is called to set the tdls connection tracker operation status
  *
  * Return: NONE
  */
-void tdls_set_ct_mode(struct wlan_objmgr_psoc *psoc);
+void tdls_set_ct_mode(struct wlan_objmgr_psoc *psoc,
+		      struct wlan_objmgr_vdev *vdev);
 
 /**
  * tdls_set_operation_mode() - set tdls operating mode
@@ -825,4 +827,20 @@ QDF_STATUS tdls_delete_all_peers_indication(struct wlan_objmgr_psoc *psoc,
 uint8_t tdls_get_opclass_from_bandwidth(struct wlan_objmgr_vdev *vdev,
 					qdf_freq_t freq, uint8_t bw_offset,
 					uint8_t *reg_bw_offset);
+
+#ifdef WLAN_FEATURE_TDLS_CONCURRENCIES
+/**
+ * tdls_is_concurrency_allowed() - Is TDLS allowed with the current concurrency
+ * @psoc: Pointer to PSOC
+ *
+ * Return: True or False
+ */
+bool tdls_is_concurrency_allowed(struct wlan_objmgr_psoc *psoc);
+#else
+static inline bool
+tdls_is_concurrency_allowed(struct wlan_objmgr_psoc *psoc)
+{
+	return false;
+}
+#endif /* WLAN_FEATURE_TDLS_CONCURRENCIES */
 #endif

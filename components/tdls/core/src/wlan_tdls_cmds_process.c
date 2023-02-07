@@ -1966,10 +1966,7 @@ static QDF_STATUS tdls_config_force_peer(
 			       req->op_class, req->min_bandwidth);
 
 	tdls_set_callback(peer, req->callback);
-
-	tdls_set_ct_mode(soc_obj->soc);
-	if (soc_obj->enable_tdls_connection_tracker)
-		tdls_implicit_enable(vdev_obj);
+	tdls_set_ct_mode(soc_obj->soc, vdev);
 
 	return status;
 error:
@@ -2146,9 +2143,7 @@ QDF_STATUS tdls_process_remove_force_peer(struct tdls_oper_request *req)
 		qdf_mem_free(peer_update_param);
 		goto error;
 	}
-	tdls_set_ct_mode(soc_obj->soc);
-	if (!soc_obj->enable_tdls_connection_tracker)
-		tdls_implicit_disable(vdev_obj);
+	tdls_set_ct_mode(soc_obj->soc, vdev);
 
 error:
 	wlan_objmgr_vdev_release_ref(vdev, WLAN_TDLS_NB_ID);

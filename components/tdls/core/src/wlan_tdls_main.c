@@ -958,6 +958,7 @@ bool tdls_check_is_tdls_allowed(struct wlan_objmgr_vdev *vdev)
 	bool state = false;
 	qdf_freq_t ch_freq;
 	QDF_STATUS status;
+	uint32_t connection_count;
 
 	status = wlan_objmgr_vdev_try_get_ref(vdev, WLAN_TDLS_NB_ID);
 	if (QDF_IS_STATUS_ERROR(status))
@@ -979,14 +980,22 @@ bool tdls_check_is_tdls_allowed(struct wlan_objmgr_vdev *vdev)
 		goto exit;
 	}
 
-	if (policy_mgr_get_connection_count(tdls_soc_obj->soc) == 1)
+	connection_count = policy_mgr_get_connection_count(tdls_soc_obj->soc);
+	if (connection_count == 1 ||
+	    (connection_count > 1 &&
+	     tdls_is_concurrency_allowed(tdls_soc_obj->soc))) {
 		state = true;
-	else
+	} else {
 		tdls_warn("Concurrent sessions exist disable TDLS");
+		goto exit;
+	}
 
 	ch_freq = wlan_get_operation_chan_freq(vdev);
-	if (wlan_reg_is_6ghz_chan_freq(ch_freq))
-		state &= tdls_is_6g_freq_allowed(vdev, ch_freq);
+	if (wlan_reg_is_6ghz_chan_freq(ch_freq) &&
+	    !tdls_is_6g_freq_allowed(vdev, ch_freq)) {
+		tdls_debug("6GHz freq:%d not allowed for TDLS", ch_freq);
+		state = false;
+	}
 
 exit:
 	wlan_objmgr_vdev_release_ref(vdev, WLAN_TDLS_NB_ID);
@@ -994,72 +1003,105 @@ exit:
 	return state;
 }
 
-/**
- * tdls_set_ct_mode() - Set the tdls connection tracker mode
- * @psoc: psoc context
- *
- * This routine is called to set the tdls connection tracker operation status
- *
- * Return: NONE
- */
-void tdls_set_ct_mode(struct wlan_objmgr_psoc *psoc)
+#ifdef WLAN_FEATURE_TDLS_CONCURRENCIES
+bool tdls_is_concurrency_allowed(struct wlan_objmgr_psoc *psoc)
 {
-	bool state = false;
-	struct tdls_soc_priv_obj *tdls_soc_obj;
+	if (!wlan_psoc_nif_fw_ext2_cap_get(psoc,
+					   WLAN_TDLS_CONCURRENCIES_SUPPORT))
+		return false;
 
-	tdls_soc_obj = wlan_psoc_get_tdls_soc_obj(psoc);
-	if (!tdls_soc_obj)
+	if (policy_mgr_get_connection_count(psoc) >
+	    WLAN_TDLS_MAX_CONCURRENT_VDEV_SUPPORTED)
+		return false;
+
+	if (policy_mgr_mode_specific_connection_count(psoc, PM_STA_MODE,
+						      NULL) > 1) {
+		tdls_debug("More than one STA exist. Don't allow TDLS");
+		return false;
+	}
+
+	if (policy_mgr_current_concurrency_is_mcc(psoc)) {
+		tdls_debug("Base channel MCC. Don't allow TDLS");
+		return false;
+	}
+
+	/*
+	 * Don't enable TDLS for P2P_CLI in concurrency cases
+	 */
+	if (policy_mgr_get_connection_count(psoc) > 1 &&
+	    !policy_mgr_mode_specific_connection_count(psoc, PM_STA_MODE,
+						       NULL))
+		return false;
+
+	return true;
+}
+#endif
+
+void tdls_set_ct_mode(struct wlan_objmgr_psoc *psoc,
+		      struct wlan_objmgr_vdev *vdev)
+{
+	struct tdls_soc_priv_obj *tdls_soc_obj;
+	struct tdls_vdev_priv_obj *tdls_vdev_obj;
+	uint32_t tdls_feature_flags = 0, sta_count, p2p_count;
+	bool state = false;
+	QDF_STATUS status;
+
+	if (!tdls_check_is_tdls_allowed(vdev))
 		return;
 
-	/* If any concurrency is detected, skip tdls pkt tracker */
-	if (policy_mgr_get_connection_count(psoc) > 1) {
+	status = tdls_get_vdev_objects(vdev, &tdls_vdev_obj, &tdls_soc_obj);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		tdls_err("Failed to get TDLS objects");
 		state = false;
 		goto set_state;
 	}
 
+	tdls_feature_flags = tdls_soc_obj->tdls_configs.tdls_feature_flags;
 	if (TDLS_SUPPORT_DISABLED == tdls_soc_obj->tdls_current_mode ||
 	    TDLS_SUPPORT_SUSPENDED == tdls_soc_obj->tdls_current_mode ||
-	    !TDLS_IS_IMPLICIT_TRIG_ENABLED(
-			tdls_soc_obj->tdls_configs.tdls_feature_flags)) {
-		state = false;
-		goto set_state;
-	} else if (policy_mgr_mode_specific_connection_count(psoc,
-							     PM_STA_MODE,
-							     NULL) == 1) {
-		state = true;
-	} else if (policy_mgr_mode_specific_connection_count(psoc,
-							     PM_P2P_CLIENT_MODE,
-							     NULL) == 1){
-		state = true;
-	} else {
+	    !TDLS_IS_IMPLICIT_TRIG_ENABLED(tdls_feature_flags)) {
 		state = false;
 		goto set_state;
 	}
 
-	/* In case of TDLS external control, peer should be added
-	 * by the user space to start connection tracker.
-	 */
-	if (TDLS_IS_EXTERNAL_CONTROL_ENABLED(
-			tdls_soc_obj->tdls_configs.tdls_feature_flags)) {
-		if (tdls_soc_obj->tdls_external_peer_count)
-			state = true;
-		else
+	sta_count = policy_mgr_mode_specific_connection_count(psoc, PM_STA_MODE,
+							      NULL);
+	p2p_count =
+		policy_mgr_mode_specific_connection_count(psoc,
+							  PM_P2P_CLIENT_MODE,
+							  NULL);
+	if (sta_count == 1 ||
+	    (policy_mgr_get_connection_count(psoc) == 1 && p2p_count == 1)) {
+		state = true;
+		/*
+		 * In case of TDLS external control, peer should be added
+		 * by the user space to start connection tracker.
+		 */
+		if (TDLS_IS_EXTERNAL_CONTROL_ENABLED(tdls_feature_flags) &&
+		    !tdls_soc_obj->tdls_external_peer_count)
 			state = false;
+
+		goto set_state;
 	}
+
+	state = false;
 
 set_state:
 	tdls_soc_obj->enable_tdls_connection_tracker = state;
+	if (tdls_soc_obj->enable_tdls_connection_tracker)
+		tdls_implicit_enable(tdls_vdev_obj);
+	else
+		tdls_implicit_disable(tdls_vdev_obj);
 
-	tdls_debug("enable_tdls_connection_tracker %d",
-		 tdls_soc_obj->enable_tdls_connection_tracker);
+	tdls_debug("enable_tdls_connection_tracker %d current_mode:%d feature_flags:0x%x",
+		   tdls_soc_obj->enable_tdls_connection_tracker,
+		   tdls_soc_obj->tdls_current_mode, tdls_feature_flags);
 }
 
 QDF_STATUS
 tdls_process_policy_mgr_notification(struct wlan_objmgr_psoc *psoc)
 {
-	struct tdls_vdev_priv_obj *tdls_priv_vdev;
 	struct wlan_objmgr_vdev *tdls_obj_vdev;
-	struct tdls_soc_priv_obj *tdls_priv_soc;
 
 	if (!psoc) {
 		tdls_err("psoc: %pK", psoc);
@@ -1078,11 +1120,7 @@ tdls_process_policy_mgr_notification(struct wlan_objmgr_psoc *psoc)
 	}
 
 	tdls_debug("enter ");
-	tdls_set_ct_mode(psoc);
-	if (tdls_get_vdev_objects(tdls_obj_vdev, &tdls_priv_vdev,
-				  &tdls_priv_soc) == QDF_STATUS_SUCCESS &&
-	    tdls_priv_soc->enable_tdls_connection_tracker)
-		tdls_implicit_enable(tdls_priv_vdev);
+	tdls_set_ct_mode(psoc, tdls_obj_vdev);
 
 	wlan_objmgr_vdev_release_ref(tdls_obj_vdev, WLAN_TDLS_NB_ID);
 
@@ -1137,21 +1175,23 @@ struct wlan_objmgr_vdev *tdls_get_vdev(struct wlan_objmgr_psoc *psoc,
 {
 	uint32_t vdev_id;
 
-	if (policy_mgr_get_connection_count(psoc) > 1)
+	if (policy_mgr_get_connection_count(psoc) > 1 &&
+	    !tdls_is_concurrency_allowed(psoc))
 		return NULL;
 
 	vdev_id = policy_mgr_mode_specific_vdev_id(psoc, PM_STA_MODE);
-
 	if (WLAN_INVALID_VDEV_ID != vdev_id)
-		return wlan_objmgr_get_vdev_by_id_from_psoc(psoc,
-							    vdev_id,
+		return wlan_objmgr_get_vdev_by_id_from_psoc(psoc, vdev_id,
 							    dbg_id);
-
+	/*
+	 * For P2P_Client mode, TDLS is not supported on concurrency
+	 * so return P2P_client vdev only if P2P client mode exists without
+	 * any concurreny
+	 */
 	vdev_id = policy_mgr_mode_specific_vdev_id(psoc, PM_P2P_CLIENT_MODE);
-
-	if (WLAN_INVALID_VDEV_ID != vdev_id)
-		return wlan_objmgr_get_vdev_by_id_from_psoc(psoc,
-							    vdev_id,
+	if (WLAN_INVALID_VDEV_ID != vdev_id &&
+	    policy_mgr_get_connection_count(psoc) == 1)
+		return wlan_objmgr_get_vdev_by_id_from_psoc(psoc, vdev_id,
 							    dbg_id);
 
 	return NULL;
@@ -1369,9 +1409,7 @@ tdls_process_sta_connect(struct tdls_sta_notify_params *notify)
 				       notify->session_id);
 
 	/* check and set the connection tracker */
-	tdls_set_ct_mode(tdls_soc_obj->soc);
-	if (tdls_soc_obj->enable_tdls_connection_tracker)
-		tdls_implicit_enable(tdls_vdev_obj);
+	tdls_set_ct_mode(tdls_soc_obj->soc, notify->vdev);
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -1458,16 +1496,11 @@ tdls_process_sta_disconnect(struct tdls_sta_notify_params *notify)
 	}
 
 	/* Check and set the connection tracker and implicit timers */
-	tdls_set_ct_mode(curr_tdls_soc->soc);
-	if (curr_tdls_soc->enable_tdls_connection_tracker)
-		tdls_implicit_enable(curr_tdls_vdev);
-	else
-		tdls_implicit_disable(curr_tdls_vdev);
-
-	/* release the vdev ref , if temp vdev was acquired */
-	if (temp_vdev)
+	if (temp_vdev) {
+		tdls_set_ct_mode(curr_tdls_soc->soc, temp_vdev);
 		wlan_objmgr_vdev_release_ref(temp_vdev,
 					     WLAN_TDLS_NB_ID);
+	}
 
 	return status;
 }
@@ -1657,18 +1690,15 @@ static void tdls_set_mode_in_vdev(struct tdls_vdev_priv_obj *tdls_vdev,
 		/* If tdls implicit mode is disabled, then
 		 * stop the connection tracker.
 		 */
-		tdls_soc->enable_tdls_connection_tracker =
-			false;
-	} else if (TDLS_SUPPORT_EXP_TRIG_ONLY ==
-		   tdls_mode) {
+		tdls_soc->enable_tdls_connection_tracker = false;
+	} else if (TDLS_SUPPORT_EXP_TRIG_ONLY == tdls_mode) {
 		clear_bit((unsigned long)source,
 			  &tdls_soc->tdls_source_bitmap);
 		tdls_implicit_disable(tdls_vdev);
 		/* If tdls implicit mode is disabled, then
 		 * stop the connection tracker.
 		 */
-		tdls_soc->enable_tdls_connection_tracker =
-			false;
+		tdls_soc->enable_tdls_connection_tracker = false;
 
 		/*
 		 * Check if any TDLS source bit is set and if
@@ -1679,7 +1709,6 @@ static void tdls_set_mode_in_vdev(struct tdls_vdev_priv_obj *tdls_vdev,
 			return;
 	}
 	tdls_debug("exit ");
-
 }
 
 /**
