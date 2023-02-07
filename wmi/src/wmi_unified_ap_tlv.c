@@ -324,6 +324,82 @@ send_pdev_get_tpc_config_cmd_tlv(wmi_unified_t wmi_handle,
 }
 
 /**
+ * send_wmi_tdma_schedule_request_cmd_tlv() - send tdma schedule config
+ * command to fw
+ * @wmi_handle: wmi handle
+ * @param: structure to get tdma schedule config
+ *
+ * Return: 0 for success or error code
+ */
+static QDF_STATUS
+send_wmi_tdma_schedule_request_cmd_tlv(
+		wmi_unified_t wmi_handle,
+		struct wlan_tdma_sched_cmd_param *param)
+{
+	int id, i;
+	wmi_tdma_schedule_request_cmd_fixed_param *cmd;
+	wmi_buf_t buf;
+	int32_t len = sizeof(wmi_tdma_schedule_request_cmd_fixed_param);
+
+	buf = wmi_buf_alloc(wmi_handle, len);
+	if (!buf) {
+		wmi_err("wmi_buf_alloc failed");
+		return QDF_STATUS_E_NOMEM;
+	}
+
+	cmd = (wmi_tdma_schedule_request_cmd_fixed_param *)wmi_buf_data(buf);
+	WMITLV_SET_HDR(
+		&cmd->tlv_header,
+		WMITLV_TAG_STRUC_wmi_tdma_schedule_request_cmd_fixed_param,
+		WMITLV_GET_STRUCT_TLVLEN
+		(wmi_tdma_schedule_request_cmd_fixed_param));
+	WMI_CHAR_ARRAY_TO_MAC_ADDR(param->owner_bssid, &cmd->owner_bssid);
+
+	cmd->pdev_id = wmi_handle->ops->convert_pdev_id_host_to_target(
+					wmi_handle, param->pdev_id);
+	cmd->schedule_type = param->schedule_type;
+	cmd->schedule_handle_id = param->schedule_handle_id;
+	cmd->start_time_tsf_low = param->start_time_tsf_low;
+	cmd->start_time_tsf_high = param->start_time_tsf_high;
+	cmd->num_busy_slots = param->num_busy_slots;
+	cmd->busy_slot_dur_ms = param->busy_slot_dur_ms;
+	cmd->busy_slot_intvl_ms = param->busy_slot_intvl_ms;
+	cmd->edca_params_valid = param->edca_params_valid;
+	for (i = 0; i < WMI_MAX_NUM_AC; i++) {
+	     cmd->aifsn[i] = param->aifsn[i];
+	     cmd->ecwmin[i] = param->cwmin[i];
+	     cmd->ecwmax[i] = param->cwmax[i];
+	}
+	wmi_debug("pdev_id = %d , schedule_type = %d ,"
+		  "schedule_handle_id = %d , start_time_tsf_low = %d "
+		  "start_time_tsf_high = %d , num_busy_slots = %d "
+		  "busy_slot_dur_ms = %d , busy_slot_intvl_ms = %d "
+		  "edca_params_valid = %d "
+		  "bssid mac_addr31to0: 0x%x, mac_addr47to32: 0x%x ",
+		  cmd->pdev_id, cmd->schedule_type, cmd->schedule_handle_id,
+		  cmd->start_time_tsf_low, cmd->start_time_tsf_high,
+		  cmd->num_busy_slots, cmd->busy_slot_dur_ms,
+		  cmd->busy_slot_intvl_ms, cmd->edca_params_valid,
+		  cmd->owner_bssid.mac_addr31to0,
+		  cmd->owner_bssid.mac_addr47to32);
+	for (id = 0; id < WMI_MAX_NUM_AC; id++) {
+	     wmi_debug("wmi aifsn[%d] = %d , wmi cwmin[%d] = %d "
+		       "wmi cwmax[%d] = %d ",
+		       id, cmd->aifsn[id], id, cmd->ecwmin[id],
+		       id, cmd->ecwmax[id]);
+	}
+	wmi_mtrace(WMI_TDMA_SCHEDULE_REQUEST_CMDID, NO_SESSION, 0);
+	if (wmi_unified_cmd_send(wmi_handle, buf, len,
+				 WMI_TDMA_SCHEDULE_REQUEST_CMDID)) {
+		wmi_err("Send wmi tdma schedule request cmd failed");
+		wmi_buf_free(buf);
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	return QDF_STATUS_SUCCESS;
+}
+
+/**
  * send_set_ctl_table_cmd_tlv() - send ctl table cmd to fw
  * @wmi_handle: wmi handle
  * @param: pointer to hold ctl table param
@@ -3852,4 +3928,6 @@ void wmi_ap_attach_tlv(wmi_unified_t wmi_handle)
 #ifdef QCA_RSSI_DB2DBM
 	ops->extract_pdev_rssi_dbm_conv_ev_param = extract_pdev_rssi_dbm_conv_ev_param_tlv;
 #endif
+	ops->send_wmi_tdma_schedule_request_cmd =
+		send_wmi_tdma_schedule_request_cmd_tlv;
 }
