@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -530,7 +530,7 @@ QDF_STATUS cm_roam_sync_event_handler_cb(struct wlan_objmgr_vdev *vdev,
 			mlme_err("LFR3: MLO: Invalid link Beacon Length");
 			goto err;
 		}
-	} else if (sync_ind->beaconProbeRespLength >
+	} else if (sync_ind->beacon_probe_resp_length >
 			(QDF_IEEE80211_3ADDR_HDR_LEN + MAC_B_PR_SSID_OFFSET)) {
 		/*
 		 * When STA roams to an MLO AP, non-assoc link might be superior
@@ -549,7 +549,7 @@ QDF_STATUS cm_roam_sync_event_handler_cb(struct wlan_objmgr_vdev *vdev,
 			ie_len = MAX_MGMT_MPDU_LEN -
 			(QDF_IEEE80211_3ADDR_HDR_LEN + MAC_B_PR_SSID_OFFSET);
 		else
-			ie_len = sync_ind->beaconProbeRespLength -
+			ie_len = sync_ind->beacon_probe_resp_length -
 			(QDF_IEEE80211_3ADDR_HDR_LEN + MAC_B_PR_SSID_OFFSET);
 
 	} else {
