@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2017-2020 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -51,7 +52,7 @@ int hdd_enable_default_pkt_filters(struct hdd_adapter *adapter)
 			packet_filter_default_rules[i].filter_id = filter_id;
 			wlan_hdd_set_filter(hdd_ctx,
 					    &packet_filter_default_rules[i],
-					    adapter->vdev_id);
+					    adapter->deflink->vdev_id);
 			filter_id++;
 		}
 		filters = filters >> 1;
@@ -90,7 +91,7 @@ int hdd_disable_default_pkt_filters(struct hdd_adapter *adapter)
 			packet_filter_default_rules.filter_id = filter_id;
 			wlan_hdd_set_filter(hdd_ctx,
 					    &packet_filter_default_rules,
-					    adapter->vdev_id);
+					    adapter->deflink->vdev_id);
 			filter_id++;
 		}
 		filters = filters >> 1;

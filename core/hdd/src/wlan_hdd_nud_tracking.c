@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2018-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -44,7 +44,7 @@ hdd_handle_nud_fail_sta(struct hdd_context *hdd_ctx,
 	}
 
 	hdd_debug("nud fail detected, try roaming to better BSSID, vdev id: %d",
-		  adapter->vdev_id);
+		  adapter->deflink->vdev_id);
 
 	qdf_mem_zero(&ap_info, sizeof(struct reject_ap_info));
 	ap_info.bssid = sta_ctx->conn_info.bssid;
@@ -56,7 +56,7 @@ hdd_handle_nud_fail_sta(struct hdd_context *hdd_ctx,
 	if (roaming_offload_enabled(hdd_ctx)) {
 		qdf_zero_macaddr(&bssid);
 		ucfg_wlan_cm_roam_invoke(hdd_ctx->pdev,
-					 adapter->vdev_id,
+					 adapter->deflink->vdev_id,
 					 &bssid, 0, CM_ROAMING_NUD_FAILURE);
 	}
 }

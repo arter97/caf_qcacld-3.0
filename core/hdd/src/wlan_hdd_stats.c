@@ -891,7 +891,7 @@ bool hdd_get_interface_info(struct hdd_adapter *adapter,
 		}
 		if (hdd_cm_is_connecting(adapter)) {
 			hdd_debug("Session ID %d, Connection is in progress",
-				  adapter->vdev_id);
+				  adapter->deflink->vdev_id);
 			info->state = WIFI_ASSOCIATING;
 		}
 		if (hdd_cm_is_vdev_associated(adapter) &&
@@ -1093,7 +1093,7 @@ hdd_link_layer_process_iface_stats(struct hdd_adapter *adapter,
 	struct sk_buff *skb;
 	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
 
-	if (if_stat->vdev_id != adapter->vdev_id) {
+	if (if_stat->vdev_id != adapter->deflink->vdev_id) {
 		hdd_cache_ll_iface_stats(hdd_ctx, if_stat);
 		return;
 	}
@@ -1906,7 +1906,7 @@ __wlan_hdd_cfg80211_ll_stats_set(struct wiphy *wiphy,
 		nla_get_u32(tb_vendor
 			    [QCA_WLAN_VENDOR_ATTR_LL_STATS_SET_CONFIG_AGGRESSIVE_STATS_GATHERING]);
 
-	req.staId = adapter->vdev_id;
+	req.staId = adapter->deflink->vdev_id;
 
 	hdd_debug("LL_STATS_SET reqId = %d, staId = %d, mpduSizeThreshold = %d, Statistics Gathering = %d",
 		req.reqId, req.staId,
@@ -2088,7 +2088,7 @@ static void cache_station_stats_cb(struct stats_event *ev, void *cookie)
 
 	hdd_for_each_adapter_dev_held_safe(hdd_ctx, adapter, next_adapter,
 					   dbgid) {
-		if (adapter->vdev_id != vdev_id) {
+		if (adapter->deflink->vdev_id != vdev_id) {
 			hdd_adapter_dev_put_debug(adapter, dbgid);
 			continue;
 		}
@@ -2116,9 +2116,10 @@ wlan_hdd_get_mlo_vdev_params(struct hdd_adapter *adapter,
 	uint32_t bmap = 0;
 	QDF_STATUS status;
 
-	req->is_mlo_req = wlan_vdev_mlme_get_is_mlo_vdev(psoc,
-							 adapter->vdev_id);
-	status = mlo_get_mlstats_vdev_params(psoc, info, adapter->vdev_id);
+	req->is_mlo_req = wlan_vdev_mlme_get_is_mlo_vdev(
+					psoc, adapter->deflink->vdev_id);
+	status = mlo_get_mlstats_vdev_params(psoc, info,
+					     adapter->deflink->vdev_id);
 	if (QDF_IS_STATUS_ERROR(status))
 		return status;
 	for (i = 0; i < info->ml_vdev_count; i++) {
@@ -2180,8 +2181,9 @@ wlan_hdd_set_station_stats_request_pending(struct hdd_adapter *adapter,
 
 	info.cookie = adapter;
 	info.u.get_station_stats_cb = cache_station_stats_cb;
-	info.vdev_id = adapter->vdev_id;
-	is_mlo_vdev = wlan_vdev_mlme_get_is_mlo_vdev(psoc, adapter->vdev_id);
+	info.vdev_id = adapter->deflink->vdev_id;
+	is_mlo_vdev = wlan_vdev_mlme_get_is_mlo_vdev(
+					psoc, adapter->deflink->vdev_id);
 	if (is_mlo_vdev) {
 		status = wlan_hdd_get_mlo_vdev_params(adapter, &info, req);
 		if (QDF_IS_STATUS_ERROR(status)) {
@@ -2330,9 +2332,9 @@ static int wlan_hdd_send_ll_stats_req(struct hdd_adapter *adapter,
 
 	priv->request_id = req->reqId;
 	priv->request_bitmap = req->paramIdMask;
-	priv->vdev_id = adapter->vdev_id;
-	priv->is_mlo_req = wlan_vdev_mlme_get_is_mlo_vdev(hdd_ctx->psoc,
-							  adapter->vdev_id);
+	priv->vdev_id = adapter->deflink->vdev_id;
+	priv->is_mlo_req = wlan_vdev_mlme_get_is_mlo_vdev(
+				hdd_ctx->psoc, adapter->deflink->vdev_id);
 	if (priv->is_mlo_req)
 		priv->mlo_vdev_id_bitmap = req->mlo_vdev_id_bitmap;
 
@@ -2415,14 +2417,14 @@ int wlan_hdd_ll_stats_get(struct hdd_adapter *adapter, uint32_t req_id,
 
 	get_req.reqId = req_id;
 	get_req.paramIdMask = req_mask;
-	get_req.staId = adapter->vdev_id;
+	get_req.staId = adapter->deflink->vdev_id;
 
 	rtnl_lock();
 	errno = wlan_hdd_send_ll_stats_req(adapter, &get_req);
 	rtnl_unlock();
 	if (errno)
 		hdd_err("Send LL stats req failed, id:%u, mask:%d, session:%d",
-			req_id, req_mask, adapter->vdev_id);
+			req_id, req_mask, adapter->deflink->vdev_id);
 
 	hdd_exit();
 
@@ -2498,9 +2500,9 @@ __wlan_hdd_cfg80211_ll_stats_get(struct wiphy *wiphy,
 		nla_get_u32(tb_vendor
 			    [QCA_WLAN_VENDOR_ATTR_LL_STATS_GET_CONFIG_REQ_MASK]);
 
-	LinkLayerStatsGetReq.staId = adapter->vdev_id;
+	LinkLayerStatsGetReq.staId = adapter->deflink->vdev_id;
 
-	if (wlan_hdd_validate_vdev_id(adapter->vdev_id))
+	if (wlan_hdd_validate_vdev_id(adapter->deflink->vdev_id))
 		return -EINVAL;
 
 	ret = wlan_hdd_send_ll_stats_req(adapter, &LinkLayerStatsGetReq);
@@ -2635,7 +2637,7 @@ __wlan_hdd_cfg80211_ll_stats_clear(struct wiphy *wiphy,
 	 */
 	LinkLayerStatsClearReq.reqId = 1;
 
-	LinkLayerStatsClearReq.staId = adapter->vdev_id;
+	LinkLayerStatsClearReq.staId = adapter->deflink->vdev_id;
 
 	hdd_debug("LL_STATS_CLEAR reqId = %d, staId = %d, statsClearReqMask = 0x%X, stopReq = %d",
 		LinkLayerStatsClearReq.reqId,
@@ -2731,7 +2733,7 @@ void wlan_hdd_clear_link_layer_stats(struct hdd_adapter *adapter)
 		WIFI_STATS_IFACE_ALL_PEER | WIFI_STATS_IFACE_CONTENTION;
 	link_layer_stats_clear_req.stopReq = 0;
 	link_layer_stats_clear_req.reqId = 1;
-	link_layer_stats_clear_req.staId = adapter->vdev_id;
+	link_layer_stats_clear_req.staId = adapter->deflink->vdev_id;
 	sme_ll_stats_clear_req(mac_handle, &link_layer_stats_clear_req);
 }
 
@@ -3895,7 +3897,7 @@ set_thresh:
 
 set_period:
 	hdd_info("send period to target");
-	errno = wma_cli_set_command(adapter->vdev_id,
+	errno = wma_cli_set_command(adapter->deflink->vdev_id,
 				    wmi_pdev_param_stats_observation_period,
 				    period, PDEV_CMD);
 	if (errno) {
@@ -3982,7 +3984,8 @@ static int __wlan_hdd_cfg80211_stats_ext_request(struct wiphy *wiphy,
 	txrx_req.stats = 2;
 	/* default value of secondary parameter is 0(mac_id) */
 	txrx_req.mac_id = 0;
-	status = cdp_txrx_stats_request(soc, adapter->vdev_id, &txrx_req);
+	status = cdp_txrx_stats_request(soc, adapter->deflink->vdev_id,
+					&txrx_req);
 	if (QDF_STATUS_SUCCESS != status) {
 		hdd_err_rl("Failed to get hw stats: %u", status);
 		ret_val = -EINVAL;
@@ -3991,14 +3994,15 @@ static int __wlan_hdd_cfg80211_stats_ext_request(struct wiphy *wiphy,
 	stats_ext_req.request_data_len = data_len;
 	stats_ext_req.request_data = (void *)data;
 
-	status = cdp_request_rx_hw_stats(soc, adapter->vdev_id);
+	status = cdp_request_rx_hw_stats(soc, adapter->deflink->vdev_id);
 
 	if (QDF_STATUS_SUCCESS != status) {
 		hdd_err_rl("Failed to get hw stats: %u", status);
 		ret_val = -EINVAL;
 	}
 
-	status = sme_stats_ext_request(adapter->vdev_id, &stats_ext_req);
+	status = sme_stats_ext_request(adapter->deflink->vdev_id,
+				       &stats_ext_req);
 
 	if (QDF_STATUS_SUCCESS != status) {
 		hdd_err_rl("Failed to get fw stats: %u", status);
@@ -4584,7 +4588,7 @@ wlan_hdd_get_sap_stats(struct hdd_adapter *adapter, struct station_info *info)
 
 	wlan_hdd_fill_summary_stats(&adapter->hdd_stats.summary_stat,
 				    info,
-				    adapter->vdev_id);
+				    adapter->deflink->vdev_id);
 
 	return 0;
 }
@@ -5210,7 +5214,7 @@ static void wlan_hdd_fill_station_info(struct wlan_objmgr_psoc *psoc,
 
 	status =
 		cdp_host_get_peer_stats(cds_get_context(QDF_MODULE_ID_SOC),
-					adapter->vdev_id,
+					adapter->deflink->vdev_id,
 					stainfo->sta_mac.bytes,
 					peer_stats);
 
@@ -5492,8 +5496,9 @@ static int wlan_hdd_get_station_remote(struct wiphy *wiphy,
 	struct hdd_fw_txrx_stats txrx_stats;
 	int i, status;
 
-	stats = wlan_cfg80211_mc_cp_stats_get_peer_stats(adapter->vdev,
-					stainfo->sta_mac.bytes, &status);
+	stats = wlan_cfg80211_mc_cp_stats_get_peer_stats(adapter->deflink->vdev,
+							 stainfo->sta_mac.bytes,
+							 &status);
 	if (status || !stats) {
 		wlan_cfg80211_mc_cp_stats_free_stats_event(stats);
 		hdd_err("fail to get peer info from fw");
@@ -5870,7 +5875,7 @@ bool hdd_report_max_rate(struct hdd_adapter *adapter,
 			max_mcs_idx = (max_mcs_idx > mcs_index) ?
 				max_mcs_idx : mcs_index;
 		} else {
-			mcs_len = ucfg_mlme_get_mcs_rate(adapter->vdev,
+			mcs_len = ucfg_mlme_get_mcs_rate(adapter->deflink->vdev,
 							 mcs_rates,
 							 sizeof(mcs_rates));
 			if (!mcs_len) {
@@ -5993,7 +5998,8 @@ void hdd_wlan_fill_per_chain_rssi_stats(struct station_info *sinfo,
 			sinfo->signal_avg = sinfo->chain_signal_avg[i];
 
 		hdd_debug("RSSI for chain %d, vdev_id %d is %d",
-			  i, adapter->vdev_id, sinfo->chain_signal_avg[i]);
+			  i, adapter->deflink->vdev_id,
+			  sinfo->chain_signal_avg[i]);
 
 		if (!rssi_stats_valid && sinfo->chain_signal_avg[i])
 			rssi_stats_valid = true;
@@ -6245,7 +6251,7 @@ static int wlan_hdd_get_sta_stats(struct wiphy *wiphy,
 
 	qdf_mtrace(QDF_MODULE_ID_HDD, QDF_MODULE_ID_HDD,
 		   TRACE_CODE_HDD_CFG80211_GET_STA,
-		   adapter->vdev_id, 0);
+		   adapter->deflink->vdev_id, 0);
 
 	if (!hdd_cm_is_vdev_associated(adapter)) {
 		hdd_debug("Not associated");
@@ -6449,7 +6455,7 @@ static int wlan_hdd_get_sta_stats(struct wiphy *wiphy,
 
 	wlan_hdd_fill_summary_stats(&adapter->hdd_stats.summary_stat,
 				    sinfo,
-				    adapter->vdev_id);
+				    adapter->deflink->vdev_id);
 
 	ucfg_dp_get_net_dev_stats(vdev, &stats);
 	sinfo->tx_bytes = stats.tx_bytes;
@@ -6551,7 +6557,7 @@ static int __wlan_hdd_cfg80211_get_station(struct wiphy *wiphy,
 	if (wlan_hdd_validate_context(hdd_ctx))
 		return -EINVAL;
 
-	if (wlan_hdd_validate_vdev_id(adapter->vdev_id))
+	if (wlan_hdd_validate_vdev_id(adapter->deflink->vdev_id))
 		return -EINVAL;
 	if (!mac) {
 		hdd_err("Received NULL mac address");
@@ -6708,7 +6714,7 @@ static int __wlan_hdd_cfg80211_dump_station(struct wiphy *wiphy,
 	if (wlan_hdd_validate_context(hdd_ctx))
 		return -EINVAL;
 
-	if (wlan_hdd_validate_vdev_id(adapter->vdev_id))
+	if (wlan_hdd_validate_vdev_id(adapter->deflink->vdev_id))
 		return -EINVAL;
 
 	if (adapter->device_mode == QDF_SAP_MODE ||
@@ -6884,7 +6890,7 @@ static bool wlan_hdd_update_survey_info(struct wiphy *wiphy,
 
 	hdd_ctx = WLAN_HDD_GET_CTX(adapter);
 	sme_get_operation_channel(hdd_ctx->mac_handle, &opfreq,
-				  adapter->vdev_id);
+				  adapter->deflink->vdev_id);
 
 	mutex_lock(&hdd_ctx->chan_info_lock);
 
@@ -7193,7 +7199,7 @@ int wlan_hdd_get_rcpi(struct hdd_adapter *adapter,
 	cookie = osif_request_cookie(request);
 
 	rcpi_req->mac_addr = mac_addr;
-	rcpi_req->session_id = adapter->vdev_id;
+	rcpi_req->session_id = adapter->deflink->vdev_id;
 	rcpi_req->measurement_type = measurement_type;
 	rcpi_req->rcpi_callback = wlan_hdd_get_rcpi_cb;
 	rcpi_req->rcpi_context = cookie;
@@ -7582,7 +7588,7 @@ void wlan_hdd_get_peer_rx_rate_stats(struct hdd_adapter *adapter)
 	peer_mac_addr = adapter->deflink->session.station.conn_info.bssid.bytes;
 
 	status = cdp_host_get_peer_stats(soc,
-					 adapter->vdev_id,
+					 adapter->deflink->vdev_id,
 					 peer_mac_addr,
 					 peer_stats);
 	if (QDF_IS_STATUS_ERROR(status)) {

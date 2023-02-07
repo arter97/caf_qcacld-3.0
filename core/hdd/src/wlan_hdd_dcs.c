@@ -134,7 +134,7 @@ static QDF_STATUS hdd_dcs_switch_chan_cb(struct wlan_objmgr_vdev *vdev,
 		if (!psoc)
 			return QDF_STATUS_E_INVAL;
 
-		wlan_hdd_set_sap_csa_reason(psoc, adapter->vdev_id,
+		wlan_hdd_set_sap_csa_reason(psoc, adapter->deflink->vdev_id,
 					    CSA_REASON_DCS);
 		ret = hdd_softap_set_channel_change(adapter->dev, tgt_freq,
 						    tgt_width, true);
@@ -301,10 +301,11 @@ static void hdd_dcs_cb(struct wlan_objmgr_psoc *psoc, uint8_t mac_id,
 			 * selecting freq of other MAC may cause MCC with
 			 * other modes if present.
 			 */
-			if (wlan_mlme_get_ap_policy(adapter->vdev) !=
+			if (wlan_mlme_get_ap_policy(adapter->deflink->vdev) !=
 			    HOST_CONCURRENT_AP_POLICY_UNSPECIFIED) {
 				status = hdd_dcs_select_random_chan(
-						hdd_ctx->pdev, adapter->vdev);
+						hdd_ctx->pdev,
+						adapter->deflink->vdev);
 				if (QDF_IS_STATUS_SUCCESS(status))
 					return;
 			}
@@ -431,7 +432,7 @@ void hdd_dcs_hostapd_set_chan(struct hdd_context *hdd_ctx,
 				  ap_ctx->operating_chan_freq,
 				  dcs_ch_freq);
 			wlan_hdd_set_sap_csa_reason(hdd_ctx->psoc,
-						    adapter->vdev_id,
+						    adapter->deflink->vdev_id,
 						    CSA_REASON_DCS);
 			hdd_switch_sap_channel(adapter, dcs_ch, true);
 
@@ -482,6 +483,7 @@ void hdd_dcs_chan_select_complete(struct hdd_adapter *adapter)
 {
 	qdf_freq_t dcs_freq;
 	struct hdd_context *hdd_ctx;
+	uint32_t chan_freq;
 
 	hdd_ctx = WLAN_HDD_GET_CTX(adapter);
 	if (!hdd_ctx) {
@@ -490,13 +492,13 @@ void hdd_dcs_chan_select_complete(struct hdd_adapter *adapter)
 	}
 
 	dcs_freq = wlansap_dcs_get_freq(WLAN_HDD_GET_SAP_CTX_PTR(adapter));
-	if (dcs_freq && dcs_freq !=
-	    adapter->deflink->session.ap.operating_chan_freq)
-		hdd_dcs_hostapd_set_chan(hdd_ctx, adapter->vdev_id, dcs_freq);
+	chan_freq = adapter->deflink->session.ap.operating_chan_freq;
+	if (dcs_freq && dcs_freq != chan_freq)
+		hdd_dcs_hostapd_set_chan(hdd_ctx, adapter->deflink->vdev_id,
+					 dcs_freq);
 	else
 		hdd_dcs_hostapd_enable_wlan_interference_mitigation(
-							hdd_ctx,
-							adapter->vdev_id);
+					hdd_ctx, adapter->deflink->vdev_id);
 
 	qdf_atomic_set(&adapter->deflink->session.ap.acs_in_progress, 0);
 }
@@ -517,7 +519,8 @@ void hdd_dcs_clear(struct hdd_adapter *adapter)
 
 	psoc = hdd_ctx->psoc;
 
-	status = policy_mgr_get_mac_id_by_session_id(psoc, adapter->vdev_id,
+	status = policy_mgr_get_mac_id_by_session_id(psoc,
+						     adapter->deflink->vdev_id,
 						     &mac_id);
 	if (QDF_IS_STATUS_ERROR(status)) {
 		hdd_err("get mac id failed");

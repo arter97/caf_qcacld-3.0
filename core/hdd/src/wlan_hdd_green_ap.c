@@ -249,8 +249,9 @@ __wlan_hdd_enter_sap_low_pwr_mode(struct wiphy *wiphy,
 	hdd_debug("state: %s",
 		  lp_flags == QCA_WLAN_DOZED_AP_ENABLE ? "ENABLE" : "DISABLE");
 
-	status = ucfg_green_ap_ll_ps(hdd_ctx->pdev, adapter->vdev, lp_flags,
-				     ap_ctx->sap_config.beacon_int, &cookie_id);
+	status = ucfg_green_ap_ll_ps(
+			hdd_ctx->pdev, adapter->deflink->vdev, lp_flags,
+			ap_ctx->sap_config.beacon_int, &cookie_id);
 	if (status != QDF_STATUS_SUCCESS) {
 		hdd_err("unable to send low latency power save cmd");
 		return -EINVAL;

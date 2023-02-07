@@ -209,9 +209,9 @@ static int hdd_tsf_reset_gpio(struct hdd_adapter *adapter)
 {
 	int ret;
 
-	ret = wma_cli_set_command((int)adapter->vdev_id,
+	ret = wma_cli_set_command((int)adapter->deflink->vdev_id,
 				  (int)GEN_PARAM_RESET_TSF_GPIO,
-				  adapter->vdev_id,
+				  adapter->deflink->vdev_id,
 				  GEN_CMD);
 
 	if (ret != 0) {
@@ -430,9 +430,9 @@ void hdd_tsf_ext_gpio_sync_work(void *data)
 	usleep_range(50, 100);
 	gpio_set_value(tsf_sync_gpio_pin, OUTPUT_LOW);
 
-	status = wma_cli_set_command((int)adapter->vdev_id,
+	status = wma_cli_set_command((int)adapter->deflink->vdev_id,
 				     (int)GEN_PARAM_CAPTURE_TSF,
-				     adapter->vdev_id, GEN_CMD);
+				     adapter->deflink->vdev_id, GEN_CMD);
 	if (status != QDF_STATUS_SUCCESS) {
 		hdd_err("cap tsf fail");
 		qdf_mc_timer_stop(&adapter->tsf.host_capture_req_timer);
@@ -549,9 +549,9 @@ hdd_capture_tsf_internal_via_wmi(struct hdd_adapter *adapter, uint32_t *buf,
 	int ret;
 	struct hdd_context *hddctx = adapter->hdd_ctx;
 
-	ret = wma_cli_set_command((int)adapter->vdev_id,
+	ret = wma_cli_set_command((int)adapter->deflink->vdev_id,
 				  (int)GEN_PARAM_CAPTURE_TSF,
-				  adapter->vdev_id, GEN_CMD);
+				  adapter->deflink->vdev_id, GEN_CMD);
 	if (ret != QDF_STATUS_SUCCESS) {
 		hdd_err("cap tsf fail");
 		buf[0] = TSF_CAPTURE_FAIL;
@@ -591,7 +591,7 @@ wlan_hdd_tsf_reg_update_details(struct hdd_adapter *adapter, struct stsf *ptsf)
 		qdf_atomic_set(&adapter->tsf.tsf_details_valid, 1);
 	}
 	hdd_info("vdev_id %u tsf_id %u tsf_id_valid %u mac_id %u",
-		 adapter->vdev_id, ptsf->tsf_id, ptsf->tsf_id_valid,
+		 adapter->deflink->vdev_id, ptsf->tsf_id, ptsf->tsf_id_valid,
 		 ptsf->mac_id);
 }
 
@@ -666,7 +666,8 @@ wlan_hdd_tsf_reg_process_report(struct hdd_adapter *adapter,
 
 	qdf_event_set(&tsf_sync_get_completion_evt);
 	hdd_update_tsf(adapter, tsf->cur_target_time);
-	hdd_info("vdev id=%u, tsf=%llu", adapter->vdev_id, tsf_report->tsf);
+	hdd_info("vdev id=%u, tsf=%llu", adapter->deflink->vdev_id,
+		 tsf_report->tsf);
 	return HDD_TSF_OP_SUCC;
 }
 
@@ -682,7 +683,7 @@ hdd_capture_tsf_internal_via_reg(struct hdd_adapter *adapter, uint32_t *buf,
 	}
 
 	qdf_mem_zero(&tsf_report, sizeof(tsf_report));
-	tsf_report.vdev_id = adapter->vdev_id;
+	tsf_report.vdev_id = adapter->deflink->vdev_id;
 	tsf_report.tsf_id = adapter->tsf.tsf_id;
 	tsf_report.mac_id = adapter->tsf.tsf_mac_id;
 
@@ -3024,14 +3025,15 @@ static int hdd_set_tsf_auto_report(struct hdd_adapter *adapter, bool ena)
 	void *soc = cds_get_context(QDF_MODULE_ID_SOC);
 	int ret;
 
-	if (QDF_IS_STATUS_ERROR(cdp_set_tsf_ul_delay_report(soc,
-							    adapter->vdev_id,
-							    ena))) {
+	if (QDF_IS_STATUS_ERROR(cdp_set_tsf_ul_delay_report(
+						soc,
+						adapter->deflink->vdev_id,
+						ena))) {
 		hdd_err_rl("Set tsf report uplink delay failed");
 		return -EPERM;
 	}
 
-	ret = wma_cli_set_command((int)adapter->vdev_id,
+	ret = wma_cli_set_command((int)adapter->deflink->vdev_id,
 				  ena ? (int)GEN_PARAM_TSF_AUTO_REPORT_ENABLE :
 				  (int)GEN_PARAM_TSF_AUTO_REPORT_DISABLE,
 				  ena, GEN_CMD);
@@ -3097,7 +3099,7 @@ static QDF_STATUS hdd_set_delta_tsf(struct hdd_adapter *adapter,
 	 */
 	if (!qdf_atomic_read(&adapter->tsf.tsf_auto_report)) {
 		hdd_debug_rl("adapter %u tsf_auto_report disabled",
-			     adapter->vdev_id);
+			     adapter->deflink->vdev_id);
 		goto exit_with_success;
 	}
 
@@ -3108,7 +3110,7 @@ static QDF_STATUS hdd_set_delta_tsf(struct hdd_adapter *adapter,
 	/* Pass delta_tsf to DP layer to report uplink delay
 	 * on a per vdev basis
 	 */
-	cdp_set_delta_tsf(soc, adapter->vdev_id, delta_tsf);
+	cdp_set_delta_tsf(soc, adapter->deflink->vdev_id, delta_tsf);
 
 exit_with_success:
 	return QDF_STATUS_SUCCESS;
@@ -3133,7 +3135,8 @@ QDF_STATUS hdd_add_uplink_delay(struct hdd_adapter *adapter,
 		return QDF_STATUS_SUCCESS;
 
 	if (qdf_atomic_read(&adapter->tsf.tsf_auto_report)) {
-		status = cdp_get_uplink_delay(soc, adapter->vdev_id, &ul_delay);
+		status = cdp_get_uplink_delay(soc, adapter->deflink->vdev_id,
+					      &ul_delay);
 		if (QDF_IS_STATUS_ERROR(status))
 			ul_delay = 0;
 	} else {

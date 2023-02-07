@@ -994,11 +994,32 @@ enum udp_qos_upgrade {
 
 /**
  * struct wlan_hdd_link_info - Data structure to store the link specific info
+ * @vdev_id: Unique value to identify VDEV. Equal to WLAN_UMAC_VDEV_ID_MAX
+ *           for invalid VDEVs.
+ * @vdev_lock: Lock to protect VDEV pointer access.
+ * @vdev: Pointer to VDEV objmgr.
+ * @vdev_destroy_event: vdev_destroy_event is moved from the qdf_event
+ *                      to linux event consciously, Lets take example
+ *                      when sap interface is waiting on the
+ *                      session_close event and then there is a SSR
+ *                      the wait event is completed the interface down
+ *                      is returned and the next command to the driver
+ *                      will be hdd_hostapd_uinit-->
+ *                      hdd_deinit_ap_mode-->
+ *                      hdd_hostapd_deinit_sap_session where in the
+ *                      sap_ctx would be freed.  During the SSR if the
+ *                      same sap context is used it would result in
+ *                      null pointer de-reference.
  * @session: union of @ap and @station specific structs
  * @session.station: station mode information
  * @session.ap: ap mode specific information
  */
 struct wlan_hdd_link_info {
+	uint8_t vdev_id;
+	qdf_spinlock_t vdev_lock;
+	struct wlan_objmgr_vdev *vdev;
+	struct completion vdev_destroy_event;
+
 	union {
 		struct hdd_station_ctx station;
 		struct hdd_ap_ctx ap;
@@ -1013,9 +1034,6 @@ struct wlan_hdd_link_info {
  *         will always be in mapped memory
  * @node: list node for membership in the adapter list
  * @hdd_ctx:
- * @vdev: object manager vdev context
- * @vdev_lock: lock to protect vdev context access
- * @vdev_id: Unique identifier assigned to the vdev
  * @dev: Handle to the network device
  * @device_mode:
  * @ipv4_notifier_work: IPv4 notifier callback for handling ARP offload on
@@ -1032,18 +1050,6 @@ struct wlan_hdd_link_info {
  * @event_flags: a bitmap of hdd_adapter_flags
  * @hdd_stats: HDD statistics
  * @estimated_linkspeed: estimated link speed
- * @vdev_destroy_event: vdev_destroy_event is moved from the qdf_event
- *                      to linux event consciously, Lets take example
- *                      when sap interface is waiting on the
- *                      session_close event and then there is a SSR
- *                      the wait event is completed the interface down
- *                      is returned and the next command to the driver
- *                      will be hdd_hostapd_uinit-->
- *                      hdd_deinit_ap_mode-->
- *                      hdd_hostapd_deinit_sap_session where in the
- *                      sap_ctx would be freed.  During the SSR if the
- *                      same sap context is used it would result in
- *                      null pointer de-reference.
  * @qdf_monitor_mode_vdev_up_event: QDF event for monitor mode vdev up
  * @disconnect_comp_var: completion variable for disconnect callback
  * @linkup_event_var: completion variable for Linkup Event
@@ -1155,9 +1161,6 @@ struct hdd_adapter {
 	qdf_list_node_t node;
 
 	struct hdd_context *hdd_ctx;
-	struct wlan_objmgr_vdev *vdev;
-	qdf_spinlock_t vdev_lock;
-	uint8_t vdev_id;
 
 	struct net_device *dev;
 
@@ -1182,8 +1185,6 @@ struct hdd_adapter {
 	struct hdd_stats hdd_stats;
 
 	uint32_t estimated_linkspeed;
-
-	struct completion vdev_destroy_event;
 
 #ifdef FEATURE_MONITOR_MODE_SUPPORT
 	qdf_event_t qdf_monitor_mode_vdev_up_event;

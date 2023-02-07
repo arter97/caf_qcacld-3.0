@@ -212,7 +212,8 @@ static void __hdd_softap_hard_start_xmit(struct sk_buff *skb,
 	ac = hdd_qdisc_ac_to_tl_ac[skb->queue_mapping];
 	++stats->per_cpu[cpu].tx_classified_ac[ac];
 
-	status = ucfg_dp_softap_start_xmit((qdf_nbuf_t)skb, adapter->vdev);
+	status = ucfg_dp_softap_start_xmit((qdf_nbuf_t)skb,
+					   adapter->deflink->vdev);
 	if (QDF_IS_STATUS_ERROR(status))
 		++stats->per_cpu[cpu].tx_dropped_ac[ac];
 
@@ -486,7 +487,7 @@ QDF_STATUS hdd_softap_deregister_sta(struct hdd_adapter *adapter,
 	if (ucfg_ipa_is_enabled()) {
 		if (ucfg_ipa_wlan_evt(hdd_ctx->pdev, adapter->dev,
 				      adapter->device_mode,
-				      adapter->vdev_id,
+				      adapter->deflink->vdev_id,
 				      WLAN_IPA_CLIENT_DISCONNECT,
 				      mac_addr->bytes,
 				      false) != QDF_STATUS_SUCCESS)
@@ -718,7 +719,7 @@ QDF_STATUS hdd_softap_stop_bss(struct hdd_adapter *adapter)
 		if (ucfg_ipa_wlan_evt(hdd_ctx->pdev,
 				      adapter->dev,
 				      adapter->device_mode,
-				      adapter->vdev_id,
+				      adapter->deflink->vdev_id,
 				      WLAN_IPA_AP_DISCONNECT,
 				      adapter->dev->dev_addr,
 				      false) != QDF_STATUS_SUCCESS)
@@ -726,7 +727,8 @@ QDF_STATUS hdd_softap_stop_bss(struct hdd_adapter *adapter)
 	}
 
 	/* Setting the RTS profile to original value */
-	if (sme_cli_set_command(adapter->vdev_id, wmi_vdev_param_enable_rtscts,
+	if (sme_cli_set_command(adapter->deflink->vdev_id,
+				wmi_vdev_param_enable_rtscts,
 				cfg_get(hdd_ctx->psoc,
 					CFG_ENABLE_FW_RTS_PROFILE),
 				VDEV_CMD))
