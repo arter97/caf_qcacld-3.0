@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
 
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -548,18 +548,18 @@ static int ol_set_tx_sniffer_mode(struct ol_ath_softc_net80211 *scn,
 	struct ieee80211com *ic = &scn->sc_ic;
 
 	if (ic->ic_tx_pkt_capture != TX_ENH_PKT_CAPTURE_DISABLE) {
-		scn->stats_tx_data_subscriber.callback =
+		scn->stats_tx_monitor_frame_subscriber.callback =
 					ol_ath_process_tx_frames;
-		scn->stats_tx_data_subscriber.context = scn->sc_pdev;
+		scn->stats_tx_monitor_frame_subscriber.context = scn->sc_pdev;
 		if (cdp_wdi_event_sub(soc_txrx_handle,
 				      pdev_id,
-				      &scn->stats_tx_data_subscriber,
+				      &scn->stats_tx_monitor_frame_subscriber,
 				      WDI_EVENT_TX_PKT_CAPTURE))
 			return A_ERROR;
 	} else {
 		if (cdp_wdi_event_unsub(soc_txrx_handle,
 					pdev_id,
-					&scn->stats_tx_data_subscriber,
+					&scn->stats_tx_monitor_frame_subscriber,
 					WDI_EVENT_TX_PKT_CAPTURE))
 			return A_ERROR;
 	}
