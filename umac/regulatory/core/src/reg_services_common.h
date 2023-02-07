@@ -41,7 +41,7 @@
 #define NUM_20_MHZ_CHAN_IN_160_MHZ_CHAN    8
 #define NUM_20_MHZ_CHAN_IN_320_MHZ_CHAN    16
 
-#define REG_MAX_5GHZ_CH_NUM channel_map[MAX_5GHZ_CHANNEL].chan_num
+#define REG_MAX_5GHZ_CH_NUM reg_max_5ghz_ch_num()
 
 #define REG_MIN_24GHZ_CH_FREQ channel_map[MIN_24GHZ_CHANNEL].center_freq
 #define REG_MAX_24GHZ_CH_FREQ channel_map[MAX_24GHZ_CHANNEL].center_freq

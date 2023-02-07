@@ -49,6 +49,7 @@
 #endif
 
 const struct chan_map *channel_map;
+uint8_t g_reg_max_5g_chan_num;
 
 #ifdef WLAN_FEATURE_11BE
 static bool reg_is_chan_bit_punctured(uint16_t input_punc_bitmap,
@@ -1297,6 +1298,21 @@ const struct chan_map channel_map_china[NUM_CHANNELS] = {
 #endif /* CONFIG_BAND_6GHZ */
 };
 
+static uint8_t reg_calculate_max_5gh_enum(void)
+{
+	int16_t idx;
+	uint8_t max_valid_ieee_chan = INVALID_CHANNEL_NUM;
+
+	for (idx = MAX_5GHZ_CHANNEL; idx >= 0; idx--) {
+		if (channel_map[idx].chan_num != INVALID_CHANNEL_NUM) {
+			max_valid_ieee_chan = channel_map[idx].chan_num;
+			break;
+		}
+	}
+
+	return max_valid_ieee_chan;
+}
+
 void reg_init_channel_map(enum dfs_reg dfs_region)
 {
 	switch (dfs_region) {
@@ -1321,6 +1337,8 @@ void reg_init_channel_map(enum dfs_reg dfs_region)
 		channel_map = channel_map_global;
 		break;
 	}
+
+	g_reg_max_5g_chan_num = reg_calculate_max_5gh_enum();
 }
 
 #ifdef WLAN_FEATURE_11BE
@@ -3017,7 +3035,7 @@ qdf_freq_t reg_ch_to_freq(uint32_t ch_enum)
 
 uint8_t reg_max_5ghz_ch_num(void)
 {
-	return REG_MAX_5GHZ_CH_NUM;
+	return g_reg_max_5g_chan_num;
 }
 
 #ifdef CONFIG_CHAN_FREQ_API
