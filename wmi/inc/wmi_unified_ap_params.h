@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2020-2021, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -252,6 +253,26 @@ struct wlan_tdma_sched_cmd_param {
 	uint16_t cwmin[WMI_MAX_NUM_AC];
 	uint16_t cwmax[WMI_MAX_NUM_AC];
 };
+/**
+ * struct sta_peer_table_list - peer list params
+ * @peer_macaddr: array of STA MAC addresses
+ * @peer_pwr_limit: Peer power limit
+ */
+struct sta_peer_table_list {
+	uint8_t peer_macaddr[QDF_MAC_ADDR_SIZE];
+	int32_t peer_pwr_limit;
+};
+
+/**
+ * struct sta_pwr_table_params - sta pwr table params
+ * @num_peers: No.of stations
+ * @peer_list: pointer to struct sta_peer_table_list
+ */
+struct sta_max_pwr_table_params {
+	uint32_t num_peers;
+	struct sta_peer_table_list *peer_list;
+};
+
 /**
  * struct mimogain_table_params - MIMO gain table params
  * @array_gain: pointer to array gain table
