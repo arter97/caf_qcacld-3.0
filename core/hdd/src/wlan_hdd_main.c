@@ -6730,20 +6730,14 @@ QDF_STATUS hdd_init_station_mode(struct hdd_adapter *adapter)
 	mac_handle = hdd_ctx->mac_handle;
 
 	vdev = hdd_objmgr_get_vdev_by_user(adapter, WLAN_INIT_DEINIT_ID);
-	if (!vdev)
-		return QDF_STATUS_E_NULL_VALUE;
+	if (!vdev) {
+		status = QDF_STATUS_E_NULL_VALUE;
+		goto wext_unregister;
+	}
 
 	hdd_vdev_set_ht_vht_ies(mac_handle, vdev);
 	hdd_init_station_context(adapter);
 	hdd_register_wext(adapter->dev);
-
-	status = ucfg_dp_init_txrx(vdev);
-	if (QDF_STATUS_SUCCESS != status) {
-		hdd_err("ucfg_dp_init_txrx() failed, status code %d", status);
-		goto error_init_txrx;
-	}
-
-	set_bit(INIT_TX_RX_SUCCESS, &adapter->event_flags);
 
 	status = hdd_wmm_adapter_init(adapter);
 	if (QDF_STATUS_SUCCESS != status) {
@@ -6773,10 +6767,9 @@ QDF_STATUS hdd_init_station_mode(struct hdd_adapter *adapter)
 	return QDF_STATUS_SUCCESS;
 
 error_wmm_init:
-	clear_bit(INIT_TX_RX_SUCCESS, &adapter->event_flags);
-	ucfg_dp_deinit_txrx(vdev);
-error_init_txrx:
 	hdd_objmgr_put_vdev_by_user(vdev, WLAN_INIT_DEINIT_ID);
+
+wext_unregister:
 	hdd_unregister_wext(adapter->dev);
 	QDF_BUG(!hdd_vdev_destroy(adapter));
 
@@ -6898,10 +6891,6 @@ static void hdd_deinit_station_mode(struct hdd_context *hdd_ctx,
 				       bool rtnl_held)
 {
 	hdd_enter_dev(adapter->dev);
-
-	if (test_bit(INIT_TX_RX_SUCCESS, &adapter->event_flags)) {
-		clear_bit(INIT_TX_RX_SUCCESS, &adapter->event_flags);
-	}
 
 	if (test_bit(WMM_INIT_DONE, &adapter->event_flags)) {
 		hdd_wmm_adapter_close(adapter);

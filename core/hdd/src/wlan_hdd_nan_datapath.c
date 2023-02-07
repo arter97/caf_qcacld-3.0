@@ -597,18 +597,8 @@ int hdd_init_nan_data_mode(struct hdd_adapter *adapter)
 	vdev = hdd_objmgr_get_vdev_by_user(adapter, WLAN_DP_ID);
 	if (!vdev) {
 		ret_val = -EAGAIN;
-		goto error_init_txrx;
+		goto wext_unregister;
 	}
-
-	status = ucfg_dp_init_txrx(vdev);
-	if (QDF_STATUS_SUCCESS != status) {
-		hdd_objmgr_put_vdev_by_user(vdev, WLAN_DP_ID);
-		hdd_err("ucfg_dp_init_tx_rx() init failed, status %d", status);
-		ret_val = -EAGAIN;
-		goto error_init_txrx;
-	}
-
-	set_bit(INIT_TX_RX_SUCCESS, &adapter->event_flags);
 
 	status = hdd_wmm_adapter_init(adapter);
 	if (QDF_STATUS_SUCCESS != status) {
@@ -649,13 +639,10 @@ int hdd_init_nan_data_mode(struct hdd_adapter *adapter)
 	return ret_val;
 
 error_wmm_init:
-	clear_bit(INIT_TX_RX_SUCCESS, &adapter->event_flags);
-	ucfg_dp_deinit_txrx(vdev);
 	hdd_objmgr_put_vdev_by_user(vdev, WLAN_DP_ID);
 
-error_init_txrx:
+wext_unregister:
 	hdd_wext_unregister(wlan_dev, true);
-
 	QDF_BUG(!hdd_vdev_destroy(adapter));
 
 	return ret_val;

@@ -305,22 +305,6 @@ QDF_STATUS ucfg_dp_rx_ol_init(struct wlan_objmgr_psoc *psoc,
 			      bool is_wifi3_0_target);
 
 /**
- * ucfg_dp_init_txrx() - Initialize STA DP init TX/RX
- * @vdev: vdev mapped to STA DP interface
- *
- * Return: 0 on success and non zero on failure.
- */
-QDF_STATUS ucfg_dp_init_txrx(struct wlan_objmgr_vdev *vdev);
-
-/**
- * ucfg_dp_deinit_txrx() - Deinitialize STA DP init TX/RX
- * @vdev: vdev mapped to STA DP interface
- *
- * Return: 0 on success and non zero on failure.
- */
-QDF_STATUS ucfg_dp_deinit_txrx(struct wlan_objmgr_vdev *vdev);
-
-/**
  * ucfg_dp_start_xmit() - Transmit packet on STA interface
  * @nbuf: n/w buffer to transmitted
  * @vdev: vdev mapped to STA DP interface

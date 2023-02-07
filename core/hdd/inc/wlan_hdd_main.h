@@ -258,7 +258,6 @@ static inline bool in_compat_syscall(void) { return is_compat_task(); }
  * enum hdd_adapter_flags - event bitmap flags registered net device
  * @NET_DEVICE_REGISTERED: Adapter is registered with the kernel
  * @SME_SESSION_OPENED: Firmware vdev has been created
- * @INIT_TX_RX_SUCCESS: Adapter datapath is initialized
  * @WMM_INIT_DONE: Adapter is initialized
  * @SOFTAP_BSS_STARTED: Software Access Point (SAP) is running
  * @DEVICE_IFACE_OPENED: Adapter has been "opened" via the kernel
@@ -269,7 +268,6 @@ static inline bool in_compat_syscall(void) { return is_compat_task(); }
 enum hdd_adapter_flags {
 	NET_DEVICE_REGISTERED,
 	SME_SESSION_OPENED,
-	INIT_TX_RX_SUCCESS,
 	WMM_INIT_DONE,
 	SOFTAP_BSS_STARTED,
 	DEVICE_IFACE_OPENED,

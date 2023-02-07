@@ -1185,33 +1185,6 @@ QDF_STATUS ucfg_dp_register_pkt_capture_callbacks(struct wlan_objmgr_vdev *vdev)
 						   dp_intf);
 }
 
-QDF_STATUS ucfg_dp_init_txrx(struct wlan_objmgr_vdev *vdev)
-{
-	struct wlan_dp_intf *dp_intf;
-
-	dp_intf = dp_get_vdev_priv_obj(vdev);
-	if (unlikely(!dp_intf)) {
-		dp_err("DP interface not found");
-		return QDF_STATUS_E_INVAL;
-	}
-
-	return QDF_STATUS_SUCCESS;
-}
-
-QDF_STATUS ucfg_dp_deinit_txrx(struct wlan_objmgr_vdev *vdev)
-{
-	struct wlan_dp_intf *dp_intf;
-
-	dp_intf = dp_get_vdev_priv_obj(vdev);
-	if (unlikely(!dp_intf)) {
-		dp_err("DP interface not found");
-		return QDF_STATUS_E_INVAL;
-	}
-
-	dp_intf->tx_fn = NULL;
-	return QDF_STATUS_SUCCESS;
-}
-
 QDF_STATUS ucfg_dp_start_xmit(qdf_nbuf_t nbuf, struct wlan_objmgr_vdev *vdev)
 {
 	struct wlan_dp_intf *dp_intf;
