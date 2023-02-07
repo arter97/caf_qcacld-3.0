@@ -1401,6 +1401,10 @@ QDF_STATUS (*send_peer_update_wds_entry_cmd)(wmi_unified_t wmi_handle,
 QDF_STATUS (*send_set_ctl_table_cmd)(wmi_unified_t wmi_handle,
 		struct ctl_table_params *param);
 
+QDF_STATUS
+(*send_set_sta_max_pwr_table_cmd)(wmi_unified_t wmi_handle,
+				  struct sta_max_pwr_table_params *param);
+
 QDF_STATUS (*send_set_mimogain_table_cmd)(wmi_unified_t wmi_handle,
 		struct mimogain_table_params *param);
 
