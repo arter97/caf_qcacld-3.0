@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2014-2017,2019-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -180,7 +180,7 @@ static inline uint8_t qdf_nbuf_is_rx_ipa_smmu_map(qdf_nbuf_t buf)
 
 /**
  * qdf_nbuf_set_rx_reo_dest_ind_or_sw_excpt() - set reo destination indication
-						or sw exception flag
+ *						or sw exception flag
  * @buf: Network buffer
  * @value: value to set
  *
@@ -194,7 +194,7 @@ static inline void qdf_nbuf_set_rx_reo_dest_ind_or_sw_excpt(qdf_nbuf_t buf,
 
 /**
  * qdf_nbuf_get_rx_reo_dest_ind_or_sw_excpt() - get reo destination indication
-						or sw exception flag
+ *						or sw exception flag
  * @buf: Network buffer
  *
  * Return reo destination indication value (0 ~ 31) or sw exception (0 ~ 1)
