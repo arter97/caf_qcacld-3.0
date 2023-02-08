@@ -2231,13 +2231,15 @@ enum dp_context_type {
  * @dp_rx_null_q_desc_handle: Handle Null Queue Exception Error
  * @dp_tx_desc_pool_alloc: Allocate arch specific TX descriptor pool
  * @dp_tx_desc_pool_free: Free arch specific TX descriptor pool
+ * @txrx_srng_init: Init txrx srng
  */
 struct dp_arch_ops {
 	/* INIT/DEINIT Arch Ops */
 	QDF_STATUS (*txrx_soc_attach)(struct dp_soc *soc,
 				      struct cdp_soc_attach_params *params);
 	QDF_STATUS (*txrx_soc_detach)(struct dp_soc *soc);
-	QDF_STATUS (*txrx_soc_init)(struct dp_soc *soc);
+	void* (*txrx_soc_init)(struct dp_soc *soc, HTC_HANDLE htc_handle,
+			       struct hif_opaque_softc *hif_handle);
 	QDF_STATUS (*txrx_soc_deinit)(struct dp_soc *soc);
 	QDF_STATUS (*txrx_soc_srng_alloc)(struct dp_soc *soc);
 	QDF_STATUS (*txrx_soc_srng_init)(struct dp_soc *soc);
@@ -2254,8 +2256,9 @@ struct dp_arch_ops {
 	void (*txrx_peer_map_detach)(struct dp_soc *soc);
 	QDF_STATUS (*dp_rxdma_ring_sel_cfg)(struct dp_soc *soc);
 	void (*soc_cfg_attach)(struct dp_soc *soc);
-	QDF_STATUS (*txrx_peer_setup)(struct dp_soc *soc,
-				      struct dp_peer *peer);
+	QDF_STATUS (*txrx_peer_setup)(struct cdp_soc_t *soc_hdl,
+				      uint8_t vdev_id, uint8_t *peer_mac,
+				      struct cdp_peer_setup_info *setup_info);
 	void (*peer_get_reo_hash)(struct dp_vdev *vdev,
 				  struct cdp_peer_setup_info *setup_info,
 				  enum cdp_host_reo_dest_ring *reo_dest,
@@ -2464,6 +2467,9 @@ struct dp_arch_ops {
 					    uint32_t num_elem,
 					    uint8_t pool_id);
 	void (*dp_tx_desc_pool_free)(struct dp_soc *soc, uint8_t pool_id);
+
+	QDF_STATUS (*txrx_srng_init)(struct dp_soc *soc, struct dp_srng *srng,
+				     int ring_type, int ring_num, int mac_id);
 };
 
 /**

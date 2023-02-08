@@ -1392,7 +1392,8 @@ qdf_export_symbol(dp_srng_free);
 QDF_STATUS dp_srng_init(struct dp_soc *soc, struct dp_srng *srng, int ring_type,
 			int ring_num, int mac_id)
 {
-	return dp_srng_init_idx(soc, srng, ring_type, ring_num, mac_id, 0);
+	return soc->arch_ops.txrx_srng_init(soc, srng, ring_type,
+					    ring_num, mac_id);
 }
 
 qdf_export_symbol(dp_srng_init);
@@ -2951,7 +2952,9 @@ void dp_soc_print_inactive_objects(struct dp_soc *soc)
  */
 static void dp_soc_deinit_wifi3(struct cdp_soc_t *txrx_soc)
 {
-	dp_soc_deinit(txrx_soc);
+	struct dp_soc *soc = (struct dp_soc *)txrx_soc;
+
+	soc->arch_ops.txrx_soc_deinit(soc);
 }
 
 /**
@@ -4860,6 +4863,26 @@ static void dp_mlo_peer_authorize(struct dp_soc *soc,
 	dp_release_link_peers_ref(&link_peers_info, DP_MOD_ID_CDP);
 }
 #endif
+
+/**
+ * dp_peer_setup_wifi3_wrapper() - initialize the peer
+ * @soc_hdl: soc handle object
+ * @vdev_id : vdev_id of vdev object
+ * @peer_mac: Peer's mac address
+ * @setup_info: peer setup info for MLO
+ *
+ * Return: QDF_STATUS
+ */
+static QDF_STATUS
+dp_peer_setup_wifi3_wrapper(struct cdp_soc_t *soc_hdl, uint8_t vdev_id,
+			    uint8_t *peer_mac,
+			    struct cdp_peer_setup_info *setup_info)
+{
+	struct dp_soc *soc = (struct dp_soc *)soc_hdl;
+
+	return soc->arch_ops.txrx_peer_setup(soc_hdl, vdev_id,
+					     peer_mac, setup_info);
+}
 
 /**
  * dp_cp_peer_del_resp_handler() - Handle the peer delete response
@@ -10093,7 +10116,7 @@ static struct cdp_cmn_ops dp_ops_cmn = {
 	.txrx_pdev_detach = dp_pdev_detach_wifi3,
 	.txrx_pdev_deinit = dp_pdev_deinit_wifi3,
 	.txrx_peer_create = dp_peer_create_wifi3,
-	.txrx_peer_setup = dp_peer_setup_wifi3,
+	.txrx_peer_setup = dp_peer_setup_wifi3_wrapper,
 #ifdef FEATURE_AST
 	.txrx_peer_teardown = dp_peer_teardown_wifi3,
 #else
@@ -11273,7 +11296,8 @@ dp_soc_attach(struct cdp_ctrl_objmgr_psoc *ctrl_psoc,
 		dp_err("wlan_cfg_ctx failed\n");
 		goto fail2;
 	}
-	dp_soc_cfg_attach(soc);
+
+	soc->arch_ops.soc_cfg_attach(soc);
 
 	if (dp_hw_link_desc_pool_banks_alloc(soc, WLAN_INVALID_PDEV_ID)) {
 		dp_err("failed to allocate link desc pool banks");
@@ -11353,13 +11377,15 @@ fail0:
 	return NULL;
 }
 
-void *dp_soc_init_wifi3(struct cdp_soc_t *soc,
+void *dp_soc_init_wifi3(struct cdp_soc_t *cdp_soc,
 			struct cdp_ctrl_objmgr_psoc *ctrl_psoc,
 			struct hif_opaque_softc *hif_handle,
 			HTC_HANDLE htc_handle, qdf_device_t qdf_osdev,
 			struct ol_if_ops *ol_ops, uint16_t device_id)
 {
-	return dp_soc_init((struct dp_soc *)soc, htc_handle, hif_handle);
+	struct dp_soc *soc = (struct dp_soc *)cdp_soc;
+
+	return soc->arch_ops.txrx_soc_init(soc, htc_handle, hif_handle);
 }
 
 #endif

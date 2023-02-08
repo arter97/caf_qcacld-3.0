@@ -19,6 +19,7 @@
 
 #include <wlan_utility.h>
 #include <dp_internal.h>
+#include "dp_rings.h"
 #include <dp_htt.h>
 #include "dp_be.h"
 #include "dp_be_tx.h"
@@ -100,6 +101,7 @@ static void dp_ppeds_inuse_desc(struct dp_soc *soc)
 static void dp_soc_cfg_attach_be(struct dp_soc *soc)
 {
 	struct wlan_cfg_dp_soc_ctxt *soc_cfg_ctx = soc->wlan_cfg_ctx;
+	dp_soc_cfg_attach(soc);
 
 	wlan_cfg_set_rx_rel_ring_id(soc_cfg_ctx, WBM2SW_REL_ERR_RING_NUM);
 
@@ -744,6 +746,10 @@ QDF_STATUS dp_peer_setup_ppeds_be(struct dp_soc *soc, struct dp_peer *peer,
 {
 	return QDF_STATUS_SUCCESS;
 }
+
+static inline void dp_ppeds_stop_soc_be(struct dp_soc *soc)
+{
+}
 #endif /* WLAN_SUPPORT_PPEDS */
 
 void dp_reo_shared_qaddr_detach(struct dp_soc *soc)
@@ -993,6 +999,10 @@ static QDF_STATUS dp_soc_deinit_be(struct dp_soc *soc)
 	struct dp_soc_be *be_soc = dp_get_be_soc_from_dp_soc(soc);
 	int i = 0;
 
+	qdf_atomic_set(&soc->cmn_init_done, 0);
+
+	dp_ppeds_stop_soc_be(soc);
+
 	dp_tx_deinit_bank_profiles(be_soc);
 	for (i = 0; i < MAX_TXDESC_POOLS; i++)
 		dp_hw_cookie_conversion_deinit(be_soc,
@@ -1007,11 +1017,35 @@ static QDF_STATUS dp_soc_deinit_be(struct dp_soc *soc)
 	return QDF_STATUS_SUCCESS;
 }
 
-static QDF_STATUS dp_soc_init_be(struct dp_soc *soc)
+static QDF_STATUS dp_soc_deinit_be_wrapper(struct dp_soc *soc)
+{
+	QDF_STATUS qdf_status;
+
+	qdf_status = dp_soc_deinit_be(soc);
+	if (QDF_IS_STATUS_ERROR(qdf_status))
+		return qdf_status;
+
+	dp_soc_deinit(soc);
+
+	return QDF_STATUS_SUCCESS;
+}
+
+static void *dp_soc_init_be(struct dp_soc *soc, HTC_HANDLE htc_handle,
+			    struct hif_opaque_softc *hif_handle)
 {
 	QDF_STATUS qdf_status = QDF_STATUS_SUCCESS;
 	struct dp_soc_be *be_soc = dp_get_be_soc_from_dp_soc(soc);
 	int i = 0;
+	void *ret_addr;
+
+	wlan_minidump_log(soc, sizeof(*soc), soc->ctrl_psoc,
+			  WLAN_MD_DP_SOC, "dp_soc");
+
+	soc->hif_handle = hif_handle;
+
+	soc->hal_soc = hif_get_hal_handle(soc->hif_handle);
+	if (!soc->hal_soc)
+		return NULL;
 
 	dp_ppeds_init_soc_be(soc);
 
@@ -1042,10 +1076,14 @@ static QDF_STATUS dp_soc_init_be(struct dp_soc *soc)
 	/* write WBM/REO cookie conversion CFG register */
 	dp_cc_reg_cfg_init(soc, true);
 
-	return qdf_status;
+	ret_addr = dp_soc_init(soc, htc_handle, hif_handle);
+	if (!ret_addr)
+		goto fail;
+
+	return ret_addr;
 fail:
 	dp_soc_deinit_be(soc);
-	return qdf_status;
+	return NULL;
 }
 
 static QDF_STATUS dp_pdev_attach_be(struct dp_pdev *pdev,
@@ -1137,18 +1175,33 @@ static QDF_STATUS dp_vdev_detach_be(struct dp_soc *soc, struct dp_vdev *vdev)
 }
 
 #ifdef WLAN_SUPPORT_PPEDS
-static QDF_STATUS dp_peer_setup_be(struct dp_soc *soc, struct dp_peer *peer)
+static void dp_soc_txrx_peer_setup_be(struct dp_soc *soc, uint8_t vdev_id,
+				      uint8_t *peer_mac)
 {
 	struct dp_vdev_be *be_vdev;
 	QDF_STATUS qdf_status = QDF_STATUS_SUCCESS;
 	struct dp_soc_be *be_soc = dp_get_be_soc_from_dp_soc(soc);
 	struct cdp_ds_vp_params vp_params = {0};
 	struct cdp_soc_t *cdp_soc = &soc->cdp_soc;
+	enum wlan_op_mode vdev_opmode;
+	struct dp_peer *peer;
+
+	peer = dp_peer_find_hash_find(soc, peer_mac, 0, vdev_id, DP_MOD_ID_CDP);
+	if (!peer)
+		return;
+	vdev_opmode = peer->vdev->opmode;
+
+	if (vdev_opmode != wlan_op_mode_ap &&
+	    vdev_opmode != wlan_op_mode_sta) {
+		dp_peer_unref_delete(peer, DP_MOD_ID_CDP);
+		return;
+	}
 
 	be_vdev = dp_get_be_vdev_from_dp_vdev(peer->vdev);
 	if (!be_vdev) {
 		qdf_err("BE vap is null");
-		return QDF_STATUS_E_NULL_VALUE;
+		qdf_status = QDF_STATUS_E_NULL_VALUE;
+		goto fail;
 	}
 
 	/*
@@ -1156,7 +1209,8 @@ static QDF_STATUS dp_peer_setup_be(struct dp_soc *soc, struct dp_peer *peer)
 	 */
 	if (!cdp_soc->ol_ops->get_ppeds_profile_info_for_vap) {
 		dp_err("%pK: Register get ppeds profile info first\n", cdp_soc);
-		return QDF_STATUS_E_NULL_VALUE;
+		qdf_status = QDF_STATUS_E_NULL_VALUE;
+		goto fail;
 	}
 
 	/*
@@ -1167,7 +1221,8 @@ static QDF_STATUS dp_peer_setup_be(struct dp_soc *soc, struct dp_peer *peer)
 								     &vp_params);
 	if (qdf_status == QDF_STATUS_E_NULL_VALUE) {
 		dp_err("%pK: Could not find ppeds profile info vdev\n", be_vdev);
-		return QDF_STATUS_E_NULL_VALUE;
+		qdf_status = QDF_STATUS_E_NULL_VALUE;
+		goto fail;
 	}
 
 	if (vp_params.ppe_vp_type == PPE_VP_USER_TYPE_DS) {
@@ -1175,14 +1230,40 @@ static QDF_STATUS dp_peer_setup_be(struct dp_soc *soc, struct dp_peer *peer)
 						    (void *)&be_soc->ppe_vp_profile[vp_params.ppe_vp_profile_idx]);
 	}
 
-	return qdf_status;
+fail:
+	dp_peer_unref_delete(peer, DP_MOD_ID_CDP);
+	if (!QDF_IS_STATUS_SUCCESS(qdf_status)) {
+		dp_err("Unable to do ppeds peer setup");
+		qdf_assert_always(0);
+	}
 }
+
 #else
-static QDF_STATUS dp_peer_setup_be(struct dp_soc *soc, struct dp_peer *peer)
+static inline
+void dp_soc_txrx_peer_setup_be(struct dp_soc *soc, uint8_t vdev_id,
+			       uint8_t *peer_mac)
 {
-	return QDF_STATUS_SUCCESS;
 }
 #endif
+
+static QDF_STATUS dp_peer_setup_be(struct cdp_soc_t *soc_hdl, uint8_t vdev_id,
+				   uint8_t *peer_mac,
+				   struct cdp_peer_setup_info *setup_info)
+{
+	struct dp_soc *soc = (struct dp_soc *)soc_hdl;
+	QDF_STATUS qdf_status = QDF_STATUS_SUCCESS;
+
+	qdf_status = dp_peer_setup_wifi3(soc_hdl, vdev_id, peer_mac,
+					 setup_info);
+	if (!QDF_IS_STATUS_SUCCESS(qdf_status)) {
+		dp_err("Unable to dp peer setup");
+		return qdf_status;
+	}
+
+	dp_soc_txrx_peer_setup_be(soc, vdev_id, peer_mac);
+
+	return QDF_STATUS_SUCCESS;
+}
 
 qdf_size_t dp_get_soc_context_size_be(void)
 {
@@ -1653,6 +1734,13 @@ dp_init_near_full_arch_ops_be(struct dp_arch_ops *arch_ops)
 {
 }
 #endif
+
+static inline
+QDF_STATUS dp_srng_init_be(struct dp_soc *soc, struct dp_srng *srng,
+			   int ring_type, int ring_num, int mac_id)
+{
+	return dp_srng_init_idx(soc, srng, ring_type, ring_num, mac_id, 0);
+}
 
 #ifdef WLAN_SUPPORT_PPEDS
 static void dp_soc_ppeds_srng_deinit(struct dp_soc *soc)
@@ -2735,7 +2823,7 @@ void dp_initialize_arch_ops_be(struct dp_arch_ops *arch_ops)
 	arch_ops->txrx_soc_attach = dp_soc_attach_be;
 	arch_ops->txrx_soc_detach = dp_soc_detach_be;
 	arch_ops->txrx_soc_init = dp_soc_init_be;
-	arch_ops->txrx_soc_deinit = dp_soc_deinit_be;
+	arch_ops->txrx_soc_deinit = dp_soc_deinit_be_wrapper;
 	arch_ops->txrx_soc_srng_alloc = dp_soc_srng_alloc_be;
 	arch_ops->txrx_soc_srng_init = dp_soc_srng_init_be;
 	arch_ops->txrx_soc_srng_deinit = dp_soc_srng_deinit_be;
@@ -2790,6 +2878,7 @@ void dp_initialize_arch_ops_be(struct dp_arch_ops *arch_ops)
 	arch_ops->peer_get_reo_hash = dp_peer_get_reo_hash_be;
 	arch_ops->reo_remap_config = dp_reo_remap_config_be;
 	arch_ops->txrx_get_vdev_mcast_param = dp_txrx_get_vdev_mcast_param_be;
+	arch_ops->txrx_srng_init = dp_srng_init_be;
 	dp_initialize_arch_ops_be_ipa(arch_ops);
 	dp_initialize_arch_ops_be_single_dev(arch_ops);
 }

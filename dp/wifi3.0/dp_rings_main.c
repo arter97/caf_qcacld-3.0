@@ -3393,13 +3393,6 @@ void dp_soc_deinit(void *txrx_soc)
 	struct dp_soc *soc = (struct dp_soc *)txrx_soc;
 	struct htt_soc *htt_soc = soc->htt_handle;
 
-	qdf_atomic_set(&soc->cmn_init_done, 0);
-
-	if (soc->arch_ops.txrx_soc_ppeds_stop)
-		soc->arch_ops.txrx_soc_ppeds_stop(soc);
-
-	soc->arch_ops.txrx_soc_deinit(soc);
-
 	dp_monitor_soc_deinit(soc);
 
 	/* free peer tables & AST tables allocated during peer_map_attach */
@@ -3468,33 +3461,6 @@ dp_htt_setup_rxdma_err_dst_ring(struct dp_soc *soc, int mac_id,
 			       RXDMA_DST);
 }
 #endif
-
-#ifdef WLAN_SUPPORT_PPEDS
-
-static inline
-void dp_soc_txrx_peer_setup(enum wlan_op_mode vdev_opmode, struct dp_soc *soc,
-			    struct dp_peer *peer)
-{
-	if (((vdev_opmode == wlan_op_mode_ap) ||
-	     (vdev_opmode == wlan_op_mode_sta)) &&
-	     (soc->arch_ops.txrx_peer_setup)) {
-		if (soc->arch_ops.txrx_peer_setup(soc, peer)
-				!= QDF_STATUS_SUCCESS) {
-			dp_err("unable to setup target peer features");
-			qdf_assert_always(0);
-		}
-	}
-}
-
-#else
-
-static inline
-void dp_soc_txrx_peer_setup(enum wlan_op_mode vdev_opmode, struct dp_soc *soc,
-			    struct dp_peer *peer)
-{
-}
-
-#endif /* WLAN_SUPPORT_PPEDS */
 
 void dp_vdev_get_default_reo_hash(struct dp_vdev *vdev,
 				  enum cdp_host_reo_dest_ring *reo_dest,
@@ -3728,8 +3694,6 @@ dp_peer_setup_wifi3(struct cdp_soc_t *soc_hdl, uint8_t vdev_id,
 			dp_peer_rx_init(pdev, peer);
 		}
 	}
-
-	dp_soc_txrx_peer_setup(vdev_opmode, soc, peer);
 
 	if (!IS_MLO_DP_MLD_PEER(peer))
 		dp_peer_ppdu_delayed_ba_init(peer);
@@ -4482,20 +4446,6 @@ void *dp_soc_init(struct dp_soc *soc, HTC_HANDLE htc_handle,
 	uint8_t i;
 	int num_dp_msi;
 
-	wlan_minidump_log(soc, sizeof(*soc), soc->ctrl_psoc,
-			  WLAN_MD_DP_SOC, "dp_soc");
-
-	soc->hif_handle = hif_handle;
-
-	soc->hal_soc = hif_get_hal_handle(soc->hif_handle);
-	if (!soc->hal_soc)
-		goto fail0;
-
-	if (!QDF_IS_STATUS_SUCCESS(soc->arch_ops.txrx_soc_init(soc))) {
-		dp_err("unable to do target specific init");
-		goto fail0;
-	}
-
 	htt_soc = htt_soc_attach(soc, htc_handle);
 	if (!htt_soc)
 		goto fail1;
@@ -4672,8 +4622,6 @@ fail3:
 fail2:
 	htt_soc_detach(htt_soc);
 fail1:
-	soc->arch_ops.txrx_soc_deinit(soc);
-fail0:
 	return NULL;
 }
 
@@ -5301,7 +5249,6 @@ void dp_soc_cfg_attach(struct dp_soc *soc)
 			wlan_cfg_num_reo_dest_rings(soc->wlan_cfg_ctx);
 	}
 
-	soc->arch_ops.soc_cfg_attach(soc);
 }
 
 void dp_pdev_set_default_reo(struct dp_pdev *pdev)
