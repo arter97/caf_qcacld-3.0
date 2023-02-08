@@ -5869,7 +5869,7 @@ typedef enum {
 	VDEV_PARAM(vdev_param_set_eht_puncturing_mode,
 		   VDEV_PARAM_SET_EHT_PUNCTURING_MODE),
 	VDEV_PARAM(vdev_param_mcast_steer, VDEV_PARAM_MCAST_STEERING),
-	VDEV_PARAM(vdev_param_xpan_profile, VDEV_PARAM_XPAN_PROFILE),
+	VDEV_PARAM(vdev_param_set_profile, VDEV_PARAM_SET_PROFILE),
 	VDEV_PARAM(vdev_param_vdev_stats_id_update,
 		   VDEV_PARAM_VDEV_STATS_ID_UPDATE),
 	VDEV_PARAM(vdev_param_skip_roam_eapol_4way_handshake,

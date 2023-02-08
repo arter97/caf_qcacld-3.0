@@ -704,6 +704,8 @@ static const uint32_t vdev_param_tlv[] = {
 		  VDEV_PARAM_NON_AGG_SW_RETRY_TH),
 	PARAM_MAP(vdev_param_set_cmd_obss_pd_threshold,
 		  VDEV_PARAM_SET_CMD_OBSS_PD_THRESHOLD),
+	PARAM_MAP(vdev_param_set_profile,
+		  VDEV_PARAM_SET_PROFILE),
 };
 #endif
 
