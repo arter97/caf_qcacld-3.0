@@ -275,10 +275,23 @@ static inline
 bool dp_tx_me_check_wds_peer_by_mac(struct dp_soc *soc, struct dp_vdev *vdev,
 				    uint8_t *mac_addr)
 {
+	struct dp_peer *peer = NULL;
+	struct cdp_peer_info peer_info = { 0 };
+
 	if (!vdev->wds_ext_enabled)
 		return false;
-	return !dp_find_peer_exist(&soc->cdp_soc, vdev->pdev->pdev_id,
-				   mac_addr);
+
+	DP_PEER_INFO_PARAMS_INIT(&peer_info, DP_VDEV_ALL, mac_addr, false,
+				 CDP_WILD_PEER_TYPE);
+
+	peer = dp_peer_hash_find_wrapper((struct dp_soc *)soc, &peer_info,
+					  DP_MOD_ID_CDP);
+
+	if (!peer)
+		return true;
+
+	dp_peer_unref_delete(peer, DP_MOD_ID_CDP);
+	return false;
 }
 #else
 static inline
