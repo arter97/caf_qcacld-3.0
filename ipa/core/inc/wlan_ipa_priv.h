@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2013-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -44,6 +44,9 @@
 #include "qdf_delayed_work.h"
 #include <qdf_event.h>
 #include "wlan_ipa_public_struct.h"
+#ifdef IPA_OPT_WIFI_DP
+#include "cdp_txrx_ipa.h"
+#endif
 
 #define WLAN_IPA_RX_INACTIVITY_MSEC_DELAY   1000
 #define WLAN_IPA_UC_WLAN_8023_HDR_SIZE      14
@@ -742,12 +745,18 @@ struct wlan_ipa_priv {
 
 	uint32_t wdi_version;
 	bool is_smmu_enabled;	/* IPA caps returned from ipa_wdi_init */
+	/* Flag to notify whether optional wifi dp feature is enabled or not */
+	bool opt_wifi_datapath;
 	qdf_atomic_t stats_quota;
 	uint8_t curr_bw_level;
 	qdf_atomic_t deinit_in_prog;
 	uint8_t instance_id;
 	bool handle_initialized;
 	qdf_ipa_wdi_hdl_t hdl;
+#ifdef IPA_OPT_WIFI_DP
+	struct wifi_dp_flt_setup dp_cce_super_rule_flt_param;
+	qdf_event_t ipa_flt_evnt;
+#endif
 };
 
 #define WLAN_IPA_WLAN_FRAG_HEADER        sizeof(struct frag_header)

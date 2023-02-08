@@ -2783,14 +2783,19 @@ void dp_peer_update_tid_stats_from_reo(struct dp_soc *soc, void *cb_ctxt,
 
 int dp_peer_get_rxtid_stats_ipa(struct dp_peer *peer,
 				dp_rxtid_stats_cmd_cb dp_stats_cmd_cb);
-
+#ifdef IPA_OPT_WIFI_DP
+void dp_ipa_wdi_opt_dpath_notify_flt_rlsd(int flt0_rslt,
+					  int flt1_rslt);
+void dp_ipa_wdi_opt_dpath_notify_flt_add_rem_cb(int flt0_rslt, int flt1_rslt);
+void dp_ipa_wdi_opt_dpath_notify_flt_rsvd(bool is_success);
+#endif
+#ifdef QCA_ENHANCED_STATS_SUPPORT
 /**
  * dp_peer_aggregate_tid_stats - aggregate rx tid stats
  * @peer: Data Path peer
  *
  * Return: void
  */
-#ifdef QCA_ENHANCED_STATS_SUPPORT
 void dp_peer_aggregate_tid_stats(struct dp_peer *peer);
 #endif
 #else

@@ -8423,6 +8423,9 @@ static void dp_peer_setup_get_reo_hash(struct dp_vdev *vdev,
 		} else if (vdev->opmode == wlan_op_mode_sta &&
 			   dp_ipa_is_mdm_platform()) {
 			*reo_dest = IPA_REO_DEST_RING_IDX + 1;
+		} else if (vdev->opmode == wlan_op_mode_sta &&
+			   (!dp_ipa_is_mdm_platform())) {
+			dp_debug("opt_dp: default reo ring is set");
 		}
 	}
 }
@@ -15149,6 +15152,11 @@ static struct cdp_ipa_ops dp_ops_ipa = {
 	.ipa_tx_buf_smmu_unmapping = dp_ipa_tx_buf_smmu_unmapping,
 #ifdef QCA_ENHANCED_STATS_SUPPORT
 	.ipa_update_peer_rx_stats = dp_ipa_update_peer_rx_stats,
+#endif
+#ifdef IPA_OPT_WIFI_DP
+	.ipa_rx_super_rule_setup = dp_ipa_rx_super_rule_setup,
+	.ipa_pcie_link_up = dp_ipa_pcie_link,
+	.ipa_pcie_link_down = dp_ipa_pcie_link_down,
 #endif
 #ifdef IPA_WDS_EASYMESH_FEATURE
 	.ipa_ast_create = dp_ipa_ast_create,

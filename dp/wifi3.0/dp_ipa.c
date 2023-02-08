@@ -18,6 +18,7 @@
 #ifdef IPA_OFFLOAD
 
 #include <wlan_ipa_ucfg_api.h>
+#include <wlan_ipa_core.h>
 #include <qdf_ipa_wdi3.h>
 #include <qdf_types.h>
 #include <qdf_lock.h>
@@ -3363,6 +3364,83 @@ static qdf_nbuf_t dp_ipa_intrabss_send(struct dp_pdev *pdev,
 	dp_peer_unref_delete(vdev_peer, DP_MOD_ID_IPA);
 	return NULL;
 }
+
+#ifdef IPA_OPT_WIFI_DP
+/**
+ * dp_ipa_rx_super_rule_setup()- pass cce super rule params to fw from ipa
+ *
+ * @soc_hdl: cdp soc
+ * @flt_params: filter tuple
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS dp_ipa_rx_super_rule_setup(struct cdp_soc_t *soc_hdl,
+				      void *flt_params)
+{
+	struct dp_soc *soc = cdp_soc_t_to_dp_soc(soc_hdl);
+
+	return htt_h2t_rx_cce_super_rule_setup(soc->htt_handle, flt_params);
+}
+
+/**
+ * dp_ipa_wdi_opt_dpath_notify_flt_add_rem_cb()- send cce super rule filter
+ * add/remove result to ipa
+ *
+ * @flt0_rslt : result for filter0 add/remove
+ * @flt1_rslt : result for filter1 add/remove
+ *
+ * Return: void
+ */
+void dp_ipa_wdi_opt_dpath_notify_flt_add_rem_cb(int flt0_rslt, int flt1_rslt)
+{
+	wlan_ipa_wdi_opt_dpath_notify_flt_add_rem_cb(flt0_rslt, flt1_rslt);
+}
+
+int dp_ipa_pcie_link_up(struct cdp_soc_t *soc_hdl)
+{
+	struct dp_soc *soc = cdp_soc_t_to_dp_soc(soc_hdl);
+	struct hal_soc *hal_soc = (struct hal_soc *)soc->hal_soc;
+	int response = 0;
+
+	response = hif_prevent_l1((hal_soc->hif_handle));
+	return response;
+}
+
+void dp_ipa_pcie_link_down(struct cdp_soc_t *soc_hdl)
+{
+	struct dp_soc *soc = cdp_soc_t_to_dp_soc(soc_hdl);
+	struct hal_soc *hal_soc = (struct hal_soc *)soc->hal_soc;
+
+	hif_allow_l1(hal_soc->hif_handle);
+}
+
+/**
+ * dp_ipa_wdi_opt_dpath_notify_flt_rlsd()- send cce super rule release
+ * notification to ipa
+ *
+ * @flt0_rslt : result for filter0 release
+ * @flt1_rslt : result for filter1 release
+ *
+ *Return: void
+ */
+void dp_ipa_wdi_opt_dpath_notify_flt_rlsd(int flt0_rslt, int flt1_rslt)
+{
+	wlan_ipa_wdi_opt_dpath_notify_flt_rlsd(flt0_rslt, flt1_rslt);
+}
+
+/**
+ * dp_ipa_wdi_opt_dpath_notify_flt_rsvd()- send cce super rule reserve
+ * notification to ipa
+ *
+ *@is_success : result of filter reservatiom
+ *
+ *Return: void
+ */
+void dp_ipa_wdi_opt_dpath_notify_flt_rsvd(bool is_success)
+{
+	wlan_ipa_wdi_opt_dpath_notify_flt_rsvd(is_success);
+}
+#endif
 
 #ifdef IPA_WDS_EASYMESH_FEATURE
 /**

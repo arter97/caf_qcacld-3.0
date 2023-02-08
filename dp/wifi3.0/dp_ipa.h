@@ -351,6 +351,12 @@ QDF_STATUS dp_ipa_disable_pipes(struct cdp_soc_t *soc_hdl, uint8_t pdev_id,
  */
 QDF_STATUS dp_ipa_set_perf_level(int client, uint32_t max_supported_bw_mbps,
 				 qdf_ipa_wdi_hdl_t hdl);
+#ifdef IPA_OPT_WIFI_DP
+QDF_STATUS dp_ipa_rx_super_rule_setup(struct cdp_soc_t *soc_hdl,
+				      void *flt_params);
+int dp_ipa_pcie_link_up(struct cdp_soc_t *soc_hdl);
+void dp_ipa_pcie_link_down(struct cdp_soc_t *soc_hdl);
+#endif
 
 /**
  * dp_ipa_rx_intrabss_fwd() - Perform intra-bss fwd for IPA RX path

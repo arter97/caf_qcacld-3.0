@@ -32,7 +32,9 @@
 #endif
 #include "qdf_mem.h"   /* qdf_mem_malloc,free */
 #include "cdp_txrx_cmn_struct.h"
-
+#ifdef IPA_OPT_WIFI_DP
+#include "cdp_txrx_ipa.h"
+#endif
 #ifdef FEATURE_PERPKT_INFO
 #include "dp_ratetable.h"
 #endif
@@ -776,6 +778,15 @@ fail0:
 qdf_export_symbol(htt_srng_setup);
 
 #ifdef QCA_SUPPORT_FULL_MON
+/**
+ * htt_h2t_full_mon_cfg() - Send full monitor configuration msg to FW
+ *
+ * @htt_soc: HTT Soc handle
+ * @pdev_id: Radio id
+ * @config: enabled/disable configuration
+ *
+ * Return: Success when HTT message is sent, error on failure
+ */
 int htt_h2t_full_mon_cfg(struct htt_soc *htt_soc,
 			 uint8_t pdev_id,
 			 enum dp_full_mon_config config)
@@ -1863,7 +1874,7 @@ dp_htt_set_pdev_obss_stats(struct dp_pdev *pdev, uint32_t tag_type,
 /**
  * dp_process_htt_stat_msg(): Process the list of buffers of HTT EXT stats
  * @htt_stats: htt stats info
- * @soc: DP soc
+ * @soc: dp_soc
  *
  * The FW sends the HTT EXT STATS as a stream of T2H messages. Each T2H message
  * contains sub messages which are identified by a TLV header.
@@ -2567,6 +2578,10 @@ static void dp_htt_alert_print(enum htt_t2h_msg_type msg_type,
  * @srng: DP_SRNG handle
  * @ring_type: srng src/dst ring
  * @state: ring state
+ * @pdev: pdev
+ * @srng: DP_SRNG handle
+ * @ring_type: srng src/dst ring
+ * @state: ring_state
  *
  * Return: void
  */
@@ -2679,6 +2694,7 @@ dp_get_tcl_status_ring_state_from_hal(struct dp_pdev *pdev,
 
 /**
  * dp_queue_ring_stats() - Print pdev hal level ring stats
+ * dp_queue_ring_stats(): Print pdev hal level ring stats
  * @pdev: DP_pdev handle
  *
  * Return: void
@@ -3865,6 +3881,20 @@ void htt_soc_detach(struct htt_soc *htt_hdl)
 
 }
 
+/**
+ * dp_h2t_ext_stats_msg_send(): function to construct HTT message to pass to FW
+ * @pdev: DP PDEV handle
+ * @stats_type_upload_mask: stats type requested by user
+ * @config_param_0: extra configuration parameters
+ * @config_param_1: extra configuration parameters
+ * @config_param_2: extra configuration parameters
+ * @config_param_3: extra configuration parameters
+ * @cookie_val: cookie value
+ * @cookie_msb: msb of debug status cookie
+ * @mac_id: mac number
+ *
+ * return: QDF STATUS
+ */
 QDF_STATUS dp_h2t_ext_stats_msg_send(struct dp_pdev *pdev,
 		uint32_t stats_type_upload_mask, uint32_t config_param_0,
 		uint32_t config_param_1, uint32_t config_param_2,
@@ -4108,6 +4138,22 @@ QDF_STATUS dp_h2t_hw_vdev_stats_config_send(struct dp_soc *dpsoc,
 }
 #endif
 
+/**
+ * dp_h2t_3tuple_config_send(): function to construct 3 tuple configuration
+ * HTT message to pass to FW
+ * @pdev: DP PDEV handle
+ * @tuple_mask: tuple configuration to report 3 tuple hash value in either
+ * toeplitz_2_or_4 or flow_id_toeplitz in MSDU START TLV.
+ * @mac_id: mac id
+ *
+ * tuple_mask[1:0]:
+ *   00 - Do not report 3 tuple hash value
+ *   10 - Report 3 tuple hash value in toeplitz_2_or_4
+ *   01 - Report 3 tuple hash value in flow_id_toeplitz
+ *   11 - Report 3 tuple hash value in both toeplitz_2_or_4 & flow_id_toeplitz
+ *
+ * return: QDF STATUS
+ */
 QDF_STATUS dp_h2t_3tuple_config_send(struct dp_pdev *pdev,
 				     uint32_t tuple_mask, uint8_t mac_id)
 {
@@ -4585,6 +4631,13 @@ dp_htt_rx_flow_fse_operation(struct dp_pdev *pdev,
 	return status;
 }
 
+/**
+ * dp_htt_rx_fisa_config(): Send HTT msg to configure FISA
+ * @pdev: DP pdev handle
+ * @fisa_config: Fisa config struct
+ *
+ * Return: Success when HTT message is sent, error on failure
+ */
 QDF_STATUS
 dp_htt_rx_fisa_config(struct dp_pdev *pdev,
 		      struct dp_htt_rx_fisa_cfg *fisa_config)
@@ -4679,6 +4732,13 @@ dp_htt_rx_fisa_config(struct dp_pdev *pdev,
 }
 
 #ifdef WLAN_SUPPORT_PPEDS
+/**
+ * dp_htt_rxdma_rxole_ppe_cfg_set() - Send RxOLE and RxDMA PPE config
+ * @soc: Data path SoC handle
+ * @cfg: RxDMA and RxOLE PPE config
+ *
+ * Return: Success when HTT message is sent, error on failure
+ */
 QDF_STATUS
 dp_htt_rxdma_rxole_ppe_cfg_set(struct dp_soc *soc,
 			       struct dp_htt_rxdma_rxole_ppe_config *cfg)
