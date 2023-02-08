@@ -217,7 +217,8 @@ static void hdd_trigger_ssr_from_hif(void *data, enum qdf_hang_reason reason,
 {
 	struct hdd_context *hdd_ctx = cds_get_context(QDF_MODULE_ID_HDD);
 
-	return cds_trigger_recovery_psoc(hdd_ctx->psoc, reason, func, line);
+	if (hdd_ctx)
+		cds_trigger_recovery_psoc(hdd_ctx->psoc, reason, func, line);
 }
 
 /**
