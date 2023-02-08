@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -190,6 +190,10 @@ extern const struct nla_policy wlan_hdd_wisa_cmd_policy[
 
 #ifndef WLAN_AKM_SUITE_SAE_EXT_KEY
 #define WLAN_AKM_SUITE_SAE_EXT_KEY 0x000FAC18
+#endif
+
+#ifndef WLAN_AKM_SUITE_FT_SAE_EXT_KEY
+#define WLAN_AKM_SUITE_FT_SAE_EXT_KEY 0x000FAC19
 #endif
 
 #ifdef FEATURE_WLAN_TDLS
