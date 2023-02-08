@@ -23,6 +23,7 @@
 #include "dp_peer.h"
 #include "dp_types.h"
 #include "dp_internal.h"
+#include "dp_ipa.h"
 #include "dp_rx.h"
 #include "htt_stats.h"
 #include "htt_ppdu_stats.h"
@@ -480,6 +481,134 @@ static int htt_h2t_ver_req_msg(struct htt_soc *soc)
 
 	return status;
 }
+
+#ifdef IPA_OPT_WIFI_DP
+QDF_STATUS htt_h2t_rx_cce_super_rule_setup(struct htt_soc *soc, void *param)
+{
+	struct wifi_dp_flt_setup *flt_params =
+			(struct wifi_dp_flt_setup *)param;
+	struct dp_htt_htc_pkt *pkt;
+	qdf_nbuf_t msg;
+	uint32_t *msg_word;
+	uint8_t *htt_logger_bufp;
+	uint8_t ver = 0;
+	uint8_t i, j, valid = 0;
+	uint8_t num_filters = flt_params->num_filters;
+	uint8_t pdev_id = flt_params->pdev_id;
+	uint8_t op = flt_params->op;
+	uint16_t ipv4 = qdf_ntohs(QDF_NBUF_TRAC_IPV4_ETH_TYPE);
+	uint16_t ipv6 = qdf_ntohs(QDF_NBUF_TRAC_IPV6_ETH_TYPE);
+	QDF_STATUS status;
+
+	if (num_filters > IPA_WDI_MAX_FILTER) {
+		dp_htt_err("Wrong filter count %d", num_filters);
+		return QDF_STATUS_FILT_REQ_ERROR;
+	}
+
+	msg = qdf_nbuf_alloc(soc->osdev,
+			     HTT_MSG_BUF_SIZE(HTT_RX_CCE_SUPER_RULE_SETUP_SZ),
+			     HTC_HEADER_LEN + HTC_HDR_ALIGNMENT_PADDING, 4,
+			     true);
+	if (!msg) {
+		dp_htt_err("Fail to allocate SUPER_RULE_SETUP msg ");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	qdf_nbuf_put_tail(msg, HTT_RX_CCE_SUPER_RULE_SETUP_SZ);
+	msg_word = (uint32_t *)qdf_nbuf_data(msg);
+	memset(msg_word, 0, HTT_RX_CCE_SUPER_RULE_SETUP_SZ);
+
+	qdf_nbuf_push_head(msg, HTC_HDR_ALIGNMENT_PADDING);
+	htt_logger_bufp = (uint8_t *)msg_word;
+
+	*msg_word = 0;
+	HTT_H2T_MSG_TYPE_SET(*msg_word,
+			     HTT_H2T_MSG_TYPE_RX_CCE_SUPER_RULE_SETUP);
+	HTT_RX_CCE_SUPER_RULE_SETUP_PDEV_ID_SET(*msg_word, pdev_id);
+	HTT_RX_CCE_SUPER_RULE_SETUP_OPERATION_SET(*msg_word, op);
+
+	/* Set cce_super_rule_params */
+	for (i = 0; i < num_filters; i++) {
+		valid = flt_params->flt_addr_params[i].valid;
+		ver = flt_params->flt_addr_params[i].l3_type;
+		msg_word++;
+
+		if (ver == ipv4) {
+			HTT_RX_CCE_SUPER_RULE_SETUP_IPV4_ADDR_ARRAY_SET(
+				msg_word,
+				flt_params->flt_addr_params[i].src_ipv4_addr);
+		} else if (ver == ipv6) {
+			HTT_RX_CCE_SUPER_RULE_SETUP_IPV6_ADDR_ARRAY_SET(
+				msg_word,
+				flt_params->flt_addr_params[i].src_ipv6_addr);
+		} else {
+			dp_htt_err("Wrong ip version. Cannot set src_addr.");
+			return QDF_STATUS_FILT_REQ_ERROR;
+		}
+
+		/* move uint32_t *msg_word by IPV6 addr size */
+		msg_word += (QDF_IPV6_ADDR_SIZE / 4);
+
+		if (ver == ipv4) {
+			HTT_RX_CCE_SUPER_RULE_SETUP_IPV4_ADDR_ARRAY_SET(
+				msg_word,
+				flt_params->flt_addr_params[i].dst_ipv4_addr);
+		} else if (ver == ipv6) {
+			HTT_RX_CCE_SUPER_RULE_SETUP_IPV6_ADDR_ARRAY_SET(
+				msg_word,
+				flt_params->flt_addr_params[i].dst_ipv6_addr);
+		} else {
+			dp_htt_err("Wrong ip version. Cannot set dst_addr.");
+			return QDF_STATUS_FILT_REQ_ERROR;
+		}
+
+		/* move uint32_t *msg_word by IPV6 addr size */
+		msg_word += (QDF_IPV6_ADDR_SIZE / 4);
+		HTT_RX_CCE_SUPER_RULE_SETUP_L3_TYPE_SET(*msg_word, ver);
+		HTT_RX_CCE_SUPER_RULE_SETUP_L4_TYPE_SET(
+					*msg_word,
+					flt_params->flt_addr_params[i].l4_type);
+		HTT_RX_CCE_SUPER_RULE_SETUP_IS_VALID_SET(*msg_word, valid);
+		msg_word++;
+		HTT_RX_CCE_SUPER_RULE_SETUP_L4_SRC_PORT_SET(
+				*msg_word,
+				flt_params->flt_addr_params[i].src_port);
+		HTT_RX_CCE_SUPER_RULE_SETUP_L4_DST_PORT_SET(
+				*msg_word,
+				flt_params->flt_addr_params[i].dst_port);
+
+		dp_info("opt_dp:: pdev: %u ver %u, flt_num %u, op %u,"
+			pdev_id, ver, i, op);
+		dp_info("valid %u", valid);
+	}
+
+	pkt = htt_htc_pkt_alloc(soc);
+	if (!pkt) {
+		dp_htt_err("%pK: Fail to allocate dp_htt_htc_pkt buffer");
+		qdf_assert(0);
+		qdf_nbuf_free(msg);
+		return QDF_STATUS_E_NOMEM;
+	}
+
+	pkt->soc_ctxt = NULL; /*not used during send-done callback */
+	SET_HTC_PACKET_INFO_TX(&pkt->htc_pkt,
+			       dp_htt_h2t_send_complete_free_netbuf,
+			       qdf_nbuf_data(msg), qdf_nbuf_len(msg),
+			       soc->htc_endpoint,
+			       HTC_TX_PACKET_TAG_RUNTIME_PUT);
+
+	SET_HTC_PACKET_NET_BUF_CONTEXT(&pkt->htc_pkt, msg);
+	status = DP_HTT_SEND_HTC_PKT(soc, pkt,
+				     HTT_H2T_MSG_TYPE_RX_CCE_SUPER_RULE_SETUP,
+				     htt_logger_bufp);
+
+	if (status != QDF_STATUS_SUCCESS) {
+		qdf_nbuf_free(msg);
+		htt_htc_pkt_free(soc, pkt);
+	}
+	return status;
+}
+#endif /* IPA_OPT_WIFI_DP */
 
 int htt_srng_setup(struct htt_soc *soc, int mac_id,
 		   hal_ring_handle_t hal_ring_hdl,
@@ -3264,7 +3393,97 @@ dp_htt_ppdu_id_fmt_handler(struct dp_soc *soc, uint32_t *msg_word)
 	}
 }
 
-/**
+#ifdef IPA_OPT_WIFI_DP
+static void dp_ipa_rx_cce_super_rule_setup_done_handler(struct htt_soc *soc,
+							uint32_t *msg_word)
+{
+	uint8_t pdev_id = 0;
+	uint8_t resp_type = 0;
+	uint8_t is_rules_enough = 0;
+	uint8_t num_rules_avail = 0;
+	int filter0_result = 0, filter1_result = 0;
+	bool is_success = false;
+
+	pdev_id = HTT_RX_CCE_SUPER_RULE_SETUP_DONE_PDEV_ID_GET(*msg_word);
+	resp_type = HTT_RX_CCE_SUPER_RULE_SETUP_DONE_RESPONSE_TYPE_GET(
+								*msg_word);
+	dp_info("opt_dp:: cce_super_rule_rsp pdev_id: %d resp_type: %d",
+		pdev_id, resp_type);
+
+	switch (resp_type) {
+	case HTT_RX_CCE_SUPER_RULE_SETUP_REQ_RESPONSE:
+	{
+		is_rules_enough =
+			HTT_RX_CCE_SUPER_RULE_SETUP_DONE_IS_RULE_ENOUGH_GET(
+								*msg_word);
+		num_rules_avail =
+			HTT_RX_CCE_SUPER_RULE_SETUP_DONE_AVAIL_RULE_NUM_GET(
+								*msg_word);
+		if (is_rules_enough == 1) {
+			is_success = true;
+			reserve_fail_cnt = 0;
+		} else {
+			is_success = false;
+			soc->reserve_fail_cnt++;
+			if (soc->reserve_fail_cnt > MAX_RESERVE_FAIL_ATTEMPT) {
+				/*
+				 * IPA will retry only after an hour by default
+				 * after MAX_RESERVE_FAIL_ATTEMPT
+				 */
+				soc->abort_count++;
+				soc->reserve_fail_cnt = 0;
+				dp_info(
+				  "opt_dp: Filter reserve failed max attempts");
+			}
+			dp_info("opt_dp:: Filter reserve failed. Rules avail %d",
+				num_rules_avail);
+		}
+		dp_ipa_wdi_opt_dpath_notify_flt_rsvd_per_inst(is_success);
+		break;
+	}
+	case HTT_RX_CCE_SUPER_RULE_INSTALL_RESPONSE:
+	{
+		filter0_result =
+			HTT_RX_CCE_SUPER_RULE_SETUP_DONE_CFG_RESULT_0_GET(
+								     *msg_word);
+		filter1_result =
+			HTT_RX_CCE_SUPER_RULE_SETUP_DONE_CFG_RESULT_1_GET(
+								     *msg_word);
+
+		dp_ipa_wdi_opt_dpath_notify_flt_add_rem_cb(filter0_result,
+							   filter1_result);
+		break;
+	}
+	case HTT_RX_CCE_SUPER_RULE_RELEASE_RESPONSE:
+	{
+		filter0_result =
+			HTT_RX_CCE_SUPER_RULE_SETUP_DONE_CFG_RESULT_0_GET(
+								     *msg_word);
+		filter1_result =
+			HTT_RX_CCE_SUPER_RULE_SETUP_DONE_CFG_RESULT_1_GET(
+								     *msg_word);
+
+		dp_ipa_wdi_opt_dpath_notify_flt_rlsd_per_inst(filter0_result,
+							      filter1_result);
+		break;
+	}
+	default:
+		dp_info("opt_dp:: Wrong Super rule setup response");
+	};
+
+	dp_info("opt_dp:: cce super rule resp type: %d, is_rules_enough: %d,",
+		resp_type, is_rules_enough);
+	dp_info("num_rules_avail: %d, rslt0: %d, rslt1: %d",
+		num_rules_avail, filter0_result, filter1_result);
+}
+#else
+static void dp_ipa_rx_cce_super_rule_setup_done_handler(struct htt_soc *soc,
+							uint32_t *msg_word)
+{
+}
+#endif
+
+/*
  * dp_htt_t2h_msg_handler() - Generic Target to host Msg/event handler
  * @context:	Opaque context (HTT SOC handle)
  * @pkt:	HTC packet
@@ -3711,7 +3930,11 @@ static void dp_htt_t2h_msg_handler(void *context, HTC_PACKET *pkt)
 		dp_sawf_mpdu_stats_handler(soc, htt_t2h_msg);
 		break;
 	}
-
+	case HTT_T2H_MSG_TYPE_RX_CCE_SUPER_RULE_SETUP_DONE:
+	{
+		dp_ipa_rx_cce_super_rule_setup_done_handler(soc, msg_word);
+		break;
+	}
 	default:
 		break;
 	};

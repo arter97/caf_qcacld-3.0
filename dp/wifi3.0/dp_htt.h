@@ -199,6 +199,10 @@ void htt_htc_pkt_pool_free(struct htt_soc *soc);
 #define dp_htt_tx_stats_debug(params...) QDF_TRACE_DEBUG(QDF_MODULE_ID_DP_HTT_TX_STATS, params)
 
 #define RXMON_GLOBAL_EN_SHIFT 28
+#ifdef IPA_OPT_WIFI_DP
+#define MAX_RESERVE_FAIL_ATTEMPT 5
+#endif
+
 /**
  * enum dp_full_mon_config - enum to enable/disable full monitor mode
  *
@@ -263,6 +267,8 @@ struct htt_soc {
 		int fail_count;
 		/* rtpm put skip count for ver req msg */
 		int htt_ver_req_put_skip;
+		int reserve_fail_cnt;
+		int abort_count;
 	} stats;
 
 	HTT_TX_MUTEX_TYPE htt_tx_mutex;
@@ -1117,4 +1123,17 @@ dp_htt_get_mon_htt_ring_id(struct dp_soc *soc,
 
 	return htt_srng_id;
 }
+
+#ifdef IPA_OPT_WIFI_DP
+/**
+ * htt_h2t_rx_cce_super_rule_setup() - htt message to set cce super rules
+ *
+ * @htt_soc: HTT Soc handle
+ * @flt_params: Filter tuple
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS htt_h2t_rx_cce_super_rule_setup(struct htt_soc *htt_soc,
+					   void *flt_params);
+#endif
 #endif /* _DP_HTT_H_ */
