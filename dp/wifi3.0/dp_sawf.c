@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -168,16 +168,31 @@ dp_peer_sawf_ctx_alloc(struct dp_soc *soc,
 	return QDF_STATUS_SUCCESS;
 }
 
-static inline void dp_sawf_dec_peer_count(struct dp_peer *peer)
+static inline void dp_sawf_dec_peer_count(struct dp_soc *soc, struct dp_peer *peer)
 {
 	int q_id;
 	uint32_t svc_id;
+	struct cdp_soc_t *cdp_soc = &soc->cdp_soc;
 
 	for (q_id = 0; q_id < DP_SAWF_Q_MAX; q_id++) {
 		svc_id = dp_sawf(peer, q_id, svc_id);
-		if (svc_id)
+		if (svc_id) {
 			wlan_service_id_dec_peer_count(svc_id);
+			/*
+			 * If service class type is SCS and boh ref count and
+			 * peer count are zero, then disable that service class
+			 */
+			if (wlan_service_id_get_type(svc_id) ==
+						SERVICE_CLASS_TYPE_SCS &&
+			    wlan_service_id_get_peer_count(svc_id) == 0 &&
+			    wlan_service_id_get_ref_count(svc_id) == 0) {
+				wlan_disable_service_class(svc_id);
+				if (soc->cdp_soc.ol_ops->disable_sawf_svc)
+					cdp_soc->ol_ops->disable_sawf_svc(svc_id);
+			}
+		}
 	}
+
 }
 
 QDF_STATUS
@@ -199,7 +214,7 @@ dp_peer_sawf_ctx_free(struct dp_soc *soc,
 		telemetry_sawf_peer_ctx_free(peer->sawf->telemetry_ctx);
 
 	if (peer->sawf) {
-		dp_sawf_dec_peer_count(peer);
+		dp_sawf_dec_peer_count(soc, peer);
 		qdf_mem_free(peer->sawf);
 	}
 

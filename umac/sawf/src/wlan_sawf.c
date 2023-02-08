@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -877,3 +877,23 @@ err:
 }
 
 qdf_export_symbol(wlan_service_id_get_peer_count);
+
+void wlan_disable_service_class(uint8_t svc_id)
+{
+	struct sawf_ctx *sawf;
+	struct wlan_sawf_scv_class_params *svclass_param;
+
+	sawf = wlan_get_sawf_ctx();
+	if (!sawf) {
+		qdf_err("SAWF ctx is invalid");
+		return;
+	}
+
+	qdf_spin_lock_bh(&sawf->lock);
+	svclass_param = &sawf->svc_classes[svc_id - 1];
+	qdf_mem_zero(svclass_param,
+		     sizeof(struct wlan_sawf_scv_class_params));
+	qdf_spin_unlock_bh(&sawf->lock);
+}
+
+qdf_export_symbol(wlan_disable_service_class);
