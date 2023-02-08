@@ -1037,6 +1037,8 @@ struct wmi_peer_latency_info_params {
 			flow_id     :4,
 			add_or_sub  :2,
 			reserved    :14;
+	uint32_t max_latency;
+	uint32_t min_throughput;
 };
 
 /**
