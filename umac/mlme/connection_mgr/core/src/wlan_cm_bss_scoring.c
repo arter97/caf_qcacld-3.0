@@ -1917,7 +1917,7 @@ static int cm_calculate_mlo_bss_score(struct wlan_objmgr_psoc *psoc,
 						    score_params);
 
 		total_score[i] = rssi_score[i] + bandwidth_score[i] +
-				   congestion_score[i];
+				 cong_total_score[i];
 		if (total_score[i] > best_total_score) {
 			best_total_score = total_score[i];
 			best_partner_index = i;
