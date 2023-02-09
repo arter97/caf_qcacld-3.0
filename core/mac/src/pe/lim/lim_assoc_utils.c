@@ -3033,9 +3033,8 @@ void lim_handle_cnf_wait_timeout(struct mac_context *mac, uint16_t staId)
 
 	switch (sta->mlmStaContext.mlmState) {
 	case eLIM_MLM_WT_ASSOC_CNF_STATE:
-		pe_debug("Did not receive Assoc Cnf in eLIM_MLM_WT_ASSOC_CNF_STATE sta Assoc id %d",
-				sta->assocId);
-		lim_print_mac_addr(mac, sta->staAddr, LOGD);
+		pe_debug("Did not receive Assoc Cnf in eLIM_MLM_WT_ASSOC_CNF_STATE sta Assoc id %d and STA: "QDF_MAC_ADDR_FMT,
+			 sta->assocId, QDF_MAC_ADDR_REF(sta->staAddr));
 
 		if (LIM_IS_AP_ROLE(pe_session)) {
 			lim_reject_association(mac, sta->staAddr,
