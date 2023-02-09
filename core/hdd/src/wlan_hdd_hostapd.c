@@ -4111,11 +4111,6 @@ QDF_STATUS hdd_init_ap_mode(struct hdd_adapter *adapter, bool reinit)
 	/* Cache station count initialize to zero */
 	qdf_atomic_init(&adapter->cache_sta_count);
 
-	/* Initialize the data path module */
-	vdev = hdd_objmgr_get_vdev_by_user(adapter, WLAN_DP_ID);
-	if (vdev)
-		ucfg_dp_softap_init_txrx(vdev);
-
 	status = hdd_wmm_adapter_init(adapter);
 	if (!QDF_IS_STATUS_SUCCESS(status)) {
 		hdd_err("hdd_wmm_adapter_init() failed code: %08d [x%08x]",
@@ -4137,11 +4132,15 @@ QDF_STATUS hdd_init_ap_mode(struct hdd_adapter *adapter, bool reinit)
 		hdd_err("wmi_pdev_param_burst_enable set failed: %d", ret);
 
 
+	vdev = hdd_objmgr_get_vdev_by_user(adapter, WLAN_OSIF_ID);
 	ucfg_mlme_is_6g_sap_fd_enabled(hdd_ctx->psoc, &is_6g_sap_fd_enabled);
 	hdd_debug("6g sap fd enabled %d", is_6g_sap_fd_enabled);
 	if (is_6g_sap_fd_enabled && vdev)
 		wlan_vdev_mlme_feat_ext_cap_set(vdev,
 						WLAN_VDEV_FEXT_FILS_DISC_6G_SAP);
+
+	if (vdev)
+		hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
 
 	hdd_set_netdev_flags(adapter);
 
@@ -4159,18 +4158,12 @@ QDF_STATUS hdd_init_ap_mode(struct hdd_adapter *adapter, bool reinit)
 	/* rcpi info initialization */
 	qdf_mem_zero(&adapter->rcpi, sizeof(adapter->rcpi));
 
-	if (vdev)
-		hdd_objmgr_put_vdev_by_user(vdev, WLAN_DP_ID);
 	hdd_exit();
 
 	return status;
 
 error_release_softap_tx_rx:
 	hdd_unregister_wext(adapter->dev);
-	if (vdev) {
-		ucfg_dp_softap_deinit_txrx(vdev);
-		hdd_objmgr_put_vdev_by_user(vdev, WLAN_DP_ID);
-	}
 error_deinit_sap_session:
 	hdd_hostapd_deinit_sap_session(adapter);
 error_release_vdev:
@@ -4182,8 +4175,6 @@ void hdd_deinit_ap_mode(struct hdd_context *hdd_ctx,
 			struct hdd_adapter *adapter,
 			bool rtnl_held)
 {
-	struct wlan_objmgr_vdev *vdev;
-
 	hdd_enter_dev(adapter->dev);
 
 	if (test_bit(WMM_INIT_DONE, &adapter->event_flags)) {
@@ -4197,12 +4188,6 @@ void hdd_deinit_ap_mode(struct hdd_context *hdd_ctx,
 
 		/* Re-enable roaming on all connected STA vdev */
 		wlan_hdd_enable_roaming(adapter, RSO_SAP_CHANNEL_CHANGE);
-	}
-
-	vdev = hdd_objmgr_get_vdev_by_user(adapter, WLAN_DP_ID);
-	if (vdev) {
-		ucfg_dp_softap_deinit_txrx(vdev);
-		hdd_objmgr_put_vdev_by_user(vdev, WLAN_DP_ID);
 	}
 
 	if (hdd_hostapd_deinit_sap_session(adapter))

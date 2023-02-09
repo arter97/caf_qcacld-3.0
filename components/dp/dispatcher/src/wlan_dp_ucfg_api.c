@@ -1212,35 +1212,6 @@ QDF_STATUS ucfg_dp_deinit_txrx(struct wlan_objmgr_vdev *vdev)
 	return QDF_STATUS_SUCCESS;
 }
 
-QDF_STATUS ucfg_dp_softap_init_txrx(struct wlan_objmgr_vdev *vdev)
-{
-	struct wlan_dp_intf *dp_intf;
-
-	dp_intf = dp_get_vdev_priv_obj(vdev);
-	if (unlikely(!dp_intf)) {
-		dp_err("DP interface not found");
-		return QDF_STATUS_E_INVAL;
-	}
-
-	qdf_mem_zero(&dp_intf->stats, sizeof(qdf_net_dev_stats));
-	return QDF_STATUS_SUCCESS;
-}
-
-QDF_STATUS ucfg_dp_softap_deinit_txrx(struct wlan_objmgr_vdev *vdev)
-{
-	struct wlan_dp_intf *dp_intf;
-
-	dp_intf = dp_get_vdev_priv_obj(vdev);
-	if (unlikely(!dp_intf)) {
-		dp_err("DP interface not found");
-		return QDF_STATUS_E_INVAL;
-	}
-
-	dp_intf->tx_fn = NULL;
-	dp_intf->sap_tx_block_mask |= DP_TX_FN_CLR;
-	return QDF_STATUS_SUCCESS;
-}
-
 QDF_STATUS ucfg_dp_start_xmit(qdf_nbuf_t nbuf, struct wlan_objmgr_vdev *vdev)
 {
 	struct wlan_dp_intf *dp_intf;
