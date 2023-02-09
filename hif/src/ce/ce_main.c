@@ -80,15 +80,6 @@ QDF_STATUS hif_post_recv_buffers_for_pipe(struct HIF_CE_pipe_info *pipe_info);
 #define BYPASS_QMI 0
 #endif
 
-#ifdef ENABLE_10_4_FW_HDR
-#if (ENABLE_10_4_FW_HDR == 1)
-#define WDI_IPA_SERVICE_GROUP 5
-#define WDI_IPA_TX_SVC MAKE_SERVICE_ID(WDI_IPA_SERVICE_GROUP, 0)
-#define HTT_DATA2_MSG_SVC MAKE_SERVICE_ID(HTT_SERVICE_GROUP, 1)
-#define HTT_DATA3_MSG_SVC MAKE_SERVICE_ID(HTT_SERVICE_GROUP, 2)
-#endif /* ENABLE_10_4_FW_HDR == 1 */
-#endif /* ENABLE_10_4_FW_HDR */
-
 static void hif_config_rri_on_ddr(struct hif_softc *scn);
 
 /**

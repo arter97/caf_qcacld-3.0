@@ -2968,7 +2968,7 @@ dp_hif_update_pipe_callback(struct dp_soc *dp_soc, void *cb_context,
 			    uint8_t pipe_id)
 {
 }
-#endif /* CONFIG_WIN */
+#endif
 
 #ifdef VDEV_PEER_PROTOCOL_COUNT
 /**

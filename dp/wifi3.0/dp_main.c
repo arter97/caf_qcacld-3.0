@@ -14261,7 +14261,7 @@ static struct cdp_raw_ops dp_ops_raw = {
 static struct cdp_pflow_ops dp_ops_pflow = {
 	dp_tx_flow_ctrl_configure_pdev,
 };
-#endif /* CONFIG_WIN */
+#endif
 
 #if defined(WLAN_CFR_ENABLE) && defined(WLAN_ENH_CFR_ENABLE)
 static struct cdp_cfr_ops dp_ops_cfr = {
