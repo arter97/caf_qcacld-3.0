@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2014-2020 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -76,6 +76,7 @@
  * @QDF_STATUS_E_RANGE: result/parameter/operation was out of range
  * @QDF_STATUS_E_GRO_DROP: return code for GRO drop
  * @QDF_STATUS_E_RESTART: return error code for wait_event_interruptible
+ * @QDF_STATUS_FILT_REQ_ERROR: return error code cee filter rule request
  * @QDF_STATUS_MAX: not a real value just a place holder for max
  */
 typedef enum {
@@ -128,6 +129,7 @@ typedef enum {
 	QDF_STATUS_E_RANGE,
 	QDF_STATUS_E_GRO_DROP,
 	QDF_STATUS_E_RESTART,
+	QDF_STATUS_FILT_REQ_ERROR,
 	QDF_STATUS_MAX
 } QDF_STATUS;
 
