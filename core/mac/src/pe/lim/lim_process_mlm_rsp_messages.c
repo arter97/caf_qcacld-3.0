@@ -1872,8 +1872,8 @@ void lim_process_ap_mlm_del_sta_rsp(struct mac_context *mac_ctx,
 		goto end;
 	}
 
-	pe_debug("Deleted STA AssocID %d", sta_ds->assocId);
-	lim_print_mac_addr(mac_ctx, sta_ds->staAddr, LOGD);
+	pe_debug("Deleted STA AssocID %d Addr "QDF_MAC_ADDR_FMT,
+		 sta_ds->assocId, QDF_MAC_ADDR_REF(sta_ds->staAddr));
 	if (eLIM_MLM_WT_ASSOC_DEL_STA_RSP_STATE ==
 	    sta_ds->mlmStaContext.mlmState) {
 		qdf_mem_free(del_sta_params);
@@ -2020,7 +2020,6 @@ void lim_process_ap_mlm_add_sta_rsp(struct mac_context *mac,
 	sta->mlmStaContext.mlmState = eLIM_MLM_WT_ASSOC_CNF_STATE;
 	pe_debug("AddStaRsp Success.STA AssocID %d sta mac" QDF_MAC_ADDR_FMT,
 		 sta->assocId, QDF_MAC_ADDR_REF(sta->staAddr));
-	lim_print_mac_addr(mac, sta->staAddr, LOGD);
 
 	/* For BTAMP-AP, the flow sequence shall be:
 	 * 1) PE sends eWNI_SME_ASSOC_IND to SME
@@ -2196,9 +2195,9 @@ void lim_process_sta_add_bss_rsp_pre_assoc(struct mac_context *mac_ctx,
 				&session_entry->dph.dphHashTable);
 		if (!sta) {
 			/* Could not add hash table entry */
-			pe_err("could not add hash entry at DPH for");
-			lim_print_mac_addr(mac_ctx,
-				add_bss_params->staContext.staMac, LOGE);
+			pe_err("could not add hash entry at DPH for STA: "QDF_MAC_ADDR_FMT,
+			       QDF_MAC_ADDR_REF(
+			       add_bss_params->staContext.staMac));
 			goto joinFailure;
 		}
 		/* Success, handle below */

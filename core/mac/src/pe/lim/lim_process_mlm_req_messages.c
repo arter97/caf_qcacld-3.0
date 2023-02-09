@@ -1039,9 +1039,9 @@ lim_process_mlm_disassoc_req_ntf(struct mac_context *mac_ctx,
 	case eLIM_STA_ROLE:
 		if (!qdf_is_macaddr_equal(&mlm_disassocreq->peer_macaddr,
 				     &curr_bssid)) {
-			pe_warn("received MLM_DISASSOC_REQ with invalid BSS id");
-			lim_print_mac_addr(mac_ctx,
-				mlm_disassocreq->peer_macaddr.bytes, LOGW);
+			pe_warn("received MLM_DISASSOC_REQ with invalid BSS: "QDF_MAC_ADDR_FMT,
+				QDF_MAC_ADDR_REF(
+				mlm_disassocreq->peer_macaddr.bytes));
 
 			/*
 			 * Disassociation response due to host triggered

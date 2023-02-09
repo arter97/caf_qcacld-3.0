@@ -166,8 +166,8 @@ static void lim_process_auth_shared_system_algo(struct mac_context *mac_ctx,
 		auth_node = lim_acquire_free_pre_auth_node(mac_ctx,
 					&mac_ctx->lim.gLimPreAuthTimerTable);
 		if (!auth_node) {
-			pe_warn("Max preauth-nodes reached");
-			lim_print_mac_addr(mac_ctx, mac_hdr->sa, LOGW);
+			pe_warn("Max preauth-nodes reached SA: "QDF_MAC_ADDR_FMT,
+				QDF_MAC_ADDR_REF(mac_hdr->sa));
 			return;
 		}
 
@@ -183,15 +183,15 @@ static void lim_process_auth_shared_system_algo(struct mac_context *mac_ctx,
 		auth_node->timestamp = qdf_mc_timer_get_system_ticks();
 		lim_add_pre_auth_node(mac_ctx, auth_node);
 
-		pe_debug("Alloc new data: %pK id: %d peer ",
-			auth_node, auth_node->authNodeIdx);
-		lim_print_mac_addr(mac_ctx, mac_hdr->sa, LOGD);
+		pe_debug("Alloc new data: %pK id: %d peer "QDF_MAC_ADDR_FMT,
+			 auth_node, auth_node->authNodeIdx,
+			 QDF_MAC_ADDR_REF(mac_hdr->sa));
 		/* / Create and activate Auth Response timer */
 		if (tx_timer_change_context(&auth_node->timer,
 				auth_node->authNodeIdx) != TX_SUCCESS) {
 			/* Could not start Auth response timer. Log error */
-			pe_warn("Unable to chg context auth response timer for peer");
-			lim_print_mac_addr(mac_ctx, mac_hdr->sa, LOGW);
+			pe_warn("Unable to chg context auth response timer for peer "QDF_MAC_ADDR_FMT,
+				QDF_MAC_ADDR_REF(mac_hdr->sa));
 
 			/*
 			 * Send Auth frame with unspecified failure status code.
@@ -221,8 +221,8 @@ static void lim_process_auth_shared_system_algo(struct mac_context *mac_ctx,
 		if (!qdf_mem_cmp(challenge_txt_arr,
 				 auth_node->challengeText,
 				 SIR_MAC_SAP_AUTH_CHALLENGE_LENGTH)) {
-			pe_err("Challenge text preparation failed");
-			lim_print_mac_addr(mac_ctx, mac_hdr->sa, LOGW);
+			pe_err("Challenge text preparation failed SA: "QDF_MAC_ADDR_FMT,
+			       QDF_MAC_ADDR_REF(mac_hdr->sa));
 			auth_frame->authAlgoNumber =
 				rx_auth_frm_body->authAlgoNumber;
 			auth_frame->authTransactionSeqNumber =
@@ -275,12 +275,12 @@ static void lim_process_auth_open_system_algo(struct mac_context *mac_ctx,
 	auth_node = lim_acquire_free_pre_auth_node(mac_ctx,
 				&mac_ctx->lim.gLimPreAuthTimerTable);
 	if (!auth_node) {
-		pe_warn("Max pre-auth nodes reached ");
-		lim_print_mac_addr(mac_ctx, mac_hdr->sa, LOGW);
+		pe_warn("Max pre-auth nodes reached SA: "QDF_MAC_ADDR_FMT,
+			QDF_MAC_ADDR_REF(mac_hdr->sa));
 		return;
 	}
-	pe_debug("Alloc new data: %pK peer", auth_node);
-	lim_print_mac_addr(mac_ctx, mac_hdr->sa, LOGD);
+	pe_debug("Alloc new data: %pK peer "QDF_MAC_ADDR_FMT, auth_node,
+		 QDF_MAC_ADDR_REF(mac_hdr->sa));
 	qdf_mem_copy((uint8_t *) auth_node->peerMacAddr,
 			mac_hdr->sa, sizeof(tSirMacAddr));
 	auth_node->mlmState = eLIM_MLM_AUTHENTICATED_STATE;
@@ -548,13 +548,13 @@ static void lim_process_ft_auth_frame(struct mac_context *mac_ctx,
 		sta_pre_auth_ctx = lim_acquire_free_pre_auth_node(mac_ctx,
 			&mac_ctx->lim.gLimPreAuthTimerTable);
 		if (!sta_pre_auth_ctx) {
-			pe_warn("Max pre-auth nodes reached ");
-			lim_print_mac_addr(mac_ctx, mac_hdr->sa, LOGW);
+			pe_warn("Max pre-auth nodes reached "QDF_MAC_ADDR_FMT,
+				QDF_MAC_ADDR_REF(mac_hdr->sa));
 			return;
 		}
-		pe_debug("Alloc new data: %pK peer", sta_pre_auth_ctx);
+		pe_debug("Alloc new data: %pK peer "QDF_MAC_ADDR_FMT,
+			 sta_pre_auth_ctx, QDF_MAC_ADDR_REF(mac_hdr->sa));
 		auth_algo = *(uint16_t *)body_ptr;
-		lim_print_mac_addr(mac_ctx, mac_hdr->sa, LOGD);
 		qdf_mem_copy((uint8_t *)sta_pre_auth_ctx->peerMacAddr,
 			     mac_hdr->sa, sizeof(tSirMacAddr));
 		sta_pre_auth_ctx->mlmState = eLIM_MLM_WT_FT_AUTH_STATE;
@@ -948,9 +948,9 @@ static void lim_process_auth_frame_type2(struct mac_context *mac_ctx,
 			 * Received Auth frame2 in an unexpected state.
 			 * Log error and ignore the frame.
 			 */
-			pe_debug("rx Auth frm2 from peer in state: %d addr",
-				pe_session->limMlmState);
-			lim_print_mac_addr(mac_ctx, mac_hdr->sa, LOGD);
+			pe_debug("rx Auth frm2 from peer in state: %d addr "QDF_MAC_ADDR_FMT,
+				 pe_session->limMlmState,
+				 QDF_MAC_ADDR_REF(mac_hdr->sa));
 		}
 		return;
 	}
@@ -1038,8 +1038,8 @@ static void lim_process_auth_frame_type2(struct mac_context *mac_ctx,
 		auth_node = lim_acquire_free_pre_auth_node(mac_ctx,
 				&mac_ctx->lim.gLimPreAuthTimerTable);
 		if (!auth_node) {
-			pe_warn("Max pre-auth nodes reached");
-			lim_print_mac_addr(mac_ctx, mac_hdr->sa, LOGW);
+			pe_warn("Max pre-auth nodes reached SA: "QDF_MAC_ADDR_FMT,
+				QDF_MAC_ADDR_REF(mac_hdr->sa));
 			return;
 		}
 
@@ -1396,12 +1396,12 @@ static void lim_process_auth_frame_type4(struct mac_context *mac_ctx,
 		auth_node = lim_acquire_free_pre_auth_node(mac_ctx,
 					&mac_ctx->lim.gLimPreAuthTimerTable);
 		if (!auth_node) {
-			pe_warn("Max pre-auth nodes reached");
-			lim_print_mac_addr(mac_ctx, mac_hdr->sa, LOGW);
+			pe_warn("Max pre-auth nodes reached SA: "QDF_MAC_ADDR_FMT,
+				QDF_MAC_ADDR_REF(mac_hdr->sa));
 			return;
 		}
-		pe_debug("Alloc new data: %pK peer", auth_node);
-		lim_print_mac_addr(mac_ctx, mac_hdr->sa, LOGD);
+		pe_debug("Alloc new data: %pK peer "QDF_MAC_ADDR_FMT, auth_node,
+			 QDF_MAC_ADDR_REF(mac_hdr->sa));
 		qdf_mem_copy((uint8_t *) auth_node->peerMacAddr,
 				mac_ctx->lim.gpLimMlmAuthReq->peerMacAddr,
 				sizeof(tSirMacAddr));
@@ -1604,9 +1604,8 @@ lim_process_auth_frame(struct mac_context *mac_ctx, uint8_t *rx_pkt_info,
 		if ((frame_len < LIM_ENCR_AUTH_BODY_LEN_SAP) ||
 		    (frame_len > LIM_ENCR_AUTH_BODY_LEN)) {
 			/* Log error */
-			pe_err("Not enough size: %d to decry rx Auth frm",
-				frame_len);
-			lim_print_mac_addr(mac_ctx, mac_hdr->sa, LOGE);
+			pe_err("Not enough size: %d to decry rx Auth frm "QDF_MAC_ADDR_FMT,
+			       frame_len, QDF_MAC_ADDR_REF(mac_hdr->sa));
 			goto free;
 		}
 
