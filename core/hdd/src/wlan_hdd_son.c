@@ -2379,7 +2379,7 @@ static QDF_STATUS hdd_son_get_node_info_sap(struct wlan_objmgr_vdev *vdev,
 
 	node_info->max_chwidth =
 			hdd_chan_width_to_son_chwidth(sta_info->ch_width);
-	node_info->num_streams = (sta_info->max_mcs_idx >= 8) ? 2 : 1;
+	node_info->num_streams = sta_info->nss;
 	ucfg_mlme_get_peer_phymode(psoc, mac_addr, &peer_phymode);
 	node_info->phymode = wlan_hdd_son_get_ieee_phymode(peer_phymode);
 	node_info->max_txpower = ucfg_son_get_tx_power(sta_info->assoc_req_ies);
