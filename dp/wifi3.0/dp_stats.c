@@ -6703,7 +6703,6 @@ void dp_print_peer_txrx_stats_li(struct cdp_peer_stats *peer_stats,
 static void dp_peer_print_reo_qref_table(struct dp_peer *peer)
 {
 	struct hal_soc *hal;
-	struct dp_peer *mld_peer;
 	int i;
 	uint64_t *reo_qref_addr;
 	uint32_t peer_idx;
@@ -6713,8 +6712,6 @@ static void dp_peer_print_reo_qref_table(struct dp_peer *peer)
 	if (!hal_reo_shared_qaddr_is_enable((hal_soc_handle_t)hal))
 		return;
 
-	peer_idx = (peer->peer_id * DP_MAX_TIDS);
-
 	if ((!hal->reo_qref.non_mlo_reo_qref_table_vaddr) ||
 	    (!hal->reo_qref.mlo_reo_qref_table_vaddr)) {
 		QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_ERROR,
@@ -6722,15 +6719,20 @@ static void dp_peer_print_reo_qref_table(struct dp_peer *peer)
 		return;
 	}
 
-	reo_qref_addr = &hal->reo_qref.non_mlo_reo_qref_table_vaddr[peer_idx];
-	mld_peer = DP_GET_MLD_PEER_FROM_PEER(peer);
-	if (mld_peer) {
-		peer = mld_peer;
+	if (IS_MLO_DP_LINK_PEER(peer))
+		return;
+
+	if (IS_MLO_DP_MLD_PEER(peer)) {
 		hal = (struct hal_soc *)
 			  peer->vdev->pdev->soc->hal_soc;
-		peer_idx = (mld_peer->peer_id - HAL_ML_PEER_ID_START) *
+		peer_idx = (peer->peer_id - HAL_ML_PEER_ID_START) *
 			    DP_MAX_TIDS;
-		reo_qref_addr = &hal->reo_qref.mlo_reo_qref_table_vaddr[peer_idx];
+		reo_qref_addr =
+			&hal->reo_qref.mlo_reo_qref_table_vaddr[peer_idx];
+	} else {
+		peer_idx = (peer->peer_id * DP_MAX_TIDS);
+		reo_qref_addr =
+			&hal->reo_qref.non_mlo_reo_qref_table_vaddr[peer_idx];
 	}
 	DP_PRINT_STATS("Reo Qref table for peer_id: %d\n", peer->peer_id);
 
