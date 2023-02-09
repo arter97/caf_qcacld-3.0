@@ -106,7 +106,6 @@ const char *ic_irqname[HIF_IC_MAX_IRQ] = {
 "txmon2host-monitor-destination-mac2",
 "txmon2host-monitor-destination-mac1",
 "host2tx-monitor-ring1",
-"umac_reset"
 };
 
 /**

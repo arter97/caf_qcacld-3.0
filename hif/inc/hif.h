@@ -136,7 +136,6 @@ enum hif_ic_irq {
 	txmon2host_monitor_destination_mac2,
 	txmon2host_monitor_destination_mac1,
 	host2tx_monitor_ring1,
-	umac_reset,
 };
 
 #ifdef QCA_SUPPORT_LEGACY_INTERRUPTS
@@ -2566,6 +2565,8 @@ QDF_STATUS hif_register_umac_reset_handler(struct hif_opaque_softc *hif_scn,
  * Return: QDF_STATUS of operation
  */
 QDF_STATUS hif_unregister_umac_reset_handler(struct hif_opaque_softc *hif_scn);
+QDF_STATUS hif_get_umac_reset_irq(struct hif_opaque_softc *hif_scn,
+				  int *umac_reset_irq);
 #else
 static inline
 QDF_STATUS hif_register_umac_reset_handler(struct hif_opaque_softc *hif_scn,
@@ -2577,6 +2578,13 @@ QDF_STATUS hif_register_umac_reset_handler(struct hif_opaque_softc *hif_scn,
 
 static inline
 QDF_STATUS hif_unregister_umac_reset_handler(struct hif_opaque_softc *hif_scn)
+{
+	return QDF_STATUS_SUCCESS;
+}
+
+static inline
+QDF_STATUS hif_get_umac_reset_irq(struct hif_opaque_softc *hif_scn,
+				  int *umac_reset_irq)
 {
 	return QDF_STATUS_SUCCESS;
 }
