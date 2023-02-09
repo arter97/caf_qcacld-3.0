@@ -1085,8 +1085,8 @@ lim_send_probe_rsp_mgmt_frame(struct mac_context *mac_ctx,
 		payload += mlo_ie_len;
 	}
 
-	pe_debug("Sending Probe Response frame to");
-	lim_print_mac_addr(mac_ctx, peer_macaddr, LOGD);
+	pe_debug("Sending Probe Response frame to: "QDF_MAC_ADDR_FMT,
+		 QDF_MAC_ADDR_REF(peer_macaddr));
 
 	lim_add_additional_ie(frame, sizeof(tSirMacMgmtHdr) + payload, add_ie,
 			      addn_ie_len, p2p_ie, noa_ie, total_noalen,
@@ -1297,8 +1297,8 @@ lim_send_addts_req_action_frame(struct mac_context *mac,
 		}
 	}
 
-	pe_debug("Sending an Add TS Request frame to");
-	lim_print_mac_addr(mac, peerMacAddr, LOGD);
+	pe_debug("Sending an Add TS Request frame to "QDF_MAC_ADDR_FMT,
+		 QDF_MAC_ADDR_REF(peerMacAddr));
 
 	if (!wlan_reg_is_24ghz_ch_freq(pe_session->curr_op_freq) ||
 	    pe_session->opmode == QDF_P2P_CLIENT_MODE ||
@@ -2227,8 +2227,8 @@ lim_send_delts_req_action_frame(struct mac_context *mac,
 		}
 	}
 
-	pe_debug("Sending DELTS REQ (size %d) to ", nBytes);
-	lim_print_mac_addr(mac, pMacHdr->da, LOGD);
+	pe_debug("Sending DELTS REQ (size %d) to "QDF_MAC_ADDR_FMT, nBytes,
+		 QDF_MAC_ADDR_REF(pMacHdr->da));
 
 	if (!wlan_reg_is_24ghz_ch_freq(pe_session->curr_op_freq) ||
 	    pe_session->opmode == QDF_P2P_CLIENT_MODE ||
@@ -5414,8 +5414,8 @@ lim_send_neighbor_report_request_frame(struct mac_context *mac,
 			nStatus);
 	}
 
-	pe_debug("Sending a Neighbor Report Request to");
-	lim_print_mac_addr(mac, peer, LOGD);
+	pe_debug("Sending a Neighbor Report Request to "QDF_MAC_ADDR_FMT,
+		 QDF_MAC_ADDR_REF(peer));
 
 	if (!wlan_reg_is_24ghz_ch_freq(pe_session->curr_op_freq) ||
 	    pe_session->opmode == QDF_P2P_CLIENT_MODE ||
@@ -5967,10 +5967,9 @@ QDF_STATUS lim_send_sa_query_request_frame(struct mac_context *mac, uint8_t *tra
 			nStatus);
 	}
 
-	pe_debug("Sending an SA Query Request to");
-	lim_print_mac_addr(mac, peer, LOGD);
-	pe_debug("Sending an SA Query Request from ");
-	lim_print_mac_addr(mac, pe_session->self_mac_addr, LOGD);
+	pe_debug("Sending an SA Query Request from "QDF_MAC_ADDR_FMT" to "QDF_MAC_ADDR_FMT,
+		 QDF_MAC_ADDR_REF(pe_session->self_mac_addr),
+		 QDF_MAC_ADDR_REF(peer));
 
 	if (!wlan_reg_is_24ghz_ch_freq(pe_session->curr_op_freq) ||
 	    pe_session->opmode == QDF_P2P_CLIENT_MODE ||
