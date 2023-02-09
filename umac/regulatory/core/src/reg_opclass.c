@@ -42,7 +42,7 @@
 static struct reg_dmn_supp_op_classes reg_dmn_curr_supp_opp_classes = { 0 };
 #endif
 
-/**
+/*
  * Given a global opclass number create the corresponding  array token.
  * Examples:
  *     'CFISARR(132)' expands to  'opcls_132_cfis_arr'
@@ -50,7 +50,7 @@ static struct reg_dmn_supp_op_classes reg_dmn_curr_supp_opp_classes = { 0 };
  */
 #define CFISARR(_g_opcls)  opcls_ ## _g_opcls ## _cfis_arr
 
-/**
+/*
  * Given a global opclass number create the corresponding list token.
  * Examples:
  *     'CFISLST(132)' expands to  'opcls_132_cfis_lst'
@@ -64,7 +64,7 @@ static struct reg_dmn_supp_op_classes reg_dmn_curr_supp_opp_classes = { 0 };
 /* The number of elements of the array */
 #define NELEMS QDF_ARRAY_SIZE
 
-/**
+/*
  * Given a global opclass number create the corresponding cfis list and assign
  * the corresponding cfis array and size of the cfis array
  * Examples:
@@ -516,7 +516,7 @@ static const struct reg_dmn_op_class_map_t china_op_class[] = {
 #ifdef HOST_OPCLASS
 /**
  * reg_get_class_from_country()- Get Class from country
- * @country- Country
+ * @country: Country
  *
  * Return: class.
  */
@@ -669,7 +669,9 @@ void reg_dmn_free_6g_opclasses_and_channels(struct wlan_objmgr_pdev *pdev,
 
 /**
  * reg_dmn_get_num_6g_opclasses() - Calculate the number of opclasses in the
- * 6GHz band.
+ *                                  6 GHz band.
+ * @pdev: Pointer to pdev.
+ *
  * Return: The number of opclasses
  */
 static uint8_t reg_dmn_get_num_6g_opclasses(struct wlan_objmgr_pdev *pdev)
@@ -1079,13 +1081,13 @@ uint16_t reg_dmn_get_curr_opclasses(uint8_t *num_classes, uint8_t *class)
 /**
  * reg_find_opclass_absent_in_ctry_opclss_tables() - Check Global Opclass table
  * when Opclass is not present in specific country.
- * @pdev - Pointer to pdev
- * @freq - Destination Frequency
- * @chan_width- Channel Width
- * @global_tbl_lookup - Global Table Lookup
- * @behav_limit - Behav Limit
- * @op_class - Pointer to Opclass
- * @chan_num - Pointer to Channel
+ * @pdev: Pointer to pdev
+ * @freq: Destination Frequency
+ * @chan_width: Channel Width
+ * @global_tbl_lookup: Global Table Lookup
+ * @behav_limit: Behav Limit
+ * @op_class: Pointer to Opclass
+ * @chan_num: Pointer to Channel
  *
  * Return: Void
  */
@@ -1454,10 +1456,10 @@ reg_get_op_class_tbl_by_chan_map(const struct
 /**
  * reg_get_channel_cen - Calculate central channel in the channel set.
  *
- * @op_class_tbl - Pointer to op_class_tbl.
- * @idx - Pointer to channel index.
- * @num_channels - Number of channels.
- * @center_chan - Pointer to center channel number
+ * @op_class_tbl: Pointer to op_class_tbl.
+ * @idx: Pointer to channel index.
+ * @num_channels: Number of channels.
+ * @center_chan: Pointer to center channel number
  *
  * Return : void
  */
@@ -1502,8 +1504,8 @@ static bool reg_is_chan_320mhz(uint16_t chan_spacing)
 /**
  * reg_get_chan_or_chan_center - Calculate central channel in the channel set.
  *
- * @op_class_tbl - Pointer to op_class_tbl.
- * @idx - Pointer to channel index.
+ * @op_class_tbl: Pointer to op_class_tbl.
+ * @idx: Pointer to channel index.
  *
  * Return : Center channel number
  */
@@ -1565,7 +1567,7 @@ static inline qdf_freq_t reg_get_nearest_primary_freq(uint16_t bw,
  * @pri_freq: Primary frequency of the input channel
  * @cfi_freq: cfi frequency of the input channel
  * @ch_width: Input channel width
- * @in_6g_pwr_type: 6g power type which decides 6G channel list lookup.
+ * @in_6g_pwr_mode: 6g power type which decides 6G channel list lookup.
  *
  * Return: True if the channel is supported, else false
  */
@@ -1614,7 +1616,7 @@ static bool reg_is_chan_supported(struct wlan_objmgr_pdev *pdev,
  * @cfi_freq: cfi frequency
  * @bw: bandwidth
  * @op_class: op_class
- * @in_6g_pwr_type: 6g power type which decides 6G channel list lookup.
+ * @in_6g_pwr_mode: 6g power type which decides 6G channel list lookup.
  *
  * Return: True if the cfi is supported, else false
  */
@@ -1647,7 +1649,7 @@ static bool reg_is_cfi_supported(struct wlan_objmgr_pdev *pdev,
  * @op_class_tbl: Pointer to op_class_tbl
  * @in_opclass_conf: input opclass configuration
  * Supported or not-supported by current HW mode
- * @in_6g_pwr_type: 6g power type which decides 6G channel list lookup.
+ * @in_6g_pwr_mode: 6g power type which decides 6G channel list lookup.
  *
  * Populate channels from opclass map to regdmn_ap_cap_opclass_t as supported
  * and non-supported channels for 6Ghz.
@@ -1703,7 +1705,7 @@ static uint16_t reg_find_nearest_ieee_bw(uint16_t spacing)
  * @op_class_tbl: Pointer to op_class_tbl
  * @in_opclass_conf: input opclass configuration
  * Supported or not-supported by current HW mode
- * @in_6g_pwr_type: 6g power type which decides 6G channel list lookup.
+ * @in_6g_pwr_mode: 6g power type which decides 6G channel list lookup.
  *
  * Populate channels from opclass map to regdmn_ap_cap_opclass_t as supported
  * and non-supported channels for non-6Ghz.
@@ -1762,7 +1764,7 @@ static void reg_get_cfis_from_opclassmap_for_non6g(
  * @is_opclass_operable: Set true if opclass is operable, else set false
  * @in_opclass_conf: input opclass configuration
  * Supported or not-supported by current HW mode
- * @in_6g_pwr_type: 6g power type which decides 6G channel list lookup.
+ * @in_6g_pwr_mode: 6g power type which decides 6G channel list lookup.
  *
  * Populate channels from opclass map to reg_ap_cap as supported and
  * non-supported channels.
@@ -1861,11 +1863,10 @@ bool reg_is_6ghz_op_class(struct wlan_objmgr_pdev *pdev, uint8_t op_class)
 }
 
 /**
- * reg_is_opclass_band_found - Check if the input opclass is 2G or 5G.
- *
- * @country - Pointer to country.
- * @op_class - Operating class.
- * @bandmask = Bitmask for band.
+ * reg_is_opclass_band_found() - Check if the input opclass is 2G or 5G.
+ * @country: Pointer to country.
+ * @op_class: Operating class.
+ * @bandmask: Bitmask for band.
  *
  * Return : Return true if the input opclass' band (2Ghz or 5Ghz) matches one
  * of bandmask's band.
@@ -1917,7 +1918,8 @@ bool reg_is_2ghz_op_class(const uint8_t *country, uint8_t op_class)
  * channel width.
  * @chan_spacing: Channel spacing
  * @opclass_chwidth: Opclass channel width
- * Return - None
+ *
+ * Return: None
  */
 #ifdef WLAN_FEATURE_11BE
 static void reg_convert_chan_spacing_to_width(uint16_t chan_spacing,

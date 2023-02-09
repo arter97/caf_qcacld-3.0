@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2017-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  *
  * Permission to use, copy, modify, and/or distribute this software for
@@ -557,8 +557,9 @@ struct regulatory_rule_ext {
  * @dfs_region: dfs region
  * @min_bw: minimum bandwidth
  * @max_bw: maximum bandwidth
+ * @ant_gain: antenna gain
  * @num_reg_rules: number of regulatory rules
- * @reg_rules_id: regulatory rule index
+ * @reg_rule_id: regulatory rule index
  */
 struct regdomain   {
 	uint8_t ctl_val;
@@ -579,6 +580,7 @@ struct regdomain   {
  * @max_bw: Maximum bandwidth in MHz
  * @num_reg_rules: number of regulatory rules
  * @reg_rules_id: regulatory rule index
+ * @sixg_reg_rule_id: Rule identifier array of 6 GHz rules
  */
 struct sub_6g_regdomain   {
 	uint16_t min_bw;
@@ -641,10 +643,10 @@ struct reg_domain_pair {
  * @APL6_6G_0A: Super domain APL6_6G_0A for Saudi Arabia LPI STA and AP
  * @MKK1_6G_0B: Super domain MKK1_6G_0B for Japan LPI and VLP
  * @ETSI2_6G_0C: Super domain ETSI2_6G_0C for Australia LPI and VLP
- * @ETSI2_6G_0D: Super domain ETSI2_6G_0D for ISRAEL LPI
+ * @ETSI1_6G_0D: Super domain ETSI1_6G_0D for ISRAEL LPI
  * @ETSI2_6G_0E: Super domain ETSI2_6G_0E for NEW ZEALAND LPI and VLP
  * @FCC2_6G_10: Super domain FCC1_6G_10 for Canada LPI &
-		SP(VLP to be added later)
+ *		SP(VLP to be added later)
  * @APL4_6G_11: Super domain APL3_6G_11 for Costa Rica LPI and VLP
  * @APL5_6G_12: Super domain APL3_6G_12 for CHILE LPI and VLP
  */

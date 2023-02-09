@@ -104,12 +104,6 @@ QDF_STATUS reg_read_current_country(struct wlan_objmgr_psoc *psoc,
 	return QDF_STATUS_SUCCESS;
 }
 
-/**
- * reg_set_default_country() - Read the default country for the regdomain
- * @country: country code.
- *
- * Return: QDF_STATUS
- */
 QDF_STATUS reg_set_default_country(struct wlan_objmgr_psoc *psoc,
 				   uint8_t *country)
 {

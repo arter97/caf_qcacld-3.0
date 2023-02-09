@@ -1601,7 +1601,7 @@ const struct regdomain regdomains_5g[] = {
 };
 
 #if defined(CONFIG_BAND_6GHZ) && defined(COMPILE_REGDB_6G)
-/**
+/*
  * List of 6G Sub Domains.
  *
  * Note - If not specified in the naming, then above 6G subdomains are for
@@ -1649,7 +1649,7 @@ enum reg_subdomains_6g {
 	MKK1_CLI_VLP_6G = MKK1_AP_VLP_6G,
 };
 
-/**
+/*
  * Table of 6G super domain to sub domain.
  */
 static const struct sixghz_super_to_subdomains g_6g_reg_dmn_9_tuples[] = {
@@ -1723,7 +1723,7 @@ static const struct sixghz_super_to_subdomains g_6g_reg_dmn_9_tuples[] = {
 	 {APL5_CLI_VLP_6G, APL5_CLI_VLP_6G} },
 };
 
-/**
+/*
  * List of 6G reg rules.
  */
 enum reg_rules_6g {
@@ -1787,7 +1787,7 @@ enum reg_rules_6g {
 	CHAN_6875_7125_10,
 };
 
-/**
+/*
  * Mapping of 6G reg rules present in the 6G sub domain.
  */
 static const struct regulatory_rule_ext reg_rules_6g[] = {
@@ -1885,7 +1885,7 @@ static const struct regulatory_rule_ext reg_rules_6g[] = {
 						REGULATORY_CHAN_INDOOR_ONLY},
 };
 
-/**
+/*
  * Mapping of 6G sub domain and 6G reg rules.
  */
 static const struct sub_6g_regdomain sub_regdomains_6g[] = {
