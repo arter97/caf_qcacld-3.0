@@ -6725,9 +6725,9 @@ void __lim_process_sme_assoc_cnf_new(struct mac_context *mac_ctx, uint32_t msg_t
 	sta_ds = dph_get_hash_entry(mac_ctx, assoc_cnf.aid,
 			&session_entry->dph.dphHashTable);
 	if (!sta_ds) {
-		pe_err("Rcvd invalid msg %X due to no STA ctx, aid %d, peer",
-				msg_type, assoc_cnf.aid);
-		lim_print_mac_addr(mac_ctx, assoc_cnf.peer_macaddr.bytes, LOGE);
+		pe_err("Rcvd invalid msg %X due to no STA ctx, aid %d, peer "QDF_MAC_ADDR_FMT,
+		       msg_type, assoc_cnf.aid,
+		       QDF_MAC_ADDR_REF(assoc_cnf.peer_macaddr.bytes));
 
 		/*
 		 * send a DISASSOC_IND message to WSM to make sure
@@ -6743,9 +6743,9 @@ void __lim_process_sme_assoc_cnf_new(struct mac_context *mac_ctx, uint32_t msg_t
 	if (qdf_mem_cmp((uint8_t *)sta_ds->staAddr,
 				(uint8_t *) assoc_cnf.peer_macaddr.bytes,
 				QDF_MAC_ADDR_SIZE)) {
-		pe_debug("peerMacAddr mismatched for aid %d, peer ",
-				assoc_cnf.aid);
-		lim_print_mac_addr(mac_ctx, assoc_cnf.peer_macaddr.bytes, LOGD);
+		pe_debug("peerMacAddr mismatched for aid %d, peer "QDF_MAC_ADDR_FMT,
+			 assoc_cnf.aid,
+			 QDF_MAC_ADDR_REF(assoc_cnf.peer_macaddr.bytes));
 		goto end;
 	}
 
@@ -6754,10 +6754,9 @@ void __lim_process_sme_assoc_cnf_new(struct mac_context *mac_ctx, uint32_t msg_t
 		 (msg_type != eWNI_SME_ASSOC_CNF)) ||
 		((sta_ds->mlmStaContext.subType == LIM_REASSOC) &&
 		 (msg_type != eWNI_SME_ASSOC_CNF))) {
-		pe_debug("not in MLM_WT_ASSOC_CNF_STATE, for aid %d, peer"
-			"StaD mlmState: %d",
-			assoc_cnf.aid, sta_ds->mlmStaContext.mlmState);
-		lim_print_mac_addr(mac_ctx, assoc_cnf.peer_macaddr.bytes, LOGD);
+		pe_debug("peer " QDF_MAC_ADDR_FMT " not in WT_ASSOC_CNF_STATE, for aid %d, sta mlmstate %d",
+			 QDF_MAC_ADDR_REF(assoc_cnf.peer_macaddr.bytes),
+			 assoc_cnf.aid, sta_ds->mlmStaContext.mlmState);
 		goto end;
 	}
 	/*
@@ -7554,8 +7553,8 @@ static void __lim_process_sme_set_ht2040_mode(struct mac_context *mac,
 				pSetHT2040Mode->bssid.bytes,
 				&sessionId);
 	if (!pe_session) {
-		pe_debug("Session does not exist for given BSSID");
-		lim_print_mac_addr(mac, pSetHT2040Mode->bssid.bytes, LOGD);
+		pe_debug("Session does not exist for given BSSID: "QDF_MAC_ADDR_FMT,
+			 QDF_MAC_ADDR_REF(pSetHT2040Mode->bssid.bytes));
 		return;
 	}
 
@@ -8509,8 +8508,8 @@ static void lim_process_sme_start_beacon_req(struct mac_context *mac, uint32_t *
 				pBeaconStartInd->bssid,
 				&sessionId);
 	if (!pe_session) {
-		lim_print_mac_addr(mac, pBeaconStartInd->bssid, LOGE);
-		pe_err("Session does not exist for given bssId");
+		pe_err("Session does not exist for given bssId: "QDF_MAC_ADDR_FMT,
+		       QDF_MAC_ADDR_REF(pBeaconStartInd->bssid));
 		return;
 	}
 
