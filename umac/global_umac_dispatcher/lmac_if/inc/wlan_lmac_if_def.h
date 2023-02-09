@@ -152,6 +152,7 @@ typedef struct big_data_stats_event stats_big_data_stats_event;
  * @send_req_infra_cp_stats: function pointer to send infra cp stats request
  *                           command to FW
  * @send_req_big_data_stats: Function pointer to send big data stats
+ * @send_req_telemetry_cp_stats: API to send stats request to wmi
  */
 struct wlan_lmac_if_cp_stats_tx_ops {
 	QDF_STATUS (*cp_stats_attach)(struct wlan_objmgr_psoc *psoc);
