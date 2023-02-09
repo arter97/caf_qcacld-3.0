@@ -27,7 +27,7 @@
 #include <hal_generic_api.h>
 #include "txmon_tlvs.h"
 
-/**
+/*
  * Debug macro to print the TLV header tag
  */
 #define SHOW_DEFINED(x) do {} while (0)
@@ -49,8 +49,10 @@ hal_tx_comp_get_buffer_timestamp_be(void *desc,
 #endif /* WLAN_FEATURE_TSF_UPLINK_DELAY || CONFIG_SAWF */
 
 /**
- * hal_tx_comp_get_status() - TQM Release reason
- * @hal_desc: completion ring Tx status
+ * hal_tx_comp_get_status_generic_be() - TQM Release reason
+ * @desc: WBM descriptor
+ * @ts1: completion ring Tx status
+ * @hal: hal_soc
  *
  * This function will parse the WBM completion descriptor and populate in
  * HAL structure
@@ -187,7 +189,7 @@ hal_tx_update_pcp_tid_generic_be(struct hal_soc *soc,
 /**
  * hal_tx_update_tidmap_prty_generic_be() - Update the tid map priority
  * @soc: HAL SoC context
- * @val: priority value
+ * @value: priority value
  *
  * Return: void
  */
@@ -220,9 +222,9 @@ static void hal_rx_get_tlv_size_generic_be(uint16_t *rx_pkt_tlv_size,
 
 /**
  * hal_rx_flow_get_tuple_info_be() - Setup a flow search entry in HW FST
- * @fst: Pointer to the Rx Flow Search Table
+ * @rx_fst: Pointer to the Rx Flow Search Table
  * @hal_hash: HAL 5 tuple hash
- * @tuple_info: 5-tuple info of the flow returned to the caller
+ * @flow_tuple_info: 5-tuple info of the flow returned to the caller
  *
  * Return: Success/Failure
  */
@@ -291,7 +293,7 @@ hal_rx_flow_get_tuple_info_be(uint8_t *rx_fst, uint32_t hal_hash,
 
 /**
  * hal_rx_flow_delete_entry_be() - Setup a flow search entry in HW FST
- * @fst: Pointer to the Rx Flow Search Table
+ * @rx_fst: Pointer to the Rx Flow Search Table
  * @hal_rx_fse: Pointer to the Rx Flow that is to be deleted from the FST
  *
  * Return: Success/Failure
@@ -327,7 +329,7 @@ hal_rx_fst_get_fse_size_be(void)
 #ifdef QCA_MONITOR_2_0_SUPPORT
 /**
  * hal_txmon_is_mon_buf_addr_tlv_generic_be() - api to find mon buffer tlv
- * @tx_tlv: pointer to TLV header
+ * @tx_tlv_hdr: pointer to TLV header
  *
  * Return: bool based on tlv tag matches monitor buffer address tlv
  */
@@ -385,7 +387,7 @@ hal_txmon_get_num_users(void *tx_tlv)
  * hal_txmon_parse_tx_fes_setup() - parse tx_fes_setup tlv
  *
  * @tx_tlv: pointer to tx_fes_setup tlv header
- * @ppdu_info: pointer to hal_tx_ppdu_info
+ * @tx_ppdu_info: pointer to hal_tx_ppdu_info
  *
  * Return: void
  */
@@ -487,7 +489,7 @@ hal_txmon_get_num_users(void *tx_tlv)
  * hal_txmon_parse_tx_fes_setup() - parse tx_fes_setup tlv
  *
  * @tx_tlv: pointer to tx_fes_setup tlv header
- * @ppdu_info: pointer to hal_tx_ppdu_info
+ * @tx_ppdu_info: pointer to hal_tx_ppdu_info
  *
  * Return: void
  */
@@ -685,7 +687,7 @@ uint8_t get_ru_offset_from_start_index(uint8_t ru_size, uint8_t start_idx)
  *
  * @tx_tlv: pointer to firmware to software tlvmpdu start tlv header
  * @type: place where this tlv is generated
- * @tx_status_info: pointer to hal_tx_status_info
+ * @status_info: pointer to hal_tx_status_info
  *
  * Return: void
  */
@@ -782,9 +784,8 @@ hal_txmon_status_get_num_users_generic_be(void *tx_tlv_hdr, uint8_t *num_users)
 
 /**
  * hal_tx_get_ppdu_info() - api to get tx ppdu info
- * @pdev_handle: DP_PDEV handle
- * @prot_ppdu_info: populate dp_ppdu_info protection
- * @tx_data_ppdu_info: populate dp_ppdu_info data
+ * @data_info: populate dp_ppdu_info data
+ * @prot_info: populate dp_ppdu_info protection
  * @tlv_tag: Tag
  *
  * Return: dp_tx_ppdu_info pointer
@@ -2966,11 +2967,12 @@ static void hal_reo_shared_qaddr_write_be(hal_soc_handle_t hal_soc_hdl,
 }
 
 /**
- * hal_reo_shared_qaddr_setup() - Allocate MLO and Non MLO reo queue
+ * hal_reo_shared_qaddr_setup_be() - Allocate MLO and Non MLO reo queue
  * reference table shared between SW and HW and initialize in Qdesc Base0
  * base1 registers provided by HW.
  *
- * @hal_soc: HAL Soc handle
+ * @hal_soc_hdl: HAL Soc handle
+ * @reo_qref: REO queue reference table
  *
  * Return: QDF_STATUS_SUCCESS on success else a QDF error.
  */
@@ -3019,10 +3021,10 @@ hal_reo_shared_qaddr_setup_be(hal_soc_handle_t hal_soc_hdl,
 }
 
 /**
- * hal_reo_shared_qaddr_init() - Zero out REO qref LUT and
+ * hal_reo_shared_qaddr_init_be() - Zero out REO qref LUT and
  * write start addr of MLO and Non MLO table in HW
  *
- * @hal_soc: HAL Soc handle
+ * @hal_soc_hdl: HAL Soc handle
  * @qref_reset: reset qref LUT
  *
  * Return: None
@@ -3059,10 +3061,10 @@ static void hal_reo_shared_qaddr_init_be(hal_soc_handle_t hal_soc_hdl,
 }
 
 /**
- * hal_reo_shared_qaddr_detach() - Free MLO and Non MLO reo queue
+ * hal_reo_shared_qaddr_detach_be() - Free MLO and Non MLO reo queue
  * reference table shared between SW and HW
  *
- * @hal_soc: HAL Soc handle
+ * @hal_soc_hdl: HAL Soc handle
  *
  * Return: None
  */
@@ -3080,8 +3082,8 @@ static void hal_reo_shared_qaddr_detach_be(hal_soc_handle_t hal_soc_hdl)
 #endif
 
 /**
- * hal_tx_vdev_mismatch_routing_set - set vdev mismatch exception routing
- * @hal_soc: HAL SoC context
+ * hal_tx_vdev_mismatch_routing_set_generic_be() - set vdev mismatch exception routing
+ * @hal_soc_hdl: HAL SoC context
  * @config: HAL_TX_VDEV_MISMATCH_TQM_NOTIFY - route via TQM
  *          HAL_TX_VDEV_MISMATCH_FW_NOTIFY - route via FW
  *
@@ -3120,8 +3122,8 @@ hal_tx_vdev_mismatch_routing_set_generic_be(hal_soc_handle_t hal_soc_hdl,
 #endif
 
 /**
- * hal_tx_mcast_mlo_reinject_routing_set - set MLO multicast reinject routing
- * @hal_soc: HAL SoC context
+ * hal_tx_mcast_mlo_reinject_routing_set_generic_be() - set MLO multicast reinject routing
+ * @hal_soc_hdl: HAL SoC context
  * @config: HAL_TX_MCAST_MLO_REINJECT_FW_NOTIFY - route via FW
  *          HAL_TX_MCAST_MLO_REINJECT_TQM_NOTIFY - route via TQM
  *
@@ -3159,9 +3161,9 @@ hal_tx_mcast_mlo_reinject_routing_set_generic_be(
 #endif
 
 /**
- * hal_get_ba_aging_timeout_be - Get BA Aging timeout
+ * hal_get_ba_aging_timeout_be_generic() - Get BA Aging timeout
  *
- * @hal_soc: Opaque HAL SOC handle
+ * @hal_soc_hdl: Opaque HAL SOC handle
  * @ac: Access category
  * @value: window size to get
  */
@@ -3203,7 +3205,7 @@ void hal_get_ba_aging_timeout_be_generic(hal_soc_handle_t hal_soc_hdl,
  * hal_setup_link_idle_list_generic_be - Setup scattered idle list using the
  * buffer list provided
  *
- * @hal_soc: Opaque HAL SOC handle
+ * @soc: Opaque HAL SOC handle
  * @scatter_bufs_base_paddr: Array of physical base addresses
  * @scatter_bufs_base_vaddr: Array of virtual base addresses
  * @num_scatter_bufs: Number of scatter buffers in the above lists
@@ -3355,7 +3357,7 @@ hal_setup_link_idle_list_generic_be(struct hal_soc *soc,
 /**
  * hal_cookie_conversion_reg_cfg_generic_be() - set cookie conversion relevant register
  *					for REO/WBM
- * @soc: HAL soc handle
+ * @hal_soc_hdl: HAL soc handle
  * @cc_cfg: structure pointer for HW cookie conversion configuration
  *
  * Return: None
@@ -3486,9 +3488,8 @@ void hal_cookie_conversion_reg_cfg_generic_be(hal_soc_handle_t hal_soc_hdl,
 }
 
 /**
- * hal_set_ba_aging_timeout_be - Set BA Aging timeout
- *
- * @hal_soc: Opaque HAL SOC handle
+ * hal_set_ba_aging_timeout_be_generic() - Set BA Aging timeout
+ * @hal_soc_hdl: Opaque HAL SOC handle
  * @ac: Access category
  * ac: 0 - Background, 1 - Best Effort, 2 - Video, 3 - Voice
  * @value: Input value to set
@@ -3531,9 +3532,9 @@ void hal_set_ba_aging_timeout_be_generic(hal_soc_handle_t hal_soc_hdl,
 }
 
 /**
- * hal_tx_populate_bank_register() - populate the bank register with
+ * hal_tx_populate_bank_register_be() - populate the bank register with
  *		the software configs.
- * @soc: HAL soc handle
+ * @hal_soc_hdl: HAL soc handle
  * @config: bank config
  * @bank_id: bank id to be configured
  *
@@ -3626,8 +3627,9 @@ hal_tx_populate_bank_register_be(hal_soc_handle_t hal_soc_hdl,
 #define HAL_TCL_VDEV_MCAST_PACKET_CTRL_SHIFT 0x2
 
 /**
- * hal_tx_vdev_mcast_ctrl_set - set mcast_ctrl value
- * @hal_soc: HAL SoC context
+ * hal_tx_vdev_mcast_ctrl_set_be() - set mcast_ctrl value
+ * @hal_soc_hdl: HAL SoC context
+ * @vdev_id: vdev identifier
  * @mcast_ctrl_val: mcast ctrl value for this VAP
  *
  * Return: void

@@ -622,12 +622,12 @@ struct hal_rx_status_buffer_done {
 };
 
 /**
- * hal_mon_status_end_reason : ppdu status buffer end reason
+ * enum hal_mon_status_end_reason - ppdu status buffer end reason
  *
  * @HAL_MON_STATUS_BUFFER_FULL: status buffer full
  * @HAL_MON_FLUSH_DETECTED: flush detected
  * @HAL_MON_END_OF_PPDU: end of ppdu detected
- * HAL_MON_PPDU_truncated: truncated ppdu status
+ * @HAL_MON_PPDU_TRUNCATED: truncated ppdu status
  */
 enum hal_mon_status_end_reason {
 	HAL_MON_STATUS_BUFFER_FULL,
@@ -637,7 +637,7 @@ enum hal_mon_status_end_reason {
 };
 
 /**
- * struct hal_mon_desc () - HAL Monitor descriptor
+ * struct hal_mon_desc - HAL Monitor descriptor
  *
  * @buf_addr: virtual buffer address
  * @ppdu_id: ppdu id
@@ -645,7 +645,9 @@ enum hal_mon_status_end_reason {
  *	     - RxMON fills phy_ppdu_id
  * @end_offset: offset (units in 4 bytes) where status buffer ended
  *		i.e offset of TLV + last TLV size
- * @end_reason: 0 - status buffer is full
+ * @reserved_3a: reserved bits
+ * @end_reason: ppdu end reason
+ *		0 - status buffer is full
  *		1 - flush detected
  *		2 - TX_FES_STATUS_END or RX_PPDU_END
  *		3 - PPDU truncated due to system error
@@ -658,7 +660,6 @@ enum hal_mon_status_end_reason {
  * @looping_count: count to indicate number of times producer
  *			of entries has looped around the ring
  * @flush_detected: if flush detected
- * @end_reason: ppdu end reason
  * @end_of_ppdu_dropped: if end_of_ppdu is dropped
  * @ppdu_drop_count: PPDU drop count
  * @mpdu_drop_count: MPDU drop count
@@ -684,14 +685,16 @@ struct hal_mon_desc {
 typedef struct hal_mon_desc *hal_mon_desc_t;
 
 /**
- * struct hal_mon_buf_addr_status () - HAL buffer address tlv get status
+ * struct hal_mon_buf_addr_status - HAL buffer address tlv get status
  *
- * @buf_addr_31_0: Lower 32 bits of virtual address of status buffer
- * @buf_addr_63_32: Upper 32 bits of virtual address of status buffer
+ * @buffer_virt_addr_31_0: Lower 32 bits of virtual address of status buffer
+ * @buffer_virt_addr_63_32: Upper 32 bits of virtual address of status buffer
  * @dma_length: DMA length
+ * @reserved_2a: reserved bits
  * @msdu_continuation: is msdu size more than fragment size
  * @truncated: is msdu got truncated
- * @tlv_padding: tlv paddding
+ * @reserved_2b: reserved bits
+ * @tlv64_padding: tlv paddding
  */
 struct hal_mon_buf_addr_status {
 	uint32_t buffer_virt_addr_31_0;
@@ -706,9 +709,10 @@ struct hal_mon_buf_addr_status {
 
 #ifdef QCA_MONITOR_2_0_SUPPORT
 /**
- * hal_be_get_mon_dest_status() - Get monitor descriptor
- * @hal_soc_hdl: HAL Soc handle
- * @desc: HAL monitor descriptor
+ * hal_be_get_mon_dest_status() - Get monitor descriptor status
+ * @hal_soc: HAL Soc handle
+ * @hw_desc: HAL monitor descriptor
+ * @status: pointer to write descriptor status
  *
  * Return: none
  */
@@ -950,7 +954,8 @@ hal_update_frame_type_cnt(hal_rx_mon_mpdu_start_t *rx_mpdu_start,
  * hal_mon_buff_addr_info_set() - set desc address in cookie
  * @hal_soc_hdl: HAL Soc handle
  * @mon_entry: monitor srng
- * @desc: HAL monitor descriptor
+ * @mon_desc_addr: HAL monitor descriptor virtual address
+ * @phy_addr: HAL monitor descriptor physical address
  *
  * Return: none
  */
@@ -1087,6 +1092,11 @@ enum txmon_generated_response {
  * @transmission_type: su or mu transmission type
  * @medium_prot_type: medium protection type
  * @generated_response: Generated frame in response window
+ * @band_center_freq1:
+ * @band_center_freq2:
+ * @freq:
+ * @phy_mode:
+ * @schedule_id:
  * @no_bitmap_avail: Bitmap available flag
  * @explicit_ack: Explicit Acknowledge flag
  * @explicit_ack_type: Explicit Acknowledge type
@@ -1094,8 +1104,13 @@ enum txmon_generated_response {
  * @response_type: Response type in response window
  * @ndp_frame: NDP frame
  * @num_users: number of users
+ * @reserved: reserved bits
+ * @mba_count: MBA count
+ * @mba_fake_bitmap_count: MBA fake bitmap count
  * @sw_frame_group_id: software frame group ID
  * @r2r_to_follow: Response to Response follow flag
+ * @phy_abort_reason: Reason for PHY abort
+ * @phy_abort_user_number: User number for PHY abort
  * @buffer: Packet buffer pointer address
  * @offset: Packet buffer offset
  * @length: Packet buffer length
@@ -1194,7 +1209,7 @@ hal_tx_status_get_next_tlv(uint8_t *tx_tlv) {
 
 /**
  * hal_txmon_status_parse_tlv() - process transmit info TLV
- * @hal_soc: HAL soc handle
+ * @hal_soc_hdl: HAL soc handle
  * @data_ppdu_info: pointer to hal data ppdu info
  * @prot_ppdu_info: pointer to hal prot ppdu info
  * @data_status_info: pointer to data status info
@@ -1226,7 +1241,7 @@ hal_txmon_status_parse_tlv(hal_soc_handle_t hal_soc_hdl,
 /**
  * hal_txmon_status_get_num_users() - api to get num users from start of fes
  * window
- * @hal_soc: HAL soc handle
+ * @hal_soc_hdl: HAL soc handle
  * @tx_tlv_hdr: pointer to TLV header
  * @num_users: reference to number of user
  *
@@ -1261,7 +1276,7 @@ hal_tx_status_get_tlv_tag(void *tx_tlv_hdr)
 
 /**
  * hal_txmon_is_mon_buf_addr_tlv() - api to find packet buffer addr tlv
- * @hal_soc: HAL soc handle
+ * @hal_soc_hdl: HAL soc handle
  * @tx_tlv_hdr: pointer to TLV header
  *
  * Return: bool
@@ -1279,7 +1294,7 @@ hal_txmon_is_mon_buf_addr_tlv(hal_soc_handle_t hal_soc_hdl, void *tx_tlv_hdr)
 
 /**
  * hal_txmon_populate_packet_info() - api to populate packet info
- * @hal_soc: HAL soc handle
+ * @hal_soc_hdl: HAL soc handle
  * @tx_tlv_hdr: pointer to TLV header
  * @packet_info: pointer to placeholder for packet info
  *
@@ -2210,9 +2225,11 @@ hal_update_rx_ctrl_frame_stats(struct hal_rx_ppdu_info *ppdu_info,
 #endif /* WLAN_SUPPORT_CTRL_FRAME_STATS */
 
 /**
- * hal_rx_status_get_tlv_info() - process receive info TLV
+ * hal_rx_status_get_tlv_info_generic_be() - process receive info TLV
  * @rx_tlv_hdr: pointer to TLV header
- * @ppdu_info: pointer to ppdu_info
+ * @ppduinfo: pointer to ppdu_info
+ * @hal_soc_hdl: HAL version of the SOC pointer
+ * @nbuf: Network buffer
  *
  * Return: HAL_TLV_STATUS_PPDU_NOT_DONE or HAL_TLV_STATUS_PPDU_DONE from tlv
  */
