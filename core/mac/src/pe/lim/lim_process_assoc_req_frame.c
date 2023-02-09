@@ -800,8 +800,8 @@ static bool lim_chk_is_11b_sta_supported(struct mac_context *mac_ctx,
 				STATUS_ASSOC_DENIED_RATES,
 				1, sa, sub_type, 0, session, false);
 
-			pe_warn("Rejecting Re/Assoc req from 11b STA:");
-			lim_print_mac_addr(mac_ctx, sa, LOGW);
+			pe_warn("Rejecting Re/Assoc req from 11b STA: "QDF_MAC_ADDR_FMT,
+				QDF_MAC_ADDR_REF(sa));
 
 #ifdef WLAN_DEBUG
 			mac_ctx->lim.gLim11bStaAssocRejectCount++;

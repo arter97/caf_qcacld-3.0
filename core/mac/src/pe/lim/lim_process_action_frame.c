@@ -1011,8 +1011,8 @@ __lim_process_sm_power_save_update(struct mac_context *mac, uint8_t *pRxPacketIn
 		dph_lookup_hash_entry(mac, pHdr->sa, &aid,
 				      &pe_session->dph.dphHashTable);
 	if (!pSta) {
-		pe_err("STA context not found - ignoring UpdateSM PSave Mode from");
-		lim_print_mac_addr(mac, pHdr->sa, LOGE);
+		pe_err("STA context not found - ignoring UpdateSM PSave Mode from SA: "QDF_MAC_ADDR_FMT,
+		       QDF_MAC_ADDR_REF(pHdr->sa));
 		return;
 	}
 
