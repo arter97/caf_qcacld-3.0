@@ -665,30 +665,6 @@ void lim_cleanup_mlm(struct mac_context *mac_ctx)
 	}
 } /*** end lim_cleanup_mlm() ***/
 
-/**
- * lim_print_mac_addr()
- *
- ***FUNCTION:
- * This function is called to print passed MAC address
- * in : format.
- *
- ***LOGIC:
- *
- ***ASSUMPTIONS:
- * NA
- *
- ***NOTE:
- * @param  macAddr  - MacAddr to be printed
- * @param  logLevel - Loglevel to be used
- *
- * @return None.
- */
-
-void lim_print_mac_addr(struct mac_context *mac, tSirMacAddr macAddr, uint8_t logLevel)
-{
-	pe_debug(QDF_MAC_ADDR_FMT, QDF_MAC_ADDR_REF(macAddr));
-} /****** end lim_print_mac_addr() ******/
-
 /*
  * lim_reset_deferred_msg_q()
  *
@@ -1057,15 +1033,13 @@ lim_update_prot_sta_params(struct mac_context *mac,
 {
 	uint32_t i;
 
-	pe_debug("Associated STA addr is:");
-	lim_print_mac_addr(mac, peerMacAddr, LOGD);
+	pe_debug("Associated STA addr is: "QDF_MAC_ADDR_FMT,
+		 QDF_MAC_ADDR_REF(peerMacAddr));
 
 	for (i = 0; i < LIM_PROT_STA_CACHE_SIZE; i++) {
 		if (pe_session->protStaCache[i].active) {
-			pe_debug("Addr:");
-				lim_print_mac_addr
-				(mac, pe_session->protStaCache[i].addr,
-				LOGD);
+			pe_debug("Addr:" QDF_MAC_ADDR_FMT,
+				 QDF_MAC_ADDR_REF(pe_session->protStaCache[i].addr));
 
 			if (!qdf_mem_cmp
 				    (pe_session->protStaCache[i].addr,
@@ -1290,9 +1264,8 @@ lim_update_short_preamble(struct mac_context *mac_ctx, tSirMacAddr peer_mac_addr
 	if (sta_ds->shortPreambleEnabled != eHAL_CLEAR)
 		return;
 
-	pe_debug("Short Preamble is not enabled in Assoc Req from");
-
-	lim_print_mac_addr(mac_ctx, peer_mac_addr, LOGD);
+	pe_debug("Short Preamble is not enabled in Assoc Req from "QDF_MAC_ADDR_FMT,
+		 QDF_MAC_ADDR_REF(peer_mac_addr));
 
 	for (i = 0; i < LIM_PROT_STA_CACHE_SIZE; i++) {
 		if (LIM_IS_AP_ROLE(psession_entry) &&
@@ -1327,14 +1300,14 @@ lim_update_short_preamble(struct mac_context *mac_ctx, tSirMacAddr peer_mac_addr
 		tLimNoShortParams *lim_params =
 				&psession_entry->gLimNoShortParams;
 		if (LIM_IS_AP_ROLE(psession_entry)) {
-			pe_err("No space in Short cache active: %d sta: %d for sta",
-				i, lim_params->numNonShortPreambleSta);
-			lim_print_mac_addr(mac_ctx, peer_mac_addr, LOGE);
+			pe_err("No space in Short cache active: %d sta: %d for sta "QDF_MAC_ADDR_FMT,
+			       i, lim_params->numNonShortPreambleSta,
+			       QDF_MAC_ADDR_REF(peer_mac_addr));
 			return;
 		} else {
-			pe_err("No space in Short cache active: %d sta: %d for sta",
-				i, lim_params->numNonShortPreambleSta);
-			lim_print_mac_addr(mac_ctx, peer_mac_addr, LOGE);
+			pe_err("No space in Short cache active: %d sta: %d for sta "QDF_MAC_ADDR_FMT,
+			       i, lim_params->numNonShortPreambleSta,
+			       QDF_MAC_ADDR_REF(peer_mac_addr));
 			return;
 		}
 
@@ -1405,8 +1378,8 @@ lim_update_short_slot_time(struct mac_context *mac_ctx, tSirMacAddr peer_mac_add
 	if (sta_ds->shortSlotTimeEnabled != eHAL_CLEAR)
 		return;
 
-	pe_debug("Short Slot Time is not enabled in Assoc Req from");
-	lim_print_mac_addr(mac_ctx, peer_mac_addr, LOGD);
+	pe_debug("Short Slot Time is not enabled in Assoc Req from "QDF_MAC_ADDR_FMT,
+		 QDF_MAC_ADDR_REF(peer_mac_addr));
 	for (i = 0; i < LIM_PROT_STA_CACHE_SIZE; i++) {
 		if (LIM_IS_AP_ROLE(session_entry) &&
 		    session_entry->gLimNoShortSlotParams.
@@ -1439,16 +1412,14 @@ lim_update_short_slot_time(struct mac_context *mac_ctx, tSirMacAddr peer_mac_add
 
 	if (i >= LIM_PROT_STA_CACHE_SIZE) {
 		if (LIM_IS_AP_ROLE(session_entry)) {
-			pe_err("No space in ShortSlot cache active: %d sta: %d for sta",
-				i, session_entry->gLimNoShortSlotParams.
-				numNonShortSlotSta);
-			lim_print_mac_addr(mac_ctx, peer_mac_addr, LOGE);
+			pe_err("No space in ShortSlot cache active: %d sta: %d for sta "QDF_MAC_ADDR_FMT,
+			       i, session_entry->gLimNoShortSlotParams.numNonShortSlotSta,
+			       QDF_MAC_ADDR_REF(peer_mac_addr));
 			return;
 		} else {
-			pe_err("No space in ShortSlot cache active: %d sta: %d for sta",
-				i, mac_ctx->lim.gLimNoShortSlotParams.
-				numNonShortSlotSta);
-			lim_print_mac_addr(mac_ctx, peer_mac_addr, LOGE);
+			pe_err("No space in ShortSlot cache active: %d sta: %d for sta "QDF_MAC_ADDR_FMT,
+			       i, mac_ctx->lim.gLimNoShortSlotParams.numNonShortSlotSta,
+			       QDF_MAC_ADDR_REF(peer_mac_addr));
 			return;
 		}
 	}
@@ -4840,8 +4811,8 @@ void lim_pmf_sa_query_timer_handler(void *pMacGlobal, uint32_t param)
 	maxretries = mac->mlme_cfg->gen.pmf_sa_query_max_retries;
 	pSta->pmfSaQueryRetryCount++;
 	if (pSta->pmfSaQueryRetryCount >= maxretries) {
-		pe_err("SA Query timed out,Deleting STA");
-		lim_print_mac_addr(mac, pSta->staAddr, LOGE);
+		pe_err("SA Query timed out,Deleting STA: "QDF_MAC_ADDR_FMT,
+		       QDF_MAC_ADDR_REF(pSta->staAddr));
 		lim_send_disassoc_mgmt_frame(mac,
 			REASON_DISASSOC_DUE_TO_INACTIVITY,
 			pSta->staAddr, pe_session, false);
