@@ -705,6 +705,34 @@ dp_dump_rx_flow_tag_stats(struct cdp_soc_t *soc, uint8_t pdev_id,
 }
 
 #if defined(WLAN_SUPPORT_PPEDS) || (QCA_PPE_VP)
+#ifdef CONFIG_MLO_SINGLE_DEV
+static inline
+wlan_if_t dp_rx_get_vap_osif_dev(osif_dev *osdev)
+{
+	osif_dev  *os_linkdev;
+	struct osif_mldev *mldev;
+	uint8_t primary_chip_id;
+	uint8_t primary_pdev_id;
+
+	if (osdev->dev_type == OSIF_NETDEV_TYPE_MLO) {
+		mldev = (struct osif_mldev *)osdev;
+		primary_chip_id = mldev->primary_chip_id;
+		primary_pdev_id = mldev->primary_pdev_id;
+
+		os_linkdev = mldev->link_dev[primary_chip_id][primary_pdev_id];
+		if (!os_linkdev)
+			return NULL;
+		return os_linkdev->os_if;
+	}
+	return osdev->os_if;
+}
+#else
+static inline
+wlan_if_t dp_rx_get_vap_osif_dev(osif_dev *osdev)
+{
+	return osdev->os_if;
+}
+#endif
 bool
 dp_rx_ppe_add_flow_entry(struct ppe_drv_fse_rule_info *ppe_flow_info)
 {
@@ -723,11 +751,11 @@ dp_rx_ppe_add_flow_entry(struct ppe_drv_fse_rule_info *ppe_flow_info)
 	if (!osdev)
 		return QDF_STATUS_E_FAILURE;
 
-	vap = osdev->os_if;
+	vap = dp_rx_get_vap_osif_dev(osdev);
 	if (!vap)
 		return QDF_STATUS_E_FAILURE;
 
-	vdev = osdev->ctrl_vdev;
+	vdev = vap->vdev_obj;
 	if (!vdev)
 		return QDF_STATUS_E_FAILURE;
 
@@ -807,11 +835,11 @@ dp_rx_ppe_del_flow_entry(struct ppe_drv_fse_rule_info *ppe_flow_info)
 	if (!osdev)
 		return QDF_STATUS_E_FAILURE;
 
-	vap = osdev->os_if;
+	vap = dp_rx_get_vap_osif_dev(osdev);
 	if (!vap)
 		return QDF_STATUS_E_FAILURE;
 
-	vdev = osdev->ctrl_vdev;
+	vdev = vap->vdev_obj;
 	if (!vdev)
 		return QDF_STATUS_E_FAILURE;
 
