@@ -23,7 +23,7 @@
 
 extern int ol_num_global_soc;
 
-#define MAX_6GHZ_SOCS  2
+#define MAX_6GHZ_SOCS  3
 #define MAX_6GHZ_LINKS MAX_6GHZ_SOCS
 
 typedef QDF_STATUS (*wlan_rnr_handler)(void *arg1, void *arg2);
