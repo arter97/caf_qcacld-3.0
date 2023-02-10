@@ -522,6 +522,23 @@ dp_ipa_ast_notify_cb(qdf_ipa_wdi_conn_in_params_t *pipe_in,
 }
 #endif
 
+#ifdef IPA_OPT_WIFI_DP
+static inline void dp_ipa_opt_dp_ixo_remap(uint8_t *ix0_map)
+{
+	ix0_map[0] = REO_REMAP_SW1;
+	ix0_map[1] = REO_REMAP_SW1;
+	ix0_map[2] = REO_REMAP_SW2;
+	ix0_map[3] = REO_REMAP_SW3;
+	ix0_map[4] = REO_REMAP_SW4;
+	ix0_map[5] = REO_REMAP_RELEASE;
+	ix0_map[6] = REO_REMAP_FW;
+	ix0_map[7] = REO_REMAP_FW;
+}
+#else
+static inline void dp_ipa_opt_dp_ixo_remap(uint8_t *ix0_map)
+{
+}
+#endif
 #ifdef QCA_ENHANCED_STATS_SUPPORT
 /**
  * dp_ipa_txrx_get_peer_stats - fetch peer stats

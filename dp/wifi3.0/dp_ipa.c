@@ -1689,6 +1689,7 @@ int dp_ipa_ring_resource_setup(struct dp_soc *soc,
 	ix0_map[6] = REO_REMAP_FW;
 	ix0_map[7] = REO_REMAP_FW;
 
+	dp_ipa_opt_dp_ixo_remap(ix0_map);
 	ix0 = hal_gen_reo_remap_val(soc->hal_soc, HAL_REO_REMAP_REG_IX0,
 				    ix0_map);
 
