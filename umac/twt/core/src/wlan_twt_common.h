@@ -32,17 +32,6 @@ QDF_STATUS
 wlan_twt_tgt_caps_get_responder(struct wlan_objmgr_psoc *psoc, bool *val);
 
 /**
- * wlan_twt_tgt_caps_get_legacy_bcast_support() - get legacy bcast support
- * @psoc: psoc handle
- * @val: pointer to the output variable
- *
- * return: QDF_STATUS
- */
-QDF_STATUS
-wlan_twt_tgt_caps_get_legacy_bcast_support(struct wlan_objmgr_psoc *psoc,
-					   bool *val);
-
-/**
  * wlan_twt_tgt_caps_get_bcast_req_support() - get bcast requestor support
  * @psoc: psoc handle
  * @val: pointer to the output variable

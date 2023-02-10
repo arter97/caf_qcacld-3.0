@@ -26,12 +26,6 @@ QDF_STATUS ucfg_twt_get_responder(struct wlan_objmgr_psoc *psoc, bool *val)
 	return wlan_twt_tgt_caps_get_responder(psoc, val);
 }
 
-QDF_STATUS ucfg_twt_get_legacy_bcast_twt_support(struct wlan_objmgr_psoc *psoc,
-						bool *val)
-{
-	return wlan_twt_tgt_caps_get_legacy_bcast_support(psoc, val);
-}
-
 QDF_STATUS ucfg_twt_get_twt_nudge_enabled(struct wlan_objmgr_psoc *psoc,
 					bool *val)
 {
