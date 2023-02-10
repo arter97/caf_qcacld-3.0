@@ -311,6 +311,23 @@ struct qca_napi_stat {
 #endif
 };
 
+/*Number of buckets for latency*/
+#define HIF_SCHED_LATENCY_BUCKETS 8
+
+/*Buckets for latency between 0 to 2 ms*/
+#define HIF_SCHED_LATENCY_BUCKET_0_2 2
+/*Buckets for latency between 3 to 10 ms*/
+#define HIF_SCHED_LATENCY_BUCKET_3_10 10
+/*Buckets for latency between 11 to 20 ms*/
+#define HIF_SCHED_LATENCY_BUCKET_11_20 20
+/*Buckets for latency between 21 to 50 ms*/
+#define HIF_SCHED_LATENCY_BUCKET_21_50 50
+/*Buckets for latency between 50 to 100 ms*/
+#define HIF_SCHED_LATENCY_BUCKET_51_100 100
+/*Buckets for latency between 100 to 250 ms*/
+#define HIF_SCHED_LATENCY_BUCKET_101_250 250
+/*Buckets for latency between 250 to 500 ms*/
+#define HIF_SCHED_LATENCY_BUCKET_251_500 500
 
 /**
  * struct qca_napi_info - per NAPI instance data structure
@@ -327,6 +344,9 @@ struct qca_napi_stat {
  * @rx_thread_napi:
  * @rx_thread_netdev:
  * @lro_ctx:
+ * @poll_start_time: napi poll service start time
+ * @sched_latency_stats: napi schedule latency stats
+ * @tstamp: napi schedule start timestamp
  *
  * This data structure holds stuff per NAPI instance.
  * Note that, in the current implementation, though scale is
@@ -350,6 +370,13 @@ struct qca_napi_info {
 	struct net_device    rx_thread_netdev;
 #endif /* RECEIVE_OFFLOAD */
 	qdf_lro_ctx_t        lro_ctx;
+#ifdef WLAN_FEATURE_RX_SOFTIRQ_TIME_LIMIT
+	unsigned long long poll_start_time;
+#endif
+#ifdef HIF_LATENCY_PROFILE_ENABLE
+	uint64_t sched_latency_stats[HIF_SCHED_LATENCY_BUCKETS];
+	uint64_t tstamp;
+#endif
 };
 
 enum qca_napi_tput_state {
