@@ -1703,10 +1703,6 @@ void dp_update_vdev_stats_on_peer_unmap(struct dp_vdev *vdev,
 				      tx.wme_ac_type_bytes[i]); \
 			DP_STATS_AGGR(_tgtobj, _srcobj, \
 				      rx.wme_ac_type_bytes[i]); \
-			DP_STATS_AGGR(_tgtobj, _srcobj, \
-					tx.wme_ac_type_bytes[i]); \
-			DP_STATS_AGGR(_tgtobj, _srcobj, \
-					rx.wme_ac_type_bytes[i]); \
 			DP_STATS_AGGR(_tgtobj, _srcobj, tx.excess_retries_per_ac[i]); \
 		\
 		} \
