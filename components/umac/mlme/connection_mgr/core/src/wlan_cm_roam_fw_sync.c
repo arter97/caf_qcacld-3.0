@@ -173,6 +173,10 @@ cm_fw_roam_sync_start_ind(struct wlan_objmgr_vdev *vdev,
 	wlan_dlm_update_bssid_connect_params(pdev,
 					     connected_bssid,
 					     DLM_AP_DISCONNECTED);
+
+	/* Notify TDLS STA about disconnection due to roaming */
+	wlan_tdls_notify_sta_disconnect(vdev_id, true, false, vdev);
+
 	if (IS_ROAM_REASON_STA_KICKOUT(sync_ind->roam_reason)) {
 		struct reject_ap_info ap_info;
 
