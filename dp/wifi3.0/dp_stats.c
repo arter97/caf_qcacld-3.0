@@ -7737,12 +7737,12 @@ void dp_print_tx_ppeds_stats(struct dp_soc *soc)
 }
 #endif
 
-#ifdef QCA_SUPPORT_GLOBAL_DESC
+#ifdef QCA_SUPPORT_DP_GLOBAL_CTX
 void dp_print_global_desc_count(void)
 {
-	struct dp_global_desc_context *dp_global;
+	struct dp_global_context *dp_global;
 
-	dp_global = wlan_objmgr_get_desc_ctx();
+	dp_global = wlan_objmgr_get_global_ctx();
 
 	DP_PRINT_STATS("Global Tx Descriptors in use = %u",
 		       dp_tx_get_global_desc_in_use(dp_global));

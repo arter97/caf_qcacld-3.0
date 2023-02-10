@@ -2359,10 +2359,10 @@ struct dp_arch_ops {
 				       unsigned int tid);
 	void (*get_rx_hash_key)(struct dp_soc *soc,
 				struct cdp_lro_hash_config *lro_hash);
-	void (*dp_set_rx_fst)(struct dp_soc *soc, struct dp_rx_fst *fst);
-	struct dp_rx_fst *(*dp_get_rx_fst)(struct dp_soc *soc);
-	uint8_t (*dp_rx_fst_deref)(struct dp_soc *soc);
-	void (*dp_rx_fst_ref)(struct dp_soc *soc);
+	void (*dp_set_rx_fst)(struct dp_rx_fst *fst);
+	struct dp_rx_fst *(*dp_get_rx_fst)(void);
+	uint32_t (*dp_rx_fst_deref)(void);
+	void (*dp_rx_fst_ref)(void);
 	void (*txrx_print_peer_stats)(struct cdp_peer_stats *peer_stats,
 				      enum peer_stats_type stats_type);
 	QDF_STATUS (*dp_peer_rx_reorder_queue_setup)(struct dp_soc *soc,

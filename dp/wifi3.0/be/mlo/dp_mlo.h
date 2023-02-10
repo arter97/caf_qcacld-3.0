@@ -64,8 +64,6 @@ struct dp_mlo_ctxt {
 	uint32_t toeplitz_hash_ipv6[LRO_IPV6_SEED_ARR_SZ];
 	struct dp_pdev_be *link_to_pdev_map[WLAN_MAX_MLO_CHIPS *
 		WLAN_MAX_MLO_LINKS_PER_SOC];
-	struct dp_rx_fst *rx_fst;
-	uint8_t rx_fst_ref_cnt;
 };
 
 /**

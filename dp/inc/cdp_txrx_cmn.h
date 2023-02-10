@@ -161,9 +161,11 @@ enum rx_tlv_bw {
 typedef void (*ipa_uc_op_cb_type)(uint8_t *op_msg,
 				  void *osif_ctxt);
 
-#ifdef QCA_SUPPORT_GLOBAL_DESC
-/* Global level structure for total descriptors in use */
-struct dp_global_desc_context {
+#ifdef QCA_SUPPORT_DP_GLOBAL_CTX
+/* Global level structure for win contexts */
+struct dp_global_context {
+	struct dp_rx_fst *fst_ctx;
+	qdf_atomic_t rx_fst_ref_cnt;
 	qdf_atomic_t global_descriptor_in_use;
 };
 
@@ -174,22 +176,24 @@ struct dp_global_desc_context {
  */
 static inline QDF_STATUS cdp_global_ctx_init(void)
 {
-	struct dp_global_desc_context *dp_global;
+	struct dp_global_context *dp_global;
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
 
-	if (wlan_objmgr_get_desc_ctx()) {
+	if (wlan_objmgr_get_global_ctx()) {
 		dp_err("Global object is already created");
 		return QDF_STATUS_SUCCESS;
 	}
 
-	dp_global =  (struct dp_global_desc_context *)
+	dp_global =  (struct dp_global_context *)
 			qdf_mem_malloc(sizeof(*dp_global));
 
 	if (!dp_global)
 		return QDF_STATUS_E_FAILURE;
 
-	wlan_objmgr_set_desc_ctx(dp_global);
+	wlan_objmgr_set_global_ctx(dp_global);
 	qdf_atomic_set(&dp_global->global_descriptor_in_use, 0);
+	dp_global->fst_ctx = NULL;
+	qdf_atomic_set(&dp_global->rx_fst_ref_cnt, 0);
 
 	return status;
 }
@@ -201,14 +205,14 @@ static inline QDF_STATUS cdp_global_ctx_init(void)
  */
 static inline QDF_STATUS cdp_global_ctx_deinit(void)
 {
-	struct dp_global_desc_context *dp_global = wlan_objmgr_get_desc_ctx();
+	struct dp_global_context *dp_global = wlan_objmgr_get_global_ctx();
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
 
 	if (!dp_global)
 		return QDF_STATUS_SUCCESS;
 
 	qdf_mem_free(dp_global);
-	wlan_objmgr_set_desc_ctx(NULL);
+	wlan_objmgr_set_global_ctx(NULL);
 
 	return status;
 }

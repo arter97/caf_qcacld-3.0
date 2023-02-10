@@ -5740,7 +5740,7 @@ dp_rx_fst_attach_wrapper(struct dp_soc *soc, struct dp_pdev *pdev)
 	if (!soc->arch_ops.dp_get_rx_fst)
 		return dp_rx_fst_attach(soc, pdev);
 
-	rx_fst = soc->arch_ops.dp_get_rx_fst(soc);
+	rx_fst = soc->arch_ops.dp_get_rx_fst();
 
 	/* for BE the FST attach is called only once per
 	 * ML context. if rx_fst is already registered
@@ -5749,15 +5749,15 @@ dp_rx_fst_attach_wrapper(struct dp_soc *soc, struct dp_pdev *pdev)
 	if (rx_fst) {
 		soc->rx_fst = rx_fst;
 		pdev->rx_fst = rx_fst;
-		soc->arch_ops.dp_rx_fst_ref(soc);
+		soc->arch_ops.dp_rx_fst_ref();
 	} else {
 		ret = dp_rx_fst_attach(soc, pdev);
 		if ((ret != QDF_STATUS_SUCCESS) &&
 		    (ret != QDF_STATUS_E_NOSUPPORT))
 			return ret;
 
-		soc->arch_ops.dp_set_rx_fst(soc, soc->rx_fst);
-		soc->arch_ops.dp_rx_fst_ref(soc);
+		soc->arch_ops.dp_set_rx_fst(soc->rx_fst);
+		soc->arch_ops.dp_rx_fst_ref();
 	}
 	return ret;
 }
@@ -5775,13 +5775,13 @@ dp_rx_fst_detach_wrapper(struct dp_soc *soc, struct dp_pdev *pdev)
 		return;
 	}
 
-	rx_fst = soc->arch_ops.dp_get_rx_fst(soc);
+	rx_fst = soc->arch_ops.dp_get_rx_fst();
 
 	/* for BE the FST detach is called only when last
 	 * ref count reaches 1.
 	 */
 	if (rx_fst) {
-		if (soc->arch_ops.dp_rx_fst_deref(soc) == 1)
+		if (soc->arch_ops.dp_rx_fst_deref() == 1)
 			dp_rx_fst_detach(soc, pdev);
 	}
 	pdev->rx_fst = NULL;

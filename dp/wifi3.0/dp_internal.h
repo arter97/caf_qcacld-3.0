@@ -2611,7 +2611,7 @@ dp_print_pdev_rx_stats(struct dp_pdev *pdev);
  */
 void dp_print_soc_tx_stats(struct dp_soc *soc);
 
-#ifdef QCA_SUPPORT_GLOBAL_DESC
+#ifdef QCA_SUPPORT_DP_GLOBAL_CTX
 /**
  * dp_print_global_desc_count(): Print global desc in use
  *

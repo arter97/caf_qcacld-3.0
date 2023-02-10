@@ -1104,7 +1104,7 @@ QDF_STATUS dispatcher_init(void)
 		goto out;
 
 	if (QDF_STATUS_SUCCESS != cdp_global_ctx_init())
-		goto global_desc_init_fail;
+		goto global_init_fail;
 
 	if (QDF_STATUS_SUCCESS != wlan_mlo_mgr_init())
 		goto mgmt_mlo_mgr_fail;
@@ -1258,7 +1258,7 @@ mgmt_txrx_init_fail:
 	wlan_objmgr_global_obj_deinit();
 mgmt_mlo_mgr_fail:
 	wlan_mlo_mgr_deinit();
-global_desc_init_fail:
+global_init_fail:
 	cdp_global_ctx_deinit();
 
 out:
