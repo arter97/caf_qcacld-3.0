@@ -30,6 +30,7 @@
 #define SAWF_SVC_CLASS_MIN 1
 #define SAWF_SVC_CLASS_MAX 128
 #define WLAN_MAX_SVC_CLASS_NAME 64
+#define DISABLED_MODE_MAX_LEN 128
 
 #define SAWF_LINE_FORMAT "================================================"
 
@@ -154,6 +155,7 @@ struct wlan_sawf_scv_class_params {
 	uint8_t type;
 	uint32_t ref_count;
 	uint32_t peer_count;
+	uint32_t disabled_modes;
 };
 
 /**
