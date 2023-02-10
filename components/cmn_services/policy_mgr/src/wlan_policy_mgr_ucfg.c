@@ -73,6 +73,8 @@ static QDF_STATUS policy_mgr_init_cfg(struct wlan_objmgr_psoc *psoc)
 	cfg->go_force_scc = cfg_get(psoc, CFG_P2P_GO_ENABLE_FORCE_SCC);
 	cfg->multi_sap_allowed_on_same_band =
 		cfg_get(psoc, CFG_MULTI_SAP_ALLOWED_ON_SAME_BAND);
+	cfg->use_sap_original_bw =
+		cfg_get(psoc, CFG_SAP_DEFAULT_BW_FOR_RESTART);
 
 	return QDF_STATUS_SUCCESS;
 }
