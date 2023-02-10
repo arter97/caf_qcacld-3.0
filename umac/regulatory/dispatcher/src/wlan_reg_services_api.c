@@ -18,11 +18,10 @@
  * PERFORMANCE OF THIS SOFTWARE.
  */
 
- /**
- * @file wlan_reg_services_api.c
- * @brief contains regulatory service functions
+/**
+ * DOC: wlan_reg_services_api.c
+ *      contains regulatory service functions
  */
-
 
 #include <qdf_status.h>
 #include <qdf_types.h>
@@ -43,12 +42,6 @@
 #include <../../core/src/reg_offload_11d_scan.h>
 #include <wlan_objmgr_global_obj.h>
 
-/**
- * wlan_reg_read_default_country() - Read the default country for the regdomain
- * @country: pointer to the country code.
- *
- * Return: None
- */
 QDF_STATUS wlan_reg_read_default_country(struct wlan_objmgr_psoc *psoc,
 					 uint8_t *country)
 {
@@ -124,12 +117,6 @@ wlan_reg_get_6g_power_type_for_ctry(struct wlan_objmgr_psoc *psoc,
 }
 #endif
 
-/**
- * wlan_reg_get_dfs_region () - Get the current dfs region
- * @dfs_reg: pointer to dfs region
- *
- * Return: Status
- */
 QDF_STATUS wlan_reg_get_dfs_region(struct wlan_objmgr_pdev *pdev,
 			     enum dfs_reg *dfs_reg)
 {
@@ -206,12 +193,6 @@ wlan_reg_is_6ghz_freq_txable(struct wlan_objmgr_pdev *pdev,
 qdf_export_symbol(wlan_reg_is_6ghz_freq_txable);
 #endif
 
-/**
- * wlan_reg_get_bw_value() - give bandwidth value
- * bw: bandwidth enum
- *
- * Return: uint16_t
- */
 uint16_t wlan_reg_get_bw_value(enum phy_ch_width bw)
 {
 	return reg_get_bw_value(bw);
@@ -219,12 +200,6 @@ uint16_t wlan_reg_get_bw_value(enum phy_ch_width bw)
 
 qdf_export_symbol(wlan_reg_get_bw_value);
 
-/**
- * wlan_reg_set_dfs_region () - Get the current dfs region
- * @dfs_reg: pointer to dfs region
- *
- * Return: None
- */
 void wlan_reg_set_dfs_region(struct wlan_objmgr_pdev *pdev,
 			     enum dfs_reg dfs_reg)
 {
@@ -1042,12 +1017,6 @@ bool wlan_reg_is_regdmn_en302502_applicable(struct wlan_objmgr_pdev *pdev)
 }
 #endif
 
-/**
- * wlan_reg_modify_pdev_chan_range() - Compute current channel list for the
- * modified regcap.
- * @pdev: pointer to struct wlan_objmgr_pdev
- *
- */
 QDF_STATUS wlan_reg_modify_pdev_chan_range(struct wlan_objmgr_pdev *pdev)
 {
 	return reg_modify_pdev_chan_range(pdev);
