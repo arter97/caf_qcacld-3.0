@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2016-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -257,6 +257,7 @@
  * @WLAN_UMAC_COMP_P2P:           P2P
  * @WLAN_UMAC_COMP_POLICY_MGR:    Policy Manager
  * @WLAN_UMAC_COMP_CONFIG:        Configuration
+ * @WLAN_TARGET_IF_COMP_DIRECT_BUF_RX: Direct Buffer RX
  * @WLAN_UMAC_COMP_WIFI_POS:      WIFI Positioning
  * @WLAN_UMAC_COMP_TDLS:          TDLS
  * @WLAN_UMAC_COMP_ATF:           Airtime Fairness
@@ -278,9 +279,10 @@
  * @WLAN_UMAC_COMP_IPA:           IPA
  * @WLAN_UMAC_COMP_CP_STATS:      Control Plane Statistics
  * @WLAN_UMAC_COMP_ACTION_OUI:    ACTION OUI
- * @WLAN_UMAC_COMP_FWOL           FW Offload
- * @WLAN_UMAC_COMP_INTEROP_ISSUES_AP       interop issues ap component
- * @WLAN_UMAC_COMP_DENYLIST_MGR:      Denylist mgr component
+ * @WLAN_UMAC_COMP_FWOL:          FW Offload
+ * @WLAN_UMAC_COMP_CFR:           CFR component
+ * @WLAN_UMAC_COMP_INTEROP_ISSUES_AP: interop issues ap component
+ * @WLAN_UMAC_COMP_DENYLIST_MGR:  Denylist mgr component
  * @WLAN_UMAC_COMP_COEX:          Coex config component
  * @WLAN_UMAC_COMP_FTM_TIME_SYNC: WLAN FTM TIMESYNC
  * @WLAN_UMAC_COMP_PKT_CAPTURE:   Packet capture component
@@ -295,6 +297,7 @@
  * @WLAN_UMAC_COMP_TWT:           Target Wake Time (TWT) Component
  * @WLAN_UMAC_COMP_PRE_CAC:       PRE CAC component
  * @WLAN_COMP_DP:                 DP component
+ * @WLAN_COMP_TELEMETRY_AGENT:    Telemetry Agent component
  * @WLAN_UMAC_COMP_COAP:          Constrained Application Protocol component
  * @WLAN_UMAC_COMP_QMI:           QMI component
  * @WLAN_UMAC_COMP_AFC:           AFC component
@@ -574,14 +577,14 @@ enum wlan_phymode {
 
 /**
  * enum phy_ch_width - channel width
- * @CH_WIDTH_20MHZ: 20 mhz width
- * @CH_WIDTH_40MHZ: 40 mhz width
- * @CH_WIDTH_80MHZ: 80 mhz width
- * @CH_WIDTH_160MHZ: 160 mhz width
- * @CH_WIDTH_80P80HZ: 80+80 mhz width
- * @CH_WIDTH_5MHZ: 5 mhz width
- * @CH_WIDTH_10MHZ: 10 mhz width
- * @CH_WIDTH_320MHZ: 320 mhz width
+ * @CH_WIDTH_20MHZ: 20 MHz width
+ * @CH_WIDTH_40MHZ: 40 MHz width
+ * @CH_WIDTH_80MHZ: 80 MHz width
+ * @CH_WIDTH_160MHZ: 160 MHz width
+ * @CH_WIDTH_80P80MHZ: 80+80 MHz width
+ * @CH_WIDTH_5MHZ: 5 MHz width
+ * @CH_WIDTH_10MHZ: 10 MHz width
+ * @CH_WIDTH_320MHZ: 320 MHz width
  * @CH_WIDTH_INVALID: invalid width
  * @CH_WIDTH_MAX: max possible width
  */
@@ -673,10 +676,10 @@ enum wlan_bss_type {
 };
 
 /**
- * enum wlan_pmf_cap: pmf capability
- * @PMF_DISABLED: PMF is disabled
- * @PMF_CAPABLE: PMF is supported
- * @PMF_REQUIRED: PMF is mandatory
+ * enum wlan_pmf_cap - pmf capability
+ * @WLAN_PMF_DISABLED: PMF is disabled
+ * @WLAN_PMF_CAPABLE: PMF is supported
+ * @WLAN_PMF_REQUIRED: PMF is mandatory
  */
 enum wlan_pmf_cap {
 	WLAN_PMF_DISABLED,
