@@ -339,6 +339,7 @@ struct wlan_channel {
  * @mldaddr:            MLD address
  * @linkaddr:           Link MAC address
  * @mlo_link_id: link id for mlo connection
+ * @mlo_external_sae_auth: MLO external SAE auth
  * @wlan_vdev_mlo_lock: lock to protect the set/clear of
  * WLAN_VDEV_FEXT2_MLO feature flag in vdev MLME
  */
@@ -359,6 +360,7 @@ struct wlan_objmgr_vdev_mlme {
 	uint8_t  linkaddr[QDF_MAC_ADDR_SIZE];
 #ifdef WLAN_FEATURE_11BE_MLO
 	uint8_t  mlo_link_id;
+	bool mlo_external_sae_auth;
 #ifdef WLAN_MLO_USE_SPINLOCK
 	qdf_spinlock_t wlan_vdev_mlo_lock;
 #else
@@ -1966,6 +1968,36 @@ static inline uint16_t wlan_vdev_get_max_peer_count(
 {
 	return vdev->vdev_objmgr.max_peer_count;
 }
+
+#ifdef WLAN_FEATURE_11BE_MLO
+/**wlan_vdev_set_mlo_external_sae_auth_conversion() - set MLO external sae auth
+ * @vdev: VDEV object
+ * @val: true or false
+ *
+ * API to set mlo external sae auth of VDEV
+ *
+ * Return: void
+ */
+static inline void
+wlan_vdev_set_mlo_external_sae_auth_conversion(struct wlan_objmgr_vdev *vdev,
+					       bool val)
+{
+	vdev->vdev_mlme.mlo_external_sae_auth = val;
+}
+
+/**wlan_vdev_get_mlo_external_sae_auth_conversion() - get MLO external sae auth
+ * @vdev: VDEV object
+ *
+ * API to get mlo external sae auth of VDEV
+ *
+ * Return: mlo external sae auth of VDEV
+ */
+static inline bool
+wlan_vdev_get_mlo_external_sae_auth_conversion(struct wlan_objmgr_vdev *vdev)
+{
+	return vdev->vdev_mlme.mlo_external_sae_auth;
+}
+#endif
 
 /**
  * wlan_print_vdev_info() - print vdev members
