@@ -315,6 +315,7 @@ QDF_STATUS sta_mlme_vdev_notify_roam_start(struct vdev_mlme_obj *vdev_mlme,
  * @vdev_mlme: vdev mlme object
  * @event_data_len: event data length
  * @event_data: event data
+ * @is_disconnect_legacy_only: flag to indicate legacy disconnect
  *
  * This function is called to disconnect BSS/send deauth to AP
  *
@@ -322,7 +323,8 @@ QDF_STATUS sta_mlme_vdev_notify_roam_start(struct vdev_mlme_obj *vdev_mlme,
  */
 static QDF_STATUS sta_mlme_vdev_disconnect_bss(struct vdev_mlme_obj *vdev_mlme,
 					       uint16_t event_data_len,
-					       void *event_data)
+					       void *event_data,
+					       bool is_disconnect_legacy_only)
 {
 	mlme_legacy_debug("vdev id = %d ",
 			  vdev_mlme->vdev->vdev_objmgr.vdev_id);
@@ -513,13 +515,15 @@ ap_mlme_vdev_notify_up_complete(struct vdev_mlme_obj *vdev_mlme,
  * @vdev_mlme: vdev mlme object
  * @data_len: event data length
  * @data: event data
+ * @is_disconnect_legacy_only: flag to indicate is disconnect legacy
  *
  * This function is called to disconnect all connected peers
  *
  * Return: QDF_STATUS
  */
 static QDF_STATUS ap_mlme_vdev_disconnect_peers(struct vdev_mlme_obj *vdev_mlme,
-						uint16_t data_len, void *data)
+						uint16_t data_len, void *data,
+						bool is_disconnect_legacy_only)
 {
 	mlme_legacy_debug("vdev id = %d ",
 			  vdev_mlme->vdev->vdev_objmgr.vdev_id);
@@ -1582,6 +1586,7 @@ static QDF_STATUS mon_mlme_vdev_up_send(struct vdev_mlme_obj *vdev_mlme,
  * @vdev_mlme: vdev mlme object
  * @data_len: event data length
  * @data: event data
+ * @is_disconnect_legacy_only: flag to indicate legacy disconnect
  *
  * montior mode no connected peers, only do VDEV state transition.
  *
@@ -1589,7 +1594,8 @@ static QDF_STATUS mon_mlme_vdev_up_send(struct vdev_mlme_obj *vdev_mlme,
  */
 static QDF_STATUS mon_mlme_vdev_disconnect_peers(
 		struct vdev_mlme_obj *vdev_mlme,
-		uint16_t data_len, void *data)
+		uint16_t data_len, void *data,
+		bool is_disconnect_legacy_only)
 {
 	mlme_legacy_debug("vdev id = %d",
 			  vdev_mlme->vdev->vdev_objmgr.vdev_id);
