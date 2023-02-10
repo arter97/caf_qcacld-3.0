@@ -1368,9 +1368,23 @@ dp_rx_intrabss_ucast_check_be(qdf_nbuf_t nbuf,
 		dp_get_be_vdev_from_dp_vdev(ta_peer->vdev);
 	struct dp_soc_be *be_soc =
 		dp_get_be_soc_from_dp_soc(params->dest_soc);
+	uint16_t da_peer_id;
+	struct dp_peer *da_peer = NULL;
 
 	if (!qdf_nbuf_is_intra_bss(nbuf))
 		return false;
+
+	da_peer_id = HAL_RX_PEER_ID_GET(msdu_metadata);
+
+	da_peer = dp_peer_get_tgt_peer_by_id(&be_soc->soc, da_peer_id,
+					     DP_MOD_ID_RX);
+	if (da_peer) {
+		if (da_peer->bss_peer || (da_peer->txrx_peer == ta_peer)) {
+			dp_peer_unref_delete(da_peer, DP_MOD_ID_RX);
+			return false;
+		}
+		dp_peer_unref_delete(da_peer, DP_MOD_ID_RX);
+	}
 
 	hal_rx_tlv_get_dest_chip_pmac_id(rx_tlv_hdr,
 					 &dest_chip_id,
