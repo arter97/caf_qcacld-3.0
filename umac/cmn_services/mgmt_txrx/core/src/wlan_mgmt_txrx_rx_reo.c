@@ -3009,6 +3009,8 @@ mgmt_rx_reo_update_egress_list(struct mgmt_rx_reo_egress_list *egress_list,
 
 			qdf_assert_always(cur->is_parallel_rx);
 		}
+
+		return QDF_STATUS_SUCCESS;
 	}
 
 	if (!new)
