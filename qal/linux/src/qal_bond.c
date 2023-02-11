@@ -22,11 +22,12 @@
 #include <qdf_module.h>
 #include "qal_bond.h"
 
+#ifdef CONFIG_MLO_SINGLE_DEV
 struct net_device *
 qal_bond_create(struct net *net, char *name,
-		struct mlo_bond_info *mlo_info)
+		void *mlo_info)
 {
-	return bond_create_mlo(net, name, mlo_info);
+	return bond_create_mlo(net, name, (struct mlo_bond_info *)mlo_info);
 }
 
 qdf_export_symbol(qal_bond_create);
@@ -64,3 +65,47 @@ qal_bond_get_mlo_ctx(struct net_device *bond_dev)
 }
 
 qdf_export_symbol(qal_bond_get_mlo_ctx);
+#else
+struct net_device *
+qal_bond_create(struct net *net, char *name,
+		void *mlo_info)
+{
+	return NULL;
+}
+
+qdf_export_symbol(qal_bond_create);
+
+int
+qal_bond_create_slave(struct net_device *bond_dev,
+		      struct net_device *slave_dev)
+{
+	return 0;
+}
+
+qdf_export_symbol(qal_bond_create_slave);
+
+int
+qal_bond_slave_release(struct net_device *bond_dev,
+		       struct net_device *slave_dev)
+{
+	return 0;
+}
+
+qdf_export_symbol(qal_bond_slave_release);
+
+int
+qal_bond_destroy(struct net_device *bond_dev)
+{
+	return 0;
+}
+
+qdf_export_symbol(qal_bond_destroy);
+
+void *
+qal_bond_get_mlo_ctx(struct net_device *bond_dev)
+{
+	return NULL;
+}
+
+qdf_export_symbol(qal_bond_get_mlo_ctx);
+#endif /* CONFIG_MLO_SINGLE_DEV */
