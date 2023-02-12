@@ -6747,3 +6747,15 @@ uint8_t *wlan_mlme_get_src_addr_from_frame(struct element_info *frame)
 
 	return hdr->i_addr2;
 }
+
+bool
+wlan_mlme_get_sap_ps_with_twt(struct wlan_objmgr_psoc *psoc)
+{
+	struct wlan_mlme_psoc_ext_obj *mlme_obj;
+
+	mlme_obj = mlme_get_psoc_ext_obj(psoc);
+	if (!mlme_obj)
+		return cfg_default(CFG_SAP_PS_WITH_TWT);
+
+	return mlme_obj->cfg.sap_cfg.sap_ps_with_twt_enable;
+}

@@ -1612,6 +1612,8 @@ static void mlme_init_sap_cfg(struct wlan_objmgr_psoc *psoc,
 		cfg_get(psoc, CFG_6G_SAP_FILS_DISCOVERY_ENABLED);
 	sap_cfg->disable_bcn_prot =
 		cfg_get(psoc, CFG_DISABLE_SAP_BCN_PROT);
+	sap_cfg->sap_ps_with_twt_enable =
+		cfg_get(psoc, CFG_SAP_PS_WITH_TWT);
 }
 
 static void mlme_init_obss_ht40_cfg(struct wlan_objmgr_psoc *psoc,

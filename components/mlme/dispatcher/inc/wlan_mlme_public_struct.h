@@ -743,6 +743,7 @@ struct wlan_mlme_wps_params {
  * @is_sap_bcast_deauth_enabled: enable bcast deauth for sap
  * @is_6g_sap_fd_enabled: enable fils discovery on sap
  * @disable_bcn_prot: disable beacon protection for sap
+ * @sap_ps_with_twt_enable: SAP power save with TWT
  */
 struct wlan_mlme_cfg_sap {
 	uint16_t beacon_interval;
@@ -779,6 +780,7 @@ struct wlan_mlme_cfg_sap {
 	bool is_sap_bcast_deauth_enabled;
 	bool is_6g_sap_fd_enabled;
 	bool disable_bcn_prot;
+	bool sap_ps_with_twt_enable;
 };
 
 /**

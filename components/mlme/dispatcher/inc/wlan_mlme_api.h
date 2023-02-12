@@ -4257,4 +4257,15 @@ wlan_mlme_is_bcn_prot_disabled_for_sap(struct wlan_objmgr_psoc *psoc);
  */
 uint8_t *
 wlan_mlme_get_src_addr_from_frame(struct element_info *frame);
+
+/*
+ * wlan_mlme_get_sap_ps_with_twt() - power save with twt config enabled/disabled
+ * for SAP interface
+ *
+ * @psoc: pointer to psoc object
+ *
+ * Return: power save enabled/disabled
+ */
+bool
+wlan_mlme_get_sap_ps_with_twt(struct wlan_objmgr_psoc *psoc);
 #endif /* _WLAN_MLME_API_H_ */
