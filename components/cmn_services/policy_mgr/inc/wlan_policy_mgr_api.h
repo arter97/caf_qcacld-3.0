@@ -2186,6 +2186,26 @@ bool policy_mgr_is_scc_with_this_vdev_id(struct wlan_objmgr_psoc *psoc,
 					 uint8_t vdev_id);
 
 /**
+ * policy_mgr_is_mcc_with_this_vdev_id() - Is current vdev having MCC
+ * with any other vdev.
+ * @psoc: Pointer to PSOC object
+ * @vdev_id: vdev id
+ * @mcc_vdev_id: Concurrent MCC vdev id
+ *
+ * Return: true if MCC exists, false otherwise
+ */
+bool policy_mgr_is_mcc_with_this_vdev_id(struct wlan_objmgr_psoc *psoc,
+					 uint8_t vdev_id, uint8_t *mcc_vdev_id);
+
+/**
+ * policy_mgr_is_mcc_on_any_sta_vdev() - Check if any sta vdev is in MCC
+ * @psoc: Pointer to PSOC object
+ *
+ * Return: true if STA vdev is in MCC false otherwise
+ */
+bool policy_mgr_is_mcc_on_any_sta_vdev(struct wlan_objmgr_psoc *psoc);
+
+/**
  * policy_mgr_soc_set_dual_mac_cfg_cb() - Callback for set dual mac config
  * @status: Status of set dual mac config
  * @scan_config: Current scan config whose status is the first param
@@ -2651,21 +2671,6 @@ bool policy_mgr_is_sta_gc_active_on_mac(struct wlan_objmgr_psoc *psoc,
  */
 QDF_STATUS policy_mgr_get_mac_id_by_session_id(struct wlan_objmgr_psoc *psoc,
 		uint8_t session_id, uint8_t *mac_id);
-
-/**
- * policy_mgr_get_mcc_session_id_on_mac() - Get MCC session's ID
- * @psoc: PSOC object information
- * @mac_id: MAC ID on which MCC session needs to be found
- * @session_id: Session with which MCC combination needs to be found
- * @mcc_session_id: Pointer to the MCC session ID
- *
- * Get the session ID of the MCC interface
- *
- * Return: QDF_STATUS
- */
-QDF_STATUS policy_mgr_get_mcc_session_id_on_mac(struct wlan_objmgr_psoc *psoc,
-		uint8_t mac_id, uint8_t session_id,
-		uint8_t *mcc_session_id);
 
 /**
  * policy_mgr_get_mcc_operating_channel() - Get the MCC channel

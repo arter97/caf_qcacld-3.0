@@ -830,6 +830,15 @@ uint8_t tdls_get_opclass_from_bandwidth(struct wlan_objmgr_vdev *vdev,
 
 #ifdef WLAN_FEATURE_TDLS_CONCURRENCIES
 /**
+ * tdls_handle_start_bss() - Handle start BSS event to act on concurrent
+ * session offchannel mode
+ * @psoc: Pointer to PSOC object
+ *
+ * Return: None
+ */
+QDF_STATUS tdls_handle_start_bss(struct wlan_objmgr_psoc *psoc);
+
+/**
  * tdls_is_concurrency_allowed() - Is TDLS allowed with the current concurrency
  * @psoc: Pointer to PSOC
  *
@@ -837,10 +846,17 @@ uint8_t tdls_get_opclass_from_bandwidth(struct wlan_objmgr_vdev *vdev,
  */
 bool tdls_is_concurrency_allowed(struct wlan_objmgr_psoc *psoc);
 #else
+static inline
+QDF_STATUS tdls_handle_start_bss(struct wlan_objmgr_psoc *psoc)
+{
+	return QDF_STATUS_SUCCESS;
+}
+
 static inline bool
 tdls_is_concurrency_allowed(struct wlan_objmgr_psoc *psoc)
 {
 	return false;
 }
+
 #endif /* WLAN_FEATURE_TDLS_CONCURRENCIES */
 #endif

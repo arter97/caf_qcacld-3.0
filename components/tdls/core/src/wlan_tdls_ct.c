@@ -1080,11 +1080,11 @@ tdls_update_peer_off_channel_list(struct wlan_objmgr_pdev *pdev,
 
 	if (!wlan_psoc_nif_fw_ext2_cap_get(psoc,
 					   WLAN_TDLS_CONCURRENCIES_SUPPORT))
-		return false;
+		return QDF_STATUS_SUCCESS;
 
 	if (!policy_mgr_get_allowed_tdls_offchannel_freq(psoc, vdev, &freq)) {
 		tdls_debug("off channel not allowed for current concurrency");
-		return false;
+		return QDF_STATUS_E_NOSUPPORT;
 	}
 
 	/*
@@ -1129,7 +1129,8 @@ tdls_update_peer_off_channel_list(struct wlan_objmgr_pdev *pdev,
 		    (!wlan_reg_is_24ghz_ch_freq(peer_freq) ||
 		     (wlan_reg_is_6ghz_chan_freq(peer_freq) &&
 		      tdls_is_6g_freq_allowed(vdev, peer_freq)))) {
-			off_channels[i] = peer_info->peer_cap.peer_chan[i];
+			off_channels[params->num_off_channels] =
+					peer_info->peer_cap.peer_chan[i];
 			params->num_off_channels++;
 		}
 	}
@@ -1244,9 +1245,17 @@ int tdls_set_tdls_offchannelmode(struct wlan_objmgr_vdev *vdev,
 		conn_peer->op_class_for_pref_off_chan =
 				chan_switch_params->oper_class;
 
-		tdls_update_peer_off_channel_list(pdev, tdls_soc, vdev,
-						  conn_peer,
-						  chan_switch_params);
+		/*
+		 * Don't enable TDLS off channel if concurrency is not allowed
+		 */
+		status = tdls_update_peer_off_channel_list(pdev, tdls_soc, vdev,
+							   conn_peer,
+							   chan_switch_params);
+		if (QDF_IS_STATUS_ERROR(status)) {
+			qdf_mem_free(chan_switch_params);
+			return -EINVAL;
+		}
+
 		break;
 	case DISABLE_CHANSWITCH:
 	case DISABLE_ACTIVE_CHANSWITCH:

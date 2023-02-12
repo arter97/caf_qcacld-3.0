@@ -3145,6 +3145,73 @@ bool policy_mgr_is_scc_with_this_vdev_id(struct wlan_objmgr_psoc *psoc,
 	return false;
 }
 
+bool policy_mgr_is_mcc_with_this_vdev_id(struct wlan_objmgr_psoc *psoc,
+					 uint8_t vdev_id, uint8_t *mcc_vdev_id)
+{
+	struct policy_mgr_psoc_priv_obj *pm_ctx;
+	uint32_t i, ch_freq;
+	QDF_STATUS status = QDF_STATUS_E_FAILURE;
+
+	if (mcc_vdev_id)
+		*mcc_vdev_id = WLAN_INVALID_VDEV_ID;
+
+	pm_ctx = policy_mgr_get_context(psoc);
+	if (!pm_ctx) {
+		policy_mgr_err("Invalid Context");
+		return false;
+	}
+
+	/* Get the channel freq for a given vdev_id */
+	status = policy_mgr_get_chan_by_session_id(psoc, vdev_id, &ch_freq);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		policy_mgr_err("Failed to get channel for vdev:%d", vdev_id);
+		return false;
+	}
+
+	/* Compare given vdev_id freq against other vdev_id's */
+	qdf_mutex_acquire(&pm_ctx->qdf_conc_list_lock);
+	for (i = 0; i < MAX_NUMBER_OF_CONC_CONNECTIONS; i++) {
+		if (pm_conc_connection_list[i].vdev_id == vdev_id)
+			continue;
+
+		if (!pm_conc_connection_list[i].in_use)
+			continue;
+
+		if (pm_conc_connection_list[i].freq != ch_freq &&
+		    policy_mgr_are_2_freq_on_same_mac(psoc,
+						      pm_conc_connection_list[i].freq,
+						      ch_freq)) {
+			if (mcc_vdev_id)
+				*mcc_vdev_id = pm_conc_connection_list[i].vdev_id;
+
+			qdf_mutex_release(&pm_ctx->qdf_conc_list_lock);
+			return true;
+		}
+	}
+	qdf_mutex_release(&pm_ctx->qdf_conc_list_lock);
+
+	return false;
+}
+
+bool policy_mgr_is_mcc_on_any_sta_vdev(struct wlan_objmgr_psoc *psoc)
+{
+	uint8_t connection_count, i;
+	uint8_t vdev_id_list[MAX_NUMBER_OF_CONC_CONNECTIONS] = {0};
+
+	connection_count =
+		policy_mgr_get_mode_specific_conn_info(psoc, NULL, vdev_id_list,
+						       PM_STA_MODE);
+	if (!connection_count)
+		return false;
+
+	for (i = 0; i < connection_count; i++)
+		if (policy_mgr_is_mcc_with_this_vdev_id(psoc, vdev_id_list[i],
+							NULL))
+			return true;
+
+	return false;
+}
+
 bool policy_mgr_current_concurrency_is_scc(struct wlan_objmgr_psoc *psoc)
 {
 	uint32_t num_connections = 0;
@@ -8397,78 +8464,22 @@ uint32_t policy_mgr_get_sap_go_count_on_mac(struct wlan_objmgr_psoc *psoc,
 	return count;
 }
 
-QDF_STATUS policy_mgr_get_mcc_session_id_on_mac(struct wlan_objmgr_psoc *psoc,
-					uint8_t mac_id, uint8_t session_id,
-					uint8_t *mcc_session_id)
-{
-	uint32_t i, ch_freq;
-	QDF_STATUS status;
-	struct policy_mgr_psoc_priv_obj *pm_ctx;
-
-	pm_ctx = policy_mgr_get_context(psoc);
-	if (!pm_ctx) {
-		policy_mgr_err("Invalid Context");
-		return QDF_STATUS_E_FAILURE;
-	}
-
-	status = policy_mgr_get_chan_by_session_id(psoc, session_id, &ch_freq);
-	if (QDF_IS_STATUS_ERROR(status)) {
-		policy_mgr_err("Failed to get channel for session id:%d",
-			       session_id);
-		return QDF_STATUS_E_FAILURE;
-	}
-
-	qdf_mutex_acquire(&pm_ctx->qdf_conc_list_lock);
-	for (i = 0; i < MAX_NUMBER_OF_CONC_CONNECTIONS; i++) {
-		if (pm_conc_connection_list[i].mac != mac_id)
-			continue;
-		if (pm_conc_connection_list[i].vdev_id == session_id)
-			continue;
-		/* Inter band or intra band MCC */
-		if (pm_conc_connection_list[i].freq != ch_freq &&
-		    pm_conc_connection_list[i].in_use) {
-			*mcc_session_id = pm_conc_connection_list[i].vdev_id;
-			qdf_mutex_release(&pm_ctx->qdf_conc_list_lock);
-			return QDF_STATUS_SUCCESS;
-		}
-	}
-	qdf_mutex_release(&pm_ctx->qdf_conc_list_lock);
-
-	return QDF_STATUS_E_FAILURE;
-}
-
 uint32_t policy_mgr_get_mcc_operating_channel(struct wlan_objmgr_psoc *psoc,
-					      uint8_t session_id)
+					      uint8_t vdev_id)
 {
-	uint8_t mac_id, mcc_session_id;
+	uint8_t mcc_vdev_id;
 	QDF_STATUS status;
 	uint32_t ch_freq;
-	struct policy_mgr_psoc_priv_obj *pm_ctx;
 
-	pm_ctx = policy_mgr_get_context(psoc);
-	if (!pm_ctx) {
-		policy_mgr_err("Invalid Context");
+	if (!policy_mgr_is_mcc_with_this_vdev_id(psoc, vdev_id, &mcc_vdev_id)) {
+		policy_mgr_debug("No concurrent MCC vdev for id:%d", vdev_id);
 		return INVALID_CHANNEL_ID;
 	}
 
-	status = policy_mgr_get_mac_id_by_session_id(psoc, session_id, &mac_id);
+	status = policy_mgr_get_chan_by_session_id(psoc, mcc_vdev_id, &ch_freq);
 	if (QDF_IS_STATUS_ERROR(status)) {
-		policy_mgr_err("failed to get MAC ID");
-		return INVALID_CHANNEL_ID;
-	}
-
-	status = policy_mgr_get_mcc_session_id_on_mac(psoc, mac_id, session_id,
-			&mcc_session_id);
-	if (QDF_IS_STATUS_ERROR(status)) {
-		policy_mgr_err("failed to get MCC session ID");
-		return INVALID_CHANNEL_ID;
-	}
-
-	status = policy_mgr_get_chan_by_session_id(psoc, mcc_session_id,
-						   &ch_freq);
-	if (QDF_IS_STATUS_ERROR(status)) {
-		policy_mgr_err("Failed to get channel for MCC session ID:%d",
-			       mcc_session_id);
+		policy_mgr_err("Failed to get channel for MCC vdev:%d",
+			       mcc_vdev_id);
 		return INVALID_CHANNEL_ID;
 	}
 

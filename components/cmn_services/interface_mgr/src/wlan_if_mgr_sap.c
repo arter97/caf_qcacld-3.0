@@ -47,7 +47,7 @@ QDF_STATUS if_mgr_ap_start_bss(struct wlan_objmgr_vdev *vdev,
 	if (!psoc)
 		return QDF_STATUS_E_FAILURE;
 
-	wlan_tdls_teardown_links_sync(psoc);
+	wlan_tdls_notify_start_bss(psoc);
 
 	if (wlan_vdev_mlme_get_opmode(vdev) == QDF_SAP_MODE ||
 	    wlan_vdev_mlme_get_opmode(vdev) == QDF_P2P_GO_MODE)

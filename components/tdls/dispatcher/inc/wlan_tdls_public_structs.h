@@ -46,8 +46,20 @@
 #define WLAN_MAC_MAX_SUPP_RATES                      32
 #define WLAN_CHANNEL_14                              14
 
+/* Enable TDLS off-channel switch */
 #define ENABLE_CHANSWITCH                            1
+
+/*
+ * Passive(peer requested) responder mode off-channel switch.
+ * If peer initiates off channel request, that will be honored in
+ * this mode
+ */
 #define DISABLE_CHANSWITCH                           2
+
+/*
+ * Disable TDLS off-channel operation completely.
+ * Peer initiated requests will also be discarded.
+ */
 #define DISABLE_ACTIVE_CHANSWITCH                    3
 
 #define WLAN_TDLS_PREFERRED_OFF_CHANNEL_NUM_MIN      1
@@ -228,6 +240,7 @@ enum tdls_feature_mode {
  * @TDLS_CMD_SET_OFFCHANMODE: tdls offchannel mode
  * @TDLS_CMD_SET_SECOFFCHANOFFSET: tdls secondary offchannel offset
  * @TDLS_DELETE_ALL_PEERS_INDICATION: tdls delete all peers indication
+ * @TDLS_CMD_START_BSS: SAP start indication to tdls module
  */
 enum tdls_command_type {
 	TDLS_CMD_TX_ACTION = 1,
@@ -253,7 +266,8 @@ enum tdls_command_type {
 	TDLS_CMD_SET_OFFCHANNEL,
 	TDLS_CMD_SET_OFFCHANMODE,
 	TDLS_CMD_SET_SECOFFCHANOFFSET,
-	TDLS_DELETE_ALL_PEERS_INDICATION
+	TDLS_DELETE_ALL_PEERS_INDICATION,
+	TDLS_CMD_START_BSS
 };
 
 /**

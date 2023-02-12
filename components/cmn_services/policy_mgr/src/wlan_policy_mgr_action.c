@@ -3818,7 +3818,7 @@ policy_mgr_get_allowed_tdls_offchannel_freq(struct wlan_objmgr_psoc *psoc,
 						return true;
 					} else if (sta_vdev_id ==
 						   info[j].vdev_id) {
-						*ch_freq = info[j].ch_freq;
+						*ch_freq = info[i].ch_freq;
 						return true;
 					}
 				}

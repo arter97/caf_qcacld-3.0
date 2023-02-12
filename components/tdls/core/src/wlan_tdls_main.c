@@ -93,7 +93,8 @@ static char *tdls_get_cmd_type_str(enum tdls_command_type cmd_type)
 		return "TDLS_NOTIFY_RESET_ADAPTERS";
 	case TDLS_CMD_ANTENNA_SWITCH:
 		return "TDLS_CMD_ANTENNA_SWITCH";
-
+	case TDLS_CMD_START_BSS:
+		return "TDLS_CMD_START_BSS";
 	default:
 		return "Invalid TDLS command";
 	}
@@ -571,6 +572,24 @@ static QDF_STATUS tdls_reset_all_peers(
 	return status;
 }
 
+#ifdef WLAN_FEATURE_TDLS_CONCURRENCIES
+QDF_STATUS tdls_handle_start_bss(struct wlan_objmgr_psoc *psoc)
+{
+	struct wlan_objmgr_vdev *tdls_vdev;
+
+	tdls_vdev = tdls_get_vdev(psoc, WLAN_TDLS_NB_ID);
+	if (!tdls_vdev) {
+		tdls_err("Unable get the tdls vdev");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	tdls_set_tdls_offchannelmode(tdls_vdev, DISABLE_ACTIVE_CHANSWITCH);
+	wlan_objmgr_vdev_release_ref(tdls_vdev, WLAN_TDLS_NB_ID);
+
+	return QDF_STATUS_SUCCESS;
+}
+#endif
+
 QDF_STATUS tdls_process_cmd(struct scheduler_msg *msg)
 {
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
@@ -654,6 +673,9 @@ QDF_STATUS tdls_process_cmd(struct scheduler_msg *msg)
 		break;
 	case TDLS_DELETE_ALL_PEERS_INDICATION:
 		tdls_reset_all_peers(msg->bodyptr);
+		break;
+	case TDLS_CMD_START_BSS:
+		tdls_handle_start_bss(msg->bodyptr);
 		break;
 	default:
 		break;
@@ -959,6 +981,7 @@ bool tdls_check_is_tdls_allowed(struct wlan_objmgr_vdev *vdev)
 	qdf_freq_t ch_freq;
 	QDF_STATUS status;
 	uint32_t connection_count;
+	uint8_t sta_count, p2p_cli_count;
 
 	status = wlan_objmgr_vdev_try_get_ref(vdev, WLAN_TDLS_NB_ID);
 	if (QDF_IS_STATUS_ERROR(status))
@@ -981,7 +1004,14 @@ bool tdls_check_is_tdls_allowed(struct wlan_objmgr_vdev *vdev)
 	}
 
 	connection_count = policy_mgr_get_connection_count(tdls_soc_obj->soc);
-	if (connection_count == 1 ||
+	sta_count =
+		policy_mgr_mode_specific_connection_count(tdls_soc_obj->soc,
+							  PM_STA_MODE, NULL);
+	p2p_cli_count =
+		policy_mgr_mode_specific_connection_count(tdls_soc_obj->soc,
+							  PM_P2P_CLIENT_MODE,
+							  NULL);
+	if ((connection_count == 1 && (sta_count || p2p_cli_count)) ||
 	    (connection_count > 1 &&
 	     tdls_is_concurrency_allowed(tdls_soc_obj->soc))) {
 		state = true;
@@ -1020,7 +1050,7 @@ bool tdls_is_concurrency_allowed(struct wlan_objmgr_psoc *psoc)
 		return false;
 	}
 
-	if (policy_mgr_current_concurrency_is_mcc(psoc)) {
+	if (policy_mgr_is_mcc_on_any_sta_vdev(psoc)) {
 		tdls_debug("Base channel MCC. Don't allow TDLS");
 		return false;
 	}
@@ -1115,9 +1145,12 @@ tdls_process_policy_mgr_notification(struct wlan_objmgr_psoc *psoc)
 	}
 
 	if (!tdls_check_is_tdls_allowed(tdls_obj_vdev)) {
+		tdls_disable_offchan_and_teardown_links(tdls_obj_vdev);
 		wlan_objmgr_vdev_release_ref(tdls_obj_vdev, WLAN_TDLS_NB_ID);
 		return QDF_STATUS_E_NULL_VALUE;
 	}
+
+	tdls_set_tdls_offchannelmode(tdls_obj_vdev, ENABLE_CHANSWITCH);
 
 	tdls_debug("enter ");
 	tdls_set_ct_mode(psoc, tdls_obj_vdev);
@@ -1139,23 +1172,40 @@ tdls_process_decrement_active_session(struct wlan_objmgr_psoc *psoc)
 	tdls_debug("Enter");
 	if (!psoc)
 		return QDF_STATUS_E_NULL_VALUE;
+
 	if(!policy_mgr_is_hw_dbs_2x2_capable(psoc) &&
-	   !policy_mgr_is_hw_dbs_required_for_band(
-				psoc, HW_MODE_MAC_BAND_2G) &&
+	   !policy_mgr_is_hw_dbs_required_for_band(psoc, HW_MODE_MAC_BAND_2G) &&
 	   policy_mgr_is_current_hwmode_dbs(psoc)) {
 		tdls_debug("Current HW mode is 1*1 DBS. Wait for Opportunistic timer to expire to enable TDLS in FW");
 		return QDF_STATUS_SUCCESS;
 	}
+
 	tdls_obj_vdev = tdls_get_vdev(psoc, WLAN_TDLS_NB_ID);
-	if (tdls_obj_vdev) {
-		tdls_debug("Enable TDLS in FW and host as only one active sta/p2p_cli interface is present");
-		vdev_id = wlan_vdev_get_id(tdls_obj_vdev);
-		if (tdls_get_vdev_objects(tdls_obj_vdev, &tdls_priv_vdev,
-		    &tdls_priv_soc) == QDF_STATUS_SUCCESS)
-			tdls_send_update_to_fw(tdls_priv_vdev, tdls_priv_soc,
-					       false, false, true, vdev_id);
-		wlan_objmgr_vdev_release_ref(tdls_obj_vdev, WLAN_TDLS_NB_ID);
+	if (!tdls_obj_vdev)
+		return QDF_STATUS_E_FAILURE;
+
+	if (!tdls_check_is_tdls_allowed(tdls_obj_vdev))
+		goto release_ref;
+
+	/*
+	 * 2 Port MCC -> 1 port scenario or
+	 * 3 Port MCC -> 2 port SCC scenario or
+	 * 4 Port -> 3 Port SCC scenario
+	 * So enable TDLS in firmware
+	 */
+	tdls_debug("Enable TDLS in FW and host as active sta/p2p_cli interface is present");
+	vdev_id = wlan_vdev_get_id(tdls_obj_vdev);
+	if (tdls_get_vdev_objects(tdls_obj_vdev, &tdls_priv_vdev,
+				  &tdls_priv_soc) == QDF_STATUS_SUCCESS) {
+		tdls_send_update_to_fw(tdls_priv_vdev, tdls_priv_soc,
+				       false, false, true, vdev_id);
+		if (tdls_priv_soc->connected_peer_count == 1)
+			tdls_set_tdls_offchannelmode(tdls_obj_vdev,
+						     ENABLE_CHANSWITCH);
 	}
+
+release_ref:
+	wlan_objmgr_vdev_release_ref(tdls_obj_vdev, WLAN_TDLS_NB_ID);
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -1331,11 +1381,12 @@ void tdls_send_update_to_fw(struct tdls_vdev_priv_obj *tdls_vdev_obj,
 	tdls_info_to_fw->tdls_state = tdls_soc_obj->tdls_current_mode;
 	tdls_info_to_fw->tdls_options = 0;
 
-	/* Do not enable TDLS offchannel, if AP prohibited TDLS
+	/*
+	 * Do not enable TDLS offchannel, if AP prohibited TDLS
 	 * channel switch
 	 */
 	if (TDLS_IS_OFF_CHANNEL_ENABLED(tdls_feature_flags) &&
-		(!tdls_chan_swit_prohibited))
+	    !tdls_chan_swit_prohibited)
 		tdls_info_to_fw->tdls_options = ENA_TDLS_OFFCHAN;
 
 	if (TDLS_IS_BUFFER_STA_ENABLED(tdls_feature_flags))
