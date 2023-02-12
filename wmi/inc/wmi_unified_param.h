@@ -5938,6 +5938,8 @@ typedef enum {
 	VDEV_PARAM(vdev_param_set_extra_eht_ltf, VDEV_PARAM_EXTRA_EHT_LTF),
 	VDEV_PARAM(vdev_param_set_disabled_modes,
 		   VDEV_PARAM_SET_DISABLED_SCHED_MODES),
+	VDEV_PARAM(vdev_param_set_sap_ps_with_twt,
+		   VDEV_PARAM_SET_SAP_PS_WITH_TWT),
 	vdev_param_max,
 } wmi_conv_vdev_param_id;
 

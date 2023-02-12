@@ -710,6 +710,8 @@ static const uint32_t vdev_param_tlv[] = {
 		  VDEV_PARAM_SET_PROFILE),
 	PARAM_MAP(vdev_param_set_disabled_modes,
 		  VDEV_PARAM_SET_DISABLED_SCHED_MODES),
+	PARAM_MAP(vdev_param_set_sap_ps_with_twt,
+		  VDEV_PARAM_SET_SAP_PS_WITH_TWT),
 };
 #endif
 
