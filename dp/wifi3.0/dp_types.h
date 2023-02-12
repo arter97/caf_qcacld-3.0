@@ -1736,6 +1736,7 @@ struct dp_peer_cmn_ops_desc {
  * @idx: index at which link peer got added in MLD peer's list
  * @num_links: num links added in the MLD peer's list
  * @action_result: add/del was success or not
+ * @reserved: reserved bit
  * @link_peer: link peer handle
  * @mld_peer: MLD peer handle
  * @link_mac_addr: link peer mac address
@@ -1794,6 +1795,7 @@ struct dp_rx_peer_map_unmap_desc {
  * @is_first_link: is the current link the first link created
  * @is_primary_link: is the current link primary link
  * @vdev_id: vdev id of the vdev on which the current link peer exists
+ * @reserved: reserved bit
  */
 struct dp_peer_setup_desc {
 	struct dp_peer *peer;
@@ -2143,6 +2145,7 @@ enum dp_context_type {
  * @tx_hw_enqueue: enqueue TX data to HW
  * @tx_comp_get_params_from_hal_desc: get software tx descriptor and release
  * 				      source from HAL desc for wbm release ring
+ * @dp_tx_mlo_mcast_send: Tx send handler for MLO multicast enhance
  * @dp_tx_process_htt_completion:
  * @dp_rx_process:
  * @dp_tx_send_fast:
