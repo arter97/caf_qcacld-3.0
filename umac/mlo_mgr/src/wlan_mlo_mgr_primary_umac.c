@@ -424,6 +424,22 @@ static QDF_STATUS mlo_set_3_link_primary_umac(
 }
 #endif
 
+#if defined(WLAN_FEATURE_11BE_MLO) && defined(WLAN_MLO_MULTI_CHIP)
+QDF_STATUS mlo_peer_overwrite_primary_umac(uint8_t psoc_id,
+					   struct wlan_mlo_peer_context *ml_peer)
+{
+	if (psoc_id >= WLAN_OBJMGR_MAX_DEVICES)
+		return QDF_STATUS_E_FAILURE;
+	if (!ml_peer)
+		return QDF_STATUS_E_FAILURE;
+
+	ml_peer->primary_umac_psoc_id = psoc_id;
+	mlo_peer_assign_primary_umac(ml_peer, &ml_peer->peer_list[0]);
+
+	return QDF_STATUS_SUCCESS;
+}
+#endif
+
 QDF_STATUS mlo_peer_allocate_primary_umac(
 		struct wlan_mlo_dev_context *ml_dev,
 		struct wlan_mlo_peer_context *ml_peer,

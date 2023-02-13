@@ -24,6 +24,7 @@
 #include "wlan_objmgr_peer_obj.h"
 
 #define WLAN_LINK_ID_INVALID    0xff
+#define WLAN_NUM_TWO_LINK_PSOC  2
 
 /**
  * mlo_peer_create - Initiatiate peer create on secondary link(s)

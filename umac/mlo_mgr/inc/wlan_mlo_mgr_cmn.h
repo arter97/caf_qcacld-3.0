@@ -199,6 +199,20 @@ void mlo_mlme_peer_create(struct wlan_objmgr_vdev *vdev,
 			  qdf_nbuf_t frm_buf);
 
 /**
+ * mlo_mlme_bridge_peer_create() - Create mlo bridge peer
+ * @vdev: Object manager vdev
+ * @ml_peer: MLO peer context
+ * @addr: Peer addr
+ * @frm_buf: Frame buffer for IE processing
+ *
+ * Return: void
+ */
+void mlo_mlme_bridge_peer_create(struct wlan_objmgr_vdev *vdev,
+				 struct wlan_mlo_peer_context *ml_peer,
+				 struct qdf_mac_addr *addr,
+				 qdf_nbuf_t frm_buf);
+
+/**
  * mlo_mlme_peer_assoc() - Send ML Peer assoc
  * @peer: Object manager peer
  *
