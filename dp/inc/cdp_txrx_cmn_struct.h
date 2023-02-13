@@ -59,7 +59,6 @@
 
 #define CDP_BA_256_BIT_MAP_SIZE_DWORDS 8
 #define CDP_BA_64_BIT_MAP_SIZE_DWORDS 2
-#define CDP_RSSI_CHAIN_LEN 8
 
 #define OL_TXRX_INVALID_PDEV_ID 0xff
 #define OL_TXRX_INVALID_LOCAL_PEER_ID 0xffff
@@ -2131,7 +2130,7 @@ struct cdp_tx_completion_ppdu_user {
 	uint8_t is_ppdu_cookie_valid;
 	uint16_t ppdu_cookie;
 	uint8_t sa_is_training;
-	uint32_t rssi_chain[CDP_RSSI_CHAIN_LEN];
+	int32_t rssi_chain[CDP_RSSI_CHAIN_LEN];
 	uint32_t sa_tx_antenna;
 	/*Max rates for BW: 20MHZ, 40MHZ and 80MHZ and 160MHZ and 320MHZ
 	 * |-------------------------------------------------|

@@ -2094,6 +2094,8 @@ void dp_update_vdev_stats_on_peer_unmap(struct dp_vdev *vdev,
 		_tgtobj->tx.tx_ucast_success.bytes += \
 				_srcobj->tx.tx_ucast_success.bytes; \
 		\
+		for (i = 0; i < CDP_RSSI_CHAIN_LEN; i++) \
+			_tgtobj->tx.rssi_chain[i] = _srcobj->tx.rssi_chain[i]; \
 		_tgtobj->rx.mpdu_cnt_fcs_ok += _srcobj->rx.mpdu_cnt_fcs_ok; \
 		_tgtobj->rx.mpdu_cnt_fcs_err += _srcobj->rx.mpdu_cnt_fcs_err; \
 		_tgtobj->rx.non_ampdu_cnt += _srcobj->rx.non_ampdu_cnt; \

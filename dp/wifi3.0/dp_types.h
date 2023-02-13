@@ -4324,6 +4324,7 @@ struct dp_peer_per_pkt_tx_stats {
  * @rts_failure: RTS failure count
  * @bar_cnt: Block ACK Request frame count
  * @ndpa_cnt: NDP announcement frame count
+ * @rssi_chain: rssi chain
  * @wme_ac_type_bytes: Wireless Multimedia bytes Count
  */
 struct dp_peer_extd_tx_stats {
@@ -4381,6 +4382,7 @@ struct dp_peer_extd_tx_stats {
 	uint32_t rts_failure;
 	uint32_t bar_cnt;
 	uint32_t ndpa_cnt;
+	int32_t rssi_chain[CDP_RSSI_CHAIN_LEN];
 	uint64_t wme_ac_type_bytes[WME_AC_MAX];
 };
 
