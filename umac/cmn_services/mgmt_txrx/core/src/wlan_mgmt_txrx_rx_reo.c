@@ -2432,6 +2432,9 @@ mgmt_rx_reo_move_entries_ingress_to_egress_list
 	struct mgmt_rx_reo_list_entry *ingress_list_entry;
 	struct mgmt_rx_reo_list_entry *latest_frame_ready_to_deliver = NULL;
 	uint16_t num_frames_ready_to_deliver = 0;
+	uint32_t num_overflow_frames = 0;
+	uint32_t ingress_list_max_size;
+	uint32_t ingress_list_cur_size;
 
 	if (!ingress_list) {
 		mgmt_rx_reo_err("Ingress list is null");
@@ -2447,7 +2450,19 @@ mgmt_rx_reo_move_entries_ingress_to_egress_list
 
 	qdf_spin_lock_bh(&reo_ingress_list->list_lock);
 
+	ingress_list_cur_size = qdf_list_size(&reo_ingress_list->list);
+	ingress_list_max_size = reo_ingress_list->max_list_size;
+	if (mgmt_rx_reo_list_overflowed(reo_ingress_list))
+		num_overflow_frames =
+				ingress_list_cur_size - ingress_list_max_size;
+
 	qdf_list_for_each(&reo_ingress_list->list, ingress_list_entry, node) {
+		if (num_overflow_frames > 0) {
+			ingress_list_entry->status |=
+						STATUS_INGRESS_LIST_OVERFLOW;
+			num_overflow_frames--;
+		}
+
 		if (!mgmt_rx_reo_is_entry_ready_to_send_up(ingress_list_entry))
 			break;
 
@@ -2480,6 +2495,8 @@ mgmt_rx_reo_move_entries_ingress_to_egress_list
 				       &temp_list_frames_ready_to_deliver);
 		qdf_assert_always(QDF_IS_STATUS_SUCCESS(status));
 
+		qdf_assert_always(qdf_list_size(&reo_ingress_list->list) <=
+				  reo_ingress_list->max_list_size);
 		qdf_assert_always(qdf_list_size(&reo_egress_list->list) <=
 						reo_egress_list->max_list_size);
 
@@ -2891,8 +2908,15 @@ mgmt_rx_reo_update_ingress_list(struct mgmt_rx_reo_ingress_list *ingress_list,
 		frame_desc->queued_list = MGMT_RX_REO_LIST_TYPE_INGRESS;
 
 		overflow = (qdf_list_size(&reo_ingress_list->list) >
-					reo_ingress_list->max_list_size);
-		qdf_assert_always(!overflow);
+					  reo_ingress_list->max_list_size);
+		if (overflow) {
+			qdf_list_t *ingress_list_ptr = &reo_ingress_list->list;
+
+			reo_ingress_list->overflow_count++;
+			mgmt_rx_reo_err_rl("Ingress overflow, cnt:%llu size:%u",
+					   reo_ingress_list->overflow_count,
+					   qdf_list_size(ingress_list_ptr));
+		}
 
 		if (new->wait_count.total_count == 0)
 			frame_desc->zero_wait_count_rx = true;

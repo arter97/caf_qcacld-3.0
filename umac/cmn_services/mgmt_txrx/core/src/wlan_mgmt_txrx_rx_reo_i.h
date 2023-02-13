@@ -36,9 +36,9 @@
 #include <wlan_objmgr_psoc_obj.h>
 #include <wlan_mlo_mgr_public_structs.h>
 
-#define MGMT_RX_REO_INGRESS_LIST_MAX_SIZE                  (256)
-#define MGMT_RX_REO_INGRESS_LIST_TIMEOUT_US                (500 * USEC_PER_MSEC)
-#define MGMT_RX_REO_INGRESS_LIST_AGEOUT_TIMER_PERIOD_MS    (250)
+#define MGMT_RX_REO_INGRESS_LIST_MAX_SIZE                  (512)
+#define MGMT_RX_REO_INGRESS_LIST_TIMEOUT_US                (250 * USEC_PER_MSEC)
+#define MGMT_RX_REO_INGRESS_LIST_AGEOUT_TIMER_PERIOD_MS    (50)
 
 #define MGMT_RX_REO_EGRESS_LIST_MAX_SIZE                   (256)
 
@@ -246,6 +246,7 @@ struct mgmt_rx_reo_frame_info {
  * @list: Linked list
  * @list_lock: Spin lock to protect the list
  * @max_list_size: Maximum size of the reorder list
+ * @overflow_count: Number of times list overflow occurred
  * @last_inserted_frame: Information about the last frame inserted to the list
  * @last_released_frame: Information about the last frame released from the list
  */
@@ -253,6 +254,7 @@ struct mgmt_rx_reo_list {
 	qdf_list_t list;
 	qdf_spinlock_t list_lock;
 	uint32_t max_list_size;
+	uint64_t overflow_count;
 	struct mgmt_rx_reo_frame_info last_inserted_frame;
 	struct mgmt_rx_reo_frame_info last_released_frame;
 };
@@ -846,6 +848,21 @@ struct mgmt_rx_reo_frame_descriptor {
 	bool reo_required;
 	struct mgmt_rx_reo_frame_info last_delivered_frame;
 };
+
+/**
+ * mgmt_rx_reo_list_overflowed() - Helper API to check whether mgmt rx reorder
+ * list overflowed
+ * @reo_list: Pointer to management rx reorder list
+ *
+ * Return: true or false
+ */
+static inline bool
+mgmt_rx_reo_list_overflowed(struct mgmt_rx_reo_list *reo_list)
+{
+	qdf_assert_always(reo_list);
+
+	return (qdf_list_size(&reo_list->list) > reo_list->max_list_size);
+}
 
 /**
  * mgmt_rx_reo_get_context_from_ingress_list() - Helper API to get pointer to
