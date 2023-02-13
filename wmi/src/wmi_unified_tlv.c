@@ -1875,10 +1875,13 @@ static QDF_STATUS send_vdev_up_cmd_tlv(wmi_unified_t wmi,
 static uint32_t convert_peer_type_host_to_target(uint32_t peer_type)
 {
 	/* Host sets the peer_type as 0 for the peer create command sent to FW
-	 * other than PASN peer create command.
+	 * other than PASN and BRIDGE peer create command.
 	 */
 	if (peer_type == WLAN_PEER_RTT_PASN)
 		return WMI_PEER_TYPE_PASN;
+
+	if (peer_type == WLAN_PEER_MLO_BRIDGE)
+		return WMI_PEER_TYPE_BRIDGE;
 
 	return peer_type;
 }
