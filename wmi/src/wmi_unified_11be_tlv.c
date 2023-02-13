@@ -319,6 +319,17 @@ uint8_t *peer_assoc_add_ml_partner_links(uint8_t *buf_ptr,
 			       WMITLV_GET_STRUCT_TLVLEN(wmi_peer_assoc_mlo_partner_link_params));
 		ml_partner_link->vdev_id = partner_info[i].vdev_id;
 		ml_partner_link->hw_mld_link_id = partner_info[i].hw_mld_link_id;
+		WMI_MLO_FLAGS_SET_ENABLED(ml_partner_link->mlo_flags.mlo_flags,
+					  partner_info[i].mlo_enabled);
+		WMI_MLO_FLAGS_SET_ASSOC_LINK(ml_partner_link->mlo_flags.mlo_flags,
+					     partner_info[i].mlo_assoc_link);
+		WMI_MLO_FLAGS_SET_PRIMARY_UMAC(ml_partner_link->mlo_flags.mlo_flags,
+					       partner_info[i].mlo_primary_umac);
+		WMI_MLO_FLAGS_SET_LINK_INDEX_VALID(ml_partner_link->mlo_flags.mlo_flags,
+						   partner_info[i].mlo_logical_link_index_valid);
+		ml_partner_link->mlo_flags.emlsr_support = partner_info[i].emlsr_support;
+		ml_partner_link->logical_link_index = partner_info[i].logical_link_index;
+
 		ml_partner_link++;
 	}
 
