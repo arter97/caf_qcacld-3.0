@@ -391,7 +391,7 @@ struct vdev_mlme_mgmt_generic {
 	uint8_t maxregpower;
 	uint8_t antennamax;
 	uint8_t reg_class_id;
-	uint8_t ampdu;
+	uint16_t ampdu;
 	uint8_t amsdu;
 	char ssid[WLAN_SSID_MAX_LEN + 1];
 	uint8_t ssid_len;
