@@ -5562,6 +5562,51 @@ dp_tx_nbuf_dev_kfree_list(qdf_nbuf_queue_head_t *nbuf_queue_head)
 }
 #endif
 
+#ifdef WLAN_SUPPORT_PPEDS
+static inline void
+dp_tx_update_ppeds_tx_comp_stats(struct dp_soc *soc,
+				 struct dp_txrx_peer *txrx_peer,
+				 struct hal_tx_completion_status *ts,
+				 struct dp_tx_desc_s *desc,
+				 uint8_t ring_id)
+{
+	uint8_t link_id = 0;
+	struct dp_vdev *vdev = NULL;
+
+	if (qdf_likely(txrx_peer)) {
+		dp_tx_update_peer_basic_stats(txrx_peer,
+					      desc->length,
+					      desc->tx_status,
+					      false);
+		if (!(desc->flags & DP_TX_DESC_FLAG_SIMPLE)) {
+			hal_tx_comp_get_status(&desc->comp,
+					       ts,
+					       soc->hal_soc);
+			vdev = txrx_peer->vdev;
+			link_id = dp_tx_get_link_id_from_ppdu_id(soc,
+								 ts,
+								 txrx_peer,
+								 vdev);
+			if (link_id < 1 || link_id > DP_MAX_MLO_LINKS)
+				link_id = 0;
+			dp_tx_update_peer_stats(desc, ts,
+						txrx_peer,
+						ring_id,
+						link_id);
+		}
+	}
+}
+#else
+static inline void
+dp_tx_update_ppeds_tx_comp_stats(struct dp_soc *soc,
+				 struct dp_txrx_peer *txrx_peer,
+				 struct hal_tx_completion_status *ts,
+				 struct dp_tx_desc_s *desc,
+				 uint8_t ring_id)
+{
+}
+#endif
+
 void
 dp_tx_comp_process_desc_list(struct dp_soc *soc,
 			     struct dp_tx_desc_s *comp_head, uint8_t ring_id)
@@ -5600,12 +5645,9 @@ dp_tx_comp_process_desc_list(struct dp_soc *soc,
 
 		if (desc->flags & DP_TX_DESC_FLAG_PPEDS) {
 			qdf_nbuf_t nbuf;
+			dp_tx_update_ppeds_tx_comp_stats(soc, txrx_peer, &ts,
+							 desc, ring_id);
 
-			if (qdf_likely(txrx_peer))
-				dp_tx_update_peer_basic_stats(txrx_peer,
-							      desc->length,
-							      desc->tx_status,
-							      false);
 			nbuf = dp_ppeds_tx_desc_free(soc, desc);
 			dp_tx_nbuf_dev_queue_free_no_flag(&h, nbuf);
 			desc = next;
