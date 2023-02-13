@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2014-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -304,6 +304,7 @@ static inline void __qdf_trace_hexdump_dummy(QDF_MODULE_ID module,
 		} \
 	} while (0)
 #endif /* WLAN_WARN_ON_ASSERT */
+
 /**
  * qdf_trace_msg()- logging API
  * @module: Module identifier. A member of the QDF_MODULE_ID enumeration that
@@ -320,8 +321,6 @@ static inline void __qdf_trace_hexdump_dummy(QDF_MODULE_ID module,
  * tracing is enabled.
  *
  * Return: nothing
- *
- * implemented in qdf_trace.c
  */
 void __printf(3, 4) qdf_trace_msg(QDF_MODULE_ID module, QDF_TRACE_LEVEL level,
 				  const char *str_format, ...);
