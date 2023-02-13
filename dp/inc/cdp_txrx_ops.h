@@ -1561,7 +1561,14 @@ void (*peer_send_wds_disconnect)(struct cdp_ctrl_objmgr_psoc *psoc,
 					  uint16_t src_info,
 					  uint8_t vdev_id, uint8_t use_ppe,
 					  uint8_t routing_enabled);
+
+	QDF_STATUS
+	(*get_ppeds_profile_info_for_vap)(struct cdp_ctrl_objmgr_psoc *psoc,
+					  uint8_t vdev_id,
+					  struct cdp_ds_vp_params *vp_params);
+
 #endif /* WLAN_SUPPORT_PPEDS */
+
 #ifdef CONFIG_SAWF_DEF_QUEUES
 	int (*disable_sawf_svc)(uint8_t svc_id);
 #endif
@@ -2253,12 +2260,14 @@ struct cdp_ppeds_txrx_ops {
 	QDF_STATUS
 	(*ppeds_entry_attach)(struct cdp_soc_t *soc,
 			      uint8_t vdev_id, void *vpai,
-			      int32_t *ppe_vp_num);
+			      int32_t *ppe_vp_num,
+			      struct cdp_ds_vp_params *vp_params);
 	QDF_STATUS
 	(*ppeds_enable_pri2tid)(struct cdp_soc_t *soc,
 				uint8_t vdev_id, bool val);
 	void (*ppeds_entry_detach)(struct cdp_soc_t *soc,
-				   uint8_t vdev_id);
+				   uint8_t vdev_id,
+				   struct cdp_ds_vp_params *vp_params);
 	void (*ppeds_set_int_pri2tid)(struct cdp_soc_t *soc,
 				      uint8_t *pri2tid);
 	void (*ppeds_update_int_pri2tid)(struct cdp_soc_t *soc,

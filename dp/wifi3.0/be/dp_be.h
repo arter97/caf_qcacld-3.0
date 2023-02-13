@@ -231,6 +231,7 @@ struct dp_ppe_vp_search_idx_tbl_entry {
 
 /**
  * struct dp_ppe_vp_profile - PPE direct switch profiler per vdev
+ * @is_configured: Boolean that the entry is configured.
  * @vp_num: Virtual port number
  * @ppe_vp_num_idx: Index to the PPE VP table entry
  * @search_idx_reg_num: Address search Index register number
@@ -239,6 +240,7 @@ struct dp_ppe_vp_search_idx_tbl_entry {
  * @use_ppe_int_pri: Use PPE INT_PRI to TID mapping table
  */
 struct dp_ppe_vp_profile {
+	bool is_configured;
 	uint8_t vp_num;
 	uint8_t ppe_vp_num_idx;
 	uint8_t search_idx_reg_num;
@@ -335,6 +337,7 @@ struct dp_soc_be {
 	struct dp_srng ppeds_wbm_release_ring;
 	struct dp_ppe_vp_tbl_entry *ppe_vp_tbl;
 	struct dp_ppe_vp_search_idx_tbl_entry *ppe_vp_search_idx_tbl;
+	struct dp_ppe_vp_profile *ppe_vp_profile;
 	struct dp_hw_cookie_conversion_t ppeds_tx_cc_ctx;
 	struct dp_ppeds_tx_desc_pool_s ppeds_tx_desc;
 	struct dp_ppeds_napi ppeds_napi_ctxt;
@@ -342,6 +345,7 @@ struct dp_soc_be {
 	qdf_mutex_t ppe_vp_tbl_lock;
 	uint8_t num_ppe_vp_entries;
 	uint8_t num_ppe_vp_search_idx_entries;
+	uint8_t num_ppe_vp_profiles;
 	char irq_name[DP_PPE_INTR_MAX][DP_PPE_INTR_STRNG_LEN];
 #endif
 #ifdef WLAN_FEATURE_11BE_MLO
@@ -393,8 +397,6 @@ struct dp_pdev_be {
  * @partner_vdev_list: partner list used for Intra-BSS
  * @seq_num: DP MLO seq number
  * @mcast_primary: MLO Mcast primary vdev
- * @ppe_vp_enabled: flag to check if PPE VP is enabled for vdev
- * @ppe_vp_profile: PPE VP profile
  */
 struct dp_vdev_be {
 	struct dp_vdev vdev;
@@ -408,10 +410,6 @@ struct dp_vdev_be {
 	bool mcast_primary;
 #endif
 #endif
-#endif
-	unsigned long ppe_vp_enabled;
-#ifdef WLAN_SUPPORT_PPEDS
-	struct dp_ppe_vp_profile ppe_vp_profile;
 #endif
 };
 
@@ -621,6 +619,10 @@ struct dp_peer_be *dp_get_be_peer_from_dp_peer(struct dp_peer *peer)
 
 void dp_ppeds_disable_irq(struct dp_soc *soc, struct dp_srng *srng);
 void dp_ppeds_enable_irq(struct dp_soc *soc, struct dp_srng *srng);
+
+QDF_STATUS dp_peer_setup_ppeds_be(struct dp_soc *soc, struct dp_peer *peer,
+				  struct dp_vdev_be *be_vdev,
+				  void *args);
 
 QDF_STATUS
 dp_hw_cookie_conversion_attach(struct dp_soc_be *be_soc,

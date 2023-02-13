@@ -621,6 +621,22 @@ struct cdp_mscs_params {
 #endif
 
 /**
+ * struct cdp_ds_vp_params - Direct Switch related params
+ * @dev: Net device
+ * @peer_id: peer id
+ * @ppe_vp_profile_idx: VP profile index in be soc
+ * @wds_ext_mode: flag to indicate wds ext.
+ * @ppe_vp_type: VP type flag.
+ */
+struct cdp_ds_vp_params {
+	struct net_device *dev;
+	uint32_t peer_id;
+	int8_t ppe_vp_profile_idx;
+	bool wds_ext_mode;
+	unsigned long ppe_vp_type;
+};
+
+/**
  * enum cdp_sec_type - security type information
  * @cdp_sec_type_none:
  * @cdp_sec_type_wep128:
