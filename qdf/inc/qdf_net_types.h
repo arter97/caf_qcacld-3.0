@@ -275,11 +275,13 @@ typedef enum {
  * typedef qdf_nbuf_rx_cksum_t - receive checksum type
  * @l4_type: L4 type
  * @l4_result: L4 result
+ * @csum_level: indicates number of checksum are calculated
  */
 typedef struct {
 	qdf_nbuf_l4_rx_cksum_type_t l4_type;
 	qdf_nbuf_l4_rx_cksum_result_t l4_result;
 	uint32_t val;
+	uint32_t csum_level;
 } qdf_nbuf_rx_cksum_t;
 
 #define QDF_ARP_REQ       1 /* ARP request */
