@@ -1577,7 +1577,7 @@ static bool reg_is_chan_supported(struct wlan_objmgr_pdev *pdev,
 				  enum phy_ch_width ch_width,
 				  enum supported_6g_pwr_types in_6g_pwr_mode)
 {
-	struct reg_channel_list chan_list;
+	struct reg_channel_list chan_list = {0};
 	qdf_freq_t center_320;
 	struct ch_params ch_params = {0};
 
