@@ -749,6 +749,16 @@ dp_tx_mlo_mcast_pkt_send(struct dp_vdev_be *be_vdev,
 		nbuf_clone = nbuf;
 	}
 
+	/* NAWDS clients will accepts on 4 addr format MCAST packets
+	 * This will ensure to send packets in 4 addr format to NAWDS clients.
+	 */
+	if (qdf_unlikely(ptnr_vdev->nawds_enabled)) {
+		qdf_mem_zero(&msdu_info, sizeof(msdu_info));
+		dp_tx_get_queue(ptnr_vdev, nbuf_clone, &msdu_info.tx_queue);
+		dp_tx_nawds_handler(ptnr_vdev->pdev->soc, ptnr_vdev,
+				    &msdu_info, nbuf_clone, DP_INVALID_PEER);
+	}
+
 	qdf_mem_zero(&msdu_info, sizeof(msdu_info));
 	dp_tx_get_queue(ptnr_vdev, nbuf_clone, &msdu_info.tx_queue);
 	msdu_info.gsn = be_vdev->seq_num;

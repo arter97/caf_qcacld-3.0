@@ -41,6 +41,12 @@
 
 #define DP_TX_MAX_NUM_FRAGS 6
 
+/* invalid peer id for reinject*/
+#define DP_INVALID_PEER 0XFFFE
+
+void dp_tx_nawds_handler(struct dp_soc *soc, struct dp_vdev *vdev,
+			 struct dp_tx_msdu_info_s *msdu_info,
+			 qdf_nbuf_t nbuf, uint16_t sa_peer_id);
 /*
  * DP_TX_DESC_FLAG_FRAG flags should always be defined to 0x1
  * please do not change this flag's definition

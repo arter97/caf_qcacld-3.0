@@ -67,6 +67,27 @@ struct ast_del_ctxt {
 	int del_count;
 };
 
+#ifdef QCA_SUPPORT_WDS_EXTENDED
+/**
+ * dp_peer_is_wds_ext_peer() - peer is WDS_EXT peer
+ *
+ * @peer: DP peer context
+ *
+ * This API checks whether the peer is WDS_EXT peer or not
+ *
+ * Return: true in the wds_ext peer else flase
+ */
+static inline bool dp_peer_is_wds_ext_peer(struct dp_txrx_peer *peer)
+{
+	return qdf_atomic_test_bit(WDS_EXT_PEER_INIT_BIT, &peer->wds_ext.init);
+}
+#else
+static inline bool dp_peer_is_wds_ext_peer(struct dp_txrx_peer *peer)
+{
+	return false;
+}
+#endif
+
 typedef void dp_peer_iter_func(struct dp_soc *soc, struct dp_peer *peer,
 			       void *arg);
 /**

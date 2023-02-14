@@ -111,8 +111,18 @@ static inline void dp_wds_ext_peer_learn_be(struct dp_soc *soc,
 		qdf_atomic_test_and_set_bit(WDS_EXT_PEER_INIT_BIT,
 					    &ta_txrx_peer->wds_ext.init);
 
-		ta_base_peer = dp_peer_get_ref_by_id(soc, ta_txrx_peer->peer_id,
-						     DP_MOD_ID_RX);
+		if (qdf_unlikely(ta_txrx_peer->nawds_enabled &&
+				 ta_txrx_peer->mld_peer)) {
+			ta_base_peer = dp_get_primary_link_peer_by_id(
+							soc,
+							ta_txrx_peer->peer_id,
+							DP_MOD_ID_RX);
+		} else {
+			ta_base_peer = dp_peer_get_ref_by_id(
+							soc,
+							ta_txrx_peer->peer_id,
+							DP_MOD_ID_RX);
+		}
 
 		if (!ta_base_peer)
 			return;

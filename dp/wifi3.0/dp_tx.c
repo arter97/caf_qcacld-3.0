@@ -64,9 +64,6 @@
 /* disable TQM_BYPASS */
 #define TQM_BYPASS_WAR 0
 
-/* invalid peer id for reinject*/
-#define DP_INVALID_PEER 0XFFFE
-
 #define DP_RETRY_COUNT 7
 #ifdef WLAN_PEER_JITTER
 #define DP_AVG_JITTER_WEIGHT_DENOM 4
@@ -3154,7 +3151,6 @@ dp_tx_per_pkt_vdev_id_check(qdf_nbuf_t nbuf, struct dp_vdev *vdev)
  * Return: none
  */
 
-static inline
 void dp_tx_nawds_handler(struct dp_soc *soc, struct dp_vdev *vdev,
 			 struct dp_tx_msdu_info_s *msdu_info,
 			 qdf_nbuf_t nbuf, uint16_t sa_peer_id)
@@ -3180,6 +3176,12 @@ void dp_tx_nawds_handler(struct dp_soc *soc, struct dp_vdev *vdev,
 			peer_id = peer->peer_id;
 
 			if (!dp_peer_is_primary_link_peer(peer))
+				continue;
+
+			/* In the case of wds ext peer mcast traffic will be
+			 * sent as part of VLAN interface
+			 */
+			if (dp_peer_is_wds_ext_peer(txrx_peer))
 				continue;
 
 			/* Multicast packets needs to be
