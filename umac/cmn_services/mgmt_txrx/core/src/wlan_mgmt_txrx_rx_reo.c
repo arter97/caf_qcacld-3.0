@@ -3082,6 +3082,7 @@ mgmt_rx_reo_update_egress_list(struct mgmt_rx_reo_egress_list *egress_list,
 	new->egress_list_insertion_ts = qdf_get_log_timestamp();
 	new->ingress_timestamp = frame_desc->ingress_timestamp;
 	new->is_parallel_rx = frame_desc->is_parallel_rx;
+	new->status |= STATUS_OLDER_THAN_READY_TO_DELIVER_FRAMES;
 	frame_desc->egress_list_insertion_pos = list_insertion_pos;
 
 	ret = qdf_list_insert_before(&reo_egress_list->list, &new->node,
