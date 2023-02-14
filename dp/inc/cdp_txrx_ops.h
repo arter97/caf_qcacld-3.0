@@ -2051,6 +2051,8 @@ struct cdp_throttle_ops {
  * @ipa_update_peer_rx_stats:
  * @ipa_uc_get_share_stats:
  * @ipa_uc_set_quota:
+ * @ipa_pcie_link_up: Hold PCIe link in L0
+ * @ipa_pcie_link_down: Release PCIe link L0 hold
  * @ipa_enable_autonomy:
  * @ipa_disable_autonomy:
  * @ipa_setup:
@@ -2064,6 +2066,7 @@ struct cdp_throttle_ops {
  * @ipa_tx_buf_smmu_mapping: Create SMMU mappings for Tx
  * @ipa_tx_buf_smmu_unmapping: Release SMMU mappings for Tx
  * buffers to IPA
+ * @ipa_rx_super_rule_setup: Setup cce super rules based on filter tuple
  * @ipa_ast_create: Create/Update ast entry
  */
 struct cdp_ipa_ops {
@@ -2099,6 +2102,10 @@ struct cdp_ipa_ops {
 					     uint8_t reset_stats);
 	QDF_STATUS (*ipa_uc_set_quota)(struct cdp_soc_t *soc_hdl,
 				       uint8_t pdev_id, uint64_t quota_bytes);
+#endif
+#ifdef IPA_OPT_WIFI_DP
+	int (*ipa_pcie_link_up)(struct cdp_soc_t *soc_hdl);
+	void (*ipa_pcie_link_down)(struct cdp_soc_t *soc_hdl);
 #endif
 	QDF_STATUS (*ipa_enable_autonomy)(struct cdp_soc_t *soc_hdl,
 					  uint8_t pdev_id);
