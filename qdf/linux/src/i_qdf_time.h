@@ -73,8 +73,8 @@ static inline ktime_t __qdf_ns_to_ktime(uint64_t ns)
 /**
  * __qdf_ktime_add() - Adds two ktime objects and returns
  * a ktime object
- * @time1: time as ktime object
- * @time2: time as ktime object
+ * @ktime1: time as ktime object
+ * @ktime2: time as ktime object
  *
  * Return: sum of ktime objects as ktime object
  */
@@ -105,7 +105,9 @@ static inline ktime_t __qdf_ktime_real_get(void)
 
 /**
  * __qdf_ktime_add_ns() - Adds ktime object and nanoseconds value and
- * returns the ktime object
+ *                        returns the ktime object
+ * @ktime: time as ktime object
+ * @ns: time in nanoseconds
  *
  * Return: ktime object
  */
@@ -117,7 +119,6 @@ static inline ktime_t __qdf_ktime_add_ns(ktime_t ktime, int64_t ns)
 /**
  * __qdf_ktime_to_ns() - convert ktime to nanoseconds
  * @ktime: time as ktime object
- * @ns: time in nanoseconds
  *
  * Return: ktime in nanoseconds
  */
@@ -231,7 +232,7 @@ static inline void __qdf_udelay(uint32_t usecs)
 
 /**
  * __qdf_mdelay() - delay execution for given milliseconds
- * @usecs: Milliseconds to delay
+ * @msecs: Milliseconds to delay
  *
  * Return: none
  */
@@ -281,7 +282,7 @@ static inline bool __qdf_system_time_after_eq(__qdf_time_t a, __qdf_time_t b)
 }
 
 /**
- * qdf_sched_clock() - use light weight timer to get timestamp
+ * __qdf_sched_clock() - use light weight timer to get timestamp
  *
  * Return: timestamp in ns
  */
@@ -420,8 +421,8 @@ static inline unsigned long long __qdf_time_sched_clock(void)
 /**
  * __qdf_time_ktime_sub() - Subtract two ktime objects and returns
  * a ktime object
- * @time1: time as ktime object
- * @time2: time as ktime object
+ * @ktime1: time as ktime object
+ * @ktime2: time as ktime object
  *
  * Return: subtraction of ktime objects as ktime object
  */
