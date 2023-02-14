@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -36,6 +36,7 @@
  * end design.
  * @frame_len: Length of original association request
  * @isreassoc: Whether this is a re-association request
+ * @link_id: Link ID for secondary links
  * @link_addr: Secondary link's MAC address
  * @link_frame: Generated secondary link specific association request. Note that
  * this will start from the 802.11 header (unlike the original association
@@ -56,6 +57,7 @@
  */
 QDF_STATUS
 util_gen_link_assoc_req(uint8_t *frame, qdf_size_t frame_len, bool isreassoc,
+			uint8_t link_id,
 			struct qdf_mac_addr link_addr,
 			uint8_t *link_frame,
 			qdf_size_t link_frame_maxsize,
@@ -69,6 +71,7 @@ util_gen_link_assoc_req(uint8_t *frame, qdf_size_t frame_len, bool isreassoc,
  * end design.
  * @frame_len: Length of original association response
  * @isreassoc: Whether this is a re-association response
+ * @link_id: Link ID for secondary links
  * @link_addr: Secondary link's MAC address
  * @link_frame: Generated secondary link specific association response. Note
  * that this will start from the 802.11 header (unlike the original association
@@ -89,6 +92,7 @@ util_gen_link_assoc_req(uint8_t *frame, qdf_size_t frame_len, bool isreassoc,
  */
 QDF_STATUS
 util_gen_link_assoc_rsp(uint8_t *frame, qdf_size_t frame_len, bool isreassoc,
+			uint8_t link_id,
 			struct qdf_mac_addr link_addr,
 			uint8_t *link_frame,
 			qdf_size_t link_frame_maxsize,
@@ -102,6 +106,7 @@ util_gen_link_assoc_rsp(uint8_t *frame, qdf_size_t frame_len, bool isreassoc,
  * end design.
  * @frame_len: Length of original probe response
  * @link_addr: Secondary link's MAC address
+ * @link_id: Link ID for secondary links
  * @link_frame: Generated secondary link specific probe response. Note
  * that this will start from the 802.11 header (unlike the original probe
  * response). This should be ignored in the case of failure.
@@ -121,6 +126,7 @@ util_gen_link_assoc_rsp(uint8_t *frame, qdf_size_t frame_len, bool isreassoc,
  */
 QDF_STATUS
 util_gen_link_probe_rsp(uint8_t *frame, qdf_size_t frame_len,
+			uint8_t link_id,
 			struct qdf_mac_addr link_addr,
 			uint8_t *link_frame,
 			qdf_size_t link_frame_maxsize,
@@ -512,6 +518,7 @@ util_get_rvmlie_persta_link_info(uint8_t *mlieseq,
 #else
 static inline QDF_STATUS
 util_gen_link_assoc_req(uint8_t *frame, qdf_size_t frame_len, bool isreassoc,
+			uint8_t link_id,
 			struct qdf_mac_addr link_addr,
 			uint8_t *link_frame,
 			qdf_size_t link_frame_maxsize,
@@ -522,6 +529,7 @@ util_gen_link_assoc_req(uint8_t *frame, qdf_size_t frame_len, bool isreassoc,
 
 static inline QDF_STATUS
 util_gen_link_assoc_rsp(uint8_t *frame, qdf_size_t frame_len, bool isreassoc,
+			uint8_t link_id,
 			struct qdf_mac_addr link_addr,
 			uint8_t *link_frame,
 			qdf_size_t link_frame_maxsize,
