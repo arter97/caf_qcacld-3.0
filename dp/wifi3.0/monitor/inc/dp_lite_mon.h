@@ -33,12 +33,13 @@
  * dp_lite_mon_peer - lite mon peer structure
  * @peer_mac: mac addr of peer
  * @rssi: rssi of peer(used only in case of non-assoc peer)
- * @type: assoc/non-assoc
+ * @vdev_id: vdev id
  * @peer_list_elem: list element
  */
 struct dp_lite_mon_peer {
 	union dp_align_mac_addr peer_mac;
 	uint8_t rssi;
+	uint8_t vdev_id;
 	TAILQ_ENTRY(dp_lite_mon_peer) peer_list_elem;
 };
 
@@ -64,6 +65,7 @@ struct dp_lite_mon_peer {
 struct dp_lite_mon_config {
 	bool enable;
 	uint8_t level;
+	uint8_t direction;
 	uint16_t mgmt_filter[CDP_MON_FRM_FILTER_MODE_MAX];
 	uint16_t ctrl_filter[CDP_MON_FRM_FILTER_MODE_MAX];
 	uint16_t data_filter[CDP_MON_FRM_FILTER_MODE_MAX];
