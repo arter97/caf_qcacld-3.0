@@ -4919,4 +4919,23 @@ uint32_t policy_mgr_get_connection_count_with_ch_freq(uint32_t ch_freq);
 bool policy_mgr_is_sap_allowed_on_indoor(struct wlan_objmgr_pdev *pdev,
 					 uint8_t vdev_id, qdf_freq_t ch_freq);
 
+#ifdef WLAN_FEATURE_TDLS_CONCURRENCIES
+/**
+ * policy_mgr_get_allowed_tdls_offchannel_freq() - Check if TDLS off-channel is
+ * allowed during concurrency. When off-channel is allowed, update the provided
+ * input channel frequency with concurrent vdev frequency in DBS case.
+ * Fill the provided channel frequency as 0 if all 5GHz/6GHz channels are
+ * allowed for off-channel operation in SCC case.
+ * Don't allow off channel operation in any MCC case.
+ * @psoc: psoc pointer
+ * @vdev: vdev pointer
+ * @ch_freq: Frequency pointer
+ *
+ * Return: true or false based on current concurrency combination
+ */
+bool
+policy_mgr_get_allowed_tdls_offchannel_freq(struct wlan_objmgr_psoc *psoc,
+					    struct wlan_objmgr_vdev *vdev,
+					    qdf_freq_t *ch_freq);
+#endif /* WLAN_FEATURE_TDLS_CONCURRENCIES */
 #endif /* __WLAN_POLICY_MGR_API_H */

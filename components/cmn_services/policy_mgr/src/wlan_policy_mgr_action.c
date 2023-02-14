@@ -3543,3 +3543,122 @@ ret_value:
 	return value;
 }
 
+#ifdef WLAN_FEATURE_TDLS_CONCURRENCIES
+bool
+policy_mgr_get_allowed_tdls_offchannel_freq(struct wlan_objmgr_psoc *psoc,
+					    struct wlan_objmgr_vdev *vdev,
+					    qdf_freq_t *ch_freq)
+{
+	struct connection_info info[MAX_NUMBER_OF_CONC_CONNECTIONS] = {0};
+	uint8_t connection_count, i, j, sta_vdev_id;
+
+	*ch_freq = 0;
+	/*
+	 * TDLS off channel is not allowed in any MCC scenario
+	 */
+	if (policy_mgr_current_concurrency_is_mcc(psoc)) {
+		policy_mgr_dump_current_concurrency(psoc);
+		policy_mgr_debug("TDLS off channel not allowed in MCC");
+		return false;
+	}
+
+	/*
+	 * TDLS offchannel is done only when STA is connected on 2G channel and
+	 * the current concurrency is not MCC
+	 */
+	if (!policy_mgr_is_sta_connected_2g(psoc)) {
+		policy_mgr_debug("STA not-connected on 2.4 Ghz");
+		return false;
+	}
+
+	/*
+	 * 2 Port DBS scenario - Allow non-STA vdev channel for
+	 * TDLS off-channel operation
+	 *
+	 * 3 Port Scenario - If STA Vdev is on SCC, allow TDLS off-channel on
+	 * the channel of vdev on the other MAC
+	 * If STA vdev is standalone on one mac, and scc on another mac, then
+	 * allow TDLS off channel on other mac scc channel
+	 */
+	sta_vdev_id = wlan_vdev_get_id(vdev);
+	connection_count = policy_mgr_get_connection_info(psoc, info);
+	switch (connection_count) {
+	case 1:
+		return true;
+	case 2:
+		/*
+		 * Allow all the 5GHz/6GHz channels when STA is in SCC
+		 */
+		if (policy_mgr_current_concurrency_is_scc(psoc)) {
+			*ch_freq = 0;
+			return true;
+		} else if (policy_mgr_is_current_hwmode_dbs(psoc)) {
+			/*
+			 * In DBS case, allow off-channel operation on the
+			 * other mac 5GHz/6GHz channel where the STA is not
+			 * present
+			 * Don't consider SBS case since STA should be
+			 * connected in 2.4GHz channel for TDLS
+			 * off-channel and MCC on SBS ex. 3 PORT
+			 * 2.4GHz STA + 5GHz Lower MCC + 5GHz Upper will
+			 * not be allowed
+			 */
+			if (sta_vdev_id == info[0].vdev_id)
+				*ch_freq = info[1].ch_freq;
+			else
+				*ch_freq = info[0].ch_freq;
+
+			return true;
+		}
+
+		break;
+	case 3:
+
+		/*
+		 * 3 Vdev SCC on 2.4GHz band. Allow TDLS off-channel operation
+		 * on all the 5GHz & 6GHz channels
+		 */
+		if (info[0].ch_freq == info[1].ch_freq &&
+		    info[0].ch_freq == info[2].ch_freq) {
+			*ch_freq = 0;
+			return true;
+		}
+
+		/*
+		 * DBS with SCC on one vdev scenario. Allow TDLS off-channel
+		 * on other mac frequency where STA is not present
+		 * SBS case is not considered since STA should be connected
+		 * on 2.4GHz and TDLS off-channel on SBS MCC is not allowed
+		 */
+		for (i = 0; i < connection_count; i++) {
+			for (j = i + 1; j < connection_count; j++) {
+				/*
+				 * Find 2 vdevs such that STA is one of the vdev
+				 * and STA + other vdev are not on same mac.
+				 * Return the foreign vdev frequency which is
+				 * not on same mac along with STA
+				 */
+				if (!policy_mgr_2_freq_always_on_same_mac(
+							psoc, info[i].ch_freq,
+							info[j].ch_freq)) {
+					if (sta_vdev_id == info[i].vdev_id) {
+						*ch_freq = info[j].ch_freq;
+						return true;
+					} else if (sta_vdev_id ==
+						   info[j].vdev_id) {
+						*ch_freq = info[j].ch_freq;
+						return true;
+					}
+				}
+			}
+		}
+
+		return false;
+	default:
+		policy_mgr_debug("TDLS off channel not allowed on > 3 port conc");
+		break;
+	}
+
+	return false;
+}
+#endif
