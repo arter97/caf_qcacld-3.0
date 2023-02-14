@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2014-2020 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -116,6 +117,7 @@ static inline int32_t __qdf_atomic_dec_and_test(__qdf_atomic_t *v)
 /**
  * __qdf_atomic_set() - set a value to the value of an atomic variable
  * @v: A pointer to an opaque atomic variable
+ * @i: value to assign
  *
  * Return: None
  */

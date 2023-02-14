@@ -43,9 +43,9 @@
 /**
  * struct qdf_sglist - scatter-gather list
  * @nsegs: total number of segments
- * @struct sg_segs - scatter-gather segment list
- * @vaddr: Virtual address of the segment
- * @len: Length of the segment
+ * @sg_segs: scatter-gather segment list
+ * @sg_segs.vaddr: Virtual address of the segment
+ * @sg_segs.len: Length of the segment
  */
 typedef struct qdf_sglist {
 	uint32_t nsegs;
@@ -101,12 +101,12 @@ typedef void *qdf_drv_handle_t;
 typedef void *qdf_os_handle_t;
 typedef void *qdf_pm_t;
 
-/**
+/*
  * typedef qdf_handle_t - handles opaque to each other
  */
 typedef void *qdf_handle_t;
 
-/**
+/*
  * typedef qdf_freq_t - define frequency as a 16 bit/32 bit
  * unsigned integer depending on the requirement
  */
@@ -146,7 +146,7 @@ typedef __qdf_off_t   qdf_off_t;
 typedef __qdf_dma_map_t qdf_dma_map_t;
 
 /**
- * tyepdef qdf_dma_addr_t - DMA address.
+ * typedef qdf_dma_addr_t - DMA address.
  */
 typedef __qdf_dma_addr_t qdf_dma_addr_t;
 
@@ -156,7 +156,7 @@ typedef __qdf_dma_addr_t qdf_dma_addr_t;
 typedef __qdf_dma_size_t qdf_dma_size_t;
 
 /**
- * tyepdef qdf_dma_context_t - DMA context.
+ * typedef qdf_dma_context_t - DMA context.
  */
 typedef __qdf_dma_context_t qdf_dma_context_t;
 
@@ -164,7 +164,7 @@ typedef __qdf_mem_info_t qdf_mem_info_t;
 typedef __sgtable_t sgtable_t;
 
 /**
- * typepdef qdf_cpu_mask - CPU Mask
+ * typedef qdf_cpu_mask - CPU Mask
  */
 typedef __qdf_cpu_mask qdf_cpu_mask;
 
@@ -191,9 +191,9 @@ typedef __qdf_dummy_netdev_t qdf_dummy_netdev_t;
 /**
  * struct qdf_dma_map_info - Information inside a DMA map.
  * @nsegs: total number mapped segments
- * @struct dma_segs - list of segments
- * @paddr: physical(dam'able) address of the segment
- * @len: length of the segment
+ * @dma_segs: list of segments
+ * @dma_segs.paddr: physical(dma'able) address of the segment
+ * @dma_segs.len: length of the segment
  */
 typedef struct qdf_dma_map_info {
 	uint32_t nsegs;
@@ -203,12 +203,15 @@ typedef struct qdf_dma_map_info {
 	} dma_segs[QDF_MAX_SCATTER];
 } qdf_dmamap_info_t;
 
-/**
+/*
  * struct qdf_shared_mem - Shared memory resource
  * @mem_info: memory info struct
  * @vaddr: virtual address
  * @sgtable: scatter-gather table
  * @qdf_dma_mem_context: dma address
+ *
+ * NB: not using kernel-doc format since the kernel-doc script doesn't
+ *     handle the qdf_dma_mem_context() macro
  */
 typedef struct qdf_shared_mem {
 	qdf_mem_info_t mem_info;
@@ -220,7 +223,7 @@ typedef struct qdf_shared_mem {
 #define qdf_iomem_t __qdf_iomem_t
 
 /**
- * typedef enum QDF_TIMER_TYPE - QDF timer type
+ * typedef QDF_TIMER_TYPE - QDF timer type
  * @QDF_TIMER_TYPE_SW: Deferrable SW timer it will not cause CPU to wake up
  * on expiry
  * @QDF_TIMER_TYPE_WAKE_APPS: Non deferrable timer which will cause CPU to
@@ -235,7 +238,7 @@ typedef enum {
 } QDF_TIMER_TYPE;
 
 /**
- * tyepdef enum qdf_resource_type_t - hw resources
+ * typedef qdf_resource_type_t - hw resources
  * @QDF_RESOURCE_TYPE_MEM: memory resource
  * @QDF_RESOURCE_TYPE_IO: io resource
  * Define the hw resources the OS has allocated for the device
@@ -247,7 +250,7 @@ typedef enum {
 } qdf_resource_type_t;
 
 /**
- * tyepdef struct qdf_resource_t - representation of a h/w resource.
+ * typedef qdf_resource_t - representation of a h/w resource.
  * @start: start
  * @end: end
  * @type: resource type
@@ -301,7 +304,7 @@ typedef bool (*qdf_irqlocked_func_t)(void *);
 #define qdf_offsetof(type, field) offsetof(type, field)
 
 /**
- * typedef enum QDF_MODULE_ID  - Debug category level
+ * typedef QDF_MODULE_ID  - Debug category level
  * @QDF_MODULE_ID_MIN: The smallest/starting module id
  * @QDF_MODULE_ID_TDLS: TDLS
  * @QDF_MODULE_ID_ACS: auto channel selection
@@ -616,7 +619,7 @@ typedef enum {
 } QDF_MODULE_ID;
 
 /**
- * typedef enum QDF_TRACE_LEVEL - Debug verbose level
+ * typedef QDF_TRACE_LEVEL - Debug verbose level
  * @QDF_TRACE_LEVEL_NONE: no trace will be logged. This value is in place
  *			  for the qdf_trace_setlevel() to allow the user
  *			  to turn off all traces
@@ -949,7 +952,7 @@ QDF_STATUS qdf_uint64_parse(const char *int_str, uint64_t *out_int);
 
 #define QDF_MAC_ADDR_SIZE 6
 
-/**
+/*
  * If the feature CONFIG_WLAN_TRACE_HIDE_MAC_ADDRESS is enabled,
  * then the requirement is to hide 2nd, 3rd and 4th octet of the
  * MAC address in the kernel logs and driver logs.
@@ -1421,7 +1424,7 @@ struct qdf_tso_seg_t {
  * @TSOSEG_LOC_GETINFO: get info
  * @TSOSEG_LOC_FILLHTTSEG: fill HTT segment
  * @TSOSEG_LOC_FILLCMNSEG: fill CMN segment
- * TSOSEG_LOC_PREPARETSO: prepare TSO
+ * @TSOSEG_LOC_PREPARETSO: prepare TSO
  * @TSOSEG_LOC_TXPREPLLFAST: tx prep LL fast
  * @TSOSEG_LOC_UNMAPTSO: unmap TSO
  * @TSOSEG_LOC_UNMAPLAST: unmap last
@@ -1465,6 +1468,11 @@ struct qdf_tso_seg_dbg_t {
  * struct qdf_tso_seg_elem_t - tso segment element
  * @next: pointer to the next segment
  * @seg: instance of segment
+ * @cookie:
+ * @on_freelist:
+ * @sent_to_target:
+ * @force_free:
+ * @dbg: debug struct
  */
 struct qdf_tso_seg_elem_t {
 	struct qdf_tso_seg_elem_t *next;
