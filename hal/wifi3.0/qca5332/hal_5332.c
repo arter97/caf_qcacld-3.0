@@ -112,7 +112,7 @@
 
 
 /**
- * hal_read_pmm_scratch_reg_5332(): API to read PMM Scratch register
+ * hal_read_pmm_scratch_reg_5332() - API to read PMM Scratch register
  *
  * @soc: HAL soc
  * @reg_enum: Enum of the scratch register
@@ -131,7 +131,7 @@ uint32_t hal_read_pmm_scratch_reg_5332(struct hal_soc *soc,
 }
 
 /**
- * hal_get_tsf2_scratch_reg_qca5332(): API to read tsf2 scratch register
+ * hal_get_tsf2_scratch_reg_qca5332() - API to read tsf2 scratch register
  *
  * @hal_soc_hdl: HAL soc context
  * @mac_id: mac id
@@ -158,7 +158,7 @@ static void hal_get_tsf2_scratch_reg_qca5332(hal_soc_handle_t hal_soc_hdl,
 }
 
 /**
- * hal_get_tqm_scratch_reg_qca5332(): API to read tqm scratch register
+ * hal_get_tqm_scratch_reg_qca5332() - API to read tqm scratch register
  *
  * @hal_soc_hdl: HAL soc context
  * @value: Pointer to update tqm value
@@ -183,7 +183,7 @@ static void hal_get_tqm_scratch_reg_qca5332(hal_soc_handle_t hal_soc_hdl,
 #define LINK_DESC_SIZE (NUM_OF_DWORDS_RX_MSDU_LINK << 2)
 #define HAL_PPE_VP_ENTRIES_MAX 32
 /**
- * hal_get_link_desc_size_5332(): API to get the link desc size
+ * hal_get_link_desc_size_5332() - API to get the link desc size
  *
  * Return: uint32_t
  */
@@ -193,7 +193,7 @@ static uint32_t hal_get_link_desc_size_5332(void)
 }
 
 /**
- * hal_rx_get_tlv_5332(): API to get the tlv
+ * hal_rx_get_tlv_5332() - API to get the tlv
  *
  * @rx_tlv: TLV data extracted from the rx packet
  * Return: uint8_t
@@ -204,10 +204,10 @@ static uint8_t hal_rx_get_tlv_5332(void *rx_tlv)
 }
 
 /**
- * hal_rx_wbm_err_msdu_continuation_get_5332 () - API to check if WBM
+ * hal_rx_wbm_err_msdu_continuation_get_5332() - API to check if WBM
  * msdu continuation bit is set
  *
- *@wbm_desc: wbm release ring descriptor
+ * @wbm_desc: wbm release ring descriptor
  *
  * Return: true if msdu continuation bit is set.
  */
@@ -222,7 +222,9 @@ uint8_t hal_rx_wbm_err_msdu_continuation_get_5332(void *wbm_desc)
 }
 
 /**
- * hal_rx_proc_phyrx_other_receive_info_tlv_5332(): API to get tlv info
+ * hal_rx_proc_phyrx_other_receive_info_tlv_5332() - API to get tlv info
+ * @rx_tlv_hdr: start address of rx_pkt_tlvs
+ * @ppdu_info_hdl: PPDU info handle to fill
  *
  * Return: uint32_t
  */
@@ -331,9 +333,9 @@ void hal_rx_get_rtt_info_5332(void *rx_tlv, void *ppdu_info_hdl)
 #endif
 #ifdef CONFIG_WORD_BASED_TLV
 /**
- * hal_rx_dump_mpdu_start_tlv_5332: dump RX mpdu_start TLV in structured
- *			       human readable format.
- * @mpdu_start: pointer the rx_attention TLV in pkt.
+ * hal_rx_dump_mpdu_start_tlv_5332() - dump RX mpdu_start TLV in structured
+ *			               human readable format.
+ * @mpdustart: pointer the rx_attention TLV in pkt.
  * @dbg_level: log level.
  *
  * Return: void
@@ -431,10 +433,10 @@ static inline void hal_rx_dump_mpdu_start_tlv_5332(void *mpdustart,
 }
 
 /**
- * hal_rx_dump_msdu_end_tlv_5332: dump RX msdu_end TLV in structured
- *			     human readable format.
- * @ msdu_end: pointer the msdu_end TLV in pkt.
- * @ dbg_level: log level.
+ * hal_rx_dump_msdu_end_tlv_5332() - dump RX msdu_end TLV in structured
+ *                                   human readable format.
+ * @msduend: pointer the msdu_end TLV in pkt.
+ * @dbg_level: log level.
  *
  * Return: void
  */
@@ -681,12 +683,12 @@ static void hal_rx_dump_msdu_end_tlv_5332(void *msduend,
 #endif
 
 /**
- * hal_reo_status_get_header_5332 - Process reo desc info
- * @d - Pointer to reo descriptor
- * @b - tlv type info
- * @h1 - Pointer to hal_reo_status_header where info to be stored
+ * hal_reo_status_get_header_5332() - Process reo desc info
+ * @ring_desc: Pointer to reo descriptor
+ * @b: tlv type info
+ * @h1: Pointer to hal_reo_status_header where info to be stored
  *
- * Return - none.
+ * Return: none.
  *
  */
 static void hal_reo_status_get_header_5332(hal_ring_desc_t ring_desc,
@@ -809,7 +811,7 @@ void *hal_dst_mpdu_desc_info_5332(void *dst_ring_desc)
 }
 
 /**
- * hal_reo_config_5332(): Set reo config parameters
+ * hal_reo_config_5332() - Set reo config parameters
  * @soc: hal soc handle
  * @reg_val: value to be set
  * @reo_params: reo parameters
@@ -826,9 +828,9 @@ hal_reo_config_5332(struct hal_soc *soc,
 
 /**
  * hal_rx_msdu_desc_info_get_ptr_5332() - Get msdu desc info ptr
- * @msdu_details_ptr - Pointer to msdu_details_ptr
+ * @msdu_details_ptr: Pointer to msdu_details_ptr
  *
- * Return - Pointer to rx_msdu_desc_info structure.
+ * Return: Pointer to rx_msdu_desc_info structure.
  *
  */
 static void *hal_rx_msdu_desc_info_get_ptr_5332(void *msdu_details_ptr)
@@ -837,10 +839,10 @@ static void *hal_rx_msdu_desc_info_get_ptr_5332(void *msdu_details_ptr)
 }
 
 /**
- * hal_rx_link_desc_msdu0_ptr_5332 - Get pointer to rx_msdu details
- * @link_desc - Pointer to link desc
+ * hal_rx_link_desc_msdu0_ptr_5332() - Get pointer to rx_msdu details
+ * @link_desc: Pointer to link desc
  *
- * Return - Pointer to rx_msdu_details structure
+ * Return: Pointer to rx_msdu_details structure
  *
  */
 static void *hal_rx_link_desc_msdu0_ptr_5332(void *link_desc)
@@ -849,13 +851,12 @@ static void *hal_rx_link_desc_msdu0_ptr_5332(void *link_desc)
 }
 
 /**
- * hal_get_window_address_5332(): Function to get hp/tp address
+ * hal_get_window_address_5332() - Function to get hp/tp address
  * @hal_soc: Pointer to hal_soc
  * @addr: address offset of register
  *
  * Return: modified address offset of register
  */
-
 static inline qdf_iomem_t hal_get_window_address_5332(struct hal_soc *hal_soc,
 						      qdf_iomem_t addr)
 {
@@ -968,9 +969,9 @@ void hal_compute_reo_remap_ix2_ix3_5332(uint32_t *ring, uint32_t num_rings,
 
 /**
  * hal_rx_flow_setup_fse_5332() - Setup a flow search entry in HW FST
- * @fst: Pointer to the Rx Flow Search Table
+ * @rx_fst: Pointer to the Rx Flow Search Table
  * @table_offset: offset into the table where the flow is to be setup
- * @flow: Flow Parameters
+ * @rx_flow: Flow Parameters
  *
  * Return: Success/Failure
  */
@@ -1078,14 +1079,14 @@ hal_rx_flow_setup_fse_5332(uint8_t *rx_fst, uint32_t table_offset,
 	return fse;
 }
 
-#ifndef NO_RX_PKT_HDR_TLV
 /**
- * hal_rx_dump_pkt_hdr_tlv: dump RX pkt header TLV in hex format
- * @ pkt_hdr_tlv: pointer the pkt_hdr_tlv in pkt.
- * @ dbg_level: log level.
+ * hal_rx_dump_pkt_hdr_tlv_5332() - dump RX pkt header TLV in hex format
+ * @pkt_tlvs: pointer the pkt_hdr_tlv in pkt.
+ * @dbg_level: log level.
  *
  * Return: void
  */
+#ifndef NO_RX_PKT_HDR_TLV
 static inline void hal_rx_dump_pkt_hdr_tlv_5332(struct rx_pkt_tlvs *pkt_tlvs,
 						uint8_t dbg_level)
 {
@@ -1101,13 +1102,6 @@ static inline void hal_rx_dump_pkt_hdr_tlv_5332(struct rx_pkt_tlvs *pkt_tlvs,
 			     sizeof(pkt_hdr_tlv->rx_pkt_hdr));
 }
 #else
-/**
- * hal_rx_dump_pkt_hdr_tlv: dump RX pkt header TLV in hex format
- * @ pkt_hdr_tlv: pointer the pkt_hdr_tlv in pkt.
- * @ dbg_level: log level.
- *
- * Return: void
- */
 static inline void hal_rx_dump_pkt_hdr_tlv_5332(struct rx_pkt_tlvs *pkt_tlvs,
 						uint8_t dbg_level)
 {
@@ -1115,7 +1109,7 @@ static inline void hal_rx_dump_pkt_hdr_tlv_5332(struct rx_pkt_tlvs *pkt_tlvs,
 #endif
 
 /**
- * hal_rx_dump_pkt_tlvs_5332(): API to print RX Pkt TLVS qca5332
+ * hal_rx_dump_pkt_tlvs_5332() - API to print RX Pkt TLVS qca5332
  * @hal_soc_hdl: hal_soc handle
  * @buf: pointer the pkt buffer
  * @dbg_level: log level
@@ -1178,7 +1172,7 @@ static void hal_cmem_write_5332(hal_soc_handle_t hal_soc_hdl,
 /**
  * hal_tx_get_num_tcl_banks_5332() - Get number of banks in target
  *
- * Returns: number of bank
+ * Return: number of bank
  */
 static uint8_t hal_tx_get_num_tcl_banks_5332(void)
 {
@@ -1281,8 +1275,11 @@ static uint16_t hal_get_rx_max_ba_window_qca5332(int tid)
 }
 
 /**
- * hal_qca5332_get_reo_qdesc_size()- Get the reo queue descriptor size
- *			  from the give Block-Ack window size
+ * hal_qca5332_get_reo_qdesc_size() - Get the reo queue descriptor size
+ *			              from the give Block-Ack window size
+ * @ba_window_size: Block-Ack window size
+ * @tid: TID
+ *
  * Return: reo queue descriptor size
  */
 static uint32_t hal_qca5332_get_reo_qdesc_size(uint32_t ba_window_size, int tid)
@@ -1322,10 +1319,12 @@ static uint32_t hal_qca5332_get_reo_qdesc_size(uint32_t ba_window_size, int tid)
 		(10 * sizeof(struct rx_reo_queue_ext)) +
 		sizeof(struct rx_reo_queue_1k);
 }
+
 /**
  * hal_rx_tlv_msdu_done_copy_get_5332() - Get msdu done copy bit from rx_tlv
+ * @buf: pointer the tx_tlv
  *
- * Returns: msdu done copy bit
+ * Return: msdu done copy bit
  */
 static inline uint32_t hal_rx_tlv_msdu_done_copy_get_5332(uint8_t *buf)
 {
@@ -2091,7 +2090,7 @@ struct hal_hw_srng_config hw_srng_table_5332[] = {
 
 /**
  * hal_srng_hw_reg_offset_init_qca5332() - Initialize the HW srng reg offset
- *				applicable only for qca5332
+ *                                         applicable only for qca5332
  * @hal_soc: HAL Soc handle
  *
  * Return: None
@@ -2108,8 +2107,10 @@ static inline void hal_srng_hw_reg_offset_init_qca5332(struct hal_soc *hal_soc)
 }
 
 /**
- * hal_qca5332_attach()- Attach 5332 target specific hal_soc ops,
+ * hal_qca5332_attach() - Attach 5332 target specific hal_soc ops,
  *			  offset and srng table
+ * @hal_soc: hal_soc handle
+ *
  * Return: void
  */
 void hal_qca5332_attach(struct hal_soc *hal_soc)
