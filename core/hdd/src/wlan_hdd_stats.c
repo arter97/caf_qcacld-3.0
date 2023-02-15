@@ -5917,9 +5917,15 @@ static int wlan_hdd_get_sta_stats(struct wiphy *wiphy,
 						   my_rx_rate,
 						   rx_nss_max);
 
-		if (!tx_rate_calc || !rx_rate_calc)
-			/* Keep GUI happy */
-			return 0;
+		if (!tx_rate_calc || !rx_rate_calc) {
+			hdd_report_actual_rate(tx_rate_flags, my_tx_rate,
+					       &sinfo->txrate, tx_mcs_index,
+					       tx_nss, tx_dcm, tx_gi);
+
+			hdd_report_actual_rate(rx_rate_flags, my_rx_rate,
+					       &sinfo->rxrate, rx_mcs_index,
+					       rx_nss, rx_dcm, rx_gi);
+		}
 	} else {
 
 		/* Fill TX stats */
@@ -5963,6 +5969,7 @@ static int wlan_hdd_get_sta_stats(struct wiphy *wiphy,
 			  sinfo->txrate.legacy, sinfo->tx_packets,
 			  sinfo->rxrate.legacy, sinfo->rx_packets);
 	} else {
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 0, 0))
 		hdd_debug("[TX: Reporting MCS rate %d, flags 0x%x pkt cnt %d, nss %d, bw %d]-"
 			  "[RX: Reporting MCS rate %d, flags 0x%x pkt cnt %d, nss %d, bw %d]",
 			  sinfo->txrate.mcs, sinfo->txrate.flags,
@@ -5970,6 +5977,15 @@ static int wlan_hdd_get_sta_stats(struct wiphy *wiphy,
 			  sinfo->rxrate.bw, sinfo->rxrate.mcs,
 			  sinfo->rxrate.flags, sinfo->rx_packets,
 			  sinfo->rxrate.nss, sinfo->rxrate.bw);
+#else
+		hdd_debug("[TX: Reporting MCS rate %d, flags 0x%x pkt cnt %d, nss %d]-"
+			  "[RX: Reporting MCS rate %d, flags 0x%x pkt cnt %d, nss %d]",
+			  sinfo->txrate.mcs, sinfo->txrate.flags,
+			  sinfo->tx_packets, sinfo->txrate.nss,
+			  sinfo->rxrate.mcs,
+			  sinfo->rxrate.flags, sinfo->rx_packets,
+			  sinfo->rxrate.nss);
+#endif
 	}
 
 	hdd_wlan_fill_per_chain_rssi_stats(sinfo, adapter);

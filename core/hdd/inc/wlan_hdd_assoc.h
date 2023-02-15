@@ -31,6 +31,10 @@
 #include <net/cfg80211.h>
 #include <linux/ieee80211.h>
 
+#ifndef IEEE80211_HT_OP_MODE_CCFS2_SHIFT
+#define IEEE80211_HT_OP_MODE_CCFS2_SHIFT			5
+#endif
+
 #define HDD_TIME_STRING_LEN 24
 
 /* Timeout (in ms) for Link to Up before Registering Station */
