@@ -9406,9 +9406,9 @@ dp_get_pdev_deter_stats(struct cdp_soc_t *soc_hdl, uint8_t pdev_id,
 	qdf_mem_copy(stats->ul_ofdma_usr, pdev->stats.deter_stats.ul_ofdma_usr,
 		     sizeof(stats->ul_ofdma_usr[0]) * CDP_MU_MAX_USERS);
 	qdf_mem_copy(stats->dl_mimo_usr, pdev->stats.deter_stats.dl_mimo_usr,
-		     sizeof(stats->dl_mimo_usr[0]) * CDP_MU_MAX_USERS);
+		     sizeof(stats->dl_mimo_usr[0]) * CDP_MU_MAX_MIMO_USERS);
 	qdf_mem_copy(stats->ul_mimo_usr, pdev->stats.deter_stats.ul_mimo_usr,
-		     sizeof(stats->ul_mimo_usr[0]) * CDP_MU_MAX_USERS);
+		     sizeof(stats->ul_mimo_usr[0]) * CDP_MU_MAX_MIMO_USERS);
 
 	qdf_mem_copy(stats->ul_mode_cnt, pdev->stats.deter_stats.ul_mode_cnt,
 		     sizeof(stats->ul_mode_cnt[0]) * TX_MODE_UL_MAX);

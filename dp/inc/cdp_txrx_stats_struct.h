@@ -44,6 +44,7 @@
 #endif
 
 #define CDP_MU_MAX_USERS 37
+#define CDP_MU_MAX_MIMO_USERS 8
 /* 1 additional MCS is for invalid values */
 #ifdef WLAN_FEATURE_11BE
 #define MAX_MCS (16 + 1)
@@ -3040,7 +3041,7 @@ struct cdp_peer_deter_stats {
 };
 
 /**
- * struct cdp_pdev_chan_util_stats - pdev channel utilization stats
+ * struct cdp_pdev_chan_util_stats- Structure to hold channel utilization stats
  * @ap_chan_util: Channel utilization
  * @ap_tx_util: TX utilization
  * @ap_rx_util: RX utilization
@@ -3077,8 +3078,8 @@ struct cdp_pdev_ul_trigger_status {
 struct cdp_pdev_deter_stats {
 	uint64_t dl_ofdma_usr[CDP_MU_MAX_USERS];
 	uint64_t ul_ofdma_usr[CDP_MU_MAX_USERS];
-	uint64_t dl_mimo_usr[CDP_MU_MAX_USERS];
-	uint64_t ul_mimo_usr[CDP_MU_MAX_USERS];
+	uint64_t dl_mimo_usr[CDP_MU_MAX_MIMO_USERS];
+	uint64_t ul_mimo_usr[CDP_MU_MAX_MIMO_USERS];
 	uint64_t dl_mode_cnt[TX_MODE_DL_MAX];
 	uint64_t ul_mode_cnt[TX_MODE_UL_MAX];
 	uint64_t rx_su_cnt;

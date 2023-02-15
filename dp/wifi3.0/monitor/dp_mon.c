@@ -2910,18 +2910,14 @@ static inline void
 dp_pdev_update_deter_stats(struct dp_pdev *pdev,
 			   struct cdp_tx_completion_ppdu *ppdu)
 {
+	uint32_t user_idx;
+
 	if (!pdev || !ppdu)
 		return;
 
 	if (ppdu->txmode_type == TX_MODE_TYPE_UNKNOWN)
 		return;
 
-	if (ppdu->num_ul_users >= HAL_MAX_UL_MU_USERS ||
-	    ppdu->num_users >= HAL_MAX_UL_MU_USERS) {
-		dp_mon_err("num ul user %d or num users %d exceeds max limit",
-			   ppdu->num_ul_users, ppdu->num_users);
-		return;
-	}
 	if (ppdu->backoff_ac_valid) {
 		if (ppdu->backoff_ac >= WME_AC_MAX) {
 			dp_mon_err("backoff_ac %d exceed max limit",
@@ -2937,15 +2933,25 @@ dp_pdev_update_deter_stats(struct dp_pdev *pdev,
 		DP_STATS_INC(pdev,
 			     deter_stats.dl_mode_cnt[ppdu->txmode],
 			     1);
+		if (!ppdu->num_users) {
+			dp_mon_err("dl users is %d", ppdu->num_users);
+			return;
+		}
+		user_idx = ppdu->num_users - 1;
 		switch (ppdu->txmode) {
 		case TX_MODE_DL_OFDMA_DATA:
 			DP_STATS_INC(pdev,
-				     deter_stats.dl_ofdma_usr[ppdu->num_users],
+				     deter_stats.dl_ofdma_usr[user_idx],
 				     1);
 			break;
 		case TX_MODE_DL_MUMIMO_DATA:
+			if (user_idx >= CDP_MU_MAX_MIMO_USERS) {
+				dp_mon_err("dl mimo users %d exceed max limit",
+					   ppdu->num_users);
+				return;
+			}
 			DP_STATS_INC(pdev,
-				     deter_stats.dl_mimo_usr[ppdu->num_users],
+				     deter_stats.dl_mimo_usr[user_idx],
 				     1);
 			break;
 		}
@@ -2953,15 +2959,26 @@ dp_pdev_update_deter_stats(struct dp_pdev *pdev,
 		DP_STATS_INC(pdev,
 			     deter_stats.ul_mode_cnt[ppdu->txmode],
 			     1);
+
+		if (!ppdu->num_ul_users) {
+			dp_mon_err("dl users is %d", ppdu->num_ul_users);
+			return;
+		}
+		user_idx = ppdu->num_ul_users - 1;
 		switch (ppdu->txmode) {
 		case TX_MODE_UL_OFDMA_BASIC_TRIGGER_DATA:
 			DP_STATS_INC(pdev,
-				     deter_stats.ul_ofdma_usr[ppdu->num_ul_users],
+				     deter_stats.ul_ofdma_usr[user_idx],
 				     1);
 			break;
 		case TX_MODE_UL_MUMIMO_BASIC_TRIGGER_DATA:
+			if (user_idx >= CDP_MU_MAX_MIMO_USERS) {
+				dp_mon_err("ul mimo users %d exceed max limit",
+					   ppdu->num_ul_users);
+				return;
+			}
 			DP_STATS_INC(pdev,
-				     deter_stats.ul_mimo_usr[ppdu->num_ul_users],
+				     deter_stats.ul_mimo_usr[user_idx],
 				     1);
 			break;
 		}
