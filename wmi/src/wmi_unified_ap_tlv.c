@@ -3483,6 +3483,10 @@ config_peer_latency_info_cmd_tlv(wmi_unified_t wmi_handle,
 			param->latency_info[i].service_interval;
 		tid_latency_info->burst_size_diff =
 			param->latency_info[i].burst_size;
+		tid_latency_info->max_latency =
+			param->latency_info[i].max_latency;
+		tid_latency_info->min_tput =
+			param->latency_info[i].min_throughput;
 		WMI_CHAR_ARRAY_TO_MAC_ADDR(param->latency_info[i].peer_mac,
 				&tid_latency_info->dest_macaddr);
 		WMI_TID_LATENCY_SET_TIDNUM(tid_latency_info->latency_tid_info,
