@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2011,2017-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -1429,6 +1429,8 @@ struct target_if_psoc_spectral {
  *            SPECTRAL_SCAN_MODE_AGILE, it indicates that Spectral was carried
  *            out on pri80 instead of the Agile frequency due to a channel
  *            switch - Software may choose to ignore the sample in this case.
+ * @blanking_status: Indicates whether scan blanking was enabled during this
+ * spectral report capture.
  * @bin_pwr_data: Contains FFT magnitudes
  */
 struct target_if_samp_msg_params {
@@ -1448,6 +1450,7 @@ struct target_if_samp_msg_params {
 	uint8_t agc_total_gain;
 	uint8_t gainchange;
 	uint8_t pri80ind;
+	uint8_t blanking_status;
 	uint8_t *bin_pwr_data;
 };
 

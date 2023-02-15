@@ -533,6 +533,10 @@ SPECTRAL_COMPILE_TIME_ASSERT(struct_samp_edge_extra_bin_size_4byte_assertion,
  * @is_sec80: Indicates whether the frequency span corresponds to pri80 or
  * sec80 (only applicable for 160/80p80 operating_bw for
  * smode SPECTRAL_SCAN_MODE_NORMAL)
+ * @blanking_status: Indicates whether scan blanking was enabled during this
+ * spectral report capture. This field is applicable only when scan blanking
+ * feature is enabled. When scan blanking feature is disabled, this field
+ * will be set to zero.
  * @padding_detector_info: padding bytes
  */
 struct samp_detector_info {
@@ -556,8 +560,9 @@ struct samp_detector_info {
 	uint8_t gainchange;
 	uint8_t pri80ind;
 	uint8_t is_sec80;
+	uint8_t blanking_status;
 	/* Padding bits to make struct size multiple of 4 bytes */
-	uint8_t padding_detector_info[1];
+	uint8_t padding_detector_info[0];
 } __packed;
 
 /* Compile time assert to check struct size is divisible by 4 Bytes */
