@@ -5069,13 +5069,15 @@ get_debug_pdev_deter_stats(struct unified_stats *stats,
 		     deter->ch_access_delay,
 		     sizeof(data->ch_access_delay));
 
-	data->trigger_success = deter->trigger_success;
-	data->trigger_fail = deter->trigger_fail;
+	qdf_mem_copy(data->ts,
+		     deter->ts,
+		     sizeof(data->ts));
 
 	data->ch_util.ap_tx_util = deter->ch_util.ap_tx_util;
 	data->ch_util.ap_rx_util = deter->ch_util.ap_rx_util;
 	data->ch_util.ap_chan_util = deter->ch_util.ap_chan_util;
 
+	data->rx_su_cnt = deter->rx_su_cnt;
 
 	stats->feat[INX_FEAT_DETER] = data;
 	stats->size[INX_FEAT_DETER] = sizeof(struct debug_pdev_data_deter);
