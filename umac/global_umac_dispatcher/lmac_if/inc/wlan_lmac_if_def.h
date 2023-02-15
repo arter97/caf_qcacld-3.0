@@ -1105,6 +1105,12 @@ struct wlan_lmac_if_ftm_rx_ops {
  * @trigger_acs_for_afc: pointer to trigger acs for afc
  * @reg_get_min_psd:
  * @is_chip_11be:
+ * @register_rate2power_table_update_event_handler: pointer to register
+ *			rate2power table update event handler.
+ * @unregister_rate2power_table_update_event_handler: pointer to unregister
+ *			rate2power table update event handler.
+ * @end_r2p_table_update_wait: Call-back function to end the wait on r2p update
+ *			response from fw.
  */
 struct wlan_lmac_if_reg_tx_ops {
 	QDF_STATUS (*register_master_handler)(struct wlan_objmgr_psoc *psoc,
@@ -1165,6 +1171,15 @@ struct wlan_lmac_if_reg_tx_ops {
 #endif
 	bool (*is_chip_11be)(struct wlan_objmgr_psoc *psoc,
 			     uint16_t phy_id);
+	QDF_STATUS (*register_rate2power_table_update_event_handler)(
+			struct wlan_objmgr_psoc *psoc,
+			void *arg);
+	QDF_STATUS (*unregister_rate2power_table_update_event_handler)(
+			struct wlan_objmgr_psoc *psoc,
+			void *arg);
+	QDF_STATUS (*end_r2p_table_update_wait)(
+			struct wlan_objmgr_psoc *psoc,
+			uint32_t pdev_id);
 };
 
 /**
@@ -1851,6 +1866,8 @@ struct wlan_lmac_if_mgmt_txrx_rx_ops {
  * @reg_get_afc_dev_type:
  * @reg_set_eirp_preferred_support:
  * @reg_get_eirp_preferred_support:
+ * @reg_r2p_table_update_response_handler: function pointer to handle
+ *		rate2power update response from fw.
  */
 struct wlan_lmac_if_reg_rx_ops {
 	QDF_STATUS (*master_list_handler)(struct cur_regulatory_info
@@ -1934,6 +1951,9 @@ struct wlan_lmac_if_reg_rx_ops {
 				struct wlan_objmgr_psoc *psoc,
 				bool *reg_is_eirp_support_preferred);
 #endif
+	QDF_STATUS (*reg_r2p_table_update_response_handler)(
+			struct wlan_objmgr_psoc *psoc,
+			uint32_t pdev_id);
 };
 
 #ifdef CONVERGED_P2P_ENABLE

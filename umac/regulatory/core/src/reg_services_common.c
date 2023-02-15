@@ -10007,3 +10007,16 @@ QDF_STATUS reg_set_afc_power_event_received(struct wlan_objmgr_pdev *pdev,
 	return QDF_STATUS_SUCCESS;
 }
 #endif
+
+QDF_STATUS reg_process_r2p_table_update_response(struct wlan_objmgr_psoc *psoc,
+						 uint32_t pdev_id)
+{
+	struct wlan_lmac_if_reg_tx_ops *reg_tx_ops;
+	QDF_STATUS status = QDF_STATUS_E_FAILURE;
+
+	reg_tx_ops = reg_get_psoc_tx_ops(psoc);
+	if (reg_tx_ops->end_r2p_table_update_wait)
+		status = reg_tx_ops->end_r2p_table_update_wait(psoc, pdev_id);
+
+	return status;
+}

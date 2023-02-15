@@ -213,4 +213,16 @@ QDF_STATUS
 tgt_reg_get_eirp_preferred_support(struct wlan_objmgr_psoc *psoc,
 				   bool *reg_is_eirp_support_preferred);
 #endif
+
+/**
+ * tgt_reg_process_r2p_table_update_response() - process rate2power table update
+ * response
+ * @psoc: pointer to psoc
+ * @pdev_id: pdev id from target
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS tgt_reg_process_r2p_table_update_response(
+						struct wlan_objmgr_psoc *psoc,
+						uint32_t pdev_id);
 #endif

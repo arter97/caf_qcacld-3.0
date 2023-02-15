@@ -524,6 +524,9 @@ static void wlan_lmac_if_umac_reg_rx_ops_register(
 	wlan_lmac_if_register_afc_handlers(rx_ops);
 
 	wlan_lmac_if_register_super_chan_display(rx_ops);
+
+	rx_ops->reg_rx_ops.reg_r2p_table_update_response_handler =
+		tgt_reg_process_r2p_table_update_response;
 }
 
 #ifdef CONVERGED_P2P_ENABLE

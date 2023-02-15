@@ -2999,4 +2999,15 @@ uint16_t reg_get_max_bw_5G_for_fo(struct wlan_objmgr_pdev *pdev);
 uint8_t
 reg_get_num_rules_of_ap_pwr_type(struct wlan_objmgr_pdev *pdev,
 				 enum reg_6g_ap_type ap_pwr_type);
+
+/**
+ * reg_process_r2p_table_update_response() - Process the response received from
+ * target for the rate2power update cmd
+ * @psoc: Pointer to psoc
+ * @pdev_id: pdev id from target
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS reg_process_r2p_table_update_response(struct wlan_objmgr_psoc *psoc,
+						 uint32_t pdev_id);
 #endif

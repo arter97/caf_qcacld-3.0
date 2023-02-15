@@ -2344,4 +2344,14 @@ static inline bool reg_is_chan_enum_invalid(enum channel_enum chan_enum)
 {
 	return chan_enum >= INVALID_CHANNEL;
 }
+
+/**
+ * struct r2p_table_update_status_obj
+ * @pdev_id: pdev id from target
+ * @status: rate2power update status
+ */
+struct r2p_table_update_status_obj {
+	uint32_t pdev_id;
+	uint32_t status;
+};
 #endif
