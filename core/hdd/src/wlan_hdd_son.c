@@ -1320,7 +1320,7 @@ static int hdd_son_add_acl_mac(struct wlan_objmgr_vdev *vdev,
 	}
 	qdf_status = wlansap_modify_acl(WLAN_HDD_GET_SAP_CTX_PTR(adapter),
 					acl_mac->bytes, list_type,
-					ADD_STA_TO_ACL);
+					ADD_STA_TO_ACL_NO_DEAUTH);
 	if (QDF_IS_STATUS_ERROR(qdf_status)) {
 		hdd_err("Modify ACL failed");
 		return -EIO;
@@ -1376,7 +1376,7 @@ static int hdd_son_del_acl_mac(struct wlan_objmgr_vdev *vdev,
 		return -EINVAL;
 	}
 	qdf_status = wlansap_modify_acl(sap_ctx, acl_mac->bytes, list_type,
-					DELETE_STA_FROM_ACL);
+					DELETE_STA_FROM_ACL_NO_DEAUTH);
 	if (QDF_IS_STATUS_ERROR(qdf_status)) {
 		hdd_err("Modify ACL failed");
 		return -EIO;

@@ -1020,7 +1020,7 @@ QDF_STATUS wlansap_modify_acl(struct sap_context *sap_ctx,
 
 	switch (list_type) {
 	case eSAP_WHITE_LIST:
-		if (cmd == ADD_STA_TO_ACL) {
+		if (cmd == ADD_STA_TO_ACL || cmd == ADD_STA_TO_ACL_NO_DEAUTH) {
 			/* error check */
 			/* if list is already at max, return failure */
 			if (sap_ctx->nAcceptMac == MAX_ACL_MAC_ADDRESS) {
@@ -1050,7 +1050,8 @@ QDF_STATUS wlansap_modify_acl(struct sap_context *sap_ctx,
 				sap_debug("size of accept and deny lists %d %d",
 					  sap_ctx->nAcceptMac,
 					  sap_ctx->nDenyMac);
-		} else if (cmd == DELETE_STA_FROM_ACL) {
+		} else if (cmd == DELETE_STA_FROM_ACL ||
+			   cmd == DELETE_STA_FROM_ACL_NO_DEAUTH) {
 			if (sta_white_list) {
 
 				struct csr_del_sta_params delStaParams;
@@ -1059,15 +1060,21 @@ QDF_STATUS wlansap_modify_acl(struct sap_context *sap_ctx,
 				sap_remove_mac_from_acl(sap_ctx->acceptMacList,
 						    &sap_ctx->nAcceptMac,
 						    staWLIndex);
-				/* If a client is deleted from white list and it is connected, send deauth */
-				wlansap_populate_del_sta_params(peer_sta_mac,
-					eCsrForcedDeauthSta,
-					SIR_MAC_MGMT_DEAUTH,
-					&delStaParams);
-				wlansap_deauth_sta(sap_ctx, &delStaParams);
-				sap_debug("size of accept and deny lists %d %d",
-					  sap_ctx->nAcceptMac,
-					  sap_ctx->nDenyMac);
+				/* If a client is deleted from allow list and */
+				/* it is connected, send deauth
+				 */
+				if (cmd == DELETE_STA_FROM_ACL) {
+					wlansap_populate_del_sta_params(
+						peer_sta_mac,
+						eCsrForcedDeauthSta,
+						SIR_MAC_MGMT_DEAUTH,
+						&delStaParams);
+					wlansap_deauth_sta(sap_ctx,
+							   &delStaParams);
+					sap_debug("size of accept and deny lists %d %d",
+						  sap_ctx->nAcceptMac,
+						  sap_ctx->nDenyMac);
+				}
 			} else {
 				sap_warn("MAC address to be deleted is not present in the white list "
 					 QDF_MAC_ADDR_FMT,
@@ -1082,7 +1089,7 @@ QDF_STATUS wlansap_modify_acl(struct sap_context *sap_ctx,
 
 	case eSAP_BLACK_LIST:
 
-		if (cmd == ADD_STA_TO_ACL) {
+		if (cmd == ADD_STA_TO_ACL || cmd == ADD_STA_TO_ACL_NO_DEAUTH) {
 			struct csr_del_sta_params delStaParams;
 			/* error check */
 			/* if list is already at max, return failure */
@@ -1106,19 +1113,25 @@ QDF_STATUS wlansap_modify_acl(struct sap_context *sap_ctx,
 						    &sap_ctx->nAcceptMac,
 						    staWLIndex);
 			}
-			/* If we are adding a client to the black list; if its connected, send deauth */
-			wlansap_populate_del_sta_params(peer_sta_mac,
-				eCsrForcedDeauthSta,
-				SIR_MAC_MGMT_DEAUTH,
-				&delStaParams);
-			wlansap_deauth_sta(sap_ctx, &delStaParams);
+			/* If we are adding a client to the deny list; */
+			/* if its connected, send deauth
+			 */
+			if (cmd == ADD_STA_TO_ACL) {
+				wlansap_populate_del_sta_params(
+					peer_sta_mac,
+					eCsrForcedDeauthSta,
+					SIR_MAC_MGMT_DEAUTH,
+					&delStaParams);
+				wlansap_deauth_sta(sap_ctx, &delStaParams);
+			}
 			sap_info("... Now add to black list");
 			sap_add_mac_to_acl(sap_ctx->denyMacList,
 				       &sap_ctx->nDenyMac, peer_sta_mac);
 			sap_debug("size of accept and deny lists %d %d",
 				  sap_ctx->nAcceptMac,
 				  sap_ctx->nDenyMac);
-		} else if (cmd == DELETE_STA_FROM_ACL) {
+		} else if (cmd == DELETE_STA_FROM_ACL ||
+			   cmd == DELETE_STA_FROM_ACL_NO_DEAUTH) {
 			if (sta_black_list) {
 				sap_info("Delete from black list");
 				sap_remove_mac_from_acl(sap_ctx->denyMacList,
