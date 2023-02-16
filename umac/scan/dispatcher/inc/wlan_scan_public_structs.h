@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2017-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -39,7 +39,11 @@ typedef uint32_t wlan_scan_id;
 
 #define WLAN_SCAN_MAX_HINT_S_SSID        10
 #define WLAN_SCAN_MAX_HINT_BSSID         10
-#define MAX_RNR_BSS                      16
+/*
+ * For N(4 LINK) link MLO, Max RNR BSS will be given:
+ * 16(N_6G_LINKS) + N - (N_6G_LINKS) - 1(SELF_LINK) = 16*2 + N-2-1 = 33
+ */
+#define MAX_RNR_BSS                      33
 #define WLAN_SCAN_MAX_NUM_SSID          16
 #define WLAN_SCAN_MAX_NUM_BSSID         4
 
@@ -500,7 +504,7 @@ struct reduced_neighbor_report {
 #define SCAN_SECURITY_TYPE_RSN 0x08
 
 #ifdef WLAN_FEATURE_11BE_MLO
-#define MLD_MAX_LINKS 3
+#define MLD_MAX_LINKS 4
 
 /**
  * struct partner_link_info: Partner link information of an ML
