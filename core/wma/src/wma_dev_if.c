@@ -2505,8 +2505,7 @@ static void wma_send_vdev_down_req(tp_wma_handle wma,
 }
 
 #ifdef WLAN_FEATURE_11BE_MLO
-static void wma_delete_peer_mlo(struct wlan_objmgr_psoc *psoc,
-				uint8_t *macaddr)
+void wma_delete_peer_mlo(struct wlan_objmgr_psoc *psoc, uint8_t *macaddr)
 {
 	struct wlan_objmgr_peer *peer = NULL;
 
@@ -2515,11 +2514,6 @@ static void wma_delete_peer_mlo(struct wlan_objmgr_psoc *psoc,
 		wlan_mlo_link_peer_delete(peer);
 		wlan_objmgr_peer_release_ref(peer, WLAN_LEGACY_WMA_ID);
 	}
-}
-#else /* WLAN_FEATURE_11BE_MLO */
-static inline void wma_delete_peer_mlo(struct wlan_objmgr_psoc *psoc,
-				       uint8_t *macaddr)
-{
 }
 #endif /* WLAN_FEATURE_11BE_MLO */
 

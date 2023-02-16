@@ -4432,6 +4432,8 @@ QDF_STATUS wma_remove_bss_peer_before_join(
 	}
 	mac_addr = bssid.bytes;
 
+	wma_delete_peer_mlo(wma->psoc, mac_addr);
+
 	qdf_status = wma_remove_peer(wma, mac_addr, vdev_id, false);
 
 	if (QDF_IS_STATUS_ERROR(qdf_status)) {
