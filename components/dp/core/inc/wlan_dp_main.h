@@ -144,6 +144,83 @@ dp_get_intf_by_macaddr(struct wlan_dp_psoc_context *dp_ctx,
 struct wlan_dp_intf*
 dp_get_intf_by_netdev(struct wlan_dp_psoc_context *dp_ctx, qdf_netdev_t dev);
 
+/**
+ * dp_get_front_link_no_lock() - Get the first link from the dp links list
+ * This API does not use any lock in it's implementation. It is the caller's
+ * directive to ensure concurrency safety.
+ * @dp_intf: DP interface handle
+ * @out_link: double pointer to pass the next link
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+dp_get_front_link_no_lock(struct wlan_dp_intf *dp_intf,
+			  struct wlan_dp_link **out_link);
+
+/**
+ * dp_get_next_link_no_lock() - Get the next link from the link list
+ * This API does not use any lock in it's implementation. It is the caller's
+ * directive to ensure concurrency safety.
+ * @dp_intf: DP interface handle
+ * @cur_link: pointer to the currentlink
+ * @out_link: double pointer to pass the nextlink
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+dp_get_next_link_no_lock(struct wlan_dp_intf *dp_intf,
+			 struct wlan_dp_link *cur_link,
+			 struct wlan_dp_link **out_link);
+
+/**
+ * __dp_take_ref_and_fetch_front_link_safe - Helper macro to lock, fetch
+ * front and next link, take ref and unlock.
+ * @dp_intf: DP interface handle
+ * @dp_link: an dp_link pointer to use as a cursor
+ * @dp_link_next: dp_link pointer to nextlink
+ */
+#define __dp_take_ref_and_fetch_front_link_safe(dp_intf, dp_link, \
+						dp_link_next) \
+	qdf_spin_lock_bh(&(dp_intf)->dp_link_list_lock), \
+	dp_get_front_link_no_lock(dp_intf, &(dp_link)), \
+	dp_get_next_link_no_lock(dp_intf, dp_link, &(dp_link_next)), \
+	qdf_spin_unlock_bh(&(dp_intf)->dp_link_list_lock)
+
+/**
+ * __dp_take_ref_and_fetch_next_link_safe - Helper macro to lock, fetch next
+ * interface, take ref and unlock.
+ * @dp_intf: DP interface handle
+ * @dp_link: dp_link pointer to use as a cursor
+ * @dp_link_next: dp_link pointer to next link
+ */
+#define __dp_take_ref_and_fetch_next_link_safe(dp_intf, dp_link, \
+					       dp_link_next) \
+	qdf_spin_lock_bh(&(dp_intf)->dp_link_list_lock), \
+	dp_link = dp_link_next, \
+	dp_get_next_link_no_lock(dp_intf, dp_link, &(dp_link_next)), \
+	qdf_spin_unlock_bh(&(dp_intf)->dp_link_list_lock)
+
+/**
+ * __dp_is_link_valid - Helper macro to return true/false for valid interface.
+ * @_dp_link: an dp_link pointer to use as a cursor
+ */
+#define __dp_is_link_valid(_dp_link) !!(_dp_link)
+
+/**
+ * dp_for_each_link_held_safe - Interface iterator called
+ *                                      in a delete safe manner
+ * @dp_intf: DP interface handle
+ * @dp_link: an dp_link pointer to use as a cursor
+ * @dp_link_next: dp_link pointer to the next interface
+ *
+ */
+#define dp_for_each_link_held_safe(dp_intf, dp_link, dp_link_next) \
+	for (__dp_take_ref_and_fetch_front_link_safe(dp_intf, dp_link, \
+						     dp_link_next); \
+	     __dp_is_link_valid(dp_link); \
+	     __dp_take_ref_and_fetch_next_link_safe(dp_intf, dp_link, \
+						    dp_link_next))
+
 /* MAX iteration count to wait for dp packet process to complete */
 #define DP_TASK_MAX_WAIT_CNT  100
 /* Milli seconds to wait when packet is getting processed */

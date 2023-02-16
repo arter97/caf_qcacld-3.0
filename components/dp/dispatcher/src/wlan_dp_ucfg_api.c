@@ -120,6 +120,7 @@ ucfg_dp_create_intf(struct wlan_objmgr_psoc *psoc,
 		return QDF_STATUS_E_FAILURE;
 	}
 
+	dp_intf->def_link = NULL;
 	dp_intf->dp_ctx = dp_ctx;
 	dp_intf->dev = ndev;
 	dp_intf->intf_id = WLAN_UMAC_VDEV_ID_MAX;
@@ -129,6 +130,9 @@ ucfg_dp_create_intf(struct wlan_objmgr_psoc *psoc,
 	qdf_spin_lock_bh(&dp_ctx->intf_list_lock);
 	qdf_list_insert_front(&dp_ctx->intf_list, &dp_intf->node);
 	qdf_spin_unlock_bh(&dp_ctx->intf_list_lock);
+
+	qdf_spinlock_create(&dp_intf->dp_link_list_lock);
+	qdf_list_create(&dp_intf->dp_link_list, 0);
 
 	dp_periodic_sta_stats_init(dp_intf);
 	dp_periodic_sta_stats_mutex_create(dp_intf);
@@ -166,6 +170,9 @@ ucfg_dp_destroy_intf(struct wlan_objmgr_psoc *psoc,
 	dp_nud_deinit_tracking(dp_intf);
 	dp_mic_deinit_work(dp_intf);
 	qdf_spinlock_destroy(&dp_intf->vdev_lock);
+
+	qdf_spinlock_destroy(&dp_intf->dp_link_list_lock);
+	qdf_list_destroy(&dp_intf->dp_link_list);
 
 	qdf_spin_lock_bh(&dp_ctx->intf_list_lock);
 	qdf_list_remove_node(&dp_ctx->intf_list, &dp_intf->node);

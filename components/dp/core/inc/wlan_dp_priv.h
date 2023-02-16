@@ -613,6 +613,10 @@ struct dp_rx_fst {
  * @qdf_sta_eap_frm_done_event: EAP frame event management
  * @traffic_end_ind: store traffic end indication info
  * @direct_link_config: direct link configuration parameters
+ * @num_links: Number of links for this DP interface
+ * @def_link: Pointer to default link (usually used for TX operation)
+ * @dp_link_list_lock: Lock to protect dp_link_list operatiosn
+ * @dp_link_list: List of dp_links for this DP interface
  */
 struct wlan_dp_intf {
 	struct wlan_dp_psoc_context *dp_ctx;
@@ -674,6 +678,24 @@ struct wlan_dp_intf {
 #ifdef FEATURE_DIRECT_LINK
 	struct direct_link_info direct_link_config;
 #endif
+	uint8_t num_links;
+	struct wlan_dp_link *def_link;
+	qdf_spinlock_t dp_link_list_lock;
+	qdf_list_t dp_link_list;
+};
+
+/**
+ * struct wlan_dp_link - DP link (corresponds to objmgr vdev)
+ * @node: list node for membership in the DP links list
+ * @link_id: ID for this DP link (Same as vdev_id)
+ * @mac_addr: mac address of this link
+ * @dp_intf: Parent DP interface for this DP link
+ */
+struct wlan_dp_link {
+	qdf_list_node_t node;
+	uint8_t link_id;
+	struct qdf_mac_addr mac_addr;
+	struct wlan_dp_intf *dp_intf;
 };
 
 /**

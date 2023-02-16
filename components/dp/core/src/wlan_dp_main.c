@@ -216,6 +216,48 @@ int is_dp_intf_valid(struct wlan_dp_intf *dp_intf)
 	return validate_interface_id(dp_intf->intf_id);
 }
 
+QDF_STATUS dp_get_front_link_no_lock(struct wlan_dp_intf *dp_intf,
+				     struct wlan_dp_link **out_link)
+{
+	QDF_STATUS status;
+	qdf_list_node_t *node;
+
+	*out_link = NULL;
+
+	status = qdf_list_peek_front(&dp_intf->dp_link_list, &node);
+
+	if (QDF_IS_STATUS_ERROR(status))
+		return status;
+
+	*out_link = qdf_container_of(node, struct wlan_dp_link, node);
+
+	return QDF_STATUS_SUCCESS;
+}
+
+QDF_STATUS dp_get_next_link_no_lock(struct wlan_dp_intf *dp_intf,
+				    struct wlan_dp_link *cur_link,
+				    struct wlan_dp_link **out_link)
+{
+	QDF_STATUS status;
+	qdf_list_node_t *node;
+
+	if (!cur_link)
+		return QDF_STATUS_E_INVAL;
+
+	*out_link = NULL;
+
+	status = qdf_list_peek_next(&dp_intf->dp_link_list,
+				    &cur_link->node,
+				    &node);
+
+	if (QDF_IS_STATUS_ERROR(status))
+		return status;
+
+	*out_link = qdf_container_of(node, struct wlan_dp_link, node);
+
+	return status;
+}
+
 static QDF_STATUS
 dp_intf_wait_for_task_complete(struct wlan_dp_intf *dp_intf)
 {
@@ -919,11 +961,13 @@ dp_vdev_obj_create_notification(struct wlan_objmgr_vdev *vdev, void *arg)
 	struct wlan_objmgr_psoc *psoc;
 	struct wlan_dp_psoc_context *dp_ctx;
 	struct wlan_dp_intf *dp_intf;
+	struct wlan_dp_link *dp_link;
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
 	struct qdf_mac_addr *mac_addr;
 	qdf_netdev_t dev;
 
-	dp_info("DP VDEV OBJ create notification");
+	dp_info("DP VDEV OBJ create notification, vdev_id %d",
+		wlan_vdev_get_id(vdev));
 
 	psoc = wlan_vdev_get_psoc(vdev);
 	if (!psoc) {
@@ -949,36 +993,62 @@ dp_vdev_obj_create_notification(struct wlan_objmgr_vdev *vdev, void *arg)
 		return QDF_STATUS_E_INVAL;
 	}
 
-	dp_intf->device_mode = wlan_vdev_mlme_get_opmode(vdev);
+	dp_link = qdf_mem_malloc(sizeof(*dp_link));
+	if (!dp_link) {
+		dp_err("DP link(" QDF_MAC_ADDR_FMT ") memory alloc failed",
+		       QDF_MAC_ADDR_REF(mac_addr->bytes));
+		return QDF_STATUS_E_NOMEM;
+	}
+
+	/* Update Parent interface details */
+	dp_link->dp_intf = dp_intf;
+	qdf_spin_lock_bh(&dp_intf->dp_link_list_lock);
+	qdf_list_insert_front(&dp_intf->dp_link_list, &dp_link->node);
+	dp_intf->num_links++;
+	qdf_spin_unlock_bh(&dp_intf->dp_link_list_lock);
+
+	qdf_copy_macaddr(&dp_link->mac_addr, mac_addr);
+
 	qdf_spin_lock_bh(&dp_intf->vdev_lock);
+	dp_link->link_id = vdev->vdev_objmgr.vdev_id;
 	dp_intf->intf_id = vdev->vdev_objmgr.vdev_id;
 	dp_intf->vdev = vdev;
 	qdf_spin_unlock_bh(&dp_intf->vdev_lock);
-	qdf_atomic_init(&dp_intf->num_active_task);
-
-	if (dp_intf->device_mode == QDF_SAP_MODE ||
-	    dp_intf->device_mode == QDF_P2P_GO_MODE) {
-		dp_intf->sap_tx_block_mask = DP_TX_FN_CLR | DP_TX_SAP_STOP;
-
-		status = qdf_event_create(&dp_intf->qdf_sta_eap_frm_done_event);
-		if (!QDF_IS_STATUS_SUCCESS(status)) {
-			dp_err("eap frm done event init failed!!");
-			return status;
-		}
-		qdf_mem_zero(&dp_intf->stats, sizeof(qdf_net_dev_stats));
-	}
 
 	status = wlan_objmgr_vdev_component_obj_attach(vdev,
 						       WLAN_COMP_DP,
-						       (void *)dp_intf,
+						       (void *)dp_link,
 						       QDF_STATUS_SUCCESS);
 	if (QDF_IS_STATUS_ERROR(status)) {
-		dp_err("Failed to attach dp_intf with vdev");
+		dp_err("Failed to attach dp_link with vdev");
 		return status;
 	}
 
-	dp_nud_ignore_tracking(dp_intf, false);
-	dp_mic_enable_work(dp_intf);
+	if (dp_intf->num_links == 1) {
+		/*
+		 * Interface level operations to be done only
+		 * when the first link is created
+		 */
+		dp_intf->def_link = dp_link;
+		dp_intf->device_mode = wlan_vdev_mlme_get_opmode(vdev);
+		qdf_atomic_init(&dp_intf->num_active_task);
+		dp_nud_ignore_tracking(dp_intf, false);
+		dp_mic_enable_work(dp_intf);
+
+		if (dp_intf->device_mode == QDF_SAP_MODE ||
+		    dp_intf->device_mode == QDF_P2P_GO_MODE) {
+			dp_intf->sap_tx_block_mask = DP_TX_FN_CLR |
+						     DP_TX_SAP_STOP;
+
+			status = qdf_event_create(&dp_intf->qdf_sta_eap_frm_done_event);
+			if (!QDF_IS_STATUS_SUCCESS(status)) {
+				dp_err("eap frm done event init failed!!");
+				return status;
+			}
+			qdf_mem_zero(&dp_intf->stats,
+				     sizeof(qdf_net_dev_stats));
+		}
+	}
 
 	return status;
 }
@@ -988,48 +1058,76 @@ dp_vdev_obj_destroy_notification(struct wlan_objmgr_vdev *vdev, void *arg)
 
 {
 	struct wlan_dp_intf *dp_intf;
+	struct wlan_dp_link *dp_link;
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
 
-	dp_info("DP VDEV OBJ destroy notification");
+	dp_info("DP VDEV OBJ destroy notification, vdev_id %d",
+		wlan_vdev_get_id(vdev));
 
 	dp_intf = dp_get_vdev_priv_obj(vdev);
-	if (!dp_intf) {
-		dp_err("Failed to get DP interface obj");
+	/*
+	 * TODO - Remove the below line after proto-type of
+	 * dp_get_vdev_priv_obj is changed
+	 */
+	dp_link = (struct wlan_dp_link *)dp_intf;
+	if (!dp_link) {
+		dp_err("Failed to get DP link obj");
 		return QDF_STATUS_E_INVAL;
 	}
 
-	dp_nud_ignore_tracking(dp_intf, true);
-	dp_nud_reset_tracking(dp_intf);
-	dp_nud_flush_work(dp_intf);
-	dp_mic_flush_work(dp_intf);
+	dp_intf = dp_link->dp_intf;
 
+	qdf_spin_lock_bh(&dp_intf->dp_link_list_lock);
+	qdf_list_remove_node(&dp_intf->dp_link_list, &dp_link->node);
+	dp_intf->num_links--;
+	qdf_spin_unlock_bh(&dp_intf->dp_link_list_lock);
+
+	if (dp_intf->num_links == 0) {
+		/*
+		 * Interface level operations are stopped when last
+		 * link is deleted
+		 */
+		dp_nud_ignore_tracking(dp_intf, true);
+		dp_nud_reset_tracking(dp_intf);
+		dp_nud_flush_work(dp_intf);
+		dp_mic_flush_work(dp_intf);
+		qdf_mem_zero(&dp_intf->conn_info,
+			     sizeof(struct wlan_dp_conn_info));
+
+		if (dp_intf->device_mode == QDF_SAP_MODE ||
+		    dp_intf->device_mode == QDF_P2P_GO_MODE) {
+			status = qdf_event_destroy(&dp_intf->qdf_sta_eap_frm_done_event);
+			if (!QDF_IS_STATUS_SUCCESS(status)) {
+				dp_err("eap frm done event destroy failed!!");
+				return status;
+			}
+			dp_intf->txrx_ops.tx.tx = NULL;
+			dp_intf->sap_tx_block_mask |= DP_TX_FN_CLR;
+		}
+	}
+
+	/*
+	 * Change this to link level, since during link switch,
+	 * it might not go to 0
+	 */
 	status = dp_intf_wait_for_task_complete(dp_intf);
 	if (QDF_IS_STATUS_ERROR(status))
 		return status;
 
-	if (dp_intf->device_mode == QDF_SAP_MODE ||
-	    dp_intf->device_mode == QDF_P2P_GO_MODE) {
-		status = qdf_event_destroy(&dp_intf->qdf_sta_eap_frm_done_event);
-		if (!QDF_IS_STATUS_SUCCESS(status)) {
-			dp_err("eap frm done event destroy failed!!");
-			return status;
-		}
-		dp_intf->txrx_ops.tx.tx = NULL;
-		dp_intf->sap_tx_block_mask |= DP_TX_FN_CLR;
-	}
-	qdf_mem_zero(&dp_intf->conn_info, sizeof(struct wlan_dp_conn_info));
 	dp_intf->intf_id = WLAN_UMAC_VDEV_ID_MAX;
 	qdf_spin_lock_bh(&dp_intf->vdev_lock);
 	dp_intf->vdev = NULL;
 	qdf_spin_unlock_bh(&dp_intf->vdev_lock);
+
 	status = wlan_objmgr_vdev_component_obj_detach(vdev,
 						       WLAN_COMP_DP,
-						       (void *)dp_intf);
+						       (void *)dp_link);
 	if (QDF_IS_STATUS_ERROR(status)) {
-		dp_err("Failed to detach dp_intf with vdev");
+		dp_err("Failed to detach dp_link with vdev");
 		return status;
 	}
 
+	qdf_mem_free(dp_link);
 	return status;
 }
 
