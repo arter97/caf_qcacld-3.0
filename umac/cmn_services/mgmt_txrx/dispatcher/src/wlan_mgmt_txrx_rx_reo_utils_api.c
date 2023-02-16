@@ -276,20 +276,36 @@ wlan_mgmt_rx_reo_psoc_obj_destroy_notification(struct wlan_objmgr_psoc *psoc)
 }
 
 QDF_STATUS
-wlan_mgmt_rx_reo_attach(struct wlan_objmgr_pdev *pdev)
+wlan_mgmt_rx_reo_pdev_attach(struct wlan_objmgr_pdev *pdev)
 {
-	return mgmt_rx_reo_attach(pdev);
+	return mgmt_rx_reo_pdev_attach(pdev);
 }
 
-qdf_export_symbol(wlan_mgmt_rx_reo_attach);
+qdf_export_symbol(wlan_mgmt_rx_reo_pdev_attach);
 
 QDF_STATUS
-wlan_mgmt_rx_reo_detach(struct wlan_objmgr_pdev *pdev)
+wlan_mgmt_rx_reo_psoc_attach(struct wlan_objmgr_psoc *psoc)
 {
-	return mgmt_rx_reo_detach(pdev);
+	return mgmt_rx_reo_psoc_attach(psoc);
 }
 
-qdf_export_symbol(wlan_mgmt_rx_reo_detach);
+qdf_export_symbol(wlan_mgmt_rx_reo_psoc_attach);
+
+QDF_STATUS
+wlan_mgmt_rx_reo_pdev_detach(struct wlan_objmgr_pdev *pdev)
+{
+	return mgmt_rx_reo_pdev_detach(pdev);
+}
+
+qdf_export_symbol(wlan_mgmt_rx_reo_pdev_detach);
+
+QDF_STATUS
+wlan_mgmt_rx_reo_psoc_detach(struct wlan_objmgr_psoc *psoc)
+{
+	return mgmt_rx_reo_psoc_detach(psoc);
+}
+
+qdf_export_symbol(wlan_mgmt_rx_reo_psoc_detach);
 
 uint16_t
 wlan_mgmt_rx_reo_get_pkt_ctr_delta_thresh(struct wlan_objmgr_psoc *psoc)

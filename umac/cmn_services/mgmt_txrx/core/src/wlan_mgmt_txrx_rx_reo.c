@@ -6413,7 +6413,7 @@ mgmt_rx_reo_clear_snapshots(struct wlan_objmgr_pdev *pdev)
 }
 
 QDF_STATUS
-mgmt_rx_reo_attach(struct wlan_objmgr_pdev *pdev)
+mgmt_rx_reo_pdev_attach(struct wlan_objmgr_pdev *pdev)
 {
 	QDF_STATUS status;
 
@@ -6436,7 +6436,13 @@ mgmt_rx_reo_attach(struct wlan_objmgr_pdev *pdev)
 }
 
 QDF_STATUS
-mgmt_rx_reo_detach(struct wlan_objmgr_pdev *pdev)
+mgmt_rx_reo_psoc_attach(struct wlan_objmgr_psoc *psoc)
+{
+	return QDF_STATUS_SUCCESS;
+}
+
+QDF_STATUS
+mgmt_rx_reo_pdev_detach(struct wlan_objmgr_pdev *pdev)
 {
 	QDF_STATUS status;
 
@@ -6455,6 +6461,12 @@ mgmt_rx_reo_detach(struct wlan_objmgr_pdev *pdev)
 		return status;
 	}
 
+	return QDF_STATUS_SUCCESS;
+}
+
+QDF_STATUS
+mgmt_rx_reo_psoc_detach(struct wlan_objmgr_psoc *psoc)
+{
 	return QDF_STATUS_SUCCESS;
 }
 
