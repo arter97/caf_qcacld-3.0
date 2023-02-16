@@ -46,12 +46,15 @@ static uint32_t dp_txrx_get_tx_ack_count(struct wlan_dp_intf *dp_intf)
 void dp_nud_set_gateway_addr(struct wlan_objmgr_vdev *vdev,
 			     struct qdf_mac_addr gw_mac_addr)
 {
-	struct wlan_dp_intf *dp_intf = dp_get_vdev_priv_obj(vdev);
+	struct wlan_dp_link *dp_link = dp_get_vdev_priv_obj(vdev);
+	struct wlan_dp_intf *dp_intf;
 
-	if (!dp_intf) {
-		dp_err("Unable to get DP Interface");
+	if (!dp_link) {
+		dp_err("Unable to get DP link");
 		return;
 	}
+
+	dp_intf = dp_link->dp_intf;
 	qdf_mem_copy(dp_intf->nud_tracking.gw_mac_addr.bytes,
 		     gw_mac_addr.bytes,
 		     sizeof(struct qdf_mac_addr));
@@ -463,12 +466,15 @@ void dp_nud_netevent_cb(struct qdf_mac_addr *netdev_addr,
 
 void dp_nud_indicate_roam(struct wlan_objmgr_vdev *vdev)
 {
-	struct wlan_dp_intf *dp_intf = dp_get_vdev_priv_obj(vdev);
+	struct wlan_dp_link *dp_link = dp_get_vdev_priv_obj(vdev);
+	struct wlan_dp_intf *dp_intf;
 
-	if (!dp_intf) {
-		dp_err("Unable to get DP Interface");
+	if (!dp_link) {
+		dp_err("Unable to get DP link");
 		return;
 	}
+
+	dp_intf = dp_link->dp_intf;
 	dp_nud_set_tracking(dp_intf, DP_NUD_NONE, false);
 }
 #endif

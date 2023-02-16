@@ -474,10 +474,18 @@ static inline void
 dp_add_latency_critical_client(struct wlan_objmgr_vdev *vdev,
 			       enum qca_wlan_802_11_mode phymode)
 {
-	struct wlan_dp_intf *dp_intf = dp_get_vdev_priv_obj(vdev);
+	struct wlan_dp_link *dp_link = dp_get_vdev_priv_obj(vdev);
+	struct wlan_dp_intf *dp_intf = dp_link->dp_intf;
 
+	if (!dp_link) {
+		dp_err("No dp_link for objmgr vdev %pK", vdev);
+		return;
+	}
+
+	dp_intf = dp_link->dp_intf;
 	if (!dp_intf) {
-		dp_err("Unable to get DP interface");
+		dp_err("Invalid dp_intf for dp_link %pK (" QDF_MAC_ADDR_FMT ")",
+		       dp_link, QDF_MAC_ADDR_REF(dp_link->mac_addr.bytes));
 		return;
 	}
 
@@ -512,10 +520,18 @@ static inline void
 dp_del_latency_critical_client(struct wlan_objmgr_vdev *vdev,
 			       enum qca_wlan_802_11_mode phymode)
 {
-	struct wlan_dp_intf *dp_intf = dp_get_vdev_priv_obj(vdev);
+	struct wlan_dp_link *dp_link = dp_get_vdev_priv_obj(vdev);
+	struct wlan_dp_intf *dp_intf = dp_link->dp_intf;
 
+	if (!dp_link) {
+		dp_err("No dp_link for objmgr vdev %pK", vdev);
+		return;
+	}
+
+	dp_intf = dp_link->dp_intf;
 	if (!dp_intf) {
-		dp_err("Unable to get DP interface");
+		dp_err("Invalid dp_intf for dp_link %pK (" QDF_MAC_ADDR_FMT ")",
+		       dp_link, QDF_MAC_ADDR_REF(dp_link->mac_addr.bytes));
 		return;
 	}
 

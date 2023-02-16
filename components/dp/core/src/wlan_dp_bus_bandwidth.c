@@ -2213,12 +2213,19 @@ void dp_bus_bw_compute_timer_try_stop(struct wlan_objmgr_psoc *psoc)
 void dp_bus_bw_compute_prev_txrx_stats(struct wlan_objmgr_vdev *vdev)
 {
 	struct wlan_objmgr_psoc *psoc = wlan_vdev_get_psoc(vdev);
-
-	struct wlan_dp_intf *dp_intf = dp_get_vdev_priv_obj(vdev);
+	struct wlan_dp_link *dp_link = dp_get_vdev_priv_obj(vdev);
+	struct wlan_dp_intf *dp_intf;
 	struct wlan_dp_psoc_context *dp_ctx = dp_psoc_get_priv(psoc);
 
+	if (!dp_link) {
+		dp_err("No dp_link for objmgr vdev %pK", vdev);
+		return;
+	}
+
+	dp_intf = dp_link->dp_intf;
 	if (!dp_intf) {
-		dp_err("Unable to get DP interface");
+		dp_err("Invalid dp_intf for dp_link %pK (" QDF_MAC_ADDR_FMT ")",
+		       dp_link, QDF_MAC_ADDR_REF(dp_link->mac_addr.bytes));
 		return;
 	}
 
@@ -2240,13 +2247,22 @@ void dp_bus_bw_compute_prev_txrx_stats(struct wlan_objmgr_vdev *vdev)
 void dp_bus_bw_compute_reset_prev_txrx_stats(struct wlan_objmgr_vdev *vdev)
 {
 	struct wlan_objmgr_psoc *psoc = wlan_vdev_get_psoc(vdev);
-	struct wlan_dp_intf *dp_intf = dp_get_vdev_priv_obj(vdev);
+	struct wlan_dp_link *dp_link = dp_get_vdev_priv_obj(vdev);
+	struct wlan_dp_intf *dp_intf;
 	struct wlan_dp_psoc_context *dp_ctx = dp_psoc_get_priv(psoc);
 
-	if (!dp_intf) {
-		dp_err("Unable to get DP interface");
+	if (!dp_link) {
+		dp_err("No dp_link for objmgr vdev %pK", vdev);
 		return;
 	}
+
+	dp_intf = dp_link->dp_intf;
+	if (!dp_intf) {
+		dp_err("Invalid dp_intf for dp_link %pK (" QDF_MAC_ADDR_FMT ")",
+		       dp_link, QDF_MAC_ADDR_REF(dp_link->mac_addr.bytes));
+		return;
+	}
+
 	if (QDF_GLOBAL_FTM_MODE == cds_get_conparam())
 		return;
 

@@ -787,6 +787,7 @@ dp_rx_mic_error_ind(struct cdp_ctrl_objmgr_psoc *psoc, uint8_t pdev_id,
 	struct dp_mic_error_info *dp_mic_info;
 	struct wlan_objmgr_vdev *vdev;
 	struct wlan_dp_intf *dp_intf;
+	struct wlan_dp_link *dp_link;
 
 	if (!psoc)
 		return;
@@ -796,12 +797,13 @@ dp_rx_mic_error_ind(struct cdp_ctrl_objmgr_psoc *psoc, uint8_t pdev_id,
 						    WLAN_DP_ID);
 	if (!vdev)
 		return;
-	dp_intf = dp_get_vdev_priv_obj(vdev);
-	if (!dp_intf) {
+	dp_link = dp_get_vdev_priv_obj(vdev);
+	if (!dp_link) {
 		dp_comp_vdev_put_ref(vdev);
 		return;
 	}
 
+	dp_intf = dp_link->dp_intf;
 	dp_mic_info = qdf_mem_malloc(sizeof(*dp_mic_info));
 	if (!dp_mic_info) {
 		dp_comp_vdev_put_ref(vdev);
@@ -1064,12 +1066,7 @@ dp_vdev_obj_destroy_notification(struct wlan_objmgr_vdev *vdev, void *arg)
 	dp_info("DP VDEV OBJ destroy notification, vdev_id %d",
 		wlan_vdev_get_id(vdev));
 
-	dp_intf = dp_get_vdev_priv_obj(vdev);
-	/*
-	 * TODO - Remove the below line after proto-type of
-	 * dp_get_vdev_priv_obj is changed
-	 */
-	dp_link = (struct wlan_dp_link *)dp_intf;
+	dp_link = dp_get_vdev_priv_obj(vdev);
 	if (!dp_link) {
 		dp_err("Failed to get DP link obj");
 		return QDF_STATUS_E_INVAL;
@@ -1398,12 +1395,15 @@ err:
 
 void dp_try_send_rps_ind(struct wlan_objmgr_vdev *vdev)
 {
-	struct wlan_dp_intf *dp_intf = dp_get_vdev_priv_obj(vdev);
+	struct wlan_dp_link *dp_link = dp_get_vdev_priv_obj(vdev);
+	struct wlan_dp_intf *dp_intf;
 
-	if (!dp_intf) {
-		dp_err("dp interface is NULL");
+	if (!dp_link) {
+		dp_err("dp link is NULL");
 		return;
 	}
+
+	dp_intf = dp_link->dp_intf;
 	if (dp_intf->dp_ctx->rps)
 		dp_send_rps_ind(dp_intf);
 }
@@ -1441,6 +1441,7 @@ void dp_set_rps(uint8_t vdev_id, bool enable)
 	struct wlan_objmgr_vdev *vdev;
 	struct wlan_dp_psoc_context *dp_ctx;
 	struct wlan_dp_intf *dp_intf;
+	struct wlan_dp_link *dp_link;
 
 	dp_ctx = dp_get_context();
 	if (!dp_ctx)
@@ -1451,12 +1452,14 @@ void dp_set_rps(uint8_t vdev_id, bool enable)
 	if (!vdev)
 		return;
 
-	dp_intf = dp_get_vdev_priv_obj(vdev);
-	if (!dp_intf) {
+	dp_link = dp_get_vdev_priv_obj(vdev);
+	if (!dp_link) {
 		dp_comp_vdev_put_ref(vdev);
-		dp_err_rl("DP interface not found for vdev_id: %d", vdev_id);
+		dp_err_rl("DP link not found for vdev_id: %d", vdev_id);
 		return;
 	}
+
+	dp_intf = dp_link->dp_intf;
 
 	dp_info("Set RPS to %d for vdev_id %d", enable, vdev_id);
 	if (!dp_ctx->rps) {
@@ -1535,6 +1538,7 @@ QDF_STATUS dp_get_arp_stats_event_handler(struct wlan_objmgr_psoc *psoc,
 					  struct dp_rsp_stats *rsp)
 {
 	struct wlan_dp_intf *dp_intf;
+	struct wlan_dp_link *dp_link;
 	struct wlan_objmgr_vdev *vdev;
 
 	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc,
@@ -1545,12 +1549,14 @@ QDF_STATUS dp_get_arp_stats_event_handler(struct wlan_objmgr_psoc *psoc,
 		return QDF_STATUS_E_INVAL;
 	}
 
-	dp_intf = dp_get_vdev_priv_obj(vdev);
-	if (!dp_intf) {
-		dp_err("Unable to get DP interface");
+	dp_link = dp_get_vdev_priv_obj(vdev);
+	if (!dp_link) {
+		dp_err("Unable to get DP link for vdev_id %d", rsp->vdev_id);
 		wlan_objmgr_vdev_release_ref(vdev, WLAN_DP_ID);
 		return QDF_STATUS_E_INVAL;
 	}
+
+	dp_intf = dp_link->dp_intf;
 
 	dp_info("rsp->arp_req_enqueue :%x", rsp->arp_req_enqueue);
 	dp_info("rsp->arp_req_tx_success :%x", rsp->arp_req_tx_success);
