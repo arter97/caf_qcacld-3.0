@@ -2046,11 +2046,11 @@ reg_get_opclass_for_cur_hwmode(struct wlan_objmgr_pdev *pdev,
 
 #ifndef CONFIG_REG_CLIENT
 /**
- * reg_enable_disable_freq_in_mas_chan_list() - Mark the opclass flag of the
+ * reg_enable_disable_chan_in_mas_chan_list() - Mark the opclass flag of the
  * freq/channel as disabled in the master channel list. Then based on that
  * regulatory disable/enable the freq/channel in the current channel list
- * @pdev: Pointer to pdev
- * @chan_num:  2.4Ghz or 5Ghz channel number
+ * @pdev_priv_obj: Pointer to regulatory pdev private object
+ * @chan_num:  2.4 GHz or 5 GHz channel number
  * @is_disable: Boolean to disable or enable
  *
  * Return: void
