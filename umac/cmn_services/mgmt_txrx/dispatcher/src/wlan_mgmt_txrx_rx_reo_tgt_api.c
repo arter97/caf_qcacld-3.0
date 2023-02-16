@@ -189,6 +189,43 @@ tgt_mgmt_rx_reo_host_drop_handler(struct wlan_objmgr_pdev *pdev,
 			pdev, params, MGMT_RX_REO_FRAME_DESC_ERROR_FRAME);
 }
 
+/**
+ * psoc_get_hw_link_id_bmap() - Helper API to get HW link ID bitmap of the
+ * pdevs in a psoc
+ * @psoc: Pointer to psoc object
+ * @obj: Pointer to pdev object
+ * @arg: pointer to void * argument
+ *
+ * Return: void
+ */
+static void
+psoc_get_hw_link_id_bmap(struct wlan_objmgr_psoc *psoc, void *obj, void *arg)
+{
+	struct wlan_objmgr_pdev *pdev = (struct wlan_objmgr_pdev *)obj;
+	uint32_t *link_bitmap = (uint32_t *)arg;
+	int8_t cur_link;
+
+	cur_link = wlan_get_mlo_link_id_from_pdev(pdev);
+	qdf_assert_always(cur_link >= 0 && cur_link < MAX_MLO_LINKS);
+
+	*link_bitmap |= (1 << cur_link);
+}
+
+QDF_STATUS
+tgt_mgmt_rx_reo_release_frames(struct wlan_objmgr_psoc *psoc)
+{
+	uint8_t mlo_grp_id;
+	uint32_t link_bitmap = 0;
+
+	mlo_grp_id = wlan_mlo_get_psoc_group_id(psoc);
+
+	wlan_objmgr_iterate_obj_list(psoc, WLAN_PDEV_OP,
+				     psoc_get_hw_link_id_bmap,
+				     &link_bitmap, false, WLAN_MGMT_RX_REO_ID);
+
+	return QDF_STATUS_SUCCESS;
+}
+
 QDF_STATUS tgt_mgmt_rx_reo_filter_config(struct wlan_objmgr_pdev *pdev,
 					 struct mgmt_rx_reo_filter *filter)
 {
@@ -373,4 +410,23 @@ cleanup:
 	free_mgmt_rx_event_params(mgmt_rx_params);
 
 	return status;
+}
+
+QDF_STATUS
+tgt_mgmt_rx_reo_schedule_delivery(struct wlan_objmgr_psoc *psoc)
+{
+	struct wlan_lmac_if_mgmt_rx_reo_tx_ops *mgmt_rx_reo_txops;
+
+	mgmt_rx_reo_txops = wlan_psoc_get_mgmt_rx_reo_txops(psoc);
+	if (!mgmt_rx_reo_txops) {
+		mgmt_rx_reo_err("MGMT Rx REO txops is NULL");
+		return QDF_STATUS_E_NULL_VALUE;
+	}
+
+	if (!mgmt_rx_reo_txops->schedule_delivery) {
+		mgmt_rx_reo_err("mgmt_rx_reo_schedule delivery is NULL");
+		return QDF_STATUS_E_NULL_VALUE;
+	}
+
+	return mgmt_rx_reo_txops->schedule_delivery(psoc);
 }
