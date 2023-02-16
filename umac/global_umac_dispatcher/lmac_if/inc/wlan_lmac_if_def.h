@@ -317,6 +317,8 @@ struct wlan_lmac_if_mgmt_rx_reo_low_level_ops {
  * @read_mgmt_rx_reo_snapshot: Read rx-reorder snapshots
  * @get_mgmt_rx_reo_snapshot_info: Get rx-reorder snapshot info
  * @mgmt_rx_reo_filter_config:  Configure MGMT Rx REO filter
+ * @schedule_delivery: Schedule delivery of management frames
+ * @cancel_scheduled_delivery: Cancel schedule delivery of management frames
  * @low_level_ops:  Low level operations of MGMT Rx REO module
  */
 struct wlan_lmac_if_mgmt_rx_reo_tx_ops {
@@ -338,6 +340,8 @@ struct wlan_lmac_if_mgmt_rx_reo_tx_ops {
 	QDF_STATUS (*mgmt_rx_reo_filter_config)(
 					struct wlan_objmgr_pdev *pdev,
 					struct mgmt_rx_reo_filter *filter);
+	QDF_STATUS (*schedule_delivery)(struct wlan_objmgr_psoc *psoc);
+	QDF_STATUS (*cancel_scheduled_delivery)(struct wlan_objmgr_psoc *psoc);
 	struct wlan_lmac_if_mgmt_rx_reo_low_level_ops low_level_ops;
 };
 
@@ -347,6 +351,7 @@ struct wlan_lmac_if_mgmt_rx_reo_tx_ops {
  * @fw_consumed_event_handler: FW consumed event handler
  * @host_drop_handler: Handler for the frames that gets dropped in Host before
  * entering REO algorithm
+ * @release_frames: Release management frames
  */
 struct wlan_lmac_if_mgmt_rx_reo_rx_ops {
 	QDF_STATUS (*fw_consumed_event_handler)(
@@ -355,6 +360,7 @@ struct wlan_lmac_if_mgmt_rx_reo_rx_ops {
 	QDF_STATUS (*host_drop_handler)(
 			struct wlan_objmgr_pdev *pdev,
 			struct mgmt_rx_reo_params *params);
+	QDF_STATUS (*release_frames)(struct wlan_objmgr_psoc *psoc);
 };
 #endif
 

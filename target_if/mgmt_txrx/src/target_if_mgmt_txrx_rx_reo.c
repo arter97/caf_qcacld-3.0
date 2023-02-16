@@ -606,6 +606,62 @@ target_if_mgmt_rx_reo_extract_reo_params(
 					      params->reo_params);
 }
 
+/**
+ * target_if_mgmt_rx_reo_schedule_delivery() - Schedule the delivery of
+ * management frames of the given psoc
+ * @soc: Pointer to psoc object
+ *
+ * Return: QDF_STATUS
+ */
+static QDF_STATUS
+target_if_mgmt_rx_reo_schedule_delivery(struct wlan_objmgr_psoc *psoc)
+{
+	struct hif_opaque_softc *hif_handle;
+	struct wmi_unified *wmi_handle;
+
+	hif_handle = lmac_get_hif_hdl(psoc);
+	if (!hif_handle) {
+		mgmt_rx_reo_err("HIF handle is null");
+		return QDF_STATUS_E_NULL_VALUE;
+	}
+
+	wmi_handle = get_wmi_unified_hdl_from_psoc(psoc);
+	if (!wmi_handle) {
+		mgmt_rx_reo_err("wmi_handle is NULL");
+		return QDF_STATUS_E_NULL_VALUE;
+	}
+
+	return QDF_STATUS_SUCCESS;
+}
+
+/**
+ * target_if_mgmt_rx_reo_cancel_scheduled_delivery() - Cancel the scheduled
+ * delivery of management frames of the given psoc
+ * @soc: Pointer to psoc object
+ *
+ * Return: QDF_STATUS
+ */
+static QDF_STATUS
+target_if_mgmt_rx_reo_cancel_scheduled_delivery(struct wlan_objmgr_psoc *psoc)
+{
+	struct hif_opaque_softc *hif_handle;
+	struct wmi_unified *wmi_handle;
+
+	hif_handle = lmac_get_hif_hdl(psoc);
+	if (!hif_handle) {
+		mgmt_rx_reo_err("HIF handle is null");
+		return QDF_STATUS_E_NULL_VALUE;
+	}
+
+	wmi_handle = get_wmi_unified_hdl_from_psoc(psoc);
+	if (!wmi_handle) {
+		mgmt_rx_reo_err("wmi_handle is NULL");
+		return QDF_STATUS_E_NULL_VALUE;
+	}
+
+	return QDF_STATUS_SUCCESS;
+}
+
 QDF_STATUS
 target_if_mgmt_rx_reo_tx_ops_register(
 			struct wlan_lmac_if_mgmt_txrx_tx_ops *mgmt_txrx_tx_ops)
@@ -627,6 +683,10 @@ target_if_mgmt_rx_reo_tx_ops_register(
 				target_if_mgmt_rx_reo_get_snapshot_info;
 	mgmt_rx_reo_tx_ops->mgmt_rx_reo_filter_config =
 					target_if_mgmt_rx_reo_filter_config;
+	mgmt_rx_reo_tx_ops->schedule_delivery =
+				target_if_mgmt_rx_reo_schedule_delivery;
+	mgmt_rx_reo_tx_ops->cancel_scheduled_delivery =
+				target_if_mgmt_rx_reo_cancel_scheduled_delivery;
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -655,4 +715,30 @@ target_if_mgmt_rx_reo_host_drop_handler(struct wlan_objmgr_pdev *pdev,
 	}
 
 	return mgmt_rx_reo_rx_ops->host_drop_handler(pdev, params->reo_params);
+}
+
+void target_if_mgmt_rx_reo_release_frames(void *arg)
+{
+	ol_scn_t scn = arg;
+	struct wlan_objmgr_psoc *psoc;
+	struct wlan_lmac_if_mgmt_rx_reo_rx_ops *mgmt_rx_reo_rx_ops;
+	QDF_STATUS status;
+
+	psoc = target_if_get_psoc_from_scn_hdl(scn);
+	if (!psoc) {
+		mgmt_rx_reo_err("null psoc");
+		return;
+	}
+
+	mgmt_rx_reo_rx_ops = target_if_mgmt_rx_reo_get_rx_ops(psoc);
+	if (!mgmt_rx_reo_rx_ops) {
+		mgmt_rx_reo_err("rx_ops of MGMT Rx REO module is NULL");
+		return;
+	}
+
+	status = mgmt_rx_reo_rx_ops->release_frames(psoc);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		mgmt_rx_reo_err("Failed to release entries, ret = %d", status);
+		return;
+	}
 }
