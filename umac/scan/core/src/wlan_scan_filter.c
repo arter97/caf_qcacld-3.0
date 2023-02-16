@@ -785,7 +785,7 @@ static bool util_eht_puncture_valid(struct wlan_objmgr_pdev *pdev,
 	uint16_t new_puncture_bitmap = 0;
 	QDF_STATUS status;
 	uint32_t cfreq1;
-	uint8_t band_mask = BIT(REG_BAND_6G);
+	uint8_t band_mask;
 
 	eht_ops = (struct wlan_ie_ehtops *)util_scan_entry_ehtop(db_entry);
 	if (!eht_ops)
@@ -811,6 +811,9 @@ static bool util_eht_puncture_valid(struct wlan_objmgr_pdev *pdev,
 	orig_width = QDF_GET_BITS(eht_ops->control,
 				  EHTOP_INFO_CHAN_WIDTH_IDX,
 				  EHTOP_INFO_CHAN_WIDTH_BITS);
+
+	band_mask = BIT(wlan_reg_freq_to_band(db_entry->channel.chan_freq));
+
 	/* Check if CCFS bits are present */
 	if (QDF_GET_BITS(eht_ops->ehtop_param,
 			 EHTOP_INFO_PRESENT_IDX, EHTOP_INFO_PRESENT_BITS))
