@@ -1481,6 +1481,53 @@ ce_watermark_cb_register(struct CE_handle *copyeng,
 		CE_state->misc_cbs = 1;
 }
 
+#ifdef CUSTOM_CB_SCHEDULER_SUPPORT
+void
+ce_register_custom_cb(struct CE_handle *copyeng, void (*custom_cb)(void *),
+		      void *custom_cb_context)
+{
+	struct CE_state *CE_state = (struct CE_state *)copyeng;
+
+	CE_state->custom_cb = custom_cb;
+	CE_state->custom_cb_context = custom_cb_context;
+	qdf_atomic_init(&CE_state->custom_cb_pending);
+}
+
+void
+ce_unregister_custom_cb(struct CE_handle *copyeng)
+{
+	struct CE_state *CE_state = (struct CE_state *)copyeng;
+
+	qdf_assert_always(!qdf_atomic_read(&CE_state->custom_cb_pending));
+	CE_state->custom_cb = NULL;
+	CE_state->custom_cb_context = NULL;
+}
+
+void
+ce_enable_custom_cb(struct CE_handle *copyeng)
+{
+	struct CE_state *CE_state = (struct CE_state *)copyeng;
+	int32_t custom_cb_pending;
+
+	qdf_assert_always(CE_state->custom_cb);
+	qdf_assert_always(CE_state->custom_cb_context);
+
+	custom_cb_pending = qdf_atomic_inc_return(&CE_state->custom_cb_pending);
+	qdf_assert_always(custom_cb_pending >= 1);
+}
+
+void
+ce_disable_custom_cb(struct CE_handle *copyeng)
+{
+	struct CE_state *CE_state = (struct CE_state *)copyeng;
+
+	qdf_assert_always(CE_state->custom_cb);
+	qdf_assert_always(CE_state->custom_cb_context);
+
+	qdf_atomic_dec_if_positive(&CE_state->custom_cb_pending);
+}
+#endif /* CUSTOM_CB_SCHEDULER_SUPPORT */
+
 bool ce_get_rx_pending(struct hif_softc *scn)
 {
 	int CE_id;

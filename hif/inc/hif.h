@@ -1075,6 +1075,51 @@ struct hif_pipe_addl_info {
 
 struct hif_bus_id;
 
+#ifdef CUSTOM_CB_SCHEDULER_SUPPORT
+/**
+ * hif_register_ce_custom_cb() - Helper API to register the custom callback
+ * @hif_ctx: HIF opaque context
+ * @pipe: Pipe number
+ * @custom_cb: Custom call back function pointer
+ * @custom_cb_context: Custom callback context
+ *
+ * return: QDF_STATUS
+ */
+QDF_STATUS
+hif_register_ce_custom_cb(struct hif_opaque_softc *hif_ctx, uint8_t pipe,
+			  void (*custom_cb)(void *), void *custom_cb_context);
+
+/**
+ * hif_unregister_ce_custom_cb() - Helper API to unregister the custom callback
+ * @hif_ctx: HIF opaque context
+ * @pipe: Pipe number
+ *
+ * return: QDF_STATUS
+ */
+QDF_STATUS
+hif_unregister_ce_custom_cb(struct hif_opaque_softc *hif_ctx, uint8_t pipe);
+
+/**
+ * hif_enable_ce_custom_cb() - Helper API to enable the custom callback
+ * @hif_ctx: HIF opaque context
+ * @pipe: Pipe number
+ *
+ * return: QDF_STATUS
+ */
+QDF_STATUS
+hif_enable_ce_custom_cb(struct hif_opaque_softc *hif_ctx, uint8_t pipe);
+
+/**
+ * hif_disable_ce_custom_cb() - Helper API to disable the custom callback
+ * @hif_ctx: HIF opaque context
+ * @pipe: Pipe number
+ *
+ * return: QDF_STATUS
+ */
+QDF_STATUS
+hif_disable_ce_custom_cb(struct hif_opaque_softc *hif_ctx, uint8_t pipe);
+#endif /* CUSTOM_CB_SCHEDULER_SUPPORT */
+
 void hif_claim_device(struct hif_opaque_softc *hif_ctx);
 QDF_STATUS hif_get_config_item(struct hif_opaque_softc *hif_ctx,
 		     int opcode, void *config, uint32_t config_len);

@@ -375,6 +375,49 @@ QDF_STATUS ce_completed_send_next(struct CE_handle *copyeng,
 				  unsigned int *hw_idx,
 				  uint32_t *toeplitz_hash_result);
 
+#ifdef CUSTOM_CB_SCHEDULER_SUPPORT
+/*==================CE custom callbacks=================================*/
+
+/**
+ * ce_register_custom_cb() - Helper API to register the custom callback
+ * @copyeng: Pointer to CE handle
+ * @custom_cb: Custom call back function pointer
+ * @custom_cb_context: Custom callback context
+ *
+ * return: void
+ */
+void
+ce_register_custom_cb(struct CE_handle *copyeng, void (*custom_cb)(void *),
+		      void *custom_cb_context);
+
+/**
+ * ce_unregister_custom_cb() - Helper API to unregister the custom callback
+ * @copyeng: Pointer to CE handle
+ *
+ * return: void
+ */
+void
+ce_unregister_custom_cb(struct CE_handle *copyeng);
+
+/**
+ * ce_enable_custom_cb() - Helper API to enable the custom callback
+ * @copyeng: Pointer to CE handle
+ *
+ * return: void
+ */
+void
+ce_enable_custom_cb(struct CE_handle *copyeng);
+
+/**
+ * ce_disable_custom_cb() - Helper API to disable the custom callback
+ * @copyeng: Pointer to CE handle
+ *
+ * return: void
+ */
+void
+ce_disable_custom_cb(struct CE_handle *copyeng);
+#endif /* CUSTOM_CB_SCHEDULER_SUPPORT */
+
 /*==================CE Engine Initialization=================================*/
 
 /* Initialize an instance of a CE */

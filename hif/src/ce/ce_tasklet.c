@@ -400,6 +400,46 @@ void hif_latency_detect_tasklet_exec(
 {}
 #endif
 
+#ifdef CUSTOM_CB_SCHEDULER_SUPPORT
+/**
+ * ce_get_custom_cb_pending() - Helper API to check whether the custom
+ * callback is pending
+ * @CE_state: Pointer to CE state
+ *
+ * return: bool
+ */
+static bool
+ce_get_custom_cb_pending(struct CE_state *CE_state)
+{
+	return (qdf_atomic_dec_if_positive(&CE_state->custom_cb_pending) >= 0);
+}
+
+/**
+ * ce_execute_custom_cb() - Helper API to execute custom callback
+ * @CE_state: Pointer to CE state
+ *
+ * return: void
+ */
+static void
+ce_execute_custom_cb(struct CE_state *CE_state)
+{
+	while (ce_get_custom_cb_pending(CE_state) && CE_state->custom_cb &&
+	       CE_state->custom_cb_context)
+		CE_state->custom_cb(CE_state->custom_cb_context);
+}
+#else
+/**
+ * ce_execute_custom_cb() - Helper API to execute custom callback
+ * @CE_state: Pointer to CE state
+ *
+ * return: void
+ */
+static void
+ce_execute_custom_cb(struct CE_state *CE_state)
+{
+}
+#endif /* CUSTOM_CB_SCHEDULER_SUPPORT */
+
 /**
  * ce_tasklet() - ce_tasklet
  * @data: data
@@ -427,6 +467,8 @@ static void ce_tasklet(unsigned long data)
 			tasklet_entry->ce_id);
 		QDF_BUG(0);
 	}
+
+	ce_execute_custom_cb(CE_state);
 
 	ce_per_engine_service(scn, tasklet_entry->ce_id);
 

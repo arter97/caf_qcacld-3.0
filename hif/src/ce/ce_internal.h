@@ -151,6 +151,11 @@ struct CE_state {
 	CE_watermark_cb watermark_cb;
 	void *wm_context;
 
+#ifdef CUSTOM_CB_SCHEDULER_SUPPORT
+	qdf_atomic_t custom_cb_pending;
+	void (*custom_cb)(void *arg);
+	void *custom_cb_context;
+#endif /* CUSTOM_CB_SCHEDULER_SUPPORT */
 	/*Record the state of the copy compl interrupt */
 	int disable_copy_compl_intr;
 
