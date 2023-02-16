@@ -438,3 +438,9 @@ wlan_mgmt_rx_reo_print_egress_frame_info(uint8_t ml_grp_id, uint16_t num_frames)
 {
 	return mgmt_rx_reo_print_egress_frame_info(ml_grp_id, num_frames);
 }
+
+QDF_STATUS
+wlan_mgmt_rx_reo_release_frames(uint8_t mlo_grp_id, uint32_t link_bitmap)
+{
+	return mgmt_rx_reo_release_frames(mlo_grp_id, link_bitmap);
+}

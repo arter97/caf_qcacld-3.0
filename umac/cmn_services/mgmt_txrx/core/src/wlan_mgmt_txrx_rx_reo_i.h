@@ -53,7 +53,7 @@
 #define STATUS_INGRESS_LIST_OVERFLOW                 (BIT(3))
 #define STATUS_OLDER_THAN_READY_TO_DELIVER_FRAMES    (BIT(4))
 
-#define MGMT_RX_REO_INVALID_LINK_ID   (-1)
+#define MGMT_RX_REO_INVALID_LINK   (-1)
 
 /* Reason to release an entry from the reorder list */
 #define RELEASE_REASON_ZERO_WAIT_COUNT                          (BIT(0))
@@ -341,6 +341,7 @@ struct mgmt_rx_reo_wait_count {
  * last frame which is delivered to the upper layer.
  * @shared_snapshots: snapshots shared b/w host and target
  * @host_snapshot: host snapshot
+ * @scheduled_count: Number of times scheduler is invoked for this frame
  */
 struct mgmt_rx_reo_list_entry {
 	qdf_list_node_t node;
@@ -363,6 +364,7 @@ struct mgmt_rx_reo_list_entry {
 	struct mgmt_rx_reo_snapshot_params shared_snapshots
 			[MAX_MLO_LINKS][MGMT_RX_REO_SHARED_SNAPSHOT_MAX];
 	struct mgmt_rx_reo_snapshot_params host_snapshot[MAX_MLO_LINKS];
+	qdf_atomic_t scheduled_count;
 };
 
 #ifdef WLAN_MGMT_RX_REO_SIM_SUPPORT
@@ -1291,5 +1293,16 @@ wlan_mgmt_rx_reo_algo_entry(struct wlan_objmgr_pdev *pdev,
  */
 QDF_STATUS
 mgmt_rx_reo_validate_mlo_link_info(struct wlan_objmgr_psoc *psoc);
+
+/**
+ * mgmt_rx_reo_release_frames() - Release management frames which are ready
+ * for delivery
+ * @mlo_grp_id: MLO group ID
+ * @link_bitmap: Link bitmap
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+mgmt_rx_reo_release_frames(uint8_t mlo_grp_id, uint32_t link_bitmap);
 #endif /* WLAN_MGMT_RX_REO_SUPPORT */
 #endif /* _WLAN_MGMT_TXRX_RX_REO_I_H */

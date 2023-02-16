@@ -446,7 +446,7 @@ mgmt_rx_reo_sim_get_mlo_link_id_from_pdev(struct wlan_objmgr_pdev *pdev)
 	sim_context = mgmt_rx_reo_sim_get_context();
 	if (!sim_context) {
 		mgmt_rx_reo_err("Mgmt reo simulation context is null");
-		return MGMT_RX_REO_INVALID_LINK_ID;
+		return MGMT_RX_REO_INVALID_LINK;
 	}
 
 	qdf_spin_lock(&sim_context->link_id_to_pdev_map.lock);
@@ -457,7 +457,7 @@ mgmt_rx_reo_sim_get_mlo_link_id_from_pdev(struct wlan_objmgr_pdev *pdev)
 
 	/* pdev is not found in map */
 	if (link_id == MAX_MLO_LINKS)
-		link_id = MGMT_RX_REO_INVALID_LINK_ID;
+		link_id = MGMT_RX_REO_INVALID_LINK;
 
 	qdf_spin_unlock(&sim_context->link_id_to_pdev_map.lock);
 
@@ -2166,6 +2166,73 @@ mgmt_rx_reo_is_entry_ready_to_send_up(struct mgmt_rx_reo_list_entry *entry)
 }
 
 /**
+ * mgmt_rx_reo_defer_delivery() - Helper API to check whether a management
+ * frame can be delivered in the current context or it has to be scheduled
+ * for delivery in a different context
+ * @entry: List entry
+ * @link_bitmap: Link bitmap
+ *
+ * Return: true if frame can't be delivered in the current context and its
+ * delivery has to be done in a different context
+ */
+bool
+mgmt_rx_reo_defer_delivery(struct mgmt_rx_reo_list_entry *entry,
+			   uint32_t link_bitmap)
+{
+	uint8_t link_id;
+
+	qdf_assert_always(entry);
+
+	link_id = mgmt_rx_reo_get_link_id(entry->rx_params);
+
+	return !(link_bitmap & (1 << link_id));
+}
+
+/**
+ * mgmt_rx_reo_schedule_delivery() - Helper API to schedule the delivery of
+ * a management frames.
+ * @entry: List entry corresponding to the frame which has to be scheduled
+ * for delivery
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+mgmt_rx_reo_schedule_delivery(struct mgmt_rx_reo_list_entry *entry)
+{
+	int scheduled_count;
+	int8_t link_id;
+	uint8_t mlo_grp_id;
+	struct wlan_objmgr_pdev *pdev;
+	QDF_STATUS status;
+
+	scheduled_count = qdf_atomic_inc_return(&entry->scheduled_count);
+	qdf_assert_always(scheduled_count > 0);
+
+	if (scheduled_count > 1)
+		return QDF_STATUS_SUCCESS;
+
+	link_id = mgmt_rx_reo_get_link_id(entry->rx_params);
+	qdf_assert_always(link_id >= 0 && link_id < MAX_MLO_LINKS);
+	mlo_grp_id = entry->rx_params->reo_params->mlo_grp_id;
+	pdev = wlan_get_pdev_from_mlo_link_id(link_id, mlo_grp_id,
+					      WLAN_MGMT_RX_REO_ID);
+	if (!pdev) {
+		mgmt_rx_reo_err("pdev for link %u, group %u is null",
+				link_id, mlo_grp_id);
+		return QDF_STATUS_E_NULL_VALUE;
+	}
+
+	status = tgt_mgmt_rx_reo_schedule_delivery(wlan_pdev_get_psoc(pdev));
+	if (QDF_IS_STATUS_ERROR(status)) {
+		mgmt_rx_reo_err("Failed to schedule for link %u, group %u",
+				link_id, mlo_grp_id);
+		return status;
+	}
+
+	return QDF_STATUS_SUCCESS;
+}
+
+/**
  * mgmt_rx_reo_release_egress_list_entries() - Release entries from the
  * egress list
  * @reo_context: Pointer to management Rx reorder context
@@ -2292,6 +2359,20 @@ exit_unlock_frame_release_lock:
 	qdf_spin_unlock(&reo_context->frame_release_lock);
 
 	return status;
+}
+
+QDF_STATUS
+mgmt_rx_reo_release_frames(uint8_t mlo_grp_id, uint32_t link_bitmap)
+{
+	struct mgmt_rx_reo_context *reo_context;
+
+	reo_context = mgmt_rx_reo_get_context(mlo_grp_id);
+	if (!reo_context) {
+		mgmt_rx_reo_err("Mgmt rx reo context is null");
+		return QDF_STATUS_E_NULL_VALUE;
+	}
+
+	return QDF_STATUS_SUCCESS;
 }
 
 /**
@@ -2720,6 +2801,7 @@ mgmt_rx_reo_prepare_list_entry(
 	list_entry->status = 0;
 	if (list_entry->wait_count.total_count)
 		list_entry->status |= STATUS_WAIT_FOR_FRAME_ON_OTHER_LINKS;
+	qdf_atomic_init(&list_entry->scheduled_count);
 
 	*entry = list_entry;
 
@@ -4974,13 +5056,13 @@ mgmt_rx_reo_sim_get_link_id(uint8_t valid_link_list_index)
 	if (valid_link_list_index >= MAX_MLO_LINKS) {
 		mgmt_rx_reo_err("Invalid index %u to valid link list",
 				valid_link_list_index);
-		return MGMT_RX_REO_INVALID_LINK_ID;
+		return MGMT_RX_REO_INVALID_LINK;
 	}
 
 	sim_context = mgmt_rx_reo_sim_get_context();
 	if (!sim_context) {
 		mgmt_rx_reo_err("Mgmt reo simulation context is null");
-		return MGMT_RX_REO_INVALID_LINK_ID;
+		return MGMT_RX_REO_INVALID_LINK;
 	}
 
 	return sim_context->link_id_to_pdev_map.valid_link_list
@@ -5624,7 +5706,7 @@ mgmt_rx_reo_sim_init(struct mgmt_rx_reo_context *reo_context)
 
 	for (link_id = 0; link_id < MAX_MLO_LINKS; link_id++)
 		sim_context->link_id_to_pdev_map.valid_link_list[link_id] =
-					MGMT_RX_REO_INVALID_LINK_ID;
+					MGMT_RX_REO_INVALID_LINK;
 
 	return QDF_STATUS_SUCCESS;
 }

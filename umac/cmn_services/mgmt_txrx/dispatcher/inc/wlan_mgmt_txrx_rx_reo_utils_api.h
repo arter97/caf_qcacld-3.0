@@ -447,6 +447,17 @@ wlan_mgmt_rx_reo_print_egress_frame_stats(uint8_t ml_grp_id);
 QDF_STATUS
 wlan_mgmt_rx_reo_print_egress_frame_info(uint8_t ml_grp_id,
 					 uint16_t num_frames);
+
+/**
+ * wlan_mgmt_rx_reo_release_frames() - Release management frames which are ready
+ * for delivery
+ * @mlo_grp_id: MLO group ID
+ * @link_bitmap: Link bitmap
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+wlan_mgmt_rx_reo_release_frames(uint8_t mlo_grp_id, uint32_t link_bitmap);
 #else
 static inline QDF_STATUS
 wlan_mgmt_rx_reo_validate_mlo_link_info(struct wlan_objmgr_psoc *psoc)
