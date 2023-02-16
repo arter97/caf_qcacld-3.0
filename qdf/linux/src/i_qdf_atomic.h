@@ -150,6 +150,18 @@ static inline int32_t __qdf_atomic_dec_return(__qdf_atomic_t *v)
 }
 
 /**
+ * __qdf_atomic_dec_if_positive() - Decrement an atomic variable if its
+ * value is positive
+ * @v: A pointer to an opaque atomic variable
+ *
+ * Return: The old value of the variable minus 1
+ */
+static inline int32_t __qdf_atomic_dec_if_positive(__qdf_atomic_t *v)
+{
+	return atomic_dec_if_positive(v);
+}
+
+/**
  * __qdf_atomic_inc_not_zero() - increment if not zero
  * @v: A pointer to an opaque atomic variable
  *
