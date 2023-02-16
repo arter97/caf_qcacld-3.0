@@ -670,6 +670,15 @@ void
 wmi_flush_endpoint(wmi_unified_t wmi_handle);
 
 /**
+ * wmi_get_endpoint() - API to get endpoint ID
+ * @wmi_handle: handle to WMI.
+ *
+ * Return Handle to endpoint
+ */
+HTC_ENDPOINT_ID
+wmi_get_endpoint(wmi_unified_t wmi_handle);
+
+/**
  * wmi_interface_sequence_stop() - API to stop wmi sequence check
  *
  * @wmi_handle: handle to WMI.
