@@ -548,6 +548,9 @@ struct sap_config {
 	struct hdd_channel_info *channel_info;
 	uint32_t channel_info_count;
 	bool dfs_cac_offload;
+#ifdef WLAN_SUPPORT_TWT
+	bool cfg80211_twt_responder;
+#endif
 #ifdef WLAN_FEATURE_11BE_MLO
 	bool mlo_sap;
 	uint8_t link_id;

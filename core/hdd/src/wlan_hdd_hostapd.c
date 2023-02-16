@@ -7315,9 +7315,8 @@ hdd_sap_nan_check_and_disable_unsupported_ndi(struct wlan_objmgr_psoc *psoc,
 	((LINUX_VERSION_CODE >= KERNEL_VERSION(5, 3, 0)) || \
 	  defined(CFG80211_TWT_RESPONDER_SUPPORT))
 #ifdef WLAN_TWT_CONV_SUPPORTED
-static void
-wlan_hdd_update_twt_responder(struct hdd_context *hdd_ctx,
-			      struct cfg80211_ap_settings *params)
+void wlan_hdd_configure_twt_responder(struct hdd_context *hdd_ctx,
+				      bool twt_responder)
 {
 	bool twt_res_svc_cap, enable_twt;
 	uint32_t reason;
@@ -7327,19 +7326,31 @@ wlan_hdd_update_twt_responder(struct hdd_context *hdd_ctx,
 	ucfg_twt_cfg_set_responder(hdd_ctx->psoc,
 				   QDF_MIN(twt_res_svc_cap,
 					   (enable_twt &&
-					    params->twt_responder)));
-	hdd_debug("cfg80211 TWT responder:%d", params->twt_responder);
-	if (enable_twt && params->twt_responder) {
+					    twt_responder)));
+	hdd_debug("cfg80211 TWT responder:%d", twt_responder);
+	if (enable_twt && twt_responder) {
 		hdd_send_twt_responder_enable_cmd(hdd_ctx);
 	} else {
 		reason = HOST_TWT_DISABLE_REASON_NONE;
 		hdd_send_twt_responder_disable_cmd(hdd_ctx, reason);
 	}
+
 }
-#else
+
 static void
-wlan_hdd_update_twt_responder(struct hdd_context *hdd_ctx,
+wlan_hdd_update_twt_responder(struct hdd_adapter *adapter,
 			      struct cfg80211_ap_settings *params)
+{
+	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
+
+	adapter->session.ap.sap_config.cfg80211_twt_responder =
+							params->twt_responder;
+	wlan_hdd_configure_twt_responder(hdd_ctx, params->twt_responder);
+}
+
+#else
+void wlan_hdd_configure_twt_responder(struct hdd_context *hdd_ctx,
+				      bool twt_responder)
 {
 	bool twt_res_svc_cap, enable_twt;
 	uint32_t reason;
@@ -7348,20 +7359,35 @@ wlan_hdd_update_twt_responder(struct hdd_context *hdd_ctx,
 	ucfg_mlme_get_twt_res_service_cap(hdd_ctx->psoc, &twt_res_svc_cap);
 	ucfg_mlme_set_twt_responder(hdd_ctx->psoc,
 				    QDF_MIN(twt_res_svc_cap,
-					    (enable_twt && params->twt_responder)));
-	hdd_debug("cfg80211 TWT responder:%d", params->twt_responder);
-	if (enable_twt && params->twt_responder) {
+					    (enable_twt && twt_responder)));
+	hdd_debug("cfg80211 TWT responder:%d", twt_responder);
+	if (enable_twt && twt_responder) {
 		hdd_send_twt_responder_enable_cmd(hdd_ctx);
 	} else {
 		reason = HOST_TWT_DISABLE_REASON_NONE;
 		hdd_send_twt_responder_disable_cmd(hdd_ctx, reason);
 	}
 }
+
+static void
+wlan_hdd_update_twt_responder(struct hdd_adapter *adapter,
+			      struct cfg80211_ap_settings *params)
+{
+	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
+
+	adapter->session.ap.sap_config.cfg80211_twt_responder =
+							params->twt_responder;
+	wlan_hdd_configure_twt_responder(hdd_ctx, params->twt_responder);
+}
 #endif
 #else
 static inline void
-wlan_hdd_update_twt_responder(struct hdd_context *hdd_ctx,
+wlan_hdd_update_twt_responder(struct hdd_adapter *adapter,
 			      struct cfg80211_ap_settings *params)
+{}
+
+void wlan_hdd_configure_twt_responder(struct hdd_context *hdd_ctx,
+				      bool twt_responder)
 {}
 #endif
 
@@ -7760,7 +7786,7 @@ static int __wlan_hdd_cfg80211_start_ap(struct wiphy *wiphy,
 		 * Enable/disable TWT responder based on
 		 * the twt_responder flag
 		 */
-		wlan_hdd_update_twt_responder(hdd_ctx, params);
+		wlan_hdd_update_twt_responder(adapter, params);
 
 		/* Enable/disable non-srg obss pd spatial reuse */
 		hdd_update_he_obss_pd(adapter, params);
