@@ -3763,6 +3763,11 @@ wmi_flush_endpoint(wmi_unified_t wmi_handle)
 }
 qdf_export_symbol(wmi_flush_endpoint);
 
+HTC_ENDPOINT_ID wmi_get_endpoint(wmi_unified_t wmi_handle)
+{
+	return wmi_handle->wmi_endpoint_id;
+}
+
 void wmi_pdev_id_conversion_enable(wmi_unified_t wmi_handle,
 				   uint32_t *pdev_id_map,
 				   uint8_t size)
