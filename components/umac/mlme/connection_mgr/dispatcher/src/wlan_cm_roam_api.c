@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2020-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -2792,6 +2792,7 @@ cm_roam_stats_get_trigger_detail_str(struct wmi_roam_trigger_info *ptr,
  * @data:  Pointer to the roam trigger data
  * @scan_data: Roam scan data pointer
  * @vdev_id: Vdev ID
+ * @is_full_scan: Was a full scan performed
  *
  * Prints the vdev, roam trigger reason, time of the day at which roaming
  * was triggered.
@@ -2828,8 +2829,10 @@ cm_roam_stats_print_trigger_info(struct wlan_objmgr_psoc *psoc,
 
 /**
  * cm_roam_stats_print_btm_rsp_info - BTM RSP related details
+ * @trigger_info:   Roam scan trigger reason
  * @data:    Pointer to the btm rsp data
  * @vdev_id: vdev id
+ * @is_wtc: is WTC?
  *
  * Prints the vdev, btm status, target_bssid and vsie reason
  *
@@ -2938,6 +2941,31 @@ cm_stats_log_roam_scan_candidates(struct wmi_roam_candidate_info *ap,
 }
 
 /**
+ * cm_get_roam_scan_type_str() - Get the string for roam scan type
+ * @roam_scan_type: roam scan type coming from fw via
+ * wmi_roam_scan_info tlv
+ *
+ *  Return: Meaningful string for roam scan type
+ */
+static char *cm_get_roam_scan_type_str(uint32_t roam_scan_type)
+{
+	switch (roam_scan_type) {
+	case ROAM_STATS_SCAN_TYPE_PARTIAL:
+		return "PARTIAL";
+	case ROAM_STATS_SCAN_TYPE_FULL:
+		return "FULL";
+	case ROAM_STATS_SCAN_TYPE_NO_SCAN:
+		return "NO SCAN";
+	case ROAM_STATS_SCAN_TYPE_HIGHER_BAND_5GHZ_6GHZ:
+		return "Higher Band: 5 GHz + 6 GHz";
+	case ROAM_STATS_SCAN_TYPE_HIGHER_BAND_6GHZ:
+		return "Higher Band : 6 GHz";
+	default:
+		return "UNKNOWN";
+	}
+}
+
+/**
  * cm_roam_stats_print_scan_info  - Print the roam scan details and candidate AP
  * details
  * @psoc:      psoc common object
@@ -2971,7 +2999,7 @@ cm_roam_stats_print_scan_info(struct wlan_objmgr_psoc *psoc,
 
 	tmp = buf;
 	/* For partial scans, print the channel info */
-	if (!scan->type) {
+	if (scan->type == ROAM_STATS_SCAN_TYPE_PARTIAL) {
 		buf_cons = qdf_snprint(tmp, buf_left, "{");
 		buf_left -= buf_cons;
 		tmp += buf_cons;
@@ -3001,7 +3029,7 @@ cm_roam_stats_print_scan_info(struct wlan_objmgr_psoc *psoc,
 
 	mlme_get_converted_timestamp(timestamp, time);
 	mlme_nofl_info("%s [ROAM_SCAN]: VDEV[%d] Scan_type: %s %s %s",
-		       time, vdev_id, mlme_get_roam_scan_type_str(scan->type),
+		       time, vdev_id, cm_get_roam_scan_type_str(scan->type),
 		       buf1, buf);
 	cm_stats_log_roam_scan_candidates(scan->ap, scan->num_ap);
 
@@ -3012,7 +3040,9 @@ cm_roam_stats_print_scan_info(struct wlan_objmgr_psoc *psoc,
 /**
  * cm_roam_stats_print_roam_result()  - Print roam result related info
  * @psoc: Pointer to psoc object
+ * @trigger: roam trigger information
  * @res:     Roam result structure pointer
+ * @scan_data: scan data
  * @vdev_id: Vdev id
  *
  * Print roam result and failure reason if roaming failed.
@@ -3058,6 +3088,7 @@ cm_roam_stats_print_roam_result(struct wlan_objmgr_psoc *psoc,
 
 /**
  * cm_roam_stats_print_11kv_info  - Print neighbor report/BTM related data
+ * @psoc: Pointer to psoc object
  * @neigh_rpt: Pointer to the extracted TLV structure
  * @vdev_id:   Vdev ID
  *
@@ -3067,7 +3098,8 @@ cm_roam_stats_print_roam_result(struct wlan_objmgr_psoc *psoc,
  * Return: none
  */
 static void
-cm_roam_stats_print_11kv_info(struct wmi_neighbor_report_data *neigh_rpt,
+cm_roam_stats_print_11kv_info(struct wlan_objmgr_psoc *psoc,
+			      struct wmi_neighbor_report_data *neigh_rpt,
 			      uint8_t vdev_id)
 {
 	char time[TIME_STRING_LEN], time1[TIME_STRING_LEN];
@@ -3075,6 +3107,7 @@ cm_roam_stats_print_11kv_info(struct wmi_neighbor_report_data *neigh_rpt,
 	uint8_t type = neigh_rpt->req_type, i;
 	uint16_t buf_left = ROAM_CHANNEL_BUF_SIZE, buf_cons;
 	uint8_t num_ch = neigh_rpt->num_freq;
+	struct wlan_objmgr_vdev *vdev;
 
 	if (!type)
 		return;
@@ -3108,6 +3141,18 @@ cm_roam_stats_print_11kv_info(struct wmi_neighbor_report_data *neigh_rpt,
 
 	if (type == WLAN_ROAM_11KV_REQ_TYPE_BTM)
 		cm_roam_btm_query_event(neigh_rpt, vdev_id);
+	else if (type == WLAN_ROAM_11KV_REQ_TYPE_NEIGH_RPT) {
+		vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, vdev_id,
+							WLAN_MLME_OBJMGR_ID);
+		if (!vdev) {
+			mlme_err("vdev pointer not found");
+			goto out;
+		}
+
+		cm_roam_neigh_rpt_req_event(neigh_rpt, vdev);
+
+		wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_OBJMGR_ID);
+	}
 
 	if (neigh_rpt->resp_time) {
 		mlme_get_converted_timestamp(neigh_rpt->resp_time, time1);
@@ -3116,11 +3161,16 @@ cm_roam_stats_print_11kv_info(struct wmi_neighbor_report_data *neigh_rpt,
 			       "BTM_REQ" : "NEIGH_RPT_RSP",
 			       vdev_id,
 			       (num_ch > 0) ? buf : "NO Ch update");
+
+		if (type == WLAN_ROAM_11KV_REQ_TYPE_NEIGH_RPT)
+			cm_roam_neigh_rpt_resp_event(neigh_rpt, vdev_id);
+
 	} else {
 		mlme_nofl_info("%s No response received from AP",
 			       (type == WLAN_ROAM_11KV_REQ_TYPE_BTM) ?
 			       "BTM" : "NEIGH_RPT");
 	}
+out:
 	qdf_mem_free(buf);
 }
 
@@ -3272,7 +3322,7 @@ cm_roam_handle_btm_stats(struct wlan_objmgr_psoc *psoc,
 	bool log_btm_frames_only = false;
 
 	if (stats_info->data_11kv[i].present)
-		cm_roam_stats_print_11kv_info(&stats_info->data_11kv[i],
+		cm_roam_stats_print_11kv_info(psoc, &stats_info->data_11kv[i],
 					      stats_info->vdev_id);
 
 	/*
@@ -3445,7 +3495,8 @@ cm_roam_stats_event_handler(struct wlan_objmgr_psoc *psoc,
 		 */
 
 		if (stats_info->data_11kv[0].present)
-			cm_roam_stats_print_11kv_info(&stats_info->data_11kv[0],
+			cm_roam_stats_print_11kv_info(psoc,
+						      &stats_info->data_11kv[0],
 						      stats_info->vdev_id);
 
 		if (stats_info->trigger[0].present &&
@@ -3715,12 +3766,12 @@ cm_cleanup_mlo_link(struct wlan_objmgr_vdev *vdev)
 {
 	QDF_STATUS status;
 
-	/* Use internal disconnect as this is for cleanup and no need
-	 * to inform OSIF, and REASON_FW_TRIGGERED_ROAM_FAILURE will
+	/* Use MLO roam internal disconnect as this is for cleanup and
+	 * no need to inform OSIF, and REASON_FW_TRIGGERED_ROAM_FAILURE will
 	 * cleanup host without informing the FW
 	 */
 	status = wlan_cm_disconnect(vdev,
-				    CM_INTERNAL_DISCONNECT,
+				    CM_MLO_ROAM_INTERNAL_DISCONNECT,
 				    REASON_FW_TRIGGERED_ROAM_FAILURE,
 				    NULL);
 	if (QDF_IS_STATUS_ERROR(status))
@@ -3819,4 +3870,34 @@ wlan_cm_get_sae_auth_ta(struct wlan_objmgr_pdev *pdev,
 	wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_CM_ID);
 
 	return QDF_STATUS_E_ALREADY;
+}
+
+void
+wlan_cm_set_assoc_btm_cap(struct wlan_objmgr_vdev *vdev, bool val)
+{
+	struct mlme_legacy_priv *mlme_priv;
+
+	if (!vdev)
+		return;
+
+	mlme_priv = wlan_vdev_mlme_get_ext_hdl(vdev);
+	if (!mlme_priv)
+		return;
+
+	mlme_priv->connect_info.assoc_btm_cap = val;
+}
+
+bool
+wlan_cm_get_assoc_btm_cap(struct wlan_objmgr_vdev *vdev)
+{
+	struct mlme_legacy_priv *mlme_priv;
+
+	if (!vdev)
+		return true;
+
+	mlme_priv = wlan_vdev_mlme_get_ext_hdl(vdev);
+	if (!mlme_priv)
+		return true;
+
+	return mlme_priv->connect_info.assoc_btm_cap;
 }

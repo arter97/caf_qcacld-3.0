@@ -213,7 +213,7 @@ static void lim_send_smps_intolerent(struct mac_context *mac_ctx,
 		/* SET vdev param */
 		pe_debug("sending SMPS intolrent vdev_param");
 		wma_cli_set_command(pe_session->vdev_id,
-				    (int)WMI_VDEV_PARAM_SMPS_INTOLERANT,
+				    (int)wmi_vdev_param_smps_intolerant,
 				    1, VDEV_CMD);
 	}
 }

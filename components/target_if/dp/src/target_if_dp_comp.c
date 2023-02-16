@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -33,7 +33,7 @@
 #include <wlan_cm_api.h>
 
 /**
- * target_if_dp_arp_stats_event_handler() - arp stats event handler
+ * target_if_dp_get_arp_stats_event_handler() - arp stats event handler
  * @scn: scn
  * @data: buffer with event
  * @datalen: buffer length
@@ -338,7 +338,7 @@ target_if_dp_send_dhcp_ind(uint16_t vdev_id,
 
 	/* fill in values */
 	peer_set_param_fp.vdev_id = vdev_id;
-	peer_set_param_fp.param_id = WMI_PEER_CRIT_PROTO_HINT_ENABLED;
+	peer_set_param_fp.param_id = WMI_HOST_PEER_CRIT_PROTO_HINT_ENABLED;
 
 	if (dhcp_ind->dhcp_start)
 		peer_set_param_fp.param_value = 1;

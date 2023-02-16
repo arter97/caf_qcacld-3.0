@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2011-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -567,6 +567,17 @@ void lim_set_twt_ext_capabilities(struct mac_context *mac_ctx,
 #endif
 
 /**
+ * lim_get_basic_rates() - Get basic rates for the given frequency
+ * @b_rates: Pointer to rates
+ * @chan_freq: frequency for which rates are required
+ *
+ * This api will get basic rates for the given frequency
+ *
+ * Return: void
+ */
+void lim_get_basic_rates(tSirMacRateSet *b_rates, uint32_t chan_freq);
+
+/**
  * lim_fill_pe_session() - Lim fill pe session
  * @mac_ctx: Pointer to mac context
  * @session: pe session
@@ -613,6 +624,24 @@ lim_gen_link_specific_probe_rsp(struct mac_context *mac_ctx,
 QDF_STATUS lim_check_for_ml_probe_req(struct pe_session *session);
 
 /**
+ * lim_process_cu_for_probe_rsp() - process critical update for probe response
+ * @mac_ctx: Pointer to mac context
+ * @session: pe session
+ * @probe_rsp: ptr to probe response
+ * @probe_rsp_len: length of probe response
+ *
+ * This api will generate link specific probe response and invoke function
+ * to process critical update IEs
+ *
+ * Return: qdf status
+ */
+QDF_STATUS
+lim_process_cu_for_probe_rsp(struct mac_context *mac_ctx,
+			     struct pe_session *session,
+			     uint8_t *probe_rsp,
+			     uint32_t probe_rsp_len);
+
+/**
  * lim_gen_link_probe_rsp_roam() - Generate link prb rsp from assoc link prb rsp
  * @mac_ctx: Pointer to mac context
  * @session_entry: pe session
@@ -648,6 +677,15 @@ lim_gen_link_probe_rsp_roam(struct mac_context *mac_ctx,
 			    struct roam_offload_synch_ind *roam_sync_ind)
 {
 	return QDF_STATUS_E_NOSUPPORT;
+}
+
+static inline QDF_STATUS
+lim_process_cu_for_probe_rsp(struct mac_context *mac_ctx,
+			     struct pe_session *session,
+			     uint8_t *probe_rsp,
+			     uint32_t probe_rsp_len)
+{
+	return QDF_STATUS_SUCCESS;
 }
 #endif
 

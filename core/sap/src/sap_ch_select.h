@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2015, 2017-2019 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -42,12 +42,7 @@
    defines and enum
    --------------------------------------------------------------------------*/
 
-#define SPECT_24GHZ_CH_COUNT    (11)    /* USA regulatory domain */
 #define SAPDFS_NORMALISE_1000      (1000/9)     /* Case of spec20 with channel diff = 0 */
-/* Gen 5 values
-   #define SOFTAP_MIN_RSSI         (-85)
-   #define SOFTAP_MAX_RSSI         (-45)
- */
 #define SOFTAP_MIN_RSSI         (-100)
 #define SOFTAP_MAX_RSSI         (0)
 #define SOFTAP_MIN_COUNT        (0)
@@ -63,7 +58,6 @@
 #define REG_MAX_EIRP_POWER 36
 #define REG_MIN_EIRP_POWER 14
 
-#define SOFTAP_HT20_CHANNELWIDTH 0
 /* In HT40/VHT80, Effect of primary Channel RSSi on Subband1 */
 #define SAP_SUBBAND1_RSSI_EFFECT_PRIMARY  (-20)
 /* In VHT80, Effect of primary Channel RSSI on Subband2 */
@@ -100,11 +94,6 @@ typedef enum {
 	CHANNEL_13,
 	CHANNEL_14
 } tSapChannel;
-
-#define MAX_80MHZ_BANDS 6
-#define SAP_80MHZ_MASK     0x0F
-#define SAP_40MHZ_MASK_L   0x03
-#define SAP_40MHZ_MASK_H   0x0C
 
 typedef struct {
 	uint32_t chan_freq;

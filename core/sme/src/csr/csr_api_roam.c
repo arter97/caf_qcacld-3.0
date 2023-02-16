@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -3426,7 +3426,6 @@ csr_roam_send_rso_enable(struct mac_context *mac_ctx, uint8_t vdev_id)
 	}
 	wlan_objmgr_vdev_release_ref(vdev,
 				     WLAN_MLME_OBJMGR_ID);
-
 	return QDF_STATUS_SUCCESS;
 }
 #else
@@ -5770,9 +5769,9 @@ cm_csr_connect_done_ind(struct wlan_objmgr_vdev *vdev,
 	rsn_cap = wlan_crypto_get_param(vdev, WLAN_CRYPTO_PARAM_RSN_CAP);
 	if (rsn_cap >= 0) {
 		cm_update_rsn_ocv_cap(&rsn_cap, rsp);
-		if (wma_cli_set2_command(vdev_id, WMI_VDEV_PARAM_RSN_CAPABILITY,
+		if (wma_cli_set2_command(vdev_id, wmi_vdev_param_rsn_capability,
 					 rsn_cap, 0, VDEV_CMD))
-			sme_err("Failed to update WMI_VDEV_PARAM_RSN_CAPABILITY for vdev id %d",
+			sme_err("Failed to update wmi_vdev_param_rsn_capability for vdev id %d",
 				vdev_id);
 	}
 

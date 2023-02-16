@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -894,10 +894,13 @@ sch_set_fixed_beacon_fields(struct mac_context *mac_ctx, struct pe_session *sess
 			pe_debug("extcap not extracted");
 		}
 		/* merge extcap IE */
-		if (extcap_present)
+		if (extcap_present) {
 			lim_merge_extcap_struct(&bcn_2->ExtCap,
 						&extracted_extcap,
 						true);
+			populate_dot11f_bcn_prot_extcaps(mac_ctx, session,
+							 &bcn_2->ExtCap);
+		}
 	}
 
 	if (session->vhtCapability && session->gLimOperatingMode.present) {

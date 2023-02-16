@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -1487,9 +1487,9 @@ static int wlan_hdd_send_ext_scan_capability(struct hdd_context *hdd_ctx)
 			data->max_number_epno_networks) ||
 	    nla_put_u32(skb, MAX_NUM_EPNO_NETS_BY_SSID,
 			data->max_number_epno_networks_by_ssid) ||
-	    nla_put_u32(skb, MAX_NUM_ALLOWLISTED_SSID,
+	    nla_put_u32(skb, MAX_NUM_WHITELISTED_SSID,
 			data->max_number_of_allow_listed_ssid) ||
-	    nla_put_u32(skb, MAX_NUM_DENYLISTED_BSSID,
+	    nla_put_u32(skb, MAX_NUM_BLACKLISTED_BSSID,
 			data->max_number_of_deny_listed_bssid)) {
 		hdd_err("nla put fail");
 		goto nla_put_failure;

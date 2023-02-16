@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2016-2021 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -129,7 +130,6 @@ static int pld_pcie_fw_sim_idle_restart_cb(struct pci_dev *pdev,
 /**
  * pld_pcie_fw_sim_idle_shutdown_cb() - Perform idle shutdown
  * @pdev: PCIE device
- * @id: PCIE device ID
  *
  * This function will be called if there is an idle shutdown request
  *
@@ -229,7 +229,7 @@ static void pld_pcie_fw_sim_notify_handler(struct pci_dev *pdev, int state)
 /**
  * pld_pcie_fw_sim_uevent() - update wlan driver status callback function
  * @pdev: PCIE device
- * @status driver uevent status
+ * @status: driver uevent status
  *
  * This function will be called when platform driver wants to update wlan
  * driver's status.
@@ -405,7 +405,6 @@ static int pld_pcie_fw_sim_idle_restart_cb(struct pci_dev *pdev,
 /**
  * pld_pcie_fw_sim_idle_shutdown_cb() - Perform idle shutdown
  * @pdev: PCIE device
- * @id: PCIE device ID
  *
  * This function will be called if there is an idle shutdown request
  *
@@ -505,7 +504,7 @@ static void pld_pcie_fw_sim_notify_handler(struct pci_dev *pdev, int state)
 /**
  * pld_pcie_fw_sim_uevent() - update wlan driver status callback function
  * @pdev: PCIE device
- * @status driver uevent status
+ * @status: driver uevent status
  *
  * This function will be called when platform driver wants to update wlan
  * driver's status.

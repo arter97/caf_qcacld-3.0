@@ -4698,7 +4698,7 @@ QDF_STATUS wma_mon_mlme_vdev_start_continue(struct vdev_mlme_obj *vdev_mlme,
 
 	/* Cancel periodic pdev stats update if running for other mac */
 	status = wma_cli_set_command(vdev_mlme->vdev->vdev_objmgr.vdev_id,
-				     WMI_PDEV_PARAM_PDEV_STATS_UPDATE_PERIOD,
+				     wmi_pdev_param_pdev_stats_update_period,
 				     0, PDEV_CMD);
 	if (status != QDF_STATUS_SUCCESS)
 		pe_err("failed to clear fw stats request = %d", status);
@@ -4713,7 +4713,7 @@ QDF_STATUS wma_mon_mlme_vdev_start_continue(struct vdev_mlme_obj *vdev_mlme,
 		pe_err("failed to send fw stats request = %d", status);
 
 	status = wma_cli_set2_command(vdev_mlme->vdev->vdev_objmgr.vdev_id,
-				      WMI_PDEV_PARAM_PDEV_STATS_UPDATE_PERIOD,
+				      wmi_pdev_param_pdev_stats_update_period,
 				      interval * 2000, pdev, PDEV_CMD);
 	if (status != QDF_STATUS_SUCCESS)
 		pe_err("failed to send fw stats request = %d", status);

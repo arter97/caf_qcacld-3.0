@@ -914,6 +914,10 @@ struct wma_wlm_stats_data {
  * * @fw_therm_throt_support: FW Supports thermal throttling?
  * @eht_cap: 802.11be capabilities
  * @set_hw_mode_resp_status: Set HW mode response status
+ * @pagefault_wakeups_ts: Stores timestamps at which host wakes up by fw
+ * because of pagefaults
+ * @num_page_fault_wakeups: Stores the number of times host wakes up by fw
+ * because of pagefaults
  *
  * This structure is the global wma context.  It contains global wma
  * module parameters and handles of other modules.
@@ -1050,6 +1054,8 @@ typedef struct {
 	qdf_wake_lock_t sap_d3_wow_wake_lock;
 	qdf_wake_lock_t go_d3_wow_wake_lock;
 	enum set_hw_mode_status set_hw_mode_resp_status;
+	qdf_time_t *pagefault_wakeups_ts;
+	uint8_t num_page_fault_wakeups;
 } t_wma_handle, *tp_wma_handle;
 
 /**
@@ -1357,24 +1363,24 @@ typedef enum {
 
 /**
  * enum green_tx_param - green tx parameters
- * @WMI_VDEV_PARAM_GTX_HT_MCS: ht mcs param
- * @WMI_VDEV_PARAM_GTX_VHT_MCS: vht mcs param
- * @WMI_VDEV_PARAM_GTX_USR_CFG: user cfg param
- * @WMI_VDEV_PARAM_GTX_THRE: thre param
- * @WMI_VDEV_PARAM_GTX_MARGIN: green tx margin param
- * @WMI_VDEV_PARAM_GTX_STEP: green tx step param
- * @WMI_VDEV_PARAM_GTX_MINTPC: mintpc param
- * @WMI_VDEV_PARAM_GTX_BW_MASK: bandwidth mask
+ * @wmi_vdev_param_gtx_ht_mcs: ht mcs param
+ * @wmi_vdev_param_gtx_vht_mcs: vht mcs param
+ * @wmi_vdev_param_gtx_usr_cfg: user cfg param
+ * @wmi_vdev_param_gtx_thre: thre param
+ * @wmi_vdev_param_gtx_margin: green tx margin param
+ * @wmi_vdev_param_gtx_step: green tx step param
+ * @wmi_vdev_param_gtx_mintpc: mintpc param
+ * @wmi_vdev_param_gtx_bw_mask: bandwidth mask
  */
 typedef enum {
-	WMI_VDEV_PARAM_GTX_HT_MCS,
-	WMI_VDEV_PARAM_GTX_VHT_MCS,
-	WMI_VDEV_PARAM_GTX_USR_CFG,
-	WMI_VDEV_PARAM_GTX_THRE,
-	WMI_VDEV_PARAM_GTX_MARGIN,
-	WMI_VDEV_PARAM_GTX_STEP,
-	WMI_VDEV_PARAM_GTX_MINTPC,
-	WMI_VDEV_PARAM_GTX_BW_MASK,
+	wmi_vdev_param_gtx_ht_mcs,
+	wmi_vdev_param_gtx_vht_mcs,
+	wmi_vdev_param_gtx_usr_cfg,
+	wmi_vdev_param_gtx_thre,
+	wmi_vdev_param_gtx_margin,
+	wmi_vdev_param_gtx_step,
+	wmi_vdev_param_gtx_mintpc,
+	wmi_vdev_param_gtx_bw_mask,
 } green_tx_param;
 
 /**

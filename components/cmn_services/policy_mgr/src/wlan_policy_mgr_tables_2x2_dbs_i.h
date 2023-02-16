@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -22,7 +22,7 @@
 
 #include "wlan_policy_mgr_api.h"
 
-/**
+/*
  * second_connection_pcl_dbs_2x2_table - table which provides PCL
  * for the 2nd connection, when we have a connection already in
  * the system (with DBS supported by HW)
@@ -220,7 +220,7 @@ pm_second_connection_pcl_dbs_2x2_table = {
 			 PM_5G_SCC_CH } },
 };
 
-/**
+/*
  * third_connection_pcl_dbs_table - table which provides PCL for
  * the 3rd connection, when we have two connections already in
  * the system (with DBS supported by HW)
@@ -1905,7 +1905,7 @@ pm_third_connection_pcl_dbs_2x2_table = {
 };
 
 #ifdef FEATURE_FOURTH_CONNECTION
-/**
+/*
  * fourth_connection_pcl_dbs_sbs_table - table which provides PCL for
  * the 4th connection, when we have 3 connections already in
  * the system (with DBS & SBS supported by HW), this table is for auto products.
@@ -1942,7 +1942,7 @@ fourth_connection_pcl_dbs_sbs_table
 	[PM_SAP_MODE] = { PM_24G, PM_24G, PM_24G } }
 };
 #else
-/**
+/*
  * fourth_connection_pcl_dbs_sbs_table - table which provides PCL for
  * the 4th connection, when we have 3 connections already in
  * the system (with DBS & SBS supported by HW), this table is for mobile
@@ -2030,7 +2030,7 @@ fourth_connection_pcl_dbs_sbs_table
 #endif
 #endif
 
-/**
+/*
  * next_action_two_connection_table - table which provides next
  * action while a new connection is coming up, with one
  * connection already in the system
@@ -2055,7 +2055,7 @@ static policy_mgr_next_action_two_connection_table_type
 	[PM_SAP_5_2x2] = {PM_DBS,		PM_SBS_DOWNGRADE},
 };
 
-/**
+/*
  * next_action_three_connection_table - table which provides next
  * action while a new connection is coming up, with two
  * connections already in the system
@@ -2170,7 +2170,7 @@ static policy_mgr_next_action_three_connection_table_type
 	[PM_P2P_GO_SAP_SBS_5_1x1] = {PM_DBS_UPGRADE, PM_NOP},
 };
 
-/**
+/*
  * next_action_two_connection_table_v2 - table which provides next
  * action while a new connection is coming up, with one
  * connection already in the system.

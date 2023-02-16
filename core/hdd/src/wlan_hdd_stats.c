@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -1466,6 +1466,10 @@ static void hdd_process_ll_stats(tSirLLStatsResults *results,
 		struct wifi_radio_stats *rs_results, *stat_result;
 		u64 channel_size = 0, pwr_lvl_size = 0;
 		int i;
+
+		if (!results->num_radio)
+			goto exit;
+
 		stats = qdf_mem_malloc(sizeof(*stats));
 		if (!stats)
 			goto exit;
@@ -3861,7 +3865,7 @@ set_thresh:
 set_period:
 	hdd_info("send period to target");
 	errno = wma_cli_set_command(adapter->vdev_id,
-				    WMI_PDEV_PARAM_STATS_OBSERVATION_PERIOD,
+				    wmi_pdev_param_stats_observation_period,
 				    period, PDEV_CMD);
 	if (errno) {
 		hdd_err("wma_cli_set_command set_period failed.");
@@ -3928,6 +3932,7 @@ static int __wlan_hdd_cfg80211_stats_ext_request(struct wiphy *wiphy,
 	QDF_STATUS status;
 	struct hdd_context *hdd_ctx = wiphy_priv(wiphy);
 	ol_txrx_soc_handle soc = cds_get_context(QDF_MODULE_ID_SOC);
+	struct cdp_txrx_stats_req txrx_req = {0};
 
 	hdd_enter_dev(dev);
 
@@ -3938,6 +3943,18 @@ static int __wlan_hdd_cfg80211_stats_ext_request(struct wiphy *wiphy,
 	if (QDF_GLOBAL_FTM_MODE == hdd_get_conparam()) {
 		hdd_err("Command not allowed in FTM mode");
 		return -EPERM;
+	}
+
+	/**
+	 * HTT_DBG_EXT_STATS_PDEV_RX
+	 */
+	txrx_req.stats = 2;
+	/* default value of secondary parameter is 0(mac_id) */
+	txrx_req.mac_id = 0;
+	status = cdp_txrx_stats_request(soc, adapter->vdev_id, &txrx_req);
+	if (QDF_STATUS_SUCCESS != status) {
+		hdd_err_rl("Failed to get hw stats: %u", status);
+		ret_val = -EINVAL;
 	}
 
 	stats_ext_req.request_data_len = data_len;
@@ -4164,7 +4181,7 @@ hdd_get_roam_rt_stats_event_len(struct roam_stats_event *roam_stats,
 
 	if (roam_stats->scan[idx].present) {
 		if (roam_stats->scan[idx].num_chan &&
-		    !roam_stats->scan[idx].type)
+		    roam_stats->scan[idx].type == ROAM_STATS_SCAN_TYPE_PARTIAL)
 			for (i = 0; i < roam_stats->scan[idx].num_chan;)
 				i++;
 
@@ -4238,7 +4255,8 @@ roam_rt_stats_fill_scan_freq(struct sk_buff *vendor_event, uint8_t idx,
 		kfree_skb(vendor_event);
 		return;
 	}
-	if (roam_stats->scan[idx].num_chan && !roam_stats->scan[idx].type) {
+	if (roam_stats->scan[idx].num_chan &&
+	    roam_stats->scan[idx].type == ROAM_STATS_SCAN_TYPE_PARTIAL) {
 		for (i = 0; i < roam_stats->scan[idx].num_chan; i++) {
 			if (nla_put_u32(vendor_event, i,
 					roam_stats->scan[idx].chan_freq[i])) {
@@ -6106,7 +6124,7 @@ static inline void wlan_hdd_mlo_update_stats_info(struct hdd_adapter *adapter)
 	rssi = &adapter->hdd_stats.summary_stat.rssi;
 	snr = &adapter->hdd_stats.summary_stat.snr;
 
-	vdev = hdd_objmgr_get_vdev_by_user(adapter, WLAN_CP_STATS_ID);
+	vdev = hdd_objmgr_get_vdev_by_user(adapter, WLAN_OSIF_STATS_ID);
 	if (!vdev)
 		return;
 
@@ -6114,10 +6132,10 @@ static inline void wlan_hdd_mlo_update_stats_info(struct hdd_adapter *adapter)
 	 * update the values in the adapter
 	 */
 	if (!wlan_vdev_mlme_is_mlo_vdev(vdev)) {
-		hdd_objmgr_put_vdev_by_user(vdev, WLAN_CP_STATS_ID);
+		hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_STATS_ID);
 		goto stat_update;
 	}
-	hdd_objmgr_put_vdev_by_user(vdev, WLAN_CP_STATS_ID);
+	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_STATS_ID);
 
 	hdd_debug("Link0: RSSI: %d, SNR: %d", *rssi, *snr);
 	mlo_adapter_info = &adapter->mlo_adapter_info;
@@ -6143,6 +6161,8 @@ stat_update:
 #else
 static inline void wlan_hdd_mlo_update_stats_info(struct hdd_adapter *adapter)
 {
+	adapter->rssi = adapter->hdd_stats.summary_stat.rssi;
+	adapter->snr = adapter->hdd_stats.summary_stat.snr;
 }
 #endif
 
@@ -6168,7 +6188,7 @@ static int wlan_hdd_get_sta_stats(struct wiphy *wiphy,
 	uint8_t tx_mcs_index, rx_mcs_index;
 	struct hdd_context *hdd_ctx = (struct hdd_context *) wiphy_priv(wiphy);
 	mac_handle_t mac_handle;
-	int8_t snr = 0;
+	int8_t snr;
 	uint16_t my_tx_rate, my_rx_rate;
 	uint8_t tx_nss = 1, rx_nss = 1, tx_dcm, rx_dcm;
 	enum txrate_gi tx_gi, rx_gi;
@@ -6217,6 +6237,7 @@ static int wlan_hdd_get_sta_stats(struct wiphy *wiphy,
 	wlan_hdd_get_peer_rx_rate_stats(adapter);
 
 	wlan_hdd_mlo_update_stats_info(adapter);
+	snr = adapter->snr;
 
 	/* for new connection there might be no valid previous RSSI */
 	if (!adapter->rssi) {

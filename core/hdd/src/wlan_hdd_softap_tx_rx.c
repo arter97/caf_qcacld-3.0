@@ -730,7 +730,7 @@ QDF_STATUS hdd_softap_stop_bss(struct hdd_adapter *adapter)
 	}
 
 	/* Setting the RTS profile to original value */
-	if (sme_cli_set_command(adapter->vdev_id, WMI_VDEV_PARAM_ENABLE_RTSCTS,
+	if (sme_cli_set_command(adapter->vdev_id, wmi_vdev_param_enable_rtscts,
 				cfg_get(hdd_ctx->psoc,
 					CFG_ENABLE_FW_RTS_PROFILE),
 				VDEV_CMD))
