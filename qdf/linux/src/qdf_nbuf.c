@@ -4849,63 +4849,31 @@ qdf_nbuf_update_radiotap_he_flags(struct mon_rx_status *rx_status,
 	 * IEEE80211_RADIOTAP_HE u16, u16, u16, u16, u16, u16
 	 * Enable all "known" HE radiotap flags for now
 	 */
-	struct mon_rx_user_status *rx_user_status = rx_status->rx_user_status;
 
 	rtap_len = qdf_align(rtap_len, 2);
 
-	if (!rx_user_status) {
-		put_unaligned_le16(rx_status->he_data1, &rtap_buf[rtap_len]);
-		rtap_len += 2;
+	put_unaligned_le16(rx_status->he_data1, &rtap_buf[rtap_len]);
+	rtap_len += 2;
 
-		put_unaligned_le16(rx_status->he_data2, &rtap_buf[rtap_len]);
-		rtap_len += 2;
+	put_unaligned_le16(rx_status->he_data2, &rtap_buf[rtap_len]);
+	rtap_len += 2;
 
-		put_unaligned_le16(rx_status->he_data3, &rtap_buf[rtap_len]);
-		rtap_len += 2;
+	put_unaligned_le16(rx_status->he_data3, &rtap_buf[rtap_len]);
+	rtap_len += 2;
 
-		put_unaligned_le16(rx_status->he_data4, &rtap_buf[rtap_len]);
-		rtap_len += 2;
+	put_unaligned_le16(rx_status->he_data4, &rtap_buf[rtap_len]);
+	rtap_len += 2;
 
-		put_unaligned_le16(rx_status->he_data5, &rtap_buf[rtap_len]);
-		rtap_len += 2;
+	put_unaligned_le16(rx_status->he_data5, &rtap_buf[rtap_len]);
+	rtap_len += 2;
 
-		put_unaligned_le16(rx_status->he_data6, &rtap_buf[rtap_len]);
-		rtap_len += 2;
-		qdf_rl_debug("he data %x %x %x %x %x %x",
-			     rx_status->he_data1,
-			     rx_status->he_data2, rx_status->he_data3,
-			     rx_status->he_data4, rx_status->he_data5,
-			     rx_status->he_data6);
-	} else {
-		put_unaligned_le16(rx_user_status->he_data1,
-				   &rtap_buf[rtap_len]);
-		rtap_len += 2;
-
-		put_unaligned_le16(rx_user_status->he_data2,
-				   &rtap_buf[rtap_len]);
-		rtap_len += 2;
-
-		put_unaligned_le16(rx_user_status->he_data3,
-				   &rtap_buf[rtap_len]);
-		rtap_len += 2;
-
-		put_unaligned_le16(rx_user_status->he_data4,
-				   &rtap_buf[rtap_len]);
-		rtap_len += 2;
-
-		put_unaligned_le16(rx_user_status->he_data5,
-				   &rtap_buf[rtap_len]);
-		rtap_len += 2;
-
-		put_unaligned_le16(rx_user_status->he_data6,
-				   &rtap_buf[rtap_len]);
-		rtap_len += 2;
-		qdf_rl_debug("he data %x %x %x %x %x %x",
-			     rx_user_status->he_data1,
-			     rx_user_status->he_data2, rx_user_status->he_data3,
-			     rx_user_status->he_data4, rx_user_status->he_data5,
-			     rx_user_status->he_data6);
-	}
+	put_unaligned_le16(rx_status->he_data6, &rtap_buf[rtap_len]);
+	rtap_len += 2;
+	qdf_rl_debug("he data %x %x %x %x %x %x",
+		     rx_status->he_data1,
+		     rx_status->he_data2, rx_status->he_data3,
+		     rx_status->he_data4, rx_status->he_data5,
+		     rx_status->he_data6);
 
 	return rtap_len;
 }
