@@ -4899,7 +4899,7 @@ int wlan_ipa_wdi_opt_dpath_flt_add_cb(
 	struct ipa_wdi_opt_dpath_flt_add_cb_params *ipa_flt =
 			 (struct ipa_wdi_opt_dpath_flt_add_cb_params *)(in_out);
 	struct wlan_ipa_priv *ipa_obj = (struct wlan_ipa_priv *)ipa_ctx;
-	int i, param_val, pdev_id;
+	int i, j, flt, param_val, pdev_id;
 	uint8_t num_flts;
 	uint32_t src_ip_addr, dst_ip_addr;
 	uint32_t *host_ipv6;
@@ -4940,8 +4940,16 @@ int wlan_ipa_wdi_opt_dpath_flt_add_cb(
 	response = cdp_ipa_pcie_link_up(ipa_obj->dp_soc);
 	ipa_info("opt_dp: Pcie link up status %d", response);
 
-	/* set filter tuple params for rx filter */
-	for (i = 0; i < num_flts; i++) {
+	for (flt = 0; flt < num_flts; flt++) {
+		for (i = 0; i < IPA_WDI_MAX_FILTER; i++)
+			if (!dp_flt_param->flt_addr_params[i].ipa_flt_in_use)
+				break;
+
+		if (i >= IPA_WDI_MAX_FILTER) {
+			ipa_err("Wrong IPA flt count %d, i=%d", num_flts, i);
+			return QDF_STATUS_FILT_REQ_ERROR;
+		}
+
 		ipa_flt->flt_info[i].out_hdl = (WLAN_HDL_FILTER1 + i);
 		dp_flt_param->flt_addr_params[i].valid = 1;
 		dp_flt_param->flt_addr_params[i].flt_hdl =
