@@ -1098,6 +1098,11 @@ dp_fisa_rx_get_sw_ft_entry(struct dp_rx_fst *fisa_hdl, qdf_nbuf_t nbuf,
 	}
 
 	sw_ft_entry = &sw_ft_base[flow_idx];
+	if (!sw_ft_entry->is_populated) {
+		dp_info("Pkt rx for non configured flow idx 0x%x", flow_idx);
+		DP_STATS_INC(fisa_hdl, invalid_flow_index, 1);
+		return NULL;
+	}
 
 	if (!fisa_hdl->flow_deletion_supported) {
 		sw_ft_entry->vdev = vdev;
