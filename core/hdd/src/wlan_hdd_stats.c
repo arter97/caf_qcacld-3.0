@@ -3932,6 +3932,7 @@ static int __wlan_hdd_cfg80211_stats_ext_request(struct wiphy *wiphy,
 	QDF_STATUS status;
 	struct hdd_context *hdd_ctx = wiphy_priv(wiphy);
 	ol_txrx_soc_handle soc = cds_get_context(QDF_MODULE_ID_SOC);
+	struct cdp_txrx_stats_req txrx_req = {0};
 
 	hdd_enter_dev(dev);
 
@@ -3942,6 +3943,18 @@ static int __wlan_hdd_cfg80211_stats_ext_request(struct wiphy *wiphy,
 	if (QDF_GLOBAL_FTM_MODE == hdd_get_conparam()) {
 		hdd_err("Command not allowed in FTM mode");
 		return -EPERM;
+	}
+
+	/**
+	 * HTT_DBG_EXT_STATS_PDEV_RX
+	 */
+	txrx_req.stats = 2;
+	/* default value of secondary parameter is 0(mac_id) */
+	txrx_req.mac_id = 0;
+	status = cdp_txrx_stats_request(soc, adapter->vdev_id, &txrx_req);
+	if (QDF_STATUS_SUCCESS != status) {
+		hdd_err_rl("Failed to get hw stats: %u", status);
+		ret_val = -EINVAL;
 	}
 
 	stats_ext_req.request_data_len = data_len;
@@ -4168,7 +4181,7 @@ hdd_get_roam_rt_stats_event_len(struct roam_stats_event *roam_stats,
 
 	if (roam_stats->scan[idx].present) {
 		if (roam_stats->scan[idx].num_chan &&
-		    !roam_stats->scan[idx].type)
+		    roam_stats->scan[idx].type == ROAM_STATS_SCAN_TYPE_PARTIAL)
 			for (i = 0; i < roam_stats->scan[idx].num_chan;)
 				i++;
 
@@ -4242,7 +4255,8 @@ roam_rt_stats_fill_scan_freq(struct sk_buff *vendor_event, uint8_t idx,
 		kfree_skb(vendor_event);
 		return;
 	}
-	if (roam_stats->scan[idx].num_chan && !roam_stats->scan[idx].type) {
+	if (roam_stats->scan[idx].num_chan &&
+	    roam_stats->scan[idx].type == ROAM_STATS_SCAN_TYPE_PARTIAL) {
 		for (i = 0; i < roam_stats->scan[idx].num_chan; i++) {
 			if (nla_put_u32(vendor_event, i,
 					roam_stats->scan[idx].chan_freq[i])) {

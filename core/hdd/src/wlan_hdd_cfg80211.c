@@ -199,6 +199,7 @@
 #include "wlan_hdd_tdls.h"
 #include "wlan_psoc_mlme_api.h"
 #include <utils_mlo.h>
+#include "wlan_mlo_mgr_roam.h"
 
 /*
  * A value of 100 (milliseconds) can be sent to FW.
@@ -3493,6 +3494,51 @@ static bool wlan_hdd_check_is_acs_request_same(struct hdd_adapter *adapter,
 }
 
 /**
+ * hdd_remove_passive_dfs_acs_channel_for_ll_sap(): Remove passive/dfs channel
+ * for LL SAP
+ * @sap_config: Pointer to sap_config
+ * @psoc: Pointer to psoc
+ * @pdev: Pointer to pdev
+ * @curr_mode: Current mode
+ * @vdev_id: Vdev Id
+ *
+ * This function will remove passive/dfs acs channel for low latency SAP
+ * which are configured through userspace.
+ *
+ * Return: void
+ */
+static void hdd_remove_passive_dfs_acs_channel_for_ll_sap(
+					struct sap_config *sap_config,
+					struct wlan_objmgr_psoc *psoc,
+					struct wlan_objmgr_pdev *pdev,
+					enum policy_mgr_con_mode curr_mode,
+					uint8_t vdev_id)
+{
+	uint32_t i, ch_cnt = 0;
+	uint32_t freq = 0;
+
+	if (!policy_mgr_is_ll_sap_present(psoc, curr_mode, vdev_id))
+		return;
+
+	for (i = 0; i < sap_config->acs_cfg.ch_list_count; i++) {
+		freq = sap_config->acs_cfg.freq_list[i];
+
+		/* Remove passive/dfs channel for LL SAP */
+		if (wlan_reg_is_passive_for_freq(pdev, freq) ||
+		    wlan_reg_is_dfs_for_freq(pdev, freq))
+			continue;
+
+		sap_config->acs_cfg.freq_list[ch_cnt++] = freq;
+	}
+
+	if (ch_cnt != sap_config->acs_cfg.ch_list_count) {
+		hdd_debug("New count after modification %d", ch_cnt);
+		sap_config->acs_cfg.ch_list_count = ch_cnt;
+		sap_dump_acs_channel(&sap_config->acs_cfg);
+	}
+}
+
+/**
  * __wlan_hdd_cfg80211_do_acs(): CFG80211 handler function for DO_ACS Vendor CMD
  * @wiphy:  Linux wiphy struct pointer
  * @wdev:   Linux wireless device struct pointer
@@ -3749,6 +3795,14 @@ static int __wlan_hdd_cfg80211_do_acs(struct wiphy *wiphy,
 
 	pm_mode =
 	      policy_mgr_convert_device_mode_to_qdf_type(adapter->device_mode);
+
+	/* Remove passive/dfs acs channel for ll sap */
+	hdd_remove_passive_dfs_acs_channel_for_ll_sap(sap_config,
+						      hdd_ctx->psoc,
+						      hdd_ctx->pdev,
+						      pm_mode,
+						      adapter->vdev_id);
+
 	/* consult policy manager to get PCL */
 	qdf_status = policy_mgr_get_pcl(hdd_ctx->psoc, pm_mode,
 					sap_config->acs_cfg.pcl_chan_freq,
@@ -4720,6 +4774,10 @@ __wlan_hdd_cfg80211_get_features(struct wiphy *wiphy,
 			MAX_CONCURRENT_CHAN_ON_5G))
 		goto nla_put_failure;
 
+	hdd_debug("feature flags:");
+	QDF_TRACE_HEX_DUMP(QDF_MODULE_ID_HDD, QDF_TRACE_LEVEL_DEBUG,
+			   feature_flags, sizeof(feature_flags));
+
 	return wlan_cfg80211_vendor_cmd_reply(skb);
 
 nla_put_failure:
@@ -5669,6 +5727,30 @@ hdd_set_roam_rx_linkspeed_threshold(struct wlan_objmgr_psoc *psoc,
 /* Include the 6 GHz channels in roam full scan only on prior discovery */
 #define INCLUDE_6GHZ_IN_FULL_SCAN_IF_DISC	1
 
+#ifdef WLAN_VENDOR_HANDOFF_CONTROL
+/**
+ * hdd_get_handoff_param() - get vendor handoff parameters
+ * @hdd_ctx: HDD context
+ * @vdev_id: vdev id
+ *
+ * Wrapper function for hdd_cm_get_handoff_param
+ *
+ * Return: QDF_STATUS
+ */
+static QDF_STATUS hdd_get_handoff_param(struct hdd_context *hdd_ctx,
+					uint8_t vdev_id)
+{
+	return hdd_cm_get_handoff_param(hdd_ctx->psoc, vdev_id,
+					VENDOR_CONTROL_PARAM_ROAM_ALL);
+}
+#else
+static inline QDF_STATUS
+hdd_get_handoff_param(struct hdd_context *hdd_ctx, uint8_t vdev_id)
+{
+	return QDF_STATUS_SUCCESS;
+}
+#endif
+
 /**
  * hdd_set_roam_with_control_config() - Set roam control configuration
  * @hdd_ctx: HDD context
@@ -5739,10 +5821,7 @@ hdd_set_roam_with_control_config(struct hdd_context *hdd_ctx,
 		if (roam_control_enable &&
 		    ucfg_cm_roam_is_vendor_handoff_control_enable(
 			hdd_ctx->psoc)) {
-			status =
-				hdd_cm_get_handoff_param(hdd_ctx->psoc, adapter,
-						adapter->vdev_id,
-						ROAM_VENDOR_CONTROL_PARAM_ALL);
+			status = hdd_get_handoff_param(hdd_ctx, vdev_id);
 			if (QDF_IS_STATUS_ERROR(status)) {
 				hdd_err("failed to get vendor handoff params");
 				return qdf_status_to_os_return(status);
@@ -20735,6 +20814,20 @@ static int wlan_hdd_add_key_sta(struct wlan_objmgr_pdev *pdev,
 }
 
 #ifdef WLAN_FEATURE_11BE_MLO
+static void
+wlan_hdd_mlo_link_free_keys(struct hdd_adapter *adapter,
+			    struct wlan_objmgr_vdev *vdev,
+			    bool pairwise)
+{
+	if (adapter->device_mode != QDF_STA_MODE)
+		return;
+
+	if (pairwise &&
+	    wlan_vdev_mlme_is_mlo_link_vdev(vdev) &&
+	    mlo_roam_is_auth_status_connected(adapter->hdd_ctx->psoc,
+					      wlan_vdev_get_id(vdev)))
+		wlan_crypto_free_vdev_key(vdev);
+}
 static bool
 wlan_hdd_mlo_set_keys_saved(struct hdd_adapter *adapter,
 			    struct wlan_objmgr_vdev *vdev,
@@ -20747,7 +20840,10 @@ wlan_hdd_mlo_set_keys_saved(struct hdd_adapter *adapter,
 		return false;
 
 	if ((adapter->device_mode == QDF_STA_MODE) &&
-	    (!wlan_cm_is_vdev_connected(vdev))) {
+	    ((!wlan_cm_is_vdev_connected(vdev)) ||
+	     (wlan_vdev_mlme_is_mlo_link_vdev(vdev) &&
+	      mlo_roam_is_auth_status_connected(adapter->hdd_ctx->psoc,
+						wlan_vdev_get_id(vdev))))) {
 		hdd_debug("MLO:Save keys for vdev %d", wlan_vdev_get_id(vdev));
 		mlo_set_keys_saved(vdev, mac_address, true);
 		return true;
@@ -20762,6 +20858,13 @@ wlan_hdd_mlo_set_keys_saved(struct hdd_adapter *adapter,
 			    struct qdf_mac_addr *mac_address)
 {
 	return false;
+}
+
+static void
+wlan_hdd_mlo_link_free_keys(struct hdd_adapter *adapter,
+			    struct wlan_objmgr_vdev *vdev,
+			    bool pairwise)
+{
 }
 #endif
 
@@ -20891,12 +20994,28 @@ static int wlan_hdd_add_key_vdev(mac_handle_t mac_handle,
 			hdd_err("Peer is null return");
 			return -EINVAL;
 		}
+
+		status = mlo_get_link_mac_addr_from_reassoc_rsp(vdev,
+								&mac_address);
+		if (QDF_IS_STATUS_ERROR(status)) {
+			peer = wlan_objmgr_vdev_try_get_bsspeer(vdev,
+								WLAN_OSIF_ID);
+			if (!peer) {
+				hdd_err("Peer is null return");
+				return -EINVAL;
+			}
+			qdf_mem_copy(mac_address.bytes,
+				     wlan_peer_get_macaddr(peer), QDF_MAC_ADDR_SIZE);
+			wlan_objmgr_peer_release_ref(peer, WLAN_OSIF_ID);
+		}
 	} else {
 		if (mac_addr)
 			qdf_mem_copy(mac_address.bytes,
 				     mac_addr,
 				     QDF_MAC_ADDR_SIZE);
 	}
+
+	wlan_hdd_mlo_link_free_keys(adapter, vdev, pairwise);
 
 	errno = wlan_cfg80211_store_key(vdev, key_index,
 					(pairwise ?
@@ -21015,7 +21134,7 @@ QDF_STATUS wlan_hdd_send_key_vdev(struct wlan_objmgr_vdev *vdev,
 defined(CFG80211_SINGLE_NETDEV_MULTI_LINK_SUPPORT)
 struct wlan_objmgr_peer *
 wlan_hdd_ml_sap_get_peer(struct wlan_objmgr_vdev *vdev,
-			 uint8_t *peer_mld)
+			 const uint8_t *peer_mld)
 {
 	struct wlan_mlo_dev_context *ap_mlo_dev_ctx;
 	struct wlan_mlo_peer_list *mlo_peer_list;
@@ -21098,16 +21217,11 @@ static int wlan_hdd_add_key_all_mlo_vdev(mac_handle_t mac_handle,
 	int errno = 0;
 	uint16_t link, vdev_count = 0;
 
-
 	/* if vdev mlme is mlo & pairwaise is set to true set same info for
 	 * both the links.
 	 */
 	hdd_ctx = WLAN_HDD_GET_CTX(adapter);
-	/* This is to avoid const qualifier voilation
-	 * while using the mac_addr received from kernel
-	 * to fetch peer
-	 */
-	qdf_mem_copy(&peer_mac.bytes[0], mac_addr, QDF_MAC_ADDR_SIZE);
+
 	mlo_sta_get_vdev_list(vdev, &vdev_count, wlan_vdev_list);
 	for (link = 0; link < vdev_count; link++) {
 		link_vdev = wlan_vdev_list[link];
@@ -21125,12 +21239,15 @@ static int wlan_hdd_add_key_all_mlo_vdev(mac_handle_t mac_handle,
 			if (wlan_vdev_mlme_is_mlo_vdev(link_vdev))
 				peer = wlan_hdd_ml_sap_get_peer(
 						link_vdev,
-						peer_mac.bytes);
+						mac_addr);
 			break;
 		case QDF_STA_MODE:
 		default:
-			peer = wlan_objmgr_vdev_try_get_bsspeer(link_vdev,
-								WLAN_OSIF_ID);
+			status = mlo_get_link_mac_addr_from_reassoc_rsp(link_vdev,
+									&peer_mac);
+			if (QDF_IS_STATUS_ERROR(status))
+				peer = wlan_objmgr_vdev_try_get_bsspeer(link_vdev,
+									WLAN_OSIF_ID);
 			break;
 		}
 
@@ -21154,7 +21271,6 @@ static int wlan_hdd_add_key_all_mlo_vdev(mac_handle_t mac_handle,
 			mlo_release_vdev_ref(link_vdev);
 			continue;
 		}
-
 		errno = wlan_hdd_add_key_vdev(mac_handle, link_vdev, key_index,
 					      pairwise, peer_mac.bytes,
 					      params, link_id, link_adapter);
@@ -21175,9 +21291,23 @@ static int wlan_hdd_add_key_mlo_vdev(mac_handle_t mac_handle,
 	struct wlan_objmgr_vdev *link_vdev;
 	struct hdd_adapter *link_adapter = NULL;
 	struct hdd_context *hdd_ctx;
+	uint8_t vdev_id;
+	QDF_STATUS status;
 
 	if (!wlan_vdev_mlme_is_mlo_vdev(vdev))
 		return errno;
+
+	vdev_id = wlan_vdev_get_id(vdev);
+	if (pairwise &&
+	    mlo_roam_is_auth_status_connected(adapter->hdd_ctx->psoc,
+					      vdev_id)) {
+		status = mlo_roam_link_connect_notify(adapter->hdd_ctx->psoc,
+						      vdev_id);
+		if (QDF_IS_STATUS_ERROR(status)) {
+			hdd_err("Posting of link connect request failed");
+			return -EINVAL;
+		}
+	}
 
 	if (pairwise && link_id == -1)
 		return wlan_hdd_add_key_all_mlo_vdev(mac_handle, vdev,

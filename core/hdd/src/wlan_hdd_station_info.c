@@ -141,13 +141,6 @@
 	QCA_WLAN_VENDOR_ATTR_GET_STATION_INFO_ASSOC_REQ_IES
 
 /*
- * it may include the beacon IEs and other miscellaneous information
- * in function hdd_get_station_info, malloc enough memory to save
- * the data.
- */
-#define WLAN_STATS_INFO_LEN 2048
-
-/*
  * MSB of rx_mc_bc_cnt indicates whether FW supports rx_mc_bc_cnt
  * feature or not, if first bit is 1 it indicates that FW supports this
  * feature, if it is 0 it indicates FW doesn't support this feature
@@ -384,6 +377,25 @@ static int hdd_convert_dot11mode(uint32_t dot11mode)
 }
 
 /**
+ * hdd_calculate_tx_bitrate_ie_size - calculate tx bitrate ie size
+ *
+ * Return: tx bitrate ie size
+ */
+static uint32_t hdd_calculate_tx_bitrate_ie_size(void)
+{
+	uint32_t nl_buf_len = nla_total_size(0);
+
+		/* NL80211_RATE_INFO_BITRATE32 */
+	nl_buf_len +=  nla_total_size(sizeof(uint32_t)) +
+		/* NL80211_RATE_INFO_BITRATE */
+		nla_total_size(sizeof(uint16_t)) +
+		/* NL80211_RATE_INFO_VHT_NSS */
+		nla_total_size(sizeof(uint8_t));
+
+	return nl_buf_len;
+}
+
+/**
  * hdd_add_tx_bitrate() - add tx bitrate attribute
  * @skb: pointer to sk buff
  * @adapter: pointer to adapter
@@ -452,6 +464,22 @@ fail:
 }
 
 /**
+ * hdd_calculate_sta_info_ie_size - calculate sta info size
+ *
+ * Return: sta info ie size
+ */
+static uint32_t hdd_calculate_sta_info_ie_size(void)
+{
+	uint32_t nl_buf_len = nla_total_size(0);
+
+		/* NL80211_STA_INFO_SIGNAL */
+	nl_buf_len += nla_total_size(sizeof(int8_t)) +
+		hdd_calculate_tx_bitrate_ie_size();
+
+	return nl_buf_len;
+}
+
+/**
  * hdd_add_sta_info() - add station info attribute
  * @skb: pointer to sk buff
  * @hdd_ctx: pointer to hdd station context
@@ -500,6 +528,23 @@ fail:
 }
 
 /**
+ * hdd_calculate_survey_info_ie_size - calculate survey info size
+ *
+ * Return: survey info ie size
+ */
+static uint32_t hdd_calculate_survey_info_ie_size(void)
+{
+	uint32_t nl_buf_len = nla_total_size(0);
+
+		/* NL80211_SURVEY_INFO_FREQUENCY */
+	nl_buf_len +=  nla_total_size(sizeof(uint32_t)) +
+		 /* NL80211_SURVEY_INFO_NOISE */
+		nla_total_size(sizeof(int8_t));
+
+	return nl_buf_len;
+}
+
+/**
  * hdd_add_survey_info() - add survey info attribute
  * @skb: pointer to sk buff
  * @hdd_sta_ctx: pointer to hdd station context
@@ -527,6 +572,25 @@ static int32_t hdd_add_survey_info(struct sk_buff *skb,
 	return 0;
 fail:
 	return -EINVAL;
+}
+
+/**
+ * hdd_calculate_link_standard_info_ie_size - calculate link standard info size
+ *
+ * Return: link standard info ie size
+ */
+static uint32_t hdd_calculate_link_standard_info_ie_size(void)
+{
+	uint32_t nl_buf_len = nla_total_size(0);
+
+		/* NL80211_ATTR_SSID */
+	nl_buf_len += nla_total_size(WLAN_SSID_MAX_LEN + 1) +
+		/* NL80211_ATTR_MAC */
+		nla_total_size(QDF_MAC_ADDR_SIZE) +
+		hdd_calculate_survey_info_ie_size() +
+		hdd_calculate_sta_info_ie_size();
+
+	return nl_buf_len;
 }
 
 /**
@@ -583,6 +647,29 @@ hdd_add_link_standard_info(struct sk_buff *skb,
 	return 0;
 fail:
 	return -EINVAL;
+}
+
+/**
+ * hdd_calculate_ap_standard_info_ie_size - calculate ap standard info size
+ * @hdd_sta_ctx: pointer to hdd station context
+ *
+ * Return: ap standard info size
+ */
+static uint32_t hdd_calculate_ap_standard_info_ie_size(
+			struct hdd_station_ctx *hdd_sta_ctx)
+{
+	uint32_t nl_buf_len = nla_total_size(0);
+
+	/* NL80211_ATTR_VHT_CAPABILITY */
+	if (hdd_sta_ctx->cache_conn_info.conn_flag.vht_present)
+		nl_buf_len += nla_total_size(sizeof(
+				hdd_sta_ctx->cache_conn_info.vht_caps));
+	/* NL80211_ATTR_HT_CAPABILITY */
+	if (hdd_sta_ctx->cache_conn_info.conn_flag.ht_present)
+		nl_buf_len += nla_total_size(sizeof(
+				hdd_sta_ctx->cache_conn_info.ht_caps));
+
+	return nl_buf_len;
 }
 
 /**
@@ -661,6 +748,12 @@ static int32_t hdd_add_he_oper_info(struct sk_buff *skb,
 	hdd_sta_ctx->cache_conn_info.he_oper_len = 0;
 	return ret;
 }
+
+static int32_t hdd_get_he_op_len(struct hdd_station_ctx *hdd_sta_ctx)
+{
+	return hdd_sta_ctx->cache_conn_info.he_oper_len;
+}
+
 #else
 static inline uint32_t hdd_add_he_oper_info(
 					struct sk_buff *skb,
@@ -668,7 +761,18 @@ static inline uint32_t hdd_add_he_oper_info(
 {
 	return 0;
 }
+
+static uint32_t hdd_get_he_op_len(struct hdd_station_ctx *hdd_sta_ctx)
+{
+	return 0;
+}
 #endif
+
+static uint32_t hdd_get_prev_connected_bss_ies_len(
+					struct hdd_station_ctx *hdd_sta_ctx)
+{
+	return hdd_sta_ctx->conn_info.prev_ap_bcn_ie.len;
+}
 
 static uint32_t hdd_add_prev_connected_bss_ies(
 					struct sk_buff *skb,
@@ -694,43 +798,84 @@ static uint32_t hdd_add_prev_connected_bss_ies(
 }
 
 /**
- * hdd_get_station_info() - send BSS information to supplicant
- * @hdd_ctx: pointer to hdd context
- * @adapter: pointer to adapter
+ * hdd_calculate_station_info_ie_size - calculate bss ie size
+ * @hdd_sta_ctx: pointer to hdd station context
  *
- * Return: 0 if success else error status
+ * Return: bss ie size
  */
-static int hdd_get_station_info(struct hdd_context *hdd_ctx,
-				struct hdd_adapter *adapter)
+static uint32_t hdd_calculate_station_info_ie_size(
+					struct hdd_station_ctx *hdd_sta_ctx)
 {
-	struct sk_buff *skb = NULL;
+	/* NLA_HDRLEN */
+	uint32_t nl_buf_len = NLA_HDRLEN;
+
+	nl_buf_len += hdd_calculate_link_standard_info_ie_size() +
+		hdd_calculate_ap_standard_info_ie_size(hdd_sta_ctx);
+
+		/* QCA_WLAN_VENDOR_ATTR_GET_STATION_INFO_ROAM_COUNT */
+	nl_buf_len += nla_total_size(sizeof(uint32_t)) +
+		/* QCA_WLAN_VENDOR_ATTR_GET_STATION_INFO_AKM */
+		nla_total_size(sizeof(uint32_t)) +
+		/* QCA_WLAN_VENDOR_ATTR_GET_STATION_INFO_802_11_MODE */
+		nla_total_size(sizeof(uint32_t));
+
+	 /* QCA_WLAN_VENDOR_ATTR_GET_STATION_INFO_HT_OPERATION */
+	if (hdd_sta_ctx->cache_conn_info.conn_flag.ht_op_present)
+		nl_buf_len += nla_total_size(sizeof(
+				hdd_sta_ctx->cache_conn_info.ht_operation));
+
+	/* QCA_WLAN_VENDOR_ATTR_GET_STATION_INFO_VHT_OPERATION */
+	if (hdd_sta_ctx->cache_conn_info.conn_flag.vht_op_present)
+		nl_buf_len += nla_total_size(sizeof(
+				hdd_sta_ctx->cache_conn_info.vht_operation));
+
+	/* QCA_WLAN_VENDOR_ATTR_GET_STATION_INFO_HE_OPERATION */
+	nl_buf_len += nla_total_size(hdd_get_he_op_len(hdd_sta_ctx));
+
+	/* QCA_WLAN_VENDOR_ATTR_GET_STATION_INFO_AP_HS20_INDICATION */
+	if (hdd_sta_ctx->cache_conn_info.conn_flag.hs20_present)
+		nl_buf_len += nla_total_size(sizeof(
+			hdd_sta_ctx->cache_conn_info.hs20vendor_ie) - 1);
+
+	 /* QCA_WLAN_VENDOR_ATTR_GET_STATION_INFO_DRIVER_DISCONNECT_REASON */
+	nl_buf_len += nla_total_size(sizeof(uint32_t));
+
+	/* QCA_WLAN_VENDOR_ATTR_GET_STATION_INFO_BEACON_IES */
+	if (hdd_sta_ctx->conn_info.prev_ap_bcn_ie.len)
+		nl_buf_len += nla_total_size(
+			hdd_get_prev_connected_bss_ies_len(hdd_sta_ctx));
+
+	return nl_buf_len;
+}
+
+/**
+ * hdd_populate_station_info_skb - populate station info in skb
+ * @hdd_ctx: pointer to hdd context
+ * @skb: pointer to socket buffer
+ * @adapter: pointer to adapter
+ * @hdd_sta_ctx: pointer to hdd station ctx
+ *
+ * Return: QDF_STATUS_SUCCESS in case of success else failure
+ */
+static QDF_STATUS hdd_populate_station_info_skb(struct hdd_context *hdd_ctx,
+					struct sk_buff *skb,
+					struct hdd_adapter *adapter,
+					struct hdd_station_ctx *hdd_sta_ctx)
+{
 	uint8_t *tmp_hs20 = NULL;
-	struct hdd_station_ctx *hdd_sta_ctx;
-
-	hdd_sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter);
-
-	if (hdd_cm_is_vdev_connected(adapter)) {
-		hdd_err("Station is connected, command is not supported");
-		return -EINVAL;
-	}
-
-	skb = wlan_cfg80211_vendor_cmd_alloc_reply_skb(hdd_ctx->wiphy,
-						       WLAN_STATS_INFO_LEN);
-	if (!skb) {
-		hdd_err("wlan_cfg80211_vendor_cmd_alloc_reply_skb failed");
-		return -ENOMEM;
-	}
 
 	if (hdd_add_link_standard_info(skb, hdd_ctx, adapter,
 				       LINK_INFO_STANDARD_NL80211_ATTR)) {
-		hdd_err("put fail");
-		goto fail;
+		hdd_err("link_standard_info put fail");
+		return QDF_STATUS_E_FAILURE;
 	}
+
 	if (hdd_add_ap_standard_info(skb, hdd_sta_ctx,
 				     AP_INFO_STANDARD_NL80211_ATTR)) {
-		hdd_err("put fail");
-		goto fail;
+		hdd_err("ap standard info fail");
+		return QDF_STATUS_E_FAILURE;
 	}
+
 	if (nla_put_u32(skb, INFO_ROAM_COUNT,
 			hdd_sta_ctx->cache_conn_info.roam_count) ||
 	    nla_put_u32(skb, INFO_AKM,
@@ -739,15 +884,16 @@ static int hdd_get_station_info(struct hdd_context *hdd_ctx,
 	    nla_put_u32(skb, WLAN802_11_MODE,
 			hdd_convert_dot11mode(
 			hdd_sta_ctx->cache_conn_info.dot11mode))) {
-		hdd_err("put fail");
-		goto fail;
+		hdd_err("Roam, AKM, dot11mode put fail");
+		return QDF_STATUS_E_FAILURE;
 	}
+
 	if (hdd_sta_ctx->cache_conn_info.conn_flag.ht_op_present) {
 		if (nla_put(skb, HT_OPERATION,
 			    (sizeof(hdd_sta_ctx->cache_conn_info.ht_operation)),
 			    &hdd_sta_ctx->cache_conn_info.ht_operation)) {
-			hdd_err("put fail");
-			goto fail;
+			hdd_err("ht operation put fail");
+			return QDF_STATUS_E_FAILURE;
 		}
 		hdd_nofl_debug("STA HT operation:");
 		qdf_trace_hex_dump(
@@ -755,13 +901,14 @@ static int hdd_get_station_info(struct hdd_context *hdd_ctx,
 			(uint8_t *)&hdd_sta_ctx->cache_conn_info.ht_operation,
 			sizeof(hdd_sta_ctx->cache_conn_info.ht_operation));
 	}
+
 	if (hdd_sta_ctx->cache_conn_info.conn_flag.vht_op_present) {
 		if (nla_put(skb, VHT_OPERATION,
 			    (sizeof(hdd_sta_ctx->
 					cache_conn_info.vht_operation)),
 			    &hdd_sta_ctx->cache_conn_info.vht_operation)) {
-			hdd_err("put fail");
-			goto fail;
+			hdd_err("vht operation put fail");
+			return QDF_STATUS_E_FAILURE;
 		}
 		hdd_nofl_debug("STA VHT operation:");
 		qdf_trace_hex_dump(
@@ -769,10 +916,12 @@ static int hdd_get_station_info(struct hdd_context *hdd_ctx,
 			(uint8_t *)&hdd_sta_ctx->cache_conn_info.vht_operation,
 			sizeof(hdd_sta_ctx->cache_conn_info.vht_operation));
 	}
+
 	if (hdd_add_he_oper_info(skb, hdd_sta_ctx)) {
-		hdd_err("put fail");
-		goto fail;
+		hdd_err("he operation info put fail");
+		return QDF_STATUS_E_FAILURE;
 	}
+
 	if (hdd_sta_ctx->cache_conn_info.conn_flag.hs20_present) {
 		tmp_hs20 =
 			(uint8_t *)&hdd_sta_ctx->cache_conn_info.hs20vendor_ie;
@@ -780,8 +929,8 @@ static int hdd_get_station_info(struct hdd_context *hdd_ctx,
 			    (sizeof(hdd_sta_ctx->cache_conn_info.hs20vendor_ie)
 			     - 1),
 			    tmp_hs20 + 1)) {
-			hdd_err("put fail");
-			goto fail;
+			hdd_err("hs20 put fail");
+			return QDF_STATUS_E_FAILURE;
 		}
 		hdd_nofl_debug("STA hs20 vendor IE:");
 		qdf_trace_hex_dump(
@@ -793,13 +942,53 @@ static int hdd_get_station_info(struct hdd_context *hdd_ctx,
 	if (nla_put_u32(skb, DISCONNECT_REASON,
 			adapter->last_disconnect_reason)) {
 		hdd_err("Failed to put disconnect reason");
-		goto fail;
+		return QDF_STATUS_E_FAILURE;
 	}
 
 	if (hdd_add_prev_connected_bss_ies(skb, hdd_sta_ctx)) {
-		hdd_err("put fail");
-		goto fail;
+		hdd_err("disconnect_reason put fail");
+		return QDF_STATUS_E_FAILURE;
 	}
+	return QDF_STATUS_SUCCESS;
+}
+
+/**
+ * hdd_get_station_info() - send BSS information to supplicant
+ * @hdd_ctx: pointer to hdd context
+ * @adapter: pointer to adapter
+ *
+ * Return: 0 if success else error status
+ */
+static int hdd_get_station_info(struct hdd_context *hdd_ctx,
+				struct hdd_adapter *adapter)
+{
+	struct sk_buff *skb = NULL;
+	uint32_t nl_buf_len;
+	struct hdd_station_ctx *hdd_sta_ctx;
+
+	hdd_sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter);
+
+	if (hdd_cm_is_vdev_connected(adapter)) {
+		hdd_err("Station is connected, command is not supported");
+		return -EINVAL;
+	}
+
+	nl_buf_len = hdd_calculate_station_info_ie_size(hdd_sta_ctx);
+	if (!nl_buf_len) {
+		hdd_err("BSS ie size calculation failed");
+		return -EINVAL;
+	}
+
+	skb = cfg80211_vendor_cmd_alloc_reply_skb(hdd_ctx->wiphy,
+						  nl_buf_len);
+	if (!skb) {
+		hdd_err("wlan_cfg80211_vendor_cmd_alloc_reply_skb failed");
+		return -ENOMEM;
+	}
+
+	if (hdd_populate_station_info_skb(hdd_ctx, skb, adapter, hdd_sta_ctx)
+	    != QDF_STATUS_SUCCESS)
+		goto fail;
 
 	hdd_nofl_debug(
 		"STA Info:: SSID:" QDF_SSID_FMT ", BSSID:" QDF_MAC_ADDR_FMT ", freq:%d, "

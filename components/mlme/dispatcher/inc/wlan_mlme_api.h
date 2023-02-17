@@ -2450,6 +2450,18 @@ wlan_mlme_set_rf_test_mode_enabled(struct wlan_objmgr_psoc *psoc, bool value);
 
 #ifdef CONFIG_BAND_6GHZ
 /**
+ * wlan_mlme_is_standard_6ghz_conn_policy_enabled() - Get the 6 GHz standard
+ *                                                    connection policy flag
+ * @psoc: psoc context
+ * @value: Enable/Disable value ptr.
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+wlan_mlme_is_standard_6ghz_conn_policy_enabled(struct wlan_objmgr_psoc *psoc,
+					       bool *value);
+
+/**
  * wlan_mlme_is_relaxed_6ghz_conn_policy_enabled() - Get the 6 GHz relaxed
  *                                                   connection policy flag
  * @psoc: psoc context
@@ -2473,6 +2485,14 @@ QDF_STATUS
 wlan_mlme_set_relaxed_6ghz_conn_policy(struct wlan_objmgr_psoc *psoc,
 				       bool value);
 #else
+static inline QDF_STATUS
+wlan_mlme_is_standard_6ghz_conn_policy_enabled(struct wlan_objmgr_psoc *psoc,
+					       bool *value)
+{
+	*value = false;
+	return QDF_STATUS_SUCCESS;
+}
+
 static inline QDF_STATUS
 wlan_mlme_is_relaxed_6ghz_conn_policy_enabled(struct wlan_objmgr_psoc *psoc,
 					      bool *value)
@@ -2870,15 +2890,6 @@ wlan_mlme_get_ignore_fw_reg_offload_ind(struct wlan_objmgr_psoc *psoc,
  *  Return: Meaningful string from enum WMI_ROAM_TRIGGER_REASON_ID
  */
 char *mlme_get_roam_trigger_str(uint32_t roam_scan_trigger);
-
-/**
- * mlme_get_roam_scan_type_str() - Get the string for roam sacn type
- * @roam_scan_type: roam scan type coming from fw via
- * wmi_roam_scan_info tlv
- *
- *  Return: Meaningful string for roam sacn type
- */
-char *mlme_get_roam_scan_type_str(uint32_t roam_scan_type);
 
 /**
  * mlme_get_roam_status_str() - Get the string for roam status
@@ -4162,4 +4173,14 @@ QDF_STATUS
 wlan_mlme_stats_get_periodic_display_time(struct wlan_objmgr_psoc *psoc,
 					  uint32_t *periodic_display_time);
 
+/**
+ * wlan_mlme_is_bcn_prot_disabled_for_sap() - Is beacon protection config
+ * disabled for SAP interface
+ *
+ * @psoc: pointer to psoc object
+ *
+ * Return: is beacon protection disabled
+ */
+bool
+wlan_mlme_is_bcn_prot_disabled_for_sap(struct wlan_objmgr_psoc *psoc);
 #endif /* _WLAN_MLME_API_H_ */

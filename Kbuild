@@ -972,6 +972,10 @@ QDF_OBJS := \
 	$(QDF_OBJ_DIR)/qdf_talloc.o \
 	$(QDF_OBJ_DIR)/qdf_types.o \
 
+ifeq ($(CONFIG_CNSS2_SSR_DRIVER_DUMP), y)
+QDF_OBJS += $(QDF_LINUX_OBJ_DIR)/qdf_ssr_driver_dump.o
+endif
+
 ifeq ($(CONFIG_WLAN_DEBUGFS), y)
 QDF_OBJS += $(QDF_LINUX_OBJ_DIR)/qdf_debugfs.o
 endif
@@ -1378,6 +1382,7 @@ ifeq ($(CONFIG_WLAN_FEATURE_11BE_MLO), y)
 UMAC_MLO_MGR_OBJS := $(UMAC_MLO_MGR_CMN_DIR)/src/wlan_mlo_mgr_main.o \
 			  $(UMAC_MLO_MGR_CMN_DIR)/src/wlan_mlo_mgr_cmn.o \
 			  $(UMAC_MLO_MGR_CMN_DIR)/src/wlan_mlo_mgr_sta.o \
+			  $(UMAC_MLO_MGR_CMN_DIR)/src/wlan_mlo_mgr_op.o \
 			  $(UMAC_MLO_MGR_CMN_DIR)/src/utils_mlo.o \
 			  $(UMAC_MLO_MGR_CMN_DIR)/src/wlan_mlo_mgr_ap.o \
 			  $(UMAC_MLO_MGR_CMN_DIR)/src/wlan_mlo_mgr_peer_list.o \
@@ -1540,6 +1545,7 @@ UMAC_MLME_OBJS := $(WLAN_COMMON_ROOT)/umac/mlme/mlme_objmgr/dispatcher/src/wlan_
 		$(WLAN_COMMON_ROOT)/umac/mlme/vdev_mgr/dispatcher/src/wlan_vdev_mgr_tgt_if_rx_api.o \
 		$(WLAN_COMMON_ROOT)/umac/mlme/vdev_mgr/dispatcher/src/wlan_vdev_mgr_tgt_if_tx_api.o \
 		$(WLAN_COMMON_ROOT)/umac/mlme/vdev_mgr/dispatcher/src/wlan_vdev_mgr_ucfg_api.o \
+		$(WLAN_COMMON_ROOT)/umac/mlme/vdev_mgr/dispatcher/src/wlan_vdev_mgr_api.o \
 		$(WLAN_COMMON_ROOT)/umac/mlme/vdev_mgr/dispatcher/src/wlan_vdev_mgr_utils_api.o \
 		$(WLAN_COMMON_ROOT)/umac/mlme/mlme_objmgr/dispatcher/src/wlan_cmn_mlme_main.o \
 		$(WLAN_COMMON_ROOT)/umac/mlme/mlme_objmgr/dispatcher/src/wlan_pdev_mlme_main.o \
@@ -2515,6 +2521,7 @@ ifeq ($(CONFIG_QCACLD_FEATURE_NAN), y)
 WLAN_NAN_OBJS := $(NAN_CORE_DIR)/nan_main.o \
 		 $(NAN_CORE_DIR)/nan_api.o \
 		 $(NAN_UCFG_DIR)/nan_ucfg_api.o \
+		 $(NAN_UCFG_DIR)/wlan_nan_api.o \
 		 $(NAN_UCFG_DIR)/cfg_nan.o \
 		 $(NAN_TGT_DIR)/target_if_nan.o \
 		 $(NAN_OS_IF_DIR)/os_if_nan.o
@@ -4016,6 +4023,7 @@ cppflags-$(CONFIG_QCA_WIFI_QCA6750) += -DQCA_WIFI_QCA6750
 cppflags-$(CONFIG_QCA_WIFI_KIWI) += -DQCA_WIFI_KIWI
 cppflags-$(CONFIG_CNSS_KIWI_V2) += -DQCA_WIFI_KIWI_V2
 cppflags-$(CONFIG_CNSS_MANGO) += -DQCA_WIFI_MANGO
+cppflags-$(CONFIG_CNSS_PEACH) += -DQCA_WIFI_PEACH
 cppflags-$(CONFIG_QCA_WIFI_QCA8074) += -DQCA_WIFI_QCA8074
 cppflags-$(CONFIG_SCALE_INCLUDES) += -DSCALE_INCLUDES
 cppflags-$(CONFIG_QCA_WIFI_QCA8074_VP) += -DQCA_WIFI_QCA8074_VP
@@ -4082,6 +4090,7 @@ cppflags-$(CONFIG_WLAN_DP_DISABLE_TCL_CMD_CRED_SRNG) += -DWLAN_DP_DISABLE_TCL_CM
 cppflags-$(CONFIG_WLAN_DP_DISABLE_TCL_STATUS_SRNG) += -DWLAN_DP_DISABLE_TCL_STATUS_SRNG
 cppflags-$(CONFIG_DP_WAR_VALIDATE_RX_ERR_MSDU_COOKIE) += -DDP_WAR_VALIDATE_RX_ERR_MSDU_COOKIE
 cppflags-$(CONFIG_WLAN_DP_SRNG_USAGE_WM_TRACKING) += -DWLAN_DP_SRNG_USAGE_WM_TRACKING
+cppflags-$(CONFIG_WLAN_FEATURE_DP_CFG_EVENT_HISTORY) += -DWLAN_FEATURE_DP_CFG_EVENT_HISTORY
 
 # Enable Low latency
 cppflags-$(CONFIG_WLAN_FEATURE_LL_MODE) += -DWLAN_FEATURE_LL_MODE
@@ -4680,6 +4689,9 @@ endif
 
 # Flag to enable Constrained Application Protocol feature
 cppflags-$(CONFIG_WLAN_FEATURE_COAP) += -DWLAN_FEATURE_COAP
+
+# SSR driver dump config
+cppflags-$(CONFIG_CNSS2_SSR_DRIVER_DUMP) += -DWLAN_FEATURE_SSR_DRIVER_DUMP
 
 KBUILD_CPPFLAGS += $(cppflags-y)
 

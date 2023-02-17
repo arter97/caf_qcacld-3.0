@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2011-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -47,7 +47,7 @@
 #include "wlan_connectivity_logging.h"
 #include "lim_types.h"
 #include <wlan_mlo_mgr_main.h>
-
+#include "wlan_nan_api_i.h"
 /**
  * is_auth_valid
  *
@@ -654,10 +654,11 @@ lim_validate_mac_address_in_auth_frame(struct mac_context *mac_ctx,
 		return QDF_STATUS_E_ALREADY;
 	}
 
-	if (mlo_mgr_ml_peer_exist(mac_hdr->sa))
+	if (mlo_mgr_ml_peer_exist_on_diff_ml_ctx(mac_hdr->sa, NULL))
 		return QDF_STATUS_E_ALREADY;
 
-	if (mlo_mgr_ml_peer_exist(rx_auth_frm_body->peer_mld.bytes))
+	if (mlo_mgr_ml_peer_exist_on_diff_ml_ctx(
+				rx_auth_frm_body->peer_mld.bytes, NULL))
 		return QDF_STATUS_E_ALREADY;
 
 	return QDF_STATUS_SUCCESS;
@@ -2032,8 +2033,19 @@ QDF_STATUS lim_process_auth_frame_no_session(struct mac_context *mac,
 
 	if (auth_alg == eSIR_AUTH_TYPE_PASN) {
 		vdev_id = lim_get_pasn_peer_vdev_id(mac, mac_hdr->bssId);
-		if (vdev_id == WLAN_UMAC_VDEV_ID_MAX)
-			return QDF_STATUS_E_FAILURE;
+		if (vdev_id == WLAN_UMAC_VDEV_ID_MAX) {
+			/*
+			 * This can be NAN auth mgmt frame and for NAN, PASN
+			 * peer is not available.
+			 */
+			vdev_id = wlan_nan_get_vdev_id_from_bssid(mac->pdev,
+							mac_hdr->bssId,
+							WLAN_MGMT_RX_ID);
+			if (vdev_id == WLAN_UMAC_VDEV_ID_MAX) {
+				pe_err("NAN vdev_id not found");
+				return QDF_STATUS_E_FAILURE;
+			}
+		}
 
 		return lim_process_pasn_auth_frame(mac, vdev_id, pBd);
 	}
