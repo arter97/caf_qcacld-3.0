@@ -1313,17 +1313,21 @@ static void dp_mon_register_intr_ops_2_0(struct dp_soc *soc)
 /*
  * dp_mon_pdev_tlv_logger_init() - initializes struct dp_mon_tlv_logger
  *
- * @mon_pdev: pointer to dp_mon_pdev
+ * @pdev: pointer to dp_pdev
  *
  * Return: QDF_STATUS
  */
 static
-QDF_STATUS dp_mon_pdev_tlv_logger_init(struct dp_mon_pdev *mon_pdev)
+QDF_STATUS dp_mon_pdev_tlv_logger_init(struct dp_pdev *pdev)
 {
+	struct dp_mon_pdev *mon_pdev = pdev->monitor_pdev;
+	struct dp_mon_pdev_be *mon_pdev_be = NULL;
 	struct dp_mon_tlv_logger *tlv_log = NULL;
 
 	if (!mon_pdev)
 		return QDF_STATUS_E_INVAL;
+
+	mon_pdev_be = dp_get_be_mon_pdev_from_dp_mon_pdev(mon_pdev);
 
 	tlv_log = qdf_mem_malloc(sizeof(struct dp_mon_tlv_logger));
 	if (!tlv_log) {
@@ -1351,7 +1355,7 @@ QDF_STATUS dp_mon_pdev_tlv_logger_init(struct dp_mon_pdev *mon_pdev)
 
 	tlv_log->tlv_logging_enable = 1;
 
-	mon_pdev->rx_tlv_log = tlv_log;
+	mon_pdev_be->rx_tlv_log = tlv_log;
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -1359,19 +1363,23 @@ QDF_STATUS dp_mon_pdev_tlv_logger_init(struct dp_mon_pdev *mon_pdev)
 /*
  * dp_mon_pdev_tlv_logger_deinit() - deinitializes struct dp_mon_tlv_logger
  *
- * @mon_pdev: pointer to dp_mon_pdev
+ * @pdev: pointer to dp_pdev
  *
  * Return: QDF_STATUS
  */
 static
-QDF_STATUS dp_mon_pdev_tlv_logger_deinit(struct dp_mon_pdev *mon_pdev)
+QDF_STATUS dp_mon_pdev_tlv_logger_deinit(struct dp_pdev *pdev)
 {
+	struct dp_mon_pdev *mon_pdev = pdev->monitor_pdev;
+	struct dp_mon_pdev_be *mon_pdev_be = NULL;
 	struct dp_mon_tlv_logger *tlv_log = NULL;
 
 	if (!mon_pdev)
 		return QDF_STATUS_E_INVAL;
 
-	tlv_log = mon_pdev->rx_tlv_log;
+	mon_pdev_be = dp_get_be_mon_pdev_from_dp_mon_pdev(mon_pdev);
+
+	tlv_log = mon_pdev_be->rx_tlv_log;
 	if (!tlv_log || !(tlv_log->buff))
 		return QDF_STATUS_E_INVAL;
 
@@ -1386,13 +1394,13 @@ QDF_STATUS dp_mon_pdev_tlv_logger_deinit(struct dp_mon_pdev *mon_pdev)
 #else
 
 static inline
-QDF_STATUS dp_mon_pdev_tlv_logger_init(struct dp_mon_pdev *mon_pdev)
+QDF_STATUS dp_mon_pdev_tlv_logger_init(struct dp_pdev *pdev)
 {
 	return QDF_STATUS_SUCCESS;
 }
 
 static inline
-QDF_STATUS dp_mon_pdev_tlv_logger_deinit(struct dp_mon_pdev *mon_pdev)
+QDF_STATUS dp_mon_pdev_tlv_logger_deinit(struct dp_pdev *pdev)
 {
 	return QDF_STATUS_SUCCESS;
 }

@@ -5887,7 +5887,7 @@ QDF_STATUS dp_mon_pdev_init(struct dp_pdev *pdev)
 		mon_ops->mon_pdev_ext_init(pdev);
 
 	if (mon_ops->mon_rx_pdev_tlv_logger_init)
-		mon_ops->mon_rx_pdev_tlv_logger_init(pdev->monitor_pdev);
+		mon_ops->mon_rx_pdev_tlv_logger_init(pdev);
 
 	mon_pdev->is_dp_mon_pdev_initialized = true;
 
@@ -5937,8 +5937,7 @@ QDF_STATUS dp_mon_pdev_deinit(struct dp_pdev *pdev)
 		mon_ops->mon_pdev_ext_deinit(pdev);
 
 	if (mon_ops->mon_rx_pdev_tlv_logger_deinit)
-		mon_ops->mon_rx_pdev_tlv_logger_deinit(
-					pdev->monitor_pdev);
+		mon_ops->mon_rx_pdev_tlv_logger_deinit(pdev);
 
 	/* detach monitor function */
 	dp_monitor_tx_ppdu_stats_detach(pdev);

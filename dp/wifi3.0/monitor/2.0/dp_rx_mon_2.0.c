@@ -367,16 +367,16 @@ void dp_rx_mon_pf_tag_to_buf_headroom_2_0(void *nbuf,
  * dp_mon_record_index_update() - update the indexes of dp_mon_tlv_logger
  *                                 to store next tlv
  *
- * @mon_pdev: pointer to dp_mon_pdev
+ * @mon_pdev_be: pointer to dp_mon_pdev_be
  *
  * Return
  */
 void
-dp_mon_record_index_update(struct dp_mon_pdev *mon_pdev) {
+dp_mon_record_index_update(struct dp_mon_pdev_be *mon_pdev_be) {
 	struct dp_mon_tlv_logger *tlv_log = NULL;
 	struct dp_mon_tlv_info *tlv_info = NULL;
 
-	tlv_log = mon_pdev->rx_tlv_log;
+	tlv_log = mon_pdev_be->rx_tlv_log;
 	tlv_info = (struct dp_mon_tlv_info *)tlv_log->buff;
 
 	(tlv_log->curr_ppdu_pos + 1 == MAX_NUM_PPDU_RECORD) ?
@@ -400,13 +400,13 @@ dp_mon_record_index_update(struct dp_mon_pdev *mon_pdev) {
 /**
  * dp_mon_record_tlv() - Store the contents of the tlv in buffer
  *
- * @mon_pdev: pointe to dp_mon_pdev
+ * @mon_pdev_be: pointe to dp_mon_pdev_be
  * @ppdu_info: struct hal_rx_ppdu_info
  *
  * Return
  */
 void
-dp_mon_record_tlv(struct dp_mon_pdev *mon_pdev,
+dp_mon_record_tlv(struct dp_mon_pdev_be *mon_pdev_be,
 		  struct hal_rx_ppdu_info *ppdu_info) {
 	struct dp_mon_tlv_logger *tlv_log = NULL;
 	struct dp_mon_tlv_info *tlv_info = NULL;
@@ -415,10 +415,10 @@ dp_mon_record_tlv(struct dp_mon_pdev *mon_pdev,
 	uint16_t *mpdu_idx = NULL;
 	uint16_t *ppdu_end_idx = NULL;
 
-	if (!mon_pdev || !(mon_pdev->rx_tlv_log))
+	if (!mon_pdev_be || !(mon_pdev_be->rx_tlv_log))
 		return;
 
-	tlv_log = mon_pdev->rx_tlv_log;
+	tlv_log = mon_pdev_be->rx_tlv_log;
 	if (!tlv_log->tlv_logging_enable || !(tlv_log->buff))
 		return;
 
@@ -546,16 +546,16 @@ dp_mon_record_tlv(struct dp_mon_pdev *mon_pdev,
 /**
  * dp_mon_record_clear_buffer() - Clear the buffer to record next PPDU
  *
- * @mon_pdev: pointer to dp_mon_pdev
+ * @mon_pdev_be: pointer to dp_mon_pdev_be
  *
  * Return
  */
 void
-dp_mon_record_clear_buffer(struct dp_mon_pdev *mon_pdev) {
+dp_mon_record_clear_buffer(struct dp_mon_pdev_be *mon_pdev_be) {
 	struct dp_mon_tlv_logger *rx_tlv_log = NULL;
 	struct dp_mon_tlv_info *tlv_info = NULL;
 
-	rx_tlv_log = mon_pdev->rx_tlv_log;
+	rx_tlv_log = mon_pdev_be->rx_tlv_log;
 	tlv_info = (struct dp_mon_tlv_info *)rx_tlv_log->buff;
 	qdf_mem_zero(&tlv_info[rx_tlv_log->ppdu_start_idx],
 		     MAX_TLVS_PER_PPDU * sizeof(struct dp_mon_tlv_info));
@@ -564,16 +564,16 @@ dp_mon_record_clear_buffer(struct dp_mon_pdev *mon_pdev) {
 #else
 
 void
-dp_mon_record_index_update(struct dp_mon_pdev *mon_pdev) {
+dp_mon_record_index_update(struct dp_mon_pdev_be *mon_pdev_be) {
 }
 
 void
-dp_mon_record_tlv(struct dp_mon_pdev *mon_pdev,
+dp_mon_record_tlv(struct dp_mon_pdev_be *mon_pdev_be,
 		  struct hal_rx_ppdu_info *ppdu_info) {
 }
 
 void
-dp_mon_record_clear_buffer(struct dp_mon_pdev *mon_pdev) {
+dp_mon_record_clear_buffer(struct dp_mon_pdev_be *mon_pdev_be) {
 }
 
 #endif
@@ -1779,14 +1779,14 @@ dp_rx_mon_process_status_tlv(struct dp_pdev *pdev)
 		rx_tlv = buf;
 		rx_tlv_start = buf;
 
-		dp_mon_record_clear_buffer(mon_pdev);
+		dp_mon_record_clear_buffer(mon_pdev_be);
 
 		do {
 			tlv_status = hal_rx_status_get_tlv_info(rx_tlv,
 								ppdu_info,
 								pdev->soc->hal_soc,
 								buf);
-			dp_mon_record_tlv(mon_pdev, ppdu_info);
+			dp_mon_record_tlv(mon_pdev_be, ppdu_info);
 			work_done += dp_rx_mon_process_tlv_status(pdev,
 								  ppdu_info,
 								  buf,
@@ -1816,7 +1816,7 @@ dp_rx_mon_process_status_tlv(struct dp_pdev *pdev)
 		qdf_frag_free(buf);
 		DP_STATS_INC(mon_soc, frag_free, 1);
 		mon_pdev->rx_mon_stats.status_buf_count++;
-		dp_mon_record_index_update(mon_pdev);
+		dp_mon_record_index_update(mon_pdev_be);
 	}
 
 	dp_mon_rx_stats_update_rssi_dbm_params(mon_pdev, ppdu_info);

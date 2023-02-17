@@ -1075,14 +1075,91 @@ enum txmon_generated_response {
 };
 
 #ifdef MONITOR_TLV_RECORDING_ENABLE
+
 /*
- * enum ppdu_tlv_category - Categories of TLV
+ * Please make sure that the maximum total size of fields in each TLV
+ * is 22 bits.
+ * 10 bits are reserved for tlv_tag
+ */
+struct hal_ppdu_start_tlv_record {
+	uint32_t ppdu_id:10;
+};
+
+struct hal_ppdu_start_user_info_tlv_record {
+	uint32_t user_id:6,
+		rate_mcs:4,
+		nss:3,
+		reception_type:3,
+		sgi:2;
+};
+
+struct hal_mpdu_start_tlv_record {
+	uint32_t user_id:6,
+		wrap_flag:1;
+};
+
+struct hal_mpdu_end_tlv_record {
+	uint32_t user_id:6,
+		fcs_err:1,
+		wrap_flag:1;
+};
+
+struct hal_header_tlv_record {
+	uint32_t wrap_flag:1;
+};
+
+struct hal_msdu_end_tlv_record {
+	uint32_t user_id:6,
+		msdu_num:8,
+		tid:4,
+		tcp_proto:1,
+		udp_proto:1,
+		wrap_flag:1;
+};
+
+struct hal_mon_buffer_addr_tlv_record {
+	uint32_t dma_length:12,
+		truncation:1,
+		continuation:1,
+		wrap_flag:1;
+};
+
+struct hal_phy_location_tlv_record {
+	uint32_t rtt_cfr_status:8,
+		rtt_num_streams:8,
+		rx_location_info_valid:1;
+};
+
+struct hal_ppdu_end_user_stats_tlv_record {
+	uint32_t ast_index:16,
+		 pkt_type:4;
+};
+
+struct hal_pcu_ppdu_end_info_tlv_record {
+	uint32_t dialog_topken:8,
+		 bb_captured_reason:3,
+		 bb_captured_channel:1,
+		 bb_captured_timeout:1,
+		 mpdu_delimiter_error_seen:1;
+};
+
+struct hal_phy_rx_ht_sig_tlv_record {
+	uint32_t crc:8,
+		 mcs:7,
+		 stbc:2,
+		 aggregation:1,
+		 short_gi:1,
+		 fes_coding:1,
+		 cbw:1;
+};
+/*
+ * enum hal_ppdu_tlv_category - Categories of TLV
  * @PPDU_START: PPDU start level TLV
  * @MPDU: MPDU level TLV
  * @PPDU_END: PPDU end level TLV
  *
  */
-enum ppdu_tlv_category {
+enum hal_ppdu_tlv_category {
 	CATEGORY_PPDU_START = 1,
 	CATEGORY_MPDU,
 	CATEGORY_PPDU_END

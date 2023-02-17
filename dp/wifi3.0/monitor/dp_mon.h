@@ -100,132 +100,6 @@ static inline bool dp_is_monitor_mode_using_poll(struct dp_soc *soc)
 }
 #endif
 
-#ifdef MONITOR_TLV_RECORDING_ENABLE
-/*
- * struct dp_mon_tlv_info - recorded information of each TLV
- * @tlv_tag: tlv tag
- * @data: other fields recorded for a TLV
- *
- * Tag and its corresponding important fields are stored in this struct
- */
-struct ppdu_start_tlv_record {
-	uint32_t ppdu_id:10;
-};
-
-struct ppdu_start_user_info_tlv_record {
-	uint32_t user_id:6,
-		rate_mcs:4,
-		nss:3,
-		reception_type:3,
-		sgi:2;
-};
-
-struct mpdu_start_tlv_record {
-	uint32_t user_id:6,
-		wrap_flag:1;
-};
-
-struct mpdu_end_tlv_record {
-	uint32_t user_id:6,
-		fcs_err:1,
-		wrap_flag:1;
-};
-
-struct header_tlv_record {
-	uint32_t wrap_flag:1;
-};
-
-struct msdu_end_tlv_record {
-	uint32_t user_id:6,
-		msdu_num:8,
-		tid:4,
-		tcp_proto:1,
-		udp_proto:1,
-		wrap_flag:1;
-};
-
-struct mon_buffer_addr_tlv_record {
-	uint32_t dma_length:12,
-		truncation:1,
-		continuation:1,
-		wrap_flag:1;
-};
-
-struct phy_location_tlv_record {
-	uint32_t rtt_cfr_status:8,
-		rtt_num_streams:8,
-		rx_location_info_valid:1;
-};
-
-struct ppdu_end_user_stats_tlv_record {
-	uint32_t ast_index:16,
-		pkt_type:4;
-};
-
-struct pcu_ppdu_end_info_tlv_record {
-	uint32_t dialog_topken:8,
-		bb_captured_reason:3,
-		bb_captured_channel:1,
-		bb_captured_timeout:1,
-		mpdu_delimiter_error_seen:1;
-};
-
-struct phy_rx_ht_sig_tlv_record {
-	uint32_t crc:8,
-		mcs:7,
-		stbc:2,
-		aggregation:1,
-		short_gi:1,
-		fes_coding:1,
-		cbw:1;
-};
-
-struct dp_mon_tlv_info {
-	uint32_t tlv_tag:10;
-	union {
-		struct ppdu_start_tlv_record ppdu_start;
-		struct ppdu_start_user_info_tlv_record  ppdu_start_user_info;
-		struct mpdu_start_tlv_record mpdu_start;
-		struct mpdu_end_tlv_record mpdu_end;
-		struct header_tlv_record header;
-		struct msdu_end_tlv_record msdu_end;
-		struct mon_buffer_addr_tlv_record mon_buffer_addr;
-		struct phy_location_tlv_record phy_location;
-		struct ppdu_end_user_stats_tlv_record ppdu_end_user_stats;
-		struct pcu_ppdu_end_info_tlv_record pcu_ppdu_end_info;
-		struct phy_rx_ht_sig_tlv_record phy_rx_ht_sig;
-		uint32_t data;
-	} data;
-};
-
-/**
- * struct dp_mon_tlv_logger - contains indexes and other data of the buffer
- * @buff: buffer in which TLVs are stored
- * @curr_ppdu_pos: position of the next ppdu to be written
- * @ppdu_start_idx: starting index form which PPDU start level TLVs are stored for a ppdu
- * @mpdu_idx: starting index form which MPDU TLVs are stored for a ppdu
- * @ppdu_end_idx: starting index form which PPDU end level TLVs are stored for a ppdu
- * @max_ppdu_start_idx: ending index for PPDU start level TLVs for a ppdu
- * @max_mpdu_idx: ending index for MPDU level TLVs for a ppdu
- * @max_ppdu_end_idx: ending index for PPDU end level TLVs for a ppdu
- * @wrap_flag: flag toggle between consecutive PPDU
- * @tlv_logging_enable: check is tlv logging is enabled
- *
- */
-struct dp_mon_tlv_logger {
-	void *buff;
-	uint16_t curr_ppdu_pos;
-	uint16_t ppdu_start_idx;
-	uint16_t mpdu_idx;
-	uint16_t ppdu_end_idx;
-	uint16_t max_ppdu_start_idx;
-	uint16_t max_ppdu_end_idx;
-	uint16_t max_mpdu_idx;
-	uint8_t wrap_flag;
-	bool tlv_logging_enable;
-};
-#endif
-
 /**
  * dp_mon_soc_attach() - DP monitor soc attach
  * @soc: Datapath SOC handle
@@ -950,8 +824,8 @@ struct dp_mon_ops {
 #endif
 	QDF_STATUS (*mon_pdev_ext_init)(struct dp_pdev *pdev);
 	QDF_STATUS (*mon_pdev_ext_deinit)(struct dp_pdev *pdev);
-	QDF_STATUS (*mon_rx_pdev_tlv_logger_init)(struct dp_mon_pdev *mon_pdev);
-	QDF_STATUS (*mon_rx_pdev_tlv_logger_deinit)(struct dp_mon_pdev *mon_pdev);
+	QDF_STATUS (*mon_rx_pdev_tlv_logger_init)(struct dp_pdev *pdev);
+	QDF_STATUS (*mon_rx_pdev_tlv_logger_deinit)(struct dp_pdev *pdev);
 	QDF_STATUS (*mon_lite_mon_alloc)(struct dp_pdev *pdev);
 	void (*mon_lite_mon_dealloc)(struct dp_pdev *pdev);
 	void (*mon_lite_mon_vdev_delete)(struct dp_pdev *pdev,
@@ -1128,11 +1002,6 @@ struct  dp_mon_pdev {
 	uint16_t mo_ctrl_filter;
 	uint16_t mo_data_filter;
 	uint16_t md_data_filter;
-
-#ifdef MONITOR_TLV_RECORDING_ENABLE
-	/*Rx TLV logger*/
-	struct dp_mon_tlv_logger *rx_tlv_log;
-#endif
 
 #ifdef WLAN_TX_PKT_CAPTURE_ENH
 	struct dp_pdev_tx_capture tx_capture;
