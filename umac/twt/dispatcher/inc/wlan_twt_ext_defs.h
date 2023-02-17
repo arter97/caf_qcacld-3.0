@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -67,6 +67,7 @@
  * @remove_sta_slot_interval: Inrerval between decisions making to remove TWT
  *                 slot of STAs. (units = milliseconds)
  * @b_twt_enable: Enable or disable broadcast TWT.
+ * @r_twt_enable: Enable or disable restricted TWT.
  */
 struct twt_ic_cfg_params {
 	bool twt_enable;
@@ -87,6 +88,7 @@ struct twt_ic_cfg_params {
 	uint32_t add_sta_slot_interval;
 	uint32_t remove_sta_slot_interval;
 	bool b_twt_enable:1;
+	bool r_twt_enable;
 };
 
 #endif /* __WLAN_TWT_EXT_DEFS_H__ */
