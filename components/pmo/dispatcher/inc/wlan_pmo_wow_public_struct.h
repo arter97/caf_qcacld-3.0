@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2017-2021 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -228,7 +229,7 @@ enum pmo_wow_state {
  * @lphb_cache: lphb cache
  * @lphb_cb_ctx: callback context for lphb, kept as void* as
  *                        osif structures are opaque to pmo.
- * @pmo_lphb_callback: registered os if calllback function
+ * @lphb_cb: registered os if calllback function
  * @ptrn_id_def: default pattern id counter for legacy firmware
  * @ptrn_id_usr: user pattern id counter for legacy firmware
  * @txrx_suspended: flag to determine if TX/RX is suspended
@@ -285,6 +286,7 @@ struct pmo_wow_add_pattern {
  * @enable: wow enable or disable flag
  * @can_suspend_link: flag to indicate if link can be suspended
  * @pause_iface_config: interface config
+ * @flags: bitmap of WMI_WOW_FLAG_* flags
  */
 struct pmo_wow_cmd_params {
 	bool enable;

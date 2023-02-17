@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -604,7 +604,7 @@ CFG_INI_UINT("g_mark_sap_indoor_as_disable", 0, 1, 0, CFG_VALUE_OR_DEFAULT, \
 CFG_INI_UINT("g_enable_go_force_scc", 0, 2, 0, CFG_VALUE_OR_DEFAULT, \
 	     "Enable/Disable P2P GO force SCC")
 
-/**
+/*
  * <ini>
  * g_pcl_band_priority - Set 5G/6G Channel order
  * Options.

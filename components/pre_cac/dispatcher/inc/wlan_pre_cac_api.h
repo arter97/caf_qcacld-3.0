@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022, Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023, Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -68,7 +68,7 @@ void wlan_pre_cac_complete_set(struct wlan_objmgr_vdev *vdev,
 bool wlan_pre_cac_complete_get(struct wlan_objmgr_vdev *vdev);
 
 /**
- * pre_cac_set_freq_before_pre_cac() - Set frequency before pre cac
+ * wlan_pre_cac_set_freq_before_pre_cac() - Set frequency before pre cac
  * @vdev: vdev object manager
  * @freq: frequency
  *
@@ -78,7 +78,7 @@ void wlan_pre_cac_set_freq_before_pre_cac(struct wlan_objmgr_vdev *vdev,
 					  qdf_freq_t freq);
 
 /**
- * pre_cac_get_freq_before_pre_cac() - Get frequency before pre cac
+ * wlan_pre_cac_get_freq_before_pre_cac() - Get frequency before pre cac
  * @vdev: vdev object manager
  *
  * Return: Frequency before pre cac

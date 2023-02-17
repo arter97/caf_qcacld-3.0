@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -216,7 +216,8 @@ bool wlan_is_log_record_present_for_bssid(struct wlan_objmgr_psoc *psoc,
 /**
  * wlan_add_sae_log_record_to_available_slot() - Add a new log record into the
  * cache for the queue.
- * @mlme_priv: Mlme private object
+ * @psoc: objmgr psoc object
+ * @vdev: objmgr vdev object
  * @rec: Log record pointer
  *
  * Return: QDF_STATUS
@@ -413,7 +414,8 @@ bool wlan_is_log_record_present_for_bssid(struct wlan_objmgr_psoc *psoc,
 /**
  * wlan_add_sae_log_record_to_available_slot() - Add a new log record into the
  * cache for the queue.
- * @mlme_priv: Mlme private object
+ * @psoc: objmgr psoc object
+ * @vdev: objmgr vdev object
  * @pkt_info: Log packet record pointer
  *
  * Return: QDF_STATUS

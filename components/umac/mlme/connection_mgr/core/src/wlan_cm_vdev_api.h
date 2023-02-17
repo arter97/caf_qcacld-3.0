@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2015, 2020-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -178,10 +178,9 @@ struct cm_ext_obj {
 #ifdef WLAN_FEATURE_FILS_SK
 /**
  * cm_update_hlp_info - API to save HLP IE
- * @psoc: Pointer to psoc
+ * @vdev: vdev ptr
  * @gen_ie: IE buffer to store
  * @len: length of the IE buffer @gen_ie
- * @vdev_id: vdev id
  * @flush: Flush the older saved HLP if any
  *
  * Return: None
@@ -220,6 +219,7 @@ void cm_diag_get_auth_enc_type_vdev_id(struct wlan_objmgr_psoc *psoc,
 #ifdef WLAN_UNIT_TEST
 /**
  * cm_get_sta_cxn_info - fill sta context info in buffer
+ * @vdev: Pointer to vdev
  * @buf: buffer to fill
  * @buf_sz: buf size
  *
@@ -424,7 +424,8 @@ cm_csr_connect_done_ind(struct wlan_objmgr_vdev *vdev,
 
 /**
  * cm_is_vdevid_connected() - check if vdev_id is in conneted state
- * @vdev: vdev pointer
+ * @pdev: pdev pointer
+ * @vdev_id: vdev ID
  *
  * Return: bool
  */
@@ -432,7 +433,8 @@ bool cm_is_vdevid_connected(struct wlan_objmgr_pdev *pdev, uint8_t vdev_id);
 
 /**
  * cm_is_vdevid_active() - check if vdev_id is in conneted/roaming state
- * @vdev: vdev pointer
+ * @pdev: pdev pointer
+ * @vdev_id: vdev ID
  *
  * Return: bool
  */
@@ -706,7 +708,7 @@ QDF_STATUS wlan_cm_send_connect_rsp(struct scheduler_msg *msg);
 void wlan_cm_free_connect_rsp(struct cm_vdev_join_rsp *rsp);
 
 /**
- * wlan_cm_handle_hw_mode_change_resp() Process hw_mode_change_resp
+ * wlan_cm_handle_hw_mode_change_resp() - Process hw_mode_change_resp
  * @pdev: pdev pointer
  * @vdev_id: vdev_id
  * @cm_id: connection manager id

@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2020-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -1015,7 +1015,7 @@ target_if_cm_roam_scan_offload_rssi_thresh(
 }
 
 /**
- * target_if_roam_scan_offload_scan_period() - set roam offload scan period
+ * target_if_cm_roam_scan_offload_scan_period() - set roam offload scan period
  * @wmi_handle: wmi handle
  * @req:  roam scan period parameters
  *
@@ -1318,7 +1318,7 @@ target_if_cm_roam_send_roam_init(struct wlan_objmgr_vdev *vdev,
 /**
  * target_if_cm_roam_scan_rssi_change_cmd()  - Send WMI_ROAM_SCAN_RSSI_CHANGE
  * command to firmware
- * @vdev:  Vdev object
+ * @wmi_handle: WMI handle
  * @params: RSSI change parameters
  *
  * Return: QDF_STATUS
@@ -1368,7 +1368,7 @@ target_if_cm_roam_send_time_sync_cmd(wmi_unified_t wmi_handle)
 
 #ifdef WLAN_FEATURE_11BE_MLO
 /**
- * target_if_cm_roam_send_start() - Send roam mlo related commands
+ * target_if_cm_roam_send_mlo_config() - Send roam mlo related commands
  * to wmi
  * @vdev: vdev object
  * @req: roam mlo config parameters

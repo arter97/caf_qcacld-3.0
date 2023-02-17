@@ -1227,6 +1227,8 @@ __lim_handle_sme_start_bss_request(struct mac_context *mac_ctx, uint32_t *msg_bu
 		if (QDF_IS_STATUS_ERROR(qdf_status))
 			goto free;
 		qdf_mem_free(mlm_start_req);
+		lim_update_rrm_capability(mac_ctx);
+
 		return;
 	} else {
 
@@ -3231,7 +3233,8 @@ lim_fill_pe_session(struct mac_context *mac_ctx, struct pe_session *session,
 		wlan_reg_read_current_country(mac_ctx->psoc,
 					      programmed_country);
 		status = wlan_reg_get_6g_power_type_for_ctry(
-				mac_ctx->psoc, ie_struct->Country.country,
+				mac_ctx->psoc, mac_ctx->pdev,
+				ie_struct->Country.country,
 				programmed_country, &power_type_6g,
 				&ctry_code_match, session->ap_power_type);
 		if (QDF_IS_STATUS_ERROR(status)) {

@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2014-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -120,7 +120,7 @@ void cds_set_rx_thread_ul_cpu_mask(uint8_t cpu_affinity_mask)
 
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 4, 0))
 /**
- * cds_rx_thread_log_cpu_affinity_change - Log Rx thread affinity change
+ * cds_rx_thread_log_cpu_affinity_change() - Log Rx thread affinity change
  * @core_affine_cnt: Available cores
  * @tput_req: Throughput request
  * @old_mask: Old affinity mask
@@ -229,15 +229,6 @@ err:
 	return 1;
 }
 
-/**
- * cds_sched_handle_cpu_hot_plug - cpu hotplug event handler
- *
- * cpu hotplug indication handler
- * will find online cores and will assign proper core based on perf requirement
- *
- * Return: 0 success
- *         1 fail
- */
 int cds_sched_handle_cpu_hot_plug(void)
 {
 	p_cds_sched_context pSchedContext = get_cds_sched_ctxt();
@@ -317,16 +308,6 @@ affine_thread:
 	mutex_unlock(&pschedcontext->affinity_lock);
 }
 
-/**
- * cds_sched_handle_throughput_req - cpu throughput requirement handler
- * @high_tput_required:	high throughput is required or not
- *
- * high or low throughput indication ahndler
- * will find online cores and will assign proper core based on perf requirement
- *
- * Return: 0 success
- *         1 fail
- */
 int cds_sched_handle_throughput_req(bool high_tput_required)
 {
 	p_cds_sched_context pSchedContext = get_cds_sched_ctxt();
@@ -437,7 +418,7 @@ static void __cds_cpu_hotplug_notify(uint32_t cpu, bool cpu_up)
 }
 
 /**
- * cds_cpu_hotplug_notify - cpu core up/down notification handler wrapper
+ * cds_cpu_hotplug_notify() - cpu core up/down notification handler wrapper
  * @cpu: CPU Id of the CPU generating the event
  * @cpu_up: true if the CPU is online
  *
@@ -466,25 +447,9 @@ static void cds_cpu_before_offline_cb(void *context, uint32_t cpu)
 }
 #endif /* QCA_CONFIG_SMP */
 
-/**
- * cds_sched_open() - initialize the CDS Scheduler
- * @p_cds_context: Pointer to the global CDS Context
- * @pSchedContext: Pointer to a previously allocated buffer big
- *	enough to hold a scheduler context.
- * @SchedCtxSize: CDS scheduler context size
- *
- * This function initializes the CDS Scheduler
- * Upon successful initialization:
- *	- All the message queues are initialized
- *	- The Main Controller thread is created and ready to receive and
- *	dispatch messages.
- *
- *
- * Return: QDF status
- */
 QDF_STATUS cds_sched_open(void *p_cds_context,
-		p_cds_sched_context pSchedContext,
-		uint32_t SchedCtxSize)
+			  p_cds_sched_context pSchedContext,
+			  uint32_t SchedCtxSize)
 {
 	cds_debug("Opening the CDS Scheduler");
 	/* Sanity checks */
@@ -557,15 +522,6 @@ pkt_freeqalloc_failure:
 } /* cds_sched_open() */
 
 #ifdef QCA_CONFIG_SMP
-/**
- * cds_free_ol_rx_pkt_freeq() - free cds buffer free queue
- * @pSchedContext: pointer to the global CDS Sched Context
- *
- * This API does mem free of the buffers available in free cds buffer
- * queue which is used for Data rx processing.
- *
- * Return: none
- */
 void cds_free_ol_rx_pkt_freeq(p_cds_sched_context pSchedContext)
 {
 	struct cds_ol_rx_pkt *pkt;
@@ -622,14 +578,6 @@ free:
 	return QDF_STATUS_E_NOMEM;
 }
 
-/**
- * cds_free_ol_rx_pkt() - api to release cds message to the freeq
- * This api returns the cds message used for Rx data to the free queue
- * @pSchedContext: Pointer to the global CDS Sched Context
- * @pkt: CDS message buffer to be returned to free queue.
- *
- * Return: none
- */
 void
 cds_free_ol_rx_pkt(p_cds_sched_context pSchedContext,
 		    struct cds_ol_rx_pkt *pkt)
@@ -640,15 +588,6 @@ cds_free_ol_rx_pkt(p_cds_sched_context pSchedContext,
 	spin_unlock_bh(&pSchedContext->cds_ol_rx_pkt_freeq_lock);
 }
 
-/**
- * cds_alloc_ol_rx_pkt() - API to return next available cds message
- * @pSchedContext: Pointer to the global CDS Sched Context
- *
- * This api returns next available cds message buffer used for rx data
- * processing
- *
- * Return: Pointer to cds message buffer
- */
 struct cds_ol_rx_pkt *cds_alloc_ol_rx_pkt(p_cds_sched_context pSchedContext)
 {
 	struct cds_ol_rx_pkt *pkt;
@@ -665,16 +604,6 @@ struct cds_ol_rx_pkt *cds_alloc_ol_rx_pkt(p_cds_sched_context pSchedContext)
 	return pkt;
 }
 
-/**
- * cds_indicate_rxpkt() - indicate rx data packet
- * @pSchedContext: Pointer to the global CDS Sched Context
- * @pkt: CDS data message buffer
- *
- * This api enqueues the rx packet into ol_rx_thread_queue and notifies
- * cds_ol_rx_thread()
- *
- * Return: none
- */
 void
 cds_indicate_rxpkt(p_cds_sched_context pSchedContext,
 		   struct cds_ol_rx_pkt *pkt)
@@ -686,13 +615,6 @@ cds_indicate_rxpkt(p_cds_sched_context pSchedContext,
 	wake_up_interruptible(&pSchedContext->ol_rx_wait_queue);
 }
 
-/**
- * cds_close_rx_thread() - close the Rx thread
- *
- * This api closes the Rx thread:
- *
- * Return: qdf status
- */
 QDF_STATUS cds_close_rx_thread(void)
 {
 	cds_debug("invoked");
@@ -718,16 +640,6 @@ QDF_STATUS cds_close_rx_thread(void)
 	return QDF_STATUS_SUCCESS;
 } /* cds_close_rx_thread */
 
-/**
- * cds_drop_rxpkt_by_staid() - api to drop pending rx packets for a sta
- * @pSchedContext: Pointer to the global CDS Sched Context
- * @staId: Station Id
- *
- * This api drops queued packets for a station, to drop all the pending
- * packets the caller has to send WLAN_MAX_STA_COUNT as staId.
- *
- * Return: none
- */
 void cds_drop_rxpkt_by_staid(p_cds_sched_context pSchedContext, uint16_t staId)
 {
 	struct list_head local_list;
@@ -894,17 +806,6 @@ void cds_resume_rx_thread(void)
 }
 #endif
 
-/**
- * cds_sched_close() - close the cds scheduler
- *
- * This api closes the CDS Scheduler upon successful closing:
- *	- All the message queues are flushed
- *	- The Main Controller thread is closed
- *	- The Tx thread is closed
- *
- *
- * Return: qdf status
- */
 QDF_STATUS cds_sched_close(void)
 {
 	cds_debug("invoked");
@@ -920,11 +821,6 @@ QDF_STATUS cds_sched_close(void)
 	return QDF_STATUS_SUCCESS;
 } /* cds_sched_close() */
 
-/**
- * get_cds_sched_ctxt() - get cds scheduler context
- *
- * Return: none
- */
 p_cds_sched_context get_cds_sched_ctxt(void)
 {
 	/* Make sure that Vos Scheduler context has been initialized */
@@ -934,36 +830,12 @@ p_cds_sched_context get_cds_sched_ctxt(void)
 	return gp_cds_sched_context;
 }
 
-/**
- * cds_ssr_protect_init() - initialize ssr protection debug functionality
- *
- * Return:
- *        void
- */
 void cds_ssr_protect_init(void)
 {
 	spin_lock_init(&ssr_protect_lock);
 	INIT_LIST_HEAD(&shutdown_notifier_head);
 }
 
-/**
- * cds_shutdown_notifier_register() - Register for shutdown notification
- * @cb          : Call back to be called
- * @priv        : Private pointer to be passed back to call back
- *
- * During driver remove or shutdown (recovery), external threads might be stuck
- * waiting on some event from firmware at lower layers. Remove or shutdown can't
- * proceed till the thread completes to avoid any race condition. Call backs can
- * be registered here to get early notification of remove or shutdown so that
- * waiting thread can be unblocked and hence remove or shutdown can proceed
- * further as waiting there may not make sense when FW may already have been
- * down.
- *
- * This is intended for early notification of remove() or shutdown() only so
- * that lower layers can take care of stuffs like external waiting thread.
- *
- * Return: CDS status
- */
 QDF_STATUS cds_shutdown_notifier_register(void (*cb)(void *priv), void *priv)
 {
 	struct shutdown_notifier *notifier;
@@ -998,16 +870,6 @@ QDF_STATUS cds_shutdown_notifier_register(void (*cb)(void *priv), void *priv)
 	return 0;
 }
 
-/**
- * cds_shutdown_notifier_purge() - Purge all the notifiers
- *
- * Shutdown notifiers are added to provide the early notification of remove or
- * shutdown being initiated. Adding this API to purge all the registered call
- * backs as they are not useful any more while all the lower layers are being
- * shutdown.
- *
- * Return: None
- */
 void cds_shutdown_notifier_purge(void)
 {
 	struct shutdown_notifier *notifier, *temp;
@@ -1027,12 +889,6 @@ void cds_shutdown_notifier_purge(void)
 	spin_unlock_irqrestore(&ssr_protect_lock, irq_flags);
 }
 
-/**
- * cds_shutdown_notifier_call() - Call shutdown notifier call back
- *
- * Call registered shutdown notifier call back to indicate about remove or
- * shutdown.
- */
 void cds_shutdown_notifier_call(void)
 {
 	struct shutdown_notifier *notifier;
@@ -1053,12 +909,6 @@ void cds_shutdown_notifier_call(void)
 	spin_unlock_irqrestore(&ssr_protect_lock, irq_flags);
 }
 
-/**
- * cds_get_gfp_flags(): get GFP flags
- *
- * Based on the scheduled context, return GFP flags
- * Return: gfp flags
- */
 int cds_get_gfp_flags(void)
 {
 	int flags = GFP_KERNEL;
@@ -1068,4 +918,3 @@ int cds_get_gfp_flags(void)
 
 	return flags;
 }
-

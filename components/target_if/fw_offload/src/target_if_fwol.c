@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2019-2021 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -437,7 +438,7 @@ target_if_fwol_register_thermal_throttle_handler(struct wlan_objmgr_psoc *psoc)
 }
 
 /**
- * target_if_fwol_unregister_thermal_stats_handler() - Register handler for
+ * target_if_fwol_unregister_thermal_throttle_handler() - Unregister handler for
  * thermal throttle stats firmware event
  * @psoc: psoc object
  *
@@ -473,7 +474,7 @@ target_if_fwol_unregister_thermal_throttle_handler(
 /**
  * target_if_fwol_set_mdns_config() - Set mdns Config to FW
  * @psoc: pointer to PSOC object
- * @offload_info: pointer to mdns config info
+ * @mdns_info: pointer to mdns config info
  *
  * Return: QDF_STATUS_SUCCESS on success
  */
