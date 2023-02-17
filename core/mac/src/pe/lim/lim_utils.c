@@ -2165,23 +2165,18 @@ void lim_process_channel_switch_timeout(tpAniSirGlobal pMac)
 					("Could not restore pre-channelSwitch (11h) state, resetting the system"));
 			return;
 		}
-
 		/*
-		 * If the channel-list that AP is asking us to switch is invalid
-		 * then we cannot switch the channel. Just disassociate from AP.
-		 * We will find a better AP !!!
+		 * The channel switch request received from AP is carrying
+		 * invalid channel. It's ok to ignore this channel switch
+		 * request as it might be from spoof AP. If it's from genuine
+		 * AP, it may lead to heart beat failure and result in
+		 * disconnection. DUT can go ahead and reconnect to it/any
+		 * other AP once it disconnects.
 		 */
-		if ((psessionEntry->limMlmState ==
-		   eLIM_MLM_LINK_ESTABLISHED_STATE) &&
-		   (psessionEntry->limSmeState != eLIM_SME_WT_DISASSOC_STATE) &&
-		   (psessionEntry->limSmeState != eLIM_SME_WT_DEAUTH_STATE)) {
-			lim_log(pMac, LOGE, FL("Invalid channel! Disconnect"));
-			lim_tear_down_link_with_ap(pMac,
-					   pMac->lim.limTimers.
-					   gLimChannelSwitchTimer.sessionId,
-					   eSIR_MAC_UNSPEC_FAILURE_REASON);
-			return;
-		}
+		lim_log(pMac, LOGE,
+			FL("Invalid channel freq %u Ignore CSA request"),
+			channel);
+		return;
 	}
 	lim_covert_channel_scan_type(pMac, psessionEntry->currentOperChannel,
 				     false);
