@@ -36,6 +36,7 @@
 #include "qdf_mc_timer.h"
 #include "cds_config.h"
 #include "qdf_cpuhp.h"
+#include "cdp_txrx_cmn_struct.h"
 
 #define MC_SUSPEND_EVENT            0x002
 #define RX_POST_EVENT               0x001
@@ -341,6 +342,15 @@ void cds_free_ol_rx_pkt(p_cds_sched_context pSchedContext,
  * Return: none
  */
 void cds_free_ol_rx_pkt_freeq(p_cds_sched_context pSchedContext);
+
+/**
+ * cds_get_rx_thread_pending() - get rx thread status
+ * @soc: ol_txrx_soc_handle object
+ *
+ * Return: 1 if rx thread is not empty.
+ *        0 if rx thread is empty.
+ */
+int cds_get_rx_thread_pending(ol_txrx_soc_handle soc);
 #else
 static inline void cds_sched_handle_rx_thread_affinity_req(
 	bool high_throughput) {}
@@ -389,6 +399,10 @@ static inline int cds_sched_handle_throughput_req(
 	return 0;
 }
 
+static inline int cds_get_rx_thread_pending(ol_txrx_soc_handle soc)
+{
+	return 0;
+}
 #endif
 
 /**

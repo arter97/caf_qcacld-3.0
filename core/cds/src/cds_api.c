@@ -145,7 +145,9 @@ static struct ol_if_ops  dp_ol_if_ops = {
     /* TODO: Add any other control path calls required to OL_IF/WMA layer */
 };
 #else
-static struct ol_if_ops  dp_ol_if_ops;
+static struct ol_if_ops  dp_ol_if_ops = {
+	.dp_rx_get_pending = cds_get_rx_thread_pending,
+};
 #endif
 
 static void cds_trigger_recovery_work(void *param);
