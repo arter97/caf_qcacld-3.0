@@ -662,10 +662,34 @@ struct ml_rv_info {
  * struct mlo_tgt_link_info - ML target link info
  * @vdev_id: link peer vdev id
  * @hw_mld_link_id: HW link id
+ * @mlo_enabled: indicate is MLO enabled
+ * @mlo_assoc_link: indicate is the link used to initialize the association
+ *                  of mlo connection
+ * @mlo_primary_umac: indicate is the link on primary UMAC, WIN only flag
+ * @mlo_logical_link_index_valid: indicate if the logial link index in is valid
+ * @mlo_peer_id_valid: indicate if the mlo peer id is valid
+ * @mlo_force_link_inactive: force the peer inactive
+ * @emlsr_support: indicate if eMLSR supported
+ * @emlmr_support: indicate if eMLMR supported
+ * @msd_cap_support: indicate if MSD supported
+ * @unused: spare bits
+ * @logical_link_index: Unique index for links of the mlo. Starts with Zero
  */
 struct mlo_tgt_link_info {
 	uint8_t vdev_id;
 	uint8_t hw_mld_link_id;
+	uint32_t mlo_enabled:1,
+		 mlo_assoc_link:1,
+		 mlo_primary_umac:1,
+		 mlo_logical_link_index_valid:1,
+		 mlo_peer_id_valid:1,
+		 mlo_force_link_inactive:1,
+		 emlsr_support:1,
+		 emlmr_support:1,
+		 msd_cap_support:1,
+		 unused:23;
+	uint32_t logical_link_index;
+
 };
 
 /**
