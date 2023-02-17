@@ -473,6 +473,11 @@ endif
 ifeq ($(CONFIG_FEATURE_DIRECT_LINK), y)
 HDD_OBJS += $(HDD_SRC_DIR)/wlan_hdd_sysfs_direct_link_ut_cmd.o
 endif
+
+ifeq ($(CONFIG_BUS_AUTO_SUSPEND), y)
+HDD_OBJS += $(HDD_SRC_DIR)/wlan_hdd_sysfs_runtime_pm.o
+endif
+
 endif # CONFIG_WLAN_SYSFS
 
 ifeq ($(CONFIG_QCACLD_FEATURE_FW_STATE), y)
