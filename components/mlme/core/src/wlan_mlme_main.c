@@ -2230,10 +2230,11 @@ static void mlme_init_powersave_params(struct wlan_objmgr_psoc *psoc,
 }
 
 #if defined(CONFIG_AFC_SUPPORT) && defined(CONFIG_BAND_6GHZ)
-static void mlme_init_afc_cfg(struct wlan_mlme_reg *reg)
+static void mlme_init_afc_cfg(struct wlan_objmgr_psoc *psoc,
+			      struct wlan_mlme_reg *reg)
 {
 	reg->enable_6ghz_sp_pwrmode_supp =
-		cfg_default(CFG_6GHZ_SP_POWER_MODE_SUPP);
+		cfg_get(psoc, CFG_6GHZ_SP_POWER_MODE_SUPP);
 	reg->afc_disable_timer_check =
 		cfg_default(CFG_AFC_TIMER_CHECK_DIS);
 	reg->afc_disable_request_id_check =
@@ -2242,7 +2243,8 @@ static void mlme_init_afc_cfg(struct wlan_mlme_reg *reg)
 		cfg_default(CFG_AFC_REG_NO_ACTION);
 }
 #else
-static inline void mlme_init_afc_cfg(struct wlan_mlme_reg *reg)
+static inline void mlme_init_afc_cfg(struct wlan_objmgr_psoc *psoc,
+				     struct wlan_mlme_reg *reg)
 {
 }
 #endif
@@ -2316,7 +2318,7 @@ static void mlme_init_reg_cfg(struct wlan_objmgr_psoc *psoc,
 	reg->enable_nan_on_indoor_channels =
 		cfg_get(psoc, CFG_INDOOR_CHANNEL_SUPPORT_FOR_NAN);
 
-	mlme_init_afc_cfg(reg);
+	mlme_init_afc_cfg(psoc, reg);
 	mlme_init_acs_avoid_freq_list(psoc, reg);
 }
 
