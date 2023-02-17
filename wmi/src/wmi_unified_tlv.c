@@ -21667,6 +21667,8 @@ static void populate_tlv_service(uint32_t *wmi_service)
 	wmi_service[wmi_service_ul_ru26_allowed] = WMI_SERVICE_UL_RU26_ALLOWED;
 	wmi_service[wmi_service_cfr_capture_support] =
 			WMI_SERVICE_CFR_CAPTURE_SUPPORT;
+	wmi_service[wmi_service_cfr_capture_pdev_id_soc] =
+			WMI_SERVICE_CFR_CAPTURE_PDEV_ID_SOC;
 	wmi_service[wmi_service_bcast_twt_support] =
 			WMI_SERVICE_BROADCAST_TWT;
 	wmi_service[wmi_service_wpa3_ft_sae_support] =
