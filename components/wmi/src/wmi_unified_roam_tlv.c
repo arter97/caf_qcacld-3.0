@@ -2025,8 +2025,8 @@ extract_roam_frame_info_tlv(wmi_unified_t wmi_handle, void *evt_buf,
 	if (!param_buf || !param_buf->roam_frame_info ||
 	    !param_buf->num_roam_frame_info ||
 	    (frame_idx + num_frames) > param_buf->num_roam_frame_info) {
-		wmi_debug("Empty roam_frame_info param buf frame_idx:%d num_frames:%d",
-			  frame_idx, num_frames);
+		wmi_err("Empty roam_frame_info param buf frame_idx:%d num_frames:%d",
+			frame_idx, num_frames);
 		return QDF_STATUS_SUCCESS;
 	}
 

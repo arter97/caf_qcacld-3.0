@@ -676,4 +676,51 @@ QDF_STATUS
 ucfg_cm_get_empty_scan_refresh_period_global(struct wlan_objmgr_psoc *psoc,
 					     uint16_t *roam_scan_period_global);
 
+#if defined(WLAN_FEATURE_ROAM_OFFLOAD) && defined(WLAN_FEATURE_ROAM_INFO_STATS)
+/**
+ * ucfg_cm_roam_stats_info_get() - get vdev roam stats info
+ *
+ * @vdev: pointer to vdev
+ * @roam_info: pointer to buffer to copy roam stats info
+ * @roam_num: pointer to valid roam stats num
+ *
+ * After use, roam_info must be released by using
+ * ucfg_cm_roam_stats_info_put()
+ *
+ * Return: QDF_STATUS
+ */
+static inline QDF_STATUS
+ucfg_cm_roam_stats_info_get(struct wlan_objmgr_vdev *vdev,
+			    struct enhance_roam_info **roam_info,
+			    uint32_t *roam_num)
+{
+	return wlan_cm_roam_stats_info_get(vdev, roam_info, roam_num);
+}
+
+/**
+ * ucfg_cm_roam_stats_info_put() - put vdev roam stats info
+ *
+ * @roam_info: pointer to buffer of roam stats info
+ *
+ * Return: QDF_STATUS
+ */
+static inline void
+ucfg_cm_roam_stats_info_put(struct enhance_roam_info *roam_info)
+{
+	qdf_mem_free(roam_info);
+}
+#else
+static inline QDF_STATUS
+ucfg_cm_roam_stats_info_get(struct wlan_objmgr_vdev *vdev,
+			    struct enhance_roam_info **roam_info,
+			    uint32_t *roam_num)
+{
+	return QDF_STATUS_E_NOSUPPORT;
+}
+
+static inline void
+ucfg_cm_roam_stats_info_put(struct enhance_roam_info *roam_info)
+{
+}
+#endif
 #endif /* _WLAN_CM_ROAM_UCFG_API_H_ */

@@ -640,7 +640,7 @@ struct eroam_trigger_info {
 	struct roam_trigger_abort_reason abort;
 	enum roam_stats_scan_type roam_scan_type;
 	uint8_t roam_status;
-	uint32_t roam_fail_reason;
+	enum wlan_roam_failure_reason_code roam_fail_reason;
 };
 
 /**
@@ -663,7 +663,7 @@ struct roam_scan_chn {
  */
 struct eroam_scan_info {
 	uint8_t num_channels;
-	struct roam_scan_chn *roam_chn;
+	struct roam_scan_chn roam_chn[MAX_ROAM_SCAN_CHAN];
 	uint32_t total_scan_time;
 };
 
@@ -681,6 +681,7 @@ struct eroam_frame_info {
 	uint64_t timestamp;
 };
 
+/* Key frame num during roaming: PREAUTH/PREASSOC/EAPOL M1-M4 */
 #define ROAM_FRAME_NUM 6
 
 /**
