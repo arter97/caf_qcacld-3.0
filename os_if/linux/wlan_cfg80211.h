@@ -174,6 +174,7 @@
  *     event index
  * @QCA_NL80211_VENDOR_SUBCMD_AFC_EVENT_INDEX: AFC Event index
  * @QCA_NL80211_VENDOR_SUBCMD_DOZED_AP_INDEX: Dozed AP event index
+ * @QCA_NL80211_VENDOR_SUBCMD_ROAM_STATS_INDEX: Roam stats index index
  */
 
 enum qca_nl80211_vendor_subcmds_index {
@@ -295,6 +296,9 @@ enum qca_nl80211_vendor_subcmds_index {
 #endif
 #ifdef WLAN_SUPPORT_GAP_LL_PS_MODE
 	QCA_NL80211_VENDOR_SUBCMD_DOZED_AP_INDEX,
+#endif
+#ifdef WLAN_FEATURE_ROAM_INFO_STATS
+	QCA_NL80211_VENDOR_SUBCMD_ROAM_STATS_INDEX,
 #endif
 };
 
