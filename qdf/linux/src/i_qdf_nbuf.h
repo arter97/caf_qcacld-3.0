@@ -249,6 +249,12 @@ typedef void (*qdf_nbuf_free_t)(__qdf_nbuf_t);
 #define __qdf_nbuf_is_raw_frame(skb) \
 	(QDF_NBUF_CB_RX_RAW_FRAME((skb)))
 
+#define __qdf_nbuf_is_fr_ds_set(skb) \
+	(QDF_NBUF_CB_RX_FROM_DS((skb)))
+
+#define __qdf_nbuf_is_to_ds_set(skb) \
+	(QDF_NBUF_CB_RX_TO_DS((skb)))
+
 #define __qdf_nbuf_get_tid_val(skb) \
 	(QDF_NBUF_CB_RX_TID_VAL((skb)))
 

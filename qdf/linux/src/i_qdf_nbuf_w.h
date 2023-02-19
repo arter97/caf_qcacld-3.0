@@ -393,6 +393,14 @@ QDF_COMPILE_TIME_ASSERT(qdf_nbuf_cb_size,
 	(((struct qdf_nbuf_cb *) \
 	((skb)->cb))->u.rx.hw_info.desc_tlv_members.is_raw_frame)
 
+#define QDF_NBUF_CB_RX_FROM_DS(skb) \
+	(((struct qdf_nbuf_cb *) \
+	  ((skb)->cb))->u.rx.hw_info.desc_tlv_members.fr_ds)
+
+#define QDF_NBUF_CB_RX_TO_DS(skb) \
+	(((struct qdf_nbuf_cb *) \
+	  ((skb)->cb))->u.rx.hw_info.desc_tlv_members.to_ds)
+
 #define QDF_NBUF_CB_RX_IS_FRAG(skb) \
 	(((struct qdf_nbuf_cb *) \
 	((skb)->cb))->u.rx.hw_info.desc_tlv_members.flag_is_frag)

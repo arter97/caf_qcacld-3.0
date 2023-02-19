@@ -1877,6 +1877,28 @@ static inline int qdf_nbuf_is_raw_frame(qdf_nbuf_t buf)
 }
 
 /**
+ * qdf_nbuf_is_fr_ds_set() - get from DS bit
+ * @buf: Network buffer
+ *
+ * Return: integer value - 0/1
+ */
+static inline int qdf_nbuf_is_fr_ds_set(qdf_nbuf_t buf)
+{
+	return __qdf_nbuf_is_fr_ds_set(buf);
+}
+
+/**
+ * qdf_nbuf_is_to_ds_set() - get to DS bit
+ * @buf: Network buffer
+ *
+ * Return: integer value - 0/1
+ */
+static inline int qdf_nbuf_is_to_ds_set(qdf_nbuf_t buf)
+{
+	return __qdf_nbuf_is_to_ds_set(buf);
+}
+
+/**
  * qdf_nbuf_set_tid_val() - set  tid_val
  * @buf: Network buffer
  * @val: 4 bits tid value

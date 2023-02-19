@@ -107,7 +107,7 @@ static inline void dp_wds_ext_peer_learn_be(struct dp_soc *soc,
 		return;
 
 	if (qdf_nbuf_is_rx_chfrag_start(nbuf) &&
-	    hal_rx_get_mpdu_mac_ad4_valid_be(rx_tlv_hdr)) {
+	    (qdf_nbuf_is_fr_ds_set(nbuf) && qdf_nbuf_is_to_ds_set(nbuf))) {
 		qdf_atomic_test_and_set_bit(WDS_EXT_PEER_INIT_BIT,
 					    &ta_txrx_peer->wds_ext.init);
 
