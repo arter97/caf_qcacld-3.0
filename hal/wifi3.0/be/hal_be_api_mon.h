@@ -1166,6 +1166,72 @@ enum hal_ppdu_tlv_category {
 };
 #endif
 
+/**
+ * struct hal_txmon_user_desc_per_user - user desc per user information
+ * @psdu_length: PSDU length of the user in octet
+ * @ru_start_index: RU number to which user is assigned
+ * @ru_size: Size of the RU for that user
+ * @ofdma_mu_mimo_enabled: mu mimo transmission within the RU
+ * @nss: Number of spatial stream occupied by the user
+ * @stream_offset: Stream Offset from which the User occupies the Streams
+ * @mcs: Modulation Coding Scheme for the User
+ * @dcm: Indicates whether dual sub-carrier modulation is applied
+ * @fec_type: Indicates whether it is BCC or LDPC
+ * @user_bf_type: user beamforming type
+ * @drop_user_cbf: frame dropped because of CBF FCS failure
+ * @ldpc_extra_symbol: LDPC encoding process
+ * @force_extra_symbol: force an extra OFDM symbol
+ * @reserved: reserved
+ * @sw_peer_id: user sw peer id
+ * @per_user_subband_mask: Per user sub band mask
+ */
+struct hal_txmon_user_desc_per_user {
+	uint32_t psdu_length;
+	uint32_t ru_start_index		:8,
+		 ru_size		:4,
+		 ofdma_mu_mimo_enabled	:1,
+		 nss			:3,
+		 stream_offset		:3,
+		 mcs			:4,
+		 dcm			:1,
+		 fec_type		:1,
+		 user_bf_type		:2,
+		 drop_user_cbf		:1,
+		 ldpc_extra_symbol	:1,
+		 force_extra_symbol	:1,
+		 reserved		:2;
+	uint32_t sw_peer_id		:16,
+		 per_user_subband_mask	:16;
+};
+
+/**
+ * struct hal_txmon_usr_desc_common - user desc common information
+ * @num_users: Number of users
+ * @ltf_size: LTF size
+ * @pkt_extn_pe: packet extension duration of the trigger-based PPDU
+ * @a_factor: packet extension duration of the trigger-based PPDU
+ * @center_ru_0: Center RU is occupied in the lower 80 MHz band
+ * @center_ru_1: Center RU is occupied in the upper 80 MHz band
+ * @num_data_symbols: number of data symbols
+ * @doppler_indication: doppler indication
+ * @reserved: reserved
+ * @ru_channel_0: RU arrangement for band 0
+ * @ru_channel_1: RU arrangement for band 1
+ */
+struct hal_txmon_usr_desc_common {
+	uint32_t num_users		:6,
+		 ltf_size		:2,
+		 pkt_extn_pe		:1,
+		 a_factor		:2,
+		 center_ru_0		:1,
+		 center_ru_1		:1,
+		 num_data_symbols	:16,
+		 doppler_indication	:1,
+		 reserved		:2;
+	uint16_t ru_channel_0[8];
+	uint16_t ru_channel_1[8];
+};
+
 #define IS_MULTI_USERS(num_users)	(!!(0xFFFE & num_users))
 
 #define TXMON_HAL(hal_tx_ppdu_info, field)		\
