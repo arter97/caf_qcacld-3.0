@@ -99,17 +99,21 @@ struct interface {
  * @s_count: Number of socs
  * @r_count: Number of radios
  * @v_count: Number of vaps
+ * @m_count: Number of mlds
  * @soc: Array of Soc Interface details
  * @radio: Array of Radio interface details
  * @vap: Array of vap interface details
+ * @mld: Array of mld interface details
  */
 struct interface_list {
 	uint8_t s_count;
 	uint8_t r_count;
 	uint8_t v_count;
+	uint8_t m_count;
 	struct interface soc[MAX_SOC_NUM];
 	struct interface radio[MAX_RADIO_NUM];
 	struct interface vap[MAX_VAP_NUM];
+	struct interface mld[MAX_VAP_NUM];
 };
 
 /**
@@ -124,6 +128,9 @@ struct interface_list {
  * @parent: Pionter to parent object list
  * @child: Pointer to child object list
  * @next: Pointer to next object in the list
+ * @is_mld_slave: Flag to indicate if object is part of MLD group
+ * @mld_ifname: MLD interface name
+ * @is_mld_processed: Flag to indicate if obj is already procesed for MLD req
  */
 struct object_list {
 	bool nlsent;
@@ -136,6 +143,9 @@ struct object_list {
 	struct object_list *parent;
 	struct object_list *child;
 	struct object_list *next;
+	bool is_mld_slave;
+	char mld_ifname[IFNAME_LEN];
+	bool is_mld_processed;
 };
 
 /**
@@ -268,6 +278,10 @@ int libstats_is_ifname_valid(const char *ifname, enum stats_object_e obj)
 			str = "wifi";
 			size = 5;
 			break;
+		case STATS_OBJ_MLD:
+			str = "mld";
+			size = 4;
+			break;
 		default:
 			return 0;
 		}
@@ -329,6 +343,11 @@ static void free_interface_list(struct interface_list *if_list)
 			free(if_list->vap[inx].name);
 	}
 	if_list->v_count = 0;
+	for (inx = 0; inx < MAX_VAP_NUM; inx++) {
+		if (if_list->mld[inx].name)
+			free(if_list->mld[inx].name);
+	}
+	if_list->m_count = 0;
 }
 
 static int get_active_radio_intf_for_soc(struct interface_list *if_list,
@@ -404,6 +423,7 @@ static int fetch_all_interfaces(struct interface_list *if_list)
 	u_int8_t rinx = 0;
 	u_int8_t vinx = 0;
 	u_int8_t sinx = 0;
+	u_int8_t minx = 0;
 	ssize_t size = 0;
 
 	dir = opendir(PATH_SYSNET_DEV);
@@ -475,6 +495,21 @@ static int fetch_all_interfaces(struct interface_list *if_list)
 			strlcpy(if_list->vap[vinx].name, temp_name, size);
 			if_list->vap[vinx].added = false;
 			vinx++;
+		} else if (libstats_is_ifname_valid(temp_name, STATS_OBJ_MLD)) {
+			if (minx >= MAX_VAP_NUM) {
+				STATS_WARN("Vap Interfaces exceeded limit\n");
+				continue;
+			}
+			size = strlen(temp_name) + 1;
+			if_list->mld[minx].name = (char *)malloc(size);
+			if (!if_list->mld[minx].name) {
+				STATS_ERR("Unable to Allocate Memory!\n");
+				closedir(dir);
+				return -ENOMEM;
+			}
+			strlcpy(if_list->mld[minx].name, temp_name, size);
+			if_list->mld[minx].added = false;
+			minx++;
 		}
 	}
 
@@ -482,6 +517,7 @@ static int fetch_all_interfaces(struct interface_list *if_list)
 	if_list->s_count = sinx;
 	if_list->r_count = rinx;
 	if_list->v_count = vinx;
+	if_list->m_count = minx;
 
 	return 0;
 }
@@ -578,7 +614,8 @@ static int is_valid_cmd(struct stats_command *cmd)
 			STATS_ERR("VAP Interface name not configured.\n");
 			return -EINVAL;
 		}
-		if (!libstats_is_ifname_valid(cmd->if_name, STATS_OBJ_VAP)) {
+		if (!libstats_is_ifname_valid(cmd->if_name, STATS_OBJ_VAP) &&
+		    !libstats_is_ifname_valid(cmd->if_name, STATS_OBJ_MLD)) {
 			STATS_ERR("VAP Interface name invalid.\n");
 			return -EINVAL;
 		}
@@ -2241,6 +2278,15 @@ static int32_t build_child_vap_list(struct interface_list *if_list,
 	struct object_list *temp_obj = NULL;
 	struct object_list *curr_obj = NULL;
 	char *ifname = NULL;
+	uint8_t minx;
+	FILE *fp;
+	bool is_mld_slave = false;
+	char *slave_intf_name = NULL;
+	char path[100];
+	char slaves_intf[100];
+	uint8_t path_size = sizeof(path);
+	uint8_t slaves_size = sizeof(slaves_intf);
+	char *temp_ptr = NULL;
 
 	if (!rifname || !rhw_addr || !parent_obj)
 		return -EINVAL;
@@ -2268,6 +2314,42 @@ static int32_t build_child_vap_list(struct interface_list *if_list,
 		else if (curr_obj)
 			curr_obj->next = temp_obj;
 		curr_obj = temp_obj;
+
+		is_mld_slave = false;
+		for (minx = 0; minx < if_list->m_count; minx++) {
+			if ((strlcpy(path, PATH_SYSNET_DEV, path_size) >= path_size) ||
+			    (strlcat(path, if_list->mld[minx].name, path_size) >= path_size) ||
+			    (strlcat(path, "/bonding/slaves", path_size) >= path_size))
+				break;
+
+			fp = fopen(path, "r");
+			if (fp) {
+				fgets(slaves_intf, slaves_size, fp);
+				fclose(fp);
+			} else {
+				continue;
+			}
+
+			/* Replace new line character with NULL character */
+			if (slaves_intf[strlen(slaves_intf) - 1] == '\n')
+				slaves_intf[strlen(slaves_intf) - 1] = '\0';
+
+			temp_ptr = slaves_intf;
+			slave_intf_name = strtok_r(slaves_intf, " ", &temp_ptr);
+			while (slave_intf_name) {
+				if ((strlen(slave_intf_name) == strlen(ifname)) &&
+				    (!strncmp(slave_intf_name, ifname, strlen(ifname)))) {
+					temp_obj->is_mld_slave = true;
+					strlcpy(temp_obj->mld_ifname, if_list->mld[minx].name, sizeof(if_list->mld[minx].name));
+					is_mld_slave = true;
+					break;
+				}
+				slave_intf_name = strtok_r(NULL, " ", &temp_ptr);
+			}
+
+			if (is_mld_slave)
+				break;
+		}
 
 		if (build_child_sta_list(ifname, curr_obj))
 			return -EIO;
@@ -2426,7 +2508,8 @@ static void *build_object_list(struct stats_command *cmd)
 }
 
 static struct object_list *find_head_object(struct stats_command *cmd,
-					    struct object_list *obj_list)
+					    struct object_list *obj_list,
+					    bool *is_mld_req)
 {
 	struct object_list *temp_obj = NULL;
 	struct object_list *ap_obj = NULL;
@@ -2458,9 +2541,18 @@ static struct object_list *find_head_object(struct stats_command *cmd,
 	case STATS_OBJ_VAP:
 		while (temp_obj) {
 			if (temp_obj->obj_type == STATS_OBJ_VAP) {
+				if (temp_obj->is_mld_processed)
+					goto next_object;
 				if (!strncmp(temp_obj->ifname, cmd->if_name,
-					     IFNAME_LEN))
+					      IFNAME_LEN))
 					break;
+				if ((temp_obj->is_mld_slave &&
+				    !strncmp(temp_obj->mld_ifname, cmd->if_name,
+					     IFNAME_LEN))) {
+					*is_mld_req = true;
+					temp_obj->is_mld_processed = true;
+					break;
+				}
 			} else if (temp_obj->child) {
 				if (temp_obj->obj_type == STATS_OBJ_AP)
 					ap_obj = temp_obj;
@@ -2469,6 +2561,7 @@ static struct object_list *find_head_object(struct stats_command *cmd,
 				temp_obj = temp_obj->child;
 				continue;
 			}
+next_object:
 			if (temp_obj->next)
 				temp_obj = temp_obj->next;
 			else if (radio_obj && radio_obj->next)
@@ -2659,6 +2752,7 @@ static int32_t send_request_per_object(struct stats_command *user_cmd,
 	struct object_list *temp_obj = NULL;
 	struct object_list *root_obj = NULL;
 	int32_t ret = 0;
+	bool is_mld_req = false;
 
 	if (!obj_list) {
 		STATS_ERR("Invalid Object List\n");
@@ -2668,11 +2762,17 @@ static int32_t send_request_per_object(struct stats_command *user_cmd,
 	/**
 	 * Based on user request find the requested subtree in root_obj.
 	 **/
-	root_obj = find_head_object(user_cmd, obj_list);
+	root_obj = find_head_object(user_cmd, obj_list, &is_mld_req);
 	if (!root_obj) {
 		STATS_ERR("No object found for %d obj type\n", user_cmd->obj);
 		return -EPERM;
 	}
+
+	if (is_mld_req && user_cmd->recursive) {
+		STATS_ERR("Recursive call not supported for MLD interface\n");
+		return -EPERM;
+	}
+
 	temp_obj = root_obj;
 
 	if (user_cmd->feat_flag == STATS_FEAT_FLG_EXT)
@@ -2711,6 +2811,16 @@ static int32_t send_request_per_object(struct stats_command *user_cmd,
 					break;
 			}
 		}
+
+		/**
+		 * If request is for MLD interface, then find the next object
+		 * of the MLD group.
+		 */
+		if (is_mld_req) {
+			temp_obj = find_head_object(user_cmd, obj_list, &is_mld_req);
+			continue;
+		}
+
 		if (!cmd.recursive)
 			break;
 		if (temp_obj->child && !temp_obj->child->nlsent)
@@ -3516,6 +3626,8 @@ void libstats_free_reply_buffer(struct stats_command *cmd)
 			break;
 		case STATS_OBJ_AP:
 			free_ap(obj);
+			break;
+		default:
 			break;
 		}
 	}
