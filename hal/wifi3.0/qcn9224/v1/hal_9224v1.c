@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -548,8 +548,10 @@ struct hal_hw_srng_config hw_srng_table_9224v1[] = {
 };
 
 /**
- * hal_qcn9224_attach()- Attach 9224 target specific hal_soc ops,
- *			  offset and srng table
+ * hal_qcn9224v1_attach() - Attach 9224v1 target specific hal_soc ops,
+ *			    offset and srng table
+ * @hal_soc: HAL SoC context
+ *
  * Return: void
  */
 void hal_qcn9224v1_attach(struct hal_soc *hal_soc)

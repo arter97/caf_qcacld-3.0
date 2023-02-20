@@ -139,8 +139,7 @@
 #define PMM_REG_BASE_QCN9224 0xB500F8
 
 /**
- * hal_read_pmm_scratch_reg(): API to read PMM Scratch register
- *
+ * hal_read_pmm_scratch_reg() - API to read PMM Scratch register
  * @soc: HAL soc
  * @base_addr: Base PMM register
  * @reg_enum: Enum of the scratch register
@@ -159,8 +158,7 @@ uint32_t hal_read_pmm_scratch_reg(struct hal_soc *soc,
 }
 
 /**
- * hal_get_tsf2_scratch_reg_qcn9224(): API to read tsf2 scratch register
- *
+ * hal_get_tsf2_scratch_reg_qcn9224() - API to read tsf2 scratch register
  * @hal_soc_hdl: HAL soc context
  * @mac_id: mac id
  * @value: Pointer to update tsf2 value
@@ -188,8 +186,7 @@ static void hal_get_tsf2_scratch_reg_qcn9224(hal_soc_handle_t hal_soc_hdl,
 }
 
 /**
- * hal_get_tqm_scratch_reg_qcn9224(): API to read tqm scratch register
- *
+ * hal_get_tqm_scratch_reg_qcn9224() - API to read tqm scratch register
  * @hal_soc_hdl: HAL soc context
  * @value: Pointer to update tqm value
  *
@@ -217,7 +214,7 @@ static void hal_get_tqm_scratch_reg_qcn9224(hal_soc_handle_t hal_soc_hdl,
 #define HAL_PPE_VP_SEARCH_IDX_REG_MAX 8
 
 /**
- * hal_get_link_desc_size_9224(): API to get the link desc size
+ * hal_get_link_desc_size_9224() - API to get the link desc size
  *
  * Return: uint32_t
  */
@@ -227,9 +224,9 @@ static uint32_t hal_get_link_desc_size_9224(void)
 }
 
 /**
- * hal_rx_get_tlv_9224(): API to get the tlv
- *
+ * hal_rx_get_tlv_9224() - API to get the tlv
  * @rx_tlv: TLV data extracted from the rx packet
+ *
  * Return: uint8_t
  */
 static uint8_t hal_rx_get_tlv_9224(void *rx_tlv)
@@ -238,10 +235,9 @@ static uint8_t hal_rx_get_tlv_9224(void *rx_tlv)
 }
 
 /**
- * hal_rx_wbm_err_msdu_continuation_get_9224 () - API to check if WBM
- * msdu continuation bit is set
- *
- *@wbm_desc: wbm release ring descriptor
+ * hal_rx_wbm_err_msdu_continuation_get_9224() - API to check if WBM msdu
+ *                                               continuation bit is set
+ * @wbm_desc: wbm release ring descriptor
  *
  * Return: true if msdu continuation bit is set.
  */
@@ -337,9 +333,11 @@ static void hal_rx_get_evm_info(void *tlv_tag, void *ppdu_info_hdl)
 #endif /* WLAN_SA_API_ENABLE && QCA_WIFI_QCA9574 */
 
 /**
- * hal_rx_proc_phyrx_other_receive_info_tlv_9224(): API to get tlv info
+ * hal_rx_proc_phyrx_other_receive_info_tlv_9224() - API to get tlv info
+ * @rx_tlv_hdr: RX TLV header
+ * @ppdu_info_hdl: Handle to PPDU info to update
  *
- * Return: uint32_t
+ * Return: None
  */
 static inline
 void hal_rx_proc_phyrx_other_receive_info_tlv_9224(void *rx_tlv_hdr,
@@ -459,9 +457,9 @@ void hal_rx_get_rtt_info_9224(void *rx_tlv, void *ppdu_info_hdl)
 
 #ifdef CONFIG_WORD_BASED_TLV
 /**
- * hal_rx_dump_mpdu_start_tlv_9224: dump RX mpdu_start TLV in structured
- *			       human readable format.
- * @mpdu_start: pointer the rx_attention TLV in pkt.
+ * hal_rx_dump_mpdu_start_tlv_9224() - dump RX mpdu_start TLV in structured
+ *                                     human readable format.
+ * @mpdustart: pointer the rx_attention TLV in pkt.
  * @dbg_level: log level.
  *
  * Return: void
@@ -559,10 +557,10 @@ static inline void hal_rx_dump_mpdu_start_tlv_9224(void *mpdustart,
 }
 
 /**
- * hal_rx_dump_msdu_end_tlv_9224: dump RX msdu_end TLV in structured
- *			     human readable format.
- * @ msdu_end: pointer the msdu_end TLV in pkt.
- * @ dbg_level: log level.
+ * hal_rx_dump_msdu_end_tlv_9224() - dump RX msdu_end TLV in structured human
+ *                                   readable format.
+ * @msduend: pointer the msdu_end TLV in pkt.
+ * @dbg_level: log level.
  *
  * Return: void
  */
@@ -809,12 +807,12 @@ static void hal_rx_dump_msdu_end_tlv_9224(void *msduend,
 #endif
 
 /**
- * hal_reo_status_get_header_9224 - Process reo desc info
- * @d - Pointer to reo descriptor
- * @b - tlv type info
- * @h1 - Pointer to hal_reo_status_header where info to be stored
+ * hal_reo_status_get_header_9224() - Process reo desc info
+ * @ring_desc: Pointer to reo descriptor
+ * @b: tlv type info
+ * @h1: Pointer to hal_reo_status_header where info to be stored
  *
- * Return - none.
+ * Return: none.
  *
  */
 static void hal_reo_status_get_header_9224(hal_ring_desc_t ring_desc,
@@ -937,7 +935,7 @@ void *hal_dst_mpdu_desc_info_9224(void *dst_ring_desc)
 }
 
 /**
- * hal_reo_config_9224(): Set reo config parameters
+ * hal_reo_config_9224() - Set reo config parameters
  * @soc: hal soc handle
  * @reg_val: value to be set
  * @reo_params: reo parameters
@@ -954,9 +952,9 @@ hal_reo_config_9224(struct hal_soc *soc,
 
 /**
  * hal_rx_msdu_desc_info_get_ptr_9224() - Get msdu desc info ptr
- * @msdu_details_ptr - Pointer to msdu_details_ptr
+ * @msdu_details_ptr: Pointer to msdu_details_ptr
  *
- * Return - Pointer to rx_msdu_desc_info structure.
+ * Return: Pointer to rx_msdu_desc_info structure.
  *
  */
 static void *hal_rx_msdu_desc_info_get_ptr_9224(void *msdu_details_ptr)
@@ -965,10 +963,10 @@ static void *hal_rx_msdu_desc_info_get_ptr_9224(void *msdu_details_ptr)
 }
 
 /**
- * hal_rx_link_desc_msdu0_ptr_9224 - Get pointer to rx_msdu details
- * @link_desc - Pointer to link desc
+ * hal_rx_link_desc_msdu0_ptr_9224() - Get pointer to rx_msdu details
+ * @link_desc: Pointer to link desc
  *
- * Return - Pointer to rx_msdu_details structure
+ * Return: Pointer to rx_msdu_details structure
  *
  */
 static void *hal_rx_link_desc_msdu0_ptr_9224(void *link_desc)
@@ -977,7 +975,7 @@ static void *hal_rx_link_desc_msdu0_ptr_9224(void *link_desc)
 }
 
 /**
- * hal_get_window_address_9224(): Function to get hp/tp address
+ * hal_get_window_address_9224() - Function to get hp/tp address
  * @hal_soc: Pointer to hal_soc
  * @addr: address offset of register
  *
@@ -1125,9 +1123,9 @@ void hal_compute_reo_remap_ix0_9224(struct hal_soc *soc)
 
 /**
  * hal_rx_flow_setup_fse_9224() - Setup a flow search entry in HW FST
- * @fst: Pointer to the Rx Flow Search Table
+ * @rx_fst: Pointer to the Rx Flow Search Table
  * @table_offset: offset into the table where the flow is to be setup
- * @flow: Flow Parameters
+ * @rx_flow: Flow Parameters
  *
  * Return: Success/Failure
  */
@@ -1249,14 +1247,14 @@ hal_rx_flow_setup_fse_9224(uint8_t *rx_fst, uint32_t table_offset,
 	return fse;
 }
 
-#ifndef NO_RX_PKT_HDR_TLV
 /**
- * hal_rx_dump_pkt_hdr_tlv: dump RX pkt header TLV in hex format
- * @ pkt_hdr_tlv: pointer the pkt_hdr_tlv in pkt.
- * @ dbg_level: log level.
+ * hal_rx_dump_pkt_hdr_tlv_9224() - dump RX pkt header TLV in hex format
+ * @pkt_tlvs: pointer the pkt_hdr_tlv in pkt.
+ * @dbg_level: log level.
  *
  * Return: void
  */
+#ifndef NO_RX_PKT_HDR_TLV
 static inline void hal_rx_dump_pkt_hdr_tlv_9224(struct rx_pkt_tlvs *pkt_tlvs,
 						uint8_t dbg_level)
 {
@@ -1272,21 +1270,14 @@ static inline void hal_rx_dump_pkt_hdr_tlv_9224(struct rx_pkt_tlvs *pkt_tlvs,
 			     sizeof(pkt_hdr_tlv->rx_pkt_hdr));
 }
 #else
-/**
- * hal_rx_dump_pkt_hdr_tlv: dump RX pkt header TLV in hex format
- * @ pkt_hdr_tlv: pointer the pkt_hdr_tlv in pkt.
- * @ dbg_level: log level.
- *
- * Return: void
- */
 static inline void hal_rx_dump_pkt_hdr_tlv_9224(struct rx_pkt_tlvs *pkt_tlvs,
 						uint8_t dbg_level)
 {
 }
 #endif
 
-/*
- * hal_tx_dump_ppe_vp_entry_9224()
+/**
+ * hal_tx_dump_ppe_vp_entry_9224() - API to print PPE VP entries
  * @hal_soc_hdl: HAL SoC handle
  *
  * Return: void
@@ -1308,7 +1299,7 @@ void hal_tx_dump_ppe_vp_entry_9224(hal_soc_handle_t hal_soc_hdl)
 }
 
 /**
- * hal_rx_dump_pkt_tlvs_9224(): API to print RX Pkt TLVS QCN9224
+ * hal_rx_dump_pkt_tlvs_9224() - API to print RX Pkt TLVS QCN9224
  * @hal_soc_hdl: hal_soc handle
  * @buf: pointer the pkt buffer
  * @dbg_level: log level
@@ -1366,7 +1357,7 @@ static void hal_cmem_write_9224(hal_soc_handle_t hal_soc_hdl,
 /**
  * hal_tx_get_num_tcl_banks_9224() - Get number of banks in target
  *
- * Returns: number of bank
+ * Return: number of bank
  */
 static uint8_t hal_tx_get_num_tcl_banks_9224(void)
 {
@@ -1471,8 +1462,11 @@ static uint16_t hal_get_rx_max_ba_window_qcn9224(int tid)
 }
 
 /**
- * hal_qcn9224_get_reo_qdesc_size()- Get the reo queue descriptor size
- *			  from the give Block-Ack window size
+ * hal_qcn9224_get_reo_qdesc_size() - Get the reo queue descriptor size from the
+ *                                    given Block-Ack window size
+ * @ba_window_size: Block-Ack window size
+ * @tid: Traffic id
+ *
  * Return: reo queue descriptor size
  */
 static uint32_t hal_qcn9224_get_reo_qdesc_size(uint32_t ba_window_size, int tid)
@@ -1513,8 +1507,8 @@ static uint32_t hal_qcn9224_get_reo_qdesc_size(uint32_t ba_window_size, int tid)
 		sizeof(struct rx_reo_queue_1k);
 }
 
-/*
- * hal_tx_get_num_ppe_vp_tbl_entries_9224()
+/**
+ * hal_tx_get_num_ppe_vp_tbl_entries_9224() - get number of PPE VP entries
  * @hal_soc_hdl: HAL SoC handle
  *
  * Return: Number of PPE VP entries
@@ -1525,8 +1519,9 @@ uint32_t hal_tx_get_num_ppe_vp_tbl_entries_9224(hal_soc_handle_t hal_soc_hdl)
 	return HAL_PPE_VP_ENTRIES_MAX;
 }
 
-/*
- * hal_tx_get_num_ppe_vp_search_idx_reg_entries_9224()
+/**
+ * hal_tx_get_num_ppe_vp_search_idx_reg_entries_9224() - get number of PPE VP
+ *                                                       search index registers
  * @hal_soc_hdl: HAL SoC handle
  *
  * Return: Number of PPE VP search index registers
@@ -1539,8 +1534,9 @@ uint32_t hal_tx_get_num_ppe_vp_search_idx_reg_entries_9224(hal_soc_handle_t hal_
 
 /**
  * hal_rx_tlv_msdu_done_copy_get_9224() - Get msdu done copy bit from rx_tlv
+ * @buf: pointer the RX TLV
  *
- * Returns: msdu done copy bit
+ * Return: msdu done copy bit
  */
 static inline uint32_t hal_rx_tlv_msdu_done_copy_get_9224(uint8_t *buf)
 {
