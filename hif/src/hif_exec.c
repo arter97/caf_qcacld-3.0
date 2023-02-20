@@ -1197,8 +1197,9 @@ static irqreturn_t hif_umac_reset_irq_handler(int irq, void *ctx)
 {
 	struct hif_umac_reset_ctx *umac_reset_ctx = ctx;
 
-	/* Schedule the tasklet and exit */
-	tasklet_hi_schedule(&umac_reset_ctx->intr_tq);
+	/* Schedule the tasklet if it is umac reset interrupt and exit */
+	if (umac_reset_ctx->irq_handler(umac_reset_ctx->cb_ctx))
+		tasklet_hi_schedule(&umac_reset_ctx->intr_tq);
 
 	return IRQ_HANDLED;
 }
@@ -1224,7 +1225,8 @@ QDF_STATUS hif_get_umac_reset_irq(struct hif_opaque_softc *hif_scn,
 qdf_export_symbol(hif_get_umac_reset_irq);
 
 QDF_STATUS hif_register_umac_reset_handler(struct hif_opaque_softc *hif_scn,
-					   int (*handler)(void *cb_ctx),
+					   bool (*irq_handler)(void *cb_ctx),
+					   int (*tl_handler)(void *cb_ctx),
 					   void *cb_ctx, int irq)
 {
 	struct hif_softc *hif_sc = HIF_GET_SOFTC(hif_scn);
@@ -1238,7 +1240,8 @@ QDF_STATUS hif_register_umac_reset_handler(struct hif_opaque_softc *hif_scn,
 
 	umac_reset_ctx = &hif_sc->umac_reset_ctx;
 
-	umac_reset_ctx->cb_handler = handler;
+	umac_reset_ctx->irq_handler = irq_handler;
+	umac_reset_ctx->cb_handler = tl_handler;
 	umac_reset_ctx->cb_ctx = cb_ctx;
 	umac_reset_ctx->os_irq = irq;
 

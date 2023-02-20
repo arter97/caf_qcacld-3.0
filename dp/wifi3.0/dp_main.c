@@ -267,6 +267,7 @@ static uint8_t dp_soc_ring_if_nss_offloaded(struct dp_soc *soc,
 					    enum hal_ring_type ring_type,
 					    int ring_num);
 #ifdef DP_UMAC_HW_RESET_SUPPORT
+static QDF_STATUS dp_umac_reset_action_trigger_recovery(struct dp_soc *soc);
 static QDF_STATUS dp_umac_reset_handle_pre_reset(struct dp_soc *soc);
 static QDF_STATUS dp_umac_reset_handle_post_reset(struct dp_soc *soc);
 static QDF_STATUS dp_umac_reset_handle_post_reset_complete(struct dp_soc *soc);
@@ -2378,18 +2379,6 @@ static inline bool dp_skip_msi_cfg(struct dp_soc *soc, int ring_type)
 }
 #endif /* DP_CON_MON_MSI_ENABLED */
 #endif /* DISABLE_MON_RING_MSI_CFG */
-
-#ifdef DP_UMAC_HW_RESET_SUPPORT
-static bool dp_check_umac_reset_in_progress(struct dp_soc *soc)
-{
-	return !!soc->umac_reset_ctx.intr_ctx_bkp;
-}
-#else
-static bool dp_check_umac_reset_in_progress(struct dp_soc *soc)
-{
-	return false;
-}
-#endif
 
 QDF_STATUS dp_srng_init_idx(struct dp_soc *soc, struct dp_srng *srng,
 			    int ring_type, int ring_num, int mac_id,
@@ -6884,6 +6873,10 @@ void dp_soc_txrx_peer_setup(enum wlan_op_mode vdev_opmode, struct dp_soc *soc,
 #ifdef DP_UMAC_HW_RESET_SUPPORT
 static void dp_register_umac_reset_handlers(struct dp_soc *soc)
 {
+	dp_umac_reset_register_rx_action_callback(soc,
+					dp_umac_reset_action_trigger_recovery,
+					UMAC_RESET_ACTION_DO_TRIGGER_RECOVERY);
+
 	dp_umac_reset_register_rx_action_callback(soc,
 		dp_umac_reset_handle_pre_reset, UMAC_RESET_ACTION_DO_PRE_RESET);
 
@@ -13687,7 +13680,8 @@ static void dp_restore_interrupt_ring_masks(struct dp_soc *soc)
 	int num_ctxt = wlan_cfg_get_num_contexts(soc->wlan_cfg_ctx);
 	int i;
 
-	qdf_assert_always(intr_bkp);
+	if (!intr_bkp)
+		return;
 
 	for (i = 0; i < num_ctxt; i++) {
 		intr_ctx = &soc->intr_ctx[i];
@@ -13900,6 +13894,19 @@ static void dp_reinit_rings(struct dp_soc *soc)
 }
 
 /**
+ * dp_umac_reset_action_trigger_recovery() - Handle FW Umac recovery trigger
+ * @soc: dp soc handle
+ *
+ * Return: QDF_STATUS
+ */
+static QDF_STATUS dp_umac_reset_action_trigger_recovery(struct dp_soc *soc)
+{
+	enum umac_reset_action action = UMAC_RESET_ACTION_DO_TRIGGER_RECOVERY;
+
+	return dp_umac_reset_notify_action_completion(soc, action);
+}
+
+/**
  * dp_umac_reset_handle_pre_reset() - Handle Umac prereset interrupt from FW
  * @soc: dp soc handle
  *
@@ -13982,9 +13989,12 @@ static QDF_STATUS dp_umac_reset_handle_post_reset_complete(struct dp_soc *soc)
 		nbuf_list = nbuf;
 	}
 
-	dp_umac_reset_info("Umac reset done on soc %pK\n prereset : %u us\n"
+	dp_umac_reset_info("Umac reset done on soc %pK\n trigger start : %u us "
+			   "trigger done : %u us prereset : %u us\n"
 			   "postreset : %u us \n postreset complete: %u us \n",
 			   soc,
+			   soc->umac_reset_ctx.ts.trigger_done -
+			   soc->umac_reset_ctx.ts.trigger_start,
 			   soc->umac_reset_ctx.ts.pre_reset_done -
 			   soc->umac_reset_ctx.ts.pre_reset_start,
 			   soc->umac_reset_ctx.ts.post_reset_done -

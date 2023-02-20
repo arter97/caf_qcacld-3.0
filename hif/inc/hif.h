@@ -2580,14 +2580,16 @@ uint8_t hif_get_max_wmi_ep(struct hif_opaque_softc *scn);
 /**
  * hif_register_umac_reset_handler() - Register UMAC HW reset handler
  * @hif_scn: hif opaque handle
- * @handler: callback handler function
+ * @irq_handler: irq callback handler function
+ * @tl_handler: tasklet callback handler function
  * @cb_ctx: context to passed to @handler
  * @irq: irq number to be used for UMAC HW reset interrupt
  *
  * Return: QDF_STATUS of operation
  */
 QDF_STATUS hif_register_umac_reset_handler(struct hif_opaque_softc *hif_scn,
-					   int (*handler)(void *cb_ctx),
+					   bool (*irq_handler)(void *cb_ctx),
+					   int (*tl_handler)(void *cb_ctx),
 					   void *cb_ctx, int irq);
 
 /**
@@ -2602,7 +2604,8 @@ QDF_STATUS hif_get_umac_reset_irq(struct hif_opaque_softc *hif_scn,
 #else
 static inline
 QDF_STATUS hif_register_umac_reset_handler(struct hif_opaque_softc *hif_scn,
-					   int (*handler)(void *cb_ctx),
+					   bool (*irq_handler)(void *cb_ctx),
+					   int (*tl_handler)(void *cb_ctx),
 					   void *cb_ctx, int irq)
 {
 	return QDF_STATUS_SUCCESS;
