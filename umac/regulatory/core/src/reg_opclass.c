@@ -2176,9 +2176,9 @@ reg_is_inlst_subset_of_opchanlst(const uint8_t *opclass_chan_list,
 	return false;
 }
 
-static bool reg_is_opclass_20mhz(uint8_t opclass)
+static bool reg_is_chanspacing_20mhz(uint16_t ch_spacing)
 {
-	return (opclass >= BW_20_MHZ) && (opclass <= BW_25_MHZ);
+	return (ch_spacing >= BW_20_MHZ) && (ch_spacing <= BW_25_MHZ);
 }
 
 QDF_STATUS reg_enable_disable_opclass_chans(struct wlan_objmgr_pdev *pdev,
@@ -2213,7 +2213,7 @@ QDF_STATUS reg_enable_disable_opclass_chans(struct wlan_objmgr_pdev *pdev,
 
 	while (op_class_tbl->op_class) {
 		if (opclass == op_class_tbl->op_class) {
-			if (!reg_is_opclass_20mhz(opclass)) {
+			if (!reg_is_chanspacing_20mhz(op_class_tbl->chan_spacing)) {
 				reg_err("Opclass should only be 20 MHz opclass");
 				return QDF_STATUS_E_INVAL;
 			}
