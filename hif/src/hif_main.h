@@ -243,6 +243,7 @@ struct hif_cfg {
 /**
  * struct hif_umac_reset_ctx - UMAC HW reset context at HIF layer
  * @intr_tq: Tasklet structure
+ * @irq_handler: IRQ handler
  * @cb_handler: Callback handler
  * @cb_ctx: Argument to be passed to @cb_handler
  * @os_irq: Interrupt number for this IRQ
@@ -250,6 +251,7 @@ struct hif_cfg {
  */
 struct hif_umac_reset_ctx {
 	struct tasklet_struct intr_tq;
+	bool (*irq_handler)(void *cb_ctx);
 	int (*cb_handler)(void *cb_ctx);
 	void *cb_ctx;
 	uint32_t os_irq;

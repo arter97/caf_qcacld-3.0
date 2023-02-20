@@ -2669,6 +2669,74 @@ void dp_reo_desc_freelist_destroy(struct dp_soc *soc);
  */
 void dp_reset_rx_reo_tid_queue(struct dp_soc *soc, void *hw_qdesc_vaddr,
 			       uint32_t size);
+
+#if defined(WLAN_FEATURE_11BE_MLO) && defined(WLAN_MLO_MULTI_CHIP)
+/**
+ * dp_umac_reset_complete_umac_recovery() - Complete Umac reset session
+ * @soc: dp soc handle
+ *
+ * Return: void
+ */
+void dp_umac_reset_complete_umac_recovery(struct dp_soc *soc);
+
+/**
+ * dp_umac_reset_initiate_umac_recovery() - Initiate Umac reset session
+ * @soc: dp soc handle
+ * @is_target_recovery: Flag to indicate if it is triggered for target recovery
+ *
+ * Return: void
+ */
+void dp_umac_reset_initiate_umac_recovery(struct dp_soc *soc,
+					  bool is_target_recovery);
+
+/**
+ * dp_umac_reset_handle_action_cb() - Function to call action callback
+ * @soc: dp soc handle
+ * @umac_reset_ctx: Umac reset context
+ * @action: Action to call the callback for
+ *
+ * Return: QDF_STATUS status
+ */
+QDF_STATUS dp_umac_reset_handle_action_cb(struct dp_soc *soc,
+				struct dp_soc_umac_reset_ctx *umac_reset_ctx,
+				enum umac_reset_action action);
+
+/**
+ * dp_umac_reset_post_tx_cmd() - Iterate partner socs and post Tx command
+ * @umac_reset_ctx: UMAC reset context
+ * @tx_cmd: Tx command to be posted
+ *
+ * Return: QDF status of operation
+ */
+QDF_STATUS
+dp_umac_reset_post_tx_cmd(struct dp_soc_umac_reset_ctx *umac_reset_ctx,
+			  enum umac_reset_tx_cmd tx_cmd);
+
+/**
+ * dp_umac_reset_initiator_check() - Check if soc is the Umac reset initiator
+ * @soc: dp soc handle
+ *
+ * Return: true if the soc is initiator or false otherwise
+ */
+bool dp_umac_reset_initiator_check(struct dp_soc *soc);
+
+/**
+ * dp_umac_reset_target_recovery_check() - Check if this is for target recovery
+ * @soc: dp soc handle
+ *
+ * Return: true if the session is for target recovery or false otherwise
+ */
+bool dp_umac_reset_target_recovery_check(struct dp_soc *soc);
+
+/**
+ * dp_umac_reset_is_soc_ignored() - Check if this soc is to be ignored
+ * @soc: dp soc handle
+ *
+ * Return: true if the soc is ignored or false otherwise
+ */
+bool dp_umac_reset_is_soc_ignored(struct dp_soc *soc);
+#endif
+
 #endif
 
 QDF_STATUS dp_reo_send_cmd(struct dp_soc *soc, enum hal_reo_cmd_type type,
