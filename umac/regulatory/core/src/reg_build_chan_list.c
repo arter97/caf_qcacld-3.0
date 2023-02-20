@@ -574,7 +574,9 @@ static void reg_modify_chan_list_for_indoor_channels(
 			if (!(REGULATORY_CHAN_DISABLED &
 			      chan_list[chan_enum].chan_flags) &&
 			    (REGULATORY_CHAN_INDOOR_ONLY &
-			     chan_list[chan_enum].chan_flags)) {
+			     chan_list[chan_enum].chan_flags) &&
+			    !(pdev_priv_obj->p2p_indoor_ch_support &&
+			      reg_is_5ghz_ch_freq(chan_list[chan_enum].center_freq))) {
 				chan_list[chan_enum].state =
 					CHANNEL_STATE_DFS;
 				chan_list[chan_enum].chan_flags |=
@@ -599,10 +601,12 @@ static void reg_modify_chan_list_for_indoor_channels(
 }
 
 /**
- *reg_modify_chan_list_for_indoor_concurrency() - Enable/Disable the indoor
- *channels for SAP operation based on the indoor concurrency list
+ * reg_modify_chan_list_for_indoor_concurrency() - Enable/Disable the indoor
+ * channels for SAP operation based on the indoor concurrency list
  *
  * @pdev_priv_obj: Pointer to regulatory private pdev structure.
+ *
+ * Return: None
  */
 static void reg_modify_chan_list_for_indoor_concurrency(
 		struct wlan_regulatory_pdev_priv_obj *pdev_priv_obj)
@@ -613,6 +617,7 @@ static void reg_modify_chan_list_for_indoor_concurrency(
 	uint8_t i;
 
 	if (pdev_priv_obj->indoor_chan_enabled ||
+	    pdev_priv_obj->p2p_indoor_ch_support ||
 	    !pdev_priv_obj->sta_sap_scc_on_indoor_channel)
 		return;
 
