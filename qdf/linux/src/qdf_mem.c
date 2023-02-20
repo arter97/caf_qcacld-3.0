@@ -2410,7 +2410,106 @@ void *qdf_mem_dma_alloc(qdf_device_t osdev, void *dev, qdf_size_t size,
 
 	return NULL;
 }
+#elif defined(QCA_DMA_PADDR_CHECK)
+#ifdef CONFIG_LEAK_DETECTION
+#define MAX_DEBUG_DOMAIN_COUNT QDF_DEBUG_DOMAIN_COUNT
+#define debug_domain_get() qdf_debug_domain_get()
+#else
+#define MAX_DEBUG_DOMAIN_COUNT 1
+#define debug_domain_get() DEFAULT_DEBUG_DOMAIN_INIT
+#endif
+/**
+ * struct qdf_dma_buf_entry - DMA invalid buffer list entry
+ * @node: QDF list node member
+ * @size: DMA buffer size
+ * @phy_addr: DMA buffer physical address
+ * @vaddr: DMA buffer virtual address. if DMA buffer size is larger than entry
+ *         size, we use the DMA buffer to save entry info and the starting
+ *         address of the entry is the DMA buffer vaddr, in this way, we can
+ *         reduce unnecessary memory consumption. if DMA buffer size is smaller
+ *         than entry size, we need alloc another buffer, and vaddr will be set
+ *         to the invalid dma buffer virtual address.
+ */
+struct qdf_dma_buf_entry {
+	qdf_list_node_t node;
+	qdf_size_t size;
+	qdf_dma_addr_t phy_addr;
+	void *vaddr;
+};
 
+#define DMA_PHY_ADDR_RESERVED 0x2000
+#define QDF_DMA_MEM_ALLOC_MAX_RETRIES 10
+#define QDF_DMA_INVALID_BUF_LIST_SIZE 128
+static qdf_list_t qdf_invalid_buf_list[MAX_DEBUG_DOMAIN_COUNT];
+static bool qdf_invalid_buf_list_init[MAX_DEBUG_DOMAIN_COUNT];
+static qdf_spinlock_t qdf_invalid_buf_list_lock;
+
+static inline void *qdf_mem_dma_alloc(qdf_device_t osdev, void *dev,
+				      qdf_size_t size, qdf_dma_addr_t *paddr)
+{
+	void *vaddr;
+	uint32_t retry;
+	QDF_STATUS status;
+	bool is_separate;
+	qdf_list_t *cur_buf_list;
+	struct qdf_dma_buf_entry *entry;
+	uint8_t current_domain;
+
+	for (retry = 0; retry < QDF_DMA_MEM_ALLOC_MAX_RETRIES; retry++) {
+		vaddr = dma_alloc_coherent(dev, size, paddr,
+					   qdf_mem_malloc_flags());
+		if (!vaddr)
+			return NULL;
+
+		if (qdf_likely(*paddr > DMA_PHY_ADDR_RESERVED))
+			return vaddr;
+
+		current_domain = debug_domain_get();
+
+		/* if qdf_invalid_buf_list not init, so we can't store memory
+		 * info and can't hold it. let's free the invalid memory and
+		 * try to get memory with phy address greater than
+		 * DMA_PHY_ADDR_RESERVED
+		 */
+		if (current_domain >= MAX_DEBUG_DOMAIN_COUNT ||
+		    !qdf_invalid_buf_list_init[current_domain]) {
+			qdf_debug("physical address below 0x%x, re-alloc",
+				  DMA_PHY_ADDR_RESERVED);
+			dma_free_coherent(dev, size, vaddr, *paddr);
+			continue;
+		}
+
+		cur_buf_list = &qdf_invalid_buf_list[current_domain];
+		if (size >= sizeof(*entry)) {
+			entry = vaddr;
+			entry->vaddr = NULL;
+		} else {
+			entry = qdf_mem_malloc(sizeof(*entry));
+			if (!entry) {
+				dma_free_coherent(dev, size, vaddr, *paddr);
+				qdf_err("qdf_mem_malloc entry failed!");
+				continue;
+			}
+			entry->vaddr = vaddr;
+		}
+
+		entry->phy_addr = *paddr;
+		entry->size = size;
+		qdf_spin_lock_irqsave(&qdf_invalid_buf_list_lock);
+		status = qdf_list_insert_back(cur_buf_list,
+					      &entry->node);
+		qdf_spin_unlock_irqrestore(&qdf_invalid_buf_list_lock);
+		if (QDF_IS_STATUS_ERROR(status)) {
+			qdf_err("insert buf entry fail, status %d", status);
+			is_separate = !entry->vaddr ? false : true;
+			dma_free_coherent(dev, size, vaddr, *paddr);
+			if (is_separate)
+				qdf_mem_free(entry);
+		}
+	}
+
+	return NULL;
+}
 #else
 static inline void *qdf_mem_dma_alloc(qdf_device_t osdev, void *dev,
 				      qdf_size_t size, qdf_dma_addr_t *paddr)
@@ -2928,3 +3027,65 @@ __qdf_kmem_cache_free(qdf_kmem_cache_t cache, void *node)
 {
 }
 #endif
+
+#ifdef QCA_DMA_PADDR_CHECK
+void qdf_dma_invalid_buf_list_init(void)
+{
+	int i;
+
+	for (i = 0; i < MAX_DEBUG_DOMAIN_COUNT; i++) {
+		qdf_list_create(&qdf_invalid_buf_list[i],
+				QDF_DMA_INVALID_BUF_LIST_SIZE);
+		qdf_invalid_buf_list_init[i] = true;
+	}
+	qdf_spinlock_create(&qdf_invalid_buf_list_lock);
+}
+
+void qdf_dma_invalid_buf_free(void *dev, uint8_t domain)
+{
+	bool is_separate;
+	qdf_list_t *cur_buf_list;
+	struct qdf_dma_buf_entry *entry;
+	QDF_STATUS status = QDF_STATUS_E_EMPTY;
+
+	if (!dev)
+		return;
+
+	if (domain >= MAX_DEBUG_DOMAIN_COUNT)
+		return;
+
+	if (!qdf_invalid_buf_list_init[domain])
+		return;
+
+	cur_buf_list = &qdf_invalid_buf_list[domain];
+	do {
+		qdf_spin_lock_irqsave(&qdf_invalid_buf_list_lock);
+		status = qdf_list_remove_front(cur_buf_list,
+					       (qdf_list_node_t **)&entry);
+		qdf_spin_unlock_irqrestore(&qdf_invalid_buf_list_lock);
+
+		if (status != QDF_STATUS_SUCCESS)
+			break;
+
+		is_separate = !entry->vaddr ? false : true;
+		if (is_separate) {
+			dma_free_coherent(dev, entry->size, entry->vaddr,
+					  entry->phy_addr);
+			qdf_mem_free(entry);
+		} else
+			dma_free_coherent(dev, entry->size, entry,
+					  entry->phy_addr);
+	} while (!qdf_list_empty(cur_buf_list));
+	qdf_invalid_buf_list_init[domain] = false;
+}
+
+void qdf_dma_invalid_buf_list_deinit(void)
+{
+	int i;
+
+	for (i = 0; i < MAX_DEBUG_DOMAIN_COUNT; i++)
+		qdf_list_destroy(&qdf_invalid_buf_list[i]);
+
+	qdf_spinlock_destroy(&qdf_invalid_buf_list_lock);
+}
+#endif /* QCA_DMA_PADDR_CHECK */
