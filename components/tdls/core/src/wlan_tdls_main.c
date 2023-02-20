@@ -1050,8 +1050,10 @@ exit:
 bool tdls_is_concurrency_allowed(struct wlan_objmgr_psoc *psoc)
 {
 	if (!wlan_psoc_nif_fw_ext2_cap_get(psoc,
-					   WLAN_TDLS_CONCURRENCIES_SUPPORT))
+					   WLAN_TDLS_CONCURRENCIES_SUPPORT)) {
+		tdls_debug("fw cap is not advertised");
 		return false;
+	}
 
 	if (policy_mgr_get_connection_count_with_mlo(psoc) >
 	    WLAN_TDLS_MAX_CONCURRENT_VDEV_SUPPORTED)

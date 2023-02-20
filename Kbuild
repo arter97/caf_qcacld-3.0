@@ -1820,6 +1820,9 @@ TDLS_INC := -I$(WLAN_ROOT)/$(TDLS_DIR)/dispatcher/inc \
 	    -I$(WLAN_ROOT)/$(TDLS_TARGET_IF_INC)
 
 ifeq ($(CONFIG_QCOM_TDLS), y)
+
+cppflags-y += -DWLAN_FEATURE_TDLS_CONCURRENCIES
+
 TDLS_OBJS := $(TDLS_DIR)/core/src/wlan_tdls_main.o \
        $(TDLS_DIR)/core/src/wlan_tdls_cmds_process.o \
        $(TDLS_DIR)/core/src/wlan_tdls_peer.o \

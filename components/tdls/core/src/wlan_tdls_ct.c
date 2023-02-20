@@ -1135,8 +1135,10 @@ tdls_update_peer_off_channel_list(struct wlan_objmgr_pdev *pdev,
 	qdf_freq_t freq, peer_freq;
 
 	if (!wlan_psoc_nif_fw_ext2_cap_get(psoc,
-					   WLAN_TDLS_CONCURRENCIES_SUPPORT))
+					   WLAN_TDLS_CONCURRENCIES_SUPPORT)) {
+		tdls_debug("TDLS Concurrencies FW cap is not supported");
 		return QDF_STATUS_SUCCESS;
+	}
 
 	if (!policy_mgr_get_allowed_tdls_offchannel_freq(psoc, vdev, &freq)) {
 		tdls_debug("off channel not allowed for current concurrency");
@@ -1187,6 +1189,9 @@ tdls_update_peer_off_channel_list(struct wlan_objmgr_pdev *pdev,
 		      tdls_is_6g_freq_allowed(vdev, peer_freq)))) {
 			off_channels[params->num_off_channels] =
 					peer_info->peer_cap.peer_chan[i];
+			tdls_debug("allowd_chan:%d idx:%d",
+				   off_channels[params->num_off_channels].ch_freq,
+				   params->num_off_channels);
 			params->num_off_channels++;
 		}
 	}
@@ -1251,9 +1256,9 @@ int tdls_set_tdls_offchannelmode(struct wlan_objmgr_vdev *vdev,
 		return -EPERM;
 	}
 
-	tdls_notice("TDLS Channel Switch in swmode=%d tdls_off_channel %d offchanoffset %d",
-		   offchanmode, tdls_soc->tdls_off_channel,
-		   tdls_soc->tdls_channel_offset);
+	tdls_notice("TDLS Channel Switch in off_chan_mode=%d tdls_off_channel %d offchanoffset %d",
+		    offchanmode, tdls_soc->tdls_off_channel,
+		    tdls_soc->tdls_channel_offset);
 
 	chan_switch_params = qdf_mem_malloc(sizeof(*chan_switch_params));
 	if (!chan_switch_params)
@@ -1332,11 +1337,12 @@ int tdls_set_tdls_offchannelmode(struct wlan_objmgr_vdev *vdev,
 	chan_switch_params->is_responder = conn_peer->is_responder;
 	qdf_mem_copy(&chan_switch_params->peer_mac_addr,
 		     &conn_peer->peer_mac.bytes, QDF_MAC_ADDR_SIZE);
-	tdls_notice("Peer " QDF_MAC_ADDR_FMT " vdevId: %d, off channel: %d, offset: %d, mode: %d, is_responder: %d",
+	tdls_notice("Peer " QDF_MAC_ADDR_FMT " vdevId: %d, off channel: %d, offset: %d, num_allowed_off_chan:%d mode: %d, is_responder: %d",
 		    QDF_MAC_ADDR_REF(chan_switch_params->peer_mac_addr),
 		    chan_switch_params->vdev_id,
 		    chan_switch_params->tdls_off_ch,
 		    chan_switch_params->tdls_off_ch_bw_offset,
+		    chan_switch_params->num_off_channels,
 		    chan_switch_params->tdls_sw_mode,
 		    chan_switch_params->is_responder);
 

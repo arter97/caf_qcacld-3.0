@@ -193,6 +193,7 @@ void wlan_tdls_notify_channel_switch_complete(struct wlan_objmgr_psoc *psoc,
 		goto exit;
 	}
 
+	tdls_debug("CSA complete");
 	/*
 	 * Channel Switch can cause SCC -> MCC switch on
 	 * STA vdev. Disable TDLS if CSA causes STA vdev to be in MCC with
@@ -261,6 +262,7 @@ wlan_tdls_post_set_off_channel_mode(struct wlan_objmgr_psoc *psoc,
 void wlan_tdls_notify_channel_switch_start(struct wlan_objmgr_psoc *psoc,
 					   struct wlan_objmgr_vdev *vdev)
 {
+	tdls_debug("Send Channel Switch start to TDLS module");
 	wlan_tdls_post_set_off_channel_mode(psoc, DISABLE_ACTIVE_CHANSWITCH);
 }
 
