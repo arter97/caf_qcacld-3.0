@@ -437,6 +437,8 @@ static const uint32_t pdev_param_tlv[] = {
 	PARAM_MAP(pdev_param_default_6ghz_rate, PDEV_PARAM_DEFAULT_6GHZ_RATE),
 	PARAM_MAP(pdev_param_scan_blanking_mode,
 		  PDEV_PARAM_SET_SCAN_BLANKING_MODE),
+	PARAM_MAP(pdev_param_set_conc_low_latency_mode,
+		  PDEV_PARAM_SET_CONC_LOW_LATENCY_MODE),
 };
 
 /* Populate vdev_param array whose index is host param, value is target param */

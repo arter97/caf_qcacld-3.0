@@ -5622,6 +5622,8 @@ typedef enum {
 		   PDEV_PARAM_SET_SCAN_BLANKING_MODE),
 	PDEV_PARAM(pdev_param_set_disabled_sched_modes,
 		   PDEV_PARAM_SET_DISABLED_SCHED_MODES),
+	PDEV_PARAM(pdev_param_set_conc_low_latency_mode,
+		   PDEV_PARAM_SET_CONC_LOW_LATENCY_MODE),
 	pdev_param_max,
 } wmi_conv_pdev_params_id;
 
