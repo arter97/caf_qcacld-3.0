@@ -735,7 +735,12 @@ static inline uint8_t *pld_get_wlan_mac_address(struct device *dev,
 static inline uint8_t *pld_get_wlan_derived_mac_address(struct device *dev,
 							uint32_t *num)
 {
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(4, 0, 0))
+	*num = 0;
+	return NULL;
+#else
 	return cnss_utils_get_wlan_derived_mac_address(dev, num);
+#endif
 }
 
 /**
