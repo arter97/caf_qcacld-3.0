@@ -3409,15 +3409,18 @@ static inline bool dp_ipa_peer_check(struct dp_soc *soc,
 static inline bool dp_ipa_peer_check(struct dp_soc *soc,
 				     uint8_t *peer_mac_addr, uint8_t vdev_id)
 {
+	struct cdp_peer_info peer_info = {0};
 	struct dp_peer *peer = NULL;
 
-	peer = dp_peer_find_hash_find(soc, peer_mac_addr, 0, vdev_id,
-				      DP_MOD_ID_IPA);
-	if (!peer) {
-		return false;
-	} else {
+	DP_PEER_INFO_PARAMS_INIT(&peer_info, vdev_id, peer_mac_addr, false,
+				 CDP_WILD_PEER_TYPE);
+
+	peer = dp_peer_hash_find_wrapper(soc, &peer_info, DP_MOD_ID_IPA);
+	if (peer) {
 		dp_peer_unref_delete(peer, DP_MOD_ID_IPA);
 		return true;
+	} else {
+		return false;
 	}
 }
 #endif
