@@ -331,6 +331,13 @@ else
 	CONFIG_QCACLD_WLAN_LFR2 := y
 endif
 
+#Flag to enable Roam stats feature
+ifeq ($(CONFIG_BERYLLIUM), y)
+ifeq (y,$(filter y,$(CONFIG_QCACLD_WLAN_LFR3)))
+       CONFIG_WLAN_FEATURE_ROAM_INFO_STATS := y
+endif
+endif
+
 #Flag to enable Dynamic MAC address update
 CONFIG_WLAN_FEATURE_DYNAMIC_MAC_ADDR_UPDATE := y
 

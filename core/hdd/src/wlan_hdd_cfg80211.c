@@ -1912,6 +1912,7 @@ static const struct nl80211_vendor_cmd_info wlan_hdd_cfg80211_vendor_events[] = 
 	},
 #endif
 	FEATURE_GREEN_AP_LOW_LATENCY_PWR_SAVE_EVENT
+	FEATURE_ROAM_STATS_EVENTS
 };
 
 /**
@@ -18892,6 +18893,7 @@ const struct wiphy_vendor_command hdd_wiphy_vendor_commands[] = {
 			      QCA_WLAN_VENDOR_ATTR_ROAM_EVENTS_MAX)
 	},
 #endif
+	FEATURE_ROAM_STATS_COMMANDS
 	FEATURE_WIFI_POS_11AZ_AUTH_COMMANDS
 	FEATURE_WIFI_POS_SET_SECURE_RANGING_CONTEXT_COMMANDS
 	FEATURE_MCC_QUOTA_VENDOR_COMMANDS
