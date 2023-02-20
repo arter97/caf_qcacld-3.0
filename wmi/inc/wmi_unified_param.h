@@ -6306,6 +6306,7 @@ typedef enum {
 #ifdef QCA_MANUAL_TRIGGERED_ULOFDMA
 	wmi_service_manual_ulofdma_trigger_support,
 #endif
+	wmi_service_pre_rx_timeout,
 	wmi_services_max,
 } wmi_conv_service_ids;
 #define WMI_SERVICE_UNAVAILABLE 0xFFFF

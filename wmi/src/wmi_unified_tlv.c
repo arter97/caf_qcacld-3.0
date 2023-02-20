@@ -21995,6 +21995,8 @@ static void populate_tlv_service(uint32_t *wmi_service)
 	wmi_service[wmi_service_manual_ulofdma_trigger_support] =
 			WMI_SERVICE_MANUAL_ULOFDMA_TRIGGER_SUPPORT;
 #endif
+	wmi_service[wmi_service_pre_rx_timeout] =
+				WMI_SERVICE_PRE_RX_TO;
 }
 
 /**
