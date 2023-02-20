@@ -1388,6 +1388,14 @@ void dp_tx_mon_filter_set_upstream_tlvs(struct htt_tx_ring_tlv_filter *filter)
 	filter->utlvs.mactx_phy_desc = 1;
 	filter->utlvs.mactx_user_desc_cmn = 1;
 	filter->utlvs.mactx_user_desc_per_usr = 1;
+
+	/* enable u_sig and eht flag */
+	filter->utlvs.u_sig_eht_su_mu = 1;
+	filter->utlvs.u_sig_eht_su = 1;
+	filter->utlvs.u_sig_eht_tb = 1;
+	filter->utlvs.eht_sig_usr_su = 1;
+	filter->utlvs.eht_sig_usr_mu_mimo = 1;
+	filter->utlvs.eht_sig_usr_ofdma = 1;
 }
 
 void dp_tx_mon_filter_set_word_mask(struct htt_tx_ring_tlv_filter *filter)

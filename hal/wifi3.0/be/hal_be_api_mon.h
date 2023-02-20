@@ -1212,9 +1212,10 @@ struct hal_txmon_user_desc_per_user {
  * @a_factor: packet extension duration of the trigger-based PPDU
  * @center_ru_0: Center RU is occupied in the lower 80 MHz band
  * @center_ru_1: Center RU is occupied in the upper 80 MHz band
- * @num_data_symbols: number of data symbols
+ * @num_ltf_symbols: number of LTF symbols
  * @doppler_indication: doppler indication
  * @reserved: reserved
+ * @spatial_reuse: spatial reuse
  * @ru_channel_0: RU arrangement for band 0
  * @ru_channel_1: RU arrangement for band 1
  */
@@ -1225,9 +1226,10 @@ struct hal_txmon_usr_desc_common {
 		 a_factor		:2,
 		 center_ru_0		:1,
 		 center_ru_1		:1,
-		 num_data_symbols	:16,
+		 num_ltf_symbols	:16,
 		 doppler_indication	:1,
 		 reserved		:2;
+	uint16_t spatial_reuse;
 	uint16_t ru_channel_0[8];
 	uint16_t ru_channel_1[8];
 };
