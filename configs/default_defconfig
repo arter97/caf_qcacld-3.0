@@ -275,6 +275,10 @@ CONFIG_BUILD_TAG := y
 endif
 endif
 
+ifeq ($(CONFIG_ARCH_PINEAPPLE), y)
+CONFIG_NUM_SOC_PERF_CLUSTER := 2
+endif
+
 ifeq ($(CONFIG_ARCH_SDXLEMUR), y)
 CONFIG_MOBILE_ROUTER := y
 endif
