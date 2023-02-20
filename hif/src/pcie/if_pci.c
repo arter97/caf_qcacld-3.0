@@ -3214,16 +3214,17 @@ void hif_pci_irq_set_affinity_hint(struct hif_exec_context *hif_ext_group,
 	int i, ret;
 	unsigned int cpus;
 	bool mask_set = false;
-	int cpu_cluster = perf ? CPU_CLUSTER_TYPE_PERF :
-						CPU_CLUSTER_TYPE_LITTLE;
+	int package_id;
+	int cpu_cluster = perf ? hif_get_perf_cluster_bitmap() :
+				 BIT(CPU_CLUSTER_TYPE_LITTLE);
 
 	for (i = 0; i < hif_ext_group->numirq; i++)
 		qdf_cpumask_clear(&hif_ext_group->new_cpu_mask[i]);
 
 	for (i = 0; i < hif_ext_group->numirq; i++) {
 		qdf_for_each_online_cpu(cpus) {
-			if (qdf_topology_physical_package_id(cpus) ==
-			    cpu_cluster) {
+			package_id = qdf_topology_physical_package_id(cpus);
+			if (package_id >= 0 && BIT(package_id) & cpu_cluster) {
 				qdf_cpumask_set_cpu(cpus,
 						    &hif_ext_group->
 						    new_cpu_mask[i]);
@@ -3255,8 +3256,7 @@ void hif_pci_irq_set_affinity_hint(struct hif_exec_context *hif_ext_group,
 #endif
 
 #ifdef HIF_CPU_PERF_AFFINE_MASK
-void hif_pci_ce_irq_set_affinity_hint(
-	struct hif_softc *scn)
+void hif_pci_ce_irq_set_affinity_hint(struct hif_softc *scn)
 {
 	int ret;
 	unsigned int cpus;
@@ -3265,13 +3265,15 @@ void hif_pci_ce_irq_set_affinity_hint(
 	struct CE_attr *host_ce_conf;
 	int ce_id;
 	qdf_cpu_mask ce_cpu_mask;
+	int perf_cpu_cluster = hif_get_perf_cluster_bitmap();
+	int package_id;
 
 	host_ce_conf = ce_sc->host_ce_config;
 	qdf_cpumask_clear(&ce_cpu_mask);
 
 	qdf_for_each_online_cpu(cpus) {
-		if (qdf_topology_physical_package_id(cpus) ==
-			CPU_CLUSTER_TYPE_PERF) {
+		package_id = qdf_topology_physical_package_id(cpus);
+		if (package_id >= 0 && BIT(package_id) & perf_cpu_cluster) {
 			qdf_cpumask_set_cpu(cpus,
 					    &ce_cpu_mask);
 		} else {

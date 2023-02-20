@@ -37,8 +37,15 @@
 /* Preprocessor definitions and constants */
 #define QDF_MAX_SGLIST 4
 
+/*
+ * Add more levels here based on the number of perf clusters in SoC
+ * Also modify hif_get_perf_cluster_bitmap
+ */
 #define CPU_CLUSTER_TYPE_LITTLE 0
 #define CPU_CLUSTER_TYPE_PERF 1
+#if defined(NUM_SOC_PERF_CLUSTER) && (NUM_SOC_PERF_CLUSTER > 1)
+#define CPU_CLUSTER_TYPE_PERF2 2
+#endif
 
 /**
  * struct qdf_sglist - scatter-gather list
