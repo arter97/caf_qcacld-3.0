@@ -719,6 +719,100 @@ void wlan_scan_get_feature_info(struct wlan_objmgr_psoc *psoc,
 #endif
 
 #ifdef WLAN_POLICY_MGR_ENABLE
+/**
+ * wlan_scan_update_hint_bssid() - Update rnr hint bssid info
+ * @psoc: objmgr psoc
+ * @req: Scan request
+ * @ll_sap_freq: ll sap freq
+ *
+ * Use to update hint_bssid if low latency Sap is UP
+ *
+ * Return: void
+ */
+static void
+wlan_scan_update_hint_bssid(struct wlan_objmgr_psoc *psoc,
+			    struct scan_start_request *req,
+			    qdf_freq_t ll_sap_freq)
+{
+	struct hint_bssid hint_bssid[WLAN_SCAN_MAX_HINT_BSSID] = {0};
+	uint32_t i;
+	uint32_t count = 0;
+	qdf_freq_t freq;
+
+	if (!req->scan_req.num_hint_bssid)
+		return;
+
+	for (i = 0; i < req->scan_req.num_hint_bssid; i++) {
+		freq = req->scan_req.hint_bssid[i].freq_flags >> 16;
+		if (!freq)
+			continue;
+		if (!policy_mgr_2_freq_always_on_same_mac(psoc,
+							  ll_sap_freq,
+							  freq)) {
+			qdf_mem_copy(
+				&hint_bssid[count].bssid,
+				&req->scan_req.hint_bssid[i].bssid,
+				sizeof(hint_bssid[i].bssid));
+			hint_bssid[count].freq_flags =
+				req->scan_req.hint_bssid[i].freq_flags;
+			count++;
+		}
+	}
+	qdf_mem_zero(req->scan_req.hint_bssid,
+		     sizeof(req->scan_req.hint_bssid));
+	if (count)
+		qdf_mem_copy(req->scan_req.hint_bssid, hint_bssid,
+			     sizeof(hint_bssid));
+	req->scan_req.num_hint_bssid = count;
+}
+
+/**
+ * wlan_scan_update_hint_s_ssid() - Update rnr hint short ssid info
+ * @psoc: objmgr psoc
+ * @req: Scan request
+ * @ll_sap_freq: ll sap freq
+ *
+ * Use to update hint_s_ssid if low latency Sap is UP
+ *
+ * Return: void
+ */
+static
+void wlan_scan_update_hint_s_ssid(struct wlan_objmgr_psoc *psoc,
+				  struct scan_start_request *req,
+				  qdf_freq_t ll_sap_freq)
+{
+	struct hint_short_ssid hint_s_ssid[WLAN_SCAN_MAX_HINT_BSSID] = {0};
+	uint32_t i;
+	uint32_t count = 0;
+	qdf_freq_t freq;
+
+	if (!req->scan_req.num_hint_s_ssid)
+		return;
+
+	for (i = 0; i < req->scan_req.num_hint_s_ssid; i++) {
+		freq = req->scan_req.hint_s_ssid[i].freq_flags >> 16;
+		if (!freq)
+			continue;
+		if (!policy_mgr_2_freq_always_on_same_mac(psoc,
+							  ll_sap_freq,
+							  freq)) {
+			qdf_mem_copy(
+				&hint_s_ssid[count].short_ssid,
+				&req->scan_req.hint_s_ssid[i].short_ssid,
+				sizeof(hint_s_ssid[i].short_ssid));
+			hint_s_ssid[count].freq_flags =
+				req->scan_req.hint_s_ssid[i].freq_flags;
+			count++;
+		}
+	}
+	qdf_mem_zero(req->scan_req.hint_s_ssid,
+		     sizeof(req->scan_req.hint_s_ssid));
+	if (count)
+		qdf_mem_copy(req->scan_req.hint_s_ssid, hint_s_ssid,
+			     sizeof(hint_s_ssid));
+	req->scan_req.num_hint_s_ssid = count;
+}
+
 void wlan_scan_update_low_latency_profile_chnlist(
 				struct wlan_objmgr_vdev *vdev,
 				struct scan_start_request *req)
@@ -737,6 +831,8 @@ void wlan_scan_update_low_latency_profile_chnlist(
 	if (!ll_sap_freq)
 		return;
 
+	wlan_scan_update_hint_bssid(psoc, req, ll_sap_freq);
+	wlan_scan_update_hint_s_ssid(psoc, req, ll_sap_freq);
 	/*
 	 * Scenario: LL SAP is present and scan is requested.
 	 * Allow scan on freq on mutually exclusive mac.
