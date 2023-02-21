@@ -517,5 +517,11 @@ mlo_get_link_mac_addr_from_reassoc_rsp(struct wlan_objmgr_vdev *vdev,
 	return QDF_STATUS_E_NOSUPPORT;
 }
 
+static inline uint32_t
+mlo_roam_get_link_freq_from_mac_addr(struct roam_offload_synch_ind *sync_ind,
+				     uint8_t *link_mac_addr)
+{
+	return 0;
+}
 #endif /* WLAN_FEATURE_11BE_MLO */
 #endif
