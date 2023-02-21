@@ -3159,6 +3159,8 @@ QDF_STATUS policy_mgr_get_channel_list(struct wlan_objmgr_psoc *psoc,
 		goto end;
 	}
 
+	num_channels = QDF_MIN(num_channels, NUM_CHANNELS);
+
 	/* Let's divide the list in 2.4 & 5 Ghz lists */
 	for (i = 0; i < num_channels; i++) {
 		if (wlan_reg_is_24ghz_ch_freq(channel_list[i])) {
