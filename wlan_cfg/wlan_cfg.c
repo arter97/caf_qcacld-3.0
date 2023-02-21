@@ -5463,6 +5463,10 @@ wlan_cfg_get_prealloc_cfg(struct cdp_ctrl_objmgr_psoc *ctrl_psoc,
 						   CFG_DP_REO_STATUS_RING);
 	cfg->num_mon_status_ring_entries = cfg_get(ctrl_psoc,
 						   CFG_DP_RXDMA_MONITOR_STATUS_RING);
+	cfg->num_tx_mon_buf_ring_entries = cfg_get(ctrl_psoc,
+						   CFG_DP_TX_MONITOR_BUF_RING);
+	cfg->num_tx_mon_dst_ring_entries = cfg_get(ctrl_psoc,
+						   CFG_DP_TX_MONITOR_DST_RING);
 }
 
 #ifdef WLAN_FEATURE_PKT_CAPTURE_V2
