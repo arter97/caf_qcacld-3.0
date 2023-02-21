@@ -4154,7 +4154,7 @@ struct dp_peer_mesh_latency_parameter {
 
 #ifdef WLAN_FEATURE_11BE_MLO
 /* Max number of links for MLO connection */
-#define DP_MAX_MLO_LINKS 3
+#define DP_MAX_MLO_LINKS 4
 
 /**
  * struct dp_peer_link_info - link peer information for MLO
