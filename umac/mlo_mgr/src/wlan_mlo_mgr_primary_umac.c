@@ -95,6 +95,7 @@ static void wlan_get_rssi_data_each_psoc(struct wlan_objmgr_psoc *psoc,
 	tqm_params->max_ml_peers = MAX_MLO_PEER;
 
 	rssi_data->current_psoc_id = index;
+	rssi_data->num_psocs++;
 
 	wlan_objmgr_iterate_obj_list(psoc, WLAN_PEER_OP,
 				     wlan_mlo_peer_get_rssi, rssi_data, 0,
