@@ -226,8 +226,13 @@ static const  uint8_t rxdma2host_ring_mask_msi[WLAN_CFG_INT_NUM_CONTEXTS] = {
 #endif /* CONFIG_BERYLLIUM */
 
 #ifdef CONFIG_BERYLLIUM
+#ifdef WLAN_FEATURE_LOCAL_PKT_CAPTURE
+static const  uint8_t rx_mon_ring_mask_msi[WLAN_CFG_INT_NUM_CONTEXTS] = {
+	[14] = WLAN_CFG_RX_MON_RING_MASK_0 | WLAN_CFG_RX_MON_RING_MASK_1};
+#else
 static const  uint8_t rx_mon_ring_mask_msi[WLAN_CFG_INT_NUM_CONTEXTS] = {
 	[5] = WLAN_CFG_RX_MON_RING_MASK_0};
+#endif
 #else
 static const  uint8_t rx_mon_ring_mask_msi[WLAN_CFG_INT_NUM_CONTEXTS] = {
 	[1] = WLAN_CFG_RX_MON_RING_MASK_0, [2] = WLAN_CFG_RX_MON_RING_MASK_1};
@@ -280,6 +285,17 @@ static const uint8_t rx_ring_near_full_irq_2_mask_msi[WLAN_CFG_INT_NUM_CONTEXTS]
 	0 };
 static const uint8_t tx_ring_near_full_irq_mask_msi[WLAN_CFG_INT_NUM_CONTEXTS] = {
 	0 };
+#endif
+
+#ifdef CONFIG_BERYLLIUM
+#ifdef WLAN_FEATURE_LOCAL_PKT_CAPTURE
+static const  uint8_t tx_mon_ring_mask_msi[WLAN_CFG_INT_NUM_CONTEXTS] = {
+	[13] = WLAN_CFG_TX_MON_RING_MASK_0 | WLAN_CFG_TX_MON_RING_MASK_1};
+#else
+static const  uint8_t tx_mon_ring_mask_msi[WLAN_CFG_INT_NUM_CONTEXTS] = {0};
+#endif /* WLAN_FEATURE_LOCAL_PKT_CAPTURE */
+#else
+static const  uint8_t tx_mon_ring_mask_msi[WLAN_CFG_INT_NUM_CONTEXTS] = {0};
 #endif
 
 #else
@@ -3357,7 +3373,7 @@ void wlan_cfg_fill_interrupt_mask(struct wlan_cfg_dp_soc_ctxt *wlan_cfg_ctx,
 
 		wlan_cfg_ctx->int_rx_mon_ring_mask[i] =
 							rx_mon_ring_mask_msi[i];
-		wlan_cfg_ctx->int_tx_mon_ring_mask[i] = 0;
+		wlan_cfg_ctx->int_tx_mon_ring_mask[i] = tx_mon_ring_mask_msi[i];
 		wlan_cfg_ctx->int_rx_err_ring_mask[i] =
 							rx_err_ring_mask_msi[i];
 		wlan_cfg_ctx->int_rx_wbm_rel_ring_mask[i] =
