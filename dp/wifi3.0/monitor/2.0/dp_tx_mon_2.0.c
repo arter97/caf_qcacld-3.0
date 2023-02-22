@@ -825,17 +825,17 @@ dp_lite_mon_filter_subtype(struct dp_lite_mon_tx_config *config,
 		IEEE80211_FC0_SUBTYPE_SHIFT);
 
 	switch (type) {
-	case IEEE80211_FC0_TYPE_MGT:
+	case QDF_IEEE80211_FC0_TYPE_MGT:
 		if (mgmt_filter >> subtype & 0x1)
 			return QDF_STATUS_SUCCESS;
 		else
 			return QDF_STATUS_E_ABORTED;
-	case IEEE80211_FC0_TYPE_CTL:
+	case QDF_IEEE80211_FC0_TYPE_CTL:
 		if (ctrl_filter >> subtype & 0x1)
 			return QDF_STATUS_SUCCESS;
 		else
 			return QDF_STATUS_E_ABORTED;
-	case IEEE80211_FC0_TYPE_DATA:
+	case QDF_IEEE80211_FC0_TYPE_DATA:
 		is_mcast = DP_FRAME_IS_MULTICAST(wh->i_addr1);
 		if ((is_mcast && (data_filter & FILTER_DATA_MCAST)) ||
 		    (!is_mcast && (data_filter & FILTER_DATA_UCAST)))

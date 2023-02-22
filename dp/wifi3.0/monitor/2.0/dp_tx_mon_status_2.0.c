@@ -347,8 +347,8 @@ dp_tx_mon_generate_cts2self_frm(struct dp_pdev *pdev,
 	wh_min = (struct ieee80211_frame_min_one *)qdf_nbuf_data(mpdu_nbuf);
 	qdf_mem_zero(wh_min, MAX_DUMMY_FRM_BODY);
 
-	frm_ctl = (IEEE80211_FC0_VERSION_0 | IEEE80211_FC0_TYPE_CTL |
-		   IEEE80211_FC0_SUBTYPE_CTS);
+	frm_ctl = (QDF_IEEE80211_FC0_VERSION_0 | QDF_IEEE80211_FC0_TYPE_CTL |
+		   QDF_IEEE80211_FC0_SUBTYPE_CTS);
 	TXMON_PPDU_COM(tx_ppdu_info, frame_control) = frm_ctl;
 	TXMON_PPDU_COM(tx_ppdu_info, frame_control_info_valid) = 1;
 	wh_min->i_fc[1] = 0;
@@ -423,8 +423,8 @@ dp_tx_mon_generate_rts_frm(struct dp_pdev *pdev,
 	wh_min = (struct ieee80211_ctlframe_addr2 *)qdf_nbuf_data(mpdu_nbuf);
 	qdf_mem_zero(wh_min, MAX_DUMMY_FRM_BODY);
 
-	frm_ctl = (IEEE80211_FC0_VERSION_0 | IEEE80211_FC0_TYPE_CTL |
-		   IEEE80211_FC0_SUBTYPE_RTS);
+	frm_ctl = (QDF_IEEE80211_FC0_VERSION_0 | QDF_IEEE80211_FC0_TYPE_CTL |
+		   QDF_IEEE80211_FC0_SUBTYPE_RTS);
 	TXMON_PPDU_COM(tx_ppdu_info, frame_control) = frm_ctl;
 	TXMON_PPDU_COM(tx_ppdu_info, frame_control_info_valid) = 1;
 	wh_min->i_fc[1] = 0;
@@ -507,8 +507,8 @@ dp_tx_mon_generate_ack_frm(struct dp_pdev *pdev,
 
 	wh_addr1 = (struct ieee80211_frame_min_one *)qdf_nbuf_data(mpdu_nbuf);
 
-	frm_ctl = (IEEE80211_FC0_VERSION_0 | IEEE80211_FC0_TYPE_CTL |
-		   IEEE80211_FC0_SUBTYPE_ACK);
+	frm_ctl = (QDF_IEEE80211_FC0_VERSION_0 | QDF_IEEE80211_FC0_TYPE_CTL |
+		   QDF_IEEE80211_FC0_SUBTYPE_ACK);
 	TXMON_PPDU_COM(tx_ppdu_info, frame_control) = frm_ctl;
 	TXMON_PPDU_COM(tx_ppdu_info, frame_control_info_valid) = 1;
 	wh_addr1->i_fc[1] = 0;
@@ -584,8 +584,8 @@ dp_tx_mon_generate_3addr_qos_null_frm(struct dp_pdev *pdev,
 	wh_addr3 = (struct ieee80211_qosframe *)qdf_nbuf_data(mpdu_nbuf);
 	qdf_mem_zero(wh_addr3, sizeof(struct ieee80211_qosframe));
 
-	frm_ctl = (IEEE80211_FC0_VERSION_0 | IEEE80211_FC0_TYPE_DATA |
-		   IEEE80211_FC0_SUBTYPE_QOS_NULL);
+	frm_ctl = (QDF_IEEE80211_FC0_VERSION_0 | QDF_IEEE80211_FC0_TYPE_DATA |
+		   QDF_IEEE80211_FC0_SUBTYPE_QOS_NULL);
 	TXMON_PPDU_COM(tx_ppdu_info, frame_control) = frm_ctl;
 	TXMON_PPDU_COM(tx_ppdu_info, frame_control_info_valid) = 1;
 	wh_addr3->i_fc[1] = 0;
@@ -661,8 +661,8 @@ dp_tx_mon_generate_4addr_qos_null_frm(struct dp_pdev *pdev,
 	wh_addr4 = (struct ieee80211_qosframe_addr4 *)qdf_nbuf_data(mpdu_nbuf);
 	qdf_mem_zero(wh_addr4, sizeof(struct ieee80211_qosframe_addr4));
 
-	frm_ctl = (IEEE80211_FC0_VERSION_0 | IEEE80211_FC0_TYPE_DATA |
-		   IEEE80211_FC0_SUBTYPE_QOS_NULL);
+	frm_ctl = (QDF_IEEE80211_FC0_VERSION_0 | QDF_IEEE80211_FC0_TYPE_DATA |
+		   QDF_IEEE80211_FC0_SUBTYPE_QOS_NULL);
 	TXMON_PPDU_COM(tx_ppdu_info, frame_control) = frm_ctl;
 	TXMON_PPDU_COM(tx_ppdu_info, frame_control_info_valid) = 1;
 	wh_addr4->i_fc[1] = 0;
@@ -765,8 +765,8 @@ dp_tx_mon_generate_mu_block_ack_frm(struct dp_pdev *pdev,
 	wh_addr2 = (struct ieee80211_ctlframe_addr2 *)qdf_nbuf_data(mpdu_nbuf);
 	qdf_mem_zero(wh_addr2, DP_BA_ACK_FRAME_SIZE);
 
-	frm_ctl = (IEEE80211_FC0_VERSION_0 | IEEE80211_FC0_TYPE_CTL |
-		   IEEE80211_FC0_BLOCK_ACK);
+	frm_ctl = (QDF_IEEE80211_FC0_VERSION_0 | QDF_IEEE80211_FC0_TYPE_CTL |
+		   QDF_IEEE80211_FC0_SUBTYPE_BA);
 	TXMON_PPDU_COM(tx_ppdu_info, frame_control) = frm_ctl;
 	TXMON_PPDU_COM(tx_ppdu_info, frame_control_info_valid) = 1;
 	wh_addr2->i_fc[1] = 0;
@@ -915,8 +915,8 @@ dp_tx_mon_generate_block_ack_frm(struct dp_pdev *pdev,
 	wh_addr2 = (struct ieee80211_ctlframe_addr2 *)qdf_nbuf_data(mpdu_nbuf);
 	qdf_mem_zero(wh_addr2, DP_BA_ACK_FRAME_SIZE);
 
-	frm_ctl = (IEEE80211_FC0_VERSION_0 | IEEE80211_FC0_TYPE_CTL |
-		   IEEE80211_FC0_BLOCK_ACK);
+	frm_ctl = (QDF_IEEE80211_FC0_VERSION_0 | QDF_IEEE80211_FC0_TYPE_CTL |
+		   QDF_IEEE80211_FC0_SUBTYPE_BA);
 	TXMON_PPDU_COM(tx_ppdu_info, frame_control) = frm_ctl;
 	TXMON_PPDU_COM(tx_ppdu_info, frame_control_info_valid) = 1;
 	wh_addr2->i_fc[1] = 0;
