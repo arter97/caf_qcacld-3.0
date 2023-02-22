@@ -3234,13 +3234,13 @@ target_if_spectral_report_params_init(
 
 	switch (rparams->version) {
 	case SPECTRAL_REPORT_FORMAT_VERSION_1:
-		rparams->ssumaary_padding_bytes =
+		rparams->ssummary_padding_bytes =
 			NUM_PADDING_BYTES_SSCAN_SUMARY_REPORT_GEN3_V1;
 		rparams->fft_report_hdr_len =
 			FFT_REPORT_HEADER_LENGTH_GEN3_V1;
 		break;
 	case SPECTRAL_REPORT_FORMAT_VERSION_2:
-		rparams->ssumaary_padding_bytes =
+		rparams->ssummary_padding_bytes =
 			NUM_PADDING_BYTES_SSCAN_SUMARY_REPORT_GEN3_V2;
 		rparams->fft_report_hdr_len =
 			FFT_REPORT_HEADER_LENGTH_GEN3_V2;

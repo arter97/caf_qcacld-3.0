@@ -2983,7 +2983,7 @@ QDF_STATUS target_if_byte_swap_spectral_headers_gen3(
 	}
 
 	/* No need to swap the padding bytes */
-	ptr32 += (spectral->rparams.ssumaary_padding_bytes >> 2);
+	ptr32 += (spectral->rparams.ssummary_padding_bytes >> 2);
 
 	/* Search FFT Report */
 	words32 = sizeof(struct spectral_phyerr_fft_report_gen3) >> 2;
@@ -3039,6 +3039,8 @@ target_if_consume_sscan_summary_report_gen3(
 				struct target_if_spectral *spectral)
 {
 	struct spectral_sscan_summary_report_gen3 *psscan_summary_report;
+	struct spectral_sscan_summary_report_padding_gen3_v2 *padding;
+	bool scan_radio_blanking;
 
 	if (!data) {
 		spectral_err_rl("Summary report buffer is null");
@@ -3109,7 +3111,35 @@ target_if_consume_sscan_summary_report_gen3(
 
 	/* Advance buf pointer to the search fft report */
 	*data += sizeof(struct spectral_sscan_summary_report_gen3);
-	*data += spectral->rparams.ssumaary_padding_bytes;
+
+	if (!spectral->rparams.ssummary_padding_bytes)
+		return QDF_STATUS_SUCCESS;
+
+	scan_radio_blanking =
+		wlan_pdev_nif_feat_ext_cap_get(spectral->pdev_obj,
+					       WLAN_PDEV_FEXT_SCAN_BLANKING_EN);
+	padding = (struct spectral_sscan_summary_report_padding_gen3_v2 *)*data;
+
+	if (scan_radio_blanking) {
+		uint32_t blanking_tag;
+		uint8_t blanking_tag_size;
+		uint8_t blanking_tag_pos;
+
+		blanking_tag_size =
+			SSCAN_SUMMARY_REPORT_PAD_HDR_A_BLANKING_SIZE_GEN3_V2;
+		blanking_tag_pos =
+			SSCAN_SUMMARY_REPORT_PAD_HDR_A_BLANKING_POS_GEN3_V2;
+		blanking_tag = get_bitfield(padding->hdr_a, blanking_tag_size,
+					    blanking_tag_pos);
+
+		if (blanking_tag ==
+		    SSCAN_SUMMARY_REPORT_PAD_HDR_A_BLANKING_TAG_GEN3_V2)
+			fields->blanking_status = 1;
+		else
+			fields->blanking_status = 0;
+	}
+
+	*data += sizeof(struct spectral_sscan_summary_report_padding_gen3_v2);
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -3401,6 +3431,7 @@ target_if_spectral_populate_samp_params_gen3(
 	params->noise_floor = report->noisefloor[chn_idx_lowest_enabled];
 	params->agc_total_gain = sscan_fields->sscan_agc_total_gain;
 	params->gainchange = sscan_fields->sscan_gainchange;
+	params->blanking_status = sscan_fields->blanking_status;
 	params->pri80ind = sscan_fields->sscan_pri80;
 
 	params->bin_pwr_data = p_sfft->bin_pwr_data;
@@ -3722,7 +3753,7 @@ target_if_consume_spectral_report_gen3(
 						    &spectral->rparams);
 	/* Advance buf pointer to the search fft report */
 	data += sizeof(struct spectral_sscan_summary_report_gen3);
-	data += spectral->rparams.ssumaary_padding_bytes;
+	data += spectral->rparams.ssummary_padding_bytes;
 	params.vhtop_ch_freq_seg1 = report->cfreq1;
 	params.vhtop_ch_freq_seg2 = report->cfreq2;
 

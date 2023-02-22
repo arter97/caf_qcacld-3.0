@@ -327,6 +327,9 @@ struct spectral_process_phyerr_info_gen2 {
 #define SSCAN_SUMMARY_REPORT_HDR_B_GAINCHANGE_SIZE_GEN3_V1      (1)
 #define SSCAN_SUMMARY_REPORT_HDR_C_GAINCHANGE_POS_GEN3_V2       (16)
 #define SSCAN_SUMMARY_REPORT_HDR_C_GAINCHANGE_SIZE_GEN3_V2      (1)
+#define SSCAN_SUMMARY_REPORT_PAD_HDR_A_BLANKING_POS_GEN3_V2     (0)
+#define SSCAN_SUMMARY_REPORT_PAD_HDR_A_BLANKING_SIZE_GEN3_V2    (32)
+#define SSCAN_SUMMARY_REPORT_PAD_HDR_A_BLANKING_TAG_GEN3_V2     (0xdeadbeaf)
 #define SPECTRAL_REPORT_LTS_HDR_LENGTH_POS_GEN3                 (0)
 #define SPECTRAL_REPORT_LTS_HDR_LENGTH_SIZE_GEN3                (16)
 #define SPECTRAL_REPORT_LTS_TAG_POS_GEN3                        (16)
@@ -473,6 +476,10 @@ struct spectral_phyerr_fft_report_gen3 {
  *                 disregard the FFT sample if this is set to 1 but detector ID
  *                 does not correspond to the ID for the pri80 segment.
  * @sscan_detector_id: Detector ID in Spectral scan report
+ * @blanking_status: Indicates whether scan blanking was enabled during this
+ * spectral report capture. This field is applicable only when scan blanking
+ * feature is enabled. When scan blanking feature is disabled, this field
+ * will be set to zero.
  */
 struct sscan_report_fields_gen3 {
 	uint8_t sscan_agc_total_gain;
@@ -480,6 +487,7 @@ struct sscan_report_fields_gen3 {
 	uint8_t sscan_gainchange;
 	uint8_t sscan_pri80;
 	uint8_t sscan_detector_id;
+	uint8_t blanking_status;
 };
 
 /**
@@ -499,6 +507,21 @@ struct spectral_sscan_summary_report_gen3 {
 	u_int32_t res1;
 	u_int32_t hdr_b;
 	u_int32_t hdr_c;
+} __ATTRIB_PACK;
+
+/**
+ * struct spectral_sscan_summary_report_padding_gen3_v2 - Spectral summary
+ * report padding region
+ * @hdr_a: Header[0:31]
+ * @hdr_b: Header[32:63]
+ * @hdr_c: Header[64:95]
+ * @hdr_d: Header[96:127]
+ */
+struct spectral_sscan_summary_report_padding_gen3_v2 {
+	u_int32_t hdr_a;
+	u_int32_t hdr_b;
+	u_int32_t hdr_c;
+	u_int32_t hdr_d;
 } __ATTRIB_PACK;
 
 #ifdef DIRECT_BUF_RX_ENABLE
@@ -601,7 +624,7 @@ struct spectral_fft_bin_len_adj_swar {
  * report.
  * @version: This represents the report format version number within each
  * Spectral generation.
- * @ssumaary_padding_bytes: Number of bytes of padding after Spectral summary
+ * @ssummary_padding_bytes: Number of bytes of padding after Spectral summary
  * report
  * @fft_report_hdr_len: Number of bytes in the header of the FFT report. This
  * has to be subtracted from the length field of FFT report to find the length
@@ -615,7 +638,7 @@ struct spectral_fft_bin_len_adj_swar {
  */
 struct spectral_report_params {
 	enum spectral_report_format_version version;
-	uint8_t ssumaary_padding_bytes;
+	uint8_t ssummary_padding_bytes;
 	uint8_t fft_report_hdr_len;
 	bool fragmentation_160[SPECTRAL_SCAN_MODE_MAX];
 	enum spectral_scan_mode detid_mode_table[SPECTRAL_DETECTOR_ID_MAX];
