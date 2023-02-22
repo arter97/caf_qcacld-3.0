@@ -3912,7 +3912,7 @@ lim_check_scan_db_for_join_req_partner_info(struct pe_session *session_entry,
 	QDF_STATUS status = QDF_STATUS_E_FAILURE;
 	struct mlo_partner_info *partner_info;
 	uint16_t join_req_freq = 0;
-	struct scan_cache_entry cache_entry;
+	struct scan_cache_entry *cache_entry;
 
 	if (!session_entry) {
 		pe_err("session entry is NULL");
@@ -3936,11 +3936,18 @@ lim_check_scan_db_for_join_req_partner_info(struct pe_session *session_entry,
 		return QDF_STATUS_E_NULL_VALUE;
 	}
 
+	cache_entry = qdf_mem_malloc(sizeof(struct scan_cache_entry));
+
+	if (!cache_entry)
+		return QDF_STATUS_E_FAILURE;
+
 	partner_link = qdf_mem_malloc(sizeof(struct partner_link_info) *
 			(MLD_MAX_LINKS - 1));
 
-	if (!partner_link)
-		return QDF_STATUS_E_FAILURE;
+	if (!partner_link) {
+		status = QDF_STATUS_E_FAILURE;
+		goto free_cache_entry;
+	}
 
 	qdf_mem_copy(&qdf_bssid,
 		     &(lim_join_req->bssDescription.bssId),
@@ -3951,7 +3958,7 @@ lim_check_scan_db_for_join_req_partner_info(struct pe_session *session_entry,
 	status = wlan_scan_get_scan_entry_by_mac_freq(pdev,
 						      &qdf_bssid,
 						      join_req_freq,
-						      &cache_entry);
+						      cache_entry);
 
 	if (!QDF_IS_STATUS_SUCCESS(status)) {
 		pe_err("failed to get partner link info by mac addr");
@@ -3959,7 +3966,7 @@ lim_check_scan_db_for_join_req_partner_info(struct pe_session *session_entry,
 		goto free_mem;
 	}
 
-	qdf_mem_copy(partner_link, cache_entry.ml_info.link_info,
+	qdf_mem_copy(partner_link, cache_entry->ml_info.link_info,
 		     sizeof(struct partner_link_info) * (MLD_MAX_LINKS - 1));
 
 	partner_info = &lim_join_req->partner_info;
@@ -3975,6 +3982,8 @@ lim_check_scan_db_for_join_req_partner_info(struct pe_session *session_entry,
 
 free_mem:
 	qdf_mem_free(partner_link);
+free_cache_entry:
+	qdf_mem_free(cache_entry);
 	return status;
 }
 #else
