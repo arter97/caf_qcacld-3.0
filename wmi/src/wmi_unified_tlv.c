@@ -14823,6 +14823,8 @@ static QDF_STATUS extract_scan_radio_cap_service_ready_ext2_tlv(
 		WMI_SCAN_RADIO_CAP_SCAN_RADIO_FLAG_GET(scan_radio_caps->flags);
 	param->dfs_en =
 		WMI_SCAN_RADIO_CAP_DFS_FLAG_GET(scan_radio_caps->flags);
+	param->blanking_en =
+		WMI_SCAN_RADIO_CAP_BLANKING_SUPPORT_GET(scan_radio_caps->flags);
 
 	return QDF_STATUS_SUCCESS;
 }

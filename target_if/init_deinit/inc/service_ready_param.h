@@ -302,11 +302,13 @@ struct wlan_psoc_host_mac_phy_caps_ext2 {
  * @phy_id: phy id
  * @scan_radio_supported: indicates scan radio support
  * @dfs_en: indicates DFS needs to be enabled/disabled for scan radio vap
+ * @blanking_en: Indicates whether scan blanking feature is enabled
  */
 struct wlan_psoc_host_scan_radio_caps {
 	uint32_t phy_id;
 	bool scan_radio_supported;
 	bool dfs_en;
+	bool blanking_en;
 };
 
 /**

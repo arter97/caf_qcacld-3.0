@@ -113,6 +113,8 @@
 #define WLAN_PDEV_FEXT_AGILE_SPECTRAL_SCAN_320_DIS     0x00000100
 /* WiFi Radar support enabled */
 #define WLAN_PDEV_FEXT_WIFI_RADAR_ENABLE               0x00000200
+/* Scan blanking support enabled.valid only for scan radio supported pdevs */
+#define WLAN_PDEV_FEXT_SCAN_BLANKING_EN                0x00000400
 
 /* PDEV op flags */
    /* Enable htrate for wep and tkip */
