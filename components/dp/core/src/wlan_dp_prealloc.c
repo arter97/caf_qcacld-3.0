@@ -31,6 +31,10 @@
 #ifdef WIFI_MONITOR_SUPPORT
 #include <dp_mon.h>
 #endif
+#ifdef WLAN_PKT_CAPTURE_TX_2_0
+#include "mon_ingress_ring.h"
+#include "mon_destination_ring.h"
+#endif
 
 #ifdef DP_MEM_PRE_ALLOC
 
@@ -315,6 +319,11 @@ static struct  dp_consistent_prealloc g_dp_consistent_allocs[] = {
 	/* 2 monitor status rings */
 	{RXDMA_MONITOR_STATUS, 0, 0, NULL, NULL, 0, 0},
 	{RXDMA_MONITOR_STATUS, 0, 0, NULL, NULL, 0, 0},
+#ifdef WLAN_PKT_CAPTURE_TX_2_0
+	/* 2 MON2SW Tx monitor rings */
+	{TX_MONITOR_DST, 0, 0, NULL, NULL, 0, 0},
+	{TX_MONITOR_DST, 0, 0, NULL, NULL, 0, 0},
+#endif
 };
 
 /* Number of HW link descriptors needed (rounded to power of 2) */
@@ -526,10 +535,53 @@ static inline uint32_t dp_get_tcl_data_srng_entrysize(void)
 {
 	return sizeof(struct tcl_data_cmd);
 }
+
+#ifdef WLAN_PKT_CAPTURE_TX_2_0
+/**
+ * dp_get_tx_mon_mem_size() - Get tx mon ring memory size
+ * @cfg: prealloc config
+ * @ring_type: ring type
+ *
+ * Return: Tx mon ring memory size
+ */
+static inline
+uint32_t dp_get_tx_mon_mem_size(struct wlan_dp_prealloc_cfg *cfg,
+				enum hal_ring_type ring_type)
+{
+	uint32_t mem_size = 0;
+
+	if (!cfg)
+		return mem_size;
+
+	if (ring_type == TX_MONITOR_BUF) {
+		mem_size = (sizeof(struct mon_ingress_ring)) *
+			    cfg->num_tx_mon_buf_ring_entries;
+	} else if (ring_type == TX_MONITOR_DST) {
+		mem_size = (sizeof(struct mon_destination_ring)) *
+			    cfg->num_tx_mon_dst_ring_entries;
+	}
+
+	return mem_size;
+}
+#else
+static inline
+uint32_t dp_get_tx_mon_mem_size(struct wlan_dp_prealloc_cfg *cfg,
+				enum hal_ring_type ring_type)
+{
+	return 0;
+}
+#endif /* WLAN_PKT_CAPTURE_TX_2_0 */
 #else
 static inline uint32_t dp_get_tcl_data_srng_entrysize(void)
 {
 	return (sizeof(struct tlv_32_hdr) + sizeof(struct tcl_data_cmd));
+}
+
+static inline
+uint32_t dp_get_tx_mon_mem_size(struct wlan_dp_prealloc_cfg *cfg,
+				enum hal_ring_type ring_type)
+{
+	return 0;
 }
 #endif
 
@@ -584,6 +636,10 @@ dp_update_mem_size_by_ring_type(struct wlan_dp_prealloc_cfg *cfg,
 	case RXDMA_MONITOR_STATUS:
 		*mem_size = (sizeof(struct wbm_buffer_ring)) *
 			    cfg->num_mon_status_ring_entries;
+		return;
+	case TX_MONITOR_BUF:
+	case TX_MONITOR_DST:
+		*mem_size = dp_get_tx_mon_mem_size(cfg, ring_type);
 		return;
 	default:
 		return;
