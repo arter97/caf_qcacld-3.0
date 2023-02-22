@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2011-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -230,16 +230,6 @@ lim_populate_ml_probe_req(struct mac_context *mac,
 
 	return QDF_STATUS_SUCCESS;
 }
-
-static bool
-lim_check_join_req_and_num_of_partner_link(struct pe_session *session)
-{
-	if (session && session->lim_join_req &&
-	    session->lim_join_req->partner_info.num_partner_links)
-		return true;
-
-	return false;
-}
 #else
 static QDF_STATUS
 lim_populate_ml_probe_req(struct mac_context *mac,
@@ -248,12 +238,6 @@ lim_populate_ml_probe_req(struct mac_context *mac,
 			  uint16_t *ml_probe_req_len)
 {
 	return QDF_STATUS_E_NOSUPPORT;
-}
-
-static bool
-lim_check_join_req_and_num_of_partner_link(struct pe_session *session)
-{
-	return false;
 }
 #endif
 
@@ -452,7 +436,7 @@ lim_send_probe_req_mgmt_frame(struct mac_context *mac_ctx,
 				    &pr->he_6ghz_band_cap);
 
 	if (IS_DOT11_MODE_EHT(dot11mode) && pesession &&
-	    lim_check_join_req_and_num_of_partner_link(pesession)) {
+			pesession->lim_join_req) {
 		lim_update_session_eht_capable(mac_ctx, pesession);
 		lim_populate_ml_probe_req(mac_ctx, pesession,
 					  &ml_probe_req_ie,
@@ -1037,6 +1021,7 @@ lim_send_probe_rsp_mgmt_frame(struct mac_context *mac_ctx,
 	if (extracted_ext_cap_flag)
 		lim_merge_extcap_struct(&frm->ExtCap, &extracted_ext_cap,
 					true);
+	populate_dot11f_bcn_prot_extcaps(mac_ctx, pe_session, &frm->ExtCap);
 
 	status = dot11f_get_packed_probe_response_size(mac_ctx, frm, &payload);
 	if (DOT11F_FAILED(status)) {
@@ -1900,7 +1885,7 @@ lim_send_assoc_rsp_mgmt_frame(struct mac_context *mac_ctx,
 	if (extracted_flag)
 		lim_merge_extcap_struct(&(frm.ExtCap), &extracted_ext_cap,
 					true);
-
+	populate_dot11f_bcn_prot_extcaps(mac_ctx, pe_session, &(frm.ExtCap));
 	if (sta && lim_is_sta_eht_capable(sta) &&
 	    lim_is_mlo_conn(pe_session, sta) &&
 	    lim_is_session_eht_capable(pe_session) &&
@@ -4232,6 +4217,17 @@ lim_send_disassoc_mgmt_frame(struct mac_context *mac,
 		if (waitForAck)
 			lim_send_disassoc_cnf(mac);
 		return;
+	} else if (lim_is_ml_peer_state_disconn(mac, pe_session, peer)) {
+		/**
+		 * Check if disassoc is already sent on link vdev and ML peer
+		 * state is moved to ML_PEER_DISCONN_INITIATED. In which case,
+		 * do not send disassoc on assoc vdev, issue disassoc only if
+		 * this check fails.
+		 */
+		pe_debug("disassoc tx not required for vdev id %d",
+			 pe_session->vdev_id);
+		lim_send_disassoc_cnf(mac);
+		return;
 	}
 	smeSessionId = pe_session->smeSessionId;
 
@@ -5569,6 +5565,41 @@ returnAfterError:
 	return status_code;
 } /* End lim_send_link_report_action_frame. */
 
+#ifdef CONNECTIVITY_DIAG_EVENT
+/**
+ * lim_beacon_report_response_event() - Send Beacon Report Response log
+ * event
+ * @token: Dialog token
+ * @num_rpt: Number of Report element
+ * @vdev_id: vdev Id
+ */
+static void
+lim_beacon_report_response_event(uint8_t token, uint8_t num_rpt,
+				 uint8_t vdev_id)
+{
+	WLAN_HOST_DIAG_EVENT_DEF(wlan_diag_event, struct wlan_diag_bcn_rpt);
+
+	qdf_mem_zero(&wlan_diag_event, sizeof(wlan_diag_event));
+
+	wlan_diag_event.diag_cmn.vdev_id = vdev_id;
+	wlan_diag_event.diag_cmn.timestamp_us = qdf_get_time_of_the_day_us();
+	wlan_diag_event.diag_cmn.ktime_us =  qdf_ktime_to_us(qdf_ktime_get());
+
+	wlan_diag_event.version = DIAG_BCN_RPT_VERSION;
+	wlan_diag_event.subtype = WLAN_CONN_DIAG_BCN_RPT_RESP_EVENT;
+	wlan_diag_event.meas_token = token;
+	wlan_diag_event.num_rpt = num_rpt;
+
+	WLAN_HOST_DIAG_EVENT_REPORT(&wlan_diag_event, EVENT_WLAN_BCN_RPT);
+}
+#else
+static void
+lim_beacon_report_response_event(uint8_t token, uint8_t num_rpt,
+				 uint8_t vdev_id)
+{
+}
+#endif
+
 QDF_STATUS
 lim_send_radio_measure_report_action_frame(struct mac_context *mac,
 				uint8_t dialog_token,
@@ -5704,6 +5735,12 @@ lim_send_radio_measure_report_action_frame(struct mac_context *mac,
 	} else if (DOT11F_WARNED(nStatus)) {
 		pe_warn("Warnings while packing Radio Measure Report (0x%08x)",
 			nStatus);
+	}
+
+	if (frm->MeasurementReport[0].type == SIR_MAC_RRM_BEACON_TYPE) {
+		lim_beacon_report_response_event(frm->MeasurementReport[0].token,
+						 num_report,
+						 wlan_vdev_get_id(pe_session->vdev));
 	}
 
 	pe_nofl_info("TX: %s seq_no:%d dialog_token:%d no. of APs:%d is_last_rpt:%d num_report: %d peer:"QDF_MAC_ADDR_FMT,
@@ -6350,6 +6387,108 @@ error_addba_rsp:
 	cds_packet_free((void *)pkt_ptr);
 	return qdf_status;
 }
+
+#ifdef WLAN_FEATURE_11BE_MLO
+QDF_STATUS
+lim_send_t2lm_action_rsp_frame(struct mac_context *mac_ctx,
+			       tSirMacAddr peer_mac,
+			       struct pe_session *session, uint8_t token,
+			       enum wlan_t2lm_resp_frm_type status_code)
+{
+	tDot11ft2lm_neg_rsp frm;
+	uint8_t session_id = 0;
+	uint8_t *frame_ptr;
+	tpSirMacMgmtHdr mgmt_hdr;
+	uint32_t num_bytes, payload_size, status;
+	void *pkt_ptr = NULL;
+	QDF_STATUS qdf_status;
+	uint8_t vdev_id = 0;
+	uint8_t tx_flag = 0;
+
+	session_id = session->smeSessionId;
+
+	qdf_mem_zero((uint8_t *)&frm, sizeof(frm));
+	frm.Category.category = ACTION_CATEGORY_PROTECTED_EHT;
+	frm.Action.action = EHT_T2LM_RESPONSE;
+
+	frm.DialogToken.token = token;
+	frm.Status.status = status_code;
+
+	pe_debug("Sending a T2LM negotiation Response from " QDF_MAC_ADDR_FMT " to " QDF_MAC_ADDR_FMT,
+		 QDF_MAC_ADDR_REF(session->self_mac_addr),
+		 QDF_MAC_ADDR_REF(peer_mac));
+	pe_debug("Dialog token %d status %d", frm.DialogToken.token,
+		 frm.Status.status);
+
+	status = dot11f_get_packed_t2lm_neg_rspSize(mac_ctx, &frm,
+						    &payload_size);
+	if (DOT11F_FAILED(status)) {
+		pe_err("Failed to calculate packed size for a T2LM negotiation Response (0x%08x).",
+		       status);
+		/* We'll fall back on the worst case scenario: */
+		payload_size = sizeof(tDot11ft2lm_neg_rsp);
+	} else if (DOT11F_WARNED(status)) {
+		pe_warn("There were warnings while calculating packed size for a T2LM negotiation Response (0x%08x).",
+			status);
+	}
+
+	num_bytes = payload_size + sizeof(*mgmt_hdr);
+	qdf_status = cds_packet_alloc(num_bytes, (void **)&frame_ptr,
+				      (void **)&pkt_ptr);
+	if (!QDF_IS_STATUS_SUCCESS(qdf_status) || (!pkt_ptr)) {
+		pe_err("Failed to allocate %d bytes for a T2LM rsp action frm",
+		       num_bytes);
+		return QDF_STATUS_E_FAILURE;
+	}
+	qdf_mem_zero(frame_ptr, num_bytes);
+
+	lim_populate_mac_header(mac_ctx, frame_ptr, SIR_MAC_MGMT_FRAME,
+				SIR_MAC_MGMT_ACTION, peer_mac,
+				session->self_mac_addr);
+
+	/* Update A3 with the BSSID */
+	mgmt_hdr = (tpSirMacMgmtHdr)frame_ptr;
+	sir_copy_mac_addr(mgmt_hdr->bssId, session->bssId);
+
+	status = dot11f_pack_t2lm_neg_rsp(mac_ctx, &frm,
+					  frame_ptr + sizeof(tSirMacMgmtHdr),
+					  payload_size, &payload_size);
+
+	if (DOT11F_FAILED(status)) {
+		pe_err("Failed to pack a T2LM negotiation response (0x%08x)",
+		       status);
+		qdf_status = QDF_STATUS_E_FAILURE;
+		goto error_addba_rsp;
+	} else if (DOT11F_WARNED(status)) {
+		pe_warn("There were warnings while packing T2LM rsp (0x%08x)",
+			status);
+	}
+
+	if (!wlan_reg_is_24ghz_ch_freq(session->curr_op_freq) ||
+	    session->opmode == QDF_P2P_CLIENT_MODE ||
+	    session->opmode == QDF_P2P_GO_MODE)
+		tx_flag |= HAL_USE_BD_RATE2_FOR_MANAGEMENT_FRAME;
+
+	MTRACE(qdf_trace(QDF_MODULE_ID_PE, TRACE_CODE_TX_MGMT,
+			 session->peSessionId, mgmt_hdr->fc.subType));
+	qdf_status = wma_tx_frame(mac_ctx, pkt_ptr, (uint16_t)num_bytes,
+				  TXRX_FRM_802_11_MGMT, ANI_TXDIR_TODS, 7,
+				  lim_tx_complete, frame_ptr, tx_flag,
+				  vdev_id, 0, RATEID_DEFAULT, 0);
+	MTRACE(qdf_trace(QDF_MODULE_ID_PE, TRACE_CODE_TX_COMPLETE,
+			 session->peSessionId, qdf_status));
+	if (QDF_STATUS_SUCCESS != qdf_status) {
+		pe_err("wma_tx_frame FAILED! Status [%d]", qdf_status);
+		return QDF_STATUS_E_FAILURE;
+	} else {
+		return QDF_STATUS_SUCCESS;
+	}
+
+error_addba_rsp:
+	cds_packet_free((void *)pkt_ptr);
+	return qdf_status;
+}
+#endif
 
 /**
  * lim_delba_tx_complete_cnf() - Confirmation for Delba OTA

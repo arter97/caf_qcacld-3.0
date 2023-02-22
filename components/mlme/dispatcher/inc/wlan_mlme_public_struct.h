@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2018-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -742,6 +742,7 @@ struct wlan_mlme_wps_params {
  * @sap_sae_enabled: enable sae in sap mode
  * @is_sap_bcast_deauth_enabled: enable bcast deauth for sap
  * @is_6g_sap_fd_enabled: enable fils discovery on sap
+ * @disable_bcn_prot: disable beacon protection for sap
  */
 struct wlan_mlme_cfg_sap {
 	uint16_t beacon_interval;
@@ -777,6 +778,7 @@ struct wlan_mlme_cfg_sap {
 	bool sap_sae_enabled;
 	bool is_sap_bcast_deauth_enabled;
 	bool is_6g_sap_fd_enabled;
+	bool disable_bcn_prot;
 };
 
 /**
@@ -1385,6 +1387,7 @@ struct wlan_user_mcc_quota {
  * @tx_retry_multiplier: TX xretry extension parameter
  * @mgmt_hw_tx_retry_count: MGMT HW tx retry count for frames
  * @relaxed_6ghz_conn_policy: 6GHz relaxed connection policy
+ * @std_6ghz_conn_policy: 6GHz standard connection policy
  * @t2lm_negotiation_support: T2LM negotiation supported enum value
  * @enable_emlsr_mode: 11BE eMLSR mode support
  * @safe_mode_enable: safe mode to bypass some strict 6 GHz checks for
@@ -1440,6 +1443,7 @@ struct wlan_mlme_generic {
 	uint8_t mgmt_hw_tx_retry_count[CFG_FRAME_TYPE_MAX];
 #ifdef CONFIG_BAND_6GHZ
 	bool relaxed_6ghz_conn_policy;
+	bool std_6ghz_conn_policy;
 #endif
 #ifdef WLAN_FEATURE_11BE_MLO
 	bool enable_emlsr_mode;
@@ -1656,13 +1660,15 @@ struct wlan_mlme_nss_chains {
 
 /**
  * enum station_keepalive_method - available keepalive methods for stations
+ * @MLME_STA_KEEPALIVE_MIN: ensure KEEPALIVE_NULL or ARP are not values of 0
  * @MLME_STA_KEEPALIVE_NULL_DATA: null data packet
  * @MLME_STA_KEEPALIVE_GRAT_ARP: gratuitous ARP packet
  * @MLME_STA_KEEPALIVE_COUNT: number of method options available
  */
 enum station_keepalive_method {
-	MLME_STA_KEEPALIVE_NULL_DATA,
-	MLME_STA_KEEPALIVE_GRAT_ARP,
+	MLME_STA_KEEPALIVE_MIN,
+	MLME_STA_KEEPALIVE_NULL_DATA = 1,
+	MLME_STA_KEEPALIVE_GRAT_ARP = 2,
 	/* keep at the end */
 	MLME_STA_KEEPALIVE_COUNT
 };

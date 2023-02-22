@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -2892,19 +2892,56 @@ sir_convert_probe_frame2_t2lm_struct(tDot11fProbeResponse *pr,
 				     tpSirProbeRespBeacon bcn_struct)
 {
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
+	struct wlan_t2lm_context *t2lm_ctx;
+	/* add 3 bytes for extn_ie_header */
+	uint8_t ie[DOT11F_IE_T2LM_IE_MAX_LEN + 3];
+	struct wlan_t2lm_info t2lm;
 	uint8_t i;
+
+	t2lm_ctx = &bcn_struct->t2lm_ctx;
+	qdf_mem_zero(&t2lm_ctx->established_t2lm.t2lm,
+		     sizeof(struct wlan_t2lm_info));
+	t2lm_ctx->established_t2lm.t2lm.direction = WLAN_T2LM_INVALID_DIRECTION;
+
+	qdf_mem_zero(&t2lm_ctx->upcoming_t2lm.t2lm,
+		     sizeof(struct wlan_t2lm_info));
+	t2lm_ctx->upcoming_t2lm.t2lm.direction = WLAN_T2LM_INVALID_DIRECTION;
 
 	if (!pr->num_t2lm_ie) {
 		pe_debug("T2LM IEs not present");
 		return status;
 	}
-	bcn_struct->t2lm_ctx.num_of_t2lm_ie = pr->num_t2lm_ie;
+
 	pe_debug("Number of T2LM IEs in probe rsp %d", pr->num_t2lm_ie);
 	for (i = 0; i < pr->num_t2lm_ie; i++) {
-		status = wlan_mlo_parse_bcn_prbresp_t2lm_ie(&bcn_struct->t2lm_ctx,
-							    &pr->t2lm_ie[i].data[0]);
-		if (QDF_IS_STATUS_ERROR(status))
+		qdf_mem_zero(&ie[0], DOT11F_IE_T2LM_IE_MAX_LEN + 3);
+		qdf_mem_zero(&t2lm, sizeof(struct wlan_t2lm_info));
+		ie[ID_POS] = WLAN_ELEMID_EXTN_ELEM;
+		ie[TAG_LEN_POS] = pr->t2lm_ie[i].num_data + 1;
+		ie[IDEXT_POS] = WLAN_EXTN_ELEMID_T2LM;
+		qdf_mem_copy(&ie[3], &pr->t2lm_ie[i].data[0],
+			     pr->t2lm_ie[i].num_data);
+
+		qdf_trace_hex_dump(QDF_MODULE_ID_PE, QDF_TRACE_LEVEL_DEBUG,
+				   &ie[0], pr->t2lm_ie[i].num_data + 3);
+
+		status = wlan_mlo_parse_t2lm_info(&ie[0], &t2lm);
+		if (QDF_IS_STATUS_ERROR(status)) {
+			pe_debug("Parse T2LM IE fail");
 			return status;
+		}
+
+		if (!t2lm.mapping_switch_time_present &&
+		    t2lm.expected_duration_present) {
+			qdf_mem_copy(&t2lm_ctx->established_t2lm.t2lm, &t2lm,
+				     sizeof(struct wlan_t2lm_info));
+			pe_debug("Parse established T2LM IE success");
+		} else if (t2lm.mapping_switch_time_present) {
+			qdf_mem_copy(&t2lm_ctx->upcoming_t2lm.t2lm, &t2lm,
+				     sizeof(struct wlan_t2lm_info));
+			pe_debug("Parse upcoming T2LM IE success");
+		}
+		pe_debug("Parse T2LM IE success");
 	}
 	return status;
 }
@@ -5036,20 +5073,54 @@ sir_convert_beacon_frame2_t2lm_struct(tDot11fBeacon *bcn_frm,
 				      tpSirProbeRespBeacon bcn_struct)
 {
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
+	struct wlan_t2lm_context *t2lm_ctx;
+	/* add 3 bytes for extn_ie_header */
+	uint8_t ie[DOT11F_IE_T2LM_IE_MAX_LEN + 3];
+	struct wlan_t2lm_info t2lm;
 	uint8_t i;
+
+	t2lm_ctx = &bcn_struct->t2lm_ctx;
+	qdf_mem_zero(&t2lm_ctx->established_t2lm.t2lm,
+		     sizeof(struct wlan_t2lm_info));
+	t2lm_ctx->established_t2lm.t2lm.direction = WLAN_T2LM_INVALID_DIRECTION;
+
+	qdf_mem_zero(&t2lm_ctx->upcoming_t2lm.t2lm,
+		     sizeof(struct wlan_t2lm_info));
+	t2lm_ctx->upcoming_t2lm.t2lm.direction = WLAN_T2LM_INVALID_DIRECTION;
 
 	if (!bcn_frm->num_t2lm_ie) {
 		pe_debug("T2LM IEs not present");
 		return status;
 	}
 
-	bcn_struct->t2lm_ctx.num_of_t2lm_ie = bcn_frm->num_t2lm_ie;
-	pe_debug("Number of T2LM IEs in probe rsp %d", bcn_frm->num_t2lm_ie);
+	pe_debug("Number of T2LM IEs in beacon %d", bcn_frm->num_t2lm_ie);
 	for (i = 0; i < bcn_frm->num_t2lm_ie; i++) {
-		status = wlan_mlo_parse_bcn_prbresp_t2lm_ie(&bcn_struct->t2lm_ctx,
-							    &bcn_frm->t2lm_ie[i].data[0]);
-		if (QDF_IS_STATUS_ERROR(status))
+		qdf_mem_zero(&ie[0], DOT11F_IE_T2LM_IE_MAX_LEN + 3);
+		qdf_mem_zero(&t2lm, sizeof(struct wlan_t2lm_info));
+		ie[ID_POS] = WLAN_ELEMID_EXTN_ELEM;
+		ie[TAG_LEN_POS] = bcn_frm->t2lm_ie[i].num_data + 1;
+		ie[IDEXT_POS] = WLAN_EXTN_ELEMID_T2LM;
+		qdf_mem_copy(&ie[3], &bcn_frm->t2lm_ie[i].data[0],
+			     bcn_frm->t2lm_ie[i].num_data + 3);
+		qdf_trace_hex_dump(QDF_MODULE_ID_PE, QDF_TRACE_LEVEL_DEBUG,
+				   &ie[0], bcn_frm->t2lm_ie[i].num_data + 3);
+		status = wlan_mlo_parse_t2lm_info(&ie[0], &t2lm);
+		if (QDF_IS_STATUS_ERROR(status)) {
+			pe_debug("Parse T2LM IE fail");
 			return status;
+		}
+
+		if (!t2lm.mapping_switch_time_present &&
+		    t2lm.expected_duration_present) {
+			qdf_mem_copy(&t2lm_ctx->established_t2lm.t2lm, &t2lm,
+				     sizeof(struct wlan_t2lm_info));
+			pe_debug("Parse established T2LM IE success");
+		} else if (t2lm.mapping_switch_time_present) {
+			qdf_mem_copy(&t2lm_ctx->upcoming_t2lm.t2lm, &t2lm,
+				     sizeof(struct wlan_t2lm_info));
+			pe_debug("Parse upcoming T2LM IE success");
+		}
+		pe_debug("Parse T2LM IE success");
 	}
 	return status;
 }
@@ -5073,6 +5144,8 @@ sir_convert_beacon_frame2_mlo_struct(uint8_t *pframe, uint32_t nframe,
 	uint8_t common_info_len = 0;
 	struct mlo_partner_info partner_info;
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
+	uint8_t bpcc;
+	bool bpcc_found;
 
 	if (bcn_frm->mlo_ie.present) {
 		status = util_find_mlie(pframe + WLAN_BEACON_IES_OFFSET,
@@ -5092,6 +5165,14 @@ sir_convert_beacon_frame2_mlo_struct(uint8_t *pframe, uint32_t nframe,
 			lim_store_mlo_ie_raw_info(ml_ie, sta_prof,
 						  ml_ie_total_len,
 						  &bcn_struct->mlo_ie.mlo_ie);
+
+			util_get_bvmlie_bssparamchangecnt(ml_ie,
+							  ml_ie_total_len,
+							  &bpcc_found, &bpcc);
+			bcn_struct->mlo_ie.mlo_ie.bss_param_change_cnt_present =
+						bpcc_found;
+			bcn_struct->mlo_ie.mlo_ie.bss_param_change_count = bpcc;
+			bcn_struct->mlo_ie.mlo_ie_present = true;
 		}
 	}
 
@@ -10186,6 +10267,7 @@ sir_convert_mlo_probe_rsp_frame2_struct(uint8_t *ml_ie,
 	bool bss_param_change_cnt_found;
 	uint8_t bss_param_change_cnt;
 	struct qdf_mac_addr mld_mac_addr;
+	uint8_t *sta_prof;
 
 	if (!ml_ie)
 		return QDF_STATUS_E_NULL_VALUE;
@@ -10214,6 +10296,10 @@ sir_convert_mlo_probe_rsp_frame2_struct(uint8_t *ml_ie,
 						bss_param_change_cnt_found;
 	mlo_ie_ptr->mlo_ie.bss_param_change_count = bss_param_change_cnt;
 	mlo_ie_ptr->mlo_ie_present = true;
+	sta_prof = ml_ie + sizeof(struct wlan_ie_multilink) +
+		   mlo_ie_ptr->mlo_ie.common_info_length;
+	lim_store_mlo_ie_raw_info(ml_ie, sta_prof,
+				  ml_ie_total_len, &mlo_ie_ptr->mlo_ie);
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -11239,11 +11325,17 @@ QDF_STATUS populate_dot11f_assoc_req_mlo_ie(struct mac_context *mac_ctx,
 	mlo_ie->mld_capab_and_op_present = 1;
 	mlo_ie->mld_id_present = 0;
 
+	if (!pe_session->lim_join_req)
+		return QDF_STATUS_E_FAILURE;
+
+	partner_info = &pe_session->lim_join_req->partner_info;
+
 	if (mlo_ie->mld_capab_and_op_present) {
 		presence_bitmap |= WLAN_ML_BV_CTRL_PBM_MLDCAPANDOP_P;
 		mlo_ie->common_info_length += WLAN_ML_BV_CINFO_MLDCAPANDOP_SIZE;
 		mlo_ie->mld_capab_and_op_info.max_simultaneous_link_num =
-			wlan_mlme_get_sta_mlo_simultaneous_links(psoc);
+			QDF_MIN(partner_info->num_partner_links,
+				wlan_mlme_get_sta_mlo_simultaneous_links(psoc));
 		pe_debug("max_simultaneous_link_num %d",
 			 mlo_ie->mld_capab_and_op_info.max_simultaneous_link_num);
 		mlo_ie->mld_capab_and_op_info.srs_support = 0;
@@ -11351,7 +11443,6 @@ QDF_STATUS populate_dot11f_assoc_req_mlo_ie(struct mac_context *mac_ctx,
 	mlo_ie->num_data = p_ml_ie - mlo_ie->data;
 
 	/* find out number of links from bcn or prb rsp */
-	partner_info = &pe_session->lim_join_req->partner_info;
 	total_sta_prof = partner_info->num_partner_links;
 
 	mlo_dev_ctx = pe_session->vdev->mlo_dev_ctx;
@@ -11819,5 +11910,35 @@ void populate_dot11f_6g_rnr(struct mac_context *mac_ctx,
 		 wlan_vdev_get_id(session->vdev),
 		 wlan_vdev_get_id(co_session->vdev),
 		 dot11f->op_class, dot11f->channel_num);
+}
+
+QDF_STATUS populate_dot11f_bcn_prot_extcaps(struct mac_context *mac_ctx,
+					    struct pe_session *pe_session,
+					    tDot11fIEExtCap *dot11f)
+{
+	struct s_ext_cap *p_ext_cap;
+
+	/*
+	 * Some legacy STA might not connect with SAP broadcasting
+	 * EXTCAP with size greater than 8bytes.
+	 * In such cases, disable the beacon protection only if
+	 * a) disable_sap_bcn_prot ini is set
+	 * b) The SAP is not operating in 6 GHz or 11be profile
+	 * where BP is mandatory.
+	 */
+	if (pe_session->opmode != QDF_SAP_MODE ||
+	    !wlan_mlme_is_bcn_prot_disabled_for_sap(mac_ctx->psoc) ||
+	    WLAN_REG_IS_6GHZ_CHAN_FREQ(pe_session->curr_op_freq) ||
+	    pe_session->dot11mode > MLME_DOT11_MODE_11AX_ONLY)
+		return QDF_STATUS_SUCCESS;
+
+	p_ext_cap = (struct s_ext_cap *)dot11f->bytes;
+	if (!dot11f->present || !p_ext_cap->beacon_protection_enable)
+		return QDF_STATUS_SUCCESS;
+
+	p_ext_cap->beacon_protection_enable = 0;
+	dot11f->num_bytes = lim_compute_ext_cap_ie_length(dot11f);
+
+	return QDF_STATUS_SUCCESS;
 }
 /* parser_api.c ends here. */

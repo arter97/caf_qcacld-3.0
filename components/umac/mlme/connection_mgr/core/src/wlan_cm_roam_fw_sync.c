@@ -46,6 +46,7 @@
 #include "connection_mgr/core/src/wlan_cm_sm.h"
 #include <wlan_mlo_mgr_sta.h>
 #include "wlan_mlo_mgr_roam.h"
+#include "wlan_vdev_mgr_utils_api.h"
 
 QDF_STATUS cm_fw_roam_sync_req(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 			       void *event, uint32_t event_data_len)
@@ -972,6 +973,7 @@ cm_fw_roam_sync_propagation(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 		policy_mgr_move_vdev_from_disabled_to_connection_tbl(psoc,
 								     vdev_id);
 	mlo_roam_copy_partner_info(connect_rsp, roam_synch_data);
+	mlo_roam_init_cu_bpcc(vdev, roam_synch_data);
 	mlo_roam_set_link_id(vdev, roam_synch_data);
 
 	/**
@@ -995,7 +997,7 @@ cm_fw_roam_sync_propagation(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 		wlan_cm_tgt_send_roam_sync_complete_cmd(psoc, vdev_id);
 		mlo_roam_update_connected_links(vdev, connect_rsp);
 		mlo_set_single_link_ml_roaming(psoc, vdev_id,
-					       roam_synch_data, false);
+					       false);
 	}
 	cm_connect_info(vdev, true, &connect_rsp->bssid, &connect_rsp->ssid,
 			connect_rsp->freq);
@@ -1010,6 +1012,10 @@ cm_fw_roam_sync_propagation(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 	}
 	mlme_cm_osif_connect_complete(vdev, connect_rsp);
 	mlme_cm_osif_roam_complete(vdev);
+
+	if (wlan_vdev_mlme_is_mlo_vdev(vdev) &&
+	    roam_synch_data->auth_status == ROAM_AUTH_STATUS_CONNECTED)
+		mlo_roam_copy_reassoc_rsp(vdev, connect_rsp);
 	mlme_debug(CM_PREFIX_FMT, CM_PREFIX_REF(vdev_id, cm_id));
 	cm_remove_cmd(cm_ctx, &cm_id);
 	status = QDF_STATUS_SUCCESS;
@@ -1172,7 +1178,8 @@ QDF_STATUS cm_fw_roam_complete(struct cnx_mgr *cm_ctx, void *data)
 		wlan_cm_roam_state_change(pdev, vdev_id,
 					  WLAN_ROAM_RSO_STOPPED,
 					  REASON_DISCONNECTED);
-	policy_mgr_check_concurrent_intf_and_restart_sap(psoc);
+	policy_mgr_check_concurrent_intf_and_restart_sap(psoc,
+			wlan_util_vdev_mgr_get_acs_mode_for_vdev(cm_ctx->vdev));
 end:
 	return status;
 }

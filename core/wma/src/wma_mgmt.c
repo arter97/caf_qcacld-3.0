@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2013-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -790,7 +790,7 @@ void wma_set_sap_keepalive(tp_wma_handle wma, uint8_t vdev_id)
 		goto error;
 	}
 
-	status = wma_send_multi_pdev_vdev_set_params(MLME_PDEV_SETPARAM,
+	status = wma_send_multi_pdev_vdev_set_params(MLME_VDEV_SETPARAM,
 						     vdev_id, setparam, index);
 	if (QDF_IS_STATUS_ERROR(status))
 		wma_err("Failed to Set AP MIN/MAX IDLE INACTIVE TIME, MAX UNRESPONSIVE TIME:%d", status);

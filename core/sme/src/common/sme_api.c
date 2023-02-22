@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -3315,7 +3315,7 @@ QDF_STATUS sme_roam_ndi_stop(mac_handle_t mac_handle, uint8_t vdev_id)
 			 0));
 
 	if (!CSR_IS_SESSION_VALID(mac_ctx, vdev_id)) {
-		sme_err("Invalid sessionID: %d", vdev_id);
+		sme_debug("Invalid sessionID: %d", vdev_id);
 		return QDF_STATUS_E_INVAL;
 	}
 
@@ -3943,6 +3943,39 @@ QDF_STATUS sme_neighbor_report_request(
 	}
 
 	return status;
+}
+
+void sme_register_ssr_on_pagefault_cb(mac_handle_t mac_handle,
+				      void (*hdd_ssr_on_pagefault_cb)(void))
+{
+	QDF_STATUS status;
+	struct mac_context *mac = MAC_CONTEXT(mac_handle);
+
+	SME_ENTER();
+
+	status = sme_acquire_global_lock(&mac->sme);
+	if (QDF_IS_STATUS_SUCCESS(status)) {
+		mac->sme.ssr_on_pagefault_cb = hdd_ssr_on_pagefault_cb;
+		sme_release_global_lock(&mac->sme);
+	}
+
+	SME_EXIT();
+}
+
+void sme_deregister_ssr_on_pagefault_cb(mac_handle_t mac_handle)
+{
+	QDF_STATUS status;
+	struct mac_context *mac = MAC_CONTEXT(mac_handle);
+
+	SME_ENTER();
+
+	status = sme_acquire_global_lock(&mac->sme);
+	if (QDF_IS_STATUS_SUCCESS(status)) {
+		mac->sme.ssr_on_pagefault_cb = NULL;
+		sme_release_global_lock(&mac->sme);
+	}
+
+	SME_EXIT();
 }
 
 #ifdef FEATURE_OEM_DATA_SUPPORT
