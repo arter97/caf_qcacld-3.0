@@ -201,7 +201,8 @@ hdd_dcs_select_random_chan(struct wlan_objmgr_pdev *pdev,
 	req_msg.band_mask = BIT(REG_BAND_6G);
 	req_msg.iface_mode_mask = BIT(NL80211_IFTYPE_AP);
 	req_msg.filter_mask = 0;
-	status = wlan_reg_get_usable_channel(pdev, req_msg, res_msg, &count);
+	status = wlan_reg_get_usable_channel(pdev, req_msg, res_msg, &count,
+					     REG_CURRENT_PWR_MODE);
 	if (QDF_STATUS_SUCCESS != status) {
 		hdd_err("get usable channel failed %d", status);
 		qdf_mem_free(res_msg);

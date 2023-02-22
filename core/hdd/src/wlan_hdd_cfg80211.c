@@ -17492,7 +17492,8 @@ static int __wlan_hdd_cfg80211_get_usable_channel(struct wiphy *wiphy,
 		  req_msg.filter_mask);
 
 	status = wlan_reg_get_usable_channel(hdd_ctx->pdev, req_msg,
-					     res_msg, &count);
+					     res_msg, &count,
+					     REG_CURRENT_PWR_MODE);
 	if (QDF_STATUS_SUCCESS != status) {
 		hdd_err("get usable channel failed %d", status);
 		ret = -EINVAL;
