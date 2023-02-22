@@ -1522,10 +1522,9 @@ dp_rx_null_q_desc_handle_li(struct dp_soc *soc, qdf_nbuf_t nbuf,
 	eh = (qdf_ether_header_t *)qdf_nbuf_data(nbuf);
 
 	if (!txrx_peer->authorize) {
-		is_eapol = qdf_nbuf_is_ipv4_eapol_pkt(nbuf) ||
-			   qdf_nbuf_is_ipv4_wapi_pkt(nbuf);
+		is_eapol = qdf_nbuf_is_ipv4_eapol_pkt(nbuf);
 
-		if (is_eapol) {
+		if (is_eapol || qdf_nbuf_is_ipv4_wapi_pkt(nbuf)) {
 			if (!dp_rx_err_match_dhost(eh, vdev))
 				goto drop_nbuf;
 		} else {
