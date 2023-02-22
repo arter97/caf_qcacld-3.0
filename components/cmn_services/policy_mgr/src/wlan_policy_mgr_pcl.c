@@ -4087,9 +4087,9 @@ bool policy_mgr_is_sta_chan_valid_for_connect_and_roam(
 }
 
 bool
-policy_mgr_is_ll_sap_present(struct wlan_objmgr_psoc *psoc,
-			     enum policy_mgr_con_mode curr_mode,
-			     uint32_t vdev_id)
+policy_mgr_is_vdev_ll_sap(struct wlan_objmgr_psoc *psoc,
+			  enum policy_mgr_con_mode curr_mode,
+			  uint32_t vdev_id)
 {
 	struct wlan_objmgr_vdev *vdev;
 	bool is_ll_sap = false;
@@ -4208,7 +4208,7 @@ policy_mgr_get_pcl_ch_for_sap_go_with_ll_sap_present(
 		freq = pm_conc_connection_list[conn_idx].freq;
 		vdev_id = pm_conc_connection_list[conn_idx].vdev_id;
 		mode = pm_conc_connection_list[conn_idx].mode;
-		if (!policy_mgr_is_ll_sap_present(psoc, mode, vdev_id))
+		if (!policy_mgr_is_vdev_ll_sap(psoc, mode, vdev_id))
 			continue;
 
 		is_ll_sap = 1;
@@ -4249,7 +4249,7 @@ policy_mgr_get_pcl_channel_for_ll_sap_concurrency(
 {
 	uint32_t orig_len = *len;
 
-	if (policy_mgr_is_ll_sap_present(psoc, curr_mode, vdev_id)) {
+	if (policy_mgr_is_vdev_ll_sap(psoc, curr_mode, vdev_id)) {
 		/* Scenario: If there is some existing interface present and
 		 * LL SAP is coming up.
 		 * Filter pcl channel for LL SAP

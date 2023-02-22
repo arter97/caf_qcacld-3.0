@@ -3575,7 +3575,7 @@ static void hdd_remove_passive_dfs_acs_channel_for_ll_sap(
 	uint32_t i, ch_cnt = 0;
 	uint32_t freq = 0;
 
-	if (!policy_mgr_is_ll_sap_present(psoc, curr_mode, vdev_id))
+	if (!policy_mgr_is_vdev_ll_sap(psoc, curr_mode, vdev_id))
 		return;
 
 	for (i = 0; i < sap_config->acs_cfg.ch_list_count; i++) {
@@ -3901,8 +3901,8 @@ static int __wlan_hdd_cfg80211_do_acs(struct wiphy *wiphy,
 		if (!sap_config->acs_cfg.ch_list_count &&
 		    sap_config->acs_cfg.master_ch_list_count &&
 		    !is_vendor_unsafe_ch_present &&
-		    !policy_mgr_is_ll_sap_present(hdd_ctx->psoc, pm_mode,
-						  adapter->vdev_id))
+		    !policy_mgr_is_vdev_ll_sap(hdd_ctx->psoc, pm_mode,
+					       adapter->vdev_id))
 			wlan_hdd_handle_zero_acs_list(
 				hdd_ctx,
 				sap_config->acs_cfg.freq_list,

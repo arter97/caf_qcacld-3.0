@@ -1752,7 +1752,7 @@ void populate_dot11f_qcn_ie(struct mac_context *mac,
 	}
 
 	populate_dot11f_qcn_ie_he_params(mac, pe_session, qcn_ie, attr_id);
-	if (policy_mgr_is_ll_sap_present(
+	if (policy_mgr_is_vdev_ll_sap(
 				mac->psoc,
 				policy_mgr_convert_device_mode_to_qdf_type(
 				pe_session->opmode), pe_session->vdev_id)) {
