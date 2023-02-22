@@ -1602,7 +1602,8 @@ static bool reg_is_chan_supported(struct wlan_objmgr_pdev *pdev,
 	struct ch_params ch_params = {0};
 
 	ch_params.ch_width = ch_width;
-	reg_set_channel_params_for_freq(pdev, pri_freq, 0, &ch_params, true);
+	reg_set_channel_params_for_pwrmode(pdev, pri_freq, 0, &ch_params,
+					   in_6g_pwr_mode, true);
 	if (ch_params.ch_width == ch_width)
 		return true;
 
