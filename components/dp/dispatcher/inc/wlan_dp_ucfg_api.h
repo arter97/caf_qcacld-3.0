@@ -44,9 +44,18 @@
 #ifdef WLAN_NUD_TRACKING
 bool
 ucfg_dp_is_roam_after_nud_enabled(struct wlan_objmgr_psoc *psoc);
+
+bool
+ucfg_dp_is_disconect_after_roam_fail(struct wlan_objmgr_psoc *psoc);
 #else
 static inline bool
 ucfg_dp_is_roam_after_nud_enabled(struct wlan_objmgr_psoc *psoc)
+{
+	return false;
+}
+
+static inline bool
+ucfg_dp_is_disconect_after_roam_fail(struct wlan_objmgr_psoc *psoc)
 {
 	return false;
 }
