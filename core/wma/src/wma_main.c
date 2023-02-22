@@ -122,6 +122,7 @@
 #include "wlan_twt_cfg_ext_api.h"
 #include "wlan_mlo_mgr_sta.h"
 #include "wlan_dp_api.h"
+#include "wlan_dp_ucfg_api.h"
 
 #define WMA_LOG_COMPLETION_TIMER 500 /* 500 msecs */
 #define WMI_TLV_HEADROOM 128
@@ -456,9 +457,10 @@ static void wma_set_feature_set_info(tp_wma_handle wma_handle,
 	feature_set->supported_dot11mode = feature_set->wifi_standard;
 	feature_set->sap_wpa3_support = true;
 	feature_set->assurance_disconnect_reason_api = true;
-	feature_set->frame_pcap_log_mgmt = false;
-	feature_set->frame_pcap_log_ctrl = false;
-	feature_set->frame_pcap_log_data = false;
+	feature_set->frame_pcap_log_mgmt =
+				    ucfg_dp_is_local_pkt_capture_enabled(psoc);
+	feature_set->frame_pcap_log_ctrl = feature_set->frame_pcap_log_mgmt;
+	feature_set->frame_pcap_log_data = feature_set->frame_pcap_log_mgmt;
 
 	/*
 	 * This information is hardcoded based on hdd_sta_akm_suites,
