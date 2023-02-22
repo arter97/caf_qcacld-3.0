@@ -2429,3 +2429,12 @@ ucfg_dp_get_per_link_peer_stats(ol_txrx_soc_handle soc, uint8_t vdev_id,
 						peer_stats, peer_type,
 						num_link);
 }
+
+#ifdef WLAN_FEATURE_LOCAL_PKT_CAPTURE
+bool ucfg_dp_is_local_pkt_capture_enabled(struct wlan_objmgr_psoc *psoc)
+{
+	void *soc = cds_get_context(QDF_MODULE_ID_SOC);
+
+	return cdp_cfg_get(soc, cfg_dp_local_pkt_capture);
+}
+#endif

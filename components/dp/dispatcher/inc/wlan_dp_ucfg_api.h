@@ -1493,4 +1493,23 @@ ucfg_dp_get_per_link_peer_stats(ol_txrx_soc_handle soc, uint8_t vdev_id,
 				struct cdp_peer_stats *peer_stats,
 				enum cdp_peer_type peer_type,
 				uint8_t num_link);
-#endif /* _WLAN_DP_UCFGi_API_H_ */
+
+#ifdef WLAN_FEATURE_LOCAL_PKT_CAPTURE
+/**
+ * ucfg_dp_is_local_pkt_capture_enabled() - Get local packet capture config
+ * @psoc: pointer to psoc object
+ *
+ * Return: true if local packet capture is enabled from ini
+ *         false otherwise
+ */
+bool
+ucfg_dp_is_local_pkt_capture_enabled(struct wlan_objmgr_psoc *psoc);
+#else
+static inline bool
+ucfg_dp_is_local_pkt_capture_enabled(struct wlan_objmgr_psoc *psoc)
+{
+	return false;
+}
+#endif /* WLAN_FEATURE_LOCAL_PKT_CAPTURE */
+
+#endif /* _WLAN_DP_UCFG_API_H_ */
