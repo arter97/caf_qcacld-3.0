@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022-2023, Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -14,22 +14,30 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
-#ifndef _WLAN_PRE_CAC_PUBLIC_STRUCT_H_
-#define _WLAN_PRE_CAC_PUBLIC_STRUCT_H_
-
-#include "wlan_objmgr_psoc_obj.h"
-
 /**
- * struct pre_cac_ops - pre cac osif callbacks
- * @pre_cac_conditional_csa_ind_cb: send conditional frequency switch status
- * @pre_cac_complete_cb: Pre cac complete callback
+ * DOC: contains definitions for NAN component
  */
-struct pre_cac_ops {
-	void (*pre_cac_conditional_csa_ind_cb)(
-			struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
-			bool status);
-	void (*pre_cac_complete_cb)(
-			struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
-			QDF_STATUS status);
-};
-#endif /* _WLAN_PRE_CAC_PUBLIC_STRUCT_H_ */
+
+#include "nan_public_structs.h"
+#include "wlan_nan_api.h"
+#include "../../core/src/nan_main_i.h"
+#include "wlan_objmgr_vdev_obj.h"
+#include "wlan_nan_api_i.h"
+
+inline enum nan_datapath_state wlan_nan_get_ndi_state(
+					struct wlan_objmgr_vdev *vdev)
+{
+	enum nan_datapath_state val;
+	struct nan_vdev_priv_obj *priv_obj = nan_get_vdev_priv_obj(vdev);
+
+	if (!priv_obj) {
+		nan_err("priv_obj is null");
+		return NAN_DATA_INVALID_STATE;
+	}
+
+	qdf_spin_lock_bh(&priv_obj->lock);
+	val = priv_obj->state;
+	qdf_spin_unlock_bh(&priv_obj->lock);
+
+	return val;
+}

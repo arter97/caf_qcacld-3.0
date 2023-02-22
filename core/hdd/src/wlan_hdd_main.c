@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -69,6 +69,7 @@
 #include <cdp_txrx_misc.h>
 #include <cdp_txrx_stats.h>
 #include "cdp_txrx_flow_ctrl_legacy.h"
+#include "qdf_ssr_driver_dump.h"
 
 #include <net/addrconf.h>
 #include <linux/wireless.h>
@@ -444,6 +445,7 @@ static const struct category_info cinfo[MAX_SUPPORTED_CATEGORY] = {
 	[QDF_MODULE_ID_CFR] = {QDF_TRACE_LEVEL_ALL},
 	[QDF_MODULE_ID_IFMGR] = {QDF_TRACE_LEVEL_ALL},
 	[QDF_MODULE_ID_GPIO] = {QDF_TRACE_LEVEL_ALL},
+	[QDF_MODULE_ID_T2LM] = {QDF_TRACE_LEVEL_ALL},
 	[QDF_MODULE_ID_MLO] = {QDF_TRACE_LEVEL_ALL},
 	[QDF_MODULE_ID_SON] = {QDF_TRACE_LEVEL_ALL},
 	[QDF_MODULE_ID_TWT] = {QDF_TRACE_LEVEL_ALL},
@@ -4864,12 +4866,11 @@ int hdd_stop_no_trans(struct net_device *dev)
 	/* DeInit the adapter. This ensures datapath cleanup as well */
 	hdd_deinit_adapter(hdd_ctx, adapter, true);
 
-	if (!hdd_is_any_interface_open(hdd_ctx))
-		hdd_psoc_idle_timer_start(hdd_ctx);
-
 reset_iface_opened:
 	/* Make sure the interface is marked as closed */
 	clear_bit(DEVICE_IFACE_OPENED, &adapter->event_flags);
+	if (!hdd_is_any_interface_open(hdd_ctx))
+		hdd_psoc_idle_timer_start(hdd_ctx);
 	hdd_exit();
 
 	return 0;
@@ -5007,7 +5008,7 @@ void hdd_update_dynamic_mac(struct hdd_context *hdd_ctx,
 #if defined(WLAN_FEATURE_11BE_MLO) && defined(CFG80211_11BE_BASIC)
 void
 hdd_set_mld_address(struct hdd_adapter *adapter,
-		    struct qdf_mac_addr *mac_addr)
+		    const struct qdf_mac_addr *mac_addr)
 {
 	int i;
 	bool eht_capab;
@@ -5352,12 +5353,6 @@ static int __hdd_set_mac_address(struct net_device *dev, void *addr)
 		       QDF_MAC_ADDR_REF(mac_addr.bytes), dev->name);
 
 	if (net_if_running && adapter->vdev) {
-		if (ucfg_scan_get_vdev_status(adapter->vdev) !=
-						SCAN_NOT_IN_PROGRESS)
-			wlan_abort_scan(hdd_ctx->pdev, INVAL_PDEV_ID,
-					adapter->vdev_id,
-					INVALID_SCAN_ID, false);
-
 		ret = hdd_update_vdev_mac_address(hdd_ctx, adapter, mac_addr);
 		if (ret)
 			return ret;
@@ -12862,12 +12857,18 @@ static void hdd_cfg_params_init(struct hdd_context *hdd_ctx)
 #ifdef CONNECTION_ROAMING_CFG
 static QDF_STATUS hdd_cfg_parse_connection_roaming_cfg(void)
 {
-	QDF_STATUS status;
+	QDF_STATUS status = QDF_STATUS_E_INVAL;
+	bool is_valid;
 
-	status = cfg_parse(WLAN_CONNECTION_ROAMING_INI_FILE);
-	if (QDF_IS_STATUS_ERROR(status))
-		status = cfg_parse(WLAN_CONNECTION_ROAMING_BACKUP_INI_FILE);
+	is_valid = cfg_valid_ini_check(WLAN_CONNECTION_ROAMING_INI_FILE);
 
+	if (is_valid)
+		status = cfg_parse(WLAN_CONNECTION_ROAMING_INI_FILE);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		is_valid = cfg_valid_ini_check(WLAN_CONNECTION_ROAMING_BACKUP_INI_FILE);
+		if (is_valid)
+			status = cfg_parse(WLAN_CONNECTION_ROAMING_BACKUP_INI_FILE);
+	}
 	return status;
 }
 #else
@@ -14534,6 +14535,7 @@ static int hdd_features_init(struct hdd_context *hdd_ctx)
 	bool b_cts2self, is_imps_enabled;
 	bool rf_test_mode;
 	bool conn_policy;
+	bool std_6ghz_conn_policy;
 	uint32_t fw_data_stall_evt;
 
 	hdd_enter();
@@ -14639,6 +14641,16 @@ static int hdd_features_init(struct hdd_context *hdd_ctx)
 	}
 	if (conn_policy)
 		wlan_cm_set_relaxed_6ghz_conn_policy(hdd_ctx->psoc, true);
+
+	status = ucfg_mlme_is_standard_6ghz_conn_policy_enabled(hdd_ctx->psoc,
+							&std_6ghz_conn_policy);
+
+	if (!QDF_IS_STATUS_SUCCESS(status)) {
+		hdd_err("Get 6ghz standard connection policy failed");
+		return QDF_STATUS_E_FAILURE;
+	}
+	if (std_6ghz_conn_policy)
+		wlan_cm_set_standard_6ghz_conn_policy(hdd_ctx->psoc, true);
 
 	hdd_thermal_stats_cmd_init(hdd_ctx);
 	sme_set_cal_failure_event_cb(hdd_ctx->mac_handle,
@@ -15898,6 +15910,39 @@ QDF_STATUS hdd_md_bl_evt_cb(void *ctx, struct sir_md_bl_evt *event)
 #endif /* WLAN_FEATURE_MOTION_DETECTION */
 
 /**
+ * hdd_ssr_on_pagefault_cb - Callback to trigger SSR because
+ * of host wake up by firmware with reason pagefault
+ *
+ * Return: None
+ */
+static void hdd_ssr_on_pagefault_cb(void)
+{
+	uint32_t ssr_frequency_on_pagefault;
+	struct hdd_context *hdd_ctx = cds_get_context(QDF_MODULE_ID_HDD);
+	qdf_time_t curr_time;
+
+	hdd_enter();
+
+	if (!hdd_ctx)
+		return;
+
+	ssr_frequency_on_pagefault =
+		ucfg_pmo_get_ssr_frequency_on_pagefault(hdd_ctx->psoc);
+
+	curr_time = qdf_get_time_of_the_day_ms();
+
+	if (!hdd_ctx->last_pagefault_ssr_time ||
+	    (curr_time - hdd_ctx->last_pagefault_ssr_time) >=
+					ssr_frequency_on_pagefault) {
+		hdd_info("curr_time %lu last_pagefault_ssr_time %lu ssr_frequency %d",
+			 curr_time, hdd_ctx->last_pagefault_ssr_time,
+			 ssr_frequency_on_pagefault);
+		hdd_ctx->last_pagefault_ssr_time = curr_time;
+		cds_trigger_recovery(QDF_HOST_WAKEUP_REASON_PAGEFAULT);
+	}
+}
+
+/**
  * hdd_register_cb - Register HDD callbacks.
  * @hdd_ctx: HDD context
  *
@@ -16008,6 +16053,8 @@ int hdd_register_cb(struct hdd_context *hdd_ctx)
 	sme_async_oem_event_init(mac_handle,
 				 hdd_oem_event_async_cb);
 
+	sme_register_ssr_on_pagefault_cb(mac_handle, hdd_ssr_on_pagefault_cb);
+
 	hdd_exit();
 
 	return ret;
@@ -16034,6 +16081,8 @@ void hdd_deregister_cb(struct hdd_context *hdd_ctx)
 	}
 
 	mac_handle = hdd_ctx->mac_handle;
+
+	sme_deregister_ssr_on_pagefault_cb(mac_handle);
 
 	sme_async_oem_event_deinit(mac_handle);
 
@@ -17729,6 +17778,7 @@ static QDF_STATUS hdd_qdf_init(void)
 
 	qdf_trace_init();
 	qdf_minidump_init();
+	qdf_ssr_driver_dump_init();
 	qdf_register_debugcb_init();
 
 	return QDF_STATUS_SUCCESS;
@@ -17756,6 +17806,7 @@ exit:
 static void hdd_qdf_deinit(void)
 {
 	/* currently, no debugcb deinit */
+	qdf_ssr_driver_dump_deinit();
 	qdf_minidump_deinit();
 	qdf_trace_deinit();
 

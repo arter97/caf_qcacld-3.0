@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -996,6 +996,7 @@ bool wlan_twt_is_setup_in_progress(struct wlan_objmgr_psoc *psoc,
  * @psoc: Pointer to global psoc object
  * @peer_mac: Global peer mac address
  * @dialog_id: Dialog ID
+ * @context: TWT context
  *
  * Return: QDF_STATUS
  */
@@ -1052,6 +1053,7 @@ wlan_twt_set_ack_context(struct wlan_objmgr_psoc *psoc,
  * @psoc: Pointer to global psoc object
  * @peer_mac: Global peer mac address
  * @dialog_id: Dialog ID
+ * @context: TWT context
  *
  * Return: QDF_STATUS
  */
@@ -1428,7 +1430,6 @@ QDF_STATUS wlan_twt_ac_pdev_param_send(struct wlan_objmgr_psoc *psoc,
  * wlan_twt_sap_teardown_req() - sap TWT teardown request
  * @psoc: Pointer to psoc object
  * @req: TWT del dialog parameters
- * @context: TWT context
  *
  * Return: QDF Status
  */
@@ -1616,7 +1617,7 @@ wlan_twt_set_setup_done(struct wlan_objmgr_psoc *psoc,
 /**
  * wlan_twt_set_session_state() - Set the TWT session state for the given dialog
  * id in TWT context
- * @peer: Pointer to peer object
+ * @psoc: Pointer to psoc object
  * @peer_mac: Pointer to peer mac address
  * @dialog_id: Dialog id
  * @state: TWT session state
@@ -1729,7 +1730,7 @@ wlan_twt_process_renego_failure(struct wlan_objmgr_psoc *psoc,
  * wlan_twt_process_add_initial_nego() - Process initial TWT setup or
  * re-negotiation successful setup
  * @psoc: psoc
- * @add_dialog_event: pointer to event buf containing twt response parameters
+ * @event: pointer to event buf containing twt response parameters
  *
  * Return: None
  */

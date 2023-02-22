@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022-2023, Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -14,22 +14,30 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
-#ifndef _WLAN_PRE_CAC_PUBLIC_STRUCT_H_
-#define _WLAN_PRE_CAC_PUBLIC_STRUCT_H_
-
-#include "wlan_objmgr_psoc_obj.h"
-
 /**
- * struct pre_cac_ops - pre cac osif callbacks
- * @pre_cac_conditional_csa_ind_cb: send conditional frequency switch status
- * @pre_cac_complete_cb: Pre cac complete callback
+ * DOC: contains prototypes for NAN component
  */
-struct pre_cac_ops {
-	void (*pre_cac_conditional_csa_ind_cb)(
-			struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
-			bool status);
-	void (*pre_cac_complete_cb)(
-			struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
-			QDF_STATUS status);
-};
-#endif /* _WLAN_PRE_CAC_PUBLIC_STRUCT_H_ */
+
+#ifndef _WLAN_NAN_API_I_H_
+#define _WLAN_NAN_API_I_H_
+
+#include "wlan_objmgr_cmn.h"
+#include "nan_public_structs.h"
+
+#ifdef WLAN_FEATURE_NAN
+/**
+ * wlan_nan_get_ndi_state: get ndi state from vdev obj
+ * @vdev: pointer to vdev object
+ *
+ * Return: ndi state
+ */
+enum nan_datapath_state wlan_nan_get_ndi_state(struct wlan_objmgr_vdev *vdev);
+
+#else
+static inline
+enum nan_datapath_state wlan_nan_get_ndi_state(struct wlan_objmgr_vdev *vdev)
+{
+	return NAN_DATA_INVALID_STATE;
+}
+#endif /*WLAN_FEATURE_NAN */
+#endif /*_WLAN_NAN_API_I_H_ */

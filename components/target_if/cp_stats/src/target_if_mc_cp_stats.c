@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2013-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -1564,6 +1564,7 @@ static uint32_t get_stats_id(enum stats_req_type type)
 /**
  * target_if_cp_stats_send_stats_req() - API to send stats request to wmi
  * @psoc: pointer to psoc object
+ * @type: Type of stats requested
  * @req: pointer to object containing stats request parameters
  *
  * Return: status of operation.

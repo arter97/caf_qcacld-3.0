@@ -36,7 +36,7 @@
  * @WLAN_AUTH_REQ: Authentication request frame
  * @WLAN_AUTH_RESP: Authentication response frame
  * @WLAN_ASSOC_REQ: Association request frame
- * @WLAN_ASSOC_RESP: Association response frame
+ * @WLAN_ASSOC_RSP: Association response frame
  * @WLAN_REASSOC_REQ: Reassociation request frame
  * @WLAN_REASSOC_RSP: Reassociation response frame
  * @WLAN_DEAUTH_RX: Deauthentication frame received
@@ -46,7 +46,7 @@
  * @WLAN_DISCONN_BMISS: Disconnection due to beacon miss
  * @WLAN_ROAM_SCAN_START: ROAM scan start
  * @WLAN_ROAM_SCAN_DONE: Roam scan done
- * @WLAN_ROAM_SCR_CURR_AP: Roam score current AP
+ * @WLAN_ROAM_SCORE_CURR_AP: Roam score current AP
  * @WLAN_ROAM_SCORE_CAND_AP: Roam Score Candidate AP
  * @WLAN_ROAM_RESULT: Roam Result
  * @WLAN_ROAM_CANCEL: Roam Cancel
@@ -222,7 +222,7 @@ enum qca_conn_diag_log_event_type {
  * @vdev_id: Vdev id
  * @timestamp_us: Timestamp(time of the day) in microseconds
  * @fw_timestamp: FW timestamp in microseconds
- * @ktimes_us: Kernel Timestamp in microseconds
+ * @ktime_us: Kernel Timestamp in microseconds
  */
 struct wlan_connectivity_log_diag_cmn {
 	uint8_t bssid[6];
@@ -366,7 +366,7 @@ struct wlan_diag_roam_scan_done {
 #define DIAG_ROAM_RESULT_VERSION 1
 
 /**
- * struct wlan_diag_roam_result_info  - Roam result data
+ * struct wlan_diag_roam_result - Roam result data
  * @diag_cmn: Common diag info
  * @version: Structure Version
  * @is_roam_successful: True if roamed successfully or false if roaming failed
@@ -452,7 +452,7 @@ struct wlan_diag_btm_cand_info {
  * transaction
  * @subtype: Event Subtype
  * @validity_timer: Validity interval in TBTT
- * @disassoc_timer: Time after which the AP disassociates the STA, defined
+ * @disassoc_tim: Time after which the AP disassociates the STA, defined
  * in TBTT.
  */
 struct wlan_diag_btm_info {
@@ -541,7 +541,7 @@ struct wlan_diag_packet_info {
  * Table 12-10—Integrity and key wrap algorithms.
  * @grp_cipher: Group cipher suite value as defined in
  * Table 12-10—Integrity and key wrap algorithm in IEEE 802.11 2020.
- * grp_mgmt: Group management cipher suite as defined in
+ * @grp_mgmt: Group management cipher suite as defined in
  * Table 12-10—Integrity and key wrap algorithms in IEEE 802.11 2020.
  */
 struct wlan_diag_connect {
@@ -588,7 +588,7 @@ struct wlan_roam_candidate_info {
 /**
  * struct wlan_roam_scan_info  - Roam scan related information
  * @cand_ap_count: Roam candidate AP count
- * @num_scanned_frequencies: Number of scanned frequencies
+ * @num_scanned_freq: Number of scanned frequencies
  * @is_btcoex_active: Is bluetooth coex active
  * @scan_freq: Array of scanned frequencies value in MHz
  */
@@ -598,6 +598,7 @@ struct wlan_roam_scan_info {
 	bool is_btcoex_active;
 	qdf_freq_t scan_freq[NUM_CHANNELS];
 };
+
 /**
  * struct wlan_roam_result_info  - Roam result data
  * @roam_fail_reason: Roam failure reason code defined in enum
@@ -610,8 +611,7 @@ struct wlan_roam_result_info {
 };
 
 /**
- * struct wlan_roam_scan_trigger_info  - Structure to store roam scan trigger
- * related data.
+ * struct wlan_roam_trigger_info - Structure to store roam trigger related data.
  * @is_full_scan: True if the scan is Full scan. False if the roam scan is
  * partial channel map scan
  * @trigger_reason: Roam trigger reason defined by enum roam_trigger_reason
@@ -633,7 +633,7 @@ struct wlan_roam_trigger_info {
 
 /**
  * struct wlan_btm_cand_info  - BTM candidate information
- * @index: Candidate index
+ * @idx: Candidate index
  * @preference: Candidate preference
  * @bssid: candidate bssid
  */
@@ -930,6 +930,7 @@ void wlan_clear_sae_auth_logs_cache(struct wlan_objmgr_psoc *psoc,
  * 2 - SAE confirm frame
  * @auth_seq: Authentication frame transaction sequence number as defined in
  * IEEE 802.11 - 2020 standard section 9.4.1.2
+ * @aid: Association ID
  * @tag: Record type main tag
  *
  * Return: QDF_STATUS
@@ -953,7 +954,7 @@ static inline void wlan_connectivity_logging_stop(void)
  * logging buffer
  * @psoc: Global psoc pointer
  * @osif_cbks: OSIF callbacks
- * @osif_cbk_context: OSIF callback context argument
+ * @osif_cb_context: OSIF callback context argument
  *
  * Return: None
  */
@@ -1001,6 +1002,7 @@ QDF_STATUS wlan_connectivity_log_enqueue(struct wlan_log_record *new_record);
  * 2 - SAE confirm frame
  * @auth_seq: Authentication frame transaction sequence number as defined in
  * IEEE 802.11 - 2020 standard section 9.4.1.2
+ * @aid: Association ID
  * @tag: Record type main tag
  *
  * Return: QDF_STATUS

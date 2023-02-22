@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2018-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -34,6 +34,7 @@
 #include <../../core/src/wlan_cm_vdev_api.h>
 #include "wlan_psoc_mlme_api.h"
 #include "wlan_action_oui_main.h"
+#include "target_if.h"
 
 /* quota in milliseconds */
 #define MCC_DUTY_CYCLE 70
@@ -3361,6 +3362,21 @@ wlan_mlme_set_rf_test_mode_enabled(struct wlan_objmgr_psoc *psoc, bool value)
 
 #ifdef CONFIG_BAND_6GHZ
 QDF_STATUS
+wlan_mlme_is_standard_6ghz_conn_policy_enabled(struct wlan_objmgr_psoc *psoc,
+					       bool *value)
+{
+	struct wlan_mlme_psoc_ext_obj *mlme_obj;
+
+	mlme_obj = mlme_get_psoc_ext_obj(psoc);
+	if (!mlme_obj)
+		return QDF_STATUS_E_FAILURE;
+
+	*value = mlme_obj->cfg.gen.std_6ghz_conn_policy;
+
+	return QDF_STATUS_SUCCESS;
+}
+
+QDF_STATUS
 wlan_mlme_is_relaxed_6ghz_conn_policy_enabled(struct wlan_objmgr_psoc *psoc,
 					      bool *value)
 {
@@ -4492,22 +4508,6 @@ char *mlme_get_roam_status_str(uint32_t roam_status)
 		return "FAILED";
 	case 2:
 		return "NO ROAM";
-	default:
-		return "UNKNOWN";
-	}
-}
-
-char *mlme_get_roam_scan_type_str(uint32_t roam_scan_type)
-{
-	switch (roam_scan_type) {
-	case 0:
-		return "PARTIAL";
-	case 1:
-		return "FULL";
-	case 2:
-		return "NO SCAN";
-	case 3:
-		return "Higher Band";
 	default:
 		return "UNKNOWN";
 	}
@@ -5948,6 +5948,86 @@ bool mlme_get_user_ps(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id)
 	return usr_ps_enable;
 }
 
+QDF_STATUS wlan_mlme_get_phy_max_freq_range(struct wlan_objmgr_psoc *psoc,
+					    uint32_t *low_2ghz_chan,
+					    uint32_t *high_2ghz_chan,
+					    uint32_t *low_5ghz_chan,
+					    uint32_t *high_5ghz_chan)
+{
+	uint32_t i;
+	uint32_t reg_low_2ghz_chan;
+	uint32_t reg_high_2ghz_chan;
+	uint32_t reg_low_5ghz_chan;
+	uint32_t reg_high_5ghz_chan;
+	struct target_psoc_info *info;
+	struct wlan_psoc_host_mac_phy_caps *mac_phy_cap;
+	struct wlan_psoc_host_hal_reg_cap_ext *reg_cap_ext;
+
+	info = wlan_psoc_get_tgt_if_handle(psoc);
+	if (!info) {
+		mlme_legacy_err("target_psoc_info is null");
+		return QDF_STATUS_E_FAILURE;
+	}
+	mac_phy_cap = info->info.mac_phy_cap;
+	reg_cap_ext = &mac_phy_cap->reg_cap_ext;
+	reg_low_2ghz_chan = reg_cap_ext->low_2ghz_chan;
+	reg_high_2ghz_chan = reg_cap_ext->high_2ghz_chan;
+	reg_low_5ghz_chan = reg_cap_ext->low_5ghz_chan;
+	reg_high_5ghz_chan = reg_cap_ext->high_5ghz_chan;
+	for (i = 1; i < PSOC_MAX_MAC_PHY_CAP; i++) {
+		mac_phy_cap = &info->info.mac_phy_cap[i];
+		reg_cap_ext = &mac_phy_cap->reg_cap_ext;
+
+		if (reg_cap_ext->low_2ghz_chan) {
+			reg_low_2ghz_chan = reg_low_2ghz_chan ?
+				QDF_MIN(reg_cap_ext->low_2ghz_chan,
+					reg_low_2ghz_chan) :
+				reg_cap_ext->low_2ghz_chan;
+		}
+		if (reg_cap_ext->high_2ghz_chan) {
+			reg_high_2ghz_chan = reg_high_2ghz_chan ?
+				QDF_MAX(reg_cap_ext->high_2ghz_chan,
+					reg_high_2ghz_chan) :
+				reg_cap_ext->high_2ghz_chan;
+		}
+		if (reg_cap_ext->low_5ghz_chan) {
+			reg_low_5ghz_chan = reg_low_5ghz_chan ?
+				QDF_MIN(reg_cap_ext->low_5ghz_chan,
+					reg_low_5ghz_chan) :
+				reg_cap_ext->low_5ghz_chan;
+		}
+		if (reg_cap_ext->high_5ghz_chan) {
+			reg_high_5ghz_chan = reg_high_5ghz_chan ?
+				QDF_MAX(reg_cap_ext->high_5ghz_chan,
+					reg_high_5ghz_chan) :
+				reg_cap_ext->high_5ghz_chan;
+		}
+	}
+	/* For old hw, no reg_cap_ext reported from service ready ext,
+	 * fill the low/high with default of regulatory.
+	 */
+	if (!reg_low_2ghz_chan && !reg_high_2ghz_chan &&
+	    !reg_low_5ghz_chan && !reg_high_5ghz_chan) {
+		mlme_legacy_debug("no reg_cap_ext in mac_phy_cap");
+		reg_low_2ghz_chan = TWOG_STARTING_FREQ - 10;
+		reg_high_2ghz_chan = TWOG_CHAN_14_IN_MHZ + 10;
+		reg_low_5ghz_chan = FIVEG_STARTING_FREQ - 10;
+		reg_high_5ghz_chan = SIXG_CHAN_233_IN_MHZ + 10;
+	}
+	if (!wlan_reg_is_6ghz_supported(psoc)) {
+		mlme_legacy_debug("disabling 6ghz channels");
+		reg_high_5ghz_chan = FIVEG_CHAN_177_IN_MHZ + 10;
+	}
+	mlme_legacy_debug("%d %d %d %d", reg_low_2ghz_chan, reg_high_2ghz_chan,
+			  reg_low_5ghz_chan, reg_high_5ghz_chan);
+	*low_2ghz_chan = reg_low_2ghz_chan;
+	*high_2ghz_chan = reg_high_2ghz_chan;
+	*low_5ghz_chan = reg_low_5ghz_chan;
+	*high_5ghz_chan = reg_high_5ghz_chan;
+
+	return QDF_STATUS_SUCCESS;
+}
+
 #ifdef WLAN_FEATURE_P2P_P2P_STA
 bool
 wlan_mlme_get_p2p_p2p_conc_support(struct wlan_objmgr_psoc *psoc)
@@ -6487,7 +6567,7 @@ void wlan_mlme_get_feature_info(struct wlan_objmgr_psoc *psoc,
 	wlan_mlme_get_sap_max_peers(psoc, &sap_max_num_clients);
 	mlme_feature_set->sap_max_num_clients = sap_max_num_clients;
 	mlme_feature_set->vendor_req_1_version =
-					WMI_HOST_VENDOR1_REQ1_VERSION_3_30;
+					WMI_HOST_VENDOR1_REQ1_VERSION_3_40;
 	roam_triggers = wlan_mlme_get_roaming_triggers(psoc);
 
 	wlan_mlme_get_bss_load_enabled(psoc, &is_bss_load_enabled);

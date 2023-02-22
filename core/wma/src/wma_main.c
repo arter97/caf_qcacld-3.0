@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2013-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -325,6 +325,23 @@ wma_get_concurrency_support(struct wlan_objmgr_psoc *psoc)
 }
 
 /**
+ * wma_update_set_feature_version() - Update the set feature version
+ *
+ * @fs: Feature set structure in which version needs to be updated.
+ *
+ * Version 1 - Base feature version
+ * Version 2 - WMI_HOST_VENDOR1_REQ1_VERSION_3_30 updated.
+ * Version 3 - min sleep period for TWT and Scheduled PM in FW updated
+ * Version4 -  WMI_HOST_VENDOR1_REQ1_VERSION_3_40 updated.
+ *
+ * Return: None
+ */
+static void wma_update_set_feature_version(struct target_feature_set *fs)
+{
+	fs->feature_set_version = 4;
+}
+
+/**
  * wma_set_feature_set_info() - Set feature set info
  * @wma_handle: WMA handle
  * @feature_set: Feature set structure which needs to be filled
@@ -479,7 +496,7 @@ static void wma_set_feature_set_info(tp_wma_handle wma_handle,
 	feature_set->peer_bigdata_getbssinfo_support = true;
 	feature_set->peer_bigdata_assocreject_info_support = true;
 	feature_set->peer_getstainfo_support = true;
-	feature_set->feature_set_version = 2;
+	wma_update_set_feature_version(feature_set);
 }
 
 /**
@@ -3388,6 +3405,15 @@ QDF_STATUS wma_open(struct wlan_objmgr_psoc *psoc,
 	}
 	wma_handle->psoc = psoc;
 
+	if (wlan_pmo_enable_ssr_on_page_fault(psoc)) {
+		wma_handle->pagefault_wakeups_ts =
+			qdf_mem_malloc(
+			wlan_pmo_get_max_pagefault_wakeups_for_ssr(psoc) *
+			sizeof(qdf_time_t));
+		if (!wma_handle->pagefault_wakeups_ts)
+			goto err_wma_handle;
+	}
+
 	wma_target_if_open(wma_handle);
 
 	/*
@@ -4812,6 +4838,9 @@ QDF_STATUS wma_close(void)
 	wmi_handle = wma_handle->wmi_handle;
 	if (wmi_validate_handle(wmi_handle))
 		return QDF_STATUS_E_INVAL;
+
+	if (wlan_pmo_enable_ssr_on_page_fault(wma_handle->psoc))
+		qdf_mem_free(wma_handle->pagefault_wakeups_ts);
 
 	qdf_atomic_set(&wma_handle->sap_num_clients_connected, 0);
 	qdf_atomic_set(&wma_handle->go_num_clients_connected, 0);
