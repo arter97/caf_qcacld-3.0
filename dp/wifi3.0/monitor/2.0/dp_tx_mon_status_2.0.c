@@ -1407,6 +1407,179 @@ dp_tx_mon_update_ppdu_info_status(struct dp_pdev *pdev,
 	return status;
 }
 
+#ifdef MONITOR_TLV_RECORDING_ENABLE
+/**
+ * dp_tx_mon_record_index_update() - update the indexes of dp_mon_tlv_logger
+ *					to store next Tx TLV
+ *
+ * @mon_pdev_be: pointer to dp_mon_pdev_be
+ *
+ * Return: void
+ */
+void dp_tx_mon_record_index_update(struct dp_mon_pdev_be *mon_pdev_be)
+{
+	struct dp_mon_tlv_logger *tlv_log = NULL;
+	struct dp_tx_mon_tlv_info *tlv_info = NULL;
+
+	tlv_log = mon_pdev_be->tx_tlv_log;
+	tlv_info = (struct dp_tx_mon_tlv_info *)tlv_log->buff;
+
+	(tlv_log->curr_ppdu_pos + 1 == MAX_NUM_PPDU_RECORD) ?
+		tlv_log->curr_ppdu_pos = 0 :
+			tlv_log->curr_ppdu_pos++;
+
+	tlv_log->wrap_flag = 0;
+	tlv_log->ppdu_start_idx = tlv_log->curr_ppdu_pos *
+		MAX_TLVS_PER_PPDU;
+	tlv_log->mpdu_idx = tlv_log->ppdu_start_idx +
+		MAX_PPDU_START_TLV_NUM;
+	tlv_log->ppdu_end_idx = tlv_log->mpdu_idx + MAX_MPDU_TLV_NUM;
+	tlv_log->max_ppdu_start_idx = tlv_log->ppdu_start_idx +
+		MAX_PPDU_START_TLV_NUM - 1;
+	tlv_log->max_mpdu_idx = tlv_log->mpdu_idx +
+		MAX_MPDU_TLV_NUM - 1;
+	tlv_log->max_ppdu_end_idx = tlv_log->ppdu_end_idx +
+		MAX_PPDU_END_TLV_NUM - 1;
+}
+
+/**
+ * dp_tx_mon_record_tlv() - Store the contents of the tlv in buffer
+ *
+ * @mon_pdev_be: pointer to dp_mon_pdev_be
+ * @data_ppdu_info: pointer to HAL Tx data ppdu info
+ * @proto_ppdu_info: pointer to HAL Tx proto ppdu info
+ *
+ * Return: void
+ */
+void dp_tx_mon_record_tlv(struct dp_mon_pdev_be *mon_pdev_be,
+			  struct hal_tx_ppdu_info *data_ppdu_info,
+			  struct hal_tx_ppdu_info *proto_ppdu_info)
+{
+	struct hal_tx_ppdu_info *ppdu_info = NULL;
+	struct dp_tx_mon_tlv_info *tlv_info = NULL;
+	struct dp_mon_tlv_logger *tlv_log = NULL;
+	uint16_t *ppdu_start_idx = NULL;
+	uint16_t *mpdu_idx = NULL;
+	uint16_t *ppdu_end_idx = NULL;
+	uint32_t tlv_tag;
+
+	if (!mon_pdev_be || !(mon_pdev_be->tx_tlv_log))
+		return;
+
+	tlv_log = mon_pdev_be->tx_tlv_log;
+	if (!tlv_log->tlv_logging_enable || !(tlv_log->buff))
+		return;
+
+	tlv_info = (struct dp_tx_mon_tlv_info *)tlv_log->buff;
+	ppdu_start_idx = &tlv_log->ppdu_start_idx;
+	mpdu_idx = &tlv_log->mpdu_idx;
+	ppdu_end_idx = &tlv_log->ppdu_end_idx;
+
+	ppdu_info = (data_ppdu_info->tx_tlv_info.is_data_ppdu_info) ?
+			data_ppdu_info : proto_ppdu_info;
+	tlv_tag = ppdu_info->tx_tlv_info.tlv_tag;
+
+	if (ppdu_info->tx_tlv_info.tlv_category == CATEGORY_PPDU_START) {
+		tlv_info[*ppdu_start_idx].tlv_tag = tlv_tag;
+		switch (tlv_tag) {
+		case WIFITX_FES_SETUP_E:
+		case WIFITXPCU_BUFFER_STATUS_E:
+		case WIFIPCU_PPDU_SETUP_INIT_E:
+		case WIFISCH_CRITICAL_TLV_REFERENCE_E:
+		case WIFITX_PEER_ENTRY_E:
+		case WIFITX_RAW_OR_NATIVE_FRAME_SETUP_E:
+		case WIFITX_QUEUE_EXTENSION_E:
+		case WIFITX_FES_SETUP_COMPLETE_E:
+		case WIFIFW2SW_MON_E:
+		case WIFISCHEDULER_END_E:
+		case WIFITQM_MPDU_GLOBAL_START_E:
+			;
+		}
+		if (*ppdu_start_idx < tlv_log->max_ppdu_start_idx)
+			(*ppdu_start_idx)++;
+	} else if (ppdu_info->tx_tlv_info.tlv_category == CATEGORY_MPDU) {
+		tlv_info[*mpdu_idx].tlv_tag = tlv_tag;
+		switch (tlv_tag) {
+		case WIFITX_MPDU_START_E:
+		case WIFITX_MSDU_START_E:
+		case WIFITX_DATA_E:
+		case WIFITX_MSDU_END_E:
+		case WIFITX_MPDU_END_E:
+			;
+		}
+		if (*mpdu_idx < tlv_log->max_mpdu_idx) {
+			(*mpdu_idx)++;
+		} else {
+			*mpdu_idx = *mpdu_idx - MAX_MPDU_TLV_NUM + 1;
+			tlv_log->wrap_flag ^= 1;
+		}
+	} else if (ppdu_info->tx_tlv_info.tlv_category == CATEGORY_PPDU_END) {
+		tlv_info[*ppdu_end_idx].tlv_tag = tlv_tag;
+		switch (tlv_tag) {
+		case WIFITX_LAST_MPDU_FETCHED_E:
+		case WIFITX_LAST_MPDU_END_E:
+		case WIFIPDG_TX_REQ_E:
+		case WIFITX_FES_STATUS_START_PPDU_E:
+		case WIFIPHYTX_PPDU_HEADER_INFO_REQUEST_E:
+		case WIFIMACTX_L_SIG_A_E:
+		case WIFITXPCU_PREAMBLE_DONE_E:
+		case WIFIMACTX_USER_DESC_COMMON_E:
+		case WIFIMACTX_SERVICE_E:
+		case WIFITXDMA_STOP_REQUEST_E:
+		case WIFITXPCU_USER_BUFFER_STATUS_E:
+		case WIFITX_FES_STATUS_USER_PPDU_E:
+		case WIFITX_MPDU_COUNT_TRANSFER_END_E:
+		case WIFIRX_START_PARAM_E:
+		case WIFITX_FES_STATUS_ACK_OR_BA_E:
+		case WIFITX_FES_STATUS_USER_RESPONSE_E:
+		case WIFITX_FES_STATUS_END_E:
+		case WIFITX_FES_STATUS_PROT_E:
+		case WIFIMACTX_PHY_DESC_E:
+		case WIFIMACTX_HE_SIG_A_SU_E:
+			;
+		}
+		if (*ppdu_end_idx < tlv_log->max_ppdu_end_idx)
+			(*ppdu_end_idx)++;
+	}
+}
+
+/**
+ * dp_tx_mon_record_clear_buffer() - Clear the buffer to record next PPDU
+ *
+ * @mon_pdev_be : pointer to dp_mon_pdev_be
+ *
+ * Return
+ */
+void dp_tx_mon_record_clear_buffer(struct dp_mon_pdev_be *mon_pdev_be)
+{
+	struct dp_mon_tlv_logger *tlv_log = NULL;
+	struct dp_tx_mon_tlv_info *tlv_info = NULL;
+
+	tlv_log = mon_pdev_be->tx_tlv_log;
+	tlv_info = (struct dp_tx_mon_tlv_info *)tlv_log->buff;
+	qdf_mem_zero(&tlv_info[tlv_log->ppdu_start_idx],
+		     MAX_TLVS_PER_PPDU *
+		     sizeof(struct dp_tx_mon_tlv_info));
+}
+#else
+
+static
+void dp_tx_mon_record_index_update(struct dp_mon_pdev_be *mon_pdev_be)
+{
+}
+
+static
+void dp_tx_mon_record_tlv(struct dp_mon_pdev_be *mon_pdev_be,
+			  struct hal_tx_ppdu_info *data_ppdu_info,
+			  struct hal_tx_ppdu_info *proto_ppdu_info)
+{
+}
+
+static
+void dp_tx_mon_record_clear_buffer(struct dp_mon_pdev_be *mon_pdev_be)
+{
+}
+#endif
 /**
  * dp_tx_mon_process_tlv_2_0() - API to parse PPDU worth information
  * @pdev: DP_PDEV handle
@@ -1501,6 +1674,8 @@ dp_tx_mon_process_tlv_2_0(struct dp_pdev *pdev,
 
 		tx_tlv = status_frag;
 		tx_tlv_start = tx_tlv;
+
+		dp_tx_mon_record_clear_buffer(mon_pdev_be);
 		/*
 		 * parse each status buffer and populate the information to
 		 * dp_tx_ppdu_info
@@ -1513,6 +1688,10 @@ dp_tx_mon_process_tlv_2_0(struct dp_pdev *pdev,
 					tx_status_data,
 					tx_status_prot,
 					tx_tlv, status_frag);
+
+			dp_tx_mon_record_tlv(mon_pdev_be,
+					     &tx_data_ppdu_info->hal_txmon,
+					     &tx_prot_ppdu_info->hal_txmon);
 
 			status =
 				dp_tx_mon_update_ppdu_info_status(
@@ -1540,6 +1719,8 @@ dp_tx_mon_process_tlv_2_0(struct dp_pdev *pdev,
 		tx_mon_be->frag_q_vec[cur_frag_q_idx].frag_buf = NULL;
 		tx_mon_be->frag_q_vec[cur_frag_q_idx].end_offset = 0;
 		cur_frag_q_idx = ++tx_mon_be->cur_frag_q_idx;
+
+		dp_tx_mon_record_index_update(mon_pdev_be);
 	}
 
 	/* clear the unreleased frag array */

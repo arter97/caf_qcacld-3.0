@@ -1384,6 +1384,18 @@ hal_txmon_status_get_num_users_generic_be(void *tx_tlv_hdr, uint8_t *num_users)
 	return tlv_status;
 }
 
+#ifdef MONITOR_TLV_RECORDING_ENABLE
+static inline void
+hal_tx_tlv_record_set_data_ppdu_info(struct hal_tx_ppdu_info *ppdu_info)
+{
+	ppdu_info->tx_tlv_info.is_data_ppdu_info = 1;
+}
+#else
+static inline void
+hal_tx_tlv_record_set_data_ppdu_info(struct hal_tx_ppdu_info *ppdu_info)
+{
+}
+#endif
 /**
  * hal_txmon_get_word_mask_generic_be() - api to get word mask for tx monitor
  * @wmask: pointer to hal_txmon_word_mask_config_t
@@ -1438,6 +1450,7 @@ hal_tx_get_ppdu_info(void *data_info, void *prot_info, uint32_t tlv_tag)
 	case WIFISCHEDULER_END_E:/* DOWNSTREAM */
 	case WIFITX_FES_STATUS_START_PPDU_E:/* UPSTREAM */
 	{
+		hal_tx_tlv_record_set_data_ppdu_info(data_info);
 		return data_info;
 	}
 	}
@@ -1455,8 +1468,70 @@ hal_tx_get_ppdu_info(void *data_info, void *prot_info, uint32_t tlv_tag)
 		return prot_info;
 	}
 
+	hal_tx_tlv_record_set_data_ppdu_info(data_info);
 	return data_info;
 }
+
+#ifdef MONITOR_TLV_RECORDING_ENABLE
+static inline void
+hal_tx_record_tlv_info(struct hal_tx_ppdu_info *ppdu_info,
+		       uint32_t tlv_tag)
+{
+	ppdu_info->tx_tlv_info.tlv_tag = tlv_tag;
+	switch (tlv_tag) {
+	case WIFITX_FES_SETUP_E:
+	case WIFITXPCU_BUFFER_STATUS_E:
+	case WIFIPCU_PPDU_SETUP_INIT_E:
+	case WIFISCH_CRITICAL_TLV_REFERENCE_E:
+	case WIFITX_PEER_ENTRY_E:
+	case WIFITX_RAW_OR_NATIVE_FRAME_SETUP_E:
+	case WIFITX_QUEUE_EXTENSION_E:
+	case WIFITX_FES_SETUP_COMPLETE_E:
+	case WIFIFW2SW_MON_E:
+	case WIFISCHEDULER_END_E:
+	case WIFITQM_MPDU_GLOBAL_START_E:
+		ppdu_info->tx_tlv_info.tlv_category = CATEGORY_PPDU_START;
+		break;
+
+	case WIFITX_MPDU_START_E:
+	case WIFITX_MSDU_START_E:
+	case WIFITX_DATA_E:
+	case WIFITX_MSDU_END_E:
+	case WIFITX_MPDU_END_E:
+		ppdu_info->tx_tlv_info.tlv_category = CATEGORY_MPDU;
+		break;
+
+	case WIFITX_LAST_MPDU_FETCHED_E:
+	case WIFITX_LAST_MPDU_END_E:
+	case WIFIPDG_TX_REQ_E:
+	case WIFITX_FES_STATUS_START_PPDU_E:
+	case WIFIPHYTX_PPDU_HEADER_INFO_REQUEST_E:
+	case WIFIMACTX_L_SIG_A_E:
+	case WIFITXPCU_PREAMBLE_DONE_E:
+	case WIFIMACTX_USER_DESC_COMMON_E:
+	case WIFIMACTX_SERVICE_E:
+	case WIFITXDMA_STOP_REQUEST_E:
+	case WIFITXPCU_USER_BUFFER_STATUS_E:
+	case WIFITX_FES_STATUS_USER_PPDU_E:
+	case WIFITX_MPDU_COUNT_TRANSFER_END_E:
+	case WIFIRX_START_PARAM_E:
+	case WIFITX_FES_STATUS_ACK_OR_BA_E:
+	case WIFITX_FES_STATUS_USER_RESPONSE_E:
+	case WIFITX_FES_STATUS_END_E:
+	case WIFITX_FES_STATUS_PROT_E:
+	case WIFIMACTX_PHY_DESC_E:
+	case WIFIMACTX_HE_SIG_A_SU_E:
+		ppdu_info->tx_tlv_info.tlv_category = CATEGORY_PPDU_END;
+		break;
+	}
+}
+#else
+static inline void
+hal_tx_record_tlv_info(struct hal_tx_ppdu_info *ppdu_info,
+		       uint32_t tlv_tag)
+{
+}
+#endif
 
 /**
  * hal_txmon_status_parse_tlv_generic_be() - api to parse status tlv.
@@ -1497,6 +1572,7 @@ hal_txmon_status_parse_tlv_generic_be(void *data_ppdu_info,
 			  prot_status_info);
 
 	user_id = (tlv_user_id > ppdu_info->num_users ? 0 : tlv_user_id);
+	hal_tx_record_tlv_info(ppdu_info, tlv_tag);
 
 	switch (tlv_tag) {
 	/* start of initiator FES window */

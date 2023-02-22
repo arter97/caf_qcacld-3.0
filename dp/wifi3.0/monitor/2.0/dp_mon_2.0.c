@@ -1072,32 +1072,37 @@ static void dp_mon_register_intr_ops_2_0(struct dp_soc *soc)
 }
 
 #ifdef MONITOR_TLV_RECORDING_ENABLE
-/*
- * dp_mon_pdev_tlv_logger_init() - initializes struct dp_mon_tlv_logger
+/**
+ * dp_mon_pdev_initialize_tlv_logger() - initialize dp_mon_tlv_logger for
+ *					Rx and Tx
  *
- * @pdev: pointer to dp_pdev
- *
+ * @tlv_logger : double pointer to dp_mon_tlv_logger
+ * @direction: Rx/Tx
  * Return: QDF_STATUS
  */
-static
-QDF_STATUS dp_mon_pdev_tlv_logger_init(struct dp_pdev *pdev)
+static QDF_STATUS
+dp_mon_pdev_initialize_tlv_logger(struct dp_mon_tlv_logger **tlv_logger,
+				  uint8_t direction)
 {
-	struct dp_mon_pdev *mon_pdev = NULL;
-	struct dp_mon_pdev_be *mon_pdev_be = NULL;
 	struct dp_mon_tlv_logger *tlv_log = NULL;
-
-	if (!pdev)
-		return QDF_STATUS_E_INVAL;
-
-	mon_pdev = pdev->monitor_pdev;
-	if (!mon_pdev)
-		return QDF_STATUS_E_INVAL;
-
-	mon_pdev_be = dp_get_be_mon_pdev_from_dp_mon_pdev(mon_pdev);
 
 	tlv_log = qdf_mem_malloc(sizeof(struct dp_mon_tlv_logger));
 	if (!tlv_log) {
-		qdf_err("Memory allocation failed");
+		dp_mon_err("Memory allocation failed");
+		return QDF_STATUS_E_NOMEM;
+	}
+
+	if (direction == MONITOR_TLV_RECORDING_RX)
+		tlv_log->buff = qdf_mem_malloc(MAX_TLV_LOGGING_SIZE *
+					sizeof(struct dp_mon_tlv_info));
+	else if (direction == MONITOR_TLV_RECORDING_TX)
+		tlv_log->buff = qdf_mem_malloc(MAX_TLV_LOGGING_SIZE *
+					sizeof(struct dp_tx_mon_tlv_info));
+
+	if (!tlv_log->buff) {
+		dp_mon_err("Memory allocation failed");
+		qdf_mem_free(tlv_log);
+		tlv_log = NULL;
 		return QDF_STATUS_E_NOMEM;
 	}
 
@@ -1110,18 +1115,71 @@ QDF_STATUS dp_mon_pdev_tlv_logger_init(struct dp_pdev *pdev)
 	tlv_log->max_mpdu_idx = MAX_PPDU_START_TLV_NUM + MAX_MPDU_TLV_NUM - 1;
 	tlv_log->max_ppdu_end_idx = MAX_TLVS_PER_PPDU - 1;
 
-	tlv_log->buff = qdf_mem_malloc(MAX_TLV_LOGGING_SIZE *
-					sizeof(struct dp_mon_tlv_info));
-	if (!tlv_log->buff) {
-		qdf_err("Memory allocation failed");
-		qdf_mem_free(tlv_log);
-		tlv_log = NULL;
-		return QDF_STATUS_E_NOMEM;
-	}
-
 	tlv_log->tlv_logging_enable = 1;
+	*tlv_logger = tlv_log;
 
-	mon_pdev_be->rx_tlv_log = tlv_log;
+	return QDF_STATUS_SUCCESS;
+}
+
+/*
+ * dp_mon_pdev_tlv_logger_init() - initializes struct dp_mon_tlv_logger
+ *
+ * @pdev: pointer to dp_pdev
+ *
+ * Return: QDF_STATUS
+ */
+static
+QDF_STATUS dp_mon_pdev_tlv_logger_init(struct dp_pdev *pdev)
+{
+	struct dp_mon_pdev *mon_pdev = NULL;
+	struct dp_mon_pdev_be *mon_pdev_be = NULL;
+	struct dp_soc *soc = NULL;
+
+	if (!pdev)
+		return QDF_STATUS_E_INVAL;
+
+	soc = pdev->soc;
+	mon_pdev = pdev->monitor_pdev;
+	if (!mon_pdev)
+		return QDF_STATUS_E_INVAL;
+
+	mon_pdev_be = dp_get_be_mon_pdev_from_dp_mon_pdev(mon_pdev);
+
+	if (dp_mon_pdev_initialize_tlv_logger(&mon_pdev_be->rx_tlv_log,
+					      MONITOR_TLV_RECORDING_RX))
+		return QDF_STATUS_E_FAILURE;
+
+	if (dp_mon_pdev_initialize_tlv_logger(&mon_pdev_be->tx_tlv_log,
+					      MONITOR_TLV_RECORDING_TX))
+		return QDF_STATUS_E_FAILURE;
+
+	return QDF_STATUS_SUCCESS;
+}
+
+/**
+ * dp_mon_pdev_deinitialize_tlv_logger() - deinitialize dp_mon_tlv_logger for
+ *					Rx and Tx
+ *
+ * @tlv_logger : double pointer to dp_mon_tlv_logger
+ *
+ * Return: QDF_STATUS
+ */
+static QDF_STATUS
+dp_mon_pdev_deinitialize_tlv_logger(struct dp_mon_tlv_logger **tlv_logger)
+{
+	struct dp_mon_tlv_logger *tlv_log = *tlv_logger;
+
+	if (!tlv_log)
+		return QDF_STATUS_SUCCESS;
+	if (!(tlv_log->buff))
+		return QDF_STATUS_E_INVAL;
+
+	tlv_log->tlv_logging_enable = 0;
+	qdf_mem_free(tlv_log->buff);
+	tlv_log->buff = NULL;
+	qdf_mem_free(tlv_log);
+	tlv_log = NULL;
+	*tlv_logger = NULL;
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -1138,7 +1196,6 @@ QDF_STATUS dp_mon_pdev_tlv_logger_deinit(struct dp_pdev *pdev)
 {
 	struct dp_mon_pdev *mon_pdev = NULL;
 	struct dp_mon_pdev_be *mon_pdev_be = NULL;
-	struct dp_mon_tlv_logger *tlv_log = NULL;
 
 	if (!pdev)
 		return QDF_STATUS_E_INVAL;
@@ -1149,15 +1206,10 @@ QDF_STATUS dp_mon_pdev_tlv_logger_deinit(struct dp_pdev *pdev)
 
 	mon_pdev_be = dp_get_be_mon_pdev_from_dp_mon_pdev(mon_pdev);
 
-	tlv_log = mon_pdev_be->rx_tlv_log;
-	if (!tlv_log || !(tlv_log->buff))
-		return QDF_STATUS_E_INVAL;
-
-	tlv_log->tlv_logging_enable = 0;
-	qdf_mem_free(tlv_log->buff);
-	tlv_log->buff = NULL;
-	qdf_mem_free(tlv_log);
-	tlv_log = NULL;
+	if (dp_mon_pdev_deinitialize_tlv_logger(&mon_pdev_be->rx_tlv_log))
+		return QDF_STATUS_E_FAILURE;
+	if (dp_mon_pdev_deinitialize_tlv_logger(&mon_pdev_be->tx_tlv_log))
+		return QDF_STATUS_E_FAILURE;
 
 	return QDF_STATUS_SUCCESS;
 }
