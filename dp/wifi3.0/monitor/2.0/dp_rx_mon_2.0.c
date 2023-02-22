@@ -997,12 +997,11 @@ dp_rx_mon_handle_full_mon(struct dp_pdev *pdev,
 	if (hdr_frag_size > mpdu_buf_len)
 		qdf_nbuf_trim_add_frag_size(head_msdu, 0, -(hdr_frag_size - mpdu_buf_len), 0);
 
-	msdu_meta = (struct hal_rx_mon_msdu_info *)(((void *)qdf_nbuf_get_frag_addr(mpdu, 1)) - (DP_RX_MON_PACKET_OFFSET + DP_RX_MON_NONRAW_L2_HDR_PAD_BYTE));
-
+	msdu_meta = (struct hal_rx_mon_msdu_info *)(((void *)qdf_nbuf_get_frag_addr(mpdu, 1)) - DP_RX_MON_PACKET_OFFSET);
 
 	/* Adjust page frag offset to appropriate after decap header */
 	frag_page_offset =
-		decap_hdr_pull_bytes;
+		decap_hdr_pull_bytes + l2_hdr_offset;
 	qdf_nbuf_move_frag_page_offset(head_msdu, 1, frag_page_offset);
 
 	frag_size = qdf_nbuf_get_frag_size_by_idx(head_msdu, 1);
@@ -1074,8 +1073,7 @@ dp_rx_mon_handle_full_mon(struct dp_pdev *pdev,
 
 			frag_addr =
 				qdf_nbuf_get_frag_addr(msdu_cur, frag_iter) -
-						       (DP_RX_MON_PACKET_OFFSET +
-						       DP_RX_MON_NONRAW_L2_HDR_PAD_BYTE);
+						       DP_RX_MON_PACKET_OFFSET;
 			msdu_meta = (struct hal_rx_mon_msdu_info *)frag_addr;
 
 			/*
@@ -1586,7 +1584,6 @@ uint8_t dp_rx_mon_process_tlv_status(struct dp_pdev *pdev,
 		} else {
 			dp_rx_mon_nbuf_add_rx_frag(tmp_nbuf, addr,
 						   packet_info->dma_length,
-						   DP_RX_MON_NONRAW_L2_HDR_PAD_BYTE +
 						   DP_RX_MON_PACKET_OFFSET,
 						   DP_MON_DATA_BUFFER_SIZE,
 						   false);
@@ -1635,8 +1632,7 @@ uint8_t dp_rx_mon_process_tlv_status(struct dp_pdev *pdev,
 		}
 		/* This points to last buffer of MSDU . update metadata here */
 		addr = qdf_nbuf_get_frag_addr(nbuf, num_frags - 1) -
-					      (DP_RX_MON_PACKET_OFFSET +
-					       DP_RX_MON_NONRAW_L2_HDR_PAD_BYTE);
+					      DP_RX_MON_PACKET_OFFSET;
 		last_buf_info = addr;
 
 		last_buf_info->first_msdu = msdu_info->first_msdu;
