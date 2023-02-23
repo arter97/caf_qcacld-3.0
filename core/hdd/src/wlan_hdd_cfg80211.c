@@ -2281,6 +2281,8 @@ int wlan_hdd_cfg80211_start_acs(struct hdd_adapter *adapter)
 {
 	struct hdd_context *hdd_ctx;
 	struct sap_config *sap_config;
+	struct sap_context *sap_ctx;
+	struct hdd_ap_ctx *ap_ctx;
 	sap_event_cb acs_event_callback;
 	uint8_t mcc_to_scc_switch = 0;
 	int status;
@@ -2295,7 +2297,9 @@ int wlan_hdd_cfg80211_start_acs(struct hdd_adapter *adapter)
 	if (0 != status)
 		return status;
 
-	sap_config = &adapter->deflink->session.ap.sap_config;
+	ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(adapter->deflink);
+	sap_ctx = WLAN_HDD_GET_SAP_CTX_PTR(adapter->deflink);
+	sap_config = &ap_ctx->sap_config;
 	if (!sap_config) {
 		hdd_err("SAP config is NULL");
 		return -EINVAL;
@@ -2314,8 +2318,7 @@ int wlan_hdd_cfg80211_start_acs(struct hdd_adapter *adapter)
 	    mcc_to_scc_switch &&
 	    !(policy_mgr_is_hw_dbs_capable(hdd_ctx->psoc) &&
 	    WLAN_REG_IS_24GHZ_CH_FREQ(sap_config->acs_cfg.end_ch_freq)) &&
-	    !wlansap_dcs_is_wlan_interference_mitigation_enabled(
-					WLAN_HDD_GET_SAP_CTX_PTR(adapter))) {
+	    !wlansap_dcs_is_wlan_interference_mitigation_enabled(sap_ctx)) {
 		status = wlan_hdd_sap_cfg_dfs_override(adapter);
 		if (status < 0)
 			return status;
@@ -2323,9 +2326,8 @@ int wlan_hdd_cfg80211_start_acs(struct hdd_adapter *adapter)
 		if (status > 0) {
 			/*notify hostapd about channel override */
 			wlan_hdd_cfg80211_acs_ch_select_evt(adapter);
-			wlansap_dcs_set_wlan_interference_mitigation_on_band(
-						WLAN_HDD_GET_SAP_CTX_PTR(adapter),
-						sap_config);
+			wlansap_dcs_set_wlan_interference_mitigation_on_band(sap_ctx,
+									     sap_config);
 			return 0;
 		}
 	}
@@ -2367,22 +2369,21 @@ int wlan_hdd_cfg80211_start_acs(struct hdd_adapter *adapter)
 	qdf_mem_copy(sap_config->self_macaddr.bytes,
 		adapter->mac_addr.bytes, sizeof(struct qdf_mac_addr));
 
-	qdf_status = wlansap_acs_chselect(WLAN_HDD_GET_SAP_CTX_PTR(adapter),
-				      acs_event_callback,
-				      sap_config, adapter->dev);
+	qdf_status = wlansap_acs_chselect(sap_ctx, acs_event_callback,
+					  sap_config, adapter->dev);
 
 	if (QDF_IS_STATUS_ERROR(qdf_status)) {
 		hdd_err("ACS channel select failed");
 		return -EINVAL;
 	}
-	if (sap_is_auto_channel_select(WLAN_HDD_GET_SAP_CTX_PTR(adapter)))
+	if (sap_is_auto_channel_select(sap_ctx))
 		sap_config->acs_cfg.acs_mode = true;
 
 	/* If ACS scan is skipped then ACS request would be completed by now,
 	 * so no need to set acs in progress
 	 */
 	if (!sap_config->acs_cfg.skip_acs_scan)
-		qdf_atomic_set(&adapter->deflink->session.ap.acs_in_progress, 1);
+		qdf_atomic_set(&ap_ctx->acs_in_progress, 1);
 
 	return 0;
 }
@@ -3119,11 +3120,11 @@ int hdd_start_vendor_acs(struct hdd_adapter *adapter)
 
 	if (is_acs_support_for_dfs_ltecoex)
 		status = qdf_status_to_os_return(wlan_sap_set_vendor_acs(
-				WLAN_HDD_GET_SAP_CTX_PTR(adapter),
+				WLAN_HDD_GET_SAP_CTX_PTR(adapter->deflink),
 				true));
 	else
 		status = qdf_status_to_os_return(wlan_sap_set_vendor_acs(
-				WLAN_HDD_GET_SAP_CTX_PTR(adapter),
+				WLAN_HDD_GET_SAP_CTX_PTR(adapter->deflink),
 				false));
 
 	return status;
@@ -3339,9 +3340,9 @@ wlan_hdd_handle_single_ch_in_acs_list(struct hdd_context *hdd_ctx,
 	}
 
 	wlan_sap_set_sap_ctx_acs_cfg(
-		WLAN_HDD_GET_SAP_CTX_PTR(adapter), sap_config);
+		WLAN_HDD_GET_SAP_CTX_PTR(adapter->deflink), sap_config);
 	sap_config_acs_result(hdd_ctx->mac_handle,
-			      WLAN_HDD_GET_SAP_CTX_PTR(adapter),
+			      WLAN_HDD_GET_SAP_CTX_PTR(adapter->deflink),
 			    sap_config->acs_cfg.ht_sec_ch_freq);
 	sap_config->ch_params.ch_width =
 			sap_config->acs_cfg.ch_width;
@@ -3364,7 +3365,7 @@ wlan_hdd_handle_single_ch_in_acs_list(struct hdd_context *hdd_ctx,
 	/*notify hostapd about channel override */
 	wlan_hdd_cfg80211_acs_ch_select_evt(adapter);
 	wlansap_dcs_set_wlan_interference_mitigation_on_band(
-		WLAN_HDD_GET_SAP_CTX_PTR(adapter),
+		WLAN_HDD_GET_SAP_CTX_PTR(adapter->deflink),
 		sap_config);
 }
 
@@ -3664,6 +3665,8 @@ static int __wlan_hdd_cfg80211_do_acs(struct wiphy *wiphy,
 	struct hdd_adapter *adapter = WLAN_HDD_GET_PRIV_PTR(ndev);
 	struct hdd_context *hdd_ctx = wiphy_priv(wiphy);
 	struct sap_config *sap_config;
+	struct sap_context *sap_ctx;
+	struct hdd_ap_ctx *ap_ctx;
 	struct sk_buff *temp_skbuff;
 	int ret, i;
 	struct nlattr *tb[QCA_WLAN_VENDOR_ATTR_ACS_MAX + 1];
@@ -3718,7 +3721,9 @@ static int __wlan_hdd_cfg80211_do_acs(struct wiphy *wiphy,
 		return -EINVAL;
 	}
 
-	if (qdf_atomic_read(&adapter->deflink->session.ap.acs_in_progress) > 0) {
+	ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(adapter->deflink);
+
+	if (qdf_atomic_read(&ap_ctx->acs_in_progress) > 0) {
 		if (wlan_hdd_check_is_acs_request_same(adapter,
 						       data, data_len)) {
 			hdd_debug("Same ACS req as ongoing is received, return success");
@@ -3728,8 +3733,7 @@ static int __wlan_hdd_cfg80211_do_acs(struct wiphy *wiphy,
 		hdd_err("ACS rejected as previous ACS req already in progress");
 		return -EINVAL;
 	} else {
-		qdf_atomic_set(&adapter->deflink->session.ap.acs_in_progress,
-			       1);
+		qdf_atomic_set(&ap_ctx->acs_in_progress, 1);
 		qdf_event_reset(&adapter->acs_complete_event);
 	}
 
@@ -3749,7 +3753,8 @@ static int __wlan_hdd_cfg80211_do_acs(struct wiphy *wiphy,
 		goto out;
 	}
 
-	sap_config = &adapter->deflink->session.ap.sap_config;
+	sap_config = &ap_ctx->sap_config;
+	sap_ctx = WLAN_HDD_GET_SAP_CTX_PTR(adapter->deflink);
 
 	/* Check and free if memory is already allocated for acs channel list */
 	wlan_hdd_undo_acs(adapter);
@@ -3940,9 +3945,8 @@ static int __wlan_hdd_cfg80211_do_acs(struct wiphy *wiphy,
 	    policy_mgr_get_connection_count(hdd_ctx->psoc)) {
 		if (adapter->device_mode == QDF_SAP_MODE)
 			is_vendor_unsafe_ch_present =
-			wlansap_filter_vendor_unsafe_ch_freq(
-					WLAN_HDD_GET_SAP_CTX_PTR(adapter),
-					sap_config);
+				wlansap_filter_vendor_unsafe_ch_freq(sap_ctx,
+								     sap_config);
 		wlan_hdd_trim_acs_channel_list(
 					sap_config->acs_cfg.pcl_chan_freq,
 					sap_config->acs_cfg.pcl_ch_count,
@@ -3971,12 +3975,10 @@ static int __wlan_hdd_cfg80211_do_acs(struct wiphy *wiphy,
 			goto out;
 		}
 	} else if (adapter->device_mode == QDF_SAP_MODE) {
-		wlansap_filter_vendor_unsafe_ch_freq(
-					WLAN_HDD_GET_SAP_CTX_PTR(adapter),
-					sap_config);
+		wlansap_filter_vendor_unsafe_ch_freq(sap_ctx, sap_config);
 		if (sap_config->acs_cfg.ch_list_count == 1) {
-			wlan_hdd_handle_single_ch_in_acs_list(
-					hdd_ctx, adapter, sap_config);
+			wlan_hdd_handle_single_ch_in_acs_list(hdd_ctx, adapter,
+							      sap_config);
 			ret = 0;
 			goto out;
 		} else if (!sap_config->acs_cfg.ch_list_count) {
@@ -4051,7 +4053,7 @@ static int __wlan_hdd_cfg80211_do_acs(struct wiphy *wiphy,
 	sap_dump_acs_channel(&sap_config->acs_cfg);
 
 	qdf_status = ucfg_mlme_get_vendor_acs_support(hdd_ctx->psoc,
-						&is_vendor_acs_support);
+						      &is_vendor_acs_support);
 	if (QDF_IS_STATUS_ERROR(qdf_status))
 		hdd_err("get_vendor_acs_support failed, set default");
 
@@ -4069,7 +4071,7 @@ out:
 		if (temp_skbuff)
 			return wlan_cfg80211_vendor_cmd_reply(temp_skbuff);
 	}
-	qdf_atomic_set(&adapter->deflink->session.ap.acs_in_progress, 0);
+	qdf_atomic_set(&ap_ctx->acs_in_progress, 0);
 
 	return ret;
 }
@@ -4116,7 +4118,7 @@ static int wlan_hdd_cfg80211_do_acs(struct wiphy *wiphy,
  */
 void wlan_hdd_undo_acs(struct hdd_adapter *adapter)
 {
-	sap_undo_acs(WLAN_HDD_GET_SAP_CTX_PTR(adapter),
+	sap_undo_acs(WLAN_HDD_GET_SAP_CTX_PTR(adapter->deflink),
 		     &adapter->deflink->session.ap.sap_config);
 }
 
@@ -15761,20 +15763,21 @@ static int __wlan_hdd_cfg80211_setband(struct wiphy *wiphy,
 static QDF_STATUS wlan_hdd_validate_acs_channel(struct hdd_adapter *adapter,
 						uint32_t chan_freq, int chan_bw)
 {
+	struct sap_context *sap_context;
+
 	if (QDF_STATUS_SUCCESS !=
 	    wlan_hdd_validate_operation_channel(adapter, chan_freq))
 		return QDF_STATUS_E_FAILURE;
 
-	if ((wlansap_is_channel_in_nol_list(WLAN_HDD_GET_SAP_CTX_PTR(adapter),
-				chan_freq,
-				PHY_SINGLE_CHANNEL_CENTERED))) {
+	sap_context = WLAN_HDD_GET_SAP_CTX_PTR(adapter->deflink);
+	if ((wlansap_is_channel_in_nol_list(sap_context, chan_freq,
+					    PHY_SINGLE_CHANNEL_CENTERED))) {
 		hdd_info("channel %d is in nol", chan_freq);
 		return -EINVAL;
 	}
 
-	if ((wlansap_is_channel_leaking_in_nol(
-				WLAN_HDD_GET_SAP_CTX_PTR(adapter),
-				chan_freq, chan_bw))) {
+	if ((wlansap_is_channel_leaking_in_nol(sap_context,
+					       chan_freq, chan_bw))) {
 		hdd_info("channel freq %d is leaking in nol", chan_freq);
 		return -EINVAL;
 	}
@@ -15878,7 +15881,7 @@ static int hdd_update_acs_channel(struct hdd_adapter *adapter, uint8_t reason,
 					   channel_list->pri_chan_freq);
 
 		wlan_sap_update_next_channel(
-			WLAN_HDD_GET_SAP_CTX_PTR(adapter), (uint8_t)ch,
+			WLAN_HDD_GET_SAP_CTX_PTR(adapter->deflink), (uint8_t)ch,
 			hdd_map_nl_chan_width(channel_list->chan_width));
 		status = sme_update_new_channel_event(
 					mac_handle,
@@ -24217,6 +24220,7 @@ __wlan_hdd_cfg80211_update_owe_info(struct wiphy *wiphy,
 	struct hdd_adapter *adapter = WLAN_HDD_GET_PRIV_PTR(dev);
 	QDF_STATUS status;
 	int errno;
+	struct sap_context *sap_ctx;
 
 	hdd_enter_dev(dev);
 
@@ -24234,8 +24238,8 @@ __wlan_hdd_cfg80211_update_owe_info(struct wiphy *wiphy,
 
 	hdd_debug("owe_status %d", owe_info->status);
 
-	status = wlansap_update_owe_info(WLAN_HDD_GET_SAP_CTX_PTR(adapter),
-					 owe_info->peer, owe_info->ie,
+	sap_ctx = WLAN_HDD_GET_SAP_CTX_PTR(adapter->deflink);
+	status = wlansap_update_owe_info(sap_ctx, owe_info->peer, owe_info->ie,
 					 owe_info->ie_len, owe_info->status);
 	if (QDF_IS_STATUS_ERROR(status)) {
 		hdd_err("Failed to update OWE info");
@@ -24583,7 +24587,7 @@ static int __wlan_hdd_cfg80211_set_mac_acl(struct wiphy *wiphy,
 			}
 		}
 		qdf_status = wlansap_set_mac_acl(
-			WLAN_HDD_GET_SAP_CTX_PTR(adapter), config);
+			WLAN_HDD_GET_SAP_CTX_PTR(adapter->deflink), config);
 		if (!QDF_IS_STATUS_SUCCESS(qdf_status)) {
 			hdd_err("SAP Set Mac Acl fail");
 			return -EINVAL;

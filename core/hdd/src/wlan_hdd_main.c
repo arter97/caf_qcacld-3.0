@@ -8634,8 +8634,7 @@ QDF_STATUS hdd_stop_adapter_ext(struct hdd_context *hdd_ctx,
 				WLAN_HDD_GET_HOSTAP_STATE_PTR(adapter->deflink);
 
 			qdf_event_reset(&hostapd_state->qdf_stop_bss_event);
-			status = wlansap_stop_bss(
-					WLAN_HDD_GET_SAP_CTX_PTR(adapter));
+			status = wlansap_stop_bss(ap_ctx->sap_context);
 
 			if (QDF_IS_STATUS_SUCCESS(status)) {
 				status = qdf_wait_single_event(
@@ -8708,7 +8707,7 @@ QDF_STATUS hdd_stop_adapter_ext(struct hdd_context *hdd_ctx,
 #ifdef WLAN_NS_OFFLOAD
 		cancel_work_sync(&adapter->ipv6_notifier_work);
 #endif
-		sap_release_vdev_ref(WLAN_HDD_GET_SAP_CTX_PTR(adapter));
+		sap_release_vdev_ref(ap_ctx->sap_context);
 
 		if (adapter->device_mode == QDF_SAP_MODE) {
 			ucfg_ipa_flush_pending_vdev_events(
@@ -12214,8 +12213,8 @@ QDF_STATUS hdd_unsafe_channel_restart_sap(struct hdd_context *hdd_ctxt)
 		if (!restart_freq) {
 			restart_freq =
 				wlansap_get_safe_channel_from_pcl_and_acs_range(
-					WLAN_HDD_GET_SAP_CTX_PTR(adapter),
-					&ch_width);
+				    WLAN_HDD_GET_SAP_CTX_PTR(adapter->deflink),
+				    &ch_width);
 		}
 		if (!restart_freq) {
 			wlan_hdd_set_sap_csa_reason(hdd_ctxt->psoc,
@@ -12331,7 +12330,7 @@ static void hdd_lte_coex_restart_sap(struct hdd_adapter *adapter,
 	uint32_t restart_freq;
 
 	restart_freq = wlansap_get_safe_channel_from_pcl_and_acs_range(
-				WLAN_HDD_GET_SAP_CTX_PTR(adapter),
+				WLAN_HDD_GET_SAP_CTX_PTR(adapter->deflink),
 				NULL);
 
 	restart_chan = wlan_reg_freq_to_chan(hdd_ctx->pdev,
@@ -12549,6 +12548,7 @@ void hdd_acs_response_timeout_handler(void *context)
 	struct hdd_adapter *adapter;
 	struct hdd_context *hdd_ctx;
 	uint8_t reason;
+	struct sap_context *sap_context;
 
 	hdd_enter();
 	if (!timer_context) {
@@ -12576,17 +12576,16 @@ void hdd_acs_response_timeout_handler(void *context)
 	hdd_err("ACS timeout happened for %s reason %d",
 				adapter->dev->name, reason);
 
+	sap_context = WLAN_HDD_GET_SAP_CTX_PTR(adapter->deflink);
 	switch (reason) {
 	/* SAP init case */
 	case QCA_WLAN_VENDOR_ACS_SELECT_REASON_INIT:
-		wlan_sap_set_vendor_acs(WLAN_HDD_GET_SAP_CTX_PTR(adapter),
-					false);
+		wlan_sap_set_vendor_acs(sap_context, false);
 		wlan_hdd_cfg80211_start_acs(adapter);
 		break;
 	/* DFS detected on current channel */
 	case QCA_WLAN_VENDOR_ACS_SELECT_REASON_DFS:
-		wlan_sap_update_next_channel(
-				WLAN_HDD_GET_SAP_CTX_PTR(adapter), 0, 0);
+		wlan_sap_update_next_channel(sap_context, 0, 0);
 		sme_update_new_channel_event(hdd_ctx->mac_handle,
 					     adapter->deflink->vdev_id);
 		break;
@@ -12596,7 +12595,6 @@ void hdd_acs_response_timeout_handler(void *context)
 		break;
 	default:
 		hdd_info("invalid reason for timer invoke");
-
 	}
 }
 
@@ -13612,7 +13610,7 @@ int hdd_start_ap_adapter(struct hdd_adapter *adapter)
 		goto sap_destroy_ctx;
 	}
 
-	sap_ctx = WLAN_HDD_GET_SAP_CTX_PTR(adapter);
+	sap_ctx = WLAN_HDD_GET_SAP_CTX_PTR(adapter->deflink);
 	status = sap_acquire_vdev_ref(hdd_ctx->psoc, sap_ctx,
 				      adapter->deflink->vdev_id);
 	if (!QDF_IS_STATUS_SUCCESS(status)) {
@@ -16555,7 +16553,7 @@ QDF_STATUS hdd_softap_sta_deauth(struct hdd_adapter *adapter,
 			return qdf_status;
 
 	qdf_status =
-		wlansap_deauth_sta(WLAN_HDD_GET_SAP_CTX_PTR(adapter),
+		wlansap_deauth_sta(WLAN_HDD_GET_SAP_CTX_PTR(adapter->deflink),
 				   param);
 
 	hdd_exit();
@@ -16580,7 +16578,7 @@ void hdd_softap_sta_disassoc(struct hdd_adapter *adapter,
 	if (param->peerMacAddr.bytes[0] & 0x1)
 		return;
 
-	wlansap_disassoc_sta(WLAN_HDD_GET_SAP_CTX_PTR(adapter),
+	wlansap_disassoc_sta(WLAN_HDD_GET_SAP_CTX_PTR(adapter->deflink),
 			     param);
 }
 
@@ -19881,7 +19879,7 @@ void hdd_check_and_restart_sap_with_non_dfs_acs(void)
 
 		restart_freq =
 			wlansap_get_safe_channel_from_pcl_and_acs_range(
-				WLAN_HDD_GET_SAP_CTX_PTR(ap_adapter),
+				WLAN_HDD_GET_SAP_CTX_PTR(ap_adapter->deflink),
 				NULL);
 
 		restart_chan = wlan_reg_freq_to_chan(hdd_ctx->pdev,

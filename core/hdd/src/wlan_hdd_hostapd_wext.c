@@ -75,7 +75,7 @@ static int hdd_sap_get_chan_width(struct hdd_adapter *adapter, int *value)
 		return -EINVAL;
 	}
 
-	sap_ctx = WLAN_HDD_GET_SAP_CTX_PTR(adapter);
+	sap_ctx = WLAN_HDD_GET_SAP_CTX_PTR(adapter->deflink);
 
 	*value = wlansap_get_chan_width(sap_ctx);
 	hdd_debug("chan_width = %d", *value);
@@ -307,7 +307,7 @@ static QDF_STATUS hdd_print_acl(struct hdd_adapter *adapter)
 	uint16_t listnum;
 	struct sap_context *sap_ctx;
 
-	sap_ctx = WLAN_HDD_GET_SAP_CTX_PTR(adapter);
+	sap_ctx = WLAN_HDD_GET_SAP_CTX_PTR(adapter->deflink);
 	qdf_mem_zero(&maclist[0], sizeof(maclist));
 	if (QDF_STATUS_SUCCESS == wlansap_get_acl_mode(sap_ctx, &acl_mode)) {
 		pr_info("******** ACL MODE *********\n");
@@ -395,7 +395,7 @@ static __iw_softap_setparam(struct net_device *dev,
 
 	case QCSAP_PARAM_CLR_ACL:
 		if (QDF_STATUS_SUCCESS != wlansap_clear_acl(
-		    WLAN_HDD_GET_SAP_CTX_PTR(adapter))) {
+		    WLAN_HDD_GET_SAP_CTX_PTR(adapter->deflink))) {
 			ret = -EIO;
 		}
 		break;
@@ -407,7 +407,7 @@ static __iw_softap_setparam(struct net_device *dev,
 			ret = -EINVAL;
 		} else {
 			wlansap_set_acl_mode(
-				WLAN_HDD_GET_SAP_CTX_PTR(adapter),
+				WLAN_HDD_GET_SAP_CTX_PTR(adapter->deflink),
 				set_value);
 		}
 		break;
@@ -872,7 +872,7 @@ static __iw_softap_setparam(struct net_device *dev,
 		break;
 	case QCASAP_SET_DFS_NOL:
 		wlansap_set_dfs_nol(
-			WLAN_HDD_GET_SAP_CTX_PTR(adapter),
+			WLAN_HDD_GET_SAP_CTX_PTR(adapter->deflink),
 			(eSapDfsNolType) set_value);
 		break;
 
@@ -1466,7 +1466,7 @@ int __iw_softap_modify_acl(struct net_device *dev,
 	       QDF_MAC_ADDR_REF(peer_mac), list_type, cmd);
 
 	qdf_status = wlansap_modify_acl(
-		WLAN_HDD_GET_SAP_CTX_PTR(adapter),
+		WLAN_HDD_GET_SAP_CTX_PTR(adapter->deflink),
 		peer_mac, (eSapACLType) list_type, (eSapACLCmdType) cmd);
 	if (!QDF_IS_STATUS_SUCCESS(qdf_status)) {
 		hdd_err("Modify ACL failed");
@@ -2111,7 +2111,7 @@ int __iw_get_genie(struct net_device *dev,
 	 * (We previously sent it down in the CSR Roam Profile.)
 	 */
 	status = wlan_sap_getstation_ie_information(
-		WLAN_HDD_GET_SAP_CTX_PTR(adapter),
+		WLAN_HDD_GET_SAP_CTX_PTR(adapter->deflink),
 		&length, genIeBytes);
 	if (status == QDF_STATUS_SUCCESS) {
 		wrqu->data.length = length;
@@ -2177,7 +2177,7 @@ __iw_softap_stopbss(struct net_device *dev,
 
 		qdf_event_reset(&hostapd_state->qdf_stop_bss_event);
 		status = wlansap_stop_bss(
-			WLAN_HDD_GET_SAP_CTX_PTR(adapter));
+			WLAN_HDD_GET_SAP_CTX_PTR(adapter->deflink));
 		if (QDF_IS_STATUS_SUCCESS(status)) {
 			status = qdf_wait_single_event(&hostapd_state->
 					qdf_stop_bss_event,

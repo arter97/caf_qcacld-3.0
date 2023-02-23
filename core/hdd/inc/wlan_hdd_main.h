@@ -1375,8 +1375,8 @@ struct hdd_adapter {
 #define WLAN_HDD_GET_CTX(adapter) ((adapter)->hdd_ctx)
 #define WLAN_HDD_GET_HOSTAP_STATE_PTR(link_info) \
 		(&(WLAN_HDD_GET_AP_CTX_PTR((link_info))->hostapd_state))
-#define WLAN_HDD_GET_SAP_CTX_PTR(adapter) \
-			((adapter)->deflink->session.ap.sap_context)
+#define WLAN_HDD_GET_SAP_CTX_PTR(link_info) \
+		(WLAN_HDD_GET_AP_CTX_PTR((link_info))->sap_context)
 
 #ifdef WLAN_FEATURE_NAN
 #define WLAN_HDD_IS_NDP_ENABLED(hdd_ctx) ((hdd_ctx)->nan_datapath_enabled)

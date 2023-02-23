@@ -332,7 +332,7 @@ static int hdd_hostapd_deinit_sap_session(struct hdd_adapter *adapter)
 		return -EINVAL;
 	}
 
-	sap_ctx = WLAN_HDD_GET_SAP_CTX_PTR(adapter);
+	sap_ctx = WLAN_HDD_GET_SAP_CTX_PTR(adapter->deflink);
 	if (!sap_ctx) {
 		hdd_debug("sap context already released, nothing to be done");
 		return 0;
@@ -888,7 +888,7 @@ static int hdd_stop_bss_link(struct hdd_adapter *adapter)
 
 	if (test_bit(SOFTAP_BSS_STARTED, &adapter->event_flags)) {
 		status = wlansap_stop_bss(
-			WLAN_HDD_GET_SAP_CTX_PTR(adapter));
+			WLAN_HDD_GET_SAP_CTX_PTR(adapter->deflink));
 		if (QDF_IS_STATUS_SUCCESS(status))
 			hdd_debug("Deleting SAP/P2P link!!!!!!");
 
@@ -1639,14 +1639,17 @@ void hdd_stop_sap_due_to_invalid_channel(struct work_struct *work)
 	struct hdd_adapter *sap_adapter = container_of(work, struct hdd_adapter,
 						       sap_stop_bss_work);
 	struct osif_vdev_sync *vdev_sync;
+	struct sap_context *sap_ctx;
 
 	if (osif_vdev_sync_op_start(sap_adapter->dev, &vdev_sync))
 		return;
 
 	hdd_debug("work started for sap session[%d]",
 		  sap_adapter->deflink->vdev_id);
+
+	sap_ctx = WLAN_HDD_GET_SAP_CTX_PTR(sap_adapter->deflink);
 	wlan_hdd_stop_sap(sap_adapter);
-	wlansap_cleanup_cac_timer(WLAN_HDD_GET_SAP_CTX_PTR(sap_adapter));
+	wlansap_cleanup_cac_timer(sap_ctx);
 	hdd_debug("work finished for sap");
 
 	osif_vdev_sync_op_stop(vdev_sync);
@@ -1773,7 +1776,7 @@ static QDF_STATUS hdd_hostapd_chan_change(struct hdd_adapter *adapter,
 		&sap_ch_param, REG_CURRENT_PWR_MODE);
 
 	phy_mode = wlan_sap_get_phymode(
-			WLAN_HDD_GET_SAP_CTX_PTR(adapter));
+			WLAN_HDD_GET_SAP_CTX_PTR(adapter->deflink));
 
 	switch (phy_mode) {
 	case eCSR_DOT11_MODE_11n:
@@ -2110,8 +2113,7 @@ QDF_STATUS hdd_hostapd_sap_event_cb(struct sap_event *sap_event,
 				hdd_ctx->psoc, adapter->deflink->vdev_id))
 			ignoreCAC = true;
 
-		wlansap_get_dfs_cac_state(mac_handle,
-					  WLAN_HDD_GET_SAP_CTX_PTR(adapter),
+		wlansap_get_dfs_cac_state(mac_handle, ap_ctx->sap_context,
 					  &cac_state);
 
 		/* DFS requirement: DO NOT transmit during CAC. */
@@ -2237,7 +2239,7 @@ QDF_STATUS hdd_hostapd_sap_event_cb(struct sap_event *sap_event,
 		we_event = IWEVCUSTOM;
 		we_custom_event_generic = we_custom_start_event;
 		wlan_hdd_set_tx_flow_info();
-		sap_ctx = WLAN_HDD_GET_SAP_CTX_PTR(adapter);
+		sap_ctx = WLAN_HDD_GET_SAP_CTX_PTR(adapter->deflink);
 		if (!sap_ctx) {
 			hdd_err("sap ctx is null");
 			return QDF_STATUS_E_FAILURE;
@@ -2905,7 +2907,7 @@ QDF_STATUS hdd_hostapd_sap_event_cb(struct sap_event *sap_event,
 		cdp_hl_fc_set_td_limit(cds_get_context(QDF_MODULE_ID_SOC),
 				       adapter->deflink->vdev_id,
 				       ap_ctx->operating_chan_freq);
-		sap_ctx = WLAN_HDD_GET_SAP_CTX_PTR(adapter);
+		sap_ctx = WLAN_HDD_GET_SAP_CTX_PTR(adapter->deflink);
 		if (!sap_ctx) {
 			hdd_err("sap ctx is null");
 			return QDF_STATUS_E_FAILURE;
@@ -2949,7 +2951,7 @@ QDF_STATUS hdd_hostapd_sap_event_cb(struct sap_event *sap_event,
 		} else {
 			wlan_hdd_cfg80211_acs_ch_select_evt(adapter);
 			wlansap_dcs_set_wlan_interference_mitigation_on_band(
-					WLAN_HDD_GET_SAP_CTX_PTR(adapter),
+					WLAN_HDD_GET_SAP_CTX_PTR(adapter->deflink),
 					&ap_ctx->sap_config);
 		}
 
@@ -3326,7 +3328,7 @@ int hdd_softap_set_channel_change(struct net_device *dev, int target_chan_freq,
 	if (adapter->device_mode != QDF_SAP_MODE &&
 	    adapter->device_mode != QDF_P2P_GO_MODE)
 		return -EINVAL;
-	sap_ctx = WLAN_HDD_GET_SAP_CTX_PTR(adapter);
+	sap_ctx = WLAN_HDD_GET_SAP_CTX_PTR(adapter->deflink);
 	if (!sap_ctx)
 		return -EINVAL;
 	/*
@@ -3497,7 +3499,7 @@ int hdd_softap_set_channel_change(struct net_device *dev, int target_chan_freq,
 	strict = strict || forced;
 	hdd_place_marker(adapter, "CHANNEL CHANGE", NULL);
 	status = wlansap_set_channel_change_with_csa(
-		WLAN_HDD_GET_SAP_CTX_PTR(adapter),
+		WLAN_HDD_GET_SAP_CTX_PTR(adapter->deflink),
 		target_chan_freq,
 		target_bw,
 		strict);
@@ -3577,7 +3579,7 @@ void hdd_stop_sap_set_tx_power(struct wlan_objmgr_psoc *psoc,
 	}
 
 	restriction_mask = wlan_hdd_get_sap_restriction_mask(hdd_ctx);
-	sap_ctx = WLAN_HDD_GET_SAP_CTX_PTR(adapter);
+	sap_ctx = WLAN_HDD_GET_SAP_CTX_PTR(adapter->deflink);
 	chan_freq = sap_ctx->chan_freq;
 	unsafe_ch_list = &psoc_priv_obj->unsafe_chan_list;
 
@@ -3681,7 +3683,7 @@ QDF_STATUS wlan_hdd_check_cc_intf_cb(struct wlan_objmgr_psoc *psoc,
 		return QDF_STATUS_E_FAILURE;
 	}
 
-	sap_context = WLAN_HDD_GET_SAP_CTX_PTR(ap_adapter);
+	sap_context = WLAN_HDD_GET_SAP_CTX_PTR(ap_adapter->deflink);
 	if (!sap_context) {
 		hdd_err("sap_context is null");
 		return QDF_STATUS_E_FAILURE;
@@ -3708,7 +3710,7 @@ void wlan_hdd_set_sap_csa_reason(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 		hdd_err("ap adapter is NULL");
 		return;
 	}
-	sap_ctx = WLAN_HDD_GET_SAP_CTX_PTR(ap_adapter);
+	sap_ctx = WLAN_HDD_GET_SAP_CTX_PTR(ap_adapter->deflink);
 	if (sap_ctx)
 		sap_ctx->csa_reason = reason;
 	hdd_nofl_debug("set csa reason %d %s vdev %d",
@@ -6766,7 +6768,7 @@ int wlan_hdd_cfg80211_start_bss(struct hdd_adapter *adapter,
 
 	qdf_event_reset(&hostapd_state->qdf_event);
 
-	sap_ctx = WLAN_HDD_GET_SAP_CTX_PTR(adapter);
+	sap_ctx = WLAN_HDD_GET_SAP_CTX_PTR(adapter->deflink);
 	if (!sap_ctx) {
 		ret = -EINVAL;
 		goto error;
@@ -6799,7 +6801,7 @@ int wlan_hdd_cfg80211_start_bss(struct hdd_adapter *adapter,
 				hostapd_state->qdf_status);
 		hdd_set_connection_in_progress(false);
 		sme_get_command_q_status(mac_handle);
-		wlansap_stop_bss(WLAN_HDD_GET_SAP_CTX_PTR(adapter));
+		wlansap_stop_bss(WLAN_HDD_GET_SAP_CTX_PTR(adapter->deflink));
 		if (!cds_is_driver_recovering())
 			QDF_ASSERT(0);
 		ret = -EINVAL;
@@ -6914,8 +6916,11 @@ static int __wlan_hdd_cfg80211_stop_ap(struct wiphy *wiphy,
 	tSirUpdateIE update_ie;
 	int ret;
 	mac_handle_t mac_handle;
+	struct hdd_ap_ctx *ap_ctx;
 
 	hdd_enter_dev(dev);
+
+	ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(adapter->deflink);
 
 	ret = wlan_hdd_validate_context(hdd_ctx);
 	/*
@@ -6970,9 +6975,9 @@ static int __wlan_hdd_cfg80211_stop_ap(struct wiphy *wiphy,
 	}
 
 	cds_flush_work(&adapter->sap_stop_bss_work);
-	adapter->deflink->session.ap.sap_config.acs_cfg.acs_mode = false;
+	ap_ctx->sap_config.acs_cfg.acs_mode = false;
 	hdd_dcs_clear(adapter);
-	qdf_atomic_set(&adapter->deflink->session.ap.acs_in_progress, 0);
+	qdf_atomic_set(&ap_ctx->acs_in_progress, 0);
 	hdd_debug("Disabling queues");
 	wlan_hdd_netif_queue_control(adapter,
 				     WLAN_STOP_ALL_NETIF_QUEUE_N_CARRIER,
@@ -6987,7 +6992,7 @@ static int __wlan_hdd_cfg80211_stop_ap(struct wiphy *wiphy,
 
 		hdd_place_marker(adapter, "TRY TO STOP", NULL);
 		qdf_event_reset(&hostapd_state->qdf_stop_bss_event);
-		status = wlansap_stop_bss(WLAN_HDD_GET_SAP_CTX_PTR(adapter));
+		status = wlansap_stop_bss(ap_ctx->sap_context);
 		if (QDF_IS_STATUS_SUCCESS(status)) {
 			qdf_status =
 				qdf_wait_single_event(&hostapd_state->
@@ -7020,10 +7025,8 @@ static int __wlan_hdd_cfg80211_stop_ap(struct wiphy *wiphy,
 			hdd_err("Stopping the BSS failed");
 			goto exit;
 		}
-		if (adapter->deflink->session.ap.beacon) {
-			qdf_mem_free(adapter->deflink->session.ap.beacon);
-			adapter->deflink->session.ap.beacon = NULL;
-		}
+		qdf_mem_free(ap_ctx->beacon);
+		ap_ctx->beacon = NULL;
 	} else {
 		hdd_debug("SAP already down");
 		mutex_unlock(&hdd_ctx->sap_lock);
@@ -7068,10 +7071,8 @@ static int __wlan_hdd_cfg80211_stop_ap(struct wiphy *wiphy,
 					    FTM_TIME_SYNC_BSS_STOPPED);
 
 exit:
-	if (adapter->deflink->session.ap.beacon) {
-		qdf_mem_free(adapter->deflink->session.ap.beacon);
-		adapter->deflink->session.ap.beacon = NULL;
-	}
+	qdf_mem_free(ap_ctx->beacon);
+	ap_ctx->beacon = NULL;
 	if (QDF_IS_STATUS_SUCCESS(status))
 		hdd_place_marker(adapter, "STOP with SUCCESS", NULL);
 	else
@@ -7239,7 +7240,7 @@ wlan_hdd_get_sap_ch_params(struct hdd_context *hdd_ctx,
 	if (!adapter)
 		return QDF_STATUS_E_INVAL;
 
-	if (!wlan_sap_get_ch_params(WLAN_HDD_GET_SAP_CTX_PTR(adapter),
+	if (!wlan_sap_get_ch_params(WLAN_HDD_GET_SAP_CTX_PTR(adapter->deflink),
 				    ch_params))
 		wlan_reg_set_channel_params_for_pwrmode(hdd_ctx->pdev, freq, 0,
 							ch_params,
@@ -8112,7 +8113,7 @@ void hdd_sap_indicate_disconnect_for_sta(struct hdd_adapter *adapter)
 
 	hdd_enter();
 
-	sap_ctx = WLAN_HDD_GET_SAP_CTX_PTR(adapter);
+	sap_ctx = WLAN_HDD_GET_SAP_CTX_PTR(adapter->deflink);
 	if (!sap_ctx) {
 		hdd_err("invalid sap context");
 		return;

@@ -728,7 +728,7 @@ static int hdd_son_set_candidate_freq(struct wlan_objmgr_vdev *vdev,
 		return -EINVAL;
 	}
 
-	sap_ctx = WLAN_HDD_GET_SAP_CTX_PTR(adapter);
+	sap_ctx = WLAN_HDD_GET_SAP_CTX_PTR(adapter->deflink);
 	if (!sap_ctx) {
 		hdd_err("null sap_ctx");
 		return -EINVAL;
@@ -765,7 +765,7 @@ static qdf_freq_t hdd_son_get_candidate_freq(struct wlan_objmgr_vdev *vdev)
 		return freq;
 	}
 
-	sap_ctx = WLAN_HDD_GET_SAP_CTX_PTR(adapter);
+	sap_ctx = WLAN_HDD_GET_SAP_CTX_PTR(adapter->deflink);
 	if (!sap_ctx) {
 		hdd_err("null sap_ctx");
 		return freq;
@@ -1194,6 +1194,7 @@ static QDF_STATUS hdd_son_set_acl_policy(struct wlan_objmgr_vdev *vdev,
 {
 	struct hdd_adapter *adapter;
 	QDF_STATUS status = QDF_STATUS_E_INVAL;
+	struct sap_context *sap_context;
 
 	if (!vdev) {
 		hdd_err("null vdev");
@@ -1205,22 +1206,22 @@ static QDF_STATUS hdd_son_set_acl_policy(struct wlan_objmgr_vdev *vdev,
 		return status;
 	}
 
+	sap_context = WLAN_HDD_GET_SAP_CTX_PTR(adapter->deflink);
 	switch (son_acl_policy) {
 	case IEEE80211_MACCMD_POLICY_OPEN:
-		status = wlansap_set_acl_mode(WLAN_HDD_GET_SAP_CTX_PTR(adapter),
-					      eSAP_ALLOW_ALL);
+		status = wlansap_set_acl_mode(sap_context, eSAP_ALLOW_ALL);
 		break;
 	case IEEE80211_MACCMD_POLICY_ALLOW:
-		status = wlansap_set_acl_mode(WLAN_HDD_GET_SAP_CTX_PTR(adapter),
+		status = wlansap_set_acl_mode(sap_context,
 					      eSAP_DENY_UNLESS_ACCEPTED);
 		break;
 	case IEEE80211_MACCMD_POLICY_DENY:
-		status = wlansap_set_acl_mode(WLAN_HDD_GET_SAP_CTX_PTR(adapter),
+		status = wlansap_set_acl_mode(sap_context,
 					      eSAP_ACCEPT_UNLESS_DENIED);
 		break;
 	case IEEE80211_MACCMD_FLUSH:
 	case IEEE80211_MACCMD_DETACH:
-		status = wlansap_clear_acl(WLAN_HDD_GET_SAP_CTX_PTR(adapter));
+		status = wlansap_clear_acl(sap_context);
 		break;
 	default:
 		hdd_err("invalid son acl policy %d", son_acl_policy);
@@ -1281,7 +1282,8 @@ static ieee80211_acl_cmd hdd_son_get_acl_policy(struct wlan_objmgr_vdev *vdev)
 		return son_acl_policy;
 	}
 
-	wlansap_get_acl_mode(WLAN_HDD_GET_SAP_CTX_PTR(adapter), &acl_policy);
+	wlansap_get_acl_mode(WLAN_HDD_GET_SAP_CTX_PTR(adapter->deflink),
+			     &acl_policy);
 
 	son_acl_policy = hdd_acl_policy_to_son_acl_policy(acl_policy);
 
@@ -1302,6 +1304,7 @@ static int hdd_son_add_acl_mac(struct wlan_objmgr_vdev *vdev,
 	QDF_STATUS qdf_status;
 	eSapMacAddrACL acl_policy;
 	struct hdd_adapter *adapter;
+	struct sap_context *sap_context;
 
 	if (!vdev) {
 		hdd_err("null vdev");
@@ -1317,7 +1320,8 @@ static int hdd_son_add_acl_mac(struct wlan_objmgr_vdev *vdev,
 		return -EINVAL;
 	}
 
-	wlansap_get_acl_mode(WLAN_HDD_GET_SAP_CTX_PTR(adapter), &acl_policy);
+	sap_context = WLAN_HDD_GET_SAP_CTX_PTR(adapter->deflink);
+	wlansap_get_acl_mode(sap_context, &acl_policy);
 
 	if (acl_policy == eSAP_ACCEPT_UNLESS_DENIED) {
 		list_type = SAP_DENY_LIST;
@@ -1327,8 +1331,7 @@ static int hdd_son_add_acl_mac(struct wlan_objmgr_vdev *vdev,
 		hdd_err("Invalid ACL policy %d.", acl_policy);
 		return -EINVAL;
 	}
-	qdf_status = wlansap_modify_acl(WLAN_HDD_GET_SAP_CTX_PTR(adapter),
-					acl_mac->bytes, list_type,
+	qdf_status = wlansap_modify_acl(sap_context, acl_mac->bytes, list_type,
 					ADD_STA_TO_ACL_NO_DEAUTH);
 	if (QDF_IS_STATUS_ERROR(qdf_status)) {
 		hdd_err("Modify ACL failed");
@@ -1368,7 +1371,7 @@ static int hdd_son_del_acl_mac(struct wlan_objmgr_vdev *vdev,
 		return -EINVAL;
 	}
 
-	sap_ctx = WLAN_HDD_GET_SAP_CTX_PTR(adapter);
+	sap_ctx = WLAN_HDD_GET_SAP_CTX_PTR(adapter->deflink);
 	if (!sap_ctx) {
 		hdd_err("null sap ctx");
 		return -EINVAL;
@@ -1465,6 +1468,7 @@ static void hdd_son_modify_acl(struct wlan_objmgr_vdev *vdev,
 {
 	QDF_STATUS status;
 	struct hdd_adapter *adapter = wlan_hdd_get_adapter_from_objmgr(vdev);
+	struct sap_context *sap_context;
 
 	if (!adapter) {
 		hdd_err("null adapter");
@@ -1472,24 +1476,19 @@ static void hdd_son_modify_acl(struct wlan_objmgr_vdev *vdev,
 	}
 	hdd_debug("Peer - " QDF_MAC_ADDR_FMT " Allow Auth - %u",
 		  QDF_MAC_ADDR_REF(peer_mac), allow_auth);
+
+	sap_context = WLAN_HDD_GET_SAP_CTX_PTR(adapter->deflink);
 	if (allow_auth) {
-		status = wlansap_modify_acl(WLAN_HDD_GET_SAP_CTX_PTR(adapter),
-					    peer_mac,
-					    SAP_DENY_LIST,
-					    DELETE_STA_FROM_ACL);
-		status = wlansap_modify_acl(WLAN_HDD_GET_SAP_CTX_PTR(adapter),
-					    peer_mac,
-					    SAP_ALLOW_LIST,
-					    ADD_STA_TO_ACL);
+		status = wlansap_modify_acl(sap_context, peer_mac,
+					    SAP_DENY_LIST, DELETE_STA_FROM_ACL);
+		status = wlansap_modify_acl(sap_context, peer_mac,
+					    SAP_ALLOW_LIST, ADD_STA_TO_ACL);
 	} else {
-		status = wlansap_modify_acl(WLAN_HDD_GET_SAP_CTX_PTR(adapter),
-					    peer_mac,
+		status = wlansap_modify_acl(sap_context, peer_mac,
 					    SAP_ALLOW_LIST,
 					    DELETE_STA_FROM_ACL);
-		status = wlansap_modify_acl(WLAN_HDD_GET_SAP_CTX_PTR(adapter),
-					    peer_mac,
-					    SAP_DENY_LIST,
-					    ADD_STA_TO_ACL);
+		status = wlansap_modify_acl(sap_context, peer_mac,
+					    SAP_DENY_LIST, ADD_STA_TO_ACL);
 	}
 }
 
@@ -2217,7 +2216,7 @@ static int hdd_son_get_acs_report(struct wlan_objmgr_vdev *vdev,
 		ret = -ENOMEM;
 		goto end;
 	}
-	sap_ctx = WLAN_HDD_GET_SAP_CTX_PTR(adapter);
+	sap_ctx = WLAN_HDD_GET_SAP_CTX_PTR(adapter->deflink);
 	acs_cfg = &adapter->deflink->session.ap.sap_config.acs_cfg;
 	if (!acs_cfg->freq_list &&
 	    (hdd_son_init_acs_channels(adapter, hdd_ctx,

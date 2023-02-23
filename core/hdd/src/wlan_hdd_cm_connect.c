@@ -696,7 +696,7 @@ def_chan:
 				    CSA_REASON_STA_CONNECT_DFS_TO_NON_DFS);
 
 	status = wlansap_set_channel_change_with_csa(
-			WLAN_HDD_GET_SAP_CTX_PTR(ap_adapter), ch_freq,
+			WLAN_HDD_GET_SAP_CTX_PTR(ap_adapter->deflink), ch_freq,
 			ch_bw, false);
 
 	if (QDF_STATUS_SUCCESS != status) {

@@ -1718,7 +1718,7 @@ static void hdd_restart_sap_with_new_phymode(struct hdd_context *hdd_ctx,
 	QDF_STATUS status;
 
 	hostapd_state = WLAN_HDD_GET_HOSTAP_STATE_PTR(adapter->deflink);
-	sap_ctx = WLAN_HDD_GET_SAP_CTX_PTR(adapter);
+	sap_ctx = WLAN_HDD_GET_SAP_CTX_PTR(adapter->deflink);
 
 	if (!test_bit(SOFTAP_BSS_STARTED, &adapter->event_flags)) {
 		sap_config->sap_orig_hw_mode = sap_config->SapHw_mode;
