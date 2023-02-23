@@ -4387,10 +4387,11 @@ struct hdd_adapter *hdd_wlan_create_ap_dev(struct hdd_context *hdd_ctx,
 	/* Initialize the adapter context to zeros. */
 	qdf_mem_zero(adapter, sizeof(struct hdd_adapter));
 	adapter->dev = dev;
-	adapter->deflink = &adapter->link_info[0];
+	adapter->deflink = &adapter->link_info[WLAN_HDD_DEFLINK_IDX];
 	adapter->hdd_ctx = hdd_ctx;
 	adapter->magic = WLAN_HDD_ADAPTER_MAGIC;
 	adapter->deflink->vdev_id = WLAN_UMAC_VDEV_ID_MAX;
+	qdf_atomic_set_bit(WLAN_HDD_DEFLINK_IDX, &adapter->active_links);
 
 	hdd_debug("dev = %pK, adapter = %pK, concurrency_mode=0x%x",
 		dev, adapter,

@@ -992,6 +992,8 @@ enum udp_qos_upgrade {
 	UDP_QOS_UPGRADE_MAX
 };
 
+#define WLAN_HDD_DEFLINK_IDX	0
+
 /**
  * struct wlan_hdd_link_info - Data structure to store the link specific info
  * @vdev_id: Unique value to identify VDEV. Equal to WLAN_UMAC_VDEV_ID_MAX
@@ -1071,6 +1073,7 @@ struct wlan_hdd_tx_power {
  * @mac_addr: Current MAC Address for the adapter
  * @mld_addr: MLD address for adapter
  * @event_flags: a bitmap of hdd_adapter_flags
+ * @active_links: a bitmap of active links in @link_info array
  * @hdd_stats: HDD statistics
  * @estimated_linkspeed: estimated link speed
  * @qdf_monitor_mode_vdev_up_event: QDF event for monitor mode vdev up
@@ -1200,6 +1203,7 @@ struct hdd_adapter {
 	struct qdf_mac_addr mac_addr;
 	struct qdf_mac_addr mld_addr;
 	unsigned long event_flags;
+	unsigned long active_links;
 
 	struct hdd_stats hdd_stats;
 
