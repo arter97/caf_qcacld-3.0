@@ -892,7 +892,7 @@ bool hdd_get_interface_info(struct hdd_adapter *adapter,
 	if (((QDF_STA_MODE == adapter->device_mode) ||
 	     (QDF_P2P_CLIENT_MODE == adapter->device_mode) ||
 	     (QDF_P2P_DEVICE_MODE == adapter->device_mode))) {
-		sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter);
+		sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter->deflink);
 		if (hdd_cm_is_disconnected(adapter)) {
 			info->state = WIFI_DISCONNECTED;
 		}
@@ -1815,7 +1815,7 @@ void hdd_lost_link_info_cb(hdd_handle_t hdd_handle,
 		return;
 	}
 
-	sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter);
+	sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter->deflink);
 
 	adapter->deflink->rssi_on_disconnect = lost_link_info->rssi;
 	hdd_debug("rssi on disconnect %d",
@@ -5717,7 +5717,7 @@ void hdd_get_max_tx_bitrate(struct hdd_context *hdd_ctx,
 	struct hdd_station_ctx *hdd_sta_ctx;
 	struct wlan_objmgr_vdev *vdev;
 
-	hdd_sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter);
+	hdd_sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter->deflink);
 
 	qdf_mem_zero(&sinfo, sizeof(struct station_info));
 
@@ -6279,16 +6279,17 @@ static inline void wlan_hdd_mlo_update_stats_info(struct hdd_adapter *adapter)
 static void wlan_hdd_update_rssi(struct hdd_adapter *adapter,
 				 struct station_info *sinfo)
 {
-	struct hdd_station_ctx *sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter);
+	struct hdd_station_ctx *sta_ctx;
 	int8_t snr;
 
+	sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter->deflink);
 	snr = adapter->deflink->snr;
 
 	/* for new connection there might be no valid previous RSSI */
 	if (!adapter->deflink->rssi) {
 		hdd_get_rssi_snr_by_bssid(adapter,
-				sta_ctx->conn_info.bssid.bytes,
-				&adapter->deflink->rssi, &snr);
+					  sta_ctx->conn_info.bssid.bytes,
+					  &adapter->deflink->rssi, &snr);
 	}
 
 	/* If RSSi is reported as positive then it is invalid */
@@ -6303,8 +6304,7 @@ static void wlan_hdd_update_rssi(struct hdd_adapter *adapter,
 		adapter->hdd_stats.summary_stat.snr,
 		adapter->hdd_stats.summary_stat.rssi);
 	sta_ctx->conn_info.signal = sinfo->signal;
-	sta_ctx->conn_info.noise =
-		sta_ctx->conn_info.signal - snr;
+	sta_ctx->conn_info.noise = sta_ctx->conn_info.signal - snr;
 	sta_ctx->cache_conn_info.signal = sinfo->signal;
 	sta_ctx->cache_conn_info.noise = sta_ctx->conn_info.noise;
 	sinfo->filled |= HDD_INFO_SIGNAL;
@@ -6314,7 +6314,7 @@ static int wlan_hdd_update_rate_info(struct hdd_adapter *adapter,
 				     struct station_info *sinfo)
 {
 	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
-	struct hdd_station_ctx *sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter);
+	struct hdd_station_ctx *sta_ctx;
 	mac_handle_t mac_handle;
 	struct wlan_objmgr_vdev *vdev;
 	enum tx_rate_info rate_flags, tx_rate_flags, rx_rate_flags;
@@ -6328,6 +6328,7 @@ static int wlan_hdd_update_rate_info(struct hdd_adapter *adapter,
 	uint8_t tx_nss = 1, rx_nss = 1, tx_dcm, rx_dcm;
 	qdf_net_dev_stats stats = {0};
 
+	sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter->deflink);
 	ucfg_mlme_stats_get_cfg_values(hdd_ctx->psoc,
 				       &link_speed_rssi_high,
 				       &link_speed_rssi_mid,
@@ -6591,7 +6592,7 @@ struct hdd_adapter *hdd_get_adapter_by_bssid(struct hdd_context *hdd_ctx,
 
 	hdd_for_each_adapter_dev_held_safe(hdd_ctx, adapter, next_adapter,
 					   dbgid) {
-		sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter);
+		sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter->deflink);
 		if (qdf_is_macaddr_equal(&sta_ctx->conn_info.bssid,
 					 (struct qdf_mac_addr *)bssid)) {
 			hdd_adapter_dev_put_debug(adapter, dbgid);
@@ -7118,7 +7119,7 @@ static bool hdd_is_rcpi_applicable(struct hdd_adapter *adapter,
 
 	if (adapter->device_mode == QDF_STA_MODE ||
 	    adapter->device_mode == QDF_P2P_CLIENT_MODE) {
-		hdd_sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter);
+		hdd_sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter->deflink);
 		if (!hdd_cm_is_vdev_associated(adapter))
 			return false;
 
@@ -7360,7 +7361,7 @@ QDF_STATUS wlan_hdd_get_rssi(struct hdd_adapter *adapter, int8_t *rssi_value)
 		return QDF_STATUS_E_FAULT;
 	}
 
-	sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter);
+	sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter->deflink);
 
 	if (cds_is_driver_recovering() || cds_is_driver_in_bad_state()) {
 		hdd_err("Recovery in Progress. State: 0x%x Ignore!!!",
@@ -7472,7 +7473,7 @@ QDF_STATUS wlan_hdd_get_snr(struct hdd_adapter *adapter, int8_t *snr)
 	if (ret)
 		return QDF_STATUS_E_FAULT;
 
-	sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter);
+	sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter->deflink);
 
 	request = osif_request_alloc(&params);
 	if (!request) {
@@ -7603,7 +7604,7 @@ int wlan_hdd_get_link_speed(struct hdd_adapter *adapter, uint32_t *link_speed)
 {
 	struct hdd_context *hddctx = WLAN_HDD_GET_CTX(adapter);
 	struct hdd_station_ctx *hdd_stactx =
-				WLAN_HDD_GET_STATION_CTX_PTR(adapter);
+				WLAN_HDD_GET_STATION_CTX_PTR(adapter->deflink);
 	int ret;
 
 	ret = wlan_hdd_validate_context(hddctx);
@@ -7936,7 +7937,7 @@ static void hdd_lost_link_cp_stats_info_cb(void *stats_ev)
 			continue;
 		}
 
-		sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter);
+		sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter->deflink);
 
 		rssi = ev->vdev_summary_stats[i].stats.rssi;
 		if (rssi == 0) {

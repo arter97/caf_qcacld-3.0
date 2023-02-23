@@ -53,7 +53,7 @@ __hdd_sysfs_txrx_stats_store(struct net_device *net_dev,
 	if (ret != 0)
 		return ret;
 
-	sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter);
+	sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter->deflink);
 	if (!wlan_hdd_validate_modules_state(hdd_ctx))
 		return -EINVAL;
 

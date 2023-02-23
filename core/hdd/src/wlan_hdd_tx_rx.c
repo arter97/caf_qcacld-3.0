@@ -290,7 +290,7 @@ void hdd_tx_resume_cb(void *adapter_context, bool tx_resume)
 		return;
 	}
 
-	hdd_sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter);
+	hdd_sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter->deflink);
 
 	/* Resume TX  */
 	if (true == tx_resume) {
@@ -1656,7 +1656,8 @@ void wlan_hdd_set_tx_flow_info(void)
 					   dbgid) {
 		switch (adapter->device_mode) {
 		case QDF_STA_MODE:
-			sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter);
+			sta_ctx =
+				WLAN_HDD_GET_STATION_CTX_PTR(adapter->deflink);
 			if (hdd_cm_is_vdev_associated(adapter)) {
 				sta_channel = wlan_reg_freq_to_chan(
 						hdd_ctx->pdev,
@@ -1665,7 +1666,8 @@ void wlan_hdd_set_tx_flow_info(void)
 			}
 			break;
 		case QDF_P2P_CLIENT_MODE:
-			sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter);
+			sta_ctx =
+				WLAN_HDD_GET_STATION_CTX_PTR(adapter->deflink);
 			if (hdd_cm_is_vdev_associated(adapter)) {
 				p2p_channel = wlan_reg_freq_to_chan(
 					hdd_ctx->pdev,

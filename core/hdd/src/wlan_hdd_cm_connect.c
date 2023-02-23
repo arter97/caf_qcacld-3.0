@@ -62,8 +62,9 @@ bool hdd_cm_is_vdev_associated(struct hdd_adapter *adapter)
 	struct wlan_objmgr_vdev *vdev;
 	bool is_vdev_active;
 	enum QDF_OPMODE opmode;
-	struct hdd_station_ctx *sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter);
+	struct hdd_station_ctx *sta_ctx;
 
+	sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter->deflink);
 	if (adapter->device_mode == QDF_NDI_MODE)
 		return (sta_ctx->conn_info.conn_state ==
 			eConnectionState_NdiConnected);
@@ -89,8 +90,9 @@ bool hdd_cm_is_vdev_connected(struct hdd_adapter *adapter)
 	struct wlan_objmgr_vdev *vdev;
 	bool is_vdev_connected;
 	enum QDF_OPMODE opmode;
-	struct hdd_station_ctx *sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter);
+	struct hdd_station_ctx *sta_ctx;
 
+	sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter->deflink);
 	if (adapter->device_mode == QDF_NDI_MODE)
 		return (sta_ctx->conn_info.conn_state ==
 			eConnectionState_NdiConnected);
@@ -199,7 +201,7 @@ void hdd_cm_update_rssi_snr_by_bssid(struct hdd_adapter *adapter)
 	struct hdd_station_ctx *sta_ctx;
 	int8_t snr = 0;
 
-	sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter);
+	sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter->deflink);
 	hdd_get_rssi_snr_by_bssid(adapter, sta_ctx->conn_info.bssid.bytes,
 				  &adapter->deflink->rssi, &snr);
 
@@ -236,7 +238,7 @@ void hdd_cm_handle_assoc_event(struct wlan_objmgr_vdev *vdev, uint8_t *peer_mac)
 		return;
 	}
 
-	sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter);
+	sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter->deflink);
 	ret = hdd_objmgr_set_peer_mlme_state(adapter->deflink->vdev,
 					     WLAN_ASSOC_STATE);
 	if (ret)
@@ -307,7 +309,7 @@ void hdd_cm_save_connect_status(struct hdd_adapter *adapter,
 {
 	struct hdd_station_ctx *hdd_sta_ctx;
 
-	hdd_sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter);
+	hdd_sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter->deflink);
 	adapter->connect_req_status = reason_code;
 	hdd_sta_ctx->conn_info.assoc_status_code = reason_code;
 	hdd_sta_ctx->cache_conn_info.assoc_status_code = reason_code;
@@ -754,7 +756,7 @@ int wlan_hdd_cm_connect(struct wiphy *wiphy,
 	}
 
 	hdd_ctx = WLAN_HDD_GET_CTX(adapter);
-	hdd_sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter);
+	hdd_sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter->deflink);
 
 	status = wlan_hdd_validate_context(hdd_ctx);
 	if (status)
@@ -849,7 +851,7 @@ hdd_cm_connect_failure_pre_user_update(struct wlan_objmgr_vdev *vdev,
 		return;
 	}
 
-	hdd_sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter);
+	hdd_sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter->deflink);
 	time_buffer_size = sizeof(hdd_sta_ctx->conn_info.connect_time);
 	qdf_mem_zero(hdd_sta_ctx->conn_info.connect_time, time_buffer_size);
 	hdd_init_scan_reject_params(hdd_ctx);
@@ -968,7 +970,7 @@ static void hdd_cm_save_bss_info(struct hdd_adapter *adapter,
 	}
 
 	hdd_ctx = WLAN_HDD_GET_CTX(adapter);
-	hdd_sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter);
+	hdd_sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter->deflink);
 
 	assoc_resp = qdf_mem_malloc(sizeof(struct sDot11fAssocResponse));
 	if (!assoc_resp)
@@ -1168,7 +1170,7 @@ static void hdd_cm_save_connect_info(struct hdd_adapter *adapter,
 	mac_handle_t mac_handle = hdd_adapter_get_mac_handle(adapter);
 	uint32_t phymode;
 
-	sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter);
+	sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter->deflink);
 	bcn_ie = qdf_mem_malloc(sizeof(*bcn_ie));
 	if (!bcn_ie)
 		return;
@@ -1336,18 +1338,22 @@ static void hdd_set_immediate_power_save(struct hdd_adapter *adapter,
 	struct hdd_station_ctx *sta_ctx;
 	int i;
 
+	if (!hdd_adapter_is_ml_adapter(adapter))
+		goto update_non_ml;
+
 	mlo_adapter_info = &adapter->mlo_adapter_info;
-	if (mlo_adapter_info->is_ml_adapter) {
-		for (i = 0; i < WLAN_MAX_MLD; i++) {
-			link_adapter = mlo_adapter_info->link_adapter[i];
-			if (!link_adapter)
-				continue;
-			sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(link_adapter);
-			sta_ctx->ap_supports_immediate_power_save =
-							is_immediate_powersave;
-		}
+	for (i = 0; i < WLAN_MAX_MLD; i++) {
+		link_adapter = mlo_adapter_info->link_adapter[i];
+		if (!link_adapter)
+			continue;
+
+		sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(link_adapter->deflink);
+		sta_ctx->ap_supports_immediate_power_save =
+						is_immediate_powersave;
 	}
-	sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter);
+
+update_non_ml:
+	sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter->deflink);
 	sta_ctx->ap_supports_immediate_power_save = is_immediate_powersave;
 }
 
@@ -1357,7 +1363,7 @@ static void hdd_set_immediate_power_save(struct hdd_adapter *adapter,
 {
 	struct hdd_station_ctx *sta_ctx;
 
-	sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter);
+	sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter->deflink);
 	sta_ctx->ap_supports_immediate_power_save = is_immediate_powersave;
 }
 #endif
@@ -1395,7 +1401,7 @@ hdd_cm_connect_success_pre_user_update(struct wlan_objmgr_vdev *vdev,
 		return;
 	}
 
-	sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter);
+	sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter->deflink);
 	mac_handle = hdd_adapter_get_mac_handle(adapter);
 
 	wlan_hdd_ft_set_key_delay(vdev);

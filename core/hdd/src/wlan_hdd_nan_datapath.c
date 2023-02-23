@@ -140,7 +140,8 @@ static bool hdd_is_ndp_allowed(struct hdd_context *hdd_ctx)
 			}
 			break;
 		case QDF_P2P_CLIENT_MODE:
-			sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter);
+			sta_ctx =
+				WLAN_HDD_GET_STATION_CTX_PTR(adapter->deflink);
 			if (hdd_cm_is_vdev_associated(adapter) ||
 			    hdd_cm_is_connecting(adapter)) {
 				hdd_adapter_dev_put_debug(adapter, dbgid);
@@ -180,7 +181,8 @@ static bool hdd_is_ndp_allowed(struct hdd_context *hdd_ctx)
 			}
 			break;
 		case QDF_P2P_CLIENT_MODE:
-			sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter);
+			sta_ctx =
+				WLAN_HDD_GET_STATION_CTX_PTR(adapter->deflink);
 			if (hdd_cm_is_vdev_associated(adapter) ||
 			    hdd_cm_is_connecting(adapter)) {
 				hdd_adapter_dev_put_debug(adapter, dbgid);
@@ -885,7 +887,7 @@ int hdd_ndi_delete(uint8_t vdev_id, const char *iface_name,
 		return -EINVAL;
 	}
 
-	sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter);
+	sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter->deflink);
 	if (!sta_ctx) {
 		hdd_err("sta_ctx is NULL");
 		return -EINVAL;
@@ -938,7 +940,7 @@ void hdd_ndi_drv_ndi_create_rsp_handler(uint8_t vdev_id,
 		return;
 	}
 
-	sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter);
+	sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter->deflink);
 	if (!sta_ctx) {
 		hdd_err("sta_ctx is null");
 		return;
@@ -1047,7 +1049,7 @@ void hdd_ndi_drv_ndi_delete_rsp_handler(uint8_t vdev_id)
 		return;
 	}
 
-	sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter);
+	sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter->deflink);
 	if (!sta_ctx) {
 		hdd_err("sta_ctx is null");
 		return;
@@ -1125,7 +1127,7 @@ int hdd_ndp_new_peer_handler(uint8_t vdev_id, uint16_t sta_id,
 		return -EINVAL;
 	}
 
-	sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter);
+	sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter->deflink);
 	if (!sta_ctx) {
 		hdd_err("sta_ctx is null");
 		return -EINVAL;
@@ -1183,9 +1185,10 @@ int hdd_ndp_new_peer_handler(uint8_t vdev_id, uint16_t sta_id,
 void hdd_cleanup_ndi(struct hdd_context *hdd_ctx,
 		     struct hdd_adapter *adapter)
 {
-	struct hdd_station_ctx *sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter);
+	struct hdd_station_ctx *sta_ctx;
 	struct wlan_objmgr_vdev *vdev;
 
+	sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter->deflink);
 	if (sta_ctx->conn_info.conn_state != eConnectionState_NdiConnected) {
 		hdd_debug("NDI has no NDPs");
 		return;
@@ -1233,7 +1236,7 @@ void hdd_ndp_peer_departed_handler(uint8_t vdev_id, uint16_t sta_id,
 		return;
 	}
 
-	sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter);
+	sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter->deflink);
 	if (!sta_ctx) {
 		hdd_err("sta_ctx is null");
 		return;

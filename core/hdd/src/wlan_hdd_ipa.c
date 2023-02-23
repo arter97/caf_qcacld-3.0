@@ -236,7 +236,8 @@ void hdd_ipa_send_nbuf_to_network(qdf_nbuf_t nbuf, qdf_netdev_t dev)
 		if (adapter->device_mode == QDF_SAP_MODE) {
 			ta_addr = adapter->mac_addr.bytes;
 		} else if (adapter->device_mode == QDF_STA_MODE) {
-			sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter);
+			sta_ctx =
+				WLAN_HDD_GET_STATION_CTX_PTR(adapter->deflink);
 			ta_addr = (u8 *)&sta_ctx->conn_info.peer_macaddr;
 		}
 
@@ -266,8 +267,7 @@ void hdd_ipa_send_nbuf_to_network(qdf_nbuf_t nbuf, qdf_netdev_t dev)
 	 * and also DP internally maintaining vdev ref count
 	 */
 	ucfg_dp_inc_rx_pkt_stats(adapter->deflink->vdev,
-				 len,
-				 delivered);
+				 len, delivered);
 	/*
 	 * Restore PF_WAKE_UP_IDLE flag in the task structure
 	 */

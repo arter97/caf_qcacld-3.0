@@ -1037,7 +1037,7 @@ int hdd_set_grat_arp_keepalive(struct hdd_adapter *adapter)
 		return -EINVAL;
 	}
 
-	sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter);
+	sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter->deflink);
 	if (!sta_ctx) {
 		hdd_err("sta_ctx is null");
 		return -EINVAL;
@@ -2275,7 +2275,7 @@ int wlan_hdd_set_powersave(struct hdd_adapter *adapter,
 		return -EINVAL;
 	}
 
-	hdd_sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter);
+	hdd_sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter->deflink);
 	if (!hdd_sta_ctx) {
 		hdd_err("hdd_sta_context is NULL");
 		return -EINVAL;
@@ -3124,7 +3124,7 @@ static int __wlan_hdd_cfg80211_set_txpower(struct wiphy *wiphy,
 		qdf_copy_macaddr(&bssid, &adapter->mac_addr);
 	} else {
 		struct hdd_station_ctx *sta_ctx =
-			WLAN_HDD_GET_STATION_CTX_PTR(adapter);
+			WLAN_HDD_GET_STATION_CTX_PTR(adapter->deflink);
 
 		if (hdd_cm_is_vdev_associated(adapter))
 			qdf_copy_macaddr(&bssid, &sta_ctx->conn_info.bssid);

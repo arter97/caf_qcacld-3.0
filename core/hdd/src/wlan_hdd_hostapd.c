@@ -3276,7 +3276,7 @@ bool hdd_is_any_sta_connecting(struct hdd_context *hdd_ctx)
 
 	hdd_for_each_adapter_dev_held_safe(hdd_ctx, adapter, next_adapter,
 					   dbgid) {
-		sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter);
+		sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter->deflink);
 		if ((adapter->device_mode == QDF_STA_MODE) ||
 		    (adapter->device_mode == QDF_P2P_CLIENT_MODE)) {
 			if (hdd_cm_is_connecting(adapter)) {
@@ -3381,7 +3381,7 @@ int hdd_softap_set_channel_change(struct net_device *dev, int target_chan_freq,
 	 * channel switch in SAP interface.
 	 */
 	if (sta_adapter && conc_rule1) {
-		sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(sta_adapter);
+		sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(sta_adapter->deflink);
 		if (hdd_cm_is_vdev_associated(sta_adapter)) {
 			hdd_err("Channel switch not allowed after STA connection with conc_custom_rule1 enabled");
 			return -EBUSY;

@@ -1370,8 +1370,7 @@ struct hdd_adapter {
 	struct wlan_hdd_tx_power tx_power;
 };
 
-#define WLAN_HDD_GET_STATION_CTX_PTR(adapter) \
-		(&(adapter)->deflink->session.station)
+#define WLAN_HDD_GET_STATION_CTX_PTR(link_info) (&(link_info)->session.station)
 #define WLAN_HDD_GET_AP_CTX_PTR(adapter) (&(adapter)->deflink->session.ap)
 #define WLAN_HDD_GET_CTX(adapter) ((adapter)->hdd_ctx)
 #define WLAN_HDD_GET_HOSTAP_STATE_PTR(adapter) \
@@ -3873,7 +3872,7 @@ struct csr_roam_profile *hdd_roam_profile(struct hdd_adapter *adapter)
 {
 	struct hdd_station_ctx *sta_ctx;
 
-	sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter);
+	sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter->deflink);
 
 	return &sta_ctx->roam_profile;
 }

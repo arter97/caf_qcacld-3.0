@@ -1793,7 +1793,7 @@ static ssize_t __hdd_wlan_tsf_show(struct device *dev,
 		return scnprintf(buf, PAGE_SIZE,
 				 "TSF sync is not initialized\n");
 
-	hdd_sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter);
+	hdd_sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter->deflink);
 	if (!hdd_cm_is_vdev_associated(adapter) &&
 	    (adapter->device_mode == QDF_STA_MODE ||
 	    adapter->device_mode == QDF_P2P_CLIENT_MODE))
@@ -1957,7 +1957,7 @@ static ssize_t __hdd_wlan_tsf_show(struct device *dev,
 		return scnprintf(buf, PAGE_SIZE,
 				 "TSF sync is not initialized\n");
 
-	hdd_sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter);
+	hdd_sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter->deflink);
 	if (!hdd_cm_is_vdev_associated(adapter) &&
 	    (adapter->device_mode == QDF_STA_MODE ||
 	    adapter->device_mode == QDF_P2P_CLIENT_MODE))

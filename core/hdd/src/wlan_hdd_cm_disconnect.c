@@ -55,10 +55,11 @@ void hdd_handle_disassociation_event(struct hdd_adapter *adapter,
 				     struct qdf_mac_addr *peer_macaddr)
 {
 	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
-	struct hdd_station_ctx *sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter);
+	struct hdd_station_ctx *sta_ctx;
 	ol_txrx_soc_handle soc = cds_get_context(QDF_MODULE_ID_SOC);
 	struct wlan_objmgr_vdev *vdev;
 
+	sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter->deflink);
 	hdd_green_ap_start_state_mc(hdd_ctx, adapter->device_mode, false);
 
 	wlan_hdd_auto_shutdown_enable(hdd_ctx, true);
@@ -123,10 +124,11 @@ static void hdd_cm_print_bss_info(struct hdd_station_ctx *hdd_sta_ctx)
 void __hdd_cm_disconnect_handler_pre_user_update(struct hdd_adapter *adapter)
 {
 	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
-	struct hdd_station_ctx *sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter);
+	struct hdd_station_ctx *sta_ctx;
 	uint32_t time_buffer_size;
 	struct wlan_objmgr_vdev *vdev;
 
+	sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter->deflink);
 	hdd_stop_tsf_sync(adapter);
 	time_buffer_size = sizeof(sta_ctx->conn_info.connect_time);
 	qdf_mem_zero(sta_ctx->conn_info.connect_time, time_buffer_size);
@@ -163,12 +165,13 @@ void __hdd_cm_disconnect_handler_post_user_update(struct hdd_adapter *adapter,
 						  struct wlan_objmgr_vdev *vdev)
 {
 	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
-	struct hdd_station_ctx *sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter);
+	struct hdd_station_ctx *sta_ctx;
 	mac_handle_t mac_handle;
 	struct hdd_adapter *link_adapter;
 	struct hdd_station_ctx *link_sta_ctx;
 
 	mac_handle = hdd_ctx->mac_handle;
+	sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter->deflink);
 
 	/* update P2P connection status */
 	ucfg_p2p_status_disconnect(vdev);
@@ -197,7 +200,7 @@ void __hdd_cm_disconnect_handler_post_user_update(struct hdd_adapter *adapter,
 		link_adapter = hdd_get_assoc_link_adapter(adapter);
 		if (link_adapter) {
 			link_sta_ctx =
-				WLAN_HDD_GET_STATION_CTX_PTR(link_adapter);
+				WLAN_HDD_GET_STATION_CTX_PTR(link_adapter->deflink);
 			hdd_conn_remove_connect_info(link_sta_ctx);
 		}
 	}
@@ -247,11 +250,13 @@ QDF_STATUS wlan_hdd_cm_issue_disconnect(struct hdd_adapter *adapter,
 {
 	QDF_STATUS status;
 	struct wlan_objmgr_vdev *vdev;
-	struct hdd_station_ctx *sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter);
+	struct hdd_station_ctx *sta_ctx;
 
 	vdev = hdd_objmgr_get_vdev_by_user(adapter, WLAN_OSIF_CM_ID);
 	if (!vdev)
 		return QDF_STATUS_E_INVAL;
+
+	sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter->deflink);
 	hdd_place_marker(adapter, "TRY TO DISCONNECT", NULL);
 	reset_mscs_params(adapter);
 	hdd_conn_set_authenticated(adapter, false);

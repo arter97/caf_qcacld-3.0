@@ -7034,7 +7034,7 @@ static bool wlan_hdd_check_dfs_channel_for_adapter(struct hdd_context *hdd_ctx,
 		if ((device_mode == adapter->device_mode) &&
 		    (device_mode == QDF_STA_MODE)) {
 			sta_ctx =
-				WLAN_HDD_GET_STATION_CTX_PTR(adapter);
+				WLAN_HDD_GET_STATION_CTX_PTR(adapter->deflink);
 			/*
 			 *  if STA is already connected on DFS channel,
 			 *  do not disable scan on dfs channels.
@@ -7406,7 +7406,7 @@ static int __wlan_hdd_cfg80211_keymgmt_set_key(struct wiphy *wiphy,
 	struct hdd_adapter *hdd_adapter = WLAN_HDD_GET_PRIV_PTR(dev);
 	struct hdd_context *hdd_ctx;
 	struct hdd_station_ctx *sta_ctx =
-			WLAN_HDD_GET_STATION_CTX_PTR(hdd_adapter);
+			WLAN_HDD_GET_STATION_CTX_PTR(hdd_adapter->deflink);
 	struct wlan_crypto_pmksa pmksa;
 	int status;
 	mac_handle_t mac_handle;
@@ -7759,7 +7759,7 @@ void wlan_hdd_save_gtk_offload_params(struct hdd_adapter *adapter,
 	if (!gtk_req)
 		return;
 
-	hdd_sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter);
+	hdd_sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter->deflink);
 	if (kck_ptr) {
 		if (kck_len > sizeof(gtk_req->kck)) {
 			kck_len = sizeof(gtk_req->kck);
@@ -11989,7 +11989,7 @@ __wlan_hdd_cfg80211_set_wifi_test_config(struct wiphy *wiphy,
 	struct keep_alive_req keep_alive_req = {0};
 	struct set_wfatest_params wfa_param = {0};
 	struct hdd_station_ctx *hdd_sta_ctx =
-		WLAN_HDD_GET_STATION_CTX_PTR(adapter);
+		WLAN_HDD_GET_STATION_CTX_PTR(adapter->deflink);
 
 	hdd_enter_dev(dev);
 
@@ -14325,7 +14325,7 @@ static int __wlan_hdd_cfg80211_get_link_properties(struct wiphy *wiphy,
 
 	if (adapter->device_mode == QDF_STA_MODE ||
 	    adapter->device_mode == QDF_P2P_CLIENT_MODE) {
-		hdd_sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter);
+		hdd_sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter->deflink);
 		if (!hdd_cm_is_vdev_associated(adapter) ||
 		    qdf_mem_cmp(hdd_sta_ctx->conn_info.bssid.bytes,
 			peer_mac, QDF_MAC_ADDR_SIZE)) {
@@ -21134,7 +21134,7 @@ static int __wlan_hdd_change_station(struct wiphy *wiphy,
 	if (0 != ret)
 		return ret;
 
-	sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter);
+	sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter->deflink);
 
 	qdf_mem_copy(sta_macaddr.bytes, mac, QDF_MAC_ADDR_SIZE);
 
@@ -22709,7 +22709,7 @@ void hdd_mon_select_cbmode(struct hdd_adapter *adapter,
 			   struct ch_params *ch_params)
 {
 	struct hdd_station_ctx *station_ctx =
-			 WLAN_HDD_GET_STATION_CTX_PTR(adapter);
+			 WLAN_HDD_GET_STATION_CTX_PTR(adapter->deflink);
 	struct hdd_mon_set_ch_info *ch_info = &station_ctx->ch_info;
 	enum hdd_dot11_mode hdd_dot11_mode;
 	uint8_t ini_dot11_mode =
@@ -25108,7 +25108,7 @@ static int __wlan_hdd_cfg80211_set_mon_ch(struct wiphy *wiphy,
 			ch_width, max_fw_bw);
 		return -EINVAL;
 	}
-	sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter);
+	sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter->deflink);
 	ch_info = &sta_ctx->ch_info;
 
 	if (WLAN_REG_IS_24GHZ_CH_FREQ(chandef->chan->center_freq) &&
@@ -26178,7 +26178,7 @@ hdd_convert_cfgdot11mode_to_80211mode(enum csr_cfgdot11mode mode)
 
 bool hdd_is_legacy_connection(struct hdd_adapter *adapter)
 {
-	struct hdd_station_ctx *sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter);
+	struct hdd_station_ctx *sta_ctx;
 	int connection_mode = QCA_WLAN_802_11_MODE_INVALID;
 	enum csr_cfgdot11mode cfgmode;
 	uint16_t tdls_connected_peer;
@@ -26187,6 +26187,7 @@ bool hdd_is_legacy_connection(struct hdd_adapter *adapter)
 	if (tdls_connected_peer)
 		return false;
 
+	sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter->deflink);
 	cfgmode = sta_ctx->conn_info.dot11mode;
 	connection_mode = hdd_convert_cfgdot11mode_to_80211mode(cfgmode);
 	if (connection_mode == QCA_WLAN_802_11_MODE_11A ||
@@ -26227,7 +26228,7 @@ static int __wlan_hdd_cfg80211_get_channel(struct wiphy *wiphy,
 		if (!hdd_cm_is_vdev_associated(adapter))
 			return -EINVAL;
 
-		sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter);
+		sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter->deflink);
 		if (sta_ctx->conn_info.dot11mode < eCSR_CFG_DOT11_MODE_11N)
 			is_legacy_phymode = true;
 
