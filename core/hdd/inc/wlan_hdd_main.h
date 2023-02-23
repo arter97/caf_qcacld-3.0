@@ -3099,6 +3099,25 @@ static inline bool hdd_dynamic_mac_addr_supported(struct hdd_context *hdd_ctx)
 #endif
 
 /**
+ * hdd_adapter_get_link_info_ptr() - To get the pointer of link_info
+ * in adapter.
+ * @adapter: HDD adapter
+ * @link_idx: Index of link_info in @adapter.
+ *
+ * The API returns link_info in @adapter pointed at @link_idx in the array.
+ *
+ * Return: Pointer to wlan_hdd_link_info or NULL.
+ */
+static inline struct wlan_hdd_link_info *
+hdd_adapter_get_link_info_ptr(struct hdd_adapter *adapter, uint8_t link_idx)
+{
+	if (!adapter || (link_idx >= WLAN_MAX_MLD))
+		return NULL;
+
+	return &adapter->link_info[link_idx];
+}
+
+/**
  * hdd_start_vendor_acs(): Start vendor ACS procedure
  * @adapter: pointer to SAP adapter struct
  *
