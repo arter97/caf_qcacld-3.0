@@ -261,7 +261,7 @@ static int __wlan_hdd_mgmt_tx(struct wiphy *wiphy, struct wireless_dev *wdev,
 	uint32_t assoc_resp_len, ft_info_len = 0;
 	const uint8_t  *assoc_resp;
 	void *ft_info;
-	struct hdd_ap_ctx *hdd_ap_ctx;
+	struct hdd_ap_ctx *ap_ctx;
 
 	if (QDF_GLOBAL_FTM_MODE == hdd_get_conparam()) {
 		hdd_err("Command not allowed in FTM mode");
@@ -302,8 +302,8 @@ static int __wlan_hdd_mgmt_tx(struct wiphy *wiphy, struct wireless_dev *wdev,
 			if ((auth_algo == eSIR_FT_AUTH) &&
 			    (adapter->device_mode == QDF_SAP_MODE ||
 			     adapter->device_mode == QDF_P2P_GO_MODE)) {
-				hdd_ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(adapter);
-				hdd_ap_ctx->during_auth_offload = false;
+				ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(adapter->deflink);
+				ap_ctx->during_auth_offload = false;
 			}
 		}
 
@@ -341,10 +341,10 @@ static int __wlan_hdd_mgmt_tx(struct wiphy *wiphy, struct wireless_dev *wdev,
 		if (!ft_info || !ft_info_len)
 			return -EINVAL;
 		hdd_debug("get ft_info_len from Assoc rsp :%d", ft_info_len);
-		hdd_ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(adapter);
-		qdf_status = wlansap_update_ft_info(hdd_ap_ctx->sap_context,
-				((struct ieee80211_mgmt *)buf)->da,
-				ft_info, ft_info_len, 0);
+		ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(adapter->deflink);
+		qdf_status = wlansap_update_ft_info(ap_ctx->sap_context,
+						    ((struct ieee80211_mgmt *)buf)->da,
+						    ft_info, ft_info_len, 0);
 		qdf_mem_free(ft_info);
 
 		if (QDF_IS_STATUS_SUCCESS(qdf_status))
@@ -1067,7 +1067,7 @@ __hdd_indicate_mgmt_frame_to_user(struct hdd_adapter *adapter,
 	bool is_pasn_auth_frame = false;
 	struct hdd_adapter *assoc_adapter;
 	bool eht_capab;
-	struct hdd_ap_ctx *hdd_ap_ctx;
+	struct hdd_ap_ctx *ap_ctx;
 
 	hdd_debug("Frame Type = %d Frame Length = %d freq = %d",
 		  frame_type, frm_len, rx_freq);
@@ -1098,12 +1098,11 @@ __hdd_indicate_mgmt_frame_to_user(struct hdd_adapter *adapter,
 					  sizeof(struct wlan_frame_hdr));
 		if (auth_algo == eSIR_AUTH_TYPE_PASN) {
 			is_pasn_auth_frame = true;
-		} else if (auth_algo == eSIR_FT_AUTH) {
-			if (adapter->device_mode == QDF_SAP_MODE ||
-			    adapter->device_mode == QDF_P2P_GO_MODE) {
-				hdd_ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(adapter);
-				hdd_ap_ctx->during_auth_offload = true;
-			}
+		} else if (auth_algo == eSIR_FT_AUTH &&
+			   (adapter->device_mode == QDF_SAP_MODE ||
+			    adapter->device_mode == QDF_P2P_GO_MODE)) {
+			ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(adapter->deflink);
+			ap_ctx->during_auth_offload = true;
 		}
 	}
 

@@ -251,7 +251,7 @@ static int __wlan_hdd_request_pre_cac(struct hdd_context *hdd_ctx,
 
 	mac_handle = hdd_ctx->mac_handle;
 
-	hdd_ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(ap_adapter);
+	hdd_ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(ap_adapter->deflink);
 	if (!hdd_ap_ctx) {
 		hdd_err("SAP context is NULL");
 		return -EINVAL;
@@ -528,7 +528,7 @@ wlan_hdd_pre_cac_conditional_freq_switch_ind(struct wlan_objmgr_vdev *vdev,
 	}
 
 	if (completed) {
-		ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(adapter);
+		ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(adapter->deflink);
 		ap_ctx->dfs_cac_block_tx = false;
 		ucfg_ipa_set_dfs_cac_tx(adapter->hdd_ctx->pdev,
 					ap_ctx->dfs_cac_block_tx);

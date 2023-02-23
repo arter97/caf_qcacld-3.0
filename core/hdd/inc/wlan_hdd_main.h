@@ -1371,7 +1371,7 @@ struct hdd_adapter {
 };
 
 #define WLAN_HDD_GET_STATION_CTX_PTR(link_info) (&(link_info)->session.station)
-#define WLAN_HDD_GET_AP_CTX_PTR(adapter) (&(adapter)->deflink->session.ap)
+#define WLAN_HDD_GET_AP_CTX_PTR(link_info) (&(link_info)->session.ap)
 #define WLAN_HDD_GET_CTX(adapter) ((adapter)->hdd_ctx)
 #define WLAN_HDD_GET_HOSTAP_STATE_PTR(adapter) \
 				(&(adapter)->deflink->session.ap.hostapd_state)

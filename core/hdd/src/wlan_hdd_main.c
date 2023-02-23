@@ -2930,14 +2930,13 @@ bool hdd_dfs_indicate_radar(struct hdd_context *hdd_ctx)
 
 	hdd_for_each_adapter_dev_held_safe(hdd_ctx, adapter, next_adapter,
 					   NET_DEV_HOLD_DFS_INDICATE_RADAR) {
-		ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(adapter);
+		ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(adapter->deflink);
 
 		if ((QDF_SAP_MODE == adapter->device_mode ||
 		    QDF_P2P_GO_MODE == adapter->device_mode) &&
 		    (wlan_reg_is_passive_or_disable_for_pwrmode(hdd_ctx->pdev,
 		     ap_ctx->operating_chan_freq, REG_CURRENT_PWR_MODE))) {
-			WLAN_HDD_GET_AP_CTX_PTR(adapter)->dfs_cac_block_tx =
-				true;
+			ap_ctx->dfs_cac_block_tx = true;
 			hdd_info("tx blocked for vdev: %d",
 				adapter->deflink->vdev_id);
 			if (adapter->deflink->vdev_id != WLAN_UMAC_VDEV_ID_MAX)
@@ -8609,7 +8608,7 @@ QDF_STATUS hdd_stop_adapter_ext(struct hdd_context *hdd_ctx,
 		fallthrough;
 
 	case QDF_P2P_GO_MODE:
-		ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(adapter);
+		ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(adapter->deflink);
 		wlansap_cleanup_cac_timer(ap_ctx->sap_context);
 
 		cds_flush_work(&adapter->sap_stop_bss_work);
@@ -10891,7 +10890,7 @@ bool wlan_hdd_get_ap_client_count(hdd_cb_handle context, uint8_t vdev_id,
 		return false;
 	}
 
-	ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(adapter);
+	ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(adapter->deflink);
 	if (!ap_ctx->ap_active)
 		return false;
 	for (i = QCA_WLAN_802_11_MODE_11B; i < QCA_WLAN_802_11_MODE_INVALID;
@@ -10996,7 +10995,7 @@ static inline bool hdd_is_ap_active(hdd_cb_handle context, uint8_t vdev_id)
 		hdd_err("adapter is null");
 		return false;
 	}
-	return WLAN_HDD_GET_AP_CTX_PTR(adapter)->ap_active;
+	return WLAN_HDD_GET_AP_CTX_PTR(adapter->deflink)->ap_active;
 }
 
 /**
@@ -11939,7 +11938,7 @@ QDF_STATUS hdd_switch_sap_channel(struct hdd_adapter *adapter, uint8_t channel,
 		return QDF_STATUS_E_INVAL;
 	}
 
-	hdd_ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(adapter);
+	hdd_ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(adapter->deflink);
 
 	mac_handle = hdd_adapter_get_mac_handle(adapter);
 	if (!mac_handle) {
@@ -11974,7 +11973,7 @@ QDF_STATUS hdd_switch_sap_chan_freq(struct hdd_adapter *adapter,
 	if(wlan_hdd_validate_context(hdd_ctx))
 		return QDF_STATUS_E_INVAL;
 
-	hdd_ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(adapter);
+	hdd_ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(adapter->deflink);
 
 	hdd_debug("chan freq:%d width:%d org bw %d",
 		  chan_freq, ch_width, hdd_ap_ctx->sap_config.ch_width_orig);
@@ -12140,7 +12139,7 @@ QDF_STATUS hdd_unsafe_channel_restart_sap(struct hdd_context *hdd_ctxt)
 
 	hdd_for_each_adapter_dev_held_safe(hdd_ctxt, adapter, next_adapter,
 					   dbgid) {
-		ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(adapter);
+		ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(adapter->deflink);
 		if (!(adapter->device_mode == QDF_SAP_MODE &&
 		    ap_ctx->sap_config.acs_cfg.acs_mode)) {
 			hdd_debug_rl("skip device mode:%d acs:%d",
@@ -16794,7 +16793,7 @@ void wlan_hdd_auto_shutdown_enable(struct hdd_context *hdd_ctx, bool enable)
 			}
 
 			if (adapter->device_mode == QDF_SAP_MODE) {
-				if (WLAN_HDD_GET_AP_CTX_PTR(adapter)->
+				if (WLAN_HDD_GET_AP_CTX_PTR(adapter->deflink)->
 				    ap_active == true) {
 					ap_connected = true;
 					hdd_adapter_dev_put_debug(adapter,
@@ -16890,7 +16889,7 @@ bool hdd_is_any_adapter_connected(struct hdd_context *hdd_ctx)
 		}
 
 		if (hdd_adapter_is_ap(adapter) &&
-		    WLAN_HDD_GET_AP_CTX_PTR(adapter)->ap_active) {
+		    WLAN_HDD_GET_AP_CTX_PTR(adapter->deflink)->ap_active) {
 			hdd_adapter_dev_put_debug(adapter, dbgid);
 			if (next_adapter)
 				hdd_adapter_dev_put_debug(next_adapter,
@@ -16959,7 +16958,7 @@ void wlan_hdd_stop_sap(struct hdd_adapter *ap_adapter)
 		return;
 	}
 
-	hdd_ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(ap_adapter);
+	hdd_ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(ap_adapter->deflink);
 	hdd_ctx = WLAN_HDD_GET_CTX(ap_adapter);
 	if (wlan_hdd_validate_context(hdd_ctx))
 		return;
@@ -17063,7 +17062,7 @@ void wlan_hdd_start_sap(struct hdd_adapter *ap_adapter, bool reinit)
 	}
 
 	hdd_ctx = WLAN_HDD_GET_CTX(ap_adapter);
-	hdd_ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(ap_adapter);
+	hdd_ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(ap_adapter->deflink);
 	hostapd_state = WLAN_HDD_GET_HOSTAP_STATE_PTR(ap_adapter);
 	sap_config = &ap_adapter->deflink->session.ap.sap_config;
 
@@ -19752,7 +19751,7 @@ void hdd_restart_sap(struct hdd_adapter *ap_adapter)
 	struct sap_config *sap_config;
 	void *sap_ctx;
 
-	hdd_ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(ap_adapter);
+	hdd_ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(ap_adapter->deflink);
 	sap_config = &hdd_ap_ctx->sap_config;
 	sap_ctx = hdd_ap_ctx->sap_context;
 

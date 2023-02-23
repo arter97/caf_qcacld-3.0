@@ -1676,7 +1676,7 @@ void wlan_hdd_set_tx_flow_info(void)
 			}
 			break;
 		case QDF_P2P_GO_MODE:
-			hdd_ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(adapter);
+			hdd_ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(adapter->deflink);
 			hostapd_state = WLAN_HDD_GET_HOSTAP_STATE_PTR(adapter);
 			if (hostapd_state->bss_state == BSS_START &&
 			    hostapd_state->qdf_status ==
@@ -1688,7 +1688,7 @@ void wlan_hdd_set_tx_flow_info(void)
 			}
 			break;
 		case QDF_SAP_MODE:
-			hdd_ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(adapter);
+			hdd_ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(adapter->deflink);
 			hostapd_state = WLAN_HDD_GET_HOSTAP_STATE_PTR(adapter);
 			if (hostapd_state->bss_state == BSS_START &&
 			    hostapd_state->qdf_status ==

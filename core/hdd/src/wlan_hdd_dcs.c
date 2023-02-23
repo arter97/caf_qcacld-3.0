@@ -424,7 +424,7 @@ QDF_STATUS hdd_dcs_hostapd_set_chan(struct hdd_context *hdd_ctx,
 			return QDF_STATUS_E_INVAL;
 		}
 
-		ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(adapter);
+		ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(adapter->deflink);
 
 		if (ap_ctx->operating_chan_freq != dcs_ch_freq) {
 			hdd_ctx->acs_policy.acs_chan_freq = AUTO_CHANNEL_SELECT;

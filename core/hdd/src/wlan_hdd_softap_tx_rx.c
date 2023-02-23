@@ -502,7 +502,7 @@ QDF_STATUS hdd_softap_deregister_sta(struct hdd_adapter *adapter,
 	ucfg_dp_del_latency_critical_client(vdev, sta->dot11_mode);
 	hdd_objmgr_put_vdev_by_user(vdev, WLAN_DP_ID);
 
-	ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(adapter);
+	ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(adapter->deflink);
 	if (!QDF_IS_ADDR_BROADCAST(sta->sta_mac.bytes) &&
 	    sta->dot11_mode < QCA_WLAN_802_11_MODE_INVALID)
 		ap_ctx->client_count[sta->dot11_mode]--;
@@ -538,7 +538,7 @@ QDF_STATUS hdd_softap_register_sta(struct hdd_adapter *adapter,
 		dot11mode = hdd_convert_dot11mode_from_phymode(event->chan_info.info);
 	}
 
-	ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(adapter);
+	ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(adapter->deflink);
 
 	/*
 	 * If the address is a broadcast address, then provide the self mac addr
@@ -666,7 +666,7 @@ QDF_STATUS hdd_softap_register_bc_sta(struct hdd_adapter *adapter,
 	struct qdf_mac_addr broadcast_macaddr = QDF_MAC_ADDR_BCAST_INIT;
 	struct hdd_ap_ctx *ap_ctx;
 	uint8_t sta_id;
-	ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(adapter);
+	ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(adapter->deflink);
 	sta_id = ap_ctx->broadcast_sta_id;
 
 	if (sta_id >= WLAN_MAX_STA_COUNT) {

@@ -518,7 +518,7 @@ static int __wlan_hdd_cfg80211_scan(struct wiphy *wiphy,
 
 	con_sap_adapter = hdd_get_con_sap_adapter(adapter, true);
 	if (con_sap_adapter) {
-		ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(con_sap_adapter);
+		ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(con_sap_adapter->deflink);
 		con_dfs_ch_freq = ap_ctx->sap_config.chan_freq;
 		con_dfs_ch_width = ap_ctx->sap_config.ch_params.ch_width;
 		if (con_dfs_ch_freq == AUTO_CHANNEL_SELECT)

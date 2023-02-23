@@ -6408,7 +6408,7 @@ static void disconnect_sta_and_restart_sap(struct hdd_context *hdd_ctx,
 			goto next_adapter;
 		}
 
-		ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(adapter);
+		ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(adapter->deflink);
 		if (check_disable_channels(hdd_ctx, ap_ctx->operating_chan_freq))
 			policy_mgr_check_sap_restart(hdd_ctx->psoc,
 						     adapter->deflink->vdev_id);

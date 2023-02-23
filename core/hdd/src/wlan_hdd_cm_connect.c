@@ -584,7 +584,7 @@ bool wlan_hdd_cm_handle_sap_sta_dfs_conc(struct hdd_context *hdd_ctx,
 	 * log and return error, if we allow STA to go through, we don't
 	 * know what is going to happen better stop sta connection
 	 */
-	hdd_ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(ap_adapter);
+	hdd_ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(ap_adapter->deflink);
 	if (!hdd_ap_ctx) {
 		hdd_err("AP context not found");
 		return false;

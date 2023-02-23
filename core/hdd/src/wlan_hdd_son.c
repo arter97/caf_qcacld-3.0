@@ -912,7 +912,7 @@ static int hdd_son_set_phymode(struct wlan_objmgr_vdev *vdev,
 
 	vendor_phy_mode = hdd_son_phy_mode_to_vendor_phy_mode(mode);
 
-	hdd_ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(adapter);
+	hdd_ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(adapter->deflink);
 	sap_config = &hdd_ap_ctx->sap_config;
 	status = wlansap_son_update_sap_config_phymode(vdev, sap_config,
 						       vendor_phy_mode);

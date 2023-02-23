@@ -878,7 +878,7 @@ static __iw_softap_setparam(struct net_device *dev,
 
 	case QCASAP_SET_RADAR_CMD:
 	{
-		struct hdd_ap_ctx *ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(adapter);
+		struct hdd_ap_ctx *ap_ctx;
 		struct wlan_objmgr_pdev *pdev;
 		struct radar_found_info radar;
 
@@ -890,6 +890,7 @@ static __iw_softap_setparam(struct net_device *dev,
 			return -EINVAL;
 		}
 
+		ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(adapter->deflink);
 		qdf_mem_zero(&radar, sizeof(radar));
 		if (wlansap_is_channel_in_nol_list(ap_ctx->sap_context,
 						   ap_ctx->operating_chan_freq,
@@ -1517,7 +1518,7 @@ static __iw_softap_getchannel(struct net_device *dev,
 		return ret;
 
 	*value = 0;
-	ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(adapter);
+	ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(adapter->deflink);
 	if (test_bit(SOFTAP_BSS_STARTED, &adapter->event_flags))
 		*value = wlan_reg_freq_to_chan(
 				hdd_ctx->pdev,

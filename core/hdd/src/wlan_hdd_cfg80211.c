@@ -4207,8 +4207,7 @@ static uint16_t wlan_hdd_acs_get_puncture_bitmap(struct sap_acs_cfg *acs_cfg)
 void wlan_hdd_cfg80211_acs_ch_select_evt(struct hdd_adapter *adapter)
 {
 	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
-	struct sap_config *sap_cfg =
-				&(WLAN_HDD_GET_AP_CTX_PTR(adapter))->sap_config;
+	struct sap_config *sap_cfg;
 	struct sk_buff *vendor_event;
 	int ret_val;
 	uint16_t ch_width;
@@ -4216,11 +4215,14 @@ void wlan_hdd_cfg80211_acs_ch_select_evt(struct hdd_adapter *adapter)
 	uint8_t ht_sec_channel;
 	uint8_t vht_seg0_center_ch, vht_seg1_center_ch;
 	uint32_t id = QCA_NL80211_VENDOR_SUBCMD_DO_ACS_INDEX;
-	uint32_t len = hdd_get_acs_evt_data_len(sap_cfg);
+	uint32_t len;
 	uint16_t puncture_bitmap;
 
 	qdf_atomic_set(&adapter->deflink->session.ap.acs_in_progress, 0);
 	qdf_event_set(&adapter->acs_complete_event);
+
+	sap_cfg = &(WLAN_HDD_GET_AP_CTX_PTR(adapter->deflink))->sap_config;
+	len = hdd_get_acs_evt_data_len(sap_cfg);
 
 	vendor_event = wlan_cfg80211_vendor_event_alloc(hdd_ctx->wiphy,
 							&adapter->wdev, len, id,
@@ -7007,7 +7009,7 @@ static bool wlan_hdd_check_dfs_channel_for_adapter(struct hdd_context *hdd_ctx,
 		if ((device_mode == adapter->device_mode) &&
 		    (device_mode == QDF_SAP_MODE)) {
 			ap_ctx =
-				WLAN_HDD_GET_AP_CTX_PTR(adapter);
+				WLAN_HDD_GET_AP_CTX_PTR(adapter->deflink);
 			/*
 			 *  if there is SAP already running on DFS channel,
 			 *  do not disable scan on dfs channels. Note that
@@ -14284,6 +14286,7 @@ static int __wlan_hdd_cfg80211_get_link_properties(struct wiphy *wiphy,
 	struct net_device *dev = wdev->netdev;
 	struct hdd_adapter *adapter = WLAN_HDD_GET_PRIV_PTR(dev);
 	struct hdd_station_ctx *hdd_sta_ctx;
+	struct hdd_ap_ctx *ap_ctx;
 	struct hdd_station_info *sta_info;
 	struct nlattr *tb[QCA_WLAN_VENDOR_ATTR_MAX+1];
 	uint8_t peer_mac[QDF_MAC_ADDR_SIZE];
@@ -14359,8 +14362,9 @@ static int __wlan_hdd_cfg80211_get_link_properties(struct wiphy *wiphy,
 			return -EINVAL;
 		}
 
+		ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(adapter->deflink);
 		nss = sta_info->nss;
-		freq = (WLAN_HDD_GET_AP_CTX_PTR(adapter))->operating_chan_freq;
+		freq = ap_ctx->operating_chan_freq;
 		rate_flags = sta_info->rate_flags;
 		hdd_put_sta_info_ref(&adapter->sta_info_list, &sta_info, true,
 				     STA_INFO_CFG80211_GET_LINK_PROPERTIES);
@@ -15235,7 +15239,7 @@ __wlan_hdd_cfg80211_sap_configuration_set(struct wiphy *wiphy,
 			return -ENOTSUPP;
 		}
 
-		ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(hostapd_adapter);
+		ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(hostapd_adapter->deflink);
 		ap_ctx->sap_config.chan_freq = chan_freq;
 		ap_ctx->sap_config.ch_params.ch_width =
 					ap_ctx->sap_config.ch_width_orig;
@@ -15807,7 +15811,7 @@ static int hdd_update_acs_channel(struct hdd_adapter *adapter, uint8_t reason,
 		return -EINVAL;
 	}
 
-	hdd_ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(adapter);
+	hdd_ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(adapter->deflink);
 	sap_config = &adapter->deflink->session.ap.sap_config;
 
 	if (QDF_TIMER_STATE_RUNNING ==
@@ -20602,7 +20606,7 @@ static int __wlan_hdd_cfg80211_change_bss(struct wiphy *wiphy,
 {
 	struct hdd_adapter *adapter = WLAN_HDD_GET_PRIV_PTR(dev);
 	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
-	struct hdd_ap_ctx *ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(adapter);
+	struct hdd_ap_ctx *ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(adapter->deflink);
 	int ret = 0;
 	QDF_STATUS qdf_ret_status;
 	mac_handle_t mac_handle;
@@ -21145,7 +21149,7 @@ static int __wlan_hdd_change_station(struct wiphy *wiphy,
 	if ((adapter->device_mode == QDF_SAP_MODE) ||
 	    (adapter->device_mode == QDF_P2P_GO_MODE)) {
 		if (params->sta_flags_set & BIT(NL80211_STA_FLAG_AUTHORIZED)) {
-			ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(adapter);
+			ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(adapter->deflink);
 			/*
 			 * For Encrypted SAP session, this will be done as
 			 * part of eSAP_STA_SET_KEY_EVENT
@@ -21620,7 +21624,7 @@ done:
 	switch (adapter->device_mode) {
 	case QDF_SAP_MODE:
 	case QDF_P2P_GO_MODE:
-		hdd_ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(adapter);
+		hdd_ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(adapter->deflink);
 		if (hdd_ap_ctx->during_auth_offload) {
 			hdd_err("don't need install key during auth");
 			return -EINVAL;
@@ -22548,7 +22552,7 @@ static int __wlan_hdd_cfg80211_set_default_key(struct wiphy *wiphy,
 			ret = -EINVAL;
 			goto out;
 		}
-		ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(adapter);
+		ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(adapter->deflink);
 		ap_ctx->wep_def_key_idx = key_index;
 	}
 
@@ -26240,7 +26244,7 @@ static int __wlan_hdd_cfg80211_get_channel(struct wiphy *wiphy,
 			(adapter->device_mode == QDF_P2P_GO_MODE)) {
 		struct hdd_ap_ctx *ap_ctx;
 
-		ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(adapter);
+		ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(adapter->deflink);
 
 		if (!test_bit(SOFTAP_BSS_STARTED, &adapter->event_flags))
 			return -EINVAL;
