@@ -23722,17 +23722,20 @@ static QDF_STATUS wlan_hdd_del_pmksa_cache(struct hdd_adapter *adapter,
 	return result;
 }
 
-QDF_STATUS wlan_hdd_flush_pmksa_cache(struct hdd_adapter *adapter)
+QDF_STATUS wlan_hdd_flush_pmksa_cache(struct wlan_hdd_link_info *link_info)
 {
 	QDF_STATUS result;
 	struct wlan_objmgr_vdev *vdev;
 
-	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink, WLAN_OSIF_ID);
+	vdev = hdd_objmgr_get_vdev_by_user(link_info, WLAN_OSIF_ID);
 	if (!vdev)
 		return QDF_STATUS_E_FAILURE;
 
 	result = wlan_crypto_set_del_pmksa(vdev, NULL, false);
 	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
+
+	if (QDF_IS_STATUS_ERROR(result))
+		hdd_debug("Cannot flush PMKIDCache");
 
 	return result;
 }
@@ -24086,13 +24089,11 @@ static int __wlan_hdd_cfg80211_flush_pmksa(struct wiphy *wiphy,
 	if (errno)
 		return errno;
 
-	status = wlan_hdd_flush_pmksa_cache(adapter);
-	if (status == QDF_STATUS_E_NOSUPPORT) {
+	status = wlan_hdd_flush_pmksa_cache(adapter->deflink);
+	if (status == QDF_STATUS_E_NOSUPPORT)
 		errno = -EOPNOTSUPP;
-	} else if (QDF_IS_STATUS_ERROR(status)) {
-		hdd_err("Cannot flush PMKIDCache");
+	else if (QDF_IS_STATUS_ERROR(status))
 		errno = -EINVAL;
-	}
 
 	sme_set_del_pmkid_cache(hdd_ctx->psoc, adapter->deflink->vdev_id,
 				NULL, false);

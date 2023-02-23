@@ -33,6 +33,7 @@
 #include <wlan_cfg80211_spectral.h>
 
 struct hdd_context;
+struct wlan_hdd_link_info;
 
 #ifdef WLAN_FEATURE_11BE_MLO
 #define EHT_OPMODE_SUPPORTED 2
@@ -729,11 +730,11 @@ void wlan_hdd_save_gtk_offload_params(struct hdd_adapter *adapter,
 
 /**
  * wlan_hdd_flush_pmksa_cache() - flush pmksa cache for adapter
- * @adapter: Adapter context
+ * @link_info: link_info pointer in adapter
  *
  * Return: qdf status
  */
-QDF_STATUS wlan_hdd_flush_pmksa_cache(struct hdd_adapter *adapter);
+QDF_STATUS wlan_hdd_flush_pmksa_cache(struct wlan_hdd_link_info *link_info);
 
 /*
  * wlan_hdd_send_mode_change_event() - API to send hw mode change event to

@@ -6981,9 +6981,7 @@ static int __wlan_hdd_cfg80211_stop_ap(struct wiphy *wiphy,
 	if (adapter->device_mode == QDF_SAP_MODE) {
 		wlan_hdd_del_station(adapter, NULL);
 		mac_handle = hdd_ctx->mac_handle;
-		status = wlan_hdd_flush_pmksa_cache(adapter);
-		if (QDF_IS_STATUS_ERROR(status))
-			hdd_debug("Cannot flush PMKIDCache");
+		status = wlan_hdd_flush_pmksa_cache(adapter->deflink);
 	}
 
 	cds_flush_work(&adapter->sap_stop_bss_work);

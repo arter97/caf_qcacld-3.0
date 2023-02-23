@@ -8515,9 +8515,7 @@ QDF_STATUS hdd_stop_adapter_ext(struct hdd_context *hdd_ctx,
 		wlan_hdd_scan_abort(adapter);
 		wlan_hdd_cleanup_actionframe(adapter);
 		wlan_hdd_cleanup_remain_on_channel_ctx(adapter);
-		status = wlan_hdd_flush_pmksa_cache(adapter);
-		if (QDF_IS_STATUS_ERROR(status))
-			hdd_debug("Cannot flush PMKIDCache");
+		status = wlan_hdd_flush_pmksa_cache(adapter->deflink);
 
 		hdd_deregister_hl_netdev_fc_timer(adapter);
 
@@ -8595,9 +8593,7 @@ QDF_STATUS hdd_stop_adapter_ext(struct hdd_context *hdd_ctx,
 			if (wlan_hdd_del_station(adapter, NULL))
 				hdd_sap_indicate_disconnect_for_sta(adapter);
 		}
-		status = wlan_hdd_flush_pmksa_cache(adapter);
-		if (QDF_IS_STATUS_ERROR(status))
-			hdd_debug("Cannot flush PMKIDCache");
+		status = wlan_hdd_flush_pmksa_cache(adapter->deflink);
 
 		sap_config = &adapter->deflink->session.ap.sap_config;
 		wlansap_reset_sap_config_add_ie(sap_config, eUPDATE_IE_ALL);
