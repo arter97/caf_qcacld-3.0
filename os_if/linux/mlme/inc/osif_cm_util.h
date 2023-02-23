@@ -28,6 +28,9 @@
 #include <qca_vendor.h>
 #include "wlan_cm_ucfg_api.h"
 #include "wlan_cm_public_struct.h"
+#ifdef WLAN_FEATURE_ROAM_OFFLOAD
+#include "wlan_cm_roam_public_struct.h"
+#endif
 #ifdef CONN_MGR_ADV_FEATURE
 #include <cdp_txrx_mob_def.h>
 #endif
@@ -299,6 +302,23 @@ void osif_cm_unlink_bss(struct wlan_objmgr_vdev *vdev,
 			uint8_t *ssid, uint8_t ssid_len) {}
 #endif
 
+#ifdef WLAN_FEATURE_ROAM_OFFLOAD
+/**
+ * typedef osif_cm_roam_rt_stats_cb: Callback to send roam
+ * stats event
+ * @roam_stats: roam_stats_event pointer
+ * @idx: TLV idx for roam stats event
+ *
+ * This callback sends roam_stats_event to userspace
+ *
+ * Context: Any context.
+ * Return: void
+ */
+typedef void
+	(*osif_cm_roam_rt_stats_cb)(struct roam_stats_event *roam_stats,
+				    uint8_t idx);
+#endif
+
 #ifdef WLAN_FEATURE_PREAUTH_ENABLE
 /**
  * typedef osif_cm_ft_preauth_complete_cb: Callback to send fast
@@ -347,6 +367,7 @@ typedef QDF_STATUS
  * @send_vdev_keys_cb: callback to send vdev keys
  * @get_scan_ie_params_cb: callback to get scan ie params
  * @set_hlp_data_cb: callback to legacy module to save hlp data
+ * @roam_rt_stats_event_cb: callback to send roam stats to userspace
  * @ft_preauth_complete_cb: callback to legacy module to send fast
  * transition event
  * @cckm_preauth_complete_cb: callback to legacy module to send cckm
@@ -366,6 +387,9 @@ struct osif_cm_ops {
 #endif
 #ifdef WLAN_FEATURE_FILS_SK
 	osif_cm_set_hlp_data_cb set_hlp_data_cb;
+#endif
+#ifdef WLAN_FEATURE_ROAM_OFFLOAD
+	osif_cm_roam_rt_stats_cb roam_rt_stats_event_cb;
 #endif
 #ifdef WLAN_FEATURE_PREAUTH_ENABLE
 	osif_cm_ft_preauth_complete_cb ft_preauth_complete_cb;

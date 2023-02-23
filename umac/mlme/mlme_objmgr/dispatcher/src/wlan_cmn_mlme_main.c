@@ -602,6 +602,16 @@ mlme_cm_osif_roam_complete(struct wlan_objmgr_vdev *vdev)
 	return ret;
 }
 
+void
+mlme_cm_osif_roam_rt_stats(struct roam_stats_event *roam_stats,
+			   uint8_t idx)
+{
+	if (glbl_cm_ops &&
+	    glbl_cm_ops->mlme_cm_roam_rt_stats_cb)
+		glbl_cm_ops->mlme_cm_roam_rt_stats_cb(roam_stats,
+						      idx);
+}
+
 QDF_STATUS
 mlme_cm_osif_roam_get_scan_params(struct wlan_objmgr_vdev *vdev,
 				  struct element_info *scan_ie,

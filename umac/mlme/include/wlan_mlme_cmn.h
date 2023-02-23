@@ -25,6 +25,9 @@
 #include <include/wlan_pdev_mlme.h>
 #include <include/wlan_vdev_mlme.h>
 #include "wlan_cm_public_struct.h"
+#ifdef WLAN_FEATURE_ROAM_OFFLOAD
+#include "wlan_cm_roam_public_struct.h"
+#endif
 #include "wlan_twt_public_structs.h"
 
 /**
@@ -79,6 +82,10 @@
  * @scan_ie: scan ie element pointer
  * @dot11mode_filter: dot11mode filter enumn pointer
  *
+ * @mlme_cm_roam_rt_stats_cb: Roam stats cb
+ * @roam_stats_event: roam_stats_event pointer
+ * @idx: TLV idx for roam_stats_event
+ *
  * @mlme_cm_ft_preauth_cmpl_cb: Roam ft preauth complete cb
  * @vdev: vdev pointer
  * @rsp: preauth response pointer
@@ -125,6 +132,8 @@ struct mlme_cm_ops {
 	QDF_STATUS (*mlme_cm_roam_get_scan_ie_cb)(struct wlan_objmgr_vdev *vdev,
 				struct element_info *scan_ie,
 				enum dot11_mode_filter *dot11mode_filter);
+	void (*mlme_cm_roam_rt_stats_cb)(struct roam_stats_event *roam_stats,
+					 uint8_t idx);
 #endif
 #ifdef WLAN_FEATURE_PREAUTH_ENABLE
 	QDF_STATUS (*mlme_cm_ft_preauth_cmpl_cb)(
@@ -932,6 +941,14 @@ QDF_STATUS mlme_cm_osif_roam_abort_ind(struct wlan_objmgr_vdev *vdev);
  */
 QDF_STATUS mlme_cm_osif_roam_complete(struct wlan_objmgr_vdev *vdev);
 
+/**
+ * mlme_cm_osif_roam_rt_stats() - osif Roam stats callback
+ * @roam_stats: roam_stats_event pointer
+ * @idx: TLV idx for roam_stats_event
+ *
+ * Return: void
+ */
+void mlme_cm_osif_roam_rt_stats(struct roam_stats_event *roam_stats, uint8_t idx);
 /**
  * mlme_cm_osif_roam_get_scan_params() - osif Roam get scan params callback
  * @vdev: vdev pointer
