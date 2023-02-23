@@ -299,19 +299,33 @@ hal_rx_update_su_evm_info(void *rx_tlv,
 	HAL_RX_UPDATE_SU_EVM_INFO(rx_tlv, ppdu_info, 32, 31);
 }
 
-static void hal_rx_get_evm_info(void *rx_tlv_hdr, void *ppdu_info_hdl)
+/**
+ * hal_rx_proc_phyrx_other_receive_info_tlv_9224() - API to get tlv info
+ * @rx_tlv_hdr: RX TLV header
+ * @ppdu_info_hdl: Handle to PPDU info to update
+ *
+ * Return: None
+ */
+static inline
+void hal_rx_proc_phyrx_other_receive_info_tlv_9224(void *rx_tlv_hdr,
+						   void *ppdu_info_hdl)
 {
+	uint32_t tlv_tag, tlv_len;
+	void *rx_tlv;
 	struct hal_rx_ppdu_info *ppdu_info  = ppdu_info_hdl;
-	void *rx_tlv = (uint8_t *)rx_tlv_hdr + HAL_RX_TLV32_HDR_SIZE;
-	uint32_t tlv_tag;
 
-	tlv_tag = HAL_RX_GET_USER_TLV32_TYPE(rx_tlv_hdr);
+	rx_tlv = (uint8_t *)rx_tlv_hdr + HAL_RX_TLV64_HDR_SIZE;
+	tlv_tag = HAL_RX_GET_USER_TLV64_TYPE(rx_tlv);
+	tlv_len = HAL_RX_GET_USER_TLV64_LEN(rx_tlv);
+
+	if (!tlv_len)
+		return;
 
 	switch (tlv_tag) {
 	case WIFIPHYRX_OTHER_RECEIVE_INFO_EVM_DETAILS_E:
 
 		/* Skip TLV length to get TLV content */
-		rx_tlv = (uint8_t *)rx_tlv + HAL_RX_TLV32_HDR_SIZE;
+		rx_tlv = (uint8_t *)rx_tlv + HAL_RX_TLV64_HDR_SIZE;
 
 		ppdu_info->evm_info.number_of_symbols = HAL_RX_GET(rx_tlv,
 				PHYRX_OTHER_RECEIVE_INFO,
@@ -326,12 +340,8 @@ static void hal_rx_get_evm_info(void *rx_tlv_hdr, void *ppdu_info_hdl)
 		break;
 	}
 }
-#else /* WLAN_SA_API_ENABLE && QCA_WIFI_QCA9574 */
-static void hal_rx_get_evm_info(void *tlv_tag, void *ppdu_info_hdl)
-{
-}
-#endif /* WLAN_SA_API_ENABLE && QCA_WIFI_QCA9574 */
 
+#else
 /**
  * hal_rx_proc_phyrx_other_receive_info_tlv_9224() - API to get tlv info
  * @rx_tlv_hdr: RX TLV header
@@ -343,34 +353,8 @@ static inline
 void hal_rx_proc_phyrx_other_receive_info_tlv_9224(void *rx_tlv_hdr,
 						   void *ppdu_info_hdl)
 {
-	uint32_t tlv_tag, tlv_len;
-	uint32_t temp_len, other_tlv_len, other_tlv_tag;
-	void *rx_tlv = (uint8_t *)rx_tlv_hdr + HAL_RX_TLV32_HDR_SIZE;
-	void *other_tlv_hdr = NULL;
-	void *other_tlv = NULL;
-
-	/* Get evm info for Smart Antenna */
-	hal_rx_get_evm_info(rx_tlv_hdr, ppdu_info_hdl);
-
-	tlv_tag = HAL_RX_GET_USER_TLV32_TYPE(rx_tlv_hdr);
-	tlv_len = HAL_RX_GET_USER_TLV32_LEN(rx_tlv_hdr);
-	temp_len = 0;
-
-	other_tlv_hdr = rx_tlv + HAL_RX_TLV32_HDR_SIZE;
-	other_tlv_tag = HAL_RX_GET_USER_TLV32_TYPE(other_tlv_hdr);
-	other_tlv_len = HAL_RX_GET_USER_TLV32_LEN(other_tlv_hdr);
-
-	temp_len += other_tlv_len;
-	other_tlv = other_tlv_hdr + HAL_RX_TLV32_HDR_SIZE;
-
-	switch (other_tlv_tag) {
-	default:
-		QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_ERROR,
-			  "%s unhandled TLV type: %d, TLV len:%d",
-			  __func__, other_tlv_tag, other_tlv_len);
-	break;
-	}
 }
+#endif /* WLAN_SA_API_ENABLE && QCA_WIFI_QCA9574 */
 
 #if defined(WLAN_CFR_ENABLE) && defined(WLAN_ENH_CFR_ENABLE)
 static inline
