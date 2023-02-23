@@ -68,7 +68,7 @@ static int hdd_sap_get_chan_width(struct hdd_adapter *adapter, int *value)
 	struct hdd_hostapd_state *hostapdstate;
 
 	hdd_enter();
-	hostapdstate = WLAN_HDD_GET_HOSTAP_STATE_PTR(adapter);
+	hostapdstate = WLAN_HDD_GET_HOSTAP_STATE_PTR(adapter->deflink);
 
 	if (hostapdstate->bss_state != BSS_START) {
 		*value = -EINVAL;
@@ -2173,7 +2173,7 @@ __iw_softap_stopbss(struct net_device *dev,
 
 	if (test_bit(SOFTAP_BSS_STARTED, &adapter->event_flags)) {
 		struct hdd_hostapd_state *hostapd_state =
-			WLAN_HDD_GET_HOSTAP_STATE_PTR(adapter);
+			WLAN_HDD_GET_HOSTAP_STATE_PTR(adapter->deflink);
 
 		qdf_event_reset(&hostapd_state->qdf_stop_bss_event);
 		status = wlansap_stop_bss(

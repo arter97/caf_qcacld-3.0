@@ -21329,7 +21329,7 @@ static int wlan_hdd_add_key_sap(struct hdd_adapter *adapter,
 	struct wlan_objmgr_vdev *vdev;
 	int errno = 0;
 	struct hdd_hostapd_state *hostapd_state =
-		WLAN_HDD_GET_HOSTAP_STATE_PTR(adapter);
+		WLAN_HDD_GET_HOSTAP_STATE_PTR(adapter->deflink);
 
 	vdev = hdd_objmgr_get_vdev_by_user(adapter, WLAN_OSIF_ID);
 	if (!vdev)
@@ -23324,7 +23324,7 @@ int __wlan_hdd_cfg80211_del_station(struct wiphy *wiphy,
 	    QDF_P2P_GO_MODE != adapter->device_mode)
 		goto fn_end;
 
-	hapd_state = WLAN_HDD_GET_HOSTAP_STATE_PTR(adapter);
+	hapd_state = WLAN_HDD_GET_HOSTAP_STATE_PTR(adapter->deflink);
 	if (!hapd_state) {
 		hdd_err("Hostapd State is Null");
 		return 0;
@@ -24483,7 +24483,7 @@ static int __wlan_hdd_cfg80211_set_mac_acl(struct wiphy *wiphy,
 	if (0 != status)
 		return status;
 
-	hostapd_state = WLAN_HDD_GET_HOSTAP_STATE_PTR(adapter);
+	hostapd_state = WLAN_HDD_GET_HOSTAP_STATE_PTR(adapter->deflink);
 
 	if (!hostapd_state) {
 		hdd_err("hostapd_state is Null");
@@ -24935,7 +24935,7 @@ static int __wlan_hdd_cfg80211_channel_switch(struct wiphy *wiphy,
 	hdd_debug("Freq %d width %d ch_width %d",
 		  csa_params->chandef.chan->center_freq,
 		  csa_params->chandef.width, ch_width);
-	hostapd_state = WLAN_HDD_GET_HOSTAP_STATE_PTR(adapter);
+	hostapd_state = WLAN_HDD_GET_HOSTAP_STATE_PTR(adapter->deflink);
 	qdf_event_reset(&hostapd_state->qdf_event);
 
 	ret =

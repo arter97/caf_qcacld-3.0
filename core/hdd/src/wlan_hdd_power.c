@@ -2529,6 +2529,7 @@ static int __wlan_hdd_cfg80211_suspend_wlan(struct wiphy *wiphy,
 	enum pmo_suspend_mode mode;
 	int rc;
 	wlan_net_dev_ref_dbgid dbgid = NET_DEV_HOLD_CFG80211_SUSPEND_WLAN;
+	struct hdd_ap_ctx *ap_ctx;
 	struct hdd_hostapd_state *hapd_state;
 	struct csr_del_sta_params params = {
 		.peerMacAddr = QDF_MAC_ADDR_BCAST_INIT,
@@ -2581,11 +2582,11 @@ static int __wlan_hdd_cfg80211_suspend_wlan(struct wiphy *wiphy,
 		}
 
 		if (QDF_SAP_MODE == adapter->device_mode) {
-			if (BSS_START ==
-			    WLAN_HDD_GET_HOSTAP_STATE_PTR(adapter)->bss_state &&
-			    true ==
-			    WLAN_HDD_GET_AP_CTX_PTR(adapter->deflink)->
-			    dfs_cac_block_tx) {
+			hapd_state =
+				WLAN_HDD_GET_HOSTAP_STATE_PTR(adapter->deflink);
+			ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(adapter->deflink);
+			if (BSS_START == hapd_state->bss_state &&
+			    true == ap_ctx->dfs_cac_block_tx) {
 				hdd_err("RADAR detection in progress, do not allow suspend");
 				wlan_hdd_inc_suspend_stats(hdd_ctx,
 							   SUSPEND_FAIL_RADAR);
@@ -2607,14 +2608,12 @@ static int __wlan_hdd_cfg80211_suspend_wlan(struct wiphy *wiphy,
 				return -EOPNOTSUPP;
 			} else if (ucfg_pmo_get_disconnect_sap_tdls_in_wow(
 				   hdd_ctx->psoc)) {
-				hapd_state =
-					WLAN_HDD_GET_HOSTAP_STATE_PTR(adapter);
-				if (hapd_state)
-					hdd_softap_deauth_all_sta(adapter,
-								  hapd_state,
-								  &params);
+				hdd_softap_deauth_all_sta(adapter, hapd_state,
+							  &params);
 			}
 		} else if (QDF_P2P_GO_MODE == adapter->device_mode) {
+			hapd_state =
+				WLAN_HDD_GET_HOSTAP_STATE_PTR(adapter->deflink);
 			if (!ucfg_pmo_get_enable_sap_suspend(
 				   hdd_ctx->psoc)) {
 				/* return -EOPNOTSUPP if GO does not support
@@ -2628,12 +2627,8 @@ static int __wlan_hdd_cfg80211_suspend_wlan(struct wiphy *wiphy,
 				return -EOPNOTSUPP;
 			} else if (ucfg_pmo_get_disconnect_sap_tdls_in_wow(
 				   hdd_ctx->psoc)) {
-				hapd_state =
-					WLAN_HDD_GET_HOSTAP_STATE_PTR(adapter);
-				if (hapd_state)
-					hdd_softap_deauth_all_sta(adapter,
-								  hapd_state,
-								  &params);
+				hdd_softap_deauth_all_sta(adapter, hapd_state,
+							  &params);
 			}
 		} else if (QDF_TDLS_MODE == adapter->device_mode &&
 			   ucfg_pmo_get_disconnect_sap_tdls_in_wow(

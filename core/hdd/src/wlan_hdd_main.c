@@ -8631,7 +8631,7 @@ QDF_STATUS hdd_stop_adapter_ext(struct hdd_context *hdd_ctx,
 		mutex_lock(&hdd_ctx->sap_lock);
 		if (test_bit(SOFTAP_BSS_STARTED, &adapter->event_flags)) {
 			struct hdd_hostapd_state *hostapd_state =
-				WLAN_HDD_GET_HOSTAP_STATE_PTR(adapter);
+				WLAN_HDD_GET_HOSTAP_STATE_PTR(adapter->deflink);
 
 			qdf_event_reset(&hostapd_state->qdf_stop_bss_event);
 			status = wlansap_stop_bss(
@@ -16966,7 +16966,8 @@ void wlan_hdd_stop_sap(struct hdd_adapter *ap_adapter)
 	mutex_lock(&hdd_ctx->sap_lock);
 	if (test_bit(SOFTAP_BSS_STARTED, &ap_adapter->event_flags)) {
 		wlan_hdd_del_station(ap_adapter, NULL);
-		hostapd_state = WLAN_HDD_GET_HOSTAP_STATE_PTR(ap_adapter);
+		hostapd_state =
+			WLAN_HDD_GET_HOSTAP_STATE_PTR(ap_adapter->deflink);
 		hdd_debug("Now doing SAP STOPBSS");
 		qdf_event_reset(&hostapd_state->qdf_stop_bss_event);
 		if (QDF_STATUS_SUCCESS == wlansap_stop_bss(hdd_ap_ctx->
@@ -17063,7 +17064,7 @@ void wlan_hdd_start_sap(struct hdd_adapter *ap_adapter, bool reinit)
 
 	hdd_ctx = WLAN_HDD_GET_CTX(ap_adapter);
 	hdd_ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(ap_adapter->deflink);
-	hostapd_state = WLAN_HDD_GET_HOSTAP_STATE_PTR(ap_adapter);
+	hostapd_state = WLAN_HDD_GET_HOSTAP_STATE_PTR(ap_adapter->deflink);
 	sap_config = &ap_adapter->deflink->session.ap.sap_config;
 
 	mutex_lock(&hdd_ctx->sap_lock);
@@ -19758,7 +19759,8 @@ void hdd_restart_sap(struct hdd_adapter *ap_adapter)
 	mutex_lock(&hdd_ctx->sap_lock);
 	if (test_bit(SOFTAP_BSS_STARTED, &ap_adapter->event_flags)) {
 		wlan_hdd_del_station(ap_adapter, NULL);
-		hostapd_state = WLAN_HDD_GET_HOSTAP_STATE_PTR(ap_adapter);
+		hostapd_state =
+			WLAN_HDD_GET_HOSTAP_STATE_PTR(ap_adapter->deflink);
 		qdf_event_reset(&hostapd_state->qdf_stop_bss_event);
 		if (QDF_STATUS_SUCCESS == wlansap_stop_bss(sap_ctx)) {
 			qdf_status = qdf_wait_single_event(

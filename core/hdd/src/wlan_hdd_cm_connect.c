@@ -690,7 +690,7 @@ def_chan:
 			  ch_bw);
 	}
 
-	hostapd_state = WLAN_HDD_GET_HOSTAP_STATE_PTR(ap_adapter);
+	hostapd_state = WLAN_HDD_GET_HOSTAP_STATE_PTR(ap_adapter->deflink);
 	qdf_event_reset(&hostapd_state->qdf_event);
 	wlan_hdd_set_sap_csa_reason(hdd_ctx->psoc, ap_adapter->deflink->vdev_id,
 				    CSA_REASON_STA_CONNECT_DFS_TO_NON_DFS);

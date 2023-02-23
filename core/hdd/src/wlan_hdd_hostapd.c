@@ -373,7 +373,7 @@ static void hdd_hostapd_channel_allow_suspend(struct hdd_adapter *adapter,
 
 	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
 	struct hdd_hostapd_state *hostapd_state =
-		WLAN_HDD_GET_HOSTAP_STATE_PTR(adapter);
+		WLAN_HDD_GET_HOSTAP_STATE_PTR(adapter->deflink);
 
 	hdd_debug("bss_state: %d, chan_freq: %d, dfs_ref_cnt: %d",
 		  hostapd_state->bss_state, chan_freq,
@@ -411,7 +411,7 @@ static void hdd_hostapd_channel_prevent_suspend(struct hdd_adapter *adapter,
 {
 	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
 	struct hdd_hostapd_state *hostapd_state =
-		WLAN_HDD_GET_HOSTAP_STATE_PTR(adapter);
+		WLAN_HDD_GET_HOSTAP_STATE_PTR(adapter->deflink);
 
 	hdd_debug("bss_state: %d, chan_freq: %d, dfs_ref_cnt: %d",
 		  hostapd_state->bss_state, chan_freq,
@@ -2042,7 +2042,7 @@ QDF_STATUS hdd_hostapd_sap_event_cb(struct sap_event *sap_event,
 		return QDF_STATUS_E_FAILURE;
 	}
 
-	hostapd_state = WLAN_HDD_GET_HOSTAP_STATE_PTR(adapter);
+	hostapd_state = WLAN_HDD_GET_HOSTAP_STATE_PTR(adapter->deflink);
 	ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(adapter->deflink);
 
 	if (!sap_event) {
@@ -4209,7 +4209,7 @@ QDF_STATUS hdd_init_ap_mode(struct hdd_adapter *adapter, bool reinit)
 					 acs_with_more_param);
 
 	/* Allocate the Wireless Extensions state structure */
-	phostapdBuf = WLAN_HDD_GET_HOSTAP_STATE_PTR(adapter);
+	phostapdBuf = WLAN_HDD_GET_HOSTAP_STATE_PTR(adapter->deflink);
 
 	ap_pwr_type = wlan_reg_decide_6g_ap_pwr_type(hdd_ctx->pdev);
 	hdd_debug("selecting AP power type %d", ap_pwr_type);
@@ -5620,7 +5620,7 @@ hdd_handle_acs_2g_preferred_sap_conc(struct wlan_objmgr_psoc *psoc,
 
 	wlan_hdd_set_sap_csa_reason(psoc, go_vdev_id,
 				    CSA_REASON_SAP_ACS);
-	hostapd_state = WLAN_HDD_GET_HOSTAP_STATE_PTR(go_adapter);
+	hostapd_state = WLAN_HDD_GET_HOSTAP_STATE_PTR(go_adapter->deflink);
 	qdf_event_reset(&hostapd_state->qdf_event);
 
 	ret = hdd_softap_set_channel_change(go_adapter->dev, go_new_ch_freq,
@@ -5720,7 +5720,7 @@ hdd_handle_p2p_go_for_3rd_ap_conc(struct wlan_objmgr_psoc *psoc,
 
 	wlan_hdd_set_sap_csa_reason(psoc, go_vdev_id,
 				    CSA_REASON_SAP_FIX_CH_CONC_WITH_GO);
-	hostapd_state = WLAN_HDD_GET_HOSTAP_STATE_PTR(go_adapter);
+	hostapd_state = WLAN_HDD_GET_HOSTAP_STATE_PTR(go_adapter->deflink);
 	qdf_event_reset(&hostapd_state->qdf_event);
 
 	ret = hdd_softap_set_channel_change(go_adapter->dev, go_new_ch_freq,
@@ -6205,7 +6205,7 @@ int wlan_hdd_cfg80211_start_bss(struct hdd_adapter *adapter,
 		goto free;
 	}
 
-	hostapd_state = WLAN_HDD_GET_HOSTAP_STATE_PTR(adapter);
+	hostapd_state = WLAN_HDD_GET_HOSTAP_STATE_PTR(adapter->deflink);
 
 	config = &ap_ctx->sap_config;
 	if (!config->chan_freq) {
@@ -6983,7 +6983,7 @@ static int __wlan_hdd_cfg80211_stop_ap(struct wiphy *wiphy,
 	mutex_lock(&hdd_ctx->sap_lock);
 	if (test_bit(SOFTAP_BSS_STARTED, &adapter->event_flags)) {
 		struct hdd_hostapd_state *hostapd_state =
-			WLAN_HDD_GET_HOSTAP_STATE_PTR(adapter);
+			WLAN_HDD_GET_HOSTAP_STATE_PTR(adapter->deflink);
 
 		hdd_place_marker(adapter, "TRY TO STOP", NULL);
 		qdf_event_reset(&hostapd_state->qdf_stop_bss_event);
