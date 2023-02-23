@@ -921,4 +921,15 @@ static inline int qdf_get_smp_processor_id(void)
 {
 	return __qdf_get_smp_processor_id();
 }
+
+/**
+ * qdf_in_atomic: Check whether current thread running in atomic context
+ *
+ * Return: true if current thread is running in the atomic context
+ *	   else it will be return false.
+ */
+static inline bool qdf_in_atomic(void)
+{
+	return __qdf_in_atomic();
+}
 #endif /*_QDF_UTIL_H*/
