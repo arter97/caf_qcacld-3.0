@@ -265,8 +265,7 @@ void lim_send_reassoc_req_with_ft_ies_mgmt_frame(struct mac_context *mac_ctx,
 		mac_ctx->mlme_cfg->lfr.ese_enabled)
 		populate_dot11f_ese_version(&frm->ESEVersion);
 	/* For ESE Associations fill the ESE IEs */
-	if (pe_session->isESEconnection &&
-	    mac_ctx->mlme_cfg->lfr.ese_enabled) {
+	if (wlan_cm_get_ese_assoc(mac_ctx->pdev, vdev_id)) {
 #ifndef FEATURE_DISABLE_RM
 		populate_dot11f_ese_rad_mgmt_cap(&frm->ESERadMgmtCap);
 #endif
@@ -280,7 +279,7 @@ void lim_send_reassoc_req_with_ft_ies_mgmt_frame(struct mac_context *mac_ctx,
 		if (wsm_enabled)
 			populate_dot11f_wmm_caps(&frm->WMMCaps);
 #ifdef FEATURE_WLAN_ESE
-		if (pe_session->isESEconnection) {
+		if (wlan_cm_get_ese_assoc(mac_ctx->pdev, vdev_id)) {
 			uint32_t phymode;
 			uint8_t rate;
 
@@ -319,7 +318,7 @@ void lim_send_reassoc_req_with_ft_ies_mgmt_frame(struct mac_context *mac_ctx,
 	if (pe_session->pLimReAssocReq->bssDescription.mdiePresent &&
 	    (mlme_priv->connect_info.ft_info.add_mdie)
 #if defined FEATURE_WLAN_ESE
-	    && !pe_session->isESEconnection
+	    && !wlan_cm_get_ese_assoc(mac_ctx->pdev, vdev_id)
 #endif
 	    ) {
 		populate_mdie(mac_ctx, &frm->MobilityDomain,

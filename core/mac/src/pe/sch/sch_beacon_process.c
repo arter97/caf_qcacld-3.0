@@ -119,7 +119,7 @@ ap_beacon_process_24_ghz(struct mac_context *mac_ctx, uint8_t *rx_pkt_info,
 		if (!tmp_exp)
 			return;
 #ifdef FEATURE_WLAN_ESE
-		if (session->isESEconnection)
+		if (wlan_cm_get_ese_assoc(mac_ctx->pdev, session->vdev_id))
 			pe_info("[INFOLOG]ESE 11g erpPresent=%d useProtection=%d nonErpPresent=%d",
 				bcn_struct->erpPresent,
 				bcn_struct->erpIEInfo.useProtection,
@@ -144,7 +144,7 @@ ap_beacon_process_24_ghz(struct mac_context *mac_ctx, uint8_t *rx_pkt_info,
 		     bcn_struct->erpIEInfo.nonErpPresent));
 	if (tmp_exp) {
 #ifdef FEATURE_WLAN_ESE
-		if (session->isESEconnection) {
+		if (wlan_cm_get_ese_assoc(mac_ctx->pdev, session->vdev_id)) {
 			pe_info("[INFOLOG]ESE 11g erpPresent=%d useProtection=%d nonErpPresent=%d",
 				bcn_struct->erpPresent,
 				bcn_struct->erpIEInfo.useProtection,

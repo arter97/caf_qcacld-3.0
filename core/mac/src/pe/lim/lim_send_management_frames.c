@@ -2668,8 +2668,7 @@ lim_send_assoc_req_mgmt_frame(struct mac_context *mac_ctx,
 		mac_ctx->mlme_cfg->lfr.ese_enabled)
 		populate_dot11f_ese_version(&frm->ESEVersion);
 	/* For ESE Associations fill the ESE IEs */
-	if (pe_session->isESEconnection &&
-	    mac_ctx->mlme_cfg->lfr.ese_enabled) {
+	if (wlan_cm_get_ese_assoc(mac_ctx->pdev, pe_session->vdev_id)) {
 #ifndef FEATURE_DISABLE_RM
 		populate_dot11f_ese_rad_mgmt_cap(&frm->ESERadMgmtCap);
 #endif
@@ -3790,9 +3789,10 @@ QDF_STATUS lim_send_deauth_cnf(struct mac_context *mac_ctx)
 		if ((session_entry->limSystemRole == eLIM_STA_ROLE) &&
 		    (
 #ifdef FEATURE_WLAN_ESE
-		    (session_entry->isESEconnection) ||
+		    (wlan_cm_get_ese_assoc(mac_ctx->pdev,
+					   session_entry->vdev_id)) ||
 #endif
-		    (session_entry->isFastRoamIniFeatureEnabled) ||
+		    (cm_is_fast_roam_enabled(mac_ctx->psoc)) ||
 		    (session_entry->is11Rconnection))) {
 			pe_debug("FT Preauth (%pK,%d) Deauth rc %d src = %d",
 				 session_entry,
@@ -3807,8 +3807,8 @@ QDF_STATUS lim_send_deauth_cnf(struct mac_context *mac_ctx)
 				 " isLFR %d"
 				 " is11r %d, Deauth reason %d Trigger = %d",
 				 session_entry->limSystemRole,
-				 session_entry->isESEconnection,
-				 session_entry->isFastRoamIniFeatureEnabled,
+				 mac_ctx->mlme_cfg->lfr.ese_enabled,
+				 cm_is_fast_roam_enabled(mac_ctx->psoc),
 				 session_entry->is11Rconnection,
 				 deauth_req->reasonCode,
 				 deauth_req->deauthTrigger);
@@ -3817,7 +3817,7 @@ QDF_STATUS lim_send_deauth_cnf(struct mac_context *mac_ctx)
 				 " isLFR %d"
 				 " is11r %d, Deauth reason %d Trigger = %d",
 				 session_entry->limSystemRole,
-				 session_entry->isFastRoamIniFeatureEnabled,
+				 cm_is_fast_roam_enabled(mac_ctx->psoc),
 				 session_entry->is11Rconnection,
 				 deauth_req->reasonCode,
 				 deauth_req->deauthTrigger);

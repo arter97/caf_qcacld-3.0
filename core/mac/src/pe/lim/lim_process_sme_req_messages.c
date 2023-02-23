@@ -1542,26 +1542,6 @@ lim_get_vdev_rmf_capable(struct mac_context *mac, struct pe_session *session)
 	return peer_rmf_capable;
 }
 
-static bool lim_is_fast_roam_enabled(struct mac_context *mac_ctx,
-				     struct wlan_objmgr_vdev *vdev)
-{
-
-	if (wlan_vdev_mlme_get_opmode(vdev) != QDF_STA_MODE)
-		return false;
-
-	if (mac_ctx->mlme_cfg->lfr.enable_fast_roam_in_concurrency)
-		return mac_ctx->mlme_cfg->lfr.lfr_enabled;
-
-	/*
-	 * If fast roam in concurrency is disabled and there are concurrent
-	 * sessions running return false.
-	 */
-	if (policy_mgr_get_connection_count(mac_ctx->psoc))
-		return false;
-
-	return mac_ctx->mlme_cfg->lfr.lfr_enabled;
-}
-
 /**
  * lim_get_nss_supported_by_sta_and_ap() - finds out nss from session
  * and beacon from AP
@@ -2811,11 +2791,9 @@ static void
 lim_fill_ese_params(struct mac_context *mac_ctx, struct pe_session *session,
 		    bool ese_version_present)
 {
-	if (cm_is_ese_connection(session->vdev, ese_version_present))
-		session->isESEconnection = true;
-
 	wlan_cm_set_ese_assoc(mac_ctx->pdev, session->vdev_id,
-			      session->isESEconnection);
+			      cm_is_ese_connection(session->vdev,
+			      ese_version_present));
 }
 #else
 static inline void
@@ -3222,13 +3200,6 @@ lim_fill_pe_session(struct mac_context *mac_ctx, struct pe_session *session,
 	/* Record if management frames need to be protected */
 	session->limRmfEnabled =
 		lim_get_vdev_rmf_capable(mac_ctx, session);
-
-	session->isFastRoamIniFeatureEnabled =
-		lim_is_fast_roam_enabled(mac_ctx, session->vdev);
-
-	session->isFastTransitionEnabled =
-				lim_is_ese_enabled(mac_ctx) ||
-				session->isFastRoamIniFeatureEnabled;
 
 	session->txLdpcIniFeatureEnabled =
 		mac_ctx->mlme_cfg->ht_caps.tx_ldpc_enable;
