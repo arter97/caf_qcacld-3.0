@@ -3557,7 +3557,6 @@ static bool wlan_hdd_check_is_acs_request_same(struct hdd_adapter *adapter,
  * @sap_config: Pointer to sap_config
  * @psoc: Pointer to psoc
  * @pdev: Pointer to pdev
- * @curr_mode: Current mode
  * @vdev_id: Vdev Id
  *
  * This function will remove passive/dfs acs channel for low latency SAP
@@ -3569,13 +3568,12 @@ static void hdd_remove_passive_dfs_acs_channel_for_ll_sap(
 					struct sap_config *sap_config,
 					struct wlan_objmgr_psoc *psoc,
 					struct wlan_objmgr_pdev *pdev,
-					enum policy_mgr_con_mode curr_mode,
 					uint8_t vdev_id)
 {
 	uint32_t i, ch_cnt = 0;
 	uint32_t freq = 0;
 
-	if (!policy_mgr_is_vdev_ll_sap(psoc, curr_mode, vdev_id))
+	if (!policy_mgr_is_vdev_ll_sap(psoc, vdev_id))
 		return;
 
 	for (i = 0; i < sap_config->acs_cfg.ch_list_count; i++) {
@@ -3859,7 +3857,6 @@ static int __wlan_hdd_cfg80211_do_acs(struct wiphy *wiphy,
 	hdd_remove_passive_dfs_acs_channel_for_ll_sap(sap_config,
 						      hdd_ctx->psoc,
 						      hdd_ctx->pdev,
-						      pm_mode,
 						      adapter->vdev_id);
 
 	/* consult policy manager to get PCL */
@@ -3871,7 +3868,7 @@ static int __wlan_hdd_cfg80211_do_acs(struct wiphy *wiphy,
 					NUM_CHANNELS);
 
 	policy_mgr_get_pcl_channel_for_ll_sap_concurrency(
-				hdd_ctx->psoc, pm_mode, adapter->vdev_id,
+				hdd_ctx->psoc, adapter->vdev_id,
 				sap_config->acs_cfg.pcl_chan_freq,
 				sap_config->acs_cfg.pcl_channels_weight_list,
 				&sap_config->acs_cfg.pcl_ch_count);
@@ -3901,8 +3898,7 @@ static int __wlan_hdd_cfg80211_do_acs(struct wiphy *wiphy,
 		if (!sap_config->acs_cfg.ch_list_count &&
 		    sap_config->acs_cfg.master_ch_list_count &&
 		    !is_vendor_unsafe_ch_present &&
-		    !policy_mgr_is_vdev_ll_sap(hdd_ctx->psoc, pm_mode,
-					       adapter->vdev_id))
+		    !policy_mgr_is_vdev_ll_sap(hdd_ctx->psoc, adapter->vdev_id))
 			wlan_hdd_handle_zero_acs_list(
 				hdd_ctx,
 				sap_config->acs_cfg.freq_list,
