@@ -2572,6 +2572,25 @@ void hdd_validate_next_adapter(struct hdd_adapter **curr,
 	     __hdd_take_ref_and_fetch_next_adapter_safe(hdd_ctx, adapter, \
 							next_adapter, dbgid))
 
+#define __hdd_adapter_deflink_idx(link_idx) (link_idx = WLAN_HDD_DEFLINK_IDX)
+#define __hdd_is_link_idx_valid(link_idx) ((link_idx) < WLAN_MAX_MLD)
+#define __hdd_adapter_next_link_idx(link_idx) ((link_idx)++)
+
+/**
+ * hdd_adapter_for_each_link_entry() - Link info iterator for all
+ * link_info fields.
+ * @adapter: HDD adapter to iterate each link_info
+ * @link_idx: Variable to save each iterating index
+ *
+ * The function iterates from the start index of link_info array
+ * in @adapter till the end of the link_info array.
+ */
+
+#define hdd_adapter_for_each_link_entry(adapter, link_idx) \
+	for (__hdd_adapter_deflink_idx(link_idx); \
+		__hdd_is_link_idx_valid(link_idx); \
+		__hdd_adapter_next_link_idx(link_idx))
+
 /**
  * wlan_hdd_get_adapter_from_objmgr() - Fetch adapter from objmgr
  * @vdev: the vdev whose corresponding adapter has to be fetched
