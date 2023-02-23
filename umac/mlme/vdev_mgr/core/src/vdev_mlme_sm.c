@@ -1728,10 +1728,35 @@ static void mlme_vdev_subst_mlo_sync_wait_entry(void *ctx)
  *
  * Return: void
  */
+#ifdef WLAN_FEATURE_11BE_MLO
+static void mlme_vdev_subst_mlo_sync_wait_exit(void *ctx)
+{
+	struct vdev_mlme_obj *vdev_mlme = (struct vdev_mlme_obj *)ctx;
+	struct wlan_objmgr_vdev *vdev = vdev_mlme->vdev;
+	struct wlan_mlo_dev_context *mld_ctx = vdev->mlo_dev_ctx;
+	enum QDF_OPMODE mode;
+	uint8_t idx;
+
+	if (!vdev->mlo_dev_ctx)
+		return;
+
+	idx = mlo_get_link_vdev_ix(mld_ctx, vdev);
+	if (idx == MLO_INVALID_LINK_IDX)
+		return;
+
+	mode = wlan_vdev_mlme_get_opmode(vdev);
+	if (mode != QDF_SAP_MODE)
+		return;
+
+	wlan_util_change_map_index(mld_ctx->ap_ctx->mlo_vdev_up_bmap,
+				   idx, 0);
+}
+#else
 static void mlme_vdev_subst_mlo_sync_wait_exit(void *ctx)
 {
 	/* NONE */
 }
+#endif
 
 /**
  * mlme_vdev_subst_mlo_sync_wait_event() - Event handler API for mlo sync wait

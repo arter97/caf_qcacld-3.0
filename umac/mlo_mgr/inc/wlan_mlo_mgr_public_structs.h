@@ -325,6 +325,7 @@ struct wlan_mlo_sta {
  * @ml_aid_mgr: ML AID mgr
  * @mlo_ap_lock: lock to sync VDEV SM event
  * @mlo_vdev_quiet_bmap: Bitmap of vdevs for which quiet ie needs to enabled
+ * @mlo_vdev_up_bmap: Bitmap of vdevs for which sync complete can be dispatched
  *
  * NB: not using kernel-doc format since the kernel-doc script doesn't
  *     handle the qdf_bitmap() macro
@@ -338,6 +339,7 @@ struct wlan_mlo_ap {
 	qdf_mutex_t mlo_ap_lock;
 #endif
 	qdf_bitmap(mlo_vdev_quiet_bmap, WLAN_UMAC_MLO_MAX_VDEVS);
+	qdf_bitmap(mlo_vdev_up_bmap, WLAN_UMAC_MLO_MAX_VDEVS);
 };
 
 /**
