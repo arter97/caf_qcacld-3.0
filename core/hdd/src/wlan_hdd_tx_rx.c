@@ -672,7 +672,7 @@ static void __hdd_tx_timeout(struct net_device *dev)
 
 	wlan_hdd_display_adapter_netif_queue_history(adapter);
 
-	vdev = hdd_objmgr_get_vdev_by_user(adapter, WLAN_DP_ID);
+	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink, WLAN_DP_ID);
 	if (vdev) {
 		ucfg_dp_tx_timeout(vdev);
 		hdd_objmgr_put_vdev_by_user(vdev, WLAN_DP_ID);
@@ -1316,7 +1316,7 @@ int hdd_set_mon_rx_cb(struct net_device *dev)
 
 	WLAN_ADDR_COPY(sta_desc.peer_addr.bytes, adapter->mac_addr.bytes);
 
-	vdev = hdd_objmgr_get_vdev_by_user(adapter, WLAN_DP_ID);
+	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink, WLAN_DP_ID);
 	if (!vdev) {
 		hdd_err("failed to get vdev");
 		return -EINVAL;

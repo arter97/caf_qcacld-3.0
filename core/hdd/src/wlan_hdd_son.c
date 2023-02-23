@@ -1586,7 +1586,7 @@ hdd_son_get_vdev_by_netdev(struct net_device *dev)
 	if (!adapter || (adapter && adapter->delete_in_progress))
 		return NULL;
 
-	vdev = hdd_objmgr_get_vdev_by_user(adapter, WLAN_SON_ID);
+	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink, WLAN_SON_ID);
 	if (!vdev)
 		return NULL;
 
@@ -2621,18 +2621,14 @@ int hdd_son_deliver_acs_complete_event(struct hdd_adapter *adapter)
 	int ret = -EINVAL;
 	struct wlan_objmgr_vdev *vdev;
 
-	if (adapter) {
-		vdev = hdd_objmgr_get_vdev_by_user(adapter, WLAN_SON_ID);
-		if (!vdev) {
-			hdd_err("null vdev");
-			return ret;
-		}
-		ret = os_if_son_deliver_ald_event(vdev, NULL,
-						  MLME_EVENT_ACS_COMPLETE,
-						  NULL);
-		hdd_objmgr_put_vdev_by_user(vdev, WLAN_SON_ID);
+	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink, WLAN_SON_ID);
+	if (!vdev) {
+		hdd_err("null vdev");
+		return ret;
 	}
-
+	ret = os_if_son_deliver_ald_event(vdev, NULL, MLME_EVENT_ACS_COMPLETE,
+					  NULL);
+	hdd_objmgr_put_vdev_by_user(vdev, WLAN_SON_ID);
 	return ret;
 }
 
@@ -2643,19 +2639,16 @@ int hdd_son_deliver_cac_status_event(struct hdd_adapter *adapter,
 	struct wlan_objmgr_vdev *vdev;
 	struct son_ald_cac_info cac_info;
 
-	if (adapter) {
-		vdev = hdd_objmgr_get_vdev_by_user(adapter, WLAN_SON_ID);
-		if (!vdev) {
-			hdd_err("null vdev");
-			return ret;
-		}
-		cac_info.freq = freq;
-		cac_info.radar_detected = radar_detected;
-		ret = os_if_son_deliver_ald_event(vdev, NULL,
-						  MLME_EVENT_CAC_STATUS,
-						  &cac_info);
-		hdd_objmgr_put_vdev_by_user(vdev, WLAN_SON_ID);
+	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink, WLAN_SON_ID);
+	if (!vdev) {
+		hdd_err("null vdev");
+		return ret;
 	}
+	cac_info.freq = freq;
+	cac_info.radar_detected = radar_detected;
+	ret = os_if_son_deliver_ald_event(vdev, NULL, MLME_EVENT_CAC_STATUS,
+					  &cac_info);
+	hdd_objmgr_put_vdev_by_user(vdev, WLAN_SON_ID);
 
 	return ret;
 }
@@ -2673,18 +2666,15 @@ int hdd_son_deliver_assoc_disassoc_event(struct hdd_adapter *adapter,
 	memcpy(info.macaddr, &sta_mac.bytes, QDF_MAC_ADDR_SIZE);
 	info.flag = flag;
 	info.reason = reason_code;
-	if (adapter) {
-		vdev = hdd_objmgr_get_vdev_by_user(adapter, WLAN_SON_ID);
-		if (!vdev) {
-			hdd_err("null vdev");
-			return ret;
-		}
-		ret = os_if_son_deliver_ald_event(vdev, NULL,
-						  MLME_EVENT_ASSOC_DISASSOC,
-						  &info);
-		hdd_objmgr_put_vdev_by_user(vdev, WLAN_SON_ID);
-	}
 
+	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink, WLAN_SON_ID);
+	if (!vdev) {
+		hdd_err("null vdev");
+		return ret;
+	}
+	ret = os_if_son_deliver_ald_event(vdev, NULL, MLME_EVENT_ASSOC_DISASSOC,
+					  &info);
+	hdd_objmgr_put_vdev_by_user(vdev, WLAN_SON_ID);
 	return ret;
 }
 
@@ -2700,7 +2690,7 @@ void hdd_son_deliver_peer_authorize_event(struct hdd_adapter *adapter,
 		hdd_err("Non SAP vdev");
 		return;
 	}
-	vdev = hdd_objmgr_get_vdev_by_user(adapter, WLAN_SON_ID);
+	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink, WLAN_SON_ID);
 	if (!vdev) {
 		hdd_err("null vdev");
 		return;
@@ -2741,7 +2731,7 @@ int hdd_son_deliver_chan_change_event(struct hdd_adapter *adapter,
 		hdd_err("null adapter");
 		return ret;
 	}
-	vdev = hdd_objmgr_get_vdev_by_user(adapter, WLAN_SON_ID);
+	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink, WLAN_SON_ID);
 	if (!vdev) {
 		hdd_err("null vdev");
 		return ret;

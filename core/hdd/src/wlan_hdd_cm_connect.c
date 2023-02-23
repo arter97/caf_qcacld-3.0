@@ -69,7 +69,7 @@ bool hdd_cm_is_vdev_associated(struct hdd_adapter *adapter)
 		return (sta_ctx->conn_info.conn_state ==
 			eConnectionState_NdiConnected);
 
-	vdev = hdd_objmgr_get_vdev_by_user(adapter, WLAN_OSIF_CM_ID);
+	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink, WLAN_OSIF_CM_ID);
 	if (!vdev)
 		return false;
 
@@ -97,7 +97,7 @@ bool hdd_cm_is_vdev_connected(struct hdd_adapter *adapter)
 		return (sta_ctx->conn_info.conn_state ==
 			eConnectionState_NdiConnected);
 
-	vdev = hdd_objmgr_get_vdev_by_user(adapter, WLAN_OSIF_CM_ID);
+	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink, WLAN_OSIF_CM_ID);
 	if (!vdev)
 		return false;
 
@@ -119,7 +119,7 @@ bool hdd_cm_is_connecting(struct hdd_adapter *adapter)
 	bool is_vdev_connecting;
 	enum QDF_OPMODE opmode;
 
-	vdev = hdd_objmgr_get_vdev_by_user(adapter, WLAN_OSIF_CM_ID);
+	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink, WLAN_OSIF_CM_ID);
 	if (!vdev)
 		return false;
 
@@ -141,7 +141,7 @@ bool hdd_cm_is_disconnected(struct hdd_adapter *adapter)
 	bool is_vdev_disconnected;
 	enum QDF_OPMODE opmode;
 
-	vdev = hdd_objmgr_get_vdev_by_user(adapter, WLAN_OSIF_CM_ID);
+	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink, WLAN_OSIF_CM_ID);
 	if (!vdev)
 		return false;
 
@@ -163,7 +163,7 @@ bool hdd_cm_is_vdev_roaming(struct hdd_adapter *adapter)
 	bool is_vdev_roaming;
 	enum QDF_OPMODE opmode;
 
-	vdev = hdd_objmgr_get_vdev_by_user(adapter, WLAN_OSIF_CM_ID);
+	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink, WLAN_OSIF_CM_ID);
 	if (!vdev)
 		return false;
 
@@ -773,7 +773,7 @@ int wlan_hdd_cm_connect(struct wiphy *wiphy,
 
 	qdf_mem_zero(&params, sizeof(params));
 	ucfg_dlm_dump_deny_list_ap(hdd_ctx->pdev);
-	vdev = hdd_objmgr_get_vdev_by_user(adapter, WLAN_OSIF_CM_ID);
+	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink, WLAN_OSIF_CM_ID);
 	if (!vdev)
 		return -EINVAL;
 
@@ -1177,7 +1177,7 @@ static void hdd_cm_save_connect_info(struct hdd_adapter *adapter,
 		return;
 
 	qdf_copy_macaddr(&sta_ctx->conn_info.bssid, &rsp->bssid);
-	vdev = hdd_objmgr_get_vdev_by_user(adapter, WLAN_DP_ID);
+	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink, WLAN_DP_ID);
 	if (vdev) {
 		ucfg_dp_conn_info_set_bssid(vdev, &rsp->bssid);
 		hdd_objmgr_put_vdev_by_user(vdev, WLAN_DP_ID);
@@ -1255,7 +1255,7 @@ static void hdd_cm_save_connect_info(struct hdd_adapter *adapter,
 
 	}
 
-	vdev = hdd_objmgr_get_vdev_by_user(adapter, WLAN_OSIF_CM_ID);
+	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink, WLAN_OSIF_CM_ID);
 	if (vdev) {
 		sta_ctx->conn_info.nss = wlan_vdev_mlme_get_nss(vdev);
 		ucfg_wlan_vdev_mgr_get_param(vdev, WLAN_MLME_CFG_RATE_FLAGS,

@@ -826,7 +826,8 @@ static int __hdd_netdev_notifier_call(struct net_device *net_dev,
 		break;
 
 	case NETDEV_GOING_DOWN:
-		vdev = hdd_objmgr_get_vdev_by_user(adapter, WLAN_OSIF_SCAN_ID);
+		vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink,
+						   WLAN_OSIF_SCAN_ID);
 		if (!vdev)
 			break;
 		if (ucfg_scan_get_vdev_status(vdev) !=
@@ -3142,7 +3143,7 @@ static int __hdd_pktcapture_open(struct net_device *dev)
 		return -EINVAL;
 	}
 
-	vdev = hdd_objmgr_get_vdev_by_user(sta_adapter, WLAN_OSIF_ID);
+	vdev = hdd_objmgr_get_vdev_by_user(sta_adapter->deflink, WLAN_OSIF_ID);
 	if (!vdev)
 		return -EINVAL;
 
@@ -3237,7 +3238,7 @@ static void hdd_map_monitor_interface_vdev(struct hdd_adapter *sta_adapter)
 	if (!wlan_hdd_is_session_type_monitor(mon_adapter->device_mode))
 		return;
 
-	vdev = hdd_objmgr_get_vdev_by_user(sta_adapter, WLAN_OSIF_ID);
+	vdev = hdd_objmgr_get_vdev_by_user(sta_adapter->deflink, WLAN_OSIF_ID);
 	if (!vdev)
 		return;
 
@@ -5430,7 +5431,7 @@ int hdd_dynamic_mac_address_set(struct hdd_adapter *adapter,
 		.timeout_ms = WLAN_SET_MAC_ADDR_TIMEOUT
 	};
 
-	vdev = hdd_objmgr_get_vdev_by_user(adapter, WLAN_OSIF_ID);
+	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink, WLAN_OSIF_ID);
 	if (!vdev)
 		return -EINVAL;
 
@@ -6607,7 +6608,7 @@ int hdd_vdev_destroy(struct hdd_adapter *adapter)
 
 	hdd_ctx = WLAN_HDD_GET_CTX(adapter);
 
-	vdev = hdd_objmgr_get_vdev_by_user(adapter, WLAN_OSIF_ID);
+	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink, WLAN_OSIF_ID);
 	if (!vdev)
 		return -EINVAL;
 
@@ -6999,7 +7000,8 @@ QDF_STATUS hdd_init_station_mode(struct hdd_adapter *adapter)
 	hdd_ctx = WLAN_HDD_GET_CTX(adapter);
 	mac_handle = hdd_ctx->mac_handle;
 
-	vdev = hdd_objmgr_get_vdev_by_user(adapter, WLAN_INIT_DEINIT_ID);
+	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink,
+					   WLAN_INIT_DEINIT_ID);
 	if (!vdev) {
 		status = QDF_STATUS_E_NULL_VALUE;
 		goto wext_unregister;
@@ -8442,7 +8444,7 @@ QDF_STATUS hdd_stop_adapter_ext(struct hdd_context *hdd_ctx,
 				     WLAN_CONTROL_PATH);
 
 	mac_handle = hdd_ctx->mac_handle;
-	vdev = hdd_objmgr_get_vdev_by_user(adapter, WLAN_OSIF_ID);
+	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink, WLAN_OSIF_ID);
 
 	switch (adapter->device_mode) {
 	case QDF_STA_MODE:
@@ -8892,7 +8894,7 @@ static void hdd_reset_scan_operation(struct hdd_context *hdd_ctx,
 		if (adapter->device_mode == QDF_STA_MODE) {
 			struct wlan_objmgr_vdev *vdev;
 
-			vdev = hdd_objmgr_get_vdev_by_user(adapter,
+			vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink,
 							   WLAN_OSIF_SCAN_ID);
 			if (!vdev)
 				break;
@@ -8964,7 +8966,7 @@ QDF_STATUS hdd_reset_all_adapters(struct hdd_context *hdd_ctx)
 			hdd_send_twt_del_all_sessions_to_userspace(adapter);
 
 			/* Stop tdls timers */
-			vdev = hdd_objmgr_get_vdev_by_user(adapter,
+			vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink,
 							   WLAN_OSIF_TDLS_ID);
 			if (vdev) {
 				hdd_notify_tdls_reset_adapter(vdev);

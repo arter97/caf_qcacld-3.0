@@ -226,7 +226,7 @@ static int hdd_twt_configure(struct hdd_adapter *adapter,
 
 	hdd_debug("TWT Operation 0x%x", twt_oper);
 
-	vdev = hdd_objmgr_get_vdev_by_user(adapter, WLAN_TWT_ID);
+	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink, WLAN_TWT_ID);
 	if (!vdev) {
 		hdd_err("vdev is NULL");
 		return -EINVAL;

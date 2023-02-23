@@ -1042,7 +1042,7 @@ QDF_STATUS hdd_chan_change_notify(struct hdd_adapter *adapter,
 				chan_change.chan_params.mhz_freq_seg0;
 	}
 
-	vdev = hdd_objmgr_get_vdev_by_user(adapter, WLAN_OSIF_ID);
+	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink, WLAN_OSIF_ID);
 	if (!vdev)
 		return -EINVAL;
 
@@ -1892,7 +1892,7 @@ hdd_hostapd_sap_fill_peer_ml_info(struct hdd_adapter *adapter,
 	struct wlan_objmgr_vdev *vdev;
 	struct wlan_objmgr_peer *sta_peer;
 
-	vdev = hdd_objmgr_get_vdev_by_user(adapter, WLAN_OSIF_ID);
+	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink, WLAN_OSIF_ID);
 	if (!vdev) {
 		hdd_err("Failed to get link id, VDEV NULL");
 		return;
@@ -2134,7 +2134,8 @@ QDF_STATUS hdd_hostapd_sap_event_cb(struct sap_event *sap_event,
 		ucfg_ipa_set_dfs_cac_tx(hdd_ctx->pdev,
 					ap_ctx->dfs_cac_block_tx);
 
-		vdev = hdd_objmgr_get_vdev_by_user(adapter, WLAN_DP_ID);
+		vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink,
+						   WLAN_DP_ID);
 		if (vdev) {
 			ucfg_dp_set_dfs_cac_tx(vdev, ap_ctx->dfs_cac_block_tx);
 			hdd_objmgr_put_vdev_by_user(vdev, WLAN_DP_ID);
@@ -2153,7 +2154,8 @@ QDF_STATUS hdd_hostapd_sap_event_cb(struct sap_event *sap_event,
 			 * go through before that.
 			 */
 			hostapd_state->bss_state = BSS_STOP;
-			vdev = hdd_objmgr_get_vdev_by_user(adapter, WLAN_DP_ID);
+			vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink,
+							   WLAN_DP_ID);
 			if (vdev) {
 				ucfg_dp_set_bss_state_start(vdev, false);
 				hdd_objmgr_put_vdev_by_user(vdev, WLAN_DP_ID);
@@ -2212,7 +2214,8 @@ QDF_STATUS hdd_hostapd_sap_event_cb(struct sap_event *sap_event,
 			ap_ctx->operating_chan_freq);
 
 		hostapd_state->bss_state = BSS_START;
-		vdev = hdd_objmgr_get_vdev_by_user(adapter, WLAN_DP_ID);
+		vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink,
+						   WLAN_DP_ID);
 		if (vdev) {
 			ucfg_dp_set_bss_state_start(vdev, true);
 			hdd_objmgr_put_vdev_by_user(vdev, WLAN_DP_ID);
@@ -2257,7 +2260,8 @@ QDF_STATUS hdd_hostapd_sap_event_cb(struct sap_event *sap_event,
 		 * Enable wds source port learning on the dp vdev in AP mode
 		 * when WDS feature is enabled.
 		 */
-		vdev = hdd_objmgr_get_vdev_by_user(adapter, WLAN_OSIF_ID);
+		vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink,
+						   WLAN_OSIF_ID);
 		if (vdev) {
 			if (wlan_vdev_mlme_get_opmode(vdev) == QDF_SAP_MODE)
 				hdd_wds_config_dp_repeater_mode(vdev);
@@ -2296,7 +2300,8 @@ QDF_STATUS hdd_hostapd_sap_event_cb(struct sap_event *sap_event,
 		if (!con_sap_adapter) {
 			ap_ctx->dfs_cac_block_tx = true;
 			hdd_ctx->dev_dfs_cac_status = DFS_CAC_NEVER_DONE;
-			vdev = hdd_objmgr_get_vdev_by_user(adapter, WLAN_DP_ID);
+			vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink,
+							   WLAN_DP_ID);
 			if (vdev) {
 				ucfg_dp_set_dfs_cac_tx(vdev,
 						ap_ctx->dfs_cac_block_tx);
@@ -2369,7 +2374,8 @@ QDF_STATUS hdd_hostapd_sap_event_cb(struct sap_event *sap_event,
 		ap_ctx->dfs_cac_block_tx = false;
 		ucfg_ipa_set_dfs_cac_tx(hdd_ctx->pdev,
 					ap_ctx->dfs_cac_block_tx);
-		vdev = hdd_objmgr_get_vdev_by_user(adapter, WLAN_DP_ID);
+		vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink,
+						   WLAN_DP_ID);
 		if (vdev) {
 			ucfg_dp_set_dfs_cac_tx(vdev,
 					       ap_ctx->dfs_cac_block_tx);
@@ -2567,7 +2573,8 @@ QDF_STATUS hdd_hostapd_sap_event_cb(struct sap_event *sap_event,
 
 		/* start timer in sap/p2p_go */
 		if (ap_ctx->ap_active == false) {
-			vdev = hdd_objmgr_get_vdev_by_user(adapter, WLAN_DP_ID);
+			vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink,
+							   WLAN_DP_ID);
 			if (vdev) {
 				ucfg_dp_bus_bw_compute_prev_txrx_stats(vdev);
 				hdd_objmgr_put_vdev_by_user(vdev, WLAN_DP_ID);
@@ -2721,7 +2728,8 @@ QDF_STATUS hdd_hostapd_sap_event_cb(struct sap_event *sap_event,
 			qdf_copy_macaddr(&sta_addr, &disassoc_comp->staMac);
 		}
 
-		vdev = hdd_objmgr_get_vdev_by_user(adapter, WLAN_DP_ID);
+		vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink,
+						   WLAN_DP_ID);
 		if (vdev) {
 			ucfg_dp_update_dhcp_state_on_disassoc(vdev,
 						      &disassoc_comp->staMac);
@@ -2802,7 +2810,8 @@ QDF_STATUS hdd_hostapd_sap_event_cb(struct sap_event *sap_event,
 
 		/*stop timer in sap/p2p_go */
 		if (ap_ctx->ap_active == false) {
-			vdev = hdd_objmgr_get_vdev_by_user(adapter, WLAN_DP_ID);
+			vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink,
+							   WLAN_DP_ID);
 			if (vdev) {
 				ucfg_dp_bus_bw_compute_reset_prev_txrx_stats(vdev);
 				hdd_objmgr_put_vdev_by_user(vdev, WLAN_DP_ID);
@@ -2999,7 +3008,8 @@ QDF_STATUS hdd_hostapd_sap_event_cb(struct sap_event *sap_event,
 		if (!wlan_reg_is_dfs_for_freq(hdd_ctx->pdev,
 					      ap_ctx->operating_chan_freq)) {
 			ap_ctx->dfs_cac_block_tx = false;
-			vdev = hdd_objmgr_get_vdev_by_user(adapter, WLAN_DP_ID);
+			vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink,
+							   WLAN_DP_ID);
 			if (vdev) {
 				ucfg_dp_set_dfs_cac_tx(vdev,
 						ap_ctx->dfs_cac_block_tx);
@@ -3044,7 +3054,8 @@ stopbss:
 		 * re-enabled
 		 */
 		hostapd_state->bss_state = BSS_STOP;
-		vdev = hdd_objmgr_get_vdev_by_user(adapter, WLAN_DP_ID);
+		vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink,
+						   WLAN_DP_ID);
 		if (vdev) {
 			ucfg_dp_set_bss_state_start(vdev, false);
 			hdd_objmgr_put_vdev_by_user(vdev, WLAN_DP_ID);
@@ -3481,7 +3492,7 @@ int hdd_softap_set_channel_change(struct net_device *dev, int target_chan_freq,
 	 * Post the Channel Change request to SAP.
 	 */
 
-	vdev = hdd_objmgr_get_vdev_by_user(adapter, WLAN_OSIF_ID);
+	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink, WLAN_OSIF_ID);
 	if (!vdev) {
 		qdf_atomic_set(&adapter->ch_switch_in_progress, 0);
 		wlan_hdd_enable_roaming(adapter, RSO_SAP_CHANNEL_CHANGE);
@@ -3554,7 +3565,7 @@ void hdd_stop_sap_set_tx_power(struct wlan_objmgr_psoc *psoc,
 			       struct hdd_adapter *adapter)
 {
 	struct wlan_objmgr_vdev *vdev =
-		hdd_objmgr_get_vdev_by_user(adapter, WLAN_OSIF_ID);
+		hdd_objmgr_get_vdev_by_user(adapter->deflink, WLAN_OSIF_ID);
 	struct wlan_objmgr_pdev *pdev;
 	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
 	struct qdf_mac_addr bssid;
@@ -4270,7 +4281,7 @@ QDF_STATUS hdd_init_ap_mode(struct hdd_adapter *adapter, bool reinit)
 		hdd_err("wmi_pdev_param_burst_enable set failed: %d", ret);
 
 
-	vdev = hdd_objmgr_get_vdev_by_user(adapter, WLAN_OSIF_ID);
+	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink, WLAN_OSIF_ID);
 	ucfg_mlme_is_6g_sap_fd_enabled(hdd_ctx->psoc, &is_6g_sap_fd_enabled);
 	hdd_debug("6g sap fd enabled %d", is_6g_sap_fd_enabled);
 	if (is_6g_sap_fd_enabled && vdev)
@@ -6175,7 +6186,8 @@ int wlan_hdd_cfg80211_start_bss(struct hdd_adapter *adapter,
 	if (policy_mgr_is_sta_mon_concurrency(hdd_ctx->psoc))
 		return -EINVAL;
 
-	vdev = hdd_objmgr_get_vdev_by_user(adapter, WLAN_HDD_ID_OBJ_MGR);
+	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink,
+					   WLAN_HDD_ID_OBJ_MGR);
 	if (!vdev)
 		return -EINVAL;
 
@@ -7315,7 +7327,7 @@ wlan_hdd_is_ap_ap_force_scc_override(struct hdd_adapter *adapter,
 		return false;
 	}
 	freq = chandef->chan->center_freq;
-	vdev = hdd_objmgr_get_vdev_by_user(adapter, WLAN_OSIF_ID);
+	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink, WLAN_OSIF_ID);
 	if (!vdev) {
 		hdd_err("failed to get vdev");
 		return false;
@@ -7569,7 +7581,7 @@ static void hdd_update_he_obss_pd(struct hdd_adapter *adapter,
 	struct wlan_objmgr_vdev *vdev;
 	struct ieee80211_he_obss_pd *obss_pd;
 
-	vdev = hdd_objmgr_get_vdev_by_user(adapter, WLAN_OSIF_ID);
+	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink, WLAN_OSIF_ID);
 	if (!vdev)
 		return;
 
@@ -7924,7 +7936,8 @@ static int __wlan_hdd_cfg80211_start_ap(struct wiphy *wiphy,
 			hdd_err("Error Start bss Failed");
 			goto err_start_bss;
 		}
-		vdev = hdd_objmgr_get_vdev_by_user(adapter, WLAN_OSIF_ID);
+		vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink,
+						   WLAN_OSIF_ID);
 		if (!vdev)
 			return -EINVAL;
 

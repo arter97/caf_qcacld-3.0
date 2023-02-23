@@ -447,7 +447,7 @@ void hdd_ndp_event_handler(struct hdd_adapter *adapter,
 	struct wlan_objmgr_psoc *psoc;
 	struct wlan_objmgr_vdev *vdev;
 
-	vdev = hdd_objmgr_get_vdev_by_user(adapter, WLAN_OSIF_NAN_ID);
+	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink, WLAN_OSIF_NAN_ID);
 	if (!vdev) {
 		hdd_err("vdev is NULL");
 		return;
@@ -548,7 +548,7 @@ static int update_ndi_state(struct hdd_adapter *adapter, uint32_t state)
 	struct wlan_objmgr_vdev *vdev;
 	QDF_STATUS status;
 
-	vdev = hdd_objmgr_get_vdev_by_user(adapter, WLAN_OSIF_NAN_ID);
+	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink, WLAN_OSIF_NAN_ID);
 	if (!vdev) {
 		hdd_err("vdev is NULL");
 		return QDF_STATUS_E_NULL_VALUE;
@@ -597,7 +597,7 @@ int hdd_init_nan_data_mode(struct hdd_adapter *adapter)
 	hdd_roam_profile_init(adapter);
 	hdd_register_wext(wlan_dev);
 
-	vdev = hdd_objmgr_get_vdev_by_user(adapter, WLAN_DP_ID);
+	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink, WLAN_DP_ID);
 	if (!vdev) {
 		ret_val = -EAGAIN;
 		goto wext_unregister;
@@ -804,7 +804,7 @@ int hdd_ndi_start(const char *iface_name, uint16_t transaction_id)
 		goto err_handler;
 	}
 
-	vdev = hdd_objmgr_get_vdev_by_user(adapter, WLAN_OSIF_NAN_ID);
+	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink, WLAN_OSIF_NAN_ID);
 	if (!vdev) {
 		hdd_err("vdev is NULL");
 		ret = -EINVAL;
@@ -893,7 +893,7 @@ int hdd_ndi_delete(uint8_t vdev_id, const char *iface_name,
 		return -EINVAL;
 	}
 
-	vdev = hdd_objmgr_get_vdev_by_user(adapter, WLAN_OSIF_NAN_ID);
+	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink, WLAN_OSIF_NAN_ID);
 	if (!vdev) {
 		hdd_err("vdev is NULL");
 		return -EINVAL;
@@ -952,7 +952,8 @@ void hdd_ndi_drv_ndi_create_rsp_handler(uint8_t vdev_id,
 
 	if (ndi_rsp->status == QDF_STATUS_SUCCESS) {
 		hdd_alert("NDI interface successfully created");
-		vdev = hdd_objmgr_get_vdev_by_user(adapter, WLAN_OSIF_NAN_ID);
+		vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink,
+						   WLAN_OSIF_NAN_ID);
 		if (!vdev) {
 			qdf_mem_free(roam_info);
 			hdd_err("vdev is NULL");
@@ -1075,7 +1076,7 @@ void hdd_ndp_session_end_handler(struct hdd_adapter *adapter)
 {
 	struct wlan_objmgr_vdev *vdev;
 
-	vdev = hdd_objmgr_get_vdev_by_user(adapter, WLAN_OSIF_NAN_ID);
+	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink, WLAN_OSIF_NAN_ID);
 	if (!vdev) {
 		hdd_err("vdev is NULL");
 		return;
@@ -1148,36 +1149,38 @@ int hdd_ndp_new_peer_handler(uint8_t vdev_id, uint16_t sta_id,
 	hdd_roam_register_sta(adapter, &roam_info->bssid,
 			      roam_info->fAuthRequired);
 
-	/* perform following steps for first new peer ind */
-	if (first_peer) {
-		hdd_debug("Set ctx connection state to connected");
-		/* Disable LRO/GRO for NDI Mode */
-		if (ucfg_dp_is_ol_enabled(hdd_ctx->psoc) &&
-		    !NAN_CONCURRENCY_SUPPORTED(hdd_ctx->psoc)) {
-			hdd_debug("Disable LRO/GRO in NDI Mode");
-			hdd_disable_rx_ol_in_concurrency(true);
-		}
+	if (!first_peer)
+		goto mem_free;
 
-		vdev = hdd_objmgr_get_vdev_by_user(adapter, WLAN_DP_ID);
-		if (vdev) {
-			ucfg_dp_bus_bw_compute_prev_txrx_stats(vdev);
-			hdd_objmgr_put_vdev_by_user(vdev, WLAN_DP_ID);
-		}
-		ucfg_dp_bus_bw_compute_timer_start(hdd_ctx->psoc);
-		sta_ctx->conn_info.conn_state = eConnectionState_NdiConnected;
-		hdd_wmm_connect(adapter, roam_info, eCSR_BSS_TYPE_NDI);
-		wlan_hdd_netif_queue_control(
-					adapter,
-					WLAN_START_ALL_NETIF_QUEUE_N_CARRIER,
-					WLAN_CONTROL_PATH);
-		/*
-		 * This is called only for first peer. So, no.of NDP sessions
-		 * are always 1
-		 */
-		if (!NDI_CONCURRENCY_SUPPORTED(hdd_ctx->psoc))
-			hdd_indicate_active_ndp_cnt(hdd_ctx->psoc, vdev_id, 1);
-		hdd_send_obss_scan_req(hdd_ctx, true);
+	hdd_debug("Set ctx connection state to connected");
+	/* Disable LRO/GRO for NDI Mode */
+	if (ucfg_dp_is_ol_enabled(hdd_ctx->psoc) &&
+	    !NAN_CONCURRENCY_SUPPORTED(hdd_ctx->psoc)) {
+		hdd_debug("Disable LRO/GRO in NDI Mode");
+		hdd_disable_rx_ol_in_concurrency(true);
 	}
+
+	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink, WLAN_DP_ID);
+	if (vdev) {
+		ucfg_dp_bus_bw_compute_prev_txrx_stats(vdev);
+		hdd_objmgr_put_vdev_by_user(vdev, WLAN_DP_ID);
+	}
+
+	ucfg_dp_bus_bw_compute_timer_start(hdd_ctx->psoc);
+	sta_ctx->conn_info.conn_state = eConnectionState_NdiConnected;
+	hdd_wmm_connect(adapter, roam_info, eCSR_BSS_TYPE_NDI);
+	wlan_hdd_netif_queue_control(adapter,
+				     WLAN_START_ALL_NETIF_QUEUE_N_CARRIER,
+				     WLAN_CONTROL_PATH);
+	/*
+	 * This is called only for first peer. So, no.of NDP sessions
+	 * are always 1
+	 */
+	if (!NDI_CONCURRENCY_SUPPORTED(hdd_ctx->psoc))
+		hdd_indicate_active_ndp_cnt(hdd_ctx->psoc, vdev_id, 1);
+	hdd_send_obss_scan_req(hdd_ctx, true);
+
+mem_free:
 	qdf_mem_free(roam_info);
 	return 0;
 }
@@ -1200,7 +1203,7 @@ void hdd_cleanup_ndi(struct hdd_context *hdd_ctx,
 	wlan_hdd_netif_queue_control(adapter,
 				     WLAN_STOP_ALL_NETIF_QUEUE_N_CARRIER,
 				     WLAN_CONTROL_PATH);
-	vdev = hdd_objmgr_get_vdev_by_user(adapter, WLAN_DP_ID);
+	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink, WLAN_DP_ID);
 	if (vdev) {
 		ucfg_dp_bus_bw_compute_reset_prev_txrx_stats(vdev);
 		hdd_objmgr_put_vdev_by_user(vdev, WLAN_DP_ID);

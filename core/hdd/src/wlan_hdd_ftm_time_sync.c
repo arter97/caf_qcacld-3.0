@@ -35,7 +35,7 @@ static ssize_t hdd_ftm_time_sync_show(struct device *dev,
 		return scnprintf(buf, PAGE_SIZE, "Invalid device\n");
 
 	hdd_sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter->deflink);
-	vdev = hdd_objmgr_get_vdev_by_user(adapter, FTM_TIME_SYNC_ID);
+	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink, FTM_TIME_SYNC_ID);
 	if (!vdev)
 		return -EINVAL;
 
@@ -57,7 +57,7 @@ hdd_ftm_time_sync_sta_state_notify(struct hdd_adapter *adapter,
 	struct net_device *net_dev;
 	struct wlan_objmgr_vdev *vdev;
 
-	vdev = hdd_objmgr_get_vdev_by_user(adapter, FTM_TIME_SYNC_ID);
+	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink, FTM_TIME_SYNC_ID);
 	if (!vdev)
 		return;
 

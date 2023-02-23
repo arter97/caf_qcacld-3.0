@@ -455,7 +455,7 @@ void hdd_conn_set_authenticated(struct hdd_adapter *adapter, uint8_t auth_state)
 		  sta_ctx->conn_info.is_authenticated, auth_state);
 	sta_ctx->conn_info.is_authenticated = auth_state;
 
-	vdev = hdd_objmgr_get_vdev_by_user(adapter, WLAN_DP_ID);
+	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink, WLAN_DP_ID);
 	if (vdev) {
 		ucfg_dp_conn_info_set_peer_authenticate(vdev, auth_state);
 		hdd_objmgr_put_vdev_by_user(vdev, WLAN_DP_ID);
@@ -1398,7 +1398,7 @@ QDF_STATUS hdd_roam_register_sta(struct hdd_adapter *adapter,
 		txrx_desc.is_wapi_supported = 0;
 #endif /* FEATURE_WLAN_WAPI */
 
-	vdev = hdd_objmgr_get_vdev_by_user(adapter, WLAN_DP_ID);
+	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink, WLAN_DP_ID);
 	if (!vdev)
 		return QDF_STATUS_E_INVAL;
 
@@ -1686,7 +1686,7 @@ QDF_STATUS hdd_roam_register_tdlssta(struct hdd_adapter *adapter,
 	/* set the QoS field appropriately .. */
 	txrx_desc.is_qos_enabled = qos;
 
-	vdev = hdd_objmgr_get_vdev_by_user(adapter, WLAN_DP_ID);
+	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink, WLAN_DP_ID);
 	if (!vdev)
 		return QDF_STATUS_E_INVAL;
 
@@ -2176,7 +2176,7 @@ static void hdd_roam_channel_switch_handler(struct hdd_adapter *adapter,
 	chan_change.chan_params.mhz_freq_seg1 =
 		roam_info->chan_info.band_center_freq2;
 
-	vdev = hdd_objmgr_get_vdev_by_user(adapter, WLAN_OSIF_ID);
+	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink, WLAN_OSIF_ID);
 	if (!vdev) {
 		hdd_err("Invalid vdev");
 		return;
@@ -2221,7 +2221,7 @@ static void hdd_roam_channel_switch_handler(struct hdd_adapter *adapter,
 	wlan_twt_concurrency_update(hdd_ctx);
 	if (adapter->device_mode == QDF_STA_MODE ||
 	    adapter->device_mode == QDF_P2P_CLIENT_MODE) {
-		vdev = hdd_objmgr_get_vdev_by_user(adapter,
+		vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink,
 						   WLAN_OSIF_ID);
 		if (!vdev)
 			return;

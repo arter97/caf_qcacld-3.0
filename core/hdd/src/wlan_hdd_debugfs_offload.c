@@ -141,7 +141,8 @@ wlan_hdd_arp_offload_info_debugfs(struct hdd_context *hdd_ctx,
 	struct wlan_objmgr_vdev *vdev;
 	QDF_STATUS status;
 
-	vdev = hdd_objmgr_get_vdev_by_user(adapter, WLAN_OSIF_POWER_ID);
+	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink,
+					   WLAN_OSIF_POWER_ID);
 	if (!vdev)
 		return 0;
 
@@ -236,7 +237,8 @@ wlan_hdd_ns_offload_info_debugfs(struct hdd_context *hdd_ctx,
 	QDF_STATUS status;
 	uint32_t i;
 
-	vdev = hdd_objmgr_get_vdev_by_user(adapter, WLAN_OSIF_POWER_ID);
+	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink,
+					   WLAN_OSIF_POWER_ID);
 	if (!vdev)
 		return 0;
 

@@ -207,7 +207,8 @@ static int wlan_cfg80211_set_pasn_key(struct hdd_adapter *adapter,
 	int cipher_len;
 	uint32_t cipher;
 
-	vdev = hdd_objmgr_get_vdev_by_user(adapter, WLAN_WIFI_POS_CORE_ID);
+	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink,
+					   WLAN_WIFI_POS_CORE_ID);
 	if (!vdev) {
 		hdd_err("Key params is NULL");
 		return -EINVAL;

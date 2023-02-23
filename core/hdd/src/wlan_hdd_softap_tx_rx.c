@@ -282,7 +282,7 @@ static void __hdd_softap_tx_timeout(struct net_device *dev)
 
 	wlan_hdd_display_adapter_netif_queue_history(adapter);
 
-	vdev = hdd_objmgr_get_vdev_by_user(adapter, WLAN_DP_ID);
+	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink, WLAN_DP_ID);
 	if (vdev) {
 		ucfg_dp_softap_tx_timeout(vdev);
 		hdd_objmgr_put_vdev_by_user(vdev, WLAN_DP_ID);
@@ -495,7 +495,7 @@ QDF_STATUS hdd_softap_deregister_sta(struct hdd_adapter *adapter,
 			hdd_debug("WLAN_CLIENT_DISCONNECT event failed");
 	}
 
-	vdev = hdd_objmgr_get_vdev_by_user(adapter, WLAN_DP_ID);
+	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink, WLAN_DP_ID);
 	if (!vdev)
 		return QDF_STATUS_E_INVAL;
 
@@ -565,7 +565,7 @@ QDF_STATUS hdd_softap_register_sta(struct hdd_adapter *adapter,
 
 	txrx_desc.is_qos_enabled = wmm_enabled;
 
-	vdev = hdd_objmgr_get_vdev_by_user(adapter, WLAN_DP_ID);
+	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink, WLAN_DP_ID);
 	if (!vdev)
 		return QDF_STATUS_E_INVAL;
 
@@ -777,17 +777,19 @@ static QDF_STATUS hdd_softap_change_per_sta_state(struct hdd_adapter *adapter,
 	hdd_debug("Station " QDF_MAC_ADDR_FMT " changed to state %d",
 		  QDF_MAC_ADDR_REF(mac_addr.bytes), state);
 
-	if (QDF_STATUS_SUCCESS == qdf_status) {
-		sta_info->peer_state = OL_TXRX_PEER_STATE_AUTH;
-		vdev = hdd_objmgr_get_vdev_by_user(adapter, WLAN_OSIF_ID);
-		if (vdev) {
-			p2p_peer_authorized(vdev, sta_mac->bytes);
-			hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
-		} else {
-			hdd_err("vdev is NULL");
-		}
+	if (QDF_IS_STATUS_ERROR(qdf_status))
+		goto put_ref;
+
+	sta_info->peer_state = OL_TXRX_PEER_STATE_AUTH;
+	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink, WLAN_OSIF_ID);
+	if (vdev) {
+		p2p_peer_authorized(vdev, sta_mac->bytes);
+		hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
+	} else {
+		hdd_err("vdev is NULL");
 	}
 
+put_ref:
 	hdd_put_sta_info_ref(&adapter->sta_info_list, &sta_info, true,
 			     STA_INFO_SOFTAP_CHANGE_STA_STATE);
 	hdd_exit();

@@ -172,7 +172,7 @@ int wlan_cfg80211_tdls_add_peer_mlo(struct hdd_adapter *adapter,
 	bool is_mlo_vdev;
 	int status;
 
-	vdev = hdd_objmgr_get_vdev_by_user(adapter, WLAN_OSIF_TDLS_ID);
+	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink, WLAN_OSIF_TDLS_ID);
 	if (!vdev)
 		return -EINVAL;
 
@@ -1215,7 +1215,7 @@ wlan_cfg80211_tdls_mgmt_mlo(struct hdd_adapter *adapter, const uint8_t *peer,
 	uint8_t i;
 	int ret;
 
-	vdev = hdd_objmgr_get_vdev_by_user(adapter, WLAN_OSIF_TDLS_ID);
+	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink, WLAN_OSIF_TDLS_ID);
 	if (!vdev)
 		return -EINVAL;
 

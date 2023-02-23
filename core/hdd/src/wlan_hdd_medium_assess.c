@@ -189,7 +189,7 @@ static int hdd_medium_assess_cca(struct hdd_context *hdd_ctx,
 	QDF_STATUS status;
 	int errno = 0;
 
-	vdev = hdd_objmgr_get_vdev_by_user(adapter, WLAN_DCS_ID);
+	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink, WLAN_DCS_ID);
 	if (!vdev)
 		return -EINVAL;
 
@@ -432,7 +432,7 @@ static int hdd_medium_assess_congestion_report(struct hdd_context *hdd_ctx,
 		return -EINVAL;
 	}
 
-	vdev = hdd_objmgr_get_vdev_by_user(adapter, WLAN_CP_STATS_ID);
+	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink, WLAN_CP_STATS_ID);
 	if (!vdev)
 		return -EINVAL;
 
@@ -729,7 +729,7 @@ static void hdd_medium_assess_expire_handler(void *arg)
 		return;
 	}
 
-	vdev = hdd_objmgr_get_vdev_by_user(adapter, WLAN_CP_STATS_ID);
+	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink, WLAN_CP_STATS_ID);
 	if (!vdev)
 		return;
 

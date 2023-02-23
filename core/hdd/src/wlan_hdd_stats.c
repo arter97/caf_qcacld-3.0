@@ -228,7 +228,8 @@ static int copy_station_stats_to_adapter(struct hdd_adapter *adapter,
 	uint16_t he_mcs_12_13_map;
 	bool is_he_mcs_12_13_supported;
 
-	vdev = hdd_objmgr_get_vdev_by_user(adapter, WLAN_OSIF_STATS_ID);
+	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink,
+					   WLAN_OSIF_STATS_ID);
 	if (!vdev)
 		return -EINVAL;
 
@@ -2178,7 +2179,8 @@ wlan_hdd_set_station_stats_request_pending(struct hdd_adapter *adapter,
 	if (!adapter->hdd_ctx->is_get_station_clubbed_in_ll_stats_req)
 		return QDF_STATUS_E_INVAL;
 
-	vdev = hdd_objmgr_get_vdev_by_user(adapter, WLAN_OSIF_STATS_ID);
+	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink,
+					   WLAN_OSIF_STATS_ID);
 	if (!vdev)
 		return QDF_STATUS_E_INVAL;
 
@@ -5727,7 +5729,7 @@ void hdd_get_max_tx_bitrate(struct hdd_context *hdd_ctx,
 	my_tx_rate = adapter->hdd_stats.class_a_stat.tx_rate;
 
 	if (!(tx_rate_flags & TX_RATE_LEGACY)) {
-		vdev = hdd_objmgr_get_vdev_by_user(adapter,
+		vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink,
 						   WLAN_OSIF_STATS_ID);
 		if (vdev) {
 			/*
@@ -5816,7 +5818,8 @@ bool hdd_report_max_rate(struct hdd_adapter *adapter,
 		}
 	}
 
-	vdev = hdd_objmgr_get_vdev_by_user(adapter, WLAN_OSIF_STATS_ID);
+	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink,
+					   WLAN_OSIF_STATS_ID);
 	if (!vdev) {
 		hdd_err("failed to get vdev");
 		return false;
@@ -6233,7 +6236,8 @@ static inline void wlan_hdd_mlo_update_stats_info(struct hdd_adapter *adapter)
 	rssi = &ml_adapter->hdd_stats.summary_stat.rssi;
 	snr = &ml_adapter->hdd_stats.summary_stat.snr;
 
-	vdev = hdd_objmgr_get_vdev_by_user(adapter, WLAN_OSIF_STATS_ID);
+	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink,
+					   WLAN_OSIF_STATS_ID);
 	if (!vdev)
 		return;
 
@@ -6391,7 +6395,7 @@ static int wlan_hdd_update_rate_info(struct hdd_adapter *adapter,
 		  (int)rx_mcs_index, (int)tx_nss, (int)rx_nss,
 		  (int)tx_dcm, (int)rx_dcm, (int)tx_gi, (int)rx_gi);
 
-	vdev = hdd_objmgr_get_vdev_by_user(adapter,
+	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink,
 					   WLAN_OSIF_STATS_ID);
 
 	if (!vdev) {
@@ -7331,7 +7335,8 @@ QDF_STATUS wlan_hdd_get_mib_stats(struct hdd_adapter *adapter)
 		return QDF_STATUS_E_FAULT;
 	}
 
-	vdev = hdd_objmgr_get_vdev_by_user(adapter, WLAN_OSIF_STATS_ID);
+	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink,
+					   WLAN_OSIF_STATS_ID);
 	if (!vdev)
 		return QDF_STATUS_E_FAULT;
 
@@ -7384,7 +7389,8 @@ QDF_STATUS wlan_hdd_get_rssi(struct hdd_adapter *adapter, int8_t *rssi_value)
 		return QDF_STATUS_SUCCESS;
 	}
 
-	vdev = hdd_objmgr_get_vdev_by_user(adapter, WLAN_OSIF_STATS_ID);
+	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink,
+					   WLAN_OSIF_STATS_ID);
 	if (!vdev) {
 		*rssi_value = adapter->deflink->rssi;
 		return QDF_STATUS_SUCCESS;
@@ -7715,7 +7721,8 @@ int wlan_hdd_get_station_stats(struct hdd_adapter *adapter)
 		return 0;
 	}
 
-	vdev = hdd_objmgr_get_vdev_by_user(adapter, WLAN_OSIF_STATS_ID);
+	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink,
+					   WLAN_OSIF_STATS_ID);
 	if (!vdev)
 		return -EINVAL;
 
@@ -7752,7 +7759,8 @@ int wlan_hdd_get_big_data_station_stats(struct hdd_adapter *adapter)
 	struct big_data_stats_event *big_data_stats;
 	struct wlan_objmgr_vdev *vdev;
 
-	vdev = hdd_objmgr_get_vdev_by_user(adapter, WLAN_OSIF_STATS_ID);
+	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink,
+					   WLAN_OSIF_STATS_ID);
 	if (!vdev)
 		return -EINVAL;
 
@@ -8971,7 +8979,8 @@ hdd_get_roam_stats(struct hdd_context *hdd_ctx,
 	struct enhance_roam_info *roam_info = NULL;
 	uint32_t roam_num = 0;
 
-	vdev = hdd_objmgr_get_vdev_by_user(adapter, WLAN_OSIF_STATS_ID);
+	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink,
+					   WLAN_OSIF_STATS_ID);
 	if (!vdev)
 		return -EINVAL;
 

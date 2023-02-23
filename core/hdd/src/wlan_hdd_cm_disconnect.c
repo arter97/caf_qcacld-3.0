@@ -75,7 +75,7 @@ void hdd_handle_disassociation_event(struct hdd_adapter *adapter,
 
 	hdd_lpass_notify_disconnect(adapter);
 
-	vdev = hdd_objmgr_get_vdev_by_user(adapter, WLAN_DP_ID);
+	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink, WLAN_DP_ID);
 	if (vdev) {
 		ucfg_dp_del_latency_critical_client(vdev,
 			hdd_convert_cfgdot11mode_to_80211mode(
@@ -143,7 +143,7 @@ void __hdd_cm_disconnect_handler_pre_user_update(struct hdd_adapter *adapter)
 				  sta_ctx->conn_info.bssid.bytes,
 				  false);
 
-	vdev = hdd_objmgr_get_vdev_by_user(adapter, WLAN_DP_ID);
+	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink, WLAN_DP_ID);
 	if (vdev) {
 		ucfg_dp_periodic_sta_stats_stop(vdev);
 		hdd_objmgr_put_vdev_by_user(vdev, WLAN_DP_ID);
@@ -253,7 +253,7 @@ QDF_STATUS wlan_hdd_cm_issue_disconnect(struct hdd_adapter *adapter,
 	struct wlan_objmgr_vdev *vdev;
 	struct hdd_station_ctx *sta_ctx;
 
-	vdev = hdd_objmgr_get_vdev_by_user(adapter, WLAN_OSIF_CM_ID);
+	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink, WLAN_OSIF_CM_ID);
 	if (!vdev)
 		return QDF_STATUS_E_INVAL;
 
