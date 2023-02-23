@@ -1226,6 +1226,13 @@ QDF_STATUS ucfg_fwol_configure_global_params(struct wlan_objmgr_psoc *psoc,
 	return status;
 }
 
+QDF_STATUS ucfg_fwol_set_ilp_config(struct wlan_objmgr_psoc *psoc,
+				    struct wlan_objmgr_pdev *pdev,
+				    uint32_t enable_ilp)
+{
+	return fwol_set_ilp_config(pdev, enable_ilp);
+}
+
 QDF_STATUS ucfg_fwol_configure_vdev_params(struct wlan_objmgr_psoc *psoc,
 					   struct wlan_objmgr_vdev *vdev)
 {
