@@ -888,7 +888,7 @@ bool hdd_get_interface_info(struct hdd_adapter *adapter,
 	     (QDF_P2P_CLIENT_MODE == adapter->device_mode) ||
 	     (QDF_P2P_DEVICE_MODE == adapter->device_mode))) {
 		sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter->deflink);
-		if (hdd_cm_is_disconnected(adapter)) {
+		if (hdd_cm_is_disconnected(adapter->deflink)) {
 			info->state = WIFI_DISCONNECTED;
 		}
 		if (hdd_cm_is_connecting(adapter->deflink)) {

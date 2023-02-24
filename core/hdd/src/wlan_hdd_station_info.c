@@ -2440,7 +2440,7 @@ static int hdd_get_station_info_ex(struct hdd_context *hdd_ctx,
 	hdd_sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter->deflink);
 	ucfg_mc_cp_get_big_data_fw_support(hdd_ctx->psoc, &big_data_fw_support);
 
-	if (hdd_cm_is_disconnected(adapter) &&
+	if (hdd_cm_is_disconnected(adapter->deflink) &&
 	    big_data_fw_support)
 		big_data_stats_req = true;
 

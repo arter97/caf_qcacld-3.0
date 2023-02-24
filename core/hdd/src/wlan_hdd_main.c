@@ -8571,8 +8571,7 @@ QDF_STATUS hdd_stop_adapter_ext(struct hdd_context *hdd_ctx,
 		if (adapter->device_mode == QDF_NDI_MODE ||
 		    ((adapter->device_mode == QDF_STA_MODE ||
 		      adapter->device_mode == QDF_P2P_CLIENT_MODE) &&
-		      !hdd_cm_is_disconnected(adapter))
-		    ) {
+		      !hdd_cm_is_disconnected(adapter->deflink))) {
 			INIT_COMPLETION(adapter->disconnect_comp_var);
 			if (cds_is_driver_recovering())
 				reason = REASON_DEVICE_RECOVERY;
