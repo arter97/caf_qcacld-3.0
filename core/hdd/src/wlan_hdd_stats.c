@@ -6136,16 +6136,15 @@ wlan_hdd_refill_os_rateflags(struct rate_info *os_rate, uint8_t preamble)
 /**
  * wlan_hdd_refill_actual_rate() - Refill actual rates info stats
  * @os_rate: rate info for os
- * @adapter: The HDD adapter structure
+ * @link_info: pointer to link_info struct in adapter
  *
  * When rates info reported is provided by driver, this function
  * will take effect to replace the bandwidth calculated from fw.
  *
  * Return: None
  */
-static void
-wlan_hdd_refill_actual_rate(struct rate_info *os_rate,
-			    struct hdd_adapter *adapter)
+static void wlan_hdd_refill_actual_rate(struct rate_info *os_rate,
+					struct wlan_hdd_link_info *link_info)
 {
 	ol_txrx_soc_handle soc;
 	uint32_t rate;
@@ -6154,12 +6153,12 @@ wlan_hdd_refill_actual_rate(struct rate_info *os_rate,
 	uint8_t preamble, mcs_index, nss;
 
 	soc = cds_get_context(QDF_MODULE_ID_SOC);
-	rate = adapter->deflink->hdd_stats.class_a_stat.rx_rate;
-	guard_interval = adapter->deflink->hdd_stats.class_a_stat.rx_gi;
-	preamble = adapter->deflink->hdd_stats.class_a_stat.rx_preamble;
-	bw = adapter->deflink->hdd_stats.class_a_stat.rx_bw;
-	mcs_index = adapter->deflink->hdd_stats.class_a_stat.rx_mcs_index;
-	nss = adapter->deflink->hdd_stats.class_a_stat.rx_nss;
+	rate = link_info->hdd_stats.class_a_stat.rx_rate;
+	guard_interval = link_info->hdd_stats.class_a_stat.rx_gi;
+	preamble = link_info->hdd_stats.class_a_stat.rx_preamble;
+	bw = link_info->hdd_stats.class_a_stat.rx_bw;
+	mcs_index = link_info->hdd_stats.class_a_stat.rx_mcs_index;
+	nss = link_info->hdd_stats.class_a_stat.rx_nss;
 
 	os_rate->nss = nss;
 	if (preamble == DOT11_A || preamble == DOT11_B) {
@@ -6186,7 +6185,7 @@ wlan_hdd_refill_actual_rate(struct rate_info *os_rate,
 #else
 static inline void
 wlan_hdd_refill_actual_rate(struct rate_info *os_rate,
-			    struct hdd_adapter *adapter)
+			    struct wlan_hdd_link_info *link_info)
 {
 }
 #endif
@@ -6456,7 +6455,8 @@ static int wlan_hdd_update_rate_info(struct hdd_adapter *adapter,
 					    my_rx_rate,
 					    rx_nss_max);
 		else
-			wlan_hdd_refill_actual_rate(&sinfo->rxrate, adapter);
+			wlan_hdd_refill_actual_rate(&sinfo->rxrate,
+						    adapter->deflink);
 	}
 
 	wlan_hdd_fill_summary_stats(&hdd_stats->summary_stat,
