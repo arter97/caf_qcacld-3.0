@@ -6293,13 +6293,14 @@ static void wlan_hdd_update_rssi(struct hdd_adapter *adapter,
 {
 	struct hdd_station_ctx *sta_ctx;
 	int8_t snr;
+	mac_handle_t mac_handle = hdd_adapter_get_mac_handle(adapter);
 
 	sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter->deflink);
 	snr = adapter->deflink->snr;
 
 	/* for new connection there might be no valid previous RSSI */
 	if (!adapter->deflink->rssi) {
-		hdd_get_rssi_snr_by_bssid(adapter,
+		hdd_get_rssi_snr_by_bssid(mac_handle,
 					  sta_ctx->conn_info.bssid.bytes,
 					  &adapter->deflink->rssi, &snr);
 	}

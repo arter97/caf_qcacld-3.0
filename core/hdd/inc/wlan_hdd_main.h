@@ -4218,14 +4218,14 @@ void hdd_update_ie_allowlist_attr(struct probe_req_allowlist_attr *ie_allowlist,
 
 /**
  * hdd_get_rssi_snr_by_bssid() - gets the rssi and snr by bssid from scan cache
- * @adapter: adapter handle
+ * @mac_handle: MAC handle
  * @bssid: bssid to look for in scan cache
  * @rssi: rssi value found
  * @snr: snr value found
  *
  * Return: QDF_STATUS
  */
-int hdd_get_rssi_snr_by_bssid(struct hdd_adapter *adapter, const uint8_t *bssid,
+int hdd_get_rssi_snr_by_bssid(mac_handle_t mac_handle, const uint8_t *bssid,
 			      int8_t *rssi, int8_t *snr);
 
 /**

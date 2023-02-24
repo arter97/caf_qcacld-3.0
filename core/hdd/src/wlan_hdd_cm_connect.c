@@ -200,7 +200,8 @@ void hdd_cm_update_rssi_snr_by_bssid(struct hdd_adapter *adapter)
 	int8_t snr = 0;
 
 	sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter->deflink);
-	hdd_get_rssi_snr_by_bssid(adapter, sta_ctx->conn_info.bssid.bytes,
+	hdd_get_rssi_snr_by_bssid(hdd_adapter_get_mac_handle(adapter),
+				  sta_ctx->conn_info.bssid.bytes,
 				  &adapter->deflink->rssi, &snr);
 
 	/* If RSSi is reported as positive then it is invalid */
