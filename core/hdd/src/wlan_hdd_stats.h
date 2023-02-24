@@ -520,11 +520,11 @@ wlan_hdd_get_peer_rx_rate_stats(struct hdd_adapter *adapter)
 
 /**
  * wlan_hdd_get_station_stats() - Get station statistics
- * @adapter: adapter for which statistics are desired
+ * @link_info: Link info pointer in HDD adapter.
  *
  * Return: status of operation
  */
-int wlan_hdd_get_station_stats(struct hdd_adapter *adapter);
+int wlan_hdd_get_station_stats(struct wlan_hdd_link_info *link_info);
 
 int wlan_hdd_qmi_get_sync_resume(void);
 int wlan_hdd_qmi_put_suspend(void);

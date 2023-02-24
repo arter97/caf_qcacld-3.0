@@ -4633,7 +4633,7 @@ static int wlan_hdd_get_sap_stats(struct wlan_hdd_link_info *link_info,
 {
 	int ret;
 
-	ret = wlan_hdd_get_station_stats(adapter);
+	ret = wlan_hdd_get_station_stats(link_info);
 	if (ret) {
 		hdd_err("Failed to get SAP stats; status:%d", ret);
 		return ret;
@@ -6562,7 +6562,7 @@ static int wlan_hdd_get_sta_stats(struct wlan_hdd_link_info *link_info,
 		wlan_hdd_get_rcpi(adapter, (uint8_t *)mac, &rcpi_value,
 				  RCPI_MEASUREMENT_TYPE_AVG_MGMT);
 
-	wlan_hdd_get_station_stats(adapter);
+	wlan_hdd_get_station_stats(link_info);
 
 	wlan_hdd_get_peer_rx_rate_stats(adapter);
 
@@ -7718,7 +7718,7 @@ void wlan_hdd_get_peer_rx_rate_stats(struct hdd_adapter *adapter)
 }
 #endif
 
-int wlan_hdd_get_station_stats(struct hdd_adapter *adapter)
+int wlan_hdd_get_station_stats(struct wlan_hdd_link_info *link_info)
 {
 	int ret = 0;
 	struct stats_event *stats;
@@ -7729,8 +7729,7 @@ int wlan_hdd_get_station_stats(struct hdd_adapter *adapter)
 		return 0;
 	}
 
-	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink,
-					   WLAN_OSIF_STATS_ID);
+	vdev = hdd_objmgr_get_vdev_by_user(link_info, WLAN_OSIF_STATS_ID);
 	if (!vdev)
 		return -EINVAL;
 
@@ -7752,8 +7751,8 @@ int wlan_hdd_get_station_stats(struct hdd_adapter *adapter)
 	}
 
 	/* update get stats cached time stamp */
-	hdd_update_station_stats_cached_timestamp(adapter);
-	copy_station_stats_to_adapter(adapter->deflink, stats);
+	hdd_update_station_stats_cached_timestamp(link_info->adapter);
+	copy_station_stats_to_adapter(link_info, stats);
 out:
 	wlan_cfg80211_mc_cp_stats_free_stats_event(stats);
 	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_STATS_ID);

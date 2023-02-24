@@ -2444,7 +2444,7 @@ static int hdd_get_station_info_ex(struct wlan_hdd_link_info *link_info)
 	if (hdd_cm_is_disconnected(link_info) && big_data_fw_support)
 		big_data_stats_req = true;
 
-	if (wlan_hdd_get_station_stats(adapter))
+	if (wlan_hdd_get_station_stats(link_info))
 		hdd_err_rl("wlan_hdd_get_station_stats fail");
 
 	wlan_hdd_get_peer_rx_rate_stats(adapter);
