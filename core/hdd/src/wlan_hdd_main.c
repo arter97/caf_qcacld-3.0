@@ -7356,10 +7356,10 @@ static void hdd_cleanup_prev_ap_bcn_ie(struct wlan_hdd_link_info *link_info)
 	}
 }
 
-void hdd_cleanup_conn_info(struct hdd_adapter *adapter)
+void hdd_cleanup_conn_info(struct wlan_hdd_link_info *link_info)
 {
-	hdd_cleanup_he_operation_info(adapter->deflink);
-	hdd_cleanup_prev_ap_bcn_ie(adapter->deflink);
+	hdd_cleanup_he_operation_info(link_info);
+	hdd_cleanup_prev_ap_bcn_ie(link_info);
 }
 
 /**
@@ -7377,7 +7377,7 @@ static void hdd_sta_destroy_ctx_all(struct hdd_context *hdd_ctx)
 	hdd_for_each_adapter_dev_held_safe(hdd_ctx, adapter, next_adapter,
 					   NET_DEV_HOLD_STA_DESTROY_CTX_ALL) {
 		if (adapter->device_mode == QDF_STA_MODE)
-			hdd_cleanup_conn_info(adapter);
+			hdd_cleanup_conn_info(adapter->deflink);
 		hdd_adapter_dev_put_debug(adapter,
 					  NET_DEV_HOLD_STA_DESTROY_CTX_ALL);
 	}
@@ -8288,7 +8288,7 @@ static void __hdd_close_adapter(struct hdd_context *hdd_ctx,
 
 	qdf_copy_macaddr(&adapter_mac, &adapter->mac_addr);
 	if (adapter->device_mode == QDF_STA_MODE)
-		hdd_cleanup_conn_info(adapter);
+		hdd_cleanup_conn_info(adapter->deflink);
 	qdf_list_destroy(&adapter->blocked_scan_request_q);
 	qdf_mutex_destroy(&adapter->blocked_scan_request_q_lock);
 	policy_mgr_clear_concurrency_mode(hdd_ctx->psoc, adapter->device_mode);

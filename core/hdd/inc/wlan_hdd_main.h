@@ -4707,14 +4707,14 @@ static inline bool hdd_nbuf_dst_addr_is_self_addr(struct hdd_adapter *adapter,
 
 /**
  * hdd_cleanup_conn_info() - Cleanup connectin info
- * @adapter: Adapter upon which the command was received
+ * @link_info: pointer to link_info struct in adapter
  *
  * This function frees the memory allocated for the connection
  * info structure
  *
  * Return: none
  */
-void hdd_cleanup_conn_info(struct hdd_adapter *adapter);
+void hdd_cleanup_conn_info(struct wlan_hdd_link_info *link_info);
 
 #ifdef FEATURE_WLAN_RESIDENT_DRIVER
 extern char *country_code;

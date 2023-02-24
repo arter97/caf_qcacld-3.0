@@ -21033,7 +21033,7 @@ static int __wlan_hdd_cfg80211_change_iface(struct wiphy *wiphy,
 
 	if (hdd_is_client_mode(adapter->device_mode)) {
 		if (adapter->device_mode == QDF_STA_MODE)
-			hdd_cleanup_conn_info(adapter);
+			hdd_cleanup_conn_info(adapter->deflink);
 
 		if (hdd_is_client_mode(new_mode)) {
 			errno = hdd_change_adapter_mode(adapter, new_mode);

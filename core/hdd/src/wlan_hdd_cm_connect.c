@@ -1045,7 +1045,7 @@ static void hdd_cm_save_bss_info(struct hdd_adapter *adapter,
 	 */
 	if (adapter->device_mode == QDF_STA_MODE) {
 		/* Cleanup already existing he info */
-		hdd_cleanup_conn_info(adapter);
+		hdd_cleanup_conn_info(adapter->deflink);
 
 		/* Cache last connection info */
 		qdf_mem_copy(&hdd_sta_ctx->cache_conn_info,
