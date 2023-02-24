@@ -7305,19 +7305,19 @@ void hdd_deinit_adapter(struct hdd_context *hdd_ctx,
      defined(WLAN_FEATURE_11AX)
 /**
  * hdd_cleanup_he_operation_info() - cleanup he operation info
- * @adapter: Adapter structure
+ * @link_info: pointer to link_info struct in adapter
  *
  * This function destroys he operation information
  *
  * Return: none
  */
-static void hdd_cleanup_he_operation_info(struct hdd_adapter *adapter)
+static void hdd_cleanup_he_operation_info(struct wlan_hdd_link_info *link_info)
 {
 	struct hdd_station_ctx *hdd_sta_ctx;
 
 	hdd_debug("cleanup he operation info");
 
-	hdd_sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter->deflink);
+	hdd_sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(link_info);
 
 	if (hdd_sta_ctx->cache_conn_info.he_operation) {
 		qdf_mem_free(hdd_sta_ctx->cache_conn_info.he_operation);
@@ -7325,7 +7325,8 @@ static void hdd_cleanup_he_operation_info(struct hdd_adapter *adapter)
 	}
 }
 #else
-static inline void hdd_cleanup_he_operation_info(struct hdd_adapter *adapter)
+static inline void
+hdd_cleanup_he_operation_info(struct wlan_hdd_link_info *link_info)
 {
 }
 #endif
@@ -7357,7 +7358,7 @@ static void hdd_cleanup_prev_ap_bcn_ie(struct wlan_hdd_link_info *link_info)
 
 void hdd_cleanup_conn_info(struct hdd_adapter *adapter)
 {
-	hdd_cleanup_he_operation_info(adapter);
+	hdd_cleanup_he_operation_info(adapter->deflink);
 	hdd_cleanup_prev_ap_bcn_ie(adapter->deflink);
 }
 
