@@ -88,16 +88,12 @@ int wlan_hdd_check_remain_on_channel(struct hdd_adapter *adapter)
 }
 
 /* Clean up RoC context at hdd_stop_adapter*/
-void wlan_hdd_cleanup_remain_on_channel_ctx(struct hdd_adapter *adapter)
+void
+wlan_hdd_cleanup_remain_on_channel_ctx(struct wlan_hdd_link_info *link_info)
 {
 	struct wlan_objmgr_vdev *vdev;
 
-	if (!adapter) {
-		hdd_err("null adapter");
-		return;
-	}
-
-	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink, WLAN_OSIF_P2P_ID);
+	vdev = hdd_objmgr_get_vdev_by_user(link_info, WLAN_OSIF_P2P_ID);
 	if (!vdev)
 		return;
 

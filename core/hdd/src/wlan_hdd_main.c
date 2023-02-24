@@ -8624,7 +8624,7 @@ QDF_STATUS hdd_stop_adapter_ext(struct hdd_context *hdd_ctx,
 
 		wlan_hdd_scan_abort(adapter);
 		wlan_hdd_cleanup_actionframe(adapter->deflink);
-		wlan_hdd_cleanup_remain_on_channel_ctx(adapter);
+		wlan_hdd_cleanup_remain_on_channel_ctx(adapter->deflink);
 		status = wlan_hdd_flush_pmksa_cache(adapter->deflink);
 
 		hdd_deregister_hl_netdev_fc_timer(adapter);
@@ -8734,7 +8734,7 @@ QDF_STATUS hdd_stop_adapter_ext(struct hdd_context *hdd_ctx,
 		}
 
 		if (adapter->device_mode == QDF_P2P_GO_MODE) {
-			wlan_hdd_cleanup_remain_on_channel_ctx(adapter);
+			wlan_hdd_cleanup_remain_on_channel_ctx(adapter->deflink);
 			hdd_abort_ongoing_sta_connection(hdd_ctx);
 		}
 
@@ -9000,7 +9000,7 @@ static void hdd_reset_scan_operation(struct hdd_context *hdd_ctx,
 	case QDF_P2P_DEVICE_MODE:
 	case QDF_NDI_MODE:
 		wlan_hdd_scan_abort(adapter);
-		wlan_hdd_cleanup_remain_on_channel_ctx(adapter);
+		wlan_hdd_cleanup_remain_on_channel_ctx(adapter->deflink);
 		if (adapter->device_mode == QDF_STA_MODE) {
 			struct wlan_objmgr_vdev *vdev;
 
@@ -9014,7 +9014,7 @@ static void hdd_reset_scan_operation(struct hdd_context *hdd_ctx,
 		}
 		break;
 	case QDF_P2P_GO_MODE:
-		wlan_hdd_cleanup_remain_on_channel_ctx(adapter);
+		wlan_hdd_cleanup_remain_on_channel_ctx(adapter->deflink);
 		break;
 	case QDF_SAP_MODE:
 		qdf_atomic_set(&adapter->deflink->session.ap.acs_in_progress, 0);

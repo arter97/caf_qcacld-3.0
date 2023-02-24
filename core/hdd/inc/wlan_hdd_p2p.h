@@ -127,8 +127,17 @@ void hdd_clean_up_interface(struct hdd_context *hdd_ctx,
 int wlan_hdd_del_virtual_intf(struct wiphy *wiphy, struct wireless_dev *wdev);
 int __wlan_hdd_del_virtual_intf(struct wiphy *wiphy, struct wireless_dev *wdev);
 
-
-void wlan_hdd_cleanup_remain_on_channel_ctx(struct hdd_adapter *adapter);
+/**
+ * wlan_hdd_cleanup_remain_on_channel_ctx - Cleanup ROC on VDEV
+ * @link_info: pointer to link_info struct in adapter
+ *
+ * This function is used to cleanup the ROC on the vdev
+ * pointed in the @link_info
+ *
+ * Return: void
+ */
+void
+wlan_hdd_cleanup_remain_on_channel_ctx(struct wlan_hdd_link_info *link_info);
 
 /**
  * wlan_hdd_set_power_save() - hdd set power save
