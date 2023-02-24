@@ -61,32 +61,6 @@
 #define MS_TO_TU_MUS(x)   ((x) * 1024)
 #define MAX_MUS_VAL       (INT_MAX / 1024)
 
-void wlan_hdd_cancel_existing_remain_on_channel(struct hdd_adapter *adapter)
-{
-	struct wlan_objmgr_vdev *vdev;
-
-	if (!adapter) {
-		hdd_err("null adapter");
-		return;
-	}
-
-	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink, WLAN_OSIF_P2P_ID);
-	if (!vdev) {
-		hdd_err("vdev is NULL");
-		return;
-	}
-	ucfg_p2p_cleanup_roc_by_vdev(vdev);
-	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_P2P_ID);
-}
-
-int wlan_hdd_check_remain_on_channel(struct hdd_adapter *adapter)
-{
-	if (QDF_P2P_GO_MODE != adapter->device_mode)
-		wlan_hdd_cancel_existing_remain_on_channel(adapter);
-
-	return 0;
-}
-
 /* Clean up RoC context at hdd_stop_adapter*/
 void
 wlan_hdd_cleanup_remain_on_channel_ctx(struct wlan_hdd_link_info *link_info)

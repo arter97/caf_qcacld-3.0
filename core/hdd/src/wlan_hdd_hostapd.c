@@ -7965,11 +7965,13 @@ static int __wlan_hdd_cfg80211_start_ap(struct wiphy *wiphy,
 
 	if (adapter->device_mode == QDF_P2P_GO_MODE) {
 		struct hdd_adapter  *p2p_adapter;
+		struct wlan_hdd_link_info *p2p_link_info;
 
 		p2p_adapter = hdd_get_adapter(hdd_ctx, QDF_P2P_DEVICE_MODE);
 		if (p2p_adapter) {
-			hdd_debug("Cancel active p2p device ROC before GO starting");
-			wlan_hdd_cancel_existing_remain_on_channel(p2p_adapter);
+			hdd_debug("Cleanup active p2p device ROC before GO starting");
+			p2p_link_info = p2p_adapter->deflink;
+			wlan_hdd_cleanup_remain_on_channel_ctx(p2p_link_info);
 		}
 	}
 

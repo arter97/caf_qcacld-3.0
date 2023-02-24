@@ -14359,8 +14359,8 @@ static int __wlan_hdd_cfg80211_set_probable_oper_channel(struct wiphy *wiphy,
 		return -EINVAL;
 	}
 
-	if (0 != wlan_hdd_check_remain_on_channel(adapter))
-		hdd_warn("Remain On Channel Pending");
+	if (QDF_P2P_GO_MODE != adapter->device_mode)
+		wlan_hdd_cleanup_remain_on_channel_ctx(adapter->deflink);
 
 	if (wlan_hdd_change_hw_mode_for_given_chnl(adapter, ch_freq,
 				POLICY_MGR_UPDATE_REASON_SET_OPER_CHAN)) {
@@ -20980,6 +20980,7 @@ static int __wlan_hdd_cfg80211_change_iface(struct wiphy *wiphy,
 	int errno;
 	uint8_t mac_addr[QDF_MAC_ADDR_SIZE];
 	bool eht_capab;
+	struct wlan_hdd_link_info *link_info = adapter->deflink;
 
 	hdd_enter();
 
@@ -21001,7 +21002,7 @@ static int __wlan_hdd_cfg80211_change_iface(struct wiphy *wiphy,
 
 	qdf_mtrace(QDF_MODULE_ID_HDD, QDF_MODULE_ID_HDD,
 		   TRACE_CODE_HDD_CFG80211_CHANGE_IFACE,
-		   adapter->deflink->vdev_id, type);
+		   link_info->vdev_id, type);
 
 	status = hdd_nl_to_qdf_iface_type(type, &new_mode);
 	if (QDF_IS_STATUS_ERROR(status))
@@ -21042,13 +21043,12 @@ static int __wlan_hdd_cfg80211_change_iface(struct wiphy *wiphy,
 			}
 		} else if (hdd_is_ap_mode(new_mode)) {
 			if (new_mode == QDF_P2P_GO_MODE)
-				wlan_hdd_cancel_existing_remain_on_channel
-					(adapter);
+				wlan_hdd_cleanup_remain_on_channel_ctx(link_info);
 
 			hdd_stop_adapter(hdd_ctx, adapter);
 			hdd_deinit_adapter(hdd_ctx, adapter, true);
-			memset(&adapter->deflink->session, 0,
-			       sizeof(adapter->deflink->session));
+			memset(&link_info->session, 0,
+			       sizeof(link_info->session));
 			adapter->device_mode = new_mode;
 
 			status = ucfg_mlme_get_ap_random_bssid_enable(

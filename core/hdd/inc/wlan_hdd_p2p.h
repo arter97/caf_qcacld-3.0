@@ -77,9 +77,6 @@ void hdd_indicate_mgmt_frame_to_user(struct hdd_adapter *adapter,
 				     int8_t rx_rssi,
 				     enum rxmgmt_flags rx_flags);
 
-int wlan_hdd_check_remain_on_channel(struct hdd_adapter *adapter);
-void wlan_hdd_cancel_existing_remain_on_channel(struct hdd_adapter *adapter);
-
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 14, 0))
 int wlan_hdd_mgmt_tx(struct wiphy *wiphy, struct wireless_dev *wdev,
 		     struct cfg80211_mgmt_tx_params *params, u64 *cookie);
