@@ -2423,14 +2423,13 @@ static int hdd_get_station_remote_ex(struct hdd_context *hdd_ctx,
 
 /**
  * hdd_get_station_info_ex() - send STA info to userspace, for STA mode only
- * @hdd_ctx: pointer to hdd context
- * @adapter: pointer to adapter
+ * @link_info: Pointer of link info in HDD adapter.
  *
  * Return: 0 if success else error status
  */
-static int hdd_get_station_info_ex(struct hdd_context *hdd_ctx,
-				   struct hdd_adapter *adapter)
+static int hdd_get_station_info_ex(struct wlan_hdd_link_info *link_info)
 {
+	struct hdd_context *hdd_ctx = link_info->adapter->hdd_ctx;
 	struct sk_buff *skb;
 	uint32_t nl_buf_len = 0, connect_fail_rsn_len;
 	struct hdd_station_ctx *hdd_sta_ctx;
@@ -2438,11 +2437,10 @@ static int hdd_get_station_info_ex(struct hdd_context *hdd_ctx,
 	bool big_data_fw_support = false;
 	int ret;
 
-	hdd_sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter->deflink);
+	hdd_sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(link_info);
 	ucfg_mc_cp_get_big_data_fw_support(hdd_ctx->psoc, &big_data_fw_support);
 
-	if (hdd_cm_is_disconnected(adapter->deflink) &&
-	    big_data_fw_support)
+	if (hdd_cm_is_disconnected(link_info) && big_data_fw_support)
 		big_data_stats_req = true;
 
 	if (wlan_hdd_get_station_stats(adapter))
@@ -2458,7 +2456,7 @@ static int hdd_get_station_info_ex(struct hdd_context *hdd_ctx,
 		nl_buf_len = hdd_get_big_data_stats_len(adapter);
 	}
 
-	nl_buf_len += hdd_get_pmf_bcn_protect_stats_len(adapter->deflink);
+	nl_buf_len += hdd_get_pmf_bcn_protect_stats_len(link_info);
 	connect_fail_rsn_len = hdd_get_connect_fail_reason_code_len(adapter);
 	nl_buf_len += connect_fail_rsn_len;
 	nl_buf_len += hdd_get_uplink_delay_len(adapter);
@@ -2475,7 +2473,7 @@ static int hdd_get_station_info_ex(struct hdd_context *hdd_ctx,
 		return -ENOMEM;
 	}
 
-	if (hdd_add_pmf_bcn_protect_stats(skb, adapter->deflink)) {
+	if (hdd_add_pmf_bcn_protect_stats(skb, link_info)) {
 		hdd_err_rl("hdd_add_pmf_bcn_protect_stats fail");
 		wlan_cfg80211_vendor_free_skb(skb);
 		return -EINVAL;
@@ -2503,7 +2501,7 @@ static int hdd_get_station_info_ex(struct hdd_context *hdd_ctx,
 	}
 
 	ret = wlan_cfg80211_vendor_cmd_reply(skb);
-	hdd_reset_roam_params(hdd_ctx->psoc, adapter->deflink->vdev_id);
+	hdd_reset_roam_params(hdd_ctx->psoc, link_info->vdev_id);
 	return ret;
 }
 
@@ -2557,7 +2555,7 @@ __hdd_cfg80211_get_sta_info_cmd(struct wiphy *wiphy,
 	switch (adapter->device_mode) {
 	case QDF_STA_MODE:
 	case QDF_P2P_CLIENT_MODE:
-		status = hdd_get_station_info_ex(hdd_ctx, adapter);
+		status = hdd_get_station_info_ex(adapter->deflink);
 		break;
 	case QDF_SAP_MODE:
 	case QDF_P2P_GO_MODE:
