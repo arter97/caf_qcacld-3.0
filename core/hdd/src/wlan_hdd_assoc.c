@@ -434,7 +434,7 @@ static void hdd_start_powersave_timer_on_associated(struct hdd_adapter *adapter)
 		return;
 	ucfg_mlme_get_auto_bmps_timer_value(hdd_ctx->psoc,
 					    &auto_bmps_timer_val);
-	timeout = hdd_cm_is_vdev_roaming(adapter) ?
+	timeout = hdd_cm_is_vdev_roaming(adapter->deflink) ?
 		AUTO_PS_ENTRY_TIMER_DEFAULT_VALUE :
 		(auto_bmps_timer_val * 1000);
 	sme_ps_enable_auto_ps_timer(hdd_ctx->mac_handle,

@@ -360,11 +360,11 @@ bool hdd_cm_is_disconnected(struct wlan_hdd_link_info *link_info);
 
 /**
  * hdd_cm_is_vdev_roaming() - Function to check roaming in progress
- * @adapter: pointer to the adapter structure
+ * @link_info: pointer to the link_info structure
  *
  * Return: true if roaming, false otherwise
  */
-bool hdd_cm_is_vdev_roaming(struct hdd_adapter *adapter);
+bool hdd_cm_is_vdev_roaming(struct wlan_hdd_link_info *link_info);
 
 /**
  * hdd_cm_get_scan_ie_params() - to get scan ie params

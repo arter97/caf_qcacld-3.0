@@ -3290,7 +3290,7 @@ static int __wlan_hdd_cfg80211_get_txpower(struct wiphy *wiphy,
 	switch (adapter->device_mode) {
 	case QDF_STA_MODE:
 	case QDF_P2P_CLIENT_MODE:
-		if (hdd_cm_is_vdev_roaming(adapter)) {
+		if (hdd_cm_is_vdev_roaming(adapter->deflink)) {
 			hdd_debug("Roaming is in progress, rej this req");
 			return -EINVAL;
 		}
