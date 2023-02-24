@@ -1910,16 +1910,16 @@ hdd_add_peer_stats_get_len(struct hdd_station_info *stainfo)
 
 /**
  * hdd_get_pmf_bcn_protect_stats_len() - get pmf bcn protect counters len
- * @adapter: adapter holding valid bcn protect counters
+ * @link_info: pointer to link_info struct in adapter
  *
  * This function calculates the data length for valid pmf bcn counters.
  *
  * Return: total data length used in hdd_add_peer_stats()
  */
 static uint32_t
-hdd_get_pmf_bcn_protect_stats_len(struct hdd_adapter *adapter)
+hdd_get_pmf_bcn_protect_stats_len(struct wlan_hdd_link_info *link_info)
 {
-	if (!adapter->deflink->hdd_stats.bcn_protect_stats.pmf_bcn_stats_valid)
+	if (!link_info->hdd_stats.bcn_protect_stats.pmf_bcn_stats_valid)
 		return 0;
 
 	/* 4 pmf becon protect counters each of 32 bit */
@@ -2457,7 +2457,7 @@ static int hdd_get_station_info_ex(struct hdd_context *hdd_ctx,
 		nl_buf_len = hdd_get_big_data_stats_len(adapter);
 	}
 
-	nl_buf_len += hdd_get_pmf_bcn_protect_stats_len(adapter);
+	nl_buf_len += hdd_get_pmf_bcn_protect_stats_len(adapter->deflink);
 	connect_fail_rsn_len = hdd_get_connect_fail_reason_code_len(adapter);
 	nl_buf_len += connect_fail_rsn_len;
 	nl_buf_len += hdd_get_uplink_delay_len(adapter);
