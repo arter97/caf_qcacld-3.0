@@ -213,12 +213,12 @@ static bool get_station_fw_request_needed = true;
 
 /*
  * copy_station_stats_to_adapter() - Copy station stats to adapter
- * @adapter: Pointer to the adapter
+ * @link_info: Pointer to link_info in adapter
  * @stats: Pointer to the station stats event
  *
  * Return: 0 if success, non-zero for failure
  */
-static int copy_station_stats_to_adapter(struct hdd_adapter *adapter,
+static int copy_station_stats_to_adapter(struct wlan_hdd_link_info *link_info,
 					 struct stats_event *stats)
 {
 	int ret = 0;
@@ -228,13 +228,13 @@ static int copy_station_stats_to_adapter(struct hdd_adapter *adapter,
 	uint16_t he_mcs_12_13_map;
 	bool is_he_mcs_12_13_supported;
 	struct hdd_stats *hdd_stats;
+	struct hdd_adapter *adapter = link_info->adapter;
 
-	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink,
-					   WLAN_OSIF_STATS_ID);
+	vdev = hdd_objmgr_get_vdev_by_user(link_info, WLAN_OSIF_STATS_ID);
 	if (!vdev)
 		return -EINVAL;
 
-	hdd_stats = &adapter->deflink->hdd_stats;
+	hdd_stats = &link_info->hdd_stats;
 	/* save summary stats to legacy location */
 	qdf_mem_copy(hdd_stats->summary_stat.retry_cnt,
 		     stats->vdev_summary_stats[0].stats.retry_cnt,
@@ -272,7 +272,7 @@ static int copy_station_stats_to_adapter(struct hdd_adapter *adapter,
 			qdf_system_ticks_to_msecs(qdf_system_ticks());
 	/* Copy vdev status info sent by FW */
 	if (stats->vdev_extd_stats)
-		adapter->deflink->is_mlo_vdev_active =
+		link_info->is_mlo_vdev_active =
 			stats->vdev_extd_stats[0].is_mlo_vdev_active;
 
 	dynamic_cfg = mlme_get_dynamic_vdev_config(vdev);
@@ -282,7 +282,7 @@ static int copy_station_stats_to_adapter(struct hdd_adapter *adapter,
 		goto out;
 	}
 
-	switch (hdd_conn_get_connected_band(adapter->deflink)) {
+	switch (hdd_conn_get_connected_band(link_info)) {
 	case BAND_2G:
 		tx_nss = dynamic_cfg->tx_nss[NSS_CHAINS_BAND_2GHZ];
 		rx_nss = dynamic_cfg->rx_nss[NSS_CHAINS_BAND_2GHZ];
@@ -2089,7 +2089,7 @@ static void cache_station_stats_cb(struct stats_event *ev, void *cookie)
 			hdd_adapter_dev_put_debug(adapter, dbgid);
 			continue;
 		}
-		copy_station_stats_to_adapter(adapter, ev);
+		copy_station_stats_to_adapter(adapter->deflink, ev);
 		wlan_hdd_get_peer_rx_rate_stats(adapter);
 		/* dev_put has to be done here */
 		hdd_adapter_dev_put_debug(adapter, dbgid);
@@ -7745,7 +7745,7 @@ int wlan_hdd_get_station_stats(struct hdd_adapter *adapter)
 
 	/* update get stats cached time stamp */
 	hdd_update_station_stats_cached_timestamp(adapter);
-	copy_station_stats_to_adapter(adapter, stats);
+	copy_station_stats_to_adapter(adapter->deflink, stats);
 out:
 	wlan_cfg80211_mc_cp_stats_free_stats_event(stats);
 	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_STATS_ID);
