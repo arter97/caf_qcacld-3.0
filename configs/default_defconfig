@@ -349,9 +349,6 @@ CONFIG_WLAN_SYSFS := y
 
 CONFIG_THERMAL_STATS_SUPPORT := y
 
-#Flag to enable pre cac feature
-CONFIG_FEATURE_WLAN_PRE_CAC := y
-
 ifeq ($(CONFIG_WLAN_SYSFS), y)
 	CONFIG_WLAN_SYSFS_STA_INFO := y
 	CONFIG_WLAN_SYSFS_CHANNEL := y
@@ -404,6 +401,9 @@ CONFIG_WLAN_DISABLE_EXPORT_SYMBOL := y
 endif
 
 CONFIG_QCACLD_FEATURE_GREEN_AP := y
+
+#Flag to enable pre cac feature
+CONFIG_FEATURE_WLAN_PRE_CAC := y
 
 #Flag to enable Android Packet Filtering
 CONFIG_QCACLD_FEATURE_APF := y
