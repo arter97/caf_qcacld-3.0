@@ -4619,7 +4619,7 @@ static void wlan_hdd_fill_summary_stats(tCsrSummaryStatsInfo *stats,
 
 /**
  * wlan_hdd_get_sap_stats() - get aggregate SAP stats
- * @adapter: sap adapter to get stats for
+ * @link_info: Link info pointer in HDD adapter
  * @info: kernel station_info struct to populate
  *
  * Fetch the vdev-level aggregate stats for the given SAP adapter. This is to
@@ -4628,8 +4628,8 @@ static void wlan_hdd_fill_summary_stats(tCsrSummaryStatsInfo *stats,
  *
  * Return: errno
  */
-static int
-wlan_hdd_get_sap_stats(struct hdd_adapter *adapter, struct station_info *info)
+static int wlan_hdd_get_sap_stats(struct wlan_hdd_link_info *link_info,
+				  struct station_info *info)
 {
 	int ret;
 
@@ -4639,8 +4639,8 @@ wlan_hdd_get_sap_stats(struct hdd_adapter *adapter, struct station_info *info)
 		return ret;
 	}
 
-	wlan_hdd_fill_summary_stats(&adapter->deflink->hdd_stats.summary_stat,
-				    info, adapter->deflink->vdev_id);
+	wlan_hdd_fill_summary_stats(&link_info->hdd_stats.summary_stat,
+				    info, link_info->vdev_id);
 
 	return 0;
 }
@@ -6683,7 +6683,7 @@ static int __wlan_hdd_cfg80211_get_station(struct wiphy *wiphy,
 			if (!errno)
 				return 0;
 		}
-		return wlan_hdd_get_sap_stats(adapter, sinfo);
+		return wlan_hdd_get_sap_stats(link_info, sinfo);
 	} else {
 		link_info = hdd_get_link_info_by_bssid(hdd_ctx, mac);
 		if (!link_info) {
