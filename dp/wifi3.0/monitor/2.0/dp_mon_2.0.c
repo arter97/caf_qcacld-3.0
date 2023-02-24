@@ -1320,10 +1320,14 @@ static void dp_mon_register_intr_ops_2_0(struct dp_soc *soc)
 static
 QDF_STATUS dp_mon_pdev_tlv_logger_init(struct dp_pdev *pdev)
 {
-	struct dp_mon_pdev *mon_pdev = pdev->monitor_pdev;
+	struct dp_mon_pdev *mon_pdev = NULL;
 	struct dp_mon_pdev_be *mon_pdev_be = NULL;
 	struct dp_mon_tlv_logger *tlv_log = NULL;
 
+	if (!pdev)
+		return QDF_STATUS_E_INVAL;
+
+	mon_pdev = pdev->monitor_pdev;
 	if (!mon_pdev)
 		return QDF_STATUS_E_INVAL;
 
@@ -1370,10 +1374,14 @@ QDF_STATUS dp_mon_pdev_tlv_logger_init(struct dp_pdev *pdev)
 static
 QDF_STATUS dp_mon_pdev_tlv_logger_deinit(struct dp_pdev *pdev)
 {
-	struct dp_mon_pdev *mon_pdev = pdev->monitor_pdev;
+	struct dp_mon_pdev *mon_pdev = NULL;
 	struct dp_mon_pdev_be *mon_pdev_be = NULL;
 	struct dp_mon_tlv_logger *tlv_log = NULL;
 
+	if (!pdev)
+		return QDF_STATUS_E_INVAL;
+
+	mon_pdev = pdev->monitor_pdev;
 	if (!mon_pdev)
 		return QDF_STATUS_E_INVAL;
 
@@ -1387,6 +1395,7 @@ QDF_STATUS dp_mon_pdev_tlv_logger_deinit(struct dp_pdev *pdev)
 	qdf_mem_free(tlv_log->buff);
 	tlv_log->buff = NULL;
 	qdf_mem_free(tlv_log);
+	tlv_log = NULL;
 
 	return QDF_STATUS_SUCCESS;
 }

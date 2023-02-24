@@ -376,7 +376,13 @@ dp_mon_record_index_update(struct dp_mon_pdev_be *mon_pdev_be) {
 	struct dp_mon_tlv_logger *tlv_log = NULL;
 	struct dp_mon_tlv_info *tlv_info = NULL;
 
+	if (!mon_pdev_be || !(mon_pdev_be->rx_tlv_log))
+		return;
+
 	tlv_log = mon_pdev_be->rx_tlv_log;
+	if (!tlv_log->tlv_logging_enable || !(tlv_log->buff))
+		return;
+
 	tlv_info = (struct dp_mon_tlv_info *)tlv_log->buff;
 
 	(tlv_log->curr_ppdu_pos + 1 == MAX_NUM_PPDU_RECORD) ?
@@ -552,12 +558,18 @@ dp_mon_record_tlv(struct dp_mon_pdev_be *mon_pdev_be,
  */
 void
 dp_mon_record_clear_buffer(struct dp_mon_pdev_be *mon_pdev_be) {
-	struct dp_mon_tlv_logger *rx_tlv_log = NULL;
+	struct dp_mon_tlv_logger *tlv_log = NULL;
 	struct dp_mon_tlv_info *tlv_info = NULL;
 
-	rx_tlv_log = mon_pdev_be->rx_tlv_log;
-	tlv_info = (struct dp_mon_tlv_info *)rx_tlv_log->buff;
-	qdf_mem_zero(&tlv_info[rx_tlv_log->ppdu_start_idx],
+	if (!mon_pdev_be || !(mon_pdev_be->rx_tlv_log))
+		return;
+
+	tlv_log = mon_pdev_be->rx_tlv_log;
+	if (!tlv_log->tlv_logging_enable || !(tlv_log->buff))
+		return;
+
+	tlv_info = (struct dp_mon_tlv_info *)tlv_log->buff;
+	qdf_mem_zero(&tlv_info[tlv_log->ppdu_start_idx],
 		     MAX_TLVS_PER_PPDU * sizeof(struct dp_mon_tlv_info));
 }
 
