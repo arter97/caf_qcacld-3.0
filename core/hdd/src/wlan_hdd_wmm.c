@@ -391,6 +391,7 @@ static void hdd_wmm_inactivity_timer_cb(void *user_data)
 	uint32_t traffic_count = 0;
 	sme_ac_enum_type ac_type;
 	unsigned int cpu;
+	struct hdd_tx_rx_stats *tx_rx_stats;
 
 	if (!qos_context) {
 		hdd_err("invalid user data");
@@ -406,11 +407,11 @@ static void hdd_wmm_inactivity_timer_cb(void *user_data)
 	}
 
 	ac = &adapter->hdd_wmm_status.ac_status[ac_type];
-
+	tx_rx_stats = &adapter->deflink->hdd_stats.tx_rx_stats;
 	/* Get the Tx stats for this AC. */
 	for (cpu = 0; cpu < NUM_CPUS; cpu++)
-		traffic_count += adapter->hdd_stats.tx_rx_stats.per_cpu[cpu].
-					 tx_classified_ac[qos_context->ac_type];
+		traffic_count +=
+		tx_rx_stats->per_cpu[cpu].tx_classified_ac[qos_context->ac_type];
 
 	hdd_warn("WMM inactivity check for AC=%d, count=%u, last=%u",
 		 ac_type, traffic_count, ac->last_traffic_count);
@@ -460,6 +461,7 @@ hdd_wmm_enable_inactivity_timer(struct hdd_wmm_qos_context *qos_context,
 	sme_ac_enum_type ac_type = qos_context->ac_type;
 	struct hdd_wmm_ac_status *ac;
 	unsigned int cpu;
+	struct hdd_tx_rx_stats *tx_rx_stats;
 
 	adapter = qos_context->adapter;
 	ac = &adapter->hdd_wmm_status.ac_status[ac_type];
@@ -489,10 +491,11 @@ hdd_wmm_enable_inactivity_timer(struct hdd_wmm_qos_context *qos_context,
 
 	ac->last_traffic_count = 0;
 	/* Initialize the current tx traffic count on this AC */
-	for (cpu = 0; cpu < NUM_CPUS; cpu++)
+	tx_rx_stats = &adapter->deflink->hdd_stats.tx_rx_stats;
+	for (cpu = 0; cpu < NUM_CPUS; cpu++) {
 		ac->last_traffic_count +=
-			adapter->hdd_stats.tx_rx_stats.per_cpu[cpu].
-					 tx_classified_ac[qos_context->ac_type];
+		tx_rx_stats->per_cpu[cpu].tx_classified_ac[qos_context->ac_type];
+	}
 	qos_context->is_inactivity_timer_running = true;
 	return qdf_status;
 }
@@ -2087,7 +2090,8 @@ uint16_t hdd_get_tx_queue_for_ac(struct hdd_adapter *adapter,
 	struct sock *sk = skb->sk;
 	int new_index;
 	int cpu = qdf_get_smp_processor_id();
-	struct hdd_tx_rx_stats *stats = &adapter->hdd_stats.tx_rx_stats;
+	struct hdd_tx_rx_stats *stats =
+				&adapter->deflink->hdd_stats.tx_rx_stats;
 
 	if (qdf_unlikely(ac == HDD_LINUX_AC_HI_PRIO))
 		return TX_GET_QUEUE_IDX(HDD_LINUX_AC_HI_PRIO, 0);

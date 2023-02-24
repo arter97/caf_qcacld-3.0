@@ -1760,6 +1760,7 @@ hdd_indicate_unprot_mgmt_frame(struct hdd_adapter *adapter,
 			       uint8_t *frame, uint8_t frame_type)
 {
 	uint8_t type, subtype;
+	struct hdd_stats *hdd_stats;
 
 	hdd_debug("Frame Type = %d Frame Length = %d",
 		  frame_type, frame_length);
@@ -1783,15 +1784,16 @@ hdd_indicate_unprot_mgmt_frame(struct hdd_adapter *adapter,
 		return;
 	}
 
+	hdd_stats = &adapter->deflink->hdd_stats;
 	subtype = WLAN_HDD_GET_SUBTYPE_FRM_FC(frame[0]);
 	switch (subtype) {
 	case SIR_MAC_MGMT_DISASSOC:
 		hdd_rx_unprot_disassoc(adapter->dev, frame, frame_length);
-		adapter->hdd_stats.hdd_pmf_stats.num_unprot_disassoc_rx++;
+		hdd_stats->hdd_pmf_stats.num_unprot_disassoc_rx++;
 		break;
 	case SIR_MAC_MGMT_DEAUTH:
 		hdd_rx_unprot_deauth(adapter->dev, frame, frame_length);
-		adapter->hdd_stats.hdd_pmf_stats.num_unprot_deauth_rx++;
+		hdd_stats->hdd_pmf_stats.num_unprot_deauth_rx++;
 		break;
 	default:
 		hdd_warn("Unexpected frame subtype %d", subtype);

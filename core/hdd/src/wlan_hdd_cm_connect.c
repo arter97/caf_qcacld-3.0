@@ -300,8 +300,8 @@ void hdd_cm_netif_queue_enable(struct hdd_adapter *adapter)
 
 void hdd_cm_clear_pmf_stats(struct hdd_adapter *adapter)
 {
-	qdf_mem_zero(&adapter->hdd_stats.hdd_pmf_stats,
-		     sizeof(adapter->hdd_stats.hdd_pmf_stats));
+	qdf_mem_zero(&adapter->deflink->hdd_stats.hdd_pmf_stats,
+		     sizeof(adapter->deflink->hdd_stats.hdd_pmf_stats));
 }
 
 void hdd_cm_save_connect_status(struct hdd_adapter *adapter,

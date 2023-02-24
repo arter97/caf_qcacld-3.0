@@ -1017,6 +1017,7 @@ enum udp_qos_upgrade {
  * @rssi_send: Notify RSSI over lpass
  * @is_mlo_vdev_active: is the mlo vdev currently active
  * @estimated_linkspeed: estimated link speed
+ * @hdd_stats: HDD statistics
  */
 struct wlan_hdd_link_info {
 	struct hdd_adapter *adapter;
@@ -1038,6 +1039,7 @@ struct wlan_hdd_link_info {
 #endif
 	bool is_mlo_vdev_active;
 	uint32_t estimated_linkspeed;
+	struct hdd_stats hdd_stats;
 };
 
 /**
@@ -1073,7 +1075,6 @@ struct wlan_hdd_tx_power {
  * @mld_addr: MLD address for adapter
  * @event_flags: a bitmap of hdd_adapter_flags
  * @active_links: a bitmap of active links in @link_info array
- * @hdd_stats: HDD statistics
  * @is_ll_stats_req_pending: atomic variable to check active stats req
  * @sta_stats_cached_timestamp: last updated stats timestamp
  * @qdf_monitor_mode_vdev_up_event: QDF event for monitor mode vdev up
@@ -1205,7 +1206,6 @@ struct hdd_adapter {
 	unsigned long event_flags;
 	unsigned long active_links;
 
-	struct hdd_stats hdd_stats;
 	qdf_atomic_t is_ll_stats_req_pending;
 
 #ifdef FEATURE_CLUB_LL_STATS_AND_GET_STATION

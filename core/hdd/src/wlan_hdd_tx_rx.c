@@ -245,6 +245,9 @@ void hdd_tx_resume_timer_expired_handler(void *adapter_context)
 static void
 hdd_tx_resume_false(struct hdd_adapter *adapter, bool tx_resume)
 {
+	QDF_STATUS status;
+	qdf_mc_timer_t *fc_timer;
+
 	if (true == tx_resume)
 		return;
 
@@ -253,22 +256,22 @@ hdd_tx_resume_false(struct hdd_adapter *adapter, bool tx_resume)
 	wlan_hdd_netif_queue_control(adapter, WLAN_STOP_ALL_NETIF_QUEUE,
 				     WLAN_DATA_FLOW_CONTROL);
 
-	if (QDF_TIMER_STATE_STOPPED ==
-			qdf_mc_timer_get_current_state(&adapter->
-						       tx_flow_control_timer)) {
-		QDF_STATUS status;
+	fc_timer = &adapter->tx_flow_control_timer;
+	if (QDF_TIMER_STATE_STOPPED != qdf_mc_timer_get_current_state(fc_timer))
+		goto update_stats;
 
-		status = qdf_mc_timer_start(&adapter->tx_flow_control_timer,
-				WLAN_HDD_TX_FLOW_CONTROL_OS_Q_BLOCK_TIME);
 
-		if (!QDF_IS_STATUS_SUCCESS(status))
-			hdd_err("Failed to start tx_flow_control_timer");
-		else
-			adapter->hdd_stats.tx_rx_stats.txflow_timer_cnt++;
-	}
+	status = qdf_mc_timer_start(fc_timer,
+				    WLAN_HDD_TX_FLOW_CONTROL_OS_Q_BLOCK_TIME);
 
-	adapter->hdd_stats.tx_rx_stats.txflow_pause_cnt++;
-	adapter->hdd_stats.tx_rx_stats.is_txflow_paused = true;
+	if (QDF_IS_STATUS_ERROR(status))
+		hdd_err("Failed to start tx_flow_control_timer");
+	else
+		adapter->deflink->hdd_stats.tx_rx_stats.txflow_timer_cnt++;
+
+update_stats:
+	adapter->deflink->hdd_stats.tx_rx_stats.txflow_pause_cnt++;
+	adapter->deflink->hdd_stats.tx_rx_stats.is_txflow_paused = true;
 }
 
 /**
@@ -303,8 +306,9 @@ void hdd_tx_resume_cb(void *adapter_context, bool tx_resume)
 		wlan_hdd_netif_queue_control(adapter,
 					     WLAN_WAKE_ALL_NETIF_QUEUE,
 					     WLAN_DATA_FLOW_CONTROL);
-		adapter->hdd_stats.tx_rx_stats.is_txflow_paused = false;
-		adapter->hdd_stats.tx_rx_stats.txflow_unpause_cnt++;
+		adapter->deflink->hdd_stats.tx_rx_stats.is_txflow_paused =
+									false;
+		adapter->deflink->hdd_stats.tx_rx_stats.txflow_unpause_cnt++;
 	}
 	hdd_tx_resume_false(adapter, tx_resume);
 }
@@ -363,6 +367,7 @@ void hdd_get_tx_resource(uint8_t vdev_id,
 	struct hdd_context *hdd_ctx = cds_get_context(QDF_MODULE_ID_HDD);
 	uint16_t timer_value = WLAN_HDD_TX_FLOW_CONTROL_OS_Q_BLOCK_TIME;
 	struct wlan_hdd_link_info *link_info;
+	qdf_mc_timer_t *fc_timer;
 
 	link_info = hdd_get_link_info_by_vdev(hdd_ctx, vdev_id);
 	if (!link_info)
@@ -373,27 +378,26 @@ void hdd_get_tx_resource(uint8_t vdev_id,
 	    adapter->device_mode == QDF_SAP_MODE)
 		timer_value = WLAN_SAP_HDD_TX_FLOW_CONTROL_OS_Q_BLOCK_TIME;
 
-	if (false ==
-	    cdp_fc_get_tx_resource(cds_get_context(QDF_MODULE_ID_SOC),
-				   OL_TXRX_PDEV_ID,
-				   *mac_addr,
+	if (cdp_fc_get_tx_resource(cds_get_context(QDF_MODULE_ID_SOC),
+				   OL_TXRX_PDEV_ID, *mac_addr,
 				   adapter->tx_flow_low_watermark,
-				   adapter->tx_flow_hi_watermark_offset)) {
-		hdd_debug("Disabling queues lwm %d hwm offset %d",
-			 adapter->tx_flow_low_watermark,
-			 adapter->tx_flow_hi_watermark_offset);
-		wlan_hdd_netif_queue_control(adapter, WLAN_STOP_ALL_NETIF_QUEUE,
-					     WLAN_DATA_FLOW_CONTROL);
-		if ((adapter->tx_flow_timer_initialized == true) &&
-		    (QDF_TIMER_STATE_STOPPED ==
-		    qdf_mc_timer_get_current_state(&adapter->
-						    tx_flow_control_timer))) {
-			qdf_mc_timer_start(&adapter->tx_flow_control_timer,
-					   timer_value);
-			adapter->hdd_stats.tx_rx_stats.txflow_timer_cnt++;
-			adapter->hdd_stats.tx_rx_stats.txflow_pause_cnt++;
-			adapter->hdd_stats.tx_rx_stats.is_txflow_paused = true;
-		}
+				   adapter->tx_flow_hi_watermark_offset))
+		return;
+
+	hdd_debug("Disabling queues lwm %d hwm offset %d",
+		  adapter->tx_flow_low_watermark,
+		  adapter->tx_flow_hi_watermark_offset);
+	wlan_hdd_netif_queue_control(adapter, WLAN_STOP_ALL_NETIF_QUEUE,
+				     WLAN_DATA_FLOW_CONTROL);
+
+	fc_timer = &adapter->tx_flow_control_timer;
+	if ((adapter->tx_flow_timer_initialized == true) &&
+	    (QDF_TIMER_STATE_STOPPED ==
+	     qdf_mc_timer_get_current_state(fc_timer))) {
+		qdf_mc_timer_start(fc_timer, timer_value);
+		link_info->hdd_stats.tx_rx_stats.txflow_timer_cnt++;
+		link_info->hdd_stats.tx_rx_stats.txflow_pause_cnt++;
+		link_info->hdd_stats.tx_rx_stats.is_txflow_paused = true;
 	}
 }
 
@@ -502,7 +506,8 @@ static void __hdd_hard_start_xmit(struct sk_buff *skb,
 				  struct net_device *dev)
 {
 	struct hdd_adapter *adapter = WLAN_HDD_GET_PRIV_PTR(dev);
-	struct hdd_tx_rx_stats *stats = &adapter->hdd_stats.tx_rx_stats;
+	struct hdd_tx_rx_stats *stats =
+				&adapter->deflink->hdd_stats.tx_rx_stats;
 	struct hdd_station_ctx *sta_ctx = &adapter->deflink->session.station;
 	int cpu = qdf_get_smp_processor_id();
 	bool granted;

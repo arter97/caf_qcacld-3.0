@@ -102,6 +102,9 @@ void hdd_softap_tx_resume_timer_expired_handler(void *adapter_context)
 static void
 hdd_softap_tx_resume_false(struct hdd_adapter *adapter, bool tx_resume)
 {
+	QDF_STATUS status;
+	qdf_mc_timer_t *fc_timer;
+
 	if (true == tx_resume)
 		return;
 
@@ -109,19 +112,17 @@ hdd_softap_tx_resume_false(struct hdd_adapter *adapter, bool tx_resume)
 	wlan_hdd_netif_queue_control(adapter, WLAN_STOP_ALL_NETIF_QUEUE,
 				     WLAN_DATA_FLOW_CONTROL);
 
-	if (QDF_TIMER_STATE_STOPPED ==
-			qdf_mc_timer_get_current_state(&adapter->
-						       tx_flow_control_timer)) {
-		QDF_STATUS status;
+	fc_timer = &adapter->tx_flow_control_timer;
+	if (QDF_TIMER_STATE_STOPPED != qdf_mc_timer_get_current_state(fc_timer))
+		return;
 
-		status = qdf_mc_timer_start(&adapter->tx_flow_control_timer,
-				WLAN_SAP_HDD_TX_FLOW_CONTROL_OS_Q_BLOCK_TIME);
+	status = qdf_mc_timer_start(fc_timer,
+				    WLAN_SAP_HDD_TX_FLOW_CONTROL_OS_Q_BLOCK_TIME);
 
-		if (!QDF_IS_STATUS_SUCCESS(status))
-			hdd_err("Failed to start tx_flow_control_timer");
-		else
-			adapter->hdd_stats.tx_rx_stats.txflow_timer_cnt++;
-	}
+	if (QDF_IS_STATUS_ERROR(status))
+		hdd_err("Failed to start tx_flow_control_timer");
+	else
+		adapter->deflink->hdd_stats.tx_rx_stats.txflow_timer_cnt++;
 }
 
 void hdd_softap_tx_resume_cb(void *adapter_context, bool tx_resume)
@@ -203,7 +204,8 @@ static void __hdd_softap_hard_start_xmit(struct sk_buff *skb,
 	sme_ac_enum_type ac = SME_AC_BE;
 	struct hdd_adapter *adapter = (struct hdd_adapter *)netdev_priv(dev);
 	struct hdd_context *hdd_ctx = adapter->hdd_ctx;
-	struct hdd_tx_rx_stats *stats = &adapter->hdd_stats.tx_rx_stats;
+	struct hdd_tx_rx_stats *stats =
+				&adapter->deflink->hdd_stats.tx_rx_stats;
 	int cpu = qdf_get_smp_processor_id();
 	QDF_STATUS status;
 

@@ -587,13 +587,16 @@ void wlan_hdd_lpc_del_monitor_interface(struct hdd_context *hdd_ctx)
 void wlan_hdd_mod_fc_timer(struct hdd_adapter *adapter,
 			   enum netif_action_type action)
 {
+	struct hdd_stats *hdd_stats;
+
 	if (!adapter->tx_flow_timer_initialized)
 		return;
 
+	hdd_stats = &adapter->deflink->hdd_stats;
 	if (action == WLAN_WAKE_NON_PRIORITY_QUEUE) {
 		qdf_mc_timer_stop(&adapter->tx_flow_control_timer);
-		adapter->hdd_stats.tx_rx_stats.is_txflow_paused = false;
-		adapter->hdd_stats.tx_rx_stats.txflow_unpause_cnt++;
+		hdd_stats->tx_rx_stats.is_txflow_paused = false;
+		hdd_stats->tx_rx_stats.txflow_unpause_cnt++;
 	} else if (action == WLAN_STOP_NON_PRIORITY_QUEUE) {
 		QDF_STATUS status =
 		qdf_mc_timer_start(&adapter->tx_flow_control_timer,
@@ -602,11 +605,10 @@ void wlan_hdd_mod_fc_timer(struct hdd_adapter *adapter,
 		if (!QDF_IS_STATUS_SUCCESS(status))
 			hdd_err("Failed to start tx_flow_control_timer");
 		else
-			adapter->
-			hdd_stats.tx_rx_stats.txflow_timer_cnt++;
+			hdd_stats->tx_rx_stats.txflow_timer_cnt++;
 
-		adapter->hdd_stats.tx_rx_stats.txflow_pause_cnt++;
-		adapter->hdd_stats.tx_rx_stats.is_txflow_paused = true;
+		hdd_stats->tx_rx_stats.txflow_pause_cnt++;
+		hdd_stats->tx_rx_stats.is_txflow_paused = true;
 	}
 }
 #endif /* QCA_HL_NETDEV_FLOW_CONTROL */
@@ -9020,8 +9022,8 @@ static void hdd_reset_scan_operation(struct hdd_context *hdd_ctx,
  */
 static void hdd_adapter_abort_tx_flow(struct hdd_adapter *adapter)
 {
-	if (adapter->hdd_stats.tx_rx_stats.is_txflow_paused &&
-		QDF_TIMER_STATE_RUNNING ==
+	if (adapter->deflink->hdd_stats.tx_rx_stats.is_txflow_paused &&
+	    QDF_TIMER_STATE_RUNNING ==
 		qdf_mc_timer_get_current_state(
 			&adapter->tx_flow_control_timer)) {
 		hdd_tx_resume_timer_expired_handler(adapter);
@@ -10897,7 +10899,8 @@ void hdd_send_mscs_action_frame(struct hdd_context *hdd_ctx,
 	uint64_t mscs_vo_pkt_delta;
 	unsigned long tx_vo_pkts = 0;
 	unsigned int cpu;
-	struct hdd_tx_rx_stats *stats = &adapter->hdd_stats.tx_rx_stats;
+	struct hdd_tx_rx_stats *stats =
+				&adapter->deflink->hdd_stats.tx_rx_stats;
 	uint32_t bus_bw_compute_interval;
 
 	/*
@@ -11613,7 +11616,8 @@ int hdd_wlan_clear_stats(struct hdd_adapter *adapter, int stats_id)
 	switch (stats_id) {
 	case CDP_HDD_STATS:
 		ucfg_dp_clear_net_dev_stats(adapter->dev);
-		memset(&adapter->hdd_stats, 0, sizeof(adapter->hdd_stats));
+		memset(&adapter->deflink->hdd_stats, 0,
+		       sizeof(adapter->deflink->hdd_stats));
 		break;
 	case CDP_TXRX_HIST_STATS:
 		ucfg_wlan_dp_clear_tx_rx_histogram(adapter->hdd_ctx->psoc);

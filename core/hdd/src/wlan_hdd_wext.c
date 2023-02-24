@@ -2777,7 +2777,8 @@ int hdd_check_private_wext_control(struct hdd_context *hdd_ctx,
 void hdd_wlan_get_stats(struct hdd_adapter *adapter, uint16_t *length,
 			char *buffer, uint16_t buf_len)
 {
-	struct hdd_tx_rx_stats *stats = &adapter->hdd_stats.tx_rx_stats;
+	struct hdd_tx_rx_stats *stats =
+				&adapter->deflink->hdd_stats.tx_rx_stats;
 	struct dp_tx_rx_stats *dp_stats;
 	uint32_t len = 0;
 	uint32_t total_rx_pkt = 0, total_rx_dropped = 0;
@@ -6222,9 +6223,9 @@ static int __iw_get_char_setnone(struct net_device *dev,
 			 connected_bssid.bytes[3],
 			 connected_bssid.bytes[4],
 			 connected_bssid.bytes[5],
-			 adapter->hdd_stats.hdd_pmf_stats.
+			 adapter->deflink->hdd_stats.hdd_pmf_stats.
 			 num_unprot_disassoc_rx,
-			 adapter->hdd_stats.hdd_pmf_stats.
+			 adapter->deflink->hdd_stats.hdd_pmf_stats.
 			 num_unprot_deauth_rx);
 
 		wrqu->data.length = strlen(extra) + 1;
@@ -7939,9 +7940,9 @@ static int __iw_get_statistics(struct net_device *dev,
 
 	hdd_get_wlan_stats(adapter);
 
-	summary_stats = &(adapter->hdd_stats.summary_stat);
-	class_a_stats = &(adapter->hdd_stats.class_a_stat);
-	class_d_stats = &(adapter->hdd_stats.class_d_stat);
+	summary_stats = &adapter->deflink->hdd_stats.summary_stat;
+	class_a_stats = &adapter->deflink->hdd_stats.class_a_stat;
+	class_d_stats = &adapter->deflink->hdd_stats.class_d_stat;
 
 	p = extra;
 	tlen = 0;

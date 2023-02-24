@@ -1918,7 +1918,7 @@ hdd_add_peer_stats_get_len(struct hdd_station_info *stainfo)
 static uint32_t
 hdd_get_pmf_bcn_protect_stats_len(struct hdd_adapter *adapter)
 {
-	if (!adapter->hdd_stats.bcn_protect_stats.pmf_bcn_stats_valid)
+	if (!adapter->deflink->hdd_stats.bcn_protect_stats.pmf_bcn_stats_valid)
 		return 0;
 
 	/* 4 pmf becon protect counters each of 32 bit */
@@ -1946,18 +1946,20 @@ hdd_get_connect_fail_reason_code_len(struct hdd_adapter *adapter)
 static int hdd_add_pmf_bcn_protect_stats(struct sk_buff *skb,
 					 struct hdd_adapter *adapter)
 {
-	if (!adapter->hdd_stats.bcn_protect_stats.pmf_bcn_stats_valid)
+	struct hdd_stats *hdd_stats = &adapter->deflink->hdd_stats;
+
+	if (!hdd_stats->bcn_protect_stats.pmf_bcn_stats_valid)
 		return 0;
 
-	adapter->hdd_stats.bcn_protect_stats.pmf_bcn_stats_valid = 0;
+	hdd_stats->bcn_protect_stats.pmf_bcn_stats_valid = 0;
 	if (nla_put_u32(skb, STA_INFO_BIP_MIC_ERROR_COUNT,
-			adapter->hdd_stats.bcn_protect_stats.igtk_mic_fail_cnt) ||
+			hdd_stats->bcn_protect_stats.igtk_mic_fail_cnt) ||
 	    nla_put_u32(skb, STA_INFO_BIP_REPLAY_COUNT,
-			adapter->hdd_stats.bcn_protect_stats.igtk_replay_cnt) ||
+			hdd_stats->bcn_protect_stats.igtk_replay_cnt) ||
 	    nla_put_u32(skb, STA_INFO_BEACON_MIC_ERROR_COUNT,
-			adapter->hdd_stats.bcn_protect_stats.bcn_mic_fail_cnt) ||
+			hdd_stats->bcn_protect_stats.bcn_mic_fail_cnt) ||
 	    nla_put_u32(skb, STA_INFO_BEACON_REPLAY_COUNT,
-			adapter->hdd_stats.bcn_protect_stats.bcn_replay_cnt)) {
+			hdd_stats->bcn_protect_stats.bcn_replay_cnt)) {
 		hdd_err("put fail");
 		return -EINVAL;
 	}

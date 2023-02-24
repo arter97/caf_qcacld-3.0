@@ -979,8 +979,8 @@ static __iw_softap_setparam(struct net_device *dev,
 		switch (set_value) {
 		case CDP_HDD_STATS:
 			ucfg_dp_clear_net_dev_stats(adapter->dev);
-			memset(&adapter->hdd_stats, 0,
-					sizeof(adapter->hdd_stats));
+			memset(&adapter->deflink->hdd_stats, 0,
+			       sizeof(adapter->deflink->hdd_stats));
 			break;
 		case CDP_TXRX_HIST_STATS:
 			ucfg_wlan_dp_clear_tx_rx_histogram(hdd_ctx->psoc);
