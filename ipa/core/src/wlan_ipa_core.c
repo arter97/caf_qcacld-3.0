@@ -649,15 +649,15 @@ static inline void wlan_ipa_wdi_init_metering(struct wlan_ipa_priv *ipa_ctxt,
  */
 static inline void wlan_ipa_wdi_init_set_opt_wifi_dp(
 					     struct wlan_ipa_priv *ipa_ctxt,
-					     qdf_ipa_wdi_init_out_params_t out)
+					     qdf_ipa_wdi_init_out_params_t *out)
 {
 	ipa_ctx->opt_wifi_datapath =
-				QDF_IPA_WDI_INIT_OUT_PARAMS_OPT_WIFI_DP(&out);
+				QDF_IPA_WDI_INIT_OUT_PARAMS_OPT_WIFI_DP(out);
 }
 #else
 static inline void wlan_ipa_wdi_init_set_opt_wifi_dp(
 					     struct wlan_ipa_priv *ipa_ctxt,
-					     qdf_ipa_wdi_init_out_params_t out)
+					     qdf_ipa_wdi_init_out_params_t *out)
 {
 }
 #endif
