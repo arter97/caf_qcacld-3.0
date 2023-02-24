@@ -1084,6 +1084,21 @@ struct dp_htt_umac_reset_setup_cmd_params {
 QDF_STATUS dp_htt_umac_reset_send_setup_cmd(
 		struct dp_soc *soc,
 		const struct dp_htt_umac_reset_setup_cmd_params *setup_params);
+
+/**
+ * dp_htt_umac_reset_send_start_pre_reset_cmd() - Send the HTT UMAC reset start
+ * pre reset command
+ * @soc: dp soc object
+ * @is_initiator: Indicates whether the target needs to execute the
+ * UMAC-recovery in context of the Initiator or Non-Initiator. The value zero
+ * indicates this target is Non-Initiator.
+ * @is_umac_hang: Indicates whether MLO UMAC recovery executed in context of
+ * UMAC hang or Target recovery.
+ *
+ * Return: Success when HTT message is sent, error on failure
+ */
+QDF_STATUS dp_htt_umac_reset_send_start_pre_reset_cmd(
+		struct dp_soc *soc, bool is_initiator, bool is_umac_hang);
 #endif
 
 /**
