@@ -6288,34 +6288,40 @@ static inline void wlan_hdd_mlo_update_stats_info(struct hdd_adapter *adapter)
 }
 #endif
 
-static void wlan_hdd_update_rssi(struct hdd_adapter *adapter,
+static void wlan_hdd_update_rssi(struct wlan_hdd_link_info *link_info,
 				 struct station_info *sinfo)
 {
 	struct hdd_station_ctx *sta_ctx;
 	int8_t snr;
-	mac_handle_t mac_handle = hdd_adapter_get_mac_handle(adapter);
+	mac_handle_t mac_handle;
 
-	sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter->deflink);
-	snr = adapter->deflink->snr;
+	mac_handle = hdd_adapter_get_mac_handle(link_info->adapter);
+	if (!mac_handle) {
+		hdd_err("mac ctx NULL");
+		return;
+	}
+
+	sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(link_info);
+	snr = link_info->snr;
 
 	/* for new connection there might be no valid previous RSSI */
-	if (!adapter->deflink->rssi) {
+	if (!link_info->rssi) {
 		hdd_get_rssi_snr_by_bssid(mac_handle,
 					  sta_ctx->conn_info.bssid.bytes,
-					  &adapter->deflink->rssi, &snr);
+					  &link_info->rssi, &snr);
 	}
 
 	/* If RSSi is reported as positive then it is invalid */
-	if (adapter->deflink->rssi > 0) {
-		hdd_debug_rl("RSSI invalid %d", adapter->deflink->rssi);
-		adapter->deflink->rssi = 0;
-		adapter->deflink->hdd_stats.summary_stat.rssi = 0;
+	if (link_info->rssi > 0) {
+		hdd_debug_rl("RSSI invalid %d", link_info->rssi);
+		link_info->rssi = 0;
+		link_info->hdd_stats.summary_stat.rssi = 0;
 	}
 
-	sinfo->signal = adapter->deflink->rssi;
+	sinfo->signal = link_info->rssi;
 	hdd_debug("snr: %d, rssi: %d",
-		adapter->deflink->hdd_stats.summary_stat.snr,
-		adapter->deflink->hdd_stats.summary_stat.rssi);
+		  link_info->hdd_stats.summary_stat.snr,
+		  link_info->hdd_stats.summary_stat.rssi);
 	sta_ctx->conn_info.signal = sinfo->signal;
 	sta_ctx->conn_info.noise = sta_ctx->conn_info.signal - snr;
 	sta_ctx->cache_conn_info.signal = sinfo->signal;
@@ -6323,10 +6329,10 @@ static void wlan_hdd_update_rssi(struct hdd_adapter *adapter,
 	sinfo->filled |= HDD_INFO_SIGNAL;
 }
 
-static int wlan_hdd_update_rate_info(struct hdd_adapter *adapter,
+static int wlan_hdd_update_rate_info(struct wlan_hdd_link_info *link_info,
 				     struct station_info *sinfo)
 {
-	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
+	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(link_info->adapter);
 	struct hdd_station_ctx *sta_ctx;
 	mac_handle_t mac_handle;
 	struct wlan_objmgr_vdev *vdev;
@@ -6342,14 +6348,14 @@ static int wlan_hdd_update_rate_info(struct hdd_adapter *adapter,
 	qdf_net_dev_stats stats = {0};
 	struct hdd_stats *hdd_stats;
 
-	sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter->deflink);
+	sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(link_info);
 	ucfg_mlme_stats_get_cfg_values(hdd_ctx->psoc,
 				       &link_speed_rssi_high,
 				       &link_speed_rssi_mid,
 				       &link_speed_rssi_low,
 				       &link_speed_rssi_report);
 
-	hdd_stats = &adapter->deflink->hdd_stats;
+	hdd_stats = &link_info->hdd_stats;
 	rate_flags = hdd_stats->class_a_stat.tx_rx_rate_flags;
 	tx_rate_flags = rx_rate_flags = rate_flags;
 
@@ -6372,8 +6378,7 @@ static int wlan_hdd_update_rate_info(struct hdd_adapter *adapter,
 
 		hdd_check_and_update_nss(hdd_ctx, &tx_nss, &rx_nss);
 
-		if (ucfg_mlme_stats_is_link_speed_report_actual(
-					hdd_ctx->psoc)) {
+		if (ucfg_mlme_stats_is_link_speed_report_actual(hdd_ctx->psoc)) {
 			/* Get current rate flags if report actual */
 			/* WMA fails to find mcs_index for legacy tx rates */
 			if (tx_mcs_index == INVALID_MCS_IDX && my_tx_rate)
@@ -6406,8 +6411,7 @@ static int wlan_hdd_update_rate_info(struct hdd_adapter *adapter,
 		  (int)rx_mcs_index, (int)tx_nss, (int)rx_nss,
 		  (int)tx_dcm, (int)rx_dcm, (int)tx_gi, (int)rx_gi);
 
-	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink,
-					   WLAN_OSIF_STATS_ID);
+	vdev = hdd_objmgr_get_vdev_by_user(link_info, WLAN_OSIF_STATS_ID);
 
 	if (!vdev) {
 		hdd_nofl_debug("vdev object NULL");
@@ -6428,7 +6432,7 @@ static int wlan_hdd_update_rate_info(struct hdd_adapter *adapter,
 
 		hdd_check_and_update_nss(hdd_ctx, &tx_nss_max, &rx_nss_max);
 
-		tx_rate_calc = hdd_report_max_rate(adapter->deflink, mac_handle,
+		tx_rate_calc = hdd_report_max_rate(link_info, mac_handle,
 						   &sinfo->txrate,
 						   sinfo->signal,
 						   tx_rate_flags,
@@ -6436,7 +6440,7 @@ static int wlan_hdd_update_rate_info(struct hdd_adapter *adapter,
 						   my_tx_rate,
 						   tx_nss_max);
 
-		rx_rate_calc = hdd_report_max_rate(adapter->deflink, mac_handle,
+		rx_rate_calc = hdd_report_max_rate(link_info, mac_handle,
 						   &sinfo->rxrate,
 						   sinfo->signal,
 						   rx_rate_flags,
@@ -6467,13 +6471,13 @@ static int wlan_hdd_update_rate_info(struct hdd_adapter *adapter,
 				       rx_nss, rx_dcm, rx_gi);
 
 		/* Using driver RX rate to replace the FW RX rate */
-		wlan_hdd_refill_actual_rate(sinfo, adapter->deflink, mac_handle,
+		wlan_hdd_refill_actual_rate(sinfo, link_info, mac_handle,
 					    rx_rate_flags, rx_mcs_index,
 					    my_rx_rate, rx_nss_max);
 	}
 
 	wlan_hdd_fill_summary_stats(&hdd_stats->summary_stat,
-				    sinfo, adapter->deflink->vdev_id);
+				    sinfo, link_info->vdev_id);
 
 	ucfg_dp_get_net_dev_stats(vdev, &stats);
 	sinfo->tx_bytes = stats.tx_bytes;
@@ -6516,7 +6520,7 @@ static int wlan_hdd_update_rate_info(struct hdd_adapter *adapter,
 
 /**
  * wlan_hdd_get_sta_stats() - get aggregate STA stats
- * @adapter: STA adapter to get stats for
+ * @link_info: Link info pointer of STA adapter to get stats for
  * @mac: mac address of sta
  * @sinfo: kernel station_info struct to populate
  *
@@ -6525,31 +6529,32 @@ static int wlan_hdd_update_rate_info(struct hdd_adapter *adapter,
  *
  * Return: errno
  */
-static int wlan_hdd_get_sta_stats(struct hdd_adapter *adapter,
+static int wlan_hdd_get_sta_stats(struct wlan_hdd_link_info *link_info,
 				  const uint8_t *mac,
 				  struct station_info *sinfo)
 {
+	struct hdd_adapter *adapter = link_info->adapter;
 	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
 	int32_t rcpi_value;
 
 	qdf_mtrace(QDF_MODULE_ID_HDD, QDF_MODULE_ID_HDD,
 		   TRACE_CODE_HDD_CFG80211_GET_STA,
-		   adapter->deflink->vdev_id, 0);
+		   link_info->vdev_id, 0);
 
-	if (!hdd_cm_is_vdev_associated(adapter->deflink)) {
+	if (!hdd_cm_is_vdev_associated(link_info)) {
 		hdd_debug("Not associated");
 		/*To keep GUI happy */
 		return 0;
 	}
 
-	if (hdd_cm_is_vdev_roaming(adapter->deflink)) {
+	if (hdd_cm_is_vdev_roaming(link_info)) {
 		hdd_debug("Roaming is in progress, cannot continue with this request");
 		/*
 		 * supplicant reports very low rssi to upper layer
 		 * and handover happens to cellular.
 		 * send the cached rssi when get_station
 		 */
-		sinfo->signal = adapter->deflink->rssi;
+		sinfo->signal = link_info->rssi;
 		sinfo->filled |= HDD_INFO_SIGNAL;
 		return 0;
 	}
@@ -6564,7 +6569,7 @@ static int wlan_hdd_get_sta_stats(struct hdd_adapter *adapter,
 
 	wlan_hdd_mlo_update_stats_info(adapter);
 
-	wlan_hdd_update_rssi(adapter, sinfo);
+	wlan_hdd_update_rssi(link_info, sinfo);
 
 	/*
 	 * we notify connect to lpass here instead of during actual
@@ -6574,13 +6579,13 @@ static int wlan_hdd_get_sta_stats(struct hdd_adapter *adapter,
 	 */
 	hdd_lpass_notify_connect(adapter);
 
-	if (wlan_hdd_update_rate_info(adapter, sinfo))
+	if (wlan_hdd_update_rate_info(link_info, sinfo))
 		/* Keep GUI happy */
 		return 0;
 
-	hdd_fill_fcs_and_mpdu_count(adapter->deflink, sinfo);
+	hdd_fill_fcs_and_mpdu_count(link_info, sinfo);
 
-	hdd_wlan_fill_per_chain_rssi_stats(sinfo, adapter->deflink);
+	hdd_wlan_fill_per_chain_rssi_stats(sinfo, link_info);
 
 	hdd_exit();
 
@@ -6687,7 +6692,7 @@ static int __wlan_hdd_cfg80211_get_station(struct wiphy *wiphy,
 			link_info = adapter->deflink;
 			hdd_err_rl("the bssid is invalid");
 		}
-		return wlan_hdd_get_sta_stats(link_info->adapter, mac, sinfo);
+		return wlan_hdd_get_sta_stats(link_info, mac, sinfo);
 	}
 }
 
@@ -6838,7 +6843,7 @@ static int __wlan_hdd_cfg80211_dump_station(struct wiphy *wiphy,
 			return -ENOENT;
 
 		qdf_mem_copy(mac, dev->dev_addr, QDF_MAC_ADDR_SIZE);
-		errno = wlan_hdd_get_sta_stats(adapter, mac, sinfo);
+		errno = wlan_hdd_get_sta_stats(adapter->deflink, mac, sinfo);
 	}
 
 	return errno;
