@@ -1027,6 +1027,7 @@ enum udp_qos_upgrade {
  * @is_mlo_vdev_active: is the mlo vdev currently active
  * @estimated_linkspeed: estimated link speed
  * @hdd_stats: HDD statistics
+ * @ll_iface_stats: Link Layer interface stats
  * @mscs_prev_tx_vo_pkts: count of prev VO AC packets transmitted
  * @mscs_counter: Counter on MSCS action frames sent
  * @link_flags: a bitmap of hdd_link_flags
@@ -1054,6 +1055,9 @@ struct wlan_hdd_link_info {
 	bool is_mlo_vdev_active;
 	uint32_t estimated_linkspeed;
 	struct hdd_stats hdd_stats;
+#if defined(WLAN_FEATURE_11BE_MLO) && defined(CFG80211_11BE_BASIC)
+	struct wifi_interface_stats ll_iface_stats;
+#endif
 
 #ifdef WLAN_FEATURE_MSCS
 	unsigned long mscs_prev_tx_vo_pkts;
@@ -1187,7 +1191,6 @@ struct wlan_hdd_tx_power {
  * @big_data_stats:
  * @mon_adapter: hdd_adapter of monitor mode.
  * @mlo_adapter_info:
- * @ll_iface_stats:
  * @set_mac_addr_req_ctx: Set MAC address command request context
  * @delta_qtime: delta between host qtime and monotonic time
  * @traffic_end_ind_en: traffic end indication feature enable/disable
@@ -1368,7 +1371,6 @@ struct hdd_adapter {
 #endif
 #if defined(WLAN_FEATURE_11BE_MLO) && defined(CFG80211_11BE_BASIC)
 	struct hdd_mlo_adapter_info mlo_adapter_info;
-	struct wifi_interface_stats ll_iface_stats;
 #endif
 #ifdef WLAN_FEATURE_DYNAMIC_MAC_ADDR_UPDATE
 	void *set_mac_addr_req_ctx;

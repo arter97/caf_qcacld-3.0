@@ -1062,7 +1062,7 @@ hdd_cache_ll_iface_stats(struct hdd_context *hdd_ctx,
 	 * required.
 	 */
 	hdd_nofl_debug("Copying iface stats into the adapter");
-	link_info->adapter->ll_iface_stats = *if_stat;
+	link_info->ll_iface_stats = *if_stat;
 }
 #else
 static void
