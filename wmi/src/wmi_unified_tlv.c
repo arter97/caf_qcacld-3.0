@@ -21958,9 +21958,8 @@ static void populate_tlv_service(uint32_t *wmi_service)
 #endif
 	wmi_service[wmi_service_wpa3_sha384_roam_support] =
 			WMI_SERVICE_WMI_SERVICE_WPA3_SHA384_ROAM_SUPPORT;
-	/* TODO: Assign FW Enum after FW Shared header changes are merged */
 	wmi_service[wmi_service_v1a_v1b_supported] =
-			WMI_SERVICE_UNAVAILABLE;
+			WMI_SERVICE_PEER_METADATA_V1A_V1B_SUPPORT;
 }
 
 /**
