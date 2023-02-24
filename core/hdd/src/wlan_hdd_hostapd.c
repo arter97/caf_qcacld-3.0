@@ -7091,7 +7091,7 @@ static int __wlan_hdd_cfg80211_stop_ap(struct wiphy *wiphy,
 				     WLAN_STOP_ALL_NETIF_QUEUE_N_CARRIER,
 				     WLAN_CONTROL_PATH);
 
-	wlan_hdd_cleanup_actionframe(adapter);
+	wlan_hdd_cleanup_actionframe(adapter->deflink);
 	wlan_hdd_cleanup_remain_on_channel_ctx(adapter);
 	mutex_lock(&hdd_ctx->sap_lock);
 	if (test_bit(SOFTAP_BSS_STARTED, &adapter->deflink->link_flags)) {

@@ -8623,7 +8623,7 @@ QDF_STATUS hdd_stop_adapter_ext(struct hdd_context *hdd_ctx,
 			ucfg_disable_nan_discovery(hdd_ctx->psoc, NULL, 0);
 
 		wlan_hdd_scan_abort(adapter);
-		wlan_hdd_cleanup_actionframe(adapter);
+		wlan_hdd_cleanup_actionframe(adapter->deflink);
 		wlan_hdd_cleanup_remain_on_channel_ctx(adapter);
 		status = wlan_hdd_flush_pmksa_cache(adapter->deflink);
 

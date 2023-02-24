@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2012-2019, 2021 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -194,11 +195,11 @@ void wlan_hdd_set_mcc_latency(struct hdd_adapter *adapter, int set_value);
 
 /**
  * wlan_hdd_cleanup_actionframe() - Cleanup action frame
- * @adapter: Pointer to HDD adapter
+ * @link_info: pointer to link_info struct in adapter
  *
  * This function cleans up action frame.
  *
  * Return: None
  */
-void wlan_hdd_cleanup_actionframe(struct hdd_adapter *adapter);
+void wlan_hdd_cleanup_actionframe(struct wlan_hdd_link_info *link_info);
 #endif /* __P2P_H */

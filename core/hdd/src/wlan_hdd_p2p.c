@@ -105,16 +105,11 @@ void wlan_hdd_cleanup_remain_on_channel_ctx(struct hdd_adapter *adapter)
 	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_P2P_ID);
 }
 
-void wlan_hdd_cleanup_actionframe(struct hdd_adapter *adapter)
+void wlan_hdd_cleanup_actionframe(struct wlan_hdd_link_info *link_info)
 {
 	struct wlan_objmgr_vdev *vdev;
 
-	if (!adapter) {
-		hdd_err("null adapter");
-		return;
-	}
-
-	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink, WLAN_OSIF_P2P_ID);
+	vdev = hdd_objmgr_get_vdev_by_user(link_info, WLAN_OSIF_P2P_ID);
 	if (!vdev)
 		return;
 	ucfg_p2p_cleanup_tx_by_vdev(vdev);
