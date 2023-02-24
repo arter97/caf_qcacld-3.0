@@ -3064,7 +3064,8 @@ static int __hdd_mon_open(struct net_device *dev)
 		}
 		hdd_err("hdd_wlan_start_modules() successful !");
 
-		if ((!test_bit(SME_SESSION_OPENED, &adapter->event_flags)) ||
+		if ((!test_bit(SME_SESSION_OPENED,
+			       &adapter->deflink->link_flags)) ||
 		    (policy_mgr_is_sta_mon_concurrency(hdd_ctx->psoc))) {
 			ret = hdd_start_adapter(adapter);
 			if (ret) {
@@ -5067,7 +5068,7 @@ static int __hdd_open(struct net_device *dev)
 		return ret;
 	}
 
-	if (!test_bit(SME_SESSION_OPENED, &adapter->event_flags)) {
+	if (!test_bit(SME_SESSION_OPENED, &adapter->deflink->link_flags)) {
 		ret = hdd_start_adapter(adapter);
 		if (ret) {
 			hdd_err("Failed to start adapter :%d",
@@ -6530,7 +6531,7 @@ QDF_STATUS hdd_sme_close_session_callback(uint8_t vdev_id)
 		return QDF_STATUS_NOT_INITIALIZED;
 	}
 
-	clear_bit(SME_SESSION_OPENED, &adapter->event_flags);
+	clear_bit(SME_SESSION_OPENED, &link_info->link_flags);
 	qdf_spin_lock_bh(&link_info->vdev_lock);
 	link_info->vdev_id = WLAN_UMAC_VDEV_ID_MAX;
 	qdf_spin_unlock_bh(&link_info->vdev_lock);
@@ -6648,7 +6649,7 @@ static int hdd_vdev_destroy_event_wait(struct hdd_context *hdd_ctx,
 			msecs_to_jiffies(SME_CMD_VDEV_CREATE_DELETE_TIMEOUT));
 	if (!rc) {
 		hdd_err("vdev %d: timed out waiting for delete", vdev_id);
-		clear_bit(SME_SESSION_OPENED, &link_info->adapter->event_flags);
+		clear_bit(SME_SESSION_OPENED, &link_info->link_flags);
 		sme_cleanup_session(hdd_ctx->mac_handle, vdev_id);
 		cds_flush_logs(WLAN_LOG_TYPE_FATAL,
 			       WLAN_LOG_INDICATOR_HOST_DRIVER,
@@ -6680,7 +6681,7 @@ int hdd_vdev_destroy(struct hdd_adapter *adapter)
 	hdd_nofl_debug("destroying vdev %d", vdev_id);
 
 	/* vdev created sanity check */
-	if (!test_bit(SME_SESSION_OPENED, &adapter->event_flags)) {
+	if (!test_bit(SME_SESSION_OPENED, &adapter->deflink->link_flags)) {
 		hdd_nofl_debug("vdev %u does not exist", vdev_id);
 		return -EINVAL;
 	}
@@ -7039,7 +7040,7 @@ int hdd_vdev_create(struct hdd_adapter *adapter)
 	if (hdd_adapter_is_ml_adapter(adapter))
 		hdd_mlo_t2lm_register_callback(vdev);
 
-	set_bit(SME_SESSION_OPENED, &adapter->event_flags);
+	set_bit(SME_SESSION_OPENED, &adapter->deflink->link_flags);
 	status = sme_vdev_post_vdev_create_setup(hdd_ctx->mac_handle, vdev);
 	if (QDF_IS_STATUS_ERROR(status)) {
 		hdd_err("Failed to setup the vdev");
@@ -9129,11 +9130,11 @@ bool hdd_is_any_interface_open(struct hdd_context *hdd_ctx)
 	hdd_for_each_adapter_dev_held_safe(hdd_ctx, adapter, next_adapter,
 					   dbgid) {
 		if (test_bit(DEVICE_IFACE_OPENED, &adapter->event_flags) ||
-		    test_bit(SME_SESSION_OPENED, &adapter->event_flags)) {
+		    test_bit(SME_SESSION_OPENED,
+			     &adapter->deflink->link_flags)) {
 			hdd_adapter_dev_put_debug(adapter, dbgid);
 			if (next_adapter)
-				hdd_adapter_dev_put_debug(next_adapter,
-							  dbgid);
+				hdd_adapter_dev_put_debug(next_adapter, dbgid);
 			return true;
 		}
 		hdd_adapter_dev_put_debug(adapter, dbgid);
@@ -13655,7 +13656,7 @@ int hdd_start_station_adapter(struct hdd_adapter *adapter)
 	int ret;
 
 	hdd_enter_dev(adapter->dev);
-	if (test_bit(SME_SESSION_OPENED, &adapter->event_flags)) {
+	if (test_bit(SME_SESSION_OPENED, &adapter->deflink->link_flags)) {
 		hdd_err("session is already opened, %d",
 			adapter->deflink->vdev_id);
 		return qdf_status_to_os_return(QDF_STATUS_SUCCESS);
@@ -13713,7 +13714,7 @@ int hdd_start_ap_adapter(struct hdd_adapter *adapter)
 
 	hdd_enter();
 
-	if (test_bit(SME_SESSION_OPENED, &adapter->event_flags)) {
+	if (test_bit(SME_SESSION_OPENED, &adapter->deflink->link_flags)) {
 		hdd_err("session is already opened, %d",
 			adapter->deflink->vdev_id);
 		return qdf_status_to_os_return(QDF_STATUS_SUCCESS);
@@ -19711,7 +19712,8 @@ bool hdd_is_roaming_in_progress(struct hdd_context *hdd_ctx)
 					   dbgid) {
 		vdev_id = adapter->deflink->vdev_id;
 		if (adapter->device_mode == QDF_STA_MODE &&
-		    test_bit(SME_SESSION_OPENED, &adapter->event_flags) &&
+		    test_bit(SME_SESSION_OPENED,
+			     &adapter->deflink->link_flags) &&
 		    sme_roaming_in_progress(hdd_ctx->mac_handle, vdev_id)) {
 			hdd_debug("Roaming is in progress on:vdev_id:%d",
 				  adapter->deflink->vdev_id);
@@ -19768,7 +19770,7 @@ static QDF_STATUS hdd_is_connection_in_progress_iterator(
 		return QDF_STATUS_E_ABORTED;
 
 	mac_handle = hdd_ctx->mac_handle;
-	if (!test_bit(SME_SESSION_OPENED, &adapter->event_flags) &&
+	if (!test_bit(SME_SESSION_OPENED, &adapter->deflink->link_flags) &&
 	    (adapter->device_mode == QDF_STA_MODE ||
 	     adapter->device_mode == QDF_P2P_CLIENT_MODE ||
 	     adapter->device_mode == QDF_P2P_DEVICE_MODE ||
