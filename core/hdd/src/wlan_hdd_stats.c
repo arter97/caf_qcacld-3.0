@@ -6026,14 +6026,14 @@ static void hdd_report_actual_rate(enum tx_rate_info rate_flags,
  * hdd_wlan_fill_per_chain_rssi_stats() - Fill per chain rssi stats
  *
  * @sinfo: The station_info structure to be filled.
- * @adapter: The HDD adapter structure
+ * @link_info: pointer to link_info struct in adapter
  *
  * Return: None
  */
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 14, 0))
-static inline
-void hdd_wlan_fill_per_chain_rssi_stats(struct station_info *sinfo,
-					struct hdd_adapter *adapter)
+static void
+hdd_wlan_fill_per_chain_rssi_stats(struct station_info *sinfo,
+				   struct wlan_hdd_link_info *link_info)
 {
 	bool rssi_stats_valid = false;
 	uint8_t i;
@@ -6041,15 +6041,14 @@ void hdd_wlan_fill_per_chain_rssi_stats(struct station_info *sinfo,
 	sinfo->signal_avg = WLAN_HDD_TGT_NOISE_FLOOR_DBM;
 	for (i = 0; i < NUM_CHAINS_MAX; i++) {
 		sinfo->chain_signal_avg[i] =
-		    adapter->deflink->hdd_stats.per_chain_rssi_stats.rssi[i];
+			   link_info->hdd_stats.per_chain_rssi_stats.rssi[i];
 		sinfo->chains |= 1 << i;
 		if (sinfo->chain_signal_avg[i] > sinfo->signal_avg &&
 		    sinfo->chain_signal_avg[i] != 0)
 			sinfo->signal_avg = sinfo->chain_signal_avg[i];
 
 		hdd_debug("RSSI for chain %d, vdev_id %d is %d",
-			  i, adapter->deflink->vdev_id,
-			  sinfo->chain_signal_avg[i]);
+			  i, link_info->vdev_id, sinfo->chain_signal_avg[i]);
 
 		if (!rssi_stats_valid && sinfo->chain_signal_avg[i])
 			rssi_stats_valid = true;
@@ -6061,9 +6060,9 @@ void hdd_wlan_fill_per_chain_rssi_stats(struct station_info *sinfo,
 	}
 }
 #else
-static inline
-void hdd_wlan_fill_per_chain_rssi_stats(struct station_info *sinfo,
-					struct hdd_adapter *adapter)
+static inline void
+hdd_wlan_fill_per_chain_rssi_stats(struct station_info *sinfo,
+				   struct wlan_hdd_link_info *link_info)
 {
 }
 #endif
@@ -6567,7 +6566,7 @@ static int wlan_hdd_get_sta_stats(struct hdd_adapter *adapter,
 
 	hdd_fill_fcs_and_mpdu_count(adapter, sinfo);
 
-	hdd_wlan_fill_per_chain_rssi_stats(sinfo, adapter);
+	hdd_wlan_fill_per_chain_rssi_stats(sinfo, adapter->deflink);
 
 	hdd_exit();
 
