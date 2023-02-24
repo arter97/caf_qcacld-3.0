@@ -3407,7 +3407,8 @@ static int __wlan_hdd_cfg80211_get_txpower(struct wiphy *wiphy,
 		break;
 	case QDF_SAP_MODE:
 	case QDF_P2P_GO_MODE:
-		if (!test_bit(SOFTAP_BSS_STARTED, &adapter->event_flags)) {
+		if (!test_bit(SOFTAP_BSS_STARTED,
+			      &adapter->deflink->link_flags)) {
 			hdd_debug("SAP is not started yet");
 			return 0;
 		}

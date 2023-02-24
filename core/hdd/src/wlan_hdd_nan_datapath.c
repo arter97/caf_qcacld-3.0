@@ -131,7 +131,7 @@ static bool hdd_is_ndp_allowed(struct hdd_context *hdd_ctx)
 		switch (adapter->device_mode) {
 		case QDF_P2P_GO_MODE:
 			if (test_bit(SOFTAP_BSS_STARTED,
-				     &adapter->event_flags)) {
+				     &adapter->deflink->link_flags)) {
 				hdd_adapter_dev_put_debug(adapter, dbgid);
 				if (next_adapter)
 					hdd_adapter_dev_put_debug(next_adapter,
@@ -172,7 +172,7 @@ static bool hdd_is_ndp_allowed(struct hdd_context *hdd_ctx)
 		case QDF_P2P_GO_MODE:
 		case QDF_SAP_MODE:
 			if (test_bit(SOFTAP_BSS_STARTED,
-				     &adapter->event_flags)) {
+				     &adapter->deflink->link_flags)) {
 				hdd_adapter_dev_put_debug(adapter, dbgid);
 				if (next_adapter)
 					hdd_adapter_dev_put_debug(next_adapter,

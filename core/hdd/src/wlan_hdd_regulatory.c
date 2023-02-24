@@ -1728,7 +1728,7 @@ static void hdd_restart_sap_with_new_phymode(struct hdd_context *hdd_ctx,
 	hostapd_state = WLAN_HDD_GET_HOSTAP_STATE_PTR(adapter->deflink);
 	sap_ctx = WLAN_HDD_GET_SAP_CTX_PTR(adapter->deflink);
 
-	if (!test_bit(SOFTAP_BSS_STARTED, &adapter->event_flags)) {
+	if (!test_bit(SOFTAP_BSS_STARTED, &adapter->deflink->link_flags)) {
 		sap_config->sap_orig_hw_mode = sap_config->SapHw_mode;
 		sap_config->SapHw_mode = csr_phy_mode;
 		hdd_err("Can't restart AP because it is not started");

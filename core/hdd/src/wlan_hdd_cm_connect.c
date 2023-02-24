@@ -509,8 +509,9 @@ static struct hdd_adapter
 		 * sap is not in started state and also not under doing CAC,
 		 * so it is fine to go ahead with sta.
 		 */
-		if (!test_bit(SOFTAP_BSS_STARTED, &(adapter)->event_flags) &&
-		    (hdd_ctx->dev_dfs_cac_status != DFS_CAC_IN_PROGRESS))
+		if (!test_bit(SOFTAP_BSS_STARTED,
+			      &adapter->deflink->link_flags) &&
+		    hdd_ctx->dev_dfs_cac_status != DFS_CAC_IN_PROGRESS)
 			goto loop_next;
 
 		chan = wlan_vdev_get_active_channel(adapter->deflink->vdev);

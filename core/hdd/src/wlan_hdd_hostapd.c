@@ -887,13 +887,13 @@ static int hdd_stop_bss_link(struct hdd_adapter *adapter)
 	if (errno)
 		return errno;
 
-	if (test_bit(SOFTAP_BSS_STARTED, &adapter->event_flags)) {
+	if (test_bit(SOFTAP_BSS_STARTED, &adapter->deflink->link_flags)) {
 		status = wlansap_stop_bss(
 			WLAN_HDD_GET_SAP_CTX_PTR(adapter->deflink));
 		if (QDF_IS_STATUS_SUCCESS(status))
 			hdd_debug("Deleting SAP/P2P link!!!!!!");
 
-		clear_bit(SOFTAP_BSS_STARTED, &adapter->event_flags);
+		clear_bit(SOFTAP_BSS_STARTED, &adapter->deflink->link_flags);
 		policy_mgr_decr_session_set_pcl(hdd_ctx->psoc,
 					adapter->device_mode,
 					adapter->deflink->vdev_id);
@@ -3016,7 +3016,8 @@ QDF_STATUS hdd_hostapd_sap_event_cb(struct sap_event *sap_event,
 			      ap_ctx->sap_config.acs_cfg.ch_width);
 
 		if (qdf_atomic_read(&ap_ctx->acs_in_progress) &&
-		    test_bit(SOFTAP_BSS_STARTED, &adapter->event_flags)) {
+		    test_bit(SOFTAP_BSS_STARTED,
+			     &adapter->deflink->link_flags)) {
 			hdd_dcs_chan_select_complete(adapter);
 		} else {
 			wlan_hdd_cfg80211_acs_ch_select_evt(adapter, true);
@@ -3757,7 +3758,7 @@ QDF_STATUS wlan_hdd_check_cc_intf_cb(struct wlan_objmgr_psoc *psoc,
 		return QDF_STATUS_E_FAILURE;
 	}
 
-	if (!test_bit(SOFTAP_BSS_STARTED, &link_info->adapter->event_flags)) {
+	if (!test_bit(SOFTAP_BSS_STARTED, &link_info->link_flags)) {
 		hdd_err("SOFTAP_BSS_STARTED not set");
 		return QDF_STATUS_E_FAILURE;
 	}
@@ -3834,7 +3835,7 @@ QDF_STATUS wlan_hdd_get_channel_for_sap_restart(struct wlan_objmgr_psoc *psoc,
 		return QDF_STATUS_E_FAILURE;
 	}
 
-	if (!test_bit(SOFTAP_BSS_STARTED, &ap_adapter->event_flags)) {
+	if (!test_bit(SOFTAP_BSS_STARTED, &ap_adapter->deflink->link_flags)) {
 		hdd_err("SOFTAP_BSS_STARTED not set");
 		return QDF_STATUS_E_FAILURE;
 	}
@@ -4090,7 +4091,7 @@ uint32_t hdd_get_ap_6ghz_capable(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id)
 	 * b. SAP is configured on 6Ghz fixed channel from userspace.
 	 * c. SAP is configured by ACS range which includes any 6Ghz channel.
 	 */
-	if (test_bit(SOFTAP_BSS_STARTED, &ap_adapter->event_flags)) {
+	if (test_bit(SOFTAP_BSS_STARTED, &ap_adapter->deflink->link_flags)) {
 		if (WLAN_REG_IS_6GHZ_CHAN_FREQ(
 				ap_ctx->operating_chan_freq))
 			capable |= CONN_6GHZ_FLAG_ACS_OR_USR_ALLOWED;
@@ -5176,7 +5177,7 @@ int wlan_hdd_cfg80211_update_apies(struct hdd_adapter *adapter)
 	wlan_hdd_add_extra_ie(adapter, proberesp_ies, &proberesp_ies_len,
 			      WLAN_ELEMID_MOBILITY_DOMAIN);
 
-	if (test_bit(SOFTAP_BSS_STARTED, &adapter->event_flags)) {
+	if (test_bit(SOFTAP_BSS_STARTED, &adapter->deflink->link_flags)) {
 		update_ie.ieBufferlength = proberesp_ies_len;
 		update_ie.pAdditionIEBuffer = proberesp_ies;
 		update_ie.append = false;
@@ -5198,7 +5199,7 @@ int wlan_hdd_cfg80211_update_apies(struct hdd_adapter *adapter)
 	}
 
 	/* Assoc resp Add ie Data */
-	if (test_bit(SOFTAP_BSS_STARTED, &adapter->event_flags)) {
+	if (test_bit(SOFTAP_BSS_STARTED, &adapter->deflink->link_flags)) {
 		update_ie.ieBufferlength = beacon->assocresp_ies_len;
 		update_ie.pAdditionIEBuffer = (uint8_t *) beacon->assocresp_ies;
 		update_ie.append = false;
@@ -5219,7 +5220,7 @@ int wlan_hdd_cfg80211_update_apies(struct hdd_adapter *adapter)
 						 eUPDATE_IE_ASSOC_RESP);
 	}
 
-	if (test_bit(SOFTAP_BSS_STARTED, &adapter->event_flags)) {
+	if (test_bit(SOFTAP_BSS_STARTED, &adapter->deflink->link_flags)) {
 		update_ie.ieBufferlength = total_ielen;
 		update_ie.pAdditionIEBuffer = genie;
 		update_ie.append = false;
@@ -6292,7 +6293,7 @@ int wlan_hdd_cfg80211_start_bss(struct hdd_adapter *adapter,
 	ucfg_mlme_get_go_force_11n_for_11ac(hdd_ctx->psoc,
 					    &go_force_11n_for_11ac);
 
-	if (test_bit(SOFTAP_BSS_STARTED, &adapter->event_flags))
+	if (test_bit(SOFTAP_BSS_STARTED, &adapter->deflink->link_flags))
 		deliver_start_evt = false;
 
 	if (deliver_start_evt) {
@@ -6830,7 +6831,7 @@ int wlan_hdd_cfg80211_start_bss(struct hdd_adapter *adapter,
 		goto error;
 	}
 
-	if (test_bit(SOFTAP_BSS_STARTED, &adapter->event_flags)) {
+	if (test_bit(SOFTAP_BSS_STARTED, &adapter->deflink->link_flags)) {
 		mutex_unlock(&hdd_ctx->sap_lock);
 
 		wlansap_reset_sap_config_add_ie(config, eUPDATE_IE_ALL);
@@ -6917,7 +6918,7 @@ int wlan_hdd_cfg80211_start_bss(struct hdd_adapter *adapter,
 		goto error;
 	}
 	/* Successfully started Bss update the state bit. */
-	set_bit(SOFTAP_BSS_STARTED, &adapter->event_flags);
+	set_bit(SOFTAP_BSS_STARTED, &adapter->deflink->link_flags);
 
 	mutex_unlock(&hdd_ctx->sap_lock);
 
@@ -7093,7 +7094,7 @@ static int __wlan_hdd_cfg80211_stop_ap(struct wiphy *wiphy,
 	wlan_hdd_cleanup_actionframe(adapter);
 	wlan_hdd_cleanup_remain_on_channel_ctx(adapter);
 	mutex_lock(&hdd_ctx->sap_lock);
-	if (test_bit(SOFTAP_BSS_STARTED, &adapter->event_flags)) {
+	if (test_bit(SOFTAP_BSS_STARTED, &adapter->deflink->link_flags)) {
 		struct hdd_hostapd_state *hostapd_state =
 			WLAN_HDD_GET_HOSTAP_STATE_PTR(adapter->deflink);
 
@@ -7115,7 +7116,7 @@ static int __wlan_hdd_cfg80211_stop_ap(struct wiphy *wiphy,
 				QDF_ASSERT(0);
 			}
 		}
-		clear_bit(SOFTAP_BSS_STARTED, &adapter->event_flags);
+		clear_bit(SOFTAP_BSS_STARTED, &adapter->deflink->link_flags);
 
 		/*BSS stopped, clear the active sessions for this device mode*/
 		policy_mgr_decr_session_set_pcl(hdd_ctx->psoc,

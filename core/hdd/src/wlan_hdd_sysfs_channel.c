@@ -48,7 +48,7 @@ static ssize_t __show_channel_number(struct net_device *net_dev, char *buf)
 		goto exit;
 
 	ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(adapter->deflink);
-	if (test_bit(SOFTAP_BSS_STARTED, &adapter->event_flags)) {
+	if (test_bit(SOFTAP_BSS_STARTED, &adapter->deflink->link_flags)) {
 		chan_num = wlan_reg_freq_to_chan(hdd_ctx->pdev,
 						 ap_ctx->operating_chan_freq);
 		ret_val = scnprintf(buf, PAGE_SIZE, "%s    getchannel:%d\n",

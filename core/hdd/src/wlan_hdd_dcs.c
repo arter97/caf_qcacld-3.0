@@ -116,7 +116,8 @@ static QDF_STATUS hdd_dcs_switch_chan_cb(struct wlan_objmgr_vdev *vdev,
 					    tgt_freq, tgt_width);
 		break;
 	case QDF_SAP_MODE:
-		if (!test_bit(SOFTAP_BSS_STARTED, &adapter->event_flags))
+		if (!test_bit(SOFTAP_BSS_STARTED,
+			      &adapter->deflink->link_flags))
 			return QDF_STATUS_E_INVAL;
 
 		/* stop sap if got invalid freq or width */

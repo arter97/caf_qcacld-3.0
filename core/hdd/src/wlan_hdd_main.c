@@ -724,7 +724,7 @@ uint32_t hdd_get_adapter_home_channel(struct hdd_adapter *adapter)
 
 	if ((adapter->device_mode == QDF_SAP_MODE ||
 	     adapter->device_mode == QDF_P2P_GO_MODE) &&
-	    test_bit(SOFTAP_BSS_STARTED, &adapter->event_flags)) {
+	    test_bit(SOFTAP_BSS_STARTED, &adapter->deflink->link_flags)) {
 		home_chan_freq =
 			adapter->deflink->session.ap.operating_chan_freq;
 	} else if ((adapter->device_mode == QDF_STA_MODE ||
@@ -750,7 +750,7 @@ enum phy_ch_width hdd_get_adapter_width(struct hdd_adapter *adapter)
 
 	if ((adapter->device_mode == QDF_SAP_MODE ||
 	     adapter->device_mode == QDF_P2P_GO_MODE) &&
-	    test_bit(SOFTAP_BSS_STARTED, &adapter->event_flags)) {
+	    test_bit(SOFTAP_BSS_STARTED, &adapter->deflink->link_flags)) {
 		width = adapter->deflink->session.ap.sap_config.ch_params.ch_width;
 	} else if ((adapter->device_mode == QDF_STA_MODE ||
 		    adapter->device_mode == QDF_P2P_CLIENT_MODE) &&
@@ -5479,7 +5479,8 @@ bool hdd_is_dynamic_set_mac_addr_allowed(struct hdd_adapter *adapter)
 	case QDF_P2P_DEVICE_MODE:
 		return true;
 	case QDF_SAP_MODE:
-		if (test_bit(SOFTAP_BSS_STARTED, &adapter->event_flags)) {
+		if (test_bit(SOFTAP_BSS_STARTED,
+			     &adapter->deflink->link_flags)) {
 			hdd_info_rl("SAP is in up state, set mac address isn't supported");
 			return false;
 		} else {
@@ -6744,7 +6745,7 @@ bool hdd_is_vdev_in_conn_state(struct hdd_adapter *adapter)
 	case QDF_SAP_MODE:
 	case QDF_P2P_GO_MODE:
 		return (test_bit(SOFTAP_BSS_STARTED,
-				 &adapter->event_flags));
+				 &adapter->deflink->link_flags));
 	default:
 		hdd_err("Device mode %d invalid", adapter->device_mode);
 		return 0;
@@ -8694,7 +8695,8 @@ QDF_STATUS hdd_stop_adapter_ext(struct hdd_context *hdd_ctx,
 		wlan_hdd_scan_abort(adapter);
 		hdd_abort_ongoing_sta_connection(hdd_ctx);
 		/* Diassociate with all the peers before stop ap post */
-		if (test_bit(SOFTAP_BSS_STARTED, &adapter->event_flags)) {
+		if (test_bit(SOFTAP_BSS_STARTED,
+			     &adapter->deflink->link_flags)) {
 			if (wlan_hdd_del_station(adapter, NULL))
 				hdd_sap_indicate_disconnect_for_sta(adapter);
 		}
@@ -8737,7 +8739,8 @@ QDF_STATUS hdd_stop_adapter_ext(struct hdd_context *hdd_ctx,
 		hdd_destroy_acs_timer(adapter);
 
 		mutex_lock(&hdd_ctx->sap_lock);
-		if (test_bit(SOFTAP_BSS_STARTED, &adapter->event_flags)) {
+		if (test_bit(SOFTAP_BSS_STARTED,
+			     &adapter->deflink->link_flags)) {
 			struct hdd_hostapd_state *hostapd_state =
 				WLAN_HDD_GET_HOSTAP_STATE_PTR(adapter->deflink);
 
@@ -8758,7 +8761,8 @@ QDF_STATUS hdd_stop_adapter_ext(struct hdd_context *hdd_ctx,
 				hdd_err("failure in wlansap_stop_bss");
 			}
 
-			clear_bit(SOFTAP_BSS_STARTED, &adapter->event_flags);
+			clear_bit(SOFTAP_BSS_STARTED,
+				  &adapter->deflink->link_flags);
 			policy_mgr_decr_session_set_pcl(hdd_ctx->psoc,
 						adapter->device_mode,
 						adapter->deflink->vdev_id);
@@ -16993,7 +16997,7 @@ hdd_get_con_sap_adapter(struct hdd_adapter *this_sap_adapter,
 						adapter != this_sap_adapter) {
 			if (check_start_bss) {
 				if (test_bit(SOFTAP_BSS_STARTED,
-						&adapter->event_flags)) {
+					     &adapter->deflink->link_flags)) {
 					con_sap_adapter = adapter;
 					hdd_adapter_dev_put_debug(adapter,
 								  dbgid);
@@ -17116,7 +17120,7 @@ void wlan_hdd_stop_sap(struct hdd_adapter *ap_adapter)
 		return;
 
 	mutex_lock(&hdd_ctx->sap_lock);
-	if (test_bit(SOFTAP_BSS_STARTED, &ap_adapter->event_flags)) {
+	if (test_bit(SOFTAP_BSS_STARTED, &ap_adapter->deflink->link_flags)) {
 		wlan_hdd_del_station(ap_adapter, NULL);
 		hostapd_state =
 			WLAN_HDD_GET_HOSTAP_STATE_PTR(ap_adapter->deflink);
@@ -17133,7 +17137,7 @@ void wlan_hdd_stop_sap(struct hdd_adapter *ap_adapter)
 				return;
 			}
 		}
-		clear_bit(SOFTAP_BSS_STARTED, &ap_adapter->event_flags);
+		clear_bit(SOFTAP_BSS_STARTED, &ap_adapter->deflink->link_flags);
 		policy_mgr_decr_session_set_pcl(hdd_ctx->psoc,
 						ap_adapter->device_mode,
 						ap_adapter->deflink->vdev_id);
@@ -17220,7 +17224,7 @@ void wlan_hdd_start_sap(struct hdd_adapter *ap_adapter, bool reinit)
 	sap_config = &ap_adapter->deflink->session.ap.sap_config;
 
 	mutex_lock(&hdd_ctx->sap_lock);
-	if (test_bit(SOFTAP_BSS_STARTED, &ap_adapter->event_flags))
+	if (test_bit(SOFTAP_BSS_STARTED, &ap_adapter->deflink->link_flags))
 		goto end;
 
 	if (0 != wlan_hdd_cfg80211_update_apies(ap_adapter)) {
@@ -17257,7 +17261,7 @@ void wlan_hdd_start_sap(struct hdd_adapter *ap_adapter, bool reinit)
 	if (reinit)
 		hdd_medium_assess_init();
 	wlansap_reset_sap_config_add_ie(sap_config, eUPDATE_IE_ALL);
-	set_bit(SOFTAP_BSS_STARTED, &ap_adapter->event_flags);
+	set_bit(SOFTAP_BSS_STARTED, &ap_adapter->deflink->link_flags);
 	if (hostapd_state->bss_state == BSS_START) {
 		policy_mgr_incr_active_session(hdd_ctx->psoc,
 					ap_adapter->device_mode,
@@ -19919,7 +19923,7 @@ void hdd_restart_sap(struct hdd_adapter *ap_adapter)
 	sap_ctx = hdd_ap_ctx->sap_context;
 
 	mutex_lock(&hdd_ctx->sap_lock);
-	if (test_bit(SOFTAP_BSS_STARTED, &ap_adapter->event_flags)) {
+	if (test_bit(SOFTAP_BSS_STARTED, &ap_adapter->deflink->link_flags)) {
 		wlan_hdd_del_station(ap_adapter, NULL);
 		hostapd_state =
 			WLAN_HDD_GET_HOSTAP_STATE_PTR(ap_adapter->deflink);
@@ -19934,7 +19938,7 @@ void hdd_restart_sap(struct hdd_adapter *ap_adapter)
 				goto end;
 			}
 		}
-		clear_bit(SOFTAP_BSS_STARTED, &ap_adapter->event_flags);
+		clear_bit(SOFTAP_BSS_STARTED, &ap_adapter->deflink->link_flags);
 		policy_mgr_decr_session_set_pcl(hdd_ctx->psoc,
 			ap_adapter->device_mode, ap_adapter->deflink->vdev_id);
 		hdd_green_ap_start_state_mc(hdd_ctx, ap_adapter->device_mode,
@@ -19973,7 +19977,7 @@ void hdd_restart_sap(struct hdd_adapter *ap_adapter)
 						eUPDATE_IE_ALL);
 		hdd_err("SAP Start Success");
 		hdd_medium_assess_init();
-		set_bit(SOFTAP_BSS_STARTED, &ap_adapter->event_flags);
+		set_bit(SOFTAP_BSS_STARTED, &ap_adapter->deflink->link_flags);
 		if (hostapd_state->bss_state == BSS_START) {
 			policy_mgr_incr_active_session(hdd_ctx->psoc,
 						ap_adapter->device_mode,
@@ -20025,7 +20029,7 @@ void hdd_check_and_restart_sap_with_non_dfs_acs(void)
 
 	ap_adapter = hdd_get_adapter(hdd_ctx, QDF_SAP_MODE);
 	if (ap_adapter &&
-	    test_bit(SOFTAP_BSS_STARTED, &ap_adapter->event_flags) &&
+	    test_bit(SOFTAP_BSS_STARTED, &ap_adapter->deflink->link_flags) &&
 	    wlan_reg_is_dfs_for_freq(
 			hdd_ctx->pdev,
 			ap_adapter->deflink->session.ap.operating_chan_freq)) {

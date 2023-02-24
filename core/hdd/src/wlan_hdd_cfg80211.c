@@ -15346,7 +15346,7 @@ __wlan_hdd_cfg80211_sap_configuration_set(struct wiphy *wiphy,
 
 	if (chan_freq_present) {
 		if (!test_bit(SOFTAP_BSS_STARTED,
-					&hostapd_adapter->event_flags)) {
+			      &hostapd_adapter->deflink->link_flags)) {
 			hdd_err("SAP is not started yet. Restart sap will be invalid");
 			return -EINVAL;
 		}
@@ -26592,7 +26592,8 @@ static int __wlan_hdd_cfg80211_get_channel(struct wiphy *wiphy,
 
 		ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(adapter->deflink);
 
-		if (!test_bit(SOFTAP_BSS_STARTED, &adapter->event_flags))
+		if (!test_bit(SOFTAP_BSS_STARTED,
+			      &adapter->deflink->link_flags))
 			return -EINVAL;
 
 		switch (ap_ctx->sap_config.SapHw_mode) {

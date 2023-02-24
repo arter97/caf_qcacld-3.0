@@ -1519,7 +1519,7 @@ static __iw_softap_getchannel(struct net_device *dev,
 
 	*value = 0;
 	ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(adapter->deflink);
-	if (test_bit(SOFTAP_BSS_STARTED, &adapter->event_flags))
+	if (test_bit(SOFTAP_BSS_STARTED, &adapter->deflink->link_flags))
 		*value = wlan_reg_freq_to_chan(
 				hdd_ctx->pdev,
 				ap_ctx->operating_chan_freq);
@@ -2171,7 +2171,7 @@ __iw_softap_stopbss(struct net_device *dev,
 	if (0 != ret)
 		return ret;
 
-	if (test_bit(SOFTAP_BSS_STARTED, &adapter->event_flags)) {
+	if (test_bit(SOFTAP_BSS_STARTED, &adapter->deflink->link_flags)) {
 		struct hdd_hostapd_state *hostapd_state =
 			WLAN_HDD_GET_HOSTAP_STATE_PTR(adapter->deflink);
 
@@ -2188,7 +2188,7 @@ __iw_softap_stopbss(struct net_device *dev,
 				QDF_ASSERT(0);
 			}
 		}
-		clear_bit(SOFTAP_BSS_STARTED, &adapter->event_flags);
+		clear_bit(SOFTAP_BSS_STARTED, &adapter->deflink->link_flags);
 		policy_mgr_decr_session_set_pcl(hdd_ctx->psoc,
 					     adapter->device_mode,
 					     adapter->deflink->vdev_id);

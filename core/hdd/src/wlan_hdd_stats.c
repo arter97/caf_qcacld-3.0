@@ -917,12 +917,11 @@ bool hdd_get_interface_info(struct hdd_adapter *adapter,
 		}
 	}
 
-	if ((adapter->device_mode == QDF_SAP_MODE) ||
-	    (adapter->device_mode == QDF_P2P_GO_MODE)) {
-		if (test_bit(SOFTAP_BSS_STARTED, &adapter->event_flags)) {
-			config = &adapter->deflink->session.ap.sap_config;
-			qdf_copy_macaddr(&info->bssid, &config->self_macaddr);
-		}
+	if ((adapter->device_mode == QDF_SAP_MODE ||
+	     adapter->device_mode == QDF_P2P_GO_MODE) &&
+	    test_bit(SOFTAP_BSS_STARTED, &adapter->deflink->link_flags)) {
+		config = &adapter->deflink->session.ap.sap_config;
+		qdf_copy_macaddr(&info->bssid, &config->self_macaddr);
 	}
 	wlan_reg_get_cc_and_src(adapter->hdd_ctx->psoc, info->countryStr);
 	wlan_reg_get_cc_and_src(adapter->hdd_ctx->psoc, info->apCountryStr);
@@ -7139,7 +7138,8 @@ static bool hdd_is_rcpi_applicable(struct hdd_adapter *adapter,
 		}
 	} else if (adapter->device_mode == QDF_SAP_MODE ||
 		   adapter->device_mode == QDF_P2P_GO_MODE) {
-		if (!test_bit(SOFTAP_BSS_STARTED, &adapter->event_flags)) {
+		if (!test_bit(SOFTAP_BSS_STARTED,
+			      &adapter->deflink->link_flags)) {
 			hdd_err("Invalid rcpi request, softap not started");
 			return false;
 		}
