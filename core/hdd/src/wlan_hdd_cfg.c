@@ -1451,7 +1451,8 @@ static QDF_STATUS hdd_get_sap_tx_nss(struct hdd_adapter *adapter,
 		return QDF_STATUS_E_INVAL;
 	}
 
-	operating_band = hdd_get_sap_operating_band_by_adapter(adapter);
+	operating_band =
+		hdd_get_sap_operating_band_by_link_info(adapter->deflink);
 	if (operating_band == BAND_UNKNOWN)
 		return QDF_STATUS_E_INVAL;
 	sme_get_sap_vdev_type_nss(mac_handle, &vdev_nss, operating_band);
@@ -1506,7 +1507,7 @@ static QDF_STATUS hdd_get_sta_tx_nss(struct hdd_adapter *adapter,
 			hdd_debug("nss chain dynamic config NULL");
 			return QDF_STATUS_E_INVAL;
 		}
-		operating_band = hdd_conn_get_connected_band(adapter);
+		operating_band = hdd_conn_get_connected_band(adapter->deflink);
 		switch (operating_band) {
 		case BAND_2G:
 			*tx_nss = dynamic_cfg->tx_nss[NSS_CHAINS_BAND_2GHZ];
@@ -1573,7 +1574,8 @@ static QDF_STATUS hdd_get_sap_rx_nss(struct hdd_adapter *adapter,
 		return QDF_STATUS_E_INVAL;
 	}
 
-	operating_band = hdd_get_sap_operating_band_by_adapter(adapter);
+	operating_band =
+		hdd_get_sap_operating_band_by_link_info(adapter->deflink);
 	if (operating_band == BAND_UNKNOWN)
 		return QDF_STATUS_E_INVAL;
 	sme_get_sap_vdev_type_nss(mac_handle, &vdev_nss, operating_band);
@@ -1629,7 +1631,7 @@ static QDF_STATUS hdd_get_sta_rx_nss(struct hdd_adapter *adapter,
 			hdd_debug("nss chain dynamic config NULL");
 			return QDF_STATUS_E_INVAL;
 		}
-		operating_band = hdd_conn_get_connected_band(adapter);
+		operating_band = hdd_conn_get_connected_band(adapter->deflink);
 		switch (operating_band) {
 		case BAND_2G:
 			*rx_nss = dynamic_cfg->rx_nss[NSS_CHAINS_BAND_2GHZ];

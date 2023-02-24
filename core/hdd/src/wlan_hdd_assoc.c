@@ -492,13 +492,13 @@ void hdd_conn_set_connection_state(struct hdd_adapter *adapter,
 	hdd_sta_ctx->conn_info.conn_state = conn_state;
 }
 
-enum band_info hdd_conn_get_connected_band(struct hdd_adapter *adapter)
+enum band_info hdd_conn_get_connected_band(struct wlan_hdd_link_info *link_info)
 {
 	struct hdd_station_ctx *sta_ctx;
 	uint32_t sta_freq = 0;
 
-	sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter->deflink);
-	if (hdd_cm_is_vdev_associated(adapter->deflink))
+	sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(link_info);
+	if (hdd_cm_is_vdev_associated(link_info))
 		sta_freq = sta_ctx->conn_info.chan_freq;
 
 	if (wlan_reg_is_24ghz_ch_freq(sta_freq))

@@ -3561,7 +3561,7 @@ hdd_twt_pack_get_capabilities_resp(struct hdd_adapter *adapter)
 	 * connected, then check the "enable_twt_24ghz" ini
 	 * value to advertise the TWT requestor capability.
 	 */
-	connected_band = hdd_conn_get_connected_band(adapter);
+	connected_band = hdd_conn_get_connected_band(adapter->deflink);
 	if (connected_band == BAND_2G &&
 	    !ucfg_mlme_is_24ghz_twt_enabled(hdd_ctx->psoc))
 		is_twt_24ghz_allowed = false;

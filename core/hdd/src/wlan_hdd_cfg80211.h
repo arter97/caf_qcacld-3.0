@@ -682,14 +682,15 @@ enum hdd_ba_mode {
 void hdd_set_rate_bw(struct rate_info *info, enum hdd_rate_info_bw hdd_bw);
 
 /*
- * hdd_get_sap_operating_band_by_adapter: Get current adapter operating channel
+ * hdd_get_sap_operating_band_by_link_info: Get operating channel of link info
  * for sap.
- * @adapter: Pointer to adapter
+ * @link_info: Pointer to link_info in adapter
  *
  * Return : Corresponding band for SAP operating channel
  */
 
-uint8_t hdd_get_sap_operating_band_by_adapter(struct hdd_adapter *adapter);
+uint8_t
+hdd_get_sap_operating_band_by_link_info(struct wlan_hdd_link_info *link_info);
 
 /*
  * hdd_get_sap_operating_band:  Get current operating channel

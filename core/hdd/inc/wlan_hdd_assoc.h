@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2013-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -199,6 +199,7 @@ struct hdd_connection_info {
 struct hdd_adapter;
 struct hdd_station_ctx;
 struct hdd_context;
+struct wlan_hdd_link_info;
 
 /*
  * hdd_is_fils_connection: API to determine if connection is FILS
@@ -238,12 +239,13 @@ void hdd_conn_set_connection_state(struct hdd_adapter *adapter,
 
 /**
  * hdd_conn_get_connected_band() - get current connection radio band
- * @adapter: HDD adapter
+ * @link_info: pointer to the link_info structure
  *
  * Return: BAND_2G or BAND_5G based on current AP connection
  *      BAND_ALL if not connected
  */
-enum band_info hdd_conn_get_connected_band(struct hdd_adapter *adapter);
+enum band_info
+hdd_conn_get_connected_band(struct wlan_hdd_link_info *link_info);
 
 /**
  * hdd_get_sta_connection_in_progress() - get STA for which connection
