@@ -21979,6 +21979,9 @@ static void populate_tlv_service(uint32_t *wmi_service)
 #endif
 	wmi_service[wmi_service_wpa3_sha384_roam_support] =
 			WMI_SERVICE_WMI_SERVICE_WPA3_SHA384_ROAM_SUPPORT;
+	wmi_service[wmi_service_self_mld_roam_between_dbs_and_hbs] =
+			WMI_SERVICE_SELF_MLD_ROAM_BETWEEN_DBS_AND_HBS;
+	/* TODO: Assign FW Enum after FW Shared header changes are merged */
 	wmi_service[wmi_service_v1a_v1b_supported] =
 			WMI_SERVICE_PEER_METADATA_V1A_V1B_SUPPORT;
 #ifdef QCA_MANUAL_TRIGGERED_ULOFDMA

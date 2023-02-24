@@ -6287,6 +6287,7 @@ typedef enum {
 	wmi_service_wpa3_sha384_roam_support,
 	wmi_service_multiple_vdev_restart_bmap,
 	wmi_service_v1a_v1b_supported,
+	wmi_service_self_mld_roam_between_dbs_and_hbs,
 	wmi_service_cfr_capture_pdev_id_soc,
 #ifdef QCA_MANUAL_TRIGGERED_ULOFDMA
 	wmi_service_manual_ulofdma_trigger_support,
