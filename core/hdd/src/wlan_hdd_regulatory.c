@@ -1806,7 +1806,7 @@ static void hdd_country_change_update_sap(struct hdd_context *hdd_ctx)
 			break;
 		case QDF_SAP_MODE:
 			if (!test_bit(SOFTAP_INIT_DONE,
-				      &adapter->event_flags)) {
+				      &adapter->deflink->link_flags)) {
 				hdd_info("AP is not started yet");
 				break;
 			}

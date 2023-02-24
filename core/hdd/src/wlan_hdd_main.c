@@ -8799,7 +8799,8 @@ QDF_STATUS hdd_stop_adapter_ext(struct hdd_context *hdd_ctx,
 		 * and is not cleared/freed on purpose in case of SAP SSR
 		 */
 		if (!cds_is_driver_recovering()) {
-			clear_bit(SOFTAP_INIT_DONE, &adapter->event_flags);
+			clear_bit(SOFTAP_INIT_DONE,
+				  &adapter->deflink->link_flags);
 			qdf_mem_free(ap_ctx->beacon);
 			ap_ctx->beacon = NULL;
 		}

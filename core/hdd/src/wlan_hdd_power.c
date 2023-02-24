@@ -1928,16 +1928,18 @@ static void hdd_ssr_restart_sap(struct hdd_context *hdd_ctx)
 
 	hdd_for_each_adapter_dev_held_safe(hdd_ctx, adapter, next_adapter,
 					   NET_DEV_HOLD_SSR_RESTART_SAP) {
-		if (adapter->device_mode == QDF_SAP_MODE) {
-			if (test_bit(SOFTAP_INIT_DONE, &adapter->event_flags)) {
-				hdd_debug(
-				"Restart prev SAP session, event_flags 0x%lx(%s)",
-				adapter->event_flags, (adapter->dev)->name);
-				wlan_hdd_set_twt_responder(hdd_ctx,
-							   adapter);
-				wlan_hdd_start_sap(adapter, true);
-			}
+		if (adapter->device_mode != QDF_SAP_MODE)
+			goto next_adapter;
+
+		if (test_bit(SOFTAP_INIT_DONE, &adapter->deflink->link_flags)) {
+			hdd_debug("Restart prev SAP session, event_flags 0x%lx, link_flags 0x%lx(%s)",
+				  adapter->event_flags,
+				  adapter->deflink->link_flags,
+				  adapter->dev->name);
+			wlan_hdd_set_twt_responder(hdd_ctx, adapter);
+			wlan_hdd_start_sap(adapter, true);
 		}
+next_adapter:
 		hdd_adapter_dev_put_debug(adapter,
 					  NET_DEV_HOLD_SSR_RESTART_SAP);
 	}

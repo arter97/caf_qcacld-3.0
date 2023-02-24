@@ -933,7 +933,7 @@ int __wlan_hdd_del_virtual_intf(struct wiphy *wiphy, struct wireless_dev *wdev)
 	 * Clear SOFTAP_INIT_DONE flag to mark SAP unload, so that we do
 	 * not restart SAP after SSR as SAP is already stopped from user space.
 	 */
-	clear_bit(SOFTAP_INIT_DONE, &adapter->event_flags);
+	clear_bit(SOFTAP_INIT_DONE, &adapter->deflink->link_flags);
 
 	qdf_mtrace(QDF_MODULE_ID_HDD, QDF_MODULE_ID_HDD,
 		   TRACE_CODE_HDD_DEL_VIRTUAL_INTF,

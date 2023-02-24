@@ -259,7 +259,6 @@ static inline bool in_compat_syscall(void) { return is_compat_task(); }
  * @NET_DEVICE_REGISTERED: Adapter is registered with the kernel
  * @WMM_INIT_DONE: Adapter is initialized
  * @DEVICE_IFACE_OPENED: Adapter has been "opened" via the kernel
- * @SOFTAP_INIT_DONE: Software Access Point (SAP) is initialized
  * @VENDOR_ACS_RESPONSE_PENDING: Waiting for event for vendor acs
  * @WDEV_ONLY_REGISTERED: Only WDEV is registered
  */
@@ -267,7 +266,6 @@ enum hdd_adapter_flags {
 	NET_DEVICE_REGISTERED,
 	WMM_INIT_DONE,
 	DEVICE_IFACE_OPENED,
-	SOFTAP_INIT_DONE,
 	VENDOR_ACS_RESPONSE_PENDING,
 	WDEV_ONLY_REGISTERED,
 };
@@ -276,10 +274,12 @@ enum hdd_adapter_flags {
  * enum hdd_link_flags - Event bitmap flags specific to per link
  * @SME_SESSION_OPENED: Firmware vdev has been created
  * @SOFTAP_BSS_STARTED: Software Access Point (SAP) is running
+ * @SOFTAP_INIT_DONE: Software Access Point (SAP) is initialized
  */
 enum hdd_link_flags {
 	SME_SESSION_OPENED,
 	SOFTAP_BSS_STARTED,
+	SOFTAP_INIT_DONE,
 };
 
 /**

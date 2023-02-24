@@ -6872,7 +6872,7 @@ int wlan_hdd_cfg80211_start_bss(struct hdd_adapter *adapter,
 	sap_event_callback = hdd_hostapd_sap_event_cb;
 
 	ap_ctx->dfs_cac_block_tx = true;
-	set_bit(SOFTAP_INIT_DONE, &adapter->event_flags);
+	set_bit(SOFTAP_INIT_DONE, &adapter->deflink->link_flags);
 
 	ucfg_dp_set_dfs_cac_tx(vdev, true);
 
@@ -6956,7 +6956,7 @@ error:
 		hdd_update_indoor_channel(hdd_ctx, false);
 		sme_update_channel_list(mac_handle);
 	}
-	clear_bit(SOFTAP_INIT_DONE, &adapter->event_flags);
+	clear_bit(SOFTAP_INIT_DONE, &adapter->deflink->link_flags);
 	qdf_atomic_set(&ap_ctx->acs_in_progress, 0);
 	wlansap_reset_sap_config_add_ie(config, eUPDATE_IE_ALL);
 
@@ -7071,7 +7071,7 @@ static int __wlan_hdd_cfg80211_stop_ap(struct wiphy *wiphy,
 	 * This update is moved to start of this function to resolve stop_ap
 	 * call during SSR case. Adapter gets cleaned up as part of SSR.
 	 */
-	clear_bit(SOFTAP_INIT_DONE, &adapter->event_flags);
+	clear_bit(SOFTAP_INIT_DONE, &adapter->deflink->link_flags);
 	hdd_debug("Event flags 0x%lx(%s) Device_mode %s(%d)",
 		  adapter->event_flags, (adapter->dev)->name,
 		  qdf_opmode_str(adapter->device_mode), adapter->device_mode);
@@ -7736,7 +7736,7 @@ static int __wlan_hdd_cfg80211_start_ap(struct wiphy *wiphy,
 
 	hdd_enter();
 
-	clear_bit(SOFTAP_INIT_DONE, &adapter->event_flags);
+	clear_bit(SOFTAP_INIT_DONE, &adapter->deflink->link_flags);
 	if (QDF_GLOBAL_FTM_MODE == hdd_get_conparam()) {
 		hdd_err("Command not allowed in FTM mode");
 		return -EINVAL;
