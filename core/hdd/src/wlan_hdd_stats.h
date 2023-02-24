@@ -593,16 +593,14 @@ int wlan_hdd_get_temperature(struct hdd_adapter *adapter, int *temperature);
 
 /**
  * hdd_get_max_tx_bitrate() - Get the max tx bitrate of the AP
- * @hdd_ctx: hdd context
- * @adapter: hostapd interface
+ * @link_info: pointer to link_info struct in adapter
  *
- * THis function gets the MAX supported rate by AP and cache
+ * This function gets the MAX supported rate by AP and cache
  * it into connection info structure
  *
  * Return: None
  */
-void hdd_get_max_tx_bitrate(struct hdd_context *hdd_ctx,
-			    struct hdd_adapter *adapter);
+void hdd_get_max_tx_bitrate(struct wlan_hdd_link_info *link_info);
 
 #ifdef TX_MULTIQ_PER_AC
 /**

@@ -5697,29 +5697,27 @@ static void wlan_hdd_fill_os_rate_info(enum tx_rate_info rate_flags,
 		os_rate->flags |= RATE_INFO_FLAGS_SHORT_GI;
 }
 
-void hdd_get_max_tx_bitrate(struct hdd_context *hdd_ctx,
-			    struct hdd_adapter *adapter)
+void hdd_get_max_tx_bitrate(struct wlan_hdd_link_info *link_info)
 {
+	struct hdd_context *hdd_ctx = link_info->adapter->hdd_ctx;
 	struct station_info sinfo;
 	enum tx_rate_info tx_rate_flags;
 	uint8_t tx_mcs_index, tx_nss = 1;
 	uint16_t my_tx_rate;
 	struct hdd_station_ctx *hdd_sta_ctx;
 	struct wlan_objmgr_vdev *vdev;
-	struct hdd_stats *hdd_stats;
 
-	hdd_sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter->deflink);
+	hdd_sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(link_info);
 
 	qdf_mem_zero(&sinfo, sizeof(struct station_info));
 
-	hdd_stats = &adapter->deflink->hdd_stats;
-	sinfo.signal = adapter->deflink->rssi;
-	tx_mcs_index = hdd_stats->class_a_stat.tx_mcs_index;
-	my_tx_rate = hdd_stats->class_a_stat.tx_rate;
-	tx_rate_flags = hdd_stats->class_a_stat.tx_rx_rate_flags;
+	sinfo.signal = link_info->rssi;
+	tx_mcs_index = link_info->hdd_stats.class_a_stat.tx_mcs_index;
+	my_tx_rate = link_info->hdd_stats.class_a_stat.tx_rate;
+	tx_rate_flags = link_info->hdd_stats.class_a_stat.tx_rx_rate_flags;
 
 	if (!(tx_rate_flags & TX_RATE_LEGACY)) {
-		vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink,
+		vdev = hdd_objmgr_get_vdev_by_user(link_info,
 						   WLAN_OSIF_STATS_ID);
 		if (vdev) {
 			/*
@@ -5730,7 +5728,7 @@ void hdd_get_max_tx_bitrate(struct hdd_context *hdd_ctx,
 			tx_nss = wlan_vdev_mlme_get_nss(vdev);
 			hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_STATS_ID);
 		} else {
-			tx_nss = hdd_stats->class_a_stat.tx_nss;
+			tx_nss = link_info->hdd_stats.class_a_stat.tx_nss;
 		}
 		hdd_check_and_update_nss(hdd_ctx, &tx_nss, NULL);
 
@@ -5738,9 +5736,9 @@ void hdd_get_max_tx_bitrate(struct hdd_context *hdd_ctx,
 			tx_mcs_index = 0;
 	}
 
-	if (hdd_report_max_rate(adapter->deflink, hdd_ctx->mac_handle,
-				&sinfo.txrate, sinfo.signal, tx_rate_flags,
-				tx_mcs_index, my_tx_rate, tx_nss)) {
+	if (hdd_report_max_rate(link_info, hdd_ctx->mac_handle, &sinfo.txrate,
+				sinfo.signal, tx_rate_flags, tx_mcs_index,
+				my_tx_rate, tx_nss)) {
 		hdd_sta_ctx->cache_conn_info.max_tx_bitrate = sinfo.txrate;
 		hdd_debug("Reporting max tx rate flags %d mcs %d nss %d bw %d",
 			  sinfo.txrate.flags, sinfo.txrate.mcs,

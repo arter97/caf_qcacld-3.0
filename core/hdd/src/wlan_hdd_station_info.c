@@ -516,8 +516,9 @@ static int32_t hdd_add_sta_info(struct sk_buff *skb,
 		hdd_err("put fail");
 		goto fail;
 	}
+
 	if (hdd_cm_is_vdev_associated(adapter->deflink))
-		hdd_get_max_tx_bitrate(hdd_ctx, adapter);
+		hdd_get_max_tx_bitrate(adapter->deflink);
 
 	if (hdd_add_tx_bitrate(skb, adapter, NL80211_STA_INFO_TX_BITRATE)) {
 		hdd_err("hdd_add_tx_bitrate failed");
