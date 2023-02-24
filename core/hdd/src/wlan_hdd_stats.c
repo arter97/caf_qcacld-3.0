@@ -5738,9 +5738,9 @@ void hdd_get_max_tx_bitrate(struct hdd_context *hdd_ctx,
 			tx_mcs_index = 0;
 	}
 
-	if (hdd_report_max_rate(adapter, hdd_ctx->mac_handle, &sinfo.txrate,
-				sinfo.signal, tx_rate_flags, tx_mcs_index,
-				my_tx_rate, tx_nss)) {
+	if (hdd_report_max_rate(adapter->deflink, hdd_ctx->mac_handle,
+				&sinfo.txrate, sinfo.signal, tx_rate_flags,
+				tx_mcs_index, my_tx_rate, tx_nss)) {
 		hdd_sta_ctx->cache_conn_info.max_tx_bitrate = sinfo.txrate;
 		hdd_debug("Reporting max tx rate flags %d mcs %d nss %d bw %d",
 			  sinfo.txrate.flags, sinfo.txrate.mcs,
@@ -5748,7 +5748,7 @@ void hdd_get_max_tx_bitrate(struct hdd_context *hdd_ctx,
 	}
 }
 
-bool hdd_report_max_rate(struct hdd_adapter *adapter,
+bool hdd_report_max_rate(struct wlan_hdd_link_info *link_info,
 			 mac_handle_t mac_handle,
 			 struct rate_info *rate,
 			 int8_t signal,
@@ -5808,8 +5808,7 @@ bool hdd_report_max_rate(struct hdd_adapter *adapter,
 		}
 	}
 
-	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink,
-					   WLAN_OSIF_STATS_ID);
+	vdev = hdd_objmgr_get_vdev_by_user(link_info, WLAN_OSIF_STATS_ID);
 	if (!vdev) {
 		hdd_err("failed to get vdev");
 		return false;
@@ -5819,8 +5818,7 @@ bool hdd_report_max_rate(struct hdd_adapter *adapter,
 	or_leng = ucfg_mlme_get_opr_rate(vdev, operational_rates,
 					 sizeof(operational_rates));
 	for (i = 0; i < or_leng; i++) {
-		for (j = 0;
-			 j < ARRAY_SIZE(supported_data_rate); j++) {
+		for (j = 0; j < ARRAY_SIZE(supported_data_rate); j++) {
 			/* Validate Rate Set */
 			if (supported_data_rate[j].beacon_rate_index ==
 				(operational_rates[i] & 0x7F)) {
@@ -5929,7 +5927,7 @@ bool hdd_report_max_rate(struct hdd_adapter *adapter,
 			max_mcs_idx = (max_mcs_idx > mcs_index) ?
 				max_mcs_idx : mcs_index;
 		} else {
-			mcs_len = ucfg_mlme_get_mcs_rate(adapter->deflink->vdev,
+			mcs_len = ucfg_mlme_get_mcs_rate(link_info->vdev,
 							 mcs_rates,
 							 sizeof(mcs_rates));
 			if (!mcs_len) {
@@ -6409,7 +6407,7 @@ static int wlan_hdd_update_rate_info(struct hdd_adapter *adapter,
 
 		hdd_check_and_update_nss(hdd_ctx, &tx_nss_max, &rx_nss_max);
 
-		tx_rate_calc = hdd_report_max_rate(adapter, mac_handle,
+		tx_rate_calc = hdd_report_max_rate(adapter->deflink, mac_handle,
 						   &sinfo->txrate,
 						   sinfo->signal,
 						   tx_rate_flags,
@@ -6417,7 +6415,7 @@ static int wlan_hdd_update_rate_info(struct hdd_adapter *adapter,
 						   my_tx_rate,
 						   tx_nss_max);
 
-		rx_rate_calc = hdd_report_max_rate(adapter, mac_handle,
+		rx_rate_calc = hdd_report_max_rate(adapter->deflink, mac_handle,
 						   &sinfo->rxrate,
 						   sinfo->signal,
 						   rx_rate_flags,
@@ -6452,7 +6450,7 @@ static int wlan_hdd_update_rate_info(struct hdd_adapter *adapter,
 		 * that the rates info has not been updated, report max rate.
 		 */
 		if (qdf_unlikely(rx_preamble == INVALID_PREAMBLE))
-			hdd_report_max_rate(adapter, mac_handle,
+			hdd_report_max_rate(adapter->deflink, mac_handle,
 					    &sinfo->rxrate,
 					    sinfo->signal,
 					    rx_rate_flags,
