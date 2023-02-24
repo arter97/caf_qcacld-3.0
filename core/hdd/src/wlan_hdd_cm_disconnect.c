@@ -241,7 +241,7 @@ void __hdd_cm_disconnect_handler_post_user_update(struct hdd_adapter *adapter,
 void reset_mscs_params(struct hdd_adapter *adapter)
 {
 	mlme_set_is_mscs_req_sent(adapter->deflink->vdev, false);
-	adapter->mscs_counter = 0;
+	adapter->deflink->mscs_counter = 0;
 }
 #endif
 

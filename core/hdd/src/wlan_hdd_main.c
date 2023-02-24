@@ -10898,14 +10898,13 @@ void wlan_hdd_set_pm_qos_request(struct hdd_context *hdd_ctx,
 #ifdef WLAN_FEATURE_MSCS
 
 static
-void hdd_send_mscs_action_frame(struct hdd_context *hdd_ctx,
-				struct hdd_adapter *adapter)
+void hdd_send_mscs_action_frame(struct wlan_hdd_link_info *link_info)
 {
+	struct hdd_context *hdd_ctx = link_info->adapter->hdd_ctx;
 	uint64_t mscs_vo_pkt_delta;
 	unsigned long tx_vo_pkts = 0;
 	unsigned int cpu;
-	struct hdd_tx_rx_stats *stats =
-				&adapter->deflink->hdd_stats.tx_rx_stats;
+	struct hdd_tx_rx_stats *stats = &link_info->hdd_stats.tx_rx_stats;
 	uint32_t bus_bw_compute_interval;
 
 	/*
@@ -10918,27 +10917,26 @@ void hdd_send_mscs_action_frame(struct hdd_context *hdd_ctx,
 	for (cpu = 0; cpu < NUM_CPUS; cpu++)
 		tx_vo_pkts += stats->per_cpu[cpu].tx_classified_ac[SME_AC_VO];
 
-	if (!adapter->mscs_counter)
-		adapter->mscs_prev_tx_vo_pkts = tx_vo_pkts;
+	if (!link_info->mscs_counter)
+		link_info->mscs_prev_tx_vo_pkts = tx_vo_pkts;
 
-	adapter->mscs_counter++;
+	link_info->mscs_counter++;
 	bus_bw_compute_interval =
 		ucfg_dp_get_bus_bw_compute_interval(hdd_ctx->psoc);
-	if (adapter->mscs_counter * bus_bw_compute_interval >=
+	if (link_info->mscs_counter * bus_bw_compute_interval >=
 	    hdd_ctx->config->mscs_voice_interval * 1000) {
-		adapter->mscs_counter = 0;
+		link_info->mscs_counter = 0;
 		mscs_vo_pkt_delta =
-				HDD_BW_GET_DIFF(tx_vo_pkts,
-						adapter->mscs_prev_tx_vo_pkts);
+			HDD_BW_GET_DIFF(tx_vo_pkts,
+					link_info->mscs_prev_tx_vo_pkts);
 		if (mscs_vo_pkt_delta > hdd_ctx->config->mscs_pkt_threshold &&
-		    !mlme_get_is_mscs_req_sent(adapter->deflink->vdev))
-			sme_send_mscs_action_frame(adapter->deflink->vdev_id);
+		    !mlme_get_is_mscs_req_sent(link_info->vdev))
+			sme_send_mscs_action_frame(link_info->vdev_id);
 	}
 }
 #else
 static inline
-void hdd_send_mscs_action_frame(struct hdd_context *hdd_ctx,
-				struct hdd_adapter *adapter)
+void hdd_send_mscs_action_frame(struct wlan_hdd_link_info *link_info)
 {
 }
 #endif
@@ -11338,7 +11336,7 @@ static inline void wlan_hdd_send_mscs_action_frame(hdd_cb_handle context,
 		hdd_err("Invalid vdev");
 		return;
 	}
-	hdd_send_mscs_action_frame(hdd_ctx, link_info->adapter);
+	hdd_send_mscs_action_frame(link_info);
 }
 
 #else

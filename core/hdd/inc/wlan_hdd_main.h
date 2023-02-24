@@ -1021,6 +1021,8 @@ enum udp_qos_upgrade {
  * @is_mlo_vdev_active: is the mlo vdev currently active
  * @estimated_linkspeed: estimated link speed
  * @hdd_stats: HDD statistics
+ * @mscs_prev_tx_vo_pkts: count of prev VO AC packets transmitted
+ * @mscs_counter: Counter on MSCS action frames sent
  */
 struct wlan_hdd_link_info {
 	struct hdd_adapter *adapter;
@@ -1045,6 +1047,11 @@ struct wlan_hdd_link_info {
 	bool is_mlo_vdev_active;
 	uint32_t estimated_linkspeed;
 	struct hdd_stats hdd_stats;
+
+#ifdef WLAN_FEATURE_MSCS
+	unsigned long mscs_prev_tx_vo_pkts;
+	uint32_t mscs_counter;
+#endif /* WLAN_FEATURE_MSCS */
 };
 
 /**
@@ -1103,8 +1110,6 @@ struct wlan_hdd_tx_power {
  * @scan_block_work:
  * @blocked_scan_request_q:
  * @blocked_scan_request_q_lock:
- * @mscs_prev_tx_vo_pkts:
- * @mscs_counter:
  * @tx_flow_control_timer:
  * @tx_flow_timer_initialized:
  * @tx_flow_low_watermark:
@@ -1256,12 +1261,6 @@ struct hdd_adapter {
 	struct work_struct scan_block_work;
 	qdf_list_t blocked_scan_request_q;
 	qdf_mutex_t blocked_scan_request_q_lock;
-
-
-#ifdef WLAN_FEATURE_MSCS
-	unsigned long mscs_prev_tx_vo_pkts;
-	uint32_t mscs_counter;
-#endif /* WLAN_FEATURE_MSCS */
 
 #if  defined(QCA_LL_LEGACY_TX_FLOW_CONTROL) || \
 				defined(QCA_HL_NETDEV_FLOW_CONTROL)
