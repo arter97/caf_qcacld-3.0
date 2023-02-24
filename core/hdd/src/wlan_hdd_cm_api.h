@@ -217,16 +217,16 @@ QDF_STATUS hdd_cm_cckm_preauth_complete(struct wlan_objmgr_vdev *vdev,
 #ifdef WLAN_FEATURE_MSCS
 /**
  * reset_mscs_params() - Reset mscs parameters
- * @adapter: pointer to adapter structure
+ * @link_info: pointer to link_info struct in adapter
  *
  * Reset mscs parameters whils disconnection
  *
  * Return: None
  */
-void reset_mscs_params(struct hdd_adapter *adapter);
+void reset_mscs_params(struct wlan_hdd_link_info *link_info);
 #else
 static inline
-void reset_mscs_params(struct hdd_adapter *adapter)
+void reset_mscs_params(struct wlan_hdd_link_info *link_info)
 {
 	return;
 }
