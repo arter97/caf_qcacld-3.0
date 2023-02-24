@@ -7332,20 +7332,20 @@ static inline void hdd_cleanup_he_operation_info(struct hdd_adapter *adapter)
 
 /**
  * hdd_cleanup_prev_ap_bcn_ie() - cleanup previous ap beacon ie
- * @adapter: Adapter structure
+ * @link_info: pointer to link_info struct in adapter
  *
  * This function destroys previous ap beacon information
  *
  * Return: none
  */
-static void hdd_cleanup_prev_ap_bcn_ie(struct hdd_adapter *adapter)
+static void hdd_cleanup_prev_ap_bcn_ie(struct wlan_hdd_link_info *link_info)
 {
 	struct hdd_station_ctx *hdd_sta_ctx;
 	struct element_info *bcn_ie;
 
 	hdd_debug("cleanup previous ap bcn ie");
 
-	hdd_sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter->deflink);
+	hdd_sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(link_info);
 	bcn_ie = &hdd_sta_ctx->conn_info.prev_ap_bcn_ie;
 
 	if (bcn_ie->ptr) {
@@ -7358,7 +7358,7 @@ static void hdd_cleanup_prev_ap_bcn_ie(struct hdd_adapter *adapter)
 void hdd_cleanup_conn_info(struct hdd_adapter *adapter)
 {
 	hdd_cleanup_he_operation_info(adapter);
-	hdd_cleanup_prev_ap_bcn_ie(adapter);
+	hdd_cleanup_prev_ap_bcn_ie(adapter->deflink);
 }
 
 /**
