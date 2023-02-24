@@ -2089,7 +2089,7 @@ static void cache_station_stats_cb(struct stats_event *ev, void *cookie)
 			continue;
 		}
 		copy_station_stats_to_adapter(adapter->deflink, ev);
-		wlan_hdd_get_peer_rx_rate_stats(adapter);
+		wlan_hdd_get_peer_rx_rate_stats(adapter->deflink);
 		/* dev_put has to be done here */
 		hdd_adapter_dev_put_debug(adapter, dbgid);
 		if (next_adapter)
@@ -6564,7 +6564,7 @@ static int wlan_hdd_get_sta_stats(struct wlan_hdd_link_info *link_info,
 
 	wlan_hdd_get_station_stats(link_info);
 
-	wlan_hdd_get_peer_rx_rate_stats(adapter);
+	wlan_hdd_get_peer_rx_rate_stats(link_info);
 
 	wlan_hdd_mlo_update_stats_info(adapter);
 
@@ -7657,16 +7657,16 @@ int wlan_hdd_get_link_speed(struct hdd_adapter *adapter, uint32_t *link_speed)
 }
 
 #ifdef FEATURE_RX_LINKSPEED_ROAM_TRIGGER
-void wlan_hdd_get_peer_rx_rate_stats(struct hdd_adapter *adapter)
+void wlan_hdd_get_peer_rx_rate_stats(struct wlan_hdd_link_info *link_info)
 {
 	struct cdp_peer_stats *peer_stats;
 	QDF_STATUS status;
 	ol_txrx_soc_handle soc;
 	uint8_t *peer_mac_addr;
 	struct wlan_objmgr_psoc *psoc;
-	struct hdd_stats *hdd_stats = &adapter->deflink->hdd_stats;
+	struct hdd_stats *hdd_stats = &link_info->hdd_stats;
 
-	psoc = adapter->hdd_ctx->psoc;
+	psoc = link_info->adapter->hdd_ctx->psoc;
 	if (!ucfg_mlme_stats_is_link_speed_report_actual(psoc))
 		return;
 
@@ -7676,7 +7676,7 @@ void wlan_hdd_get_peer_rx_rate_stats(struct hdd_adapter *adapter)
 	if (!peer_stats)
 		return;
 
-	peer_mac_addr = adapter->deflink->session.station.conn_info.bssid.bytes;
+	peer_mac_addr = link_info->session.station.conn_info.bssid.bytes;
 
 	/*
 	 * If failed to get RX rates info, assign an invalid value to the
@@ -7684,10 +7684,8 @@ void wlan_hdd_get_peer_rx_rate_stats(struct hdd_adapter *adapter)
 	 * and rx_mcs_index are also assigned with tx_rate and tx_mcs_index
 	 * if they are invalid after ASSOC/REASSOC/ROAMING
 	 */
-	status = cdp_host_get_peer_stats(soc,
-					 adapter->deflink->vdev_id,
-					 peer_mac_addr,
-					 peer_stats);
+	status = cdp_host_get_peer_stats(soc, link_info->vdev_id,
+					 peer_mac_addr, peer_stats);
 	if (qdf_unlikely(QDF_IS_STATUS_ERROR(status)) ||
 	    qdf_unlikely(peer_stats->rx.last_rx_rate == 0)) {
 		hdd_debug("No rates, reporting max rate, rx mcs=%d, status=%d",

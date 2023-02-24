@@ -7903,7 +7903,7 @@ static int hdd_get_wlan_stats(struct hdd_adapter *adapter)
 {
 	int stats = wlan_hdd_get_station_stats(adapter->deflink);
 
-	wlan_hdd_get_peer_rx_rate_stats(adapter);
+	wlan_hdd_get_peer_rx_rate_stats(adapter->deflink);
 
 	return stats;
 }

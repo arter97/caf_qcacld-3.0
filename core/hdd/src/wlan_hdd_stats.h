@@ -500,7 +500,7 @@ int wlan_hdd_get_link_speed(struct hdd_adapter *adapter, uint32_t *link_speed);
 #ifdef FEATURE_RX_LINKSPEED_ROAM_TRIGGER
 /**
  * wlan_hdd_get_peer_rx_rate_stats() - STA gets rx rate stats
- * @adapter: adapter upon which the measurement is requested
+ * @link_info: Link info pointer in HDD adapter
  *
  * STA gets rx rate stats through using the existed API
  * cdp_host_get_peer_stats. The reason that we make this
@@ -509,11 +509,10 @@ int wlan_hdd_get_link_speed(struct hdd_adapter *adapter, uint32_t *link_speed);
  *
  * Return: void
  */
-void
-wlan_hdd_get_peer_rx_rate_stats(struct hdd_adapter *adapter);
+void wlan_hdd_get_peer_rx_rate_stats(struct wlan_hdd_link_info *link_info);
 #else
 static inline void
-wlan_hdd_get_peer_rx_rate_stats(struct hdd_adapter *adapter)
+wlan_hdd_get_peer_rx_rate_stats(struct wlan_hdd_link_info *link_info)
 {
 }
 #endif
