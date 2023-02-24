@@ -533,13 +533,13 @@ hdd_conn_get_connected_cipher_algo(struct hdd_adapter *adapter,
 	return connected;
 }
 
-struct hdd_adapter *hdd_get_sta_connection_in_progress(
-			struct hdd_context *hdd_ctx)
+struct wlan_hdd_link_info *
+hdd_get_sta_connection_in_progress(struct hdd_context *hdd_ctx)
 {
 	struct hdd_adapter *adapter = NULL, *next_adapter = NULL;
-	struct hdd_station_ctx *hdd_sta_ctx;
 	wlan_net_dev_ref_dbgid dbgid =
 				NET_DEV_HOLD_GET_STA_CONNECTION_IN_PROGRESS;
+	struct wlan_hdd_link_info *link_info;
 
 	if (!hdd_ctx) {
 		hdd_err("HDD context is NULL");
@@ -548,18 +548,21 @@ struct hdd_adapter *hdd_get_sta_connection_in_progress(
 
 	hdd_for_each_adapter_dev_held_safe(hdd_ctx, adapter, next_adapter,
 					   dbgid) {
-		hdd_sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter->deflink);
 		if ((QDF_STA_MODE == adapter->device_mode) ||
 		    (QDF_P2P_CLIENT_MODE == adapter->device_mode) ||
 		    (QDF_P2P_DEVICE_MODE == adapter->device_mode)) {
-			if (hdd_cm_is_connecting(adapter->deflink)) {
+			hdd_adapter_for_each_active_link_info(adapter,
+							      link_info) {
+				if (!hdd_cm_is_connecting(link_info))
+					continue;
+
 				hdd_debug("vdev_id %d: Connection is in progress",
-					  adapter->deflink->vdev_id);
+					  link_info->vdev_id);
 				hdd_adapter_dev_put_debug(adapter, dbgid);
 				if (next_adapter)
 					hdd_adapter_dev_put_debug(next_adapter,
 								  dbgid);
-				return adapter;
+				return link_info;
 			}
 		}
 		hdd_adapter_dev_put_debug(adapter, dbgid);
@@ -569,11 +572,11 @@ struct hdd_adapter *hdd_get_sta_connection_in_progress(
 
 void hdd_abort_ongoing_sta_connection(struct hdd_context *hdd_ctx)
 {
-	struct hdd_adapter *sta_adapter;
+	struct wlan_hdd_link_info *link_info;
 
-	sta_adapter = hdd_get_sta_connection_in_progress(hdd_ctx);
-	if (sta_adapter)
-		wlan_hdd_cm_issue_disconnect(sta_adapter,
+	link_info = hdd_get_sta_connection_in_progress(hdd_ctx);
+	if (link_info)
+		wlan_hdd_cm_issue_disconnect(link_info->adapter,
 					     REASON_UNSPEC_FAILURE, false);
 }
 

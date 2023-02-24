@@ -252,10 +252,10 @@ hdd_conn_get_connected_band(struct wlan_hdd_link_info *link_info);
  *                                        is in progress
  * @hdd_ctx: hdd context
  *
- * Return: hdd adapter for which connection is in progress
+ * Return: Link info pointer in adapter for which connection is in progress
  */
-struct hdd_adapter *hdd_get_sta_connection_in_progress(
-			struct hdd_context *hdd_ctx);
+struct wlan_hdd_link_info *
+hdd_get_sta_connection_in_progress(struct hdd_context *hdd_ctx);
 
 /**
  * hdd_abort_ongoing_sta_connection() - Disconnect the sta for which the
