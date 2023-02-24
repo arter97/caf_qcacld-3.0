@@ -3809,7 +3809,7 @@ static int __wlan_hdd_cfg80211_do_acs(struct wiphy *wiphy,
 		return -EINVAL;
 	} else {
 		qdf_atomic_set(&ap_ctx->acs_in_progress, 1);
-		qdf_event_reset(&adapter->acs_complete_event);
+		qdf_event_reset(&adapter->deflink->acs_complete_event);
 	}
 
 	hdd_reg_wait_for_country_change(hdd_ctx);
@@ -4328,7 +4328,7 @@ void wlan_hdd_cfg80211_acs_ch_select_evt(struct hdd_adapter *adapter,
 	uint16_t puncture_bitmap;
 
 	qdf_atomic_set(&adapter->deflink->session.ap.acs_in_progress, 0);
-	qdf_event_set(&adapter->acs_complete_event);
+	qdf_event_set(&adapter->deflink->acs_complete_event);
 
 	sap_cfg = &(WLAN_HDD_GET_AP_CTX_PTR(adapter->deflink))->sap_config;
 	len = hdd_get_acs_evt_data_len(sap_cfg);

@@ -8214,7 +8214,7 @@ struct hdd_adapter *hdd_open_adapter(struct hdd_context *hdd_ctx,
 		  hdd_stop_sap_due_to_invalid_channel);
 	qdf_list_create(&adapter->blocked_scan_request_q, WLAN_MAX_SCAN_COUNT);
 	qdf_mutex_create(&adapter->blocked_scan_request_q_lock);
-	qdf_event_create(&adapter->acs_complete_event);
+	qdf_event_create(&adapter->deflink->acs_complete_event);
 	qdf_event_create(&adapter->peer_cleanup_done);
 	hdd_sta_info_init(&adapter->sta_info_list);
 	hdd_sta_info_init(&adapter->cache_sta_info_list);
@@ -8277,7 +8277,7 @@ static void __hdd_close_adapter(struct hdd_context *hdd_ctx,
 	qdf_list_destroy(&adapter->blocked_scan_request_q);
 	qdf_mutex_destroy(&adapter->blocked_scan_request_q_lock);
 	policy_mgr_clear_concurrency_mode(hdd_ctx->psoc, adapter->device_mode);
-	qdf_event_destroy(&adapter->acs_complete_event);
+	qdf_event_destroy(&adapter->deflink->acs_complete_event);
 	qdf_event_destroy(&adapter->peer_cleanup_done);
 	hdd_adapter_feature_update_work_deinit(adapter);
 	hdd_cleanup_adapter(hdd_ctx, adapter, rtnl_held);
@@ -8717,7 +8717,7 @@ QDF_STATUS hdd_stop_adapter_ext(struct hdd_context *hdd_ctx,
 		if (qdf_atomic_read(&ap_ctx->acs_in_progress)) {
 			hdd_info("ACS in progress, wait for complete");
 			qdf_wait_for_event_completion(
-				&adapter->acs_complete_event,
+				&adapter->deflink->acs_complete_event,
 				ACS_COMPLETE_TIMEOUT);
 		}
 

@@ -1011,6 +1011,7 @@ enum udp_qos_upgrade {
  * @session: union of @ap and @station specific structs
  * @session.station: station mode information
  * @session.ap: ap mode specific information
+ * @acs_complete_event: acs complete event
  * @rssi: The signal strength (dBm)
  * @snr: SNR measured from @rssi
  * @rssi_on_disconnect: Rssi at disconnection time in STA mode
@@ -1030,6 +1031,8 @@ struct wlan_hdd_link_info {
 		struct hdd_station_ctx station;
 		struct hdd_ap_ctx ap;
 	} session;
+
+	qdf_event_t acs_complete_event;
 
 	int8_t rssi;
 	uint8_t snr;
@@ -1090,7 +1093,6 @@ struct wlan_hdd_tx_power {
  * @wapi_info:
  * @sap_stop_bss_work:
  * @ch_switch_in_progress:
- * @acs_complete_event: acs complete event
  * @tsf: structure containing tsf related information
  * @mc_addr_list:
  * @addr_filter_pattern:
@@ -1240,7 +1242,6 @@ struct hdd_adapter {
 	struct work_struct  sap_stop_bss_work;
 
 	qdf_atomic_t ch_switch_in_progress;
-	qdf_event_t acs_complete_event;
 
 #ifdef WLAN_FEATURE_TSF
 	struct hdd_vdev_tsf tsf;
