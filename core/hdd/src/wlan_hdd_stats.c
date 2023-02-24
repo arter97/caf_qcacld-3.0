@@ -7586,7 +7586,7 @@ int wlan_hdd_get_linkspeed_for_peermac(struct hdd_adapter *adapter,
 		hdd_err("SME timed out while retrieving link speed");
 		goto cleanup;
 	}
-	adapter->estimated_linkspeed = linkspeed_info->estLinkSpeed;
+	adapter->deflink->estimated_linkspeed = linkspeed_info->estLinkSpeed;
 
 cleanup:
 	/*
@@ -7597,7 +7597,7 @@ cleanup:
 	osif_request_put(request);
 
 return_cached_value:
-	*linkspeed = adapter->estimated_linkspeed;
+	*linkspeed = adapter->deflink->estimated_linkspeed;
 
 	return ret;
 }

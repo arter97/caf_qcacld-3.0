@@ -1016,6 +1016,7 @@ enum udp_qos_upgrade {
  * @rssi_on_disconnect: Rssi at disconnection time in STA mode
  * @rssi_send: Notify RSSI over lpass
  * @is_mlo_vdev_active: is the mlo vdev currently active
+ * @estimated_linkspeed: estimated link speed
  */
 struct wlan_hdd_link_info {
 	struct hdd_adapter *adapter;
@@ -1036,6 +1037,7 @@ struct wlan_hdd_link_info {
 	bool rssi_send;
 #endif
 	bool is_mlo_vdev_active;
+	uint32_t estimated_linkspeed;
 };
 
 /**
@@ -1074,7 +1076,6 @@ struct wlan_hdd_tx_power {
  * @hdd_stats: HDD statistics
  * @is_ll_stats_req_pending: atomic variable to check active stats req
  * @sta_stats_cached_timestamp: last updated stats timestamp
- * @estimated_linkspeed: estimated link speed
  * @qdf_monitor_mode_vdev_up_event: QDF event for monitor mode vdev up
  * @disconnect_comp_var: completion variable for disconnect callback
  * @linkup_event_var: completion variable for Linkup Event
@@ -1210,8 +1211,6 @@ struct hdd_adapter {
 #ifdef FEATURE_CLUB_LL_STATS_AND_GET_STATION
 	uint32_t sta_stats_cached_timestamp;
 #endif
-
-	uint32_t estimated_linkspeed;
 
 #ifdef FEATURE_MONITOR_MODE_SUPPORT
 	qdf_event_t qdf_monitor_mode_vdev_up_event;
