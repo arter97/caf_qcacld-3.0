@@ -1938,16 +1938,17 @@ hdd_get_connect_fail_reason_code_len(struct hdd_adapter *adapter)
 /**
  * hdd_add_pmf_bcn_protect_stats() - add pmf bcn protect counters in resp
  * @skb: pointer to response skb buffer
- * @adapter: adapter holding valid bcn protect counters
+ * @link_info: Pointer to link_info holding valid bcn protect counters
  *
  * This function adds the pmf bcn stats in response.
  *
  * Return: 0 on success
  */
-static int hdd_add_pmf_bcn_protect_stats(struct sk_buff *skb,
-					 struct hdd_adapter *adapter)
+static int
+hdd_add_pmf_bcn_protect_stats(struct sk_buff *skb,
+			      struct wlan_hdd_link_info *link_info)
 {
-	struct hdd_stats *hdd_stats = &adapter->deflink->hdd_stats;
+	struct hdd_stats *hdd_stats = &link_info->hdd_stats;
 
 	if (!hdd_stats->bcn_protect_stats.pmf_bcn_stats_valid)
 		return 0;
@@ -2474,7 +2475,7 @@ static int hdd_get_station_info_ex(struct hdd_context *hdd_ctx,
 		return -ENOMEM;
 	}
 
-	if (hdd_add_pmf_bcn_protect_stats(skb, adapter)) {
+	if (hdd_add_pmf_bcn_protect_stats(skb, adapter->deflink)) {
 		hdd_err_rl("hdd_add_pmf_bcn_protect_stats fail");
 		wlan_cfg80211_vendor_free_skb(skb);
 		return -EINVAL;
