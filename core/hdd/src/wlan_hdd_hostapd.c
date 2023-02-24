@@ -6994,7 +6994,7 @@ int hdd_destroy_acs_timer(struct hdd_adapter *adapter)
 
 	ap_ctx->vendor_acs_timer_initialized = false;
 
-	clear_bit(VENDOR_ACS_RESPONSE_PENDING, &adapter->event_flags);
+	clear_bit(VENDOR_ACS_RESPONSE_PENDING, &adapter->deflink->link_flags);
 	if (QDF_TIMER_STATE_RUNNING == ap_ctx->vendor_acs_timer.state) {
 		qdf_status = qdf_mc_timer_stop(&ap_ctx->vendor_acs_timer);
 		if (!QDF_IS_STATUS_SUCCESS(qdf_status))

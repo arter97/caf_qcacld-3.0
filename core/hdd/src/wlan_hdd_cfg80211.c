@@ -3056,7 +3056,7 @@ static int hdd_create_acs_timer(struct hdd_adapter *adapter)
 
 	timer_context->adapter = adapter;
 
-	set_bit(VENDOR_ACS_RESPONSE_PENDING, &adapter->event_flags);
+	set_bit(VENDOR_ACS_RESPONSE_PENDING, &adapter->deflink->link_flags);
 	status = qdf_mc_timer_init(
 		  &adapter->deflink->session.ap.vendor_acs_timer,
 		  QDF_TIMER_TYPE_SW,
@@ -16357,9 +16357,11 @@ static int __wlan_hdd_cfg80211_update_vendor_channel(struct wiphy *wiphy,
 		return -EINVAL;
 	}
 
-	if (test_bit(VENDOR_ACS_RESPONSE_PENDING, &adapter->event_flags))
-		clear_bit(VENDOR_ACS_RESPONSE_PENDING, &adapter->event_flags);
-	else {
+	if (test_bit(VENDOR_ACS_RESPONSE_PENDING,
+		     &adapter->deflink->link_flags)) {
+		clear_bit(VENDOR_ACS_RESPONSE_PENDING,
+			  &adapter->deflink->link_flags);
+	} else {
 		hdd_err("already timeout happened for acs");
 		return -EINVAL;
 	}

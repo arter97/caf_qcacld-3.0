@@ -12118,7 +12118,7 @@ int hdd_update_acs_timer_reason(struct hdd_adapter *adapter, uint8_t reason)
 	QDF_STATUS qdf_status;
 	qdf_mc_timer_t *vendor_acs_timer;
 
-	set_bit(VENDOR_ACS_RESPONSE_PENDING, &adapter->event_flags);
+	set_bit(VENDOR_ACS_RESPONSE_PENDING, &adapter->deflink->link_flags);
 
 	vendor_acs_timer = &adapter->deflink->session.ap.vendor_acs_timer;
 	if (QDF_TIMER_STATE_RUNNING ==
@@ -12703,13 +12703,14 @@ void hdd_acs_response_timeout_handler(void *context)
 	if (wlan_hdd_validate_context(hdd_ctx))
 		return;
 
-	if (test_bit(VENDOR_ACS_RESPONSE_PENDING, &adapter->event_flags))
-		clear_bit(VENDOR_ACS_RESPONSE_PENDING, &adapter->event_flags);
-	else
+	if (!test_bit(VENDOR_ACS_RESPONSE_PENDING,
+		      &adapter->deflink->link_flags))
 		return;
 
+	clear_bit(VENDOR_ACS_RESPONSE_PENDING, &adapter->deflink->link_flags);
+
 	hdd_err("ACS timeout happened for %s reason %d",
-				adapter->dev->name, reason);
+		adapter->dev->name, reason);
 
 	sap_context = WLAN_HDD_GET_SAP_CTX_PTR(adapter->deflink);
 	switch (reason) {
