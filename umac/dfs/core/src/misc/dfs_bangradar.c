@@ -138,6 +138,26 @@ dfs_check_bangradar_sanity_for_11be(struct wlan_dfs *dfs,
 }
 
 /**
+ * dfs_is_agile_radar_and_adfs_disabled() - If radar is injected on the agile
+ * channel using agile detector id and if the agile config is disabled, return
+ * true, else return false.
+ *
+ * @dfs: Pointer to struct wlan_dfs
+ * @bgrdr_params: Pointer to struct dfs_bangradar_params
+ */
+static bool
+dfs_is_agile_radar_and_adfs_disabled(struct wlan_dfs *dfs,
+				     struct dfs_bangradar_params *bgrdr_params)
+{
+	if ((dfs_get_agile_detector_id(dfs) == bgrdr_params->detector_id)
+	    && !dfs_is_agile_cac_enabled(dfs)) {
+		dfs_debug(dfs, WLAN_DEBUG_DFS_ALWAYS, "Agile not enabled but radar is injected on agile chan");
+		return true;
+	}
+	return false;
+}
+
+/**
  * dfs_check_bangradar_sanity() - Check the sanity of bangradar
  * @dfs: Pointer to wlan_dfs structure.
  * @bangradar_params: Parameters of the radar to be simulated.
@@ -151,6 +171,9 @@ dfs_check_bangradar_sanity(struct wlan_dfs *dfs,
 			  "bangradar params is NULL");
 		return -EINVAL;
 	}
+
+	if (dfs_is_agile_radar_and_adfs_disabled(dfs, bangradar_params))
+		return -EINVAL;
 
 	if (dfs->dfs_is_radar_found_chan_freq_eq_center_freq) {
 		if (dfs_check_bangradar_sanity_for_11be(dfs,
