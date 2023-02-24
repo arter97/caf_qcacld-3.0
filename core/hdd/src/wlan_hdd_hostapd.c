@@ -3354,7 +3354,7 @@ bool hdd_is_any_sta_connecting(struct hdd_context *hdd_ctx)
 		sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter->deflink);
 		if ((adapter->device_mode == QDF_STA_MODE) ||
 		    (adapter->device_mode == QDF_P2P_CLIENT_MODE)) {
-			if (hdd_cm_is_connecting(adapter)) {
+			if (hdd_cm_is_connecting(adapter->deflink)) {
 				hdd_debug("vdev_id %d: connecting",
 					  adapter->deflink->vdev_id);
 				hdd_adapter_dev_put_debug(adapter, dbgid);

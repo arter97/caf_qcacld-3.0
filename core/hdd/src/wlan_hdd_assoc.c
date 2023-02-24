@@ -552,7 +552,7 @@ struct hdd_adapter *hdd_get_sta_connection_in_progress(
 		if ((QDF_STA_MODE == adapter->device_mode) ||
 		    (QDF_P2P_CLIENT_MODE == adapter->device_mode) ||
 		    (QDF_P2P_DEVICE_MODE == adapter->device_mode)) {
-			if (hdd_cm_is_connecting(adapter)) {
+			if (hdd_cm_is_connecting(adapter->deflink)) {
 				hdd_debug("vdev_id %d: Connection is in progress",
 					  adapter->deflink->vdev_id);
 				hdd_adapter_dev_put_debug(adapter, dbgid);

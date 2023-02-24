@@ -891,7 +891,7 @@ bool hdd_get_interface_info(struct hdd_adapter *adapter,
 		if (hdd_cm_is_disconnected(adapter)) {
 			info->state = WIFI_DISCONNECTED;
 		}
-		if (hdd_cm_is_connecting(adapter)) {
+		if (hdd_cm_is_connecting(adapter->deflink)) {
 			hdd_debug("Session ID %d, Connection is in progress",
 				  adapter->deflink->vdev_id);
 			info->state = WIFI_ASSOCIATING;

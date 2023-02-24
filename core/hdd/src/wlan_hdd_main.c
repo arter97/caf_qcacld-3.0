@@ -19766,10 +19766,10 @@ static QDF_STATUS hdd_is_connection_in_progress_iterator(
 	     adapter->device_mode == QDF_SAP_MODE))
 		return QDF_STATUS_SUCCESS;
 
-	if (((QDF_STA_MODE == adapter->device_mode)
-		|| (QDF_P2P_CLIENT_MODE == adapter->device_mode)
-		|| (QDF_P2P_DEVICE_MODE == adapter->device_mode))
-		&& hdd_cm_is_connecting(adapter)) {
+	if ((QDF_STA_MODE == adapter->device_mode ||
+	     QDF_P2P_CLIENT_MODE == adapter->device_mode ||
+	     QDF_P2P_DEVICE_MODE == adapter->device_mode) &&
+	    hdd_cm_is_connecting(adapter->deflink)) {
 		hdd_debug("%pK(%d) mode %d Connection is in progress",
 			  WLAN_HDD_GET_STATION_CTX_PTR(adapter->deflink),
 			  adapter->deflink->vdev_id, adapter->device_mode);

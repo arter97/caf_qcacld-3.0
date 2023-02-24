@@ -111,13 +111,13 @@ bool hdd_cm_is_vdev_connected(struct wlan_hdd_link_info *link_info)
 	return is_vdev_connected;
 }
 
-bool hdd_cm_is_connecting(struct hdd_adapter *adapter)
+bool hdd_cm_is_connecting(struct wlan_hdd_link_info *link_info)
 {
 	struct wlan_objmgr_vdev *vdev;
 	bool is_vdev_connecting;
 	enum QDF_OPMODE opmode;
 
-	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink, WLAN_OSIF_CM_ID);
+	vdev = hdd_objmgr_get_vdev_by_user(link_info, WLAN_OSIF_CM_ID);
 	if (!vdev)
 		return false;
 
