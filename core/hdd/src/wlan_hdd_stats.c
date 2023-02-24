@@ -6587,24 +6587,29 @@ static int wlan_hdd_get_sta_stats(struct hdd_adapter *adapter,
 	return 0;
 }
 
-static
-struct hdd_adapter *hdd_get_adapter_by_bssid(struct hdd_context *hdd_ctx,
-					     const uint8_t *bssid)
+static struct wlan_hdd_link_info *
+hdd_get_link_info_by_bssid(struct hdd_context *hdd_ctx, const uint8_t *bssid)
 {
 	struct hdd_adapter *adapter, *next_adapter = NULL;
 	struct hdd_station_ctx *sta_ctx;
 	wlan_net_dev_ref_dbgid dbgid = NET_DEV_HOLD_GET_ADAPTER_BY_BSSID;
+	struct wlan_hdd_link_info *link_info;
+
+	if (qdf_is_macaddr_zero((struct qdf_mac_addr *)bssid))
+		return NULL;
 
 	hdd_for_each_adapter_dev_held_safe(hdd_ctx, adapter, next_adapter,
 					   dbgid) {
-		sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter->deflink);
-		if (qdf_is_macaddr_equal(&sta_ctx->conn_info.bssid,
-					 (struct qdf_mac_addr *)bssid)) {
-			hdd_adapter_dev_put_debug(adapter, dbgid);
-			if (next_adapter)
-				hdd_adapter_dev_put_debug(next_adapter,
-							  dbgid);
-			return adapter;
+		hdd_adapter_for_each_active_link_info(adapter, link_info) {
+			sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(link_info);
+			if (qdf_is_macaddr_equal((struct qdf_mac_addr *)bssid,
+						 &sta_ctx->conn_info.bssid)) {
+				hdd_adapter_dev_put_debug(adapter, dbgid);
+				if (next_adapter)
+					hdd_adapter_dev_put_debug(next_adapter,
+								  dbgid);
+				return link_info;
+			}
 		}
 		hdd_adapter_dev_put_debug(adapter, dbgid);
 	}
@@ -6631,6 +6636,7 @@ static int __wlan_hdd_cfg80211_get_station(struct wiphy *wiphy,
 	struct hdd_station_info *stainfo;
 	bool get_peer_info_enable;
 	QDF_STATUS qdf_status;
+	struct wlan_hdd_link_info *link_info = adapter->deflink;
 
 	hdd_enter_dev(dev);
 
@@ -6642,14 +6648,11 @@ static int __wlan_hdd_cfg80211_get_station(struct wiphy *wiphy,
 	if (wlan_hdd_validate_context(hdd_ctx))
 		return -EINVAL;
 
-	if (wlan_hdd_validate_vdev_id(adapter->deflink->vdev_id))
+	if (wlan_hdd_validate_vdev_id(link_info->vdev_id))
 		return -EINVAL;
-	if (!mac) {
-		hdd_err("Received NULL mac address");
-		return -EINVAL;
-	}
-	if (qdf_is_macaddr_zero((struct qdf_mac_addr *)mac)) {
-		hdd_err("MAC is all zero");
+
+	if (!mac || qdf_is_macaddr_zero((struct qdf_mac_addr *)mac)) {
+		hdd_err("Invalid MAC addr");
 		return -EINVAL;
 	}
 
@@ -6678,12 +6681,13 @@ static int __wlan_hdd_cfg80211_get_station(struct wiphy *wiphy,
 		}
 		return wlan_hdd_get_sap_stats(adapter, sinfo);
 	} else {
-		adapter = hdd_get_adapter_by_bssid(hdd_ctx, mac);
-		if (!adapter) {
+		link_info = hdd_get_link_info_by_bssid(hdd_ctx, mac);
+		if (!link_info) {
 			adapter = WLAN_HDD_GET_PRIV_PTR(dev);
+			link_info = adapter->deflink;
 			hdd_err_rl("the bssid is invalid");
 		}
-		return wlan_hdd_get_sta_stats(adapter, mac, sinfo);
+		return wlan_hdd_get_sta_stats(link_info->adapter, mac, sinfo);
 	}
 }
 
