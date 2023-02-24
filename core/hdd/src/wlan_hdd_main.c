@@ -1609,7 +1609,7 @@ hdd_update_feature_cfg_club_get_sta_in_ll_stats_req(
 static void
 hdd_init_get_sta_in_ll_stats_config(struct hdd_adapter *adapter)
 {
-	adapter->hdd_stats.sta_stats_cached_timestamp = 0;
+	adapter->sta_stats_cached_timestamp = 0;
 }
 #else
 static void
@@ -6425,7 +6425,7 @@ hdd_alloc_station_adapter(struct hdd_context *hdd_ctx, tSirMacAddr mac_addr,
 	adapter->start_time = qdf_system_ticks();
 	adapter->last_time = adapter->start_time;
 
-	qdf_atomic_init(&adapter->hdd_stats.is_ll_stats_req_pending);
+	qdf_atomic_init(&adapter->is_ll_stats_req_pending);
 	hdd_init_get_sta_in_ll_stats_config(adapter);
 
 	return adapter;

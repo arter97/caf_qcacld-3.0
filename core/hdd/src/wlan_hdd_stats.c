@@ -375,7 +375,7 @@ static void copy_station_big_data_stats_to_adapter(
 static void
 hdd_update_station_stats_cached_timestamp(struct hdd_adapter *adapter)
 {
-	adapter->hdd_stats.sta_stats_cached_timestamp =
+	adapter->sta_stats_cached_timestamp =
 				qdf_system_ticks_to_msecs(qdf_system_ticks());
 }
 #else
@@ -2057,12 +2057,12 @@ static void wlan_hdd_dealloc_ll_stats(void *priv)
 static QDF_STATUS
 wlan_hdd_set_ll_stats_request_pending(struct hdd_adapter *adapter)
 {
-	if (qdf_atomic_read(&adapter->hdd_stats.is_ll_stats_req_pending)) {
+	if (qdf_atomic_read(&adapter->is_ll_stats_req_pending)) {
 		hdd_nofl_debug("Previous ll_stats request is in progress");
 		return QDF_STATUS_E_ALREADY;
 	}
 
-	qdf_atomic_set(&adapter->hdd_stats.is_ll_stats_req_pending, 1);
+	qdf_atomic_set(&adapter->is_ll_stats_req_pending, 1);
 	return QDF_STATUS_SUCCESS;
 }
 
@@ -2255,7 +2255,7 @@ static QDF_STATUS wlan_hdd_stats_request_needed(struct hdd_adapter *adapter)
 
 		stats_cached_duration =
 				qdf_system_ticks_to_msecs(qdf_system_ticks()) -
-				adapter->hdd_stats.sta_stats_cached_timestamp;
+				adapter->sta_stats_cached_timestamp;
 		if (stats_cached_duration <=
 			adapter->hdd_ctx->config->sta_stats_cache_expiry_time)
 			return QDF_STATUS_E_ALREADY;
@@ -2384,7 +2384,7 @@ static int wlan_hdd_send_ll_stats_req(struct hdd_adapter *adapter,
 	}
 	qdf_list_destroy(&priv->ll_stats_q);
 exit:
-	qdf_atomic_set(&adapter->hdd_stats.is_ll_stats_req_pending, 0);
+	qdf_atomic_set(&adapter->is_ll_stats_req_pending, 0);
 	wlan_hdd_reset_station_stats_request_pending(hdd_ctx->psoc, adapter);
 	hdd_exit();
 	osif_request_put(request);

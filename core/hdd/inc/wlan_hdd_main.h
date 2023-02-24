@@ -592,11 +592,6 @@ struct hdd_stats {
 	struct hdd_peer_stats peer_stats;
 	struct hdd_pmf_stats hdd_pmf_stats;
 	struct pmf_bcn_protect_stats bcn_protect_stats;
-	qdf_atomic_t is_ll_stats_req_pending;
-
-#ifdef FEATURE_CLUB_LL_STATS_AND_GET_STATION
-	uint32_t sta_stats_cached_timestamp;
-#endif
 };
 
 /**
@@ -1077,6 +1072,8 @@ struct wlan_hdd_tx_power {
  * @event_flags: a bitmap of hdd_adapter_flags
  * @active_links: a bitmap of active links in @link_info array
  * @hdd_stats: HDD statistics
+ * @is_ll_stats_req_pending: atomic variable to check active stats req
+ * @sta_stats_cached_timestamp: last updated stats timestamp
  * @estimated_linkspeed: estimated link speed
  * @qdf_monitor_mode_vdev_up_event: QDF event for monitor mode vdev up
  * @disconnect_comp_var: completion variable for disconnect callback
@@ -1208,6 +1205,11 @@ struct hdd_adapter {
 	unsigned long active_links;
 
 	struct hdd_stats hdd_stats;
+	qdf_atomic_t is_ll_stats_req_pending;
+
+#ifdef FEATURE_CLUB_LL_STATS_AND_GET_STATION
+	uint32_t sta_stats_cached_timestamp;
+#endif
 
 	uint32_t estimated_linkspeed;
 
