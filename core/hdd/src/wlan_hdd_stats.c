@@ -6069,17 +6069,17 @@ hdd_wlan_fill_per_chain_rssi_stats(struct station_info *sinfo,
 
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 20, 0)) || \
 	defined(CFG80211_RX_FCS_ERROR_REPORTING_SUPPORT)
-static void hdd_fill_fcs_and_mpdu_count(struct hdd_adapter *adapter,
+static void hdd_fill_fcs_and_mpdu_count(struct wlan_hdd_link_info *link_info,
 					struct station_info *sinfo)
 {
-	sinfo->rx_mpdu_count = adapter->deflink->hdd_stats.peer_stats.rx_count;
-	sinfo->fcs_err_count = adapter->deflink->hdd_stats.peer_stats.fcs_count;
+	sinfo->rx_mpdu_count = link_info->hdd_stats.peer_stats.rx_count;
+	sinfo->fcs_err_count = link_info->hdd_stats.peer_stats.fcs_count;
 	hdd_debug("RX mpdu count %d fcs_err_count %d",
 		  sinfo->rx_mpdu_count, sinfo->fcs_err_count);
 	sinfo->filled |= HDD_INFO_FCS_ERROR_COUNT | HDD_INFO_RX_MPDUS;
 }
 #else
-static void hdd_fill_fcs_and_mpdu_count(struct hdd_adapter *adapter,
+static void hdd_fill_fcs_and_mpdu_count(struct wlan_hdd_link_info *link_info,
 					struct station_info *sinfo)
 {
 }
@@ -6577,7 +6577,7 @@ static int wlan_hdd_get_sta_stats(struct hdd_adapter *adapter,
 		/* Keep GUI happy */
 		return 0;
 
-	hdd_fill_fcs_and_mpdu_count(adapter, sinfo);
+	hdd_fill_fcs_and_mpdu_count(adapter->deflink, sinfo);
 
 	hdd_wlan_fill_per_chain_rssi_stats(sinfo, adapter->deflink);
 
