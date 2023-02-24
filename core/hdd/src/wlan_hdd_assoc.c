@@ -592,7 +592,7 @@ bool hdd_is_any_sta_connected(struct hdd_context *hdd_ctx)
 					   dbgid) {
 		if (QDF_STA_MODE == adapter->device_mode ||
 		    QDF_P2P_CLIENT_MODE == adapter->device_mode) {
-			if (hdd_cm_is_vdev_connected(adapter)) {
+			if (hdd_cm_is_vdev_connected(adapter->deflink)) {
 				hdd_adapter_dev_put_debug(adapter, dbgid);
 				if (next_adapter)
 					hdd_adapter_dev_put_debug(next_adapter,
@@ -621,7 +621,7 @@ QDF_STATUS hdd_get_first_connected_sta_vdev_id(struct hdd_context *hdd_ctx,
 					   dbgid) {
 		if (adapter->device_mode == QDF_STA_MODE ||
 		    adapter->device_mode == QDF_P2P_CLIENT_MODE) {
-			if (hdd_cm_is_vdev_connected(adapter)) {
+			if (hdd_cm_is_vdev_connected(adapter->deflink)) {
 				*vdev_id = adapter->deflink->vdev_id;
 				hdd_adapter_dev_put_debug(adapter, dbgid);
 				if (next_adapter)

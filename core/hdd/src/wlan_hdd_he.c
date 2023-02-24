@@ -663,8 +663,7 @@ static bool hdd_check_mode_support_for_sr(struct hdd_adapter *adapter,
 					  uint8_t sr_ctrl)
 {
 	if ((adapter->device_mode == QDF_STA_MODE) &&
-	    (!hdd_cm_is_vdev_connected(adapter) ||
-	    !sr_ctrl ||
+	    (!hdd_cm_is_vdev_connected(adapter->deflink) || !sr_ctrl ||
 	    ((sr_ctrl & NON_SRG_PD_SR_DISALLOWED) &&
 	    !(sr_ctrl & SRG_INFO_PRESENT)))) {
 		hdd_err("mode %d doesn't supports SR", adapter->device_mode);

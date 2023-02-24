@@ -3963,7 +3963,7 @@ __wlan_hdd_cfg80211_connected_chan_stats_request(struct wiphy *wiphy,
 	enum QDF_OPMODE mode;
 	QDF_STATUS status;
 
-	is_vdev_connected = hdd_cm_is_vdev_connected(adapter);
+	is_vdev_connected = hdd_cm_is_vdev_connected(adapter->deflink);
 	mode = adapter->device_mode;
 
 	if (mode != QDF_STA_MODE || !is_vdev_connected) {

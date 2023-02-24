@@ -972,7 +972,7 @@ static int hdd_get_station_info(struct hdd_context *hdd_ctx,
 
 	hdd_sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter->deflink);
 
-	if (hdd_cm_is_vdev_connected(adapter)) {
+	if (hdd_cm_is_vdev_connected(adapter->deflink)) {
 		hdd_err("Station is connected, command is not supported");
 		return -EINVAL;
 	}

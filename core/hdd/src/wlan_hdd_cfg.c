@@ -2234,7 +2234,7 @@ int hdd_update_channel_width(struct hdd_adapter *adapter,
 	}
 
 	if (ucfg_mlme_is_chwidth_with_notify_supported(hdd_ctx->psoc) &&
-	    hdd_cm_is_vdev_connected(adapter)) {
+	    hdd_cm_is_vdev_connected(adapter->deflink)) {
 		ch_width = hdd_convert_chwidth_to_phy_chwidth(chwidth);
 		hdd_debug("vdev %d : process update ch width request to %d",
 			  adapter->deflink->vdev_id, ch_width);
