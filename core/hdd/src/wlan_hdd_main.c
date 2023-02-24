@@ -3812,20 +3812,25 @@ static bool hdd_is_chan_switch_in_progress(void)
 	struct hdd_context *hdd_ctx = cds_get_context(QDF_MODULE_ID_HDD);
 	wlan_net_dev_ref_dbgid dbgid =
 				NET_DEV_HOLD_IS_CHAN_SWITCH_IN_PROGRESS;
+	struct hdd_ap_ctx *ap_ctx;
 
 	hdd_for_each_adapter_dev_held_safe(hdd_ctx, adapter, next_adapter,
 					   dbgid) {
-		if ((adapter->device_mode == QDF_SAP_MODE ||
-		     adapter->device_mode == QDF_P2P_GO_MODE) &&
-		    qdf_atomic_read(&adapter->ch_switch_in_progress)) {
+		if (!(adapter->device_mode == QDF_SAP_MODE ||
+		      adapter->device_mode == QDF_P2P_GO_MODE))
+			goto next_adapter;
+
+		ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(adapter->deflink);
+		if (qdf_atomic_read(&ap_ctx->ch_switch_in_progress)) {
 			hdd_debug("channel switch progress for vdev_id %d",
 				  adapter->deflink->vdev_id);
 			hdd_adapter_dev_put_debug(adapter, dbgid);
 			if (next_adapter)
-				hdd_adapter_dev_put_debug(next_adapter,
-							  dbgid);
+				hdd_adapter_dev_put_debug(next_adapter, dbgid);
+
 			return true;
 		}
+next_adapter:
 		hdd_adapter_dev_put_debug(adapter, dbgid);
 	}
 

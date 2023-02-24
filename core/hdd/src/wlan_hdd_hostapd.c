@@ -2159,7 +2159,7 @@ QDF_STATUS hdd_hostapd_sap_event_cb(struct sap_event *sap_event,
 		hostapd_state->qdf_status =
 			sap_event->sapevt.sapStartBssCompleteEvent.status;
 
-		qdf_atomic_set(&adapter->ch_switch_in_progress, 0);
+		qdf_atomic_set(&ap_ctx->ch_switch_in_progress, 0);
 		wlansap_get_dfs_ignore_cac(mac_handle, &ignoreCAC);
 		if (!policy_mgr_get_dfs_master_dynamic_enabled(
 				hdd_ctx->psoc, adapter->deflink->vdev_id))
@@ -2394,7 +2394,7 @@ QDF_STATUS hdd_hostapd_sap_event_cb(struct sap_event *sap_event,
 			hdd_debug("Sent CAC start to user space");
 		}
 
-		qdf_atomic_set(&adapter->ch_switch_in_progress, 0);
+		qdf_atomic_set(&ap_ctx->ch_switch_in_progress, 0);
 		hdd_stop_tsf_sync(adapter);
 		break;
 	case eSAP_DFS_CAC_INTERRUPTED:
@@ -3057,7 +3057,7 @@ QDF_STATUS hdd_hostapd_sap_event_cb(struct sap_event *sap_event,
 		 * roaming once channel change process (success/failure)
 		 * is completed
 		 */
-		qdf_atomic_set(&adapter->ch_switch_in_progress, 0);
+		qdf_atomic_set(&ap_ctx->ch_switch_in_progress, 0);
 		policy_mgr_set_chan_switch_complete_evt(hdd_ctx->psoc);
 		wlan_hdd_enable_roaming(adapter,
 					RSO_SAP_CHANNEL_CHANGE);
@@ -3380,6 +3380,7 @@ int hdd_softap_set_channel_change(struct net_device *dev, int target_chan_freq,
 	struct hdd_adapter *sta_adapter;
 	struct hdd_station_ctx *sta_ctx;
 	struct sap_context *sap_ctx;
+	struct hdd_ap_ctx *ap_ctx;
 	uint8_t conc_rule1 = 0;
 	uint8_t  sta_sap_scc_on_dfs_chnl;
 	bool is_p2p_go_session = false;
@@ -3403,6 +3404,8 @@ int hdd_softap_set_channel_change(struct net_device *dev, int target_chan_freq,
 	sap_ctx = WLAN_HDD_GET_SAP_CTX_PTR(adapter->deflink);
 	if (!sap_ctx)
 		return -EINVAL;
+
+	ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(adapter->deflink);
 	/*
 	 * If sta connection is in progress do not allow SAP channel change from
 	 * user space as it may change the HW mode requirement, for which sta is
@@ -3509,7 +3512,7 @@ int hdd_softap_set_channel_change(struct net_device *dev, int target_chan_freq,
 	 * once the channel change is completed and SAP will
 	 * post eSAP_START_BSS_EVENT success event to HDD.
 	 */
-	if (qdf_atomic_inc_return(&adapter->ch_switch_in_progress) > 1) {
+	if (qdf_atomic_inc_return(&ap_ctx->ch_switch_in_progress) > 1) {
 		hdd_err("Channel switch in progress!!");
 		return -EBUSY;
 	}
@@ -3537,7 +3540,7 @@ int hdd_softap_set_channel_change(struct net_device *dev, int target_chan_freq,
 				forced,
 				sap_ctx->csa_reason)) {
 		hdd_err("Channel switch failed due to concurrency check failure");
-		qdf_atomic_set(&adapter->ch_switch_in_progress, 0);
+		qdf_atomic_set(&ap_ctx->ch_switch_in_progress, 0);
 		return -EINVAL;
 	}
 
@@ -3549,7 +3552,7 @@ int hdd_softap_set_channel_change(struct net_device *dev, int target_chan_freq,
 	if (sme_is_any_session_in_middle_of_roaming(hdd_ctx->mac_handle) ||
 	    hdd_is_roaming_in_progress(hdd_ctx)) {
 		hdd_info("Channel switch not allowed as reassoc in progress");
-		qdf_atomic_set(&adapter->ch_switch_in_progress, 0);
+		qdf_atomic_set(&ap_ctx->ch_switch_in_progress, 0);
 		return -EINVAL;
 	}
 	/* Disable Roaming on all adapters before doing channel change */
@@ -3561,7 +3564,7 @@ int hdd_softap_set_channel_change(struct net_device *dev, int target_chan_freq,
 
 	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink, WLAN_OSIF_ID);
 	if (!vdev) {
-		qdf_atomic_set(&adapter->ch_switch_in_progress, 0);
+		qdf_atomic_set(&ap_ctx->ch_switch_in_progress, 0);
 		wlan_hdd_enable_roaming(adapter, RSO_SAP_CHANNEL_CHANGE);
 		return -EINVAL;
 	}
@@ -3590,7 +3593,7 @@ int hdd_softap_set_channel_change(struct net_device *dev, int target_chan_freq,
 		 * radar found flag and also restart the netif
 		 * queues.
 		 */
-		qdf_atomic_set(&adapter->ch_switch_in_progress, 0);
+		qdf_atomic_set(&ap_ctx->ch_switch_in_progress, 0);
 
 		/*
 		 * If Posting of the Channel Change request fails
@@ -4393,15 +4396,18 @@ void hdd_deinit_ap_mode(struct hdd_context *hdd_ctx,
 			struct hdd_adapter *adapter,
 			bool rtnl_held)
 {
+	struct hdd_ap_ctx *ap_ctx;
+
 	hdd_enter_dev(adapter->dev);
 
+	ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(adapter->deflink);
 	if (test_bit(WMM_INIT_DONE, &adapter->event_flags)) {
 		hdd_wmm_adapter_close(adapter);
 		clear_bit(WMM_INIT_DONE, &adapter->event_flags);
 	}
-	qdf_atomic_set(&adapter->deflink->session.ap.acs_in_progress, 0);
-	if (qdf_atomic_read(&adapter->ch_switch_in_progress)) {
-		qdf_atomic_set(&adapter->ch_switch_in_progress, 0);
+	qdf_atomic_set(&ap_ctx->acs_in_progress, 0);
+	if (qdf_atomic_read(&ap_ctx->ch_switch_in_progress)) {
+		qdf_atomic_set(&ap_ctx->ch_switch_in_progress, 0);
 		policy_mgr_set_chan_switch_complete_evt(hdd_ctx->psoc);
 
 		/* Re-enable roaming on all connected STA vdev */
@@ -4487,7 +4493,7 @@ struct hdd_adapter *hdd_wlan_create_ap_dev(struct hdd_context *hdd_ctx,
 	spin_lock_init(&adapter->pause_map_lock);
 	adapter->start_time = adapter->last_time = qdf_system_ticks();
 
-	qdf_atomic_init(&adapter->ch_switch_in_progress);
+	qdf_atomic_init(&adapter->deflink->session.ap.ch_switch_in_progress);
 
 	return adapter;
 }

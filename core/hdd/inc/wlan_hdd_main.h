@@ -807,6 +807,7 @@ struct hdd_fw_txrx_stats {
  * @vendor_acs_timer_initialized: Is @vendor_acs_timer initialized?
  * @bss_stop_reason: Reason why the BSS was stopped
  * @acs_in_progress: In progress acs flag for an adapter
+ * @ch_switch_in_progress: channel change in progress or not
  * @client_count: client count per dot11_mode
  * @country_ie_updated: country ie is updated or not by hdd hostapd
  * @during_auth_offload: auth mgmt frame is offloading to hostapd
@@ -828,6 +829,7 @@ struct hdd_ap_ctx {
 	bool vendor_acs_timer_initialized;
 	enum bss_stop_reason bss_stop_reason;
 	qdf_atomic_t acs_in_progress;
+	qdf_atomic_t ch_switch_in_progress;
 	uint16_t client_count[QCA_WLAN_802_11_MODE_INVALID];
 	bool country_ie_updated;
 	bool during_auth_offload;
@@ -1092,7 +1094,6 @@ struct wlan_hdd_tx_power {
  * @cache_sta_count: number of currently cached stations
  * @wapi_info:
  * @sap_stop_bss_work:
- * @ch_switch_in_progress:
  * @tsf: structure containing tsf related information
  * @mc_addr_list:
  * @addr_filter_pattern:
@@ -1240,8 +1241,6 @@ struct hdd_adapter {
 #endif
 
 	struct work_struct  sap_stop_bss_work;
-
-	qdf_atomic_t ch_switch_in_progress;
 
 #ifdef WLAN_FEATURE_TSF
 	struct hdd_vdev_tsf tsf;
