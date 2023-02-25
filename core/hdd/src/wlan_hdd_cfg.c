@@ -1144,7 +1144,7 @@ hdd_set_nss_params(struct hdd_adapter *adapter,
 	if ((adapter->device_mode == QDF_STA_MODE ||
 	     adapter->device_mode == QDF_P2P_CLIENT_MODE) &&
 	     policy_mgr_is_sta_active_connection_exists(hdd_ctx->psoc))
-		wlan_hdd_tdls_antenna_switch(hdd_ctx, adapter, rx_nss);
+		wlan_hdd_tdls_antenna_switch(adapter->deflink, rx_nss);
 
 	return QDF_STATUS_SUCCESS;
 }

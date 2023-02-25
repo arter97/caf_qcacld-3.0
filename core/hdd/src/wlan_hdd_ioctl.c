@@ -5912,7 +5912,7 @@ int hdd_set_antenna_mode(struct hdd_adapter *adapter,
 	/* Check TDLS status and update antenna mode */
 	if ((QDF_STA_MODE == adapter->device_mode) &&
 	    policy_mgr_is_sta_active_connection_exists(hdd_ctx->psoc)) {
-		ret = wlan_hdd_tdls_antenna_switch(hdd_ctx, adapter, mode);
+		ret = wlan_hdd_tdls_antenna_switch(adapter->deflink, mode);
 		if (0 != ret)
 			goto exit;
 	}

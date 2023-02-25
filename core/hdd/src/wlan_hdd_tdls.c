@@ -1004,26 +1004,16 @@ int hdd_set_tdls_scan_type(struct hdd_context *hdd_ctx, int val)
 	return 0;
 }
 
-/**
- * wlan_hdd_tdls_antenna_switch() - Dynamic TDLS antenna  switch 1x1 <-> 2x2
- * antenna mode in standalone station
- * @hdd_ctx: Pointer to hdd context
- * @adapter: Pointer to hdd adapter
- * @mode: enum antenna_mode
- *
- * Return: 0 if success else non zero
- */
-int wlan_hdd_tdls_antenna_switch(struct hdd_context *hdd_ctx,
-				 struct hdd_adapter *adapter,
+int wlan_hdd_tdls_antenna_switch(struct wlan_hdd_link_info *link_info,
 				 uint32_t mode)
 {
 	int ret;
 	struct wlan_objmgr_vdev *vdev;
 
-	if (!hdd_ctx->tdls_umac_comp_active)
+	if (!link_info->adapter->hdd_ctx->tdls_umac_comp_active)
 		return 0;
 
-	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink, WLAN_OSIF_TDLS_ID);
+	vdev = hdd_objmgr_get_vdev_by_user(link_info, WLAN_OSIF_TDLS_ID);
 	if (!vdev)
 		return -EINVAL;
 
