@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2017-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -182,6 +182,7 @@ g_dbr_ring_debug_event[DBR_RING_DEBUG_EVENT_MAX][RING_DEBUG_EVENT_NAME_SIZE] = {
  * @print_priv: The private data to be consumed by @print
  * @dbr_pdev_obj: Pdev object of the DBR module
  * @mod_id: Module ID
+ * @srng_id: ring id
  *
  * Print ring debug entries of the ring identified by @dbr_pdev_obj and @mod_id
  * using the  given print adapter function
@@ -227,7 +228,7 @@ static QDF_STATUS target_if_dbr_print_ring_debug_entries(
 
 /**
  * target_if_dbr_qdf_err_printer() - QDF error level printer for DBR module
- * @print_priv: The private data
+ * @priv: The private data
  * @fmt: Format string
  *
  * This function should be passed in place of the 'print' argument to
@@ -2013,6 +2014,7 @@ dbr_get_pdev_and_srng_id(struct wlan_objmgr_psoc *psoc, uint8_t pdev_id,
  * @pdev: pointer to pdev object
  * @mod_id: Module ID
  * @event: ring debug event
+ * @srng_id: ring id
  *
  * Log the given event, head and tail pointers of DBR ring of the given module
  * into its ring debug data structure.

@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2018, 2020 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021, 2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -46,6 +46,8 @@ target_if_ipa_uc_offload_control_req(struct wlan_objmgr_psoc *psoc,
 }
 
 /**
+ * target_if_ipa_intrabss_control_req() - Send IPA intra-BSS control request
+ * @psoc: psoc object
  * @req: IPA intra bss enable/disable control param
  *
  * Return: QDF_STATUS_SUCCESS on success
