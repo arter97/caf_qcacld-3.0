@@ -39,7 +39,7 @@
 #endif
 
 /**
- * get_chan_list_cc_event_id() - Get chan_list_cc event i
+ * get_chan_list_cc_event_id() - Get chan_list_cc event id
  *
  * Return: Event id
  */
@@ -79,7 +79,7 @@ static bool tgt_if_regulatory_is_regdb_offloaded(struct wlan_objmgr_psoc *psoc)
 }
 
 /**
- * tgt_if_regulatory_is_6ghz_supported() - Check if 6ghz is supported
+ * tgt_if_regulatory_is_6ghz_supported() - Check if 6 GHz is supported
  * @psoc: Pointer to psoc
  *
  * Return: true if regdb if offloaded, else false
@@ -95,10 +95,10 @@ static bool tgt_if_regulatory_is_6ghz_supported(struct wlan_objmgr_psoc *psoc)
 }
 
 /**
- * tgt_if_regulatory_is_5dot9_ghz_supported() - Check if 5.9ghz is supported
+ * tgt_if_regulatory_is_5dot9_ghz_supported() - Check if 5.9 GHz is supported
  * @psoc: Pointer to psoc
  *
- * Return: true if regdb if offloaded, else false
+ * Return: true if 5.9 GHz is supported, else false
  */
 static bool
 tgt_if_regulatory_is_5dot9_ghz_supported(struct wlan_objmgr_psoc *psoc)
@@ -363,7 +363,7 @@ static QDF_STATUS tgt_if_regulatory_unregister_master_list_handler(
 #ifdef CONFIG_BAND_6GHZ
 #ifdef CONFIG_REG_CLIENT
 /**
- * tgt_mem_free_fcc_rules() - Free regulatory fcc rules
+ * tgt_reg_mem_free_fcc_rules() - Free regulatory fcc rules
  * @reg_info: Pointer to regulatory info
  *
  */
@@ -1044,8 +1044,8 @@ void tgt_if_set_reg_afc_configure(struct target_psoc_info *tgt_hdl,
 
 #if defined(CONFIG_BAND_6GHZ)
 /**
- * tgt_if_regulatory_is_lower_6g_edge_ch_supp() - Check if lower 6ghz
- * edge channel (5935MHz) is supported
+ * tgt_if_regulatory_is_lower_6g_edge_ch_supp() - Check if lower 6 GHz
+ * edge channel (5935 MHz) is supported
  * @psoc: Pointer to psoc
  *
  * Return: true if channel is supported, else false
@@ -1064,7 +1064,7 @@ tgt_if_regulatory_is_lower_6g_edge_ch_supp(struct wlan_objmgr_psoc *psoc)
 
 /**
  * tgt_if_regulatory_is_upper_6g_edge_ch_disabled() - Check if upper
- * 6ghz edge channel (7115MHz) is disabled
+ * 6 GHz edge channel (7115 MHz) is disabled
  * @psoc: Pointer to psoc
  *
  * Return: true if channel is disabled, else false
@@ -1182,9 +1182,8 @@ target_if_reg_get_afc_dev_type(struct wlan_objmgr_psoc *psoc,
 }
 
 /**
- * tgt_if_regulatory_is_eirp_preferred_support() - Check if FW prefers EIRP
+ * target_if_regulatory_is_eirp_preferred_support() - Check if FW prefers EIRP
  * support for TPC power command.
- *
  * @psoc: Pointer to psoc
  *
  * Return: true if FW prefers EIRP format for TPC, else false
