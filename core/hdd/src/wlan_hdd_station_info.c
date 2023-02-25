@@ -160,19 +160,19 @@ hdd_get_sta_policy[QCA_WLAN_VENDOR_ATTR_GET_STA_INFO_MAX + 1] = {
 						   .len = QDF_MAC_ADDR_SIZE},
 };
 
-static int hdd_get_sta_congestion(struct hdd_adapter *adapter,
+static int hdd_get_sta_congestion(struct wlan_hdd_link_info *link_info,
 				  uint32_t *congestion)
 {
 	QDF_STATUS status;
 	struct cca_stats cca_stats;
 	struct wlan_objmgr_vdev *vdev;
 
-	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink,
-					   WLAN_OSIF_STATS_ID);
+	vdev = hdd_objmgr_get_vdev_by_user(link_info, WLAN_OSIF_STATS_ID);
 	if (!vdev) {
 		hdd_err("vdev is NULL");
 		return -EINVAL;
 	}
+
 	status = ucfg_mc_cp_stats_cca_stats_get(vdev, &cca_stats);
 	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_STATS_ID);
 	if (QDF_IS_STATUS_ERROR(status))
@@ -217,7 +217,7 @@ static int hdd_get_station_assoc_fail(struct hdd_context *hdd_ctx,
 		goto fail;
 	}
 
-	if (hdd_get_sta_congestion(adapter, &congestion))
+	if (hdd_get_sta_congestion(adapter->deflink, &congestion))
 		congestion = 0;
 
 	hdd_info("congestion:%d", congestion);
