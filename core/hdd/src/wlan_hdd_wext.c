@@ -2983,8 +2983,7 @@ static int __iw_get_linkspeed(struct net_device *dev,
 	int len = sizeof(uint32_t) + 1;
 	uint32_t link_speed = 0;
 	struct hdd_context *hdd_ctx;
-	int ret;
-	int rc;
+	int ret, rc;
 
 	hdd_enter_dev(dev);
 
@@ -2997,7 +2996,7 @@ static int __iw_get_linkspeed(struct net_device *dev,
 	if (0 != ret)
 		return ret;
 
-	ret = wlan_hdd_get_link_speed(adapter, &link_speed);
+	ret = wlan_hdd_get_link_speed(adapter->deflink, &link_speed);
 	if (0 != ret)
 		return ret;
 

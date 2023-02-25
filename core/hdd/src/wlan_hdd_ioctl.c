@@ -5491,7 +5491,7 @@ static int drv_cmd_get_linkspeed(struct hdd_adapter *adapter,
 	char extra[32];
 	uint8_t len = 0;
 
-	ret = wlan_hdd_get_link_speed(adapter, &link_speed);
+	ret = wlan_hdd_get_link_speed(adapter->deflink, &link_speed);
 	if (0 != ret)
 		return ret;
 

@@ -487,7 +487,7 @@ int wlan_hdd_get_linkspeed_for_peermac(struct hdd_adapter *adapter,
 
 /**
  * wlan_hdd_get_link_speed() - get link speed
- * @adapter:     pointer to the adapter
+ * @link_info: Link info pointer in HDD adapter
  * @link_speed:   pointer to link speed
  *
  * This function fetches per bssid link speed.
@@ -496,7 +496,8 @@ int wlan_hdd_get_linkspeed_for_peermac(struct hdd_adapter *adapter,
  *         if not associated, link speed of 0 is returned.
  *         On error, error number will be returned.
  */
-int wlan_hdd_get_link_speed(struct hdd_adapter *adapter, uint32_t *link_speed);
+int wlan_hdd_get_link_speed(struct wlan_hdd_link_info *link_info,
+			    uint32_t *link_speed);
 
 #ifdef FEATURE_RX_LINKSPEED_ROAM_TRIGGER
 /**

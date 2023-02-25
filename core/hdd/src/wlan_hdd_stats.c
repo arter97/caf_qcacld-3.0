@@ -7603,17 +7603,19 @@ return_cached_value:
 	return ret;
 }
 
-int wlan_hdd_get_link_speed(struct hdd_adapter *adapter, uint32_t *link_speed)
+int wlan_hdd_get_link_speed(struct wlan_hdd_link_info *link_info,
+			    uint32_t *link_speed)
 {
+	struct hdd_adapter *adapter =  link_info->adapter;
 	struct hdd_context *hddctx = WLAN_HDD_GET_CTX(adapter);
-	struct hdd_station_ctx *hdd_stactx =
-				WLAN_HDD_GET_STATION_CTX_PTR(adapter->deflink);
+	struct hdd_station_ctx *hdd_stactx;
 	int ret;
 
 	ret = wlan_hdd_validate_context(hddctx);
 	if (ret)
 		return ret;
 
+	hdd_stactx = WLAN_HDD_GET_STATION_CTX_PTR(link_info);
 	/* Linkspeed is allowed for CLIENT/STA mode */
 	if (adapter->device_mode != QDF_P2P_CLIENT_MODE &&
 	    adapter->device_mode != QDF_STA_MODE) {
@@ -7623,7 +7625,7 @@ int wlan_hdd_get_link_speed(struct hdd_adapter *adapter, uint32_t *link_speed)
 		return -ENOTSUPP;
 	}
 
-	if (!hdd_cm_is_vdev_associated(adapter->deflink)) {
+	if (!hdd_cm_is_vdev_associated(link_info)) {
 		/* we are not connected so we don't have a classAstats */
 		*link_speed = 0;
 	} else {
