@@ -913,7 +913,7 @@ static __iw_softap_setparam(struct net_device *dev,
 		ret = wma_cli_set_command(link_info->vdev_id,
 					  wmi_pdev_param_tx_chain_mask,
 					  set_value, PDEV_CMD);
-		ret = hdd_set_antenna_mode(adapter, hdd_ctx, set_value);
+		ret = hdd_set_antenna_mode(link_info, set_value);
 		break;
 	}
 
@@ -923,14 +923,14 @@ static __iw_softap_setparam(struct net_device *dev,
 		ret = wma_cli_set_command(link_info->vdev_id,
 					  wmi_pdev_param_rx_chain_mask,
 					  set_value, PDEV_CMD);
-		ret = hdd_set_antenna_mode(adapter, hdd_ctx, set_value);
+		ret = hdd_set_antenna_mode(link_info, set_value);
 		break;
 	}
 
 	case QCASAP_NSS_CMD:
 	{
 		hdd_debug("QCASAP_NSS_CMD val %d", set_value);
-		hdd_update_nss(adapter, set_value, set_value);
+		hdd_update_nss(link_info, set_value, set_value);
 		ret = wma_cli_set_command(link_info->vdev_id,
 					  wmi_vdev_param_nss,
 					  set_value, VDEV_CMD);

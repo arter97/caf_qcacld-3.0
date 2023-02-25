@@ -1189,9 +1189,10 @@ static void hdd_set_sap_nss_params(struct hdd_context *hdd_ctx,
 	hdd_restart_sap(adapter);
 }
 
-QDF_STATUS hdd_update_nss(struct hdd_adapter *adapter, uint8_t tx_nss,
-			  uint8_t rx_nss)
+QDF_STATUS hdd_update_nss(struct wlan_hdd_link_info *link_info,
+			  uint8_t tx_nss, uint8_t rx_nss)
 {
+	struct hdd_adapter *adapter = link_info->adapter;
 	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
 	uint32_t rx_supp_data_rate, tx_supp_data_rate;
 	bool status = true;
@@ -1202,8 +1203,7 @@ QDF_STATUS hdd_update_nss(struct hdd_adapter *adapter, uint8_t tx_nss,
 	uint8_t mcs_set_temp[SIZE_OF_SUPPORTED_MCS_SET];
 	uint8_t enable2x2;
 	mac_handle_t mac_handle;
-	bool bval = 0;
-	bool restart_sap = 0;
+	bool bval = 0, restart_sap = 0;
 
 	if ((tx_nss == 2 || rx_nss == 2) && (hdd_ctx->num_rf_chains != 2)) {
 		hdd_err("No support for 2 spatial streams");
@@ -1251,7 +1251,7 @@ QDF_STATUS hdd_update_nss(struct hdd_adapter *adapter, uint8_t tx_nss,
 			return QDF_STATUS_E_FAILURE;
 		}
 
-		if (hdd_is_vdev_in_conn_state(adapter->deflink))
+		if (hdd_is_vdev_in_conn_state(link_info))
 			return hdd_set_nss_params(adapter, tx_nss, rx_nss);
 
 		if (tx_nss != rx_nss) {
@@ -1261,15 +1261,14 @@ QDF_STATUS hdd_update_nss(struct hdd_adapter *adapter, uint8_t tx_nss,
 		}
 
 		hdd_debug("Vdev %d in disconnect state, changing ini nss params",
-			  adapter->deflink->vdev_id);
-
+			  link_info->vdev_id);
 		if (!bval) {
 			hdd_err("Nss in 1x1, no change required, 2x2 mode disabled");
 			return QDF_STATUS_SUCCESS;
 		}
 
 		hdd_update_nss_in_vdev(adapter, mac_handle, tx_nss, rx_nss);
-		sme_set_nss_capability(mac_handle, adapter->deflink->vdev_id,
+		sme_set_nss_capability(mac_handle, link_info->vdev_id,
 				       rx_nss, adapter->device_mode);
 
 		return QDF_STATUS_SUCCESS;
@@ -1379,7 +1378,7 @@ skip_ht_cap_update:
 		status = false;
 		hdd_err("Could not get MCS SET from CFG");
 	}
-	sme_set_nss_capability(mac_handle, adapter->deflink->vdev_id,
+	sme_set_nss_capability(mac_handle, link_info->vdev_id,
 			       rx_nss, adapter->device_mode);
 #undef WLAN_HDD_RX_MCS_ALL_NSTREAM_RATES
 

@@ -78,12 +78,10 @@ QDF_STATUS hdd_update_smps_antenna_mode(struct hdd_context *hdd_ctx, int mode);
 
 /**
  * hdd_set_antenna_mode() - SET ANTENNA MODE command handler
- * @adapter: Pointer to network adapter
- * @hdd_ctx: Pointer to hdd context
+ * @link_info: Link info pointer in HDD adapter
  * @mode: new antenna mode
  */
-int hdd_set_antenna_mode(struct hdd_adapter *adapter,
-			  struct hdd_context *hdd_ctx, int mode);
+int hdd_set_antenna_mode(struct wlan_hdd_link_info *link_info, int mode);
 
 #ifdef WLAN_FEATURE_ROAM_OFFLOAD
 /**

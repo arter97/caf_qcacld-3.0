@@ -5856,9 +5856,10 @@ wlan_hdd_soc_set_antenna_mode_cb(enum set_antenna_mode_status status,
 	osif_request_put(request);
 }
 
-int hdd_set_antenna_mode(struct hdd_adapter *adapter,
-				  struct hdd_context *hdd_ctx, int mode)
+int hdd_set_antenna_mode(struct wlan_hdd_link_info *link_info, int mode)
 {
+	struct hdd_adapter *adapter =  link_info->adapter;
+	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
 	struct sir_antenna_mode_param params;
 	QDF_STATUS status;
 	int ret = 0;
@@ -5884,7 +5885,7 @@ int hdd_set_antenna_mode(struct hdd_adapter *adapter,
 	}
 
 	if (hdd_ctx->dynamic_nss_chains_support)
-		return hdd_set_dynamic_antenna_mode(adapter,
+		return hdd_set_dynamic_antenna_mode(link_info,
 						    params.num_rx_chains,
 						    params.num_tx_chains);
 
@@ -5904,7 +5905,7 @@ int hdd_set_antenna_mode(struct hdd_adapter *adapter,
 	/* Check TDLS status and update antenna mode */
 	if ((QDF_STA_MODE == adapter->device_mode) &&
 	    policy_mgr_is_sta_active_connection_exists(hdd_ctx->psoc)) {
-		ret = wlan_hdd_tdls_antenna_switch(adapter->deflink, mode);
+		ret = wlan_hdd_tdls_antenna_switch(link_info, mode);
 		if (0 != ret)
 			goto exit;
 	}
@@ -5975,7 +5976,7 @@ static int drv_cmd_set_antenna_mode(struct wlan_hdd_link_info *link_info,
 
 	hdd_debug("Processing antenna mode switch to: %d", mode);
 
-	return hdd_set_antenna_mode(link_info->adapter, hdd_ctx, mode);
+	return hdd_set_antenna_mode(link_info, mode);
 }
 
 /**

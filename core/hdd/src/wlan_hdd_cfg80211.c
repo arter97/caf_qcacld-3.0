@@ -8984,15 +8984,14 @@ hdd_populate_vdev_chains(struct wlan_mlme_nss_chains *nss_chains_cfg,
 }
 
 int
-hdd_set_dynamic_antenna_mode(struct hdd_adapter *adapter,
-			     uint8_t num_rx_chains,
-			     uint8_t num_tx_chains)
+hdd_set_dynamic_antenna_mode(struct wlan_hdd_link_info *link_info,
+			     uint8_t num_rx_chains, uint8_t num_tx_chains)
 {
 	enum nss_chains_band_info band;
 	struct wlan_mlme_nss_chains user_cfg;
 	QDF_STATUS status;
 	mac_handle_t mac_handle;
-	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
+	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(link_info->adapter);
 	struct wlan_objmgr_vdev *vdev;
 	int ret;
 
@@ -9006,13 +9005,13 @@ hdd_set_dynamic_antenna_mode(struct hdd_adapter *adapter,
 		return -EINVAL;
 	}
 
-	if (!hdd_is_vdev_in_conn_state(adapter->deflink)) {
+	if (!hdd_is_vdev_in_conn_state(link_info)) {
 		hdd_debug("Vdev (id %d) not in connected/started state, cannot accept command",
-			  adapter->deflink->vdev_id);
+			  link_info->vdev_id);
 		return -EINVAL;
 	}
 
-	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink, WLAN_OSIF_ID);
+	vdev = hdd_objmgr_get_vdev_by_user(link_info, WLAN_OSIF_ID);
 	if (!vdev) {
 		hdd_err("vdev is NULL");
 		return -EINVAL;
@@ -9032,7 +9031,7 @@ hdd_set_dynamic_antenna_mode(struct hdd_adapter *adapter,
 
 	status = sme_nss_chains_update(mac_handle,
 				       &user_cfg,
-				       adapter->deflink->vdev_id);
+				       link_info->vdev_id);
 	if (QDF_IS_STATUS_ERROR(status))
 		return -EINVAL;
 
@@ -9064,8 +9063,8 @@ static int hdd_config_vdev_chains(struct wlan_hdd_link_info *link_info,
 	rx_chains = nla_get_u8(rx_attr);
 
 	if (hdd_ctx->dynamic_nss_chains_support)
-		return hdd_set_dynamic_antenna_mode(adapter, rx_chains,
-						    tx_chains);
+		return hdd_set_dynamic_antenna_mode(link_info,
+						    rx_chains, tx_chains);
 	return 0;
 }
 
@@ -9100,7 +9099,7 @@ static int hdd_config_tx_rx_nss(struct wlan_hdd_link_info *link_info,
 			rx_nss);
 		return -EINVAL;
 	}
-	status = hdd_update_nss(link_info->adapter, tx_nss, rx_nss);
+	status = hdd_update_nss(link_info, tx_nss, rx_nss);
 	if (status != QDF_STATUS_SUCCESS) {
 		hdd_debug("Can't set tx_nss %d rx_nss %d", tx_nss, rx_nss);
 		return -EINVAL;
@@ -10594,13 +10593,12 @@ static int hdd_set_nss(struct wlan_hdd_link_info *link_info,
 	uint8_t nss;
 	int ret;
 	QDF_STATUS status;
-	struct hdd_adapter *adapter = link_info->adapter;
 
 	nss = nla_get_u8(attr);
-	status = hdd_update_nss(adapter, nss, nss);
+	status = hdd_update_nss(link_info, nss, nss);
 	ret = qdf_status_to_os_return(status);
 
-	if (ret == 0 && adapter->device_mode == QDF_SAP_MODE)
+	if (ret == 0 && link_info->adapter->device_mode == QDF_SAP_MODE)
 		ret = wma_cli_set_command(link_info->vdev_id,
 					  wmi_vdev_param_nss, nss, VDEV_CMD);
 

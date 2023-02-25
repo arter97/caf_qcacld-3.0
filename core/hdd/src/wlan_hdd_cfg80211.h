@@ -790,7 +790,7 @@ QDF_STATUS wlan_hdd_send_sta_authorized_event(
 
 /**
  * hdd_set_dynamic_antenna_mode() - set dynamic antenna mode
- * @adapter: Pointer to network adapter
+ * @link_info: Link info pointer in HDD adapter
  * @num_rx_chains: number of chains to be used for receiving data
  * @num_tx_chains: number of chains to be used for transmitting data
  *
@@ -798,9 +798,8 @@ QDF_STATUS wlan_hdd_send_sta_authorized_event(
  *
  * Return: 0 for success
  */
-int hdd_set_dynamic_antenna_mode(struct hdd_adapter *adapter,
-				 uint8_t num_rx_chains,
-				 uint8_t num_tx_chains);
+int hdd_set_dynamic_antenna_mode(struct wlan_hdd_link_info *link_info,
+				 uint8_t num_rx_chains, uint8_t num_tx_chains);
 
 #ifdef MULTI_CLIENT_LL_SUPPORT
 /**

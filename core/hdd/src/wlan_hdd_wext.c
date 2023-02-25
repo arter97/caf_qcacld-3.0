@@ -3692,7 +3692,7 @@ static int hdd_we_set_nss(struct wlan_hdd_link_info *link_info, int nss)
 		return -EINVAL;
 	}
 
-	status = hdd_update_nss(link_info->adapter, nss, nss);
+	status = hdd_update_nss(link_info, nss, nss);
 	if (QDF_IS_STATUS_ERROR(status))
 		hdd_err("cfg set failed, value %d status %d", nss, status);
 
@@ -4237,30 +4237,28 @@ static int hdd_we_set_tx_chainmask(struct wlan_hdd_link_info *link_info,
 				   int value)
 {
 	int errno;
-	struct hdd_adapter *adapter = link_info->adapter;
 
-	errno = hdd_we_set_pdev(adapter,
+	errno = hdd_we_set_pdev(link_info->adapter,
 				wmi_pdev_param_tx_chain_mask,
 				value);
 	if (errno)
 		return errno;
 
-	return hdd_set_antenna_mode(adapter, adapter->hdd_ctx, value);
+	return hdd_set_antenna_mode(link_info, value);
 }
 
 static int hdd_we_set_rx_chainmask(struct wlan_hdd_link_info *link_info,
 				   int value)
 {
 	int errno;
-	struct hdd_adapter *adapter = link_info->adapter;
 
-	errno = hdd_we_set_pdev(adapter,
+	errno = hdd_we_set_pdev(link_info->adapter,
 				wmi_pdev_param_rx_chain_mask,
 				value);
 	if (errno)
 		return errno;
 
-	return hdd_set_antenna_mode(adapter, adapter->hdd_ctx, value);
+	return hdd_set_antenna_mode(link_info, value);
 }
 
 static int hdd_we_set_txpow_2g(struct wlan_hdd_link_info *link_info,

@@ -255,8 +255,7 @@ void hdd_cfg_print_global_config(struct hdd_context *hdd_ctx);
 
 /**
  * hdd_update_nss() - Update the number of spatial streams supported.
- *
- * @adapter: the pointer to adapter
+ * @link_info: Link info pointer in HDD adapter
  * @tx_nss: the number of Tx spatial streams to be updated
  * @rx_nss: the number of Rx spatial streams to be updated
  *
@@ -266,8 +265,8 @@ void hdd_cfg_print_global_config(struct hdd_context *hdd_ctx);
  * Return: QDF_STATUS_SUCCESS if nss is correctly updated,
  *              otherwise QDF_STATUS_E_FAILURE would be returned
  */
-QDF_STATUS hdd_update_nss(struct hdd_adapter *adapter, uint8_t tx_nss,
-			  uint8_t rx_nss);
+QDF_STATUS hdd_update_nss(struct wlan_hdd_link_info *link_info,
+			  uint8_t tx_nss, uint8_t rx_nss);
 
 /**
  * hdd_get_nss() - Get the number of spatial streams supported by the adapter
