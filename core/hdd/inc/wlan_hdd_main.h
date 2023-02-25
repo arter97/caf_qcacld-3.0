@@ -4938,12 +4938,12 @@ uint8_t *hdd_ch_width_str(enum phy_ch_width ch_width);
 
 /**
  * hdd_we_set_ch_width - Function to update channel width
- * @adapter: hdd_adapter pointer
+ * @link_info: Link info pointer in HDD adapter.
  * @ch_width: enum eSirMacHTChannelWidth
  *
  * Return: 0 for success otherwise failure
  */
-int hdd_we_set_ch_width(struct hdd_adapter *adapter, int ch_width);
+int hdd_we_set_ch_width(struct wlan_hdd_link_info *link_info, int ch_width);
 
 /**
  * hdd_stop_adapter_ext: close/delete the vdev session in host/fw.

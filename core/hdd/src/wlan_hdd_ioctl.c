@@ -2495,10 +2495,11 @@ static int hdd_parse_get_cckm_ie(uint8_t *command, uint8_t **cckm_ie,
 }
 #endif /* FEATURE_WLAN_ESE */
 
-int wlan_hdd_set_mc_rate(struct hdd_adapter *adapter, int target_rate)
+int wlan_hdd_set_mc_rate(struct wlan_hdd_link_info *link_info, int target_rate)
 {
 	tSirRateUpdateInd rate_update = {0};
 	QDF_STATUS status;
+	struct hdd_adapter *adapter = link_info->adapter;
 	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
 	bool bval = false;
 
@@ -5065,7 +5066,7 @@ static int drv_cmd_set_mc_rate(struct wlan_hdd_link_info *link_info,
 	/* Convert the value from ascii to integer, decimal base */
 	ret = kstrtouint(value, 10, &target_rate);
 
-	ret = wlan_hdd_set_mc_rate(link_info->adapter, target_rate);
+	ret = wlan_hdd_set_mc_rate(link_info, target_rate);
 	return ret;
 }
 

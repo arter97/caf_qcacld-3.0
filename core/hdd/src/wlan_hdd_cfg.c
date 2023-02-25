@@ -2016,12 +2016,12 @@ int hdd_get_ldpc(struct hdd_adapter *adapter, int *value)
 	return ret;
 }
 
-int hdd_set_ldpc(struct hdd_adapter *adapter, int value)
+int hdd_set_ldpc(struct wlan_hdd_link_info *link_info, int value)
 {
-	mac_handle_t mac_handle = adapter->hdd_ctx->mac_handle;
+	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(link_info->adapter);
+	mac_handle_t mac_handle = hdd_ctx->mac_handle;
 	int ret;
 	QDF_STATUS status;
-	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
 	struct mlme_ht_capabilities_info ht_cap_info;
 
 	hdd_debug("%d", value);
@@ -2048,16 +2048,15 @@ int hdd_set_ldpc(struct hdd_adapter *adapter, int value)
 		hdd_err("Failed to set VHT LDPC capability info");
 		return -EIO;
 	}
-	ret = sme_update_ht_config(mac_handle, adapter->deflink->vdev_id,
-				   WNI_CFG_HT_CAP_INFO_ADVANCE_CODING,
-				   value);
+	ret = sme_update_ht_config(mac_handle, link_info->vdev_id,
+				   WNI_CFG_HT_CAP_INFO_ADVANCE_CODING, value);
 	if (ret)
 		hdd_err("Failed to set LDPC value");
 	ret = sme_update_he_ldpc_supp(mac_handle,
-				      adapter->deflink->vdev_id, value);
+				      link_info->vdev_id, value);
 	if (ret)
 		hdd_err("Failed to set HE LDPC value");
-	ret = sme_set_auto_rate_ldpc(mac_handle, adapter->deflink->vdev_id,
+	ret = sme_set_auto_rate_ldpc(mac_handle, link_info->vdev_id,
 				     (value ? 0 : 1));
 
 	return ret;
@@ -2081,10 +2080,10 @@ int hdd_get_tx_stbc(struct hdd_adapter *adapter, int *value)
 	return ret;
 }
 
-int hdd_set_tx_stbc(struct hdd_adapter *adapter, int value)
+int hdd_set_tx_stbc(struct wlan_hdd_link_info *link_info, int value)
 {
-	mac_handle_t mac_handle = adapter->hdd_ctx->mac_handle;
-	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
+	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(link_info->adapter);
+	mac_handle_t mac_handle = hdd_ctx->mac_handle;
 	int ret;
 	QDF_STATUS status;
 	struct mlme_ht_capabilities_info ht_cap_info;
@@ -2109,13 +2108,13 @@ int hdd_set_tx_stbc(struct hdd_adapter *adapter, int value)
 			return -EINVAL;
 		}
 	}
-	ret = sme_update_ht_config(mac_handle, adapter->deflink->vdev_id,
+	ret = sme_update_ht_config(mac_handle, link_info->vdev_id,
 				   WNI_CFG_HT_CAP_INFO_TX_STBC,
 				   value);
 	if (ret)
 		hdd_err("Failed to set TX STBC value");
 	ret = sme_update_he_tx_stbc_cap(mac_handle,
-					adapter->deflink->vdev_id, value);
+					link_info->vdev_id, value);
 	if (ret)
 		hdd_err("Failed to set HE TX STBC value");
 
@@ -2140,10 +2139,10 @@ int hdd_get_rx_stbc(struct hdd_adapter *adapter, int *value)
 	return ret;
 }
 
-int hdd_set_rx_stbc(struct hdd_adapter *adapter, int value)
+int hdd_set_rx_stbc(struct wlan_hdd_link_info *link_info, int value)
 {
-	mac_handle_t mac_handle = adapter->hdd_ctx->mac_handle;
-	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
+	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(link_info->adapter);
+	mac_handle_t mac_handle = hdd_ctx->mac_handle;
 	int ret;
 	QDF_STATUS status;
 	struct mlme_ht_capabilities_info ht_cap_info;
@@ -2168,14 +2167,14 @@ int hdd_set_rx_stbc(struct hdd_adapter *adapter, int value)
 			return -EINVAL;
 		}
 	}
-	ret = sme_update_ht_config(mac_handle, adapter->deflink->vdev_id,
+	ret = sme_update_ht_config(mac_handle, link_info->vdev_id,
 				   WNI_CFG_HT_CAP_INFO_RX_STBC,
 				   value);
 	if (ret)
 		hdd_err("Failed to set RX STBC value");
 
 	ret = sme_update_he_rx_stbc_cap(mac_handle,
-					adapter->deflink->vdev_id, value);
+					link_info->vdev_id, value);
 	if (ret)
 		hdd_err("Failed to set HE RX STBC value");
 

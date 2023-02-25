@@ -8768,7 +8768,7 @@ static int hdd_config_ldpc(struct wlan_hdd_link_info *link_info,
 
 	ldpc = nla_get_u8(attr);
 
-	ret = hdd_set_ldpc(link_info->adapter, ldpc);
+	ret = hdd_set_ldpc(link_info, ldpc);
 
 	return ret;
 }
@@ -8781,7 +8781,7 @@ static int hdd_config_tx_stbc(struct wlan_hdd_link_info *link_info,
 
 	tx_stbc = nla_get_u8(attr);
 
-	ret = hdd_set_tx_stbc(link_info->adapter, tx_stbc);
+	ret = hdd_set_tx_stbc(link_info, tx_stbc);
 
 	return ret;
 }
@@ -8794,7 +8794,7 @@ static int hdd_config_rx_stbc(struct wlan_hdd_link_info *link_info,
 
 	rx_stbc = nla_get_u8(attr);
 
-	ret = hdd_set_rx_stbc(link_info->adapter, rx_stbc);
+	ret = hdd_set_rx_stbc(link_info, rx_stbc);
 
 	return ret;
 }
@@ -12387,8 +12387,9 @@ __wlan_hdd_cfg80211_set_wifi_test_config(struct wiphy *wiphy,
 	uint32_t cmd_id;
 	struct keep_alive_req keep_alive_req = {0};
 	struct set_wfatest_params wfa_param = {0};
+	struct wlan_hdd_link_info *link_info = adapter->link_info;
 	struct hdd_station_ctx *hdd_sta_ctx =
-		WLAN_HDD_GET_STATION_CTX_PTR(adapter->deflink);
+			WLAN_HDD_GET_STATION_CTX_PTR(link_info);
 	uint8_t op_mode;
 
 	hdd_enter_dev(dev);
@@ -12430,7 +12431,7 @@ __wlan_hdd_cfg80211_set_wifi_test_config(struct wiphy *wiphy,
 			);
 		hdd_debug("set addba accept req from peer value %d", cfg_val);
 		ret_val = sme_set_addba_accept(mac_handle,
-					       adapter->deflink->vdev_id,
+					       link_info->vdev_id,
 					       cfg_val);
 		if (ret_val)
 			goto send_err;
@@ -12441,7 +12442,7 @@ __wlan_hdd_cfg80211_set_wifi_test_config(struct wiphy *wiphy,
 			QCA_WLAN_VENDOR_ATTR_WIFI_TEST_CONFIG_HE_MCS]);
 		hdd_debug("set HE MCS value 0x%0X", cfg_val);
 		ret_val = sme_update_he_mcs(mac_handle,
-					    adapter->deflink->vdev_id, cfg_val);
+					    link_info->vdev_id, cfg_val);
 		if (ret_val)
 			goto send_err;
 	}
@@ -12483,15 +12484,15 @@ __wlan_hdd_cfg80211_set_wifi_test_config(struct wiphy *wiphy,
 
 		op_mode = wlan_get_opmode_from_vdev_id(
 						hdd_ctx->pdev,
-						adapter->deflink->vdev_id);
+						link_info->vdev_id);
 		if (op_mode == QDF_STA_MODE)
 			sme_set_ba_opmode(mac_handle,
-					  adapter->deflink->vdev_id,
+					  link_info->vdev_id,
 					  set_val);
 
 		if (!cfg_val) {
 			ret_val = wma_cli_set_command(
-				adapter->deflink->vdev_id,
+				link_info->vdev_id,
 				wmi_vdev_param_amsdu_aggregation_size_optimization,
 				0, VDEV_CMD);
 		}
@@ -12508,7 +12509,7 @@ __wlan_hdd_cfg80211_set_wifi_test_config(struct wiphy *wiphy,
 
 		hdd_debug("set HE fragmention to %d", set_val);
 		ret_val = sme_update_he_frag_supp(mac_handle,
-						  adapter->deflink->vdev_id,
+						  link_info->vdev_id,
 						  set_val);
 	}
 
@@ -12538,7 +12539,7 @@ __wlan_hdd_cfg80211_set_wifi_test_config(struct wiphy *wiphy,
 				buff_size = nla_get_u16(tb[
 				QCA_WLAN_VENDOR_ATTR_WIFI_TEST_CONFIG_ADDBA_BUFF_SIZE]);
 			ret_val = sme_send_addba_req(mac_handle,
-						     adapter->deflink->vdev_id,
+						     link_info->vdev_id,
 						     tid, buff_size);
 		} else if (cfg_val == QCA_WLAN_DELETE_BA) {
 		} else {
@@ -12551,7 +12552,7 @@ __wlan_hdd_cfg80211_set_wifi_test_config(struct wiphy *wiphy,
 		QCA_WLAN_VENDOR_ATTR_WIFI_TEST_CONFIG_ADDBA_BUFF_SIZE]);
 		hdd_debug("set buff size to %d for all tids", buff_size);
 		ret_val = sme_set_ba_buff_size(mac_handle,
-					       adapter->deflink->vdev_id,
+					       link_info->vdev_id,
 					       buff_size);
 		if (ret_val)
 			goto send_err;
@@ -12569,15 +12570,15 @@ __wlan_hdd_cfg80211_set_wifi_test_config(struct wiphy *wiphy,
 			/* Configure ADDBA req buffer size to 64 */
 			set_val = HDD_BA_MODE_64;
 
-		sme_set_ba_opmode(mac_handle, adapter->deflink->vdev_id,
+		sme_set_ba_opmode(mac_handle, link_info->vdev_id,
 				  set_val);
 
-		ret_val = wma_cli_set_command(adapter->deflink->vdev_id,
+		ret_val = wma_cli_set_command(link_info->vdev_id,
 					      wmi_vdev_param_set_ba_mode,
 					      set_val, VDEV_CMD);
 		if (ret_val)
 			hdd_err("Failed to set BA operating mode %d", set_val);
-		ret_val = wma_cli_set_command(adapter->deflink->vdev_id,
+		ret_val = wma_cli_set_command(link_info->vdev_id,
 					      GEN_VDEV_PARAM_AMPDU,
 					      buff_size, GEN_CMD);
 	}
@@ -12597,7 +12598,7 @@ __wlan_hdd_cfg80211_set_wifi_test_config(struct wiphy *wiphy,
 			QCA_WLAN_VENDOR_ATTR_WIFI_TEST_CONFIG_ENABLE_NO_ACK]);
 		hdd_debug("Set NO_ACK to %d for ac %d", cfg_val, ac);
 		ret_val = sme_set_no_ack_policy(mac_handle,
-						adapter->deflink->vdev_id,
+						link_info->vdev_id,
 						cfg_val, ac);
 		if (cfg_val) {
 			status = ucfg_mlme_get_vht_enable2x2(hdd_ctx->psoc,
@@ -12640,9 +12641,9 @@ __wlan_hdd_cfg80211_set_wifi_test_config(struct wiphy *wiphy,
 			ucfg_mlme_get_sta_keep_alive_period(
 						hdd_ctx->psoc,
 						&keep_alive_req.timePeriod);
-			keep_alive_req.sessionId = adapter->deflink->vdev_id;
+			keep_alive_req.sessionId = link_info->vdev_id;
 			status = sme_set_keep_alive(hdd_ctx->mac_handle,
-						    adapter->deflink->vdev_id,
+						    link_info->vdev_id,
 						    &keep_alive_req);
 			if (QDF_IS_STATUS_ERROR(status)) {
 				hdd_err("Failed to set keepalive");
@@ -12657,12 +12658,12 @@ __wlan_hdd_cfg80211_set_wifi_test_config(struct wiphy *wiphy,
 				QCA_WLAN_VENDOR_ATTR_WIFI_TEST_CONFIG_HE_LTF]);
 		hdd_debug("Set HE LTF to %d", cfg_val);
 		ret_val = sme_set_auto_rate_he_ltf(mac_handle,
-						   adapter->deflink->vdev_id,
+						   link_info->vdev_id,
 						   cfg_val);
 		if (ret_val)
 			sme_err("Failed to set auto rate HE LTF");
 
-		ret_val = wma_cli_set_command(adapter->deflink->vdev_id,
+		ret_val = wma_cli_set_command(link_info->vdev_id,
 					      wmi_vdev_param_set_he_ltf,
 					      cfg_val, VDEV_CMD);
 		if (ret_val)
@@ -12675,13 +12676,12 @@ __wlan_hdd_cfg80211_set_wifi_test_config(struct wiphy *wiphy,
 			QCA_WLAN_VENDOR_ATTR_WIFI_TEST_CONFIG_ENABLE_TX_BEAMFORMEE]);
 		hdd_debug("Set Tx beamformee to %d", cfg_val);
 		ret_val = sme_update_tx_bfee_supp(mac_handle,
-						  adapter->deflink->vdev_id,
+						  link_info->vdev_id,
 						  cfg_val);
 		if (ret_val)
 			sme_err("Failed to update Tx beamformee support");
 
-		ret_val = sme_update_eht_caps(mac_handle,
-					      adapter->deflink->vdev_id,
+		ret_val = sme_update_eht_caps(mac_handle, link_info->vdev_id,
 					      cfg_val, EHT_TX_BFEE_ENABLE,
 					      adapter->device_mode);
 		if (ret_val)
@@ -12693,7 +12693,7 @@ __wlan_hdd_cfg80211_set_wifi_test_config(struct wiphy *wiphy,
 	if (tb[cmd_id]) {
 		cfg_val = nla_get_u8(tb[cmd_id]);
 		ret_val = sme_update_he_capabilities(mac_handle,
-						     adapter->deflink->vdev_id,
+						     link_info->vdev_id,
 						     cfg_val, cmd_id);
 		if (ret_val)
 			sme_err("Failed to update HE cap");
@@ -12703,7 +12703,7 @@ __wlan_hdd_cfg80211_set_wifi_test_config(struct wiphy *wiphy,
 	if (tb[cmd_id]) {
 		cfg_val = nla_get_u8(tb[cmd_id]);
 		ret_val = sme_update_he_capabilities(mac_handle,
-						     adapter->deflink->vdev_id,
+						     link_info->vdev_id,
 						     cfg_val, cmd_id);
 		if (ret_val)
 			sme_err("Failed to update HE cap");
@@ -12725,7 +12725,7 @@ __wlan_hdd_cfg80211_set_wifi_test_config(struct wiphy *wiphy,
 		}
 		hdd_debug("Set Tx beamformee NSTS to %d", cfg_val);
 		ret_val = sme_update_tx_bfee_nsts(hdd_ctx->mac_handle,
-						  adapter->deflink->vdev_id,
+						  link_info->vdev_id,
 						  cfg_val,
 						  value);
 		if (ret_val)
@@ -12739,7 +12739,7 @@ __wlan_hdd_cfg80211_set_wifi_test_config(struct wiphy *wiphy,
 		if (cfg_val) {
 			hdd_debug("Set HE mac padding dur to %d", cfg_val);
 			ret_val = sme_cli_set_command(
-					adapter->deflink->vdev_id,
+					link_info->vdev_id,
 					wmi_vdev_param_mu_edca_fw_update_en,
 					0, VDEV_CMD);
 			if (ret_val)
@@ -12748,18 +12748,18 @@ __wlan_hdd_cfg80211_set_wifi_test_config(struct wiphy *wiphy,
 			sme_set_he_mu_edca_def_cfg(hdd_ctx->mac_handle);
 			if (sme_update_mu_edca_params(
 						hdd_ctx->mac_handle,
-						adapter->deflink->vdev_id))
+						link_info->vdev_id))
 				hdd_err("Failed to send mu edca params");
 		} else {
 			ret_val = sme_cli_set_command(
-					adapter->deflink->vdev_id,
+					link_info->vdev_id,
 					wmi_vdev_param_mu_edca_fw_update_en,
 					1, VDEV_CMD);
 			sme_set_usr_cfg_mu_edca(hdd_ctx->mac_handle, false);
 		}
 		ret_val = sme_update_he_trigger_frm_mac_pad(
 						    hdd_ctx->mac_handle,
-						    adapter->deflink->vdev_id,
+						    link_info->vdev_id,
 						    cfg_val);
 		if (ret_val)
 			hdd_err("Failed to set Trig frame mac padding cap");
@@ -12770,7 +12770,7 @@ __wlan_hdd_cfg80211_set_wifi_test_config(struct wiphy *wiphy,
 				     QCA_WLAN_VENDOR_ATTR_WIFI_TEST_CONFIG_OVERRIDE_MU_EDCA]);
 		if (cfg_val) {
 			ret_val = sme_cli_set_command(
-					adapter->deflink->vdev_id,
+					link_info->vdev_id,
 					wmi_vdev_param_mu_edca_fw_update_en,
 					0, VDEV_CMD);
 			if (ret_val)
@@ -12779,11 +12779,11 @@ __wlan_hdd_cfg80211_set_wifi_test_config(struct wiphy *wiphy,
 			sme_set_he_mu_edca_def_cfg(hdd_ctx->mac_handle);
 			if (sme_update_mu_edca_params(
 						hdd_ctx->mac_handle,
-						adapter->deflink->vdev_id))
+						link_info->vdev_id))
 				hdd_err("Failed to send mu edca params");
 		} else {
 			ret_val = sme_cli_set_command(
-					adapter->deflink->vdev_id,
+					link_info->vdev_id,
 					wmi_vdev_param_mu_edca_fw_update_en,
 					1, VDEV_CMD);
 			sme_set_usr_cfg_mu_edca(hdd_ctx->mac_handle, false);
@@ -12794,7 +12794,7 @@ __wlan_hdd_cfg80211_set_wifi_test_config(struct wiphy *wiphy,
 		cfg_val = nla_get_u8(tb[
 				     QCA_WLAN_VENDOR_ATTR_WIFI_TEST_CONFIG_HE_OM_CTRL_SUPP]);
 		ret_val = sme_update_he_om_ctrl_supp(hdd_ctx->mac_handle,
-						     adapter->deflink->vdev_id,
+						     link_info->vdev_id,
 						     cfg_val);
 	}
 
@@ -12834,7 +12834,7 @@ __wlan_hdd_cfg80211_set_wifi_test_config(struct wiphy *wiphy,
 				cfg_val = nla_get_u8(tb2[cmd_id]);
 				ret_val = sme_set_he_om_ctrl_param(
 						    hdd_ctx->mac_handle,
-						    adapter->deflink->vdev_id,
+						    link_info->vdev_id,
 						    cmd_id, cfg_val);
 			}
 			cmd_id = QCA_WLAN_VENDOR_ATTR_HE_OMI_RX_NSS;
@@ -12842,7 +12842,7 @@ __wlan_hdd_cfg80211_set_wifi_test_config(struct wiphy *wiphy,
 				cfg_val = nla_get_u8(tb2[cmd_id]);
 				ret_val = sme_set_he_om_ctrl_param(
 						    hdd_ctx->mac_handle,
-						    adapter->deflink->vdev_id,
+						    link_info->vdev_id,
 						    cmd_id, cfg_val);
 			}
 
@@ -12851,7 +12851,7 @@ __wlan_hdd_cfg80211_set_wifi_test_config(struct wiphy *wiphy,
 				cfg_val = nla_get_u8(tb2[cmd_id]);
 				ret_val = sme_set_he_om_ctrl_param(
 						    hdd_ctx->mac_handle,
-						    adapter->deflink->vdev_id,
+						    link_info->vdev_id,
 						    cmd_id, cfg_val);
 			}
 
@@ -12860,7 +12860,7 @@ __wlan_hdd_cfg80211_set_wifi_test_config(struct wiphy *wiphy,
 				cfg_val = nla_get_u8(tb2[cmd_id]);
 				ret_val = sme_set_he_om_ctrl_param(
 						    hdd_ctx->mac_handle,
-						    adapter->deflink->vdev_id,
+						    link_info->vdev_id,
 						    cmd_id, cfg_val);
 			}
 
@@ -12869,7 +12869,7 @@ __wlan_hdd_cfg80211_set_wifi_test_config(struct wiphy *wiphy,
 				cfg_val = nla_get_u8(tb2[cmd_id]);
 				ret_val = sme_set_he_om_ctrl_param(
 						    hdd_ctx->mac_handle,
-						    adapter->deflink->vdev_id,
+						    link_info->vdev_id,
 						    cmd_id, cfg_val);
 			}
 
@@ -12900,7 +12900,7 @@ __wlan_hdd_cfg80211_set_wifi_test_config(struct wiphy *wiphy,
 			goto send_err;
 		}
 		ret_val = sme_send_he_om_ctrl_update(hdd_ctx->mac_handle,
-						     adapter->deflink->vdev_id,
+						     link_info->vdev_id,
 						     &omi_data);
 	}
 
@@ -12912,6 +12912,7 @@ __wlan_hdd_cfg80211_set_wifi_test_config(struct wiphy *wiphy,
 		int i;
 		enum wlan_eht_mode eht_mode;
 		uint8_t op_mode;
+
 		cfg_val = nla_get_u8(tb[cmd_id]);
 		ucfg_mlme_get_eht_mode(hdd_ctx->psoc, &eht_mode);
 		if (eht_mode == WLAN_EHT_MODE_MLMR ||
@@ -12933,13 +12934,11 @@ __wlan_hdd_cfg80211_set_wifi_test_config(struct wiphy *wiphy,
 			}
 		} else {
 			if (cfg_val)
-				sme_config_su_ppdu_queue(
-						adapter->deflink->vdev_id,
-						true);
+				sme_config_su_ppdu_queue(link_info->vdev_id,
+							 true);
 			else
-				sme_config_su_ppdu_queue(
-						adapter->deflink->vdev_id,
-						false);
+				sme_config_su_ppdu_queue(link_info->vdev_id,
+							 false);
 		}
 	}
 
@@ -12956,7 +12955,7 @@ __wlan_hdd_cfg80211_set_wifi_test_config(struct wiphy *wiphy,
 		cfg_val = nla_get_u8(tb[cmd_id]);
 		hdd_debug("Configure +HTC_HE support %d", cfg_val);
 		sme_update_he_htc_he_supp(hdd_ctx->mac_handle,
-					  adapter->deflink->vdev_id,
+					  link_info->vdev_id,
 					  (cfg_val ? true : false));
 	}
 
@@ -12965,7 +12964,7 @@ __wlan_hdd_cfg80211_set_wifi_test_config(struct wiphy *wiphy,
 		cfg_val = nla_get_u8(tb[cmd_id]);
 		hdd_debug("Configure Punctured preamble Rx %d", cfg_val);
 		ret_val = sme_update_he_capabilities(mac_handle,
-						     adapter->deflink->vdev_id,
+						     link_info->vdev_id,
 						     cfg_val, cmd_id);
 		if (ret_val)
 			sme_err("Failed to update HE cap");
@@ -12978,10 +12977,10 @@ __wlan_hdd_cfg80211_set_wifi_test_config(struct wiphy *wiphy,
 		hdd_debug("Configure HE testbed defaults %d", cfg_val);
 		if (!cfg_val)
 			sme_reset_he_caps(hdd_ctx->mac_handle,
-					  adapter->deflink->vdev_id);
+					  link_info->vdev_id);
 		else
 			sme_set_he_testbed_def(hdd_ctx->mac_handle,
-					       adapter->deflink->vdev_id);
+					       link_info->vdev_id);
 	}
 
 	cmd_id = QCA_WLAN_VENDOR_ATTR_WIFI_TEST_CONFIG_HE_ACTION_TX_TB_PPDU;
@@ -12989,7 +12988,7 @@ __wlan_hdd_cfg80211_set_wifi_test_config(struct wiphy *wiphy,
 		cfg_val = nla_get_u8(tb[cmd_id]);
 		hdd_debug("Configure Action frame Tx in TB PPDU %d", cfg_val);
 		sme_config_action_tx_in_tb_ppdu(hdd_ctx->mac_handle,
-						adapter->deflink->vdev_id,
+						link_info->vdev_id,
 						cfg_val);
 	}
 
@@ -13011,7 +13010,7 @@ __wlan_hdd_cfg80211_set_wifi_test_config(struct wiphy *wiphy,
 		hdd_debug("twt_request: val %d", cfg_val);
 		ret_val = sme_update_he_twt_req_support(
 						hdd_ctx->mac_handle,
-						adapter->deflink->vdev_id,
+						link_info->vdev_id,
 						cfg_val);
 	}
 
@@ -13045,7 +13044,7 @@ __wlan_hdd_cfg80211_set_wifi_test_config(struct wiphy *wiphy,
 		}
 		ret_val = sme_update_he_full_ul_mumimo(
 						hdd_ctx->mac_handle,
-						adapter->deflink->vdev_id,
+						link_info->vdev_id,
 						cfg_val);
 	}
 
@@ -13054,7 +13053,7 @@ __wlan_hdd_cfg80211_set_wifi_test_config(struct wiphy *wiphy,
 		cfg_val = nla_get_u8(tb[cmd_id]);
 		hdd_debug("disable Tx cfg: val %d", cfg_val);
 		sme_set_cfg_disable_tx(hdd_ctx->mac_handle,
-				       adapter->deflink->vdev_id, cfg_val);
+				       link_info->vdev_id, cfg_val);
 	}
 
 	cmd_id = QCA_WLAN_VENDOR_ATTR_WIFI_TEST_CONFIG_PMF_PROTECTION;
@@ -13087,7 +13086,7 @@ __wlan_hdd_cfg80211_set_wifi_test_config(struct wiphy *wiphy,
 	if (tb[cmd_id]) {
 		hdd_info("Send disassoc mgmt frame");
 		sme_send_disassoc_req_frame(hdd_ctx->mac_handle,
-					    adapter->deflink->vdev_id,
+					    link_info->vdev_id,
 					    hdd_sta_ctx->conn_info.bssid.bytes,
 					    1, false);
 	}
@@ -13111,17 +13110,17 @@ __wlan_hdd_cfg80211_set_wifi_test_config(struct wiphy *wiphy,
 			hdd_update_channel_width(
 					adapter, eHT_CHANNEL_WIDTH_20MHZ,
 					WNI_CFG_CHANNEL_BONDING_MODE_DISABLE);
-			hdd_set_tx_stbc(adapter, 0);
+			hdd_set_tx_stbc(link_info, 0);
 			hdd_set_11ax_rate(adapter, 0x400, NULL);
 			status = wma_cli_set_command(
-					adapter->deflink->vdev_id,
+					link_info->vdev_id,
 					wmi_vdev_param_he_range_ext,
 					1, VDEV_CMD);
 			if (QDF_IS_STATUS_ERROR(status))
 				hdd_err("failed to set HE_RANGE_EXT, %d",
 					status);
 			status = wma_cli_set_command(
-					adapter->deflink->vdev_id,
+					link_info->vdev_id,
 					wmi_vdev_param_non_data_he_range_ext,
 					1, VDEV_CMD);
 			if (QDF_IS_STATUS_ERROR(status))
@@ -13131,17 +13130,17 @@ __wlan_hdd_cfg80211_set_wifi_test_config(struct wiphy *wiphy,
 			hdd_update_channel_width(
 					adapter, eHT_CHANNEL_WIDTH_160MHZ,
 					WNI_CFG_CHANNEL_BONDING_MODE_ENABLE);
-			hdd_set_tx_stbc(adapter, 1);
+			hdd_set_tx_stbc(link_info, 1);
 			hdd_set_11ax_rate(adapter, 0xFFFF, NULL);
 			status = wma_cli_set_command(
-					adapter->deflink->vdev_id,
+					link_info->vdev_id,
 					wmi_vdev_param_he_range_ext,
 					0, VDEV_CMD);
 			if (QDF_IS_STATUS_ERROR(status))
 				hdd_err("failed to set HE_RANGE_EXT, %d",
 					status);
 			status = wma_cli_set_command(
-					adapter->deflink->vdev_id,
+					link_info->vdev_id,
 					wmi_vdev_param_non_data_he_range_ext,
 					0, VDEV_CMD);
 			if (QDF_IS_STATUS_ERROR(status))
@@ -13153,7 +13152,7 @@ __wlan_hdd_cfg80211_set_wifi_test_config(struct wiphy *wiphy,
 
 	cmd_id = QCA_WLAN_VENDOR_ATTR_WIFI_TEST_CONFIG_FT_REASSOCREQ_RSNXE_USED;
 	if (tb[cmd_id]) {
-		wfa_param.vdev_id = adapter->deflink->vdev_id;
+		wfa_param.vdev_id = link_info->vdev_id;
 		wfa_param.value = nla_get_u8(tb[cmd_id]);
 
 		if (wfa_param.value < RSNXE_DEFAULT ||
@@ -13164,13 +13163,13 @@ __wlan_hdd_cfg80211_set_wifi_test_config(struct wiphy *wiphy,
 		wfa_param.cmd = WFA_CONFIG_RXNE;
 		hdd_info("send wfa test config RXNE used %d", wfa_param.value);
 
-		ret_val = ucfg_send_wfatest_cmd(adapter->deflink->vdev,
+		ret_val = ucfg_send_wfatest_cmd(link_info->vdev,
 						&wfa_param);
 	}
 
 	cmd_id = QCA_WLAN_VENDOR_ATTR_WIFI_TEST_CONFIG_IGNORE_CSA;
 	if (tb[cmd_id]) {
-		wfa_param.vdev_id = adapter->deflink->vdev_id;
+		wfa_param.vdev_id = link_info->vdev_id;
 		wfa_param.value = nla_get_u8(tb[cmd_id]);
 
 		if (wfa_param.value != CSA_DEFAULT &&
@@ -13181,7 +13180,7 @@ __wlan_hdd_cfg80211_set_wifi_test_config(struct wiphy *wiphy,
 		wfa_param.cmd = WFA_CONFIG_CSA;
 		hdd_info("send wfa test config CSA used %d", wfa_param.value);
 
-		ret_val = ucfg_send_wfatest_cmd(adapter->deflink->vdev,
+		ret_val = ucfg_send_wfatest_cmd(link_info->vdev,
 						&wfa_param);
 	}
 
@@ -13197,7 +13196,7 @@ __wlan_hdd_cfg80211_set_wifi_test_config(struct wiphy *wiphy,
 	if (tb[cmd_id]) {
 		struct nlattr *tb2[QCA_WLAN_VENDOR_ATTR_OCI_OVERRIDE_MAX + 1];
 
-		wfa_param.vdev_id = adapter->deflink->vdev_id;
+		wfa_param.vdev_id = link_info->vdev_id;
 		wfa_param.cmd = WFA_CONFIG_OCV;
 		if (wlan_cfg80211_nla_parse_nested(
 				tb2, QCA_WLAN_VENDOR_ATTR_OCI_OVERRIDE_MAX,
@@ -13262,14 +13261,14 @@ __wlan_hdd_cfg80211_set_wifi_test_config(struct wiphy *wiphy,
 		hdd_info("send wfa test config OCV frame type %d freq %d",
 			 wfa_param.ocv_param->frame_type,
 			 wfa_param.ocv_param->freq);
-		ret_val = ucfg_send_wfatest_cmd(adapter->deflink->vdev,
+		ret_val = ucfg_send_wfatest_cmd(link_info->vdev,
 						&wfa_param);
 		qdf_mem_free(wfa_param.ocv_param);
 	}
 
 	cmd_id = QCA_WLAN_VENDOR_ATTR_WIFI_TEST_CONFIG_IGNORE_SA_QUERY_TIMEOUT;
 	if (tb[cmd_id]) {
-		wfa_param.vdev_id = adapter->deflink->vdev_id;
+		wfa_param.vdev_id = link_info->vdev_id;
 		wfa_param.value = nla_get_u8(tb[cmd_id]);
 
 		if (wfa_param.value != SA_QUERY_TIMEOUT_DEFAULT &&
@@ -13281,13 +13280,13 @@ __wlan_hdd_cfg80211_set_wifi_test_config(struct wiphy *wiphy,
 		wfa_param.cmd = WFA_CONFIG_SA_QUERY;
 		hdd_info("send wfa test config SAquery %d", wfa_param.value);
 
-		ret_val = ucfg_send_wfatest_cmd(adapter->deflink->vdev,
+		ret_val = ucfg_send_wfatest_cmd(link_info->vdev,
 						&wfa_param);
 	}
 
 	cmd_id = QCA_WLAN_VENDOR_ATTR_WIFI_TEST_CONFIG_FILS_DISCOVERY_FRAMES_TX;
 	if (tb[cmd_id] && adapter->device_mode == QDF_SAP_MODE) {
-		wfa_param.vdev_id = adapter->deflink->vdev_id;
+		wfa_param.vdev_id = link_info->vdev_id;
 		wfa_param.value = nla_get_u8(tb[cmd_id]);
 
 		if (!(wfa_param.value == FILS_DISCV_FRAMES_DISABLE ||
@@ -13299,13 +13298,13 @@ __wlan_hdd_cfg80211_set_wifi_test_config(struct wiphy *wiphy,
 		wfa_param.cmd = WFA_FILS_DISCV_FRAMES;
 		hdd_info("send wfa FILS_DISCV_FRAMES TX config %d",
 			 wfa_param.value);
-		ret_val = ucfg_send_wfatest_cmd(adapter->deflink->vdev,
+		ret_val = ucfg_send_wfatest_cmd(link_info->vdev,
 						&wfa_param);
 	}
 
 	cmd_id = QCA_WLAN_VENDOR_ATTR_WIFI_TEST_CONFIG_IGNORE_H2E_RSNXE;
 	if (tb[cmd_id]) {
-		wfa_param.vdev_id = adapter->deflink->vdev_id;
+		wfa_param.vdev_id = link_info->vdev_id;
 		wfa_param.value = nla_get_u8(tb[cmd_id]);
 
 		if (!(wfa_param.value == H2E_RSNXE_DEFAULT ||
@@ -13317,7 +13316,7 @@ __wlan_hdd_cfg80211_set_wifi_test_config(struct wiphy *wiphy,
 		wfa_param.cmd = WFA_IGNORE_H2E_RSNXE;
 		hdd_info("send wfa WFA_IGNORE_H2E_RSNXE config %d",
 			 wfa_param.value);
-		ret_val = ucfg_send_wfatest_cmd(adapter->deflink->vdev,
+		ret_val = ucfg_send_wfatest_cmd(link_info->vdev,
 						&wfa_param);
 	}
 
@@ -13335,7 +13334,7 @@ __wlan_hdd_cfg80211_set_wifi_test_config(struct wiphy *wiphy,
 		set_val = cfg_val ? TX_BFER_NDP_PERIODICITY : 0;
 
 		ret_val = wma_cli_set_command(
-					adapter->deflink->vdev_id,
+					link_info->vdev_id,
 					WMI_PDEV_PARAM_TXBF_SOUND_PERIOD_CMDID,
 					set_val, PDEV_CMD);
 	}
@@ -13345,8 +13344,7 @@ __wlan_hdd_cfg80211_set_wifi_test_config(struct wiphy *wiphy,
 		cfg_val = nla_get_u8(tb[cmd_id]);
 		hdd_debug("Configure Tx BF < 80 MHz: %d", cfg_val);
 
-		ret_val = sme_update_eht_caps(mac_handle,
-					      adapter->deflink->vdev_id,
+		ret_val = sme_update_eht_caps(mac_handle, link_info->vdev_id,
 					      cfg_val, EHT_TX_BFEE_SS_80MHZ,
 					      adapter->device_mode);
 		if (ret_val)
@@ -13358,8 +13356,7 @@ __wlan_hdd_cfg80211_set_wifi_test_config(struct wiphy *wiphy,
 		cfg_val = nla_get_u8(tb[cmd_id]);
 		hdd_debug("Configure Tx BF for 160 MHz: %d", cfg_val);
 
-		ret_val = sme_update_eht_caps(mac_handle,
-					      adapter->deflink->vdev_id,
+		ret_val = sme_update_eht_caps(mac_handle, link_info->vdev_id,
 					      cfg_val, EHT_TX_BFEE_SS_160MHZ,
 					      adapter->device_mode);
 		if (ret_val)
@@ -13371,8 +13368,7 @@ __wlan_hdd_cfg80211_set_wifi_test_config(struct wiphy *wiphy,
 		cfg_val = nla_get_u8(tb[cmd_id]);
 		hdd_debug("Configure Tx BF for 320 MHz: %d", cfg_val);
 
-		ret_val = sme_update_eht_caps(mac_handle,
-					      adapter->deflink->vdev_id,
+		ret_val = sme_update_eht_caps(mac_handle, link_info->vdev_id,
 					      cfg_val, EHT_TX_BFEE_SS_320MHZ,
 					      adapter->device_mode);
 		if (ret_val)
@@ -13384,17 +13380,17 @@ __wlan_hdd_cfg80211_set_wifi_test_config(struct wiphy *wiphy,
 		cfg_val = nla_get_u8(tb[cmd_id]);
 
 		if (cfg_val) {
-			wlan_vdev_obj_lock(adapter->deflink->vdev);
+			wlan_vdev_obj_lock(link_info->vdev);
 			wlan_vdev_mlme_cap_set(
-					adapter->deflink->vdev,
+					link_info->vdev,
 					WLAN_VDEV_C_EXCL_STA_PROF_PRB_REQ);
-			wlan_vdev_obj_unlock(adapter->deflink->vdev);
+			wlan_vdev_obj_unlock(link_info->vdev);
 		} else {
-			wlan_vdev_obj_lock(adapter->deflink->vdev);
+			wlan_vdev_obj_lock(link_info->vdev);
 			wlan_vdev_mlme_cap_clear(
-					adapter->deflink->vdev,
+					link_info->vdev,
 					WLAN_VDEV_C_EXCL_STA_PROF_PRB_REQ);
-			wlan_vdev_obj_unlock(adapter->deflink->vdev);
+			wlan_vdev_obj_unlock(link_info->vdev);
 		}
 		hdd_debug("Sta profile in Probe req frame: %d", cfg_val);
 	}
@@ -13405,24 +13401,23 @@ __wlan_hdd_cfg80211_set_wifi_test_config(struct wiphy *wiphy,
 		hdd_debug("Configure EHT testbed defaults %d", cfg_val);
 		if (!cfg_val)
 			sme_reset_eht_caps(hdd_ctx->mac_handle,
-					   adapter->deflink->vdev_id);
+					   link_info->vdev_id);
 		else
 			sme_set_eht_testbed_def(hdd_ctx->mac_handle,
-						adapter->deflink->vdev_id);
+						link_info->vdev_id);
 
 		sme_set_vdev_ies_per_band(hdd_ctx->mac_handle,
-					  adapter->deflink->vdev_id,
+					  link_info->vdev_id,
 					  adapter->device_mode);
 	}
 
 	cmd_id = QCA_WLAN_VENDOR_ATTR_WIFI_TEST_CONFIG_EHT_MCS;
 	if (tb[cmd_id]) {
 		cfg_val = nla_get_u8(tb[cmd_id]);
-		sme_update_eht_cap_mcs(hdd_ctx->mac_handle,
-				       adapter->deflink->vdev_id,
+		sme_update_eht_cap_mcs(hdd_ctx->mac_handle, link_info->vdev_id,
 				       cfg_val);
 		sme_set_vdev_ies_per_band(hdd_ctx->mac_handle,
-					  adapter->deflink->vdev_id,
+					  link_info->vdev_id,
 					  adapter->device_mode);
 	}
 
@@ -13433,7 +13428,7 @@ __wlan_hdd_cfg80211_set_wifi_test_config(struct wiphy *wiphy,
 			  cfg_val);
 
 		ret_val = sme_update_eht_caps(
-					mac_handle, adapter->deflink->vdev_id,
+					mac_handle, link_info->vdev_id,
 					cfg_val,
 					EHT_TX_BFEE_SOUNDING_FEEDBACK_RATELIMIT,
 					adapter->device_mode);
@@ -13447,13 +13442,13 @@ __wlan_hdd_cfg80211_set_wifi_test_config(struct wiphy *wiphy,
 		hdd_debug("EHT OM control support: %d", cfg_val);
 
 		ret_val = sme_update_he_htc_he_supp(hdd_ctx->mac_handle,
-						    adapter->deflink->vdev_id,
+						    link_info->vdev_id,
 						    true);
 		if (ret_val)
 			hdd_err("Could not set htc_he");
 
 		ret_val = sme_update_eht_om_ctrl_supp(hdd_ctx->mac_handle,
-						      adapter->deflink->vdev_id,
+						      link_info->vdev_id,
 						      cfg_val);
 		if (ret_val)
 			hdd_err("Could not update EHT OM control fields");
@@ -13498,7 +13493,7 @@ __wlan_hdd_cfg80211_set_wifi_test_config(struct wiphy *wiphy,
 		arg[0] = 676;
 		arg[1] = 1;
 
-		ret_val = sme_send_unit_test_cmd(adapter->deflink->vdev_id,
+		ret_val = sme_send_unit_test_cmd(link_info->vdev_id,
 						 0x48, 2, arg);
 
 		if (ret_val)

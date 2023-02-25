@@ -239,12 +239,12 @@ void *mem_alloc_copy_from_user_helper(const void *wrqu_data, size_t len);
 
 /**
  * hdd_we_set_short_gi() - Set adapter Short GI
- * @adapter: adapter being modified
+ * @link_info: Link info pointer in HDD adapter
  * @sgi: new sgi value
  *
  * Return: 0 on success, negative errno on failure
  */
-int hdd_we_set_short_gi(struct hdd_adapter *adapter, int sgi);
+int hdd_we_set_short_gi(struct wlan_hdd_link_info *link_info, int sgi);
 
 /**
  * hdd_assemble_rate_code() - assemble rate code to be sent to FW
@@ -273,7 +273,7 @@ int hdd_set_11ax_rate(struct hdd_adapter *adapter, int value,
 
 /**
  * hdd_we_update_phymode() - handle change in PHY mode
- * @adapter: adapter being modified
+ * @link_info: Link info pointer in HDD adapter.
  * @new_phymode: new PHY mode for the device
  *
  * This function is called when the device is set to a new PHY mode.
@@ -284,22 +284,23 @@ int hdd_set_11ax_rate(struct hdd_adapter *adapter, int value,
  *
  * Return: 0 on success, negative errno value on error
  */
-int hdd_we_update_phymode(struct hdd_adapter *adapter, int new_phymode);
+int hdd_we_update_phymode(struct wlan_hdd_link_info *link_info,
+			  int new_phymode);
 
 /**
  * wlan_hdd_set_btcoex_mode() - set BTCoex Mode
- * @adapter: adapter being modified
+ * @link_info: Link info pointer in HDD adapter
  * @value: new BTCoex mode for the adapter
  *
  * This function is called to set a BTCoex Operation Mode
  *
  * Return: 0 on success, negative errno value on error
  */
-int wlan_hdd_set_btcoex_mode(struct hdd_adapter *adapter, int value);
+int wlan_hdd_set_btcoex_mode(struct wlan_hdd_link_info *link_info, int value);
 
 /**
  * wlan_hdd_set_btcoex_rssi_threshold() - set RSSI threshold
- * @adapter: adapter being modified
+ * @link_info: Link info pointer in HDD adapter
  * @value: new RSSI Threshold for the adapter
  *
  * This function is called to set a new RSSI threshold for
@@ -307,7 +308,8 @@ int wlan_hdd_set_btcoex_mode(struct hdd_adapter *adapter, int value);
  *
  * Return: 0 on success, negative errno value on error
  */
-int wlan_hdd_set_btcoex_rssi_threshold(struct hdd_adapter *adapter, int value);
+int wlan_hdd_set_btcoex_rssi_threshold(struct wlan_hdd_link_info *link_info,
+				       int value);
 
 struct iw_request_info;
 

@@ -53,7 +53,17 @@ int hdd_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd);
  */
 int hdd_dev_private_ioctl(struct net_device *dev, struct ifreq *ifr,
 			  void __user *data, int cmd);
-int wlan_hdd_set_mc_rate(struct hdd_adapter *adapter, int target_rate);
+
+/**
+ * wlan_hdd_set_mc_rate() - Function to set MC rate.
+ * @link_info: Link info pointer in HDD adapter
+ * @target_rate: Target rate to set.
+ *
+ * The API sets the value in @target_rate for MC Tx
+ *
+ * Return: Non-zero value on failure.
+ */
+int wlan_hdd_set_mc_rate(struct wlan_hdd_link_info *link_info, int target_rate);
 
 /**
  * hdd_update_smps_antenna_mode() - set smps and antenna mode

@@ -408,12 +408,12 @@ int hdd_get_ldpc(struct hdd_adapter *adapter, int *value);
 
 /**
  * hdd_set_ldpc() - Set adapter LDPC
- * @adapter: adapter being modified
+ * @link_info: Link info pointer in adapter
  * @value: new LDPC value
  *
  * Return: 0 on success, negative errno on failure
  */
-int hdd_set_ldpc(struct hdd_adapter *adapter, int value);
+int hdd_set_ldpc(struct wlan_hdd_link_info *link_info, int value);
 
 /**
  * hdd_get_tx_stbc() - Get adapter TX STBC
@@ -426,12 +426,12 @@ int hdd_get_tx_stbc(struct hdd_adapter *adapter, int *value);
 
 /**
  * hdd_set_tx_stbc() - Set adapter TX STBC
- * @adapter: adapter being modified
+ * @link_info: Link info pointer in HDD adapter
  * @value: new TX STBC value
  *
  * Return: 0 on success, negative errno on failure
  */
-int hdd_set_tx_stbc(struct hdd_adapter *adapter, int value);
+int hdd_set_tx_stbc(struct wlan_hdd_link_info *link_info, int value);
 
 /**
  * hdd_get_rx_stbc() - Get adapter RX STBC
@@ -444,12 +444,12 @@ int hdd_get_rx_stbc(struct hdd_adapter *adapter, int *value);
 
 /**
  * hdd_set_rx_stbc() - Set adapter RX STBC
- * @adapter: adapter being modified
+ * @link_info: Link info pointer in HDD adapter
  * @value: new RX STBC value
  *
  * Return: 0 on success, negative errno on failure
  */
-int hdd_set_rx_stbc(struct hdd_adapter *adapter, int value);
+int hdd_set_rx_stbc(struct wlan_hdd_link_info *link_info, int value);
 
 /**
  * hdd_update_channel_width() - Update adapter channel width settings
