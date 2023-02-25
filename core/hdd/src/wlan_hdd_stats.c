@@ -7542,7 +7542,7 @@ hdd_get_link_speed_cb(struct link_speed_info *linkspeed_info, void *context)
 	osif_request_put(request);
 }
 
-int wlan_hdd_get_linkspeed_for_peermac(struct hdd_adapter *adapter,
+int wlan_hdd_get_linkspeed_for_peermac(struct wlan_hdd_link_info *link_info,
 				       struct qdf_mac_addr *mac_address,
 				       uint32_t *linkspeed)
 {
@@ -7552,12 +7552,13 @@ int wlan_hdd_get_linkspeed_for_peermac(struct hdd_adapter *adapter,
 	struct link_speed_info *linkspeed_info;
 	struct osif_request *request;
 	struct linkspeed_priv *priv;
+	struct hdd_adapter *adapter = link_info->adapter;
 	static const struct osif_request_params params = {
 		.priv_size = sizeof(*priv),
 		.timeout_ms = WLAN_WAIT_TIME_STATS,
 	};
 
-	if ((!adapter) || (!linkspeed)) {
+	if (!linkspeed) {
 		hdd_err("NULL argument");
 		return -EINVAL;
 	}
@@ -7587,7 +7588,7 @@ int wlan_hdd_get_linkspeed_for_peermac(struct hdd_adapter *adapter,
 		hdd_err("SME timed out while retrieving link speed");
 		goto cleanup;
 	}
-	adapter->deflink->estimated_linkspeed = linkspeed_info->estLinkSpeed;
+	link_info->estimated_linkspeed = linkspeed_info->estLinkSpeed;
 
 cleanup:
 	/*
@@ -7598,7 +7599,7 @@ cleanup:
 	osif_request_put(request);
 
 return_cached_value:
-	*linkspeed = adapter->deflink->estimated_linkspeed;
+	*linkspeed = link_info->estimated_linkspeed;
 
 	return ret;
 }
@@ -7633,8 +7634,8 @@ int wlan_hdd_get_link_speed(struct wlan_hdd_link_info *link_info,
 
 		qdf_copy_macaddr(&bssid, &hdd_stactx->conn_info.bssid);
 
-		ret = wlan_hdd_get_linkspeed_for_peermac(adapter, &bssid,
-							 link_speed);
+		ret = wlan_hdd_get_linkspeed_for_peermac(link_info,
+							 &bssid, link_speed);
 		if (ret) {
 			hdd_err("Unable to retrieve SME linkspeed");
 			return ret;

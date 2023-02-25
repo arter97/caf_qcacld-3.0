@@ -472,7 +472,7 @@ QDF_STATUS wlan_hdd_get_snr(struct wlan_hdd_link_info *link_info, int8_t *snr);
 
 /**
  * wlan_hdd_get_linkspeed_for_peermac() - Get link speed for a peer
- * @adapter: adapter upon which the peer is active
+ * @link_info: Link info pointer in adapter
  * @mac_address: MAC address of the peer
  * @linkspeed: pointer to memory where returned link speed is to be placed
  *
@@ -481,7 +481,7 @@ QDF_STATUS wlan_hdd_get_snr(struct wlan_hdd_link_info *link_info, int8_t *snr);
  *
  * Return: 0 if linkspeed data is available, negative errno otherwise
  */
-int wlan_hdd_get_linkspeed_for_peermac(struct hdd_adapter *adapter,
+int wlan_hdd_get_linkspeed_for_peermac(struct wlan_hdd_link_info *link_info,
 				       struct qdf_mac_addr *mac_address,
 				       uint32_t *linkspeed);
 

@@ -2570,8 +2570,8 @@ int __iw_get_softap_linkspeed(struct net_device *dev,
 		hdd_err("Invalid peer macaddress");
 		return -EINVAL;
 	}
-	rc = wlan_hdd_get_linkspeed_for_peermac(adapter, &mac_address,
-						&link_speed);
+	rc = wlan_hdd_get_linkspeed_for_peermac(adapter->deflink,
+						&mac_address, &link_speed);
 	if (rc) {
 		hdd_err("Unable to retrieve SME linkspeed");
 		return rc;
