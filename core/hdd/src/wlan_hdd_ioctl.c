@@ -5467,7 +5467,7 @@ static int drv_cmd_get_rssi(struct hdd_adapter *adapter,
 
 	uint8_t len = 0;
 
-	wlan_hdd_get_rssi(adapter, &rssi);
+	wlan_hdd_get_rssi(adapter->deflink, &rssi);
 
 	len = scnprintf(extra, sizeof(extra), "%s %d", command, rssi);
 	len = QDF_MIN(priv_data->total_len, len + 1);

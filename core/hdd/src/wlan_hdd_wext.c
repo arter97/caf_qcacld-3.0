@@ -6085,7 +6085,7 @@ static int __iw_get_char_setnone(struct net_device *dev,
 	{
 		int8_t s7Rssi = 0;
 
-		wlan_hdd_get_rssi(adapter, &s7Rssi);
+		wlan_hdd_get_rssi(link_info, &s7Rssi);
 		snprintf(extra, WE_MAX_STR_LEN, "rssi=%d", s7Rssi);
 		wrqu->data.length = strlen(extra) + 1;
 		break;
@@ -6352,7 +6352,7 @@ static int __iw_get_char_setnone(struct net_device *dev,
 				enable_snr_monitoring);
 			return -ENONET;
 		}
-		wlan_hdd_get_snr(adapter, &s7snr);
+		wlan_hdd_get_snr(link_info, &s7snr);
 		snprintf(extra, WE_MAX_STR_LEN, "snr=%d", s7snr);
 		wrqu->data.length = strlen(extra) + 1;
 		break;

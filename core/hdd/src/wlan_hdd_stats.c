@@ -7364,45 +7364,39 @@ QDF_STATUS wlan_hdd_get_mib_stats(struct hdd_adapter *adapter)
 }
 #endif
 
-QDF_STATUS wlan_hdd_get_rssi(struct hdd_adapter *adapter, int8_t *rssi_value)
+QDF_STATUS wlan_hdd_get_rssi(struct wlan_hdd_link_info *link_info,
+			     int8_t *rssi_value)
 {
 	int ret = 0, i;
 	struct hdd_station_ctx *sta_ctx;
 	struct stats_event *rssi_info;
 	struct wlan_objmgr_vdev *vdev;
 
-	if (!adapter) {
-		hdd_err("Invalid context, adapter");
-		return QDF_STATUS_E_FAULT;
-	}
-
-	sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter->deflink);
-
 	if (cds_is_driver_recovering() || cds_is_driver_in_bad_state()) {
 		hdd_err("Recovery in Progress. State: 0x%x Ignore!!!",
 			cds_get_driver_state());
 		/* return a cached value */
-		*rssi_value = adapter->deflink->rssi;
+		*rssi_value = link_info->rssi;
 		return QDF_STATUS_SUCCESS;
 	}
 
-	if (!hdd_cm_is_vdev_associated(adapter->deflink)) {
+	sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(link_info);
+	if (!hdd_cm_is_vdev_associated(link_info)) {
 		hdd_debug("Not associated!, rssi on disconnect %d",
-			  adapter->deflink->rssi_on_disconnect);
-		*rssi_value = adapter->deflink->rssi_on_disconnect;
+			  link_info->rssi_on_disconnect);
+		*rssi_value = link_info->rssi_on_disconnect;
 		return QDF_STATUS_SUCCESS;
 	}
 
-	if (hdd_cm_is_vdev_roaming(adapter->deflink)) {
+	if (hdd_cm_is_vdev_roaming(link_info)) {
 		hdd_debug("Roaming in progress, return cached RSSI");
-		*rssi_value = adapter->deflink->rssi;
+		*rssi_value = link_info->rssi;
 		return QDF_STATUS_SUCCESS;
 	}
 
-	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink,
-					   WLAN_OSIF_STATS_ID);
+	vdev = hdd_objmgr_get_vdev_by_user(link_info, WLAN_OSIF_STATS_ID);
 	if (!vdev) {
-		*rssi_value = adapter->deflink->rssi;
+		*rssi_value = link_info->rssi;
 		return QDF_STATUS_SUCCESS;
 	}
 
@@ -7462,9 +7456,9 @@ static void hdd_get_snr_cb(int8_t snr, void *context)
 	osif_request_put(request);
 }
 
-QDF_STATUS wlan_hdd_get_snr(struct hdd_adapter *adapter, int8_t *snr)
+QDF_STATUS wlan_hdd_get_snr(struct wlan_hdd_link_info *link_info, int8_t *snr)
 {
-	struct hdd_context *hdd_ctx;
+	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(link_info->adapter);
 	struct hdd_station_ctx *sta_ctx;
 	QDF_STATUS status;
 	int ret;
@@ -7478,18 +7472,11 @@ QDF_STATUS wlan_hdd_get_snr(struct hdd_adapter *adapter, int8_t *snr)
 
 	hdd_enter();
 
-	if (!adapter) {
-		hdd_err("Invalid context, adapter");
-		return QDF_STATUS_E_FAULT;
-	}
-
-	hdd_ctx = WLAN_HDD_GET_CTX(adapter);
-
 	ret = wlan_hdd_validate_context(hdd_ctx);
 	if (ret)
 		return QDF_STATUS_E_FAULT;
 
-	sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter->deflink);
+	sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(link_info);
 
 	request = osif_request_alloc(&params);
 	if (!request) {
@@ -7512,7 +7499,7 @@ QDF_STATUS wlan_hdd_get_snr(struct hdd_adapter *adapter, int8_t *snr)
 		} else {
 			/* update the adapter with the fresh results */
 			priv = osif_request_priv(request);
-			adapter->deflink->snr = priv->snr;
+			link_info->snr = priv->snr;
 		}
 	}
 
@@ -7523,7 +7510,7 @@ QDF_STATUS wlan_hdd_get_snr(struct hdd_adapter *adapter, int8_t *snr)
 	 */
 	osif_request_put(request);
 
-	*snr = adapter->deflink->snr;
+	*snr = link_info->snr;
 	hdd_exit();
 	return QDF_STATUS_SUCCESS;
 }

@@ -453,21 +453,22 @@ QDF_STATUS wlan_hdd_get_mib_stats(struct hdd_adapter *adapter);
 
 /**
  * wlan_hdd_get_rssi() - Get the current RSSI
- * @adapter: adapter upon which the measurement is requested
+ * @link_info: Link info pointer in HDD adapter
  * @rssi_value: pointer to where the RSSI should be returned
  *
  * Return: QDF_STATUS_SUCCESS on success, QDF_STATUS_E_** on error
  */
-QDF_STATUS wlan_hdd_get_rssi(struct hdd_adapter *adapter, int8_t *rssi_value);
+QDF_STATUS wlan_hdd_get_rssi(struct wlan_hdd_link_info *link_info,
+			     int8_t *rssi_value);
 
 /**
  * wlan_hdd_get_snr() - Get the current SNR
- * @adapter: adapter upon which the measurement is requested
+ * @link_info: Link info pointer in HDD adapter
  * @snr: pointer to where the SNR should be returned
  *
  * Return: QDF_STATUS_SUCCESS on success, QDF_STATUS_E_** on error
  */
-QDF_STATUS wlan_hdd_get_snr(struct hdd_adapter *adapter, int8_t *snr);
+QDF_STATUS wlan_hdd_get_snr(struct wlan_hdd_link_info *link_info, int8_t *snr);
 
 /**
  * wlan_hdd_get_linkspeed_for_peermac() - Get link speed for a peer
