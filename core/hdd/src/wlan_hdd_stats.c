@@ -2077,6 +2077,7 @@ static void cache_station_stats_cb(struct stats_event *ev, void *cookie)
 	struct hdd_context *hdd_ctx = adapter->hdd_ctx;
 	uint8_t vdev_id;
 	wlan_net_dev_ref_dbgid dbgid = NET_DEV_HOLD_DISPLAY_TXRX_STATS;
+	struct wlan_hdd_link_info *link_info;
 
 	if (!ev->vdev_summary_stats || !ev->vdev_chain_rssi ||
 	    !ev->peer_adv_stats || !ev->pdev_stats) {
@@ -2088,18 +2089,20 @@ static void cache_station_stats_cb(struct stats_event *ev, void *cookie)
 
 	hdd_for_each_adapter_dev_held_safe(hdd_ctx, adapter, next_adapter,
 					   dbgid) {
-		if (adapter->deflink->vdev_id != vdev_id) {
+		hdd_adapter_for_each_active_link_info(adapter, link_info) {
+			if (link_info->vdev_id != vdev_id)
+				continue;
+
+			copy_station_stats_to_adapter(link_info, ev);
+			wlan_hdd_get_peer_rx_rate_stats(link_info);
+
+			/* dev_put has to be done here */
 			hdd_adapter_dev_put_debug(adapter, dbgid);
-			continue;
+			if (next_adapter)
+				hdd_adapter_dev_put_debug(next_adapter, dbgid);
+			return;
 		}
-		copy_station_stats_to_adapter(adapter->deflink, ev);
-		wlan_hdd_get_peer_rx_rate_stats(adapter->deflink);
-		/* dev_put has to be done here */
 		hdd_adapter_dev_put_debug(adapter, dbgid);
-		if (next_adapter)
-			hdd_adapter_dev_put_debug(next_adapter,
-						  dbgid);
-		break;
 	}
 }
 
