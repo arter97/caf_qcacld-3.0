@@ -873,11 +873,12 @@ static tSirWifiInterfaceMode hdd_map_device_to_ll_iface_mode(int device_mode)
 	}
 }
 
-bool hdd_get_interface_info(struct hdd_adapter *adapter,
+bool hdd_get_interface_info(struct wlan_hdd_link_info *link_info,
 			    struct wifi_interface_info *info)
 {
 	struct hdd_station_ctx *sta_ctx;
 	struct sap_config *config;
+	struct hdd_adapter *adapter = link_info->adapter;
 
 	info->mode = hdd_map_device_to_ll_iface_mode(adapter->device_mode);
 
@@ -886,23 +887,23 @@ bool hdd_get_interface_info(struct hdd_adapter *adapter,
 	if (((QDF_STA_MODE == adapter->device_mode) ||
 	     (QDF_P2P_CLIENT_MODE == adapter->device_mode) ||
 	     (QDF_P2P_DEVICE_MODE == adapter->device_mode))) {
-		sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter->deflink);
-		if (hdd_cm_is_disconnected(adapter->deflink)) {
+		sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(link_info);
+		if (hdd_cm_is_disconnected(link_info))
 			info->state = WIFI_DISCONNECTED;
-		}
-		if (hdd_cm_is_connecting(adapter->deflink)) {
+
+		if (hdd_cm_is_connecting(link_info)) {
 			hdd_debug("Session ID %d, Connection is in progress",
-				  adapter->deflink->vdev_id);
+				  link_info->vdev_id);
 			info->state = WIFI_ASSOCIATING;
 		}
-		if (hdd_cm_is_vdev_associated(adapter->deflink) &&
+		if (hdd_cm_is_vdev_associated(link_info) &&
 		    !sta_ctx->conn_info.is_authenticated) {
 			hdd_err("client " QDF_MAC_ADDR_FMT
 				" is in the middle of WPS/EAPOL exchange.",
 				QDF_MAC_ADDR_REF(adapter->mac_addr.bytes));
 			info->state = WIFI_AUTHENTICATING;
 		}
-		if (hdd_cm_is_vdev_associated(adapter->deflink)) {
+		if (hdd_cm_is_vdev_associated(link_info)) {
 			info->state = WIFI_ASSOCIATED;
 			qdf_copy_macaddr(&info->bssid,
 					 &sta_ctx->conn_info.bssid);
@@ -918,8 +919,8 @@ bool hdd_get_interface_info(struct hdd_adapter *adapter,
 
 	if ((adapter->device_mode == QDF_SAP_MODE ||
 	     adapter->device_mode == QDF_P2P_GO_MODE) &&
-	    test_bit(SOFTAP_BSS_STARTED, &adapter->deflink->link_flags)) {
-		config = &adapter->deflink->session.ap.sap_config;
+	    test_bit(SOFTAP_BSS_STARTED, &link_info->link_flags)) {
+		config = &link_info->session.ap.sap_config;
 		qdf_copy_macaddr(&info->bssid, &config->self_macaddr);
 	}
 	wlan_reg_get_cc_and_src(adapter->hdd_ctx->psoc, info->countryStr);
@@ -1050,7 +1051,7 @@ hdd_cache_ll_iface_stats(struct hdd_context *hdd_ctx,
 
 	link_info = hdd_get_link_info_by_vdev(hdd_ctx, if_stat->vdev_id);
 	if (!link_info) {
-		hdd_err("Invalid vdev");
+		hdd_err("Invalid vdev %d", if_stat->vdev_id);
 		return;
 	}
 	/*
@@ -1073,7 +1074,7 @@ hdd_cache_ll_iface_stats(struct hdd_context *hdd_ctx,
 
 /**
  * hdd_link_layer_process_iface_stats() - This function is called after
- * @adapter: Pointer to device adapter
+ * @link_info: Link info pointer in HDD adapter
  * @if_stat: Pointer to stats data
  * @num_peers: Number of peers
  *
@@ -1084,14 +1085,14 @@ hdd_cache_ll_iface_stats(struct hdd_context *hdd_ctx,
  * Return: None
  */
 static void
-hdd_link_layer_process_iface_stats(struct hdd_adapter *adapter,
+hdd_link_layer_process_iface_stats(struct wlan_hdd_link_info *link_info,
 				   struct wifi_interface_stats *if_stat,
 				   u32 num_peers)
 {
 	struct sk_buff *skb;
-	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
+	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(link_info->adapter);
 
-	if (if_stat->vdev_id != adapter->deflink->vdev_id) {
+	if (if_stat->vdev_id != link_info->vdev_id) {
 		hdd_cache_ll_iface_stats(hdd_ctx, if_stat);
 		return;
 	}
@@ -1120,7 +1121,7 @@ hdd_link_layer_process_iface_stats(struct hdd_adapter *adapter,
 
 	hdd_debug("WMI_LINK_STATS_IFACE Data");
 
-	if (!hdd_get_interface_info(adapter, &if_stat->info)) {
+	if (!hdd_get_interface_info(link_info, &if_stat->info)) {
 		hdd_err("hdd_get_interface_info get fail");
 		wlan_cfg80211_vendor_free_skb(skb);
 		return;
@@ -1630,10 +1631,11 @@ out:
 	qdf_spin_unlock(&priv->ll_stats_lock);
 }
 
-static void hdd_debugfs_process_ll_stats(struct hdd_adapter *adapter,
+static void hdd_debugfs_process_ll_stats(struct wlan_hdd_link_info *link_info,
 					 tSirLLStatsResults *results,
 					 struct osif_request *request)
 {
+	struct hdd_adapter *adapter = link_info->adapter;
 	struct hdd_ll_stats_priv *priv = osif_request_priv(request);
 
 	if (results->paramId & WMI_LINK_STATS_RADIO) {
@@ -1644,7 +1646,7 @@ static void hdd_debugfs_process_ll_stats(struct hdd_adapter *adapter,
 		if (!results->moreResultToFollow)
 			priv->request_bitmap &= ~(WMI_LINK_STATS_RADIO);
 	} else if (results->paramId & WMI_LINK_STATS_IFACE) {
-		hdd_debugfs_process_iface_stats(adapter, results->results,
+		hdd_debugfs_process_iface_stats(link_info, results->results,
 						results->num_peers);
 
 		/* Firmware doesn't send peerstats event if no peers are
@@ -1767,7 +1769,7 @@ void wlan_hdd_cfg80211_link_layer_stats_callback(hdd_handle_t hdd_handle,
 		wlan_hdd_update_ll_stats_request_bitmap(hdd_ctx, request,
 							results);
 		if (results->rspId == DEBUGFS_LLSTATS_REQID) {
-			hdd_debugfs_process_ll_stats(link_info->adapter,
+			hdd_debugfs_process_ll_stats(link_info,
 						     results, request);
 		 } else {
 			hdd_process_ll_stats(results, request);
@@ -1964,10 +1966,11 @@ const struct nla_policy qca_wlan_vendor_ll_get_policy[
 	[QCA_WLAN_VENDOR_ATTR_LL_STATS_GET_CONFIG_REQ_MASK] = {.type = NLA_U32}
 };
 
-static void wlan_hdd_handle_ll_stats(struct hdd_adapter *adapter,
-				     struct hdd_ll_stats *stats,
-				     int ret)
+static void wlan_hdd_handle_ll_stats(struct wlan_hdd_link_info *link_info,
+				     struct hdd_ll_stats *stats, int ret)
 {
+	struct hdd_adapter *adapter = link_info->adapter;
+
 	switch (stats->result_param_id) {
 	case WMI_LINK_STATS_RADIO:
 	{
@@ -1990,7 +1993,8 @@ static void wlan_hdd_handle_ll_stats(struct hdd_adapter *adapter,
 	}
 		break;
 	case WMI_LINK_STATS_IFACE:
-		hdd_link_layer_process_iface_stats(adapter, stats->result,
+		hdd_link_layer_process_iface_stats(link_info,
+						   stats->result,
 						   stats->stats_nradio_npeer.
 						   no_of_peers);
 		break;
@@ -2159,12 +2163,13 @@ wlan_hdd_get_mlo_vdev_params(struct hdd_adapter *adapter,
 #endif
 
 static QDF_STATUS
-wlan_hdd_set_station_stats_request_pending(struct hdd_adapter *adapter,
+wlan_hdd_set_station_stats_request_pending(struct wlan_hdd_link_info *link_info,
 					   tSirLLStatsGetReq *req)
 {
 	struct wlan_objmgr_peer *peer;
 	struct request_info info = {0};
 	struct wlan_objmgr_vdev *vdev;
+	struct hdd_adapter *adapter = link_info->adapter;
 	struct wlan_objmgr_psoc *psoc = adapter->hdd_ctx->psoc;
 	bool is_mlo_vdev = false;
 	QDF_STATUS status;
@@ -2172,16 +2177,14 @@ wlan_hdd_set_station_stats_request_pending(struct hdd_adapter *adapter,
 	if (!adapter->hdd_ctx->is_get_station_clubbed_in_ll_stats_req)
 		return QDF_STATUS_E_INVAL;
 
-	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink,
-					   WLAN_OSIF_STATS_ID);
+	vdev = hdd_objmgr_get_vdev_by_user(link_info, WLAN_OSIF_STATS_ID);
 	if (!vdev)
 		return QDF_STATUS_E_INVAL;
 
 	info.cookie = adapter;
 	info.u.get_station_stats_cb = cache_station_stats_cb;
-	info.vdev_id = adapter->deflink->vdev_id;
-	is_mlo_vdev = wlan_vdev_mlme_get_is_mlo_vdev(
-					psoc, adapter->deflink->vdev_id);
+	info.vdev_id = link_info->vdev_id;
+	is_mlo_vdev = wlan_vdev_mlme_get_is_mlo_vdev(psoc, link_info->vdev_id);
 	if (is_mlo_vdev) {
 		status = wlan_hdd_get_mlo_vdev_params(adapter, &info, req);
 		if (QDF_IS_STATUS_ERROR(status)) {
@@ -2204,8 +2207,7 @@ wlan_hdd_set_station_stats_request_pending(struct hdd_adapter *adapter,
 
 	wlan_objmgr_peer_release_ref(peer, WLAN_OSIF_STATS_ID);
 
-	ucfg_mc_cp_stats_set_pending_req(wlan_vdev_get_psoc(vdev),
-					 TYPE_STATION_STATS, &info);
+	ucfg_mc_cp_stats_set_pending_req(psoc, TYPE_STATION_STATS, &info);
 
 	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_STATS_ID);
 	return QDF_STATUS_SUCCESS;
@@ -2256,8 +2258,8 @@ static QDF_STATUS wlan_hdd_stats_request_needed(struct hdd_adapter *adapter)
 }
 
 #else
-static QDF_STATUS
-wlan_hdd_set_station_stats_request_pending(struct hdd_adapter *adapter,
+static inline QDF_STATUS
+wlan_hdd_set_station_stats_request_pending(struct wlan_hdd_link_info *link_info,
 					   tSirLLStatsGetReq *req)
 {
 	return QDF_STATUS_SUCCESS;
@@ -2275,7 +2277,7 @@ static QDF_STATUS wlan_hdd_stats_request_needed(struct hdd_adapter *adapter)
 }
 #endif /* FEATURE_CLUB_LL_STATS_AND_GET_STATION */
 
-static int wlan_hdd_send_ll_stats_req(struct hdd_adapter *adapter,
+static int wlan_hdd_send_ll_stats_req(struct wlan_hdd_link_info *link_info,
 				      tSirLLStatsGetReq *req)
 {
 	int ret = 0;
@@ -2284,6 +2286,7 @@ static int wlan_hdd_send_ll_stats_req(struct hdd_adapter *adapter,
 	struct osif_request *request;
 	qdf_list_node_t *ll_node;
 	QDF_STATUS status;
+	struct hdd_adapter *adapter = link_info->adapter;
 	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
 	void *cookie;
 	static const struct osif_request_params params = {
@@ -2298,7 +2301,7 @@ static int wlan_hdd_send_ll_stats_req(struct hdd_adapter *adapter,
 	if (QDF_IS_STATUS_ERROR(status))
 		return qdf_status_to_os_return(status);
 
-	status = wlan_hdd_set_station_stats_request_pending(adapter, req);
+	status = wlan_hdd_set_station_stats_request_pending(link_info, req);
 	if (QDF_IS_STATUS_ERROR(status))
 		hdd_nofl_debug("Requesting LL_STATS only");
 
@@ -2330,9 +2333,9 @@ static int wlan_hdd_send_ll_stats_req(struct hdd_adapter *adapter,
 
 	priv->request_id = req->reqId;
 	priv->request_bitmap = req->paramIdMask;
-	priv->vdev_id = adapter->deflink->vdev_id;
-	priv->is_mlo_req = wlan_vdev_mlme_get_is_mlo_vdev(
-				hdd_ctx->psoc, adapter->deflink->vdev_id);
+	priv->vdev_id = link_info->vdev_id;
+	priv->is_mlo_req = wlan_vdev_mlme_get_is_mlo_vdev(hdd_ctx->psoc,
+							  link_info->vdev_id);
 	if (priv->is_mlo_req)
 		priv->mlo_vdev_id_bitmap = req->mlo_vdev_id_bitmap;
 
@@ -2367,7 +2370,7 @@ static int wlan_hdd_send_ll_stats_req(struct hdd_adapter *adapter,
 	while (QDF_IS_STATUS_SUCCESS(status)) {
 		stats =  qdf_container_of(ll_node, struct hdd_ll_stats,
 					  ll_stats_node);
-		wlan_hdd_handle_ll_stats(adapter, stats, ret);
+		wlan_hdd_handle_ll_stats(link_info, stats, ret);
 		qdf_mem_free(stats->result);
 		qdf_mem_free(stats);
 		qdf_spin_lock(&priv->ll_stats_lock);
@@ -2390,11 +2393,12 @@ exit:
 	return ret;
 }
 
-int wlan_hdd_ll_stats_get(struct hdd_adapter *adapter, uint32_t req_id,
-			  uint32_t req_mask)
+int wlan_hdd_ll_stats_get(struct wlan_hdd_link_info *link_info,
+			  uint32_t req_id, uint32_t req_mask)
 {
 	int errno;
 	tSirLLStatsGetReq get_req;
+	struct hdd_adapter *adapter = link_info->adapter;
 
 	hdd_enter_dev(adapter->dev);
 
@@ -2403,7 +2407,7 @@ int wlan_hdd_ll_stats_get(struct hdd_adapter *adapter, uint32_t req_id,
 		return -EPERM;
 	}
 
-	if (hdd_cm_is_vdev_roaming(adapter->deflink)) {
+	if (hdd_cm_is_vdev_roaming(link_info)) {
 		hdd_err("Roaming in progress, cannot process the request");
 		return -EBUSY;
 	}
@@ -2415,14 +2419,14 @@ int wlan_hdd_ll_stats_get(struct hdd_adapter *adapter, uint32_t req_id,
 
 	get_req.reqId = req_id;
 	get_req.paramIdMask = req_mask;
-	get_req.staId = adapter->deflink->vdev_id;
+	get_req.staId = link_info->vdev_id;
 
 	rtnl_lock();
-	errno = wlan_hdd_send_ll_stats_req(adapter, &get_req);
+	errno = wlan_hdd_send_ll_stats_req(link_info, &get_req);
 	rtnl_unlock();
 	if (errno)
 		hdd_err("Send LL stats req failed, id:%u, mask:%d, session:%d",
-			req_id, req_mask, adapter->deflink->vdev_id);
+			req_id, req_mask, link_info->vdev_id);
 
 	hdd_exit();
 
@@ -2450,6 +2454,7 @@ __wlan_hdd_cfg80211_ll_stats_get(struct wiphy *wiphy,
 	tSirLLStatsGetReq LinkLayerStatsGetReq;
 	struct net_device *dev = wdev->netdev;
 	struct hdd_adapter *adapter = WLAN_HDD_GET_PRIV_PTR(dev);
+	struct wlan_hdd_link_info *link_info = adapter->deflink;
 
 	hdd_enter_dev(dev);
 
@@ -2468,7 +2473,7 @@ __wlan_hdd_cfg80211_ll_stats_get(struct wiphy *wiphy,
 		return -EINVAL;
 	}
 
-	if (hdd_cm_is_vdev_roaming(adapter->deflink)) {
+	if (hdd_cm_is_vdev_roaming(link_info)) {
 		hdd_err("Roaming in progress, cannot process the request");
 		return -EBUSY;
 	}
@@ -2498,12 +2503,12 @@ __wlan_hdd_cfg80211_ll_stats_get(struct wiphy *wiphy,
 		nla_get_u32(tb_vendor
 			    [QCA_WLAN_VENDOR_ATTR_LL_STATS_GET_CONFIG_REQ_MASK]);
 
-	LinkLayerStatsGetReq.staId = adapter->deflink->vdev_id;
+	LinkLayerStatsGetReq.staId = link_info->vdev_id;
 
-	if (wlan_hdd_validate_vdev_id(adapter->deflink->vdev_id))
+	if (wlan_hdd_validate_vdev_id(link_info->vdev_id))
 		return -EINVAL;
 
-	ret = wlan_hdd_send_ll_stats_req(adapter, &LinkLayerStatsGetReq);
+	ret = wlan_hdd_send_ll_stats_req(link_info, &LinkLayerStatsGetReq);
 	if (0 != ret) {
 		hdd_err("Failed to send LL stats request (id:%u)",
 			LinkLayerStatsGetReq.reqId);

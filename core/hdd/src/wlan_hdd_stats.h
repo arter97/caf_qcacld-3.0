@@ -205,24 +205,24 @@ int wlan_hdd_cfg80211_ll_stats_ext_set_param(struct wiphy *wiphy,
 					     int data_len);
 /**
  * hdd_get_interface_info() - get interface info
- * @adapter: Pointer to device adapter
+ * @link_info: Link info pointer in HDD adapter
  * @info: Pointer to interface info
  *
  * Return: bool
  */
-bool hdd_get_interface_info(struct hdd_adapter *adapter,
+bool hdd_get_interface_info(struct wlan_hdd_link_info *link_info,
 			    struct wifi_interface_info *info);
 
 /**
  * wlan_hdd_ll_stats_get() - Get Link Layer statistics from FW
- * @adapter: Pointer to device adapter
+ * @link_info: Link info pointer in HDD adapter
  * @req_id: request id
  * @req_mask: bitmask used by FW for the request
  *
  * Return: 0 on success and error code otherwise
  */
-int wlan_hdd_ll_stats_get(struct hdd_adapter *adapter, uint32_t req_id,
-			  uint32_t req_mask);
+int wlan_hdd_ll_stats_get(struct wlan_hdd_link_info *link_info,
+			  uint32_t req_id, uint32_t req_mask);
 
 /**
  * wlan_hdd_cfg80211_link_layer_stats_callback() - This function is called
@@ -283,8 +283,8 @@ wlan_hdd_cfg80211_ll_stats_ext_set_param(struct wiphy *wiphy,
 }
 
 static inline int
-wlan_hdd_ll_stats_get(struct hdd_adapter *adapter, uint32_t req_id,
-		      uint32_t req_mask)
+wlan_hdd_ll_stats_get(struct wlan_hdd_link_info *link_info,
+		      uint32_t req_id, uint32_t req_mask)
 {
 	return -EINVAL;
 }
