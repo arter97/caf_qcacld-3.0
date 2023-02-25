@@ -279,7 +279,7 @@ bool dp_tx_me_check_primary_peer_by_mac(struct dp_soc *soc, struct dp_vdev *vdev
 	struct dp_peer *tgt_peer = NULL;
 	struct cdp_peer_info peer_info = { 0 };
 
-	if (!vdev->wds_ext_enabled)
+	if (!dp_vdev_is_wds_ext_enabled(vdev))
 		return false;
 
 	DP_PEER_INFO_PARAMS_INIT(&peer_info, DP_VDEV_ALL, mac_addr, false,
