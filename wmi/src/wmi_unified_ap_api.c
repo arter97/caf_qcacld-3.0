@@ -848,3 +848,15 @@ QDF_STATUS wmi_unified_tdma_schedule_send(
 	}
 	return QDF_STATUS_E_FAILURE;
 }
+
+#ifdef QCA_STANDALONE_SOUNDING_TRIGGER
+QDF_STATUS wmi_unified_txbf_sounding_trig_info_cmd_send(struct wmi_unified *wmi_handle,
+							struct wmi_txbf_sounding_trig_param *sounding_params)
+{
+	if (wmi_handle->ops->config_txbf_sounding_trig_info_cmd) {
+	    return wmi_handle->ops->config_txbf_sounding_trig_info_cmd(wmi_handle,
+								       sounding_params);
+	}
+	return QDF_STATUS_E_FAILURE;
+}
+#endif
