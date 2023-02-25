@@ -264,7 +264,7 @@ void hdd_cm_handle_assoc_event(struct wlan_objmgr_vdev *vdev, uint8_t *peer_mac)
  */
 static bool hdd_cm_netif_features_update_required(struct hdd_adapter *adapter)
 {
-	bool is_legacy_connection = hdd_is_legacy_connection(adapter);
+	bool is_legacy_connection = hdd_is_legacy_connection(adapter->deflink);
 
 	hdd_debug("Legacy Connection: %d, TSO_CSUM Feature Enabled:%d",
 		  is_legacy_connection, adapter->tso_csum_feature_enabled);

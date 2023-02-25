@@ -185,14 +185,14 @@ int hdd_set_tdls_offchannel(struct hdd_context *hdd_ctx,
 
 /**
  * hdd_get_tdls_connected_peer_count() - Gets connected TDLS peer count.
- * @adapter: Pointer to adapter
+ * @link_info: Pointer to link_info in hdd adapter
  *
  * This function return number of connected peer.
  *
  * Return: void
  */
 uint16_t
-hdd_get_tdls_connected_peer_count(struct hdd_adapter *adapter);
+hdd_get_tdls_connected_peer_count(struct wlan_hdd_link_info *link_info);
 
 /**
  * hdd_check_and_set_tdls_conn_params() - Sets and Overwrite netdev params if
@@ -336,7 +336,7 @@ static inline void hdd_config_tdls_with_band_switch(struct hdd_context *hdd_ctx)
 }
 
 static inline uint16_t
-hdd_get_tdls_connected_peer_count(struct hdd_adapter *adapter)
+hdd_get_tdls_connected_peer_count(struct wlan_hdd_link_info *link_info)
 {
 	return 0;
 }

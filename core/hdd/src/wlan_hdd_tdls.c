@@ -728,12 +728,12 @@ hdd_is_sta_legacy(struct wlan_hdd_link_info *link_info)
 }
 
 uint16_t
-hdd_get_tdls_connected_peer_count(struct hdd_adapter *adapter)
+hdd_get_tdls_connected_peer_count(struct wlan_hdd_link_info *link_info)
 {
 	struct wlan_objmgr_vdev *vdev;
 	uint16_t peer_count;
 
-	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink, WLAN_OSIF_TDLS_ID);
+	vdev = hdd_objmgr_get_vdev_by_user(link_info, WLAN_OSIF_TDLS_ID);
 
 	peer_count = ucfg_get_tdls_conn_peer_count(vdev);
 	wlan_objmgr_vdev_release_ref(vdev, WLAN_OSIF_TDLS_ID);

@@ -26938,18 +26938,18 @@ hdd_convert_cfgdot11mode_to_80211mode(enum csr_cfgdot11mode mode)
 	}
 }
 
-bool hdd_is_legacy_connection(struct hdd_adapter *adapter)
+bool hdd_is_legacy_connection(struct wlan_hdd_link_info *link_info)
 {
 	struct hdd_station_ctx *sta_ctx;
 	int connection_mode = QCA_WLAN_802_11_MODE_INVALID;
 	enum csr_cfgdot11mode cfgmode;
 	uint16_t tdls_connected_peer;
 
-	tdls_connected_peer = hdd_get_tdls_connected_peer_count(adapter);
+	tdls_connected_peer = hdd_get_tdls_connected_peer_count(link_info);
 	if (tdls_connected_peer)
 		return false;
 
-	sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter->deflink);
+	sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(link_info);
 	cfgmode = sta_ctx->conn_info.dot11mode;
 	connection_mode = hdd_convert_cfgdot11mode_to_80211mode(cfgmode);
 	if (connection_mode == QCA_WLAN_802_11_MODE_11A ||

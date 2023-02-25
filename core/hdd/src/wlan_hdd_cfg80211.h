@@ -969,11 +969,11 @@ int hdd_set_mac_chan_width(struct hdd_adapter *adapter,
 
 /**
  * hdd_is_legacy_connection() - Is adapter connection is legacy
- * @adapter: Handle to hdd_adapter
+ * @link_info: Pointer to link_info in hdd_adapter
  *
  * Return: true if connection mode is legacy, false otherwise.
  */
-bool hdd_is_legacy_connection(struct hdd_adapter *adapter);
+bool hdd_is_legacy_connection(struct wlan_hdd_link_info *link_info);
 
 struct hdd_hostapd_state;
 

@@ -6117,7 +6117,7 @@ static netdev_features_t __hdd_fix_features(struct net_device *net_dev,
 	}
 
 	feature_tso_csum = hdd_get_tso_csum_feature_flags();
-	if (hdd_is_legacy_connection(adapter)) {
+	if (hdd_is_legacy_connection(adapter->deflink)) {
 		/* Disable checksum and TSO */
 		feature_change_req &= ~feature_tso_csum;
 		adapter->tso_csum_feature_enabled = 0;
