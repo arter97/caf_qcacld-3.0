@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2015,2017-2020 The Linux Foundation. All rights reserved.
- *
+ * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -452,7 +452,7 @@ target_if_populate_reportset_static(
 /**
  * target_if_depopulate_reportset() - Free all the instances of
  * struct spectralsim_reportset
- * @report: head pointer to struct spectralsim_reportset linked list
+ * @reportset: head pointer to struct spectralsim_reportset linked list
  *
  * Free all the instances of struct spectralsim_reportset
  *
@@ -554,10 +554,12 @@ target_if_depopulate_simdata(
 	SPECTRAL_SIM_REPORTSET_DEPOPLFREE_LIST(simctx->bw80_80_headreportset);
 }
 
-/**
+/*
  * target_if_spectral_sim_phyerrdelivery_handler() - Phyerr delivery handler
  *
  * Return: none
+ *
+ * NB: kernel-doc script doesn't parse OS_TIMER_FUNC
  */
 static
 OS_TIMER_FUNC(target_if_spectral_sim_phyerrdelivery_handler)

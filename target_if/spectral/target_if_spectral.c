@@ -33,7 +33,7 @@
 #include <wlan_reg_services_api.h>
 #include <wlan_dfs_ucfg_api.h>
 
-/**
+/*
  * @spectral_ops - Spectral function table, holds the Spectral functions that
  * depend on whether the architecture is Direct Attach or Offload. This is used
  * to populate the actual Spectral function table present in the Spectral
@@ -624,7 +624,7 @@ static inline bool is_spectral_arch_beryllium(uint32_t target_tpe)
 	return false;
 }
 
-/**
+/*
  * List of supported sscan BWs. Make sure to maintain the array elements in the
  * same order of BWs as that of struct spectral_supported_bws bitmap.
  */
@@ -1001,8 +1001,7 @@ target_if_log_read_spectral_enabled(
 }
 
 /**
- * target_if_log_read_spectral_enabled() - Helper function to log spectral
- * parameters after reading cache
+ * target_if_log_read_spectral_params() - log spectral parameters
  * @function_name: Function name
  * @pparam: Spectral parameters
  *
@@ -3057,7 +3056,7 @@ target_if_spectral_detach_simulation(struct target_if_spectral *spectral)
 
 /**
  * target_if_spectral_detach() - De-initialize target_if Spectral
- * @pdev: Pointer to pdev object
+ * @spectral: Pointer to Spectral target_if internal private data
  *
  * Function to detach target_if spectral
  *
@@ -3887,13 +3886,13 @@ fail:
 }
 
 /**
- * target_if_calculate_center_freq() - Helper routine to
- * check whether given frequency is center frequency of a
- * WLAN channel
- *
- * @spectral: Pointer to Spectral object
+ * target_if_is_center_freq_of_any_chan() - Check for center frequency
+ * @pdev: Pointer to pdev object
  * @chan_freq: Center frequency of a WLAN channel
  * @is_valid: Indicates whether given frequency is valid
+ *
+ * Helper routine to check whether given frequency is center frequency
+ * of a WLAN channel
  *
  * Return: QDF_STATUS
  */
@@ -3947,14 +3946,14 @@ target_if_is_center_freq_of_any_chan(struct wlan_objmgr_pdev *pdev,
 }
 
 /**
- * target_if_calculate_center_freq() - Helper routine to
- * find the center frequency of the agile span from a
- * WLAN channel center frequency
- *
+ * target_if_calculate_center_freq() - find center frequency of agile span
  * @spectral: Pointer to Spectral object
  * @ch_width: Channel width array
  * @chan_freq: Center frequency of a WLAN channel
  * @center_freq: Pointer to center frequency
+ *
+ * Helper routine to find the center frequency of the agile span from
+ * a WLAN channel center frequency
  *
  * Return: QDF_STATUS
  */
@@ -4012,13 +4011,13 @@ target_if_calculate_center_freq(struct target_if_spectral *spectral,
 }
 
 /**
- * target_if_validate_center_freq() - Helper routine to
- * validate user provided agile center frequency
- *
+ * target_if_validate_center_freq() - validate agile center frequency
  * @spectral: Pointer to Spectral object
  * @ch_width: Channel width array
  * @center_freq: User provided agile span center frequency
  * @is_valid: Indicates whether agile span center frequency is valid
+ *
+ * Helper routine to validate user provided agile center frequency
  *
  * Return: QDF_STATUS
  */
@@ -4782,7 +4781,6 @@ target_if_set_spectral_config(struct wlan_objmgr_pdev *pdev,
 /**
  * target_if_get_fft_bin_count() - Get fft bin count for a given fft length
  * @fft_len: FFT length
- * @pdev: Pointer to pdev object
  *
  * API to get fft bin count for a given fft length
  *
@@ -5445,8 +5443,8 @@ target_if_is_aspectral_prohibited_by_adfs(struct wlan_objmgr_psoc *psoc,
 
 /**
  * target_if_get_curr_band() - Get current operating band of pdev
- *
  * @pdev: pointer to pdev object
+ * @vdev_id: id of vdev
  *
  * API to get current operating band of a given pdev.
  *
