@@ -1095,14 +1095,13 @@ hdd_populate_vdev_nss(struct wlan_mlme_nss_chains *user_cfg,
 	user_cfg->tx_nss[band] = tx_nss;
 }
 
-static QDF_STATUS
-hdd_set_nss_params(struct hdd_adapter *adapter,
-		   uint8_t tx_nss,
-		   uint8_t rx_nss)
+static QDF_STATUS hdd_set_nss_params(struct wlan_hdd_link_info *link_info,
+				     uint8_t tx_nss, uint8_t rx_nss)
 {
 	enum nss_chains_band_info band;
 	struct wlan_mlme_nss_chains user_cfg;
 	mac_handle_t mac_handle;
+	struct hdd_adapter *adapter = link_info->adapter;
 	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
 	struct wlan_objmgr_vdev *vdev;
 
@@ -1115,10 +1114,10 @@ hdd_set_nss_params(struct hdd_adapter *adapter,
 	}
 
 	vdev = wlan_objmgr_get_vdev_by_id_from_pdev(hdd_ctx->pdev,
-						    adapter->deflink->vdev_id,
+						    link_info->vdev_id,
 						    WLAN_HDD_ID_OBJ_MGR);
 	if (!vdev) {
-		hdd_err("vdev is NULL %d", adapter->deflink->vdev_id);
+		hdd_err("vdev is NULL %d", link_info->vdev_id);
 		return QDF_STATUS_E_INVAL;
 	}
 
@@ -1132,29 +1131,28 @@ hdd_set_nss_params(struct hdd_adapter *adapter,
 	wlan_objmgr_vdev_release_ref(vdev, WLAN_HDD_ID_OBJ_MGR);
 
 	for (band = NSS_CHAINS_BAND_2GHZ; band < NSS_CHAINS_BAND_MAX; band++)
-		hdd_populate_vdev_nss(&user_cfg, tx_nss,
-				      rx_nss, band);
+		hdd_populate_vdev_nss(&user_cfg, tx_nss, rx_nss, band);
 	if (QDF_IS_STATUS_ERROR(
-		sme_nss_chains_update(mac_handle,
-				      &user_cfg,
-				      adapter->deflink->vdev_id)))
+		sme_nss_chains_update(mac_handle, &user_cfg,
+				      link_info->vdev_id)))
 		return QDF_STATUS_E_FAILURE;
 
 	/* Check TDLS status and update antenna mode */
 	if ((adapter->device_mode == QDF_STA_MODE ||
 	     adapter->device_mode == QDF_P2P_CLIENT_MODE) &&
 	     policy_mgr_is_sta_active_connection_exists(hdd_ctx->psoc))
-		wlan_hdd_tdls_antenna_switch(adapter->deflink, rx_nss);
+		wlan_hdd_tdls_antenna_switch(link_info, rx_nss);
 
 	return QDF_STATUS_SUCCESS;
 }
 
-static void
-hdd_update_nss_in_vdev(struct hdd_adapter *adapter, mac_handle_t mac_handle,
-		       uint8_t tx_nss, uint8_t rx_nss)
+static void hdd_update_nss_in_vdev(struct wlan_hdd_link_info *link_info,
+				   mac_handle_t mac_handle, uint8_t tx_nss,
+				   uint8_t rx_nss)
 {
 	uint8_t band, max_supp_nss = MAX_VDEV_NSS;
 	struct wlan_objmgr_vdev *vdev;
+	struct hdd_adapter *adapter = link_info->adapter;
 
 	for (band = NSS_CHAINS_BAND_2GHZ; band < NSS_CHAINS_BAND_MAX;
 	     band++) {
@@ -1165,14 +1163,13 @@ hdd_update_nss_in_vdev(struct hdd_adapter *adapter, mac_handle_t mac_handle,
 		 * This API will change the vdev nss params in mac
 		 * context
 		 */
-		sme_update_vdev_type_nss(mac_handle, max_supp_nss,
-					 band);
+		sme_update_vdev_type_nss(mac_handle, max_supp_nss, band);
 	}
 	/*
 	 * This API will change the ini and dynamic nss params in
 	 * mlme vdev priv obj.
 	 */
-	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink, WLAN_OSIF_ID);
+	vdev = hdd_objmgr_get_vdev_by_user(link_info, WLAN_OSIF_ID);
 	if (!vdev)
 		return;
 
@@ -1180,13 +1177,12 @@ hdd_update_nss_in_vdev(struct hdd_adapter *adapter, mac_handle_t mac_handle,
 	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
 }
 
-static void hdd_set_sap_nss_params(struct hdd_context *hdd_ctx,
-				   struct hdd_adapter *adapter,
+static void hdd_set_sap_nss_params(struct wlan_hdd_link_info *link_info,
 				   mac_handle_t mac_handle,
 				   uint8_t tx_nss, uint8_t rx_nss)
 {
-	hdd_update_nss_in_vdev(adapter, mac_handle, tx_nss, rx_nss);
-	hdd_restart_sap(adapter);
+	hdd_update_nss_in_vdev(link_info, mac_handle, tx_nss, rx_nss);
+	hdd_restart_sap(link_info->adapter);
 }
 
 QDF_STATUS hdd_update_nss(struct wlan_hdd_link_info *link_info,
@@ -1241,9 +1237,8 @@ QDF_STATUS hdd_update_nss(struct wlan_hdd_link_info *link_info,
 		     adapter->device_mode == QDF_P2P_GO_MODE) && restart_sap) {
 			if ((tx_nss == 2 && rx_nss == 2) ||
 			    (tx_nss == 1 && rx_nss == 1)) {
-				hdd_set_sap_nss_params(hdd_ctx, adapter,
-						       mac_handle, tx_nss,
-						       rx_nss);
+				hdd_set_sap_nss_params(link_info, mac_handle,
+						       tx_nss, rx_nss);
 				return QDF_STATUS_SUCCESS;
 			}
 			hdd_err("tx_nss %d rx_nss %d not supported ",
@@ -1252,14 +1247,13 @@ QDF_STATUS hdd_update_nss(struct wlan_hdd_link_info *link_info,
 		}
 
 		if (hdd_is_vdev_in_conn_state(link_info))
-			return hdd_set_nss_params(adapter, tx_nss, rx_nss);
+			return hdd_set_nss_params(link_info, tx_nss, rx_nss);
 
 		if (tx_nss != rx_nss) {
 			hdd_err("TX NSS = %d, RX NSS  = %d value mismatch, doesn't support asymmetric config in disconnected state",
 				tx_nss, rx_nss);
 			return QDF_STATUS_E_FAILURE;
 		}
-
 		hdd_debug("Vdev %d in disconnect state, changing ini nss params",
 			  link_info->vdev_id);
 		if (!bval) {
@@ -1267,7 +1261,7 @@ QDF_STATUS hdd_update_nss(struct wlan_hdd_link_info *link_info,
 			return QDF_STATUS_SUCCESS;
 		}
 
-		hdd_update_nss_in_vdev(adapter, mac_handle, tx_nss, rx_nss);
+		hdd_update_nss_in_vdev(link_info, mac_handle, tx_nss, rx_nss);
 		sme_set_nss_capability(mac_handle, link_info->vdev_id,
 				       rx_nss, adapter->device_mode);
 
