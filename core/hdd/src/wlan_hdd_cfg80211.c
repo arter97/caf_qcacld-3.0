@@ -11737,7 +11737,7 @@ static int hdd_get_tx_nss_config(struct wlan_hdd_link_info *link_info,
 		return -EINVAL;
 	}
 
-	status = hdd_get_tx_nss(link_info->adapter, &tx_nss);
+	status = hdd_get_tx_nss(link_info, &tx_nss);
 	if (!QDF_IS_STATUS_SUCCESS(status)) {
 		hdd_err("Failed to get nss");
 		return -EINVAL;
@@ -11772,7 +11772,7 @@ static int hdd_get_rx_nss_config(struct wlan_hdd_link_info *link_info,
 		return -EINVAL;
 	}
 
-	status = hdd_get_rx_nss(link_info->adapter, &rx_nss);
+	status = hdd_get_rx_nss(link_info, &rx_nss);
 	if (!QDF_IS_STATUS_SUCCESS(status)) {
 		hdd_err("Failed to get nss");
 		return -EINVAL;

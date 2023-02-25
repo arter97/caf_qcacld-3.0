@@ -1534,15 +1534,16 @@ hdd_get_sta_tx_nss(struct wlan_hdd_link_info *link_info, uint8_t *tx_nss)
 	return QDF_STATUS_SUCCESS;
 }
 
-QDF_STATUS hdd_get_tx_nss(struct hdd_adapter *adapter, uint8_t *tx_nss)
+QDF_STATUS hdd_get_tx_nss(struct wlan_hdd_link_info *link_info, uint8_t *tx_nss)
 {
+	struct hdd_adapter *adapter = link_info->adapter;
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
 
 	if (adapter->device_mode == QDF_SAP_MODE ||
 	    adapter->device_mode == QDF_P2P_GO_MODE)
-		status = hdd_get_sap_tx_nss(adapter->deflink, tx_nss);
+		status = hdd_get_sap_tx_nss(link_info, tx_nss);
 	else
-		status = hdd_get_sta_tx_nss(adapter->deflink, tx_nss);
+		status = hdd_get_sta_tx_nss(link_info, tx_nss);
 
 	return status;
 }
@@ -1659,15 +1660,16 @@ hdd_get_sta_rx_nss(struct wlan_hdd_link_info *link_info, uint8_t *rx_nss)
 	return QDF_STATUS_SUCCESS;
 }
 
-QDF_STATUS hdd_get_rx_nss(struct hdd_adapter *adapter, uint8_t *rx_nss)
+QDF_STATUS hdd_get_rx_nss(struct wlan_hdd_link_info *link_info, uint8_t *rx_nss)
 {
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
+	struct hdd_adapter *adapter = link_info->adapter;
 
 	if (adapter->device_mode == QDF_SAP_MODE ||
 	    adapter->device_mode == QDF_P2P_GO_MODE)
-		status = hdd_get_sap_rx_nss(adapter->deflink, rx_nss);
+		status = hdd_get_sap_rx_nss(link_info, rx_nss);
 	else
-		status = hdd_get_sta_rx_nss(adapter->deflink, rx_nss);
+		status = hdd_get_sta_rx_nss(link_info, rx_nss);
 
 	return status;
 }

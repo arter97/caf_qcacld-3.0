@@ -283,8 +283,7 @@ QDF_STATUS hdd_get_nss(struct hdd_adapter *adapter, uint8_t *nss);
 
 /**
  * hdd_get_tx_nss() - Get the number of spatial streams supported by the adapter
- *
- * @adapter: the pointer to adapter
+ * @link_info: Link info pointer in HDD adapter
  * @tx_nss: the number Tx of spatial streams supported by the adapter
  *
  * This function is used to get the number of Tx spatial streams supported by
@@ -292,12 +291,12 @@ QDF_STATUS hdd_get_nss(struct hdd_adapter *adapter, uint8_t *nss);
  *
  * Return: QDF_STATUS
  */
-QDF_STATUS hdd_get_tx_nss(struct hdd_adapter *adapter, uint8_t *tx_nss);
+QDF_STATUS hdd_get_tx_nss(struct wlan_hdd_link_info *link_info,
+			  uint8_t *tx_nss);
 
 /**
  * hdd_get_rx_nss() - Get the number of spatial streams supported by the adapter
- *
- * @adapter: the pointer to adapter
+ * @link_info: Link info pointer in HDD adapter
  * @rx_nss: the number Rx of spatial streams supported by the adapter
  *
  * This function is used to get the number of Rx spatial streams supported by
@@ -305,7 +304,8 @@ QDF_STATUS hdd_get_tx_nss(struct hdd_adapter *adapter, uint8_t *tx_nss);
  *
  * Return: QDF_STATUS
  */
-QDF_STATUS hdd_get_rx_nss(struct hdd_adapter *adapter, uint8_t *rx_nss);
+QDF_STATUS hdd_get_rx_nss(struct wlan_hdd_link_info *link_info,
+			  uint8_t *rx_nss);
 
 
 /**
