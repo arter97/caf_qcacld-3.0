@@ -2000,8 +2000,8 @@ void dp_mon_filter_show_rx_filter_be(enum dp_mon_filter_mode mode,
 void dp_mon_filter_show_tx_filter_be(enum dp_mon_filter_mode mode,
 				     struct dp_mon_filter_be *filter)
 {
-	dp_mon_filter_err("TX MON RING TLV FILTER CONFIG:");
-	dp_mon_filter_err("[Mode %d]: Valid: %d", mode, filter->tx_valid);
+	DP_MON_FILTER_PRINT("TX MON RING TLV FILTER CONFIG:");
+	DP_MON_FILTER_PRINT("[Mode %d]: Valid: %d", mode, filter->tx_valid);
 
 	if (filter->tx_valid)
 		dp_tx_mon_filter_show_filter(filter);
