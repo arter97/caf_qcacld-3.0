@@ -184,19 +184,18 @@ static int hdd_get_sta_congestion(struct wlan_hdd_link_info *link_info,
 
 /**
  * hdd_get_station_assoc_fail() - Handle get station assoc fail
- * @hdd_ctx: HDD context within host driver
- * @adapter: pointer to adapter
+ * @link_info: Link info pointer in HDD adaper
  *
  * Handles QCA_NL80211_VENDOR_SUBCMD_GET_STATION_ASSOC_FAIL.
  * Validate cmd attributes and send the station info to upper layers.
  *
  * Return: Success(0) or reason code for failure
  */
-static int hdd_get_station_assoc_fail(struct hdd_context *hdd_ctx,
-				      struct hdd_adapter *adapter)
+static int hdd_get_station_assoc_fail(struct wlan_hdd_link_info *link_info)
 {
 	struct sk_buff *skb = NULL;
 	uint32_t nl_buf_len;
+	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(link_info->adapter);
 	struct hdd_station_ctx *hdd_sta_ctx;
 	uint32_t congestion;
 
@@ -208,8 +207,7 @@ static int hdd_get_station_assoc_fail(struct hdd_context *hdd_ctx,
 		hdd_err("wlan_cfg80211_vendor_cmd_alloc_reply_skb failed");
 		return -ENOMEM;
 	}
-
-	hdd_sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter->deflink);
+	hdd_sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(link_info);
 
 	if (nla_put_u32(skb, INFO_ASSOC_FAIL_REASON,
 			hdd_sta_ctx->conn_info.assoc_status_code)) {
@@ -217,7 +215,7 @@ static int hdd_get_station_assoc_fail(struct hdd_context *hdd_ctx,
 		goto fail;
 	}
 
-	if (hdd_get_sta_congestion(adapter->deflink, &congestion))
+	if (hdd_get_sta_congestion(link_info, &congestion))
 		congestion = 0;
 
 	hdd_info("congestion:%d", congestion);
@@ -399,14 +397,13 @@ static uint32_t hdd_calculate_tx_bitrate_ie_size(void)
 /**
  * hdd_add_tx_bitrate() - add tx bitrate attribute
  * @skb: pointer to sk buff
- * @adapter: pointer to adapter
+ * @link_info: Link info pointer in HDD adapter
  * @idx: attribute index
  *
  * Return: Success(0) or reason code for failure
  */
 static int32_t hdd_add_tx_bitrate(struct sk_buff *skb,
-				  struct hdd_adapter *adapter,
-				  int idx)
+				  struct wlan_hdd_link_info *link_info, int idx)
 {
 	struct nlattr *nla_attr;
 	uint32_t bitrate, bitrate_compat;
@@ -418,10 +415,10 @@ static int32_t hdd_add_tx_bitrate(struct sk_buff *skb,
 		goto fail;
 	}
 
-	sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter->deflink);
+	sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(link_info);
 
 	/* cfg80211_calculate_bitrate will return 0 for mcs >= 32 */
-	if (hdd_cm_is_vdev_associated(adapter->deflink))
+	if (hdd_cm_is_vdev_associated(link_info))
 		bitrate = cfg80211_calculate_bitrate(
 				&sta_ctx->cache_conn_info.max_tx_bitrate);
 	else
@@ -485,25 +482,18 @@ static uint32_t hdd_calculate_sta_info_ie_size(void)
 /**
  * hdd_add_sta_info() - add station info attribute
  * @skb: pointer to sk buff
- * @hdd_ctx: pointer to hdd station context
- * @adapter: pointer to adapter
+ * @link_info: Link info pointer in HDD adapter
  * @idx: attribute index
  *
  * Return: Success(0) or reason code for failure
  */
 static int32_t hdd_add_sta_info(struct sk_buff *skb,
-				struct hdd_context *hdd_ctx,
-				struct hdd_adapter *adapter,
-				int idx)
+				struct wlan_hdd_link_info *link_info, int idx)
 {
 	struct nlattr *nla_attr;
 	struct hdd_station_ctx *hdd_sta_ctx;
 
-	hdd_sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter->deflink);
-	if (!hdd_sta_ctx) {
-		hdd_err("Invalid sta ctx");
-		goto fail;
-	}
+	hdd_sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(link_info);
 
 	nla_attr = nla_nest_start(skb, idx);
 	if (!nla_attr) {
@@ -517,10 +507,10 @@ static int32_t hdd_add_sta_info(struct sk_buff *skb,
 		goto fail;
 	}
 
-	if (hdd_cm_is_vdev_associated(adapter->deflink))
-		hdd_get_max_tx_bitrate(adapter->deflink);
+	if (hdd_cm_is_vdev_associated(link_info))
+		hdd_get_max_tx_bitrate(link_info);
 
-	if (hdd_add_tx_bitrate(skb, adapter, NL80211_STA_INFO_TX_BITRATE)) {
+	if (hdd_add_tx_bitrate(skb, link_info, NL80211_STA_INFO_TX_BITRATE)) {
 		hdd_err("hdd_add_tx_bitrate failed");
 		goto fail;
 	}
@@ -600,21 +590,19 @@ static uint32_t hdd_calculate_link_standard_info_ie_size(void)
 /**
  * hdd_add_link_standard_info() - add link info attribute
  * @skb: pointer to sk buff
- * @hdd_ctx: pointer to hdd context
- * @adapter: pointer to adapter
+ * @link_info: Link info pointer in HDD adapter
  * @idx: attribute index
  *
  * Return: Success(0) or reason code for failure
  */
 static int32_t
 hdd_add_link_standard_info(struct sk_buff *skb,
-			   struct hdd_context *hdd_ctx,
-			   struct hdd_adapter *adapter, int idx)
+			   struct wlan_hdd_link_info *link_info, int idx)
 {
 	struct nlattr *nla_attr;
 	struct hdd_station_ctx *hdd_sta_ctx;
 
-	hdd_sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter->deflink);
+	hdd_sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(link_info);
 	if (!hdd_sta_ctx) {
 		hdd_err("Invalid sta ctx");
 		goto fail;
@@ -643,7 +631,7 @@ hdd_add_link_standard_info(struct sk_buff *skb,
 		goto fail;
 	}
 
-	if (hdd_add_sta_info(skb, hdd_ctx, adapter, NL80211_ATTR_STA_INFO)) {
+	if (hdd_add_sta_info(skb, link_info, NL80211_ATTR_STA_INFO)) {
 		hdd_err("hdd_add_sta_info failed");
 		goto fail;
 	}
@@ -854,21 +842,20 @@ static uint32_t hdd_calculate_station_info_ie_size(
 
 /**
  * hdd_populate_station_info_skb - populate station info in skb
- * @hdd_ctx: pointer to hdd context
  * @skb: pointer to socket buffer
- * @adapter: pointer to adapter
- * @hdd_sta_ctx: pointer to hdd station ctx
+ * @link_info: Link info pointer in HDD adapter
  *
  * Return: QDF_STATUS_SUCCESS in case of success else failure
  */
-static QDF_STATUS hdd_populate_station_info_skb(struct hdd_context *hdd_ctx,
-					struct sk_buff *skb,
-					struct hdd_adapter *adapter,
-					struct hdd_station_ctx *hdd_sta_ctx)
+static QDF_STATUS
+hdd_populate_station_info_skb(struct sk_buff *skb,
+			      struct wlan_hdd_link_info *link_info)
 {
 	uint8_t *tmp_hs20 = NULL;
+	struct hdd_station_ctx *hdd_sta_ctx =
+					WLAN_HDD_GET_STATION_CTX_PTR(link_info);
 
-	if (hdd_add_link_standard_info(skb, hdd_ctx, adapter,
+	if (hdd_add_link_standard_info(skb, link_info,
 				       LINK_INFO_STANDARD_NL80211_ATTR)) {
 		hdd_err("link_standard_info put fail");
 		return QDF_STATUS_E_FAILURE;
@@ -944,7 +931,7 @@ static QDF_STATUS hdd_populate_station_info_skb(struct hdd_context *hdd_ctx,
 	}
 
 	if (nla_put_u32(skb, DISCONNECT_REASON,
-			adapter->last_disconnect_reason)) {
+			link_info->adapter->last_disconnect_reason)) {
 		hdd_err("Failed to put disconnect reason");
 		return QDF_STATUS_E_FAILURE;
 	}
@@ -958,21 +945,21 @@ static QDF_STATUS hdd_populate_station_info_skb(struct hdd_context *hdd_ctx,
 
 /**
  * hdd_get_station_info() - send BSS information to supplicant
- * @hdd_ctx: pointer to hdd context
- * @adapter: pointer to adapter
+ * @link_info: Link info pointer in HDD adapter
  *
  * Return: 0 if success else error status
  */
-static int hdd_get_station_info(struct hdd_context *hdd_ctx,
-				struct hdd_adapter *adapter)
+static int hdd_get_station_info(struct wlan_hdd_link_info *link_info)
 {
 	struct sk_buff *skb = NULL;
 	uint32_t nl_buf_len;
+	struct hdd_adapter *adapter = link_info->adapter;
+	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
 	struct hdd_station_ctx *hdd_sta_ctx;
 
-	hdd_sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter->deflink);
+	hdd_sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(link_info);
 
-	if (hdd_cm_is_vdev_connected(adapter->deflink)) {
+	if (hdd_cm_is_vdev_connected(link_info)) {
 		hdd_err("Station is connected, command is not supported");
 		return -EINVAL;
 	}
@@ -983,15 +970,13 @@ static int hdd_get_station_info(struct hdd_context *hdd_ctx,
 		return -EINVAL;
 	}
 
-	skb = cfg80211_vendor_cmd_alloc_reply_skb(hdd_ctx->wiphy,
-						  nl_buf_len);
+	skb = cfg80211_vendor_cmd_alloc_reply_skb(hdd_ctx->wiphy, nl_buf_len);
 	if (!skb) {
 		hdd_err("wlan_cfg80211_vendor_cmd_alloc_reply_skb failed");
 		return -ENOMEM;
 	}
 
-	if (hdd_populate_station_info_skb(hdd_ctx, skb, adapter, hdd_sta_ctx)
-	    != QDF_STATUS_SUCCESS)
+	if (hdd_populate_station_info_skb(skb, link_info) != QDF_STATUS_SUCCESS)
 		goto fail;
 
 	hdd_nofl_debug(
@@ -1477,8 +1462,7 @@ fail:
 
 /**
  * hdd_get_connected_station_info() - get connected peer's info
- * @hdd_ctx: hdd context
- * @adapter: hostapd interface
+ * @link_info: Link info pointer in HDD adapter
  * @mac_addr: mac address of requested peer
  * @stainfo: location to store peer info
  *
@@ -1486,18 +1470,17 @@ fail:
  *
  * Return: 0 on success, otherwise error value
  */
-static int hdd_get_connected_station_info(struct hdd_context *hdd_ctx,
-					  struct hdd_adapter *adapter,
+static int hdd_get_connected_station_info(struct wlan_hdd_link_info *link_info,
 					  struct qdf_mac_addr mac_addr,
 					  struct hdd_station_info *stainfo)
 {
 	struct sk_buff *skb = NULL;
 	uint32_t nl_buf_len;
 	struct stats_event *stats;
-	bool txrx_rate = false;
-	bool value;
+	bool txrx_rate = false, value;
 	QDF_STATUS status;
 	int ret;
+	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(link_info->adapter);
 
 	nl_buf_len = NLMSG_HDRLEN;
 	nl_buf_len += (sizeof(stainfo->max_phy_rate) + NLA_HDRLEN) +
@@ -1513,7 +1496,7 @@ static int hdd_get_connected_station_info(struct hdd_context *hdd_ctx,
 		hdd_err("Unable to fetch sap ger peer info");
 	if (value) {
 		stats = wlan_cfg80211_mc_cp_stats_get_peer_stats(
-					adapter->deflink->vdev, mac_addr.bytes,
+					link_info->vdev, mac_addr.bytes,
 					&ret);
 		if (ret || !stats) {
 			hdd_err("fail to get tx/rx rate");
@@ -1554,19 +1537,15 @@ static int hdd_get_connected_station_info(struct hdd_context *hdd_ctx,
 
 	hdd_info("stainfo");
 	hdd_info("maxrate %x tx_pkts %x tx_bytes %llx",
-		 stainfo->max_phy_rate, stainfo->tx_packets,
-		 stainfo->tx_bytes);
+		 stainfo->max_phy_rate, stainfo->tx_packets, stainfo->tx_bytes);
 	hdd_info("rx_pkts %x rx_bytes %llx mode %x",
-		 stainfo->rx_packets, stainfo->rx_bytes,
-		 stainfo->mode);
+		 stainfo->rx_packets, stainfo->rx_bytes, stainfo->mode);
 	if (stainfo->mode > SIR_SME_PHY_MODE_LEGACY) {
 		hdd_info("ampdu %d tx_stbc %d rx_stbc %d",
-			 stainfo->ampdu, stainfo->tx_stbc,
-			 stainfo->rx_stbc);
+			 stainfo->ampdu, stainfo->tx_stbc, stainfo->rx_stbc);
 		hdd_info("wmm %d chwidth %d sgi %d",
 			 stainfo->is_qos_enabled,
-			 stainfo->ch_width,
-			 stainfo->sgi_enable);
+			 stainfo->ch_width, stainfo->sgi_enable);
 	}
 
 	if (nla_put_u32(skb, REMOTE_MAX_PHY_RATE, stainfo->max_phy_rate) ||
@@ -1611,19 +1590,19 @@ fail:
 
 /**
  * hdd_get_station_remote() - get remote peer's info
- * @hdd_ctx: hdd context
- * @adapter: hostapd interface
+ * @link_info: Link info pointer in HDD adapter
  * @mac_addr: mac address of requested peer
  *
  * This function collect and indicate the remote peer's info
  *
  * Return: 0 on success, otherwise error value
  */
-static int hdd_get_station_remote(struct hdd_context *hdd_ctx,
-				  struct hdd_adapter *adapter,
+static int hdd_get_station_remote(struct wlan_hdd_link_info *link_info,
 				  struct qdf_mac_addr mac_addr)
 {
 	int status = 0;
+	struct hdd_adapter *adapter = link_info->adapter;
+	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
 	struct hdd_station_info *stainfo =
 			hdd_get_sta_info_by_mac(
 					&adapter->sta_info_list,
@@ -1636,8 +1615,7 @@ static int hdd_get_station_remote(struct hdd_context *hdd_ctx,
 		return status;
 	}
 
-	status = hdd_get_connected_station_info(hdd_ctx, adapter,
-						mac_addr, stainfo);
+	status = hdd_get_connected_station_info(link_info, mac_addr, stainfo);
 	hdd_put_sta_info_ref(&adapter->sta_info_list, &stainfo, true,
 			     STA_INFO_HDD_GET_STATION_REMOTE);
 	return status;
@@ -1689,9 +1667,9 @@ __hdd_cfg80211_get_station_cmd(struct wiphy *wiphy,
 
 	/* Parse and fetch Command Type*/
 	if (tb[STATION_INFO]) {
-		status = hdd_get_station_info(hdd_ctx, adapter);
+		status = hdd_get_station_info(adapter->deflink);
 	} else if (tb[STATION_ASSOC_FAIL_REASON]) {
-		status = hdd_get_station_assoc_fail(hdd_ctx, adapter);
+		status = hdd_get_station_assoc_fail(adapter->deflink);
 	} else if (tb[STATION_REMOTE]) {
 		struct qdf_mac_addr mac_addr;
 
@@ -1708,7 +1686,7 @@ __hdd_cfg80211_get_station_cmd(struct wiphy *wiphy,
 		hdd_debug("STATION_REMOTE " QDF_MAC_ADDR_FMT,
 			  QDF_MAC_ADDR_REF(mac_addr.bytes));
 
-		status = hdd_get_station_remote(hdd_ctx, adapter, mac_addr);
+		status = hdd_get_station_remote(adapter->deflink, mac_addr);
 	} else {
 		hdd_err("get station info cmd type failed");
 		status = -EINVAL;
