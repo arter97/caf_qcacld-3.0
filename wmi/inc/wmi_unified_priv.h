@@ -2980,6 +2980,12 @@ QDF_STATUS
 			  struct wmi_trigger_ul_ofdma_mu_params *param);
 #endif
 
+#ifdef QCA_STANDALONE_SOUNDING_TRIGGER
+QDF_STATUS
+(*config_txbf_sounding_trig_info_cmd)(wmi_unified_t wmi,
+				      struct wmi_txbf_sounding_trig_param
+				      *sounding_params);
+#endif
 QDF_STATUS (*send_set_tpc_power_cmd)(wmi_unified_t wmi_handle,
 				     uint8_t vdev_id,
 				     struct reg_tpc_power_info *param);
