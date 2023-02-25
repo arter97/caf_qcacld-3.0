@@ -11361,20 +11361,20 @@ static const struct independent_setters independent_setters[] = {
 #ifdef WLAN_FEATURE_ELNA
 /**
  * hdd_get_elna_bypass() - Get eLNA bypass
- * @adapter: Pointer to HDD adapter
+ * @link_info: Link info pointer in HDD adapter
  * @skb: sk buffer to hold nl80211 attributes
  * @attr: Pointer to struct nlattr
  *
  * Return: 0 on success; error number otherwise
  */
-static int hdd_get_elna_bypass(struct hdd_adapter *adapter,
+static int hdd_get_elna_bypass(struct wlan_hdd_link_info *link_info,
 			       struct sk_buff *skb,
 			       const struct nlattr *attr)
 {
 	int ret;
 	struct wlan_objmgr_vdev *vdev;
 
-	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink, WLAN_FWOL_NB_ID);
+	vdev = hdd_objmgr_get_vdev_by_user(link_info, WLAN_FWOL_NB_ID);
 	if (!vdev)
 		return -EINVAL;
 
@@ -11388,14 +11388,14 @@ static int hdd_get_elna_bypass(struct hdd_adapter *adapter,
 
 /**
  * hdd_get_roam_reason_vsie_status() - Get roam_reason_vsie
- * @adapter: Pointer to HDD adapter
+ * @link_info: Link info pointer in HDD adapter
  * @skb: sk buffer to hold nl80211 attributes
  * @attr: Pointer to struct nlattr
  *
  * Return: 0 on success; error number otherwise
  */
 #ifdef WLAN_FEATURE_ROAM_OFFLOAD
-static int hdd_get_roam_reason_vsie_status(struct hdd_adapter *adapter,
+static int hdd_get_roam_reason_vsie_status(struct wlan_hdd_link_info *link_info,
 					   struct sk_buff *skb,
 					   const struct nlattr *attr)
 {
@@ -11403,7 +11403,7 @@ static int hdd_get_roam_reason_vsie_status(struct hdd_adapter *adapter,
 	struct hdd_context *hdd_ctx = NULL;
 	QDF_STATUS status;
 
-	hdd_ctx = WLAN_HDD_GET_CTX(adapter);
+	hdd_ctx = WLAN_HDD_GET_CTX(link_info->adapter);
 
 	status = ucfg_mlme_get_roam_reason_vsie_status
 			       (hdd_ctx->psoc,
@@ -11422,22 +11422,21 @@ static int hdd_get_roam_reason_vsie_status(struct hdd_adapter *adapter,
 	return 0;
 }
 #else
-static int hdd_get_roam_reason_vsie_status(struct hdd_adapter *adapter,
-					   struct sk_buff *skb,
-					   const struct nlattr *attr)
+static inline int
+hdd_get_roam_reason_vsie_status(struct wlan_hdd_link_info *link_info,
+				struct sk_buff *skb, const struct nlattr *attr)
 {
 	return -EINVAL;
 }
 #endif
 
-static int hdd_vendor_attr_ldpc_get(struct hdd_adapter *adapter,
+static int hdd_vendor_attr_ldpc_get(struct wlan_hdd_link_info *link_info,
 				    struct sk_buff *skb,
 				    const struct nlattr *attr)
 {
-	int ldpc;
-	int ret;
+	int ldpc, ret;
 
-	ret = hdd_get_ldpc(adapter, &ldpc);
+	ret = hdd_get_ldpc(link_info->adapter, &ldpc);
 	if (ret) {
 		hdd_err("get ldpc failed");
 		return -EINVAL;
@@ -11453,14 +11452,14 @@ static int hdd_vendor_attr_ldpc_get(struct hdd_adapter *adapter,
 	return 0;
 }
 
-static int hdd_vendor_attr_tx_stbc_get(struct hdd_adapter *adapter,
+static int hdd_vendor_attr_tx_stbc_get(struct wlan_hdd_link_info *link_info,
 				       struct sk_buff *skb,
 				       const struct nlattr *attr)
 {
 	int tx_stbc;
 	int ret;
 
-	ret = hdd_get_tx_stbc(adapter, &tx_stbc);
+	ret = hdd_get_tx_stbc(link_info->adapter, &tx_stbc);
 	if (ret) {
 		hdd_err("get tx_stbc failed");
 		return -EINVAL;
@@ -11476,14 +11475,14 @@ static int hdd_vendor_attr_tx_stbc_get(struct hdd_adapter *adapter,
 	return 0;
 }
 
-static int hdd_vendor_attr_rx_stbc_get(struct hdd_adapter *adapter,
+static int hdd_vendor_attr_rx_stbc_get(struct wlan_hdd_link_info *link_info,
 				       struct sk_buff *skb,
 				       const struct nlattr *attr)
 {
 	int rx_stbc;
 	int ret;
 
-	ret = hdd_get_rx_stbc(adapter, &rx_stbc);
+	ret = hdd_get_rx_stbc(link_info->adapter, &rx_stbc);
 	if (ret) {
 		hdd_err("get rx_stbc failed");
 		return -EINVAL;
@@ -11501,19 +11500,18 @@ static int hdd_vendor_attr_rx_stbc_get(struct hdd_adapter *adapter,
 
 /**
  * hdd_get_tx_ampdu() - Get TX AMPDU
- * @adapter: Pointer to HDD adapter
+ * @link_info: Link info in HDD adapter
  * @skb: sk buffer to hold nl80211 attributes
  * @attr: Pointer to struct nlattr
  *
  * Return: 0 on success; error number otherwise
  */
-static int hdd_get_tx_ampdu(struct hdd_adapter *adapter,
-			    struct sk_buff *skb,
-			    const struct nlattr *attr)
+static int hdd_get_tx_ampdu(struct wlan_hdd_link_info *link_info,
+			    struct sk_buff *skb, const struct nlattr *attr)
 {
 	int value;
 
-	value = wma_cli_get_command(adapter->deflink->vdev_id,
+	value = wma_cli_get_command(link_info->vdev_id,
 				    GEN_VDEV_PARAM_TX_AMPDU, GEN_CMD);
 	if (value < 0) {
 		hdd_err("Failed to get tx_ampdu");
@@ -11531,19 +11529,18 @@ static int hdd_get_tx_ampdu(struct hdd_adapter *adapter,
 
 /**
  * hdd_get_rx_ampdu() - Get RX AMPDU
- * @adapter: Pointer to HDD adapter
+ * @link_info: Link info in HDD adapter
  * @skb: sk buffer to hold nl80211 attributes
  * @attr: Pointer to struct nlattr
  *
  * Return: 0 on success; error number otherwise
  */
-static int hdd_get_rx_ampdu(struct hdd_adapter *adapter,
-			    struct sk_buff *skb,
-			    const struct nlattr *attr)
+static int hdd_get_rx_ampdu(struct wlan_hdd_link_info *link_info,
+			    struct sk_buff *skb, const struct nlattr *attr)
 {
 	int value;
 
-	value = wma_cli_get_command(adapter->deflink->vdev_id,
+	value = wma_cli_get_command(link_info->vdev_id,
 				    GEN_VDEV_PARAM_RX_AMPDU, GEN_CMD);
 	if (value < 0) {
 		hdd_err("Failed to get rx_ampdu");
@@ -11561,19 +11558,18 @@ static int hdd_get_rx_ampdu(struct hdd_adapter *adapter,
 
 /**
  * hdd_get_tx_amsdu() - Get TX AMSDU
- * @adapter: Pointer to HDD adapter
+ * @link_info: Link info pointer in HDD adapter
  * @skb: sk buffer to hold nl80211 attributes
  * @attr: Pointer to struct nlattr
  *
  * Return: 0 on success; error number otherwise
  */
-static int hdd_get_tx_amsdu(struct hdd_adapter *adapter,
-			    struct sk_buff *skb,
-			    const struct nlattr *attr)
+static int hdd_get_tx_amsdu(struct wlan_hdd_link_info *link_info,
+			    struct sk_buff *skb, const struct nlattr *attr)
 {
 	int value;
 
-	value = wma_cli_get_command(adapter->deflink->vdev_id,
+	value = wma_cli_get_command(link_info->vdev_id,
 				    GEN_VDEV_PARAM_TX_AMSDU, GEN_CMD);
 	if (value < 0) {
 		hdd_err("Failed to get tx_amsdu");
@@ -11591,19 +11587,18 @@ static int hdd_get_tx_amsdu(struct hdd_adapter *adapter,
 
 /**
  * hdd_get_rx_amsdu() - Get RX AMSDU
- * @adapter: Pointer to HDD adapter
+ * @link_info: Link info pointer in HDD adapter
  * @skb: sk buffer to hold nl80211 attributes
  * @attr: Pointer to struct nlattr
  *
  * Return: 0 on success; error number otherwise
  */
-static int hdd_get_rx_amsdu(struct hdd_adapter *adapter,
-			    struct sk_buff *skb,
-			    const struct nlattr *attr)
+static int hdd_get_rx_amsdu(struct wlan_hdd_link_info *link_info,
+			    struct sk_buff *skb, const struct nlattr *attr)
 {
 	int value;
 
-	value = wma_cli_get_command(adapter->deflink->vdev_id,
+	value = wma_cli_get_command(link_info->vdev_id,
 				    GEN_VDEV_PARAM_RX_AMSDU, GEN_CMD);
 	if (value < 0) {
 		hdd_err("Failed to get rx_amsdu");
@@ -11621,20 +11616,19 @@ static int hdd_get_rx_amsdu(struct hdd_adapter *adapter,
 
 /**
  * hdd_get_channel_width() - Get channel width
- * @adapter: Pointer to HDD adapter
+ * @link_info: Link info pointer in HDD adapter
  * @skb: sk buffer to hold nl80211 attributes
  * @attr: Pointer to struct nlattr
  *
  * Return: 0 on success; error number otherwise
  */
-static int hdd_get_channel_width(struct hdd_adapter *adapter,
-				 struct sk_buff *skb,
-				 const struct nlattr *attr)
+static int hdd_get_channel_width(struct wlan_hdd_link_info *link_info,
+				 struct sk_buff *skb, const struct nlattr *attr)
 {
 	enum eSirMacHTChannelWidth chwidth;
 	uint8_t nl80211_chwidth;
 
-	chwidth = wma_cli_get_command(adapter->deflink->vdev_id,
+	chwidth = wma_cli_get_command(link_info->vdev_id,
 				      wmi_vdev_param_chwidth, VDEV_CMD);
 	if (chwidth < 0) {
 		hdd_err("Failed to get chwidth");
@@ -11653,19 +11647,18 @@ static int hdd_get_channel_width(struct hdd_adapter *adapter,
 
 /**
  * hdd_get_dynamic_bw() - Get dynamic bandwidth disabled / enabled
- * @adapter: Pointer to HDD adapter
+ * @link_info: Link info pointer in HDD adapter
  * @skb: sk buffer to hold nl80211 attributes
  * @attr: Pointer to struct nlattr
  *
  * Return: 0 on success; error number otherwise
  */
-static int hdd_get_dynamic_bw(struct hdd_adapter *adapter,
-			      struct sk_buff *skb,
-			      const struct nlattr *attr)
+static int hdd_get_dynamic_bw(struct wlan_hdd_link_info *link_info,
+			      struct sk_buff *skb, const struct nlattr *attr)
 {
 	int enable;
 
-	enable = wma_cli_get_command(adapter->deflink->vdev_id,
+	enable = wma_cli_get_command(link_info->vdev_id,
 				     wmi_pdev_param_dynamic_bw, PDEV_CMD);
 	if (enable < 0) {
 		hdd_err("Failed to get dynamic_bw");
@@ -11684,22 +11677,22 @@ static int hdd_get_dynamic_bw(struct hdd_adapter *adapter,
 /**
  * hdd_get_nss_config() - Get the number of spatial streams supported by
  * the adapter
- * @adapter: Pointer to HDD adapter
+ * @link_info: Link info pointer in HDD adapter
  * @skb: sk buffer to hold nl80211 attributes
  * @attr: Pointer to struct nlattr
  *
  * Return: 0 on success; error number otherwise
  */
-static int hdd_get_nss_config(struct hdd_adapter *adapter,
-			      struct sk_buff *skb,
-			      const struct nlattr *attr)
+static int hdd_get_nss_config(struct wlan_hdd_link_info *link_info,
+			      struct sk_buff *skb, const struct nlattr *attr)
 {
 	uint8_t nss;
+	struct hdd_adapter *adapter = link_info->adapter;
 
 	if (adapter->device_mode == QDF_SAP_MODE) {
 		int value;
 
-		value = wma_cli_get_command(adapter->deflink->vdev_id,
+		value = wma_cli_get_command(link_info->vdev_id,
 					    wmi_vdev_param_nss, VDEV_CMD);
 		if (value < 0) {
 			hdd_err("Failed to get nss");
@@ -11729,25 +11722,24 @@ static int hdd_get_nss_config(struct hdd_adapter *adapter,
 /**
  * hdd_get_tx_nss_config() - Get the number of tx spatial streams supported by
  * the adapter
- * @adapter: Pointer to HDD adapter
+ * @link_info: Link info pointer in HDD adapter
  * @skb: sk buffer to hold nl80211 attributes
  * @attr: Pointer to struct nlattr
  *
  * Return: 0 on success; error number otherwise
  */
-static int hdd_get_tx_nss_config(struct hdd_adapter *adapter,
-				 struct sk_buff *skb,
-				 const struct nlattr *attr)
+static int hdd_get_tx_nss_config(struct wlan_hdd_link_info *link_info,
+				 struct sk_buff *skb, const struct nlattr *attr)
 {
 	uint8_t tx_nss;
 	QDF_STATUS status;
 
-	if (!hdd_is_vdev_in_conn_state(adapter->deflink)) {
+	if (!hdd_is_vdev_in_conn_state(link_info)) {
 		hdd_err("Not in connected state");
 		return -EINVAL;
 	}
 
-	status = hdd_get_tx_nss(adapter, &tx_nss);
+	status = hdd_get_tx_nss(link_info->adapter, &tx_nss);
 	if (!QDF_IS_STATUS_SUCCESS(status)) {
 		hdd_err("Failed to get nss");
 		return -EINVAL;
@@ -11765,25 +11757,24 @@ static int hdd_get_tx_nss_config(struct hdd_adapter *adapter,
 /**
  * hdd_get_rx_nss_config() - Get the number of rx spatial streams supported by
  * the adapter
- * @adapter: Pointer to HDD adapter
+ * @link_info: Link info pointer in HDD adapter
  * @skb: sk buffer to hold nl80211 attributes
  * @attr: Pointer to struct nlattr
  *
  * Return: 0 on success; error number otherwise
  */
-static int hdd_get_rx_nss_config(struct hdd_adapter *adapter,
-				 struct sk_buff *skb,
-				 const struct nlattr *attr)
+static int hdd_get_rx_nss_config(struct wlan_hdd_link_info *link_info,
+				 struct sk_buff *skb, const struct nlattr *attr)
 {
 	uint8_t rx_nss;
 	QDF_STATUS status;
 
-	if (!hdd_is_vdev_in_conn_state(adapter->deflink)) {
+	if (!hdd_is_vdev_in_conn_state(link_info)) {
 		hdd_err("Not in connected state");
 		return -EINVAL;
 	}
 
-	status = hdd_get_rx_nss(adapter, &rx_nss);
+	status = hdd_get_rx_nss(link_info->adapter, &rx_nss);
 	if (!QDF_IS_STATUS_SUCCESS(status)) {
 		hdd_err("Failed to get nss");
 		return -EINVAL;
@@ -11800,18 +11791,19 @@ static int hdd_get_rx_nss_config(struct hdd_adapter *adapter,
 
 /**
  * hdd_get_listen_interval_config() - Get listen interval from driver
- * @adapter: Pointer to HDD adapter
+ * @link_info: Link info pointer in HDD adapter
  * @skb: sk buffer to hold nl80211 attributes
  * @attr: Pointer to struct nlattr
  *
  * Return: 0 on success; error number otherwise
  */
-static int hdd_get_listen_interval_config(struct hdd_adapter *adapter,
+static int hdd_get_listen_interval_config(struct wlan_hdd_link_info *link_info,
 					  struct sk_buff *skb,
 					  const struct nlattr *attr)
 {
 	uint32_t listen_interval = 0;
 	QDF_STATUS status;
+	struct hdd_adapter *adapter = link_info->adapter;
 	struct wlan_objmgr_vdev *vdev;
 
 	if (adapter->device_mode != QDF_STA_MODE &&
@@ -11819,7 +11811,7 @@ static int hdd_get_listen_interval_config(struct hdd_adapter *adapter,
 		hdd_err("Device not in STA / P2P-CLI mode");
 		return -EINVAL;
 	}
-	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink, WLAN_OSIF_ID);
+	vdev = hdd_objmgr_get_vdev_by_user(link_info, WLAN_OSIF_ID);
 	if (!vdev) {
 		hdd_err("Failed to get vdev");
 		return -EINVAL;
@@ -11845,17 +11837,17 @@ static int hdd_get_listen_interval_config(struct hdd_adapter *adapter,
 /**
  * hdd_get_optimized_power_config() - Get the number of spatial streams
  * supported by the adapter
- * @adapter: Pointer to HDD adapter
+ * @link_info: Link info pointer in HDD adapter
  * @skb: sk buffer to hold nl80211 attributes
  * @attr: Pointer to struct nlattr
  *
  * Return: 0 on success; error number otherwise
  */
-static int hdd_get_optimized_power_config(struct hdd_adapter *adapter,
+static int hdd_get_optimized_power_config(struct wlan_hdd_link_info *link_info,
 					  struct sk_buff *skb,
 					  const struct nlattr *attr)
 {
-	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
+	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(link_info->adapter);
 	uint8_t optimized_power_cfg;
 	int errno;
 
@@ -11877,7 +11869,7 @@ static int hdd_get_optimized_power_config(struct hdd_adapter *adapter,
 
 /**
  * typedef config_getter_fn - get configuration handler
- * @adapter: The adapter being configured
+ * @link_info: Link info pointer in HDD adapter
  * @skb: sk buffer to hold nl80211 attributes
  * @attr: The nl80211 attribute being applied
  *
@@ -11885,7 +11877,7 @@ static int hdd_get_optimized_power_config(struct hdd_adapter *adapter,
  *
  * Return: 0 if the attribute was handled successfully, otherwise an errno
  */
-typedef int (*config_getter_fn)(struct hdd_adapter *adapter,
+typedef int (*config_getter_fn)(struct wlan_hdd_link_info *link_info,
 				struct sk_buff *skb,
 				const struct nlattr *attr);
 
@@ -11957,7 +11949,7 @@ static const struct config_getters config_getters[] = {
 
 /**
  * hdd_get_configuration() - Handle get configuration
- * @adapter: adapter upon which the vendor command was received
+ * @link_info: Link info pointer in HDD adapter
  * @tb: parsed attribute array
  *
  * This is a table-driven function which dispatches attributes
@@ -11966,10 +11958,10 @@ static const struct config_getters config_getters[] = {
  *
  * Return: 0 if there were no issues, otherwise errno of the last issue
  */
-static int hdd_get_configuration(struct hdd_adapter *adapter,
+static int hdd_get_configuration(struct wlan_hdd_link_info *link_info,
 				 struct nlattr **tb)
 {
-	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
+	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(link_info->adapter);
 	uint32_t i, id;
 	unsigned long nl_buf_len = NLMSG_HDRLEN;
 	struct sk_buff *skb;
@@ -12003,7 +11995,7 @@ static int hdd_get_configuration(struct hdd_adapter *adapter,
 		hdd_debug("Get wifi configuration %d", id);
 
 		cb = config_getters[i].cb;
-		errno = cb(adapter, skb, attr);
+		errno = cb(link_info, skb, attr);
 		if (errno)
 			break;
 	}
@@ -12227,8 +12219,7 @@ __wlan_hdd_cfg80211_wifi_configuration_get(struct wiphy *wiphy,
 	struct hdd_adapter *adapter = WLAN_HDD_GET_PRIV_PTR(dev);
 	struct hdd_context *hdd_ctx  = wiphy_priv(wiphy);
 	struct nlattr *tb[QCA_WLAN_VENDOR_ATTR_CONFIG_MAX + 1];
-	int errno;
-	int ret;
+	int errno, ret;
 
 	hdd_enter_dev(dev);
 
@@ -12260,7 +12251,7 @@ __wlan_hdd_cfg80211_wifi_configuration_get(struct wiphy *wiphy,
 	if (tb[QCA_WLAN_VENDOR_ATTR_CONFIG_GENERIC_COMMAND])
 		return hdd_son_send_get_wifi_generic_command(wiphy, wdev, tb);
 
-	ret = hdd_get_configuration(adapter, tb);
+	ret = hdd_get_configuration(adapter->deflink, tb);
 	if (ret)
 		errno = ret;
 
