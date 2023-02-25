@@ -2762,23 +2762,10 @@ int hdd_check_private_wext_control(struct hdd_context *hdd_ctx,
 				      info);
 }
 
-/**
- * hdd_wlan_get_stats() - Get txrx stats in SAP mode
- * @adapter: Pointer to the hdd adapter.
- * @length:   Size of the data copied
- * @buffer:   Pointer to char buffer.
- * @buf_len:  Length of the char buffer.
- *
- * This function called when the "iwpriv wlan0 get_stats" command is given.
- * It used to collect the txrx stats when the device is configured in SAP mode.
- *
- * Return - none
- */
-void hdd_wlan_get_stats(struct hdd_adapter *adapter, uint16_t *length,
+void hdd_wlan_get_stats(struct wlan_hdd_link_info *link_info, uint16_t *length,
 			char *buffer, uint16_t buf_len)
 {
-	struct hdd_tx_rx_stats *stats =
-				&adapter->deflink->hdd_stats.tx_rx_stats;
+	struct hdd_tx_rx_stats *stats = &link_info->hdd_stats.tx_rx_stats;
 	struct dp_tx_rx_stats *dp_stats;
 	uint32_t len = 0;
 	uint32_t total_rx_pkt = 0, total_rx_dropped = 0;
@@ -2790,10 +2777,10 @@ void hdd_wlan_get_stats(struct hdd_adapter *adapter, uint16_t *length,
 	uint32_t total_tx_dropped_ac[WLAN_MAX_AC] = {0};
 	int i = 0;
 	uint8_t ac, rx_ol_con = 0, rx_ol_low_tput = 0;
-	struct hdd_context *hdd_ctx = adapter->hdd_ctx;
+	struct hdd_context *hdd_ctx = link_info->adapter->hdd_ctx;
 	struct wlan_objmgr_vdev *vdev;
 
-	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink, WLAN_DP_ID);
+	vdev = hdd_objmgr_get_vdev_by_user(link_info, WLAN_DP_ID);
 	if (!vdev)
 		return;
 
@@ -2803,7 +2790,7 @@ void hdd_wlan_get_stats(struct hdd_adapter *adapter, uint16_t *length,
 		return;
 	}
 
-	if (ucfg_dp_get_txrx_stats(adapter->deflink->vdev, dp_stats)) {
+	if (ucfg_dp_get_txrx_stats(vdev, dp_stats)) {
 		hdd_objmgr_put_vdev_by_user(vdev, WLAN_DP_ID);
 		hdd_err("Unable to get stats from DP component");
 		qdf_mem_free(dp_stats);
@@ -2884,7 +2871,7 @@ void hdd_wlan_get_stats(struct hdd_adapter *adapter, uint16_t *length,
 		stats->txflow_unpause_cnt);
 
 	len += cdp_stats(cds_get_context(QDF_MODULE_ID_SOC),
-			 adapter->deflink->vdev_id, &buffer[len],
+			 link_info->vdev_id, &buffer[len],
 			 (buf_len - len));
 	*length = len + 1;
 	qdf_mem_free(dp_stats);
@@ -5912,6 +5899,7 @@ static int __iw_get_char_setnone(struct net_device *dev,
 	int ret;
 	QDF_STATUS status;
 	uint8_t value;
+	struct wlan_hdd_link_info *link_info = adapter->deflink;
 
 	hdd_enter_dev(dev);
 
@@ -5935,7 +5923,7 @@ static int __iw_get_char_setnone(struct net_device *dev,
 
 	case WE_GET_STATS:
 	{
-		hdd_wlan_get_stats(adapter, &(wrqu->data.length),
+		hdd_wlan_get_stats(link_info, &wrqu->data.length,
 				   extra, WE_MAX_STR_LEN);
 		break;
 	}
@@ -5968,11 +5956,10 @@ static int __iw_get_char_setnone(struct net_device *dev,
 		int adapter_num = 0;
 		int count = 0, check = 1;
 		uint8_t stat_vdev_id;
-
 		struct hdd_station_ctx *sta_ctx = NULL;
-
 		struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
 		struct hdd_adapter *stat_adapter = NULL;
+		struct wlan_hdd_link_info *stat_link_info;
 
 		/* Print wlan0 or p2p0 states based on the adapter_num
 		 * by using the correct adapter
@@ -5980,24 +5967,20 @@ static int __iw_get_char_setnone(struct net_device *dev,
 		while (adapter_num < 2) {
 			if (WLAN_ADAPTER == adapter_num) {
 				stat_adapter = adapter;
-				buf =
-					scnprintf(extra + len,
-						  WE_MAX_STR_LEN - len,
-						  "\n\n wlan0 States:-");
+				buf = scnprintf(extra + len,
+						WE_MAX_STR_LEN - len,
+						"\n\n wlan0 States:-");
 				len += buf;
 			} else if (P2P_ADAPTER == adapter_num) {
-				buf =
-					scnprintf(extra + len,
-						  WE_MAX_STR_LEN - len,
-						  "\n\n p2p0 States:-");
+				buf = scnprintf(extra + len,
+						WE_MAX_STR_LEN - len,
+						"\n\n p2p0 States:-");
 				len += buf;
 
 				if (!hdd_ctx) {
-					buf =
-						scnprintf(extra + len,
-							  WE_MAX_STR_LEN -
-							  len,
-							  "\n hdd_ctx is NULL");
+					buf = scnprintf(extra + len,
+							WE_MAX_STR_LEN - len,
+							"\n hdd_ctx is NULL");
 					len += buf;
 					break;
 				}
@@ -6027,25 +6010,21 @@ static int __iw_get_char_setnone(struct net_device *dev,
 				len += buf;
 				break;
 			}
-			sta_ctx =
-			    WLAN_HDD_GET_STATION_CTX_PTR(stat_adapter->deflink);
+			stat_link_info = stat_adapter->deflink;
+			sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(stat_link_info);
 
-			stat_vdev_id = stat_adapter->deflink->vdev_id;
-			buf =
-				scnprintf(extra + len, WE_MAX_STR_LEN - len,
-					  "\n HDD Conn State - %s "
-					  "\n\n SME State:"
-					  "\n CSR State - %s"
-					  "\n CSR Substate - %s",
-					  hdd_connection_state_string
+			stat_vdev_id = stat_link_info->vdev_id;
+			buf = scnprintf(extra + len, WE_MAX_STR_LEN - len,
+					"\n HDD Conn State - %s \n\n SME State:\n CSR State - %s\n CSR Substate - %s",
+					hdd_connection_state_string
 						(sta_ctx->conn_info.conn_state),
-					  mac_trace_getcsr_roam_state
+					mac_trace_getcsr_roam_state
 						(sme_get_current_roam_state
 						   (mac_handle, stat_vdev_id)),
-					  mac_trace_getcsr_roam_sub_state
+					mac_trace_getcsr_roam_sub_state
 						(sme_get_current_roam_sub_state
 						   (mac_handle, stat_vdev_id))
-					  );
+					);
 			len += buf;
 			adapter_num++;
 		}
@@ -6211,7 +6190,7 @@ static int __iw_get_char_setnone(struct net_device *dev,
 		struct qdf_mac_addr connected_bssid;
 
 		wlan_mlme_get_bssid_vdev_id(hdd_ctx->pdev,
-					    adapter->deflink->vdev_id,
+					    link_info->vdev_id,
 					    &connected_bssid);
 		snprintf(extra, WE_MAX_STR_LEN,
 			 "\n BSSID %02X:%02X:%02X:%02X:%02X:%02X"
@@ -6223,9 +6202,9 @@ static int __iw_get_char_setnone(struct net_device *dev,
 			 connected_bssid.bytes[3],
 			 connected_bssid.bytes[4],
 			 connected_bssid.bytes[5],
-			 adapter->deflink->hdd_stats.hdd_pmf_stats.
+			 link_info->hdd_stats.hdd_pmf_stats.
 			 num_unprot_disassoc_rx,
-			 adapter->deflink->hdd_stats.hdd_pmf_stats.
+			 link_info->hdd_stats.hdd_pmf_stats.
 			 num_unprot_deauth_rx);
 
 		wrqu->data.length = strlen(extra) + 1;
@@ -6368,7 +6347,7 @@ static int __iw_get_char_setnone(struct net_device *dev,
 		enable_snr_monitoring =
 				ucfg_scan_is_snr_monitor_enabled(hdd_ctx->psoc);
 		if (!enable_snr_monitoring ||
-		    !hdd_cm_is_vdev_associated(adapter->deflink)) {
+		    !hdd_cm_is_vdev_associated(link_info)) {
 			hdd_err("getSNR failed: Enable SNR Monitoring-%d",
 				enable_snr_monitoring);
 			return -ENONET;

@@ -1921,8 +1921,8 @@ static int __iw_get_char_setnone(struct net_device *dev,
 
 	switch (sub_cmd) {
 	case QCSAP_GET_STATS:
-		hdd_wlan_get_stats(adapter, &(wrqu->data.length),
-					extra, WE_MAX_STR_LEN);
+		hdd_wlan_get_stats(adapter->deflink, &wrqu->data.length,
+				   extra, WE_MAX_STR_LEN);
 		break;
 	case QCSAP_LIST_FW_PROFILE:
 		hdd_wlan_list_fw_profile(&(wrqu->data.length),
