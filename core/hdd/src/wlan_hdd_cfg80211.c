@@ -8504,16 +8504,16 @@ static int wlan_hdd_handle_restrict_offchan_config(struct hdd_adapter *adapter,
 
 /**
  * wlan_hdd_cfg80211_wifi_set_reorder_timeout() - set reorder timeout
- * @adapter: Pointer to HDD adapter
+ * @link_info: link info pointer in HDD adapter
  * @tb: array of pointer to struct nlattr
  *
  * Return: 0 on success; error number otherwise
  */
-static
-int wlan_hdd_cfg80211_wifi_set_reorder_timeout(struct hdd_adapter *adapter,
-					       struct nlattr *tb[])
+static int
+wlan_hdd_cfg80211_wifi_set_reorder_timeout(struct wlan_hdd_link_info *link_info,
+					   struct nlattr *tb[])
 {
-	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
+	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(link_info->adapter);
 	int ret_val = 0;
 	QDF_STATUS qdf_status;
 	struct sir_set_rx_reorder_timeout_val reorder_timeout;
@@ -8572,15 +8572,16 @@ int wlan_hdd_cfg80211_wifi_set_reorder_timeout(struct hdd_adapter *adapter,
 
 /**
  * wlan_hdd_cfg80211_wifi_set_rx_blocksize() - set rx blocksize
- * @adapter: hdd adapter
+ * @link_info: Link info pointer in HDD adapter
  * @tb: array of pointer to struct nlattr
  *
  * Return: 0 on success; error number otherwise
  */
-static int wlan_hdd_cfg80211_wifi_set_rx_blocksize(struct hdd_adapter *adapter,
-						   struct nlattr *tb[])
+static int
+wlan_hdd_cfg80211_wifi_set_rx_blocksize(struct wlan_hdd_link_info *link_info,
+					struct nlattr *tb[])
 {
-	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
+	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(link_info->adapter);
 	int ret_val = 0;
 	uint32_t set_value;
 	QDF_STATUS qdf_status;
@@ -8604,7 +8605,7 @@ static int wlan_hdd_cfg80211_wifi_set_rx_blocksize(struct hdd_adapter *adapter,
 		       nla_data(tb[RX_BLOCKSIZE_PEER_MAC]),
 		       sizeof(rx_blocksize.peer_macaddr)),
 
-		rx_blocksize.vdev_id = adapter->deflink->vdev_id;
+		rx_blocksize.vdev_id = link_info->vdev_id;
 		set_value = nla_get_u32(tb[RX_BLOCKSIZE_WINLIMIT]);
 		/* maximum window size is 64 */
 		if (set_value >= WINDOW_SIZE_VAL_MIN &&
@@ -8661,40 +8662,39 @@ int hdd_set_phy_mode(struct hdd_adapter *adapter,
 
 /**
  * hdd_config_phy_mode() - set PHY mode
- * @adapter: hdd adapter
+ * @link_info: Link info pointer in HDD adapter
  * @attr: nla attr sent from userspace
  *
  * Return: 0 on success; error number otherwise
  */
-static int hdd_config_phy_mode(struct hdd_adapter *adapter,
+static int hdd_config_phy_mode(struct wlan_hdd_link_info *link_info,
 			       const struct nlattr *attr)
 {
 	enum qca_wlan_vendor_phy_mode vendor_phy_mode;
 
 	vendor_phy_mode = nla_get_u32(attr);
 
-	return hdd_set_phy_mode(adapter, vendor_phy_mode);
+	return hdd_set_phy_mode(link_info->adapter, vendor_phy_mode);
 }
 
 /**
  * hdd_set_roam_reason_vsie_status() - enable/disable inclusion of
  * roam reason vsie in Reassoc
- *
- * @adapter: hdd adapter
+ * @link_info: Link info pointer in adapter
  * @attr: nla attr sent by supplicant
  *
  * Return: 0 on success, negative errno on failure
  */
 #ifdef WLAN_FEATURE_ROAM_OFFLOAD
-static int hdd_set_roam_reason_vsie_status(struct hdd_adapter *adapter,
+static int hdd_set_roam_reason_vsie_status(struct wlan_hdd_link_info *link_info,
 					   const struct nlattr *attr)
 {
 	uint8_t roam_reason_vsie_enabled;
 	int errno;
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
-	struct hdd_context *hdd_ctx = NULL;
+	struct hdd_adapter *adapter = link_info->adapter;
+	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
 
-	hdd_ctx = WLAN_HDD_GET_CTX(adapter);
 	if (!hdd_ctx) {
 		hdd_err("hdd_ctx failure");
 		return -EINVAL;
@@ -8713,7 +8713,7 @@ static int hdd_set_roam_reason_vsie_status(struct hdd_adapter *adapter,
 	}
 
 	errno = sme_cli_set_command
-			(adapter->deflink->vdev_id,
+			(link_info->vdev_id,
 			 wmi_vdev_param_enable_disable_roam_reason_vsie,
 			 roam_reason_vsie_enabled, VDEV_CMD);
 	if (errno) {
@@ -8724,21 +8724,21 @@ static int hdd_set_roam_reason_vsie_status(struct hdd_adapter *adapter,
 	return qdf_status_to_os_return(status);
 }
 #else
-static int hdd_set_roam_reason_vsie_status(struct hdd_adapter *adapter,
-					   const struct nlattr *attr)
+static inline int
+hdd_set_roam_reason_vsie_status(struct wlan_hdd_link_info *link_info,
+				const struct nlattr *attr)
 {
 	return -ENOTSUPP;
 }
 #endif
 
-static int hdd_set_ft_over_ds(struct hdd_adapter *adapter,
+static int hdd_set_ft_over_ds(struct wlan_hdd_link_info *link_info,
 			      const struct nlattr *attr)
 {
 	uint8_t ft_over_ds_enable;
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
-	struct hdd_context *hdd_ctx = NULL;
+	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(link_info->adapter);
 
-	hdd_ctx = WLAN_HDD_GET_CTX(adapter);
 	if (!hdd_ctx) {
 		hdd_err("hdd_ctx failure");
 		return -EINVAL;
@@ -8760,7 +8760,7 @@ static int hdd_set_ft_over_ds(struct hdd_adapter *adapter,
 	return status;
 }
 
-static int hdd_config_ldpc(struct hdd_adapter *adapter,
+static int hdd_config_ldpc(struct wlan_hdd_link_info *link_info,
 			   const struct nlattr *attr)
 {
 	uint8_t ldpc;
@@ -8768,12 +8768,12 @@ static int hdd_config_ldpc(struct hdd_adapter *adapter,
 
 	ldpc = nla_get_u8(attr);
 
-	ret = hdd_set_ldpc(adapter, ldpc);
+	ret = hdd_set_ldpc(link_info->adapter, ldpc);
 
 	return ret;
 }
 
-static int hdd_config_tx_stbc(struct hdd_adapter *adapter,
+static int hdd_config_tx_stbc(struct wlan_hdd_link_info *link_info,
 			      const struct nlattr *attr)
 {
 	uint8_t tx_stbc;
@@ -8781,12 +8781,12 @@ static int hdd_config_tx_stbc(struct hdd_adapter *adapter,
 
 	tx_stbc = nla_get_u8(attr);
 
-	ret = hdd_set_tx_stbc(adapter, tx_stbc);
+	ret = hdd_set_tx_stbc(link_info->adapter, tx_stbc);
 
 	return ret;
 }
 
-static int hdd_config_rx_stbc(struct hdd_adapter *adapter,
+static int hdd_config_rx_stbc(struct wlan_hdd_link_info *link_info,
 			      const struct nlattr *attr)
 {
 	uint8_t rx_stbc;
@@ -8794,15 +8794,15 @@ static int hdd_config_rx_stbc(struct hdd_adapter *adapter,
 
 	rx_stbc = nla_get_u8(attr);
 
-	ret = hdd_set_rx_stbc(adapter, rx_stbc);
+	ret = hdd_set_rx_stbc(link_info->adapter, rx_stbc);
 
 	return ret;
 }
 
-static int hdd_config_access_policy(struct hdd_adapter *adapter,
+static int hdd_config_access_policy(struct wlan_hdd_link_info *link_info,
 				    struct nlattr *tb[])
 {
-	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
+	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(link_info->adapter);
 	struct nlattr *policy_attr =
 		tb[QCA_WLAN_VENDOR_ATTR_CONFIG_ACCESS_POLICY];
 	struct nlattr *ielist_attr =
@@ -8843,7 +8843,7 @@ static int hdd_config_access_policy(struct hdd_adapter *adapter,
 
 	hdd_debug("calling sme_update_access_policy_vendor_ie");
 	status = sme_update_access_policy_vendor_ie(hdd_ctx->mac_handle,
-						    adapter->deflink->vdev_id,
+						    link_info->vdev_id,
 						    ie, access_policy);
 	if (QDF_IS_STATUS_ERROR(status))
 		hdd_err("Failed to set vendor ie and access policy, %d",
@@ -8852,14 +8852,14 @@ static int hdd_config_access_policy(struct hdd_adapter *adapter,
 	return qdf_status_to_os_return(status);
 }
 
-static int hdd_config_mpdu_aggregation(struct hdd_adapter *adapter,
+static int hdd_config_mpdu_aggregation(struct wlan_hdd_link_info *link_info,
 				       struct nlattr *tb[])
 {
 	struct nlattr *tx_attr =
 		tb[QCA_WLAN_VENDOR_ATTR_CONFIG_TX_MPDU_AGGREGATION];
 	struct nlattr *rx_attr =
 		tb[QCA_WLAN_VENDOR_ATTR_CONFIG_RX_MPDU_AGGREGATION];
-	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
+	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(link_info->adapter);
 	mac_handle_t mac_handle = hdd_ctx->mac_handle;
 	uint8_t tx_size, rx_size;
 	QDF_STATUS status;
@@ -8896,7 +8896,7 @@ static int hdd_config_mpdu_aggregation(struct hdd_adapter *adapter,
 		sme_set_amsdu(mac_handle, false);
 
 	hdd_debug("tx size: %d", tx_size);
-	status = wma_cli_set_command(adapter->deflink->vdev_id,
+	status = wma_cli_set_command(link_info->vdev_id,
 				     GEN_VDEV_PARAM_AMSDU,
 				     tx_size, GEN_CMD);
 	if (status) {
@@ -8904,15 +8904,14 @@ static int hdd_config_mpdu_aggregation(struct hdd_adapter *adapter,
 		return qdf_status_to_os_return(status);
 	}
 
-	status = wma_set_tx_rx_aggr_size(adapter->deflink->vdev_id,
-					 tx_size,
-					 rx_size,
+	status = wma_set_tx_rx_aggr_size(link_info->vdev_id,
+					 tx_size, rx_size,
 					 WMI_VDEV_CUSTOM_AGGR_TYPE_AMPDU);
 
 	return qdf_status_to_os_return(status);
 }
 
-static int hdd_config_msdu_aggregation(struct hdd_adapter *adapter,
+static int hdd_config_msdu_aggregation(struct wlan_hdd_link_info *link_info,
 				       struct nlattr *tb[])
 {
 	struct nlattr *tx_attr =
@@ -8943,7 +8942,7 @@ static int hdd_config_msdu_aggregation(struct hdd_adapter *adapter,
 		return -EINVAL;
 	}
 
-	status = wma_set_tx_rx_aggr_size(adapter->deflink->vdev_id,
+	status = wma_set_tx_rx_aggr_size(link_info->vdev_id,
 					 tx_size,
 					 rx_size,
 					 WMI_VDEV_CUSTOM_AGGR_TYPE_AMSDU);
@@ -9040,9 +9039,10 @@ hdd_set_dynamic_antenna_mode(struct hdd_adapter *adapter,
 	return 0;
 }
 
-static int hdd_config_vdev_chains(struct hdd_adapter *adapter,
+static int hdd_config_vdev_chains(struct wlan_hdd_link_info *link_info,
 				  struct nlattr *tb[])
 {
+	struct hdd_adapter *adapter = link_info->adapter;
 	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
 	uint8_t tx_chains, rx_chains;
 	struct nlattr *tx_attr =
@@ -9069,8 +9069,8 @@ static int hdd_config_vdev_chains(struct hdd_adapter *adapter,
 	return 0;
 }
 
-static int hdd_config_tx_rx_nss(struct hdd_adapter *adapter,
-				  struct nlattr *tb[])
+static int hdd_config_tx_rx_nss(struct wlan_hdd_link_info *link_info,
+				struct nlattr *tb[])
 {
 	uint8_t tx_nss, rx_nss;
 	QDF_STATUS status;
@@ -9100,7 +9100,7 @@ static int hdd_config_tx_rx_nss(struct hdd_adapter *adapter,
 			rx_nss);
 		return -EINVAL;
 	}
-	status = hdd_update_nss(adapter, tx_nss, rx_nss);
+	status = hdd_update_nss(link_info->adapter, tx_nss, rx_nss);
 	if (status != QDF_STATUS_SUCCESS) {
 		hdd_debug("Can't set tx_nss %d rx_nss %d", tx_nss, rx_nss);
 		return -EINVAL;
@@ -9110,11 +9110,12 @@ static int hdd_config_tx_rx_nss(struct hdd_adapter *adapter,
 }
 
 #ifdef WLAN_FEATURE_SON
-static int hdd_process_generic_set_cmd(struct hdd_adapter *adapter,
+static int hdd_process_generic_set_cmd(struct wlan_hdd_link_info *link_info,
 				       struct nlattr *tb[])
 {
 	struct wireless_dev *wdev;
 	struct wiphy *wiphy;
+	struct hdd_adapter *adapter = link_info->adapter;
 
 	if (!adapter)
 		return 0;
@@ -9133,14 +9134,15 @@ static int hdd_process_generic_set_cmd(struct hdd_adapter *adapter,
 	return 0;
 }
 #else
-static int hdd_process_generic_set_cmd(struct hdd_adapter *adapter,
-				       struct nlattr *tb[])
+static inline int
+hdd_process_generic_set_cmd(struct wlan_hdd_link_info *link_info,
+			    struct nlattr *tb[])
 {
 	return 0;
 }
 #endif
 
-static int hdd_config_ani(struct hdd_adapter *adapter,
+static int hdd_config_ani(struct wlan_hdd_link_info *link_info,
 			  struct nlattr *tb[])
 {
 	int errno;
@@ -9183,7 +9185,7 @@ static int hdd_config_ani(struct hdd_adapter *adapter,
 	else
 		enable_ani = 0;
 
-	errno = wma_cli_set_command(adapter->deflink->vdev_id,
+	errno = wma_cli_set_command(link_info->vdev_id,
 				    wmi_pdev_param_ani_enable,
 				    enable_ani, PDEV_CMD);
 	if (errno) {
@@ -9192,7 +9194,7 @@ static int hdd_config_ani(struct hdd_adapter *adapter,
 	}
 
 	if (ani_setting_type == QCA_WLAN_ANI_SETTING_FIXED) {
-		errno = wma_cli_set_command(adapter->deflink->vdev_id,
+		errno = wma_cli_set_command(link_info->vdev_id,
 					    wmi_pdev_param_ani_ofdm_level,
 					    ani_level, PDEV_CMD);
 		if (errno) {
@@ -9204,7 +9206,7 @@ static int hdd_config_ani(struct hdd_adapter *adapter,
 	return 0;
 }
 
-static int hdd_config_ant_div_period(struct hdd_adapter *adapter,
+static int hdd_config_ant_div_period(struct wlan_hdd_link_info *link_info,
 				     struct nlattr *tb[])
 {
 	struct nlattr *probe_attr =
@@ -9229,7 +9231,7 @@ static int hdd_config_ant_div_period(struct hdd_adapter *adapter,
 	stay_period = nla_get_u32(stay_attr);
 	ant_div_usrcfg = ANT_DIV_SET_PERIOD(probe_period, stay_period);
 	hdd_debug("ant div set period: %x", ant_div_usrcfg);
-	errno = wma_cli_set_command(adapter->deflink->vdev_id,
+	errno = wma_cli_set_command(link_info->vdev_id,
 				    wmi_pdev_param_ant_div_usrcfg,
 				    ant_div_usrcfg, PDEV_CMD);
 	if (errno)
@@ -9238,7 +9240,7 @@ static int hdd_config_ant_div_period(struct hdd_adapter *adapter,
 	return errno;
 }
 
-static int hdd_config_ant_div_snr_weight(struct hdd_adapter *adapter,
+static int hdd_config_ant_div_snr_weight(struct wlan_hdd_link_info *link_info,
 					 struct nlattr *tb[])
 {
 	struct nlattr *mgmt_attr =
@@ -9265,7 +9267,7 @@ static int hdd_config_ant_div_snr_weight(struct hdd_adapter *adapter,
 	ack_snr = nla_get_u32(ack_attr);
 	ant_div_usrcfg = ANT_DIV_SET_WEIGHT(mgmt_snr, data_snr, ack_snr);
 	hdd_debug("ant div set weight: %x", ant_div_usrcfg);
-	errno = wma_cli_set_command(adapter->deflink->vdev_id,
+	errno = wma_cli_set_command(link_info->vdev_id,
 				    wmi_pdev_param_ant_div_usrcfg,
 				    ant_div_usrcfg, PDEV_CMD);
 	if (errno)
@@ -9274,9 +9276,11 @@ static int hdd_config_ant_div_snr_weight(struct hdd_adapter *adapter,
 	return errno;
 }
 
-static int hdd_config_fine_time_measurement(struct hdd_adapter *adapter,
-					    const struct nlattr *attr)
+static int
+hdd_config_fine_time_measurement(struct wlan_hdd_link_info *link_info,
+				 const struct nlattr *attr)
 {
+	struct hdd_adapter *adapter = link_info->adapter;
 	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
 	uint32_t user_capability;
 	uint32_t target_capability;
@@ -9295,7 +9299,7 @@ static int hdd_config_fine_time_measurement(struct hdd_adapter *adapter,
 	}
 
 	sme_update_fine_time_measurement_capab(hdd_ctx->mac_handle,
-					       adapter->deflink->vdev_id,
+					       link_info->vdev_id,
 					       final_capability);
 	ucfg_wifi_pos_set_ftm_cap(hdd_ctx->psoc, final_capability);
 
@@ -9305,7 +9309,7 @@ static int hdd_config_fine_time_measurement(struct hdd_adapter *adapter,
 	return 0;
 }
 
-static int hdd_config_modulated_dtim(struct hdd_adapter *adapter,
+static int hdd_config_modulated_dtim(struct wlan_hdd_link_info *link_info,
 				     const struct nlattr *attr)
 {
 	struct wlan_objmgr_vdev *vdev;
@@ -9313,8 +9317,7 @@ static int hdd_config_modulated_dtim(struct hdd_adapter *adapter,
 	QDF_STATUS status;
 
 	modulated_dtim = nla_get_u32(attr);
-
-	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink, WLAN_OSIF_ID);
+	vdev = hdd_objmgr_get_vdev_by_user(link_info, WLAN_OSIF_ID);
 	if (!vdev)
 		return -EINVAL;
 
@@ -9325,7 +9328,7 @@ static int hdd_config_modulated_dtim(struct hdd_adapter *adapter,
 	return qdf_status_to_os_return(status);
 }
 
-static int hdd_config_listen_interval(struct hdd_adapter *adapter,
+static int hdd_config_listen_interval(struct wlan_hdd_link_info *link_info,
 				      const struct nlattr *attr)
 {
 	struct wlan_objmgr_vdev *vdev;
@@ -9339,7 +9342,7 @@ static int hdd_config_listen_interval(struct hdd_adapter *adapter,
 		return -EINVAL;
 	}
 
-	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink, WLAN_PMO_ID);
+	vdev = hdd_objmgr_get_vdev_by_user(link_info, WLAN_PMO_ID);
 	if (!vdev)
 		return -EINVAL;
 
@@ -9350,7 +9353,7 @@ static int hdd_config_listen_interval(struct hdd_adapter *adapter,
 	return qdf_status_to_os_return(status);
 }
 
-static int hdd_config_lro(struct hdd_adapter *adapter,
+static int hdd_config_lro(struct wlan_hdd_link_info *link_info,
 			  const struct nlattr *attr)
 {
 	struct wlan_objmgr_vdev *vdev;
@@ -9358,8 +9361,7 @@ static int hdd_config_lro(struct hdd_adapter *adapter,
 	QDF_STATUS status = QDF_STATUS_E_FAULT;
 
 	enable_flag = nla_get_u8(attr);
-
-	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink, WLAN_DP_ID);
+	vdev = hdd_objmgr_get_vdev_by_user(link_info, WLAN_DP_ID);
 	if (vdev) {
 		status = osif_dp_lro_set_reset(vdev, enable_flag);
 		hdd_objmgr_put_vdev_by_user(vdev, WLAN_DP_ID);
@@ -9368,33 +9370,33 @@ static int hdd_config_lro(struct hdd_adapter *adapter,
 	return qdf_status_to_os_return(status);
 }
 
-static int hdd_config_scan_enable(struct hdd_adapter *adapter,
+static int hdd_config_scan_enable(struct wlan_hdd_link_info *link_info,
 				  const struct nlattr *attr)
 {
-	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
+	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(link_info->adapter);
 	uint8_t enable_flag;
 
 	enable_flag = nla_get_u8(attr);
 	if (enable_flag)
-		ucfg_scan_psoc_set_enable(hdd_ctx->psoc,
-					  REASON_USER_SPACE);
+		ucfg_scan_psoc_set_enable(hdd_ctx->psoc, REASON_USER_SPACE);
 	else
-		ucfg_scan_psoc_set_disable(hdd_ctx->psoc,
-					   REASON_USER_SPACE);
+		ucfg_scan_psoc_set_disable(hdd_ctx->psoc, REASON_USER_SPACE);
 
 	return 0;
 }
 
 /**
  * hdd_config_udp_qos_upgrade_be_bk() - Set UDP QoS threshold for BE/BK AC.
- * @adapter: adapter for which this configuration is to be applied
+ * @link_info: Link info pointer in HDD adapter
  * @attr: NL attribute
  *
  * Returns: 0 on success, -EINVAL on failure
  */
-static int hdd_config_udp_qos_upgrade_be_bk(struct hdd_adapter *adapter,
-					    const struct nlattr *attr)
+static int
+hdd_config_udp_qos_upgrade_be_bk(struct wlan_hdd_link_info *link_info,
+				 const struct nlattr *attr)
 {
+	struct hdd_adapter *adapter = link_info->adapter;
 	uint8_t priority = nla_get_u8(attr);
 
 	adapter->udp_qos_upgrade_type = UDP_QOS_UPGRADE_BK_BE;
@@ -9404,23 +9406,26 @@ static int hdd_config_udp_qos_upgrade_be_bk(struct hdd_adapter *adapter,
 /**
  * hdd_config_udp_qos_upgrade_threshold() - NL attribute handler to parse
  *					    priority upgrade threshold value.
- * @adapter: adapter for which this configuration is to be applied
+ * @link_info: Link info pointer in adapter
  * @attr: NL attribute
  *
  * Returns: 0 on success, -EINVAL on failure
  */
-static int hdd_config_udp_qos_upgrade_threshold(struct hdd_adapter *adapter,
-						const struct nlattr *attr)
+static int
+hdd_config_udp_qos_upgrade_threshold(struct wlan_hdd_link_info *link_info,
+				     const struct nlattr *attr)
 {
+	struct hdd_adapter *adapter = link_info->adapter;
 	uint8_t priority = nla_get_u8(attr);
 
 	adapter->udp_qos_upgrade_type = UDP_QOS_UPGRADE_ALL;
 	return hdd_set_udp_qos_upgrade_config(adapter, priority);
 }
 
-static int hdd_config_power(struct hdd_adapter *adapter,
+static int hdd_config_power(struct wlan_hdd_link_info *link_info,
 			    const struct nlattr *attr)
 {
+	struct hdd_adapter *adapter = link_info->adapter;
 	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
 	uint8_t power;
 
@@ -9434,56 +9439,55 @@ static int hdd_config_power(struct hdd_adapter *adapter,
 	return hdd_set_power_config(hdd_ctx, adapter, power);
 }
 
-static int hdd_config_stats_avg_factor(struct hdd_adapter *adapter,
+static int hdd_config_stats_avg_factor(struct wlan_hdd_link_info *link_info,
 				       const struct nlattr *attr)
 {
+	struct hdd_adapter *adapter = link_info->adapter;
 	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
 	uint16_t stats_avg_factor;
 	QDF_STATUS status;
 
 	stats_avg_factor = nla_get_u16(attr);
 	status = sme_configure_stats_avg_factor(hdd_ctx->mac_handle,
-						adapter->deflink->vdev_id,
+						link_info->vdev_id,
 						stats_avg_factor);
 
 	return qdf_status_to_os_return(status);
 }
 
-static int hdd_config_non_agg_retry(struct hdd_adapter *adapter,
+static int hdd_config_non_agg_retry(struct wlan_hdd_link_info *link_info,
 				    const struct nlattr *attr)
 {
 	uint8_t retry;
 
 	retry = nla_get_u8(attr);
-
 	/* Value less than CFG_AGG_RETRY_MIN has side effect to t-put */
 	retry = (retry > CFG_NON_AGG_RETRY_MAX) ? CFG_NON_AGG_RETRY_MAX :
 		((retry < CFG_NON_AGG_RETRY_MIN) ? CFG_NON_AGG_RETRY_MIN :
 		  retry);
 	hdd_debug("sending Non-Agg Retry Th: %d", retry);
 
-	return sme_set_vdev_sw_retry(adapter->deflink->vdev_id, retry,
+	return sme_set_vdev_sw_retry(link_info->vdev_id, retry,
 				     WMI_VDEV_CUSTOM_SW_RETRY_TYPE_NONAGGR);
 }
 
-static int hdd_config_agg_retry(struct hdd_adapter *adapter,
+static int hdd_config_agg_retry(struct wlan_hdd_link_info *link_info,
 				const struct nlattr *attr)
 {
 	uint8_t retry;
 
 	retry = nla_get_u8(attr);
-
 	/* Value less than CFG_AGG_RETRY_MIN has side effect to t-put */
 	retry = (retry > CFG_AGG_RETRY_MAX) ? CFG_AGG_RETRY_MAX :
 		((retry < CFG_AGG_RETRY_MIN) ? CFG_AGG_RETRY_MIN :
 		  retry);
 	hdd_debug("sending Agg Retry Th: %d", retry);
 
-	return sme_set_vdev_sw_retry(adapter->deflink->vdev_id, retry,
+	return sme_set_vdev_sw_retry(link_info->vdev_id, retry,
 				     WMI_VDEV_CUSTOM_SW_RETRY_TYPE_AGGR);
 }
 
-static int hdd_config_mgmt_retry(struct hdd_adapter *adapter,
+static int hdd_config_mgmt_retry(struct wlan_hdd_link_info *link_info,
 				 const struct nlattr *attr)
 {
 	uint8_t retry;
@@ -9496,11 +9500,11 @@ static int hdd_config_mgmt_retry(struct hdd_adapter *adapter,
 		max_mgmt_retry : retry;
 	param_id = wmi_pdev_param_mgmt_retry_limit;
 
-	return wma_cli_set_command(adapter->deflink->vdev_id, param_id,
+	return wma_cli_set_command(link_info->vdev_id, param_id,
 				   retry, PDEV_CMD);
 }
 
-static int hdd_config_ctrl_retry(struct hdd_adapter *adapter,
+static int hdd_config_ctrl_retry(struct wlan_hdd_link_info *link_info,
 				 const struct nlattr *attr)
 {
 	uint8_t retry;
@@ -9511,11 +9515,11 @@ static int hdd_config_ctrl_retry(struct hdd_adapter *adapter,
 		CFG_CTRL_RETRY_MAX : retry;
 	param_id = wmi_pdev_param_ctrl_retry_limit;
 
-	return wma_cli_set_command(adapter->deflink->vdev_id, param_id,
+	return wma_cli_set_command(link_info->vdev_id, param_id,
 				   retry, PDEV_CMD);
 }
 
-static int hdd_config_propagation_delay(struct hdd_adapter *adapter,
+static int hdd_config_propagation_delay(struct wlan_hdd_link_info *link_info,
 					const struct nlattr *attr)
 {
 	uint8_t delay;
@@ -9528,12 +9532,13 @@ static int hdd_config_propagation_delay(struct hdd_adapter *adapter,
 	abs_delay = delay + CFG_PROPAGATION_DELAY_BASE;
 	param_id = wmi_pdev_param_propagation_delay;
 
-	return  wma_cli_set_command(adapter->deflink->vdev_id, param_id,
+	return  wma_cli_set_command(link_info->vdev_id, param_id,
 				    abs_delay, PDEV_CMD);
 }
 
-static int hdd_config_propagation_abs_delay(struct hdd_adapter *adapter,
-					    const struct nlattr *attr)
+static int
+hdd_config_propagation_abs_delay(struct wlan_hdd_link_info *link_info,
+				 const struct nlattr *attr)
 {
 	uint32_t abs_delay;
 	int param_id;
@@ -9541,14 +9546,14 @@ static int hdd_config_propagation_abs_delay(struct hdd_adapter *adapter,
 	abs_delay = nla_get_u32(attr);
 	param_id = wmi_pdev_param_propagation_delay;
 
-	return wma_cli_set_command(adapter->deflink->vdev_id, param_id,
+	return wma_cli_set_command(link_info->vdev_id, param_id,
 				   abs_delay, PDEV_CMD);
 }
 
-static int hdd_config_tx_fail_count(struct hdd_adapter *adapter,
+static int hdd_config_tx_fail_count(struct wlan_hdd_link_info *link_info,
 				    const struct nlattr *attr)
 {
-	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
+	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(link_info->adapter);
 	uint32_t tx_fail_count;
 	QDF_STATUS status;
 
@@ -9557,7 +9562,7 @@ static int hdd_config_tx_fail_count(struct hdd_adapter *adapter,
 		return 0;
 
 	status = sme_update_tx_fail_cnt_threshold(hdd_ctx->mac_handle,
-						  adapter->deflink->vdev_id,
+						  link_info->vdev_id,
 						  tx_fail_count);
 	if (QDF_IS_STATUS_ERROR(status))
 		hdd_err("sme_update_tx_fail_cnt_threshold (err=%d)",
@@ -9566,10 +9571,11 @@ static int hdd_config_tx_fail_count(struct hdd_adapter *adapter,
 	return qdf_status_to_os_return(status);
 }
 
-static int hdd_config_channel_avoidance_ind(struct hdd_adapter *adapter,
-					    const struct nlattr *attr)
+static int
+hdd_config_channel_avoidance_ind(struct wlan_hdd_link_info *link_info,
+				 const struct nlattr *attr)
 {
-	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
+	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(link_info->adapter);
 	uint8_t set_value;
 
 	set_value = nla_get_u8(attr);
@@ -9578,24 +9584,26 @@ static int hdd_config_channel_avoidance_ind(struct hdd_adapter *adapter,
 	return hdd_enable_disable_ca_event(hdd_ctx, set_value);
 }
 
-static int hdd_config_guard_time(struct hdd_adapter *adapter,
+static int hdd_config_guard_time(struct wlan_hdd_link_info *link_info,
 				 const struct nlattr *attr)
 {
+	struct hdd_adapter *adapter = link_info->adapter;
 	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
 	uint32_t guard_time;
 	QDF_STATUS status;
 
 	guard_time = nla_get_u32(attr);
 	status = sme_configure_guard_time(hdd_ctx->mac_handle,
-					  adapter->deflink->vdev_id,
-					  guard_time);
+					  link_info->vdev_id, guard_time);
 
 	return qdf_status_to_os_return(status);
 }
 
-static int hdd_config_scan_default_ies(struct hdd_adapter *adapter,
-				       const struct nlattr *attr)
+static int
+hdd_config_scan_default_ies(struct wlan_hdd_link_info *link_info,
+			    const struct nlattr *attr)
 {
+	struct hdd_adapter *adapter = link_info->adapter;
 	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
 	uint8_t *scan_ie;
 	uint16_t scan_ie_len;
@@ -9604,7 +9612,7 @@ static int hdd_config_scan_default_ies(struct hdd_adapter *adapter,
 
 	scan_ie_len = nla_len(attr);
 	hdd_debug("IE len %d session %d device mode %d",
-		  scan_ie_len, adapter->deflink->vdev_id, adapter->device_mode);
+		  scan_ie_len, link_info->vdev_id, adapter->device_mode);
 
 	if (!scan_ie_len) {
 		hdd_err("zero-length IE prohibited");
@@ -9630,7 +9638,7 @@ static int hdd_config_scan_default_ies(struct hdd_adapter *adapter,
 	if (adapter->device_mode == QDF_STA_MODE) {
 		mac_handle = hdd_ctx->mac_handle;
 		status = sme_set_default_scan_ie(mac_handle,
-						 adapter->deflink->vdev_id,
+						 link_info->vdev_id,
 						 scan_ie, scan_ie_len);
 		if (QDF_STATUS_SUCCESS != status) {
 			hdd_err("failed to set default scan IEs in sme: %d",
@@ -9642,7 +9650,7 @@ static int hdd_config_scan_default_ies(struct hdd_adapter *adapter,
 	return 0;
 }
 
-static int hdd_config_ant_div_ena(struct hdd_adapter *adapter,
+static int hdd_config_ant_div_ena(struct wlan_hdd_link_info *link_info,
 				  const struct nlattr *attr)
 {
 	uint32_t antdiv_enable;
@@ -9650,7 +9658,7 @@ static int hdd_config_ant_div_ena(struct hdd_adapter *adapter,
 
 	antdiv_enable = nla_get_u32(attr);
 	hdd_debug("antdiv_enable: %d", antdiv_enable);
-	errno = wma_cli_set_command(adapter->deflink->vdev_id,
+	errno = wma_cli_set_command(link_info->vdev_id,
 				    wmi_pdev_param_ena_ant_div,
 				    antdiv_enable, PDEV_CMD);
 	if (errno)
@@ -9659,7 +9667,7 @@ static int hdd_config_ant_div_ena(struct hdd_adapter *adapter,
 	return errno;
 }
 
-static int hdd_config_ant_div_snr_diff(struct hdd_adapter *adapter,
+static int hdd_config_ant_div_snr_diff(struct wlan_hdd_link_info *link_info,
 				       const struct nlattr *attr)
 {
 	uint32_t ant_div_snr_diff;
@@ -9672,7 +9680,7 @@ static int hdd_config_ant_div_snr_diff(struct hdd_adapter *adapter,
 	ant_div_usrcfg = ANT_DIV_SET_SNR_DIFF(ant_div_snr_diff);
 	hdd_debug("usrcfg: %x", ant_div_usrcfg);
 
-	errno = wma_cli_set_command(adapter->deflink->vdev_id,
+	errno = wma_cli_set_command(link_info->vdev_id,
 				    wmi_pdev_param_ant_div_usrcfg,
 				    ant_div_usrcfg, PDEV_CMD);
 	if (errno)
@@ -9681,8 +9689,9 @@ static int hdd_config_ant_div_snr_diff(struct hdd_adapter *adapter,
 	return errno;
 }
 
-static int hdd_config_ant_div_probe_dwell_time(struct hdd_adapter *adapter,
-					       const struct nlattr *attr)
+static int
+hdd_config_ant_div_probe_dwell_time(struct wlan_hdd_link_info *link_info,
+				    const struct nlattr *attr)
 {
 	uint32_t dwell_time;
 	uint32_t ant_div_usrcfg;
@@ -9694,7 +9703,7 @@ static int hdd_config_ant_div_probe_dwell_time(struct hdd_adapter *adapter,
 	ant_div_usrcfg = ANT_DIV_SET_PROBE_DWELL_TIME(dwell_time);
 	hdd_debug("usrcfg: %x", ant_div_usrcfg);
 
-	errno = wma_cli_set_command(adapter->deflink->vdev_id,
+	errno = wma_cli_set_command(link_info->vdev_id,
 				    wmi_pdev_param_ant_div_usrcfg,
 				    ant_div_usrcfg, PDEV_CMD);
 	if (errno)
@@ -9703,7 +9712,7 @@ static int hdd_config_ant_div_probe_dwell_time(struct hdd_adapter *adapter,
 	return errno;
 }
 
-static int hdd_config_ant_div_chain(struct hdd_adapter *adapter,
+static int hdd_config_ant_div_chain(struct wlan_hdd_link_info *link_info,
 				    const struct nlattr *attr)
 {
 	uint32_t antdiv_chain;
@@ -9712,7 +9721,7 @@ static int hdd_config_ant_div_chain(struct hdd_adapter *adapter,
 	antdiv_chain = nla_get_u32(attr);
 	hdd_debug("antdiv_chain: %d", antdiv_chain);
 
-	errno = wma_cli_set_command(adapter->deflink->vdev_id,
+	errno = wma_cli_set_command(link_info->vdev_id,
 				    wmi_pdev_param_force_chain_ant,
 				    antdiv_chain, PDEV_CMD);
 	if (errno)
@@ -9721,7 +9730,7 @@ static int hdd_config_ant_div_chain(struct hdd_adapter *adapter,
 	return errno;
 }
 
-static int hdd_config_ant_div_selftest(struct hdd_adapter *adapter,
+static int hdd_config_ant_div_selftest(struct wlan_hdd_link_info *link_info,
 				       const struct nlattr *attr)
 {
 	uint32_t antdiv_selftest;
@@ -9729,8 +9738,7 @@ static int hdd_config_ant_div_selftest(struct hdd_adapter *adapter,
 
 	antdiv_selftest = nla_get_u32(attr);
 	hdd_debug("antdiv_selftest: %d", antdiv_selftest);
-
-	errno = wma_cli_set_command(adapter->deflink->vdev_id,
+	errno = wma_cli_set_command(link_info->vdev_id,
 				    wmi_pdev_param_ant_div_selftest,
 				    antdiv_selftest, PDEV_CMD);
 	if (errno)
@@ -9739,16 +9747,16 @@ static int hdd_config_ant_div_selftest(struct hdd_adapter *adapter,
 	return errno;
 }
 
-static int hdd_config_ant_div_selftest_intvl(struct hdd_adapter *adapter,
-					     const struct nlattr *attr)
+static int
+hdd_config_ant_div_selftest_intvl(struct wlan_hdd_link_info *link_info,
+				  const struct nlattr *attr)
 {
 	uint32_t antdiv_selftest_intvl;
 	int errno;
 
 	antdiv_selftest_intvl = nla_get_u32(attr);
 	hdd_debug("antdiv_selftest_intvl: %d", antdiv_selftest_intvl);
-
-	errno = wma_cli_set_command(adapter->deflink->vdev_id,
+	errno = wma_cli_set_command(link_info->vdev_id,
 				    wmi_pdev_param_ant_div_selftest_intvl,
 				    antdiv_selftest_intvl, PDEV_CMD);
 	if (errno)
@@ -9757,10 +9765,11 @@ static int hdd_config_ant_div_selftest_intvl(struct hdd_adapter *adapter,
 	return errno;
 }
 
-static int hdd_config_ignore_assoc_disallowed(struct hdd_adapter *adapter,
-					      const struct nlattr *attr)
+static int
+hdd_config_ignore_assoc_disallowed(struct wlan_hdd_link_info *link_info,
+				   const struct nlattr *attr)
 {
-	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
+	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(link_info->adapter);
 	uint8_t ignore_assoc_disallowed;
 
 	ignore_assoc_disallowed = nla_get_u8(attr);
@@ -9775,7 +9784,7 @@ static int hdd_config_ignore_assoc_disallowed(struct hdd_adapter *adapter,
 	return 0;
 }
 
-static int hdd_config_restrict_offchannel(struct hdd_adapter *adapter,
+static int hdd_config_restrict_offchannel(struct wlan_hdd_link_info *link_info,
 					  const struct nlattr *attr)
 {
 	uint8_t restrict_offchan;
@@ -9788,13 +9797,15 @@ static int hdd_config_restrict_offchannel(struct hdd_adapter *adapter,
 		return -EINVAL;
 	}
 
-	return wlan_hdd_handle_restrict_offchan_config(adapter,
+	return wlan_hdd_handle_restrict_offchan_config(link_info->adapter,
 						       restrict_offchan);
 }
 
-static int hdd_config_total_beacon_miss_count(struct hdd_adapter *adapter,
-					      const struct nlattr *attr)
+static int
+hdd_config_total_beacon_miss_count(struct wlan_hdd_link_info *link_info,
+				   const struct nlattr *attr)
 {
+	struct hdd_adapter *adapter = link_info->adapter;
 	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
 	uint8_t first_miss_count;
 	uint8_t final_miss_count;
@@ -9824,14 +9835,14 @@ static int hdd_config_total_beacon_miss_count(struct hdd_adapter *adapter,
 		  first_miss_count, final_miss_count);
 
 	status = sme_set_roam_bmiss_final_bcnt(hdd_ctx->mac_handle,
-					       adapter->deflink->vdev_id,
+					       link_info->vdev_id,
 					       final_miss_count);
 	if (QDF_IS_STATUS_ERROR(status)) {
 		hdd_err("Failed to set final count, status %u", status);
 		return qdf_status_to_os_return(status);
 	}
 
-	status = sme_set_bmiss_bcnt(adapter->deflink->vdev_id,
+	status = sme_set_bmiss_bcnt(link_info->vdev_id,
 				    first_miss_count,
 				    final_miss_count);
 	if (QDF_IS_STATUS_ERROR(status))
@@ -10164,9 +10175,10 @@ hdd_get_netlink_sender_portid(struct hdd_context *hdd_ctx, uint32_t *port_id)
 }
 #endif
 
-static int hdd_config_latency_level(struct hdd_adapter *adapter,
+static int hdd_config_latency_level(struct wlan_hdd_link_info *link_info,
 				    const struct nlattr *attr)
 {
+	struct hdd_adapter *adapter = link_info->adapter;
 	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
 	uint32_t port_id;
 	uint16_t latency_level, host_latency_level;
@@ -10212,7 +10224,7 @@ static int hdd_config_latency_level(struct hdd_adapter *adapter,
 		}
 	} else {
 		status = sme_set_wlm_latency_level(hdd_ctx->mac_handle,
-						   adapter->deflink->vdev_id,
+						   link_info->vdev_id,
 						   host_latency_level, 0,
 						   false);
 		if (QDF_IS_STATUS_ERROR(status)) {
@@ -10239,9 +10251,10 @@ error:
 	return ret;
 }
 
-static int hdd_config_disable_fils(struct hdd_adapter *adapter,
+static int hdd_config_disable_fils(struct wlan_hdd_link_info *link_info,
 				   const struct nlattr *attr)
 {
+	struct hdd_adapter *adapter = link_info->adapter;
 	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
 	uint8_t disable_fils;
 	bool enabled;
@@ -10264,7 +10277,7 @@ static int hdd_config_disable_fils(struct hdd_adapter *adapter,
 		hdd_err("could not set enable bcast probe resp info, %d",
 			status);
 
-	status = wma_cli_set_command(adapter->deflink->vdev_id,
+	status = wma_cli_set_command(link_info->vdev_id,
 				     wmi_vdev_param_enable_bcast_probe_response,
 				     !disable_fils, VDEV_CMD);
 	if (QDF_IS_STATUS_ERROR(status))
@@ -10274,9 +10287,10 @@ static int hdd_config_disable_fils(struct hdd_adapter *adapter,
 	return qdf_status_to_os_return(status);
 }
 
-static int hdd_set_primary_interface(struct hdd_adapter *adapter,
+static int hdd_set_primary_interface(struct wlan_hdd_link_info *link_info,
 				     const struct nlattr *attr)
 {
+	struct hdd_adapter *adapter = link_info->adapter;
 	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
 	bool is_set_primary_iface;
 	QDF_STATUS status;
@@ -10291,7 +10305,7 @@ static int hdd_set_primary_interface(struct hdd_adapter *adapter,
 
 	is_set_primary_iface = nla_get_u8(attr);
 
-	vdev_id = adapter->deflink->vdev_id;
+	vdev_id = link_info->vdev_id;
 	primary_vdev_id =
 		is_set_primary_iface ? vdev_id : WLAN_UMAC_VDEV_ID_MAX;
 
@@ -10330,11 +10344,11 @@ static int hdd_set_primary_interface(struct hdd_adapter *adapter,
 		     !policy_mgr_concurrent_sta_on_different_mac(hdd_ctx->psoc)) ||
 		    !ucfg_mlme_get_dual_sta_roaming_enabled(hdd_ctx->psoc)) {
 			hdd_err("Enable roaming on requested interface: %d",
-				adapter->deflink->vdev_id);
+				link_info->vdev_id);
 			hdd_debug("Enable roaming on requested interface: %d",
-				  adapter->deflink->vdev_id);
+				  link_info->vdev_id);
 			wlan_cm_roam_state_change(hdd_ctx->pdev,
-						  adapter->deflink->vdev_id,
+						  link_info->vdev_id,
 						  WLAN_ROAM_RSO_ENABLED,
 						  REASON_ROAM_SET_PRIMARY);
 	}
@@ -10395,10 +10409,10 @@ static int hdd_set_primary_interface(struct hdd_adapter *adapter,
 	return 0;
 }
 
-static int hdd_config_rsn_ie(struct hdd_adapter *adapter,
+static int hdd_config_rsn_ie(struct wlan_hdd_link_info *link_info,
 			     const struct nlattr *attr)
 {
-	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
+	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(link_info->adapter);
 	uint8_t force_rsne_override;
 
 	force_rsne_override = nla_get_u8(attr);
@@ -10413,7 +10427,7 @@ static int hdd_config_rsn_ie(struct hdd_adapter *adapter,
 	return 0;
 }
 
-static int hdd_config_gtx(struct hdd_adapter *adapter,
+static int hdd_config_gtx(struct wlan_hdd_link_info *link_info,
 			  const struct nlattr *attr)
 {
 	uint8_t config_gtx;
@@ -10425,7 +10439,7 @@ static int hdd_config_gtx(struct hdd_adapter *adapter,
 		return -EINVAL;
 	}
 
-	errno = sme_cli_set_command(adapter->deflink->vdev_id,
+	errno = sme_cli_set_command(link_info->vdev_id,
 				    wmi_vdev_param_gtx_enable,
 				    config_gtx, VDEV_CMD);
 	if (errno)
@@ -10436,19 +10450,20 @@ static int hdd_config_gtx(struct hdd_adapter *adapter,
 
 /**
  * hdd_config_disconnect_ies() - Configure disconnect IEs
- * @adapter: Pointer to HDD adapter
+ * @link_info: Link info pointer in HDD adapter
  * @attr: array of pointer to struct nlattr
  *
  * Return: 0 on success; error number otherwise
  */
-static int hdd_config_disconnect_ies(struct hdd_adapter *adapter,
+static int hdd_config_disconnect_ies(struct wlan_hdd_link_info *link_info,
 				     const struct nlattr *attr)
 {
+	struct hdd_adapter *adapter = link_info->adapter;
 	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
 	QDF_STATUS status;
 
 	hdd_debug("IE len %u session %u device mode %u",
-		  nla_len(attr), adapter->deflink->vdev_id,
+		  nla_len(attr), link_info->vdev_id,
 		  adapter->device_mode);
 	if (!nla_len(attr) ||
 	    nla_len(attr) > SIR_MAC_MAX_ADD_IE_LENGTH + 2 ||
@@ -10458,7 +10473,7 @@ static int hdd_config_disconnect_ies(struct hdd_adapter *adapter,
 	}
 
 	status = sme_set_disconnect_ies(hdd_ctx->mac_handle,
-					adapter->deflink->vdev_id,
+					link_info->vdev_id,
 					nla_data(attr),
 					nla_len(attr));
 	if (QDF_IS_STATUS_ERROR(status))
@@ -10470,18 +10485,18 @@ static int hdd_config_disconnect_ies(struct hdd_adapter *adapter,
 #ifdef WLAN_FEATURE_ELNA
 /**
  * hdd_set_elna_bypass() - Set eLNA bypass
- * @adapter: Pointer to HDD adapter
+ * @link_info: Link info pointer in HDD adapter
  * @attr: Pointer to struct nlattr
  *
  * Return: 0 on success; error number otherwise
  */
-static int hdd_set_elna_bypass(struct hdd_adapter *adapter,
+static int hdd_set_elna_bypass(struct wlan_hdd_link_info *link_info,
 			       const struct nlattr *attr)
 {
 	int ret;
 	struct wlan_objmgr_vdev *vdev;
 
-	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink, WLAN_FWOL_NB_ID);
+	vdev = hdd_objmgr_get_vdev_by_user(link_info, WLAN_FWOL_NB_ID);
 	if (!vdev)
 		return -EINVAL;
 
@@ -10527,13 +10542,12 @@ int hdd_set_mac_chan_width(struct hdd_adapter *adapter,
 
 /**
  * hdd_set_channel_width() - set channel width
- *
- * @adapter: hdd adapter
+ * @link_info: Link info pointer in HDD adapter.
  * @attr: nla attr sent by supplicant
  *
  * Return: 0 on success, negative errno on failure
  */
-static int hdd_set_channel_width(struct hdd_adapter *adapter,
+static int hdd_set_channel_width(struct wlan_hdd_link_info *link_info,
 				 const struct nlattr *attr)
 {
 	uint8_t nl80211_chwidth;
@@ -10546,51 +10560,48 @@ static int hdd_set_channel_width(struct hdd_adapter *adapter,
 		return -EINVAL;
 	}
 
-	return hdd_set_mac_chan_width(adapter, chwidth);
+	return hdd_set_mac_chan_width(link_info->adapter, chwidth);
 }
 
 /**
  * hdd_set_dynamic_bw() - enable / disable dynamic bandwidth
- *
- * @adapter: hdd adapter
+ * @link_info: Link info in adapter
  * @attr: nla attr sent by supplicant
  *
  * Return: 0 on success, negative errno on failure
  */
-static int hdd_set_dynamic_bw(struct hdd_adapter *adapter,
+static int hdd_set_dynamic_bw(struct wlan_hdd_link_info *link_info,
 			      const struct nlattr *attr)
 {
 	uint8_t enable;
 
 	enable = nla_get_u8(attr);
-
-	return wma_cli_set_command(adapter->deflink->vdev_id,
+	return wma_cli_set_command(link_info->vdev_id,
 				   wmi_pdev_param_dynamic_bw,
 				   enable, PDEV_CMD);
 }
 
 /**
  * hdd_set_nss() - set the number of spatial streams supported by the adapter
- *
- * @adapter: hdd adapter
+ * @link_info: Link info pointer in HDD adapter
  * @attr: pointer to nla attr
  *
  * Return: 0 on success, negative errno on failure
  */
-static int hdd_set_nss(struct hdd_adapter *adapter,
+static int hdd_set_nss(struct wlan_hdd_link_info *link_info,
 		       const struct nlattr *attr)
 {
 	uint8_t nss;
 	int ret;
 	QDF_STATUS status;
+	struct hdd_adapter *adapter = link_info->adapter;
 
 	nss = nla_get_u8(attr);
-
 	status = hdd_update_nss(adapter, nss, nss);
 	ret = qdf_status_to_os_return(status);
 
 	if (ret == 0 && adapter->device_mode == QDF_SAP_MODE)
-		ret = wma_cli_set_command(adapter->deflink->vdev_id,
+		ret = wma_cli_set_command(link_info->vdev_id,
 					  wmi_vdev_param_nss, nss, VDEV_CMD);
 
 	return ret;
@@ -10602,17 +10613,18 @@ static int hdd_set_nss(struct hdd_adapter *adapter,
 
 /**
  * hdd_set_arp_ns_offload() - enable/disable arp/ns offload feature
- * @adapter: hdd adapter
+ * @link_info: Link info pointer in HDD adapter
  * @attr: pointer to nla attr
  *
  * Return: 0 on success, negative errno on failure
  */
-static int hdd_set_arp_ns_offload(struct hdd_adapter *adapter,
+static int hdd_set_arp_ns_offload(struct wlan_hdd_link_info *link_info,
 				  const struct nlattr *attr)
 {
 	uint8_t offload_state;
 	int errno;
 	QDF_STATUS qdf_status = QDF_STATUS_E_FAILURE;
+	struct hdd_adapter *adapter = link_info->adapter;
 	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
 	struct wlan_objmgr_vdev *vdev;
 
@@ -10637,7 +10649,7 @@ static int hdd_set_arp_ns_offload(struct hdd_adapter *adapter,
 		return -EINVAL;
 	}
 
-	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink, WLAN_OSIF_ID);
+	vdev = hdd_objmgr_get_vdev_by_user(link_info, WLAN_OSIF_ID);
 	if (!vdev) {
 		hdd_err("vdev is NULL");
 		return -EINVAL;
@@ -10669,7 +10681,7 @@ static int hdd_set_arp_ns_offload(struct hdd_adapter *adapter,
 		goto vdev_ref;
 	}
 
-	if (!hdd_is_vdev_in_conn_state(adapter->deflink)) {
+	if (!hdd_is_vdev_in_conn_state(link_info)) {
 		hdd_info("set not in connect state, updated state %d",
 			 offload_state);
 		errno = qdf_status_to_os_return(QDF_STATUS_SUCCESS);
@@ -10830,14 +10842,15 @@ err:
 
 /**
  * hdd_set_dbam_config() - set DBAM config
- * @adapter: hdd adapter
+ * @link_info: Link info pointer in HDD adapter
  * @attr: pointer to nla attr
  *
  * Return: 0 on success, negative errno on failure
  */
-static int hdd_set_dbam_config(struct hdd_adapter *adapter,
+static int hdd_set_dbam_config(struct wlan_hdd_link_info *link_info,
 			       const struct nlattr *attr)
 {
+	struct hdd_adapter *adapter = link_info->adapter;
 	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
 	int errno;
 	enum qca_dbam_config dbam_config;
@@ -10868,13 +10881,14 @@ static int hdd_set_dbam_config(struct hdd_adapter *adapter,
 
 /**
  * hdd_set_beamformer_periodic_sounding() - enable/disable Tx Beamforming
- * @adapter: hdd adapter
+ * @link_info: Link info pointer in HDD adapter
  * @attr: pointer to nla attr
  *
  * Return: 0 on success, negative on failure
  */
-static int hdd_set_beamformer_periodic_sounding(struct hdd_adapter *adapter,
-						const struct nlattr *attr)
+static int
+hdd_set_beamformer_periodic_sounding(struct wlan_hdd_link_info *link_info,
+				     const struct nlattr *attr)
 {
 	uint8_t cfg_val;
 	int set_val;
@@ -10882,25 +10896,24 @@ static int hdd_set_beamformer_periodic_sounding(struct hdd_adapter *adapter,
 	cfg_val = nla_get_u8(attr);
 
 	set_val = cfg_val ? TX_BFER_NDP_PERIODICITY : 0;
-
-	return wma_cli_set_command(adapter->deflink->vdev_id,
+	return wma_cli_set_command(link_info->vdev_id,
 				   WMI_PDEV_PARAM_TXBF_SOUND_PERIOD_CMDID,
 				   set_val, PDEV_CMD);
 }
 
 /**
  * hdd_set_wfc_state() - Set wfc state
- * @adapter: hdd adapter
+ * @link_info: Link info pointer in HDD adapter
  * @attr: pointer to nla attr
  *
  * Return: 0 on success, negative on failure
  */
-static int hdd_set_wfc_state(struct hdd_adapter *adapter,
+static int hdd_set_wfc_state(struct wlan_hdd_link_info *link_info,
 			     const struct nlattr *attr)
 {
 	uint8_t cfg_val;
 	enum pld_wfc_mode set_val;
-	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
+	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(link_info->adapter);
 	int errno;
 
 	errno = wlan_hdd_validate_context(hdd_ctx);
@@ -10991,46 +11004,47 @@ hdd_test_config_emlsr_action_mode(struct hdd_adapter *adapter,
 /**
  * hdd_set_eht_max_simultaneous_links() - Set EHT maximum number of
  * simultaneous links
- * @adapter: hdd adapter
+ * @link_info: Link info pointer in HDD adapter
  * @attr: pointer to nla attr
  *
  * Return: 0 on success, negative on failure
  */
-static int hdd_set_eht_max_simultaneous_links(struct hdd_adapter *adapter,
-					      const struct nlattr *attr)
+static int
+hdd_set_eht_max_simultaneous_links(struct wlan_hdd_link_info *link_info,
+				   const struct nlattr *attr)
 {
 	uint8_t cfg_val;
-	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
+	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(link_info->adapter);
 
 	cfg_val = nla_get_u8(attr);
 	if (cfg_val > MAX_SIMULTANEOUS_STA_ML_LINKS)
 		return -EINVAL;
 
 	sme_set_mlo_max_simultaneous_links(hdd_ctx->mac_handle,
-					   adapter->deflink->vdev_id, cfg_val);
+					   link_info->vdev_id, cfg_val);
 
 	return 0;
 }
 
 /**
  * hdd_set_eht_max_num_links() - Set EHT maximum number of links
- * @adapter: hdd adapter
+ * @link_info: Link info pointer in HDD adapter
  * @attr: pointer to nla attr
  *
  * Return: 0 on success, negative on failure
  */
-static int hdd_set_eht_max_num_links(struct hdd_adapter *adapter,
+static int hdd_set_eht_max_num_links(struct wlan_hdd_link_info *link_info,
 				     const struct nlattr *attr)
 {
 	uint8_t cfg_val;
-	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
+	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(link_info->adapter);
 
 	cfg_val = nla_get_u8(attr);
 	if (cfg_val > MAX_NUM_STA_ML_LINKS)
 		return -EINVAL;
 
 	sme_set_mlo_max_links(hdd_ctx->mac_handle,
-			      adapter->deflink->vdev_id, cfg_val);
+			      link_info->vdev_id, cfg_val);
 
 	return 0;
 }
@@ -11060,15 +11074,16 @@ hdd_get_cfg_eht_mode(enum qca_wlan_eht_mlo_mode qca_wlan_eht_mode)
 
 /**
  * hdd_set_eht_mlo_mode() - Set EHT MLO mode of operation
- * @adapter: hdd adapter
+ * @link_info: Link info pointer in HDD adapter
  * @attr: pointer to nla attr
  *
  * Return: 0 on success, negative on failure
  */
-static int hdd_set_eht_mlo_mode(struct hdd_adapter *adapter,
+static int hdd_set_eht_mlo_mode(struct wlan_hdd_link_info *link_info,
 				const struct nlattr *attr)
 {
 	uint8_t cfg_val;
+	struct hdd_adapter *adapter = link_info->adapter;
 	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
 	enum wlan_eht_mode eht_mode;
 
@@ -11088,29 +11103,30 @@ static int hdd_set_eht_mlo_mode(struct hdd_adapter *adapter,
 	return 0;
 }
 #else
-static inline
-int hdd_set_eht_max_simultaneous_links(struct hdd_adapter *adapter,
-				       const struct nlattr *attr)
+static inline int
+hdd_set_eht_max_simultaneous_links(struct wlan_hdd_link_info *link_info,
+				   const struct nlattr *attr)
 {
 	return 0;
 }
 
-static inline
-int hdd_set_eht_max_num_links(struct hdd_adapter *adapter,
-			      const struct nlattr *attr)
+static inline int
+hdd_set_eht_max_num_links(struct wlan_hdd_link_info  *link_info,
+			  const struct nlattr *attr)
 {
 	return 0;
 }
 
-static inline
-int hdd_set_eht_mlo_mode(struct hdd_adapter *adapter, const struct nlattr *attr)
+static inline int
+hdd_set_eht_mlo_mode(struct wlan_hdd_link_info *link_info,
+		     const struct nlattr *attr)
 {
 	return 0;
 }
 #endif
 
 #ifdef WLAN_FEATURE_11BE_MLO
-static int hdd_set_link_force_active(struct hdd_adapter *adapter,
+static int hdd_set_link_force_active(struct wlan_hdd_link_info *link_info,
 				     const struct nlattr *attr)
 {
 	struct hdd_context *hdd_ctx = NULL;
@@ -11119,6 +11135,7 @@ static int hdd_set_link_force_active(struct hdd_adapter *adapter,
 	struct qdf_mac_addr *mac_addr_ptr;
 	uint32_t num_links = 0;
 	int32_t len;
+	struct hdd_adapter *adapter = link_info->adapter;
 
 	hdd_ctx = WLAN_HDD_GET_CTX(adapter);
 	if (!hdd_ctx)
@@ -11134,7 +11151,7 @@ static int hdd_set_link_force_active(struct hdd_adapter *adapter,
 			num_links++;
 		}
 		sme_activate_mlo_links(hdd_ctx->mac_handle,
-				       adapter->deflink->vdev_id, num_links,
+				       link_info->vdev_id, num_links,
 				       active_link_addr);
 	}
 	hdd_debug("number of links to force active: %d", num_links);
@@ -11163,7 +11180,7 @@ hdd_get_cfg_emlsr_mode(enum qca_wlan_eht_mlo_mode qca_wlan_emlsr_mode)
 	}
 }
 
-static int hdd_set_emlsr_mode(struct hdd_adapter *adapter,
+static int hdd_set_emlsr_mode(struct wlan_hdd_link_info *link_info,
 			      const struct nlattr *attr)
 {
 	uint8_t cfg_val;
@@ -11179,20 +11196,21 @@ static int hdd_set_emlsr_mode(struct hdd_adapter *adapter,
 	hdd_debug("EMLSR mode: %s", emlsr_action_mode == WLAN_EMLSR_MODE_ENTER ?
 		  "Enter" : "Exit");
 
-	hdd_test_config_emlsr_action_mode(adapter, emlsr_action_mode);
+	hdd_test_config_emlsr_action_mode(link_info->adapter,
+					  emlsr_action_mode);
 
 	return 0;
 }
 #else
-static inline
-int hdd_set_link_force_active(struct hdd_adapter *adapter,
-			      const struct nlattr *attr)
+static inline int
+hdd_set_link_force_active(struct wlan_hdd_link_info *link_info,
+			  const struct nlattr *attr)
 {
 	return 0;
 }
 
 static inline
-int hdd_set_emlsr_mode(struct hdd_adapter *adapter,
+int hdd_set_emlsr_mode(struct wlan_hdd_link_info *link_info,
 		       const struct nlattr *attr)
 {
 	return 0;
@@ -11201,14 +11219,14 @@ int hdd_set_emlsr_mode(struct hdd_adapter *adapter,
 
 /**
  * typedef independent_setter_fn - independent attribute handler
- * @adapter: The adapter being configured
+ * @link_info: Link info pointer in HDD adapter
  * @attr: The nl80211 attribute being applied
  *
  * Defines the signature of functions in the independent attribute vtable
  *
  * Return: 0 if the attribute was handled successfully, otherwise an errno
  */
-typedef int (*independent_setter_fn)(struct hdd_adapter *adapter,
+typedef int (*independent_setter_fn)(struct wlan_hdd_link_info *link_info,
 				     const struct nlattr *attr);
 
 /**
@@ -12003,7 +12021,7 @@ static int hdd_get_configuration(struct hdd_adapter *adapter,
 
 /**
  * hdd_set_independent_configuration() - Handle independent attributes
- * @adapter: adapter upon which the vendor command was received
+ * @link_info: Link info pointer in HDD adapter
  * @tb: parsed attribute array
  *
  * This is a table-driven function which dispatches independent
@@ -12013,8 +12031,9 @@ static int hdd_get_configuration(struct hdd_adapter *adapter,
  *
  * Return: 0 if there were no issues, otherwise errno of the last issue
  */
-static int hdd_set_independent_configuration(struct hdd_adapter *adapter,
-					     struct nlattr **tb)
+static int
+hdd_set_independent_configuration(struct wlan_hdd_link_info *link_info,
+				  struct nlattr **tb)
 {
 	uint32_t i;
 	uint32_t id;
@@ -12032,7 +12051,7 @@ static int hdd_set_independent_configuration(struct hdd_adapter *adapter,
 		hdd_debug("Set wifi configuration %d", id);
 
 		cb = independent_setters[i].cb;
-		ret = cb(adapter, attr);
+		ret = cb(link_info, attr);
 		if (ret)
 			errno = ret;
 	}
@@ -12042,14 +12061,14 @@ static int hdd_set_independent_configuration(struct hdd_adapter *adapter,
 
 /**
  * typedef interdependent_setter_fn - interdependent attribute handler
- * @adapter: The adapter being configured
+ * @link_info: Link info pointer in HDD adapter
  * @tb: The parsed nl80211 attributes being applied
  *
  * Defines the signature of functions in the interdependent attribute vtable
  *
  * Return: 0 if attributes were handled successfully, otherwise an errno
  */
-typedef int (*interdependent_setter_fn)(struct hdd_adapter *adapter,
+typedef int (*interdependent_setter_fn)(struct wlan_hdd_link_info *link_info,
 					struct nlattr **tb);
 
 /* vtable for interdependent setters */
@@ -12069,7 +12088,7 @@ static const interdependent_setter_fn interdependent_setters[] = {
 
 /**
  * hdd_set_interdependent_configuration() - Handle interdependent attributes
- * @adapter: adapter upon which the vendor command was received
+ * @link_info: Link info pointer in hdd adapter
  * @tb: parsed attribute array
  *
  * This is a table-driven function which handles interdependent
@@ -12081,8 +12100,9 @@ static const interdependent_setter_fn interdependent_setters[] = {
  *
  * Return: 0 if there were no issues, otherwise errno of the last issue
  */
-static int hdd_set_interdependent_configuration(struct hdd_adapter *adapter,
-						struct nlattr **tb)
+static int
+hdd_set_interdependent_configuration(struct wlan_hdd_link_info *link_info,
+				     struct nlattr **tb)
 {
 	uint32_t i;
 	interdependent_setter_fn cb;
@@ -12091,7 +12111,7 @@ static int hdd_set_interdependent_configuration(struct hdd_adapter *adapter,
 
 	for (i = 0; i < QDF_ARRAY_SIZE(interdependent_setters); i++) {
 		cb = interdependent_setters[i];
-		ret = cb(adapter, tb);
+		ret = cb(link_info, tb);
 		if (ret)
 			errno = ret;
 	}
@@ -12122,8 +12142,7 @@ __wlan_hdd_cfg80211_wifi_configuration_set(struct wiphy *wiphy,
 	struct hdd_adapter *adapter = WLAN_HDD_GET_PRIV_PTR(dev);
 	struct hdd_context *hdd_ctx  = wiphy_priv(wiphy);
 	struct nlattr *tb[QCA_WLAN_VENDOR_ATTR_CONFIG_MAX + 1];
-	int errno;
-	int ret;
+	int errno, ret;
 
 	hdd_enter_dev(dev);
 
@@ -12142,11 +12161,11 @@ __wlan_hdd_cfg80211_wifi_configuration_set(struct wiphy *wiphy,
 		return -EINVAL;
 	}
 
-	ret = hdd_set_independent_configuration(adapter, tb);
+	ret = hdd_set_independent_configuration(adapter->deflink, tb);
 	if (ret)
 		errno = ret;
 
-	ret = hdd_set_interdependent_configuration(adapter, tb);
+	ret = hdd_set_interdependent_configuration(adapter->deflink, tb);
 	if (ret)
 		errno = ret;
 
