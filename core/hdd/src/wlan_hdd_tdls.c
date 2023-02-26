@@ -614,11 +614,11 @@ int wlan_hdd_cfg80211_tdls_mgmt(struct wiphy *wiphy,
 }
 
 static bool
-hdd_is_sta_legacy(struct hdd_adapter *adapter)
+hdd_is_sta_legacy(struct wlan_hdd_link_info *link_info)
 {
 	struct hdd_station_ctx *sta_ctx;
 
-	sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter->deflink);
+	sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(link_info);
 	if (!sta_ctx)
 		return false;
 
@@ -669,7 +669,7 @@ hdd_check_and_set_tdls_conn_params(struct wlan_objmgr_vdev *vdev)
 	/*
 	 * Only need to set this if STA link is in legacy mode
 	 */
-	if (!hdd_is_sta_legacy(adapter))
+	if (!hdd_is_sta_legacy(adapter->deflink))
 		return;
 
 	hdd_ctx = WLAN_HDD_GET_CTX(adapter);
@@ -714,7 +714,7 @@ hdd_check_and_set_tdls_disconn_params(struct wlan_objmgr_vdev *vdev)
 	/*
 	 * Only need to set this if STA link is in legacy mode
 	 */
-	if (!hdd_is_sta_legacy(adapter))
+	if (!hdd_is_sta_legacy(adapter->deflink))
 		return;
 
 	hdd_cm_netif_queue_enable(adapter);
