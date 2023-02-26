@@ -1577,17 +1577,15 @@ static void hdd_regulatory_chanlist_dump(struct regulatory_channel *chan_list)
 #ifdef FEATURE_WLAN_CH_AVOID_EXT
 /**
  * hdd_country_change_bw_check() - Check if bandwidth changed
- * @hdd_ctx: Global HDD context
- * @adapter: HDD vdev context
+ * @link_info: Link info pointer in HDD adapter
  * @oper_freq: current frequency of adapter
  *
  * Return: true if bandwidth changed otherwise false.
  */
-static bool
-hdd_country_change_bw_check(struct hdd_context *hdd_ctx,
-			    struct hdd_adapter *adapter,
-			    qdf_freq_t oper_freq)
+static bool hdd_country_change_bw_check(struct wlan_hdd_link_info *link_info,
+					qdf_freq_t oper_freq)
 {
+	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(link_info->adapter);
 	bool width_changed = false;
 	enum phy_ch_width width;
 	uint16_t org_bw = 0;
@@ -1598,10 +1596,9 @@ hdd_country_change_bw_check(struct hdd_context *hdd_ctx,
 	if (!cur_chan_list)
 		return false;
 
-	ucfg_reg_get_current_chan_list(hdd_ctx->pdev,
-				       cur_chan_list);
+	ucfg_reg_get_current_chan_list(hdd_ctx->pdev, cur_chan_list);
 
-	width = hdd_get_link_info_width(adapter->deflink);
+	width = hdd_get_link_info_width(link_info);
 	org_bw = wlan_reg_get_bw_value(width);
 
 	for (i = 0; i < NUM_CHANNELS; i++) {
@@ -1620,8 +1617,7 @@ hdd_country_change_bw_check(struct hdd_context *hdd_ctx,
 }
 #else
 static inline bool
-hdd_country_change_bw_check(struct hdd_context *hdd_ctx,
-			    struct hdd_adapter *adapter,
+hdd_country_change_bw_check(struct wlan_hdd_link_info *link_info,
 			    qdf_freq_t oper_freq)
 {
 	return false;
@@ -1681,8 +1677,7 @@ static void hdd_country_change_update_sta(struct hdd_context *hdd_ctx)
 					(sta_ctx->reg_phymode != csr_phy_mode);
 
 				width_changed =
-					hdd_country_change_bw_check(hdd_ctx,
-								    adapter,
+					hdd_country_change_bw_check(link_info,
 								    oper_freq);
 
 				if (!hdd_is_vdev_in_conn_state(link_info))
@@ -1716,8 +1711,7 @@ static void hdd_country_change_update_sta(struct hdd_context *hdd_ctx)
 
 /**
  * hdd_restart_sap_with_new_phymode() - restart the SAP with the new phymode
- * @hdd_ctx: Global HDD context
- * @adapter: HDD vdev context
+ * @link_info: Link info pointer in HDD adapter.
  * @sap_config: sap configuration pointer
  * @csr_phy_mode: phymode to restart SAP with
  *
@@ -1726,19 +1720,21 @@ static void hdd_country_change_update_sta(struct hdd_context *hdd_ctx)
  *
  * Return: none
  */
-static void hdd_restart_sap_with_new_phymode(struct hdd_context *hdd_ctx,
-					     struct hdd_adapter *adapter,
-					     struct sap_config *sap_config,
-					     eCsrPhyMode csr_phy_mode)
+static void
+hdd_restart_sap_with_new_phymode(struct wlan_hdd_link_info *link_info,
+				 struct sap_config *sap_config,
+				 eCsrPhyMode csr_phy_mode)
 {
+	struct hdd_adapter *adapter = link_info->adapter;
+	struct hdd_context *hdd_ctx = adapter->hdd_ctx;
 	struct hdd_hostapd_state *hostapd_state = NULL;
 	struct sap_context *sap_ctx = NULL;
 	QDF_STATUS status;
 
-	hostapd_state = WLAN_HDD_GET_HOSTAP_STATE_PTR(adapter->deflink);
-	sap_ctx = WLAN_HDD_GET_SAP_CTX_PTR(adapter->deflink);
+	hostapd_state = WLAN_HDD_GET_HOSTAP_STATE_PTR(link_info);
+	sap_ctx = WLAN_HDD_GET_SAP_CTX_PTR(link_info);
 
-	if (!test_bit(SOFTAP_BSS_STARTED, &adapter->deflink->link_flags)) {
+	if (!test_bit(SOFTAP_BSS_STARTED, &link_info->link_flags)) {
 		sap_config->sap_orig_hw_mode = sap_config->SapHw_mode;
 		sap_config->SapHw_mode = csr_phy_mode;
 		hdd_err("Can't restart AP because it is not started");
@@ -1835,8 +1831,7 @@ static void hdd_country_change_update_sap(struct hdd_context *hdd_ctx)
 					(csr_phy_mode != sap_config->SapHw_mode);
 
 				if (phy_changed)
-					hdd_restart_sap_with_new_phymode(hdd_ctx,
-									 adapter,
+					hdd_restart_sap_with_new_phymode(link_info,
 									 sap_config,
 									 csr_phy_mode);
 				else
