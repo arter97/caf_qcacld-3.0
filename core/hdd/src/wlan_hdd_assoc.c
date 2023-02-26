@@ -1367,7 +1367,7 @@ QDF_STATUS hdd_update_dp_vdev_flags(void *cbk_data,
 	return status;
 }
 
-QDF_STATUS hdd_roam_register_sta(struct hdd_adapter *adapter,
+QDF_STATUS hdd_roam_register_sta(struct wlan_hdd_link_info *link_info,
 				 struct qdf_mac_addr *bssid,
 				 bool is_auth_required)
 {
@@ -1377,6 +1377,7 @@ QDF_STATUS hdd_roam_register_sta(struct hdd_adapter *adapter,
 	enum phy_ch_width ch_width;
 	enum wlan_phymode phymode;
 	struct wlan_objmgr_vdev *vdev;
+	struct hdd_adapter *adapter = link_info->adapter;
 
 	/* Get the Station ID from the one saved during the association */
 	if (!QDF_IS_ADDR_BROADCAST(bssid->bytes))
@@ -1401,11 +1402,19 @@ QDF_STATUS hdd_roam_register_sta(struct hdd_adapter *adapter,
 		txrx_desc.is_wapi_supported = 0;
 #endif /* FEATURE_WLAN_WAPI */
 
-	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink, WLAN_DP_ID);
+	vdev = hdd_objmgr_get_vdev_by_user(link_info, WLAN_DP_ID);
 	if (!vdev)
 		return QDF_STATUS_E_INVAL;
 
-	qdf_status = ucfg_dp_sta_register_txrx_ops(vdev);
+	/* TODO, right now only one interface is registered with DP
+	 * so for second vdev not doing the register ops as it will
+	 * point to the same again.
+	 */
+	if (ucfg_dp_get_intf_id(vdev) == wlan_vdev_get_id(vdev))
+		qdf_status = ucfg_dp_sta_register_txrx_ops(vdev);
+	else
+		qdf_status = QDF_STATUS_SUCCESS;
+
 	hdd_objmgr_put_vdev_by_user(vdev, WLAN_DP_ID);
 	if (!QDF_IS_STATUS_SUCCESS(qdf_status)) {
 		hdd_err("DP tx/rx ops register failed Status: %d", qdf_status);
@@ -1415,7 +1424,7 @@ QDF_STATUS hdd_roam_register_sta(struct hdd_adapter *adapter,
 	if (adapter->device_mode == QDF_NDI_MODE) {
 		phymode = ucfg_mlme_get_vdev_phy_mode(
 						adapter->hdd_ctx->psoc,
-						adapter->deflink->vdev_id);
+						link_info->vdev_id);
 		ch_width = ucfg_mlme_get_ch_width_from_phymode(phymode);
 	} else {
 		ch_width = ucfg_mlme_get_peer_ch_width(adapter->hdd_ctx->psoc,

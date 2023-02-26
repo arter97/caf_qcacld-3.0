@@ -363,13 +363,13 @@ QDF_STATUS hdd_update_dp_vdev_flags(void *cbk_data,
 
 /**
  * hdd_roam_register_sta() - register station
- * @adapter: pointer to adapter
+ * @link_info: Link info pointer in HDD adapter
  * @bssid: bssid of the connection
  * @is_auth_required: is upper layer authenticatoin required
  *
  * Return: QDF_STATUS enumeration
  */
-QDF_STATUS hdd_roam_register_sta(struct hdd_adapter *adapter,
+QDF_STATUS hdd_roam_register_sta(struct wlan_hdd_link_info *link_info,
 				 struct qdf_mac_addr *bssid,
 				 bool is_auth_required);
 

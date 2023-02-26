@@ -1546,7 +1546,7 @@ hdd_cm_connect_success_pre_user_update(struct wlan_objmgr_vdev *vdev,
 		}
 		hdd_debug("is_roam_offload %d, is_roam %d, is_auth_required %d",
 			  is_roam_offload, is_roam, is_auth_required);
-		hdd_roam_register_sta(adapter, &rsp->bssid, is_auth_required);
+		hdd_roam_register_sta(link_info, &rsp->bssid, is_auth_required);
 	} else {
 		/* for host roam/LFR2 */
 		hdd_cm_set_peer_authenticate(adapter, &rsp->bssid,

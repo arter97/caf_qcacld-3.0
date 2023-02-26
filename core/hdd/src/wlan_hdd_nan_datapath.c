@@ -911,8 +911,9 @@ int hdd_ndi_delete(uint8_t vdev_id, const char *iface_name,
  * wmi_vdev_param_ndp_keepalive_timeout
  */
 
-void hdd_ndi_drv_ndi_create_rsp_handler(uint8_t vdev_id,
-				struct nan_datapath_inf_create_rsp *ndi_rsp)
+void
+hdd_ndi_drv_ndi_create_rsp_handler(uint8_t vdev_id,
+				   struct nan_datapath_inf_create_rsp *ndi_rsp)
 {
 	struct hdd_context *hdd_ctx;
 	struct hdd_adapter *adapter;
@@ -999,7 +1000,8 @@ void hdd_ndi_drv_ndi_create_rsp_handler(uint8_t vdev_id,
 
 	hdd_save_peer(sta_ctx, &bc_mac_addr);
 	qdf_copy_macaddr(&roam_info->bssid, &bc_mac_addr);
-	hdd_roam_register_sta(adapter, &roam_info->bssid,
+	hdd_roam_register_sta(link_info,
+			      &roam_info->bssid,
 			      roam_info->fAuthRequired);
 
 error:
@@ -1100,7 +1102,8 @@ static void hdd_send_obss_scan_req(struct hdd_context *hdd_ctx, bool val)
 }
 
 int hdd_ndp_new_peer_handler(uint8_t vdev_id, uint16_t sta_id,
-			struct qdf_mac_addr *peer_mac_addr, bool first_peer)
+			     struct qdf_mac_addr *peer_mac_addr,
+			     bool first_peer)
 {
 	struct hdd_context *hdd_ctx;
 	struct hdd_adapter *adapter;
@@ -1134,7 +1137,7 @@ int hdd_ndp_new_peer_handler(uint8_t vdev_id, uint16_t sta_id,
 	qdf_copy_macaddr(&roam_info->bssid, peer_mac_addr);
 
 	/* this function is called for each new peer */
-	hdd_roam_register_sta(adapter, &roam_info->bssid,
+	hdd_roam_register_sta(link_info, &roam_info->bssid,
 			      roam_info->fAuthRequired);
 
 	if (!first_peer)
