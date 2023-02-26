@@ -234,22 +234,23 @@ void reset_mscs_params(struct wlan_hdd_link_info *link_info)
 
 /**
  * hdd_handle_disassociation_event() - Handle disassociation event
- * @adapter: Pointer to adapter
+ * @link_info: Link info pointer in HDD adapter
  * @peer_macaddr: Pointer to peer mac address
  *
  * Return: None
  */
-void hdd_handle_disassociation_event(struct hdd_adapter *adapter,
+void hdd_handle_disassociation_event(struct wlan_hdd_link_info *link_info,
 				     struct qdf_mac_addr *peer_macaddr);
 
 /**
  * __hdd_cm_disconnect_handler_pre_user_update() - Handle disconnect indication
  * before updating to user space
- * @adapter: Pointer to adapter
+ * @link_info: Link info pointer in HDD adapter
  *
  * Return: None
  */
-void __hdd_cm_disconnect_handler_pre_user_update(struct hdd_adapter *adapter);
+void
+__hdd_cm_disconnect_handler_pre_user_update(struct wlan_hdd_link_info *link_info);
 
 /**
  * __hdd_cm_disconnect_handler_post_user_update() - Handle disconnect indication
