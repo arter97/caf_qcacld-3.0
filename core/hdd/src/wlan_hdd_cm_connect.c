@@ -194,27 +194,27 @@ void hdd_cm_set_peer_authenticate(struct wlan_hdd_link_info *link_info,
 					    !is_auth_required);
 }
 
-void hdd_cm_update_rssi_snr_by_bssid(struct hdd_adapter *adapter)
+void hdd_cm_update_rssi_snr_by_bssid(struct wlan_hdd_link_info *link_info)
 {
 	struct hdd_station_ctx *sta_ctx;
 	int8_t snr = 0;
+	struct hdd_adapter *adapter = link_info->adapter;
 
-	sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter->deflink);
+	sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(link_info);
 	hdd_get_rssi_snr_by_bssid(hdd_adapter_get_mac_handle(adapter),
 				  sta_ctx->conn_info.bssid.bytes,
-				  &adapter->deflink->rssi, &snr);
+				  &link_info->rssi, &snr);
 
 	/* If RSSi is reported as positive then it is invalid */
-	if (adapter->deflink->rssi > 0) {
-		hdd_debug_rl("RSSI invalid %d", adapter->deflink->rssi);
-		adapter->deflink->rssi = 0;
+	if (link_info->rssi > 0) {
+		hdd_debug_rl("RSSI invalid %d", link_info->rssi);
+		link_info->rssi = 0;
 	}
 
-	hdd_debug("snr: %d, rssi: %d", snr, adapter->deflink->rssi);
+	hdd_debug("snr: %d, rssi: %d", snr, link_info->rssi);
 
-	sta_ctx->conn_info.signal = adapter->deflink->rssi;
-	sta_ctx->conn_info.noise =
-		sta_ctx->conn_info.signal - snr;
+	sta_ctx->conn_info.signal = link_info->rssi;
+	sta_ctx->conn_info.noise = sta_ctx->conn_info.signal - snr;
 	sta_ctx->cache_conn_info.signal = sta_ctx->conn_info.signal;
 	sta_ctx->cache_conn_info.noise = sta_ctx->conn_info.noise;
 }
@@ -873,7 +873,7 @@ hdd_cm_connect_failure_pre_user_update(struct wlan_objmgr_vdev *vdev,
 	hdd_cm_save_connect_status(adapter, rsp->status_code);
 	hdd_conn_remove_connect_info(hdd_sta_ctx);
 	ucfg_dp_remove_conn_info(vdev);
-	hdd_cm_update_rssi_snr_by_bssid(adapter);
+	hdd_cm_update_rssi_snr_by_bssid(link_info);
 	hdd_cm_rec_connect_info(rsp);
 	hdd_debug("Invoking packetdump deregistration API");
 	wlan_deregister_txrx_packetdump(OL_TXRX_PDEV_ID);
@@ -1424,7 +1424,7 @@ hdd_cm_connect_success_pre_user_update(struct wlan_objmgr_vdev *vdev,
 	mac_handle = hdd_adapter_get_mac_handle(adapter);
 
 	wlan_hdd_ft_set_key_delay(vdev);
-	hdd_cm_update_rssi_snr_by_bssid(adapter);
+	hdd_cm_update_rssi_snr_by_bssid(link_info);
 	hdd_cm_save_connect_status(adapter, rsp->status_code);
 
 	hdd_init_scan_reject_params(hdd_ctx);

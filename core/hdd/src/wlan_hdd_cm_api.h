@@ -277,11 +277,11 @@ void hdd_cm_set_peer_authenticate(struct wlan_hdd_link_info *link_info,
 
 /**
  * hdd_cm_update_rssi_snr_by_bssid() - update rsi and snr into adapter
- * @adapter: Pointer to adapter
+ * @link_info: Link info pointer in HDD adapter
  *
  * Return: None
  */
-void hdd_cm_update_rssi_snr_by_bssid(struct hdd_adapter *adapter);
+void hdd_cm_update_rssi_snr_by_bssid(struct wlan_hdd_link_info *link_info);
 
 /**
  *  hdd_cm_handle_assoc_event() - Send disassociation indication to oem
