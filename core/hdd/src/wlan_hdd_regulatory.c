@@ -1647,62 +1647,67 @@ static void hdd_country_change_update_sta(struct hdd_context *hdd_ctx)
 	qdf_freq_t oper_freq;
 	eCsrPhyMode csr_phy_mode;
 	wlan_net_dev_ref_dbgid dbgid = NET_DEV_HOLD_COUNTRY_CHANGE_UPDATE_STA;
+	struct wlan_hdd_link_info *link_info;
 
 	pdev = hdd_ctx->pdev;
 
 	hdd_for_each_adapter_dev_held_safe(hdd_ctx, adapter, next_adapter,
 					   dbgid) {
-		width_changed = false;
-		oper_freq = hdd_get_link_info_home_channel(adapter->deflink);
-		if (oper_freq)
-			freq_changed = wlan_reg_is_disable_for_pwrmode(
-							pdev,
-							oper_freq,
+		hdd_adapter_for_each_active_link_info(adapter, link_info) {
+			width_changed = false;
+			oper_freq = hdd_get_link_info_home_channel(link_info);
+			if (oper_freq)
+				freq_changed = wlan_reg_is_disable_for_pwrmode(
+							pdev, oper_freq,
 							REG_CURRENT_PWR_MODE);
-		else
-			freq_changed = false;
+			else
+				freq_changed = false;
 
-		switch (adapter->device_mode) {
-		case QDF_P2P_CLIENT_MODE:
-			/*
-			 * P2P client is the same as STA
-			 * continue to next statement
-			 */
-		case QDF_STA_MODE:
-			sta_ctx =
-				WLAN_HDD_GET_STATION_CTX_PTR(adapter->deflink);
-			new_phy_mode = wlan_reg_get_max_phymode(pdev,
+			switch (adapter->device_mode) {
+			case QDF_P2P_CLIENT_MODE:
+				/*
+				 * P2P client is the same as STA
+				 * continue to next statement
+				 */
+			case QDF_STA_MODE:
+				sta_ctx =
+					WLAN_HDD_GET_STATION_CTX_PTR(link_info);
+				new_phy_mode = wlan_reg_get_max_phymode(pdev,
 								REG_PHYMODE_MAX,
 								oper_freq);
-			csr_phy_mode =
-				csr_convert_from_reg_phy_mode(new_phy_mode);
-			phy_changed = (sta_ctx->reg_phymode != csr_phy_mode);
+				csr_phy_mode =
+					csr_convert_from_reg_phy_mode(new_phy_mode);
+				phy_changed =
+					(sta_ctx->reg_phymode != csr_phy_mode);
 
-			width_changed = hdd_country_change_bw_check(hdd_ctx,
+				width_changed =
+					hdd_country_change_bw_check(hdd_ctx,
 								    adapter,
 								    oper_freq);
 
-			if (hdd_is_vdev_in_conn_state(adapter->deflink)) {
+				if (!hdd_is_vdev_in_conn_state(link_info))
+					continue;
+
 				if (phy_changed || freq_changed ||
 				    width_changed) {
 					hdd_debug("changed: phy %d, freq %d, width %d",
 						  phy_changed, freq_changed,
 						  width_changed);
 					wlan_hdd_cm_issue_disconnect(
-							adapter->deflink,
+							link_info,
 							REASON_UNSPEC_FAILURE,
 							false);
 					sta_ctx->reg_phymode = csr_phy_mode;
 				} else {
 					hdd_debug("Remain on current channel but update tx power");
 					wlan_reg_update_tx_power_on_ctry_change(
-						    pdev,
-						    adapter->deflink->vdev_id);
+							    pdev,
+							    link_info->vdev_id);
 				}
+				break;
+			default:
+				break;
 			}
-			break;
-		default:
-			break;
 		}
 		/* dev_put has to be done here */
 		hdd_adapter_dev_put_debug(adapter, dbgid);
@@ -1797,50 +1802,54 @@ static void hdd_country_change_update_sap(struct hdd_context *hdd_ctx)
 	qdf_freq_t oper_freq;
 	eCsrPhyMode csr_phy_mode;
 	wlan_net_dev_ref_dbgid dbgid = NET_DEV_HOLD_COUNTRY_CHANGE_UPDATE_SAP;
+	struct wlan_hdd_link_info *link_info;
 
 	pdev = hdd_ctx->pdev;
 
 	hdd_for_each_adapter_dev_held_safe(hdd_ctx, adapter, next_adapter,
 					   dbgid) {
-		oper_freq = hdd_get_link_info_home_channel(adapter->deflink);
+		hdd_adapter_for_each_active_link_info(adapter, link_info) {
+			oper_freq = hdd_get_link_info_home_channel(link_info);
 
-		switch (adapter->device_mode) {
-		case QDF_P2P_GO_MODE:
-			policy_mgr_check_sap_restart(hdd_ctx->psoc,
-						     adapter->deflink->vdev_id);
-			break;
-		case QDF_SAP_MODE:
-			if (!test_bit(SOFTAP_INIT_DONE,
-				      &adapter->deflink->link_flags)) {
-				hdd_info("AP is not started yet");
+			switch (adapter->device_mode) {
+			case QDF_P2P_GO_MODE:
+				policy_mgr_check_sap_restart(hdd_ctx->psoc,
+							     link_info->vdev_id);
 				break;
-			}
-			sap_config = &adapter->deflink->session.ap.sap_config;
-			reg_phy_mode = csr_convert_to_reg_phy_mode(
-						sap_config->sap_orig_hw_mode,
-						oper_freq);
-			new_phy_mode = wlan_reg_get_max_phymode(pdev,
+			case QDF_SAP_MODE:
+				if (!test_bit(SOFTAP_INIT_DONE,
+					      &link_info->link_flags)) {
+					hdd_info("AP is not started yet");
+					break;
+				}
+				sap_config = &link_info->session.ap.sap_config;
+				reg_phy_mode = csr_convert_to_reg_phy_mode(
+						    sap_config->sap_orig_hw_mode,
+						    oper_freq);
+				new_phy_mode = wlan_reg_get_max_phymode(pdev,
 								reg_phy_mode,
 								oper_freq);
-			csr_phy_mode =
-				csr_convert_from_reg_phy_mode(new_phy_mode);
-			phy_changed = (csr_phy_mode != sap_config->SapHw_mode);
+				csr_phy_mode =
+					csr_convert_from_reg_phy_mode(new_phy_mode);
+				phy_changed =
+					(csr_phy_mode != sap_config->SapHw_mode);
 
-			if (phy_changed)
-				hdd_restart_sap_with_new_phymode(hdd_ctx,
-								 adapter,
-								 sap_config,
-								 csr_phy_mode);
-			else
-				policy_mgr_check_sap_restart(
-						hdd_ctx->psoc,
-						adapter->deflink->vdev_id);
-				hdd_debug("Update tx power due to ctry change");
-				wlan_reg_update_tx_power_on_ctry_change(
-					    pdev, adapter->deflink->vdev_id);
-			break;
-		default:
-			break;
+				if (phy_changed)
+					hdd_restart_sap_with_new_phymode(hdd_ctx,
+									 adapter,
+									 sap_config,
+									 csr_phy_mode);
+				else
+					policy_mgr_check_sap_restart(
+							hdd_ctx->psoc,
+							link_info->vdev_id);
+					hdd_debug("Update tx power due to ctry change");
+					wlan_reg_update_tx_power_on_ctry_change(
+						    pdev, link_info->vdev_id);
+				break;
+			default:
+				break;
+			}
 		}
 		/* dev_put has to be done here */
 		hdd_adapter_dev_put_debug(adapter, dbgid);
