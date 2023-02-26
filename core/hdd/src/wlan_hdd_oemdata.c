@@ -195,6 +195,7 @@ static void send_oem_reg_rsp_nlink_msg(void)
 	uint8_t *vdev_id;
 	struct hdd_adapter *adapter, *next_adapter = NULL;
 	wlan_net_dev_ref_dbgid dbgid = NET_DEV_HOLD_SEND_OEM_REG_RSP_NLINK_MSG;
+	struct wlan_hdd_link_info *link_info;
 
 	/* OEM msg is always to a specific process & cannot be a broadcast */
 	if (p_hdd_ctx->oem_pid == 0) {
@@ -227,14 +228,15 @@ static void send_oem_reg_rsp_nlink_msg(void)
 	/* Iterate through each adapter and fill device mode and vdev id */
 	hdd_for_each_adapter_dev_held_safe(p_hdd_ctx, adapter, next_adapter,
 					   dbgid) {
-		device_mode = buf++;
-		vdev_id = buf++;
-		*device_mode = adapter->device_mode;
-		*vdev_id = adapter->deflink->vdev_id;
-		(*num_interfaces)++;
-		hdd_debug("num_interfaces: %d, device_mode: %d, vdev_id: %d",
-			  *num_interfaces, *device_mode,
-			  *vdev_id);
+		hdd_adapter_for_each_active_link_info(adapter, link_info) {
+			device_mode = buf++;
+			vdev_id = buf++;
+			*device_mode = adapter->device_mode;
+			*vdev_id = link_info->vdev_id;
+			(*num_interfaces)++;
+			hdd_debug("num_interfaces: %d, device_mode: %d, vdev_id: %d",
+				  *num_interfaces, *device_mode, *vdev_id);
+		}
 		hdd_adapter_dev_put_debug(adapter, dbgid);
 	}
 
