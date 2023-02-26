@@ -583,40 +583,12 @@ void hdd_abort_ongoing_sta_connection(struct hdd_context *hdd_ctx)
 					     REASON_UNSPEC_FAILURE, false);
 }
 
-bool hdd_is_any_sta_connected(struct hdd_context *hdd_ctx)
-{
-	struct hdd_adapter *adapter = NULL, *next_adapter = NULL;
-	wlan_net_dev_ref_dbgid dbgid =
-				NET_DEV_HOLD_IS_ANY_STA_CONNECTED;
-
-	if (!hdd_ctx) {
-		hdd_err("HDD context is NULL");
-		return false;
-	}
-
-	hdd_for_each_adapter_dev_held_safe(hdd_ctx, adapter, next_adapter,
-					   dbgid) {
-		if (QDF_STA_MODE == adapter->device_mode ||
-		    QDF_P2P_CLIENT_MODE == adapter->device_mode) {
-			if (hdd_cm_is_vdev_connected(adapter->deflink)) {
-				hdd_adapter_dev_put_debug(adapter, dbgid);
-				if (next_adapter)
-					hdd_adapter_dev_put_debug(next_adapter,
-								  dbgid);
-				return true;
-			}
-		}
-		hdd_adapter_dev_put_debug(adapter, dbgid);
-	}
-	return false;
-}
-
 QDF_STATUS hdd_get_first_connected_sta_vdev_id(struct hdd_context *hdd_ctx,
 					       uint32_t *vdev_id)
 {
 	struct hdd_adapter *adapter = NULL, *next_adapter = NULL;
-	wlan_net_dev_ref_dbgid dbgid =
-				NET_DEV_HOLD_IS_ANY_STA_CONNECTED;
+	wlan_net_dev_ref_dbgid dbgid = NET_DEV_HOLD_IS_ANY_STA_CONNECTED;
+	struct wlan_hdd_link_info *link_info;
 
 	if (!hdd_ctx) {
 		hdd_err("HDD context is NULL");
@@ -627,8 +599,12 @@ QDF_STATUS hdd_get_first_connected_sta_vdev_id(struct hdd_context *hdd_ctx,
 					   dbgid) {
 		if (adapter->device_mode == QDF_STA_MODE ||
 		    adapter->device_mode == QDF_P2P_CLIENT_MODE) {
-			if (hdd_cm_is_vdev_connected(adapter->deflink)) {
-				*vdev_id = adapter->deflink->vdev_id;
+			hdd_adapter_for_each_active_link_info(adapter,
+							      link_info) {
+				if (!hdd_cm_is_vdev_connected(link_info))
+					continue;
+
+				*vdev_id = link_info->vdev_id;
 				hdd_adapter_dev_put_debug(adapter, dbgid);
 				if (next_adapter)
 					hdd_adapter_dev_put_debug(next_adapter,
@@ -639,6 +615,15 @@ QDF_STATUS hdd_get_first_connected_sta_vdev_id(struct hdd_context *hdd_ctx,
 		hdd_adapter_dev_put_debug(adapter, dbgid);
 	}
 	return QDF_STATUS_E_FAILURE;
+}
+
+bool hdd_is_any_sta_connected(struct hdd_context *hdd_ctx)
+{
+	QDF_STATUS status;
+	uint32_t vdev_id;
+
+	status = hdd_get_first_connected_sta_vdev_id(hdd_ctx, &vdev_id);
+	return QDF_IS_STATUS_ERROR(status) ? false : true;
 }
 
 /**
