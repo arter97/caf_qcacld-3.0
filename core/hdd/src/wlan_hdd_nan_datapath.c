@@ -438,7 +438,7 @@ static int hdd_get_random_nan_mac_addr(struct hdd_context *hdd_ctx,
 	return -EINVAL;
 }
 
-void hdd_ndp_event_handler(struct hdd_adapter *adapter,
+void hdd_ndp_event_handler(struct wlan_hdd_link_info *link_info,
 			   struct csr_roam_info *roam_info,
 			   eRoamCmdStatus roam_status,
 			   eCsrRoamResult roam_result)
@@ -447,7 +447,7 @@ void hdd_ndp_event_handler(struct hdd_adapter *adapter,
 	struct wlan_objmgr_psoc *psoc;
 	struct wlan_objmgr_vdev *vdev;
 
-	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink, WLAN_OSIF_NAN_ID);
+	vdev = hdd_objmgr_get_vdev_by_user(link_info, WLAN_OSIF_NAN_ID);
 	if (!vdev) {
 		hdd_err("vdev is NULL");
 		return;
@@ -462,18 +462,16 @@ void hdd_ndp_event_handler(struct hdd_adapter *adapter,
 					NAN_DATAPATH_RSP_STATUS_SUCCESS);
 			hdd_debug("posting ndi create status: %d (%s) to umac",
 				  success, success ? "Success" : "Failure");
-			os_if_nan_post_ndi_create_rsp(
-					psoc, adapter->deflink->vdev_id,
-					success);
+			os_if_nan_post_ndi_create_rsp(psoc, link_info->vdev_id,
+						      success);
 			return;
 		case eCSR_ROAM_RESULT_NDI_DELETE_RSP:
 			success = (roam_info->ndp.ndi_create_params.status ==
 					NAN_DATAPATH_RSP_STATUS_SUCCESS);
 			hdd_debug("posting ndi delete status: %d (%s) to umac",
 				  success, success ? "Success" : "Failure");
-			os_if_nan_post_ndi_delete_rsp(
-					psoc, adapter->deflink->vdev_id,
-					success);
+			os_if_nan_post_ndi_delete_rsp(psoc, link_info->vdev_id,
+						      success);
 			return;
 		default:
 			hdd_err("in correct roam_result: %d", roam_result);

@@ -233,7 +233,7 @@ static const int beacon_filter_extn_table[] = {
 /**
  * wlan_hdd_sae_copy_ta_addr() - Send TA address to supplicant
  * @params: pointer to external auth params
- * @adapter: pointer adapter context
+ * @link_info: Link info pointer in HDD adapter
  *
  * This API is used to copy TA address info in supplicant structure.
  *
@@ -241,20 +241,20 @@ static const int beacon_filter_extn_table[] = {
  */
 static inline
 void wlan_hdd_sae_copy_ta_addr(struct cfg80211_external_auth_params *params,
-			       struct hdd_adapter *adapter)
+			       struct wlan_hdd_link_info *link_info)
 {
 	struct qdf_mac_addr ta = QDF_MAC_ADDR_ZERO_INIT;
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
 	uint8_t *link_addr;
 
-	status = ucfg_cm_get_sae_auth_ta(adapter->hdd_ctx->pdev,
-					 adapter->deflink->vdev_id,
+	status = ucfg_cm_get_sae_auth_ta(link_info->adapter->hdd_ctx->pdev,
+					 link_info->vdev_id,
 					 &ta);
 	if (QDF_IS_STATUS_SUCCESS(status))
-		qdf_mem_copy(params->tx_addr, ta.bytes, QDF_MAC_ADDR_SIZE);
-	else if (wlan_vdev_mlme_is_mlo_vdev(adapter->deflink->vdev)) {
-		link_addr = wlan_vdev_mlme_get_linkaddr(adapter->deflink->vdev);
-		qdf_mem_copy(params->tx_addr, link_addr, QDF_MAC_ADDR_SIZE);
+		qdf_ether_addr_copy(params->tx_addr, ta.bytes);
+	else if (wlan_vdev_mlme_is_mlo_vdev(link_info->vdev)) {
+		link_addr = wlan_vdev_mlme_get_linkaddr(link_info->vdev);
+		qdf_ether_addr_copy(params->tx_addr, link_addr);
 	}
 
 	hdd_debug("status:%d ta:" QDF_MAC_ADDR_FMT, status,
@@ -264,7 +264,7 @@ void wlan_hdd_sae_copy_ta_addr(struct cfg80211_external_auth_params *params,
 #else
 static inline
 void wlan_hdd_sae_copy_ta_addr(struct cfg80211_external_auth_params *params,
-			       struct hdd_adapter *adapter)
+			       struct wlan_hdd_link_info *link_info)
 {
 }
 #endif
@@ -273,7 +273,7 @@ void wlan_hdd_sae_copy_ta_addr(struct cfg80211_external_auth_params *params,
 /**
  * wlan_hdd_sae_update_mld_addr() - Send mld address to supplicant
  * @params: pointer to external auth params
- * @adapter: pointer adapter context
+ * @link_info: Link info pointer in HDD adapter
  *
  * This API is used to copy MLD address info in supplicant structure.
  *
@@ -281,17 +281,17 @@ void wlan_hdd_sae_copy_ta_addr(struct cfg80211_external_auth_params *params,
  */
 static inline QDF_STATUS
 wlan_hdd_sae_update_mld_addr(struct cfg80211_external_auth_params *params,
-			     struct hdd_adapter *adapter)
+			     struct wlan_hdd_link_info *link_info)
 {
 	struct qdf_mac_addr mld_addr;
 	struct qdf_mac_addr *mld_roaming_addr;
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
 	struct wlan_objmgr_vdev *vdev;
 
-	if (!adapter->deflink->vdev)
+	if (!link_info->vdev)
 		return QDF_STATUS_E_INVAL;
 
-	vdev = adapter->deflink->vdev;
+	vdev = link_info->vdev;
 	wlan_objmgr_vdev_get_ref(vdev, WLAN_HDD_ID_OBJ_MGR);
 
 	if (!ucfg_cm_is_sae_auth_addr_conversion_required(vdev))
@@ -328,7 +328,7 @@ end:
 #else
 static inline QDF_STATUS
 wlan_hdd_sae_update_mld_addr(struct cfg80211_external_auth_params *params,
-			     struct hdd_adapter *adapter)
+			     struct wlan_hdd_link_info *link_info)
 {
 	return QDF_STATUS_SUCCESS;
 }
@@ -365,16 +365,17 @@ wlan_hdd_get_keymgmt_for_sae_akm(uint32_t akm)
 
 /**
  * wlan_hdd_sae_callback() - Sends SAE info to supplicant
- * @adapter: pointer adapter context
+ * @link_info: Link info pointer in HDD adapter
  * @roam_info: pointer to roam info
  *
  * This API is used to send required SAE info to trigger SAE in supplicant.
  *
  * Return: None
  */
-static void wlan_hdd_sae_callback(struct hdd_adapter *adapter,
+static void wlan_hdd_sae_callback(struct wlan_hdd_link_info *link_info,
 				  struct csr_roam_info *roam_info)
 {
+	struct hdd_adapter *adapter = link_info->adapter;
 	struct hdd_context *hdd_ctx = adapter->hdd_ctx;
 	int flags;
 	struct sir_sae_info *sae_info = roam_info->sae_info;
@@ -395,10 +396,9 @@ static void wlan_hdd_sae_callback(struct hdd_adapter *adapter,
 		wlan_hdd_get_keymgmt_for_sae_akm(sae_info->akm);
 
 	params.action = NL80211_EXTERNAL_AUTH_START;
-	qdf_mem_copy(params.bssid, sae_info->peer_mac_addr.bytes,
-		     QDF_MAC_ADDR_SIZE);
-	wlan_hdd_sae_copy_ta_addr(&params, adapter);
-	status = wlan_hdd_sae_update_mld_addr(&params, adapter);
+	qdf_ether_addr_copy(params.bssid, sae_info->peer_mac_addr.bytes);
+	wlan_hdd_sae_copy_ta_addr(&params, link_info);
+	status = wlan_hdd_sae_update_mld_addr(&params, link_info);
 	if (QDF_IS_STATUS_ERROR(status))
 		return;
 
@@ -409,7 +409,7 @@ static void wlan_hdd_sae_callback(struct hdd_adapter *adapter,
 	hdd_debug("SAE: sent cmd");
 }
 #else
-static inline void wlan_hdd_sae_callback(struct hdd_adapter *adapter,
+static inline void wlan_hdd_sae_callback(struct wlan_hdd_link_info *link_info,
 					 struct csr_roam_info *roam_info)
 { }
 #endif
@@ -1643,7 +1643,7 @@ bool hdd_any_valid_peer_present(struct hdd_adapter *adapter)
 
 /**
  * hdd_roam_mic_error_indication_handler() - MIC error indication handler
- * @adapter: pointer to adapter
+ * @link_info: Link info pointer in HDD adapter
  * @roam_info: pointer to roam info
  *
  * This function indicates the Mic failure to the supplicant
@@ -1651,12 +1651,13 @@ bool hdd_any_valid_peer_present(struct hdd_adapter *adapter)
  * Return: None
  */
 static void
-hdd_roam_mic_error_indication_handler(struct hdd_adapter *adapter,
+hdd_roam_mic_error_indication_handler(struct wlan_hdd_link_info *link_info,
 				      struct csr_roam_info *roam_info)
 {
+	struct hdd_adapter *adapter = link_info->adapter;
 	tSirMicFailureInfo *mic_failure_info;
 
-	if (!hdd_cm_is_vdev_associated(adapter->deflink))
+	if (!hdd_cm_is_vdev_associated(link_info))
 		return;
 
 	mic_failure_info = roam_info->u.pMICFailureInfo;
@@ -1748,7 +1749,7 @@ static void hdd_rx_unprot_deauth(struct net_device *dev,
 
 /**
  * hdd_indicate_unprot_mgmt_frame() - indicate unprotected management frame
- * @adapter: pointer to the adapter
+ * @link_info: Link info pointer in HDD adapter
  * @frame_length: Length of the unprotected frame being passed
  * @frame: Pointer to the frame buffer
  * @frame_type: 802.11 frame type
@@ -1758,12 +1759,13 @@ static void hdd_rx_unprot_deauth(struct net_device *dev,
  * Return: nothing
  */
 static void
-hdd_indicate_unprot_mgmt_frame(struct hdd_adapter *adapter,
-			       uint32_t frame_length,
-			       uint8_t *frame, uint8_t frame_type)
+hdd_indicate_unprot_mgmt_frame(struct wlan_hdd_link_info *link_info,
+			       uint32_t frame_length, uint8_t *frame,
+			       uint8_t frame_type)
 {
 	uint8_t type, subtype;
 	struct hdd_stats *hdd_stats;
+	struct hdd_adapter *adapter = link_info->adapter;
 
 	hdd_debug("Frame Type = %d Frame Length = %d",
 		  frame_type, frame_length);
@@ -1787,7 +1789,7 @@ hdd_indicate_unprot_mgmt_frame(struct hdd_adapter *adapter,
 		return;
 	}
 
-	hdd_stats = &adapter->deflink->hdd_stats;
+	hdd_stats = &link_info->hdd_stats;
 	subtype = WLAN_HDD_GET_SUBTYPE_FRM_FC(frame[0]);
 	switch (subtype) {
 	case SIR_MAC_MGMT_DISASSOC:
@@ -2255,12 +2257,14 @@ void wlan_hdd_ft_set_key_delay(struct wlan_objmgr_vdev *vdev)
 }
 #endif
 
-QDF_STATUS
-hdd_sme_roam_callback(void *context, struct csr_roam_info *roam_info,
-		      eRoamCmdStatus roam_status, eCsrRoamResult roam_result)
+QDF_STATUS hdd_sme_roam_callback(void *context,
+				 struct csr_roam_info *roam_info,
+				 eRoamCmdStatus roam_status,
+				 eCsrRoamResult roam_result)
 {
 	QDF_STATUS qdf_ret_status = QDF_STATUS_SUCCESS;
-	struct hdd_adapter *adapter = context;
+	struct wlan_hdd_link_info *link_info = context;
+	struct hdd_adapter *adapter = link_info->adapter;
 	struct hdd_station_ctx *sta_ctx = NULL;
 	struct hdd_context *hdd_ctx;
 
@@ -2269,20 +2273,20 @@ hdd_sme_roam_callback(void *context, struct csr_roam_info *roam_info,
 		  get_e_csr_roam_result_str(roam_result), roam_result);
 
 	/* Sanity check */
-	if ((!adapter) || (WLAN_HDD_ADAPTER_MAGIC != adapter->magic)) {
+	if (WLAN_HDD_ADAPTER_MAGIC != adapter->magic) {
 		hdd_err("Invalid adapter or adapter has invalid magic");
 		return QDF_STATUS_E_FAILURE;
 	}
 
-	sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter->deflink);
+	sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(link_info);
 	hdd_ctx = WLAN_HDD_GET_CTX(adapter);
 
 	MTRACE(qdf_trace(QDF_MODULE_ID_HDD, TRACE_CODE_HDD_RX_SME_MSG,
-				 adapter->deflink->vdev_id, roam_status));
+				 link_info->vdev_id, roam_status));
 
 	switch (roam_status) {
 	case eCSR_ROAM_MIC_ERROR_IND:
-		hdd_roam_mic_error_indication_handler(adapter, roam_info);
+		hdd_roam_mic_error_indication_handler(link_info, roam_info);
 		break;
 
 	case eCSR_ROAM_SET_KEY_COMPLETE:
@@ -2293,22 +2297,23 @@ hdd_sme_roam_callback(void *context, struct csr_roam_info *roam_info,
 							  roam_result);
 		if (eCSR_ROAM_RESULT_AUTHENTICATED == roam_result)
 			hdd_debug("set key complete, session: %d",
-				  adapter->deflink->vdev_id);
+				  link_info->vdev_id);
 	}
 		break;
 	case eCSR_ROAM_UNPROT_MGMT_FRAME_IND:
 		if (roam_info)
-			hdd_indicate_unprot_mgmt_frame(adapter,
-					       roam_info->nFrameLength,
-					       roam_info->pbFrames,
-					       roam_info->frameType);
+			hdd_indicate_unprot_mgmt_frame(link_info,
+						       roam_info->nFrameLength,
+						       roam_info->pbFrames,
+						       roam_info->frameType);
 		break;
 #ifdef FEATURE_WLAN_ESE
 	case eCSR_ROAM_TSM_IE_IND:
 		if (roam_info)
-			hdd_indicate_tsm_ie(adapter, roam_info->tsm_ie.tsid,
-				    roam_info->tsm_ie.state,
-				    roam_info->tsm_ie.msmt_interval);
+			hdd_indicate_tsm_ie(adapter,
+					    roam_info->tsm_ie.tsid,
+					    roam_info->tsm_ie.state,
+					    roam_info->tsm_ie.msmt_interval);
 		break;
 	case eCSR_ROAM_ESE_ADJ_AP_REPORT_IND:
 	{
@@ -2327,12 +2332,12 @@ hdd_sme_roam_callback(void *context, struct csr_roam_info *roam_info,
 		break;
 
 	case eCSR_ROAM_NDP_STATUS_UPDATE:
-		hdd_ndp_event_handler(adapter, roam_info, roam_status,
-				      roam_result);
+		hdd_ndp_event_handler(link_info, roam_info,
+				      roam_status, roam_result);
 		break;
 	case eCSR_ROAM_SAE_COMPUTE:
 		if (roam_info)
-			wlan_hdd_sae_callback(adapter, roam_info);
+			wlan_hdd_sae_callback(link_info, roam_info);
 		break;
 	default:
 		break;

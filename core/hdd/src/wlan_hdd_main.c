@@ -513,7 +513,7 @@ QDF_STATUS hdd_common_roam_callback(struct wlan_objmgr_psoc *psoc,
 	case QDF_NDI_MODE:
 	case QDF_P2P_CLIENT_MODE:
 	case QDF_P2P_DEVICE_MODE:
-		status = hdd_sme_roam_callback(adapter, roam_info,
+		status = hdd_sme_roam_callback(link_info, roam_info,
 					       roam_status, roam_result);
 		break;
 	case QDF_SAP_MODE:

@@ -288,7 +288,7 @@ QDF_STATUS hdd_get_first_connected_sta_vdev_id(struct hdd_context *hdd_ctx,
 
 /**
  * hdd_sme_roam_callback() - hdd sme roam callback
- * @context: pointer to adapter context
+ * @context: pointer to link info context in HDD adapter
  * @roam_info: pointer to roam info
  * @roam_status: roam status
  * @roam_result: roam result
