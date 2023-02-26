@@ -3343,6 +3343,7 @@ bool hdd_is_any_sta_connecting(struct hdd_context *hdd_ctx)
 	struct hdd_adapter *adapter = NULL, *next_adapter = NULL;
 	struct hdd_station_ctx *sta_ctx;
 	wlan_net_dev_ref_dbgid dbgid = NET_DEV_HOLD_IS_ANY_STA_CONNECTING;
+	struct wlan_hdd_link_info *link_info;
 
 	if (!hdd_ctx) {
 		hdd_err("HDD context is NULL");
@@ -3351,19 +3352,22 @@ bool hdd_is_any_sta_connecting(struct hdd_context *hdd_ctx)
 
 	hdd_for_each_adapter_dev_held_safe(hdd_ctx, adapter, next_adapter,
 					   dbgid) {
-		sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter->deflink);
-		if ((adapter->device_mode == QDF_STA_MODE) ||
-		    (adapter->device_mode == QDF_P2P_CLIENT_MODE)) {
-			if (hdd_cm_is_connecting(adapter->deflink)) {
-				hdd_debug("vdev_id %d: connecting",
-					  adapter->deflink->vdev_id);
-				hdd_adapter_dev_put_debug(adapter, dbgid);
-				if (next_adapter)
-					hdd_adapter_dev_put_debug(next_adapter,
-								  dbgid);
-				return true;
-			}
+		if (adapter->device_mode != QDF_STA_MODE &&
+		    adapter->device_mode != QDF_P2P_CLIENT_MODE)
+			goto next_adapter;
+
+		hdd_adapter_for_each_active_link_info(adapter, link_info) {
+			sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(link_info);
+			if (!hdd_cm_is_connecting(link_info))
+				continue;
+
+			hdd_debug("vdev_id %d: connecting", link_info->vdev_id);
+			hdd_adapter_dev_put_debug(adapter, dbgid);
+			if (next_adapter)
+				hdd_adapter_dev_put_debug(next_adapter, dbgid);
+			return true;
 		}
+next_adapter:
 		hdd_adapter_dev_put_debug(adapter, dbgid);
 	}
 
