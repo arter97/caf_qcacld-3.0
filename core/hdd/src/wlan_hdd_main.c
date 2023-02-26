@@ -8587,6 +8587,7 @@ QDF_STATUS hdd_stop_adapter_ext(struct hdd_context *hdd_ctx,
 	mac_handle_t mac_handle;
 	struct wlan_objmgr_vdev *vdev;
 	enum wlan_reason_code reason = REASON_IFACE_DOWN;
+	struct wlan_hdd_link_info *link_info = adapter->deflink;
 
 	hdd_enter();
 	hdd_destroy_adapter_sysfs_files(adapter);
@@ -8598,7 +8599,7 @@ QDF_STATUS hdd_stop_adapter_ext(struct hdd_context *hdd_ctx,
 		hdd_unmap_monitor_interface_vdev(adapter);
 	}
 
-	if (adapter->deflink->vdev_id != WLAN_UMAC_VDEV_ID_MAX)
+	if (link_info->vdev_id != WLAN_UMAC_VDEV_ID_MAX)
 		wlan_hdd_cfg80211_deregister_frames(adapter);
 
 	hdd_stop_tsf_sync(adapter);
@@ -8610,7 +8611,7 @@ QDF_STATUS hdd_stop_adapter_ext(struct hdd_context *hdd_ctx,
 				     WLAN_CONTROL_PATH);
 
 	mac_handle = hdd_ctx->mac_handle;
-	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink, WLAN_OSIF_ID);
+	vdev = hdd_objmgr_get_vdev_by_user(link_info, WLAN_OSIF_ID);
 
 	switch (adapter->device_mode) {
 	case QDF_STA_MODE:
@@ -8618,12 +8619,12 @@ QDF_STATUS hdd_stop_adapter_ext(struct hdd_context *hdd_ctx,
 	case QDF_P2P_DEVICE_MODE:
 	case QDF_NDI_MODE:
 	case QDF_NAN_DISC_MODE:
-		sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter->deflink);
+		sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(link_info);
 
 		if (adapter->device_mode == QDF_NDI_MODE ||
 		    ((adapter->device_mode == QDF_STA_MODE ||
 		      adapter->device_mode == QDF_P2P_CLIENT_MODE) &&
-		      !hdd_cm_is_disconnected(adapter->deflink))) {
+		      !hdd_cm_is_disconnected(link_info))) {
 			INIT_COMPLETION(adapter->disconnect_comp_var);
 			if (cds_is_driver_recovering())
 				reason = REASON_DEVICE_RECOVERY;
@@ -8633,7 +8634,7 @@ QDF_STATUS hdd_stop_adapter_ext(struct hdd_context *hdd_ctx,
 				hdd_ndp_peer_cleanup(hdd_ctx, adapter);
 				status = sme_roam_ndi_stop(
 						mac_handle,
-						adapter->deflink->vdev_id);
+						link_info->vdev_id);
 				if (QDF_IS_STATUS_SUCCESS(status)) {
 					rc = wait_for_completion_timeout(
 						&adapter->disconnect_comp_var,
@@ -8652,7 +8653,7 @@ QDF_STATUS hdd_stop_adapter_ext(struct hdd_context *hdd_ctx,
 				 * complete before vdev is moved to logically
 				 * deleted.
 				 */
-				status = wlan_hdd_cm_issue_disconnect(adapter,
+				status = wlan_hdd_cm_issue_disconnect(link_info,
 								      reason,
 								      true);
 				if (QDF_IS_STATUS_ERROR(status) &&
@@ -8678,9 +8679,9 @@ QDF_STATUS hdd_stop_adapter_ext(struct hdd_context *hdd_ctx,
 			ucfg_disable_nan_discovery(hdd_ctx->psoc, NULL, 0);
 
 		wlan_hdd_scan_abort(adapter);
-		wlan_hdd_cleanup_actionframe(adapter->deflink);
-		wlan_hdd_cleanup_remain_on_channel_ctx(adapter->deflink);
-		status = wlan_hdd_flush_pmksa_cache(adapter->deflink);
+		wlan_hdd_cleanup_actionframe(link_info);
+		wlan_hdd_cleanup_remain_on_channel_ctx(link_info);
+		status = wlan_hdd_flush_pmksa_cache(link_info);
 
 		hdd_deregister_hl_netdev_fc_timer(adapter);
 
@@ -8697,7 +8698,7 @@ QDF_STATUS hdd_stop_adapter_ext(struct hdd_context *hdd_ctx,
 
 			ucfg_ipa_flush_pending_vdev_events(
 						hdd_ctx->pdev,
-						adapter->deflink->vdev_id);
+						link_info->vdev_id);
 		}
 		hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
 		hdd_vdev_destroy(adapter);
@@ -8705,16 +8706,14 @@ QDF_STATUS hdd_stop_adapter_ext(struct hdd_context *hdd_ctx,
 
 	case QDF_MONITOR_MODE:
 		if (wlan_hdd_is_session_type_monitor(adapter->device_mode) &&
-		    adapter->deflink->vdev &&
+		    vdev &&
 		    ucfg_pkt_capture_get_mode(hdd_ctx->psoc) !=
 						PACKET_CAPTURE_MODE_DISABLE) {
 			struct hdd_adapter *sta_adapter;
 
-			ucfg_pkt_capture_deregister_callbacks(
-							adapter->deflink->vdev);
-			hdd_objmgr_put_vdev_by_user(adapter->deflink->vdev,
-						    WLAN_OSIF_ID);
-			adapter->deflink->vdev = NULL;
+			ucfg_pkt_capture_deregister_callbacks(vdev);
+			hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
+			link_info->vdev = NULL;
 
 			sta_adapter = hdd_get_adapter(hdd_ctx, QDF_STA_MODE);
 			if (!sta_adapter) {
@@ -8728,7 +8727,7 @@ QDF_STATUS hdd_stop_adapter_ext(struct hdd_context *hdd_ctx,
 		    (ucfg_mlme_is_sta_mon_conc_supported(hdd_ctx->psoc) ||
 		     ucfg_dp_is_local_pkt_capture_enabled(hdd_ctx->psoc))) {
 			hdd_info("Release wakelock for STA + monitor mode!");
-			os_if_dp_local_pkt_capture_stop(adapter->deflink->vdev);
+			os_if_dp_local_pkt_capture_stop(vdev);
 			qdf_runtime_pm_allow_suspend(
 				&hdd_ctx->runtime_context.monitor_mode);
 			hdd_lpc_enable_powersave(hdd_ctx);
@@ -8745,7 +8744,7 @@ QDF_STATUS hdd_stop_adapter_ext(struct hdd_context *hdd_ctx,
 		status = hdd_monitor_mode_vdev_status(adapter);
 		if (QDF_IS_STATUS_ERROR(status))
 			hdd_err_rl("stop failed monitor mode");
-		sme_delete_mon_session(mac_handle, adapter->deflink->vdev_id);
+		sme_delete_mon_session(mac_handle, link_info->vdev_id);
 		hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
 		hdd_vdev_destroy(adapter);
 		break;
@@ -8754,19 +8753,18 @@ QDF_STATUS hdd_stop_adapter_ext(struct hdd_context *hdd_ctx,
 		wlan_hdd_scan_abort(adapter);
 		hdd_abort_ongoing_sta_connection(hdd_ctx);
 		/* Diassociate with all the peers before stop ap post */
-		if (test_bit(SOFTAP_BSS_STARTED,
-			     &adapter->deflink->link_flags)) {
+		if (test_bit(SOFTAP_BSS_STARTED, &link_info->link_flags)) {
 			if (wlan_hdd_del_station(adapter, NULL))
 				hdd_sap_indicate_disconnect_for_sta(adapter);
 		}
-		status = wlan_hdd_flush_pmksa_cache(adapter->deflink);
+		status = wlan_hdd_flush_pmksa_cache(link_info);
 
-		sap_config = &adapter->deflink->session.ap.sap_config;
+		sap_config = &link_info->session.ap.sap_config;
 		wlansap_reset_sap_config_add_ie(sap_config, eUPDATE_IE_ALL);
 
 		ucfg_ipa_flush(hdd_ctx->pdev);
 
-		if (!ucfg_pre_cac_adapter_is_active(adapter->deflink->vdev)) {
+		if (!ucfg_pre_cac_adapter_is_active(vdev)) {
 			ucfg_pre_cac_stop(hdd_ctx->psoc);
 			hdd_close_pre_cac_adapter(hdd_ctx);
 		} else {
@@ -8777,19 +8775,19 @@ QDF_STATUS hdd_stop_adapter_ext(struct hdd_context *hdd_ctx,
 		fallthrough;
 
 	case QDF_P2P_GO_MODE:
-		ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(adapter->deflink);
+		ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(link_info);
 		wlansap_cleanup_cac_timer(ap_ctx->sap_context);
 
 		cds_flush_work(&adapter->sap_stop_bss_work);
 		if (qdf_atomic_read(&ap_ctx->acs_in_progress)) {
 			hdd_info("ACS in progress, wait for complete");
 			qdf_wait_for_event_completion(
-				&adapter->deflink->acs_complete_event,
+				&link_info->acs_complete_event,
 				ACS_COMPLETE_TIMEOUT);
 		}
 
 		if (adapter->device_mode == QDF_P2P_GO_MODE) {
-			wlan_hdd_cleanup_remain_on_channel_ctx(adapter->deflink);
+			wlan_hdd_cleanup_remain_on_channel_ctx(link_info);
 			hdd_abort_ongoing_sta_connection(hdd_ctx);
 		}
 
@@ -8798,10 +8796,9 @@ QDF_STATUS hdd_stop_adapter_ext(struct hdd_context *hdd_ctx,
 		hdd_destroy_acs_timer(adapter);
 
 		mutex_lock(&hdd_ctx->sap_lock);
-		if (test_bit(SOFTAP_BSS_STARTED,
-			     &adapter->deflink->link_flags)) {
+		if (test_bit(SOFTAP_BSS_STARTED, &link_info->link_flags)) {
 			struct hdd_hostapd_state *hostapd_state =
-				WLAN_HDD_GET_HOSTAP_STATE_PTR(adapter->deflink);
+				WLAN_HDD_GET_HOSTAP_STATE_PTR(link_info);
 
 			qdf_event_reset(&hostapd_state->qdf_stop_bss_event);
 			status = wlansap_stop_bss(ap_ctx->sap_context);
@@ -8820,18 +8817,17 @@ QDF_STATUS hdd_stop_adapter_ext(struct hdd_context *hdd_ctx,
 				hdd_err("failure in wlansap_stop_bss");
 			}
 
-			clear_bit(SOFTAP_BSS_STARTED,
-				  &adapter->deflink->link_flags);
+			clear_bit(SOFTAP_BSS_STARTED, &link_info->link_flags);
 			policy_mgr_decr_session_set_pcl(hdd_ctx->psoc,
 						adapter->device_mode,
-						adapter->deflink->vdev_id);
+						link_info->vdev_id);
 			hdd_green_ap_start_state_mc(hdd_ctx,
 						    adapter->device_mode,
 						    false);
 
 			qdf_copy_macaddr(&update_ie.bssid,
 					 &adapter->mac_addr);
-			update_ie.vdev_id = adapter->deflink->vdev_id;
+			update_ie.vdev_id = link_info->vdev_id;
 			update_ie.ieBufferlength = 0;
 			update_ie.pAdditionIEBuffer = NULL;
 			update_ie.append = false;
@@ -8858,8 +8854,7 @@ QDF_STATUS hdd_stop_adapter_ext(struct hdd_context *hdd_ctx,
 		 * and is not cleared/freed on purpose in case of SAP SSR
 		 */
 		if (!cds_is_driver_recovering()) {
-			clear_bit(SOFTAP_INIT_DONE,
-				  &adapter->deflink->link_flags);
+			clear_bit(SOFTAP_INIT_DONE, &link_info->link_flags);
 			qdf_mem_free(ap_ctx->beacon);
 			ap_ctx->beacon = NULL;
 		}
@@ -8884,7 +8879,7 @@ QDF_STATUS hdd_stop_adapter_ext(struct hdd_context *hdd_ctx,
 		if (adapter->device_mode == QDF_SAP_MODE) {
 			ucfg_ipa_flush_pending_vdev_events(
 						hdd_ctx->pdev,
-						adapter->deflink->vdev_id);
+						link_info->vdev_id);
 		}
 		hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
 		hdd_vdev_destroy(adapter);
@@ -8892,7 +8887,7 @@ QDF_STATUS hdd_stop_adapter_ext(struct hdd_context *hdd_ctx,
 		mutex_unlock(&hdd_ctx->sap_lock);
 		break;
 	case QDF_OCB_MODE:
-		sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter->deflink);
+		sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(link_info);
 		cdp_clear_peer(cds_get_context(QDF_MODULE_ID_SOC),
 			       OL_TXRX_PDEV_ID,
 			       sta_ctx->conn_info.peer_macaddr[0]);
@@ -20354,7 +20349,7 @@ wlan_hdd_add_monitor_check(struct hdd_context *hdd_ctx,
 
 		if (num_open_session == 1) {
 			/* Try disconnecting if already in connected state */
-			wlan_hdd_cm_issue_disconnect(sta_adapter,
+			wlan_hdd_cm_issue_disconnect(sta_adapter->deflink,
 						     REASON_UNSPEC_FAILURE,
 						     true);
 		}

@@ -576,7 +576,7 @@ void hdd_abort_ongoing_sta_connection(struct hdd_context *hdd_ctx)
 
 	link_info = hdd_get_sta_connection_in_progress(hdd_ctx);
 	if (link_info)
-		wlan_hdd_cm_issue_disconnect(link_info->adapter,
+		wlan_hdd_cm_issue_disconnect(link_info,
 					     REASON_UNSPEC_FAILURE, false);
 }
 

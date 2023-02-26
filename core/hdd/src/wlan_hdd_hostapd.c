@@ -5622,9 +5622,8 @@ hdd_check_and_disconnect_sta_on_invalid_channel(struct hdd_context *hdd_ctx,
 		hdd_err("STA adapter does not exist");
 		return;
 	}
-
 	hdd_err("chan %d not valid, issue disconnect", sta_chan_freq);
-	wlan_hdd_cm_issue_disconnect(sta_adapter, reason, false);
+	wlan_hdd_cm_issue_disconnect(sta_adapter->deflink, reason, false);
 }
 
 /**

@@ -245,21 +245,22 @@ void reset_mscs_params(struct wlan_hdd_link_info *link_info)
 }
 #endif
 
-QDF_STATUS wlan_hdd_cm_issue_disconnect(struct hdd_adapter *adapter,
-					enum wlan_reason_code reason,
-					bool sync)
+QDF_STATUS
+wlan_hdd_cm_issue_disconnect(struct wlan_hdd_link_info *link_info,
+			     enum wlan_reason_code reason, bool sync)
 {
 	QDF_STATUS status;
 	struct wlan_objmgr_vdev *vdev;
 	struct hdd_station_ctx *sta_ctx;
+	struct hdd_adapter *adapter = link_info->adapter;
 
-	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink, WLAN_OSIF_CM_ID);
+	vdev = hdd_objmgr_get_vdev_by_user(link_info, WLAN_OSIF_CM_ID);
 	if (!vdev)
 		return QDF_STATUS_E_INVAL;
 
-	sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter->deflink);
+	sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(link_info);
 	hdd_place_marker(adapter, "TRY TO DISCONNECT", NULL);
-	reset_mscs_params(adapter->deflink);
+	reset_mscs_params(link_info);
 	hdd_conn_set_authenticated(adapter, false);
 	wlan_hdd_netif_queue_control(adapter,
 				     WLAN_STOP_ALL_NETIF_QUEUE_N_CARRIER,
@@ -267,7 +268,7 @@ QDF_STATUS wlan_hdd_cm_issue_disconnect(struct hdd_adapter *adapter,
 
 	qdf_rtpm_sync_resume();
 
-	wlan_rec_conn_info(adapter->deflink->vdev_id, DEBUG_CONN_DISCONNECT,
+	wlan_rec_conn_info(link_info->vdev_id, DEBUG_CONN_DISCONNECT,
 			   sta_ctx->conn_info.bssid.bytes, 0, reason);
 
 	if (sync)
@@ -287,6 +288,7 @@ int wlan_hdd_cm_disconnect(struct wiphy *wiphy,
 	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
 	QDF_STATUS status;
 	int ret;
+	struct wlan_hdd_link_info *link_info = adapter->deflink;
 
 	if (QDF_GLOBAL_FTM_MODE == hdd_get_conparam()) {
 		hdd_err("Command not allowed in FTM mode");
@@ -297,7 +299,7 @@ int wlan_hdd_cm_disconnect(struct wiphy *wiphy,
 	if (ret)
 		return ret;
 
-	if (wlan_hdd_validate_vdev_id(adapter->deflink->vdev_id))
+	if (wlan_hdd_validate_vdev_id(link_info->vdev_id))
 		return -EINVAL;
 
 	if (hdd_ctx->is_wiphy_suspended) {
@@ -307,7 +309,7 @@ int wlan_hdd_cm_disconnect(struct wiphy *wiphy,
 
 	qdf_mtrace(QDF_MODULE_ID_HDD, QDF_MODULE_ID_HDD,
 		   TRACE_CODE_HDD_CFG80211_DISCONNECT,
-		   adapter->deflink->vdev_id, reason);
+		   link_info->vdev_id, reason);
 
 	hdd_print_netdev_txq_status(dev);
 
@@ -327,7 +329,7 @@ int wlan_hdd_cm_disconnect(struct wiphy *wiphy,
 	 * Thus we need to wait for disconnect to complete in this case,
 	 * and thus use sync API here.
 	 */
-	status = wlan_hdd_cm_issue_disconnect(adapter, reason, true);
+	status = wlan_hdd_cm_issue_disconnect(link_info, reason, true);
 
 	return qdf_status_to_os_return(status);
 }

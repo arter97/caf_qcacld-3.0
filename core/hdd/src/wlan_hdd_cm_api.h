@@ -46,7 +46,7 @@ int wlan_hdd_cm_connect(struct wiphy *wiphy,
 
 /**
  * wlan_hdd_cm_issue_disconnect() - initiate disconnect from osif
- * @adapter: Pointer to adapter
+ * @link_info: Link info pointer in HDD adapter
  * @reason: Disconnect reason code
  * @sync: true if wait for disconnect to complete is required. for the
  *        supplicant initiated disconnect or during vdev delete/change interface
@@ -56,9 +56,9 @@ int wlan_hdd_cm_connect(struct wiphy *wiphy,
  *
  * Return: QDF_STATUS
  */
-QDF_STATUS wlan_hdd_cm_issue_disconnect(struct hdd_adapter *adapter,
-					enum wlan_reason_code reason,
-					bool sync);
+QDF_STATUS
+wlan_hdd_cm_issue_disconnect(struct wlan_hdd_link_info *link_info,
+			     enum wlan_reason_code reason, bool sync);
 
 /**
  * wlan_hdd_cm_disconnect() - cfg80211 disconnect api

@@ -64,20 +64,21 @@ hdd_handle_nud_fail_sta(struct hdd_context *hdd_ctx,
 }
 
 static void
-hdd_handle_nud_fail_non_sta(struct hdd_adapter *adapter)
+hdd_handle_nud_fail_non_sta(struct wlan_hdd_link_info *link_info)
 {
-	wlan_hdd_cm_issue_disconnect(adapter,
+	wlan_hdd_cm_issue_disconnect(link_info,
 				     REASON_GATEWAY_REACHABILITY_FAILURE,
 				     false);
 }
 
 /**
  * __hdd_nud_failure_work() - work for nud event
- * @adapter: Pointer to hdd_adapter
+ * @adapter: HDD adapter
  *
  * Return: None
  */
-static void __hdd_nud_failure_work(struct hdd_adapter *adapter)
+static void
+__hdd_nud_failure_work(struct hdd_adapter *adapter)
 {
 	struct hdd_context *hdd_ctx;
 	int status;
@@ -119,7 +120,7 @@ static void __hdd_nud_failure_work(struct hdd_adapter *adapter)
 		hdd_handle_nud_fail_sta(hdd_ctx, adapter);
 		return;
 	}
-	hdd_handle_nud_fail_non_sta(adapter);
+	hdd_handle_nud_fail_non_sta(adapter->deflink);
 
 	hdd_exit();
 }

@@ -1684,7 +1684,7 @@ static void hdd_country_change_update_sta(struct hdd_context *hdd_ctx)
 						  phy_changed, freq_changed,
 						  width_changed);
 					wlan_hdd_cm_issue_disconnect(
-							adapter,
+							adapter->deflink,
 							REASON_UNSPEC_FAILURE,
 							false);
 					sta_ctx->reg_phymode = csr_phy_mode;
