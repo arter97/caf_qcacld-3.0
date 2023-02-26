@@ -1251,7 +1251,7 @@ QDF_STATUS hdd_update_nss(struct hdd_adapter *adapter, uint8_t tx_nss,
 			return QDF_STATUS_E_FAILURE;
 		}
 
-		if (hdd_is_vdev_in_conn_state(adapter))
+		if (hdd_is_vdev_in_conn_state(adapter->deflink))
 			return hdd_set_nss_params(adapter, tx_nss, rx_nss);
 
 		if (tx_nss != rx_nss) {

@@ -8927,7 +8927,7 @@ hdd_set_dynamic_antenna_mode(struct hdd_adapter *adapter,
 		return -EINVAL;
 	}
 
-	if (!hdd_is_vdev_in_conn_state(adapter)) {
+	if (!hdd_is_vdev_in_conn_state(adapter->deflink)) {
 		hdd_debug("Vdev (id %d) not in connected/started state, cannot accept command",
 			  adapter->deflink->vdev_id);
 		return -EINVAL;
@@ -10588,7 +10588,7 @@ static int hdd_set_arp_ns_offload(struct hdd_adapter *adapter,
 		return qdf_status_to_os_return(qdf_status);
 	}
 
-	if (!hdd_is_vdev_in_conn_state(adapter)) {
+	if (!hdd_is_vdev_in_conn_state(adapter->deflink)) {
 		hdd_info("set not in connect state, updated state %d",
 			 offload_state);
 		return 0;
@@ -11450,7 +11450,7 @@ static int hdd_get_tx_nss_config(struct hdd_adapter *adapter,
 	uint8_t tx_nss;
 	QDF_STATUS status;
 
-	if (!hdd_is_vdev_in_conn_state(adapter)) {
+	if (!hdd_is_vdev_in_conn_state(adapter->deflink)) {
 		hdd_err("Not in connected state");
 		return -EINVAL;
 	}
@@ -11486,7 +11486,7 @@ static int hdd_get_rx_nss_config(struct hdd_adapter *adapter,
 	uint8_t rx_nss;
 	QDF_STATUS status;
 
-	if (!hdd_is_vdev_in_conn_state(adapter)) {
+	if (!hdd_is_vdev_in_conn_state(adapter->deflink)) {
 		hdd_err("Not in connected state");
 		return -EINVAL;
 	}

@@ -6735,23 +6735,22 @@ hdd_store_nss_chains_cfg_in_vdev(struct hdd_context *hdd_ctx,
 	sme_store_nss_chains_cfg_in_vdev(vdev, &vdev_ini_cfg);
 }
 
-bool hdd_is_vdev_in_conn_state(struct hdd_adapter *adapter)
+bool hdd_is_vdev_in_conn_state(struct wlan_hdd_link_info *link_info)
 {
-	switch (adapter->device_mode) {
+	switch (link_info->adapter->device_mode) {
 	case QDF_STA_MODE:
 	case QDF_P2P_CLIENT_MODE:
 	case QDF_P2P_DEVICE_MODE:
-		return hdd_cm_is_vdev_associated(adapter->deflink);
+		return hdd_cm_is_vdev_associated(link_info);
 	case QDF_SAP_MODE:
 	case QDF_P2P_GO_MODE:
 		return (test_bit(SOFTAP_BSS_STARTED,
-				 &adapter->deflink->link_flags));
+				 &link_info->link_flags));
 	default:
-		hdd_err("Device mode %d invalid", adapter->device_mode);
+		hdd_err("Device mode %d invalid",
+			link_info->adapter->device_mode);
 		return 0;
 	}
-
-	return 0;
 }
 
 #define MAX_VDEV_RTT_PARAMS 2

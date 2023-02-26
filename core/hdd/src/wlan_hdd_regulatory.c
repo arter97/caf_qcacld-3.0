@@ -1677,7 +1677,7 @@ static void hdd_country_change_update_sta(struct hdd_context *hdd_ctx)
 								    adapter,
 								    oper_freq);
 
-			if (hdd_is_vdev_in_conn_state(adapter)) {
+			if (hdd_is_vdev_in_conn_state(adapter->deflink)) {
 				if (phy_changed || freq_changed ||
 				    width_changed) {
 					hdd_debug("changed: phy %d, freq %d, width %d",

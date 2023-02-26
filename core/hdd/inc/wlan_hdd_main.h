@@ -2738,14 +2738,14 @@ hdd_get_adapter_by_rand_macaddr(struct hdd_context *hdd_ctx,
 /**
  * hdd_is_vdev_in_conn_state() - Check whether the vdev is in
  * connected/started state.
- * @adapter: hdd adapter of the vdev
+ * @link_info: Pointer to link_info in adapter
  *
  * This function will give whether the vdev in the adapter is in
  * connected/started state.
  *
  * Return: True/false
  */
-bool hdd_is_vdev_in_conn_state(struct hdd_adapter *adapter);
+bool hdd_is_vdev_in_conn_state(struct wlan_hdd_link_info *link_info);
 
 /**
  * hdd_vdev_create() - Create the vdev in the firmware
