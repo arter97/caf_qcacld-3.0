@@ -631,7 +631,7 @@ QDF_STATUS wlan_spectral_update_rx_chainmask(struct hdd_adapter *adapter)
 	uint8_t pdev_id;
 	struct wlan_objmgr_vdev *vdev;
 
-	home_chan_freq = hdd_get_adapter_home_channel(adapter);
+	home_chan_freq = hdd_get_link_info_home_channel(adapter->deflink);
 	pdev_id = wlan_objmgr_pdev_get_pdev_id(adapter->hdd_ctx->pdev);
 	wma_get_rx_chainmask(pdev_id, &chainmask_2g, &chainmask_5g);
 	chainmask = chainmask_5g;

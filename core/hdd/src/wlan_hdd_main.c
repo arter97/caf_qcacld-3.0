@@ -711,52 +711,57 @@ int hdd_validate_channel_and_bandwidth(struct hdd_adapter *adapter,
 	return 0;
 }
 
-uint32_t hdd_get_adapter_home_channel(struct hdd_adapter *adapter)
+uint32_t hdd_get_link_info_home_channel(struct wlan_hdd_link_info *link_info)
 {
 	uint32_t home_chan_freq = 0;
-	struct hdd_context *hdd_ctx;
+	enum QDF_OPMODE opmode = link_info->adapter->device_mode;
 
-	hdd_ctx = WLAN_HDD_GET_CTX(adapter);
-	if (!hdd_ctx) {
-		hdd_err("hdd context is NULL");
-		return 0;
-	}
-
-	if ((adapter->device_mode == QDF_SAP_MODE ||
-	     adapter->device_mode == QDF_P2P_GO_MODE) &&
-	    test_bit(SOFTAP_BSS_STARTED, &adapter->deflink->link_flags)) {
-		home_chan_freq =
-			adapter->deflink->session.ap.operating_chan_freq;
-	} else if ((adapter->device_mode == QDF_STA_MODE ||
-		    adapter->device_mode == QDF_P2P_CLIENT_MODE) &&
-		   hdd_cm_is_vdev_associated(adapter->deflink)) {
-		home_chan_freq =
-			adapter->deflink->session.station.conn_info.chan_freq;
+	switch (opmode) {
+	case QDF_SAP_MODE:
+	case QDF_P2P_GO_MODE:
+		if (test_bit(SOFTAP_BSS_STARTED, &link_info->link_flags)) {
+			home_chan_freq =
+				link_info->session.ap.operating_chan_freq;
+		}
+		break;
+	case QDF_STA_MODE:
+	case QDF_P2P_CLIENT_MODE:
+		if (hdd_cm_is_vdev_associated(link_info)) {
+			home_chan_freq =
+				link_info->session.station.conn_info.chan_freq;
+		}
+		break;
+	default:
+		break;
 	}
 
 	return home_chan_freq;
 }
 
-enum phy_ch_width hdd_get_adapter_width(struct hdd_adapter *adapter)
+enum phy_ch_width hdd_get_link_info_width(struct wlan_hdd_link_info *link_info)
 {
 	enum phy_ch_width width = CH_WIDTH_20MHZ;
-	struct hdd_context *hdd_ctx;
+	enum QDF_OPMODE opmode = link_info->adapter->device_mode;
 
-	hdd_ctx = WLAN_HDD_GET_CTX(adapter);
-	if (!hdd_ctx) {
-		hdd_err("hdd context is NULL");
-		return 0;
+	switch (opmode) {
+	case QDF_SAP_MODE:
+	case QDF_P2P_GO_MODE:
+		if (test_bit(SOFTAP_BSS_STARTED, &link_info->link_flags)) {
+			struct hdd_ap_ctx *ap_ctx =
+					WLAN_HDD_GET_AP_CTX_PTR(link_info);
+
+			width = ap_ctx->sap_config.ch_params.ch_width;
+		}
+		break;
+	case QDF_STA_MODE:
+	case QDF_P2P_CLIENT_MODE:
+		if (hdd_cm_is_vdev_associated(link_info))
+			width = link_info->session.station.conn_info.ch_width;
+		break;
+	default:
+		break;
 	}
 
-	if ((adapter->device_mode == QDF_SAP_MODE ||
-	     adapter->device_mode == QDF_P2P_GO_MODE) &&
-	    test_bit(SOFTAP_BSS_STARTED, &adapter->deflink->link_flags)) {
-		width = adapter->deflink->session.ap.sap_config.ch_params.ch_width;
-	} else if ((adapter->device_mode == QDF_STA_MODE ||
-		    adapter->device_mode == QDF_P2P_CLIENT_MODE) &&
-		   hdd_cm_is_vdev_associated(adapter->deflink)) {
-		width = adapter->deflink->session.station.conn_info.ch_width;
-	}
 	return width;
 }
 
@@ -9957,7 +9962,7 @@ uint32_t hdd_get_operating_chan_freq(struct hdd_context *hdd_ctx,
 					   dbgid) {
 		if (mode == adapter->device_mode) {
 			oper_chan_freq =
-				hdd_get_adapter_home_channel(adapter);
+			    hdd_get_link_info_home_channel(adapter->deflink);
 			hdd_adapter_dev_put_debug(adapter, dbgid);
 			if (next_adapter)
 				hdd_adapter_dev_put_debug(next_adapter,

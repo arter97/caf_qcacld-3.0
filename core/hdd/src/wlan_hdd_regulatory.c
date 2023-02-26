@@ -1596,7 +1596,7 @@ hdd_country_change_bw_check(struct hdd_context *hdd_ctx,
 	ucfg_reg_get_current_chan_list(hdd_ctx->pdev,
 				       cur_chan_list);
 
-	width = hdd_get_adapter_width(adapter);
+	width = hdd_get_link_info_width(adapter->deflink);
 	org_bw = wlan_reg_get_bw_value(width);
 
 	for (i = 0; i < NUM_CHANNELS; i++) {
@@ -1648,7 +1648,7 @@ static void hdd_country_change_update_sta(struct hdd_context *hdd_ctx)
 	hdd_for_each_adapter_dev_held_safe(hdd_ctx, adapter, next_adapter,
 					   dbgid) {
 		width_changed = false;
-		oper_freq = hdd_get_adapter_home_channel(adapter);
+		oper_freq = hdd_get_link_info_home_channel(adapter->deflink);
 		if (oper_freq)
 			freq_changed = wlan_reg_is_disable_for_pwrmode(
 							pdev,
@@ -1797,7 +1797,7 @@ static void hdd_country_change_update_sap(struct hdd_context *hdd_ctx)
 
 	hdd_for_each_adapter_dev_held_safe(hdd_ctx, adapter, next_adapter,
 					   dbgid) {
-		oper_freq = hdd_get_adapter_home_channel(adapter);
+		oper_freq = hdd_get_link_info_home_channel(adapter->deflink);
 
 		switch (adapter->device_mode) {
 		case QDF_P2P_GO_MODE:

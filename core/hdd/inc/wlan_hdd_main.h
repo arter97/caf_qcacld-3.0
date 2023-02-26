@@ -2700,26 +2700,26 @@ struct hdd_adapter *hdd_get_adapter_by_macaddr(struct hdd_context *hdd_ctx,
 					       tSirMacAddr mac_addr);
 
 /**
- * hdd_get_adapter_home_channel() - return home channel of adapter
- * @adapter: hdd adapter of vdev
+ * hdd_get_link_info_home_channel() - return home channel of adapter
+ * @link_info: Pointer of link_info in @adapter
  *
  * This function returns operation channel of station/p2p-cli if
  * connected, returns operation channel of sap/p2p-go if started.
  *
  * Return: home channel if connected/started or invalid channel 0
  */
-uint32_t hdd_get_adapter_home_channel(struct hdd_adapter *adapter);
+uint32_t hdd_get_link_info_home_channel(struct wlan_hdd_link_info *link_info);
 
 /**
- * hdd_get_adapter_width() - return current bandwidth of adapter
- * @adapter: hdd adapter of vdev
+ * hdd_get_link_info_width() - return current bandwidth of adapter
+ * @link_info: Pointer of link_info in @adapter
  *
  * This function returns current bandwidth of station/p2p-cli if
  * connected, returns current bandwidth of sap/p2p-go if started.
  *
  * Return: bandwidth if connected/started or invalid bandwidth 0
  */
-enum phy_ch_width hdd_get_adapter_width(struct hdd_adapter *adapter);
+enum phy_ch_width hdd_get_link_info_width(struct wlan_hdd_link_info *link_info);
 
 /*
  * hdd_get_adapter_by_rand_macaddr() - find Random mac adapter
