@@ -5622,19 +5622,7 @@ hdd_check_and_disconnect_sta_on_invalid_channel(struct hdd_context *hdd_ctx,
 {
 	struct hdd_adapter *sta_adapter;
 	uint32_t sta_chan_freq;
-
-	sta_chan_freq = hdd_get_operating_chan_freq(hdd_ctx, QDF_STA_MODE);
-	if (!sta_chan_freq) {
-		hdd_err("STA not connected");
-		return;
-	}
-
-	hdd_err("STA connected on %d", sta_chan_freq);
-
-	if (sme_is_channel_valid(hdd_ctx->mac_handle, sta_chan_freq)) {
-		hdd_err("STA connected on %d and it is valid", sta_chan_freq);
-		return;
-	}
+	struct wlan_hdd_link_info *link_info;
 
 	sta_adapter = hdd_get_adapter(hdd_ctx, QDF_STA_MODE);
 
@@ -5642,8 +5630,21 @@ hdd_check_and_disconnect_sta_on_invalid_channel(struct hdd_context *hdd_ctx,
 		hdd_err("STA adapter does not exist");
 		return;
 	}
-	hdd_err("chan %d not valid, issue disconnect", sta_chan_freq);
-	wlan_hdd_cm_issue_disconnect(sta_adapter->deflink, reason, false);
+
+	hdd_adapter_for_each_active_link_info(sta_adapter, link_info) {
+		sta_chan_freq = hdd_get_link_info_home_channel(link_info);
+		if (!sta_chan_freq)
+			continue;
+
+		hdd_err("VDEV-%d STA connected on %d",
+			link_info->vdev_id, sta_chan_freq);
+
+		if (sme_is_channel_valid(hdd_ctx->mac_handle, sta_chan_freq))
+			continue;
+
+		hdd_err("chan %d not valid, issue disconnect", sta_chan_freq);
+		wlan_hdd_cm_issue_disconnect(link_info, reason, false);
+	}
 }
 
 /**
