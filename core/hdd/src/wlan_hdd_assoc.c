@@ -512,21 +512,20 @@ enum band_info hdd_conn_get_connected_band(struct wlan_hdd_link_info *link_info)
 
 /**
  * hdd_conn_get_connected_cipher_algo() - get current connection cipher type
- * @adapter: pointer to the hdd adapter
+ * @link_info: Link info pointer in HDD adapter.
  * @sta_ctx: pointer to global HDD Station context
  * @pConnectedCipherAlgo: pointer to connected cipher algo
  *
  * Return: false if any errors encountered, true otherwise
  */
 static inline bool
-hdd_conn_get_connected_cipher_algo(struct hdd_adapter *adapter,
+hdd_conn_get_connected_cipher_algo(struct wlan_hdd_link_info *link_info,
 				   struct hdd_station_ctx *sta_ctx,
 				   eCsrEncryptionType *pConnectedCipherAlgo)
 {
-	bool connected = false;
+	bool connected;
 
-	connected = hdd_cm_is_vdev_associated(adapter->deflink);
-
+	connected = hdd_cm_is_vdev_associated(link_info);
 	if (pConnectedCipherAlgo)
 		*pConnectedCipherAlgo = sta_ctx->conn_info.uc_encrypt_type;
 
@@ -1447,7 +1446,7 @@ QDF_STATUS hdd_roam_register_sta(struct wlan_hdd_link_info *link_info,
 /**
  * hdd_change_sta_state_authenticated()-
  * This function changes STA state to authenticated
- * @adapter:  pointer to the adapter structure.
+ * @link_info: Link info pointer in HDD adapter
  * @roaminfo: pointer to the RoamInfo structure.
  *
  * This is called from hdd_RoamSetKeyCompleteHandler
@@ -1455,28 +1454,31 @@ QDF_STATUS hdd_roam_register_sta(struct wlan_hdd_link_info *link_info,
  *
  * Return: 0 on success and errno on failure
  */
-static int hdd_change_sta_state_authenticated(struct hdd_adapter *adapter,
-					      struct csr_roam_info *roaminfo)
+static int
+hdd_change_sta_state_authenticated(struct wlan_hdd_link_info *link_info,
+				   struct csr_roam_info *roaminfo)
 {
 	uint8_t *mac_addr;
-	struct hdd_station_ctx *hddstactx =
-		WLAN_HDD_GET_STATION_CTX_PTR(adapter->deflink);
+	struct hdd_station_ctx *sta_ctx;
+	struct hdd_adapter *adapter = link_info->adapter;
 
-	mac_addr = hddstactx->conn_info.bssid.bytes;
+	sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(link_info);
 
-	if (ucfg_ipa_is_enabled() && !hddstactx->conn_info.is_authenticated &&
+	mac_addr = sta_ctx->conn_info.bssid.bytes;
+
+	if (ucfg_ipa_is_enabled() && !sta_ctx->conn_info.is_authenticated &&
 	    adapter->device_mode == QDF_STA_MODE &&
-	    hddstactx->conn_info.auth_type != eCSR_AUTH_TYPE_NONE &&
-	    hddstactx->conn_info.auth_type != eCSR_AUTH_TYPE_OPEN_SYSTEM &&
-	    hddstactx->conn_info.auth_type != eCSR_AUTH_TYPE_SHARED_KEY)
+	    sta_ctx->conn_info.auth_type != eCSR_AUTH_TYPE_NONE &&
+	    sta_ctx->conn_info.auth_type != eCSR_AUTH_TYPE_OPEN_SYSTEM &&
+	    sta_ctx->conn_info.auth_type != eCSR_AUTH_TYPE_SHARED_KEY)
 		ucfg_ipa_wlan_evt(adapter->hdd_ctx->pdev, adapter->dev,
 				  adapter->device_mode,
-				  adapter->deflink->vdev_id,
+				  link_info->vdev_id,
 				  WLAN_IPA_STA_CONNECT, mac_addr,
 				  WLAN_REG_IS_24GHZ_CH_FREQ(
-					hddstactx->conn_info.chan_freq));
+					sta_ctx->conn_info.chan_freq));
 
-	hdd_cm_set_peer_authenticate(adapter, &hddstactx->conn_info.bssid,
+	hdd_cm_set_peer_authenticate(adapter, &sta_ctx->conn_info.bssid,
 				     false);
 
 	return 0;
@@ -1485,7 +1487,7 @@ static int hdd_change_sta_state_authenticated(struct hdd_adapter *adapter,
 /**
  * hdd_change_peer_state_after_set_key() - change the peer state on set key
  *                                         complete
- * @adapter: pointer to HDD adapter
+ * @link_info: Link info pointer in HDD adapter
  * @roaminfo: pointer to roam info
  * @roam_result: roam result
  *
@@ -1495,13 +1497,17 @@ static int hdd_change_sta_state_authenticated(struct hdd_adapter *adapter,
  *
  * Return: None
  */
-static void hdd_change_peer_state_after_set_key(struct hdd_adapter *adapter,
-						struct csr_roam_info *roaminfo,
-						eCsrRoamResult roam_result)
+static void
+hdd_change_peer_state_after_set_key(struct wlan_hdd_link_info *link_info,
+				    struct csr_roam_info *roaminfo,
+				    eCsrRoamResult roam_result)
 {
-	struct hdd_station_ctx *hdd_sta_ctx =
-		WLAN_HDD_GET_STATION_CTX_PTR(adapter->deflink);
-	eCsrEncryptionType encr_type = hdd_sta_ctx->conn_info.uc_encrypt_type;
+	struct hdd_station_ctx *hdd_sta_ctx;
+	eCsrEncryptionType encr_type;
+	struct hdd_adapter *adapter = link_info->adapter;
+
+	hdd_sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(link_info);
+	encr_type = hdd_sta_ctx->conn_info.uc_encrypt_type;
 
 	if (eCSR_ROAM_RESULT_AUTHENTICATED == roam_result) {
 		hdd_sta_ctx->conn_info.gtk_installed = true;
@@ -1513,7 +1519,7 @@ static void hdd_change_peer_state_after_set_key(struct hdd_adapter *adapter,
 		 * case of 11R roaming.
 		 */
 		if (sme_neighbor_roam_is11r_assoc(adapter->hdd_ctx->mac_handle,
-						  adapter->deflink->vdev_id))
+						  link_info->vdev_id))
 			hdd_sta_ctx->conn_info.ptk_installed = true;
 	} else {
 		hdd_sta_ctx->conn_info.ptk_installed = true;
@@ -1531,9 +1537,9 @@ static void hdd_change_peer_state_after_set_key(struct hdd_adapter *adapter,
 	    (encr_type == eCSR_ENCRYPT_TYPE_WEP104_STATICKEY)) {
 		if (hdd_sta_ctx->conn_info.gtk_installed &&
 		    hdd_sta_ctx->conn_info.ptk_installed)
-			hdd_change_sta_state_authenticated(adapter, roaminfo);
+			hdd_change_sta_state_authenticated(link_info, roaminfo);
 	} else if (hdd_sta_ctx->conn_info.ptk_installed) {
-		hdd_change_sta_state_authenticated(adapter, roaminfo);
+		hdd_change_sta_state_authenticated(link_info, roaminfo);
 	}
 
 	if (hdd_sta_ctx->conn_info.gtk_installed &&
@@ -1545,7 +1551,7 @@ static void hdd_change_peer_state_after_set_key(struct hdd_adapter *adapter,
 
 /**
  * hdd_roam_set_key_complete_handler() - Update the security parameters
- * @adapter: pointer to adapter
+ * @link_info: Link info pointer in HDD adapter
  * @roam_info: pointer to roam info
  * @roam_status: roam status
  * @roam_result: roam result
@@ -1553,14 +1559,15 @@ static void hdd_change_peer_state_after_set_key(struct hdd_adapter *adapter,
  * Return: QDF_STATUS enumeration
  */
 static QDF_STATUS
-hdd_roam_set_key_complete_handler(struct hdd_adapter *adapter,
+hdd_roam_set_key_complete_handler(struct wlan_hdd_link_info *link_info,
 				  struct csr_roam_info *roam_info,
 				  eRoamCmdStatus roam_status,
 				  eCsrRoamResult roam_result)
 {
 	eCsrEncryptionType algorithm;
-	bool connected = false;
+	bool connected;
 	struct hdd_station_ctx *sta_ctx;
+	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(link_info->adapter);
 
 	hdd_enter();
 
@@ -1568,6 +1575,13 @@ hdd_roam_set_key_complete_handler(struct hdd_adapter *adapter,
 		hdd_err("roam_info is NULL");
 		return QDF_STATUS_E_FAILURE;
 	}
+
+	if (!hdd_ctx || !hdd_ctx->psoc) {
+		hdd_err("hdd_ctx or psoc is NULL");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(link_info);
 	/*
 	 * if (WPA), tell TL to go to 'authenticated' after the keys are set.
 	 * then go to 'authenticated'.  For all other authentication types
@@ -1578,19 +1592,15 @@ hdd_roam_set_key_complete_handler(struct hdd_adapter *adapter,
 		  QDF_MAC_ADDR_FMT, roam_status, roam_result,
 		  QDF_MAC_ADDR_REF(roam_info->peerMac.bytes));
 
-	sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter->deflink);
-	connected = hdd_conn_get_connected_cipher_algo(adapter, sta_ctx,
+	sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(link_info);
+	connected = hdd_conn_get_connected_cipher_algo(link_info, sta_ctx,
 						       &algorithm);
 	if (connected) {
-		hdd_change_peer_state_after_set_key(adapter, roam_info,
-						    roam_result);
+		hdd_change_peer_state_after_set_key(link_info,
+						    roam_info, roam_result);
 	}
 
-	if (!adapter->hdd_ctx || !adapter->hdd_ctx->psoc) {
-		hdd_err("hdd_ctx or psoc is NULL");
-		return QDF_STATUS_E_FAILURE;
-	}
-	policy_mgr_restart_opportunistic_timer(adapter->hdd_ctx->psoc, false);
+	policy_mgr_restart_opportunistic_timer(hdd_ctx->psoc, false);
 
 	hdd_exit();
 	return QDF_STATUS_SUCCESS;
@@ -2301,7 +2311,7 @@ QDF_STATUS hdd_sme_roam_callback(void *context,
 	case eCSR_ROAM_SET_KEY_COMPLETE:
 	{
 		qdf_ret_status =
-			hdd_roam_set_key_complete_handler(adapter, roam_info,
+			hdd_roam_set_key_complete_handler(link_info, roam_info,
 							  roam_status,
 							  roam_result);
 		if (eCSR_ROAM_RESULT_AUTHENTICATED == roam_result)
