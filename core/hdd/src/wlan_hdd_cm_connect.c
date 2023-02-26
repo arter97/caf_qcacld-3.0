@@ -177,7 +177,7 @@ bool hdd_cm_is_vdev_roaming(struct wlan_hdd_link_info *link_info)
 	return is_vdev_roaming;
 }
 
-void hdd_cm_set_peer_authenticate(struct hdd_adapter *adapter,
+void hdd_cm_set_peer_authenticate(struct wlan_hdd_link_info *link_info,
 				  struct qdf_mac_addr *bssid,
 				  bool is_auth_required)
 {
@@ -185,12 +185,12 @@ void hdd_cm_set_peer_authenticate(struct hdd_adapter *adapter,
 		  QDF_MAC_ADDR_REF(bssid->bytes),
 		  is_auth_required ? "CONNECTED" : "AUTHENTICATED");
 
-	hdd_change_peer_state(adapter, bssid->bytes,
+	hdd_change_peer_state(link_info->adapter, bssid->bytes,
 			      is_auth_required ?
 			      OL_TXRX_PEER_STATE_CONN :
 			      OL_TXRX_PEER_STATE_AUTH);
-	hdd_conn_set_authenticated(adapter, !is_auth_required);
-	hdd_objmgr_set_peer_mlme_auth_state(adapter->deflink->vdev,
+	hdd_conn_set_authenticated(link_info, !is_auth_required);
+	hdd_objmgr_set_peer_mlme_auth_state(link_info->vdev,
 					    !is_auth_required);
 }
 
@@ -1549,8 +1549,8 @@ hdd_cm_connect_success_pre_user_update(struct wlan_objmgr_vdev *vdev,
 		hdd_roam_register_sta(link_info, &rsp->bssid, is_auth_required);
 	} else {
 		/* for host roam/LFR2 */
-		hdd_cm_set_peer_authenticate(adapter, &rsp->bssid,
-					     is_auth_required);
+		hdd_cm_set_peer_authenticate(link_info,
+					     &rsp->bssid, is_auth_required);
 	}
 
 	hdd_debug("Enabling queues");

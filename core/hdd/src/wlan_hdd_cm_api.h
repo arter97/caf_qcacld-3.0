@@ -265,13 +265,13 @@ __hdd_cm_disconnect_handler_post_user_update(struct hdd_adapter *adapter,
 
 /**
  * hdd_cm_set_peer_authenticate() - set peer as authenticated
- * @adapter: pointer to adapter
+ * @link_info: Link info pointer in HDD adapter
  * @bssid: bssid of the connection
  * @is_auth_required: is upper layer authenticatoin required
  *
  * Return: QDF_STATUS enumeration
  */
-void hdd_cm_set_peer_authenticate(struct hdd_adapter *adapter,
+void hdd_cm_set_peer_authenticate(struct wlan_hdd_link_info *link_info,
 				  struct qdf_mac_addr *bssid,
 				  bool is_auth_required);
 

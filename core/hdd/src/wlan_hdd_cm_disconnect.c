@@ -261,7 +261,7 @@ wlan_hdd_cm_issue_disconnect(struct wlan_hdd_link_info *link_info,
 	sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(link_info);
 	hdd_place_marker(adapter, "TRY TO DISCONNECT", NULL);
 	reset_mscs_params(link_info);
-	hdd_conn_set_authenticated(adapter, false);
+	hdd_conn_set_authenticated(link_info, false);
 	wlan_hdd_netif_queue_control(adapter,
 				     WLAN_STOP_ALL_NETIF_QUEUE_N_CARRIER,
 				     WLAN_CONTROL_PATH);
@@ -354,7 +354,7 @@ hdd_cm_disconnect_complete_pre_user_update(struct wlan_objmgr_vdev *vdev,
 	}
 
 	adapter = link_info->adapter;
-	hdd_conn_set_authenticated(adapter, false);
+	hdd_conn_set_authenticated(link_info, false);
 	hdd_napi_serialize(0);
 	hdd_disable_and_flush_mc_addr_list(adapter, pmo_peer_disconnect);
 	__hdd_cm_disconnect_handler_pre_user_update(adapter);

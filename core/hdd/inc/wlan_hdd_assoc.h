@@ -213,7 +213,7 @@ bool hdd_is_fils_connection(struct hdd_context *hdd_ctx,
 
 /**
  * hdd_conn_set_authenticated() - set authentication state
- * @adapter: pointer to the adapter
+ * @link_info: Link info pointer in HDD adapter
  * @auth_state: authentication state
  *
  * This function updates the global HDD station context
@@ -222,8 +222,8 @@ bool hdd_is_fils_connection(struct hdd_context *hdd_ctx,
  *
  * Return: none
  */
-void
-hdd_conn_set_authenticated(struct hdd_adapter *adapter, uint8_t auth_state);
+void hdd_conn_set_authenticated(struct wlan_hdd_link_info *link_info,
+				uint8_t auth_state);
 
 /**
  * hdd_conn_set_connection_state() - set connection state

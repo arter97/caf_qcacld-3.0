@@ -417,45 +417,49 @@ static inline void wlan_hdd_sae_callback(struct wlan_hdd_link_info *link_info,
 /**
  * hdd_start_powersave_timer_on_associated() - Start auto powersave timer
  *  after associated
- * @adapter: pointer to the adapter
+ *  @link_info: Link info pointer in HDD adapter
  *
  * This function will start auto powersave timer for STA/P2P Client.
  *
  * Return: none
  */
-static void hdd_start_powersave_timer_on_associated(struct hdd_adapter *adapter)
+static void
+hdd_start_powersave_timer_on_associated(struct wlan_hdd_link_info *link_info)
 {
 	uint32_t timeout;
 	uint32_t auto_bmps_timer_val;
+	struct hdd_adapter *adapter = link_info->adapter;
 	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
 
 	if (adapter->device_mode != QDF_STA_MODE &&
 	    adapter->device_mode != QDF_P2P_CLIENT_MODE)
 		return;
+
 	ucfg_mlme_get_auto_bmps_timer_value(hdd_ctx->psoc,
 					    &auto_bmps_timer_val);
-	timeout = hdd_cm_is_vdev_roaming(adapter->deflink) ?
+	timeout = hdd_cm_is_vdev_roaming(link_info) ?
 		AUTO_PS_ENTRY_TIMER_DEFAULT_VALUE :
 		(auto_bmps_timer_val * 1000);
 	sme_ps_enable_auto_ps_timer(hdd_ctx->mac_handle,
-				    adapter->deflink->vdev_id,
+				    link_info->vdev_id,
 				    timeout);
 }
 
-void hdd_conn_set_authenticated(struct hdd_adapter *adapter, uint8_t auth_state)
+void hdd_conn_set_authenticated(struct wlan_hdd_link_info *link_info,
+				uint8_t auth_state)
 {
 	struct hdd_station_ctx *sta_ctx;
 	struct wlan_objmgr_vdev *vdev;
 	char *auth_time;
 	uint32_t time_buffer_size;
 
-	sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter->deflink);
+	sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(link_info);
 	/* save the new connection state */
 	hdd_debug("Authenticated state Changed from oldState:%d to State:%d",
 		  sta_ctx->conn_info.is_authenticated, auth_state);
 	sta_ctx->conn_info.is_authenticated = auth_state;
 
-	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink, WLAN_DP_ID);
+	vdev = hdd_objmgr_get_vdev_by_user(link_info, WLAN_DP_ID);
 	if (vdev) {
 		ucfg_dp_conn_info_set_peer_authenticate(vdev, auth_state);
 		hdd_objmgr_put_vdev_by_user(vdev, WLAN_DP_ID);
@@ -472,7 +476,7 @@ void hdd_conn_set_authenticated(struct hdd_adapter *adapter, uint8_t auth_state)
 	if (auth_state &&
 	    (sta_ctx->conn_info.ptk_installed ||
 	     sta_ctx->conn_info.uc_encrypt_type == eCSR_ENCRYPT_TYPE_NONE))
-		hdd_start_powersave_timer_on_associated(adapter);
+		hdd_start_powersave_timer_on_associated(link_info);
 }
 
 void hdd_conn_set_connection_state(struct hdd_adapter *adapter,
@@ -1437,7 +1441,7 @@ QDF_STATUS hdd_roam_register_sta(struct wlan_hdd_link_info *link_info,
 		return qdf_status;
 	}
 
-	hdd_cm_set_peer_authenticate(adapter, &txrx_desc.peer_addr,
+	hdd_cm_set_peer_authenticate(link_info, &txrx_desc.peer_addr,
 				     is_auth_required);
 
 	return qdf_status;
@@ -1478,8 +1482,8 @@ hdd_change_sta_state_authenticated(struct wlan_hdd_link_info *link_info,
 				  WLAN_REG_IS_24GHZ_CH_FREQ(
 					sta_ctx->conn_info.chan_freq));
 
-	hdd_cm_set_peer_authenticate(adapter, &sta_ctx->conn_info.bssid,
-				     false);
+	hdd_cm_set_peer_authenticate(link_info,
+				     &sta_ctx->conn_info.bssid, false);
 
 	return 0;
 }
