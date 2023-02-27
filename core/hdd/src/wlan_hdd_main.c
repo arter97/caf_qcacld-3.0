@@ -12431,7 +12431,7 @@ hdd_check_chn_bw_boundary_unsafe(struct hdd_context *hdd_ctxt,
 
 /**
  * hdd_unsafe_channel_restart_sap() - restart sap if sap is on unsafe channel
- * @hdd_ctxt: hdd context pointer
+ * @hdd_ctx: hdd context pointer
  *
  * hdd_unsafe_channel_restart_sap check all unsafe channel list
  * and if ACS is enabled, driver will ask userspace to restart the
@@ -12439,7 +12439,7 @@ hdd_check_chn_bw_boundary_unsafe(struct hdd_context *hdd_ctxt,
  *
  * Return - none
  */
-QDF_STATUS hdd_unsafe_channel_restart_sap(struct hdd_context *hdd_ctxt)
+QDF_STATUS hdd_unsafe_channel_restart_sap(struct hdd_context *hdd_ctx)
 {
 	struct hdd_adapter *adapter, *next_adapter = NULL;
 	struct hdd_ap_ctx *ap_ctx;
@@ -12455,134 +12455,142 @@ QDF_STATUS hdd_unsafe_channel_restart_sap(struct hdd_context *hdd_ctxt)
 		cfg_default(CFG_USER_AUTO_CHANNEL_SELECTION);
 	wlan_net_dev_ref_dbgid dbgid = NET_DEV_HOLD_UNSAFE_CHANNEL_RESTART_SAP;
 	enum phy_ch_width ch_width;
+	struct wlan_hdd_link_info *link_info;
 
-	hdd_for_each_adapter_dev_held_safe(hdd_ctxt, adapter, next_adapter,
+	hdd_for_each_adapter_dev_held_safe(hdd_ctx, adapter, next_adapter,
 					   dbgid) {
-		ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(adapter->deflink);
-		if (!(adapter->device_mode == QDF_SAP_MODE &&
-		    ap_ctx->sap_config.acs_cfg.acs_mode)) {
-			hdd_debug_rl("skip device mode:%d acs:%d",
-				     adapter->device_mode,
-				     ap_ctx->sap_config.acs_cfg.acs_mode);
+		if (adapter->device_mode != QDF_SAP_MODE) {
+			hdd_debug_rl("skip device mode:%d",
+				     adapter->device_mode);
 			hdd_adapter_dev_put_debug(adapter, dbgid);
 			continue;
 		}
 
-		ap_chan_freq = ap_ctx->operating_chan_freq;
-		ch_width = ap_ctx->sap_config.ch_width_orig;
-		found = false;
-		status =
-		ucfg_policy_mgr_get_sta_sap_scc_lte_coex_chnl(hdd_ctxt->psoc,
-							      &scc_on_lte_coex);
-		if (!QDF_IS_STATUS_SUCCESS(status))
-			hdd_err("can't get scc on lte coex chnl, use def");
-		/*
-		 * If STA+SAP is doing SCC & g_sta_sap_scc_on_lte_coex_chan
-		 * is set, no need to move SAP.
-		 */
-		if ((policy_mgr_is_sta_sap_scc(hdd_ctxt->psoc, ap_ctx->operating_chan_freq) &&
-		     scc_on_lte_coex) ||
-		    policy_mgr_nan_sap_scc_on_unsafe_ch_chk(hdd_ctxt->psoc,
-							    ap_chan_freq))
-			hdd_debug("SAP allowed in unsafe SCC channel");
-		else
-			found = hdd_check_chn_bw_boundary_unsafe(hdd_ctxt,
-								 adapter);
-		if (!found) {
-			hdd_store_sap_restart_channel(
-				ap_chan_freq,
-				restart_chan_store);
-			hdd_debug("ch freq:%d is safe. no need to change channel",
-				  ap_chan_freq);
-			hdd_adapter_dev_put_debug(adapter, dbgid);
-			continue;
-		}
-
-		status = ucfg_mlme_get_acs_support_for_dfs_ltecoex(
-					hdd_ctxt->psoc,
-					&is_acs_support_for_dfs_ltecoex);
-		if (!QDF_IS_STATUS_SUCCESS(status))
-			hdd_err("get_acs_support_for_dfs_ltecoex failed,set def");
-
-		status = ucfg_mlme_get_vendor_acs_support(
-					hdd_ctxt->psoc,
-					&is_vendor_acs_support);
-		if (!QDF_IS_STATUS_SUCCESS(status))
-			hdd_err("get_vendor_acs_support failed, set default");
-
-		if (is_vendor_acs_support && is_acs_support_for_dfs_ltecoex) {
-			hdd_update_acs_timer_reason(adapter,
-				QCA_WLAN_VENDOR_ACS_SELECT_REASON_LTE_COEX);
-			hdd_adapter_dev_put_debug(adapter, dbgid);
-			continue;
-		}
-
-		restart_freq = 0;
-		for (i = 0; i < SAP_MAX_NUM_SESSION; i++) {
-			if (!restart_chan_store[i])
+		hdd_adapter_for_each_active_link_info(adapter, link_info) {
+			ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(link_info);
+			if (!ap_ctx->sap_config.acs_cfg.acs_mode) {
+				hdd_debug_rl("skip acs:%d",
+					     ap_ctx->sap_config.acs_cfg.acs_mode);
 				continue;
-
-			if (policy_mgr_is_force_scc(hdd_ctxt->psoc) &&
-			    WLAN_REG_IS_SAME_BAND_FREQS(
-					restart_chan_store[i],
-					ap_chan_freq)) {
-				restart_freq = restart_chan_store[i];
-				break;
 			}
-		}
-		if (!restart_freq) {
-			restart_freq =
-				wlansap_get_safe_channel_from_pcl_and_acs_range(
-				    WLAN_HDD_GET_SAP_CTX_PTR(adapter->deflink),
-				    &ch_width);
-		}
-		if (!restart_freq) {
-			wlan_hdd_set_sap_csa_reason(hdd_ctxt->psoc,
-						    adapter->deflink->vdev_id,
+
+			ap_chan_freq = ap_ctx->operating_chan_freq;
+			ch_width = ap_ctx->sap_config.ch_width_orig;
+			found = false;
+			status =
+			ucfg_policy_mgr_get_sta_sap_scc_lte_coex_chnl(hdd_ctx->psoc,
+								      &scc_on_lte_coex);
+			if (!QDF_IS_STATUS_SUCCESS(status))
+				hdd_err("can't get scc on lte coex chnl, use def");
+			/*
+			 * If STA+SAP is doing SCC &
+			 * g_sta_sap_scc_on_lte_coex_chan is set,
+			 * no need to move SAP.
+			 */
+			if ((policy_mgr_is_sta_sap_scc(hdd_ctx->psoc,
+						       ap_chan_freq) &&
+			     scc_on_lte_coex) ||
+			    policy_mgr_nan_sap_scc_on_unsafe_ch_chk(hdd_ctx->psoc,
+								    ap_chan_freq))
+				hdd_debug("SAP allowed in unsafe SCC channel");
+			else
+				found = hdd_check_chn_bw_boundary_unsafe(hdd_ctx,
+									 adapter);
+			if (!found) {
+				hdd_store_sap_restart_channel(ap_chan_freq,
+							      restart_chan_store);
+				hdd_debug("ch freq:%d is safe. no need to change channel",
+					  ap_chan_freq);
+				continue;
+			}
+
+			status = ucfg_mlme_get_acs_support_for_dfs_ltecoex(
+						hdd_ctx->psoc,
+						&is_acs_support_for_dfs_ltecoex);
+			if (!QDF_IS_STATUS_SUCCESS(status))
+				hdd_err("get_acs_support_for_dfs_ltecoex failed,set def");
+
+			status = ucfg_mlme_get_vendor_acs_support(
+						hdd_ctx->psoc,
+						&is_vendor_acs_support);
+			if (!QDF_IS_STATUS_SUCCESS(status))
+				hdd_err("get_vendor_acs_support failed, set default");
+
+			if (is_vendor_acs_support &&
+			    is_acs_support_for_dfs_ltecoex) {
+				hdd_update_acs_timer_reason(adapter,
+				    QCA_WLAN_VENDOR_ACS_SELECT_REASON_LTE_COEX);
+				continue;
+			}
+
+			restart_freq = 0;
+			for (i = 0; i < SAP_MAX_NUM_SESSION; i++) {
+				if (!restart_chan_store[i])
+					continue;
+
+				if (policy_mgr_is_force_scc(hdd_ctx->psoc) &&
+				    WLAN_REG_IS_SAME_BAND_FREQS(
+						restart_chan_store[i],
+						ap_chan_freq)) {
+					restart_freq = restart_chan_store[i];
+					break;
+				}
+			}
+			if (!restart_freq) {
+				restart_freq =
+					wlansap_get_safe_channel_from_pcl_and_acs_range(
+					    WLAN_HDD_GET_SAP_CTX_PTR(link_info),
+					    &ch_width);
+			}
+			if (!restart_freq) {
+				wlan_hdd_set_sap_csa_reason(hdd_ctx->psoc,
+							    link_info->vdev_id,
+							    CSA_REASON_UNSAFE_CHANNEL);
+				hdd_err("Unable to find safe chan, Stop the SAP if restriction mask is set else set txpower");
+				hdd_stop_sap_set_tx_power(hdd_ctx->psoc, adapter);
+				continue;
+			}
+			/*
+			 * SAP restart due to unsafe channel. While
+			 * restarting the SAP, make sure to clear
+			 * acs_channel, channel to reset to
+			 * 0. Otherwise these settings will override
+			 * the ACS while restart.
+			 */
+			hdd_ctx->acs_policy.acs_chan_freq =
+						AUTO_CHANNEL_SELECT;
+			ucfg_mlme_get_sap_internal_restart(hdd_ctx->psoc,
+							   &value);
+			if (value) {
+				wlan_hdd_set_sap_csa_reason(hdd_ctx->psoc,
+						    link_info->vdev_id,
 						    CSA_REASON_UNSAFE_CHANNEL);
-			hdd_err("Unable to find safe chan, Stop the SAP if restriction mask is set else set txpower");
-			hdd_stop_sap_set_tx_power(hdd_ctxt->psoc, adapter);
-			hdd_adapter_dev_put_debug(adapter, dbgid);
-			continue;
-		}
-		/*
-		 * SAP restart due to unsafe channel. While
-		 * restarting the SAP, make sure to clear
-		 * acs_channel, channel to reset to
-		 * 0. Otherwise these settings will override
-		 * the ACS while restart.
-		 */
-		hdd_ctxt->acs_policy.acs_chan_freq =
-					AUTO_CHANNEL_SELECT;
-		ucfg_mlme_get_sap_internal_restart(hdd_ctxt->psoc,
-						   &value);
-		if (value) {
-			wlan_hdd_set_sap_csa_reason(hdd_ctxt->psoc,
-						    adapter->deflink->vdev_id,
-						    CSA_REASON_UNSAFE_CHANNEL);
-			status = hdd_switch_sap_chan_freq(adapter,
-							  restart_freq,
-							  ch_width,
-							  true);
-			if (QDF_IS_STATUS_SUCCESS(status)) {
+				status = hdd_switch_sap_chan_freq(adapter,
+								  restart_freq,
+								  ch_width,
+								  true);
+				if (QDF_IS_STATUS_SUCCESS(status)) {
+					hdd_adapter_dev_put_debug(adapter,
+								  dbgid);
+					if (next_adapter)
+						hdd_adapter_dev_put_debug(
+								next_adapter,
+								dbgid);
+					return QDF_STATUS_E_PENDING;
+				} else {
+					hdd_debug("CSA failed, check next SAP");
+				}
+			} else {
+				hdd_debug("sending coex indication");
+				wlan_hdd_send_svc_nlink_msg(
+						hdd_ctx->radio_index,
+						WLAN_SVC_LTE_COEX_IND, NULL, 0);
 				hdd_adapter_dev_put_debug(adapter, dbgid);
 				if (next_adapter)
 					hdd_adapter_dev_put_debug(next_adapter,
 								  dbgid);
-				return QDF_STATUS_E_PENDING;
-			} else {
-				hdd_debug("CSA failed, check next SAP");
+				return QDF_STATUS_SUCCESS;
 			}
-		} else {
-			hdd_debug("sending coex indication");
-			wlan_hdd_send_svc_nlink_msg(
-					hdd_ctxt->radio_index,
-					WLAN_SVC_LTE_COEX_IND, NULL, 0);
-			hdd_adapter_dev_put_debug(adapter, dbgid);
-			if (next_adapter)
-				hdd_adapter_dev_put_debug(next_adapter,
-							  dbgid);
-			return QDF_STATUS_SUCCESS;
 		}
 		/* dev_put has to be done here */
 		hdd_adapter_dev_put_debug(adapter, dbgid);
