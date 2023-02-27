@@ -16288,7 +16288,7 @@ static int hdd_update_acs_channel(struct hdd_adapter *adapter, uint8_t reason,
 		wlan_hdd_set_sap_csa_reason(hdd_ctx->psoc,
 					    adapter->deflink->vdev_id,
 					    CSA_REASON_LTE_COEX);
-		hdd_switch_sap_channel(adapter, (uint8_t)ch, true);
+		hdd_switch_sap_channel(adapter->deflink, (uint8_t)ch, true);
 		break;
 
 	default:
