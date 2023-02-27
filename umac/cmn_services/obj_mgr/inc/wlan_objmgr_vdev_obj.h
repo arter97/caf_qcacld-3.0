@@ -2128,6 +2128,20 @@ QDF_STATUS wlan_vdev_get_bss_peer_mac(struct wlan_objmgr_vdev *vdev,
  */
 QDF_STATUS wlan_vdev_get_bss_peer_mld_mac(struct wlan_objmgr_vdev *vdev,
 					  struct qdf_mac_addr *mld_mac);
+
+/**
+ * wlan_vdev_get_mlo_dev_ctx() - get MLO dev context
+ * @vdev: VDEV object
+ *
+ * API to get MLO dev context pointer from vdev
+ *
+ * Return: MLO dev context pointer
+ */
+static inline struct wlan_mlo_dev_context *wlan_vdev_get_mlo_dev_ctx(
+				struct wlan_objmgr_vdev *vdev)
+{
+	return vdev->mlo_dev_ctx;
+}
 #endif
 
 /**
