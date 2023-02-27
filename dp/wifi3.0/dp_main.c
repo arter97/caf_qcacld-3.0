@@ -13779,6 +13779,11 @@ static void dp_reinit_rings(struct dp_soc *soc)
  */
 static QDF_STATUS dp_umac_reset_handle_pre_reset(struct dp_soc *soc)
 {
+	if (wlan_cfg_get_dp_soc_is_ppeds_enabled(soc->wlan_cfg_ctx)) {
+		dp_err("Umac reset is currently not supported in DS config");
+		qdf_assert_always(0);
+	}
+
 	dp_reset_interrupt_ring_masks(soc);
 
 	dp_pause_tx_hardstart(soc);
