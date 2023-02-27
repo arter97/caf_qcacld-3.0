@@ -2327,7 +2327,7 @@ int wlan_hdd_cfg80211_start_acs(struct wlan_hdd_link_info *link_info)
 
 		if (status > 0) {
 			/*notify hostapd about channel override */
-			wlan_hdd_cfg80211_acs_ch_select_evt(adapter, true);
+			wlan_hdd_cfg80211_acs_ch_select_evt(link_info, true);
 			wlansap_dcs_set_wlan_interference_mitigation_on_band(sap_ctx,
 									     sap_config);
 			return 0;
@@ -3306,9 +3306,7 @@ void wlan_hdd_handle_zero_acs_list(struct hdd_context *hdd_ctx,
 
 /**
  * wlan_hdd_handle_single_ch_in_acs_list() - Handle acs list with single channel
- * @hdd_ctx: hdd context
- * @adapter: adapter
- * @sap_config: sap acs config context
+ * @link_info: Link info pointer in HDD adapter
  *
  * If only one acs channel is left after filter, driver will return the channel
  * to hostapd without ACS scan.
@@ -3316,12 +3314,13 @@ void wlan_hdd_handle_zero_acs_list(struct hdd_context *hdd_ctx,
  * Return: None
  */
 static void
-wlan_hdd_handle_single_ch_in_acs_list(struct hdd_context *hdd_ctx,
-				      struct hdd_adapter *adapter,
-				      struct sap_config *sap_config)
+wlan_hdd_handle_single_ch_in_acs_list(struct wlan_hdd_link_info *link_info)
 {
+	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(link_info->adapter);
 	uint32_t channel_bonding_mode_2g;
+	struct sap_config *sap_config;
 
+	sap_config = &link_info->session.ap.sap_config;
 	ucfg_mlme_get_channel_bonding_24ghz(hdd_ctx->psoc,
 					    &channel_bonding_mode_2g);
 	sap_config->acs_cfg.start_ch_freq =
@@ -3342,9 +3341,9 @@ wlan_hdd_handle_single_ch_in_acs_list(struct hdd_context *hdd_ctx,
 	}
 
 	wlan_sap_set_sap_ctx_acs_cfg(
-		WLAN_HDD_GET_SAP_CTX_PTR(adapter->deflink), sap_config);
+		WLAN_HDD_GET_SAP_CTX_PTR(link_info), sap_config);
 	sap_config_acs_result(hdd_ctx->mac_handle,
-			      WLAN_HDD_GET_SAP_CTX_PTR(adapter->deflink),
+			      WLAN_HDD_GET_SAP_CTX_PTR(link_info),
 			    sap_config->acs_cfg.ht_sec_ch_freq);
 	sap_config->ch_params.ch_width =
 			sap_config->acs_cfg.ch_width;
@@ -3365,9 +3364,9 @@ wlan_hdd_handle_single_ch_in_acs_list(struct hdd_context *hdd_ctx,
 	sap_config->ch_params.mhz_freq_seg1 =
 		sap_config->acs_cfg.vht_seg1_center_ch_freq;
 	/*notify hostapd about channel override */
-	wlan_hdd_cfg80211_acs_ch_select_evt(adapter, true);
+	wlan_hdd_cfg80211_acs_ch_select_evt(link_info, true);
 	wlansap_dcs_set_wlan_interference_mitigation_on_band(
-		WLAN_HDD_GET_SAP_CTX_PTR(adapter->deflink),
+		WLAN_HDD_GET_SAP_CTX_PTR(link_info),
 		sap_config);
 }
 
@@ -3729,7 +3728,7 @@ wlan_hdd_ll_lt_sap_get_valid_last_acs_freq(struct hdd_adapter *adapter)
 		 * Reason for not storing the last acs frequency is to avoid
 		 * storing the same freq again and again
 		 */
-		wlan_hdd_cfg80211_acs_ch_select_evt(adapter, false);
+		wlan_hdd_cfg80211_acs_ch_select_evt(adapter->deflink, false);
 		wlansap_dcs_set_wlan_interference_mitigation_on_band(sap_ctx,
 								    sap_config);
 
@@ -4062,8 +4061,7 @@ static int __wlan_hdd_cfg80211_do_acs(struct wiphy *wiphy,
 				sap_config->acs_cfg.master_ch_list_count);
 		/* if it is only one channel, send ACS event to upper layer */
 		if (sap_config->acs_cfg.ch_list_count == 1) {
-			wlan_hdd_handle_single_ch_in_acs_list(
-					hdd_ctx, adapter, sap_config);
+			wlan_hdd_handle_single_ch_in_acs_list(link_info);
 			ret = 0;
 			goto out;
 		} else if (!sap_config->acs_cfg.ch_list_count) {
@@ -4074,8 +4072,7 @@ static int __wlan_hdd_cfg80211_do_acs(struct wiphy *wiphy,
 	} else if (adapter->device_mode == QDF_SAP_MODE) {
 		wlansap_filter_vendor_unsafe_ch_freq(sap_ctx, sap_config);
 		if (sap_config->acs_cfg.ch_list_count == 1) {
-			wlan_hdd_handle_single_ch_in_acs_list(hdd_ctx, adapter,
-							      sap_config);
+			wlan_hdd_handle_single_ch_in_acs_list(link_info);
 			ret = 0;
 			goto out;
 		} else if (!sap_config->acs_cfg.ch_list_count) {
@@ -4334,9 +4331,10 @@ static uint16_t wlan_hdd_acs_get_puncture_bitmap(struct sap_acs_cfg *acs_cfg)
 }
 #endif /* WLAN_FEATURE_11BE */
 
-void wlan_hdd_cfg80211_acs_ch_select_evt(struct hdd_adapter *adapter,
+void wlan_hdd_cfg80211_acs_ch_select_evt(struct wlan_hdd_link_info *link_info,
 					 bool store_acs_freq)
 {
+	struct hdd_adapter *adapter = link_info->adapter;
 	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
 	struct sap_config *sap_cfg;
 	struct sk_buff *vendor_event;
@@ -4349,15 +4347,15 @@ void wlan_hdd_cfg80211_acs_ch_select_evt(struct hdd_adapter *adapter,
 	uint32_t len;
 	uint16_t puncture_bitmap;
 
-	qdf_atomic_set(&adapter->deflink->session.ap.acs_in_progress, 0);
-	qdf_event_set(&adapter->deflink->acs_complete_event);
+	qdf_atomic_set(&link_info->session.ap.acs_in_progress, 0);
+	qdf_event_set(&link_info->acs_complete_event);
 
-	sap_cfg = &(WLAN_HDD_GET_AP_CTX_PTR(adapter->deflink))->sap_config;
+	sap_cfg = &(WLAN_HDD_GET_AP_CTX_PTR(link_info))->sap_config;
 	len = hdd_get_acs_evt_data_len(sap_cfg);
 
 	if (store_acs_freq &&
 	    policy_mgr_is_vdev_ll_lt_sap(hdd_ctx->psoc,
-					 adapter->deflink->vdev_id)) {
+					 link_info->vdev_id)) {
 		sap_cfg->last_acs_freq = sap_cfg->acs_cfg.pri_ch_freq;
 		sap_cfg->last_acs_complete_time = qdf_get_time_of_the_day_ms();
 	}
@@ -16299,13 +16297,13 @@ static void hdd_update_acs_sap_config(struct hdd_context *hdd_ctx,
 			channel_list->ht_sec_chan_freq;
 }
 
-static int hdd_update_acs_channel(struct hdd_adapter *adapter, uint8_t reason,
-				  uint8_t channel_cnt,
+static int hdd_update_acs_channel(struct wlan_hdd_link_info *link_info,
+				  uint8_t reason, uint8_t channel_cnt,
 				  struct hdd_vendor_chan_info *channel_list)
 {
 	struct sap_config *sap_config;
 	struct hdd_ap_ctx *hdd_ap_ctx;
-	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
+	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(link_info->adapter);
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
 	mac_handle_t mac_handle;
 	uint32_t ch;
@@ -16315,8 +16313,8 @@ static int hdd_update_acs_channel(struct hdd_adapter *adapter, uint8_t reason,
 		return -EINVAL;
 	}
 
-	hdd_ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(adapter->deflink);
-	sap_config = &adapter->deflink->session.ap.sap_config;
+	hdd_ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(link_info);
+	sap_config = &link_info->session.ap.sap_config;
 
 	if (QDF_TIMER_STATE_RUNNING ==
 	    qdf_mc_timer_get_current_state(&hdd_ap_ctx->vendor_acs_timer)) {
@@ -16338,7 +16336,7 @@ static int hdd_update_acs_channel(struct hdd_adapter *adapter, uint8_t reason,
 	case QCA_WLAN_VENDOR_ACS_SELECT_REASON_INIT:
 		hdd_update_acs_sap_config(hdd_ctx, sap_config, channel_list);
 		/* Update Hostapd */
-		wlan_hdd_cfg80211_acs_ch_select_evt(adapter, true);
+		wlan_hdd_cfg80211_acs_ch_select_evt(link_info, true);
 		break;
 
 	/* DFS detected on current channel */
@@ -16347,11 +16345,10 @@ static int hdd_update_acs_channel(struct hdd_adapter *adapter, uint8_t reason,
 					   channel_list->pri_chan_freq);
 
 		wlan_sap_update_next_channel(
-			WLAN_HDD_GET_SAP_CTX_PTR(adapter->deflink), (uint8_t)ch,
+			WLAN_HDD_GET_SAP_CTX_PTR(link_info), (uint8_t)ch,
 			hdd_map_nl_chan_width(channel_list->chan_width));
 		status = sme_update_new_channel_event(
-					mac_handle,
-					adapter->deflink->vdev_id);
+					mac_handle, link_info->vdev_id);
 		break;
 
 	/* LTE coex event on current channel */
@@ -16364,9 +16361,9 @@ static int hdd_update_acs_channel(struct hdd_adapter *adapter, uint8_t reason,
 		hdd_ap_ctx->sap_config.ch_width_orig =
 				sap_config->acs_cfg.ch_width;
 		wlan_hdd_set_sap_csa_reason(hdd_ctx->psoc,
-					    adapter->deflink->vdev_id,
+					    link_info->vdev_id,
 					    CSA_REASON_LTE_COEX);
-		hdd_switch_sap_channel(adapter->deflink, (uint8_t)ch, true);
+		hdd_switch_sap_channel(link_info, (uint8_t)ch, true);
 		break;
 
 	default:
@@ -16730,6 +16727,7 @@ static int __wlan_hdd_cfg80211_update_vendor_channel(struct wiphy *wiphy,
 	struct hdd_adapter *adapter = WLAN_HDD_GET_PRIV_PTR(wdev->netdev);
 	struct hdd_context *hdd_ctx = wiphy_priv(wiphy);
 	struct hdd_vendor_chan_info *chan_list_ptr;
+	struct wlan_hdd_link_info *link_info = adapter->deflink;
 
 	hdd_enter();
 
@@ -16742,10 +16740,8 @@ static int __wlan_hdd_cfg80211_update_vendor_channel(struct wiphy *wiphy,
 		return -EINVAL;
 	}
 
-	if (test_bit(VENDOR_ACS_RESPONSE_PENDING,
-		     &adapter->deflink->link_flags)) {
-		clear_bit(VENDOR_ACS_RESPONSE_PENDING,
-			  &adapter->deflink->link_flags);
+	if (test_bit(VENDOR_ACS_RESPONSE_PENDING, &link_info->link_flags)) {
+		clear_bit(VENDOR_ACS_RESPONSE_PENDING, &link_info->link_flags);
 	} else {
 		hdd_err("already timeout happened for acs");
 		return -EINVAL;
@@ -16761,7 +16757,7 @@ static int __wlan_hdd_cfg80211_update_vendor_channel(struct wiphy *wiphy,
 	/* Validate channel to be set */
 	while (channel_cnt && chan_list) {
 		phy_ch_width = hdd_map_nl_chan_width(chan_list->chan_width);
-		status = wlan_hdd_validate_acs_channel(adapter->deflink,
+		status = wlan_hdd_validate_acs_channel(link_info,
 						       chan_list->pri_chan_freq,
 						       phy_ch_width);
 		if (status == QDF_STATUS_SUCCESS)
@@ -16787,7 +16783,7 @@ static int __wlan_hdd_cfg80211_update_vendor_channel(struct wiphy *wiphy,
 	hdd_debug("received primary channel freq as %d",
 		  chan_list->pri_chan_freq);
 
-	ret_val = hdd_update_acs_channel(adapter, reason,
+	ret_val = hdd_update_acs_channel(link_info, reason,
 					 channel_cnt, chan_list);
 	qdf_mem_free(chan_list_ptr);
 	return ret_val;

@@ -2365,7 +2365,7 @@ QDF_STATUS hdd_hostapd_sap_event_cb(struct sap_event *sap_event,
 		qdf_status =
 			policy_mgr_get_mac_id_by_session_id(
 						    hdd_ctx->psoc,
-						    adapter->deflink->vdev_id,
+						    link_info->vdev_id,
 						    &pdev_id);
 		if (QDF_IS_STATUS_SUCCESS(qdf_status))
 			hdd_medium_assess_stop_timer(pdev_id, hdd_ctx);
@@ -2605,7 +2605,7 @@ QDF_STATUS hdd_hostapd_sap_event_cb(struct sap_event *sap_event,
 		sta_id = event->staId;
 
 		if (ucfg_ipa_is_enabled()) {
-			vdev = adapter->deflink->vdev;
+			vdev = link_info->vdev;
 
 			if (wlan_vdev_mlme_is_mlo_vdev(vdev) &&
 			    !qdf_is_macaddr_zero(&event->sta_mld))
@@ -3016,7 +3016,7 @@ QDF_STATUS hdd_hostapd_sap_event_cb(struct sap_event *sap_event,
 		    test_bit(SOFTAP_BSS_STARTED, &link_info->link_flags)) {
 			hdd_dcs_chan_select_complete(adapter);
 		} else {
-			wlan_hdd_cfg80211_acs_ch_select_evt(adapter, true);
+			wlan_hdd_cfg80211_acs_ch_select_evt(link_info, true);
 			wlansap_dcs_set_wlan_interference_mitigation_on_band(
 					WLAN_HDD_GET_SAP_CTX_PTR(link_info),
 					&ap_ctx->sap_config);
