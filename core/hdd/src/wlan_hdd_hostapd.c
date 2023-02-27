@@ -6119,33 +6119,28 @@ static void wlan_hdd_set_sap_mcc_chnl_avoid(struct hdd_context *hdd_ctx)
 #ifdef WLAN_FEATURE_11BE_MLO
 /**
  * wlan_hdd_mlo_update() - handle mlo scenario for start bss
- * @hdd_ctx: Pointer to hdd context
- * @config: Pointer to sap config
- * @adapter: Pointer to hostapd adapter
- * @beacon: Pointer to beacon
+ * @link_info: Pointer to hostapd adapter
  *
  * Return: QDF_STATUS
  */
-static QDF_STATUS wlan_hdd_mlo_update(struct hdd_context *hdd_ctx,
-				      struct sap_config *config,
-				      struct hdd_adapter *adapter,
-				      struct hdd_beacon_data *beacon)
+static QDF_STATUS wlan_hdd_mlo_update(struct wlan_hdd_link_info *link_info)
 {
-	uint8_t link_id = 0;
-	uint8_t num_link = 0;
 	bool is_ml_ap;
+	uint8_t link_id = 0, num_link = 0;
+	struct hdd_context *hdd_ctx = link_info->adapter->hdd_ctx;
+	struct sap_config *config = &link_info->session.ap.sap_config;
+	struct hdd_beacon_data *beacon = link_info->session.ap.beacon;
 
 	if (config->SapHw_mode == eCSR_DOT11_MODE_11be ||
 	    config->SapHw_mode == eCSR_DOT11_MODE_11be_ONLY) {
 		wlan_hdd_get_mlo_link_id(beacon, &link_id, &num_link);
 		hdd_debug("MLO SAP vdev id %d, link id %d total link %d",
-			  adapter->deflink->vdev_id, link_id, num_link);
+			  link_info->vdev_id, link_id, num_link);
 		if (!num_link) {
 			hdd_debug("start 11be AP without mlo");
 			return QDF_STATUS_SUCCESS;
 		}
-		if (!mlo_ap_vdev_attach(adapter->deflink->vdev,
-					link_id, num_link)) {
+		if (!mlo_ap_vdev_attach(link_info->vdev, link_id, num_link)) {
 			hdd_err("MLO SAP attach fails");
 			return QDF_STATUS_E_INVAL;
 		}
@@ -6155,9 +6150,9 @@ static QDF_STATUS wlan_hdd_mlo_update(struct hdd_context *hdd_ctx,
 		config->num_link = num_link;
 	}
 
-	is_ml_ap = wlan_vdev_mlme_is_mlo_ap(adapter->deflink->vdev);
-	if (!policy_mgr_is_mlo_sap_concurrency_allowed(
-						hdd_ctx->psoc, is_ml_ap)) {
+	is_ml_ap = wlan_vdev_mlme_is_mlo_ap(link_info->vdev);
+	if (!policy_mgr_is_mlo_sap_concurrency_allowed(hdd_ctx->psoc,
+						       is_ml_ap)) {
 		hdd_err("MLO SAP concurrency check fails");
 		return QDF_STATUS_E_INVAL;
 	}
@@ -6165,20 +6160,22 @@ static QDF_STATUS wlan_hdd_mlo_update(struct hdd_context *hdd_ctx,
 	return QDF_STATUS_SUCCESS;
 }
 
-void wlan_hdd_mlo_reset(struct hdd_adapter *adapter)
+void wlan_hdd_mlo_reset(struct wlan_hdd_link_info *link_info)
 {
-	if (wlan_vdev_mlme_is_mlo_ap(adapter->deflink->vdev)) {
-		adapter->deflink->session.ap.sap_config.mlo_sap = false;
-		adapter->deflink->session.ap.sap_config.link_id = 0;
-		adapter->deflink->session.ap.sap_config.num_link = 0;
-		mlo_ap_vdev_detach(adapter->deflink->vdev);
-	}
+	struct sap_config *sap_config;
+
+	if (!wlan_vdev_mlme_is_mlo_ap(link_info->vdev))
+		return;
+
+	sap_config = &link_info->session.ap.sap_config;
+	sap_config->mlo_sap = false;
+	sap_config->link_id = 0;
+	sap_config->num_link = 0;
+	mlo_ap_vdev_detach(link_info->vdev);
 }
 #else
-static QDF_STATUS wlan_hdd_mlo_update(struct hdd_context *hdd_ctx,
-				      struct sap_config *config,
-				      struct hdd_adapter *adapter,
-				      struct hdd_beacon_data *beacon)
+static inline QDF_STATUS
+wlan_hdd_mlo_update(struct wlan_hdd_link_info *link_info)
 {
 	return QDF_STATUS_SUCCESS;
 }
@@ -6729,12 +6726,13 @@ int wlan_hdd_cfg80211_start_bss(struct hdd_adapter *adapter,
 	if (!cds_is_sub_20_mhz_enabled())
 		wlan_hdd_set_sap_hwmode(adapter->deflink);
 
-	if (QDF_IS_STATUS_ERROR(wlan_hdd_mlo_update(hdd_ctx, config,
-						    adapter, beacon))) {
+	qdf_status = wlan_hdd_mlo_update(adapter->deflink);
+	if (QDF_IS_STATUS_ERROR(qdf_status)) {
 		ret = -EINVAL;
 		goto error;
 	}
-	status = ucfg_mlme_get_vht_for_24ghz(hdd_ctx->psoc, &bval);
+
+	qdf_status = ucfg_mlme_get_vht_for_24ghz(hdd_ctx->psoc, &bval);
 	if (QDF_IS_STATUS_ERROR(qdf_status))
 		hdd_err("Failed to get vht_for_24ghz");
 
@@ -6760,8 +6758,7 @@ int wlan_hdd_cfg80211_start_bss(struct hdd_adapter *adapter,
 	config->SapHw_mode = csr_convert_from_reg_phy_mode(updated_phy_mode);
 	if (config->sap_orig_hw_mode != config->SapHw_mode)
 		hdd_info("orig phymode %d new phymode %d",
-			 config->sap_orig_hw_mode,
-			 config->SapHw_mode);
+			 config->sap_orig_hw_mode, config->SapHw_mode);
 	qdf_mem_zero(sme_config, sizeof(*sme_config));
 	sme_get_config_param(mac_handle, sme_config);
 	/* Override hostapd.conf wmm_enabled only for 11n and 11AC configs (IOT)
@@ -6778,10 +6775,8 @@ int wlan_hdd_cfg80211_start_bss(struct hdd_adapter *adapter,
 		sme_config->csr_config.WMMSupportMode = WMM_USER_MODE_NO_QOS;
 	sme_update_config(mac_handle, sme_config);
 
-	if (((adapter->device_mode == QDF_SAP_MODE) &&
-	     (sap_force_11n_for_11ac)) ||
-	     ((adapter->device_mode == QDF_P2P_GO_MODE) &&
-	     (go_force_11n_for_11ac))) {
+	if ((adapter->device_mode == QDF_SAP_MODE && sap_force_11n_for_11ac) ||
+	    (adapter->device_mode == QDF_P2P_GO_MODE && go_force_11n_for_11ac)) {
 		if (config->ch_width_orig > CH_WIDTH_40MHZ)
 			config->ch_width_orig = CH_WIDTH_40MHZ;
 	}
@@ -6962,7 +6957,7 @@ int wlan_hdd_cfg80211_start_bss(struct hdd_adapter *adapter,
 	goto free;
 
 error:
-	wlan_hdd_mlo_reset(adapter);
+	wlan_hdd_mlo_reset(adapter->deflink);
 	/* Revert the indoor to passive marking if START BSS fails */
 	if (indoor_chnl_marking && adapter->device_mode == QDF_SAP_MODE) {
 		hdd_update_indoor_channel(hdd_ctx, false);

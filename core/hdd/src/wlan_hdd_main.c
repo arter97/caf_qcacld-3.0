@@ -17164,29 +17164,25 @@ void wlan_hdd_stop_sap(struct hdd_adapter *ap_adapter)
 #if defined(WLAN_FEATURE_11BE_MLO) && defined(CFG80211_11BE_BASIC)
 /**
  * wlan_hdd_mlo_sap_reinit() - handle mlo scenario for ssr
- * @hdd_ctx: Pointer to hdd context
- * @config: Pointer to sap config
- * @adapter: Pointer to hostapd adapter
+ * @link_info: Pointer of link_info in adapter
  *
  * Return: QDF_STATUS
  */
-static QDF_STATUS wlan_hdd_mlo_sap_reinit(struct hdd_context *hdd_ctx,
-					  struct sap_config *config,
-					  struct hdd_adapter *adapter)
+static QDF_STATUS wlan_hdd_mlo_sap_reinit(struct wlan_hdd_link_info *link_info)
 {
-	bool is_ml_ap;
+	struct hdd_context *hdd_ctx = link_info->adapter->hdd_ctx;
+	struct sap_config *config = &link_info->session.ap.sap_config;
 
 	if (config->mlo_sap) {
-		if (!mlo_ap_vdev_attach(adapter->deflink->vdev, config->link_id,
+		if (!mlo_ap_vdev_attach(link_info->vdev, config->link_id,
 					config->num_link)) {
 			hdd_err("SAP mlo mgr attach fail");
 			return QDF_STATUS_E_INVAL;
 		}
 	}
 
-	is_ml_ap = wlan_vdev_mlme_is_mlo_ap(adapter->deflink->vdev);
-	if (!policy_mgr_is_mlo_sap_concurrency_allowed(
-				hdd_ctx->psoc, is_ml_ap)) {
+	if (!policy_mgr_is_mlo_sap_concurrency_allowed(hdd_ctx->psoc,
+						       config->mlo_sap)) {
 		hdd_err("MLO SAP concurrency check fails");
 		return QDF_STATUS_E_INVAL;
 	}
@@ -17194,9 +17190,8 @@ static QDF_STATUS wlan_hdd_mlo_sap_reinit(struct hdd_context *hdd_ctx,
 	return QDF_STATUS_SUCCESS;
 }
 #else
-static QDF_STATUS wlan_hdd_mlo_sap_reinit(struct hdd_context *hdd_ctx,
-					  struct sap_config *config,
-					  struct hdd_adapter *adapter)
+static inline QDF_STATUS
+wlan_hdd_mlo_sap_reinit(struct wlan_hdd_link_info *link_info)
 {
 	return QDF_STATUS_SUCCESS;
 }
@@ -17212,7 +17207,7 @@ static QDF_STATUS wlan_hdd_mlo_sap_reinit(struct hdd_context *hdd_ctx,
  */
 void wlan_hdd_start_sap(struct hdd_adapter *ap_adapter, bool reinit)
 {
-	struct hdd_ap_ctx *hdd_ap_ctx;
+	struct hdd_ap_ctx *ap_ctx;
 	struct hdd_hostapd_state *hostapd_state;
 	QDF_STATUS qdf_status;
 	struct hdd_context *hdd_ctx;
@@ -17229,34 +17224,33 @@ void wlan_hdd_start_sap(struct hdd_adapter *ap_adapter, bool reinit)
 	}
 
 	hdd_ctx = WLAN_HDD_GET_CTX(ap_adapter);
-	hdd_ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(ap_adapter->deflink);
+	ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(ap_adapter->deflink);
 	hostapd_state = WLAN_HDD_GET_HOSTAP_STATE_PTR(ap_adapter->deflink);
-	sap_config = &ap_adapter->deflink->session.ap.sap_config;
+	sap_config = &ap_ctx->sap_config;
 
 	mutex_lock(&hdd_ctx->sap_lock);
 	if (test_bit(SOFTAP_BSS_STARTED, &ap_adapter->deflink->link_flags))
 		goto end;
 
-	if (0 != wlan_hdd_cfg80211_update_apies(ap_adapter)) {
+	if (wlan_hdd_cfg80211_update_apies(ap_adapter)) {
 		hdd_err("SAP Not able to set AP IEs");
 		goto end;
 	}
-	wlan_reg_set_channel_params_for_pwrmode(
-				hdd_ctx->pdev,
-				hdd_ap_ctx->sap_config.chan_freq,
-				0, &hdd_ap_ctx->sap_config.ch_params,
-				REG_CURRENT_PWR_MODE);
-	if (QDF_IS_STATUS_ERROR(wlan_hdd_mlo_sap_reinit(hdd_ctx, sap_config,
-							ap_adapter))) {
+	wlan_reg_set_channel_params_for_pwrmode(hdd_ctx->pdev,
+						sap_config->chan_freq, 0,
+						&sap_config->ch_params,
+						REG_CURRENT_PWR_MODE);
+	qdf_status = wlan_hdd_mlo_sap_reinit(ap_adapter->deflink);
+	if (QDF_IS_STATUS_ERROR(qdf_status)) {
 		hdd_err("SAP Not able to do mlo attach");
 		goto end;
 	}
 
 	qdf_event_reset(&hostapd_state->qdf_event);
-	if (wlansap_start_bss(hdd_ap_ctx->sap_context, hdd_hostapd_sap_event_cb,
-			      &hdd_ap_ctx->sap_config,
-			      ap_adapter->dev)
-			      != QDF_STATUS_SUCCESS)
+	qdf_status = wlansap_start_bss(ap_ctx->sap_context,
+				       hdd_hostapd_sap_event_cb, sap_config,
+				       ap_adapter->dev);
+	if (QDF_IS_STATUS_ERROR(qdf_status))
 		goto end;
 
 	hdd_debug("Waiting for SAP to start");
@@ -17283,7 +17277,7 @@ void wlan_hdd_start_sap(struct hdd_adapter *ap_adapter, bool reinit)
 
 	return;
 end:
-	wlan_hdd_mlo_reset(ap_adapter);
+	wlan_hdd_mlo_reset(ap_adapter->deflink);
 	wlansap_reset_sap_config_add_ie(sap_config, eUPDATE_IE_ALL);
 	mutex_unlock(&hdd_ctx->sap_lock);
 	/* SAP context and beacon cleanup will happen during driver unload
@@ -17291,10 +17285,8 @@ end:
 	 */
 	hdd_err("SAP restart after SSR failed! Reload WLAN and try SAP again");
 	/* Free the beacon memory in case of failure in the sap restart */
-	if (ap_adapter->deflink->session.ap.beacon) {
-		qdf_mem_free(ap_adapter->deflink->session.ap.beacon);
-		ap_adapter->deflink->session.ap.beacon = NULL;
-	}
+	qdf_mem_free(ap_ctx->beacon);
+	ap_ctx->beacon = NULL;
 }
 
 #ifdef QCA_CONFIG_SMP
@@ -19921,29 +19913,26 @@ bool hdd_is_connection_in_progress(uint8_t *out_vdev_id,
  */
 void hdd_restart_sap(struct hdd_adapter *ap_adapter)
 {
-	struct hdd_ap_ctx *hdd_ap_ctx;
-	struct hdd_hostapd_state *hostapd_state;
-	QDF_STATUS qdf_status;
+	struct hdd_hostapd_state *hapd_state;
+	QDF_STATUS status;
 	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(ap_adapter);
 	struct sap_config *sap_config;
 	void *sap_ctx;
 
-	hdd_ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(ap_adapter->deflink);
-	sap_config = &hdd_ap_ctx->sap_config;
-	sap_ctx = hdd_ap_ctx->sap_context;
+	sap_config =
+		&(WLAN_HDD_GET_AP_CTX_PTR(ap_adapter->deflink)->sap_config);
+	sap_ctx = WLAN_HDD_GET_SAP_CTX_PTR(ap_adapter->deflink);
 
 	mutex_lock(&hdd_ctx->sap_lock);
 	if (test_bit(SOFTAP_BSS_STARTED, &ap_adapter->deflink->link_flags)) {
 		wlan_hdd_del_station(ap_adapter, NULL);
-		hostapd_state =
-			WLAN_HDD_GET_HOSTAP_STATE_PTR(ap_adapter->deflink);
-		qdf_event_reset(&hostapd_state->qdf_stop_bss_event);
+		hapd_state = WLAN_HDD_GET_HOSTAP_STATE_PTR(ap_adapter->deflink);
+		qdf_event_reset(&hapd_state->qdf_stop_bss_event);
 		if (QDF_STATUS_SUCCESS == wlansap_stop_bss(sap_ctx)) {
-			qdf_status = qdf_wait_single_event(
-					&hostapd_state->qdf_stop_bss_event,
-					SME_CMD_STOP_BSS_TIMEOUT);
+			status = qdf_wait_single_event(&hapd_state->qdf_stop_bss_event,
+						       SME_CMD_STOP_BSS_TIMEOUT);
 
-			if (!QDF_IS_STATUS_SUCCESS(qdf_status)) {
+			if (!QDF_IS_STATUS_SUCCESS(status)) {
 				hdd_err("SAP Stop Failed");
 				goto end;
 			}
@@ -19960,35 +19949,32 @@ void hdd_restart_sap(struct hdd_adapter *ap_adapter)
 			goto end;
 		}
 
-		qdf_status = wlan_hdd_mlo_sap_reinit(hdd_ctx, sap_config,
-						     ap_adapter);
-		if (QDF_IS_STATUS_ERROR(qdf_status)) {
+		status = wlan_hdd_mlo_sap_reinit(ap_adapter->deflink);
+		if (QDF_IS_STATUS_ERROR(status)) {
 			hdd_err("SAP Not able to do mlo attach");
 			goto deinit_mlo;
 		}
 
-		qdf_event_reset(&hostapd_state->qdf_event);
-		if (wlansap_start_bss(sap_ctx, hdd_hostapd_sap_event_cb,
-				      sap_config,
-				      ap_adapter->dev) != QDF_STATUS_SUCCESS) {
+		qdf_event_reset(&hapd_state->qdf_event);
+		status = wlansap_start_bss(sap_ctx, hdd_hostapd_sap_event_cb,
+					   sap_config, ap_adapter->dev);
+		if (QDF_IS_STATUS_ERROR(status)) {
 			hdd_err("SAP Start Bss fail");
 			goto deinit_mlo;
 		}
 
 		hdd_info("Waiting for SAP to start");
-		qdf_status =
-			qdf_wait_single_event(&hostapd_state->qdf_event,
-					SME_CMD_START_BSS_TIMEOUT);
-		if (!QDF_IS_STATUS_SUCCESS(qdf_status)) {
+		status = qdf_wait_single_event(&hapd_state->qdf_event,
+					       SME_CMD_START_BSS_TIMEOUT);
+		if (!QDF_IS_STATUS_SUCCESS(status)) {
 			hdd_err("SAP Start failed");
 			goto deinit_mlo;
 		}
-		wlansap_reset_sap_config_add_ie(sap_config,
-						eUPDATE_IE_ALL);
+		wlansap_reset_sap_config_add_ie(sap_config, eUPDATE_IE_ALL);
 		hdd_err("SAP Start Success");
 		hdd_medium_assess_init();
 		set_bit(SOFTAP_BSS_STARTED, &ap_adapter->deflink->link_flags);
-		if (hostapd_state->bss_state == BSS_START) {
+		if (hapd_state->bss_state == BSS_START) {
 			policy_mgr_incr_active_session(hdd_ctx->psoc,
 						ap_adapter->device_mode,
 						ap_adapter->deflink->vdev_id);
@@ -20001,7 +19987,7 @@ void hdd_restart_sap(struct hdd_adapter *ap_adapter)
 	return;
 
 deinit_mlo:
-	wlan_hdd_mlo_reset(ap_adapter);
+	wlan_hdd_mlo_reset(ap_adapter->deflink);
 end:
 	wlansap_reset_sap_config_add_ie(sap_config, eUPDATE_IE_ALL);
 	mutex_unlock(&hdd_ctx->sap_lock);
