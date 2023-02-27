@@ -156,11 +156,14 @@ tgt_mgmt_rx_reo_enter_algo_without_buffer(
 	desc.rx_params = &mgmt_rx_params;
 	desc.type = type;
 	desc.ingress_timestamp = qdf_get_log_timestamp();
-	desc.list_size_rx = -1;
-	desc.list_insertion_pos = -1;
+	desc.ingress_list_size_rx = -1;
+	desc.ingress_list_insertion_pos = -1;
+	desc.egress_list_size_rx = -1;
+	desc.egress_list_insertion_pos = -1;
 	desc.frame_type = IEEE80211_FC0_TYPE_MGT;
 	desc.frame_subtype = 0xFF;
 	desc.reo_required = is_mgmt_rx_reo_required(pdev, &desc);
+	desc.queued_list = MGMT_RX_REO_LIST_TYPE_INVALID;
 
 	/* Enter the REO algorithm */
 	status = wlan_mgmt_rx_reo_algo_entry(pdev, &desc, &is_frm_queued);
@@ -324,8 +327,11 @@ QDF_STATUS tgt_mgmt_rx_reo_frame_handler(
 	desc.nbuf = buf;
 	desc.rx_params = mgmt_rx_params;
 	desc.ingress_timestamp = qdf_get_log_timestamp();
-	desc.list_size_rx = -1;
-	desc.list_insertion_pos = -1;
+	desc.ingress_list_size_rx = -1;
+	desc.ingress_list_insertion_pos = -1;
+	desc.egress_list_size_rx = -1;
+	desc.egress_list_insertion_pos = -1;
+	desc.queued_list = MGMT_RX_REO_LIST_TYPE_INVALID;
 
 	wh = (struct ieee80211_frame *)qdf_nbuf_data(buf);
 	frame_type = wh->i_fc[0] & IEEE80211_FC0_TYPE_MASK;

@@ -3268,11 +3268,11 @@ bool dp_rx_is_sg_formation_required(struct hal_wbm_err_desc_info *info);
 void dp_rx_err_tlv_invalidate(struct dp_soc *soc,
 			      qdf_nbuf_t nbuf);
 
-/*
+/**
  * dp_rx_wbm_sg_list_last_msdu_war() - war for HW issue
+ * @soc: DP SOC handle
  *
  * This is a war for HW issue where length is only valid in last msdu
- * @soc: DP SOC handle
  *
  * Return: NONE
  */
@@ -3318,7 +3318,7 @@ bool dp_rx_null_q_handle_invalid_peer_id_exception(struct dp_soc *soc,
  */
 bool dp_rx_err_drop_3addr_mcast(struct dp_vdev *vdev, uint8_t *rx_tlv_hdr);
 
-/*
+/**
  * dp_rx_deliver_to_osif_stack() - function to deliver rx pkts to stack
  * @soc: DP soc
  * @vdev: DP vdev handle

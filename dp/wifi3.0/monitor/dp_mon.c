@@ -3008,10 +3008,12 @@ void dp_ppdu_desc_get_txmode(struct cdp_tx_completion_ppdu *ppdu)
 {
 	uint16_t frame_type = ppdu->htt_frame_type;
 
-	if (ppdu->frame_type != CDP_PPDU_FTYPE_DATA)
-		return;
-
 	ppdu->txmode_type = TX_MODE_TYPE_UNKNOWN;
+
+	if (ppdu->frame_type == CDP_PPDU_FTYPE_CTRL &&
+	    (frame_type != HTT_STATS_FTYPE_SGEN_MU_TRIG &&
+	     frame_type != HTT_STATS_FTYPE_SGEN_BE_MU_TRIG))
+		return;
 
 	if (frame_type == HTT_STATS_FTYPE_SGEN_MU_BAR ||
 	    frame_type == HTT_STATS_FTYPE_SGEN_BE_MU_BAR) {
@@ -3079,28 +3081,24 @@ dp_pdev_update_deter_stats(struct dp_pdev *pdev,
 	if (!pdev || !ppdu)
 		return;
 
-	if (ppdu->frame_type != CDP_PPDU_FTYPE_DATA)
-		return;
-
 	if (ppdu->txmode_type == TX_MODE_TYPE_UNKNOWN)
 		return;
 
-	if (ppdu->backoff_ac_valid)
+	if (ppdu->num_ul_users >= HAL_MAX_UL_MU_USERS ||
+	    ppdu->num_users >= HAL_MAX_UL_MU_USERS) {
+		dp_mon_err("num ul user %d or num users %d exceeds max limit",
+			   ppdu->num_ul_users, ppdu->num_users);
+		return;
+	}
+	if (ppdu->backoff_ac_valid) {
+		if (ppdu->backoff_ac >= WME_AC_MAX) {
+			dp_mon_err("backoff_ac %d exceed max limit",
+				   ppdu->backoff_ac);
+			return;
+		}
 		DP_STATS_UPD(pdev,
 			     deter_stats.ch_access_delay[ppdu->backoff_ac],
 			     ppdu->ch_access_delay);
-
-	if (ppdu->num_ul_user_resp_valid &&
-	    (ppdu->txmode_type == TX_MODE_TYPE_UL)) {
-		if (ppdu->num_ul_user_resp) {
-			DP_STATS_INC(pdev,
-				     deter_stats.trigger_success,
-				     1);
-		} else {
-			DP_STATS_INC(pdev,
-				     deter_stats.trigger_fail,
-				     1);
-		}
 	}
 
 	if (ppdu->txmode_type == TX_MODE_TYPE_DL) {
@@ -3134,6 +3132,17 @@ dp_pdev_update_deter_stats(struct dp_pdev *pdev,
 				     deter_stats.ul_mimo_usr[ppdu->num_ul_users],
 				     1);
 			break;
+		}
+		if (ppdu->num_ul_user_resp_valid) {
+			if (ppdu->num_ul_user_resp) {
+				DP_STATS_INC(pdev,
+					     deter_stats.ts[ppdu->txmode].trigger_success,
+					     1);
+			} else {
+				DP_STATS_INC(pdev,
+					     deter_stats.ts[ppdu->txmode].trigger_fail,
+					     1);
+			}
 		}
 	}
 }
@@ -3184,17 +3193,15 @@ dp_ppdu_desc_user_deter_stats_update(struct dp_pdev *pdev,
 				     struct cdp_tx_completion_ppdu_user *user)
 {
 	struct dp_mon_peer *mon_peer = NULL;
+	uint64_t avg_tx_rate = 0;
+	uint32_t ratekbps = 0;
+	uint32_t rix;
 	uint32_t msduq;
+	uint16_t ratecode = 0;
 	uint8_t txmode;
 	uint8_t tid;
 
 	if (!pdev || !ppdu_desc || !user || !peer)
-		return;
-
-	if (ppdu_desc->frame_type != CDP_PPDU_FTYPE_DATA)
-		return;
-
-	if (user->tid >= CDP_DATA_TID_MAX)
 		return;
 
 	mon_peer = peer->monitor_peer;
@@ -3204,33 +3211,67 @@ dp_ppdu_desc_user_deter_stats_update(struct dp_pdev *pdev,
 	if (ppdu_desc->txmode_type == TX_MODE_TYPE_UNKNOWN)
 		return;
 
+	if (ppdu_desc->txmode_type == TX_MODE_TYPE_UL &&
+	    (ppdu_desc->txmode != TX_MODE_UL_OFDMA_MU_BAR_TRIGGER)) {
+		if (user->tid < CDP_UL_TRIG_BK_TID ||
+		    user->tid > CDP_UL_TRIG_VO_TID)
+			return;
+
+		user->tid = UL_TRIGGER_TID_TO_DATA_TID(user->tid);
+	}
+
+	if (user->tid >= CDP_DATA_TID_MAX)
+		return;
+
+	ratekbps = dp_getrateindex(user->gi,
+				   user->mcs,
+				   user->nss,
+				   user->preamble,
+				   user->bw,
+				   user->punc_mode,
+				   &rix,
+				   &ratecode);
+
+	if (!ratekbps)
+		return;
+
+	avg_tx_rate = mon_peer->stats.deter_stats.avg_tx_rate;
+	avg_tx_rate = dp_ath_rate_lpf(avg_tx_rate,
+				      ratekbps);
+	DP_STATS_UPD(mon_peer,
+		     deter_stats.avg_tx_rate,
+		     avg_tx_rate);
+
 	txmode = ppdu_desc->txmode;
 	tid = user->tid;
+
 	if (ppdu_desc->txmode_type == TX_MODE_TYPE_DL) {
 		dp_ppdu_desc_get_msduq(user->msduq_bitmap, &msduq);
 		if (msduq == MSDUQ_INDEX_MAX)
 			return;
 
 		DP_STATS_INC(mon_peer,
-			     deter_stats[tid].dl_det[msduq][txmode].mode_cnt,
+			     deter_stats.deter[tid].dl_det[msduq][txmode].mode_cnt,
 			     1);
+
 		DP_STATS_UPD(mon_peer,
-			     deter_stats[tid].dl_det[msduq][txmode].avg_rate,
-			     mon_peer->stats.tx.avg_tx_rate);
+			     deter_stats.deter[tid].dl_det[msduq][txmode].avg_rate,
+			     avg_tx_rate);
 	} else {
 		DP_STATS_INC(mon_peer,
-			     deter_stats[tid].ul_det[txmode].mode_cnt,
+			     deter_stats.deter[tid].ul_det[txmode].mode_cnt,
 			     1);
+
 		DP_STATS_UPD(mon_peer,
-			     deter_stats[tid].ul_det[txmode].avg_rate,
-			     mon_peer->stats.tx.avg_tx_rate);
+			     deter_stats.deter[tid].ul_det[txmode].avg_rate,
+			     avg_tx_rate);
 		if (!user->completion_status) {
 			DP_STATS_INC(mon_peer,
-				     deter_stats[tid].ul_det[txmode].trigger_success,
+				     deter_stats.deter[tid].ul_det[txmode].trigger_success,
 				     1);
 		} else {
 			DP_STATS_INC(mon_peer,
-				     deter_stats[tid].ul_det[txmode].trigger_fail,
+				     deter_stats.deter[tid].ul_det[txmode].trigger_fail,
 				     1);
 		}
 	}
@@ -3437,9 +3478,6 @@ dp_tx_stats_update(struct dp_pdev *pdev, struct dp_peer *peer,
 
 	dp_tx_rate_stats_update(peer, ppdu);
 	dp_pdev_telemetry_stats_update(pdev, ppdu);
-
-	dp_ppdu_desc_user_deter_stats_update(pdev, peer, ppdu_desc,
-					     ppdu);
 
 	dp_peer_stats_notify(pdev, peer);
 
@@ -4849,6 +4887,9 @@ dp_ppdu_desc_user_stats_update(struct dp_pdev *pdev,
 
 		dp_tx_ctrl_stats_update(pdev, peer, &ppdu_desc->user[i]);
 
+		dp_ppdu_desc_user_deter_stats_update(pdev, peer, ppdu_desc,
+						     &ppdu_desc->user[i]);
+
 		/*
 		 * different frame like DATA, BAR or CTRL has different
 		 * tlv bitmap expected. Apart from ACK_BA_STATUS TLV, we
@@ -5614,12 +5655,15 @@ static void dp_mon_pdev_per_target_config(struct dp_pdev *pdev)
 	target_type = hal_get_target_type(soc->hal_soc);
 	switch (target_type) {
 	case TARGET_TYPE_KIWI:
+	case TARGET_TYPE_QCN9224:
 	case TARGET_TYPE_MANGO:
 	case TARGET_TYPE_PEACH:
 		mon_pdev->is_tlv_hdr_64_bit = true;
+		mon_pdev->tlv_hdr_size = HAL_RX_TLV64_HDR_SIZE;
 		break;
 	default:
 		mon_pdev->is_tlv_hdr_64_bit = false;
+		mon_pdev->tlv_hdr_size = HAL_RX_TLV32_HDR_SIZE;
 		break;
 	}
 }
@@ -6687,6 +6731,7 @@ void dp_mon_feature_ops_deregister(struct dp_soc *soc)
 	mon_ops->rx_hdr_length_set = NULL;
 	mon_ops->rx_packet_length_set = NULL;
 	mon_ops->rx_wmask_subscribe = NULL;
+	mon_ops->rx_pkt_tlv_offset = NULL;
 	mon_ops->rx_enable_mpdu_logging = NULL;
 	mon_ops->rx_enable_fpmo = NULL;
 	mon_ops->mon_neighbour_peers_detach = NULL;

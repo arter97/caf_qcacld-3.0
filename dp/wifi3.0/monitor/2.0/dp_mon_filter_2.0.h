@@ -77,6 +77,15 @@ dp_rx_mon_word_mask_subscribe(uint32_t *msg_word,
 			      struct htt_rx_ring_tlv_filter *tlv_filter);
 
 /**
+ * dp_rx_mon_pkt_tlv_offset_subscribe() - Setup rx monitor packet tlv offset
+ * @msg_word: msg word
+ * @tlv_filter: rx ring filter configuration
+ */
+void
+dp_rx_mon_pkt_tlv_offset_subscribe(uint32_t *msg_word,
+				   struct htt_rx_ring_tlv_filter *tlv_filter);
+
+/**
  * dp_rx_mon_enable_mpdu_logging() - Setup rx monitor per packet mpdu logging
  * @msg_word: msg word
  * @tlv_filter: rx ring filter configuration

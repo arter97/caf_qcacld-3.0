@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2016-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -49,10 +49,12 @@
 	WBM_RELEASE_RING_2_RXDMA_ERROR_CODE_LSB)
 
 /**
- * hal_rx_wbm_err_info_get_generic_li(): Retrieves WBM error code and reason and
- *	save it to hal_wbm_err_desc_info structure passed by caller
+ * hal_rx_wbm_err_info_get_generic_li() - Retrieves WBM error code and
+ *	reason and save it to hal_wbm_err_desc_info structure passed
+ *	by caller
  * @wbm_desc: wbm ring descriptor
  * @wbm_er_info1: hal_wbm_err_desc_info structure, output parameter.
+ *
  * Return: void
  */
 static inline
@@ -199,8 +201,10 @@ hal_rx_get_crc_he_sig_a_mu_dl_info(struct hal_rx_ppdu_info *ppdu_info,
 #endif /* QCA_UNDECODED_METADATA_SUPPORT */
 
 /**
- * hal_tx_comp_get_status() - TQM Release reason
- * @hal_desc: completion ring Tx status
+ * hal_tx_comp_get_status_generic_li() - Get tx completion status
+ * @desc: tx descriptor
+ * @ts1: completion ring Tx status
+ * @hal: hal_soc object
  *
  * This function will parse the WBM completion descriptor and populate in
  * HAL structure
@@ -270,13 +274,14 @@ hal_tx_comp_get_status_generic_li(void *desc, void *ts1,
 }
 
 /**
- * hal_tx_desc_set_buf_addr - Fill Buffer Address information in Tx Descriptor
+ * hal_tx_desc_set_buf_addr_generic_li() - Fill Buffer Address
+ *                                         information in Tx Descriptor
  * @desc: Handle to Tx Descriptor
  * @paddr: Physical Address
- * @pool_id: Return Buffer Manager ID
+ * @rbm_id: Return Buffer Manager ID
  * @desc_id: Descriptor ID
  * @type: 0 - Address points to a MSDU buffer
- *		1 - Address points to MSDU extension descriptor
+ *        1 - Address points to MSDU extension descriptor
  *
  * Return: void
  */
@@ -317,8 +322,8 @@ hal_tx_desc_set_buf_addr_generic_li(void *desc, dma_addr_t paddr,
 #if defined(QCA_WIFI_QCA6290_11AX_MU_UL) && defined(QCA_WIFI_QCA6290_11AX)
 /**
  * hal_rx_handle_other_tlvs() - handle special TLVs like MU_UL
- * tlv_tag: Taf of the TLVs
- * rx_tlv: the pointer to the TLVs
+ * @tlv_tag: Tag of the TLVs
+ * @rx_tlv: the pointer to the TLVs
  * @ppdu_info: pointer to ppdu_info
  *
  * Return: true if the tlv is handled, false if not
@@ -655,9 +660,11 @@ hal_update_rx_ctrl_frame_stats(struct hal_rx_ppdu_info *ppdu_info,
 #endif /* WLAN_SUPPORT_CTRL_FRAME_STATS */
 
 /**
- * hal_rx_status_get_tlv_info() - process receive info TLV
+ * hal_rx_status_get_tlv_info_generic_li() - process receive info TLV
  * @rx_tlv_hdr: pointer to TLV header
- * @ppdu_info: pointer to ppdu_info
+ * @ppduinfo: pointer to ppdu_info
+ * @hal_soc_hdl: hal_soc handle
+ * @nbuf: pointer the pkt buffer.
  *
  * Return: HAL_TLV_STATUS_PPDU_NOT_DONE or HAL_TLV_STATUS_PPDU_DONE from tlv
  */
@@ -1814,9 +1821,10 @@ static inline uint8_t hal_get_wbm_internal_error_generic_li(void *hal_desc)
 }
 
 /**
- * hal_rx_dump_mpdu_start_tlv_generic_li: dump RX mpdu_start TLV in structured
- *			       human readable format.
- * @mpdu_start: pointer the rx_attention TLV in pkt.
+ * hal_rx_dump_mpdu_start_tlv_generic_li() - dump RX mpdu_start TLV in
+ *			                     structured human readable
+ *			                     format.
+ * @mpdustart: pointer the rx_attention TLV in pkt.
  * @dbg_level: log level.
  *
  * Return: void
@@ -2078,7 +2086,7 @@ hal_tx_update_pcp_tid_generic_li(struct hal_soc *soc,
 /**
  * hal_tx_update_tidmap_prty_generic_li() - Update the tid map priority
  * @soc: HAL SoC context
- * @val: priority value
+ * @value: priority value
  *
  * Return: void
  */
@@ -2095,11 +2103,11 @@ void hal_tx_update_tidmap_prty_generic_li(struct hal_soc *soc, uint8_t value)
 }
 
 /**
- * hal_rx_msdu_packet_metadata_get(): API to get the
- * msdu information from rx_msdu_end TLV
- *
- * @ buf: pointer to the start of RX PKT TLV headers
- * @ hal_rx_msdu_metadata: pointer to the msdu info structure
+ * hal_rx_msdu_packet_metadata_get_generic_li() - API to get the msdu
+ *                                                information from
+ *                                                rx_msdu_end TLV
+ * @buf: pointer to the start of RX PKT TLV headers
+ * @pkt_msdu_metadata: pointer to the msdu info structure
  */
 static void
 hal_rx_msdu_packet_metadata_get_generic_li(uint8_t *buf,
@@ -2119,7 +2127,7 @@ hal_rx_msdu_packet_metadata_get_generic_li(uint8_t *buf,
 }
 
 /**
- * hal_rx_msdu_end_offset_get_generic(): API to get the
+ * hal_rx_msdu_end_offset_get_generic() - API to get the
  * msdu_end structure offset rx_pkt_tlv structure
  *
  * NOTE: API returns offset of msdu_end TLV from structure
@@ -2131,7 +2139,7 @@ static uint32_t hal_rx_msdu_end_offset_get_generic(void)
 }
 
 /**
- * hal_rx_attn_offset_get_generic(): API to get the
+ * hal_rx_attn_offset_get_generic() - API to get the
  * msdu_end structure offset rx_pkt_tlv structure
  *
  * NOTE: API returns offset of attn TLV from structure
@@ -2143,7 +2151,7 @@ static uint32_t hal_rx_attn_offset_get_generic(void)
 }
 
 /**
- * hal_rx_msdu_start_offset_get_generic(): API to get the
+ * hal_rx_msdu_start_offset_get_generic() - API to get the
  * msdu_start structure offset rx_pkt_tlv structure
  *
  * NOTE: API returns offset of attn TLV from structure
@@ -2155,7 +2163,7 @@ static uint32_t hal_rx_msdu_start_offset_get_generic(void)
 }
 
 /**
- * hal_rx_mpdu_start_offset_get_generic(): API to get the
+ * hal_rx_mpdu_start_offset_get_generic() - API to get the
  * mpdu_start structure offset rx_pkt_tlv structure
  *
  * NOTE: API returns offset of attn TLV from structure
@@ -2167,7 +2175,7 @@ static uint32_t hal_rx_mpdu_start_offset_get_generic(void)
 }
 
 /**
- * hal_rx_mpdu_end_offset_get_generic(): API to get the
+ * hal_rx_mpdu_end_offset_get_generic() - API to get the
  * mpdu_end structure offset rx_pkt_tlv structure
  *
  * NOTE: API returns offset of attn TLV from structure
@@ -2212,10 +2220,9 @@ static inline void hal_setup_reo_swap(struct hal_soc *soc)
 #endif
 
 /**
- * hal_reo_setup_generic_li - Initialize HW REO block
- *
- * @hal_soc: Opaque HAL SOC handle
- * @reo_params: parameters needed by HAL for REO config
+ * hal_reo_setup_generic_li() - Initialize HW REO block
+ * @soc: Opaque HAL SOC handle
+ * @reoparams: parameters needed by HAL for REO config
  * @qref_reset: reset qref
  */
 static
@@ -2315,10 +2322,9 @@ void hal_reo_setup_generic_li(struct hal_soc *soc, void *reoparams,
 }
 
 /**
- * hal_setup_link_idle_list_generic_li - Setup scattered idle list using the
- * buffer list provided
- *
- * @hal_soc: Opaque HAL SOC handle
+ * hal_setup_link_idle_list_generic_li() - Setup scattered idle list
+ *                                         using the buffer list provided
+ * @soc: Opaque HAL SOC handle
  * @scatter_bufs_base_paddr: Array of physical base addresses
  * @scatter_bufs_base_vaddr: Array of virtual base addresses
  * @num_scatter_bufs: Number of scatter buffers in the above lists
@@ -2467,7 +2473,7 @@ hal_setup_link_idle_list_generic_li(struct hal_soc *soc,
 
 #ifdef TCL_DATA_CMD_2_SEARCH_TYPE_OFFSET
 /**
- * hal_tx_desc_set_search_type_generic_li - Set the search type value
+ * hal_tx_desc_set_search_type_generic_li() - Set the search type value
  * @desc: Handle to Tx Descriptor
  * @search_type: search type
  *		     0 – Normal search
@@ -2492,7 +2498,7 @@ void hal_tx_desc_set_search_type_generic_li(void *desc, uint8_t search_type)
 
 #ifdef TCL_DATA_CMD_5_SEARCH_INDEX_OFFSET
 /**
- * hal_tx_desc_set_search_index_generic_li - Set the search index value
+ * hal_tx_desc_set_search_index_generic_li() - Set the search index value
  * @desc: Handle to Tx Descriptor
  * @search_index: The index that will be used for index based address or
  *                flow search. The field is valid when 'search_type' is
@@ -2515,7 +2521,7 @@ void hal_tx_desc_set_search_index_generic_li(void *desc, uint32_t search_index)
 
 #ifdef TCL_DATA_CMD_5_CACHE_SET_NUM_OFFSET
 /**
- * hal_tx_desc_set_cache_set_num_generic_li - Set the cache-set-num value
+ * hal_tx_desc_set_cache_set_num_generic_li() - Set the cache-set-num value
  * @desc: Handle to Tx Descriptor
  * @cache_num: Cache set number that should be used to cache the index
  *                based search results, for address and flow search.
@@ -2543,9 +2549,9 @@ void hal_tx_desc_set_cache_set_num_generic_li(void *desc, uint8_t cache_num)
 #ifdef WLAN_SUPPORT_RX_FISA
 /**
  * hal_rx_flow_get_tuple_info_li() - Setup a flow search entry in HW FST
- * @fst: Pointer to the Rx Flow Search Table
+ * @rx_fst: Pointer to the Rx Flow Search Table
  * @hal_hash: HAL 5 tuple hash
- * @tuple_info: 5-tuple info of the flow returned to the caller
+ * @flow_tuple_info: 5-tuple info of the flow returned to the caller
  *
  * Return: Success/Failure
  */
@@ -2614,7 +2620,7 @@ hal_rx_flow_get_tuple_info_li(uint8_t *rx_fst, uint32_t hal_hash,
 
 /**
  * hal_rx_flow_delete_entry_li() - Setup a flow search entry in HW FST
- * @fst: Pointer to the Rx Flow Search Table
+ * @rx_fst: Pointer to the Rx Flow Search Table
  * @hal_rx_fse: Pointer to the Rx Flow that is to be deleted from the FST
  *
  * Return: Success/Failure
@@ -2664,11 +2670,10 @@ hal_rx_fst_get_fse_size_li(void)
 #endif /* WLAN_SUPPORT_RX_FISA */
 
 /**
- * hal_rx_get_frame_ctrl_field(): Function to retrieve frame control field
+ * hal_rx_get_frame_ctrl_field_li() - Function to retrieve frame control field
+ * @buf: Network buffer
  *
- * @nbuf: Network buffer
- * Returns: rx more fragment bit
- *
+ * Return: rx more fragment bit
  */
 static uint16_t hal_rx_get_frame_ctrl_field_li(uint8_t *buf)
 {

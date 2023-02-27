@@ -22,6 +22,9 @@
 #include "qdf_module.h"
 #include "qdf_net_if.h"
 #include <pld_common.h>
+#ifdef DP_UMAC_HW_RESET_SUPPORT
+#include "if_pci.h"
+#endif
 
 /* mapping NAPI budget 0 to internal budget 0
  * NAPI budget 1 to internal budget [1,scaler -1]
@@ -1192,6 +1195,26 @@ static irqreturn_t hif_umac_reset_irq_handler(int irq, void *ctx)
 
 	return IRQ_HANDLED;
 }
+
+QDF_STATUS hif_get_umac_reset_irq(struct hif_opaque_softc *hif_scn,
+				  int *umac_reset_irq)
+{
+	int ret;
+	struct hif_softc *hif_sc = HIF_GET_SOFTC(hif_scn);
+	struct hif_pci_softc *sc = HIF_GET_PCI_SOFTC(hif_sc);
+	struct platform_device *pdev = (struct platform_device *)sc->pdev;
+
+	ret = pfrm_get_irq(&pdev->dev, (struct qdf_pfm_hndl *)pdev,
+			   "umac_reset", 0, umac_reset_irq);
+
+	if (ret) {
+		hif_err("umac reset get irq failed ret %d\n", ret);
+		return QDF_STATUS_E_FAILURE;
+	}
+	return QDF_STATUS_SUCCESS;
+}
+
+qdf_export_symbol(hif_get_umac_reset_irq);
 
 QDF_STATUS hif_register_umac_reset_handler(struct hif_opaque_softc *hif_scn,
 					   int (*handler)(void *cb_ctx),

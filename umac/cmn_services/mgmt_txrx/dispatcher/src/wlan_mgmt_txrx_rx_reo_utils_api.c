@@ -38,9 +38,16 @@ wlan_mgmt_rx_reo_deinit(void)
 	if (total_mlo_grps > WLAN_MAX_MLO_GROUPS)
 		return QDF_STATUS_E_INVAL;
 
-	for (ml_grp = 0; ml_grp < total_mlo_grps; ml_grp++)
-		if (mgmt_rx_reo_deinit_context(ml_grp))
-			return QDF_STATUS_E_INVAL;
+	for (ml_grp = 0; ml_grp < total_mlo_grps; ml_grp++) {
+		QDF_STATUS status;
+
+		status = mgmt_rx_reo_deinit_context(ml_grp);
+		if (QDF_IS_STATUS_ERROR(status)) {
+			mgmt_rx_reo_err("Reo context deinit failed for grp %u",
+					ml_grp);
+			return status;
+		}
+	}
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -54,9 +61,16 @@ wlan_mgmt_rx_reo_init(void)
 	if (total_mlo_grps > WLAN_MAX_MLO_GROUPS)
 		return QDF_STATUS_E_INVAL;
 
-	for (ml_grp = 0; ml_grp < total_mlo_grps; ml_grp++)
-		if (mgmt_rx_reo_init_context(ml_grp))
-			return QDF_STATUS_E_INVAL;
+	for (ml_grp = 0; ml_grp < total_mlo_grps; ml_grp++) {
+		QDF_STATUS status;
+
+		status = mgmt_rx_reo_init_context(ml_grp);
+		if (QDF_IS_STATUS_ERROR(status)) {
+			mgmt_rx_reo_err("Reo context init failed for grp %u",
+					ml_grp);
+			return status;
+		}
+	}
 
 	return QDF_STATUS_SUCCESS;
 }

@@ -60,15 +60,15 @@
  */
 typedef struct sk_buff *__qdf_nbuf_t;
 
-/**
+/*
  * typedef __qdf_nbuf_queue_head_t - abstraction for sk_buff_head linux struct
  *
  * This is used for skb queue management via linux skb buff head APIs
  */
 typedef struct sk_buff_head __qdf_nbuf_queue_head_t;
 
-/**
- * typedef __qdf_nbuf_get_shinfo for skb_shinfo linux struct
+/*
+ * typedef __qdf_nbuf_shared_info_t for skb_shinfo linux struct
  *
  * This is used for skb shared info via linux skb shinfo APIs
  */
@@ -139,118 +139,141 @@ typedef union {
  *      TX and RX union.
  *
  * @paddr   : physical addressed retrieved by dma_map of nbuf->data
+ * @u: union of rx and tx data
+ * @u.rx: rx data
+ * @u.rx.dev: union of priv_cb_w and priv_cb_m
  *
- * @rx.dev.priv_cb_w.ext_cb_ptr: extended cb pointer
- * @rx.dev.priv_cb_w.fctx: ctx to handle special pkts defined by ftype
- * @rx.dev.priv_cb_w.msdu_len: length of RX packet
- * @rx.dev.priv_cb_w.ipa_smmu_map: do IPA smmu map
- * @rx.dev.priv_cb_w.peer_id: peer_id for RX packet
- * @rx.dev.priv_cb_w.flag_intra_bss: flag to indicate this is intra bss packet
- * @rx.dev.priv_cb_w.protocol_tag: protocol tag set by app for rcvd packet type
- * @rx.dev.priv_cb_w.flow_idx_valid: flow entry is found
- * @rx.dev.priv_cb_w.flow_idx_timeout: flow entry search timed out
- * @rx.dev.priv_cb_w.rsvd: rerserved bits
- * @rx.dev.priv_cb_w.flow_tag: flow tag set by application for 5 tuples rcvd
+ * @u.rx.dev.priv_cb_w:
+ * @u.rx.dev.priv_cb_w.ext_cb_ptr: extended cb pointer
+ * @u.rx.dev.priv_cb_w.fctx: ctx to handle special pkts defined by ftype
+ * @u.rx.dev.priv_cb_w.msdu_len: length of RX packet
+ * @u.rx.dev.priv_cb_w.flag_intra_bss: flag to indicate this is intra bss packet
+ * @u.rx.dev.priv_cb_w.ipa_smmu_map: do IPA smmu map
+ * @u.rx.dev.priv_cb_w.peer_id: peer_id for RX packet
+ * @u.rx.dev.priv_cb_w.protocol_tag: protocol tag set by app for rcvd packet
+ *                                   type
+ * @u.rx.dev.priv_cb_w.flow_idx_valid: flow entry is found
+ * @u.rx.dev.priv_cb_w.flow_idx_timeout: flow entry search timed out
+ * @u.rx.dev.priv_cb_w.rsvd: rerserved bits
+ * @u.rx.dev.priv_cb_w.flow_tag: flow tag set by application for 5 tuples rcvd
  *
- * @rx.dev.priv_cb_m.peer_cached_buf_frm: peer cached buffer
- * @rx.dev.priv_cb_m.flush_ind: flush indication
- * @rx.dev.priv_cb_m.packet_buf_pool:  packet buff bool
- * @rx.dev.priv_cb_m.l3_hdr_pad: L3 header padding offset
- * @rx.dev.priv_cb_m.exc_frm: exception frame
- * @rx.dev.priv_cb_m.ipa_smmu_map: do IPA smmu map
- * @rx.dev.priv_cb_m.reo_dest_ind_or_sw_excpt: reo destination indication or
-					     sw exception bit from ring desc
- * @rx.dev.priv_cb_m.lmac_id: lmac id for RX packet
- * @rx.dev.priv_cb_m.tcp_seq_num: TCP sequence number
- * @rx.dev.priv_cb_m.tcp_ack_num: TCP ACK number
- * @rx.dev.priv_cb_m.lro_ctx: LRO context
- * @rx.dev.priv_cb_m.dp.wifi3.msdu_len: length of RX packet
- * @rx.dev.priv_cb_m.dp.wifi3.peer_id:  peer_id for RX packet
- * @rx.dev.priv_cb_m.dp.wifi2.map_index:
- * @rx.dev.priv_cb_m.ipa_owned: packet owned by IPA
+ * @u.rx.dev.priv_cb_m:
+ * @u.rx.dev.priv_cb_m.ipa.owned: packet owned by IPA
+ * @u.rx.dev.priv_cb_m.peer_cached_buf_frm: peer cached buffer
+ * @u.rx.dev.priv_cb_m.flush_ind: flush indication
+ * @u.rx.dev.priv_cb_m.packet_buf_pool:  packet buff bool
+ * @u.rx.dev.priv_cb_m.l3_hdr_pad: L3 header padding offset
+ * @u.rx.dev.priv_cb_m.exc_frm: exception frame
+ * @u.rx.dev.priv_cb_m.ipa_smmu_map: do IPA smmu map
+ * @u.rx.dev.priv_cb_m.reo_dest_ind_or_sw_excpt: reo destination indication or
+ *					     sw exception bit from ring desc
+ * @u.rx.dev.priv_cb_m.lmac_id: lmac id for RX packet
+ * @u.rx.dev.priv_cb_m.reserved1: reserved bits
+ * @u.rx.dev.priv_cb_m.tcp_seq_num: TCP sequence number
+ * @u.rx.dev.priv_cb_m.tcp_ack_num: TCP ACK number
+ * @u.rx.dev.priv_cb_m.dp: Union of wifi3 and wifi2 structs
+ * @u.rx.dev.priv_cb_m.dp.wifi3: wifi3 data
+ * @u.rx.dev.priv_cb_m.dp.wifi3.msdu_len: length of RX packet
+ * @u.rx.dev.priv_cb_m.dp.wifi3.peer_id:  peer_id for RX packet
+ * @u.rx.dev.priv_cb_m.dp.wifi2: wifi2 data
+ * @u.rx.dev.priv_cb_m.dp.wifi2.map_index:
+ * @u.rx.dev.priv_cb_m.lro_ctx: LRO context
  *
- * @rx.lro_eligible: flag to indicate whether the MSDU is LRO eligible
- * @rx.tcp_proto: L4 protocol is TCP
- * @rx.tcp_pure_ack: A TCP ACK packet with no payload
- * @rx.ipv6_proto: L3 protocol is IPV6
- * @rx.ip_offset: offset to IP header
- * @rx.tcp_offset: offset to TCP header
- * @rx_ctx_id: Rx context id
- * @num_elements_in_list: number of elements in the nbuf list
+ * @u.rx.lro_eligible: flag to indicate whether the MSDU is LRO eligible
+ * @u.rx.tcp_proto: L4 protocol is TCP
+ * @u.rx.tcp_pure_ack: A TCP ACK packet with no payload
+ * @u.rx.ipv6_proto: L3 protocol is IPV6
+ * @u.rx.ip_offset: offset to IP header
+ * @u.rx.tcp_offset: offset to TCP header
+ * @u.rx.rx_ctx_id: Rx context id
+ * @u.rx.fcs_err: FCS error
+ * @u.rx.is_raw_frame: RAW frame
+ * @u.rx.num_elements_in_list: number of elements in the nbuf list
  *
- * @rx.tcp_udp_chksum: L4 payload checksum
- * @rx.tcp_wim: TCP window size
+ * @u.rx.tcp_udp_chksum: L4 payload checksum
+ * @u.rx.tcp_win: TCP window size
  *
- * @rx.flow_id: 32bit flow id
+ * @u.rx.flow_id: 32bit flow id
  *
- * @rx.flag_chfrag_start: first MSDU in an AMSDU
- * @rx.flag_chfrag_cont: middle or part of MSDU in an AMSDU
- * @rx.flag_chfrag_end: last MSDU in an AMSDU
- * @rx.flag_retry: flag to indicate MSDU is retried
- * @rx.flag_da_mcbc: flag to indicate mulicast or broadcast packets
- * @rx.flag_da_valid: flag to indicate DA is valid for RX packet
- * @rx.flag_sa_valid: flag to indicate SA is valid for RX packet
- * @rx.flag_is_frag: flag to indicate skb has frag list
- * @rx.rsrvd: reserved
+ * @u.rx.flag_chfrag_start: first MSDU in an AMSDU
+ * @u.rx.flag_chfrag_cont: middle or part of MSDU in an AMSDU
+ * @u.rx.flag_chfrag_end: last MSDU in an AMSDU
+ * @u.rx.flag_retry: flag to indicate MSDU is retried
+ * @u.rx.flag_da_mcbc: flag to indicate mulicast or broadcast packets
+ * @u.rx.flag_da_valid: flag to indicate DA is valid for RX packet
+ * @u.rx.flag_sa_valid: flag to indicate SA is valid for RX packet
+ * @u.rx.flag_is_frag: flag to indicate skb has frag list
  *
- * @rx.trace: combined structure for DP and protocol trace
- * @rx.trace.packet_stat: {NBUF_TX_PKT_[(HDD)|(TXRX_ENQUEUE)|(TXRX_DEQUEUE)|
+ * @u.rx.trace: combined structure for DP and protocol trace
+ * @u.rx.trace.packet_state: {NBUF_TX_PKT_[(HDD)|(TXRX_ENQUEUE)|(TXRX_DEQUEUE)|
  *                       +          (TXRX)|(HTT)|(HTC)|(HIF)|(CE)|(FREE)]
- * @rx.trace.dp_trace: flag (Datapath trace)
- * @rx.trace.packet_track: RX_DATA packet
- * @rx.trace.rsrvd: enable packet logging
+ * @u.rx.trace.dp_trace: flag (Datapath trace)
+ * @u.rx.trace.packet_track: RX_DATA packet
+ * @u.rx.trace.rsrvd: enable packet logging
  *
- * @rx.vdev_id: vdev_id for RX pkt
- * @rx.is_raw_frame: RAW frame
- * @rx.fcs_err: FCS error
- * @rx.tid_val: tid value
- * @rx.reserved: reserved
- * @rx.ftype: mcast2ucast, TSO, SG, MESH
+ * @u.rx.vdev_id: vdev_id for RX pkt
+ * @u.rx.tid_val: tid value
+ * @u.rx.ftype: mcast2ucast, TSO, SG, MESH
  *
- * @tx.dev.priv_cb_w.fctx: ctx to handle special pkts defined by ftype
- * @tx.dev.priv_cb_w.ext_cb_ptr: extended cb pointer
+ * @u.tx: tx data
+ * @u.tx.dev: union of priv_cb_w and priv_cb_m
  *
- * @tx.dev.priv_cb_w.data_attr: value that is programmed in CE descr, includes
+ * @u.tx.dev.priv_cb_w:
+ * @u.tx.dev.priv_cb_w.ext_cb_ptr: extended cb pointer
+ * @u.tx.dev.priv_cb_w.fctx: ctx to handle special pkts defined by ftype
+ *
+ * @u.tx.dev.priv_cb_m:
+ * @u.tx.dev.priv_cb_m:ipa: IPA-specific data
+ * @u.tx.dev.priv_cb_m.ipa.ipa.owned: packet owned by IPA
+ * @u.tx.dev.priv_cb_m.ipa.ipa.priv: private data, used by IPA
+ * @u.tx.dev.priv_cb_m.data_attr: value that is programmed in CE descr, includes
  *                 + (1) CE classification enablement bit
  *                 + (2) packet type (802.3 or Ethernet type II)
  *                 + (3) packet offset (usually length of HTC/HTT descr)
- * @tx.dev.priv_cb_m.ipa.owned: packet owned by IPA
- * @tx.dev.priv_cb_m.ipa.priv: private data, used by IPA
- * @tx.dev.priv_cb_m.desc_id: tx desc id, used to sync between host and fw
- * @tx.dev.priv_cb_m.mgmt_desc_id: mgmt descriptor for tx completion cb
- * @tx.dev.priv_cb_m.dma_option.bi_map: flag to do bi-direction dma map
- * @tx.dev.priv_cb_m.dma_option.reserved: reserved bits for future use
- * @tx.dev.priv_cb_m.reserved: reserved
+ * @u.tx.dev.priv_cb_m.desc_id: tx desc id, used to sync between host and fw
+ * @u.tx.dev.priv_cb_m.dma_option: DMA options
+ * @u.tx.dev.priv_cb_m.dma_option.mgmt_desc_id: mgmt descriptor for tx
+ *                                              completion cb
+ * @u.tx.dev.priv_cb_m.dma_option.dma_option.bi_map: flag to do bi-direction
+ *                                                   dma map
+ * @u.tx.dev.priv_cb_m.dma_option.dma_option.reserved: reserved bits for future
+ *                                                     use
+ * @u.tx.dev.priv_cb_m.flag_notify_comp: reserved
+ * @u.tx.dev.priv_cb_m.rsvd: reserved
+ * @u.tx.dev.priv_cb_m.reserved: reserved
  *
- * @tx.ftype: mcast2ucast, TSO, SG, MESH
- * @tx.vdev_id: vdev (for protocol trace)
- * @tx.len: length of efrag pointed by the above pointers
+ * @u.tx.ftype: mcast2ucast, TSO, SG, MESH
+ * @u.tx.vdev_id: vdev (for protocol trace)
+ * @u.tx.len: length of efrag pointed by the above pointers
  *
- * @tx.flags.bits.flag_efrag: flag, efrag payload to be swapped (wordstream)
- * @tx.flags.bits.num: number of extra frags ( 0 or 1)
- * @tx.flags.bits.nbuf: flag, nbuf payload to be swapped (wordstream)
- * @tx.flags.bits.flag_chfrag_start: first MSDU in an AMSDU
- * @tx.flags.bits.flag_chfrag_cont: middle or part of MSDU in an AMSDU
- * @tx.flags.bits.flag_chfrag_end: last MSDU in an AMSDU
- * @tx.flags.bits.flag_ext_header: extended flags
- * @tx.flags.bits.is_critical: flag indicating a critical frame
- * @tx.trace: combined structure for DP and protocol trace
- * @tx.trace.packet_stat: {NBUF_TX_PKT_[(HDD)|(TXRX_ENQUEUE)|(TXRX_DEQUEUE)|
+ * @u.tx.flags: union of flag representations
+ * @u.tx.flags.bits: flags represent as individual bitmasks
+ * @u.tx.flags.bits.flag_efrag: flag, efrag payload to be swapped (wordstream)
+ * @u.tx.flags.bits.num: number of extra frags ( 0 or 1)
+ * @u.tx.flags.bits.nbuf: flag, nbuf payload to be swapped (wordstream)
+ * @u.tx.flags.bits.flag_chfrag_start: first MSDU in an AMSDU
+ * @u.tx.flags.bits.flag_chfrag_cont: middle or part of MSDU in an AMSDU
+ * @u.tx.flags.bits.flag_chfrag_end: last MSDU in an AMSDU
+ * @u.tx.flags.bits.flag_ext_header: extended flags
+ * @u.tx.flags.bits.is_critical: flag indicating a critical frame
+ * @u.tx.flags.u8: flags as a single u8
+ * @u.tx.trace: combined structure for DP and protocol trace
+ * @u.tx.trace.packet_stat: {NBUF_TX_PKT_[(HDD)|(TXRX_ENQUEUE)|(TXRX_DEQUEUE)|
  *                       +          (TXRX)|(HTT)|(HTC)|(HIF)|(CE)|(FREE)]
- * @tx.trace.is_packet_priv:
- * @tx.trace.packet_track: {NBUF_TX_PKT_[(DATA)|(MGMT)]_TRACK}
- * @tx.trace.to_fw: Flag to indicate send this packet to FW
- * @tx.trace.proto_type: bitmap of NBUF_PKT_TRAC_TYPE[(EAPOL)|(DHCP)|
+ * @u.tx.trace.is_packet_priv:
+ * @u.tx.trace.packet_track: {NBUF_TX_PKT_[(DATA)|(MGMT)]_TRACK}
+ * @u.tx.trace.to_fw: Flag to indicate send this packet to FW
+ * @u.tx.trace.htt2_frm: flag (high-latency path only)
+ * @u.tx.trace.proto_type: bitmap of NBUF_PKT_TRAC_TYPE[(EAPOL)|(DHCP)|
  *                          + (MGMT_ACTION)] - 4 bits
- * @tx.trace.dp_trace: flag (Datapath trace)
- * @tx.trace.is_bcast: flag (Broadcast packet)
- * @tx.trace.is_mcast: flag (Multicast packet)
- * @tx.trace.packet_type: flag (Packet type)
- * @tx.trace.htt2_frm: flag (high-latency path only)
- * @tx.trace.print: enable packet logging
+ * @u.tx.trace.dp_trace: flag (Datapath trace)
+ * @u.tx.trace.is_bcast: flag (Broadcast packet)
+ * @u.tx.trace.is_mcast: flag (Multicast packet)
+ * @u.tx.trace.packet_type: flag (Packet type)
+ * @u.tx.trace.print: enable packet logging
  *
- * @tx.vaddr: virtual address of ~
- * @tx.paddr: physical/DMA address of ~
+ * @u.tx.vaddr: virtual address of ~
+ * @u.tx.paddr: physical/DMA address of ~
  */
 struct qdf_nbuf_cb {
 	/* common */
@@ -384,7 +407,6 @@ struct qdf_nbuf_cb {
 					is_packet_priv:1;
 				uint8_t packet_track:3,
 					to_fw:1,
-					/* used only for hl */
 					htt2_frm:1,
 					proto_type:3;
 				uint8_t dp_trace:1,
@@ -409,7 +431,7 @@ QDF_COMPILE_TIME_ASSERT(qdf_nbuf_cb_size,
 			FIELD_SIZEOF(struct sk_buff, cb));
 #endif
 
-/**
+/*
  *  access macros to qdf_nbuf_cb
  *  Note: These macros can be used as L-values as well as R-values.
  *        When used as R-values, they effectively function as "get" macros
@@ -605,7 +627,7 @@ QDF_COMPILE_TIME_ASSERT(qdf_nbuf_cb_size,
 #define __qdf_nbuf_reset_num_frags(skb) \
 	(QDF_NBUF_CB_TX_NUM_EXTRA_FRAGS(skb) = 0)
 
-/**
+/*
  *   end of nbuf->cb access macros
  */
 
@@ -862,7 +884,7 @@ __qdf_nbuf_t __qdf_nbuf_alloc_no_recycler(size_t size, int reserve, int align,
 
 /**
  * __qdf_nbuf_clone() - clone the nbuf (copy is readonly)
- * @skb: Pointer to network buffer
+ * @nbuf: Pointer to network buffer
  *
  * if GFP_ATOMIC is overkill then we can check whether its
  * called from interrupt context and then do it or else in
@@ -874,101 +896,847 @@ __qdf_nbuf_t __qdf_nbuf_alloc_no_recycler(size_t size, int reserve, int align,
  */
 __qdf_nbuf_t __qdf_nbuf_clone(__qdf_nbuf_t nbuf);
 
+/**
+ * __qdf_nbuf_free() - free the nbuf its interrupt safe
+ * @skb: Pointer to network buffer
+ *
+ * Return: none
+ */
 void __qdf_nbuf_free(struct sk_buff *skb);
+
+/**
+ * __qdf_nbuf_map() - map a buffer to local bus address space
+ * @osdev: OS device
+ * @skb: Pointer to network buffer
+ * @dir: Direction
+ *
+ * Return: QDF_STATUS
+ */
 QDF_STATUS __qdf_nbuf_map(__qdf_device_t osdev,
 			struct sk_buff *skb, qdf_dma_dir_t dir);
+
+/**
+ * __qdf_nbuf_unmap() - to unmap a previously mapped buf
+ * @osdev: OS device
+ * @skb: Pointer to network buffer
+ * @dir: dma direction
+ *
+ * Return: none
+ */
 void __qdf_nbuf_unmap(__qdf_device_t osdev,
 			struct sk_buff *skb, qdf_dma_dir_t dir);
+
+/**
+ * __qdf_nbuf_map_single() - map a single buffer to local bus address space
+ * @osdev: OS device
+ * @skb: Pointer to network buffer
+ * @dir: Direction
+ *
+ * Return: QDF_STATUS
+ */
 QDF_STATUS __qdf_nbuf_map_single(__qdf_device_t osdev,
 				 struct sk_buff *skb, qdf_dma_dir_t dir);
+
+/**
+ * __qdf_nbuf_unmap_single() -  unmap a previously mapped buf
+ * @osdev: OS device
+ * @skb: Pointer to network buffer
+ * @dir: Direction
+ *
+ * Return: none
+ */
 void __qdf_nbuf_unmap_single(__qdf_device_t osdev,
 			struct sk_buff *skb, qdf_dma_dir_t dir);
+
+/**
+ * __qdf_nbuf_reg_trace_cb() - register trace callback
+ * @cb_func_ptr: Pointer to trace callback function
+ *
+ * Return: none
+ */
 void __qdf_nbuf_reg_trace_cb(qdf_nbuf_trace_update_t cb_func_ptr);
+
+/**
+ * __qdf_nbuf_reg_free_cb() - register nbuf free callback
+ * @cb_func_ptr: function pointer to the nbuf free callback
+ *
+ * This function registers a callback function for nbuf free.
+ *
+ * Return: none
+ */
 void __qdf_nbuf_reg_free_cb(qdf_nbuf_free_t cb_func_ptr);
 
+/**
+ * __qdf_nbuf_dmamap_create() - create a DMA map.
+ * @osdev: qdf device handle
+ * @dmap: dma map handle
+ *
+ * This can later be used to map networking buffers. They :
+ * - need space in adf_drv's software descriptor
+ * - are typically created during adf_drv_create
+ * - need to be created before any API(qdf_nbuf_map) that uses them
+ *
+ * Return: QDF STATUS
+ */
 QDF_STATUS __qdf_nbuf_dmamap_create(qdf_device_t osdev, __qdf_dma_map_t *dmap);
-void __qdf_nbuf_dmamap_destroy(qdf_device_t osdev, __qdf_dma_map_t dmap);
-void __qdf_nbuf_dmamap_set_cb(__qdf_dma_map_t dmap, void *cb, void *arg);
-QDF_STATUS __qdf_nbuf_map_nbytes(qdf_device_t osdev, struct sk_buff *skb,
-	qdf_dma_dir_t dir, int nbytes);
-void __qdf_nbuf_unmap_nbytes(qdf_device_t osdev, struct sk_buff *skb,
-	qdf_dma_dir_t dir, int nbytes);
 
+/**
+ * __qdf_nbuf_dmamap_destroy() - delete a dma map
+ * @osdev: qdf device handle
+ * @dmap: dma map handle
+ *
+ * Return: none
+ */
+void __qdf_nbuf_dmamap_destroy(qdf_device_t osdev, __qdf_dma_map_t dmap);
+
+/**
+ * __qdf_nbuf_dmamap_set_cb() - setup the map callback for a dma map
+ * @dmap: dma map
+ * @cb: callback
+ * @arg: argument
+ *
+ * Return: none
+ */
+void __qdf_nbuf_dmamap_set_cb(__qdf_dma_map_t dmap, void *cb, void *arg);
+
+/**
+ * __qdf_nbuf_map_nbytes() - get the dma map of the nbuf
+ * @osdev: os device
+ * @skb: skb handle
+ * @dir: dma direction
+ * @nbytes: number of bytes to be mapped
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS __qdf_nbuf_map_nbytes(qdf_device_t osdev, struct sk_buff *skb,
+				 qdf_dma_dir_t dir, int nbytes);
+
+/**
+ * __qdf_nbuf_unmap_nbytes() - to unmap a previously mapped buf
+ * @osdev: OS device
+ * @skb: skb handle
+ * @dir: direction
+ * @nbytes: number of bytes
+ *
+ * Return: none
+ */
+void __qdf_nbuf_unmap_nbytes(qdf_device_t osdev, struct sk_buff *skb,
+			     qdf_dma_dir_t dir, int nbytes);
+
+/**
+ * __qdf_nbuf_sync_for_cpu() - nbuf sync
+ * @osdev: os device
+ * @skb: sk buff
+ * @dir: direction
+ *
+ * Return: none
+ */
 void __qdf_nbuf_sync_for_cpu(qdf_device_t osdev, struct sk_buff *skb,
 	qdf_dma_dir_t dir);
 
+/**
+ * __qdf_nbuf_dma_map_info() - return the dma map info
+ * @bmap: dma map
+ * @sg: dma map info
+ *
+ * Return: none
+ */
 void __qdf_nbuf_dma_map_info(__qdf_dma_map_t bmap, qdf_dmamap_info_t *sg);
+
+/**
+ * __qdf_nbuf_get_frag_size() - get frag size
+ * @nbuf: sk buffer
+ * @cur_frag: current frag
+ *
+ * Return: frag size
+ */
 uint32_t __qdf_nbuf_get_frag_size(__qdf_nbuf_t nbuf, uint32_t cur_frag);
+
+/**
+ * __qdf_nbuf_frag_info() - return the frag data & len, where frag no. is
+ *			specified by the index
+ * @skb: sk buff
+ * @sg: scatter/gather list of all the frags
+ *
+ * Return: none
+ */
 void __qdf_nbuf_frag_info(struct sk_buff *skb, qdf_sglist_t  *sg);
+
+/**
+ * __qdf_nbuf_frag_map() - dma map frag
+ * @osdev: os device
+ * @nbuf: sk buff
+ * @offset: offset
+ * @dir: direction
+ * @cur_frag: current fragment
+ *
+ * Return: QDF status
+ */
 QDF_STATUS __qdf_nbuf_frag_map(
 	qdf_device_t osdev, __qdf_nbuf_t nbuf,
 	int offset, qdf_dma_dir_t dir, int cur_frag);
+
+/**
+ * qdf_nbuf_classify_pkt() - classify packet
+ * @skb: sk buff
+ *
+ * Return: none
+ */
 void qdf_nbuf_classify_pkt(struct sk_buff *skb);
 
+/**
+ * __qdf_nbuf_is_ipv4_wapi_pkt() - check if skb data is a wapi packet
+ * @skb: Pointer to network buffer
+ *
+ * This api is for ipv4 packet.
+ *
+ * Return: true if packet is WAPI packet
+ *	   false otherwise.
+ */
 bool __qdf_nbuf_is_ipv4_wapi_pkt(struct sk_buff *skb);
+
+/**
+ * __qdf_nbuf_is_ipv4_tdls_pkt() - check if skb data is a tdls packet
+ * @skb: Pointer to network buffer
+ *
+ * This api is for ipv4 packet.
+ *
+ * Return: true if packet is tdls packet
+ *	   false otherwise.
+ */
 bool __qdf_nbuf_is_ipv4_tdls_pkt(struct sk_buff *skb);
+
+/**
+ * __qdf_nbuf_data_is_ipv4_pkt() - check if packet is a ipv4 packet
+ * @data: Pointer to network data
+ *
+ * This api is for Tx packets.
+ *
+ * Return: true if packet is ipv4 packet
+ *	   false otherwise
+ */
 bool __qdf_nbuf_data_is_ipv4_pkt(uint8_t *data);
+
+/**
+ * __qdf_nbuf_data_is_ipv6_pkt() - check if it is IPV6 packet.
+ * @data: Pointer to IPV6 packet data buffer
+ *
+ * This func. checks whether it is a IPV6 packet or not.
+ *
+ * Return: TRUE if it is a IPV6 packet
+ *         FALSE if not
+ */
 bool __qdf_nbuf_data_is_ipv6_pkt(uint8_t *data);
+
+/**
+ * __qdf_nbuf_data_is_ipv4_mcast_pkt() - check if it is IPV4 multicast packet.
+ * @data: Pointer to IPV4 packet data buffer
+ *
+ * This func. checks whether it is a IPV4 multicast packet or not.
+ *
+ * Return: TRUE if it is a IPV4 multicast packet
+ *         FALSE if not
+ */
 bool __qdf_nbuf_data_is_ipv4_mcast_pkt(uint8_t *data);
+
+/**
+ * __qdf_nbuf_data_is_ipv6_mcast_pkt() - check if it is IPV6 multicast packet.
+ * @data: Pointer to IPV6 packet data buffer
+ *
+ * This func. checks whether it is a IPV6 multicast packet or not.
+ *
+ * Return: TRUE if it is a IPV6 multicast packet
+ *         FALSE if not
+ */
 bool __qdf_nbuf_data_is_ipv6_mcast_pkt(uint8_t *data);
+
+/**
+ * __qdf_nbuf_data_is_icmp_pkt() - check if it is IPV4 ICMP packet.
+ * @data: Pointer to IPV4 ICMP packet data buffer
+ *
+ * This func. checks whether it is a ICMP packet or not.
+ *
+ * Return: TRUE if it is a ICMP packet
+ *         FALSE if not
+ */
 bool __qdf_nbuf_data_is_icmp_pkt(uint8_t *data);
+
+/**
+ * __qdf_nbuf_data_is_icmpv6_pkt() - check if it is IPV6 ICMPV6 packet.
+ * @data: Pointer to IPV6 ICMPV6 packet data buffer
+ *
+ * This func. checks whether it is a ICMPV6 packet or not.
+ *
+ * Return: TRUE if it is a ICMPV6 packet
+ *         FALSE if not
+ */
 bool __qdf_nbuf_data_is_icmpv6_pkt(uint8_t *data);
+
+/**
+ * __qdf_nbuf_data_is_ipv4_udp_pkt() - check if it is IPV4 UDP packet.
+ * @data: Pointer to IPV4 UDP packet data buffer
+ *
+ * This func. checks whether it is a IPV4 UDP packet or not.
+ *
+ * Return: TRUE if it is a IPV4 UDP packet
+ *         FALSE if not
+ */
 bool __qdf_nbuf_data_is_ipv4_udp_pkt(uint8_t *data);
+
+/**
+ * __qdf_nbuf_data_is_ipv4_tcp_pkt() - check if it is IPV4 TCP packet.
+ * @data: Pointer to IPV4 TCP packet data buffer
+ *
+ * This func. checks whether it is a IPV4 TCP packet or not.
+ *
+ * Return: TRUE if it is a IPV4 TCP packet
+ *         FALSE if not
+ */
 bool __qdf_nbuf_data_is_ipv4_tcp_pkt(uint8_t *data);
+
+/**
+ * __qdf_nbuf_data_is_ipv6_udp_pkt() - check if it is IPV6 UDP packet.
+ * @data: Pointer to IPV6 UDP packet data buffer
+ *
+ * This func. checks whether it is a IPV6 UDP packet or not.
+ *
+ * Return: TRUE if it is a IPV6 UDP packet
+ *         FALSE if not
+ */
 bool __qdf_nbuf_data_is_ipv6_udp_pkt(uint8_t *data);
+
+/**
+ * __qdf_nbuf_data_is_ipv6_tcp_pkt() - check if it is IPV6 TCP packet.
+ * @data: Pointer to IPV6 TCP packet data buffer
+ *
+ * This func. checks whether it is a IPV6 TCP packet or not.
+ *
+ * Return: TRUE if it is a IPV6 TCP packet
+ *         FALSE if not
+ */
 bool __qdf_nbuf_data_is_ipv6_tcp_pkt(uint8_t *data);
+
+/**
+ * __qdf_nbuf_data_is_ipv4_dhcp_pkt() - check if skb data is a dhcp packet
+ * @data: Pointer to network data buffer
+ *
+ * This api is for ipv4 packet.
+ *
+ * Return: true if packet is DHCP packet
+ *	   false otherwise
+ */
 bool __qdf_nbuf_data_is_ipv4_dhcp_pkt(uint8_t *data);
+
+/**
+ * __qdf_nbuf_data_is_ipv6_dhcp_pkt() - check if skb data is a dhcp packet
+ * @data: Pointer to network data buffer
+ *
+ * This api is for ipv6 packet.
+ *
+ * Return: true if packet is DHCP packet
+ *	   false otherwise
+ */
 bool __qdf_nbuf_data_is_ipv6_dhcp_pkt(uint8_t *data);
+
+/**
+ * __qdf_nbuf_data_is_ipv6_mdns_pkt() - check if skb data is a mdns packet
+ * @data: Pointer to network data buffer
+ *
+ * This api is for ipv6 packet.
+ *
+ * Return: true if packet is MDNS packet
+ *	   false otherwise
+ */
 bool __qdf_nbuf_data_is_ipv6_mdns_pkt(uint8_t *data);
+
+/**
+ * __qdf_nbuf_data_is_ipv4_eapol_pkt() - check if skb data is a eapol packet
+ * @data: Pointer to network data buffer
+ *
+ * This api is for ipv4 packet.
+ *
+ * Return: true if packet is EAPOL packet
+ *	   false otherwise.
+ */
 bool __qdf_nbuf_data_is_ipv4_eapol_pkt(uint8_t *data);
+
+/**
+ * __qdf_nbuf_data_is_ipv4_igmp_pkt() - check if skb data is a igmp packet
+ * @data: Pointer to network data buffer
+ *
+ * This api is for ipv4 packet.
+ *
+ * Return: true if packet is igmp packet
+ *	   false otherwise.
+ */
 bool __qdf_nbuf_data_is_ipv4_igmp_pkt(uint8_t *data);
+
+/**
+ * __qdf_nbuf_data_is_ipv6_igmp_pkt() - check if skb data is a igmp packet
+ * @data: Pointer to network data buffer
+ *
+ * This api is for ipv6 packet.
+ *
+ * Return: true if packet is igmp packet
+ *	   false otherwise.
+ */
 bool __qdf_nbuf_data_is_ipv6_igmp_pkt(uint8_t *data);
+
+/**
+ * __qdf_nbuf_is_ipv4_igmp_leave_pkt() - check if skb is a igmp leave packet
+ * @buf: Pointer to network buffer
+ *
+ * This api is for ipv4 packet.
+ *
+ * Return: true if packet is igmp packet
+ *	   false otherwise.
+ */
 bool __qdf_nbuf_is_ipv4_igmp_leave_pkt(__qdf_nbuf_t buf);
+
+/**
+ * __qdf_nbuf_is_ipv6_igmp_leave_pkt() - check if skb is a igmp leave packet
+ * @buf: Pointer to network buffer
+ *
+ * This api is for ipv6 packet.
+ *
+ * Return: true if packet is igmp packet
+ *	   false otherwise.
+ */
 bool __qdf_nbuf_is_ipv6_igmp_leave_pkt(__qdf_nbuf_t buf);
+
+/**
+ * __qdf_nbuf_data_is_ipv4_arp_pkt() - check if skb data is a arp packet
+ * @data: Pointer to network data buffer
+ *
+ * This api is for ipv4 packet.
+ *
+ * Return: true if packet is ARP packet
+ *	   false otherwise.
+ */
 bool __qdf_nbuf_data_is_ipv4_arp_pkt(uint8_t *data);
+
+/**
+ * __qdf_nbuf_is_bcast_pkt() - is destination address broadcast
+ * @nbuf: sk buff
+ *
+ * Return: true if packet is broadcast
+ *	   false otherwise
+ */
 bool __qdf_nbuf_is_bcast_pkt(__qdf_nbuf_t nbuf);
+
+/**
+ * __qdf_nbuf_is_mcast_replay() - is multicast replay packet
+ * @nbuf: sk buff
+ *
+ * Return: true if packet is multicast replay
+ *	   false otherwise
+ */
 bool __qdf_nbuf_is_mcast_replay(__qdf_nbuf_t nbuf);
+
+/**
+ * __qdf_nbuf_is_arp_local() - check if local or non local arp
+ * @skb: pointer to sk_buff
+ *
+ * Return: true if local arp or false otherwise.
+ */
 bool __qdf_nbuf_is_arp_local(struct sk_buff *skb);
+
+/**
+ * __qdf_nbuf_data_is_arp_req() - check if skb data is a arp request
+ * @data: Pointer to network data buffer
+ *
+ * This api is for ipv4 packet.
+ *
+ * Return: true if packet is ARP request
+ *	   false otherwise.
+ */
 bool __qdf_nbuf_data_is_arp_req(uint8_t *data);
+
+/**
+ * __qdf_nbuf_data_is_arp_rsp() - check if skb data is a arp response
+ * @data: Pointer to network data buffer
+ *
+ * This api is for ipv4 packet.
+ *
+ * Return: true if packet is ARP response
+ *	   false otherwise.
+ */
 bool __qdf_nbuf_data_is_arp_rsp(uint8_t *data);
+
+/**
+ * __qdf_nbuf_get_arp_src_ip() - get arp src IP
+ * @data: Pointer to network data buffer
+ *
+ * This api is for ipv4 packet.
+ *
+ * Return: ARP packet source IP value.
+ */
 uint32_t __qdf_nbuf_get_arp_src_ip(uint8_t *data);
+
+/**
+ * __qdf_nbuf_get_arp_tgt_ip() - get arp target IP
+ * @data: Pointer to network data buffer
+ *
+ * This api is for ipv4 packet.
+ *
+ * Return: ARP packet target IP value.
+ */
 uint32_t __qdf_nbuf_get_arp_tgt_ip(uint8_t *data);
+
+/**
+ * __qdf_nbuf_get_dns_domain_name() - get dns domain name
+ * @data: Pointer to network data buffer
+ * @len: length to copy
+ *
+ * This api is for dns domain name
+ *
+ * Return: dns domain name.
+ */
 uint8_t *__qdf_nbuf_get_dns_domain_name(uint8_t *data, uint32_t len);
+
+/**
+ * __qdf_nbuf_data_is_dns_query() - check if skb data is a dns query
+ * @data: Pointer to network data buffer
+ *
+ * This api is for dns query packet.
+ *
+ * Return: true if packet is dns query packet.
+ *	   false otherwise.
+ */
 bool __qdf_nbuf_data_is_dns_query(uint8_t *data);
+
+/**
+ * __qdf_nbuf_data_is_dns_response() - check if skb data is a dns response
+ * @data: Pointer to network data buffer
+ *
+ * This api is for dns query response.
+ *
+ * Return: true if packet is dns response packet.
+ *	   false otherwise.
+ */
 bool __qdf_nbuf_data_is_dns_response(uint8_t *data);
+
+/**
+ * __qdf_nbuf_data_is_tcp_fin() - check if skb data is a tcp fin
+ * @data: Pointer to network data buffer
+ *
+ * This api is to check if the packet is tcp fin.
+ *
+ * Return: true if packet is tcp fin packet.
+ *         false otherwise.
+ */
 bool __qdf_nbuf_data_is_tcp_fin(uint8_t *data);
+
+/**
+ * __qdf_nbuf_data_is_tcp_fin_ack() - check if skb data is a tcp fin ack
+ * @data: Pointer to network data buffer
+ *
+ * This api is to check if the tcp packet is fin ack.
+ *
+ * Return: true if packet is tcp fin ack packet.
+ *         false otherwise.
+ */
 bool __qdf_nbuf_data_is_tcp_fin_ack(uint8_t *data);
+
+/**
+ * __qdf_nbuf_data_is_tcp_syn() - check if skb data is a tcp syn
+ * @data: Pointer to network data buffer
+ *
+ * This api is for tcp syn packet.
+ *
+ * Return: true if packet is tcp syn packet.
+ *	   false otherwise.
+ */
 bool __qdf_nbuf_data_is_tcp_syn(uint8_t *data);
+
+/**
+ * __qdf_nbuf_data_is_tcp_syn_ack() - check if skb data is a tcp syn ack
+ * @data: Pointer to network data buffer
+ *
+ * This api is for tcp syn ack packet.
+ *
+ * Return: true if packet is tcp syn ack packet.
+ *	   false otherwise.
+ */
 bool __qdf_nbuf_data_is_tcp_syn_ack(uint8_t *data);
+
+/**
+ * __qdf_nbuf_data_is_tcp_rst() - check if skb data is a tcp rst
+ * @data: Pointer to network data buffer
+ *
+ * This api is to check if the tcp packet is rst.
+ *
+ * Return: true if packet is tcp rst packet.
+ *         false otherwise.
+ */
 bool __qdf_nbuf_data_is_tcp_rst(uint8_t *data);
+
+/**
+ * __qdf_nbuf_data_is_tcp_ack() - check if skb data is a tcp ack
+ * @data: Pointer to network data buffer
+ *
+ * This api is for tcp ack packet.
+ *
+ * Return: true if packet is tcp ack packet.
+ *	   false otherwise.
+ */
 bool __qdf_nbuf_data_is_tcp_ack(uint8_t *data);
+
+/**
+ * __qdf_nbuf_data_get_tcp_src_port() - get tcp src port
+ * @data: Pointer to network data buffer
+ *
+ * This api is for tcp packet.
+ *
+ * Return: tcp source port value.
+ */
 uint16_t __qdf_nbuf_data_get_tcp_src_port(uint8_t *data);
+
+/**
+ * __qdf_nbuf_data_get_tcp_dst_port() - get tcp dst port
+ * @data: Pointer to network data buffer
+ *
+ * This api is for tcp packet.
+ *
+ * Return: tcp destination port value.
+ */
 uint16_t __qdf_nbuf_data_get_tcp_dst_port(uint8_t *data);
+
+/**
+ * __qdf_nbuf_data_is_icmpv4_req() - check if skb data is a icmpv4 request
+ * @data: Pointer to network data buffer
+ *
+ * This api is for ipv4 req packet.
+ *
+ * Return: true if packet is icmpv4 request
+ *	   false otherwise.
+ */
 bool __qdf_nbuf_data_is_icmpv4_req(uint8_t *data);
+
+/**
+ * __qdf_nbuf_data_is_icmpv4_redirect() - check if skb data is a icmpv4 redirect
+ * @data: Pointer to network data buffer
+ *
+ * This api is for ipv4 req packet.
+ *
+ * Return: true if packet is icmpv4 redirect
+ *	   false otherwise.
+ */
 bool __qdf_nbuf_data_is_icmpv4_redirect(uint8_t *data);
+
+/**
+ * __qdf_nbuf_data_is_icmpv6_redirect() - check if skb data is a icmpv6 redirect
+ * @data: Pointer to network data buffer
+ *
+ * This api is for ipv6 req packet.
+ *
+ * Return: true if packet is icmpv6 redirect
+ *	   false otherwise.
+ */
 bool __qdf_nbuf_data_is_icmpv6_redirect(uint8_t *data);
+
+/**
+ * __qdf_nbuf_data_is_icmpv4_rsp() - check if skb data is a icmpv4 res
+ * @data: Pointer to network data buffer
+ *
+ * This api is for ipv4 res packet.
+ *
+ * Return: true if packet is icmpv4 response
+ *	   false otherwise.
+ */
 bool __qdf_nbuf_data_is_icmpv4_rsp(uint8_t *data);
+
+/**
+ * __qdf_nbuf_get_icmpv4_src_ip() - get icmpv4 src IP
+ * @data: Pointer to network data buffer
+ *
+ * This api is for ipv4 packet.
+ *
+ * Return: icmpv4 packet source IP value.
+ */
 uint32_t __qdf_nbuf_get_icmpv4_src_ip(uint8_t *data);
+
+/**
+ * __qdf_nbuf_get_icmpv4_tgt_ip() - get icmpv4 target IP
+ * @data: Pointer to network data buffer
+ *
+ * This api is for ipv4 packet.
+ *
+ * Return: icmpv4 packet target IP value.
+ */
 uint32_t __qdf_nbuf_get_icmpv4_tgt_ip(uint8_t *data);
+
+/**
+ * __qdf_nbuf_data_get_dhcp_subtype() - get the subtype
+ *              of DHCP packet.
+ * @data: Pointer to DHCP packet data buffer
+ *
+ * This func. returns the subtype of DHCP packet.
+ *
+ * Return: subtype of the DHCP packet.
+ */
 enum qdf_proto_subtype  __qdf_nbuf_data_get_dhcp_subtype(uint8_t *data);
+
+/**
+ * __qdf_nbuf_data_get_eapol_subtype() - get the subtype of EAPOL packet.
+ * @data: Pointer to EAPOL packet data buffer
+ *
+ * This func. returns the subtype of EAPOL packet.
+ *
+ * Return: subtype of the EAPOL packet.
+ */
 enum qdf_proto_subtype  __qdf_nbuf_data_get_eapol_subtype(uint8_t *data);
+
+/**
+ * __qdf_nbuf_data_get_arp_subtype() - get the subtype
+ *            of ARP packet.
+ * @data: Pointer to ARP packet data buffer
+ *
+ * This func. returns the subtype of ARP packet.
+ *
+ * Return: subtype of the ARP packet.
+ */
 enum qdf_proto_subtype  __qdf_nbuf_data_get_arp_subtype(uint8_t *data);
+
+/**
+ * __qdf_nbuf_data_get_icmp_subtype() - get the subtype
+ *            of IPV4 ICMP packet.
+ * @data: Pointer to IPV4 ICMP packet data buffer
+ *
+ * This func. returns the subtype of ICMP packet.
+ *
+ * Return: subtype of the ICMP packet.
+ */
 enum qdf_proto_subtype  __qdf_nbuf_data_get_icmp_subtype(uint8_t *data);
+
+/**
+ * __qdf_nbuf_data_get_icmpv6_subtype() - get the subtype
+ *            of IPV6 ICMPV6 packet.
+ * @data: Pointer to IPV6 ICMPV6 packet data buffer
+ *
+ * This func. returns the subtype of ICMPV6 packet.
+ *
+ * Return: subtype of the ICMPV6 packet.
+ */
 enum qdf_proto_subtype  __qdf_nbuf_data_get_icmpv6_subtype(uint8_t *data);
+
+/**
+ * __qdf_nbuf_data_get_ipv4_proto() - get the proto type
+ *            of IPV4 packet.
+ * @data: Pointer to IPV4 packet data buffer
+ *
+ * This func. returns the proto type of IPV4 packet.
+ *
+ * Return: proto type of IPV4 packet.
+ */
 uint8_t __qdf_nbuf_data_get_ipv4_proto(uint8_t *data);
+
+/**
+ * __qdf_nbuf_data_get_ipv6_proto() - get the proto type
+ *            of IPV6 packet.
+ * @data: Pointer to IPV6 packet data buffer
+ *
+ * This func. returns the proto type of IPV6 packet.
+ *
+ * Return: proto type of IPV6 packet.
+ */
 uint8_t __qdf_nbuf_data_get_ipv6_proto(uint8_t *data);
+
+/**
+ * __qdf_nbuf_data_get_ipv4_tos() - get the TOS type of IPv4 packet
+ * @data: Pointer to skb payload
+ *
+ * This func. returns the TOS type of IPv4 packet.
+ *
+ * Return: TOS type of IPv4 packet.
+ */
 uint8_t __qdf_nbuf_data_get_ipv4_tos(uint8_t *data);
+
+/**
+ * __qdf_nbuf_data_get_ipv6_tc() - get the TC field
+ *                                 of IPv6 packet.
+ * @data: Pointer to IPv6 packet data buffer
+ *
+ * This func. returns the TC field of IPv6 packet.
+ *
+ * Return: traffic classification of IPv6 packet.
+ */
 uint8_t __qdf_nbuf_data_get_ipv6_tc(uint8_t *data);
+
+/**
+ * __qdf_nbuf_data_set_ipv4_tos() - set the TOS for IPv4 packet
+ * @data: pointer to skb payload
+ * @tos: value of TOS to be set
+ *
+ * This func. set the TOS field of IPv4 packet.
+ *
+ * Return: None
+ */
 void __qdf_nbuf_data_set_ipv4_tos(uint8_t *data, uint8_t tos);
+
+/**
+ * __qdf_nbuf_data_set_ipv6_tc() - set the TC field
+ *                                 of IPv6 packet.
+ * @data: Pointer to skb payload
+ * @tc: value to set to IPv6 header TC field
+ *
+ * This func. set the TC field of IPv6 header.
+ *
+ * Return: None
+ */
 void __qdf_nbuf_data_set_ipv6_tc(uint8_t *data, uint8_t tc);
+
+/**
+ * __qdf_nbuf_is_ipv4_last_fragment() - Check if IPv4 packet is last fragment
+ * @skb: Buffer
+ *
+ * This function checks IPv4 packet is last fragment or not.
+ * Caller has to call this function for IPv4 packets only.
+ *
+ * Return: True if IPv4 packet is last fragment otherwise false
+ */
 bool __qdf_nbuf_is_ipv4_last_fragment(struct sk_buff *skb);
+
 bool __qdf_nbuf_is_ipv4_v6_pure_tcp_ack(struct sk_buff *skb);
 
 #ifdef QDF_NBUF_GLOBAL_COUNT
+/**
+ * __qdf_nbuf_count_get() - get nbuf global count
+ *
+ * Return: nbuf global count
+ */
 int __qdf_nbuf_count_get(void);
-void __qdf_nbuf_count_inc(struct sk_buff *skb);
-void __qdf_nbuf_count_dec(struct sk_buff *skb);
+
+/**
+ * __qdf_nbuf_count_inc() - increment nbuf global count
+ *
+ * @nbuf: sk buff
+ *
+ * Return: void
+ */
+void __qdf_nbuf_count_inc(struct sk_buff *nbuf);
+
+/**
+ * __qdf_nbuf_count_dec() - decrement nbuf global count
+ *
+ * @nbuf: sk buff
+ *
+ * Return: void
+ */
+void __qdf_nbuf_count_dec(struct sk_buff *nbuf);
+
+/**
+ * __qdf_nbuf_mod_init() - Initialization routine for qdf_nbuf
+ *
+ * Return void
+ */
 void __qdf_nbuf_mod_init(void);
+
+/**
+ * __qdf_nbuf_mod_exit() - Unintialization routine for qdf_nbuf
+ *
+ * Return void
+ */
 void __qdf_nbuf_mod_exit(void);
 
 #else
@@ -1077,7 +1845,7 @@ __qdf_nbuf_cat(struct sk_buff *dst, struct sk_buff *src)
  */
 /**
  * __qdf_nbuf_headroom() - return the amount of tail space available
- * @buf: Pointer to network buffer
+ * @skb: Pointer to network buffer
  *
  * Return: amount of tail room
  */
@@ -1088,7 +1856,7 @@ static inline int __qdf_nbuf_headroom(struct sk_buff *skb)
 
 /**
  * __qdf_nbuf_tailroom() - return the amount of tail space available
- * @buf: Pointer to network buffer
+ * @skb: Pointer to network buffer
  *
  * Return: amount of tail room
  */
@@ -1133,13 +1901,65 @@ static inline void __qdf_nbuf_trim_tail(struct sk_buff *skb, size_t size)
 /*
  * prototypes. Implemented in qdf_nbuf.c
  */
+
+/**
+ * __qdf_nbuf_get_tx_cksum() - get tx checksum
+ * @skb: Pointer to network buffer
+ *
+ * Return: TX checksum value
+ */
 qdf_nbuf_tx_cksum_t __qdf_nbuf_get_tx_cksum(struct sk_buff *skb);
+
+/**
+ * __qdf_nbuf_set_rx_cksum() - set rx checksum
+ * @skb: Pointer to network buffer
+ * @cksum: Pointer to checksum value
+ *
+ * Return: QDF_STATUS
+ */
 QDF_STATUS __qdf_nbuf_set_rx_cksum(struct sk_buff *skb,
-				qdf_nbuf_rx_cksum_t *cksum);
+				   qdf_nbuf_rx_cksum_t *cksum);
+
+/**
+ * __qdf_nbuf_get_tid() - get tid
+ * @skb: Pointer to network buffer
+ *
+ * Return: tid
+ */
 uint8_t __qdf_nbuf_get_tid(struct sk_buff *skb);
+
+/**
+ * __qdf_nbuf_set_tid() - set tid
+ * @skb: Pointer to network buffer
+ * @tid: TID value to set
+ *
+ * Return: none
+ */
 void __qdf_nbuf_set_tid(struct sk_buff *skb, uint8_t tid);
+
+/**
+ * __qdf_nbuf_get_exemption_type() - get exemption type
+ * @skb: Pointer to network buffer
+ *
+ * Return: exemption type
+ */
 uint8_t __qdf_nbuf_get_exemption_type(struct sk_buff *skb);
+
+/**
+ * __qdf_nbuf_ref() - Reference the nbuf so it can get held until the last free.
+ * @skb: sk_buff handle
+ *
+ * Return: none
+ */
+
 void __qdf_nbuf_ref(struct sk_buff *skb);
+
+/**
+ * __qdf_nbuf_shared() - Check whether the buffer is shared
+ *  @skb: sk_buff buffer
+ *
+ *  Return: true if more than one person has a reference to this buffer.
+ */
 int __qdf_nbuf_shared(struct sk_buff *skb);
 
 /**
@@ -1256,7 +2076,7 @@ __qdf_nbuf_unlink_no_lock(struct sk_buff *skb, struct sk_buff_head *list)
 
 /**
  * __qdf_nbuf_reset() - reset the buffer data and pointer
- * @buf: Network buf instance
+ * @skb: Network buf instance
  * @reserve: reserve
  * @align: align
  *
@@ -1296,8 +2116,8 @@ __qdf_nbuf_reset(struct sk_buff *skb, int reserve, int align)
 
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 14, 0))
 /**
- * qdf_nbuf_dev_scratch_is_supported() - dev_scratch support for network buffer
- *                                       in kernel
+ * __qdf_nbuf_is_dev_scratch_supported() - dev_scratch support for network
+ *                                         buffer in kernel
  *
  * Return: true if dev_scratch is supported
  *         false if dev_scratch is not supported
@@ -1308,7 +2128,7 @@ static inline bool __qdf_nbuf_is_dev_scratch_supported(void)
 }
 
 /**
- * qdf_nbuf_get_dev_scratch() - get dev_scratch of network buffer
+ * __qdf_nbuf_get_dev_scratch() - get dev_scratch of network buffer
  * @skb: Pointer to network buffer
  *
  * Return: dev_scratch if dev_scratch supported
@@ -1320,7 +2140,7 @@ static inline unsigned long __qdf_nbuf_get_dev_scratch(struct sk_buff *skb)
 }
 
 /**
- * qdf_nbuf_set_dev_scratch() - set dev_scratch of network buffer
+ * __qdf_nbuf_set_dev_scratch() - set dev_scratch of network buffer
  * @skb: Pointer to network buffer
  * @value: value to be set in dev_scratch of network buffer
  *
@@ -1436,7 +2256,7 @@ static inline void __qdf_nbuf_set_priority(struct sk_buff *skb, uint32_t p)
 /**
  * __qdf_nbuf_set_next() - sets the next skb pointer of the current skb
  * @skb: Current skb
- * @next_skb: Next skb
+ * @skb_next: Next skb
  *
  * Return: void
  */
@@ -1460,7 +2280,7 @@ static inline struct sk_buff *__qdf_nbuf_next(struct sk_buff *skb)
 /**
  * __qdf_nbuf_set_next_ext() - sets the next skb pointer of the current skb
  * @skb: Current skb
- * @next_skb: Next skb
+ * @skb_next: Next skb
  *
  * This fn is used to link up extensions to the head skb. Does not handle
  * linking to the head
@@ -1506,7 +2326,7 @@ __qdf_nbuf_append_ext_list(struct sk_buff *skb_head,
 
 /**
  * __qdf_nbuf_get_shinfo() - return the shared info of the skb
- * @skb: Pointer to network buffer
+ * @head_buf: Pointer to network buffer
  *
  * Return: skb shared info from head buf
  */
@@ -1626,12 +2446,45 @@ __qdf_nbuf_set_protocol(struct sk_buff *skb, uint16_t protocol)
 #define __qdf_nbuf_get_tx_htt2_frm(skb)	\
 	QDF_NBUF_CB_TX_HL_HTT2_FRM(skb)
 
+/**
+ * __qdf_dmaaddr_to_32s() - return high and low parts of dma_addr
+ * @dmaaddr: DMA address
+ * @lo: low 32-bits of @dmaaddr
+ * @hi: high 32-bits of @dmaaddr
+ *
+ * Returns the high and low 32-bits of the DMA addr in the provided ptrs
+ *
+ * Return: N/A
+ */
 void __qdf_dmaaddr_to_32s(qdf_dma_addr_t dmaaddr,
 				      uint32_t *lo, uint32_t *hi);
 
+/**
+ * __qdf_nbuf_get_tso_info() - function to divide a TSO nbuf
+ * into segments
+ * @osdev: qdf device handle
+ * @skb: network buffer to be segmented
+ * @tso_info: This is the output. The information about the
+ *           TSO segments will be populated within this.
+ *
+ * This function fragments a TCP jumbo packet into smaller
+ * segments to be transmitted by the driver. It chains the TSO
+ * segments created into a list.
+ *
+ * Return: number of TSO segments
+ */
 uint32_t __qdf_nbuf_get_tso_info(qdf_device_t osdev, struct sk_buff *skb,
-	struct qdf_tso_info_t *tso_info);
+				 struct qdf_tso_info_t *tso_info);
 
+/**
+ * __qdf_nbuf_unmap_tso_segment() - function to dma unmap TSO segment element
+ *
+ * @osdev: qdf device handle
+ * @tso_seg: TSO segment element to be unmapped
+ * @is_last_seg: whether this is last tso seg or not
+ *
+ * Return: none
+ */
 void __qdf_nbuf_unmap_tso_segment(qdf_device_t osdev,
 			  struct qdf_tso_seg_elem_t *tso_seg,
 			  bool is_last_seg);
@@ -1645,6 +2498,18 @@ void __qdf_nbuf_unmap_tso_segment(qdf_device_t osdev,
  * Return: size
  */
 size_t __qdf_nbuf_get_tcp_payload_len(struct sk_buff *skb);
+
+/**
+ * __qdf_nbuf_get_tso_num_seg() - function to divide a TSO nbuf
+ *                                into segments
+ * @skb:   network buffer to be segmented
+ *
+ * This function fragments a TCP jumbo packet into smaller
+ * segments to be transmitted by the driver. It chains the TSO
+ * segments created into a list.
+ *
+ * Return: number of segments
+ */
 uint32_t __qdf_nbuf_get_tso_num_seg(struct sk_buff *skb);
 
 #else
@@ -1679,7 +2544,7 @@ int __qdf_nbuf_get_users(struct sk_buff *skb);
  * __qdf_nbuf_tx_info_get() - Modify pkt_type, set pkt_subtype,
  *			      and get hw_classify by peeking
  *			      into packet
- * @nbuf:		Network buffer (skb on Linux)
+ * @skb:		Network buffer (skb on Linux)
  * @pkt_type:		Pkt type (from enum htt_pkt_type)
  * @pkt_subtype:	Bit 4 of this field in HTT descriptor
  *			needs to be set in case of CE classification support
@@ -1721,7 +2586,7 @@ do {								\
 								\
 } while (0)
 
-/**
+/*
  * nbuf private buffer routines
  */
 
@@ -1729,7 +2594,7 @@ do {								\
  * __qdf_nbuf_peek_header() - return the header's addr & m_len
  * @skb: Pointer to network buffer
  * @addr: Pointer to store header's addr
- * @m_len: network buffer length
+ * @len: network buffer length
  *
  * Return: none
  */
@@ -1741,7 +2606,7 @@ __qdf_nbuf_peek_header(struct sk_buff *skb, uint8_t **addr, uint32_t *len)
 }
 
 /**
- * typedef struct __qdf_nbuf_queue_t -  network buffer queue
+ * typedef __qdf_nbuf_queue_t -  network buffer queue
  * @head: Head pointer
  * @tail: Tail pointer
  * @qlen: Queue length
@@ -2058,7 +2923,7 @@ __qdf_nbuf_unshare(struct sk_buff *skb)
 
 /**
  * __qdf_nbuf_is_cloned() - test whether the nbuf is cloned or not
- *@buf: sk buff
+ * @skb: sk buff
  *
  * Return: true/false
  */
@@ -2166,6 +3031,9 @@ __qdf_nbuf_get_ref_fraglist(struct sk_buff *buf)
 
 /**
  * __qdf_nbuf_tx_cksum_info() - tx checksum info
+ * @skb: Network buffer
+ * @hdr_off:
+ * @where:
  *
  * Return: true/false
  */
@@ -2231,7 +3099,7 @@ static inline size_t __qdf_nbuf_tcp_tso_size(struct sk_buff *skb)
  */
 void __qdf_nbuf_init(__qdf_nbuf_t nbuf);
 
-/*
+/**
  *  __qdf_nbuf_get_cb() - returns a pointer to skb->cb
  * @nbuf: sk buff
  *
@@ -2257,7 +3125,7 @@ __qdf_nbuf_headlen(struct sk_buff *skb)
 
 /**
  * __qdf_nbuf_tso_tcp_v4() - to check if the TSO TCP pkt is a IPv4 or not.
- * @buf: sk buff
+ * @skb: sk buff
  *
  * Return: true/false
  */
@@ -2268,7 +3136,7 @@ static inline bool __qdf_nbuf_tso_tcp_v4(struct sk_buff *skb)
 
 /**
  * __qdf_nbuf_tso_tcp_v6() - to check if the TSO TCP pkt is a IPv6 or not.
- * @buf: sk buff
+ * @skb: sk buff
  *
  * Return: true/false
  */
@@ -2301,7 +3169,7 @@ static inline size_t __qdf_nbuf_get_tcp_hdr_len(struct sk_buff *skb)
 
 /**
  * __qdf_nbuf_is_nonlinear() - test whether the nbuf is nonlinear or not
- * @buf: sk buff
+ * @skb: sk buff
  *
  * Return:  true/false
  */
@@ -2315,7 +3183,7 @@ static inline bool __qdf_nbuf_is_nonlinear(struct sk_buff *skb)
 
 /**
  * __qdf_nbuf_tcp_seq() - get the TCP sequence number of the  skb
- * @buf: sk buff
+ * @skb: sk buff
  *
  * Return: TCP sequence number
  */
@@ -2326,7 +3194,7 @@ static inline uint32_t __qdf_nbuf_tcp_seq(struct sk_buff *skb)
 
 /**
  * __qdf_nbuf_get_priv_ptr() - get the priv pointer from the nbuf'f private space
- *@buf: sk buff
+ *@skb: sk buff
  *
  * Return: data pointer to typecast into your priv structure
  */
@@ -2351,7 +3219,7 @@ __qdf_nbuf_mark_wakeup_frame(__qdf_nbuf_t buf)
 /**
  * __qdf_nbuf_record_rx_queue() - set rx queue in skb
  *
- * @buf: sk buff
+ * @skb: sk buff
  * @queue_id: Queue id
  *
  * Return: void
@@ -2365,7 +3233,7 @@ __qdf_nbuf_record_rx_queue(struct sk_buff *skb, uint16_t queue_id)
 /**
  * __qdf_nbuf_get_queue_mapping() - get the queue mapping set by linux kernel
  *
- * @buf: sk buff
+ * @skb: sk buff
  *
  * Return: Queue mapping
  */
@@ -2378,7 +3246,7 @@ __qdf_nbuf_get_queue_mapping(struct sk_buff *skb)
 /**
  * __qdf_nbuf_set_queue_mapping() - get the queue mapping set by linux kernel
  *
- * @buf: sk buff
+ * @skb: sk buff
  * @val: queue_id
  *
  */
@@ -2391,7 +3259,7 @@ __qdf_nbuf_set_queue_mapping(struct sk_buff *skb, uint16_t val)
 /**
  * __qdf_nbuf_set_timestamp() - set the timestamp for frame
  *
- * @buf: sk buff
+ * @skb: sk buff
  *
  * Return: void
  */
@@ -2404,7 +3272,7 @@ __qdf_nbuf_set_timestamp(struct sk_buff *skb)
 /**
  * __qdf_nbuf_get_timestamp() - get the timestamp for frame
  *
- * @buf: sk buff
+ * @skb: sk buff
  *
  * Return: timestamp stored in skb in ms
  */
@@ -2417,7 +3285,7 @@ __qdf_nbuf_get_timestamp(struct sk_buff *skb)
 /**
  * __qdf_nbuf_get_timestamp_us() - get the timestamp for frame
  *
- * @buf: sk buff
+ * @skb: sk buff
  *
  * Return: timestamp stored in skb in us
  */
@@ -2430,7 +3298,7 @@ __qdf_nbuf_get_timestamp_us(struct sk_buff *skb)
 /**
  * __qdf_nbuf_get_timedelta_ms() - get time difference in ms
  *
- * @buf: sk buff
+ * @skb: sk buff
  *
  * Return: time difference in ms
  */
@@ -2443,7 +3311,7 @@ __qdf_nbuf_get_timedelta_ms(struct sk_buff *skb)
 /**
  * __qdf_nbuf_get_timedelta_us() - get time difference in micro seconds
  *
- * @buf: sk buff
+ * @skb: sk buff
  *
  * Return: time difference in micro seconds
  */
@@ -2644,7 +3512,7 @@ int __qdf_nbuf_queue_empty(__qdf_nbuf_queue_head_t *nbuf_queue_head)
 
 /**
  * __qdf_nbuf_queue_head_lock() - Acquire the skb list lock
- * @head: skb list for which lock is to be acquired
+ * @skb_queue_head: skb list for which lock is to be acquired
  *
  * Return: void
  */
@@ -2656,7 +3524,7 @@ void __qdf_nbuf_queue_head_lock(struct sk_buff_head *skb_queue_head)
 
 /**
  * __qdf_nbuf_queue_head_unlock() - Release the skb list lock
- * @head: skb list for which lock is to be release
+ * @skb_queue_head: skb list for which lock is to be release
  *
  * Return: void
  */
@@ -2684,7 +3552,7 @@ static inline unsigned int __qdf_nbuf_get_frag_size_by_idx(__qdf_nbuf_t nbuf,
 }
 
 /**
- * __qdf_nbuf_get_frag_address() - Get nbuf frag address at index idx
+ * __qdf_nbuf_get_frag_addr() - Get nbuf frag address at index idx
  * @nbuf: qdf_nbuf_t
  * @idx: Index for which frag address is requested
  *
@@ -2760,6 +3628,7 @@ void __qdf_nbuf_add_rx_frag(__qdf_frag_t buf, __qdf_nbuf_t nbuf,
 
 /**
  * __qdf_nbuf_ref_frag() - get frag reference
+ * @buf: Pointer to nbuf
  *
  * Return: void
  */
@@ -2803,6 +3672,7 @@ static inline qdf_size_t __qdf_nbuf_get_data_len(__qdf_nbuf_t nbuf)
 /**
  * __qdf_nbuf_set_data_len() - Return the data_len of the nbuf
  * @nbuf: qdf_nbuf_t
+ * @len: data_len to be set
  *
  * Return: value of data_len
  */
@@ -2930,8 +3800,9 @@ static inline unsigned int __qdf_nbuf_get_gso_size(struct sk_buff *skb)
 /**
  * __qdf_nbuf_set_gso_size() - Set the gso size in nbuf
  * @skb: Pointer to network buffer
+ * @val: the number of GSO segments
  *
- * Return: Return the number of gso segments
+ * Return: None
  */
 static inline void
 __qdf_nbuf_set_gso_size(struct sk_buff *skb, unsigned int val)
@@ -2941,7 +3812,7 @@ __qdf_nbuf_set_gso_size(struct sk_buff *skb, unsigned int val)
 
 /**
  * __qdf_nbuf_kfree() - Free nbuf using kfree
- * @buf: Pointer to network buffer
+ * @skb: Pointer to network buffer
  *
  * This function is called to free the skb on failure cases
  *
@@ -2954,7 +3825,7 @@ static inline void __qdf_nbuf_kfree(struct sk_buff *skb)
 
 /**
  * __qdf_nbuf_dev_kfree_list() - Free nbuf list using dev based os call
- * @skb_queue_head: Pointer to nbuf queue head
+ * @nbuf_queue_head: Pointer to nbuf queue head
  *
  * This function is called to free the nbuf list on failure cases
  *
@@ -2965,7 +3836,7 @@ __qdf_nbuf_dev_kfree_list(__qdf_nbuf_queue_head_t *nbuf_queue_head);
 
 /**
  * __qdf_nbuf_dev_queue_head() - queue a buffer using dev at the list head
- * @skb_queue_head: Pointer to skb list head
+ * @nbuf_queue_head: Pointer to skb list head
  * @buff: Pointer to nbuf
  *
  * This function is called to queue buffer at the skb list head
@@ -2981,7 +3852,7 @@ __qdf_nbuf_dev_queue_head(__qdf_nbuf_queue_head_t *nbuf_queue_head,
 
 /**
  * __qdf_nbuf_dev_kfree() - Free nbuf using dev based os call
- * @buf: Pointer to network buffer
+ * @skb: Pointer to network buffer
  *
  * This function is called to free the skb on failure cases
  *
@@ -2994,7 +3865,7 @@ static inline void __qdf_nbuf_dev_kfree(struct sk_buff *skb)
 
 /**
  * __qdf_nbuf_pkt_type_is_mcast() - check if skb pkt type is mcast
- * @buf: Network buffer
+ * @skb: Network buffer
  *
  * Return: TRUE if skb pkt type is mcast
  *         FALSE if not
@@ -3007,7 +3878,7 @@ bool __qdf_nbuf_pkt_type_is_mcast(struct sk_buff *skb)
 
 /**
  * __qdf_nbuf_pkt_type_is_bcast() - check if skb pkt type is bcast
- * @buf: Network buffer
+ * @skb: Network buffer
  *
  * Return: TRUE if skb pkt type is mcast
  *         FALSE if not
@@ -3019,9 +3890,9 @@ bool __qdf_nbuf_pkt_type_is_bcast(struct sk_buff *skb)
 }
 
 /**
- * __qdf_nbuf_set_dev_scratch() - set dev_scratch of network buffer
- * @buf: Pointer to network buffer
- * @value: value to be set in dev_scratch of network buffer
+ * __qdf_nbuf_set_dev() - set dev of network buffer
+ * @skb: Pointer to network buffer
+ * @dev: value to be set in dev of network buffer
  *
  * Return: void
  */
@@ -3033,7 +3904,7 @@ void __qdf_nbuf_set_dev(struct sk_buff *skb, struct net_device *dev)
 
 /**
  * __qdf_nbuf_get_dev_mtu() - get dev mtu in n/w buffer
- * @buf: Pointer to network buffer
+ * @skb: Pointer to network buffer
  *
  * Return: dev mtu value in nbuf
  */
@@ -3044,8 +3915,9 @@ unsigned int __qdf_nbuf_get_dev_mtu(struct sk_buff *skb)
 }
 
 /**
- * __qdf_nbuf_set_protocol_eth_tye_trans() - set protocol using eth trans os API
- * @buf: Pointer to network buffer
+ * __qdf_nbuf_set_protocol_eth_type_trans() - set protocol using eth trans
+ *                                            os API
+ * @skb: Pointer to network buffer
  *
  * Return: None
  */
@@ -3055,7 +3927,7 @@ void __qdf_nbuf_set_protocol_eth_type_trans(struct sk_buff *skb)
 	skb->protocol = eth_type_trans(skb, skb->dev);
 }
 
-/*
+/**
  * __qdf_nbuf_net_timedelta() - get time delta
  * @t: time as __qdf_ktime_t object
  *

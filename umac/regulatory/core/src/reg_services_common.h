@@ -1089,36 +1089,6 @@ void reg_set_channel_params_for_pwrmode(struct wlan_objmgr_pdev *pdev,
 
 #ifdef WLAN_FEATURE_11BE
 /**
- * reg_fill_channel_list() - Fills an array of ch_params (list of
- * channels) for the given channel width and primary freq.
- * If 320 band_center is given, ch_params corresponding to the
- * given band_center is filled.
- *
- * @pdev: Pointer to pdev
- * @freq: Center frequency of the primary channel in MHz
- * @sec_ch_2g_freq: Secondary 2G channel frequency in MHZ
- * @ch_width: Input channel width.
- * @band_center: Center frequency of the 320MHZ channel.
- * @chan_list: Pointer to struct reg_channel_list to be filled (Output).
- * The caller is supposed to provide enough storage for the elements
- * in the list.
- * @in_6g_pwr_type: 6g power type which decides 6G channel list lookup.
- * @treat_nol_chan_as_disabled: bool to treat nol channel as enabled or
- * disabled. If set to true, nol chan is considered as disabled in chan search.
- *
- * Return: None
- */
-void
-reg_fill_channel_list(struct wlan_objmgr_pdev *pdev,
-		      qdf_freq_t freq,
-		      qdf_freq_t sec_ch_2g_freq,
-		      enum phy_ch_width ch_width,
-		      qdf_freq_t band_center_320,
-		      struct reg_channel_list *chan_list,
-		      bool treat_nol_chan_as_disabled);
-
-#ifdef CONFIG_REG_6G_PWRMODE
-/**
  * reg_fill_channel_list_for_pwrmode() - Fills an array of ch_params (list of
  * channels) for the given channel width and primary freq.
  * If 320 band_center is given, ch_params corresponding to the
@@ -1147,7 +1117,6 @@ reg_fill_channel_list_for_pwrmode(struct wlan_objmgr_pdev *pdev,
 				  struct reg_channel_list *chan_list,
 				  enum supported_6g_pwr_types in_6g_pwr_mode,
 				  bool treat_nol_chan_as_disabled);
-#endif
 
 /**
  * reg_is_punc_bitmap_valid() - is puncture bitmap valid or not

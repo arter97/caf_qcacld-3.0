@@ -39,11 +39,11 @@ struct dp_be_intrabss_params {
 
 #ifndef QCA_HOST_MODE_WIFI_DISABLED
 
-/*
+/**
  * dp_rx_intrabss_fwd_be() - API for intrabss fwd. For EAPOL
  *  pkt with DA not equal to vdev mac addr, fwd is not allowed.
  * @soc: core txrx main context
- * @ta_txrx_peer: source peer entry
+ * @ta_peer: source peer entry
  * @rx_tlv_hdr: start address of rx tlvs
  * @nbuf: nbuf that has to be intrabss forwarded
  * @msdu_metadata: msdu metadata
@@ -51,10 +51,8 @@ struct dp_be_intrabss_params {
  * Return: true if it is forwarded else false
  */
 
-bool dp_rx_intrabss_fwd_be(struct dp_soc *soc,
-			   struct dp_txrx_peer *ta_txrx_peer,
-			   uint8_t *rx_tlv_hdr,
-			   qdf_nbuf_t nbuf,
+bool dp_rx_intrabss_fwd_be(struct dp_soc *soc, struct dp_txrx_peer *ta_peer,
+			   uint8_t *rx_tlv_hdr, qdf_nbuf_t nbuf,
 			   struct hal_rx_msdu_metadata msdu_metadata);
 #endif
 
@@ -77,6 +75,19 @@ void dp_rx_word_mask_subscribe_be(struct dp_soc *soc,
 				  uint32_t *msg_word,
 				  void *rx_filter);
 
+/**
+ * dp_rx_process_be() - Brain of the Rx processing functionality
+ *		     Called from the bottom half (tasklet/NET_RX_SOFTIRQ)
+ * @int_ctx: per interrupt context
+ * @hal_ring_hdl: opaque pointer to the HAL Rx Ring, which will be serviced
+ * @reo_ring_num: ring number (0, 1, 2 or 3) of the reo ring.
+ * @quota: No. of units (packets) that can be serviced in one shot.
+ *
+ * This function implements the core of Rx functionality. This is
+ * expected to handle only non-error frames.
+ *
+ * Return: uint32_t: No. of elements processed
+ */
 uint32_t dp_rx_process_be(struct dp_intr *int_ctx,
 			  hal_ring_handle_t hal_ring_hdl, uint8_t reo_ring_num,
 			  uint32_t quota);
@@ -146,7 +157,7 @@ struct dp_rx_desc *dp_rx_desc_cookie_2_va_be(struct dp_soc *soc,
 		defined(DP_HW_COOKIE_CONVERT_EXCEPTION)
 /**
  * dp_rx_desc_sw_cc_check() - check if RX desc VA is got correctly,
-			      if not, do SW cookie conversion.
+ *			      if not, do SW cookie conversion.
  * @soc:Handle to DP Soc structure
  * @rx_buf_cookie: RX desc cookie ID
  * @r_rx_desc: double pointer for RX desc
@@ -279,8 +290,8 @@ bool dp_rx_mlo_igmp_handler(struct dp_soc *soc,
 			    qdf_nbuf_t nbuf);
 
 /**
- * dp_peer_rx_reorder_queue_setup() - Send reo queue setup wmi cmd to FW
-				      per peer type
+ * dp_peer_rx_reorder_queue_setup_be() - Send reo queue setup wmi cmd to FW
+ *					 per peer type
  * @soc: DP Soc handle
  * @peer: dp peer to operate on
  * @tid: TID
@@ -434,9 +445,8 @@ void dp_rx_prefetch_nbuf_data_be(qdf_nbuf_t nbuf, qdf_nbuf_t next)
 
 #ifdef QCA_DP_RX_HW_SW_NBUF_DESC_PREFETCH
 /**
- * dp_rx_cookie_2_va_rxdma_buf_prefetch() - function to prefetch the SW desc
- * @soc: Handle to DP Soc structure
- * @cookie: cookie used to lookup virtual address
+ * dp_rx_va_prefetch() - function to prefetch the SW desc
+ * @last_prefetched_hw_desc: HW desc
  *
  * Return: prefetched Rx descriptor virtual address
  */
@@ -451,8 +461,10 @@ void *dp_rx_va_prefetch(void *last_prefetched_hw_desc)
 }
 
 /**
- * dp_rx_prefetch_hw_sw_nbuf_desc() - function to prefetch HW and SW desc
- * @soc: Handle to HAL Soc structure
+ * dp_rx_prefetch_hw_sw_nbuf_32_byte_desc() - function to prefetch HW and SW
+ *                                            descriptors
+ * @soc: DP soc context
+ * @hal_soc: Handle to HAL Soc structure
  * @num_entries: valid number of HW descriptors
  * @hal_ring_hdl: Destination ring pointer
  * @last_prefetched_hw_desc: pointer to the last prefetched HW descriptor

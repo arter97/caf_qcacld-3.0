@@ -880,11 +880,30 @@ void dp_rx_mon_update_user_deter_stats(struct dp_pdev *pdev,
 		return;
 
 	DP_STATS_INC(mon_peer,
-		     deter_stats[tid].rx_det.mode_cnt,
+		     deter_stats.deter[tid].rx_det.mode_cnt,
 		     1);
 	DP_STATS_UPD(mon_peer,
-		     deter_stats[tid].rx_det.avg_rate,
+		     deter_stats.deter[tid].rx_det.avg_rate,
 		     mon_peer->stats.rx.avg_rx_rate);
+}
+
+/**
+ * dp_rx_mon_update_pdev_deter_stats() - Update pdev deterministic stats
+ * @pdev: Datapath pdev handle
+ * @ppdu: PPDU Descriptor
+ *
+ * Return: None
+ */
+static inline
+void dp_rx_mon_update_pdev_deter_stats(struct dp_pdev *pdev,
+				       struct cdp_rx_indication_ppdu *ppdu)
+{
+	if (!dp_is_subtype_data(ppdu->frame_ctrl))
+		return;
+
+	DP_STATS_INC(pdev,
+		     deter_stats.rx_su_cnt,
+		     1);
 }
 #else
 static inline void
@@ -899,6 +918,11 @@ void dp_rx_mon_update_user_deter_stats(struct dp_pdev *pdev,
 				       struct dp_peer *peer,
 				       struct cdp_rx_indication_ppdu *ppdu,
 				       struct cdp_rx_stats_ppdu_user *user)
+{ }
+
+static inline
+void dp_rx_mon_update_pdev_deter_stats(struct dp_pdev *pdev,
+				       struct cdp_rx_indication_ppdu *ppdu)
 { }
 #endif
 
@@ -1200,6 +1224,8 @@ dp_rx_handle_ppdu_stats(struct dp_soc *soc, struct dp_pdev *pdev,
 		if (!qdf_unlikely(qdf_nbuf_put_tail(ppdu_nbuf,
 				       sizeof(struct cdp_rx_indication_ppdu))))
 			return;
+		if (cdp_rx_ppdu->u.ppdu_type == HAL_RX_TYPE_SU)
+			dp_rx_mon_update_pdev_deter_stats(pdev, cdp_rx_ppdu);
 
 		dp_rx_stats_update(pdev, cdp_rx_ppdu);
 

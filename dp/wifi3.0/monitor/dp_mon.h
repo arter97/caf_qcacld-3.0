@@ -793,6 +793,8 @@ struct dp_mon_ops {
 				     struct htt_rx_ring_tlv_filter *tlv_filter);
 	void (*rx_wmask_subscribe)(uint32_t *msg_word,
 				   struct htt_rx_ring_tlv_filter *tlv_filter);
+	void (*rx_pkt_tlv_offset)(uint32_t *msg_word,
+				  struct htt_rx_ring_tlv_filter *tlv_filter);
 	void (*rx_enable_mpdu_logging)(uint32_t *msg_word,
 				       struct htt_rx_ring_tlv_filter *tlv_filter);
 	void (*rx_enable_fpmo)(uint32_t *msg_word,
@@ -914,14 +916,12 @@ struct dp_mon_peer_airtime_stats {
 
 /**
  * struct dp_mon_peer_deterministic - Monitor peer deterministic stats
- * @dl_det: Downlink deterministic stats
- * @ul_det: Uplink deterministic stats
- * @rx_det: RX deterministic stats
+ * @deter: Deterministic stats per data tid
+ * @avg_tx_rate: Avg TX rate
  */
 struct dp_mon_peer_deterministic {
-	struct cdp_peer_tx_dl_deter dl_det[MSDUQ_INDEX_MAX][TX_MODE_DL_MAX];
-	struct cdp_peer_tx_ul_deter ul_det[TX_MODE_UL_MAX];
-	struct cdp_peer_rx_deter rx_det;
+	struct cdp_peer_deter_stats deter[CDP_DATA_TID_MAX];
+	uint64_t avg_tx_rate;
 };
 #endif
 
@@ -938,7 +938,7 @@ struct dp_mon_peer_stats {
 	dp_mon_peer_rx_stats rx;
 #ifdef WLAN_TELEMETRY_STATS_SUPPORT
 	struct dp_mon_peer_airtime_stats airtime_stats;
-	struct dp_mon_peer_deterministic deter_stats[CDP_DATA_TID_MAX];
+	struct dp_mon_peer_deterministic deter_stats;
 #endif
 #endif
 };
@@ -1170,6 +1170,8 @@ struct  dp_mon_pdev {
 	bool reset_scan_spcl_vap_stats_enable;
 #endif
 	bool is_tlv_hdr_64_bit;
+	/* TLV header size*/
+	uint8_t tlv_hdr_size;
 
 	/* Invalid monitor peer to account for stats in mcopy mode */
 	struct dp_mon_peer *invalid_mon_peer;
@@ -3830,6 +3832,7 @@ void dp_monitor_pdev_reset_scan_spcl_vap_stats_enable(struct dp_pdev *pdev,
 }
 #endif
 
+#if defined(CONFIG_MON_WORD_BASED_TLV)
 static inline void
 dp_mon_rx_wmask_subscribe(struct dp_soc *soc, uint32_t *msg_word,
 			  struct htt_rx_ring_tlv_filter *tlv_filter)
@@ -3850,6 +3853,34 @@ dp_mon_rx_wmask_subscribe(struct dp_soc *soc, uint32_t *msg_word,
 	}
 
 	monitor_ops->rx_wmask_subscribe(msg_word, tlv_filter);
+}
+#else
+static inline void
+dp_mon_rx_wmask_subscribe(struct dp_soc *soc, uint32_t *msg_word,
+			  struct htt_rx_ring_tlv_filter *tlv_filter)
+{
+}
+#endif
+
+static inline void
+dp_mon_rx_enable_pkt_tlv_offset(struct dp_soc *soc, uint32_t *msg_word,
+				struct htt_rx_ring_tlv_filter *tlv_filter)
+{
+	struct dp_mon_soc *mon_soc = soc->monitor_soc;
+	struct dp_mon_ops *monitor_ops;
+
+	if (!mon_soc) {
+		dp_mon_debug("mon soc is NULL");
+		return;
+	}
+
+	monitor_ops = mon_soc->mon_ops;
+	if (!monitor_ops || !monitor_ops->rx_pkt_tlv_offset) {
+		dp_mon_debug("callback not registered");
+		return;
+	}
+
+	monitor_ops->rx_pkt_tlv_offset(msg_word, tlv_filter);
 }
 
 static inline void
@@ -4458,13 +4489,13 @@ void dp_monitor_peer_deter_stats(struct dp_peer *peer,
 				 struct cdp_peer_deter_stats *stats)
 {
 	struct dp_mon_peer_stats *mon_peer_stats = NULL;
-	struct dp_mon_peer_deterministic *deter_stats;
+	struct cdp_peer_deter_stats *deter_stats;
 
 	if (qdf_unlikely(!peer->monitor_peer))
 		return;
 
 	mon_peer_stats = &peer->monitor_peer->stats;
-	deter_stats = mon_peer_stats->deter_stats;
+	deter_stats = &mon_peer_stats->deter_stats.deter[0];
 	qdf_mem_copy(stats, deter_stats, sizeof(*stats) * CDP_DATA_TID_MAX);
 }
 #endif

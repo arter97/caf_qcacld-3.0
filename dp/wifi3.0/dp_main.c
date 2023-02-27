@@ -3224,8 +3224,6 @@ static void dp_soc_interrupt_map_calculate_integrated(struct dp_soc *soc,
 					soc->wlan_cfg_ctx, intr_ctx_num);
 	int txmon2host_mon_ring_mask = wlan_cfg_get_tx_mon_ring_mask(
 					soc->wlan_cfg_ctx, intr_ctx_num);
-	int umac_reset_mask = wlan_cfg_get_umac_reset_intr_mask(
-					soc->wlan_cfg_ctx, intr_ctx_num);
 
 	soc->intr_mode = DP_INTR_INTEGRATED;
 
@@ -3281,9 +3279,6 @@ static void dp_soc_interrupt_map_calculate_integrated(struct dp_soc *soc,
 			irq_id_map[num_irq++] =
 				(txmon2host_monitor_destination_mac1 - j);
 		}
-
-		if (umac_reset_mask & (1 << j))
-			irq_id_map[num_irq++] = (umac_reset - j);
 
 	}
 	*num_irq_r = num_irq;
@@ -5740,7 +5735,7 @@ dp_rx_fst_attach_wrapper(struct dp_soc *soc, struct dp_pdev *pdev)
 	if (!soc->arch_ops.dp_get_rx_fst)
 		return dp_rx_fst_attach(soc, pdev);
 
-	rx_fst = soc->arch_ops.dp_get_rx_fst(soc);
+	rx_fst = soc->arch_ops.dp_get_rx_fst();
 
 	/* for BE the FST attach is called only once per
 	 * ML context. if rx_fst is already registered
@@ -5749,15 +5744,15 @@ dp_rx_fst_attach_wrapper(struct dp_soc *soc, struct dp_pdev *pdev)
 	if (rx_fst) {
 		soc->rx_fst = rx_fst;
 		pdev->rx_fst = rx_fst;
-		soc->arch_ops.dp_rx_fst_ref(soc);
+		soc->arch_ops.dp_rx_fst_ref();
 	} else {
 		ret = dp_rx_fst_attach(soc, pdev);
 		if ((ret != QDF_STATUS_SUCCESS) &&
 		    (ret != QDF_STATUS_E_NOSUPPORT))
 			return ret;
 
-		soc->arch_ops.dp_set_rx_fst(soc, soc->rx_fst);
-		soc->arch_ops.dp_rx_fst_ref(soc);
+		soc->arch_ops.dp_set_rx_fst(soc->rx_fst);
+		soc->arch_ops.dp_rx_fst_ref();
 	}
 	return ret;
 }
@@ -5775,13 +5770,13 @@ dp_rx_fst_detach_wrapper(struct dp_soc *soc, struct dp_pdev *pdev)
 		return;
 	}
 
-	rx_fst = soc->arch_ops.dp_get_rx_fst(soc);
+	rx_fst = soc->arch_ops.dp_get_rx_fst();
 
 	/* for BE the FST detach is called only when last
 	 * ref count reaches 1.
 	 */
 	if (rx_fst) {
-		if (soc->arch_ops.dp_rx_fst_deref(soc) == 1)
+		if (soc->arch_ops.dp_rx_fst_deref() == 1)
 			dp_rx_fst_detach(soc, pdev);
 	}
 	pdev->rx_fst = NULL;
@@ -14266,7 +14261,7 @@ static struct cdp_raw_ops dp_ops_raw = {
 static struct cdp_pflow_ops dp_ops_pflow = {
 	dp_tx_flow_ctrl_configure_pdev,
 };
-#endif /* CONFIG_WIN */
+#endif
 
 #if defined(WLAN_CFR_ENABLE) && defined(WLAN_ENH_CFR_ENABLE)
 static struct cdp_cfr_ops dp_ops_cfr = {

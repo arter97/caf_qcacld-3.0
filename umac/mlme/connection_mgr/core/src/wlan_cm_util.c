@@ -39,6 +39,7 @@ static uint32_t cm_get_prefix_for_cm_id(enum wlan_cm_source source) {
 	case CM_ROAMING_HOST:
 	case CM_ROAMING_FW:
 	case CM_ROAMING_NUD_FAILURE:
+	case CM_ROAMING_LINK_REMOVAL:
 		return ROAM_REQ_PREFIX;
 	default:
 		return DISCONNECT_REQ_PREFIX;

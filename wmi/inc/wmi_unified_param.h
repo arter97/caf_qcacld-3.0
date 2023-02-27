@@ -5570,6 +5570,8 @@ typedef enum {
 	PDEV_PARAM(pdev_param_btcoex_cfg, UNAVAILABLE_PARAM),
 	PDEV_PARAM(pdev_param_soft_tx_chain_mask, PDEV_PARAM_TX_CHAIN_MASK),
 	PDEV_PARAM(pdev_param_enable_peer_retry_stats, UNAVAILABLE_PARAM),
+	PDEV_PARAM(pdev_param_scan_blanking_mode,
+		   PDEV_PARAM_SET_SCAN_BLANKING_MODE),
 	pdev_param_max,
 } wmi_conv_pdev_params_id;
 
@@ -6231,6 +6233,7 @@ typedef enum {
 #endif
 	wmi_service_wpa3_sha384_roam_support,
 	wmi_service_multiple_vdev_restart_bmap,
+	wmi_service_v1a_v1b_supported,
 	wmi_services_max,
 } wmi_conv_service_ids;
 #define WMI_SERVICE_UNAVAILABLE 0xFFFF
@@ -6600,6 +6603,7 @@ struct target_feature_set {
  * @num_max_active_vdevs: max number of active virtual devices (VAPs) to
  * support
  * @notify_frame_support: capability to mark notify frames from host
+ * @dp_peer_meta_data_ver: datapath peer meta data version flag
  */
 typedef struct {
 	uint32_t num_vdevs;
@@ -6727,6 +6731,7 @@ typedef struct {
 	bool reo_qdesc_shared_addr_table_enabled;
 	uint32_t num_max_active_vdevs;
 	uint8_t notify_frame_support;
+	uint8_t dp_peer_meta_data_ver;
 } target_resource_config;
 
 /**
@@ -8790,6 +8795,85 @@ struct wmi_btm_req_candidate_info {
 };
 
 /**
+ * struct wmi_roam_trigger_per_data - per roam trigger related information
+ * @rx_rate_thresh_percent:  percentage of lower than rx rate threshold
+ * @tx_rate_thresh_percent:  percentage of lower than tx rate threshold
+ */
+struct wmi_roam_trigger_per_data {
+	uint8_t rx_rate_thresh_percent;
+	uint8_t tx_rate_thresh_percent;
+};
+
+/**
+ * struct wmi_roam_trigger_bmiss_data - bmiss roam trigger related information
+ * @final_bmiss_cnt:        final beacon miss count
+ * @consecutive_bmiss_cnt:  consecutive beacon miss count
+ * @qos_null_success:       is Qos-Null tx Success: 0: success, 1:fail
+ */
+struct wmi_roam_trigger_bmiss_data {
+	uint32_t final_bmiss_cnt;
+	uint32_t consecutive_bmiss_cnt;
+	uint8_t qos_null_success;
+};
+
+/**
+ * struct wmi_roam_trigger_low_rssi_data - low rssi roam trigger
+ * related information
+ * @current_rssi:         Connected AP rssi in dBm
+ * @roam_rssi_threshold:  rssi threshold value in dBm
+ * @rx_linkspeed_status:  rx linkspeed status, 0:good linkspeed, 1:bad
+ */
+struct wmi_roam_trigger_low_rssi_data {
+	uint8_t current_rssi;
+	uint8_t roam_rssi_threshold;
+	uint8_t rx_linkspeed_status;
+};
+
+/**
+ * struct wmi_roam_trigger_hi_rssi_data - high rssi roam trigger
+ * related information
+ * @current_rssi:      Connected AP rssi in dBm
+ * @hirssi_threshold:  roam high RSSI threshold
+ */
+struct wmi_roam_trigger_hi_rssi_data {
+	uint8_t current_rssi;
+	uint8_t hirssi_threshold;
+};
+
+/**
+ * struct wmi_roam_trigger_congestion_data - congestion roam trigger
+ * related information
+ * @rx_tput:         RX Throughput in bytes per second in dense env
+ * @tx_tput:         TX Throughput in bytes per second in dense env
+ * @roamable_count:  roamable AP count info in dense env
+ */
+struct wmi_roam_trigger_congestion_data {
+	uint32_t rx_tput;
+	uint32_t tx_tput;
+	uint8_t roamable_count;
+};
+
+/**
+ * struct wmi_roam_trigger_user_data - user roam trigger related information
+ * @invoke_reason: defined in wlan_roam_invoke_reason
+ */
+struct wmi_roam_trigger_user_data {
+	uint32_t invoke_reason;
+};
+
+/**
+ * struct wmi_roam_trigger_background_data -  roam trigger related information
+ * @current_rssi:         Connected AP rssi in dBm
+ * @data_rssi:            data frame rssi in dBm
+ * @data_rssi_threshold:  data rssi threshold in dBm
+ */
+struct wmi_roam_trigger_background_data {
+	uint8_t current_rssi;
+	uint8_t data_rssi;
+	uint8_t data_rssi_threshold;
+};
+
+/**
  * struct wmi_roam_btm_trigger_data - BTM roam trigger related information
  * @timestamp:             timestamp
  * @btm_request_mode:      BTM request mode - solicited/unsolicited
@@ -8847,6 +8931,26 @@ struct wmi_roam_deauth_trigger_data {
 };
 
 /**
+ * struct wmi_roam_trigger_periodic_data - periodic roam trigger
+ * related information
+ * @periodic_timer_ms: roam scan periodic, milliseconds
+ */
+struct wmi_roam_trigger_periodic_data {
+	uint32_t periodic_timer_ms;
+};
+
+/**
+ * struct wmi_roam_trigger_tx_failures_data - tx failures roam trigger
+ * related information
+ * @kickout_threshold:  consecutive tx failure threshold
+ * @kickout_reason:     defined in wmi_peer_sta_kickout_reason
+ */
+struct wmi_roam_trigger_tx_failures_data {
+	uint32_t kickout_threshold;
+	uint32_t  kickout_reason;
+};
+
+/**
  * struct wmi_roam_wtc_btm_trigger_data - wtc btm roaming trigger related
  * parameters
  * @roaming_mode: Roaming Mode
@@ -8874,6 +8978,20 @@ struct wmi_roam_wtc_btm_trigger_data {
 	uint32_t wtc_candi_rssi_th_5g;
 	uint32_t wtc_candi_rssi_th_6g;
 	uint32_t duration;
+};
+
+/**
+ * struct wmi_roam_trigger_abort_reason - abort roam related information
+ * @abort_reason_code:    detail in qca_wlan_roam_abort_reason
+ * @data_rssi:            data rssi in dBm
+ * @data_rssi_threshold:  data rssi threshold in dBm
+ * @rx_linkspeed_status:  rx linkspeed status, 0:good linkspeed, 1:bad
+ */
+struct wmi_roam_trigger_abort_reason {
+	uint32_t abort_reason_code;
+	uint8_t data_rssi;
+	uint8_t data_rssi_threshold;
+	uint8_t rx_linkspeed_status;
 };
 
 /**
@@ -8923,6 +9041,8 @@ struct wmi_roam_candidate_info {
  * @next_rssi_threshold: Next roam can trigger rssi threshold
  * @chan_freq: List of frequencies scanned as part of roam scan
  * @ap: List of candidate AP info
+ * @dwell_type: roam scan channel dwell type, enum in roam_scan_dwell_type
+ * @scan_complete_timestamp: timestamp of all channels scan completed
  */
 struct wmi_roam_scan_data {
 	bool present;
@@ -8934,6 +9054,8 @@ struct wmi_roam_scan_data {
 	uint32_t next_rssi_threshold;
 	uint16_t chan_freq[MAX_ROAM_SCAN_CHAN];
 	struct wmi_roam_candidate_info ap[MAX_ROAM_CANDIDATE_AP];
+	uint8_t dwell_type[MAX_ROAM_SCAN_CHAN];
+	uint32_t scan_complete_timestamp;
 };
 
 /**
@@ -8995,11 +9117,24 @@ struct wmi_neighbor_report_data {
  * @trigger_sub_reason: Sub reason for roam trigger if multiple roam scans
  * @current_rssi:       Connected AP RSSI
  * @timestamp:          Host timestamp in millisecs when roam scan was triggered
+ * @per_trig_data:      per roam trigger parameters
+ * @bmiss_trig_data:    beacon miss roam trigger parameters.
+ * @low_rssi_trig_data: low rssi roam trigger parameters.
+ * @hi_rssi_trig_data:  high rssi roam trigger parameters.
+ * @congestion_trig_data: congestion roam trigger parameters.
+ * @user_trig_data:     user trigger roam parameters.
+ * @background_trig_data: background roam trigger parameters.
  * @btm_trig_data:      BTM roam trigger parameters.
  * @cu_trig_data:       BSS Load roam trigger parameters.
  * @rssi_trig_data:     RSSI trigger related info.
  * @deauth_trig_data:   Deauth roam trigger related info
+ * @periodic_trig_data: periodic roam trigger parameters.
+ * @tx_failures_trig_data: tx failures roam trigger parameters.
  * @wtc_btm_trig_data:  WTC BTM roam trigger related info
+ * @abort_reason:       roam abort reason
+ * @scan_type:          roam scan type
+ * @roam_status:        roam result status
+ * @fail_reason:        roam fail reason
  */
 struct wmi_roam_trigger_info {
 	bool present;
@@ -9008,12 +9143,25 @@ struct wmi_roam_trigger_info {
 	uint32_t current_rssi;
 	uint32_t timestamp;
 	union {
+		struct wmi_roam_trigger_per_data per_trig_data;
+		struct wmi_roam_trigger_bmiss_data bmiss_trig_data;
+		struct wmi_roam_trigger_low_rssi_data low_rssi_trig_data;
+		struct wmi_roam_trigger_hi_rssi_data hi_rssi_trig_data;
+		struct wmi_roam_trigger_congestion_data congestion_trig_data;
+		struct wmi_roam_trigger_user_data user_trig_data;
+		struct wmi_roam_trigger_background_data background_trig_data;
 		struct wmi_roam_btm_trigger_data btm_trig_data;
 		struct wmi_roam_cu_trigger_data cu_trig_data;
 		struct wmi_roam_rssi_trigger_data rssi_trig_data;
 		struct wmi_roam_deauth_trigger_data deauth_trig_data;
+		struct wmi_roam_trigger_periodic_data periodic_trig_data;
+		struct wmi_roam_trigger_tx_failures_data tx_failures_trig_data;
 		struct wmi_roam_wtc_btm_trigger_data wtc_btm_trig_data;
 	};
+	struct wmi_roam_trigger_abort_reason abort_reason;
+	uint32_t scan_type;
+	uint32_t roam_status;
+	uint32_t fail_reason;
 };
 
 /* End of roam scan stats definitions */

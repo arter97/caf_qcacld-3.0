@@ -81,7 +81,7 @@ dp_rx_wds_learn(struct dp_soc *soc,
  * path on receiving 1st 4-address frame from backhaul.
  * @soc: DP soc
  * @ta_txrx_peer: WDS repeater txrx peer
- * @rx_tlv_hdr  : start address of rx tlvs
+ * @rx_tlv_hdr: start address of rx tlvs
  * @nbuf: RX packet buffer
  *
  * Return: void
@@ -161,19 +161,6 @@ dp_rx_set_msdu_lmac_id(qdf_nbuf_t nbuf, uint32_t peer_mdata)
 }
 #endif
 
-/**
- * dp_rx_process_be() - Brain of the Rx processing functionality
- *		     Called from the bottom half (tasklet/NET_RX_SOFTIRQ)
- * @int_ctx: per interrupt context
- * @hal_ring_hdl: opaque pointer to the HAL Rx Ring, which will be serviced
- * @reo_ring_num: ring number (0, 1, 2 or 3) of the reo ring.
- * @quota: No. of units (packets) that can be serviced in one shot.
- *
- * This function implements the core of Rx functionality. This is
- * expected to handle only non-error frames.
- *
- * Return: uint32_t: No. of elements processed
- */
 uint32_t dp_rx_process_be(struct dp_intr *int_ctx,
 			  hal_ring_handle_t hal_ring_hdl, uint8_t reo_ring_num,
 			  uint32_t quota)
@@ -1388,22 +1375,27 @@ dp_rx_intrabss_ucast_check_be(qdf_nbuf_t nbuf,
 	hal_rx_tlv_get_dest_chip_pmac_id(rx_tlv_hdr,
 					 &dest_chip_id,
 					 &dest_chip_pmac_id);
+
 	qdf_assert_always(dest_chip_id <= (DP_MLO_MAX_DEST_CHIP_ID - 1));
 
 	if (dest_chip_id == be_soc->mlo_chip_id) {
-		/* TODO: adding to self list is better */
-		params->tx_vdev_id = ta_peer->vdev->vdev_id;
+		if (dest_chip_pmac_id == ta_peer->vdev->pdev->pdev_id)
+			params->tx_vdev_id = ta_peer->vdev->vdev_id;
+		else
+			params->tx_vdev_id =
+				be_vdev->partner_vdev_list[dest_chip_id]
+							  [dest_chip_pmac_id];
 		return true;
 	}
+
+	params->tx_vdev_id =
+		be_vdev->partner_vdev_list[dest_chip_id][dest_chip_pmac_id];
 
 	params->dest_soc =
 		dp_mlo_get_soc_ref_by_chip_id(be_soc->ml_ctxt,
 					      dest_chip_id);
 	if (!params->dest_soc)
 		return false;
-
-	params->tx_vdev_id =
-		be_vdev->partner_vdev_list[dest_chip_id][dest_chip_pmac_id];
 
 	return true;
 }
@@ -1572,12 +1564,14 @@ void dp_rx_word_mask_subscribe_be(struct dp_soc *soc,
 	if (!msg_word || !tlv_filter)
 		return;
 
+	/* tlv_filter->enable is set to 1 for monitor rings */
+	if (tlv_filter->enable)
+		return;
+
 	/* if word mask is zero, FW will set the default values */
 	if (!(tlv_filter->rx_mpdu_start_wmask > 0 &&
 	      tlv_filter->rx_msdu_end_wmask > 0)) {
-		msg_word += 4;
-		*msg_word = 0;
-		goto config_mon;
+		return;
 	}
 
 	HTT_RX_RING_SELECTION_CFG_WORD_MASK_COMPACTION_ENABLE_SET(*msg_word, 1);
@@ -1596,9 +1590,6 @@ void dp_rx_word_mask_subscribe_be(struct dp_soc *soc,
 	HTT_RX_RING_SELECTION_CFG_RX_MSDU_END_WORD_MASK_SET(
 				*msg_word,
 				tlv_filter->rx_msdu_end_wmask);
-config_mon:
-	msg_word--;
-	dp_mon_rx_wmask_subscribe(soc, msg_word, tlv_filter);
 }
 #else
 void dp_rx_word_mask_subscribe_be(struct dp_soc *soc,
@@ -1649,15 +1640,7 @@ bool dp_rx_intrabss_mlo_mcbc_fwd(struct dp_soc *soc, struct dp_vdev *vdev,
 	return false;
 }
 #endif
-/**
- * dp_rx_intrabss_mcast_handler_be() - handler for mcast packets
- * @soc: core txrx main context
- * @ta_txrx_peer: source txrx_peer entry
- * @nbuf_copy: nbuf that has to be intrabss forwarded
- * @tid_stats: tid_stats structure
- *
- * Return: true if it is forwarded else false
- */
+
 bool
 dp_rx_intrabss_mcast_handler_be(struct dp_soc *soc,
 				struct dp_txrx_peer *ta_txrx_peer,
@@ -1697,17 +1680,6 @@ dp_rx_intrabss_mcast_handler_be(struct dp_soc *soc,
 	return false;
 }
 
-/*
- * dp_rx_intrabss_fwd_be() - API for intrabss fwd. For EAPOL
- *  pkt with DA not equal to vdev mac addr, fwd is not allowed.
- * @soc: core txrx main context
- * @ta_peer: source peer entry
- * @rx_tlv_hdr: start address of rx tlvs
- * @nbuf: nbuf that has to be intrabss forwarded
- * @msdu_metadata: msdu metadata
- *
- * Return: true if it is forwarded else false
- */
 bool dp_rx_intrabss_fwd_be(struct dp_soc *soc, struct dp_txrx_peer *ta_peer,
 			   uint8_t *rx_tlv_hdr, qdf_nbuf_t nbuf,
 			   struct hal_rx_msdu_metadata msdu_metadata)

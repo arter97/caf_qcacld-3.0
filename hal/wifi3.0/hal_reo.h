@@ -206,6 +206,7 @@ struct hal_reo_cmd_flush_cache_params {
 	bool flush_no_inval;
 	bool block_use_after_flush;
 	bool flush_entire_cache;
+	bool flush_q_1k_desc;
 };
 
 /**

@@ -433,6 +433,8 @@ static const uint32_t pdev_param_tlv[] = {
 		  PDEV_PARAM_CTS2SELF_FOR_P2P_GO_CONFIG),
 	PARAM_MAP(pdev_param_txpower_reason_sar, PDEV_PARAM_TXPOWER_REASON_SAR),
 	PARAM_MAP(pdev_param_default_6ghz_rate, PDEV_PARAM_DEFAULT_6GHZ_RATE),
+	PARAM_MAP(pdev_param_scan_blanking_mode,
+		  PDEV_PARAM_SET_SCAN_BLANKING_MODE),
 };
 
 /* Populate vdev_param array whose index is host param, value is target param */
@@ -9267,9 +9269,24 @@ void wmi_copy_resource_config(wmi_resource_config *resource_cfg,
 	if (tgt_res_cfg->reo_qdesc_shared_addr_table_enabled)
 		WMI_RSRC_CFG_HOST_SERVICE_FLAG_REO_QREF_FEATURE_SUPPORT_SET(
 			resource_cfg->host_service_flags, 1);
+	/*
+	 * DP Peer Meta data FW version
+	 */
+	if (tgt_res_cfg->dp_peer_meta_data_ver) {
+#ifdef CONFIG_AP_PLATFORM
+		WMI_RSRC_CFG_FLAGS2_RX_PEER_METADATA_VERSION_SET(
+			resource_cfg->flags2, 3);
+#else
+		WMI_RSRC_CFG_FLAGS2_RX_PEER_METADATA_VERSION_SET(
+			resource_cfg->flags2, 2);
+#endif
+	} else {
+		WMI_RSRC_CFG_FLAGS2_RX_PEER_METADATA_VERSION_SET(
+			resource_cfg->flags2,
+			WMI_TARGET_CAP_FLAGS_RX_PEER_METADATA_VERSION_GET(
+			tgt_res_cfg->target_cap_flags));
+	}
 
-	WMI_RSRC_CFG_FLAGS2_RX_PEER_METADATA_VERSION_SET(resource_cfg->flags2,
-						 tgt_res_cfg->target_cap_flags);
 	if (tgt_res_cfg->notify_frame_support)
 		WMI_RSRC_CFG_FLAGS2_NOTIFY_FRAME_CONFIG_ENABLE_SET(
 			resource_cfg->flags2, 1);
@@ -18549,6 +18566,213 @@ wmi_convert_roam_sub_reason(WMI_ROAM_TRIGGER_SUB_REASON_ID subreason)
 }
 
 /**
+ * wlan_roam_fail_reason_code() - Convert FW enum to Host enum
+ * @wmi_roam_fail_reason: roam fail enum
+ *
+ * Return: Roaming failure reason codes
+ */
+static enum wlan_roam_failure_reason_code
+wlan_roam_fail_reason_code(uint16_t wmi_roam_fail_reason)
+{
+	switch (wmi_roam_fail_reason) {
+	case WMI_ROAM_FAIL_REASON_NO_SCAN_START:
+		return ROAM_FAIL_REASON_NO_SCAN_START;
+	case WMI_ROAM_FAIL_REASON_NO_AP_FOUND:
+		return ROAM_FAIL_REASON_NO_AP_FOUND;
+	case WMI_ROAM_FAIL_REASON_NO_CAND_AP_FOUND:
+		return ROAM_FAIL_REASON_NO_CAND_AP_FOUND;
+	case WMI_ROAM_FAIL_REASON_HOST:
+		return ROAM_FAIL_REASON_HOST;
+	case WMI_ROAM_FAIL_REASON_AUTH_SEND:
+		return ROAM_FAIL_REASON_AUTH_SEND;
+	case WMI_ROAM_FAIL_REASON_AUTH_RECV:
+		return ROAM_FAIL_REASON_AUTH_RECV;
+	case WMI_ROAM_FAIL_REASON_NO_AUTH_RESP:
+		return ROAM_FAIL_REASON_NO_AUTH_RESP;
+	case WMI_ROAM_FAIL_REASON_REASSOC_SEND:
+		return ROAM_FAIL_REASON_REASSOC_SEND;
+	case WMI_ROAM_FAIL_REASON_REASSOC_RECV:
+		return ROAM_FAIL_REASON_REASSOC_RECV;
+	case WMI_ROAM_FAIL_REASON_NO_REASSOC_RESP:
+		return ROAM_FAIL_REASON_NO_REASSOC_RESP;
+	case WMI_ROAM_FAIL_REASON_EAPOL_TIMEOUT:
+		return ROAM_FAIL_REASON_EAPOL_TIMEOUT;
+	case WMI_ROAM_FAIL_REASON_MLME:
+		return ROAM_FAIL_REASON_MLME;
+	case WMI_ROAM_FAIL_REASON_INTERNAL_ABORT:
+		return ROAM_FAIL_REASON_INTERNAL_ABORT;
+	case WMI_ROAM_FAIL_REASON_SCAN_START:
+		return ROAM_FAIL_REASON_SCAN_START;
+	case WMI_ROAM_FAIL_REASON_AUTH_NO_ACK:
+		return ROAM_FAIL_REASON_AUTH_NO_ACK;
+	case WMI_ROAM_FAIL_REASON_AUTH_INTERNAL_DROP:
+		return ROAM_FAIL_REASON_AUTH_INTERNAL_DROP;
+	case WMI_ROAM_FAIL_REASON_REASSOC_NO_ACK:
+		return ROAM_FAIL_REASON_REASSOC_NO_ACK;
+	case WMI_ROAM_FAIL_REASON_REASSOC_INTERNAL_DROP:
+		return ROAM_FAIL_REASON_REASSOC_INTERNAL_DROP;
+	case WMI_ROAM_FAIL_REASON_EAPOL_M2_SEND:
+		return ROAM_FAIL_REASON_EAPOL_M2_SEND;
+	case WMI_ROAM_FAIL_REASON_EAPOL_M2_INTERNAL_DROP:
+		return ROAM_FAIL_REASON_EAPOL_M2_INTERNAL_DROP;
+	case WMI_ROAM_FAIL_REASON_EAPOL_M2_NO_ACK:
+		return ROAM_FAIL_REASON_EAPOL_M2_NO_ACK;
+	case WMI_ROAM_FAIL_REASON_EAPOL_M3_TIMEOUT:
+		return ROAM_FAIL_REASON_EAPOL_M3_TIMEOUT;
+	case WMI_ROAM_FAIL_REASON_EAPOL_M4_SEND:
+		return ROAM_FAIL_REASON_EAPOL_M4_SEND;
+	case WMI_ROAM_FAIL_REASON_EAPOL_M4_INTERNAL_DROP:
+		return ROAM_FAIL_REASON_EAPOL_M4_INTERNAL_DROP;
+	case WMI_ROAM_FAIL_REASON_EAPOL_M4_NO_ACK:
+		return ROAM_FAIL_REASON_EAPOL_M4_NO_ACK;
+	case WMI_ROAM_FAIL_REASON_NO_SCAN_FOR_FINAL_BMISS:
+		return ROAM_FAIL_REASON_NO_SCAN_FOR_FINAL_BMISS;
+	case WMI_ROAM_FAIL_REASON_DISCONNECT:
+		return ROAM_FAIL_REASON_DISCONNECT;
+	case WMI_ROAM_FAIL_REASON_SYNC:
+		return ROAM_FAIL_REASON_SYNC;
+	case WMI_ROAM_FAIL_REASON_SAE_INVALID_PMKID:
+		return ROAM_FAIL_REASON_SAE_INVALID_PMKID;
+	case WMI_ROAM_FAIL_REASON_SAE_PREAUTH_TIMEOUT:
+		return ROAM_FAIL_REASON_SAE_PREAUTH_TIMEOUT;
+	case WMI_ROAM_FAIL_REASON_SAE_PREAUTH_FAIL:
+		return ROAM_FAIL_REASON_SAE_PREAUTH_FAIL;
+	case WMI_ROAM_FAIL_REASON_UNABLE_TO_START_ROAM_HO:
+		return ROAM_FAIL_REASON_UNABLE_TO_START_ROAM_HO;
+	default:
+		return ROAM_FAIL_REASON_UNKNOWN;
+	}
+}
+
+/**
+ * wmi_convert_to_cm_roam_invoke_reason() - Convert FW enum to Host enum
+ * @reason: roam invoke reason from fw
+ *
+ * Return: Roam invoke reason code defined in host driver
+ */
+static enum roam_invoke_reason
+wmi_convert_to_cm_roam_invoke_reason(enum wlan_roam_invoke_reason reason)
+{
+	switch (reason) {
+	case ROAM_INVOKE_REASON_UNDEFINED:
+		return WLAN_ROAM_STATS_INVOKE_REASON_UNDEFINED;
+	case ROAM_INVOKE_REASON_NUD_FAILURE:
+		return WLAN_ROAM_STATS_INVOKE_REASON_NUD_FAILURE;
+	case ROAM_INVOKE_REASON_USER_SPACE:
+		return WLAN_ROAM_STATS_INVOKE_REASON_USER_SPACE;
+	default:
+		return WLAN_ROAM_STATS_INVOKE_REASON_UNDEFINED;
+	}
+}
+
+/**
+ * wmi_convert_to_cm_roam_tx_fail_reason() - Convert FW enum to Host enum
+ * @tx_fail_reason: roam tx fail reason from fw
+ *
+ * Return: Roam tx fail reason code defined in host driver
+ */
+static enum roam_tx_failures_reason
+wmi_convert_to_cm_roam_tx_fail_reason(PEER_KICKOUT_REASON tx_fail_reason)
+{
+	switch (tx_fail_reason) {
+	case WMI_PEER_STA_KICKOUT_REASON_UNSPECIFIED:
+		return WLAN_ROAM_STATS_KICKOUT_REASON_UNSPECIFIED;
+	case WMI_PEER_STA_KICKOUT_REASON_XRETRY:
+		return WLAN_ROAM_STATS_KICKOUT_REASON_XRETRY;
+	case WMI_PEER_STA_KICKOUT_REASON_INACTIVITY:
+		return WLAN_ROAM_STATS_KICKOUT_REASON_INACTIVITY;
+	case WMI_PEER_STA_KICKOUT_REASON_IBSS_DISCONNECT:
+		return WLAN_ROAM_STATS_KICKOUT_REASON_IBSS_DISCONNECT;
+	case WMI_PEER_STA_KICKOUT_REASON_TDLS_DISCONNECT:
+		return WLAN_ROAM_STATS_KICKOUT_REASON_TDLS_DISCONNECT;
+	case WMI_PEER_STA_KICKOUT_REASON_SA_QUERY_TIMEOUT:
+		return WLAN_ROAM_STATS_KICKOUT_REASON_SA_QUERY_TIMEOUT;
+	case WMI_PEER_STA_KICKOUT_REASON_ROAMING_EVENT:
+		return WLAN_ROAM_STATS_KICKOUT_REASON_ROAMING_EVENT;
+	default:
+		return WLAN_ROAM_STATS_KICKOUT_REASON_UNSPECIFIED;
+	}
+}
+
+/**
+ * wmi_convert_roam_abort_reason() - Convert FW enum to Host enum
+ * @abort_reason: roam abort reason from fw
+ *
+ * Return: Roam abort reason code defined in host driver
+ */
+static enum roam_abort_reason
+wmi_convert_roam_abort_reason(WMI_ROAM_FAIL_SUB_REASON_ID abort_reason)
+{
+	switch (abort_reason) {
+	case WMI_ROAM_ABORT_UNSPECIFIED:
+		return WLAN_ROAM_STATS_ABORT_UNSPECIFIED;
+	case WMI_ROAM_ABORT_LOWRSSI_DATA_RSSI_HIGH:
+		return WLAN_ROAM_STATS_ABORT_LOWRSSI_DATA_RSSI_HIGH;
+	case WMI_ROAM_ABORT_LOWRSSI_LINK_SPEED_GOOD:
+		return WLAN_ROAM_STATS_ABORT_LOWRSSI_LINK_SPEED_GOOD;
+	case WMI_ROAM_ABORT_BG_DATA_RSSI_HIGH:
+		return WLAN_ROAM_STATS_ABORT_BG_DATA_RSSI_HIGH;
+	case WMI_ROAM_ABORT_BG_RSSI_ABOVE_THRESHOLD:
+		return WLAN_ROAM_STATS_ABORT_BG_RSSI_ABOVE_THRESHOLD;
+	default:
+		return WLAN_ROAM_STATS_ABORT_UNSPECIFIED;
+	}
+}
+
+/**
+ * wlan_roam_scan_type() - Convert FW enum to Host enum
+ * @scan_type: roam scan type from fw
+ *
+ * Return: Roam scan type defined in host driver
+ */
+static enum roam_stats_scan_type
+wlan_roam_scan_type(uint32_t scan_type)
+{
+	switch (scan_type) {
+	case 0:
+		return ROAM_STATS_SCAN_TYPE_PARTIAL;
+	case 1:
+		return ROAM_STATS_SCAN_TYPE_FULL;
+	case 2:
+		return ROAM_STATS_SCAN_TYPE_NO_SCAN;
+	case 3:
+		return ROAM_STATS_SCAN_TYPE_HIGHER_BAND_5GHZ_6GHZ;
+	case 4:
+		return ROAM_STATS_SCAN_TYPE_HIGHER_BAND_6GHZ;
+	default:
+		return ROAM_STATS_SCAN_TYPE_PARTIAL;
+	}
+}
+
+/**
+ * wlan_roam_dwell_type() - Convert FW enum to Host enum
+ * @dwell_type: roam channel scan dwell type from fw
+ *
+ * Return: Roam channel scan dwell type defined in host driver
+ */
+static enum roam_scan_dwell_type
+wlan_roam_dwell_type(uint32_t dwell_type)
+{
+	switch (dwell_type) {
+	case 0:
+		return WLAN_ROAM_DWELL_TYPE_UNSPECIFIED;
+	case 1:
+		return WLAN_ROAM_DWELL_ACTIVE_TYPE;
+	case 2:
+		return WLAN_ROAM_DWELL_PASSIVE_TYPE;
+	default:
+		return WLAN_ROAM_DWELL_TYPE_UNSPECIFIED;
+	}
+}
+
+#define WLAN_ROAM_PER_TX_RATE_OFFSET       0
+#define WLAN_ROAM_PER_RX_RATE_OFFSET       16
+#define WLAN_ROAM_BMISS_FINNAL_OFFSET       0
+#define WLAN_ROAM_BMISS_CONSECUTIVE_OFFSET  7
+#define WLAN_ROAM_BMISS_QOSNULL_OFFSET      24
+#define WLAN_ROAM_DENSE_ROAMABLE_OFFSET     0
+
+/**
  * extract_roam_trigger_stats_tlv() - Extract the Roam trigger stats
  * from the WMI_ROAM_STATS_EVENTID
  * @wmi_handle: wmi handle
@@ -18564,100 +18788,313 @@ extract_roam_trigger_stats_tlv(wmi_unified_t wmi_handle, void *evt_buf,
 {
 	WMI_ROAM_STATS_EVENTID_param_tlvs *param_buf;
 	wmi_roam_trigger_reason *src_data = NULL;
-	uint32_t trig_reason;
+	uint32_t trig_reason = 0;
+	uint32_t fail_reason = 0;
+	uint32_t abort       = 0;
+	uint32_t invoke      = 0;
+	uint32_t tx_fail     = 0;
+	wmi_roam_trigger_reason_cmm *cmn_data = NULL;
+	wmi_roam_trigger_per        *per_data = NULL;
+	wmi_roam_trigger_bmiss      *bmiss_data = NULL;
+	wmi_roam_trigger_hi_rssi    *hi_rssi_data = NULL;
+	wmi_roam_trigger_dense      *dense_data = NULL;
+	wmi_roam_trigger_force      *force_data = NULL;
+	wmi_roam_trigger_btm        *btm_data = NULL;
+	wmi_roam_trigger_bss_load   *bss_load_data = NULL;
+	wmi_roam_trigger_deauth     *deauth_data = NULL;
+	wmi_roam_trigger_periodic   *periodic_data = NULL;
+	wmi_roam_trigger_rssi       *rssi_data = NULL;
+	wmi_roam_trigger_kickout    *kickout_data = NULL;
+	wmi_roam_result             *roam_result = NULL;
+	wmi_roam_scan_info          *scan_info = NULL;
 
 	param_buf = (WMI_ROAM_STATS_EVENTID_param_tlvs *)evt_buf;
-	if (!param_buf || !param_buf->roam_trigger_reason)
+	if (!param_buf) {
+		wmi_err("Param buf is NULL");
 		return QDF_STATUS_E_FAILURE;
+	}
 
-	src_data = &param_buf->roam_trigger_reason[idx];
+	if (!param_buf->roam_result || idx >= param_buf->num_roam_result)
+		wmi_err("roam_result or idx error.%u", idx);
+
+	if (!param_buf->roam_scan_info || idx >= param_buf->num_roam_scan_info)
+		wmi_err("roam_scan_info or idx error.%u", idx);
 
 	trig->present = true;
-	trig_reason = src_data->trigger_reason;
-	trig->trigger_reason = wmi_convert_fw_to_cm_trig_reason(trig_reason);
-	trig->trigger_sub_reason =
-		wmi_convert_roam_sub_reason(src_data->trigger_sub_reason);
-	trig->current_rssi = src_data->current_rssi;
-	trig->timestamp = src_data->timestamp;
+
+	if (param_buf->roam_scan_info)
+		scan_info = &param_buf->roam_scan_info[idx];
+
+	if (param_buf->roam_trigger_reason_cmm)
+		cmn_data = &param_buf->roam_trigger_reason_cmm[idx];
+
+	if (param_buf->roam_trigger_reason)
+		src_data = &param_buf->roam_trigger_reason[idx];
+
+	if (cmn_data) {
+		trig_reason = cmn_data->trigger_reason;
+		trig->trigger_reason =
+			wmi_convert_fw_to_cm_trig_reason(trig_reason);
+		trig->timestamp = cmn_data->timestamp;
+	} else if (src_data) {
+		trig_reason = src_data->trigger_reason;
+		trig->trigger_reason =
+			wmi_convert_fw_to_cm_trig_reason(trig_reason);
+		trig->trigger_sub_reason =
+			wmi_convert_roam_sub_reason(src_data->trigger_sub_reason);
+		trig->current_rssi = src_data->current_rssi;
+		trig->timestamp = src_data->timestamp;
+	}
+
+	if (param_buf->roam_trigger_rssi)
+		rssi_data = &param_buf->roam_trigger_rssi[idx];
+
+	if (param_buf->roam_result) {
+		roam_result = &param_buf->roam_result[idx];
+
+		if (roam_result) {
+			trig->roam_status = roam_result->roam_status;
+			if (trig->roam_status) {
+				fail_reason = roam_result->roam_fail_reason;
+				trig->fail_reason =
+					wlan_roam_fail_reason_code(fail_reason);
+
+				if (rssi_data) {
+					abort = roam_result->roam_abort_reason;
+					trig->abort_reason.abort_reason_code =
+						wmi_convert_roam_abort_reason(abort);
+					trig->abort_reason.data_rssi =
+						rssi_data->data_rssi;
+					trig->abort_reason.data_rssi_threshold =
+						rssi_data->data_rssi_threshold;
+					trig->abort_reason.rx_linkspeed_status =
+						rssi_data->rx_linkspeed_status;
+				}
+			}
+		}
+	}
+
+	if (scan_info)
+		trig->scan_type =
+			wlan_roam_scan_type(scan_info->roam_scan_type);
 
 	switch (trig_reason) {
 	case WMI_ROAM_TRIGGER_REASON_PER:
+		if (param_buf->roam_trigger_per)
+			per_data = &param_buf->roam_trigger_per[idx];
+		if (per_data) {
+			trig->per_trig_data.tx_rate_thresh_percent =
+				WMI_GET_BITS(per_data->rate_thresh_percnt,
+					     WLAN_ROAM_PER_RX_RATE_OFFSET, 8);
+			trig->per_trig_data.rx_rate_thresh_percent =
+				WMI_GET_BITS(per_data->rate_thresh_percnt,
+					     WLAN_ROAM_PER_TX_RATE_OFFSET, 8);
+		}
+		return QDF_STATUS_SUCCESS;
+
 	case WMI_ROAM_TRIGGER_REASON_BMISS:
+		if (param_buf->roam_trigger_bmiss)
+			bmiss_data = &param_buf->roam_trigger_bmiss[idx];
+		if (bmiss_data) {
+			trig->bmiss_trig_data.final_bmiss_cnt =
+				WMI_GET_BITS(bmiss_data->bmiss_status,
+					     WLAN_ROAM_BMISS_FINNAL_OFFSET, 7);
+			trig->bmiss_trig_data.consecutive_bmiss_cnt =
+				WMI_GET_BITS(bmiss_data->bmiss_status,
+					     WLAN_ROAM_BMISS_CONSECUTIVE_OFFSET,
+					     17);
+			trig->bmiss_trig_data.qos_null_success =
+				WMI_GET_BITS(bmiss_data->bmiss_status,
+					     WLAN_ROAM_BMISS_QOSNULL_OFFSET, 1);
+		}
+		return QDF_STATUS_SUCCESS;
+
 	case WMI_ROAM_TRIGGER_REASON_HIGH_RSSI:
+		if (param_buf->roam_trigger_hi_rssi)
+			hi_rssi_data = &param_buf->roam_trigger_hi_rssi[idx];
+
+		if (hi_rssi_data && cmn_data) {
+			trig->hi_rssi_trig_data.current_rssi =
+				(uint8_t)cmn_data->current_rssi;
+			trig->hi_rssi_trig_data.hirssi_threshold =
+				(uint8_t)hi_rssi_data->hi_rssi_threshold;
+		}
+		return QDF_STATUS_SUCCESS;
+
 	case WMI_ROAM_TRIGGER_REASON_MAWC:
 	case WMI_ROAM_TRIGGER_REASON_DENSE:
+		if (param_buf->roam_trigger_dense)
+			dense_data = &param_buf->roam_trigger_dense[idx];
+		if (dense_data) {
+			trig->congestion_trig_data.rx_tput =
+				dense_data->rx_tput;
+			trig->congestion_trig_data.tx_tput =
+				dense_data->tx_tput;
+			trig->congestion_trig_data.roamable_count =
+				WMI_GET_BITS(dense_data->dense_status,
+					     WLAN_ROAM_DENSE_ROAMABLE_OFFSET,
+					     8);
+		}
+		return QDF_STATUS_SUCCESS;
+
 	case WMI_ROAM_TRIGGER_REASON_BACKGROUND:
+		if (cmn_data && rssi_data) {
+			trig->background_trig_data.current_rssi =
+				(uint8_t)cmn_data->current_rssi;
+			trig->background_trig_data.data_rssi =
+				(uint8_t)rssi_data->data_rssi;
+			trig->background_trig_data.data_rssi_threshold =
+				(uint8_t)rssi_data->data_rssi_threshold;
+		}
+		return QDF_STATUS_SUCCESS;
+
 	case WMI_ROAM_TRIGGER_REASON_IDLE:
 	case WMI_ROAM_TRIGGER_REASON_FORCED:
+		if (param_buf->roam_trigger_force)
+			force_data = &param_buf->roam_trigger_force[idx];
+		if (force_data) {
+			invoke = force_data->invoke_reason;
+			trig->user_trig_data.invoke_reason =
+				wmi_convert_to_cm_roam_invoke_reason(invoke);
+		}
+		return QDF_STATUS_SUCCESS;
+
 	case WMI_ROAM_TRIGGER_REASON_UNIT_TEST:
 	case WMI_ROAM_TRIGGER_REASON_BTC:
 		return QDF_STATUS_SUCCESS;
 
 	case WMI_ROAM_TRIGGER_REASON_BTM:
-		trig->btm_trig_data.btm_request_mode =
-				src_data->btm_request_mode;
-		trig->btm_trig_data.disassoc_timer =
-				src_data->disassoc_imminent_timer;
-		trig->btm_trig_data.validity_interval =
-				src_data->validity_internal;
-		trig->btm_trig_data.candidate_list_count =
-				src_data->candidate_list_count;
-		trig->btm_trig_data.btm_resp_status =
-				src_data->btm_response_status_code;
-		trig->btm_trig_data.btm_bss_termination_timeout =
-				src_data->btm_bss_termination_timeout;
-		trig->btm_trig_data.btm_mbo_assoc_retry_timeout =
-				src_data->btm_mbo_assoc_retry_timeout;
-		trig->btm_trig_data.token = src_data->btm_req_dialog_token;
-		if ((btm_idx + trig->btm_trig_data.candidate_list_count) <=
-		    param_buf->num_roam_btm_request_candidate_info)
-			extract_roam_11kv_candidate_info(
-					wmi_handle, evt_buf,
-					trig->btm_trig_data.btm_cand,
-					btm_idx,
-					src_data->candidate_list_count);
+		if (param_buf->roam_trigger_btm)
+			btm_data = &param_buf->roam_trigger_btm[idx];
+		if (btm_data) {
+			trig->btm_trig_data.btm_request_mode =
+				btm_data->btm_request_mode;
+			trig->btm_trig_data.disassoc_timer =
+				btm_data->disassoc_imminent_timer;
+			trig->btm_trig_data.validity_interval =
+				btm_data->validity_internal;
+			trig->btm_trig_data.candidate_list_count =
+				btm_data->candidate_list_count;
+			trig->btm_trig_data.btm_resp_status =
+				btm_data->btm_response_status_code;
+			trig->btm_trig_data.btm_bss_termination_timeout =
+				btm_data->btm_bss_termination_timeout;
+			trig->btm_trig_data.btm_mbo_assoc_retry_timeout =
+				btm_data->btm_mbo_assoc_retry_timeout;
+			trig->btm_trig_data.token =
+				(uint16_t)btm_data->btm_req_dialog_token;
+		} else if (src_data) {
+			trig->btm_trig_data.btm_request_mode =
+					src_data->btm_request_mode;
+			trig->btm_trig_data.disassoc_timer =
+					src_data->disassoc_imminent_timer;
+			trig->btm_trig_data.validity_interval =
+					src_data->validity_internal;
+			trig->btm_trig_data.candidate_list_count =
+					src_data->candidate_list_count;
+			trig->btm_trig_data.btm_resp_status =
+					src_data->btm_response_status_code;
+			trig->btm_trig_data.btm_bss_termination_timeout =
+					src_data->btm_bss_termination_timeout;
+			trig->btm_trig_data.btm_mbo_assoc_retry_timeout =
+					src_data->btm_mbo_assoc_retry_timeout;
+			trig->btm_trig_data.token =
+				src_data->btm_req_dialog_token;
+			if ((btm_idx +
+				trig->btm_trig_data.candidate_list_count) <=
+			    param_buf->num_roam_btm_request_candidate_info)
+				extract_roam_11kv_candidate_info(
+						wmi_handle, evt_buf,
+						trig->btm_trig_data.btm_cand,
+						btm_idx,
+						src_data->candidate_list_count);
+		}
 
 		return QDF_STATUS_SUCCESS;
 
 	case WMI_ROAM_TRIGGER_REASON_BSS_LOAD:
-		trig->cu_trig_data.cu_load = src_data->cu_load;
+		if (param_buf->roam_trigger_bss_load)
+			bss_load_data = &param_buf->roam_trigger_bss_load[idx];
+		if (bss_load_data)
+			trig->cu_trig_data.cu_load = bss_load_data->cu_load;
+		else if (src_data)
+			trig->cu_trig_data.cu_load = src_data->cu_load;
 		return QDF_STATUS_SUCCESS;
 
 	case WMI_ROAM_TRIGGER_REASON_DEAUTH:
-		trig->deauth_trig_data.type = src_data->deauth_type;
-		trig->deauth_trig_data.reason = src_data->deauth_reason;
+		if (param_buf->roam_trigger_deauth)
+			deauth_data = &param_buf->roam_trigger_deauth[idx];
+		if (deauth_data) {
+			trig->deauth_trig_data.type = deauth_data->deauth_type;
+			trig->deauth_trig_data.reason =
+				deauth_data->deauth_reason;
+		} else if (src_data) {
+			trig->deauth_trig_data.type = src_data->deauth_type;
+			trig->deauth_trig_data.reason = src_data->deauth_reason;
+		}
 		return QDF_STATUS_SUCCESS;
 
 	case WMI_ROAM_TRIGGER_REASON_PERIODIC:
+		if (param_buf->roam_trigger_periodic)
+			periodic_data = &param_buf->roam_trigger_periodic[idx];
+		if (periodic_data) {
+			trig->periodic_trig_data.periodic_timer_ms =
+				periodic_data->periodic_timer_ms;
+		}
+		return QDF_STATUS_SUCCESS;
+
 	case WMI_ROAM_TRIGGER_REASON_LOW_RSSI:
-		trig->rssi_trig_data.threshold = src_data->roam_rssi_threshold;
+		if (cmn_data && rssi_data) {
+			trig->low_rssi_trig_data.current_rssi =
+				(uint8_t)cmn_data->current_rssi;
+			trig->low_rssi_trig_data.roam_rssi_threshold =
+				(uint8_t)rssi_data->roam_rssi_threshold;
+			trig->low_rssi_trig_data.rx_linkspeed_status =
+				(uint8_t)rssi_data->rx_linkspeed_status;
+		} else if (src_data)
+			trig->rssi_trig_data.threshold =
+				src_data->roam_rssi_threshold;
+
+		return QDF_STATUS_SUCCESS;
+
+	case WMI_ROAM_TRIGGER_REASON_STA_KICKOUT:
+		if (param_buf->roam_trigger_kickout)
+			kickout_data = &param_buf->roam_trigger_kickout[idx];
+		if (kickout_data) {
+			tx_fail = kickout_data->kickout_reason;
+			trig->tx_failures_trig_data.kickout_threshold =
+				kickout_data->kickout_th;
+			trig->tx_failures_trig_data.kickout_reason =
+				wmi_convert_to_cm_roam_tx_fail_reason(tx_fail);
+		}
 		return QDF_STATUS_SUCCESS;
 
 	case WMI_ROAM_TRIGGER_REASON_WTC_BTM:
-		trig->wtc_btm_trig_data.roaming_mode =
-					src_data->vendor_specific1[0];
-		trig->wtc_btm_trig_data.vsie_trigger_reason =
-					src_data->vendor_specific1[1];
-		trig->wtc_btm_trig_data.sub_code =
-					src_data->vendor_specific1[2];
-		trig->wtc_btm_trig_data.wtc_mode =
-					src_data->vendor_specific1[3];
-		trig->wtc_btm_trig_data.wtc_scan_mode =
-			convert_wtc_scan_mode(src_data->vendor_specific1[4]);
-		trig->wtc_btm_trig_data.wtc_rssi_th =
-					src_data->vendor_specific1[5];
-		trig->wtc_btm_trig_data.wtc_candi_rssi_th =
-					src_data->vendor_specific1[6];
+		if (src_data) {
+			trig->wtc_btm_trig_data.roaming_mode =
+						src_data->vendor_specific1[0];
+			trig->wtc_btm_trig_data.vsie_trigger_reason =
+						src_data->vendor_specific1[1];
+			trig->wtc_btm_trig_data.sub_code =
+						src_data->vendor_specific1[2];
+			trig->wtc_btm_trig_data.wtc_mode =
+						src_data->vendor_specific1[3];
+			trig->wtc_btm_trig_data.wtc_scan_mode =
+				convert_wtc_scan_mode(src_data->vendor_specific1[4]);
+			trig->wtc_btm_trig_data.wtc_rssi_th =
+						src_data->vendor_specific1[5];
+			trig->wtc_btm_trig_data.wtc_candi_rssi_th =
+						src_data->vendor_specific1[6];
 
-		trig->wtc_btm_trig_data.wtc_candi_rssi_ext_present =
-					src_data->vendor_specific2[0];
-		trig->wtc_btm_trig_data.wtc_candi_rssi_th_5g =
-					src_data->vendor_specific2[1];
-		trig->wtc_btm_trig_data.wtc_candi_rssi_th_6g =
-					src_data->vendor_specific2[2];
-		trig->wtc_btm_trig_data.duration =
-					src_data->vendor_specific2[3];
-
+			trig->wtc_btm_trig_data.wtc_candi_rssi_ext_present =
+						src_data->vendor_specific2[0];
+			trig->wtc_btm_trig_data.wtc_candi_rssi_th_5g =
+						src_data->vendor_specific2[1];
+			trig->wtc_btm_trig_data.wtc_candi_rssi_th_6g =
+						src_data->vendor_specific2[2];
+			trig->wtc_btm_trig_data.duration =
+						src_data->vendor_specific2[3];
+		}
 		return QDF_STATUS_SUCCESS;
 	default:
 		return QDF_STATUS_SUCCESS;
@@ -18752,6 +19189,7 @@ extract_roam_scan_stats_tlv(wmi_unified_t wmi_handle, void *evt_buf,
 	dst->present = true;
 	dst->type = src_data->roam_scan_type;
 	dst->num_chan = src_data->roam_scan_channel_count;
+	dst->scan_complete_timestamp = src_data->scan_complete_timestamp;
 	dst->next_rssi_threshold = src_data->next_rssi_trigger_threshold;
 	dst->is_btcoex_active = WMI_GET_BTCONNECT_STATUS(src_data->flags);
 	dst->frame_info_count = src_data->frame_info_count;
@@ -18767,6 +19205,8 @@ extract_roam_scan_stats_tlv(wmi_unified_t wmi_handle, void *evt_buf,
 		src_chan = &param_buf->roam_scan_chan_info[chan_idx];
 		for (i = 0; i < dst->num_chan; i++) {
 			dst->chan_freq[i] = src_chan->channel;
+			dst->dwell_type[i] =
+				(uint8_t)wlan_roam_dwell_type(src_chan->ch_dwell_type);
 			src_chan++;
 		}
 	}
@@ -18786,85 +19226,6 @@ extract_roam_scan_stats_tlv(wmi_unified_t wmi_handle, void *evt_buf,
 	}
 
 	return QDF_STATUS_SUCCESS;
-}
-
-/**
- * wlan_roam_fail_reason_code() - Convert FW enum to Host enum
- * @wmi_roam_fail_reason: roam fail enum
- *
- * Return: Roaming failure reason codes
- */
-static enum wlan_roam_failure_reason_code
-wlan_roam_fail_reason_code(uint16_t wmi_roam_fail_reason)
-{
-	switch (wmi_roam_fail_reason) {
-	case WMI_ROAM_FAIL_REASON_NO_SCAN_START:
-		return ROAM_FAIL_REASON_NO_SCAN_START;
-	case WMI_ROAM_FAIL_REASON_NO_AP_FOUND:
-		return ROAM_FAIL_REASON_NO_AP_FOUND;
-	case WMI_ROAM_FAIL_REASON_NO_CAND_AP_FOUND:
-		return ROAM_FAIL_REASON_NO_CAND_AP_FOUND;
-	case WMI_ROAM_FAIL_REASON_HOST:
-		return ROAM_FAIL_REASON_HOST;
-	case WMI_ROAM_FAIL_REASON_AUTH_SEND:
-		return ROAM_FAIL_REASON_AUTH_SEND;
-	case WMI_ROAM_FAIL_REASON_AUTH_RECV:
-		return ROAM_FAIL_REASON_AUTH_RECV;
-	case WMI_ROAM_FAIL_REASON_NO_AUTH_RESP:
-		return ROAM_FAIL_REASON_NO_AUTH_RESP;
-	case WMI_ROAM_FAIL_REASON_REASSOC_SEND:
-		return ROAM_FAIL_REASON_REASSOC_SEND;
-	case WMI_ROAM_FAIL_REASON_REASSOC_RECV:
-		return ROAM_FAIL_REASON_REASSOC_RECV;
-	case WMI_ROAM_FAIL_REASON_NO_REASSOC_RESP:
-		return ROAM_FAIL_REASON_NO_REASSOC_RESP;
-	case WMI_ROAM_FAIL_REASON_EAPOL_TIMEOUT:
-		return ROAM_FAIL_REASON_EAPOL_TIMEOUT;
-	case WMI_ROAM_FAIL_REASON_MLME:
-		return ROAM_FAIL_REASON_MLME;
-	case WMI_ROAM_FAIL_REASON_INTERNAL_ABORT:
-		return ROAM_FAIL_REASON_INTERNAL_ABORT;
-	case WMI_ROAM_FAIL_REASON_SCAN_START:
-		return ROAM_FAIL_REASON_SCAN_START;
-	case WMI_ROAM_FAIL_REASON_AUTH_NO_ACK:
-		return ROAM_FAIL_REASON_AUTH_NO_ACK;
-	case WMI_ROAM_FAIL_REASON_AUTH_INTERNAL_DROP:
-		return ROAM_FAIL_REASON_AUTH_INTERNAL_DROP;
-	case WMI_ROAM_FAIL_REASON_REASSOC_NO_ACK:
-		return ROAM_FAIL_REASON_REASSOC_NO_ACK;
-	case WMI_ROAM_FAIL_REASON_REASSOC_INTERNAL_DROP:
-		return ROAM_FAIL_REASON_REASSOC_INTERNAL_DROP;
-	case WMI_ROAM_FAIL_REASON_EAPOL_M2_SEND:
-		return ROAM_FAIL_REASON_EAPOL_M2_SEND;
-	case WMI_ROAM_FAIL_REASON_EAPOL_M2_INTERNAL_DROP:
-		return ROAM_FAIL_REASON_EAPOL_M2_INTERNAL_DROP;
-	case WMI_ROAM_FAIL_REASON_EAPOL_M2_NO_ACK:
-		return ROAM_FAIL_REASON_EAPOL_M2_NO_ACK;
-	case WMI_ROAM_FAIL_REASON_EAPOL_M3_TIMEOUT:
-		return ROAM_FAIL_REASON_EAPOL_M3_TIMEOUT;
-	case WMI_ROAM_FAIL_REASON_EAPOL_M4_SEND:
-		return ROAM_FAIL_REASON_EAPOL_M4_SEND;
-	case WMI_ROAM_FAIL_REASON_EAPOL_M4_INTERNAL_DROP:
-		return ROAM_FAIL_REASON_EAPOL_M4_INTERNAL_DROP;
-	case WMI_ROAM_FAIL_REASON_EAPOL_M4_NO_ACK:
-		return ROAM_FAIL_REASON_EAPOL_M4_NO_ACK;
-	case WMI_ROAM_FAIL_REASON_NO_SCAN_FOR_FINAL_BMISS:
-		return ROAM_FAIL_REASON_NO_SCAN_FOR_FINAL_BMISS;
-	case WMI_ROAM_FAIL_REASON_DISCONNECT:
-		return ROAM_FAIL_REASON_DISCONNECT;
-	case WMI_ROAM_FAIL_REASON_SYNC:
-		return ROAM_FAIL_REASON_SYNC;
-	case WMI_ROAM_FAIL_REASON_SAE_INVALID_PMKID:
-		return ROAM_FAIL_REASON_SAE_INVALID_PMKID;
-	case WMI_ROAM_FAIL_REASON_SAE_PREAUTH_TIMEOUT:
-		return ROAM_FAIL_REASON_SAE_PREAUTH_TIMEOUT;
-	case WMI_ROAM_FAIL_REASON_SAE_PREAUTH_FAIL:
-		return ROAM_FAIL_REASON_SAE_PREAUTH_FAIL;
-	case WMI_ROAM_FAIL_REASON_UNABLE_TO_START_ROAM_HO:
-		return ROAM_FAIL_REASON_UNABLE_TO_START_ROAM_HO;
-	default:
-		return ROAM_FAIL_REASON_UNKNOWN;
-	}
 }
 
 /**
@@ -21555,6 +21916,9 @@ static void populate_tlv_service(uint32_t *wmi_service)
 #endif
 	wmi_service[wmi_service_wpa3_sha384_roam_support] =
 			WMI_SERVICE_WMI_SERVICE_WPA3_SHA384_ROAM_SUPPORT;
+	/* TODO: Assign FW Enum after FW Shared header changes are merged */
+	wmi_service[wmi_service_v1a_v1b_supported] =
+			WMI_SERVICE_UNAVAILABLE;
 }
 
 /**

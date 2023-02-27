@@ -960,6 +960,18 @@ dp_mon_rx_mac_filter_set(struct dp_soc *soc, uint32_t *msg_word,
 {
 }
 
+static inline void
+dp_mon_rx_enable_pkt_tlv_offset(struct dp_soc *soc, uint32_t *msg_word,
+				struct htt_rx_ring_tlv_filter *tlv_filter)
+{
+}
+
+static inline void
+dp_mon_rx_enable_fpmo(struct dp_soc *soc, uint32_t *msg_word,
+		      struct htt_rx_ring_tlv_filter *tlv_filter)
+{
+}
+
 #ifdef WLAN_TELEMETRY_STATS_SUPPORT
 static inline
 void dp_monitor_peer_telemetry_stats(struct dp_peer *peer,
@@ -2605,7 +2617,7 @@ dp_print_pdev_rx_stats(struct dp_pdev *pdev);
  */
 void dp_print_soc_tx_stats(struct dp_soc *soc);
 
-#ifdef QCA_SUPPORT_GLOBAL_DESC
+#ifdef QCA_SUPPORT_DP_GLOBAL_CTX
 /**
  * dp_print_global_desc_count(): Print global desc in use
  *
@@ -2962,7 +2974,7 @@ dp_hif_update_pipe_callback(struct dp_soc *dp_soc, void *cb_context,
 			    uint8_t pipe_id)
 {
 }
-#endif /* CONFIG_WIN */
+#endif
 
 #ifdef VDEV_PEER_PROTOCOL_COUNT
 /**

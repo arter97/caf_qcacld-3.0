@@ -29,7 +29,9 @@
 #define DP_MLO_MAX_DEST_CHIP_ID 3
 
 /*
- * dp_mlo_ctxt
+ * NB: intentionally not using kernel-doc comment because the kernel-doc
+ *     script does not handle the TAILQ_HEAD macro
+ * struct dp_mlo_ctxt - datapath MLO context
  *
  * @ctrl_ctxt: opaque handle of cp mlo mgr
  * @ml_soc_list: list of socs which are mlo enabled. This also maintains
@@ -39,6 +41,8 @@
  * @mld_peer_hash: peer hash table for ML peers
  *           Associated peer with this MAC address)
  * @mld_peer_hash_lock: lock to protect mld_peer_hash
+ * @toeplitz_hash_ipv4:
+ * @toeplitz_hash_ipv6:
  * @link_to_pdev_map: link to pdev mapping
  * @rx_fst: pointer to rx_fst handle
  * @rx_fst_ref_cnt: ref count of rx_fst
@@ -60,8 +64,6 @@ struct dp_mlo_ctxt {
 	uint32_t toeplitz_hash_ipv6[LRO_IPV6_SEED_ARR_SZ];
 	struct dp_pdev_be *link_to_pdev_map[WLAN_MAX_MLO_CHIPS *
 		WLAN_MAX_MLO_LINKS_PER_SOC];
-	struct dp_rx_fst *rx_fst;
-	uint8_t rx_fst_ref_cnt;
 };
 
 /**
@@ -77,9 +79,8 @@ struct cdp_mlo_ctxt *dp_mlo_ctx_to_cdp(struct dp_mlo_ctxt *mlo_ctxt)
 }
 
 /**
- * cdp_mlo_ctx_to_dp() - typecast cdp_soc_t to
- * dp soc handle
- * @psoc: CDP psoc handle
+ * cdp_mlo_ctx_to_dp() - typecast CDP MLO context to DP MLO context
+ * @mlo_ctxt: CDP MLO context
  *
  * Return: struct dp_soc pointer
  */
@@ -108,6 +109,17 @@ void dp_soc_mlo_fill_params(struct dp_soc *soc,
  */
 void dp_pdev_mlo_fill_params(struct dp_pdev *pdev,
 			     struct cdp_pdev_attach_params *params);
+
+/**
+ * dp_mlo_get_soc_ref_by_chip_id() - Get DP soc from DP ML context.
+ * @ml_ctxt: DP ML context handle
+ * @chip_id: MLO chip id
+ *
+ * This API will increment a reference count for DP soc. Caller has
+ * to take care for decrementing refcount.
+ *
+ * Return: dp_soc
+ */
 struct dp_soc*
 dp_mlo_get_soc_ref_by_chip_id(struct dp_mlo_ctxt *ml_ctxt, uint8_t chip_id);
 
@@ -152,7 +164,7 @@ struct dp_rx_fst *dp_mlo_get_rx_fst(struct dp_soc *soc);
 void dp_mlo_set_rx_fst(struct dp_soc *soc, struct dp_rx_fst *fst);
 
 /**
- * dp_mlo_update_link_to_pdev_map : map link-id to pdev mapping
+ * dp_mlo_update_link_to_pdev_map() - map link-id to pdev mapping
  * @soc: DP SOC
  * @pdev: DP PDEV
  *
@@ -161,7 +173,7 @@ void dp_mlo_set_rx_fst(struct dp_soc *soc, struct dp_rx_fst *fst);
 void dp_mlo_update_link_to_pdev_map(struct dp_soc *soc, struct dp_pdev *pdev);
 
 /**
- * dp_mlo_update_link_to_pdev_unmap : unmap link-id to pdev mapping
+ * dp_mlo_update_link_to_pdev_unmap() - unmap link-id to pdev mapping
  * @soc: DP SOC
  * @pdev: DP PDEV
  *

@@ -722,6 +722,66 @@ static QDF_STATUS dp_soc_detach_be(struct dp_soc *soc)
 	return QDF_STATUS_SUCCESS;
 }
 
+#ifdef QCA_SUPPORT_DP_GLOBAL_CTX
+static void dp_set_rx_fst_be(struct dp_rx_fst *fst)
+{
+	struct dp_global_context *dp_global = wlan_objmgr_get_global_ctx();
+
+	if (dp_global)
+		dp_global->fst_ctx = fst;
+}
+
+static struct dp_rx_fst *dp_get_rx_fst_be(void)
+{
+	struct dp_global_context *dp_global = wlan_objmgr_get_global_ctx();
+
+	if (dp_global)
+		return dp_global->fst_ctx;
+
+	return NULL;
+}
+
+static uint32_t dp_rx_fst_release_ref_be(void)
+{
+	struct dp_global_context *dp_global = wlan_objmgr_get_global_ctx();
+	uint32_t rx_fst_ref_cnt;
+
+	if (dp_global) {
+		rx_fst_ref_cnt = qdf_atomic_read(&dp_global->rx_fst_ref_cnt);
+		qdf_atomic_dec(&dp_global->rx_fst_ref_cnt);
+		return rx_fst_ref_cnt;
+	}
+
+	return 1;
+}
+
+static void dp_rx_fst_get_ref_be(void)
+{
+	struct dp_global_context *dp_global = wlan_objmgr_get_global_ctx();
+
+	if (dp_global)
+		qdf_atomic_inc(&dp_global->rx_fst_ref_cnt);
+}
+#else
+static void dp_set_rx_fst_be(struct dp_rx_fst *fst)
+{
+}
+
+static struct dp_rx_fst *dp_get_rx_fst_be(void)
+{
+	return NULL;
+}
+
+static uint32_t dp_rx_fst_release_ref_be(void)
+{
+	return 1;
+}
+
+static void dp_rx_fst_get_ref_be(void)
+{
+}
+#endif
+
 #ifdef WLAN_MLO_MULTI_CHIP
 #ifdef WLAN_MCAST_MLO
 static inline void
@@ -753,25 +813,6 @@ dp_mlo_mcast_deinit(struct dp_soc *soc, struct dp_vdev *vdev)
 	vdev->mlo_vdev = false;
 }
 
-static void dp_set_rx_fst_be(struct dp_soc *soc, struct dp_rx_fst *fst)
-{
-	dp_mlo_set_rx_fst(soc, fst);
-}
-
-static struct dp_rx_fst *dp_get_rx_fst_be(struct dp_soc *soc)
-{
-	return dp_mlo_get_rx_fst(soc);
-}
-
-static uint8_t dp_rx_fst_deref_be(struct dp_soc *soc)
-{
-	return dp_mlo_rx_fst_deref(soc);
-}
-
-static void dp_rx_fst_ref_be(struct dp_soc *soc)
-{
-	dp_mlo_rx_fst_ref(soc);
-}
 #else
 static inline void
 dp_mlo_mcast_init(struct dp_soc *soc, struct dp_vdev *vdev)
@@ -780,24 +821,6 @@ dp_mlo_mcast_init(struct dp_soc *soc, struct dp_vdev *vdev)
 
 static inline void
 dp_mlo_mcast_deinit(struct dp_soc *soc, struct dp_vdev *vdev)
-{
-}
-
-static void dp_set_rx_fst_be(struct dp_soc *soc, struct dp_rx_fst *fst)
-{
-}
-
-static struct dp_rx_fst *dp_get_rx_fst_be(struct dp_soc *soc)
-{
-	return NULL;
-}
-
-static uint8_t dp_rx_fst_deref_be(struct dp_soc *soc)
-{
-	return 1;
-}
-
-static void dp_rx_fst_ref_be(struct dp_soc *soc)
 {
 }
 #endif
@@ -836,23 +859,6 @@ static void dp_get_rx_hash_key_be(struct dp_soc *soc,
 	dp_get_rx_hash_key_bytes(lro_hash);
 }
 
-static void dp_set_rx_fst_be(struct dp_soc *soc, struct dp_rx_fst *fst)
-{
-}
-
-static struct dp_rx_fst *dp_get_rx_fst_be(struct dp_soc *soc)
-{
-	return NULL;
-}
-
-static uint8_t dp_rx_fst_deref_be(struct dp_soc *soc)
-{
-	return 1;
-}
-
-static void dp_rx_fst_ref_be(struct dp_soc *soc)
-{
-}
 #endif
 
 static QDF_STATUS dp_soc_attach_be(struct dp_soc *soc,
@@ -2667,8 +2673,8 @@ void dp_initialize_arch_ops_be(struct dp_arch_ops *arch_ops)
 	arch_ops->get_rx_hash_key = dp_get_rx_hash_key_be;
 	arch_ops->dp_set_rx_fst = dp_set_rx_fst_be;
 	arch_ops->dp_get_rx_fst = dp_get_rx_fst_be;
-	arch_ops->dp_rx_fst_deref = dp_rx_fst_deref_be;
-	arch_ops->dp_rx_fst_ref = dp_rx_fst_ref_be;
+	arch_ops->dp_rx_fst_deref = dp_rx_fst_release_ref_be;
+	arch_ops->dp_rx_fst_ref = dp_rx_fst_get_ref_be;
 	arch_ops->print_mlo_ast_stats = dp_print_mlo_ast_stats_be;
 	arch_ops->peer_get_reo_hash = dp_peer_get_reo_hash_be;
 	arch_ops->reo_remap_config = dp_reo_remap_config_be;

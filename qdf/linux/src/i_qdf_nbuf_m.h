@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2014-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -121,7 +121,22 @@ qdf_nbuf_cb_update_vdev_id(struct sk_buff *skb, uint8_t vdev_id)
 	QDF_NBUF_CB_RX_VDEV_ID(skb) = vdev_id;
 }
 
+/**
+ * __qdf_nbuf_init_replenish_timer() - Initialize the alloc replenish timer
+ *
+ * This function initializes the nbuf alloc fail replenish timer.
+ *
+ * Return: void
+ */
 void __qdf_nbuf_init_replenish_timer(void);
+
+/**
+ * __qdf_nbuf_deinit_replenish_timer() - Deinitialize the alloc replenish timer
+ *
+ * This function deinitializes the nbuf alloc fail replenish timer.
+ *
+ * Return: void
+ */
 void __qdf_nbuf_deinit_replenish_timer(void);
 
 /**

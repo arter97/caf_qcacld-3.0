@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2016-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -98,10 +98,6 @@ htt_htc_pkt_free(struct htt_soc *soc, struct dp_htt_htc_pkt *pkt)
 
 qdf_export_symbol(htt_htc_pkt_free);
 
-/*
- * htt_htc_pkt_pool_free() - Free HTC packet pool
- * @htt_soc:	HTT SOC handle
- */
 void
 htt_htc_pkt_pool_free(struct htt_soc *soc)
 {
@@ -118,9 +114,9 @@ htt_htc_pkt_pool_free(struct htt_soc *soc)
 
 #ifndef ENABLE_CE4_COMP_DISABLE_HTT_HTC_MISC_LIST
 
-/*
+/**
  * htt_htc_misc_pkt_list_trim() - trim misc list
- * @htt_soc: HTT SOC handle
+ * @soc: HTT SOC handle
  * @level: max no. of pkts in list
  */
 static void
@@ -151,11 +147,6 @@ htt_htc_misc_pkt_list_trim(struct htt_soc *soc, int level)
 	HTT_TX_MUTEX_RELEASE(&soc->htt_tx_mutex);
 }
 
-/*
- * htt_htc_misc_pkt_list_add() - Add pkt to misc list
- * @htt_soc:	HTT SOC handle
- * @dp_htt_htc_pkt: pkt to be added to list
- */
 void
 htt_htc_misc_pkt_list_add(struct htt_soc *soc, struct dp_htt_htc_pkt *pkt)
 {
@@ -183,9 +174,9 @@ htt_htc_misc_pkt_list_add(struct htt_soc *soc, struct dp_htt_htc_pkt *pkt)
 qdf_export_symbol(htt_htc_misc_pkt_list_add);
 #endif  /* ENABLE_CE4_COMP_DISABLE_HTT_HTC_MISC_LIST */
 
-/*
+/**
  * htt_htc_misc_pkt_pool_free() - free pkts in misc list
- * @htt_soc:	HTT SOC handle
+ * @soc:	HTT SOC handle
  */
 static void
 htt_htc_misc_pkt_pool_free(struct htt_soc *soc)
@@ -221,7 +212,7 @@ htt_htc_misc_pkt_pool_free(struct htt_soc *soc)
 		soc->stats.fail_count, soc->stats.skip_count);
 }
 
-/*
+/**
  * htt_t2h_mac_addr_deswizzle() - Swap MAC addr bytes if FW endianness differ
  * @tgt_mac_addr:	Target MAC
  * @buffer:		Output buffer
@@ -255,7 +246,7 @@ htt_t2h_mac_addr_deswizzle(u_int8_t *tgt_mac_addr, u_int8_t *buffer)
 #endif
 }
 
-/*
+/**
  * dp_htt_h2t_send_complete_free_netbuf() - Free completed buffer
  * @soc:	SOC handle
  * @status:	Completion status
@@ -269,7 +260,7 @@ dp_htt_h2t_send_complete_free_netbuf(
 }
 
 #ifdef ENABLE_CE4_COMP_DISABLE_HTT_HTC_MISC_LIST
-/*
+/**
  * dp_htt_h2t_send_complete() - H2T completion handler
  * @context:	Opaque context (HTT SOC handle)
  * @htc_pkt:	HTC packet
@@ -296,11 +287,6 @@ dp_htt_h2t_send_complete(void *context, HTC_PACKET *htc_pkt)
 
 #else /* ENABLE_CE4_COMP_DISABLE_HTT_HTC_MISC_LIST */
 
-/*
- *  * dp_htt_h2t_send_complete() - H2T completion handler
- *   * @context:    Opaque context (HTT SOC handle)
- *    * @htc_pkt:    HTC packet
- *     */
 static void
 dp_htt_h2t_send_complete(void *context, HTC_PACKET *htc_pkt)
 {
@@ -318,7 +304,7 @@ dp_htt_h2t_send_complete(void *context, HTC_PACKET *htc_pkt)
 	netbuf = (qdf_nbuf_t) htc_pkt->pNetBufContext;
 	/*
 	 * adf sendcomplete is required for windows only
-	*/
+	 */
 	/* qdf_nbuf_set_sendcompleteflag(netbuf, TRUE); */
 	if (send_complete_part2){
 		send_complete_part2(
@@ -330,9 +316,9 @@ dp_htt_h2t_send_complete(void *context, HTC_PACKET *htc_pkt)
 
 #endif /* ENABLE_CE4_COMP_DISABLE_HTT_HTC_MISC_LIST */
 
-/*
+/**
  * dp_htt_h2t_add_tcl_metadata_ver_v1() - Add tcl_metadata version V1
- * @htt_soc:	HTT SOC handle
+ * @soc:	HTT SOC handle
  * @msg:	Pointer to nbuf
  *
  * Return: 0 on success; error code on failure
@@ -376,9 +362,9 @@ static int dp_htt_h2t_add_tcl_metadata_ver_v1(struct htt_soc *soc,
 }
 
 #ifdef QCA_DP_TX_FW_METADATA_V2
-/*
+/**
  * dp_htt_h2t_add_tcl_metadata_ver_v2() - Add tcl_metadata version V2
- * @htt_soc:	HTT SOC handle
+ * @soc:	HTT SOC handle
  * @msg:	Pointer to nbuf
  *
  * Return: 0 on success; error code on failure
@@ -430,9 +416,9 @@ static int dp_htt_h2t_add_tcl_metadata_ver_v2(struct htt_soc *soc,
 	return QDF_STATUS_SUCCESS;
 }
 
-/*
+/**
  * dp_htt_h2t_add_tcl_metadata_ver() - Add tcl_metadata version
- * @htt_soc:	HTT SOC handle
+ * @soc:	HTT SOC handle
  * @msg:	Pointer to nbuf
  *
  * Return: 0 on success; error code on failure
@@ -453,9 +439,9 @@ static int dp_htt_h2t_add_tcl_metadata_ver(struct htt_soc *soc, qdf_nbuf_t *msg)
 }
 #endif
 
-/*
+/**
  * htt_h2t_ver_req_msg() - Send HTT version request message to target
- * @htt_soc:	HTT SOC handle
+ * @soc:	HTT SOC handle
  *
  * Return: 0 on success; error code on failure
  */
@@ -493,15 +479,6 @@ static int htt_h2t_ver_req_msg(struct htt_soc *soc)
 	return status;
 }
 
-/*
- * htt_srng_setup() - Send SRNG setup message to target
- * @htt_soc:	HTT SOC handle
- * @mac_id:	MAC Id
- * @hal_srng:	Opaque HAL SRNG pointer
- * @hal_ring_type:	SRNG ring type
- *
- * Return: 0 on success; error code on failure
- */
 int htt_srng_setup(struct htt_soc *soc, int mac_id,
 		   hal_ring_handle_t hal_ring_hdl,
 		   int hal_ring_type)
@@ -799,15 +776,6 @@ fail0:
 qdf_export_symbol(htt_srng_setup);
 
 #ifdef QCA_SUPPORT_FULL_MON
-/**
- * htt_h2t_full_mon_cfg() - Send full monitor configuration msg to FW
- *
- * @htt_soc: HTT Soc handle
- * @pdev_id: Radio id
- * @dp_full_mon_config: enabled/disable configuration
- *
- * Return: Success when HTT message is sent, error on failure
- */
 int htt_h2t_full_mon_cfg(struct htt_soc *htt_soc,
 			 uint8_t pdev_id,
 			 enum dp_full_mon_config config)
@@ -943,17 +911,6 @@ dp_mon_rx_enable_phy_errors(uint32_t *msg_word,
 }
 #endif
 
-/*
- * htt_h2t_rx_ring_cfg() - Send SRNG packet and TLV filter
- * config message to target
- * @htt_soc:	HTT SOC handle
- * @pdev_id:	WIN- PDEV Id, MCL- mac id
- * @hal_srng:	Opaque HAL SRNG pointer
- * @hal_ring_type:	SRNG ring type
- * @ring_buf_size:	SRNG buffer size
- * @htt_tlv_filter:	Rx SRNG TLV and filter setting
- * Return: 0 on success; error code on failure
- */
 int htt_h2t_rx_ring_cfg(struct htt_soc *htt_soc, int pdev_id,
 			hal_ring_handle_t hal_ring_hdl,
 			int hal_ring_type, int ring_buf_size,
@@ -1672,25 +1629,33 @@ int htt_h2t_rx_ring_cfg(struct htt_soc *htt_soc, int pdev_id,
 						msg_word,
 						(void *)htt_tlv_filter);
 
+	dp_mon_rx_wmask_subscribe(soc->dp_soc, msg_word, htt_tlv_filter);
+
 	if (mon_drop_th > 0)
 		HTT_RX_RING_SELECTION_CFG_RX_DROP_THRESHOLD_SET(*msg_word,
-								mon_drop_th);
+				mon_drop_th);
+
 	dp_mon_rx_enable_mpdu_logging(soc->dp_soc, msg_word, htt_tlv_filter);
 
 	dp_mon_rx_enable_phy_errors(msg_word, htt_tlv_filter);
 
 	/* word 14*/
 	msg_word += 3;
+
 	/* word 15*/
 	msg_word++;
 
-#ifdef FW_SUPPORT_NOT_YET
-	/* word 17*/
-	msg_word += 3;
+	/* word 16*/
+	msg_word++;
+	*msg_word = 0;
+
+	dp_mon_rx_enable_pkt_tlv_offset(soc->dp_soc, msg_word, htt_tlv_filter);
+
+	/* word 20 and 21*/
+	msg_word += 4;
 	*msg_word = 0;
 
 	dp_mon_rx_enable_fpmo(soc->dp_soc, msg_word, htt_tlv_filter);
-#endif/* FW_SUPPORT_NOT_YET */
 
 	/* "response_required" field should be set if a HTT response message is
 	 * required after setting up the ring.
@@ -1844,12 +1809,12 @@ dp_htt_stats_sysfs_update_config(struct dp_pdev *pdev)
 	soc->sysfs_config->printing_mode = PRINTING_MODE_ENABLED;
 }
 
-/*
+/**
  * dp_htt_stats_sysfs_set_event() - Set sysfs stats event.
  * @soc: soc handle.
  * @msg_word: Pointer to htt msg word.
  *
- * @return: void
+ * Return: void
  */
 static inline void
 dp_htt_stats_sysfs_set_event(struct dp_soc *soc, uint32_t *msg_word)
@@ -1898,13 +1863,14 @@ dp_htt_set_pdev_obss_stats(struct dp_pdev *pdev, uint32_t tag_type,
 /**
  * dp_process_htt_stat_msg(): Process the list of buffers of HTT EXT stats
  * @htt_stats: htt stats info
+ * @soc: DP soc
  *
  * The FW sends the HTT EXT STATS as a stream of T2H messages. Each T2H message
  * contains sub messages which are identified by a TLV header.
  * In this function we will process the stream of T2H messages and read all the
  * TLV contained in the message.
  *
- * THe following cases have been taken care of
+ * The following cases have been taken care of
  * Case 1: When the tlv_remain_length <= msg_remain_length of HTT MSG buffer
  *		In this case the buffer will contain multiple tlvs.
  * Case 2: When the tlv_remain_length > msg_remain_length of HTT MSG buffer.
@@ -1913,7 +1879,7 @@ dp_htt_set_pdev_obss_stats(struct dp_pdev *pdev, uint32_t tag_type,
  * Case 3: When the buffer is the continuation of the previous message
  * Case 4: tlv length is 0. which will indicate the end of message
  *
- * return: void
+ * Return: void
  */
 static inline void dp_process_htt_stat_msg(struct htt_stats_context *htt_stats,
 					struct dp_soc *soc)
@@ -2204,12 +2170,6 @@ error:
 	return;
 }
 
-/*
- * htt_soc_attach_target() - SOC level HTT setup
- * @htt_soc:	HTT SOC handle
- *
- * Return: 0 on success; error code on failure
- */
 int htt_soc_attach_target(struct htt_soc *htt_soc)
 {
 	struct htt_soc *soc = (struct htt_soc *)htt_soc;
@@ -2278,9 +2238,9 @@ struct htt_soc *htt_soc_attach(struct dp_soc *soc, HTC_HANDLE htc_handle)
 
 #if defined(WDI_EVENT_ENABLE) && \
 	!defined(REMOVE_PKT_LOG)
-/*
+/**
  * dp_pktlog_msg_handler() - Pktlog msg handler
- * @htt_soc:	 HTT SOC handle
+ * @soc:	 HTT SOC handle
  * @msg_word:    Pointer to payload
  *
  * Return: None
@@ -2310,10 +2270,10 @@ dp_pktlog_msg_handler(struct htt_soc *soc,
 #endif
 
 #ifdef QCA_VDEV_STATS_HW_OFFLOAD_SUPPORT
-/*
+/**
  * dp_vdev_txrx_hw_stats_handler - Handle vdev stats received from FW
- * @soc - htt soc handle
- * @ msg_word - buffer containing stats
+ * @soc: htt soc handle
+ * @msg_word: buffer containing stats
  *
  * Return: void
  */
@@ -2506,14 +2466,14 @@ static void dp_sawf_def_queues_update_map_report_conf(struct htt_soc *soc,
 #endif
 
 #ifdef CONFIG_SAWF
-/*
+/**
  * dp_sawf_msduq_map() - Msdu queue creation information received
  * from target
  * @soc: soc handle.
  * @msg_word: Pointer to htt msg word.
  * @htt_t2h_msg: HTT message nbuf
  *
- * @return: void
+ * Return: void
  */
 static void dp_sawf_msduq_map(struct htt_soc *soc, uint32_t *msg_word,
 			      qdf_nbuf_t htt_t2h_msg)
@@ -2521,12 +2481,12 @@ static void dp_sawf_msduq_map(struct htt_soc *soc, uint32_t *msg_word,
 	dp_htt_sawf_msduq_map(soc, msg_word, htt_t2h_msg);
 }
 
-/*
+/**
  * dp_sawf_mpdu_stats_handler() - HTT message handler for MPDU stats
  * @soc: soc handle.
  * @htt_t2h_msg: HTT message nbuf
  *
- * @return: void
+ * Return: void
  */
 static void dp_sawf_mpdu_stats_handler(struct htt_soc *soc,
 				       qdf_nbuf_t htt_t2h_msg)
@@ -2543,10 +2503,11 @@ static void dp_sawf_mpdu_stats_handler(struct htt_soc *soc,
 {}
 #endif
 
-/*
+/**
  * time_allow_print() - time allow print
- * @htt_ring_tt:	ringi_id array of timestamps
+ * @htt_bp_handler:	backpressure handler
  * @ring_id:		ring_id (index)
+ * @th_time:		threshold time
  *
  * Return: 1 for successfully saving timestamp in array
  *	and 0 for timestamp falling within 2 seconds after last one
@@ -2602,8 +2563,10 @@ static void dp_htt_alert_print(enum htt_t2h_msg_type msg_type,
 /**
  * dp_get_srng_ring_state_from_hal(): Get hal level ring stats
  * @soc: DP_SOC handle
+ * @pdev: DP pdev handle
  * @srng: DP_SRNG handle
  * @ring_type: srng src/dst ring
+ * @state: ring state
  *
  * Return: void
  */
@@ -2715,7 +2678,7 @@ dp_get_tcl_status_ring_state_from_hal(struct dp_pdev *pdev,
 #endif
 
 /**
- * dp_queue_srng_ring_stats(): Print pdev hal level ring stats
+ * dp_queue_ring_stats() - Print pdev hal level ring stats
  * @pdev: DP_pdev handle
  *
  * Return: void
@@ -2924,10 +2887,10 @@ static void dp_queue_ring_stats(struct dp_pdev *pdev)
 		       &pdev->bkp_stats.work);
 }
 
-/*
+/**
  * dp_htt_bkp_event_alert() - htt backpressure event alert
  * @msg_word:	htt packet context
- * @htt_soc:	HTT SOC handle
+ * @soc:	HTT SOC handle
  *
  * Return: after attempting to print stats
  */
@@ -2995,9 +2958,9 @@ static void dp_htt_bkp_event_alert(u_int32_t *msg_word, struct htt_soc *soc)
 }
 
 #ifdef WLAN_FEATURE_PKT_CAPTURE_V2
-/*
+/**
  * dp_offload_ind_handler() - offload msg handler
- * @htt_soc: HTT SOC handle
+ * @soc: HTT SOC handle
  * @msg_word: Pointer to payload
  *
  * Return: None
@@ -3218,7 +3181,7 @@ dp_rx_mlo_timestamp_ind_handler(void *soc_handle,
 }
 #endif
 
-/*
+/**
  * dp_htt_rx_addba_handler() - RX Addba HTT msg handler
  * @soc: DP Soc handler
  * @peer_id: ID of peer
@@ -3258,9 +3221,9 @@ dp_htt_rx_addba_handler(struct dp_soc *soc, uint16_t peer_id,
 		peer_id, win_sz, tid, status);
 }
 
-/*
+/**
  * dp_htt_ppdu_id_fmt_handler() - PPDU ID Format handler
- * @htt_soc: HTT SOC handle
+ * @soc: HTT SOC handle
  * @msg_word: Pointer to payload
  *
  * Return: None
@@ -3285,7 +3248,7 @@ dp_htt_ppdu_id_fmt_handler(struct dp_soc *soc, uint32_t *msg_word)
 	}
 }
 
-/*
+/**
  * dp_htt_t2h_msg_handler() - Generic Target to host Msg/event handler
  * @context:	Opaque context (HTT SOC handle)
  * @pkt:	HTC packet
@@ -3742,7 +3705,7 @@ static void dp_htt_t2h_msg_handler(void *context, HTC_PACKET *pkt)
 		qdf_nbuf_free(htt_t2h_msg);
 }
 
-/*
+/**
  * dp_htt_h2t_full() - Send full handler (called from HTC)
  * @context:	Opaque context (HTT SOC handle)
  * @pkt:	HTC packet
@@ -3755,7 +3718,7 @@ dp_htt_h2t_full(void *context, HTC_PACKET *pkt)
 	return HTC_SEND_FULL_KEEP;
 }
 
-/*
+/**
  * dp_htt_hif_t2h_hp_callback() - HIF callback for high priority T2H messages
  * @context:	Opaque context (HTT SOC handle)
  * @nbuf:	nbuf containing T2H message
@@ -3782,9 +3745,9 @@ dp_htt_hif_t2h_hp_callback (void *context, qdf_nbuf_t nbuf, uint8_t pipe_id)
 	return rc;
 }
 
-/*
+/**
  * htt_htc_soc_attach() - Register SOC level HTT instance with HTC
- * @htt_soc:	HTT SOC handle
+ * @soc:	HTT SOC handle
  *
  * Return: QDF_STATUS
  */
@@ -3841,16 +3804,6 @@ htt_htc_soc_attach(struct htt_soc *soc)
 	return QDF_STATUS_SUCCESS; /* success */
 }
 
-/*
- * htt_soc_initialize() - SOC level HTT initialization
- * @htt_soc: Opaque htt SOC handle
- * @ctrl_psoc: Opaque ctrl SOC handle
- * @htc_soc: SOC level HTC handle
- * @hal_soc: Opaque HAL SOC handle
- * @osdev: QDF device
- *
- * Return: HTT handle on success; NULL on failure
- */
 void *
 htt_soc_initialize(struct htt_soc *htt_soc,
 		   struct cdp_ctrl_objmgr_psoc *ctrl_psoc,
@@ -3880,13 +3833,6 @@ void htt_soc_htc_dealloc(struct htt_soc *htt_handle)
 	htt_htc_pkt_pool_free(htt_handle);
 }
 
-/*
- * htt_soc_htc_prealloc() - HTC memory prealloc
- * @htt_soc: SOC level HTT handle
- *
- * Return: QDF_STATUS_SUCCESS on Success or
- * QDF_STATUS_E_NOMEM on allocation failure
- */
 QDF_STATUS htt_soc_htc_prealloc(struct htt_soc *soc)
 {
 	int i;
@@ -3904,10 +3850,6 @@ QDF_STATUS htt_soc_htc_prealloc(struct htt_soc *soc)
 	return QDF_STATUS_SUCCESS;
 }
 
-/*
- * htt_soc_detach() - Free SOC level HTT handle
- * @htt_hdl: HTT SOC handle
- */
 void htt_soc_detach(struct htt_soc *htt_hdl)
 {
 	int i;
@@ -3923,18 +3865,6 @@ void htt_soc_detach(struct htt_soc *htt_hdl)
 
 }
 
-/**
- * dp_h2t_ext_stats_msg_send(): function to construct HTT message to pass to FW
- * @pdev: DP PDEV handle
- * @stats_type_upload_mask: stats type requested by user
- * @config_param_0: extra configuration parameters
- * @config_param_1: extra configuration parameters
- * @config_param_2: extra configuration parameters
- * @config_param_3: extra configuration parameters
- * @mac_id: mac number
- *
- * return: QDF STATUS
- */
 QDF_STATUS dp_h2t_ext_stats_msg_send(struct dp_pdev *pdev,
 		uint32_t stats_type_upload_mask, uint32_t config_param_0,
 		uint32_t config_param_1, uint32_t config_param_2,
@@ -4178,21 +4108,6 @@ QDF_STATUS dp_h2t_hw_vdev_stats_config_send(struct dp_soc *dpsoc,
 }
 #endif
 
-/**
- * dp_h2t_3tuple_config_send(): function to construct 3 tuple configuration
- * HTT message to pass to FW
- * @pdev: DP PDEV handle
- * @tuple_mask: tuple configuration to report 3 tuple hash value in either
- * toeplitz_2_or_4 or flow_id_toeplitz in MSDU START TLV.
- *
- * tuple_mask[1:0]:
- *   00 - Do not report 3 tuple hash value
- *   10 - Report 3 tuple hash value in toeplitz_2_or_4
- *   01 - Report 3 tuple hash value in flow_id_toeplitz
- *   11 - Report 3 tuple hash value in both toeplitz_2_or_4 & flow_id_toeplitz
- *
- * return: QDF STATUS
- */
 QDF_STATUS dp_h2t_3tuple_config_send(struct dp_pdev *pdev,
 				     uint32_t tuple_mask, uint8_t mac_id)
 {
@@ -4273,14 +4188,6 @@ QDF_STATUS dp_h2t_3tuple_config_send(struct dp_pdev *pdev,
  * HTT_H2T_MSG_TYPE_PPDU_STATS_CFG in htt.h file
  * */
 #if defined(WDI_EVENT_ENABLE)
-/**
- * dp_h2t_cfg_stats_msg_send(): function to construct HTT message to pass to FW
- * @pdev: DP PDEV handle
- * @stats_type_upload_mask: stats type requested by user
- * @mac_id: Mac id number
- *
- * return: QDF STATUS
- */
 QDF_STATUS dp_h2t_cfg_stats_msg_send(struct dp_pdev *pdev,
 		uint32_t stats_type_upload_mask, uint8_t mac_id)
 {
@@ -4402,13 +4309,6 @@ dp_peer_update_inactive_time(struct dp_pdev *pdev, uint32_t tag_type,
 	}
 }
 
-/**
- * dp_htt_rx_flow_fst_setup(): Send HTT Rx FST setup message to FW
- * @pdev: DP pdev handle
- * @fse_setup_info: FST setup parameters
- *
- * Return: Success when HTT message is sent, error on failure
- */
 QDF_STATUS
 dp_htt_rx_flow_fst_setup(struct dp_pdev *pdev,
 			 struct dp_htt_rx_flow_fst_setup *fse_setup_info)
@@ -4544,14 +4444,6 @@ dp_htt_rx_flow_fst_setup(struct dp_pdev *pdev,
 	return status;
 }
 
-/**
- * dp_htt_rx_flow_fse_operation(): Send HTT Flow Search Entry msg to
- * add/del a flow in HW
- * @pdev: DP pdev handle
- * @fse_op_info: Flow entry parameters
- *
- * Return: Success when HTT message is sent, error on failure
- */
 QDF_STATUS
 dp_htt_rx_flow_fse_operation(struct dp_pdev *pdev,
 			     struct dp_htt_rx_flow_fst_operation *fse_op_info)
@@ -4693,13 +4585,6 @@ dp_htt_rx_flow_fse_operation(struct dp_pdev *pdev,
 	return status;
 }
 
-/**
- * dp_htt_rx_fisa_config(): Send HTT msg to configure FISA
- * @pdev: DP pdev handle
- * @fse_op_info: Flow entry parameters
- *
- * Return: Success when HTT message is sent, error on failure
- */
 QDF_STATUS
 dp_htt_rx_fisa_config(struct dp_pdev *pdev,
 		      struct dp_htt_rx_fisa_cfg *fisa_config)
@@ -4794,13 +4679,6 @@ dp_htt_rx_fisa_config(struct dp_pdev *pdev,
 }
 
 #ifdef WLAN_SUPPORT_PPEDS
-/**
- * dp_htt_rxdma_rxole_ppe_cfg_set() - Send RxOLE and RxDMA PPE config
- * @dp_osc: Data path SoC handle
- * @cfg: RxDMA and RxOLE PPE config
- *
- * Return: Success when HTT message is sent, error on failure
- */
 QDF_STATUS
 dp_htt_rxdma_rxole_ppe_cfg_set(struct dp_soc *soc,
 			       struct dp_htt_rxdma_rxole_ppe_config *cfg)
@@ -4958,12 +4836,6 @@ static void dp_bk_pressure_stats_handler(void *context)
 			       &pdev->bkp_stats.work);
 }
 
-/*
- * dp_pdev_bkp_stats_detach() - detach resources for back pressure stats
- *				processing
- * @pdev: Datapath PDEV handle
- *
- */
 void dp_pdev_bkp_stats_detach(struct dp_pdev *pdev)
 {
 	struct dp_soc_srngs_state *ring_state, *ring_state_next;
@@ -4986,14 +4858,6 @@ void dp_pdev_bkp_stats_detach(struct dp_pdev *pdev)
 	qdf_spinlock_destroy(&pdev->bkp_stats.list_lock);
 }
 
-/*
- * dp_pdev_bkp_stats_attach() - attach resources for back pressure stats
- *				processing
- * @pdev: Datapath PDEV handle
- *
- * Return: QDF_STATUS_SUCCESS: Success
- *         QDF_STATUS_E_NOMEM: Error
- */
 QDF_STATUS dp_pdev_bkp_stats_attach(struct dp_pdev *pdev)
 {
 	TAILQ_INIT(&pdev->bkp_stats.list);

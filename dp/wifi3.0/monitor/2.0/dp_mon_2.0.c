@@ -1427,6 +1427,7 @@ dp_mon_register_feature_ops_2_0(struct dp_soc *soc)
 	mon_ops->rx_packet_length_set = dp_rx_mon_packet_length_set;
 	mon_ops->rx_mon_enable = dp_rx_mon_enable_set;
 	mon_ops->rx_wmask_subscribe = dp_rx_mon_word_mask_subscribe;
+	mon_ops->rx_pkt_tlv_offset = dp_rx_mon_pkt_tlv_offset_subscribe;
 	mon_ops->rx_enable_mpdu_logging = dp_rx_mon_enable_mpdu_logging;
 	mon_ops->mon_neighbour_peers_detach = NULL;
 	mon_ops->mon_vdev_set_monitor_mode_buf_rings =

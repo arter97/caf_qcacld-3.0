@@ -1255,6 +1255,36 @@ static const char *qdf_dp_subtype_to_str(enum qdf_proto_subtype subtype)
 		return "LOGOFF";
 	case QDF_PROTO_EAPOL_ASF:
 		return "ASF";
+	case QDF_PROTO_EAP_REQ_ID:
+		return "EAP REQ ID";
+	case QDF_PROTO_EAP_RSP_ID:
+		return "EAP RSP ID";
+	case QDF_PROTO_EAP_M1:
+		return "EAP M1";
+	case QDF_PROTO_EAP_M2:
+		return "EAP M2";
+	case QDF_PROTO_EAP_M3:
+		return "EAP M3";
+	case QDF_PROTO_EAP_M4:
+		return "EAP M4";
+	case QDF_PROTO_EAP_M5:
+		return "EAP M5";
+	case QDF_PROTO_EAP_M6:
+		return "EAP M6";
+	case QDF_PROTO_EAP_M7:
+		return "EAP M7";
+	case QDF_PROTO_EAP_M8:
+		return "EAP M8";
+	case QDF_PROTO_EAP_WSC_START:
+		return "EAP WSC START";
+	case QDF_PROTO_EAP_WSC_DONE:
+		return "EAP WSC DONE";
+	case QDF_PROTO_EAP_WSC_ACK:
+		return "EAP WSC ACK";
+	case QDF_PROTO_EAP_WSC_NACK:
+		return "EAP WSC NACK";
+	case QDF_PROTO_EAP_WSC_FRAG_ACK:
+		return "EAP WSC FRAG ACK";
 	default:
 		return "invalid";
 	}
@@ -1555,6 +1585,36 @@ uint8_t *qdf_get_pkt_type_string(uint8_t type, uint8_t subtype)
 		return "EAPOL-LOGOFF";
 	case QDF_PROTO_EAPOL_ASF:
 		return "EAPOL-ASF";
+	case QDF_PROTO_EAP_REQ_ID:
+		return "EAP-REQ-ID";
+	case QDF_PROTO_EAP_RSP_ID:
+		return "EAP-RSP-ID";
+	case QDF_PROTO_EAP_M1:
+		return "EAP-M1";
+	case QDF_PROTO_EAP_M2:
+		return "EAP-M2";
+	case QDF_PROTO_EAP_M3:
+		return "EAP-M3";
+	case QDF_PROTO_EAP_M4:
+		return "EAP-M4";
+	case QDF_PROTO_EAP_M5:
+		return "EAP-M5";
+	case QDF_PROTO_EAP_M6:
+		return "EAP-M6";
+	case QDF_PROTO_EAP_M7:
+		return "EAP-M7";
+	case QDF_PROTO_EAP_M8:
+		return "EAP-M8";
+	case QDF_PROTO_EAP_WSC_START:
+		return "EAP-WSC-START";
+	case QDF_PROTO_EAP_WSC_DONE:
+		return "EAP-WSC-DONE";
+	case QDF_PROTO_EAP_WSC_ACK:
+		return "EAP-WSC-ACK";
+	case QDF_PROTO_EAP_WSC_NACK:
+		return "EAP-WSC-NACK";
+	case QDF_PROTO_EAP_WSC_FRAG_ACK:
+		return "EAP-WSC-FRAG-ACK";
 	default:
 		switch (type) {
 		case QDF_PROTO_TYPE_EAPOL:
