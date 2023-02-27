@@ -262,9 +262,9 @@ static void dp_tx_me_mem_free(struct dp_pdev *pdev,
 	}
 }
 
-#ifdef QCA_SUPPORT_WDS_EXTENDED
+#if defined(QCA_SUPPORT_WDS_EXTENDED) || defined(CONFIG_MLO_SINGLE_DEV)
 /**
- * dp_tx_me_check_wds_peer_by_mac() - Check WDS peer using mac address
+ * dp_tx_me_check_primary_peer_by_mac() - Check primary peer using mac address
  * @soc: Datapath soc handle
  * @vdev: DP vdev
  * @mac_addr: Peer mac address
@@ -272,18 +272,40 @@ static void dp_tx_me_mem_free(struct dp_pdev *pdev,
  * Return: True if wds ext peer; false otherwise
  */
 static inline
-bool dp_tx_me_check_wds_peer_by_mac(struct dp_soc *soc, struct dp_vdev *vdev,
-				    uint8_t *mac_addr)
+bool dp_tx_me_check_primary_peer_by_mac(struct dp_soc *soc, struct dp_vdev *vdev,
+					uint8_t *mac_addr)
 {
+	struct dp_peer *peer = NULL;
+	struct dp_peer *tgt_peer = NULL;
+	struct cdp_peer_info peer_info = { 0 };
+
 	if (!vdev->wds_ext_enabled)
 		return false;
-	return !dp_find_peer_exist(&soc->cdp_soc, vdev->pdev->pdev_id,
-				   mac_addr);
+
+	DP_PEER_INFO_PARAMS_INIT(&peer_info, DP_VDEV_ALL, mac_addr, false,
+				 CDP_WILD_PEER_TYPE);
+
+	peer = dp_peer_hash_find_wrapper((struct dp_soc *)soc, &peer_info,
+					  DP_MOD_ID_CDP);
+
+	if (!peer)
+		return true;
+
+	tgt_peer = dp_get_tgt_peer_from_peer(peer);
+
+	/* if peer is non primary don't forward packet */
+	if (vdev != tgt_peer->vdev) {
+		dp_peer_unref_delete(peer, DP_MOD_ID_CDP);
+		return true;
+	}
+
+	dp_peer_unref_delete(peer, DP_MOD_ID_CDP);
+	return false;
 }
 #else
 static inline
-bool dp_tx_me_check_wds_peer_by_mac(struct dp_soc *soc, struct dp_vdev *vdev,
-				    uint8_t *mac_addr)
+bool dp_tx_me_check_primary_peer_by_mac(struct dp_soc *soc, struct dp_vdev *vdev,
+					uint8_t *mac_addr)
 {
 	return false;
 }
@@ -461,7 +483,8 @@ dp_tx_me_send_convert_ucast(struct cdp_soc_t *soc_hdl, uint8_t vdev_id,
 		if (!qdf_mem_cmp(dstmac, srcmac, QDF_MAC_ADDR_SIZE))
 			continue;
 
-		if (dp_tx_me_check_wds_peer_by_mac(soc, vdev, dstmac))
+		/* forward the packet only on primary peer */
+		if (dp_tx_me_check_primary_peer_by_mac(soc, vdev, dstmac))
 			continue;
 
 		/*

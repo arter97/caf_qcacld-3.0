@@ -294,7 +294,8 @@ dp_rx_flow_find_entry_by_flowid(struct dp_rx_fst *fst,
 		return NULL;
 
 	dp_info("flow_idx= %d, flow_addr = %pK", flow_id, fse);
-	qdf_assert_always(fse->flow_id == flow_id);
+	qdf_assert_always(fse->flow_id == hal_rx_get_hal_hash(fst->hal_rx_fst,
+							      flow_id));
 
 	return fse;
 }

@@ -45,6 +45,15 @@
 #define TIME_TO_LIVE_MID 250
 #define SAWF_TID_INFER_LESS_THAN(param, threshold) \
 	p_cmd->param < threshold
+
+enum wmi_sched_disabled  {
+	SCHED_MODE_DL_MU_MIMO,
+	SCHED_MODE_UL_MU_MIMO,
+	SCHED_MODE_DL_OFDMA,
+	SCHED_MODE_UL_OFDMA,
+	SCHED_MODE_INV_DMODE,
+};
+
 /**
  * wmi_wifi_pos_lcr_info - LCR info structure
  * @pdev_id: host pdev id
@@ -1099,6 +1108,7 @@ struct wmi_sawf_params {
 	uint32_t priority;
 	uint32_t tid;
 	uint32_t msdu_rate_loss;
+	uint32_t disabled_modes;
 };
 #endif
 #endif

@@ -3745,6 +3745,22 @@ static void sawf_create_set_defaults(struct wmi_sawf_params *param)
 }
 
 
+void parse_disabled_schd_mode(uint32_t disabled_modes,
+			      uint32_t *wmi_disabled_modes)
+{
+	if (disabled_modes & (1 << SCHED_MODE_DL_MU_MIMO))
+		*wmi_disabled_modes |= WMI_SCHED_MODE_DL_MU_MIMO;
+
+	if (disabled_modes & (1 << SCHED_MODE_UL_MU_MIMO))
+		*wmi_disabled_modes |= WMI_SCHED_MODE_UL_MU_MIMO;
+
+	if (disabled_modes & (1 << SCHED_MODE_DL_OFDMA))
+		*wmi_disabled_modes |= WMI_SCHED_MODE_DL_OFDMA;
+
+	if (disabled_modes & (1 << SCHED_MODE_UL_OFDMA))
+		*wmi_disabled_modes |= WMI_SCHED_MODE_UL_OFDMA;
+}
+
 QDF_STATUS send_sawf_create_cmd_tlv(wmi_unified_t wmi_handle,
 				    struct wmi_sawf_params *param)
 {
@@ -3753,6 +3769,7 @@ QDF_STATUS send_sawf_create_cmd_tlv(wmi_unified_t wmi_handle,
 	wmi_buf_t buf;
 	uint8_t tid;
 	uint16_t len = sizeof(*cmd);
+	uint32_t disabled_modes = 0;
 
 	buf = wmi_buf_alloc(wmi_handle, len);
 	if (!buf)
@@ -3777,6 +3794,9 @@ QDF_STATUS send_sawf_create_cmd_tlv(wmi_unified_t wmi_handle,
 	cmd->priority = param->priority;
 	cmd->tid = param->tid;
 	cmd->msdu_loss_rate_ppm = param->msdu_rate_loss;
+
+	parse_disabled_schd_mode(param->disabled_modes, &disabled_modes);
+	cmd->disabled_sched_modes = disabled_modes;
 
 	if (param->tid == WMI_SAWF_SVC_CLASS_PARAM_DEFAULT_TID) {
 		tid = sawf_tid_infer(cmd);
