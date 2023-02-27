@@ -2958,7 +2958,9 @@ bool hdd_dfs_indicate_radar(struct hdd_context *hdd_ctx)
 {
 	struct hdd_adapter *adapter, *next_adapter = NULL;
 	struct hdd_ap_ctx *ap_ctx;
+	uint32_t ap_chan;
 	bool dfs_disable_channel_switch = false;
+	struct wlan_hdd_link_info *link_info;
 
 	if (!hdd_ctx) {
 		hdd_info("Couldn't get hdd_ctx");
@@ -2975,20 +2977,26 @@ bool hdd_dfs_indicate_radar(struct hdd_context *hdd_ctx)
 
 	hdd_for_each_adapter_dev_held_safe(hdd_ctx, adapter, next_adapter,
 					   NET_DEV_HOLD_DFS_INDICATE_RADAR) {
-		ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(adapter->deflink);
 
-		if ((QDF_SAP_MODE == adapter->device_mode ||
-		    QDF_P2P_GO_MODE == adapter->device_mode) &&
-		    (wlan_reg_is_passive_or_disable_for_pwrmode(hdd_ctx->pdev,
-		     ap_ctx->operating_chan_freq, REG_CURRENT_PWR_MODE))) {
+		if (adapter->device_mode != QDF_SAP_MODE &&
+		    adapter->device_mode != QDF_P2P_GO_MODE)
+			goto next_adapter;
+
+		hdd_adapter_for_each_active_link_info(adapter, link_info) {
+			ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(link_info);
+			ap_chan = ap_ctx->operating_chan_freq;
+			if (!wlan_reg_is_passive_or_disable_for_pwrmode(hdd_ctx->pdev,
+							ap_chan, REG_CURRENT_PWR_MODE))
+				continue;
+
 			ap_ctx->dfs_cac_block_tx = true;
-			hdd_info("tx blocked for vdev: %d",
-				adapter->deflink->vdev_id);
-			if (adapter->deflink->vdev_id != WLAN_UMAC_VDEV_ID_MAX)
+			hdd_info("tx blocked for vdev: %d", link_info->vdev_id);
+			if (link_info->vdev_id != WLAN_UMAC_VDEV_ID_MAX)
 				cdp_fc_vdev_flush(
 					cds_get_context(QDF_MODULE_ID_SOC),
-					adapter->deflink->vdev_id);
+					link_info->vdev_id);
 		}
+next_adapter:
 		hdd_adapter_dev_put_debug(adapter,
 					  NET_DEV_HOLD_DFS_INDICATE_RADAR);
 	}
@@ -3837,25 +3845,27 @@ static bool hdd_is_chan_switch_in_progress(void)
 {
 	struct hdd_adapter *adapter = NULL, *next_adapter = NULL;
 	struct hdd_context *hdd_ctx = cds_get_context(QDF_MODULE_ID_HDD);
-	wlan_net_dev_ref_dbgid dbgid =
-				NET_DEV_HOLD_IS_CHAN_SWITCH_IN_PROGRESS;
+	wlan_net_dev_ref_dbgid dbgid = NET_DEV_HOLD_IS_CHAN_SWITCH_IN_PROGRESS;
 	struct hdd_ap_ctx *ap_ctx;
+	struct wlan_hdd_link_info *link_info;
 
 	hdd_for_each_adapter_dev_held_safe(hdd_ctx, adapter, next_adapter,
 					   dbgid) {
-		if (!(adapter->device_mode == QDF_SAP_MODE ||
-		      adapter->device_mode == QDF_P2P_GO_MODE))
+		if (adapter->device_mode != QDF_SAP_MODE &&
+		    adapter->device_mode != QDF_P2P_GO_MODE)
 			goto next_adapter;
 
-		ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(adapter->deflink);
-		if (qdf_atomic_read(&ap_ctx->ch_switch_in_progress)) {
-			hdd_debug("channel switch progress for vdev_id %d",
-				  adapter->deflink->vdev_id);
-			hdd_adapter_dev_put_debug(adapter, dbgid);
-			if (next_adapter)
-				hdd_adapter_dev_put_debug(next_adapter, dbgid);
-
-			return true;
+		hdd_adapter_for_each_active_link_info(adapter, link_info) {
+			ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(link_info);
+			if (qdf_atomic_read(&ap_ctx->ch_switch_in_progress)) {
+				hdd_debug("channel switch progress for vdev_id %d",
+					  link_info->vdev_id);
+				hdd_adapter_dev_put_debug(adapter, dbgid);
+				if (next_adapter)
+					hdd_adapter_dev_put_debug(next_adapter,
+								  dbgid);
+				return true;
+			}
 		}
 next_adapter:
 		hdd_adapter_dev_put_debug(adapter, dbgid);
