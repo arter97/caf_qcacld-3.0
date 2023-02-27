@@ -64,6 +64,9 @@ bool qca_scs_peer_lookup_n_rule_match(uint32_t rule_id, uint8_t *dst_mac_addr)
 	soc = ol_global_soc[soc_id];
 	soc_txrx_handle = wlan_psoc_get_dp_handle(soc->psoc_obj);
 
+	scs_trace("SCS callback: Rule ID: %u, Destination Mac Address: "
+		  QDF_MAC_ADDR_FMT, rule_id, QDF_MAC_ADDR_REF(dst_mac_addr));
+
 	return cdp_scs_peer_lookup_n_rule_match(soc_txrx_handle, rule_id,
 						dst_mac_addr);
 }
