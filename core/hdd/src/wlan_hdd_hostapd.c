@@ -4571,10 +4571,9 @@ static inline bool wlan_hdd_get_sap_obss(struct wlan_hdd_link_info *link_info)
  *
  * Return: 0 for success non-zero for failure
  */
-int wlan_hdd_set_channel(struct wiphy *wiphy,
-				struct net_device *dev,
-				struct cfg80211_chan_def *chandef,
-				enum nl80211_channel_type channel_type)
+int wlan_hdd_set_channel(struct wiphy *wiphy, struct net_device *dev,
+			 struct cfg80211_chan_def *chandef,
+			 enum nl80211_channel_type channel_type)
 {
 	struct hdd_adapter *adapter = NULL;
 	uint32_t num_ch = 0;
@@ -4636,59 +4635,54 @@ int wlan_hdd_set_channel(struct wiphy *wiphy,
 
 	num_ch = CFG_VALID_CHANNEL_LIST_LEN;
 
-	if (QDF_STATUS_SUCCESS !=  wlan_hdd_validate_operation_channel(
-	    adapter, chandef->chan->center_freq)) {
+	if (QDF_STATUS_SUCCESS !=
+	    wlan_hdd_validate_operation_channel(hdd_ctx,
+						chandef->chan->center_freq)) {
 		hdd_err("Invalid freq: %d", chandef->chan->center_freq);
 		return -EINVAL;
 	}
 
-	if (adapter->device_mode == QDF_SAP_MODE ||
-	    adapter->device_mode == QDF_P2P_GO_MODE) {
-		ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(adapter->deflink);
-		sap_config = &ap_ctx->sap_config;
-		sap_config->chan_freq = chandef->chan->center_freq;
-		sap_config->ch_params.center_freq_seg1 = channel_seg2;
-		sap_config->ch_params.center_freq_seg0 =
+	ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(adapter->deflink);
+	sap_config = &ap_ctx->sap_config;
+	sap_config->chan_freq = chandef->chan->center_freq;
+	sap_config->ch_params.center_freq_seg1 = channel_seg2;
+	sap_config->ch_params.center_freq_seg0 =
 			ieee80211_frequency_to_channel(chandef->center_freq1);
 
-		if (QDF_SAP_MODE == adapter->device_mode) {
-			/* set channel to what hostapd configured */
-			sap_config->chan_freq = chandef->chan->center_freq;
-			sap_config->ch_params.center_freq_seg1 = channel_seg2;
+	if (QDF_SAP_MODE == adapter->device_mode) {
+		/* set channel to what hostapd configured */
+		sap_config->chan_freq = chandef->chan->center_freq;
+		sap_config->ch_params.center_freq_seg1 = channel_seg2;
 
-			sme_config = qdf_mem_malloc(sizeof(*sme_config));
-			if (!sme_config)
-				return -ENOMEM;
+		sme_config = qdf_mem_malloc(sizeof(*sme_config));
+		if (!sme_config)
+			return -ENOMEM;
 
-			sme_get_config_param(mac_handle, sme_config);
-			switch (channel_type) {
-			case NL80211_CHAN_HT20:
-			case NL80211_CHAN_NO_HT:
-				sme_config->csr_config.obssEnabled = false;
-				sap_config->sec_ch_freq = 0;
-				break;
-			case NL80211_CHAN_HT40MINUS:
-				sap_config->sec_ch_freq =
-					sap_config->chan_freq - 20;
-				break;
-			case NL80211_CHAN_HT40PLUS:
-				sap_config->sec_ch_freq =
-					sap_config->chan_freq + 20;
-				break;
-			default:
-				hdd_err("Error!!! Invalid HT20/40 mode !");
-				qdf_mem_free(sme_config);
-				return -EINVAL;
-			}
-			sme_config->csr_config.obssEnabled =
+		sme_get_config_param(mac_handle, sme_config);
+		switch (channel_type) {
+		case NL80211_CHAN_HT20:
+		case NL80211_CHAN_NO_HT:
+			sme_config->csr_config.obssEnabled = false;
+			sap_config->sec_ch_freq = 0;
+			break;
+		case NL80211_CHAN_HT40MINUS:
+			sap_config->sec_ch_freq =
+				sap_config->chan_freq - 20;
+			break;
+		case NL80211_CHAN_HT40PLUS:
+			sap_config->sec_ch_freq =
+				sap_config->chan_freq + 20;
+			break;
+		default:
+			hdd_err("Error!!! Invalid HT20/40 mode !");
+			qdf_mem_free(sme_config);
+			return -EINVAL;
+		}
+		sme_config->csr_config.obssEnabled =
 					wlan_hdd_get_sap_obss(link_info);
 
-			sme_update_config(mac_handle, sme_config);
-			qdf_mem_free(sme_config);
-		}
-	} else {
-		hdd_err("Invalid device mode failed to set valid channel");
-		return -EINVAL;
+		sme_update_config(mac_handle, sme_config);
+		qdf_mem_free(sme_config);
 	}
 
 	return status;
@@ -6433,7 +6427,7 @@ int wlan_hdd_cfg80211_start_bss(struct hdd_adapter *adapter,
 		hdd_ctx->dev_dfs_cac_status = DFS_CAC_NEVER_DONE;
 
 	if (QDF_STATUS_SUCCESS !=
-	    wlan_hdd_validate_operation_channel(adapter, config->chan_freq)) {
+	    wlan_hdd_validate_operation_channel(hdd_ctx, config->chan_freq)) {
 		hdd_err("Invalid Ch_freq: %d", config->chan_freq);
 		ret = -EINVAL;
 		goto error;

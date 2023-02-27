@@ -16138,23 +16138,26 @@ static int __wlan_hdd_cfg80211_setband(struct wiphy *wiphy,
 }
 
 /**
- *wlan_hdd_validate_acs_channel() - validate channel frequency provided by ACS
- * @adapter: hdd adapter
+ * wlan_hdd_validate_acs_channel() - validate channel frequency provided by ACS
+ * @link_info: Pointer to link_info in adapter
  * @chan_freq: channel frequency in MHz
  * @chan_bw: channel bandiodth in MHz
  *
  * return: QDF status based on success or failure
  */
-static QDF_STATUS wlan_hdd_validate_acs_channel(struct hdd_adapter *adapter,
-						uint32_t chan_freq, int chan_bw)
+static QDF_STATUS
+wlan_hdd_validate_acs_channel(struct wlan_hdd_link_info *link_info,
+			      uint32_t chan_freq, int chan_bw)
 {
+	struct hdd_context *hdd_ctx;
 	struct sap_context *sap_context;
 
+	hdd_ctx = link_info->adapter->hdd_ctx;
 	if (QDF_STATUS_SUCCESS !=
-	    wlan_hdd_validate_operation_channel(adapter, chan_freq))
+	    wlan_hdd_validate_operation_channel(hdd_ctx, chan_freq))
 		return QDF_STATUS_E_FAILURE;
 
-	sap_context = WLAN_HDD_GET_SAP_CTX_PTR(adapter->deflink);
+	sap_context = WLAN_HDD_GET_SAP_CTX_PTR(link_info);
 	if ((wlansap_is_channel_in_nol_list(sap_context, chan_freq,
 					    PHY_SINGLE_CHANNEL_CENTERED))) {
 		hdd_info("channel %d is in nol", chan_freq);
@@ -16637,16 +16640,18 @@ hdd_parse_vendor_acs_chan_config(struct hdd_context *hdd_ctx,
  * Return: 0 on success, negative errno on failure
  */
 static int __wlan_hdd_cfg80211_update_vendor_channel(struct wiphy *wiphy,
-		struct wireless_dev *wdev,
-		const void *data, int data_len)
+						     struct wireless_dev *wdev,
+						     const void *data,
+						     int data_len)
 {
 	int ret_val;
-	QDF_STATUS qdf_status;
+	QDF_STATUS status;
+	enum phy_ch_width phy_ch_width;
 	uint8_t channel_cnt = 0, reason = -1;
-	struct hdd_vendor_chan_info *channel_list = NULL;
+	struct hdd_vendor_chan_info *chan_list = NULL;
 	struct hdd_adapter *adapter = WLAN_HDD_GET_PRIV_PTR(wdev->netdev);
 	struct hdd_context *hdd_ctx = wiphy_priv(wiphy);
-	struct hdd_vendor_chan_info *channel_list_ptr;
+	struct hdd_vendor_chan_info *chan_list_ptr;
 
 	hdd_enter();
 
@@ -16668,44 +16673,45 @@ static int __wlan_hdd_cfg80211_update_vendor_channel(struct wiphy *wiphy,
 		return -EINVAL;
 	}
 
-	ret_val = hdd_parse_vendor_acs_chan_config(hdd_ctx, &channel_list,
+	ret_val = hdd_parse_vendor_acs_chan_config(hdd_ctx, &chan_list,
 						   &reason, &channel_cnt, data,
 						   data_len);
-	channel_list_ptr = channel_list;
+	chan_list_ptr = chan_list;
 	if (ret_val)
 		return ret_val;
 
 	/* Validate channel to be set */
-	while (channel_cnt && channel_list) {
-		qdf_status = wlan_hdd_validate_acs_channel(adapter,
-			     channel_list->pri_chan_freq,
-			     hdd_map_nl_chan_width(channel_list->chan_width));
-		if (qdf_status == QDF_STATUS_SUCCESS)
+	while (channel_cnt && chan_list) {
+		phy_ch_width = hdd_map_nl_chan_width(chan_list->chan_width);
+		status = wlan_hdd_validate_acs_channel(adapter->deflink,
+						       chan_list->pri_chan_freq,
+						       phy_ch_width);
+		if (status == QDF_STATUS_SUCCESS)
 			break;
 		else if (channel_cnt == 1) {
 			hdd_err("invalid channel frequ %u received from app",
-				channel_list->pri_chan_freq);
-			channel_list->pri_chan_freq = 0;
+				chan_list->pri_chan_freq);
+			chan_list->pri_chan_freq = 0;
 			break;
 		}
 
 		channel_cnt--;
-		channel_list++;
+		chan_list++;
 	}
 
-	if ((channel_cnt <= 0) || !channel_list) {
+	if ((channel_cnt <= 0) || !chan_list) {
 		hdd_err("no available channel/chanlist %d/%pK", channel_cnt,
-			channel_list);
-		qdf_mem_free(channel_list_ptr);
+			chan_list);
+		qdf_mem_free(chan_list_ptr);
 		return -EINVAL;
 	}
 
 	hdd_debug("received primary channel freq as %d",
-		  channel_list->pri_chan_freq);
+		  chan_list->pri_chan_freq);
 
 	ret_val = hdd_update_acs_channel(adapter, reason,
-				      channel_cnt, channel_list);
-	qdf_mem_free(channel_list_ptr);
+					 channel_cnt, chan_list);
+	qdf_mem_free(chan_list_ptr);
 	return ret_val;
 }
 
@@ -21004,19 +21010,11 @@ bool wlan_hdd_is_ap_supports_immediate_power_save(uint8_t *ies, int length)
 	return true;
 }
 
-/*
- * FUNCTION: wlan_hdd_validate_operation_channel
- * called by wlan_hdd_cfg80211_start_bss() and
- * wlan_hdd_set_channel()
- * This function validates whether given channel is part of valid
- * channel list.
- */
-QDF_STATUS wlan_hdd_validate_operation_channel(struct hdd_adapter *adapter,
+QDF_STATUS wlan_hdd_validate_operation_channel(struct hdd_context *hdd_ctx,
 					       uint32_t ch_freq)
 {
 	bool value = 0;
 	uint32_t i;
-	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
 	struct regulatory_channel *cur_chan_list;
 	QDF_STATUS status;
 
