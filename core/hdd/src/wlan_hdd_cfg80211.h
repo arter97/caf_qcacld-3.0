@@ -585,7 +585,13 @@ void hdd_send_roam_scan_ch_list_event(struct hdd_context *hdd_ctx,
 }
 #endif
 
-int wlan_hdd_cfg80211_update_apies(struct hdd_adapter *adapter);
+/**
+ * wlan_hdd_cfg80211_update_apies() - update ap mode ies
+ * @link_info: Link info pointer in hostapd adapter
+ *
+ * Return: 0 for success non-zero for failure
+ */
+int wlan_hdd_cfg80211_update_apies(struct wlan_hdd_link_info *link_info);
 
 int wlan_hdd_sap_cfg_dfs_override(struct hdd_adapter *adapter);
 

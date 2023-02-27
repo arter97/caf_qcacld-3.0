@@ -114,7 +114,7 @@ wlan_hdd_btc_chain_mode_handler(struct wlan_objmgr_vdev *vdev)
 		break;
 	case QDF_SAP_MODE:
 	case QDF_P2P_GO_MODE:
-		hdd_restart_sap(adapter);
+		hdd_restart_sap(link_info);
 		break;
 	default:
 		break;

@@ -17236,27 +17236,15 @@ wlan_hdd_mlo_sap_reinit(struct wlan_hdd_link_info *link_info)
 	return QDF_STATUS_SUCCESS;
 }
 #endif
-/**
- * wlan_hdd_start_sap() - this function starts bss of SAP.
- * @ap_adapter: SAP adapter
- * @reinit: true if this is a re-init, otherwise initial int
- *
- * This function will process the starting of sap adapter.
- *
- * Return: None
- */
-void wlan_hdd_start_sap(struct hdd_adapter *ap_adapter, bool reinit)
+
+void wlan_hdd_start_sap(struct wlan_hdd_link_info *link_info, bool reinit)
 {
 	struct hdd_ap_ctx *ap_ctx;
 	struct hdd_hostapd_state *hostapd_state;
 	QDF_STATUS qdf_status;
 	struct hdd_context *hdd_ctx;
 	struct sap_config *sap_config;
-
-	if (!ap_adapter) {
-		hdd_err("ap_adapter is NULL here");
-		return;
-	}
+	struct hdd_adapter *ap_adapter = link_info->adapter;
 
 	if (QDF_SAP_MODE != ap_adapter->device_mode) {
 		hdd_err("SoftAp role has not been enabled");
@@ -17264,15 +17252,15 @@ void wlan_hdd_start_sap(struct hdd_adapter *ap_adapter, bool reinit)
 	}
 
 	hdd_ctx = WLAN_HDD_GET_CTX(ap_adapter);
-	ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(ap_adapter->deflink);
-	hostapd_state = WLAN_HDD_GET_HOSTAP_STATE_PTR(ap_adapter->deflink);
+	ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(link_info);
+	hostapd_state = WLAN_HDD_GET_HOSTAP_STATE_PTR(link_info);
 	sap_config = &ap_ctx->sap_config;
 
 	mutex_lock(&hdd_ctx->sap_lock);
-	if (test_bit(SOFTAP_BSS_STARTED, &ap_adapter->deflink->link_flags))
+	if (test_bit(SOFTAP_BSS_STARTED, &link_info->link_flags))
 		goto end;
 
-	if (wlan_hdd_cfg80211_update_apies(ap_adapter)) {
+	if (wlan_hdd_cfg80211_update_apies(link_info)) {
 		hdd_err("SAP Not able to set AP IEs");
 		goto end;
 	}
@@ -17280,7 +17268,7 @@ void wlan_hdd_start_sap(struct hdd_adapter *ap_adapter, bool reinit)
 						sap_config->chan_freq, 0,
 						&sap_config->ch_params,
 						REG_CURRENT_PWR_MODE);
-	qdf_status = wlan_hdd_mlo_sap_reinit(ap_adapter->deflink);
+	qdf_status = wlan_hdd_mlo_sap_reinit(link_info);
 	if (QDF_IS_STATUS_ERROR(qdf_status)) {
 		hdd_err("SAP Not able to do mlo attach");
 		goto end;
@@ -17305,11 +17293,11 @@ void wlan_hdd_start_sap(struct hdd_adapter *ap_adapter, bool reinit)
 	if (reinit)
 		hdd_medium_assess_init();
 	wlansap_reset_sap_config_add_ie(sap_config, eUPDATE_IE_ALL);
-	set_bit(SOFTAP_BSS_STARTED, &ap_adapter->deflink->link_flags);
+	set_bit(SOFTAP_BSS_STARTED, &link_info->link_flags);
 	if (hostapd_state->bss_state == BSS_START) {
 		policy_mgr_incr_active_session(hdd_ctx->psoc,
 					ap_adapter->device_mode,
-					ap_adapter->deflink->vdev_id);
+					link_info->vdev_id);
 		hdd_green_ap_start_state_mc(hdd_ctx, ap_adapter->device_mode,
 					    true);
 	}
@@ -17317,7 +17305,7 @@ void wlan_hdd_start_sap(struct hdd_adapter *ap_adapter, bool reinit)
 
 	return;
 end:
-	wlan_hdd_mlo_reset(ap_adapter->deflink);
+	wlan_hdd_mlo_reset(link_info);
 	wlansap_reset_sap_config_add_ie(sap_config, eUPDATE_IE_ALL);
 	mutex_unlock(&hdd_ctx->sap_lock);
 	/* SAP context and beacon cleanup will happen during driver unload
@@ -19978,28 +19966,23 @@ bool hdd_is_connection_in_progress(uint8_t *out_vdev_id,
 	return hdd_conn.connection_in_progress;
 }
 
-/**
- * hdd_restart_sap() - to restart SAP in driver internally
- * @ap_adapter: Pointer to SAP struct hdd_adapter structure
- *
- * Return: None
- */
-void hdd_restart_sap(struct hdd_adapter *ap_adapter)
+void hdd_restart_sap(struct wlan_hdd_link_info *link_info)
 {
 	struct hdd_hostapd_state *hapd_state;
 	QDF_STATUS status;
+	struct hdd_adapter *ap_adapter = link_info->adapter;
 	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(ap_adapter);
 	struct sap_config *sap_config;
 	void *sap_ctx;
 
 	sap_config =
-		&(WLAN_HDD_GET_AP_CTX_PTR(ap_adapter->deflink)->sap_config);
-	sap_ctx = WLAN_HDD_GET_SAP_CTX_PTR(ap_adapter->deflink);
+		&(WLAN_HDD_GET_AP_CTX_PTR(link_info)->sap_config);
+	sap_ctx = WLAN_HDD_GET_SAP_CTX_PTR(link_info);
 
 	mutex_lock(&hdd_ctx->sap_lock);
-	if (test_bit(SOFTAP_BSS_STARTED, &ap_adapter->deflink->link_flags)) {
+	if (test_bit(SOFTAP_BSS_STARTED, &link_info->link_flags)) {
 		wlan_hdd_del_station(ap_adapter, NULL);
-		hapd_state = WLAN_HDD_GET_HOSTAP_STATE_PTR(ap_adapter->deflink);
+		hapd_state = WLAN_HDD_GET_HOSTAP_STATE_PTR(link_info);
 		qdf_event_reset(&hapd_state->qdf_stop_bss_event);
 		if (QDF_STATUS_SUCCESS == wlansap_stop_bss(sap_ctx)) {
 			status = qdf_wait_single_event(&hapd_state->qdf_stop_bss_event,
@@ -20010,19 +19993,19 @@ void hdd_restart_sap(struct hdd_adapter *ap_adapter)
 				goto end;
 			}
 		}
-		clear_bit(SOFTAP_BSS_STARTED, &ap_adapter->deflink->link_flags);
+		clear_bit(SOFTAP_BSS_STARTED, &link_info->link_flags);
 		policy_mgr_decr_session_set_pcl(hdd_ctx->psoc,
-			ap_adapter->device_mode, ap_adapter->deflink->vdev_id);
+			ap_adapter->device_mode, link_info->vdev_id);
 		hdd_green_ap_start_state_mc(hdd_ctx, ap_adapter->device_mode,
 					    false);
 		hdd_err("SAP Stop Success");
 
-		if (0 != wlan_hdd_cfg80211_update_apies(ap_adapter)) {
+		if (0 != wlan_hdd_cfg80211_update_apies(link_info)) {
 			hdd_err("SAP Not able to set AP IEs");
 			goto end;
 		}
 
-		status = wlan_hdd_mlo_sap_reinit(ap_adapter->deflink);
+		status = wlan_hdd_mlo_sap_reinit(link_info);
 		if (QDF_IS_STATUS_ERROR(status)) {
 			hdd_err("SAP Not able to do mlo attach");
 			goto deinit_mlo;
@@ -20046,11 +20029,11 @@ void hdd_restart_sap(struct hdd_adapter *ap_adapter)
 		wlansap_reset_sap_config_add_ie(sap_config, eUPDATE_IE_ALL);
 		hdd_err("SAP Start Success");
 		hdd_medium_assess_init();
-		set_bit(SOFTAP_BSS_STARTED, &ap_adapter->deflink->link_flags);
+		set_bit(SOFTAP_BSS_STARTED, &link_info->link_flags);
 		if (hapd_state->bss_state == BSS_START) {
 			policy_mgr_incr_active_session(hdd_ctx->psoc,
 						ap_adapter->device_mode,
-						ap_adapter->deflink->vdev_id);
+						link_info->vdev_id);
 			hdd_green_ap_start_state_mc(hdd_ctx,
 						    ap_adapter->device_mode,
 						    true);
@@ -20060,7 +20043,7 @@ void hdd_restart_sap(struct hdd_adapter *ap_adapter)
 	return;
 
 deinit_mlo:
-	wlan_hdd_mlo_reset(ap_adapter->deflink);
+	wlan_hdd_mlo_reset(link_info);
 end:
 	wlansap_reset_sap_config_add_ie(sap_config, eUPDATE_IE_ALL);
 	mutex_unlock(&hdd_ctx->sap_lock);

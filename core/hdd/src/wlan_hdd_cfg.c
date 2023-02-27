@@ -1182,7 +1182,7 @@ static void hdd_set_sap_nss_params(struct wlan_hdd_link_info *link_info,
 				   uint8_t tx_nss, uint8_t rx_nss)
 {
 	hdd_update_nss_in_vdev(link_info, mac_handle, tx_nss, rx_nss);
-	hdd_restart_sap(link_info->adapter);
+	hdd_restart_sap(link_info);
 }
 
 QDF_STATUS hdd_update_nss(struct wlan_hdd_link_info *link_info,

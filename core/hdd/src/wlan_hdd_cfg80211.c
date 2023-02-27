@@ -15690,6 +15690,7 @@ __wlan_hdd_cfg80211_sap_configuration_set(struct wiphy *wiphy,
 	uint32_t chan_freq = 0;
 	bool chan_freq_present = false;
 	QDF_STATUS status;
+	struct wlan_hdd_link_info *link_info;
 
 	hdd_enter();
 
@@ -15702,6 +15703,7 @@ __wlan_hdd_cfg80211_sap_configuration_set(struct wiphy *wiphy,
 	if (0 != ret)
 		return -EINVAL;
 
+	link_info = hostapd_adapter->deflink;
 	if (wlan_cfg80211_nla_parse(tb, QCA_WLAN_VENDOR_ATTR_SAP_CONFIG_MAX,
 				    data, data_len,
 				    wlan_hdd_sap_config_policy)) {
@@ -15723,8 +15725,7 @@ __wlan_hdd_cfg80211_sap_configuration_set(struct wiphy *wiphy,
 	}
 
 	if (chan_freq_present) {
-		if (!test_bit(SOFTAP_BSS_STARTED,
-			      &hostapd_adapter->deflink->link_flags)) {
+		if (!test_bit(SOFTAP_BSS_STARTED, &link_info->link_flags)) {
 			hdd_err("SAP is not started yet. Restart sap will be invalid");
 			return -EINVAL;
 		}
@@ -15737,7 +15738,7 @@ __wlan_hdd_cfg80211_sap_configuration_set(struct wiphy *wiphy,
 			return -ENOTSUPP;
 		}
 
-		ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(hostapd_adapter->deflink);
+		ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(link_info);
 		ap_ctx->sap_config.chan_freq = chan_freq;
 		ap_ctx->sap_config.ch_params.ch_width =
 					ap_ctx->sap_config.ch_width_orig;
@@ -15752,7 +15753,7 @@ __wlan_hdd_cfg80211_sap_configuration_set(struct wiphy *wiphy,
 				&ap_ctx->sap_config.ch_params,
 				REG_CURRENT_PWR_MODE);
 
-		hdd_restart_sap(hostapd_adapter);
+		hdd_restart_sap(link_info);
 	}
 
 	if (tb[QCA_WLAN_VENDOR_ATTR_SAP_MANDATORY_FREQUENCY_LIST]) {

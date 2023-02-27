@@ -908,6 +908,7 @@ static int hdd_son_set_phymode(struct wlan_objmgr_vdev *vdev,
 	QDF_STATUS status;
 	struct hdd_ap_ctx *hdd_ap_ctx;
 	struct sap_config *sap_config;
+	struct wlan_hdd_link_info *link_info;
 
 	if (!vdev) {
 		hdd_err("null vdev");
@@ -916,7 +917,7 @@ static int hdd_son_set_phymode(struct wlan_objmgr_vdev *vdev,
 
 	link_info = wlan_hdd_get_link_info_from_objmgr(vdev);
 	if (!link_info) {
-		hdd_err("null adapter");
+		hdd_err("Invalid VDEV %d", wlan_vdev_get_id(vdev));
 		return -EINVAL;
 	}
 
@@ -936,7 +937,7 @@ static int hdd_son_set_phymode(struct wlan_objmgr_vdev *vdev,
 		return -EINVAL;
 	}
 
-	hdd_restart_sap(adapter);
+	hdd_restart_sap(link_info);
 
 	return 0;
 }

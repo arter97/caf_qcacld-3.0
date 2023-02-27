@@ -1829,7 +1829,7 @@ static void hdd_ssr_restart_sap(struct hdd_context *hdd_ctx)
 				  adapter->deflink->link_flags,
 				  adapter->dev->name);
 			wlan_hdd_set_twt_responder(hdd_ctx, adapter);
-			wlan_hdd_start_sap(adapter, true);
+			wlan_hdd_start_sap(adapter->deflink, true);
 		}
 next_adapter:
 		hdd_adapter_dev_put_debug(adapter,

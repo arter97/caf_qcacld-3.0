@@ -3458,7 +3458,17 @@ QDF_STATUS hdd_post_cds_enable_config(struct hdd_context *hdd_ctx);
 QDF_STATUS hdd_abort_mac_scan_all_adapters(struct hdd_context *hdd_ctx);
 
 void wlan_hdd_stop_sap(struct hdd_adapter *ap_adapter);
-void wlan_hdd_start_sap(struct hdd_adapter *ap_adapter, bool reinit);
+
+/**
+ * wlan_hdd_start_sap() - this function starts bss of SAP.
+ * @link_info: Link info pointer in SAP/GO adapter
+ * @reinit: true if this is a re-init, otherwise initial int
+ *
+ * This function will process the starting of sap adapter.
+ *
+ * Return: None
+ */
+void wlan_hdd_start_sap(struct wlan_hdd_link_info *link_info, bool reinit);
 
 #ifdef QCA_CONFIG_SMP
 int wlan_hdd_get_cpu(void);
@@ -3620,11 +3630,23 @@ int wlan_hdd_set_channel(struct wiphy *wiphy,
 		struct net_device *dev,
 		struct cfg80211_chan_def *chandef,
 		enum nl80211_channel_type channel_type);
-int wlan_hdd_cfg80211_start_bss(struct hdd_adapter *adapter,
-		struct cfg80211_beacon_data *params,
-		const u8 *ssid, size_t ssid_len,
-		enum nl80211_hidden_ssid hidden_ssid,
-		bool check_for_concurrency);
+
+/**
+ * wlan_hdd_cfg80211_start_bss() - start bss
+ * @link_info: Link info pointer in hostapd adapter
+ * @params: Pointer to start bss beacon parameters
+ * @ssid: Pointer ssid
+ * @ssid_len: Length of ssid
+ * @hidden_ssid: Hidden SSID parameter
+ * @check_for_concurrency: Flag to indicate if check for concurrency is needed
+ *
+ * Return: 0 for success non-zero for failure
+ */
+int wlan_hdd_cfg80211_start_bss(struct wlan_hdd_link_info *link_info,
+				struct cfg80211_beacon_data *params,
+				const u8 *ssid, size_t ssid_len,
+				enum nl80211_hidden_ssid hidden_ssid,
+				bool check_for_concurrency);
 
 #if !defined(REMOVE_PKT_LOG)
 int hdd_process_pktlog_command(struct hdd_context *hdd_ctx, uint32_t set_value,
@@ -4019,7 +4041,13 @@ bool hdd_is_roaming_in_progress(struct hdd_context *hdd_ctx);
 bool hdd_is_connection_in_progress(uint8_t *out_vdev_id,
 				   enum scan_reject_states *out_reason);
 
-void hdd_restart_sap(struct hdd_adapter *ap_adapter);
+/**
+ * hdd_restart_sap() - to restart SAP in driver internally
+ * @link_info: Link info pointer of SAP adapter
+ *
+ * Return: None
+ */
+void hdd_restart_sap(struct wlan_hdd_link_info *link_info);
 void hdd_check_and_restart_sap_with_non_dfs_acs(void);
 bool hdd_set_connection_in_progress(bool value);
 
@@ -4042,7 +4070,6 @@ void wlan_hdd_init_chan_info(struct hdd_context *hdd_ctx);
  * Return: None
  */
 void wlan_hdd_deinit_chan_info(struct hdd_context *hdd_ctx);
-void wlan_hdd_start_sap(struct hdd_adapter *ap_adapter, bool reinit);
 
 /**
  * hdd_is_any_interface_open() - Check for interface up

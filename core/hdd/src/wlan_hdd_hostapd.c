@@ -5092,13 +5092,8 @@ static int hdd_update_11be_apies(struct wlan_hdd_link_info *link_info,
 }
 #endif
 
-/**
- * wlan_hdd_cfg80211_update_apies() - update ap mode ies
- * @adapter: Pointer to hostapd adapter
- *
- * Return: 0 for success non-zero for failure
- */
-int wlan_hdd_cfg80211_update_apies(struct hdd_adapter *adapter)
+int
+wlan_hdd_cfg80211_update_apies(struct wlan_hdd_link_info *link_info)
 {
 	uint8_t *genie;
 	uint16_t total_ielen = 0;
@@ -5109,9 +5104,10 @@ int wlan_hdd_cfg80211_update_apies(struct hdd_adapter *adapter)
 	uint16_t proberesp_ies_len;
 	uint8_t *proberesp_ies = NULL;
 	mac_handle_t mac_handle;
+	struct hdd_adapter *adapter = link_info->adapter;
 
-	config = &adapter->deflink->session.ap.sap_config;
-	beacon = adapter->deflink->session.ap.beacon;
+	config = &link_info->session.ap.sap_config;
+	beacon = link_info->session.ap.beacon;
 	if (!beacon) {
 		hdd_err("Beacon is NULL !");
 		return -EINVAL;
@@ -5128,42 +5124,42 @@ int wlan_hdd_cfg80211_update_apies(struct hdd_adapter *adapter)
 		return -ENOMEM;
 
 	/* Extract and add the extended capabilities and interworking IE */
-	wlan_hdd_add_extra_ie(adapter->deflink, genie, &total_ielen,
+	wlan_hdd_add_extra_ie(link_info, genie, &total_ielen,
 			      WLAN_EID_EXT_CAPABILITY);
 
-	wlan_hdd_add_extra_ie(adapter->deflink, genie, &total_ielen,
+	wlan_hdd_add_extra_ie(link_info, genie, &total_ielen,
 			      WLAN_EID_INTERWORKING);
-	wlan_hdd_add_extra_ie(adapter->deflink, genie, &total_ielen,
+	wlan_hdd_add_extra_ie(link_info, genie, &total_ielen,
 			      WLAN_EID_ADVERTISEMENT_PROTOCOL);
-	wlan_hdd_add_extra_ie(adapter->deflink, genie,
+	wlan_hdd_add_extra_ie(link_info, genie,
 			      &total_ielen, WLAN_ELEMID_RSNXE);
-	wlan_hdd_add_extra_ie(adapter->deflink, genie, &total_ielen,
+	wlan_hdd_add_extra_ie(link_info, genie, &total_ielen,
 			      WLAN_ELEMID_MOBILITY_DOMAIN);
 #ifdef FEATURE_WLAN_WAPI
 	if (QDF_SAP_MODE == adapter->device_mode) {
-		wlan_hdd_add_extra_ie(adapter->deflink, genie, &total_ielen,
+		wlan_hdd_add_extra_ie(link_info, genie, &total_ielen,
 				      WLAN_ELEMID_WAPI);
 	}
 #endif
 	/* extract and add rrm ie from hostapd */
-	wlan_hdd_add_extra_ie(adapter->deflink, genie,
+	wlan_hdd_add_extra_ie(link_info, genie,
 			      &total_ielen, WLAN_ELEMID_RRM);
 
-	wlan_hdd_add_hostapd_conf_vsie(adapter->deflink, genie,
+	wlan_hdd_add_hostapd_conf_vsie(link_info, genie,
 				       &total_ielen);
 
-	ret = hdd_update_11ax_apies(adapter->deflink, genie, &total_ielen);
+	ret = hdd_update_11ax_apies(link_info, genie, &total_ielen);
 	if (ret)
 		goto done;
 
-	ret = hdd_update_11be_apies(adapter->deflink, genie, &total_ielen);
+	ret = hdd_update_11be_apies(link_info, genie, &total_ielen);
 	if (ret)
 		goto done;
 
-	wlan_hdd_add_sap_obss_scan_ie(adapter->deflink, genie, &total_ielen);
+	wlan_hdd_add_sap_obss_scan_ie(link_info, genie, &total_ielen);
 
 	qdf_copy_macaddr(&update_ie.bssid, &adapter->mac_addr);
-	update_ie.vdev_id = adapter->deflink->vdev_id;
+	update_ie.vdev_id = link_info->vdev_id;
 
 	/* Added for Probe Response IE */
 	proberesp_ies = qdf_mem_malloc(beacon->proberesp_ies_len +
@@ -5176,14 +5172,14 @@ int wlan_hdd_cfg80211_update_apies(struct hdd_adapter *adapter)
 		    beacon->proberesp_ies_len);
 	proberesp_ies_len = beacon->proberesp_ies_len;
 
-	wlan_hdd_add_sap_obss_scan_ie(adapter->deflink, proberesp_ies,
+	wlan_hdd_add_sap_obss_scan_ie(link_info, proberesp_ies,
 				      &proberesp_ies_len);
-	wlan_hdd_add_extra_ie(adapter->deflink, proberesp_ies,
+	wlan_hdd_add_extra_ie(link_info, proberesp_ies,
 			      &proberesp_ies_len, WLAN_ELEMID_RSNXE);
-	wlan_hdd_add_extra_ie(adapter->deflink, proberesp_ies,
+	wlan_hdd_add_extra_ie(link_info, proberesp_ies,
 			      &proberesp_ies_len, WLAN_ELEMID_MOBILITY_DOMAIN);
 
-	if (test_bit(SOFTAP_BSS_STARTED, &adapter->deflink->link_flags)) {
+	if (test_bit(SOFTAP_BSS_STARTED, &link_info->link_flags)) {
 		update_ie.ieBufferlength = proberesp_ies_len;
 		update_ie.pAdditionIEBuffer = proberesp_ies;
 		update_ie.append = false;
@@ -5205,7 +5201,7 @@ int wlan_hdd_cfg80211_update_apies(struct hdd_adapter *adapter)
 	}
 
 	/* Assoc resp Add ie Data */
-	if (test_bit(SOFTAP_BSS_STARTED, &adapter->deflink->link_flags)) {
+	if (test_bit(SOFTAP_BSS_STARTED, &link_info->link_flags)) {
 		update_ie.ieBufferlength = beacon->assocresp_ies_len;
 		update_ie.pAdditionIEBuffer = (uint8_t *) beacon->assocresp_ies;
 		update_ie.append = false;
@@ -5226,7 +5222,7 @@ int wlan_hdd_cfg80211_update_apies(struct hdd_adapter *adapter)
 						 eUPDATE_IE_ASSOC_RESP);
 	}
 
-	if (test_bit(SOFTAP_BSS_STARTED, &adapter->deflink->link_flags)) {
+	if (test_bit(SOFTAP_BSS_STARTED, &link_info->link_flags)) {
 		update_ie.ieBufferlength = total_ielen;
 		update_ie.pAdditionIEBuffer = genie;
 		update_ie.append = false;
@@ -6238,7 +6234,7 @@ wlan_hdd_set_multipass(struct wlan_objmgr_vdev *vdev)
 
 /**
  * wlan_hdd_cfg80211_start_bss() - start bss
- * @adapter: Pointer to hostapd adapter
+ * @link_info: Link info pointer in HDD adapter
  * @params: Pointer to start bss beacon parameters
  * @ssid: Pointer ssid
  * @ssid_len: Length of ssid
@@ -6247,12 +6243,13 @@ wlan_hdd_set_multipass(struct wlan_objmgr_vdev *vdev)
  *
  * Return: 0 for success non-zero for failure
  */
-int wlan_hdd_cfg80211_start_bss(struct hdd_adapter *adapter,
-				       struct cfg80211_beacon_data *params,
-				       const u8 *ssid, size_t ssid_len,
-				       enum nl80211_hidden_ssid hidden_ssid,
-				       bool check_for_concurrency)
+int wlan_hdd_cfg80211_start_bss(struct wlan_hdd_link_info *link_info,
+				struct cfg80211_beacon_data *params,
+				const u8 *ssid, size_t ssid_len,
+				enum nl80211_hidden_ssid hidden_ssid,
+				bool check_for_concurrency)
 {
+	struct hdd_adapter *adapter = link_info->adapter;
 	struct sap_config *config;
 	struct hdd_beacon_data *beacon = NULL;
 	struct ieee80211_mgmt *mgmt_frame;
@@ -6297,18 +6294,17 @@ int wlan_hdd_cfg80211_start_bss(struct hdd_adapter *adapter,
 	if (policy_mgr_is_sta_mon_concurrency(hdd_ctx->psoc))
 		return -EINVAL;
 
-	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink,
-					   WLAN_HDD_ID_OBJ_MGR);
+	vdev = hdd_objmgr_get_vdev_by_user(link_info, WLAN_HDD_ID_OBJ_MGR);
 	if (!vdev)
 		return -EINVAL;
 
-	ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(adapter->deflink);
+	ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(link_info);
 	ucfg_mlme_get_sap_force_11n_for_11ac(hdd_ctx->psoc,
 					     &sap_force_11n_for_11ac);
 	ucfg_mlme_get_go_force_11n_for_11ac(hdd_ctx->psoc,
 					    &go_force_11n_for_11ac);
 
-	if (test_bit(SOFTAP_BSS_STARTED, &adapter->deflink->link_flags))
+	if (test_bit(SOFTAP_BSS_STARTED, &link_info->link_flags))
 		deliver_start_evt = false;
 
 	if (deliver_start_evt) {
@@ -6330,7 +6326,7 @@ int wlan_hdd_cfg80211_start_bss(struct hdd_adapter *adapter,
 		goto free;
 	}
 
-	hostapd_state = WLAN_HDD_GET_HOSTAP_STATE_PTR(adapter->deflink);
+	hostapd_state = WLAN_HDD_GET_HOSTAP_STATE_PTR(link_info);
 
 	config = &ap_ctx->sap_config;
 	if (!config->chan_freq) {
@@ -6503,7 +6499,6 @@ int wlan_hdd_cfg80211_start_bss(struct hdd_adapter *adapter,
 	}
 
 	ap_ctx->encryption_type = eCSR_ENCRYPT_TYPE_NONE;
-
 	config->RSNWPAReqIELength = 0;
 	memset(&config->RSNWPAReqIE[0], 0, sizeof(config->RSNWPAReqIE));
 	ie = wlan_get_ie_ptr_from_eid(WLAN_EID_RSN, beacon->tail,
@@ -6554,7 +6549,7 @@ int wlan_hdd_cfg80211_start_bss(struct hdd_adapter *adapter,
 					   config->akm_list.numEntries);
 
 			hdd_softap_update_pasn_vdev_params(
-					hdd_ctx, adapter->deflink->vdev_id,
+					hdd_ctx, link_info->vdev_id,
 					beacon, mfp_capable, mfp_required);
 		}
 	}
@@ -6730,9 +6725,9 @@ int wlan_hdd_cfg80211_start_bss(struct hdd_adapter *adapter,
 	}
 
 	if (!cds_is_sub_20_mhz_enabled())
-		wlan_hdd_set_sap_hwmode(adapter->deflink);
+		wlan_hdd_set_sap_hwmode(link_info);
 
-	qdf_status = wlan_hdd_mlo_update(adapter->deflink);
+	qdf_status = wlan_hdd_mlo_update(link_info);
 	if (QDF_IS_STATUS_ERROR(qdf_status)) {
 		ret = -EINVAL;
 		goto error;
@@ -6816,7 +6811,7 @@ int wlan_hdd_cfg80211_start_bss(struct hdd_adapter *adapter,
 						config->sec_ch_freq,
 						&config->ch_params,
 						REG_CURRENT_PWR_MODE);
-	if (0 != wlan_hdd_cfg80211_update_apies(adapter)) {
+	if (0 != wlan_hdd_cfg80211_update_apies(link_info)) {
 		hdd_err("SAP Not able to set AP IEs");
 		ret = -EINVAL;
 		goto error;
@@ -6844,7 +6839,7 @@ int wlan_hdd_cfg80211_start_bss(struct hdd_adapter *adapter,
 		goto error;
 	}
 
-	if (test_bit(SOFTAP_BSS_STARTED, &adapter->deflink->link_flags)) {
+	if (test_bit(SOFTAP_BSS_STARTED, &link_info->link_flags)) {
 		mutex_unlock(&hdd_ctx->sap_lock);
 
 		wlansap_reset_sap_config_add_ie(config, eUPDATE_IE_ALL);
@@ -6863,7 +6858,7 @@ int wlan_hdd_cfg80211_start_bss(struct hdd_adapter *adapter,
 					adapter->device_mode),
 				config->chan_freq, HW_MODE_20_MHZ,
 				policy_mgr_get_conc_ext_flags(vdev, false),
-				adapter->deflink->vdev_id)) {
+				link_info->vdev_id)) {
 			mutex_unlock(&hdd_ctx->sap_lock);
 
 			hdd_err("This concurrency combination is not allowed");
@@ -6885,13 +6880,13 @@ int wlan_hdd_cfg80211_start_bss(struct hdd_adapter *adapter,
 	sap_event_callback = hdd_hostapd_sap_event_cb;
 
 	ap_ctx->dfs_cac_block_tx = true;
-	set_bit(SOFTAP_INIT_DONE, &adapter->deflink->link_flags);
+	set_bit(SOFTAP_INIT_DONE, &link_info->link_flags);
 
 	ucfg_dp_set_dfs_cac_tx(vdev, true);
 
 	qdf_event_reset(&hostapd_state->qdf_event);
 
-	sap_ctx = WLAN_HDD_GET_SAP_CTX_PTR(adapter->deflink);
+	sap_ctx = WLAN_HDD_GET_SAP_CTX_PTR(link_info);
 	if (!sap_ctx) {
 		ret = -EINVAL;
 		goto error;
@@ -6924,14 +6919,14 @@ int wlan_hdd_cfg80211_start_bss(struct hdd_adapter *adapter,
 				hostapd_state->qdf_status);
 		hdd_set_connection_in_progress(false);
 		sme_get_command_q_status(mac_handle);
-		wlansap_stop_bss(WLAN_HDD_GET_SAP_CTX_PTR(adapter->deflink));
+		wlansap_stop_bss(WLAN_HDD_GET_SAP_CTX_PTR(link_info));
 		if (!cds_is_driver_recovering())
 			QDF_ASSERT(0);
 		ret = -EINVAL;
 		goto error;
 	}
 	/* Successfully started Bss update the state bit. */
-	set_bit(SOFTAP_BSS_STARTED, &adapter->deflink->link_flags);
+	set_bit(SOFTAP_BSS_STARTED, &link_info->link_flags);
 
 	mutex_unlock(&hdd_ctx->sap_lock);
 
@@ -6940,14 +6935,14 @@ int wlan_hdd_cfg80211_start_bss(struct hdd_adapter *adapter,
 	if (hostapd_state->bss_state == BSS_START) {
 		policy_mgr_incr_active_session(hdd_ctx->psoc,
 					adapter->device_mode,
-					adapter->deflink->vdev_id);
+					link_info->vdev_id);
 
 		hdd_green_ap_start_state_mc(hdd_ctx, adapter->device_mode,
 					    true);
 		wlan_set_sap_user_config_freq(vdev, user_config_freq);
 	}
 
-	wlan_hdd_dhcp_offload_enable(adapter->deflink);
+	wlan_hdd_dhcp_offload_enable(link_info);
 	ucfg_p2p_status_start_bss(vdev);
 
 	/* Check and restart SAP if it is on unsafe channel */
@@ -6963,13 +6958,13 @@ int wlan_hdd_cfg80211_start_bss(struct hdd_adapter *adapter,
 	goto free;
 
 error:
-	wlan_hdd_mlo_reset(adapter->deflink);
+	wlan_hdd_mlo_reset(link_info);
 	/* Revert the indoor to passive marking if START BSS fails */
 	if (indoor_chnl_marking && adapter->device_mode == QDF_SAP_MODE) {
 		hdd_update_indoor_channel(hdd_ctx, false);
 		sme_update_channel_list(mac_handle);
 	}
-	clear_bit(SOFTAP_INIT_DONE, &adapter->deflink->link_flags);
+	clear_bit(SOFTAP_INIT_DONE, &link_info->link_flags);
 	qdf_atomic_set(&ap_ctx->acs_in_progress, 0);
 	wlansap_reset_sap_config_add_ie(config, eUPDATE_IE_ALL);
 
@@ -7981,7 +7976,7 @@ static int __wlan_hdd_cfg80211_start_ap(struct wiphy *wiphy,
 		hdd_update_he_obss_pd(link_info, params);
 
 		hdd_place_marker(adapter, "TRY TO START", NULL);
-		status = wlan_hdd_cfg80211_start_bss(adapter, &params->beacon,
+		status = wlan_hdd_cfg80211_start_bss(link_info, &params->beacon,
 						     params->ssid,
 						     params->ssid_len,
 						     params->hidden_ssid, true);
@@ -8132,8 +8127,8 @@ static int __wlan_hdd_cfg80211_change_beacon(struct wiphy *wiphy,
 
 	link_info->session.ap.beacon = new;
 	hdd_debug("update beacon for P2P GO/SAP");
-	status = wlan_hdd_cfg80211_start_bss(adapter, params, NULL,
-					0, 0, false);
+	status = wlan_hdd_cfg80211_start_bss(link_info, params,
+					     NULL, 0, 0, false);
 
 	hdd_exit();
 	return status;
