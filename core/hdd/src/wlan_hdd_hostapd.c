@@ -4912,7 +4912,7 @@ static void wlan_hdd_add_extra_ie(struct wlan_hdd_link_info *link_info,
 
 /**
  * wlan_hdd_cfg80211_alloc_new_beacon() - alloc beacon in ap mode
- * @adapter: Pointer to hostapd adapter
+ * @link_info: Pointer to link_info in hostapd adapter
  * @out_beacon: Location to store newly allocated beacon data
  * @params: Pointer to beacon parameters
  * @dtim_period: DTIM period
@@ -4920,7 +4920,7 @@ static void wlan_hdd_add_extra_ie(struct wlan_hdd_link_info *link_info,
  * Return: 0 for success non-zero for failure
  */
 static int
-wlan_hdd_cfg80211_alloc_new_beacon(struct hdd_adapter *adapter,
+wlan_hdd_cfg80211_alloc_new_beacon(struct wlan_hdd_link_info *link_info,
 				   struct hdd_beacon_data **out_beacon,
 				   struct cfg80211_beacon_data *params,
 				   int dtim_period)
@@ -4937,11 +4937,10 @@ wlan_hdd_cfg80211_alloc_new_beacon(struct hdd_adapter *adapter,
 		return -EINVAL;
 	}
 
-	old = adapter->deflink->session.ap.beacon;
-
+	old = link_info->session.ap.beacon;
 	if (!params->head && !old) {
 		hdd_err("session: %d old and new heads points to NULL",
-		       adapter->deflink->vdev_id);
+		       link_info->vdev_id);
 		return -EINVAL;
 	}
 
@@ -5013,7 +5012,7 @@ wlan_hdd_cfg80211_alloc_new_beacon(struct hdd_adapter *adapter,
 
 	*out_beacon = beacon;
 
-	adapter->deflink->session.ap.beacon = NULL;
+	link_info->session.ap.beacon = NULL;
 	qdf_mem_free(old);
 
 	return 0;
@@ -7291,7 +7290,7 @@ static uint16_t hdd_get_data_rate_from_rate_mask(struct wiphy *wiphy,
 
 /**
  * hdd_update_beacon_rate() - Update beacon tx rate
- * @adapter: Pointer to hdd_adapter_t
+ * @link_info: Pointer to link_info in adapter
  * @wiphy: Pointer to wiphy
  * @params: Pointet to cfg80211_ap_settings
  *
@@ -7301,11 +7300,11 @@ static uint16_t hdd_get_data_rate_from_rate_mask(struct wiphy *wiphy,
  *
  * Return: none
  */
-static void hdd_update_beacon_rate(struct hdd_adapter *adapter,
-		struct wiphy *wiphy,
-		struct cfg80211_ap_settings *params)
+static void
+hdd_update_beacon_rate(struct wlan_hdd_link_info *link_info,
+		       struct wiphy *wiphy, struct cfg80211_ap_settings *params)
 {
-	struct hdd_ap_ctx *ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(adapter->deflink);
+	struct hdd_ap_ctx *ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(link_info);
 	struct cfg80211_bitrate_mask *beacon_rate_mask;
 	enum nl80211_band band;
 
@@ -7321,9 +7320,9 @@ static void hdd_update_beacon_rate(struct hdd_adapter *adapter,
 	}
 }
 #else
-static void hdd_update_beacon_rate(struct hdd_adapter *adapter,
-		struct wiphy *wiphy,
-		struct cfg80211_ap_settings *params)
+static inline void
+hdd_update_beacon_rate(struct wlan_hdd_link_info *link_info,
+		       struct wiphy *wiphy, struct cfg80211_ap_settings *params)
 {
 }
 #endif
@@ -7993,7 +7992,8 @@ static int __wlan_hdd_cfg80211_start_ap(struct wiphy *wiphy,
 			return -EALREADY;
 
 		status =
-			wlan_hdd_cfg80211_alloc_new_beacon(adapter, &new,
+			wlan_hdd_cfg80211_alloc_new_beacon(adapter->deflink,
+							   &new,
 							   &params->beacon,
 							   params->dtim_period);
 
@@ -8011,7 +8011,7 @@ static int __wlan_hdd_cfg80211_start_ap(struct wiphy *wiphy,
 
 		wlan_hdd_set_channel(wiphy, dev, chandef, channel_type);
 
-		hdd_update_beacon_rate(adapter, wiphy, params);
+		hdd_update_beacon_rate(adapter->deflink, wiphy, params);
 
 		/* set authentication type */
 		switch (params->auth_type) {
@@ -8142,6 +8142,7 @@ static int __wlan_hdd_cfg80211_change_beacon(struct wiphy *wiphy,
 	struct hdd_context *hdd_ctx;
 	struct hdd_beacon_data *old, *new;
 	int status;
+	struct wlan_hdd_link_info *link_info = adapter->deflink;
 
 	hdd_enter();
 
@@ -8150,12 +8151,12 @@ static int __wlan_hdd_cfg80211_change_beacon(struct wiphy *wiphy,
 		return -EINVAL;
 	}
 
-	if (wlan_hdd_validate_vdev_id(adapter->deflink->vdev_id))
+	if (wlan_hdd_validate_vdev_id(link_info->vdev_id))
 		return -EINVAL;
 
 	qdf_mtrace(QDF_MODULE_ID_HDD, QDF_MODULE_ID_HDD,
 		   TRACE_CODE_HDD_CFG80211_CHANGE_BEACON,
-		   adapter->deflink->vdev_id, adapter->device_mode);
+		   link_info->vdev_id, adapter->device_mode);
 
 	hdd_debug("Device_mode %s(%d)",
 		  qdf_opmode_str(adapter->device_mode), adapter->device_mode);
@@ -8171,22 +8172,22 @@ static int __wlan_hdd_cfg80211_change_beacon(struct wiphy *wiphy,
 		return -EOPNOTSUPP;
 	}
 
-	old = adapter->deflink->session.ap.beacon;
+	old = link_info->session.ap.beacon;
 
 	if (!old) {
 		hdd_err("session id: %d beacon data points to NULL",
-		       adapter->deflink->vdev_id);
+		       link_info->vdev_id);
 		return -EINVAL;
 	}
 
-	status = wlan_hdd_cfg80211_alloc_new_beacon(adapter, &new, params, 0);
+	status = wlan_hdd_cfg80211_alloc_new_beacon(link_info, &new, params, 0);
 
 	if (status != QDF_STATUS_SUCCESS) {
 		hdd_err("new beacon alloc failed");
 		return -EINVAL;
 	}
 
-	adapter->deflink->session.ap.beacon = new;
+	link_info->session.ap.beacon = new;
 	hdd_debug("update beacon for P2P GO/SAP");
 	status = wlan_hdd_cfg80211_start_bss(adapter, params, NULL,
 					0, 0, false);
