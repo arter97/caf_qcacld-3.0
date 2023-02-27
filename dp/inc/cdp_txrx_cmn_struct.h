@@ -2496,6 +2496,7 @@ struct cdp_tx_completion_msdu {
  * @ofdma_ru_width: size of RU in units of 1(26tone)RU
  * @nss: NSS 1,2, ...8
  * @mcs: MCS index
+ * @is_manual_ulofdma_trig: manual ulofdma trig or not?
  * @user_index: user ID in multi-user case
  * @is_bss_peer: is bss peer check
  * @ast_index: ast index in multi-user case
@@ -2534,7 +2535,13 @@ struct cdp_rx_stats_ppdu_user {
 		 ofdma_ru_start_index:7,
 		 ofdma_ru_width:7,
 		 nss:4,
-		 mcs:4;
+		 mcs:4,
+#ifdef QCA_MANUAL_TRIGGERED_ULOFDMA
+		 is_manual_ulofdma_trig:1,
+		 reserved:8;
+#else
+		 reserved:9;
+#endif
 	/* user id */
 	uint8_t  user_index;
 	uint8_t is_bss_peer;
