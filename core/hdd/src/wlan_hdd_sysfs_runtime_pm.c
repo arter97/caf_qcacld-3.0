@@ -44,7 +44,7 @@ int hdd_sysfs_runtime_pm_create(struct kobject *driver_kobject)
 	error = sysfs_create_file(driver_kobject,
 				  &runtime_pm_attribute.attr);
 	if (error)
-		hdd_err("could not create scan_disable sysfs file");
+		hdd_err("could not create runtime_pm sysfs file");
 
 	return error;
 }

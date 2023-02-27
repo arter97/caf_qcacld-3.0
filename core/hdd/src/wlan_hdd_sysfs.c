@@ -921,7 +921,7 @@ void hdd_create_sysfs_files(struct hdd_context *hdd_ctx)
 void hdd_destroy_sysfs_files(void)
 {
 	if  (QDF_GLOBAL_MISSION_MODE == hdd_get_conparam()) {
-		hdd_sysfs_runtime_pm_create(driver_kobject);
+		hdd_sysfs_runtime_pm_destroy(driver_kobject);
 		hdd_sysfs_dp_pkt_add_ts_destroy(driver_kobject);
 		hdd_sysfs_get_valid_freq_for_power_destroy(driver_kobject);
 		hdd_sysfs_dp_txrx_stats_sysfs_destroy(driver_kobject);

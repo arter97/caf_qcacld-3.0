@@ -19,8 +19,22 @@
 
 #if defined(WLAN_SYSFS) && defined(FEATURE_RUNTIME_PM)
 
+/**
+ * hdd_sysfs_runtime_pm_create(): create runtime pm WoW stats sysfs node
+ * @driver_kobject: pointer to driver kobject
+ *
+ * Return: 0 for success and non zero error code for failure
+ *
+ */
 int hdd_sysfs_runtime_pm_create(struct kobject *driver_kobject);
 
+/**
+ * hdd_sysfs_runtime_pm_destroy(): destroy runtime pm WoW stats sysfs node
+ * @driver_kobject: pointer to driver kobject
+ *
+ * Return: void
+ *
+ */
 void
 hdd_sysfs_runtime_pm_destroy(struct kobject *driver_kobject);
 
