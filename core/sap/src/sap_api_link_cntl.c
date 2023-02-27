@@ -1644,6 +1644,7 @@ void wlansap_process_chan_info_event(struct sap_context *sap_ctx,
 	struct mac_context *mac;
 	struct scan_filter *filter;
 	qdf_list_t *list = NULL;
+	enum channel_state state;
 
 	mac = sap_get_mac_context();
 	if (!mac) {
@@ -1658,6 +1659,12 @@ void wlansap_process_chan_info_event(struct sap_context *sap_ctx,
 		return;
 
 	if (WLAN_REG_IS_24GHZ_CH_FREQ(roam_info->chan_info_freq))
+		return;
+
+	state = wlan_reg_get_channel_state_for_pwrmode(
+				mac->pdev, roam_info->chan_info_freq,
+				REG_CURRENT_PWR_MODE);
+	if (state != CHANNEL_STATE_ENABLE)
 		return;
 
 	if (sap_ctx->optimize_acs_chan_selected)
