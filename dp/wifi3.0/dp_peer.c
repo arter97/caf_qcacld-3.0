@@ -2724,7 +2724,7 @@ dp_rx_mlo_peer_map_handler(struct dp_soc *soc, uint16_t peer_id,
 	uint16_t ml_peer_id = dp_gen_ml_peer_id(soc, peer_id);
 	enum cdp_txrx_ast_entry_type type = CDP_TXRX_AST_TYPE_STATIC;
 	QDF_STATUS err = QDF_STATUS_SUCCESS;
-	struct dp_soc *primary_soc;
+	struct dp_soc *primary_soc = NULL;
 
 	dp_cfg_event_record_peer_map_unmap_evt(soc, DP_CFG_EVENT_MLO_PEER_MAP,
 					       NULL, peer_mac_addr,
@@ -2802,6 +2802,9 @@ dp_rx_mlo_peer_map_handler(struct dp_soc *soc, uint16_t peer_id,
 		}
 	}
 
+	if (!primary_soc)
+		primary_soc = soc;
+
 	err = dp_peer_map_ast(soc, peer, peer_mac_addr, hw_peer_id,
 			      vdev_id, ast_hash, is_wds);
 
@@ -2810,7 +2813,7 @@ dp_rx_mlo_peer_map_handler(struct dp_soc *soc, uint16_t peer_id,
 	 * host based on mlo peer map event from FW
 	 */
 	if (soc->ast_offload_support && soc->host_ast_db_enable) {
-		dp_peer_host_add_map_ast(soc, ml_peer_id, peer_mac_addr,
+		dp_peer_host_add_map_ast(primary_soc, ml_peer_id, peer_mac_addr,
 					 hw_peer_id, vdev_id,
 					 ast_hash, is_wds);
 	}
@@ -3035,6 +3038,14 @@ dp_rx_peer_unmap_handler(struct dp_soc *soc, uint16_t peer_id,
 				     (void *)&params, peer_id,
 				     WDI_NO_VAL, vdev->pdev->pdev_id);
 	}
+
+	/*
+	 * In scenario where assoc peer soc id is different from
+	 * primary soc id, reset the soc to point to primary psoc.
+	 * Since map is received on primary soc, the unmap should
+	 * also delete ast on primary soc.
+	 */
+	soc = peer->vdev->pdev->soc;
 
 	/* If V2 Peer map messages are enabled AST entry has to be
 	 * freed here
