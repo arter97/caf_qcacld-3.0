@@ -6008,9 +6008,10 @@ int wlan_hdd_restore_channels(struct hdd_context *hdd_ctx)
 #endif
 
 #ifdef DHCP_SERVER_OFFLOAD
-static void wlan_hdd_set_dhcp_server_offload(struct hdd_adapter *adapter)
+static void
+wlan_hdd_set_dhcp_server_offload(struct wlan_hdd_link_info *link_info)
 {
-	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
+	struct hdd_context *hdd_ctx;
 	struct dhcp_offload_info_params dhcp_srv_info;
 	uint8_t num_entries = 0;
 	uint8_t *srv_ip;
@@ -6020,11 +6021,12 @@ static void wlan_hdd_set_dhcp_server_offload(struct hdd_adapter *adapter)
 	mac_handle_t mac_handle;
 	QDF_STATUS status;
 
+	hdd_ctx = link_info->adapter->hdd_ctx;
 	if (!hdd_ctx->config->dhcp_server_ip.is_dhcp_server_ip_valid)
 		return;
 
 	srv_ip = hdd_ctx->config->dhcp_server_ip.dhcp_server_ip;
-	dhcp_srv_info.vdev_id = adapter->deflink->vdev_id;
+	dhcp_srv_info.vdev_id = link_info->vdev_id;
 	dhcp_srv_info.dhcp_offload_enabled = true;
 
 	status = ucfg_fwol_get_dhcp_max_num_clients(hdd_ctx->psoc,
@@ -6062,18 +6064,17 @@ static void wlan_hdd_set_dhcp_server_offload(struct hdd_adapter *adapter)
 
 /**
  * wlan_hdd_dhcp_offload_enable: Enable DHCP offload
- * @hdd_ctx: HDD context handler
- * @adapter: Adapter pointer
+ * @link_info: Pointer of link_info in adapter
  *
  * Enables the DHCP Offload feature in firmware if it has been configured.
  *
  * Return: None
  */
-static void wlan_hdd_dhcp_offload_enable(struct hdd_context *hdd_ctx,
-					 struct hdd_adapter *adapter)
+static void wlan_hdd_dhcp_offload_enable(struct wlan_hdd_link_info *link_info)
 {
 	bool enable_dhcp_server_offload;
 	QDF_STATUS status;
+	struct hdd_context *hdd_ctx = link_info->adapter->hdd_ctx;
 
 	status = ucfg_fwol_get_enable_dhcp_server_offload(
 						hdd_ctx->psoc,
@@ -6082,11 +6083,11 @@ static void wlan_hdd_dhcp_offload_enable(struct hdd_context *hdd_ctx,
 		return;
 
 	if (enable_dhcp_server_offload)
-		wlan_hdd_set_dhcp_server_offload(adapter);
+		wlan_hdd_set_dhcp_server_offload(link_info);
 }
 #else
-static void wlan_hdd_dhcp_offload_enable(struct hdd_context *hdd_ctx,
-					 struct hdd_adapter *adapter)
+static inline void
+wlan_hdd_dhcp_offload_enable(struct wlan_hdd_link_info *link_info)
 {
 }
 #endif /* DHCP_SERVER_OFFLOAD */
@@ -6934,7 +6935,7 @@ int wlan_hdd_cfg80211_start_bss(struct hdd_adapter *adapter,
 		wlan_set_sap_user_config_freq(vdev, user_config_freq);
 	}
 
-	wlan_hdd_dhcp_offload_enable(hdd_ctx, adapter);
+	wlan_hdd_dhcp_offload_enable(adapter->deflink);
 	ucfg_p2p_status_start_bss(vdev);
 
 	/* Check and restart SAP if it is on unsafe channel */
