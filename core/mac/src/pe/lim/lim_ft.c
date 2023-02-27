@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -594,13 +594,15 @@ void lim_fill_ft_session(struct mac_context *mac,
 		 && pBeaconStruct->HTCaps.present);
 
 	if (IS_DOT11_MODE_HE(ft_session->dot11mode) &&
-	    pBeaconStruct->he_cap.present)
+	    pBeaconStruct->he_cap.present) {
 		lim_update_session_he_capable(mac, ft_session);
-
+		lim_copy_join_req_he_cap(ft_session);
+	}
 	if (IS_DOT11_MODE_EHT(ft_session->dot11mode) &&
-	    pBeaconStruct->eht_cap.present)
+	    pBeaconStruct->eht_cap.present) {
 		lim_update_session_eht_capable(mac, ft_session);
-
+		lim_copy_join_req_eht_cap(ft_session);
+	}
 	/* Assign default configured nss value in the new session */
 	if (!wlan_reg_is_24ghz_ch_freq(ft_session->curr_op_freq))
 		ft_session->vdev_nss = mac->vdev_type_nss_5g.sta;
