@@ -1953,7 +1953,7 @@ static int hdd_son_start_acs(struct wlan_objmgr_vdev *vdev, uint8_t enable)
 
 	link_info = wlan_hdd_get_link_info_from_objmgr(vdev);
 	if (!link_info) {
-		hdd_err("null adapter");
+		hdd_err("Invalid VDEV %d", wlan_vdev_get_id(vdev));
 		return -EINVAL;
 	}
 
@@ -1980,7 +1980,7 @@ static int hdd_son_start_acs(struct wlan_objmgr_vdev *vdev, uint8_t enable)
 		  sap_config->acs_cfg.end_ch_freq, sap_config->acs_cfg.band);
 	sap_dump_acs_channel(&sap_config->acs_cfg);
 
-	wlan_hdd_cfg80211_start_acs(adapter);
+	wlan_hdd_cfg80211_start_acs(link_info);
 
 	return 0;
 }

@@ -12858,6 +12858,7 @@ void hdd_acs_response_timeout_handler(void *context)
 	struct hdd_context *hdd_ctx;
 	uint8_t reason;
 	struct sap_context *sap_context;
+	struct wlan_hdd_link_info *link_info;
 
 	hdd_enter();
 	if (!timer_context) {
@@ -12867,37 +12868,36 @@ void hdd_acs_response_timeout_handler(void *context)
 	adapter = timer_context->adapter;
 	reason = timer_context->reason;
 
-
-	if ((!adapter) ||
-	    (adapter->magic != WLAN_HDD_ADAPTER_MAGIC)) {
+	if (!adapter || adapter->magic != WLAN_HDD_ADAPTER_MAGIC) {
 		hdd_err("invalid adapter or adapter has invalid magic");
 		return;
 	}
+
 	hdd_ctx = WLAN_HDD_GET_CTX(adapter);
 	if (wlan_hdd_validate_context(hdd_ctx))
 		return;
 
-	if (!test_bit(VENDOR_ACS_RESPONSE_PENDING,
-		      &adapter->deflink->link_flags))
+	link_info = adapter->deflink;
+	if (!test_bit(VENDOR_ACS_RESPONSE_PENDING, &link_info->link_flags))
 		return;
 
-	clear_bit(VENDOR_ACS_RESPONSE_PENDING, &adapter->deflink->link_flags);
+	clear_bit(VENDOR_ACS_RESPONSE_PENDING, &link_info->link_flags);
 
 	hdd_err("ACS timeout happened for %s reason %d",
 		adapter->dev->name, reason);
 
-	sap_context = WLAN_HDD_GET_SAP_CTX_PTR(adapter->deflink);
+	sap_context = WLAN_HDD_GET_SAP_CTX_PTR(link_info);
 	switch (reason) {
 	/* SAP init case */
 	case QCA_WLAN_VENDOR_ACS_SELECT_REASON_INIT:
 		wlan_sap_set_vendor_acs(sap_context, false);
-		wlan_hdd_cfg80211_start_acs(adapter);
+		wlan_hdd_cfg80211_start_acs(link_info);
 		break;
 	/* DFS detected on current channel */
 	case QCA_WLAN_VENDOR_ACS_SELECT_REASON_DFS:
 		wlan_sap_update_next_channel(sap_context, 0, 0);
 		sme_update_new_channel_event(hdd_ctx->mac_handle,
-					     adapter->deflink->vdev_id);
+					     link_info->vdev_id);
 		break;
 	/* LTE coex event on current channel */
 	case QCA_WLAN_VENDOR_ACS_SELECT_REASON_LTE_COEX:

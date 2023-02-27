@@ -3257,14 +3257,14 @@ void hdd_acs_response_timeout_handler(void *context);
 
 /**
  * wlan_hdd_cfg80211_start_acs(): Start ACS Procedure for SAP
- * @adapter: pointer to SAP adapter struct
+ * @link_info: Link info pointer in HDD adapter
  *
  * This function starts the ACS procedure if there are no
  * constraints like MBSSID DFS restrictions.
  *
  * Return: Status of ACS Start procedure
  */
-int wlan_hdd_cfg80211_start_acs(struct hdd_adapter *adapter);
+int wlan_hdd_cfg80211_start_acs(struct wlan_hdd_link_info *link_info);
 
 /**
  * wlan_hdd_trim_acs_channel_list() - Trims ACS channel list with

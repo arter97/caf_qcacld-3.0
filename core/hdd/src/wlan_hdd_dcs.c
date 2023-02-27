@@ -306,7 +306,7 @@ static void hdd_dcs_cb(struct wlan_objmgr_psoc *psoc, uint8_t mac_id,
 			if (QDF_IS_STATUS_SUCCESS(status))
 				return;
 		}
-		wlan_hdd_cfg80211_start_acs(link_info->adapter);
+		wlan_hdd_cfg80211_start_acs(link_info);
 		return;
 	}
 }

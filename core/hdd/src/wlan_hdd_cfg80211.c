@@ -2278,14 +2278,14 @@ static void hdd_update_acs_channel_list(struct sap_config *sap_config,
 
 /**
  * wlan_hdd_cfg80211_start_acs : Start ACS Procedure for SAP
- * @adapter: pointer to SAP adapter struct
+ * @link_info: Link info pointer in SAP HDD adapter
  *
  * This function starts the ACS procedure if there are no
  * constraints like MBSSID DFS restrictions.
  *
  * Return: Status of ACS Start procedure
  */
-int wlan_hdd_cfg80211_start_acs(struct hdd_adapter *adapter)
+int wlan_hdd_cfg80211_start_acs(struct wlan_hdd_link_info *link_info)
 {
 	struct hdd_context *hdd_ctx;
 	struct sap_config *sap_config;
@@ -2295,23 +2295,17 @@ int wlan_hdd_cfg80211_start_acs(struct hdd_adapter *adapter)
 	uint8_t mcc_to_scc_switch = 0;
 	int status;
 	QDF_STATUS qdf_status;
+	struct hdd_adapter *adapter = link_info->adapter;
 
-	if (!adapter) {
-		hdd_err("adapter is NULL");
-		return -EINVAL;
-	}
 	hdd_ctx = WLAN_HDD_GET_CTX(adapter);
 	status = wlan_hdd_validate_context(hdd_ctx);
 	if (0 != status)
 		return status;
 
-	ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(adapter->deflink);
-	sap_ctx = WLAN_HDD_GET_SAP_CTX_PTR(adapter->deflink);
+	ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(link_info);
+	sap_ctx = WLAN_HDD_GET_SAP_CTX_PTR(link_info);
 	sap_config = &ap_ctx->sap_config;
-	if (!sap_config) {
-		hdd_err("SAP config is NULL");
-		return -EINVAL;
-	}
+
 	if (hdd_ctx->acs_policy.acs_chan_freq)
 		sap_config->chan_freq = hdd_ctx->acs_policy.acs_chan_freq;
 	else
@@ -3786,6 +3780,7 @@ static int __wlan_hdd_cfg80211_do_acs(struct wiphy *wiphy,
 	uint32_t channel_bonding_mode_2g;
 	uint32_t last_scan_ageout_time;
 	bool ll_lt_sap = false;
+	struct wlan_hdd_link_info *link_info = adapter->deflink;
 
 	/* ***Note*** Donot set SME config related to ACS operation here because
 	 * ACS operation is not synchronouse and ACS for Second AP may come when
@@ -3822,7 +3817,7 @@ static int __wlan_hdd_cfg80211_do_acs(struct wiphy *wiphy,
 		return -EINVAL;
 	}
 
-	ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(adapter->deflink);
+	ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(link_info);
 
 	if (qdf_atomic_read(&ap_ctx->acs_in_progress) > 0) {
 		if (wlan_hdd_check_is_acs_request_same(adapter,
@@ -3835,7 +3830,7 @@ static int __wlan_hdd_cfg80211_do_acs(struct wiphy *wiphy,
 		return -EINVAL;
 	} else {
 		qdf_atomic_set(&ap_ctx->acs_in_progress, 1);
-		qdf_event_reset(&adapter->deflink->acs_complete_event);
+		qdf_event_reset(&link_info->acs_complete_event);
 	}
 
 	hdd_reg_wait_for_country_change(hdd_ctx);
@@ -3855,7 +3850,7 @@ static int __wlan_hdd_cfg80211_do_acs(struct wiphy *wiphy,
 	}
 
 	sap_config = &ap_ctx->sap_config;
-	sap_ctx = WLAN_HDD_GET_SAP_CTX_PTR(adapter->deflink);
+	sap_ctx = WLAN_HDD_GET_SAP_CTX_PTR(link_info);
 
 	/* Check and free if memory is already allocated for acs channel list */
 	wlan_hdd_undo_acs(adapter);
@@ -3864,7 +3859,7 @@ static int __wlan_hdd_cfg80211_do_acs(struct wiphy *wiphy,
 
 	hw_mode = nla_get_u8(tb[QCA_WLAN_VENDOR_ATTR_ACS_HW_MODE]);
 	hdd_nofl_info("ACS request vid %d hw mode %d",
-		      adapter->deflink->vdev_id, hw_mode);
+		      link_info->vdev_id, hw_mode);
 	ht_enabled = nla_get_flag(tb[QCA_WLAN_VENDOR_ATTR_ACS_HT_ENABLED]);
 	ht40_enabled = nla_get_flag(tb[QCA_WLAN_VENDOR_ATTR_ACS_HT40_ENABLED]);
 	vht_enabled = nla_get_flag(tb[QCA_WLAN_VENDOR_ATTR_ACS_VHT_ENABLED]);
@@ -4014,7 +4009,7 @@ static int __wlan_hdd_cfg80211_do_acs(struct wiphy *wiphy,
 	hdd_remove_passive_dfs_acs_channel_for_ll_sap(
 						sap_config, hdd_ctx->psoc,
 						hdd_ctx->pdev,
-						adapter->deflink->vdev_id);
+						link_info->vdev_id);
 
 	/* consult policy manager to get PCL */
 	qdf_status = policy_mgr_get_pcl(hdd_ctx->psoc, pm_mode,
@@ -4023,11 +4018,11 @@ static int __wlan_hdd_cfg80211_do_acs(struct wiphy *wiphy,
 					sap_config->acs_cfg.
 					pcl_channels_weight_list,
 					NUM_CHANNELS,
-					adapter->deflink->vdev_id);
+					link_info->vdev_id);
 
 	policy_mgr_get_pcl_channel_for_ll_sap_concurrency(
 				hdd_ctx->psoc,
-				adapter->deflink->vdev_id,
+				link_info->vdev_id,
 				sap_config->acs_cfg.pcl_chan_freq,
 				sap_config->acs_cfg.pcl_channels_weight_list,
 				&sap_config->acs_cfg.pcl_ch_count);
@@ -4042,7 +4037,7 @@ static int __wlan_hdd_cfg80211_do_acs(struct wiphy *wiphy,
 	sap_config->acs_cfg.acs_mode = true;
 
 	ll_lt_sap = policy_mgr_is_vdev_ll_lt_sap(hdd_ctx->psoc,
-						 adapter->deflink->vdev_id);
+						 link_info->vdev_id);
 	if ((is_external_acs_policy &&
 	    policy_mgr_is_force_scc(hdd_ctx->psoc) &&
 	    policy_mgr_get_connection_count(hdd_ctx->psoc)) || ll_lt_sap) {
@@ -4168,7 +4163,7 @@ static int __wlan_hdd_cfg80211_do_acs(struct wiphy *wiphy,
 	if (is_vendor_acs_support)
 		ret = hdd_start_vendor_acs(adapter);
 	else
-		ret = wlan_hdd_cfg80211_start_acs(adapter);
+		ret = wlan_hdd_cfg80211_start_acs(link_info);
 
 out:
 	if (ret == 0) {
