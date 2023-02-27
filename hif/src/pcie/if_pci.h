@@ -157,6 +157,7 @@ struct hif_pci_softc {
 	qdf_cpu_mask ce_irq_cpu_mask[CE_COUNT_MAX];
 #endif
 	struct hif_soc_info device_version;
+	qdf_spinlock_t force_wake_lock;
 };
 
 bool hif_pci_targ_is_present(struct hif_softc *scn, void *__iomem *mem);

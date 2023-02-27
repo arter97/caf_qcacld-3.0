@@ -1157,6 +1157,7 @@ QDF_STATUS hif_pci_open(struct hif_softc *hif_ctx, enum qdf_bus_type bus_type)
 	hif_rtpm_open(hif_ctx);
 
 	qdf_spinlock_create(&sc->irq_lock);
+	qdf_spinlock_create(&sc->force_wake_lock);
 
 	return hif_ce_open(hif_ctx);
 }
@@ -4021,6 +4022,65 @@ bool hif_pci_needs_bmi(struct hif_softc *scn)
  */
 #define HIF_POLL_UMAC_WAKE 0x2
 
+static inline int hif_soc_wake_request(struct hif_opaque_softc *hif_handle)
+{
+	uint32_t timeout, value;
+	struct hif_softc *scn = (struct hif_softc *)hif_handle;
+	struct hif_pci_softc *pci_scn = HIF_GET_PCI_SOFTC(scn);
+
+	qdf_spin_lock_bh(&pci_scn->force_wake_lock);
+	if ((qdf_atomic_inc_return(&scn->active_wake_req_cnt) > 1)) {
+		qdf_spin_unlock_bh(&pci_scn->force_wake_lock);
+		return 0;
+	}
+
+	hif_write32_mb(scn, scn->mem + PCIE_REG_WAKE_UMAC_OFFSET, 1);
+	HIF_STATS_INC(pci_scn, soc_force_wake_register_write_success, 1);
+	/*
+	 * do not reset the timeout
+	 * total_wake_time = MHI_WAKE_TIME + PCI_WAKE_TIME < 50 ms
+	 */
+	timeout = 0;
+	do {
+		value = hif_read32_mb(
+				scn, scn->mem +
+				PCIE_SOC_PCIE_REG_PCIE_SCRATCH_0_SOC_PCIE_REG);
+		if (value == HIF_POLL_UMAC_WAKE)
+			break;
+		qdf_mdelay(FORCE_WAKE_DELAY_MS);
+		timeout += FORCE_WAKE_DELAY_MS;
+	} while (timeout <= FORCE_WAKE_DELAY_TIMEOUT_MS);
+
+	if (value != HIF_POLL_UMAC_WAKE) {
+		hif_err("force wake handshake failed, reg value = 0x%x",
+			value);
+		HIF_STATS_INC(pci_scn, soc_force_wake_failure, 1);
+		qdf_atomic_dec(&scn->active_wake_req_cnt);
+		qdf_spin_unlock_bh(&pci_scn->force_wake_lock);
+		return -ETIMEDOUT;
+	}
+
+	HIF_STATS_INC(pci_scn, soc_force_wake_success, 1);
+	qdf_spin_unlock_bh(&pci_scn->force_wake_lock);
+	return 0;
+}
+
+static inline void hif_soc_wake_release(struct hif_opaque_softc *hif_handle)
+{
+	struct hif_softc *scn = (struct hif_softc *)hif_handle;
+	struct hif_pci_softc *pci_scn = HIF_GET_PCI_SOFTC(scn);
+
+	qdf_spin_lock_bh(&pci_scn->force_wake_lock);
+	if (!qdf_atomic_dec_and_test(&scn->active_wake_req_cnt)) {
+		qdf_spin_unlock_bh(&pci_scn->force_wake_lock);
+		return;
+	}
+
+	/* Release umac force wake */
+	hif_write32_mb(scn, scn->mem + PCIE_REG_WAKE_UMAC_OFFSET, 0);
+	qdf_spin_unlock_bh(&pci_scn->force_wake_lock);
+}
+
 /**
  * hif_force_wake_request(): Enable the force wake recipe
  * @hif_handle: HIF handle
@@ -4034,7 +4094,7 @@ bool hif_pci_needs_bmi(struct hif_softc *scn)
  */
 int hif_force_wake_request(struct hif_opaque_softc *hif_handle)
 {
-	uint32_t timeout, value;
+	uint32_t timeout;
 	struct hif_softc *scn = (struct hif_softc *)hif_handle;
 	struct hif_pci_softc *pci_scn = HIF_GET_PCI_SOFTC(scn);
 	int ret, status = 0;
@@ -4068,34 +4128,24 @@ int hif_force_wake_request(struct hif_opaque_softc *hif_handle)
 		hif_info("state-change event races, ignore");
 
 	HIF_STATS_INC(pci_scn, mhi_force_wake_success, 1);
-	hif_write32_mb(scn, scn->mem + PCIE_REG_WAKE_UMAC_OFFSET, 1);
-	HIF_STATS_INC(pci_scn, soc_force_wake_register_write_success, 1);
-	/*
-	 * do not reset the timeout
-	 * total_wake_time = MHI_WAKE_TIME + PCI_WAKE_TIME < 50 ms
-	 */
-	timeout = 0;
-	do {
-		value = hif_read32_mb(
-				scn, scn->mem +
-				PCIE_SOC_PCIE_REG_PCIE_SCRATCH_0_SOC_PCIE_REG);
-		if (value == HIF_POLL_UMAC_WAKE)
-			break;
-		qdf_mdelay(FORCE_WAKE_DELAY_MS);
-		timeout += FORCE_WAKE_DELAY_MS;
-	} while (timeout <= FORCE_WAKE_DELAY_TIMEOUT_MS);
 
-	if (value != HIF_POLL_UMAC_WAKE) {
-		hif_err("force wake handshake failed, reg value = 0x%x",
-			value);
-		HIF_STATS_INC(pci_scn, soc_force_wake_failure, 1);
-		status = -ETIMEDOUT;
-		goto release_rtpm_ref;
+	ret = hif_soc_wake_request(hif_handle);
+	if (ret) {
+		hif_err("soc force wake failed: %d", ret);
+		status = ret;
+		goto release_mhi_wake;
 	}
-
-	HIF_STATS_INC(pci_scn, soc_force_wake_success, 1);
 	return 0;
 
+release_mhi_wake:
+	/* Release MHI force wake */
+	ret = pld_force_wake_release(scn->qdf_dev->dev);
+	if (ret) {
+		hif_err("pld force wake release failure");
+		HIF_STATS_INC(pci_scn, mhi_force_wake_release_failure, 1);
+		return ret;
+	}
+	HIF_STATS_INC(pci_scn, mhi_force_wake_release_success, 1);
 release_rtpm_ref:
 	/* Release runtime PM force wake */
 	ret = hif_rtpm_put(HIF_RTPM_PUT_ASYNC, HIF_RTPM_ID_FORCE_WAKE);
@@ -4113,8 +4163,7 @@ int hif_force_wake_release(struct hif_opaque_softc *hif_handle)
 	struct hif_softc *scn = (struct hif_softc *)hif_handle;
 	struct hif_pci_softc *pci_scn = HIF_GET_PCI_SOFTC(scn);
 
-	/* Release umac force wake */
-	hif_write32_mb(scn, scn->mem + PCIE_REG_WAKE_UMAC_OFFSET, 0);
+	hif_soc_wake_release(hif_handle);
 
 	/* Release MHI force wake */
 	ret = pld_force_wake_release(scn->qdf_dev->dev);

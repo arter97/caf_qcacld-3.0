@@ -299,6 +299,7 @@ struct hif_softc {
 	atomic_t active_grp_tasklet_cnt;
 	atomic_t link_suspended;
 	void *vaddr_rri_on_ddr;
+	atomic_t active_wake_req_cnt;
 	qdf_dma_addr_t paddr_rri_on_ddr;
 #ifdef CONFIG_BYPASS_QMI
 	uint32_t *vaddr_qmi_bypass;
