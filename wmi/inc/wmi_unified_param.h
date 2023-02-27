@@ -5252,6 +5252,9 @@ typedef enum {
 	wmi_xgap_enable_complete_eventid,
 #endif
 	wmi_pdev_set_tgtr2p_table_eventid,
+#ifdef QCA_MANUAL_TRIGGERED_ULOFDMA
+	wmi_manual_ul_ofdma_trig_feedback_eventid,
+#endif
 	wmi_events_max,
 } wmi_conv_event_id;
 
@@ -6285,6 +6288,9 @@ typedef enum {
 	wmi_service_multiple_vdev_restart_bmap,
 	wmi_service_v1a_v1b_supported,
 	wmi_service_cfr_capture_pdev_id_soc,
+#ifdef QCA_MANUAL_TRIGGERED_ULOFDMA
+	wmi_service_manual_ulofdma_trigger_support,
+#endif
 	wmi_services_max,
 } wmi_conv_service_ids;
 #define WMI_SERVICE_UNAVAILABLE 0xFFFF

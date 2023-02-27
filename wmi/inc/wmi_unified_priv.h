@@ -1535,6 +1535,14 @@ QDF_STATUS (*extract_chan_info_event)(wmi_unified_t wmi_handle, void *evt_buf,
 QDF_STATUS (*extract_scan_blanking_params)(wmi_unified_t wmi_handle,
 	    void *evt_buf, wmi_host_scan_blanking_params *blanking_params);
 
+#ifdef QCA_MANUAL_TRIGGERED_ULOFDMA
+QDF_STATUS
+(*extract_ulofdma_trigger_feedback_event)(
+		wmi_unified_t wmi_handle,
+		void *evt_buf,
+		wmi_host_manual_ul_ofdma_trig_feedback_evt *feedback);
+#endif
+
 QDF_STATUS (*extract_channel_hopping_event)(wmi_unified_t wmi_handle,
 		void *evt_buf,
 		wmi_host_pdev_channel_hopping_event *ch_hopping);
@@ -2962,6 +2970,14 @@ QDF_STATUS (*config_peer_latency_info_cmd)(
 				struct wmi_peer_latency_config_params
 				*param);
 #endif
+#endif
+#ifdef QCA_MANUAL_TRIGGERED_ULOFDMA
+QDF_STATUS
+(*trigger_ulofdma_su_cmd)(wmi_unified_t wmi,
+			  struct wmi_trigger_ul_ofdma_su_params *param);
+QDF_STATUS
+(*trigger_ulofdma_mu_cmd)(wmi_unified_t wmi,
+			  struct wmi_trigger_ul_ofdma_mu_params *param);
 #endif
 
 QDF_STATUS (*send_set_tpc_power_cmd)(wmi_unified_t wmi_handle,

@@ -21436,6 +21436,10 @@ static void populate_tlv_events_id(WMI_EVT_ID *event_ids)
 #endif
 	event_ids[wmi_pdev_set_tgtr2p_table_eventid] =
 		WMI_PDEV_SET_TGTR2P_TABLE_EVENTID;
+#ifdef QCA_MANUAL_TRIGGERED_ULOFDMA
+	event_ids[wmi_manual_ul_ofdma_trig_feedback_eventid] =
+		WMI_MANUAL_UL_OFDMA_TRIG_FEEDBACK_EVENTID;
+#endif
 }
 
 #ifdef WLAN_FEATURE_LINK_LAYER_STATS
@@ -21977,6 +21981,10 @@ static void populate_tlv_service(uint32_t *wmi_service)
 			WMI_SERVICE_WMI_SERVICE_WPA3_SHA384_ROAM_SUPPORT;
 	wmi_service[wmi_service_v1a_v1b_supported] =
 			WMI_SERVICE_PEER_METADATA_V1A_V1B_SUPPORT;
+#ifdef QCA_MANUAL_TRIGGERED_ULOFDMA
+	wmi_service[wmi_service_manual_ulofdma_trigger_support] =
+			WMI_SERVICE_MANUAL_ULOFDMA_TRIGGER_SUPPORT;
+#endif
 }
 
 /**
