@@ -2148,7 +2148,8 @@ static void hdd_roam_channel_switch_handler(struct hdd_adapter *adapter,
 	mac_handle_t mac_handle = hdd_adapter_get_mac_handle(adapter);
 	struct hdd_station_ctx *sta_ctx;
 	uint8_t connected_vdev;
-	bool notify = true;
+	bool notify = true, is_sap_go_moved_before_sta = false;
+	struct wlan_objmgr_vdev *vdev;
 
 	/* Enable Roaming on STA interface which was disabled before CSA */
 	if (adapter->device_mode == QDF_STA_MODE)
@@ -2198,8 +2199,16 @@ static void hdd_roam_channel_switch_handler(struct hdd_adapter *adapter,
 	if (QDF_IS_STATUS_ERROR(status))
 		hdd_debug("set hw mode change not done");
 
-	policy_mgr_check_concurrent_intf_and_restart_sap(hdd_ctx->psoc,
-			!!adapter->session.ap.sap_config.acs_cfg.acs_mode);
+	vdev = hdd_objmgr_get_vdev_by_user(adapter, WLAN_DP_ID);
+	if (vdev) {
+		is_sap_go_moved_before_sta =
+			wlan_vdev_mlme_is_sap_go_move_before_sta(vdev);
+		hdd_objmgr_put_vdev_by_user(vdev, WLAN_DP_ID);
+	}
+
+	if (!is_sap_go_moved_before_sta)
+		policy_mgr_check_concurrent_intf_and_restart_sap(hdd_ctx->psoc,
+			    !!adapter->session.ap.sap_config.acs_cfg.acs_mode);
 	wlan_twt_concurrency_update(hdd_ctx);
 }
 
