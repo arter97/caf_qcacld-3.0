@@ -5261,14 +5261,14 @@ done:
 
 /**
  * wlan_hdd_set_sap_hwmode() - set sap hw mode
- * @adapter: Pointer to hostapd adapter
+ * @link_info: Pointer to link_info in hostapd adapter
  *
  * Return: none
  */
-static void wlan_hdd_set_sap_hwmode(struct hdd_adapter *adapter)
+static void wlan_hdd_set_sap_hwmode(struct wlan_hdd_link_info *link_info)
 {
-	struct sap_config *config = &adapter->deflink->session.ap.sap_config;
-	struct hdd_beacon_data *beacon = adapter->deflink->session.ap.beacon;
+	struct sap_config *config = &link_info->session.ap.sap_config;
+	struct hdd_beacon_data *beacon = link_info->session.ap.beacon;
 	struct ieee80211_mgmt *mgmt_frame =
 		(struct ieee80211_mgmt *)beacon->head;
 	u8 checkRatesfor11g = true;
@@ -6727,7 +6727,7 @@ int wlan_hdd_cfg80211_start_bss(struct hdd_adapter *adapter,
 	}
 
 	if (!cds_is_sub_20_mhz_enabled())
-		wlan_hdd_set_sap_hwmode(adapter);
+		wlan_hdd_set_sap_hwmode(adapter->deflink);
 
 	if (QDF_IS_STATUS_ERROR(wlan_hdd_mlo_update(hdd_ctx, config,
 						    adapter, beacon))) {
@@ -7678,37 +7678,36 @@ wlan_util_get_centre_freq(struct wireless_dev *wdev, unsigned int link_id)
 /**
  * hdd_update_he_obss_pd() - Enable or disable spatial reuse
  * based on user space input and concurrency combination.
- * @adapter:  Pointer to hostapd adapter
+ * @link_info:  Pointer to link_info in hostapd adapter
  * @params: Pointer to AP configuration from cfg80211
  *
  * Return: void
  */
-static void hdd_update_he_obss_pd(struct hdd_adapter *adapter,
+static void hdd_update_he_obss_pd(struct wlan_hdd_link_info *link_info,
 				  struct cfg80211_ap_settings *params)
 {
 	struct wlan_objmgr_vdev *vdev;
 	struct ieee80211_he_obss_pd *obss_pd;
 
-	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink, WLAN_OSIF_ID);
+	if (!params || !params->he_obss_pd.enable)
+		return;
+
+	vdev = hdd_objmgr_get_vdev_by_user(link_info, WLAN_OSIF_ID);
 	if (!vdev)
 		return;
 
-	if (params && params->he_obss_pd.enable) {
-		obss_pd = &params->he_obss_pd;
-		ucfg_spatial_reuse_set_sr_config(vdev,
-						 obss_pd->sr_ctrl,
-						 obss_pd->non_srg_max_offset);
-		ucfg_spatial_reuse_set_sr_enable(vdev, obss_pd->enable);
-		hdd_debug("obss_pd_enable: %d, sr_ctrl: %d, non_srg_max_offset: %d",
-			  obss_pd->enable, obss_pd->sr_ctrl,
-			  obss_pd->non_srg_max_offset);
-	}
+	obss_pd = &params->he_obss_pd;
+	ucfg_spatial_reuse_set_sr_config(vdev, obss_pd->sr_ctrl,
+					 obss_pd->non_srg_max_offset);
+	ucfg_spatial_reuse_set_sr_enable(vdev, obss_pd->enable);
+	hdd_debug("obss_pd_enable: %d, sr_ctrl: %d, non_srg_max_offset: %d",
+		  obss_pd->enable, obss_pd->sr_ctrl,
+		  obss_pd->non_srg_max_offset);
 	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
 }
 #else
-static inline
-void hdd_update_he_obss_pd(struct hdd_adapter *adapter,
-			   struct cfg80211_ap_settings *params)
+static inline void hdd_update_he_obss_pd(struct wlan_hdd_link_info *link_info,
+					 struct cfg80211_ap_settings *params)
 {
 }
 #endif
@@ -8040,7 +8039,7 @@ static int __wlan_hdd_cfg80211_start_ap(struct wiphy *wiphy,
 		wlan_hdd_update_twt_responder(adapter, params);
 
 		/* Enable/disable non-srg obss pd spatial reuse */
-		hdd_update_he_obss_pd(adapter, params);
+		hdd_update_he_obss_pd(adapter->deflink, params);
 
 		hdd_place_marker(adapter, "TRY TO START", NULL);
 		status = wlan_hdd_cfg80211_start_bss(adapter, &params->beacon,
