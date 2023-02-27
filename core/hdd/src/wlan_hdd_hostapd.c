@@ -4521,21 +4521,25 @@ static bool wlan_hdd_rate_is_11g(u8 rate)
 #ifdef QCA_HT_2040_COEX
 /**
  * wlan_hdd_get_sap_obss() - Get SAP OBSS enable config based on HT_CAPAB IE
- * @adapter: Pointer to hostapd adapter
+ * @link_info: Pointer to link info in adapter
  *
  * Return: HT support channel width config value
  */
-static bool wlan_hdd_get_sap_obss(struct hdd_adapter *adapter)
+static bool wlan_hdd_get_sap_obss(struct wlan_hdd_link_info *link_info)
 {
 	uint32_t ret;
 	const uint8_t *ie;
 	uint8_t ht_cap_ie[DOT11F_IE_HTCAPS_MAX_LEN];
-	tDot11fIEHTCaps dot11_ht_cap_ie = {0};
-	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
-	struct hdd_beacon_data *beacon = adapter->deflink->session.ap.beacon;
 	mac_handle_t mac_handle;
+	tDot11fIEHTCaps dot11_ht_cap_ie = {0};
+	struct hdd_beacon_data *beacon = link_info->session.ap.beacon;
 
-	mac_handle = hdd_ctx->mac_handle;
+	mac_handle = hdd_adapter_get_mac_handle(link_info->adapter);
+	if (!mac_handle) {
+		hdd_debug("NULL MAC context");
+		return false;
+	}
+
 	ie = wlan_get_ie_ptr_from_eid(WLAN_EID_HT_CAPABILITY,
 				      beacon->tail, beacon->tail_len);
 	if (ie && ie[1] && (ie[1] <= DOT11F_IE_HTCAPS_MAX_LEN)) {
@@ -4553,7 +4557,7 @@ static bool wlan_hdd_get_sap_obss(struct hdd_adapter *adapter)
 	return false;
 }
 #else
-static bool wlan_hdd_get_sap_obss(struct hdd_adapter *adapter)
+static inline bool wlan_hdd_get_sap_obss(struct wlan_hdd_link_info *link_info)
 {
 	return false;
 }
@@ -4581,16 +4585,18 @@ int wlan_hdd_set_channel(struct wiphy *wiphy,
 	struct sme_config_params *sme_config;
 	struct sap_config *sap_config;
 	struct hdd_ap_ctx *ap_ctx;
+	struct wlan_hdd_link_info *link_info;
 
 	if (!dev) {
 		hdd_err("Called with dev = NULL");
 		return -ENODEV;
 	}
 	adapter = WLAN_HDD_GET_PRIV_PTR(dev);
+	link_info = adapter->deflink;
 
 	qdf_mtrace(QDF_MODULE_ID_HDD, QDF_MODULE_ID_HDD,
 		   TRACE_CODE_HDD_CFG80211_SET_CHANNEL,
-		   adapter->deflink->vdev_id, channel_type);
+		   link_info->vdev_id, channel_type);
 
 	hdd_debug("Dev_mode %s(%d) freq %d, ch_bw %d ccfs1 %d ccfs2 %d",
 		  qdf_opmode_str(adapter->device_mode),
@@ -4675,7 +4681,7 @@ int wlan_hdd_set_channel(struct wiphy *wiphy,
 				return -EINVAL;
 			}
 			sme_config->csr_config.obssEnabled =
-				wlan_hdd_get_sap_obss(adapter);
+					wlan_hdd_get_sap_obss(link_info);
 
 			sme_update_config(mac_handle, sme_config);
 			qdf_mem_free(sme_config);
@@ -4756,7 +4762,7 @@ static void wlan_hdd_check_h2e(const tSirMacRateSet *rs, bool *require_h2e)
 #ifdef WLAN_FEATURE_11AX
 /**
  * wlan_hdd_add_extn_ie() - add extension IE
- * @adapter: Pointer to hostapd adapter
+ * @link_info: Link info pointer in adapter
  * @genie: Pointer to ie to be added
  * @total_ielen: Pointer to store total ie length
  * @oui: Pointer to oui
@@ -4764,13 +4770,13 @@ static void wlan_hdd_check_h2e(const tSirMacRateSet *rs, bool *require_h2e)
  *
  * Return: 0 for success non-zero for failure
  */
-static int wlan_hdd_add_extn_ie(struct hdd_adapter *adapter, uint8_t *genie,
-				uint16_t *total_ielen, uint8_t *oui,
-				uint8_t oui_size)
+static int wlan_hdd_add_extn_ie(struct wlan_hdd_link_info *link_info,
+				uint8_t *genie, uint16_t *total_ielen,
+				uint8_t *oui, uint8_t oui_size)
 {
 	const uint8_t *ie;
 	uint16_t ielen = 0;
-	struct hdd_beacon_data *beacon = adapter->deflink->session.ap.beacon;
+	struct hdd_beacon_data *beacon = link_info->session.ap.beacon;
 
 	ie = wlan_get_ext_ie_ptr_from_ext_id(oui, oui_size,
 					     beacon->tail,
@@ -4791,17 +4797,17 @@ static int wlan_hdd_add_extn_ie(struct hdd_adapter *adapter, uint8_t *genie,
 
 /**
  * wlan_hdd_add_hostapd_conf_vsie() - configure Vendor IE in sap mode
- * @adapter: Pointer to hostapd adapter
+ * @link_info: Index of link_info in HDD adapter
  * @genie: Pointer to Vendor IE
  * @total_ielen: Pointer to store total ie length
  *
  * Return: none
  */
-static void wlan_hdd_add_hostapd_conf_vsie(struct hdd_adapter *adapter,
+static void wlan_hdd_add_hostapd_conf_vsie(struct wlan_hdd_link_info *link_info,
 					   uint8_t *genie,
 					   uint16_t *total_ielen)
 {
-	struct hdd_beacon_data *beacon = adapter->deflink->session.ap.beacon;
+	struct hdd_beacon_data *beacon = link_info->session.ap.beacon;
 	int left = beacon->tail_len;
 	uint8_t *ptr = beacon->tail;
 	uint8_t elem_id, elem_len;
@@ -4858,18 +4864,18 @@ static void wlan_hdd_add_hostapd_conf_vsie(struct hdd_adapter *adapter,
 
 /**
  * wlan_hdd_add_extra_ie() - add extra ies in beacon
- * @adapter: Pointer to hostapd adapter
+ * @link_info: Pointer to link_info in adapter
  * @genie: Pointer to extra ie
  * @total_ielen: Pointer to store total ie length
  * @temp_ie_id: ID of extra ie
  *
  * Return: none
  */
-static void wlan_hdd_add_extra_ie(struct hdd_adapter *adapter,
+static void wlan_hdd_add_extra_ie(struct wlan_hdd_link_info *link_info,
 				  uint8_t *genie, uint16_t *total_ielen,
 				  uint8_t temp_ie_id)
 {
-	struct hdd_beacon_data *beacon = adapter->deflink->session.ap.beacon;
+	struct hdd_beacon_data *beacon = link_info->session.ap.beacon;
 	int left = beacon->tail_len;
 	uint8_t *ptr = beacon->tail;
 	uint8_t elem_id, elem_len;
@@ -5015,25 +5021,27 @@ wlan_hdd_cfg80211_alloc_new_beacon(struct hdd_adapter *adapter,
 }
 
 #ifdef QCA_HT_2040_COEX
-static void wlan_hdd_add_sap_obss_scan_ie(
-	struct hdd_adapter *hostapd_adapter, uint8_t *ie_buf, uint16_t *ie_len)
+static void wlan_hdd_add_sap_obss_scan_ie(struct wlan_hdd_link_info *link_info,
+					  uint8_t *ie_buf, uint16_t *ie_len)
 {
-	if (QDF_SAP_MODE == hostapd_adapter->device_mode) {
-		if (wlan_hdd_get_sap_obss(hostapd_adapter))
-			wlan_hdd_add_extra_ie(hostapd_adapter, ie_buf, ie_len,
-					WLAN_EID_OVERLAP_BSS_SCAN_PARAM);
-	}
+	if (QDF_SAP_MODE != link_info->adapter->device_mode ||
+	    !wlan_hdd_get_sap_obss(link_info))
+		return;
+
+	wlan_hdd_add_extra_ie(link_info, ie_buf, ie_len,
+			      WLAN_EID_OVERLAP_BSS_SCAN_PARAM);
 }
 #else
-static void wlan_hdd_add_sap_obss_scan_ie(
-	struct hdd_adapter *hostapd_adapter, uint8_t *ie_buf, uint16_t *ie_len)
+static inline void
+wlan_hdd_add_sap_obss_scan_ie(struct wlan_hdd_link_info *link_info,
+			      uint8_t *ie_buf, uint16_t *ie_len)
 {
 }
 #endif
 
 /**
  * hdd_update_11ax_apies() - update ap mode 11ax ies
- * @adapter: Pointer to hostapd adapter
+ * @link_info: Pointer to link_info in adapter
  * @genie: generic IE buffer
  * @total_ielen: out param to update total ielen
  *
@@ -5041,16 +5049,16 @@ static void wlan_hdd_add_sap_obss_scan_ie(
  */
 
 #ifdef WLAN_FEATURE_11AX
-static int hdd_update_11ax_apies(struct hdd_adapter *adapter,
+static int hdd_update_11ax_apies(struct wlan_hdd_link_info *link_info,
 				 uint8_t *genie, uint16_t *total_ielen)
 {
-	if (wlan_hdd_add_extn_ie(adapter, genie, total_ielen,
+	if (wlan_hdd_add_extn_ie(link_info, genie, total_ielen,
 				 HE_CAP_OUI_TYPE, HE_CAP_OUI_SIZE)) {
 		hdd_err("Adding HE Cap ie failed");
 		return -EINVAL;
 	}
 
-	if (wlan_hdd_add_extn_ie(adapter, genie, total_ielen,
+	if (wlan_hdd_add_extn_ie(link_info, genie, total_ielen,
 				 HE_OP_OUI_TYPE, HE_OP_OUI_SIZE)) {
 		hdd_err("Adding HE Op ie failed");
 		return -EINVAL;
@@ -5059,7 +5067,7 @@ static int hdd_update_11ax_apies(struct hdd_adapter *adapter,
 	return 0;
 }
 #else
-static int hdd_update_11ax_apies(struct hdd_adapter *adapter,
+static int hdd_update_11ax_apies(struct wlan_hdd_link_info *link_info,
 				 uint8_t *genie, uint16_t *total_ielen)
 {
 	return 0;
@@ -5067,16 +5075,16 @@ static int hdd_update_11ax_apies(struct hdd_adapter *adapter,
 #endif
 
 #ifdef WLAN_FEATURE_11BE
-static int hdd_update_11be_apies(struct hdd_adapter *adapter,
+static int hdd_update_11be_apies(struct wlan_hdd_link_info *link_info,
 				 uint8_t *genie, uint16_t *total_ielen)
 {
-	if (wlan_hdd_add_extn_ie(adapter, genie, total_ielen,
+	if (wlan_hdd_add_extn_ie(link_info, genie, total_ielen,
 				 EHT_OP_OUI_TYPE, EHT_OP_OUI_SIZE)) {
 		hdd_err("Adding EHT Cap IE failed");
 		return -EINVAL;
 	}
 
-	if (wlan_hdd_add_extn_ie(adapter, genie, total_ielen,
+	if (wlan_hdd_add_extn_ie(link_info, genie, total_ielen,
 				 EHT_CAP_OUI_TYPE, EHT_CAP_OUI_SIZE)) {
 		hdd_err("Adding EHT Op IE failed");
 		return -EINVAL;
@@ -5085,7 +5093,7 @@ static int hdd_update_11be_apies(struct hdd_adapter *adapter,
 	return 0;
 }
 #else
-static int hdd_update_11be_apies(struct hdd_adapter *adapter,
+static int hdd_update_11be_apies(struct wlan_hdd_link_info *link_info,
 				 uint8_t *genie, uint16_t *total_ielen)
 {
 	return 0;
@@ -5117,44 +5125,50 @@ int wlan_hdd_cfg80211_update_apies(struct hdd_adapter *adapter)
 		return -EINVAL;
 	}
 
+	mac_handle = hdd_adapter_get_mac_handle(adapter);
+	if (!mac_handle) {
+		hdd_debug("NULL MAC context");
+		return -EINVAL;
+	}
+
 	genie = qdf_mem_malloc(MAX_GENIE_LEN);
 	if (!genie)
 		return -ENOMEM;
 
-	mac_handle = adapter->hdd_ctx->mac_handle;
-
 	/* Extract and add the extended capabilities and interworking IE */
-	wlan_hdd_add_extra_ie(adapter, genie, &total_ielen,
+	wlan_hdd_add_extra_ie(adapter->deflink, genie, &total_ielen,
 			      WLAN_EID_EXT_CAPABILITY);
 
-	wlan_hdd_add_extra_ie(adapter, genie, &total_ielen,
+	wlan_hdd_add_extra_ie(adapter->deflink, genie, &total_ielen,
 			      WLAN_EID_INTERWORKING);
-	wlan_hdd_add_extra_ie(adapter, genie, &total_ielen,
+	wlan_hdd_add_extra_ie(adapter->deflink, genie, &total_ielen,
 			      WLAN_EID_ADVERTISEMENT_PROTOCOL);
-	wlan_hdd_add_extra_ie(adapter, genie, &total_ielen, WLAN_ELEMID_RSNXE);
-	wlan_hdd_add_extra_ie(adapter, genie, &total_ielen,
+	wlan_hdd_add_extra_ie(adapter->deflink, genie,
+			      &total_ielen, WLAN_ELEMID_RSNXE);
+	wlan_hdd_add_extra_ie(adapter->deflink, genie, &total_ielen,
 			      WLAN_ELEMID_MOBILITY_DOMAIN);
 #ifdef FEATURE_WLAN_WAPI
 	if (QDF_SAP_MODE == adapter->device_mode) {
-		wlan_hdd_add_extra_ie(adapter, genie, &total_ielen,
+		wlan_hdd_add_extra_ie(adapter->deflink, genie, &total_ielen,
 				      WLAN_ELEMID_WAPI);
 	}
 #endif
 	/* extract and add rrm ie from hostapd */
-	wlan_hdd_add_extra_ie(adapter, genie, &total_ielen, WLAN_ELEMID_RRM);
+	wlan_hdd_add_extra_ie(adapter->deflink, genie,
+			      &total_ielen, WLAN_ELEMID_RRM);
 
-	wlan_hdd_add_hostapd_conf_vsie(adapter, genie,
+	wlan_hdd_add_hostapd_conf_vsie(adapter->deflink, genie,
 				       &total_ielen);
 
-	ret = hdd_update_11ax_apies(adapter, genie, &total_ielen);
+	ret = hdd_update_11ax_apies(adapter->deflink, genie, &total_ielen);
 	if (ret)
 		goto done;
 
-	ret = hdd_update_11be_apies(adapter, genie, &total_ielen);
+	ret = hdd_update_11be_apies(adapter->deflink, genie, &total_ielen);
 	if (ret)
 		goto done;
 
-	wlan_hdd_add_sap_obss_scan_ie(adapter, genie, &total_ielen);
+	wlan_hdd_add_sap_obss_scan_ie(adapter->deflink, genie, &total_ielen);
 
 	qdf_copy_macaddr(&update_ie.bssid, &adapter->mac_addr);
 	update_ie.vdev_id = adapter->deflink->vdev_id;
@@ -5170,12 +5184,12 @@ int wlan_hdd_cfg80211_update_apies(struct hdd_adapter *adapter)
 		    beacon->proberesp_ies_len);
 	proberesp_ies_len = beacon->proberesp_ies_len;
 
-	wlan_hdd_add_sap_obss_scan_ie(adapter, proberesp_ies,
-				     &proberesp_ies_len);
-	wlan_hdd_add_extra_ie(adapter, proberesp_ies, &proberesp_ies_len,
-			      WLAN_ELEMID_RSNXE);
-	wlan_hdd_add_extra_ie(adapter, proberesp_ies, &proberesp_ies_len,
-			      WLAN_ELEMID_MOBILITY_DOMAIN);
+	wlan_hdd_add_sap_obss_scan_ie(adapter->deflink, proberesp_ies,
+				      &proberesp_ies_len);
+	wlan_hdd_add_extra_ie(adapter->deflink, proberesp_ies,
+			      &proberesp_ies_len, WLAN_ELEMID_RSNXE);
+	wlan_hdd_add_extra_ie(adapter->deflink, proberesp_ies,
+			      &proberesp_ies_len, WLAN_ELEMID_MOBILITY_DOMAIN);
 
 	if (test_bit(SOFTAP_BSS_STARTED, &adapter->deflink->link_flags)) {
 		update_ie.ieBufferlength = proberesp_ies_len;
@@ -5235,9 +5249,7 @@ int wlan_hdd_cfg80211_update_apies(struct hdd_adapter *adapter)
 		}
 		wlansap_reset_sap_config_add_ie(config, eUPDATE_IE_PROBE_BCN);
 	} else {
-		wlansap_update_sap_config_add_ie(config,
-						 genie,
-						 total_ielen,
+		wlansap_update_sap_config_add_ie(config, genie, total_ielen,
 						 eUPDATE_IE_PROBE_BCN);
 	}
 
