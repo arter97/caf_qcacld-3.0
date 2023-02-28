@@ -9249,6 +9249,7 @@ QDF_STATUS hdd_reset_all_adapters(struct hdd_context *hdd_ctx)
 	struct hdd_adapter *adapter, *next_adapter = NULL;
 	bool value;
 	struct wlan_objmgr_vdev *vdev;
+	struct wlan_hdd_link_info *link_info;
 
 	hdd_enter();
 
@@ -9261,55 +9262,57 @@ QDF_STATUS hdd_reset_all_adapters(struct hdd_context *hdd_ctx)
 			 qdf_opmode_str(adapter->device_mode),
 			 adapter->device_mode);
 
+		hdd_adapter_for_each_active_link_info(adapter, link_info) {
+			hdd_adapter_abort_tx_flow(adapter);
 
-		hdd_adapter_abort_tx_flow(adapter);
+			if ((adapter->device_mode == QDF_STA_MODE) ||
+			    (adapter->device_mode == QDF_P2P_CLIENT_MODE)) {
+				hdd_send_twt_del_all_sessions_to_userspace(link_info);
 
-		if ((adapter->device_mode == QDF_STA_MODE) ||
-		    (adapter->device_mode == QDF_P2P_CLIENT_MODE)) {
-			hdd_send_twt_del_all_sessions_to_userspace(adapter);
-
-			/* Stop tdls timers */
-			vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink,
+				/* Stop tdls timers */
+				vdev = hdd_objmgr_get_vdev_by_user(link_info,
 							   WLAN_OSIF_TDLS_ID);
-			if (vdev) {
-				hdd_notify_tdls_reset_adapter(vdev);
-				hdd_objmgr_put_vdev_by_user(vdev,
+				if (vdev) {
+					hdd_notify_tdls_reset_adapter(vdev);
+					hdd_objmgr_put_vdev_by_user(vdev,
 							    WLAN_OSIF_TDLS_ID);
+				}
 			}
-		}
 
-		if (value &&
-		    adapter->device_mode == QDF_SAP_MODE) {
-			hdd_medium_assess_ssr_enable_flag();
-			wlan_hdd_netif_queue_control(adapter,
+			if (value &&
+			    adapter->device_mode == QDF_SAP_MODE) {
+				hdd_medium_assess_ssr_enable_flag();
+				wlan_hdd_netif_queue_control(adapter,
 						     WLAN_STOP_ALL_NETIF_QUEUE,
 						     WLAN_CONTROL_PATH);
-		} else {
-			wlan_hdd_netif_queue_control(adapter,
+			} else {
+				wlan_hdd_netif_queue_control(adapter,
 					   WLAN_STOP_ALL_NETIF_QUEUE_N_CARRIER,
 					   WLAN_CONTROL_PATH);
-		}
+			}
 
-		/*
-		 * Clear fc flag if it was set before SSR to avoid TX queues
-		 * permanently stopped after SSR.
-		 * Here WLAN_START_ALL_NETIF_QUEUE will actually not start any
-		 * queue since it's blocked by reason WLAN_CONTROL_PATH.
-		 */
-		if (adapter->pause_map & (1 << WLAN_DATA_FLOW_CONTROL))
-			wlan_hdd_netif_queue_control(adapter,
+			/*
+			 * Clear fc flag if it was set before SSR to avoid
+			 * TX queues permanently stopped after SSR.
+			 * Here WLAN_START_ALL_NETIF_QUEUE will actually
+			 * not start any queue since it's blocked by reason
+			 * WLAN_CONTROL_PATH.
+			 */
+			if (adapter->pause_map & (1 << WLAN_DATA_FLOW_CONTROL))
+				wlan_hdd_netif_queue_control(adapter,
 						     WLAN_START_ALL_NETIF_QUEUE,
 						     WLAN_DATA_FLOW_CONTROL);
 
-		hdd_reset_scan_operation(hdd_ctx, adapter);
+			hdd_reset_scan_operation(hdd_ctx, adapter);
 
-		if (test_bit(WMM_INIT_DONE, &adapter->event_flags)) {
-			hdd_wmm_adapter_close(adapter);
-			clear_bit(WMM_INIT_DONE, &adapter->event_flags);
+			if (test_bit(WMM_INIT_DONE, &adapter->event_flags)) {
+				hdd_wmm_adapter_close(adapter);
+				clear_bit(WMM_INIT_DONE, &adapter->event_flags);
+			}
+
+			hdd_debug("Flush any mgmt references held by peer");
+			hdd_stop_adapter(hdd_ctx, adapter);
 		}
-
-		hdd_debug("Flush any mgmt references held by peer");
-		hdd_stop_adapter(hdd_ctx, adapter);
 		hdd_adapter_dev_put_debug(adapter,
 					  NET_DEV_HOLD_RESET_ALL_ADAPTERS);
 	}
@@ -16975,21 +16978,20 @@ void wlan_hdd_auto_shutdown_enable(struct hdd_context *hdd_ctx, bool enable)
 	}
 
 	/* To enable shutdown timer check conncurrency */
-	if (policy_mgr_concurrent_open_sessions_running(hdd_ctx->psoc)) {
-		hdd_for_each_adapter_dev_held_safe(hdd_ctx, adapter,
-						   next_adapter, dbgid) {
-			link_info = adapter->deflink;
-			if (adapter->device_mode == QDF_STA_MODE) {
-				if (hdd_cm_is_vdev_associated(link_info)) {
-					sta_connected = true;
-					hdd_adapter_dev_put_debug(adapter,
+	if (!policy_mgr_concurrent_open_sessions_running(hdd_ctx->psoc))
+		goto start_timer;
+
+	hdd_for_each_adapter_dev_held_safe(hdd_ctx, adapter,
+					   next_adapter, dbgid) {
+		hdd_adapter_for_each_active_link_info(adapter, link_info) {
+			if (adapter->device_mode == QDF_STA_MODE &&
+			    hdd_cm_is_vdev_associated(link_info)) {
+				sta_connected = true;
+				hdd_adapter_dev_put_debug(adapter, dbgid);
+				if (next_adapter)
+					hdd_adapter_dev_put_debug(next_adapter,
 								  dbgid);
-					if (next_adapter)
-						hdd_adapter_dev_put_debug(
-								next_adapter,
-								dbgid);
-					break;
-				}
+				break;
 			}
 
 			if (adapter->device_mode == QDF_SAP_MODE) {
@@ -17005,10 +17007,11 @@ void wlan_hdd_auto_shutdown_enable(struct hdd_context *hdd_ctx, bool enable)
 					break;
 				}
 			}
-			hdd_adapter_dev_put_debug(adapter, dbgid);
 		}
+		hdd_adapter_dev_put_debug(adapter, dbgid);
 	}
 
+start_timer:
 	if (ap_connected == true || sta_connected == true) {
 		hdd_debug("CC Session active. Shutdown timer not enabled");
 		return;
