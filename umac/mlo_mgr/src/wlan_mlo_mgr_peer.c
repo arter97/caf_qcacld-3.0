@@ -1296,6 +1296,8 @@ void wlan_mlo_peer_get_partner_links_info(struct wlan_objmgr_peer *peer,
 
 		ix = ml_links->num_partner_links;
 		ml_links->partner_link_info[ix].link_id = peer_entry->link_ix;
+		ml_links->partner_link_info[ix].is_bridge =
+		   (wlan_peer_get_peer_type(link_peer) == WLAN_PEER_MLO_BRIDGE);
 
 		qdf_copy_macaddr(&ml_links->partner_link_info[ix].link_addr,
 				 &peer_entry->link_addr);
