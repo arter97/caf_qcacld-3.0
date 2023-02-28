@@ -1587,6 +1587,7 @@ hdd_suspend_wlan(void)
 	QDF_STATUS status;
 	struct hdd_adapter *adapter = NULL, *next_adapter = NULL;
 	uint32_t conn_state_mask = 0;
+	struct wlan_hdd_link_info *link_info;
 
 	hdd_info("WLAN being suspended by OS");
 
@@ -1602,18 +1603,18 @@ hdd_suspend_wlan(void)
 
 	hdd_for_each_adapter_dev_held_safe(hdd_ctx, adapter, next_adapter,
 					   NET_DEV_HOLD_SUSPEND_WLAN) {
-		if (wlan_hdd_validate_vdev_id(adapter->deflink->vdev_id)) {
-			hdd_adapter_dev_put_debug(adapter,
-						  NET_DEV_HOLD_SUSPEND_WLAN);
-			continue;
+		hdd_adapter_for_each_active_link_info(adapter, link_info) {
+			if (wlan_hdd_validate_vdev_id(link_info->vdev_id))
+				continue;
+
+			if (adapter->device_mode == QDF_STA_MODE)
+				status = hdd_enable_default_pkt_filters(
+						hdd_ctx, link_info->vdev_id);
+
+			/* Configure supported OffLoads */
+			hdd_enable_host_offloads(adapter, pmo_apps_suspend);
+			hdd_update_conn_state_mask(adapter, &conn_state_mask);
 		}
-
-		if (adapter->device_mode == QDF_STA_MODE)
-			status = hdd_enable_default_pkt_filters(adapter);
-
-		/* Configure supported OffLoads */
-		hdd_enable_host_offloads(adapter, pmo_apps_suspend);
-		hdd_update_conn_state_mask(adapter, &conn_state_mask);
 		hdd_adapter_dev_put_debug(adapter, NET_DEV_HOLD_SUSPEND_WLAN);
 	}
 
@@ -1643,6 +1644,7 @@ static int hdd_resume_wlan(void)
 	struct hdd_context *hdd_ctx;
 	struct hdd_adapter *adapter, *next_adapter = NULL;
 	QDF_STATUS status;
+	struct wlan_hdd_link_info *link_info;
 
 	hdd_info("WLAN being resumed by OS");
 
@@ -1662,19 +1664,19 @@ static int hdd_resume_wlan(void)
 	/*loop through all adapters. Concurrency */
 	hdd_for_each_adapter_dev_held_safe(hdd_ctx, adapter, next_adapter,
 					   NET_DEV_HOLD_RESUME_WLAN) {
-		if (wlan_hdd_validate_vdev_id(adapter->deflink->vdev_id)) {
-			hdd_adapter_dev_put_debug(adapter,
-						  NET_DEV_HOLD_RESUME_WLAN);
-			continue;
+		hdd_adapter_for_each_active_link_info(adapter, link_info) {
+			if (wlan_hdd_validate_vdev_id(link_info->vdev_id))
+				continue;
+
+			/* Disable supported OffLoads */
+			hdd_disable_host_offloads(adapter, pmo_apps_resume);
+
+			if (adapter->device_mode == QDF_STA_MODE)
+				status = hdd_disable_default_pkt_filters(
+						hdd_ctx, link_info->vdev_id);
+
+			hdd_restart_tsf_sync_post_wlan_resume(adapter);
 		}
-
-		/* Disable supported OffLoads */
-		hdd_disable_host_offloads(adapter, pmo_apps_resume);
-
-		if (adapter->device_mode == QDF_STA_MODE)
-			status = hdd_disable_default_pkt_filters(adapter);
-
-		hdd_restart_tsf_sync_post_wlan_resume(adapter);
 		hdd_adapter_dev_put_debug(adapter, NET_DEV_HOLD_RESUME_WLAN);
 	}
 
