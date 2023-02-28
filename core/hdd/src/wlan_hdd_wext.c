@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2011-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -8460,48 +8460,55 @@ static int printk_adapter(void *priv, const char *fmt, ...)
 	return ret;
 }
 
-static void hdd_ioctl_log_buffer(int log_id, uint32_t count)
+static void hdd_ioctl_log_buffer(int log_id, uint32_t count, qdf_abstract_print
+							     *custom_print,
+							     void *print_ctx)
 {
-	qdf_abstract_print *print = &printk_adapter;
+	qdf_abstract_print *print;
 
+	if (custom_print)
+		print = custom_print;
+	else
+		print = &printk_adapter;
 	switch (log_id) {
 	case HTC_CREDIT_HISTORY_LOG:
-		cds_print_htc_credit_history(count, print, NULL);
+		cds_print_htc_credit_history(count, print, print_ctx);
 		break;
 	case COMMAND_LOG:
-		wma_print_wmi_cmd_log(count, print, NULL);
+		wma_print_wmi_cmd_log(count, print, print_ctx);
 		break;
 	case COMMAND_TX_CMP_LOG:
-		wma_print_wmi_cmd_tx_cmp_log(count, print, NULL);
+		wma_print_wmi_cmd_tx_cmp_log(count, print, print_ctx);
 		break;
 	case MGMT_COMMAND_LOG:
-		wma_print_wmi_mgmt_cmd_log(count, print, NULL);
+		wma_print_wmi_mgmt_cmd_log(count, print, print_ctx);
 		break;
 	case MGMT_COMMAND_TX_CMP_LOG:
-		wma_print_wmi_mgmt_cmd_tx_cmp_log(count, print, NULL);
+		wma_print_wmi_mgmt_cmd_tx_cmp_log(count, print, print_ctx);
 		break;
 	case EVENT_LOG:
-		wma_print_wmi_event_log(count, print, NULL);
+		wma_print_wmi_event_log(count, print, print_ctx);
 		break;
 	case RX_EVENT_LOG:
-		wma_print_wmi_rx_event_log(count, print, NULL);
+		wma_print_wmi_rx_event_log(count, print, print_ctx);
 		break;
 	case MGMT_EVENT_LOG:
-		wma_print_wmi_mgmt_event_log(count, print, NULL);
+		wma_print_wmi_mgmt_event_log(count, print, print_ctx);
 		break;
 	default:
-		print(NULL, "Invalid Log Id %d", log_id);
+		print(print_ctx, "Invalid Log Id %d", log_id);
 		break;
 	}
 }
 
 #ifdef WLAN_DUMP_LOG_BUF_CNT
-void hdd_dump_log_buffer(void)
+void hdd_dump_log_buffer(void *print_ctx, qdf_abstract_print *custom_print)
 {
 	int i;
 
 	for (i = 0; i <= MGMT_EVENT_LOG; i++)
-		hdd_ioctl_log_buffer(i, WLAN_DUMP_LOG_BUF_CNT);
+		hdd_ioctl_log_buffer(i, WLAN_DUMP_LOG_BUF_CNT, custom_print,
+				     print_ctx);
 }
 #endif
 
@@ -8609,7 +8616,7 @@ static int __iw_set_two_ints_getnone(struct net_device *dev,
 		int log_id = value[1];
 		uint32_t count = value[2] < 0 ? 0 : value[2];
 
-		hdd_ioctl_log_buffer(log_id, count);
+		hdd_ioctl_log_buffer(log_id, count, NULL, NULL);
 
 		break;
 	}

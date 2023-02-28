@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -347,13 +347,17 @@ void hdd_wext_send_event(struct net_device *dev, unsigned int cmd,
 #ifdef WLAN_DUMP_LOG_BUF_CNT
 /**
  * hdd_dump_log_buffer() - dump log buffer history
+ * @print_ctx: print context for custom print function
+ * @custom_print: custom print function pointer
+ *
+ * If custom print function is NULL, will default to printk
  *
  * Return: None
  */
-void hdd_dump_log_buffer(void);
+void hdd_dump_log_buffer(void *print_ctx, qdf_abstract_print *custom_print);
 #else
 static inline
-void hdd_dump_log_buffer(void)
+void hdd_dump_log_buffer(void *print_ctx, qdf_abstract_print *custom_print)
 {
 }
 #endif
