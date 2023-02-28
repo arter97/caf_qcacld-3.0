@@ -3612,7 +3612,7 @@ int hdd_update_components_config(struct hdd_context *hdd_ctx);
 
 /**
  * hdd_chan_change_notify() - Function to notify hostapd about channel change
- * @adapter:		hostapd adapter
+ * @link_info:          Link info pointer in HDD adapter
  * @dev:		Net device structure
  * @chan_change:	New channel change parameters
  * @legacy_phymode:	is the phymode legacy
@@ -3622,10 +3622,11 @@ int hdd_update_components_config(struct hdd_context *hdd_ctx);
  * Return: Success on intimating userspace
  *
  */
-QDF_STATUS hdd_chan_change_notify(struct hdd_adapter *adapter,
-		struct net_device *dev,
-		struct hdd_chan_change_params chan_change,
-		bool legacy_phymode);
+QDF_STATUS hdd_chan_change_notify(struct wlan_hdd_link_info *link_info,
+				  struct net_device *dev,
+				  struct hdd_chan_change_params chan_change,
+				  bool legacy_phymode);
+
 int wlan_hdd_set_channel(struct wiphy *wiphy,
 		struct net_device *dev,
 		struct cfg80211_chan_def *chandef,

@@ -2180,16 +2180,18 @@ hdd_indicate_ese_bcn_report_ind(const struct hdd_adapter *adapter,
 
 /*
  * hdd_roam_channel_switch_handler() - hdd channel switch handler
- * @adapter: Pointer to adapter context
+ * @link_info: Link info pointer in HDD adapter
  * @roam_info: Pointer to roam info
  *
  * Return: None
  */
-static void hdd_roam_channel_switch_handler(struct hdd_adapter *adapter,
-					    struct csr_roam_info *roam_info)
+static void
+hdd_roam_channel_switch_handler(struct wlan_hdd_link_info *link_info,
+				struct csr_roam_info *roam_info)
 {
 	struct hdd_chan_change_params chan_change = {0};
 	QDF_STATUS status;
+	struct hdd_adapter *adapter = link_info->adapter;
 	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
 	mac_handle_t mac_handle;
 	struct hdd_station_ctx *sta_ctx;
@@ -2203,11 +2205,11 @@ static void hdd_roam_channel_switch_handler(struct hdd_adapter *adapter,
 
 	/* Enable Roaming on STA interface which was disabled before CSA */
 	if (adapter->device_mode == QDF_STA_MODE)
-		sme_start_roaming(mac_handle, adapter->deflink->vdev_id,
+		sme_start_roaming(mac_handle, link_info->vdev_id,
 				  REASON_DRIVER_ENABLED,
 				  RSO_CHANNEL_SWITCH);
 
-	sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter->deflink);
+	sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(link_info);
 	if (sta_ctx) {
 		sta_ctx->conn_info.chan_freq = roam_info->chan_info.mhz;
 		sta_ctx->conn_info.ch_width = roam_info->chan_info.ch_width;
@@ -2223,7 +2225,7 @@ static void hdd_roam_channel_switch_handler(struct hdd_adapter *adapter,
 	chan_change.chan_params.mhz_freq_seg1 =
 		roam_info->chan_info.band_center_freq2;
 
-	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink, WLAN_OSIF_ID);
+	vdev = hdd_objmgr_get_vdev_by_user(link_info, WLAN_OSIF_ID);
 	if (!vdev) {
 		hdd_err("Invalid vdev");
 		return;
@@ -2235,13 +2237,13 @@ static void hdd_roam_channel_switch_handler(struct hdd_adapter *adapter,
 				hdd_ctx->pdev, sta_ctx->conn_info.bssid.bytes,
 				&connected_vdev))
 			notify = false;
-		else if (adapter->deflink->vdev_id != connected_vdev ||
+		else if (link_info->vdev_id != connected_vdev ||
 			 !ucfg_cm_is_vdev_active(vdev))
 			notify = false;
 	}
 	if (notify) {
-		status = hdd_chan_change_notify(adapter, adapter->dev,
-						chan_change,
+		status = hdd_chan_change_notify(link_info,
+						adapter->dev, chan_change,
 						roam_info->mode ==
 						SIR_SME_PHY_MODE_LEGACY);
 		if (QDF_IS_STATUS_ERROR(status))
@@ -2249,10 +2251,10 @@ static void hdd_roam_channel_switch_handler(struct hdd_adapter *adapter,
 	} else {
 		hdd_err("BSS "QDF_MAC_ADDR_FMT" no connected with vdev %d (%d)",
 			QDF_MAC_ADDR_REF(sta_ctx->conn_info.bssid.bytes),
-			adapter->deflink->vdev_id, connected_vdev);
+			link_info->vdev_id, connected_vdev);
 	}
 	status = policy_mgr_set_hw_mode_on_channel_switch(hdd_ctx->psoc,
-		adapter->deflink->vdev_id);
+							  link_info->vdev_id);
 	if (QDF_IS_STATUS_ERROR(status))
 		hdd_debug("set hw mode change not done");
 
@@ -2263,12 +2265,12 @@ static void hdd_roam_channel_switch_handler(struct hdd_adapter *adapter,
 	if (!is_sap_go_moved_before_sta)
 		policy_mgr_check_concurrent_intf_and_restart_sap(
 		   hdd_ctx->psoc,
-		   !!adapter->deflink->session.ap.sap_config.acs_cfg.acs_mode);
+		   !!link_info->session.ap.sap_config.acs_cfg.acs_mode);
 
 	wlan_twt_concurrency_update(hdd_ctx);
 	if (adapter->device_mode == QDF_STA_MODE ||
 	    adapter->device_mode == QDF_P2P_CLIENT_MODE) {
-		vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink,
+		vdev = hdd_objmgr_get_vdev_by_user(link_info,
 						   WLAN_OSIF_ID);
 		if (!vdev)
 			return;
@@ -2368,7 +2370,7 @@ QDF_STATUS hdd_sme_roam_callback(void *context,
 	}
 #endif /* FEATURE_WLAN_ESE */
 	case eCSR_ROAM_STA_CHANNEL_SWITCH:
-		hdd_roam_channel_switch_handler(adapter, roam_info);
+		hdd_roam_channel_switch_handler(link_info, roam_info);
 		break;
 
 	case eCSR_ROAM_NDP_STATUS_UPDATE:

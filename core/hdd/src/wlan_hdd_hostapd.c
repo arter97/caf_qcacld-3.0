@@ -959,15 +959,16 @@ wlan_hdd_get_puncture_bitmap(struct hdd_chan_change_params chan_change)
 }
 #endif /* WLAN_FEATURE_11BE */
 
-QDF_STATUS hdd_chan_change_notify(struct hdd_adapter *adapter,
-		struct net_device *dev,
-		struct hdd_chan_change_params chan_change,
-		bool legacy_phymode)
+QDF_STATUS hdd_chan_change_notify(struct wlan_hdd_link_info *link_info,
+				  struct net_device *dev,
+				  struct hdd_chan_change_params chan_change,
+				  bool legacy_phymode)
 {
 	struct ieee80211_channel *chan;
 	struct cfg80211_chan_def chandef;
 	enum nl80211_channel_type channel_type;
 	uint32_t freq;
+	struct hdd_adapter *adapter = link_info->adapter;
 	mac_handle_t mac_handle = adapter->hdd_ctx->mac_handle;
 	struct wlan_objmgr_vdev *vdev;
 	uint16_t link_id = 0;
@@ -980,7 +981,6 @@ QDF_STATUS hdd_chan_change_notify(struct hdd_adapter *adapter,
 	}
 
 	freq = chan_change.chan_freq;
-
 	chan = ieee80211_get_channel(adapter->wdev.wiphy, freq);
 
 	if (!chan) {
@@ -1043,7 +1043,7 @@ QDF_STATUS hdd_chan_change_notify(struct hdd_adapter *adapter,
 				chan_change.chan_params.mhz_freq_seg0;
 	}
 
-	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink, WLAN_OSIF_ID);
+	vdev = hdd_objmgr_get_vdev_by_user(link_info, WLAN_OSIF_ID);
 	if (!vdev)
 		return -EINVAL;
 
@@ -1749,23 +1749,24 @@ hdd_fill_channel_change_puncture(struct hdd_chan_change_params *chan_change,
 
 /**
  * hdd_hostapd_chan_change() - prepare new operation chan info to kernel
- * @adapter: pointre to hdd_adapter
+ * @link_info: Link info pointer in HDD adapter
  * @sap_event: pointer to sap_event
  *
  * Return: QDF_STATUS
  */
-static QDF_STATUS hdd_hostapd_chan_change(struct hdd_adapter *adapter,
+static QDF_STATUS hdd_hostapd_chan_change(struct wlan_hdd_link_info *link_info,
 					  struct sap_event *sap_event)
 {
 	struct hdd_chan_change_params chan_change = {0};
 	struct ch_params sap_ch_param = {0};
 	eCsrPhyMode phy_mode;
 	bool legacy_phymode;
+	struct hdd_adapter *adapter = link_info->adapter;
 	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
 	struct sap_ch_selected_s *sap_chan_selected =
 			&sap_event->sapevt.sap_ch_selected;
 	struct sap_config *sap_config =
-				&adapter->deflink->session.ap.sap_config;
+				&link_info->session.ap.sap_config;
 
 	sap_ch_param.ch_width = sap_chan_selected->ch_width;
 	sap_ch_param.mhz_freq_seg0 =
@@ -1782,7 +1783,7 @@ static QDF_STATUS hdd_hostapd_chan_change(struct hdd_adapter *adapter,
 		&sap_ch_param, REG_CURRENT_PWR_MODE);
 
 	phy_mode = wlan_sap_get_phymode(
-			WLAN_HDD_GET_SAP_CTX_PTR(adapter->deflink));
+			WLAN_HDD_GET_SAP_CTX_PTR(link_info));
 
 	switch (phy_mode) {
 	case eCSR_DOT11_MODE_11n:
@@ -1810,7 +1811,7 @@ static QDF_STATUS hdd_hostapd_chan_change(struct hdd_adapter *adapter,
 			sap_chan_selected->vht_seg1_center_ch_freq;
 	hdd_fill_channel_change_puncture(&chan_change, &sap_ch_param);
 
-	return hdd_chan_change_notify(adapter, adapter->dev,
+	return hdd_chan_change_notify(link_info, adapter->dev,
 				      chan_change, legacy_phymode);
 }
 
@@ -2974,7 +2975,7 @@ QDF_STATUS hdd_hostapd_sap_event_cb(struct sap_event *sap_event,
 
 		hdd_son_deliver_chan_change_event(
 			adapter, sap_event->sapevt.sap_ch_selected.pri_ch_freq);
-		return hdd_hostapd_chan_change(adapter, sap_event);
+		return hdd_hostapd_chan_change(link_info, sap_event);
 	case eSAP_ACS_SCAN_SUCCESS_EVENT:
 		return hdd_handle_acs_scan_event(sap_event, adapter);
 
@@ -3065,7 +3066,7 @@ QDF_STATUS hdd_hostapd_sap_event_cb(struct sap_event *sap_event,
 		if (!QDF_IS_STATUS_SUCCESS(qdf_status))
 			hdd_err("qdf_event_set failed! status: %d",
 				qdf_status);
-		return hdd_hostapd_chan_change(adapter, sap_event);
+		return hdd_hostapd_chan_change(link_info, sap_event);
 	default:
 		hdd_debug("SAP message is not handled");
 		goto stopbss;
