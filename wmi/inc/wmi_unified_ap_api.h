@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2013-2018,2020-2021 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -87,6 +88,17 @@ QDF_STATUS wmi_unified_set_vht_ie_cmd_send(wmi_unified_t wmi_handle,
  */
 QDF_STATUS wmi_unified_set_ctl_table_cmd_send(wmi_unified_t wmi_handle,
 					      struct ctl_table_params *param);
+
+/**
+ *  wmi_unified_set_sta_max_pwr_table_cmd_send() - WMI sta max Tx pwr cmd function
+ *  @wmi_handle: handle to WMI.
+ *  @param: pointer to hold sta max table param
+ *
+ *  Return: QDF_STATUS_SUCCESS on success and QDF_STATUS_E_FAILURE for failure
+ */
+QDF_STATUS wmi_unified_set_sta_max_pwr_table_cmd_send(
+		wmi_unified_t wmi_handle,
+		struct sta_max_pwr_table_params *param);
 
 /**
  *  wmi_unified_set_mimogain_table_cmd_send() - WMI set mimogain cmd function

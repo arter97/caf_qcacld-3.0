@@ -467,6 +467,78 @@ send_set_ctl_table_cmd_tlv(wmi_unified_t wmi_handle,
 }
 
 /**
+ * send_set_sta_max_pwr_table_cmd_tlv() - send each sta max pwr table cmd to fw
+ * @wmi_handle: wmi handle
+ * @param: pointer to hold sta max pwr table param
+ *
+ * @return QDF_STATUS_SUCCESS  on success and -ve on failure.
+ */
+static QDF_STATUS
+send_set_sta_max_pwr_table_cmd_tlv(wmi_unified_t wmi_handle,
+				   struct sta_max_pwr_table_params *param)
+{
+	wmi_peer_bulk_set_cmd_fixed_param *cmd;
+	wmi_peer_list *wmi_peer;
+	struct sta_peer_table_list *tmp_peer_list;
+	wmi_buf_t buf;
+	int32_t len, i, err;
+	uint8_t *buf_ptr;
+
+	len = sizeof(*cmd) + WMI_TLV_HDR_SIZE;
+	len += sizeof(wmi_peer_list) * param->num_peers;
+	buf = wmi_buf_alloc(wmi_handle, len);
+	if (!buf)
+		return QDF_STATUS_E_NOMEM;
+
+	buf_ptr = (uint8_t *)wmi_buf_data(buf);
+	qdf_mem_zero(buf_ptr, len);
+
+	cmd = (wmi_peer_bulk_set_cmd_fixed_param *)buf_ptr;
+
+	WMITLV_SET_HDR(&cmd->tlv_header,
+		       WMITLV_TAG_STRUC_wmi_peer_bulk_set_cmd_fixed_param,
+		       WMITLV_GET_STRUCT_TLVLEN
+				(wmi_peer_bulk_set_cmd_fixed_param));
+
+	/*
+	* Vdev id is not known set it to zero. The FW will find the vdev
+	* for the peer if needed.
+	*/
+	cmd->vdev_var = 0;
+	WMITLV_SET_HDR((buf_ptr +
+			       sizeof(wmi_peer_bulk_set_cmd_fixed_param)),
+			       WMITLV_TAG_ARRAY_STRUC,
+			       sizeof(wmi_peer_list) * param->num_peers);
+	wmi_peer = (wmi_peer_list *)(buf_ptr + sizeof(*cmd) + WMI_TLV_HDR_SIZE);
+
+	for (i = 0; i < param->num_peers; i++) {
+		WMITLV_SET_HDR(&wmi_peer->tlv_header,
+			       WMITLV_TAG_STRUC_wmi_peer_list,
+			       WMITLV_GET_STRUCT_TLVLEN(wmi_peer_list));
+		tmp_peer_list = param->peer_list + i;
+		if (!tmp_peer_list)
+			return QDF_STATUS_E_FAILURE;
+
+		WMI_CHAR_ARRAY_TO_MAC_ADDR(tmp_peer_list->peer_macaddr,
+					   &wmi_peer->peer_macaddr);
+		wmi_peer->param_id = WMI_PEER_USE_FIXED_PWR;
+		wmi_peer->param_value = tmp_peer_list->peer_pwr_limit;
+		wmi_peer++;
+	}
+
+	err = wmi_unified_cmd_send(wmi_handle, buf,
+				   len,
+				   WMI_PEER_BULK_SET_CMDID);
+	if (err) {
+		wmi_err("Failed to send set_param cmd");
+		wmi_buf_free(buf);
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	return 0;
+}
+
+/**
  * send_set_mimogain_table_cmd_tlv() - send mimogain table cmd to fw
  * @wmi_handle: wmi handle
  * @param: pointer to hold mimogain table param
@@ -3894,6 +3966,8 @@ void wmi_ap_attach_tlv(wmi_unified_t wmi_handle)
 					send_peer_update_wds_entry_cmd_tlv;
 	ops->send_pdev_get_tpc_config_cmd = send_pdev_get_tpc_config_cmd_tlv;
 	ops->send_set_ctl_table_cmd = send_set_ctl_table_cmd_tlv;
+	ops->send_set_sta_max_pwr_table_cmd =
+					send_set_sta_max_pwr_table_cmd_tlv;
 	ops->send_set_mimogain_table_cmd = send_set_mimogain_table_cmd_tlv;
 	ops->send_packet_power_info_get_cmd =
 					send_packet_power_info_get_cmd_tlv;
