@@ -43,6 +43,11 @@
 #define CHANNEL_SWITCH_COMPLETE_TIMEOUT   (2000)
 #define MAX_NOA_TIME (3000)
 
+/* Defer SAP force SCC check by 2000ms due to another SAP/GO start AP in
+ * progress
+ */
+#define SAP_CONC_CHECK_DEFER_TIMEOUT_MS (2000)
+
 /*
  * Policy Mgr hardware mode list bit-mask definitions.
  * Bits 4:0, 31:29 are unused.
