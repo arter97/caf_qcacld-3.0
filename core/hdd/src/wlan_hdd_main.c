@@ -5198,12 +5198,13 @@ static int __hdd_open(struct net_device *dev)
 	struct hdd_adapter *adapter = WLAN_HDD_GET_PRIV_PTR(dev);
 	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
 	int ret;
+	struct wlan_hdd_link_info *link_info = adapter->deflink;
 
 	hdd_enter_dev(dev);
 
 	qdf_mtrace(QDF_MODULE_ID_HDD, QDF_MODULE_ID_HDD,
 		   TRACE_CODE_HDD_OPEN_REQUEST,
-		   adapter->deflink->vdev_id, adapter->device_mode);
+		   link_info->vdev_id, adapter->device_mode);
 
 	/* Nothing to be done if device is unloading */
 	if (cds_is_driver_unloading()) {
@@ -5240,7 +5241,7 @@ static int __hdd_open(struct net_device *dev)
 		return ret;
 	}
 
-	if (!test_bit(SME_SESSION_OPENED, &adapter->deflink->link_flags)) {
+	if (!test_bit(SME_SESSION_OPENED, &link_info->link_flags)) {
 		ret = hdd_start_adapter(adapter);
 		if (ret) {
 			hdd_err("Failed to start adapter :%d",
@@ -5250,7 +5251,7 @@ static int __hdd_open(struct net_device *dev)
 	}
 
 	set_bit(DEVICE_IFACE_OPENED, &adapter->event_flags);
-	if (hdd_cm_is_vdev_associated(adapter->deflink)) {
+	if (hdd_cm_is_vdev_associated(link_info)) {
 		hdd_debug("Enabling Tx Queues");
 		/* Enable TX queues only when we are connected */
 		wlan_hdd_netif_queue_control(adapter,
@@ -5267,7 +5268,7 @@ static int __hdd_open(struct net_device *dev)
 	}
 
 	hdd_populate_wifi_pos_cfg(hdd_ctx);
-	hdd_lpass_notify_start(hdd_ctx, adapter);
+	hdd_lpass_notify_start(link_info);
 
 	if (ucfg_pkt_capture_get_mode(hdd_ctx->psoc) !=
 				      PACKET_CAPTURE_MODE_DISABLE)
@@ -9634,7 +9635,7 @@ QDF_STATUS hdd_start_all_adapters(struct hdd_context *hdd_ctx)
 					adapter,
 					hdd_tx_resume_timer_expired_handler);
 
-			hdd_lpass_notify_start(hdd_ctx, adapter);
+			hdd_lpass_notify_start(adapter->deflink);
 			break;
 
 		case QDF_SAP_MODE:

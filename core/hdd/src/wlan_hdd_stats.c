@@ -6586,7 +6586,7 @@ static int wlan_hdd_get_sta_stats(struct wlan_hdd_link_info *link_info,
 	 * actual connection.  lpass will ensure the notification is
 	 * only processed once per association.
 	 */
-	hdd_lpass_notify_connect(adapter);
+	hdd_lpass_notify_connect(link_info);
 
 	if (wlan_hdd_update_rate_info(link_info, sinfo))
 		/* Keep GUI happy */

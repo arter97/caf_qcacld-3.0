@@ -21387,7 +21387,7 @@ static int __wlan_hdd_cfg80211_change_iface(struct wiphy *wiphy,
 
 	if (hdd_is_client_mode(adapter->device_mode)) {
 		if (adapter->device_mode == QDF_STA_MODE)
-			hdd_cleanup_conn_info(adapter->deflink);
+			hdd_cleanup_conn_info(link_info);
 
 		if (hdd_is_client_mode(new_mode)) {
 			errno = hdd_change_adapter_mode(adapter, new_mode);
@@ -21498,7 +21498,7 @@ static int __wlan_hdd_cfg80211_change_iface(struct wiphy *wiphy,
 	}
 
 	ndev->ieee80211_ptr->iftype = type;
-	hdd_lpass_notify_mode_change(adapter);
+	hdd_lpass_notify_mode_change(link_info);
 err:
 	/* Set bitmask based on updated value */
 	policy_mgr_set_concurrency_mode(hdd_ctx->psoc, adapter->device_mode);

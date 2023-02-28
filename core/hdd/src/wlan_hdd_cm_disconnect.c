@@ -74,7 +74,7 @@ void hdd_handle_disassociation_event(struct wlan_hdd_link_info *link_info,
 						link_info->vdev_id, NULL,
 						adapter->device_mode);
 
-	hdd_lpass_notify_disconnect(adapter);
+	hdd_lpass_notify_disconnect(link_info);
 
 	vdev = hdd_objmgr_get_vdev_by_user(link_info, WLAN_DP_ID);
 	if (vdev) {
