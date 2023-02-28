@@ -3318,6 +3318,21 @@ static void hal_reo_shared_qaddr_write_be(hal_soc_handle_t hal_soc_hdl,
 			  reo_qref->rx_reo_queue_desc_addr_39_32);
 }
 
+#ifdef BIG_ENDIAN_HOST
+static inline void hal_reo_shared_qaddr_enable(struct hal_soc *hal)
+{
+	HAL_REG_WRITE(hal, HWIO_REO_R0_QDESC_ADDR_READ_ADDR(REO_REG_REG_BASE),
+		      HAL_SM(HWIO_REO_R0_QDESC_ADDR_READ, GXI_SWAP, 1) |
+		      HAL_SM(HWIO_REO_R0_QDESC_ADDR_READ, LUT_FEATURE_ENABLE, 1));
+}
+#else
+static inline void hal_reo_shared_qaddr_enable(struct hal_soc *hal)
+{
+	HAL_REG_WRITE(hal, HWIO_REO_R0_QDESC_ADDR_READ_ADDR(REO_REG_REG_BASE),
+		      HAL_SM(HWIO_REO_R0_QDESC_ADDR_READ, LUT_FEATURE_ENABLE, 1));
+}
+#endif
+
 /**
  * hal_reo_shared_qaddr_setup_be() - Allocate MLO and Non MLO reo queue
  * reference table shared between SW and HW and initialize in Qdesc Base0
@@ -3402,10 +3417,7 @@ static void hal_reo_shared_qaddr_init_be(hal_soc_handle_t hal_soc_hdl,
 	HAL_REG_WRITE(hal,
 		      HWIO_REO_R0_QDESC_LUT_BASE1_ADDR_ADDR(REO_REG_REG_BASE),
 		      hal->reo_qref.mlo_reo_qref_table_paddr >> 8);
-	HAL_REG_WRITE(hal,
-		      HWIO_REO_R0_QDESC_ADDR_READ_ADDR(REO_REG_REG_BASE),
-		      HAL_SM(HWIO_REO_R0_QDESC_ADDR_READ, LUT_FEATURE_ENABLE,
-			     1));
+	hal_reo_shared_qaddr_enable(hal);
 	HAL_REG_WRITE(hal,
 		      HWIO_REO_R0_QDESC_MAX_SW_PEER_ID_ADDR(REO_REG_REG_BASE),
 		      HAL_MS(HWIO_REO_R0_QDESC, MAX_SW_PEER_ID_MAX_SUPPORTED,

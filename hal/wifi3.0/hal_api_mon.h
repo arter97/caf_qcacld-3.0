@@ -38,34 +38,34 @@
 #define HAL_RX_TLV32_HDR_SIZE			4
 
 #define HAL_RX_GET_USER_TLV32_TYPE(rx_status_tlv_ptr) \
-		((*((uint32_t *)(rx_status_tlv_ptr)) & \
+		((qdf_le32_to_cpu(*((uint32_t *)(rx_status_tlv_ptr))) & \
 		HAL_RX_USER_TLV32_TYPE_MASK) >> \
 		HAL_RX_USER_TLV32_TYPE_LSB)
 
 #define HAL_RX_GET_USER_TLV32_LEN(rx_status_tlv_ptr) \
-		((*((uint32_t *)(rx_status_tlv_ptr)) & \
+		((qdf_le32_to_cpu(*((uint32_t *)(rx_status_tlv_ptr))) & \
 		HAL_RX_USER_TLV32_LEN_MASK) >> \
 		HAL_RX_USER_TLV32_LEN_LSB)
 
 #define HAL_RX_GET_USER_TLV32_USERID(rx_status_tlv_ptr) \
-		((*((uint32_t *)(rx_status_tlv_ptr)) & \
+		((qdf_le32_to_cpu(*((uint32_t *)(rx_status_tlv_ptr))) & \
 		HAL_RX_USER_TLV32_USERID_MASK) >> \
 		HAL_RX_USER_TLV32_USERID_LSB)
 
 #define HAL_RX_TLV64_HDR_SIZE			8
 
 #define HAL_RX_GET_USER_TLV64_TYPE(rx_status_tlv_ptr) \
-		((*((uint64_t *)(rx_status_tlv_ptr)) & \
+		((qdf_le64_to_cpu(*((uint64_t *)(rx_status_tlv_ptr))) & \
 		HAL_RX_USER_TLV64_TYPE_MASK) >> \
 		HAL_RX_USER_TLV64_TYPE_LSB)
 
 #define HAL_RX_GET_USER_TLV64_LEN(rx_status_tlv_ptr) \
-		((*((uint64_t *)(rx_status_tlv_ptr)) & \
+		((qdf_le64_to_cpu(*((uint64_t *)(rx_status_tlv_ptr))) & \
 		HAL_RX_USER_TLV64_LEN_MASK) >> \
 		HAL_RX_USER_TLV64_LEN_LSB)
 
 #define HAL_RX_GET_USER_TLV64_USERID(rx_status_tlv_ptr) \
-		((*((uint64_t *)(rx_status_tlv_ptr)) & \
+		((qdf_le64_to_cpu(*((uint64_t *)(rx_status_tlv_ptr))) & \
 		HAL_RX_USER_TLV64_USERID_MASK) >> \
 		HAL_RX_USER_TLV64_USERID_LSB)
 
