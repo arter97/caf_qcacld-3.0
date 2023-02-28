@@ -3426,32 +3426,24 @@ hdd_store_nss_chains_cfg_in_vdev(struct hdd_context *hdd_ctx,
 				 struct wlan_objmgr_vdev *vdev);
 
 /**
- * wlan_hdd_disable_roaming() - disable roaming on all STAs except the input one
- * @cur_adapter: Current HDD adapter passed from caller
+ * wlan_hdd_set_roaming_state() - Enable or disable roaming
+ * on all STAs except the input one
+ * @cur_link_info: Current link info pointer in HDD adapter
  * @rso_op_requestor: roam disable requestor
+ * @enab_roam: Set to true to enable roaming or else set false
  *
- * This function loops through all adapters and disables roaming on each STA
- * mode adapter except the current adapter passed from the caller
+ * This function loops through all adapters and enables or
+ * disables roaming on each STA mode adapter except the
+ * current adapter passed from the caller.
+ * If @enab_roam is true, roaming is enabled or else
+ * roaming is disabled
  *
  * Return: None
  */
 void
-wlan_hdd_disable_roaming(struct hdd_adapter *cur_adapter,
-			 enum wlan_cm_rso_control_requestor rso_op_requestor);
-
-/**
- * wlan_hdd_enable_roaming() - enable roaming on all STAs except the input one
- * @cur_adapter: Current HDD adapter passed from caller
- * @rso_op_requestor: roam disable requestor
- *
- * This function loops through all adapters and enables roaming on each STA
- * mode adapter except the current adapter passed from the caller
- *
- * Return: None
- */
-void
-wlan_hdd_enable_roaming(struct hdd_adapter *cur_adapter,
-			enum wlan_cm_rso_control_requestor rso_op_requestor);
+wlan_hdd_set_roaming_state(struct wlan_hdd_link_info *cur_link_info,
+			   enum wlan_cm_rso_control_requestor rso_op_requestor,
+			   bool enab_roam);
 
 QDF_STATUS hdd_post_cds_enable_config(struct hdd_context *hdd_ctx);
 

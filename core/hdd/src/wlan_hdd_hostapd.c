@@ -3040,8 +3040,8 @@ QDF_STATUS hdd_hostapd_sap_event_cb(struct sap_event *sap_event,
 		 */
 		qdf_atomic_set(&ap_ctx->ch_switch_in_progress, 0);
 		policy_mgr_set_chan_switch_complete_evt(hdd_ctx->psoc);
-		wlan_hdd_enable_roaming(adapter,
-					RSO_SAP_CHANNEL_CHANGE);
+		wlan_hdd_set_roaming_state(link_info, RSO_SAP_CHANNEL_CHANGE,
+					   true);
 
 		/* Indoor channels are also marked DFS, therefore
 		 * check if the channel has REGULATORY_CHAN_RADAR
@@ -3376,6 +3376,7 @@ int hdd_softap_set_channel_change(struct net_device *dev, int target_chan_freq,
 	struct wlan_crypto_params crypto_params = {0};
 	bool capable, is_wps;
 	int32_t keymgmt;
+	struct wlan_hdd_link_info *link_info;
 
 	hdd_ctx = WLAN_HDD_GET_CTX(adapter);
 	ret = wlan_hdd_validate_context(hdd_ctx);
@@ -3385,11 +3386,13 @@ int hdd_softap_set_channel_change(struct net_device *dev, int target_chan_freq,
 	if (adapter->device_mode != QDF_SAP_MODE &&
 	    adapter->device_mode != QDF_P2P_GO_MODE)
 		return -EINVAL;
-	sap_ctx = WLAN_HDD_GET_SAP_CTX_PTR(adapter->deflink);
+
+	link_info = adapter->deflink;
+	sap_ctx = WLAN_HDD_GET_SAP_CTX_PTR(link_info);
 	if (!sap_ctx)
 		return -EINVAL;
 
-	ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(adapter->deflink);
+	ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(link_info);
 	/*
 	 * If sta connection is in progress do not allow SAP channel change from
 	 * user space as it may change the HW mode requirement, for which sta is
@@ -3470,7 +3473,7 @@ int hdd_softap_set_channel_change(struct net_device *dev, int target_chan_freq,
 
 	if (!policy_mgr_is_sap_go_interface_allowed_on_indoor(
 						hdd_ctx->pdev,
-						adapter->deflink->vdev_id,
+						link_info->vdev_id,
 						target_chan_freq)) {
 		hdd_debug("Channel switch is not allowed to indoor frequency %d",
 			  target_chan_freq);
@@ -3520,7 +3523,7 @@ int hdd_softap_set_channel_change(struct net_device *dev, int target_chan_freq,
 				policy_mgr_convert_device_mode_to_qdf_type(
 					adapter->device_mode),
 				target_chan_freq, policy_mgr_get_bw(target_bw),
-				adapter->deflink->vdev_id,
+				link_info->vdev_id,
 				forced,
 				sap_ctx->csa_reason)) {
 		hdd_err("Channel switch failed due to concurrency check failure");
@@ -3540,16 +3543,17 @@ int hdd_softap_set_channel_change(struct net_device *dev, int target_chan_freq,
 		return -EINVAL;
 	}
 	/* Disable Roaming on all adapters before doing channel change */
-	wlan_hdd_disable_roaming(adapter, RSO_SAP_CHANNEL_CHANGE);
+	wlan_hdd_set_roaming_state(link_info, RSO_SAP_CHANNEL_CHANGE, false);
 
 	/*
 	 * Post the Channel Change request to SAP.
 	 */
 
-	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink, WLAN_OSIF_ID);
+	vdev = hdd_objmgr_get_vdev_by_user(link_info, WLAN_OSIF_ID);
 	if (!vdev) {
 		qdf_atomic_set(&ap_ctx->ch_switch_in_progress, 0);
-		wlan_hdd_enable_roaming(adapter, RSO_SAP_CHANNEL_CHANGE);
+		wlan_hdd_set_roaming_state(link_info, RSO_SAP_CHANNEL_CHANGE,
+					   true);
 		return -EINVAL;
 	}
 	if (wlan_vdev_mlme_get_opmode(vdev) == QDF_P2P_GO_MODE)
@@ -3564,10 +3568,8 @@ int hdd_softap_set_channel_change(struct net_device *dev, int target_chan_freq,
 	strict = strict || forced;
 	hdd_place_marker(adapter, "CHANNEL CHANGE", NULL);
 	status = wlansap_set_channel_change_with_csa(
-		WLAN_HDD_GET_SAP_CTX_PTR(adapter->deflink),
-		target_chan_freq,
-		target_bw,
-		strict);
+		WLAN_HDD_GET_SAP_CTX_PTR(link_info),
+		target_chan_freq, target_bw, strict);
 
 	if (QDF_STATUS_SUCCESS != status) {
 		hdd_err("SAP set channel failed for channel freq: %d, bw: %d",
@@ -3583,8 +3585,8 @@ int hdd_softap_set_channel_change(struct net_device *dev, int target_chan_freq,
 		 * If Posting of the Channel Change request fails
 		 * enable roaming on all adapters
 		 */
-		wlan_hdd_enable_roaming(adapter,
-					RSO_SAP_CHANNEL_CHANGE);
+		wlan_hdd_set_roaming_state(link_info, RSO_SAP_CHANNEL_CHANGE,
+					   true);
 
 		ret = -EINVAL;
 	}
@@ -4395,7 +4397,8 @@ void hdd_deinit_ap_mode(struct hdd_context *hdd_ctx,
 		policy_mgr_set_chan_switch_complete_evt(hdd_ctx->psoc);
 
 		/* Re-enable roaming on all connected STA vdev */
-		wlan_hdd_enable_roaming(adapter, RSO_SAP_CHANNEL_CHANGE);
+		wlan_hdd_set_roaming_state(adapter->deflink,
+					   RSO_SAP_CHANNEL_CHANGE, true);
 	}
 
 	if (hdd_hostapd_deinit_sap_session(adapter))

@@ -1573,10 +1573,10 @@ void hdd_indicate_active_ndp_cnt(struct wlan_objmgr_psoc *psoc,
 	hdd_debug("vdev_id:%d%s active ndp sessions present", vdev_id,
 		  cnt ? "" : " no more");
 	if (!cnt)
-		wlan_hdd_enable_roaming(link_info->adapter, RSO_NDP_CON_ON_NDI);
+		wlan_hdd_set_roaming_state(link_info, RSO_NDP_CON_ON_NDI, true);
 	else
-		wlan_hdd_disable_roaming(link_info->adapter,
-					 RSO_NDP_CON_ON_NDI);
+		wlan_hdd_set_roaming_state(link_info, RSO_NDP_CON_ON_NDI,
+					   false);
 }
 
 #ifdef WLAN_FEATURE_ROAM_OFFLOAD
@@ -16782,58 +16782,41 @@ void hdd_softap_sta_disassoc(struct hdd_adapter *adapter,
 }
 
 void
-wlan_hdd_disable_roaming(struct hdd_adapter *cur_adapter,
-			 enum wlan_cm_rso_control_requestor rso_op_requestor)
+wlan_hdd_set_roaming_state(struct wlan_hdd_link_info *cur_link_info,
+			   enum wlan_cm_rso_control_requestor rso_op_requestor,
+			   bool enab_roam)
 {
-	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(cur_adapter);
+	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(cur_link_info->adapter);
 	struct hdd_adapter *adapter = NULL, *next_adapter = NULL;
-	struct hdd_station_ctx *sta_ctx;
 	wlan_net_dev_ref_dbgid dbgid = NET_DEV_HOLD_DISABLE_ROAMING;
-	uint8_t vdev_id;
+	uint8_t vdev_id, cur_vdev_id = cur_link_info->vdev_id;
+	struct wlan_hdd_link_info *link_info;
 
 	if (!policy_mgr_is_sta_active_connection_exists(hdd_ctx->psoc))
 		return;
 
 	hdd_for_each_adapter_dev_held_safe(hdd_ctx, adapter, next_adapter,
 					   dbgid) {
-		sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter->deflink);
-		vdev_id = adapter->deflink->vdev_id;
-		if (cur_adapter->deflink->vdev_id != vdev_id &&
-		    adapter->device_mode == QDF_STA_MODE &&
-		    hdd_cm_is_vdev_associated(adapter->deflink)) {
-			hdd_debug("%d Disable roaming", vdev_id);
-			sme_stop_roaming(hdd_ctx->mac_handle, vdev_id,
-					 REASON_DRIVER_DISABLED,
-					 rso_op_requestor);
-		}
-		hdd_adapter_dev_put_debug(adapter, dbgid);
-	}
-}
-
-void
-wlan_hdd_enable_roaming(struct hdd_adapter *cur_adapter,
-			enum wlan_cm_rso_control_requestor rso_op_requestor)
-{
-	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(cur_adapter);
-	struct hdd_adapter *adapter = NULL, *next_adapter = NULL;
-	struct hdd_station_ctx *sta_ctx;
-	wlan_net_dev_ref_dbgid dbgid = NET_DEV_HOLD_ENABLE_ROAMING;
-	uint8_t vdev_id;
-
-	if (!policy_mgr_is_sta_active_connection_exists(hdd_ctx->psoc))
-		return;
-
-	hdd_for_each_adapter_dev_held_safe(hdd_ctx, adapter, next_adapter,
-					   dbgid) {
-		sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter->deflink);
-		vdev_id = adapter->deflink->vdev_id;
-		if (cur_adapter->deflink->vdev_id != vdev_id &&
-		    adapter->device_mode == QDF_STA_MODE &&
-		    hdd_cm_is_vdev_associated(adapter->deflink)) {
-			hdd_debug("%d Enable roaming", vdev_id);
-			sme_start_roaming(hdd_ctx->mac_handle, vdev_id,
-					  REASON_DRIVER_ENABLED,
-					  rso_op_requestor);
+		hdd_adapter_for_each_active_link_info(adapter, link_info) {
+			vdev_id = link_info->vdev_id;
+			if (cur_vdev_id != link_info->vdev_id &&
+			    adapter->device_mode == QDF_STA_MODE &&
+			    hdd_cm_is_vdev_associated(link_info)) {
+				if (enab_roam) {
+					hdd_debug("%d Enable roaming", vdev_id);
+					sme_start_roaming(hdd_ctx->mac_handle,
+							  vdev_id,
+							  REASON_DRIVER_ENABLED,
+							  rso_op_requestor);
+				} else {
+					hdd_debug("%d Disable roaming",
+						  vdev_id);
+					sme_stop_roaming(hdd_ctx->mac_handle,
+							 vdev_id,
+							 REASON_DRIVER_DISABLED,
+							 rso_op_requestor);
+				}
+			}
 		}
 		hdd_adapter_dev_put_debug(adapter, dbgid);
 	}
@@ -20260,7 +20243,7 @@ void hdd_hidden_ssid_enable_roaming(hdd_handle_t hdd_handle, uint8_t vdev_id)
 		return;
 	}
 	/* enable roaming on all adapters once hdd get hidden ssid rsp */
-	wlan_hdd_enable_roaming(link_info->adapter, RSO_START_BSS);
+	wlan_hdd_set_roaming_state(link_info, RSO_START_BSS, true);
 }
 
 #ifdef WLAN_FEATURE_PKT_CAPTURE
