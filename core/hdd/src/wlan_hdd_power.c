@@ -2448,6 +2448,7 @@ static int __wlan_hdd_cfg80211_suspend_wlan(struct wiphy *wiphy,
 		.reason_code = REASON_DEAUTH_NETWORK_LEAVING,
 		.subtype = SIR_MAC_MGMT_DEAUTH,
 	};
+	struct wlan_hdd_link_info *link_info;
 
 	hdd_enter();
 
@@ -2488,70 +2489,78 @@ static int __wlan_hdd_cfg80211_suspend_wlan(struct wiphy *wiphy,
 	 */
 	hdd_for_each_adapter_dev_held_safe(hdd_ctx, adapter, next_adapter,
 					   dbgid) {
-		if (wlan_hdd_validate_vdev_id(adapter->deflink->vdev_id)) {
-			hdd_adapter_dev_put_debug(adapter, dbgid);
-			continue;
-		}
+		hdd_adapter_for_each_active_link_info(adapter, link_info) {
+			if (wlan_hdd_validate_vdev_id(link_info->vdev_id))
+				continue;
 
-		if (QDF_SAP_MODE == adapter->device_mode) {
-			hapd_state =
-				WLAN_HDD_GET_HOSTAP_STATE_PTR(adapter->deflink);
-			ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(adapter->deflink);
-			if (BSS_START == hapd_state->bss_state &&
-			    true == ap_ctx->dfs_cac_block_tx) {
-				hdd_err("RADAR detection in progress, do not allow suspend");
-				wlan_hdd_inc_suspend_stats(hdd_ctx,
+			if (QDF_SAP_MODE == adapter->device_mode) {
+				hapd_state =
+					WLAN_HDD_GET_HOSTAP_STATE_PTR(link_info);
+				ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(link_info);
+				if (BSS_START == hapd_state->bss_state &&
+				    true == ap_ctx->dfs_cac_block_tx) {
+					hdd_err("RADAR detection in progress, do not allow suspend");
+					wlan_hdd_inc_suspend_stats(hdd_ctx,
 							   SUSPEND_FAIL_RADAR);
-				hdd_adapter_dev_put_debug(adapter, dbgid);
-				if (next_adapter)
-					hdd_adapter_dev_put_debug(next_adapter,
+					hdd_adapter_dev_put_debug(adapter,
 								  dbgid);
-				return -EAGAIN;
-			} else if (!ucfg_pmo_get_enable_sap_suspend(
-				   hdd_ctx->psoc)) {
-				/* return -EOPNOTSUPP if SAP does not support
-				 * suspend
-				 */
-				hdd_err("SAP does not support suspend!!");
-				hdd_adapter_dev_put_debug(adapter, dbgid);
-				if (next_adapter)
-					hdd_adapter_dev_put_debug(next_adapter,
+					if (next_adapter)
+						hdd_adapter_dev_put_debug(
+								next_adapter,
+								dbgid);
+					return -EAGAIN;
+				} else if (!ucfg_pmo_get_enable_sap_suspend(
+					   hdd_ctx->psoc)) {
+					/* return -EOPNOTSUPP if SAP
+					 * does not support suspend
+					 */
+					hdd_err("SAP does not support suspend!!");
+					hdd_adapter_dev_put_debug(adapter,
 								  dbgid);
-				return -EOPNOTSUPP;
-			} else if (ucfg_pmo_get_disconnect_sap_tdls_in_wow(
-				   hdd_ctx->psoc)) {
-				hdd_softap_deauth_all_sta(adapter, hapd_state,
-							  &params);
-			}
-		} else if (QDF_P2P_GO_MODE == adapter->device_mode) {
-			hapd_state =
-				WLAN_HDD_GET_HOSTAP_STATE_PTR(adapter->deflink);
-			if (!ucfg_pmo_get_enable_sap_suspend(
-				   hdd_ctx->psoc)) {
-				/* return -EOPNOTSUPP if GO does not support
-				 * suspend
-				 */
-				hdd_err("GO does not support suspend!!");
-				hdd_adapter_dev_put_debug(adapter, dbgid);
-				if (next_adapter)
-					hdd_adapter_dev_put_debug(next_adapter,
+					if (next_adapter)
+						hdd_adapter_dev_put_debug(
+								next_adapter,
+								dbgid);
+					return -EOPNOTSUPP;
+				} else if (ucfg_pmo_get_disconnect_sap_tdls_in_wow(
+					   hdd_ctx->psoc)) {
+					hdd_softap_deauth_all_sta(adapter,
+								  hapd_state,
+								  &params);
+				}
+			} else if (QDF_P2P_GO_MODE == adapter->device_mode) {
+				hapd_state =
+					WLAN_HDD_GET_HOSTAP_STATE_PTR(link_info);
+				if (!ucfg_pmo_get_enable_sap_suspend(
+					   hdd_ctx->psoc)) {
+					/* return -EOPNOTSUPP if GO
+					 * does not support suspend
+					 */
+					hdd_err("GO does not support suspend!!");
+					hdd_adapter_dev_put_debug(adapter,
 								  dbgid);
-				return -EOPNOTSUPP;
-			} else if (ucfg_pmo_get_disconnect_sap_tdls_in_wow(
-				   hdd_ctx->psoc)) {
-				hdd_softap_deauth_all_sta(adapter, hapd_state,
-							  &params);
-			}
-		} else if (QDF_TDLS_MODE == adapter->device_mode &&
-			   ucfg_pmo_get_disconnect_sap_tdls_in_wow(
-							hdd_ctx->psoc)) {
-			vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink,
-							   WLAN_TDLS_NB_ID);
-			if (vdev) {
-				ucfg_tdls_teardown_links_sync(hdd_ctx->psoc,
-							      vdev);
-				hdd_objmgr_put_vdev_by_user(vdev,
-							    WLAN_TDLS_NB_ID);
+					if (next_adapter)
+						hdd_adapter_dev_put_debug(
+								next_adapter,
+								dbgid);
+					return -EOPNOTSUPP;
+				} else if (ucfg_pmo_get_disconnect_sap_tdls_in_wow(
+					   hdd_ctx->psoc)) {
+					hdd_softap_deauth_all_sta(adapter,
+								  hapd_state,
+								  &params);
+				}
+			} else if (QDF_TDLS_MODE == adapter->device_mode &&
+				   ucfg_pmo_get_disconnect_sap_tdls_in_wow(
+								hdd_ctx->psoc)) {
+				vdev = hdd_objmgr_get_vdev_by_user(link_info,
+								   WLAN_TDLS_NB_ID);
+				if (vdev) {
+					ucfg_tdls_teardown_links_sync(hdd_ctx->psoc,
+								      vdev);
+					hdd_objmgr_put_vdev_by_user(vdev,
+								    WLAN_TDLS_NB_ID);
+				}
 			}
 		}
 		hdd_adapter_dev_put_debug(adapter, dbgid);
@@ -2568,12 +2577,12 @@ static int __wlan_hdd_cfg80211_suspend_wlan(struct wiphy *wiphy,
 	/* flush any pending powersave timers */
 	hdd_for_each_adapter_dev_held_safe(hdd_ctx, adapter, next_adapter,
 					   dbgid) {
-		if (wlan_hdd_validate_vdev_id(adapter->deflink->vdev_id)) {
-			hdd_adapter_dev_put_debug(adapter, dbgid);
-			continue;
-		}
+		hdd_adapter_for_each_active_link_info(adapter, link_info) {
+			if (wlan_hdd_validate_vdev_id(link_info->vdev_id))
+				continue;
 
-		sme_ps_timer_flush_sync(mac_handle, adapter->deflink->vdev_id);
+			sme_ps_timer_flush_sync(mac_handle, link_info->vdev_id);
+		}
 		hdd_adapter_dev_put_debug(adapter, dbgid);
 	}
 
