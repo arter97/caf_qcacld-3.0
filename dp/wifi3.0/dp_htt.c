@@ -487,7 +487,7 @@ QDF_STATUS htt_h2t_rx_cce_super_rule_setup(struct htt_soc *soc, void *param)
 	uint32_t *msg_word;
 	uint8_t *htt_logger_bufp;
 	uint16_t ver = 0;
-	uint8_t i, j, valid = 0;
+	uint8_t i, valid = 0;
 	uint8_t num_filters = flt_params->num_filters;
 	uint8_t pdev_id = flt_params->pdev_id;
 	uint8_t op = flt_params->op;
@@ -495,7 +495,7 @@ QDF_STATUS htt_h2t_rx_cce_super_rule_setup(struct htt_soc *soc, void *param)
 	uint16_t ipv6 = qdf_ntohs(QDF_NBUF_TRAC_IPV6_ETH_TYPE);
 	QDF_STATUS status;
 
-	if (num_filters > IPA_WDI_MAX_FILTER) {
+	if (num_filters > RX_CCE_SUPER_RULE_SETUP_NUM) {
 		dp_htt_err("Wrong filter count %d", num_filters);
 		return QDF_STATUS_FILT_REQ_ERROR;
 	}
@@ -570,7 +570,7 @@ QDF_STATUS htt_h2t_rx_cce_super_rule_setup(struct htt_soc *soc, void *param)
 				*msg_word,
 				flt_params->flt_addr_params[i].dst_port);
 
-		dp_info("opt_dp:: pdev: %u ver %u, flt_num %u, op %u,"
+		dp_info("opt_dp:: pdev: %u ver %u, flt_num %u, op %u",
 			pdev_id, ver, i, op);
 		dp_info("valid %u", valid);
 	}
@@ -3559,24 +3559,25 @@ static void dp_ipa_rx_cce_super_rule_setup_done_handler(struct htt_soc *soc,
 								*msg_word);
 		if (is_rules_enough == 1) {
 			is_success = true;
-			reserve_fail_cnt = 0;
+			soc->stats.reserve_fail_cnt = 0;
 		} else {
 			is_success = false;
-			soc->reserve_fail_cnt++;
-			if (soc->reserve_fail_cnt > MAX_RESERVE_FAIL_ATTEMPT) {
+			soc->stats.reserve_fail_cnt++;
+			if (soc->stats.reserve_fail_cnt >
+					MAX_RESERVE_FAIL_ATTEMPT) {
 				/*
 				 * IPA will retry only after an hour by default
 				 * after MAX_RESERVE_FAIL_ATTEMPT
 				 */
-				soc->abort_count++;
-				soc->reserve_fail_cnt = 0;
+				soc->stats.abort_count++;
+				soc->stats.reserve_fail_cnt = 0;
 				dp_info(
 				  "opt_dp: Filter reserve failed max attempts");
 			}
 			dp_info("opt_dp:: Filter reserve failed. Rules avail %d",
 				num_rules_avail);
 		}
-		dp_ipa_wdi_opt_dpath_notify_flt_rsvd_per_inst(is_success);
+		dp_ipa_wdi_opt_dpath_notify_flt_rsvd(is_success);
 		break;
 	}
 	case HTT_RX_CCE_SUPER_RULE_INSTALL_RESPONSE:
@@ -3601,8 +3602,8 @@ static void dp_ipa_rx_cce_super_rule_setup_done_handler(struct htt_soc *soc,
 			HTT_RX_CCE_SUPER_RULE_SETUP_DONE_CFG_RESULT_1_GET(
 								     *msg_word);
 
-		dp_ipa_wdi_opt_dpath_notify_flt_rlsd_per_inst(filter0_result,
-							      filter1_result);
+		dp_ipa_wdi_opt_dpath_notify_flt_rlsd(filter0_result,
+						     filter1_result);
 		break;
 	}
 	default:
