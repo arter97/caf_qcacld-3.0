@@ -499,15 +499,16 @@ static int hdd_fill_ipv6_ac_addr(struct inet6_dev *idev,
 }
 
 void hdd_enable_ns_offload(struct hdd_adapter *adapter,
+			   struct wlan_objmgr_vdev *vdev,
 			   enum pmo_offload_trigger trigger)
 {
 	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
 	struct wlan_objmgr_psoc *psoc = hdd_ctx->psoc;
-	struct wlan_objmgr_vdev *vdev;
 	struct inet6_dev *in6_dev;
 	struct pmo_ns_req *ns_req;
 	QDF_STATUS status;
 	int errno;
+	uint8_t vdev_id;
 
 	hdd_enter();
 
@@ -526,24 +527,18 @@ void hdd_enable_ns_offload(struct hdd_adapter *adapter,
 	if (!ns_req)
 		goto out;
 
+	vdev_id = wlan_vdev_get_id(vdev);
+
 	ns_req->psoc = psoc;
-	ns_req->vdev_id = adapter->deflink->vdev_id;
+	ns_req->vdev_id = vdev_id;
 	ns_req->trigger = trigger;
 	ns_req->count = 0;
 
-	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink,
-					   WLAN_OSIF_POWER_ID);
-	if (!vdev) {
-		hdd_err("vdev is NULL");
-		goto free_req;
-	}
-
 	/* check if offload cache and send is required or not */
-	status = ucfg_pmo_ns_offload_check(psoc, trigger,
-					   adapter->deflink->vdev_id);
+	status = ucfg_pmo_ns_offload_check(psoc, trigger, vdev_id);
 	if (QDF_IS_STATUS_ERROR(status)) {
 		hdd_debug("NS offload is not required");
-		goto put_vdev;
+		goto free_req;
 	}
 
 	if (ucfg_pmo_get_arp_ns_offload_dynamic_disable(vdev)) {
@@ -557,9 +552,9 @@ void hdd_enable_ns_offload(struct hdd_adapter *adapter,
 				      ns_req->ipv6_addr_type, ns_req->scope,
 				      &ns_req->count);
 	if (errno) {
-		hdd_disable_ns_offload(adapter, trigger);
+		hdd_disable_ns_offload(adapter, vdev, trigger);
 		hdd_debug("Max supported addresses: disabling NS offload");
-		goto put_vdev;
+		goto free_req;
 	}
 
 	/* Anycast Addresses */
@@ -567,16 +562,16 @@ void hdd_enable_ns_offload(struct hdd_adapter *adapter,
 				      ns_req->ipv6_addr_type, ns_req->scope,
 				      &ns_req->count);
 	if (errno) {
-		hdd_disable_ns_offload(adapter, trigger);
+		hdd_disable_ns_offload(adapter, vdev, trigger);
 		hdd_debug("Max supported addresses: disabling NS offload");
-		goto put_vdev;
+		goto free_req;
 	}
 
 	/* cache ns request */
 	status = ucfg_pmo_cache_ns_offload_req(ns_req);
 	if (QDF_IS_STATUS_ERROR(status)) {
 		hdd_debug("Failed to cache ns request; status:%d", status);
-		goto put_vdev;
+		goto free_req;
 	}
 
 skip_cache_ns:
@@ -584,12 +579,10 @@ skip_cache_ns:
 	status = ucfg_pmo_enable_ns_offload_in_fwr(vdev, trigger);
 	if (QDF_IS_STATUS_ERROR(status)) {
 		hdd_debug("Failed to enable ns offload; status:%d", status);
-		goto put_vdev;
+		goto free_req;
 	}
 
 	hdd_wlan_offload_event(SIR_IPV6_NS_OFFLOAD, SIR_OFFLOAD_ENABLE);
-put_vdev:
-	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_POWER_ID);
 free_req:
 	qdf_mem_free(ns_req);
 
@@ -598,32 +591,25 @@ out:
 }
 
 void hdd_disable_ns_offload(struct hdd_adapter *adapter,
-		enum pmo_offload_trigger trigger)
+			    struct wlan_objmgr_vdev *vdev,
+			    enum pmo_offload_trigger trigger)
 {
 	QDF_STATUS status;
 	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
-	struct wlan_objmgr_vdev *vdev;
 
 	hdd_enter();
 
 	status = ucfg_pmo_ns_offload_check(hdd_ctx->psoc, trigger,
-					   adapter->deflink->vdev_id);
+					   wlan_vdev_get_id(vdev));
 	if (status != QDF_STATUS_SUCCESS) {
 		hdd_debug("Flushing of NS offload not required");
-		goto out;
-	}
-
-	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink,
-					   WLAN_OSIF_POWER_ID);
-	if (!vdev) {
-		hdd_err("vdev is NULL");
 		goto out;
 	}
 
 	status = ucfg_pmo_flush_ns_offload_req(vdev);
 	if (status != QDF_STATUS_SUCCESS) {
 		hdd_err("Failed to flush NS Offload");
-		goto put_vdev;
+		goto out;
 	}
 
 	status = ucfg_pmo_disable_ns_offload_in_fwr(vdev, trigger);
@@ -632,8 +618,6 @@ void hdd_disable_ns_offload(struct hdd_adapter *adapter,
 	else
 		hdd_wlan_offload_event(SIR_IPV6_NS_OFFLOAD,
 			SIR_OFFLOAD_DISABLE);
-put_vdev:
-	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_POWER_ID);
 out:
 	hdd_exit();
 
@@ -706,6 +690,7 @@ static void __hdd_ipv6_notifier_work_queue(struct hdd_adapter *adapter)
 {
 	struct hdd_context *hdd_ctx;
 	int errno;
+	struct wlan_objmgr_vdev *vdev;
 
 	hdd_enter();
 
@@ -718,10 +703,15 @@ static void __hdd_ipv6_notifier_work_queue(struct hdd_adapter *adapter)
 	if (errno)
 		goto exit;
 
-	hdd_enable_ns_offload(adapter, pmo_ipv6_change_notify);
-	hdd_enable_icmp_offload(adapter, pmo_ipv6_change_notify);
+	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink, WLAN_OSIF_ID);
+	if (!vdev)
+		goto exit;
 
+	hdd_enable_ns_offload(adapter, vdev, pmo_ipv6_change_notify);
+	hdd_enable_icmp_offload(adapter, vdev, pmo_ipv6_change_notify);
 	hdd_send_ps_config_to_fw(adapter);
+
+	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
 exit:
 	hdd_exit();
 }
@@ -821,8 +811,8 @@ void hdd_enable_host_offloads(struct hdd_adapter *adapter,
 
 	hdd_debug("enable offloads");
 	hdd_enable_gtk_offload(vdev);
-	hdd_enable_arp_offload(adapter, trigger);
-	hdd_enable_ns_offload(adapter, trigger);
+	hdd_enable_arp_offload(adapter, vdev, trigger);
+	hdd_enable_ns_offload(adapter, vdev, trigger);
 	hdd_enable_mc_addr_filtering(adapter, trigger);
 	if (adapter->device_mode == QDF_STA_MODE)
 		hdd_enable_igmp_offload(adapter, vdev);
@@ -864,8 +854,8 @@ void hdd_disable_host_offloads(struct hdd_adapter *adapter,
 
 	hdd_debug("disable offloads");
 	hdd_disable_gtk_offload(adapter, vdev);
-	hdd_disable_arp_offload(adapter, trigger);
-	hdd_disable_ns_offload(adapter, trigger);
+	hdd_disable_arp_offload(adapter, vdev, trigger);
+	hdd_disable_ns_offload(adapter, vdev, trigger);
 	hdd_disable_mc_addr_filtering(adapter, trigger);
 	if (adapter->device_mode == QDF_STA_MODE)
 		hdd_disable_igmp_offload(adapter, vdev);
@@ -1021,6 +1011,7 @@ static void __hdd_ipv4_notifier_work_queue(struct hdd_adapter *adapter)
 	struct in_ifaddr *ifa;
 	enum station_keepalive_method val;
 	QDF_STATUS status;
+	struct wlan_objmgr_vdev *vdev;
 
 	hdd_enter();
 
@@ -1033,12 +1024,16 @@ static void __hdd_ipv4_notifier_work_queue(struct hdd_adapter *adapter)
 	if (errno)
 		goto exit;
 
-	hdd_enable_arp_offload(adapter, pmo_ipv4_change_notify);
-	hdd_enable_icmp_offload(adapter, pmo_ipv4_change_notify);
+	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink, WLAN_OSIF_ID);
+	if (!vdev)
+		goto exit;
+
+	hdd_enable_arp_offload(adapter, vdev, pmo_ipv4_change_notify);
+	hdd_enable_icmp_offload(adapter, vdev, pmo_ipv4_change_notify);
 
 	status = ucfg_mlme_get_sta_keepalive_method(hdd_ctx->psoc, &val);
 	if (QDF_IS_STATUS_ERROR(status))
-		goto exit;
+		goto vdev_ref;
 
 	if (val == MLME_STA_KEEPALIVE_GRAT_ARP)
 		hdd_set_grat_arp_keepalive(adapter);
@@ -1049,9 +1044,12 @@ static void __hdd_ipv4_notifier_work_queue(struct hdd_adapter *adapter)
 	ifa = hdd_lookup_ifaddr(adapter);
 	if (ifa && hdd_ctx->is_fils_roaming_supported)
 		sme_send_hlp_ie_info(hdd_ctx->mac_handle,
-				     adapter->deflink->vdev_id,
+				     wlan_vdev_get_id(vdev),
 				     ifa->ifa_local);
 	hdd_send_ps_config_to_fw(adapter);
+
+vdev_ref:
+	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
 exit:
 	hdd_exit();
 }
@@ -1249,6 +1247,7 @@ static struct in_ifaddr *hdd_get_ipv4_local_interface(
 }
 
 void hdd_enable_arp_offload(struct hdd_adapter *adapter,
+			    struct wlan_objmgr_vdev *vdev,
 			    enum pmo_offload_trigger trigger)
 {
 	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
@@ -1256,7 +1255,7 @@ void hdd_enable_arp_offload(struct hdd_adapter *adapter,
 	QDF_STATUS status;
 	struct pmo_arp_req *arp_req;
 	struct in_ifaddr *ifa;
-	struct wlan_objmgr_vdev *vdev;
+	uint8_t vdev_id;
 
 	hdd_enter();
 
@@ -1264,22 +1263,16 @@ void hdd_enable_arp_offload(struct hdd_adapter *adapter,
 	if (!arp_req)
 		return;
 
-	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink,
-					   WLAN_OSIF_POWER_ID);
-	if (!vdev) {
-		hdd_err("vdev is NULL");
-		goto free_req;
-	}
+	vdev_id =  wlan_vdev_get_id(vdev);
 
 	arp_req->psoc = psoc;
-	arp_req->vdev_id = adapter->deflink->vdev_id;
+	arp_req->vdev_id = vdev_id;
 	arp_req->trigger = trigger;
 
-	status = ucfg_pmo_check_arp_offload(psoc, trigger,
-					    adapter->deflink->vdev_id);
+	status = ucfg_pmo_check_arp_offload(psoc, trigger, vdev_id);
 	if (QDF_IS_STATUS_ERROR(status)) {
 		hdd_debug("ARP offload not required");
-		goto put_vdev;
+		goto free_req;
 	}
 
 	if (ucfg_pmo_get_arp_ns_offload_dynamic_disable(vdev)) {
@@ -1292,7 +1285,7 @@ void hdd_enable_arp_offload(struct hdd_adapter *adapter,
 	if (!ifa || !ifa->ifa_local) {
 		hdd_info("IP Address is not assigned");
 		status = QDF_STATUS_NOT_INITIALIZED;
-		goto put_vdev;
+		goto free_req;
 	}
 
 	arp_req->ipv4_addr = (uint32_t)ifa->ifa_local;
@@ -1300,20 +1293,18 @@ void hdd_enable_arp_offload(struct hdd_adapter *adapter,
 	status = ucfg_pmo_cache_arp_offload_req(arp_req);
 	if (QDF_IS_STATUS_ERROR(status)) {
 		hdd_err("failed to cache arp offload req; status:%d", status);
-		goto put_vdev;
+		goto free_req;
 	}
 
 skip_cache_arp:
 	status = ucfg_pmo_enable_arp_offload_in_fwr(vdev, trigger);
 	if (QDF_IS_STATUS_ERROR(status)) {
 		hdd_err("failed arp offload config in fw; status:%d", status);
-		goto put_vdev;
+		goto free_req;
 	}
 
 	hdd_wlan_offload_event(PMO_IPV4_ARP_REPLY_OFFLOAD, PMO_OFFLOAD_ENABLE);
 
-put_vdev:
-	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_POWER_ID);
 free_req:
 	qdf_mem_free(arp_req);
 }
@@ -1409,14 +1400,15 @@ free_req:
 }
 
 void hdd_enable_icmp_offload(struct hdd_adapter *adapter,
+			     struct wlan_objmgr_vdev *vdev,
 			     enum pmo_offload_trigger trigger)
 {
 	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
 	struct wlan_objmgr_psoc *psoc = hdd_ctx->psoc;
 	struct pmo_icmp_offload *pmo_icmp_req;
-	struct wlan_objmgr_vdev *vdev;
 	bool is_icmp_enable;
 	QDF_STATUS status;
+	uint8_t vdev_id;
 
 	is_icmp_enable = ucfg_pmo_is_icmp_offload_enabled(psoc);
 	if (!is_icmp_enable) {
@@ -1428,18 +1420,12 @@ void hdd_enable_icmp_offload(struct hdd_adapter *adapter,
 	if (!pmo_icmp_req)
 		return;
 
-	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink,
-					   WLAN_OSIF_POWER_ID);
-	if (!vdev) {
-		hdd_err("vdev is NULL");
-		goto free_req;
-	}
-
-	status = ucfg_pmo_check_icmp_offload(psoc, adapter->deflink->vdev_id);
+	vdev_id = wlan_vdev_get_id(vdev);
+	status = ucfg_pmo_check_icmp_offload(psoc, vdev_id);
 	if (QDF_IS_STATUS_ERROR(status))
-		goto put_vdev;
+		goto free_req;
 
-	pmo_icmp_req->vdev_id = adapter->deflink->vdev_id;
+	pmo_icmp_req->vdev_id = vdev_id;
 	pmo_icmp_req->enable = is_icmp_enable;
 	pmo_icmp_req->trigger = trigger;
 
@@ -1447,59 +1433,47 @@ void hdd_enable_icmp_offload(struct hdd_adapter *adapter,
 	case pmo_ipv4_change_notify:
 		if (hdd_fill_ipv4_addr(adapter, pmo_icmp_req)) {
 			hdd_debug("Unable to populate IPv4 Address");
-			goto put_vdev;
+			goto free_req;
 		}
 		break;
 	case pmo_ipv6_change_notify:
 		if (hdd_fill_ipv6_addr(adapter, pmo_icmp_req)) {
 			hdd_debug("Unable to populate IPv6 Address");
-			goto put_vdev;
+			goto free_req;
 		}
 		break;
 	default:
 		QDF_DEBUG_PANIC("The trigger %d is not supported", trigger);
-		goto put_vdev;
+		goto free_req;
 	}
 
 	status = ucfg_pmo_config_icmp_offload(psoc, pmo_icmp_req);
-	if (QDF_IS_STATUS_ERROR(status)) {
+	if (QDF_IS_STATUS_ERROR(status))
 		hdd_err_rl("icmp offload config in fw failed: %d", status);
-		goto put_vdev;
-	}
 
-put_vdev:
-	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_POWER_ID);
 free_req:
 	qdf_mem_free(pmo_icmp_req);
 }
 #endif
 
 void hdd_disable_arp_offload(struct hdd_adapter *adapter,
-		enum pmo_offload_trigger trigger)
+			     struct wlan_objmgr_vdev *vdev,
+			     enum pmo_offload_trigger trigger)
 {
 	QDF_STATUS status;
 	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
-	struct wlan_objmgr_vdev *vdev;
 
 	hdd_enter();
 
 	status = ucfg_pmo_check_arp_offload(hdd_ctx->psoc, trigger,
-					    adapter->deflink->vdev_id);
+					    wlan_vdev_get_id(vdev));
 	if (status != QDF_STATUS_SUCCESS) {
 		hdd_debug("Flushing of ARP offload not required");
 		return;
 	}
 
-	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink,
-					   WLAN_OSIF_POWER_ID);
-	if (!vdev) {
-		hdd_err("vdev is NULL");
-		return;
-	}
-
 	status = ucfg_pmo_flush_arp_offload_req(vdev);
 	if (status != QDF_STATUS_SUCCESS) {
-		hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_POWER_ID);
 		hdd_err("Failed to flush arp Offload");
 		return;
 	}
@@ -1510,7 +1484,6 @@ void hdd_disable_arp_offload(struct hdd_adapter *adapter,
 			PMO_OFFLOAD_DISABLE);
 	else
 		hdd_info("fail to disable arp offload");
-	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_POWER_ID);
 }
 
 void hdd_enable_mc_addr_filtering(struct hdd_adapter *adapter,

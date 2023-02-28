@@ -10621,36 +10621,40 @@ static int hdd_set_arp_ns_offload(struct hdd_adapter *adapter,
 			ucfg_pmo_dynamic_arp_ns_offload_runtime_prevent(vdev);
 	}
 
-	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
-
 	if (QDF_IS_STATUS_ERROR(qdf_status)) {
 		if (qdf_status == QDF_STATUS_E_ALREADY) {
 			hdd_info_rl("already set arp/ns offload %d",
 				    offload_state);
-			return 0;
+			errno = qdf_status_to_os_return(QDF_STATUS_SUCCESS);
+		} else {
+			errno = qdf_status_to_os_return(qdf_status);
 		}
-		return qdf_status_to_os_return(qdf_status);
+
+		goto vdev_ref;
 	}
 
 	if (!hdd_is_vdev_in_conn_state(adapter->deflink)) {
 		hdd_info("set not in connect state, updated state %d",
 			 offload_state);
-		return 0;
+		errno = qdf_status_to_os_return(QDF_STATUS_SUCCESS);
+		goto vdev_ref;
 	}
 
 	if (offload_state == DYNAMIC_ARP_NS_ENABLE) {
-		hdd_enable_arp_offload(adapter,
+		hdd_enable_arp_offload(adapter, vdev,
 				       pmo_arp_ns_offload_dynamic_update);
-		hdd_enable_ns_offload(adapter,
+		hdd_enable_ns_offload(adapter, vdev,
 				      pmo_arp_ns_offload_dynamic_update);
 	} else if (offload_state == DYNAMIC_ARP_NS_DISABLE) {
-		hdd_disable_arp_offload(adapter,
+		hdd_disable_arp_offload(adapter, vdev,
 					pmo_arp_ns_offload_dynamic_update);
-		hdd_disable_ns_offload(adapter,
+		hdd_disable_ns_offload(adapter, vdev,
 				       pmo_arp_ns_offload_dynamic_update);
 	}
 
-	return 0;
+vdev_ref:
+	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
+	return errno;
 }
 
 #undef DYNAMIC_ARP_NS_ENABLE
@@ -14193,6 +14197,7 @@ __wlan_hdd_cfg80211_set_ns_offload(struct wiphy *wiphy,
 	struct hdd_context *hdd_ctx = wiphy_priv(wiphy);
 	struct net_device *dev = wdev->netdev;
 	struct hdd_adapter *adapter =  WLAN_HDD_GET_PRIV_PTR(dev);
+	struct wlan_objmgr_vdev *vdev;
 
 	hdd_enter_dev(wdev->netdev);
 
@@ -14230,12 +14235,19 @@ __wlan_hdd_cfg80211_set_ns_offload(struct wiphy *wiphy,
 	hdd_ctx->ns_offload_enable =
 		nla_get_u8(tb[QCA_WLAN_VENDOR_ATTR_ND_OFFLOAD_FLAG]);
 
+	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink, WLAN_OSIF_ID);
+	if (!vdev)
+		return -EINVAL;
+
 	/* update ns offload in case it is already enabled/disabled */
 	if (hdd_ctx->ns_offload_enable)
-		hdd_enable_ns_offload(adapter, pmo_ns_offload_dynamic_update);
+		hdd_enable_ns_offload(adapter, vdev,
+				      pmo_ns_offload_dynamic_update);
 	else
-		hdd_disable_ns_offload(adapter, pmo_ns_offload_dynamic_update);
+		hdd_disable_ns_offload(adapter, vdev,
+				       pmo_ns_offload_dynamic_update);
 
+	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
 	return 0;
 }
 
