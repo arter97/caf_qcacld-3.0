@@ -9939,8 +9939,6 @@ QDF_STATUS hdd_adapter_iterate(hdd_adapter_iterate_cb cb, void *context)
 			}
 		}
 		hdd_adapter_put(adapter);
-		if (status != QDF_STATUS_SUCCESS)
-			return status;
 	}
 
 	return ret;
@@ -12805,8 +12803,11 @@ void hdd_indicate_mgmt_frame(tSirSmeMgmtFrameInd *frame_ind)
 		num_adapters = 0;
 		hdd_for_each_adapter_dev_held_safe(hdd_ctx, adapter,
 						   next_adapter, dbgid) {
-			vdev_id[num_adapters] = adapter->deflink->vdev_id;
-			num_adapters++;
+			hdd_adapter_for_each_active_link_info(adapter,
+							      link_info) {
+				vdev_id[num_adapters] = link_info->vdev_id;
+				num_adapters++;
+			}
 			/* dev_put has to be done here */
 			hdd_adapter_dev_put_debug(adapter, dbgid);
 		}
