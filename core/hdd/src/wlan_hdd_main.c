@@ -15889,6 +15889,7 @@ static void hdd_state_info_dump(char **buf_ptr, uint16_t *size)
 	uint16_t len = 0;
 	char *buf = *buf_ptr;
 	wlan_net_dev_ref_dbgid dbgid = NET_DEV_HOLD_STATE_INFO_DUMP;
+	struct wlan_hdd_link_info *link_info;
 
 	hdd_ctx = cds_get_context(QDF_MODULE_ID_HDD);
 	if (!hdd_ctx)
@@ -15903,22 +15904,25 @@ static void hdd_state_info_dump(char **buf_ptr, uint16_t *size)
 
 	hdd_for_each_adapter_dev_held_safe(hdd_ctx, adapter, next_adapter,
 					   dbgid) {
-		len += scnprintf(buf + len, *size - len,
-				 "\n device name: %s", adapter->dev->name);
-		len += scnprintf(buf + len, *size - len,
-				 "\n device_mode: %d", adapter->device_mode);
-		switch (adapter->device_mode) {
-		case QDF_STA_MODE:
-		case QDF_P2P_CLIENT_MODE:
-			sta_ctx =
-				WLAN_HDD_GET_STATION_CTX_PTR(adapter->deflink);
-			len += scnprintf(buf + len, *size - len,
-					 "\n conn_state: %d",
-					 sta_ctx->conn_info.conn_state);
-			break;
-
-		default:
-			break;
+		hdd_adapter_for_each_active_link_info(adapter, link_info) {
+			len +=
+			scnprintf(buf + len, *size - len, "\n device name: %s",
+				  adapter->dev->name);
+			len +=
+			scnprintf(buf + len, *size - len, "\n device_mode: %d",
+				  adapter->device_mode);
+			switch (adapter->device_mode) {
+			case QDF_STA_MODE:
+			case QDF_P2P_CLIENT_MODE:
+				sta_ctx =
+					WLAN_HDD_GET_STATION_CTX_PTR(link_info);
+				len += scnprintf(buf + len, *size - len,
+					"\n conn_state: %d",
+					sta_ctx->conn_info.conn_state);
+				break;
+			default:
+				break;
+			}
 		}
 		hdd_adapter_dev_put_debug(adapter, dbgid);
 	}
