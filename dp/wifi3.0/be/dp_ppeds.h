@@ -93,10 +93,22 @@ QDF_STATUS dp_ppeds_start_soc_be(struct dp_soc *soc);
 void dp_ppeds_stop_soc_be(struct dp_soc *soc);
 
 /**
- * dp_ppeds_detach_vdev_be() - Deattach the VP port from vdev
- * @soc_hdl: CDP SoC Tx/Rx handle
+ * dp_ppeds_stats_sync_be() - sync stats for DS mode.
+ * @soc: CDP SoC Tx/Rx handle
  * @vdev_id: vdev id
- * @vp_params: vp params
+ * @vp_params: PPE virtual port params
+ * @stats: pointer to stats structure
+ *
+ * Return: void
+ */
+void dp_ppeds_stats_sync_be(struct cdp_soc_t *soc, uint16_t vdev_id,
+			    struct cdp_ds_vp_params *vp_params, void *stats);
+
+/**
+ * dp_ppeds_detach_vdev_be() - Deattach the VP port from vdev
+ * @soc: CDP SoC Tx/Rx handle
+ * @vdev_id: vdev id
+ * @vp_params: PPE virtual port params
  *
  * Detach the VP port from BE VAP
  *
@@ -124,7 +136,7 @@ QDF_STATUS dp_ppeds_vp_setup_on_fw_recovery(struct cdp_soc_t *soc,
  * @vdev_id: vdev_id
  * @vp_arg: PPE VP opaque
  * @ppe_vp_num: PPE VP number
- * @vp_params: vp params
+ * @vp_params: PPE virtual port params
  *
  * Allocate a DS VP port and attach to BE VAP
  *
