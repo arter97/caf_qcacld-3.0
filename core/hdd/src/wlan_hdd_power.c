@@ -176,43 +176,34 @@ int wlan_hdd_rx_thread_suspend(struct hdd_context *hdd_ctx)
 
 /**
  * hdd_enable_gtk_offload() - enable GTK offload
- * @adapter: pointer to the adapter
+ * @vdev: VDEV objmgr pointer
  *
  * Central function to enable GTK offload.
  *
  * Return: nothing
  */
-static void hdd_enable_gtk_offload(struct hdd_adapter *adapter)
+static void hdd_enable_gtk_offload(struct wlan_objmgr_vdev *vdev)
 {
 	QDF_STATUS status;
-	struct wlan_objmgr_vdev *vdev;
-
-	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink,
-					   WLAN_OSIF_POWER_ID);
-	if (!vdev) {
-		hdd_err("vdev is NULL");
-		return;
-	}
 
 	status = ucfg_pmo_enable_gtk_offload_in_fwr(vdev);
 	if (status != QDF_STATUS_SUCCESS)
 		hdd_debug("Failed to enable gtk offload");
-	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_POWER_ID);
 }
 
 #ifdef WLAN_FEATURE_IGMP_OFFLOAD
 /**
  * hdd_send_igmp_offload_params() - enable igmp offload
  * @adapter: pointer to the adapter
+ * @vdev: VDEV ojbmgr pointer
  * @enable: enable/disable
  *
  * Return: nothing
  */
 static QDF_STATUS
 hdd_send_igmp_offload_params(struct hdd_adapter *adapter,
-			     bool enable)
+			     struct wlan_objmgr_vdev *vdev, bool enable)
 {
-	struct wlan_objmgr_vdev *vdev;
 	struct in_device *in_dev = adapter->dev->ip_ptr;
 	struct ip_mc_list *ip_list;
 	struct pmo_igmp_offload_req *igmp_req = NULL;
@@ -227,15 +218,12 @@ hdd_send_igmp_offload_params(struct hdd_adapter *adapter,
 	ip_list = in_dev->mc_list;
 	if (!ip_list) {
 		hdd_debug("ip list empty");
-		status = QDF_STATUS_E_FAILURE;
-		goto out;
+		return QDF_STATUS_E_FAILURE;
 	}
 
 	igmp_req = qdf_mem_malloc(sizeof(*igmp_req));
-	if (!igmp_req) {
-		status = QDF_STATUS_E_FAILURE;
-		goto out;
-	}
+	if (!igmp_req)
+		return QDF_STATUS_E_FAILURE;
 
 	while (ip_list && ip_list->multiaddr && enable &&
 	       count < MAX_MC_IP_ADDR) {
@@ -249,104 +237,82 @@ hdd_send_igmp_offload_params(struct hdd_adapter *adapter,
 	igmp_req->enable = enable;
 	igmp_req->num_grp_ip_address = count;
 
-	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink,
-					   WLAN_OSIF_POWER_ID);
-	if (!vdev) {
-		hdd_err("vdev is NULL");
-		qdf_mem_free(igmp_req);
-		status = QDF_STATUS_E_FAILURE;
-		goto out;
-	}
-
 	status = ucfg_pmo_enable_igmp_offload(vdev, igmp_req);
 	if (status != QDF_STATUS_SUCCESS)
-		hdd_debug("Failed to enable igmp offload");
+		hdd_debug("Failed to configure igmp offload");
 
-	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_POWER_ID);
 	qdf_mem_free(igmp_req);
-out:
 	return status;
 }
 
 /**
  * hdd_enable_igmp_offload() - enable GTK offload
  * @adapter: pointer to the adapter
+ * @vdev: VDEV objmgr pointer
  *
  * Enable IGMP offload in suspended case to save power
  *
  * Return: nothing
  */
-static void hdd_enable_igmp_offload(struct hdd_adapter *adapter)
+static void hdd_enable_igmp_offload(struct hdd_adapter *adapter,
+				    struct wlan_objmgr_vdev *vdev)
 {
 	QDF_STATUS status;
-	struct wlan_objmgr_vdev *vdev;
 
-	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink,
-					   WLAN_OSIF_POWER_ID);
-	if (!vdev) {
-		hdd_err("vdev is NULL");
-		return;
-	}
-	status = hdd_send_igmp_offload_params(adapter, true);
+	status = hdd_send_igmp_offload_params(adapter, vdev, true);
 	if (status != QDF_STATUS_SUCCESS)
 		hdd_debug("Failed to enable igmp offload");
-	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_POWER_ID);
 }
 
 /**
  * hdd_disable_igmp_offload() - disable GTK offload
  * @adapter: pointer to the adapter
+ * @vdev: VDEV objmgr pointer
  *
  * Enable IGMP offload in suspended case to save power
  *
  * Return: nothing
  */
-static void hdd_disable_igmp_offload(struct hdd_adapter *adapter)
+static void hdd_disable_igmp_offload(struct hdd_adapter *adapter,
+				     struct wlan_objmgr_vdev *vdev)
 {
 	QDF_STATUS status;
-	struct wlan_objmgr_vdev *vdev;
 
-	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink,
-					   WLAN_OSIF_POWER_ID);
-	if (!vdev) {
-		hdd_err("vdev is NULL");
-		return;
-	}
-	status = hdd_send_igmp_offload_params(adapter, false);
+	status = hdd_send_igmp_offload_params(adapter, vdev, false);
 	if (status != QDF_STATUS_SUCCESS)
-		hdd_debug("Failed to enable igmp offload");
-	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_POWER_ID);
+		hdd_debug("Failed to disable igmp offload");
 }
 #else
-static inline void
-hdd_enable_igmp_offload(struct hdd_adapter *adapter)
+static inline void hdd_enable_igmp_offload(struct hdd_adapter *adapter,
+					   struct wlan_objmgr_vdev *vdev)
 {}
 
 static inline QDF_STATUS
 hdd_send_igmp_offload_params(struct hdd_adapter *adapter,
-			     bool enable)
+			     struct wlan_objmgr_vdev *vdev, bool enable)
 {
 	return QDF_STATUS_SUCCESS;
 }
 
-static inline void
-hdd_disable_igmp_offload(struct hdd_adapter *adapter)
+static inline void hdd_disable_igmp_offload(struct hdd_adapter *adapter,
+					    struct wlan_objmgr_vdev *vdev)
 {}
 #endif
 
 /**
  * hdd_disable_gtk_offload() - disable GTK offload
  * @adapter:   pointer to the adapter
+ * @vdev: VDEV objmgr pointer
  *
  * Central function to disable GTK offload.
  *
  * Return: nothing
  */
-static void hdd_disable_gtk_offload(struct hdd_adapter *adapter)
+static void hdd_disable_gtk_offload(struct hdd_adapter *adapter,
+				    struct wlan_objmgr_vdev *vdev)
 {
 	struct pmo_gtk_rsp_req gtk_rsp_request;
 	QDF_STATUS status;
-	struct wlan_objmgr_vdev *vdev;
 
 	/* ensure to get gtk rsp first before disable it*/
 	gtk_rsp_request.callback = wlan_hdd_cfg80211_update_replay_counter_cb;
@@ -354,25 +320,16 @@ static void hdd_disable_gtk_offload(struct hdd_adapter *adapter)
 	/* Passing as void* as PMO does not know legacy HDD adapter type */
 	gtk_rsp_request.callback_context = (void *)adapter;
 
-	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink,
-					   WLAN_OSIF_POWER_ID);
-	if (!vdev) {
-		hdd_err("vdev is NULL");
-		return;
-	}
-
 	status = ucfg_pmo_get_gtk_rsp(vdev, &gtk_rsp_request);
 	if (status != QDF_STATUS_SUCCESS) {
 		hdd_err("Failed to send get gtk rsp status:%d", status);
-		goto put_vdev;
+		return;
 	}
 
 	hdd_debug("send get_gtk_rsp successful");
 	status = ucfg_pmo_disable_gtk_offload_in_fwr(vdev);
 	if (status != QDF_STATUS_SUCCESS)
 		hdd_info("Failed to disable gtk offload");
-put_vdev:
-	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_POWER_ID);
 }
 
 #ifdef WLAN_NS_OFFLOAD
@@ -863,12 +820,12 @@ void hdd_enable_host_offloads(struct hdd_adapter *adapter,
 	}
 
 	hdd_debug("enable offloads");
-	hdd_enable_gtk_offload(adapter);
+	hdd_enable_gtk_offload(vdev);
 	hdd_enable_arp_offload(adapter, trigger);
 	hdd_enable_ns_offload(adapter, trigger);
 	hdd_enable_mc_addr_filtering(adapter, trigger);
 	if (adapter->device_mode == QDF_STA_MODE)
-		hdd_enable_igmp_offload(adapter);
+		hdd_enable_igmp_offload(adapter, vdev);
 
 	if (adapter->device_mode != QDF_NDI_MODE)
 		hdd_enable_hw_filter(vdev);
@@ -906,12 +863,12 @@ void hdd_disable_host_offloads(struct hdd_adapter *adapter,
 	}
 
 	hdd_debug("disable offloads");
-	hdd_disable_gtk_offload(adapter);
+	hdd_disable_gtk_offload(adapter, vdev);
 	hdd_disable_arp_offload(adapter, trigger);
 	hdd_disable_ns_offload(adapter, trigger);
 	hdd_disable_mc_addr_filtering(adapter, trigger);
 	if (adapter->device_mode == QDF_STA_MODE)
-		hdd_disable_igmp_offload(adapter);
+		hdd_disable_igmp_offload(adapter, vdev);
 	if (adapter->device_mode != QDF_NDI_MODE)
 		hdd_disable_hw_filter(vdev);
 	hdd_disable_action_frame_patterns(vdev);
