@@ -60,7 +60,7 @@ void wlan_tdls_teardown_links_sync(struct wlan_objmgr_psoc *psoc);
  * wlan_tdls_notify_sta_disconnect() - notify sta disconnect
  * @vdev_id: pointer to soc object
  * @lfr_roam: indicate, whether disconnect due to lfr roam
- * @bool user_disconnect: disconnect from user space
+ * @user_disconnect: disconnect from user space
  * @vdev: vdev object manager
  *
  * Notify sta disconnect event to TDLS component

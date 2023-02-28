@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -35,7 +35,7 @@
 #include "wlan_dp_fisa_rx.h"
 #endif
 #include "nan_public_structs.h"
-#include "nan_ucfg_api.h"
+#include "wlan_nan_api_i.h"
 #include <wlan_cm_api.h>
 #include <enet.h>
 #include <cds_utils.h>
@@ -422,7 +422,7 @@ void dp_get_transmit_mac_addr(struct wlan_dp_intf *dp_intf,
 
 	switch (dp_intf->device_mode) {
 	case QDF_NDI_MODE:
-		state = ucfg_nan_get_ndi_state(dp_intf->vdev);
+		state = wlan_nan_get_ndi_state(dp_intf->vdev);
 		if (state == NAN_DATA_NDI_CREATED_STATE ||
 		    state == NAN_DATA_CONNECTED_STATE ||
 		    state == NAN_DATA_CONNECTING_STATE ||
@@ -796,7 +796,8 @@ void dp_sta_notify_tx_comp_cb(qdf_nbuf_t nbuf, void *ctx, uint16_t flag)
 	case QDF_NBUF_CB_PACKET_TYPE_EAPOL:
 		subtype = qdf_nbuf_get_eapol_subtype(nbuf);
 		if (!(flag & BIT(QDF_TX_RX_STATUS_OK)) &&
-		    subtype != QDF_PROTO_INVALID)
+		    subtype != QDF_PROTO_INVALID &&
+		    subtype <= QDF_PROTO_EAPOL_M4)
 			++dp_intf->dp_stats.eapol_stats.
 				tx_noack_cnt[subtype - QDF_PROTO_EAPOL_M1];
 		break;

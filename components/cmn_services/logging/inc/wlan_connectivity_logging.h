@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -36,7 +36,7 @@
  * @WLAN_AUTH_REQ: Authentication request frame
  * @WLAN_AUTH_RESP: Authentication response frame
  * @WLAN_ASSOC_REQ: Association request frame
- * @WLAN_ASSOC_RESP: Association response frame
+ * @WLAN_ASSOC_RSP: Association response frame
  * @WLAN_REASSOC_REQ: Reassociation request frame
  * @WLAN_REASSOC_RSP: Reassociation response frame
  * @WLAN_DEAUTH_RX: Deauthentication frame received
@@ -46,7 +46,7 @@
  * @WLAN_DISCONN_BMISS: Disconnection due to beacon miss
  * @WLAN_ROAM_SCAN_START: ROAM scan start
  * @WLAN_ROAM_SCAN_DONE: Roam scan done
- * @WLAN_ROAM_SCR_CURR_AP: Roam score current AP
+ * @WLAN_ROAM_SCORE_CURR_AP: Roam score current AP
  * @WLAN_ROAM_SCORE_CAND_AP: Roam Score Candidate AP
  * @WLAN_ROAM_RESULT: Roam Result
  * @WLAN_ROAM_CANCEL: Roam Cancel
@@ -161,6 +161,10 @@ enum wlan_main_tag {
  * @WLAN_CONN_DIAG_EAP_FAIL_EVENT: EAP failure
  * @WLAN_CONN_DIAG_CUSTOM_EVENT: Additional WLAN logs
  * @WLAN_CONN_DIAG_EAP_START_EVENT: EAPOL start frame
+ * @WLAN_CONN_DIAG_NBR_RPT_REQ_EVENT: Neighbor report request
+ * @WLAN_CONN_DIAG_NBR_RPT_RESP_EVENT: Neighbor report response
+ * @WLAN_CONN_DIAG_BCN_RPT_REQ_EVENT: Beacon report request
+ * @WLAN_CONN_DIAG_BCN_RPT_RESP_EVENT: Beacon report response
  * @WLAN_CONN_DIAG_MAX: MAX tag
  */
 enum qca_conn_diag_log_event_type {
@@ -205,6 +209,10 @@ enum qca_conn_diag_log_event_type {
 	WLAN_CONN_DIAG_EAP_FAIL_EVENT,
 	WLAN_CONN_DIAG_CUSTOM_EVENT,
 	WLAN_CONN_DIAG_EAP_START_EVENT,
+	WLAN_CONN_DIAG_NBR_RPT_REQ_EVENT,
+	WLAN_CONN_DIAG_NBR_RPT_RESP_EVENT,
+	WLAN_CONN_DIAG_BCN_RPT_REQ_EVENT,
+	WLAN_CONN_DIAG_BCN_RPT_RESP_EVENT,
 	WLAN_CONN_DIAG_MAX
 };
 
@@ -214,7 +222,7 @@ enum qca_conn_diag_log_event_type {
  * @vdev_id: Vdev id
  * @timestamp_us: Timestamp(time of the day) in microseconds
  * @fw_timestamp: FW timestamp in microseconds
- * @ktimes_us: Kernel Timestamp in microseconds
+ * @ktime_us: Kernel Timestamp in microseconds
  */
 struct wlan_connectivity_log_diag_cmn {
 	uint8_t bssid[6];
@@ -222,6 +230,84 @@ struct wlan_connectivity_log_diag_cmn {
 	uint64_t timestamp_us;
 	uint64_t fw_timestamp;
 	uint64_t ktime_us;
+} qdf_packed;
+
+#define DIAG_NBR_RPT_VERSION 1
+
+/**
+ * struct wlan_diag_nbr_rpt - Neighbor report structure
+ * @diag_cmn: Common diag info
+ * @version: structure version
+ * @num_rpt: the number of neighbor report elements in response frame.
+ * @subtype: Event Subtype
+ * @token: dialog token. Dialog Token is a nonzero value chosen by the STA
+ * @num_freq: Number of frequency in response frame
+ * @ssid_len: SSID length
+ * @seq_num: Sequence number
+ * @ssid: SSID
+ * @freq: Frequency list in response frame
+ */
+struct wlan_diag_nbr_rpt {
+	struct wlan_connectivity_log_diag_cmn diag_cmn;
+	uint8_t version;
+	uint8_t num_rpt;
+	uint8_t subtype;
+	uint8_t token;
+	uint16_t num_freq;
+	uint16_t ssid_len;
+	uint32_t seq_num;
+	char ssid[WLAN_SSID_MAX_LEN];
+	uint32_t freq[WLAN_MAX_LOGGING_FREQ];
+} qdf_packed;
+
+/**
+ * enum wlan_bcn_rpt_measurement_mode - Measurement mode enum.
+ * Defined in IEEE Std 802.11‐2020 Table 9-103.
+ * @MEASURE_MODE_PASSIVE: Passive measurement mode
+ * @MEASURE_MODE_ACTIVE: Active measurement mode
+ * @MEASURE_MODE_BCN_TABLE: Beacon table measurement mode
+ * @MEASURE_MODE_RESERVED: Reserved
+ */
+enum wlan_bcn_rpt_measurement_mode {
+	MEASURE_MODE_PASSIVE = 0,
+	MEASURE_MODE_ACTIVE,
+	MEASURE_MODE_BCN_TABLE,
+	MEASURE_MODE_RESERVED = 0xFF
+};
+
+#define DIAG_BCN_RPT_VERSION 1
+
+/**
+ * struct wlan_diag_bcn_rpt - Beacon report structure
+ * @diag_cmn: Common diag info
+ * @version: structure version
+ * @subtype: Event Subtype
+ * @diag_token: Dialog token
+ * @op_class: Operating classes that include primary channels
+ * @chan: The channel number field in the beacon report request.
+ * @req_mode: hex value defines Duration mandatory, parallel, enable,
+ * request, and report bits.
+ * @num_rpt: the number of neighbor report elements in response frame.
+ * @meas_token: A nonzero number that is unique among the Measurement Request
+ * elements
+ * @mode: Mode used for measurement.Values defined in IEEE
+ * Std 802.11‐2020 Table 9-103.
+ * @duration: The duration over which the Beacon report was measured.(in ms)
+ * @seq_num: Sequence number.
+ */
+struct wlan_diag_bcn_rpt {
+	struct wlan_connectivity_log_diag_cmn diag_cmn;
+	uint8_t version;
+	uint8_t subtype;
+	uint8_t diag_token;
+	uint8_t op_class;
+	uint8_t chan;
+	uint8_t req_mode;
+	uint8_t num_rpt;
+	uint8_t meas_token;
+	uint16_t mode;
+	uint16_t duration;
+	uint32_t seq_num;
 } qdf_packed;
 
 #define DIAG_ROAM_CAND_VERSION 1
@@ -280,7 +366,7 @@ struct wlan_diag_roam_scan_done {
 #define DIAG_ROAM_RESULT_VERSION 1
 
 /**
- * struct wlan_diag_roam_result_info  - Roam result data
+ * struct wlan_diag_roam_result - Roam result data
  * @diag_cmn: Common diag info
  * @version: Structure Version
  * @is_roam_successful: True if roamed successfully or false if roaming failed
@@ -366,7 +452,7 @@ struct wlan_diag_btm_cand_info {
  * transaction
  * @subtype: Event Subtype
  * @validity_timer: Validity interval in TBTT
- * @disassoc_timer: Time after which the AP disassociates the STA, defined
+ * @disassoc_tim: Time after which the AP disassociates the STA, defined
  * in TBTT.
  */
 struct wlan_diag_btm_info {
@@ -455,7 +541,7 @@ struct wlan_diag_packet_info {
  * Table 12-10—Integrity and key wrap algorithms.
  * @grp_cipher: Group cipher suite value as defined in
  * Table 12-10—Integrity and key wrap algorithm in IEEE 802.11 2020.
- * grp_mgmt: Group management cipher suite as defined in
+ * @grp_mgmt: Group management cipher suite as defined in
  * Table 12-10—Integrity and key wrap algorithms in IEEE 802.11 2020.
  */
 struct wlan_diag_connect {
@@ -502,7 +588,7 @@ struct wlan_roam_candidate_info {
 /**
  * struct wlan_roam_scan_info  - Roam scan related information
  * @cand_ap_count: Roam candidate AP count
- * @num_scanned_frequencies: Number of scanned frequencies
+ * @num_scanned_freq: Number of scanned frequencies
  * @is_btcoex_active: Is bluetooth coex active
  * @scan_freq: Array of scanned frequencies value in MHz
  */
@@ -512,6 +598,7 @@ struct wlan_roam_scan_info {
 	bool is_btcoex_active;
 	qdf_freq_t scan_freq[NUM_CHANNELS];
 };
+
 /**
  * struct wlan_roam_result_info  - Roam result data
  * @roam_fail_reason: Roam failure reason code defined in enum
@@ -524,8 +611,7 @@ struct wlan_roam_result_info {
 };
 
 /**
- * struct wlan_roam_scan_trigger_info  - Structure to store roam scan trigger
- * related data.
+ * struct wlan_roam_trigger_info - Structure to store roam trigger related data.
  * @is_full_scan: True if the scan is Full scan. False if the roam scan is
  * partial channel map scan
  * @trigger_reason: Roam trigger reason defined by enum roam_trigger_reason
@@ -547,7 +633,7 @@ struct wlan_roam_trigger_info {
 
 /**
  * struct wlan_btm_cand_info  - BTM candidate information
- * @index: Candidate index
+ * @idx: Candidate index
  * @preference: Candidate preference
  * @bssid: candidate bssid
  */
@@ -844,6 +930,7 @@ void wlan_clear_sae_auth_logs_cache(struct wlan_objmgr_psoc *psoc,
  * 2 - SAE confirm frame
  * @auth_seq: Authentication frame transaction sequence number as defined in
  * IEEE 802.11 - 2020 standard section 9.4.1.2
+ * @aid: Association ID
  * @tag: Record type main tag
  *
  * Return: QDF_STATUS
@@ -867,7 +954,7 @@ static inline void wlan_connectivity_logging_stop(void)
  * logging buffer
  * @psoc: Global psoc pointer
  * @osif_cbks: OSIF callbacks
- * @osif_cbk_context: OSIF callback context argument
+ * @osif_cb_context: OSIF callback context argument
  *
  * Return: None
  */
@@ -915,6 +1002,7 @@ QDF_STATUS wlan_connectivity_log_enqueue(struct wlan_log_record *new_record);
  * 2 - SAE confirm frame
  * @auth_seq: Authentication frame transaction sequence number as defined in
  * IEEE 802.11 - 2020 standard section 9.4.1.2
+ * @aid: Association ID
  * @tag: Record type main tag
  *
  * Return: QDF_STATUS

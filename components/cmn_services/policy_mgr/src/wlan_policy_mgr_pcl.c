@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -397,7 +397,7 @@ void policy_mgr_decr_session_set_pcl(struct wlan_objmgr_psoc *psoc,
 /**
  * policy_mgr_update_valid_ch_freq_list() - Update policy manager valid ch list
  * @pm_ctx: policy manager context data
- * @ch_list: Regulatory channel list
+ * @reg_ch_list: Regulatory channel list
  * @is_client: true if caller is a client, false if it is a beaconing entity
  *
  * When regulatory component channel list is updated this internal function is
@@ -1073,7 +1073,7 @@ add_freq:
 static QDF_STATUS policy_mgr_pcl_modification_for_sap(
 			struct wlan_objmgr_psoc *psoc,
 			uint32_t *pcl_channels, uint8_t *pcl_weight,
-			uint32_t *len)
+			uint32_t *len, uint32_t weight_len)
 {
 	QDF_STATUS status = QDF_STATUS_E_FAILURE;
 	struct policy_mgr_psoc_priv_obj *pm_ctx;
@@ -1086,6 +1086,10 @@ static QDF_STATUS policy_mgr_pcl_modification_for_sap(
 	bool srd_chan_enabled;
 
 	pm_ctx = policy_mgr_get_context(psoc);
+
+	/* check the channel avoidance list for beaconing entities */
+	policy_mgr_update_with_safe_channel_list(psoc, pcl_channels,
+						 len, pcl_weight, weight_len);
 
 	if (policy_mgr_is_sap_mandatory_channel_set(psoc)) {
 		status = policy_mgr_modify_sap_pcl_based_on_mandatory_channel(
@@ -1166,15 +1170,26 @@ static QDF_STATUS policy_mgr_pcl_modification_for_sap(
 static QDF_STATUS policy_mgr_pcl_modification_for_p2p_go(
 			struct wlan_objmgr_psoc *psoc,
 			uint32_t *pcl_channels, uint8_t *pcl_weight,
-			uint32_t *len)
+			uint32_t *len, uint32_t weight_len)
 {
 	QDF_STATUS status = QDF_STATUS_E_FAILURE;
 	bool srd_chan_enabled;
+
+	/* check the channel avoidance list for beaconing entities */
+	policy_mgr_update_with_safe_channel_list(psoc, pcl_channels,
+						 len, pcl_weight, weight_len);
 
 	status = policy_mgr_modify_pcl_based_on_enabled_channels(
 			psoc, pcl_channels, pcl_weight, len);
 	if (QDF_IS_STATUS_ERROR(status)) {
 		policy_mgr_err("failed to get modified pcl for GO");
+		return status;
+	}
+
+	status = policy_mgr_modify_sap_pcl_based_on_dfs(
+			psoc, pcl_channels, pcl_weight, len);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		policy_mgr_err("failed to get dfs modified pcl for GO");
 		return status;
 	}
 
@@ -1196,18 +1211,19 @@ static QDF_STATUS policy_mgr_pcl_modification_for_p2p_go(
 static QDF_STATUS policy_mgr_mode_specific_modification_on_pcl(
 			struct wlan_objmgr_psoc *psoc,
 			uint32_t *pcl_channels, uint8_t *pcl_weight,
-			uint32_t *len, enum policy_mgr_con_mode mode)
+			uint32_t *len, uint32_t weight_len,
+			enum policy_mgr_con_mode mode)
 {
 	QDF_STATUS status = QDF_STATUS_E_FAILURE;
 
 	switch (mode) {
 	case PM_SAP_MODE:
 		status = policy_mgr_pcl_modification_for_sap(
-			psoc, pcl_channels, pcl_weight, len);
+			psoc, pcl_channels, pcl_weight, len, weight_len);
 		break;
 	case PM_P2P_GO_MODE:
 		status = policy_mgr_pcl_modification_for_p2p_go(
-			psoc, pcl_channels, pcl_weight, len);
+			psoc, pcl_channels, pcl_weight, len, weight_len);
 		break;
 	case PM_STA_MODE:
 	case PM_P2P_CLIENT_MODE:
@@ -1383,7 +1399,7 @@ QDF_STATUS policy_mgr_get_pcl(struct wlan_objmgr_psoc *psoc,
 	policy_mgr_debug("PCL before modification");
 	policy_mgr_dump_channel_list(*len, pcl_channels, pcl_weight);
 	policy_mgr_mode_specific_modification_on_pcl(
-		psoc, pcl_channels, pcl_weight, len, mode);
+		psoc, pcl_channels, pcl_weight, len, weight_len, mode);
 
 	status = policy_mgr_modify_pcl_based_on_dnbs(psoc, pcl_channels,
 						pcl_weight, len);
@@ -2357,7 +2373,7 @@ policy_mgr_get_index_for_ml_sta_sap_dbs(
 }
 
 /**
- * policy_mgr_get_index_for_ml_sta_sap_sbs() - Find the index for next
+ * policy_mgr_get_index_for_ml_sta_sap_hwmode_sbs() - Find the index for next
  * connection for ML STA + SAP, in case current HW mode is SBS but ML STA is
  * with 2 GHz + 5/6 GHz.
  * @pm_ctx: policy manager context
@@ -3230,7 +3246,8 @@ QDF_STATUS policy_mgr_get_valid_chans_from_range(
 			ch_weight_len);
 
 	status = policy_mgr_mode_specific_modification_on_pcl(
-			psoc, ch_freq_list, ch_weight_list, ch_cnt, mode);
+			psoc, ch_freq_list, ch_weight_list, ch_cnt,
+			ch_weight_len, mode);
 
 	if (QDF_IS_STATUS_ERROR(status)) {
 		policy_mgr_err("failed to get modified pcl for mode %d", mode);

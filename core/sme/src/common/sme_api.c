@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -3315,7 +3315,7 @@ QDF_STATUS sme_roam_ndi_stop(mac_handle_t mac_handle, uint8_t vdev_id)
 			 0));
 
 	if (!CSR_IS_SESSION_VALID(mac_ctx, vdev_id)) {
-		sme_err("Invalid sessionID: %d", vdev_id);
+		sme_debug("Invalid sessionID: %d", vdev_id);
 		return QDF_STATUS_E_INVAL;
 	}
 
@@ -3943,6 +3943,39 @@ QDF_STATUS sme_neighbor_report_request(
 	}
 
 	return status;
+}
+
+void sme_register_ssr_on_pagefault_cb(mac_handle_t mac_handle,
+				      void (*hdd_ssr_on_pagefault_cb)(void))
+{
+	QDF_STATUS status;
+	struct mac_context *mac = MAC_CONTEXT(mac_handle);
+
+	SME_ENTER();
+
+	status = sme_acquire_global_lock(&mac->sme);
+	if (QDF_IS_STATUS_SUCCESS(status)) {
+		mac->sme.ssr_on_pagefault_cb = hdd_ssr_on_pagefault_cb;
+		sme_release_global_lock(&mac->sme);
+	}
+
+	SME_EXIT();
+}
+
+void sme_deregister_ssr_on_pagefault_cb(mac_handle_t mac_handle)
+{
+	QDF_STATUS status;
+	struct mac_context *mac = MAC_CONTEXT(mac_handle);
+
+	SME_ENTER();
+
+	status = sme_acquire_global_lock(&mac->sme);
+	if (QDF_IS_STATUS_SUCCESS(status)) {
+		mac->sme.ssr_on_pagefault_cb = NULL;
+		sme_release_global_lock(&mac->sme);
+	}
+
+	SME_EXIT();
 }
 
 #ifdef FEATURE_OEM_DATA_SUPPORT
@@ -7777,7 +7810,7 @@ int sme_set_auto_rate_he_ltf(mac_handle_t mac_handle, uint8_t session_id,
 
 	mac_ctx->he_sgi_ltf_cfg_bit_mask = set_val;
 	status = wma_cli_set_command(session_id,
-			WMI_VDEV_PARAM_AUTORATE_MISC_CFG,
+			wmi_vdev_param_autorate_misc_cfg,
 			set_val, VDEV_CMD);
 	if (status) {
 		sme_err("failed to set he_ltf_sgi");
@@ -7811,7 +7844,7 @@ int sme_set_auto_rate_he_sgi(mac_handle_t mac_handle, uint8_t session_id,
 
 	mac_ctx->he_sgi_ltf_cfg_bit_mask = set_val;
 	status = wma_cli_set_command(session_id,
-				     WMI_VDEV_PARAM_AUTORATE_MISC_CFG,
+				     wmi_vdev_param_autorate_misc_cfg,
 				     set_val, VDEV_CMD);
 	if (status) {
 		sme_err("failed to set he_ltf_sgi");
@@ -7836,7 +7869,7 @@ int sme_set_auto_rate_ldpc(mac_handle_t mac_handle, uint8_t session_id,
 	set_val |= (ldpc_disable << AUTO_RATE_LDPC_DIS_BIT);
 
 	status = wma_cli_set_command(session_id,
-				     WMI_VDEV_PARAM_AUTORATE_MISC_CFG,
+				     wmi_vdev_param_autorate_misc_cfg,
 				     set_val, VDEV_CMD);
 	if (status) {
 		sme_err("failed to set auto rate LDPC cfg");
@@ -11696,8 +11729,8 @@ QDF_STATUS sme_set_peer_authorized(uint8_t *peer_addr,
 		return QDF_STATUS_E_FAILURE;
 
 	wma_set_peer_authorized_cb(wma_handle, auth_cb);
-	return wma_set_peer_param(wma_handle, peer_addr, WMI_PEER_AUTHORIZE,
-				  1, vdev_id);
+	return wma_set_peer_param(wma_handle, peer_addr,
+				  WMI_HOST_PEER_AUTHORIZE, 1, vdev_id);
 }
 
 /**
@@ -11926,7 +11959,7 @@ QDF_STATUS sme_handle_bcn_recv_start(mac_handle_t mac_handle,
 	 * beacons of connected AP to HOST
 	 */
 	ret = sme_cli_set_command(vdev_id,
-				  WMI_VDEV_PARAM_NTH_BEACON_TO_HOST,
+				  wmi_vdev_param_nth_beacon_to_host,
 				  nth_value, VDEV_CMD);
 	if (ret) {
 		status = sme_acquire_global_lock(&mac_ctx->sme);
@@ -11935,7 +11968,7 @@ QDF_STATUS sme_handle_bcn_recv_start(mac_handle_t mac_handle,
 			session->beacon_report_do_not_resume = false;
 			sme_release_global_lock(&mac_ctx->sme);
 		}
-		sme_err("WMI_VDEV_PARAM_NTH_BEACON_TO_HOST %d", ret);
+		sme_err("wmi_vdev_param_nth_beacon_to_host %d", ret);
 		status = qdf_status_from_os_return(ret);
 	}
 
@@ -11956,10 +11989,10 @@ void sme_stop_beacon_report(mac_handle_t mac_handle, uint32_t session_id)
 	}
 
 	ret = sme_cli_set_command(session_id,
-				  WMI_VDEV_PARAM_NTH_BEACON_TO_HOST, 0,
+				  wmi_vdev_param_nth_beacon_to_host, 0,
 				  VDEV_CMD);
 	if (ret)
-		sme_err("WMI_VDEV_PARAM_NTH_BEACON_TO_HOST command failed to FW");
+		sme_err("wmi_vdev_param_nth_beacon_to_host command failed to FW");
 	status = sme_acquire_global_lock(&mac_ctx->sme);
 	if (QDF_IS_STATUS_SUCCESS(status)) {
 		session->is_bcn_recv_start = false;
@@ -13847,7 +13880,7 @@ int sme_set_enable_mem_deep_sleep(mac_handle_t mac_handle, int vdev_id)
 {
 	struct mac_context *mac_ctx = MAC_CONTEXT(mac_handle);
 
-	return wma_cli_set_command(vdev_id, WMI_PDEV_PARAM_HYST_EN,
+	return wma_cli_set_command(vdev_id, wmi_pdev_param_hyst_en,
 				   mac_ctx->mlme_cfg->gen.memory_deep_sleep,
 				   PDEV_CMD);
 }
@@ -13857,7 +13890,7 @@ int sme_set_cck_tx_fir_override(mac_handle_t mac_handle, int vdev_id)
 	struct mac_context *mac_ctx = MAC_CONTEXT(mac_handle);
 
 	return wma_cli_set_command(vdev_id,
-				   WMI_PDEV_PARAM_ENABLE_CCK_TXFIR_OVERRIDE,
+				   wmi_pdev_param_enable_cck_txfir_override,
 				   mac_ctx->mlme_cfg->gen.cck_tx_fir_override,
 				   PDEV_CMD);
 }
@@ -14532,7 +14565,7 @@ void sme_set_cfg_disable_tx(mac_handle_t mac_handle, uint8_t vdev_id,
 	}
 
 	ret_val = wma_cli_set_command(vdev_id,
-			WMI_VDEV_PARAM_PROHIBIT_DATA_MGMT,
+			wmi_vdev_param_prohibit_data_mgmt,
 			val, VDEV_CMD);
 	if (ret_val)
 		sme_err("Failed to set firmware, errno %d", ret_val);
@@ -14628,7 +14661,7 @@ void sme_check_enable_ru_242_tx(mac_handle_t mac_handle, uint8_t vdev_id)
 	sme_debug("Config VDEV for RU 242 Tx, usr cfg %d",
 		  mac_ctx->usr_cfg_ru_242_tone_tx);
 	if (mac_ctx->usr_cfg_ru_242_tone_tx) {
-		ret = wma_cli_set_command(vdev_id, WMI_VDEV_PARAM_CHWIDTH,
+		ret = wma_cli_set_command(vdev_id, wmi_vdev_param_chwidth,
 					  0, VDEV_CMD);
 		if (ret)
 			sme_err("Failed to set VDEV BW to 20MHz");
@@ -14731,7 +14764,7 @@ void sme_set_he_testbed_def(mac_handle_t mac_handle, uint8_t vdev_id)
 	if (QDF_STATUS_SUCCESS != status)
 		sme_err("prevent pm cmd send failed");
 	status = wma_cli_set_command(vdev_id,
-				     WMI_VDEV_PARAM_ENABLE_BCAST_PROBE_RESPONSE,
+				     wmi_vdev_param_enable_bcast_probe_response,
 				     0, VDEV_CMD);
 	if (QDF_IS_STATUS_ERROR(status))
 		sme_err("Failed to set enable bcast probe resp in FW, %d",
@@ -14779,7 +14812,7 @@ void sme_reset_he_caps(mac_handle_t mac_handle, uint8_t vdev_id)
 			status);
 
 	status = wma_cli_set_command(vdev_id,
-				     WMI_VDEV_PARAM_ENABLE_BCAST_PROBE_RESPONSE,
+				     wmi_vdev_param_enable_bcast_probe_response,
 				     1, VDEV_CMD);
 	if (QDF_IS_STATUS_ERROR(status))
 		sme_err("Failed to set enable bcast probe resp in FW, %d",
@@ -16357,4 +16390,20 @@ QDF_STATUS sme_update_beacon_country_ie(mac_handle_t mac_handle,
 	csr_update_beacon(mac);
 
 	return QDF_STATUS_SUCCESS;
+}
+
+QDF_STATUS
+sme_send_multi_pdev_vdev_set_params(enum mlme_dev_setparam param_type,
+				    uint8_t dev_id,
+				    struct dev_set_param *param,
+				    uint8_t max_index)
+{
+	return wma_send_multi_pdev_vdev_set_params(param_type, dev_id, param,
+						   max_index);
+}
+
+QDF_STATUS
+sme_validate_txrx_chain_mask(uint32_t id, uint32_t value)
+{
+	return wma_validate_txrx_chain_mask(id, value);
 }

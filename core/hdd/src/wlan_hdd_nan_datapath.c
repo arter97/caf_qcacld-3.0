@@ -623,11 +623,11 @@ int hdd_init_nan_data_mode(struct hdd_adapter *adapter)
 		hdd_err("Failed to get sifs burst value, use default");
 
 	ret_val = wma_cli_set_command((int)adapter->vdev_id,
-				      (int)WMI_PDEV_PARAM_BURST_ENABLE,
+				      (int)wmi_pdev_param_burst_enable,
 				      enable_sifs_burst,
 				      PDEV_CMD);
 	if (0 != ret_val)
-		hdd_err("WMI_PDEV_PARAM_BURST_ENABLE set failed %d", ret_val);
+		hdd_err("wmi_pdev_param_burst_enable set failed %d", ret_val);
 
 	/* RTS CTS PARAM  */
 	status = ucfg_fwol_get_rts_profile(hdd_ctx->psoc, &rts_profile);
@@ -635,7 +635,7 @@ int hdd_init_nan_data_mode(struct hdd_adapter *adapter)
 		hdd_err("FAILED TO GET RTSCTS Profile status:%d", status);
 
 	ret_val = sme_cli_set_command(adapter->vdev_id,
-				      WMI_VDEV_PARAM_ENABLE_RTSCTS, rts_profile,
+				      wmi_vdev_param_enable_rtscts, rts_profile,
 				      VDEV_CMD);
 	if (ret_val)
 		hdd_err("FAILED TO SET RTSCTS Profile ret:%d", ret_val);
@@ -917,6 +917,12 @@ int hdd_ndi_delete(uint8_t vdev_id, const char *iface_name,
 	return ret;
 }
 
+#define MAX_VDEV_NDP_PARAMS 2
+/* params being sent:
+ * wmi_vdev_param_ndp_inactivity_timeout
+ * wmi_vdev_param_ndp_keepalive_timeout
+ */
+
 void hdd_ndi_drv_ndi_create_rsp_handler(uint8_t vdev_id,
 				struct nan_datapath_inf_create_rsp *ndi_rsp)
 {
@@ -928,6 +934,9 @@ void hdd_ndi_drv_ndi_create_rsp_handler(uint8_t vdev_id,
 	uint16_t ndp_keep_alive_period;
 	struct qdf_mac_addr bc_mac_addr = QDF_MAC_ADDR_BCAST_INIT;
 	struct wlan_objmgr_vdev *vdev;
+	struct dev_set_param setparam[MAX_VDEV_NDP_PARAMS] = {};
+	uint8_t index = 0;
+	QDF_STATUS status;
 
 	hdd_ctx = cds_get_context(QDF_MODULE_ID_HDD);
 	if (!hdd_ctx)
@@ -969,18 +978,35 @@ void hdd_ndi_drv_ndi_create_rsp_handler(uint8_t vdev_id,
 		if (QDF_IS_STATUS_ERROR(cfg_nan_get_ndp_inactivity_timeout(
 		    hdd_ctx->psoc, &ndp_inactivity_timeout)))
 			hdd_err("Failed to fetch inactivity timeout value");
-
-		sme_cli_set_command(adapter->vdev_id,
-				    WMI_VDEV_PARAM_NDP_INACTIVITY_TIMEOUT,
-				    ndp_inactivity_timeout, VDEV_CMD);
+		status = mlme_check_index_setparam(
+					setparam,
+					wmi_vdev_param_ndp_inactivity_timeout,
+					ndp_inactivity_timeout, index++,
+					MAX_VDEV_NDP_PARAMS);
+		if (QDF_IS_STATUS_ERROR(status)) {
+			hdd_err("failed at wmi_vdev_param_ndp_inactivity_timeout");
+			goto error;
+		}
 
 		if (QDF_IS_STATUS_SUCCESS(cfg_nan_get_ndp_keepalive_period(
 						hdd_ctx->psoc,
-						&ndp_keep_alive_period)))
-			sme_cli_set_command(
-				adapter->vdev_id,
-				WMI_VDEV_PARAM_NDP_KEEPALIVE_TIMEOUT,
-				ndp_keep_alive_period, VDEV_CMD);
+						&ndp_keep_alive_period))) {
+			status = mlme_check_index_setparam(
+					setparam,
+					wmi_vdev_param_ndp_keepalive_timeout,
+					ndp_keep_alive_period, index++,
+					MAX_VDEV_NDP_PARAMS);
+			if (QDF_IS_STATUS_ERROR(status)) {
+				hdd_err("failed at wmi_vdev_param_ndp_keepalive_timeout");
+				goto error;
+			}
+		}
+		status = sme_send_multi_pdev_vdev_set_params(MLME_VDEV_SETPARAM,
+							     adapter->vdev_id,
+							     setparam,
+							     index);
+		if (QDF_IS_STATUS_ERROR(status))
+			hdd_err("failed to send vdev set params");
 	} else {
 		hdd_alert("NDI interface creation failed with reason %d",
 			ndi_rsp->reason /* create_reason */);
@@ -991,6 +1017,7 @@ void hdd_ndi_drv_ndi_create_rsp_handler(uint8_t vdev_id,
 	hdd_roam_register_sta(adapter, &roam_info->bssid,
 			      roam_info->fAuthRequired);
 
+error:
 	qdf_mem_free(roam_info);
 }
 

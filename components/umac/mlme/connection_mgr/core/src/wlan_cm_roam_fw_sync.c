@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -46,6 +46,7 @@
 #include "connection_mgr/core/src/wlan_cm_sm.h"
 #include <wlan_mlo_mgr_sta.h>
 #include "wlan_mlo_mgr_roam.h"
+#include "wlan_vdev_mgr_utils_api.h"
 
 QDF_STATUS cm_fw_roam_sync_req(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 			       void *event, uint32_t event_data_len)
@@ -61,7 +62,9 @@ QDF_STATUS cm_fw_roam_sync_req(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 		return QDF_STATUS_E_NULL_VALUE;
 	}
 
-	if (cm_is_vdev_connecting(vdev) || cm_is_vdev_disconnecting(vdev)) {
+	if (mlo_is_mld_disconnecting_connecting(vdev) ||
+	    cm_is_vdev_connecting(vdev) ||
+	    cm_is_vdev_disconnecting(vdev)) {
 		mlme_err("vdev %d Roam sync not handled in connecting/disconnecting state",
 			 vdev_id);
 		wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_SB_ID);
@@ -465,6 +468,43 @@ cm_fill_bssid_freq_info(uint8_t vdev_id,
 }
 #endif
 
+static void
+cm_update_assoc_btm_cap(struct wlan_objmgr_vdev *vdev,
+			struct cm_vdev_join_rsp *rsp)
+{
+	struct wlan_connect_rsp_ies *connect_ies;
+	const uint8_t *ext_cap_ie;
+	struct s_ext_cap *extcap;
+	uint8_t offset;
+
+	connect_ies = &rsp->connect_rsp.connect_ies;
+	/*
+	 * Retain the btm cap from initial assoc if
+	 * there is no assoc request
+	 */
+	if (!connect_ies->assoc_req.ptr ||
+	    !connect_ies->assoc_req.len)
+		return;
+
+	if (rsp->connect_rsp.is_assoc)
+		offset = WLAN_ASSOC_REQ_IES_OFFSET;
+	else
+		offset = WLAN_REASSOC_REQ_IES_OFFSET;
+
+	ext_cap_ie =
+		wlan_get_ie_ptr_from_eid(WLAN_ELEMID_XCAPS,
+					 connect_ies->assoc_req.ptr + offset,
+					 connect_ies->assoc_req.len - offset);
+
+	if (!ext_cap_ie) {
+		mlme_debug("Ext cap is not present, disable btm");
+		wlan_cm_set_assoc_btm_cap(vdev, false);
+		return;
+	}
+	extcap = (struct s_ext_cap *)&ext_cap_ie[2];
+	wlan_cm_set_assoc_btm_cap(vdev, extcap->bss_transition);
+}
+
 static QDF_STATUS
 cm_fill_roam_info(struct wlan_objmgr_vdev *vdev,
 		  struct roam_offload_synch_ind *roam_synch_data,
@@ -549,6 +589,7 @@ cm_fill_roam_info(struct wlan_objmgr_vdev *vdev,
 	roaming_info->next_erp_seq_num = roam_synch_data->next_erp_seq_num;
 
 	cm_fils_update_erp_seq_num(vdev, roaming_info->next_erp_seq_num, cm_id);
+	cm_update_assoc_btm_cap(vdev, rsp);
 
 	return status;
 }
@@ -932,6 +973,7 @@ cm_fw_roam_sync_propagation(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 		policy_mgr_move_vdev_from_disabled_to_connection_tbl(psoc,
 								     vdev_id);
 	mlo_roam_copy_partner_info(connect_rsp, roam_synch_data);
+	mlo_roam_init_cu_bpcc(vdev, roam_synch_data);
 	mlo_roam_set_link_id(vdev, roam_synch_data);
 
 	/**
@@ -955,7 +997,7 @@ cm_fw_roam_sync_propagation(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 		wlan_cm_tgt_send_roam_sync_complete_cmd(psoc, vdev_id);
 		mlo_roam_update_connected_links(vdev, connect_rsp);
 		mlo_set_single_link_ml_roaming(psoc, vdev_id,
-					       roam_synch_data, false);
+					       false);
 	}
 	cm_connect_info(vdev, true, &connect_rsp->bssid, &connect_rsp->ssid,
 			connect_rsp->freq);
@@ -970,6 +1012,10 @@ cm_fw_roam_sync_propagation(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 	}
 	mlme_cm_osif_connect_complete(vdev, connect_rsp);
 	mlme_cm_osif_roam_complete(vdev);
+
+	if (wlan_vdev_mlme_is_mlo_vdev(vdev) &&
+	    roam_synch_data->auth_status == ROAM_AUTH_STATUS_CONNECTED)
+		mlo_roam_copy_reassoc_rsp(vdev, connect_rsp);
 	mlme_debug(CM_PREFIX_FMT, CM_PREFIX_REF(vdev_id, cm_id));
 	cm_remove_cmd(cm_ctx, &cm_id);
 	status = QDF_STATUS_SUCCESS;
@@ -1132,7 +1178,8 @@ QDF_STATUS cm_fw_roam_complete(struct cnx_mgr *cm_ctx, void *data)
 		wlan_cm_roam_state_change(pdev, vdev_id,
 					  WLAN_ROAM_RSO_STOPPED,
 					  REASON_DISCONNECTED);
-	policy_mgr_check_concurrent_intf_and_restart_sap(psoc);
+	policy_mgr_check_concurrent_intf_and_restart_sap(psoc,
+			wlan_util_vdev_mgr_get_acs_mode_for_vdev(cm_ctx->vdev));
 end:
 	return status;
 }

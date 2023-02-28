@@ -188,6 +188,10 @@ extern const struct nla_policy wlan_hdd_wisa_cmd_policy[
 #define WLAN_AKM_SUITE_FT_EAP_SHA_384 0x000FAC0D
 #endif
 
+#ifndef WLAN_AKM_SUITE_SAE_EXT_KEY
+#define WLAN_AKM_SUITE_SAE_EXT_KEY 0x000FAC18
+#endif
+
 #ifdef FEATURE_WLAN_TDLS
 #define WLAN_IS_TDLS_SETUP_ACTION(action) \
 	((TDLS_SETUP_REQUEST <= action) && \
@@ -1043,10 +1047,12 @@ wlan_hdd_mlo_copy_partner_addr_from_mlie(struct wlan_objmgr_vdev *vdev,
  * Return: Peer object
  */
 struct wlan_objmgr_peer *
-wlan_hdd_ml_sap_get_peer(struct wlan_objmgr_vdev *vdev, uint8_t *peer_mld);
+wlan_hdd_ml_sap_get_peer(struct wlan_objmgr_vdev *vdev,
+			 const uint8_t *peer_mld);
 #else
 static inline struct wlan_objmgr_peer *
-wlan_hdd_ml_sap_get_peer(struct wlan_objmgr_vdev *vdev, uint8_t *peer_mld)
+wlan_hdd_ml_sap_get_peer(struct wlan_objmgr_vdev *vdev,
+			 const uint8_t *peer_mld)
 {
 	return NULL;
 }

@@ -118,21 +118,23 @@ enum nan_datapath_status_type {
 
 /**
  * enum nan_datapath_reason_code - NDP command rsp reason code value
- * @NDP_UNSUPPORTED_CONCURRENCY: Will be used in unsupported concurrency cases
- * @NDP_NAN_DATA_IFACE_CREATE_FAILED: ndi create failed
- * @NDP_NAN_DATA_IFACE_DELETE_FAILED: ndi delete failed
- * @NDP_DATA_INITIATOR_REQ_FAILED: data initiator request failed
- * @NDP_DATA_RESPONDER_REQ_FAILED: data responder request failed
- * @NDP_INVALID_SERVICE_INSTANCE_ID: invalid service instance id
- * @NDP_INVALID_NDP_INSTANCE_ID: invalid ndp instance id
- * @NDP_INVALID_RSP_CODE: invalid response code in ndp responder request
- * @NDP_INVALID_APP_INFO_LEN: invalid app info length
- * @NDP_NMF_REQ_FAIL: OTA nan mgmt frame failure for data request
- * @NDP_NMF_RSP_FAIL: OTA nan mgmt frame failure for data response
- * @NDP_NMF_CNF_FAIL: OTA nan mgmt frame failure for confirm
- * @NDP_END_FAILED: ndp end failed
- * @NDP_NMF_END_REQ_FAIL: OTA nan mgmt frame failure for data end
- * @NDP_VENDOR_SPECIFIC_ERROR: other vendor specific failures
+ * @NAN_DATAPATH_UNSUPPORTED_CONCURRENCY: Will be used in unsupported
+ *                                        concurrency cases
+ * @NAN_DATAPATH_NAN_DATA_IFACE_CREATE_FAILED: ndi create failed
+ * @NAN_DATAPATH_NAN_DATA_IFACE_DELETE_FAILED: ndi delete failed
+ * @NAN_DATAPATH_DATA_INITIATOR_REQ_FAILED: data initiator request failed
+ * @NAN_DATAPATH_DATA_RESPONDER_REQ_FAILED: data responder request failed
+ * @NAN_DATAPATH_INVALID_SERVICE_INSTANCE_ID: invalid service instance id
+ * @NAN_DATAPATH_INVALID_NDP_INSTANCE_ID: invalid ndp instance id
+ * @NAN_DATAPATH_INVALID_RSP_CODE: invalid response code in ndp responder
+ *                                 request
+ * @NAN_DATAPATH_INVALID_APP_INFO_LEN: invalid app info length
+ * @NAN_DATAPATH_NMF_REQ_FAIL: OTA nan mgmt frame failure for data request
+ * @NAN_DATAPATH_NMF_RSP_FAIL: OTA nan mgmt frame failure for data response
+ * @NAN_DATAPATH_NMF_CNF_FAIL: OTA nan mgmt frame failure for confirm
+ * @NAN_DATAPATH_END_FAILED: ndp end failed
+ * @NAN_DATAPATH_NMF_END_REQ_FAIL: OTA nan mgmt frame failure for data end
+ * @NAN_DATAPATH_VENDOR_SPECIFIC_ERROR: other vendor specific failures
  */
 enum nan_datapath_reason_code {
 	NAN_DATAPATH_UNSUPPORTED_CONCURRENCY = 9000,
@@ -214,6 +216,7 @@ enum nan_datapath_end_reason_code {
 
 /**
  * enum nan_datapath_state - NAN datapath states
+ * @NAN_DATA_INVALID_STATE: Invalid state
  * @NAN_DATA_NDI_CREATING_STATE: NDI create is in progress
  * @NAN_DATA_NDI_CREATED_STATE: NDI successfully created
  * @NAN_DATA_NDI_DELETING_STATE: NDI delete is in progress
@@ -352,7 +355,6 @@ struct nan_datapath_inf_create_req {
 struct nan_datapath_inf_create_rsp {
 	uint32_t status;
 	uint32_t reason;
-	uint8_t sta_id;
 };
 
 /**
@@ -651,7 +653,7 @@ struct nan_datapath_end_indication_event {
 };
 
 /**
- * struct nan_datapath_peer_ind - ndp peer indication
+ * struct nan_dump_msg - ndp logging message
  * @msg: msg received by FW
  * @data_len: data length
  *
@@ -706,7 +708,7 @@ struct nan_datapath_confirm_event {
  * @ndp_initiator_mac_addr: NDI mac address of the peer initiating NDP
  * @ndp_instance_id: locally created NDP instance ID
  * @role: self role for NDP
- * @ndp_accept_policy: accept policy configured by the upper layer
+ * @policy: accept policy configured by the upper layer
  * @ndp_config: ndp configuration params
  * @ndp_info: ndp application info
  * @ncs_sk_type: indicates NCS_SK_128 or NCS_SK_256

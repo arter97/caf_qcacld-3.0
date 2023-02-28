@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -22,7 +22,7 @@
 
 #include "wlan_policy_mgr_api.h"
 
-/**
+/*
  * pm_second_connection_pcl_dbs_sbs_2x2_table - table which provides PCL
  * for the 2nd connection, when we have a connection already in
  * the system (with DBS-SBS supported by HW)
@@ -222,7 +222,7 @@ pm_second_connection_pcl_dbs_sbs_2x2_table = {
 			 PM_5G_SCC_CH } },
 };
 
-/**
+/*
  * third_connection_pcl_dbs_table - table which provides PCL for
  * the 3rd connection, when we have two connections already in
  * the system (with DBS supported by HW)
