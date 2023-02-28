@@ -319,12 +319,12 @@ void hdd_cm_clear_pmf_stats(struct hdd_adapter *adapter);
 
 /**
  * hdd_cm_save_connect_status() - Save connect status
- * @adapter: pointer to the adapter structure
+ * @link_info: Link info pointer in HDD adapter
  * @reason_code: IEE80211 wlan status code
  *
  * Returns: None
  */
-void hdd_cm_save_connect_status(struct hdd_adapter *adapter,
+void hdd_cm_save_connect_status(struct wlan_hdd_link_info *link_info,
 				uint32_t reason_code);
 
 /**
