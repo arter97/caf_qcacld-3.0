@@ -6905,7 +6905,7 @@ int hdd_vdev_destroy(struct hdd_adapter *adapter)
 	hdd_stop_last_active_connection(hdd_ctx, vdev);
 	hdd_check_wait_for_hw_mode_completion(hdd_ctx);
 	ucfg_scan_vdev_set_disable(vdev, REASON_VDEV_DOWN);
-	wlan_hdd_scan_abort(adapter);
+	wlan_hdd_scan_abort(adapter->deflink);
 	hdd_vdev_deinit_components(vdev);
 	wlan_cfg80211_cleanup_scan_queue(hdd_ctx->pdev, adapter->dev);
 	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
@@ -8821,7 +8821,7 @@ QDF_STATUS hdd_stop_adapter_ext(struct hdd_context *hdd_ctx,
 		    ucfg_is_nan_disc_active(hdd_ctx->psoc))
 			ucfg_disable_nan_discovery(hdd_ctx->psoc, NULL, 0);
 
-		wlan_hdd_scan_abort(adapter);
+		wlan_hdd_scan_abort(link_info);
 		wlan_hdd_cleanup_actionframe(link_info);
 		wlan_hdd_cleanup_remain_on_channel_ctx(link_info);
 		status = wlan_hdd_flush_pmksa_cache(link_info);
@@ -8877,7 +8877,7 @@ QDF_STATUS hdd_stop_adapter_ext(struct hdd_context *hdd_ctx,
 			qdf_wake_lock_release(&hdd_ctx->monitor_mode_wakelock,
 				WIFI_POWER_EVENT_WAKELOCK_MONITOR_MODE);
 		}
-		wlan_hdd_scan_abort(adapter);
+		wlan_hdd_scan_abort(link_info);
 		hdd_deregister_hl_netdev_fc_timer(adapter);
 		hdd_deregister_tx_flow_control(adapter);
 		status = hdd_disable_monitor_mode();
@@ -8893,7 +8893,7 @@ QDF_STATUS hdd_stop_adapter_ext(struct hdd_context *hdd_ctx,
 		break;
 
 	case QDF_SAP_MODE:
-		wlan_hdd_scan_abort(adapter);
+		wlan_hdd_scan_abort(link_info);
 		hdd_abort_ongoing_sta_connection(hdd_ctx);
 		/* Diassociate with all the peers before stop ap post */
 		if (test_bit(SOFTAP_BSS_STARTED, &link_info->link_flags)) {
@@ -9184,20 +9184,19 @@ void hdd_set_netdev_flags(struct hdd_adapter *adapter)
 	hdd_debug("adapter mode %u dev feature 0x%llx", device_mode, temp);
 }
 
-static void hdd_reset_scan_operation(struct hdd_context *hdd_ctx,
-				     struct hdd_adapter *adapter)
+static void hdd_reset_scan_operation(struct wlan_hdd_link_info *link_info)
 {
-	switch (adapter->device_mode) {
+	switch (link_info->adapter->device_mode) {
 	case QDF_STA_MODE:
 	case QDF_P2P_CLIENT_MODE:
 	case QDF_P2P_DEVICE_MODE:
 	case QDF_NDI_MODE:
-		wlan_hdd_scan_abort(adapter);
-		wlan_hdd_cleanup_remain_on_channel_ctx(adapter->deflink);
-		if (adapter->device_mode == QDF_STA_MODE) {
+		wlan_hdd_scan_abort(link_info);
+		wlan_hdd_cleanup_remain_on_channel_ctx(link_info);
+		if (link_info->adapter->device_mode == QDF_STA_MODE) {
 			struct wlan_objmgr_vdev *vdev;
 
-			vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink,
+			vdev = hdd_objmgr_get_vdev_by_user(link_info,
 							   WLAN_OSIF_SCAN_ID);
 			if (!vdev)
 				break;
@@ -9207,10 +9206,10 @@ static void hdd_reset_scan_operation(struct hdd_context *hdd_ctx,
 		}
 		break;
 	case QDF_P2P_GO_MODE:
-		wlan_hdd_cleanup_remain_on_channel_ctx(adapter->deflink);
+		wlan_hdd_cleanup_remain_on_channel_ctx(link_info);
 		break;
 	case QDF_SAP_MODE:
-		qdf_atomic_set(&adapter->deflink->session.ap.acs_in_progress, 0);
+		qdf_atomic_set(&link_info->session.ap.acs_in_progress, 0);
 		break;
 	default:
 		break;
@@ -9303,7 +9302,7 @@ QDF_STATUS hdd_reset_all_adapters(struct hdd_context *hdd_ctx)
 						     WLAN_START_ALL_NETIF_QUEUE,
 						     WLAN_DATA_FLOW_CONTROL);
 
-			hdd_reset_scan_operation(hdd_ctx, adapter);
+			hdd_reset_scan_operation(link_info);
 
 			if (test_bit(WMM_INIT_DONE, &adapter->event_flags)) {
 				hdd_wmm_adapter_close(adapter);
@@ -10205,6 +10204,7 @@ QDF_STATUS hdd_abort_mac_scan_all_adapters(struct hdd_context *hdd_ctx)
 	struct hdd_adapter *adapter, *next_adapter = NULL;
 	wlan_net_dev_ref_dbgid dbgid =
 				NET_DEV_HOLD_ABORT_MAC_SCAN_ALL_ADAPTERS;
+	struct wlan_hdd_link_info *link_info;
 
 	hdd_enter();
 
@@ -10215,9 +10215,12 @@ QDF_STATUS hdd_abort_mac_scan_all_adapters(struct hdd_context *hdd_ctx)
 		    adapter->device_mode == QDF_P2P_DEVICE_MODE ||
 		    adapter->device_mode == QDF_SAP_MODE ||
 		    adapter->device_mode == QDF_P2P_GO_MODE) {
-			wlan_abort_scan(hdd_ctx->pdev, INVAL_PDEV_ID,
-					adapter->deflink->vdev_id,
-					INVALID_SCAN_ID, true);
+			hdd_adapter_for_each_active_link_info(adapter,
+							      link_info) {
+				wlan_abort_scan(hdd_ctx->pdev, INVAL_PDEV_ID,
+						link_info->vdev_id,
+						INVALID_SCAN_ID, true);
+			}
 		}
 		hdd_adapter_dev_put_debug(adapter, dbgid);
 	}

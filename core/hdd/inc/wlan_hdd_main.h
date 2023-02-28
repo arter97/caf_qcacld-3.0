@@ -3117,11 +3117,11 @@ bool hdd_is_2g_supported(struct hdd_context *hdd_ctx);
 
 /**
  * wlan_hdd_scan_abort() - abort ongoing scan
- * @adapter: Pointer to interface adapter
+ * @link_info: Link info pointer in HDD adapter
  *
  * Return: 0 for success, non zero for failure
  */
-int wlan_hdd_scan_abort(struct hdd_adapter *adapter);
+int wlan_hdd_scan_abort(struct wlan_hdd_link_info *link_info);
 
 /**
  * hdd_indicate_active_ndp_cnt() - Callback to indicate active ndp count to hdd
