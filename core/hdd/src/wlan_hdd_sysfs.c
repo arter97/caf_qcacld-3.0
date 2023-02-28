@@ -735,6 +735,30 @@ void hdd_destroy_wifi_feature_interface_sysfs_file(void)
 	hdd_sysfs_destroy_wifi_feature_interface(wifi_kobject);
 }
 
+int hdd_sysfs_print(void *ctx, const char *fmt, ...)
+{
+	va_list args;
+	int ret = -1;
+	struct hdd_sysfs_print_ctx *p_ctx = ctx;
+
+	va_start(args, fmt);
+
+	if (ctx) {
+		ret = vscnprintf(p_ctx->buf + p_ctx->idx,
+				 PAGE_SIZE - p_ctx->idx, fmt, args);
+		p_ctx->idx += ret;
+		if (p_ctx->new_line) {
+			ret += scnprintf(p_ctx->buf + p_ctx->idx,
+					  PAGE_SIZE - p_ctx->idx,
+					  "\n");
+			p_ctx->idx += ret;
+		}
+	}
+
+	va_end(args);
+	return ret;
+}
+
 #ifdef WLAN_FEATURE_BEACON_RECEPTION_STATS
 static int hdd_sysfs_create_bcn_reception_interface(struct hdd_adapter
 						     *adapter)
