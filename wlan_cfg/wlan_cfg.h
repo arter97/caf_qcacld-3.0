@@ -335,6 +335,8 @@ struct wlan_srng_cfg {
  *                                         type handling is disabled
  * @tx_pkt_inspect_for_ilp: flag to indicate if TX packet inspection for HW
  *			    based ILP feature is enabled
+ * @pointer_timer_threshold_rx: RX REO2SW ring pointer update timer threshold
+ * @pointer_num_threshold_rx: RX REO2SW ring pointer update entries threshold
  */
 struct wlan_cfg_dp_soc_ctxt {
 	int num_int_ctxts;
@@ -531,6 +533,8 @@ struct wlan_cfg_dp_soc_ctxt {
 #ifdef DP_TX_PACKET_INSPECT_FOR_ILP
 	bool tx_pkt_inspect_for_ilp;
 #endif
+	uint16_t pointer_timer_threshold_rx;
+	uint8_t pointer_num_threshold_rx;
 };
 
 /**
@@ -2451,4 +2455,25 @@ uint8_t wlan_cfg_get_napi_scale_factor(struct wlan_cfg_dp_soc_ctxt *cfg);
 void
 wlan_cfg_soc_update_tgt_params(struct wlan_cfg_dp_soc_ctxt *wlan_cfg_ctx,
 			       struct cdp_ctrl_objmgr_psoc *ctrl_obj);
+
+/**
+ * wlan_cfg_get_pointer_timer_threshold_rx() - Get timer threshold for RX
+ *                                             pointer update
+ * @cfg: soc configuration context
+ *
+ * Return: timer threshold for RX REO Dest ring  pointer update
+ */
+uint16_t
+wlan_cfg_get_pointer_timer_threshold_rx(struct wlan_cfg_dp_soc_ctxt *cfg);
+
+/**
+ * wlan_cfg_get_pointer_num_threshold_rx() - Get number threshold for RX
+ *                                           pointer update
+ * @cfg: soc configuration context
+ *
+ * Return: entries number threshold for RX REO Dest ring  pointer update
+ */
+uint8_t
+wlan_cfg_get_pointer_num_threshold_rx(struct wlan_cfg_dp_soc_ctxt *cfg);
+
 #endif /*__WLAN_CFG_H*/

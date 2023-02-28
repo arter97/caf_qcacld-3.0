@@ -3119,6 +3119,10 @@ wlan_cfg_soc_attach(struct cdp_ctrl_objmgr_psoc *psoc)
 			cfg_get(psoc, CFG_DP_HANDLE_INVALID_DECAP_TYPE_DISABLE);
 	wlan_cfg_ctx->txmon_sw_peer_filtering =
 			cfg_get(psoc, CFG_DP_TXMON_SW_PEER_FILTERING);
+	wlan_cfg_ctx->pointer_timer_threshold_rx =
+			cfg_get(psoc, CFG_DP_POINTER_TIMER_THRESHOLD_RX);
+	wlan_cfg_ctx->pointer_num_threshold_rx =
+			cfg_get(psoc, CFG_DP_POINTER_NUM_THRESHOLD_RX);
 	wlan_soc_tx_packet_inspect_attach(psoc, wlan_cfg_ctx);
 
 	return wlan_cfg_ctx;
@@ -4465,3 +4469,15 @@ bool wlan_cfg_get_txmon_sw_peer_filtering(struct wlan_cfg_dp_soc_ctxt *cfg)
 }
 
 qdf_export_symbol(wlan_cfg_get_txmon_sw_peer_filtering);
+
+uint16_t
+wlan_cfg_get_pointer_timer_threshold_rx(struct wlan_cfg_dp_soc_ctxt *cfg)
+{
+	return cfg->pointer_timer_threshold_rx;
+}
+
+uint8_t
+wlan_cfg_get_pointer_num_threshold_rx(struct wlan_cfg_dp_soc_ctxt *cfg)
+{
+	return cfg->pointer_num_threshold_rx;
+}

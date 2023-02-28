@@ -1559,6 +1559,11 @@ void *hal_srng_setup_idx(void *hal_soc, int ring_type, int ring_num, int mac_id,
 	srng->intr_timer_thres_us = ring_params->intr_timer_thres_us;
 	srng->intr_batch_cntr_thres_entries =
 		ring_params->intr_batch_cntr_thres_entries;
+	srng->pointer_timer_threshold =
+		ring_params->pointer_timer_threshold;
+	srng->pointer_num_threshold =
+		ring_params->pointer_num_threshold;
+
 	if (!idle_check)
 		srng->prefetch_timer = ring_params->prefetch_timer;
 	srng->hal_soc = hal_soc;
