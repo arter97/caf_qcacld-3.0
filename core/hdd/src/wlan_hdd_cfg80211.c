@@ -7162,67 +7162,77 @@ wlan_hdd_set_no_dfs_flag_config_policy[QCA_WLAN_VENDOR_ATTR_SET_NO_DFS_FLAG_MAX
  *  Return:         bool
  */
 static bool wlan_hdd_check_dfs_channel_for_adapter(struct hdd_context *hdd_ctx,
-				enum QDF_OPMODE device_mode)
+						   enum QDF_OPMODE device_mode)
 {
 	struct hdd_adapter *adapter, *next_adapter = NULL;
 	struct hdd_ap_ctx *ap_ctx;
 	struct hdd_station_ctx *sta_ctx;
 	wlan_net_dev_ref_dbgid dbgid =
 				NET_DEV_HOLD_CHECK_DFS_CHANNEL_FOR_ADAPTER;
+	struct wlan_hdd_link_info *link_info;
 
 	hdd_for_each_adapter_dev_held_safe(hdd_ctx, adapter, next_adapter,
 					   dbgid) {
-		if ((device_mode == adapter->device_mode) &&
-		    (device_mode == QDF_SAP_MODE)) {
-			ap_ctx =
-				WLAN_HDD_GET_AP_CTX_PTR(adapter->deflink);
-			/*
-			 *  if there is SAP already running on DFS channel,
-			 *  do not disable scan on dfs channels. Note that
-			 *  with SAP on DFS, there cannot be conurrency on
-			 *  single radio. But then we can have multiple
-			 *  radios !!
-			 *
-			 *  Indoor channels are also marked DFS, therefore
-			 *  check if the channel has REGULATORY_CHAN_RADAR
-			 *  channel flag to identify if the channel is DFS
-			 */
-			if (wlan_reg_is_dfs_for_freq(
+		if (adapter->device_mode != device_mode)
+			goto next_adapter;
+
+		hdd_adapter_for_each_active_link_info(adapter, link_info) {
+			if (device_mode == QDF_SAP_MODE) {
+				ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(link_info);
+				/*
+				 *  if there is SAP already running on
+				 *  DFS channel, do not disable scan on
+				 *  dfs channels. Note that with SAP on DFS,
+				 *  there cannot be conurrency on single radio.
+				 *  But then we can have multiple radios !!
+				 *
+				 *  Indoor channels are also marked DFS,
+				 *  therefore check if the channel has
+				 *  REGULATORY_CHAN_RADAR channel flag to
+				 *  identify if the channel is DFS
+				 */
+				if (wlan_reg_is_dfs_for_freq(
 						hdd_ctx->pdev,
 						ap_ctx->operating_chan_freq)) {
-				hdd_err("SAP running on DFS channel");
-				hdd_adapter_dev_put_debug(adapter, dbgid);
-				if (next_adapter)
-					hdd_adapter_dev_put_debug(next_adapter,
+					hdd_err("SAP running on DFS channel");
+					hdd_adapter_dev_put_debug(adapter,
 								  dbgid);
-				return true;
+					if (next_adapter)
+						hdd_adapter_dev_put_debug(
+								next_adapter,
+								dbgid);
+					return true;
+				}
 			}
-		}
 
-		if ((device_mode == adapter->device_mode) &&
-		    (device_mode == QDF_STA_MODE)) {
-			sta_ctx =
-				WLAN_HDD_GET_STATION_CTX_PTR(adapter->deflink);
-			/*
-			 *  if STA is already connected on DFS channel,
-			 *  do not disable scan on dfs channels.
-			 *
-			 *  Indoor channels are also marked DFS, therefore
-			 *  check if the channel has REGULATORY_CHAN_RADAR
-			 *  channel flag to identify if the channel is DFS
-			 */
-			if (hdd_cm_is_vdev_associated(adapter->deflink) &&
-			    wlan_reg_is_dfs_for_freq(
-				    hdd_ctx->pdev,
-				    sta_ctx->conn_info.chan_freq)) {
-				hdd_err("client connected on DFS channel");
-				hdd_adapter_dev_put_debug(adapter, dbgid);
-				if (next_adapter)
-					hdd_adapter_dev_put_debug(next_adapter,
+			if (device_mode == QDF_STA_MODE) {
+				sta_ctx =
+					WLAN_HDD_GET_STATION_CTX_PTR(link_info);
+				/*
+				 *  if STA is already connected on DFS channel,
+				 *  do not disable scan on dfs channels.
+				 *
+				 *  Indoor channels are also marked DFS,
+				 *  therefore check if the channel has
+				 *  REGULATORY_CHAN_RADAR channel flag to
+				 *  identify if the channel is DFS
+				 */
+				if (hdd_cm_is_vdev_associated(link_info) &&
+				    wlan_reg_is_dfs_for_freq(
+					    hdd_ctx->pdev,
+					    sta_ctx->conn_info.chan_freq)) {
+					hdd_err("client connected on DFS channel");
+					hdd_adapter_dev_put_debug(adapter,
 								  dbgid);
-				return true;
+					if (next_adapter)
+						hdd_adapter_dev_put_debug(
+								next_adapter,
+								dbgid);
+					return true;
+				}
 			}
 		}
+next_adapter:
 		hdd_adapter_dev_put_debug(adapter, dbgid);
 	}
 
