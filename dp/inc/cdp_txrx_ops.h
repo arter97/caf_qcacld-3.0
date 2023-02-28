@@ -2405,6 +2405,11 @@ struct cdp_ppeds_txrx_ops {
 	void (*ppeds_update_int_pri2tid)(struct cdp_soc_t *soc,
 					 uint8_t pri, uint8_t tid);
 	void (*ppeds_entry_dump)(struct cdp_soc_t *soc);
+	void
+	(*ppeds_stats_sync)(struct cdp_soc_t *soc,
+			    uint16_t vdev_id,
+			    struct cdp_ds_vp_params *vp_params,
+			    void *stats);
 };
 #endif /* WLAN_SUPPORT_PPEDS */
 

@@ -8873,6 +8873,8 @@ void dp_update_pdev_stats(struct dp_pdev *tgtobj,
 		srcobj->tx.last_ack_rssi;
 	tgtobj->stats.rx.mec_drop.num += srcobj->rx.mec_drop.num;
 	tgtobj->stats.rx.mec_drop.bytes += srcobj->rx.mec_drop.bytes;
+	tgtobj->stats.rx.ppeds_drop.num += srcobj->rx.ppeds_drop.num;
+	tgtobj->stats.rx.ppeds_drop.bytes += srcobj->rx.ppeds_drop.bytes;
 	tgtobj->stats.rx.multipass_rx_pkt_drop +=
 		srcobj->rx.multipass_rx_pkt_drop;
 	tgtobj->stats.rx.peer_unauth_rx_pkt_drop +=
