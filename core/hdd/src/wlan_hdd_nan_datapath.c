@@ -123,36 +123,40 @@ static int hdd_close_ndi(struct hdd_adapter *adapter)
 static bool hdd_is_ndp_allowed(struct hdd_context *hdd_ctx)
 {
 	struct hdd_adapter *adapter, *next_adapter = NULL;
-	struct hdd_station_ctx *sta_ctx;
 	wlan_net_dev_ref_dbgid dbgid = NET_DEV_HOLD_IS_NDP_ALLOWED;
+	struct wlan_hdd_link_info *link_info;
 
 	hdd_for_each_adapter_dev_held_safe(hdd_ctx, adapter, next_adapter,
 					   dbgid) {
-		switch (adapter->device_mode) {
-		case QDF_P2P_GO_MODE:
-			if (test_bit(SOFTAP_BSS_STARTED,
-				     &adapter->deflink->link_flags)) {
-				hdd_adapter_dev_put_debug(adapter, dbgid);
-				if (next_adapter)
-					hdd_adapter_dev_put_debug(next_adapter,
+		hdd_adapter_for_each_active_link_info(adapter, link_info) {
+			switch (adapter->device_mode) {
+			case QDF_P2P_GO_MODE:
+				if (test_bit(SOFTAP_BSS_STARTED,
+					     &link_info->link_flags)) {
+					hdd_adapter_dev_put_debug(adapter,
 								  dbgid);
-				return false;
-			}
-			break;
-		case QDF_P2P_CLIENT_MODE:
-			sta_ctx =
-				WLAN_HDD_GET_STATION_CTX_PTR(adapter->deflink);
-			if (hdd_cm_is_vdev_associated(adapter->deflink) ||
-			    hdd_cm_is_connecting(adapter->deflink)) {
-				hdd_adapter_dev_put_debug(adapter, dbgid);
-				if (next_adapter)
-					hdd_adapter_dev_put_debug(next_adapter,
+					if (next_adapter)
+						hdd_adapter_dev_put_debug(
+								next_adapter,
+								dbgid);
+					return false;
+				}
+				break;
+			case QDF_P2P_CLIENT_MODE:
+				if (hdd_cm_is_vdev_associated(link_info) ||
+				    hdd_cm_is_connecting(link_info)) {
+					hdd_adapter_dev_put_debug(adapter,
 								  dbgid);
-				return false;
+					if (next_adapter)
+						hdd_adapter_dev_put_debug(
+								next_adapter,
+								dbgid);
+					return false;
+				}
+				break;
+			default:
+				break;
 			}
-			break;
-		default:
-			break;
 		}
 		hdd_adapter_dev_put_debug(adapter, dbgid);
 	}
@@ -163,37 +167,41 @@ static bool hdd_is_ndp_allowed(struct hdd_context *hdd_ctx)
 static bool hdd_is_ndp_allowed(struct hdd_context *hdd_ctx)
 {
 	struct hdd_adapter *adapter, *next_adapter = NULL;
-	struct hdd_station_ctx *sta_ctx;
 	wlan_net_dev_ref_dbgid dbgid = NET_DEV_HOLD_IS_NDP_ALLOWED;
+	struct wlan_hdd_link_info *link_info;
 
 	hdd_for_each_adapter_dev_held_safe(hdd_ctx, adapter, next_adapter,
 					   dbgid) {
-		switch (adapter->device_mode) {
-		case QDF_P2P_GO_MODE:
-		case QDF_SAP_MODE:
-			if (test_bit(SOFTAP_BSS_STARTED,
-				     &adapter->deflink->link_flags)) {
-				hdd_adapter_dev_put_debug(adapter, dbgid);
-				if (next_adapter)
-					hdd_adapter_dev_put_debug(next_adapter,
+		hdd_adapter_for_each_active_link_info(adapter, link_info) {
+			switch (adapter->device_mode) {
+			case QDF_P2P_GO_MODE:
+			case QDF_SAP_MODE:
+				if (test_bit(SOFTAP_BSS_STARTED,
+					     &link_info->link_flags)) {
+					hdd_adapter_dev_put_debug(adapter,
 								  dbgid);
-				return false;
-			}
-			break;
-		case QDF_P2P_CLIENT_MODE:
-			sta_ctx =
-				WLAN_HDD_GET_STATION_CTX_PTR(adapter->deflink);
-			if (hdd_cm_is_vdev_associated(adapter->deflink) ||
-			    hdd_cm_is_connecting(adapter->deflink)) {
-				hdd_adapter_dev_put_debug(adapter, dbgid);
-				if (next_adapter)
-					hdd_adapter_dev_put_debug(next_adapter,
+					if (next_adapter)
+						hdd_adapter_dev_put_debug(
+								next_adapter,
+								dbgid);
+					return false;
+				}
+				break;
+			case QDF_P2P_CLIENT_MODE:
+				if (hdd_cm_is_vdev_associated(link_info) ||
+				    hdd_cm_is_connecting(link_info)) {
+					hdd_adapter_dev_put_debug(adapter,
 								  dbgid);
-				return false;
+					if (next_adapter)
+						hdd_adapter_dev_put_debug(
+								next_adapter,
+								dbgid);
+					return false;
+				}
+				break;
+			default:
+				break;
 			}
-			break;
-		default:
-			break;
 		}
 		hdd_adapter_dev_put_debug(adapter, dbgid);
 	}
