@@ -491,54 +491,60 @@ hdd_get_dot11mode_filter(struct hdd_context *hdd_ctx)
  *
  * Return: pointer to adapter or null
  */
-static struct hdd_adapter
-*hdd_get_sap_adapter_of_dfs(struct hdd_context *hdd_ctx)
+static struct hdd_adapter *
+hdd_get_sap_adapter_of_dfs(struct hdd_context *hdd_ctx)
 {
 	struct hdd_adapter *adapter, *next_adapter = NULL;
 	wlan_net_dev_ref_dbgid dbgid = NET_DEV_HOLD_GET_ADAPTER;
 	struct wlan_channel *chan;
 	struct ch_params ch_params = {0};
+	struct wlan_hdd_link_info *link_info;
 
 	hdd_for_each_adapter_dev_held_safe(hdd_ctx, adapter, next_adapter,
 					   dbgid) {
 		if (adapter->device_mode != QDF_SAP_MODE)
 			goto loop_next;
 
-		if (wlan_hdd_validate_vdev_id(adapter->deflink->vdev_id))
-			goto loop_next;
+		hdd_adapter_for_each_active_link_info(adapter, link_info) {
+			if (wlan_hdd_validate_vdev_id(link_info->vdev_id))
+				continue;
 
-		/*
-		 * sap is not in started state and also not under doing CAC,
-		 * so it is fine to go ahead with sta.
-		 */
-		if (!test_bit(SOFTAP_BSS_STARTED,
-			      &adapter->deflink->link_flags) &&
-		    hdd_ctx->dev_dfs_cac_status != DFS_CAC_IN_PROGRESS)
-			goto loop_next;
+			/*
+			 * sap is not in started state and also not under doing
+			 * CAC, so it is fine to go ahead with sta.
+			 */
+			if (!test_bit(SOFTAP_BSS_STARTED,
+				      &link_info->link_flags) &&
+			    hdd_ctx->dev_dfs_cac_status != DFS_CAC_IN_PROGRESS)
+				continue;
 
-		chan = wlan_vdev_get_active_channel(adapter->deflink->vdev);
-		if (!chan) {
-			hdd_debug("Can not get active channel");
-			goto loop_next;
-		}
+			chan = wlan_vdev_get_active_channel(link_info->vdev);
+			if (!chan) {
+				hdd_debug("Can not get active channel");
+				continue;
+			}
 
-		if (!wlan_reg_is_5ghz_ch_freq(chan->ch_freq))
-			goto loop_next;
+			if (!wlan_reg_is_5ghz_ch_freq(chan->ch_freq))
+				continue;
 
-		ch_params.ch_width = chan->ch_width;
-		if (ch_params.ch_width == CH_WIDTH_160MHZ)
-			wlan_reg_set_create_punc_bitmap(&ch_params, true);
+			ch_params.ch_width = chan->ch_width;
+			if (ch_params.ch_width == CH_WIDTH_160MHZ)
+				wlan_reg_set_create_punc_bitmap(&ch_params,
+								true);
 
-		if (wlan_reg_get_5g_bonded_channel_state_for_pwrmode(hdd_ctx->pdev,
-								     chan->ch_freq,
-								     &ch_params,
-								     REG_CURRENT_PWR_MODE) ==
-		    CHANNEL_STATE_DFS) {
-			hdd_adapter_dev_put_debug(adapter, dbgid);
-			if (next_adapter)
-				hdd_adapter_dev_put_debug(next_adapter, dbgid);
+			if (wlan_reg_get_5g_bonded_channel_state_for_pwrmode(
+							hdd_ctx->pdev,
+							chan->ch_freq,
+							&ch_params,
+							REG_CURRENT_PWR_MODE) ==
+			    CHANNEL_STATE_DFS) {
+				hdd_adapter_dev_put_debug(adapter, dbgid);
+				if (next_adapter)
+					hdd_adapter_dev_put_debug(next_adapter,
+								  dbgid);
 
-			return adapter;
+				return adapter;
+			}
 		}
 loop_next:
 		hdd_adapter_dev_put_debug(adapter, dbgid);
