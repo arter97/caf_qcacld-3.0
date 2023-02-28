@@ -784,93 +784,55 @@ void hdd_ipv6_notifier_work_queue(struct work_struct *work)
 }
 #endif /* WLAN_NS_OFFLOAD */
 
-static void hdd_enable_hw_filter(struct hdd_adapter *adapter)
+static void hdd_enable_hw_filter(struct wlan_objmgr_vdev *vdev)
 {
 	QDF_STATUS status;
-	struct wlan_objmgr_vdev *vdev;
 
 	hdd_enter();
-
-	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink,
-					   WLAN_OSIF_POWER_ID);
-	if (!vdev) {
-		hdd_err("vdev is NULL");
-		return;
-	}
 
 	status = ucfg_pmo_enable_hw_filter_in_fwr(vdev);
 	if (status != QDF_STATUS_SUCCESS)
 		hdd_info("Failed to enable hardware filter");
 
-	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_POWER_ID);
 	hdd_exit();
 }
 
-static void hdd_disable_hw_filter(struct hdd_adapter *adapter)
+static void hdd_disable_hw_filter(struct wlan_objmgr_vdev *vdev)
 {
 	QDF_STATUS status;
-	struct wlan_objmgr_vdev *vdev;
 
 	hdd_enter();
-
-	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink,
-					   WLAN_OSIF_POWER_ID);
-	if (!vdev) {
-		hdd_err("vdev is NULL");
-		return;
-	}
 
 	status = ucfg_pmo_disable_hw_filter_in_fwr(vdev);
 	if (status != QDF_STATUS_SUCCESS)
 		hdd_info("Failed to disable hardware filter");
 
-	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_POWER_ID);
-
 	hdd_exit();
 }
 
-static void hdd_enable_action_frame_patterns(struct hdd_adapter *adapter)
+static void hdd_enable_action_frame_patterns(struct wlan_objmgr_vdev *vdev)
 {
 	QDF_STATUS status;
-	struct wlan_objmgr_vdev *vdev;
-	hdd_enter();
 
-	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink,
-					   WLAN_OSIF_POWER_ID);
-	if (!vdev) {
-		hdd_err("vdev is NULL");
-		return;
-	}
+	hdd_enter();
 
 	status = ucfg_pmo_enable_action_frame_patterns(vdev,
 						       QDF_SYSTEM_SUSPEND);
 	if (QDF_IS_STATUS_ERROR(status))
 		hdd_info("Failed to enable action frame patterns");
 
-	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_POWER_ID);
-
 	hdd_exit();
 }
 
-static void hdd_disable_action_frame_patterns(struct hdd_adapter *adapter)
+static void hdd_disable_action_frame_patterns(struct wlan_objmgr_vdev *vdev)
 {
 	QDF_STATUS status;
-	struct wlan_objmgr_vdev *vdev;
 
 	hdd_enter();
-
-	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink,
-					   WLAN_OSIF_POWER_ID);
-	if (!vdev) {
-		hdd_err("vdev is NULL");
-		return;
-	}
 
 	status = ucfg_pmo_disable_action_frame_patterns(vdev);
 	if (QDF_IS_STATUS_ERROR(status))
 		hdd_info("Failed to disable action frame patterns");
-
-	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_POWER_ID);
 
 	hdd_exit();
 }
@@ -909,8 +871,8 @@ void hdd_enable_host_offloads(struct hdd_adapter *adapter,
 		hdd_enable_igmp_offload(adapter);
 
 	if (adapter->device_mode != QDF_NDI_MODE)
-		hdd_enable_hw_filter(adapter);
-	hdd_enable_action_frame_patterns(adapter);
+		hdd_enable_hw_filter(vdev);
+	hdd_enable_action_frame_patterns(vdev);
 put_vdev:
 	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_POWER_ID);
 out:
@@ -951,8 +913,8 @@ void hdd_disable_host_offloads(struct hdd_adapter *adapter,
 	if (adapter->device_mode == QDF_STA_MODE)
 		hdd_disable_igmp_offload(adapter);
 	if (adapter->device_mode != QDF_NDI_MODE)
-		hdd_disable_hw_filter(adapter);
-	hdd_disable_action_frame_patterns(adapter);
+		hdd_disable_hw_filter(vdev);
+	hdd_disable_action_frame_patterns(vdev);
 
 put_vdev:
 	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_POWER_ID);
