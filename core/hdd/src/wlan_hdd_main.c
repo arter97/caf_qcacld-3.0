@@ -17029,41 +17029,42 @@ hdd_get_con_sap_adapter(struct hdd_adapter *this_sap_adapter,
 			bool check_start_bss)
 {
 	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(this_sap_adapter);
-	struct hdd_adapter *adapter, *con_sap_adapter, *next_adapter = NULL;
+	struct hdd_adapter *adapter, *next_adapter = NULL;
 	wlan_net_dev_ref_dbgid dbgid = NET_DEV_HOLD_GET_CON_SAP_ADAPTER;
-
-	con_sap_adapter = NULL;
+	struct wlan_hdd_link_info *link_info;
 
 	hdd_for_each_adapter_dev_held_safe(hdd_ctx, adapter, next_adapter,
 					   dbgid) {
-		if (adapter && ((adapter->device_mode == QDF_SAP_MODE) ||
-				(adapter->device_mode == QDF_P2P_GO_MODE)) &&
-						adapter != this_sap_adapter) {
-			if (check_start_bss) {
-				if (test_bit(SOFTAP_BSS_STARTED,
-					     &adapter->deflink->link_flags)) {
-					con_sap_adapter = adapter;
+		if ((adapter->device_mode == QDF_SAP_MODE ||
+		     adapter->device_mode == QDF_P2P_GO_MODE) &&
+		    adapter != this_sap_adapter) {
+			hdd_adapter_for_each_active_link_info(adapter,
+							      link_info) {
+				if (!check_start_bss) {
 					hdd_adapter_dev_put_debug(adapter,
 								  dbgid);
 					if (next_adapter)
 						hdd_adapter_dev_put_debug(
 								next_adapter,
 								dbgid);
-					break;
+					return adapter;
 				}
-			} else {
-				con_sap_adapter = adapter;
-				hdd_adapter_dev_put_debug(adapter, dbgid);
-				if (next_adapter)
-					hdd_adapter_dev_put_debug(next_adapter,
+				if (test_bit(SOFTAP_BSS_STARTED,
+					     &link_info->link_flags)) {
+					hdd_adapter_dev_put_debug(adapter,
 								  dbgid);
-				break;
+					if (next_adapter)
+						hdd_adapter_dev_put_debug(
+								next_adapter,
+								dbgid);
+					return adapter;
+				}
 			}
 		}
 		hdd_adapter_dev_put_debug(adapter, dbgid);
 	}
 
-	return con_sap_adapter;
+	return NULL;
 }
 
 static inline bool hdd_adapter_is_sta(struct hdd_adapter *adapter)
@@ -17076,35 +17077,37 @@ bool hdd_is_any_adapter_connected(struct hdd_context *hdd_ctx)
 {
 	struct hdd_adapter *adapter, *next_adapter = NULL;
 	wlan_net_dev_ref_dbgid dbgid = NET_DEV_HOLD_IS_ANY_ADAPTER_CONNECTED;
+	struct wlan_hdd_link_info *link_info;
 
 	hdd_for_each_adapter_dev_held_safe(hdd_ctx, adapter, next_adapter,
 					   dbgid) {
-		if (hdd_adapter_is_sta(adapter) &&
-		    hdd_cm_is_vdev_associated(adapter->deflink)) {
-			hdd_adapter_dev_put_debug(adapter, dbgid);
-			if (next_adapter)
-				hdd_adapter_dev_put_debug(next_adapter,
-							  dbgid);
-			return true;
-		}
+		hdd_adapter_for_each_active_link_info(adapter, link_info) {
+			if (hdd_adapter_is_sta(adapter) &&
+			    hdd_cm_is_vdev_associated(link_info)) {
+				hdd_adapter_dev_put_debug(adapter, dbgid);
+				if (next_adapter)
+					hdd_adapter_dev_put_debug(next_adapter,
+								  dbgid);
+				return true;
+			}
 
-		if (hdd_adapter_is_ap(adapter) &&
-		    WLAN_HDD_GET_AP_CTX_PTR(adapter->deflink)->ap_active) {
-			hdd_adapter_dev_put_debug(adapter, dbgid);
-			if (next_adapter)
-				hdd_adapter_dev_put_debug(next_adapter,
-							  dbgid);
-			return true;
-		}
+			if (hdd_adapter_is_ap(adapter) &&
+			    WLAN_HDD_GET_AP_CTX_PTR(link_info)->ap_active) {
+				hdd_adapter_dev_put_debug(adapter, dbgid);
+				if (next_adapter)
+					hdd_adapter_dev_put_debug(next_adapter,
+								  dbgid);
+				return true;
+			}
 
-		if (adapter->device_mode == QDF_NDI_MODE &&
-		    WLAN_HDD_GET_STATION_CTX_PTR(adapter->deflink)->
-		    conn_info.conn_state == eConnectionState_NdiConnected) {
-			hdd_adapter_dev_put_debug(adapter, dbgid);
-			if (next_adapter)
-				hdd_adapter_dev_put_debug(next_adapter,
-							  dbgid);
-			return true;
+			if (adapter->device_mode == QDF_NDI_MODE &&
+			    hdd_cm_is_vdev_associated(link_info)) {
+				hdd_adapter_dev_put_debug(adapter, dbgid);
+				if (next_adapter)
+					hdd_adapter_dev_put_debug(next_adapter,
+								  dbgid);
+				return true;
+			}
 		}
 		hdd_adapter_dev_put_debug(adapter, dbgid);
 	}
@@ -19760,6 +19763,7 @@ bool hdd_is_roaming_in_progress(struct hdd_context *hdd_ctx)
 	struct hdd_adapter *adapter = NULL, *next_adapter = NULL;
 	uint8_t vdev_id;
 	wlan_net_dev_ref_dbgid dbgid = NET_DEV_HOLD_IS_ROAMING_IN_PROGRESS;
+	struct wlan_hdd_link_info *link_info;
 
 	if (!hdd_ctx) {
 		hdd_err("HDD context is NULL");
@@ -19771,19 +19775,25 @@ bool hdd_is_roaming_in_progress(struct hdd_context *hdd_ctx)
 
 	hdd_for_each_adapter_dev_held_safe(hdd_ctx, adapter, next_adapter,
 					   dbgid) {
-		vdev_id = adapter->deflink->vdev_id;
-		if (adapter->device_mode == QDF_STA_MODE &&
-		    test_bit(SME_SESSION_OPENED,
-			     &adapter->deflink->link_flags) &&
-		    sme_roaming_in_progress(hdd_ctx->mac_handle, vdev_id)) {
-			hdd_debug("Roaming is in progress on:vdev_id:%d",
-				  adapter->deflink->vdev_id);
-			hdd_adapter_dev_put_debug(adapter, dbgid);
-			if (next_adapter)
-				hdd_adapter_dev_put_debug(next_adapter,
-							  dbgid);
-			return true;
+		if (adapter->device_mode != QDF_STA_MODE)
+			goto adapter_put;
+
+		hdd_adapter_for_each_active_link_info(adapter, link_info) {
+			vdev_id = link_info->vdev_id;
+			if (test_bit(SME_SESSION_OPENED,
+				     &link_info->link_flags) &&
+			    sme_roaming_in_progress(hdd_ctx->mac_handle,
+						    vdev_id)) {
+				hdd_debug("Roaming is in progress on:vdev_id:%d",
+					  link_info->vdev_id);
+				hdd_adapter_dev_put_debug(adapter, dbgid);
+				if (next_adapter)
+					hdd_adapter_dev_put_debug(next_adapter,
+								  dbgid);
+				return true;
+			}
 		}
+adapter_put:
 		hdd_adapter_dev_put_debug(adapter, dbgid);
 	}
 
