@@ -258,7 +258,7 @@ QDF_STATUS dfs_inject_synthetic_pulse_sequence(struct wlan_dfs *dfs,
  *
  * Return: None
  */
-#if defined(WLAN_DFS_PARTIAL_OFFLOAD) && defined(HOST_DFS_SPOOF_TEST)
+#if defined(WLAN_DFS_PARTIAL_OFFLOAD)
 void
 dfs_disable_radar_and_flush_pulses(struct wlan_dfs *dfs);
 #else
