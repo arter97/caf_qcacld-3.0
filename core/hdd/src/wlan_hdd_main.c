@@ -7437,37 +7437,25 @@ void hdd_check_for_net_dev_ref_leak(struct hdd_adapter *adapter)
 
 /**
  * hdd_deinit_station_mode() - De-initialize the station adapter
- * @hdd_ctx: global hdd context
- * @adapter: HDD adapter
- * @rtnl_held: Used to indicate whether or not the caller is holding
- *             the kernel rtnl_mutex
+ * @adapter: HDD adapter pointer
  *
  * This function De-initializes the STA/P2P/OCB adapter.
  *
  * Return: None.
  */
-static void hdd_deinit_station_mode(struct hdd_context *hdd_ctx,
-				       struct hdd_adapter *adapter,
-				       bool rtnl_held)
+static void hdd_deinit_station_mode(struct hdd_adapter *adapter)
 {
-	hdd_enter_dev(adapter->dev);
-
 	if (test_bit(WMM_INIT_DONE, &adapter->event_flags)) {
 		hdd_wmm_adapter_close(adapter);
 		clear_bit(WMM_INIT_DONE, &adapter->event_flags);
 	}
-
-
-	hdd_exit();
 }
 
-void hdd_deinit_adapter(struct hdd_context *hdd_ctx,
-			struct hdd_adapter *adapter,
-			bool rtnl_held)
+void hdd_deinit_session(struct hdd_adapter *adapter)
 {
-	hdd_enter();
+	struct wlan_hdd_link_info *link_info;
 
-	hdd_wext_unregister(adapter->dev, rtnl_held);
+	hdd_enter();
 
 	switch (adapter->device_mode) {
 	case QDF_STA_MODE:
@@ -7477,14 +7465,15 @@ void hdd_deinit_adapter(struct hdd_context *hdd_ctx,
 	case QDF_NDI_MODE:
 	case QDF_NAN_DISC_MODE:
 	{
-		hdd_deinit_station_mode(hdd_ctx, adapter, rtnl_held);
+		hdd_deinit_station_mode(adapter);
 		break;
 	}
 
 	case QDF_SAP_MODE:
 	case QDF_P2P_GO_MODE:
 	{
-		hdd_deinit_ap_mode(hdd_ctx, adapter, rtnl_held);
+		hdd_adapter_for_each_active_link_info(adapter, link_info)
+			hdd_deinit_ap_mode(link_info);
 		break;
 	}
 
@@ -7498,6 +7487,17 @@ void hdd_deinit_adapter(struct hdd_context *hdd_ctx,
 		adapter->scan_info.default_scan_ies_len = 0;
 	}
 
+	hdd_exit();
+}
+
+void hdd_deinit_adapter(struct hdd_context *hdd_ctx,
+			struct hdd_adapter *adapter,
+			bool rtnl_held)
+{
+	hdd_enter_dev(adapter->dev);
+
+	hdd_wext_unregister(adapter->dev, rtnl_held);
+	hdd_deinit_session(adapter);
 	hdd_exit();
 }
 
@@ -14074,7 +14074,7 @@ sap_release_ref:
 sap_vdev_destroy:
 	hdd_vdev_destroy(link_info);
 sap_destroy_ctx:
-	hdd_sap_destroy_ctx(adapter);
+	hdd_sap_destroy_ctx(link_info);
 	return ret;
 }
 

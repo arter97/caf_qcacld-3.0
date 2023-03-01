@@ -315,7 +315,7 @@ error:
 
 /**
  * hdd_hostapd_deinit_sap_session() - To de-init the sap session completely
- * @adapter: SAP/GO adapter
+ * @link_info: Pointer of link_info in adapter
  *
  * This API will do
  * 1) sap_init_ctx()
@@ -323,29 +323,25 @@ error:
  *
  * Return: 0 if success else non-zero value.
  */
-static int hdd_hostapd_deinit_sap_session(struct hdd_adapter *adapter)
+static int
+hdd_hostapd_deinit_sap_session(struct wlan_hdd_link_info *link_info)
 {
 	struct sap_context *sap_ctx;
 	int status = 0;
 
-	if (!adapter) {
-		hdd_err("invalid adapter");
-		return -EINVAL;
-	}
-
-	sap_ctx = WLAN_HDD_GET_SAP_CTX_PTR(adapter->deflink);
+	sap_ctx = WLAN_HDD_GET_SAP_CTX_PTR(link_info);
 	if (!sap_ctx) {
 		hdd_debug("sap context already released, nothing to be done");
 		return 0;
 	}
 
-	wlan_hdd_undo_acs(adapter);
+	wlan_hdd_undo_acs(link_info);
 	if (!QDF_IS_STATUS_SUCCESS(sap_deinit_ctx(sap_ctx))) {
 		hdd_err("Error stopping the sap session");
 		status = -EINVAL;
 	}
 
-	if (!hdd_sap_destroy_ctx(adapter)) {
+	if (!hdd_sap_destroy_ctx(link_info)) {
 		hdd_err("Error closing the sap session");
 		status = -EINVAL;
 	}
@@ -4175,13 +4171,13 @@ bool hdd_sap_create_ctx(struct hdd_adapter *adapter)
 	return false;
 }
 
-bool hdd_sap_destroy_ctx(struct hdd_adapter *adapter)
+bool hdd_sap_destroy_ctx(struct wlan_hdd_link_info *link_info)
 {
-	struct sap_context *sap_ctx = adapter->deflink->session.ap.sap_context;
+	struct sap_context *sap_ctx = link_info->session.ap.sap_context;
 
-	if (adapter->deflink->session.ap.beacon) {
-		qdf_mem_free(adapter->deflink->session.ap.beacon);
-		adapter->deflink->session.ap.beacon = NULL;
+	if (link_info->session.ap.beacon) {
+		qdf_mem_free(link_info->session.ap.beacon);
+		link_info->session.ap.beacon = NULL;
 	}
 
 	if (!sap_ctx) {
@@ -4194,7 +4190,7 @@ bool hdd_sap_destroy_ctx(struct hdd_adapter *adapter)
 	if (QDF_IS_STATUS_ERROR(sap_destroy_ctx(sap_ctx)))
 		return false;
 
-	adapter->deflink->session.ap.sap_context = NULL;
+	link_info->session.ap.sap_context = NULL;
 
 	return true;
 }
@@ -4202,6 +4198,7 @@ bool hdd_sap_destroy_ctx(struct hdd_adapter *adapter)
 void hdd_sap_destroy_ctx_all(struct hdd_context *hdd_ctx, bool is_ssr)
 {
 	struct hdd_adapter *adapter, *next_adapter = NULL;
+	struct wlan_hdd_link_info *link_info;
 
 	/* sap_ctx is not destroyed as it will be leveraged for sap restart */
 	if (is_ssr)
@@ -4211,8 +4208,12 @@ void hdd_sap_destroy_ctx_all(struct hdd_context *hdd_ctx, bool is_ssr)
 
 	hdd_for_each_adapter_dev_held_safe(hdd_ctx, adapter, next_adapter,
 					   NET_DEV_HOLD_SAP_DESTROY_CTX_ALL) {
-		if (adapter->device_mode == QDF_SAP_MODE)
-			hdd_sap_destroy_ctx(adapter);
+		if (adapter->device_mode == QDF_SAP_MODE) {
+			hdd_adapter_for_each_active_link_info(adapter,
+							      link_info) {
+				hdd_sap_destroy_ctx(link_info);
+			}
+		}
 		hdd_adapter_dev_put_debug(adapter,
 					  NET_DEV_HOLD_SAP_DESTROY_CTX_ALL);
 	}
@@ -4372,36 +4373,36 @@ QDF_STATUS hdd_init_ap_mode(struct hdd_adapter *adapter, bool reinit)
 error_release_softap_tx_rx:
 	hdd_unregister_wext(adapter->dev);
 error_deinit_sap_session:
-	hdd_hostapd_deinit_sap_session(adapter);
+	hdd_hostapd_deinit_sap_session(adapter->deflink);
 error_release_vdev:
 	hdd_exit();
 	return status;
 }
 
-void hdd_deinit_ap_mode(struct hdd_context *hdd_ctx,
-			struct hdd_adapter *adapter,
-			bool rtnl_held)
+void hdd_deinit_ap_mode(struct wlan_hdd_link_info *link_info)
 {
 	struct hdd_ap_ctx *ap_ctx;
+	struct hdd_adapter *adapter = link_info->adapter;
 
 	hdd_enter_dev(adapter->dev);
 
-	ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(adapter->deflink);
+	ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(link_info);
 	if (test_bit(WMM_INIT_DONE, &adapter->event_flags)) {
 		hdd_wmm_adapter_close(adapter);
 		clear_bit(WMM_INIT_DONE, &adapter->event_flags);
 	}
+
 	qdf_atomic_set(&ap_ctx->acs_in_progress, 0);
 	if (qdf_atomic_read(&ap_ctx->ch_switch_in_progress)) {
 		qdf_atomic_set(&ap_ctx->ch_switch_in_progress, 0);
-		policy_mgr_set_chan_switch_complete_evt(hdd_ctx->psoc);
+		policy_mgr_set_chan_switch_complete_evt(adapter->hdd_ctx->psoc);
 
 		/* Re-enable roaming on all connected STA vdev */
-		wlan_hdd_set_roaming_state(adapter->deflink,
+		wlan_hdd_set_roaming_state(link_info,
 					   RSO_SAP_CHANNEL_CHANGE, true);
 	}
 
-	if (hdd_hostapd_deinit_sap_session(adapter))
+	if (hdd_hostapd_deinit_sap_session(link_info))
 		hdd_err("Failed:hdd_hostapd_deinit_sap_session");
 
 	hdd_exit();

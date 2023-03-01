@@ -1972,7 +1972,7 @@ static int hdd_son_start_acs(struct wlan_objmgr_vdev *vdev, uint8_t enable)
 		hdd_err("ACS is in-progress");
 		return -EAGAIN;
 	}
-	wlan_hdd_undo_acs(adapter);
+	wlan_hdd_undo_acs(link_info);
 	sap_config = &link_info->session.ap.sap_config;
 	hdd_debug("ACS Config country %s hw_mode %d ACS_BW: %d START_CH: %d END_CH: %d band %d",
 		  hdd_ctx->reg.alpha2, sap_config->acs_cfg.hw_mode,

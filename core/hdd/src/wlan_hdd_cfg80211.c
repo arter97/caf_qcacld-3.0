@@ -3854,7 +3854,7 @@ static int __wlan_hdd_cfg80211_do_acs(struct wiphy *wiphy,
 	sap_ctx = WLAN_HDD_GET_SAP_CTX_PTR(link_info);
 
 	/* Check and free if memory is already allocated for acs channel list */
-	wlan_hdd_undo_acs(adapter);
+	wlan_hdd_undo_acs(link_info);
 
 	qdf_mem_zero(&sap_config->acs_cfg, sizeof(struct sap_acs_cfg));
 
@@ -4208,19 +4208,10 @@ static int wlan_hdd_cfg80211_do_acs(struct wiphy *wiphy,
 	return errno;
 }
 
-/**
- * wlan_hdd_undo_acs : Do cleanup of DO_ACS
- * @adapter:  Pointer to adapter struct
- *
- * This function handle cleanup of what was done in DO_ACS, including free
- * memory.
- *
- * Return: void
- */
-void wlan_hdd_undo_acs(struct hdd_adapter *adapter)
+void wlan_hdd_undo_acs(struct wlan_hdd_link_info *link_info)
 {
-	sap_undo_acs(WLAN_HDD_GET_SAP_CTX_PTR(adapter->deflink),
-		     &adapter->deflink->session.ap.sap_config);
+	sap_undo_acs(WLAN_HDD_GET_SAP_CTX_PTR(link_info),
+		     &link_info->session.ap.sap_config);
 }
 
 /**

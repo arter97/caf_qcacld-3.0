@@ -2911,6 +2911,18 @@ struct hdd_adapter *hdd_get_adapter(struct hdd_context *hdd_ctx,
  */
 enum QDF_OPMODE hdd_get_device_mode(uint32_t vdev_id);
 
+/**
+ * hdd_deinit_session() - Cleanup session context in
+ * adapter
+ * @adapter: HDD adapter
+ *
+ * The API cleans up session context and scan IEs
+ * in link_info and adapter.
+ *
+ * Return: None
+ */
+void hdd_deinit_session(struct hdd_adapter *adapter);
+
 void hdd_deinit_adapter(struct hdd_context *hdd_ctx,
 			struct hdd_adapter *adapter,
 			bool rtnl_held);
@@ -4036,7 +4048,17 @@ bool hdd_local_unsafe_channel_updated(struct hdd_context *hdd_ctx,
 
 int hdd_enable_disable_ca_event(struct hdd_context *hddctx,
 				uint8_t set_value);
-void wlan_hdd_undo_acs(struct hdd_adapter *adapter);
+
+/**
+ * wlan_hdd_undo_acs : Do cleanup of DO_ACS
+ * @link_info: Pointer of link_info in adapter
+ *
+ * This function handle cleanup of what was done in DO_ACS, including free
+ * memory.
+ *
+ * Return: void
+ */
+void wlan_hdd_undo_acs(struct wlan_hdd_link_info *link_info);
 
 /**
  * wlan_hdd_set_restriction_mask() - set restriction mask for hdd context
