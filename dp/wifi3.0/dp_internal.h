@@ -22,6 +22,7 @@
 
 #include "dp_types.h"
 #include "dp_htt.h"
+#include "dp_rx_tid.h"
 
 #define RX_BUFFER_SIZE_PKTLOG_LITE 1024
 
@@ -2293,14 +2294,6 @@ void dp_peer_rx_init(struct dp_pdev *pdev, struct dp_peer *peer);
  */
 void dp_peer_cleanup(struct dp_vdev *vdev, struct dp_peer *peer);
 
-/**
- * dp_peer_rx_cleanup() - Cleanup receive TID state
- * @vdev: Datapath vdev
- * @peer: Datapath peer
- *
- */
-void dp_peer_rx_cleanup(struct dp_vdev *vdev, struct dp_peer *peer);
-
 #ifdef DP_PEER_EXTENDED_API
 /**
  * dp_register_peer() - Register peer into physical device
@@ -2502,130 +2495,6 @@ void dp_set_peer_as_tdls_peer(struct cdp_soc_t *soc_hdl, uint8_t vdev_id,
 bool dp_find_peer_exist(struct cdp_soc_t *soc_hdl, uint8_t pdev_id,
 			uint8_t *peer_addr);
 
-/**
- * dp_addba_resp_tx_completion_wifi3() - Update Rx Tid State
- *
- * @cdp_soc: Datapath soc handle
- * @peer_mac: Datapath peer mac address
- * @vdev_id: id of atapath vdev
- * @tid: TID number
- * @status: tx completion status
- * Return: 0 on success, error code on failure
- */
-int dp_addba_resp_tx_completion_wifi3(struct cdp_soc_t *cdp_soc,
-				      uint8_t *peer_mac, uint16_t vdev_id,
-				      uint8_t tid,
-				      int status);
-
-/**
- * dp_addba_requestprocess_wifi3() - Process ADDBA request from peer
- * @cdp_soc: Datapath soc handle
- * @peer_mac: Datapath peer mac address
- * @vdev_id: id of atapath vdev
- * @dialogtoken: dialogtoken from ADDBA frame
- * @tid: TID number
- * @batimeout: BA timeout
- * @buffersize: BA window size
- * @startseqnum: Start seq. number received in BA sequence control
- *
- * Return: 0 on success, error code on failure
- */
-int dp_addba_requestprocess_wifi3(struct cdp_soc_t *cdp_soc,
-				  uint8_t *peer_mac, uint16_t vdev_id,
-				  uint8_t dialogtoken, uint16_t tid,
-				  uint16_t batimeout,
-				  uint16_t buffersize,
-				  uint16_t startseqnum);
-
-/**
- * dp_addba_responsesetup_wifi3() - Process ADDBA request from peer
- * @cdp_soc: Datapath soc handle
- * @peer_mac: Datapath peer mac address
- * @vdev_id: id of atapath vdev
- * @tid: TID number
- * @dialogtoken: output dialogtoken
- * @statuscode: output dialogtoken
- * @buffersize: Output BA window size
- * @batimeout: Output BA timeout
- */
-QDF_STATUS dp_addba_responsesetup_wifi3(struct cdp_soc_t *cdp_soc,
-					uint8_t *peer_mac, uint16_t vdev_id,
-					uint8_t tid, uint8_t *dialogtoken,
-					uint16_t *statuscode,
-					uint16_t *buffersize,
-					uint16_t *batimeout);
-
-/**
- * dp_set_addba_response() - Set a user defined ADDBA response status code
- * @cdp_soc: Datapath soc handle
- * @peer_mac: Datapath peer mac address
- * @vdev_id: id of atapath vdev
- * @tid: TID number
- * @statuscode: response status code to be set
- */
-QDF_STATUS dp_set_addba_response(struct cdp_soc_t *cdp_soc,
-				 uint8_t *peer_mac,
-				 uint16_t vdev_id, uint8_t tid,
-				 uint16_t statuscode);
-
-/**
- * dp_delba_process_wifi3() - Process DELBA from peer
- * @cdp_soc: Datapath soc handle
- * @peer_mac: Datapath peer mac address
- * @vdev_id: id of atapath vdev
- * @tid: TID number
- * @reasoncode: Reason code received in DELBA frame
- *
- * Return: 0 on success, error code on failure
- */
-int dp_delba_process_wifi3(struct cdp_soc_t *cdp_soc, uint8_t *peer_mac,
-			   uint16_t vdev_id, int tid,
-			   uint16_t reasoncode);
-
-/**
- * dp_rx_tid_update_ba_win_size() - Update the DP tid BA window size
- * @cdp_soc: soc handle
- * @peer_mac: mac address of peer handle
- * @vdev_id: id of vdev handle
- * @tid: tid
- * @buffersize: BA window size
- *
- * Return: success/failure of tid update
- */
-QDF_STATUS dp_rx_tid_update_ba_win_size(struct cdp_soc_t *cdp_soc,
-					uint8_t *peer_mac, uint16_t vdev_id,
-					uint8_t tid, uint16_t buffersize);
-
-/**
- * dp_delba_tx_completion_wifi3() -  Handle delba tx completion
- * @cdp_soc: soc handle
- * @peer_mac: peer mac address
- * @vdev_id: id of the vdev handle
- * @tid: Tid number
- * @status: Tx completion status
- *
- * Indicate status of delba Tx to DP for stats update and retry
- * delba if tx failed.
- *
- * Return: 0 on success, error code on failure
- */
-int dp_delba_tx_completion_wifi3(struct cdp_soc_t *cdp_soc, uint8_t *peer_mac,
-				 uint16_t vdev_id, uint8_t tid,
-				 int status);
-
-/**
- * dp_rx_tid_setup_wifi3() - Setup receive TID state
- * @peer: Datapath peer handle
- * @tid: TID
- * @ba_window_size: BlockAck window size
- * @start_seq: Starting sequence number
- *
- * Return: QDF_STATUS code
- */
-QDF_STATUS dp_rx_tid_setup_wifi3(struct dp_peer *peer, int tid,
-				 uint32_t ba_window_size,
-				 uint32_t start_seq);
-
 #ifdef DP_UMAC_HW_RESET_SUPPORT
 /**
  * dp_pause_reo_send_cmd() - Pause Reo send commands.
@@ -2803,9 +2672,6 @@ uint32_t dp_reo_status_ring_handler(struct dp_intr *int_ctx,
 void dp_aggregate_vdev_stats(struct dp_vdev *vdev,
 			     struct cdp_vdev_stats *vdev_stats);
 
-void dp_rx_tid_stats_cb(struct dp_soc *soc, void *cb_ctxt,
-	union hal_reo_status *reo_status);
-
 /**
  * dp_rx_bar_stats_cb() - BAR received stats callback
  * @soc: SOC handle
@@ -2887,27 +2753,6 @@ void dp_htt_stats_copy_tag(struct dp_pdev *pdev, uint8_t tag_type, uint32_t *tag
  */
 QDF_STATUS dp_h2t_3tuple_config_send(struct dp_pdev *pdev, uint32_t tuple_mask,
 				     uint8_t mac_id);
-/**
- * typedef dp_rxtid_stats_cmd_cb() - function pointer for peer
- *			             rx tid stats cmd call_back
- * @soc:
- * @cb_ctxt:
- * @reo_status:
- */
-typedef void (*dp_rxtid_stats_cmd_cb)(struct dp_soc *soc, void *cb_ctxt,
-				      union hal_reo_status *reo_status);
-
-/**
- * dp_peer_rxtid_stats() - Retried Rx TID (REO queue) stats from HW
- * @peer: DP peer handle
- * @dp_stats_cmd_cb: REO command callback function
- * @cb_ctxt: Callback context
- *
- * Return: count of tid stats cmd send succeeded
- */
-int dp_peer_rxtid_stats(struct dp_peer *peer,
-			dp_rxtid_stats_cmd_cb dp_stats_cmd_cb,
-			void *cb_ctxt);
 
 #ifdef IPA_OFFLOAD
 /**
@@ -2943,20 +2788,6 @@ static inline void dp_peer_aggregate_tid_stats(struct dp_peer *peer)
 {
 }
 #endif
-
-/**
- * dp_set_pn_check_wifi3() - enable PN check in REO for security
- * @soc: Datapath soc handle
- * @vdev_id: id of atapath vdev
- * @peer_mac: Datapath peer mac address
- * @sec_type: security type
- * @rx_pn: Receive pn starting number
- *
- */
-QDF_STATUS
-dp_set_pn_check_wifi3(struct cdp_soc_t *soc, uint8_t vdev_id,
-		      uint8_t *peer_mac, enum cdp_sec_type sec_type,
-		      uint32_t *rx_pn);
 
 /**
  * dp_set_key_sec_type_wifi3() - set security mode of key
@@ -4064,20 +3895,6 @@ dp_get_pdev_from_soc_pdev_id_wifi3(struct dp_soc *soc,
 
 	return soc->pdev_list[pdev_id];
 }
-
-/**
- * dp_rx_tid_update_wifi3() - Update receive TID state
- * @peer: Datapath peer handle
- * @tid: TID
- * @ba_window_size: BlockAck window size
- * @start_seq: Starting sequence number
- * @bar_update: BAR update triggered
- *
- * Return: QDF_STATUS code
- */
-QDF_STATUS dp_rx_tid_update_wifi3(struct dp_peer *peer, int tid,
-				  uint32_t ba_window_size, uint32_t start_seq,
-				  bool bar_update);
 
 /**
  * dp_get_peer_mac_list(): function to get peer mac list of vdev
