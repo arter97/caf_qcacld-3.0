@@ -5648,6 +5648,7 @@ uint32_t dp_tx_comp_handler(struct dp_intr *int_ctx, struct dp_soc *soc,
 	struct dp_srng *tx_comp_ring = &soc->tx_comp_ring[ring_id];
 	int max_reap_limit, ring_near_full;
 	uint32_t num_entries;
+	uint32_t rquota = quota;
 
 	DP_HIST_INIT();
 
@@ -5674,8 +5675,8 @@ more_data:
 		num_avail_for_reap = hal_srng_dst_num_valid(hal_soc,
 							    hal_ring_hdl, 0);
 
-	if (num_avail_for_reap >= quota)
-		num_avail_for_reap = quota;
+	if (num_avail_for_reap >= rquota)
+		num_avail_for_reap = rquota;
 
 	dp_srng_dst_inv_cached_descs(soc, hal_ring_hdl, num_avail_for_reap);
 	last_prefetched_hw_desc = dp_srng_dst_prefetch_32_byte_desc(hal_soc,
@@ -5863,8 +5864,10 @@ next_desc:
 	 *
 	 * One more loop will move the state to normal processing and yield
 	 */
-	if (ring_near_full)
+	if (ring_near_full && rquota) {
+		rquota -= num_processed;
 		goto more_data;
+	}
 
 	if (dp_tx_comp_enable_eol_data_check(soc)) {
 
@@ -5876,8 +5879,10 @@ next_desc:
 						  hal_ring_hdl)) {
 			DP_STATS_INC(soc, tx.hp_oos2, 1);
 			if (!hif_exec_should_yield(soc->hif_handle,
-						   int_ctx->dp_intr_id))
+						   int_ctx->dp_intr_id)) {
+				rquota -= num_processed;
 				goto more_data;
+			}
 
 			num_avail_for_reap =
 				hal_srng_dst_num_valid_locked(soc->hal_soc,
@@ -5887,6 +5892,7 @@ next_desc:
 					 (num_avail_for_reap >=
 					  num_entries >> 1))) {
 				DP_STATS_INC(soc, tx.near_full, 1);
+				rquota -= num_processed;
 				goto more_data;
 			}
 		}
