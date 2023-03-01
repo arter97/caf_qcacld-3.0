@@ -376,6 +376,35 @@ wlan_mgmt_rx_reo_is_feature_enabled_at_pdev(struct wlan_objmgr_pdev *pdev)
 }
 
 qdf_export_symbol(wlan_mgmt_rx_reo_is_feature_enabled_at_pdev);
+
+bool
+wlan_mgmt_rx_reo_is_scheduler_enabled_at_psoc(struct wlan_objmgr_psoc *psoc)
+{
+	if (!psoc) {
+		mgmt_rx_reo_err("psoc is NULL!");
+		return false;
+	}
+
+	return cfg_get(psoc, CFG_MGMT_RX_REO_SCHEDULER_ENABLE);
+}
+
+qdf_export_symbol(wlan_mgmt_rx_reo_is_scheduler_enabled_at_psoc);
+
+bool
+wlan_mgmt_rx_reo_is_scheduler_enabled_at_pdev(struct wlan_objmgr_pdev *pdev)
+{
+	struct wlan_objmgr_psoc *psoc;
+
+	if (!pdev) {
+		mgmt_rx_reo_err("pdev is NULL!");
+		return false;
+	}
+
+	psoc = wlan_pdev_get_psoc(pdev);
+	return wlan_mgmt_rx_reo_is_scheduler_enabled_at_psoc(psoc);
+}
+
+qdf_export_symbol(wlan_mgmt_rx_reo_is_scheduler_enabled_at_pdev);
 #else
 bool
 wlan_mgmt_rx_reo_is_feature_enabled_at_psoc(struct wlan_objmgr_psoc *psoc)

@@ -99,6 +99,32 @@ target_if_mgmt_rx_reo_fw_consumed_event_handler(
 	return 0;
 }
 
+void target_if_mgmt_rx_reo_release_frames(void *arg)
+{
+	ol_scn_t scn = arg;
+	struct wlan_objmgr_psoc *psoc;
+	struct wlan_lmac_if_mgmt_rx_reo_rx_ops *mgmt_rx_reo_rx_ops;
+	QDF_STATUS status;
+
+	psoc = target_if_get_psoc_from_scn_hdl(scn);
+	if (!psoc) {
+		mgmt_rx_reo_err("null psoc");
+		return;
+	}
+
+	mgmt_rx_reo_rx_ops = target_if_mgmt_rx_reo_get_rx_ops(psoc);
+	if (!mgmt_rx_reo_rx_ops) {
+		mgmt_rx_reo_err("rx_ops of MGMT Rx REO module is NULL");
+		return;
+	}
+
+	status = mgmt_rx_reo_rx_ops->release_frames(psoc);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		mgmt_rx_reo_err("Failed to release entries, ret = %d", status);
+		return;
+	}
+}
+
 QDF_STATUS
 target_if_mgmt_rx_reo_register_event_handlers(struct wlan_objmgr_psoc *psoc)
 {
@@ -619,19 +645,29 @@ target_if_mgmt_rx_reo_extract_reo_params(
 static QDF_STATUS
 target_if_mgmt_rx_reo_schedule_delivery(struct wlan_objmgr_psoc *psoc)
 {
-	struct hif_opaque_softc *hif_handle;
 	struct wmi_unified *wmi_handle;
-
-	hif_handle = lmac_get_hif_hdl(psoc);
-	if (!hif_handle) {
-		mgmt_rx_reo_err("HIF handle is null");
-		return QDF_STATUS_E_NULL_VALUE;
-	}
+	QDF_STATUS status;
+	HTC_ENDPOINT_ID wmi_endpoint_id;
+	HTC_HANDLE htc_handle;
 
 	wmi_handle = get_wmi_unified_hdl_from_psoc(psoc);
 	if (!wmi_handle) {
 		mgmt_rx_reo_err("wmi_handle is NULL");
 		return QDF_STATUS_E_NULL_VALUE;
+	}
+
+	htc_handle = lmac_get_htc_hdl(psoc);
+	if (!htc_handle) {
+		mgmt_rx_reo_err("HTC_handle is NULL");
+		return QDF_STATUS_E_NULL_VALUE;
+	}
+
+	wmi_endpoint_id = wmi_get_endpoint(wmi_handle);
+
+	status = htc_enable_custom_cb(htc_handle, wmi_endpoint_id);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		mgmt_rx_reo_err("Failed to schedule delivery");
+		return status;
 	}
 
 	return QDF_STATUS_SUCCESS;
@@ -647,19 +683,29 @@ target_if_mgmt_rx_reo_schedule_delivery(struct wlan_objmgr_psoc *psoc)
 static QDF_STATUS
 target_if_mgmt_rx_reo_cancel_scheduled_delivery(struct wlan_objmgr_psoc *psoc)
 {
-	struct hif_opaque_softc *hif_handle;
 	struct wmi_unified *wmi_handle;
-
-	hif_handle = lmac_get_hif_hdl(psoc);
-	if (!hif_handle) {
-		mgmt_rx_reo_err("HIF handle is null");
-		return QDF_STATUS_E_NULL_VALUE;
-	}
+	QDF_STATUS status;
+	HTC_ENDPOINT_ID wmi_endpoint_id;
+	HTC_HANDLE htc_handle;
 
 	wmi_handle = get_wmi_unified_hdl_from_psoc(psoc);
 	if (!wmi_handle) {
 		mgmt_rx_reo_err("wmi_handle is NULL");
 		return QDF_STATUS_E_NULL_VALUE;
+	}
+
+	htc_handle = lmac_get_htc_hdl(psoc);
+	if (!htc_handle) {
+		mgmt_rx_reo_err("HTC_handle is NULL");
+		return QDF_STATUS_E_NULL_VALUE;
+	}
+
+	wmi_endpoint_id = wmi_get_endpoint(wmi_handle);
+
+	status = htc_disable_custom_cb(htc_handle, wmi_endpoint_id);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		mgmt_rx_reo_err("Failed to cancel scheduled delivery");
+		return status;
 	}
 
 	return QDF_STATUS_SUCCESS;
@@ -718,30 +764,4 @@ target_if_mgmt_rx_reo_host_drop_handler(struct wlan_objmgr_pdev *pdev,
 	}
 
 	return mgmt_rx_reo_rx_ops->host_drop_handler(pdev, params->reo_params);
-}
-
-void target_if_mgmt_rx_reo_release_frames(void *arg)
-{
-	ol_scn_t scn = arg;
-	struct wlan_objmgr_psoc *psoc;
-	struct wlan_lmac_if_mgmt_rx_reo_rx_ops *mgmt_rx_reo_rx_ops;
-	QDF_STATUS status;
-
-	psoc = target_if_get_psoc_from_scn_hdl(scn);
-	if (!psoc) {
-		mgmt_rx_reo_err("null psoc");
-		return;
-	}
-
-	mgmt_rx_reo_rx_ops = target_if_mgmt_rx_reo_get_rx_ops(psoc);
-	if (!mgmt_rx_reo_rx_ops) {
-		mgmt_rx_reo_err("rx_ops of MGMT Rx REO module is NULL");
-		return;
-	}
-
-	status = mgmt_rx_reo_rx_ops->release_frames(psoc);
-	if (QDF_IS_STATUS_ERROR(status)) {
-		mgmt_rx_reo_err("Failed to release entries, ret = %d", status);
-		return;
-	}
 }
