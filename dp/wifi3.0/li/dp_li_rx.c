@@ -438,7 +438,7 @@ more_data:
 			qdf_nbuf_set_raw_frame(rx_desc->nbuf, 1);
 
 		if (!is_prev_msdu_last &&
-		    msdu_desc_info.msdu_flags & HAL_MSDU_F_LAST_MSDU_IN_MPDU)
+		    !(msdu_desc_info.msdu_flags & HAL_MSDU_F_MSDU_CONTINUATION))
 			is_prev_msdu_last = true;
 
 		rx_bufs_reaped[rx_desc->pool_id]++;
