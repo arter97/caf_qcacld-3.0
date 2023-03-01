@@ -1315,6 +1315,15 @@ lim_process_assoc_rsp_frame(struct mac_context *mac_ctx, uint8_t *rx_pkt_info,
 			session_entry->pLimMlmJoinReq = NULL;
 		}
 
+		if (session_entry->limAssocResponseData) {
+			tpSirAssocRsp pre_assoc_rsp;
+
+			pre_assoc_rsp = (tpSirAssocRsp)
+					session_entry->limAssocResponseData;
+			qdf_mem_free(pre_assoc_rsp->sha384_ft_subelem.gtk);
+			qdf_mem_free(pre_assoc_rsp->sha384_ft_subelem.igtk);
+			qdf_mem_free(session_entry->limAssocResponseData);
+		}
 		session_entry->limAssocResponseData = (void *)assoc_rsp;
 		/*
 		 * Store the ReAssocRsp Frame in DphTable
