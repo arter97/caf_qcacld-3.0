@@ -3672,6 +3672,8 @@ config_peer_latency_info_cmd_tlv(wmi_unified_t wmi_handle,
 				param->latency_info[i].ul_enable);
 		WMI_LATENCY_SET_BURST_SIZE_SUM(tid_latency_info->latency_tid_info,
 				param->latency_info[i].add_or_sub);
+		WMI_LATENCY_SET_SAWF_UL_PARAMS_BIT(tid_latency_info->latency_tid_info,
+				param->latency_info[i].sawf_ul_param);
 		tid_latency_info++;
 	}
 

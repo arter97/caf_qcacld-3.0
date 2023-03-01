@@ -1081,6 +1081,9 @@ struct wmi_vdev_tid_latency_config_params {
  * @dl_enable: Bit to indicate dl latency enable
  * @flow_id: Flow id associated with tid
  * @add_or_sub: Bit to indicate add/delete of latency params
+ * @sawf_ul_param: Bit to indicate if UL params are for SAWF/SCS
+ * @max_latency: Maximum latency in milliseconds
+ * @min_throughput: Minimum throughput in Kbps
  */
 struct wmi_peer_latency_info_params {
 	uint8_t peer_mac[QDF_MAC_ADDR_SIZE];
@@ -1092,7 +1095,8 @@ struct wmi_peer_latency_info_params {
 			dl_enable   :1,
 			flow_id     :4,
 			add_or_sub  :2,
-			reserved    :14;
+			sawf_ul_param :1,
+			reserved    :13;
 	uint32_t max_latency;
 	uint32_t min_throughput;
 };
