@@ -9000,13 +9000,113 @@ static int hdd_stop_mon_adapter(struct hdd_adapter *adapter)
 	return 0;
 }
 
+static void hdd_stop_sap_go_adapter(struct hdd_adapter *adapter)
+{
+	enum QDF_OPMODE mode;
+	struct hdd_ap_ctx *ap_ctx;
+	struct sap_context *sap_ctx;
+	struct sap_config *sap_config;
+	struct hdd_hostapd_state *hostapd_state;
+	struct wlan_objmgr_vdev *vdev;
+	struct wlan_hdd_link_info *link_info = adapter->deflink;
+	QDF_STATUS status = QDF_STATUS_SUCCESS;
+	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
+
+	mode = adapter->device_mode;
+	ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(link_info);
+	sap_ctx = WLAN_HDD_GET_SAP_CTX_PTR(link_info);
+	vdev = hdd_objmgr_get_vdev_by_user(link_info, WLAN_INIT_DEINIT_ID);
+
+	if (mode == QDF_SAP_MODE) {
+		wlan_hdd_scan_abort(link_info);
+		hdd_abort_ongoing_sta_connection(hdd_ctx);
+		/* Diassociate with all the peers before stop ap post */
+		if (test_bit(SOFTAP_BSS_STARTED, &link_info->link_flags)) {
+			if (wlan_hdd_del_station(adapter, NULL))
+				hdd_sap_indicate_disconnect_for_sta(adapter);
+		}
+		wlan_hdd_flush_pmksa_cache(link_info);
+		sap_config = &ap_ctx->sap_config;
+		wlansap_reset_sap_config_add_ie(sap_config, eUPDATE_IE_ALL);
+		hdd_stop_and_close_pre_cac_adapter(hdd_ctx, vdev);
+	}
+	wlansap_cleanup_cac_timer(sap_ctx);
+	cds_flush_work(&adapter->sap_stop_bss_work);
+
+	if (qdf_atomic_read(&ap_ctx->acs_in_progress)) {
+		hdd_info("ACS in progress, wait for complete");
+		qdf_wait_for_event_completion(&link_info->acs_complete_event,
+					      ACS_COMPLETE_TIMEOUT);
+	}
+
+	if (mode == QDF_P2P_GO_MODE) {
+		wlan_hdd_cleanup_remain_on_channel_ctx(link_info);
+		hdd_abort_ongoing_sta_connection(hdd_ctx);
+	}
+
+	hdd_adapter_deregister_fc(adapter);
+	hdd_destroy_acs_timer(adapter);
+
+	mutex_lock(&hdd_ctx->sap_lock);
+	if (test_bit(SOFTAP_BSS_STARTED, &link_info->link_flags)) {
+		hostapd_state = WLAN_HDD_GET_HOSTAP_STATE_PTR(link_info);
+		qdf_event_reset(&hostapd_state->qdf_stop_bss_event);
+		status = wlansap_stop_bss(ap_ctx->sap_context);
+		if (QDF_IS_STATUS_SUCCESS(status)) {
+			status = qdf_wait_single_event(&hostapd_state->qdf_stop_bss_event,
+						       SME_CMD_STOP_BSS_TIMEOUT);
+			if (QDF_IS_STATUS_ERROR(status)) {
+				hdd_err("failure waiting for wlansap_stop_bss %d",
+					status);
+				hdd_ipa_ap_disconnect_evt(hdd_ctx, adapter);
+			}
+		} else {
+			hdd_err("failure in wlansap_stop_bss");
+		}
+
+		clear_bit(SOFTAP_BSS_STARTED, &link_info->link_flags);
+		policy_mgr_decr_session_set_pcl(hdd_ctx->psoc,
+						adapter->device_mode,
+						link_info->vdev_id);
+		hdd_green_ap_start_state_mc(hdd_ctx, adapter->device_mode,
+					    false);
+
+		hdd_reset_ies_on_sap_stop(link_info);
+	}
+
+	/*
+	 * Note to restart sap after SSR driver needs below information
+	 * and is not cleared/freed on purpose in case of SAP SSR
+	 */
+	if (!cds_is_driver_recovering()) {
+		clear_bit(SOFTAP_INIT_DONE, &link_info->link_flags);
+		qdf_mem_free(ap_ctx->beacon);
+		ap_ctx->beacon = NULL;
+	}
+	/* Clear all the cached sta info */
+	hdd_clear_cached_sta_info(adapter);
+
+	if (vdev && policy_mgr_is_dnsc_set(vdev))
+		wlan_hdd_send_avoid_freq_for_dnbs(hdd_ctx, 0);
+
+	hdd_cancel_ip_notifier_work(adapter);
+	sap_release_vdev_ref(sap_ctx);
+
+	if (mode == QDF_SAP_MODE)
+		ucfg_ipa_flush_pending_vdev_events(hdd_ctx->pdev,
+						   link_info->vdev_id);
+	if (vdev)
+		hdd_objmgr_put_vdev_by_user(vdev, WLAN_INIT_DEINIT_ID);
+	hdd_vdev_destroy(link_info);
+	mutex_unlock(&hdd_ctx->sap_lock);
+	ucfg_ipa_flush(hdd_ctx->pdev);
+}
+
 QDF_STATUS hdd_stop_adapter_ext(struct hdd_context *hdd_ctx,
 				struct hdd_adapter *adapter)
 {
-	QDF_STATUS status = QDF_STATUS_SUCCESS;
+	QDF_STATUS status;
 	struct hdd_station_ctx *sta_ctx;
-	struct hdd_ap_ctx *ap_ctx;
-	struct sap_config *sap_config;
 	mac_handle_t mac_handle;
 	struct wlan_objmgr_vdev *vdev = NULL;
 	struct wlan_hdd_link_info *link_info = adapter->deflink;
@@ -9049,112 +9149,8 @@ QDF_STATUS hdd_stop_adapter_ext(struct hdd_context *hdd_ctx,
 
 		break;
 	case QDF_SAP_MODE:
-		vdev = hdd_objmgr_get_vdev_by_user(link_info, WLAN_OSIF_ID);
-		wlan_hdd_scan_abort(link_info);
-		hdd_abort_ongoing_sta_connection(hdd_ctx);
-		/* Diassociate with all the peers before stop ap post */
-		if (test_bit(SOFTAP_BSS_STARTED, &link_info->link_flags)) {
-			if (wlan_hdd_del_station(adapter, NULL))
-				hdd_sap_indicate_disconnect_for_sta(adapter);
-		}
-		status = wlan_hdd_flush_pmksa_cache(link_info);
-
-		sap_config = &link_info->session.ap.sap_config;
-		wlansap_reset_sap_config_add_ie(sap_config, eUPDATE_IE_ALL);
-
-		ucfg_ipa_flush(hdd_ctx->pdev);
-		hdd_stop_and_close_pre_cac_adapter(hdd_ctx, vdev);
-
-		fallthrough;
 	case QDF_P2P_GO_MODE:
-		if (!vdev)
-			vdev = hdd_objmgr_get_vdev_by_user(link_info,
-							   WLAN_OSIF_ID);
-
-		ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(link_info);
-		wlansap_cleanup_cac_timer(ap_ctx->sap_context);
-		cds_flush_work(&adapter->sap_stop_bss_work);
-		if (qdf_atomic_read(&ap_ctx->acs_in_progress)) {
-			hdd_info("ACS in progress, wait for complete");
-			qdf_wait_for_event_completion(
-				&link_info->acs_complete_event,
-				ACS_COMPLETE_TIMEOUT);
-		}
-
-		if (adapter->device_mode == QDF_P2P_GO_MODE) {
-			wlan_hdd_cleanup_remain_on_channel_ctx(link_info);
-			hdd_abort_ongoing_sta_connection(hdd_ctx);
-		}
-
-		hdd_adapter_deregister_fc(adapter);
-		hdd_destroy_acs_timer(adapter);
-
-		mutex_lock(&hdd_ctx->sap_lock);
-		if (test_bit(SOFTAP_BSS_STARTED, &link_info->link_flags)) {
-			struct hdd_hostapd_state *hostapd_state =
-				WLAN_HDD_GET_HOSTAP_STATE_PTR(link_info);
-
-			qdf_event_reset(&hostapd_state->qdf_stop_bss_event);
-			status = wlansap_stop_bss(ap_ctx->sap_context);
-
-			if (QDF_IS_STATUS_SUCCESS(status)) {
-				status = qdf_wait_single_event(
-					&hostapd_state->qdf_stop_bss_event,
-					SME_CMD_STOP_BSS_TIMEOUT);
-				if (QDF_IS_STATUS_ERROR(status)) {
-					hdd_err("failure waiting for wlansap_stop_bss %d",
-						status);
-					hdd_ipa_ap_disconnect_evt(hdd_ctx,
-								  adapter);
-				}
-			} else {
-				hdd_err("failure in wlansap_stop_bss");
-			}
-
-			clear_bit(SOFTAP_BSS_STARTED, &link_info->link_flags);
-			policy_mgr_decr_session_set_pcl(hdd_ctx->psoc,
-						adapter->device_mode,
-						link_info->vdev_id);
-			hdd_green_ap_start_state_mc(hdd_ctx,
-						    adapter->device_mode,
-						    false);
-
-			hdd_reset_ies_on_sap_stop(link_info);
-		}
-
-		/*
-		 * Note to restart sap after SSR driver needs below information
-		 * and is not cleared/freed on purpose in case of SAP SSR
-		 */
-		if (!cds_is_driver_recovering()) {
-			clear_bit(SOFTAP_INIT_DONE, &link_info->link_flags);
-			qdf_mem_free(ap_ctx->beacon);
-			ap_ctx->beacon = NULL;
-		}
-
-		/* Clear all the cached sta info */
-		hdd_clear_cached_sta_info(adapter);
-
-		/*
-		 * If Do_Not_Break_Stream was enabled clear avoid channel list.
-		 */
-		if (vdev) {
-			if (policy_mgr_is_dnsc_set(vdev))
-				wlan_hdd_send_avoid_freq_for_dnbs(hdd_ctx, 0);
-		}
-
-		hdd_cancel_ip_notifier_work(adapter);
-		sap_release_vdev_ref(ap_ctx->sap_context);
-
-		if (adapter->device_mode == QDF_SAP_MODE) {
-			ucfg_ipa_flush_pending_vdev_events(
-						hdd_ctx->pdev,
-						link_info->vdev_id);
-		}
-		hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
-		hdd_vdev_destroy(link_info);
-
-		mutex_unlock(&hdd_ctx->sap_lock);
+		hdd_stop_sap_go_adapter(adapter);
 		break;
 	case QDF_OCB_MODE:
 		vdev = hdd_objmgr_get_vdev_by_user(link_info, WLAN_OSIF_ID);
