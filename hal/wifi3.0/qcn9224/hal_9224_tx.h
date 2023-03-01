@@ -529,6 +529,32 @@ struct pcu_ppdu_setup_init_compact_9224 {
 	/* DWORD - 57 */
 	uint32_t protection_frame_ad4_47_16		: 32;
 };
+
+/**
+ * hal_txmon_set_word_mask_qcn9224() - api to set word mask for tx monitor
+ * @wmask: pointer to hal_txmon_word_mask_config_t
+ *
+ * Return: void
+ */
+static inline
+void hal_txmon_set_word_mask_qcn9224(void *wmask)
+{
+	hal_txmon_word_mask_config_t *word_mask = NULL;
+
+	word_mask = (hal_txmon_word_mask_config_t *)wmask;
+
+	word_mask->compaction_enable = 1;
+	word_mask->tx_fes_setup = TX_FES_SETUP_MASK;
+	word_mask->tx_peer_entry = TX_PEER_ENTRY_MASK;
+	word_mask->tx_queue_ext = TX_QUEUE_EXT_MASK;
+	word_mask->tx_msdu_start = TX_MSDU_START_MASK;
+	word_mask->pcu_ppdu_setup_init = PCU_PPDU_SETUP_INIT_MASK;
+	word_mask->tx_mpdu_start = TX_MPDU_START_MASK;
+	word_mask->rxpcu_user_setup = 0xFF;
+	word_mask->tx_fes_status_end = TX_FES_STATUS_END_MASK;
+	word_mask->response_end_status = RESPONSE_END_STATUS_MASK;
+	word_mask->tx_fes_status_prot = TX_FES_STATUS_PROT_MASK;
+}
 #endif
 
 /**

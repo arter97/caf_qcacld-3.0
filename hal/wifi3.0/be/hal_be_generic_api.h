@@ -1381,6 +1381,22 @@ hal_txmon_status_get_num_users_generic_be(void *tx_tlv_hdr, uint8_t *num_users)
 }
 
 /**
+ * hal_txmon_set_word_mask_generic_be() - api to set word mask for tx monitor
+ * @wmask: pointer to hal_txmon_word_mask_config_t
+ *
+ * Return: void
+ */
+static inline
+void hal_txmon_set_word_mask_generic_be(void *wmask)
+{
+	hal_txmon_word_mask_config_t *word_mask = NULL;
+
+	word_mask = (hal_txmon_word_mask_config_t *)wmask;
+	qdf_mem_set(word_mask, sizeof(hal_txmon_word_mask_config_t), 0xFF);
+	word_mask->compaction_enable = 0;
+}
+
+/**
  * hal_tx_get_ppdu_info() - api to get tx ppdu info
  * @data_info: populate dp_ppdu_info data
  * @prot_info: populate dp_ppdu_info protection

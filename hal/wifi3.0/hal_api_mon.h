@@ -1443,4 +1443,39 @@ hal_clear_rx_status_done(uint8_t *rx_tlv)
 	*(uint32_t *)rx_tlv = 0;
 	return QDF_STATUS_SUCCESS;
 }
+
+#ifdef QCA_MONITOR_2_0_SUPPORT
+/**
+ * struct hal_txmon_word_mask_config - hal tx monitor word mask filter setting
+ * @pcu_ppdu_setup_init: PCU_PPDU_SETUP TLV word mask
+ * @tx_peer_entry: TX_PEER_ENTRY TLV word mask
+ * @tx_queue_ext: TX_QUEUE_EXTENSION TLV word mask
+ * @tx_fes_status_end: TX_FES_STATUS_END TLV word mask
+ * @response_end_status: RESPONSE_END_STATUS TLV word mask
+ * @tx_fes_status_prot: TX_FES_STATUS_PROT TLV word mask
+ * @tx_fes_setup: TX_FES_SETUP TLV word mask
+ * @tx_msdu_start: TX_MSDU_START TLV word mask
+ * @tx_mpdu_start: TX_MPDU_START TLV word mask
+ * @rxpcu_user_setup: RXPCU_USER_SETUP TLV word mask
+ * @compaction_enable: flag to enable word mask compaction
+ */
+struct hal_txmon_word_mask_config {
+	uint32_t pcu_ppdu_setup_init;
+	uint16_t tx_peer_entry;
+	uint16_t tx_queue_ext;
+	uint16_t tx_fes_status_end;
+	uint16_t response_end_status;
+	uint16_t tx_fes_status_prot;
+	uint8_t tx_fes_setup;
+	uint8_t tx_msdu_start;
+	uint8_t tx_mpdu_start;
+	uint8_t rxpcu_user_setup;
+	uint8_t compaction_enable;
+};
+
+/*
+ * typedef hal_txmon_word_mask_config_t - handle for tx monitor word mask
+ */
+typedef struct hal_txmon_word_mask_config hal_txmon_word_mask_config_t;
+#endif /* QCA_MONITOR_2_0_SUPPORT */
 #endif
