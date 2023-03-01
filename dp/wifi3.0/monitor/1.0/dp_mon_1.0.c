@@ -400,11 +400,16 @@ QDF_STATUS dp_vdev_set_monitor_mode_rings(struct dp_pdev *pdev,
 	struct dp_srng *mon_buf_ring;
 	uint32_t num_entries;
 	struct dp_mon_pdev *mon_pdev = pdev->monitor_pdev;
-
+	uint32_t target_type = hal_get_target_type(soc->hal_soc);
 
 	/* If monitor rings are already initialized, return from here */
 	if (mon_pdev->pdev_mon_init)
 		return QDF_STATUS_SUCCESS;
+
+	if (target_type == TARGET_TYPE_QCN9160) {
+		dp_alert("Mon SOC:%pK config, skip desc pool alloc", soc);
+		goto pass;
+	}
 
 	for (mac_id = 0; mac_id < NUM_RXDMA_RINGS_PER_PDEV; mac_id++) {
 		mac_for_pdev = dp_get_lmac_id_for_pdev_id(pdev->soc, mac_id,
@@ -457,8 +462,8 @@ QDF_STATUS dp_vdev_set_monitor_mode_rings(struct dp_pdev *pdev,
 			       soc->rxdma_mon_dst_ring[mac_for_pdev].hal_srng,
 			       RXDMA_MONITOR_DST);
 	}
+pass:
 	mon_pdev->pdev_mon_init = 1;
-
 	return QDF_STATUS_SUCCESS;
 
 fail0:
