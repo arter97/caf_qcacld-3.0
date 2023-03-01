@@ -27,24 +27,22 @@
 #define _PKTLOG_AC_API_
 #if defined(CONNECTIVITY_PKTLOG) || !defined(REMOVE_PKT_LOG)
 
-/**
- * @typedef hif_opaque_softc_handle
- * @brief opaque handle for hif_opaque_softc
- */
 struct hif_opaque_softc;
-typedef struct hif_opaque_softc *hif_opaque_softc_handle;
+/**
+ * typedef hif_opaque_softc_handle - opaque handle for hif_opaque_softc
+ */
+typedef struct hif_opaque_softc * hif_opaque_softc_handle;
 
 enum pktlog_callback_regtype {
 	PKTLOG_DEFAULT_CALLBACK_REGISTRATION,
 	PKTLOG_LITE_CALLBACK_REGISTRATION
 };
 
-/**
- * @typedef net_device_handle
- * @brief opaque handle linux phy device object
- */
 struct net_device;
-typedef struct net_device *net_device_handle;
+/**
+ * typedef net_device_handle - opaque handle to linux net device object
+ */
+typedef struct net_device * net_device_handle;
 
 struct pktlog_dev_t;
 
