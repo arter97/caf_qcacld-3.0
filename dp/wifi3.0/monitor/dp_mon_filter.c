@@ -272,6 +272,7 @@ dp_mon_ht2_rx_ring_cfg(struct dp_soc *soc,
 	int mac_id;
 	int max_mac_rings = wlan_cfg_get_num_mac_rings(pdev->wlan_cfg_ctx);
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
+	uint32_t target_type = hal_get_target_type(soc->hal_soc);
 
 	/*
 	 * Overwrite the max_mac_rings for the status rings.
@@ -295,7 +296,12 @@ dp_mon_ht2_rx_ring_cfg(struct dp_soc *soc,
 
 		switch (srng_type) {
 		case DP_MON_FILTER_SRNG_TYPE_RXDMA_BUF:
-			hal_ring_hdl = pdev->rx_mac_buf_ring[lmac_id].hal_srng;
+			if (target_type == TARGET_TYPE_QCN9160)
+				hal_ring_hdl =
+				soc->rx_refill_buf_ring[lmac_id].hal_srng;
+			else
+				hal_ring_hdl =
+					pdev->rx_mac_buf_ring[lmac_id].hal_srng;
 			hal_ring_type = RXDMA_BUF;
 			ring_buf_size = RX_DATA_BUFFER_SIZE;
 			break;
