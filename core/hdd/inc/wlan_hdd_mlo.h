@@ -45,6 +45,11 @@ struct hdd_adapter_create_param {
 		 unused:27;
 };
 
+#ifdef WLAN_FEATURE_11BE_MLO
+#define MAX_SIMULTANEOUS_STA_ML_LINKS 1
+#define MAX_NUM_STA_ML_LINKS 3
+#endif
+
 #if defined(WLAN_FEATURE_11BE_MLO) && defined(CFG80211_11BE_BASIC)
 #define hdd_adapter_is_link_adapter(x) ((x)->mlo_adapter_info.is_link_adapter)
 #define hdd_adapter_is_ml_adapter(x)   ((x)->mlo_adapter_info.is_ml_adapter)

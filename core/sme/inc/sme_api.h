@@ -3679,9 +3679,6 @@ enum sme_eht_tx_bfee_cap_type {
 };
 
 #ifdef WLAN_FEATURE_11BE
-#define MAX_SIMULTANEOUS_STA_ML_LINKS 1
-#define MAX_NUM_STA_ML_lINKS 3
-
 /**
  * sme_set_eht_testbed_def() - set eht testbed default
  * @mac_handle: Opaque handle to the global MAC context

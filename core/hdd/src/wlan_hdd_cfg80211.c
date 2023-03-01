@@ -10828,7 +10828,7 @@ static int hdd_set_wfc_state(struct hdd_adapter *adapter,
 
 }
 
-#ifdef WLAN_FEATURE_11BE
+#ifdef WLAN_FEATURE_11BE_MLO
 /**
  * hdd_set_eht_max_simultaneous_links() - Set EHT maximum number of
  * simultaneous links
@@ -10844,7 +10844,7 @@ static int hdd_set_eht_max_simultaneous_links(struct hdd_adapter *adapter,
 	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
 
 	cfg_val = nla_get_u8(attr);
-	if (cfg_val < 0 || cfg_val > MAX_SIMULTANEOUS_STA_ML_LINKS)
+	if (cfg_val > MAX_SIMULTANEOUS_STA_ML_LINKS)
 		return -EINVAL;
 
 	sme_set_mlo_max_simultaneous_links(hdd_ctx->mac_handle,
@@ -10867,7 +10867,7 @@ static int hdd_set_eht_max_num_links(struct hdd_adapter *adapter,
 	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
 
 	cfg_val = nla_get_u8(attr);
-	if (cfg_val < 0 || cfg_val > MAX_NUM_STA_ML_lINKS)
+	if (cfg_val > MAX_NUM_STA_ML_LINKS)
 		return -EINVAL;
 
 	sme_set_mlo_max_links(hdd_ctx->mac_handle,
