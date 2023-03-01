@@ -6589,7 +6589,6 @@ hdd_alloc_station_adapter(struct hdd_context *hdd_ctx, tSirMacAddr mac_addr,
 	adapter->deflink = &adapter->link_info[WLAN_HDD_DEFLINK_IDX];
 	adapter->hdd_ctx = hdd_ctx;
 	adapter->magic = WLAN_HDD_ADAPTER_MAGIC;
-	adapter->deflink->vdev_id = WLAN_UMAC_VDEV_ID_MAX;
 	qdf_atomic_set_bit(WLAN_HDD_DEFLINK_IDX, &adapter->active_links);
 
 	qdf_status = hdd_monitor_mode_qdf_create_event(adapter, session_type);
@@ -6731,7 +6730,7 @@ QDF_STATUS hdd_sme_close_session_callback(uint8_t vdev_id)
 
 	link_info = hdd_get_link_info_by_vdev(hdd_ctx, vdev_id);
 	if (!link_info) {
-		hdd_err("Invalid vdev");
+		hdd_err("Invalid vdev %d", vdev_id);
 		return QDF_STATUS_E_INVAL;
 	}
 
@@ -6880,41 +6879,44 @@ void hdd_vdev_deinit_components(struct wlan_objmgr_vdev *vdev)
 	ucfg_son_disable_cbs(vdev);
 }
 
-int hdd_vdev_destroy(struct hdd_adapter *adapter)
+static inline
+void hdd_reset_vdev_info(struct wlan_hdd_link_info *link_info)
+{
+	qdf_spin_lock_bh(&link_info->vdev_lock);
+	link_info->vdev = NULL;
+	qdf_spin_unlock_bh(&link_info->vdev_lock);
+}
+
+int hdd_vdev_destroy(struct wlan_hdd_link_info *link_info)
 {
 	int ret;
 	uint8_t vdev_id;
 	struct hdd_context *hdd_ctx;
 	struct wlan_objmgr_vdev *vdev;
 
-	vdev_id = adapter->deflink->vdev_id;
+	vdev_id = link_info->vdev_id;
 	hdd_nofl_debug("destroying vdev %d", vdev_id);
-
 	/* vdev created sanity check */
-	if (!test_bit(SME_SESSION_OPENED, &adapter->deflink->link_flags)) {
+	if (!test_bit(SME_SESSION_OPENED, &link_info->link_flags)) {
 		hdd_nofl_debug("vdev %u does not exist", vdev_id);
 		return -EINVAL;
 	}
 
-	hdd_ctx = WLAN_HDD_GET_CTX(adapter);
+	hdd_ctx = WLAN_HDD_GET_CTX(link_info->adapter);
 
-	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink, WLAN_OSIF_ID);
+	vdev = hdd_objmgr_get_vdev_by_user(link_info, WLAN_OSIF_ID);
 	if (!vdev)
 		return -EINVAL;
 
 	hdd_stop_last_active_connection(hdd_ctx, vdev);
 	hdd_check_wait_for_hw_mode_completion(hdd_ctx);
 	ucfg_scan_vdev_set_disable(vdev, REASON_VDEV_DOWN);
-	wlan_hdd_scan_abort(adapter->deflink);
+	wlan_hdd_scan_abort(link_info);
 	hdd_vdev_deinit_components(vdev);
-	wlan_cfg80211_cleanup_scan_queue(hdd_ctx->pdev, adapter->dev);
+	hdd_mlo_t2lm_unregister_callback(vdev);
 	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
 
-	qdf_spin_lock_bh(&adapter->deflink->vdev_lock);
-	hdd_mlo_t2lm_unregister_callback(adapter->deflink->vdev);
-	adapter->deflink->vdev = NULL;
-	qdf_spin_unlock_bh(&adapter->deflink->vdev_lock);
-
+	hdd_reset_vdev_info(link_info);
 	osif_cm_osif_priv_deinit(vdev);
 
 	/* Release the hdd reference */
@@ -7273,7 +7275,7 @@ int hdd_vdev_create(struct hdd_adapter *adapter)
 	return errno;
 
 hdd_vdev_destroy_procedure:
-	QDF_BUG(!hdd_vdev_destroy(adapter));
+	QDF_BUG(!hdd_vdev_destroy(adapter->deflink));
 
 	return errno;
 }
@@ -7332,7 +7334,7 @@ error_wmm_init:
 
 wext_unregister:
 	hdd_unregister_wext(adapter->dev);
-	QDF_BUG(!hdd_vdev_destroy(adapter));
+	QDF_BUG(!hdd_vdev_destroy(adapter->deflink));
 
 	return status;
 }
@@ -7603,12 +7605,19 @@ hdd_unregister_netdevice(struct hdd_adapter *adapter, struct net_device *dev)
 }
 #endif
 
+static inline void hdd_adapter_destroy_vdev_info(struct hdd_adapter *adapter)
+{
+	struct wlan_hdd_link_info *link_info;
+
+	hdd_adapter_for_each_link_info(adapter, link_info)
+		qdf_spinlock_destroy(&link_info->vdev_lock);
+}
+
 static void hdd_cleanup_adapter(struct hdd_context *hdd_ctx,
 				struct hdd_adapter *adapter,
 				bool rtnl_held)
 {
 	struct net_device *dev = NULL;
-	struct wlan_hdd_link_info *link_info;
 
 	if (adapter)
 		dev = adapter->dev;
@@ -7619,9 +7628,7 @@ static void hdd_cleanup_adapter(struct hdd_context *hdd_ctx,
 
 	hdd_apf_context_destroy(adapter);
 	qdf_spinlock_destroy(&adapter->mc_list_lock);
-	hdd_adapter_for_each_link_info(adapter, link_info)
-		qdf_spinlock_destroy(&link_info->vdev_lock);
-
+	hdd_adapter_destroy_vdev_info(adapter);
 	hdd_sta_info_deinit(&adapter->sta_info_list);
 	hdd_sta_info_deinit(&adapter->cache_sta_info_list);
 
@@ -8952,7 +8959,7 @@ QDF_STATUS hdd_stop_adapter_ext(struct hdd_context *hdd_ctx,
 						link_info->vdev_id);
 		}
 		hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
-		hdd_vdev_destroy(adapter);
+		hdd_vdev_destroy(link_info);
 		break;
 
 	case QDF_MONITOR_MODE:
@@ -8979,7 +8986,7 @@ QDF_STATUS hdd_stop_adapter_ext(struct hdd_context *hdd_ctx,
 		hdd_adapter_deregister_fc(adapter);
 		hdd_monitor_mode_disable_and_delete(link_info);
 		hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
-		hdd_vdev_destroy(adapter);
+		hdd_vdev_destroy(link_info);
 		break;
 
 	case QDF_SAP_MODE:
@@ -9083,7 +9090,7 @@ QDF_STATUS hdd_stop_adapter_ext(struct hdd_context *hdd_ctx,
 						link_info->vdev_id);
 		}
 		hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
-		hdd_vdev_destroy(adapter);
+		hdd_vdev_destroy(link_info);
 
 		mutex_unlock(&hdd_ctx->sap_lock);
 		break;
@@ -9094,12 +9101,15 @@ QDF_STATUS hdd_stop_adapter_ext(struct hdd_context *hdd_ctx,
 			       sta_ctx->conn_info.peer_macaddr[0]);
 		hdd_adapter_deregister_fc(adapter);
 		hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
-		hdd_vdev_destroy(adapter);
+		hdd_vdev_destroy(link_info);
 		break;
 	default:
 		hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
 		break;
 	}
+
+	/* Moved from vdev destroy as it is per adapter */
+	wlan_cfg80211_cleanup_scan_queue(hdd_ctx->pdev, adapter->dev);
 
 	/* This function should be invoked at the end of this api*/
 	hdd_dump_func_call_map();
@@ -14036,7 +14046,7 @@ int hdd_start_ap_adapter(struct hdd_adapter *adapter)
 sap_release_ref:
 	sap_release_vdev_ref(sap_ctx);
 sap_vdev_destroy:
-	hdd_vdev_destroy(adapter);
+	hdd_vdev_destroy(adapter->deflink);
 sap_destroy_ctx:
 	hdd_sap_destroy_ctx(adapter);
 	return ret;

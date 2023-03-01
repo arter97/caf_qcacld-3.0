@@ -95,7 +95,7 @@ static int hdd_close_ndi(struct hdd_adapter *adapter)
 	hdd_cancel_ip_notifier_work(adapter);
 	hdd_adapter_deregister_fc(adapter);
 
-	errno = hdd_vdev_destroy(adapter);
+	errno = hdd_vdev_destroy(adapter->deflink);
 	if (errno)
 		hdd_err("failed to destroy vdev: %d", errno);
 
@@ -648,7 +648,7 @@ error_wmm_init:
 
 wext_unregister:
 	hdd_wext_unregister(wlan_dev, true);
-	QDF_BUG(!hdd_vdev_destroy(adapter));
+	QDF_BUG(!hdd_vdev_destroy(adapter->deflink));
 
 	return ret_val;
 }
