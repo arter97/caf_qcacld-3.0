@@ -2822,6 +2822,36 @@ hdd_get_adapter_by_rand_macaddr(struct hdd_context *hdd_ctx,
 bool hdd_is_vdev_in_conn_state(struct wlan_hdd_link_info *link_info);
 
 /**
+ * hdd_adapter_deregister_fc() - Deregisters flow control
+ * callbacks
+ * @adapter: HDD adapter
+ *
+ * The function call deregisters flow control callbacks
+ *
+ * Return: void
+ */
+void hdd_adapter_deregister_fc(struct hdd_adapter *adapter);
+
+#ifdef WLAN_OPEN_SOURCE
+/**
+ * hdd_cancel_ip_notifier_work() - Cancel scheduled IP
+ * notifier deferred work
+ * @adapter: HDD adapter
+ *
+ * The API calls cancel work for IPv4 and IPv6 notifier
+ * deferred task
+ *
+ * Return: void
+ */
+void hdd_cancel_ip_notifier_work(struct hdd_adapter *adapter);
+#else
+static inline
+void hdd_cancel_ip_notifier_work(struct hdd_adapter *adapter)
+{
+}
+#endif
+
+/**
  * hdd_vdev_create() - Create the vdev in the firmware
  * @adapter: hdd adapter
  *

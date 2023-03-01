@@ -92,13 +92,9 @@ static int hdd_close_ndi(struct hdd_adapter *adapter)
 				     WLAN_STOP_ALL_NETIF_QUEUE_N_CARRIER,
 				     WLAN_CONTROL_PATH);
 
-	cancel_work_sync(&adapter->ipv4_notifier_work);
-	hdd_deregister_hl_netdev_fc_timer(adapter);
-	hdd_deregister_tx_flow_control(adapter);
+	hdd_cancel_ip_notifier_work(adapter);
+	hdd_adapter_deregister_fc(adapter);
 
-#ifdef WLAN_NS_OFFLOAD
-	cancel_work_sync(&adapter->ipv6_notifier_work);
-#endif
 	errno = hdd_vdev_destroy(adapter);
 	if (errno)
 		hdd_err("failed to destroy vdev: %d", errno);

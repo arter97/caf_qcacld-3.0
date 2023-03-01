@@ -8717,6 +8717,22 @@ static inline void hdd_dump_func_call_map(void)
 }
 #endif
 
+#ifdef WLAN_OPEN_SOURCE
+void hdd_cancel_ip_notifier_work(struct hdd_adapter *adapter)
+{
+	cancel_work_sync(&adapter->ipv4_notifier_work);
+#ifdef WLAN_NS_OFFLOAD
+	cancel_work_sync(&adapter->ipv6_notifier_work);
+#endif
+}
+#endif
+
+void hdd_adapter_deregister_fc(struct hdd_adapter *adapter)
+{
+	hdd_deregister_hl_netdev_fc_timer(adapter);
+	hdd_deregister_tx_flow_control(adapter);
+}
+
 QDF_STATUS hdd_stop_adapter_ext(struct hdd_context *hdd_ctx,
 				struct hdd_adapter *adapter)
 {
@@ -8826,14 +8842,8 @@ QDF_STATUS hdd_stop_adapter_ext(struct hdd_context *hdd_ctx,
 		wlan_hdd_cleanup_remain_on_channel_ctx(link_info);
 		status = wlan_hdd_flush_pmksa_cache(link_info);
 
-		hdd_deregister_hl_netdev_fc_timer(adapter);
-
-		hdd_deregister_tx_flow_control(adapter);
-
-		cancel_work_sync(&adapter->ipv4_notifier_work);
-#ifdef WLAN_NS_OFFLOAD
-		cancel_work_sync(&adapter->ipv6_notifier_work);
-#endif
+		hdd_adapter_deregister_fc(adapter);
+		hdd_cancel_ip_notifier_work(adapter);
 
 		if (adapter->device_mode == QDF_STA_MODE) {
 			if (vdev)
@@ -8878,8 +8888,8 @@ QDF_STATUS hdd_stop_adapter_ext(struct hdd_context *hdd_ctx,
 				WIFI_POWER_EVENT_WAKELOCK_MONITOR_MODE);
 		}
 		wlan_hdd_scan_abort(link_info);
-		hdd_deregister_hl_netdev_fc_timer(adapter);
-		hdd_deregister_tx_flow_control(adapter);
+		hdd_adapter_deregister_fc(adapter);
+
 		status = hdd_disable_monitor_mode();
 		if (QDF_IS_STATUS_ERROR(status))
 			hdd_err_rl("datapath reset failed for monitor mode");
@@ -8934,8 +8944,7 @@ QDF_STATUS hdd_stop_adapter_ext(struct hdd_context *hdd_ctx,
 			hdd_abort_ongoing_sta_connection(hdd_ctx);
 		}
 
-		hdd_deregister_hl_netdev_fc_timer(adapter);
-		hdd_deregister_tx_flow_control(adapter);
+		hdd_adapter_deregister_fc(adapter);
 		hdd_destroy_acs_timer(adapter);
 
 		mutex_lock(&hdd_ctx->sap_lock);
@@ -9013,10 +9022,7 @@ QDF_STATUS hdd_stop_adapter_ext(struct hdd_context *hdd_ctx,
 				wlan_hdd_send_avoid_freq_for_dnbs(hdd_ctx, 0);
 		}
 
-		cancel_work_sync(&adapter->ipv4_notifier_work);
-#ifdef WLAN_NS_OFFLOAD
-		cancel_work_sync(&adapter->ipv6_notifier_work);
-#endif
+		hdd_cancel_ip_notifier_work(adapter);
 		sap_release_vdev_ref(ap_ctx->sap_context);
 
 		if (adapter->device_mode == QDF_SAP_MODE) {
@@ -9034,8 +9040,7 @@ QDF_STATUS hdd_stop_adapter_ext(struct hdd_context *hdd_ctx,
 		cdp_clear_peer(cds_get_context(QDF_MODULE_ID_SOC),
 			       OL_TXRX_PDEV_ID,
 			       sta_ctx->conn_info.peer_macaddr[0]);
-		hdd_deregister_hl_netdev_fc_timer(adapter);
-		hdd_deregister_tx_flow_control(adapter);
+		hdd_adapter_deregister_fc(adapter);
 		hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
 		hdd_vdev_destroy(adapter);
 		break;
