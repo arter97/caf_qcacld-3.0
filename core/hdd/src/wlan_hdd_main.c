@@ -8961,6 +8961,45 @@ static void hdd_stop_station_adapter(struct hdd_adapter *adapter)
 	hdd_cancel_ip_notifier_work(adapter);
 }
 
+static int hdd_stop_mon_adapter(struct hdd_adapter *adapter)
+{
+	struct wlan_objmgr_vdev *vdev;
+	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
+	struct wlan_hdd_link_info *link_info = adapter->deflink;
+
+	vdev = hdd_objmgr_get_vdev_by_user(link_info,
+					   WLAN_INIT_DEINIT_ID);
+	if (wlan_hdd_is_session_type_monitor(adapter->device_mode) &&
+	    vdev &&
+	    ucfg_pkt_capture_get_mode(hdd_ctx->psoc) !=
+					PACKET_CAPTURE_MODE_DISABLE) {
+		struct hdd_adapter *sta_adapter;
+
+		ucfg_pkt_capture_deregister_callbacks(vdev);
+		hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
+		link_info->vdev = NULL;
+
+		sta_adapter = hdd_get_adapter(hdd_ctx, QDF_STA_MODE);
+		if (!sta_adapter) {
+			hdd_objmgr_put_vdev_by_user(vdev, WLAN_INIT_DEINIT_ID);
+			hdd_err("No station interface found");
+			return -EINVAL;
+		}
+		hdd_reset_monitor_interface(sta_adapter);
+	}
+
+	hdd_monitor_mode_release_wakelock(link_info);
+	wlan_hdd_scan_abort(link_info);
+	hdd_adapter_deregister_fc(adapter);
+	hdd_monitor_mode_disable_and_delete(link_info);
+	if (vdev)
+		hdd_objmgr_put_vdev_by_user(vdev, WLAN_INIT_DEINIT_ID);
+
+	hdd_vdev_destroy(link_info);
+
+	return 0;
+}
+
 QDF_STATUS hdd_stop_adapter_ext(struct hdd_context *hdd_ctx,
 				struct hdd_adapter *adapter)
 {
@@ -9004,32 +9043,10 @@ QDF_STATUS hdd_stop_adapter_ext(struct hdd_context *hdd_ctx,
 		hdd_stop_station_adapter(adapter);
 		break;
 	case QDF_MONITOR_MODE:
-		vdev = hdd_objmgr_get_vdev_by_user(link_info, WLAN_OSIF_ID);
-		if (wlan_hdd_is_session_type_monitor(adapter->device_mode) &&
-		    vdev &&
-		    ucfg_pkt_capture_get_mode(hdd_ctx->psoc) !=
-						PACKET_CAPTURE_MODE_DISABLE) {
-			struct hdd_adapter *sta_adapter;
+		status = hdd_stop_mon_adapter(adapter);
+		if (QDF_IS_STATUS_ERROR(status))
+			return status;
 
-			ucfg_pkt_capture_deregister_callbacks(vdev);
-			hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
-			link_info->vdev = NULL;
-
-			sta_adapter = hdd_get_adapter(hdd_ctx, QDF_STA_MODE);
-			if (!sta_adapter) {
-				hdd_err("No station interface found");
-				hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
-				return -EINVAL;
-			}
-			hdd_reset_monitor_interface(sta_adapter);
-		}
-
-		hdd_monitor_mode_release_wakelock(link_info);
-		wlan_hdd_scan_abort(link_info);
-		hdd_adapter_deregister_fc(adapter);
-		hdd_monitor_mode_disable_and_delete(link_info);
-		hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
-		hdd_vdev_destroy(link_info);
 		break;
 	case QDF_SAP_MODE:
 		vdev = hdd_objmgr_get_vdev_by_user(link_info, WLAN_OSIF_ID);
