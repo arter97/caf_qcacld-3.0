@@ -2853,14 +2853,14 @@ void hdd_cancel_ip_notifier_work(struct hdd_adapter *adapter)
 
 /**
  * hdd_vdev_create() - Create the vdev in the firmware
- * @adapter: hdd adapter
+ * @link_info: Link info pointer in HDD adapter
  *
  * This function will create the vdev in the firmware
  *
  * Return: 0 when the vdev create is sent to firmware or -EINVAL when
  * there is a failure to send the command.
  */
-int hdd_vdev_create(struct hdd_adapter *adapter);
+int hdd_vdev_create(struct wlan_hdd_link_info *link_info);
 
 /**
  * hdd_vdev_destroy() - Destroy the vdev in the firmware

@@ -7022,21 +7022,21 @@ hdd_vdev_configure_rtt_params(struct wlan_objmgr_vdev *vdev)
 	return status;
 }
 
-static void hdd_store_vdev_info(struct hdd_adapter *adapter,
+static void hdd_store_vdev_info(struct wlan_hdd_link_info *link_info,
 				struct wlan_objmgr_vdev *vdev)
 {
 	struct vdev_osif_priv *osif_priv;
 
 	osif_priv = wlan_vdev_get_ospriv(vdev);
 	if (osif_priv) {
-		osif_priv->wdev = adapter->dev->ieee80211_ptr;
-		osif_priv->legacy_osif_priv = adapter->deflink;
+		osif_priv->wdev = link_info->adapter->dev->ieee80211_ptr;
+		osif_priv->legacy_osif_priv = link_info;
 	}
 
-	qdf_spin_lock_bh(&adapter->deflink->vdev_lock);
-	adapter->deflink->vdev_id = wlan_vdev_get_id(vdev);
-	adapter->deflink->vdev = vdev;
-	qdf_spin_unlock_bh(&adapter->deflink->vdev_lock);
+	qdf_spin_lock_bh(&link_info->vdev_lock);
+	link_info->vdev_id = wlan_vdev_get_id(vdev);
+	link_info->vdev = vdev;
+	qdf_spin_unlock_bh(&link_info->vdev_lock);
 }
 
 static void
@@ -7211,10 +7211,11 @@ hdd_populate_vdev_create_params(struct hdd_adapter *adapter,
 }
 #endif
 
-int hdd_vdev_create(struct hdd_adapter *adapter)
+int hdd_vdev_create(struct wlan_hdd_link_info *link_info)
 {
 	QDF_STATUS status;
 	int errno = 0;
+	struct hdd_adapter *adapter = link_info->adapter;
 	struct hdd_context *hdd_ctx;
 	struct wlan_objmgr_vdev *vdev;
 	struct wlan_vdev_create_params vdev_params = {0};
@@ -7246,13 +7247,13 @@ int hdd_vdev_create(struct hdd_adapter *adapter)
 		return -EINVAL;
 	}
 
-	hdd_store_vdev_info(adapter, vdev);
+	hdd_store_vdev_info(link_info, vdev);
 	osif_cm_osif_priv_init(vdev);
 
 	if (hdd_adapter_is_ml_adapter(adapter))
 		hdd_mlo_t2lm_register_callback(vdev);
 
-	set_bit(SME_SESSION_OPENED, &adapter->deflink->link_flags);
+	set_bit(SME_SESSION_OPENED, &link_info->link_flags);
 	status = sme_vdev_post_vdev_create_setup(hdd_ctx->mac_handle, vdev);
 	if (QDF_IS_STATUS_ERROR(status)) {
 		hdd_err("Failed to setup the vdev");
@@ -7270,13 +7271,12 @@ int hdd_vdev_create(struct hdd_adapter *adapter)
 
 	hdd_vdev_configure_opmode_params(hdd_ctx, vdev);
 
-	hdd_nofl_debug("vdev %d created successfully",
-		       adapter->deflink->vdev_id);
+	hdd_nofl_debug("vdev %d created successfully", link_info->vdev_id);
 
 	return errno;
 
 hdd_vdev_destroy_procedure:
-	QDF_BUG(!hdd_vdev_destroy(adapter->deflink));
+	QDF_BUG(!hdd_vdev_destroy(link_info));
 
 	return errno;
 }
@@ -13962,7 +13962,7 @@ int hdd_start_station_adapter(struct hdd_adapter *adapter)
 	    (adapter->device_mode == QDF_NAN_DISC_MODE))
 		wlan_hdd_lpc_del_monitor_interface(adapter->hdd_ctx);
 
-	ret = hdd_vdev_create(adapter);
+	ret = hdd_vdev_create(adapter->deflink);
 	if (ret) {
 		hdd_err("failed to create vdev: %d", ret);
 		return ret;
@@ -14037,7 +14037,7 @@ int hdd_start_ap_adapter(struct hdd_adapter *adapter)
 		return qdf_status_to_os_return(QDF_STATUS_E_FAILURE);
 	}
 
-	ret = hdd_vdev_create(adapter);
+	ret = hdd_vdev_create(adapter->deflink);
 	if (ret) {
 		hdd_err("failed to create vdev, status:%d", ret);
 		goto sap_destroy_ctx;

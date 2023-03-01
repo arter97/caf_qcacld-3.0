@@ -579,7 +579,7 @@ int hdd_init_nan_data_mode(struct hdd_adapter *adapter)
 	struct wlan_objmgr_vdev *vdev;
 	uint16_t rts_profile = 0;
 
-	ret_val = hdd_vdev_create(adapter);
+	ret_val = hdd_vdev_create(adapter->deflink);
 	if (ret_val) {
 		hdd_err("failed to create vdev: %d", ret_val);
 		return ret_val;
