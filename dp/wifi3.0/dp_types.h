@@ -45,19 +45,13 @@
 #include <hal_api.h>
 #include <hal_api_mon.h>
 #include "hal_rx.h"
-//#include "hal_rx_flow.h"
 
 #define MAX_BW 8
 #define MAX_RETRIES 4
 #define MAX_RECEPTION_TYPES 4
 
 #define MINIDUMP_STR_SIZE 25
-#ifndef REMOVE_PKT_LOG
-#include <pktlog.h>
-#endif
 #include <dp_umac_reset.h>
-
-//#include "dp_tx.h"
 
 #define REPT_MU_MIMO 1
 #define REPT_MU_OFDMA_MIMO 3
