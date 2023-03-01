@@ -1381,13 +1381,13 @@ hal_txmon_status_get_num_users_generic_be(void *tx_tlv_hdr, uint8_t *num_users)
 }
 
 /**
- * hal_txmon_set_word_mask_generic_be() - api to set word mask for tx monitor
+ * hal_txmon_get_word_mask_generic_be() - api to get word mask for tx monitor
  * @wmask: pointer to hal_txmon_word_mask_config_t
  *
  * Return: void
  */
 static inline
-void hal_txmon_set_word_mask_generic_be(void *wmask)
+void hal_txmon_get_word_mask_generic_be(void *wmask)
 {
 	hal_txmon_word_mask_config_t *word_mask = NULL;
 

@@ -1434,20 +1434,20 @@ hal_tx_status_get_tlv_tag(void *tx_tlv_hdr)
 }
 
 /**
- * hal_txmon_set_word_mask() - api to set word mask for tx monitor
+ * hal_txmon_get_word_mask() - api to get word mask for tx monitor
  * @hal_soc_hdl: HAL soc handle
  * @wmask: pointer to hal_txmon_word_mask_config_t
  *
  * Return: bool
  */
 static inline bool
-hal_txmon_set_word_mask(hal_soc_handle_t hal_soc_hdl,
+hal_txmon_get_word_mask(hal_soc_handle_t hal_soc_hdl,
 			hal_txmon_word_mask_config_t *wmask)
 {
 	struct hal_soc *hal_soc = (struct hal_soc *)hal_soc_hdl;
 
-	if (hal_soc->ops->hal_txmon_set_word_mask) {
-		hal_soc->ops->hal_txmon_set_word_mask(wmask);
+	if (hal_soc->ops->hal_txmon_get_word_mask) {
+		hal_soc->ops->hal_txmon_get_word_mask(wmask);
 		return true;
 	}
 

@@ -531,13 +531,13 @@ struct pcu_ppdu_setup_init_compact_9224 {
 };
 
 /**
- * hal_txmon_set_word_mask_qcn9224() - api to set word mask for tx monitor
+ * hal_txmon_get_word_mask_qcn9224() - api to get word mask for tx monitor
  * @wmask: pointer to hal_txmon_word_mask_config_t
  *
  * Return: void
  */
 static inline
-void hal_txmon_set_word_mask_qcn9224(void *wmask)
+void hal_txmon_get_word_mask_qcn9224(void *wmask)
 {
 	hal_txmon_word_mask_config_t *word_mask = NULL;
 
