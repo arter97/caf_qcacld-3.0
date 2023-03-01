@@ -1661,13 +1661,13 @@ void hdd_delete_peer(struct hdd_station_ctx *sta_ctx,
 	}
 }
 
-bool hdd_any_valid_peer_present(struct hdd_adapter *adapter)
+bool hdd_any_valid_peer_present(struct wlan_hdd_link_info *link_info)
 {
 	struct hdd_station_ctx *sta_ctx;
 	int i;
 	struct qdf_mac_addr *mac_addr;
 
-	sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter->deflink);
+	sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(link_info);
 	for (i = 0; i < MAX_PEERS; i++) {
 		mac_addr = &sta_ctx->conn_info.peer_macaddr[i];
 		if (!qdf_is_macaddr_zero(mac_addr) &&

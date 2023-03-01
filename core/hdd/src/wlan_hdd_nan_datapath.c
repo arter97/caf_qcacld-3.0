@@ -1180,13 +1180,14 @@ mem_free:
 	return 0;
 }
 
-void hdd_cleanup_ndi(struct hdd_context *hdd_ctx,
-		     struct hdd_adapter *adapter)
+void hdd_cleanup_ndi(struct wlan_hdd_link_info *link_info)
 {
 	struct hdd_station_ctx *sta_ctx;
 	struct wlan_objmgr_vdev *vdev;
+	struct hdd_adapter *adapter = link_info->adapter;
+	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
 
-	sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter->deflink);
+	sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(link_info);
 	if (sta_ctx->conn_info.conn_state != eConnectionState_NdiConnected) {
 		hdd_debug("NDI has no NDPs");
 		return;
@@ -1198,7 +1199,7 @@ void hdd_cleanup_ndi(struct hdd_context *hdd_ctx,
 	wlan_hdd_netif_queue_control(adapter,
 				     WLAN_STOP_ALL_NETIF_QUEUE_N_CARRIER,
 				     WLAN_CONTROL_PATH);
-	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink, WLAN_DP_ID);
+	vdev = hdd_objmgr_get_vdev_by_user(link_info, WLAN_DP_ID);
 	if (vdev) {
 		ucfg_dp_bus_bw_compute_reset_prev_txrx_stats(vdev);
 		hdd_objmgr_put_vdev_by_user(vdev, WLAN_DP_ID);
@@ -1245,7 +1246,7 @@ void hdd_ndp_peer_departed_handler(uint8_t vdev_id, uint16_t sta_id,
 
 	if (last_peer) {
 		hdd_debug("No more ndp peers.");
-		hdd_cleanup_ndi(hdd_ctx, adapter);
+		hdd_cleanup_ndi(link_info);
 		qdf_event_set(&adapter->peer_cleanup_done);
 		/*
 		 * This is called only for last peer. So, no.of NDP sessions

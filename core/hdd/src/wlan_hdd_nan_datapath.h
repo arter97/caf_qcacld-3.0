@@ -71,16 +71,14 @@ void hdd_ndp_session_end_handler(struct hdd_adapter *adapter);
 
 /**
  * hdd_cleanup_ndi() - Cleanup NDI state/resources
- * @hdd_ctx: HDD context
- * @adapter: Pointer to the NDI adapter
+ * @link_info: Link info pointer in HDD adapter
  *
  * Cleanup NDI state/resources allocated when NDPs are created on that NDI.
  *
  * Return: None
  */
 
-void hdd_cleanup_ndi(struct hdd_context *hdd_ctx,
-		     struct hdd_adapter *adapter);
+void hdd_cleanup_ndi(struct wlan_hdd_link_info *link_info);
 
 /**
  * hdd_ndi_start() - Start NDI adapter and create NDI vdev
@@ -218,8 +216,7 @@ static inline void hdd_ndp_session_end_handler(struct hdd_adapter *adapter)
 {
 }
 
-static inline void hdd_cleanup_ndi(struct hdd_context *hdd_ctx,
-				   struct hdd_adapter *adapter)
+static inline void hdd_cleanup_ndi(struct wlan_hdd_link_info *link_info)
 {
 }
 

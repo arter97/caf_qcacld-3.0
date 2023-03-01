@@ -450,14 +450,14 @@ void hdd_roam_profile_init(struct hdd_adapter *adapter);
 
 /**
  * hdd_any_valid_peer_present() - Check if any valid peer is present
- * @adapter: The HDD adapter
+ * @link_info: Pointer of link_info in adapter struct
  *
  * Check if there is any peer present with non-zero mac address other than
  * broadcast address.
  *
  * Return: True if there is any valid peer present
  */
-bool hdd_any_valid_peer_present(struct hdd_adapter *adapter);
+bool hdd_any_valid_peer_present(struct wlan_hdd_link_info *link_info);
 
 /**
  * hdd_cm_register_cb() - Sets legacy callbacks to osif

@@ -8639,33 +8639,33 @@ hdd_ndp_state_cleanup(struct wlan_objmgr_psoc *psoc, uint8_t ndi_vdev_id)
 }
 
 /**
- * hdd_ndp_peer_cleanup() - This API will delete NDP peer if exist and modifies
+ * hdd_peer_cleanup() - This API will delete NDP peer if exist and modifies
  * the NDP state.
- * @hdd_ctx: hdd context
- * @adapter: hdd adapter
+ * @link_info: Link info pointer in HDD adapter
  *
  * Return: None
  */
-static void
-hdd_ndp_peer_cleanup(struct hdd_context *hdd_ctx, struct hdd_adapter *adapter)
+static void hdd_peer_cleanup(struct wlan_hdd_link_info *link_info)
 {
 	QDF_STATUS qdf_status = QDF_STATUS_E_FAILURE;
+	struct hdd_adapter *adapter = link_info->adapter;
+	struct hdd_context *hdd_ctx = adapter->hdd_ctx;
 
 	/* Check if there is any peer present on the adapter */
-	if (!hdd_any_valid_peer_present(adapter)) {
+	if (!hdd_any_valid_peer_present(link_info)) {
 		/*
 		 * No peers are connected to the NDI. So, set the NDI state to
 		 * DISCONNECTED. If there are any peers, ucfg_nan_disable_ndi()
 		 * would take care of cleanup all the peers and setting the
 		 * state to DISCONNECTED.
 		 */
-		hdd_ndp_state_cleanup(hdd_ctx->psoc, adapter->deflink->vdev_id);
+		hdd_ndp_state_cleanup(hdd_ctx->psoc, link_info->vdev_id);
 		return;
 	}
 
 	if (adapter->device_mode == QDF_NDI_MODE)
 		qdf_status = ucfg_nan_disable_ndi(hdd_ctx->psoc,
-						  adapter->deflink->vdev_id);
+						  link_info->vdev_id);
 
 	if (QDF_IS_STATUS_ERROR(qdf_status))
 		return;
@@ -8683,6 +8683,10 @@ hdd_ndp_state_cleanup(struct wlan_objmgr_psoc *psoc, uint8_t ndi_vdev_id)
 
 static inline void
 hdd_ndp_peer_cleanup(struct hdd_context *hdd_ctx, struct hdd_adapter *adapter)
+{
+}
+
+static inline void hdd_peer_cleanup(struct wlan_hdd_link_info *link_info)
 {
 }
 #endif /* WLAN_FEATURE_NAN */
@@ -8733,6 +8737,27 @@ void hdd_adapter_deregister_fc(struct hdd_adapter *adapter)
 	hdd_deregister_tx_flow_control(adapter);
 }
 
+static void hdd_stop_and_cleanup_ndi(struct wlan_hdd_link_info *link_info)
+{
+	QDF_STATUS status;
+	unsigned long rc;
+	struct hdd_adapter *adapter = link_info->adapter;
+	struct hdd_context *hdd_ctx = adapter->hdd_ctx;
+
+	/* For NDI do not use roam_profile */
+	INIT_COMPLETION(adapter->disconnect_comp_var);
+	hdd_peer_cleanup(link_info);
+	status = sme_roam_ndi_stop(hdd_ctx->mac_handle, link_info->vdev_id);
+	if (QDF_IS_STATUS_SUCCESS(status)) {
+		rc = wait_for_completion_timeout(
+			&adapter->disconnect_comp_var,
+			msecs_to_jiffies(SME_CMD_STOP_BSS_TIMEOUT));
+		if (!rc)
+			hdd_warn("disconn_comp_var wait fail");
+		hdd_cleanup_ndi(link_info);
+	}
+}
+
 QDF_STATUS hdd_stop_adapter_ext(struct hdd_context *hdd_ctx,
 				struct hdd_adapter *adapter)
 {
@@ -8741,7 +8766,6 @@ QDF_STATUS hdd_stop_adapter_ext(struct hdd_context *hdd_ctx,
 	struct hdd_ap_ctx *ap_ctx;
 	union iwreq_data wrqu;
 	tSirUpdateIE update_ie;
-	unsigned long rc;
 	struct sap_config *sap_config;
 	mac_handle_t mac_handle;
 	struct wlan_objmgr_vdev *vdev;
@@ -8775,61 +8799,40 @@ QDF_STATUS hdd_stop_adapter_ext(struct hdd_context *hdd_ctx,
 	switch (adapter->device_mode) {
 	case QDF_STA_MODE:
 	case QDF_P2P_CLIENT_MODE:
-	case QDF_P2P_DEVICE_MODE:
 	case QDF_NDI_MODE:
-	case QDF_NAN_DISC_MODE:
-		sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(link_info);
+		if (adapter->device_mode == QDF_NDI_MODE) {
+			hdd_stop_and_cleanup_ndi(link_info);
+		} else if ((adapter->device_mode == QDF_STA_MODE ||
+			    adapter->device_mode == QDF_P2P_CLIENT_MODE) &&
+			   !hdd_cm_is_disconnected(link_info)) {
 
-		if (adapter->device_mode == QDF_NDI_MODE ||
-		    ((adapter->device_mode == QDF_STA_MODE ||
-		      adapter->device_mode == QDF_P2P_CLIENT_MODE) &&
-		      !hdd_cm_is_disconnected(link_info))) {
-			INIT_COMPLETION(adapter->disconnect_comp_var);
 			if (cds_is_driver_recovering())
 				reason = REASON_DEVICE_RECOVERY;
 
-			/* For NDI do not use roam_profile */
-			if (adapter->device_mode == QDF_NDI_MODE) {
-				hdd_ndp_peer_cleanup(hdd_ctx, adapter);
-				status = sme_roam_ndi_stop(
-						mac_handle,
-						link_info->vdev_id);
-				if (QDF_IS_STATUS_SUCCESS(status)) {
-					rc = wait_for_completion_timeout(
-						&adapter->disconnect_comp_var,
-						msecs_to_jiffies
-						 (SME_CMD_STOP_BSS_TIMEOUT));
-					if (!rc)
-						hdd_warn("disconn_comp_var wait fail");
-					hdd_cleanup_ndi(hdd_ctx, adapter);
-				}
-			} else if (adapter->device_mode == QDF_STA_MODE ||
-				   adapter->device_mode == QDF_P2P_CLIENT_MODE) {
-				/*
-				 * On vdev delete wait for disconnect to
-				 * complete. i.e use sync API, so that the
-				 * vdev ref of MLME are cleaned and disconnect
-				 * complete before vdev is moved to logically
-				 * deleted.
-				 */
-				status = wlan_hdd_cm_issue_disconnect(link_info,
-								      reason,
-								      true);
-				if (QDF_IS_STATUS_ERROR(status) &&
-				    ucfg_ipa_is_enabled()) {
-					hdd_err("STA disconnect failed");
-					ucfg_ipa_uc_cleanup_sta(hdd_ctx->pdev,
-								adapter->dev);
-				}
+			/*
+			 * On vdev delete wait for disconnect to
+			 * complete. i.e use sync API, so that the
+			 * vdev ref of MLME are cleaned and disconnect
+			 * complete before vdev is moved to logically
+			 * deleted.
+			 */
+			status = wlan_hdd_cm_issue_disconnect(link_info,
+							      reason, true);
+			if (QDF_IS_STATUS_ERROR(status) &&
+			    ucfg_ipa_is_enabled()) {
+				hdd_err("STA disconnect failed");
+				ucfg_ipa_uc_cleanup_sta(hdd_ctx->pdev,
+							adapter->dev);
 			}
-
-			memset(&wrqu, '\0', sizeof(wrqu));
-			wrqu.ap_addr.sa_family = ARPHRD_ETHER;
-			memset(wrqu.ap_addr.sa_data, '\0', ETH_ALEN);
-			hdd_wext_send_event(adapter->dev, SIOCGIWAP, &wrqu,
-					    NULL);
 		}
 
+		memset(&wrqu, '\0', sizeof(wrqu));
+		wrqu.ap_addr.sa_family = ARPHRD_ETHER;
+		memset(wrqu.ap_addr.sa_data, '\0', ETH_ALEN);
+		hdd_wext_send_event(adapter->dev, SIOCGIWAP, &wrqu, NULL);
+		fallthrough;
+	case QDF_P2P_DEVICE_MODE:
+	case QDF_NAN_DISC_MODE:
 		if ((adapter->device_mode == QDF_NAN_DISC_MODE ||
 		     (adapter->device_mode == QDF_STA_MODE &&
 		      !ucfg_nan_is_vdev_creation_allowed(hdd_ctx->psoc))) &&
