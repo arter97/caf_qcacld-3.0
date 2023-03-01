@@ -13938,18 +13938,11 @@ out:
 	hdd_debug("wlm initial mode %u", adapter->latency_level);
 }
 
-/**
- * hdd_start_station_adapter()- Start the Station Adapter
- * @adapter: HDD adapter
- *
- * This function initializes the adapter for the station mode.
- *
- * Return: 0 on success or errno on failure.
- */
 int hdd_start_station_adapter(struct hdd_adapter *adapter)
 {
 	QDF_STATUS status;
 	int ret;
+	struct wlan_hdd_link_info *link_info;
 
 	hdd_enter_dev(adapter->dev);
 	if (test_bit(SME_SESSION_OPENED, &adapter->deflink->link_flags)) {
@@ -13962,16 +13955,19 @@ int hdd_start_station_adapter(struct hdd_adapter *adapter)
 	    (adapter->device_mode == QDF_NAN_DISC_MODE))
 		wlan_hdd_lpc_del_monitor_interface(adapter->hdd_ctx);
 
-	ret = hdd_vdev_create(adapter->deflink);
-	if (ret) {
-		hdd_err("failed to create vdev: %d", ret);
-		return ret;
-	}
-	status = hdd_init_station_mode(adapter->deflink);
+	hdd_adapter_for_each_active_link_info(adapter, link_info) {
+		ret = hdd_vdev_create(link_info);
+		if (ret) {
+			hdd_err("failed to create vdev: %d", ret);
+			goto fail;
+		}
 
-	if (QDF_STATUS_SUCCESS != status) {
-		hdd_err("Error Initializing station mode: %d", status);
-		goto fail;
+		status = hdd_init_station_mode(link_info);
+		if (QDF_STATUS_SUCCESS != status) {
+			hdd_err("Error Initializing station mode: %d", status);
+			ret = qdf_status_to_os_return(status);
+			goto fail;
+		}
 	}
 
 	hdd_register_wext(adapter->dev);
@@ -13995,18 +13991,13 @@ int hdd_start_station_adapter(struct hdd_adapter *adapter)
 	return 0;
 
 fail:
+	hdd_adapter_for_each_active_link_info(adapter, link_info)
+		hdd_vdev_destroy(link_info);
+
 	hdd_unregister_wext(adapter->dev);
-	return qdf_status_to_os_return(status);
+	return ret;
 }
 
-/**
- * hdd_start_ap_adapter()- Start AP Adapter
- * @adapter: HDD adapter
- *
- * This function initializes the adapter for the AP mode.
- *
- * Return: 0 on success errno on failure.
- */
 int hdd_start_ap_adapter(struct hdd_adapter *adapter)
 {
 	QDF_STATUS status;
@@ -14014,12 +14005,13 @@ int hdd_start_ap_adapter(struct hdd_adapter *adapter)
 	int ret;
 	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
 	struct sap_context *sap_ctx;
+	struct wlan_hdd_link_info *link_info = adapter->deflink;
 
 	hdd_enter();
 
-	if (test_bit(SME_SESSION_OPENED, &adapter->deflink->link_flags)) {
+	if (test_bit(SME_SESSION_OPENED, &link_info->link_flags)) {
 		hdd_err("session is already opened, %d",
-			adapter->deflink->vdev_id);
+			link_info->vdev_id);
 		return qdf_status_to_os_return(QDF_STATUS_SUCCESS);
 	}
 
@@ -14030,25 +14022,25 @@ int hdd_start_ap_adapter(struct hdd_adapter *adapter)
 	 * vdev as while creating the vdev, driver needs to
 	 * register SAP callback and that callback uses sap context
 	 */
-	if (adapter->deflink->session.ap.sap_context) {
+	if (WLAN_HDD_GET_SAP_CTX_PTR(link_info)) {
 		is_ssr = true;
 	} else if (!hdd_sap_create_ctx(adapter)) {
 		hdd_err("sap creation failed");
 		return qdf_status_to_os_return(QDF_STATUS_E_FAILURE);
 	}
 
-	ret = hdd_vdev_create(adapter->deflink);
+	ret = hdd_vdev_create(link_info);
 	if (ret) {
 		hdd_err("failed to create vdev, status:%d", ret);
 		goto sap_destroy_ctx;
 	}
 
-	sap_ctx = WLAN_HDD_GET_SAP_CTX_PTR(adapter->deflink);
+	sap_ctx = WLAN_HDD_GET_SAP_CTX_PTR(link_info);
 	status = sap_acquire_vdev_ref(hdd_ctx->psoc, sap_ctx,
-				      adapter->deflink->vdev_id);
+				      link_info->vdev_id);
 	if (!QDF_IS_STATUS_SUCCESS(status)) {
 		hdd_err("Failed to get vdev ref for sap for session_id: %u",
-			adapter->deflink->vdev_id);
+			link_info->vdev_id);
 		ret = qdf_status_to_os_return(status);
 		goto sap_vdev_destroy;
 	}
@@ -14080,7 +14072,7 @@ int hdd_start_ap_adapter(struct hdd_adapter *adapter)
 sap_release_ref:
 	sap_release_vdev_ref(sap_ctx);
 sap_vdev_destroy:
-	hdd_vdev_destroy(adapter->deflink);
+	hdd_vdev_destroy(link_info);
 sap_destroy_ctx:
 	hdd_sap_destroy_ctx(adapter);
 	return ret;

@@ -3887,7 +3887,25 @@ QDF_STATUS hdd_sme_close_session_callback(uint8_t vdev_id);
 
 int hdd_register_cb(struct hdd_context *hdd_ctx);
 void hdd_deregister_cb(struct hdd_context *hdd_ctx);
+
+/**
+ * hdd_start_station_adapter()- Start the Station Adapter
+ * @adapter: HDD adapter
+ *
+ * This function initializes the adapter for the station mode.
+ *
+ * Return: 0 on success or errno on failure.
+ */
 int hdd_start_station_adapter(struct hdd_adapter *adapter);
+
+/**
+ * hdd_start_ap_adapter()- Start AP Adapter
+ * @adapter: HDD adapter
+ *
+ * This function initializes the adapter for the AP mode.
+ *
+ * Return: 0 on success errno on failure.
+ */
 int hdd_start_ap_adapter(struct hdd_adapter *adapter);
 int hdd_configure_cds(struct hdd_context *hdd_ctx);
 int hdd_set_fw_params(struct hdd_adapter *adapter);
