@@ -253,6 +253,29 @@ struct wlan_tdma_sched_cmd_param {
 	uint16_t cwmin[WMI_MAX_NUM_AC];
 	uint16_t cwmax[WMI_MAX_NUM_AC];
 };
+
+/**
+ * struct rate2power_table_params - Rate2Power table params
+ * @pwr_array: pointer to pwr array
+ * @pwr_cmd_len: rate2power command length
+ * @freq_band: Frequency band
+ * @sub_band: Sub band for the frequency band
+ * @end_of_update: Flag to denote the end of update
+ * @is_ext: is extension flag
+ * @target_type: target type
+ * @pdev_id: pdev id
+ */
+struct rate2power_table_params {
+	int8_t   *pwr_array;
+	uint16_t pwr_cmd_len;
+	uint32_t freq_band;
+	uint32_t sub_band;
+	uint32_t end_of_update;
+	uint32_t is_ext;
+	uint32_t target_type;
+	uint32_t pdev_id;
+};
+
 /**
  * struct sta_peer_table_list - peer list params
  * @peer_macaddr: array of STA MAC addresses

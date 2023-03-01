@@ -539,6 +539,76 @@ send_set_sta_max_pwr_table_cmd_tlv(wmi_unified_t wmi_handle,
 }
 
 /**
+ * send_set_power_table_cmd_tlv() - send rate2power table cmd to fw
+ * @wmi_handle: wmi handle
+ * @param: pointer to hold rate2pwer table param
+ *
+ *  @return QDF_STATUS_SUCCESS  on success and -ve on failure.
+ */
+static QDF_STATUS
+send_set_power_table_cmd_tlv(wmi_unified_t wmi_handle,
+			     struct rate2power_table_params *param)
+{
+	uint16_t len, pwr_tlv_len;
+	int8_t *buf_ptr;
+	wmi_buf_t buf;
+	wmi_pdev_set_tgtr2p_table_cmd_fixed_param *cmd;
+	int8_t *pwr_array;
+
+	if (!param->pwr_array) {
+		wmi_err("pwr_array is null");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	pwr_tlv_len = WMI_TLV_HDR_SIZE +
+		roundup(param->pwr_cmd_len, sizeof(uint32_t));
+	len = sizeof(*cmd) + pwr_tlv_len;
+
+	buf = wmi_buf_alloc(wmi_handle, len);
+	if (!buf) {
+		wmi_err("wmi_buf_alloc failed");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	buf_ptr = wmi_buf_data(buf);
+	qdf_mem_zero(buf_ptr, len);
+
+	cmd = (wmi_pdev_set_tgtr2p_table_cmd_fixed_param *)buf_ptr;
+
+	WMITLV_SET_HDR(&cmd->tlv_header,
+		       WMITLV_TAG_STRUC_wmi_pdev_set_tgtr2p_table_cmd_fixed_param,
+		       WMITLV_GET_STRUCT_TLVLEN(
+				wmi_pdev_set_tgtr2p_table_cmd_fixed_param));
+	cmd->r2p_array_len = param->pwr_cmd_len;
+	cmd->freq_band = param->freq_band;
+	cmd->sub_band = param->sub_band;
+	cmd->is_ext = param->is_ext;
+	cmd->end_of_r2ptable_update = param->end_of_update;
+	cmd->target_type = param->target_type;
+	cmd->r2p_array_len = param->pwr_cmd_len;
+	cmd->pdev_id = wmi_handle->ops->convert_pdev_id_host_to_target(
+								wmi_handle,
+								param->pdev_id);
+	buf_ptr += sizeof(*cmd);
+	WMITLV_SET_HDR(buf_ptr, WMITLV_TAG_ARRAY_BYTE, (cmd->r2p_array_len));
+	buf_ptr += WMI_TLV_HDR_SIZE;
+	pwr_array = buf_ptr;
+
+	WMI_HOST_IF_MSG_COPY_CHAR_ARRAY(&pwr_array[0], param->pwr_array,
+					param->pwr_cmd_len);
+
+	wmi_mtrace(WMI_PDEV_SET_TGTR2P_TABLE_CMDID, NO_SESSION, 0);
+	if (wmi_unified_cmd_send(wmi_handle, buf, len,
+				 WMI_PDEV_SET_TGTR2P_TABLE_CMDID)) {
+		wmi_err("Failed to send WMI_PDEV_SET_TGTR2P_TABLE_CMDID command");
+		wmi_buf_free(buf);
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	return QDF_STATUS_SUCCESS;
+}
+
+/**
  * send_set_mimogain_table_cmd_tlv() - send mimogain table cmd to fw
  * @wmi_handle: wmi handle
  * @param: pointer to hold mimogain table param
@@ -3968,6 +4038,7 @@ void wmi_ap_attach_tlv(wmi_unified_t wmi_handle)
 	ops->send_set_ctl_table_cmd = send_set_ctl_table_cmd_tlv;
 	ops->send_set_sta_max_pwr_table_cmd =
 					send_set_sta_max_pwr_table_cmd_tlv;
+	ops->send_set_power_table_cmd = send_set_power_table_cmd_tlv;
 	ops->send_set_mimogain_table_cmd = send_set_mimogain_table_cmd_tlv;
 	ops->send_packet_power_info_get_cmd =
 					send_packet_power_info_get_cmd_tlv;
