@@ -8798,6 +8798,42 @@ hdd_disable_nan_active_disc(struct hdd_adapter *adapter)
 		ucfg_disable_nan_discovery(hdd_ctx->psoc, NULL, 0);
 }
 
+static void
+hdd_monitor_mode_release_wakelock(struct wlan_hdd_link_info *link_info)
+{
+	struct hdd_adapter *adapter = link_info->adapter;
+	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
+
+	if (wlan_hdd_is_session_type_monitor(adapter->device_mode) &&
+	    (ucfg_mlme_is_sta_mon_conc_supported(hdd_ctx->psoc) ||
+	     ucfg_dp_is_local_pkt_capture_enabled(hdd_ctx->psoc))) {
+		hdd_info("Release wakelock for STA + monitor mode!");
+		os_if_dp_local_pkt_capture_stop(link_info->vdev);
+		qdf_runtime_pm_allow_suspend(
+				&hdd_ctx->runtime_context.monitor_mode);
+		hdd_lpc_enable_powersave(hdd_ctx);
+		qdf_wake_lock_release(&hdd_ctx->monitor_mode_wakelock,
+				      WIFI_POWER_EVENT_WAKELOCK_MONITOR_MODE);
+	}
+}
+
+static void
+hdd_monitor_mode_disable_and_delete(struct wlan_hdd_link_info *link_info)
+{
+	QDF_STATUS status;
+	struct hdd_adapter *adapter = link_info->adapter;
+	struct hdd_context *hdd_ctx = adapter->hdd_ctx;
+
+	status = hdd_disable_monitor_mode();
+	if (QDF_IS_STATUS_ERROR(status))
+		hdd_err_rl("datapath reset failed for montior mode");
+	hdd_set_idle_ps_config(hdd_ctx, true);
+	status = hdd_monitor_mode_vdev_status(adapter);
+	if (QDF_IS_STATUS_ERROR(status))
+		hdd_err_rl("stop failed montior mode");
+	sme_delete_mon_session(hdd_ctx->mac_handle, link_info->vdev_id);
+}
+
 QDF_STATUS hdd_stop_adapter_ext(struct hdd_context *hdd_ctx,
 				struct hdd_adapter *adapter)
 {
@@ -8892,28 +8928,10 @@ QDF_STATUS hdd_stop_adapter_ext(struct hdd_context *hdd_ctx,
 			hdd_reset_monitor_interface(sta_adapter);
 		}
 
-		if (wlan_hdd_is_session_type_monitor(QDF_MONITOR_MODE) &&
-		    (ucfg_mlme_is_sta_mon_conc_supported(hdd_ctx->psoc) ||
-		     ucfg_dp_is_local_pkt_capture_enabled(hdd_ctx->psoc))) {
-			hdd_info("Release wakelock for STA + monitor mode!");
-			os_if_dp_local_pkt_capture_stop(vdev);
-			qdf_runtime_pm_allow_suspend(
-				&hdd_ctx->runtime_context.monitor_mode);
-			hdd_lpc_enable_powersave(hdd_ctx);
-			qdf_wake_lock_release(&hdd_ctx->monitor_mode_wakelock,
-				WIFI_POWER_EVENT_WAKELOCK_MONITOR_MODE);
-		}
+		hdd_monitor_mode_release_wakelock(link_info);
 		wlan_hdd_scan_abort(link_info);
 		hdd_adapter_deregister_fc(adapter);
-
-		status = hdd_disable_monitor_mode();
-		if (QDF_IS_STATUS_ERROR(status))
-			hdd_err_rl("datapath reset failed for monitor mode");
-		hdd_set_idle_ps_config(hdd_ctx, true);
-		status = hdd_monitor_mode_vdev_status(adapter);
-		if (QDF_IS_STATUS_ERROR(status))
-			hdd_err_rl("stop failed monitor mode");
-		sme_delete_mon_session(mac_handle, link_info->vdev_id);
+		hdd_monitor_mode_disable_and_delete(link_info);
 		hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
 		hdd_vdev_destroy(adapter);
 		break;
