@@ -2938,7 +2938,16 @@ uint32_t hdd_get_operating_chan_freq(struct hdd_context *hdd_ctx,
 
 void hdd_set_conparam(int32_t con_param);
 enum QDF_GLOBAL_MODE hdd_get_conparam(void);
-void wlan_hdd_reset_prob_rspies(struct hdd_adapter *adapter);
+
+/**
+ * wlan_hdd_reset_prob_rspies() - Reset probe response IEs
+ * @link_info: Link info pointer in HDD adapter.
+ *
+ * Reset the probe response IEs for the VDEV pointer by link info.
+ *
+ * Return: void
+ */
+void wlan_hdd_reset_prob_rspies(struct wlan_hdd_link_info *link_info);
 void hdd_prevent_suspend(uint32_t reason);
 
 /*

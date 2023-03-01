@@ -8547,18 +8547,19 @@ void hdd_close_all_adapters(struct hdd_context *hdd_ctx, bool rtnl_held)
 	hdd_exit();
 }
 
-void wlan_hdd_reset_prob_rspies(struct hdd_adapter *adapter)
+void wlan_hdd_reset_prob_rspies(struct wlan_hdd_link_info *link_info)
 {
 	struct qdf_mac_addr *bssid = NULL;
 	tSirUpdateIE update_ie;
 	mac_handle_t mac_handle;
+	struct hdd_adapter *adapter = link_info->adapter;
 
 	switch (adapter->device_mode) {
 	case QDF_STA_MODE:
 	case QDF_P2P_CLIENT_MODE:
 	{
 		struct hdd_station_ctx *sta_ctx =
-			WLAN_HDD_GET_STATION_CTX_PTR(adapter->deflink);
+			WLAN_HDD_GET_STATION_CTX_PTR(link_info);
 		bssid = &sta_ctx->conn_info.bssid;
 		break;
 	}
@@ -8581,7 +8582,7 @@ void wlan_hdd_reset_prob_rspies(struct hdd_adapter *adapter)
 	}
 
 	qdf_copy_macaddr(&update_ie.bssid, bssid);
-	update_ie.vdev_id = adapter->deflink->vdev_id;
+	update_ie.vdev_id = link_info->vdev_id;
 	update_ie.ieBufferlength = 0;
 	update_ie.pAdditionIEBuffer = NULL;
 	update_ie.append = true;
@@ -8850,6 +8851,36 @@ hdd_stop_and_close_pre_cac_adapter(struct hdd_context *hdd_ctx,
 	}
 }
 
+static void hdd_reset_ies_on_sap_stop(struct wlan_hdd_link_info *link_info)
+{
+	mac_handle_t mac_handle;
+	tSirUpdateIE update_ie;
+	QDF_STATUS status;
+	struct hdd_adapter *adapter = link_info->adapter;
+
+	mac_handle = hdd_adapter_get_mac_handle(adapter);
+	update_ie.vdev_id = link_info->vdev_id;
+	update_ie.ieBufferlength = 0;
+	update_ie.pAdditionIEBuffer = NULL;
+	update_ie.append = false;
+	update_ie.notify = false;
+
+	/* Probe bcn reset */
+	status = sme_update_add_ie(mac_handle, &update_ie,
+				   eUPDATE_IE_PROBE_BCN);
+	if (status == QDF_STATUS_E_FAILURE)
+		hdd_err("Could not pass PROBE_RSP_BCN to PE");
+
+	/* Assoc resp reset */
+	status = sme_update_add_ie(mac_handle, &update_ie,
+				   eUPDATE_IE_ASSOC_RESP);
+	if (status == QDF_STATUS_E_FAILURE)
+		hdd_err("Could not pass ASSOC_RSP to PE");
+
+	/* Reset WNI_CFG_PROBE_RSP Flags */
+	wlan_hdd_reset_prob_rspies(link_info);
+}
+
 QDF_STATUS hdd_stop_adapter_ext(struct hdd_context *hdd_ctx,
 				struct hdd_adapter *adapter)
 {
@@ -8857,7 +8888,6 @@ QDF_STATUS hdd_stop_adapter_ext(struct hdd_context *hdd_ctx,
 	struct hdd_station_ctx *sta_ctx;
 	struct hdd_ap_ctx *ap_ctx;
 	union iwreq_data wrqu;
-	tSirUpdateIE update_ie;
 	struct sap_config *sap_config;
 	mac_handle_t mac_handle;
 	struct wlan_objmgr_vdev *vdev;
@@ -9020,28 +9050,7 @@ QDF_STATUS hdd_stop_adapter_ext(struct hdd_context *hdd_ctx,
 						    adapter->device_mode,
 						    false);
 
-			qdf_copy_macaddr(&update_ie.bssid,
-					 &adapter->mac_addr);
-			update_ie.vdev_id = link_info->vdev_id;
-			update_ie.ieBufferlength = 0;
-			update_ie.pAdditionIEBuffer = NULL;
-			update_ie.append = false;
-			update_ie.notify = false;
-
-			/* Probe bcn reset */
-			status = sme_update_add_ie(mac_handle, &update_ie,
-						   eUPDATE_IE_PROBE_BCN);
-			if (status == QDF_STATUS_E_FAILURE)
-				hdd_err("Could not pass PROBE_RSP_BCN to PE");
-
-			/* Assoc resp reset */
-			status = sme_update_add_ie(mac_handle, &update_ie,
-						   eUPDATE_IE_ASSOC_RESP);
-			if (status == QDF_STATUS_E_FAILURE)
-				hdd_err("Could not pass ASSOC_RSP to PE");
-
-			/* Reset WNI_CFG_PROBE_RSP Flags */
-			wlan_hdd_reset_prob_rspies(adapter);
+			hdd_reset_ies_on_sap_stop(link_info);
 		}
 
 		/*

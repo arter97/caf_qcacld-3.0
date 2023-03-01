@@ -7196,7 +7196,7 @@ static int __wlan_hdd_cfg80211_stop_ap(struct wiphy *wiphy,
 		hdd_err("Could not pass on ASSOC_RSP data to PE");
 	}
 	/* Reset WNI_CFG_PROBE_RSP Flags */
-	wlan_hdd_reset_prob_rspies(adapter);
+	wlan_hdd_reset_prob_rspies(adapter->deflink);
 	hdd_destroy_acs_timer(adapter);
 
 	ucfg_p2p_status_stop_bss(adapter->deflink->vdev);
