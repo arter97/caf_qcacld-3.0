@@ -219,6 +219,10 @@ dp_rxdma_ring_sel_cfg_li(struct dp_soc *soc)
 	struct htt_rx_ring_tlv_filter htt_tlv_filter = {0};
 	struct dp_srng *rx_mac_srng;
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
+	uint32_t target_type = hal_get_target_type(soc->hal_soc);
+
+	if (target_type == TARGET_TYPE_QCN9160)
+		return status;
 
 	htt_tlv_filter.mpdu_start = 1;
 	htt_tlv_filter.msdu_start = 1;
@@ -300,6 +304,10 @@ dp_rxdma_ring_sel_cfg_li(struct dp_soc *soc)
 	struct htt_rx_ring_tlv_filter htt_tlv_filter = {0};
 	struct dp_srng *rx_mac_srng;
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
+	uint32_t target_type = hal_get_target_type(soc->hal_soc);
+
+	if (target_type == TARGET_TYPE_QCN9160)
+		return status;
 
 	htt_tlv_filter.mpdu_start = 1;
 	htt_tlv_filter.msdu_start = 1;
