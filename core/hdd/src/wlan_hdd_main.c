@@ -8758,6 +8758,32 @@ static void hdd_stop_and_cleanup_ndi(struct wlan_hdd_link_info *link_info)
 	}
 }
 
+static void
+hdd_sta_disconnect_and_cleanup(struct wlan_hdd_link_info *link_info)
+{
+	QDF_STATUS status;
+	enum wlan_reason_code reason;
+	struct hdd_adapter *adapter = link_info->adapter;
+
+	/*
+	 * On vdev delete wait for disconnect to
+	 * complete. i.e use sync API, so that the
+	 * vdev ref of MLME are cleaned and disconnect
+	 * complete before vdev is moved to logically
+	 * deleted.
+	 */
+	if (cds_is_driver_recovering())
+		reason = REASON_DEVICE_RECOVERY;
+	else
+		reason = REASON_IFACE_DOWN;
+
+	status = wlan_hdd_cm_issue_disconnect(link_info, reason, true);
+	if (QDF_IS_STATUS_ERROR(status) && ucfg_ipa_is_enabled()) {
+		hdd_err("STA disconnect failed");
+		ucfg_ipa_uc_cleanup_sta(adapter->hdd_ctx->pdev, adapter->dev);
+	}
+}
+
 QDF_STATUS hdd_stop_adapter_ext(struct hdd_context *hdd_ctx,
 				struct hdd_adapter *adapter)
 {
@@ -8769,7 +8795,6 @@ QDF_STATUS hdd_stop_adapter_ext(struct hdd_context *hdd_ctx,
 	struct sap_config *sap_config;
 	mac_handle_t mac_handle;
 	struct wlan_objmgr_vdev *vdev;
-	enum wlan_reason_code reason = REASON_IFACE_DOWN;
 	struct wlan_hdd_link_info *link_info = adapter->deflink;
 
 	hdd_enter();
@@ -8800,31 +8825,10 @@ QDF_STATUS hdd_stop_adapter_ext(struct hdd_context *hdd_ctx,
 	case QDF_STA_MODE:
 	case QDF_P2P_CLIENT_MODE:
 	case QDF_NDI_MODE:
-		if (adapter->device_mode == QDF_NDI_MODE) {
+		if (adapter->device_mode == QDF_NDI_MODE)
 			hdd_stop_and_cleanup_ndi(link_info);
-		} else if ((adapter->device_mode == QDF_STA_MODE ||
-			    adapter->device_mode == QDF_P2P_CLIENT_MODE) &&
-			   !hdd_cm_is_disconnected(link_info)) {
-
-			if (cds_is_driver_recovering())
-				reason = REASON_DEVICE_RECOVERY;
-
-			/*
-			 * On vdev delete wait for disconnect to
-			 * complete. i.e use sync API, so that the
-			 * vdev ref of MLME are cleaned and disconnect
-			 * complete before vdev is moved to logically
-			 * deleted.
-			 */
-			status = wlan_hdd_cm_issue_disconnect(link_info,
-							      reason, true);
-			if (QDF_IS_STATUS_ERROR(status) &&
-			    ucfg_ipa_is_enabled()) {
-				hdd_err("STA disconnect failed");
-				ucfg_ipa_uc_cleanup_sta(hdd_ctx->pdev,
-							adapter->dev);
-			}
-		}
+		else if (!hdd_cm_is_disconnected(link_info))
+			hdd_sta_disconnect_and_cleanup(link_info);
 
 		memset(&wrqu, '\0', sizeof(wrqu));
 		wrqu.ap_addr.sa_family = ARPHRD_ETHER;
