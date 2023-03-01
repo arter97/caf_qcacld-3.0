@@ -4692,7 +4692,7 @@ dp_get_pdev_telemetry_stats(struct cdp_soc_t *soc_hdl, uint8_t pdev_id,
 			    struct cdp_pdev_telemetry_stats *stats);
 
 /**
- * dp_get_peer_telemetry_stats- API to get peer telemetry stats
+ * dp_get_peer_telemetry_stats() - API to get peer telemetry stats
  * @soc_hdl: soc handle
  * @addr: peer mac
  * @stats: pointer to peer telemetry stats
@@ -4704,8 +4704,8 @@ QDF_STATUS
 dp_get_peer_telemetry_stats(struct cdp_soc_t *soc_hdl, uint8_t *addr,
 			    struct cdp_peer_telemetry_stats *stats);
 
-/*
- * dp_get_peer_deter_stats- API to get peer deterministic stats
+/**
+ * dp_get_peer_deter_stats() - API to get peer deterministic stats
  * @soc_hdl: soc handle
  * @vdev_id: id of vdev handle
  * @addr: peer mac
@@ -4720,8 +4720,8 @@ dp_get_peer_deter_stats(struct cdp_soc_t *soc_hdl,
 			uint8_t *addr,
 			struct cdp_peer_deter_stats *stats);
 
-/*
- * dp_get_pdev_deter_stats- API to get pdev deterministic stats
+/**
+ * dp_get_pdev_deter_stats() - API to get pdev deterministic stats
  * @soc_hdl: soc handle
  * @pdev_id: id of pdev handle
  * @stats: pointer to pdev deterministic stats
@@ -4733,8 +4733,8 @@ QDF_STATUS
 dp_get_pdev_deter_stats(struct cdp_soc_t *soc_hdl, uint8_t pdev_id,
 			struct cdp_pdev_deter_stats *stats);
 
-/*
- * dp_update_pdev_chan_util_stats- API to update channel utilization stats
+/**
+ * dp_update_pdev_chan_util_stats() - API to update channel utilization stats
  * @soc_hdl: soc handle
  * @pdev_id: id of pdev handle
  * @ch_util: Pointer to channel util stats
