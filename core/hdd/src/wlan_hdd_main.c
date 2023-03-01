@@ -8784,6 +8784,20 @@ hdd_sta_disconnect_and_cleanup(struct wlan_hdd_link_info *link_info)
 	}
 }
 
+static void
+hdd_disable_nan_active_disc(struct hdd_adapter *adapter)
+{
+	struct hdd_context *hdd_ctx = adapter->hdd_ctx;
+	enum QDF_OPMODE device_mode = adapter->device_mode;
+
+	if ((device_mode == QDF_NAN_DISC_MODE ||
+	     (device_mode == QDF_STA_MODE &&
+	      !ucfg_nan_is_vdev_creation_allowed(hdd_ctx->psoc))) &&
+	    ucfg_is_nan_conc_control_supported(hdd_ctx->psoc) &&
+	    ucfg_is_nan_disc_active(hdd_ctx->psoc))
+		ucfg_disable_nan_discovery(hdd_ctx->psoc, NULL, 0);
+}
+
 QDF_STATUS hdd_stop_adapter_ext(struct hdd_context *hdd_ctx,
 				struct hdd_adapter *adapter)
 {
@@ -8837,12 +8851,7 @@ QDF_STATUS hdd_stop_adapter_ext(struct hdd_context *hdd_ctx,
 		fallthrough;
 	case QDF_P2P_DEVICE_MODE:
 	case QDF_NAN_DISC_MODE:
-		if ((adapter->device_mode == QDF_NAN_DISC_MODE ||
-		     (adapter->device_mode == QDF_STA_MODE &&
-		      !ucfg_nan_is_vdev_creation_allowed(hdd_ctx->psoc))) &&
-		    ucfg_is_nan_conc_control_supported(hdd_ctx->psoc) &&
-		    ucfg_is_nan_disc_active(hdd_ctx->psoc))
-			ucfg_disable_nan_discovery(hdd_ctx->psoc, NULL, 0);
+		hdd_disable_nan_active_disc(adapter);
 
 		wlan_hdd_scan_abort(link_info);
 		wlan_hdd_cleanup_actionframe(link_info);
