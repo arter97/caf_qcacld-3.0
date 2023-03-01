@@ -3546,15 +3546,12 @@ static void dp_peer_setup_get_reo_hash(struct dp_vdev *vdev,
 	 * Hence, *reo_dest = IPA_REO_DEST_RING_IDX + 1
 	 */
 	if (wlan_cfg_is_ipa_enabled(soc->wlan_cfg_ctx)) {
-		if (vdev->opmode == wlan_op_mode_ap) {
+		if (dp_ipa_is_mdm_platform()) {
 			*reo_dest = IPA_REO_DEST_RING_IDX + 1;
-			*hash_based = 0;
-		} else if (vdev->opmode == wlan_op_mode_sta &&
-			   dp_ipa_is_mdm_platform()) {
-			*reo_dest = IPA_REO_DEST_RING_IDX + 1;
-		} else if (vdev->opmode == wlan_op_mode_sta &&
-			   (!dp_ipa_is_mdm_platform())) {
-			dp_debug("opt_dp: default reo ring is set");
+			if (vdev->opmode == wlan_op_mode_ap)
+				*hash_based = 0;
+		} else {
+			dp_debug("opt_dp: default HOST reo ring is set");
 		}
 	}
 }
