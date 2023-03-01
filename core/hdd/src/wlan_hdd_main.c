@@ -9102,13 +9102,26 @@ static void hdd_stop_sap_go_adapter(struct hdd_adapter *adapter)
 	ucfg_ipa_flush(hdd_ctx->pdev);
 }
 
+static void hdd_stop_ocb_adapter(struct hdd_adapter *adapter)
+{
+	struct hdd_station_ctx *sta_ctx;
+	struct wlan_objmgr_vdev *vdev;
+	struct wlan_hdd_link_info *link_info = adapter->deflink;
+
+	vdev = hdd_objmgr_get_vdev_by_user(link_info, WLAN_INIT_DEINIT_ID);
+	sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(link_info);
+	cdp_clear_peer(cds_get_context(QDF_MODULE_ID_SOC), OL_TXRX_PDEV_ID,
+		       sta_ctx->conn_info.peer_macaddr[0]);
+	hdd_adapter_deregister_fc(adapter);
+	if (vdev)
+		hdd_objmgr_put_vdev_by_user(vdev, WLAN_INIT_DEINIT_ID);
+	hdd_vdev_destroy(link_info);
+}
+
 QDF_STATUS hdd_stop_adapter_ext(struct hdd_context *hdd_ctx,
 				struct hdd_adapter *adapter)
 {
 	QDF_STATUS status;
-	struct hdd_station_ctx *sta_ctx;
-	mac_handle_t mac_handle;
-	struct wlan_objmgr_vdev *vdev = NULL;
 	struct wlan_hdd_link_info *link_info = adapter->deflink;
 
 	hdd_enter();
@@ -9132,8 +9145,6 @@ QDF_STATUS hdd_stop_adapter_ext(struct hdd_context *hdd_ctx,
 				     WLAN_STOP_ALL_NETIF_QUEUE_N_CARRIER,
 				     WLAN_CONTROL_PATH);
 
-	mac_handle = hdd_ctx->mac_handle;
-
 	switch (adapter->device_mode) {
 	case QDF_STA_MODE:
 	case QDF_P2P_CLIENT_MODE:
@@ -9153,14 +9164,7 @@ QDF_STATUS hdd_stop_adapter_ext(struct hdd_context *hdd_ctx,
 		hdd_stop_sap_go_adapter(adapter);
 		break;
 	case QDF_OCB_MODE:
-		vdev = hdd_objmgr_get_vdev_by_user(link_info, WLAN_OSIF_ID);
-		sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(link_info);
-		cdp_clear_peer(cds_get_context(QDF_MODULE_ID_SOC),
-			       OL_TXRX_PDEV_ID,
-			       sta_ctx->conn_info.peer_macaddr[0]);
-		hdd_adapter_deregister_fc(adapter);
-		hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
-		hdd_vdev_destroy(link_info);
+		hdd_stop_ocb_adapter(adapter);
 		break;
 	default:
 		break;
