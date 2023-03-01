@@ -1170,6 +1170,10 @@ int htt_h2t_tx_ring_cfg(struct htt_soc *htt_soc, int pdev_id,
 	if (htt_tlv_filter->data_msdu_end)
 		HTT_TX_MONITOR_CFG_FILTER_IN_TX_MSDU_END_DATA_SET(*msg_word, 1);
 
+	if (htt_tlv_filter->compaction_enable)
+		HTT_TX_MONITOR_CFG_WORD_MASK_COMPACTION_ENABLE_SET(*msg_word,
+								   1);
+
 	/* word 3 */
 	msg_word++;
 	*msg_word = 0;
@@ -1439,21 +1443,41 @@ void dp_tx_mon_filter_set_all(struct dp_mon_pdev_be *mon_pdev_be,
 void dp_tx_mon_filter_set_word_mask(struct dp_pdev *pdev,
 				    struct htt_tx_ring_tlv_filter *filter)
 {
-	/* invoke hal api to get the word mask */
+	hal_txmon_word_mask_config_t word_mask = {0};
+	bool status = false;
 
-	filter->wmask.pcu_ppdu_setup_init = 0xFFFFFFFF;
-	filter->wmask.tx_peer_entry = 0xFFFF;
-	filter->wmask.tx_queue_ext = 0xFFFF;
-	filter->wmask.tx_fes_status_end = 0xFFFF;
-	filter->wmask.response_end_status = 0xFFFF;
-	filter->wmask.tx_fes_status_prot = 0xFFFF;
-	filter->wmask.tx_fes_setup = 0xFF;
-	filter->wmask.tx_msdu_start = 0xFF;
-	filter->wmask.tx_mpdu_start = 0xFF;
-	filter->wmask.rxpcu_user_setup = 0xFF;
+	status = hal_txmon_get_word_mask(pdev->soc->hal_soc, &word_mask);
 
-	/* compaction is disable */
-	filter->compaction_enable = 0;
+	if (status) {
+		filter->wmask.pcu_ppdu_setup_init =
+			word_mask.pcu_ppdu_setup_init;
+		filter->wmask.tx_peer_entry = word_mask.tx_peer_entry;
+		filter->wmask.tx_queue_ext = word_mask.tx_queue_ext;
+		filter->wmask.tx_fes_status_end = word_mask.tx_fes_status_end;
+		filter->wmask.response_end_status =
+			word_mask.response_end_status;
+		filter->wmask.tx_fes_status_prot = word_mask.tx_fes_status_prot;
+		filter->wmask.tx_fes_setup = word_mask.tx_fes_setup;
+		filter->wmask.tx_msdu_start = word_mask.tx_msdu_start;
+		filter->wmask.tx_mpdu_start = word_mask.tx_mpdu_start;
+		filter->wmask.rxpcu_user_setup = word_mask.rxpcu_user_setup;
+
+		filter->compaction_enable = word_mask.compaction_enable;
+	} else {
+		filter->wmask.pcu_ppdu_setup_init = 0xFFFFFFFF;
+		filter->wmask.tx_peer_entry = 0xFFFF;
+		filter->wmask.tx_queue_ext = 0xFFFF;
+		filter->wmask.tx_fes_status_end = 0xFFFF;
+		filter->wmask.response_end_status = 0xFFFF;
+		filter->wmask.tx_fes_status_prot = 0xFFFF;
+		filter->wmask.tx_fes_setup = 0xFF;
+		filter->wmask.tx_msdu_start = 0xFF;
+		filter->wmask.tx_mpdu_start = 0xFF;
+		filter->wmask.rxpcu_user_setup = 0xFF;
+
+		/* compaction is disable */
+		filter->compaction_enable = 0;
+	}
 }
 
 void dp_mon_filter_setup_tx_mon_mode_2_0(struct dp_pdev *pdev)
@@ -2790,20 +2814,28 @@ static
 void dp_tx_mon_wordmask_config_set(struct htt_tx_ring_tlv_filter *dst_filter,
 				   struct htt_tx_ring_tlv_filter *src_filter)
 {
-	dst_filter->wmask.tx_fes_setup |=
-		src_filter->wmask.tx_fes_setup;
+	dst_filter->wmask.pcu_ppdu_setup_init |=
+		src_filter->wmask.pcu_ppdu_setup_init;
 	dst_filter->wmask.tx_peer_entry |=
 		src_filter->wmask.tx_peer_entry;
 	dst_filter->wmask.tx_queue_ext |=
 		src_filter->wmask.tx_queue_ext;
+	dst_filter->wmask.tx_fes_status_end |=
+		src_filter->wmask.tx_fes_status_end;
+	dst_filter->wmask.response_end_status |=
+		src_filter->wmask.response_end_status;
+	dst_filter->wmask.tx_fes_status_prot |=
+		src_filter->wmask.tx_fes_status_prot;
+	dst_filter->wmask.tx_fes_setup |=
+		src_filter->wmask.tx_fes_setup;
 	dst_filter->wmask.tx_msdu_start |=
 		src_filter->wmask.tx_msdu_start;
 	dst_filter->wmask.tx_mpdu_start |=
 		src_filter->wmask.tx_mpdu_start;
-	dst_filter->wmask.pcu_ppdu_setup_init |=
-		src_filter->wmask.pcu_ppdu_setup_init;
 	dst_filter->wmask.rxpcu_user_setup |=
 		src_filter->wmask.rxpcu_user_setup;
+	dst_filter->compaction_enable |=
+		src_filter->compaction_enable;
 }
 
 /**
