@@ -2887,7 +2887,19 @@ int hdd_vdev_destroy(struct wlan_hdd_link_info *link_info);
 int hdd_vdev_ready(struct wlan_objmgr_vdev *vdev,
 		   struct qdf_mac_addr *bridgeaddr);
 
-QDF_STATUS hdd_init_station_mode(struct hdd_adapter *adapter);
+/**
+ * hdd_init_station_mode() - Initialize STA mode adapter
+ * post vdev creation.
+ * @link_info: Link info pointer in HDD adapter
+ *
+ * The function initializes the adapter post vdev
+ * create for STA mode type adapters on start
+ * adapter.
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS hdd_init_station_mode(struct wlan_hdd_link_info *link_info);
+
 struct hdd_adapter *hdd_get_adapter(struct hdd_context *hdd_ctx,
 			enum QDF_OPMODE mode);
 
@@ -4040,7 +4052,7 @@ hdd_wlan_nla_put_u64(struct sk_buff *skb, int attrtype, u64 value)
 
 /**
  * hdd_roam_profile() - Get adapter's roam profile
- * @adapter: The adapter being queried
+ * @link_info: Link info pointer in HDD adapter
  *
  * Given an adapter this function returns a pointer to its roam profile.
  *
@@ -4049,13 +4061,12 @@ hdd_wlan_nla_put_u64(struct sk_buff *skb, int attrtype, u64 value)
  *
  * Return: pointer to the adapter's roam profile
  */
-static inline
-struct csr_roam_profile *hdd_roam_profile(struct hdd_adapter *adapter)
+static inline struct csr_roam_profile *
+hdd_roam_profile(struct wlan_hdd_link_info *link_info)
 {
 	struct hdd_station_ctx *sta_ctx;
 
-	sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter->deflink);
-
+	sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(link_info);
 	return &sta_ctx->roam_profile;
 }
 

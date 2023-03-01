@@ -7039,16 +7039,17 @@ static void hdd_store_vdev_info(struct hdd_adapter *adapter,
 	qdf_spin_unlock_bh(&adapter->deflink->vdev_lock);
 }
 
-static void hdd_init_station_context(struct hdd_adapter *adapter)
+static void
+hdd_init_station_context(struct wlan_hdd_link_info *link_info)
 {
 	struct hdd_station_ctx *sta_ctx;
-	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
+	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(link_info->adapter);
 
 	/* Set the default operation channel freq and auth type to open */
-	sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter->deflink);
+	sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(link_info);
 	sta_ctx->conn_info.chan_freq = hdd_ctx->config->operating_chan_freq;
 	sta_ctx->conn_info.auth_type = eCSR_AUTH_TYPE_OPEN_SYSTEM;
-	hdd_roam_profile_init(adapter);
+	hdd_roam_profile_init(link_info);
 }
 
 static void hdd_vdev_set_ht_vht_ies(mac_handle_t mac_handle,
@@ -7280,8 +7281,9 @@ hdd_vdev_destroy_procedure:
 	return errno;
 }
 
-QDF_STATUS hdd_init_station_mode(struct hdd_adapter *adapter)
+QDF_STATUS hdd_init_station_mode(struct wlan_hdd_link_info *link_info)
 {
+	struct hdd_adapter *adapter = link_info->adapter;
 	struct hdd_context *hdd_ctx;
 	QDF_STATUS status;
 	mac_handle_t mac_handle;
@@ -7291,16 +7293,14 @@ QDF_STATUS hdd_init_station_mode(struct hdd_adapter *adapter)
 	hdd_ctx = WLAN_HDD_GET_CTX(adapter);
 	mac_handle = hdd_ctx->mac_handle;
 
-	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink,
-					   WLAN_INIT_DEINIT_ID);
+	vdev = hdd_objmgr_get_vdev_by_user(link_info, WLAN_INIT_DEINIT_ID);
 	if (!vdev) {
 		status = QDF_STATUS_E_NULL_VALUE;
-		goto wext_unregister;
+		goto vdev_destroy;
 	}
 
 	hdd_vdev_set_ht_vht_ies(mac_handle, vdev);
-	hdd_init_station_context(adapter);
-	hdd_register_wext(adapter->dev);
+	hdd_init_station_context(link_info);
 
 	status = hdd_wmm_adapter_init(adapter);
 	if (QDF_STATUS_SUCCESS != status) {
@@ -7310,15 +7310,13 @@ QDF_STATUS hdd_init_station_mode(struct hdd_adapter *adapter)
 	}
 	set_bit(WMM_INIT_DONE, &adapter->event_flags);
 
-	hdd_set_netdev_flags(adapter);
-
 	/* rcpi info initialization */
 	qdf_mem_zero(&adapter->rcpi, sizeof(adapter->rcpi));
 
 	if (adapter->device_mode == QDF_STA_MODE) {
 		roam_triggers = ucfg_mlme_get_roaming_triggers(hdd_ctx->psoc);
 		mlme_set_roam_trigger_bitmap(hdd_ctx->psoc,
-					     adapter->deflink->vdev_id,
+					     link_info->vdev_id,
 					     roam_triggers);
 
 		status = hdd_vdev_configure_rtt_params(vdev);
@@ -7332,9 +7330,8 @@ QDF_STATUS hdd_init_station_mode(struct hdd_adapter *adapter)
 error_wmm_init:
 	hdd_objmgr_put_vdev_by_user(vdev, WLAN_INIT_DEINIT_ID);
 
-wext_unregister:
-	hdd_unregister_wext(adapter->dev);
-	QDF_BUG(!hdd_vdev_destroy(adapter->deflink));
+vdev_destroy:
+	QDF_BUG(!hdd_vdev_destroy(link_info));
 
 	return status;
 }
@@ -13970,12 +13967,15 @@ int hdd_start_station_adapter(struct hdd_adapter *adapter)
 		hdd_err("failed to create vdev: %d", ret);
 		return ret;
 	}
-	status = hdd_init_station_mode(adapter);
+	status = hdd_init_station_mode(adapter->deflink);
 
 	if (QDF_STATUS_SUCCESS != status) {
 		hdd_err("Error Initializing station mode: %d", status);
-		return qdf_status_to_os_return(status);
+		goto fail;
 	}
+
+	hdd_register_wext(adapter->dev);
+	hdd_set_netdev_flags(adapter);
 
 	hdd_register_tx_flow_control(adapter,
 		hdd_tx_resume_timer_expired_handler,
@@ -13993,6 +13993,10 @@ int hdd_start_station_adapter(struct hdd_adapter *adapter)
 	hdd_exit();
 
 	return 0;
+
+fail:
+	hdd_unregister_wext(adapter->dev);
+	return qdf_status_to_os_return(status);
 }
 
 /**

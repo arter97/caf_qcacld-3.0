@@ -596,7 +596,7 @@ int hdd_init_nan_data_mode(struct hdd_adapter *adapter)
 	sme_set_vdev_ies_per_band(mac_handle, adapter->deflink->vdev_id,
 				  adapter->device_mode);
 
-	hdd_roam_profile_init(adapter);
+	hdd_roam_profile_init(adapter->deflink);
 	hdd_register_wext(wlan_dev);
 
 	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink, WLAN_DP_ID);

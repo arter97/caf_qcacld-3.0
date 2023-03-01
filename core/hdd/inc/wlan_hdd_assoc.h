@@ -439,14 +439,14 @@ void hdd_copy_vht_caps(struct ieee80211_vht_cap *hdd_vht_cap,
 
 /**
  * hdd_roam_profile_init() - initialize adapter roam profile
- * @adapter: The HDD adapter being initialized
+ * @link_info: Link info pointer in HDD adapter
  *
  * This function initializes the roam profile that is embedded within
  * the adapter.
  *
  * Return: void
  */
-void hdd_roam_profile_init(struct hdd_adapter *adapter);
+void hdd_roam_profile_init(struct wlan_hdd_link_info *link_info);
 
 /**
  * hdd_any_valid_peer_present() - Check if any valid peer is present

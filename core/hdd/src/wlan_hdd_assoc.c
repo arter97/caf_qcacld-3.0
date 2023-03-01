@@ -2700,17 +2700,17 @@ bool hdd_is_fils_connection(struct hdd_context *hdd_ctx,
 }
 #endif
 
-void hdd_roam_profile_init(struct hdd_adapter *adapter)
+void hdd_roam_profile_init(struct wlan_hdd_link_info *link_info)
 {
 	struct csr_roam_profile *roam_profile;
 	struct hdd_station_ctx *sta_ctx;
 
 	hdd_enter();
 
-	roam_profile = hdd_roam_profile(adapter);
+	roam_profile = hdd_roam_profile(link_info);
 	qdf_mem_zero(roam_profile, sizeof(*roam_profile));
 
-	sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter->deflink);
+	sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(link_info);
 
 	/* Configure the roaming profile links to SSID and bssid. */
 	roam_profile->SSIDs.numOfSSIDs = 0;
@@ -2728,9 +2728,9 @@ void hdd_roam_profile_init(struct hdd_adapter *adapter)
 	roam_profile->phyMode = eCSR_DOT11_MODE_AUTO;
 
 	/* Set the default scan mode */
-	adapter->scan_info.scan_mode = eSIR_ACTIVE_SCAN;
+	link_info->adapter->scan_info.scan_mode = eSIR_ACTIVE_SCAN;
 
-	hdd_clear_roam_profile_ie(adapter);
+	hdd_clear_roam_profile_ie(link_info->adapter);
 	hdd_exit();
 }
 
