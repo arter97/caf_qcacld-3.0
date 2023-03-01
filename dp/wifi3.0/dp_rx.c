@@ -3156,6 +3156,7 @@ QDF_STATUS dp_rx_pdev_desc_pool_init(struct dp_pdev *pdev)
 	uint32_t rx_sw_desc_num;
 	struct dp_srng *dp_rxdma_srng;
 	struct rx_desc_pool *rx_desc_pool;
+	uint32_t target_type = hal_get_target_type(soc->hal_soc);
 
 	rx_desc_pool = &soc->rx_desc_buf[mac_for_pdev];
 	if (wlan_cfg_get_dp_pdev_nss_enabled(pdev->wlan_cfg_ctx)) {
@@ -3185,7 +3186,10 @@ QDF_STATUS dp_rx_pdev_desc_pool_init(struct dp_pdev *pdev)
 	rx_desc_pool->buf_size = RX_DATA_BUFFER_SIZE;
 	rx_desc_pool->buf_alignment = RX_DATA_BUFFER_ALIGNMENT;
 	/* Disable monitor dest processing via frag */
-	dp_rx_enable_mon_dest_frag(rx_desc_pool, false);
+	if (target_type == TARGET_TYPE_QCN9160)
+		dp_rx_enable_mon_dest_frag(rx_desc_pool, true);
+	else
+		dp_rx_enable_mon_dest_frag(rx_desc_pool, false);
 
 	dp_rx_desc_pool_init(soc, mac_for_pdev,
 			     rx_sw_desc_num, rx_desc_pool);
@@ -3211,6 +3215,7 @@ dp_rx_pdev_buffers_alloc(struct dp_pdev *pdev)
 	struct dp_srng *dp_rxdma_srng;
 	struct rx_desc_pool *rx_desc_pool;
 	uint32_t rxdma_entries;
+	uint32_t target_type = hal_get_target_type(soc->hal_soc);
 
 	dp_rxdma_srng = &soc->rx_refill_buf_ring[mac_for_pdev];
 	rxdma_entries = dp_rxdma_srng->num_entries;
@@ -3222,10 +3227,16 @@ dp_rx_pdev_buffers_alloc(struct dp_pdev *pdev)
 	 */
 	dp_rx_buffer_pool_init(soc, mac_for_pdev);
 
-	return dp_pdev_rx_buffers_attach_simple(soc, mac_for_pdev,
-						dp_rxdma_srng,
-						rx_desc_pool,
-						rxdma_entries - 1);
+	if (target_type == TARGET_TYPE_QCN9160)
+		return dp_pdev_rx_buffers_attach(soc, mac_for_pdev,
+						 dp_rxdma_srng,
+						 rx_desc_pool,
+						 rxdma_entries - 1);
+	else
+		return dp_pdev_rx_buffers_attach_simple(soc, mac_for_pdev,
+							dp_rxdma_srng,
+							rx_desc_pool,
+							rxdma_entries - 1);
 }
 
 void
@@ -3234,10 +3245,15 @@ dp_rx_pdev_buffers_free(struct dp_pdev *pdev)
 	int mac_for_pdev = pdev->lmac_id;
 	struct dp_soc *soc = pdev->soc;
 	struct rx_desc_pool *rx_desc_pool;
+	uint32_t target_type = hal_get_target_type(soc->hal_soc);
 
 	rx_desc_pool = &soc->rx_desc_buf[mac_for_pdev];
 
-	dp_rx_desc_nbuf_free(soc, rx_desc_pool, false);
+	if (target_type == TARGET_TYPE_QCN9160)
+		dp_rx_desc_frag_free(soc, rx_desc_pool);
+	else
+		dp_rx_desc_nbuf_free(soc, rx_desc_pool, false);
+
 	dp_rx_buffer_pool_deinit(soc, mac_for_pdev);
 }
 
