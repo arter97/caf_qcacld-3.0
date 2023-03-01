@@ -373,8 +373,6 @@ QDF_STATUS wlan_ipa_uc_op_metering(struct wlan_ipa_priv *ipa_ctx,
 /**
  * wlan_ipa_wdi_meter_notifier_cb() - SSR wrapper for
  * __wlan_ipa_wdi_meter_notifier_cb
- * @priv: pointer to private data registered with IPA (we register a
- *        pointer to the global IPA context)
  * @evt: the IPA event which triggered the callback
  * @data: data associated with the event
  *
@@ -466,6 +464,7 @@ void wlan_ipa_uc_info(struct wlan_ipa_priv *ipa_ctx);
 /**
  * wlan_ipa_print_fw_wdi_stats() - Print FW IPA WDI stats
  * @ipa_ctx: IPA context
+ * @uc_fw_stat: stats to print
  *
  * Return: None
  */
@@ -602,7 +601,7 @@ void wlan_ipa_reg_rps_enable_cb(struct wlan_ipa_priv *ipa_ctx,
 }
 
 /**
- * ipa_set_rps_enable(): Enable/disable RPS for all interfaces of specific mode
+ * ipa_set_rps(): Enable/disable RPS for all interfaces of specific mode
  * @ipa_ctx: IPA context
  * @mode: mode of interface for which RPS needs to be enabled
  * @enable: Set true to enable RPS
@@ -776,9 +775,10 @@ static inline void wlan_ipa_mcc_work_handler(void *data)
  * @net_dev: Interface net device
  * @device_mode: Net interface device mode
  * @session_id: session id for the event
- * @type: event enum of type ipa_wlan_event
- * @mac_address: MAC address associated with the event
+ * @ipa_event_type: event enum of type ipa_wlan_event
+ * @mac_addr: MAC address associated with the event
  * @is_2g_iface: true if interface is operating on 2G band, otherwise false
+ * @ipa_obj: IPA context
  *
  * Return: QDF_STATUS
  */
@@ -863,7 +863,7 @@ void wlan_ipa_fw_rejuvenate_send_msg(struct wlan_ipa_priv *ipa_ctx);
 /**
  * wlan_ipa_flush_pending_vdev_events() - flush pending vdev ipa events
  * @ipa_ctx: IPA context
- * vdev_id: vdev id
+ * @vdev_id: vdev id
  *
  * This function is to flush vdev wlan ipa pending events
  *
