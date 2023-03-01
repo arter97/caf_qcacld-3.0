@@ -965,9 +965,9 @@ enum channel_enum reg_get_chan_enum_for_freq(qdf_freq_t freq);
  * reg_get_min_max_bw_on_cur_chan_list() - To get min and max BW supported
  * by channel enum
  * @pdev: pointer to pdev
- * @chn_idx: enum channel_enum
- * @min bw: min bw
- * @max bw: max bw
+ * @chan_idx: enum channel_enum
+ * @min_bw: min bw
+ * @max_bw: max bw
  *
  * Return: SUCCESS/FAILURE
  */

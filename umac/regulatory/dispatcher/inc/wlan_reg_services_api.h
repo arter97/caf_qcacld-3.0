@@ -1435,9 +1435,9 @@ enum channel_enum wlan_reg_get_chan_enum_for_freq(qdf_freq_t freq);
  * wlan_reg_get_min_max_bw_for_chan_index() - To get min and max BW supported
  * by channel enum
  * @pdev: pointer to pdev
- * @chn_idx: enum channel_enum
- * @min bw: min bw
- * @max bw: max bw
+ * @chan_idx: enum channel_enum
+ * @min_bw: min bw
+ * @max_bw: max bw
  *
  * Return: SUCCESS/FAILURE
  */
