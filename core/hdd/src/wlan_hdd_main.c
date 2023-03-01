@@ -8729,6 +8729,38 @@ static inline void hdd_dump_func_call_map(void)
 }
 #endif
 
+static void hdd_reset_scan_operation(struct wlan_hdd_link_info *link_info)
+{
+	switch (link_info->adapter->device_mode) {
+	case QDF_STA_MODE:
+	case QDF_P2P_CLIENT_MODE:
+	case QDF_P2P_DEVICE_MODE:
+	case QDF_NDI_MODE:
+		wlan_hdd_scan_abort(link_info);
+		wlan_hdd_cleanup_remain_on_channel_ctx(link_info);
+		if (link_info->adapter->device_mode == QDF_STA_MODE) {
+			struct wlan_objmgr_vdev *vdev;
+
+			vdev = hdd_objmgr_get_vdev_by_user(link_info,
+							   WLAN_OSIF_SCAN_ID);
+			if (!vdev)
+				break;
+
+			wlan_cfg80211_sched_scan_stop(vdev);
+			hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_SCAN_ID);
+		}
+		break;
+	case QDF_P2P_GO_MODE:
+		wlan_hdd_cleanup_remain_on_channel_ctx(link_info);
+		break;
+	case QDF_SAP_MODE:
+		qdf_atomic_set(&link_info->session.ap.acs_in_progress, 0);
+		break;
+	default:
+		break;
+	}
+}
+
 #ifdef WLAN_OPEN_SOURCE
 void hdd_cancel_ip_notifier_work(struct hdd_adapter *adapter)
 {
@@ -8888,16 +8920,56 @@ static void hdd_reset_ies_on_sap_stop(struct wlan_hdd_link_info *link_info)
 	wlan_hdd_reset_prob_rspies(link_info);
 }
 
+static void hdd_stop_station_adapter(struct hdd_adapter *adapter)
+{
+	struct wlan_objmgr_vdev *vdev;
+	enum QDF_OPMODE mode;
+	struct wlan_hdd_link_info *link_info;
+	union iwreq_data wrqu;
+
+	mode = adapter->device_mode;
+	hdd_adapter_for_each_active_link_info(adapter, link_info) {
+		vdev = hdd_objmgr_get_vdev_by_user(link_info,
+						   WLAN_INIT_DEINIT_ID);
+		if (!vdev)
+			continue;
+
+		if (mode == QDF_NDI_MODE)
+			hdd_stop_and_cleanup_ndi(link_info);
+		else if (!hdd_cm_is_disconnected(link_info))
+			hdd_sta_disconnect_and_cleanup(link_info);
+
+		hdd_reset_scan_operation(link_info);
+		wlan_hdd_cleanup_actionframe(link_info);
+		wlan_hdd_flush_pmksa_cache(link_info);
+
+		if (mode == QDF_STA_MODE)
+			ucfg_ipa_flush_pending_vdev_events(
+						wlan_vdev_get_pdev(vdev),
+						link_info->vdev_id);
+		hdd_objmgr_put_vdev_by_user(vdev, WLAN_INIT_DEINIT_ID);
+		hdd_vdev_destroy(link_info);
+	}
+
+	memset(&wrqu, '\0', sizeof(wrqu));
+	wrqu.ap_addr.sa_family = ARPHRD_ETHER;
+	memset(wrqu.ap_addr.sa_data, '\0', ETH_ALEN);
+	hdd_wext_send_event(adapter->dev, SIOCGIWAP, &wrqu, NULL);
+
+	hdd_disable_nan_active_disc(adapter);
+	hdd_adapter_deregister_fc(adapter);
+	hdd_cancel_ip_notifier_work(adapter);
+}
+
 QDF_STATUS hdd_stop_adapter_ext(struct hdd_context *hdd_ctx,
 				struct hdd_adapter *adapter)
 {
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
 	struct hdd_station_ctx *sta_ctx;
 	struct hdd_ap_ctx *ap_ctx;
-	union iwreq_data wrqu;
 	struct sap_config *sap_config;
 	mac_handle_t mac_handle;
-	struct wlan_objmgr_vdev *vdev;
+	struct wlan_objmgr_vdev *vdev = NULL;
 	struct wlan_hdd_link_info *link_info = adapter->deflink;
 
 	hdd_enter();
@@ -8922,47 +8994,17 @@ QDF_STATUS hdd_stop_adapter_ext(struct hdd_context *hdd_ctx,
 				     WLAN_CONTROL_PATH);
 
 	mac_handle = hdd_ctx->mac_handle;
-	vdev = hdd_objmgr_get_vdev_by_user(link_info, WLAN_OSIF_ID);
 
 	switch (adapter->device_mode) {
 	case QDF_STA_MODE:
 	case QDF_P2P_CLIENT_MODE:
 	case QDF_NDI_MODE:
-		if (adapter->device_mode == QDF_NDI_MODE)
-			hdd_stop_and_cleanup_ndi(link_info);
-		else if (!hdd_cm_is_disconnected(link_info))
-			hdd_sta_disconnect_and_cleanup(link_info);
-
-		memset(&wrqu, '\0', sizeof(wrqu));
-		wrqu.ap_addr.sa_family = ARPHRD_ETHER;
-		memset(wrqu.ap_addr.sa_data, '\0', ETH_ALEN);
-		hdd_wext_send_event(adapter->dev, SIOCGIWAP, &wrqu, NULL);
-		fallthrough;
 	case QDF_P2P_DEVICE_MODE:
 	case QDF_NAN_DISC_MODE:
-		hdd_disable_nan_active_disc(adapter);
-
-		wlan_hdd_scan_abort(link_info);
-		wlan_hdd_cleanup_actionframe(link_info);
-		wlan_hdd_cleanup_remain_on_channel_ctx(link_info);
-		status = wlan_hdd_flush_pmksa_cache(link_info);
-
-		hdd_adapter_deregister_fc(adapter);
-		hdd_cancel_ip_notifier_work(adapter);
-
-		if (adapter->device_mode == QDF_STA_MODE) {
-			if (vdev)
-				wlan_cfg80211_sched_scan_stop(vdev);
-
-			ucfg_ipa_flush_pending_vdev_events(
-						hdd_ctx->pdev,
-						link_info->vdev_id);
-		}
-		hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
-		hdd_vdev_destroy(link_info);
+		hdd_stop_station_adapter(adapter);
 		break;
-
 	case QDF_MONITOR_MODE:
+		vdev = hdd_objmgr_get_vdev_by_user(link_info, WLAN_OSIF_ID);
 		if (wlan_hdd_is_session_type_monitor(adapter->device_mode) &&
 		    vdev &&
 		    ucfg_pkt_capture_get_mode(hdd_ctx->psoc) !=
@@ -8976,6 +9018,7 @@ QDF_STATUS hdd_stop_adapter_ext(struct hdd_context *hdd_ctx,
 			sta_adapter = hdd_get_adapter(hdd_ctx, QDF_STA_MODE);
 			if (!sta_adapter) {
 				hdd_err("No station interface found");
+				hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
 				return -EINVAL;
 			}
 			hdd_reset_monitor_interface(sta_adapter);
@@ -8988,8 +9031,8 @@ QDF_STATUS hdd_stop_adapter_ext(struct hdd_context *hdd_ctx,
 		hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
 		hdd_vdev_destroy(link_info);
 		break;
-
 	case QDF_SAP_MODE:
+		vdev = hdd_objmgr_get_vdev_by_user(link_info, WLAN_OSIF_ID);
 		wlan_hdd_scan_abort(link_info);
 		hdd_abort_ongoing_sta_connection(hdd_ctx);
 		/* Diassociate with all the peers before stop ap post */
@@ -9006,11 +9049,13 @@ QDF_STATUS hdd_stop_adapter_ext(struct hdd_context *hdd_ctx,
 		hdd_stop_and_close_pre_cac_adapter(hdd_ctx, vdev);
 
 		fallthrough;
-
 	case QDF_P2P_GO_MODE:
+		if (!vdev)
+			vdev = hdd_objmgr_get_vdev_by_user(link_info,
+							   WLAN_OSIF_ID);
+
 		ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(link_info);
 		wlansap_cleanup_cac_timer(ap_ctx->sap_context);
-
 		cds_flush_work(&adapter->sap_stop_bss_work);
 		if (qdf_atomic_read(&ap_ctx->acs_in_progress)) {
 			hdd_info("ACS in progress, wait for complete");
@@ -9095,6 +9140,7 @@ QDF_STATUS hdd_stop_adapter_ext(struct hdd_context *hdd_ctx,
 		mutex_unlock(&hdd_ctx->sap_lock);
 		break;
 	case QDF_OCB_MODE:
+		vdev = hdd_objmgr_get_vdev_by_user(link_info, WLAN_OSIF_ID);
 		sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(link_info);
 		cdp_clear_peer(cds_get_context(QDF_MODULE_ID_SOC),
 			       OL_TXRX_PDEV_ID,
@@ -9104,7 +9150,6 @@ QDF_STATUS hdd_stop_adapter_ext(struct hdd_context *hdd_ctx,
 		hdd_vdev_destroy(link_info);
 		break;
 	default:
-		hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
 		break;
 	}
 
@@ -9249,38 +9294,6 @@ void hdd_set_netdev_flags(struct hdd_adapter *adapter)
 	temp = (uint64_t)adapter->dev->features;
 
 	hdd_debug("adapter mode %u dev feature 0x%llx", device_mode, temp);
-}
-
-static void hdd_reset_scan_operation(struct wlan_hdd_link_info *link_info)
-{
-	switch (link_info->adapter->device_mode) {
-	case QDF_STA_MODE:
-	case QDF_P2P_CLIENT_MODE:
-	case QDF_P2P_DEVICE_MODE:
-	case QDF_NDI_MODE:
-		wlan_hdd_scan_abort(link_info);
-		wlan_hdd_cleanup_remain_on_channel_ctx(link_info);
-		if (link_info->adapter->device_mode == QDF_STA_MODE) {
-			struct wlan_objmgr_vdev *vdev;
-
-			vdev = hdd_objmgr_get_vdev_by_user(link_info,
-							   WLAN_OSIF_SCAN_ID);
-			if (!vdev)
-				break;
-
-			wlan_cfg80211_sched_scan_stop(vdev);
-			hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_SCAN_ID);
-		}
-		break;
-	case QDF_P2P_GO_MODE:
-		wlan_hdd_cleanup_remain_on_channel_ctx(link_info);
-		break;
-	case QDF_SAP_MODE:
-		qdf_atomic_set(&link_info->session.ap.acs_in_progress, 0);
-		break;
-	default:
-		break;
-	}
 }
 
 #ifdef QCA_LL_LEGACY_TX_FLOW_CONTROL
