@@ -796,8 +796,8 @@ static int __hdd_hostapd_set_mac_address(struct net_device *dev, void *addr)
 		else
 			qdf_zero_macaddr(&mld_addr);
 
-		ret = hdd_dynamic_mac_address_set(adapter, mac_addr, mld_addr,
-						  false);
+		ret = hdd_dynamic_mac_address_set(adapter->deflink, mac_addr,
+						  mld_addr, false);
 		if (ret)
 			return ret;
 	}

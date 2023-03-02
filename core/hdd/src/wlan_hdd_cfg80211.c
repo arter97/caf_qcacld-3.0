@@ -21376,7 +21376,8 @@ static bool hdd_is_ap_mode(enum QDF_OPMODE mode)
 	}
 }
 
-#if defined(WLAN_FEATURE_11BE_MLO) && defined(CFG80211_11BE_BASIC)
+#if defined(WLAN_FEATURE_11BE_MLO) && defined(CFG80211_11BE_BASIC) && \
+	!defined(WLAN_HDD_MULTI_VDEV_SINGLE_NDEV)
 static QDF_STATUS
 hdd_adapter_update_mac_on_mode_change(struct hdd_adapter *adapter)
 {
@@ -21577,6 +21578,7 @@ static int __wlan_hdd_cfg80211_change_iface(struct wiphy *wiphy,
 		switch (adapter->device_mode) {
 		case QDF_SAP_MODE:
 			hdd_adapter_set_sl_ml_adapter(adapter);
+			adapter->active_links = 0x1;
 			break;
 		case QDF_STA_MODE:
 			hdd_adapter_clear_sl_ml_adapter(adapter);
@@ -21585,9 +21587,12 @@ static int __wlan_hdd_cfg80211_change_iface(struct wiphy *wiphy,
 			if (QDF_IS_STATUS_ERROR(status))
 				goto err;
 
+			adapter->active_links =
+					(1 << adapter->num_links_on_create) - 1;
 			break;
 		default:
 			hdd_adapter_clear_sl_ml_adapter(adapter);
+			adapter->active_links = 0x1;
 			break;
 		}
 	}

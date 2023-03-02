@@ -35,6 +35,7 @@
 #define WLAN_WAIT_TIME_LINK_STATE 800
 
 #if defined(CFG80211_11BE_BASIC)
+#ifndef WLAN_HDD_MULTI_VDEV_SINGLE_NDEV
 #ifdef CFG80211_IFTYPE_MLO_LINK_SUPPORT
 
 static
@@ -196,27 +197,6 @@ void hdd_wlan_register_mlo_interfaces(struct hdd_context *hdd_ctx)
 		hdd_err("Failed to register link adapter:%d", status);
 }
 
-#ifdef CFG80211_MLD_MAC_IN_WDEV
-static inline
-void wlan_hdd_populate_mld_address(struct hdd_adapter *adapter,
-				   uint8_t *mld_addr)
-{
-	qdf_mem_copy(adapter->wdev.mld_address, mld_addr,
-		     QDF_NET_MAC_ADDR_MAX_LEN);
-}
-#else
-static inline
-void wlan_hdd_populate_mld_address(struct hdd_adapter *adapter,
-				   uint8_t *mld_addr)
-{
-}
-#endif
-void
-hdd_adapter_set_ml_adapter(struct hdd_adapter *adapter)
-{
-	adapter->mlo_adapter_info.is_ml_adapter = true;
-}
-
 void
 hdd_adapter_set_sl_ml_adapter(struct hdd_adapter *adapter)
 {
@@ -248,6 +228,20 @@ struct hdd_adapter *hdd_get_ml_adapter(struct hdd_context *hdd_ctx)
 
 	return NULL;
 }
+#endif
+
+#ifndef WLAN_HDD_MULTI_VDEV_SINGLE_NDEV
+void hdd_adapter_set_ml_adapter(struct hdd_adapter *adapter)
+{
+	adapter->mlo_adapter_info.is_ml_adapter = true;
+	qdf_copy_macaddr(&adapter->mld_addr, &adapter->mac_addr);
+}
+#else
+void hdd_adapter_set_ml_adapter(struct hdd_adapter *adapter)
+{
+	adapter->mlo_adapter_info.is_ml_adapter = true;
+}
+#endif
 
 void hdd_mlo_t2lm_register_callback(struct wlan_objmgr_vdev *vdev)
 {
@@ -305,6 +299,61 @@ QDF_STATUS hdd_derive_link_address_from_mld(struct qdf_mac_addr *mld_addr,
 }
 
 #ifdef WLAN_FEATURE_DYNAMIC_MAC_ADDR_UPDATE
+#ifdef WLAN_HDD_MULTI_VDEV_SINGLE_NDEV
+int hdd_update_vdev_mac_address(struct hdd_adapter *adapter,
+				struct qdf_mac_addr mac_addr)
+{
+	int i = 0, ret = 0;
+	bool eht_capab, update_self_peer;
+	QDF_STATUS status;
+	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
+	struct wlan_hdd_link_info *link_info;
+	uint8_t *addr_list[WLAN_MAX_MLD + 2] = {0};
+	struct qdf_mac_addr link_addrs[WLAN_MAX_MLD] = {0};
+
+	/* This API is only called with is ml adapter set for STA mode adapter.
+	 * For SAP mode, hdd_hostapd_set_mac_address() is the entry point for
+	 * MAC address update.
+	 */
+	ucfg_psoc_mlme_get_11be_capab(hdd_ctx->psoc, &eht_capab);
+	if (!(eht_capab && hdd_adapter_is_ml_adapter(adapter))) {
+		struct qdf_mac_addr mld_addr = QDF_MAC_ADDR_ZERO_INIT;
+
+		ret = hdd_dynamic_mac_address_set(adapter->deflink, mac_addr,
+						  mld_addr, true);
+		return ret;
+	}
+
+	status = hdd_derive_link_address_from_mld(&mac_addr, &link_addrs[0],
+						  WLAN_MAX_MLD);
+
+	if (QDF_IS_STATUS_ERROR(status))
+		return qdf_status_to_os_return(status);
+
+	hdd_adapter_for_each_active_link_info(adapter, link_info) {
+		addr_list[i] = &link_addrs[i].bytes[0];
+		i++;
+	}
+
+	status = sme_check_for_duplicate_session(hdd_ctx->mac_handle,
+						 &addr_list[0]);
+	if (QDF_IS_STATUS_ERROR(status))
+		return qdf_status_to_os_return(status);
+
+	i = 0;
+	hdd_adapter_for_each_active_link_info(adapter, link_info) {
+		update_self_peer =
+			(link_info == adapter->deflink) ? true : false;
+		ret = hdd_dynamic_mac_address_set(link_info, link_addrs[i],
+						  mac_addr, update_self_peer);
+		if (ret)
+			return ret;
+
+		qdf_copy_macaddr(&link_info->link_addr, &link_addrs[i++]);
+	}
+	return ret;
+}
+#else
 int hdd_update_vdev_mac_address(struct hdd_adapter *adapter,
 				struct qdf_mac_addr mac_addr)
 {
@@ -325,7 +374,7 @@ int hdd_update_vdev_mac_address(struct hdd_adapter *adapter,
 	if (!(eht_capab && hdd_adapter_is_ml_adapter(adapter))) {
 		struct qdf_mac_addr mld_addr = QDF_MAC_ADDR_ZERO_INIT;
 
-		ret = hdd_dynamic_mac_address_set(adapter, mac_addr,
+		ret = hdd_dynamic_mac_address_set(adapter->deflink, mac_addr,
 						  mld_addr, true);
 		return ret;
 	}
@@ -355,8 +404,9 @@ int hdd_update_vdev_mac_address(struct hdd_adapter *adapter,
 		else
 			update_self_peer = false;
 
-		ret = hdd_dynamic_mac_address_set(link_adapter, link_addrs[i],
-						  mac_addr, update_self_peer);
+		ret = hdd_dynamic_mac_address_set(link_adapter->deflink,
+						  link_addrs[i], mac_addr,
+						  update_self_peer);
 		if (ret)
 			return ret;
 
@@ -370,6 +420,7 @@ int hdd_update_vdev_mac_address(struct hdd_adapter *adapter,
 	return ret;
 }
 #endif
+#endif /* WLAN_FEATURE_DYNAMIC_MAC_ADDR_UPDATE */
 
 const struct nla_policy
 ml_link_state_config_policy [QCA_WLAN_VENDOR_ATTR_LINK_STATE_CONFIG_MAX + 1] = {

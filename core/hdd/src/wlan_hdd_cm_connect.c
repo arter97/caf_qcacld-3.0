@@ -1203,8 +1203,7 @@ static void hdd_cm_save_connect_info(struct wlan_hdd_link_info *link_info,
 	qdf_copy_macaddr(&sta_ctx->conn_info.bssid, &rsp->bssid);
 	vdev = hdd_objmgr_get_vdev_by_user(link_info, WLAN_DP_ID);
 	if (vdev) {
-		if (ucfg_dp_get_intf_id(vdev) == rsp->vdev_id)
-			ucfg_dp_conn_info_set_bssid(vdev, &rsp->bssid);
+		ucfg_dp_conn_info_set_bssid(vdev, &rsp->bssid);
 		hdd_objmgr_put_vdev_by_user(vdev, WLAN_DP_ID);
 	}
 
@@ -1333,6 +1332,7 @@ static bool hdd_cm_is_roam_auth_required(struct hdd_station_ctx *sta_ctx,
 #endif
 
 #if defined(WLAN_FEATURE_11BE_MLO) && defined(CFG80211_11BE_BASIC)
+#ifndef WLAN_HDD_MULTI_VDEV_SINGLE_NDEV
 struct hdd_adapter *hdd_get_assoc_link_adapter(struct hdd_adapter *ml_adapter)
 {
 	int i;
@@ -1355,7 +1355,22 @@ struct hdd_adapter *hdd_get_assoc_link_adapter(struct hdd_adapter *ml_adapter)
 
 	return NULL;
 }
+#endif
 
+#ifdef WLAN_HDD_MULTI_VDEV_SINGLE_NDEV
+static void hdd_set_immediate_power_save(struct hdd_adapter *adapter,
+					 bool is_immediate_powersave)
+{
+	struct hdd_station_ctx *sta_ctx;
+	struct wlan_hdd_link_info *link_info;
+
+	hdd_adapter_for_each_active_link_info(adapter, link_info) {
+		sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(link_info);
+		sta_ctx->ap_supports_immediate_power_save =
+						is_immediate_powersave;
+	}
+}
+#else
 static void hdd_set_immediate_power_save(struct hdd_adapter *adapter,
 					 bool is_immediate_powersave)
 {
@@ -1382,7 +1397,7 @@ update_non_ml:
 	sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter->deflink);
 	sta_ctx->ap_supports_immediate_power_save = is_immediate_powersave;
 }
-
+#endif
 #else
 static void hdd_set_immediate_power_save(struct hdd_adapter *adapter,
 					 bool is_immediate_powersave)

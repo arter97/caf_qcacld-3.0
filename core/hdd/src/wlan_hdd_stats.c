@@ -878,11 +878,18 @@ bool hdd_get_interface_info(struct wlan_hdd_link_info *link_info,
 {
 	struct hdd_station_ctx *sta_ctx;
 	struct sap_config *config;
+	struct qdf_mac_addr *mac;
 	struct hdd_adapter *adapter = link_info->adapter;
 
 	info->mode = hdd_map_device_to_ll_iface_mode(adapter->device_mode);
 
-	qdf_copy_macaddr(&info->macAddr, &adapter->mac_addr);
+	mac = hdd_adapter_get_mac_address(link_info);
+	if (!mac) {
+		hdd_debug("Invalid HDD link info");
+		return false;
+	}
+
+	qdf_copy_macaddr(&info->macAddr, mac);
 
 	if (((QDF_STA_MODE == adapter->device_mode) ||
 	     (QDF_P2P_CLIENT_MODE == adapter->device_mode) ||
@@ -900,7 +907,7 @@ bool hdd_get_interface_info(struct wlan_hdd_link_info *link_info,
 		    !sta_ctx->conn_info.is_authenticated) {
 			hdd_err("client " QDF_MAC_ADDR_FMT
 				" is in the middle of WPS/EAPOL exchange.",
-				QDF_MAC_ADDR_REF(adapter->mac_addr.bytes));
+				QDF_MAC_ADDR_REF(mac->bytes));
 			info->state = WIFI_AUTHENTICATING;
 		}
 		if (hdd_cm_is_vdev_associated(link_info)) {

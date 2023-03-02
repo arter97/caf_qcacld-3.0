@@ -1426,15 +1426,7 @@ QDF_STATUS hdd_roam_register_sta(struct wlan_hdd_link_info *link_info,
 	if (!vdev)
 		return QDF_STATUS_E_INVAL;
 
-	/* TODO, right now only one interface is registered with DP
-	 * so for second vdev not doing the register ops as it will
-	 * point to the same again.
-	 */
-	if (ucfg_dp_get_intf_id(vdev) == wlan_vdev_get_id(vdev))
-		qdf_status = ucfg_dp_sta_register_txrx_ops(vdev);
-	else
-		qdf_status = QDF_STATUS_SUCCESS;
-
+	qdf_status = ucfg_dp_sta_register_txrx_ops(vdev);
 	hdd_objmgr_put_vdev_by_user(vdev, WLAN_DP_ID);
 	if (!QDF_IS_STATUS_SUCCESS(qdf_status)) {
 		hdd_err("DP tx/rx ops register failed Status: %d", qdf_status);

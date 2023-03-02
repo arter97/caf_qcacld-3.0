@@ -579,6 +579,12 @@ int hdd_init_nan_data_mode(struct hdd_adapter *adapter)
 	struct wlan_objmgr_vdev *vdev;
 	uint16_t rts_profile = 0;
 
+	status = hdd_adapter_fill_link_address(adapter);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		hdd_debug("Link address derive failed");
+		return qdf_status_to_os_return(status);
+	}
+
 	status = hdd_adapter_check_duplicate_session(adapter);
 	if (QDF_IS_STATUS_ERROR(status)) {
 		hdd_err("Duplicate session is existing with same mac address");

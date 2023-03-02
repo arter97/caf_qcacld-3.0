@@ -1016,6 +1016,7 @@ enum udp_qos_upgrade {
  *                      sap_ctx would be freed.  During the SSR if the
  *                      same sap context is used it would result in
  *                      null pointer de-reference.
+ * @link_addr: Link MAC address
  * @session: union of @ap and @station specific structs
  * @session.station: station mode information
  * @session.ap: ap mode specific information
@@ -1039,6 +1040,9 @@ struct wlan_hdd_link_info {
 	qdf_spinlock_t vdev_lock;
 	struct wlan_objmgr_vdev *vdev;
 	struct completion vdev_destroy_event;
+#ifdef WLAN_HDD_MULTI_VDEV_SINGLE_NDEV
+	struct qdf_mac_addr link_addr;
+#endif
 
 	union {
 		struct hdd_station_ctx station;
@@ -1104,6 +1108,7 @@ struct wlan_hdd_tx_power {
  * @mld_addr: MLD address for adapter
  * @event_flags: a bitmap of hdd_adapter_flags
  * @active_links: a bitmap of active links in @link_info array
+ * @num_links_on_create: No of active links set on initial hdd_open_adapter().
  * @is_ll_stats_req_pending: atomic variable to check active stats req
  * @sta_stats_cached_timestamp: last updated stats timestamp
  * @qdf_monitor_mode_vdev_up_event: QDF event for monitor mode vdev up
@@ -1226,9 +1231,12 @@ struct hdd_adapter {
 	uint32_t ctw;
 
 	struct qdf_mac_addr mac_addr;
+#ifndef WLAN_HDD_MULTI_VDEV_SINGLE_NDEV
 	struct qdf_mac_addr mld_addr;
+#endif
 	unsigned long event_flags;
 	unsigned long active_links;
+	uint8_t num_links_on_create;
 
 	qdf_atomic_t is_ll_stats_req_pending;
 
@@ -3900,6 +3908,49 @@ QDF_STATUS hdd_sme_close_session_callback(uint8_t vdev_id);
 int hdd_register_cb(struct hdd_context *hdd_ctx);
 void hdd_deregister_cb(struct hdd_context *hdd_ctx);
 
+#if defined(WLAN_FEATURE_11BE_MLO) && defined(CFG80211_11BE_BASIC) && \
+	defined(WLAN_HDD_MULTI_VDEV_SINGLE_NDEV)
+/**
+ * hdd_adapter_fill_link_address() - Fill derived
+ * link address in adapter
+ * @adapter: HDD adapter
+ *
+ * The API takes MLD address of @adapter and calls link address
+ * derive API and fills the derived link address in each link.
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS hdd_adapter_fill_link_address(struct hdd_adapter *adapter);
+#else
+static inline
+QDF_STATUS hdd_adapter_fill_link_address(struct hdd_adapter *adapter)
+{
+	return QDF_STATUS_SUCCESS;
+}
+#endif
+
+/**
+ * hdd_adapter_get_mac_address() - Returns the appropriate MAC address pointer
+ * in adapter.
+ * @link_info: Link info in HDD adapter.
+ *
+ * If WLAN_HDD_MULTI_VDEV_SINGLE_NDEV flag is enabled, then MAC address pointer
+ * returned is based on following conditions:
+ *      -if adapter of link info is non-ml:
+ *              Return pointer of mac_addr in adapter.
+ *      -else if link_addr in @link_info is NULL:
+ *              Return pointer of mac_addr in adapter.
+ *      -else
+ *              Return pointer of link_addr in @link_info.
+ *
+ * If WLAN_HDD_MULTI_VDEV_SINGLE_NDEV flag is not enabled, then return pointer
+ * of mac_addr in adapter.
+ *
+ * Return: MAC address pointer based on adapter type.
+ */
+struct qdf_mac_addr *
+hdd_adapter_get_mac_address(struct wlan_hdd_link_info *link_info);
+
 /**
  * hdd_adapter_check_duplicate_session() - Check for duplicate
  * session on start adapter.
@@ -4505,7 +4556,8 @@ int wlan_hdd_set_mon_chan(struct hdd_adapter *adapter, qdf_freq_t freq,
 }
 #endif
 
-#if defined(WLAN_FEATURE_11BE_MLO) && defined(CFG80211_11BE_BASIC)
+#if defined(WLAN_FEATURE_11BE_MLO) && defined(CFG80211_11BE_BASIC) && \
+	!defined(WLAN_HDD_MULTI_VDEV_SINGLE_NDEV)
 /**
  *  hdd_set_mld_address() - Set the MLD address of the adapter
  *  @adapter: Handle to adapter
@@ -4883,35 +4935,6 @@ hdd_monitor_mode_qdf_create_event(struct hdd_adapter *adapter,
 }
 #endif
 
-static inline bool hdd_is_mac_addr_same(uint8_t *addr1, uint8_t *addr2)
-{
-	return !qdf_mem_cmp(addr1, addr2, QDF_MAC_ADDR_SIZE);
-}
-
-#ifdef WLAN_FEATURE_11BE_MLO
-static inline bool hdd_nbuf_dst_addr_is_mld_addr(struct hdd_adapter *adapter,
-						 struct sk_buff *nbuf)
-{
-	return hdd_is_mac_addr_same(adapter->mld_addr.bytes,
-				    qdf_nbuf_data(nbuf) +
-				    QDF_NBUF_DEST_MAC_OFFSET);
-}
-#else
-static inline bool hdd_nbuf_dst_addr_is_mld_addr(struct hdd_adapter *adapter,
-						 struct sk_buff *nbuf)
-{
-	return false;
-}
-#endif
-
-static inline bool hdd_nbuf_dst_addr_is_self_addr(struct hdd_adapter *adapter,
-						  struct sk_buff *nbuf)
-{
-	return hdd_is_mac_addr_same(adapter->mac_addr.bytes,
-				    qdf_nbuf_data(nbuf) +
-				    QDF_NBUF_DEST_MAC_OFFSET);
-}
-
 /**
  * hdd_cleanup_conn_info() - Cleanup connectin info
  * @link_info: pointer to link_info struct in adapter
@@ -5102,7 +5125,7 @@ void hdd_check_for_net_dev_ref_leak(struct hdd_adapter *adapter);
 /**
  * hdd_dynamic_mac_address_set(): API to set MAC address, when interface
  *                                is up.
- * @adapter: Pointer to hdd_adapter
+ * @link_info: Link info pointer in HDD adapter
  * @mac_addr: MAC address to set
  * @mld_addr: MLD address to set
  * @update_self_peer: Set to true to update self peer's address
@@ -5111,7 +5134,7 @@ void hdd_check_for_net_dev_ref_leak(struct hdd_adapter *adapter);
  *
  * Return: 0 for success. non zero valure for failure.
  */
-int hdd_dynamic_mac_address_set(struct hdd_adapter *adapter,
+int hdd_dynamic_mac_address_set(struct wlan_hdd_link_info *link_info,
 				struct qdf_mac_addr mac_addr,
 				struct qdf_mac_addr mld_addr,
 				bool update_self_peer);
@@ -5143,7 +5166,8 @@ static inline int hdd_update_vdev_mac_address(struct hdd_adapter *adapter,
 {
 	struct qdf_mac_addr mld_addr = QDF_MAC_ADDR_ZERO_INIT;
 
-	return hdd_dynamic_mac_address_set(adapter, mac_addr, mld_addr, true);
+	return hdd_dynamic_mac_address_set(adapter->deflink, mac_addr,
+					   mld_addr, true);
 }
 #endif /* WLAN_FEATURE_11BE_MLO */
 #else
@@ -5153,10 +5177,11 @@ static inline int hdd_update_vdev_mac_address(struct hdd_adapter *adapter,
 	return 0;
 }
 
-static inline int hdd_dynamic_mac_address_set(struct hdd_adapter *adapter,
-					      struct qdf_mac_addr mac_addr,
-					      struct qdf_mac_addr mld_addr,
-					      bool update_self_peer)
+static inline int
+hdd_dynamic_mac_address_set(struct wlan_hdd_link_info *link_info,
+			    struct qdf_mac_addr mac_addr,
+			    struct qdf_mac_addr mld_addr,
+			    bool update_self_peer)
 {
 	return 0;
 }
