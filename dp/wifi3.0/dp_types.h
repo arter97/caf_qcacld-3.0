@@ -2204,6 +2204,11 @@ enum dp_context_type {
  * @dp_free_ppeds_interrupts:
  * @dp_rx_wbm_err_reap_desc: Reap WBM Error Ring Descriptor
  * @dp_rx_null_q_desc_handle: Handle Null Queue Exception Error
+ * @txrx_soc_ppeds_interrupt_stop:
+ * @txrx_soc_ppeds_interrupt_start:
+ * @txrx_soc_ppeds_service_status_update:
+ * @txrx_soc_ppeds_enabled_check:
+ * @txrx_soc_ppeds_txdesc_pool_reset:
  */
 struct dp_arch_ops {
 	/* INIT/DEINIT Arch Ops */
@@ -2431,6 +2436,15 @@ struct dp_arch_ops {
 					       struct dp_txrx_peer *txrx_peer,
 					       bool is_reo_exception,
 					       uint8_t link_id);
+#ifdef WLAN_SUPPORT_PPEDS
+	void (*txrx_soc_ppeds_interrupt_stop)(struct dp_soc *soc);
+	void (*txrx_soc_ppeds_interrupt_start)(struct dp_soc *soc);
+	void (*txrx_soc_ppeds_service_status_update)(struct dp_soc *soc,
+						     bool enable);
+	bool (*txrx_soc_ppeds_enabled_check)(struct dp_soc *soc);
+	void (*txrx_soc_ppeds_txdesc_pool_reset)(struct dp_soc *soc,
+						 qdf_nbuf_t *nbuf_list);
+#endif
 };
 
 /**

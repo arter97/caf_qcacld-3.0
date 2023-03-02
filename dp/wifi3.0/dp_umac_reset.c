@@ -62,12 +62,6 @@ dp_umac_reset_send_setup_cmd(struct dp_soc *soc)
 	uint32_t msi_base_data, msi_vector_start;
 	struct dp_htt_umac_reset_setup_cmd_params params;
 
-	if (wlan_cfg_get_dp_soc_is_ppeds_enabled(soc->wlan_cfg_ctx)) {
-		dp_umac_reset_err(
-			"Umac reset is currently not supported in DS config");
-		return QDF_STATUS_E_NOSUPPORT;
-	}
-
 	umac_reset_ctx = &soc->umac_reset_ctx;
 	qdf_mem_zero(&params, sizeof(params));
 	ret = pld_get_user_msi_assignment(soc->osdev->dev, "DP",
