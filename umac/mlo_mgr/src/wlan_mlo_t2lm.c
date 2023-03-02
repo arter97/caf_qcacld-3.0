@@ -926,6 +926,42 @@ peer_release:
 	return status;
 }
 
+QDF_STATUS
+wlan_send_peer_level_tid_to_link_mapping(struct wlan_objmgr_vdev *vdev,
+					 struct wlan_objmgr_peer *peer)
+{
+	uint8_t dir, idx = 0;
+	struct wlan_mlo_peer_context *ml_peer;
+	struct wlan_t2lm_info *t2lm_info;
+	QDF_STATUS status = QDF_STATUS_E_NULL_VALUE;
+
+	if (!peer) {
+		t2lm_err("peer is null");
+		return status;
+	}
+
+	ml_peer = peer->mlo_peer_ctx;
+	if (!ml_peer) {
+		t2lm_err("ml peer is null");
+		return status;
+	}
+
+	for (dir = 0; dir < WLAN_T2LM_MAX_DIRECTION; dir++) {
+		t2lm_info = &ml_peer->t2lm_policy.t2lm_negotiated_info.t2lm_info[dir];
+		if (t2lm_info && t2lm_info->direction !=
+		    WLAN_T2LM_INVALID_DIRECTION) {
+			t2lm_debug("send peer-level mapping to FW for dir: %d", dir);
+			status = wlan_send_tid_to_link_mapping(vdev, t2lm_info);
+			idx++;
+		}
+	}
+
+	if (!idx)
+		t2lm_debug("No peer-level mapping present");
+
+	return status;
+}
+
 void wlan_mlo_t2lm_timer_expiry_handler(void *vdev)
 {
 	struct wlan_objmgr_vdev *vdev_ctx = (struct wlan_objmgr_vdev *)vdev;
