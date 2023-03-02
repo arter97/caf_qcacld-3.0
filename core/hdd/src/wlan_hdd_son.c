@@ -2328,35 +2328,6 @@ wlan_hdd_son_get_ieee_phymode(enum wlan_phymode wlan_phymode)
 	return wlanphymode2ieeephymode[wlan_phymode];
 }
 
-static QDF_STATUS hdd_son_get_node_info_sta(struct wlan_objmgr_vdev *vdev,
-					    uint8_t *mac_addr,
-					    wlan_node_info *node_info)
-{
-	struct hdd_adapter *adapter = wlan_hdd_get_adapter_from_objmgr(vdev);
-	struct hdd_station_ctx *sta_ctx;
-	struct hdd_context *hdd_ctx;
-
-	hdd_ctx = adapter->hdd_ctx;
-	if (wlan_hdd_validate_context(hdd_ctx))
-		return QDF_STATUS_E_FAILURE;
-
-	if (!hdd_cm_is_vdev_associated(adapter)) {
-		hdd_debug_rl("STA adapter not connected");
-		/* Still return success and framework will see default stats */
-		return QDF_STATUS_SUCCESS;
-	}
-
-	hdd_get_max_tx_bitrate(hdd_ctx, adapter);
-
-	sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter);
-	node_info->tx_bitrate = cfg80211_calculate_bitrate(
-			&sta_ctx->cache_conn_info.max_tx_bitrate);
-	/* convert to Mbps */
-	node_info->tx_bitrate = qdf_do_div(node_info->tx_bitrate, 10);
-	hdd_debug("tx_bitrate %u", node_info->tx_bitrate);
-	return QDF_STATUS_SUCCESS;
-}
-
 /**
  * hdd_son_get_peer_tx_rate() - Get peer tx rate from FW
  * @vdev: pointer to object mgr vdev
@@ -2385,6 +2356,32 @@ static uint32_t hdd_son_get_peer_tx_rate(struct wlan_objmgr_vdev *vdev,
 	wlan_cfg80211_mc_cp_stats_free_stats_event(stats);
 
 	return tx_rate;
+}
+
+static QDF_STATUS hdd_son_get_node_info_sta(struct wlan_objmgr_vdev *vdev,
+					    uint8_t *mac_addr,
+					    wlan_node_info *node_info)
+{
+	struct hdd_adapter *adapter = wlan_hdd_get_adapter_from_objmgr(vdev);
+	struct hdd_context *hdd_ctx;
+
+	hdd_ctx = adapter->hdd_ctx;
+	if (wlan_hdd_validate_context(hdd_ctx))
+		return QDF_STATUS_E_FAILURE;
+
+	if (!hdd_cm_is_vdev_associated(adapter)) {
+		hdd_debug_rl("STA adapter not connected");
+		/* Still return success and framework will see default stats */
+		return QDF_STATUS_SUCCESS;
+	}
+
+
+	node_info->tx_bitrate = hdd_son_get_peer_tx_rate(vdev, mac_addr);
+	/* convert it to Mbps */
+	node_info->tx_bitrate = qdf_do_div(node_info->tx_bitrate, 1000);
+	hdd_debug_rl("tx_bitrate %u", node_info->tx_bitrate);
+
+	return QDF_STATUS_SUCCESS;
 }
 
 static QDF_STATUS hdd_son_get_node_info_sap(struct wlan_objmgr_vdev *vdev,
