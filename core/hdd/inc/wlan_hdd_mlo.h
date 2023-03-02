@@ -219,6 +219,23 @@ ml_link_state_request_policy[QCA_WLAN_VENDOR_ATTR_LINK_STATE_MAX + 1];
 int wlan_hdd_cfg80211_process_ml_link_state(struct wiphy *wiphy,
 					    struct wireless_dev *wdev,
 					    const void *data, int data_len);
+
+/**
+ * hdd_derive_link_address_from_mld() - Function to derive link address from
+ * MLD address which is passed as input argument.
+ * @mld_addr: Input MLD address
+ * @link_addr_list: Start index of array to hold derived MAC addresses
+ * @max_idx: Number of addresses to derive
+ *
+ * The API will generate link addresses from the input MLD address and saves
+ * each link address as an array in @link_addr_list. Caller can request upto
+ * WLAN_MAX_MLD addresses.
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS hdd_derive_link_address_from_mld(struct qdf_mac_addr *mld_addr,
+					    struct qdf_mac_addr *link_addr_list,
+					    uint8_t max_idx);
 #else
 static inline
 QDF_STATUS hdd_wlan_unregister_mlo_interfaces(struct hdd_adapter *adapter,
@@ -287,6 +304,13 @@ int wlan_hdd_cfg80211_process_ml_link_state(struct wiphy *wiphy,
 	return -ENOTSUPP;
 }
 
+static inline
+QDF_STATUS hdd_derive_link_address_from_mld(struct qdf_mac_addr *mld_addr,
+					    struct qdf_mac_addr *link_addr_list,
+					    uint8_t max_idx)
+{
+	return QDF_STATUS_E_NOSUPPORT;
+}
 #define FEATURE_ML_LINK_STATE_COMMANDS
 #endif
 #endif

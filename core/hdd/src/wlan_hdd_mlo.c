@@ -266,6 +266,42 @@ void hdd_mlo_t2lm_unregister_callback(struct wlan_objmgr_vdev *vdev)
 	wlan_unregister_t2lm_link_update_notify_handler(vdev->mlo_dev_ctx, 0);
 }
 
+QDF_STATUS hdd_derive_link_address_from_mld(struct qdf_mac_addr *mld_addr,
+					    struct qdf_mac_addr *link_addr_list,
+					    uint8_t max_idx)
+{
+	uint8_t last_byte, temp_byte, idx;
+	struct qdf_mac_addr new_addr;
+	struct qdf_mac_addr *link_addr;
+
+	if (!mld_addr || !link_addr_list || !max_idx ||
+	    max_idx > WLAN_MAX_MLD || qdf_is_macaddr_zero(mld_addr)) {
+		hdd_err("Invalid values");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	qdf_copy_macaddr(&new_addr, mld_addr);
+	/* Set locally administered bit */
+	new_addr.bytes[0] |= 0x02;
+
+	link_addr = link_addr_list;
+	last_byte = mld_addr->bytes[5];
+	hdd_debug("MLD addr: " QDF_MAC_ADDR_FMT, QDF_MAC_ADDR_REF(mld_addr));
+
+	for (idx = 0; idx < max_idx; idx++) {
+		temp_byte = ((last_byte >> 4 & INTF_MACADDR_MASK) + idx) &
+			     INTF_MACADDR_MASK;
+		new_addr.bytes[5] = last_byte + temp_byte;
+
+		qdf_copy_macaddr(link_addr, &new_addr);
+		link_addr++;
+		hdd_debug("Derived link addr: " QDF_MAC_ADDR_FMT ", idx: %d",
+			  QDF_MAC_ADDR_REF(new_addr.bytes), idx);
+	}
+
+	return QDF_STATUS_SUCCESS;
+}
+
 #ifdef WLAN_FEATURE_DYNAMIC_MAC_ADDR_UPDATE
 int hdd_update_vdev_mac_address(struct hdd_context *hdd_ctx,
 				struct hdd_adapter *adapter,
