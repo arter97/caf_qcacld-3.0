@@ -2442,7 +2442,7 @@ QDF_STATUS hdd_add_adapter_front(struct hdd_context *hdd_ctx,
 
 /**
  * typedef hdd_adapter_iterate_cb() - Iteration callback function
- * @adapter: current adapter of interest
+ * @link_info: Link info pointer in HDD adapter
  * @context: user context supplied to the iterator
  *
  * This specifies the type of a callback function to supply to
@@ -2452,8 +2452,8 @@ QDF_STATUS hdd_add_adapter_front(struct hdd_context *hdd_ctx,
  * * QDF_STATUS_SUCCESS if further iteration should continue
  * * QDF_STATUS_E_ABORTED if further iteration should be aborted
  */
-typedef QDF_STATUS (*hdd_adapter_iterate_cb)(struct hdd_adapter *adapter,
-					     void *context);
+typedef QDF_STATUS
+(*hdd_adapter_iterate_cb)(struct wlan_hdd_link_info *link_info, void *context);
 
 /**
  * hdd_adapter_iterate() - Safely iterate over all adapters

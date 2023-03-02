@@ -9906,6 +9906,7 @@ QDF_STATUS hdd_adapter_iterate(hdd_adapter_iterate_cb cb, void *context)
 	QDF_STATUS ret = QDF_STATUS_SUCCESS;
 	QDF_STATUS status;
 	int i;
+	struct wlan_hdd_link_info *link_info;
 
 	hdd_ctx = cds_get_context(QDF_MODULE_ID_HDD);
 	if (unlikely(!hdd_ctx))
@@ -9928,8 +9929,13 @@ QDF_STATUS hdd_adapter_iterate(hdd_adapter_iterate_cb cb, void *context)
 			ret = QDF_STATUS_E_FAILURE;
 			continue;
 		}
-
-		status = cb(adapter, context);
+		hdd_adapter_for_each_active_link_info(adapter, link_info) {
+			status = cb(link_info, context);
+			if (status != QDF_STATUS_SUCCESS) {
+				hdd_adapter_put(adapter);
+				return status;
+			}
+		}
 		hdd_adapter_put(adapter);
 		if (status != QDF_STATUS_SUCCESS)
 			return status;
@@ -19799,7 +19805,7 @@ struct hdd_is_connection_in_progress_priv {
 /**
  * hdd_is_connection_in_progress_iterator() - Check adapter connection based
  * on device mode
- * @adapter: current adapter of interest
+ * @link_info: Link info pointer in HDD adapter
  * @ctx: user context supplied
  *
  * Check if connection is in progress for the current adapter according to the
@@ -19809,9 +19815,9 @@ struct hdd_is_connection_in_progress_priv {
  * * QDF_STATUS_SUCCESS if iteration should continue
  * * QDF_STATUS_E_ABORTED if iteration should be aborted
  */
-static QDF_STATUS hdd_is_connection_in_progress_iterator(
-					struct hdd_adapter *adapter,
-					void *ctx)
+static QDF_STATUS
+hdd_is_connection_in_progress_iterator(struct wlan_hdd_link_info *link_info,
+				       void *ctx)
 {
 	struct hdd_station_ctx *hdd_sta_ctx;
 	uint8_t *sta_mac;
@@ -19819,13 +19825,15 @@ static QDF_STATUS hdd_is_connection_in_progress_iterator(
 	mac_handle_t mac_handle;
 	struct hdd_station_info *sta_info, *tmp = NULL;
 	struct hdd_is_connection_in_progress_priv *context = ctx;
+	struct hdd_adapter *adapter = link_info->adapter;
 
 	hdd_ctx = cds_get_context(QDF_MODULE_ID_HDD);
 	if (!hdd_ctx)
 		return QDF_STATUS_E_ABORTED;
 
 	mac_handle = hdd_ctx->mac_handle;
-	if (!test_bit(SME_SESSION_OPENED, &adapter->deflink->link_flags) &&
+
+	if (!test_bit(SME_SESSION_OPENED, &link_info->link_flags) &&
 	    (adapter->device_mode == QDF_STA_MODE ||
 	     adapter->device_mode == QDF_P2P_CLIENT_MODE ||
 	     adapter->device_mode == QDF_P2P_DEVICE_MODE ||
@@ -19836,12 +19844,12 @@ static QDF_STATUS hdd_is_connection_in_progress_iterator(
 	if ((QDF_STA_MODE == adapter->device_mode ||
 	     QDF_P2P_CLIENT_MODE == adapter->device_mode ||
 	     QDF_P2P_DEVICE_MODE == adapter->device_mode) &&
-	    hdd_cm_is_connecting(adapter->deflink)) {
+	    hdd_cm_is_connecting(link_info)) {
 		hdd_debug("%pK(%d) mode %d Connection is in progress",
-			  WLAN_HDD_GET_STATION_CTX_PTR(adapter->deflink),
-			  adapter->deflink->vdev_id, adapter->device_mode);
+			  WLAN_HDD_GET_STATION_CTX_PTR(link_info),
+			  link_info->vdev_id, adapter->device_mode);
 
-		context->out_vdev_id = adapter->deflink->vdev_id;
+		context->out_vdev_id = link_info->vdev_id;
 		context->out_reason = CONNECTION_IN_PROGRESS;
 		context->connection_in_progress = true;
 
@@ -19849,12 +19857,12 @@ static QDF_STATUS hdd_is_connection_in_progress_iterator(
 	}
 
 	if ((QDF_STA_MODE == adapter->device_mode) &&
-	     sme_roaming_in_progress(mac_handle, adapter->deflink->vdev_id)) {
+	     sme_roaming_in_progress(mac_handle, link_info->vdev_id)) {
 		hdd_debug("%pK(%d) mode %d Reassociation in progress",
-			  WLAN_HDD_GET_STATION_CTX_PTR(adapter->deflink),
-			  adapter->deflink->vdev_id, adapter->device_mode);
+			  WLAN_HDD_GET_STATION_CTX_PTR(link_info),
+			  link_info->vdev_id, adapter->device_mode);
 
-		context->out_vdev_id = adapter->deflink->vdev_id;
+		context->out_vdev_id = link_info->vdev_id;
 		context->out_reason = REASSOC_IN_PROGRESS;
 		context->connection_in_progress = true;
 		return QDF_STATUS_E_ABORTED;
@@ -19864,16 +19872,16 @@ static QDF_STATUS hdd_is_connection_in_progress_iterator(
 		(QDF_P2P_CLIENT_MODE == adapter->device_mode) ||
 		(QDF_P2P_DEVICE_MODE == adapter->device_mode)) {
 		hdd_sta_ctx =
-			WLAN_HDD_GET_STATION_CTX_PTR(adapter->deflink);
-		if (hdd_cm_is_vdev_associated(adapter->deflink)
+			WLAN_HDD_GET_STATION_CTX_PTR(link_info);
+		if (hdd_cm_is_vdev_associated(link_info)
 		    && sme_is_sta_key_exchange_in_progress(
-		    mac_handle, adapter->deflink->vdev_id)) {
+		    mac_handle, link_info->vdev_id)) {
 			sta_mac = (uint8_t *)&(adapter->mac_addr.bytes[0]);
 			hdd_debug("client " QDF_MAC_ADDR_FMT
 				  " is in middle of WPS/EAPOL exchange.",
 				  QDF_MAC_ADDR_REF(sta_mac));
 
-			context->out_vdev_id = adapter->deflink->vdev_id;
+			context->out_vdev_id = link_info->vdev_id;
 			context->out_reason = EAPOL_IN_PROGRESS;
 			context->connection_in_progress = true;
 
@@ -19896,7 +19904,7 @@ static QDF_STATUS hdd_is_connection_in_progress_iterator(
 				  " of SAP/GO is in middle of WPS/EAPOL exchange",
 				  QDF_MAC_ADDR_REF(sta_mac));
 
-			context->out_vdev_id = adapter->deflink->vdev_id;
+			context->out_vdev_id = link_info->vdev_id;
 			context->out_reason = SAP_EAPOL_IN_PROGRESS;
 			context->connection_in_progress = true;
 
@@ -19912,9 +19920,9 @@ static QDF_STATUS hdd_is_connection_in_progress_iterator(
 		}
 		if (hdd_ctx->connection_in_progress) {
 			hdd_debug("AP/GO: vdev %d connection is in progress",
-				  adapter->deflink->vdev_id);
+				  link_info->vdev_id);
 			context->out_reason = SAP_CONNECTION_IN_PROGRESS;
-			context->out_vdev_id = adapter->deflink->vdev_id;
+			context->out_vdev_id = link_info->vdev_id;
 			context->connection_in_progress = true;
 
 			return QDF_STATUS_E_ABORTED;
