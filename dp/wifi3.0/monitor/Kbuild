@@ -166,13 +166,25 @@ monitor-objs += \
 	$(HOST_CMN_CONVG_SRC)/dp/wifi3.0/monitor/1.0/dp_mon_filter_1.0.o
 
 ifeq ($(strip ${CONFIG_BERYLLIUM}),1)
-ifeq ($(strip ${QCA_MONITOR_2_0_SUPPORT}),1)
+TX_OR_RX =
+
+ifeq ($(strip ${WLAN_PKT_CAPTURE_TX_2_0}),1)
+TX_OR_RX = y
+monitor-objs += \
+       $(HOST_CMN_CONVG_SRC)/dp/wifi3.0/monitor/2.0/dp_tx_mon_status_2.0.o \
+       $(HOST_CMN_CONVG_SRC)/dp/wifi3.0/monitor/2.0/dp_tx_mon_2.0.o
+endif
+
+ifeq ($(strip ${WLAN_PKT_CAPTURE_RX_2_0}),1)
+TX_OR_RX = y
 monitor-objs += \
        $(HOST_CMN_CONVG_SRC)/dp/wifi3.0/monitor/2.0/dp_rx_mon_status_2.0.o \
-       $(HOST_CMN_CONVG_SRC)/dp/wifi3.0/monitor/2.0/dp_rx_mon_2.0.o \
-       $(HOST_CMN_CONVG_SRC)/dp/wifi3.0/monitor/2.0/dp_tx_mon_status_2.0.o \
-       $(HOST_CMN_CONVG_SRC)/dp/wifi3.0/monitor/2.0/dp_tx_mon_2.0.o \
-	$(HOST_CMN_CONVG_SRC)/dp/wifi3.0/monitor/2.0/dp_mon_2.0.o \
+       $(HOST_CMN_CONVG_SRC)/dp/wifi3.0/monitor/2.0/dp_rx_mon_2.0.o
+endif
+
+ifdef TX_OR_RX
+monitor-objs += \
+       $(HOST_CMN_CONVG_SRC)/dp/wifi3.0/monitor/2.0/dp_mon_2.0.o \
        $(HOST_CMN_CONVG_SRC)/dp/wifi3.0/monitor/2.0/dp_mon_filter_2.0.o \
        $(HOST_CMN_CONVG_SRC)/../component_dev/dp/wifi3.0/monitor/src/dp_lite_mon.o
 endif
