@@ -137,18 +137,6 @@ typedef struct last_processed_frame {
 	uint16_t seq_num;
 } last_processed_msg;
 
-/**
- * struct lim_max_tx_pwr_attr - List of tx powers from various sources
- * @reg_max: power from regulatory database
- * @ap_tx_power: local power constraint adjusted value
- * @frequency: current operating frequency for which above powers are defined
- */
-struct lim_max_tx_pwr_attr {
-	int8_t reg_max;
-	int8_t ap_tx_power;
-	uint32_t frequency;
-};
-
 /* LIM utility functions */
 bool lim_is_valid_frame(last_processed_msg *last_processed_frm,
 		uint8_t *pRxPacketInfo);
