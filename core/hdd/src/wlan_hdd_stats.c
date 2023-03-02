@@ -6236,15 +6236,63 @@ static inline void wlan_hdd_populate_mlo_snr(int32_t *snr, int32_t *link_snr)
 	*snr = QDF_MAX(*snr, *link_snr);
 }
 
-static inline void wlan_hdd_mlo_update_stats_info(struct hdd_adapter *adapter)
+#ifdef WLAN_HDD_MULTI_VDEV_SINGLE_NDEV
+static inline void
+wlan_hdd_mlo_update_stats_info(struct wlan_hdd_link_info *link_info)
+{
+	int8_t *rssi, *link_rssi;
+	uint32_t *snr, *link_snr;
+	struct wlan_objmgr_vdev *vdev;
+	struct wlan_hdd_link_info *iter_link_info;
+	struct hdd_station_ctx *sta_ctx;
+	struct hdd_adapter *adapter = link_info->adapter;
+
+	sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(link_info);
+
+	rssi = &link_info->hdd_stats.summary_stat.rssi;
+	snr = &link_info->hdd_stats.summary_stat.snr;
+
+	vdev = hdd_objmgr_get_vdev_by_user(link_info, WLAN_OSIF_STATS_ID);
+	if (!vdev)
+		return;
+
+	/* For non ML connection just
+	 * update the values in the adapter
+	 */
+	if (!wlan_vdev_mlme_is_mlo_vdev(vdev)) {
+		hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_STATS_ID);
+		goto stat_update;
+	}
+	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_STATS_ID);
+
+	hdd_debug("Link0: RSSI: %d, SNR: %d", *rssi, *snr);
+	hdd_adapter_for_each_active_link_info(adapter, iter_link_info) {
+		if (link_info == iter_link_info)
+			continue;
+
+		link_rssi = &iter_link_info->hdd_stats.summary_stat.rssi;
+		wlan_hdd_populate_mlo_rssi(rssi, link_rssi);
+
+		link_snr = &iter_link_info->hdd_stats.summary_stat.snr;
+		wlan_hdd_populate_mlo_snr(snr, link_snr);
+		hdd_debug("Partner Link: RSSI: %d, SNR: %d",
+			  *link_rssi, *link_snr);
+	}
+stat_update:
+	link_info->rssi = *rssi;
+	link_info->snr = *snr;
+}
+#else
+static void wlan_hdd_mlo_update_stats_info(struct wlan_hdd_link_info *link_info)
 {
 	int8_t *rssi, *link_rssi;
 	uint32_t *snr, *link_snr;
 	uint8_t iter;
 	struct hdd_mlo_adapter_info *mlo_adapter_info;
-	struct hdd_adapter *link_adapter, *ml_adapter;
+	struct hdd_adapter *link_adapter, *ml_adapter, *adapter;
 	struct wlan_objmgr_vdev *vdev;
 
+	adapter = link_info->adapter;
 	if (hdd_adapter_is_link_adapter(adapter))
 		ml_adapter = hdd_adapter_get_mlo_adapter_from_link(adapter);
 	else
@@ -6253,7 +6301,7 @@ static inline void wlan_hdd_mlo_update_stats_info(struct hdd_adapter *adapter)
 	rssi = &ml_adapter->deflink->hdd_stats.summary_stat.rssi;
 	snr = &ml_adapter->deflink->hdd_stats.summary_stat.snr;
 
-	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink,
+	vdev = hdd_objmgr_get_vdev_by_user(link_info,
 					   WLAN_OSIF_STATS_ID);
 	if (!vdev)
 		return;
@@ -6286,14 +6334,16 @@ static inline void wlan_hdd_mlo_update_stats_info(struct hdd_adapter *adapter)
 	}
 
 stat_update:
-	adapter->deflink->rssi = *rssi;
-	adapter->deflink->snr = *snr;
+	link_info->rssi = *rssi;
+	link_info->snr = *snr;
 }
+#endif
 #else
-static inline void wlan_hdd_mlo_update_stats_info(struct hdd_adapter *adapter)
+static inline void
+wlan_hdd_mlo_update_stats_info(struct wlan_hdd_link_info *link_info)
 {
-	adapter->deflink->rssi = adapter->deflink->hdd_stats.summary_stat.rssi;
-	adapter->deflink->snr = adapter->deflink->hdd_stats.summary_stat.snr;
+	link_info->rssi = link_info->hdd_stats.summary_stat.rssi;
+	link_info->snr = link_info->hdd_stats.summary_stat.snr;
 }
 #endif
 
@@ -6576,7 +6626,7 @@ static int wlan_hdd_get_sta_stats(struct wlan_hdd_link_info *link_info,
 
 	wlan_hdd_get_peer_rx_rate_stats(link_info);
 
-	wlan_hdd_mlo_update_stats_info(adapter);
+	wlan_hdd_mlo_update_stats_info(link_info);
 
 	wlan_hdd_update_rssi(link_info, sinfo);
 
