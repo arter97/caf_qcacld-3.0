@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -126,10 +126,12 @@ QDF_STATUS wmi_extract_mgmt_rx_mlo_link_removal_info(
  * wmi_send_mlo_peer_tid_to_link_map_cmd() - send TID-to-link mapping command
  * @wmi: WMI handle for this pdev
  * @params: Pointer to TID-to-link mapping params
+ * @t2lm_info: T2LM info presence flag
  */
 QDF_STATUS wmi_send_mlo_peer_tid_to_link_map_cmd(
 		wmi_unified_t wmi,
-		struct wmi_host_tid_to_link_map_params *params);
+		struct wmi_host_tid_to_link_map_params *params,
+		bool t2lm_info);
 
 /**
  * wmi_send_mlo_vdev_tid_to_link_map_cmd() - send TID-to-link mapping command

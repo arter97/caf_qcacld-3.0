@@ -1111,11 +1111,21 @@ typedef struct {
  * is present.
  * @preffered_link_order: Preferred links in order.
  * @timeout: timeout values for all the access categories.
+ * @tlt_characterization_params: Bitmask to select Tx-Link Tuple from ordered
+ *  list.
+ *  Bit 0-15 : Each bit maps to the corresponding Link ID
+ *  Bit 16-31: Reserved
+ * @link_control_flags: Link control flags.
+ *  Bit 0: TLT enable/disable
+ *  Bit 1: Preferred Link enable/disable
+ *  Bit 2-31: Reserved
  */
 struct wlan_host_preferred_links {
 	uint8_t num_pref_links;
 	uint8_t  preffered_link_order[MAX_PREFERRED_LINKS];
 	uint32_t timeout[WMI_HOST_WLAN_MAX_AC];
+	uint32_t tlt_characterization_params;
+	uint32_t link_control_flags;
 };
 #endif
 
