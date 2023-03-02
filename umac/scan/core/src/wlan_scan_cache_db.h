@@ -358,4 +358,28 @@ scm_scan_get_entry_by_mac_addr(struct wlan_objmgr_pdev *pdev,
 struct scan_cache_entry *
 scm_scan_get_entry_by_bssid(struct wlan_objmgr_pdev *pdev,
 			    struct qdf_mac_addr *bssid);
+
+#ifdef WLAN_FEATURE_11BE_MLO
+/**
+ * scm_get_mld_addr_by_link_addr() - function to fetch the peer mld address from
+ * the scan entry for the given link address.
+ * @pdev: pdev object
+ * @link_addr: link address
+ * @mld_mac_addr: pointer to mld_mac_address
+ *
+ * Return : scan entry if found, else NULL
+ */
+QDF_STATUS
+scm_get_mld_addr_by_link_addr(struct wlan_objmgr_pdev *pdev,
+			      struct qdf_mac_addr *link_addr,
+			      struct qdf_mac_addr *mld_mac_addr);
+#else
+static inline QDF_STATUS
+scm_get_mld_addr_by_link_addr(struct wlan_objmgr_pdev *pdev,
+			      struct qdf_mac_addr *link_addr,
+			      struct qdf_mac_addr *mld_mac_addr)
+{
+	return QDF_STATUS_E_NOSUPPORT;
+}
+#endif
 #endif

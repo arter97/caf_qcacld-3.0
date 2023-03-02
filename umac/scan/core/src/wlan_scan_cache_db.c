@@ -2186,6 +2186,34 @@ done:
 	return status;
 }
 
+#ifdef WLAN_FEATURE_11BE_MLO
+QDF_STATUS scm_get_mld_addr_by_link_addr(struct wlan_objmgr_pdev *pdev,
+					 struct qdf_mac_addr *link_addr,
+					 struct qdf_mac_addr *mld_mac_addr)
+{
+	struct scan_cache_entry *entry = NULL;
+
+	/* For ML connection, BSSID is link address */
+	entry = scm_scan_get_entry_by_bssid(pdev, link_addr);
+	if (!entry) {
+		scm_err("scan entry not found for link addr: " QDF_MAC_ADDR_FMT,
+			QDF_MAC_ADDR_REF(link_addr));
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	if (qdf_is_macaddr_zero(&entry->ml_info.mld_mac_addr)) {
+		util_scan_free_cache_entry(entry);
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	qdf_mem_copy(mld_mac_addr, &entry->ml_info.mld_mac_addr,
+		     QDF_MAC_ADDR_SIZE);
+	util_scan_free_cache_entry(entry);
+
+	return QDF_STATUS_SUCCESS;
+}
+#endif
+
 struct scan_cache_entry *
 scm_scan_get_entry_by_bssid(struct wlan_objmgr_pdev *pdev,
 			    struct qdf_mac_addr *bssid)
