@@ -810,6 +810,15 @@ static void dp_srng_msi_setup(struct dp_soc *soc, struct dp_srng *srng,
 		 (uint64_t)ring_params->msi_addr);
 
 	vector = msi_irq_start + (reg_msi_grp_num % msi_data_count);
+
+	/*
+	 * During umac reset ppeds interrupts free is not called.
+	 * Avoid registering interrupts again.
+	 *
+	 */
+	if (dp_check_umac_reset_in_progress(soc))
+		goto configure_msi2;
+
 	if (soc->arch_ops.dp_register_ppeds_interrupts)
 		if (soc->arch_ops.dp_register_ppeds_interrupts(soc, srng,
 							       vector,

@@ -2232,6 +2232,11 @@ enum dp_context_type {
  * @dp_tx_desc_pool_alloc: Allocate arch specific TX descriptor pool
  * @dp_tx_desc_pool_free: Free arch specific TX descriptor pool
  * @txrx_srng_init: Init txrx srng
+ * @txrx_soc_ppeds_interrupt_stop:
+ * @txrx_soc_ppeds_interrupt_start:
+ * @txrx_soc_ppeds_service_status_update:
+ * @txrx_soc_ppeds_enabled_check:
+ * @txrx_soc_ppeds_txdesc_pool_reset:
  */
 struct dp_arch_ops {
 	/* INIT/DEINIT Arch Ops */
@@ -2470,6 +2475,15 @@ struct dp_arch_ops {
 
 	QDF_STATUS (*txrx_srng_init)(struct dp_soc *soc, struct dp_srng *srng,
 				     int ring_type, int ring_num, int mac_id);
+#ifdef WLAN_SUPPORT_PPEDS
+	void (*txrx_soc_ppeds_interrupt_stop)(struct dp_soc *soc);
+	void (*txrx_soc_ppeds_interrupt_start)(struct dp_soc *soc);
+	void (*txrx_soc_ppeds_service_status_update)(struct dp_soc *soc,
+						     bool enable);
+	bool (*txrx_soc_ppeds_enabled_check)(struct dp_soc *soc);
+	void (*txrx_soc_ppeds_txdesc_pool_reset)(struct dp_soc *soc,
+						 qdf_nbuf_t *nbuf_list);
+#endif
 };
 
 /**

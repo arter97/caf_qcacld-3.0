@@ -2865,6 +2865,15 @@ void dp_initialize_arch_ops_be(struct dp_arch_ops *arch_ops)
 	arch_ops->dp_tx_ppeds_inuse_desc = dp_ppeds_inuse_desc;
 	arch_ops->dp_tx_ppeds_cfg_astidx_cache_mapping =
 				dp_tx_ppeds_cfg_astidx_cache_mapping;
+#ifdef DP_UMAC_HW_RESET_SUPPORT
+	arch_ops->txrx_soc_ppeds_interrupt_stop = dp_ppeds_interrupt_stop_be;
+	arch_ops->txrx_soc_ppeds_interrupt_start = dp_ppeds_interrupt_start_be;
+	arch_ops->txrx_soc_ppeds_service_status_update =
+					dp_ppeds_service_status_update_be;
+	arch_ops->txrx_soc_ppeds_enabled_check = dp_ppeds_is_enabled_on_soc;
+	arch_ops->txrx_soc_ppeds_txdesc_pool_reset =
+					dp_ppeds_tx_desc_pool_reset;
+#endif
 #endif
 	dp_init_near_full_arch_ops_be(arch_ops);
 	arch_ops->get_reo_qdesc_addr = dp_rx_get_reo_qdesc_addr_be;
