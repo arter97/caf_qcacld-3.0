@@ -39,6 +39,9 @@ typedef uint32_t wlan_cm_id;
 	((STOP_RESPONSE_TIMER) + (DELETE_RESPONSE_TIMER) +\
 	 (RSO_STOP_RESPONSE_TIMER) + (1000))
 
+#define CM_DISCONNECT_ASSOC_VDEV_EXTRA_TIMEOUT \
+		(STOP_RESPONSE_TIMER + DELETE_RESPONSE_TIMER)
+
 /*
  * Disconnect command wait timeout VDEV timeouts + 5 sec buff for current active
  * command to complete
