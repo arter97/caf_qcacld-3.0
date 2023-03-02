@@ -179,7 +179,7 @@ QDF_STATUS wlan_mlo_mgr_deinit(void)
 	return status;
 }
 
-static inline struct wlan_mlo_dev_context *mlo_list_peek_head(
+struct wlan_mlo_dev_context *wlan_mlo_list_peek_head(
 					qdf_list_t *ml_list)
 {
 	struct wlan_mlo_dev_context *mld_ctx;
@@ -195,8 +195,7 @@ static inline struct wlan_mlo_dev_context *mlo_list_peek_head(
 	return mld_ctx;
 }
 
-static inline
-struct wlan_mlo_dev_context *mlo_get_next_mld_ctx(qdf_list_t *ml_list,
+struct wlan_mlo_dev_context *wlan_mlo_get_next_mld_ctx(qdf_list_t *ml_list,
 					struct wlan_mlo_dev_context *mld_cur)
 {
 	struct wlan_mlo_dev_context *mld_next;
@@ -230,13 +229,13 @@ uint8_t wlan_mlo_get_sta_mld_ctx_count(void)
 	ml_link_lock_acquire(mlo_mgr_ctx);
 	ml_list = &mlo_mgr_ctx->ml_dev_list;
 	/* Get first mld context */
-	mld_cur = mlo_list_peek_head(ml_list);
+	mld_cur = wlan_mlo_list_peek_head(ml_list);
 
 	while (mld_cur) {
 		/* get next mld node */
 		if (mld_cur->sta_ctx)
 			count++;
-		mld_next = mlo_get_next_mld_ctx(ml_list, mld_cur);
+		mld_next = wlan_mlo_get_next_mld_ctx(ml_list, mld_cur);
 		mld_cur = mld_next;
 	}
 	ml_link_lock_release(mlo_mgr_ctx);
@@ -258,7 +257,7 @@ struct wlan_mlo_dev_context
 	ml_link_lock_acquire(mlo_mgr_ctx);
 	ml_list = &mlo_mgr_ctx->ml_dev_list;
 	/* Get first mld context */
-	mld_cur = mlo_list_peek_head(ml_list);
+	mld_cur = wlan_mlo_list_peek_head(ml_list);
 	/**
 	 * Iterate through ml list, till ml mldaddr matches with
 	 * entry of list
@@ -270,7 +269,7 @@ struct wlan_mlo_dev_context
 			return mld_cur;
 		}
 		/* get next mld node */
-		mld_next = mlo_get_next_mld_ctx(ml_list, mld_cur);
+		mld_next = wlan_mlo_get_next_mld_ctx(ml_list, mld_cur);
 		mld_cur = mld_next;
 	}
 	ml_link_lock_release(mlo_mgr_ctx);
@@ -310,7 +309,7 @@ bool mlo_mgr_ml_peer_exist_on_diff_ml_ctx(uint8_t *peer_addr,
 	if (!qdf_list_size(ml_list))
 		goto g_ml_ref;
 
-	mld_cur = mlo_list_peek_head(ml_list);
+	mld_cur = wlan_mlo_list_peek_head(ml_list);
 	while (mld_cur) {
 		mlo_dev_lock_acquire(mld_cur);
 		if (qdf_is_macaddr_equal(&mld_cur->mld_addr,
@@ -369,7 +368,7 @@ bool mlo_mgr_ml_peer_exist_on_diff_ml_ctx(uint8_t *peer_addr,
 		}
 		ml_peerlist_lock_release(mlo_peer_list);
 
-		mld_next = mlo_get_next_mld_ctx(ml_list, mld_cur);
+		mld_next = wlan_mlo_get_next_mld_ctx(ml_list, mld_cur);
 		mlo_dev_lock_release(mld_cur);
 		mld_cur = mld_next;
 	}

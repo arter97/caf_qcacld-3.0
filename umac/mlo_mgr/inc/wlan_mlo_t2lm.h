@@ -103,11 +103,16 @@ enum wlan_link_band_caps {
  * is present.
  * @pref_order: Preferred links in order.it is in form of hardware link id.
  * @timeout: timeout values for all the access categories.
+ * @tlt_characterization_params: Bitmask to select Tx-Link Tuple from ordered
+ *  list.
+ *  Bit 0-15: Each bit maps to the corresponding Link ID
+ *  Bit 16-31: Reserved
  */
 struct wlan_link_preference {
 	uint8_t num_pref_links;
 	uint8_t pref_order[MAX_PREFERRED_LINKS];
 	uint32_t timeout[WIFI_AC_MAX];
+	uint32_t tlt_characterization_params;
 };
 
 /**

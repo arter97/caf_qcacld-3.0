@@ -435,6 +435,19 @@ struct wlan_mlo_peer_context *wlan_mlo_get_mlpeer_by_mld_mac(
 				struct qdf_mac_addr *mld_mac);
 
 /**
+ * wlan_mlo_get_mlpeer_by_peer_mladdr() - Get ML peer from the list of MLD's
+ *                                        using MLD MAC address
+ *
+ * @mldaddr: MAC address of the ML peer
+ * @mldev: Update corresponding ML dev context in which peer is found
+ *
+ * Return: Pointer to mlo peer context
+ */
+struct wlan_mlo_peer_context
+*wlan_mlo_get_mlpeer_by_peer_mladdr(struct qdf_mac_addr *mldaddr,
+				    struct wlan_mlo_dev_context **mldev);
+
+/**
  * wlan_mlo_get_mlpeer_by_aid() - find ML peer by AID
  * @ml_dev: MLO DEV object
  * @assoc_id:  AID
