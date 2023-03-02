@@ -1910,17 +1910,16 @@ static void __lim_process_channel_switch_timeout(struct pe_session *pe_session)
 		}
 
 		/*
-		 * If the channel-list that AP is asking us to switch is invalid
-		 * then we cannot switch the channel. Just disassociate from AP.
-		 * We will find a better AP !!!
+		 * The channel switch request received from AP is carrying
+		 * invalid channel. It's ok to ignore this channel switch
+		 * request as it might be from spoof AP. If it's from genuine
+		 * AP, it may lead to heart beat failure and result in
+		 * disconnection. DUT can go ahead and reconnect to it/any
+		 * other AP once it disconnects.
 		 */
-		if (lim_is_sb_disconnect_allowed(pe_session)) {
-			pe_err("Invalid channel! Disconnect");
-			lim_tear_down_link_with_ap(mac, pe_session->peSessionId,
-					   REASON_UNSUPPORTED_CHANNEL_CSA,
-					   eLIM_LINK_MONITORING_DISASSOC);
-			return;
-		}
+		pe_err("Invalid channel freq %u Ignore CSA request",
+		       channel_freq);
+		return;
 	}
 	switch (pe_session->gLimChannelSwitch.state) {
 	case eLIM_CHANNEL_SWITCH_PRIMARY_ONLY:
@@ -7370,6 +7369,15 @@ void lim_update_he_caps_mcs(struct mac_context *mac, struct pe_session *session)
 	mlme_priv->he_config.rx_he_mcs_map_lt_80 = rx_mcs_map;
 	*((uint16_t *)mlme_priv->he_config.tx_he_mcs_map_160) = tx_mcs_map;
 	*((uint16_t *)mlme_priv->he_config.rx_he_mcs_map_160) = rx_mcs_map;
+	qdf_mem_copy(mlme_priv->he_config.tx_he_mcs_map_160, &tx_mcs_map,
+		     sizeof(u_int16_t));
+	qdf_mem_copy(mlme_priv->he_config.rx_he_mcs_map_160, &rx_mcs_map,
+		     sizeof(u_int16_t));
+
+	pe_debug("new HE80 mcs map tx: 0x%x, rx: 0x%x", tx_mcs_map, rx_mcs_map);
+	pe_debug("new HE160 mcs map tx: 0x%x, rx: 0x%x",
+		 *(uint16_t *)mlme_priv->he_config.tx_he_mcs_map_160,
+		 *(uint16_t *)mlme_priv->he_config.rx_he_mcs_map_160);
 }
 
 static void
@@ -9623,6 +9631,7 @@ void lim_send_sme_mgmt_frame_ind(struct mac_context *mac_ctx, uint8_t frame_type
 {
 	tpSirSmeMgmtFrameInd sme_mgmt_frame = NULL;
 	uint16_t length;
+	struct wlan_objmgr_vdev *vdev;
 
 	length = sizeof(tSirSmeMgmtFrameInd) + frame_len;
 
@@ -9635,8 +9644,22 @@ void lim_send_sme_mgmt_frame_ind(struct mac_context *mac_ctx, uint8_t frame_type
 		!vdev_id) {
 		pe_debug("Broadcast action frame");
 		vdev_id = SME_SESSION_ID_BROADCAST;
+		goto fill_frame;
 	}
 
+	if (frame_type != SIR_MAC_MGMT_ACTION)
+		goto fill_frame;
+
+	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(mac_ctx->psoc, vdev_id,
+						    WLAN_LEGACY_MAC_ID);
+
+	if (!vdev)
+		goto fill_frame;
+
+	wlan_mlo_update_action_frame_to_user(vdev, frame, frame_len);
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_MAC_ID);
+
+fill_frame:
 	sme_mgmt_frame->frame_len = frame_len;
 	sme_mgmt_frame->sessionId = vdev_id;
 	sme_mgmt_frame->frameType = frame_type;
@@ -10591,6 +10614,8 @@ QDF_STATUS lim_set_ch_phy_mode(struct wlan_objmgr_vdev *vdev, uint8_t dot11mode)
 			wlan_reg_chan_band_to_freq(mac_ctx->pdev,
 						   des_chan->ch_freq_seg1,
 						   band_mask);
+		} else if (bw_val >= 160) {
+			pe_debug("Skip center_freq check for bw %d", bw_val);
 		} else {
 			pe_err("Invalid cntr_freq for bw %d, drop to 20",
 			       bw_val);
@@ -10802,7 +10827,8 @@ QDF_STATUS lim_pre_vdev_start(struct mac_context *mac,
 		if (ch_params.mhz_freq_seg0 ==  session->curr_op_freq - 10)
 			sec_chan_freq = session->curr_op_freq - 20;
 	}
-	if (LIM_IS_AP_ROLE(session))
+	if (LIM_IS_AP_ROLE(session) &&
+	    !mlme_is_chan_switch_in_progress(mlme_obj->vdev))
 		lim_apply_puncture(mac, session, ch_params.mhz_freq_seg1);
 
 	if (IS_DOT11_MODE_EHT(session->dot11mode))

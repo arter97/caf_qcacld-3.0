@@ -346,6 +346,22 @@ QDF_STATUS
 policy_mgr_get_original_bw_for_sap_restart(struct wlan_objmgr_psoc *psoc,
 					   bool *use_sap_original_bw);
 
+/**
+ * policy_mgr_get_dfs_sta_sap_go_scc_movement() - returns SAP / GO's movement
+ * in STA+SAP DFS SCC concurrency to whether SAP / GO should be moved first
+ * or not.
+ * @psoc: pointer to psoc
+ * @move_sap_go_first: value to be filled
+ *
+ * In STA+SAP DFS SCC concurrency, this API returns config on whether to move
+ * SAP / GO first on getting CSA STA side or not.
+ *
+ * Return: QDF_STATUS_SUCCESS up on success and any other status for failure.
+ */
+QDF_STATUS
+policy_mgr_get_dfs_sta_sap_go_scc_movement(struct wlan_objmgr_psoc *psoc,
+					   bool *move_sap_go_first);
+
 /*
  * policy_mgr_get_connected_vdev_band_mask() - to get the connected vdev band
  * mask
@@ -4539,7 +4555,7 @@ bool policy_mgr_is_mlo_in_mode_dbs(struct wlan_objmgr_psoc *psoc,
 bool policy_mgr_is_mlo_in_mode_emlsr(struct wlan_objmgr_psoc *psoc,
 				     uint8_t *mlo_vdev_lst, uint8_t *num_mlo);
 
-/*
+/**
  * policy_mgr_handle_ml_sta_links_on_vdev_up_csa() - Handle enable/disable
  * link on vdev UP and channel change
  * @psoc: objmgr psoc
@@ -4553,7 +4569,7 @@ policy_mgr_handle_ml_sta_links_on_vdev_up_csa(struct wlan_objmgr_psoc *psoc,
 					      enum QDF_OPMODE mode,
 					      uint8_t vdev_id);
 
-/*
+/**
  * policy_mgr_handle_ml_sta_link_on_traffic_type_change() - Handle
  * enable/disable link on vdev traffic type change on SAP/P2P vdev
  * @psoc: objmgr psoc
@@ -4568,7 +4584,7 @@ void policy_mgr_handle_ml_sta_link_on_traffic_type_change(
 						struct wlan_objmgr_psoc *psoc,
 						struct wlan_objmgr_vdev *vdev);
 
-/*
+/**
  * policy_mgr_handle_ml_sta_links_on_vdev_down() - Handle enable
  * link on any vdev down
  * @psoc: objmgr psoc
@@ -4581,9 +4597,41 @@ void policy_mgr_handle_ml_sta_links_on_vdev_down(struct wlan_objmgr_psoc *psoc,
 						 enum QDF_OPMODE mode,
 						 uint8_t vdev_id);
 
+/**
+ * policy_mgr_handle_emlsr_sta_concurrency() - Handle concurrency scenarios with
+ * EMLSR STA.
+ * @psoc: objmgr psoc
+ * @vdev: pointer to vdev
+ * @ap_coming_up: Check if the new connection request is SAP/P2P GO/NAN
+ * @sta_coming_up: Check if the new connection request is STA/P2P Client
+ * @emlsr_sta_coming_up: Check if the new connection request is EMLSR STA
+ *
+ * The API handles concurrency scenarios with existing EMLSR connection when a
+ * new connection request is received OR with an existing legacy connection when
+ * an EMLSR sta comes up.
+ *
+ * Return: none
+ */
 void policy_mgr_handle_emlsr_sta_concurrency(struct wlan_objmgr_psoc *psoc,
 					     struct wlan_objmgr_vdev *vdev,
-					     bool is_ap_up, bool sta_coming_up);
+					     bool ap_coming_up,
+					     bool sta_coming_up,
+					     bool emlsr_sta_coming_up);
+
+/**
+ * policy_mgr_activate_mlo_links() - Force active ML links based on user
+ * requested link mac address
+ *
+ * @psoc: objmgr psoc
+ * @session_id: session id
+ * @num_links: number of links to be forced active
+ * @active_link_addr: link mac address of links to be forced active
+ *
+ * Return: void
+ */
+void policy_mgr_activate_mlo_links(struct wlan_objmgr_psoc *psoc,
+				   uint8_t session_id, uint8_t num_links,
+				   struct qdf_mac_addr *active_link_addr);
 #else
 
 static inline bool policy_mgr_is_mlo_sap_concurrency_allowed(

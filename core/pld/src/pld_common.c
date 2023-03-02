@@ -1350,9 +1350,12 @@ int pld_get_irq(struct device *dev, int ce_id)
 		ret = pld_snoc_fw_sim_get_irq(dev, ce_id);
 		break;
 	case PLD_BUS_TYPE_IPCI:
+		ret = pld_ipci_get_irq(dev, ce_id);
 		break;
 	case PLD_BUS_TYPE_PCIE_FW_SIM:
 	case PLD_BUS_TYPE_IPCI_FW_SIM:
+		ret = pld_pcie_fw_sim_get_irq(dev, ce_id);
+		break;
 	case PLD_BUS_TYPE_PCIE:
 	default:
 		ret = -EINVAL;
@@ -2495,7 +2498,10 @@ int pld_thermal_register(struct device *dev,
 	case PLD_BUS_TYPE_SDIO:
 	case PLD_BUS_TYPE_USB:
 	case PLD_BUS_TYPE_SNOC:
+		break;
 	case PLD_BUS_TYPE_PCIE:
+		errno = pld_pci_thermal_register(dev, max_state, mon_id);
+		break;
 	case PLD_BUS_TYPE_PCIE_FW_SIM:
 		break;
 	case PLD_BUS_TYPE_IPCI_FW_SIM:
@@ -2524,7 +2530,10 @@ void pld_thermal_unregister(struct device *dev, int mon_id)
 	case PLD_BUS_TYPE_SDIO:
 	case PLD_BUS_TYPE_USB:
 	case PLD_BUS_TYPE_SNOC:
+		break;
 	case PLD_BUS_TYPE_PCIE:
+		pld_pci_thermal_unregister(dev, mon_id);
+		break;
 	case PLD_BUS_TYPE_PCIE_FW_SIM:
 		break;
 	case PLD_BUS_TYPE_IPCI_FW_SIM:
@@ -2580,6 +2589,8 @@ const char *pld_bus_width_type_to_str(enum pld_bus_width_type level)
 		return "MEDIUM";
 	case PLD_BUS_WIDTH_HIGH:
 		return "HIGH";
+	case PLD_BUS_WIDTH_MID_HIGH:
+		return "MID_HIGH";
 	case PLD_BUS_WIDTH_VERY_HIGH:
 		return "VERY_HIGH";
 	case PLD_BUS_WIDTH_ULTRA_HIGH:
@@ -2605,7 +2616,10 @@ int pld_get_thermal_state(struct device *dev, unsigned long *thermal_state,
 	case PLD_BUS_TYPE_SDIO:
 	case PLD_BUS_TYPE_USB:
 	case PLD_BUS_TYPE_SNOC:
+		break;
 	case PLD_BUS_TYPE_PCIE:
+		errno = pld_pci_get_thermal_state(dev, thermal_state, mon_id);
+		break;
 	case PLD_BUS_TYPE_PCIE_FW_SIM:
 		break;
 	case PLD_BUS_TYPE_IPCI_FW_SIM:

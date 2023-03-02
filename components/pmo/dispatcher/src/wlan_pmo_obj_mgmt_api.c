@@ -490,8 +490,6 @@ QDF_STATUS pmo_suspend_all_components(struct wlan_objmgr_psoc *psoc,
 	pmo_psoc_suspend_handler handler;
 	void *arg;
 
-	pmo_enter();
-
 	pmo_ctx = pmo_get_context();
 	if (!pmo_ctx) {
 		pmo_err("unable to get pmo ctx");
@@ -539,8 +537,6 @@ suspend_recovery:
 	}
 
 exit_with_status:
-	pmo_exit();
-
 	return status;
 }
 
@@ -552,8 +548,6 @@ QDF_STATUS pmo_resume_all_components(struct wlan_objmgr_psoc *psoc,
 	uint8_t i;
 	pmo_psoc_suspend_handler handler;
 	void *arg;
-
-	pmo_enter();
 
 	pmo_ctx = pmo_get_context();
 	if (!pmo_ctx) {
@@ -583,8 +577,6 @@ QDF_STATUS pmo_resume_all_components(struct wlan_objmgr_psoc *psoc,
 	}
 
 exit_with_status:
-	pmo_exit();
-
 	return status;
 }
 

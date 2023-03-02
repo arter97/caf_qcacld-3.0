@@ -400,6 +400,8 @@ static void dp_ini_bus_bandwidth(struct wlan_dp_psoc_cfg *config,
 		cfg_get(psoc, CFG_DP_BUS_BANDWIDTH_VERY_HIGH_THRESHOLD);
 	config->bus_bw_dbs_threshold =
 		cfg_get(psoc, CFG_DP_BUS_BANDWIDTH_DBS_THRESHOLD);
+	config->bus_bw_mid_high_threshold =
+		cfg_get(psoc, CFG_DP_BUS_BANDWIDTH_MID_HIGH_THRESHOLD);
 	config->bus_bw_high_threshold =
 		cfg_get(psoc, CFG_DP_BUS_BANDWIDTH_HIGH_THRESHOLD);
 	config->bus_bw_medium_threshold =
@@ -938,6 +940,7 @@ dp_vdev_obj_create_notification(struct wlan_objmgr_vdev *vdev, void *arg)
 			dp_err("eap frm done event init failed!!");
 			return status;
 		}
+		qdf_mem_zero(&dp_intf->stats, sizeof(qdf_net_dev_stats));
 	}
 
 	status = wlan_objmgr_vdev_component_obj_attach(vdev,
@@ -986,6 +989,8 @@ dp_vdev_obj_destroy_notification(struct wlan_objmgr_vdev *vdev, void *arg)
 			dp_err("eap frm done event destroy failed!!");
 			return status;
 		}
+		dp_intf->tx_fn = NULL;
+		dp_intf->sap_tx_block_mask |= DP_TX_FN_CLR;
 	}
 	qdf_mem_zero(&dp_intf->conn_info, sizeof(struct wlan_dp_conn_info));
 	dp_intf->intf_id = WLAN_UMAC_VDEV_ID_MAX;

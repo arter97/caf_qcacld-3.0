@@ -32,6 +32,7 @@
 #include <wlan_mlo_mgr_cmn.h>
 #include "wlan_mlme_ucfg_api.h"
 #include "wifi_pos_ucfg_i.h"
+#include "wlan_mlo_mgr_sta.h"
 
 #define NUM_OF_SOUNDING_DIMENSIONS     1 /*Nss - 1, (Nss = 2 for 2x2)*/
 
@@ -1537,6 +1538,23 @@ static bool is_sae_sap_enabled(struct wlan_objmgr_psoc *psoc)
 	return false;
 }
 #endif
+uint16_t wlan_get_rand_from_lst_for_freq(uint16_t *freq_lst,
+					 uint8_t num_chan)
+{
+	uint8_t i;
+	uint32_t rand_byte = 0;
+
+	if (!num_chan || !freq_lst) {
+		mlme_legacy_debug("invalid param freq_lst %pK, num_chan = %d",
+				  freq_lst, num_chan);
+		return 0;
+	}
+
+	get_random_bytes((uint8_t *)&rand_byte, 1);
+	i = (rand_byte + qdf_mc_timer_get_system_ticks()) % num_chan;
+
+	return freq_lst[i];
+}
 
 static void mlme_init_sap_cfg(struct wlan_objmgr_psoc *psoc,
 			      struct wlan_mlme_cfg_sap *sap_cfg)
@@ -1733,6 +1751,7 @@ static void mlme_init_acs_cfg(struct wlan_objmgr_psoc *psoc,
 	acs->is_external_acs_policy =
 		cfg_get(psoc, CFG_EXTERNAL_ACS_POLICY);
 	acs->np_chan_weightage = cfg_get(psoc, CFG_ACS_NP_CHAN_WEIGHT);
+	acs->acs_prefer_6ghz_psc = cfg_default(CFG_ACS_PREFER_6GHZ_PSC);
 	mlme_acs_parse_weight_list(psoc, acs);
 }
 
@@ -1767,6 +1786,148 @@ static void mlme_init_sta_mlo_cfg(struct wlan_objmgr_psoc *psoc,
 		cfg_default(CFG_MLO_SUPPORT_LINK_BAND);
 	sta->mlo_max_simultaneous_links =
 		cfg_default(CFG_MLO_MAX_SIMULTANEOUS_LINKS);
+}
+
+static bool
+wlan_get_vdev_link_removed_flag(struct wlan_objmgr_vdev *vdev)
+{
+	struct mlme_legacy_priv *mlme_priv;
+	bool is_mlo_link_removed;
+
+	if (!mlo_is_mld_sta(vdev))
+		return false;
+
+	wlan_vdev_obj_lock(vdev);
+	mlme_priv = wlan_vdev_mlme_get_ext_hdl(vdev);
+	if (!mlme_priv) {
+		wlan_vdev_obj_unlock(vdev);
+		mlme_legacy_err("vdev legacy private object is NULL");
+		return false;
+	}
+
+	is_mlo_link_removed = mlme_priv->is_mlo_sta_link_removed;
+	wlan_vdev_obj_unlock(vdev);
+
+	return is_mlo_link_removed;
+}
+
+bool wlan_get_vdev_link_removed_flag_by_vdev_id(struct wlan_objmgr_psoc *psoc,
+						uint8_t vdev_id)
+{
+	struct wlan_objmgr_vdev *vdev;
+	bool is_mlo_link_removed;
+
+	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, vdev_id,
+						    WLAN_MLME_OBJMGR_ID);
+	if (!vdev) {
+		mlme_legacy_err("get vdev failed for id %d", vdev_id);
+		return false;
+	}
+
+	is_mlo_link_removed = wlan_get_vdev_link_removed_flag(vdev);
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_OBJMGR_ID);
+
+	return is_mlo_link_removed;
+}
+
+static QDF_STATUS
+wlan_set_vdev_link_removed_flag(struct wlan_objmgr_vdev *vdev, bool removed)
+{
+	struct mlme_legacy_priv *mlme_priv;
+
+	if (!vdev) {
+		mlme_legacy_err("vdev NULL");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	if (!mlo_is_mld_sta(vdev)) {
+		mlme_legacy_debug("vdev not mld sta");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	wlan_vdev_obj_lock(vdev);
+	mlme_priv = wlan_vdev_mlme_get_ext_hdl(vdev);
+	if (!mlme_priv) {
+		wlan_vdev_obj_unlock(vdev);
+		mlme_legacy_err("vdev legacy private object is NULL");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	if (removed == mlme_priv->is_mlo_sta_link_removed) {
+		wlan_vdev_obj_unlock(vdev);
+		return QDF_STATUS_SUCCESS;
+	}
+
+	mlme_legacy_debug("mlo sta vdev %d link removed flag %d",
+			  wlan_vdev_get_id(vdev), removed);
+	mlme_priv->is_mlo_sta_link_removed = removed;
+	wlan_vdev_obj_unlock(vdev);
+
+	return QDF_STATUS_SUCCESS;
+}
+
+QDF_STATUS
+wlan_set_vdev_link_removed_flag_by_vdev_id(struct wlan_objmgr_psoc *psoc,
+					   uint8_t vdev_id, bool removed)
+{
+	struct wlan_objmgr_vdev *vdev;
+	QDF_STATUS status;
+
+	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, vdev_id,
+						    WLAN_MLME_OBJMGR_ID);
+	if (!vdev) {
+		mlme_legacy_err("vdev null for id %d", vdev_id);
+		return QDF_STATUS_E_INVAL;
+	}
+
+	if (!mlo_is_mld_sta(vdev)) {
+		mlme_legacy_debug("vdev %d not mld sta", vdev_id);
+		wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_OBJMGR_ID);
+		return QDF_STATUS_E_INVAL;
+	}
+
+	status = wlan_set_vdev_link_removed_flag(vdev, removed);
+
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_OBJMGR_ID);
+
+	return status;
+}
+
+void wlan_clear_mlo_sta_link_removed_flag(struct wlan_objmgr_vdev *vdev)
+{
+	struct wlan_objmgr_vdev *wlan_vdev_list[WLAN_UMAC_MLO_MAX_VDEVS] = {0};
+	uint16_t vdev_count = 0;
+	uint8_t i;
+
+	if (!vdev || !mlo_is_mld_sta(vdev))
+		return;
+
+	mlo_get_ml_vdev_list(vdev, &vdev_count, wlan_vdev_list);
+	if (!vdev_count) {
+		mlme_legacy_err("vdev num 0 in mld dev");
+		return;
+	}
+
+	for (i = 0; i < vdev_count; i++) {
+		if (!wlan_vdev_list[i]) {
+			mlme_legacy_err("vdev is null in mld");
+			goto release_ref;
+		}
+
+		wlan_set_vdev_link_removed_flag(wlan_vdev_list[i], false);
+	}
+
+release_ref:
+	for (i = 0; i < vdev_count; i++)
+		mlo_release_vdev_ref(wlan_vdev_list[i]);
+}
+
+bool wlan_drop_mgmt_frame_on_link_removal(struct wlan_objmgr_vdev *vdev)
+{
+	if (!vdev || !mlo_is_mld_sta(vdev))
+		return false;
+
+	return wlan_get_vdev_link_removed_flag(vdev);
 }
 #else
 static void mlme_init_sta_mlo_cfg(struct wlan_objmgr_psoc *psoc,
@@ -1903,6 +2064,8 @@ static void mlme_init_roam_offload_cfg(struct wlan_objmgr_psoc *psoc,
 		cfg_get(psoc, CFG_LFR_ENABLE_IDLE_ROAM);
 	lfr->idle_roam_rssi_delta =
 		cfg_get(psoc, CFG_LFR_IDLE_ROAM_RSSI_DELTA);
+	lfr->roam_info_stats_num =
+		cfg_get(psoc, CFG_LFR3_ROAM_INFO_STATS_NUM);
 
 	ucfg_mlme_get_connection_roaming_ini_present(psoc, &val);
 	if (val) {
@@ -2768,10 +2931,11 @@ static void mlme_init_powersave_params(struct wlan_objmgr_psoc *psoc,
 }
 
 #if defined(CONFIG_AFC_SUPPORT) && defined(CONFIG_BAND_6GHZ)
-static void mlme_init_afc_cfg(struct wlan_mlme_reg *reg)
+static void mlme_init_afc_cfg(struct wlan_objmgr_psoc *psoc,
+			      struct wlan_mlme_reg *reg)
 {
 	reg->enable_6ghz_sp_pwrmode_supp =
-		cfg_default(CFG_6GHZ_SP_POWER_MODE_SUPP);
+		cfg_get(psoc, CFG_6GHZ_SP_POWER_MODE_SUPP);
 	reg->afc_disable_timer_check =
 		cfg_default(CFG_AFC_TIMER_CHECK_DIS);
 	reg->afc_disable_request_id_check =
@@ -2780,7 +2944,8 @@ static void mlme_init_afc_cfg(struct wlan_mlme_reg *reg)
 		cfg_default(CFG_AFC_REG_NO_ACTION);
 }
 #else
-static inline void mlme_init_afc_cfg(struct wlan_mlme_reg *reg)
+static inline void mlme_init_afc_cfg(struct wlan_objmgr_psoc *psoc,
+				     struct wlan_mlme_reg *reg)
 {
 }
 #endif
@@ -2880,7 +3045,7 @@ static void mlme_init_reg_cfg(struct wlan_objmgr_psoc *psoc,
 	reg->enable_nan_on_indoor_channels =
 		cfg_get(psoc, CFG_INDOOR_CHANNEL_SUPPORT_FOR_NAN);
 
-	mlme_init_afc_cfg(reg);
+	mlme_init_afc_cfg(psoc, reg);
 	mlme_init_acs_avoid_freq_list(psoc, reg);
 	mlme_init_coex_unsafe_chan_cfg(psoc, reg);
 	mlme_init_coex_unsafe_chan_reg_disable_cfg(psoc, reg);

@@ -1725,7 +1725,9 @@ bool policy_mgr_is_sap_restart_required_after_sta_disconnect(
 		 * 2. The frequency is not allowed in the indoor
 		 * channel.
 		 */
-		if (sta_sap_scc_on_indoor_channel &&
+		if (!policy_mgr_sap_allowed_on_indoor_freq(
+			pm_ctx->psoc, pm_ctx->pdev, op_ch_freq_list[i]) &&
+		    sta_sap_scc_on_indoor_channel &&
 		    wlan_reg_is_freq_indoor(pm_ctx->pdev, op_ch_freq_list[i]) &&
 		    pm_ctx->last_disconn_sta_freq == op_ch_freq_list[i]) {
 			curr_sap_freq = op_ch_freq_list[i];
@@ -2129,12 +2131,8 @@ void policy_mgr_check_sap_restart(struct wlan_objmgr_psoc *psoc,
 
 	if (pm_ctx->hdd_cbacks.hdd_is_chan_switch_in_progress &&
 	    pm_ctx->hdd_cbacks.hdd_is_chan_switch_in_progress()) {
-		policy_mgr_debug("wait as channel switch is already in progress");
-		status =
-			qdf_wait_single_event(&pm_ctx->channel_switch_complete_evt,
-					      CHANNEL_SWITCH_COMPLETE_TIMEOUT);
-		if (QDF_IS_STATUS_ERROR(status))
-			policy_mgr_err("wait for event failed, still continue with channel switch");
+		policy_mgr_debug("channel switch is already in progress");
+		return;
 	}
 
 	if (!pm_ctx->hdd_cbacks.wlan_hdd_get_channel_for_sap_restart) {

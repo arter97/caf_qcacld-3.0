@@ -58,6 +58,27 @@ enum wlan_wds_mode {
 };
 
 /**
+ * enum wlan_eht_mode - EHT mode of operation
+ * @WLAN_EHT_MODE_DISABLED: EHT is disabled
+ * @WLAN_EHT_MODE_SLO: Single-link operation mode
+ * @WLAN_EHT_MODE_MLSR: Multi-link Single-Radio mode
+ * @WLAN_EHT_MODE_MLMR: Multi-link Multi-Radio mode
+ * @WLAN_EHT_MODE_LAST: last value in enum
+ * @WLAN_EHT_MODE_MAX: max value supported
+ *
+ * This is used for 'type' values in eht_mode
+ */
+enum wlan_eht_mode {
+	WLAN_EHT_MODE_DISABLED  = 0,
+	WLAN_EHT_MODE_SLO       = 1,
+	WLAN_EHT_MODE_MLSR      = 2,
+	WLAN_EHT_MODE_MLMR      = 3,
+	/* keep this last */
+	WLAN_EHT_MODE_LAST,
+	WLAN_EHT_MODE_MAX = WLAN_EHT_MODE_LAST - 1,
+};
+
+/**
  * enum debug_packet_log_type - Debug packet log type
  * @DEBUG_PKTLOG_TYPE_NONE: Debug packet log is disabled
  * @DEBUG_PKTLOG_TYPE_MGMT: Management frames logging is enabled.

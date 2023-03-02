@@ -1388,6 +1388,7 @@ struct wlan_user_mcc_quota {
  * @mgmt_hw_tx_retry_count: MGMT HW tx retry count for frames
  * @relaxed_6ghz_conn_policy: 6GHz relaxed connection policy
  * @std_6ghz_conn_policy: 6GHz standard connection policy
+ * @eht_mode: EHT mode of operation
  * @t2lm_negotiation_support: T2LM negotiation supported enum value
  * @enable_emlsr_mode: 11BE eMLSR mode support
  * @safe_mode_enable: safe mode to bypass some strict 6 GHz checks for
@@ -1446,6 +1447,7 @@ struct wlan_mlme_generic {
 	bool std_6ghz_conn_policy;
 #endif
 #ifdef WLAN_FEATURE_11BE_MLO
+	enum wlan_eht_mode eht_mode;
 	bool enable_emlsr_mode;
 	enum t2lm_negotiation_support t2lm_negotiation_support;
 #endif
@@ -1512,6 +1514,7 @@ struct acs_weight_range {
  * @num_weight_range: num of ranges provided by user
  * @force_sap_start: Force SAP start when no channel is found suitable
  * by ACS
+ * @acs_prefer_6ghz_psc: Select 6 GHz PSC channel as priority
  * @np_chan_weightage: Weightage to be given to non preferred channels.
  */
 struct wlan_mlme_acs {
@@ -1525,6 +1528,7 @@ struct wlan_mlme_acs {
 	struct acs_weight_range normalize_weight_range[MAX_ACS_WEIGHT_RANGE];
 	uint16_t num_weight_range;
 	bool force_sap_start;
+	bool acs_prefer_6ghz_psc;
 	uint32_t np_chan_weightage;
 };
 
@@ -1856,6 +1860,7 @@ struct fw_scan_channels {
  *                           vsie in Re(assoc) frame
  * @roam_trigger_bitmap: Bitmap of roaming triggers.
  * @sta_roam_disable: STA roaming disabled by interfaces
+ * @roam_info_stats_num: STA roaming information cache number
  * @early_stop_scan_enable: Set early stop scan
  * @enable_5g_band_pref: Enable preference for 5G from INI
  * @ese_enabled: Enable ESE feature
@@ -1984,6 +1989,7 @@ struct wlan_mlme_lfr_cfg {
 	bool enable_roam_reason_vsie;
 	uint32_t roam_trigger_bitmap;
 	uint32_t sta_roam_disable;
+	uint32_t roam_info_stats_num;
 #endif
 	bool early_stop_scan_enable;
 	bool enable_5g_band_pref;
@@ -2893,10 +2899,12 @@ struct wlan_mlme_features {
  * @HOST_CONCURRENT_AP_POLICY_GAMING_AUDIO: Gaming audio concurrent policy value
  * @HOST_CONCURRENT_AP_POLICY_LOSSLESS_AUDIO_STREAMING: Lossless audio
  * concurrent streaming policy value
+ * @HOST_CONCURRENT_AP_POLICY_XR: Concurrent policy to meet AR/VR requirements.
  */
 enum host_concurrent_ap_policy {
 	HOST_CONCURRENT_AP_POLICY_UNSPECIFIED = 0,
 	HOST_CONCURRENT_AP_POLICY_GAMING_AUDIO = 1,
-	HOST_CONCURRENT_AP_POLICY_LOSSLESS_AUDIO_STREAMING = 2
+	HOST_CONCURRENT_AP_POLICY_LOSSLESS_AUDIO_STREAMING = 2,
+	HOST_CONCURRENT_AP_POLICY_XR = 3
 };
 #endif

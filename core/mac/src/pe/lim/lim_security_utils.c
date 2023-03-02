@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2013-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -382,9 +382,9 @@ void lim_delete_pre_auth_node(struct mac_context *mac, tSirMacAddr macAddr)
 
 			pPrevNode->next = pTempNode->next;
 
-			pe_debug("subsequent node to delete, Release data entry: %pK id %d peer",
-				       pTempNode, pTempNode->authNodeIdx);
-			       lim_print_mac_addr(mac, macAddr, LOG1);
+			pe_debug("subsequent node to delete, Release data entry: %pK id %d peer "QDF_MAC_ADDR_FMT,
+				 pTempNode, pTempNode->authNodeIdx,
+				 QDF_MAC_ADDR_REF(macAddr));
 			lim_release_pre_auth_node(mac, pTempNode);
 
 			return;
@@ -394,8 +394,8 @@ void lim_delete_pre_auth_node(struct mac_context *mac, tSirMacAddr macAddr)
 		pTempNode = pTempNode->next;
 	}
 
-	pe_err("peer not found in pre-auth list, addr= ");
-	lim_print_mac_addr(mac, macAddr, LOGE);
+	pe_err("peer not found in pre-auth list, addr= "QDF_MAC_ADDR_FMT,
+	       QDF_MAC_ADDR_REF(macAddr));
 
 } /*** end lim_delete_pre_auth_node() ***/
 

@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2016-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -442,7 +442,8 @@ void lim_send_reassoc_req_with_ft_ies_mgmt_frame(struct mac_context *mac_ctx,
 	/* Paranoia: */
 	qdf_mem_zero(frame, bytes + ft_ies_length);
 
-	lim_print_mac_addr(mac_ctx, pe_session->limReAssocbssId, LOGD);
+	pe_debug("BSSID: "QDF_MAC_ADDR_FMT,
+		 QDF_MAC_ADDR_REF(pe_session->limReAssocbssId));
 	/* Next, we fill out the buffer descriptor: */
 	lim_populate_mac_header(mac_ctx, frame, SIR_MAC_MGMT_FRAME,
 		SIR_MAC_MGMT_REASSOC_REQ, pe_session->limReAssocbssId,
