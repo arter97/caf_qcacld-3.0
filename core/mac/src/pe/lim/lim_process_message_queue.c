@@ -1631,11 +1631,6 @@ static void lim_process_messages(struct mac_context *mac_ctx,
 	case SIR_LIM_UPDATE_BEACON:
 		lim_update_beacon(mac_ctx);
 		break;
-#ifdef ANI_SIR_IBSS_PEER_CACHING
-	case WMA_IBSS_STA_ADD:
-		lim_ibss_sta_add(mac_ctx, msg->bodyptr);
-		break;
-#endif
 	case SIR_BB_XPORT_MGMT_MSG:
 		/* These messages are from Peer MAC entity. */
 #ifdef WLAN_DEBUG

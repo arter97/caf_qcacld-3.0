@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -154,7 +154,6 @@ enum wmamsgtype {
 	WMA_P2P_NOA_ATTR_IND = SIR_HAL_P2P_NOA_ATTR_IND,
 	WMA_PWR_SAVE_CFG = SIR_HAL_PWR_SAVE_CFG,
 
-	WMA_IBSS_STA_ADD = SIR_HAL_IBSS_STA_ADD,
 	WMA_TIMER_ADJUST_ADAPTIVE_THRESHOLD_IND =
 				SIR_HAL_TIMER_ADJUST_ADAPTIVE_THRESHOLD_IND,
 	WMA_SET_LINK_STATE = SIR_HAL_SET_LINK_STATE,
