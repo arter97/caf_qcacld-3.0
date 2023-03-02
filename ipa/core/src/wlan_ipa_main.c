@@ -97,6 +97,11 @@ bool ipa_config_is_uc_enabled(void)
 	return g_ipa_config ? wlan_ipa_uc_is_enabled(g_ipa_config) : 0;
 }
 
+bool ipa_config_is_opt_wifi_dp_enabled(void)
+{
+	return g_ipa_config ? wlan_ipa_is_opt_wifi_dp_enabled(g_ipa_config) : 0;
+}
+
 bool ipa_config_is_vlan_enabled(void)
 {
 	if (!ipa_config_is_enabled())

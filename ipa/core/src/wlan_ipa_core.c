@@ -4144,8 +4144,15 @@ QDF_STATUS wlan_ipa_setup(struct wlan_ipa_priv *ipa_ctx,
 
 	/* Register call backs for opt wifi dp */
 	if (ipa_ctx->opt_wifi_datapath) {
-		status = wlan_ipa_reg_flt_cbs(ipa_ctx);
-		ipa_info("opt_dp: Register cb status %d", status);
+		if (ipa_config_is_opt_wifi_dp_enabled()) {
+			status = wlan_ipa_reg_flt_cbs(ipa_ctx);
+			ipa_info("opt_dp: Register cb. status %d",
+				 status);
+		} else {
+			ipa_info("opt_dp: Disabled from WLAN INI");
+		}
+	} else {
+		ipa_info("opt_dp: Disabled from IPA");
 	}
 
 	qdf_event_create(&ipa_ctx->ipa_resource_comp);

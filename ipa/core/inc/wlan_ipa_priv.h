@@ -84,6 +84,7 @@
 #define WLAN_IPA_UC_ENABLE_MASK             BIT(5)
 #define WLAN_IPA_UC_STA_ENABLE_MASK         BIT(6)
 #define WLAN_IPA_REAL_TIME_DEBUGGING        BIT(8)
+#define WLAN_IPA_OPT_WIFI_DP                BIT(9)
 
 #ifdef QCA_IPA_LL_TX_FLOW_CONTROL
 #define WLAN_IPA_MAX_BANDWIDTH              4800
