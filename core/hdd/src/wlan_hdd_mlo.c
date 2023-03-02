@@ -315,6 +315,7 @@ int hdd_update_vdev_mac_address(struct hdd_adapter *adapter,
 	struct hdd_mlo_adapter_info *mlo_adapter_info;
 	struct hdd_context *hdd_ctx = adapter->hdd_ctx;
 	struct qdf_mac_addr link_addrs[WLAN_MAX_MLD] = {0};
+	uint8_t *addr_list[WLAN_MAX_MLD + 1] = {0};
 
 	/* This API is only called with is ml adapter set for STA mode adapter.
 	 * For SAP mode, hdd_hostapd_set_mac_address() is the entry point for
@@ -335,17 +336,19 @@ int hdd_update_vdev_mac_address(struct hdd_adapter *adapter,
 	if (QDF_IS_STATUS_ERROR(status))
 		return qdf_status_to_os_return(status);
 
+	for (i = 0; i < WLAN_MAX_MLD; i++)
+		addr_list[i] = &link_addrs[i].bytes[0];
+
+	status = sme_check_for_duplicate_session(hdd_ctx->mac_handle,
+						 &addr_list[0]);
+	if (QDF_IS_STATUS_ERROR(status))
+		return qdf_status_to_os_return(status);
+
 	mlo_adapter_info = &adapter->mlo_adapter_info;
 	for (i = 0; i < WLAN_MAX_MLD; i++) {
 		link_adapter = mlo_adapter_info->link_adapter[i];
 		if (!link_adapter)
 			continue;
-
-		status = sme_check_for_duplicate_session(hdd_ctx->mac_handle,
-							 link_addrs[i].bytes);
-
-		if (QDF_IS_STATUS_ERROR(status))
-			return qdf_status_to_os_return(status);
 
 		if (hdd_adapter_is_associated_with_ml_adapter(link_adapter))
 			update_self_peer = true;

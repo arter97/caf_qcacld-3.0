@@ -4486,14 +4486,15 @@ QDF_STATUS sme_get_full_roam_scan_period(mac_handle_t mac_handle,
 /**
  * sme_check_for_duplicate_session() - check for duplicate session
  * @mac_handle: Opaque handle to the MAC context
- * @peer_addr: Peer device mac address
+ * @mac_list: List of mac address of peers.
  *
  * Check for duplicate mac address is available on other vdev.
+ * The list pointed by @mac_list has to be NULL terminated.
  *
  * Return: QDF_STATUS
  */
 QDF_STATUS sme_check_for_duplicate_session(mac_handle_t mac_handle,
-					   uint8_t *peer_addr);
+					   uint8_t **mac_list);
 #ifdef FEATURE_ANI_LEVEL_REQUEST
 /*
  * sme_get_ani_level() -

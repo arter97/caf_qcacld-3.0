@@ -7224,13 +7224,6 @@ int hdd_vdev_create(struct wlan_hdd_link_info *link_info)
 
 	/* do vdev create via objmgr */
 	hdd_ctx = WLAN_HDD_GET_CTX(adapter);
-	status = sme_check_for_duplicate_session(hdd_ctx->mac_handle,
-						 adapter->mac_addr.bytes);
-	if (QDF_IS_STATUS_ERROR(status)) {
-		hdd_err("Duplicate session is existing with same mac address");
-		errno = qdf_status_to_os_return(status);
-		return errno;
-	}
 
 	hdd_populate_vdev_create_params(adapter, &vdev_params);
 
@@ -13938,6 +13931,50 @@ out:
 	hdd_debug("wlm initial mode %u", adapter->latency_level);
 }
 
+#if defined(WLAN_FEATURE_11BE_MLO) && defined(CFG80211_11BE_BASIC)
+QDF_STATUS hdd_adapter_check_duplicate_session(struct hdd_adapter *adapter)
+{
+	int i;
+	QDF_STATUS status;
+	uint8_t *addr_list[WLAN_MAX_MLD + 1] = {0};
+	struct hdd_adapter *link_adapter;
+	struct hdd_mlo_adapter_info *mlo_adapter_info;
+	mac_handle_t mac_handle = hdd_adapter_get_mac_handle(adapter);
+
+	if (hdd_adapter_is_ml_adapter(adapter) &&
+	    adapter->device_mode == QDF_STA_MODE) {
+		addr_list[0] = &adapter->mld_addr.bytes[0];
+		mlo_adapter_info = &adapter->mlo_adapter_info;
+		for (i = 0; i < WLAN_MAX_MLD; i++) {
+			link_adapter = mlo_adapter_info->link_adapter[i];
+			if (!link_adapter)
+				continue;
+			if (hdd_adapter_is_associated_with_ml_adapter(
+							link_adapter)) {
+				addr_list[1] = &link_adapter->mac_addr.bytes[0];
+			}
+		}
+	} else {
+		addr_list[0] = &adapter->mac_addr.bytes[0];
+	}
+
+	status = sme_check_for_duplicate_session(mac_handle, &addr_list[0]);
+	return status;
+}
+#else
+QDF_STATUS hdd_adapter_check_duplicate_session(struct hdd_adapter *adapter)
+{
+	QDF_STATUS status;
+	uint8_t *addr_list[2] = {0};
+	mac_handle_t mac_handle = hdd_adapter_get_mac_handle(adapter);
+
+	addr_list[0] = &adapter->mac_addr.bytes[0];
+	status = sme_check_for_duplicate_session(mac_handle, &addr_list[0]);
+
+	return status;
+}
+#endif
+
 int hdd_start_station_adapter(struct hdd_adapter *adapter)
 {
 	QDF_STATUS status;
@@ -13954,6 +13991,12 @@ int hdd_start_station_adapter(struct hdd_adapter *adapter)
 	if ((adapter->device_mode == QDF_P2P_DEVICE_MODE) ||
 	    (adapter->device_mode == QDF_NAN_DISC_MODE))
 		wlan_hdd_lpc_del_monitor_interface(adapter->hdd_ctx);
+
+	status = hdd_adapter_check_duplicate_session(adapter);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		hdd_err("Duplicate session is existing with same mac address");
+		return qdf_status_to_os_return(status);
+	}
 
 	hdd_adapter_for_each_active_link_info(adapter, link_info) {
 		ret = hdd_vdev_create(link_info);
@@ -14016,6 +14059,13 @@ int hdd_start_ap_adapter(struct hdd_adapter *adapter)
 	}
 
 	wlan_hdd_lpc_del_monitor_interface(hdd_ctx);
+
+	status = hdd_adapter_check_duplicate_session(adapter);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		hdd_err("Duplicate session is existing with same mac address");
+		return qdf_status_to_os_return(status);
+	}
+
 	/*
 	 * In SSR case no need to create new sap context.
 	 * Otherwise create sap context first and then create

@@ -579,6 +579,12 @@ int hdd_init_nan_data_mode(struct hdd_adapter *adapter)
 	struct wlan_objmgr_vdev *vdev;
 	uint16_t rts_profile = 0;
 
+	status = hdd_adapter_check_duplicate_session(adapter);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		hdd_err("Duplicate session is existing with same mac address");
+		return qdf_status_to_os_return(status);
+	}
+
 	ret_val = hdd_vdev_create(adapter->deflink);
 	if (ret_val) {
 		hdd_err("failed to create vdev: %d", ret_val);

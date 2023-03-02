@@ -16231,25 +16231,29 @@ sme_get_full_roam_scan_period(mac_handle_t mac_handle, uint8_t vdev_id,
 }
 
 QDF_STATUS sme_check_for_duplicate_session(mac_handle_t mac_handle,
-					   uint8_t *peer_addr)
+					   uint8_t **mac_list)
 {
-	QDF_STATUS status = QDF_STATUS_E_INVAL;
+	QDF_STATUS status = QDF_STATUS_SUCCESS;
 	bool peer_exist = false;
 	void *soc = cds_get_context(QDF_MODULE_ID_SOC);
 	struct mac_context *mac_ctx = MAC_CONTEXT(mac_handle);
+	uint8_t **peer_addr = mac_list;
 
 	if (!soc)
 		return QDF_STATUS_E_INVAL;
 
 	if (QDF_STATUS_SUCCESS != sme_acquire_global_lock(&mac_ctx->sme))
-		return status;
+		return QDF_STATUS_E_INVAL;
 
-	peer_exist = cdp_find_peer_exist(soc, OL_TXRX_PDEV_ID, peer_addr);
-	if (peer_exist) {
-		sme_err("Peer exists with same MAC");
-		status = QDF_STATUS_E_EXISTS;
-	} else {
-		status = QDF_STATUS_SUCCESS;
+	while (*peer_addr) {
+		peer_exist = cdp_find_peer_exist(soc, OL_TXRX_PDEV_ID,
+						 *peer_addr);
+		if (peer_exist) {
+			sme_err("Peer exists with same MAC");
+			status = QDF_STATUS_E_EXISTS;
+			break;
+		}
+		peer_addr++;
 	}
 	sme_release_global_lock(&mac_ctx->sme);
 

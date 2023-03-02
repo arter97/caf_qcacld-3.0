@@ -3901,6 +3901,19 @@ int hdd_register_cb(struct hdd_context *hdd_ctx);
 void hdd_deregister_cb(struct hdd_context *hdd_ctx);
 
 /**
+ * hdd_adapter_check_duplicate_session() - Check for duplicate
+ * session on start adapter.
+ * @adapter: HDD adapter
+ *
+ * The API passes list of addresses contained in @adapter to
+ * sme_check_for_duplicate_session() to check the status
+ * of existing peer with same MAC address.
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS hdd_adapter_check_duplicate_session(struct hdd_adapter *adapter);
+
+/**
  * hdd_start_station_adapter()- Start the Station Adapter
  * @adapter: HDD adapter
  *
