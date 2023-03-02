@@ -6223,7 +6223,8 @@ void dp_mon_cdp_ops_register(struct dp_soc *soc)
 #if defined(WLAN_CFR_ENABLE) && defined(WLAN_ENH_CFR_ENABLE)
 		dp_cfr_filter_register_1_0(ops);
 #endif
-		if (target_type == TARGET_TYPE_QCN9000)
+		if (target_type == TARGET_TYPE_QCN9000 ||
+		    target_type == TARGET_TYPE_QCN9160)
 			ops->ctrl_ops->txrx_update_mon_mac_filter =
 					dp_update_mon_mac_filter;
 		break;
