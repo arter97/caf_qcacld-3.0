@@ -463,18 +463,6 @@ enum hdd_nb_cmd_id {
 #define INTF_MACADDR_MASK       0x7
 
 /**
- * enum hdd_auth_key_mgmt - auth key mgmt protocols
- * @HDD_AUTH_KEY_MGMT_802_1X: 802.1x
- * @HDD_AUTH_KEY_MGMT_PSK: PSK
- * @HDD_AUTH_KEY_MGMT_CCKM: CCKM
- */
-enum hdd_auth_key_mgmt {
-	HDD_AUTH_KEY_MGMT_802_1X = BIT(0),
-	HDD_AUTH_KEY_MGMT_PSK = BIT(1),
-	HDD_AUTH_KEY_MGMT_CCKM = BIT(2)
-};
-
-/**
  * typedef wlan_net_dev_ref_dbgid - Debug IDs to detect net device reference
  *                                  leaks.
  * NOTE: New values added to the enum must also be reflected in function
