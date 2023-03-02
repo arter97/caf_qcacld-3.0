@@ -618,6 +618,7 @@ QDF_STATUS dp_peer_setup_ppeds_be(struct dp_soc *soc,
 			}
 
 			vdev_id = be_vdev->vdev.vdev_id;
+			soc = link_peer->vdev->pdev->soc;
 			qdf_status = dp_peer_ppeds_default_route_be(soc,
 								    be_peer,
 								    vdev_id,
@@ -633,48 +634,44 @@ QDF_STATUS dp_peer_setup_ppeds_be(struct dp_soc *soc,
 
 		/*
 		 * In case of MLO link peer,
-		 * 1. WDS EXT case : use the VP profile created for the
-		 * wds_ext netdev which is passed as an argument.
-		 * 2. Non WDS EXT case : Fetch the VP profile from the mld vdev.
+		 * Fetch the VP profile from the mld vdev.
 		 */
-		if (!dp_peer_check_wds_ext_peer(mld_peer)) {
-			be_vdev = dp_get_be_vdev_from_dp_vdev(mld_peer->vdev);
-			if (!be_vdev) {
-				dp_err("BE vap is null");
-				return QDF_STATUS_E_NULL_VALUE;
-			}
-
-			/*
-			 * Extract the VP profile from the vap
-			 * in case of MLO peer, we have to get the profile form
-			 * the MLD vdev's osif handle and not the link peer.
-			 */
-			mld_soc = mld_peer->vdev->pdev->soc;
-			cdp_soc = &mld_soc->cdp_soc;
-			if (!cdp_soc->ol_ops->get_ppeds_profile_info_for_vap) {
-				qdf_err("%pK: Register PPEDS profile info API before use\n", cdp_soc);
-				return QDF_STATUS_E_NULL_VALUE;
-			}
-
-			qdf_status = cdp_soc->ol_ops->get_ppeds_profile_info_for_vap(mld_soc->ctrl_psoc,
-										     mld_peer->vdev->vdev_id,
-										     &vp_params);
-			if (qdf_status == QDF_STATUS_E_NULL_VALUE) {
-				qdf_err("%pK: Failed to get ppeds profile for mld soc\n", mld_soc);
-				return qdf_status;
-			}
-
-			/*
-			 * Check if PPE DS routing is enabled on
-			 * the associated vap.
-			 */
-			if (vp_params.ppe_vp_type != PPE_VP_USER_TYPE_DS)
-				return qdf_status;
-
-			be_soc = dp_get_be_soc_from_dp_soc(mld_soc);
-			ppe_vp_profile = &be_soc->ppe_vp_profile[vp_params.ppe_vp_profile_idx];
-			src_info = ppe_vp_profile->vp_num;
+		be_vdev = dp_get_be_vdev_from_dp_vdev(mld_peer->vdev);
+		if (!be_vdev) {
+			dp_err("BE vap is null");
+			return QDF_STATUS_E_NULL_VALUE;
 		}
+
+		/*
+		 * Extract the VP profile from the vap
+		 * in case of MLO peer, we have to get the profile from
+		 * the MLD vdev's osif handle and not the link peer.
+		 */
+		mld_soc = mld_peer->vdev->pdev->soc;
+		cdp_soc = &mld_soc->cdp_soc;
+		if (!cdp_soc->ol_ops->get_ppeds_profile_info_for_vap) {
+			dp_err("%pK: Register PPEDS profile info API before use\n", cdp_soc);
+			return QDF_STATUS_E_NULL_VALUE;
+		}
+
+		qdf_status = cdp_soc->ol_ops->get_ppeds_profile_info_for_vap(mld_soc->ctrl_psoc,
+									     mld_peer->vdev->vdev_id,
+									     &vp_params);
+		if (qdf_status == QDF_STATUS_E_NULL_VALUE) {
+			dp_err("%pK: Failed to get ppeds profile for mld soc\n", mld_soc);
+			return qdf_status;
+		}
+
+		/*
+		 * Check if PPE DS routing is enabled on
+		 * the associated vap.
+		 */
+		if (vp_params.ppe_vp_type != PPE_VP_USER_TYPE_DS)
+			return qdf_status;
+
+		be_soc = dp_get_be_soc_from_dp_soc(mld_soc);
+		ppe_vp_profile = &be_soc->ppe_vp_profile[vp_params.ppe_vp_profile_idx];
+		src_info = ppe_vp_profile->vp_num;
 
 		qdf_status = dp_peer_ppeds_default_route_be(soc, be_peer,
 							    vdev_id, src_info);
