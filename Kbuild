@@ -31,6 +31,13 @@ ifneq ($(ANDROID_BUILD_TOP),)
       override WLAN_ROOT := $(ANDROID_BUILD_TOP_REL)/$(WLAN_ROOT)
       override WLAN_COMMON_INC := $(ANDROID_BUILD_TOP_REL)/$(WLAN_COMMON_INC)
       override WLAN_FW_API := $(ANDROID_BUILD_TOP_REL)/$(WLAN_FW_API)
+else ifneq ($(LINUX_BUILD_TOP),)
+      LINUX_BUILD_TOP_REL := $(shell python -c "import os.path; print(os.path.relpath('$(LINUX_BUILD_TOP)'))")
+      $(warning "LINUX_BUILD_TOP_REL=: $(LINUX_BUILD_TOP_REL)")
+      override WLAN_ROOT := $(LINUX_BUILD_TOP_REL)/qcacld-3.0
+      override WLAN_COMMON_ROOT ?= cmn
+      override WLAN_COMMON_INC ?= $(WLAN_ROOT)/$(WLAN_COMMON_ROOT)
+      override WLAN_FW_API := $(WLAN_ROOT)/../fw-api
 endif
 endif
 
@@ -3463,6 +3470,8 @@ cppflags-y += \
 	-DWLAN_WAKE_LOCK_DEBUG \
 	-DWLAN_PERIODIC_WORK_DEBUG
 endif
+
+cppflags-$(CONFIG_ALLOC_CONTIGUOUS_MULTI_PAGE) += -DALLOC_CONTIGUOUS_MULTI_PAGE
 
 cppflags-y += -DWLAN_FEATURE_P2P
 cppflags-y += -DWLAN_FEATURE_WFD
