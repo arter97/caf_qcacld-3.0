@@ -2783,11 +2783,6 @@ struct wlan_mlme_cfg {
 	struct wlan_mlme_eml_cap eml_cap;
 };
 
-enum pkt_origin {
-	FW,
-	HOST
-};
-
 /**
  * struct mlme_pmk_info - SAE Roaming using single pmk info
  * @pmk: pmk
