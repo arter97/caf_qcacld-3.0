@@ -11373,6 +11373,50 @@ static int hdd_get_rx_nss_config(struct hdd_adapter *adapter,
 }
 
 /**
+ * hdd_get_listen_interval_config() - Get listen interval from driver
+ * @adapter: Pointer to HDD adapter
+ * @skb: sk buffer to hold nl80211 attributes
+ * @attr: Pointer to struct nlattr
+ *
+ * Return: 0 on success; error number otherwise
+ */
+static int hdd_get_listen_interval_config(struct hdd_adapter *adapter,
+					  struct sk_buff *skb,
+					  const struct nlattr *attr)
+{
+	uint32_t listen_interval = 0;
+	QDF_STATUS status;
+	struct wlan_objmgr_vdev *vdev;
+
+	if (adapter->device_mode != QDF_STA_MODE &&
+	    adapter->device_mode != QDF_P2P_CLIENT_MODE) {
+		hdd_err("Device not in STA / P2P-CLI mode");
+		return -EINVAL;
+	}
+	vdev = hdd_objmgr_get_vdev_by_user(adapter, WLAN_OSIF_ID);
+	if (!vdev) {
+		hdd_err("Failed to get vdev");
+		return -EINVAL;
+	}
+
+	status = ucfg_pmo_get_listen_interval(vdev, &listen_interval);
+	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
+	if (status != QDF_STATUS_SUCCESS) {
+		hdd_err("vdev/vdev ctx NULL for getting listen interval");
+		return -EINVAL;
+	}
+
+	hdd_debug("listen interval %d", listen_interval);
+	if (nla_put_u32(skb, QCA_WLAN_VENDOR_ATTR_CONFIG_LISTEN_INTERVAL,
+			listen_interval)) {
+		hdd_err("nla_put failure");
+		return -EINVAL;
+	}
+
+	return 0;
+}
+
+/**
  * hdd_get_optimized_power_config() - Get the number of spatial streams
  * supported by the adapter
  * @adapter: Pointer to HDD adapter
@@ -11480,6 +11524,9 @@ static const struct config_getters config_getters[] = {
 	 {QCA_WLAN_VENDOR_ATTR_CONFIG_RX_NSS,
 	 sizeof(uint8_t),
 	 hdd_get_rx_nss_config},
+	 {QCA_WLAN_VENDOR_ATTR_CONFIG_LISTEN_INTERVAL,
+	 sizeof(uint32_t),
+	 hdd_get_listen_interval_config},
 };
 
 /**

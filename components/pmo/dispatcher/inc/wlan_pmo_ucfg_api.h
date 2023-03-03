@@ -1100,6 +1100,18 @@ QDF_STATUS ucfg_pmo_config_listen_interval(struct wlan_objmgr_vdev *vdev,
 					   uint32_t listen_interval);
 
 /**
+ * ucfg_pmo_get_listen_interval() - function to get listen interval
+ * @vdev: objmgr vdev
+ * @listen_interval: pointer to store listen interval
+ *
+ * This function allows user to get listen interval dynamically
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS ucfg_pmo_get_listen_interval(struct wlan_objmgr_vdev *vdev,
+					uint32_t *listen_interval);
+
+/**
  * ucfg_pmo_config_modulated_dtim() - function to configure modulated dtim
  * @vdev: objmgr vdev handle
  * @mod_dtim: New modulated dtim value passed by user
