@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -495,6 +495,8 @@ QDF_STATUS dp_sawf_init_telemetry_params(void);
  * @tid: TID
  * @service_interval: Service Interval
  * @burst_size: Burst size
+ * @min_tput: min throughput
+ * @max_latency: max latency
  * @add_or_sub: Add or Sub
  *
  * Return: QDF_STATUS
@@ -502,7 +504,8 @@ QDF_STATUS dp_sawf_init_telemetry_params(void);
 QDF_STATUS
 dp_sawf_peer_config_ul(struct cdp_soc_t *soc_hdl, uint8_t *mac_addr,
 		       uint8_t tid, uint32_t service_interval,
-		       uint32_t burst_size, uint8_t add_or_sub);
+		       uint32_t burst_size, uint32_t min_tput,
+		       uint32_t max_latency, uint8_t add_or_sub);
 
 /*
  * dp_swaf_peer_is_sla_configured() - Check if sla is configured for a peer

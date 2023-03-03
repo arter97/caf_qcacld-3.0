@@ -515,7 +515,8 @@ static struct dp_peer *dp_sawf_get_peer_from_wds_ext_dev(
 QDF_STATUS
 dp_sawf_peer_config_ul(struct cdp_soc_t *soc_hdl, uint8_t *mac_addr,
 		       uint8_t tid, uint32_t service_interval,
-		       uint32_t burst_size, uint8_t add_or_sub)
+		       uint32_t burst_size, uint32_t min_tput,
+		       uint32_t max_latency, uint8_t add_or_sub)
 {
 	struct dp_soc *dpsoc = cdp_soc_t_to_dp_soc(soc_hdl);
 	struct dp_vdev *vdev;
@@ -544,7 +545,8 @@ dp_sawf_peer_config_ul(struct cdp_soc_t *soc_hdl, uint8_t *mac_addr,
 	status = soc_hdl->ol_ops->peer_update_sawf_ul_params(dpsoc->ctrl_psoc,
 			vdev->vdev_id, mac_addr,
 			tid, TID_TO_WME_AC(tid),
-			service_interval, burst_size, add_or_sub);
+			service_interval, burst_size, min_tput, max_latency,
+			add_or_sub);
 
 	dp_peer_unref_delete(peer, DP_MOD_ID_SAWF);
 
