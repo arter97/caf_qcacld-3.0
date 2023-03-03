@@ -2171,6 +2171,7 @@ DP_INC := -I$(WLAN_COMMON_INC)/dp/inc \
 
 DP_SRC := $(WLAN_COMMON_ROOT)/dp/wifi3.0
 DP_OBJS := $(DP_SRC)/dp_main.o \
+		$(DP_SRC)/dp_rings_main.o \
 		$(DP_SRC)/dp_tx.o \
 		$(DP_SRC)/dp_arch_ops.o \
 		$(DP_SRC)/dp_tx_desc.o \
