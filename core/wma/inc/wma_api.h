@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -658,19 +658,6 @@ QDF_STATUS wma_ap_mlme_vdev_stop_start_send(struct vdev_mlme_obj *vdev_mlme,
 					    enum vdev_cmd_type type,
 					    uint16_t data_len, void *data);
 
-/**
- * wma_sta_mlme_vdev_down_send() - VDEV down operation
- * @vdev_mlme_obj:  VDEV MLME comp object
- * @data_len: data size
- * @data: event data
- *
- * API invokes VDEV down operation
- *
- * Return: SUCCESS on successful completion of VDEV down operation
- *         FAILURE, if it fails due to any
- */
-QDF_STATUS wma_sta_mlme_vdev_down_send(struct vdev_mlme_obj *vdev_mlme,
-				       uint16_t data_len, void *data);
 /**
  * wma_post_vdev_create_setup() - Post vdev create setup
  * @vdev: vdev obj
