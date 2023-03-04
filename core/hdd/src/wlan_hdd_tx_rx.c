@@ -1449,8 +1449,6 @@ void hdd_dp_cfg_update(struct wlan_objmgr_psoc *psoc,
 
 	config->napi_cpu_affinity_mask =
 		cfg_get(psoc, CFG_DP_NAPI_CE_CPU_MASK);
-	config->enable_fisa_lru_deletion =
-				cfg_get(psoc, CFG_DP_RX_FISA_LRU_DEL_ENABLE);
 	config->cfg_wmi_credit_cnt = cfg_get(psoc, CFG_DP_HTC_WMI_CREDIT_CNT);
 
 	hdd_ini_tx_flow_control(config, psoc);
