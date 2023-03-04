@@ -3261,12 +3261,6 @@ struct omi_ctrl_tx {
 	uint32_t reserved:14;
 };
 
-int sme_send_he_om_ctrl_bw_update(mac_handle_t mac_handle, uint8_t session_id,
-				  uint8_t cfg_val);
-
-int sme_send_he_om_ctrl_nss_update(mac_handle_t mac_handle, uint8_t session_id,
-				   uint8_t cfg_val);
-
 void sme_reset_he_om_ctrl(mac_handle_t mac_handle);
 
 /**
