@@ -1146,32 +1146,6 @@ struct wma_target_req {
 };
 
 /**
- * struct wma_set_key_params - set key parameters
- * @vdev_id: vdev id
- * @def_key_idx: used to see if we have to read the key from cfg
- * @key_len: key length
- * @peer_mac: peer mac address
- * @singl_tid_rc: 1=Single TID based Replay Count, 0=Per TID based RC
- * @key_type: key type
- * @key_idx: key index
- * @unicast: unicast flag
- * @key_data: key data
- */
-struct wma_set_key_params {
-	uint8_t vdev_id;
-	/* def_key_idx can be used to see if we have to read the key from cfg */
-	uint32_t def_key_idx;
-	uint16_t key_len;
-	uint8_t peer_mac[QDF_MAC_ADDR_SIZE];
-	uint8_t singl_tid_rc;
-	enum eAniEdType key_type;
-	uint32_t key_idx;
-	bool unicast;
-	uint8_t key_data[SIR_MAC_MAX_KEY_LENGTH];
-	uint8_t key_rsc[WLAN_CRYPTO_RSC_SIZE];
-};
-
-/**
  * struct t_thermal_cmd_params - thermal command parameters
  * @minTemp: minimum temperature
  * @maxTemp: maximum temperature
