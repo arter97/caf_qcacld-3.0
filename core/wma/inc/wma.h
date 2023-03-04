@@ -996,7 +996,6 @@ typedef struct {
 	uint32_t old_hw_mode_index;
 	uint32_t new_hw_mode_index;
 	wma_peer_authorized_fp peer_authorized_cb;
-	struct sir_ocb_config *ocb_config_req;
 	uint16_t self_gen_frm_pwr;
 	bool tx_chain_mask_cck;
 	qdf_mc_timer_t service_ready_ext_timer;
