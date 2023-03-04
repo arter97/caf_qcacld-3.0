@@ -444,12 +444,6 @@ qdf_napi_struct
 }
 #endif
 
-uint32_t hdd_txrx_get_tx_ack_count(struct hdd_adapter *adapter)
-{
-	return cdp_get_tx_ack_stats(cds_get_context(QDF_MODULE_ID_SOC),
-				    adapter->vdev_id);
-}
-
 int hdd_set_udp_qos_upgrade_config(struct hdd_adapter *adapter,
 				   uint8_t priority)
 {
