@@ -137,8 +137,8 @@ int wma_rx_service_ready_ext_event(void *handle, uint8_t *ev, uint32_t len);
 /**
  * wma_rx_service_ready_ext2_event() - evt handler for service ready ext2 event.
  * @handle: wma handle
- * @event: params of the service ready extended event
- * @length: param length
+ * @ev: params of the service ready extended event
+ * @len: param length
  *
  * Return: none
  */
@@ -239,7 +239,7 @@ static inline int wma_unified_radio_tx_mem_free(void *handle)
 
 /**
  * wma_form_unit_test_cmd_and_send() - to form a wma command and send it to FW
- * @session_id: wma session id to be filled while forming the command
+ * @vdev_id: vdev id to be filled while forming the command
  * @module_id: module id given by user to be filled in the command
  * @arg_count: number of argument count
  * @arg: pointer to argument list
@@ -321,7 +321,7 @@ QDF_STATUS wma_set_cts2self_for_p2p_go(void *wma_handle,
 #ifdef WLAN_FEATURE_ROAM_OFFLOAD
 /**
  * wma_get_roam_scan_ch() - API to get roam scan channel list.
- * @wma_handle: pointer to wma handle.
+ * @wma: pointer to wma handle.
  * @vdev_id: vdev id
  *
  * Return: QDF_STATUS.
@@ -423,7 +423,7 @@ QDF_STATUS wma_get_sar_limit(WMA_HANDLE handle,
 /**
  * wma_set_sar_limit() - set sar limits in the target
  * @handle: wma handle
- * @sar_limit_cmd_params: sar limit cmd params
+ * @sar_limit_params: sar limit cmd params
  *
  *  This function sends WMI command to set SAR limits.
  *
@@ -559,7 +559,7 @@ bool wma_get_channel_switch_in_progress(struct wma_txrx_node *iface);
 
 /**
  * wma_sta_mlme_vdev_start_continue() - VDEV start response handling
- * @vdev_mlme_obj:  VDEV MLME comp object
+ * @vdev_mlme:  VDEV MLME comp object
  * @data_len: data size
  * @data: event data
  *
@@ -573,7 +573,7 @@ QDF_STATUS wma_sta_mlme_vdev_start_continue(struct vdev_mlme_obj *vdev_mlme,
 
 /**
  * wma_ap_mlme_vdev_start_continue() - VDEV start response handling
- * @vdev_mlme_obj:  VDEV MLME comp object
+ * @vdev_mlme:  VDEV MLME comp object
  * @data_len: data size
  * @data: event data
  *
@@ -587,7 +587,7 @@ QDF_STATUS wma_ap_mlme_vdev_start_continue(struct vdev_mlme_obj *vdev_mlme,
 
 /**
  * wma_sta_vdev_up_send() - Send VDEV UP command
- * @vdev_mlme_obj:  VDEV MLME comp object
+ * @vdev_mlme:  VDEV MLME comp object
  * @data_len: data size
  * @data: event data
  *
@@ -601,7 +601,7 @@ QDF_STATUS wma_sta_vdev_up_send(struct vdev_mlme_obj *vdev_mlme,
 
 /**
  * wma_mlme_vdev_stop_continue() - VDEV stop response handling
- * @vdev_mlme_obj:  VDEV MLME comp object
+ * @vdev_mlme:  VDEV MLME comp object
  * @data_len: data size
  * @data: event data
  *
@@ -615,7 +615,7 @@ QDF_STATUS wma_mlme_vdev_stop_continue(struct vdev_mlme_obj *vdev_mlme,
 
 /**
  * wma_ap_mlme_vdev_down_send() - VDEV down operation
- * @vdev_mlme_obj:  VDEV MLME comp object
+ * @vdev_mlme:  VDEV MLME comp object
  * @data_len: data size
  * @data: event data
  *
@@ -630,7 +630,7 @@ QDF_STATUS wma_ap_mlme_vdev_down_send(struct vdev_mlme_obj *vdev_mlme,
 /**
  * wma_mlme_vdev_notify_down_complete() - VDEV init state transition
  * notification
- * @vdev_mlme_obj:  VDEV MLME comp object
+ * @vdev_mlme:  VDEV MLME comp object
  * @data_len: data size
  * @data: event data
  *
@@ -645,7 +645,7 @@ wma_mlme_vdev_notify_down_complete(struct vdev_mlme_obj *vdev_mlme,
 
 /**
  * wma_ap_mlme_vdev_stop_start_send() - handle vdev stop during start req
- * @vdev_mlme_obj:  VDEV MLME comp object
+ * @vdev_mlme:  VDEV MLME comp object
  * @type: restart req or start req
  * @data_len: data size
  * @data: event data
@@ -722,7 +722,7 @@ QDF_STATUS wma_vdev_set_data_tx_callback(struct wlan_objmgr_vdev *vdev);
 
 /**
  * wma_mon_mlme_vdev_start_continue() - VDEV start response handling
- * @vdev_mlme_obj:  VDEV MLME comp object
+ * @vdev_mlme:  VDEV MLME comp object
  * @data_len: data size
  * @data: event data
  *
@@ -736,7 +736,7 @@ QDF_STATUS wma_mon_mlme_vdev_start_continue(struct vdev_mlme_obj *vdev_mlme,
 
 /**
  * wma_mon_mlme_vdev_up_send() - Send VDEV UP command
- * @vdev_mlme_obj:  VDEV MLME comp object
+ * @vdev_mlme:  VDEV MLME comp object
  * @data_len: data size
  * @data: event data
  *
@@ -750,7 +750,7 @@ QDF_STATUS wma_mon_mlme_vdev_up_send(struct vdev_mlme_obj *vdev_mlme,
 
 /**
  * wma_mon_mlme_vdev_stop_send() - VDEV stop operation
- * @vdev_mlme_obj:  VDEV MLME comp object
+ * @vdev_mlme:  VDEV MLME comp object
  * @data_len: data size
  * @data: event data
  *
@@ -764,7 +764,7 @@ QDF_STATUS wma_mon_mlme_vdev_stop_send(struct vdev_mlme_obj *vdev_mlme,
 
 /**
  * wma_mon_mlme_vdev_down_send() - VDEV down operation
- * @vdev_mlme_obj:  VDEV MLME comp object
+ * @vdev_mlme:  VDEV MLME comp object
  * @data_len: data size
  * @data: event data
  *
@@ -789,11 +789,10 @@ QDF_STATUS wma_vdev_detach_callback(struct vdev_delete_response *rsp);
 
 /**
  * wma_vdev_stop_resp_handler() - vdev stop response handler
- * @handle: wma handle
- * @cmd_param_info: event buffer
- * @len: buffer length
+ * @vdev_mlme: vdev mlme obj
+ * @rsp: vdev stup response
  *
- * Return: 0 for success or error code
+ * Return: QDF_STATUS_SUCCESS for success or error code
  */
 QDF_STATUS wma_vdev_stop_resp_handler(struct vdev_mlme_obj *vdev_mlme,
 				struct vdev_stop_response *rsp);
@@ -850,7 +849,7 @@ int wma_wlm_stats_rsp(void *wma_ctx, uint8_t *event, uint32_t len);
 #endif /* FEATURE_WLM_STATS */
 
 /**
- * wma_self_peer_create() - create self peer in objmgr
+ * wma_vdev_self_peer_create() - create self peer in objmgr
  * @vdev_mlme: vdev mlme component private object
  *
  * Create the self peer in firmware for beaconing vdev's and create then
