@@ -19715,7 +19715,6 @@ wlan_hdd_add_monitor_check(struct hdd_context *hdd_ctx,
 						NULL);
 
 		if (num_open_session == 1) {
-			hdd_ctx->disconnect_for_sta_mon_conc = true;
 			/* Try disconnecting if already in connected state */
 			wlan_hdd_cm_issue_disconnect(sta_adapter,
 						     REASON_UNSPEC_FAILURE,

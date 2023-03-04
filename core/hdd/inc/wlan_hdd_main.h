@@ -1884,7 +1884,6 @@ enum wlan_state_ctrl_str_id {
  * @ll_stats_per_chan_rx_tx_time:
  * @is_get_station_clubbed_in_ll_stats_req:
  * @multi_client_thermal_mitigation: Multi client thermal mitigation by fw
- * @disconnect_for_sta_mon_conc: disconnect if sta monitor intf concurrency
  * @is_dual_mac_cfg_updated: indicate whether dual mac cfg has been updated
  * @is_regulatory_update_in_progress:
  * @regulatory_update_event:
@@ -2157,7 +2156,6 @@ struct hdd_context {
 #ifdef FEATURE_WPSS_THERMAL_MITIGATION
 	bool multi_client_thermal_mitigation;
 #endif
-	bool disconnect_for_sta_mon_conc;
 	bool is_dual_mac_cfg_updated;
 	bool is_regulatory_update_in_progress;
 	qdf_event_t regulatory_update_event;
