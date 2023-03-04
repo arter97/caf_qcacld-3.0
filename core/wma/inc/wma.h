@@ -1514,9 +1514,6 @@ QDF_STATUS wma_set_gateway_params(tp_wma_handle wma,
 }
 #endif /* FEATURE_LFR_SUBNET_DETECTION */
 
-QDF_STATUS wma_lro_config_cmd(void *handle,
-	 struct cdp_lro_hash_config *wma_lro_cmd);
-
 QDF_STATUS wma_ht40_stop_obss_scan(tp_wma_handle wma_handle,
 				int32_t vdev_id);
 

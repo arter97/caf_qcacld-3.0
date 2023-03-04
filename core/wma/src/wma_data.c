@@ -3079,42 +3079,6 @@ void wma_tx_abort(uint8_t vdev_id)
 					 &param);
 }
 
-/**
- * wma_lro_config_cmd() - process the LRO config command
- * @wma: Pointer to WMA handle
- * @wma_lro_cmd: Pointer to LRO configuration parameters
- *
- * This function sends down the LRO configuration parameters to
- * the firmware to enable LRO, sets the TCP flags and sets the
- * seed values for the toeplitz hash generation
- *
- * Return: QDF_STATUS_SUCCESS for success otherwise failure
- */
-QDF_STATUS wma_lro_config_cmd(void *handle,
-	 struct cdp_lro_hash_config *wma_lro_cmd)
-{
-	struct wmi_lro_config_cmd_t wmi_lro_cmd = {0};
-	tp_wma_handle wma = cds_get_context(QDF_MODULE_ID_WMA);
-
-	if (!wma || !wma_lro_cmd) {
-		wma_err("Invalid input!");
-		return QDF_STATUS_E_FAILURE;
-	}
-
-	wmi_lro_cmd.lro_enable = wma_lro_cmd->lro_enable;
-	wmi_lro_cmd.tcp_flag = wma_lro_cmd->tcp_flag;
-	wmi_lro_cmd.tcp_flag_mask = wma_lro_cmd->tcp_flag_mask;
-	qdf_mem_copy(wmi_lro_cmd.toeplitz_hash_ipv4,
-			wma_lro_cmd->toeplitz_hash_ipv4,
-			LRO_IPV4_SEED_ARR_SZ * sizeof(uint32_t));
-	qdf_mem_copy(wmi_lro_cmd.toeplitz_hash_ipv6,
-			wma_lro_cmd->toeplitz_hash_ipv6,
-			LRO_IPV6_SEED_ARR_SZ * sizeof(uint32_t));
-
-	return wmi_unified_lro_config_cmd(wma->wmi_handle,
-						&wmi_lro_cmd);
-}
-
 void wma_delete_invalid_peer_entries(uint8_t vdev_id, uint8_t *peer_mac_addr)
 {
 	tp_wma_handle wma = cds_get_context(QDF_MODULE_ID_WMA);

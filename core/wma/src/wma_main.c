@@ -9342,11 +9342,6 @@ static QDF_STATUS wma_mc_process_msg(struct scheduler_msg *msg)
 			(struct sir_antenna_mode_param *)msg->bodyptr);
 		qdf_mem_free(msg->bodyptr);
 		break;
-	case WMA_LRO_CONFIG_CMD:
-		wma_lro_config_cmd(wma_handle,
-			(struct cdp_lro_hash_config *)msg->bodyptr);
-		qdf_mem_free(msg->bodyptr);
-		break;
 	case WMA_GW_PARAM_UPDATE_REQ:
 		wma_set_gateway_params(wma_handle, msg->bodyptr);
 		qdf_mem_free(msg->bodyptr);
@@ -9981,35 +9976,6 @@ QDF_STATUS wma_crash_inject(WMA_HANDLE wma_handle, uint32_t type,
 	param.delay_time_ms = delay_time_ms;
 	return wmi_crash_inject(wma->wmi_handle, &param);
 }
-
-#ifdef RECEIVE_OFFLOAD
-int wma_lro_init(struct cdp_lro_hash_config *lro_config)
-{
-	struct scheduler_msg msg = {0};
-	struct cdp_lro_hash_config *iwcmd;
-
-	iwcmd = qdf_mem_malloc(sizeof(*iwcmd));
-	if (!iwcmd)
-		return -ENOMEM;
-
-	*iwcmd = *lro_config;
-
-	msg.type = WMA_LRO_CONFIG_CMD;
-	msg.reserved = 0;
-	msg.bodyptr = iwcmd;
-
-	if (QDF_STATUS_SUCCESS !=
-		scheduler_post_message(QDF_MODULE_ID_WMA,
-				       QDF_MODULE_ID_WMA,
-				       QDF_MODULE_ID_WMA, &msg)) {
-		qdf_mem_free(iwcmd);
-		return -EAGAIN;
-	}
-
-	wma_debug("sending the LRO configuration to the fw");
-	return 0;
-}
-#endif
 
 QDF_STATUS wma_configure_smps_params(uint32_t vdev_id, uint32_t param_id,
 							uint32_t param_val)
