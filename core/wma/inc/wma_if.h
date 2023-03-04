@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2011-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -696,16 +696,6 @@ typedef struct sMaxTxPowerPerBandParams {
 	enum band_info bandInfo;
 	int8_t power;
 } tMaxTxPowerPerBandParams, *tpMaxTxPowerPerBandParams;
-
-/**
- * struct vdev_create_req_param - vdev create request params
- * @vdev_id: vdev_id
- * @status: response status code
- */
-struct vdev_create_req_param {
-	uint32_t vdev_id;
-	QDF_STATUS status;
-};
 
 /**
  * struct set_ie_param - set IE params structure
