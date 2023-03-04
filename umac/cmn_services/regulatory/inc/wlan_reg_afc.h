@@ -27,50 +27,27 @@
  */
 
 /**
- * struct wlan_afc_host_req_fixed_params - Structure to send the list of AFC
- *                                          requests to AFC app to query the
- *                                          AFC server.
- *
- * @req_id:        Unique request ID from FW to be used as AFC request ID
- *                 to server.
- * @version_minor: Lower 16 bits for the AFC request version.
- * @version_major: Higher 16 bits for the AFC request version.
- * @req_length:    Length of entire AFC request message.
- * @min_des_power: Minimum desired power(in dbm) for queried spectrum.
- */
-struct wlan_afc_host_req_fixed_params {
-	uint64_t req_id;
-	uint16_t version_minor;
-	uint16_t version_major;
-	uint16_t req_length;
-	int16_t  min_des_power;
-} qdf_packed;
-
-/**
  * struct wlan_afc_freq_range_obj - Structure for frequency range query.
- *
  * @lowfreq:  Lower limit(in MHz) for frequency range query.
  * @highfreq: Higher limit(in MHz) for frequency range query.
  */
 struct wlan_afc_freq_range_obj {
 	uint16_t lowfreq;
 	uint16_t highfreq;
-} qdf_packed;
+};
 
 /**
  * struct wlan_afc_frange_list - Structure to send freq range list to AFC app.
- *
  * @num_ranges: Number of queried frequency ranges.
  * @range_objs: List of queried frequency ranges.
  */
 struct wlan_afc_frange_list {
 	uint32_t num_ranges;
-	struct wlan_afc_freq_range_obj range_objs[0];
-} qdf_packed;
+	struct wlan_afc_freq_range_obj *range_objs;
+};
 
 /**
  * struct wlan_afc_opclass_obj - Structure for opclass/channel query.
- *
  * @opclass_num_cfis: Number of channels to be required for given opclass.
  * @opclass:          Operating class to be queried.
  * @cfis:             List of Channels to be queried for given Global opclass.
@@ -78,45 +55,43 @@ struct wlan_afc_frange_list {
 struct wlan_afc_opclass_obj {
 	uint8_t opclass_num_cfis;
 	uint8_t opclass;
-	uint8_t cfis[0];
-} qdf_packed;
+	uint8_t *cfis;
+};
 
 /**
- * struct wlan_afc_num_opclasses - Structure for opclass list
- *
- * @num_opclasses: Number of opclass to be queried.
+ * struct wlan_afc_opclass_obj_list - Structure to send opclass object list
+ * to AFC app.
+ * @num_opclass_objs: Number of opclass objects.
+ * @opclass_objs: Pointer to list of opclass objects.
  */
-struct wlan_afc_num_opclasses {
-	uint8_t num_opclasses;
-} qdf_packed;
+struct wlan_afc_opclass_obj_list {
+	uint8_t num_opclass_objs;
+	struct wlan_afc_opclass_obj *opclass_objs;
+};
 
 /**
- * struct wlan_afc_host_partial_request - Structure to send AFC request info
- *
- * @fixed_params: AFC request fixed params (req_id, length, min_des_power)
- *
- * The following is the layout of the AFC host request
- * It is not a C structure as some of the structures are not of fixed size.
- *
- * struct wlan_afc_host_partial_request {
- *      <fixed-size>    struct wlan_afc_host_req_fixed_params fixed_parms;
- *      <variable-size> struct wlan_afc_freq_list freq_lst;
- *      <fixed-size>    struct wlan_afc_num_opclasses opclss_list_size;
- *      <variable-size> struct wlan_afc_opclass_obj obj[0];
- *      <variable-size> struct wlan_afc_opclass_obj obj[1];
- *      ....
- *      <variable-size> struct wlan_afc_opclass_obj obj[opclass_list_size-1];
- *      <fixed-size>    struct wlan_afc_location afc_location;
- * };
+ * struct wlan_afc_host_request - Structure to send AFC request info.
+ * @req_id:        Unique request ID from FW to be used as AFC request ID
+ *                 to server.
+ * @version_minor: Lower 16 bits for the AFC request version.
+ * @version_major: Higher 16 bits for the AFC request version.
+ * @min_des_power: Minimum desired power(in dbm) for queried spectrum.
+ * @freq_lst: Pointer to the list of frequency ranges.
+ * @opclass_obj_lst: Pointer to opclass objects list.
+ * @afc_location: Pointer to the AFC location structure,
  */
-struct wlan_afc_host_partial_request {
-	struct wlan_afc_host_req_fixed_params fixed_params;
-	/* Other structures to follow. See the layout in the comment above */
-} qdf_packed;
+struct wlan_afc_host_request {
+	uint64_t req_id;
+	uint16_t version_minor;
+	uint16_t version_major;
+	int16_t  min_des_power;
+	struct wlan_afc_frange_list *freq_lst;
+	struct wlan_afc_opclass_obj_list *opclass_obj_lst;
+	struct wlan_afc_location *afc_location;
+};
 
 /**
  * enum reg_afc_dev_deploy_type - Deployment type of AP
- *
  * @AFC_DEPLOYMENT_UNKNOWN: Unknown
  * @AFC_DEPLOYMENT_INDOOR: Located Indoor
  * @AFC_DEPLOYMENT_OUTDOOR: Located Outdoor
@@ -129,7 +104,6 @@ enum reg_afc_dev_deploy_type {
 
 /**
  * enum afc_object_type - AFC Request object types
- *
  * @AFC_OBJ_LOCATION: Location object
  */
 enum afc_object_type {
@@ -138,20 +112,14 @@ enum afc_object_type {
 
 /**
  * struct wlan_afc_location - Structure for afc location info.
- *
- * @afc_elem_type: AFC element type of enum afc_object_type
- * @afc_elem_len: AFC element length
  * @deployment_type: Deployment type of enum reg_afc_dev_deploy_type
  */
 struct wlan_afc_location {
-	uint32_t afc_elem_type;
-	uint32_t afc_elem_len;
 	uint32_t deployment_type;
-} qdf_packed;
+};
 
 /**
  * struct wlan_afc_host_resp - Structure for AFC Host response to FW
- *
  * @header:       Header for compatibility.
  *                Valid value: 0
  * @status:       Flag to indicate validity of data. To be updated by TZ
@@ -208,7 +176,6 @@ struct wlan_afc_host_resp {
  * struct wlan_afc_resp_opclass_info - Structure to populate operating class
  *                                     and channel information from AFC
  *                                     response.
- *
  * @opclass:        Operating class
  * @num_channels:   Number of channels received in AFC response
  */
@@ -219,7 +186,6 @@ struct wlan_afc_resp_opclass_info {
 
 /**
  * struct wlan_afc_resp_eirp_info - Structure to update EIRP values for channels
- *
  * @channel_cfi:  Channel center frequency index
  * @max_eirp_pwr: Maximum permissible EIRP(in dBm) for the Channel
  */
@@ -231,7 +197,6 @@ struct wlan_afc_resp_eirp_info {
 /**
  * struct wlan_afc_resp_freq_psd_info - Structure to update PSD values for
  *                                      queried frequency ranges
- *
  * @freq_info: Frequency range in MHz:- bits 15:0  = u16 start_freq,
  *                                      bits 31:16 = u16 end_freq
  * @max_psd:   Maximum PSD in dbm/MHz
@@ -243,7 +208,6 @@ struct wlan_afc_resp_freq_psd_info {
 
 /**
  * struct wlan_afc_bin_resp_data - Structure to populate AFC binary response
- *
  * @local_err_code:     Internal error code between AFC app and FW
  *                      0 - Success
  *                      1 - General failure

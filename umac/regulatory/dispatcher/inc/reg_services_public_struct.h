@@ -2312,13 +2312,13 @@ struct reg_afc_resp_rx_ind_info {
  * typedef afc_req_rx_evt_handler() - Function prototype of AFC request
  *                                    received event handler
  * @pdev: Pointer to pdev
- * @afc_par_req: Pointer to AFC partial request
+ * @afc_req: Pointer to AFC request
  * @arg: Pointer to void (opaque) argument object
  *
  * Return: void
  */
 typedef void (*afc_req_rx_evt_handler)(struct wlan_objmgr_pdev *pdev,
-				       struct wlan_afc_host_partial_request *afc_par_req,
+				       struct wlan_afc_host_request *afc_req,
 				       void *arg);
 
 /**

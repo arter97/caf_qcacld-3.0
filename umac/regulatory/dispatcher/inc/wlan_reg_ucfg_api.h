@@ -340,7 +340,7 @@ QDF_STATUS ucfg_reg_unregister_afc_req_rx_callback(struct wlan_objmgr_pdev *pdev
 						   afc_req_rx_evt_handler cbf);
 
 /**
- * ucfg_reg_get_partial_afc_req_info() - Get the the frequency ranges and
+ * ucfg_reg_get_afc_req_info() - Get the the frequency ranges and
  * opclass + channel ranges. This is partial because in the AFC request there
  * are a few more parameters: Longitude, Latitude a few other information
  * @pdev: Pointer to PDEV object.
@@ -349,10 +349,21 @@ QDF_STATUS ucfg_reg_unregister_afc_req_rx_callback(struct wlan_objmgr_pdev *pdev
  *
  * Return: QDF_STATUS_E_INVAL if unable to set and QDF_STATUS_SUCCESS is set.
  */
-QDF_STATUS ucfg_reg_get_partial_afc_req_info(
-		struct wlan_objmgr_pdev *pdev,
-		struct wlan_afc_host_partial_request **afc_req,
-		uint64_t req_id);
+QDF_STATUS ucfg_reg_get_afc_req_info(struct wlan_objmgr_pdev *pdev,
+				     struct wlan_afc_host_request **afc_req,
+				     uint64_t req_id);
+
+/**
+ * ucfg_reg_free_afc_req() - Free the  memory allocated for AFC request
+ * structure and its members.
+ * @pdev: Pointer to pdev.
+ * @afc_req: Pointer to AFC request structure.
+ *
+ * Return: void
+ */
+void
+ucfg_reg_free_afc_req(struct wlan_objmgr_pdev *pdev,
+		      struct wlan_afc_host_request *afc_req);
 
 /**
  * ucfg_reg_register_afc_power_event_callback() - add AFC power event received
