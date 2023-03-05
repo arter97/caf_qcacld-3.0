@@ -1559,9 +1559,7 @@ void lim_process_sta_mlm_add_sta_rsp(struct mac_context *mac_ctx,
 			session_entry->limMlmState));
 		lim_process_add_sta_rsp_mlo(mac_ctx, &mlm_assoc_cnf,
 					    session_entry);
-#ifdef WLAN_DEBUG
-		mac_ctx->lim.gLimNumLinkEsts++;
-#endif
+
 #ifdef FEATURE_WLAN_TDLS
 		/* initialize TDLS peer related data */
 		lim_init_tdls_data(mac_ctx, session_entry);

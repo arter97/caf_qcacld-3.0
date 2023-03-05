@@ -107,11 +107,6 @@ static void __lim_init_bss_vars(struct mac_context *mac)
 
 static void __lim_init_stats_vars(struct mac_context *mac)
 {
-	mac->lim.gLimNumBeaconsRcvd = 0;
-	mac->lim.gLimNumBeaconsIgnored = 0;
-
-	mac->lim.gLimNumDeferredMsgs = 0;
-
 	/* / Variable to keep track of number of currently associated STAs */
 	mac->lim.gLimNumOfAniSTAs = 0; /* count of ANI peers */
 
@@ -120,31 +115,6 @@ static void __lim_init_stats_vars(struct mac_context *mac)
 	qdf_mem_zero(mac->lim.gLimHeartBeatApMac[1],
 			sizeof(tSirMacAddr));
 	mac->lim.gLimHeartBeatApMacIndex = 0;
-
-	/* Statistics to keep track of no. beacons rcvd in heart beat interval */
-	qdf_mem_zero(mac->lim.gLimHeartBeatBeaconStats,
-		    sizeof(mac->lim.gLimHeartBeatBeaconStats));
-
-#ifdef WLAN_DEBUG
-	/* Debug counters */
-	mac->lim.numTot = 0;
-	mac->lim.numBbt = 0;
-	mac->lim.numProtErr = 0;
-	mac->lim.numLearn = 0;
-	mac->lim.numLearnIgnore = 0;
-	mac->lim.numSme = 0;
-	qdf_mem_zero(mac->lim.numMAC, sizeof(mac->lim.numMAC));
-	mac->lim.gLimNumAssocReqDropInvldState = 0;
-	mac->lim.gLimNumAssocReqDropACRejectTS = 0;
-	mac->lim.gLimNumAssocReqDropACRejectSta = 0;
-	mac->lim.gLimNumReassocReqDropInvldState = 0;
-	mac->lim.gLimNumHashMissIgnored = 0;
-	mac->lim.gLimUnexpBcnCnt = 0;
-	mac->lim.gLimBcnSSIDMismatchCnt = 0;
-	mac->lim.gLimNumLinkEsts = 0;
-	mac->lim.gLimNumRxCleanup = 0;
-	mac->lim.gLim11bStaAssocRejectCount = 0;
-#endif
 }
 
 static void __lim_init_states(struct mac_context *mac)

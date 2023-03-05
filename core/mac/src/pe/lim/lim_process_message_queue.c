@@ -1359,17 +1359,8 @@ lim_handle80211_frames(struct mac_context *mac, struct scheduler_msg *limMsg,
 			fc.protVer);
 		lim_pkt_free(mac, TXRX_FRM_802_11_MGMT, pRxPacketInfo,
 			     (void *)limMsg->bodyptr);
-#ifdef WLAN_DEBUG
-		mac->lim.numProtErr++;
-#endif
 		goto end;
 	}
-
-/* Chance of crashing : to be done BT-AMP ........happens when broadcast probe req is received */
-
-#ifdef WLAN_DEBUG
-	mac->lim.numMAC[fc.type][fc.subType]++;
-#endif
 
 	switch (fc.type) {
 	case SIR_MAC_MGMT_FRAME:
@@ -1600,9 +1591,6 @@ static void lim_process_messages(struct mac_context *mac_ctx,
 		return;
 	}
 
-#ifdef WLAN_DEBUG
-	mac_ctx->lim.numTot++;
-#endif
 	/*
 	 * MTRACE logs not captured for events received from SME
 	 * SME enums (eWNI_SME_START_REQ) starts with 0x16xx.
@@ -1632,11 +1620,8 @@ static void lim_process_messages(struct mac_context *mac_ctx,
 		lim_update_beacon(mac_ctx);
 		break;
 	case SIR_BB_XPORT_MGMT_MSG:
-		/* These messages are from Peer MAC entity. */
-#ifdef WLAN_DEBUG
-		mac_ctx->lim.numBbt++;
-#endif
-		/* The original msg which we were deferring have the
+		/* These messages are from Peer MAC entity.
+		 * The original msg which we were deferring have the
 		 * bodyPointer point to 'BD' instead of 'cds pkt'. If we
 		 * don't make a copy of msg, then overwrite the
 		 * msg->bodyPointer and next time when we try to
@@ -2201,9 +2186,6 @@ static void lim_process_normal_hdd_msg(struct mac_context *mac_ctx,
 		 * if radar is detected, Defer processing this message
 		 */
 		if (lim_defer_msg(mac_ctx, msg) != TX_SUCCESS) {
-#ifdef WLAN_DEBUG
-			mac_ctx->lim.numSme++;
-#endif
 			lim_log_session_states(mac_ctx);
 			/* Release body */
 			qdf_mem_free(msg->bodyptr);
@@ -2217,9 +2199,6 @@ static void lim_process_normal_hdd_msg(struct mac_context *mac_ctx,
 		 */
 		if (rsp_reqd)
 			mac_ctx->lim.gLimRspReqd = true;
-#ifdef WLAN_DEBUG
-		mac_ctx->lim.numSme++;
-#endif
 		if (lim_process_sme_req_messages(mac_ctx, msg)) {
 			/*
 			 * Release body. limProcessSmeReqMessage consumed the
