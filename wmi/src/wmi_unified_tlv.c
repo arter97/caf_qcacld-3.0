@@ -21447,6 +21447,10 @@ static void populate_tlv_events_id(WMI_EVT_ID *event_ids)
 	event_ids[wmi_manual_ul_ofdma_trig_feedback_eventid] =
 		WMI_MANUAL_UL_OFDMA_TRIG_FEEDBACK_EVENTID;
 #endif
+#ifdef QCA_STANDALONE_SOUNDING_TRIGGER
+	event_ids[wmi_vdev_standalone_sound_complete_eventid] =
+		WMI_VDEV_STANDALONE_SOUND_COMPLETE_EVENTID;
+#endif
 }
 
 #ifdef WLAN_FEATURE_LINK_LAYER_STATS
@@ -21997,6 +22001,10 @@ static void populate_tlv_service(uint32_t *wmi_service)
 #endif
 	wmi_service[wmi_service_pre_rx_timeout] =
 				WMI_SERVICE_PRE_RX_TO;
+#ifdef QCA_STANDALONE_SOUNDING_TRIGGER
+	wmi_service[wmi_service_standalone_sound] =
+			WMI_SERVICE_STANDALONE_SOUND;
+#endif
 }
 
 /**

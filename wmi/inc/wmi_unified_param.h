@@ -5265,6 +5265,9 @@ typedef enum {
 #ifdef QCA_MANUAL_TRIGGERED_ULOFDMA
 	wmi_manual_ul_ofdma_trig_feedback_eventid,
 #endif
+#ifdef QCA_STANDALONE_SOUNDING_TRIGGER
+	wmi_vdev_standalone_sound_complete_eventid,
+#endif
 	wmi_events_max,
 } wmi_conv_event_id;
 
@@ -6307,6 +6310,9 @@ typedef enum {
 	wmi_service_manual_ulofdma_trigger_support,
 #endif
 	wmi_service_pre_rx_timeout,
+#ifdef QCA_STANDALONE_SOUNDING_TRIGGER
+	wmi_service_standalone_sound,
+#endif
 	wmi_services_max,
 } wmi_conv_service_ids;
 #define WMI_SERVICE_UNAVAILABLE 0xFFFF

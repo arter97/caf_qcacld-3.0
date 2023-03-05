@@ -2283,6 +2283,11 @@ QDF_STATUS (*extract_dbr_buf_metadata)(
 			wmi_unified_t wmi_handle,
 			uint8_t *evt_buf, uint8_t idx,
 			struct direct_buf_rx_metadata *param);
+
+QDF_STATUS (*extract_dbr_buf_cv_metadata)(
+			wmi_unified_t wmi_handle,
+			uint8_t *evt_buf, uint8_t idx,
+			struct direct_buf_rx_cv_metadata *param);
 #endif
 
 QDF_STATUS (*extract_pdev_utf_event)(wmi_unified_t wmi_hdl,
@@ -2705,6 +2710,15 @@ QDF_STATUS(*extract_twt_session_stats_data)
 		 struct wmi_twt_session_stats_event_param *params,
 		 struct wmi_host_twt_session_stats_info *session,
 		 uint32_t idx
+		);
+#endif
+
+#ifdef QCA_STANDALONE_SOUNDING_TRIGGER
+QDF_STATUS (*extract_standalone_sounding_evt_params)
+		(
+		wmi_unified_t wmi_handle,
+		void *evt_buf,
+		struct wmi_host_standalone_sounding_evt_params *ss_params
 		);
 #endif
 
