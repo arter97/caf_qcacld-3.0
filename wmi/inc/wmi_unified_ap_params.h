@@ -1173,4 +1173,38 @@ struct wmi_sawf_params {
 	uint32_t disabled_modes;
 };
 #endif
+
+#ifdef QCA_STANDALONE_SOUNDING_TRIGGER
+enum wmi_host_standalone_sounding_status {
+	WMI_HOST_STANDALONE_SOUND_STATUS_OK,
+	WMI_HOST_STANDALONE_SOUND_STATUS_ERR_NUM_PEERS_EXCEEDED,
+	WMI_HOST_STANDALONE_SOUND_STATUS_ERR_NG_INVALID,
+	WMI_HOST_STANDALONE_SOUND_STATUS_ERR_NUM_REPEAT_EXCEEDED,
+	WMI_HOST_STANDALONE_SOUND_STATUS_ERR_PEER_DOESNOT_SUPPORT_BW,
+	WMI_HOST_STANDALONE_SOUND_STATUS_ERR_INVALID_PEER,
+	WMI_HOST_STANDALONE_SOUND_STATUS_ERR_INVALID_VDEV,
+	WMI_HOST_STANDALONE_SOUND_STATUS_ERR_PEER_DOES_NOT_SUPPORT_MU_FB,
+	WMI_HOST_STANDALONE_SOUND_STATUS_ERR_DMA_NOT_CONFIGURED,
+	WMI_HOST_STANDALONE_SOUND_STATUS_ERR_COMPLETE_FAILURE,
+};
+
+#define MAX_NUM_SOUNDING_REPEATS 5
+/**
+ * struct wmi_host_standalone_sounding_evt_params - Standalone sounding
+ * command complete event params
+ * @vdev_id: vdev id
+ * @status: Standalone sounding command status
+ * @buffer_uploaded: number of CV buffers uploaded
+ * @num_sounding_repeats: Number of sounding repeats
+ * @num_snd_failed: Number of sounding failures per repetition
+ */
+struct wmi_host_standalone_sounding_evt_params {
+	uint32_t vdev_id;
+	uint32_t status;
+	uint32_t buffer_uploaded;
+	uint32_t num_sounding_repeats;
+	uint32_t snd_failed[MAX_NUM_SOUNDING_REPEATS];
+};
+#endif /* QCA_STANDALONE_SOUNDING_TRIGGER */
+
 #endif

@@ -1024,6 +1024,22 @@ QDF_STATUS wmi_sawf_create_send(struct wmi_unified *wmi_handle,
 QDF_STATUS wmi_sawf_disable_send(struct wmi_unified *wmi_handle,
 				 uint8_t svc_id);
 #endif
+
+#ifdef QCA_STANDALONE_SOUNDING_TRIGGER
+/*
+ * wmi_extract_standalone_sounding_complete_event_params() - extract standalone
+ * sounding complete event
+ * @wmi_handle: wmi handle
+ * @evt_buf: pointer to event buffer
+ * @ss_complete: Pointer to sounding command complete event params
+ *
+ * Return: QDF_STATUS_SUCCESS on success and QDF_STATUS_E_FAILURE for failure
+ */
+QDF_STATUS wmi_extract_standalone_sounding_evt_params(
+		wmi_unified_t wmi_handle, void *evt_buf,
+		struct wmi_host_standalone_sounding_evt_params *ss_params);
+#endif /* QCA_STANDALONE_SOUNDING_TRIGGER */
+
 #endif /* _WMI_UNIFIED_AP_API_H_ */
 
 /**

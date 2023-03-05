@@ -4025,6 +4025,51 @@ QDF_STATUS send_sawf_disable_cmd_tlv(wmi_unified_t wmi_handle,
 }
 #endif
 
+#ifdef QCA_STANDALONE_SOUNDING_TRIGGER
+/**
+ * extract_standalone_sounding_evt_params_tlv() - extract standalone
+ * sounding trigger status
+ * @wmi_handle: wmi handle
+ * @param evt_buf: pointer to event buffer
+ * @param chan_info: Pointer to standalone sounding event params
+ *
+ * Return: QDF_STATUS_SUCCESS for success or error code
+ */
+static QDF_STATUS
+extract_standalone_sounding_evt_params_tlv(wmi_unified_t wmi_handle,
+					   void *evt_buf,
+	struct wmi_host_standalone_sounding_evt_params *ss_params)
+{
+	WMI_VDEV_STANDALONE_SOUND_COMPLETE_EVENTID_param_tlvs *param_buf;
+	wmi_standalone_sounding_evt_fixed_param *ev;
+
+	param_buf = (WMI_VDEV_STANDALONE_SOUND_COMPLETE_EVENTID_param_tlvs *)
+		evt_buf;
+
+	ev = (wmi_standalone_sounding_evt_fixed_param *)
+		param_buf->fixed_param;
+	if (!ev) {
+		wmi_err("WMI sounding TLV is NULL ");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	ss_params->vdev_id = ev->vdev_id;
+	ss_params->status = ev->status;
+	ss_params->buffer_uploaded = ev->buffer_uploaded;
+	ss_params->num_sounding_repeats = param_buf->num_snd_failed;
+
+	if (param_buf->num_snd_failed > sizeof(ss_params->snd_failed)) {
+		wmi_err("Invalid num_num_snd_failed:%u",
+			param_buf->num_snd_failed);
+		return QDF_STATUS_E_INVAL;
+	}
+	qdf_mem_copy(ss_params->snd_failed, param_buf->snd_failed,
+		     (param_buf->num_snd_failed * sizeof(uint32_t)));
+
+	return QDF_STATUS_SUCCESS;
+}
+#endif /* QCA_STANDALONE_SOUNDING_TRIGGER */
+
 void wmi_ap_attach_tlv(wmi_unified_t wmi_handle)
 {
 	struct wmi_ops *ops = wmi_handle->ops;
@@ -4130,6 +4175,10 @@ void wmi_ap_attach_tlv(wmi_unified_t wmi_handle)
 #endif
 #ifdef QCA_RSSI_DB2DBM
 	ops->extract_pdev_rssi_dbm_conv_ev_param = extract_pdev_rssi_dbm_conv_ev_param_tlv;
+#endif
+#ifdef QCA_STANDALONE_SOUNDING_TRIGGER
+	ops->extract_standalone_sounding_evt_params =
+			extract_standalone_sounding_evt_params_tlv;
 #endif
 	ops->send_wmi_tdma_schedule_request_cmd =
 		send_wmi_tdma_schedule_request_cmd_tlv;

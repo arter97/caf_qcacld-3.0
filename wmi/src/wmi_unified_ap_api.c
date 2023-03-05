@@ -872,6 +872,20 @@ QDF_STATUS wmi_sawf_disable_send(struct wmi_unified *wmi_handle,
 }
 #endif
 
+#ifdef QCA_STANDALONE_SOUNDING_TRIGGER
+QDF_STATUS wmi_extract_standalone_sounding_evt_params(
+		wmi_unified_t wmi_handle, void *evt_buf,
+		struct wmi_host_standalone_sounding_evt_params *ss_params)
+{
+	if (wmi_handle->ops->extract_standalone_sounding_evt_params) {
+		return wmi_handle->ops->extract_standalone_sounding_evt_params(
+				wmi_handle, evt_buf, ss_params);
+	}
+
+	return QDF_STATUS_E_FAILURE;
+}
+#endif /* QCA_STANDALONE_SOUNDING_TRIGGER */
+
 QDF_STATUS wmi_unified_tdma_schedule_send(
 		struct wmi_unified *wmi_handle,
 		struct wlan_tdma_sched_cmd_param *param)

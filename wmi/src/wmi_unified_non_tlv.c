@@ -10662,6 +10662,9 @@ static void populate_non_tlv_service(uint32_t *wmi_service)
 	wmi_service[wmi_service_5dot9_ghz_support] = WMI_SERVICE_5_DOT_9GHZ_SUPPORT;
 	wmi_service[wmi_service_v1a_v1b_supported] =
 		WMI_SERVICE_UNAVAILABLE;
+#ifdef QCA_STANDALONE_SOUNDING_TRIGGER
+	wmi_service[wmi_service_standalone_sound] = WMI_SERVICE_UNAVAILABLE;
+#endif
 }
 
 /**
