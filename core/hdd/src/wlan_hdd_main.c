@@ -20094,32 +20094,6 @@ out:
 	return ret;
 }
 
-void hdd_wait_for_dp_tx(void)
-{
-	int count = MAX_SSR_WAIT_ITERATIONS;
-	int r;
-
-	hdd_enter();
-
-	while (count) {
-		r = atomic_read(&dp_protect_entry_count);
-
-		if (!r)
-			break;
-
-		if (--count) {
-			hdd_err_rl("Waiting for Packet tx to complete: %d",
-				   count);
-			msleep(SSR_WAIT_SLEEP_TIME);
-		}
-	}
-
-	if (!count)
-		hdd_err("Timed-out waiting for packet tx");
-
-	hdd_exit();
-}
-
 static const struct kernel_param_ops pcie_gen_speed_ops = {
 	.set = pcie_set_gen_speed_handler,
 	.get = param_get_int,

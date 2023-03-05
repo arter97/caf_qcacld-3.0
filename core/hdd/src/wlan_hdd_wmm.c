@@ -2229,9 +2229,8 @@ uint16_t hdd_wmm_select_queue(struct net_device *dev,
 {
 	uint16_t q_index;
 
-	hdd_dp_ssr_protect();
 	q_index = __hdd_wmm_select_queue(dev, skb);
-	hdd_dp_ssr_unprotect();
+
 	return q_index;
 }
 
