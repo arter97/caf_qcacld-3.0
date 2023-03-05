@@ -194,7 +194,6 @@ struct hdd_config {
 	bool enable_sar_safety;
 	bool config_sar_safety_sleep_index;
 #endif
-	bool get_roam_chan_from_fw;
 	uint8_t nb_commands_interval;
 
 #ifdef FEATURE_CLUB_LL_STATS_AND_GET_STATION
