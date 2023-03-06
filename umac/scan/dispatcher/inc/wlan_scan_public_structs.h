@@ -1521,6 +1521,20 @@ struct scan_user_cfg {
 };
 
 /**
+ * typedef update_mbssid_bcn_prb_rsp() - cb to inform mbssid beacon or prob resp
+ * @frame: the pointer of frame data
+ * @frame_len: the length of frame data
+ * @frm_subtype: frame type
+ * @bssid: the pointer of bssid
+ *
+ * Return: QDF_STATUS
+ */
+typedef QDF_STATUS (*update_mbssid_bcn_prb_rsp)(uint8_t *frame,
+						uint32_t frame_len,
+						uint8_t frm_subtype,
+						char *bssid);
+
+/**
  * typedef update_beacon_cb() - cb to inform/update beacon
  * @pdev: pdev pointer
  * @scan_entry:  scan entry to inform/update

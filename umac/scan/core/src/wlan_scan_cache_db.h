@@ -183,6 +183,17 @@ QDF_STATUS scm_scan_register_bcn_cb(struct wlan_objmgr_psoc *psoc,
 	update_beacon_cb cb, enum scan_cb_type type);
 
 /**
+ * scm_scan_register_mbssid_cb() - API to register api to handle bcn/probe
+ * as soon as they are generated
+ * @psoc: psoc object
+ * @cb: callback to be registered
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS scm_scan_register_mbssid_cb(struct wlan_objmgr_psoc *psoc,
+				       update_mbssid_bcn_prb_rsp cb);
+
+/**
  * scm_db_init() - API to init scan db
  * @psoc: psoc
  *

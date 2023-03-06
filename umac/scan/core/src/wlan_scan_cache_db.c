@@ -1728,6 +1728,22 @@ void scm_filter_valid_channel(struct wlan_objmgr_pdev *pdev,
 	}
 }
 
+QDF_STATUS scm_scan_register_mbssid_cb(struct wlan_objmgr_psoc *psoc,
+				       update_mbssid_bcn_prb_rsp cb)
+{
+	struct wlan_scan_obj *scan_obj;
+
+	scan_obj = wlan_psoc_get_scan_obj(psoc);
+	if (!scan_obj) {
+		scm_err("scan obj is NULL");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	scan_obj->cb.inform_mbssid_bcn_prb_rsp = cb;
+
+	return QDF_STATUS_SUCCESS;
+}
+
 QDF_STATUS scm_scan_register_bcn_cb(struct wlan_objmgr_psoc *psoc,
 	update_beacon_cb cb, enum scan_cb_type type)
 {
