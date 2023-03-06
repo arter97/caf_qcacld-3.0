@@ -116,16 +116,6 @@ static inline void hdd_destroy_sysfs_files(void)
 {
 }
 
-static inline
-void hdd_sysfs_create_adapter_root_obj(struct hdd_adapter *adapter)
-{
-}
-
-static inline
-void hdd_sysfs_destroy_adapter_root_obj(struct hdd_adapter *adapter)
-{
-}
-
 static inline void hdd_create_adapter_sysfs_files(struct hdd_adapter *adapter)
 {
 }
