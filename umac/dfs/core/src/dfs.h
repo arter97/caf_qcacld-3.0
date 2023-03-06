@@ -978,6 +978,18 @@ struct dfs_rcac_params {
 };
 #endif
 
+#ifdef WLAN_DISP_CHAN_INFO
+/**
+ * struct dfs_cacelem - CAC parameters of a DFS channel (20 MHz channel).
+ * @cac_start_us: Time in microseconds when cac started (monotonic boot time).
+ * @cac_completed_time: CAC completed time in ms (monotonic boot time).
+ */
+struct dfs_cacelem {
+	uint64_t cac_start_us;
+	uint64_t cac_completed_time;
+};
+#endif
+
 /*
  * NB: not using kernel-doc format since the kernel-doc script doesn't
  *     handle the TAILQ_HEAD() or STAILQ_HEAD() macros
@@ -1160,6 +1172,9 @@ struct dfs_rcac_params {
  *                                   CAC REQUIRED, CAC COMPLETED, NOL,
  *                                   PRECAC STARTED, PRECAC COMPLETED etc. of
  *                                   all the DFS channels.
+ * @dfs_cacelems:                    Stores the CAC related parameters of a
+ *                                   channel such as: CAC started time, CAC
+ *                                   completed time.
  */
 struct wlan_dfs {
 	uint32_t       dfs_debug_mask;
@@ -1335,6 +1350,7 @@ struct wlan_dfs {
 #endif
 #if defined(WLAN_DISP_CHAN_INFO)
 	enum channel_dfs_state dfs_channel_state_array[NUM_DFS_CHANS];
+	struct dfs_cacelem dfs_cacelems[NUM_DFS_CHANS];
 #endif /* WLAN_DISP_CHAN_INFO */
 #ifdef QCA_SUPPORT_AGILE_DFS
 #endif
@@ -2189,6 +2205,32 @@ bool dfs_is_cac_required(struct wlan_dfs *dfs,
 			 bool is_vap_restart);
 
 /**
+ * dfs_update_cac_elements() - Fill the dfs_cacelem data structure based
+ * on the dfs_ev events posted.
+ * @dfs: Pointer to wlan_dfs structure.
+ * @freq_list: Pointer to a list of frequencies in MHz
+ * @num_chan: Number of frequencies
+ * @dfs_chan: Pointer to dfs_channel
+ * @dfs_ev: DFS events
+ *
+ * Return: QDF STATUS
+ */
+#if defined(WLAN_DISP_CHAN_INFO)
+QDF_STATUS
+dfs_update_cac_elements(struct wlan_dfs *dfs, uint16_t *freq_list,
+			uint8_t num_chan, struct dfs_channel *dfs_chan,
+			enum WLAN_DFS_EVENTS dfs_ev);
+#else
+static inline QDF_STATUS
+dfs_update_cac_elements(struct wlan_dfs *dfs, uint16_t *freq_list,
+			uint8_t num_chan, struct dfs_channel *dfs_chan,
+			enum WLAN_DFS_EVENTS dfs_ev)
+{
+	return QDF_STATUS_SUCCESS;
+}
+#endif
+
+/**
  * dfs_send_dfs_events_for_chan() - Send CAC RESET events
  * @dfs: Pointer to wlan_dfs structure.
  * @chan: Pointer to dfs_channel structure.
@@ -2287,6 +2329,14 @@ void dfs_deliver_cac_state_events(struct wlan_dfs *dfs)
 static inline
 void dfs_stacac_stop(struct wlan_dfs *dfs)
 {
+}
+
+static inline QDF_STATUS
+dfs_update_cac_elements(struct wlan_dfs *dfs, uint16_t *freq_list,
+			uint8_t num_chan, struct dfs_channel *dfs_chan,
+			enum WLAN_DFS_EVENTS dfs_ev)
+{
+	return QDF_STATUS_SUCCESS;
 }
 
 static inline
