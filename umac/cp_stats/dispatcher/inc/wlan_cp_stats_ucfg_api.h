@@ -56,7 +56,7 @@ QDF_STATUS
 ucfg_send_infra_cp_stats_request(struct wlan_objmgr_vdev *vdev,
 				 struct infra_cp_stats_cmd_info *req);
 
-#ifdef WLAN_TELEMETRY_STATS_SUPPORT
+#ifdef WLAN_CONFIG_TELEMETRY_AGENT
 /**
  * ucfg_send_telemetry_cp_stats_request() - send a telemetry cp stats command
  * @pdev: pointer to pdev object

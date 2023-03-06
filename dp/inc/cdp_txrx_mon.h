@@ -275,7 +275,7 @@ cdp_set_params_rssi_dbm_conversion(ol_txrx_soc_handle soc,
 }
 #endif
 
-#ifdef WLAN_TELEMETRY_STATS_SUPPORT
+#ifdef WLAN_CONFIG_TELEMETRY_AGENT
 /*
  * cdp_update_pdev_mon_telemetry_airtime_stats() - update telemetry airtime
  * stats in monitor pdev
