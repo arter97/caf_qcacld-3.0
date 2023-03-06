@@ -4871,6 +4871,7 @@ struct dp_fisa_stats {
 	/* workqueue deferred due to suspend */
 	uint32_t update_deferred;
 	struct dp_fisa_reo_mismatch_stats reo_mismatch;
+	uint32_t incorrect_rdi;
 };
 
 enum fisa_aggr_ret {
