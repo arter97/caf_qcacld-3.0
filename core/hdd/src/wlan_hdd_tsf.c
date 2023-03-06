@@ -2871,7 +2871,6 @@ static int wlan_ptp_gettime(struct ptp_clock_info *ptp, struct timespec *ts)
 	uint64_t host_time, target_time = 0;
 	struct hdd_context *hdd_ctx;
 	struct hdd_adapter *adapter;
-	uint32_t tsf_reg_read_enabled;
 	struct osif_psoc_sync *psoc_sync;
 	int errno, status = 0;
 
