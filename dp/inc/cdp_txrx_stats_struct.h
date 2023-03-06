@@ -2075,10 +2075,12 @@ struct cdp_calibr_stats_intf {
 
 /**
  * struct cdp_peer_stats - peer stats structure
+ * @mac_addr: MAC address
  * @tx: cdp tx stats
  * @rx: cdp rx stats
  */
 struct cdp_peer_stats {
+	struct qdf_mac_addr mac_addr;
 	struct cdp_tx_stats tx;
 	struct cdp_rx_stats rx;
 };

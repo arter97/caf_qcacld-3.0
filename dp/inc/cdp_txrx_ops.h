@@ -1124,6 +1124,7 @@ struct cdp_mon_ops {
  * @txrx_update_pdev_stats:
  * @txrx_get_peer_stats_param:
  * @txrx_get_peer_stats:
+ * @txrx_get_per_link_stats:
  * @txrx_get_soc_stats:
  * @txrx_reset_peer_ald_stats:
  * @txrx_reset_peer_stats:
@@ -1223,6 +1224,12 @@ struct cdp_host_stats_ops {
 		(*txrx_get_peer_stats)(struct cdp_soc_t *soc, uint8_t vdev_id,
 				       uint8_t *peer_mac,
 				       struct cdp_peer_stats *peer_stats);
+	QDF_STATUS
+		(*txrx_get_per_link_stats)(struct cdp_soc_t *soc,
+					   uint8_t vdev_id, uint8_t *peer_mac,
+					   struct cdp_peer_stats *stats,
+					   enum cdp_peer_type peer_type,
+					   uint8_t num_link);
 	QDF_STATUS
 		(*txrx_get_soc_stats)(struct cdp_soc_t *soc,
 				      struct cdp_soc_stats *soc_stats);

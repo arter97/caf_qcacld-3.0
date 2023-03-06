@@ -5321,6 +5321,19 @@ void dp_get_peer_stats(struct dp_peer *peer,
 		       struct cdp_peer_stats *peer_stats);
 
 /**
+ * dp_get_per_link_peer_stats()- Get per link peer stats
+ * @peer: Datapath peer
+ * @peer_stats: buffer for peer stats
+ * @peer_type: Peer type
+ * @num_link: Number of ML links
+ *
+ * Return: status success/failure
+ */
+QDF_STATUS dp_get_per_link_peer_stats(struct dp_peer *peer,
+				      struct cdp_peer_stats *peer_stats,
+				      enum cdp_peer_type peer_type,
+				      uint8_t num_link);
+/**
  * dp_get_peer_hw_link_id() - get peer hardware link id
  * @soc: soc handle
  * @pdev: data path pdev
