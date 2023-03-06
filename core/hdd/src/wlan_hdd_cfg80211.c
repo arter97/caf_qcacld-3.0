@@ -18877,11 +18877,19 @@ static int wlan_hdd_cfg80211_add_key(struct wiphy *wiphy,
 	return errno;
 }
 #else
+#ifdef CFG80211_SINGLE_NETDEV_MULTI_LINK_SUPPORT
+static int wlan_hdd_cfg80211_add_key(struct wiphy *wiphy,
+				     struct net_device *ndev,
+				     int link_id, u8 key_index, bool pairwise,
+				     const u8 *mac_addr,
+				     struct key_params *params)
+#else
 static int wlan_hdd_cfg80211_add_key(struct wiphy *wiphy,
 				     struct net_device *ndev,
 				     u8 key_index, bool pairwise,
 				     const u8 *mac_addr,
 				     struct key_params *params)
+#endif
 {
 	int errno;
 	struct osif_vdev_sync *vdev_sync;
@@ -19020,6 +19028,15 @@ static int wlan_hdd_cfg80211_get_key(struct wiphy *wiphy,
 	return errno;
 }
 #else
+#ifdef CFG80211_SINGLE_NETDEV_MULTI_LINK_SUPPORT
+static int wlan_hdd_cfg80211_get_key(struct wiphy *wiphy,
+				     struct net_device *ndev,
+				     int link_id, u8 key_index, bool pairwise,
+				     const u8 *mac_addr, void *cookie,
+				     void (*callback)(void *cookie,
+						      struct key_params *)
+				     )
+#else
 static int wlan_hdd_cfg80211_get_key(struct wiphy *wiphy,
 				     struct net_device *ndev,
 				     u8 key_index, bool pairwise,
@@ -19027,6 +19044,7 @@ static int wlan_hdd_cfg80211_get_key(struct wiphy *wiphy,
 				     void (*callback)(void *cookie,
 						      struct key_params *)
 				     )
+#endif
 {
 	int errno;
 	struct osif_vdev_sync *vdev_sync;
@@ -19114,10 +19132,17 @@ static int wlan_hdd_cfg80211_del_key(struct wiphy *wiphy,
 	return errno;
 }
 #else
+#ifdef CFG80211_SINGLE_NETDEV_MULTI_LINK_SUPPORT
+static int wlan_hdd_cfg80211_del_key(struct wiphy *wiphy,
+				     struct net_device *dev,
+				     int link_id, u8 key_index,
+				     bool pairwise, const u8 *mac_addr)
+#else
 static int wlan_hdd_cfg80211_del_key(struct wiphy *wiphy,
 				     struct net_device *dev,
 				     u8 key_index,
 				     bool pairwise, const u8 *mac_addr)
+#endif
 {
 	int errno;
 	struct osif_vdev_sync *vdev_sync;
@@ -19251,10 +19276,17 @@ static int wlan_hdd_cfg80211_set_default_key(struct wiphy *wiphy,
 	return errno;
 }
 #else
+#ifdef CFG80211_SINGLE_NETDEV_MULTI_LINK_SUPPORT
+static int wlan_hdd_cfg80211_set_default_key(struct wiphy *wiphy,
+					     struct net_device *ndev,
+					     int link_id, u8 key_index,
+					     bool unicast, bool multicast)
+#else
 static int wlan_hdd_cfg80211_set_default_key(struct wiphy *wiphy,
 					     struct net_device *ndev,
 					     u8 key_index,
 					     bool unicast, bool multicast)
+#endif
 {
 	int errno;
 	struct osif_vdev_sync *vdev_sync;
@@ -19308,9 +19340,15 @@ static int wlan_hdd_cfg80211_set_default_beacon_key(struct wiphy *wiphy,
 	return errno;
 }
 #else
+#ifdef CFG80211_SINGLE_NETDEV_MULTI_LINK_SUPPORT
+static int wlan_hdd_cfg80211_set_default_beacon_key(struct wiphy *wiphy,
+						    struct net_device *ndev,
+						    int link_id, u8 key_index)
+#else
 static int wlan_hdd_cfg80211_set_default_beacon_key(struct wiphy *wiphy,
 						    struct net_device *ndev,
 						    u8 key_index)
+#endif
 {
 	int errno;
 	struct osif_vdev_sync *vdev_sync;
@@ -19623,9 +19661,15 @@ static int wlan_hdd_set_default_mgmt_key(struct wiphy *wiphy,
 	return errno;
 }
 #else
+#ifdef CFG80211_SINGLE_NETDEV_MULTI_LINK_SUPPORT
+static int wlan_hdd_set_default_mgmt_key(struct wiphy *wiphy,
+					 struct net_device *netdev,
+					 int link_id, u8 key_index)
+#else
 static int wlan_hdd_set_default_mgmt_key(struct wiphy *wiphy,
 					 struct net_device *netdev,
 					 u8 key_index)
+#endif
 {
 	int errno;
 	struct osif_vdev_sync *vdev_sync;
