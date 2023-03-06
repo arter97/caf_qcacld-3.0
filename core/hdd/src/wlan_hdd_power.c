@@ -325,13 +325,6 @@ hdd_send_igmp_offload_params(struct hdd_adapter *adapter,
 	return QDF_STATUS_SUCCESS;
 }
 
-static inline QDF_STATUS
-wlan_hdd_send_igmp_offload_params(struct hdd_adapter *adapter, bool enable,
-				  uint32_t *mc_address, uint32_t count)
-{
-	return QDF_STATUS_SUCCESS;
-}
-
 static inline void
 hdd_disable_igmp_offload(struct hdd_adapter *adapter)
 {}
