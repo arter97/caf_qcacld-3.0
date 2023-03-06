@@ -900,7 +900,7 @@ struct dp_mon_soc {
 	struct dp_mon_soc_stats stats;
 };
 
-#ifdef WLAN_TELEMETRY_STATS_SUPPORT
+#ifdef WLAN_CONFIG_TELEMETRY_AGENT
 struct dp_mon_peer_airtime_consumption {
 	uint32_t consumption;
 	uint16_t avg_consumption_per_sec;
@@ -940,7 +940,7 @@ struct dp_mon_peer_stats {
 #ifdef QCA_ENHANCED_STATS_SUPPORT
 	dp_mon_peer_tx_stats tx;
 	dp_mon_peer_rx_stats rx;
-#ifdef WLAN_TELEMETRY_STATS_SUPPORT
+#ifdef WLAN_CONFIG_TELEMETRY_AGENT
 	struct dp_mon_peer_airtime_stats airtime_stats;
 	struct dp_mon_peer_deterministic deter_stats;
 #endif
@@ -4485,7 +4485,7 @@ dp_lite_mon_get_legacy_feature_enabled(struct cdp_soc_t *soc,
 }
 #endif
 
-#ifdef WLAN_TELEMETRY_STATS_SUPPORT
+#ifdef WLAN_CONFIG_TELEMETRY_AGENT
 static inline
 void dp_monitor_peer_telemetry_stats(struct dp_peer *peer,
 				     struct cdp_peer_telemetry_stats *stats)
@@ -4597,7 +4597,7 @@ dp_mon_rx_print_advanced_stats(struct dp_soc *soc,
 	return monitor_ops->mon_rx_print_advanced_stats(soc, pdev);
 }
 
-#ifdef WLAN_TELEMETRY_STATS_SUPPORT
+#ifdef WLAN_CONFIG_TELEMETRY_AGENT
 /*
  * dp_update_pdev_mon_telemetry_airtime_stats() - update telemetry airtime
  * stats in monitor pdev

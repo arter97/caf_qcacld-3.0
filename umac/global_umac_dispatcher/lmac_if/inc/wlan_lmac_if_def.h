@@ -180,7 +180,7 @@ struct wlan_lmac_if_cp_stats_tx_ops {
 					struct wlan_objmgr_psoc *psoc,
 					stats_req_info *req);
 #endif
-#ifdef WLAN_TELEMETRY_STATS_SUPPORT
+#ifdef WLAN_CONFIG_TELEMETRY_AGENT
 	QDF_STATUS (*send_req_telemetry_cp_stats)(
 					struct wlan_objmgr_pdev *pdev,
 					struct infra_cp_stats_cmd_info *req);

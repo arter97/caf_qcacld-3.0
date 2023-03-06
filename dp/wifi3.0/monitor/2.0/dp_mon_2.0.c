@@ -1690,7 +1690,7 @@ struct cdp_mon_ops dp_ops_mon_2_0 = {
 #endif
 	.txrx_set_mon_pdev_params_rssi_dbm_conv =
 				dp_mon_pdev_params_rssi_dbm_conv,
-#ifdef WLAN_TELEMETRY_STATS_SUPPORT
+#ifdef WLAN_CONFIG_TELEMETRY_AGENT
 	.txrx_update_pdev_mon_telemetry_airtime_stats =
 			dp_pdev_update_telemetry_airtime_stats,
 #endif

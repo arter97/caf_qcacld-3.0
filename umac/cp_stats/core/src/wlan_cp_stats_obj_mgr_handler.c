@@ -466,7 +466,7 @@ wlan_cp_stats_send_infra_cp_req(struct wlan_objmgr_psoc *psoc,
 }
 #endif /* WLAN_SUPPORT_INFRA_CTRL_PATH_STATS */
 
-#ifdef WLAN_TELEMETRY_STATS_SUPPORT
+#ifdef WLAN_CONFIG_TELEMETRY_AGENT
 QDF_STATUS
 wlan_cp_stats_send_telemetry_cp_req(struct wlan_objmgr_pdev *pdev,
 				    struct infra_cp_stats_cmd_info *req)

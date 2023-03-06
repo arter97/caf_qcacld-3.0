@@ -23,7 +23,7 @@
 #include <wlan_cp_stats_public_structs.h>
 
 #if defined(WLAN_SUPPORT_INFRA_CTRL_PATH_STATS) || \
-	defined(WLAN_TELEMETRY_STATS_SUPPORT)
+	defined(WLAN_CONFIG_TELEMETRY_AGENT)
 /**
  * get_infra_cp_stats_id() - convert from to wmi_ctrl_path_stats_id
  * @type: type from enum infra_cp_stats_id
@@ -230,7 +230,7 @@ void wmi_bmiss_extract_stats_struct(void *tag_buf,
 
 #endif/* CONFIG_WLAN_BMISS */
 
-#ifdef WLAN_TELEMETRY_STATS_SUPPORT
+#ifdef WLAN_CONFIG_TELEMETRY_AGENT
 static void
 wmi_extract_ctrl_path_pmlo_stats_tlv(wmi_unified_t wmi_handle, void *tag_buf,
 				     struct ctrl_path_pmlo_telemetry_stats_struct *param)
@@ -1147,7 +1147,7 @@ extract_pmf_bcn_protect_stats_tlv(wmi_unified_t wmi_handle, void *evt_buf,
 }
 
 #if defined(WLAN_SUPPORT_INFRA_CTRL_PATH_STATS) || \
-	defined(WLAN_TELEMETRY_STATS_SUPPORT)
+	defined(WLAN_CONFIG_TELEMETRY_AGENT)
 static void wmi_infra_cp_stats_ops_attach_tlv(struct wmi_ops *ops)
 {
 	ops->send_infra_cp_stats_request_cmd =

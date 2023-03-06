@@ -982,7 +982,7 @@ cdp_get_pdev_tid_stats(ol_txrx_soc_handle soc, uint8_t pdev_id,
 								 tid_stats);
 }
 
-#ifdef WLAN_TELEMETRY_STATS_SUPPORT
+#ifdef WLAN_CONFIG_TELEMETRY_AGENT
 /**
  * cdp_get_pdev_telemetry_stats() - function to get pdev telemetry stats
  * @soc: soc handle

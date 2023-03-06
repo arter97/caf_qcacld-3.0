@@ -549,7 +549,7 @@ static void target_if_register_infra_cp_stats_txops(
 }
 #endif /* WLAN_SUPPORT_INFRA_CTRL_PATH_STATS */
 
-#ifdef WLAN_TELEMETRY_STATS_SUPPORT
+#ifdef WLAN_CONFIG_TELEMETRY_AGENT
 /**
  * target_if_telemetry_cp_stats_req() - API to send stats request to wmi
  * @pdev: pointer to pdev object

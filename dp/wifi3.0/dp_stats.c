@@ -9390,7 +9390,7 @@ dp_pdev_get_tx_capture_stats(struct cdp_soc_t *soc_hdl, uint8_t pdev_id,
 }
 #endif /* WLAN_TX_PKT_CAPTURE_ENH */
 
-#ifdef WLAN_TELEMETRY_STATS_SUPPORT
+#ifdef WLAN_CONFIG_TELEMETRY_AGENT
 QDF_STATUS
 dp_get_pdev_telemetry_stats(struct cdp_soc_t *soc_hdl, uint8_t pdev_id,
 			    struct cdp_pdev_telemetry_stats *stats)

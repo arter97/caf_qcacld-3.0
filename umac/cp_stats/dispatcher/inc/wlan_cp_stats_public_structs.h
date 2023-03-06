@@ -125,7 +125,7 @@ struct bmiss_infra_cp_stats_event  {
 };
 #endif /* CONFIG_WLAN_BMISS */
 
-#ifdef WLAN_TELEMETRY_STATS_SUPPORT
+#ifdef WLAN_CONFIG_TELEMETRY_AGENT
 /**
  * struct ctrl_path_pmlo_telemetry_stats_struct - pmlo telemetry
  * stats struct
@@ -200,7 +200,7 @@ struct infra_cp_stats_event {
 #ifdef CONFIG_WLAN_BMISS
 	struct bmiss_infra_cp_stats_event *bmiss_infra_cp_stats;
 #endif
-#ifdef WLAN_TELEMETRY_STATS_SUPPORT
+#ifdef WLAN_CONFIG_TELEMETRY_AGENT
 	struct ctrl_path_pmlo_telemetry_stats_struct *telemetry_stats;
 #endif
 	/* Extend with other required infra_cp_stats structs */
