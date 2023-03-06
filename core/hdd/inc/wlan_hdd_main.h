@@ -607,16 +607,12 @@ struct hdd_stats {
  * @peer_mac: Peer MAC address for IBSS connection
  * @roam_id: Unique identifier for a roaming instance
  * @roam_status: Current roam command status
- * @defer_key_complete: Should key complete be deferred?
- *
  */
 struct hdd_roaming_info {
 	tSirMacAddr bssid;
 	tSirMacAddr peer_mac;
 	uint32_t roam_id;
 	eRoamCmdStatus roam_status;
-	bool defer_key_complete;
-
 };
 
 #ifdef FEATURE_WLAN_WAPI
