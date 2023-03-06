@@ -1868,8 +1868,6 @@ enum wlan_state_ctrl_str_id {
  * @pm_qos_req:
  * @qos_cpu_mask: voted cpu core mask
  * @pm_qos_req: pm_qos request for all cpu cores
- * @enable_pkt_capture_support: enable packet capture support
- * @val_pkt_capture_mode: value for packet capturte mode
  * @roam_ch_from_fw_supported:
  * @dutycycle_off_percent:
  * @pm_qos_request_flags:
@@ -2129,12 +2127,6 @@ struct hdd_context {
 	struct cpumask qos_cpu_mask;
 #elif defined(CLD_PM_QOS)
 	struct pm_qos_request pm_qos_req;
-#endif
-#ifdef WLAN_FEATURE_PKT_CAPTURE
-	/* enable packet capture support */
-	bool enable_pkt_capture_support;
-	/* value for packet capturte mode */
-	uint8_t val_pkt_capture_mode;
 #endif
 	bool roam_ch_from_fw_supported;
 #ifdef FW_THERMAL_THROTTLE_SUPPORT
