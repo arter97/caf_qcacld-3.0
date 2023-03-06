@@ -1840,7 +1840,6 @@ static inline void sap_acs_set_puncture_support(struct sap_context *sap_ctx,
 }
 #endif /* WLAN_FEATURE_11BE */
 
-#ifdef PRE_CAC_SUPPORT
 /**
  * sap_cac_end_notify() - Notify CAC end to HDD
  * @mac_handle: Opaque handle to the global MAC context
@@ -1852,14 +1851,6 @@ static inline void sap_acs_set_puncture_support(struct sap_context *sap_ctx,
  */
 QDF_STATUS sap_cac_end_notify(mac_handle_t mac_handle,
 			      struct csr_roam_info *roamInfo);
-#else
-static inline QDF_STATUS
-sap_cac_end_notify(mac_handle_t mac_handle,
-		   struct csr_roam_info *roamInfo)
-{
-	return QDF_STATUS_SUCCESS;
-}
-#endif /* PRE_CAC_SUPPORT */
 
 #ifdef WLAN_FEATURE_SAP_ACS_OPTIMIZE
 static inline bool sap_is_acs_scan_optimize_enable(void)
