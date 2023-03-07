@@ -2092,6 +2092,7 @@ struct hdd_context {
 #ifdef FEATURE_WPSS_THERMAL_MITIGATION
 	bool multi_client_thermal_mitigation;
 #endif
+	qdf_wake_lock_t lpm_reinit_wakelock;
 };
 
 /**

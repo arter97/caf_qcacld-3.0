@@ -8890,6 +8890,8 @@ static int hdd_context_deinit(struct hdd_context *hdd_ctx)
 {
 	qdf_wake_lock_destroy(&hdd_ctx->monitor_mode_wakelock);
 
+	qdf_wake_lock_destroy(&hdd_ctx->lpm_reinit_wakelock);
+
 	wlan_hdd_cfg80211_deinit(hdd_ctx->wiphy);
 
 	hdd_sap_context_destroy(hdd_ctx);
@@ -11645,6 +11647,10 @@ static int hdd_context_init(struct hdd_context *hdd_ctx)
 
 	qdf_wake_lock_create(&hdd_ctx->monitor_mode_wakelock,
 			     "monitor_mode_wakelock");
+
+	qdf_wake_lock_create(&hdd_ctx->lpm_reinit_wakelock,
+			     "lpm_reinit_wakelock");
+
 
 	return 0;
 
