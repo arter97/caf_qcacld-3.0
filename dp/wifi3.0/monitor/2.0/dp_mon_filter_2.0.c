@@ -3402,4 +3402,77 @@ void dp_cfr_filter_register_2_0(struct cdp_ops *ops)
 {
 	ops->mon_ops->txrx_cfr_filter = dp_cfr_filter_2_0;
 }
+
+#ifdef WLAN_FEATURE_LOCAL_PKT_CAPTURE
+void dp_mon_filter_setup_local_pkt_capture_tx(struct dp_pdev *pdev)
+{
+	struct dp_mon_pdev *mon_pdev = pdev->monitor_pdev;
+	enum dp_mon_filter_mode mode = DP_MON_FILTER_MONITOR_MODE;
+	enum dp_mon_filter_srng_type srng_type =
+				DP_MON_FILTER_SRNG_TYPE_TXMON_DEST;
+	struct dp_mon_pdev_be *mon_pdev_be = NULL;
+	struct dp_mon_filter_be filter = {0};
+	struct htt_tx_ring_tlv_filter *tx_tlv_filter = &filter.tx_tlv_filter;
+	struct dp_pdev_tx_monitor_be *tx_mon_be;
+
+	mon_pdev_be = dp_get_be_mon_pdev_from_dp_mon_pdev(mon_pdev);
+	tx_mon_be = &mon_pdev_be->tx_monitor_be;
+	tx_mon_be->mode = TX_MON_BE_FULL_CAPTURE;
+	mon_pdev_be->tx_mon_mode = 1;
+	mon_pdev_be->tx_mon_filter_length = DMA_LENGTH_256B;
+
+	filter.tx_valid = true;
+	tx_tlv_filter->enable = 1;
+	dp_tx_mon_filter_set_downstream_tlvs(tx_tlv_filter);
+	dp_tx_mon_filter_set_upstream_tlvs(tx_tlv_filter);
+	dp_tx_mon_filter_set_word_mask(pdev, tx_tlv_filter);
+
+	if (mon_pdev->fp_mgmt_filter) {
+		tx_tlv_filter->mgmt_filter = FILTER_MGMT_ALL;
+		tx_tlv_filter->mgmt_mpdu_end = 1;
+		tx_tlv_filter->mgmt_msdu_end = 1;
+		tx_tlv_filter->mgmt_msdu_start = 1;
+		tx_tlv_filter->mgmt_mpdu_start = 1;
+		tx_tlv_filter->mgmt_mpdu_log = 1;
+		tx_tlv_filter->mgmt_dma_length = DMA_LENGTH_256B;
+	}
+
+	if (mon_pdev->fp_ctrl_filter) {
+		tx_tlv_filter->ctrl_filter = FILTER_CTRL_ALL;
+		tx_tlv_filter->ctrl_mpdu_end = 1;
+		tx_tlv_filter->ctrl_msdu_end = 1;
+		tx_tlv_filter->ctrl_msdu_start = 1;
+		tx_tlv_filter->ctrl_mpdu_start = 1;
+		tx_tlv_filter->ctrl_mpdu_log = 1;
+		tx_tlv_filter->ctrl_dma_length = DMA_LENGTH_256B;
+	}
+
+	if (mon_pdev->fp_data_filter) {
+		tx_tlv_filter->data_filter = FILTER_DATA_ALL;
+		tx_tlv_filter->data_mpdu_end = 1;
+		tx_tlv_filter->data_msdu_end = 1;
+		tx_tlv_filter->data_msdu_start = 1;
+		tx_tlv_filter->data_mpdu_start = 1;
+		tx_tlv_filter->data_mpdu_log = 1;
+		tx_tlv_filter->data_dma_length = DMA_LENGTH_256B;
+	}
+
+	dp_mon_filter_show_tx_filter_be(mode, &filter);
+	mon_pdev_be->filter_be[mode][srng_type] = filter;
+}
+
+void dp_mon_filter_reset_local_pkt_capture_tx(struct dp_pdev *pdev)
+{
+	struct dp_mon_pdev *mon_pdev = pdev->monitor_pdev;
+	enum dp_mon_filter_mode mode = DP_MON_FILTER_MONITOR_MODE;
+	struct dp_mon_filter_be filter = {0};
+	enum dp_mon_filter_srng_type srng_type =
+				DP_MON_FILTER_SRNG_TYPE_TXMON_DEST;
+	struct dp_mon_pdev_be *mon_pdev_be = NULL;
+
+	mon_pdev_be = dp_get_be_mon_pdev_from_dp_mon_pdev(mon_pdev);
+	filter.tx_valid = true;
+	mon_pdev_be->filter_be[mode][srng_type] = filter;
+}
+#endif /* WLAN_FEATURE_LOCAL_PKT_CAPTURE */
 #endif

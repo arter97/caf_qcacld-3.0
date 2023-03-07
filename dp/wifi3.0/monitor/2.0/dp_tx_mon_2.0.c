@@ -15,6 +15,7 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
+#include "qdf_types.h"
 #include "hal_be_hw_headers.h"
 #include "dp_types.h"
 #include "hal_be_tx.h"
@@ -29,9 +30,7 @@
 #include <dp_be.h>
 #include <hal_be_api_mon.h>
 #include <dp_mon_filter_2.0.h>
-#ifdef FEATURE_PERPKT_INFO
 #include "dp_ratetable.h"
-#endif
 #ifdef QCA_SUPPORT_LITE_MONITOR
 #include "dp_lite_mon.h"
 #endif
@@ -950,6 +949,33 @@ dp_tx_lite_mon_filtering(struct dp_pdev *pdev,
 }
 #endif
 
+#ifdef WLAN_FEATURE_LOCAL_PKT_CAPTURE
+static int
+dp_tx_handle_local_pkt_capture(struct dp_pdev *pdev, qdf_nbuf_t nbuf)
+{
+	struct dp_mon_vdev *mon_vdev;
+	struct dp_mon_pdev *mon_pdev = pdev->monitor_pdev;
+
+	if (!mon_pdev->mvdev) {
+		dp_mon_err("Monitor vdev is NULL !!");
+		return 1;
+	}
+
+	mon_vdev = mon_pdev->mvdev->monitor_vdev;
+
+	if (mon_vdev && mon_vdev->osif_rx_mon)
+		mon_vdev->osif_rx_mon(mon_pdev->mvdev->osif_vdev, nbuf, NULL);
+
+	return 0;
+}
+#else
+static int
+dp_tx_handle_local_pkt_capture(struct dp_pdev *pdev, qdf_nbuf_t nbuf)
+{
+	return 0;
+}
+#endif
+
 /**
  * dp_tx_mon_send_to_stack() - API to send to stack
  * @pdev: pdev Handle
@@ -975,7 +1001,19 @@ dp_tx_mon_send_to_stack(struct dp_pdev *pdev, qdf_nbuf_t mpdu,
 	tx_capture_info.radiotap_done = 1;
 	tx_capture_info.mpdu_nbuf = mpdu;
 	tx_capture_info.mpdu_info.ppdu_id = ppdu_id;
-	if (!dp_lite_mon_is_tx_enabled(mon_pdev)) {
+
+	if (qdf_unlikely(IS_LOCAL_PKT_CAPTURE_RUNNING(mon_pdev,
+			is_local_pkt_capture_running))) {
+		int ret = dp_tx_handle_local_pkt_capture(pdev, mpdu);
+
+		/*
+		 * On error, free the memory here,
+		 * otherwise it will be freed by the network stack
+		 */
+		if (ret)
+			qdf_nbuf_free(mpdu);
+		return;
+	} else if (!dp_lite_mon_is_tx_enabled(mon_pdev)) {
 		dp_wdi_event_handler(WDI_EVENT_TX_PKT_CAPTURE,
 				     pdev->soc,
 				     &tx_capture_info,

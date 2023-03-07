@@ -24,7 +24,9 @@
 #include <dp_mon.h>
 #include <dp_tx_mon_2.0.h>
 #include <dp_mon_2.0.h>
+#ifdef QCA_SUPPORT_LITE_MONITOR
 #include <dp_lite_mon.h>
+#endif
 
 #define MAX_PPDU_INFO_LIST_DEPTH 64
 
@@ -104,7 +106,8 @@ dp_tx_mon_status_free_packet_buf(struct dp_pdev *pdev,
 		}
 
 		/* need api definition for hal_tx_status_get_next_tlv */
-		tx_tlv = hal_tx_status_get_next_tlv(tx_tlv);
+		tx_tlv = hal_tx_status_get_next_tlv(tx_tlv,
+						   mon_pdev->is_tlv_hdr_64_bit);
 	} while ((tx_tlv - tx_tlv_start) < end_offset);
 }
 
@@ -1468,6 +1471,8 @@ dp_tx_mon_process_tlv_2_0(struct dp_pdev *pdev,
 	tlv_status = hal_txmon_status_get_num_users(pdev->soc->hal_soc,
 						    tx_tlv, &num_users);
 	if (tlv_status == HAL_MON_TX_STATUS_PPDU_NOT_DONE || !num_users) {
+		dp_tx_mon_free_ppdu_info(tx_prot_ppdu_info, tx_mon_be);
+		tx_mon_be->tx_prot_ppdu_info = NULL;
 		dp_mon_err("window open with tlv_tag[0x%x] num_users[%d]!\n",
 			   hal_tx_status_get_tlv_tag(tx_tlv), num_users);
 		return QDF_STATUS_E_INVAL;
@@ -1478,6 +1483,8 @@ dp_tx_mon_process_tlv_2_0(struct dp_pdev *pdev,
 						    num_users,
 						    tx_mon_be->be_ppdu_id);
 	if (!tx_data_ppdu_info) {
+		dp_tx_mon_free_ppdu_info(tx_prot_ppdu_info, tx_mon_be);
+		tx_mon_be->tx_prot_ppdu_info = NULL;
 		dp_mon_info("tx prot ppdu info alloc got failed!!");
 		return QDF_STATUS_E_NOMEM;
 	}
@@ -1518,7 +1525,8 @@ dp_tx_mon_process_tlv_2_0(struct dp_pdev *pdev,
 							mon_desc_list_ref);
 
 			/* need api definition for hal_tx_status_get_next_tlv */
-			tx_tlv = hal_tx_status_get_next_tlv(tx_tlv);
+			tx_tlv = hal_tx_status_get_next_tlv(tx_tlv,
+						mon_pdev->is_tlv_hdr_64_bit);
 			if ((tx_tlv - tx_tlv_start) >= end_offset)
 				break;
 		} while ((tx_tlv - tx_tlv_start) < end_offset);

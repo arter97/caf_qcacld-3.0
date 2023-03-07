@@ -1353,18 +1353,22 @@ struct hal_tx_ppdu_info {
 /**
  * hal_tx_status_get_next_tlv() - get next tx status TLV
  * @tx_tlv: pointer to TLV header
+ * @is_tlv_hdr_64_bit: Flag to indicate tlv hdr 64 bit
  *
  * Return: pointer to next tlv info
  */
 static inline uint8_t*
-hal_tx_status_get_next_tlv(uint8_t *tx_tlv) {
-	uint32_t tlv_len, tlv_tag;
+hal_tx_status_get_next_tlv(uint8_t *tx_tlv, bool is_tlv_hdr_64_bit) {
+	uint32_t tlv_len, tlv_hdr_size;
 
 	tlv_len = HAL_RX_GET_USER_TLV32_LEN(tx_tlv);
-	tlv_tag = HAL_RX_GET_USER_TLV32_TYPE(tx_tlv);
+	tlv_hdr_size = is_tlv_hdr_64_bit ? HAL_RX_TLV64_HDR_SIZE :
+					   HAL_RX_TLV32_HDR_SIZE;
 
-	return (uint8_t *)(((unsigned long)(tx_tlv + tlv_len +
-					    HAL_RX_TLV32_HDR_SIZE + 7)) & (~7));
+	return (uint8_t *)(uintptr_t)qdf_align((uint64_t)((uintptr_t)tx_tlv +
+							  tlv_len +
+							  tlv_hdr_size),
+					       tlv_hdr_size);
 }
 
 /**

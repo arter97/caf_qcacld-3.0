@@ -1653,7 +1653,6 @@ hal_txmon_status_parse_tlv_generic_be(void *data_ppdu_info,
 		 * reference of the status buffer will be held in
 		 * dp_tx_update_ppdu_info_status()
 		 */
-		status = HAL_MON_TX_DATA;
 		SHOW_DEFINED(WIFITX_DATA_E);
 		break;
 	}

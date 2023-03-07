@@ -62,6 +62,12 @@
 #define dp_mon_info_rl(params...) \
 	__QDF_TRACE_RL(QDF_TRACE_LEVEL_INFO_HIGH, QDF_MODULE_ID_MON, ## params)
 
+#ifdef WLAN_FEATURE_LOCAL_PKT_CAPTURE
+#define IS_LOCAL_PKT_CAPTURE_RUNNING(var, field) ((var)->field)
+#else
+#define IS_LOCAL_PKT_CAPTURE_RUNNING(var, field) 0
+#endif
+
 #ifdef QCA_ENHANCED_STATS_SUPPORT
 typedef struct dp_peer_extd_tx_stats dp_mon_peer_tx_stats;
 typedef struct dp_peer_extd_rx_stats dp_mon_peer_rx_stats;
@@ -866,6 +872,9 @@ struct dp_mon_ops {
 	void (*mon_rx_ppdu_info_cache_destroy)(struct dp_pdev *pdev);
 	void (*mon_mac_filter_set)(uint32_t *msg_word,
 				   struct htt_rx_ring_tlv_filter *tlv_filter);
+#ifdef WLAN_FEATURE_LOCAL_PKT_CAPTURE
+	QDF_STATUS (*start_local_pkt_capture)(struct dp_pdev *pdev);
+#endif /* WLAN_FEATURE_LOCAL_PKT_CAPTURE */
 };
 
 /**
@@ -4746,5 +4755,42 @@ dp_mon_rx_print_advanced_stats(struct dp_soc *soc,
 
 QDF_STATUS dp_pdev_update_telemetry_airtime_stats(struct cdp_soc_t *soc,
 						  uint8_t pdev_id);
+#endif
+
+/*
+ * dp_mon_register_lpc_ops_1_0() - set local packet capture 1_0 mon ops
+ * @mon_ops: monitor ops
+ *
+ * This function initializes the mon_ops callbacks.
+ * index [0] is for Monitor 1.0 and index [1] is for Monitor 2.0
+ * based on the @WLAN_FEATURE_LOCAL_PKT_CAPTURE macro, it sets the
+ * appropriate callbacks
+ *
+ * Return: None
+ */
+void dp_mon_register_lpc_ops_1_0(struct dp_mon_ops *mon_ops);
+
+/*
+ * dp_mon_register_tx_pkt_enh_ops_1_0() - set tx pkt enh mon ops
+ * @mon_ops: monitor ops
+ *
+ * Return: None
+ */
+void dp_mon_register_tx_pkt_enh_ops_1_0(struct dp_mon_ops *mon_ops);
+
+#ifdef WLAN_FEATURE_LOCAL_PKT_CAPTURE
+/*
+ * dp_local_pkt_capture_tx_config() - local packet capture tx config
+ * @pdev: physical device handle
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS dp_local_pkt_capture_tx_config(struct dp_pdev *pdev);
+#else
+static inline
+QDF_STATUS dp_local_pkt_capture_tx_config(struct dp_pdev *pdev)
+{
+	return QDF_STATUS_SUCCESS;
+}
 #endif
 #endif /* _DP_MON_H_ */

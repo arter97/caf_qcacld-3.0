@@ -806,4 +806,27 @@ uint32_t dp_mon_rx_add_tlv(uint8_t id, uint16_t len, void *value,
 void
 dp_mon_rx_stats_update_rssi_dbm_params(struct dp_mon_pdev *mon_pdev,
 				       struct hal_rx_ppdu_info *ppdu_info);
+
+#ifdef WLAN_FEATURE_LOCAL_PKT_CAPTURE
+/**
+ * dp_rx_handle_local_pkt_capture() - Rx handle for local packet capture
+ * @pdev: Datapath PDEV handle
+ * @ppdu_info: Structure for rx ppdu info
+ * @nbuf: Qdf nbuf abstraction for linux skb
+ *
+ * Return: 0 on success, 1 on failure
+ */
+int
+dp_rx_handle_local_pkt_capture(struct dp_pdev *pdev,
+			      struct hal_rx_ppdu_info *ppdu_info,
+			      qdf_nbuf_t nbuf);
+#else
+static inline int
+dp_rx_handle_local_pkt_capture(struct dp_pdev *pdev,
+			      struct hal_rx_ppdu_info *ppdu_info,
+			      qdf_nbuf_t nbuf)
+{
+	return 0;
+}
+#endif
 #endif /* _DP_RX_MON_H_ */

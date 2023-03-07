@@ -303,4 +303,24 @@ void dp_mon_filter_reset_tx_lite_mon(struct dp_mon_pdev_be *be_mon_pdev);
  */
 void dp_mon_filter_setup_tx_lite_mon(struct dp_pdev *pdev);
 #endif
+
+#ifdef WLAN_FEATURE_LOCAL_PKT_CAPTURE
+/**
+ * dp_mon_filter_setup_local_pkt_capture_tx() - Setup local packet capture
+ *     tx monitor filter
+ * @pdev: physical device handle
+ *
+ * Return: void
+ */
+void dp_mon_filter_setup_local_pkt_capture_tx(struct dp_pdev *pdev);
+
+/**
+ * dp_mon_filter_reset_local_pkt_capture_tx() - Reset local packet capture
+ *     tx monitor filter
+ * @pdev: physical device handle
+ *
+ * Return: void
+ */
+void dp_mon_filter_reset_local_pkt_capture_tx(struct dp_pdev *pdev);
+#endif
 #endif /* _DP_MON_FILTER_2_0_H_ */

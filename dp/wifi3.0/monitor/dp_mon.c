@@ -37,6 +37,11 @@
 #ifdef QCA_SUPPORT_LITE_MONITOR
 #include "dp_lite_mon.h"
 #endif
+#include "dp_mon_1.0.h"
+#ifdef WLAN_FEATURE_LOCAL_PKT_CAPTURE
+#include "dp_mon_2.0.h"
+#include "dp_mon_filter_2.0.h"
+#endif
 
 #define DP_INTR_POLL_TIMER_MS	5
 #define INVALID_FREE_BUFF 0xffffffff
@@ -5756,6 +5761,153 @@ QDF_STATUS dp_mon_pdev_detach(struct dp_pdev *pdev)
 	return QDF_STATUS_SUCCESS;
 }
 
+static void dp_mon_pdev_filter_init(struct dp_mon_pdev *mon_pdev)
+{
+	if (!mon_pdev)
+		return;
+
+	mon_pdev->mon_filter_mode = MON_FILTER_ALL;
+	mon_pdev->fp_mgmt_filter = FILTER_MGMT_ALL;
+	mon_pdev->fp_ctrl_filter = FILTER_CTRL_ALL;
+	mon_pdev->fp_data_filter = FILTER_DATA_ALL;
+	mon_pdev->mo_mgmt_filter = FILTER_MGMT_ALL;
+	mon_pdev->mo_ctrl_filter = FILTER_CTRL_ALL;
+	mon_pdev->mo_data_filter = FILTER_DATA_ALL;
+}
+
+#ifdef WLAN_TX_PKT_CAPTURE_ENH
+void dp_mon_register_tx_pkt_enh_ops_1_0(struct dp_mon_ops *mon_ops)
+{
+	mon_ops->mon_tx_ppdu_stats_attach = dp_tx_ppdu_stats_attach_1_0;
+	mon_ops->mon_tx_ppdu_stats_detach = dp_tx_ppdu_stats_detach_1_0;
+	mon_ops->mon_peer_tx_capture_filter_check =
+				dp_peer_tx_capture_filter_check_1_0;
+}
+#elif defined(WLAN_TX_PKT_CAPTURE_ENH_BE) && defined(WLAN_FEATURE_LOCAL_PKT_CAPTURE)
+void dp_mon_register_tx_pkt_enh_ops_1_0(struct dp_mon_ops *mon_ops)
+{
+	mon_ops->mon_tx_ppdu_stats_attach = dp_tx_ppdu_stats_attach_2_0;
+	mon_ops->mon_tx_ppdu_stats_detach = dp_tx_ppdu_stats_detach_2_0;
+	mon_ops->mon_peer_tx_capture_filter_check = NULL;
+}
+#elif (defined(WIFI_MONITOR_SUPPORT) && !defined(WLAN_TX_PKT_CAPTURE_ENH))
+void dp_mon_register_tx_pkt_enh_ops_1_0(struct dp_mon_ops *mon_ops)
+{
+	mon_ops->mon_tx_ppdu_stats_attach = NULL;
+	mon_ops->mon_tx_ppdu_stats_detach = NULL;
+	mon_ops->mon_peer_tx_capture_filter_check = NULL;
+}
+#endif
+
+#ifdef WLAN_FEATURE_LOCAL_PKT_CAPTURE
+#if !defined(DISABLE_MON_CONFIG)
+static inline void dp_mon_config_register_ops(struct dp_mon_ops *mon_ops)
+{
+	mon_ops->mon_pdev_htt_srng_setup[0] = dp_mon_htt_srng_setup_1_0;
+	mon_ops->mon_pdev_htt_srng_setup[1] = dp_mon_pdev_htt_srng_setup_2_0;
+	mon_ops->mon_soc_htt_srng_setup = dp_mon_soc_htt_srng_setup_2_0;
+}
+#else
+static inline void dp_mon_config_register_ops(struct dp_mon_ops *mon_ops)
+{
+}
+#endif
+
+void dp_mon_register_lpc_ops_1_0(struct dp_mon_ops *mon_ops)
+{
+	mon_ops->mon_soc_attach[0] = NULL;
+	mon_ops->mon_soc_detach[0] = NULL;
+	mon_ops->mon_soc_init[0] = NULL;
+	mon_ops->mon_soc_deinit[0] = NULL;
+	mon_ops->mon_soc_attach[1] = dp_mon_soc_attach_2_0;
+	mon_ops->mon_soc_detach[1] = dp_mon_soc_detach_2_0;
+	mon_ops->mon_soc_init[1] = dp_mon_soc_init_2_0;
+	mon_ops->mon_soc_deinit[1] = dp_mon_soc_deinit_2_0;
+
+	dp_mon_config_register_ops(mon_ops);
+
+	mon_ops->mon_rings_alloc[0] = dp_mon_rings_alloc_1_0;
+	mon_ops->mon_rings_free[0] = dp_mon_rings_free_1_0;
+	mon_ops->mon_rings_init[0] = dp_mon_rings_init_1_0;
+	mon_ops->mon_rings_deinit[0] = dp_mon_rings_deinit_1_0;
+	mon_ops->mon_rings_alloc[1] = dp_pdev_mon_rings_alloc_2_0;
+	mon_ops->mon_rings_free[1] = dp_pdev_mon_rings_free_2_0;
+	mon_ops->mon_rings_init[1] = dp_pdev_mon_rings_init_2_0;
+	mon_ops->mon_rings_deinit[1] = dp_pdev_mon_rings_deinit_2_0;
+
+	mon_ops->mon_filter_setup_tx_mon_mode =
+				dp_mon_filter_setup_local_pkt_capture_tx;
+	mon_ops->mon_filter_reset_tx_mon_mode =
+				dp_mon_filter_reset_local_pkt_capture_tx;
+	mon_ops->tx_mon_filter_update = dp_tx_mon_filter_update_2_0;
+
+	mon_ops->rx_hdr_length_set = dp_rx_mon_hdr_length_set;
+	dp_mon_register_tx_pkt_enh_ops_1_0(mon_ops);
+}
+
+static void dp_mon_pdev_filter_lpc_init(struct dp_mon_pdev *mon_pdev)
+{
+	if (!mon_pdev)
+		return;
+
+	mon_pdev->mon_filter_mode = MON_FILTER_PASS;
+	mon_pdev->fp_mgmt_filter = FILTER_MGMT_ALL;
+	mon_pdev->fp_ctrl_filter = FILTER_CTRL_ALL;
+	mon_pdev->fp_data_filter = FILTER_DATA_ALL;
+	mon_pdev->mo_mgmt_filter = 0;
+	mon_pdev->mo_ctrl_filter = 0;
+	mon_pdev->mo_data_filter = 0;
+}
+#else
+#if !defined(DISABLE_MON_CONFIG)
+static inline void dp_mon_config_register_ops(struct dp_mon_ops *mon_ops)
+{
+	mon_ops->mon_pdev_htt_srng_setup[0] = dp_mon_htt_srng_setup_1_0;
+	mon_ops->mon_pdev_htt_srng_setup[1] = NULL;
+	mon_ops->mon_soc_htt_srng_setup = NULL;
+}
+#else
+static inline void dp_mon_config_register_ops(struct dp_mon_ops *mon_ops)
+{
+}
+#endif
+
+void dp_mon_register_lpc_ops_1_0(struct dp_mon_ops *mon_ops)
+{
+	mon_ops->mon_soc_attach[0] = NULL;
+	mon_ops->mon_soc_detach[0] = NULL;
+	mon_ops->mon_soc_init[0] = NULL;
+	mon_ops->mon_soc_deinit[0] = NULL;
+	mon_ops->mon_soc_attach[1] = NULL;
+	mon_ops->mon_soc_detach[1] = NULL;
+	mon_ops->mon_soc_init[1] = NULL;
+	mon_ops->mon_soc_deinit[1] = NULL;
+
+	dp_mon_config_register_ops(mon_ops);
+
+	mon_ops->mon_rings_alloc[0] = dp_mon_rings_alloc_1_0;
+	mon_ops->mon_rings_free[0] = dp_mon_rings_free_1_0;
+	mon_ops->mon_rings_init[0] = dp_mon_rings_init_1_0;
+	mon_ops->mon_rings_deinit[0] = dp_mon_rings_deinit_1_0;
+	mon_ops->mon_rings_alloc[1] = NULL;
+	mon_ops->mon_rings_free[1] = NULL;
+	mon_ops->mon_rings_init[1] = NULL;
+	mon_ops->mon_rings_deinit[1] = NULL;
+
+	mon_ops->mon_filter_setup_tx_mon_mode = NULL;
+	mon_ops->mon_filter_reset_tx_mon_mode = NULL;
+	mon_ops->tx_mon_filter_update = NULL;
+
+	mon_ops->rx_hdr_length_set = NULL;
+	dp_mon_register_tx_pkt_enh_ops_1_0(mon_ops);
+}
+
+static void dp_mon_pdev_filter_lpc_init(struct dp_mon_pdev *mon_pdev)
+{
+	dp_mon_pdev_filter_init(mon_pdev);
+}
+#endif
+
 QDF_STATUS dp_mon_pdev_init(struct dp_pdev *pdev)
 {
 	struct dp_mon_pdev *mon_pdev;
@@ -5804,15 +5956,12 @@ QDF_STATUS dp_mon_pdev_init(struct dp_pdev *pdev)
 	TAILQ_INIT(&mon_pdev->neighbour_peers_list);
 	mon_pdev->neighbour_peers_added = false;
 	mon_pdev->monitor_configured = false;
-	/* Monitor filter init */
-	mon_pdev->mon_filter_mode = MON_FILTER_ALL;
-	mon_pdev->fp_mgmt_filter = FILTER_MGMT_ALL;
-	mon_pdev->fp_ctrl_filter = FILTER_CTRL_ALL;
-	mon_pdev->fp_data_filter = FILTER_DATA_ALL;
-	mon_pdev->mo_mgmt_filter = FILTER_MGMT_ALL;
-	mon_pdev->mo_ctrl_filter = FILTER_CTRL_ALL;
-	mon_pdev->mo_data_filter = FILTER_DATA_ALL;
 
+	/* Monitor filter init */
+	if (wlan_cfg_get_local_pkt_capture(pdev->soc->wlan_cfg_ctx))
+		dp_mon_pdev_filter_lpc_init(mon_pdev);
+	else
+		dp_mon_pdev_filter_init(mon_pdev);
 	/*
 	 * initialize ppdu tlv list
 	 */
@@ -6690,13 +6839,20 @@ void dp_mon_feature_ops_deregister(struct dp_soc *soc)
 QDF_STATUS dp_mon_soc_attach(struct dp_soc *soc)
 {
 	struct dp_mon_soc *mon_soc;
+	qdf_size_t soc_context_size;
 
 	if (!soc) {
 		dp_mon_err("dp_soc is NULL");
 		return QDF_STATUS_E_FAILURE;
 	}
 
-	mon_soc = (struct dp_mon_soc *)qdf_mem_malloc(sizeof(*mon_soc));
+	if (soc->arch_ops.txrx_get_mon_context_size) {
+		soc_context_size = soc->arch_ops.txrx_get_mon_context_size(DP_CONTEXT_TYPE_MON_SOC);
+		mon_soc = dp_context_alloc_mem(soc, DP_MON_SOC_TYPE,
+					       soc_context_size);
+	} else {
+		mon_soc = (struct dp_mon_soc *)qdf_mem_malloc(sizeof(*mon_soc));
+	}
 	if (!mon_soc) {
 		dp_mon_err("%pK: mem allocation failed", soc);
 		return QDF_STATUS_E_NOMEM;
@@ -6707,6 +6863,7 @@ QDF_STATUS dp_mon_soc_attach(struct dp_soc *soc)
 	dp_mon_register_intr_ops(soc);
 
 	dp_mon_cdp_ops_register(soc);
+	dp_monitor_soc_attach(soc);
 	dp_mon_register_feature_ops(soc);
 	return QDF_STATUS_SUCCESS;
 }
@@ -6723,6 +6880,7 @@ QDF_STATUS dp_mon_soc_detach(struct dp_soc *soc)
 	mon_soc = soc->monitor_soc;
 	dp_monitor_vdev_timer_deinit(soc);
 	dp_mon_cdp_ops_deregister(soc);
+	dp_monitor_soc_detach(soc);
 	soc->monitor_soc = NULL;
 	qdf_mem_free(mon_soc);
 	return QDF_STATUS_SUCCESS;

@@ -536,7 +536,7 @@ void hal_srng_dst_hw_init_generic(struct hal_soc *hal,
 	 * (when SRNG_ENABLE field for the MISC register is available in fw_api)
 	 * (WCSS_UMAC_CE_0_SRC_WFSS_CE_CHANNEL_SRC_R0_SRC_RING_MISC)
 	 */
-	reg_val |= 0x40;
+	reg_val |= SRNG_ENABLE_BIT;
 
 	SRNG_DST_REG_WRITE(srng, MISC, reg_val);
 

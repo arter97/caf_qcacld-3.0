@@ -3018,6 +3018,18 @@ void dp_rxdma_setup_refill_ring3(struct dp_soc *soc,
 { }
 #endif
 
+#ifdef WIFI_MONITOR_SUPPORT
+static inline QDF_STATUS dp_lpc_tx_config(struct dp_pdev *pdev)
+{
+	return dp_local_pkt_capture_tx_config(pdev);
+}
+#else
+static inline QDF_STATUS dp_lpc_tx_config(struct dp_pdev *pdev)
+{
+	return QDF_STATUS_SUCCESS;
+}
+#endif
+
 /**
  * dp_rxdma_ring_config() - configure the RX DMA rings
  * @soc: data path SoC handle
@@ -3058,6 +3070,7 @@ static QDF_STATUS dp_rxdma_ring_config(struct dp_soc *soc)
 			dp_rxdma_setup_refill_ring3(soc, pdev, i);
 
 			dp_update_num_mac_rings_for_dbs(soc, &max_mac_rings);
+			dp_lpc_tx_config(pdev);
 			dp_err("pdev_id %d max_mac_rings %d",
 			       pdev->pdev_id, max_mac_rings);
 
@@ -3730,7 +3743,8 @@ static QDF_STATUS dp_vdev_attach_wifi3(struct cdp_soc_t *cdp_soc,
 			qdf_timer_mod(&soc->int_timer, DP_INTR_POLL_TIMER_MS);
 	} else if (dp_soc_get_con_mode(soc) == QDF_GLOBAL_MISSION_MODE &&
 		   soc->intr_mode == DP_INTR_MSI &&
-		   wlan_op_mode_monitor == vdev->opmode) {
+		   wlan_op_mode_monitor == vdev->opmode &&
+		   !wlan_cfg_get_local_pkt_capture(soc->wlan_cfg_ctx)) {
 		/* Timer to reap status ring in mission mode */
 		dp_monitor_vdev_timer_start(soc);
 	}

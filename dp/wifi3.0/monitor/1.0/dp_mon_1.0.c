@@ -211,7 +211,6 @@ void dp_flush_monitor_rings(struct dp_soc *soc)
 	dp_info("After flush: Monitor DST ring HP %u TP %u", hp, tp);
 }
 
-static
 void dp_mon_rings_deinit_1_0(struct dp_pdev *pdev)
 {
 	int mac_id = 0;
@@ -231,7 +230,6 @@ void dp_mon_rings_deinit_1_0(struct dp_pdev *pdev)
 	}
 }
 
-static
 void dp_mon_rings_free_1_0(struct dp_pdev *pdev)
 {
 	int mac_id = 0;
@@ -250,7 +248,6 @@ void dp_mon_rings_free_1_0(struct dp_pdev *pdev)
 	}
 }
 
-static
 QDF_STATUS dp_mon_rings_init_1_0(struct dp_pdev *pdev)
 {
 	struct dp_soc *soc = pdev->soc;
@@ -279,7 +276,6 @@ fail1:
 	return QDF_STATUS_E_NOMEM;
 }
 
-static
 QDF_STATUS dp_mon_rings_alloc_1_0(struct dp_pdev *pdev)
 {
 	struct dp_soc *soc = pdev->soc;
@@ -315,28 +311,6 @@ fail1:
 inline
 void dp_flush_monitor_rings(struct dp_soc *soc)
 {
-}
-
-static inline
-void dp_mon_rings_deinit_1_0(struct dp_pdev *pdev)
-{
-}
-
-static inline
-void dp_mon_rings_free_1_0(struct dp_pdev *pdev)
-{
-}
-
-static inline
-QDF_STATUS dp_mon_rings_init_1_0(struct dp_pdev *pdev)
-{
-	return QDF_STATUS_SUCCESS;
-}
-
-static inline
-QDF_STATUS dp_mon_rings_alloc_1_0(struct dp_pdev *pdev)
-{
-	return QDF_STATUS_SUCCESS;
 }
 
 #endif
@@ -731,18 +705,7 @@ static void dp_mon_neighbour_peer_add_ast(struct dp_pdev *pdev,
 }
 
 #if !defined(DISABLE_MON_CONFIG)
-
-/**
- * dp_mon_htt_srng_setup_1_0() - Prepare HTT messages for Monitor rings
- * @soc: soc handle
- * @pdev: physical device handle
- * @mac_id: ring number
- * @mac_for_pdev: mac_id
- *
- * Return: non-zero for failure, zero for success
- */
 #if defined(DP_CON_MON)
-static
 QDF_STATUS dp_mon_htt_srng_setup_1_0(struct dp_soc *soc,
 				     struct dp_pdev *pdev,
 				     int mac_id,
@@ -771,7 +734,6 @@ QDF_STATUS dp_mon_htt_srng_setup_1_0(struct dp_soc *soc,
 }
 #else
 /* This is only for WIN */
-static
 QDF_STATUS dp_mon_htt_srng_setup_1_0(struct dp_soc *soc,
 				     struct dp_pdev *pdev,
 				     int mac_id,
@@ -1386,7 +1348,6 @@ dp_mon_register_feature_ops_1_0(struct dp_soc *soc)
 #if defined(DP_CON_MON) && !defined(REMOVE_PKT_LOG)
 	mon_ops->mon_pktlogmod_exit = dp_pktlogmod_exit;
 #endif
-	mon_ops->rx_hdr_length_set = NULL;
 	mon_ops->rx_packet_length_set = NULL;
 	mon_ops->rx_mon_enable = NULL;
 	mon_ops->rx_wmask_subscribe = NULL;
@@ -1417,6 +1378,7 @@ dp_mon_register_feature_ops_1_0(struct dp_soc *soc)
 
 struct dp_mon_ops monitor_ops_1_0 = {
 	.mon_soc_cfg_init = dp_mon_soc_cfg_init,
+
 	.mon_pdev_alloc = NULL,
 	.mon_pdev_free = NULL,
 	.mon_pdev_attach = dp_mon_pdev_attach,
@@ -1434,9 +1396,6 @@ struct dp_mon_ops monitor_ops_1_0 = {
 				dp_mon_invalid_peer_update_pdev_stats,
 	.mon_peer_get_stats_param = dp_mon_peer_get_stats_param,
 	.mon_flush_rings = dp_flush_monitor_rings,
-#if !defined(DISABLE_MON_CONFIG)
-	.mon_pdev_htt_srng_setup = dp_mon_htt_srng_setup_1_0,
-#endif
 #if defined(DP_CON_MON)
 	.mon_service_rings = dp_service_mon_rings,
 #endif
@@ -1456,10 +1415,7 @@ struct dp_mon_ops monitor_ops_1_0 = {
 	.mon_reap_timer_deinit = dp_mon_reap_timer_deinit,
 	.mon_filter_setup_rx_mon_mode = dp_mon_filter_setup_mon_mode_1_0,
 	.mon_filter_reset_rx_mon_mode = dp_mon_filter_reset_mon_mode_1_0,
-	.mon_filter_setup_tx_mon_mode = NULL,
-	.mon_filter_reset_tx_mon_mode = NULL,
 	.rx_mon_filter_update = dp_mon_filter_update_1_0,
-	.tx_mon_filter_update = NULL,
 	.set_mon_mode_buf_rings_tx = NULL,
 	.rx_mon_desc_pool_init = dp_rx_pdev_mon_desc_pool_init,
 	.rx_mon_desc_pool_deinit = dp_rx_pdev_mon_desc_pool_deinit,
@@ -1472,24 +1428,10 @@ struct dp_mon_ops monitor_ops_1_0 = {
 	.tx_mon_desc_pool_alloc = NULL,
 	.tx_mon_desc_pool_free = NULL,
 	.tx_mon_filter_alloc = NULL,
-	.mon_rings_alloc = dp_mon_rings_alloc_1_0,
-	.mon_rings_free = dp_mon_rings_free_1_0,
-	.mon_rings_init = dp_mon_rings_init_1_0,
-	.mon_rings_deinit = dp_mon_rings_deinit_1_0,
 #if !defined(DISABLE_MON_CONFIG)
 	.mon_register_intr_ops = dp_mon_register_intr_ops_1_0,
 #endif
 	.mon_register_feature_ops = dp_mon_register_feature_ops_1_0,
-#ifdef WLAN_TX_PKT_CAPTURE_ENH
-	.mon_tx_ppdu_stats_attach = dp_tx_ppdu_stats_attach_1_0,
-	.mon_tx_ppdu_stats_detach = dp_tx_ppdu_stats_detach_1_0,
-	.mon_peer_tx_capture_filter_check = dp_peer_tx_capture_filter_check_1_0,
-#endif
-#if (defined(WIFI_MONITOR_SUPPORT) && !defined(WLAN_TX_PKT_CAPTURE_ENH))
-	.mon_tx_ppdu_stats_attach = NULL,
-	.mon_tx_ppdu_stats_detach = NULL,
-	.mon_peer_tx_capture_filter_check = NULL,
-#endif
 	.mon_lite_mon_alloc = NULL,
 	.mon_lite_mon_dealloc = NULL,
 	.mon_lite_mon_vdev_delete = NULL,
@@ -1527,6 +1469,9 @@ struct cdp_mon_ops dp_ops_mon_1_0 = {
 #endif
 	.txrx_set_mon_pdev_params_rssi_dbm_conv =
 				dp_mon_pdev_params_rssi_dbm_conv,
+#ifdef WLAN_FEATURE_LOCAL_PKT_CAPTURE
+	.start_local_pkt_capture = dp_mon_start_local_pkt_capture,
+#endif /* WLAN_FEATURE_LOCAL_PKT_CAPTURE */
 };
 
 #ifdef QCA_MONITOR_OPS_PER_SOC_SUPPORT
@@ -1547,6 +1492,7 @@ void dp_mon_ops_register_1_0(struct dp_mon_soc *mon_soc)
 
 	qdf_mem_copy(mon_ops, &monitor_ops_1_0, sizeof(struct dp_mon_ops));
 	mon_soc->mon_ops = mon_ops;
+	dp_mon_register_lpc_ops_1_0(mon_ops);
 }
 
 void dp_mon_cdp_ops_register_1_0(struct cdp_ops *ops)
@@ -1571,6 +1517,7 @@ void dp_mon_cdp_ops_register_1_0(struct cdp_ops *ops)
 void dp_mon_ops_register_1_0(struct dp_mon_soc *mon_soc)
 {
 	mon_soc->mon_ops = &monitor_ops_1_0;
+	dp_mon_register_lpc_ops_1_0(mon_soc->mon_ops);
 }
 
 void dp_mon_cdp_ops_register_1_0(struct cdp_ops *ops)

@@ -76,6 +76,16 @@ do { \
 	*val |= ((value) << DP_MON_ ## field ## _LSB); \
 } while (0)
 
+#if defined(WLAN_PKT_CAPTURE_RX_2_0) || defined(CONFIG_WORD_BASED_TLV) || \
+	defined(WLAN_FEATURE_LOCAL_PKT_CAPTURE)
+#define DP_RX_MON_FILTER_SET_RX_HDR_LEN(dst, src) \
+do { \
+	(dst)->rx_hdr_length = src.rx_hdr_length; \
+} while (0)
+#else
+#define DP_RX_MON_FILTER_SET_RX_HDR_LEN(dst, src)
+#endif
+
 #define DP_MON_FILTER_PRINT(fmt, args ...) \
 	QDF_TRACE(QDF_MODULE_ID_MON_FILTER, QDF_TRACE_LEVEL_DEBUG, \
 		  fmt, ## args)
@@ -477,6 +487,12 @@ void dp_mon_filter_setup_mon_mode(struct dp_pdev *pdev);
 void dp_mon_filter_setup_tx_mon_mode(struct dp_pdev *pdev);
 
 /**
+ * dp_mon_filter_reset_tx_mon_mode() - Reset the Tx monitor mode filter
+ * @pdev: DP pdev handle
+ */
+void dp_mon_filter_reset_tx_mon_mode(struct dp_pdev *pdev);
+
+/**
  * dp_mon_filter_reset_mon_mode() - Reset the Rx monitor mode filter
  * @pdev: DP pdev handle
  */
@@ -538,4 +554,33 @@ dp_mon_ht2_rx_ring_cfg(struct dp_soc *soc,
 		       struct dp_pdev *pdev,
 		       enum dp_mon_filter_srng_type srng_type,
 		       struct htt_rx_ring_tlv_filter *tlv_filter);
+
+/**
+ * dp_rx_mon_hdr_length_set() - Setup rx monitor hdr tlv length
+ * @msg_word: msg word
+ * @tlv_filter: rx ring filter configuration
+ */
+void
+dp_rx_mon_hdr_length_set(uint32_t *msg_word,
+			 struct htt_rx_ring_tlv_filter *tlv_filter);
+
+#ifdef WLAN_FEATURE_LOCAL_PKT_CAPTURE
+/**
+ * dp_mon_start_local_pkt_capture() - start local packet capture
+ * @cdp_soc: cdp soc
+ * @pdev_id: pdev id
+ * @filter: filter configuration
+ */
+QDF_STATUS dp_mon_start_local_pkt_capture(struct cdp_soc_t *cdp_soc,
+					  uint8_t pdev_id,
+					  struct cdp_monitor_filter *filter);
+#else
+static inline
+QDF_STATUS dp_mon_start_local_pkt_capture(struct cdp_soc_t *cdp_soc,
+					  uint8_t pdev_id,
+					  struct cdp_monitor_filter *filter)
+{
+	return QDF_STATUS_E_NOSUPPORT;
+}
+#endif /* WLAN_FEATURE_LOCAL_PKT_CAPTURE */
 #endif /* #ifndef _DP_MON_FILTER_H_ */

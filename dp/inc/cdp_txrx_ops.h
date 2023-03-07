@@ -993,6 +993,7 @@ struct cdp_me_ops {
  *                                                stats in monitor pdev
  * @txrx_cfr_filter: Handler to configure host rx monitor status ring
  * @txrx_update_mon_mac_filter: Handler to configure mon mac filter
+ * @start_local_pkt_capture: start local packet capture
  */
 struct cdp_mon_ops {
 
@@ -1101,6 +1102,11 @@ struct cdp_mon_ops {
 	QDF_STATUS (*txrx_update_mon_mac_filter)(struct cdp_soc_t *soc,
 						 uint8_t vdev_id,
 						 uint32_t cmd);
+#ifdef WLAN_FEATURE_LOCAL_PKT_CAPTURE
+	QDF_STATUS (*start_local_pkt_capture)
+			(struct cdp_soc_t *soc, uint8_t pdev_id,
+			 struct cdp_monitor_filter *filter);
+#endif
 };
 
 /**

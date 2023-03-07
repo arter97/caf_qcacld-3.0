@@ -1041,7 +1041,8 @@ static inline bool dp_skip_msi_cfg(struct dp_soc *soc, int ring_type)
 	    soc->cdp_soc.ol_ops->get_con_mode() == QDF_GLOBAL_MONITOR_MODE) {
 		if (ring_type == REO_DST || ring_type == RXDMA_DST)
 			return true;
-	} else if (ring_type == RXDMA_MONITOR_STATUS) {
+	} else if (ring_type == RXDMA_MONITOR_STATUS &&
+		  !wlan_cfg_get_local_pkt_capture(soc->wlan_cfg_ctx)) {
 		return true;
 	}
 
@@ -1807,7 +1808,8 @@ dp_soc_near_full_interrupt_attach(struct dp_soc *soc, int num_irq,
 static inline bool dp_skip_rx_mon_ring_mask_set(struct dp_soc *soc)
 {
 	return !!(soc->cdp_soc.ol_ops->get_con_mode() !=
-			QDF_GLOBAL_MONITOR_MODE);
+		 QDF_GLOBAL_MONITOR_MODE &&
+		 !wlan_cfg_get_local_pkt_capture(soc->wlan_cfg_ctx));
 }
 #else
 static inline bool dp_skip_rx_mon_ring_mask_set(struct dp_soc *soc)

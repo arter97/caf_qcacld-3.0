@@ -54,6 +54,23 @@ int8_t *dp_mon_filter_mode_type_to_str[DP_MON_FILTER_MAX_MODE] = {
 #endif
 };
 
+#if defined(WLAN_PKT_CAPTURE_RX_2_0) || defined(CONFIG_WORD_BASED_TLV) || \
+	defined(WLAN_FEATURE_LOCAL_PKT_CAPTURE)
+static inline
+void dp_mon_filter_show_filter_1(struct htt_rx_ring_tlv_filter *tlv_filter)
+{
+	DP_MON_FILTER_PRINT("rx_hdr_length: %d", tlv_filter->rx_hdr_length);
+	DP_MON_FILTER_PRINT("mgmt_dma_length: %d", tlv_filter->mgmt_dma_length);
+	DP_MON_FILTER_PRINT("ctrl_dma_length: %d", tlv_filter->ctrl_dma_length);
+	DP_MON_FILTER_PRINT("data_dma_length: %d", tlv_filter->data_dma_length);
+}
+#else
+static inline
+void dp_mon_filter_show_filter_1(struct htt_rx_ring_tlv_filter *tlv_filter)
+{
+}
+#endif
+
 void dp_mon_filter_show_filter(struct dp_mon_pdev *mon_pdev,
 			       enum dp_mon_filter_mode mode,
 			       struct dp_mon_filter *filter)
@@ -63,6 +80,7 @@ void dp_mon_filter_show_filter(struct dp_mon_pdev *mon_pdev,
 	DP_MON_FILTER_PRINT("[%s]: Valid: %d",
 			    dp_mon_filter_mode_type_to_str[mode],
 			    filter->valid);
+	dp_mon_filter_show_filter_1(tlv_filter);
 	DP_MON_FILTER_PRINT("mpdu_start: %d", tlv_filter->mpdu_start);
 	DP_MON_FILTER_PRINT("msdu_start: %d", tlv_filter->msdu_start);
 	DP_MON_FILTER_PRINT("packet: %d", tlv_filter->packet);
@@ -258,6 +276,10 @@ void dp_mon_filter_h2t_setup(struct dp_soc *soc, struct dp_pdev *pdev,
 		dp_mon_set_fp_phy_err_filter(tlv_filter, mon_filter);
 		tlv_filter->enable_mon_mac_filter =
 				mon_filter->tlv_filter.enable_mon_mac_filter;
+		DP_RX_MON_FILTER_SET_RX_HDR_LEN(tlv_filter,
+						mon_filter->tlv_filter);
+		DP_RX_MON_FILTER_SET_RX_HDR_LEN(tlv_filter,
+						mon_filter->tlv_filter);
 	}
 
 	dp_mon_filter_show_filter(mon_pdev, 0, filter);
@@ -485,6 +507,15 @@ void dp_mon_filter_setup_tx_mon_mode(struct dp_pdev *pdev)
 	mon_ops = dp_mon_ops_get(pdev->soc);
 	if (mon_ops && mon_ops->mon_filter_setup_tx_mon_mode)
 		mon_ops->mon_filter_setup_tx_mon_mode(pdev);
+}
+
+void dp_mon_filter_reset_tx_mon_mode(struct dp_pdev *pdev)
+{
+	struct dp_mon_ops *mon_ops = NULL;
+
+	mon_ops = dp_mon_ops_get(pdev->soc);
+	if (mon_ops && mon_ops->mon_filter_reset_tx_mon_mode)
+		mon_ops->mon_filter_reset_tx_mon_mode(pdev);
 }
 
 void dp_mon_filter_reset_mon_mode(struct dp_pdev *pdev)
@@ -861,3 +892,122 @@ fail:
 	dp_mon_filter_dealloc(mon_pdev);
 	return NULL;
 }
+
+#ifdef WLAN_FEATURE_LOCAL_PKT_CAPTURE
+static void
+dp_mon_set_local_pkt_capture_rx_filter(struct dp_pdev *pdev,
+				       struct cdp_monitor_filter *src_filter)
+{
+	struct dp_mon_pdev *mon_pdev = pdev->monitor_pdev;
+	enum dp_mon_filter_mode mode = DP_MON_FILTER_MONITOR_MODE;
+	enum dp_mon_filter_srng_type srng_type;
+	struct dp_mon_filter dst_filter = {0};
+	struct dp_soc *soc = pdev->soc;
+
+	srng_type = ((soc->wlan_cfg_ctx->rxdma1_enable) ?
+			DP_MON_FILTER_SRNG_TYPE_RXDMA_MON_BUF :
+			DP_MON_FILTER_SRNG_TYPE_RXDMA_BUF);
+
+	dst_filter.valid = true;
+	dp_mon_filter_set_mon_cmn(pdev, &dst_filter);
+
+	dp_mon_filter_show_filter(mon_pdev, mode, &dst_filter);
+	mon_pdev->filter[mode][srng_type] = dst_filter;
+
+	qdf_mem_zero(&dst_filter, sizeof(struct dp_mon_filter));
+	dst_filter.valid = true;
+	dp_mon_filter_set_status_cmn(mon_pdev, &dst_filter);
+
+	dst_filter.tlv_filter.packet_header = 1;
+	dst_filter.tlv_filter.header_per_msdu = 1;
+	dst_filter.tlv_filter.rx_hdr_length = RX_HDR_DMA_LENGTH_256B;
+	dst_filter.tlv_filter.fp_mgmt_filter = src_filter->fp_mgmt;
+	dst_filter.tlv_filter.fp_ctrl_filter = src_filter->fp_ctrl;
+	dst_filter.tlv_filter.fp_data_filter = src_filter->fp_data;
+	dst_filter.tlv_filter.enable_fp = src_filter->mode;
+	dst_filter.tlv_filter.enable_md = 0;
+	dst_filter.tlv_filter.enable_mo = 0;
+
+	dp_mon_filter_show_filter(mon_pdev, mode, &dst_filter);
+
+	/* Store the above filter */
+	srng_type = DP_MON_FILTER_SRNG_TYPE_RXDMA_MONITOR_STATUS;
+	mon_pdev->filter[mode][srng_type] = dst_filter;
+}
+
+static void dp_mon_clear_local_pkt_capture_rx_filter(struct dp_pdev *pdev)
+{
+	struct dp_mon_pdev *mon_pdev = pdev->monitor_pdev;
+	enum dp_mon_filter_mode mode = DP_MON_FILTER_MONITOR_MODE;
+	enum dp_mon_filter_srng_type srng_type =
+				DP_MON_FILTER_SRNG_TYPE_RXDMA_MONITOR_STATUS;
+	struct dp_mon_filter filter = {0};
+
+	mon_pdev->filter[mode][srng_type] = filter;
+}
+
+static void dp_mon_reset_local_pkt_capture_rx_filter(struct dp_pdev *pdev)
+{
+	struct dp_mon_pdev *mon_pdev = pdev->monitor_pdev;
+	enum dp_mon_filter_mode mode = DP_MON_FILTER_MONITOR_MODE;
+	enum dp_mon_filter_srng_type srng_type =
+				DP_MON_FILTER_SRNG_TYPE_RXDMA_MONITOR_STATUS;
+	struct dp_mon_filter filter = {0};
+
+	filter.valid = true;
+	mon_pdev->filter[mode][srng_type] = filter;
+}
+
+QDF_STATUS dp_mon_start_local_pkt_capture(struct cdp_soc_t *cdp_soc,
+					  uint8_t pdev_id,
+					  struct cdp_monitor_filter *filter)
+{
+	bool local_pkt_capture_running;
+	struct dp_soc *soc = cdp_soc_t_to_dp_soc(cdp_soc);
+	struct dp_pdev *pdev = dp_get_pdev_from_soc_pdev_id_wifi3(soc, pdev_id);
+	struct dp_mon_pdev *mon_pdev;
+	QDF_STATUS status = QDF_STATUS_SUCCESS;
+
+	if (!pdev) {
+		dp_mon_filter_err("pdev Context is null");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	mon_pdev = pdev->monitor_pdev;
+	local_pkt_capture_running = dp_mon_get_local_pkt_capture_running(cdp_soc,
+					pdev_id);
+	if (local_pkt_capture_running) {
+		dp_mon_filter_err("Can't start local pkt capture. Already running");
+		return QDF_STATUS_E_ALREADY;
+	}
+
+	mon_pdev->mon_filter_mode = filter->mode;
+	mon_pdev->fp_mgmt_filter = filter->fp_mgmt;
+	mon_pdev->fp_ctrl_filter = filter->fp_ctrl;
+	mon_pdev->fp_data_filter = filter->fp_data;
+
+	qdf_spin_lock_bh(&mon_pdev->mon_lock);
+	dp_mon_set_local_pkt_capture_rx_filter(pdev, filter);
+	status = dp_mon_filter_update(pdev);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		dp_mon_clear_local_pkt_capture_rx_filter(pdev);
+		qdf_spin_unlock_bh(&mon_pdev->mon_lock);
+		dp_mon_filter_err("local pkt capture set rx filter failed");
+		return status;
+	}
+
+	dp_mon_filter_setup_tx_mon_mode(pdev);
+	status = dp_tx_mon_filter_update(pdev);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		qdf_spin_unlock_bh(&mon_pdev->mon_lock);
+		dp_mon_filter_err("local pkt capture set tx filter failed");
+		return status;
+	}
+	qdf_spin_unlock_bh(&mon_pdev->mon_lock);
+
+	dp_mon_filter_debug("local pkt capture tx filter set");
+
+	return status;
+}
+
+#endif /* WLAN_FEATURE_LOCAL_PKT_CAPTURE */

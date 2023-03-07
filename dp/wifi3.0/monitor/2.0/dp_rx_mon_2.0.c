@@ -15,6 +15,7 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
+#include "qdf_types.h"
 #include "hal_be_hw_headers.h"
 #include "dp_types.h"
 #include "hal_be_rx.h"

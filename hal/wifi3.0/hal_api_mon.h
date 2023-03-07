@@ -683,7 +683,7 @@ struct hal_rx_ppdu_common_info {
  */
 struct hal_rx_msdu_payload_info {
 	uint8_t *first_msdu_payload;
-	uint8_t payload_len;
+	uint16_t payload_len;
 };
 
 /**

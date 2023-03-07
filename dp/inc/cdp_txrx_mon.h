@@ -304,4 +304,43 @@ cdp_update_pdev_mon_telemetry_airtime_stats(ol_txrx_soc_handle soc,
 						soc, pdev_id);
 }
 #endif
+
+#ifdef WLAN_FEATURE_LOCAL_PKT_CAPTURE
+/**
+ * cdp_start_local_pkt_capture() - start local pkt capture
+ * @soc: opaque soc handle
+ * @pdev_id: pdev id
+ * @filter: monitor filter config
+ *
+ * Return: QDF_STATUS_SUCCESS if success
+ *         QDF_STATUS_E_FAILURE if error
+ */
+static inline
+QDF_STATUS cdp_start_local_pkt_capture(ol_txrx_soc_handle soc,
+				       uint8_t pdev_id,
+				       struct cdp_monitor_filter *filter)
+{
+	if (!soc || !soc->ops) {
+		dp_cdp_debug("Invalid Instance");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	if (!soc->ops->mon_ops ||
+	    !soc->ops->mon_ops->start_local_pkt_capture)
+		return QDF_STATUS_E_FAILURE;
+
+	return soc->ops->mon_ops->start_local_pkt_capture(soc, pdev_id, filter);
+}
+
+#else
+static inline
+QDF_STATUS cdp_start_local_pkt_capture(ol_txrx_soc_handle soc,
+				       uint8_t pdev_id,
+				       struct cdp_monitor_filter *filter)
+{
+	return QDF_STATUS_E_NOSUPPORT;
+}
+
+#endif /* WLAN_FEATURE_LOCAL_PKT_CAPTURE */
+
 #endif
