@@ -88,11 +88,11 @@ cdp_update_filter_neighbour_peers(ol_txrx_soc_handle soc,
 		return 0;
 	}
 
-	if (!soc->ops->ctrl_ops ||
-	    !soc->ops->ctrl_ops->txrx_update_filter_neighbour_peers)
+	if (!soc->ops->mon_ops ||
+	    !soc->ops->mon_ops->txrx_update_filter_neighbour_peers)
 		return 0;
 
-	return soc->ops->ctrl_ops->txrx_update_filter_neighbour_peers
+	return soc->ops->mon_ops->txrx_update_filter_neighbour_peers
 			(soc, vdev_id, cmd, macaddr);
 }
 #endif /* ATH_SUPPORT_NAC || ATH_SUPPORT_NAC_RSSI*/
@@ -1153,11 +1153,11 @@ static inline QDF_STATUS cdp_vdev_config_for_nac_rssi(ol_txrx_soc_handle soc,
 		return QDF_STATUS_E_FAILURE;
 	}
 
-	if (!soc->ops->ctrl_ops ||
-			!soc->ops->ctrl_ops->txrx_vdev_config_for_nac_rssi)
+	if (!soc->ops->mon_ops ||
+			!soc->ops->mon_ops->txrx_vdev_config_for_nac_rssi)
 		return QDF_STATUS_E_FAILURE;
 
-	return soc->ops->ctrl_ops->txrx_vdev_config_for_nac_rssi(soc, vdev_id,
+	return soc->ops->mon_ops->txrx_vdev_config_for_nac_rssi(soc, vdev_id,
 			nac_cmd, bssid, client_macaddr, chan_num);
 }
 
@@ -1182,11 +1182,11 @@ static inline QDF_STATUS cdp_vdev_get_neighbour_rssi(ol_txrx_soc_handle soc,
 		return QDF_STATUS_E_FAILURE;
 	}
 
-	if (!soc->ops->ctrl_ops ||
-	    !soc->ops->ctrl_ops->txrx_vdev_get_neighbour_rssi)
+	if (!soc->ops->mon_ops ||
+	    !soc->ops->mon_ops->txrx_vdev_get_neighbour_rssi)
 		return QDF_STATUS_E_FAILURE;
 
-	return soc->ops->ctrl_ops->txrx_vdev_get_neighbour_rssi(soc, vdev_id,
+	return soc->ops->mon_ops->txrx_vdev_get_neighbour_rssi(soc, vdev_id,
 								macaddr,
 								rssi);
 }
