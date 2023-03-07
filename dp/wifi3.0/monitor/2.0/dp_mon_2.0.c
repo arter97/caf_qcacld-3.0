@@ -452,28 +452,17 @@ static bool dp_ppdu_stats_feat_enable_check_2_0(struct dp_pdev *pdev)
 }
 #endif
 
-static
 QDF_STATUS dp_mon_soc_htt_srng_setup_2_0(struct dp_soc *soc)
 {
-	struct dp_mon_soc *mon_soc = soc->monitor_soc;
-	struct dp_mon_soc_be *mon_soc_be = dp_get_be_mon_soc_from_dp_mon_soc(mon_soc);
 	QDF_STATUS status;
 
-	hal_set_low_threshold(soc->rxdma_mon_buf_ring[0].hal_srng,
-			      MON_BUF_MIN_ENTRIES << 2);
-	status = htt_srng_setup(soc->htt_handle, 0,
-				soc->rxdma_mon_buf_ring[0].hal_srng,
-				RXDMA_MONITOR_BUF);
-
+	status = dp_rx_mon_soc_htt_srng_setup_2_0(soc, 0);
 	if (status != QDF_STATUS_SUCCESS) {
 		dp_err("Failed to send htt srng setup message for Rx mon buf ring");
 		return status;
 	}
 
-	hal_set_low_threshold(mon_soc_be->tx_mon_buf_ring.hal_srng, 0);
-	status = htt_srng_setup(soc->htt_handle, 0,
-				mon_soc_be->tx_mon_buf_ring.hal_srng,
-				TX_MONITOR_BUF);
+	status = dp_tx_mon_soc_htt_srng_setup_2_0(soc, 0);
 	if (status != QDF_STATUS_SUCCESS) {
 		dp_err("Failed to send htt srng setup message for Tx mon buf ring");
 		return status;
@@ -482,7 +471,30 @@ QDF_STATUS dp_mon_soc_htt_srng_setup_2_0(struct dp_soc *soc)
 	return status;
 }
 
-static
+#if defined(DP_CON_MON)
+QDF_STATUS dp_mon_pdev_htt_srng_setup_2_0(struct dp_soc *soc,
+					  struct dp_pdev *pdev,
+					  int mac_id,
+					  int mac_for_pdev)
+{
+	struct dp_mon_soc *mon_soc = soc->monitor_soc;
+	struct dp_mon_soc_be *mon_soc_be = dp_get_be_mon_soc_from_dp_mon_soc(mon_soc);
+	QDF_STATUS status;
+
+	if (!mon_soc_be->tx_mon_dst_ring[mac_id].hal_srng)
+		return QDF_STATUS_SUCCESS;
+
+	status = dp_tx_mon_pdev_htt_srng_setup_2_0(soc, pdev, mac_id,
+						   mac_for_pdev);
+	if (status != QDF_STATUS_SUCCESS) {
+		dp_mon_err("Failed to send htt srng message for Tx mon dst ring");
+		return status;
+	}
+
+	return status;
+}
+#else
+/* This is for WIN case */
 QDF_STATUS dp_mon_pdev_htt_srng_setup_2_0(struct dp_soc *soc,
 					  struct dp_pdev *pdev,
 					  int mac_id,
@@ -495,10 +507,8 @@ QDF_STATUS dp_mon_pdev_htt_srng_setup_2_0(struct dp_soc *soc,
 	if (!soc->rxdma_mon_dst_ring[mac_id].hal_srng)
 		return QDF_STATUS_SUCCESS;
 
-	status = htt_srng_setup(soc->htt_handle, mac_for_pdev,
-				soc->rxdma_mon_dst_ring[mac_id].hal_srng,
-				RXDMA_MONITOR_DST);
-
+	status = dp_rx_mon_pdev_htt_srng_setup_2_0(soc, pdev, mac_id,
+						   mac_for_pdev);
 	if (status != QDF_STATUS_SUCCESS) {
 		dp_mon_err("Failed to send htt srng setup message for Rxdma dst ring");
 		return status;
@@ -507,10 +517,8 @@ QDF_STATUS dp_mon_pdev_htt_srng_setup_2_0(struct dp_soc *soc,
 	if (!mon_soc_be->tx_mon_dst_ring[mac_id].hal_srng)
 		return QDF_STATUS_SUCCESS;
 
-	status = htt_srng_setup(soc->htt_handle, mac_for_pdev,
-				mon_soc_be->tx_mon_dst_ring[mac_id].hal_srng,
-				TX_MONITOR_DST);
-
+	status = dp_tx_mon_pdev_htt_srng_setup_2_0(soc, pdev, mac_id,
+						   mac_for_pdev);
 	if (status != QDF_STATUS_SUCCESS) {
 		dp_mon_err("Failed to send htt srng message for Tx mon dst ring");
 		return status;
@@ -518,7 +526,9 @@ QDF_STATUS dp_mon_pdev_htt_srng_setup_2_0(struct dp_soc *soc,
 
 	return status;
 }
+#endif
 
+static
 QDF_STATUS dp_rx_mon_refill_buf_ring_2_0(struct dp_intr *int_ctx)
 {
 	struct dp_soc *soc  = int_ctx->soc;
@@ -561,26 +571,14 @@ QDF_STATUS dp_rx_mon_refill_buf_ring_2_0(struct dp_intr *int_ctx)
 	return QDF_STATUS_SUCCESS;
 }
 
-static
 QDF_STATUS dp_mon_soc_detach_2_0(struct dp_soc *soc)
 {
-	struct dp_mon_soc *mon_soc = soc->monitor_soc;
-	struct dp_mon_soc_be *mon_soc_be = dp_get_be_mon_soc_from_dp_mon_soc(mon_soc);
-
-	if (!mon_soc_be) {
-		dp_mon_err("DP MON SOC NULL");
-		return QDF_STATUS_E_FAILURE;
-	}
-
-	dp_rx_mon_buf_desc_pool_free(soc);
-	dp_srng_free(soc, &soc->rxdma_mon_buf_ring[0]);
-	dp_tx_mon_buf_desc_pool_free(soc);
-	dp_srng_free(soc, &mon_soc_be->tx_mon_buf_ring);
-
+	dp_rx_mon_soc_detach_2_0(soc, 0);
+	dp_tx_mon_soc_detach_2_0(soc, 0);
 	return QDF_STATUS_SUCCESS;
 }
 
-static void dp_mon_soc_deinit_2_0(struct dp_soc *soc)
+void dp_mon_soc_deinit_2_0(struct dp_soc *soc)
 {
 	struct dp_mon_soc *mon_soc = soc->monitor_soc;
 	struct dp_mon_soc_be *mon_soc_be =
@@ -589,14 +587,8 @@ static void dp_mon_soc_deinit_2_0(struct dp_soc *soc)
 	if (!mon_soc_be->is_dp_mon_soc_initialized)
 		return;
 
-	dp_rx_mon_buffers_free(soc);
-	dp_tx_mon_buffers_free(soc);
-
-	dp_rx_mon_buf_desc_pool_deinit(soc);
-	dp_tx_mon_buf_desc_pool_deinit(soc);
-
-	dp_srng_deinit(soc, &soc->rxdma_mon_buf_ring[0], RXDMA_MONITOR_BUF, 0);
-	dp_srng_deinit(soc, &mon_soc_be->tx_mon_buf_ring, TX_MONITOR_BUF, 0);
+	dp_rx_mon_soc_deinit_2_0(soc, 0);
+	dp_tx_mon_soc_deinit_2_0(soc, 0);
 
 	mon_soc_be->is_dp_mon_soc_initialized = false;
 }
@@ -632,13 +624,11 @@ fail:
 	return QDF_STATUS_E_FAILURE;
 }
 
-static
 QDF_STATUS dp_mon_soc_attach_2_0(struct dp_soc *soc)
 {
 	struct dp_mon_soc *mon_soc = soc->monitor_soc;
 	struct dp_mon_soc_be *mon_soc_be =
 		dp_get_be_mon_soc_from_dp_mon_soc(mon_soc);
-	int entries;
 	struct wlan_cfg_dp_soc_ctxt *soc_cfg_ctx;
 
 	soc_cfg_ctx = soc->wlan_cfg_ctx;
@@ -647,18 +637,12 @@ QDF_STATUS dp_mon_soc_attach_2_0(struct dp_soc *soc)
 		return QDF_STATUS_E_FAILURE;
 	}
 
-	entries = wlan_cfg_get_dp_soc_rx_mon_buf_ring_size(soc_cfg_ctx);
-	qdf_print("%s:%d rx mon buf entries: %d", __func__, __LINE__, entries);
-	if (dp_srng_alloc(soc, &soc->rxdma_mon_buf_ring[0],
-			  RXDMA_MONITOR_BUF, entries, 0)) {
+	if (dp_rx_mon_soc_attach_2_0(soc, 0)) {
 		dp_mon_err("%pK: " RNG_ERR "rx_mon_buf_ring", soc);
 		goto fail;
 	}
 
-	entries = wlan_cfg_get_dp_soc_tx_mon_buf_ring_size(soc_cfg_ctx);
-	qdf_print("%s:%d tx mon buf entries: %d", __func__, __LINE__, entries);
-	if (dp_srng_alloc(soc, &mon_soc_be->tx_mon_buf_ring,
-			  TX_MONITOR_BUF, entries, 0)) {
+	if (dp_tx_mon_soc_attach_2_0(soc, 0)) {
 		dp_mon_err("%pK: " RNG_ERR "tx_mon_buf_ring", soc);
 		goto fail;
 	}
@@ -1471,6 +1455,42 @@ struct cdp_mon_ops dp_ops_mon_2_0 = {
 	.txrx_update_mon_mac_filter = NULL,
 };
 
+#ifdef WLAN_PKT_CAPTURE_TX_2_0
+void dp_mon_ops_register_tx_2_0(struct dp_mon_soc *mon_soc)
+{
+	struct dp_mon_ops *mon_ops = mon_soc->mon_ops;
+
+	if (!mon_ops) {
+		dp_err("tx 2.0 ops registration failed");
+		return;
+	}
+	mon_ops->tx_mon_filter_update = dp_tx_mon_filter_update_2_0;
+	mon_ops->tx_mon_filter_alloc = dp_mon_filter_alloc_2_0;
+	mon_ops->tx_mon_filter_dealloc = dp_mon_filter_dealloc_2_0;
+#ifndef DISABLE_MON_CONFIG
+	mon_ops->mon_tx_process = dp_tx_mon_process_2_0;
+	mon_ops->print_txmon_ring_stat = dp_tx_mon_print_ring_stat_2_0;
+#endif
+}
+#endif
+
+#ifdef WLAN_PKT_CAPTURE_RX_2_0
+void dp_mon_ops_register_rx_2_0(struct dp_mon_soc *mon_soc)
+{
+	struct dp_mon_ops *mon_ops = mon_soc->mon_ops;
+
+	if (!mon_ops) {
+		dp_err("rx 2.0 ops registration failed");
+		return;
+	}
+	mon_ops->mon_filter_setup_rx_mon_mode =
+				dp_mon_filter_setup_rx_mon_mode_2_0;
+	mon_ops->mon_filter_reset_rx_mon_mode =
+				dp_mon_filter_reset_rx_mon_mode_2_0;
+	mon_ops->rx_mon_filter_update = dp_rx_mon_filter_update_2_0;
+}
+#endif
+
 #ifdef QCA_MONITOR_OPS_PER_SOC_SUPPORT
 void dp_mon_ops_register_2_0(struct dp_mon_soc *mon_soc)
 {
@@ -1489,6 +1509,8 @@ void dp_mon_ops_register_2_0(struct dp_mon_soc *mon_soc)
 
 	qdf_mem_copy(mon_ops, &monitor_ops_2_0, sizeof(struct dp_mon_ops));
 	mon_soc->mon_ops = mon_ops;
+	dp_mon_ops_register_tx_2_0(mon_soc);
+	dp_mon_ops_register_rx_2_0(mon_soc);
 }
 
 void dp_mon_cdp_ops_register_2_0(struct cdp_ops *ops)

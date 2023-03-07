@@ -6275,6 +6275,7 @@ void dp_mon_ops_register(struct dp_soc *soc)
 	case TARGET_TYPE_QCN6122:
 	case TARGET_TYPE_WCN6450:
 		dp_mon_ops_register_1_0(mon_soc);
+		dp_mon_ops_register_tx_2_0(mon_soc);
 		break;
 	case TARGET_TYPE_QCN9224:
 	case TARGET_TYPE_QCA5332:

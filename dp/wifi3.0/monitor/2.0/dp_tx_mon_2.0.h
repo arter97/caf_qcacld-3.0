@@ -762,12 +762,80 @@ QDF_STATUS dp_config_enh_tx_core_monitor_2_0(struct dp_pdev *pdev, uint8_t val);
 #endif
 
 #ifdef WLAN_PKT_CAPTURE_TX_2_0
+QDF_STATUS dp_tx_mon_pdev_htt_srng_setup_2_0(struct dp_soc *soc,
+					     struct dp_pdev *pdev,
+					     int mac_id,
+					     int mac_for_pdev);
+QDF_STATUS dp_tx_mon_soc_htt_srng_setup_2_0(struct dp_soc *soc,
+					    int mac_id);
+QDF_STATUS dp_tx_mon_pdev_rings_alloc_2_0(struct dp_pdev *pdev, uint32_t lmac_id);
+void dp_tx_mon_pdev_rings_free_2_0(struct dp_pdev *pdev, uint32_t lmac_id);
+QDF_STATUS dp_tx_mon_pdev_rings_init_2_0(struct dp_pdev *pdev, uint32_t lmac_id);
+void dp_tx_mon_pdev_rings_deinit_2_0(struct dp_pdev *pdev, uint32_t lmac_id);
 QDF_STATUS dp_tx_mon_soc_init_2_0(struct dp_soc *soc);
+QDF_STATUS dp_tx_mon_soc_attach_2_0(struct dp_soc *soc, uint32_t lmac_id);
+QDF_STATUS dp_tx_mon_soc_detach_2_0(struct dp_soc *soc, uint32_t lmac_id);
+void dp_tx_mon_soc_deinit_2_0(struct dp_soc *soc, uint32_t lmac_id);
 #else
+static inline
+QDF_STATUS dp_tx_mon_pdev_htt_srng_setup_2_0(struct dp_soc *soc,
+					     struct dp_pdev *pdev,
+					     int mac_id,
+					     int mac_for_pdev)
+{
+	return QDF_STATUS_SUCCESS;
+}
+
+static inline
+QDF_STATUS dp_tx_mon_soc_htt_srng_setup_2_0(struct dp_soc *soc,
+					    int mac_id)
+{
+	return QDF_STATUS_SUCCESS;
+}
+
+static inline
+QDF_STATUS dp_tx_mon_pdev_rings_alloc_2_0(struct dp_pdev *pdev, uint32_t lmac_id)
+{
+	return QDF_STATUS_SUCCESS;
+}
+
+static inline
+void dp_tx_mon_pdev_rings_free_2_0(struct dp_pdev *pdev, uint32_t lmac_id)
+{
+}
+
+static inline
+QDF_STATUS dp_tx_mon_pdev_rings_init_2_0(struct dp_pdev *pdev, uint32_t lmac_id);
+{
+	return QDF_STATUS_SUCCESS;
+}
+
+static inline
+void dp_tx_mon_pdev_rings_deinit_2_0(struct dp_pdev *pdev, uint32_t lmac_id)
+{
+}
+
 static inline
 QDF_STATUS dp_tx_mon_soc_init_2_0(struct dp_soc *soc)
 {
 	return QDF_STATUS_SUCCESS;
+}
+
+static inline
+QDF_STATUS dp_tx_mon_soc_attach_2_0(struct dp_soc *soc, uint32_t lmac_id)
+{
+	return QDF_STATUS_SUCCESS;
+}
+
+static inline
+QDF_STATUS dp_tx_mon_soc_detach_2_0(struct dp_soc *soc, uint32_t lmac_id)
+{
+	return QDF_STATUS_SUCCESS;
+}
+
+static inline
+void dp_tx_mon_soc_deinit_2_0(struct dp_soc *soc, uint32_t lmac_id)
+{
 }
 #endif
 

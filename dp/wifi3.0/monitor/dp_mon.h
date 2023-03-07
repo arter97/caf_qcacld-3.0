@@ -4315,7 +4315,29 @@ void dp_mon_cdp_ops_register_1_0(struct cdp_ops *ops);
 void dp_cfr_filter_register_1_0(struct cdp_ops *ops);
 #endif
 
-#ifdef QCA_MONITOR_2_0_SUPPORT
+QDF_STATUS dp_mon_pdev_htt_srng_setup_2_0(struct dp_soc *soc,
+					  struct dp_pdev *pdev,
+					  int mac_id,
+					  int mac_for_pdev);
+QDF_STATUS dp_mon_soc_htt_srng_setup_2_0(struct dp_soc *soc);
+QDF_STATUS dp_mon_soc_attach_2_0(struct dp_soc *soc);
+QDF_STATUS dp_mon_soc_init_2_0(struct dp_soc *soc);
+void dp_mon_soc_deinit_2_0(struct dp_soc *soc);
+QDF_STATUS dp_mon_soc_detach_2_0(struct dp_soc *soc);
+void dp_pdev_mon_rings_deinit_2_0(struct dp_pdev *pdev);
+QDF_STATUS dp_pdev_mon_rings_init_2_0(struct dp_pdev *pdev);
+void dp_pdev_mon_rings_free_2_0(struct dp_pdev *pdev);
+QDF_STATUS dp_pdev_mon_rings_alloc_2_0(struct dp_pdev *pdev);
+
+#ifdef WLAN_PKT_CAPTURE_TX_2_0
+/**
+ * dp_mon_ops_register_tx_2_0(): register monitor tx ops 2.0
+ * @mon_soc: monitor soc handle
+ *
+ * return: void
+ */
+void dp_mon_ops_register_tx_2_0(struct dp_mon_soc *mon_soc);
+
 /**
  * dp_mon_ops_register_2_0(): register monitor ops
  * @mon_soc: monitor soc handle
@@ -4341,7 +4363,27 @@ void dp_mon_cdp_ops_register_2_0(struct cdp_ops *ops);
  */
 void dp_cfr_filter_register_2_0(struct cdp_ops *ops);
 #endif
-#endif /* QCA_MONITOR_2_0_SUPPORT */
+#else
+static inline
+void dp_mon_ops_register_tx_2_0(struct dp_mon_soc *mon_soc)
+{
+}
+#endif /* WLAN_PKT_CAPTURE_TX_2_0 */
+
+#ifdef WLAN_PKT_CAPTURE_RX_2_0
+/**
+ * dp_mon_ops_register_rx_2_0(): register monitor rx ops 2.0
+ * @mon_soc: monitor soc handle
+ *
+ * return: void
+ */
+void dp_mon_ops_register_rx_2_0(struct dp_mon_soc *mon_soc);
+#else
+static inline
+void dp_mon_ops_register_rx_2_0(struct dp_mon_soc *mon_soc)
+{
+}
+#endif
 
 /**
  * dp_mon_register_feature_ops(): Register mon feature ops

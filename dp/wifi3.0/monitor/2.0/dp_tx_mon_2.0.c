@@ -378,6 +378,17 @@ fail:
 	return QDF_STATUS_E_FAILURE;
 }
 
+void dp_tx_mon_soc_deinit_2_0(struct dp_soc *soc, uint32_t lmac_id)
+{
+	struct dp_mon_soc *mon_soc = soc->monitor_soc;
+	struct dp_mon_soc_be *mon_soc_be =
+		dp_get_be_mon_soc_from_dp_mon_soc(mon_soc);
+
+	dp_tx_mon_buffers_free(soc);
+	dp_tx_mon_buf_desc_pool_deinit(soc);
+	dp_srng_deinit(soc, &mon_soc_be->tx_mon_buf_ring, TX_MONITOR_BUF, 0);
+}
+
 QDF_STATUS
 dp_tx_mon_buf_desc_pool_alloc(struct dp_soc *soc)
 {
@@ -1428,4 +1439,108 @@ dp_config_enh_tx_core_monitor_2_0(struct dp_pdev *pdev, uint8_t val)
 
 	return QDF_STATUS_SUCCESS;
 }
+#endif
+
+#ifdef WLAN_PKT_CAPTURE_TX_2_0
+QDF_STATUS dp_tx_mon_pdev_htt_srng_setup_2_0(struct dp_soc *soc,
+					     struct dp_pdev *pdev,
+					     int mac_id,
+					     int mac_for_pdev)
+{
+	struct dp_mon_soc *mon_soc = soc->monitor_soc;
+	struct dp_mon_soc_be *mon_soc_be = dp_get_be_mon_soc_from_dp_mon_soc(mon_soc);
+
+	return htt_srng_setup(soc->htt_handle, mac_for_pdev,
+			      mon_soc_be->tx_mon_dst_ring[mac_id].hal_srng,
+			      TX_MONITOR_DST);
+}
+
+QDF_STATUS dp_tx_mon_soc_htt_srng_setup_2_0(struct dp_soc *soc,
+					    int mac_id)
+{
+	struct dp_mon_soc *mon_soc = soc->monitor_soc;
+	struct dp_mon_soc_be *mon_soc_be = dp_get_be_mon_soc_from_dp_mon_soc(mon_soc);
+
+	hal_set_low_threshold(mon_soc_be->tx_mon_buf_ring.hal_srng, 0);
+	return htt_srng_setup(soc->htt_handle, mac_id,
+				mon_soc_be->tx_mon_buf_ring.hal_srng,
+				TX_MONITOR_BUF);
+}
+
+QDF_STATUS dp_tx_mon_pdev_rings_alloc_2_0(struct dp_pdev *pdev, uint32_t lmac_id)
+{
+	struct dp_soc *soc = pdev->soc;
+	int entries;
+	struct wlan_cfg_dp_pdev_ctxt *pdev_cfg_ctx;
+	struct dp_mon_soc *mon_soc = soc->monitor_soc;
+	struct dp_mon_soc_be *mon_soc_be = dp_get_be_mon_soc_from_dp_mon_soc(mon_soc);
+
+	pdev_cfg_ctx = pdev->wlan_cfg_ctx;
+	entries = wlan_cfg_get_dma_tx_mon_dest_ring_size(pdev_cfg_ctx);
+
+	return dp_srng_alloc(soc, &mon_soc_be->tx_mon_dst_ring[lmac_id],
+				  TX_MONITOR_DST, entries, 0);
+}
+
+void dp_tx_mon_pdev_rings_free_2_0(struct dp_pdev *pdev, uint32_t lmac_id)
+{
+	struct dp_soc *soc = pdev->soc;
+	struct dp_mon_soc *mon_soc = soc->monitor_soc;
+	struct dp_mon_soc_be *mon_soc_be = dp_get_be_mon_soc_from_dp_mon_soc(mon_soc);
+
+	dp_srng_free(soc, &mon_soc_be->tx_mon_dst_ring[lmac_id]);
+}
+
+QDF_STATUS dp_tx_mon_pdev_rings_init_2_0(struct dp_pdev *pdev, uint32_t lmac_id)
+{
+	struct dp_soc *soc = pdev->soc;
+	struct dp_mon_soc *mon_soc = soc->monitor_soc;
+	struct dp_mon_soc_be *mon_soc_be = dp_get_be_mon_soc_from_dp_mon_soc(mon_soc);
+
+	return dp_srng_init(soc, &mon_soc_be->tx_mon_dst_ring[lmac_id],
+				 TX_MONITOR_DST, pdev->pdev_id, lmac_id);
+}
+
+void dp_tx_mon_pdev_rings_deinit_2_0(struct dp_pdev *pdev, uint32_t lmac_id)
+{
+	struct dp_soc *soc = pdev->soc;
+	struct dp_mon_soc *mon_soc = soc->monitor_soc;
+	struct dp_mon_soc_be *mon_soc_be =
+			dp_get_be_mon_soc_from_dp_mon_soc(mon_soc);
+
+	dp_srng_deinit(soc, &mon_soc_be->tx_mon_dst_ring[lmac_id],
+		       TX_MONITOR_DST, pdev->pdev_id);
+}
+
+QDF_STATUS dp_tx_mon_soc_attach_2_0(struct dp_soc *soc, uint32_t lmac_id)
+{
+	int entries;
+	struct wlan_cfg_dp_soc_ctxt *soc_cfg_ctx = soc->wlan_cfg_ctx;
+	struct dp_mon_soc *mon_soc = soc->monitor_soc;
+	struct dp_mon_soc_be *mon_soc_be =
+		dp_get_be_mon_soc_from_dp_mon_soc(mon_soc);
+
+	entries = wlan_cfg_get_dp_soc_tx_mon_buf_ring_size(soc_cfg_ctx);
+	qdf_print("%s:%d tx mon buf entries: %d", __func__, __LINE__, entries);
+
+	return dp_srng_alloc(soc, &mon_soc_be->tx_mon_buf_ring,
+			  TX_MONITOR_BUF, entries, 0);
+}
+
+QDF_STATUS dp_tx_mon_soc_detach_2_0(struct dp_soc *soc, uint32_t lmac_id)
+{
+	struct dp_mon_soc *mon_soc = soc->monitor_soc;
+	struct dp_mon_soc_be *mon_soc_be =
+			dp_get_be_mon_soc_from_dp_mon_soc(mon_soc);
+
+	if (!mon_soc_be) {
+		dp_mon_err("DP MON SOC NULL");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	dp_tx_mon_buf_desc_pool_free(soc);
+	dp_srng_free(soc, &mon_soc_be->tx_mon_buf_ring);
+	return QDF_STATUS_SUCCESS;
+}
+
 #endif

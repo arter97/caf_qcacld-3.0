@@ -56,6 +56,14 @@ QDF_STATUS dp_mon_pdev_ext_init_2_0(struct dp_pdev *pdev);
 QDF_STATUS dp_mon_pdev_ext_deinit_2_0(struct dp_pdev *pdev);
 QDF_STATUS dp_rx_mon_ppdu_info_cache_create(struct dp_pdev *pdev);
 void dp_rx_mon_ppdu_info_cache_destroy(struct dp_pdev *pdev);
+QDF_STATUS dp_rx_mon_pdev_htt_srng_setup_2_0(struct dp_soc *soc,
+					    struct dp_pdev *pdev,
+					    int mac_id,
+					    int mac_for_pdev);
+QDF_STATUS dp_rx_mon_soc_htt_srng_setup_2_0(struct dp_soc *soc,
+					    int mac_id);
+QDF_STATUS dp_rx_mon_pdev_rings_alloc_2_0(struct dp_pdev *pdev, int lmac_id);
+void dp_rx_mon_pdev_rings_free_2_0(struct dp_pdev *pdev, int lmac_id);
 QDF_STATUS dp_rx_mon_pdev_rings_init_2_0(struct dp_pdev *pdev, int lmac_id);
 void dp_rx_mon_pdev_rings_deinit_2_0(struct dp_pdev *pdev, int lmac_id);
 QDF_STATUS dp_rx_mon_soc_init_2_0(struct dp_soc *soc);
@@ -164,6 +172,9 @@ QDF_STATUS dp_rx_process_pktlog_be(struct dp_soc *soc, struct dp_pdev *pdev,
 				   struct hal_rx_ppdu_info *ppdu_info,
 				   void *status_frag, uint32_t end_offset);
 
+QDF_STATUS dp_rx_mon_soc_attach_2_0(struct dp_soc *soc, int lmac_id);
+void  dp_rx_mon_soc_detach_2_0(struct dp_soc *soc, int lmac_id);
+void dp_rx_mon_soc_deinit_2_0(struct dp_soc *soc, uint32_t lmac_id);
 #else
 static inline QDF_STATUS dp_mon_pdev_ext_init_2_0(struct dp_pdev *pdev)
 {
@@ -250,6 +261,59 @@ QDF_STATUS dp_rx_process_pktlog_be(struct dp_soc *soc, struct dp_pdev *pdev,
 	return QDF_STATUS_SUCCESS;
 }
 
+static inline
+QDF_STATUS dp_rx_mon_pdev_htt_srng_setup_2_0(struct dp_soc *soc,
+					    struct dp_pdev *pdev,
+					    int mac_id,
+					    int mac_for_pdev)
+{
+	return QDF_STATUS_SUCCESS;
+}
+
+static inline
+QDF_STATUS dp_rx_mon_soc_htt_srng_setup_2_0(struct dp_soc *soc,
+					    int mac_id)
+{
+	return QDF_STATUS_SUCCESS;
+}
+
+static inline
+QDF_STATUS dp_rx_mon_pdev_rings_alloc_2_0(struct dp_pdev *pdev, int lmac_id)
+{
+	return QDF_STATUS_SUCCESS;
+}
+
+static inline
+void dp_rx_mon_pdev_rings_free_2_0(struct dp_pdev *pdev, int lmac_id)
+{
+}
+
+static inline
+QDF_STATUS dp_rx_mon_pdev_rings_init_2_0(struct dp_pdev *pdev, int lmac_id)
+{
+	return QDF_STATUS_SUCCESS;
+}
+
+static inline
+void dp_rx_mon_pdev_rings_deinit_2_0(struct dp_pdev *pdev, int lmac_id)
+{
+}
+
+static inline
+QDF_STATUS dp_rx_mon_soc_attach_2_0(struct dp_soc *soc, int lmac_id)
+{
+	return QDF_STATUS_SUCCESS;
+}
+
+static inline
+void dp_rx_mon_soc_detach_2_0(struct dp_soc *soc, int lmac_id)
+{
+}
+
+static inline
+void dp_rx_mon_soc_deinit_2_0(struct dp_soc *soc, uint32_t lmac_id)
+{
+}
 #endif
 
 #if !defined(DISABLE_MON_CONFIG) && defined(WLAN_PKT_CAPTURE_RX_2_0)
