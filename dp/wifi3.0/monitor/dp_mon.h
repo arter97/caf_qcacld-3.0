@@ -583,13 +583,28 @@ dp_mon_pdev_params_rssi_dbm_conv(struct cdp_soc_t *cdp_soc,
 }
 #endif /* QCA_RSSI_DB2DBM */
 
+#if !defined(DISABLE_MON_CONFIG)
+typedef	QDF_STATUS (*mon_pdev_htt_srng_setup_fp)(struct dp_soc *soc,
+						 struct dp_pdev *pdev,
+						 int mac_id,
+						 int mac_for_pdev);
+#endif
+typedef	QDF_STATUS (*mon_rings_alloc_fp)(struct dp_pdev *pdev);
+typedef	void (*mon_rings_free_fp)(struct dp_pdev *pdev);
+typedef	QDF_STATUS (*mon_rings_init_fp)(struct dp_pdev *pdev);
+typedef	void (*mon_rings_deinit_fp)(struct dp_pdev *pdev);
+typedef	QDF_STATUS (*mon_soc_attach_fp)(struct dp_soc *soc);
+typedef	QDF_STATUS (*mon_soc_detach_fp)(struct dp_soc *soc);
+typedef	QDF_STATUS (*mon_soc_init_fp)(struct dp_soc *soc);
+typedef	void (*mon_soc_deinit_fp)(struct dp_soc *soc);
+
 struct dp_mon_ops {
 	QDF_STATUS (*mon_soc_cfg_init)(struct dp_soc *soc);
-	QDF_STATUS (*mon_soc_attach)(struct dp_soc *soc);
-	QDF_STATUS (*mon_soc_detach)(struct dp_soc *soc);
+	mon_soc_attach_fp mon_soc_attach[2];
+	mon_soc_detach_fp mon_soc_detach[2];
+	mon_soc_init_fp mon_soc_init[2];
+	mon_soc_deinit_fp mon_soc_deinit[2];
 	QDF_STATUS (*mon_pdev_alloc)(struct dp_pdev *pdev);
-	QDF_STATUS (*mon_soc_init)(struct dp_soc *soc);
-	void (*mon_soc_deinit)(struct dp_soc *soc);
 	void (*mon_pdev_free)(struct dp_pdev *pdev);
 	QDF_STATUS (*mon_pdev_attach)(struct dp_pdev *pdev);
 	QDF_STATUS (*mon_pdev_detach)(struct dp_pdev *pdev);
@@ -611,10 +626,7 @@ struct dp_mon_ops {
 	QDF_STATUS (*mon_config_debug_sniffer)(struct dp_pdev *pdev, int val);
 	void (*mon_flush_rings)(struct dp_soc *soc);
 #if !defined(DISABLE_MON_CONFIG)
-	QDF_STATUS (*mon_pdev_htt_srng_setup)(struct dp_soc *soc,
-					      struct dp_pdev *pdev,
-					      int mac_id,
-					      int mac_for_pdev);
+	mon_pdev_htt_srng_setup_fp mon_pdev_htt_srng_setup[2];
 	QDF_STATUS (*mon_soc_htt_srng_setup)(struct dp_soc *soc);
 #endif
 #if !defined(DISABLE_MON_CONFIG) && defined(MON_ENABLE_DROP_FOR_MAC)
@@ -785,10 +797,10 @@ struct dp_mon_ops {
 
 	QDF_STATUS (*tx_mon_filter_alloc)(struct dp_pdev *pdev);
 	void (*tx_mon_filter_dealloc)(struct dp_pdev *pdev);
-	QDF_STATUS (*mon_rings_alloc)(struct dp_pdev *pdev);
-	void (*mon_rings_free)(struct dp_pdev *pdev);
-	QDF_STATUS (*mon_rings_init)(struct dp_pdev *pdev);
-	void (*mon_rings_deinit)(struct dp_pdev *pdev);
+	mon_rings_alloc_fp mon_rings_alloc[2];
+	mon_rings_free_fp mon_rings_free[2];
+	mon_rings_init_fp mon_rings_init[2];
+	mon_rings_deinit_fp mon_rings_deinit[2];
 
 	QDF_STATUS (*rx_mon_buffers_alloc)(struct dp_pdev *pdev);
 	void (*rx_mon_buffers_free)(struct dp_pdev *pdev);
@@ -2348,6 +2360,7 @@ static inline QDF_STATUS dp_monitor_htt_srng_setup(struct dp_soc *soc,
 {
 	struct dp_mon_ops *monitor_ops;
 	struct dp_mon_soc *mon_soc = soc->monitor_soc;
+	QDF_STATUS status = QDF_STATUS_SUCCESS;
 
 	if (!mon_soc) {
 		dp_mon_debug("monitor soc is NULL");
@@ -2355,13 +2368,31 @@ static inline QDF_STATUS dp_monitor_htt_srng_setup(struct dp_soc *soc,
 	}
 
 	monitor_ops = mon_soc->mon_ops;
-	if (!monitor_ops || !monitor_ops->mon_pdev_htt_srng_setup) {
-		dp_mon_debug("callback not registered");
+	if (!monitor_ops) {
+		dp_mon_err("monitor_ops is NULL");
 		return QDF_STATUS_E_FAILURE;
 	}
 
-	return monitor_ops->mon_pdev_htt_srng_setup(soc, pdev, mac_id,
-						    mac_for_pdev);
+	if (monitor_ops->mon_pdev_htt_srng_setup[0]) {
+		status = monitor_ops->mon_pdev_htt_srng_setup[0](soc, pdev,
+							mac_id, mac_for_pdev);
+		if (QDF_IS_STATUS_ERROR(status)) {
+			dp_mon_err("error: %d", status);
+			goto error;
+		}
+	}
+
+	if (monitor_ops->mon_pdev_htt_srng_setup[1]) {
+		status = monitor_ops->mon_pdev_htt_srng_setup[1](soc, pdev,
+							mac_id, mac_for_pdev);
+		if (QDF_IS_STATUS_ERROR(status)) {
+			dp_mon_err("error: %d", status);
+			goto error;
+		}
+	}
+
+error:
+	return status;
 }
 
 static inline QDF_STATUS dp_monitor_soc_htt_srng_setup(struct dp_soc *soc)
@@ -4164,6 +4195,44 @@ struct cdp_mon_ops *dp_mon_cdp_ops_get(struct dp_soc *soc)
 }
 
 /**
+ * dp_monitor_soc_attach() - Monitor SOC attach
+ * @soc: DP soc handle
+ *
+ * Return: void
+ */
+static inline void dp_monitor_soc_attach(struct dp_soc *soc)
+{
+	struct dp_mon_ops *mon_ops;
+
+	mon_ops = dp_mon_ops_get(soc);
+
+	if (mon_ops && mon_ops->mon_soc_attach[0])
+		mon_ops->mon_soc_attach[0](soc);
+
+	if (mon_ops && mon_ops->mon_soc_attach[1])
+		mon_ops->mon_soc_attach[1](soc);
+}
+
+/**
+ * dp_monitor_soc_detach() - Monitor SOC detach
+ * @soc: DP soc handle
+ *
+ * Return: void
+ */
+static inline void dp_monitor_soc_detach(struct dp_soc *soc)
+{
+	struct dp_mon_ops *mon_ops;
+
+	mon_ops = dp_mon_ops_get(soc);
+
+	if (mon_ops && mon_ops->mon_soc_detach[0])
+		mon_ops->mon_soc_detach[0](soc);
+
+	if (mon_ops && mon_ops->mon_soc_detach[1])
+		mon_ops->mon_soc_detach[1](soc);
+}
+
+/**
  * dp_monitor_soc_init() - Monitor SOC init
  * @soc: DP soc handle
  *
@@ -4175,8 +4244,11 @@ static inline void dp_monitor_soc_init(struct dp_soc *soc)
 
 	mon_ops = dp_mon_ops_get(soc);
 
-	if (mon_ops && mon_ops->mon_soc_init)
-		mon_ops->mon_soc_init(soc);
+	if (mon_ops && mon_ops->mon_soc_init[0])
+		mon_ops->mon_soc_init[0](soc);
+
+	if (mon_ops && mon_ops->mon_soc_init[1])
+		mon_ops->mon_soc_init[1](soc);
 }
 
 /**
@@ -4191,8 +4263,11 @@ static inline void dp_monitor_soc_deinit(struct dp_soc *soc)
 
 	mon_ops = dp_mon_ops_get(soc);
 
-	if (mon_ops && mon_ops->mon_soc_deinit)
-		mon_ops->mon_soc_deinit(soc);
+	if (mon_ops && mon_ops->mon_soc_deinit[0])
+		mon_ops->mon_soc_deinit[0](soc);
+
+	if (mon_ops && mon_ops->mon_soc_deinit[1])
+		mon_ops->mon_soc_deinit[1](soc);
 }
 
 /**

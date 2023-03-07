@@ -5547,6 +5547,106 @@ static void dp_mon_pdev_per_target_config(struct dp_pdev *pdev)
 	}
 }
 
+static
+QDF_STATUS dp_mon_rings_alloc(struct dp_pdev *pdev)
+{
+	QDF_STATUS status = QDF_STATUS_SUCCESS;
+	struct dp_mon_ops *mon_ops;
+
+	mon_ops = dp_mon_ops_get(pdev->soc);
+	if (!mon_ops) {
+		dp_mon_err("mon_ops is NULL");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	if (mon_ops->mon_rings_alloc[0]) {
+		status = mon_ops->mon_rings_alloc[0](pdev);
+		if (QDF_IS_STATUS_ERROR(status)) {
+			dp_mon_err("error: %d", status);
+			goto error;
+		}
+	}
+
+	if (mon_ops->mon_rings_alloc[1]) {
+		status = mon_ops->mon_rings_alloc[1](pdev);
+		if (QDF_IS_STATUS_ERROR(status)) {
+			dp_mon_err("error: %d", status);
+			goto error;
+		}
+	}
+
+error:
+	return status;
+}
+
+static
+void dp_mon_rings_free(struct dp_pdev *pdev)
+{
+	struct dp_mon_ops *mon_ops;
+
+	mon_ops = dp_mon_ops_get(pdev->soc);
+	if (!mon_ops) {
+		dp_mon_err("mon_ops is NULL");
+		return;
+	}
+
+	if (mon_ops->mon_rings_free[0])
+		mon_ops->mon_rings_free[0](pdev);
+
+	if (mon_ops->mon_rings_free[1])
+		mon_ops->mon_rings_free[1](pdev);
+}
+
+static
+QDF_STATUS dp_mon_rings_init(struct dp_pdev *pdev)
+{
+	QDF_STATUS status = QDF_STATUS_SUCCESS;
+	struct dp_mon_ops *mon_ops;
+
+	mon_ops = dp_mon_ops_get(pdev->soc);
+	if (!mon_ops) {
+		dp_mon_err("mon_ops is NULL");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	if (mon_ops->mon_rings_init[0]) {
+		status = mon_ops->mon_rings_init[0](pdev);
+		if (QDF_IS_STATUS_ERROR(status)) {
+			dp_mon_err("error: %d", status);
+			goto error;
+		}
+	}
+
+	if (mon_ops->mon_rings_init[1]) {
+		status = mon_ops->mon_rings_init[1](pdev);
+		if (QDF_IS_STATUS_ERROR(status)) {
+			dp_mon_err("error: %d", status);
+			goto error;
+		}
+	}
+
+error:
+	return status;
+}
+
+static
+void dp_mon_rings_deinit(struct dp_pdev *pdev)
+{
+	struct dp_mon_ops *mon_ops;
+
+	mon_ops = dp_mon_ops_get(pdev->soc);
+	if (!mon_ops) {
+		dp_mon_err("mon_ops is NULL");
+		return;
+	}
+
+	if (mon_ops->mon_rings_deinit[0])
+		mon_ops->mon_rings_deinit[0](pdev);
+
+	if (mon_ops->mon_rings_deinit[1])
+		mon_ops->mon_rings_deinit[1](pdev);
+}
+
 QDF_STATUS dp_mon_pdev_attach(struct dp_pdev *pdev)
 {
 	struct dp_soc *soc;
@@ -5582,11 +5682,9 @@ QDF_STATUS dp_mon_pdev_attach(struct dp_pdev *pdev)
 		}
 	}
 
-	if (mon_ops->mon_rings_alloc) {
-		if (mon_ops->mon_rings_alloc(pdev)) {
-			dp_mon_err("%pK: MONITOR rings setup failed", pdev);
-			goto fail2;
-		}
+	if (dp_mon_rings_alloc(pdev)) {
+		dp_mon_err("%pK: MONITOR rings setup failed", pdev);
+		goto fail2;
 	}
 
 	/* Rx monitor mode specific init */
@@ -5611,8 +5709,7 @@ fail4:
 	if (mon_ops->rx_mon_desc_pool_free)
 		mon_ops->rx_mon_desc_pool_free(pdev);
 fail3:
-	if (mon_ops->mon_rings_free)
-		mon_ops->mon_rings_free(pdev);
+	dp_mon_rings_free(pdev);
 fail2:
 	if (mon_ops->mon_pdev_free)
 		mon_ops->mon_pdev_free(pdev);
@@ -5649,8 +5746,7 @@ QDF_STATUS dp_mon_pdev_detach(struct dp_pdev *pdev)
 		mon_ops->mon_rx_ppdu_info_cache_destroy(pdev);
 	if (mon_ops->rx_mon_desc_pool_free)
 		mon_ops->rx_mon_desc_pool_free(pdev);
-	if (mon_ops->mon_rings_free)
-		mon_ops->mon_rings_free(pdev);
+	dp_mon_rings_free(pdev);
 	if (mon_ops->mon_pdev_free)
 		mon_ops->mon_pdev_free(pdev);
 
@@ -5739,11 +5835,9 @@ QDF_STATUS dp_mon_pdev_init(struct dp_pdev *pdev)
 		}
 	}
 
-	if (mon_ops->mon_rings_init) {
-		if (mon_ops->mon_rings_init(pdev)) {
-			dp_mon_err("%pK: MONITOR rings setup failed", pdev);
-			goto fail4;
-		}
+	if (dp_mon_rings_init(pdev)) {
+		dp_mon_err("%pK: MONITOR rings setup failed", pdev);
+		goto fail4;
 	}
 
 	/* initialize sw monitor rx descriptors */
@@ -5776,8 +5870,7 @@ fail5:
 	if (mon_ops->rx_mon_desc_pool_deinit)
 		mon_ops->rx_mon_desc_pool_deinit(pdev);
 
-	if (mon_ops->mon_rings_deinit)
-		mon_ops->mon_rings_deinit(pdev);
+	dp_mon_rings_deinit(pdev);
 fail4:
 	if (mon_ops->mon_lite_mon_dealloc)
 		mon_ops->mon_lite_mon_dealloc(pdev);
@@ -5825,8 +5918,7 @@ QDF_STATUS dp_mon_pdev_deinit(struct dp_pdev *pdev)
 		mon_ops->rx_mon_buffers_free(pdev);
 	if (mon_ops->rx_mon_desc_pool_deinit)
 		mon_ops->rx_mon_desc_pool_deinit(pdev);
-	if (mon_ops->mon_rings_deinit)
-		mon_ops->mon_rings_deinit(pdev);
+	dp_mon_rings_deinit(pdev);
 	dp_cal_client_detach(&mon_pdev->cal_client_ctx);
 	if (mon_ops->mon_lite_mon_dealloc)
 		mon_ops->mon_lite_mon_dealloc(pdev);
@@ -5838,8 +5930,7 @@ QDF_STATUS dp_mon_pdev_deinit(struct dp_pdev *pdev)
 		mon_ops->tx_mon_filter_dealloc(pdev);
 	if (mon_pdev->filter)
 		dp_mon_filter_dealloc(mon_pdev);
-	if (mon_ops->mon_rings_deinit)
-		mon_ops->mon_rings_deinit(pdev);
+	dp_mon_rings_deinit(pdev);
 	if (mon_pdev->invalid_mon_peer)
 		qdf_mem_free(mon_pdev->invalid_mon_peer);
 	mon_pdev->is_dp_mon_pdev_initialized = false;
