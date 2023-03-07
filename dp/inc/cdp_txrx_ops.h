@@ -2356,6 +2356,9 @@ struct cdp_sawf_ops {
 #ifdef WLAN_SUPPORT_PPEDS
 struct cdp_ppeds_txrx_ops {
 	QDF_STATUS
+	(*ppeds_vp_setup_recovery)(struct cdp_soc_t *soc,
+				   uint8_t vdev_id, uint16_t profile_idx);
+	QDF_STATUS
 	(*ppeds_entry_attach)(struct cdp_soc_t *soc,
 			      uint8_t vdev_id, void *vpai,
 			      int32_t *ppe_vp_num,

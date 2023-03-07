@@ -74,6 +74,7 @@ static struct cdp_ppeds_txrx_ops dp_ops_ppeds_be = {
 	.ppeds_update_int_pri2tid = dp_ppeds_update_int_pri2tid_be,
 	.ppeds_entry_dump = dp_ppeds_dump_ppe_vp_tbl_be,
 	.ppeds_enable_pri2tid = dp_ppeds_vdev_enable_pri2tid_be,
+	.ppeds_vp_setup_recovery = dp_ppeds_vp_setup_on_fw_recovery,
 };
 
 static void dp_ppeds_rings_status(struct dp_soc *soc)
