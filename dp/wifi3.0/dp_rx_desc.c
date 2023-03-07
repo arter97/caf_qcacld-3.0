@@ -288,7 +288,7 @@ QDF_STATUS dp_rx_desc_pool_alloc(struct dp_soc *soc,
 				 uint32_t pool_size,
 				 struct rx_desc_pool *rx_desc_pool)
 {
-	rx_desc_pool->array = qdf_mem_malloc(pool_size *
+	rx_desc_pool->array = qdf_mem_common_alloc(pool_size *
 				     sizeof(union dp_rx_desc_list_elem_t));
 
 	if (!(rx_desc_pool->array)) {
@@ -363,7 +363,7 @@ void dp_rx_desc_nbuf_and_pool_free(struct dp_soc *soc, uint32_t pool_id,
 			dp_rx_nbuf_free(nbuf);
 		}
 	}
-	qdf_mem_free(rx_desc_pool->array);
+	qdf_mem_common_free(rx_desc_pool->array);
 	qdf_spin_unlock_bh(&rx_desc_pool->lock);
 	qdf_spinlock_destroy(&rx_desc_pool->lock);
 }
@@ -426,7 +426,7 @@ qdf_export_symbol(dp_rx_desc_frag_free);
 void dp_rx_desc_pool_free(struct dp_soc *soc,
 			  struct rx_desc_pool *rx_desc_pool)
 {
-	qdf_mem_free(rx_desc_pool->array);
+	qdf_mem_common_free(rx_desc_pool->array);
 }
 
 qdf_export_symbol(dp_rx_desc_pool_free);

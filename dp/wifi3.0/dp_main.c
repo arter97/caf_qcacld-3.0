@@ -6511,7 +6511,7 @@ static void dp_soc_detach(struct cdp_soc_t *txrx_soc)
 	}
 
 	qdf_mem_free(soc->cdp_soc.ops);
-	qdf_mem_free(soc);
+	qdf_mem_common_free(soc);
 }
 
 /**
@@ -15586,7 +15586,7 @@ dp_soc_attach(struct cdp_ctrl_objmgr_psoc *ctrl_psoc,
 		goto fail0;
 	}
 	arch_id = cdp_get_arch_type_from_devid(device_id);
-	soc = qdf_mem_malloc(dp_get_soc_context_size(device_id));
+	soc = qdf_mem_common_alloc(dp_get_soc_context_size(device_id));
 	if (!soc) {
 		dp_err("DP SOC memory allocation failed");
 		goto fail0;
@@ -15713,7 +15713,7 @@ fail3:
 fail2:
 	qdf_mem_free(soc->cdp_soc.ops);
 fail1:
-	qdf_mem_free(soc);
+	qdf_mem_common_free(soc);
 fail0:
 	return NULL;
 }

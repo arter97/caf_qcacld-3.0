@@ -1091,7 +1091,7 @@ void *hal_attach(struct hif_opaque_softc *hif_handle, qdf_device_t qdf_dev)
 	struct hal_soc *hal;
 	int i;
 
-	hal = qdf_mem_malloc(sizeof(*hal));
+	hal = qdf_mem_common_alloc(sizeof(*hal));
 
 	if (!hal) {
 		QDF_TRACE(QDF_MODULE_ID_TXRX, QDF_TRACE_LEVEL_ERROR,
@@ -1177,7 +1177,7 @@ fail2:
 		sizeof(*(hal->shadow_rdptr_mem_vaddr)) * HAL_SRNG_ID_MAX,
 		hal->shadow_rdptr_mem_vaddr, hal->shadow_rdptr_mem_paddr, 0);
 fail1:
-	qdf_mem_free(hal);
+	qdf_mem_common_free(hal);
 fail0:
 	return NULL;
 }
@@ -1215,7 +1215,7 @@ void hal_detach(void *hal_soc)
 	qdf_mem_free_consistent(hal->qdf_dev, hal->qdf_dev->dev,
 		sizeof(*(hal->shadow_wrptr_mem_vaddr)) * HAL_MAX_LMAC_RINGS,
 		hal->shadow_wrptr_mem_vaddr, hal->shadow_wrptr_mem_paddr, 0);
-	qdf_mem_free(hal);
+	qdf_mem_common_free(hal);
 
 	return;
 }
