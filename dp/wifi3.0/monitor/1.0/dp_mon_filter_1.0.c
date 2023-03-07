@@ -265,7 +265,7 @@ static void dp_mon_filter_set_reset_mcopy_dest(struct dp_pdev *pdev,
 
 	/* Set the filter */
 	if (pfilter->valid) {
-		dp_mon_filter_set_mon_cmn(mon_pdev, pfilter);
+		dp_mon_filter_set_mon_cmn(pdev, pfilter);
 
 		pfilter->tlv_filter.fp_data_filter = 0;
 		pfilter->tlv_filter.mo_data_filter = 0;
@@ -438,7 +438,7 @@ void dp_mon_filter_set_reset_rx_enh_capture_dest(struct dp_pdev *pdev,
 
 	/* Set the filter */
 	if (pfilter->valid) {
-		dp_mon_filter_set_mon_cmn(mon_pdev, pfilter);
+		dp_mon_filter_set_mon_cmn(pdev, pfilter);
 
 		pfilter->tlv_filter.fp_mgmt_filter = 0;
 		pfilter->tlv_filter.fp_ctrl_filter = 0;
@@ -563,7 +563,7 @@ static void dp_mon_filter_set_reset_mon_dest(struct dp_pdev *pdev,
 
 	/* set the filter */
 	if (pfilter->valid) {
-		dp_mon_filter_set_mon_cmn(mon_pdev, pfilter);
+		dp_mon_filter_set_mon_cmn(pdev, pfilter);
 
 		dp_mon_filter_show_filter(mon_pdev, mode, pfilter);
 		mon_pdev->filter[mode][srng_type] = *pfilter;

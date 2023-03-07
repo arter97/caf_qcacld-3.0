@@ -622,9 +622,37 @@ dp_mon_filter_reset_mon_srng(struct dp_soc *soc, struct dp_pdev *pdev,
 	}
 }
 
-void dp_mon_filter_set_mon_cmn(struct dp_mon_pdev *mon_pdev,
+/**
+ * dp_mon_filter_adjust() - adjust the mon filters per target basis
+ * @pdev: DP pdev handle
+ * @filter: DP mon filter
+ *
+ * Return: None
+ */
+static inline
+void dp_mon_filter_adjust(struct dp_pdev *pdev, struct dp_mon_filter *filter)
+{
+	struct dp_soc *soc = pdev->soc;
+
+	switch (hal_get_target_type(soc->hal_soc)) {
+	case TARGET_TYPE_KIWI:
+	case TARGET_TYPE_MANGO:
+	case TARGET_TYPE_PEACH:
+		filter->tlv_filter.msdu_start = 0;
+		filter->tlv_filter.mpdu_end = 0;
+		filter->tlv_filter.packet_header = 0;
+		filter->tlv_filter.attention = 0;
+		break;
+	default:
+		break;
+	}
+}
+
+void dp_mon_filter_set_mon_cmn(struct dp_pdev *pdev,
 			       struct dp_mon_filter *filter)
 {
+	struct dp_mon_pdev *mon_pdev = pdev->monitor_pdev;
+
 	filter->tlv_filter.mpdu_start = 1;
 	filter->tlv_filter.msdu_start = 1;
 	filter->tlv_filter.packet = 1;
@@ -650,6 +678,7 @@ void dp_mon_filter_set_mon_cmn(struct dp_mon_pdev *mon_pdev,
 	filter->tlv_filter.mo_ctrl_filter = mon_pdev->mo_ctrl_filter;
 	filter->tlv_filter.mo_data_filter = mon_pdev->mo_data_filter;
 	filter->tlv_filter.offset_valid = false;
+	dp_mon_filter_adjust(pdev, filter);
 }
 
 void dp_mon_filter_set_status_cmn(struct dp_mon_pdev *mon_pdev,
