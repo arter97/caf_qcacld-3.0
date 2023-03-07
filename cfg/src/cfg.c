@@ -445,7 +445,7 @@ cfg_store_alloc(const char *path, struct cfg_value_store **out_store)
 
 	cfg_enter();
 
-	store = qdf_mem_malloc(sizeof(*store));
+	store = qdf_mem_common_alloc(sizeof(*store));
 	if (!store)
 		return QDF_STATUS_E_NOMEM;
 
@@ -472,7 +472,7 @@ free_path:
 	qdf_mem_free(store->path);
 
 free_store:
-	qdf_mem_free(store);
+	qdf_mem_common_free(store);
 
 	return status;
 }
@@ -491,7 +491,7 @@ static void cfg_store_free(struct cfg_value_store *store)
 				status);
 
 	qdf_mem_free(store->path);
-	qdf_mem_free(store);
+	qdf_mem_common_free(store);
 }
 
 static QDF_STATUS
