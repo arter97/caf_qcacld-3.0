@@ -2103,6 +2103,7 @@ struct hdd_context {
 	bool multi_client_thermal_mitigation;
 #endif
 	enum hdd_ssr_src ssr_src;
+	qdf_wake_lock_t lpm_reinit_wakelock;
 };
 
 /**

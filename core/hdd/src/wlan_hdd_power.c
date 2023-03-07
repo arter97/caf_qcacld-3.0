@@ -1640,6 +1640,60 @@ static void hdd_restore_sar_config(struct hdd_context *hdd_ctx)
 		hdd_err("Unable to configured SAR after SSR");
 }
 
+#ifdef FEATURE_WLAN_FULL_POWER_DOWN_SUPPORT
+bool wlan_hdd_is_full_power_down_enable(struct hdd_context *hdd_ctx)
+{
+	if (ucfg_pmo_get_suspend_mode(hdd_ctx->psoc) == PMO_FULL_POWER_DOWN) {
+		hdd_info_rl("Wlan full power down is enabled while suspend");
+		return true;
+	}
+
+	return false;
+}
+
+static QDF_STATUS
+wlan_hdd_set_full_power_down_state(struct hdd_context *hdd_ctx,
+					bool triggered)
+{
+	QDF_STATUS status;
+
+	status = hdd_set_pld_full_power_down_state(triggered);
+	if (status != QDF_STATUS_SUCCESS) {
+		hdd_info_rl("set full power down state to PLD fail");
+		goto out;
+	}
+
+	status = ucfg_ipa_set_full_power_down_state(hdd_ctx->pdev, triggered);
+	if (status != QDF_STATUS_SUCCESS)
+		hdd_info_rl("ucfg set full power down state to IPA fail");
+
+out:
+	return status;
+}
+
+static void full_power_down_status_reset(struct hdd_context *hdd_ctx)
+{
+	if (wlan_hdd_is_full_power_down_enable(hdd_ctx)) {
+		if (wlan_hdd_set_full_power_down_state(hdd_ctx, false)) {
+			hdd_err("Failed to set full power down status(false)!");
+		}
+		hdd_err("[keh]Driver has been re-initialized, release wakelock!");
+		qdf_wake_lock_release(&hdd_ctx->lpm_reinit_wakelock, 1);
+	}
+}
+#else
+static QDF_STATUS
+wlan_hdd_set_full_power_down_state(struct hdd_context *hdd_ctx,
+					bool triggered)
+{
+	return QDF_STATUS_SUCCESS;
+}
+
+static void full_power_down_status_reset(struct hdd_context *hdd_ctx)
+{
+}
+#endif
+
 QDF_STATUS hdd_wlan_re_init(void)
 {
 	struct hdd_context *hdd_ctx = NULL;
@@ -1701,6 +1755,9 @@ QDF_STATUS hdd_wlan_re_init(void)
 		hdd_ssr_restart_sap(hdd_ctx);
 	hdd_is_interface_down_during_ssr(hdd_ctx);
 	hdd_wlan_ssr_reinit_event();
+
+	full_power_down_status_reset(hdd_ctx);
+
 	return QDF_STATUS_SUCCESS;
 
 err_re_init:
@@ -1842,45 +1899,6 @@ hdd_sched_scan_results(struct wiphy *wiphy, uint64_t reqid)
 }
 #endif
 
-#ifdef FEATURE_WLAN_FULL_POWER_DOWN_SUPPORT
-bool wlan_hdd_is_full_power_down_enable(struct hdd_context *hdd_ctx)
-{
-	if (ucfg_pmo_get_suspend_mode(hdd_ctx->psoc) == PMO_FULL_POWER_DOWN) {
-		hdd_info_rl("Wlan full power down is enabled while suspend");
-		return true;
-	}
-
-	return false;
-}
-
-static QDF_STATUS
-wlan_hdd_set_full_power_down_state(struct hdd_context *hdd_ctx,
-					bool triggered)
-{
-	QDF_STATUS status;
-
-	status = hdd_set_pld_full_power_down_state(triggered);
-	if (status != QDF_STATUS_SUCCESS) {
-		hdd_info_rl("set full power down state to PLD fail");
-		goto out;
-	}
-
-	status = ucfg_ipa_set_full_power_down_state(hdd_ctx->pdev, triggered);
-	if (status != QDF_STATUS_SUCCESS)
-		hdd_info_rl("ucfg set full power down state to IPA fail");
-
-out:
-	return status;
-}
-#else
-static QDF_STATUS
-wlan_hdd_set_full_power_down_state(struct hdd_context *hdd_ctx,
-					bool triggered)
-{
-	return QDF_STATUS_SUCCESS;
-}
-#endif
-
 /**
  * __wlan_hdd_cfg80211_resume_wlan() - cfg80211 resume callback
  * @wiphy: Pointer to wiphy
@@ -1917,16 +1935,6 @@ static int __wlan_hdd_cfg80211_resume_wlan(struct wiphy *wiphy)
 	if (ucfg_pmo_get_suspend_mode(hdd_ctx->psoc) == PMO_SUSPEND_NONE) {
 		hdd_info_rl("Suspend is not supported");
 		return -EINVAL;
-	}
-
-	if (wlan_hdd_is_full_power_down_enable(hdd_ctx)) {
-		status = wlan_hdd_set_full_power_down_state(hdd_ctx, false);
-		if (status != QDF_STATUS_SUCCESS) {
-			hdd_err("Failed to set full power down status(false)!");
-		}
-		hdd_debug("Driver has been re-initialized; Skipping resume");
-		exit_code = 0;
-		goto exit_with_code;
 	}
 
 	if (hdd_ctx->driver_status != DRIVER_MODULES_ENABLED) {
@@ -2017,10 +2025,43 @@ static int _wlan_hdd_cfg80211_resume_wlan(struct wiphy *wiphy)
 	return errno;
 }
 
+#ifdef FEATURE_WLAN_FULL_POWER_DOWN_SUPPORT
+static int full_power_down_status_check(struct wiphy *wiphy)
+{
+	struct hdd_context *hdd_ctx = wiphy_priv(wiphy);
+
+	if (!hdd_ctx) {
+		hdd_err_rl("hdd context is null");
+		return -ENODEV;
+	}
+
+	if (hdd_ctx->driver_status != DRIVER_MODULES_ENABLED) {
+		hdd_err("[keh]Driver Modules is not Enabled!");
+		if (wlan_hdd_is_full_power_down_enable(hdd_ctx) &&
+			cds_is_driver_recovering()) {
+			hdd_err("[keh]wlan driver reinit is not completed, lock wake 5 seconds!");
+			qdf_wake_lock_timeout_acquire(&hdd_ctx->lpm_reinit_wakelock, 5000);
+		}
+		return 0;
+	}
+
+	return 1;
+}
+#else
+static int full_power_down_status_check(struct wiphy *wiphy)
+{
+	return 1;
+}
+#endif
+
 int wlan_hdd_cfg80211_resume_wlan(struct wiphy *wiphy)
 {
 	struct osif_psoc_sync *psoc_sync;
 	int errno;
+
+	errno = full_power_down_status_check(wiphy);
+	if (errno <= 0)
+		return errno;
 
 	errno = osif_psoc_sync_op_start(wiphy_dev(wiphy), &psoc_sync);
 	if (errno)
