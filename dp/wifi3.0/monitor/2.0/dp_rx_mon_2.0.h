@@ -50,6 +50,16 @@
 			    + (DP_RX_MON_TLV_TOTAL_LEN))
 
 #define DP_RX_MON_WQ_THRESHOLD 128
+
+#ifdef WLAN_PKT_CAPTURE_RX_2_0
+QDF_STATUS dp_mon_pdev_ext_init_2_0(struct dp_pdev *pdev);
+QDF_STATUS dp_mon_pdev_ext_deinit_2_0(struct dp_pdev *pdev);
+QDF_STATUS dp_rx_mon_ppdu_info_cache_create(struct dp_pdev *pdev);
+void dp_rx_mon_ppdu_info_cache_destroy(struct dp_pdev *pdev);
+QDF_STATUS dp_rx_mon_pdev_rings_init_2_0(struct dp_pdev *pdev, int lmac_id);
+void dp_rx_mon_pdev_rings_deinit_2_0(struct dp_pdev *pdev, int lmac_id);
+QDF_STATUS dp_rx_mon_soc_init_2_0(struct dp_soc *soc);
+
 /*
  * dp_rx_mon_buffers_alloc() - allocate rx monitor buffers
  * @soc: DP soc handle
@@ -154,7 +164,95 @@ QDF_STATUS dp_rx_process_pktlog_be(struct dp_soc *soc, struct dp_pdev *pdev,
 				   struct hal_rx_ppdu_info *ppdu_info,
 				   void *status_frag, uint32_t end_offset);
 
-#if !defined(DISABLE_MON_CONFIG)
+#else
+static inline QDF_STATUS dp_mon_pdev_ext_init_2_0(struct dp_pdev *pdev)
+{
+	return QDF_STATUS_SUCCESS;
+}
+
+static inline QDF_STATUS dp_mon_pdev_ext_deinit_2_0(struct dp_pdev *pdev)
+{
+	return QDF_STATUS_SUCCESS;
+}
+
+static inline QDF_STATUS dp_rx_mon_ppdu_info_cache_create(struct dp_pdev *pdev)
+{
+	return QDF_STATUS_SUCCESS;
+}
+
+static inline void dp_rx_mon_ppdu_info_cache_destroy(struct dp_pdev *pdev)
+{
+}
+
+static inline QDF_STATUS
+dp_rx_mon_buffers_alloc(struct dp_soc *soc, uint32_t size)
+{
+	return QDF_STATUS_SUCCESS;
+}
+
+static inline
+QDF_STATUS dp_rx_mon_soc_init_2_0(struct dp_soc *soc)
+{
+	return QDF_STATUS_SUCCESS;
+}
+
+static inline void
+dp_rx_mon_buffers_free(struct dp_soc *soc)
+
+{
+}
+
+static inline void
+dp_rx_mon_buf_desc_pool_deinit(struct dp_soc *soc)
+{
+}
+
+static inline QDF_STATUS
+dp_rx_mon_buf_desc_pool_init(struct dp_soc *soc)
+{
+	return QDF_STATUS_SUCCESS;
+}
+
+static inline void dp_rx_mon_buf_desc_pool_free(struct dp_soc *soc)
+{
+}
+
+static inline QDF_STATUS
+dp_rx_mon_buf_desc_pool_alloc(struct dp_soc *soc)
+{
+	return QDF_STATUS_SUCCESS;
+}
+
+static inline
+void dp_rx_mon_stats_update_2_0(struct dp_mon_peer *mon_peer,
+				struct cdp_rx_indication_ppdu *ppdu,
+				struct cdp_rx_stats_ppdu_user *ppdu_user)
+{
+}
+
+static inline void
+dp_rx_mon_populate_ppdu_usr_info_2_0(struct mon_rx_user_status *rx_user_status,
+				     struct cdp_rx_stats_ppdu_user *ppdu_user)
+{
+}
+
+static inline void
+dp_rx_mon_populate_ppdu_info_2_0(struct hal_rx_ppdu_info *hal_ppdu_info,
+				 struct cdp_rx_indication_ppdu *ppdu)
+{
+}
+
+static inline
+QDF_STATUS dp_rx_process_pktlog_be(struct dp_soc *soc, struct dp_pdev *pdev,
+				   struct hal_rx_ppdu_info *ppdu_info,
+				   void *status_frag, uint32_t end_offset)
+{
+	return QDF_STATUS_SUCCESS;
+}
+
+#endif
+
+#if !defined(DISABLE_MON_CONFIG) && defined(WLAN_PKT_CAPTURE_RX_2_0)
 /*
  * dp_rx_mon_process_2_0() - Process Rx monitor interrupt
  *
@@ -174,7 +272,7 @@ dp_rx_mon_process_2_0(struct dp_soc *soc, struct dp_intr *int_ctx,
  */
 void dp_rx_mon_process_ppdu(void *context);
 #else
-static uint32_t
+static inline uint32_t
 dp_rx_mon_process_2_0(struct dp_soc *soc, struct dp_intr *int_ctx,
 		      uint32_t mac_id, uint32_t quota)
 {
@@ -217,22 +315,10 @@ void dp_rx_mon_drain_wq(struct dp_pdev *pdev);
  *
  * Return: void
  */
-void
-dp_mon_free_parent_nbuf(struct dp_mon_pdev *mon_pdev,
+void dp_mon_free_parent_nbuf(struct dp_mon_pdev *mon_pdev,
 			qdf_nbuf_t nbuf);
-#if !defined(WLAN_SUPPORT_RX_PROTOCOL_TYPE_TAG) &&\
-	!defined(WLAN_SUPPORT_RX_FLOW_TAG)
-void
-dp_rx_mon_pf_tag_to_buf_headroom_2_0(void *nbuf,
-				     struct hal_rx_ppdu_info *ppdu_info,
-				     struct dp_pdev *pdev, struct dp_soc *soc)
-{
-}
 
-void dp_rx_mon_shift_pf_tag_in_headroom(qdf_nbuf_t nbuf, struct dp_soc *soc)
-{
-}
-#endif /* WLAN_SUPPORT_RX_PROTOCOL_TYPE_TAG */
+#ifdef QCA_ENHANCED_STATS_SUPPORT
 /**
  * dp_mon_rx_print_advanced_stats_2_0() - print advanced monitor statistics
  *
@@ -243,4 +329,12 @@ void dp_rx_mon_shift_pf_tag_in_headroom(qdf_nbuf_t nbuf, struct dp_soc *soc)
  */
 void dp_mon_rx_print_advanced_stats_2_0(struct dp_soc *soc,
 					struct dp_pdev *pdev);
+#else
+static inline
+void dp_mon_rx_print_advanced_stats_2_0(struct dp_soc *soc,
+					struct dp_pdev *pdev)
+{
+}
+#endif
+
 #endif /* _DP_RX_MON_2_0_H_ */

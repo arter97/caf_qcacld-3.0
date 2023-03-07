@@ -490,21 +490,6 @@ dp_rx_mon_add_frag_to_skb(struct hal_rx_ppdu_info *ppdu_info,
 	}
 }
 
-#if defined(WLAN_SUPPORT_RX_PROTOCOL_TYPE_TAG) ||\
-	defined(WLAN_SUPPORT_RX_FLOW_TAG)
-/**
- * dp_mon_rx_update_rx_protocol_tag_stats() - Update mon protocols's
- *					      statistics from given protocol
- *					      type
- * @pdev: pdev handle
- * @protocol_index: Protocol index for which the stats should be incremented
- *
- * Return: void
- */
-void dp_mon_rx_update_rx_protocol_tag_stats(struct dp_pdev *pdev,
-					    uint16_t protocol_index);
-#endif /* WLAN_SUPPORT_RX_PROTOCOL_TYPE_TAG */
-
 #if !defined(DISABLE_MON_CONFIG) && (defined(WLAN_PKT_CAPTURE_TX_2_0) || \
 	defined(WLAN_PKT_CAPTURE_RX_2_0))
 /**

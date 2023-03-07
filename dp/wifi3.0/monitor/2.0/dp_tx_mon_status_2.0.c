@@ -1404,40 +1404,6 @@ dp_tx_mon_update_ppdu_info_status(struct dp_pdev *pdev,
 	return status;
 }
 
-QDF_STATUS
-dp_tx_process_pktlog_be(struct dp_soc *soc, struct dp_pdev *pdev,
-			qdf_frag_t status_frag, uint32_t end_offset)
-{
-	struct dp_mon_pdev *mon_pdev = pdev->monitor_pdev;
-	qdf_nbuf_t nbuf = NULL;
-	enum WDI_EVENT pktlog_mode = WDI_NO_VAL;
-	int frag_bytes;
-
-	if (!mon_pdev->pktlog_hybrid_mode)
-		return QDF_STATUS_E_INVAL;
-
-	nbuf = qdf_nbuf_alloc(soc->osdev, MAX_DUMMY_FRM_BODY, 0, 4, FALSE);
-	if (!nbuf)
-		return QDF_STATUS_E_NOMEM;
-
-	qdf_nbuf_add_rx_frag(status_frag, nbuf, 0,
-			     (end_offset + 1),
-			     0, true);
-
-	if (mon_pdev->pktlog_hybrid_mode)
-		pktlog_mode = WDI_EVENT_HYBRID_TX;
-
-	frag_bytes = qdf_nbuf_get_frag_len(nbuf, 0);
-	if (pktlog_mode != WDI_NO_VAL) {
-		dp_wdi_event_handler(pktlog_mode, soc,
-				     nbuf, HTT_INVALID_PEER,
-				     WDI_NO_VAL, pdev->pdev_id);
-	}
-	qdf_nbuf_free(nbuf);
-
-	return QDF_STATUS_SUCCESS;
-}
-
 /**
  * dp_tx_mon_process_tlv_2_0() - API to parse PPDU worth information
  * @pdev: DP_PDEV handle
@@ -1445,7 +1411,7 @@ dp_tx_process_pktlog_be(struct dp_soc *soc, struct dp_pdev *pdev,
  *
  * Return: status
  */
-QDF_STATUS
+static QDF_STATUS
 dp_tx_mon_process_tlv_2_0(struct dp_pdev *pdev,
 			  struct dp_tx_mon_desc_list *mon_desc_list_ref)
 {
@@ -1821,3 +1787,41 @@ void dp_tx_mon_update_end_reason(struct dp_mon_pdev *mon_pdev,
 {
 }
 #endif
+
+#if defined(WLAN_TX_PKT_CAPTURE_ENH_BE) && defined(WLAN_PKT_CAPTURE_TX_2_0) && \
+	defined(BE_PKTLOG_SUPPORT)
+QDF_STATUS
+dp_tx_process_pktlog_be(struct dp_soc *soc, struct dp_pdev *pdev,
+			qdf_frag_t status_frag, uint32_t end_offset)
+{
+	struct dp_mon_pdev *mon_pdev = pdev->monitor_pdev;
+	qdf_nbuf_t nbuf = NULL;
+	enum WDI_EVENT pktlog_mode = WDI_NO_VAL;
+	int frag_bytes;
+
+	if (!mon_pdev->pktlog_hybrid_mode)
+		return QDF_STATUS_E_INVAL;
+
+	nbuf = qdf_nbuf_alloc(soc->osdev, MAX_DUMMY_FRM_BODY, 0, 4, FALSE);
+	if (!nbuf)
+		return QDF_STATUS_E_NOMEM;
+
+	qdf_nbuf_add_rx_frag(status_frag, nbuf, 0,
+			     (end_offset + 1),
+			     0, true);
+
+	if (mon_pdev->pktlog_hybrid_mode)
+		pktlog_mode = WDI_EVENT_HYBRID_TX;
+
+	frag_bytes = qdf_nbuf_get_frag_len(nbuf, 0);
+	if (pktlog_mode != WDI_NO_VAL) {
+		dp_wdi_event_handler(pktlog_mode, soc,
+				     nbuf, HTT_INVALID_PEER,
+				     WDI_NO_VAL, pdev->pdev_id);
+	}
+	qdf_nbuf_free(nbuf);
+
+	return QDF_STATUS_SUCCESS;
+}
+#endif
+

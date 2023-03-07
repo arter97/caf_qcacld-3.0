@@ -25,18 +25,6 @@
 #define DMA_LENGTH_128B 2
 #define DMA_LENGTH_256B 4
 
-/* rx hdr tlv dma lengths */
-enum dp_rx_hdr_dma_length {
-	/* default dma length(128B) */
-	DEFAULT_RX_HDR_DMA_LENGTH = 0,
-	/* dma length 64 bytes */
-	RX_HDR_DMA_LENGTH_64B = 1,
-	/* dma length 128 bytes */
-	RX_HDR_DMA_LENGTH_128B = 2,
-	/* dma length 256 bytes */
-	RX_HDR_DMA_LENGTH_256B = 3,
-};
-
 /* fwd declarations */
 struct dp_mon_pdev_be;
 
@@ -48,15 +36,6 @@ struct dp_mon_pdev_be;
 void
 dp_rx_mon_enable_set(uint32_t *msg_word,
 		     struct htt_rx_ring_tlv_filter *tlv_filter);
-
-/**
- * dp_rx_mon_hdr_length_set() - Setup rx monitor hdr tlv length
- * @msg_word: msg word
- * @tlv_filter: rx ring filter configuration
- */
-void
-dp_rx_mon_hdr_length_set(uint32_t *msg_word,
-			 struct htt_rx_ring_tlv_filter *tlv_filter);
 
 /**
  * dp_rx_mon_packet_length_set() - Setup rx monitor per packet type length

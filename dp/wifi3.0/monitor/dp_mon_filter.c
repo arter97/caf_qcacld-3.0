@@ -496,6 +496,24 @@ void dp_mon_filter_reset_mon_mode(struct dp_pdev *pdev)
 		mon_ops->mon_filter_reset_rx_mon_mode(pdev);
 }
 
+#if defined(WLAN_PKT_CAPTURE_RX_2_0) || defined(CONFIG_WORD_BASED_TLV) || \
+	defined(WLAN_FEATURE_LOCAL_PKT_CAPTURE)
+void dp_rx_mon_hdr_length_set(uint32_t *msg_word,
+			      struct htt_rx_ring_tlv_filter *tlv_filter)
+{
+	if (!msg_word || !tlv_filter)
+		return;
+
+	HTT_RX_RING_SELECTION_CFG_RX_HDR_LEN_SET(*msg_word,
+						 tlv_filter->rx_hdr_length);
+}
+#else
+void dp_rx_mon_hdr_length_set(uint32_t *msg_word,
+			      struct htt_rx_ring_tlv_filter *tlv_filter)
+{
+}
+#endif
+
 #ifdef WDI_EVENT_ENABLE
 void dp_mon_filter_setup_rx_pkt_log_full(struct dp_pdev *pdev)
 {

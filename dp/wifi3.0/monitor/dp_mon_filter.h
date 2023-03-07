@@ -96,6 +96,18 @@ struct dp_mon_filter {
 	struct htt_rx_ring_tlv_filter tlv_filter;
 };
 
+/* rx hdr tlv dma lengths */
+enum dp_rx_hdr_dma_length {
+	/* default dma length(128B) */
+	DEFAULT_RX_HDR_DMA_LENGTH = 0,
+	/* dma length 64 bytes */
+	RX_HDR_DMA_LENGTH_64B = 1,
+	/* dma length 128 bytes */
+	RX_HDR_DMA_LENGTH_128B = 2,
+	/* dma length 256 bytes */
+	RX_HDR_DMA_LENGTH_256B = 3,
+};
+
 /*
  * NB: intentionally not using kernel-doc comment because the kernel-doc
  *     script does not handle the complex conditional compilation

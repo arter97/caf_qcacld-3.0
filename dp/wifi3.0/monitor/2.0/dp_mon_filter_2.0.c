@@ -119,16 +119,6 @@ fail:
 	return QDF_STATUS_E_FAILURE;
 }
 
-void dp_rx_mon_hdr_length_set(uint32_t *msg_word,
-			      struct htt_rx_ring_tlv_filter *tlv_filter)
-{
-	if (!msg_word || !tlv_filter)
-		return;
-
-	HTT_RX_RING_SELECTION_CFG_RX_HDR_LEN_SET(*msg_word,
-						 tlv_filter->rx_hdr_length);
-}
-
 void dp_rx_mon_packet_length_set(uint32_t *msg_word,
 				 struct htt_rx_ring_tlv_filter *tlv_filter)
 {
@@ -1013,6 +1003,7 @@ dp_htt_h2t_send_complete_free_netbuf(
  * @htt_tlv_filter:	Rx SRNG TLV and filter setting
  * Return: 0 on success; error code on failure
  */
+static
 int htt_h2t_tx_ring_cfg(struct htt_soc *htt_soc, int pdev_id,
 			hal_ring_handle_t hal_ring_hdl,
 			int hal_ring_type, int ring_buf_size,
@@ -1390,7 +1381,7 @@ dp_mon_filter_reset_undecoded_metadata_capture_2_0(struct dp_pdev *pdev)
 }
 #endif
 
-void dp_tx_mon_filter_set_downstream_tlvs(struct htt_tx_ring_tlv_filter *filter)
+static void dp_tx_mon_filter_set_downstream_tlvs(struct htt_tx_ring_tlv_filter *filter)
 {
 	filter->dtlvs.tx_fes_setup = 1;
 	filter->dtlvs.pcu_ppdu_setup_init = 1;
@@ -1399,7 +1390,8 @@ void dp_tx_mon_filter_set_downstream_tlvs(struct htt_tx_ring_tlv_filter *filter)
 	filter->dtlvs.fw2s_mon = 1;
 }
 
-void dp_tx_mon_filter_set_upstream_tlvs(struct htt_tx_ring_tlv_filter *filter)
+static void
+dp_tx_mon_filter_set_upstream_tlvs(struct htt_tx_ring_tlv_filter *filter)
 {
 	filter->utlvs.tx_fes_status_end = 1;
 	filter->utlvs.rx_response_required_info = 1;
@@ -1434,8 +1426,9 @@ void dp_tx_mon_filter_set_upstream_tlvs(struct htt_tx_ring_tlv_filter *filter)
 	filter->utlvs.eht_sig_usr_ofdma = 1;
 }
 
-void dp_tx_mon_filter_set_all(struct dp_mon_pdev_be *mon_pdev_be,
-			      struct htt_tx_ring_tlv_filter *filter)
+static void
+dp_tx_mon_filter_set_all(struct dp_mon_pdev_be *mon_pdev_be,
+			 struct htt_tx_ring_tlv_filter *filter)
 {
 	qdf_mem_zero(&filter->dtlvs,
 		     sizeof(filter->dtlvs));
@@ -1472,6 +1465,7 @@ void dp_tx_mon_filter_set_all(struct dp_mon_pdev_be *mon_pdev_be,
 	filter->data_dma_length = mon_pdev_be->tx_mon_filter_length;
 }
 
+static
 void dp_tx_mon_filter_set_word_mask(struct dp_pdev *pdev,
 				    struct htt_tx_ring_tlv_filter *filter)
 {
@@ -2297,6 +2291,7 @@ void dp_mon_filter_reset_rx_pktlog_cbf_2_0(struct dp_pdev *pdev)
 	mon_pdev_be->filter_be[mode][srng_type] = filter;
 }
 
+#ifdef BE_PKTLOG_SUPPORT
 void dp_mon_filter_setup_pktlog_hybrid_2_0(struct dp_pdev *pdev)
 {
 	struct dp_mon_filter_be filter = {0};
@@ -2389,6 +2384,7 @@ void dp_mon_filter_reset_pktlog_hybrid_2_0(struct dp_pdev *pdev)
 
 	mon_pdev_be->filter_be[mode][srng_type] = filter;
 }
+#endif
 #endif /* WDI_EVENT_ENABLE */
 
 /**

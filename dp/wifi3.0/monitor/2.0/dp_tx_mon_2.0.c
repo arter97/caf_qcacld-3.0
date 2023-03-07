@@ -356,6 +356,28 @@ void dp_tx_mon_buf_desc_pool_free(struct dp_soc *soc)
 		dp_mon_desc_pool_free(&mon_soc_be->tx_desc_mon);
 }
 
+QDF_STATUS dp_tx_mon_soc_init_2_0(struct dp_soc *soc)
+{
+	struct dp_mon_soc *mon_soc = soc->monitor_soc;
+	struct dp_mon_soc_be *mon_soc_be =
+		dp_get_be_mon_soc_from_dp_mon_soc(mon_soc);
+
+	if (dp_srng_init(soc, &mon_soc_be->tx_mon_buf_ring,
+			 TX_MONITOR_BUF, 0, 0)) {
+		dp_mon_err("%pK: " RNG_ERR "tx_mon_buf_ring", soc);
+		goto fail;
+	}
+
+	if (dp_tx_mon_buf_desc_pool_init(soc)) {
+		dp_mon_err("%pK: " RNG_ERR "tx mon desc pool init", soc);
+		goto fail;
+	}
+
+	return QDF_STATUS_SUCCESS;
+fail:
+	return QDF_STATUS_E_FAILURE;
+}
+
 QDF_STATUS
 dp_tx_mon_buf_desc_pool_alloc(struct dp_soc *soc)
 {

@@ -78,6 +78,20 @@ struct dp_peer_tx_capture {
 };
 #endif
 
+/**
+ * struct ieee80211_ctlframe_addr2 - control frame addr
+ * @i_fc: frame control
+ * @i_aidordur: aid or duration
+ * @i_addr1: address 1
+ * @i_addr2: address 2
+ */
+struct ieee80211_ctlframe_addr2 {
+	uint8_t i_fc[2];
+	uint8_t i_aidordur[2];
+	uint8_t i_addr1[QDF_NET_MAC_ADDR_MAX_LEN];
+	uint8_t i_addr2[QDF_NET_MAC_ADDR_MAX_LEN];
+} __packed;
+
 #ifndef WLAN_TX_PKT_CAPTURE_ENH
 static inline void
 dp_process_ppdu_stats_update_failed_bitmap(struct dp_pdev *pdev,
