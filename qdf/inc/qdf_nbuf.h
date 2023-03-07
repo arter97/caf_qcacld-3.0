@@ -242,6 +242,8 @@ enum wsc_op_code {
 #define MAX_CHAIN 8
 #define QDF_MON_STATUS_MPDU_FCS_BMAP_NWORDS 8
 
+#define EHT_USER_INFO_LEN 4
+
 /**
  * typedef qdf_nbuf_queue_t - Platform independent packet queue abstraction
  */
@@ -512,7 +514,7 @@ struct mon_rx_status {
 	uint32_t usig_mask;
 	uint32_t eht_known;
 	uint32_t eht_data[6];
-	uint32_t eht_user_info[4];
+	uint32_t eht_user_info[EHT_USER_INFO_LEN];
 #ifdef QCA_UNDECODED_METADATA_SUPPORT
 	uint32_t phyrx_abort:1,
 		 phyrx_abort_reason:8,
