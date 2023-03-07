@@ -722,10 +722,6 @@ struct cdp_ctrl_ops {
 
 	int
 		(*txrx_mempools_attach)(ol_txrx_soc_handle dp_soc);
-	int
-		(*txrx_update_filter_neighbour_peers)(
-				struct cdp_soc_t *soc, uint8_t vdev_id,
-				uint32_t cmd, uint8_t *macaddr);
 
 	/* Is this similar to ol_txrx_peer_state_update() in MCL */
 	/**
@@ -845,19 +841,6 @@ struct cdp_ctrl_ops {
 				       qdf_nbuf_t nbuf,
 				       bool is_egress,
 				       bool is_rx);
-#endif
-#ifdef ATH_SUPPORT_NAC_RSSI
-	QDF_STATUS (*txrx_vdev_config_for_nac_rssi)(struct cdp_soc_t *cdp_soc,
-						    uint8_t vdev_id,
-						    enum cdp_nac_param_cmd cmd,
-						    char *bssid,
-						    char *client_macaddr,
-						    uint8_t chan_num);
-
-	QDF_STATUS (*txrx_vdev_get_neighbour_rssi)(struct cdp_soc_t *cdp_soc,
-						   uint8_t vdev_id,
-						   char *macaddr,
-						   uint8_t *rssi);
 #endif
 
 #ifdef WLAN_SUPPORT_MSCS
@@ -986,6 +969,9 @@ struct cdp_me_ops {
  * @soc_config_full_mon_mode: pdev configure full monitor mode
  * @get_mon_pdev_rx_stats: Get monitor mode pdev stats
  * @txrx_enable_mon_reap_timer: Enable/Disable reap timer of monitor status ring
+ * @txrx_update_filter_neighbour_peers: config nac peer
+ * @txrx_vdev_config_for_nac_rssi: config nac rssi peer
+ * @txrx_vdev_get_neighbour_rssi: get nac peer rssi
  * @txrx_set_lite_mon_config:  set lite monitor config
  * @txrx_get_lite_mon_config:  get lite monitor config
  * @txrx_set_lite_mon_peer_config: set lite monitor peer config
@@ -1030,6 +1016,25 @@ struct cdp_mon_ops {
 
 	QDF_STATUS (*txrx_disable_enhanced_stats)(struct cdp_soc_t *soc,
 						  uint8_t pdev_id);
+
+	int
+		(*txrx_update_filter_neighbour_peers)(
+				struct cdp_soc_t *soc, uint8_t vdev_id,
+				uint32_t cmd, uint8_t *macaddr);
+
+#ifdef ATH_SUPPORT_NAC_RSSI
+	QDF_STATUS (*txrx_vdev_config_for_nac_rssi)(struct cdp_soc_t *cdp_soc,
+						    uint8_t vdev_id,
+						    enum cdp_nac_param_cmd cmd,
+						    char *bssid,
+						    char *client_macaddr,
+						    uint8_t chan_num);
+
+	QDF_STATUS (*txrx_vdev_get_neighbour_rssi)(struct cdp_soc_t *cdp_soc,
+						   uint8_t vdev_id,
+						   char *macaddr,
+						   uint8_t *rssi);
+#endif
 
 #ifdef QCA_SUPPORT_LITE_MONITOR
 	QDF_STATUS

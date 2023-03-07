@@ -1668,6 +1668,13 @@ struct cdp_mon_ops dp_ops_mon_2_0 = {
 	.txrx_enable_enhanced_stats = dp_enable_enhanced_stats,
 	.txrx_disable_enhanced_stats = dp_disable_enhanced_stats,
 #endif /* QCA_ENHANCED_STATS_SUPPORT */
+#if defined(ATH_SUPPORT_NAC_RSSI) || defined(ATH_SUPPORT_NAC)
+	.txrx_update_filter_neighbour_peers = dp_lite_mon_config_nac_peer,
+#endif
+#ifdef ATH_SUPPORT_NAC_RSSI
+	.txrx_vdev_config_for_nac_rssi = dp_lite_mon_config_nac_rssi_peer,
+	.txrx_vdev_get_neighbour_rssi = dp_lite_mon_get_nac_peer_rssi,
+#endif
 #ifdef QCA_SUPPORT_LITE_MONITOR
 	.txrx_set_lite_mon_config = dp_lite_mon_set_config,
 	.txrx_get_lite_mon_config = dp_lite_mon_get_config,
