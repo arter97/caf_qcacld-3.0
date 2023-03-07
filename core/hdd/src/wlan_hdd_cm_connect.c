@@ -493,7 +493,8 @@ static struct hdd_adapter
 {
 	struct hdd_adapter *adapter, *next_adapter = NULL;
 	wlan_net_dev_ref_dbgid dbgid = NET_DEV_HOLD_GET_ADAPTER;
-	qdf_freq_t chan_freq = 0;
+	struct wlan_channel *chan;
+	struct ch_params ch_params = {0};
 
 	hdd_for_each_adapter_dev_held_safe(hdd_ctx, adapter, next_adapter,
 					   dbgid) {
@@ -508,11 +509,24 @@ static struct hdd_adapter
 		    (hdd_ctx->dev_dfs_cac_status != DFS_CAC_IN_PROGRESS))
 			goto loop_next;
 
-		chan_freq = wlan_get_operation_chan_freq_vdev_id(hdd_ctx->pdev,
-							adapter->vdev_id);
+		chan = wlan_vdev_get_active_channel(adapter->vdev);
+		if (!chan) {
+			hdd_debug("Can not get active channel");
+			goto loop_next;
+		}
 
-		if (chan_freq && wlan_reg_is_dfs_for_freq(hdd_ctx->pdev,
-							  chan_freq)) {
+		if (!wlan_reg_is_5ghz_ch_freq(chan->ch_freq))
+			goto loop_next;
+
+		ch_params.ch_width = chan->ch_width;
+		if (ch_params.ch_width == CH_WIDTH_160MHZ)
+			wlan_reg_set_create_punc_bitmap(&ch_params, true);
+
+		if (wlan_reg_get_5g_bonded_channel_state_for_pwrmode(hdd_ctx->pdev,
+								     chan->ch_freq,
+								     &ch_params,
+								     REG_CURRENT_PWR_MODE) ==
+		    CHANNEL_STATE_DFS) {
 			hdd_adapter_dev_put_debug(adapter, dbgid);
 			if (next_adapter)
 				hdd_adapter_dev_put_debug(next_adapter, dbgid);
@@ -935,6 +949,11 @@ static void hdd_cm_save_bss_info(struct hdd_adapter *adapter,
 	mac_handle_t mac_handle = hdd_adapter_get_mac_handle(adapter);
 	struct sDot11fAssocResponse *assoc_resp;
 
+	if (!mac_handle) {
+		hdd_err("mac handle is null");
+		return;
+	}
+
 	hdd_ctx = WLAN_HDD_GET_CTX(adapter);
 	hdd_sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter);
 
@@ -1051,6 +1070,11 @@ static void hdd_wmm_cm_connect(struct wlan_objmgr_vdev *vdev,
 	struct vdev_mlme_obj *vdev_mlme;
 	mac_handle_t mac_handle = hdd_adapter_get_mac_handle(adapter);
 	struct mac_context *mac_ctx = MAC_CONTEXT(mac_handle);
+
+	if (!mac_handle) {
+		hdd_err("mac handle is null");
+		return;
+	}
 
 	vdev_mlme = wlan_vdev_mlme_get_cmpt_obj(vdev);
 	if (!vdev_mlme) {
