@@ -1600,8 +1600,19 @@ void policy_mgr_dump_current_concurrency(struct wlan_objmgr_psoc *psoc)
 			psoc, cc_mode, len);
 		qdf_mutex_acquire(&pm_ctx->qdf_conc_list_lock);
 		if (pm_conc_connection_list[0].freq ==
-			pm_conc_connection_list[1].freq) {
+		    pm_conc_connection_list[1].freq) {
 			strlcat(cc_mode, " SCC", len);
+			/* In some platform 2.4 Ghz can lead to DBS,
+			 * so check for DBS for SCC/MCC case
+			 */
+			if (policy_mgr_is_current_hwmode_dbs(psoc))
+				strlcat(cc_mode, " (DBS)", len);
+		} else if (policy_mgr_2_freq_always_on_same_mac(psoc,
+			   pm_conc_connection_list[0].freq,
+			   pm_conc_connection_list[1].freq)) {
+			strlcat(cc_mode, " MCC", len);
+			if (policy_mgr_is_current_hwmode_dbs(psoc))
+				strlcat(cc_mode, " (DBS)", len);
 		} else if (policy_mgr_is_current_hwmode_dbs(psoc)) {
 			strlcat(cc_mode, " DBS", len);
 		} else if (policy_mgr_is_current_hwmode_sbs(psoc)) {
