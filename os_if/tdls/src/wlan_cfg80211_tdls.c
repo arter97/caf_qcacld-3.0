@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2017-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -39,8 +39,6 @@
 #include "wlan_tdls_ucfg_api.h"
 #include "wlan_cm_roam_api.h"
 #include "wlan_mlo_mgr_sta.h"
-
-#define TDLS_MAX_NO_OF_2_4_CHANNELS 14
 
 static int wlan_cfg80211_tdls_validate_mac_addr(const uint8_t *mac)
 {
