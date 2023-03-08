@@ -641,7 +641,8 @@ struct wlan_dp_psoc_callbacks {
 	qdf_netdev_t (*dp_get_netdev_by_vdev_mac)(struct qdf_mac_addr *mac_addr);
 	unsigned int (*dp_get_tx_flow_low_watermark)(hdd_cb_handle cb_ctx,
 						     uint8_t intf_id);
-	void (*dp_get_tx_resource)(uint8_t intf_id, struct qdf_mac_addr *mac_addr);
+	void (*dp_get_tx_resource)(uint8_t link_id_id,
+				   struct qdf_mac_addr *mac_addr);
 	void (*dp_get_tsf_time)(uint8_t intf_id,
 				uint64_t input_time, uint64_t *tsf_time);
 

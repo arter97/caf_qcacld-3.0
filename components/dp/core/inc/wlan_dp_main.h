@@ -562,6 +562,16 @@ dp_del_latency_critical_client(struct wlan_objmgr_vdev *vdev,
 int is_dp_intf_valid(struct wlan_dp_intf *dp_intf);
 
 /**
+ * is_dp_link_valid() - check if DP link is valid
+ * @dp_link: DP link handle
+ *
+ * API to check whether DP link is valid
+ *
+ * Return: true if dp_link is valid, else false.
+ */
+bool is_dp_link_valid(struct wlan_dp_link *dp_link);
+
+/**
  * dp_send_rps_ind() - send rps indication to daemon
  * @dp_intf: DP interface
  *

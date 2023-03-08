@@ -64,12 +64,13 @@ void dp_rx_skip_fisa(struct wlan_dp_psoc_context *dp_ctx, uint32_t value)
 #endif
 
 #ifdef QCA_LL_LEGACY_TX_FLOW_CONTROL
-void dp_get_tx_resource(struct wlan_dp_intf *dp_intf,
+void dp_get_tx_resource(struct wlan_dp_link *dp_link,
 			struct qdf_mac_addr *mac_addr)
 {
+	struct wlan_dp_intf *dp_intf = dp_link->dp_intf;
 	struct wlan_dp_psoc_callbacks *dp_ops = &dp_intf->dp_ctx->dp_ops;
 
-	dp_ops->dp_get_tx_resource(dp_intf->intf_id,
+	dp_ops->dp_get_tx_resource(dp_link->link_id,
 				   mac_addr);
 }
 #endif /* QCA_LL_LEGACY_TX_FLOW_CONTROL */
@@ -627,7 +628,7 @@ dp_start_xmit(struct wlan_dp_link *dp_link, qdf_nbuf_t nbuf)
 		goto drop_pkt;
 	}
 
-	dp_get_tx_resource(dp_intf, &mac_addr_tx_allowed);
+	dp_get_tx_resource(dp_link, &mac_addr_tx_allowed);
 
 	if (!qdf_nbuf_ipa_owned_get(nbuf)) {
 		nbuf = dp_nbuf_orphan(dp_intf, nbuf);
@@ -1341,32 +1342,34 @@ dp_rx_thread_gro_flush_ind_cbk(void *intf_ctx, int rx_ctx_id)
 				   rx_ctx_id, gro_flush_code);
 }
 
-QDF_STATUS dp_rx_pkt_thread_enqueue_cbk(void *intf_ctx,
+QDF_STATUS dp_rx_pkt_thread_enqueue_cbk(void *link_ctx,
 					qdf_nbuf_t nbuf_list)
 {
 	struct wlan_dp_intf *dp_intf;
-	uint8_t intf_id;
+	struct wlan_dp_link *dp_link;
+	uint8_t link_id;
 	qdf_nbuf_t head_ptr;
 
-	if (qdf_unlikely(!intf_ctx || !nbuf_list)) {
+	if (qdf_unlikely(!link_ctx || !nbuf_list)) {
 		dp_err("Null params being passed");
 		return QDF_STATUS_E_FAILURE;
 	}
 
-	dp_intf = (struct wlan_dp_intf *)intf_ctx;
-	if (is_dp_intf_valid(dp_intf))
+	dp_link = (struct wlan_dp_link *)link_ctx;
+	if (!is_dp_link_valid(dp_link))
 		return QDF_STATUS_E_FAILURE;
 
+	dp_intf = dp_link->dp_intf;
 	if (dp_intf->runtime_disable_rx_thread &&
 	    dp_intf->txrx_ops.rx.rx_stack)
 		return dp_intf->txrx_ops.rx.rx_stack(dp_intf, nbuf_list);
 
-	intf_id = dp_intf->intf_id;
+	link_id = dp_link->link_id;
 
 	head_ptr = nbuf_list;
 	while (head_ptr) {
 		qdf_nbuf_cb_update_vdev_id(head_ptr,
-					   intf_id);
+					   link_id);
 		head_ptr = qdf_nbuf_next(head_ptr);
 	}
 

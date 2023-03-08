@@ -392,13 +392,15 @@ qdf_nbuf_t dp_sap_nbuf_orphan(struct wlan_dp_intf *dp_intf,
 
 #ifdef QCA_LL_LEGACY_TX_FLOW_CONTROL
 static
-void dp_softap_get_tx_resource(struct wlan_dp_intf *dp_intf,
+void dp_softap_get_tx_resource(struct wlan_dp_link *dp_link,
 			       qdf_nbuf_t nbuf)
 {
+	struct wlan_dp_intf *dp_intf = dp_link->dp_intf;
+
 	if (QDF_NBUF_CB_GET_IS_BCAST(nbuf) || QDF_NBUF_CB_GET_IS_MCAST(nbuf))
-		dp_get_tx_resource(dp_intf, &dp_intf->mac_addr);
+		dp_get_tx_resource(dp_link, &dp_intf->mac_addr);
 	else
-		dp_get_tx_resource(dp_intf,
+		dp_get_tx_resource(dp_link,
 				   (struct qdf_mac_addr *)(qdf_nbuf_data(nbuf) +
 							   QDF_NBUF_DEST_MAC_OFFSET));
 }
@@ -613,12 +615,13 @@ dp_softap_inspect_traffic_end_indication_pkt(struct wlan_dp_intf *dp_intf,
 /**
  * dp_softap_start_xmit() - Transmit a frame
  * @nbuf: pointer to Network buffer
- * @dp_intf: DP interface
+ * @dp_link: DP link handle
  *
  * Return: QDF_STATUS_SUCCESS on successful transmission
  */
-QDF_STATUS dp_softap_start_xmit(qdf_nbuf_t nbuf, struct wlan_dp_intf *dp_intf)
+QDF_STATUS dp_softap_start_xmit(qdf_nbuf_t nbuf, struct wlan_dp_link *dp_link)
 {
+	struct wlan_dp_intf *dp_intf = dp_link->dp_intf;
 	struct wlan_dp_psoc_context *dp_ctx = dp_intf->dp_ctx;
 	struct qdf_mac_addr *dest_mac_addr;
 	void *soc = cds_get_context(QDF_MODULE_ID_SOC);
@@ -639,7 +642,7 @@ QDF_STATUS dp_softap_start_xmit(qdf_nbuf_t nbuf, struct wlan_dp_intf *dp_intf)
 	if (QDF_IS_STATUS_ERROR(dp_softap_validate_peer_state(dp_intf, nbuf)))
 		goto drop_pkt;
 
-	dp_softap_get_tx_resource(dp_intf, nbuf);
+	dp_softap_get_tx_resource(dp_link, nbuf);
 
 	nbuf = dp_sap_nbuf_orphan(dp_intf, nbuf);
 	if (!nbuf)

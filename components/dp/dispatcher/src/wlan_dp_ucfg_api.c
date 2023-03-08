@@ -1321,7 +1321,7 @@ ucfg_dp_softap_start_xmit(qdf_nbuf_t nbuf, struct wlan_objmgr_vdev *vdev)
 
 	dp_intf = dp_link->dp_intf;
 	qdf_atomic_inc(&dp_intf->num_active_task);
-	status = dp_softap_start_xmit(nbuf, dp_intf);
+	status = dp_softap_start_xmit(nbuf, dp_link);
 	qdf_atomic_dec(&dp_intf->num_active_task);
 
 	return status;

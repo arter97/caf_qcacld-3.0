@@ -162,11 +162,11 @@ QDF_STATUS dp_rx_flush_packet_cbk(void *dp_link_context, uint8_t link_id);
 /**
  * dp_softap_start_xmit() - Transmit a frame for SAP interface
  * @nbuf: pointer to Network buffer
- * @dp_intf: DP interface
+ * @dp_link: DP link handle
  *
  * Return: QDF_STATUS_SUCCESS on successful transmission
  */
-QDF_STATUS dp_softap_start_xmit(qdf_nbuf_t nbuf, struct wlan_dp_intf *dp_intf);
+QDF_STATUS dp_softap_start_xmit(qdf_nbuf_t nbuf, struct wlan_dp_link *dp_link);
 
 /**
  * dp_softap_tx_timeout() - TX timeout handler
@@ -297,7 +297,7 @@ QDF_STATUS dp_rx_thread_gro_flush_ind_cbk(void *intf_ctx, int rx_ctx_id);
 
 /**
  * dp_rx_pkt_thread_enqueue_cbk() - receive pkt handler to enqueue into thread
- * @intf_ctx: pointer to DP interface context
+ * @link_ctx: pointer to DP link context
  * @nbuf_list: pointer to qdf_nbuf list
  *
  * Receive callback registered with DP layer which enqueues packets into dp rx
@@ -306,7 +306,7 @@ QDF_STATUS dp_rx_thread_gro_flush_ind_cbk(void *intf_ctx, int rx_ctx_id);
  * Return: QDF_STATUS_E_FAILURE if any errors encountered,
  *	   QDF_STATUS_SUCCESS otherwise
  */
-QDF_STATUS dp_rx_pkt_thread_enqueue_cbk(void *intf_ctx,
+QDF_STATUS dp_rx_pkt_thread_enqueue_cbk(void *link_ctx,
 					qdf_nbuf_t nbuf_list);
 
 /**
@@ -426,12 +426,12 @@ qdf_nbuf_t dp_nbuf_orphan(struct wlan_dp_intf *dp_intf,
 
 /**
  * dp_get_tx_resource() - check tx resources and take action
- * @dp_intf: DP interface
+ * @dp_link: DP link handle
  * @mac_addr: mac address
  *
  * Return: none
  */
-void dp_get_tx_resource(struct wlan_dp_intf *dp_intf,
+void dp_get_tx_resource(struct wlan_dp_link *dp_link,
 			struct qdf_mac_addr *mac_addr);
 
 #else
@@ -481,13 +481,13 @@ qdf_nbuf_t dp_nbuf_orphan(struct wlan_dp_intf *dp_intf,
 
 /**
  * dp_get_tx_resource() - check tx resources and take action
- * @dp_intf: DP interface
+ * @dp_link: DP link handle
  * @mac_addr: mac address
  *
  * Return: none
  */
 static inline
-void dp_get_tx_resource(struct wlan_dp_intf *dp_intf,
+void dp_get_tx_resource(struct wlan_dp_link *dp_link,
 			struct qdf_mac_addr *mac_addr)
 {
 }

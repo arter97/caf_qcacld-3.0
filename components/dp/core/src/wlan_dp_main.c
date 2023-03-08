@@ -177,22 +177,24 @@ dp_get_intf_by_netdev(struct wlan_dp_psoc_context *dp_ctx, qdf_netdev_t dev)
 }
 
 /**
- * validate_interface_id() - Check if interface ID is valid
- * @intf_id: interface ID
+ * validate_link_id() - Check if link ID is valid
+ * @link_id: DP link ID
  *
- * Return: 0 on success, error code on failure
+ * Return: true on success, false on failure
  */
-static int validate_interface_id(uint8_t intf_id)
+static bool validate_link_id(uint8_t link_id)
 {
-	if (intf_id == WLAN_UMAC_VDEV_ID_MAX) {
+	if (link_id == WLAN_UMAC_VDEV_ID_MAX) {
 		dp_err("Interface is not up: %ps", QDF_RET_IP);
-		return -EINVAL;
+		return false;
 	}
-	if (intf_id >= WLAN_MAX_VDEVS) {
-		dp_err("Bad interface id:%u", intf_id);
-		return -EINVAL;
+
+	if (link_id >= WLAN_MAX_VDEVS) {
+		dp_err("Bad interface id:%u", link_id);
+		return false;
 	}
-	return 0;
+
+	return true;
 }
 
 int is_dp_intf_valid(struct wlan_dp_intf *dp_intf)
@@ -213,7 +215,25 @@ int is_dp_intf_valid(struct wlan_dp_intf *dp_intf)
 		return -EAGAIN;
 	}
 
-	return validate_interface_id(dp_intf->intf_id);
+	return 0;
+}
+
+bool is_dp_link_valid(struct wlan_dp_link *dp_link)
+{
+	struct wlan_dp_intf *dp_intf;
+	int ret;
+
+	if (!dp_link) {
+		dp_err("link is NULL");
+		return false;
+	}
+
+	dp_intf = dp_link->dp_intf;
+	ret = is_dp_intf_valid(dp_intf);
+	if (ret)
+		return false;
+
+	return validate_link_id(dp_link->link_id);
 }
 
 QDF_STATUS dp_get_front_link_no_lock(struct wlan_dp_intf *dp_intf,
