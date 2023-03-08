@@ -6304,9 +6304,6 @@ void dp_mon_cdp_ops_deregister(struct dp_soc *soc)
 
 	dp_mon_cdp_mon_ops_deregister(ops);
 
-#if defined(WLAN_CFR_ENABLE) && defined(WLAN_ENH_CFR_ENABLE)
-	ops->cfr_ops->txrx_cfr_filter = NULL;
-#endif
 	ops->cmn_drv_ops->txrx_set_monitor_mode = NULL;
 	ops->cmn_drv_ops->txrx_get_mon_vdev_from_pdev = NULL;
 #ifdef DP_PEER_EXTENDED_API

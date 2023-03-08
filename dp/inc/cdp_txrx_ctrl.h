@@ -933,10 +933,10 @@ cdp_cfr_filter(ol_txrx_soc_handle soc,
 		return;
 	}
 
-	if (!soc->ops->cfr_ops || !soc->ops->cfr_ops->txrx_cfr_filter)
+	if (!soc->ops->mon_ops || !soc->ops->mon_ops->txrx_cfr_filter)
 		return;
 
-	soc->ops->cfr_ops->txrx_cfr_filter(soc, pdev_id, enable, filter_val,
+	soc->ops->mon_ops->txrx_cfr_filter(soc, pdev_id, enable, filter_val,
 					   cfr_enable_monitor_mode);
 }
 
