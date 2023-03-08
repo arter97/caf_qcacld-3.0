@@ -36,6 +36,7 @@
 #include "dp_sawf.h"
 #endif
 #include <qdf_pkt_add_timestamp.h>
+#include "dp_ipa.h"
 
 #define DP_INVALID_VDEV_ID 0xFF
 
@@ -822,12 +823,25 @@ static inline enum qdf_dp_tx_rx_status dp_tx_hw_to_qdf(uint16_t status)
  * Return: None
  */
 #ifdef QCA_OL_TX_MULTIQ_SUPPORT
+#if defined(IPA_OFFLOAD) && defined(QCA_IPA_LL_TX_FLOW_CONTROL)
+static inline void dp_tx_get_queue(struct dp_vdev *vdev,
+				   qdf_nbuf_t nbuf, struct dp_tx_queue *queue)
+{
+	queue->ring_id = qdf_get_cpu();
+	if (vdev->pdev->soc->wlan_cfg_ctx->ipa_enabled)
+		if (queue->ring_id == IPA_TCL_DATA_RING_IDX)
+			queue->ring_id = 0;
+
+	queue->desc_pool_id = queue->ring_id;
+}
+#else
 static inline void dp_tx_get_queue(struct dp_vdev *vdev,
 				   qdf_nbuf_t nbuf, struct dp_tx_queue *queue)
 {
 	queue->ring_id = qdf_get_cpu();
 	queue->desc_pool_id = queue->ring_id;
 }
+#endif
 
 /**
  * dp_tx_get_hal_ring_hdl() - Get the hal_tx_ring_hdl for data transmission
