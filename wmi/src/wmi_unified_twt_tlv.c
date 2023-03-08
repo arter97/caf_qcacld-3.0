@@ -445,6 +445,8 @@ send_twt_btwt_remove_sta_cmd_tlv(wmi_unified_t wmi_handle,
 	WMI_CHAR_ARRAY_TO_MAC_ADDR(params->peer_macaddr.bytes,
 				   &cmd->peer_macaddr);
 	cmd->dialog_id = params->dialog_id;
+	cmd->r_twt_dl_tid_bitmap = params->r_twt_dl_tid_bitmap;
+	cmd->r_twt_ul_tid_bitmap = params->r_twt_ul_tid_bitmap;
 
 	status = wmi_unified_cmd_send(wmi_handle, buf, sizeof(*cmd),
 				      WMI_TWT_BTWT_REMOVE_STA_CMDID);

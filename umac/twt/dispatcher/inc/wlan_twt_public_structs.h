@@ -970,11 +970,15 @@ struct twt_btwt_invite_sta_complete_event_param {
  * @vdev_id: VDEV identifier
  * @peer_macaddr: Peer mac address
  * @dialog_id: BTWT dialog ID
+ * @r_twt_dl_tid_bitmap: rTWT DL tids bitmap
+ * @r_twt_ul_tid_bitmap: rTWT UL tids bitmap
  */
 struct twt_btwt_remove_sta_cmd_param {
 	uint32_t vdev_id;
 	struct qdf_mac_addr peer_macaddr;
 	uint32_t dialog_id;
+	uint32_t r_twt_dl_tid_bitmap;
+	uint32_t r_twt_ul_tid_bitmap;
 };
 
 /**
