@@ -8727,9 +8727,10 @@ int wlan_hdd_get_temperature(struct hdd_adapter *adapter, int *temperature)
 }
 
 #ifdef TX_MULTIQ_PER_AC
-void wlan_hdd_display_tx_multiq_stats(hdd_cb_handle context, uint8_t vdev_id)
+void wlan_hdd_display_tx_multiq_stats(hdd_cb_handle context,
+				      qdf_netdev_t netdev)
 {
-	struct hdd_context *hdd_ctx;
+	struct hdd_adapter *adapter;
 	struct wlan_hdd_link_info *link_info;
 	struct hdd_tx_rx_stats *stats;
 	uint32_t total_inv_sk_and_skb_hash = 0;
@@ -8738,17 +8739,13 @@ void wlan_hdd_display_tx_multiq_stats(hdd_cb_handle context, uint8_t vdev_id)
 	uint32_t total_qselect_skb_hash = 0;
 	unsigned int i;
 
-	hdd_ctx = hdd_cb_handle_to_context(context);
-	if (!hdd_ctx) {
-		hdd_err("hdd_ctx is null");
+	adapter = WLAN_HDD_GET_PRIV_PTR(netdev);
+	if (!adapter) {
+		hdd_err("adapter is null");
 		return;
 	}
 
-	link_info = hdd_get_link_info_by_vdev(hdd_ctx, vdev_id);
-	if (!link_info) {
-		hdd_err("Invalid vdev");
-		return;
-	}
+	link_info = adapter->deflink;
 
 	stats = &link_info->hdd_stats.tx_rx_stats;
 

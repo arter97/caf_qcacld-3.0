@@ -1034,7 +1034,6 @@ dp_vdev_obj_create_notification(struct wlan_objmgr_vdev *vdev, void *arg)
 
 	qdf_spin_lock_bh(&dp_link->vdev_lock);
 	dp_link->link_id = vdev->vdev_objmgr.vdev_id;
-	dp_intf->intf_id = vdev->vdev_objmgr.vdev_id;
 	dp_link->vdev = vdev;
 	qdf_spin_unlock_bh(&dp_link->vdev_lock);
 
@@ -1109,8 +1108,6 @@ dp_vdev_obj_destroy_notification(struct wlan_objmgr_vdev *vdev, void *arg)
 		dp_nud_reset_tracking(dp_intf);
 		dp_nud_flush_work(dp_intf);
 		dp_mic_flush_work(dp_intf);
-		qdf_mem_zero(&dp_intf->conn_info,
-			     sizeof(struct wlan_dp_conn_info));
 
 		if (dp_intf->device_mode == QDF_SAP_MODE ||
 		    dp_intf->device_mode == QDF_P2P_GO_MODE) {
@@ -1124,6 +1121,8 @@ dp_vdev_obj_destroy_notification(struct wlan_objmgr_vdev *vdev, void *arg)
 		}
 	}
 
+	qdf_mem_zero(&dp_link->conn_info, sizeof(struct wlan_dp_conn_info));
+
 	/*
 	 * Change this to link level, since during link switch,
 	 * it might not go to 0
@@ -1132,7 +1131,6 @@ dp_vdev_obj_destroy_notification(struct wlan_objmgr_vdev *vdev, void *arg)
 	if (QDF_IS_STATUS_ERROR(status))
 		return status;
 
-	dp_intf->intf_id = WLAN_UMAC_VDEV_ID_MAX;
 	qdf_spin_lock_bh(&dp_link->vdev_lock);
 	dp_link->vdev = NULL;
 	qdf_spin_unlock_bh(&dp_link->vdev_lock);
@@ -2203,6 +2201,7 @@ QDF_STATUS dp_config_direct_link(struct wlan_dp_intf *dp_intf,
 {
 	struct wlan_dp_psoc_context *dp_ctx = dp_intf->dp_ctx;
 	struct direct_link_info *config = &dp_intf->direct_link_config;
+	struct wlan_dp_link *dp_link, *dp_link_next;
 	void *htc_handle;
 	bool prev_ll, update_ll, vote_link;
 	cdp_config_param_type vdev_param = {0};
@@ -2230,10 +2229,15 @@ QDF_STATUS dp_config_direct_link(struct wlan_dp_intf *dp_intf,
 	vote_link = config->config_set ^ config_direct_link;
 	config->config_set = config_direct_link;
 	config->low_latency = enable_low_latency;
-	vdev_param.cdp_vdev_tx_to_fw = config_direct_link;
-	status = cdp_txrx_set_vdev_param(wlan_psoc_get_dp_handle(dp_ctx->psoc),
-					 dp_intf->intf_id, CDP_VDEV_TX_TO_FW,
-					 vdev_param);
+	dp_for_each_link_held_safe(dp_intf, dp_link, dp_link_next) {
+		vdev_param.cdp_vdev_tx_to_fw = config_direct_link;
+		status = cdp_txrx_set_vdev_param(
+				wlan_psoc_get_dp_handle(dp_ctx->psoc),
+				dp_link->link_id, CDP_VDEV_TX_TO_FW,
+				vdev_param);
+		if (QDF_IS_STATUS_ERROR(status))
+			break;
+	}
 
 	if (config_direct_link) {
 		if (vote_link)

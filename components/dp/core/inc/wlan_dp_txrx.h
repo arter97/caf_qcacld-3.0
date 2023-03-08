@@ -90,18 +90,18 @@ void dp_softap_check_wait_for_tx_eap_pkt(struct wlan_dp_intf *dp_intf,
 #ifdef SAP_DHCP_FW_IND
 /**
  * dp_post_dhcp_ind() - Send DHCP START/STOP indication to FW
- * @dp_intf: pointer to dp interface
+ * @dp_link: DP link handle
  * @mac_addr: mac address
  * @dhcp_start: true if DHCP start, otherwise DHCP stop
  *
  * Return: error number
  */
-int dp_post_dhcp_ind(struct wlan_dp_intf *dp_intf,
+int dp_post_dhcp_ind(struct wlan_dp_link *dp_link,
 		     uint8_t *mac_addr, bool dhcp_start);
 
 /**
  * dp_softap_inspect_dhcp_packet() - Inspect DHCP packet
- * @dp_intf: pointer to dp interface
+ * @dp_link: DP link handle
  * @nbuf: pointer to OS packet (sk_buff)
  * @dir: direction
  *
@@ -126,19 +126,19 @@ int dp_post_dhcp_ind(struct wlan_dp_intf *dp_intf,
  *
  * Return: error number
  */
-int dp_softap_inspect_dhcp_packet(struct wlan_dp_intf *dp_intf,
+int dp_softap_inspect_dhcp_packet(struct wlan_dp_link *dp_link,
 				  qdf_nbuf_t nbuf,
 				  enum qdf_proto_dir dir);
 #else
 static inline
-int dp_post_dhcp_ind(struct wlan_dp_intf *dp_intf,
+int dp_post_dhcp_ind(struct wlan_dp_link *dp_link,
 		     uint8_t *mac_addr, bool dhcp_start)
 {
 	return 0;
 }
 
 static inline
-int dp_softap_inspect_dhcp_packet(struct wlan_dp_intf *dp_intf,
+int dp_softap_inspect_dhcp_packet(struct wlan_dp_link *dp_link,
 				  qdf_nbuf_t nbuf,
 				  enum qdf_proto_dir dir)
 {
@@ -386,7 +386,7 @@ qdf_nbuf_t dp_nbuf_orphan(struct wlan_dp_intf *dp_intf,
 
 	tx_flow_low_watermark =
 	   dp_ops->dp_get_tx_flow_low_watermark(dp_ops->callback_ctx,
-						dp_intf->intf_id);
+						dp_intf->dev);
 	if (tx_flow_low_watermark > 0) {
 #if (LINUX_VERSION_CODE > KERNEL_VERSION(3, 19, 0))
 		/*

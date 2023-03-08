@@ -605,14 +605,16 @@ void hdd_get_max_tx_bitrate(struct wlan_hdd_link_info *link_info);
 /**
  * wlan_hdd_display_tx_multiq_stats() - display Tx multi queue stats
  * @context: hdd context
- * @vdev_id: vdev id
+ * @netdev: netdev
  *
  * Return: none
  */
-void wlan_hdd_display_tx_multiq_stats(hdd_cb_handle context, uint8_t vdev_id);
+void wlan_hdd_display_tx_multiq_stats(hdd_cb_handle context,
+				      qdf_netdev_t netdev);
 #else
 static inline
-void wlan_hdd_display_tx_multiq_stats(hdd_cb_handle context, uint8_t vdev_id)
+void wlan_hdd_display_tx_multiq_stats(hdd_cb_handle context,
+				      qdf_netdev_t netdev)
 {
 }
 #endif

@@ -495,9 +495,9 @@ dp_add_latency_critical_client(struct wlan_objmgr_vdev *vdev,
 		qdf_atomic_inc(&dp_intf->dp_ctx->num_latency_critical_clients);
 
 		dp_debug("Adding latency critical connection for vdev %d",
-			 dp_intf->intf_id);
+			 dp_link->link_id);
 		cdp_vdev_inform_ll_conn(cds_get_context(QDF_MODULE_ID_SOC),
-					dp_intf->intf_id,
+					dp_link->link_id,
 					CDP_VDEV_LL_CONN_ADD);
 		break;
 	default:
@@ -541,9 +541,9 @@ dp_del_latency_critical_client(struct wlan_objmgr_vdev *vdev,
 		qdf_atomic_dec(&dp_intf->dp_ctx->num_latency_critical_clients);
 
 		dp_info("Removing latency critical connection for vdev %d",
-			dp_intf->intf_id);
+			dp_link->link_id);
 		cdp_vdev_inform_ll_conn(cds_get_context(QDF_MODULE_ID_SOC),
-					dp_intf->intf_id,
+					dp_link->link_id,
 					CDP_VDEV_LL_CONN_DEL);
 		break;
 	default:
@@ -871,7 +871,6 @@ void dp_direct_link_deinit(struct wlan_dp_psoc_context *dp_ctx, bool is_ssr);
 QDF_STATUS dp_config_direct_link(struct wlan_dp_intf *dp_intf,
 				 bool config_direct_link,
 				 bool enable_low_latency);
-
 #else
 static inline
 QDF_STATUS dp_direct_link_init(struct wlan_dp_psoc_context *dp_ctx)

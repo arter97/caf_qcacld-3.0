@@ -606,7 +606,6 @@ struct dp_rx_fst {
  * @runtime_disable_rx_thread: Runtime Rx thread flag
  * @rx_stack: function pointer Rx packet handover
  * @tx_fn: function pointer to send Tx packet
- * @conn_info: STA connection information
  * @bss_state: AP BSS state
  * @qdf_sta_eap_frm_done_event: EAP frame event management
  * @traffic_end_ind: store traffic end indication info
@@ -624,8 +623,6 @@ struct wlan_dp_intf {
 	struct qdf_mac_addr mac_addr;
 
 	enum QDF_OPMODE device_mode;
-
-	uint8_t intf_id;
 
 	qdf_list_node_t node;
 
@@ -666,7 +663,6 @@ struct wlan_dp_intf {
 	uint8_t gro_flushed[DP_MAX_RX_THREADS];
 
 	bool runtime_disable_rx_thread;
-	struct wlan_dp_conn_info conn_info;
 
 	enum bss_intf_state bss_state;
 	qdf_event_t qdf_sta_eap_frm_done_event;
@@ -688,6 +684,7 @@ struct wlan_dp_intf {
  * @dp_intf: Parent DP interface for this DP link
  * @vdev: object manager vdev context
  * @vdev_lock: vdev spin lock
+ * @conn_info: STA connection information
  */
 struct wlan_dp_link {
 	qdf_list_node_t node;
@@ -696,6 +693,7 @@ struct wlan_dp_link {
 	struct wlan_dp_intf *dp_intf;
 	struct wlan_objmgr_vdev *vdev;
 	qdf_spinlock_t vdev_lock;
+	struct wlan_dp_conn_info conn_info;
 };
 
 /**

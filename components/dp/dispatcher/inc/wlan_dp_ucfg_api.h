@@ -924,12 +924,12 @@ bool ucfg_dp_get_dad_value(struct wlan_objmgr_vdev *vdev);
 bool ucfg_dp_get_con_status_value(struct wlan_objmgr_vdev *vdev);
 
 /**
- * ucfg_dp_get_intf_id() - Get intf_id
+ * ucfg_dp_get_link_id() - Get link_id
  * @vdev: vdev context
  *
- * Return: intf_id
+ * Return: link_id
  */
-uint8_t ucfg_dp_get_intf_id(struct wlan_objmgr_vdev *vdev);
+uint8_t ucfg_dp_get_link_id(struct wlan_objmgr_vdev *vdev);
 
 /**
  * ucfg_dp_get_arp_stats() - Get ARP stats
@@ -1414,13 +1414,13 @@ void ucfg_dp_wfds_del_server(void);
 
 /**
  * ucfg_dp_config_direct_link() - Set direct link config for vdev
- * @vdev: objmgr Vdev handle
+ * @dev: netdev
  * @config_direct_link: Flag to enable direct link path
  * @enable_low_latency: Flag to enable low link latency
  *
  * Return: QDF Status
  */
-QDF_STATUS ucfg_dp_config_direct_link(struct wlan_objmgr_vdev *vdev,
+QDF_STATUS ucfg_dp_config_direct_link(qdf_netdev_t dev,
 				      bool config_direct_link,
 				      bool enable_low_latency);
 #else
@@ -1457,7 +1457,7 @@ static inline void ucfg_dp_wfds_del_server(void)
 #endif
 
 static inline
-QDF_STATUS ucfg_dp_config_direct_link(struct wlan_objmgr_vdev *vdev,
+QDF_STATUS ucfg_dp_config_direct_link(qdf_netdev_t dev,
 				      bool config_direct_link,
 				      bool enable_low_latency)
 {

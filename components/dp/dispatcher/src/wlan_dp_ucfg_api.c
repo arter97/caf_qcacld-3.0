@@ -53,17 +53,25 @@ static inline
 QDF_STATUS wlan_dp_set_vdev_direct_link_cfg(struct wlan_objmgr_psoc *psoc,
 					    struct wlan_dp_intf *dp_intf)
 {
+	struct wlan_dp_link *dp_link, *dp_link_next;
 	cdp_config_param_type vdev_param = {0};
+	QDF_STATUS status;
 
 	if (dp_intf->device_mode != QDF_SAP_MODE ||
 	    !dp_intf->dp_ctx->dp_direct_link_ctx)
 		return QDF_STATUS_SUCCESS;
 
-	vdev_param.cdp_vdev_tx_to_fw = dp_intf->direct_link_config.config_set;
+	dp_for_each_link_held_safe(dp_intf, dp_link, dp_link_next) {
+		vdev_param.cdp_vdev_tx_to_fw =
+					dp_intf->direct_link_config.config_set;
+		status = cdp_txrx_set_vdev_param(wlan_psoc_get_dp_handle(psoc),
+						 dp_link->link_id,
+						 CDP_VDEV_TX_TO_FW, vdev_param);
+		if (QDF_IS_STATUS_ERROR(status))
+			break;
+	}
 
-	return cdp_txrx_set_vdev_param(wlan_psoc_get_dp_handle(psoc),
-				       dp_intf->intf_id, CDP_VDEV_TX_TO_FW,
-				       vdev_param);
+	return status;
 }
 #else
 static inline
@@ -97,6 +105,11 @@ void ucfg_dp_update_inf_mac(struct wlan_objmgr_psoc *psoc,
 
 	qdf_copy_macaddr(&dp_intf->mac_addr, new_mac);
 
+	/*
+	 * TODO - Expectation here is that
+	 * vdevs will be deleted and created for MLD addr change
+	 * Hence, set the direct link config for all its links
+	 */
 	wlan_dp_set_vdev_direct_link_cfg(psoc, dp_intf);
 }
 
@@ -123,7 +136,6 @@ ucfg_dp_create_intf(struct wlan_objmgr_psoc *psoc,
 	dp_intf->def_link = NULL;
 	dp_intf->dp_ctx = dp_ctx;
 	dp_intf->dev = ndev;
-	dp_intf->intf_id = WLAN_UMAC_VDEV_ID_MAX;
 	qdf_copy_macaddr(&dp_intf->mac_addr, intf_addr);
 
 	qdf_spin_lock_bh(&dp_ctx->intf_list_lock);
@@ -162,8 +174,15 @@ ucfg_dp_destroy_intf(struct wlan_objmgr_psoc *psoc,
 		return QDF_STATUS_E_FAILURE;
 	}
 
+	/*
+	 * TODO - dp_intf is destroyed, so such config is no longer
+	 * required.
+	 * Check and confirm this theory and remove this call
+	 */
+	/*
 	if (dp_intf->device_mode == QDF_SAP_MODE)
 		dp_config_direct_link(dp_intf, false, false);
+	*/
 
 	dp_periodic_sta_stats_mutex_destroy(dp_intf);
 	dp_nud_deinit_tracking(dp_intf);
@@ -591,7 +610,6 @@ void ucfg_dp_wait_complete_tasks(void)
 
 void ucfg_dp_remove_conn_info(struct wlan_objmgr_vdev *vdev)
 {
-	struct wlan_dp_intf *dp_intf;
 	struct wlan_dp_link *dp_link;
 
 	dp_link = dp_get_vdev_priv_obj(vdev);
@@ -600,15 +618,13 @@ void ucfg_dp_remove_conn_info(struct wlan_objmgr_vdev *vdev)
 		return;
 	}
 
-	dp_intf = dp_link->dp_intf;
-	qdf_mem_zero(&dp_intf->conn_info,
+	qdf_mem_zero(&dp_link->conn_info,
 		     sizeof(struct wlan_dp_conn_info));
 }
 
 void ucfg_dp_conn_info_set_bssid(struct wlan_objmgr_vdev *vdev,
 				 struct qdf_mac_addr *bssid)
 {
-	struct wlan_dp_intf *dp_intf;
 	struct wlan_dp_link *dp_link;
 
 	dp_link = dp_get_vdev_priv_obj(vdev);
@@ -617,14 +633,12 @@ void ucfg_dp_conn_info_set_bssid(struct wlan_objmgr_vdev *vdev,
 		return;
 	}
 
-	dp_intf = dp_link->dp_intf;
-	qdf_copy_macaddr(&dp_intf->conn_info.bssid, bssid);
+	qdf_copy_macaddr(&dp_link->conn_info.bssid, bssid);
 }
 
 void ucfg_dp_conn_info_set_arp_service(struct wlan_objmgr_vdev *vdev,
 				       uint8_t proxy_arp_service)
 {
-	struct wlan_dp_intf *dp_intf;
 	struct wlan_dp_link *dp_link;
 
 	dp_link = dp_get_vdev_priv_obj(vdev);
@@ -633,14 +647,12 @@ void ucfg_dp_conn_info_set_arp_service(struct wlan_objmgr_vdev *vdev,
 		return;
 	}
 
-	dp_intf = dp_link->dp_intf;
-	dp_intf->conn_info.proxy_arp_service = proxy_arp_service;
+	dp_link->conn_info.proxy_arp_service = proxy_arp_service;
 }
 
 void ucfg_dp_conn_info_set_peer_authenticate(struct wlan_objmgr_vdev *vdev,
 					     uint8_t is_authenticated)
 {
-	struct wlan_dp_intf *dp_intf;
 	struct wlan_dp_link *dp_link;
 
 	dp_link = dp_get_vdev_priv_obj(vdev);
@@ -649,14 +661,12 @@ void ucfg_dp_conn_info_set_peer_authenticate(struct wlan_objmgr_vdev *vdev,
 		return;
 	}
 
-	dp_intf = dp_link->dp_intf;
-	dp_intf->conn_info.is_authenticated = is_authenticated;
+	dp_link->conn_info.is_authenticated = is_authenticated;
 }
 
 void ucfg_dp_conn_info_set_peer_mac(struct wlan_objmgr_vdev *vdev,
 				    struct qdf_mac_addr *peer_mac)
 {
-	struct wlan_dp_intf *dp_intf;
 	struct wlan_dp_link *dp_link;
 
 	dp_link = dp_get_vdev_priv_obj(vdev);
@@ -665,8 +675,7 @@ void ucfg_dp_conn_info_set_peer_mac(struct wlan_objmgr_vdev *vdev,
 		return;
 	}
 
-	dp_intf = dp_link->dp_intf;
-	qdf_copy_macaddr(&dp_intf->conn_info.peer_macaddr, peer_mac);
+	qdf_copy_macaddr(&dp_link->conn_info.peer_macaddr, peer_mac);
 }
 
 void ucfg_dp_softap_check_wait_for_tx_eap_pkt(struct wlan_objmgr_vdev *vdev,
@@ -718,7 +727,7 @@ void ucfg_dp_update_dhcp_state_on_disassoc(struct wlan_objmgr_vdev *vdev,
 	/* Send DHCP STOP indication to FW */
 	stainfo->dhcp_phase = DHCP_PHASE_ACK;
 	if (stainfo->dhcp_nego_status == DHCP_NEGO_IN_PROGRESS)
-		dp_post_dhcp_ind(dp_intf,
+		dp_post_dhcp_ind(dp_link,
 				 stainfo->sta_mac.bytes,
 				 0);
 	stainfo->dhcp_nego_status = DHCP_NEGO_STOP;
@@ -1006,14 +1015,15 @@ dp_rx_register_fisa_ops(struct ol_txrx_ops *txrx_ops)
 #endif
 
 #ifdef CONFIG_DP_PKT_ADD_TIMESTAMP
-static QDF_STATUS wlan_dp_get_tsf_time(void *dp_intf_ctx,
+static QDF_STATUS wlan_dp_get_tsf_time(void *dp_link_ctx,
 				       uint64_t input_time,
 				       uint64_t *tsf_time)
 {
-	struct wlan_dp_intf *dp_intf = (struct wlan_dp_intf *)dp_intf_ctx;
+	struct wlan_dp_link *dp_link = (struct wlan_dp_link *)dp_link_ctx;
+	struct wlan_dp_intf *dp_intf = dp_link->dp_intf;
 	struct wlan_dp_psoc_callbacks *dp_ops = &dp_intf->dp_ctx->dp_ops;
 
-	dp_ops->dp_get_tsf_time(dp_intf->intf_id,
+	dp_ops->dp_get_tsf_time(dp_intf->dev,
 				input_time,
 				tsf_time);
 	return QDF_STATUS_SUCCESS;
@@ -1151,7 +1161,7 @@ QDF_STATUS ucfg_dp_ocb_register_txrx_ops(struct wlan_objmgr_vdev *vdev)
 	txrx_ops.rx.rx = dp_rx_packet_cbk;
 	txrx_ops.rx.stats_rx = dp_tx_rx_collect_connectivity_stats_info;
 
-	cdp_vdev_register(soc, dp_intf->intf_id, (ol_osif_vdev_handle)dp_intf,
+	cdp_vdev_register(soc, dp_link->link_id, (ol_osif_vdev_handle)dp_link,
 			  &txrx_ops);
 	if (!txrx_ops.tx.tx) {
 		dp_err("vdev register fail");
@@ -1160,8 +1170,8 @@ QDF_STATUS ucfg_dp_ocb_register_txrx_ops(struct wlan_objmgr_vdev *vdev)
 
 	dp_intf->txrx_ops = txrx_ops;
 
-	qdf_copy_macaddr(&dp_intf->conn_info.peer_macaddr,
-			 &dp_intf->mac_addr);
+	qdf_copy_macaddr(&dp_link->conn_info.peer_macaddr,
+			 &dp_link->mac_addr);
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -1184,8 +1194,8 @@ QDF_STATUS ucfg_dp_mon_register_txrx_ops(struct wlan_objmgr_vdev *vdev)
 	qdf_mem_zero(&txrx_ops, sizeof(txrx_ops));
 	txrx_ops.rx.rx = dp_mon_rx_packet_cbk;
 	dp_monitor_set_rx_monitor_cb(&txrx_ops, dp_rx_monitor_callback);
-	cdp_vdev_register(soc, dp_intf->intf_id,
-			  (ol_osif_vdev_handle)dp_intf,
+	cdp_vdev_register(soc, dp_link->link_id,
+			  (ol_osif_vdev_handle)dp_link,
 			  &txrx_ops);
 
 	dp_intf->txrx_ops = txrx_ops;
@@ -1225,8 +1235,8 @@ QDF_STATUS ucfg_dp_softap_register_txrx_ops(struct wlan_objmgr_vdev *vdev,
 
 	txrx_ops->get_tsf_time = wlan_dp_get_tsf_time;
 	cdp_vdev_register(soc,
-			  dp_intf->intf_id,
-			  (ol_osif_vdev_handle)dp_intf,
+			  dp_link->link_id,
+			  (ol_osif_vdev_handle)dp_link,
 			  txrx_ops);
 	if (!txrx_ops->tx.tx) {
 		dp_err("vdev register fail");
@@ -1884,18 +1894,16 @@ bool ucfg_dp_get_con_status_value(struct wlan_objmgr_vdev *vdev)
 	return dp_intf->con_status;
 }
 
-uint8_t ucfg_dp_get_intf_id(struct wlan_objmgr_vdev *vdev)
+uint8_t ucfg_dp_get_link_id(struct wlan_objmgr_vdev *vdev)
 {
 	struct wlan_dp_link *dp_link = dp_get_vdev_priv_obj(vdev);
-	struct wlan_dp_intf *dp_intf;
 
 	if (!dp_link) {
 		dp_err("Unable to get DP link");
 		return 0;
 	}
 
-	dp_intf = dp_link->dp_intf;
-	return dp_intf->intf_id;
+	return dp_link->link_id;
 }
 
 struct dp_arp_stats *ucfg_dp_get_arp_stats(struct wlan_objmgr_vdev *vdev)
@@ -2347,15 +2355,13 @@ ucfg_dp_softap_inspect_dhcp_packet(struct wlan_objmgr_vdev *vdev,
 				   qdf_nbuf_t nbuf, enum qdf_proto_dir dir)
 {
 	struct wlan_dp_link *dp_link = dp_get_vdev_priv_obj(vdev);
-	struct wlan_dp_intf *dp_intf;
 
 	if (!dp_link) {
 		dp_err("Unable to get DP link");
 		return QDF_STATUS_E_INVAL;
 	}
 
-	dp_intf = dp_link->dp_intf;
-	return dp_softap_inspect_dhcp_packet(dp_intf, nbuf, dir);
+	return dp_softap_inspect_dhcp_packet(dp_link, nbuf, dir);
 }
 
 void
@@ -2440,7 +2446,7 @@ ucfg_dp_traffic_end_indication_set(struct wlan_objmgr_vdev *vdev,
 
 	vdev_param.cdp_vdev_param_traffic_end_ind = info.enabled;
 	if (cdp_txrx_set_vdev_param(cds_get_context(QDF_MODULE_ID_SOC),
-				    dp_intf->intf_id,
+				    dp_link->link_id,
 				    CDP_ENABLE_TRAFFIC_END_INDICATION,
 				    vdev_param))
 		dp_err("Failed to set traffic end indication param on DP vdev");
@@ -2577,19 +2583,23 @@ void ucfg_dp_wfds_del_server(void)
 	dp_wfds_del_server();
 }
 
-QDF_STATUS ucfg_dp_config_direct_link(struct wlan_objmgr_vdev *vdev,
+QDF_STATUS ucfg_dp_config_direct_link(qdf_netdev_t dev,
 				      bool config_direct_link,
 				      bool enable_low_latency)
 {
-	struct wlan_dp_link *dp_link = dp_get_vdev_priv_obj(vdev);
+	struct wlan_dp_psoc_context *dp_ctx;
 	struct wlan_dp_intf *dp_intf;
 
-	if (!dp_link) {
-		dp_err("Unable to get DP link");
+	dp_ctx = dp_get_context();
+	if (!dp_ctx)
+		return QDF_STATUS_E_FAILURE;
+
+	dp_intf = dp_get_intf_by_netdev(dp_ctx, dev);
+	if (!dp_intf) {
+		dp_err("Unable to get DP interface");
 		return QDF_STATUS_E_INVAL;
 	}
 
-	dp_intf = dp_link->dp_intf;
 	return dp_config_direct_link(dp_intf, config_direct_link,
 				     enable_low_latency);
 }

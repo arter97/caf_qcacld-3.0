@@ -11436,30 +11436,30 @@ void hdd_send_mscs_action_frame(struct wlan_hdd_link_info *link_info)
 /**
  * wlan_hdd_sta_get_dot11mode() - GET AP client count
  * @context: HDD context
- * @vdev_id: vdev ID
+ * @netdev: netdev
  * @dot11_mode: variable in which mode need to update.
  *
  * Return: true on success else false
  */
 static inline
-bool wlan_hdd_sta_get_dot11mode(hdd_cb_handle context, uint8_t vdev_id,
+bool wlan_hdd_sta_get_dot11mode(hdd_cb_handle context, qdf_netdev_t netdev,
 				enum qca_wlan_802_11_mode *dot11_mode)
 {
 	struct hdd_context *hdd_ctx;
 	struct wlan_hdd_link_info *link_info;
 	struct hdd_station_ctx *sta_ctx;
+	struct hdd_adapter *adapter;
 	enum csr_cfgdot11mode mode;
 
 	hdd_ctx = hdd_cb_handle_to_context(context);
 	if (!hdd_ctx)
 		return false;
 
-	link_info = hdd_get_link_info_by_vdev(hdd_ctx, vdev_id);
-	if (!link_info)
+	adapter = WLAN_HDD_GET_PRIV_PTR(netdev);
+	if (!adapter)
 		return false;
 
-	if (!hdd_cm_is_vdev_associated(link_info))
-		return false;
+	link_info = adapter->deflink;
 
 	sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(link_info);
 	mode = sta_ctx->conn_info.dot11mode;
@@ -11470,17 +11470,18 @@ bool wlan_hdd_sta_get_dot11mode(hdd_cb_handle context, uint8_t vdev_id,
 /**
  * wlan_hdd_get_ap_client_count() - GET AP client count
  * @context: HDD context
- * @vdev_id: vdev ID
+ * @netdev: netdev
  * @client_count: variable in which number of client need to update.
  *
  * Return: true on success else false
  */
 static inline
-bool wlan_hdd_get_ap_client_count(hdd_cb_handle context, uint8_t vdev_id,
+bool wlan_hdd_get_ap_client_count(hdd_cb_handle context, qdf_netdev_t netdev,
 				  uint16_t *client_count)
 {
 	struct hdd_context *hdd_ctx;
 	struct wlan_hdd_link_info *link_info;
+	struct hdd_adapter *adapter;
 	struct hdd_ap_ctx *ap_ctx;
 	enum qca_wlan_802_11_mode i;
 
@@ -11490,31 +11491,35 @@ bool wlan_hdd_get_ap_client_count(hdd_cb_handle context, uint8_t vdev_id,
 		return false;
 	}
 
-	link_info = hdd_get_link_info_by_vdev(hdd_ctx, vdev_id);
-	if (!link_info) {
-		hdd_err("Invalid vdev");
+	adapter = WLAN_HDD_GET_PRIV_PTR(netdev);
+	if (!adapter) {
+		hdd_err("adapter is null");
 		return false;
 	}
 
+	link_info = adapter->deflink;
 	ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(link_info);
 	if (!ap_ctx->ap_active)
 		return false;
+
 	for (i = QCA_WLAN_802_11_MODE_11B; i < QCA_WLAN_802_11_MODE_INVALID;
 	     i++)
 		client_count[i] = ap_ctx->client_count[i];
+
 	return true;
 }
 
 /**
  * wlan_hdd_sta_ndi_connected() - Check if NDI connected
  * @context: HDD context
- * @vdev_id: vdev ID
+ * @netdev: netdev
  *
  * Return: true if NDI connected else false
  */
 static inline
-bool wlan_hdd_sta_ndi_connected(hdd_cb_handle context, uint8_t vdev_id)
+bool wlan_hdd_sta_ndi_connected(hdd_cb_handle context, qdf_netdev_t netdev)
 {
+	struct hdd_adapter *adapter;
 	struct hdd_context *hdd_ctx;
 	struct wlan_hdd_link_info *link_info;
 	struct hdd_station_ctx *sta_ctx;
@@ -11525,11 +11530,13 @@ bool wlan_hdd_sta_ndi_connected(hdd_cb_handle context, uint8_t vdev_id)
 		return false;
 	}
 
-	link_info = hdd_get_link_info_by_vdev(hdd_ctx, vdev_id);
-	if (!link_info) {
-		hdd_err("Invalid vdev");
+	adapter = WLAN_HDD_GET_PRIV_PTR(netdev);
+	if (!adapter) {
+		hdd_err("adapter is null");
 		return false;
 	}
+
+	link_info = adapter->deflink;
 
 	sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(link_info);
 	if (sta_ctx->conn_info.conn_state != eConnectionState_NdiConnected)
@@ -11582,12 +11589,13 @@ static inline bool wlan_hdd_is_roaming_in_progress(hdd_cb_handle context)
 /**
  * hdd_is_ap_active() - Check if AP is active
  * @context: HDD context
- * @vdev_id: Vdev ID
+ * @netdev: netdev
  *
  * Return: true if AP active else false
  */
-static inline bool hdd_is_ap_active(hdd_cb_handle context, uint8_t vdev_id)
+static inline bool hdd_is_ap_active(hdd_cb_handle context, qdf_netdev_t netdev)
 {
+	struct hdd_adapter *adapter;
 	struct hdd_context *hdd_ctx;
 	struct wlan_hdd_link_info *link_info;
 
@@ -11597,11 +11605,13 @@ static inline bool hdd_is_ap_active(hdd_cb_handle context, uint8_t vdev_id)
 		return false;
 	}
 
-	link_info = hdd_get_link_info_by_vdev(hdd_ctx, vdev_id);
-	if (!link_info) {
-		hdd_err("Invalid vdev");
+	adapter = WLAN_HDD_GET_PRIV_PTR(netdev);
+	if (!adapter) {
+		hdd_err("adapter is null");
 		return false;
 	}
+
+	link_info = adapter->deflink;
 	return WLAN_HDD_GET_AP_CTX_PTR(link_info)->ap_active;
 }
 
@@ -11660,27 +11670,22 @@ static inline bool hdd_is_link_adapter(hdd_cb_handle context, uint8_t vdev_id)
 /**
  * hdd_get_pause_map() - Get pause map value
  * @context: HDD context
- * @vdev_id: Vdev ID
+ * @netdev: netdev
  *
  * Return: pause map value
  */
 static inline
-uint32_t hdd_get_pause_map(hdd_cb_handle context, uint8_t vdev_id)
+uint32_t hdd_get_pause_map(hdd_cb_handle context, qdf_netdev_t netdev)
 {
-	struct hdd_context *hdd_ctx = hdd_cb_handle_to_context(context);
-	struct wlan_hdd_link_info *link_info;
+	struct hdd_adapter *adapter;
 
-	if (!hdd_ctx) {
-		hdd_err("hdd_ctx is null");
+	adapter = WLAN_HDD_GET_PRIV_PTR(netdev);
+	if (!adapter) {
+		hdd_err("adapter is null");
 		return 0;
 	}
 
-	link_info = hdd_get_link_info_by_vdev(hdd_ctx, vdev_id);
-	if (!link_info) {
-		hdd_err("Invalid vdev");
-		return 0;
-	}
-	return link_info->adapter->pause_map;
+	return adapter->pause_map;
 }
 
 /**
@@ -11806,27 +11811,23 @@ static inline void wlan_hdd_pm_qos_remove_request(hdd_cb_handle context)
 /**
  * wlan_hdd_send_mscs_action_frame() - Send MSCS action frame
  * @context: HDD context
- * @vdev_id: Vdev ID
+ * @netdev: netdev
  *
  * Return: None
  */
 static inline void wlan_hdd_send_mscs_action_frame(hdd_cb_handle context,
-						   uint8_t vdev_id)
+						   qdf_netdev_t netdev)
 {
-	struct hdd_context *hdd_ctx;
+	struct hdd_adapter *adapter;
 	struct wlan_hdd_link_info *link_info;
 
-	hdd_ctx = hdd_cb_handle_to_context(context);
-	if (!hdd_ctx) {
-		hdd_err("hdd_ctx is null");
+	adapter = WLAN_HDD_GET_PRIV_PTR(netdev);
+	if (!adapter) {
+		hdd_err("adapter is null");
 		return;
 	}
 
-	link_info = hdd_get_link_info_by_vdev(hdd_ctx, vdev_id);
-	if (!link_info) {
-		hdd_err("Invalid vdev");
-		return;
-	}
+	link_info = adapter->deflink;
 	hdd_send_mscs_action_frame(link_info);
 }
 
@@ -11854,7 +11855,7 @@ static inline void wlan_hdd_pm_qos_remove_request(hdd_cb_handle context)
 }
 
 static inline void wlan_hdd_send_mscs_action_frame(hdd_cb_handle context,
-						   uint8_t vdev_id)
+						   qdf_netdev_t netdev)
 {
 }
 #endif

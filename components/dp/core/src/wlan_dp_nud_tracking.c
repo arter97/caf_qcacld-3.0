@@ -39,8 +39,16 @@
  */
 static uint32_t dp_txrx_get_tx_ack_count(struct wlan_dp_intf *dp_intf)
 {
-	return cdp_get_tx_ack_stats(cds_get_context(QDF_MODULE_ID_SOC),
-				    dp_intf->intf_id);
+	struct cdp_soc_t *soc = cds_get_context(QDF_MODULE_ID_SOC);
+	struct wlan_dp_link *dp_link;
+	struct wlan_dp_link *dp_link_next;
+	uint32_t ack_count = 0;
+
+	dp_for_each_link_held_safe(dp_intf, dp_link, dp_link_next) {
+		ack_count += cdp_get_tx_ack_stats(soc, dp_link->link_id);
+	}
+
+	return ack_count;
 }
 
 void dp_nud_set_gateway_addr(struct wlan_objmgr_vdev *vdev,
@@ -80,11 +88,6 @@ void dp_nud_incr_gw_rx_pkt_cnt(struct wlan_dp_intf *dp_intf,
 void dp_nud_flush_work(struct wlan_dp_intf *dp_intf)
 {
 	struct wlan_dp_psoc_context *dp_ctx = dp_intf->dp_ctx;
-	struct wlan_dp_psoc_callbacks *dp_ops = &dp_ctx->dp_ops;
-
-	if (dp_ops->dp_is_link_adapter(dp_ops->callback_ctx,
-				       dp_intf->intf_id))
-		return;
 
 	if (dp_intf->device_mode == QDF_STA_MODE &&
 	    dp_ctx->dp_cfg.enable_nud_tracking) {
@@ -163,8 +166,9 @@ static void dp_nud_stats_info(struct wlan_dp_intf *dp_intf)
 
 	cb->os_if_dp_nud_stats_info(vdev);
 
+	/* TODO - Again this is also adapter based so pass dev */
 	pause_map = cb->dp_get_pause_map(cb->callback_ctx,
-					 dp_intf->intf_id);
+					 dp_intf->dev);
 	dp_info("Current pause_map value %x", pause_map);
 	dp_objmgr_put_vdev_by_user(vdev, WLAN_DP_ID);
 }
@@ -281,8 +285,12 @@ static void dp_nud_failure_work(void *data)
 		return;
 	}
 
+	/*
+	 * TODO - The handler is totally adapter based,
+	 * so just dev should be fine
+	 */
 	dp_ctx->dp_ops.dp_nud_failure_work(dp_ctx->dp_ops.callback_ctx,
-					   dp_intf->intf_id);
+					   dp_intf->dev);
 }
 
 void dp_nud_init_tracking(struct wlan_dp_intf *dp_intf)
@@ -349,6 +357,7 @@ static void dp_nud_filter_netevent(struct qdf_mac_addr *netdev_addr,
 {
 	int status;
 	struct wlan_dp_intf *dp_intf;
+	struct wlan_dp_link *dp_link;
 	struct wlan_dp_psoc_context *dp_ctx;
 	struct wlan_objmgr_vdev *vdev;
 
@@ -396,7 +405,12 @@ static void dp_nud_filter_netevent(struct qdf_mac_addr *netdev_addr,
 		return;
 	}
 	dp_objmgr_put_vdev_by_user(vdev, WLAN_DP_ID);
-	if (!dp_intf->conn_info.is_authenticated) {
+	dp_link = dp_intf->def_link;
+	/*
+	 * TODO - For now using deflink, have some analysis
+	 * (I think this should be fine)
+	 */
+	if (!dp_link->conn_info.is_authenticated) {
 		dp_info("client " QDF_MAC_ADDR_FMT
 			" is in the middle of WPS/EAPOL exchange.",
 			QDF_MAC_ADDR_REF(dp_intf->mac_addr.bytes));

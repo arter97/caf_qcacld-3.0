@@ -15327,9 +15327,10 @@ uint8_t hdd_get_sap_operating_band(struct hdd_context *hdd_ctx)
 }
 
 static inline QDF_STATUS
-wlan_hdd_config_dp_direct_link_profile(struct wlan_objmgr_vdev *vdev,
+wlan_hdd_config_dp_direct_link_profile(struct hdd_adapter *adapter,
 				       enum host_concurrent_ap_policy ap_policy)
 {
+	struct wlan_objmgr_vdev *vdev = adapter->deflink->vdev;
 	enum host_concurrent_ap_policy prev_ap_policy;
 
 	prev_ap_policy = ucfg_mlme_get_ap_policy(vdev);
@@ -15341,9 +15342,11 @@ wlan_hdd_config_dp_direct_link_profile(struct wlan_objmgr_vdev *vdev,
 	case HOST_CONCURRENT_AP_POLICY_UNSPECIFIED:
 		switch (ap_policy) {
 		case HOST_CONCURRENT_AP_POLICY_LOSSLESS_AUDIO_STREAMING:
-			return ucfg_dp_config_direct_link(vdev, true, false);
+			return ucfg_dp_config_direct_link(adapter->dev, true,
+							  false);
 		case HOST_CONCURRENT_AP_POLICY_GAMING_AUDIO:
-			return ucfg_dp_config_direct_link(vdev, true, true);
+			return ucfg_dp_config_direct_link(adapter->dev, true,
+							  true);
 		default:
 			break;
 		}
@@ -15352,7 +15355,8 @@ wlan_hdd_config_dp_direct_link_profile(struct wlan_objmgr_vdev *vdev,
 		switch (ap_policy) {
 		case HOST_CONCURRENT_AP_POLICY_UNSPECIFIED:
 		case HOST_CONCURRENT_AP_POLICY_LOSSLESS_AUDIO_STREAMING:
-			return ucfg_dp_config_direct_link(vdev, true, false);
+			return ucfg_dp_config_direct_link(adapter->dev, true,
+							  false);
 		default:
 			break;
 		}
@@ -15360,7 +15364,8 @@ wlan_hdd_config_dp_direct_link_profile(struct wlan_objmgr_vdev *vdev,
 	case HOST_CONCURRENT_AP_POLICY_LOSSLESS_AUDIO_STREAMING:
 		switch (ap_policy) {
 		case HOST_CONCURRENT_AP_POLICY_GAMING_AUDIO:
-			return ucfg_dp_config_direct_link(vdev, true, true);
+			return ucfg_dp_config_direct_link(adapter->dev, true,
+							  true);
 		default:
 			break;
 		}
@@ -15541,14 +15546,14 @@ static int __wlan_hdd_cfg80211_dual_sta_policy(struct hdd_context *hdd_ctx,
 /**
  * __wlan_hdd_cfg80211_ap_policy() - Wrapper to configure the concurrent
  * session policies
- * @vdev: pointer to vdev
+ * @adapter: HDD adapter
  * @tb: parsed attribute array
  *
  * Configure the concurrent session policies when multiple STA ifaces are
  * (getting) active.
  * Return: 0 on success; errno on failure
  */
-static int __wlan_hdd_cfg80211_ap_policy(struct wlan_objmgr_vdev *vdev,
+static int __wlan_hdd_cfg80211_ap_policy(struct hdd_adapter *adapter,
 					 struct nlattr **tb)
 {
 	QDF_STATUS status;
@@ -15560,7 +15565,7 @@ static int __wlan_hdd_cfg80211_ap_policy(struct wlan_objmgr_vdev *vdev,
 	uint8_t ap_config =
 		QCA_WLAN_CONCURRENT_AP_POLICY_LOSSLESS_AUDIO_STREAMING;
 
-	vdev_id = wlan_vdev_get_id(vdev);
+	vdev_id = wlan_vdev_get_id(adapter->deflink->vdev);
 	device_mode = hdd_get_device_mode(vdev_id);
 	if (device_mode != QDF_SAP_MODE) {
 		hdd_err_rl("command not allowed in %d mode, vdev_id: %d",
@@ -15590,12 +15595,12 @@ static int __wlan_hdd_cfg80211_ap_policy(struct wlan_objmgr_vdev *vdev,
 		hdd_err("Failed to set profile %d", profile);
 		return -EINVAL;
 	}
-	status = wlan_hdd_config_dp_direct_link_profile(vdev, ap_cfg_policy);
+	status = wlan_hdd_config_dp_direct_link_profile(adapter, ap_cfg_policy);
 	if (QDF_IS_STATUS_ERROR(status)) {
 		hdd_err("failed to set DP ap config");
 		return -EINVAL;
 	}
-	status = ucfg_mlme_set_ap_policy(vdev, ap_cfg_policy);
+	status = ucfg_mlme_set_ap_policy(adapter->deflink->vdev, ap_cfg_policy);
 	if (QDF_IS_STATUS_ERROR(status)) {
 		hdd_err("failed to set MLME ap config");
 		return -EINVAL;
@@ -15658,7 +15663,7 @@ static int __wlan_hdd_cfg80211_concurrent_session_policy(
 		__wlan_hdd_cfg80211_dual_sta_policy(adapter->hdd_ctx, tb);
 
 	if (tb[QCA_WLAN_VENDOR_ATTR_CONCURRENT_POLICY_AP_CONFIG])
-		__wlan_hdd_cfg80211_ap_policy(adapter->deflink->vdev, tb);
+		__wlan_hdd_cfg80211_ap_policy(adapter, tb);
 
 	return 0;
 }
