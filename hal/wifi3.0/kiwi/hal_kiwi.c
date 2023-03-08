@@ -135,6 +135,9 @@
 #define FW_QTIME_CYCLES_PER_10_USEC 192
 #endif
 
+struct wbm2sw_completion_ring_tx gwbm2sw_tx_comp_symbol __attribute__((used));
+struct wbm2sw_completion_ring_rx gwbm2sw_rx_comp_symbol __attribute__((used));
+
 static uint32_t hal_get_link_desc_size_kiwi(void)
 {
 	return LINK_DESC_SIZE;
