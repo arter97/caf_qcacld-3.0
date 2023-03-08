@@ -3689,6 +3689,82 @@ config_peer_latency_info_cmd_tlv(wmi_unified_t wmi_handle,
 }
 #endif
 
+#ifdef QCA_STANDALONE_SOUNDING_TRIGGER
+/**
+ * config_txbf_sounding_trig_info_cmd_tlv() - This API to send the
+ * WMI_VDEV_STANDALONE_SOUND_CMDID to FW
+ * @wmi: wmi handle
+ * @sounding_params: txbf sounding config param
+ *
+ * Return: QDF_STATUS_SUCCESS for success or error code
+ */
+static QDF_STATUS
+config_txbf_sounding_trig_info_cmd_tlv(wmi_unified_t wmi,
+				       struct wmi_txbf_sounding_trig_param *sounding_params)
+{
+	wmi_standalone_sounding_cmd_fixed_param *param_cmd;
+	wmi_buf_t buf;
+	wmi_mac_addr *peer_mac_address;
+	QDF_STATUS retval;
+	u_int8_t *buf_ptr = 0, i = 0, num_sounding_peers = 0;
+	u_int32_t len = 0;
+
+	num_sounding_peers = sounding_params->num_sounding_peers;
+	len = sizeof(*param_cmd) + WMI_TLV_HDR_SIZE;
+
+	if (num_sounding_peers)
+	    len += num_sounding_peers * sizeof(wmi_mac_addr);
+
+	buf = wmi_buf_alloc(wmi, len);
+	if (!buf) {
+		wmi_err("wmi_buf_alloc failed");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	buf_ptr = (uint8_t *)wmi_buf_data(buf);
+	param_cmd = (wmi_standalone_sounding_cmd_fixed_param *)buf_ptr;
+
+	WMITLV_SET_HDR(&param_cmd->tlv_header,
+		       WMITLV_TAG_STRUC_wmi_standalone_sounding_cmd_fixed_param,
+		       WMITLV_GET_STRUCT_TLVLEN(wmi_standalone_sounding_cmd_fixed_param));
+
+	param_cmd->vdev_id = sounding_params->vdev_id;
+	WMI_SET_STANDALONE_SOUND_PARAMS_FB_TYPE(param_cmd->sounding_params, sounding_params->feedback_type);
+	WMI_SET_STANDALONE_SOUND_PARAMS_NG(param_cmd->sounding_params, sounding_params->ng);
+	WMI_SET_STANDALONE_SOUND_PARAMS_CB(param_cmd->sounding_params, sounding_params->codebook);
+	WMI_SET_STANDALONE_SOUND_PARAMS_BW(param_cmd->sounding_params, sounding_params->bw);
+	param_cmd->num_sounding_repeats = sounding_params->sounding_repeats;
+
+	buf_ptr += sizeof(*param_cmd);
+
+	WMITLV_SET_HDR(buf_ptr, WMITLV_TAG_ARRAY_FIXED_STRUC,
+		       (num_sounding_peers * sizeof(wmi_mac_addr)));
+
+	peer_mac_address = (wmi_mac_addr *)(buf_ptr + WMI_TLV_HDR_SIZE);
+
+	for (i = 0; i < num_sounding_peers; ++i) {
+	     WMI_CHAR_ARRAY_TO_MAC_ADDR(&sounding_params->macaddr[i][0],
+					peer_mac_address);
+	     peer_mac_address++;
+	}
+
+	buf_ptr += WMI_TLV_HDR_SIZE + (num_sounding_peers * sizeof(wmi_mac_addr));
+
+	wmi_mtrace(WMI_VDEV_STANDALONE_SOUND_CMDID, param_cmd->vdev_id, 0);
+
+	retval = wmi_unified_cmd_send(wmi, buf, len,
+				      WMI_VDEV_STANDALONE_SOUND_CMDID);
+
+	if (QDF_IS_STATUS_ERROR(retval)) {
+	    wmi_err("Failed to send WMI_VDEV_STANDALONE_SOUND_CMDID");
+	    wmi_buf_free(buf);
+	    return retval;
+	}
+
+	return retval;
+}
+#endif
+
 /**
  * send_soc_tqm_reset_enable_disable_cmd_tlv() - This API to send the
  * WMI_SOC_TQM_RESET_ENABLE_DISABLE_CMDID to FW
@@ -4158,6 +4234,9 @@ void wmi_ap_attach_tlv(wmi_unified_t wmi_handle)
 #ifdef WLAN_SUPPORT_MESH_LATENCY
 	ops->config_vdev_tid_latency_info_cmd = config_vdev_tid_latency_info_cmd_tlv;
 	ops->config_peer_latency_info_cmd = config_peer_latency_info_cmd_tlv;
+#endif
+#ifdef QCA_STANDALONE_SOUNDING_TRIGGER
+	ops->config_txbf_sounding_trig_info_cmd = config_txbf_sounding_trig_info_cmd_tlv;
 #endif
 	ops->send_get_halphy_cal_status_cmd = send_get_halphy_cal_status_cmd_tlv;
 	ops->send_peer_set_intra_bss_cmd = send_peer_set_intra_bss_cmd_tlv;

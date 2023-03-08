@@ -918,6 +918,20 @@ QDF_STATUS wmi_unified_config_peer_latency_info_cmd_send(
 		struct wmi_peer_latency_config_params
 		*param);
 #endif
+
+#ifdef QCA_STANDALONE_SOUNDING_TRIGGER
+/**
+ * wmi_unified_txbf_sounding_trig_info_cmd_send() - WMI for txbf sounding for peers
+ * @wmi_handle: wmi handle
+ * @sounding_params: pointer to hold txbf sounding config param
+ *
+ * Return: QDF_STATUS_SUCCESS on success and QDF_STATUS_E_FAILURE for failure
+ */
+QDF_STATUS
+wmi_unified_txbf_sounding_trig_info_cmd_send(struct wmi_unified *wmi_handle,
+					     struct wmi_txbf_sounding_trig_param
+					     *sounding_params);
+#endif
 /**
  * wmi_unified_vdev_set_intra_bss_cmd_send() - Set inta bss params
  * @wmi_handle: wmi handle

@@ -1172,6 +1172,39 @@ struct wmi_sawf_params {
 	uint32_t msdu_rate_loss;
 	uint32_t disabled_modes;
 };
+
+#ifdef QCA_STANDALONE_SOUNDING_TRIGGER
+
+/* TXBF souding max peer macro */
+#define MAX_MU_TXBF_SOUNDING_USER 3
+
+/**
+ * struct wmi_txbf_sounding_trig_param - TXBF souding parameters
+ * @pdev_id: pdev id
+ * @vde_id: vdev id
+ * @feedback_type: single user/multi user feedback type,[0]Range[0-SU, 1-MU]
+ * @ng: [2:1] Ng -Range[0-1]
+ * @codebook: [3] Codebook -Range[0-1]
+ * @bw: [6:4] Bandwidth -Range[0-4]
+ * @reserved: [31:7] reserved
+ * @sounding_repeats: sounding repetations,Range[[0-3]-MU, [0-5]-SU]
+ * @num_sounding_peers: number of peers, Range[1- SU, [1-3]-MU]
+ * @macaddr: mac address of peers
+ */
+struct wmi_txbf_sounding_trig_param {
+	u_int32_t  pdev_id;
+	u_int32_t  vdev_id;
+	u_int32_t  feedback_type :1,
+		   ng            :2,
+		   codebook      :1,
+		   bw            :3,
+		   reserved      :25;
+	u_int32_t  sounding_repeats;
+	u_int8_t   num_sounding_peers;
+	u_int8_t   macaddr[MAX_MU_TXBF_SOUNDING_USER][QDF_MAC_ADDR_SIZE];
+};
+#endif
+
 #endif
 
 #ifdef QCA_STANDALONE_SOUNDING_TRIGGER
