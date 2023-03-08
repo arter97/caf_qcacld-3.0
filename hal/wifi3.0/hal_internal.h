@@ -692,6 +692,32 @@ hal_get_tsf_enum(uint32_t tsf_id, uint32_t mac_id,
 	}
 }
 
+#ifdef HAL_SRNG_REG_HIS_DEBUG
+
+#define HAL_SRNG_REG_MAX_ENTRIES 64
+
+/**
+ * struct hal_srng_reg_his_entry - history entry for single srng pointer
+ *                                 register update
+ * @write_time: register write timestamp
+ * @write_value: register write value
+ */
+struct hal_srng_reg_his_entry {
+	qdf_time_t write_time;
+	uint32_t write_value;
+};
+
+/**
+ * struct hal_srng_reg_his_ctx - context for srng pointer writing history
+ * @current_idx: the index which has recorded srng pointer writing
+ * @reg_his_arr: array to record the history
+ */
+struct hal_srng_reg_his_ctx {
+	qdf_atomic_t current_idx;
+	struct hal_srng_reg_his_entry reg_his_arr[HAL_SRNG_REG_MAX_ENTRIES];
+};
+#endif
+
 /* Common SRNG ring structure for source and destination rings */
 struct hal_srng {
 	/* Unique SRNG ring ID */
@@ -847,7 +873,59 @@ struct hal_srng {
 	uint16_t pointer_timer_threshold;
 	/* Number threshold of ring entries to issue pointer update */
 	uint8_t pointer_num_threshold;
+#ifdef HAL_SRNG_REG_HIS_DEBUG
+	/* pointer register writing history for this srng */
+	struct hal_srng_reg_his_ctx reg_his_ctx;
+#endif
 };
+
+#ifdef HAL_SRNG_REG_HIS_DEBUG
+/**
+ * hal_srng_reg_his_init() - SRNG register history context initialize
+ *
+ * @srng: SRNG handle pointer
+ *
+ * Return: None
+ */
+static inline
+void hal_srng_reg_his_init(struct hal_srng *srng)
+{
+	qdf_atomic_set(&srng->reg_his_ctx.current_idx, -1);
+}
+
+/**
+ * hal_srng_reg_his_add() - add pointer writing history to SRNG
+ *
+ * @srng: SRNG handle pointer
+ * @reg_val: pointer value to write
+ *
+ * Return: None
+ */
+static inline
+void hal_srng_reg_his_add(struct hal_srng *srng, uint32_t reg_val)
+{
+	uint32_t write_idx;
+	struct hal_srng_reg_his_entry *reg_his_entry;
+
+	write_idx = qdf_atomic_inc_return(&srng->reg_his_ctx.current_idx);
+	write_idx = write_idx & (HAL_SRNG_REG_MAX_ENTRIES - 1);
+
+	reg_his_entry = &srng->reg_his_ctx.reg_his_arr[write_idx];
+
+	reg_his_entry->write_time = qdf_get_log_timestamp();
+	reg_his_entry->write_value = reg_val;
+}
+#else
+static inline
+void hal_srng_reg_his_init(struct hal_srng *srng)
+{
+}
+
+static inline
+void hal_srng_reg_his_add(struct hal_srng *srng, uint32_t reg_val)
+{
+}
+#endif
 
 /* HW SRNG configuration table */
 struct hal_hw_srng_config {

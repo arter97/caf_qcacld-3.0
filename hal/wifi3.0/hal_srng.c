@@ -686,6 +686,7 @@ hal_process_reg_write_q_elem(struct hal_soc *hal,
 					srng->u.dst_ring.tp, false);
 		write_val = srng->u.dst_ring.tp;
 	}
+	hal_srng_reg_his_add(srng, write_val);
 
 	q_elem->valid = 0;
 	srng->last_dequeue_time = q_elem->dequeue_time;
@@ -1056,6 +1057,7 @@ void hal_delayed_reg_write(struct hal_soc *hal_soc,
 		     PLD_MHI_STATE_L0 ==
 		     pld_get_mhi_state(hal_soc->qdf_dev->dev))) {
 			hal_write_address_32_mb(hal_soc, addr, value, false);
+			hal_srng_reg_his_add(srng, value);
 			qdf_atomic_inc(&hal_soc->stats.wstats.direct);
 			srng->wstats.direct++;
 		} else {
@@ -1070,6 +1072,7 @@ void hal_delayed_reg_write(struct hal_soc *hal_soc,
 		    PLD_MHI_STATE_L0 ==
 		    pld_get_mhi_state(hal_soc->qdf_dev->dev)) {
 			hal_write_address_32_mb(hal_soc, addr, value, false);
+			hal_srng_reg_his_add(srng, value);
 			qdf_atomic_inc(&hal_soc->stats.wstats.direct);
 			srng->wstats.direct++;
 		} else {
@@ -1090,6 +1093,7 @@ void hal_delayed_reg_write(struct hal_soc *hal_soc,
 		qdf_atomic_inc(&hal_soc->stats.wstats.direct);
 		srng->wstats.direct++;
 		hal_write_address_32_mb(hal_soc, addr, value, false);
+		hal_srng_reg_his_add(srng, value);
 	} else {
 		hal_reg_write_enqueue(hal_soc, srng, addr, value);
 	}
@@ -1556,6 +1560,7 @@ void *hal_srng_setup_idx(void *hal_soc, int ring_type, int ring_num, int mac_id,
 		return NULL;
 	}
 
+	hal_srng_reg_his_init(srng);
 	dev_base_addr = hal->dev_base_addr;
 	srng->ring_id = ring_id;
 	srng->ring_type = ring_type;

@@ -467,6 +467,7 @@ static inline void hal_srng_write_address_32_mb(struct hal_soc *hal_soc,
 						uint32_t value)
 {
 	qdf_iowrite32(addr, value);
+	hal_srng_reg_his_add(srng, value);
 }
 #elif defined(FEATURE_HAL_DELAYED_REG_WRITE)
 static inline void hal_srng_write_address_32_mb(struct hal_soc *hal_soc,
@@ -483,6 +484,7 @@ static inline void hal_srng_write_address_32_mb(struct hal_soc *hal_soc,
 						uint32_t value)
 {
 	hal_write_address_32_mb(hal_soc, addr, value, false);
+	hal_srng_reg_his_add(srng, value);
 }
 #endif
 
