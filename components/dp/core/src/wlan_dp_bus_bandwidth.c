@@ -1815,7 +1815,9 @@ dp_link_monitoring(struct wlan_dp_psoc_context *dp_ctx,
 	peer_stats = qdf_mem_malloc(sizeof(*peer_stats));
 	if (!peer_stats)
 		return;
-	bss_peer = wlan_vdev_get_bsspeer(dp_intf->vdev);
+
+	/* TODO - Temp WAR, check what to do here */
+	bss_peer = wlan_vdev_get_bsspeer(dp_intf->def_link->vdev);
 	if (!bss_peer) {
 		dp_debug("Invalid bss peer");
 		qdf_mem_free(peer_stats);
@@ -1898,7 +1900,8 @@ static void __dp_bus_bw_work_handler(struct wlan_dp_psoc_context *dp_ctx)
 	dp_ctx->bw_vote_time = curr_time_us;
 
 	dp_for_each_intf_held_safe(dp_ctx, dp_intf, dp_intf_next) {
-		vdev = dp_objmgr_get_vdev_by_user(dp_intf, WLAN_DP_ID);
+		vdev = dp_objmgr_get_vdev_by_user(dp_intf->def_link,
+						  WLAN_DP_ID);
 		if (!vdev)
 			continue;
 

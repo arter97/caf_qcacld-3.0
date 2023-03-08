@@ -125,7 +125,6 @@ ucfg_dp_create_intf(struct wlan_objmgr_psoc *psoc,
 	dp_intf->dev = ndev;
 	dp_intf->intf_id = WLAN_UMAC_VDEV_ID_MAX;
 	qdf_copy_macaddr(&dp_intf->mac_addr, intf_addr);
-	qdf_spinlock_create(&dp_intf->vdev_lock);
 
 	qdf_spin_lock_bh(&dp_ctx->intf_list_lock);
 	qdf_list_insert_front(&dp_ctx->intf_list, &dp_intf->node);
@@ -169,7 +168,6 @@ ucfg_dp_destroy_intf(struct wlan_objmgr_psoc *psoc,
 	dp_periodic_sta_stats_mutex_destroy(dp_intf);
 	dp_nud_deinit_tracking(dp_intf);
 	dp_mic_deinit_work(dp_intf);
-	qdf_spinlock_destroy(&dp_intf->vdev_lock);
 
 	qdf_spinlock_destroy(&dp_intf->dp_link_list_lock);
 	qdf_list_destroy(&dp_intf->dp_link_list);
@@ -1069,7 +1067,7 @@ QDF_STATUS ucfg_dp_sta_register_txrx_ops(struct wlan_objmgr_vdev *vdev)
 	txrx_ops.tx.tx_comp = dp_sta_notify_tx_comp_cb;
 	txrx_ops.tx.tx = NULL;
 	txrx_ops.get_tsf_time = wlan_dp_get_tsf_time;
-	cdp_vdev_register(soc, dp_intf->intf_id, (ol_osif_vdev_handle)dp_intf,
+	cdp_vdev_register(soc, dp_link->link_id, (ol_osif_vdev_handle)dp_link,
 			  &txrx_ops);
 	if (!txrx_ops.tx.tx) {
 		dp_err("vdev register fail");
@@ -1120,7 +1118,7 @@ QDF_STATUS ucfg_dp_tdlsta_register_txrx_ops(struct wlan_objmgr_vdev *vdev)
 	txrx_ops.tx.tx_comp = dp_sta_notify_tx_comp_cb;
 	txrx_ops.tx.tx = NULL;
 
-	cdp_vdev_register(soc, dp_intf->intf_id, (ol_osif_vdev_handle)dp_intf,
+	cdp_vdev_register(soc, dp_link->link_id, (ol_osif_vdev_handle)dp_link,
 			  &txrx_ops);
 
 	if (!txrx_ops.tx.tx) {
@@ -1272,7 +1270,7 @@ QDF_STATUS ucfg_dp_start_xmit(qdf_nbuf_t nbuf, struct wlan_objmgr_vdev *vdev)
 
 	dp_intf = dp_link->dp_intf;
 	qdf_atomic_inc(&dp_intf->num_active_task);
-	status = dp_start_xmit(dp_intf, nbuf);
+	status = dp_start_xmit(dp_link, nbuf);
 	qdf_atomic_dec(&dp_intf->num_active_task);
 
 	return status;
@@ -1290,7 +1288,7 @@ QDF_STATUS ucfg_dp_rx_packet_cbk(struct wlan_objmgr_vdev *vdev, qdf_nbuf_t nbuf)
 	}
 
 	dp_intf = dp_link->dp_intf;
-	return dp_rx_packet_cbk(dp_intf, nbuf);
+	return dp_rx_packet_cbk(dp_link, nbuf);
 }
 
 void ucfg_dp_tx_timeout(struct wlan_objmgr_vdev *vdev)

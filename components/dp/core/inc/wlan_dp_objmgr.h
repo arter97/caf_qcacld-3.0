@@ -105,26 +105,26 @@ dp_psoc_get_priv(struct wlan_objmgr_psoc *psoc)
 }
 
 /**
- * dp_objmgr_get_vdev_by_user() - Get reference of vdev from dp_intf
+ * dp_objmgr_get_vdev_by_user() - Get reference of vdev from dp_link
  *  with user id
- * @dp_intf: dp dp_intf
+ * @dp_link: DP link handle
  * @dbgid: reference count dbg id
  *
  * Return: pointer to vdev object for success, NULL for failure
  */
 #ifdef WLAN_OBJMGR_REF_ID_TRACE
-#define dp_objmgr_get_vdev_by_user(dp_intf, dbgid) \
-	__dp_objmgr_get_vdev_by_user(dp_intf, dbgid, __func__, __LINE__)
+#define dp_objmgr_get_vdev_by_user(dp_link, dbgid) \
+	__dp_objmgr_get_vdev_by_user(dp_link, dbgid, __func__, __LINE__)
 struct wlan_objmgr_vdev *
-__dp_objmgr_get_vdev_by_user(struct wlan_dp_intf *dp_intf,
+__dp_objmgr_get_vdev_by_user(struct wlan_dp_link *dp_link,
 			     wlan_objmgr_ref_dbgid id,
 			     const char *func,
 			     int line);
 #else
-#define dp_objmgr_get_vdev_by_user(dp_intf, dbgid) \
-	__dp_objmgr_get_vdev_by_user(dp_intf, dbgid, __func__)
+#define dp_objmgr_get_vdev_by_user(dp_link, dbgid) \
+	__dp_objmgr_get_vdev_by_user(dp_link, dbgid, __func__)
 struct wlan_objmgr_vdev *
-__dp_objmgr_get_vdev_by_user(struct wlan_dp_intf *dp_intf,
+__dp_objmgr_get_vdev_by_user(struct wlan_dp_link *dp_link,
 			     wlan_objmgr_ref_dbgid id,
 			     const char *func);
 #endif

@@ -404,23 +404,24 @@ dp_tx_rx_collect_connectivity_stats_info(qdf_nbuf_t nbuf, void *context,
 
 /**
  * dp_get_transmit_mac_addr() - Get the mac address to validate the xmit
- * @dp_intf: DP interface
+ * @dp_link: DP link handle
  * @nbuf: The network buffer
  * @mac_addr_tx_allowed: The mac address to be filled
  *
  * Return: None
  */
 static
-void dp_get_transmit_mac_addr(struct wlan_dp_intf *dp_intf,
+void dp_get_transmit_mac_addr(struct wlan_dp_link *dp_link,
 			      qdf_nbuf_t nbuf,
 			      struct qdf_mac_addr *mac_addr_tx_allowed)
 {
+	struct wlan_dp_intf *dp_intf = dp_link->dp_intf;
 	bool is_mc_bc_addr = false;
 	enum nan_datapath_state state;
 
 	switch (dp_intf->device_mode) {
 	case QDF_NDI_MODE:
-		state = wlan_nan_get_ndi_state(dp_intf->vdev);
+		state = wlan_nan_get_ndi_state(dp_link->vdev);
 		if (state == NAN_DATA_NDI_CREATED_STATE ||
 		    state == NAN_DATA_CONNECTED_STATE ||
 		    state == NAN_DATA_CONNECTING_STATE ||
@@ -438,7 +439,7 @@ void dp_get_transmit_mac_addr(struct wlan_dp_intf *dp_intf,
 		break;
 	case QDF_STA_MODE:
 	case QDF_P2P_CLIENT_MODE:
-		if (wlan_cm_is_vdev_active(dp_intf->vdev))
+		if (wlan_cm_is_vdev_active(dp_link->vdev))
 			qdf_copy_macaddr(mac_addr_tx_allowed,
 					 &dp_intf->conn_info.bssid);
 		break;
@@ -550,8 +551,9 @@ void wlan_dp_pkt_add_timestamp(struct wlan_dp_intf *dp_intf,
 #endif
 
 QDF_STATUS
-dp_start_xmit(struct wlan_dp_intf *dp_intf, qdf_nbuf_t nbuf)
+dp_start_xmit(struct wlan_dp_link *dp_link, qdf_nbuf_t nbuf)
 {
+	struct wlan_dp_intf *dp_intf = dp_link->dp_intf;
 	struct wlan_dp_psoc_context *dp_ctx = dp_intf->dp_ctx;
 	struct dp_tx_rx_stats *stats;
 	void *soc = cds_get_context(QDF_MODULE_ID_SOC);
@@ -619,7 +621,7 @@ dp_start_xmit(struct wlan_dp_intf *dp_intf, qdf_nbuf_t nbuf)
 							 PKT_TYPE_REQ,
 							 &pkt_type);
 
-	dp_get_transmit_mac_addr(dp_intf, nbuf, &mac_addr_tx_allowed);
+	dp_get_transmit_mac_addr(dp_link, nbuf, &mac_addr_tx_allowed);
 	if (qdf_is_macaddr_zero(&mac_addr_tx_allowed)) {
 		dp_info_rl("tx not allowed, transmit operation suspended");
 		goto drop_pkt;
@@ -773,7 +775,8 @@ void dp_tx_timeout(struct wlan_dp_intf *dp_intf)
 
 void dp_sta_notify_tx_comp_cb(qdf_nbuf_t nbuf, void *ctx, uint16_t flag)
 {
-	struct wlan_dp_intf *dp_intf = ctx;
+	struct wlan_dp_link *dp_link = ctx;
+	struct wlan_dp_intf *dp_intf = dp_link->dp_intf;
 	enum qdf_proto_subtype subtype;
 	struct qdf_mac_addr *dest_mac_addr;
 	QDF_STATUS status;
@@ -812,10 +815,10 @@ void dp_sta_notify_tx_comp_cb(qdf_nbuf_t nbuf, void *ctx, uint16_t flag)
 	}
 
 	/* Since it is TDLS call took TDLS vdev ref*/
-	status = wlan_objmgr_vdev_try_get_ref(dp_intf->vdev, WLAN_TDLS_SB_ID);
+	status = wlan_objmgr_vdev_try_get_ref(dp_link->vdev, WLAN_TDLS_SB_ID);
 	if (QDF_IS_STATUS_SUCCESS(status)) {
-		wlan_tdls_update_tx_pkt_cnt(dp_intf->vdev, dest_mac_addr);
-		wlan_objmgr_vdev_release_ref(dp_intf->vdev, WLAN_TDLS_SB_ID);
+		wlan_tdls_update_tx_pkt_cnt(dp_link->vdev, dest_mac_addr);
+		wlan_objmgr_vdev_release_ref(dp_link->vdev, WLAN_TDLS_SB_ID);
 	}
 }
 
@@ -1563,9 +1566,10 @@ dp_is_gratuitous_arp_unsolicited_na(struct wlan_dp_psoc_context *dp_ctx,
 	return false;
 }
 
-QDF_STATUS dp_rx_flush_packet_cbk(void *dp_intf_context, uint8_t intf_id)
+QDF_STATUS dp_rx_flush_packet_cbk(void *dp_link_context, uint8_t link_id)
 {
-	struct wlan_dp_intf *dp_intf = (struct wlan_dp_intf *)dp_intf_context;
+	struct wlan_dp_link *dp_link = (struct wlan_dp_link *)dp_link_context;
+	struct wlan_dp_intf *dp_intf = dp_link->dp_intf;
 	struct wlan_dp_psoc_context *dp_ctx;
 	ol_txrx_soc_handle soc = cds_get_context(QDF_MODULE_ID_SOC);
 
@@ -1580,10 +1584,10 @@ QDF_STATUS dp_rx_flush_packet_cbk(void *dp_intf_context, uint8_t intf_id)
 
 	/* do fisa flush for this vdev */
 	if (wlan_dp_cfg_is_rx_fisa_enabled(&dp_ctx->dp_cfg))
-		wlan_dp_rx_fisa_flush_by_vdev_id((struct dp_soc *)soc, intf_id);
+		wlan_dp_rx_fisa_flush_by_vdev_id((struct dp_soc *)soc, link_id);
 
 	if (dp_ctx->enable_dp_rx_threads)
-		dp_txrx_flush_pkts_by_vdev_id(soc, intf_id);
+		dp_txrx_flush_pkts_by_vdev_id(soc, link_id);
 
 	qdf_atomic_dec(&dp_intf->num_active_task);
 
@@ -1610,10 +1614,11 @@ QDF_STATUS wlan_dp_rx_fisa_flush_by_vdev_id(void *dp_soc, uint8_t vdev_id)
 }
 #endif
 
-QDF_STATUS dp_rx_packet_cbk(void *dp_intf_context,
+QDF_STATUS dp_rx_packet_cbk(void *dp_link_context,
 			    qdf_nbuf_t rxBuf)
 {
 	struct wlan_dp_intf *dp_intf = NULL;
+	struct wlan_dp_link *dp_link = NULL;
 	struct wlan_dp_psoc_context *dp_ctx = NULL;
 	QDF_STATUS qdf_status = QDF_STATUS_E_FAILURE;
 	qdf_nbuf_t nbuf = NULL;
@@ -1630,12 +1635,13 @@ QDF_STATUS dp_rx_packet_cbk(void *dp_intf_context,
 	uint8_t pkt_type;
 
 	/* Sanity check on inputs */
-	if (qdf_unlikely((!dp_intf_context) || (!rxBuf))) {
+	if (qdf_unlikely((!dp_link_context) || (!rxBuf))) {
 		dp_err("Null params being passed");
 		return QDF_STATUS_E_FAILURE;
 	}
 
-	dp_intf = (struct wlan_dp_intf *)dp_intf_context;
+	dp_link = (struct wlan_dp_link *)dp_link_context;
+	dp_intf = dp_link->dp_intf;
 	dp_ctx = dp_intf->dp_ctx;
 
 	cpu_index = qdf_get_cpu();
@@ -1727,12 +1733,12 @@ QDF_STATUS dp_rx_packet_cbk(void *dp_intf_context,
 		mac_addr = (struct qdf_mac_addr *)(qdf_nbuf_data(nbuf) +
 						   QDF_NBUF_SRC_MAC_OFFSET);
 
-		status = wlan_objmgr_vdev_try_get_ref(dp_intf->vdev,
+		status = wlan_objmgr_vdev_try_get_ref(dp_link->vdev,
 						      WLAN_TDLS_SB_ID);
 		if (QDF_IS_STATUS_SUCCESS(status)) {
-			wlan_tdls_update_rx_pkt_cnt(dp_intf->vdev, mac_addr,
+			wlan_tdls_update_rx_pkt_cnt(dp_link->vdev, mac_addr,
 						    dest_mac_addr);
-			wlan_objmgr_vdev_release_ref(dp_intf->vdev,
+			wlan_objmgr_vdev_release_ref(dp_link->vdev,
 						     WLAN_TDLS_SB_ID);
 		}
 

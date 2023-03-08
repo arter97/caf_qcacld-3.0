@@ -774,8 +774,7 @@ static inline bool dp_nbuf_dst_addr_is_mld_addr(struct wlan_dp_intf *dp_intf,
 {
 	struct qdf_mac_addr *mld_addr;
 
-	mld_addr = (struct qdf_mac_addr *)
-		wlan_vdev_mlme_get_mldaddr(dp_intf->vdev);
+	mld_addr = (struct qdf_mac_addr *)&dp_intf->mac_addr;
 
 	if (!qdf_is_macaddr_zero(mld_addr) &&
 	    !qdf_mem_cmp(mld_addr->bytes,

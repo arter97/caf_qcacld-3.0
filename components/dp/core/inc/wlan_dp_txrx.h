@@ -148,8 +148,8 @@ int dp_softap_inspect_dhcp_packet(struct wlan_dp_intf *dp_intf,
 
 /**
  * dp_rx_flush_packet_cbk() - flush rx packet handler
- * @dp_intf_ctx: pointer to DP interface context
- * @vdev_id: vdev_id of the packets to be flushed
+ * @dp_link_context: pointer to DP link context
+ * @link_id: vdev_id of the packets to be flushed
  *
  * Flush rx packet callback registered with data path. DP will call this to
  * notify when packets for a particular vdev is to be flushed out.
@@ -157,7 +157,7 @@ int dp_softap_inspect_dhcp_packet(struct wlan_dp_intf *dp_intf,
  * Return: QDF_STATUS_E_FAILURE if any errors encountered,
  *	   QDF_STATUS_SUCCESS otherwise
  */
-QDF_STATUS dp_rx_flush_packet_cbk(void *dp_intf_ctx, uint8_t vdev_id);
+QDF_STATUS dp_rx_flush_packet_cbk(void *dp_link_context, uint8_t link_id);
 
 /**
  * dp_softap_start_xmit() - Transmit a frame for SAP interface
@@ -198,12 +198,12 @@ dp_softap_rx_packet_cbk(void *intf_ctx, qdf_nbuf_t rx_buf);
 /**
  * dp_start_xmit() - Transmit a frame for STA interface
  * @nbuf: pointer to Network buffer
- * @dp_intf: DP interface
+ * @dp_link: DP link handle
  *
  * Return: QDF_STATUS_SUCCESS on successful transmission
  */
 QDF_STATUS
-dp_start_xmit(struct wlan_dp_intf *dp_intf, qdf_nbuf_t nbuf);
+dp_start_xmit(struct wlan_dp_link *dp_link, qdf_nbuf_t nbuf);
 
 /**
  * dp_tx_timeout() - DP Tx timeout API
@@ -217,7 +217,7 @@ void dp_tx_timeout(struct wlan_dp_intf *dp_intf);
 
 /**
  * dp_rx_packet_cbk() - Receive packet handler
- * @dp_intf_context: pointer to DP interface context
+ * @dp_link_context: pointer to DP link context
  * @rx_buf: pointer to rx qdf_nbuf
  *
  * Receive callback registered with data path.  DP will call this to notify
@@ -227,7 +227,7 @@ void dp_tx_timeout(struct wlan_dp_intf *dp_intf);
  * Return: QDF_STATUS_E_FAILURE if any errors encountered,
  *	   QDF_STATUS_SUCCESS otherwise
  */
-QDF_STATUS dp_rx_packet_cbk(void *dp_intf_context, qdf_nbuf_t rx_buf);
+QDF_STATUS dp_rx_packet_cbk(void *dp_link_context, qdf_nbuf_t rx_buf);
 
 #if defined(WLAN_SUPPORT_RX_FISA)
 /**
@@ -495,7 +495,7 @@ void dp_get_tx_resource(struct wlan_dp_intf *dp_intf,
 
 /**
  * dp_start_xmit() - Transmit a frame
- * @dp_intf: pointer to DP interface
+ * @dp_link: DP link handle
  * @nbuf: n/w buffer
  *
  * Function called to Transmit a n/w buffer in STA mode.
@@ -503,7 +503,7 @@ void dp_get_tx_resource(struct wlan_dp_intf *dp_intf,
  * Return: Status of the transmission
  */
 QDF_STATUS
-dp_start_xmit(struct wlan_dp_intf *dp_intf, qdf_nbuf_t nbuf);
+dp_start_xmit(struct wlan_dp_link *dp_link, qdf_nbuf_t nbuf);
 
 #ifdef FEATURE_MONITOR_MODE_SUPPORT
 /**

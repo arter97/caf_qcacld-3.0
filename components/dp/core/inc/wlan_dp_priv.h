@@ -574,8 +574,6 @@ struct dp_rx_fst {
  * @device_mode: Device Mode
  * @intf_id: Interface ID
  * @node: list node for membership in the interface list
- * @vdev: object manager vdev context
- * @vdev_lock: vdev spin lock
  * @dev: netdev reference
  * @txrx_ops: Interface tx-rx ops
  * @dp_stats: Device TX/RX statistics
@@ -631,8 +629,6 @@ struct wlan_dp_intf {
 
 	qdf_list_node_t node;
 
-	struct wlan_objmgr_vdev *vdev;
-	qdf_spinlock_t vdev_lock;
 	qdf_netdev_t dev;
 	struct ol_txrx_ops txrx_ops;
 	struct dp_stats dp_stats;
@@ -690,12 +686,16 @@ struct wlan_dp_intf {
  * @link_id: ID for this DP link (Same as vdev_id)
  * @mac_addr: mac address of this link
  * @dp_intf: Parent DP interface for this DP link
+ * @vdev: object manager vdev context
+ * @vdev_lock: vdev spin lock
  */
 struct wlan_dp_link {
 	qdf_list_node_t node;
 	uint8_t link_id;
 	struct qdf_mac_addr mac_addr;
 	struct wlan_dp_intf *dp_intf;
+	struct wlan_objmgr_vdev *vdev;
+	qdf_spinlock_t vdev_lock;
 };
 
 /**

@@ -146,7 +146,7 @@ static void dp_nud_stats_info(struct wlan_dp_intf *dp_intf)
 	struct wlan_dp_psoc_callbacks *cb = &dp_intf->dp_ctx->dp_ops;
 	uint32_t pause_map;
 
-	vdev = dp_objmgr_get_vdev_by_user(dp_intf, WLAN_DP_ID);
+	vdev = dp_objmgr_get_vdev_by_user(dp_intf->def_link, WLAN_DP_ID);
 	if (!vdev) {
 		return;
 	}
@@ -216,7 +216,7 @@ static bool dp_nud_honour_failure(struct wlan_dp_intf *dp_intf)
 	uint8_t bssid[QDF_MAC_ADDR_SIZE];
 	bool ap_is_gateway;
 
-	vdev = dp_objmgr_get_vdev_by_user(dp_intf, WLAN_DP_ID);
+	vdev = dp_objmgr_get_vdev_by_user(dp_intf->def_link, WLAN_DP_ID);
 	if (!vdev)
 		goto fail;
 	wlan_vdev_mgr_get_param_bssid(vdev, bssid);
@@ -386,7 +386,7 @@ static void dp_nud_filter_netevent(struct qdf_mac_addr *netdev_addr,
 		return;
 	}
 
-	vdev = dp_objmgr_get_vdev_by_user(dp_intf, WLAN_DP_ID);
+	vdev = dp_objmgr_get_vdev_by_user(dp_intf->def_link, WLAN_DP_ID);
 	if (!vdev)
 		return;
 
