@@ -859,6 +859,8 @@ QDF_STATUS wlan_mlo_mgr_vdev_created_notification(struct wlan_objmgr_vdev *vdev,
 		  QDF_MAC_ADDR_REF(mld_addr->bytes));
 	status = mlo_dev_ctx_init(vdev);
 
+	wlan_vdev_set_link_id(vdev, WLAN_LINK_ID_INVALID);
+
 	return status;
 }
 

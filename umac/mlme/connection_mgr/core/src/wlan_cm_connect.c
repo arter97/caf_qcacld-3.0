@@ -35,6 +35,9 @@
 #include "wlan_t2lm_api.h"
 #endif
 #include <wlan_utility.h>
+#ifdef WLAN_FEATURE_11BE_MLO
+#include <wlan_mlo_mgr_peer.h>
+#endif
 #include <wlan_mlo_mgr_sta.h>
 #include "wlan_mlo_mgr_op.h"
 #include <wlan_objmgr_vdev_obj.h>
@@ -2351,6 +2354,8 @@ cm_clear_vdev_mlo_cap(struct wlan_objmgr_vdev *vdev)
 	 */
 	if (!wlan_vdev_mlme_is_mlo_link_vdev(vdev))
 		ucfg_mlo_mld_clear_mlo_cap(vdev);
+
+	wlan_vdev_set_link_id(vdev, WLAN_LINK_ID_INVALID);
 }
 #endif /*WLAN_FEATURE_11BE_MLO_ADV_FEATURE*/
 #else /*WLAN_FEATURE_11BE_MLO*/
