@@ -1811,8 +1811,8 @@ static void wma_process_cli_set_cmd(tp_wma_handle wma,
 					      privcmd->param_value);
 			break;
 		default:
-			wma_debug("Invalid wma_cli_set vdev command/Not yet implemented 0x%x",
-				 privcmd->param_id);
+			wma_debug("vdev cmd is not part vdev_cli_config 0x%x",
+				  privcmd->param_id);
 			break;
 		}
 	} else if (2 == privcmd->param_vp_dev) {

@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -670,5 +670,41 @@ void hdd_check_and_update_nss(struct hdd_context *hdd_ctx,
 void wlan_hdd_register_cp_stats_cb(struct hdd_context *hdd_ctx);
 #else
 static inline void wlan_hdd_register_cp_stats_cb(struct hdd_context *hdd_ctx) {}
+#endif
+
+#if defined(WLAN_FEATURE_ROAM_OFFLOAD) && defined(WLAN_FEATURE_ROAM_INFO_STATS)
+#define FEATURE_ROAM_STATS_COMMANDS	\
+	{	\
+	.info.vendor_id = QCA_NL80211_VENDOR_ID,	\
+	.info.subcmd = QCA_NL80211_VENDOR_SUBCMD_ROAM_STATS,	\
+	.flags = WIPHY_VENDOR_CMD_NEED_WDEV |	\
+		 WIPHY_VENDOR_CMD_NEED_NETDEV |	\
+		 WIPHY_VENDOR_CMD_NEED_RUNNING,	\
+	.doit = wlan_hdd_cfg80211_get_roam_stats,	\
+	vendor_command_policy(VENDOR_CMD_RAW_DATA, 0)	\
+	},	\
+
+#define FEATURE_ROAM_STATS_EVENTS	\
+	[QCA_NL80211_VENDOR_SUBCMD_ROAM_STATS_INDEX] = {	\
+		.vendor_id = QCA_NL80211_VENDOR_ID,	\
+		.subcmd = QCA_NL80211_VENDOR_SUBCMD_ROAM_STATS,	\
+	},	\
+
+/**
+ * wlan_hdd_cfg80211_get_roam_stats() - get roam statstics information
+ * @wiphy: wiphy pointer
+ * @wdev: pointer to struct wireless_dev
+ * @data: pointer to incoming NL vendor data
+ * @data_len: length of @data
+ *
+ * Return: 0 on success; error number otherwise.
+ */
+int wlan_hdd_cfg80211_get_roam_stats(struct wiphy *wiphy,
+				     struct wireless_dev *wdev,
+				     const void *data,
+				     int data_len);
+#else
+#define FEATURE_ROAM_STATS_COMMANDS
+#define FEATURE_ROAM_STATS_EVENTS
 #endif
 #endif /* end #if !defined(WLAN_HDD_STATS_H) */

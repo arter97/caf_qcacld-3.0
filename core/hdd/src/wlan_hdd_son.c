@@ -1327,7 +1327,7 @@ static int hdd_son_add_acl_mac(struct wlan_objmgr_vdev *vdev,
 	}
 	qdf_status = wlansap_modify_acl(WLAN_HDD_GET_SAP_CTX_PTR(adapter),
 					acl_mac->bytes, list_type,
-					ADD_STA_TO_ACL);
+					ADD_STA_TO_ACL_NO_DEAUTH);
 	if (QDF_IS_STATUS_ERROR(qdf_status)) {
 		hdd_err("Modify ACL failed");
 		return -EIO;
@@ -1383,7 +1383,7 @@ static int hdd_son_del_acl_mac(struct wlan_objmgr_vdev *vdev,
 		return -EINVAL;
 	}
 	qdf_status = wlansap_modify_acl(sap_ctx, acl_mac->bytes, list_type,
-					DELETE_STA_FROM_ACL);
+					DELETE_STA_FROM_ACL_NO_DEAUTH);
 	if (QDF_IS_STATUS_ERROR(qdf_status)) {
 		hdd_err("Modify ACL failed");
 		return -EIO;
@@ -2353,8 +2353,40 @@ static QDF_STATUS hdd_son_get_node_info_sta(struct wlan_objmgr_vdev *vdev,
 	sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter);
 	node_info->tx_bitrate = cfg80211_calculate_bitrate(
 			&sta_ctx->cache_conn_info.max_tx_bitrate);
+	/* convert to Mbps */
+	node_info->tx_bitrate = qdf_do_div(node_info->tx_bitrate, 10);
 	hdd_debug("tx_bitrate %u", node_info->tx_bitrate);
 	return QDF_STATUS_SUCCESS;
+}
+
+/**
+ * hdd_son_get_peer_tx_rate() - Get peer tx rate from FW
+ * @vdev: pointer to object mgr vdev
+ * @peer_macaddr: peer mac address
+ *
+ * Return: tx rate in Kbps
+ */
+static uint32_t hdd_son_get_peer_tx_rate(struct wlan_objmgr_vdev *vdev,
+					 uint8_t *peer_macaddr)
+{
+	uint32_t tx_rate = 0;
+	struct stats_event *stats;
+	int retval = 0;
+
+	stats = wlan_cfg80211_mc_cp_stats_get_peer_stats(vdev,
+							 peer_macaddr,
+							 &retval);
+	if (retval || !stats) {
+		if (stats)
+			wlan_cfg80211_mc_cp_stats_free_stats_event(stats);
+		hdd_err("Unable to get peer tx rate from fw");
+		return tx_rate;
+	}
+
+	tx_rate = stats->peer_stats_info_ext->tx_rate;
+	wlan_cfg80211_mc_cp_stats_free_stats_event(stats);
+
+	return tx_rate;
 }
 
 static QDF_STATUS hdd_son_get_node_info_sap(struct wlan_objmgr_vdev *vdev,
@@ -2378,6 +2410,9 @@ static QDF_STATUS hdd_son_get_node_info_sap(struct wlan_objmgr_vdev *vdev,
 		return QDF_STATUS_E_FAILURE;
 	}
 
+	node_info->tx_bitrate = hdd_son_get_peer_tx_rate(vdev, mac_addr);
+	/* convert it to Mbps */
+	node_info->tx_bitrate = qdf_do_div(node_info->tx_bitrate, 1000);
 	node_info->max_chwidth =
 			hdd_chan_width_to_son_chwidth(sta_info->ch_width);
 	node_info->num_streams = sta_info->nss;

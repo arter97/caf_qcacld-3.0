@@ -1912,6 +1912,7 @@ static const struct nl80211_vendor_cmd_info wlan_hdd_cfg80211_vendor_events[] = 
 	},
 #endif
 	FEATURE_GREEN_AP_LOW_LATENCY_PWR_SAVE_EVENT
+	FEATURE_ROAM_STATS_EVENTS
 };
 
 /**
@@ -3574,7 +3575,7 @@ static void hdd_remove_passive_dfs_acs_channel_for_ll_sap(
 	uint32_t i, ch_cnt = 0;
 	uint32_t freq = 0;
 
-	if (!policy_mgr_is_ll_sap_present(psoc, curr_mode, vdev_id))
+	if (!policy_mgr_is_vdev_ll_sap(psoc, curr_mode, vdev_id))
 		return;
 
 	for (i = 0; i < sap_config->acs_cfg.ch_list_count; i++) {
@@ -3900,8 +3901,8 @@ static int __wlan_hdd_cfg80211_do_acs(struct wiphy *wiphy,
 		if (!sap_config->acs_cfg.ch_list_count &&
 		    sap_config->acs_cfg.master_ch_list_count &&
 		    !is_vendor_unsafe_ch_present &&
-		    !policy_mgr_is_ll_sap_present(hdd_ctx->psoc, pm_mode,
-						  adapter->vdev_id))
+		    !policy_mgr_is_vdev_ll_sap(hdd_ctx->psoc, pm_mode,
+					       adapter->vdev_id))
 			wlan_hdd_handle_zero_acs_list(
 				hdd_ctx,
 				sap_config->acs_cfg.freq_list,
@@ -18892,6 +18893,7 @@ const struct wiphy_vendor_command hdd_wiphy_vendor_commands[] = {
 			      QCA_WLAN_VENDOR_ATTR_ROAM_EVENTS_MAX)
 	},
 #endif
+	FEATURE_ROAM_STATS_COMMANDS
 	FEATURE_WIFI_POS_11AZ_AUTH_COMMANDS
 	FEATURE_WIFI_POS_SET_SECURE_RANGING_CONTEXT_COMMANDS
 	FEATURE_MCC_QUOTA_VENDOR_COMMANDS
@@ -25865,11 +25867,14 @@ static int __wlan_hdd_cfg80211_get_channel(struct wiphy *wiphy,
 	if (!vdev)
 		return -EINVAL;
 
-	vdev_id = wlan_vdev_get_id(vdev);
-	link_adapter = hdd_get_adapter_by_vdev(hdd_ctx, vdev_id);
-	if (link_adapter && !hdd_cm_is_vdev_associated(link_adapter)) {
-		wlan_key_put_link_vdev(vdev, WLAN_OSIF_ID);
-		return -EBUSY;
+	if (adapter->device_mode == QDF_STA_MODE) {
+		vdev_id = wlan_vdev_get_id(vdev);
+		link_adapter = hdd_get_adapter_by_vdev(hdd_ctx, vdev_id);
+		if (link_adapter &&
+		    !hdd_cm_is_vdev_associated(link_adapter)) {
+			wlan_key_put_link_vdev(vdev, WLAN_OSIF_ID);
+			return -EBUSY;
+		}
 	}
 
 	chan_freq = vdev->vdev_mlme.des_chan->ch_freq;

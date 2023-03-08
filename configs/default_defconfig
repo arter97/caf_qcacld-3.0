@@ -331,6 +331,13 @@ else
 	CONFIG_QCACLD_WLAN_LFR2 := y
 endif
 
+#Flag to enable Roam stats feature
+ifeq ($(CONFIG_BERYLLIUM), y)
+ifeq (y,$(filter y,$(CONFIG_QCACLD_WLAN_LFR3)))
+       CONFIG_WLAN_FEATURE_ROAM_INFO_STATS := y
+endif
+endif
+
 #Flag to enable Dynamic MAC address update
 CONFIG_WLAN_FEATURE_DYNAMIC_MAC_ADDR_UPDATE := y
 
@@ -1035,6 +1042,7 @@ CONFIG_IPA_OFFLOAD := y
 endif
 else
 CONFIG_IPA_OFFLOAD := n
+CONFIG_IPA_OPT_WIFI_DP := n
 endif
 
 #Flag to enable SMMU S1 support
@@ -1100,6 +1108,13 @@ CONFIG_ENABLE_SMMU_S1_TRANSLATION := y
 CONFIG_SMMU_S1_UNMAP := y
 endif
 CONFIG_WLAN_TSF_UPLINK_DELAY := y
+endif
+
+ifeq ($(CONFIG_ARCH_KALAMA), y)
+ifeq ($(CONFIG_IPA_OFFLOAD), y)
+CONFIG_ENABLE_SMMU_S1_TRANSLATION := y
+CONFIG_SMMU_S1_UNMAP := y
+endif
 endif
 
 ifeq ($(CONFIG_ARCH_SDX20), y)
@@ -1177,6 +1192,9 @@ CONFIG_WLAN_BCN_RECV_FEATURE := y
 
 #Flag to enable LTE COEX feature
 CONFIG_LTE_COEX := y
+
+#Flag to enable delayed peer obj free
+CONFIG_FEATURE_DELAYED_PEER_OBJ_DESTROY := y
 
 #Flag to enable/disable TARGET 11d scan
 CONFIG_TARGET_11D_SCAN := y
