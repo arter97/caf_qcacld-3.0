@@ -996,6 +996,7 @@ struct cdp_me_ops {
  *                                           in monitor pdev
  * @txrx_update_pdev_mon_telemetry_airtime_stats: update telemetry airtime
  *                                                stats in monitor pdev
+ * @txrx_cfr_filter: Handler to configure host rx monitor status ring
  */
 struct cdp_mon_ops {
 
@@ -1072,6 +1073,14 @@ struct cdp_mon_ops {
 	QDF_STATUS (*txrx_update_pdev_mon_telemetry_airtime_stats)
 		(struct cdp_soc_t *soc,
 		 uint8_t pdev_id);
+#endif
+
+#if defined(WLAN_CFR_ENABLE) && defined(WLAN_ENH_CFR_ENABLE)
+	void (*txrx_cfr_filter)(struct cdp_soc_t *soc_hdl,
+				uint8_t pdev_id,
+				bool enable,
+				struct cdp_monitor_filter *filter_val,
+				bool cfr_enable_monitor_mode);
 #endif
 };
 
@@ -2241,18 +2250,12 @@ struct cdp_rx_offld_ops {
 #if defined(WLAN_CFR_ENABLE) && defined(WLAN_ENH_CFR_ENABLE)
 /**
  * struct cdp_cfr_ops - host cfr ops
- * @txrx_cfr_filter: Handler to configure host rx monitor status ring
  * @txrx_get_cfr_rcc: Handler to get CFR mode
  * @txrx_set_cfr_rcc: Handler to enable/disable CFR mode
  * @txrx_get_cfr_dbg_stats: Handler to get debug statistics for CFR mode
  * @txrx_clear_cfr_dbg_stats: Handler to clear debug statistics for CFR mode
  */
 struct cdp_cfr_ops {
-	void (*txrx_cfr_filter)(struct cdp_soc_t *soc_hdl,
-				uint8_t pdev_id,
-				bool enable,
-				struct cdp_monitor_filter *filter_val,
-				bool cfr_enable_monitor_mode);
 	bool (*txrx_get_cfr_rcc)(struct cdp_soc_t *soc_hdl,
 				 uint8_t pdev_id);
 	void (*txrx_set_cfr_rcc)(struct cdp_soc_t *soc_hdl,
