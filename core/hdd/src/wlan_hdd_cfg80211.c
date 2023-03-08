@@ -9686,14 +9686,14 @@ hdd_latency_level_event_handler_cb(const struct latency_level_data *event_data,
 
 	hdd_enter();
 
+	if (wlan_hdd_validate_context(hdd_ctx))
+		return;
+
 	hdd_adapter = hdd_get_adapter_by_vdev(hdd_ctx, vdev_id);
 	if (!hdd_adapter) {
 		hdd_err("adapter is NULL vdev_id = %d", vdev_id);
 		return;
 	}
-
-	if (wlan_hdd_validate_context(hdd_ctx))
-		return;
 
 	if (!event_data) {
 		hdd_err("Invalid latency level event data");
@@ -20061,12 +20061,17 @@ int wlan_hdd_cfg80211_register_frames(struct hdd_adapter *adapter)
 	mac_handle_t mac_handle = hdd_adapter_get_mac_handle(adapter);
 	/* Register for all P2P action, public action etc frames */
 	uint16_t type = (SIR_MAC_MGMT_FRAME << 2) | (SIR_MAC_MGMT_ACTION << 4);
-	QDF_STATUS status;
+	QDF_STATUS status = QDF_STATUS_E_INVAL;
 
 	hdd_enter();
 	if (adapter->device_mode == QDF_FTM_MODE) {
 		hdd_info("No need to register frames in FTM mode");
 		return 0;
+	}
+
+	if (!mac_handle) {
+		hdd_err("mac_handle is NULL, failed to register frames");
+		goto ret_status;
 	}
 
 	/* Register frame indication call back */
@@ -20169,6 +20174,11 @@ void wlan_hdd_cfg80211_deregister_frames(struct hdd_adapter *adapter)
 	uint16_t type = (SIR_MAC_MGMT_FRAME << 2) | (SIR_MAC_MGMT_ACTION << 4);
 
 	hdd_enter();
+
+	if (!mac_handle) {
+		hdd_err("mac_handle is NULL, failed to deregister frames");
+		return;
+	}
 
 	/* Right now we are registering these frame when driver is getting
 	 * initialized. Once we will move to 2.6.37 kernel, in which we have
