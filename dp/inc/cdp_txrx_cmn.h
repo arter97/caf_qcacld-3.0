@@ -1864,6 +1864,28 @@ static inline void cdp_txrx_umac_reset_deinit(ol_txrx_soc_handle soc)
 }
 
 /**
+ * cdp_notify_asserted_soc(): function to notify asserted SoC
+ * @soc: soc handle
+ *
+ * Return: QDF_STATUS
+ */
+static inline QDF_STATUS
+cdp_notify_asserted_soc(ol_txrx_soc_handle soc)
+{
+	if (!soc || !soc->ops) {
+		dp_cdp_debug("Invalid Instance:");
+		QDF_BUG(0);
+		return QDF_STATUS_E_NULL_VALUE;
+	}
+
+	if (!soc->ops->cmn_drv_ops ||
+	    !soc->ops->cmn_drv_ops->notify_asserted_soc)
+		return QDF_STATUS_E_NULL_VALUE;
+
+	return soc->ops->cmn_drv_ops->notify_asserted_soc(soc);
+}
+
+/**
  * cdp_display_stats(): function to map to dump stats
  * @soc: soc handle
  * @value: statistics option
