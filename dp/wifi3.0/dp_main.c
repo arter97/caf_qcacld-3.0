@@ -12143,6 +12143,26 @@ fail0:
 }
 
 /**
+ * dp_soc_notify_asserted_soc() - API to notify asserted soc info
+ * @psoc: CDP soc handle
+ *
+ * Return: QDF_STATUS
+ */
+static QDF_STATUS dp_soc_notify_asserted_soc(struct cdp_soc_t *psoc)
+{
+	struct dp_soc *soc =
+		(struct dp_soc *)psoc;
+	QDF_STATUS status = QDF_STATUS_SUCCESS;
+
+	if (!soc) {
+		dp_cdp_err("%pK: soc is NULL", soc);
+		return QDF_STATUS_E_INVAL;
+	}
+
+	return status;
+}
+
+/**
  * dp_txrx_dump_stats() -  Dump statistics
  * @psoc: CDP soc handle
  * @value: Statistics option
@@ -14215,6 +14235,7 @@ static struct cdp_cmn_ops dp_ops_cmn = {
 	.txrx_stats_request = dp_txrx_stats_request,
 	.txrx_get_peer_mac_from_peer_id = dp_get_peer_mac_from_peer_id,
 	.display_stats = dp_txrx_dump_stats,
+	.notify_asserted_soc = dp_soc_notify_asserted_soc,
 	.txrx_intr_attach = dp_soc_interrupt_attach_wrapper,
 	.txrx_intr_detach = dp_soc_interrupt_detach,
 	.txrx_ppeds_stop = dp_soc_ppeds_stop,
