@@ -486,7 +486,7 @@ QDF_STATUS htt_h2t_rx_cce_super_rule_setup(struct htt_soc *soc, void *param)
 	qdf_nbuf_t msg;
 	uint32_t *msg_word;
 	uint8_t *htt_logger_bufp;
-	uint8_t ver = 0;
+	uint16_t ver = 0;
 	uint8_t i, j, valid = 0;
 	uint8_t num_filters = flt_params->num_filters;
 	uint8_t pdev_id = flt_params->pdev_id;
