@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2013-2018 The Linux Foundation. All rights reserved.
+* Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -915,7 +916,7 @@ wma_fill_tx_stats(struct sir_wifi_ll_ext_stats *ll_stats,
 
 	num_entries = fix_param->num_peer_ac_tx_stats * WLAN_MAX_AC;
 	if (num_entries > param_buf->num_tx_stats) {
-		wma_err("tx stats invalid arg, %d", num_entries);
+		WMA_LOGE(FL("tx stats invalid arg, %d"), num_entries);
 		return QDF_STATUS_E_FAILURE;
 	}
 
