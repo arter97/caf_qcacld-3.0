@@ -2795,11 +2795,9 @@ static void csr_roam_process_start_bss_success(struct mac_context *mac_ctx,
 	 */
 	if (opmode == QDF_SAP_MODE || opmode == QDF_P2P_GO_MODE) {
 		if (wlan_is_open_wep_cipher(mac_ctx->pdev, vdev_id)) {
-			/* NO keys. these key parameters don't matter */
 			csr_issue_set_context_req_helper(mac_ctx, vdev_id,
 							 &bcast_mac, false,
-							 false, eSIR_TX_RX,
-							 0, 0, NULL);
+							 false, 0);
 		}
 	}
 
@@ -3588,12 +3586,10 @@ static QDF_STATUS csr_roam_issue_set_context_req(struct mac_context *mac_ctx,
 
 QDF_STATUS
 csr_issue_set_context_req_helper(struct mac_context *mac_ctx,
-				 uint32_t session_id, tSirMacAddr *bssid,
-				 bool addkey, bool unicast,
-				 tAniKeyDirection key_direction, uint8_t key_id,
-				 uint16_t key_length, uint8_t *key)
+				 uint32_t vdev_id, tSirMacAddr *bssid,
+				 bool addkey, bool unicast, uint8_t key_id)
 {
-	return csr_roam_issue_set_context_req(mac_ctx, session_id, addkey,
+	return csr_roam_issue_set_context_req(mac_ctx, vdev_id, addkey,
 					      unicast, key_id,
 					      (struct qdf_mac_addr *)bssid);
 }
@@ -3985,10 +3981,9 @@ csr_roam_chk_lnk_assoc_ind(struct mac_context *mac_ctx, tSirSmeRsp *msg_ptr)
 
 	if (opmode == QDF_SAP_MODE || opmode == QDF_P2P_GO_MODE) {
 		if (wlan_is_open_wep_cipher(mac_ctx->pdev, sessionId)) {
-			/* NO keys... these key parameters don't matter. */
 			csr_issue_set_context_req_helper(mac_ctx, sessionId,
 					&roam_info->peerMac.bytes, false, true,
-					eSIR_TX_RX, 0, 0, NULL);
+					0);
 			roam_info->fAuthRequired = false;
 		} else {
 			roam_info->fAuthRequired = true;
