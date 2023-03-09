@@ -707,6 +707,8 @@ struct wlan_ipa_priv {
 #endif
 
 	qdf_event_t ipa_resource_comp;
+	qdf_event_t ipa_assoc_comp;
+	bool ipa_eapol_wait;
 
 	uint32_t wdi_version;
 	bool is_smmu_enabled;	/* IPA caps returned from ipa_wdi_init */
