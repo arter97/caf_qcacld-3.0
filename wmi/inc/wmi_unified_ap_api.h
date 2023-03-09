@@ -738,6 +738,20 @@ QDF_STATUS wmi_extract_mgmt_tx_compl_param(
 		wmi_unified_t wmi_handle, void *evt_buf,
 		wmi_host_mgmt_tx_compl_event *param);
 
+#ifdef QCA_MANUAL_TRIGGERED_ULOFDMA
+/**
+ * wmi_extract_ulofdma_trigger_feedback_event() - extract ulofdma trig feedback
+ * @wmi_handle: wmi handle
+ * @evt_buf: pointer to event buffer
+ * @feedback: Pointer to hold ulofdma trig feedback
+ *
+ * Return: QDF_STATUS_SUCCESS on success and QDF_STATUS_E_FAILURE for failure
+ */
+QDF_STATUS wmi_extract_ulofdma_trigger_feedback_event(
+		wmi_unified_t wmi_handle, void *evt_buf,
+		wmi_host_manual_ul_ofdma_trig_feedback_evt *feedback);
+#endif
+
 /**
  * wmi_extract_chan_info_event() - extract chan information from event
  * @wmi_handle: wmi handle
@@ -932,6 +946,33 @@ wmi_unified_txbf_sounding_trig_info_cmd_send(struct wmi_unified *wmi_handle,
 					     struct wmi_txbf_sounding_trig_param
 					     *sounding_params);
 #endif
+
+#ifdef QCA_MANUAL_TRIGGERED_ULOFDMA
+/**
+ * wmi_unified_config_trigger_ulofdma_su_cmd_send() - trig ulofdma for SU
+ * @wmi_handle: wmi handle
+ * @param: pointer to hold SU trigger ulofdma param
+ *
+ * Return: QDF_STATUS_SUCCESS on success and QDF_STATUS_E_FAILURE for failure
+ */
+QDF_STATUS wmi_unified_config_trigger_ulofdma_su_cmd_send(
+		wmi_unified_t wmi_hdl,
+		struct wmi_trigger_ul_ofdma_su_params
+		*param);
+
+/**
+ * wmi_unified_config_trigger_ulofdma_mu_cmd_send() - trig ulofdma for MU
+ * @wmi_handle: wmi handle
+ * @param: pointer to hold MU trigger ulofdma param
+ *
+ * Return: QDF_STATUS_SUCCESS on success and QDF_STATUS_E_FAILURE for failure
+ */
+QDF_STATUS wmi_unified_config_trigger_ulofdma_mu_cmd_send(
+		wmi_unified_t wmi_hdl,
+		struct wmi_trigger_ul_ofdma_mu_params
+		*param);
+#endif
+
 /**
  * wmi_unified_vdev_set_intra_bss_cmd_send() - Set inta bss params
  * @wmi_handle: wmi handle

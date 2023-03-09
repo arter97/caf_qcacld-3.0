@@ -2807,6 +2807,68 @@ static QDF_STATUS extract_mgmt_tx_compl_param_tlv(wmi_unified_t wmi_handle,
 	return QDF_STATUS_SUCCESS;
 }
 
+#ifdef QCA_MANUAL_TRIGGERED_ULOFDMA
+/**
+ * extract_ulofdma_trigger_feedback_event_tlv() - extract trigger feedback info
+ * @wmi_handle: wmi handle
+ * @evt_buf: event buffer
+ * @feedback: Pointer to hold ULOFDMA trigger feedback info
+ *
+ * Return: QDF_STATUS_SUCCESS for success or error code
+ */
+static QDF_STATUS
+extract_ulofdma_trigger_feedback_event_tlv(
+			wmi_unified_t wmi_handle,
+			void *evt_buf,
+			wmi_host_manual_ul_ofdma_trig_feedback_evt *feedback)
+{
+	WMI_MANUAL_UL_OFDMA_TRIG_FEEDBACK_EVENTID_param_tlvs *param_buf;
+	wmi_manual_ul_ofdma_trig_feedback_evt_fixed_param *ev;
+	wmi_mac_addr *ev_macaddr;
+	int i = 0;
+
+	param_buf = (WMI_MANUAL_UL_OFDMA_TRIG_FEEDBACK_EVENTID_param_tlvs *)
+						evt_buf;
+
+	ev = (wmi_manual_ul_ofdma_trig_feedback_evt_fixed_param *)
+						param_buf->fixed_param;
+
+	ev_macaddr = (wmi_mac_addr *)param_buf->peer_macaddr;
+
+	if (!ev || !ev_macaddr) {
+		wmi_err("Failed to allocmemory");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	if (param_buf->num_peer_macaddr > MAX_ULOFDMA_MU_PEER) {
+		wmi_err("invalid number of peer mac");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	feedback->vdev_id = ev->vdev_id;
+	feedback->trigger_type = ev->feedback_trig_type;
+	feedback->manual_trig_status = ev->manual_trig_status;
+	feedback->num_peer = param_buf->num_peer_macaddr;
+
+	if (feedback->trigger_type == WMI_HOST_ULOFDMA_SU_TRIGGER) {
+		feedback->u.su.curr_su_manual_trig =
+					ev->curr_su_manual_trig_count;
+		feedback->u.su.remaining_su_manual_trig =
+					ev->remaining_su_manual_trig;
+	} else if (feedback->trigger_type == WMI_HOST_ULOFDMA_MU_TRIGGER) {
+		feedback->u.mu.remaining_mu_trig_peers =
+					ev->remaining_mu_trig_peers;
+	}
+
+	for (i = 0; i < feedback->num_peer; ++i) {
+		WMI_MAC_ADDR_TO_CHAR_ARRAY(ev_macaddr, feedback->macaddr[i]);
+		ev_macaddr++;
+	}
+
+	return QDF_STATUS_SUCCESS;
+}
+#endif
+
 /**
  * extract_chan_info_event_tlv() - extract chan information from event
  * @wmi_handle: wmi handle
@@ -3765,6 +3827,131 @@ config_txbf_sounding_trig_info_cmd_tlv(wmi_unified_t wmi,
 }
 #endif
 
+#ifdef QCA_MANUAL_TRIGGERED_ULOFDMA
+/**
+ * trigger_ulofdma_su_cmd_tlv() - trigger SU ulofdma config command
+ * @wmi_handle: wmi handle
+ * @param: trigger SU ulofdma config
+ *
+ * Return: QDF_STATUS_SUCCESS for success or error code
+ */
+static QDF_STATUS
+trigger_ulofdma_su_cmd_tlv(wmi_unified_t wmi_handle,
+			   struct wmi_trigger_ul_ofdma_su_params *param)
+{
+	wmi_vdev_set_manual_su_trig_cmd_fixed_param *cmd;
+	wmi_buf_t buf;
+	QDF_STATUS retval;
+	uint32_t len = 0;
+	uint8_t *buf_ptr = 0;
+
+	len = sizeof(*cmd);
+	buf = wmi_buf_alloc(wmi_handle, len);
+	if (!buf) {
+		wmi_err("wmi_buf_alloc failed");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	buf_ptr = (uint8_t *)wmi_buf_data(buf);
+	cmd = (wmi_vdev_set_manual_su_trig_cmd_fixed_param *)buf_ptr;
+	WMITLV_SET_HDR(
+		&cmd->tlv_header,
+		WMITLV_TAG_STRUC_wmi_vdev_set_manual_su_trig_cmd_fixed_param,
+		WMITLV_GET_STRUCT_TLVLEN(
+		wmi_vdev_set_manual_su_trig_cmd_fixed_param));
+
+	cmd->vdev_id = param->vdev_id;
+	WMI_CHAR_ARRAY_TO_MAC_ADDR(param->macaddr, &cmd->peer_macaddr);
+
+	cmd->manual_trig_preferred_ac = param->preferred_ac;
+	cmd->num_su_manual_trig = param->num_trigger;
+	cmd->manual_trig_length = param->length;
+	cmd->manual_trig_mcs = param->mcs;
+	cmd->manual_trig_nss = param->nss;
+	cmd->manual_trig_target_rssi = param->rssi;
+
+	buf_ptr += sizeof(*cmd);
+
+	wmi_mtrace(WMI_VDEV_SET_ULOFDMA_MANUAL_SU_TRIG_CMDID, cmd->vdev_id, 0);
+	retval = wmi_unified_cmd_send(
+				wmi_handle, buf, len,
+				WMI_VDEV_SET_ULOFDMA_MANUAL_SU_TRIG_CMDID);
+
+	if (QDF_IS_STATUS_ERROR(retval)) {
+		wmi_err("WMI WMI_VDEV_SET_ULOFDMA_MANUAL_SU_TRIG_CMDID Failed");
+		wmi_buf_free(buf);
+	}
+
+	return retval;
+}
+
+/**
+ * trigger_ulofdma_mu_cmd_tlv() - trigger MU ulofdma config command
+ * @wmi_handle: wmi handle
+ * @param: trigger MU ulofdma config
+ *
+ * Return: QDF_STATUS_SUCCESS for success or error code
+ */
+static QDF_STATUS
+trigger_ulofdma_mu_cmd_tlv(wmi_unified_t wmi_handle,
+			   struct wmi_trigger_ul_ofdma_mu_params *param)
+{
+	wmi_vdev_set_manual_mu_trig_cmd_fixed_param *cmd;
+	wmi_mac_addr *peer_mac;
+	wmi_buf_t buf;
+	QDF_STATUS retval;
+	uint32_t len = 0;
+	uint8_t *buf_ptr = 0;
+	uint8_t i = 0;
+
+	len = sizeof(*cmd) + WMI_TLV_HDR_SIZE;
+	if (param->num_peer)
+		len += param->num_peer * sizeof(wmi_mac_addr);
+
+	buf = wmi_buf_alloc(wmi_handle, len);
+	if (!buf) {
+		wmi_err("wmi_buf_alloc failed");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	buf_ptr = (uint8_t *)wmi_buf_data(buf);
+	cmd = (wmi_vdev_set_manual_mu_trig_cmd_fixed_param *)buf_ptr;
+	WMITLV_SET_HDR(
+		&cmd->tlv_header,
+		WMITLV_TAG_STRUC_wmi_vdev_set_manual_mu_trig_cmd_fixed_param,
+		WMITLV_GET_STRUCT_TLVLEN(
+		wmi_vdev_set_manual_mu_trig_cmd_fixed_param));
+
+	cmd->vdev_id = param->vdev_id;
+	cmd->manual_trig_preferred_ac = param->preferred_ac;
+
+	buf_ptr += sizeof(*cmd);
+
+	WMITLV_SET_HDR(buf_ptr, WMITLV_TAG_ARRAY_FIXED_STRUC,
+		       (param->num_peer * sizeof(wmi_mac_addr)));
+	peer_mac = (wmi_mac_addr *)(buf_ptr + WMI_TLV_HDR_SIZE);
+
+	if (param->num_peer) {
+		for (i = 0; i < param->num_peer; ++i) {
+			WMI_CHAR_ARRAY_TO_MAC_ADDR(param->macaddr[i], peer_mac);
+			peer_mac++;
+		}
+	}
+
+	wmi_mtrace(WMI_VDEV_SET_ULOFDMA_MANUAL_MU_TRIG_CMDID, cmd->vdev_id, 0);
+	retval = wmi_unified_cmd_send(
+				wmi_handle, buf, len,
+				WMI_VDEV_SET_ULOFDMA_MANUAL_MU_TRIG_CMDID);
+
+	if (QDF_IS_STATUS_ERROR(retval)) {
+		wmi_err("WMI WMI_VDEV_SET_ULOFDMA_MANUAL_MU_TRIG_CMDID Failed");
+		wmi_buf_free(buf);
+	}
+
+	return retval;
+}
+#endif
+
 /**
  * send_soc_tqm_reset_enable_disable_cmd_tlv() - This API to send the
  * WMI_SOC_TQM_RESET_ENABLE_DISABLE_CMDID to FW
@@ -4214,6 +4401,10 @@ void wmi_ap_attach_tlv(wmi_unified_t wmi_handle)
 	ops->extract_mgmt_tx_compl_param = extract_mgmt_tx_compl_param_tlv;
 	ops->extract_chan_info_event = extract_chan_info_event_tlv;
 	ops->extract_scan_blanking_params = extract_scan_blanking_params_tlv;
+#ifdef QCA_MANUAL_TRIGGERED_ULOFDMA
+	ops->extract_ulofdma_trigger_feedback_event =
+			extract_ulofdma_trigger_feedback_event_tlv;
+#endif
 	ops->extract_channel_hopping_event = extract_channel_hopping_event_tlv;
 	ops->send_peer_chan_width_switch_cmd =
 					send_peer_chan_width_switch_cmd_tlv;
@@ -4237,6 +4428,10 @@ void wmi_ap_attach_tlv(wmi_unified_t wmi_handle)
 #endif
 #ifdef QCA_STANDALONE_SOUNDING_TRIGGER
 	ops->config_txbf_sounding_trig_info_cmd = config_txbf_sounding_trig_info_cmd_tlv;
+#endif
+#ifdef QCA_MANUAL_TRIGGERED_ULOFDMA
+	ops->trigger_ulofdma_su_cmd = trigger_ulofdma_su_cmd_tlv;
+	ops->trigger_ulofdma_mu_cmd = trigger_ulofdma_mu_cmd_tlv;
 #endif
 	ops->send_get_halphy_cal_status_cmd = send_get_halphy_cal_status_cmd_tlv;
 	ops->send_peer_set_intra_bss_cmd = send_peer_set_intra_bss_cmd_tlv;
