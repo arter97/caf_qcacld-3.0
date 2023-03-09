@@ -3635,8 +3635,7 @@ static inline int wlan_hdd_nl_init(struct hdd_context *hdd_ctx)
 	return nl_srv_init(hdd_ctx->wiphy, proto);
 }
 #endif
-QDF_STATUS hdd_sme_open_session_callback(uint8_t vdev_id,
-					 QDF_STATUS qdf_status);
+
 QDF_STATUS hdd_sme_close_session_callback(uint8_t vdev_id);
 
 int hdd_register_cb(struct hdd_context *hdd_ctx);
