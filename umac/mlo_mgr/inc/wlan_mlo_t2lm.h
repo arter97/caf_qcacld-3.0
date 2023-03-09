@@ -118,12 +118,12 @@ struct wlan_link_preference {
 /**
  * struct wlan_t2lm_of_tids - TID-to-link mapping for a given direction
  * @direction: direction from 'enum wlan_t2lm_direction'
- * @t2lm_provisioned_links: Link mapping for all the TIDs.
- * It is in form of enum wlan_link_band_caps.
+ * @t2lm_provisioned_links: Link mapping for all the TIDs. Represented as
+ *                          bitmap of type wlan_link_band_caps enum.
  */
 struct wlan_t2lm_of_tids {
 	enum wlan_t2lm_direction direction;
-	enum wlan_link_band_caps t2lm_provisioned_links[T2LM_MAX_NUM_TIDS];
+	uint16_t t2lm_provisioned_links[T2LM_MAX_NUM_TIDS];
 };
 
 /**
