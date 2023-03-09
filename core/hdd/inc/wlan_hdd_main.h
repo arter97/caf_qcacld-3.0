@@ -1756,7 +1756,6 @@ enum wlan_state_ctrl_str_id {
  * @is_extwow_app_type2_param_set: is extwow app type2 param set
  * @ext_scan_start_since_boot: Time since boot up to extscan start (in micro
  *                             seconds)
- * @g_event_flags: a bitmap of hdd_driver_flags (unused??)
  * @miracast_value: value of driver miracast command
  * @ipv6_notifier: IPv6 notifier callback for handling NS offload on change
  *                 in IP
@@ -1981,7 +1980,6 @@ struct hdd_context {
 #endif
 
 	uint64_t ext_scan_start_since_boot;
-	unsigned long g_event_flags;
 	uint8_t miracast_value;
 
 #ifdef WLAN_NS_OFFLOAD
