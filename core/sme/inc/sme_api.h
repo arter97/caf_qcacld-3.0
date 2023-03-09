@@ -208,14 +208,6 @@ struct sme_5g_band_pref_params {
 	uint8_t     max_rssi_penalize_5g;
 };
 
-/**
- * struct sme_session_params: Session creation params passed by HDD layer
- * @vdev: pointer to vdev object
- */
-struct sme_session_params {
-	struct wlan_objmgr_vdev *vdev;
-};
-
 #define MAX_CANDIDATE_INFO 10
 
 /**
