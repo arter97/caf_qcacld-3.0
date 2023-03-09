@@ -1209,6 +1209,7 @@ QDF_STATUS wlan_mlo_peer_create(struct wlan_objmgr_vdev *vdev,
 		if (QDF_STATUS_SUCCESS != status) {
 			mlo_err("MLD ID %d: Bridge peer creation failed",
 				ml_dev->mld_id);
+			wlan_mlo_partner_peer_create_failed_notify(ml_peer);
 			mlo_dev_release_link_vdevs(link_vdevs);
 			wlan_mlo_peer_release_ref(ml_peer);
 			return QDF_STATUS_E_FAILURE;
