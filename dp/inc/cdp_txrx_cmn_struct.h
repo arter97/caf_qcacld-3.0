@@ -116,6 +116,8 @@
 #define CDP_DATA_NON_QOS_TID 16
 
 #define CDP_NUM_SA_BW 4
+/* Smart Antenna 320MHz BW Phy MAX Rate Code Index */
+#define CDP_SA_BW320_INX 4
 #define CDP_PERCENT_MACRO 100
 #define CDP_NUM_KB_IN_MB 1000
 /*
