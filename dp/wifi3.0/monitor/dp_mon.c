@@ -4164,7 +4164,7 @@ static void dp_process_ppdu_stats_user_cmpltn_common_tlv(
 
 	tag_buf++;
 	/* Extract 320MHz MAX PHY ratecode */
-	ppdu_user_desc->sa_max_rates[bw_iter] =
+	ppdu_user_desc->sa_max_rates[CDP_SA_BW320_INX] =
 		HTT_PPDU_STATS_USER_CMPLTN_COMMON_TLV_MAX_RATES_GET(*tag_buf);
 }
 
