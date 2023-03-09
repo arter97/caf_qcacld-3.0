@@ -1436,6 +1436,30 @@ void qdf_mem_tx_desc_cnt_update(qdf_atomic_t pending_tx_descs,
  */
 #define qdf_mem_valloc(size) __qdf_mem_valloc(size, __func__, __LINE__)
 
+#ifdef ENABLE_VALLOC_REPLACE_MALLOC
+/**
+ * qdf_mem_common_alloc() - Common function to allocate memory for the
+ * given size, allocation method decided by ENABLE_VALLOC_REPLACE_MALLOC
+ * @size: Number of bytes of memory to be allocated
+ *
+ * Return: Pointer to the starting address of the allocated memory
+ */
+#define qdf_mem_common_alloc(size) qdf_mem_valloc(size)
+
+/**
+ * qdf_mem_common_free() - Common function to free the memory pointed
+ * to by ptr, memory free method decided by ENABLE_VALLOC_REPLACE_MALLOC
+ * @ptr: Pointer to the starting address of the memory to
+ * be freed.
+ *
+ * Return: None
+ */
+#define qdf_mem_common_free(ptr) qdf_mem_vfree(ptr)
+#else
+#define qdf_mem_common_alloc(size) qdf_mem_malloc(size)
+#define qdf_mem_common_free(ptr) qdf_mem_free(ptr)
+#endif
+
 /**
  * qdf_ioremap() - map bus memory into cpu space
  * @HOST_CE_ADDRESS: bus address of the memory
