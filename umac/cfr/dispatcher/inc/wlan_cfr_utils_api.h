@@ -650,7 +650,7 @@ enum cfr_capt_status {
  * struct peer_cfr - private peer object for cfr
  * @peer_obj: pointer to peer_obj
  * @request: Type of request (start/stop)
- * @bandwidth: bandwitdth of capture for this peer
+ * @bandwidth: bandwidth of capture for this peer
  * @period: period of capture for this peer
  * @capture_method: enum determining type of cfr data capture.
  *                 0-Qos null data
