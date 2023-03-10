@@ -82,10 +82,10 @@ void qca_sawf_config_ul(uint8_t *dst_mac, uint8_t *src_mac,
 	uint32_t min_tput = 0, max_latency = 0;
 	uint8_t tid = 0;
 
-	qdf_info("src " QDF_MAC_ADDR_FMT " dst " QDF_MAC_ADDR_FMT
-		 " fw_service_id %u rv_service_id %u",
-		 QDF_MAC_ADDR_REF(src_mac), QDF_MAC_ADDR_REF(dst_mac),
-		 fw_service_id, rv_service_id);
+	qdf_nofl_debug("src " QDF_MAC_ADDR_FMT " dst " QDF_MAC_ADDR_FMT
+		       " fwd_service_id %u rvrs_service_id %u",
+		       QDF_MAC_ADDR_REF(src_mac), QDF_MAC_ADDR_REF(dst_mac),
+		       fw_service_id, rv_service_id);
 
 	if (QDF_IS_STATUS_SUCCESS(wlan_sawf_get_uplink_params(fw_service_id,
 							      &tid,
