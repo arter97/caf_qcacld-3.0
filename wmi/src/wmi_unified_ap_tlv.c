@@ -467,6 +467,148 @@ send_set_ctl_table_cmd_tlv(wmi_unified_t wmi_handle,
 }
 
 /**
+ * send_set_sta_max_pwr_table_cmd_tlv() - send each sta max pwr table cmd to fw
+ * @wmi_handle: wmi handle
+ * @param: pointer to hold sta max pwr table param
+ *
+ * @return QDF_STATUS_SUCCESS  on success and -ve on failure.
+ */
+static QDF_STATUS
+send_set_sta_max_pwr_table_cmd_tlv(wmi_unified_t wmi_handle,
+				   struct sta_max_pwr_table_params *param)
+{
+	wmi_peer_bulk_set_cmd_fixed_param *cmd;
+	wmi_peer_list *wmi_peer;
+	struct sta_peer_table_list *tmp_peer_list;
+	wmi_buf_t buf;
+	int32_t len, i, err;
+	uint8_t *buf_ptr;
+
+	len = sizeof(*cmd) + WMI_TLV_HDR_SIZE;
+	len += sizeof(wmi_peer_list) * param->num_peers;
+	buf = wmi_buf_alloc(wmi_handle, len);
+	if (!buf)
+		return QDF_STATUS_E_NOMEM;
+
+	buf_ptr = (uint8_t *)wmi_buf_data(buf);
+	qdf_mem_zero(buf_ptr, len);
+
+	cmd = (wmi_peer_bulk_set_cmd_fixed_param *)buf_ptr;
+
+	WMITLV_SET_HDR(&cmd->tlv_header,
+		       WMITLV_TAG_STRUC_wmi_peer_bulk_set_cmd_fixed_param,
+		       WMITLV_GET_STRUCT_TLVLEN
+				(wmi_peer_bulk_set_cmd_fixed_param));
+
+	/*
+	* Vdev id is not known set it to zero. The FW will find the vdev
+	* for the peer if needed.
+	*/
+	cmd->vdev_var = 0;
+	WMITLV_SET_HDR((buf_ptr +
+			       sizeof(wmi_peer_bulk_set_cmd_fixed_param)),
+			       WMITLV_TAG_ARRAY_STRUC,
+			       sizeof(wmi_peer_list) * param->num_peers);
+	wmi_peer = (wmi_peer_list *)(buf_ptr + sizeof(*cmd) + WMI_TLV_HDR_SIZE);
+
+	for (i = 0; i < param->num_peers; i++) {
+		WMITLV_SET_HDR(&wmi_peer->tlv_header,
+			       WMITLV_TAG_STRUC_wmi_peer_list,
+			       WMITLV_GET_STRUCT_TLVLEN(wmi_peer_list));
+		tmp_peer_list = param->peer_list + i;
+		if (!tmp_peer_list)
+			return QDF_STATUS_E_FAILURE;
+
+		WMI_CHAR_ARRAY_TO_MAC_ADDR(tmp_peer_list->peer_macaddr,
+					   &wmi_peer->peer_macaddr);
+		wmi_peer->param_id = WMI_PEER_USE_FIXED_PWR;
+		wmi_peer->param_value = tmp_peer_list->peer_pwr_limit;
+		wmi_peer++;
+	}
+
+	err = wmi_unified_cmd_send(wmi_handle, buf,
+				   len,
+				   WMI_PEER_BULK_SET_CMDID);
+	if (err) {
+		wmi_err("Failed to send set_param cmd");
+		wmi_buf_free(buf);
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	return 0;
+}
+
+/**
+ * send_set_power_table_cmd_tlv() - send rate2power table cmd to fw
+ * @wmi_handle: wmi handle
+ * @param: pointer to hold rate2pwer table param
+ *
+ *  @return QDF_STATUS_SUCCESS  on success and -ve on failure.
+ */
+static QDF_STATUS
+send_set_power_table_cmd_tlv(wmi_unified_t wmi_handle,
+			     struct rate2power_table_params *param)
+{
+	uint16_t len, pwr_tlv_len;
+	int8_t *buf_ptr;
+	wmi_buf_t buf;
+	wmi_pdev_set_tgtr2p_table_cmd_fixed_param *cmd;
+	int8_t *pwr_array;
+
+	if (!param->pwr_array) {
+		wmi_err("pwr_array is null");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	pwr_tlv_len = WMI_TLV_HDR_SIZE +
+		roundup(param->pwr_cmd_len, sizeof(uint32_t));
+	len = sizeof(*cmd) + pwr_tlv_len;
+
+	buf = wmi_buf_alloc(wmi_handle, len);
+	if (!buf) {
+		wmi_err("wmi_buf_alloc failed");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	buf_ptr = wmi_buf_data(buf);
+	qdf_mem_zero(buf_ptr, len);
+
+	cmd = (wmi_pdev_set_tgtr2p_table_cmd_fixed_param *)buf_ptr;
+
+	WMITLV_SET_HDR(&cmd->tlv_header,
+		       WMITLV_TAG_STRUC_wmi_pdev_set_tgtr2p_table_cmd_fixed_param,
+		       WMITLV_GET_STRUCT_TLVLEN(
+				wmi_pdev_set_tgtr2p_table_cmd_fixed_param));
+	cmd->r2p_array_len = param->pwr_cmd_len;
+	cmd->freq_band = param->freq_band;
+	cmd->sub_band = param->sub_band;
+	cmd->is_ext = param->is_ext;
+	cmd->end_of_r2ptable_update = param->end_of_update;
+	cmd->target_type = param->target_type;
+	cmd->r2p_array_len = param->pwr_cmd_len;
+	cmd->pdev_id = wmi_handle->ops->convert_pdev_id_host_to_target(
+								wmi_handle,
+								param->pdev_id);
+	buf_ptr += sizeof(*cmd);
+	WMITLV_SET_HDR(buf_ptr, WMITLV_TAG_ARRAY_BYTE, (cmd->r2p_array_len));
+	buf_ptr += WMI_TLV_HDR_SIZE;
+	pwr_array = buf_ptr;
+
+	WMI_HOST_IF_MSG_COPY_CHAR_ARRAY(&pwr_array[0], param->pwr_array,
+					param->pwr_cmd_len);
+
+	wmi_mtrace(WMI_PDEV_SET_TGTR2P_TABLE_CMDID, NO_SESSION, 0);
+	if (wmi_unified_cmd_send(wmi_handle, buf, len,
+				 WMI_PDEV_SET_TGTR2P_TABLE_CMDID)) {
+		wmi_err("Failed to send WMI_PDEV_SET_TGTR2P_TABLE_CMDID command");
+		wmi_buf_free(buf);
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	return QDF_STATUS_SUCCESS;
+}
+
+/**
  * send_set_mimogain_table_cmd_tlv() - send mimogain table cmd to fw
  * @wmi_handle: wmi handle
  * @param: pointer to hold mimogain table param
@@ -2714,6 +2856,37 @@ static QDF_STATUS extract_chan_info_event_tlv(wmi_unified_t wmi_handle,
 }
 
 /**
+ * extract_scan_blanking_params_tlv() - extract scan blanking params from event
+ * @wmi_handle: wmi handle
+ * @param evt_buf: pointer to event buffer
+ * @param chan_info: Pointer to hold scan blanking parameters
+ *
+ * Return: QDF_STATUS_SUCCESS for success or error code
+ */
+static QDF_STATUS extract_scan_blanking_params_tlv(wmi_unified_t wmi_handle,
+	void *evt_buf, wmi_host_scan_blanking_params *blanking_params)
+{
+	WMI_CHAN_INFO_EVENTID_param_tlvs *param_buf;
+	wmi_scan_blanking_params_info *ev;
+
+	param_buf = (WMI_CHAN_INFO_EVENTID_param_tlvs *) evt_buf;
+
+	blanking_params->valid = false;
+
+	ev = (wmi_scan_blanking_params_info *) param_buf->scan_blanking_params;
+	if (!ev) {
+		wmi_debug("Scan blanking parameters is null");
+		return QDF_STATUS_SUCCESS;
+	}
+
+	blanking_params->blanking_duration = ev->scan_radio_blanking_duration;
+	blanking_params->blanking_count = ev->scan_radio_blanking_count;
+	blanking_params->valid = true;
+
+	return QDF_STATUS_SUCCESS;
+}
+
+/**
  * extract_channel_hopping_event_tlv() - extract channel hopping param
  * from event
  * @wmi_handle: wmi handle
@@ -3483,6 +3656,10 @@ config_peer_latency_info_cmd_tlv(wmi_unified_t wmi_handle,
 			param->latency_info[i].service_interval;
 		tid_latency_info->burst_size_diff =
 			param->latency_info[i].burst_size;
+		tid_latency_info->max_latency =
+			param->latency_info[i].max_latency;
+		tid_latency_info->min_tput =
+			param->latency_info[i].min_throughput;
 		WMI_CHAR_ARRAY_TO_MAC_ADDR(param->latency_info[i].peer_mac,
 				&tid_latency_info->dest_macaddr);
 		WMI_TID_LATENCY_SET_TIDNUM(tid_latency_info->latency_tid_info,
@@ -3745,6 +3922,22 @@ static void sawf_create_set_defaults(struct wmi_sawf_params *param)
 }
 
 
+void parse_disabled_schd_mode(uint32_t disabled_modes,
+			      uint32_t *wmi_disabled_modes)
+{
+	if (disabled_modes & (1 << SCHED_MODE_DL_MU_MIMO))
+		*wmi_disabled_modes |= WMI_SCHED_MODE_DL_MU_MIMO;
+
+	if (disabled_modes & (1 << SCHED_MODE_UL_MU_MIMO))
+		*wmi_disabled_modes |= WMI_SCHED_MODE_UL_MU_MIMO;
+
+	if (disabled_modes & (1 << SCHED_MODE_DL_OFDMA))
+		*wmi_disabled_modes |= WMI_SCHED_MODE_DL_OFDMA;
+
+	if (disabled_modes & (1 << SCHED_MODE_UL_OFDMA))
+		*wmi_disabled_modes |= WMI_SCHED_MODE_UL_OFDMA;
+}
+
 QDF_STATUS send_sawf_create_cmd_tlv(wmi_unified_t wmi_handle,
 				    struct wmi_sawf_params *param)
 {
@@ -3753,6 +3946,7 @@ QDF_STATUS send_sawf_create_cmd_tlv(wmi_unified_t wmi_handle,
 	wmi_buf_t buf;
 	uint8_t tid;
 	uint16_t len = sizeof(*cmd);
+	uint32_t disabled_modes = 0;
 
 	buf = wmi_buf_alloc(wmi_handle, len);
 	if (!buf)
@@ -3777,6 +3971,9 @@ QDF_STATUS send_sawf_create_cmd_tlv(wmi_unified_t wmi_handle,
 	cmd->priority = param->priority;
 	cmd->tid = param->tid;
 	cmd->msdu_loss_rate_ppm = param->msdu_rate_loss;
+
+	parse_disabled_schd_mode(param->disabled_modes, &disabled_modes);
+	cmd->disabled_sched_modes = disabled_modes;
 
 	if (param->tid == WMI_SAWF_SVC_CLASS_PARAM_DEFAULT_TID) {
 		tid = sawf_tid_infer(cmd);
@@ -3839,6 +4036,9 @@ void wmi_ap_attach_tlv(wmi_unified_t wmi_handle)
 					send_peer_update_wds_entry_cmd_tlv;
 	ops->send_pdev_get_tpc_config_cmd = send_pdev_get_tpc_config_cmd_tlv;
 	ops->send_set_ctl_table_cmd = send_set_ctl_table_cmd_tlv;
+	ops->send_set_sta_max_pwr_table_cmd =
+					send_set_sta_max_pwr_table_cmd_tlv;
+	ops->send_set_power_table_cmd = send_set_power_table_cmd_tlv;
 	ops->send_set_mimogain_table_cmd = send_set_mimogain_table_cmd_tlv;
 	ops->send_packet_power_info_get_cmd =
 					send_packet_power_info_get_cmd_tlv;
@@ -3890,6 +4090,7 @@ void wmi_ap_attach_tlv(wmi_unified_t wmi_handle)
 	ops->send_wmm_update_cmd = send_wmm_update_cmd_tlv;
 	ops->extract_mgmt_tx_compl_param = extract_mgmt_tx_compl_param_tlv;
 	ops->extract_chan_info_event = extract_chan_info_event_tlv;
+	ops->extract_scan_blanking_params = extract_scan_blanking_params_tlv;
 	ops->extract_channel_hopping_event = extract_channel_hopping_event_tlv;
 	ops->send_peer_chan_width_switch_cmd =
 					send_peer_chan_width_switch_cmd_tlv;

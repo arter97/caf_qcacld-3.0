@@ -704,12 +704,62 @@ dp_dump_rx_flow_tag_stats(struct cdp_soc_t *soc, uint8_t pdev_id,
 	return status;
 }
 
-#if defined(WLAN_SUPPORT_PPEDS) || (QCA_PPE_VP)
+#if defined (WLAN_SUPPORT_PPEDS) || (QCA_PPE_VP)
+#if defined (CONFIG_MLO_SINGLE_DEV) || (QCA_SUPPORT_WDS_EXTENDED)
+static inline
+wlan_if_t dp_rx_get_vap_osif_dev(osif_dev *osdev)
+{
+#ifdef QCA_SUPPORT_WDS_EXTENDED
+	osif_peer_dev *osifp;
+#endif
+#ifdef CONFIG_MLO_SINGLE_DEV
+	osif_dev  *os_linkdev;
+	struct osif_mldev *mldev;
+	uint8_t primary_chip_id;
+	uint8_t primary_pdev_id;
+#endif
+	switch (osdev->dev_type) {
+#ifdef CONFIG_MLO_SINGLE_DEV
+	case OSIF_NETDEV_TYPE_MLO:
+		mldev = (struct osif_mldev *)osdev;
+		primary_chip_id = mldev->primary_chip_id;
+		primary_pdev_id = mldev->primary_pdev_id;
+
+		os_linkdev = mldev->link_dev[primary_chip_id][primary_pdev_id];
+		if (!os_linkdev)
+			return NULL;
+
+		return os_linkdev->os_if;
+#endif
+#ifdef QCA_SUPPORT_WDS_EXTENDED
+	case OSIF_NETDEV_TYPE_WDS_EXT:
+		osifp = (osif_peer_dev *)(osdev);
+		if (!osifp->parent_netdev)
+			return NULL;
+
+		osdev = ath_netdev_priv(osifp->parent_netdev);
+		if (!osdev)
+			return NULL;
+
+		return osdev->os_if;
+#endif
+	}
+
+	return osdev->os_if;
+}
+#else
+static inline
+wlan_if_t dp_rx_get_vap_osif_dev(osif_dev *osdev)
+{
+	return osdev->os_if;
+}
+#endif
+
 bool
 dp_rx_ppe_add_flow_entry(struct ppe_drv_fse_rule_info *ppe_flow_info)
 {
 	struct cdp_rx_flow_info flow_info = { 0 };
-	osif_dev  *osdev;
+	osif_dev *osdev;
 	wlan_if_t vap;
 	struct wlan_objmgr_vdev *vdev;
 	struct wlan_cfg_dp_soc_ctxt *cfg;
@@ -723,11 +773,11 @@ dp_rx_ppe_add_flow_entry(struct ppe_drv_fse_rule_info *ppe_flow_info)
 	if (!osdev)
 		return QDF_STATUS_E_FAILURE;
 
-	vap = osdev->os_if;
+	vap = dp_rx_get_vap_osif_dev(osdev);
 	if (!vap)
 		return QDF_STATUS_E_FAILURE;
 
-	vdev = osdev->ctrl_vdev;
+	vdev = vap->vdev_obj;
 	if (!vdev)
 		return QDF_STATUS_E_FAILURE;
 
@@ -807,11 +857,11 @@ dp_rx_ppe_del_flow_entry(struct ppe_drv_fse_rule_info *ppe_flow_info)
 	if (!osdev)
 		return QDF_STATUS_E_FAILURE;
 
-	vap = osdev->os_if;
+	vap = dp_rx_get_vap_osif_dev(osdev);
 	if (!vap)
 		return QDF_STATUS_E_FAILURE;
 
-	vdev = osdev->ctrl_vdev;
+	vdev = vap->vdev_obj;
 	if (!vdev)
 		return QDF_STATUS_E_FAILURE;
 

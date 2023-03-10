@@ -23,7 +23,7 @@
 
 
 struct rnr_global_info g_rnr_info;
-uint8_t g_soc_id_map[MAX_6GHZ_SOCS] = {GLOBAL_SOC_SIZE, GLOBAL_SOC_SIZE};
+uint8_t g_soc_id_map[MAX_6GHZ_SOCS] = {GLOBAL_SOC_SIZE, GLOBAL_SOC_SIZE, GLOBAL_SOC_SIZE};
 
 void wlan_rnr_init_cnt(void)
 {

@@ -514,6 +514,9 @@ int dp_extap_output(dp_pdev_extap_t *extap, uint8_t *vdev_macaddr,
 	case ETHERTYPE_IPV6:
 			return dp_extap_out_ipv6(extap, vdev_macaddr, eh, extap_nssol);
 
+	case ETHERTYPE_LLDP:
+			WLAN_ADDR_COPY(eh->ether_shost, vdev_macaddr);
+			return 0;
 	default:
 			extap_debug("Uknown packet type - 0x%x\n",
 					   eh->ether_type);

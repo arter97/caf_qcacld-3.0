@@ -3400,37 +3400,44 @@ void print_debug_radio_deter_stats(struct debug_pdev_data_deter *deter)
 	uint8_t user;
 
 	STATS_PRINT("----Mode Count: ----\n");
-	STATS_64(stdout, "DL SU:", deter->dl_mode_cnt[0]);
-	STATS_64(stdout, "DL MUOFDMA:", deter->dl_mode_cnt[1]);
-	STATS_64(stdout, "DL MUMIMO:", deter->dl_mode_cnt[2]);
-	STATS_64(stdout, "UL MUOFDMA:", deter->ul_mode_cnt[0]);
-	STATS_64(stdout, "UL_MUMIMO:", deter->ul_mode_cnt[1]);
-	STATS_64(stdout, "UL BAR:", deter->ul_mode_cnt[2]);
+	STATS_64(stdout, "DL SU:", deter->dl_mode_cnt[STATS_IF_TXDL_SU_DATA]);
+	STATS_64(stdout, "DL MUOFDMA:", deter->dl_mode_cnt[STATS_IF_TXDL_OFDMA_DATA]);
+	STATS_64(stdout, "DL MUMIMO:", deter->dl_mode_cnt[STATS_IF_TXDL_MUMIMO_DATA]);
+	STATS_64(stdout, "UL MUOFDMA:", deter->ul_mode_cnt[STATS_IF_TXUL_OFDMA_BASIC_TRIGGER_DATA]);
+	STATS_64(stdout, "UL_MUMIMO:", deter->ul_mode_cnt[STATS_IF_TXUL_MUMIMO_BASIC_TRIGGER_DATA]);
+	STATS_64(stdout, "UL BAR:", deter->ul_mode_cnt[STATS_IF_TXUL_OFDMA_MU_BAR]);
+	STATS_64(stdout, "RX SU:", deter->rx_su_cnt);
+
 	STATS_PRINT("----DL OFDMA Num Users: ----\n");
-	for (user = 0; user < STATS_IF_MAX_USERS; user++)
+	for (user = 1; user < STATS_IF_MAX_USERS; user++)
 		STATS_PRINT("Num Users [%u]: %ju\n", user, deter->dl_ofdma_usr[user]);
 	STATS_PRINT("----UL OFDMA Num Users: ----\n");
-	for (user = 0; user < STATS_IF_MAX_USERS; user++)
+	for (user = 1; user < STATS_IF_MAX_USERS; user++)
 		STATS_PRINT("Num Users [%u]: %ju\n", user, deter->ul_ofdma_usr[user]);
 	STATS_PRINT("----DL MIMO Num Users: ----\n");
-	for (user = 0; user < STATS_IF_MAX_USERS; user++)
+	for (user = 1; user < STATS_IF_MAX_USERS; user++)
 		STATS_PRINT("Num Users [%u]: %ju\n", user, deter->dl_mimo_usr[user]);
-	STATS_PRINT("----DL MIMO Num Users: ----\n");
-	for (user = 0; user < STATS_IF_MAX_USERS; user++)
+	STATS_PRINT("----UL MIMO Num Users: ----\n");
+	for (user = 1; user < STATS_IF_MAX_USERS; user++)
 		STATS_PRINT("Num Users [%u]: %ju\n", user, deter->ul_mimo_usr[user]);
 
 	STATS_PRINT("----Trigger Status: ----\n");
-	STATS_64(stdout, "Success:", deter->trigger_success);
-	STATS_64(stdout, "fail:", deter->trigger_fail);
+	STATS_64(stdout, "UL OFDMA Success:", deter->ts[STATS_IF_TXUL_OFDMA_BASIC_TRIGGER_DATA].trigger_success);
+	STATS_64(stdout, "UL OFDMA fail:", deter->ts[STATS_IF_TXUL_OFDMA_BASIC_TRIGGER_DATA].trigger_fail);
+	STATS_64(stdout, "UL MIMO Success:", deter->ts[STATS_IF_TXUL_MUMIMO_BASIC_TRIGGER_DATA].trigger_success);
+	STATS_64(stdout, "UL MIMO fail:", deter->ts[STATS_IF_TXUL_MUMIMO_BASIC_TRIGGER_DATA].trigger_fail);
+	STATS_64(stdout, "UL BAR Success:", deter->ts[STATS_IF_TXUL_OFDMA_MU_BAR].trigger_success);
+	STATS_64(stdout, "UL BAR fail:", deter->ts[STATS_IF_TXUL_OFDMA_MU_BAR].trigger_fail);
+
 	STATS_PRINT("----Channel Utilization: ----\n");
 	STATS_32(stdout, "Total_cu:", deter->ch_util.ap_chan_util);
 	STATS_32(stdout, "TX Util:", deter->ch_util.ap_tx_util);
 	STATS_32(stdout, "RX Util:", deter->ch_util.ap_rx_util);
 	STATS_PRINT("----Channel ACCESS DELAY: ----\n");
-	STATS_32(stdout, "delay BE:", deter->ch_access_delay[0]);
-	STATS_32(stdout, "delay BK:", deter->ch_access_delay[1]);
-	STATS_32(stdout, "delay VI:", deter->ch_access_delay[2]);
-	STATS_32(stdout, "delay VO:", deter->ch_access_delay[3]);
+	STATS_32(stdout, "delay BE:", deter->ch_access_delay[STATS_IF_WME_AC_BE]);
+	STATS_32(stdout, "delay BK:", deter->ch_access_delay[STATS_IF_WME_AC_BK]);
+	STATS_32(stdout, "delay VI:", deter->ch_access_delay[STATS_IF_WME_AC_VI]);
+	STATS_32(stdout, "delay VO:", deter->ch_access_delay[STATS_IF_WME_AC_VO]);
 }
 
 void print_debug_radio_ctrl_tx(struct debug_pdev_ctrl_tx *tx)

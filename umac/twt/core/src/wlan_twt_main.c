@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Copyright (c) 2011, Atheros Communications Inc.
  *
@@ -80,8 +80,9 @@ QDF_STATUS wlan_twt_cfg_init(struct wlan_objmgr_psoc *psoc)
 			cfg_get(psoc, CFG_OL_TWT_REMOVE_STA_SLOT_INTERVAL);
 	twt_cfg->b_twt_enable =
 			cfg_get(psoc, CFG_OL_B_TWT_ENABLE);
+	twt_cfg->r_twt_enable =
+			cfg_get(psoc, CFG_OL_R_TWT_ENABLE);
 
-	qdf_info("ME-DBG");
 	return QDF_STATUS_SUCCESS;
 }
 
@@ -272,6 +273,7 @@ QDF_STATUS wlan_twt_send_enable_cmd(struct wlan_objmgr_pdev *pdev)
 	twt_param.remove_sta_slot_interval =
 		twt_cfg->remove_sta_slot_interval;
 	twt_param.b_twt_enable = twt_cfg->b_twt_enable;
+	twt_param.r_twt_enable = twt_cfg->r_twt_enable;
 
 	return wlan_twt_responder_enable(psoc, &twt_param, NULL);
 }

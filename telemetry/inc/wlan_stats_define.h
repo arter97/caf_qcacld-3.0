@@ -156,6 +156,7 @@ enum stats_level_e {
  * enum stats_object_e: Defines the Stats specific to object
  * @STATS_OBJ_STA:   Stats for station/peer associated to AP
  * @STATS_OBJ_VAP:   Stats for VAP
+ * @STATS_OBJ_MLD:   Stats for MLD group
  * @STATS_OBJ_RADIO: Stats for particular Radio
  * @STATS_OBJ_AP:    Stats for SoC
  * @STATS_OBJ_MAX:   Max supported objects
@@ -163,6 +164,7 @@ enum stats_level_e {
 enum stats_object_e {
 	STATS_OBJ_STA,
 	STATS_OBJ_VAP,
+	STATS_OBJ_MLD,
 	STATS_OBJ_RADIO,
 	STATS_OBJ_AP,
 	STATS_OBJ_MAX = STATS_OBJ_AP,
@@ -1479,6 +1481,11 @@ struct stats_if_chan_util {
 	uint8_t ap_rx_util;
 };
 
+struct stats_if_ul_trigger_status {
+	uint64_t trigger_success;
+	uint64_t trigger_fail;
+};
+
 struct debug_pdev_data_deter {
 	uint64_t dl_ofdma_usr[STATS_IF_MAX_USERS];
 	uint64_t ul_ofdma_usr[STATS_IF_MAX_USERS];
@@ -1486,10 +1493,10 @@ struct debug_pdev_data_deter {
 	uint64_t ul_mimo_usr[STATS_IF_MAX_USERS];
 	uint64_t dl_mode_cnt[STATS_IF_TXDL_MAX];
 	uint64_t ul_mode_cnt[STATS_IF_TXUL_MAX];
+	uint64_t rx_su_cnt;
 	uint32_t ch_access_delay[STATS_IF_WME_AC_MAX];
-	uint64_t trigger_success;
-	uint64_t trigger_fail;
 	struct stats_if_chan_util ch_util;
+	struct stats_if_ul_trigger_status ts[STATS_IF_TXUL_MAX];
 };
 
 /* Debug pdev control */

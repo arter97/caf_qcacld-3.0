@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2016-2018,2020-2021 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -83,6 +84,28 @@ QDF_STATUS wmi_unified_set_ctl_table_cmd_send(
 {
 	if (wmi_handle->ops->send_set_ctl_table_cmd)
 		return wmi_handle->ops->send_set_ctl_table_cmd(wmi_handle,
+				param);
+
+	return QDF_STATUS_E_FAILURE;
+}
+
+QDF_STATUS wmi_unified_set_sta_max_pwr_table_cmd_send(
+		wmi_unified_t wmi_handle,
+		struct sta_max_pwr_table_params *param)
+{
+	if (wmi_handle->ops->send_set_sta_max_pwr_table_cmd)
+		return wmi_handle->ops->send_set_sta_max_pwr_table_cmd(
+								wmi_handle,
+								param);
+	return QDF_STATUS_E_FAILURE;
+}
+
+QDF_STATUS wmi_unified_set_power_table_cmd_send(
+		wmi_unified_t wmi_handle,
+		struct rate2power_table_params *param)
+{
+	if (wmi_handle->ops->send_set_power_table_cmd)
+		return wmi_handle->ops->send_set_power_table_cmd(wmi_handle,
 				param);
 
 	return QDF_STATUS_E_FAILURE;
@@ -539,6 +562,17 @@ QDF_STATUS wmi_extract_chan_info_event(
 	if (wmi_handle->ops->extract_chan_info_event)
 		return wmi_handle->ops->extract_chan_info_event(wmi_handle,
 			evt_buf, chan_info);
+
+	return QDF_STATUS_E_FAILURE;
+}
+
+QDF_STATUS wmi_extract_scan_blanking_params(
+		wmi_unified_t wmi_handle, void *evt_buf,
+		wmi_host_scan_blanking_params *blanking_params)
+{
+	if (wmi_handle->ops->extract_scan_blanking_params)
+		return wmi_handle->ops->extract_scan_blanking_params(wmi_handle,
+			evt_buf, blanking_params);
 
 	return QDF_STATUS_E_FAILURE;
 }

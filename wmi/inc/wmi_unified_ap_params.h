@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2020-2021, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -45,6 +46,15 @@
 #define TIME_TO_LIVE_MID 250
 #define SAWF_TID_INFER_LESS_THAN(param, threshold) \
 	p_cmd->param < threshold
+
+enum wmi_sched_disabled  {
+	SCHED_MODE_DL_MU_MIMO,
+	SCHED_MODE_UL_MU_MIMO,
+	SCHED_MODE_DL_OFDMA,
+	SCHED_MODE_UL_OFDMA,
+	SCHED_MODE_INV_DMODE,
+};
+
 /**
  * wmi_wifi_pos_lcr_info - LCR info structure
  * @pdev_id: host pdev id
@@ -243,6 +253,49 @@ struct wlan_tdma_sched_cmd_param {
 	uint16_t cwmin[WMI_MAX_NUM_AC];
 	uint16_t cwmax[WMI_MAX_NUM_AC];
 };
+
+/**
+ * struct rate2power_table_params - Rate2Power table params
+ * @pwr_array: pointer to pwr array
+ * @pwr_cmd_len: rate2power command length
+ * @freq_band: Frequency band
+ * @sub_band: Sub band for the frequency band
+ * @end_of_update: Flag to denote the end of update
+ * @is_ext: is extension flag
+ * @target_type: target type
+ * @pdev_id: pdev id
+ */
+struct rate2power_table_params {
+	int8_t   *pwr_array;
+	uint16_t pwr_cmd_len;
+	uint32_t freq_band;
+	uint32_t sub_band;
+	uint32_t end_of_update;
+	uint32_t is_ext;
+	uint32_t target_type;
+	uint32_t pdev_id;
+};
+
+/**
+ * struct sta_peer_table_list - peer list params
+ * @peer_macaddr: array of STA MAC addresses
+ * @peer_pwr_limit: Peer power limit
+ */
+struct sta_peer_table_list {
+	uint8_t peer_macaddr[QDF_MAC_ADDR_SIZE];
+	int32_t peer_pwr_limit;
+};
+
+/**
+ * struct sta_pwr_table_params - sta pwr table params
+ * @num_peers: No.of stations
+ * @peer_list: pointer to struct sta_peer_table_list
+ */
+struct sta_max_pwr_table_params {
+	uint32_t num_peers;
+	struct sta_peer_table_list *peer_list;
+};
+
 /**
  * struct mimogain_table_params - MIMO gain table params
  * @array_gain: pointer to array gain table
@@ -923,6 +976,18 @@ typedef struct {
 } wmi_host_chan_info_event;
 
 /**
+ * struct wmi_host_scan_blanking_params - Scan blanking parameters
+ * @valid: Indicates whether the structure is valid
+ * @blanking_count: blanking count
+ * @blanking_duration: blanking duration
+ */
+typedef struct {
+	bool valid;
+	uint32_t blanking_count;
+	uint32_t blanking_duration;
+} wmi_host_scan_blanking_params;
+
+/**
  * struct wmi_host_pdev_channel_hopping_event
  * @pdev_id: pdev_id
  * @noise_floor_report_iter: Noise threshold iterations with high values
@@ -1028,6 +1093,8 @@ struct wmi_peer_latency_info_params {
 			flow_id     :4,
 			add_or_sub  :2,
 			reserved    :14;
+	uint32_t max_latency;
+	uint32_t min_throughput;
 };
 
 /**
@@ -1099,6 +1166,7 @@ struct wmi_sawf_params {
 	uint32_t priority;
 	uint32_t tid;
 	uint32_t msdu_rate_loss;
+	uint32_t disabled_modes;
 };
 #endif
 #endif

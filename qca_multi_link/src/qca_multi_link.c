@@ -16,6 +16,7 @@
  */
 
 #include "qca_multi_link.h"
+#include <br_private.h>
 
 static bool is_initialized;
 qca_multi_link_parameters_t qca_multi_link_cfg;

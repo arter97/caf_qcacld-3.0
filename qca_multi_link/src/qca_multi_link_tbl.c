@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2020-2021 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -20,6 +21,7 @@
 #include "qdf_trace.h"
 #include "qal_vbus_dev.h"
 #include "qal_bridge.h"
+#include <br_private.h>
 
 int qca_multi_link_tbl_get_eth_entries(struct net_device *net_dev,
 					void *fill_buff, int buff_size)
