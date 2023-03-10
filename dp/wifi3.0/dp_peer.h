@@ -1533,7 +1533,7 @@ dp_link_peer_hash_find_by_chip_id(struct dp_soc *soc,
  * @vdev_id: vdev_id
  * @mod_id: id of module requesting reference
  *
- * Return: peer in sucsess
+ * Return: peer in success
  *         NULL in failure
  */
 static inline
