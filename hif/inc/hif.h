@@ -84,6 +84,7 @@ typedef void *hif_handle_t;
 #define HIF_TYPE_QCA5332 30
 #define HIF_TYPE_QCN9160 31
 #define HIF_TYPE_PEACH 32
+#define HIF_TYPE_WCN6450 33
 
 #define DMA_COHERENT_MASK_DEFAULT   37
 
@@ -136,7 +137,6 @@ enum hif_ic_irq {
 	txmon2host_monitor_destination_mac2,
 	txmon2host_monitor_destination_mac1,
 	host2tx_monitor_ring1,
-	umac_reset,
 };
 
 #ifdef QCA_SUPPORT_LEGACY_INTERRUPTS
@@ -2088,6 +2088,37 @@ void hif_allow_link_low_power_states(struct hif_opaque_softc *hif)
 }
 #endif
 
+#ifdef IPA_OPT_WIFI_DP
+/**
+ * hif_prevent_l1() - Prevent from going to low power states
+ * @hif: HIF opaque context
+ *
+ * Return: 0 on success. Error code on failure.
+ */
+int hif_prevent_l1(struct hif_opaque_softc *hif);
+
+/**
+ * hif_allow_l1() - Allow link to go to low power states
+ * @hif: HIF opaque context
+ *
+ * Return: None
+ */
+void hif_allow_l1(struct hif_opaque_softc *hif);
+
+#else
+
+static inline
+int hif_prevent_l1(struct hif_opaque_softc *hif)
+{
+	return 0;
+}
+
+static inline
+void hif_allow_l1(struct hif_opaque_softc *hif)
+{
+}
+#endif
+
 void *hif_get_dev_ba(struct hif_opaque_softc *hif_handle);
 void *hif_get_dev_ba_ce(struct hif_opaque_softc *hif_handle);
 void *hif_get_dev_ba_pmm(struct hif_opaque_softc *hif_handle);
@@ -2566,6 +2597,8 @@ QDF_STATUS hif_register_umac_reset_handler(struct hif_opaque_softc *hif_scn,
  * Return: QDF_STATUS of operation
  */
 QDF_STATUS hif_unregister_umac_reset_handler(struct hif_opaque_softc *hif_scn);
+QDF_STATUS hif_get_umac_reset_irq(struct hif_opaque_softc *hif_scn,
+				  int *umac_reset_irq);
 #else
 static inline
 QDF_STATUS hif_register_umac_reset_handler(struct hif_opaque_softc *hif_scn,
@@ -2577,6 +2610,13 @@ QDF_STATUS hif_register_umac_reset_handler(struct hif_opaque_softc *hif_scn,
 
 static inline
 QDF_STATUS hif_unregister_umac_reset_handler(struct hif_opaque_softc *hif_scn)
+{
+	return QDF_STATUS_SUCCESS;
+}
+
+static inline
+QDF_STATUS hif_get_umac_reset_irq(struct hif_opaque_softc *hif_scn,
+				  int *umac_reset_irq)
 {
 	return QDF_STATUS_SUCCESS;
 }

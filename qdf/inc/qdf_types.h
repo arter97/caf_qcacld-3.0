@@ -43,9 +43,9 @@
 /**
  * struct qdf_sglist - scatter-gather list
  * @nsegs: total number of segments
- * @struct sg_segs - scatter-gather segment list
- * @vaddr: Virtual address of the segment
- * @len: Length of the segment
+ * @sg_segs: scatter-gather segment list
+ * @sg_segs.vaddr: Virtual address of the segment
+ * @sg_segs.len: Length of the segment
  */
 typedef struct qdf_sglist {
 	uint32_t nsegs;
@@ -101,12 +101,12 @@ typedef void *qdf_drv_handle_t;
 typedef void *qdf_os_handle_t;
 typedef void *qdf_pm_t;
 
-/**
+/*
  * typedef qdf_handle_t - handles opaque to each other
  */
 typedef void *qdf_handle_t;
 
-/**
+/*
  * typedef qdf_freq_t - define frequency as a 16 bit/32 bit
  * unsigned integer depending on the requirement
  */
@@ -146,7 +146,7 @@ typedef __qdf_off_t   qdf_off_t;
 typedef __qdf_dma_map_t qdf_dma_map_t;
 
 /**
- * tyepdef qdf_dma_addr_t - DMA address.
+ * typedef qdf_dma_addr_t - DMA address.
  */
 typedef __qdf_dma_addr_t qdf_dma_addr_t;
 
@@ -156,7 +156,7 @@ typedef __qdf_dma_addr_t qdf_dma_addr_t;
 typedef __qdf_dma_size_t qdf_dma_size_t;
 
 /**
- * tyepdef qdf_dma_context_t - DMA context.
+ * typedef qdf_dma_context_t - DMA context.
  */
 typedef __qdf_dma_context_t qdf_dma_context_t;
 
@@ -164,7 +164,7 @@ typedef __qdf_mem_info_t qdf_mem_info_t;
 typedef __sgtable_t sgtable_t;
 
 /**
- * typepdef qdf_cpu_mask - CPU Mask
+ * typedef qdf_cpu_mask - CPU Mask
  */
 typedef __qdf_cpu_mask qdf_cpu_mask;
 
@@ -191,9 +191,9 @@ typedef __qdf_dummy_netdev_t qdf_dummy_netdev_t;
 /**
  * struct qdf_dma_map_info - Information inside a DMA map.
  * @nsegs: total number mapped segments
- * @struct dma_segs - list of segments
- * @paddr: physical(dam'able) address of the segment
- * @len: length of the segment
+ * @dma_segs: list of segments
+ * @dma_segs.paddr: physical(dma'able) address of the segment
+ * @dma_segs.len: length of the segment
  */
 typedef struct qdf_dma_map_info {
 	uint32_t nsegs;
@@ -203,12 +203,15 @@ typedef struct qdf_dma_map_info {
 	} dma_segs[QDF_MAX_SCATTER];
 } qdf_dmamap_info_t;
 
-/**
+/*
  * struct qdf_shared_mem - Shared memory resource
  * @mem_info: memory info struct
  * @vaddr: virtual address
  * @sgtable: scatter-gather table
  * @qdf_dma_mem_context: dma address
+ *
+ * NB: not using kernel-doc format since the kernel-doc script doesn't
+ *     handle the qdf_dma_mem_context() macro
  */
 typedef struct qdf_shared_mem {
 	qdf_mem_info_t mem_info;
@@ -220,7 +223,7 @@ typedef struct qdf_shared_mem {
 #define qdf_iomem_t __qdf_iomem_t
 
 /**
- * typedef enum QDF_TIMER_TYPE - QDF timer type
+ * typedef QDF_TIMER_TYPE - QDF timer type
  * @QDF_TIMER_TYPE_SW: Deferrable SW timer it will not cause CPU to wake up
  * on expiry
  * @QDF_TIMER_TYPE_WAKE_APPS: Non deferrable timer which will cause CPU to
@@ -235,7 +238,7 @@ typedef enum {
 } QDF_TIMER_TYPE;
 
 /**
- * tyepdef enum qdf_resource_type_t - hw resources
+ * typedef qdf_resource_type_t - hw resources
  * @QDF_RESOURCE_TYPE_MEM: memory resource
  * @QDF_RESOURCE_TYPE_IO: io resource
  * Define the hw resources the OS has allocated for the device
@@ -247,7 +250,7 @@ typedef enum {
 } qdf_resource_type_t;
 
 /**
- * tyepdef struct qdf_resource_t - representation of a h/w resource.
+ * typedef qdf_resource_t - representation of a h/w resource.
  * @start: start
  * @end: end
  * @type: resource type
@@ -301,7 +304,7 @@ typedef bool (*qdf_irqlocked_func_t)(void *);
 #define qdf_offsetof(type, field) offsetof(type, field)
 
 /**
- * typedef enum QDF_MODULE_ID  - Debug category level
+ * typedef QDF_MODULE_ID  - Debug category level
  * @QDF_MODULE_ID_MIN: The smallest/starting module id
  * @QDF_MODULE_ID_TDLS: TDLS
  * @QDF_MODULE_ID_ACS: auto channel selection
@@ -616,7 +619,7 @@ typedef enum {
 } QDF_MODULE_ID;
 
 /**
- * typedef enum QDF_TRACE_LEVEL - Debug verbose level
+ * typedef QDF_TRACE_LEVEL - Debug verbose level
  * @QDF_TRACE_LEVEL_NONE: no trace will be logged. This value is in place
  *			  for the qdf_trace_setlevel() to allow the user
  *			  to turn off all traces
@@ -949,7 +952,7 @@ QDF_STATUS qdf_uint64_parse(const char *int_str, uint64_t *out_int);
 
 #define QDF_MAC_ADDR_SIZE 6
 
-/**
+/*
  * If the feature CONFIG_WLAN_TRACE_HIDE_MAC_ADDRESS is enabled,
  * then the requirement is to hide 2nd, 3rd and 4th octet of the
  * MAC address in the kernel logs and driver logs.
@@ -1042,15 +1045,30 @@ struct qdf_mac_addr {
  * @QDF_ROAM_EVENTID: roam eventid from fw
  * @QDF_PROTO_DNS_QUERY: dns query
  * @QDF_PROTO_DNS_RES: dns response
- * QDF_PROTO_EAP_REQUEST: EAP Request
- * QDF_PROTO_EAP_RESPONSE: EAP Response
- * QDF_PROTO_EAP_SUCCESS: EAP Success
- * QDF_PROTO_EAP_FAILURE: EAP Filure
- * QDF_PROTO_EAP_INITIATE: EAP Initiate
- * QDF_PROTO_EAP_FINISH: EAP Finish
- * QDF_PROTO_EAPOL_START: EAPOL-Start message
- * QDF_PROTO_EAPOL_LOGOFF: EAPOL Log Off message.
- * QDF_PROTO_EAPOL_ASF: ASF Alert message
+ * @QDF_PROTO_EAP_REQUEST: EAP Request
+ * @QDF_PROTO_EAP_RESPONSE: EAP Response
+ * @QDF_PROTO_EAP_SUCCESS: EAP Success
+ * @QDF_PROTO_EAP_FAILURE: EAP Filure
+ * @QDF_PROTO_EAP_INITIATE: EAP Initiate
+ * @QDF_PROTO_EAP_FINISH: EAP Finish
+ * @QDF_PROTO_EAPOL_START: EAPOL-Start message
+ * @QDF_PROTO_EAPOL_LOGOFF: EAPOL Log Off message.
+ * @QDF_PROTO_EAPOL_ASF: ASF Alert message
+ * @QDF_PROTO_EAP_REQ_ID: EAP identify request
+ * @QDF_PROTO_EAP_RSP_ID: EAP identify response
+ * @QDF_PROTO_EAP_M1: EAP expanded type M1
+ * @QDF_PROTO_EAP_M2: EAP expanded type M2
+ * @QDF_PROTO_EAP_M3: EAP expanded type M3
+ * @QDF_PROTO_EAP_M4: EAP expanded type M4
+ * @QDF_PROTO_EAP_M5: EAP expanded type M5
+ * @QDF_PROTO_EAP_M6: EAP expanded type M6
+ * @QDF_PROTO_EAP_M7: EAP expanded type M7
+ * @QDF_PROTO_EAP_M8: EAP expanded type M8
+ * @QDF_PROTO_EAP_WSC_START: EAP expanded type WSC start
+ * @QDF_PROTO_EAP_WSC_ACK: EAP expanded type WSC ACK
+ * @QDF_PROTO_EAP_WSC_NACK: EAP expanded type WSC NACK
+ * @QDF_PROTO_EAP_WSC_DONE: EAP expanded type WSC DONE
+ * @QDF_PROTO_EAP_WSC_FRAG_ACK: EAP expanded type WSC frag ACK
  * @QDF_PROTO_SUBTYPE_MAX: subtype max
  */
 enum qdf_proto_subtype {
@@ -1099,6 +1117,21 @@ enum qdf_proto_subtype {
 	QDF_PROTO_EAPOL_START,
 	QDF_PROTO_EAPOL_LOGOFF,
 	QDF_PROTO_EAPOL_ASF,
+	QDF_PROTO_EAP_REQ_ID,
+	QDF_PROTO_EAP_RSP_ID,
+	QDF_PROTO_EAP_M1,
+	QDF_PROTO_EAP_M2,
+	QDF_PROTO_EAP_M3,
+	QDF_PROTO_EAP_M4,
+	QDF_PROTO_EAP_M5,
+	QDF_PROTO_EAP_M6,
+	QDF_PROTO_EAP_M7,
+	QDF_PROTO_EAP_M8,
+	QDF_PROTO_EAP_WSC_START,
+	QDF_PROTO_EAP_WSC_ACK,
+	QDF_PROTO_EAP_WSC_NACK,
+	QDF_PROTO_EAP_WSC_DONE,
+	QDF_PROTO_EAP_WSC_FRAG_ACK,
 	QDF_PROTO_SUBTYPE_MAX
 };
 
@@ -1391,7 +1424,7 @@ struct qdf_tso_seg_t {
  * @TSOSEG_LOC_GETINFO: get info
  * @TSOSEG_LOC_FILLHTTSEG: fill HTT segment
  * @TSOSEG_LOC_FILLCMNSEG: fill CMN segment
- * TSOSEG_LOC_PREPARETSO: prepare TSO
+ * @TSOSEG_LOC_PREPARETSO: prepare TSO
  * @TSOSEG_LOC_TXPREPLLFAST: tx prep LL fast
  * @TSOSEG_LOC_UNMAPTSO: unmap TSO
  * @TSOSEG_LOC_UNMAPLAST: unmap last
@@ -1435,6 +1468,11 @@ struct qdf_tso_seg_dbg_t {
  * struct qdf_tso_seg_elem_t - tso segment element
  * @next: pointer to the next segment
  * @seg: instance of segment
+ * @cookie:
+ * @on_freelist:
+ * @sent_to_target:
+ * @force_free:
+ * @dbg: debug struct
  */
 struct qdf_tso_seg_elem_t {
 	struct qdf_tso_seg_elem_t *next;
@@ -1491,27 +1529,6 @@ struct qdf_tso_info_t {
 	uint32_t msdu_stats_idx;
 };
 
-/*
- * Used to set classify bit in CE desc.
- */
-#define QDF_CE_TX_CLASSIFY_BIT_S   5
-
-/**
- * QDF_CE_TX_PKT_TYPE_BIT_S - 2 bits starting at bit 6 in CE desc.
- */
-#define QDF_CE_TX_PKT_TYPE_BIT_S   6
-
-/**
- * QDF_CE_TX_PKT_OFFSET_BIT_S - 12 bits --> 16-27, in the CE descriptor
- *  the length of HTT/HTC descriptor
- */
-#define QDF_CE_TX_PKT_OFFSET_BIT_S  16
-
-/**
- * QDF_CE_TX_PKT_OFFSET_BIT_M - Mask for packet offset in the CE descriptor.
- */
-#define QDF_CE_TX_PKT_OFFSET_BIT_M   0x0fff0000
-
 /**
  * enum qdf_suspend_type - type of suspend
  * @QDF_SYSTEM_SUSPEND: System suspend triggered wlan suspend
@@ -1557,6 +1574,12 @@ enum qdf_suspend_type {
  * @QDF_STATS_REQ_TIMEDOUT: Stats request timedout
  * @QDF_TX_DESC_LEAK: tx desc leak
  * @QDF_HOST_WAKEUP_REASON_PAGEFAULT: Host wakeup because of pagefault
+ * @QDF_SCHED_TIMEOUT: Scheduler watchdog timedout
+ * @QDF_SELF_PEER_DEL_FAILED: Failed to send self peer deletion cmd to fw
+ * @QDF_DEL_SELF_STA_FAILED: Received del self sta without del bss
+ * @QDF_FLUSH_LOGS : Recovery needed when sending flush completion to userspace
+ * @QDF_WMI_CMD_SENT_DURING_SUSPEND: WMI command is received when target is
+ * suspended
  */
 enum qdf_hang_reason {
 	QDF_REASON_UNSPECIFIED,
@@ -1589,6 +1612,11 @@ enum qdf_hang_reason {
 	QDF_STATS_REQ_TIMEDOUT,
 	QDF_TX_DESC_LEAK,
 	QDF_HOST_WAKEUP_REASON_PAGEFAULT,
+	QDF_SCHED_TIMEOUT,
+	QDF_SELF_PEER_DEL_FAILED,
+	QDF_DEL_SELF_STA_FAILED,
+	QDF_FLUSH_LOGS,
+	QDF_WMI_CMD_SENT_DURING_SUSPEND,
 };
 
 /**

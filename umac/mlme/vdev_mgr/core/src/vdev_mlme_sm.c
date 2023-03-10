@@ -156,6 +156,7 @@ static bool mlme_vdev_state_init_event(void *ctx, uint16_t event,
 	struct vdev_mlme_obj *vdev_mlme = (struct vdev_mlme_obj *)ctx;
 	bool status;
 	enum QDF_OPMODE mode;
+	QDF_STATUS sm_status;
 
 	mode = wlan_vdev_mlme_get_opmode(vdev_mlme->vdev);
 
@@ -211,9 +212,17 @@ static bool mlme_vdev_state_init_event(void *ctx, uint16_t event,
 		 */
 		if (wlan_vdev_mlme_is_mlo_link_vdev(vdev_mlme->vdev)) {
 			mlme_vdev_sm_transition_to(vdev_mlme, WLAN_VDEV_S_UP);
-			mlme_vdev_sm_deliver_event(vdev_mlme, event,
-						   event_data_len, event_data);
-			status = true;
+			sm_status = mlme_vdev_sm_deliver_event(vdev_mlme, event,
+							       event_data_len,
+							       event_data);
+			status = !sm_status;
+			/*
+			 * Error in handling link-vdev roam event, move the
+			 * SM back to INIT.
+			 */
+			if (QDF_IS_STATUS_ERROR(sm_status))
+				mlme_vdev_sm_transition_to(vdev_mlme,
+							   WLAN_VDEV_S_INIT);
 		} else {
 			status = false;
 		}
@@ -468,6 +477,7 @@ static bool mlme_vdev_state_up_event(void *ctx, uint16_t event,
 	enum QDF_OPMODE mode;
 	struct wlan_objmgr_vdev *vdev;
 	bool status;
+	QDF_STATUS sm_status;
 
 	vdev = vdev_mlme->vdev;
 	mode = wlan_vdev_mlme_get_opmode(vdev);
@@ -509,9 +519,10 @@ static bool mlme_vdev_state_up_event(void *ctx, uint16_t event,
 		if (wlan_vdev_mlme_is_mlo_link_vdev(vdev_mlme->vdev)) {
 			mlme_vdev_sm_transition_to(vdev_mlme,
 						   WLAN_VDEV_SS_UP_ACTIVE);
-			mlme_vdev_sm_deliver_event(vdev_mlme, event,
-						   event_data_len, event_data);
-			status = true;
+			sm_status = mlme_vdev_sm_deliver_event(vdev_mlme, event,
+							       event_data_len,
+							       event_data);
+			status = !sm_status;
 		} else {
 			status = false;
 		}
@@ -1717,10 +1728,35 @@ static void mlme_vdev_subst_mlo_sync_wait_entry(void *ctx)
  *
  * Return: void
  */
+#ifdef WLAN_FEATURE_11BE_MLO
+static void mlme_vdev_subst_mlo_sync_wait_exit(void *ctx)
+{
+	struct vdev_mlme_obj *vdev_mlme = (struct vdev_mlme_obj *)ctx;
+	struct wlan_objmgr_vdev *vdev = vdev_mlme->vdev;
+	struct wlan_mlo_dev_context *mld_ctx = vdev->mlo_dev_ctx;
+	enum QDF_OPMODE mode;
+	uint8_t idx;
+
+	if (!vdev->mlo_dev_ctx)
+		return;
+
+	idx = mlo_get_link_vdev_ix(mld_ctx, vdev);
+	if (idx == MLO_INVALID_LINK_IDX)
+		return;
+
+	mode = wlan_vdev_mlme_get_opmode(vdev);
+	if (mode != QDF_SAP_MODE)
+		return;
+
+	wlan_util_change_map_index(mld_ctx->ap_ctx->mlo_vdev_up_bmap,
+				   idx, 0);
+}
+#else
 static void mlme_vdev_subst_mlo_sync_wait_exit(void *ctx)
 {
 	/* NONE */
 }
+#endif
 
 /**
  * mlme_vdev_subst_mlo_sync_wait_event() - Event handler API for mlo sync wait
@@ -1837,6 +1873,7 @@ static bool mlme_vdev_subst_up_active_event(void *ctx, uint16_t event,
 	enum QDF_OPMODE mode;
 	struct wlan_objmgr_vdev *vdev;
 	bool status;
+	QDF_STATUS sm_status;
 
 	vdev = vdev_mlme->vdev;
 	mode = wlan_vdev_mlme_get_opmode(vdev);
@@ -1915,9 +1952,10 @@ static bool mlme_vdev_subst_up_active_event(void *ctx, uint16_t event,
 		break;
 
 	case WLAN_VDEV_SM_EV_ROAM:
-		mlme_vdev_notify_roam_start(vdev_mlme, event_data_len,
-					    event_data);
-		status = true;
+		sm_status = mlme_vdev_notify_roam_start(vdev_mlme,
+							event_data_len,
+							event_data);
+		status = !sm_status;
 		break;
 
 	default:

@@ -344,7 +344,6 @@ static void reg_update_max_bw_per_rule(uint32_t num_reg_rules,
 			min(reg_rule_start[count].max_bw, max_bw);
 }
 
-#ifdef CONFIG_REG_CLIENT
 /**
  * reg_bw_floor() - Calculate floor of a given bandwidth. Find the nearest
  * bandwidth, from the set = {5, 10, 20, 40, 80, 160, 320}, which is less
@@ -422,32 +421,6 @@ static void reg_do_auto_bw_correction(uint32_t num_reg_rules,
 		}
 	}
 }
-#else
-/**
- * reg_do_auto_bw_correction() - Calculate and update the maximum bandwidth
- * value.
- * @num_reg_rules: Number of regulatory rules.
- * @reg_rule_ptr: Pointer to regulatory rules.
- * @max_bw: Maximum bandwidth
- */
-static void reg_do_auto_bw_correction(uint32_t num_reg_rules,
-				      struct cur_reg_rule *reg_rule_ptr,
-				      uint16_t max_bw)
-{
-	uint32_t count;
-	uint16_t new_bw;
-
-	for (count = 0; count < num_reg_rules - 1; count++) {
-		if (reg_rule_ptr[count].end_freq ==
-		    reg_rule_ptr[count + 1].start_freq) {
-			new_bw = QDF_MIN(max_bw, reg_rule_ptr[count].max_bw +
-					 reg_rule_ptr[count + 1].max_bw);
-			reg_rule_ptr[count].max_bw = new_bw;
-			reg_rule_ptr[count + 1].max_bw = new_bw;
-		}
-	}
-}
-#endif
 
 /**
  * reg_modify_chan_list_for_dfs_channels() - disable the DFS channels if
@@ -495,7 +468,7 @@ reg_is_lpi_cli_supp_pwr_mode(enum supported_6g_pwr_types supp_pwr_mode)
  * @pdev_priv_obj: Pointer to regulatory private pdev structure.
  * @chn_idx: Channel index for which indoor channel needs to be disabled in
  * super channel list.
- * pwr_mode: Input power mode
+ * @pwr_mode: Input power mode
  *
  * Return: None
  */
@@ -601,7 +574,9 @@ static void reg_modify_chan_list_for_indoor_channels(
 			if (!(REGULATORY_CHAN_DISABLED &
 			      chan_list[chan_enum].chan_flags) &&
 			    (REGULATORY_CHAN_INDOOR_ONLY &
-			     chan_list[chan_enum].chan_flags)) {
+			     chan_list[chan_enum].chan_flags) &&
+			    !(pdev_priv_obj->p2p_indoor_ch_support &&
+			      reg_is_5ghz_ch_freq(chan_list[chan_enum].center_freq))) {
 				chan_list[chan_enum].state =
 					CHANNEL_STATE_DFS;
 				chan_list[chan_enum].chan_flags |=
@@ -626,10 +601,12 @@ static void reg_modify_chan_list_for_indoor_channels(
 }
 
 /**
- *reg_modify_chan_list_for_indoor_concurrency() - Enable/Disable the indoor
- *channels for SAP operation based on the indoor concurrency list
+ * reg_modify_chan_list_for_indoor_concurrency() - Enable/Disable the indoor
+ * channels for SAP operation based on the indoor concurrency list
  *
  * @pdev_priv_obj: Pointer to regulatory private pdev structure.
+ *
+ * Return: None
  */
 static void reg_modify_chan_list_for_indoor_concurrency(
 		struct wlan_regulatory_pdev_priv_obj *pdev_priv_obj)
@@ -640,6 +617,7 @@ static void reg_modify_chan_list_for_indoor_concurrency(
 	uint8_t i;
 
 	if (pdev_priv_obj->indoor_chan_enabled ||
+	    pdev_priv_obj->p2p_indoor_ch_support ||
 	    !pdev_priv_obj->sta_sap_scc_on_indoor_channel)
 		return;
 
@@ -1567,8 +1545,8 @@ reg_append_mas_chan_list_for_6g_lpi(struct wlan_regulatory_pdev_priv_obj
 }
 
 /**
- * reg_append_mas_chan_list_for_6g_VLP() - Append VLP channels to the master
- * channel list
+ * reg_append_mas_chan_list_for_6g_vlp() - Append VLP channels to the master
+ *                                         channel list
  * @pdev_priv_obj: Pointer to pdev private object
  *
  * This function appends VLP channels to the master channel list
@@ -1871,7 +1849,8 @@ reg_populate_secondary_cur_chan_list(struct wlan_regulatory_pdev_priv_obj
 #endif /* CONFIG_REG_CLIENT */
 
 #ifdef CONFIG_AFC_SUPPORT
-/* reg_intersect_6g_afc_chan_list() - Do intersection of tx_powers of AFC master
+/**
+ * reg_intersect_6g_afc_chan_list() - Do intersection of tx_powers of AFC master
  * channel list and SP channel list and store the power in the AFC channel list.
  * @pdev_priv_obj: pointer to pdev_priv_obj.
  *
@@ -1923,7 +1902,8 @@ reg_intersect_6g_afc_chan_list(struct wlan_regulatory_pdev_priv_obj
 	}
 }
 
-/* reg_modify_6g_afc_chan_list() - Modify the AFC channel list if the AFC WMI
+/**
+ * reg_modify_6g_afc_chan_list() - Modify the AFC channel list if the AFC WMI
  * power event is received from the target
  * @pdev_priv_obj: pointer to pdev_priv_obj.
  *
@@ -2349,6 +2329,7 @@ reg_modify_chan_list_for_avoid_chan_ext(struct wlan_regulatory_pdev_priv_obj
  * reg_init_super_chan_entry() - Initialize the super channel list entry
  * for an input channel index by disabling the state and chan flags.
  * @pdev_priv_obj: Pointer to pdev_priv_obj
+ * @chan_idx: Channel index to initialize
  *
  * Return: void
  */
@@ -2589,8 +2570,8 @@ struct regulatory_channel *reg_get_reg_maschan_lst_frm_6g_pwr_mode(
 }
 
 /**
- * reg_disable_out_of_range_chan_entry() - Disable the input channel if it is
- * out of the range of the 6G radio and return true, else return false
+ * reg_is_chan_out_of_chip_range() - Determine if the input channel is
+ *                                   out of the range
  * @reg_chan: Pointer to reg_chan
  * @pdev_priv_obj: Pointer to pdev_priv_obj
  *
@@ -2767,6 +2748,7 @@ reg_is_deployment_outdoor(struct wlan_regulatory_pdev_priv_obj *pdev_priv_obj)
  * @pdev_priv_obj: Pointer to pdev_priv_obj
  * @supp_pwr_mode: Supported power mode
  * @chn_idx: Channel index
+ * @max_eirp_pwr: Maximum EIRP power
  *
  * Return: void
  */
@@ -2891,6 +2873,35 @@ reg_compute_super_chan_list(struct wlan_regulatory_pdev_priv_obj *pdev_priv_obj)
 }
 #endif /* CONFIG_BAND_6GHZ */
 
+#ifndef CONFIG_REG_CLIENT
+/**
+ * reg_disable_enable_opclass_channels() - Disable the channels in the
+ * current channel list that have opclass_chan_disable flag set.
+ * @pdev_priv_obj: Pointer to pdev_priv_obj
+ *
+ * Return: void
+ */
+static void
+reg_disable_enable_opclass_channels(struct wlan_regulatory_pdev_priv_obj *pdev_priv_obj)
+{
+	uint8_t i;
+	struct regulatory_channel *cur_chan_list;
+
+	cur_chan_list = pdev_priv_obj->cur_chan_list;
+	for (i = 0; i < NUM_CHANNELS; i++) {
+		if (cur_chan_list[i].opclass_chan_disable) {
+			cur_chan_list[i].state = CHANNEL_STATE_DISABLE;
+			cur_chan_list[i].chan_flags |= REGULATORY_CHAN_DISABLED;
+		}
+	}
+}
+#else
+static void
+reg_disable_enable_opclass_channels(struct wlan_regulatory_pdev_priv_obj *pdev_priv_obj)
+{
+}
+#endif
+
 void reg_compute_pdev_current_chan_list(struct wlan_regulatory_pdev_priv_obj
 					*pdev_priv_obj)
 {
@@ -2952,6 +2963,8 @@ void reg_compute_pdev_current_chan_list(struct wlan_regulatory_pdev_priv_obj
 	reg_modify_chan_list_for_avoid_chan_ext(pdev_priv_obj);
 
 	reg_modify_sec_chan_list_for_6g_edge_chan(pdev_priv_obj);
+
+	reg_disable_enable_opclass_channels(pdev_priv_obj);
 }
 
 void reg_reset_reg_rules(struct reg_rule_info *reg_rules)
@@ -3139,8 +3152,8 @@ void reg_save_reg_rules_to_pdev(struct reg_rule_info *psoc_reg_rules,
 #ifdef CONFIG_REG_CLIENT
 /**
  * reg_set_pdev_fcc_rules - Set pdev fcc rules array
- * @psoc_priv_obj - PSOC private object pointer
- * @pdev_priv_obj - PDEV private object pointer
+ * @psoc_priv_obj: PSOC private object pointer
+ * @pdev_priv_obj: PDEV private object pointer
  *
  */
 
@@ -3523,10 +3536,10 @@ static void reg_init_legacy_master_chan(struct regulatory_channel *dst_list,
 #ifdef CONFIG_REG_CLIENT
 /**
  * reg_set_psoc_fcc_rules - Set PSOC fcc rules array
- * @soc_reg - PSOC private object pointer
- * @regulat_info - Regulatory info pointer
+ * @soc_reg: PSOC private object pointer
+ * @regulat_info: Regulatory info pointer
  *
- * Return - QDF_STATUS
+ * Return: QDF_STATUS
  */
 static QDF_STATUS reg_set_psoc_fcc_rules(
 		struct wlan_regulatory_psoc_priv_obj *soc_reg,
@@ -4606,7 +4619,7 @@ static void reg_find_low_limit_chan_enum_for_6g(
  * reg_find_high_limit_chan_enum_for_6g() - Find 6G channel enum for a given
  * 6G higher edge frequency in the input channel list
  * @chan_list: Pointer to regulatory channel list.
- * @freq: Channel frequency.
+ * @high_freq: Edge Channel frequency.
  * @channel_enum: pointer to output channel enum.
  *
  * Return: None

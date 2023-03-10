@@ -132,8 +132,8 @@ mgmt_rx_reo_compare_global_timestamps_gte(uint32_t ts1, uint32_t ts2)
 /**
  * mgmt_rx_reo_is_stale_frame()- API to check whether the given management frame
  * is stale
- * @ts_last_released_frame: pointer to global time stamp of the last frame
- * removed from the reorder list
+ * @last_delivered_frame: pointer to the info of the last frame delivered to
+ * upper layer
  * @frame_desc: pointer to frame descriptor
  *
  * This API checks whether the current management frame under processing is
@@ -148,14 +148,16 @@ mgmt_rx_reo_compare_global_timestamps_gte(uint32_t ts1, uint32_t ts2)
  */
 static QDF_STATUS
 mgmt_rx_reo_is_stale_frame(
-		struct mgmt_rx_reo_global_ts_info *ts_last_released_frame,
+		struct mgmt_rx_reo_frame_info *last_delivered_frame,
 		struct mgmt_rx_reo_frame_descriptor *frame_desc)
 {
 	uint32_t cur_frame_start_ts;
 	uint32_t cur_frame_end_ts;
+	uint32_t last_delivered_frame_start_ts;
+	uint32_t last_delivered_frame_end_ts;
 
-	if (!ts_last_released_frame) {
-		mgmt_rx_reo_err("Last released frame time stamp info is null");
+	if (!last_delivered_frame) {
+		mgmt_rx_reo_err("Last delivered frame info is null");
 		return QDF_STATUS_E_NULL_VALUE;
 	}
 
@@ -166,21 +168,26 @@ mgmt_rx_reo_is_stale_frame(
 
 	frame_desc->is_stale = false;
 	frame_desc->is_parallel_rx = false;
+	frame_desc->last_delivered_frame = *last_delivered_frame;
 
-	if (!ts_last_released_frame->valid)
+	if (!last_delivered_frame->valid)
 		return QDF_STATUS_SUCCESS;
 
 	cur_frame_start_ts = mgmt_rx_reo_get_start_ts(frame_desc->rx_params);
 	cur_frame_end_ts = mgmt_rx_reo_get_end_ts(frame_desc->rx_params);
+	last_delivered_frame_start_ts =
+			last_delivered_frame->reo_params.start_timestamp;
+	last_delivered_frame_end_ts =
+			last_delivered_frame->reo_params.end_timestamp;
 
 	frame_desc->is_stale =
 		!mgmt_rx_reo_compare_global_timestamps_gte(cur_frame_start_ts,
-					ts_last_released_frame->start_ts);
+					last_delivered_frame_start_ts);
 
 	if (mgmt_rx_reo_compare_global_timestamps_gte
-		(ts_last_released_frame->start_ts, cur_frame_start_ts) &&
+		(last_delivered_frame_start_ts, cur_frame_start_ts) &&
 	    mgmt_rx_reo_compare_global_timestamps_gte
-		(cur_frame_end_ts, ts_last_released_frame->end_ts)) {
+		(cur_frame_end_ts, last_delivered_frame_end_ts)) {
 		frame_desc->is_parallel_rx = true;
 		frame_desc->is_stale = false;
 	}
@@ -439,7 +446,7 @@ mgmt_rx_reo_sim_get_mlo_link_id_from_pdev(struct wlan_objmgr_pdev *pdev)
 	sim_context = mgmt_rx_reo_sim_get_context();
 	if (!sim_context) {
 		mgmt_rx_reo_err("Mgmt reo simulation context is null");
-		return MGMT_RX_REO_INVALID_LINK_ID;
+		return MGMT_RX_REO_INVALID_LINK;
 	}
 
 	qdf_spin_lock(&sim_context->link_id_to_pdev_map.lock);
@@ -450,7 +457,7 @@ mgmt_rx_reo_sim_get_mlo_link_id_from_pdev(struct wlan_objmgr_pdev *pdev)
 
 	/* pdev is not found in map */
 	if (link_id == MAX_MLO_LINKS)
-		link_id = MGMT_RX_REO_INVALID_LINK_ID;
+		link_id = MGMT_RX_REO_INVALID_LINK;
 
 	qdf_spin_unlock(&sim_context->link_id_to_pdev_map.lock);
 
@@ -663,8 +670,7 @@ mgmt_rx_reo_handle_stale_frame(struct mgmt_rx_reo_list *reo_list,
 static bool
 mgmt_rx_reo_is_potential_premature_delivery(uint8_t release_reason)
 {
-	return !(release_reason &
-			MGMT_RX_REO_LIST_ENTRY_RELEASE_REASON_ZERO_WAIT_COUNT);
+	return !(release_reason & RELEASE_REASON_ZERO_WAIT_COUNT);
 }
 
 /**
@@ -1555,7 +1561,7 @@ mgmt_rx_reo_debug_print_egress_frame_stats(struct mgmt_rx_reo_context *reo_ctx)
 	uint64_t total_delivery_success_count = 0;
 	uint64_t total_premature_delivery_count = 0;
 	uint64_t delivery_count_per_link[MAX_MLO_LINKS] = {0};
-	uint64_t delivery_count_per_reason[MGMT_RX_REO_RELEASE_REASON_MAX] = {0};
+	uint64_t delivery_count_per_reason[RELEASE_REASON_MAX] = {0};
 	uint64_t total_delivery_count = 0;
 	char delivery_reason_stats_boarder_a[MGMT_RX_REO_EGRESS_FRAME_DELIVERY_REASON_STATS_BOARDER_A_MAX_SIZE + 1] = {0};
 	char delivery_reason_stats_boarder_b[MGMT_RX_REO_EGRESS_FRAME_DELIVERY_REASON_STATS_BOARDER_B_MAX_SIZE + 1] = {0};
@@ -1575,13 +1581,13 @@ mgmt_rx_reo_debug_print_egress_frame_stats(struct mgmt_rx_reo_context *reo_ctx)
 	}
 
 	for (link_id = 0; link_id < MAX_MLO_LINKS; link_id++) {
-		for (reason = 0; reason < MGMT_RX_REO_RELEASE_REASON_MAX;
+		for (reason = 0; reason < RELEASE_REASON_MAX;
 		     reason++)
 			delivery_count_per_link[link_id] +=
 				stats->delivery_count[link_id][reason];
 		total_delivery_count += delivery_count_per_link[link_id];
 	}
-	for (reason = 0; reason < MGMT_RX_REO_RELEASE_REASON_MAX; reason++)
+	for (reason = 0; reason < RELEASE_REASON_MAX; reason++)
 		for (link_id = 0; link_id < MAX_MLO_LINKS; link_id++)
 			delivery_count_per_reason[reason] +=
 				stats->delivery_count[link_id][reason];
@@ -1606,14 +1612,16 @@ mgmt_rx_reo_debug_print_egress_frame_stats(struct mgmt_rx_reo_context *reo_ctx)
 
 	mgmt_rx_reo_alert("\t2) Delivery reason related stats");
 	mgmt_rx_reo_alert("\tRelease Reason Values:-");
-	mgmt_rx_reo_alert("\tRELEASE_REASON_ZERO_WAIT_COUNT - 0x%lx",
-			  MGMT_RX_REO_LIST_ENTRY_RELEASE_REASON_ZERO_WAIT_COUNT);
-	mgmt_rx_reo_alert("\tRELEASE_REASON_AGED_OUT - 0x%lx",
-			  MGMT_RX_REO_LIST_ENTRY_RELEASE_REASON_AGED_OUT);
-	mgmt_rx_reo_alert("\tRELEASE_REASON_OLDER_THAN_AGED_OUT_FRAME - 0x%lx",
-			  MGMT_RX_REO_LIST_ENTRY_RELEASE_REASON_OLDER_THAN_AGED_OUT_FRAME);
-	mgmt_rx_reo_alert("\tRELEASE_REASON_LIST_MAX_SIZE_EXCEEDED - 0x%lx",
-			  MGMT_RX_REO_LIST_ENTRY_RELEASE_REASON_LIST_MAX_SIZE_EXCEEDED);
+	mgmt_rx_reo_alert("\tREASON_ZERO_WAIT_COUNT - 0x%lx",
+			  RELEASE_REASON_ZERO_WAIT_COUNT);
+	mgmt_rx_reo_alert("\tREASON_AGED_OUT - 0x%lx",
+			  RELEASE_REASON_AGED_OUT);
+	mgmt_rx_reo_alert("\tREASON_OLDER_THAN_AGED_OUT_FRAME - 0x%lx",
+			  RELEASE_REASON_OLDER_THAN_AGED_OUT_FRAME);
+	mgmt_rx_reo_alert("\tREASON_INGRESS_LIST_OVERFLOW - 0x%lx",
+			  RELEASE_REASON_INGRESS_LIST_OVERFLOW);
+	mgmt_rx_reo_alert("\tREASON_OLDER_THAN_READY_TO_DELIVER_FRAMES - 0x%lx",
+			  RELEASE_REASON_OLDER_THAN_READY_TO_DELIVER_FRAMES);
 
 	qdf_mem_set(delivery_reason_stats_boarder_a,
 		    MGMT_RX_REO_EGRESS_FRAME_DELIVERY_REASON_STATS_BOARDER_A_MAX_SIZE, '-');
@@ -1627,7 +1635,7 @@ mgmt_rx_reo_debug_print_egress_frame_stats(struct mgmt_rx_reo_context *reo_ctx)
 			  "0", "1", "2", "3", "4", "5");
 	mgmt_rx_reo_alert("\t%s", delivery_reason_stats_boarder_b);
 
-	for (reason = 0; reason < MGMT_RX_REO_RELEASE_REASON_MAX; reason++) {
+	for (reason = 0; reason < RELEASE_REASON_MAX; reason++) {
 		mgmt_rx_reo_alert("\t|%16x|%7llu|%7llu|%7llu|%7llu|%7llu|%7llu|%7llu",
 				  reason, stats->delivery_count[0][reason],
 				  stats->delivery_count[1][reason],
@@ -1701,9 +1709,15 @@ mgmt_rx_reo_log_egress_frame_before_delivery(
 	qdf_mem_copy(cur_frame_debug_info->host_snapshot, entry->host_snapshot,
 		     qdf_min(sizeof(cur_frame_debug_info->host_snapshot),
 			     sizeof(entry->host_snapshot)));
-	cur_frame_debug_info->insertion_ts = entry->insertion_ts;
 	cur_frame_debug_info->ingress_timestamp = entry->ingress_timestamp;
-	cur_frame_debug_info->removal_ts =  entry->removal_ts;
+	cur_frame_debug_info->ingress_list_insertion_ts =
+					entry->ingress_list_insertion_ts;
+	cur_frame_debug_info->ingress_list_removal_ts =
+					entry->ingress_list_removal_ts;
+	cur_frame_debug_info->egress_list_insertion_ts =
+					entry->egress_list_insertion_ts;
+	cur_frame_debug_info->egress_list_removal_ts =
+					entry->egress_list_removal_ts;
 	cur_frame_debug_info->egress_timestamp = qdf_get_log_timestamp();
 	cur_frame_debug_info->release_reason = entry->release_reason;
 	cur_frame_debug_info->is_premature_delivery =
@@ -1831,14 +1845,16 @@ mgmt_rx_reo_debug_print_egress_frame_info(struct mgmt_rx_reo_context *reo_ctx,
 	boarder = egress_frame_debug_info->boarder;
 
 	mgmt_rx_reo_alert_no_fl("%s", boarder);
-	mgmt_rx_reo_alert_no_fl("|%3s|%5s|%4s|%5s|%10s|%11s|%11s|%11s|%11s|%5s|%7s|%5s|%4s|%69s|%69s|%94s|%94s|%94s|%94s|%94s|%94s|",
+	mgmt_rx_reo_alert_no_fl("|%3s|%5s|%4s|%5s|%10s|%11s|%11s|%11s|%11s|%11s|%11s|%5s|%7s|%7s|%5s|%4s|%69s|%69s|%94s|%94s|%94s|%94s|%94s|%94s|",
 				"No.", "CPU", "Link", "SeqNo", "Global ts",
-				"Ingress ts", "Insert. ts", "Removal ts",
-				"Egress ts", "E Dur", "W Dur", "Flags", "Rea.",
-				"Final wait count", "Initial wait count",
-				"Snapshot : link 0", "Snapshot : link 1",
-				"Snapshot : link 2", "Snapshot : link 3",
-				"Snapshot : link 4", "Snapshot : link 5");
+				"Ingress ts", "Ing Insert",
+				"Ing Remove", "Eg Insert", "Eg Remove",
+				"Egress ts", "E Dur", "I W Dur", "E W Dur",
+				"Flags", "Rea.", "Final wait count",
+				"Initial wait count", "Snapshot : link 0",
+				"Snapshot : link 1", "Snapshot : link 2",
+				"Snapshot : link 3", "Snapshot : link 4",
+				"Snapshot : link 5");
 	mgmt_rx_reo_alert_no_fl("%s", boarder);
 
 	index = start_index;
@@ -1921,15 +1937,21 @@ mgmt_rx_reo_debug_print_egress_frame_info(struct mgmt_rx_reo_context *reo_ctx,
 				 fw_forwarded, host);
 		}
 
-		mgmt_rx_reo_alert_no_fl("|%3u|%5d|%4u|%5u|%10u|%11llu|%11llu|%11llu|%11llu|%5llu|%7llu|%5s|%4x|%69s|%69s|%94s|%94s|%94s|%94s|%94s|%94s|",
+		mgmt_rx_reo_alert_no_fl("|%3u|%5d|%4u|%5u|%10u|%11llu|%11llu|%11llu|%11llu|%11llu|%11llu|%5llu|%7llu|%7llu|%5s|%4x|%69s|%69s|%94s|%94s|%94s|%94s|%94s|%94s|",
 					entry, info->cpu_id, info->link_id,
 					info->mgmt_pkt_ctr,
 					info->global_timestamp,
 					info->ingress_timestamp,
-					info->insertion_ts, info->removal_ts,
+					info->ingress_list_insertion_ts,
+					info->ingress_list_removal_ts,
+					info->egress_list_insertion_ts,
+					info->egress_list_removal_ts,
 					info->egress_timestamp,
 					info->egress_duration,
-					info->removal_ts - info->insertion_ts,
+					info->ingress_list_removal_ts -
+					info->ingress_list_insertion_ts,
+					info->egress_list_removal_ts -
+					info->egress_list_insertion_ts,
 					flags, info->release_reason,
 					final_wait_count, initial_wait_count,
 					snapshots[0], snapshots[1],
@@ -2023,45 +2045,44 @@ mgmt_rx_reo_debug_print_egress_frame_info(struct mgmt_rx_reo_context *reo_ctx)
 static uint8_t
 mgmt_rx_reo_list_entry_get_release_reason(struct mgmt_rx_reo_list_entry *entry)
 {
-	uint8_t release_reason = 0;
+	uint8_t reason = 0;
 
 	if (!entry)
 		return 0;
 
-	if (MGMT_RX_REO_LIST_ENTRY_IS_MAX_SIZE_EXCEEDED(entry))
-		release_reason |=
-		   MGMT_RX_REO_LIST_ENTRY_RELEASE_REASON_LIST_MAX_SIZE_EXCEEDED;
+	if (!LIST_ENTRY_IS_WAITING_FOR_FRAME_ON_OTHER_LINK(entry))
+		reason |= RELEASE_REASON_ZERO_WAIT_COUNT;
 
-	if (!MGMT_RX_REO_LIST_ENTRY_IS_WAITING_FOR_FRAME_ON_OTHER_LINK(entry))
-		release_reason |=
-			MGMT_RX_REO_LIST_ENTRY_RELEASE_REASON_ZERO_WAIT_COUNT;
+	if (LIST_ENTRY_IS_AGED_OUT(entry))
+		reason |= RELEASE_REASON_AGED_OUT;
 
-	if (MGMT_RX_REO_LIST_ENTRY_IS_AGED_OUT(entry))
-		release_reason |=
-				MGMT_RX_REO_LIST_ENTRY_RELEASE_REASON_AGED_OUT;
+	if (LIST_ENTRY_IS_OLDER_THAN_LATEST_AGED_OUT_FRAME(entry))
+		reason |= RELEASE_REASON_OLDER_THAN_AGED_OUT_FRAME;
 
-	if (MGMT_RX_REO_LIST_ENTRY_IS_OLDER_THAN_LATEST_AGED_OUT_FRAME(entry))
-		release_reason |=
-		MGMT_RX_REO_LIST_ENTRY_RELEASE_REASON_OLDER_THAN_AGED_OUT_FRAME;
+	if (LIST_ENTRY_IS_REMOVED_DUE_TO_INGRESS_LIST_OVERFLOW(entry))
+		reason |= RELEASE_REASON_INGRESS_LIST_OVERFLOW;
 
-	return release_reason;
+	if (LIST_ENTRY_IS_OLDER_THAN_READY_TO_DELIVER_FRAMES(entry))
+		reason |= RELEASE_REASON_OLDER_THAN_READY_TO_DELIVER_FRAMES;
+
+	return reason;
 }
 
 /**
  * mgmt_rx_reo_list_entry_send_up() - API to send the frame to the upper layer.
- * @reo_list: Pointer to reorder list
+ * @reo_context: Pointer to reorder context
  * @entry: List entry
  *
  * API to send the frame to the upper layer. This API has to be called only
  * for entries which can be released to upper layer. It is the caller's
  * responsibility to ensure that entry can be released (by using API
- * mgmt_rx_reo_list_is_ready_to_send_up_entry). This API is called after
+ * mgmt_rx_reo_is_entry_ready_to_send_up). This API is called after
  * acquiring the lock which serializes the frame delivery to the upper layers.
  *
  * Return: QDF_STATUS
  */
 static QDF_STATUS
-mgmt_rx_reo_list_entry_send_up(struct mgmt_rx_reo_list *reo_list,
+mgmt_rx_reo_list_entry_send_up(struct mgmt_rx_reo_context *reo_context,
 			       struct mgmt_rx_reo_list_entry *entry)
 {
 	uint8_t release_reason;
@@ -2069,13 +2090,9 @@ mgmt_rx_reo_list_entry_send_up(struct mgmt_rx_reo_list *reo_list,
 	uint32_t entry_global_ts;
 	QDF_STATUS status;
 	QDF_STATUS temp;
-	struct mgmt_rx_reo_context *reo_context;
 
-	qdf_assert_always(reo_list);
-	qdf_assert_always(entry);
-
-	reo_context = mgmt_rx_reo_get_context_from_reo_list(reo_list);
 	qdf_assert_always(reo_context);
+	qdf_assert_always(entry);
 
 	link_id = mgmt_rx_reo_get_link_id(entry->rx_params);
 	entry_global_ts = mgmt_rx_reo_get_global_ts(entry->rx_params);
@@ -2130,32 +2147,97 @@ exit:
 }
 
 /**
- * mgmt_rx_reo_list_is_ready_to_send_up_entry() - API to check whether the
+ * mgmt_rx_reo_is_entry_ready_to_send_up() - API to check whether the
  * list entry can be send to upper layers.
- * @reo_list: Pointer to reorder list
  * @entry: List entry
  *
  * Return: QDF_STATUS
  */
 static bool
-mgmt_rx_reo_list_is_ready_to_send_up_entry(struct mgmt_rx_reo_list *reo_list,
-					   struct mgmt_rx_reo_list_entry *entry)
+mgmt_rx_reo_is_entry_ready_to_send_up(struct mgmt_rx_reo_list_entry *entry)
 {
-	if (!reo_list || !entry)
-		return false;
+	qdf_assert_always(entry);
 
-	return mgmt_rx_reo_list_max_size_exceeded(reo_list) ||
-	       !MGMT_RX_REO_LIST_ENTRY_IS_WAITING_FOR_FRAME_ON_OTHER_LINK(
-	       entry) || MGMT_RX_REO_LIST_ENTRY_IS_AGED_OUT(entry) ||
-	       MGMT_RX_REO_LIST_ENTRY_IS_OLDER_THAN_LATEST_AGED_OUT_FRAME
-	       (entry);
+	return LIST_ENTRY_IS_REMOVED_DUE_TO_INGRESS_LIST_OVERFLOW(entry) ||
+	       !LIST_ENTRY_IS_WAITING_FOR_FRAME_ON_OTHER_LINK(entry) ||
+	       LIST_ENTRY_IS_AGED_OUT(entry) ||
+	       LIST_ENTRY_IS_OLDER_THAN_LATEST_AGED_OUT_FRAME(entry) ||
+	       LIST_ENTRY_IS_OLDER_THAN_READY_TO_DELIVER_FRAMES(entry);
 }
 
 /**
- * mgmt_rx_reo_list_release_entries() - Release entries from the reorder list
+ * mgmt_rx_reo_defer_delivery() - Helper API to check whether a management
+ * frame can be delivered in the current context or it has to be scheduled
+ * for delivery in a different context
+ * @entry: List entry
+ * @link_bitmap: Link bitmap
+ *
+ * Return: true if frame can't be delivered in the current context and its
+ * delivery has to be done in a different context
+ */
+bool
+mgmt_rx_reo_defer_delivery(struct mgmt_rx_reo_list_entry *entry,
+			   uint32_t link_bitmap)
+{
+	uint8_t link_id;
+
+	qdf_assert_always(entry);
+
+	link_id = mgmt_rx_reo_get_link_id(entry->rx_params);
+
+	return !(link_bitmap & (1 << link_id));
+}
+
+/**
+ * mgmt_rx_reo_schedule_delivery() - Helper API to schedule the delivery of
+ * a management frames.
+ * @entry: List entry corresponding to the frame which has to be scheduled
+ * for delivery
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+mgmt_rx_reo_schedule_delivery(struct mgmt_rx_reo_list_entry *entry)
+{
+	int scheduled_count;
+	int8_t link_id;
+	uint8_t mlo_grp_id;
+	struct wlan_objmgr_pdev *pdev;
+	QDF_STATUS status;
+
+	scheduled_count = qdf_atomic_inc_return(&entry->scheduled_count);
+	qdf_assert_always(scheduled_count > 0);
+
+	if (scheduled_count > 1)
+		return QDF_STATUS_SUCCESS;
+
+	link_id = mgmt_rx_reo_get_link_id(entry->rx_params);
+	qdf_assert_always(link_id >= 0 && link_id < MAX_MLO_LINKS);
+	mlo_grp_id = entry->rx_params->reo_params->mlo_grp_id;
+	pdev = wlan_get_pdev_from_mlo_link_id(link_id, mlo_grp_id,
+					      WLAN_MGMT_RX_REO_ID);
+	if (!pdev) {
+		mgmt_rx_reo_err("pdev for link %u, group %u is null",
+				link_id, mlo_grp_id);
+		return QDF_STATUS_E_NULL_VALUE;
+	}
+
+	status = tgt_mgmt_rx_reo_schedule_delivery(wlan_pdev_get_psoc(pdev));
+	if (QDF_IS_STATUS_ERROR(status)) {
+		mgmt_rx_reo_err("Failed to schedule for link %u, group %u",
+				link_id, mlo_grp_id);
+		return status;
+	}
+
+	return QDF_STATUS_SUCCESS;
+}
+
+/**
+ * mgmt_rx_reo_release_egress_list_entries() - Release entries from the
+ * egress list
  * @reo_context: Pointer to management Rx reorder context
  *
- * This API releases the entries from the reorder list based on the following
+ * This API releases the entries from the egress list based on the following
  * conditions.
  *   a) Entries with total wait count equal to 0
  *   b) Entries which are timed out or entries with global time stamp <= global
@@ -2167,17 +2249,21 @@ mgmt_rx_reo_list_is_ready_to_send_up_entry(struct mgmt_rx_reo_list *reo_list,
  * Return: QDF_STATUS
  */
 static QDF_STATUS
-mgmt_rx_reo_list_release_entries(struct mgmt_rx_reo_context *reo_context)
+mgmt_rx_reo_release_egress_list_entries(struct mgmt_rx_reo_context *reo_context)
 {
-	struct mgmt_rx_reo_list *reo_list;
 	QDF_STATUS status;
+	struct mgmt_rx_reo_egress_list *egress_list;
+	struct mgmt_rx_reo_list *reo_egress_list;
+	qdf_timer_t *egress_inactivity_timer;
 
 	if (!reo_context) {
 		mgmt_rx_reo_err("reo context is null");
 		return QDF_STATUS_E_NULL_VALUE;
 	}
 
-	reo_list = &reo_context->reo_list;
+	egress_list = &reo_context->egress_list;
+	reo_egress_list = &egress_list->reo_list;
+	egress_inactivity_timer = &egress_list->egress_inactivity_timer;
 
 	qdf_spin_lock(&reo_context->frame_release_lock);
 
@@ -2185,42 +2271,40 @@ mgmt_rx_reo_list_release_entries(struct mgmt_rx_reo_context *reo_context)
 		struct mgmt_rx_reo_list_entry *first_entry;
 		/* TODO yield if release_count > THRESHOLD */
 		uint16_t release_count = 0;
-		struct mgmt_rx_reo_global_ts_info *ts_last_released_frame =
-					&reo_list->ts_last_released_frame;
-		uint32_t entry_global_ts;
+		uint32_t first_entry_ts;
+		struct mgmt_rx_event_params *rx_params;
+		struct mgmt_rx_reo_frame_info *last_released_frame =
+					&reo_egress_list->last_released_frame;
+		uint32_t last_released_frame_ts;
+		bool deliver;
 
-		qdf_spin_lock_bh(&reo_list->list_lock);
+		qdf_spin_lock_bh(&reo_egress_list->list_lock);
 
 		first_entry = qdf_list_first_entry_or_null(
-			&reo_list->list, struct mgmt_rx_reo_list_entry, node);
-
+					&reo_egress_list->list,
+					struct mgmt_rx_reo_list_entry, node);
 		if (!first_entry) {
 			status = QDF_STATUS_SUCCESS;
-			goto exit_unlock_list_lock;
+			goto exit_unlock_egress_list_lock;
 		}
 
-		if (!mgmt_rx_reo_list_is_ready_to_send_up_entry(reo_list,
-								first_entry)) {
-			status = QDF_STATUS_SUCCESS;
-			goto exit_unlock_list_lock;
-		}
+		deliver = mgmt_rx_reo_is_entry_ready_to_send_up(first_entry);
+		qdf_assert_always(deliver);
 
-		if (mgmt_rx_reo_list_max_size_exceeded(reo_list))
-			first_entry->status |=
-				MGMT_RX_REO_STATUS_LIST_MAX_SIZE_EXCEEDED;
+		rx_params = first_entry->rx_params;
 
-		status = qdf_list_remove_node(&reo_list->list,
+		status = qdf_list_remove_node(&reo_egress_list->list,
 					      &first_entry->node);
 		if (QDF_IS_STATUS_ERROR(status)) {
 			status = QDF_STATUS_E_FAILURE;
-			goto exit_unlock_list_lock;
+			goto exit_unlock_egress_list_lock;
 		}
-		first_entry->removal_ts = qdf_get_log_timestamp();
+		first_entry->egress_list_removal_ts = qdf_get_log_timestamp();
 
 		/**
 		 * Last released frame global time stamp is invalid means that
 		 * current frame is the first frame to be released to the
-		 * upper layer from the reorder list. Blindly update the last
+		 * upper layer from the egress list. Blindly update the last
 		 * released frame global time stamp to the current frame's
 		 * global time stamp and set the valid to true.
 		 * If the last released frame global time stamp is valid and
@@ -2228,26 +2312,21 @@ mgmt_rx_reo_list_release_entries(struct mgmt_rx_reo_context *reo_context)
 		 * global time stamp, deliver the current frame to upper layer
 		 * and update the last released frame global time stamp.
 		 */
-		entry_global_ts =
-			mgmt_rx_reo_get_global_ts(first_entry->rx_params);
+		first_entry_ts = mgmt_rx_reo_get_global_ts(rx_params);
+		last_released_frame_ts =
+			last_released_frame->reo_params.global_timestamp;
 
-		if (!ts_last_released_frame->valid ||
+		if (!last_released_frame->valid ||
 		    mgmt_rx_reo_compare_global_timestamps_gte(
-			entry_global_ts, ts_last_released_frame->global_ts)) {
-			struct mgmt_rx_event_params *params;
+			first_entry_ts, last_released_frame_ts)) {
+			qdf_timer_sync_cancel(egress_inactivity_timer);
 
-			params = first_entry->rx_params;
+			last_released_frame->reo_params =
+						*rx_params->reo_params;
+			last_released_frame->valid = true;
 
-			ts_last_released_frame->global_ts = entry_global_ts;
-			ts_last_released_frame->start_ts =
-					mgmt_rx_reo_get_start_ts(params);
-			ts_last_released_frame->end_ts =
-					mgmt_rx_reo_get_end_ts(params);
-			ts_last_released_frame->valid = true;
-
-			qdf_timer_mod
-				(&reo_list->global_mgmt_rx_inactivity_timer,
-				 MGMT_RX_REO_GLOBAL_MGMT_RX_INACTIVITY_TIMEOUT);
+			qdf_timer_mod(egress_inactivity_timer,
+				      MGMT_RX_REO_EGRESS_INACTIVITY_TIMEOUT);
 		} else {
 			/**
 			 * This should never happen. All the frames older than
@@ -2257,9 +2336,9 @@ mgmt_rx_reo_list_release_entries(struct mgmt_rx_reo_context *reo_context)
 			qdf_assert_always(first_entry->is_parallel_rx);
 		}
 
-		qdf_spin_unlock_bh(&reo_list->list_lock);
+		qdf_spin_unlock_bh(&reo_egress_list->list_lock);
 
-		status = mgmt_rx_reo_list_entry_send_up(reo_list,
+		status = mgmt_rx_reo_list_entry_send_up(reo_context,
 							first_entry);
 		if (QDF_IS_STATUS_ERROR(status)) {
 			status = QDF_STATUS_E_FAILURE;
@@ -2274,108 +2353,388 @@ mgmt_rx_reo_list_release_entries(struct mgmt_rx_reo_context *reo_context)
 	status = QDF_STATUS_SUCCESS;
 	goto exit_unlock_frame_release_lock;
 
-exit_unlock_list_lock:
-	qdf_spin_unlock_bh(&reo_list->list_lock);
+exit_unlock_egress_list_lock:
+	qdf_spin_unlock_bh(&reo_egress_list->list_lock);
 exit_unlock_frame_release_lock:
 	qdf_spin_unlock(&reo_context->frame_release_lock);
 
 	return status;
 }
 
+QDF_STATUS
+mgmt_rx_reo_release_frames(uint8_t mlo_grp_id, uint32_t link_bitmap)
+{
+	struct mgmt_rx_reo_context *reo_context;
+
+	reo_context = mgmt_rx_reo_get_context(mlo_grp_id);
+	if (!reo_context) {
+		mgmt_rx_reo_err("Mgmt rx reo context is null");
+		return QDF_STATUS_E_NULL_VALUE;
+	}
+
+	return QDF_STATUS_SUCCESS;
+}
+
 /**
- * mgmt_rx_reo_list_ageout_timer_handler() - Periodic ageout timer handler
+ * mgmt_rx_reo_check_sanity_list() - Check the sanity of reorder list
+ * @reo_list: Pointer to reorder list
+ *
+ * Check the sanity of ingress reorder list or egress reorder list.
+ * Ingress/Egress reorder list entries should be in the non decreasing order
+ * of global time stamp.
+ *
+ * Return: QDF_STATUS
+ */
+static QDF_STATUS
+mgmt_rx_reo_check_sanity_list(struct mgmt_rx_reo_list *reo_list)
+{
+	struct mgmt_rx_reo_list_entry *first;
+	struct mgmt_rx_reo_list_entry *cur;
+	uint32_t ts_prev;
+	uint32_t ts_cur;
+
+	qdf_assert_always(reo_list);
+
+	if (qdf_list_empty(&reo_list->list))
+		return QDF_STATUS_SUCCESS;
+
+	first = qdf_list_first_entry_or_null(&reo_list->list,
+					     struct mgmt_rx_reo_list_entry,
+					     node);
+	qdf_assert_always(first);
+
+	cur = first;
+	ts_prev = mgmt_rx_reo_get_global_ts(first->rx_params);
+
+	qdf_list_for_each_continue(&reo_list->list, cur, node) {
+		ts_cur = mgmt_rx_reo_get_global_ts(cur->rx_params);
+
+		if (!mgmt_rx_reo_compare_global_timestamps_gte(ts_cur,
+							       ts_prev))
+			return QDF_STATUS_E_INVAL;
+
+		ts_prev = ts_cur;
+	}
+
+	return QDF_STATUS_SUCCESS;
+}
+
+/**
+ * mgmt_rx_reo_check_sanity_lists() - Check the sanity of ingress and
+ * egress reorder lists
+ * @reo_egress_list: Pointer to egress reorder list
+ * @reo_ingress_list: Pointer to ingress reorder list
+ *
+ * Check the sanity of ingress reorder list and egress reorder list.
+ * This API does the following sanity checks.
+ *
+ * 1. Ingress list entries should be in the non decreasing order of global
+ *    time stamp.
+ * 2. Egress list entries should be in the non decreasing order of global
+ *    time stamp.
+ * 3. All the entries in egress list should have global time stamp less
+ *    than or equal to all the entries in ingress list.
+ *
+ * Return: QDF_STATUS
+ */
+static QDF_STATUS
+mgmt_rx_reo_check_sanity_lists(struct mgmt_rx_reo_list *reo_egress_list,
+			       struct mgmt_rx_reo_list *reo_ingress_list)
+{
+	QDF_STATUS status;
+	struct mgmt_rx_reo_list_entry *last_entry_egress_list;
+	uint32_t ts_egress_last_entry;
+	struct mgmt_rx_reo_list_entry *first_entry_ingress_list;
+	uint32_t ts_ingress_first_entry;
+
+	qdf_assert_always(reo_egress_list);
+	qdf_assert_always(reo_ingress_list);
+
+	status = mgmt_rx_reo_check_sanity_list(reo_egress_list);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		mgmt_rx_reo_err("Sanity check of egress list failed");
+		return status;
+	}
+
+	status = mgmt_rx_reo_check_sanity_list(reo_ingress_list);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		mgmt_rx_reo_err("Sanity check of ingress list failed");
+		return status;
+	}
+
+	if (qdf_list_empty(&reo_egress_list->list) ||
+	    qdf_list_empty(&reo_ingress_list->list))
+		return QDF_STATUS_SUCCESS;
+
+	last_entry_egress_list =
+		qdf_list_last_entry(&reo_egress_list->list,
+				    struct mgmt_rx_reo_list_entry, node);
+	ts_egress_last_entry =
+		mgmt_rx_reo_get_global_ts(last_entry_egress_list->rx_params);
+
+	first_entry_ingress_list =
+		qdf_list_first_entry_or_null(&reo_ingress_list->list,
+					     struct mgmt_rx_reo_list_entry,
+					     node);
+	if (!first_entry_ingress_list) {
+		mgmt_rx_reo_err("Ingress list is expected to be non empty");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	ts_ingress_first_entry =
+		mgmt_rx_reo_get_global_ts(first_entry_ingress_list->rx_params);
+
+	if (!mgmt_rx_reo_compare_global_timestamps_gte(ts_ingress_first_entry,
+						       ts_egress_last_entry))
+		return QDF_STATUS_E_INVAL;
+
+	return QDF_STATUS_SUCCESS;
+}
+
+/**
+ * mgmt_rx_reo_move_entries_ingress_to_egress_list() - Moves frames in
+ * the ingress list which are ready to be delivered to the egress list
+ * @ingress_list: Pointer to ingress list
+ * @egress_list: Pointer to egress list
+ *
+ * This API moves frames in the ingress list which are ready to be delivered
+ * to the egress list.
+ *
+ * Return: QDF_STATUS
+ */
+static QDF_STATUS
+mgmt_rx_reo_move_entries_ingress_to_egress_list
+		(struct mgmt_rx_reo_ingress_list *ingress_list,
+		 struct mgmt_rx_reo_egress_list *egress_list)
+{
+	struct mgmt_rx_reo_list *reo_ingress_list;
+	struct mgmt_rx_reo_list *reo_egress_list;
+	QDF_STATUS status;
+	struct mgmt_rx_reo_list_entry *ingress_list_entry;
+	struct mgmt_rx_reo_list_entry *latest_frame_ready_to_deliver = NULL;
+	uint16_t num_frames_ready_to_deliver = 0;
+	uint32_t num_overflow_frames = 0;
+	uint32_t ingress_list_max_size;
+	uint32_t ingress_list_cur_size;
+
+	if (!ingress_list) {
+		mgmt_rx_reo_err("Ingress list is null");
+		return QDF_STATUS_E_NULL_VALUE;
+	}
+	reo_ingress_list = &ingress_list->reo_list;
+
+	if (!egress_list) {
+		mgmt_rx_reo_err("Egress list is null");
+		return QDF_STATUS_E_NULL_VALUE;
+	}
+	reo_egress_list = &egress_list->reo_list;
+
+	qdf_spin_lock_bh(&reo_ingress_list->list_lock);
+
+	ingress_list_cur_size = qdf_list_size(&reo_ingress_list->list);
+	ingress_list_max_size = reo_ingress_list->max_list_size;
+	if (mgmt_rx_reo_list_overflowed(reo_ingress_list))
+		num_overflow_frames =
+				ingress_list_cur_size - ingress_list_max_size;
+
+	qdf_list_for_each(&reo_ingress_list->list, ingress_list_entry, node) {
+		if (num_overflow_frames > 0) {
+			ingress_list_entry->status |=
+						STATUS_INGRESS_LIST_OVERFLOW;
+			num_overflow_frames--;
+		}
+
+		if (!mgmt_rx_reo_is_entry_ready_to_send_up(ingress_list_entry))
+			break;
+
+		ingress_list_entry->ingress_list_removal_ts =
+							qdf_get_log_timestamp();
+		ingress_list_entry->egress_list_insertion_ts =
+							qdf_get_log_timestamp();
+		latest_frame_ready_to_deliver = ingress_list_entry;
+		num_frames_ready_to_deliver++;
+	}
+
+	/* Check if ingress list has at least one frame ready to be delivered */
+	if (num_frames_ready_to_deliver) {
+		qdf_list_t temp_list_frames_ready_to_deliver;
+
+		qdf_list_create(&temp_list_frames_ready_to_deliver,
+				INGRESS_TO_EGRESS_MOVEMENT_TEMP_LIST_MAX_SIZE);
+
+		status = qdf_list_split(&temp_list_frames_ready_to_deliver,
+					&reo_ingress_list->list,
+					&latest_frame_ready_to_deliver->node);
+		qdf_assert_always(QDF_IS_STATUS_SUCCESS(status));
+
+		qdf_assert_always(num_frames_ready_to_deliver ==
+			qdf_list_size(&temp_list_frames_ready_to_deliver));
+
+		qdf_spin_lock_bh(&reo_egress_list->list_lock);
+
+		status = qdf_list_join(&reo_egress_list->list,
+				       &temp_list_frames_ready_to_deliver);
+		qdf_assert_always(QDF_IS_STATUS_SUCCESS(status));
+
+		qdf_assert_always(qdf_list_size(&reo_ingress_list->list) <=
+				  reo_ingress_list->max_list_size);
+		qdf_assert_always(qdf_list_size(&reo_egress_list->list) <=
+						reo_egress_list->max_list_size);
+
+		status = mgmt_rx_reo_check_sanity_lists(reo_egress_list,
+							reo_ingress_list);
+		if (QDF_IS_STATUS_ERROR(status)) {
+			mgmt_rx_reo_err("Sanity check of reo lists failed");
+			qdf_assert_always(0);
+		}
+
+		qdf_spin_unlock_bh(&reo_egress_list->list_lock);
+
+		qdf_list_destroy(&temp_list_frames_ready_to_deliver);
+	}
+
+	qdf_spin_unlock_bh(&reo_ingress_list->list_lock);
+
+	return QDF_STATUS_SUCCESS;
+}
+
+/**
+ * mgmt_rx_reo_ageout_entries_ingress_list() - Helper API to ageout entries
+ * in the ingress list
+ * @ingress_list: Pointer to the ingress list
+ * @latest_aged_out_entry: Double pointer to the latest agedout entry in the
+ * ingress list
+ *
+ * Helper API to ageout entries in the ingress list.
+ *
+ * Return: QDF_STATUS
+ */
+static QDF_STATUS
+mgmt_rx_reo_ageout_entries_ingress_list
+			(struct mgmt_rx_reo_ingress_list *ingress_list,
+			 struct mgmt_rx_reo_list_entry **latest_aged_out_entry)
+{
+	struct mgmt_rx_reo_list *reo_ingress_list;
+	struct mgmt_rx_reo_list_entry *cur_entry;
+	uint64_t cur_ts;
+
+	qdf_assert_always(ingress_list);
+	qdf_assert_always(latest_aged_out_entry);
+
+	*latest_aged_out_entry = NULL;
+	reo_ingress_list = &ingress_list->reo_list;
+
+	qdf_spin_lock_bh(&reo_ingress_list->list_lock);
+
+	cur_ts = qdf_get_log_timestamp();
+
+	qdf_list_for_each(&reo_ingress_list->list, cur_entry, node) {
+		if (cur_ts - cur_entry->ingress_list_insertion_ts >=
+		    ingress_list->list_entry_timeout_us) {
+			*latest_aged_out_entry = cur_entry;
+			cur_entry->status |= STATUS_AGED_OUT;
+		}
+	}
+
+	if (!*latest_aged_out_entry)
+		goto exit_release_list_lock;
+
+	qdf_list_for_each(&reo_ingress_list->list, cur_entry, node) {
+		if (cur_entry == *latest_aged_out_entry)
+			break;
+		cur_entry->status |= STATUS_OLDER_THAN_LATEST_AGED_OUT_FRAME;
+	}
+
+exit_release_list_lock:
+	qdf_spin_unlock_bh(&reo_ingress_list->list_lock);
+
+	return QDF_STATUS_SUCCESS;
+}
+
+/**
+ * mgmt_rx_reo_ingress_list_ageout_timer_handler() - Periodic ageout timer
+ * handler
  * @arg: Argument to timer handler
  *
  * This is the handler for periodic ageout timer used to timeout entries in the
- * reorder list.
+ * ingress list.
  *
  * Return: void
  */
 static void
-mgmt_rx_reo_list_ageout_timer_handler(void *arg)
+mgmt_rx_reo_ingress_list_ageout_timer_handler(void *arg)
 {
-	struct mgmt_rx_reo_list *reo_list = arg;
-	struct mgmt_rx_reo_list_entry *cur_entry;
-	uint64_t cur_ts;
-	QDF_STATUS status;
-	struct mgmt_rx_reo_context *reo_context;
+	struct mgmt_rx_reo_ingress_list *ingress_list = arg;
+	struct mgmt_rx_reo_egress_list *egress_list;
+	QDF_STATUS ret;
+	struct mgmt_rx_reo_context *reo_ctx;
 	/**
-	 * Stores the pointer to the entry in reorder list for the latest aged
+	 * Stores the pointer to the entry in ingress list for the latest aged
 	 * out frame. Latest aged out frame is the aged out frame in reorder
 	 * list which has the largest global time stamp value.
 	 */
 	struct mgmt_rx_reo_list_entry *latest_aged_out_entry = NULL;
 
-	qdf_assert_always(reo_list);
+	qdf_assert_always(ingress_list);
+	reo_ctx = mgmt_rx_reo_get_context_from_ingress_list(ingress_list);
+	qdf_assert_always(reo_ctx);
+	egress_list = &reo_ctx->egress_list;
 
-	qdf_timer_mod(&reo_list->ageout_timer,
-		      MGMT_RX_REO_AGEOUT_TIMER_PERIOD_MS);
+	qdf_timer_mod(&ingress_list->ageout_timer,
+		      MGMT_RX_REO_INGRESS_LIST_AGEOUT_TIMER_PERIOD_MS);
 
-	reo_context = mgmt_rx_reo_get_context_from_reo_list(reo_list);
-	qdf_assert_always(reo_context);
-
-	qdf_spin_lock_bh(&reo_list->list_lock);
-
-	cur_ts = qdf_get_log_timestamp();
-
-	qdf_list_for_each(&reo_list->list, cur_entry, node) {
-		if (cur_ts - cur_entry->insertion_ts >=
-		    reo_list->list_entry_timeout_us) {
-			latest_aged_out_entry = cur_entry;
-			cur_entry->status |= MGMT_RX_REO_STATUS_AGED_OUT;
-		}
+	ret = mgmt_rx_reo_ageout_entries_ingress_list(ingress_list,
+						      &latest_aged_out_entry);
+	if (QDF_IS_STATUS_ERROR(ret)) {
+		mgmt_rx_reo_err("Failure to ageout entries in ingress list");
+		return;
 	}
 
-	if (latest_aged_out_entry) {
-		qdf_list_for_each(&reo_list->list, cur_entry, node) {
-			if (cur_entry == latest_aged_out_entry)
-				break;
-			cur_entry->status |= MGMT_RX_REO_STATUS_OLDER_THAN_LATEST_AGED_OUT_FRAME;
-		}
+	if (!latest_aged_out_entry)
+		return;
+
+	ret = mgmt_rx_reo_move_entries_ingress_to_egress_list(ingress_list,
+							      egress_list);
+	if (QDF_IS_STATUS_ERROR(ret)) {
+		mgmt_rx_reo_err("Ingress to egress list movement failure(%d)",
+				ret);
+		return;
 	}
 
-	qdf_spin_unlock_bh(&reo_list->list_lock);
-
-	if (latest_aged_out_entry) {
-		status = mgmt_rx_reo_list_release_entries(reo_context);
-		if (QDF_IS_STATUS_ERROR(status)) {
-			mgmt_rx_reo_err("Failed to release entries, ret = %d",
-					status);
-			return;
-		}
+	ret = mgmt_rx_reo_release_egress_list_entries(reo_ctx);
+	if (QDF_IS_STATUS_ERROR(ret)) {
+		mgmt_rx_reo_err("Failure to release entries, ret = %d", ret);
+		return;
 	}
 }
 
 /**
- * mgmt_rx_reo_global_mgmt_rx_inactivity_timer_handler() - Timer handler
- * for global management Rx inactivity timer
+ * mgmt_rx_reo_egress_inactivity_timer_handler() - Timer handler
+ * for egress inactivity timer
  * @arg: Argument to timer handler
  *
- * This is the timer handler for tracking management Rx inactivity across
- * links.
+ * This is the timer handler for tracking management Rx inactivity
+ * across links.
  *
  * Return: void
  */
 static void
-mgmt_rx_reo_global_mgmt_rx_inactivity_timer_handler(void *arg)
+mgmt_rx_reo_egress_inactivity_timer_handler(void *arg)
 {
-	struct mgmt_rx_reo_list *reo_list = arg;
-	struct mgmt_rx_reo_context *reo_context;
-	struct mgmt_rx_reo_global_ts_info *ts_last_released_frame;
+	struct mgmt_rx_reo_egress_list *egress_list = arg;
+	struct mgmt_rx_reo_list *reo_egress_list;
+	struct mgmt_rx_reo_frame_info *last_delivered_frame;
 
-	qdf_assert_always(reo_list);
-	ts_last_released_frame = &reo_list->ts_last_released_frame;
+	qdf_assert_always(egress_list);
 
-	reo_context = mgmt_rx_reo_get_context_from_reo_list(reo_list);
-	qdf_assert_always(reo_context);
+	reo_egress_list = &egress_list->reo_list;
+	last_delivered_frame = &reo_egress_list->last_released_frame;
 
-	qdf_spin_lock(&reo_context->frame_release_lock);
-	qdf_spin_lock_bh(&reo_list->list_lock);
+	qdf_spin_lock(&reo_egress_list->list_lock);
 
-	qdf_mem_zero(ts_last_released_frame, sizeof(*ts_last_released_frame));
+	qdf_mem_zero(last_delivered_frame, sizeof(*last_delivered_frame));
 
-	qdf_spin_unlock_bh(&reo_list->list_lock);
-	qdf_spin_unlock(&reo_context->frame_release_lock);
+	qdf_spin_unlock(&reo_egress_list->list_lock);
 }
 
 /**
@@ -2441,8 +2800,8 @@ mgmt_rx_reo_prepare_list_entry(
 			     sizeof(frame_desc->host_snapshot)));
 	list_entry->status = 0;
 	if (list_entry->wait_count.total_count)
-		list_entry->status |=
-			MGMT_RX_REO_STATUS_WAIT_FOR_FRAME_ON_OTHER_LINKS;
+		list_entry->status |= STATUS_WAIT_FOR_FRAME_ON_OTHER_LINKS;
+	qdf_atomic_init(&list_entry->scheduled_count);
 
 	*entry = list_entry;
 
@@ -2498,9 +2857,11 @@ mgmt_rx_reo_update_wait_count(
 }
 
 /**
- * mgmt_rx_reo_update_list() - Modify the reorder list when a frame is received
- * @reo_list: Pointer to reorder list
+ * mgmt_rx_reo_update_ingress_list() - Modify the reorder list when a frame is
+ * received
+ * @ingress_list: Pointer to ingress list
  * @frame_desc: Pointer to frame descriptor
+ * @new: pointer to the list entry for the current frame
  * @is_queued: Whether this frame is queued in the REO list
  *
  * API to update the reorder list on every management frame reception.
@@ -2525,143 +2886,140 @@ mgmt_rx_reo_update_wait_count(
  * Return: QDF_STATUS
  */
 static QDF_STATUS
-mgmt_rx_reo_update_list(struct mgmt_rx_reo_list *reo_list,
-			struct mgmt_rx_reo_frame_descriptor *frame_desc,
-			bool *is_queued)
+mgmt_rx_reo_update_ingress_list(struct mgmt_rx_reo_ingress_list *ingress_list,
+				struct mgmt_rx_reo_frame_descriptor *frame_desc,
+				struct mgmt_rx_reo_list_entry *new,
+				bool *is_queued)
 {
-	struct mgmt_rx_reo_list_entry *cur_entry;
-	struct mgmt_rx_reo_list_entry *least_greater_entry = NULL;
+	struct mgmt_rx_reo_list *reo_ingress_list;
+	struct mgmt_rx_reo_list_entry *cur;
+	struct mgmt_rx_reo_list_entry *least_greater = NULL;
 	bool least_greater_entry_found = false;
 	QDF_STATUS status;
-	uint32_t new_frame_global_ts;
-	struct mgmt_rx_reo_list_entry *new_entry = NULL;
 	uint16_t list_insertion_pos = 0;
+	uint32_t ts_new;
 
-	if (!is_queued)
-		return QDF_STATUS_E_NULL_VALUE;
-	*is_queued = false;
-
-	if (!reo_list) {
-		mgmt_rx_reo_err("Mgmt Rx reo list is null");
+	if (!ingress_list) {
+		mgmt_rx_reo_err("Mgmt Rx reo ingress list is null");
 		return QDF_STATUS_E_NULL_VALUE;
 	}
+	reo_ingress_list = &ingress_list->reo_list;
 
 	if (!frame_desc) {
 		mgmt_rx_reo_err("Mgmt frame descriptor is null");
 		return QDF_STATUS_E_NULL_VALUE;
 	}
 
-	new_frame_global_ts = mgmt_rx_reo_get_global_ts(frame_desc->rx_params);
+	if (!(frame_desc->type == MGMT_RX_REO_FRAME_DESC_HOST_CONSUMED_FRAME &&
+	      frame_desc->reo_required) != !new)
+		qdf_assert_always(0);
 
-	/* Prepare the list entry before acquiring lock */
-	if (frame_desc->type == MGMT_RX_REO_FRAME_DESC_HOST_CONSUMED_FRAME &&
-	    frame_desc->reo_required) {
-		status = mgmt_rx_reo_prepare_list_entry(frame_desc, &new_entry);
-		if (QDF_IS_STATUS_ERROR(status)) {
-			mgmt_rx_reo_err("Failed to prepare list entry");
-			return QDF_STATUS_E_FAILURE;
-		}
+	if (!is_queued) {
+		mgmt_rx_reo_err("Pointer to queued indication is null");
+		return QDF_STATUS_E_NULL_VALUE;
 	}
+	*is_queued = false;
 
-	qdf_spin_lock_bh(&reo_list->list_lock);
+	ts_new = mgmt_rx_reo_get_global_ts(frame_desc->rx_params);
 
-	frame_desc->list_size_rx = qdf_list_size(&reo_list->list);
+	frame_desc->ingress_list_size_rx =
+				qdf_list_size(&reo_ingress_list->list);
 
-	status = mgmt_rx_reo_is_stale_frame(&reo_list->ts_last_released_frame,
-					    frame_desc);
-	if (QDF_IS_STATUS_ERROR(status))
-		goto exit_free_entry;
+	qdf_list_for_each(&reo_ingress_list->list, cur, node) {
+		uint32_t ts_cur;
 
-	if (frame_desc->is_stale) {
-		status = mgmt_rx_reo_handle_stale_frame(reo_list, frame_desc);
-		if (QDF_IS_STATUS_ERROR(status))
-			goto exit_free_entry;
-	}
+		ts_cur = mgmt_rx_reo_get_global_ts(cur->rx_params);
 
-	qdf_list_for_each(&reo_list->list, cur_entry, node) {
-		uint32_t cur_entry_global_ts;
-
-		cur_entry_global_ts = mgmt_rx_reo_get_global_ts(
-					cur_entry->rx_params);
-
-		if (!mgmt_rx_reo_compare_global_timestamps_gte(
-		    new_frame_global_ts, cur_entry_global_ts)) {
-			least_greater_entry = cur_entry;
-			least_greater_entry_found = true;
+		least_greater_entry_found =
+		     !mgmt_rx_reo_compare_global_timestamps_gte(ts_new, ts_cur);
+		if (least_greater_entry_found) {
+			least_greater = cur;
 			break;
 		}
 
-		qdf_assert_always(!frame_desc->is_stale ||
-				  cur_entry->is_parallel_rx);
+		qdf_assert_always(!frame_desc->is_stale || cur->is_parallel_rx);
 
 		list_insertion_pos++;
 
-		status = mgmt_rx_reo_update_wait_count(
-					&cur_entry->wait_count,
-					&frame_desc->wait_count);
+		status = mgmt_rx_reo_update_wait_count(&cur->wait_count,
+						       &frame_desc->wait_count);
 		if (QDF_IS_STATUS_ERROR(status))
-			goto exit_free_entry;
+			return status;
 
-		if (cur_entry->wait_count.total_count == 0)
-			cur_entry->status &=
-			      ~MGMT_RX_REO_STATUS_WAIT_FOR_FRAME_ON_OTHER_LINKS;
+		if (cur->wait_count.total_count == 0)
+			cur->status &= ~STATUS_WAIT_FOR_FRAME_ON_OTHER_LINKS;
 	}
 
 	if (frame_desc->type == MGMT_RX_REO_FRAME_DESC_HOST_CONSUMED_FRAME &&
-	    !frame_desc->is_stale && frame_desc->reo_required) {
+	    !frame_desc->is_stale && frame_desc->reo_required &&
+	    (frame_desc->queued_list != MGMT_RX_REO_LIST_TYPE_EGRESS)) {
+		bool overflow;
+
 		if (least_greater_entry_found) {
 			status = mgmt_rx_reo_update_wait_count(
-					&new_entry->wait_count,
-					&least_greater_entry->wait_count);
+					&new->wait_count,
+					&least_greater->wait_count);
 
 			if (QDF_IS_STATUS_ERROR(status))
-				goto exit_free_entry;
+				return status;
 
-			frame_desc->wait_count = new_entry->wait_count;
+			frame_desc->wait_count = new->wait_count;
 
-			if (new_entry->wait_count.total_count == 0)
-				new_entry->status &=
-					~MGMT_RX_REO_STATUS_WAIT_FOR_FRAME_ON_OTHER_LINKS;
+			if (new->wait_count.total_count == 0)
+				new->status &=
+					~STATUS_WAIT_FOR_FRAME_ON_OTHER_LINKS;
 		}
 
-		new_entry->insertion_ts = qdf_get_log_timestamp();
-		new_entry->ingress_timestamp = frame_desc->ingress_timestamp;
-		new_entry->is_parallel_rx = frame_desc->is_parallel_rx;
-		frame_desc->list_insertion_pos = list_insertion_pos;
+		new->ingress_list_insertion_ts = qdf_get_log_timestamp();
+		new->ingress_timestamp = frame_desc->ingress_timestamp;
+		new->is_parallel_rx = frame_desc->is_parallel_rx;
+		frame_desc->ingress_list_insertion_pos = list_insertion_pos;
 
 		if (least_greater_entry_found)
 			status = qdf_list_insert_before(
-					&reo_list->list, &new_entry->node,
-					&least_greater_entry->node);
+					&reo_ingress_list->list, &new->node,
+					&least_greater->node);
 		else
 			status = qdf_list_insert_back(
-					&reo_list->list, &new_entry->node);
+					&reo_ingress_list->list, &new->node);
 
 		if (QDF_IS_STATUS_ERROR(status))
-			goto exit_free_entry;
+			return status;
 
 		*is_queued = true;
+		frame_desc->queued_list = MGMT_RX_REO_LIST_TYPE_INGRESS;
 
-		if (new_entry->wait_count.total_count == 0)
+		overflow = (qdf_list_size(&reo_ingress_list->list) >
+					  reo_ingress_list->max_list_size);
+		if (overflow) {
+			qdf_list_t *ingress_list_ptr = &reo_ingress_list->list;
+
+			reo_ingress_list->overflow_count++;
+			mgmt_rx_reo_err_rl("Ingress overflow, cnt:%llu size:%u",
+					   reo_ingress_list->overflow_count,
+					   qdf_list_size(ingress_list_ptr));
+		}
+
+		if (new->wait_count.total_count == 0)
 			frame_desc->zero_wait_count_rx = true;
 
 		if (frame_desc->zero_wait_count_rx &&
-		    qdf_list_first_entry_or_null(&reo_list->list,
+		    qdf_list_first_entry_or_null(&reo_ingress_list->list,
 						 struct mgmt_rx_reo_list_entry,
-						 node) == new_entry)
+						 node) == new)
 			frame_desc->immediate_delivery = true;
 	}
 
 	if (least_greater_entry_found) {
-		cur_entry = least_greater_entry;
+		cur = least_greater;
 
-		qdf_list_for_each_from(&reo_list->list, cur_entry, node) {
+		qdf_list_for_each_from(&reo_ingress_list->list, cur, node) {
 			uint8_t frame_link_id;
 			struct mgmt_rx_reo_wait_count *wait_count;
 
 			frame_link_id =
 				mgmt_rx_reo_get_link_id(frame_desc->rx_params);
-			wait_count = &cur_entry->wait_count;
+			wait_count = &cur->wait_count;
 			if (wait_count->per_link_count[frame_link_id]) {
 				uint32_t old_wait_count;
 				uint32_t new_wait_count;
@@ -2686,15 +3044,240 @@ mgmt_rx_reo_update_list(struct mgmt_rx_reo_list *reo_list,
 				wait_count->total_count -= wait_count_diff;
 
 				if (wait_count->total_count == 0)
-					cur_entry->status &=
-						~MGMT_RX_REO_STATUS_WAIT_FOR_FRAME_ON_OTHER_LINKS;
+					cur->status &=
+					  ~STATUS_WAIT_FOR_FRAME_ON_OTHER_LINKS;
 			}
 		}
 	}
 
-	status = QDF_STATUS_SUCCESS;
+	return QDF_STATUS_SUCCESS;
+}
 
-exit_free_entry:
+static QDF_STATUS
+mgmt_rx_reo_update_egress_list(struct mgmt_rx_reo_egress_list *egress_list,
+			       struct mgmt_rx_reo_frame_descriptor *frame_desc,
+			       struct mgmt_rx_reo_list_entry *new,
+			       bool *is_queued)
+{
+	struct mgmt_rx_reo_list *reo_egress_list;
+	struct mgmt_rx_reo_list_entry *cur;
+	struct mgmt_rx_reo_list_entry *last;
+	struct mgmt_rx_reo_list_entry *least_greater = NULL;
+	bool least_greater_entry_found = false;
+	uint32_t ts_last;
+	uint32_t ts_new;
+	uint16_t list_insertion_pos = 0;
+	QDF_STATUS ret;
+
+	if (!egress_list) {
+		mgmt_rx_reo_err("Mgmt Rx reo egress list is null");
+		return QDF_STATUS_E_NULL_VALUE;
+	}
+	reo_egress_list = &egress_list->reo_list;
+
+	if (!frame_desc) {
+		mgmt_rx_reo_err("Mgmt frame descriptor is null");
+		return QDF_STATUS_E_NULL_VALUE;
+	}
+
+	if (!(frame_desc->type == MGMT_RX_REO_FRAME_DESC_HOST_CONSUMED_FRAME &&
+	      frame_desc->reo_required) != !new)
+		qdf_assert_always(0);
+
+	if (!is_queued) {
+		mgmt_rx_reo_err("Pointer to queued indication is null");
+		return QDF_STATUS_E_NULL_VALUE;
+	}
+	*is_queued = false;
+
+	ts_new = mgmt_rx_reo_get_global_ts(frame_desc->rx_params);
+	frame_desc->egress_list_size_rx = qdf_list_size(&reo_egress_list->list);
+
+	ret = mgmt_rx_reo_is_stale_frame(&reo_egress_list->last_released_frame,
+					 frame_desc);
+	if (QDF_IS_STATUS_ERROR(ret))
+		return ret;
+
+	if (frame_desc->is_stale) {
+		ret = mgmt_rx_reo_handle_stale_frame(reo_egress_list,
+						     frame_desc);
+		if (QDF_IS_STATUS_ERROR(ret))
+			return ret;
+
+		qdf_list_for_each(&reo_egress_list->list, cur, node) {
+			uint32_t ts_cur;
+
+			ts_cur = mgmt_rx_reo_get_global_ts(cur->rx_params);
+
+			if (!mgmt_rx_reo_compare_global_timestamps_gte(ts_new,
+								       ts_cur))
+				break;
+
+			qdf_assert_always(cur->is_parallel_rx);
+		}
+
+		return QDF_STATUS_SUCCESS;
+	}
+
+	if (!new)
+		return QDF_STATUS_SUCCESS;
+
+	if (qdf_list_empty(&reo_egress_list->list))
+		return QDF_STATUS_SUCCESS;
+
+	last = qdf_list_last_entry(&reo_egress_list->list,
+				   struct mgmt_rx_reo_list_entry, node);
+	qdf_assert_always(last);
+
+	ts_last = mgmt_rx_reo_get_global_ts(last->rx_params);
+
+	if (mgmt_rx_reo_compare_global_timestamps_gte(ts_new, ts_last))
+		return QDF_STATUS_SUCCESS;
+
+	qdf_list_for_each(&reo_egress_list->list, cur, node) {
+		uint32_t ts_cur;
+
+		ts_cur = mgmt_rx_reo_get_global_ts(cur->rx_params);
+
+		if (!mgmt_rx_reo_compare_global_timestamps_gte(ts_new,
+							       ts_cur)) {
+			least_greater = cur;
+			least_greater_entry_found = true;
+			break;
+		}
+
+		list_insertion_pos++;
+	}
+	qdf_assert_always(least_greater_entry_found);
+
+	ret = mgmt_rx_reo_update_wait_count(&new->wait_count,
+					    &least_greater->wait_count);
+
+	if (QDF_IS_STATUS_ERROR(ret))
+		return ret;
+
+	frame_desc->wait_count = new->wait_count;
+
+	if (new->wait_count.total_count == 0)
+		new->status &= ~STATUS_WAIT_FOR_FRAME_ON_OTHER_LINKS;
+
+	new->egress_list_insertion_ts = qdf_get_log_timestamp();
+	new->ingress_timestamp = frame_desc->ingress_timestamp;
+	new->is_parallel_rx = frame_desc->is_parallel_rx;
+	new->status |= STATUS_OLDER_THAN_READY_TO_DELIVER_FRAMES;
+	frame_desc->egress_list_insertion_pos = list_insertion_pos;
+
+	ret = qdf_list_insert_before(&reo_egress_list->list, &new->node,
+				     &least_greater->node);
+	if (QDF_IS_STATUS_ERROR(ret))
+		return ret;
+
+	*is_queued = true;
+	frame_desc->queued_list = MGMT_RX_REO_LIST_TYPE_EGRESS;
+
+	if (frame_desc->wait_count.total_count == 0)
+		frame_desc->zero_wait_count_rx = true;
+	frame_desc->immediate_delivery = true;
+
+	return QDF_STATUS_SUCCESS;
+}
+
+static QDF_STATUS
+mgmt_rx_reo_update_lists(struct mgmt_rx_reo_ingress_list *ingress_list,
+			 struct mgmt_rx_reo_egress_list *egress_list,
+			 struct mgmt_rx_reo_frame_descriptor *frame_desc,
+			 bool *is_queued)
+{
+	struct mgmt_rx_reo_list *reo_ingress_list;
+	struct mgmt_rx_reo_list *reo_egress_list;
+	bool is_queued_to_ingress_list = false;
+	bool is_queued_to_egress_list = false;
+	QDF_STATUS status;
+	struct mgmt_rx_reo_list_entry *new_entry = NULL;
+	enum mgmt_rx_reo_list_type queued_list;
+
+	if (!ingress_list) {
+		mgmt_rx_reo_err("Mgmt Rx reo ingress list is null");
+		return QDF_STATUS_E_NULL_VALUE;
+	}
+	reo_ingress_list = &ingress_list->reo_list;
+
+	if (!egress_list) {
+		mgmt_rx_reo_err("Mgmt Rx reo egress list is null");
+		return QDF_STATUS_E_NULL_VALUE;
+	}
+	reo_egress_list = &egress_list->reo_list;
+
+	if (!frame_desc) {
+		mgmt_rx_reo_err("Mgmt frame descriptor is null");
+		return QDF_STATUS_E_NULL_VALUE;
+	}
+
+	if (!is_queued) {
+		mgmt_rx_reo_err("Pointer to queued indication is null");
+		return QDF_STATUS_E_NULL_VALUE;
+	}
+	*is_queued = false;
+
+	/* Prepare the list entry before acquiring lock */
+	if (frame_desc->type == MGMT_RX_REO_FRAME_DESC_HOST_CONSUMED_FRAME &&
+	    frame_desc->reo_required) {
+		status = mgmt_rx_reo_prepare_list_entry(frame_desc, &new_entry);
+		if (QDF_IS_STATUS_ERROR(status)) {
+			mgmt_rx_reo_err("Failed to prepare list entry");
+			return QDF_STATUS_E_FAILURE;
+		}
+	}
+
+	qdf_spin_lock_bh(&reo_ingress_list->list_lock);
+
+	qdf_spin_lock_bh(&reo_egress_list->list_lock);
+
+	status = mgmt_rx_reo_update_egress_list(egress_list, frame_desc,
+						new_entry,
+						&is_queued_to_egress_list);
+	if (QDF_IS_STATUS_ERROR(status))
+		goto exit_release_egress_list_lock;
+
+	status = mgmt_rx_reo_check_sanity_list(reo_egress_list);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		mgmt_rx_reo_err("Sanity check of egress list failed");
+		qdf_assert_always(0);
+	}
+
+	qdf_spin_unlock_bh(&reo_egress_list->list_lock);
+
+	status = mgmt_rx_reo_update_ingress_list(ingress_list, frame_desc,
+						 new_entry,
+						 &is_queued_to_ingress_list);
+	if (QDF_IS_STATUS_ERROR(status))
+		goto exit_release_ingress_list_lock;
+
+	status = mgmt_rx_reo_check_sanity_list(reo_ingress_list);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		mgmt_rx_reo_err("Sanity check of ingress list failed");
+		qdf_assert_always(0);
+	}
+
+	status = QDF_STATUS_SUCCESS;
+	goto exit_release_ingress_list_lock;
+
+exit_release_egress_list_lock:
+	qdf_spin_unlock_bh(&reo_egress_list->list_lock);
+exit_release_ingress_list_lock:
+	qdf_spin_unlock_bh(&reo_ingress_list->list_lock);
+
+	qdf_assert_always(!is_queued_to_ingress_list ||
+			  !is_queued_to_egress_list);
+
+	*is_queued = is_queued_to_ingress_list || is_queued_to_egress_list;
+
+	queued_list = frame_desc->queued_list;
+	qdf_assert_always(!(*is_queued &&
+			    queued_list == MGMT_RX_REO_LIST_TYPE_INVALID));
+
+	qdf_assert_always(new_entry || !*is_queued);
+
 	/* Cleanup the entry if it is not queued */
 	if (new_entry && !*is_queued) {
 		/**
@@ -2706,49 +3289,91 @@ exit_free_entry:
 		qdf_mem_free(new_entry);
 	}
 
-	qdf_spin_unlock_bh(&reo_list->list_lock);
-
-	if (!*is_queued)
-		return status;
-
 	return status;
 }
 
 /**
- * mgmt_rx_reo_list_init() - Initialize the management rx-reorder list
- * @reo_list: Pointer to reorder list
+ * mgmt_rx_reo_ingress_list_init() - Initialize the management rx-reorder
+ * ingress list
+ * @ingress_list: Pointer to ingress list
  *
- * API to initialize the management rx-reorder list.
+ * API to initialize the management rx-reorder ingress list.
  *
  * Return: QDF_STATUS
  */
 static QDF_STATUS
-mgmt_rx_reo_list_init(struct mgmt_rx_reo_list *reo_list)
+mgmt_rx_reo_ingress_list_init(struct mgmt_rx_reo_ingress_list *ingress_list)
 {
 	QDF_STATUS status;
+	struct mgmt_rx_reo_list *reo_ingress_list;
 
-	reo_list->max_list_size = MGMT_RX_REO_LIST_MAX_SIZE;
-	reo_list->list_entry_timeout_us = MGMT_RX_REO_LIST_TIMEOUT_US;
-
-	qdf_list_create(&reo_list->list, reo_list->max_list_size);
-	qdf_spinlock_create(&reo_list->list_lock);
-
-	status = qdf_timer_init(NULL, &reo_list->ageout_timer,
-				mgmt_rx_reo_list_ageout_timer_handler, reo_list,
-				QDF_TIMER_TYPE_WAKE_APPS);
-	if (QDF_IS_STATUS_ERROR(status)) {
-		mgmt_rx_reo_err("Failed to initialize reo list ageout timer");
-		return status;
+	if (!ingress_list) {
+		mgmt_rx_reo_err("Ingress list is null");
+		return QDF_STATUS_E_NULL_VALUE;
 	}
 
-	reo_list->ts_last_released_frame.valid = false;
+	reo_ingress_list = &ingress_list->reo_list;
 
-	status = qdf_timer_init
-			(NULL, &reo_list->global_mgmt_rx_inactivity_timer,
-			 mgmt_rx_reo_global_mgmt_rx_inactivity_timer_handler,
-			 reo_list, QDF_TIMER_TYPE_WAKE_APPS);
+	reo_ingress_list->max_list_size = MGMT_RX_REO_INGRESS_LIST_MAX_SIZE;
+	qdf_list_create(&reo_ingress_list->list,
+			reo_ingress_list->max_list_size);
+	qdf_spinlock_create(&reo_ingress_list->list_lock);
+	qdf_mem_zero(&reo_ingress_list->last_inserted_frame,
+		     sizeof(reo_ingress_list->last_inserted_frame));
+	qdf_mem_zero(&reo_ingress_list->last_released_frame,
+		     sizeof(reo_ingress_list->last_released_frame));
+
+	ingress_list->list_entry_timeout_us =
+					MGMT_RX_REO_INGRESS_LIST_TIMEOUT_US;
+
+	status = qdf_timer_init(NULL, &ingress_list->ageout_timer,
+				mgmt_rx_reo_ingress_list_ageout_timer_handler,
+				ingress_list, QDF_TIMER_TYPE_WAKE_APPS);
 	if (QDF_IS_STATUS_ERROR(status)) {
-		mgmt_rx_reo_err("Failed to init glb mgmt rx inactivity timer");
+		mgmt_rx_reo_err("Failed to initialize ingress ageout timer");
+		return status;
+	}
+	qdf_timer_start(&ingress_list->ageout_timer,
+			MGMT_RX_REO_INGRESS_LIST_AGEOUT_TIMER_PERIOD_MS);
+
+	return QDF_STATUS_SUCCESS;
+}
+
+/**
+ * mgmt_rx_reo_egress_list_init() - Initialize the management rx-reorder
+ * egress list
+ * @egress_list: Pointer to egress list
+ *
+ * API to initialize the management rx-reorder egress list.
+ *
+ * Return: QDF_STATUS
+ */
+static QDF_STATUS
+mgmt_rx_reo_egress_list_init(struct mgmt_rx_reo_egress_list *egress_list)
+{
+	struct mgmt_rx_reo_list *reo_egress_list;
+	QDF_STATUS status;
+
+	if (!egress_list) {
+		mgmt_rx_reo_err("Egress list is null");
+		return QDF_STATUS_E_NULL_VALUE;
+	}
+
+	reo_egress_list = &egress_list->reo_list;
+
+	reo_egress_list->max_list_size = MGMT_RX_REO_EGRESS_LIST_MAX_SIZE;
+	qdf_list_create(&reo_egress_list->list, reo_egress_list->max_list_size);
+	qdf_spinlock_create(&reo_egress_list->list_lock);
+	qdf_mem_zero(&reo_egress_list->last_inserted_frame,
+		     sizeof(reo_egress_list->last_inserted_frame));
+	qdf_mem_zero(&reo_egress_list->last_released_frame,
+		     sizeof(reo_egress_list->last_released_frame));
+
+	status = qdf_timer_init(NULL, &egress_list->egress_inactivity_timer,
+				mgmt_rx_reo_egress_inactivity_timer_handler,
+				egress_list, QDF_TIMER_TYPE_WAKE_APPS);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		mgmt_rx_reo_err("Failed to initialize egress inactivity timer");
 		return status;
 	}
 
@@ -2898,18 +3523,28 @@ mgmt_rx_reo_debug_print_ingress_frame_stats(struct mgmt_rx_reo_context *reo_ctx)
 	struct reo_ingress_frame_stats *stats;
 	uint8_t link_id;
 	uint8_t desc_type;
+	uint8_t list_type;
 	uint64_t ingress_count_per_link[MAX_MLO_LINKS] = {0};
 	uint64_t ingress_count_per_desc_type[MGMT_RX_REO_FRAME_DESC_TYPE_MAX] = {0};
 	uint64_t total_ingress_count = 0;
+	uint64_t reo_count_per_link[MAX_MLO_LINKS] = {0};
+	uint64_t reo_count_per_desc_type[MGMT_RX_REO_FRAME_DESC_TYPE_MAX] = {0};
+	uint64_t total_reo_count = 0;
 	uint64_t stale_count_per_link[MAX_MLO_LINKS] = {0};
 	uint64_t stale_count_per_desc_type[MGMT_RX_REO_FRAME_DESC_TYPE_MAX] = {0};
 	uint64_t total_stale_count = 0;
 	uint64_t error_count_per_link[MAX_MLO_LINKS] = {0};
 	uint64_t error_count_per_desc_type[MGMT_RX_REO_FRAME_DESC_TYPE_MAX] = {0};
 	uint64_t total_error_count = 0;
-	uint64_t total_queued_count = 0;
-	uint64_t total_zero_wait_count_rx_count = 0;
-	uint64_t total_immediate_delivery_count = 0;
+	uint64_t total_queued = 0;
+	uint64_t queued_per_list[MGMT_RX_REO_LIST_TYPE_MAX] = {0};
+	uint64_t queued_per_link[MAX_MLO_LINKS] = {0};
+	uint64_t total_zero_wait_count_rx = 0;
+	uint64_t zero_wait_count_rx_per_list[MGMT_RX_REO_LIST_TYPE_MAX] = {0};
+	uint64_t zero_wait_count_rx_per_link[MAX_MLO_LINKS] = {0};
+	uint64_t total_immediate_delivery = 0;
+	uint64_t immediate_delivery_per_list[MGMT_RX_REO_LIST_TYPE_MAX] = {0};
+	uint64_t immediate_delivery_per_link[MAX_MLO_LINKS] = {0};
 
 	if (!reo_ctx)
 		return QDF_STATUS_E_NULL_VALUE;
@@ -2921,6 +3556,8 @@ mgmt_rx_reo_debug_print_ingress_frame_stats(struct mgmt_rx_reo_context *reo_ctx)
 		     desc_type++) {
 			ingress_count_per_link[link_id] +=
 				stats->ingress_count[link_id][desc_type];
+			reo_count_per_link[link_id] +=
+				stats->reo_count[link_id][desc_type];
 			stale_count_per_link[link_id] +=
 					stats->stale_count[link_id][desc_type];
 			error_count_per_link[link_id] +=
@@ -2928,6 +3565,7 @@ mgmt_rx_reo_debug_print_ingress_frame_stats(struct mgmt_rx_reo_context *reo_ctx)
 		}
 
 		total_ingress_count += ingress_count_per_link[link_id];
+		total_reo_count += reo_count_per_link[link_id];
 		total_stale_count += stale_count_per_link[link_id];
 		total_error_count += error_count_per_link[link_id];
 	}
@@ -2937,6 +3575,8 @@ mgmt_rx_reo_debug_print_ingress_frame_stats(struct mgmt_rx_reo_context *reo_ctx)
 		for (link_id = 0; link_id < MAX_MLO_LINKS; link_id++) {
 			ingress_count_per_desc_type[desc_type] +=
 				stats->ingress_count[link_id][desc_type];
+			reo_count_per_desc_type[desc_type] +=
+				stats->reo_count[link_id][desc_type];
 			stale_count_per_desc_type[desc_type] +=
 					stats->stale_count[link_id][desc_type];
 			error_count_per_desc_type[desc_type] +=
@@ -2945,11 +3585,33 @@ mgmt_rx_reo_debug_print_ingress_frame_stats(struct mgmt_rx_reo_context *reo_ctx)
 	}
 
 	for (link_id = 0; link_id < MAX_MLO_LINKS; link_id++) {
-		total_queued_count += stats->queued_count[link_id];
-		total_zero_wait_count_rx_count +=
-				stats->zero_wait_count_rx_count[link_id];
-		total_immediate_delivery_count +=
-				stats->immediate_delivery_count[link_id];
+		for (list_type = 0; list_type < MGMT_RX_REO_LIST_TYPE_MAX;
+		     list_type++) {
+			queued_per_link[link_id] +=
+				stats->queued_count[link_id][list_type];
+			zero_wait_count_rx_per_link[link_id] +=
+			    stats->zero_wait_count_rx_count[link_id][list_type];
+			immediate_delivery_per_link[link_id] +=
+			    stats->immediate_delivery_count[link_id][list_type];
+		}
+
+		total_queued += queued_per_link[link_id];
+		total_zero_wait_count_rx +=
+					zero_wait_count_rx_per_link[link_id];
+		total_immediate_delivery +=
+					immediate_delivery_per_link[link_id];
+	}
+
+	for (list_type = 0; list_type < MGMT_RX_REO_LIST_TYPE_MAX;
+	     list_type++) {
+		for (link_id = 0; link_id < MAX_MLO_LINKS; link_id++) {
+			queued_per_list[list_type] +=
+				stats->queued_count[link_id][list_type];
+			zero_wait_count_rx_per_list[list_type] +=
+			    stats->zero_wait_count_rx_count[link_id][list_type];
+			immediate_delivery_per_list[list_type] +=
+			    stats->immediate_delivery_count[link_id][list_type];
+		}
 	}
 
 	mgmt_rx_reo_alert("Ingress Frame Stats:");
@@ -2977,7 +3639,27 @@ mgmt_rx_reo_debug_print_ingress_frame_stats(struct mgmt_rx_reo_context *reo_ctx)
 			  ingress_count_per_desc_type[2],
 			  total_ingress_count);
 
-	mgmt_rx_reo_alert("\t2) Stale Frame Count:");
+	mgmt_rx_reo_alert("\t2) Reo required Frame Count:");
+	mgmt_rx_reo_alert("\t------------------------------------");
+	mgmt_rx_reo_alert("\t|link id/  |       |       |       |");
+	mgmt_rx_reo_alert("\t|desc type |      0|      1|      2|");
+	mgmt_rx_reo_alert("\t-------------------------------------------");
+
+	for (link_id = 0; link_id < MAX_MLO_LINKS; link_id++) {
+		mgmt_rx_reo_alert("\t|%10u|%7llu|%7llu|%7llu|%7llu", link_id,
+				  stats->reo_count[link_id][0],
+				  stats->reo_count[link_id][1],
+				  stats->reo_count[link_id][2],
+				  reo_count_per_link[link_id]);
+		mgmt_rx_reo_alert("\t-------------------------------------------");
+	}
+	mgmt_rx_reo_alert("\t           |%7llu|%7llu|%7llu|%7llu\n\n",
+			  reo_count_per_desc_type[0],
+			  reo_count_per_desc_type[1],
+			  reo_count_per_desc_type[2],
+			  total_reo_count);
+
+	mgmt_rx_reo_alert("\t3) Stale Frame Count:");
 	mgmt_rx_reo_alert("\t------------------------------------");
 	mgmt_rx_reo_alert("\t|link id/  |       |       |       |");
 	mgmt_rx_reo_alert("\t|desc type |      0|      1|      2|");
@@ -2996,7 +3678,7 @@ mgmt_rx_reo_debug_print_ingress_frame_stats(struct mgmt_rx_reo_context *reo_ctx)
 			  stale_count_per_desc_type[2],
 			  total_stale_count);
 
-	mgmt_rx_reo_alert("\t3) Error Frame Count:");
+	mgmt_rx_reo_alert("\t4) Error Frame Count:");
 	mgmt_rx_reo_alert("\t------------------------------------");
 	mgmt_rx_reo_alert("\t|link id/  |       |       |       |");
 	mgmt_rx_reo_alert("\t|desc type |      0|      1|      2|");
@@ -3015,22 +3697,57 @@ mgmt_rx_reo_debug_print_ingress_frame_stats(struct mgmt_rx_reo_context *reo_ctx)
 			  error_count_per_desc_type[2],
 			  total_error_count);
 
-	mgmt_rx_reo_alert("\t4) Host consumed frames related stats:");
+	mgmt_rx_reo_alert("\t5) Host consumed frames related stats:");
+	mgmt_rx_reo_alert("\tOverall:");
 	mgmt_rx_reo_alert("\t------------------------------------------------");
 	mgmt_rx_reo_alert("\t|link id   |Queued frame |Zero wait |Immediate |");
 	mgmt_rx_reo_alert("\t|          |    count    |  count   | delivery |");
 	mgmt_rx_reo_alert("\t------------------------------------------------");
 	for (link_id = 0; link_id < MAX_MLO_LINKS; link_id++) {
 		mgmt_rx_reo_alert("\t|%10u|%13llu|%10llu|%10llu|", link_id,
-				  stats->queued_count[link_id],
-				  stats->zero_wait_count_rx_count[link_id],
-				  stats->immediate_delivery_count[link_id]);
+				  queued_per_link[link_id],
+				  zero_wait_count_rx_per_link[link_id],
+				  immediate_delivery_per_link[link_id]);
 		mgmt_rx_reo_alert("\t------------------------------------------------");
 	}
 	mgmt_rx_reo_alert("\t%11s|%13llu|%10llu|%10llu|\n\n", "",
-			  total_queued_count,
-			  total_zero_wait_count_rx_count,
-			  total_immediate_delivery_count);
+			  total_queued,
+			  total_zero_wait_count_rx,
+			  total_immediate_delivery);
+
+	mgmt_rx_reo_alert("\t\ta) Ingress List:");
+	mgmt_rx_reo_alert("\t\t------------------------------------------------");
+	mgmt_rx_reo_alert("\t\t|link id   |Queued frame |Zero wait |Immediate |");
+	mgmt_rx_reo_alert("\t\t|          |    count    |  count   | delivery |");
+	mgmt_rx_reo_alert("\t\t------------------------------------------------");
+	for (link_id = 0; link_id < MAX_MLO_LINKS; link_id++) {
+		mgmt_rx_reo_alert("\t\t|%10u|%13llu|%10llu|%10llu|", link_id,
+				  stats->queued_count[link_id][0],
+				  stats->zero_wait_count_rx_count[link_id][0],
+				  stats->immediate_delivery_count[link_id][0]);
+		mgmt_rx_reo_alert("\t\t------------------------------------------------");
+	}
+	mgmt_rx_reo_alert("\t\t%11s|%13llu|%10llu|%10llu|\n\n", "",
+			  queued_per_list[0],
+			  zero_wait_count_rx_per_list[0],
+			  immediate_delivery_per_list[0]);
+
+	mgmt_rx_reo_alert("\t\tb) Egress List:");
+	mgmt_rx_reo_alert("\t\t------------------------------------------------");
+	mgmt_rx_reo_alert("\t\t|link id   |Queued frame |Zero wait |Immediate |");
+	mgmt_rx_reo_alert("\t\t|          |    count    |  count   | delivery |");
+	mgmt_rx_reo_alert("\t\t------------------------------------------------");
+	for (link_id = 0; link_id < MAX_MLO_LINKS; link_id++) {
+		mgmt_rx_reo_alert("\t\t|%10u|%13llu|%10llu|%10llu|", link_id,
+				  stats->queued_count[link_id][1],
+				  stats->zero_wait_count_rx_count[link_id][1],
+				  stats->immediate_delivery_count[link_id][1]);
+		mgmt_rx_reo_alert("\t\t------------------------------------------------");
+	}
+	mgmt_rx_reo_alert("\t\t%11s|%13llu|%10llu|%10llu|\n\n", "",
+			  queued_per_list[1],
+			  zero_wait_count_rx_per_list[1],
+			  immediate_delivery_per_list[1]);
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -3054,6 +3771,7 @@ mgmt_rx_reo_log_ingress_frame(struct mgmt_rx_reo_context *reo_ctx,
 	struct reo_ingress_debug_frame_info *cur_frame_debug_info;
 	struct reo_ingress_frame_stats *stats;
 	uint8_t link_id;
+	enum mgmt_rx_reo_list_type queued_list;
 
 	if (!reo_ctx || !desc)
 		return QDF_STATUS_E_NULL_VALUE;
@@ -3062,13 +3780,16 @@ mgmt_rx_reo_log_ingress_frame(struct mgmt_rx_reo_context *reo_ctx,
 
 	stats = &ingress_frame_debug_info->stats;
 	link_id = mgmt_rx_reo_get_link_id(desc->rx_params);
+	queued_list = desc->queued_list;
 	stats->ingress_count[link_id][desc->type]++;
+	if (desc->reo_required)
+		stats->reo_count[link_id][desc->type]++;
 	if (is_queued)
-		stats->queued_count[link_id]++;
+		stats->queued_count[link_id][queued_list]++;
 	if (desc->zero_wait_count_rx)
-		stats->zero_wait_count_rx_count[link_id]++;
+		stats->zero_wait_count_rx_count[link_id][queued_list]++;
 	if (desc->immediate_delivery)
-		stats->immediate_delivery_count[link_id]++;
+		stats->immediate_delivery_count[link_id][queued_list]++;
 	if (is_error)
 		stats->error_count[link_id][desc->type]++;
 	if (desc->is_stale)
@@ -3106,16 +3827,22 @@ mgmt_rx_reo_log_ingress_frame(struct mgmt_rx_reo_context *reo_ctx,
 	cur_frame_debug_info->is_queued = is_queued;
 	cur_frame_debug_info->is_stale = desc->is_stale;
 	cur_frame_debug_info->is_parallel_rx = desc->is_parallel_rx;
+	cur_frame_debug_info->queued_list = desc->queued_list;
 	cur_frame_debug_info->zero_wait_count_rx = desc->zero_wait_count_rx;
 	cur_frame_debug_info->immediate_delivery = desc->immediate_delivery;
 	cur_frame_debug_info->is_error = is_error;
-	cur_frame_debug_info->ts_last_released_frame =
-				reo_ctx->reo_list.ts_last_released_frame;
+	cur_frame_debug_info->last_delivered_frame = desc->last_delivered_frame;
 	cur_frame_debug_info->ingress_timestamp = desc->ingress_timestamp;
 	cur_frame_debug_info->ingress_duration =
 			qdf_get_log_timestamp() - desc->ingress_timestamp;
-	cur_frame_debug_info->list_size_rx = desc->list_size_rx;
-	cur_frame_debug_info->list_insertion_pos = desc->list_insertion_pos;
+	cur_frame_debug_info->ingress_list_size_rx =
+					desc->ingress_list_size_rx;
+	cur_frame_debug_info->ingress_list_insertion_pos =
+					desc->ingress_list_insertion_pos;
+	cur_frame_debug_info->egress_list_size_rx =
+					desc->egress_list_size_rx;
+	cur_frame_debug_info->egress_list_insertion_pos =
+					desc->egress_list_insertion_pos;
 	cur_frame_debug_info->cpu_id = qdf_get_smp_processor_id();
 	cur_frame_debug_info->reo_required = desc->reo_required;
 
@@ -3193,12 +3920,13 @@ mgmt_rx_reo_debug_print_ingress_frame_info(struct mgmt_rx_reo_context *reo_ctx,
 	boarder = ingress_frame_debug_info->boarder;
 
 	mgmt_rx_reo_alert_no_fl("%s", boarder);
-	mgmt_rx_reo_alert_no_fl("|%5s|%5s|%6s|%6s|%9s|%4s|%5s|%10s|%10s|%10s|%5s|%10s|%11s|%13s|%11s|%4s|%3s|%69s|%94s|%94s|%94s|%94s|%94s|%94s|",
+	mgmt_rx_reo_alert_no_fl("|%5s|%5s|%6s|%6s|%9s|%4s|%5s|%10s|%10s|%10s|%5s|%10s|%11s|%13s|%4s|%11s|%6s|%5s|%6s|%5s|%69s|%94s|%94s|%94s|%94s|%94s|%94s|",
 				"Index", "CPU", "D.type", "F.type", "F.subtype",
 				"Link", "SeqNo", "Global ts",
 				"Start ts", "End ts", "Dur", "Last ts",
-				"Ingress ts", "Flags", "Ingress Dur", "Size",
-				"Pos", "Wait Count", "Snapshot : link 0",
+				"Ingress ts", "Flags", "List", "Ingress Dur",
+				"I Size", "I Pos", "E Size",
+				"E Pos", "Wait Count", "Snapshot : link 0",
 				"Snapshot : link 1", "Snapshot : link 2",
 				"Snapshot : link 3", "Snapshot : link 4",
 				"Snapshot : link 5");
@@ -3217,14 +3945,17 @@ mgmt_rx_reo_debug_print_ingress_frame_info(struct mgmt_rx_reo_context *reo_ctx,
 		char flag_zero_wait_count_rx = ' ';
 		char flag_immediate_delivery = ' ';
 		char flag_reo_required = ' ';
-		int64_t ts_last_released_frame = -1;
+		int64_t ts_last_delivered_frame = -1;
 		uint8_t link;
 
 		info = &reo_ctx->ingress_frame_debug_info.frame_list[index];
 
-		if (info->ts_last_released_frame.valid)
-			ts_last_released_frame =
-					info->ts_last_released_frame.global_ts;
+		if (info->last_delivered_frame.valid) {
+			struct mgmt_rx_reo_params *reo_params;
+
+			reo_params = &info->last_delivered_frame.reo_params;
+			ts_last_delivered_frame = reo_params->global_timestamp;
+		}
 
 		if (info->is_queued)
 			flag_queued = 'Q';
@@ -3247,7 +3978,7 @@ mgmt_rx_reo_debug_print_ingress_frame_info(struct mgmt_rx_reo_context *reo_ctx,
 		if (!info->reo_required)
 			flag_reo_required = 'N';
 
-		snprintf(flags, sizeof(flags), "%c %c %c %c %c %c %c", flag_error,
+		snprintf(flags, sizeof(flags), "%c %c %c %c %c %c %c",flag_error,
 			 flag_stale, flag_parallel_rx, flag_queued,
 			 flag_zero_wait_count_rx, flag_immediate_delivery,
 			 flag_reo_required);
@@ -3301,7 +4032,7 @@ mgmt_rx_reo_debug_print_ingress_frame_info(struct mgmt_rx_reo_context *reo_ctx,
 				 fw_forwarded, host);
 		}
 
-		mgmt_rx_reo_alert_no_fl("|%5u|%5d|%6u|%6x|%9x|%4u|%5u|%10u|%10u|%10u|%5u|%10lld|%11llu|%13s|%11llu|%4d|%3d|%69s|%70s|%70s|%70s|%70s|%70s|%70s|",
+		mgmt_rx_reo_alert_no_fl("|%5u|%5d|%6u|%6x|%9x|%4u|%5u|%10u|%10u|%10u|%5u|%10lld|%11llu|%11s|%4u|%11llu|%6d|%5d|%6d|%5d|%69s|%70s|%70s|%70s|%70s|%70s|%70s|",
 					entry, info->cpu_id, info->desc_type,
 					info->frame_type, info->frame_subtype,
 					info->link_id,
@@ -3310,11 +4041,15 @@ mgmt_rx_reo_debug_print_ingress_frame_info(struct mgmt_rx_reo_context *reo_ctx,
 					info->start_timestamp,
 					info->end_timestamp,
 					info->duration_us,
-					ts_last_released_frame,
+					ts_last_delivered_frame,
 					info->ingress_timestamp, flags,
+					info->queued_list,
 					info->ingress_duration,
-					info->list_size_rx,
-					info->list_insertion_pos, wait_count,
+					info->ingress_list_size_rx,
+					info->ingress_list_insertion_pos,
+					info->egress_list_size_rx,
+					info->egress_list_insertion_pos,
+					wait_count,
 					snapshots[0], snapshots[1],
 					snapshots[2], snapshots[3],
 					snapshots[4], snapshots[5]);
@@ -3381,10 +4116,14 @@ wlan_mgmt_rx_reo_algo_entry(struct wlan_objmgr_pdev *pdev,
 			    bool *is_queued)
 {
 	struct mgmt_rx_reo_context *reo_ctx;
+	struct mgmt_rx_reo_ingress_list *ingress_list;
+	struct mgmt_rx_reo_egress_list *egress_list;
 	QDF_STATUS ret;
 
-	if (!is_queued)
+	if (!is_queued) {
+		mgmt_rx_reo_err("Pointer to queued indication is null");
 		return QDF_STATUS_E_NULL_VALUE;
+	}
 
 	*is_queued = false;
 
@@ -3398,6 +4137,8 @@ wlan_mgmt_rx_reo_algo_entry(struct wlan_objmgr_pdev *pdev,
 		mgmt_rx_reo_err("REO context is NULL");
 		return QDF_STATUS_E_NULL_VALUE;
 	}
+	ingress_list = &reo_ctx->ingress_list;
+	egress_list = &reo_ctx->egress_list;
 
 	/**
 	 * Critical Section = Host snapshot update + Calculation of wait
@@ -3505,8 +4246,9 @@ wlan_mgmt_rx_reo_algo_entry(struct wlan_objmgr_pdev *pdev,
 	if (QDF_IS_STATUS_ERROR(ret))
 		goto failure;
 
-	/* Update the REO list */
-	ret = mgmt_rx_reo_update_list(&reo_ctx->reo_list, desc, is_queued);
+	/* Update ingress and egress list */
+	ret = mgmt_rx_reo_update_lists(ingress_list, egress_list, desc,
+				       is_queued);
 	if (QDF_IS_STATUS_ERROR(ret))
 		goto failure;
 
@@ -3519,8 +4261,13 @@ wlan_mgmt_rx_reo_algo_entry(struct wlan_objmgr_pdev *pdev,
 
 	qdf_spin_unlock(&reo_ctx->reo_algo_entry_lock);
 
+	ret = mgmt_rx_reo_move_entries_ingress_to_egress_list(ingress_list,
+							      egress_list);
+	if (QDF_IS_STATUS_ERROR(ret))
+		return ret;
+
 	/* Finally, release the entries for which pending frame is received */
-	return mgmt_rx_reo_list_release_entries(reo_ctx);
+	return mgmt_rx_reo_release_egress_list_entries(reo_ctx);
 
 failure:
 	/**
@@ -4309,13 +5056,13 @@ mgmt_rx_reo_sim_get_link_id(uint8_t valid_link_list_index)
 	if (valid_link_list_index >= MAX_MLO_LINKS) {
 		mgmt_rx_reo_err("Invalid index %u to valid link list",
 				valid_link_list_index);
-		return MGMT_RX_REO_INVALID_LINK_ID;
+		return MGMT_RX_REO_INVALID_LINK;
 	}
 
 	sim_context = mgmt_rx_reo_sim_get_context();
 	if (!sim_context) {
 		mgmt_rx_reo_err("Mgmt reo simulation context is null");
-		return MGMT_RX_REO_INVALID_LINK_ID;
+		return MGMT_RX_REO_INVALID_LINK;
 	}
 
 	return sim_context->link_id_to_pdev_map.valid_link_list
@@ -4959,7 +5706,7 @@ mgmt_rx_reo_sim_init(struct mgmt_rx_reo_context *reo_context)
 
 	for (link_id = 0; link_id < MAX_MLO_LINKS; link_id++)
 		sim_context->link_id_to_pdev_map.valid_link_list[link_id] =
-					MGMT_RX_REO_INVALID_LINK_ID;
+					MGMT_RX_REO_INVALID_LINK;
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -5352,7 +6099,7 @@ mgmt_rx_reo_debug_info_deinit(struct wlan_objmgr_psoc *psoc)
 #endif /* WLAN_MGMT_RX_REO_DEBUG_SUPPORT */
 
 /**
- * mgmt_rx_reo_flush_reorder_list() - Flush all entries in the reorder list
+ * mgmt_rx_reo_flush_list() - Flush all entries in the reorder list
  * @reo_list: Pointer to reorder list
  *
  * API to flush all the entries of the reorder list. This API would acquire
@@ -5361,7 +6108,7 @@ mgmt_rx_reo_debug_info_deinit(struct wlan_objmgr_psoc *psoc)
  * Return: QDF_STATUS
  */
 static QDF_STATUS
-mgmt_rx_reo_flush_reorder_list(struct mgmt_rx_reo_list *reo_list)
+mgmt_rx_reo_flush_list(struct mgmt_rx_reo_list *reo_list)
 {
 	struct mgmt_rx_reo_list_entry *cur_entry;
 	struct mgmt_rx_reo_list_entry *temp;
@@ -5392,28 +6139,71 @@ mgmt_rx_reo_flush_reorder_list(struct mgmt_rx_reo_list *reo_list)
 }
 
 /**
- * mgmt_rx_reo_list_deinit() - De initialize the management rx-reorder list
- * @reo_list: Pointer to reorder list
+ * mgmt_rx_reo_ingress_list_deinit() - De initialize the management rx-reorder
+ * ingress list
+ * @ingress_list: Pointer to ingress reorder list
  *
- * API to de initialize the management rx-reorder list.
+ * API to de initialize the management rx-reorder ingress list.
  *
  * Return: QDF_STATUS
  */
 static QDF_STATUS
-mgmt_rx_reo_list_deinit(struct mgmt_rx_reo_list *reo_list)
+mgmt_rx_reo_ingress_list_deinit(struct mgmt_rx_reo_ingress_list *ingress_list)
 {
 	QDF_STATUS status;
+	struct mgmt_rx_reo_list *reo_ingress_list;
 
-	qdf_timer_free(&reo_list->global_mgmt_rx_inactivity_timer);
-	qdf_timer_free(&reo_list->ageout_timer);
+	if (!ingress_list) {
+		mgmt_rx_reo_err("Ingress list is null");
+		return QDF_STATUS_E_NULL_VALUE;
+	}
+	reo_ingress_list = &ingress_list->reo_list;
 
-	status = mgmt_rx_reo_flush_reorder_list(reo_list);
+	qdf_timer_sync_cancel(&ingress_list->ageout_timer);
+	qdf_timer_free(&ingress_list->ageout_timer);
+
+	status = mgmt_rx_reo_flush_list(reo_ingress_list);
 	if (QDF_IS_STATUS_ERROR(status)) {
-		mgmt_rx_reo_err("Failed to flush the reorder list");
+		mgmt_rx_reo_err("Failed to flush the ingress list");
+		return status;
+	}
+	qdf_spinlock_destroy(&reo_ingress_list->list_lock);
+	qdf_list_destroy(&reo_ingress_list->list);
+
+	return QDF_STATUS_SUCCESS;
+}
+
+/**
+ * mgmt_rx_reo_egress_list_deinit() - De initialize the management rx-reorder
+ * egress list
+ * @egress_list: Pointer to egress reorder list
+ *
+ * API to de initialize the management rx-reorder egress list.
+ *
+ * Return: QDF_STATUS
+ */
+static QDF_STATUS
+mgmt_rx_reo_egress_list_deinit(struct mgmt_rx_reo_egress_list *egress_list)
+{
+	QDF_STATUS status;
+	struct mgmt_rx_reo_list *reo_egress_list;
+
+	if (!egress_list) {
+		mgmt_rx_reo_err("Egress list is null");
+		return QDF_STATUS_E_NULL_VALUE;
+	}
+	reo_egress_list = &egress_list->reo_list;
+
+	qdf_timer_sync_cancel(&egress_list->egress_inactivity_timer);
+	qdf_timer_free(&egress_list->egress_inactivity_timer);
+
+	status = mgmt_rx_reo_flush_list(reo_egress_list);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		mgmt_rx_reo_err("Failed to flush the egress list");
 		return QDF_STATUS_E_FAILURE;
 	}
-	qdf_spinlock_destroy(&reo_list->list_lock);
-	qdf_list_destroy(&reo_list->list);
+	qdf_spinlock_destroy(&reo_egress_list->list_lock);
+	qdf_list_destroy(&reo_egress_list->list);
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -5430,10 +6220,7 @@ mgmt_rx_reo_deinit_context(uint8_t ml_grp_id)
 		return QDF_STATUS_E_NULL_VALUE;
 	}
 
-	qdf_timer_sync_cancel(
-			&reo_context->reo_list.global_mgmt_rx_inactivity_timer);
-	qdf_timer_sync_cancel(&reo_context->reo_list.ageout_timer);
-
+	qdf_spinlock_destroy(&reo_context->frame_release_lock);
 	qdf_spinlock_destroy(&reo_context->reo_algo_entry_lock);
 
 	status = mgmt_rx_reo_sim_deinit(reo_context);
@@ -5443,15 +6230,22 @@ mgmt_rx_reo_deinit_context(uint8_t ml_grp_id)
 		return QDF_STATUS_E_FAILURE;
 	}
 
-	status = mgmt_rx_reo_list_deinit(&reo_context->reo_list);
+	status = mgmt_rx_reo_egress_list_deinit(&reo_context->egress_list);
 	if (QDF_IS_STATUS_ERROR(status)) {
-		mgmt_rx_reo_err("Failed to de-initialize mgmt Rx reo list");
+		mgmt_rx_reo_err("Failed to de-initialize Rx reo egress list");
 		qdf_mem_free(reo_context);
 		return status;
 	}
 
-	qdf_mem_free(reo_context);
+	status = mgmt_rx_reo_ingress_list_deinit(&reo_context->ingress_list);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		mgmt_rx_reo_err("Failed to de-initialize Rx reo ingress list");
+		qdf_mem_free(reo_context);
+		return status;
+	}
+
 	mgmt_rx_reo_set_context(ml_grp_id, NULL);
+	qdf_mem_free(reo_context);
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -5468,36 +6262,48 @@ mgmt_rx_reo_init_context(uint8_t ml_grp_id)
 		mgmt_rx_reo_err("Failed to allocate reo context");
 		return QDF_STATUS_E_NULL_VALUE;
 	}
+	reo_context->mlo_grp_id = ml_grp_id;
 
 	mgmt_rx_reo_set_context(ml_grp_id, reo_context);
 
-	reo_context->mlo_grp_id = ml_grp_id;
-
-	status = mgmt_rx_reo_list_init(&reo_context->reo_list);
+	status = mgmt_rx_reo_ingress_list_init(&reo_context->ingress_list);
 	if (QDF_IS_STATUS_ERROR(status)) {
-		mgmt_rx_reo_err("Failed to initialize mgmt Rx reo list");
-		return status;
+		mgmt_rx_reo_err("Failed to initialize Rx reo ingress list");
+		goto free_reo_context;
+	}
+
+	status = mgmt_rx_reo_egress_list_init(&reo_context->egress_list);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		mgmt_rx_reo_err("Failed to initialize Rx reo egress list");
+		goto deinit_reo_ingress_list;
 	}
 
 	status = mgmt_rx_reo_sim_init(reo_context);
 	if (QDF_IS_STATUS_ERROR(status)) {
 		mgmt_rx_reo_err("Failed to initialize reo simulation context");
-		goto error_reo_list_deinit;
+		goto deinit_reo_egress_list;
 	}
 
 	qdf_spinlock_create(&reo_context->reo_algo_entry_lock);
-
-	qdf_timer_mod(&reo_context->reo_list.ageout_timer,
-		      MGMT_RX_REO_AGEOUT_TIMER_PERIOD_MS);
+	qdf_spinlock_create(&reo_context->frame_release_lock);
 
 	return QDF_STATUS_SUCCESS;
 
-error_reo_list_deinit:
-	temp = mgmt_rx_reo_list_deinit(&reo_context->reo_list);
+deinit_reo_egress_list:
+	temp = mgmt_rx_reo_egress_list_deinit(&reo_context->egress_list);
 	if (QDF_IS_STATUS_ERROR(temp)) {
-		mgmt_rx_reo_err("Failed to de-initialize mgmt Rx reo list");
+		mgmt_rx_reo_err("Failed to de-initialize Rx reo egress list");
 		return temp;
 	}
+deinit_reo_ingress_list:
+	temp = mgmt_rx_reo_ingress_list_deinit(&reo_context->ingress_list);
+	if (QDF_IS_STATUS_ERROR(temp)) {
+		mgmt_rx_reo_err("Failed to de-initialize Rx reo ingress list");
+		return temp;
+	}
+free_reo_context:
+	mgmt_rx_reo_set_context(ml_grp_id, NULL);
+	qdf_mem_free(reo_context);
 
 	return status;
 }
@@ -5689,7 +6495,7 @@ mgmt_rx_reo_clear_snapshots(struct wlan_objmgr_pdev *pdev)
 }
 
 QDF_STATUS
-mgmt_rx_reo_attach(struct wlan_objmgr_pdev *pdev)
+mgmt_rx_reo_pdev_attach(struct wlan_objmgr_pdev *pdev)
 {
 	QDF_STATUS status;
 
@@ -5712,7 +6518,13 @@ mgmt_rx_reo_attach(struct wlan_objmgr_pdev *pdev)
 }
 
 QDF_STATUS
-mgmt_rx_reo_detach(struct wlan_objmgr_pdev *pdev)
+mgmt_rx_reo_psoc_attach(struct wlan_objmgr_psoc *psoc)
+{
+	return QDF_STATUS_SUCCESS;
+}
+
+QDF_STATUS
+mgmt_rx_reo_pdev_detach(struct wlan_objmgr_pdev *pdev)
 {
 	QDF_STATUS status;
 
@@ -5731,6 +6543,12 @@ mgmt_rx_reo_detach(struct wlan_objmgr_pdev *pdev)
 		return status;
 	}
 
+	return QDF_STATUS_SUCCESS;
+}
+
+QDF_STATUS
+mgmt_rx_reo_psoc_detach(struct wlan_objmgr_psoc *psoc)
+{
 	return QDF_STATUS_SUCCESS;
 }
 

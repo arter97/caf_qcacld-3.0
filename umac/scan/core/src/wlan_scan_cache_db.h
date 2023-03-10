@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2017-2020 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -17,7 +17,7 @@
  * PERFORMANCE OF THIS SOFTWARE.
  */
 
-/*
+/**
  * DOC: contains scan cache entry api
  */
 
@@ -39,6 +39,7 @@
 /**
  * struct scan_dbs - scan cache data base definition
  * @num_entries: number of scan entries
+ * @scan_db_lock: lock for @scan_hash_tbl
  * @scan_hash_tbl: link list of bssid hashed scan cache entries for a pdev
  */
 struct scan_dbs {
@@ -172,7 +173,7 @@ scm_iterate_scan_db(struct wlan_objmgr_pdev *pdev,
 /**
  * scm_scan_register_bcn_cb() - API to register api to indicate bcn/probe
  * as soon as they are received
- * @pdev: psoc
+ * @psoc: psoc
  * @cb: callback to be registered
  * @type: Type of callback to be registered
  *
@@ -210,7 +211,7 @@ struct channel_list_db *scm_get_rnr_channel_db(struct wlan_objmgr_psoc *psoc);
 /**
  * scm_get_chan_meta() - API to return channel meta
  * @psoc: psoc
- * @freq: channel frequency
+ * @chan_freq: channel frequency
  *
  * Return: channel meta information
  */
@@ -255,7 +256,7 @@ void scm_update_rnr_from_scan_cache(struct wlan_objmgr_pdev *pdev);
  *                             during pno scan request
  * @vdev: vdev
  * @short_ssid: short ssid
- * @pno_chan_list: channel list
+ * @chan_list: channel list
  *
  * Remove FLAG_SCAN_ONLY_IF_RNR_FOUND flag in channel if ssid is different for
  * colocated AP, in pno scan request
@@ -291,6 +292,7 @@ scm_filter_rnr_flag_pno(struct wlan_objmgr_vdev *vdev,
  * scm_scan_update_mlme_by_bssinfo() - updates scan entry with mlme data
  * @pdev: pdev object
  * @bss_info: BSS information
+ * @mlme: scan entry MLME info
  *
  * This function updates scan db with scan_entry->mlme_info
  *
@@ -301,6 +303,22 @@ QDF_STATUS scm_scan_update_mlme_by_bssinfo(struct wlan_objmgr_pdev *pdev,
 
 uint32_t scm_get_last_scan_time_per_channel(struct wlan_objmgr_vdev *vdev,
 					    uint32_t freq);
+
+/**
+ * scm_scan_get_scan_entry_by_mac_freq() - Get scan entry by mac and freq
+ * @pdev: pdev info
+ * @bssid: BSSID of the bcn/probe response to be fetched from scan db
+ * @freq: freq for scan filter
+ * @cache_entry: cache entry to be filled from scan info
+ *
+ * Return: QDF_STATUS_SUCCESS if scan entry is present in scan db
+ */
+QDF_STATUS
+scm_scan_get_scan_entry_by_mac_freq(struct wlan_objmgr_pdev *pdev,
+				    struct qdf_mac_addr *bssid,
+				    uint16_t freq,
+				    struct scan_cache_entry
+				    *cache_entry);
 
 /**
  * scm_scan_get_entry_by_mac_addr() - Get bcn/probe rsp from scan db

@@ -487,8 +487,11 @@ dp_rx_mon_status_process_tlv(struct dp_soc *soc, struct dp_intr *int_ctx,
 				rx_tlv = hal_rx_status_get_next_tlv(rx_tlv,
 						mon_pdev->is_tlv_hdr_64_bit);
 
-				if (qdf_unlikely((rx_tlv - rx_tlv_start)) >=
-					RX_MON_STATUS_BUF_SIZE)
+				if (qdf_unlikely(((rx_tlv - rx_tlv_start) >=
+						RX_MON_STATUS_BUF_SIZE) ||
+						(RX_MON_STATUS_BUF_SIZE -
+						(rx_tlv - rx_tlv_start) <
+						mon_pdev->tlv_hdr_size)))
 					break;
 
 			} while ((tlv_status == HAL_TLV_STATUS_PPDU_NOT_DONE) ||

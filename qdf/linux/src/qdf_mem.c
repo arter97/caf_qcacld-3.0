@@ -132,8 +132,8 @@ enum list_type {
 };
 
 /**
- * major_alloc_priv: private data registered to debugfs entry created to list
- *                   the list major allocations
+ * struct major_alloc_priv - private data registered to debugfs entry
+ *                           created to list the list major allocations
  * @type:            type of the list to be parsed
  * @threshold:       configured by user by overwriting the respective debugfs
  *                   sys entry. This is to list the functions which requested
@@ -544,12 +544,6 @@ int qdf_mem_malloc_flags(void)
 
 qdf_export_symbol(qdf_mem_malloc_flags);
 
-/**
- * qdf_prealloc_disabled_config_get() - Get the user configuration of
- *                                       prealloc_disabled
- *
- * Return: value of prealloc_disabled qdf module argument
- */
 bool qdf_prealloc_disabled_config_get(void)
 {
 	return prealloc_disabled;
@@ -558,14 +552,6 @@ bool qdf_prealloc_disabled_config_get(void)
 qdf_export_symbol(qdf_prealloc_disabled_config_get);
 
 #ifdef QCA_WIFI_MODULE_PARAMS_FROM_INI
-/**
- * qdf_prealloc_disabled_config_set() - Set prealloc_disabled
- * @str_value: value of the module param
- *
- * This function will set qdf module param prealloc_disabled
- *
- * Return: QDF_STATUS_SUCCESS on Success
- */
 QDF_STATUS qdf_prealloc_disabled_config_set(const char *str_value)
 {
 	QDF_STATUS status;
@@ -1233,17 +1219,6 @@ static inline void qdf_mem_dma_dec(qdf_size_t size)
 	qdf_atomic_sub(size, &qdf_mem_stat.dma);
 }
 
-/**
- * __qdf_mempool_init() - Create and initialize memory pool
- *
- * @osdev: platform device object
- * @pool_addr: address of the pool created
- * @elem_cnt: no. of elements in pool
- * @elem_size: size of each pool element in bytes
- * @flags: flags
- *
- * return: Handle to memory pool or NULL if allocation failed
- */
 int __qdf_mempool_init(qdf_device_t osdev, __qdf_mempool_t *pool_addr,
 		       int elem_cnt, size_t elem_size, u_int32_t flags)
 {
@@ -1322,13 +1297,6 @@ int __qdf_mempool_init(qdf_device_t osdev, __qdf_mempool_t *pool_addr,
 }
 qdf_export_symbol(__qdf_mempool_init);
 
-/**
- * __qdf_mempool_destroy() - Destroy memory pool
- * @osdev: platform device object
- * @Handle: to memory pool
- *
- * Returns: none
- */
 void __qdf_mempool_destroy(qdf_device_t osdev, __qdf_mempool_t pool)
 {
 	int pool_id = 0;
@@ -1350,14 +1318,6 @@ void __qdf_mempool_destroy(qdf_device_t osdev, __qdf_mempool_t pool)
 }
 qdf_export_symbol(__qdf_mempool_destroy);
 
-/**
- * __qdf_mempool_alloc() - Allocate an element memory pool
- *
- * @osdev: platform device object
- * @Handle: to memory pool
- *
- * Return: Pointer to the allocated element or NULL if the pool is empty
- */
 void *__qdf_mempool_alloc(qdf_device_t osdev, __qdf_mempool_t pool)
 {
 	void *buf = NULL;
@@ -1383,14 +1343,6 @@ void *__qdf_mempool_alloc(qdf_device_t osdev, __qdf_mempool_t pool)
 }
 qdf_export_symbol(__qdf_mempool_alloc);
 
-/**
- * __qdf_mempool_free() - Free a memory pool element
- * @osdev: Platform device object
- * @pool: Handle to memory pool
- * @buf: Element to be freed
- *
- * Returns: none
- */
 void __qdf_mempool_free(qdf_device_t osdev, __qdf_mempool_t pool, void *buf)
 {
 	if (!pool)
@@ -1470,11 +1422,6 @@ static inline bool qdf_mem_prealloc_put(void *ptr)
 
 /* External Function implementation */
 #ifdef MEMORY_DEBUG
-/**
- * qdf_mem_debug_config_get() - Get the user configuration of mem_debug_disabled
- *
- * Return: value of mem_debug_disabled qdf module argument
- */
 #ifdef DISABLE_MEM_DBG_LOAD_CONFIG
 bool qdf_mem_debug_config_get(void)
 {
@@ -1488,14 +1435,6 @@ bool qdf_mem_debug_config_get(void)
 }
 #endif /* DISABLE_MEM_DBG_LOAD_CONFIG */
 
-/**
- * qdf_mem_debug_disabled_set() - Set mem_debug_disabled
- * @str_value: value of the module param
- *
- * This function will se qdf module param mem_debug_disabled
- *
- * Return: QDF_STATUS_SUCCESS on Success
- */
 #ifdef QCA_WIFI_MODULE_PARAMS_FROM_INI
 QDF_STATUS qdf_mem_debug_disabled_config_set(const char *str_value)
 {
@@ -1813,26 +1752,6 @@ void qdf_mem_check_for_leaks(void)
 				   leaks_count);
 }
 
-/**
- * qdf_mem_multi_pages_alloc_debug() - Debug version of
- * qdf_mem_multi_pages_alloc
- * @osdev: OS device handle pointer
- * @pages: Multi page information storage
- * @element_size: Each element size
- * @element_num: Total number of elements should be allocated
- * @memctxt: Memory context
- * @cacheable: Coherent memory or cacheable memory
- * @func: Caller of this allocator
- * @line: Line number of the caller
- * @caller: Return address of the caller
- *
- * This function will allocate large size of memory over multiple pages.
- * Large size of contiguous memory allocation will fail frequently, then
- * instead of allocate large memory by one shot, allocate through multiple, non
- * contiguous memory and combine pages when actual usage
- *
- * Return: None
- */
 void qdf_mem_multi_pages_alloc_debug(qdf_device_t osdev,
 				     struct qdf_mem_multi_page_t *pages,
 				     size_t element_size, uint32_t element_num,
@@ -1928,19 +1847,6 @@ out_fail:
 
 qdf_export_symbol(qdf_mem_multi_pages_alloc_debug);
 
-/**
- * qdf_mem_multi_pages_free_debug() - Debug version of qdf_mem_multi_pages_free
- * @osdev: OS device handle pointer
- * @pages: Multi page information storage
- * @memctxt: Memory context
- * @cacheable: Coherent memory or cacheable memory
- * @func: Caller of this allocator
- * @line: Line number of the caller
- *
- * This function will free large size of memory over multiple pages.
- *
- * Return: None
- */
 void qdf_mem_multi_pages_free_debug(qdf_device_t osdev,
 				    struct qdf_mem_multi_page_t *pages,
 				    qdf_dma_context_t memctxt, bool cacheable,
@@ -2014,22 +1920,6 @@ void *qdf_mem_malloc_atomic_fl(size_t size, const char *func, uint32_t line)
 }
 qdf_export_symbol(qdf_mem_malloc_atomic_fl);
 
-/**
- * qdf_mem_multi_pages_alloc() - allocate large size of kernel memory
- * @osdev: OS device handle pointer
- * @pages: Multi page information storage
- * @element_size: Each element size
- * @element_num: Total number of elements should be allocated
- * @memctxt: Memory context
- * @cacheable: Coherent memory or cacheable memory
- *
- * This function will allocate large size of memory over multiple pages.
- * Large size of contiguous memory allocation will fail frequently, then
- * instead of allocate large memory by one shot, allocate through multiple, non
- * contiguous memory and combine pages when actual usage
- *
- * Return: None
- */
 void qdf_mem_multi_pages_alloc(qdf_device_t osdev,
 			       struct qdf_mem_multi_page_t *pages,
 			       size_t element_size, uint32_t element_num,
@@ -2119,17 +2009,6 @@ out_fail:
 }
 qdf_export_symbol(qdf_mem_multi_pages_alloc);
 
-/**
- * qdf_mem_multi_pages_free() - free large size of kernel memory
- * @osdev: OS device handle pointer
- * @pages: Multi page information storage
- * @memctxt: Memory context
- * @cacheable: Coherent memory or cacheable memory
- *
- * This function will free large size of memory over multiple pages.
- *
- * Return: None
- */
 void qdf_mem_multi_pages_free(qdf_device_t osdev,
 			      struct qdf_mem_multi_page_t *pages,
 			      qdf_dma_context_t memctxt, bool cacheable)
@@ -2325,18 +2204,6 @@ void *qdf_aligned_malloc_fl(uint32_t *size,
 qdf_export_symbol(qdf_aligned_malloc_fl);
 
 #if defined(DP_UMAC_HW_RESET_SUPPORT) || defined(WLAN_SUPPORT_PPEDS)
-/**
- * qdf_tx_desc_pool_free_bufs() - Go through elems and call the registered  cb
- * @ctxt: Context to be passed to the cb
- * @pages: Multi page information storage
- * @elem_size: Each element size
- * @elem_count: Total number of elements in the pool.
- * @cacheable: Coherent memory or cacheable memory
- * @cb: Callback to free the elements
- * @elem_list: elem list for delayed free
- *
- * Return: 0 on Succscc, or Error code
- */
 int qdf_tx_desc_pool_free_bufs(void *ctxt, struct qdf_mem_multi_page_t *pages,
 			       uint32_t elem_size, uint32_t elem_count,
 			       uint8_t cacheable, qdf_mem_release_cb cb,
@@ -2374,21 +2241,10 @@ int qdf_tx_desc_pool_free_bufs(void *ctxt, struct qdf_mem_multi_page_t *pages,
 qdf_export_symbol(qdf_tx_desc_pool_free_bufs);
 #endif
 
-/**
- * qdf_mem_multi_page_link() - Make links for multi page elements
- * @osdev: OS device handle pointer
- * @pages: Multi page information storage
- * @elem_size: Single element size
- * @elem_count: elements count should be linked
- * @cacheable: Coherent memory or cacheable memory
- *
- * This function will make links for multi page allocated structure
- *
- * Return: 0 success
- */
 int qdf_mem_multi_page_link(qdf_device_t osdev,
-		struct qdf_mem_multi_page_t *pages,
-		uint32_t elem_size, uint32_t elem_count, uint8_t cacheable)
+			    struct qdf_mem_multi_page_t *pages,
+			    uint32_t elem_size, uint32_t elem_count,
+			    uint8_t cacheable)
 {
 	uint16_t i, i_int;
 	void *page_info;
@@ -2501,14 +2357,6 @@ qdf_shared_mem_t *qdf_mem_shared_mem_alloc(qdf_device_t osdev, uint32_t size)
 
 qdf_export_symbol(qdf_mem_shared_mem_alloc);
 
-/**
- * qdf_mem_copy_toio() - copy memory
- * @dst_addr: Pointer to destination memory location (to copy to)
- * @src_addr: Pointer to source memory location (to copy from)
- * @num_bytes: Number of bytes to copy.
- *
- * Return: none
- */
 void qdf_mem_copy_toio(void *dst_addr, const void *src_addr, uint32_t num_bytes)
 {
 	if (0 == num_bytes) {
@@ -2528,14 +2376,6 @@ void qdf_mem_copy_toio(void *dst_addr, const void *src_addr, uint32_t num_bytes)
 
 qdf_export_symbol(qdf_mem_copy_toio);
 
-/**
- * qdf_mem_set_io() - set (fill) memory with a specified byte value.
- * @ptr: Pointer to memory that will be set
- * @value: Byte set in memory
- * @num_bytes: Number of bytes to be set
- *
- * Return: None
- */
 void qdf_mem_set_io(void *ptr, uint32_t num_bytes, uint32_t value)
 {
 	if (!ptr) {
@@ -2845,18 +2685,6 @@ void *qdf_aligned_mem_alloc_consistent_fl(
 }
 qdf_export_symbol(qdf_aligned_mem_alloc_consistent_fl);
 
-/**
- * qdf_mem_dma_sync_single_for_device() - assign memory to device
- * @osdev: OS device handle
- * @bus_addr: dma address to give to the device
- * @size: Size of the memory block
- * @direction: direction data will be DMAed
- *
- * Assign memory to the remote device.
- * The cache lines are flushed to ram or invalidated as needed.
- *
- * Return: none
- */
 void qdf_mem_dma_sync_single_for_device(qdf_device_t osdev,
 					qdf_dma_addr_t bus_addr,
 					qdf_size_t size,
@@ -2866,17 +2694,6 @@ void qdf_mem_dma_sync_single_for_device(qdf_device_t osdev,
 }
 qdf_export_symbol(qdf_mem_dma_sync_single_for_device);
 
-/**
- * qdf_mem_dma_sync_single_for_cpu() - assign memory to CPU
- * @osdev: OS device handle
- * @bus_addr: dma address to give to the cpu
- * @size: Size of the memory block
- * @direction: direction data will be DMAed
- *
- * Assign memory to the CPU.
- *
- * Return: none
- */
 void qdf_mem_dma_sync_single_for_cpu(qdf_device_t osdev,
 				     qdf_dma_addr_t bus_addr,
 				     qdf_size_t size,
@@ -2906,16 +2723,6 @@ void qdf_mem_exit(void)
 }
 qdf_export_symbol(qdf_mem_exit);
 
-/**
- * qdf_ether_addr_copy() - copy an Ethernet address
- *
- * @dst_addr: A six-byte array Ethernet address destination
- * @src_addr: A six-byte array Ethernet address source
- *
- * Please note: dst & src must both be aligned to u16.
- *
- * Return: none
- */
 void qdf_ether_addr_copy(void *dst_addr, const void *src_addr)
 {
 	if ((!dst_addr) || (!src_addr)) {

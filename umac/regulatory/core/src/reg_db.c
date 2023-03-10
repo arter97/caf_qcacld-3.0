@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2017-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  *
  * Permission to use, copy, modify, and/or distribute this software for
@@ -1275,11 +1275,7 @@ const struct regulatory_rule reg_rules_5g[] = {
 	[CHAN_5735_5895_2] = {5735, 5895, 160, 20, REGULATORY_CHAN_NO_IR},
 	[CHAN_5835_5855_1] = {5835, 5855, 20, 30, 0},
 	[CHAN_5835_5855_2] = {5835, 5855, 20, 14, REGULATORY_CHAN_INDOOR_ONLY},
-#ifdef CONFIG_REG_CLIENT
 	[CHAN_5835_5895_1] = {5835, 5895, 40, 30, REGULATORY_CHAN_INDOOR_ONLY},
-#else
-	[CHAN_5835_5895_1] = {5835, 5895, 80, 30, REGULATORY_CHAN_INDOOR_ONLY},
-#endif
 	[CHAN_5850_5925_1] = {5850, 5925, 20, 24, 0},
 	[CHAN_5850_5925_2] = {5850, 5925, 20, 30, 0},
 #if defined(CONFIG_BAND_6GHZ) && defined(COMPILE_REGDB_6G)
@@ -1605,7 +1601,7 @@ const struct regdomain regdomains_5g[] = {
 };
 
 #if defined(CONFIG_BAND_6GHZ) && defined(COMPILE_REGDB_6G)
-/**
+/*
  * List of 6G Sub Domains.
  *
  * Note - If not specified in the naming, then above 6G subdomains are for
@@ -1653,7 +1649,7 @@ enum reg_subdomains_6g {
 	MKK1_CLI_VLP_6G = MKK1_AP_VLP_6G,
 };
 
-/**
+/*
  * Table of 6G super domain to sub domain.
  */
 static const struct sixghz_super_to_subdomains g_6g_reg_dmn_9_tuples[] = {
@@ -1727,7 +1723,7 @@ static const struct sixghz_super_to_subdomains g_6g_reg_dmn_9_tuples[] = {
 	 {APL5_CLI_VLP_6G, APL5_CLI_VLP_6G} },
 };
 
-/**
+/*
  * List of 6G reg rules.
  */
 enum reg_rules_6g {
@@ -1791,7 +1787,7 @@ enum reg_rules_6g {
 	CHAN_6875_7125_10,
 };
 
-/**
+/*
  * Mapping of 6G reg rules present in the 6G sub domain.
  */
 static const struct regulatory_rule_ext reg_rules_6g[] = {
@@ -1889,7 +1885,7 @@ static const struct regulatory_rule_ext reg_rules_6g[] = {
 						REGULATORY_CHAN_INDOOR_ONLY},
 };
 
-/**
+/*
  * Mapping of 6G sub domain and 6G reg rules.
  */
 static const struct sub_6g_regdomain sub_regdomains_6g[] = {

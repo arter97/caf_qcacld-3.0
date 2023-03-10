@@ -41,6 +41,12 @@
 
 #define DP_TX_MAX_NUM_FRAGS 6
 
+/* invalid peer id for reinject*/
+#define DP_INVALID_PEER 0XFFFE
+
+void dp_tx_nawds_handler(struct dp_soc *soc, struct dp_vdev *vdev,
+			 struct dp_tx_msdu_info_s *msdu_info,
+			 qdf_nbuf_t nbuf, uint16_t sa_peer_id);
 /*
  * DP_TX_DESC_FLAG_FRAG flags should always be defined to 0x1
  * please do not change this flag's definition
@@ -189,16 +195,19 @@ struct dp_tx_queue {
  * @tx_queue: Tx queue on which this MSDU should be transmitted
  * @num_seg: Number of segments (TSO)
  * @tid: TID (override) that is sent from HLOS
+ * @exception_fw: Duplicate frame to be sent to firmware
+ * @is_tx_sniffer: Indicates if the packet has to be sniffed
+ * @u: union of frame information structs
  * @u.tso_info: TSO information for TSO frame types
  * 	     (chain of the TSO segments, number of segments)
  * @u.sg_info: Scatter Gather information for non-TSO SG frames
  * @meta_data: Mesh meta header information
- * @exception_fw: Duplicate frame to be sent to firmware
  * @ppdu_cookie: 16-bit ppdu_cookie that has to be replayed back in completions
- * @ix_tx_sniffer: Indicates if the packet has to be sniffed
  * @gsn: global sequence for reinjected mcast packets
  * @vdev_id : vdev_id for reinjected mcast packets
  * @skip_hp_update : Skip HP update for TSO segments and update in last segment
+ * @buf_len:
+ * @payload_addr:
  *
  * This structure holds the complete MSDU information needed to program the
  * Hardware TCL and MSDU extension descriptors for different frame types
@@ -248,54 +257,177 @@ struct dp_tx_msdu_info_s {
 void dp_tx_deinit_pair_by_index(struct dp_soc *soc, int index);
 #endif /* QCA_HOST_MODE_WIFI_DISABLED */
 
+/**
+ * dp_tx_comp_process_desc_list() - Tx complete software descriptor handler
+ * @soc: core txrx main context
+ * @comp_head: software descriptor head pointer
+ * @ring_id: ring number
+ *
+ * This function will process batch of descriptors reaped by dp_tx_comp_handler
+ * and release the software descriptors after processing is complete
+ *
+ * Return: none
+ */
 void
 dp_tx_comp_process_desc_list(struct dp_soc *soc,
 			     struct dp_tx_desc_s *comp_head, uint8_t ring_id);
+
+/**
+ * dp_tx_comp_free_buf() - Free nbuf associated with the Tx Descriptor
+ * @soc: Soc handle
+ * @desc: software Tx descriptor to be processed
+ * @delayed_free: defer freeing of nbuf
+ *
+ * Return: nbuf to be freed later
+ */
 qdf_nbuf_t dp_tx_comp_free_buf(struct dp_soc *soc, struct dp_tx_desc_s *desc,
 			       bool delayed_free);
+
+/**
+ * dp_tx_desc_release() - Release Tx Descriptor
+ * @tx_desc: Tx Descriptor
+ * @desc_pool_id: Descriptor Pool ID
+ *
+ * Deallocate all resources attached to Tx descriptor and free the Tx
+ * descriptor.
+ *
+ * Return:
+ */
 void dp_tx_desc_release(struct dp_tx_desc_s *tx_desc, uint8_t desc_pool_id);
+
+/**
+ * dp_tx_compute_delay() - Compute and fill in all timestamps
+ *				to pass in correct fields
+ * @vdev: pdev handle
+ * @tx_desc: tx descriptor
+ * @tid: tid value
+ * @ring_id: TCL or WBM ring number for transmit path
+ *
+ * Return: none
+ */
 void dp_tx_compute_delay(struct dp_vdev *vdev, struct dp_tx_desc_s *tx_desc,
 			 uint8_t tid, uint8_t ring_id);
+
+/**
+ * dp_tx_comp_process_tx_status() - Parse and Dump Tx completion status info
+ * @soc: DP soc handle
+ * @tx_desc: software descriptor head pointer
+ * @ts: Tx completion status
+ * @txrx_peer: txrx peer handle
+ * @ring_id: ring number
+ *
+ * Return: none
+ */
 void dp_tx_comp_process_tx_status(struct dp_soc *soc,
 				  struct dp_tx_desc_s *tx_desc,
 				  struct hal_tx_completion_status *ts,
 				  struct dp_txrx_peer *txrx_peer,
 				  uint8_t ring_id);
+
+/**
+ * dp_tx_comp_process_desc() - Process tx descriptor and free associated nbuf
+ * @soc: DP Soc handle
+ * @desc: software Tx descriptor
+ * @ts: Tx completion status from HAL/HTT descriptor
+ * @txrx_peer: DP peer context
+ *
+ * Return: none
+ */
 void dp_tx_comp_process_desc(struct dp_soc *soc,
 			     struct dp_tx_desc_s *desc,
 			     struct hal_tx_completion_status *ts,
 			     struct dp_txrx_peer *txrx_peer);
+
+/**
+ * dp_tx_reinject_handler() - Tx Reinject Handler
+ * @soc: datapath soc handle
+ * @vdev: datapath vdev handle
+ * @tx_desc: software descriptor head pointer
+ * @status: Tx completion status from HTT descriptor
+ * @reinject_reason: reinject reason from HTT descriptor
+ *
+ * This function reinjects frames back to Target.
+ * Todo - Host queue needs to be added
+ *
+ * Return: none
+ */
 void dp_tx_reinject_handler(struct dp_soc *soc,
 			    struct dp_vdev *vdev,
 			    struct dp_tx_desc_s *tx_desc,
 			    uint8_t *status,
 			    uint8_t reinject_reason);
+
+/**
+ * dp_tx_inspect_handler() - Tx Inspect Handler
+ * @soc: datapath soc handle
+ * @vdev: datapath vdev handle
+ * @tx_desc: software descriptor head pointer
+ * @status: Tx completion status from HTT descriptor
+ *
+ * Handles Tx frames sent back to Host for inspection
+ * (ProxyARP)
+ *
+ * Return: none
+ */
 void dp_tx_inspect_handler(struct dp_soc *soc,
 			   struct dp_vdev *vdev,
 			   struct dp_tx_desc_s *tx_desc,
 			   uint8_t *status);
+
+/**
+ * dp_tx_update_peer_basic_stats() - Update peer basic stats
+ * @txrx_peer: Datapath txrx_peer handle
+ * @length: Length of the packet
+ * @tx_status: Tx status from TQM/FW
+ * @update: enhanced flag value present in dp_pdev
+ *
+ * Return: none
+ */
 void dp_tx_update_peer_basic_stats(struct dp_txrx_peer *txrx_peer,
 				   uint32_t length, uint8_t tx_status,
 				   bool update);
 
 #ifdef DP_UMAC_HW_RESET_SUPPORT
+/**
+ * dp_tx_drop() - Drop the frame on a given VAP
+ * @soc: DP soc handle
+ * @vdev_id: id of DP vdev handle
+ * @nbuf: skb
+ *
+ * Drop all the incoming packets
+ *
+ * Return: nbuf
+ */
 qdf_nbuf_t dp_tx_drop(struct cdp_soc_t *soc, uint8_t vdev_id, qdf_nbuf_t nbuf);
 
+/**
+ * dp_tx_exc_drop() - Drop the frame on a given VAP
+ * @soc_hdl: DP soc handle
+ * @vdev_id: id of DP vdev handle
+ * @nbuf: skb
+ * @tx_exc_metadata: Handle that holds exception path meta data
+ *
+ * Drop all the incoming packets
+ *
+ * Return: nbuf
+ */
 qdf_nbuf_t dp_tx_exc_drop(struct cdp_soc_t *soc_hdl, uint8_t vdev_id,
 			  qdf_nbuf_t nbuf,
 			  struct cdp_tx_exception_metadata *tx_exc_metadata);
 #endif
 #ifdef WLAN_SUPPORT_PPEDS
-void dp_ppeds_tx_desc_free(struct dp_soc *soc, struct dp_tx_desc_s *tx_desc);
+qdf_nbuf_t
+dp_ppeds_tx_desc_free(struct dp_soc *soc, struct dp_tx_desc_s *tx_desc);
 #else
-static inline
-void dp_ppeds_tx_desc_free(struct dp_soc *soc, struct dp_tx_desc_s *tx_desc)
+static inline qdf_nbuf_t
+dp_ppeds_tx_desc_free(struct dp_soc *soc, struct dp_tx_desc_s *tx_desc)
 {
+	return NULL;
 }
 #endif
 #ifndef QCA_HOST_MODE_WIFI_DISABLED
 /**
- * dp_tso_attach() - TSO Attach handler
+ * dp_tso_soc_attach() - TSO Attach handler
  * @txrx_soc: Opaque Dp handle
  *
  * Reserve TSO descriptor buffers
@@ -306,7 +438,7 @@ void dp_ppeds_tx_desc_free(struct dp_soc *soc, struct dp_tx_desc_s *tx_desc)
 QDF_STATUS dp_tso_soc_attach(struct cdp_soc_t *txrx_soc);
 
 /**
- * dp_tso_detach() - TSO Detach handler
+ * dp_tso_soc_detach() - TSO Detach handler
  * @txrx_soc: Opaque Dp handle
  *
  * Deallocate TSO descriptor buffers
@@ -316,37 +448,128 @@ QDF_STATUS dp_tso_soc_attach(struct cdp_soc_t *txrx_soc);
  */
 QDF_STATUS dp_tso_soc_detach(struct cdp_soc_t *txrx_soc);
 
-qdf_nbuf_t dp_tx_send(struct cdp_soc_t *soc, uint8_t vdev_id, qdf_nbuf_t nbuf);
+/**
+ * dp_tx_send() - Transmit a frame on a given VAP
+ * @soc_hdl: DP soc handle
+ * @vdev_id: id of DP vdev handle
+ * @nbuf: skb
+ *
+ * Entry point for Core Tx layer (DP_TX) invoked from
+ * hard_start_xmit in OSIF/HDD or from dp_rx_process for intravap forwarding
+ * cases
+ *
+ * Return: NULL on success,
+ *         nbuf when it fails to send
+ */
+qdf_nbuf_t dp_tx_send(struct cdp_soc_t *soc_hdl, uint8_t vdev_id,
+		      qdf_nbuf_t nbuf);
 
-qdf_nbuf_t dp_tx_send_vdev_id_check(struct cdp_soc_t *soc, uint8_t vdev_id,
-				    qdf_nbuf_t nbuf);
+/**
+ * dp_tx_send_vdev_id_check() - Transmit a frame on a given VAP in special
+ *      case to avoid check in per-packet path.
+ * @soc_hdl: DP soc handle
+ * @vdev_id: id of DP vdev handle
+ * @nbuf: skb
+ *
+ * Entry point for Core Tx layer (DP_TX) invoked from
+ * hard_start_xmit in OSIF/HDD to transmit packet through dp_tx_send
+ * with special condition to avoid per pkt check in dp_tx_send
+ *
+ * Return: NULL on success,
+ *         nbuf when it fails to send
+ */
+qdf_nbuf_t dp_tx_send_vdev_id_check(struct cdp_soc_t *soc_hdl,
+				    uint8_t vdev_id, qdf_nbuf_t nbuf);
 
-qdf_nbuf_t dp_tx_send_exception(struct cdp_soc_t *soc, uint8_t vdev_id,
-				qdf_nbuf_t nbuf,
-				struct cdp_tx_exception_metadata *tx_exc);
+/**
+ * dp_tx_send_exception() - Transmit a frame on a given VAP in exception path
+ * @soc_hdl: DP soc handle
+ * @vdev_id: id of DP vdev handle
+ * @nbuf: skb
+ * @tx_exc_metadata: Handle that holds exception path meta data
+ *
+ * Entry point for Core Tx layer (DP_TX) invoked from
+ * hard_start_xmit in OSIF/HDD to transmit frames through fw
+ *
+ * Return: NULL on success,
+ *         nbuf when it fails to send
+ */
+qdf_nbuf_t
+dp_tx_send_exception(struct cdp_soc_t *soc_hdl, uint8_t vdev_id,
+		     qdf_nbuf_t nbuf,
+		     struct cdp_tx_exception_metadata *tx_exc_metadata);
 
-qdf_nbuf_t dp_tx_send_exception_vdev_id_check(struct cdp_soc_t *soc,
-					      uint8_t vdev_id,
-					      qdf_nbuf_t nbuf,
-				struct cdp_tx_exception_metadata *tx_exc);
+/**
+ * dp_tx_send_exception_vdev_id_check() - Transmit a frame on a given VAP
+ *      in exception path in special case to avoid regular exception path chk.
+ * @soc_hdl: DP soc handle
+ * @vdev_id: id of DP vdev handle
+ * @nbuf: skb
+ * @tx_exc_metadata: Handle that holds exception path meta data
+ *
+ * Entry point for Core Tx layer (DP_TX) invoked from
+ * hard_start_xmit in OSIF/HDD to transmit frames through fw
+ *
+ * Return: NULL on success,
+ *         nbuf when it fails to send
+ */
+qdf_nbuf_t
+dp_tx_send_exception_vdev_id_check(struct cdp_soc_t *soc_hdl,
+				   uint8_t vdev_id, qdf_nbuf_t nbuf,
+				   struct cdp_tx_exception_metadata *tx_exc_metadata);
 
-qdf_nbuf_t dp_tx_send_mesh(struct cdp_soc_t *soc, uint8_t vdev_id,
+/**
+ * dp_tx_send_mesh() - Transmit mesh frame on a given VAP
+ * @soc_hdl: DP soc handle
+ * @vdev_id: DP vdev handle
+ * @nbuf: skb
+ *
+ * Entry point for Core Tx layer (DP_TX) invoked from
+ * hard_start_xmit in OSIF/HDD
+ *
+ * Return: NULL on success,
+ *         nbuf when it fails to send
+ */
+qdf_nbuf_t dp_tx_send_mesh(struct cdp_soc_t *soc_hdl, uint8_t vdev_id,
 			   qdf_nbuf_t nbuf);
+
+/**
+ * dp_tx_send_msdu_single() - Setup descriptor and enqueue single MSDU to TCL
+ * @vdev: DP vdev handle
+ * @nbuf: skb
+ * @msdu_info: MSDU information
+ * @peer_id: peer_id of the peer in case of NAWDS frames
+ * @tx_exc_metadata: Handle that holds exception path metadata
+ *
+ * Return: NULL on success,
+ *         nbuf when it fails to send
+ */
 qdf_nbuf_t
 dp_tx_send_msdu_single(struct dp_vdev *vdev, qdf_nbuf_t nbuf,
 		       struct dp_tx_msdu_info_s *msdu_info, uint16_t peer_id,
 		       struct cdp_tx_exception_metadata *tx_exc_metadata);
 
 /**
- * dp_tx_mcast_enhance
+ * dp_tx_mcast_enhance() - Multicast enhancement on TX
  * @vdev: DP vdev handle
  * @nbuf: network buffer to be transmitted
  *
  * Return: true on success
  *         false on failure
  */
-bool dp_tx_mcast_enhance(struct dp_vdev *vdev, qdf_nbuf_t buf);
+bool dp_tx_mcast_enhance(struct dp_vdev *vdev, qdf_nbuf_t nbuf);
 
+/**
+ * dp_tx_send_msdu_multiple() - Enqueue multiple MSDUs
+ * @vdev: DP vdev handle
+ * @nbuf: skb
+ * @msdu_info: MSDU info to be setup in MSDU extension descriptor
+ *
+ * Prepare descriptors for multiple MSDUs (TSO segments) and enqueue to TCL
+ *
+ * Return: NULL on success,
+ *         nbuf when it fails to send
+ */
 #if QDF_LOCK_STATS
 noinline qdf_nbuf_t
 dp_tx_send_msdu_multiple(struct dp_vdev *vdev, qdf_nbuf_t nbuf,
@@ -369,6 +592,15 @@ qdf_nbuf_t dp_tx_send_msdu_multiple(struct dp_vdev *vdev, qdf_nbuf_t nbuf,
 qdf_nbuf_t dp_tx_non_std(struct cdp_soc_t *soc_hdl, uint8_t vdev_id,
 			 enum ol_tx_spec tx_spec, qdf_nbuf_t msdu_list);
 #endif
+
+/**
+ * dp_tx_frame_is_drop() - checks if the packet is loopback
+ * @vdev: DP vdev handle
+ * @srcmac: source MAC address
+ * @dstmac: destination MAC address
+ *
+ * Return: 1 if frame needs to be dropped else 0
+ */
 int dp_tx_frame_is_drop(struct dp_vdev *vdev, uint8_t *srcmac, uint8_t *dstmac);
 
 /**
@@ -506,12 +738,44 @@ void dp_tx_vdev_multipass_deinit(struct dp_vdev *vdev)
 }
 
 #else
+/**
+ * dp_tx_multipass_process() - Process vlan frames in tx path
+ * @soc: dp soc handle
+ * @vdev: DP vdev handle
+ * @nbuf: skb
+ * @msdu_info: msdu descriptor
+ *
+ * Return: status whether frame needs to be dropped or transmitted
+ */
 bool dp_tx_multipass_process(struct dp_soc *soc, struct dp_vdev *vdev,
 			     qdf_nbuf_t nbuf,
 			     struct dp_tx_msdu_info_s *msdu_info);
 
+/**
+ * dp_tx_vdev_multipass_deinit() - set vlan map for vdev
+ * @vdev: pointer to vdev
+ *
+ * return: void
+ */
 void dp_tx_vdev_multipass_deinit(struct dp_vdev *vdev);
+
+/**
+ * dp_tx_remove_vlan_tag() - Remove 4 bytes of vlan tag
+ * @vdev: DP vdev handle
+ * @nbuf: network buffer
+ *
+ * Return: void
+ */
 void dp_tx_remove_vlan_tag(struct dp_vdev *vdev, qdf_nbuf_t nbuf);
+
+/**
+ * dp_tx_add_groupkey_metadata() - Add group key in metadata
+ * @vdev: DP vdev handle
+ * @msdu_info: MSDU info to be setup in MSDU descriptor
+ * @group_key: Group key index programmed in metadata
+ *
+ * Return: void
+ */
 void dp_tx_add_groupkey_metadata(struct dp_vdev *vdev,
 				 struct dp_tx_msdu_info_s *msdu_info,
 				 uint16_t group_key);
@@ -564,12 +828,12 @@ static inline void dp_tx_get_queue(struct dp_vdev *vdev,
 	queue->desc_pool_id = queue->ring_id;
 }
 
-/*
- * dp_tx_get_hal_ring_hdl()- Get the hal_tx_ring_hdl for data transmission
- * @dp_soc - DP soc structure pointer
- * @ring_id - Transmit Queue/ring_id to be used when XPS is enabled
+/**
+ * dp_tx_get_hal_ring_hdl() - Get the hal_tx_ring_hdl for data transmission
+ * @soc: DP soc structure pointer
+ * @ring_id: Transmit Queue/ring_id to be used when XPS is enabled
  *
- * Return - HAL ring handle
+ * Return: HAL ring handle
  */
 static inline hal_ring_handle_t dp_tx_get_hal_ring_hdl(struct dp_soc *soc,
 						       uint8_t ring_id)
@@ -623,12 +887,12 @@ static inline hal_ring_handle_t dp_tx_get_hal_ring_hdl(struct dp_soc *soc,
 #endif
 
 #ifdef QCA_OL_TX_LOCK_LESS_ACCESS
-/*
- * dp_tx_hal_ring_access_start()- hal_tx_ring access for data transmission
- * @dp_soc - DP soc structure pointer
- * @hal_ring_hdl - HAL ring handle
+/**
+ * dp_tx_hal_ring_access_start() - hal_tx_ring access for data transmission
+ * @soc: DP soc structure pointer
+ * @hal_ring_hdl: HAL ring handle
  *
- * Return - None
+ * Return: None
  */
 static inline int dp_tx_hal_ring_access_start(struct dp_soc *soc,
 					      hal_ring_handle_t hal_ring_hdl)
@@ -636,12 +900,12 @@ static inline int dp_tx_hal_ring_access_start(struct dp_soc *soc,
 	return hal_srng_access_start_unlocked(soc->hal_soc, hal_ring_hdl);
 }
 
-/*
- * dp_tx_hal_ring_access_end()- hal_tx_ring access for data transmission
- * @dp_soc - DP soc structure pointer
- * @hal_ring_hdl - HAL ring handle
+/**
+ * dp_tx_hal_ring_access_end() - hal_tx_ring access for data transmission
+ * @soc: DP soc structure pointer
+ * @hal_ring_hdl: HAL ring handle
  *
- * Return - None
+ * Return: None
  */
 static inline void dp_tx_hal_ring_access_end(struct dp_soc *soc,
 					     hal_ring_handle_t hal_ring_hdl)
@@ -649,12 +913,12 @@ static inline void dp_tx_hal_ring_access_end(struct dp_soc *soc,
 	hal_srng_access_end_unlocked(soc->hal_soc, hal_ring_hdl);
 }
 
-/*
- * dp_tx_hal_ring_access_reap()- hal_tx_ring access for data transmission
- * @dp_soc - DP soc structure pointer
- * @hal_ring_hdl - HAL ring handle
+/**
+ * dp_tx_hal_ring_access_end_reap() - hal_tx_ring access for data transmission
+ * @soc: DP soc structure pointer
+ * @hal_ring_hdl: HAL ring handle
  *
- * Return - None
+ * Return: None
  */
 static inline void dp_tx_hal_ring_access_end_reap(struct dp_soc *soc,
 						  hal_ring_handle_t
@@ -697,15 +961,126 @@ static inline void dp_tx_comp_process_exception(struct dp_tx_desc_s *tx_desc)
 }
 /* TODO TX_FEATURE_NOT_YET */
 
+/**
+ * dp_tx_desc_flush() - release resources associated
+ *                      to TX Desc
+ *
+ * @pdev: Handle to DP pdev structure
+ * @vdev: virtual device instance
+ * NULL: no specific Vdev is required and check all allcated TX desc
+ * on this pdev.
+ * Non-NULL: only check the allocated TX Desc associated to this Vdev.
+ *
+ * @force_free:
+ * true: flush the TX desc.
+ * false: only reset the Vdev in each allocated TX desc
+ * that associated to current Vdev.
+ *
+ * This function will go through the TX desc pool to flush
+ * the outstanding TX data or reset Vdev to NULL in associated TX
+ * Desc.
+ */
 void dp_tx_desc_flush(struct dp_pdev *pdev, struct dp_vdev *vdev,
 		      bool force_free);
+
+/**
+ * dp_tx_vdev_attach() - attach vdev to dp tx
+ * @vdev: virtual device instance
+ *
+ * Return: QDF_STATUS_SUCCESS: success
+ *         QDF_STATUS_E_RESOURCES: Error return
+ */
 QDF_STATUS dp_tx_vdev_attach(struct dp_vdev *vdev);
+
+/**
+ * dp_tx_vdev_detach() - detach vdev from dp tx
+ * @vdev: virtual device instance
+ *
+ * Return: QDF_STATUS_SUCCESS: success
+ *         QDF_STATUS_E_RESOURCES: Error return
+ */
 QDF_STATUS dp_tx_vdev_detach(struct dp_vdev *vdev);
+
+/**
+ * dp_tx_vdev_update_search_flags() - Update vdev flags as per opmode
+ * @vdev: virtual device instance
+ *
+ * Return: void
+ *
+ */
 void dp_tx_vdev_update_search_flags(struct dp_vdev *vdev);
+
+/**
+ * dp_soc_tx_desc_sw_pools_alloc() - Allocate tx descriptor pool memory
+ * @soc: core txrx main context
+ *
+ * This function allocates memory for following descriptor pools
+ * 1. regular sw tx descriptor pools (static pools)
+ * 2. TX extension descriptor pools (ME, RAW, TSO etc...)
+ * 3. TSO descriptor pools
+ *
+ * Return: QDF_STATUS_SUCCESS: success
+ *         QDF_STATUS_E_RESOURCES: Error return
+ */
 QDF_STATUS dp_soc_tx_desc_sw_pools_alloc(struct dp_soc *soc);
+
+/**
+ * dp_soc_tx_desc_sw_pools_init() - Initialise TX descriptor pools
+ * @soc: core txrx main context
+ *
+ * This function initializes the following TX descriptor pools
+ * 1. regular sw tx descriptor pools (static pools)
+ * 2. TX extension descriptor pools (ME, RAW, TSO etc...)
+ * 3. TSO descriptor pools
+ *
+ * Return: QDF_STATUS_SUCCESS: success
+ *	   QDF_STATUS_E_RESOURCES: Error return
+ */
 QDF_STATUS dp_soc_tx_desc_sw_pools_init(struct dp_soc *soc);
+
+/**
+ * dp_soc_tx_desc_sw_pools_free() - free all TX descriptors
+ * @soc: core txrx main context
+ *
+ * This function frees all tx related descriptors as below
+ * 1. Regular TX descriptors (static pools)
+ * 2. extension TX descriptors (used for ME, RAW, TSO etc...)
+ * 3. TSO descriptors
+ *
+ */
 void dp_soc_tx_desc_sw_pools_free(struct dp_soc *soc);
+
+/**
+ * dp_soc_tx_desc_sw_pools_deinit() - de-initialize all TX descriptors
+ * @soc: core txrx main context
+ *
+ * This function de-initializes all tx related descriptors as below
+ * 1. Regular TX descriptors (static pools)
+ * 2. extension TX descriptors (used for ME, RAW, TSO etc...)
+ * 3. TSO descriptors
+ *
+ */
 void dp_soc_tx_desc_sw_pools_deinit(struct dp_soc *soc);
+
+/**
+ * dp_handle_wbm_internal_error() - handles wbm_internal_error case
+ * @soc: core DP main context
+ * @hal_desc: hal descriptor
+ * @buf_type: indicates if the buffer is of type link disc or msdu
+ *
+ * wbm_internal_error is seen in following scenarios :
+ *
+ * 1.  Null pointers detected in WBM_RELEASE_RING descriptors
+ * 2.  Null pointers detected during delinking process
+ *
+ * Some null pointer cases:
+ *
+ * a. MSDU buffer pointer is NULL
+ * b. Next_MSDU_Link_Desc pointer is NULL, with no last msdu flag
+ * c. MSDU buffer pointer is NULL or Next_Link_Desc pointer is NULL
+ *
+ * Return: None
+ */
 void
 dp_handle_wbm_internal_error(struct dp_soc *soc, void *hal_desc,
 			     uint32_t buf_type);
@@ -757,14 +1132,42 @@ static inline void dp_tx_vdev_update_search_flags(struct dp_vdev *vdev)
 	defined(QCA_TX_CAPTURE_SUPPORT) || \
 	defined(QCA_MCOPY_SUPPORT)
 #ifdef FEATURE_PERPKT_INFO
+
+/**
+ * dp_get_completion_indication_for_stack() - send completion to stack
+ * @soc : dp_soc handle
+ * @pdev: dp_pdev handle
+ * @txrx_peer: dp peer handle
+ * @ts: transmit completion status structure
+ * @netbuf: Buffer pointer for free
+ * @time_latency:
+ *
+ * This function is used for indication whether buffer needs to be
+ * sent to stack for freeing or not
+ *
+ * Return: QDF_STATUS
+ */
 QDF_STATUS
 dp_get_completion_indication_for_stack(struct dp_soc *soc,
 				       struct dp_pdev *pdev,
-				       struct dp_txrx_peer *peer,
+				       struct dp_txrx_peer *txrx_peer,
 				       struct hal_tx_completion_status *ts,
 				       qdf_nbuf_t netbuf,
 				       uint64_t time_latency);
 
+/**
+ * dp_send_completion_to_stack() - send completion to stack
+ * @soc :  dp_soc handle
+ * @pdev:  dp_pdev handle
+ * @peer_id: peer_id of the peer for which completion came
+ * @ppdu_id: ppdu_id
+ * @netbuf: Buffer pointer for free
+ *
+ * This function is used to send completion to stack
+ * to free buffer
+ *
+ * Return: QDF_STATUS
+ */
 void dp_send_completion_to_stack(struct dp_soc *soc,  struct dp_pdev *pdev,
 			    uint16_t peer_id, uint32_t ppdu_id,
 			    qdf_nbuf_t netbuf);
@@ -790,6 +1193,15 @@ void dp_send_completion_to_stack(struct dp_soc *soc,  struct dp_pdev *pdev,
 #endif
 
 #ifdef WLAN_FEATURE_PKT_CAPTURE_V2
+/**
+ * dp_send_completion_to_pkt_capture() - send tx completion to packet capture
+ * @soc: dp_soc handle
+ * @desc: Tx Descriptor
+ * @ts: HAL Tx completion descriptor contents
+ *
+ * This function is used to send tx completion to packet capture
+ */
+
 void dp_send_completion_to_pkt_capture(struct dp_soc *soc,
 				       struct dp_tx_desc_s *desc,
 				       struct hal_tx_completion_status *ts);
@@ -810,7 +1222,7 @@ dp_send_completion_to_pkt_capture(struct dp_soc *soc,
  * @tx_desc: TX descriptor reference
  * @ring_id: TCL ring id
  *
- * Returns: none
+ * Return: none
  */
 void dp_tx_update_stats(struct dp_soc *soc,
 			struct dp_tx_desc_s *tx_desc,
@@ -819,12 +1231,13 @@ void dp_tx_update_stats(struct dp_soc *soc,
 /**
  * dp_tx_attempt_coalescing() - Check and attempt TCL register write coalescing
  * @soc: Datapath soc handle
+ * @vdev: DP vdev handle
  * @tx_desc: tx packet descriptor
  * @tid: TID for pkt transmission
  * @msdu_info: MSDU info of tx packet
  * @ring_id: TCL ring id
  *
- * Returns: 1, if coalescing is to be done
+ * Return: 1, if coalescing is to be done
  *	    0, if coalescing is not to be done
  */
 int
@@ -840,7 +1253,7 @@ dp_tx_attempt_coalescing(struct dp_soc *soc, struct dp_vdev *vdev,
  * @hal_ring_hdl: HAL ring handle
  * @coalesce: Coalesce the current write or not
  *
- * Returns: none
+ * Return: none
  */
 void
 dp_tx_ring_access_end(struct dp_soc *soc, hal_ring_handle_t hal_ring_hdl,
@@ -852,7 +1265,7 @@ dp_tx_ring_access_end(struct dp_soc *soc, hal_ring_handle_t hal_ring_hdl,
  * @tx_desc: TX descriptor reference
  * @ring_id: TCL ring id
  *
- * Returns: none
+ * Return: none
  */
 static inline void dp_tx_update_stats(struct dp_soc *soc,
 				      struct dp_tx_desc_s *tx_desc,
@@ -883,7 +1296,7 @@ dp_tx_attempt_coalescing(struct dp_soc *soc, struct dp_vdev *vdev,
  * @soc_hdl: DP soc handle
  * @is_high_tput: flag to indicate whether throughput is high
  *
- * Returns: none
+ * Return: none
  */
 static inline
 void dp_set_rtpm_tput_policy_requirement(struct cdp_soc_t *soc_hdl,
@@ -894,6 +1307,17 @@ void dp_set_rtpm_tput_policy_requirement(struct cdp_soc_t *soc_hdl,
 	qdf_atomic_set(&soc->rtpm_high_tput_flag, is_high_tput);
 }
 
+/**
+ * dp_tx_ring_access_end_wrapper() - Wrapper for ring access end
+ * @soc: Datapath soc handle
+ * @hal_ring_hdl: HAL ring handle
+ * @coalesce: Coalesce the current write or not
+ *
+ * Feature-specific wrapper for HAL ring access end for data
+ * transmission
+ *
+ * Return: none
+ */
 void
 dp_tx_ring_access_end_wrapper(struct dp_soc *soc,
 			      hal_ring_handle_t hal_ring_hdl,
@@ -987,7 +1411,7 @@ void dp_set_delta_tsf(struct cdp_soc_t *soc_hdl, uint8_t vdev_id,
 #endif
 #ifdef WLAN_FEATURE_TSF_UPLINK_DELAY
 /**
- * dp_set_tsf_report_ul_delay() - Enable or disable reporting uplink delay
+ * dp_set_tsf_ul_delay_report() - Enable or disable reporting uplink delay
  * @soc_hdl: cdp soc pointer
  * @vdev_id: vdev id
  * @enable: true to enable and false to disable
@@ -1025,7 +1449,7 @@ bool dp_tx_pkt_tracepoints_enabled(void)
 #ifdef DP_TX_TRACKING
 /**
  * dp_tx_desc_set_timestamp() - set timestamp in tx descriptor
- * @tx_desc - tx descriptor
+ * @tx_desc: tx descriptor
  *
  * Return: None
  */
@@ -1138,7 +1562,7 @@ void dp_pkt_get_timestamp(uint64_t *time)
  * dp_update_tx_desc_stats - Update the increase or decrease in
  * outstanding tx desc count
  * values on pdev and soc
- * @vdev: DP pdev handle
+ * @pdev: DP pdev handle
  *
  * Return: void
  */
@@ -1161,7 +1585,7 @@ dp_update_tx_desc_stats(struct dp_pdev *pdev)
 }
 #endif /* CONFIG_WLAN_SYSFS_MEM_STATS */
 
-#ifdef QCA_SUPPORT_GLOBAL_DESC
+#ifdef QCA_SUPPORT_DP_GLOBAL_CTX
 /**
  * dp_tx_get_global_desc_in_use() - read global descriptors in usage
  * @dp_global: Datapath global context
@@ -1169,7 +1593,7 @@ dp_update_tx_desc_stats(struct dp_pdev *pdev)
  * Return: global descriptors in use
  */
 static inline int32_t
-dp_tx_get_global_desc_in_use(struct dp_global_desc_context *dp_global)
+dp_tx_get_global_desc_in_use(struct dp_global_context *dp_global)
 {
 	return qdf_atomic_read(&dp_global->global_descriptor_in_use);
 }
@@ -1183,12 +1607,13 @@ static inline bool is_spl_packet(qdf_nbuf_t nbuf)
 	return false;
 }
 
-#ifdef QCA_SUPPORT_GLOBAL_DESC
+#ifdef QCA_SUPPORT_DP_GLOBAL_CTX
 /**
  * is_dp_spl_tx_limit_reached - Check if the packet is a special packet to allow
  * allocation if allocated tx descriptors are within the global max limit
  * and pdev max limit.
  * @vdev: DP vdev handle
+ * @nbuf: network buffer
  *
  * Return: true if allocated tx descriptors reached max configured value, else
  * false
@@ -1198,10 +1623,10 @@ is_dp_spl_tx_limit_reached(struct dp_vdev *vdev, qdf_nbuf_t nbuf)
 {
 	struct dp_pdev *pdev = vdev->pdev;
 	struct dp_soc *soc = pdev->soc;
-	struct dp_global_desc_context *dp_global;
+	struct dp_global_context *dp_global;
 	uint32_t global_tx_desc_allowed;
 
-	dp_global = wlan_objmgr_get_desc_ctx();
+	dp_global = wlan_objmgr_get_global_ctx();
 	global_tx_desc_allowed =
 		wlan_cfg_get_num_global_tx_desc(soc->wlan_cfg_ctx);
 
@@ -1225,6 +1650,7 @@ is_dp_spl_tx_limit_reached(struct dp_vdev *vdev, qdf_nbuf_t nbuf)
  * global max reg limit and pdev max reg limit for regular packets. Also check
  * if the limit is reached for special packets.
  * @vdev: DP vdev handle
+ * @nbuf: network buffer
  *
  * Return: true if allocated tx descriptors reached max limit for regular
  * packets and in case of special packets, if the limit is reached max
@@ -1235,12 +1661,12 @@ dp_tx_limit_check(struct dp_vdev *vdev, qdf_nbuf_t nbuf)
 {
 	struct dp_pdev *pdev = vdev->pdev;
 	struct dp_soc *soc = pdev->soc;
-	struct dp_global_desc_context *dp_global;
+	struct dp_global_context *dp_global;
 	uint32_t global_tx_desc_allowed;
 	uint32_t global_tx_desc_reg_allowed;
 	uint32_t global_tx_desc_spcl_allowed;
 
-	dp_global = wlan_objmgr_get_desc_ctx();
+	dp_global = wlan_objmgr_get_global_ctx();
 	global_tx_desc_allowed =
 		wlan_cfg_get_num_global_tx_desc(soc->wlan_cfg_ctx);
 	global_tx_desc_spcl_allowed =
@@ -1274,6 +1700,7 @@ dp_tx_limit_check(struct dp_vdev *vdev, qdf_nbuf_t nbuf)
  * allocation if allocated tx descriptors are within the soc max limit
  * and pdev max limit.
  * @vdev: DP vdev handle
+ * @nbuf: network buffer
  *
  * Return: true if allocated tx descriptors reached max configured value, else
  * false
@@ -1304,6 +1731,7 @@ is_dp_spl_tx_limit_reached(struct dp_vdev *vdev, qdf_nbuf_t nbuf)
  * soc max reg limit and pdev max reg limit for regular packets. Also check if
  * the limit is reached for special packets.
  * @vdev: DP vdev handle
+ * @nbuf: network buffer
  *
  * Return: true if allocated tx descriptors reached max limit for regular
  * packets and in case of special packets, if the limit is reached max
@@ -1362,19 +1790,19 @@ dp_tx_exception_limit_check(struct dp_vdev *vdev)
 	return false;
 }
 
-#ifdef QCA_SUPPORT_GLOBAL_DESC
+#ifdef QCA_SUPPORT_DP_GLOBAL_CTX
 /**
  * dp_tx_outstanding_inc - Inc outstanding tx desc values on global and pdev
- * @vdev: DP pdev handle
+ * @pdev: DP pdev handle
  *
  * Return: void
  */
 static inline void
 dp_tx_outstanding_inc(struct dp_pdev *pdev)
 {
-	struct dp_global_desc_context *dp_global;
+	struct dp_global_context *dp_global;
 
-	dp_global = wlan_objmgr_get_desc_ctx();
+	dp_global = wlan_objmgr_get_global_ctx();
 
 	qdf_atomic_inc(&dp_global->global_descriptor_in_use);
 	qdf_atomic_inc(&pdev->num_tx_outstanding);
@@ -1382,17 +1810,17 @@ dp_tx_outstanding_inc(struct dp_pdev *pdev)
 }
 
 /**
- * dp_tx_outstanding__dec - Dec outstanding tx desc values on global and pdev
- * @vdev: DP pdev handle
+ * dp_tx_outstanding_dec - Dec outstanding tx desc values on global and pdev
+ * @pdev: DP pdev handle
  *
  * Return: void
  */
 static inline void
 dp_tx_outstanding_dec(struct dp_pdev *pdev)
 {
-	struct dp_global_desc_context *dp_global;
+	struct dp_global_context *dp_global;
 
-	dp_global = wlan_objmgr_get_desc_ctx();
+	dp_global = wlan_objmgr_get_global_ctx();
 
 	qdf_atomic_dec(&dp_global->global_descriptor_in_use);
 	qdf_atomic_dec(&pdev->num_tx_outstanding);
@@ -1402,7 +1830,7 @@ dp_tx_outstanding_dec(struct dp_pdev *pdev)
 #else
 /**
  * dp_tx_outstanding_inc - Increment outstanding tx desc values on pdev and soc
- * @vdev: DP pdev handle
+ * @pdev: DP pdev handle
  *
  * Return: void
  */
@@ -1417,8 +1845,8 @@ dp_tx_outstanding_inc(struct dp_pdev *pdev)
 }
 
 /**
- * dp_tx_outstanding__dec - Decrement outstanding tx desc values on pdev and soc
- * @vdev: DP pdev handle
+ * dp_tx_outstanding_dec - Decrement outstanding tx desc values on pdev and soc
+ * @pdev: DP pdev handle
  *
  * Return: void
  */
@@ -1431,7 +1859,7 @@ dp_tx_outstanding_dec(struct dp_pdev *pdev)
 	qdf_atomic_dec(&soc->num_tx_outstanding);
 	dp_update_tx_desc_stats(pdev);
 }
-#endif /* QCA_SUPPORT_GLOBAL_DESC */
+#endif /* QCA_SUPPORT_DP_GLOBAL_CTX */
 
 #else //QCA_TX_LIMIT_CHECK
 static inline bool

@@ -183,15 +183,6 @@ void dp_rx_link_desc_refill_duplicate_check(
 	*buf_info = current_link_desc_buf_info;
 }
 
-/**
- * dp_rx_link_desc_return_by_addr - Return a MPDU link descriptor to
- *					(WBM) by address
- *
- * @soc: core DP main context
- * @link_desc_addr: link descriptor addr
- *
- * Return: QDF_STATUS
- */
 QDF_STATUS
 dp_rx_link_desc_return_by_addr(struct dp_soc *soc,
 			       hal_buff_addrinfo_t link_desc_addr,
@@ -255,15 +246,6 @@ done:
 
 qdf_export_symbol(dp_rx_link_desc_return_by_addr);
 
-/**
- * dp_rx_link_desc_return() - Return a MPDU link descriptor to HW
- *				(WBM), following error handling
- *
- * @soc: core DP main context
- * @ring_desc: opaque pointer to the REO error ring descriptor
- *
- * Return: QDF_STATUS
- */
 QDF_STATUS
 dp_rx_link_desc_return(struct dp_soc *soc, hal_ring_desc_t ring_desc,
 		       uint8_t bm_action)
@@ -281,8 +263,7 @@ dp_rx_link_desc_return(struct dp_soc *soc, hal_ring_desc_t ring_desc,
  * @soc: core txrx main context
  * @ring_desc: opaque pointer to the REO error ring descriptor
  * @mpdu_desc_info: MPDU descriptor information from ring descriptor
- * @head: head of the local descriptor free-list
- * @tail: tail of the local descriptor free-list
+ * @mac_id: mac ID
  * @quota: No. of units (packets) that can be serviced in one shot.
  *
  * This function is used to drop all MSDU in an MPDU
@@ -422,8 +403,7 @@ more_msdu_link_desc:
  * @soc: core txrx main context
  * @ring_desc: opaque pointer to the REO error ring descriptor
  * @mpdu_desc_info: MPDU descriptor information from ring descriptor
- * @head: head of the local descriptor free-list
- * @tail: tail of the local descriptor free-list
+ * @mac_id: mac ID
  * @quota: No. of units (packets) that can be serviced in one shot.
  *
  * This function implements PN error handling
@@ -478,7 +458,7 @@ dp_rx_pn_error_handle(struct dp_soc *soc, hal_ring_desc_t ring_desc,
 /**
  * dp_rx_deliver_oor_frame() - deliver OOR frames to stack
  * @soc: Datapath soc handler
- * @peer: pointer to DP peer
+ * @txrx_peer: pointer to DP peer
  * @nbuf: pointer to the skb of RX frame
  * @frame_mask: the mask for special frame needed
  * @rx_tlv_hdr: start of rx tlv header
@@ -726,6 +706,8 @@ _dp_rx_bar_frame_handle(struct dp_soc *soc, qdf_nbuf_t nbuf,
  * @ring_desc: Hal ring desc
  * @rx_desc: dp rx desc
  * @mpdu_desc_info: mpdu desc info
+ * @err_status: error status
+ * @err_code: error code
  *
  * Handle the error BAR frames received. Ensure the SOC level
  * stats are updated based on the REO error code. The BAR frames
@@ -781,31 +763,8 @@ dp_rx_bar_frame_handle(struct dp_soc *soc,
 
 #endif /* QCA_HOST_MODE_WIFI_DISABLED */
 
-/**
- * dp_2k_jump_handle() - Function to handle 2k jump exception
- *                        on WBM ring
- *
- * @soc: core DP main context
- * @nbuf: buffer pointer
- * @rx_tlv_hdr: start of rx tlv header
- * @peer_id: peer id of first msdu
- * @tid: Tid for which exception occurred
- *
- * This function handles 2k jump violations arising out
- * of receiving aggregates in non BA case. This typically
- * may happen if aggregates are received on a QOS enabled TID
- * while Rx window size is still initialized to value of 2. Or
- * it may also happen if negotiated window size is 1 but peer
- * sends aggregates.
- *
- */
-
-void
-dp_2k_jump_handle(struct dp_soc *soc,
-		  qdf_nbuf_t nbuf,
-		  uint8_t *rx_tlv_hdr,
-		  uint16_t peer_id,
-		  uint8_t tid)
+void dp_2k_jump_handle(struct dp_soc *soc, qdf_nbuf_t nbuf, uint8_t *rx_tlv_hdr,
+		       uint16_t peer_id, uint8_t tid)
 {
 	struct dp_peer *peer = NULL;
 	struct dp_rx_tid *rx_tid = NULL;
@@ -956,14 +915,6 @@ dp_rx_deliver_to_osif_stack(struct dp_soc *soc,
 #endif
 
 #ifdef WLAN_FEATURE_11BE_MLO
-/*
- * dp_rx_err_match_dhost() - function to check whether dest-mac is correct
- * @eh: Ethernet header of incoming packet
- * @vdev: dp_vdev object of the VAP on which this data packet is received
- *
- * Return: 1 if the destination mac is correct,
- *         0 if this frame is not correctly destined to this VAP/MLD
- */
 int dp_rx_err_match_dhost(qdf_ether_header_t *eh, struct dp_vdev *vdev)
 {
 	return ((qdf_mem_cmp(eh->ether_dhost, &vdev->mac_addr.raw[0],
@@ -1327,19 +1278,6 @@ process_next_msdu:
 
 #endif /* QCA_HOST_MODE_WIFI_DISABLED */
 
-/**
- * dp_rx_process_rxdma_err() - Function to deliver rxdma unencrypted_err
- *			       frames to OS or wifi parse errors.
- * @soc: core DP main context
- * @nbuf: buffer pointer
- * @rx_tlv_hdr: start of rx tlv header
- * @txrx_peer: peer reference
- * @err_code: rxdma err code
- * @mac_id: mac_id which is one of 3 mac_ids(Assuming mac_id and
- * pool_id has same mapping)
- *
- * Return: None
- */
 void
 dp_rx_process_rxdma_err(struct dp_soc *soc, qdf_nbuf_t nbuf,
 			uint8_t *rx_tlv_hdr, struct dp_txrx_peer *txrx_peer,
@@ -1494,15 +1432,6 @@ process_rx:
 	return;
 }
 
-/**
- * dp_rx_process_mic_error(): Function to pass mic error indication to umac
- * @soc: core DP main context
- * @nbuf: buffer pointer
- * @rx_tlv_hdr: start of rx tlv header
- * @txrx_peer: txrx peer handle
- *
- * return: void
- */
 void dp_rx_process_mic_error(struct dp_soc *soc, qdf_nbuf_t nbuf,
 			     uint8_t *rx_tlv_hdr,
 			     struct dp_txrx_peer *txrx_peer)
@@ -1781,7 +1710,7 @@ dp_rx_link_cookie_invalidate(hal_ring_desc_t ring_desc)
  * @sw_cookie: SW cookie of the buffer in RX err ring
  * @rbm: Return buffer manager of the buffer in RX err ring
  *
- * Returns: None
+ * Return: None
  */
 static inline void
 dp_rx_err_ring_record_entry(struct dp_soc *soc, uint64_t paddr,
@@ -1921,19 +1850,19 @@ static int dp_rx_err_exception(struct dp_soc *soc, hal_ring_desc_t ring_desc)
 #endif /* HANDLE_RX_REROUTE_ERR */
 
 #ifdef WLAN_MLO_MULTI_CHIP
-/*
+/**
  * dp_idle_link_bm_id_check() - war for HW issue
- *
- * This is a war for HW issue where link descriptor
- * of partner soc received due to packets wrongly
- * interpreted as fragments
  *
  * @soc: DP SOC handle
  * @rbm: idle link RBM value
  * @ring_desc: reo error link descriptor
  *
- * returns: true in case link desc is consumed
- *	    false in other cases
+ * This is a war for HW issue where link descriptor
+ * of partner soc received due to packets wrongly
+ * interpreted as fragments
+ *
+ * Return: true in case link desc is consumed
+ *	   false in other cases
  */
 static bool dp_idle_link_bm_id_check(struct dp_soc *soc, uint8_t rbm,
 				     void *ring_desc)
@@ -2745,7 +2674,7 @@ static void dup_desc_dbg(struct dp_soc *soc,
  * @rxdma_dst_ring_desc: void pointer to monitor link descriptor buf addr info
  * @head: head of descs list to be freed
  * @tail: tail of decs list to be freed
-
+ *
  * Return: number of msdu in MPDU to be popped
  */
 static inline uint32_t
@@ -3054,26 +2983,6 @@ dp_wbm_int_err_mpdu_pop(struct dp_soc *soc, uint32_t mac_id,
 	} while (buf_info.paddr);
 }
 
-/*
- *
- * dp_handle_wbm_internal_error() - handles wbm_internal_error case
- *
- * @soc: core DP main context
- * @hal_desc: hal descriptor
- * @buf_type: indicates if the buffer is of type link disc or msdu
- * Return: None
- *
- * wbm_internal_error is seen in following scenarios :
- *
- * 1.  Null pointers detected in WBM_RELEASE_RING descriptors
- * 2.  Null pointers detected during delinking process
- *
- * Some null pointer cases:
- *
- * a. MSDU buffer pointer is NULL
- * b. Next_MSDU_Link_Desc pointer is NULL, with no last msdu flag
- * c. MSDU buffer pointer is NULL or Next_Link_Desc pointer is NULL
- */
 void
 dp_handle_wbm_internal_error(struct dp_soc *soc, void *hal_desc,
 			     uint32_t buf_type)

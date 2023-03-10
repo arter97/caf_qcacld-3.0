@@ -797,7 +797,7 @@ static void send_flush_completion_to_user(uint8_t ring_id)
 	wlan_report_log_completion(is_fatal, indicator, reason_code, ring_id);
 
 	if (recovery_needed)
-		cds_trigger_recovery(QDF_REASON_UNSPECIFIED);
+		cds_trigger_recovery(QDF_FLUSH_LOGS);
 }
 #endif
 

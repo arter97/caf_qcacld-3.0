@@ -1153,13 +1153,16 @@ void wlan_mlo_peer_get_links_info(struct wlan_objmgr_peer *peer,
 	struct wlan_mlo_link_peer_entry *peer_entry;
 	struct wlan_objmgr_peer *link_peer;
 	struct wlan_objmgr_vdev *link_vdev;
-	uint8_t i, ix;
+	uint8_t i, ix, idx = 0;
+	struct wlan_mlo_eml_cap *ml_emlcap;
 
 	ml_peer = peer->mlo_peer_ctx;
 	ml_links->num_partner_links = 0;
 
 	if (!ml_peer)
 		return;
+
+	ml_emlcap = &ml_peer->mlpeer_emlcap;
 
 	mlo_peer_lock_acquire(ml_peer);
 
@@ -1175,6 +1178,7 @@ void wlan_mlo_peer_get_links_info(struct wlan_objmgr_peer *peer,
 
 		if (!link_peer)
 			continue;
+		idx++;
 		if (link_peer == peer)
 			continue;
 		link_vdev = wlan_peer_get_vdev(link_peer);
@@ -1187,6 +1191,14 @@ void wlan_mlo_peer_get_links_info(struct wlan_objmgr_peer *peer,
 		ix = ml_links->num_partner_links;
 		ml_links->link_info[ix].vdev_id = wlan_vdev_get_id(link_vdev);
 		ml_links->link_info[ix].hw_mld_link_id = peer_entry->hw_link_id;
+		ml_links->link_info[ix].mlo_enabled = 1;
+		ml_links->link_info[ix].mlo_assoc_link =
+			wlan_peer_mlme_is_assoc_peer(link_peer);
+		ml_links->link_info[ix].mlo_primary_umac =
+			peer_entry->is_primary;
+		ml_links->link_info[ix].mlo_logical_link_index_valid = 1;
+		ml_links->link_info[ix].emlsr_support = ml_emlcap->emlsr_supp;
+		ml_links->link_info[ix].logical_link_index = idx - 1;
 		ml_links->num_partner_links++;
 	}
 	mlo_peer_lock_release(ml_peer);

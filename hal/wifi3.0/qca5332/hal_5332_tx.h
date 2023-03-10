@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022, Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023, Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -32,7 +32,7 @@
 
 /**
  * hal_tx_set_dscp_tid_map_5332() - Configure default DSCP to TID map table
- * @soc: HAL SoC context
+ * @hal_soc: HAL SoC context
  * @map: DSCP-TID mapping table
  * @id: mapping table ID - 0-31
  *
@@ -101,10 +101,10 @@ static void hal_tx_set_dscp_tid_map_5332(struct hal_soc *hal_soc, uint8_t *map,
 
 /**
  * hal_tx_update_dscp_tid_5332() - Update the dscp tid map table as updated
- *					by the user
+ *                                 by the user
  * @soc: HAL SoC context
- * @map: DSCP-TID mapping table
- * @id : MAP ID
+ * @tid: TID
+ * @id: MAP ID
  * @dscp: DSCP_TID map index
  *
  * Return: void
@@ -188,8 +188,8 @@ static void hal_tx_update_dscp_tid_5332(struct hal_soc *soc, uint8_t tid,
 			(HWIO_TCL_R0_RBM_MAPPING0_SW2TCL_CREDIT_RING_SHFT >> 2)
 
 /**
- * hal_tx_config_rbm_mapping_be() - Update return buffer manager ring id
- * @hal_soc: HAL SoC context
+ * hal_tx_config_rbm_mapping_be_5332() - Update return buffer manager ring id
+ * @hal_soc_hdl: HAL SoC context
  * @hal_ring_hdl: Source ring pointer
  * @rbm_id: return buffer manager ring id
  *
@@ -241,7 +241,7 @@ hal_tx_config_rbm_mapping_be_5332(hal_soc_handle_t hal_soc_hdl,
 /**
  * hal_tx_init_cmd_credit_ring_5332() - Initialize command/credit SRNG
  * @hal_soc_hdl: Handle to HAL SoC structure
- * @hal_srng: Handle to HAL SRNG structure
+ * @hal_ring_hdl: Handle to HAL SRNG structure
  *
  * Return: none
  */

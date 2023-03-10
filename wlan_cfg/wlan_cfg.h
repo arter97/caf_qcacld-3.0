@@ -106,6 +106,8 @@
 #define WLAN_MAX_MLO_CHIPS 1
 #endif
 
+#define UMAC_RESET_IPC 451
+
 struct wlan_cfg_dp_pdev_ctxt;
 
 /**
@@ -307,6 +309,7 @@ struct wlan_srng_cfg {
  * @ppe2tcl_ring: PPE2TCL ring size
  * @ppeds_num_tx_desc: Number of tx descs for PPE DS
  * @ppeds_tx_comp_napi_budget: Napi budget for tx completions
+ * @ppeds_tx_desc_hotlist_len: PPE DS tx desc hotlist max length
  * @pkt_capture_mode: Packet capture mode config
  * @rx_mon_buf_ring_size: Rx monitor buf ring size
  * @tx_mon_buf_ring_size: Tx monitor buf ring size
@@ -489,6 +492,7 @@ struct wlan_cfg_dp_soc_ctxt {
 	int ppe2tcl_ring;
 	int ppeds_num_tx_desc;
 	int ppeds_tx_comp_napi_budget;
+	int ppeds_tx_desc_hotlist_len;
 #endif
 #ifdef WLAN_FEATURE_PKT_CAPTURE_V2
 	uint32_t pkt_capture_mode;
@@ -2137,6 +2141,14 @@ int
 wlan_cfg_get_dp_soc_ppeds_num_tx_desc(struct wlan_cfg_dp_soc_ctxt *cfg);
 
 /**
+ * wlan_cfg_get_dp_soc_ppeds_tx_desc_hotlist_len() - Max hotlist len of tx descs
+ * @cfg: Configuration Handle
+ *
+ * Return: hotlist len
+ */
+int
+wlan_cfg_get_dp_soc_ppeds_tx_desc_hotlist_len(struct wlan_cfg_dp_soc_ctxt *cfg);
+/**
  * wlan_cfg_get_dp_soc_ppeds_tx_comp_napi_budget() - ppeds Tx comp napi budget
  * @cfg: Configuration Handle
  *
@@ -2171,6 +2183,12 @@ wlan_cfg_get_dp_soc_ppeds_num_tx_desc(struct wlan_cfg_dp_soc_ctxt *cfg)
 
 static inline int
 wlan_cfg_get_dp_soc_ppeds_tx_comp_napi_budget(struct wlan_cfg_dp_soc_ctxt *cfg)
+{
+	return 0;
+}
+
+static inline int
+wlan_cfg_get_dp_soc_ppeds_tx_desc_hotlist_len(struct wlan_cfg_dp_soc_ctxt *cfg)
 {
 	return 0;
 }

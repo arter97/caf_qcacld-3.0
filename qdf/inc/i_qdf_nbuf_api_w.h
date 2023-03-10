@@ -236,7 +236,7 @@ static inline void qdf_nbuf_ipa_priv_set(qdf_nbuf_t buf, uint32_t priv)
 
 /**
  * qdf_nbuf_set_rx_reo_dest_ind_or_sw_excpt() - set reo destination indication
-						or sw exception flag
+ *						or sw exception flag
  * @buf: Network buffer
  * @value: value to set
  *

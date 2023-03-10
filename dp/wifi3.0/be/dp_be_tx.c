@@ -414,12 +414,12 @@ release_tx_desc:
 
 #ifdef QCA_OL_TX_MULTIQ_SUPPORT
 #ifdef DP_TX_IMPLICIT_RBM_MAPPING
-/*
- * dp_tx_get_rbm_id()- Get the RBM ID for data transmission completion.
- * @dp_soc - DP soc structure pointer
- * @ring_id - Transmit Queue/ring_id to be used when XPS is enabled
+/**
+ * dp_tx_get_rbm_id_be() - Get the RBM ID for data transmission completion.
+ * @soc: DP soc structure pointer
+ * @ring_id: Transmit Queue/ring_id to be used when XPS is enabled
  *
- * Return - RBM ID corresponding to TCL ring_id
+ * Return: RBM ID corresponding to TCL ring_id
  */
 static inline uint8_t dp_tx_get_rbm_id_be(struct dp_soc *soc,
 					  uint8_t ring_id)
@@ -448,18 +448,18 @@ static inline uint8_t dp_tx_get_rbm_id_be(struct dp_soc *soc,
 
 #ifdef QCA_SUPPORT_TX_MIN_RATES_FOR_SPECIAL_FRAMES
 
-/*
+/**
  * dp_tx_set_min_rates_for_critical_frames()- sets min-rates for critical pkts
- * @dp_soc - DP soc structure pointer
- * @hal_tx_desc - HAL descriptor where fields are set
- * nbuf - skb to be considered for min rates
+ * @soc: DP soc structure pointer
+ * @hal_tx_desc: HAL descriptor where fields are set
+ * @nbuf: skb to be considered for min rates
  *
  * The function relies on upper layers to set QDF_NBUF_CB_TX_EXTRA_IS_CRITICAL
  * and uses it to determine if the frame is critical. For a critical frame,
  * flow override bits are set to classify the frame into HW's high priority
  * queue. The HW will pick pre-configured min rates for such packets.
  *
- * Return - None
+ * Return: None
  */
 static void
 dp_tx_set_min_rates_for_critical_frames(struct dp_soc *soc,
@@ -749,6 +749,16 @@ dp_tx_mlo_mcast_pkt_send(struct dp_vdev_be *be_vdev,
 		nbuf_clone = nbuf;
 	}
 
+	/* NAWDS clients will accepts on 4 addr format MCAST packets
+	 * This will ensure to send packets in 4 addr format to NAWDS clients.
+	 */
+	if (qdf_unlikely(ptnr_vdev->nawds_enabled)) {
+		qdf_mem_zero(&msdu_info, sizeof(msdu_info));
+		dp_tx_get_queue(ptnr_vdev, nbuf_clone, &msdu_info.tx_queue);
+		dp_tx_nawds_handler(ptnr_vdev->pdev->soc, ptnr_vdev,
+				    &msdu_info, nbuf_clone, DP_INVALID_PEER);
+	}
+
 	qdf_mem_zero(&msdu_info, sizeof(msdu_info));
 	dp_tx_get_queue(ptnr_vdev, nbuf_clone, &msdu_info.tx_queue);
 	msdu_info.gsn = be_vdev->seq_num;
@@ -955,14 +965,13 @@ QDF_STATUS dp_sawf_tx_enqueue_fail_peer_stats(struct dp_soc *soc,
 
 #ifdef WLAN_SUPPORT_PPEDS
 
-/*
+/**
  * dp_ppeds_stats() - Accounting fw2wbm_tx_drop drops in Tx path
  * @soc: Handle to DP Soc structure
  * @peer_id: Peer ID in the descriptor
  *
  * Return: NONE
  */
-
 static inline
 void dp_ppeds_stats(struct dp_soc *soc, uint16_t peer_id)
 {
@@ -982,13 +991,6 @@ void dp_ppeds_stats(struct dp_soc *soc, uint16_t peer_id)
 	}
 }
 
-/**
- * dp_ppeds_tx_comp_handler()- Handle tx completions for ppe2tcl ring
- * @soc: Handle to DP Soc structure
- * @quota: Max number of tx completions to process
- *
- * Return: Number of tx completions processed
- */
 int dp_ppeds_tx_comp_handler(struct dp_soc_be *be_soc, uint32_t quota)
 {
 	uint32_t num_avail_for_reap = 0;
@@ -1001,6 +1003,7 @@ int dp_ppeds_tx_comp_handler(struct dp_soc_be *be_soc, uint32_t quota)
 	struct dp_soc *soc = &be_soc->soc;
 	void *last_prefetch_hw_desc = NULL;
 	struct dp_tx_desc_s *last_prefetch_sw_desc = NULL;
+	qdf_nbuf_t  nbuf;
 	hal_soc_handle_t hal_soc = soc->hal_soc;
 	hal_ring_handle_t hal_ring_hdl =
 				be_soc->ppeds_wbm_release_ring.hal_srng;
@@ -1058,8 +1061,8 @@ int dp_ppeds_tx_comp_handler(struct dp_soc_be *be_soc, uint32_t quota)
 			if (status != HTT_TX_FW2WBM_TX_STATUS_OK)
 				dp_ppeds_stats(soc, tx_desc->peer_id);
 
-			qdf_nbuf_free(tx_desc->nbuf);
-			dp_ppeds_tx_desc_free(soc, tx_desc);
+			nbuf = dp_ppeds_tx_desc_free(soc, tx_desc);
+			qdf_nbuf_free(nbuf);
 		} else {
 			tx_desc->tx_status =
 				hal_tx_comp_get_tx_status(tx_comp_hal_desc);
@@ -1686,19 +1689,6 @@ void dp_tx_nbuf_unmap_be(struct dp_soc *soc,
 {
 }
 
-/**
- * dp_tx_fast_send_be() - Transmit a frame on a given VAP
- * @soc: DP soc handle
- * @vdev_id: id of DP vdev handle
- * @nbuf: skb
- *
- * Entry point for Core Tx layer (DP_TX) invoked from
- * hard_start_xmit in OSIF/HDD or from dp_rx_process for intravap forwarding
- * cases
- *
- * Return: NULL on success,
- *         nbuf when it fails to send
- */
 #ifdef QCA_DP_TX_NBUF_LIST_FREE
 qdf_nbuf_t dp_tx_fast_send_be(struct cdp_soc_t *soc_hdl, uint8_t vdev_id,
 			      qdf_nbuf_t nbuf)

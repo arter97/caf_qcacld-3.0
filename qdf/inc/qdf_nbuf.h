@@ -130,6 +130,33 @@
 #define QDF_EAP_INITIATE			5
 #define QDF_EAP_FINISH				6
 
+#define EAP_PACKET_TYPE_ID 0x01
+#define EAP_PACKET_TYPE_EXP 0xFE
+
+#define EAP_EXP_TYPE_WSC_START 0x01
+#define EAP_EXP_TYPE_M1 0x04
+#define EAP_EXP_TYPE_M2 0x05
+#define EAP_EXP_TYPE_M3 0x07
+#define EAP_EXP_TYPE_M4 0x08
+#define EAP_EXP_TYPE_M5 0x09
+#define EAP_EXP_TYPE_M6 0x0A
+#define EAP_EXP_TYPE_M7 0x0B
+#define EAP_EXP_TYPE_M8 0x0C
+#define EAP_EXP_TYPE_WSC_DONE 0x0F
+
+#define EAP_EXP_MSG_OPCODE_OFFSET 0x1E
+#define EAP_EXP_MSG_TYPE_OFFSET 0x29
+
+enum wsc_op_code {
+	WSC_UPNP = 0, /* No OP Code in UPnP transport */
+	WSC_START = 0x01,
+	WSC_ACK = 0x02,
+	WSC_NACK = 0x03,
+	WSC_MSG = 0x04,
+	WSC_DONE = 0x05,
+	WSC_FRAG_ACK = 0x06
+};
+
 /* ARP Related MASK */
 #define QDF_NBUF_PKT_ARP_OPCODE_OFFSET	20
 #define QDF_NBUF_PKT_ARPOP_REQ		1
@@ -216,11 +243,11 @@
 #define QDF_MON_STATUS_MPDU_FCS_BMAP_NWORDS 8
 
 /**
- * @qdf_nbuf_queue_t - Platform independent packet queue abstraction
+ * typedef qdf_nbuf_queue_t - Platform independent packet queue abstraction
  */
 typedef __qdf_nbuf_queue_t qdf_nbuf_queue_t;
 
-/**
+/*
  * This is the length for radiotap, combined length
  * (Mandatory part struct ieee80211_radiotap_header + RADIOTAP_HEADER_LEN)
  * cannot be more than available headroom_sz.
@@ -325,9 +352,9 @@ typedef __qdf_nbuf_queue_t qdf_nbuf_queue_t;
  * @vht_flag_values3: VHT flag value 3
  * @vht_flag_values4: VHT flag value 4
  * @vht_flag_values5: VHT flag value 5
- * @he_sig_b_common_RU[4]: HE (11ax) common RU assignment index
+ * @he_sig_b_common_RU: HE (11ax) common RU assignment index
  * @rssi_comb: Combined RSSI
- * @rssi[MAX_CHAIN]: 8 bits RSSI per 20Mhz per chain
+ * @rssi: 8 bits RSSI per 20 MHz per chain
  * @duration: 802.11 Duration
  * @frame_control: frame control field
  * @ast_index: AST table hash index
@@ -338,12 +365,14 @@ typedef __qdf_nbuf_queue_t qdf_nbuf_queue_t;
  * @he_per_user_known: HE per user known info
  * @he_flags1: HE flags
  * @he_flags2: HE flags
- * @he_RU[4]: HE RU assignment index
+ * @he_RU: HE RU assignment index
  * @he_data1: HE property of received frame
  * @he_data2: HE property of received frame
  * @he_data3: HE property of received frame
  * @he_data4: HE property of received frame
  * @he_data5: HE property of received frame
+ * @he_data6: HE property of received frame
+ * @ppdu_len: PPDU length
  * @prev_ppdu_id: ppdu_id in previously received message
  * @ppdu_id: Id of the PLCP protocol data unit
  *
@@ -528,16 +557,21 @@ struct mon_rx_status {
  * @frame_control_info_valid: field indicates if fc value is valid
  * @frame_control: frame control field
  * @data_sequence_control_info_valid: field to indicate validity of seq control
+ * @ba_bitmap_sz: blockack bitmap size
  * @filter_category: mpdu filter category
  * @tcp_msdu_count: tcp protocol msdu count
  * @udp_msdu_count: udp protocol msdu count
  * @other_msdu_count: other protocol msdu count
  * @first_data_seq_ctrl: Sequence ctrl field of first data frame
  * @duration: 802.11 Duration
- * @vht_flag_values1-5: Contains corresponding data for flags field
+ * @vht_flag_values2: Contains corresponding data for flags field
+ * @vht_flag_values3: Contains corresponding data for flags field
+ * @vht_flag_values4: Contains corresponding data for flags field
+ * @vht_flag_values5: Contains corresponding data for flags field
+ * @vht_flag_values6: Contains corresponding data for flags field
  * @he_flags1: HE flags
  * @he_flags2: HE flags
- * @he_RU[4]: HE RU assignment index
+ * @he_RU: HE RU assignment index
  * @he_data1: HE property of received frame
  * @he_data2: HE property of received frame
  * @he_data3: HE property of received frame
@@ -639,6 +673,7 @@ struct qdf_radiotap_vendor_ns {
  * struct qdf_radiotap_vendor_ns_ath - Combined QTI Vendor NS
  * including the Radiotap specified Vendor Namespace header and
  * QTI specific Vendor Namespace data
+ * @hdr: radiotap vendor namespace header
  * @lsig: L_SIG_A (or L_SIG)
  * @device_id: Device Identification
  * @lsig_b: L_SIG_B
@@ -655,11 +690,12 @@ struct qdf_radiotap_vendor_ns_ath {
 
 /**
  * struct qdf_radiotap_ext2 - radiotap ext2 fields
- * ppdu_id: ppdu_id of current msdu
- * prev_ppdu_id: ppdu_id of previous msdu
- * tid: tid number of previous msdu
- * start_seq: start sequence of previous msdu
- * ba_bitmap: block ack bitmap of previous msdu
+ * @ppdu_id: ppdu_id of current msdu
+ * @prev_ppdu_id: ppdu_id of previous msdu
+ * @tid: tid number of previous msdu
+ * @reserved: reserved bits
+ * @start_seq: start sequence of previous msdu
+ * @ba_bitmap: block ack bitmap of previous msdu
  */
 struct qdf_radiotap_ext2 {
 	uint32_t ppdu_id;
@@ -998,14 +1034,15 @@ struct qdf_radiotap_ext2 {
 
 /**
  * enum qdf_proto_type - protocol type
- * @QDF_PROTO_TYPE_DHCP - DHCP
- * @QDF_PROTO_TYPE_EAPOL - EAPOL
- * @QDF_PROTO_TYPE_ARP - ARP
- * @QDF_PROTO_TYPE_MGMT - MGMT
- * @QDF_PROTO_TYPE_ICMP - ICMP
- * @QDF_PROTO_TYPE_ICMPv6 - ICMPv6
- * @QDF_PROTO_TYPE_EVENT - EVENT
- * @QDF_PROTO_TYPE_DNS - DNS
+ * @QDF_PROTO_TYPE_DHCP: DHCP
+ * @QDF_PROTO_TYPE_EAPOL: EAPOL
+ * @QDF_PROTO_TYPE_ARP: ARP
+ * @QDF_PROTO_TYPE_MGMT: MGMT
+ * @QDF_PROTO_TYPE_ICMP: ICMP
+ * @QDF_PROTO_TYPE_ICMPv6: ICMPv6
+ * @QDF_PROTO_TYPE_EVENT: EVENT
+ * @QDF_PROTO_TYPE_DNS: DNS
+ * @QDF_PROTO_TYPE_MAX: Max enumeration
  */
 enum qdf_proto_type {
 	QDF_PROTO_TYPE_DHCP,
@@ -1020,11 +1057,11 @@ enum qdf_proto_type {
 };
 
 /**
- * qdf_reception_type - reception type used by lithium phy TLV
- * @QDF_RECEPTION_TYPE_ULOFMDA - UL OFDMA
- * @QDF_RECEPTION_TYPE_ULMIMO - UL MIMO
- * @QQDF_RECEPTION_TYPE_FRAMELESS - Frame less
- * @QDF_RECEPTION_TYPE_OTHER - All the other types
+ * enum qdf_reception_type - reception type used by lithium phy TLV
+ * @QDF_RECEPTION_TYPE_ULOFMDA: UL OFDMA
+ * @QDF_RECEPTION_TYPE_ULMIMO: UL MIMO
+ * @QDF_RECEPTION_TYPE_FRAMELESS: Frame less
+ * @QDF_RECEPTION_TYPE_OTHER: All the other types
  */
 enum qdf_reception_type {
 	QDF_RECEPTION_TYPE_ULOFMDA,
@@ -1034,19 +1071,19 @@ enum qdf_reception_type {
 };
 
 /**
- * cb_ftype - Frame type information in skb cb
- * @CB_FTYPE_INVALID - Invalid
- * @CB_FTYPE_MCAST2UCAST - Multicast to Unicast converted packet
- * @CB_FTYPE_TSO - TCP Segmentation Offload
- * @CB_FTYPE_TSO_SG - TSO Scatter Gather
- * @CB_FTYPE_SG - Scatter Gather
- * @CB_FTYPE_INTRABSS_FWD - Intra BSS forwarding
- * @CB_FTYPE_RX_INFO - Rx information
- * @CB_FTYPE_MESH_RX_INFO - Mesh Rx information
- * @CB_FTYPE_MESH_TX_INFO - Mesh Tx information
- * @CB_FTYPE_DMS - Directed Multicast Service
- * @CB_FTYPE_SAWF - SAWF information
- * @CB_FTYPE_MLO_MCAST - MLO MCAST enable information
+ * enum cb_ftype - Frame type information in skb cb
+ * @CB_FTYPE_INVALID: Invalid
+ * @CB_FTYPE_MCAST2UCAST: Multicast to Unicast converted packet
+ * @CB_FTYPE_TSO: TCP Segmentation Offload
+ * @CB_FTYPE_TSO_SG: TSO Scatter Gather
+ * @CB_FTYPE_SG: Scatter Gather
+ * @CB_FTYPE_INTRABSS_FWD: Intra BSS forwarding
+ * @CB_FTYPE_RX_INFO: Rx information
+ * @CB_FTYPE_MESH_RX_INFO: Mesh Rx information
+ * @CB_FTYPE_MESH_TX_INFO: Mesh Tx information
+ * @CB_FTYPE_DMS: Directed Multicast Service
+ * @CB_FTYPE_SAWF: SAWF information
+ * @CB_FTYPE_MLO_MCAST: MLO MCAST enable information
  */
 enum cb_ftype {
 	CB_FTYPE_INVALID = 0,
@@ -1064,12 +1101,12 @@ enum cb_ftype {
 };
 
 /**
- * @qdf_nbuf_t - Platform independent packet abstraction
+ * typedef qdf_nbuf_t - Platform independent packet abstraction
  */
 typedef __qdf_nbuf_t qdf_nbuf_t;
 
 /**
- * @qdf_nbuf_shared_info_t- Platform independent shared info
+ * typedef qdf_nbuf_shared_info_t - Platform independent shared info
  */
 typedef __qdf_nbuf_shared_info_t qdf_nbuf_shared_info_t;
 
@@ -1130,7 +1167,10 @@ typedef struct qdf_nbuf_track_t QDF_NBUF_TRACK;
 typedef __qdf_nbuf_queue_head_t qdf_nbuf_queue_head_t;
 
 /**
- * @qdf_dma_map_cb_t - Dma map callback prototype
+ * typedef qdf_dma_map_cb_t() - Dma map callback prototype
+ * @arg: callback context
+ * @buf: netbuf
+ * @dmap: DMA map
  */
 typedef void (*qdf_dma_map_cb_t)(void *arg, qdf_nbuf_t buf,
 				 qdf_dma_map_t dmap);
@@ -1837,6 +1877,28 @@ static inline int qdf_nbuf_is_raw_frame(qdf_nbuf_t buf)
 }
 
 /**
+ * qdf_nbuf_is_fr_ds_set() - get from DS bit
+ * @buf: Network buffer
+ *
+ * Return: integer value - 0/1
+ */
+static inline int qdf_nbuf_is_fr_ds_set(qdf_nbuf_t buf)
+{
+	return __qdf_nbuf_is_fr_ds_set(buf);
+}
+
+/**
+ * qdf_nbuf_is_to_ds_set() - get to DS bit
+ * @buf: Network buffer
+ *
+ * Return: integer value - 0/1
+ */
+static inline int qdf_nbuf_is_to_ds_set(qdf_nbuf_t buf)
+{
+	return __qdf_nbuf_is_to_ds_set(buf);
+}
+
+/**
  * qdf_nbuf_set_tid_val() - set  tid_val
  * @buf: Network buffer
  * @val: 4 bits tid value
@@ -1858,7 +1920,7 @@ static inline uint8_t qdf_nbuf_get_tid_val(qdf_nbuf_t buf)
 }
 
 /**
- * qdf_nbuf_set_frag_list() - set  frag list bit
+ * qdf_nbuf_set_is_frag() - set  frag list bit
  * @buf: Network buffer
  * @val: 0/1
  *
@@ -1870,7 +1932,7 @@ static inline void qdf_nbuf_set_is_frag(qdf_nbuf_t buf, uint8_t val)
 }
 
 /**
- * qdf_nbuf_is_sa_valid() - get da frag list bit
+ * qdf_nbuf_is_frag() - get da frag list bit
  * @buf: Network buffer
  *
  * Return: integer value - 0/1
@@ -1959,7 +2021,7 @@ qdf_nbuf_dma_map_info(qdf_dma_map_t bmap, qdf_dmamap_info_t *sg)
 
 /**
  * qdf_nbuf_is_tso() - is the network buffer a jumbo packet?
- * @buf: Network buffer
+ * @nbuf: Network buffer
  *
  * Return: 1 - this is a jumbo packet 0 - not a jumbo packet
  */
@@ -2051,27 +2113,70 @@ enum qdf_nbuf_event_type {
 	QDF_NBUF_SMMU_UNMAP,
 };
 
+/**
+ * qdf_net_buf_debug_init() - initialize network buffer debug functionality
+ *
+ * QDF network buffer debug feature tracks all SKBs allocated by WLAN driver
+ * in a hash table and when driver is unloaded it reports about leaked SKBs.
+ * WLAN driver module whose allocated SKB is freed by network stack are
+ * suppose to call qdf_net_buf_debug_release_skb() such that the SKB is not
+ * reported as memory leak.
+ *
+ * Return: none
+ */
 void qdf_net_buf_debug_init(void);
+
+/**
+ * qdf_net_buf_debug_exit() - exit network buffer debug functionality
+ *
+ * Exit network buffer tracking debug functionality and log SKB memory leaks
+ * As part of exiting the functionality, free the leaked memory and
+ * cleanup the tracking buffers.
+ *
+ * Return: none
+ */
 void qdf_net_buf_debug_exit(void);
+
 void qdf_net_buf_debug_clean(void);
 void qdf_nbuf_history_add(qdf_nbuf_t nbuf, const char *func, uint32_t line,
 			  enum qdf_nbuf_event_type type);
+
+/**
+ * qdf_net_buf_debug_add_node() - store skb in debug hash table
+ * @net_buf: network buffer
+ * @size: buffer size
+ * @func_name: function name that requests for mapping the nbuf
+ * @line_num: function line number
+ *
+ * Return: none
+ */
 void qdf_net_buf_debug_add_node(qdf_nbuf_t net_buf, size_t size,
 				const char *func_name, uint32_t line_num);
+
 /**
  * qdf_net_buf_debug_update_node() - update nbuf in debug hash table
+ * @net_buf: network buffer
+ * @func_name: function name that requests for mapping the nbuf
+ * @line_num: function line number
  *
  * Return: none
  */
 void qdf_net_buf_debug_update_node(qdf_nbuf_t net_buf, const char *func_name,
 				   uint32_t line_num);
+
+/**
+ * qdf_net_buf_debug_delete_node() - remove skb from debug hash table
+ * @net_buf: network buffer
+ *
+ * Return: none
+ */
 void qdf_net_buf_debug_delete_node(qdf_nbuf_t net_buf);
 
 /**
  * qdf_net_buf_debug_update_map_node() - update nbuf in debug
  * hash table with the mapping function info
- * @nbuf: network buffer
- * @func: function name that requests for mapping the nbuf
+ * @net_buf: network buffer
+ * @func_name: function name that requests for mapping the nbuf
  * @line_num: function line number
  *
  * Return: none
@@ -2128,8 +2233,8 @@ void qdf_net_buf_debug_update_smmu_unmap_node(qdf_nbuf_t nbuf,
 /**
  * qdf_net_buf_debug_update_unmap_node() - update nbuf in debug
  * hash table with the unmap function info
- * @nbuf:   network buffer
- * @func: function name that requests for unmapping the nbuf
+ * @net_buf:   network buffer
+ * @func_name: function name that requests for unmapping the nbuf
  * @line_num: function line number
  *
  * Return: none
@@ -2153,6 +2258,17 @@ void qdf_net_buf_debug_update_unmap_node(qdf_nbuf_t net_buf,
 void qdf_net_buf_debug_acquire_skb(qdf_nbuf_t net_buf,
 				   const char *func_name,
 				   uint32_t line_num);
+
+/**
+ * qdf_net_buf_debug_release_skb() - release skb to avoid memory leak
+ * @net_buf: Network buf holding head segment (single)
+ *
+ * WLAN driver module whose allocated SKB is freed by network stack are
+ * suppose to call this API before returning SKB to network stack such
+ * that the SKB is not reported as memory leak.
+ *
+ * Return: none
+ */
 void qdf_net_buf_debug_release_skb(qdf_nbuf_t net_buf);
 
 /* nbuf allocation routines */
@@ -2172,6 +2288,20 @@ qdf_nbuf_t qdf_nbuf_alloc_debug(qdf_device_t osdev, qdf_size_t size,
  * @size: Size to be allocated for skb
  * @reserve: Reserved headroom size
  * @align: Align
+ *
+ * This API allocates skb of required size and aligns if needed and reserves
+ * some space in the front. This skb allocation is not from skb recycler pool.
+ *
+ * Return: Allocated nbuf pointer
+ */
+#define qdf_nbuf_alloc_no_recycler(size, reserve, align) \
+	qdf_nbuf_alloc_no_recycler_debug(size, reserve, align, __func__, __LINE__)
+
+/**
+ * qdf_nbuf_alloc_no_recycler_debug() - Allocates skb
+ * @size: Size to be allocated for skb
+ * @reserve: Reserved headroom size
+ * @align: Align
  * @func: Function name of the call site
  * @line: Line number of the callsite
  *
@@ -2180,9 +2310,6 @@ qdf_nbuf_t qdf_nbuf_alloc_debug(qdf_device_t osdev, qdf_size_t size,
  *
  * Return: Allocated nbuf pointer
  */
-#define qdf_nbuf_alloc_no_recycler(s, r, a) \
-	qdf_nbuf_alloc_no_recycler_debug(s, r, a, __func__, __LINE__)
-
 qdf_nbuf_t qdf_nbuf_alloc_no_recycler_debug(size_t size, int reserve, int align,
 					    const char *func, uint32_t line);
 #define qdf_nbuf_free(d) \
@@ -2255,23 +2382,23 @@ qdf_nbuf_copy_expand_debug(qdf_nbuf_t buf, int headroom, int tailroom,
  * Return: New nbuf which is a copy of the received nbuf if it is cloned,
  *      else, return the original nbuf
  */
-#define qdf_nbuf_unshare(d) \
-	qdf_nbuf_unshare_debug(d, __func__, __LINE__)
+#define qdf_nbuf_unshare(buf) \
+	qdf_nbuf_unshare_debug(buf, __func__, __LINE__)
 
 qdf_nbuf_t
 qdf_nbuf_unshare_debug(qdf_nbuf_t buf, const char *func_name,
 		       uint32_t line_num);
 
 /**
- * qdf_nbuf_kfree_list() - Free nbuf list using kfree
+ * qdf_nbuf_dev_kfree_list() - Free nbuf list using kfree
  * @buf: Pointer to network buffer head
  *
  * This function is called to free the nbuf list on failure cases
  *
  * Return: None
  */
-#define qdf_nbuf_dev_kfree_list(d) \
-	qdf_nbuf_dev_kfree_list_debug(d, __func__, __LINE__)
+#define qdf_nbuf_dev_kfree_list(buf) \
+	qdf_nbuf_dev_kfree_list_debug(buf, __func__, __LINE__)
 
 void
 qdf_nbuf_dev_kfree_list_debug(qdf_nbuf_queue_head_t *nbuf_queue_head,
@@ -2408,8 +2535,8 @@ static inline qdf_nbuf_t qdf_nbuf_unshare(qdf_nbuf_t buf)
 }
 
 /**
- * qdf_nbuf_kfree_list() - Free nbuf list using kfree
- * @buf: Pointer to network buffer head
+ * qdf_nbuf_dev_kfree_list() - Free nbuf list using kfree
+ * @nbuf_queue_head: Pointer to buffer list head
  *
  * This function is called to free the nbuf list on failure cases
  *
@@ -2430,7 +2557,7 @@ qdf_nbuf_dev_kfree_list(qdf_nbuf_queue_head_t *nbuf_queue_head)
 /**
  * qdf_nbuf_dev_queue_head() - Queue a buffer at the list head
  * @nbuf_queue_head: Pointer to buffer list head
- * @buff: Pointer to network buffer head
+ * @buf: Pointer to network buffer head
  *
  * This function is called to queue a buffer at the list head
  *
@@ -2495,8 +2622,8 @@ qdf_nbuf_copy_expand_fraglist(qdf_nbuf_t buf, int headroom,
 #ifdef WLAN_FEATURE_FASTPATH
 /**
  * qdf_nbuf_init_fast() - before put buf into pool,turn it to init state
+ * @nbuf: buf instance
  *
- * @buf: buf instance
  * Return: data pointer of this buf where new data has to be
  *         put, or NULL if there is not enough room in this buf.
  */
@@ -2504,12 +2631,11 @@ void qdf_nbuf_init_fast(qdf_nbuf_t nbuf);
 #endif /* WLAN_FEATURE_FASTPATH */
 
 /**
- * @qdf_nbuf_list_free() - free a list of nbufs
+ * qdf_nbuf_list_free() - free a list of nbufs
  * @buf_list: A list of nbufs to be freed
  *
  * Return: none
  */
-
 static inline void qdf_nbuf_list_free(qdf_nbuf_t buf_list)
 {
 	while (buf_list) {
@@ -2540,8 +2666,8 @@ static inline QDF_STATUS qdf_nbuf_cat(qdf_nbuf_t dst, qdf_nbuf_t src)
 }
 
 /**
- * @qdf_nbuf_copy_bits() - return the length of the copy bits for skb
- * @skb: SKB pointer
+ * qdf_nbuf_copy_bits() - return the length of the copy bits for skb
+ * @nbuf: netbuf
  * @offset: offset
  * @len: Length
  * @to: To
@@ -2558,7 +2684,7 @@ qdf_nbuf_copy_bits(qdf_nbuf_t nbuf, uint32_t offset, uint32_t len, void *to)
 /* nbuf manipulation routines */
 
 /**
- * @qdf_nbuf_head() - return the address of an nbuf's buffer
+ * qdf_nbuf_head() - return the address of an nbuf's buffer
  * @buf: netbuf
  *
  * Return: head address
@@ -2677,7 +2803,7 @@ static inline qdf_size_t qdf_nbuf_len(qdf_nbuf_t buf)
 /**
  * qdf_nbuf_set_pktlen() - set the length of the buf
  * @buf: Network buf instance
- * @size: Size to be set
+ * @len: Size to be set
  *
  * Return: none
  */
@@ -2763,7 +2889,7 @@ static inline void qdf_nbuf_reset(qdf_nbuf_t buf, int reserve, int align)
 }
 
 /**
- * qdf_nbuf_dev_scratch_is_supported() - dev_scratch support for network buffer
+ * qdf_nbuf_is_dev_scratch_supported() - dev_scratch support for network buffer
  *                                       in kernel
  *
  * Return: true if dev_scratch is supported
@@ -2800,7 +2926,7 @@ static inline void qdf_nbuf_set_dev_scratch(qdf_nbuf_t buf, unsigned long value)
 
 /**
  * qdf_nbuf_set_dev() - set dev in network buffer
- * @buf: Pointer to network buffer
+ * @nbuf: Pointer to network buffer
  * @dev: netdev to be set in network buffer
  *
  * Return: void
@@ -2813,7 +2939,7 @@ void qdf_nbuf_set_dev(qdf_nbuf_t nbuf, qdf_netdev_t dev)
 
 /**
  * qdf_nbuf_get_dev_mtu() - get dev mtu in n/w buffer
- * @buf: Pointer to network buffer
+ * @nbuf: Pointer to network buffer
  *
  * Return: dev mtu value in nbuf
  */
@@ -2825,7 +2951,7 @@ unsigned int qdf_nbuf_get_dev_mtu(qdf_nbuf_t nbuf)
 
 /**
  * qdf_nbuf_set_protocol_eth_tye_trans() - set protocol using eth trans os API
- * @buf: Pointer to network buffer
+ * @nbuf: Pointer to network buffer
  *
  * Return: None
  */
@@ -2932,7 +3058,7 @@ static inline qdf_nbuf_t qdf_nbuf_queue_next(qdf_nbuf_t buf)
 }
 
 /**
- * @qdf_nbuf_is_queue_empty() - check if the buf queue is empty
+ * qdf_nbuf_is_queue_empty() - check if the buf queue is empty
  * @nbq: Network buf queue handle
  *
  * Return: true  if queue is empty
@@ -3240,7 +3366,7 @@ qdf_nbuf_get_dhcp_subtype(qdf_nbuf_t buf)
 /**
  * qdf_nbuf_data_get_dhcp_subtype() - get the subtype
  *              of DHCP packet.
- * @buf: Pointer to DHCP packet data buffer
+ * @data: Pointer to DHCP packet data buffer
  *
  * This func. returns the subtype of DHCP packet.
  *
@@ -3537,8 +3663,8 @@ bool qdf_nbuf_data_is_ipv4_dhcp_pkt(uint8_t *data)
 }
 
 /**
- * qdf_nbuf_data_is_ipv6_mdsn_pkt() - check if it is MDNS packet.
- * @data: Pointer to packet data buffer
+ * qdf_nbuf_is_ipv6_mdns_pkt() - check if it is MDNS packet.
+ * @buf: Pointer to packet data buffer
  *
  * This func. checks whether it is a MDNS packet or not.
  *
@@ -3551,8 +3677,8 @@ bool qdf_nbuf_is_ipv6_mdns_pkt(qdf_nbuf_t buf)
 }
 
 /**
- * qdf_nbuf_data_is_ipv6_dhcp_pkt() - check if it is DHCP packet.
- * @data: Pointer to DHCP packet data buffer
+ * qdf_nbuf_is_ipv6_dhcp_pkt() - check if it is DHCP packet.
+ * @buf: Pointer to DHCP packet data buffer
  *
  * This func. checks whether it is a DHCP packet or not.
  *
@@ -3736,7 +3862,7 @@ bool qdf_nbuf_data_is_arp_rsp(qdf_nbuf_t buf)
 }
 
 /**
- * qdf_nbuf_data_get_arp_src_ip() - get ARP packet source IP gateway.
+ * qdf_nbuf_get_arp_src_ip() - get ARP packet source IP gateway.
  * @buf:  buffer
  *
  * Return: ARP packet source IP value.
@@ -3748,7 +3874,7 @@ uint32_t qdf_nbuf_get_arp_src_ip(qdf_nbuf_t buf)
 }
 
 /**
- * qdf_nbuf_data_get_arp_tgt_ip() - get ARP packet target IP gateway.
+ * qdf_nbuf_get_arp_tgt_ip() - get ARP packet target IP gateway.
  * @buf:  buffer
  *
  * Return: ARP packet target IP value.
@@ -3946,7 +4072,7 @@ uint32_t qdf_nbuf_get_icmpv4_src_ip(qdf_nbuf_t buf)
 }
 
 /**
- * qdf_nbuf_data_get_icmpv4_tgt_ip() - get icmpv4 target IP
+ * qdf_nbuf_get_icmpv4_tgt_ip() - get icmpv4 target IP
  * @buf:  buffer
  *
  * Return: icmpv4 packet target IP value.
@@ -4301,7 +4427,7 @@ void qdf_nbuf_set_priority_pkt_type(qdf_nbuf_t nbuf, uint8_t pkt_type)
 /**
  * qdf_nbuf_remove_priority_pkt_type() - Remove the packet type bits
  *					 from priority
- * @@nbuf: pointer to network buffer
+ * @nbuf: pointer to network buffer
  *
  * Return: none
  */
@@ -4355,6 +4481,9 @@ static inline void qdf_nbuf_reset_num_frags(qdf_nbuf_t buf)
 
 /**
  * qdf_dmaaddr_to_32s - return high and low parts of dma_addr
+ * @dmaaddr: DMA address
+ * @lo: low 32-bits of @dmaaddr
+ * @hi: high 32-bits of @dmaaddr
  *
  * Returns the high and low 32-bits of the DMA addr in the provided ptrs
  *
@@ -4368,10 +4497,11 @@ static inline void qdf_dmaaddr_to_32s(qdf_dma_addr_t dmaaddr,
 
 /**
  * qdf_nbuf_get_tso_info() - function to divide a jumbo TSO
- * network buffer into segments
+ *                           network buffer into segments
+ * @osdev: qdf device handle
  * @nbuf:   network buffer to be segmented
  * @tso_info:  This is the output. The information about the
- *      TSO segments will be populated within this.
+ *             TSO segments will be populated within this.
  *
  * This function fragments a TCP jumbo packet into smaller
  * segments to be transmitted by the driver. It chains the TSO
@@ -4418,7 +4548,7 @@ static inline size_t qdf_nbuf_get_tcp_payload_len(qdf_nbuf_t nbuf)
  * @nbuf:   TSO jumbo network buffer to be segmented
  *
  * This function calculates the number of TCP segments that the
-   network buffer can be divided into.
+ * network buffer can be divided into.
  *
  * Return: number of TCP segments
  */
@@ -4428,8 +4558,7 @@ static inline uint32_t qdf_nbuf_get_tso_num_seg(qdf_nbuf_t nbuf)
 }
 
 /**
- * qdf_nbuf_get_gso_segs() - Return the number of gso segments in
- * nbuf
+ * qdf_nbuf_get_gso_segs() - Return the number of gso segments in nbuf
  * @nbuf: Network buffer
  *
  * Return: number of gso segments in nbuf
@@ -4440,8 +4569,7 @@ static inline uint16_t qdf_nbuf_get_gso_segs(qdf_nbuf_t nbuf)
 }
 
 /**
- * qdf_nbuf_set_gso_segs() - set the number of gso segments in
- * nbuf
+ * qdf_nbuf_set_gso_segs() - set the number of gso segments in nbuf
  * @nbuf: Network buffer
  * @val: val to be set
  *
@@ -4475,8 +4603,7 @@ static inline void qdf_nbuf_set_ip_summed_partial(qdf_nbuf_t nbuf)
 }
 
 /**
- * qdf_nbuf_get_gso_size() - Return the number of gso size in
- * nbuf
+ * qdf_nbuf_get_gso_size() - Return the number of gso size in nbuf
  * @nbuf: Network buffer
  *
  * Return: number of gso segments in nbuf
@@ -4488,9 +4615,10 @@ static inline unsigned int qdf_nbuf_get_gso_size(qdf_nbuf_t nbuf)
 
 /**
  * qdf_nbuf_set_gso_size() - Set the gso size in nbuf
- * @skb: Pointer to network buffer
+ * @nbuf: Pointer to network buffer
+ * @val: number of gso segments in nbuf
  *
- * Return: Return the number of gso segments
+ * Return: None
  */
 static inline void  qdf_nbuf_set_gso_size(qdf_nbuf_t nbuf, unsigned int val)
 {
@@ -4499,8 +4627,7 @@ static inline void  qdf_nbuf_set_gso_size(qdf_nbuf_t nbuf, unsigned int val)
 
 /**
  * qdf_nbuf_inc_users() - function to increment the number of
- * users referencing this network buffer
- *
+ *                        users referencing this network buffer
  * @nbuf:   network buffer
  *
  * This function increments the number of users referencing this
@@ -4515,8 +4642,7 @@ static inline qdf_nbuf_t qdf_nbuf_inc_users(qdf_nbuf_t nbuf)
 
 /**
  * qdf_nbuf_data_attr_get() - Get data_attr field from cvg_nbuf_cb
- *
- * @nbuf: Network buffer (skb on linux)
+ * @buf: Network buffer (skb on linux)
  *
  * This function returns the values of data_attr field
  * in struct cvg_nbuf_cb{}, to which skb->cb is typecast.
@@ -4531,8 +4657,7 @@ static inline uint32_t qdf_nbuf_data_attr_get(qdf_nbuf_t buf)
 
 /**
  * qdf_nbuf_data_attr_set() - Sets data_attr field in cvg_nbuf_cb
- *
- * @nbuf: Network buffer (skb on linux)
+ * @buf: Network buffer (skb on linux)
  * @data_attr: Value to be stored cvg_nbuf_cb->data_attr
  *
  * This function stores the value to be programmed in CE
@@ -4548,8 +4673,15 @@ void qdf_nbuf_data_attr_set(qdf_nbuf_t buf, uint32_t data_attr)
 
 /**
  * qdf_nbuf_tx_info_get() - Parse skb and get Tx metadata
- *
- * @nbuf: Network buffer (skb on linux)
+ * @nbuf:		Network buffer
+ * @pkt_type:		Pkt type (from enum htt_pkt_type)
+ * @pkt_subtype:	Bit 4 of this field in HTT descriptor
+ *			needs to be set in case of CE classification support
+ *			Is set by this macro.
+ * @hw_classify:	This is a flag which is set to indicate
+ *			CE classification is enabled.
+ *			Do not set this bit for VLAN packets
+ *			OR for mcast / bcast frames.
  *
  * This function parses the payload to figure out relevant
  * Tx meta-data e.g. whether to enable tx_classify bit
@@ -4557,10 +4689,34 @@ void qdf_nbuf_data_attr_set(qdf_nbuf_t buf, uint32_t data_attr)
  *
  * Return:     void
  */
-#define qdf_nbuf_tx_info_get __qdf_nbuf_tx_info_get
+#define qdf_nbuf_tx_info_get(nbuf, pkt_type, pkt_subtype, hw_classify)	\
+		__qdf_nbuf_tx_info_get(nbuf, pkt_type,			\
+				       pkt_subtype, hw_classify)
 
+/**
+ * qdf_nbuf_set_state() - Updates the packet state
+ * @nbuf:            network buffer
+ * @current_state :  layer at which the packet currently is
+ *
+ * This function updates the packet state to the layer at which the packet
+ * currently is
+ *
+ * Return: none
+ */
 void qdf_nbuf_set_state(qdf_nbuf_t nbuf, uint8_t current_state);
+
+/**
+ * qdf_nbuf_tx_desc_count_display() - Displays the packet counter
+ *
+ * Return: none
+ */
 void qdf_nbuf_tx_desc_count_display(void);
+
+/**
+ * qdf_nbuf_tx_desc_count_clear() - Clears packet counter for both data, mgmt
+ *
+ * Return: none
+ */
 void qdf_nbuf_tx_desc_count_clear(void);
 
 static inline qdf_nbuf_t
@@ -4679,7 +4835,7 @@ static inline qdf_size_t qdf_nbuf_l2l3l4_hdr_len(qdf_nbuf_t buf)
 
 /**
  * qdf_nbuf_get_tcp_hdr_len() - return TCP header length of the skb
- * @skb: sk buff
+ * @nbuf: sk buff
  *
  * Return: size of TCP header length
  */
@@ -4814,7 +4970,7 @@ static inline void qdf_nbuf_mod_init(void)
 }
 
 /**
- * qdf_nbuf_mod_init() - Unintialization routine for qdf_nbuf
+ * qdf_nbuf_mod_exit() - Unintialization routine for qdf_nbuf
  *
  * Return void
  */
@@ -5423,6 +5579,7 @@ static inline void qdf_set_smmu_fault_state(bool smmu_fault_state)
  * Return: void
  */
 void qdf_nbuf_stop_replenish_timer(void);
+
 /**
  * qdf_get_nbuf_valid_frag() - Get nbuf to store frag
  * @nbuf: qdf_nbuf_t master nbuf

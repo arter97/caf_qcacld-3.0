@@ -36,36 +36,47 @@
 #include <wlan_objmgr_psoc_obj.h>
 #include <wlan_mlo_mgr_public_structs.h>
 
-#define MGMT_RX_REO_LIST_MAX_SIZE             (100)
-#define MGMT_RX_REO_LIST_TIMEOUT_US           (500 * USEC_PER_MSEC)
-#define MGMT_RX_REO_AGEOUT_TIMER_PERIOD_MS    (250)
-#define MGMT_RX_REO_GLOBAL_MGMT_RX_INACTIVITY_TIMEOUT   (10 * 60 * MSEC_PER_SEC)
-#define MGMT_RX_REO_STATUS_WAIT_FOR_FRAME_ON_OTHER_LINKS         (BIT(0))
-#define MGMT_RX_REO_STATUS_AGED_OUT                              (BIT(1))
-#define MGMT_RX_REO_STATUS_OLDER_THAN_LATEST_AGED_OUT_FRAME      (BIT(2))
-#define MGMT_RX_REO_STATUS_LIST_MAX_SIZE_EXCEEDED                (BIT(3))
+#define MGMT_RX_REO_INGRESS_LIST_MAX_SIZE                  (512)
+#define MGMT_RX_REO_INGRESS_LIST_TIMEOUT_US                (250 * USEC_PER_MSEC)
+#define MGMT_RX_REO_INGRESS_LIST_AGEOUT_TIMER_PERIOD_MS    (50)
 
-#define MGMT_RX_REO_INVALID_LINK_ID   (-1)
+#define MGMT_RX_REO_EGRESS_LIST_MAX_SIZE                   (256)
+
+#define INGRESS_TO_EGRESS_MOVEMENT_TEMP_LIST_MAX_SIZE \
+				(MGMT_RX_REO_INGRESS_LIST_MAX_SIZE)
+
+#define MGMT_RX_REO_EGRESS_INACTIVITY_TIMEOUT    (10 * 60 * MSEC_PER_SEC)
+
+#define STATUS_WAIT_FOR_FRAME_ON_OTHER_LINKS         (BIT(0))
+#define STATUS_AGED_OUT                              (BIT(1))
+#define STATUS_OLDER_THAN_LATEST_AGED_OUT_FRAME      (BIT(2))
+#define STATUS_INGRESS_LIST_OVERFLOW                 (BIT(3))
+#define STATUS_OLDER_THAN_READY_TO_DELIVER_FRAMES    (BIT(4))
+
+#define MGMT_RX_REO_INVALID_LINK   (-1)
 
 /* Reason to release an entry from the reorder list */
-#define MGMT_RX_REO_LIST_ENTRY_RELEASE_REASON_ZERO_WAIT_COUNT           (BIT(0))
-#define MGMT_RX_REO_LIST_ENTRY_RELEASE_REASON_AGED_OUT                  (BIT(1))
-#define MGMT_RX_REO_LIST_ENTRY_RELEASE_REASON_OLDER_THAN_AGED_OUT_FRAME (BIT(2))
-#define MGMT_RX_REO_LIST_ENTRY_RELEASE_REASON_LIST_MAX_SIZE_EXCEEDED    (BIT(3))
-#define MGMT_RX_REO_RELEASE_REASON_MAX      \
-	(MGMT_RX_REO_LIST_ENTRY_RELEASE_REASON_LIST_MAX_SIZE_EXCEEDED << 1)
+#define RELEASE_REASON_ZERO_WAIT_COUNT                          (BIT(0))
+#define RELEASE_REASON_AGED_OUT                                 (BIT(1))
+#define RELEASE_REASON_OLDER_THAN_AGED_OUT_FRAME                (BIT(2))
+#define RELEASE_REASON_INGRESS_LIST_OVERFLOW                    (BIT(3))
+#define RELEASE_REASON_OLDER_THAN_READY_TO_DELIVER_FRAMES       (BIT(4))
+#define RELEASE_REASON_MAX  \
+		(RELEASE_REASON_OLDER_THAN_READY_TO_DELIVER_FRAMES << 1)
 
-#define MGMT_RX_REO_LIST_ENTRY_IS_WAITING_FOR_FRAME_ON_OTHER_LINK(entry)   \
-	((entry)->status & MGMT_RX_REO_STATUS_WAIT_FOR_FRAME_ON_OTHER_LINKS)
-#define MGMT_RX_REO_LIST_ENTRY_IS_AGED_OUT(entry)   \
-	((entry)->status & MGMT_RX_REO_STATUS_AGED_OUT)
-#define MGMT_RX_REO_LIST_ENTRY_IS_OLDER_THAN_LATEST_AGED_OUT_FRAME(entry)  \
-	((entry)->status & MGMT_RX_REO_STATUS_OLDER_THAN_LATEST_AGED_OUT_FRAME)
-#define MGMT_RX_REO_LIST_ENTRY_IS_MAX_SIZE_EXCEEDED(entry)  \
-	((entry)->status & MGMT_RX_REO_STATUS_LIST_MAX_SIZE_EXCEEDED)
+#define LIST_ENTRY_IS_WAITING_FOR_FRAME_ON_OTHER_LINK(entry)   \
+	((entry)->status & STATUS_WAIT_FOR_FRAME_ON_OTHER_LINKS)
+#define LIST_ENTRY_IS_AGED_OUT(entry)   \
+	((entry)->status & STATUS_AGED_OUT)
+#define LIST_ENTRY_IS_OLDER_THAN_LATEST_AGED_OUT_FRAME(entry)  \
+	((entry)->status & STATUS_OLDER_THAN_LATEST_AGED_OUT_FRAME)
+#define LIST_ENTRY_IS_REMOVED_DUE_TO_INGRESS_LIST_OVERFLOW(entry)  \
+	((entry)->status & STATUS_INGRESS_LIST_OVERFLOW)
+#define LIST_ENTRY_IS_OLDER_THAN_READY_TO_DELIVER_FRAMES(entry)  \
+	((entry)->status & STATUS_OLDER_THAN_READY_TO_DELIVER_FRAMES)
 
 #ifdef WLAN_MGMT_RX_REO_DEBUG_SUPPORT
-#define MGMT_RX_REO_EGRESS_FRAME_DEBUG_INFO_BOARDER_MAX_SIZE   (816)
+#define MGMT_RX_REO_EGRESS_FRAME_DEBUG_INFO_BOARDER_MAX_SIZE   (848)
 #define MGMT_RX_REO_EGRESS_FRAME_DELIVERY_REASON_STATS_BOARDER_A_MAX_SIZE  (66)
 #define MGMT_RX_REO_EGRESS_FRAME_DELIVERY_REASON_STATS_BOARDER_B_MAX_SIZE  (73)
 #define MGMT_RX_REO_EGRESS_FRAME_DEBUG_INFO_FLAG_MAX_SIZE   (3)
@@ -74,7 +85,7 @@
 #define MGMT_RX_REO_EGRESS_FRAME_DEBUG_INFO_SNAPSHOT_MAX_SIZE     (22)
 #define MGMT_RX_REO_EGRESS_FRAME_DEBUG_INFO_PRINT_MAX_FRAMES     (0)
 
-#define MGMT_RX_REO_INGRESS_FRAME_DEBUG_INFO_BOARDER_MAX_SIZE   (785)
+#define MGMT_RX_REO_INGRESS_FRAME_DEBUG_INFO_BOARDER_MAX_SIZE   (807)
 #define MGMT_RX_REO_INGRESS_FRAME_DEBUG_INFO_FLAG_MAX_SIZE   (13)
 #define MGMT_RX_REO_INGRESS_FRAME_DEBUG_INFO_WAIT_COUNT_MAX_SIZE   (69)
 #define MGMT_RX_REO_INGRESS_FRAME_DEBUG_INFO_PER_LINK_SNAPSHOTS_MAX_SIZE   (94)
@@ -110,24 +121,40 @@ struct mgmt_rx_reo_pdev_info {
 };
 
 /**
- * mgmt_rx_reo_attach() - Initializes the per pdev data structures related to
- * management rx-reorder module
+ * mgmt_rx_reo_pdev_attach() - Initializes the per pdev data structures related
+ * to management rx-reorder module
  * @pdev: pointer to pdev object
  *
  * Return: QDF_STATUS
  */
-QDF_STATUS
-mgmt_rx_reo_attach(struct wlan_objmgr_pdev *pdev);
+QDF_STATUS mgmt_rx_reo_pdev_attach(struct wlan_objmgr_pdev *pdev);
 
 /**
- * mgmt_rx_reo_detach() - Clears the per pdev data structures related to
+ * mgmt_rx_reo_psoc_attach() - Initializes the per psoc data structures related
+ * to management rx-reorder module
+ * @psoc: pointer to psoc object
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS mgmt_rx_reo_psoc_attach(struct wlan_objmgr_psoc *psoc);
+
+/**
+ * mgmt_rx_reo_pdev_detach() - Clears the per pdev data structures related to
  * management rx-reorder module
  * @pdev: pointer to pdev object
  *
  * Return: QDF_STATUS
  */
-QDF_STATUS
-mgmt_rx_reo_detach(struct wlan_objmgr_pdev *pdev);
+QDF_STATUS mgmt_rx_reo_pdev_detach(struct wlan_objmgr_pdev *pdev);
+
+/**
+ * mgmt_rx_reo_psoc_detach() - Clears the per psoc data structures related to
+ * management rx-reorder module
+ * @psoc: pointer to psoc object
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS mgmt_rx_reo_psoc_detach(struct wlan_objmgr_psoc *psoc);
 
 /**
  * mgmt_rx_reo_pdev_obj_create_notification() - pdev create handler for
@@ -203,43 +230,74 @@ enum mgmt_rx_reo_frame_descriptor_type {
 };
 
 /**
- * struct mgmt_rx_reo_global_ts_info - This structure holds the global time
- * stamp information of a frame.
- * @valid: Indicates whether global time stamp is valid
- * @global_ts: Global time stamp value
- * @start_ts: Start time stamp value
- * @end_ts: End time stamp value
+ * enum mgmt_rx_reo_list_type - Enumeration for management rx reorder list type
+ * @MGMT_RX_REO_LIST_TYPE_INGRESS: Ingress list type
+ * @MGMT_RX_REO_LIST_TYPE_EGRESS: Egress list type
+ * @MGMT_RX_REO_LIST_TYPE_MAX: Maximum number of list types
+ * @MGMT_RX_REO_LIST_TYPE_INVALID: Invalid list type
  */
-struct mgmt_rx_reo_global_ts_info {
-	bool valid;
-	uint32_t global_ts;
-	uint32_t start_ts;
-	uint32_t end_ts;
+enum mgmt_rx_reo_list_type {
+	MGMT_RX_REO_LIST_TYPE_INGRESS = 0,
+	MGMT_RX_REO_LIST_TYPE_EGRESS,
+	MGMT_RX_REO_LIST_TYPE_MAX,
+	MGMT_RX_REO_LIST_TYPE_INVALID,
 };
 
 /**
- * struct mgmt_rx_reo_list - Linked list used to reorder the management frames
- * received. Each list entry would correspond to a management frame. List
- * entries would be sorted in the same order in which they are received by MAC
- * HW.
- * @list: List used for reordering
- * @list_lock: Lock to protect the list
+ * struct mgmt_rx_reo_frame_info - This structure holds the information
+ * about a management frame.
+ * @valid: Indicates whether the structure content is valid
+ * @reo_params: Management Rx reorder parameters
+ */
+struct mgmt_rx_reo_frame_info {
+	bool valid;
+	struct mgmt_rx_reo_params reo_params;
+};
+
+/**
+ * struct mgmt_rx_reo_list - Linked list used to reorder/deliver the management
+ * frames received. Each list entry would correspond to a management frame. List
+ * entries would be sorted in the same order in which they are received by
+ * MAC HW.
+ * @list: Linked list
+ * @list_lock: Spin lock to protect the list
  * @max_list_size: Maximum size of the reorder list
- * @list_entry_timeout_us: Time out value(microsecond) for the reorder list
- * entries
- * @ageout_timer: Periodic timer to age-out the list entries
- * @global_mgmt_rx_inactivity_timer: Global management Rx inactivity timer
- * @ts_last_released_frame: Stores the global time stamp for the last frame
- * removed from the reorder list
+ * @overflow_count: Number of times list overflow occurred
+ * @last_inserted_frame: Information about the last frame inserted to the list
+ * @last_released_frame: Information about the last frame released from the list
  */
 struct mgmt_rx_reo_list {
 	qdf_list_t list;
 	qdf_spinlock_t list_lock;
 	uint32_t max_list_size;
+	uint64_t overflow_count;
+	struct mgmt_rx_reo_frame_info last_inserted_frame;
+	struct mgmt_rx_reo_frame_info last_released_frame;
+};
+
+/**
+ * struct mgmt_rx_reo_ingress_list - Linked list used to reorder the management
+ * frames received
+ * @reo_list: Linked list used for reordering
+ * @list_entry_timeout_us: Time out value(microsecond) for the list entries
+ * @ageout_timer: Periodic timer to age-out the list entries
+ */
+struct mgmt_rx_reo_ingress_list {
+	struct mgmt_rx_reo_list reo_list;
 	uint32_t list_entry_timeout_us;
 	qdf_timer_t ageout_timer;
-	qdf_timer_t global_mgmt_rx_inactivity_timer;
-	struct mgmt_rx_reo_global_ts_info ts_last_released_frame;
+};
+
+/**
+ * struct mgmt_rx_reo_egress_list - Linked list used to store the frames which
+ * are reordered and pending delivery
+ * @reo_list: Linked list used for storing the frames which are reordered and
+ * pending delivery
+ * @egress_inactivity_timer: Management Rx inactivity timer
+ */
+struct mgmt_rx_reo_egress_list {
+	struct mgmt_rx_reo_list reo_list;
+	qdf_timer_t egress_inactivity_timer;
 };
 
 /*
@@ -261,10 +319,16 @@ struct mgmt_rx_reo_wait_count {
  * @rx_params: Management rx event parameters
  * @wait_count: Wait counts for the frame
  * @initial_wait_count: Wait count when the frame is queued
- * @insertion_ts: Host time stamp when this entry is inserted to the list.
- * @removal_ts: Host time stamp when this entry is removed from the list
  * @ingress_timestamp: Host time stamp when this frame has arrived reorder
  * module
+ * @ingress_list_insertion_ts: Host time stamp when this entry is inserted to
+ * the ingress list.
+ * @ingress_list_removal_ts: Host time stamp when this entry is removed from
+ * the ingress list
+ * @egress_list_insertion_ts: Host time stamp when this entry is inserted to
+ * the egress list.
+ * @egress_list_removal_ts: Host time stamp when this entry is removed from
+ * the egress list
  * @egress_timestamp: Host time stamp when this frame has exited reorder
  * module
  * @status: Status for this entry
@@ -277,6 +341,7 @@ struct mgmt_rx_reo_wait_count {
  * last frame which is delivered to the upper layer.
  * @shared_snapshots: snapshots shared b/w host and target
  * @host_snapshot: host snapshot
+ * @scheduled_count: Number of times scheduler is invoked for this frame
  */
 struct mgmt_rx_reo_list_entry {
 	qdf_list_node_t node;
@@ -284,9 +349,11 @@ struct mgmt_rx_reo_list_entry {
 	struct mgmt_rx_event_params *rx_params;
 	struct mgmt_rx_reo_wait_count wait_count;
 	struct mgmt_rx_reo_wait_count initial_wait_count;
-	uint64_t insertion_ts;
-	uint64_t removal_ts;
 	uint64_t ingress_timestamp;
+	uint64_t ingress_list_insertion_ts;
+	uint64_t ingress_list_removal_ts;
+	uint64_t egress_list_insertion_ts;
+	uint64_t egress_list_removal_ts;
 	uint64_t egress_timestamp;
 	uint32_t status;
 	struct wlan_objmgr_pdev *pdev;
@@ -297,6 +364,7 @@ struct mgmt_rx_reo_list_entry {
 	struct mgmt_rx_reo_snapshot_params shared_snapshots
 			[MAX_MLO_LINKS][MGMT_RX_REO_SHARED_SNAPSHOT_MAX];
 	struct mgmt_rx_reo_snapshot_params host_snapshot[MAX_MLO_LINKS];
+	qdf_atomic_t scheduled_count;
 };
 
 #ifdef WLAN_MGMT_RX_REO_SIM_SUPPORT
@@ -486,13 +554,18 @@ struct mgmt_rx_reo_sim_context {
  * zero when received by host
  * @immediate_delivery: Indicates whether this frame can be delivered
  * immediately to the upper layers
+ * @queued_list: Type of list in which the current frame is queued
  * @is_error: Indicates whether any error occurred during processing this frame
- * @ts_last_released_frame: Stores the global time stamp for the last frame
- * removed from the reorder list
- * @list_size_rx: Size of the reorder list when this frame is received (before
- * updating the list based on this frame).
- * @list_insertion_pos: Position in the reorder list where this frame is going
- * to get inserted (Applicable for only host consumed frames)
+ * @last_delivered_frame: Stores the information about the last frame delivered
+ * to the upper layer
+ * @ingress_list_size_rx: Size of the ingress list when this frame is
+ * received (before updating the ingress list based on this frame).
+ * @ingress_list_insertion_pos: Position in the ingress list where this
+ * frame is going to get inserted (Applicable for only host consumed frames)
+ * @egress_list_size_rx: Size of the egress list when this frame is
+ * added to the egress list
+ * @egress_list_insertion_pos: Position in the egress list where this
+ * frame is going to get inserted
  * @shared_snapshots: snapshots shared b/w host and target
  * @host_snapshot: host snapshot
  * @cpu_id: CPU index
@@ -518,10 +591,13 @@ struct reo_ingress_debug_frame_info {
 	bool is_parallel_rx;
 	bool zero_wait_count_rx;
 	bool immediate_delivery;
+	enum mgmt_rx_reo_list_type queued_list;
 	bool is_error;
-	struct mgmt_rx_reo_global_ts_info ts_last_released_frame;
-	int16_t list_size_rx;
-	int16_t list_insertion_pos;
+	struct mgmt_rx_reo_frame_info last_delivered_frame;
+	int16_t ingress_list_size_rx;
+	int16_t ingress_list_insertion_pos;
+	int16_t egress_list_size_rx;
+	int16_t egress_list_insertion_pos;
 	struct mgmt_rx_reo_snapshot_params shared_snapshots
 			[MAX_MLO_LINKS][MGMT_RX_REO_SHARED_SNAPSHOT_MAX];
 	struct mgmt_rx_reo_snapshot_params host_snapshot[MAX_MLO_LINKS];
@@ -539,13 +615,18 @@ struct reo_ingress_debug_frame_info {
  * @mgmt_pkt_ctr: management packet counter
  * @global_timestamp: MLO global time stamp
  * @ingress_timestamp: Host time stamp when the frame enters the reorder module
- * @insertion_ts: Host time stamp when the frame is inserted into the reorder
- * list
+ * @ingress_list_insertion_ts: Host time stamp when this entry is inserted to
+ * the ingress list.
+ * @ingress_list_removal_ts: Host time stamp when this entry is removed from
+ * the ingress list
+ * @egress_list_insertion_ts: Host time stamp when this entry is inserted to
+ * the egress list.
+ * @egress_list_removal_ts: Host time stamp when this entry is removed from
+ * the egress list
  * @egress_timestamp: Host time stamp just before delivery of the frame to upper
  * layer
  * @egress_duration: Duration in us taken by the upper layer to process
  * the frame.
- * @removal_ts: Host time stamp when this entry is removed from the list
  * @initial_wait_count: Wait count when the frame is queued
  * @final_wait_count: Wait count when frame is released to upper layer
  * @release_reason: Reason for delivering the frame to upper layers
@@ -560,10 +641,12 @@ struct reo_egress_debug_frame_info {
 	uint16_t mgmt_pkt_ctr;
 	uint32_t global_timestamp;
 	uint64_t ingress_timestamp;
-	uint64_t insertion_ts;
+	uint64_t ingress_list_insertion_ts;
+	uint64_t ingress_list_removal_ts;
+	uint64_t egress_list_insertion_ts;
+	uint64_t egress_list_removal_ts;
 	uint64_t egress_timestamp;
 	uint64_t egress_duration;
-	uint64_t removal_ts;
 	struct mgmt_rx_reo_wait_count initial_wait_count;
 	struct mgmt_rx_reo_wait_count final_wait_count;
 	uint8_t release_reason;
@@ -577,6 +660,7 @@ struct reo_egress_debug_frame_info {
  * struct reo_ingress_frame_stats - Structure to store statistics related to
  * incoming frames
  * @ingress_count: Number of frames entering reo module
+ * @reo_count: Number of frames for which reorder is required
  * @queued_count: Number of frames queued to reorder list
  * @zero_wait_count_rx_count: Number of frames for which wait count is
  * zero when received at host
@@ -595,9 +679,13 @@ struct reo_egress_debug_frame_info {
 struct reo_ingress_frame_stats {
 	uint64_t ingress_count
 		[MAX_MLO_LINKS][MGMT_RX_REO_FRAME_DESC_TYPE_MAX];
-	uint64_t queued_count[MAX_MLO_LINKS];
-	uint64_t zero_wait_count_rx_count[MAX_MLO_LINKS];
-	uint64_t immediate_delivery_count[MAX_MLO_LINKS];
+	uint64_t reo_count
+		[MAX_MLO_LINKS][MGMT_RX_REO_FRAME_DESC_TYPE_MAX];
+	uint64_t queued_count[MAX_MLO_LINKS][MGMT_RX_REO_LIST_TYPE_MAX];
+	uint64_t zero_wait_count_rx_count
+		[MAX_MLO_LINKS][MGMT_RX_REO_LIST_TYPE_MAX];
+	uint64_t immediate_delivery_count
+		[MAX_MLO_LINKS][MGMT_RX_REO_LIST_TYPE_MAX];
 	uint64_t stale_count[MAX_MLO_LINKS]
 			    [MGMT_RX_REO_FRAME_DESC_TYPE_MAX];
 	uint64_t error_count[MAX_MLO_LINKS]
@@ -621,8 +709,7 @@ struct reo_egress_frame_stats {
 	uint64_t delivery_attempts_count[MAX_MLO_LINKS];
 	uint64_t delivery_success_count[MAX_MLO_LINKS];
 	uint64_t premature_delivery_count[MAX_MLO_LINKS];
-	uint64_t delivery_count[MAX_MLO_LINKS]
-			       [MGMT_RX_REO_RELEASE_REASON_MAX];
+	uint64_t delivery_count[MAX_MLO_LINKS][RELEASE_REASON_MAX];
 };
 
 /**
@@ -670,7 +757,8 @@ struct reo_egress_debug_info {
  * struct mgmt_rx_reo_context - This structure holds the info required for
  * management rx-reordering. Reordering is done across all the psocs.
  * So there should be only one instance of this structure defined.
- * @reo_list: Linked list used for reordering
+ * @ingress_list: Ingress list object
+ * @egress_list: Egress list object
  * @reo_algo_entry_lock: Spin lock to protect reo algorithm entry critical
  * section execution
  * @frame_release_lock: Spin lock to serialize the frame delivery to the
@@ -697,7 +785,8 @@ struct reo_egress_debug_info {
  * @mlo_grp_id: MLO Group ID which it belongs to
  */
 struct mgmt_rx_reo_context {
-	struct mgmt_rx_reo_list reo_list;
+	struct mgmt_rx_reo_ingress_list ingress_list;
+	struct mgmt_rx_reo_egress_list egress_list;
 	qdf_spinlock_t reo_algo_entry_lock;
 	qdf_spinlock_t frame_release_lock;
 #ifdef WLAN_MGMT_RX_REO_SIM_SUPPORT
@@ -733,18 +822,25 @@ struct mgmt_rx_reo_context {
  * zero when received by host
  * @immediate_delivery: Indicates whether this frame can be delivered
  * immediately to the upper layers
- * @list_size_rx: Size of the reorder list when this frame is received (before
- * updating the list based on this frame).
- * @list_insertion_pos: Position in the reorder list where this frame is going
- * to get inserted (Applicable for only host consumed frames)
+ * @ingress_list_size_rx: Size of the ingress list when this frame is
+ * received (before updating the ingress list based on this frame).
+ * @ingress_list_insertion_pos: Position in the ingress list where this
+ * frame is going to get inserted (Applicable for only host consumed frames)
+ * @egress_list_size_rx: Size of the egress list when this frame is
+ * added to the egress list
+ * @egress_list_insertion_pos: Position in the egress list where this
+ * frame is going to get inserted
  * @shared_snapshots: snapshots shared b/w host and target
  * @host_snapshot: host snapshot
  * @is_parallel_rx: Indicates that this frame is received in parallel to the
  * last frame which is delivered to the upper layer.
+ * @queued_list: Type of list in which the current frame is queued
  * @pkt_ctr_delta: Packet counter delta of the current and last frame
  * @reo_required: Indicates whether reorder is required for the current frame.
  * If reorder is not required, current frame will just be used for updating the
  * wait count of frames already part of the reorder list.
+ * @last_delivered_frame: Stores the information about the last frame delivered
+ * to the upper layer
  */
 struct mgmt_rx_reo_frame_descriptor {
 	enum mgmt_rx_reo_frame_descriptor_type type;
@@ -757,29 +853,65 @@ struct mgmt_rx_reo_frame_descriptor {
 	bool is_stale;
 	bool zero_wait_count_rx;
 	bool immediate_delivery;
-	int16_t list_size_rx;
-	int16_t list_insertion_pos;
+	int16_t ingress_list_size_rx;
+	int16_t ingress_list_insertion_pos;
+	int16_t egress_list_size_rx;
+	int16_t egress_list_insertion_pos;
 	struct mgmt_rx_reo_snapshot_params shared_snapshots
 			[MAX_MLO_LINKS][MGMT_RX_REO_SHARED_SNAPSHOT_MAX];
 	struct mgmt_rx_reo_snapshot_params host_snapshot[MAX_MLO_LINKS];
 	bool is_parallel_rx;
+	enum mgmt_rx_reo_list_type queued_list;
 	int pkt_ctr_delta;
 	bool reo_required;
+	struct mgmt_rx_reo_frame_info last_delivered_frame;
 };
 
 /**
- * mgmt_rx_reo_get_context_from_reo_list() - Helper API to get pointer to
- * management rx reorder context from pointer to management reorder list
+ * mgmt_rx_reo_list_overflowed() - Helper API to check whether mgmt rx reorder
+ * list overflowed
  * @reo_list: Pointer to management rx reorder list
+ *
+ * Return: true or false
+ */
+static inline bool
+mgmt_rx_reo_list_overflowed(struct mgmt_rx_reo_list *reo_list)
+{
+	qdf_assert_always(reo_list);
+
+	return (qdf_list_size(&reo_list->list) > reo_list->max_list_size);
+}
+
+/**
+ * mgmt_rx_reo_get_context_from_ingress_list() - Helper API to get pointer to
+ * management rx reorder context from pointer to management rx reo ingress list
+ * @ingress_list: Pointer to management rx reo ingress list
  *
  * Return: Pointer to management rx reorder context
  */
 static inline struct mgmt_rx_reo_context *
-mgmt_rx_reo_get_context_from_reo_list(const struct mgmt_rx_reo_list *reo_list) {
-	qdf_assert_always(reo_list);
+mgmt_rx_reo_get_context_from_ingress_list
+		(const struct mgmt_rx_reo_ingress_list *ingress_list) {
+	qdf_assert_always(ingress_list);
 
-	return qdf_container_of(reo_list, struct mgmt_rx_reo_context,
-				reo_list);
+	return qdf_container_of(ingress_list, struct mgmt_rx_reo_context,
+				ingress_list);
+}
+
+/**
+ * mgmt_rx_reo_get_context_from_egress_list() - Helper API to get pointer to
+ * management rx reorder context from pointer to management rx reo egress list
+ * @egress_list: Pointer to management rx reo egress list
+ *
+ * Return: Pointer to management rx reorder context
+ */
+static inline struct mgmt_rx_reo_context *
+mgmt_rx_reo_get_context_from_egress_list
+			(const struct mgmt_rx_reo_ingress_list *egress_list) {
+	qdf_assert_always(egress_list);
+
+	return qdf_container_of(egress_list, struct mgmt_rx_reo_context,
+				egress_list);
 }
 
 /**
@@ -1148,22 +1280,6 @@ wlan_mgmt_rx_reo_algo_entry(struct wlan_objmgr_pdev *pdev,
 			    bool *is_queued);
 
 /**
- * mgmt_rx_reo_list_max_size_exceeded() - Helper API to check whether
- * list has exceeded the maximum configured size
- * @reo_list: Pointer to reorder list
- *
- * This API expects the caller to acquire the spin lock protecting the reorder
- * list.
- *
- * Return: true if reorder list has exceeded the max size
- */
-static inline bool
-mgmt_rx_reo_list_max_size_exceeded(struct mgmt_rx_reo_list *reo_list)
-{
-	return (qdf_list_size(&reo_list->list) > reo_list->max_list_size);
-}
-
-/**
  * mgmt_rx_reo_validate_mlo_link_info() - Validate the MLO HW link info
  * obtained from the global shared memory arena
  * @psoc: Pointer to psoc object
@@ -1177,5 +1293,16 @@ mgmt_rx_reo_list_max_size_exceeded(struct mgmt_rx_reo_list *reo_list)
  */
 QDF_STATUS
 mgmt_rx_reo_validate_mlo_link_info(struct wlan_objmgr_psoc *psoc);
+
+/**
+ * mgmt_rx_reo_release_frames() - Release management frames which are ready
+ * for delivery
+ * @mlo_grp_id: MLO group ID
+ * @link_bitmap: Link bitmap
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+mgmt_rx_reo_release_frames(uint8_t mlo_grp_id, uint32_t link_bitmap);
 #endif /* WLAN_MGMT_RX_REO_SUPPORT */
 #endif /* _WLAN_MGMT_TXRX_RX_REO_I_H */

@@ -711,6 +711,9 @@ enum vdev_start_resp_type {
  * @mlme_vdev_dfs_cac_wait_notify:      callback to notify about CAC state
  * @mlme_vdev_csa_complete:             callback to indicate CSA complete
  * @mlme_vdev_sta_disconn_start:        callback to initiate STA disconnection
+ * @mlme_vdev_reconfig_notify:          callback to notify ml reconfing link
+ *                                      delete start operation after receive
+ *                                      the first ml reconfig IE
  * @mlme_vdev_reconfig_timer_complete:  callback to process ml reconfing
  *                                      operation
  * @mlme_vdev_notify_mlo_sync_wait_entry:
@@ -792,6 +795,9 @@ struct vdev_mlme_ops {
 	QDF_STATUS (*mlme_vdev_sta_disconn_start)(
 				struct vdev_mlme_obj *vdev_mlme,
 				uint16_t event_data_len, void *event_data);
+	QDF_STATUS (*mlme_vdev_reconfig_notify)(
+				struct vdev_mlme_obj *vdev_mlme,
+				uint16_t *tbtt_count, uint16_t bcn_int);
 	void (*mlme_vdev_reconfig_timer_complete)(
 				struct vdev_mlme_obj *vdev_mlme);
 	QDF_STATUS (*mlme_vdev_notify_mlo_sync_wait_entry)(

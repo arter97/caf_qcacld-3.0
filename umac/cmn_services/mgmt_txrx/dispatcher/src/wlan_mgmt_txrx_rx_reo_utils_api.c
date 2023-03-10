@@ -38,9 +38,16 @@ wlan_mgmt_rx_reo_deinit(void)
 	if (total_mlo_grps > WLAN_MAX_MLO_GROUPS)
 		return QDF_STATUS_E_INVAL;
 
-	for (ml_grp = 0; ml_grp < total_mlo_grps; ml_grp++)
-		if (mgmt_rx_reo_deinit_context(ml_grp))
-			return QDF_STATUS_E_INVAL;
+	for (ml_grp = 0; ml_grp < total_mlo_grps; ml_grp++) {
+		QDF_STATUS status;
+
+		status = mgmt_rx_reo_deinit_context(ml_grp);
+		if (QDF_IS_STATUS_ERROR(status)) {
+			mgmt_rx_reo_err("Reo context deinit failed for grp %u",
+					ml_grp);
+			return status;
+		}
+	}
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -54,9 +61,16 @@ wlan_mgmt_rx_reo_init(void)
 	if (total_mlo_grps > WLAN_MAX_MLO_GROUPS)
 		return QDF_STATUS_E_INVAL;
 
-	for (ml_grp = 0; ml_grp < total_mlo_grps; ml_grp++)
-		if (mgmt_rx_reo_init_context(ml_grp))
-			return QDF_STATUS_E_INVAL;
+	for (ml_grp = 0; ml_grp < total_mlo_grps; ml_grp++) {
+		QDF_STATUS status;
+
+		status = mgmt_rx_reo_init_context(ml_grp);
+		if (QDF_IS_STATUS_ERROR(status)) {
+			mgmt_rx_reo_err("Reo context init failed for grp %u",
+					ml_grp);
+			return status;
+		}
+	}
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -262,20 +276,36 @@ wlan_mgmt_rx_reo_psoc_obj_destroy_notification(struct wlan_objmgr_psoc *psoc)
 }
 
 QDF_STATUS
-wlan_mgmt_rx_reo_attach(struct wlan_objmgr_pdev *pdev)
+wlan_mgmt_rx_reo_pdev_attach(struct wlan_objmgr_pdev *pdev)
 {
-	return mgmt_rx_reo_attach(pdev);
+	return mgmt_rx_reo_pdev_attach(pdev);
 }
 
-qdf_export_symbol(wlan_mgmt_rx_reo_attach);
+qdf_export_symbol(wlan_mgmt_rx_reo_pdev_attach);
 
 QDF_STATUS
-wlan_mgmt_rx_reo_detach(struct wlan_objmgr_pdev *pdev)
+wlan_mgmt_rx_reo_psoc_attach(struct wlan_objmgr_psoc *psoc)
 {
-	return mgmt_rx_reo_detach(pdev);
+	return mgmt_rx_reo_psoc_attach(psoc);
 }
 
-qdf_export_symbol(wlan_mgmt_rx_reo_detach);
+qdf_export_symbol(wlan_mgmt_rx_reo_psoc_attach);
+
+QDF_STATUS
+wlan_mgmt_rx_reo_pdev_detach(struct wlan_objmgr_pdev *pdev)
+{
+	return mgmt_rx_reo_pdev_detach(pdev);
+}
+
+qdf_export_symbol(wlan_mgmt_rx_reo_pdev_detach);
+
+QDF_STATUS
+wlan_mgmt_rx_reo_psoc_detach(struct wlan_objmgr_psoc *psoc)
+{
+	return mgmt_rx_reo_psoc_detach(psoc);
+}
+
+qdf_export_symbol(wlan_mgmt_rx_reo_psoc_detach);
 
 uint16_t
 wlan_mgmt_rx_reo_get_pkt_ctr_delta_thresh(struct wlan_objmgr_psoc *psoc)
@@ -407,4 +437,10 @@ QDF_STATUS
 wlan_mgmt_rx_reo_print_egress_frame_info(uint8_t ml_grp_id, uint16_t num_frames)
 {
 	return mgmt_rx_reo_print_egress_frame_info(ml_grp_id, num_frames);
+}
+
+QDF_STATUS
+wlan_mgmt_rx_reo_release_frames(uint8_t mlo_grp_id, uint32_t link_bitmap)
+{
+	return mgmt_rx_reo_release_frames(mlo_grp_id, link_bitmap);
 }

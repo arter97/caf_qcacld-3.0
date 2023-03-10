@@ -1106,6 +1106,12 @@ dp_tx_mon_update_radiotap(struct dp_pdev *pdev,
 	    dp_populate_tsft_from_phy_timestamp(pdev, ppdu_info))
 		return;
 
+	/* update mlo timestamp */
+	TXMON_PPDU_COM(ppdu_info, tsft) =
+			(TXMON_PPDU_COM(ppdu_info, tsft) +
+			 pdev->timestamp.mlo_offset_lo_us +
+			 ((uint64_t)pdev->timestamp.mlo_offset_hi_us << 32));
+
 	for (usr_idx = 0; usr_idx < num_users; usr_idx++) {
 		qdf_nbuf_queue_t *mpdu_q = NULL;
 

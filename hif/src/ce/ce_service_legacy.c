@@ -233,7 +233,7 @@ int ce_send_fast(struct CE_handle *copyeng, qdf_nbuf_t msdu,
 		/*
 		 * Clear packet offset for all but the first CE desc.
 		 */
-		user_flags &= ~QDF_CE_TX_PKT_OFFSET_BIT_M;
+		user_flags &= ~CE_DESC_PKT_OFFSET_BIT_M;
 		ce_buffer_addr_hi_set(shadow_src_desc, dma_addr, user_flags);
 		shadow_src_desc->meta_data = transfer_id;
 

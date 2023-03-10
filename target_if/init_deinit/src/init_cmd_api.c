@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2018-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -529,6 +529,9 @@ void init_deinit_prepare_send_init_cmd(
 
 	if (wmi_service_enabled(wmi_handle, wmi_service_ext2_msg))
 		init_deinit_derive_afc_dev_type_param(psoc, &init_param);
+
+	if (wmi_service_enabled(wmi_handle, wmi_service_v1a_v1b_supported))
+		info->wlan_res_cfg.dp_peer_meta_data_ver = 1;
 
 	target_if_ext_res_cfg_enable(psoc, tgt_hdl, NULL);
 

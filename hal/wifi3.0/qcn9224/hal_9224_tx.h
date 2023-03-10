@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -33,7 +33,7 @@
 #define HAL_TX_NUM_DSCP_REGISTER_SIZE 32
 
 /**
- * hal_tx_ppe2tcl_ring_halt_set() - Enable ring halt for the ppe2tcl ring
+ * hal_tx_ppe2tcl_ring_halt_set_9224() - Enable ring halt for the ppe2tcl ring
  * @hal_soc: HAL SoC context
  *
  * Return: none
@@ -57,7 +57,8 @@ static void hal_tx_ppe2tcl_ring_halt_set_9224(hal_soc_handle_t hal_soc)
 }
 
 /**
- * hal_tx_ppe2tcl_ring_halt_reset() - Disable ring halt for the ppe2tcl ring
+ * hal_tx_ppe2tcl_ring_halt_reset_9224() - Disable ring halt for the ppe2tcl
+ *                                         ring
  * @hal_soc: HAL SoC context
  *
  * Return: none
@@ -80,7 +81,8 @@ static void hal_tx_ppe2tcl_ring_halt_reset_9224(hal_soc_handle_t hal_soc)
 }
 
 /**
- * hal_tx_ppe2tcl_ring_halt_done() - Check if ring halt is done for ppe2tcl ring
+ * hal_tx_ppe2tcl_ring_halt_done_9224() - Check if ring halt is done
+ *                                        for ppe2tcl ring
  * @hal_soc: HAL SoC context
  *
  * Return: true if halt done
@@ -102,7 +104,7 @@ static bool hal_tx_ppe2tcl_ring_halt_done_9224(hal_soc_handle_t hal_soc)
 
 /**
  * hal_tx_set_dscp_tid_map_9224() - Configure default DSCP to TID map table
- * @soc: HAL SoC context
+ * @hal_soc: HAL SoC context
  * @map: DSCP-TID mapping table
  * @id: mapping table ID - 0-31
  *
@@ -173,9 +175,9 @@ static void hal_tx_set_dscp_tid_map_9224(struct hal_soc *hal_soc, uint8_t *map,
  * hal_tx_update_dscp_tid_9224() - Update the dscp tid map table as updated
  *					by the user
  * @soc: HAL SoC context
- * @map: DSCP-TID mapping table
- * @id : MAP ID
- * @dscp: DSCP_TID map index
+ * @tid: TID
+ * @id: MAP ID
+ * @dscp: DSCP
  *
  * Return: void
  */
@@ -260,8 +262,8 @@ static void hal_tx_update_dscp_tid_9224(struct hal_soc *soc, uint8_t tid,
 			(HWIO_TCL_R0_RBM_MAPPING0_SW2TCL_CREDIT_RING_SHFT >> 2)
 
 /**
- * hal_tx_config_rbm_mapping_be() - Update return buffer manager ring id
- * @hal_soc: HAL SoC context
+ * hal_tx_config_rbm_mapping_be_9224() - Update return buffer manager ring id
+ * @hal_soc_hdl: HAL SoC context
  * @hal_ring_hdl: Source ring pointer
  * @rbm_id: return buffer manager ring id
  *
@@ -315,7 +317,7 @@ hal_tx_config_rbm_mapping_be_9224(hal_soc_handle_t hal_soc_hdl,
 /**
  * hal_tx_init_cmd_credit_ring_9224() - Initialize command/credit SRNG
  * @hal_soc_hdl: Handle to HAL SoC structure
- * @hal_srng: Handle to HAL SRNG structure
+ * @hal_ring_hdl: Handle to HAL SRNG structure
  *
  * Return: none
  */
@@ -412,7 +414,7 @@ void hal_tx_set_ppe_cmn_config_9224(hal_soc_handle_t hal_soc_hdl,
 /**
  * hal_tx_set_ppe_vp_entry_9224() - Set the PPE VP entry
  * @hal_soc_hdl: HAL SoC handle
- * @vp_cfg: PPE VP config
+ * @cfg: PPE VP config
  * @ppe_vp_idx : PPE VP index to the table
  *
  * Return: void
@@ -455,7 +457,7 @@ hal_ppeds_cfg_ast_override_map_reg_9224(hal_soc_handle_t hal_soc_hdl,
 }
 
 /**
- * hal_tx_set_ppe_pri2tid_map1_9224()
+ * hal_tx_set_ppe_pri2tid_map_9224() - Set PPE PRI to TID map
  * @hal_soc_hdl: HAL SoC handle
  * @val : PRI to TID value
  * @map_no: Map number
@@ -481,10 +483,10 @@ void hal_tx_set_ppe_pri2tid_map_9224(hal_soc_handle_t hal_soc_hdl,
 }
 
 /**
- * hal_tx_set_ppe_pri2tid_map1_9224()
+ * hal_tx_enable_pri2tid_map_9224() - Enable PRI to TID map
  * @hal_soc_hdl: HAL SoC handle
- * @val : PRI to TID value
- * @map_no: Map number
+ * @val: PRI to TID value
+ * @ppe_vp_idx: Map number
  *
  * Return: void
  */
@@ -515,7 +517,7 @@ void hal_tx_enable_pri2tid_map_9224(hal_soc_handle_t hal_soc_hdl,
 }
 
 /**
- * hal_tx_update_ppe_pri2tid_9224()
+ * hal_tx_update_ppe_pri2tid_9224() - Update PPE PRI to TID
  * @hal_soc_hdl: HAL SoC handle
  * @pri: INT_PRI
  * @tid: Wi-Fi TID

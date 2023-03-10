@@ -111,6 +111,19 @@ enum MLO_SOC_LIST {
 
 #define MAX_MLO_LINKS 6
 #define MAX_MLO_CHIPS 5
+#define MAX_ADJ_CHIPS 2
+
+/**
+ * struct mlo_chip_info: MLO chip info per link
+ * @info_valid: If the info here is valid or not
+ * @chip_id: Chip ID as assigned by platform
+ * @adj_chip_ids: Chip IDs of Adjacent chips
+ */
+struct mlo_chip_info {
+	uint8_t info_valid;
+	uint8_t chip_id[MAX_MLO_CHIPS];
+	uint8_t adj_chip_ids[MAX_MLO_CHIPS][MAX_ADJ_CHIPS];
+};
 
 /**
  * struct mlo_setup_info: MLO setup status per link
@@ -128,6 +141,7 @@ enum MLO_SOC_LIST {
  * @state_lock: lock to protect access to link state
  * @event: event for teardown completion
  * @dp_handle: pointer to DP ML context
+ * @chip_info: chip specific info of the soc
  */
 struct mlo_setup_info {
 	uint8_t ml_grp_id;
@@ -144,6 +158,7 @@ struct mlo_setup_info {
 	qdf_spinlock_t state_lock;
 	qdf_event_t event;
 	struct cdp_mlo_ctxt *dp_handle;
+	struct mlo_chip_info chip_info;
 };
 
 /**
@@ -325,6 +340,7 @@ struct wlan_mlo_sta {
  * @ml_aid_mgr: ML AID mgr
  * @mlo_ap_lock: lock to sync VDEV SM event
  * @mlo_vdev_quiet_bmap: Bitmap of vdevs for which quiet ie needs to enabled
+ * @mlo_vdev_up_bmap: Bitmap of vdevs for which sync complete can be dispatched
  *
  * NB: not using kernel-doc format since the kernel-doc script doesn't
  *     handle the qdf_bitmap() macro
@@ -338,6 +354,7 @@ struct wlan_mlo_ap {
 	qdf_mutex_t mlo_ap_lock;
 #endif
 	qdf_bitmap(mlo_vdev_quiet_bmap, WLAN_UMAC_MLO_MAX_VDEVS);
+	qdf_bitmap(mlo_vdev_up_bmap, WLAN_UMAC_MLO_MAX_VDEVS);
 };
 
 /**
@@ -662,10 +679,34 @@ struct ml_rv_info {
  * struct mlo_tgt_link_info - ML target link info
  * @vdev_id: link peer vdev id
  * @hw_mld_link_id: HW link id
+ * @mlo_enabled: indicate is MLO enabled
+ * @mlo_assoc_link: indicate is the link used to initialize the association
+ *                  of mlo connection
+ * @mlo_primary_umac: indicate is the link on primary UMAC, WIN only flag
+ * @mlo_logical_link_index_valid: indicate if the logial link index in is valid
+ * @mlo_peer_id_valid: indicate if the mlo peer id is valid
+ * @mlo_force_link_inactive: force the peer inactive
+ * @emlsr_support: indicate if eMLSR supported
+ * @emlmr_support: indicate if eMLMR supported
+ * @msd_cap_support: indicate if MSD supported
+ * @unused: spare bits
+ * @logical_link_index: Unique index for links of the mlo. Starts with Zero
  */
 struct mlo_tgt_link_info {
 	uint8_t vdev_id;
 	uint8_t hw_mld_link_id;
+	uint32_t mlo_enabled:1,
+		 mlo_assoc_link:1,
+		 mlo_primary_umac:1,
+		 mlo_logical_link_index_valid:1,
+		 mlo_peer_id_valid:1,
+		 mlo_force_link_inactive:1,
+		 emlsr_support:1,
+		 emlmr_support:1,
+		 msd_cap_support:1,
+		 unused:23;
+	uint32_t logical_link_index;
+
 };
 
 /**
@@ -745,6 +786,8 @@ struct mlo_mlme_ext_ops {
  *  Force inactive a number of links, firmware to decide which links to inactive
  * @MLO_LINK_FORCE_MODE_NO_FORCE:
  *  Cancel the force operation of specific links, allow firmware to decide
+ * @MLO_LINK_FORCE_MODE_ACTIVE_INACTIVE: Force specific links active and
+ *  force specific links inactive
  */
 enum mlo_link_force_mode {
 	MLO_LINK_FORCE_MODE_ACTIVE       = 1,
@@ -752,6 +795,7 @@ enum mlo_link_force_mode {
 	MLO_LINK_FORCE_MODE_ACTIVE_NUM   = 3,
 	MLO_LINK_FORCE_MODE_INACTIVE_NUM = 4,
 	MLO_LINK_FORCE_MODE_NO_FORCE     = 5,
+	MLO_LINK_FORCE_MODE_ACTIVE_INACTIVE = 6,
 };
 
 /**
@@ -760,10 +804,13 @@ enum mlo_link_force_mode {
  *  Set force specific links because of new connection
  * @MLO_LINK_FORCE_REASON_DISCONNECT:
  *  Set force specific links because of new dis-connection
+ * @MLO_LINK_FORCE_REASON_LINK_REMOVAL:
+ *  Set force specific links because of AP side link removal
  */
 enum mlo_link_force_reason {
 	MLO_LINK_FORCE_REASON_CONNECT    = 1,
 	MLO_LINK_FORCE_REASON_DISCONNECT = 2,
+	MLO_LINK_FORCE_REASON_LINK_REMOVAL = 3,
 };
 
 /**
@@ -802,21 +849,31 @@ struct mlo_link_num_param {
  * @reason: reason for the operation (enum mlo_link_force_reason)
  * @num_link_entry: number of the valid entries for link_num
  * @num_vdev_bitmap: number of the valid entries for vdev_bitmap
+ * @num_inactive_vdev_bitmap: number of the valid entries for
+ *  inactive_vdev_bitmap
  * @link_num: link number param array
  *  It's present only when force_mode is MLO_LINK_FORCE_MODE_ACTIVE_NUM or
  *  MLO_LINK_FORCE_MODE_INACTIVE_NUM
  * @vdev_bitmap: active/inactive vdev bitmap array
  *  It will be present when force_mode is MLO_LINK_FORCE_MODE_ACTIVE,
  *  MLO_LINK_FORCE_MODE_INACTIVE, MLO_LINK_FORCE_MODE_NO_FORCE,
- *  MLO_LINK_FORCE_MODE_ACTIVE_NUM or MLO_LINK_FORCE_MODE_INACTIVE_NUM
+ *  MLO_LINK_FORCE_MODE_ACTIVE_NUM or MLO_LINK_FORCE_MODE_INACTIVE_NUM,
+ *  and MLO_LINK_FORCE_MODE_ACTIVE_INACTIVE.
+ *  For MLO_LINK_FORCE_MODE_ACTIVE_INACTIVE, it includes the active vdev
+ *  bitmaps
+ * @inactive_vdev_bitmap: inactive vdev bitmap array
+ *  It will be present when force_mode is MLO_LINK_FORCE_MODE_ACTIVE_INACTIVE,
+ *  it includes the inactive vdev bitmaps
  */
 struct mlo_link_set_active_param {
 	uint32_t force_mode;
 	uint32_t reason;
 	uint32_t num_link_entry;
 	uint32_t num_vdev_bitmap;
+	uint32_t num_inactive_vdev_bitmap;
 	struct mlo_link_num_param link_num[MLO_LINK_NUM_SZ];
 	uint32_t vdev_bitmap[MLO_VDEV_BITMAP_SZ];
+	uint32_t inactive_vdev_bitmap[MLO_VDEV_BITMAP_SZ];
 };
 
 /**

@@ -297,24 +297,40 @@ QDF_STATUS
 wlan_mgmt_rx_reo_psoc_obj_destroy_notification(struct wlan_objmgr_psoc *psoc);
 
 /**
- * wlan_mgmt_rx_reo_attach() - Initializes the per pdev data structures related
+ * wlan_mgmt_rx_reo_pdev_attach() - Initializes the per pdev data structures
+ * related to management rx-reorder module
+ * @pdev: pointer to pdev object
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS wlan_mgmt_rx_reo_pdev_attach(struct wlan_objmgr_pdev *pdev);
+
+/**
+ * wlan_mgmt_rx_reo_psoc_attach() - Initializes the per psoc data structures
+ * related to management rx-reorder module
+ * @psoc: pointer to psoc object
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS wlan_mgmt_rx_reo_psoc_attach(struct wlan_objmgr_psoc *psoc);
+
+/**
+ * wlan_mgmt_rx_reo_pdev_detach() - Clears the per pdev data structures related
  * to management rx-reorder module
  * @pdev: pointer to pdev object
  *
  * Return: QDF_STATUS
  */
-QDF_STATUS
-wlan_mgmt_rx_reo_attach(struct wlan_objmgr_pdev *pdev);
+QDF_STATUS wlan_mgmt_rx_reo_pdev_detach(struct wlan_objmgr_pdev *pdev);
 
 /**
- * wlan_mgmt_rx_reo_detach() - Clears the per pdev data structures related to
- * management rx-reorder module
- * @pdev: pointer to pdev object
+ * wlan_mgmt_rx_reo_psoc_detach() - Clears the per psoc data structures related
+ * to management rx-reorder module
+ * @psoc: pointer to psoc object
  *
  * Return: QDF_STATUS
  */
-QDF_STATUS
-wlan_mgmt_rx_reo_detach(struct wlan_objmgr_pdev *pdev);
+QDF_STATUS wlan_mgmt_rx_reo_psoc_detach(struct wlan_objmgr_psoc *psoc);
 
 /**
  * wlan_mgmt_rx_reo_is_feature_enabled_at_psoc() - Check if MGMT Rx REO feature
@@ -431,6 +447,17 @@ wlan_mgmt_rx_reo_print_egress_frame_stats(uint8_t ml_grp_id);
 QDF_STATUS
 wlan_mgmt_rx_reo_print_egress_frame_info(uint8_t ml_grp_id,
 					 uint16_t num_frames);
+
+/**
+ * wlan_mgmt_rx_reo_release_frames() - Release management frames which are ready
+ * for delivery
+ * @mlo_grp_id: MLO group ID
+ * @link_bitmap: Link bitmap
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+wlan_mgmt_rx_reo_release_frames(uint8_t mlo_grp_id, uint32_t link_bitmap);
 #else
 static inline QDF_STATUS
 wlan_mgmt_rx_reo_validate_mlo_link_info(struct wlan_objmgr_psoc *psoc)
@@ -507,27 +534,53 @@ wlan_mgmt_rx_reo_psoc_obj_destroy_notification(struct wlan_objmgr_psoc *psoc)
 }
 
 /**
- * wlan_mgmt_rx_reo_attach() - Initializes the per pdev data structures related
+ * wlan_mgmt_rx_reo_pdev_attach() - Initializes the per pdev data structures
+ * related to management rx-reorder module
+ * @pdev: pointer to pdev object
+ *
+ * Return: QDF_STATUS
+ */
+static inline QDF_STATUS
+wlan_mgmt_rx_reo_pdev_attach(struct wlan_objmgr_pdev *pdev)
+{
+	return QDF_STATUS_SUCCESS;
+}
+
+/**
+ * wlan_mgmt_rx_reo_psoc_attach() - Initializes the per psoc data structures
+ * related to management rx-reorder module
+ * @psoc: pointer to psoc object
+ *
+ * Return: QDF_STATUS
+ */
+static inline QDF_STATUS
+wlan_mgmt_rx_reo_psoc_attach(struct wlan_objmgr_psoc *psoc)
+{
+	return QDF_STATUS_SUCCESS;
+}
+
+/**
+ * wlan_mgmt_rx_reo_pdev_detach() - Clears the per pdev data structures related
  * to management rx-reorder module
  * @pdev: pointer to pdev object
  *
  * Return: QDF_STATUS
  */
 static inline QDF_STATUS
-wlan_mgmt_rx_reo_attach(struct wlan_objmgr_pdev *pdev)
+wlan_mgmt_rx_reo_pdev_detach(struct wlan_objmgr_pdev *pdev)
 {
 	return QDF_STATUS_SUCCESS;
 }
 
 /**
- * wlan_mgmt_rx_reo_detach() - Clears the per pdev data structures related to
- * management rx-reorder module
- * @pdev: pointer to pdev object
+ * wlan_mgmt_rx_reo_psoc_detach() - Clears the per psoc data structures related
+ * to management rx-reorder module
+ * @psoc: pointer to psoc object
  *
  * Return: QDF_STATUS
  */
 static inline QDF_STATUS
-wlan_mgmt_rx_reo_detach(struct wlan_objmgr_pdev *pdev)
+wlan_mgmt_rx_reo_psoc_detach(struct wlan_objmgr_psoc *psoc)
 {
 	return QDF_STATUS_SUCCESS;
 }

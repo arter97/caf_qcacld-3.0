@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2017-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  *
  * Permission to use, copy, modify, and/or distribute this software for
@@ -1270,6 +1270,121 @@ static bool tgt_if_reg_is_chip_11be_cap(struct wlan_objmgr_psoc *psoc,
 }
 #endif
 
+static int
+tgt_rate_to_power_complete_handler(ol_scn_t handle, uint8_t *event_buf,
+				   uint32_t len)
+{
+	int ret_val = 0;
+	struct wlan_objmgr_psoc *psoc;
+	struct wlan_lmac_if_reg_rx_ops *reg_rx_ops;
+	QDF_STATUS status;
+	struct wmi_unified *wmi_handle;
+	struct r2p_table_update_status_obj *update_status_obj = NULL;
+	uint32_t pdev_id;
+
+	TARGET_IF_ENTER();
+
+	psoc = target_if_get_psoc_from_scn_hdl(handle);
+	if (!psoc) {
+		target_if_err("psoc ptr is NULL");
+		ret_val = -EINVAL;
+		goto clean;
+	}
+
+	reg_rx_ops = target_if_regulatory_get_rx_ops(psoc);
+	if (!reg_rx_ops) {
+		target_if_err("reg_rx_ops is NULL");
+		ret_val = -EINVAL;
+		goto clean;
+	}
+
+	if (!reg_rx_ops->reg_r2p_table_update_response_handler) {
+		target_if_err("reg_r2p_table_update_response_handler is NULL");
+		ret_val = -EINVAL;
+		goto clean;
+	}
+
+	wmi_handle = get_wmi_unified_hdl_from_psoc(psoc);
+	if (!wmi_handle) {
+		target_if_err("invalid wmi handle");
+		ret_val = -EINVAL;
+		goto clean;
+	}
+
+	update_status_obj = qdf_mem_malloc(sizeof(*update_status_obj));
+	if (!update_status_obj) {
+		ret_val = -ENOMEM;
+		goto clean;
+	}
+
+	status = wmi_extract_tgtr2p_table_event(wmi_handle, event_buf,
+						update_status_obj, len);
+	if (!QDF_IS_STATUS_SUCCESS(status)) {
+		target_if_err("Extraction of r2p update response event failed");
+		ret_val = -EFAULT;
+		goto clean;
+	}
+
+	pdev_id = update_status_obj->pdev_id;
+	status = reg_rx_ops->reg_r2p_table_update_response_handler(psoc,
+								   pdev_id);
+	if (!QDF_IS_STATUS_SUCCESS(status)) {
+		target_if_err("Failed to process r2p update response");
+		ret_val = -EFAULT;
+		goto clean;
+	}
+clean:
+	qdf_mem_free(update_status_obj);
+	TARGET_IF_EXIT();
+
+	return ret_val;
+}
+
+/**
+ * tgt_if_regulatory_register_rate2power_table_update_handler() - Register
+ * rate2power table update handler
+ * @psoc: Pointer to psoc
+ * @arg: Pointer to argument list
+ *
+ * Return: QDF_STATUS
+ */
+static QDF_STATUS
+tgt_if_regulatory_register_rate2power_table_update_handler(
+						struct wlan_objmgr_psoc *psoc,
+						void *arg)
+{
+	wmi_unified_t wmi_handle = get_wmi_unified_hdl_from_psoc(psoc);
+
+	if (!wmi_handle)
+		return QDF_STATUS_E_FAILURE;
+
+	return wmi_unified_register_event_handler(
+			wmi_handle, wmi_pdev_set_tgtr2p_table_eventid,
+			tgt_rate_to_power_complete_handler, WMI_RX_WORK_CTX);
+}
+
+/**
+ * tgt_if_regulatory_register_rate2power_table_update_handler() - Unregister
+ * rate2power table update handler
+ * @psoc: Pointer to psoc
+ * @arg: Pointer to argument list
+ *
+ * Return: QDF_STATUS
+ */
+static QDF_STATUS
+tgt_if_regulatory_unregister_rate2power_table_update_handler(
+						struct wlan_objmgr_psoc *psoc,
+						void *arg)
+{
+	wmi_unified_t wmi_handle = get_wmi_unified_hdl_from_psoc(psoc);
+
+	if (!wmi_handle)
+		return QDF_STATUS_E_FAILURE;
+
+	return wmi_unified_unregister_event_handler(
+			wmi_handle, wmi_pdev_set_tgtr2p_table_eventid);
+}
+
 QDF_STATUS target_if_register_regulatory_tx_ops(
 		struct wlan_lmac_if_tx_ops *tx_ops)
 {
@@ -1330,6 +1445,14 @@ QDF_STATUS target_if_register_regulatory_tx_ops(
 	tgt_if_register_afc_callback(reg_ops);
 
 	reg_ops->is_chip_11be = tgt_if_reg_is_chip_11be_cap;
+
+	reg_ops->register_rate2power_table_update_event_handler =
+		tgt_if_regulatory_register_rate2power_table_update_handler;
+
+	reg_ops->unregister_rate2power_table_update_event_handler =
+		tgt_if_regulatory_unregister_rate2power_table_update_handler;
+
+	reg_ops->end_r2p_table_update_wait = NULL;
 
 	return QDF_STATUS_SUCCESS;
 }

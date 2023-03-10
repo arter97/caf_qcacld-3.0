@@ -27,7 +27,7 @@
 #include <hal_generic_api.h>
 #include "txmon_tlvs.h"
 
-/**
+/*
  * Debug macro to print the TLV header tag
  */
 #define SHOW_DEFINED(x) do {} while (0)
@@ -49,8 +49,10 @@ hal_tx_comp_get_buffer_timestamp_be(void *desc,
 #endif /* WLAN_FEATURE_TSF_UPLINK_DELAY || CONFIG_SAWF */
 
 /**
- * hal_tx_comp_get_status() - TQM Release reason
- * @hal_desc: completion ring Tx status
+ * hal_tx_comp_get_status_generic_be() - TQM Release reason
+ * @desc: WBM descriptor
+ * @ts1: completion ring Tx status
+ * @hal: hal_soc
  *
  * This function will parse the WBM completion descriptor and populate in
  * HAL structure
@@ -187,7 +189,7 @@ hal_tx_update_pcp_tid_generic_be(struct hal_soc *soc,
 /**
  * hal_tx_update_tidmap_prty_generic_be() - Update the tid map priority
  * @soc: HAL SoC context
- * @val: priority value
+ * @value: priority value
  *
  * Return: void
  */
@@ -220,9 +222,9 @@ static void hal_rx_get_tlv_size_generic_be(uint16_t *rx_pkt_tlv_size,
 
 /**
  * hal_rx_flow_get_tuple_info_be() - Setup a flow search entry in HW FST
- * @fst: Pointer to the Rx Flow Search Table
+ * @rx_fst: Pointer to the Rx Flow Search Table
  * @hal_hash: HAL 5 tuple hash
- * @tuple_info: 5-tuple info of the flow returned to the caller
+ * @flow_tuple_info: 5-tuple info of the flow returned to the caller
  *
  * Return: Success/Failure
  */
@@ -291,7 +293,7 @@ hal_rx_flow_get_tuple_info_be(uint8_t *rx_fst, uint32_t hal_hash,
 
 /**
  * hal_rx_flow_delete_entry_be() - Setup a flow search entry in HW FST
- * @fst: Pointer to the Rx Flow Search Table
+ * @rx_fst: Pointer to the Rx Flow Search Table
  * @hal_rx_fse: Pointer to the Rx Flow that is to be deleted from the FST
  *
  * Return: Success/Failure
@@ -327,7 +329,7 @@ hal_rx_fst_get_fse_size_be(void)
 #ifdef QCA_MONITOR_2_0_SUPPORT
 /**
  * hal_txmon_is_mon_buf_addr_tlv_generic_be() - api to find mon buffer tlv
- * @tx_tlv: pointer to TLV header
+ * @tx_tlv_hdr: pointer to TLV header
  *
  * Return: bool based on tlv tag matches monitor buffer address tlv
  */
@@ -385,7 +387,7 @@ hal_txmon_get_num_users(void *tx_tlv)
  * hal_txmon_parse_tx_fes_setup() - parse tx_fes_setup tlv
  *
  * @tx_tlv: pointer to tx_fes_setup tlv header
- * @ppdu_info: pointer to hal_tx_ppdu_info
+ * @tx_ppdu_info: pointer to hal_tx_ppdu_info
  *
  * Return: void
  */
@@ -487,7 +489,7 @@ hal_txmon_get_num_users(void *tx_tlv)
  * hal_txmon_parse_tx_fes_setup() - parse tx_fes_setup tlv
  *
  * @tx_tlv: pointer to tx_fes_setup tlv header
- * @ppdu_info: pointer to hal_tx_ppdu_info
+ * @tx_ppdu_info: pointer to hal_tx_ppdu_info
  *
  * Return: void
  */
@@ -685,7 +687,7 @@ uint8_t get_ru_offset_from_start_index(uint8_t ru_size, uint8_t start_idx)
  *
  * @tx_tlv: pointer to firmware to software tlvmpdu start tlv header
  * @type: place where this tlv is generated
- * @tx_status_info: pointer to hal_tx_status_info
+ * @status_info: pointer to hal_tx_status_info
  *
  * Return: void
  */
@@ -731,6 +733,609 @@ hal_txmon_parse_fw2sw(void *tx_tlv, uint8_t type,
 		break;
 	}
 	};
+}
+
+/**
+ * hal_txmon_parse_u_sig_hdr() - parse u_sig header information from tlv
+ *
+ * @tx_tlv: pointer to mactx_u_sig_eht_su_mu/tb tlv
+ * @ppdu_info: pointer to hal_tx_ppdu_info
+ *
+ * Return: void
+ */
+static inline void
+hal_txmon_parse_u_sig_hdr(void *tx_tlv, struct hal_tx_ppdu_info *ppdu_info)
+{
+	struct hal_mon_usig_hdr *usig = (struct hal_mon_usig_hdr *)tx_tlv;
+	struct hal_mon_usig_cmn *usig_1 = &usig->usig_1;
+	uint8_t bad_usig_crc;
+
+	bad_usig_crc = HAL_TX_DESC_GET_64(tx_tlv,
+					  MACTX_U_SIG_EHT_SU_MU_MACTX_U_SIG_EHT_SU_MU_INFO_DETAILS,
+					  CRC) ? 0 : 1;
+
+	TXMON_HAL_STATUS(ppdu_info, usig_common) |=
+			QDF_MON_STATUS_USIG_PHY_VERSION_KNOWN |
+			QDF_MON_STATUS_USIG_BW_KNOWN |
+			QDF_MON_STATUS_USIG_UL_DL_KNOWN |
+			QDF_MON_STATUS_USIG_BSS_COLOR_KNOWN |
+			QDF_MON_STATUS_USIG_TXOP_KNOWN;
+
+	TXMON_HAL_STATUS(ppdu_info, usig_common) |=
+			(usig_1->phy_version <<
+			 QDF_MON_STATUS_USIG_PHY_VERSION_SHIFT);
+	TXMON_HAL_STATUS(ppdu_info, usig_common) |=
+			(usig_1->bw << QDF_MON_STATUS_USIG_BW_SHIFT);
+	TXMON_HAL_STATUS(ppdu_info, usig_common) |=
+			(usig_1->ul_dl << QDF_MON_STATUS_USIG_UL_DL_SHIFT);
+	TXMON_HAL_STATUS(ppdu_info, usig_common) |=
+			(usig_1->bss_color <<
+			 QDF_MON_STATUS_USIG_BSS_COLOR_SHIFT);
+	TXMON_HAL_STATUS(ppdu_info, usig_common) |=
+			(usig_1->txop << QDF_MON_STATUS_USIG_TXOP_SHIFT);
+	TXMON_HAL_STATUS(ppdu_info, usig_common) |= bad_usig_crc;
+	TXMON_HAL_STATUS(ppdu_info, bw) = usig_1->bw;
+
+	TXMON_HAL_STATUS(ppdu_info, usig_flags) = 1;
+}
+
+/**
+ * hal_txmon_populate_he_data_per_user() - populate he data per user
+ *
+ * @usr: pointer to hal_txmon_user_desc_per_user
+ * @user_id: user index
+ * @ppdu_info: pointer to hal_tx_ppdu_info
+ *
+ * Return: void
+ */
+static inline void
+hal_txmon_populate_he_data_per_user(struct hal_txmon_user_desc_per_user *usr,
+				    uint32_t user_id,
+				    struct hal_tx_ppdu_info *ppdu_info)
+{
+	uint32_t he_data1 = TXMON_HAL_USER(ppdu_info, user_id, he_data1);
+	uint32_t he_data2 = TXMON_HAL_USER(ppdu_info, user_id, he_data2);
+	uint32_t he_data3 = TXMON_HAL_USER(ppdu_info, user_id, he_data3);
+	uint32_t he_data5 = TXMON_HAL_USER(ppdu_info, user_id, he_data5);
+	uint32_t he_data6 = TXMON_HAL_USER(ppdu_info, user_id, he_data6);
+
+	/* populate */
+	/* BEAM CHANGE */
+	he_data1 |= QDF_MON_STATUS_HE_BEAM_CHANGE_KNOWN;
+	he_data1 |= QDF_MON_STATUS_TXBF_KNOWN;
+	he_data5 |= (!!usr->user_bf_type << QDF_MON_STATUS_TXBF_SHIFT);
+	he_data3 |= (!!usr->user_bf_type << QDF_MON_STATUS_BEAM_CHANGE_SHIFT);
+
+	/* UL/DL known */
+	he_data1 |= QDF_MON_STATUS_HE_DL_UL_KNOWN;
+	he_data3 |= (1 << QDF_MON_STATUS_DL_UL_SHIFT);
+
+	/* MCS */
+	he_data1 |= QDF_MON_STATUS_HE_MCS_KNOWN;
+	he_data3 |= (usr->mcs << QDF_MON_STATUS_TRANSMIT_MCS_SHIFT);
+	/* DCM */
+	he_data1 |= QDF_MON_STATUS_HE_DCM_KNOWN;
+	he_data3 |= (usr->dcm << QDF_MON_STATUS_DCM_SHIFT);
+	/* LDPC EXTRA SYMB */
+	he_data1 |= QDF_MON_STATUS_HE_LDPC_EXTRA_SYMBOL_KNOWN;
+	he_data3 |= (usr->ldpc_extra_symbol <<
+		     QDF_MON_STATUS_LDPC_EXTRA_SYMBOL_SHIFT);
+	/* RU offset and RU */
+	he_data2 |= QDF_MON_STATUS_RU_ALLOCATION_OFFSET_KNOWN;
+	he_data2 |= (get_ru_offset_from_start_index(usr->ru_size,
+						    usr->ru_start_index) <<
+		     QDF_MON_STATUS_RU_ALLOCATION_SHIFT);
+	/* Data BW and RU allocation */
+	if (usr->ru_size < HAL_MAX_RU_INDEX) {
+		/* update bandwidth if it is full bandwidth */
+		he_data1 |= QDF_MON_STATUS_HE_DATA_BW_RU_KNOWN;
+		he_data5 = (he_data5 & 0xFFF0) | (4 + usr->ru_size);
+	}
+
+	he_data6 |= (usr->nss & 0xF);
+	TXMON_HAL_USER(ppdu_info, user_id, mcs) = usr->mcs;
+
+	/* update stack variable to ppdu_info */
+	TXMON_HAL_USER(ppdu_info, user_id, he_data1) = he_data1;
+	TXMON_HAL_USER(ppdu_info, user_id, he_data2) = he_data2;
+	TXMON_HAL_USER(ppdu_info, user_id, he_data3) = he_data3;
+	TXMON_HAL_USER(ppdu_info, user_id, he_data5) = he_data5;
+	TXMON_HAL_USER(ppdu_info, user_id, he_data6) = he_data6;
+}
+
+/**
+ * hal_txmon_get_user_desc_per_user() - get mactx user desc per user from tlv
+ *
+ * @tx_tlv: pointer to mactx_user_desc_per_user tlv
+ * @usr: pointer to hal_txmon_user_desc_per_user
+ *
+ * Return: void
+ */
+static inline void
+hal_txmon_get_user_desc_per_user(void *tx_tlv,
+				 struct hal_txmon_user_desc_per_user *usr)
+{
+	usr->psdu_length = HAL_TX_DESC_GET_64(tx_tlv, MACTX_USER_DESC_PER_USER,
+					      PSDU_LENGTH);
+	usr->ru_start_index = HAL_TX_DESC_GET_64(tx_tlv,
+						 MACTX_USER_DESC_PER_USER,
+						 RU_START_INDEX);
+	usr->ru_size = HAL_TX_DESC_GET_64(tx_tlv, MACTX_USER_DESC_PER_USER,
+					  RU_SIZE);
+	usr->ofdma_mu_mimo_enabled =
+		HAL_TX_DESC_GET_64(tx_tlv, MACTX_USER_DESC_PER_USER,
+				   OFDMA_MU_MIMO_ENABLED);
+	usr->nss = HAL_TX_DESC_GET_64(tx_tlv, MACTX_USER_DESC_PER_USER, NSS);
+	usr->stream_offset = HAL_TX_DESC_GET_64(tx_tlv,
+						MACTX_USER_DESC_PER_USER,
+						STREAM_OFFSET);
+	usr->mcs = HAL_TX_DESC_GET_64(tx_tlv, MACTX_USER_DESC_PER_USER, MCS);
+	usr->dcm = HAL_TX_DESC_GET_64(tx_tlv, MACTX_USER_DESC_PER_USER, DCM);
+	usr->fec_type = HAL_TX_DESC_GET_64(tx_tlv, MACTX_USER_DESC_PER_USER,
+					   FEC_TYPE);
+	usr->user_bf_type = HAL_TX_DESC_GET_64(tx_tlv, MACTX_USER_DESC_PER_USER,
+					       USER_BF_TYPE);
+	usr->drop_user_cbf = HAL_TX_DESC_GET_64(tx_tlv,
+						MACTX_USER_DESC_PER_USER,
+						DROP_USER_CBF);
+	usr->ldpc_extra_symbol = HAL_TX_DESC_GET_64(tx_tlv,
+						    MACTX_USER_DESC_PER_USER,
+						    LDPC_EXTRA_SYMBOL);
+	usr->force_extra_symbol = HAL_TX_DESC_GET_64(tx_tlv,
+						     MACTX_USER_DESC_PER_USER,
+						     FORCE_EXTRA_SYMBOL);
+	usr->sw_peer_id = HAL_TX_DESC_GET_64(tx_tlv, MACTX_USER_DESC_PER_USER,
+					     SW_PEER_ID);
+}
+
+/**
+ * hal_txmon_populate_eht_sig_per_user() - populate eht sig user information
+ *
+ * @usr: pointer to hal_txmon_user_desc_per_user
+ * @user_id: user index
+ * @ppdu_info: pointer to hal_tx_ppdu_info
+ *
+ * Return: void
+ */
+static inline void
+hal_txmon_populate_eht_sig_per_user(struct hal_txmon_user_desc_per_user *usr,
+				    uint32_t user_id,
+				    struct hal_tx_ppdu_info *ppdu_info)
+{
+	uint32_t eht_known = 0;
+	uint32_t eht_data[6] = {0};
+	uint8_t i = 0;
+
+	eht_known = QDF_MON_STATUS_EHT_LDPC_EXTRA_SYMBOL_SEG_KNOWN;
+
+	eht_data[0] |= (usr->ldpc_extra_symbol <<
+			QDF_MON_STATUS_EHT_LDPC_EXTRA_SYMBOL_SEG_SHIFT);
+
+	TXMON_HAL_STATUS(ppdu_info, eht_known) |= eht_known;
+
+	for (i = 0; i < 6; i++)
+		TXMON_HAL_STATUS(ppdu_info, eht_data[i]) |= eht_data[i];
+}
+
+/**
+ * hal_txmon_parse_user_desc_per_user() - parse mactx user desc per user
+ *
+ * @tx_tlv: pointer to mactx_user_desc_per_user tlv
+ * @user_id: user index
+ * @ppdu_info: pointer to hal_tx_ppdu_info
+ *
+ * Return: void
+ */
+static inline void
+hal_txmon_parse_user_desc_per_user(void *tx_tlv, uint32_t user_id,
+				   struct hal_tx_ppdu_info *ppdu_info)
+{
+	struct hal_txmon_user_desc_per_user usr_info = {0};
+
+	hal_txmon_get_user_desc_per_user(tx_tlv, &usr_info);
+
+	/* based on preamble type populate user desc user info */
+	if (TXMON_HAL_STATUS(ppdu_info, he_flags))
+		hal_txmon_populate_he_data_per_user(&usr_info,
+						    user_id, ppdu_info);
+
+	hal_txmon_populate_eht_sig_per_user(&usr_info, user_id, ppdu_info);
+}
+
+/**
+ * hal_txmon_get_user_desc_common() - update hal_txmon_usr_desc_common from tlv
+ *
+ * @tx_tlv: pointer to mactx_user_desc_common tlv
+ * @usr_common: pointer to hal_txmon_usr_desc_common
+ *
+ * Return: void
+ */
+static inline void
+hal_txmon_get_user_desc_common(void *tx_tlv,
+			       struct hal_txmon_usr_desc_common *usr_common)
+{
+	usr_common->ltf_size =
+		HAL_TX_DESC_GET_64(tx_tlv, MACTX_USER_DESC_COMMON, LTF_SIZE);
+	usr_common->pkt_extn_pe =
+		HAL_TX_DESC_GET_64(tx_tlv, MACTX_USER_DESC_COMMON,
+				   PACKET_EXTENSION_PE_DISAMBIGUITY);
+	usr_common->a_factor =
+		HAL_TX_DESC_GET_64(tx_tlv, MACTX_USER_DESC_COMMON,
+				   PACKET_EXTENSION_A_FACTOR);
+	usr_common->center_ru_0 =
+		HAL_TX_DESC_GET_64(tx_tlv, MACTX_USER_DESC_COMMON, CENTER_RU_0);
+	usr_common->center_ru_1 =
+		HAL_TX_DESC_GET_64(tx_tlv, MACTX_USER_DESC_COMMON, CENTER_RU_1);
+	usr_common->num_ltf_symbols =
+		HAL_TX_DESC_GET_64(tx_tlv, MACTX_USER_DESC_COMMON,
+				   NUM_LTF_SYMBOLS);
+	usr_common->doppler_indication =
+		HAL_TX_DESC_GET_64(tx_tlv, MACTX_USER_DESC_COMMON,
+				   DOPPLER_INDICATION);
+	usr_common->spatial_reuse =
+		HAL_TX_DESC_GET_64(tx_tlv, MACTX_USER_DESC_COMMON,
+				   SPATIAL_REUSE);
+
+	usr_common->ru_channel_0[0] =
+	HAL_TX_DESC_GET_64(tx_tlv, MACTX_USER_DESC_COMMON,
+			   RU_ALLOCATION_0123_DETAILS_RU_ALLOCATION_BAND0_0);
+	usr_common->ru_channel_0[1] =
+	HAL_TX_DESC_GET_64(tx_tlv, MACTX_USER_DESC_COMMON,
+			   RU_ALLOCATION_0123_DETAILS_RU_ALLOCATION_BAND0_1);
+	usr_common->ru_channel_0[2] =
+	HAL_TX_DESC_GET_64(tx_tlv, MACTX_USER_DESC_COMMON,
+			   RU_ALLOCATION_0123_DETAILS_RU_ALLOCATION_BAND0_2);
+	usr_common->ru_channel_0[3] =
+	HAL_TX_DESC_GET_64(tx_tlv, MACTX_USER_DESC_COMMON,
+			   RU_ALLOCATION_0123_DETAILS_RU_ALLOCATION_BAND0_3);
+	usr_common->ru_channel_0[4] =
+	HAL_TX_DESC_GET_64(tx_tlv, MACTX_USER_DESC_COMMON,
+			   RU_ALLOCATION_4567_DETAILS_RU_ALLOCATION_BAND0_0);
+	usr_common->ru_channel_0[5] =
+	HAL_TX_DESC_GET_64(tx_tlv, MACTX_USER_DESC_COMMON,
+			   RU_ALLOCATION_4567_DETAILS_RU_ALLOCATION_BAND0_1);
+	usr_common->ru_channel_0[6] =
+	HAL_TX_DESC_GET_64(tx_tlv, MACTX_USER_DESC_COMMON,
+			   RU_ALLOCATION_4567_DETAILS_RU_ALLOCATION_BAND0_2);
+	usr_common->ru_channel_0[7] =
+	HAL_TX_DESC_GET_64(tx_tlv, MACTX_USER_DESC_COMMON,
+			   RU_ALLOCATION_4567_DETAILS_RU_ALLOCATION_BAND0_3);
+
+	usr_common->ru_channel_1[0] =
+	HAL_TX_DESC_GET_64(tx_tlv, MACTX_USER_DESC_COMMON,
+			   RU_ALLOCATION_0123_DETAILS_RU_ALLOCATION_BAND1_0);
+	usr_common->ru_channel_1[1] =
+	HAL_TX_DESC_GET_64(tx_tlv, MACTX_USER_DESC_COMMON,
+			   RU_ALLOCATION_0123_DETAILS_RU_ALLOCATION_BAND1_1);
+	usr_common->ru_channel_1[2] =
+	HAL_TX_DESC_GET_64(tx_tlv, MACTX_USER_DESC_COMMON,
+			   RU_ALLOCATION_0123_DETAILS_RU_ALLOCATION_BAND1_2);
+	usr_common->ru_channel_1[3] =
+	HAL_TX_DESC_GET_64(tx_tlv, MACTX_USER_DESC_COMMON,
+			   RU_ALLOCATION_0123_DETAILS_RU_ALLOCATION_BAND1_3);
+	usr_common->ru_channel_1[4] =
+	HAL_TX_DESC_GET_64(tx_tlv, MACTX_USER_DESC_COMMON,
+			   RU_ALLOCATION_4567_DETAILS_RU_ALLOCATION_BAND1_0);
+	usr_common->ru_channel_1[5] =
+	HAL_TX_DESC_GET_64(tx_tlv, MACTX_USER_DESC_COMMON,
+			   RU_ALLOCATION_4567_DETAILS_RU_ALLOCATION_BAND1_1);
+	usr_common->ru_channel_1[6] =
+	HAL_TX_DESC_GET_64(tx_tlv, MACTX_USER_DESC_COMMON,
+			   RU_ALLOCATION_4567_DETAILS_RU_ALLOCATION_BAND1_2);
+	usr_common->ru_channel_1[7] =
+	HAL_TX_DESC_GET_64(tx_tlv, MACTX_USER_DESC_COMMON,
+			   RU_ALLOCATION_4567_DETAILS_RU_ALLOCATION_BAND1_3);
+}
+
+/**
+ * hal_txmon_populate_he_data_common() - populate he data common information
+ *
+ * @usr_common: pointer to hal_txmon_usr_desc_common
+ * @user_id: user index
+ * @ppdu_info: pointer to hal_tx_ppdu_info
+ *
+ * Return: void
+ */
+static inline void
+hal_txmon_populate_he_data_common(struct hal_txmon_usr_desc_common *usr_common,
+				  uint32_t user_id,
+				  struct hal_tx_ppdu_info *ppdu_info)
+{
+	/* HE data 1 */
+	TXMON_HAL_USER(ppdu_info,
+		       user_id, he_data1) |= QDF_MON_STATUS_HE_DOPPLER_KNOWN;
+
+	/* HE data 2 */
+	TXMON_HAL_USER(ppdu_info, user_id,
+		       he_data2) |= (QDF_MON_STATUS_PE_DISAMBIGUITY_KNOWN |
+				     QDF_MON_STATUS_LTF_SYMBOLS_KNOWN);
+
+	/* HE data 5 */
+	TXMON_HAL_USER(ppdu_info, user_id, he_data5) |=
+		(usr_common->pkt_extn_pe <<
+		 QDF_MON_STATUS_PE_DISAMBIGUITY_SHIFT) |
+		(usr_common->a_factor << QDF_MON_STATUS_PRE_FEC_PAD_SHIFT) |
+		((1 + usr_common->ltf_size) <<
+		 QDF_MON_STATUS_HE_LTF_SIZE_SHIFT) |
+		(usr_common->num_ltf_symbols <<
+		 QDF_MON_STATUS_HE_LTF_SYM_SHIFT);
+
+	/* HE data 6 */
+	TXMON_HAL_USER(ppdu_info, user_id,
+		       he_data6) |= (usr_common->doppler_indication <<
+				     QDF_MON_STATUS_DOPPLER_SHIFT);
+}
+
+/**
+ * hal_txmon_populate_he_mu_common() - populate he mu common information
+ *
+ * @usr_common: pointer to hal_txmon_usr_desc_common
+ * @user_id: user index
+ * @ppdu_info: pointer to hal_tx_ppdu_info
+ *
+ * Return: void
+ */
+static inline void
+hal_txmon_populate_he_mu_common(struct hal_txmon_usr_desc_common *usr_common,
+				uint32_t user_id,
+				struct hal_tx_ppdu_info *ppdu_info)
+{
+	uint16_t he_mu_flag_1 = 0;
+	uint16_t he_mu_flag_2 = 0;
+	uint16_t i = 0;
+
+	he_mu_flag_1 |= (QDF_MON_STATUS_CHANNEL_2_CENTER_26_RU_KNOWN |
+			 QDF_MON_STATUS_CHANNEL_1_CENTER_26_RU_KNOWN |
+			 ((usr_common->center_ru_0 <<
+			   QDF_MON_STATUS_CHANNEL_1_CENTER_26_RU_SHIFT) &
+			  QDF_MON_STATUS_CHANNEL_1_CENTER_26_RU_VALUE));
+	he_mu_flag_2 |= ((usr_common->center_ru_1 <<
+			  QDF_MON_STATUS_CHANNEL_2_CENTER_26_RU_SHIFT) &
+			 QDF_MON_STATUS_CHANNEL_2_CENTER_26_RU_VALUE);
+
+	for (i = 0; i < usr_common->num_users; i++) {
+		TXMON_HAL_USER(ppdu_info, i, he_flags1) |= he_mu_flag_1;
+		TXMON_HAL_USER(ppdu_info, i, he_flags2) |= he_mu_flag_2;
+
+		/* channel 1 */
+		TXMON_HAL_USER(ppdu_info, i, he_RU[0]) =
+					usr_common->ru_channel_0[0];
+		TXMON_HAL_USER(ppdu_info, i, he_RU[1]) =
+					usr_common->ru_channel_0[1];
+		TXMON_HAL_USER(ppdu_info, i, he_RU[2]) =
+					usr_common->ru_channel_0[2];
+		TXMON_HAL_USER(ppdu_info, i, he_RU[3]) =
+					usr_common->ru_channel_0[3];
+		/* channel 2 */
+		TXMON_HAL_USER(ppdu_info, i, he_RU[4]) =
+					usr_common->ru_channel_1[0];
+		TXMON_HAL_USER(ppdu_info, i, he_RU[5]) =
+					usr_common->ru_channel_1[1];
+		TXMON_HAL_USER(ppdu_info, i, he_RU[6]) =
+					usr_common->ru_channel_1[2];
+		TXMON_HAL_USER(ppdu_info, i, he_RU[7]) =
+					usr_common->ru_channel_1[3];
+	}
+}
+
+/**
+ * hal_txmon_populate_eht_sig_common() - populate eht sig common information
+ *
+ * @usr_common: pointer to hal_txmon_usr_desc_common
+ * @user_id: user index
+ * @ppdu_info: pointer to hal_tx_ppdu_info
+ *
+ * Return: void
+ */
+static inline void
+hal_txmon_populate_eht_sig_common(struct hal_txmon_usr_desc_common *usr_common,
+				  uint32_t user_id,
+				  struct hal_tx_ppdu_info *ppdu_info)
+{
+	uint32_t eht_known = 0;
+	uint32_t eht_data[9] = {0};
+	uint8_t num_ru_allocation_known = 0;
+	uint8_t i = 0;
+
+	eht_known = (QDF_MON_STATUS_EHT_SPATIAL_REUSE_KNOWN |
+		     QDF_MON_STATUS_EHT_EHT_LTF_KNOWN |
+		     QDF_MON_STATUS_EHT_PRE_FEC_PADDING_FACTOR_KNOWN |
+		     QDF_MON_STATUS_EHT_PE_DISAMBIGUITY_KNOWN |
+		     QDF_MON_STATUS_EHT_DISREARD_KNOWN);
+
+	eht_data[0] |= (usr_common->spatial_reuse <<
+			QDF_MON_STATUS_EHT_SPATIAL_REUSE_SHIFT);
+	eht_data[0] |= (usr_common->num_ltf_symbols <<
+			QDF_MON_STATUS_EHT_EHT_LTF_SHIFT);
+	eht_data[0] |= (usr_common->a_factor <<
+			QDF_MON_STATUS_EHT_PRE_FEC_PADDING_FACTOR_SHIFT);
+	eht_data[0] |= (usr_common->pkt_extn_pe <<
+			QDF_MON_STATUS_EHT_PE_DISAMBIGUITY_SHIFT);
+	eht_data[0] |= (0xF << QDF_MON_STATUS_EHT_DISREGARD_SHIFT);
+
+	switch (TXMON_HAL_STATUS(ppdu_info, bw)) {
+	case HAL_EHT_BW_320_2:
+	case HAL_EHT_BW_320_1:
+		num_ru_allocation_known += 4;
+
+		eht_data[3] |= (usr_common->ru_channel_0[7] <<
+				QDF_MON_STATUS_EHT_RU_ALLOCATION2_6_SHIFT);
+		eht_data[3] |= (usr_common->ru_channel_0[6] <<
+				QDF_MON_STATUS_EHT_RU_ALLOCATION2_5_SHIFT);
+		eht_data[3] |= (usr_common->ru_channel_0[5] <<
+				QDF_MON_STATUS_EHT_RU_ALLOCATION2_4_SHIFT);
+		eht_data[2] |= (usr_common->ru_channel_0[4] <<
+				QDF_MON_STATUS_EHT_RU_ALLOCATION2_3_SHIFT);
+		fallthrough;
+	case HAL_EHT_BW_160:
+		num_ru_allocation_known += 2;
+
+		eht_data[2] |= (usr_common->ru_channel_0[3] <<
+				QDF_MON_STATUS_EHT_RU_ALLOCATION2_2_SHIFT);
+		eht_data[2] |= (usr_common->ru_channel_0[2] <<
+				QDF_MON_STATUS_EHT_RU_ALLOCATION2_1_SHIFT);
+		fallthrough;
+	case HAL_EHT_BW_80:
+		num_ru_allocation_known += 1;
+
+		eht_data[1] |= (usr_common->ru_channel_0[1] <<
+				QDF_MON_STATUS_EHT_RU_ALLOCATION1_2_SHIFT);
+		fallthrough;
+	case HAL_EHT_BW_40:
+	case HAL_EHT_BW_20:
+		num_ru_allocation_known += 1;
+
+		eht_data[1] |= (usr_common->ru_channel_0[0] <<
+				QDF_MON_STATUS_EHT_RU_ALLOCATION1_1_SHIFT);
+		break;
+	default:
+		break;
+	}
+
+	eht_known |= (num_ru_allocation_known <<
+		      QDF_MON_STATUS_EHT_NUM_KNOWN_RU_ALLOCATIONS_SHIFT);
+
+	TXMON_HAL_STATUS(ppdu_info, eht_known) |= eht_known;
+
+	for (i = 0; i < 4; i++)
+		TXMON_HAL_STATUS(ppdu_info, eht_data[i]) |= eht_data[i];
+}
+
+/**
+ * hal_txmon_parse_user_desc_common() - parse mactx user desc common tlv
+ *
+ * @tx_tlv: pointer to mactx_user_desc_common tlv
+ * @user_id: user index
+ * @ppdu_info: pointer to hal_tx_ppdu_info
+ *
+ * Return: void
+ */
+static inline void
+hal_txmon_parse_user_desc_common(void *tx_tlv, uint32_t user_id,
+				 struct hal_tx_ppdu_info *ppdu_info)
+{
+	struct hal_txmon_usr_desc_common usr_common = {0};
+
+	usr_common.num_users = TXMON_HAL(ppdu_info, num_users);
+	hal_txmon_get_user_desc_common(tx_tlv, &usr_common);
+
+	TXMON_HAL_STATUS(ppdu_info,
+			 he_mu_flags) = IS_MULTI_USERS(usr_common.num_users);
+
+	switch (TXMON_HAL_STATUS(ppdu_info, preamble_type)) {
+	case TXMON_PKT_TYPE_11AX:
+		if (TXMON_HAL_STATUS(ppdu_info, he_flags))
+			hal_txmon_populate_he_data_common(&usr_common,
+							  user_id, ppdu_info);
+		if (TXMON_HAL_STATUS(ppdu_info, he_mu_flags))
+			hal_txmon_populate_he_mu_common(&usr_common,
+							user_id, ppdu_info);
+		break;
+	case TXMON_PKT_TYPE_11BE:
+		hal_txmon_populate_eht_sig_common(&usr_common,
+						  user_id, ppdu_info);
+		break;
+	}
+}
+
+/**
+ * hal_txmon_parse_eht_sig_non_mumimo_user_info() - parse eht sig non mumimo tlv
+ *
+ * @tx_tlv: pointer to hal_eht_sig_non_mu_mimo_user_info
+ * @user_id: user index
+ * @ppdu_info: pointer to hal_tx_ppdu_info
+ *
+ * Return: void
+ */
+static inline void
+hal_txmon_parse_eht_sig_non_mumimo_user_info(void *tx_tlv, uint32_t user_id,
+					     struct hal_tx_ppdu_info *ppdu_info)
+{
+	struct hal_eht_sig_non_mu_mimo_user_info *user_info;
+	uint32_t idx = TXMON_HAL_STATUS(ppdu_info, num_eht_user_info_valid);
+
+	user_info = (struct hal_eht_sig_non_mu_mimo_user_info *)tx_tlv;
+
+	TXMON_HAL_STATUS(ppdu_info, eht_user_info[idx]) |=
+		QDF_MON_STATUS_EHT_USER_STA_ID_KNOWN |
+		QDF_MON_STATUS_EHT_USER_MCS_KNOWN |
+		QDF_MON_STATUS_EHT_USER_CODING_KNOWN |
+		QDF_MON_STATUS_EHT_USER_NSS_KNOWN |
+		QDF_MON_STATUS_EHT_USER_BEAMFORMING_KNOWN;
+
+	TXMON_HAL_STATUS(ppdu_info, eht_user_info[idx]) |=
+				(user_info->sta_id <<
+				 QDF_MON_STATUS_EHT_USER_STA_ID_SHIFT);
+
+	TXMON_HAL_STATUS(ppdu_info, eht_user_info[idx]) |=
+				(user_info->mcs <<
+				 QDF_MON_STATUS_EHT_USER_MCS_SHIFT);
+
+	TXMON_HAL_STATUS(ppdu_info, mcs) = user_info->mcs;
+
+	TXMON_HAL_STATUS(ppdu_info, eht_user_info[idx]) |=
+				(user_info->nss <<
+				 QDF_MON_STATUS_EHT_USER_NSS_SHIFT);
+
+	TXMON_HAL_STATUS(ppdu_info, nss) = user_info->nss + 1;
+
+	TXMON_HAL_STATUS(ppdu_info, eht_user_info[idx]) |=
+				(user_info->beamformed <<
+				 QDF_MON_STATUS_EHT_USER_BEAMFORMING_SHIFT);
+
+	TXMON_HAL_STATUS(ppdu_info, eht_user_info[idx]) |=
+				(user_info->coding <<
+				 QDF_MON_STATUS_EHT_USER_CODING_SHIFT);
+
+	/* TODO: CRC */
+
+	TXMON_HAL_STATUS(ppdu_info, num_eht_user_info_valid) += 1;
+}
+
+/**
+ * hal_txmon_parse_eht_sig_mumimo_user_info() - parse eht sig mumimo tlv
+ *
+ * @tx_tlv: pointer to hal_eht_sig_mu_mimo_user_info
+ * @user_id: user index
+ * @ppdu_info: pointer to hal_tx_ppdu_info
+ *
+ * Return: void
+ */
+static inline void
+hal_txmon_parse_eht_sig_mumimo_user_info(void *tx_tlv, uint32_t user_id,
+					 struct hal_tx_ppdu_info *ppdu_info)
+{
+	struct hal_eht_sig_mu_mimo_user_info *user_info;
+	uint32_t idx = TXMON_HAL_STATUS(ppdu_info, num_eht_user_info_valid);
+
+	user_info = (struct hal_eht_sig_mu_mimo_user_info *)tx_tlv;
+
+	TXMON_HAL_STATUS(ppdu_info, eht_user_info[idx]) |=
+		QDF_MON_STATUS_EHT_USER_STA_ID_KNOWN |
+		QDF_MON_STATUS_EHT_USER_MCS_KNOWN |
+		QDF_MON_STATUS_EHT_USER_CODING_KNOWN |
+		QDF_MON_STATUS_EHT_USER_SPATIAL_CONFIG_KNOWN;
+
+	TXMON_HAL_STATUS(ppdu_info, eht_user_info[idx]) |=
+				(user_info->sta_id <<
+				 QDF_MON_STATUS_EHT_USER_STA_ID_SHIFT);
+
+	TXMON_HAL_STATUS(ppdu_info, eht_user_info[idx]) |=
+				(user_info->mcs <<
+				 QDF_MON_STATUS_EHT_USER_MCS_SHIFT);
+
+	TXMON_HAL_STATUS(ppdu_info, mcs) = user_info->mcs;
+
+	TXMON_HAL_STATUS(ppdu_info, eht_user_info[idx]) |=
+				(user_info->coding <<
+				 QDF_MON_STATUS_EHT_USER_CODING_SHIFT);
+
+	TXMON_HAL_STATUS(ppdu_info, eht_user_info[idx]) |=
+				(user_info->spatial_coding <<
+				 QDF_MON_STATUS_EHT_USER_SPATIAL_CONFIG_SHIFT);
+	/*  TODO: CRC */
+
+	TXMON_HAL_STATUS(ppdu_info, num_eht_user_info_valid) += 1;
 }
 
 /**
@@ -782,9 +1387,8 @@ hal_txmon_status_get_num_users_generic_be(void *tx_tlv_hdr, uint8_t *num_users)
 
 /**
  * hal_tx_get_ppdu_info() - api to get tx ppdu info
- * @pdev_handle: DP_PDEV handle
- * @prot_ppdu_info: populate dp_ppdu_info protection
- * @tx_data_ppdu_info: populate dp_ppdu_info data
+ * @data_info: populate dp_ppdu_info data
+ * @prot_info: populate dp_ppdu_info protection
  * @tlv_tag: Tag
  *
  * Return: dp_tx_ppdu_info pointer
@@ -1329,6 +1933,8 @@ hal_txmon_status_parse_tlv_generic_be(void *data_ppdu_info,
 		TXMON_HAL_STATUS(ppdu_info,
 				 ppdu_timestamp) = start_timestamp;
 
+		TXMON_HAL(ppdu_info, prot_tlv_status) = tlv_tag;
+
 		SHOW_DEFINED(WIFITX_FES_STATUS_PROT_E);
 		break;
 	}
@@ -1782,27 +2388,118 @@ hal_txmon_status_parse_tlv_generic_be(void *data_ppdu_info,
 
 	case WIFIMACTX_U_SIG_EHT_SU_MU_E:
 	{
+		struct hal_mon_usig_hdr *usig = NULL;
+		struct hal_mon_usig_mu *usig_mu = NULL;
+
+		usig = (struct hal_mon_usig_hdr *)tx_tlv;
+		usig_mu = &usig->usig_2.mu;
+
+		hal_txmon_parse_u_sig_hdr(tx_tlv, ppdu_info);
+
+		TXMON_HAL_STATUS(ppdu_info, usig_mask) |=
+			QDF_MON_STATUS_USIG_DISREGARD_KNOWN |
+			QDF_MON_STATUS_USIG_PPDU_TYPE_N_COMP_MODE_KNOWN |
+			QDF_MON_STATUS_USIG_VALIDATE_KNOWN |
+			QDF_MON_STATUS_USIG_MU_VALIDATE1_KNOWN |
+			QDF_MON_STATUS_USIG_MU_PUNCTURE_CH_INFO_KNOWN |
+			QDF_MON_STATUS_USIG_MU_VALIDATE2_KNOWN |
+			QDF_MON_STATUS_USIG_MU_EHT_SIG_MCS_KNOWN |
+			QDF_MON_STATUS_USIG_MU_NUM_EHT_SIG_SYM_KNOWN |
+			QDF_MON_STATUS_USIG_CRC_KNOWN |
+			QDF_MON_STATUS_USIG_TAIL_KNOWN;
+
+		TXMON_HAL_STATUS(ppdu_info, usig_value) |=
+			(0x1F << QDF_MON_STATUS_USIG_DISREGARD_SHIFT);
+		TXMON_HAL_STATUS(ppdu_info, usig_value) |=
+			(0x1 << QDF_MON_STATUS_USIG_MU_VALIDATE1_SHIFT);
+		TXMON_HAL_STATUS(ppdu_info, usig_value) |=
+			(usig_mu->ppdu_type_comp_mode <<
+			 QDF_MON_STATUS_USIG_PPDU_TYPE_N_COMP_MODE_SHIFT);
+		TXMON_HAL_STATUS(ppdu_info, usig_value) |=
+			(0x1 << QDF_MON_STATUS_USIG_VALIDATE_SHIFT);
+		TXMON_HAL_STATUS(ppdu_info, usig_value) |=
+			(usig_mu->punc_ch_info <<
+			 QDF_MON_STATUS_USIG_MU_PUNCTURE_CH_INFO_SHIFT);
+		TXMON_HAL_STATUS(ppdu_info, usig_value) |=
+			(0x1 << QDF_MON_STATUS_USIG_MU_VALIDATE2_SHIFT);
+		TXMON_HAL_STATUS(ppdu_info, usig_value) |=
+			(usig_mu->eht_sig_mcs <<
+			 QDF_MON_STATUS_USIG_MU_EHT_SIG_MCS_SHIFT);
+		TXMON_HAL_STATUS(ppdu_info, usig_value) |=
+			(usig_mu->num_eht_sig_sym <<
+			 QDF_MON_STATUS_USIG_MU_NUM_EHT_SIG_SYM_SHIFT);
+		TXMON_HAL_STATUS(ppdu_info, usig_value) |=
+			(usig_mu->crc << QDF_MON_STATUS_USIG_CRC_SHIFT);
+		TXMON_HAL_STATUS(ppdu_info, usig_value) |=
+			(usig_mu->tail << QDF_MON_STATUS_USIG_TAIL_SHIFT);
+
 		SHOW_DEFINED(WIFIMACTX_U_SIG_EHT_SU_MU_E);
 		break;
 	}
 	case WIFIMACTX_U_SIG_EHT_TB_E:
 	{
-		/* TODO: no radiotap info available */
+		struct hal_mon_usig_hdr *usig = NULL;
+		struct hal_mon_usig_tb *usig_tb = NULL;
+
+		usig = (struct hal_mon_usig_hdr *)tx_tlv;
+		usig_tb = &usig->usig_2.tb;
+
+		hal_txmon_parse_u_sig_hdr(tx_tlv, ppdu_info);
+
+		TXMON_HAL_STATUS(ppdu_info, usig_mask) |=
+			QDF_MON_STATUS_USIG_DISREGARD_KNOWN |
+			QDF_MON_STATUS_USIG_PPDU_TYPE_N_COMP_MODE_KNOWN |
+			QDF_MON_STATUS_USIG_VALIDATE_KNOWN |
+			QDF_MON_STATUS_USIG_TB_SPATIAL_REUSE_1_KNOWN |
+			QDF_MON_STATUS_USIG_TB_SPATIAL_REUSE_2_KNOWN |
+			QDF_MON_STATUS_USIG_TB_DISREGARD1_KNOWN |
+			QDF_MON_STATUS_USIG_CRC_KNOWN |
+			QDF_MON_STATUS_USIG_TAIL_KNOWN;
+
+		TXMON_HAL_STATUS(ppdu_info, usig_value) |=
+			(0x3F << QDF_MON_STATUS_USIG_DISREGARD_SHIFT);
+		TXMON_HAL_STATUS(ppdu_info, usig_value) |=
+			(usig_tb->ppdu_type_comp_mode <<
+			 QDF_MON_STATUS_USIG_PPDU_TYPE_N_COMP_MODE_SHIFT);
+		TXMON_HAL_STATUS(ppdu_info, usig_value) |=
+			(0x1 << QDF_MON_STATUS_USIG_VALIDATE_SHIFT);
+		TXMON_HAL_STATUS(ppdu_info, usig_value) |=
+			(usig_tb->spatial_reuse_1 <<
+			 QDF_MON_STATUS_USIG_TB_SPATIAL_REUSE_1_SHIFT);
+		TXMON_HAL_STATUS(ppdu_info, usig_value) |=
+			(usig_tb->spatial_reuse_2 <<
+			 QDF_MON_STATUS_USIG_TB_SPATIAL_REUSE_2_SHIFT);
+		TXMON_HAL_STATUS(ppdu_info, usig_value) |=
+			(0x1F << QDF_MON_STATUS_USIG_TB_DISREGARD1_SHIFT);
+		TXMON_HAL_STATUS(ppdu_info, usig_value) |=
+			(usig_tb->crc << QDF_MON_STATUS_USIG_CRC_SHIFT);
+		TXMON_HAL_STATUS(ppdu_info, usig_value) |=
+			(usig_tb->tail << QDF_MON_STATUS_USIG_TAIL_SHIFT);
+
 		SHOW_DEFINED(WIFIMACTX_U_SIG_EHT_TB_E);
 		break;
 	}
 	case WIFIMACTX_EHT_SIG_USR_OFDMA_E:
 	{
+		hal_txmon_parse_eht_sig_non_mumimo_user_info(tx_tlv, user_id,
+							     ppdu_info);
+		TXMON_HAL_STATUS(ppdu_info, eht_flags) = 1;
 		SHOW_DEFINED(WIFIMACTX_EHT_SIG_USR_OFDMA_E);
 		break;
 	}
 	case WIFIMACTX_EHT_SIG_USR_MU_MIMO_E:
 	{
+		hal_txmon_parse_eht_sig_mumimo_user_info(tx_tlv, user_id,
+							 ppdu_info);
+		TXMON_HAL_STATUS(ppdu_info, eht_flags) = 1;
 		SHOW_DEFINED(WIFIMACTX_EHT_SIG_USR_MU_MIMO_E);
 		break;
 	}
 	case WIFIMACTX_EHT_SIG_USR_SU_E:
 	{
+		hal_txmon_parse_eht_sig_non_mumimo_user_info(tx_tlv, user_id,
+							     ppdu_info);
+		TXMON_HAL_STATUS(ppdu_info, eht_flags) = 1;
 		SHOW_DEFINED(WIFIMACTX_EHT_SIG_USR_SU_E);
 		/* TODO: no radiotap info available */
 		break;
@@ -2214,7 +2911,8 @@ hal_txmon_status_parse_tlv_generic_be(void *data_ppdu_info,
 
 		TXMON_HAL_STATUS(ppdu_info, ofdm_flag) = 1;
 		TXMON_HAL_STATUS(ppdu_info, reception_type) = HAL_RX_TYPE_SU;
-		TXMON_HAL_STATUS(ppdu_info, l_sig_a_info) = *l_sig_a_info;
+		TXMON_HAL_STATUS(ppdu_info,
+				 l_sig_a_info) = *((uint32_t *)l_sig_a_info);
 
 		SHOW_DEFINED(WIFIMACTX_L_SIG_A_E);
 		break;
@@ -2449,244 +3147,14 @@ hal_txmon_status_parse_tlv_generic_be(void *data_ppdu_info,
 	}
 	case WIFIMACTX_USER_DESC_PER_USER_E:
 	{
-		/* user tlv */
-		uint32_t bf = 0;
-		uint32_t psdu_length = 0;
-		uint8_t ru_start_index = 0;
-		uint8_t ru_size = 0;
-		uint8_t nss = 0;
-		uint8_t mcs = 0;
-		uint8_t dcm = 0;
-		uint8_t fec_type = 0;
-		uint8_t is_ldpc_extra_symb = 0;
-		uint32_t he_data1 = TXMON_HAL_USER(ppdu_info, user_id,
-						   he_data1);
-		uint32_t he_data2 = TXMON_HAL_USER(ppdu_info, user_id,
-						   he_data2);
-		uint32_t he_data3 = TXMON_HAL_USER(ppdu_info, user_id,
-						   he_data3);
-		uint32_t he_data5 = TXMON_HAL_USER(ppdu_info, user_id,
-						   he_data5);
-		uint32_t he_data6 = TXMON_HAL_USER(ppdu_info, user_id,
-						   he_data6);
-
-		status = HAL_MON_MACTX_USER_DESC_PER_USER;
-
-		TXMON_HAL(ppdu_info, cur_usr_idx) = user_id;
-
-		psdu_length = HAL_TX_DESC_GET_64(tx_tlv,
-						 MACTX_USER_DESC_PER_USER,
-						 PSDU_LENGTH);
-		ru_start_index = HAL_TX_DESC_GET_64(tx_tlv,
-						    MACTX_USER_DESC_PER_USER,
-						    RU_START_INDEX);
-		ru_size = HAL_TX_DESC_GET_64(tx_tlv, MACTX_USER_DESC_PER_USER,
-					     RU_SIZE);
-		bf = HAL_TX_DESC_GET_64(tx_tlv, MACTX_USER_DESC_PER_USER,
-					USER_BF_TYPE);
-
-		nss = HAL_TX_DESC_GET_64(tx_tlv,
-					 MACTX_USER_DESC_PER_USER, NSS) + 1;
-		mcs = HAL_TX_DESC_GET_64(tx_tlv, MACTX_USER_DESC_PER_USER, MCS);
-		dcm = HAL_TX_DESC_GET_64(tx_tlv, MACTX_USER_DESC_PER_USER, DCM);
-		fec_type = HAL_TX_DESC_GET_64(tx_tlv, MACTX_USER_DESC_PER_USER,
-					      FEC_TYPE);
-		is_ldpc_extra_symb =
-			HAL_TX_DESC_GET_64(tx_tlv, MACTX_USER_DESC_PER_USER,
-					   LDPC_EXTRA_SYMBOL);
-
-		if (!TXMON_HAL_STATUS(ppdu_info, he_flags))
-			break;
-
-		/* update */
-		/* BEAM CHANGE */
-		he_data1 |= QDF_MON_STATUS_HE_BEAM_CHANGE_KNOWN;
-		he_data1 |= QDF_MON_STATUS_TXBF_KNOWN;
-		he_data5 |= (!!bf << QDF_MON_STATUS_TXBF_SHIFT);
-		he_data3 |= (!!bf << QDF_MON_STATUS_BEAM_CHANGE_SHIFT);
-
-		/* UL/DL known */
-		he_data1 |= QDF_MON_STATUS_HE_DL_UL_KNOWN;
-		he_data3 |= (1 << QDF_MON_STATUS_DL_UL_SHIFT);
-
-		/* MCS */
-		he_data1 |= QDF_MON_STATUS_HE_MCS_KNOWN;
-		he_data3 |= (mcs << QDF_MON_STATUS_TRANSMIT_MCS_SHIFT);
-		/* DCM */
-		he_data1 |= QDF_MON_STATUS_HE_DCM_KNOWN;
-		he_data3 |= (dcm << QDF_MON_STATUS_DCM_SHIFT);
-		/* LDPC EXTRA SYMB */
-		he_data1 |= QDF_MON_STATUS_HE_LDPC_EXTRA_SYMBOL_KNOWN;
-		he_data3 |= (is_ldpc_extra_symb <<
-			     QDF_MON_STATUS_LDPC_EXTRA_SYMBOL_SHIFT);
-		/* RU offset and RU */
-		he_data2 |= QDF_MON_STATUS_RU_ALLOCATION_OFFSET_KNOWN;
-		he_data2 |= (get_ru_offset_from_start_index(ru_size,
-							    ru_start_index) <<
-			     QDF_MON_STATUS_RU_ALLOCATION_SHIFT);
-
-		/* Data BW and RU allocation */
-		if (ru_size < HAL_MAX_RU_INDEX) {
-			/* update bandwidth if it is full bandwidth */
-			he_data1 |= QDF_MON_STATUS_HE_DATA_BW_RU_KNOWN;
-			he_data5 = (he_data5 & 0xFFF0) | (4 + ru_size);
-		}
-
-		he_data6 |= (nss & 0xF);
-		TXMON_HAL_USER(ppdu_info, user_id, mcs) = mcs;
-
-		/* update stack variable to ppdu_info */
-		TXMON_HAL_USER(ppdu_info, user_id, he_data1) = he_data1;
-		TXMON_HAL_USER(ppdu_info, user_id, he_data2) = he_data2;
-		TXMON_HAL_USER(ppdu_info, user_id, he_data3) = he_data3;
-		TXMON_HAL_USER(ppdu_info, user_id, he_data5) = he_data5;
-		TXMON_HAL_USER(ppdu_info, user_id, he_data6) = he_data6;
+		hal_txmon_parse_user_desc_per_user(tx_tlv, user_id, ppdu_info);
 
 		SHOW_DEFINED(WIFIMACTX_USER_DESC_PER_USER_E);
 		break;
 	}
 	case WIFIMACTX_USER_DESC_COMMON_E:
 	{
-		uint16_t he_mu_flag_1 = 0;
-		uint16_t he_mu_flag_2 = 0;
-		uint16_t ru_channel_1[4] = {0};
-		uint16_t ru_channel_2[4] = {0};
-		uint16_t num_users = 0;
-		uint8_t doppler;
-		uint8_t ltf_size;
-		uint8_t num_ltf_symbols;
-		uint8_t pkt_extn_pe;
-		uint8_t a_factor;
-		uint8_t center_ru_0;
-		uint8_t center_ru_1;
-		uint8_t i = 0;
-
-		num_users = TXMON_HAL(ppdu_info, num_users);
-
-		doppler = HAL_TX_DESC_GET_64(tx_tlv,
-					     MACTX_USER_DESC_COMMON,
-					     DOPPLER_INDICATION);
-
-		ltf_size = HAL_TX_DESC_GET_64(tx_tlv,
-					      MACTX_USER_DESC_COMMON,
-					      LTF_SIZE);
-
-		num_ltf_symbols = HAL_TX_DESC_GET_64(tx_tlv,
-						     MACTX_USER_DESC_COMMON,
-						     NUM_DATA_SYMBOLS);
-
-		pkt_extn_pe = HAL_TX_DESC_GET_64(tx_tlv,
-						 MACTX_USER_DESC_COMMON,
-						 PACKET_EXTENSION_PE_DISAMBIGUITY);
-
-		a_factor = HAL_TX_DESC_GET_64(tx_tlv,
-					      MACTX_USER_DESC_COMMON,
-					      PACKET_EXTENSION_A_FACTOR);
-
-		center_ru_0 = HAL_TX_DESC_GET_64(tx_tlv,
-						 MACTX_USER_DESC_COMMON,
-						 CENTER_RU_0);
-
-		center_ru_1 = HAL_TX_DESC_GET_64(tx_tlv,
-						 MACTX_USER_DESC_COMMON,
-						 CENTER_RU_1);
-
-		ru_channel_1[0] = HAL_TX_DESC_GET_64(tx_tlv,
-						     MACTX_USER_DESC_COMMON,
-						     RU_ALLOCATION_0123_DETAILS_RU_ALLOCATION_BAND0_0);
-		ru_channel_1[1] = HAL_TX_DESC_GET_64(tx_tlv,
-						     MACTX_USER_DESC_COMMON,
-						     RU_ALLOCATION_0123_DETAILS_RU_ALLOCATION_BAND0_1);
-		ru_channel_1[2] = HAL_TX_DESC_GET_64(tx_tlv,
-						     MACTX_USER_DESC_COMMON,
-						     RU_ALLOCATION_0123_DETAILS_RU_ALLOCATION_BAND0_2);
-		ru_channel_1[3] = HAL_TX_DESC_GET_64(tx_tlv,
-						     MACTX_USER_DESC_COMMON,
-						     RU_ALLOCATION_0123_DETAILS_RU_ALLOCATION_BAND0_3);
-
-		ru_channel_2[0] = HAL_TX_DESC_GET_64(tx_tlv,
-						     MACTX_USER_DESC_COMMON,
-						     RU_ALLOCATION_0123_DETAILS_RU_ALLOCATION_BAND1_0);
-		ru_channel_2[1] = HAL_TX_DESC_GET_64(tx_tlv,
-						     MACTX_USER_DESC_COMMON,
-						     RU_ALLOCATION_0123_DETAILS_RU_ALLOCATION_BAND1_1);
-		ru_channel_2[2] = HAL_TX_DESC_GET_64(tx_tlv,
-						     MACTX_USER_DESC_COMMON,
-						     RU_ALLOCATION_0123_DETAILS_RU_ALLOCATION_BAND1_2);
-		ru_channel_2[3] = HAL_TX_DESC_GET_64(tx_tlv,
-						     MACTX_USER_DESC_COMMON,
-						     RU_ALLOCATION_0123_DETAILS_RU_ALLOCATION_BAND1_3);
-
-		/* HE data 1 */
-		TXMON_HAL_USER(ppdu_info, user_id, he_data1) |=
-					QDF_MON_STATUS_HE_DOPPLER_KNOWN;
-
-		/* HE data 2 */
-		TXMON_HAL_USER(ppdu_info, user_id, he_data2) |=
-					QDF_MON_STATUS_PE_DISAMBIGUITY_KNOWN |
-					QDF_MON_STATUS_LTF_SYMBOLS_KNOWN;
-
-		/* HE data 5 */
-		TXMON_HAL_USER(ppdu_info, user_id, he_data5) |=
-				(pkt_extn_pe <<
-				 QDF_MON_STATUS_PE_DISAMBIGUITY_SHIFT) |
-				(a_factor << QDF_MON_STATUS_PRE_FEC_PAD_SHIFT) |
-				((1 + ltf_size) <<
-				 QDF_MON_STATUS_HE_LTF_SIZE_SHIFT) |
-				(num_ltf_symbols <<
-				 QDF_MON_STATUS_HE_LTF_SYM_SHIFT);
-
-		/* HE data 6 */
-		TXMON_HAL_USER(ppdu_info, user_id, he_data6) |=
-				(doppler << QDF_MON_STATUS_DOPPLER_SHIFT);
-
-		/* number of symbol */
-		he_mu_flag_1 |=
-			(QDF_MON_STATUS_CHANNEL_2_CENTER_26_RU_KNOWN |
-			 QDF_MON_STATUS_CHANNEL_1_CENTER_26_RU_KNOWN |
-			 ((center_ru_0 <<
-			   QDF_MON_STATUS_CHANNEL_1_CENTER_26_RU_SHIFT) &
-			  QDF_MON_STATUS_CHANNEL_1_CENTER_26_RU_VALUE));
-
-		he_mu_flag_2 |= ((center_ru_1 <<
-				  QDF_MON_STATUS_CHANNEL_2_CENTER_26_RU_SHIFT) &
-				 QDF_MON_STATUS_CHANNEL_2_CENTER_26_RU_VALUE);
-
-		TXMON_HAL_STATUS(ppdu_info,
-				 he_mu_flags) = IS_MULTI_USERS(num_users);
-		for (i = 0; i < num_users; i++) {
-			TXMON_HAL_USER(ppdu_info, i, he_flags1) |= he_mu_flag_1;
-			TXMON_HAL_USER(ppdu_info, i, he_flags2) |= he_mu_flag_2;
-
-			/* channel 1 */
-			TXMON_HAL_USER(ppdu_info, i,
-				       he_RU[0]) = ru_channel_1[0];
-			TXMON_HAL_USER(ppdu_info, i,
-				       he_RU[1]) = ru_channel_1[1];
-			TXMON_HAL_USER(ppdu_info, i,
-				       he_RU[2]) = ru_channel_1[2];
-			TXMON_HAL_USER(ppdu_info, i,
-				       he_RU[3]) = ru_channel_1[3];
-			/* channel 2 */
-			TXMON_HAL_USER(ppdu_info, i,
-				       he_RU[4]) = ru_channel_2[0];
-			TXMON_HAL_USER(ppdu_info, i,
-				       he_RU[5]) = ru_channel_2[1];
-			TXMON_HAL_USER(ppdu_info, i,
-				       he_RU[6]) = ru_channel_2[2];
-			TXMON_HAL_USER(ppdu_info, i,
-				       he_RU[7]) = ru_channel_2[3];
-		}
-		/* channel 1 */
-		TXMON_HAL_STATUS(ppdu_info, he_RU[0]) = ru_channel_1[0];
-		TXMON_HAL_STATUS(ppdu_info, he_RU[1]) = ru_channel_1[1];
-		TXMON_HAL_STATUS(ppdu_info, he_RU[2]) = ru_channel_1[2];
-		TXMON_HAL_STATUS(ppdu_info, he_RU[3]) = ru_channel_1[3];
-		/* channel 2 */
-		TXMON_HAL_STATUS(ppdu_info, he_RU[4]) = ru_channel_2[0];
-		TXMON_HAL_STATUS(ppdu_info, he_RU[5]) = ru_channel_2[1];
-		TXMON_HAL_STATUS(ppdu_info, he_RU[6]) = ru_channel_2[2];
-		TXMON_HAL_STATUS(ppdu_info, he_RU[7]) = ru_channel_2[3];
+		hal_txmon_parse_user_desc_common(tx_tlv, user_id, ppdu_info);
 
 		/* copy per user info to all user */
 		SHOW_DEFINED(WIFIMACTX_USER_DESC_COMMON_E);
@@ -2711,6 +3179,7 @@ hal_txmon_status_parse_tlv_generic_be(void *data_ppdu_info,
 		uint16_t num_users = 0;
 		uint8_t i = 0;
 
+		SHOW_DEFINED(WIFIMACTX_PHY_DESC_E);
 		status = HAL_MON_MACTX_PHY_DESC;
 
 		num_users = TXMON_HAL(ppdu_info, num_users);
@@ -2810,8 +3279,6 @@ hal_txmon_status_parse_tlv_generic_be(void *data_ppdu_info,
 			TXMON_HAL_USER(ppdu_info, i, he_flags1) |= he_mu_flag_1;
 			TXMON_HAL_USER(ppdu_info, i, he_flags2) |= he_mu_flag_2;
 		}
-
-		SHOW_DEFINED(WIFIMACTX_PHY_DESC_E);
 		break;
 	}
 	case WIFICOEX_RX_STATUS_E:
@@ -2966,11 +3433,12 @@ static void hal_reo_shared_qaddr_write_be(hal_soc_handle_t hal_soc_hdl,
 }
 
 /**
- * hal_reo_shared_qaddr_setup() - Allocate MLO and Non MLO reo queue
+ * hal_reo_shared_qaddr_setup_be() - Allocate MLO and Non MLO reo queue
  * reference table shared between SW and HW and initialize in Qdesc Base0
  * base1 registers provided by HW.
  *
- * @hal_soc: HAL Soc handle
+ * @hal_soc_hdl: HAL Soc handle
+ * @reo_qref: REO queue reference table
  *
  * Return: QDF_STATUS_SUCCESS on success else a QDF error.
  */
@@ -3019,10 +3487,10 @@ hal_reo_shared_qaddr_setup_be(hal_soc_handle_t hal_soc_hdl,
 }
 
 /**
- * hal_reo_shared_qaddr_init() - Zero out REO qref LUT and
+ * hal_reo_shared_qaddr_init_be() - Zero out REO qref LUT and
  * write start addr of MLO and Non MLO table in HW
  *
- * @hal_soc: HAL Soc handle
+ * @hal_soc_hdl: HAL Soc handle
  * @qref_reset: reset qref LUT
  *
  * Return: None
@@ -3059,10 +3527,10 @@ static void hal_reo_shared_qaddr_init_be(hal_soc_handle_t hal_soc_hdl,
 }
 
 /**
- * hal_reo_shared_qaddr_detach() - Free MLO and Non MLO reo queue
+ * hal_reo_shared_qaddr_detach_be() - Free MLO and Non MLO reo queue
  * reference table shared between SW and HW
  *
- * @hal_soc: HAL Soc handle
+ * @hal_soc_hdl: HAL Soc handle
  *
  * Return: None
  */
@@ -3080,8 +3548,8 @@ static void hal_reo_shared_qaddr_detach_be(hal_soc_handle_t hal_soc_hdl)
 #endif
 
 /**
- * hal_tx_vdev_mismatch_routing_set - set vdev mismatch exception routing
- * @hal_soc: HAL SoC context
+ * hal_tx_vdev_mismatch_routing_set_generic_be() - set vdev mismatch exception routing
+ * @hal_soc_hdl: HAL SoC context
  * @config: HAL_TX_VDEV_MISMATCH_TQM_NOTIFY - route via TQM
  *          HAL_TX_VDEV_MISMATCH_FW_NOTIFY - route via FW
  *
@@ -3120,8 +3588,8 @@ hal_tx_vdev_mismatch_routing_set_generic_be(hal_soc_handle_t hal_soc_hdl,
 #endif
 
 /**
- * hal_tx_mcast_mlo_reinject_routing_set - set MLO multicast reinject routing
- * @hal_soc: HAL SoC context
+ * hal_tx_mcast_mlo_reinject_routing_set_generic_be() - set MLO multicast reinject routing
+ * @hal_soc_hdl: HAL SoC context
  * @config: HAL_TX_MCAST_MLO_REINJECT_FW_NOTIFY - route via FW
  *          HAL_TX_MCAST_MLO_REINJECT_TQM_NOTIFY - route via TQM
  *
@@ -3159,9 +3627,9 @@ hal_tx_mcast_mlo_reinject_routing_set_generic_be(
 #endif
 
 /**
- * hal_get_ba_aging_timeout_be - Get BA Aging timeout
+ * hal_get_ba_aging_timeout_be_generic() - Get BA Aging timeout
  *
- * @hal_soc: Opaque HAL SOC handle
+ * @hal_soc_hdl: Opaque HAL SOC handle
  * @ac: Access category
  * @value: window size to get
  */
@@ -3203,7 +3671,7 @@ void hal_get_ba_aging_timeout_be_generic(hal_soc_handle_t hal_soc_hdl,
  * hal_setup_link_idle_list_generic_be - Setup scattered idle list using the
  * buffer list provided
  *
- * @hal_soc: Opaque HAL SOC handle
+ * @soc: Opaque HAL SOC handle
  * @scatter_bufs_base_paddr: Array of physical base addresses
  * @scatter_bufs_base_vaddr: Array of virtual base addresses
  * @num_scatter_bufs: Number of scatter buffers in the above lists
@@ -3355,7 +3823,7 @@ hal_setup_link_idle_list_generic_be(struct hal_soc *soc,
 /**
  * hal_cookie_conversion_reg_cfg_generic_be() - set cookie conversion relevant register
  *					for REO/WBM
- * @soc: HAL soc handle
+ * @hal_soc_hdl: HAL soc handle
  * @cc_cfg: structure pointer for HW cookie conversion configuration
  *
  * Return: None
@@ -3486,9 +3954,8 @@ void hal_cookie_conversion_reg_cfg_generic_be(hal_soc_handle_t hal_soc_hdl,
 }
 
 /**
- * hal_set_ba_aging_timeout_be - Set BA Aging timeout
- *
- * @hal_soc: Opaque HAL SOC handle
+ * hal_set_ba_aging_timeout_be_generic() - Set BA Aging timeout
+ * @hal_soc_hdl: Opaque HAL SOC handle
  * @ac: Access category
  * ac: 0 - Background, 1 - Best Effort, 2 - Video, 3 - Voice
  * @value: Input value to set
@@ -3531,9 +3998,9 @@ void hal_set_ba_aging_timeout_be_generic(hal_soc_handle_t hal_soc_hdl,
 }
 
 /**
- * hal_tx_populate_bank_register() - populate the bank register with
+ * hal_tx_populate_bank_register_be() - populate the bank register with
  *		the software configs.
- * @soc: HAL soc handle
+ * @hal_soc_hdl: HAL soc handle
  * @config: bank config
  * @bank_id: bank id to be configured
  *
@@ -3626,8 +4093,9 @@ hal_tx_populate_bank_register_be(hal_soc_handle_t hal_soc_hdl,
 #define HAL_TCL_VDEV_MCAST_PACKET_CTRL_SHIFT 0x2
 
 /**
- * hal_tx_vdev_mcast_ctrl_set - set mcast_ctrl value
- * @hal_soc: HAL SoC context
+ * hal_tx_vdev_mcast_ctrl_set_be() - set mcast_ctrl value
+ * @hal_soc_hdl: HAL SoC context
+ * @vdev_id: vdev identifier
  * @mcast_ctrl_val: mcast ctrl value for this VAP
  *
  * Return: void

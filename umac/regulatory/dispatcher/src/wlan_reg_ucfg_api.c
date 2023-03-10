@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2017-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  *
  * Permission to use, copy, modify, and/or distribute this software for
@@ -18,9 +18,9 @@
  * PERFORMANCE OF THIS SOFTWARE.
  */
 
- /**
- * @file wlan_req_ucfg_api.c
- * @brief contains regulatory user config interface definitions
+/**
+ * DOC: wlan_req_ucfg_api.c
+ *      contains regulatory user config interface definitions
  */
 
 #include <wlan_objmgr_vdev_obj.h>
@@ -29,6 +29,7 @@
 #include <../../core/src/reg_priv_objs.h>
 #include <../../core/src/reg_utils.h>
 #include <../../core/src/reg_services_common.h>
+#include <../../core/src/reg_opclass.h>
 #include <../../core/src/reg_lte.h>
 #include <../../core/src/reg_offload_11d_scan.h>
 #include <../../core/src/reg_build_chan_list.h>
@@ -133,28 +134,12 @@ QDF_STATUS ucfg_reg_get_band(struct wlan_objmgr_pdev *pdev,
 	return reg_get_band(pdev, band_bitmap);
 }
 
-/**
- * ucfg_reg_notify_sap_event() - Notify regulatory domain for sap event
- * @pdev: The physical dev to set the band for
- * @sap_state: true for sap start else false
- *
- * Return: QDF_STATUS
- */
 QDF_STATUS ucfg_reg_notify_sap_event(struct wlan_objmgr_pdev *pdev,
-			bool sap_state)
+				     bool sap_state)
 {
 	return reg_notify_sap_event(pdev, sap_state);
 }
 
-/**
- * ucfg_reg_set_fcc_constraint() - apply fcc constraints on channels 12/13
- * @pdev: The physical pdev to reduce tx power for
- *
- * This function adjusts the transmit power on channels 12 and 13, to comply
- * with FCC regulations in the USA.
- *
- * Return: QDF_STATUS
- */
 QDF_STATUS ucfg_reg_set_fcc_constraint(struct wlan_objmgr_pdev *pdev,
 				       bool fcc_constraint)
 {
@@ -167,13 +152,6 @@ QDF_STATUS ucfg_reg_get_current_country(struct wlan_objmgr_psoc *psoc,
 	return reg_read_current_country(psoc, country_code);
 }
 
-/**
- * ucfg_reg_set_default_country() - Set the default regulatory country
- * @psoc: The physical SoC to set default country for
- * @country: The country information to configure
- *
- * Return: QDF_STATUS
- */
 QDF_STATUS ucfg_reg_set_default_country(struct wlan_objmgr_psoc *psoc,
 					uint8_t *country)
 {
@@ -181,49 +159,23 @@ QDF_STATUS ucfg_reg_set_default_country(struct wlan_objmgr_psoc *psoc,
 }
 #endif
 
-/**
- * ucfg_reg_get_default_country() - Get the default regulatory country
- * @psoc: The physical SoC to get default country from
- * @country_code: the buffer to populate the country code into
- *
- * Return: QDF_STATUS
- */
 QDF_STATUS ucfg_reg_get_default_country(struct wlan_objmgr_psoc *psoc,
 					uint8_t *country_code)
 {
 	return reg_read_default_country(psoc, country_code);
 }
 
-/**
- * ucfg_reg_set_country() - Set the current regulatory country
- * @pdev: The physical dev to set current country for
- * @country: The country information to configure
- *
- * Return: QDF_STATUS
- */
 QDF_STATUS ucfg_reg_set_country(struct wlan_objmgr_pdev *pdev,
 				uint8_t *country)
 {
 	return reg_set_country(pdev, country);
 }
 
-/**
- * ucfg_reg_reset_country() - Reset the regulatory country to default
- * @psoc: The physical SoC to reset country for
- *
- * Return: QDF_STATUS
- */
 QDF_STATUS ucfg_reg_reset_country(struct wlan_objmgr_psoc *psoc)
 {
 	return reg_reset_country(psoc);
 }
 
-/**
- * ucfg_reg_enable_dfs_channels() - Enable the use of DFS channels
- * @pdev: The physical dev to enable DFS channels for
- *
- * Return: QDF_STATUS
- */
 QDF_STATUS ucfg_reg_enable_dfs_channels(struct wlan_objmgr_pdev *pdev,
 					bool dfs_enable)
 {
@@ -358,14 +310,6 @@ qdf_export_symbol(ucfg_reg_update_hal_reg_cap);
 
 #ifdef DISABLE_CHANNEL_LIST
 #ifdef CONFIG_CHAN_FREQ_API
-/**
- * ucfg_reg_cache_channel_freq_state() - Cache the current state of the channels
- * based of the channel center frequency.
- * @pdev: The physical dev to cache the channels for
- * @channel_list: List of the channels for which states needs to be cached
- * @num_channels: Number of channels in the list
- *
- */
 void ucfg_reg_cache_channel_freq_state(struct wlan_objmgr_pdev *pdev,
 				       uint32_t *channel_list,
 				       uint32_t num_channels)
@@ -490,5 +434,19 @@ QDF_STATUS
 ucfg_reg_afc_start(struct wlan_objmgr_pdev *pdev, uint64_t req_id)
 {
 	return reg_afc_start(pdev, req_id);
+}
+#endif
+
+#ifndef CONFIG_REG_CLIENT
+QDF_STATUS ucfg_reg_enable_disable_opclass_chans(struct wlan_objmgr_pdev *pdev,
+						 bool is_disable,
+						 uint8_t opclass,
+						 uint8_t *ieee_chan_list,
+						 uint8_t chan_list_size,
+						 bool global_tbl_lookup)
+{
+	return reg_enable_disable_opclass_chans(pdev, is_disable, opclass,
+						ieee_chan_list, chan_list_size,
+						global_tbl_lookup);
 }
 #endif

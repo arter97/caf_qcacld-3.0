@@ -16,9 +16,10 @@
  * TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
  * PERFORMANCE OF THIS SOFTWARE.
  */
+
 /**
- * @file cdp_txrx_ops.h
- * @brief Define the host data path converged API functions
+ * DOC: cdp_txrx_ops.h
+ * Define the host data path converged API functions
  * called by the host control SW and the OS interface module
  */
 #ifndef _CDP_TXRX_CMN_OPS_H_
@@ -41,14 +42,14 @@
 #endif
 #endif
 
-/**
+/*
  * bitmap values to indicate special handling of peer_delete
  */
 #define CDP_PEER_DELETE_NO_SPECIAL             0
 #define CDP_PEER_DO_NOT_START_UNMAP_TIMER      1
 
 struct hif_opaque_softc;
-/**
+/*
  * cdp_ctrl_mlo_mgr - opaque handle for mlo manager context
  */
 struct cdp_ctrl_mlo_mgr;
@@ -66,19 +67,15 @@ enum cdp_nac_param_cmd {
 
 /**
  * enum cdp_tx_filter_action - TX peer filtering action
- * @CDP_TX_FILTER_ACTION_ADD: add peer
- * @CDP_TX_FILTER_ACTION_DEL: delete peer
- *
- * whether add or delete
+ * @CDP_TX_FILTER_ACTION_ADD: add peer mac address
+ * @CDP_TX_FILTER_ACTION_DEL: delete peer mac address
+ * @CDP_TX_FILTER_ACTION_ENABLE_FILTERING: Enable Tx peer filtering
+ * @CDP_TX_FILTER_ACTION_CLEAR_FILTERING: Clear Tx peer filtering
  */
 enum cdp_tx_filter_action {
-	/* add peer mac address*/
 	CDP_TX_FILTER_ACTION_ADD = 1,
-	/* delete peer mac address */
 	CDP_TX_FILTER_ACTION_DEL,
-	/* Enable Tx peer filtering */
 	CDP_TX_FILTER_ACTION_ENABLE_FILTERING,
-	/* Clear Tx peer filtering */
 	CDP_TX_FILTER_ACTION_CLEAR_FILTERING,
 };
 
@@ -133,6 +130,7 @@ enum vdev_ll_conn_actions {
  * @CDP_PEER_TXQ_FLUSH_POLICY_NONE: No flush policy configured
  * @CDP_PEER_TXQ_FLUSH_POLICY_IMMEDIATE: Flush peer TX TID queue(s) immediately
  * @CDP_PEER_TXQ_FLUSH_POLICY_TWT_SP_END: Flush peer TX TID queue(s) at SP end
+ * @CDP_PEER_TXQ_FLUSH_POLICY_INVALID: Invalid policy
  *
  * This is used to map the 'flush_policy' in WMI_PEER_FLUSH_POLICY_CMDID
  */
@@ -145,10 +143,13 @@ enum cdp_peer_txq_flush_policy {
 	CDP_PEER_TXQ_FLUSH_POLICY_INVALID,
 };
 
+#if defined(WLAN_FEATURE_11BE_MLO) && defined(WLAN_MLO_MULTI_CHIP)
 /**
  * struct cdp_mlo_ops - MLO ops for multichip
  * @mlo_soc_setup: setup DP mlo for SOC
  * @mlo_soc_teardown: teardown DP mlo for SOC
+ * @update_mlo_ptnr_list:
+ * @clear_mlo_ptnr_list:
  * @mlo_setup_complete: indication to DP that all SOCs mlo is setup
  * @mlo_update_delta_tsf2: update delta tsf2 for link
  * @mlo_update_delta_tqm: update delta tqm for SOC
@@ -156,7 +157,6 @@ enum cdp_peer_txq_flush_policy {
  * @mlo_ctxt_attach: Attach DP MLO context
  * @mlo_ctxt_detach: Detach DP MLO context
  */
-#if defined(WLAN_FEATURE_11BE_MLO) && defined(WLAN_MLO_MULTI_CHIP)
 struct cdp_mlo_ops {
 	void (*mlo_soc_setup)(struct cdp_soc_t *cdp_soc,
 			      struct cdp_mlo_ctxt *mlo_ctxt);
@@ -972,10 +972,19 @@ struct cdp_me_ops {
  * @txrx_deliver_tx_mgmt: deliver mgmt tx frame
  * @txrx_set_advance_monitor_filter: set advanced monitor mode
  * @config_full_mon_mode: configure full monitor mode
+ * @soc_config_full_mon_mode: pdev configure full monitor mode
+ * @get_mon_pdev_rx_stats: Get monitor mode pdev stats
  * @txrx_enable_mon_reap_timer: Enable/Disable reap timer of monitor status ring
+ * @txrx_set_lite_mon_config:  set lite monitor config
+ * @txrx_get_lite_mon_config:  get lite monitor config
+ * @txrx_set_lite_mon_peer_config: set lite monitor peer config
+ * @txrx_get_lite_mon_peer_config: get lite monitor peer list
+ * @txrx_is_lite_mon_enabled: get lite monitor enable/disable status
  * @txrx_get_lite_mon_legacy_feature_enabled: returns the legacy filter enabled
+ * @txrx_set_mon_pdev_params_rssi_dbm_conv: To set RSSI dbm conversion params
+ *                                           in monitor pdev
  * @txrx_update_pdev_mon_telemetry_airtime_stats: update telemetry airtime
- * stats in monitor pdev
+ *                                                stats in monitor pdev
  */
 struct cdp_mon_ops {
 
@@ -985,57 +994,48 @@ struct cdp_mon_ops {
 	QDF_STATUS (*txrx_deliver_tx_mgmt)
 		(struct cdp_soc_t *cdp_soc, uint8_t pdev_id, qdf_nbuf_t nbuf);
 
-	/* HK advance monitor filter support */
 	QDF_STATUS (*txrx_set_advance_monitor_filter)
 		(struct cdp_soc_t *soc_hdl, uint8_t pdev_id,
 		 struct cdp_monitor_filter *filter_val);
 
-	/* Configure full monitor mode */
 	QDF_STATUS
 		(*config_full_mon_mode)(struct cdp_soc_t *soc, uint8_t val);
 	QDF_STATUS (*soc_config_full_mon_mode)(struct cdp_pdev *cdp_pdev,
 					       uint8_t val);
 
-	/* Get monitor mode pdev stats */
 	QDF_STATUS
 		(*get_mon_pdev_rx_stats)(struct cdp_soc_t *soc, uint8_t pdev_id,
 					 struct cdp_pdev_mon_stats *stats);
 
-	/* Configure monitor status srng reap timer */
 	bool (*txrx_enable_mon_reap_timer)(struct cdp_soc_t *soc_hdl,
 					   enum cdp_mon_reap_source source,
 					   bool enable);
 
 #ifdef QCA_SUPPORT_LITE_MONITOR
-	/* set lite monitor config */
 	QDF_STATUS
 	(*txrx_set_lite_mon_config)(
 			struct cdp_soc_t *soc,
 			struct cdp_lite_mon_filter_config *mon_config,
 			uint8_t pdev_id);
 
-	/* get lite monitor config */
 	QDF_STATUS
 	(*txrx_get_lite_mon_config)(
 			struct cdp_soc_t *soc,
 			struct cdp_lite_mon_filter_config *mon_config,
 			uint8_t pdev_id);
 
-	/* set lite monitor peer config */
 	QDF_STATUS
 	(*txrx_set_lite_mon_peer_config)(
 			struct cdp_soc_t *soc,
 			struct cdp_lite_mon_peer_config *peer_config,
 			uint8_t pdev_id);
 
-	/* get lite monitor peer list */
 	QDF_STATUS
 	(*txrx_get_lite_mon_peer_config)(
 			struct cdp_soc_t *soc,
 			struct cdp_lite_mon_peer_info *info,
 			uint8_t pdev_id);
 
-	/* get lite monitor enable/disable status */
 	int
 	(*txrx_is_lite_mon_enabled)(struct cdp_soc_t *soc,
 				    uint8_t pdev_id,
@@ -1047,19 +1047,70 @@ struct cdp_mon_ops {
 						    uint8_t pdev_id,
 						    uint8_t direction);
 #endif
-	/*To set RSSI dbm conversion params in monitor pdev */
 	QDF_STATUS (*txrx_set_mon_pdev_params_rssi_dbm_conv)
 		(struct cdp_soc_t *soc,
 		 struct cdp_rssi_db2dbm_param_dp *params);
 
 #ifdef WLAN_TELEMETRY_STATS_SUPPORT
-	/*To update telemetry airtime stats in monitor pdev */
 	QDF_STATUS (*txrx_update_pdev_mon_telemetry_airtime_stats)
 		(struct cdp_soc_t *soc,
 		 uint8_t pdev_id);
 #endif
 };
 
+/**
+ * struct cdp_host_stats_ops - statistic operations
+ * @txrx_host_stats_get:
+ * @txrx_host_stats_clr:
+ * @txrx_host_ce_stats:
+ * @txrx_stats_publish:
+ * @txrx_enable_enhanced_stats: Enable enhanced stats functionality.
+ * @txrx_disable_enhanced_stats: Disable enhanced stats functionality.
+ * @tx_print_tso_stats:
+ * @tx_rst_tso_stats:
+ * @tx_print_sg_stats:
+ * @tx_rst_sg_stats:
+ * @print_rx_cksum_stats:
+ * @rst_rx_cksum_stats:
+ * @txrx_host_me_stats:
+ * @txrx_per_peer_stats:
+ * @txrx_host_msdu_ttl_stats:
+ * @ol_txrx_update_peer_stats:
+ * @get_fw_peer_stats:
+ * @get_htt_stats:
+ * @txrx_update_pdev_stats:
+ * @txrx_get_peer_stats_param:
+ * @txrx_get_peer_stats:
+ * @txrx_get_soc_stats:
+ * @txrx_reset_peer_ald_stats:
+ * @txrx_reset_peer_stats:
+ * @txrx_get_vdev_stats:
+ * @txrx_process_wmi_host_vdev_stats:
+ * @txrx_get_vdev_extd_stats:
+ * @txrx_update_vdev_stats:
+ * @txrx_get_radio_stats:
+ * @txrx_get_pdev_stats:
+ * @txrx_get_ratekbps:
+ * @txrx_update_peer_stats:
+ * @txrx_get_scan_spcl_vap_stats:
+ * @txrx_get_peer_delay_stats:
+ * @txrx_get_peer_jitter_stats:
+ * @txrx_alloc_vdev_stats_id:
+ * @txrx_reset_vdev_stats_id:
+ * @get_peer_tx_capture_stats:
+ * @get_pdev_tx_capture_stats:
+ * @enable_disable_vdev_tx_delay_stats:
+ * @is_tx_delay_stats_enabled:
+ * @txrx_get_pdev_tid_stats:
+ * @txrx_pdev_telemetry_stats:
+ * @txrx_peer_telemetry_stats:
+ * @txrx_pdev_deter_stats:
+ * @txrx_peer_deter_stats:
+ * @txrx_update_pdev_chan_util_stats:
+ * @txrx_get_peer_extd_rate_link_stats:
+ * @get_pdev_obss_stats:
+ * @clear_pdev_obss_pd_stats:
+ */
 struct cdp_host_stats_ops {
 	int (*txrx_host_stats_get)(struct cdp_soc_t *soc, uint8_t vdev_id,
 				   struct ol_txrx_stats_req *req);
@@ -1072,23 +1123,8 @@ struct cdp_host_stats_ops {
 
 	int (*txrx_stats_publish)(struct cdp_soc_t *soc, uint8_t pdev_id,
 				  struct cdp_stats_extd *buf);
-	/**
-	 * @brief Enable enhanced stats functionality.
-	 *
-	 * @param soc - the soc handle
-	 * @param pdev_id - pdev_id of pdev
-	 * @return - QDF_STATUS
-	 */
 	QDF_STATUS (*txrx_enable_enhanced_stats)(struct cdp_soc_t *soc,
 						 uint8_t pdev_id);
-
-	/**
-	 * @brief Disable enhanced stats functionality.
-	 *
-	 * @param soc - the soc handle
-	 * @param pdev_id - pdev_id of pdev
-	 * @return - QDF_STATUS
-	 */
 	QDF_STATUS (*txrx_disable_enhanced_stats)(struct cdp_soc_t *soc,
 						  uint8_t pdev_id);
 
@@ -1273,6 +1309,12 @@ struct cdp_host_stats_ops {
 					       struct cdp_txrx_stats_req *req);
 };
 
+/**
+ * struct cdp_wds_ops - WDS operations
+ * @txrx_set_wds_rx_policy:
+ * @txrx_wds_peer_tx_policy_update:
+ * @vdev_set_wds:
+ */
 struct cdp_wds_ops {
 	QDF_STATUS
 	(*txrx_set_wds_rx_policy)(struct cdp_soc_t *soc, uint8_t vdev_id,
@@ -1285,6 +1327,10 @@ struct cdp_wds_ops {
 			    uint32_t val);
 };
 
+/**
+ * struct cdp_raw_ops - raw packet operations
+ * @rsim_get_astentry:
+ */
 struct cdp_raw_ops {
 	QDF_STATUS
 	(*rsim_get_astentry)(struct cdp_soc_t *soc, uint8_t vdev_id,
@@ -1292,6 +1338,10 @@ struct cdp_raw_ops {
 };
 
 #ifdef PEER_FLOW_CONTROL
+/**
+ * struct cdp_pflow_ops - peer flow control operations
+ * @pflow_update_pdev_params:
+ */
 struct cdp_pflow_ops {
 	uint32_t (*pflow_update_pdev_params)(struct cdp_soc_t *soc,
 					     uint8_t pdev_id,
@@ -1561,7 +1611,14 @@ void (*peer_send_wds_disconnect)(struct cdp_ctrl_objmgr_psoc *psoc,
 					  uint16_t src_info,
 					  uint8_t vdev_id, uint8_t use_ppe,
 					  uint8_t routing_enabled);
+
+	QDF_STATUS
+	(*get_ppeds_profile_info_for_vap)(struct cdp_ctrl_objmgr_psoc *psoc,
+					  uint8_t vdev_id,
+					  struct cdp_ds_vp_params *vp_params);
+
 #endif /* WLAN_SUPPORT_PPEDS */
+
 #ifdef CONFIG_SAWF_DEF_QUEUES
 	int (*disable_sawf_svc)(uint8_t svc_id);
 #endif
@@ -1577,6 +1634,7 @@ void (*peer_send_wds_disconnect)(struct cdp_ctrl_objmgr_psoc *psoc,
  * @hl_tdls_flag_reset: reset tdls flag for vdev
  * @tx_non_std: Allow the control-path SW to send data frames
  * @get_vdev_id: get vdev id
+ * @get_tx_ack_stats:
  * @set_wisa_mode: set wisa mode for a vdev
  * @txrx_data_stall_cb_register: register data stall callback
  * @txrx_data_stall_cb_deregister: deregister data stall callback
@@ -1585,31 +1643,37 @@ void (*peer_send_wds_disconnect)(struct cdp_ctrl_objmgr_psoc *psoc,
  * @runtime_resume: ensure TXRX is ready to runtime resume
  * @get_opmode: get operation mode of vdev
  * @mark_first_wakeup_packet: set flag to indicate that fw is compatible for
-			      marking first packet after wow wakeup
+ *			      marking first packet after wow wakeup
  * @update_mac_id: update mac_id for vdev
  * @flush_rx_frames: flush rx frames on the queue
  * @get_intra_bss_fwd_pkts_count: to get the total tx and rx packets that
-				  has been forwarded from txrx layer
-				  without going to upper layers
+ *				  has been forwarded from txrx layer
+ *				  without going to upper layers
  * @pkt_log_init: handler to initialize packet log
  * @pkt_log_con_service: handler to connect packet log service
+ * @pkt_log_exit:
  * @get_num_rx_contexts: handler to get number of RX contexts
- * @register_packetdump_cb: register callback for different pktlog
- * @unregister_packetdump_cb: unregister callback for different pktlog
+ * @register_pktdump_cb: register callback for different pktlog
+ * @unregister_pktdump_cb: unregister callback for different pktlog
  * @pdev_reset_driver_del_ack: reset driver delayed ack enabled flag
  * @vdev_set_driver_del_ack_enable: set driver delayed ack enabled flag
  *
+ * @vdev_set_bundle_require_flag:
+ * @pdev_reset_bundle_require_flag:
+ * @txrx_ext_stats_request:
+ * @request_rx_hw_stats:
+ * @reset_rx_hw_ext_stats:
  * @vdev_inform_ll_conn: inform DP to add/delete a latency critical connection
  *			 for this particular vdev.
  * @set_swlm_enable: Enable or Disable Software Latency Manager.
  * @is_swlm_enabled: Check if Software latency manager is enabled or not.
  * @display_txrx_hw_info: Dump the DP rings info
- * @set_tx_flush_pending: Configures the ac/tid to be flushed and policy
- *			  to flush.
- *
- * set_bus_vote_lvl_high: The bus lvl is set to high or low based on tput
- * get_bus_vote_lvl_high: Get bus lvl to determine whether or not get
- *                        rx rate stats
+ * @get_tx_rings_grp_bitmap:
+ * @set_peer_txq_flush_config: Configures the ac/tid to be flushed and policy
+ *			       to flush.
+ * @set_bus_vote_lvl_high: The bus lvl is set to high or low based on tput
+ * @get_bus_vote_lvl_high: Get bus lvl to determine whether or not get
+ *                         rx rate stats
  *
  * Function pointers for miscellaneous soc/pdev/vdev related operations.
  */
@@ -1732,19 +1796,27 @@ struct cdp_ocb_ops {
  * struct cdp_peer_ops - mcl peer related ops
  * @register_peer:
  * @clear_peer:
- * @find_peer_exist
- * @find_peer_exist_on_vdev
- * @find_peer_exist_on_other_vdev
+ * @find_peer_exist:
+ * @find_peer_exist_on_vdev:
+ * @find_peer_exist_on_other_vdev:
  * @peer_state_update:
  * @get_vdevid:
+ * @get_vdev_by_peer_addr:
  * @register_ocb_peer:
  * @peer_get_peer_mac_addr:
  * @get_peer_state:
+ * @get_vdev_for_peer:
  * @update_ibss_add_peer_num_of_vdev:
+ * @remove_peers_for_vdev:
+ * @remove_peers_for_vdev_no_lock:
  * @copy_mac_addr_raw:
  * @add_last_real_peer:
  * @is_vdev_restore_last_peer:
  * @update_last_real_peer:
+ * @peer_detach_force_delete:
+ * @set_tdls_offchan_enabled:
+ * @set_peer_as_tdls_peer:
+ * @peer_flush_frags:
  */
 struct cdp_peer_ops {
 	QDF_STATUS (*register_peer)(struct cdp_soc_t *soc_hdl, uint8_t pdev_id,
@@ -1972,11 +2044,29 @@ struct cdp_throttle_ops {
  * @ipa_set_active:
  * @ipa_op_response:
  * @ipa_register_op_cb:
+ * @ipa_deregister_op_cb:
  * @ipa_get_stat:
  * @ipa_tx_data_frame:
+ * @ipa_set_uc_tx_partition_base:
+ * @ipa_update_peer_rx_stats:
+ * @ipa_uc_get_share_stats:
+ * @ipa_uc_set_quota:
+ * @ipa_pcie_link_up: Hold PCIe link in L0
+ * @ipa_pcie_link_down: Release PCIe link L0 hold
+ * @ipa_enable_autonomy:
+ * @ipa_disable_autonomy:
+ * @ipa_setup:
+ * @ipa_cleanup:
+ * @ipa_setup_iface:
+ * @ipa_cleanup_iface:
+ * @ipa_enable_pipes:
+ * @ipa_disable_pipes:
+ * @ipa_set_perf_level:
+ * @ipa_rx_intrabss_fwd:
  * @ipa_tx_buf_smmu_mapping: Create SMMU mappings for Tx
  * @ipa_tx_buf_smmu_unmapping: Release SMMU mappings for Tx
  * buffers to IPA
+ * @ipa_rx_super_rule_setup: Setup cce super rules based on filter tuple
  * @ipa_ast_create: Create/Update ast entry
  */
 struct cdp_ipa_ops {
@@ -2012,6 +2102,10 @@ struct cdp_ipa_ops {
 					     uint8_t reset_stats);
 	QDF_STATUS (*ipa_uc_set_quota)(struct cdp_soc_t *soc_hdl,
 				       uint8_t pdev_id, uint64_t quota_bytes);
+#endif
+#ifdef IPA_OPT_WIFI_DP
+	int (*ipa_pcie_link_up)(struct cdp_soc_t *soc_hdl);
+	void (*ipa_pcie_link_down)(struct cdp_soc_t *soc_hdl);
 #endif
 	QDF_STATUS (*ipa_enable_autonomy)(struct cdp_soc_t *soc_hdl,
 					  uint8_t pdev_id);
@@ -2066,6 +2160,10 @@ struct cdp_ipa_ops {
 						uint8_t pdev_id,
 						const char *func,
 						uint32_t line);
+#ifdef IPA_OPT_WIFI_DP
+	QDF_STATUS (*ipa_rx_super_rule_setup)(struct cdp_soc_t *soc_hdl,
+					      void *flt_params);
+#endif
 #ifdef IPA_WDS_EASYMESH_FEATURE
 	QDF_STATUS (*ipa_ast_create)(struct cdp_soc_t *soc_hdl,
 				     qdf_ipa_ast_info_type_t *data);
@@ -2253,12 +2351,14 @@ struct cdp_ppeds_txrx_ops {
 	QDF_STATUS
 	(*ppeds_entry_attach)(struct cdp_soc_t *soc,
 			      uint8_t vdev_id, void *vpai,
-			      int32_t *ppe_vp_num);
+			      int32_t *ppe_vp_num,
+			      struct cdp_ds_vp_params *vp_params);
 	QDF_STATUS
 	(*ppeds_enable_pri2tid)(struct cdp_soc_t *soc,
 				uint8_t vdev_id, bool val);
 	void (*ppeds_entry_detach)(struct cdp_soc_t *soc,
-				   uint8_t vdev_id);
+				   uint8_t vdev_id,
+				   struct cdp_ds_vp_params *vp_params);
 	void (*ppeds_set_int_pri2tid)(struct cdp_soc_t *soc,
 				      uint8_t *pri2tid);
 	void (*ppeds_update_int_pri2tid)(struct cdp_soc_t *soc,

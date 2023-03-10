@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2017-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -195,7 +195,7 @@
 #define HAL_RX_FRAME_CTRL_TYPE_DATA 0x2
 
 /**
- * hal_dl_ul_flag - flag to indicate UL/DL
+ * enum hal_dl_ul_flag - flag to indicate UL/DL
  * @dl_ul_flag_is_dl_or_tdls: DL
  * @dl_ul_flag_is_ul: UL
  */
@@ -204,8 +204,8 @@ enum hal_dl_ul_flag {
 	dl_ul_flag_is_ul,
 };
 
-/*
- * hal_eht_ppdu_sig_cmn_type - PPDU type
+/**
+ * enum hal_eht_ppdu_sig_cmn_type - PPDU type
  * @eht_ppdu_sig_tb_or_dl_ofdma: TB/DL_OFDMA PPDU
  * @eht_ppdu_sig_su: SU PPDU
  * @eht_ppdu_sig_dl_mu_mimo: DL_MU_MIMO PPDU
@@ -216,8 +216,8 @@ enum hal_eht_ppdu_sig_cmn_type {
 	eht_ppdu_sig_dl_mu_mimo,
 };
 
-/*
- * hal_mon_packet_info - packet info
+/**
+ * struct hal_mon_packet_info - packet info
  * @sw_cookie: 64-bit SW desc virtual address
  * @dma_length: packet DMA length
  * @msdu_continuation: msdu continulation in next buffer
@@ -230,8 +230,8 @@ struct hal_mon_packet_info {
 		 truncated : 1;
 };
 
-/*
- * hal_rx_mon_msdu_info - msdu info
+/**
+ * struct hal_rx_mon_msdu_info - msdu info
  * @first_buffer: first buffer of msdu
  * @last_buffer: last buffer of msdu
  * @first_mpdu: first MPDU
@@ -270,8 +270,8 @@ struct hal_rx_mon_msdu_info {
 	int16_t user_rssi;
 };
 
-/*
- * hal_rx_mon_mpdu_info - MPDU info
+/**
+ * struct hal_rx_mon_mpdu_info - MPDU info
  * @decap_type: decap_type
  * @mpdu_length_err: MPDU length error
  * @fcs_err: FCS error
@@ -302,7 +302,7 @@ struct hal_rx_mon_mpdu_info {
  * @status_buf_count:        number of status buffer count
  * @rxdma_push_reason:       rxdma push reason
  * @rxdma_error_code:        rxdma error code
- * @msdu_cnt:                msdu count
+ * @msdu_count:              msdu count
  * @end_of_ppdu:             end of ppdu
  * @link_desc:               msdu link descriptor address
  * @status_buf:              for a PPDU, status buffers can span acrosss
@@ -324,8 +324,8 @@ struct hal_rx_mon_desc_info {
 	bool drop_ppdu;
 };
 
-/*
- * Struct hal_rx_su_evm_info - SU evm info
+/**
+ * struct hal_rx_su_evm_info - SU evm info
  * @number_of_symbols: number of symbols
  * @nss_count:         nss count
  * @pilot_count:       pilot count
@@ -378,12 +378,12 @@ hal_rx_reo_ent_get_src_link_id(hal_soc_handle_t hal_soc_hdl,
 }
 
 /**
- * hal_rx_reo_ent_buf_paddr_get: Gets the physical address and
- *			cookie from the REO entrance ring element
- * @hal_rx_desc_cookie: Opaque cookie pointer used by HAL to get to
- * the current descriptor
- * @ buf_info: structure to return the buffer information
- * @ msdu_cnt: pointer to msdu count in MPDU
+ * hal_rx_reo_ent_buf_paddr_get() - Gets the physical address and cookie from
+ *                                  the REO entrance ring element
+ * @hal_soc_hdl: HAL version of the SOC pointer
+ * @rx_desc: rx descriptor
+ * @buf_info: structure to return the buffer information
+ * @msdu_cnt: pointer to msdu count in MPDU
  *
  * CAUTION: This API calls a hal_soc ops, so be careful before calling this in
  * per packet path
@@ -535,11 +535,10 @@ hal_rx_hw_desc_mpdu_user_id(hal_soc_handle_t hal_soc_hdl,
 /* TODO: Move all Rx descriptor functions to hal_rx.h to avoid duplication */
 
 /**
- * hal_rx_msdu_link_desc_set: Retrieves MSDU Link Descriptor to WBM
- *
- * @ soc		: HAL version of the SOC pointer
- * @ src_srng_desc	: void pointer to the WBM Release Ring descriptor
- * @ buf_addr_info	: void pointer to the buffer_addr_info
+ * hal_rx_mon_msdu_link_desc_set() - Retrieves MSDU Link Descriptor to WBM
+ * @hal_soc_hdl: HAL version of the SOC pointer
+ * @src_srng_desc: void pointer to the WBM Release Ring descriptor
+ * @buf_addr_info: void pointer to the buffer_addr_info
  *
  * Return: void
  */
@@ -623,7 +622,7 @@ enum {
 	HAL_RX_TYPE_UL,
 };
 
-/*
+/**
  * enum
  * @HAL_RECEPTION_TYPE_SU: Basic SU reception
  * @HAL_RECEPTION_TYPE_DL_MU_MIMO: DL MU_MIMO reception
@@ -655,15 +654,16 @@ enum {
 	HAL_RX_MON_PPDU_RESET,
 };
 
-/* struct hal_rx_ppdu_common_info  - common ppdu info
- * @ppdu_id - ppdu id number
- * @ppdu_timestamp - timestamp at ppdu received
- * @mpdu_cnt_fcs_ok - mpdu count in ppdu with fcs ok
- * @mpdu_cnt_fcs_err - mpdu count in ppdu with fcs err
- * @mpdu_fcs_ok_bitmap - fcs ok mpdu count in ppdu bitmap
- * @last_ppdu_id - last received ppdu id
- * @mpdu_cnt - total mpdu count
- * @num_users - num users
+/**
+ * struct hal_rx_ppdu_common_info  - common ppdu info
+ * @ppdu_id: ppdu id number
+ * @ppdu_timestamp: timestamp at ppdu received
+ * @mpdu_cnt_fcs_ok: mpdu count in ppdu with fcs ok
+ * @mpdu_cnt_fcs_err: mpdu count in ppdu with fcs err
+ * @num_users: num users
+ * @mpdu_fcs_ok_bitmap: fcs ok mpdu count in ppdu bitmap
+ * @last_ppdu_id: last received ppdu id
+ * @mpdu_cnt: total mpdu count
  */
 struct hal_rx_ppdu_common_info {
 	uint32_t ppdu_id;
@@ -939,7 +939,7 @@ struct hal_mon_usig_hdr {
 		 HAL_RX_MON_USIG_RX_INTEGRITY_CHECK_PASSED_LSB)
 
 /**
- * enum hal_eht_bw: Reception bandwidth
+ * enum hal_eht_bw - Reception bandwidth
  * @HAL_EHT_BW_20: 20Mhz
  * @HAL_EHT_BW_40: 40Mhz
  * @HAL_EHT_BW_80: 80Mhz
@@ -975,7 +975,7 @@ struct hal_eht_sig_non_mu_mimo_user_info {
 };
 
 /**
- * union hal_eht_sig_user_field: User field in EHTSIG
+ * union hal_eht_sig_user_field - User field in EHTSIG
  * @mu_mimo_usr: MU-MIMO user field information in EHTSIG
  * @non_mu_mimo_usr: Non MU-MIMO user field information in EHTSIG
  */
@@ -1223,7 +1223,8 @@ struct hal_rx_tlv_aggr_info {
 	uint8_t buf[HAL_RX_MON_MAX_AGGR_SIZE];
 };
 
-/* struct hal_rx_u_sig_info - Certain fields from U-SIG header which are used
+/**
+ * struct hal_rx_u_sig_info - Certain fields from U-SIG header which are used
  *		for other header field parsing.
  * @ul_dl: UL or DL
  * @bw: EHT BW
@@ -1247,6 +1248,19 @@ struct hal_rx_user_ctrl_frm_info {
 #else
 struct hal_rx_user_ctrl_frm_info {};
 #endif /* WLAN_SUPPORT_CTRL_FRAME_STATS */
+
+#ifdef MONITOR_TLV_RECORDING_ENABLE
+/**
+ * struct hal_rx_tlv_info - TLV info to pass to dp layer
+ * @tlv_tag: Tag of the TLV
+ * @tlv_category: Category of TLV
+ *
+ */
+struct hal_rx_tlv_info {
+	uint32_t tlv_tag;
+	uint8_t tlv_category;
+};
+#endif
 
 struct hal_rx_ppdu_info {
 	struct hal_rx_ppdu_common_info com_info;
@@ -1320,6 +1334,10 @@ struct hal_rx_ppdu_info {
 	uint8_t start_user_info_cnt;
 	/* PPDU drop cnt */
 	struct hal_rx_ppdu_drop_cnt drop_cnt;
+#ifdef MONITOR_TLV_RECORDING_ENABLE
+	/*TLV Recording*/
+	struct hal_rx_tlv_info rx_tlv_info;
+#endif
 };
 
 static inline uint32_t
@@ -1361,15 +1379,17 @@ hal_rx_status_get_next_tlv(uint8_t *rx_tlv, bool is_tlv_hdr_64_bit) {
 /**
  * hal_rx_proc_phyrx_other_receive_info_tlv()
  *				    - process other receive info TLV
+ * @hal_soc: HAL soc object
  * @rx_tlv_hdr: pointer to TLV header
  * @ppdu_info: pointer to ppdu_info
  *
  * Return: None
  */
-static inline void hal_rx_proc_phyrx_other_receive_info_tlv(struct hal_soc *hal_soc,
-						     void *rx_tlv_hdr,
-						     struct hal_rx_ppdu_info
-						     *ppdu_info)
+static inline void
+hal_rx_proc_phyrx_other_receive_info_tlv(struct hal_soc *hal_soc,
+					 void *rx_tlv_hdr,
+					 struct hal_rx_ppdu_info
+					 *ppdu_info)
 {
 	hal_soc->ops->hal_rx_proc_phyrx_other_receive_info_tlv(rx_tlv_hdr,
 							(void *)ppdu_info);
@@ -1379,7 +1399,7 @@ static inline void hal_rx_proc_phyrx_other_receive_info_tlv(struct hal_soc *hal_
  * hal_rx_status_get_tlv_info() - process receive info TLV
  * @rx_tlv_hdr: pointer to TLV header
  * @ppdu_info: pointer to ppdu_info
- * @hal_soc: HAL soc handle
+ * @hal_soc_hdl: HAL soc handle
  * @nbuf: PPDU status network buffer
  *
  * Return: HAL_TLV_STATUS_PPDU_NOT_DONE or HAL_TLV_STATUS_PPDU_DONE from tlv

@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2014-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -56,6 +56,8 @@
 #else
 #include <linux/byteorder/generic.h>
 #endif
+
+#include <linux/rcupdate.h>
 
 typedef wait_queue_head_t __qdf_wait_queue_head_t;
 
@@ -175,7 +177,7 @@ static inline bool __qdf_is_macaddr_equal(const struct qdf_mac_addr *mac_addr1,
 #define __qdf_min(_a, _b) min(_a, _b)
 #define __qdf_max(_a, _b) max(_a, _b)
 
-/**
+/*
  * Setting it to blank as feature is not intended to be supported
  * on linux version less than 4.3
  */
@@ -201,9 +203,6 @@ static inline bool __qdf_is_macaddr_equal(const struct qdf_mac_addr *mac_addr1,
 
 #define MEMINFO_KB(x)  ((x) << (PAGE_SHIFT - 10))   /* In kilobytes */
 
-/**
- * @brief Assert
- */
 #define __qdf_assert(expr)  do { \
 		if (unlikely(!(expr))) { \
 			pr_err("Assertion failed! %s:%s %s:%d\n", \
@@ -213,9 +212,6 @@ static inline bool __qdf_is_macaddr_equal(const struct qdf_mac_addr *mac_addr1,
 		} \
 } while (0)
 
-/**
- * @brief Assert
- */
 #define __qdf_target_assert(expr)  do {    \
 	if (unlikely(!(expr))) {                                 \
 		qdf_err("Assertion failed! %s:%s %s:%d",   \
@@ -225,9 +221,6 @@ static inline bool __qdf_is_macaddr_equal(const struct qdf_mac_addr *mac_addr1,
 	}     \
 } while (0)
 
-/**
- * @brief Compile time Assert
- */
 #define QDF_COMPILE_TIME_ASSERT(assertion_name, predicate) \
     typedef char assertion_name[(predicate) ? 1 : -1]
 
@@ -255,9 +248,6 @@ static inline bool __qdf_is_macaddr_equal(const struct qdf_mac_addr *mac_addr1,
 #define __qdf_be32_to_cpu be32_to_cpu
 #define __qdf_be64_to_cpu be64_to_cpu
 
-/**
- * @brief memory barriers.
- */
 #define __qdf_wmb()                wmb()
 #define __qdf_rmb()                rmb()
 #define __qdf_mb()                 mb()
@@ -419,10 +409,11 @@ int __qdf_set_dma_coherent_mask(struct device *dev, uint8_t addr_bits)
 }
 #endif
 /**
- * qdf_get_random_bytes() - returns nbytes bytes of random
- * data
+ * __qdf_get_random_bytes() - returns nbytes bytes of random data
+ * @buf: buffer to fill
+ * @nbytes: number of bytes to fill
  *
- * Return: random bytes of data
+ * Return: void
  */
 static inline
 void __qdf_get_random_bytes(void *buf, int nbytes)
@@ -511,4 +502,19 @@ static inline int __qdf_get_smp_processor_id(void)
 {
 	return smp_processor_id();
 }
+
+/**
+ * __qdf_in_atomic: Check whether current thread running in atomic context
+ *
+ * Return: true if current thread is running in the atomic context
+ *	   else it will be return false.
+ */
+static inline bool __qdf_in_atomic(void)
+{
+	if (in_interrupt() || !preemptible() || rcu_preempt_depth())
+		return true;
+
+	return false;
+}
+
 #endif /*_I_QDF_UTIL_H*/

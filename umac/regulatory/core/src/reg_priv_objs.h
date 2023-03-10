@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2017-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -119,6 +119,17 @@ struct indoor_concurrency_list {
  * struct wlan_regulatory_psoc_priv_obj - wlan regulatory psoc private object
  * @mas_chan_params: master channel parameters list
  * @chan_list_recvd: whether channel list has been received
+ * @offload_enabled:
+ * @six_ghz_supported: whether 6ghz is supported
+ * @five_dot_nine_ghz_supported: whether 5.9ghz is supported
+ *	(service bit WMI_SERVICE_5_DOT_9GHZ_SUPPORT)
+ * @num_phy:
+ * @cur_country:
+ * @def_country:
+ * @def_country_code:
+ * @def_region_domain:
+ * @cc_src:
+ * @psoc_ptr:
  * @new_user_ctry_pending: In this array, element[phy_id] is true if any user
  *	country update is pending for pdev (phy_id), used in case of MCL.
  * @new_init_ctry_pending: In this array, element[phy_id] is true if any user
@@ -127,14 +138,39 @@ struct indoor_concurrency_list {
  *	country update is pending for pdev (phy_id).
  * @world_country_pending: In this array, element[phy_id] is true if any world
  *	country update is pending for pdev (phy_id).
+ * @dfs_enabled:
  * @band_capability: bitmap of bands enabled, using enum reg_wifi_band as the
  *	bit position value
+ * @indoor_chan_enabled:
  * @ignore_fw_reg_offload_ind: Ignore FW reg offload indication
- * @six_ghz_supported: whether 6ghz is supported
- * @five_dot_nine_ghz_supported: whether 5.9ghz is supported
- *	(service bit WMI_SERVICE_5_DOT_9GHZ_SUPPORT)
+ * @enable_11d_supp_original:
+ * @enable_11d_supp:
+ * @is_11d_offloaded:
+ * @vdev_id_for_11d_scan:
+ * @master_vdev_cnt:
+ * @vdev_cnt_11d:
+ * @scan_11d_interval:
+ * @is_host_11d_inited:
+ * @scan_req_id:
+ * @scan_id:
+ * @timer:
+ * @vdev_ids_11d:
+ * @user_ctry_priority:
+ * @user_ctry_set:
+ * @cbk_list:
+ * @num_chan_change_cbks:
+ * @cc_cbk:
+ * @ch_avoid_ind:
+ * @unsafe_chan_list:
+ * @avoid_freq_list:
+ * @restart_beaconing:
+ * @reg_cap:
+ * @force_ssc_disable_indoor_channel:
+ * @enable_srd_chan_in_master_mode:
+ * @enable_11d_in_world_mode:
  * @enable_5dot9_ghz_chan_in_master_mode: 5.9 GHz channel support in
  *	master mode (ini fcc_5dot9_ghz_chan_in_master_mode)
+ * @cbk_list_lock:
  * @retain_nol_across_regdmn_update: Retain the NOL list across the regdomain
  *	changes.
  * @domain_code_6g_ap: domain code for 6G AP
@@ -159,7 +195,8 @@ struct indoor_concurrency_list {
  * @afc_disable_request_id_check: Whether disable target AFC request id check
  * @is_afc_reg_noaction: Whether no action to AFC power event
  * @sta_sap_scc_on_indoor_channel: Value of sap+sta scc on indoor support
- * @fcc_rules_ptr : Value of fcc channel frequency and tx_power list received
+ * @p2p_indoor_ch_support: Allow P2P GO in indoor channels
+ * @fcc_rules_ptr: Value of fcc channel frequency and tx_power list received
  * from firmware
  * @set_fcc_channel: Flag to set fcc channels
  */
@@ -239,6 +276,7 @@ struct wlan_regulatory_psoc_priv_obj {
 	bool is_afc_reg_noaction;
 #endif
 	bool sta_sap_scc_on_indoor_channel;
+	bool p2p_indoor_ch_support;
 #ifdef CONFIG_REG_CLIENT
 	struct cur_fcc_rule fcc_rules_ptr[MAX_NUM_FCC_RULES];
 #endif
@@ -250,17 +288,44 @@ struct wlan_regulatory_psoc_priv_obj {
  * @cur_chan_list: current channel list, includes 6G channels
  * @secondary_cur_chan_list: secondary current channel list, for concurrency
  * situations
- * @mas_chan_list: master channel list
- * from the firmware.
+ * @mas_chan_list: master channel list from the firmware.
  * @is_6g_channel_list_populated: indicates the channel lists are populated
  * @mas_chan_list_6g_ap: master channel list for 6G AP, includes all power types
  * @mas_chan_list_6g_client: master channel list for 6G client, includes
  *	all power types
  * @super_chan_list: 6G super channel list that includes the information of
  * all 6G power modes for every 6G channel
+ * @cache_disable_chan_list:
+ * @num_cache_channels:
+ * @disable_cached_channels:
+ * @default_country:
+ * @def_region_domain:
+ * @def_country_code:
+ * @current_country:
+ * @reg_dmn_pair:
+ * @reg_6g_superid: 6Ghz super domain id
+ * @ctry_code:
+ * @unii_5g_bitmap:
+ * @dfs_region:
+ * @phybitmap:
+ * @pdev_ptr:
+ * @range_2g_low:
+ * @range_2g_high:
+ * @range_5g_low:
+ * @range_5g_high:
+ * @dfs_enabled:
+ * @set_fcc_channel:
  * @band_capability: bitmap of bands enabled, using enum reg_wifi_band as the
  *	bit position value
- * @reg_6g_superid: 6Ghz super domain id
+ * @indoor_chan_enabled:
+ * @en_chan_144:
+ * @wireless_modes:
+ * @freq_avoid_list:
+ * @force_ssc_disable_indoor_channel:
+ * @sap_state:
+ * @reg_rules:
+ * @reg_rules_lock:
+ * @chan_list_recvd:
  * @pdev_opened: whether pdev has been opened by application
  * @reg_cur_6g_ap_pwr_type: 6G AP type ie VLP/SP/LPI.
  * @reg_cur_6g_client_mobility_type: 6G client type ie Default/Subordinate.
@@ -270,6 +335,8 @@ struct wlan_regulatory_psoc_priv_obj {
  * domain.
  * @reg_unspecified_ap_usable: Indicates if the AP type mentioned is not part of
  * 802.11 standard.
+ * @reg_6g_thresh_priority_freq: All frequencies greater or equal will be given
+ * priority during channel selection by upper layer
  * @max_phymode: The maximum phymode supported by the device and regulatory.
  * @max_chwidth: The maximum bandwidth corresponding to the maximum phymode.
  * @avoid_chan_ext_list: the extended avoid frequency list.
@@ -289,13 +356,12 @@ struct wlan_regulatory_psoc_priv_obj {
  * sent by the target
  * @is_reg_noaction_on_afc_pwr_evt: indicates whether regulatory needs to
  * take action when AFC Power event is received
- * @reg_6g_thresh_priority_freq: All frequencies greater or equal will be given
- * priority during channel selection by upper layer
  * @reg_afc_dev_deployment_type: AFC device deployment type from BDF
  * @sta_sap_scc_on_indoor_channel: Value of sap+sta scc on indoor support
- * @indoor_concurrency_list: List of current indoor station interfaces
+ * @p2p_indoor_ch_support: Allow P2P GO in indoor channels
  * @fcc_rules_ptr : Value of fcc channel frequency and tx_power list received
  * from firmware
+ * @indoor_list: List of current indoor station interfaces
  */
 struct wlan_regulatory_pdev_priv_obj {
 	struct regulatory_channel cur_chan_list[NUM_CHANNELS];
@@ -373,6 +439,7 @@ struct wlan_regulatory_pdev_priv_obj {
 	enum reg_afc_dev_deploy_type reg_afc_dev_deployment_type;
 #endif
 	bool sta_sap_scc_on_indoor_channel;
+	bool p2p_indoor_ch_support;
 #ifdef CONFIG_REG_CLIENT
 	struct cur_fcc_rule fcc_rules_ptr[MAX_NUM_FCC_RULES];
 	struct indoor_concurrency_list indoor_list[MAX_INDOOR_LIST_SIZE];
@@ -390,7 +457,7 @@ struct wlan_regulatory_psoc_priv_obj *reg_get_psoc_obj(
 
 /**
  * reg_get_pdev_obj() - Provides the reg component object pointer
- * @psoc: pointer to psoc object.
+ * @pdev: pointer to pdev object.
  *
  * Return: reg component object pointer
  */

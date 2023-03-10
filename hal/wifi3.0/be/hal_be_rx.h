@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2016-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -538,4 +538,38 @@ hal_rx_tlv_get_dest_chip_pmac_id(uint8_t *buf,
 	*d_chip_pmac_id = HAL_RX_TLV_DEST_CHIP_PMAC_ID_GET(rx_pkt_tlvs);
 }
 #endif /* INTRA_BSS_FWD_OFFLOAD */
+
+static inline uint8_t hal_rx_get_reo_push_rsn(void *desc_addr)
+{
+	struct reo_destination_ring *reo_dst_ring;
+
+	reo_dst_ring = (struct reo_destination_ring *)desc_addr;
+	return reo_dst_ring->reo_push_reason;
+}
+
+/**
+ * hal_rx_get_mpdu_msdu_desc_info_be() - get msdu, mpdu, peer meta data info
+ *					 from HAL Desc.
+ * @desc_addr: REO ring descriptor addr
+ * @mpdu_info: pointer to MPDU info
+ * @peer_mdata: pointer to peer meta data info
+ * @msdu_info: pointer to msdu info
+ *
+ * Return: void
+ */
+static inline void
+hal_rx_get_mpdu_msdu_desc_info_be(void *desc_addr,
+				  uint32_t *mpdu_info,
+				  uint32_t *peer_mdata,
+				  uint32_t *msdu_info)
+{
+	struct reo_destination_ring *reo_dst_ring;
+
+	reo_dst_ring = (struct reo_destination_ring *)desc_addr;
+	*mpdu_info = *(uint32_t *)(&reo_dst_ring->rx_mpdu_desc_info_details);
+	*peer_mdata = *((uint32_t *)
+			&reo_dst_ring->rx_mpdu_desc_info_details + 1);
+	*msdu_info = *(uint32_t *)(&reo_dst_ring->rx_msdu_desc_info_details);
+}
+
 #endif /* _HAL_BE_RX_H_ */

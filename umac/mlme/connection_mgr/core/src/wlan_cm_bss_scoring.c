@@ -1832,16 +1832,16 @@ static int cm_calculate_mlo_bss_score(struct wlan_objmgr_psoc *psoc,
 {
 	struct scan_cache_entry *entry_partner[MLD_MAX_LINKS - 1];
 	int32_t rssi[MLD_MAX_LINKS - 1];
-	uint32_t rssi_score[MLD_MAX_LINKS - 1] = {0, 0};
-	uint16_t prorated_pct[MLD_MAX_LINKS - 1] = {0, 0};
+	uint32_t rssi_score[MLD_MAX_LINKS - 1] = {};
+	uint16_t prorated_pct[MLD_MAX_LINKS - 1] = {};
 	uint32_t freq[MLD_MAX_LINKS - 1];
 	uint16_t ch_width[MLD_MAX_LINKS - 1];
-	uint32_t bandwidth_score[MLD_MAX_LINKS - 1] = {0, 0};
-	uint32_t congestion_pct[MLD_MAX_LINKS - 1] = {0, 0};
-	uint32_t congestion_score[MLD_MAX_LINKS - 1] = {0, 0};
-	uint32_t cong_total_score[MLD_MAX_LINKS - 1] = {0, 0};
-	uint32_t total_score[MLD_MAX_LINKS - 1] = {0, 0};
-	uint8_t i;
+	uint32_t bandwidth_score[MLD_MAX_LINKS - 1] = {};
+	uint32_t congestion_pct[MLD_MAX_LINKS - 1] = {};
+	uint32_t congestion_score[MLD_MAX_LINKS - 1] = {};
+	uint32_t cong_total_score[MLD_MAX_LINKS - 1] = {};
+	uint32_t total_score[MLD_MAX_LINKS - 1] = {};
+	uint8_t i, j;
 	uint16_t chan_width;
 	uint32_t best_total_score = 0;
 	uint8_t best_partner_index = 0;
@@ -1853,6 +1853,8 @@ static int cm_calculate_mlo_bss_score(struct wlan_objmgr_psoc *psoc,
 	struct wlan_objmgr_pdev *pdev;
 	bool rssi_bad_zone;
 	bool eht_capab;
+	struct partner_link_info tmp_link_info;
+	uint32_t tmp_total_score = 0;
 
 	wlan_psoc_mlme_get_11be_capab(psoc, &eht_capab);
 	if (!eht_capab)
@@ -1864,8 +1866,8 @@ static int cm_calculate_mlo_bss_score(struct wlan_objmgr_psoc *psoc,
 	cong_score = cm_calculate_congestion_score(entry,
 						   score_params,
 						   &cong_pct, false);
+	link = &entry->ml_info.link_info[0];
 	for (i = 0; i < entry->ml_info.num_links; i++) {
-		link = &entry->ml_info.link_info[0];
 		if (!link[i].is_valid_link)
 			continue;
 		entry_partner[i] = cm_get_entry(scan_list, &link[i].link_addr);
@@ -1917,7 +1919,7 @@ static int cm_calculate_mlo_bss_score(struct wlan_objmgr_psoc *psoc,
 						    score_params);
 
 		total_score[i] = rssi_score[i] + bandwidth_score[i] +
-				   congestion_score[i];
+				 cong_total_score[i];
 		if (total_score[i] > best_total_score) {
 			best_total_score = total_score[i];
 			best_partner_index = i;
@@ -1929,12 +1931,29 @@ static int cm_calculate_mlo_bss_score(struct wlan_objmgr_psoc *psoc,
 				cong_score, congestion_score[i],
 				cong_total_score[i], total_score[i]);
 	}
+
 	*rssi_prorated_pct = prorated_pct[best_partner_index];
 
-	/* STA only support at most 2 links, only select 1 partner link */
-	for (i = 0; i < entry->ml_info.num_links; i++) {
-		if (i != best_partner_index)
-			entry->ml_info.link_info[i].is_valid_link = false;
+	/* reorder the link idx per score */
+	for (j = 0; j < entry->ml_info.num_links; j++) {
+		tmp_total_score = total_score[j];
+		best_partner_index = j;
+		for (i = j + 1; i < entry->ml_info.num_links; i++) {
+			if (tmp_total_score < total_score[i]) {
+				tmp_total_score = total_score[i];
+				best_partner_index = i;
+			}
+		}
+
+		if (best_partner_index != j) {
+			tmp_link_info = entry->ml_info.link_info[j];
+			entry->ml_info.link_info[j] =
+				entry->ml_info.link_info[best_partner_index];
+			entry->ml_info.link_info[best_partner_index] =
+							tmp_link_info;
+			total_score[best_partner_index] = total_score[j];
+		}
+		total_score[j] = 0;
 	}
 
 	best_total_score += weight_config->mlo_weightage *

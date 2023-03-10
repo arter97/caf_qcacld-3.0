@@ -2542,13 +2542,33 @@ void dp_rx_cksum_offload(struct dp_pdev *pdev,
 	hal_rx_tlv_csum_err_get(pdev->soc->hal_soc, rx_tlv_hdr, &ip_csum_err,
 				&tcp_udp_csum_er);
 
-	if (qdf_likely(!ip_csum_err && !tcp_udp_csum_er)) {
-		cksum.l4_result = QDF_NBUF_RX_CKSUM_TCP_UDP_UNNECESSARY;
-		qdf_nbuf_set_rx_cksum(nbuf, &cksum);
+	if (qdf_nbuf_is_ipv4_pkt(nbuf)) {
+		if (qdf_likely(!ip_csum_err)) {
+			cksum.l4_result = QDF_NBUF_RX_CKSUM_TCP_UDP_UNNECESSARY;
+			if (qdf_nbuf_is_ipv4_udp_pkt(nbuf) ||
+			    qdf_nbuf_is_ipv4_tcp_pkt(nbuf)) {
+				if (qdf_likely(!tcp_udp_csum_er))
+					cksum.csum_level = 1;
+				else
+					DP_STATS_INCC(pdev,
+						      err.tcp_udp_csum_err, 1,
+						      tcp_udp_csum_er);
+			}
+		} else {
+			DP_STATS_INCC(pdev, err.ip_csum_err, 1, ip_csum_err);
+		}
+	} else if (qdf_nbuf_is_ipv6_udp_pkt(nbuf) ||
+		   qdf_nbuf_is_ipv6_tcp_pkt(nbuf)) {
+		if (qdf_likely(!tcp_udp_csum_er))
+			cksum.l4_result = QDF_NBUF_RX_CKSUM_TCP_UDP_UNNECESSARY;
+		else
+			DP_STATS_INCC(pdev, err.tcp_udp_csum_err, 1,
+				      tcp_udp_csum_er);
 	} else {
-		DP_STATS_INCC(pdev, err.ip_csum_err, 1, ip_csum_err);
-		DP_STATS_INCC(pdev, err.tcp_udp_csum_err, 1, tcp_udp_csum_er);
+		cksum.l4_result = QDF_NBUF_RX_CKSUM_NONE;
 	}
+
+	qdf_nbuf_set_rx_cksum(nbuf, &cksum);
 }
 #else
 static inline
@@ -3268,11 +3288,11 @@ bool dp_rx_is_sg_formation_required(struct hal_wbm_err_desc_info *info);
 void dp_rx_err_tlv_invalidate(struct dp_soc *soc,
 			      qdf_nbuf_t nbuf);
 
-/*
+/**
  * dp_rx_wbm_sg_list_last_msdu_war() - war for HW issue
+ * @soc: DP SOC handle
  *
  * This is a war for HW issue where length is only valid in last msdu
- * @soc: DP SOC handle
  *
  * Return: NONE
  */
@@ -3318,7 +3338,7 @@ bool dp_rx_null_q_handle_invalid_peer_id_exception(struct dp_soc *soc,
  */
 bool dp_rx_err_drop_3addr_mcast(struct dp_vdev *vdev, uint8_t *rx_tlv_hdr);
 
-/*
+/**
  * dp_rx_deliver_to_osif_stack() - function to deliver rx pkts to stack
  * @soc: DP soc
  * @vdev: DP vdev handle

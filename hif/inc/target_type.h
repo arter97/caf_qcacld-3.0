@@ -104,6 +104,11 @@ extern "C" {
 #define TARGET_TYPE_PEACH    37
 #endif
 
+/* Evros */
+#ifndef TARGET_TYPE_WCN6450
+#define TARGET_TYPE_WCN6450 38
+#endif
+
 #ifdef __cplusplus
 }
 #endif

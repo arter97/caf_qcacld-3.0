@@ -793,7 +793,8 @@ static void cm_get_vdev_id_with_active_vdev_op(struct wlan_objmgr_pdev *pdev,
 		return;
 	}
 
-	if (opmode == QDF_SAP_MODE || opmode == QDF_P2P_GO_MODE) {
+	if (opmode == QDF_SAP_MODE || opmode == QDF_P2P_GO_MODE ||
+	    opmode == QDF_NDI_MODE) {
 		/* Check if START/STOP AP OP is in progress */
 		if (wlan_ser_is_non_scan_cmd_type_in_vdev_queue(vdev,
 					WLAN_SER_CMD_VDEV_START_BSS) ||
@@ -853,7 +854,7 @@ cm_is_any_other_vdev_connecting_disconnecting(struct cnx_mgr *cm_ctx,
 	 */
 	if (cm_req->connect_req.cur_candidate &&
 	    vdev_arg.sap_go_vdev_id != WLAN_INVALID_VDEV_ID) {
-		mlme_info(CM_PREFIX_FMT "Avoid next candidate as SAP/GO vdev %d has pending vdev op",
+		mlme_info(CM_PREFIX_FMT "Avoid next candidate as SAP/GO/NDI vdev %d has pending vdev op",
 			  CM_PREFIX_REF(cur_vdev_id, cm_req->cm_id),
 			  vdev_arg.sap_go_vdev_id);
 		return true;
@@ -1998,48 +1999,50 @@ void cm_update_per_peer_key_mgmt_crypto_params(struct wlan_objmgr_vdev *vdev,
 	 * As there can be multiple AKM present select the most secured AKM
 	 * present
 	 */
-	if (QDF_HAS_PARAM(neg_akm, WLAN_CRYPTO_KEY_MGMT_FT_SAE))
+	if (QDF_HAS_PARAM(neg_akm, WLAN_CRYPTO_KEY_MGMT_FT_FILS_SHA384))
+		QDF_SET_PARAM(key_mgmt, WLAN_CRYPTO_KEY_MGMT_FT_FILS_SHA384);
+	else if (QDF_HAS_PARAM(neg_akm, WLAN_CRYPTO_KEY_MGMT_FT_FILS_SHA256))
+		QDF_SET_PARAM(key_mgmt, WLAN_CRYPTO_KEY_MGMT_FT_FILS_SHA256);
+	else if (QDF_HAS_PARAM(neg_akm, WLAN_CRYPTO_KEY_MGMT_FILS_SHA384))
+		QDF_SET_PARAM(key_mgmt, WLAN_CRYPTO_KEY_MGMT_FILS_SHA384);
+	else if (QDF_HAS_PARAM(neg_akm, WLAN_CRYPTO_KEY_MGMT_FILS_SHA256))
+		QDF_SET_PARAM(key_mgmt, WLAN_CRYPTO_KEY_MGMT_FILS_SHA256);
+	else if (QDF_HAS_PARAM(neg_akm,
+			       WLAN_CRYPTO_KEY_MGMT_FT_IEEE8021X_SHA384))
+		QDF_SET_PARAM(key_mgmt,
+			      WLAN_CRYPTO_KEY_MGMT_FT_IEEE8021X_SHA384);
+	else if (QDF_HAS_PARAM(neg_akm,
+			       WLAN_CRYPTO_KEY_MGMT_IEEE8021X_SUITE_B_192))
+		QDF_SET_PARAM(key_mgmt,
+			      WLAN_CRYPTO_KEY_MGMT_IEEE8021X_SUITE_B_192);
+	else if (QDF_HAS_PARAM(neg_akm, WLAN_CRYPTO_KEY_MGMT_IEEE8021X_SUITE_B))
+		QDF_SET_PARAM(key_mgmt, WLAN_CRYPTO_KEY_MGMT_IEEE8021X_SUITE_B);
+	else if (QDF_HAS_PARAM(neg_akm, WLAN_CRYPTO_KEY_MGMT_FT_SAE))
 		QDF_SET_PARAM(key_mgmt, WLAN_CRYPTO_KEY_MGMT_FT_SAE);
 	else if (QDF_HAS_PARAM(neg_akm, WLAN_CRYPTO_KEY_MGMT_SAE_EXT_KEY))
 		QDF_SET_PARAM(key_mgmt, WLAN_CRYPTO_KEY_MGMT_SAE_EXT_KEY);
 	else if (QDF_HAS_PARAM(neg_akm, WLAN_CRYPTO_KEY_MGMT_SAE))
 		QDF_SET_PARAM(key_mgmt, WLAN_CRYPTO_KEY_MGMT_SAE);
-	else if (QDF_HAS_PARAM(neg_akm, WLAN_CRYPTO_KEY_MGMT_IEEE8021X_SUITE_B))
-		QDF_SET_PARAM(key_mgmt, WLAN_CRYPTO_KEY_MGMT_IEEE8021X_SUITE_B);
-	else if (QDF_HAS_PARAM(neg_akm,
-			       WLAN_CRYPTO_KEY_MGMT_IEEE8021X_SUITE_B_192))
-		QDF_SET_PARAM(key_mgmt,
-			      WLAN_CRYPTO_KEY_MGMT_IEEE8021X_SUITE_B_192);
-	else if (QDF_HAS_PARAM(neg_akm, WLAN_CRYPTO_KEY_MGMT_FILS_SHA256))
-		QDF_SET_PARAM(key_mgmt, WLAN_CRYPTO_KEY_MGMT_FILS_SHA256);
-	else if (QDF_HAS_PARAM(neg_akm, WLAN_CRYPTO_KEY_MGMT_FILS_SHA384))
-		QDF_SET_PARAM(key_mgmt, WLAN_CRYPTO_KEY_MGMT_FILS_SHA384);
-	else if (QDF_HAS_PARAM(neg_akm, WLAN_CRYPTO_KEY_MGMT_FT_FILS_SHA256))
-		QDF_SET_PARAM(key_mgmt, WLAN_CRYPTO_KEY_MGMT_FT_FILS_SHA256);
-	else if (QDF_HAS_PARAM(neg_akm, WLAN_CRYPTO_KEY_MGMT_FT_FILS_SHA384))
-		QDF_SET_PARAM(key_mgmt, WLAN_CRYPTO_KEY_MGMT_FT_FILS_SHA384);
 	else if (QDF_HAS_PARAM(neg_akm, WLAN_CRYPTO_KEY_MGMT_OWE))
 		QDF_SET_PARAM(key_mgmt, WLAN_CRYPTO_KEY_MGMT_OWE);
 	else if (QDF_HAS_PARAM(neg_akm, WLAN_CRYPTO_KEY_MGMT_DPP))
 		QDF_SET_PARAM(key_mgmt, WLAN_CRYPTO_KEY_MGMT_DPP);
-	else if (QDF_HAS_PARAM(neg_akm,
-			       WLAN_CRYPTO_KEY_MGMT_FT_IEEE8021X_SHA384))
-		QDF_SET_PARAM(key_mgmt,
-			      WLAN_CRYPTO_KEY_MGMT_FT_IEEE8021X_SHA384);
-	else if (QDF_HAS_PARAM(neg_akm, WLAN_CRYPTO_KEY_MGMT_FT_PSK))
-		QDF_SET_PARAM(key_mgmt, WLAN_CRYPTO_KEY_MGMT_FT_PSK);
 	else if (QDF_HAS_PARAM(neg_akm, WLAN_CRYPTO_KEY_MGMT_FT_IEEE8021X))
 		QDF_SET_PARAM(key_mgmt, WLAN_CRYPTO_KEY_MGMT_FT_IEEE8021X);
-	else if (QDF_HAS_PARAM(neg_akm, WLAN_CRYPTO_KEY_MGMT_PSK))
-		QDF_SET_PARAM(key_mgmt, WLAN_CRYPTO_KEY_MGMT_PSK);
 	else if (QDF_HAS_PARAM(neg_akm, WLAN_CRYPTO_KEY_MGMT_IEEE8021X_SHA256))
 		QDF_SET_PARAM(key_mgmt, WLAN_CRYPTO_KEY_MGMT_IEEE8021X_SHA256);
-	else if (QDF_HAS_PARAM(neg_akm, WLAN_CRYPTO_KEY_MGMT_PSK_SHA256))
-		QDF_SET_PARAM(key_mgmt, WLAN_CRYPTO_KEY_MGMT_PSK_SHA256);
+	else if (QDF_HAS_PARAM(neg_akm, WLAN_CRYPTO_KEY_MGMT_IEEE8021X))
+		QDF_SET_PARAM(key_mgmt, WLAN_CRYPTO_KEY_MGMT_IEEE8021X);
 	else if (QDF_HAS_PARAM(neg_akm, WLAN_CRYPTO_KEY_MGMT_FT_PSK_SHA384))
 		QDF_SET_PARAM(key_mgmt, WLAN_CRYPTO_KEY_MGMT_FT_PSK_SHA384);
 	else if (QDF_HAS_PARAM(neg_akm, WLAN_CRYPTO_KEY_MGMT_PSK_SHA384))
 		QDF_SET_PARAM(key_mgmt, WLAN_CRYPTO_KEY_MGMT_PSK_SHA384);
+	else if (QDF_HAS_PARAM(neg_akm, WLAN_CRYPTO_KEY_MGMT_PSK_SHA256))
+		QDF_SET_PARAM(key_mgmt, WLAN_CRYPTO_KEY_MGMT_PSK_SHA256);
+	else if (QDF_HAS_PARAM(neg_akm, WLAN_CRYPTO_KEY_MGMT_FT_PSK))
+		QDF_SET_PARAM(key_mgmt, WLAN_CRYPTO_KEY_MGMT_FT_PSK);
+	else if (QDF_HAS_PARAM(neg_akm, WLAN_CRYPTO_KEY_MGMT_PSK))
+		QDF_SET_PARAM(key_mgmt, WLAN_CRYPTO_KEY_MGMT_PSK);
 	else if (QDF_HAS_PARAM(neg_akm, WLAN_CRYPTO_KEY_MGMT_WAPI_PSK))
 		QDF_SET_PARAM(key_mgmt, WLAN_CRYPTO_KEY_MGMT_WAPI_PSK);
 	else if (QDF_HAS_PARAM(neg_akm, WLAN_CRYPTO_KEY_MGMT_WAPI_CERT))
@@ -2050,8 +2053,6 @@ void cm_update_per_peer_key_mgmt_crypto_params(struct wlan_objmgr_vdev *vdev,
 		QDF_SET_PARAM(key_mgmt, WLAN_CRYPTO_KEY_MGMT_OSEN);
 	else if (QDF_HAS_PARAM(neg_akm, WLAN_CRYPTO_KEY_MGMT_WPS))
 		QDF_SET_PARAM(key_mgmt, WLAN_CRYPTO_KEY_MGMT_WPS);
-	else if (QDF_HAS_PARAM(neg_akm, WLAN_CRYPTO_KEY_MGMT_IEEE8021X))
-		QDF_SET_PARAM(key_mgmt, WLAN_CRYPTO_KEY_MGMT_IEEE8021X);
 	else if (QDF_HAS_PARAM(neg_akm, WLAN_CRYPTO_KEY_MGMT_IEEE8021X_NO_WPA))
 		QDF_SET_PARAM(key_mgmt, WLAN_CRYPTO_KEY_MGMT_IEEE8021X_NO_WPA);
 	else if (QDF_HAS_PARAM(neg_akm, WLAN_CRYPTO_KEY_MGMT_WPA_NONE))

@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2016-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -29,17 +29,6 @@ uint32_t hal_get_reo_reg_base_offset_be(void)
 	return REO_REG_REG_BASE;
 }
 
-/**
- * hal_reo_qdesc_setup - Setup HW REO queue descriptor
- *
- * @hal_soc: Opaque HAL SOC handle
- * @ba_window_size: BlockAck window size
- * @start_seq: Starting sequence number
- * @hw_qdesc_vaddr: Virtual address of REO queue descriptor memory
- * @hw_qdesc_paddr: Physical address of REO queue descriptor memory
- * @tid: TID
- *
- */
 void hal_reo_qdesc_setup_be(hal_soc_handle_t hal_soc_hdl, int tid,
 			    uint32_t ba_window_size,
 			    uint32_t start_seq, void *hw_qdesc_vaddr,
@@ -404,6 +393,9 @@ hal_reo_cmd_flush_cache_be(hal_ring_handle_t hal_ring_hdl,
 
 	HAL_DESC_64_SET_FIELD(reo_desc, REO_FLUSH_CACHE,
 			      FLUSH_WITHOUT_INVALIDATE, cp->flush_no_inval);
+
+	HAL_DESC_64_SET_FIELD(reo_desc, REO_FLUSH_CACHE,
+			      FLUSH_QUEUE_1K_DESC, cp->flush_q_1k_desc);
 
 	HAL_DESC_64_SET_FIELD(reo_desc, REO_FLUSH_CACHE,
 			      BLOCK_CACHE_USAGE_AFTER_FLUSH,

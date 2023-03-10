@@ -79,6 +79,14 @@ struct hif_ipci_stats {
 #define EP_WAKE_DELAY_US 200
 #endif
 
+#if defined(QCA_WIFI_WCN6450)
+#define HIF_IPCI_DEVICE_ID WCN6450_DEVICE_ID
+#elif defined(QCA_WIFI_QCA6750)
+#define HIF_IPCI_DEVICE_ID QCA6750_DEVICE_ID
+#else
+#define HIF_IPCI_DEVICE_ID 0
+#endif
+
 struct hif_ipci_softc {
 	struct HIF_CE_state ce_sc;
 	void __iomem *mem;      /* PCI address. */

@@ -2039,7 +2039,9 @@ QDF_STATUS wmi_unified_cmd_send_fl(wmi_unified_t wmi_handle, wmi_buf_t buf,
 		   !wmi_is_pm_resume_cmd(cmd_id) &&
 		   !wmi_is_legacy_d0wow_disable_cmd(buf, cmd_id)) {
 			wmi_nofl_err("Target is suspended (via %s:%u)",
-					func, line);
+				     func, line);
+			qdf_trigger_self_recovery(wmi_handle->soc->wmi_psoc,
+						  QDF_WMI_CMD_SENT_DURING_SUSPEND);
 		return QDF_STATUS_E_BUSY;
 	}
 

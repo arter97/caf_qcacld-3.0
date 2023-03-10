@@ -2605,6 +2605,21 @@ target_pdev_scan_radio_is_dfs_enabled(struct wlan_objmgr_pdev *pdev,
 				      bool *is_dfs_en);
 
 /**
+ * target_is_scan_blanking_enabled() - API to check
+ * whether scan blanking needs to be enabled/disabled for scan radio.
+ * @pdev:  pointer to pdev
+ * @blanking_en: Pointer to scan blanking enable flag
+ *
+ * API to check whether scan blanking needs to be enabled/disabled for
+ * scan radio. This API should be used only for a scan radio pdev.
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+target_is_scan_blanking_enabled(struct wlan_objmgr_pdev *pdev,
+				bool *blanking_en);
+
+/**
  * target_psoc_get_preamble_puncture_cap() - Get Preamble Puncturing capability
  * @psoc_info: pointer to structure target_psoc_info
  *

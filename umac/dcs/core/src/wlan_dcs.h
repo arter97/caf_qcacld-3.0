@@ -391,4 +391,16 @@ static inline void wlan_dcs_pdev_obj_unlock(struct dcs_pdev_priv_obj *dcs_pdev)
 {
 	qdf_spin_unlock_bh(&dcs_pdev->lock);
 }
+
+/**
+ * wlan_dcs_switch_chan() - switch channel for vdev
+ * @vdev: vdev ptr
+ * @tgt_freq: target frequency
+ * @tgt_width: target channel width
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+wlan_dcs_switch_chan(struct wlan_objmgr_vdev *vdev, qdf_freq_t tgt_freq,
+		     enum phy_ch_width tgt_width);
 #endif  /* _WLAN_DCS_H_ */

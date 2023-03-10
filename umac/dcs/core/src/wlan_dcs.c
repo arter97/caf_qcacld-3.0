@@ -714,15 +714,7 @@ static void wlan_dcs_frequency_control(struct wlan_objmgr_psoc *psoc,
 	}
 }
 
-/**
- * wlan_dcs_switch_chan() - switch channel for vdev
- * @vdev: vdev ptr
- * @tgt_freq: target frequency
- * @tgt_width: target channel width
- *
- * Return: QDF_STATUS
- */
-static QDF_STATUS
+QDF_STATUS
 wlan_dcs_switch_chan(struct wlan_objmgr_vdev *vdev, qdf_freq_t tgt_freq,
 		     enum phy_ch_width tgt_width)
 {
@@ -1514,8 +1506,9 @@ static enum phy_ch_width wlan_dcs_afc_reduce_bw(struct wlan_objmgr_pdev *pdev,
 		return input_bw;
 
 	while (input_bw > CH_WIDTH_20MHZ) {
-		state = wlan_reg_get_5g_bonded_channel_and_state_for_freq(
-				pdev, freq, input_bw, &bonded_chan_ptr);
+		state = wlan_reg_get_5g_bonded_channel_and_state_for_pwrmode(
+				pdev, freq, input_bw, &bonded_chan_ptr,
+				REG_CURRENT_PWR_MODE, NO_SCHANS_PUNC);
 		if (state != CHANNEL_STATE_ENABLE) {
 			input_bw = wlan_reg_get_next_lower_bandwidth(input_bw);
 			continue;

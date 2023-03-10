@@ -152,6 +152,7 @@ typedef struct big_data_stats_event stats_big_data_stats_event;
  * @send_req_infra_cp_stats: function pointer to send infra cp stats request
  *                           command to FW
  * @send_req_big_data_stats: Function pointer to send big data stats
+ * @send_req_telemetry_cp_stats: API to send stats request to wmi
  */
 struct wlan_lmac_if_cp_stats_tx_ops {
 	QDF_STATUS (*cp_stats_attach)(struct wlan_objmgr_psoc *psoc);
@@ -316,6 +317,8 @@ struct wlan_lmac_if_mgmt_rx_reo_low_level_ops {
  * @read_mgmt_rx_reo_snapshot: Read rx-reorder snapshots
  * @get_mgmt_rx_reo_snapshot_info: Get rx-reorder snapshot info
  * @mgmt_rx_reo_filter_config:  Configure MGMT Rx REO filter
+ * @schedule_delivery: Schedule delivery of management frames
+ * @cancel_scheduled_delivery: Cancel schedule delivery of management frames
  * @low_level_ops:  Low level operations of MGMT Rx REO module
  */
 struct wlan_lmac_if_mgmt_rx_reo_tx_ops {
@@ -337,6 +340,8 @@ struct wlan_lmac_if_mgmt_rx_reo_tx_ops {
 	QDF_STATUS (*mgmt_rx_reo_filter_config)(
 					struct wlan_objmgr_pdev *pdev,
 					struct mgmt_rx_reo_filter *filter);
+	QDF_STATUS (*schedule_delivery)(struct wlan_objmgr_psoc *psoc);
+	QDF_STATUS (*cancel_scheduled_delivery)(struct wlan_objmgr_psoc *psoc);
 	struct wlan_lmac_if_mgmt_rx_reo_low_level_ops low_level_ops;
 };
 
@@ -346,6 +351,7 @@ struct wlan_lmac_if_mgmt_rx_reo_tx_ops {
  * @fw_consumed_event_handler: FW consumed event handler
  * @host_drop_handler: Handler for the frames that gets dropped in Host before
  * entering REO algorithm
+ * @release_frames: Release management frames
  */
 struct wlan_lmac_if_mgmt_rx_reo_rx_ops {
 	QDF_STATUS (*fw_consumed_event_handler)(
@@ -354,6 +360,7 @@ struct wlan_lmac_if_mgmt_rx_reo_rx_ops {
 	QDF_STATUS (*host_drop_handler)(
 			struct wlan_objmgr_pdev *pdev,
 			struct mgmt_rx_reo_params *params);
+	QDF_STATUS (*release_frames)(struct wlan_objmgr_psoc *psoc);
 };
 #endif
 
@@ -723,15 +730,15 @@ struct wlan_lmac_if_fd_tx_ops {
 
 /**
  * struct wlan_lmac_if_sa_api_tx_ops - SA API specific tx function pointers
- * @sa_api_register_event_handler:
- * @sa_api_unregister_event_handler:
- * @sa_api_enable_sa:
- * @sa_api_set_rx_antenna:
- * @sa_api_set_tx_antenna:
- * @sa_api_set_tx_default_antenna:
- * @sa_api_set_training_info:
- * @sa_api_prepare_rateset:
- * @sa_api_set_node_config_ops:
+ * @sa_api_register_event_handler: Register event handler for Smart Antenna
+ * @sa_api_unregister_event_handler: Unregister event handler for Smart Antenna
+ * @sa_api_enable_sa: Enable Smart Antenna
+ * @sa_api_set_rx_antenna: Set Rx antenna
+ * @sa_api_set_tx_antenna: Set Tx antenna
+ * @sa_api_set_tx_default_antenna: Set default Tx antenna
+ * @sa_api_set_training_info: Set Smart Antenna training metrics
+ * @sa_api_prepare_rateset: Prepare rest set
+ * @sa_api_set_node_config_ops: Set Peer config operations structure
  */
 struct wlan_lmac_if_sa_api_tx_ops {
 	void (*sa_api_register_event_handler)(struct wlan_objmgr_psoc *psoc);
@@ -747,7 +754,9 @@ struct wlan_lmac_if_sa_api_tx_ops {
 	void (*sa_api_set_training_info) (struct wlan_objmgr_peer *peer,
 			uint32_t *rate_array,
 			uint32_t *antenna_array,
-			uint32_t numpkts);
+			uint32_t numpkts,
+			uint16_t minpkts,
+			uint16_t per_threshold);
 	void (*sa_api_prepare_rateset)(struct wlan_objmgr_pdev *pdev,
 			struct wlan_objmgr_peer *peer,
 			struct sa_rate_info *rate_info);
@@ -1096,6 +1105,12 @@ struct wlan_lmac_if_ftm_rx_ops {
  * @trigger_acs_for_afc: pointer to trigger acs for afc
  * @reg_get_min_psd:
  * @is_chip_11be:
+ * @register_rate2power_table_update_event_handler: pointer to register
+ *			rate2power table update event handler.
+ * @unregister_rate2power_table_update_event_handler: pointer to unregister
+ *			rate2power table update event handler.
+ * @end_r2p_table_update_wait: Call-back function to end the wait on r2p update
+ *			response from fw.
  */
 struct wlan_lmac_if_reg_tx_ops {
 	QDF_STATUS (*register_master_handler)(struct wlan_objmgr_psoc *psoc,
@@ -1156,6 +1171,15 @@ struct wlan_lmac_if_reg_tx_ops {
 #endif
 	bool (*is_chip_11be)(struct wlan_objmgr_psoc *psoc,
 			     uint16_t phy_id);
+	QDF_STATUS (*register_rate2power_table_update_event_handler)(
+			struct wlan_objmgr_psoc *psoc,
+			void *arg);
+	QDF_STATUS (*unregister_rate2power_table_update_event_handler)(
+			struct wlan_objmgr_psoc *psoc,
+			void *arg);
+	QDF_STATUS (*end_r2p_table_update_wait)(
+			struct wlan_objmgr_psoc *psoc,
+			uint32_t pdev_id);
 };
 
 /**
@@ -1842,6 +1866,8 @@ struct wlan_lmac_if_mgmt_txrx_rx_ops {
  * @reg_get_afc_dev_type:
  * @reg_set_eirp_preferred_support:
  * @reg_get_eirp_preferred_support:
+ * @reg_r2p_table_update_response_handler: function pointer to handle
+ *		rate2power update response from fw.
  */
 struct wlan_lmac_if_reg_rx_ops {
 	QDF_STATUS (*master_list_handler)(struct cur_regulatory_info
@@ -1925,6 +1951,9 @@ struct wlan_lmac_if_reg_rx_ops {
 				struct wlan_objmgr_psoc *psoc,
 				bool *reg_is_eirp_support_preferred);
 #endif
+	QDF_STATUS (*reg_r2p_table_update_response_handler)(
+			struct wlan_objmgr_psoc *psoc,
+			uint32_t pdev_id);
 };
 
 #ifdef CONVERGED_P2P_ENABLE

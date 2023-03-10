@@ -382,6 +382,118 @@ g_ml_ref:
 	ml_link_lock_release(g_mlo_ctx);
 	return ret_status;
 }
+
+#define WLAN_HDD_MGMT_FRAME_DA_OFFSET 4
+#define WLAN_HDD_MGMT_FRAME_SA_OFFSET (WLAN_HDD_MGMT_FRAME_DA_OFFSET + 6)
+#define WLAN_HDD_MGMT_FRAME_BSSID_OFFSET (WLAN_HDD_MGMT_FRAME_SA_OFFSET + 6)
+#define WLAN_HDD_MGMT_FRAME_ACTION_CATEGORY_OFFSET \
+				(WLAN_HDD_MGMT_FRAME_BSSID_OFFSET + 6 + 2)
+#define WLAN_HDD_MGMT_FRAME_ACTION_TYPE_OFFSET \
+				(WLAN_HDD_MGMT_FRAME_ACTION_CATEGORY_OFFSET + 1)
+#define WLAN_HDD_ACTION_FRAME_CATEGORY_PUBLIC 0x04
+
+/*
+ * Typical 802.11 Action Frame Format
+ * +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-
+ * | FC | DUR |  DA  |   SA  | BSSID |Seq.|Cat.|Act|   Elements   | FCS |
+ * +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-
+ *    2    2     6       6       6     2    1    1   Variable Len    4
+ */
+void wlan_mlo_update_action_frame_from_user(struct wlan_objmgr_vdev *vdev,
+					    uint8_t *frame,
+					    uint32_t frame_len)
+{
+	struct wlan_objmgr_peer *peer;
+	uint8_t *da, *sa, *bssid;
+
+	if (!wlan_vdev_mlme_is_mlo_vdev(vdev) ||
+	    (wlan_vdev_mlme_get_opmode(vdev) != QDF_STA_MODE))
+		return;
+
+	if (frame_len <= WLAN_HDD_MGMT_FRAME_ACTION_TYPE_OFFSET) {
+		mlo_debug("Not a valid Action frame len: %d", frame_len);
+		return;
+	}
+
+	/* Translate address only for action frames
+	 * which are not of public category.
+	 * Reference: 802.11-2012, Subclause: 8.5
+	 */
+
+	if (frame[WLAN_HDD_MGMT_FRAME_ACTION_CATEGORY_OFFSET] ==
+				WLAN_HDD_ACTION_FRAME_CATEGORY_PUBLIC)
+		return;
+
+	da = frame + WLAN_HDD_MGMT_FRAME_DA_OFFSET;
+	sa = frame + WLAN_HDD_MGMT_FRAME_SA_OFFSET;
+	bssid = frame + WLAN_HDD_MGMT_FRAME_BSSID_OFFSET;
+
+	peer = wlan_objmgr_vdev_try_get_bsspeer(vdev, WLAN_MLO_MGR_ID);
+	if (!peer) {
+		mlo_debug("Peer not found");
+		return;
+	}
+
+	mlo_debug("Change MLD addr to link addr for non-Public action frame");
+	/* DA = VDEV's BSS peer's link address.
+	 * SA = VDEV's link address.
+	 * BSSID = VDEV's BSS peer's link address.
+	 */
+
+	qdf_ether_addr_copy(da, wlan_peer_get_macaddr(peer));
+	qdf_ether_addr_copy(sa, wlan_vdev_mlme_get_macaddr(vdev));
+	qdf_ether_addr_copy(bssid, wlan_peer_get_macaddr(peer));
+
+	wlan_objmgr_peer_release_ref(peer, WLAN_MLO_MGR_ID);
+}
+
+void wlan_mlo_update_action_frame_to_user(struct wlan_objmgr_vdev *vdev,
+					  uint8_t *frame,
+					  uint32_t frame_len)
+{
+	struct wlan_objmgr_peer *peer;
+	uint8_t *da, *sa, *bssid;
+
+	if (!wlan_vdev_mlme_is_mlo_vdev(vdev) ||
+	    (wlan_vdev_mlme_get_opmode(vdev) != QDF_STA_MODE))
+		return;
+
+	if (frame_len <= WLAN_HDD_MGMT_FRAME_ACTION_TYPE_OFFSET) {
+		mlo_debug("Not a valid Action frame len: %d", frame_len);
+		return;
+	}
+
+	/* Translate address only for action frames
+	 * which are not of public category.
+	 * Reference: 802.11-2012, Subclause: 8.5
+	 */
+
+	if (frame[WLAN_HDD_MGMT_FRAME_ACTION_CATEGORY_OFFSET] ==
+				WLAN_HDD_ACTION_FRAME_CATEGORY_PUBLIC)
+		return;
+
+	da = frame + WLAN_HDD_MGMT_FRAME_DA_OFFSET;
+	sa = frame + WLAN_HDD_MGMT_FRAME_SA_OFFSET;
+	bssid = frame + WLAN_HDD_MGMT_FRAME_BSSID_OFFSET;
+
+	peer = wlan_objmgr_vdev_try_get_bsspeer(vdev, WLAN_MLO_MGR_ID);
+	if (!peer) {
+		mlo_debug("Peer not found");
+		return;
+	}
+
+	mlo_debug("Change link addr to MLD addr for non-Public action frame");
+	/* DA = VDEV's MLD address.
+	 * SA = VDEV's BSS peer's MLD address.
+	 * BSSID = VDEV's BSS peer's MLD address.
+	 */
+
+	qdf_ether_addr_copy(da, wlan_vdev_mlme_get_mldaddr(vdev));
+	qdf_ether_addr_copy(sa, wlan_peer_mlme_get_mldaddr(peer));
+	qdf_ether_addr_copy(bssid, wlan_peer_mlme_get_mldaddr(peer));
+
+	wlan_objmgr_peer_release_ref(peer, WLAN_MLO_MGR_ID);
+}
 #endif
 
 static QDF_STATUS mlo_ap_ctx_deinit(struct wlan_mlo_dev_context *ml_dev)

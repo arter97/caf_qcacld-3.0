@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -63,15 +63,17 @@ dp_umac_reset_send_setup_cmd(struct dp_soc *soc)
 	struct dp_htt_umac_reset_setup_cmd_params params;
 
 	umac_reset_ctx = &soc->umac_reset_ctx;
+	qdf_mem_zero(&params, sizeof(params));
 	ret = pld_get_user_msi_assignment(soc->osdev->dev, "DP",
 					  &msi_vector_count, &msi_base_data,
 					  &msi_vector_start);
-	if (ret)
-		return QDF_STATUS_E_FAILURE;
+	if (ret) {
+		params.msi_data = UMAC_RESET_IPC;
+	} else {
+		params.msi_data = (umac_reset_ctx->intr_offset %
+				  msi_vector_count) + msi_base_data;
+	}
 
-	qdf_mem_zero(&params, sizeof(params));
-	params.msi_data = (umac_reset_ctx->intr_offset % msi_vector_count) +
-				msi_base_data;
 	params.shmem_addr_low =
 		qdf_get_lower_32_bits(umac_reset_ctx->shmem_paddr_aligned);
 	params.shmem_addr_high =
@@ -175,7 +177,8 @@ QDF_STATUS dp_soc_umac_reset_deinit(struct cdp_soc_t *txrx_soc)
 }
 
 /**
- * dp_umac_reset_get_rx_event() - Extract the Rx event from the shared memory
+ * dp_umac_reset_get_rx_event_from_shmem() - Extract the Rx event from the
+ *                                           shared memory
  * @umac_reset_ctx: UMAC reset context
  *
  * Return: Extracted Rx event in the form of enumeration umac_reset_rx_event
@@ -374,6 +377,7 @@ QDF_STATUS dp_umac_reset_interrupt_attach(struct dp_soc *soc)
 	int msi_vector_count, ret;
 	uint32_t msi_base_data, msi_vector_start;
 	uint32_t umac_reset_vector, umac_reset_irq;
+	QDF_STATUS status;
 
 	if (!soc) {
 		dp_umac_reset_err("DP SOC is null");
@@ -396,21 +400,28 @@ QDF_STATUS dp_umac_reset_interrupt_attach(struct dp_soc *soc)
 					  &msi_vector_count, &msi_base_data,
 					  &msi_vector_start);
 	if (ret) {
-		dp_umac_reset_err("UMAC reset is only supported in MSI interrupt mode");
-		return QDF_STATUS_E_FAILURE;
-	}
+		/* UMAC reset uses IPC interrupt for AHB devices */
+		status = hif_get_umac_reset_irq(soc->hif_handle,
+						&umac_reset_irq);
+		if (status) {
+			dp_umac_reset_err("get_umac_reset_irq failed status %d",
+					  status);
+			return QDF_STATUS_E_FAILURE;
+		}
+	} else {
+		if (umac_reset_ctx->intr_offset < 0 ||
+		    umac_reset_ctx->intr_offset >= WLAN_CFG_INT_NUM_CONTEXTS) {
+			dp_umac_reset_err("Invalid interrupt offset");
+			return QDF_STATUS_E_FAILURE;
+		}
 
-	if (umac_reset_ctx->intr_offset < 0 ||
-	    umac_reset_ctx->intr_offset >= WLAN_CFG_INT_NUM_CONTEXTS) {
-		dp_umac_reset_err("Invalid interrupt offset");
-		return QDF_STATUS_E_FAILURE;
-	}
-
-	umac_reset_vector = msi_vector_start +
+		umac_reset_vector = msi_vector_start +
 			       (umac_reset_ctx->intr_offset % msi_vector_count);
 
-	/* Get IRQ number */
-	umac_reset_irq = pld_get_msi_irq(soc->osdev->dev, umac_reset_vector);
+		/* Get IRQ number */
+		umac_reset_irq = pld_get_msi_irq(soc->osdev->dev,
+						 umac_reset_vector);
+	}
 
 	/* Finally register to this IRQ from HIF layer */
 	return hif_register_umac_reset_handler(

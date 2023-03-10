@@ -117,49 +117,55 @@ struct hal_hw_cc_config {
 		 reserved:2;
 };
 
-/*
- * dp_hal_soc - opaque handle for DP HAL soc
- */
 struct hal_soc_handle;
+/*
+ * typedef hal_soc_handle_t - opaque handle for DP HAL soc
+ */
 typedef struct hal_soc_handle *hal_soc_handle_t;
 
-/**
- * hal_ring_desc - opaque handle for DP ring descriptor
- */
 struct hal_ring_desc;
+/*
+ * typedef hal_ring_desc_t - opaque handle for DP ring descriptor
+ */
 typedef struct hal_ring_desc *hal_ring_desc_t;
 
-/**
- * hal_link_desc - opaque handle for DP link descriptor
- */
 struct hal_link_desc;
+/*
+ * typedef hal_link_desc_t - opaque handle for DP link descriptor
+ */
 typedef struct hal_link_desc *hal_link_desc_t;
 
-/**
- * hal_rxdma_desc - opaque handle for DP rxdma dst ring descriptor
- */
 struct hal_rxdma_desc;
+/*
+ * typedef hal_rxdma_desc_t - opaque handle for DP rxdma dst ring descriptor
+ */
 typedef struct hal_rxdma_desc *hal_rxdma_desc_t;
 
-/**
- * hal_buff_addrinfo - opaque handle for DP buffer address info
- */
 struct hal_buff_addrinfo;
+/*
+ * typedef hal_buff_addrinfo_t - opaque handle for DP buffer address info
+ */
 typedef struct hal_buff_addrinfo *hal_buff_addrinfo_t;
 
-/**
- * hal_rx_mon_desc_info - opaque handle for sw monitor ring desc info
- */
 struct hal_rx_mon_desc_info;
+/*
+ * typedef hal_rx_mon_desc_info_t - opaque handle for sw monitor ring desc info
+ */
 typedef struct hal_rx_mon_desc_info *hal_rx_mon_desc_info_t;
 
 struct hal_buf_info;
+/*
+ * typedef hal_buf_info_t - opaque handle for HAL buffer info
+ */
 typedef struct hal_buf_info *hal_buf_info_t;
 
 struct rx_msdu_desc_info;
+/*
+ * typedef rx_msdu_desc_info_t - opaque handle for rx MSDU descriptor info
+ */
 typedef struct rx_msdu_desc_info *rx_msdu_desc_info_t;
 
-/**
+/*
  * Opaque handler for PPE VP config.
  */
 union hal_tx_ppe_vp_config;
@@ -421,11 +427,11 @@ enum hal_reo_remap_reg {
 #define SRNG_LOCK_DESTROY(_lock) qdf_spinlock_destroy(_lock)
 
 struct hal_soc;
-
-/**
- * dp_hal_ring - opaque handle for DP HAL SRNG
- */
 struct hal_ring_handle;
+
+/*
+ * typedef hal_ring_handle_t - opaque handle for DP HAL SRNG
+ */
 typedef struct hal_ring_handle *hal_ring_handle_t;
 
 #define MAX_SRNG_REG_GROUPS 2
@@ -540,6 +546,7 @@ struct hal_offload_info {
  * @HAL_SRNG_HIGH_WM_BIN_70_to_80: 70-80% SRNG entries used
  * @HAL_SRNG_HIGH_WM_BIN_80_to_90: 80-90% SRNG entries used
  * @HAL_SRNG_HIGH_WM_BIN_90_to_100: 90-100% SRNG entries used
+ * @HAL_SRNG_HIGH_WM_BIN_MAX: maximum enumeration
  */
 enum hal_srng_high_wm_bin {
 	HAL_SRNG_HIGH_WM_BIN_BELOW_50_PERCENT,
@@ -570,23 +577,23 @@ struct hal_srng_high_wm_info {
 
 /**
  * enum hal_scratch_reg_enum - Enum to indicate scratch register values
- * @PMM_QTIMER_GLOBAL_OFFSET_LO_US - QTIMER GLOBAL OFFSET LOW
- * @PMM_QTIMER_GLOBAL_OFFSET_HI_US - QTIMER GLOBAL OFFSET HIGH
- * @PMM_MAC0_TSF1_OFFSET_LO_US - MAC0 TSF1 OFFSET LOW
- * @PMM_MAC0_TSF1_OFFSET_HI_US - MAC0 TSF1 OFFSET HIGH
- * @PMM_MAC0_TSF2_OFFSET_LO_US - MAC0 TSF2 OFFSET LOW
- * @PMM_MAC0_TSF2_OFFSET_HI_US - MAC0 TSF2 OFFSET HIGH
- * @PMM_MAC1_TSF1_OFFSET_LO_US - MAC1 TSF1 OFFSET LOW
- * @PMM_MAC1_TSF1_OFFSET_HI_US - MAC1 TSF1 OFFSET HIGH
- * @PMM_MAC1_TSF2_OFFSET_LO_US - MAC1 TSF2 OFFSET LOW
- * @PMM_MAC1_TSF2_OFFSET_HI_US - MAC1 TSF2 OFFSET HIGH
- * @PMM_MLO_OFFSET_LO_US - MLO OFFSET LOW
- * @PMM_MLO_OFFSET_HI_US - MLO OFFSET HIGH
- * @PMM_TQM_CLOCK_OFFSET_LO_US - TQM CLOCK OFFSET LOW
- * @PMM_TQM_CLOCK_OFFSET_HI_US - TQM CLOCK OFFSET HIGH
- * @PMM_Q6_CRASH_REASON - Q6 CRASH REASON
- * @PMM_SCRATCH_TWT_OFFSET - TWT OFFSET
- * @PMM_PMM_REG_MAX - Max PMM REG value
+ * @PMM_QTIMER_GLOBAL_OFFSET_LO_US: QTIMER GLOBAL OFFSET LOW
+ * @PMM_QTIMER_GLOBAL_OFFSET_HI_US: QTIMER GLOBAL OFFSET HIGH
+ * @PMM_MAC0_TSF1_OFFSET_LO_US: MAC0 TSF1 OFFSET LOW
+ * @PMM_MAC0_TSF1_OFFSET_HI_US: MAC0 TSF1 OFFSET HIGH
+ * @PMM_MAC0_TSF2_OFFSET_LO_US: MAC0 TSF2 OFFSET LOW
+ * @PMM_MAC0_TSF2_OFFSET_HI_US: MAC0 TSF2 OFFSET HIGH
+ * @PMM_MAC1_TSF1_OFFSET_LO_US: MAC1 TSF1 OFFSET LOW
+ * @PMM_MAC1_TSF1_OFFSET_HI_US: MAC1 TSF1 OFFSET HIGH
+ * @PMM_MAC1_TSF2_OFFSET_LO_US: MAC1 TSF2 OFFSET LOW
+ * @PMM_MAC1_TSF2_OFFSET_HI_US: MAC1 TSF2 OFFSET HIGH
+ * @PMM_MLO_OFFSET_LO_US: MLO OFFSET LOW
+ * @PMM_MLO_OFFSET_HI_US: MLO OFFSET HIGH
+ * @PMM_TQM_CLOCK_OFFSET_LO_US: TQM CLOCK OFFSET LOW
+ * @PMM_TQM_CLOCK_OFFSET_HI_US: TQM CLOCK OFFSET HIGH
+ * @PMM_Q6_CRASH_REASON: Q6 CRASH REASON
+ * @PMM_SCRATCH_TWT_OFFSET: TWT OFFSET
+ * @PMM_PMM_REG_MAX: Max PMM REG value
  */
 enum hal_scratch_reg_enum {
 	PMM_QTIMER_GLOBAL_OFFSET_LO_US,
@@ -613,8 +620,8 @@ enum hal_scratch_reg_enum {
  *
  * @tsf_id: tsf id
  * @mac_id: mac id
- * @enum_lo: Pointer to update low scratch register
- * @enum_hi: Pointer to update hi scratch register
+ * @tsf_enum_low: Pointer to update low scratch register
+ * @tsf_enum_hi: Pointer to update hi scratch register
  *
  * Return: void
  */
@@ -1412,77 +1419,90 @@ struct hal_suspend_write_history {
  * struct hal_soc - HAL context to be used to access SRNG APIs
  *		    (currently used by data path and
  *		    transport (CE) modules)
+ * @hif_handle: HIF handle to access HW registers
+ * @qdf_dev: QDF device handle
+ * @dev_base_addr: Device base address
+ * @dev_base_addr_ce: Device base address for ce - qca5018 target
+ * @dev_base_addr_cmem: Device base address for CMEM
+ * @dev_base_addr_pmm: Device base address for PMM
+ * @srng_list: HAL internal state for all SRNG rings
+ * @shadow_rdptr_mem_vaddr: Remote pointer memory for HW/FW updates (virtual)
+ * @shadow_rdptr_mem_paddr: Remote pointer memory for HW/FW updates (physical)
+ * @shadow_wrptr_mem_vaddr: Shared memory for ring pointer updates from host
+ *                          to FW (virtual)
+ * @shadow_wrptr_mem_paddr: Shared memory for ring pointer updates from host
+ *                          to FW (physical)
+ * @reo_res_bitmap: REO blocking resource index
+ * @index:
+ * @target_type:
+ * @version:
+ * @shadow_config: shadow register configuration
+ * @num_shadow_registers_configured:
+ * @use_register_windowing:
+ * @register_window:
+ * @register_access_lock:
+ * @static_window_map: Static window map configuration for multiple window write
+ * @hw_srng_table: srng table
+ * @hal_hw_reg_offset:
+ * @ops: TXRX operations
+ * @init_phase: Indicate srngs initialization
+ * @stats: Hal level stats
+ * @reg_wr_fail_hist: write failure history
+ * @reg_write_queue: queue(array) to hold register writes
+ * @reg_write_work: delayed work to be queued into workqueue
+ * @reg_write_wq: workqueue for delayed register writes
+ * @write_idx: write index used by caller to enqueue delayed work
+ * @read_idx: read index used by worker thread to dequeue/write registers
+ * @active_work_cnt:
  * @list_shadow_reg_config: array of generic regs mapped to
  *			    shadow regs
  * @num_generic_shadow_regs_configured: number of generic regs
  *					mapped to shadow regs
+ * @dmac_cmn_src_rxbuf_ring: flag to indicate cmn dmac rings in beryllium
+ * @reo_qref: Reo queue ref table items
  */
 struct hal_soc {
-	/* HIF handle to access HW registers */
 	struct hif_opaque_softc *hif_handle;
-
-	/* QDF device handle */
 	qdf_device_t qdf_dev;
-
-	/* Device base address */
 	void *dev_base_addr;
-	/* Device base address for ce - qca5018 target */
 	void *dev_base_addr_ce;
-
 	void *dev_base_addr_cmem;
-
 	void *dev_base_addr_pmm;
-	/* HAL internal state for all SRNG rings.
-	 * TODO: See if this is required
-	 */
 	struct hal_srng srng_list[HAL_SRNG_ID_MAX];
 
-	/* Remote pointer memory for HW/FW updates */
 	uint32_t *shadow_rdptr_mem_vaddr;
 	qdf_dma_addr_t shadow_rdptr_mem_paddr;
 
-	/* Shared memory for ring pointer updates from host to FW */
 	uint32_t *shadow_wrptr_mem_vaddr;
 	qdf_dma_addr_t shadow_wrptr_mem_paddr;
 
-	/* REO blocking resource index */
 	uint8_t reo_res_bitmap;
 	uint8_t index;
 	uint32_t target_type;
 	uint32_t version;
 
-	/* shadow register configuration */
 	union hal_shadow_reg_cfg shadow_config[MAX_SHADOW_REGISTERS];
 	int num_shadow_registers_configured;
 	bool use_register_windowing;
 	uint32_t register_window;
 	qdf_spinlock_t register_access_lock;
 
-	/* Static window map configuration for multiple window write*/
 	bool static_window_map;
 
-	/* srng table */
 	struct hal_hw_srng_config *hw_srng_table;
 	int32_t hal_hw_reg_offset[SRNG_REGISTER_MAX];
 	struct hal_hw_txrx_ops *ops;
 
-	/* Indicate srngs initialization */
 	bool init_phase;
-	/* Hal level stats */
 	struct hal_soc_stats stats;
 #ifdef ENABLE_HAL_REG_WR_HISTORY
 	struct hal_reg_write_fail_history *reg_wr_fail_hist;
 #endif
 #ifdef FEATURE_HAL_DELAYED_REG_WRITE
-	/* queue(array) to hold register writes */
 	struct hal_reg_write_q_elem *reg_write_queue;
-	/* delayed work to be queued into workqueue */
 	qdf_work_t reg_write_work;
-	/* workqueue for delayed register writes */
 	qdf_workqueue_t *reg_write_wq;
-	/* write index used by caller to enqueue delayed work */
 	qdf_atomic_t write_idx;
-	/* read index used by worker thread to dequeue/write registers */
 	uint32_t read_idx;
 #endif /*FEATURE_HAL_DELAYED_REG_WRITE */
 	qdf_atomic_t active_work_cnt;
@@ -1491,15 +1511,13 @@ struct hal_soc {
 		list_shadow_reg_config[MAX_GENERIC_SHADOW_REG];
 	int num_generic_shadow_regs_configured;
 #endif
-	/* flag to indicate cmn dmac rings in berryllium */
 	bool dmac_cmn_src_rxbuf_ring;
-	/* Reo queue ref table items */
 	struct reo_queue_ref_table reo_qref;
 };
 
 #if defined(FEATURE_HAL_DELAYED_REG_WRITE)
 /**
- *  hal_delayed_reg_write() - delayed register write
+ * hal_delayed_reg_write() - delayed register write
  * @hal_soc: HAL soc handle
  * @srng: hal srng
  * @addr: iomem address
@@ -1530,9 +1548,9 @@ void hal_qcn9224v1_attach(struct hal_soc *hal_soc);
 void hal_qcn9224v2_attach(struct hal_soc *hal_soc);
 
 /**
- * hal_soc_to_dp_hal_roc() - API to convert hal_soc to opaque
- * dp_hal_soc handle type
- * @hal_soc - hal_soc type
+ * hal_soc_to_hal_soc_handle() - API to convert hal_soc to opaque
+ *                               hal_soc_handle_t type
+ * @hal_soc: hal_soc type
  *
  * Return: hal_soc_handle_t type
  */
@@ -1542,10 +1560,10 @@ hal_soc_handle_t hal_soc_to_hal_soc_handle(struct hal_soc *hal_soc)
 	return (hal_soc_handle_t)hal_soc;
 }
 
-/*
- * hal_srng_to_hal_ring_handle - API to convert hal_srng to opaque
- * dp_hal_ring handle type
- * @hal_srng - hal_srng type
+/**
+ * hal_srng_to_hal_ring_handle() - API to convert hal_srng to opaque
+ *                                 hal_ring handle_t type
+ * @hal_srng: hal_srng type
  *
  * Return: hal_ring_handle_t type
  */
@@ -1555,9 +1573,9 @@ hal_ring_handle_t hal_srng_to_hal_ring_handle(struct hal_srng *hal_srng)
 	return (hal_ring_handle_t)hal_srng;
 }
 
-/*
- * hal_ring_handle_to_hal_srng - API to convert dp_hal_ring to hal_srng handle
- * @hal_ring - hal_ring_handle_t type
+/**
+ * hal_ring_handle_to_hal_srng() - API to convert hal_ring_handle_t to hal_srng
+ * @hal_ring: hal_ring_handle_t type
  *
  * Return: hal_srng pointer type
  */
@@ -1595,6 +1613,7 @@ struct hal_srng *hal_ring_handle_to_hal_srng(hal_ring_handle_t hal_ring)
  * @HAL_DOT11BE: 802.11be PPDU type
  * @HAL_DOT11AZ: 802.11az (ranging) PPDU type
  * @HAL_DOT11N_GF: 802.11n Green Field PPDU type
+ * @HAL_DOT11_MAX: Maximum enumeration
  *
  * Enum indicating the packet type reported by HW in rx_pkt_tlvs (RX data)
  * or WBM2SW ring entry's descriptor (TX data completion)

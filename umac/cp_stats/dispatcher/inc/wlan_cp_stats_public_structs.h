@@ -184,8 +184,7 @@ struct ctrl_path_pmlo_telemetry_stats_struct {
  *                          available
  * @twt_infra_cp_stats: pointer to TWT session statistics structures
  * @bmiss_infra_cp_stats: pointer to beacon miss statistics
- * @ctrl_path_pmlo_telemetry_stats_struct: pointer to pmlo telemetry
- *                                         stats struct
+ * @telemetry_stats: pointer to pmlo telemetry stats struct
  *
  * This structure is used to store the statistics information
  * extracted from firmware event(wmi_pdev_cp_fwstats_eventid)
@@ -241,6 +240,7 @@ enum infra_cp_stats_id {
  *             valid dialog_id's representing a single TWT session.
  *             255 represents all twt sessions
  * @infra_cp_stats_resp_cb: callback function to handle the response
+ * @stat_periodicity: WMI ctrl-path stats event periodicity
  */
 struct infra_cp_stats_cmd_info {
 	enum infra_cp_stats_id stats_id;

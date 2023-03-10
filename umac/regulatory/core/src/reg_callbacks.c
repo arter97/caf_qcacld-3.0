@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2014-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -120,6 +120,7 @@ reg_fill_freq_ext_payload(struct reg_sched_payload **payload,
  * reg_alloc_and_fill_payload() - Alloc and fill payload structure.
  * @psoc: Pointer to global psoc structure.
  * @pdev: Pointer to global pdev structure.
+ * @payload: output pointer to allocated payload buffer
  */
 static void reg_alloc_and_fill_payload(struct wlan_objmgr_psoc *psoc,
 				       struct wlan_objmgr_pdev *pdev,
