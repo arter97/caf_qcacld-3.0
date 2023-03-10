@@ -929,6 +929,65 @@ typedef struct {
 	uint64_t	tx_tsf;
 } wmi_host_mgmt_tx_compl_event;
 
+#ifdef QCA_MANUAL_TRIGGERED_ULOFDMA
+#define MAX_ULOFDMA_SU_TRIGGER 8
+#define MAX_ULOFDMA_MU_PEER 8
+#define WMI_HOST_ULOFDMA_SU_TRIGGER 0
+#define WMI_HOST_ULOFDMA_MU_TRIGGER 1
+
+/**
+ * enum wmi_host_ulofdma_trig_status - manual ulofdma trig response status
+ * @wmi_host_ul_ofdma_manual_trig_txerr_none - none
+ * @wmi_host_ul_ofdma_manual_trig_txerr_resp - response timeout, mismatch
+ *                                             BW mismatch, mimo ctrl mismatch
+ *                                             CRC error..
+ * @wmi_host_ul_ofdma_manual_trig_txerr_filt - blocked by tx filtering
+ * @wmi_host_ul_ofdma_manual_trig_txerr_fifo - fifo, misc errors in HW
+ * @wmi_host_ul_ofdma_manual_trig_txerr_swabort - software initialted abort
+ *                                                (TX_ABORT)
+ * @wmi_host_ul_ofdma_manual_trig_txerr_max - max status
+ * @wmi_host_ul_ofdma_manual_trig_txerr_invalid - invalid status
+ */
+typedef enum {
+	wmi_host_ul_ofdma_manual_trig_txerr_none,
+	wmi_host_ul_ofdma_manual_trig_txerr_resp,
+	wmi_host_ul_ofdma_manual_trig_txerr_filt,
+	wmi_host_ul_ofdma_manual_trig_txerr_fifo,
+	wmi_host_ul_ofdma_manual_trig_txerr_swabort,
+	wmi_host_ul_ofdma_manual_trig_txerr_max     = 0xff,
+	wmi_host_ul_ofdma_manual_trig_txerr_invalid =
+					wmi_host_ul_ofdma_manual_trig_txerr_max,
+} wmi_host_ulofdma_trig_status;
+
+/**
+ * struct wmi_host_manual_ul_ofdma_trig_feedback_evt - Trigger feedback event
+ * @vdev_id: Associated vdev_id
+ * @trigger_type: SU-0, MU-1
+ * @curr_su_manual_trig: current_su_manual_trig
+ * @remaining_su_manual_trig: remaining_su_manual_trig
+ * @remaining_mu_trig_peers: remaining_mu_trig_peers
+ * @manual_trig_status: manual trigger status
+ * @macaddr: peer macaddr
+ * @num_peer: number of peers
+ */
+typedef struct {
+	uint32_t vdev_id;
+	uint32_t trigger_type;
+	wmi_host_ulofdma_trig_status manual_trig_status;
+	uint8_t  macaddr[MAX_ULOFDMA_MU_PEER][QDF_MAC_ADDR_SIZE];
+	uint8_t  num_peer;
+	union {
+		struct {
+			uint32_t curr_su_manual_trig;
+			uint32_t remaining_su_manual_trig;
+		} su;
+		struct {
+			uint32_t remaining_mu_trig_peers;
+		} mu;
+	} u;
+} wmi_host_manual_ul_ofdma_trig_feedback_evt;
+#endif
+
 /**
  * struct wmi_host_chan_info_event - Channel info WMI event
  * @pdev_id: pdev_id
@@ -1112,6 +1171,48 @@ struct wmi_peer_latency_config_params {
 	uint32_t num_peer;
 	uint32_t pdev_id;
 	struct wmi_peer_latency_info_params latency_info[2];
+};
+#endif
+
+#ifdef QCA_MANUAL_TRIGGERED_ULOFDMA
+/**
+ * struct wmi_trigger_ul_ofdma_su_params - SU manual trigger ul_ofdma info
+ * @vdev_id: Associated vdev id
+ * @length: trigger length
+ * @nss : trigger nss value
+ * @mcs : trigger mcs value
+ * @gi_ltf: trigger gi_ltf value
+ * @reserved: reserved bits
+ * @rssi : trigger rssi value
+ * @macaddr : Peer macaddr
+ * @preferred_ac: Preferred AC
+ * @num_trigger: Number of SU ULOFDMA triggers
+ */
+struct wmi_trigger_ul_ofdma_su_params {
+	uint32_t vdev_id;
+	uint32_t length:12,
+		 nss:4,
+		 mcs:4,
+		 gi_ltf:2,
+		 reserved:10;
+	int8_t rssi;
+	uint8_t macaddr[QDF_MAC_ADDR_SIZE];
+	uint8_t preferred_ac;
+	uint8_t num_trigger;
+};
+
+/**
+ * struct wmi_trigger_ul_ofdma_mu_params - MU manual trigger ul_ofdma info
+ * @vdev_id: Associated vdev id
+ * @num_peer: Number of MU ULOFDMA peers
+ * @preferred_ac: Preferred AC
+ * @macaddr : Peer macaddr
+ */
+struct wmi_trigger_ul_ofdma_mu_params {
+	uint32_t vdev_id;
+	uint8_t num_peer;
+	uint8_t preferred_ac;
+	uint8_t macaddr[MAX_ULOFDMA_MU_PEER][QDF_MAC_ADDR_SIZE];
 };
 #endif
 

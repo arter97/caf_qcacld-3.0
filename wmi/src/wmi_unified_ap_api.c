@@ -555,6 +555,27 @@ QDF_STATUS wmi_extract_mgmt_tx_compl_param(
 	return QDF_STATUS_E_FAILURE;
 }
 
+#ifdef QCA_MANUAL_TRIGGERED_ULOFDMA
+/**
+ * wmi_extract_ulofdma_trigger_feedback_event - extract ulofdma trig feedback
+ * @wmi_handle: wmi handle
+ * @evt_buf: event buffer
+ * @feedback: feedback to be extracted from event buffer
+ *
+ * Return: QDF_STATUS_SUCCESS on success and QDF_STATUS_E_FAILURE for failure
+ */
+QDF_STATUS wmi_extract_ulofdma_trigger_feedback_event(
+		wmi_unified_t wmi_handle, void *evt_buf,
+		wmi_host_manual_ul_ofdma_trig_feedback_evt *feedback)
+{
+	if (wmi_handle->ops->extract_ulofdma_trigger_feedback_event)
+		return wmi_handle->ops->extract_ulofdma_trigger_feedback_event(
+					wmi_handle, evt_buf, feedback);
+
+	return QDF_STATUS_E_FAILURE;
+}
+#endif
+
 QDF_STATUS wmi_extract_chan_info_event(
 		wmi_unified_t wmi_handle, void *evt_buf,
 		wmi_host_chan_info_event *chan_info)
@@ -747,6 +768,46 @@ QDF_STATUS wmi_unified_config_peer_latency_info_cmd_send(
 				wmi_handle, param);
 	return QDF_STATUS_E_FAILURE;
 }
+
+#ifdef QCA_MANUAL_TRIGGERED_ULOFDMA
+/**
+ * wmi_unified_config_trigger_ulofdma_su_cmd_send() - WMI SU ULOFDMA trigger
+ * @wmi_hdl: wmi handle
+ * @param: pointer to hold peer config SU trigger info
+ *
+ * Return: QDF_STATUS_SUCCESS on success and QDF_STATUS_E_FAILURE for failure
+ */
+QDF_STATUS wmi_unified_config_trigger_ulofdma_su_cmd_send(
+		wmi_unified_t wmi_hdl,
+		struct wmi_trigger_ul_ofdma_su_params *param)
+{
+	wmi_unified_t wmi_handle = wmi_hdl;
+
+	if (wmi_handle->ops->trigger_ulofdma_su_cmd)
+		return wmi_handle->ops->trigger_ulofdma_su_cmd(
+				wmi_handle, param);
+	return QDF_STATUS_E_FAILURE;
+}
+
+/**
+ * wmi_unified_config_trigger_ulofdma_mu_cmd_send() - WMI MU ULOFDMA trigger
+ * @wmi_hdl: wmi handle
+ * @param: pointer to hold peer config MU trigger info
+ *
+ * Return: QDF_STATUS_SUCCESS on success and QDF_STATUS_E_FAILURE for failure
+ */
+QDF_STATUS wmi_unified_config_trigger_ulofdma_mu_cmd_send(
+		wmi_unified_t wmi_hdl,
+		struct wmi_trigger_ul_ofdma_mu_params *param)
+{
+	wmi_unified_t wmi_handle = wmi_hdl;
+
+	if (wmi_handle->ops->trigger_ulofdma_mu_cmd)
+		return wmi_handle->ops->trigger_ulofdma_mu_cmd(
+				wmi_handle, param);
+	return QDF_STATUS_E_FAILURE;
+}
+#endif
 
 /**
  * wmi_unified_vdev_set_intra_bss_cmd_send() - Set inta bss params
