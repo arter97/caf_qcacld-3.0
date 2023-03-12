@@ -678,6 +678,11 @@ struct cdp_cmn_ops {
 					  uint8_t *mac,
 					  ol_txrx_rx_fp rx,
 					  ol_osif_peer_handle osif_peer);
+	QDF_STATUS (*get_wds_ext_peer_osif_handle)
+					(ol_txrx_soc_handle soc,
+					 uint8_t vdev_id,
+					 uint8_t *mac,
+					 ol_osif_peer_handle *osif_peer);
 #endif /* QCA_SUPPORT_WDS_EXTENDED */
 	void (*txrx_drain)(ol_txrx_soc_handle soc);
 	int (*get_free_desc_poolsize)(struct cdp_soc_t *soc);
