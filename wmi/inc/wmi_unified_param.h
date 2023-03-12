@@ -5264,6 +5264,7 @@ typedef enum {
 	wmi_pdev_set_tgtr2p_table_eventid,
 #ifdef QCA_MANUAL_TRIGGERED_ULOFDMA
 	wmi_manual_ul_ofdma_trig_feedback_eventid,
+	wmi_manual_ul_ofdma_trig_rx_peer_userinfo_eventid,
 #endif
 #ifdef QCA_STANDALONE_SOUNDING_TRIGGER
 	wmi_vdev_standalone_sound_complete_eventid,

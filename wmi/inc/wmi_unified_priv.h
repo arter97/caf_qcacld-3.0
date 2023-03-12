@@ -1541,6 +1541,11 @@ QDF_STATUS
 		wmi_unified_t wmi_handle,
 		void *evt_buf,
 		wmi_host_manual_ul_ofdma_trig_feedback_evt *feedback);
+
+QDF_STATUS
+(*extract_ul_ofdma_trig_rx_peer_userinfo)(wmi_unified_t wmi_handle,
+		void *evt_buf,
+		struct wmi_host_rx_peer_userinfo_evt_data *resp);
 #endif
 
 QDF_STATUS (*extract_channel_hopping_event)(wmi_unified_t wmi_handle,

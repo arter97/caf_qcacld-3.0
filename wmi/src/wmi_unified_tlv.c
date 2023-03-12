@@ -21446,6 +21446,8 @@ static void populate_tlv_events_id(WMI_EVT_ID *event_ids)
 #ifdef QCA_MANUAL_TRIGGERED_ULOFDMA
 	event_ids[wmi_manual_ul_ofdma_trig_feedback_eventid] =
 		WMI_MANUAL_UL_OFDMA_TRIG_FEEDBACK_EVENTID;
+	event_ids[wmi_manual_ul_ofdma_trig_rx_peer_userinfo_eventid] =
+		WMI_MANUAL_UL_OFDMA_TRIG_RX_PEER_USERINFO_EVENTID;
 #endif
 #ifdef QCA_STANDALONE_SOUNDING_TRIGGER
 	event_ids[wmi_vdev_standalone_sound_complete_eventid] =
