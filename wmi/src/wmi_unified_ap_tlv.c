@@ -2867,7 +2867,80 @@ extract_ulofdma_trigger_feedback_event_tlv(
 
 	return QDF_STATUS_SUCCESS;
 }
-#endif
+
+/**
+ * extract_ul_ofdma_trig_rx_peer_userinfo_tlv() - extract trigger response info
+ * @wmi_handle: wmi handle
+ * @evt_buf: event buffer
+ * @resp: Pointer to hold ULOFDMA trigger response info
+ *
+ * Return: QDF_STATUS_SUCCESS for success or error code
+ */
+QDF_STATUS
+extract_ul_ofdma_trig_rx_peer_userinfo_tlv(
+		wmi_unified_t wmi_handle, void *evt_buf,
+		struct wmi_host_rx_peer_userinfo_evt_data *resp)
+{
+	WMI_MANUAL_UL_OFDMA_TRIG_RX_PEER_USERINFO_EVENTID_param_tlvs *param_buf;
+	wmi_manual_ul_ofdma_trig_rx_peer_userinfo_evt_fixed_param *fixed_param;
+	wmi_manual_ul_ofdma_trig_rx_peer_userinfo *buf;
+	int i;
+
+	param_buf = (WMI_MANUAL_UL_OFDMA_TRIG_RX_PEER_USERINFO_EVENTID_param_tlvs *)evt_buf;
+	if (!param_buf) {
+		wmi_err("Invalid RX PEER USERINFO buffer");
+		return QDF_STATUS_E_INVAL;
+	}
+	fixed_param = param_buf->fixed_param;
+	if (param_buf->num_rx_peer_userinfo >
+			((WMI_SVC_MSG_MAX_SIZE - sizeof(*fixed_param)) /
+			 sizeof(wmi_manual_ul_ofdma_trig_rx_peer_userinfo))) {
+		wmi_err("Invalid TLV size");
+		return QDF_STATUS_E_INVAL;
+	}
+	if (!param_buf->num_rx_peer_userinfo ||
+	    param_buf->num_rx_peer_userinfo > MAX_ULOFDMA_MU_PEER) {
+		wmi_err("Invalid num TLV:%d", param_buf->num_rx_peer_userinfo);
+		return QDF_STATUS_E_INVAL;
+	}
+
+	resp->comm_info.vdev_id = fixed_param->vdev_id;
+	if (resp->comm_info.vdev_id >= WLAN_UMAC_PDEV_MAX_VDEVS) {
+		wmi_err("Invalid vdev id:%d", resp->comm_info.vdev_id);
+		return QDF_STATUS_E_INVAL;
+	}
+	resp->comm_info.rx_ppdu_resp_type = fixed_param->rx_ppdu_resp_type;
+	resp->comm_info.rx_resp_bw = fixed_param->rx_resp_bw;
+	resp->comm_info.combined_rssi = fixed_param->combined_rssi;
+
+	buf = param_buf->rx_peer_userinfo;
+	if (!buf) {
+		wmi_err("NULL peer param TLV");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	wmi_debug("num_rx_peer_userinfo:%d", param_buf->num_rx_peer_userinfo);
+	for (i = 0; i < param_buf->num_rx_peer_userinfo; i++) {
+		WMI_MAC_ADDR_TO_CHAR_ARRAY(&buf->peer_macaddr,
+					   resp->peer_info[i].peer_mac.bytes);
+		resp->peer_info[i].resp_type =
+			WMI_GET_RX_PEER_STATS_RESP_TYPE(buf->rx_peer_stats);
+		resp->peer_info[i].mcs =
+			WMI_GET_RX_PEER_STATS_MCS(buf->rx_peer_stats);
+		resp->peer_info[i].nss =
+			WMI_GET_RX_PEER_STATS_NSS(buf->rx_peer_stats);
+		resp->peer_info[i].gi_ltf_type =
+			WMI_GET_RX_PEER_STATS_GI_LTF_TYPE(buf->rx_peer_stats);
+		qdf_mem_copy(&resp->peer_info[i].per_chain_rssi,
+			     &buf->peer_per_chain_rssi,
+			     sizeof(resp->peer_info[i].per_chain_rssi));
+		resp->comm_info.num_peers++;
+		buf++;
+	}
+
+	return QDF_STATUS_SUCCESS;
+}
+#endif /* QCA_MANUAL_TRIGGERED_ULOFDMA */
 
 /**
  * extract_chan_info_event_tlv() - extract chan information from event
@@ -4404,6 +4477,8 @@ void wmi_ap_attach_tlv(wmi_unified_t wmi_handle)
 #ifdef QCA_MANUAL_TRIGGERED_ULOFDMA
 	ops->extract_ulofdma_trigger_feedback_event =
 			extract_ulofdma_trigger_feedback_event_tlv;
+	ops->extract_ul_ofdma_trig_rx_peer_userinfo =
+			extract_ul_ofdma_trig_rx_peer_userinfo_tlv;
 #endif
 	ops->extract_channel_hopping_event = extract_channel_hopping_event_tlv;
 	ops->send_peer_chan_width_switch_cmd =
