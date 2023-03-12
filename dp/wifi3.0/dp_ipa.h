@@ -18,7 +18,8 @@
 #ifndef _DP_IPA_H_
 #define _DP_IPA_H_
 
-#if defined(QCA_WIFI_KIWI) || defined(QCA_WIFI_KIWI_V2)
+#if defined(QCA_WIFI_KIWI) || defined(QCA_WIFI_KIWI_V2) || \
+	defined(QCA_WIFI_QCN9224)
 /* Index into soc->tcl_data_ring[] */
 #define IPA_TCL_DATA_RING_IDX	3
 #else
