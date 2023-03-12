@@ -1273,6 +1273,7 @@ struct wmi_sawf_params {
 	uint32_t msdu_rate_loss;
 	uint32_t disabled_modes;
 };
+#endif
 
 #ifdef QCA_STANDALONE_SOUNDING_TRIGGER
 
@@ -1304,11 +1305,7 @@ struct wmi_txbf_sounding_trig_param {
 	u_int8_t   num_sounding_peers;
 	u_int8_t   macaddr[MAX_MU_TXBF_SOUNDING_USER][QDF_MAC_ADDR_SIZE];
 };
-#endif
 
-#endif
-
-#ifdef QCA_STANDALONE_SOUNDING_TRIGGER
 enum wmi_host_standalone_sounding_status {
 	WMI_HOST_STANDALONE_SOUND_STATUS_OK,
 	WMI_HOST_STANDALONE_SOUND_STATUS_ERR_NUM_PEERS_EXCEEDED,
