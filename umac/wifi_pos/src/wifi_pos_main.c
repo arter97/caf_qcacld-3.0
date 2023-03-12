@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -74,7 +74,7 @@ struct regulatory_channel;
 static uint32_t vdev_idx;
 
 /**
- * wifi_pos_get_tlv_support: indicates if firmware supports TLV wifi pos msg
+ * wifi_pos_get_tlv_support() - indicates if firmware supports TLV wifi pos msg
  * @psoc: psoc object
  *
  * Return: status of operation
@@ -117,7 +117,7 @@ wifi_pos_prepare_reg_resp(uint32_t *rsp_len,
 }
 
 /**
- * wifi_pos_get_host_pdev_id: Get host pdev_id
+ * wifi_pos_get_host_pdev_id() - Get host pdev_id
  * @psoc: Pointer to psoc object
  * @tgt_pdev_id: target_pdev_id
  * @host_pdev_id: host pdev_id
@@ -456,8 +456,8 @@ static void wifi_update_channel_bw_info(struct wlan_objmgr_psoc *psoc,
 }
 
 /**
- * wifi_pos_get_valid_channels: Get the list of valid channels from the
- * given channel list
+ * wifi_pos_get_valid_channels() - Get the list of valid channels from the
+ *                                 given channel list
  * @chan_freqs: Channel frequencies to be validated
  * @num_ch: NUmber of channels in the channel list to be validated
  * @valid_channel_list: Pointer to valid channel list
@@ -887,8 +887,9 @@ app_reg_failed:
 }
 
 /**
- * wifi_pos_tlv_callback: wifi pos msg handler registered for TLV type req
- * @wmi_msg: wmi type request msg
+ * wifi_pos_tlv_callback() - wifi pos msg handler registered for TLV type req
+ * @psoc: psoc object
+ * @req: wifi positioning request msg
  *
  * Return: status of operation
  */
@@ -915,9 +916,10 @@ static QDF_STATUS wifi_pos_tlv_callback(struct wlan_objmgr_psoc *psoc,
 }
 
 /**
- * wifi_pos_non_tlv_callback: wifi pos msg handler registered for non-TLV
- * type req
- * @wmi_msg: wmi type request msg
+ * wifi_pos_non_tlv_callback() - wifi pos msg handler registered for non-TLV
+ *                               type req
+ * @psoc: psoc object
+ * @req: wifi positioning request msg
  *
  * Return: status of operation
  */

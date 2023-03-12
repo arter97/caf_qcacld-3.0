@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2017-2018, 2020 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021, 2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -18,7 +18,7 @@
  */
 
 /**
- * This file defines the important dispatcher APIs pertinent to
+ * DOC: This file defines the important dispatcher APIs pertinent to
  * wifi positioning.
  */
 #include <wlan_lmac_if_def.h>
