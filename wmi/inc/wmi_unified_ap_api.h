@@ -750,6 +750,20 @@ QDF_STATUS wmi_extract_mgmt_tx_compl_param(
 QDF_STATUS wmi_extract_ulofdma_trigger_feedback_event(
 		wmi_unified_t wmi_handle, void *evt_buf,
 		wmi_host_manual_ul_ofdma_trig_feedback_evt *feedback);
+
+/**
+ * wmi_extract_ul_ofdma_trig_rx_peer_userinfo() - extract ulofdma
+ * trigger response uder info
+ * @wmi_handle: wmi handle
+ * @evt_buf: pointer to event buffer
+ * @resp: Pointer to ulofdma rx trig peer response data
+ *
+ * Return: QDF_STATUS_SUCCESS on success and QDF_STATUS_E_FAILURE for failure
+ */
+QDF_STATUS
+wmi_extract_ul_ofdma_trig_rx_peer_userinfo(
+		wmi_unified_t wmi_handle, void *evt_buf,
+		struct wmi_host_rx_peer_userinfo_evt_data *resp);
 #endif
 
 /**
