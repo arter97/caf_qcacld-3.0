@@ -632,6 +632,16 @@ static QDF_STATUS nan_ndp_end_req_tlv(wmi_unified_t wmi_handle,
 			       (sizeof(*ndp_end_req_lst) - WMI_TLV_HDR_SIZE));
 
 		ndp_end_req_lst[i].ndp_instance_id = req->ndp_ids[i];
+
+		/*
+		 * vdev_id is added in NDP END TLV to facilitate fw to give it
+		 * back in the NDP END indication.
+		 */
+		if (req->vdev) {
+			ndp_end_req_lst[i].vdev_id =
+						wlan_vdev_get_id(req->vdev);
+			ndp_end_req_lst[i].vdev_id_valid = 1;
+		}
 	}
 
 	wmi_mtrace(WMI_NDP_END_REQ_CMDID, NO_SESSION, 0);
