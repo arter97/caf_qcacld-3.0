@@ -1363,7 +1363,7 @@ tgt_if_regulatory_register_rate2power_table_update_handler(
 }
 
 /**
- * tgt_if_regulatory_register_rate2power_table_update_handler() - Unregister
+ * tgt_if_regulatory_unregister_rate2power_table_update_handler() - Unregister
  * rate2power table update handler
  * @psoc: Pointer to psoc
  * @arg: Pointer to argument list
