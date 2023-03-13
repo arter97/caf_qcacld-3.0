@@ -1970,6 +1970,28 @@ dp_ppeds_get_umac_reset_progress(struct dp_soc *soc,
 #endif
 
 /**
+ * dp_ppeds_target_supported - Check target supports ppeds
+ * @target_type: Device ID
+ *
+ * Check target supports ppeds
+ *
+ * Return: true if supported , false if not supported
+ */
+bool dp_ppeds_target_supported(int target_type)
+{
+	/*
+	 * Add ppeds capable wlan target type here.
+	 */
+	switch (target_type) {
+	case TARGET_TYPE_QCN9224:
+		return true;
+
+	default:
+		return false;
+	}
+}
+
+/**
  * dp_ppeds_stop_soc_be() - Stop the PPE-DS instance
  * @soc: DP SoC
  *
@@ -2206,7 +2228,7 @@ QDF_STATUS dp_ppeds_init_soc_be(struct dp_soc *soc)
 {
 	struct dp_soc_be *be_soc = dp_get_be_soc_from_dp_soc(soc);
 
-	if (!wlan_cfg_get_dp_soc_is_ppeds_enabled(soc->wlan_cfg_ctx))
+	if (!be_soc->ppeds_handle)
 		return QDF_STATUS_SUCCESS;
 
 	be_soc->dp_ppeds_txdesc_hotlist_len =
@@ -2219,7 +2241,7 @@ QDF_STATUS dp_ppeds_deinit_soc_be(struct dp_soc *soc)
 {
 	struct dp_soc_be *be_soc = dp_get_be_soc_from_dp_soc(soc);
 
-	if (!wlan_cfg_get_dp_soc_is_ppeds_enabled(soc->wlan_cfg_ctx))
+	if (!be_soc->ppeds_handle)
 		return QDF_STATUS_SUCCESS;
 
 	return dp_hw_cookie_conversion_deinit(be_soc, &be_soc->ppeds_tx_cc_ctx);
