@@ -2909,4 +2909,16 @@ enum host_concurrent_ap_policy {
 	HOST_CONCURRENT_AP_POLICY_LOSSLESS_AUDIO_STREAMING = 2,
 	HOST_CONCURRENT_AP_POLICY_XR = 3
 };
+
+/**
+ * enum ll_ap_type - low latency AP type
+ * @LL_AP_TYPE_HT: low latency AP type high throughput
+ * @LL_AP_TYPE_LT: low latency AP type low latency
+ * @LL_AP_TYPE_ANY: low latency AP type any
+ */
+enum ll_ap_type {
+	LL_AP_TYPE_HT = 0,
+	LL_AP_TYPE_LT = 1,
+	LL_AP_TYPE_ANY = 2,
+};
 #endif

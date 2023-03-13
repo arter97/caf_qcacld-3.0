@@ -4086,9 +4086,18 @@ bool policy_mgr_is_sta_chan_valid_for_connect_and_roam(
 	return true;
 }
 
-bool
-policy_mgr_is_vdev_ll_sap(struct wlan_objmgr_psoc *psoc,
-			  uint32_t vdev_id)
+/**
+ * _policy_mgr_is_vdev_ll_sap() - Check whether any LL SAP is present or not
+ * for provided ap policy
+ * @psoc: psoc object
+ * @vdev_id: vdev id
+ * @ap_type: LL SAP type
+ *
+ * Return: true if it's present otherwise false
+ */
+static bool
+_policy_mgr_is_vdev_ll_sap(struct wlan_objmgr_psoc *psoc,
+			   uint32_t vdev_id, enum ll_ap_type ap_type)
 {
 	struct wlan_objmgr_vdev *vdev;
 	bool is_ll_sap = false;
@@ -4116,12 +4125,50 @@ policy_mgr_is_vdev_ll_sap(struct wlan_objmgr_psoc *psoc,
 	}
 
 	profile = wlan_mlme_get_ap_policy(vdev);
-	if (profile == HOST_CONCURRENT_AP_POLICY_GAMING_AUDIO ||
-	    profile == HOST_CONCURRENT_AP_POLICY_LOSSLESS_AUDIO_STREAMING)
-		is_ll_sap = true;
-
 	wlan_objmgr_vdev_release_ref(vdev, WLAN_POLICY_MGR_ID);
+	switch (ap_type) {
+	case LL_AP_TYPE_HT:
+		if (profile == HOST_CONCURRENT_AP_POLICY_XR)
+			is_ll_sap = true;
+	break;
+	case LL_AP_TYPE_LT:
+		if (profile == HOST_CONCURRENT_AP_POLICY_GAMING_AUDIO ||
+		    profile ==
+		    HOST_CONCURRENT_AP_POLICY_LOSSLESS_AUDIO_STREAMING)
+			is_ll_sap = true;
+	break;
+	case LL_AP_TYPE_ANY:
+		if (profile == HOST_CONCURRENT_AP_POLICY_GAMING_AUDIO ||
+		    profile ==
+		    HOST_CONCURRENT_AP_POLICY_LOSSLESS_AUDIO_STREAMING ||
+		    profile == HOST_CONCURRENT_AP_POLICY_XR)
+			is_ll_sap = true;
+	break;
+	default:
+		policy_mgr_err("invalid ap type %d", ap_type);
+	}
 	return is_ll_sap;
+}
+
+bool
+policy_mgr_is_vdev_ll_sap(struct wlan_objmgr_psoc *psoc,
+			  uint32_t vdev_id)
+{
+	return _policy_mgr_is_vdev_ll_sap(psoc, vdev_id, LL_AP_TYPE_ANY);
+}
+
+bool
+policy_mgr_is_vdev_ht_ll_sap(struct wlan_objmgr_psoc *psoc,
+			     uint32_t vdev_id)
+{
+	return _policy_mgr_is_vdev_ll_sap(psoc, vdev_id, LL_AP_TYPE_HT);
+}
+
+bool
+policy_mgr_is_vdev_lt_ll_sap(struct wlan_objmgr_psoc *psoc,
+			     uint32_t vdev_id)
+{
+	return _policy_mgr_is_vdev_ll_sap(psoc, vdev_id, LL_AP_TYPE_LT);
 }
 
 QDF_STATUS

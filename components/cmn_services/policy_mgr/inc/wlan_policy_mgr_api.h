@@ -1651,6 +1651,35 @@ policy_mgr_is_vdev_ll_sap(struct wlan_objmgr_psoc *psoc,
 			  uint32_t vdev_id);
 
 /**
+ * policy_mgr_is_vdev_ht_ll_sap() - Check whether given vdev is HT LL SAP or not
+ * @psoc: psoc object
+ * @vdev_id: vdev id
+ *
+ * Based on vdev id ap profile set via vendor command is get and compared with
+ * ht_ll_type AP type and is return true if profile set is throghput sensitive.
+ *
+ * Return: true if it's present otherwise false
+ */
+bool
+policy_mgr_is_vdev_ht_ll_sap(struct wlan_objmgr_psoc *psoc,
+			     uint32_t vdev_id);
+
+/**
+ * policy_mgr_is_vdev_lt_ll_sap() - Check whether given vdev is LT LL SAP or not
+ * @psoc: psoc object
+ * @vdev_id: vdev id
+ *
+ * Based on vdev id ap profile set via vendor command is get and compared with
+ * lt_ll_type AP and is return true if profile set is gaming or losless audio
+ * where latency matters.
+ *
+ * Return: true if it's present otherwise false
+ */
+bool
+policy_mgr_is_vdev_lt_ll_sap(struct wlan_objmgr_psoc *psoc,
+			     uint32_t vdev_id);
+
+/**
  * policy_mgr_get_preferred_dbs_action_table() - get dbs action table type
  * @psoc: Pointer to psoc
  * @vdev_id: vdev Id
