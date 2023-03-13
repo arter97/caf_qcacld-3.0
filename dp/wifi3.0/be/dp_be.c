@@ -2000,13 +2000,13 @@ static void dp_mlo_peer_find_hash_detach_wrapper(struct dp_soc *soc)
 }
 #endif
 
-#ifdef DP_MLO_LINK_STATS_SUPPORT
+#ifdef QCA_ENHANCED_STATS_SUPPORT
 static uint8_t
 dp_get_hw_link_id_be(struct dp_pdev *pdev)
 {
 	struct dp_pdev_be *be_pdev = dp_get_be_pdev_from_dp_pdev(pdev);
 
-	return ((be_pdev->mlo_link_id) + 1);
+	return be_pdev->mlo_link_id;
 }
 #else
 static uint8_t
@@ -2014,7 +2014,7 @@ dp_get_hw_link_id_be(struct dp_pdev *pdev)
 {
 	return 0;
 }
-#endif
+#endif /* QCA_ENHANCED_STATS_SUPPORT */
 
 static struct dp_peer *
 dp_mlo_peer_find_hash_find_be(struct dp_soc *soc,

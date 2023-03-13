@@ -5504,7 +5504,7 @@ dp_get_peer_hw_link_id(struct dp_soc *soc,
 		       struct dp_pdev *pdev)
 {
 	if (wlan_cfg_is_peer_link_stats_enabled(soc->wlan_cfg_ctx))
-		return soc->arch_ops.get_hw_link_id(pdev);
+		return ((soc->arch_ops.get_hw_link_id(pdev)) + 1);
 
 	return 0;
 }

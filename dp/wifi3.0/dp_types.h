@@ -4241,6 +4241,7 @@ typedef void *dp_txrx_ref_handle;
  * @protocol_trace_cnt: per-peer protocol counter
  * @release_src_not_tqm: Counter to keep track of release source is not TQM
  *			 in TX completion status processing
+ * @inval_link_id_pkt_cnt: Counter to capture Invalid Link Id
  */
 struct dp_peer_per_pkt_tx_stats {
 	struct cdp_pkt_info ucast;
@@ -4279,6 +4280,7 @@ struct dp_peer_per_pkt_tx_stats {
 	struct protocol_trace_count protocol_trace_cnt[CDP_TRACE_MAX];
 #endif
 	uint32_t release_src_not_tqm;
+	uint32_t inval_link_id_pkt_cnt;
 };
 
 /**
@@ -4434,6 +4436,7 @@ struct dp_peer_extd_tx_stats {
  * @protocol_trace_cnt: per-peer protocol counters
  * @mcast_3addr_drop:
  * @rx_total: total rx count
+ * @inval_link_id_pkt_cnt: Counter to capture Invalid Link Id
  */
 struct dp_peer_per_pkt_rx_stats {
 	struct cdp_pkt_info rcvd_reo[CDP_MAX_RX_RINGS];
@@ -4474,6 +4477,7 @@ struct dp_peer_per_pkt_rx_stats {
 #ifdef IPA_OFFLOAD
 	struct cdp_pkt_info rx_total;
 #endif
+	uint32_t inval_link_id_pkt_cnt;
 };
 
 /**
