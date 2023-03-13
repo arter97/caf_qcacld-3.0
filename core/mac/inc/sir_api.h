@@ -1512,16 +1512,6 @@ struct qos_map_set {
 	uint8_t dscp_range[QOS_MAP_RANGE_NUM][2];
 };
 
-typedef struct sSmeIbssPeerInd {
-	uint16_t mesgType;
-	uint16_t mesgLen;
-	uint8_t sessionId;
-
-	struct qdf_mac_addr peer_addr;
-
-	/* Beacon will be appended for new Peer indication. */
-} tSmeIbssPeerInd, *tpSmeIbssPeerInd;
-
 typedef struct sSmeMaxAssocInd {
 	uint16_t mesgType;      /* eWNI_SME_MAX_ASSOC_EXCEEDED */
 	uint16_t mesgLen;
