@@ -2164,6 +2164,153 @@ void dp_update_vdev_stats_on_peer_unmap(struct dp_vdev *vdev,
 		DP_UPDATE_11BE_STATS(_tgtobj, _srcobj); \
 	} while (0)
 
+#define DP_UPDATE_INGRESS_STATS(_tgtobj, _srcobj) \
+	do { \
+		uint8_t i = 0; \
+		_tgtobj->tx_i.rcvd.num += _srcobj->tx_i.rcvd.num; \
+		_tgtobj->tx_i.rcvd.bytes += _srcobj->tx_i.rcvd.bytes; \
+		_tgtobj->tx_i.rcvd_in_fast_xmit_flow += \
+					_srcobj->tx_i.rcvd_in_fast_xmit_flow; \
+		for (i = 0; i < CDP_MAX_TX_DATA_RINGS; i++) { \
+			_tgtobj->tx_i.rcvd_per_core[i] += \
+					_srcobj->tx_i.rcvd_per_core[i]; \
+		} \
+		_tgtobj->tx_i.processed.num += _srcobj->tx_i.processed.num; \
+		_tgtobj->tx_i.processed.bytes += \
+						_srcobj->tx_i.processed.bytes; \
+		_tgtobj->tx_i.reinject_pkts.num += \
+					_srcobj->tx_i.reinject_pkts.num; \
+		_tgtobj->tx_i.reinject_pkts.bytes += \
+					_srcobj->tx_i.reinject_pkts.bytes; \
+		_tgtobj->tx_i.inspect_pkts.num += \
+					_srcobj->tx_i.inspect_pkts.num; \
+		_tgtobj->tx_i.inspect_pkts.bytes += \
+				_srcobj->tx_i.inspect_pkts.bytes; \
+		_tgtobj->tx_i.nawds_mcast.num += \
+					_srcobj->tx_i.nawds_mcast.num; \
+		_tgtobj->tx_i.nawds_mcast.bytes += \
+					_srcobj->tx_i.nawds_mcast.bytes; \
+		_tgtobj->tx_i.bcast.num += _srcobj->tx_i.bcast.num; \
+		_tgtobj->tx_i.bcast.bytes += _srcobj->tx_i.bcast.bytes; \
+		_tgtobj->tx_i.raw.raw_pkt.num += \
+					_srcobj->tx_i.raw.raw_pkt.num; \
+		_tgtobj->tx_i.raw.raw_pkt.bytes += \
+					_srcobj->tx_i.raw.raw_pkt.bytes; \
+		_tgtobj->tx_i.raw.dma_map_error += \
+					_srcobj->tx_i.raw.dma_map_error; \
+		_tgtobj->tx_i.raw.invalid_raw_pkt_datatype += \
+				_srcobj->tx_i.raw.invalid_raw_pkt_datatype; \
+		_tgtobj->tx_i.raw.num_frags_overflow_err += \
+				_srcobj->tx_i.raw.num_frags_overflow_err; \
+		_tgtobj->tx_i.sg.sg_pkt.num += _srcobj->tx_i.sg.sg_pkt.num; \
+		_tgtobj->tx_i.sg.sg_pkt.bytes += \
+					_srcobj->tx_i.sg.sg_pkt.bytes; \
+		_tgtobj->tx_i.sg.non_sg_pkts.num += \
+					_srcobj->tx_i.sg.non_sg_pkts.num; \
+		_tgtobj->tx_i.sg.non_sg_pkts.bytes += \
+					_srcobj->tx_i.sg.non_sg_pkts.bytes; \
+		_tgtobj->tx_i.sg.dropped_host.num += \
+					_srcobj->tx_i.sg.dropped_host.num; \
+		_tgtobj->tx_i.sg.dropped_host.bytes += \
+					_srcobj->tx_i.sg.dropped_host.bytes; \
+		_tgtobj->tx_i.sg.dropped_target += \
+					_srcobj->tx_i.sg.dropped_target; \
+		_tgtobj->tx_i.sg.dma_map_error += \
+					_srcobj->tx_i.sg.dma_map_error; \
+		_tgtobj->tx_i.mcast_en.mcast_pkt.num += \
+					_srcobj->tx_i.mcast_en.mcast_pkt.num; \
+		_tgtobj->tx_i.mcast_en.mcast_pkt.bytes += \
+				_srcobj->tx_i.mcast_en.mcast_pkt.bytes; \
+		_tgtobj->tx_i.mcast_en.dropped_map_error += \
+				_srcobj->tx_i.mcast_en.dropped_map_error; \
+		_tgtobj->tx_i.mcast_en.dropped_self_mac += \
+				_srcobj->tx_i.mcast_en.dropped_self_mac; \
+		_tgtobj->tx_i.mcast_en.dropped_send_fail += \
+				_srcobj->tx_i.mcast_en.dropped_send_fail; \
+		_tgtobj->tx_i.mcast_en.ucast += _srcobj->tx_i.mcast_en.ucast; \
+		_tgtobj->tx_i.mcast_en.fail_seg_alloc += \
+					_srcobj->tx_i.mcast_en.fail_seg_alloc; \
+		_tgtobj->tx_i.mcast_en.clone_fail += \
+					_srcobj->tx_i.mcast_en.clone_fail; \
+		_tgtobj->tx_i.igmp_mcast_en.igmp_rcvd += \
+				_srcobj->tx_i.igmp_mcast_en.igmp_rcvd; \
+		_tgtobj->tx_i.igmp_mcast_en.igmp_ucast_converted += \
+			_srcobj->tx_i.igmp_mcast_en.igmp_ucast_converted; \
+		_tgtobj->tx_i.dropped.desc_na.num += \
+				_srcobj->tx_i.dropped.desc_na.num; \
+		_tgtobj->tx_i.dropped.desc_na.bytes += \
+				_srcobj->tx_i.dropped.desc_na.bytes; \
+		_tgtobj->tx_i.dropped.desc_na_exc_alloc_fail.num += \
+			_srcobj->tx_i.dropped.desc_na_exc_alloc_fail.num; \
+		_tgtobj->tx_i.dropped.desc_na_exc_alloc_fail.bytes += \
+			_srcobj->tx_i.dropped.desc_na_exc_alloc_fail.bytes; \
+		_tgtobj->tx_i.dropped.desc_na_exc_outstand.num += \
+			_srcobj->tx_i.dropped.desc_na_exc_outstand.num; \
+		_tgtobj->tx_i.dropped.desc_na_exc_outstand.bytes += \
+			_srcobj->tx_i.dropped.desc_na_exc_outstand.bytes; \
+		_tgtobj->tx_i.dropped.exc_desc_na.num += \
+				_srcobj->tx_i.dropped.exc_desc_na.num; \
+		_tgtobj->tx_i.dropped.exc_desc_na.bytes += \
+				_srcobj->tx_i.dropped.exc_desc_na.bytes; \
+		_tgtobj->tx_i.dropped.ring_full += \
+					_srcobj->tx_i.dropped.ring_full; \
+		_tgtobj->tx_i.dropped.enqueue_fail += \
+					_srcobj->tx_i.dropped.enqueue_fail; \
+		_tgtobj->tx_i.dropped.dma_error += \
+					_srcobj->tx_i.dropped.dma_error; \
+		_tgtobj->tx_i.dropped.res_full += \
+					_srcobj->tx_i.dropped.res_full; \
+		_tgtobj->tx_i.dropped.headroom_insufficient += \
+				_srcobj->tx_i.dropped.headroom_insufficient; \
+		_tgtobj->tx_i.dropped.fail_per_pkt_vdev_id_check += \
+			_srcobj->tx_i.dropped.fail_per_pkt_vdev_id_check; \
+		_tgtobj->tx_i.dropped.drop_ingress += \
+				_srcobj->tx_i.dropped.drop_ingress; \
+		_tgtobj->tx_i.dropped.invalid_peer_id_in_exc_path += \
+			_srcobj->tx_i.dropped.invalid_peer_id_in_exc_path; \
+		_tgtobj->tx_i.dropped.tx_mcast_drop += \
+					_srcobj->tx_i.dropped.tx_mcast_drop; \
+		_tgtobj->tx_i.dropped.fw2wbm_tx_drop += \
+					_srcobj->tx_i.dropped.fw2wbm_tx_drop; \
+		_tgtobj->tx_i.dropped.dropped_pkt.num = \
+			_tgtobj->tx_i.dropped.dma_error + \
+			_tgtobj->tx_i.dropped.ring_full + \
+			_tgtobj->tx_i.dropped.enqueue_fail + \
+			_tgtobj->tx_i.dropped.fail_per_pkt_vdev_id_check + \
+			_tgtobj->tx_i.dropped.desc_na.num + \
+			_tgtobj->tx_i.dropped.res_full + \
+			_tgtobj->tx_i.dropped.drop_ingress + \
+			_tgtobj->tx_i.dropped.headroom_insufficient + \
+			_tgtobj->tx_i.dropped.invalid_peer_id_in_exc_path + \
+			_tgtobj->tx_i.dropped.tx_mcast_drop + \
+			_tgtobj->tx_i.dropped.fw2wbm_tx_drop; \
+		_tgtobj->tx_i.dropped.dropped_pkt.bytes += \
+				_srcobj->tx_i.dropped.dropped_pkt.bytes; \
+		_tgtobj->tx_i.mesh.exception_fw += \
+					_srcobj->tx_i.mesh.exception_fw; \
+		_tgtobj->tx_i.mesh.completion_fw += \
+					_srcobj->tx_i.mesh.completion_fw; \
+		_tgtobj->tx_i.cce_classified += \
+					_srcobj->tx_i.cce_classified; \
+		_tgtobj->tx_i.cce_classified_raw += \
+					_srcobj->tx_i.cce_classified_raw; \
+		_tgtobj->tx_i.sniffer_rcvd.num += \
+					_srcobj->tx_i.sniffer_rcvd.num; \
+		_tgtobj->tx_i.sniffer_rcvd.bytes += \
+					_srcobj->tx_i.sniffer_rcvd.bytes; \
+		_tgtobj->rx_i.reo_rcvd_pkt.num += \
+					_srcobj->rx_i.reo_rcvd_pkt.num; \
+		_tgtobj->rx_i.reo_rcvd_pkt.bytes += \
+					_srcobj->rx_i.reo_rcvd_pkt.bytes; \
+		_tgtobj->rx_i.null_q_desc_pkt.num += \
+					_srcobj->rx_i.null_q_desc_pkt.num; \
+		_tgtobj->rx_i.null_q_desc_pkt.bytes += \
+					_srcobj->rx_i.null_q_desc_pkt.bytes; \
+		_tgtobj->rx_i.routed_eapol_pkt.num += \
+					_srcobj->rx_i.routed_eapol_pkt.num; \
+		_tgtobj->rx_i.routed_eapol_pkt.bytes += \
+					_srcobj->rx_i.routed_eapol_pkt.bytes; \
+	} while (0)
 /**
  * dp_peer_find_attach() - Allocates memory for peer objects
  * @soc: SoC handle

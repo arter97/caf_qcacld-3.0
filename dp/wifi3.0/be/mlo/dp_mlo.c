@@ -552,6 +552,60 @@ static void dp_mlo_update_mlo_ts_offset(struct cdp_soc_t *soc_hdl,
 	be_soc->mlo_tstamp_offset = offset;
 }
 
+#ifdef CONFIG_MLO_SINGLE_DEV
+static void dp_mlo_aggregate_mld_vdev_stats(struct dp_vdev_be *be_vdev,
+					    struct dp_vdev *ptnr_vdev,
+					    void *arg)
+{
+	struct cdp_vdev_stats *tgt_vdev_stats = (struct cdp_vdev_stats *)arg;
+	struct cdp_vdev_stats *src_vdev_stats = &ptnr_vdev->stats;
+
+	/* Aggregate vdev ingress stats */
+	DP_UPDATE_INGRESS_STATS(tgt_vdev_stats, src_vdev_stats);
+
+	/* Aggregate unmapped peers stats */
+	DP_UPDATE_PER_PKT_STATS(tgt_vdev_stats, src_vdev_stats);
+	DP_UPDATE_EXTD_STATS(tgt_vdev_stats, src_vdev_stats);
+
+	/* Aggregate associated peers stats */
+	dp_vdev_iterate_peer(ptnr_vdev, dp_update_vdev_stats, tgt_vdev_stats,
+			     DP_MOD_ID_GENERIC_STATS);
+}
+
+static QDF_STATUS dp_mlo_get_mld_vdev_stats(struct cdp_soc_t *soc_hdl,
+					    uint8_t vdev_id, void *buf)
+{
+	struct dp_soc *soc = cdp_soc_t_to_dp_soc(soc_hdl);
+	struct dp_soc_be *be_soc = dp_get_be_soc_from_dp_soc(soc);
+	struct cdp_vdev_stats *vdev_stats;
+	struct dp_vdev *vdev = dp_vdev_get_ref_by_id(soc, vdev_id,
+						     DP_MOD_ID_GENERIC_STATS);
+	struct dp_vdev_be *vdev_be = NULL;
+
+	if (!vdev)
+		return QDF_STATUS_E_FAILURE;
+
+	vdev_be = dp_get_be_vdev_from_dp_vdev(vdev);
+	if (!vdev_be) {
+		dp_vdev_unref_delete(soc, vdev, DP_MOD_ID_GENERIC_STATS);
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	vdev_stats = (struct cdp_vdev_stats *)buf;
+
+	dp_aggregate_vdev_stats(vdev, buf);
+
+	/* Aggregate stats from partner vdevs */
+	dp_mlo_iter_ptnr_vdev(be_soc, vdev_be,
+			      dp_mlo_aggregate_mld_vdev_stats, buf,
+			      DP_MOD_ID_GENERIC_STATS);
+
+	dp_vdev_unref_delete(soc, vdev, DP_MOD_ID_GENERIC_STATS);
+
+	return QDF_STATUS_SUCCESS;
+}
+#endif
+
 static struct cdp_mlo_ops dp_mlo_ops = {
 	.mlo_soc_setup = dp_mlo_soc_setup,
 	.mlo_soc_teardown = dp_mlo_soc_teardown,
@@ -563,6 +617,9 @@ static struct cdp_mlo_ops dp_mlo_ops = {
 	.mlo_update_mlo_ts_offset = dp_mlo_update_mlo_ts_offset,
 	.mlo_ctxt_attach = dp_mlo_ctxt_attach_wifi3,
 	.mlo_ctxt_detach = dp_mlo_ctxt_detach_wifi3,
+#ifdef CONFIG_MLO_SINGLE_DEV
+	.mlo_get_mld_vdev_stats = dp_mlo_get_mld_vdev_stats,
+#endif
 };
 
 void dp_soc_mlo_fill_params(struct dp_soc *soc,
@@ -830,12 +887,12 @@ dp_soc_get_by_idle_bm_id(struct dp_soc *soc, uint8_t idle_bm_id)
 	return NULL;
 }
 
-#ifdef WLAN_MCAST_MLO
-void dp_mcast_mlo_iter_ptnr_vdev(struct dp_soc_be *be_soc,
-				 struct dp_vdev_be *be_vdev,
-				 dp_ptnr_vdev_iter_func func,
-				 void *arg,
-				 enum dp_mod_id mod_id)
+#ifdef WLAN_MLO_MULTI_CHIP
+void dp_mlo_iter_ptnr_vdev(struct dp_soc_be *be_soc,
+			   struct dp_vdev_be *be_vdev,
+			   dp_ptnr_vdev_iter_func func,
+			   void *arg,
+			   enum dp_mod_id mod_id)
 {
 	int i = 0;
 	int j = 0;
@@ -864,8 +921,10 @@ void dp_mcast_mlo_iter_ptnr_vdev(struct dp_soc_be *be_soc,
 	}
 }
 
-qdf_export_symbol(dp_mcast_mlo_iter_ptnr_vdev);
+qdf_export_symbol(dp_mlo_iter_ptnr_vdev);
+#endif
 
+#ifdef WLAN_MCAST_MLO
 struct dp_vdev *dp_mlo_get_mcast_primary_vdev(struct dp_soc_be *be_soc,
 					      struct dp_vdev_be *be_vdev,
 					      enum dp_mod_id mod_id)
