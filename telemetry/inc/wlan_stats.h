@@ -91,6 +91,8 @@ enum stats_feat_index_e {
  * @type:  Requested stats category
  * @aggregate: Aggregate in driver
  * @serviceid: service id for checking the level of sawf stats
+ * @mld_req: Flag to indicate if request is rcvd for MLD interface
+ * @intf_name: Interface name for which stats are requested
  */
 struct stats_config {
 	struct wiphy           *wiphy;
@@ -100,6 +102,8 @@ struct stats_config {
 	enum stats_type_e      type;
 	bool                   aggregate;
 	u_int8_t               serviceid;
+	bool                   mld_req;
+	char                   intf_name[IFNAMSIZ];
 };
 
 /**
