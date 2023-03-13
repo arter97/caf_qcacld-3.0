@@ -246,4 +246,17 @@
 	(defined CFG80211_EXTERNAL_AUTH_MLO_SUPPORT))
 #define WLAN_EXTERNAL_AUTH_MLO_SUPPORT
 #endif
+
+/*
+ * CFG80211_TID_LINK_MAP_SUPPORT
+ * Used to indicate Linux kernel contains support to get the TID to link map
+ * status and response event.
+ *
+ * TODO: Corresponding Linux kernel support check changes are still under review
+ * will add the commit-ID when available
+ */
+#if (defined CFG80211_TID_LINK_MAP_SUPPORT)
+#define WLAN_TID_LINK_MAP_SUPPORT
+#endif
+
 #endif
