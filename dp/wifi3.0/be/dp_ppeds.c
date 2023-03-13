@@ -1333,7 +1333,7 @@ QDF_STATUS dp_ppeds_attach_vdev_be(struct cdp_soc_t *soc_hdl, uint8_t vdev_id,
 	struct dp_soc_be *be_soc;
 	struct dp_vdev *vdev;
 	struct dp_vdev_be *be_vdev;
-	struct dp_peer *dp_peer = NULL;
+	struct dp_peer *dp_peer, *mld_peer, *tgt_peer = NULL;
 	struct dp_ppe_vp_profile *vp_profile = NULL;
 	uint32_t peer_id;
 	int8_t ppe_vp_idx;
@@ -1432,7 +1432,26 @@ QDF_STATUS dp_ppeds_attach_vdev_be(struct cdp_soc_t *soc_hdl, uint8_t vdev_id,
 			goto fail5;
 		}
 
-		if (dp_peer_setup_ppeds_be(soc, dp_peer, be_vdev,
+		tgt_peer = dp_peer;
+
+		/*
+		 * In case of WDS EXT MLO case, dp_peer is the primary
+		 * link peer, hence obtain the corresponding MLD peer
+		 * and set the newly created VP number as a src_info
+		 * for all its link peers.
+		 */
+		if (!IS_DP_LEGACY_PEER(dp_peer)) {
+			mld_peer = DP_GET_MLD_PEER_FROM_PEER(dp_peer);
+			if (!mld_peer) {
+				dp_err("%p: No MLD peer for WDS ext\n", vdev);
+				ret = QDF_STATUS_E_INVAL;
+				goto fail5;
+			}
+
+			tgt_peer = mld_peer;
+		}
+
+		if (dp_peer_setup_ppeds_be(soc, tgt_peer, be_vdev,
 					   (void *)vp_profile) != QDF_STATUS_SUCCESS) {
 			ret = QDF_STATUS_E_RESOURCES;
 			goto fail5;
