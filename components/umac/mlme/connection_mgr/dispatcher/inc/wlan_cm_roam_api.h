@@ -111,14 +111,6 @@ wlan_roam_update_cfg(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
  */
 void wlan_cm_send_beacon_miss(uint8_t vdev_id, int32_t rssi);
 
-/**
- * wlan_cm_is_sta_connected() - check if STA is connected
- * @vdev_id: vdev id
- *
- * Return: bool
- */
-bool wlan_cm_is_sta_connected(uint8_t vdev_id);
-
 #else
 static inline
 QDF_STATUS wlan_cm_roam_send_rso_cmd(struct wlan_objmgr_psoc *psoc,
