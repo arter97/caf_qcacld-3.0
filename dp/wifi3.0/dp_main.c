@@ -5698,7 +5698,6 @@ void dp_aggregate_vdev_stats(struct dp_vdev *vdev,
 	if (!vdev || !vdev->pdev)
 		return;
 
-
 	dp_update_vdev_ingress_stats(vdev);
 
 	qdf_mem_copy(vdev_stats, &vdev->stats, sizeof(vdev->stats));

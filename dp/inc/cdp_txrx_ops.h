@@ -156,6 +156,7 @@ enum cdp_peer_txq_flush_policy {
  * @mlo_update_mlo_ts_offset: update MLO timestamp offset for SOC
  * @mlo_ctxt_attach: Attach DP MLO context
  * @mlo_ctxt_detach: Detach DP MLO context
+ * @mlo_get_mld_vdev_stats: Get MLD vdev stats
  */
 struct cdp_mlo_ops {
 	void (*mlo_soc_setup)(struct cdp_soc_t *cdp_soc,
@@ -178,6 +179,8 @@ struct cdp_mlo_ops {
 				     uint64_t delta_tqm);
 	void (*mlo_update_mlo_ts_offset)(struct cdp_soc_t *soc_hdl,
 					 uint64_t offset);
+	QDF_STATUS (*mlo_get_mld_vdev_stats)(struct cdp_soc_t *soc,
+					     uint8_t vdev_id, void *buf);
 };
 #endif
 

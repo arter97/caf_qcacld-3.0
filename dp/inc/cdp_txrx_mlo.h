@@ -184,4 +184,27 @@ static inline void cdp_mlo_update_delta_tqm(ol_txrx_soc_handle soc,
 
 	soc->ops->mlo_ops->mlo_update_delta_tqm(soc, delta_tqm);
 }
+
+/*
+ * cdp_mlo_get_mld_vdev_stats - Get MLD vdev stats
+ * @soc: soc handle
+ * @vdev_id: vdev_id of one of the vdev's of the MLD group
+ * @buf: buffer to hold vdev_stats
+ *
+ * return: QDF_STATUS
+ */
+static inline QDF_STATUS
+cdp_mlo_get_mld_vdev_stats(ol_txrx_soc_handle soc,
+			   uint8_t vdev_id, struct cdp_vdev_stats *buf)
+{
+	if (!soc || !soc->ops) {
+		QDF_BUG(0);
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	if (!soc->ops->mlo_ops || !soc->ops->mlo_ops->mlo_get_mld_vdev_stats)
+		return QDF_STATUS_E_FAILURE;
+
+	return soc->ops->mlo_ops->mlo_get_mld_vdev_stats(soc, vdev_id, buf);
+}
 #endif /*_CDP_TXRX_MLO_H_*/
