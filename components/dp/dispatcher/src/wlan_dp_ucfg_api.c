@@ -39,6 +39,7 @@
 #include <qdf_net_stats.h>
 #include "wlan_dp_prealloc.h"
 #include "wlan_dp_rx_thread.h"
+#include <cdp_txrx_host_stats.h>
 
 #ifdef FEATURE_DIRECT_LINK
 /**
@@ -2415,4 +2416,16 @@ QDF_STATUS ucfg_dp_txrx_set_cpu_mask(ol_txrx_soc_handle soc,
 				     qdf_cpu_mask *new_mask)
 {
 	return dp_txrx_set_cpu_mask(soc, new_mask);
+}
+
+QDF_STATUS
+ucfg_dp_get_per_link_peer_stats(ol_txrx_soc_handle soc, uint8_t vdev_id,
+				uint8_t *peer_mac,
+				struct cdp_peer_stats *peer_stats,
+				enum cdp_peer_type peer_type,
+				uint8_t num_link)
+{
+	return cdp_host_get_per_link_peer_stats(soc, vdev_id, peer_mac,
+						peer_stats, peer_type,
+						num_link);
 }
