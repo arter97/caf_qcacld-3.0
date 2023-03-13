@@ -32,6 +32,10 @@
 #include <ieee80211_var.h>
 #include <ieee80211_cfg80211.h>
 #include <wlan_stats.h>
+#ifdef CONFIG_MLO_SINGLE_DEV
+#include "cdp_txrx_mlo.h"
+#include "wlan_mlo_mgr_ap.h"
+#endif
 
 static void fill_basic_data_tx_stats(struct basic_data_tx_stats *tx,
 				     struct cdp_tx_stats *cdp_tx)
@@ -807,7 +811,7 @@ get_failed:
 static QDF_STATUS get_basic_vdev_data(struct wlan_objmgr_psoc *psoc,
 				      struct wlan_objmgr_vdev *vdev,
 				      struct unified_stats *stats,
-				      uint32_t feat)
+				      uint32_t feat, bool mld_req)
 {
 	struct cdp_vdev_stats *vdev_stats = NULL;
 	QDF_STATUS ret = QDF_STATUS_SUCCESS;
@@ -822,9 +826,18 @@ static QDF_STATUS get_basic_vdev_data(struct wlan_objmgr_psoc *psoc,
 		qdf_err("Allocation Failed!");
 		return QDF_STATUS_E_NOMEM;
 	}
-	ret = cdp_host_get_vdev_stats(wlan_psoc_get_dp_handle(psoc),
-				      wlan_vdev_get_id(vdev),
-				      vdev_stats, true);
+
+#ifdef CONFIG_MLO_SINGLE_DEV
+	if (mld_req)
+		ret = cdp_mlo_get_mld_vdev_stats(wlan_psoc_get_dp_handle(psoc),
+						 wlan_vdev_get_id(vdev),
+						 vdev_stats);
+	else
+#endif
+		ret = cdp_host_get_vdev_stats(wlan_psoc_get_dp_handle(psoc),
+					      wlan_vdev_get_id(vdev),
+					      vdev_stats, true);
+
 	if (ret != QDF_STATUS_SUCCESS) {
 		qdf_err("Unable to get Vdev Stats!");
 		goto get_failed;
@@ -852,9 +865,138 @@ get_failed:
 	return ret;
 }
 
+#ifdef CONFIG_MLO_SINGLE_DEV
+static void aggregate_mld_vdev_stats(struct vdev_ic_cp_stats *tgt,
+				     struct vdev_ic_cp_stats *src)
+{
+	tgt->stats.cs_rx_wrongbss += src->stats.cs_rx_wrongbss;
+	tgt->stats.cs_rx_tooshort += src->stats.cs_rx_tooshort;
+	tgt->stats.cs_rx_wrongdir += src->stats.cs_rx_wrongdir;
+	tgt->stats.cs_rx_mcast_echo += src->stats.cs_rx_mcast_echo;
+	tgt->stats.cs_rx_not_assoc += src->stats.cs_rx_not_assoc;
+	tgt->stats.cs_rx_noprivacy += src->stats.cs_rx_noprivacy;
+	tgt->stats.cs_rx_mgmt_discard += src->stats.cs_rx_mgmt_discard;
+	tgt->stats.cs_rx_ctl += src->stats.cs_rx_ctl;
+	tgt->stats.cs_rx_rs_too_big += src->stats.cs_rx_rs_too_big;
+	tgt->stats.cs_rx_elem_missing += src->stats.cs_rx_elem_missing;
+	tgt->stats.cs_rx_elem_too_big += src->stats.cs_rx_elem_too_big;
+	tgt->stats.cs_rx_chan_err += src->stats.cs_rx_chan_err;
+	tgt->stats.cs_rx_node_alloc += src->stats.cs_rx_node_alloc;
+	tgt->stats.cs_rx_ssid_mismatch += src->stats.cs_rx_ssid_mismatch;
+	tgt->stats.cs_rx_auth_unsupported += src->stats.cs_rx_auth_unsupported;
+	tgt->stats.cs_rx_auth_fail += src->stats.cs_rx_auth_fail;
+	tgt->stats.cs_rx_auth_countermeasures += src->stats.cs_rx_auth_countermeasures;
+	tgt->stats.cs_rx_assoc_bss += src->stats.cs_rx_assoc_bss;
+	tgt->stats.cs_rx_assoc_notauth += src->stats.cs_rx_assoc_notauth;
+	tgt->stats.cs_rx_assoc_cap_mismatch += src->stats.cs_rx_assoc_cap_mismatch;
+	tgt->stats.cs_rx_assoc_norate += src->stats.cs_rx_assoc_norate;
+	tgt->stats.cs_rx_assoc_wpaie_err += src->stats.cs_rx_assoc_wpaie_err;
+	tgt->stats.cs_rx_action += src->stats.cs_rx_action;
+	tgt->stats.cs_rx_auth_err += src->stats.cs_rx_auth_err;
+	tgt->stats.cs_tx_nodefkey += src->stats.cs_tx_nodefkey;
+	tgt->stats.cs_tx_noheadroom += src->stats.cs_tx_noheadroom;
+	tgt->stats.cs_rx_acl += src->stats.cs_rx_acl;
+	tgt->stats.cs_rx_nowds += src->stats.cs_rx_nowds;
+	tgt->stats.cs_tx_nobuf += src->stats.cs_tx_nobuf;
+	tgt->stats.cs_tx_nonode += src->stats.cs_tx_nonode;
+	tgt->stats.cs_tx_cipher_err += src->stats.cs_tx_cipher_err;
+	tgt->stats.cs_tx_not_ok += src->stats.cs_tx_not_ok;
+	tgt->stats.cs_tx_bcn_swba += src->stats.cs_tx_bcn_swba;
+	tgt->stats.cs_node_timeout += src->stats.cs_node_timeout;
+	tgt->stats.cs_crypto_nomem += src->stats.cs_crypto_nomem;
+	tgt->stats.cs_crypto_tkip += src->stats.cs_crypto_tkip;
+	tgt->stats.cs_crypto_tkipenmic += src->stats.cs_crypto_tkipenmic;
+	tgt->stats.cs_crypto_tkipcm += src->stats.cs_crypto_tkipcm;
+	tgt->stats.cs_crypto_ccmp += src->stats.cs_crypto_ccmp;
+	tgt->stats.cs_crypto_wep += src->stats.cs_crypto_wep;
+	tgt->stats.cs_crypto_setkey_cipher += src->stats.cs_crypto_setkey_cipher;
+	tgt->stats.cs_crypto_setkey_nokey += src->stats.cs_crypto_setkey_nokey;
+	tgt->stats.cs_crypto_delkey += src->stats.cs_crypto_delkey;
+	tgt->stats.cs_crypto_cipher_err += src->stats.cs_crypto_cipher_err;
+	tgt->stats.cs_crypto_attach_fail += src->stats.cs_crypto_attach_fail;
+	tgt->stats.cs_crypto_swfallback += src->stats.cs_crypto_swfallback;
+	tgt->stats.cs_crypto_keyfail += src->stats.cs_crypto_keyfail;
+	tgt->stats.cs_ibss_capmismatch += src->stats.cs_ibss_capmismatch;
+	tgt->stats.cs_ps_unassoc += src->stats.cs_ps_unassoc;
+	tgt->stats.cs_ps_aid_err += src->stats.cs_ps_aid_err;
+	tgt->stats.cs_padding += src->stats.cs_padding;
+	tgt->stats.cs_tx_offchan_mgmt += src->stats.cs_tx_offchan_mgmt;
+	tgt->stats.cs_tx_offchan_data += src->stats.cs_tx_offchan_data;
+	tgt->stats.cs_tx_offchan_fail += src->stats.cs_tx_offchan_fail;
+	tgt->stats.cs_invalid_macaddr_nodealloc_fail += src->stats.cs_invalid_macaddr_nodealloc_fail;
+	tgt->stats.cs_tx_bcn_success += src->stats.cs_tx_bcn_success;
+	tgt->stats.cs_tx_bcn_outage += src->stats.cs_tx_bcn_outage;
+	tgt->stats.cs_sta_xceed_rlim += src->stats.cs_sta_xceed_rlim;
+	tgt->stats.cs_sta_xceed_vlim += src->stats.cs_sta_xceed_vlim;
+	tgt->stats.cs_mlme_auth_attempt += src->stats.cs_mlme_auth_attempt;
+	tgt->stats.cs_mlme_auth_success += src->stats.cs_mlme_auth_success;
+	tgt->stats.cs_authorize_attempt += src->stats.cs_authorize_attempt;
+	tgt->stats.cs_authorize_success += src->stats.cs_authorize_success;
+	tgt->stats.cs_peer_delete_req += src->stats.cs_peer_delete_req;
+	tgt->stats.cs_peer_delete_resp += src->stats.cs_peer_delete_resp;
+	tgt->stats.cs_peer_delete_all_req += src->stats.cs_peer_delete_all_req;
+	tgt->stats.cs_peer_delete_all_resp += src->stats.cs_peer_delete_all_resp;
+	tgt->stats.cs_prob_req_drops += src->stats.cs_prob_req_drops;
+	tgt->stats.cs_oob_probe_req_count += src->stats.cs_oob_probe_req_count;
+	tgt->stats.cs_wc_probe_req_drops += src->stats.cs_wc_probe_req_drops;
+	tgt->stats.cs_fils_frames_sent += src->stats.cs_fils_frames_sent;
+	tgt->stats.cs_fils_frames_sent_fail += src->stats.cs_fils_frames_sent_fail;
+	tgt->stats.cs_tx_offload_prb_resp_succ_cnt += src->stats.cs_tx_offload_prb_resp_succ_cnt;
+	tgt->stats.cs_tx_offload_prb_resp_fail_cnt += src->stats.cs_tx_offload_prb_resp_fail_cnt;
+#ifdef QCA_SUPPORT_SCAN_SPCL_VAP_STATS
+	tgt->stats.cs_tx_mgmt_ok_cnt += src->stats.cs_tx_mgmt_ok_cnt;
+	tgt->stats.cs_tx_mgmt_ok_bytes += src->stats.cs_tx_mgmt_ok_bytes;
+	tgt->stats.cs_tx_mgmt_retry_cnt += src->stats.cs_tx_mgmt_retry_cnt;
+	tgt->stats.cs_tx_mgmt_retry_bytes += src->stats.cs_tx_mgmt_retry_bytes;
+	tgt->stats.cs_tx_mgmt_err_cnt += src->stats.cs_tx_mgmt_err_cnt;
+	tgt->stats.cs_tx_mgmt_err_bytes += src->stats.cs_tx_mgmt_err_bytes;
+#endif
+
+	/* Ucast stats */
+	tgt->ucast_stats.cs_rx_badkeyid += src->ucast_stats.cs_rx_badkeyid;
+	tgt->ucast_stats.cs_rx_decryptok += src->ucast_stats.cs_rx_decryptok;
+	tgt->ucast_stats.cs_rx_decryptcrc += src->ucast_stats.cs_rx_decryptcrc;
+	tgt->ucast_stats.cs_rx_pnerr += src->ucast_stats.cs_rx_pnerr;
+	tgt->ucast_stats.cs_rx_wepfail += src->ucast_stats.cs_rx_wepfail;
+	tgt->ucast_stats.cs_rx_tkipreplay += src->ucast_stats.cs_rx_tkipreplay;
+	tgt->ucast_stats.cs_rx_tkipformat += src->ucast_stats.cs_rx_tkipformat;
+	tgt->ucast_stats.cs_rx_tkipicv += src->ucast_stats.cs_rx_tkipicv;
+	tgt->ucast_stats.cs_rx_ccmpreplay += src->ucast_stats.cs_rx_ccmpreplay;
+	tgt->ucast_stats.cs_rx_ccmpformat += src->ucast_stats.cs_rx_ccmpformat;
+	tgt->ucast_stats.cs_rx_ccmpmic += src->ucast_stats.cs_rx_ccmpmic;
+	tgt->ucast_stats.cs_rx_wpireplay += src->ucast_stats.cs_rx_wpireplay;
+	tgt->ucast_stats.cs_rx_wpimic += src->ucast_stats.cs_rx_wpimic;
+	tgt->ucast_stats.cs_rx_countermeasure += src->ucast_stats.cs_rx_countermeasure;
+	tgt->ucast_stats.cs_tx_mgmt += src->ucast_stats.cs_tx_mgmt;
+	tgt->ucast_stats.cs_rx_mgmt += src->ucast_stats.cs_rx_mgmt;
+	tgt->ucast_stats.cs_tx_discard += src->ucast_stats.cs_tx_discard;
+	tgt->ucast_stats.cs_rx_discard += src->ucast_stats.cs_rx_discard;
+
+	/*Mcast stats */
+	tgt->mcast_stats.cs_rx_badkeyid += src->mcast_stats.cs_rx_badkeyid;
+	tgt->mcast_stats.cs_rx_decryptok += src->mcast_stats.cs_rx_decryptok;
+	tgt->mcast_stats.cs_rx_decryptcrc += src->mcast_stats.cs_rx_decryptcrc;
+	tgt->mcast_stats.cs_rx_pnerr += src->mcast_stats.cs_rx_pnerr;
+	tgt->mcast_stats.cs_rx_wepfail += src->mcast_stats.cs_rx_wepfail;
+	tgt->mcast_stats.cs_rx_tkipreplay += src->mcast_stats.cs_rx_tkipreplay;
+	tgt->mcast_stats.cs_rx_tkipformat += src->mcast_stats.cs_rx_tkipformat;
+	tgt->mcast_stats.cs_rx_tkipicv += src->mcast_stats.cs_rx_tkipicv;
+	tgt->mcast_stats.cs_rx_ccmpreplay += src->mcast_stats.cs_rx_ccmpreplay;
+	tgt->mcast_stats.cs_rx_ccmpformat += src->mcast_stats.cs_rx_ccmpformat;
+	tgt->mcast_stats.cs_rx_ccmpmic += src->mcast_stats.cs_rx_ccmpmic;
+	tgt->mcast_stats.cs_rx_wpireplay += src->mcast_stats.cs_rx_wpireplay;
+	tgt->mcast_stats.cs_rx_wpimic += src->mcast_stats.cs_rx_wpimic;
+	tgt->mcast_stats.cs_rx_countermeasure += src->mcast_stats.cs_rx_countermeasure;
+	tgt->mcast_stats.cs_tx_mgmt += src->mcast_stats.cs_tx_mgmt;
+	tgt->mcast_stats.cs_rx_mgmt += src->mcast_stats.cs_rx_mgmt;
+	tgt->mcast_stats.cs_tx_discard += src->mcast_stats.cs_tx_discard;
+	tgt->mcast_stats.cs_rx_discard += src->mcast_stats.cs_rx_discard;
+}
+#endif
+
 static QDF_STATUS get_basic_vdev_ctrl(struct wlan_objmgr_vdev *vdev,
 				      struct unified_stats *stats,
-				      uint32_t feat)
+				      uint32_t feat, bool mld_req)
 {
 	struct vdev_ic_cp_stats *cp_stats = NULL;
 	QDF_STATUS ret = QDF_STATUS_SUCCESS;
@@ -869,7 +1011,39 @@ static QDF_STATUS get_basic_vdev_ctrl(struct wlan_objmgr_vdev *vdev,
 		qdf_err("Allocation Failed!");
 		return QDF_STATUS_E_NOMEM;
 	}
-	ret = wlan_cfg80211_get_vdev_cp_stats(vdev, cp_stats);
+
+#ifdef CONFIG_MLO_SINGLE_DEV
+	if (mld_req) {
+		uint16_t num_links = 0, i = 0;
+		QDF_STATUS status = QDF_STATUS_SUCCESS;
+		struct vdev_ic_cp_stats *temp_cp_stats = NULL;
+		struct wlan_objmgr_vdev *vdev_list[WLAN_UMAC_MLO_MAX_VDEVS] = {NULL};
+
+		temp_cp_stats = qdf_mem_malloc(sizeof(struct vdev_ic_cp_stats));
+		if (!temp_cp_stats) {
+			qdf_err("Allocation Failed!");
+			qdf_mem_free(cp_stats);
+			return QDF_STATUS_E_NOMEM;
+		}
+
+		mlo_ap_get_vdev_list(vdev, &num_links, vdev_list);
+		for (i = 0; i < num_links; i++) {
+			status = wlan_cfg80211_get_vdev_cp_stats(vdev_list[i],
+								 temp_cp_stats);
+			mlo_release_vdev_ref(vdev_list[i]);
+			if (status != QDF_STATUS_SUCCESS) {
+				ret = status;
+				continue;
+			}
+			aggregate_mld_vdev_stats(cp_stats, temp_cp_stats);
+		}
+		qdf_mem_free(temp_cp_stats);
+	} else
+#endif
+	{
+		ret = wlan_cfg80211_get_vdev_cp_stats(vdev, cp_stats);
+	}
+
 	if (QDF_STATUS_SUCCESS != ret) {
 		qdf_err("Unable to get Vdev Control stats!");
 		goto get_failed;
@@ -2548,7 +2722,7 @@ static QDF_STATUS get_advance_vdev_ctrl_rx(struct unified_stats *stats,
 static QDF_STATUS get_advance_vdev_data(struct wlan_objmgr_psoc *psoc,
 					struct wlan_objmgr_vdev *vdev,
 					struct unified_stats *stats,
-					uint32_t feat)
+					uint32_t feat, bool mld_req)
 {
 	struct cdp_vdev_stats *vdev_stats = NULL;
 	QDF_STATUS ret = QDF_STATUS_SUCCESS;
@@ -2563,9 +2737,18 @@ static QDF_STATUS get_advance_vdev_data(struct wlan_objmgr_psoc *psoc,
 		qdf_err("Allocation Failed!");
 		return QDF_STATUS_E_NOMEM;
 	}
-	ret = cdp_host_get_vdev_stats(wlan_psoc_get_dp_handle(psoc),
-				      wlan_vdev_get_id(vdev),
-				      vdev_stats, true);
+
+#ifdef CONFIG_MLO_SINGLE_DEV
+	if (mld_req)
+		ret = cdp_mlo_get_mld_vdev_stats(wlan_psoc_get_dp_handle(psoc),
+						 wlan_vdev_get_id(vdev),
+						 vdev_stats);
+	else
+#endif
+		ret = cdp_host_get_vdev_stats(wlan_psoc_get_dp_handle(psoc),
+					      wlan_vdev_get_id(vdev),
+					      vdev_stats, true);
+
 	if (ret != QDF_STATUS_SUCCESS) {
 		qdf_err("Unable to get Vdev Stats!");
 		goto get_failed;
@@ -2637,7 +2820,7 @@ get_failed:
 
 static QDF_STATUS get_advance_vdev_ctrl(struct wlan_objmgr_vdev *vdev,
 					struct unified_stats *stats,
-					uint32_t feat)
+					uint32_t feat, bool mld_req)
 {
 	struct vdev_ic_cp_stats *cp_stats = NULL;
 	QDF_STATUS ret = QDF_STATUS_SUCCESS;
@@ -2652,7 +2835,39 @@ static QDF_STATUS get_advance_vdev_ctrl(struct wlan_objmgr_vdev *vdev,
 		qdf_err("Allocation Failed!");
 		return QDF_STATUS_E_NOMEM;
 	}
-	ret = get_vdev_cp_stats(vdev, cp_stats);
+
+#ifdef CONFIG_MLO_SINGLE_DEV
+	if (mld_req) {
+		uint16_t num_links = 0, i = 0;
+		QDF_STATUS status = QDF_STATUS_SUCCESS;
+		struct vdev_ic_cp_stats *temp_cp_stats = NULL;
+		struct wlan_objmgr_vdev *vdev_list[WLAN_UMAC_MLO_MAX_VDEVS] = {NULL};
+
+		temp_cp_stats = qdf_mem_malloc(sizeof(struct vdev_ic_cp_stats));
+		if (!temp_cp_stats) {
+			qdf_err("Allocation Failed!");
+			qdf_mem_free(cp_stats);
+			return QDF_STATUS_E_NOMEM;
+		}
+
+		mlo_ap_get_vdev_list(vdev, &num_links, vdev_list);
+		for (i = 0; i < num_links; i++) {
+			status = wlan_cfg80211_get_vdev_cp_stats(vdev_list[i],
+								 temp_cp_stats);
+			mlo_release_vdev_ref(vdev_list[i]);
+			if (status != QDF_STATUS_SUCCESS) {
+				ret = status;
+				continue;
+			}
+			aggregate_mld_vdev_stats(cp_stats, temp_cp_stats);
+		}
+		qdf_mem_free(temp_cp_stats);
+	} else
+#endif
+	{
+		ret = wlan_cfg80211_get_vdev_cp_stats(vdev, cp_stats);
+	}
+
 	if (QDF_STATUS_SUCCESS != ret) {
 		qdf_err("Unable to get Vdev Control stats!");
 		goto get_failed;
@@ -4322,7 +4537,7 @@ static QDF_STATUS get_debug_vdev_data_tso(struct unified_stats *stats,
 static QDF_STATUS get_debug_vdev_data(struct wlan_objmgr_psoc *psoc,
 				      struct wlan_objmgr_vdev *vdev,
 				      struct unified_stats *stats,
-				      uint32_t feat)
+				      uint32_t feat, bool mld_req)
 {
 	struct cdp_vdev_stats *vdev_stats = NULL;
 	QDF_STATUS ret = QDF_STATUS_SUCCESS;
@@ -4337,9 +4552,18 @@ static QDF_STATUS get_debug_vdev_data(struct wlan_objmgr_psoc *psoc,
 		qdf_err("Allocation Failed!");
 		return QDF_STATUS_E_NOMEM;
 	}
-	ret = cdp_host_get_vdev_stats(wlan_psoc_get_dp_handle(psoc),
-				      wlan_vdev_get_id(vdev),
-				      vdev_stats, true);
+
+#ifdef CONFIG_MLO_SINGLE_DEV
+	if (mld_req)
+		ret = cdp_mlo_get_mld_vdev_stats(wlan_psoc_get_dp_handle(psoc),
+						 wlan_vdev_get_id(vdev),
+						 vdev_stats);
+	else
+#endif
+		ret = cdp_host_get_vdev_stats(wlan_psoc_get_dp_handle(psoc),
+					      wlan_vdev_get_id(vdev),
+					      vdev_stats, true);
+
 	if (ret != QDF_STATUS_SUCCESS) {
 		qdf_err("Unable to get Vdev Stats!");
 		goto get_failed;
@@ -4495,7 +4719,7 @@ static QDF_STATUS get_debug_vdev_ctrl_wmi(struct unified_stats *stats,
 
 static QDF_STATUS get_debug_vdev_ctrl(struct wlan_objmgr_vdev *vdev,
 				      struct unified_stats *stats,
-				      uint32_t feat)
+				      uint32_t feat, bool mld_req)
 {
 	struct vdev_ic_cp_stats *cp_stats = NULL;
 	QDF_STATUS ret = QDF_STATUS_SUCCESS;
@@ -4511,7 +4735,37 @@ static QDF_STATUS get_debug_vdev_ctrl(struct wlan_objmgr_vdev *vdev,
 		return QDF_STATUS_E_NOMEM;
 	}
 
-	ret = get_vdev_cp_stats(vdev, cp_stats);
+#ifdef CONFIG_MLO_SINGLE_DEV
+	if (mld_req) {
+		uint16_t num_links = 0, i = 0;
+		QDF_STATUS status = QDF_STATUS_SUCCESS;
+		struct vdev_ic_cp_stats *temp_cp_stats = NULL;
+		struct wlan_objmgr_vdev *vdev_list[WLAN_UMAC_MLO_MAX_VDEVS] = {NULL};
+
+		temp_cp_stats = qdf_mem_malloc(sizeof(struct vdev_ic_cp_stats));
+		if (!temp_cp_stats) {
+			qdf_err("Allocation Failed!");
+			qdf_mem_free(cp_stats);
+			return QDF_STATUS_E_NOMEM;
+		}
+		mlo_ap_get_vdev_list(vdev, &num_links, vdev_list);
+		for (i = 0; i < num_links; i++) {
+			status = wlan_cfg80211_get_vdev_cp_stats(vdev_list[i],
+								 temp_cp_stats);
+			mlo_release_vdev_ref(vdev_list[i]);
+			if (status != QDF_STATUS_SUCCESS) {
+				ret = status;
+				continue;
+			}
+			aggregate_mld_vdev_stats(cp_stats, temp_cp_stats);
+		}
+		qdf_mem_free(temp_cp_stats);
+	} else
+#endif
+	{
+		ret = wlan_cfg80211_get_vdev_cp_stats(vdev, cp_stats);
+	}
+
 	if (QDF_STATUS_SUCCESS != ret) {
 		qdf_err("Unable to get Vdev Control stats!");
 		goto get_failed;
@@ -5663,25 +5917,25 @@ QDF_STATUS wlan_stats_get_vdev_stats(struct wlan_objmgr_psoc *psoc,
 	switch (cfg->lvl) {
 	case STATS_LVL_BASIC:
 		if (cfg->type == STATS_TYPE_DATA)
-			ret = get_basic_vdev_data(psoc, vdev, stats, cfg->feat);
+			ret = get_basic_vdev_data(psoc, vdev, stats, cfg->feat, cfg->mld_req);
 		else
-			ret = get_basic_vdev_ctrl(vdev, stats, cfg->feat);
+			ret = get_basic_vdev_ctrl(vdev, stats, cfg->feat, cfg->mld_req);
 		break;
 #if WLAN_ADVANCE_TELEMETRY
 	case STATS_LVL_ADVANCE:
 		if (cfg->type == STATS_TYPE_DATA)
 			ret = get_advance_vdev_data(psoc, vdev,
-						    stats, cfg->feat);
+						    stats, cfg->feat, cfg->mld_req);
 		else
-			ret = get_advance_vdev_ctrl(vdev, stats, cfg->feat);
+			ret = get_advance_vdev_ctrl(vdev, stats, cfg->feat, cfg->mld_req);
 		break;
 #endif /* WLAN_ADVANCE_TELEMETRY */
 #if WLAN_DEBUG_TELEMETRY
 	case STATS_LVL_DEBUG:
 		if (cfg->type == STATS_TYPE_DATA)
-			ret = get_debug_vdev_data(psoc, vdev, stats, cfg->feat);
+			ret = get_debug_vdev_data(psoc, vdev, stats, cfg->feat, cfg->mld_req);
 		else
-			ret = get_debug_vdev_ctrl(vdev, stats, cfg->feat);
+			ret = get_debug_vdev_ctrl(vdev, stats, cfg->feat, cfg->mld_req);
 		break;
 #endif /* WLAN_DEBUG_TELEMETRY */
 	default:
