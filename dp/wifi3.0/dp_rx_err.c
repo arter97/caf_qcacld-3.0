@@ -2422,11 +2422,15 @@ dp_rx_wbm_err_process(struct dp_intr *int_ctx, struct dp_soc *soc,
 
 		if (dp_pdev && dp_pdev->link_peer_stats &&
 		    txrx_peer && txrx_peer->is_mld_peer) {
-			link_id = ((dp_rx_peer_mdata_link_id_get(
+			link_id = dp_rx_peer_mdata_link_id_get(
 							soc,
-							peer_meta_data)) + 1);
-			if (link_id < 1 || link_id > DP_MAX_MLO_LINKS)
-				link_id = 0;
+							peer_meta_data);
+				if (!link_id) {
+					DP_PEER_PER_PKT_STATS_INC(
+						  txrx_peer,
+						  rx.inval_link_id_pkt_cnt,
+						  1, link_id);
+				}
 		} else {
 			link_id = 0;
 		}

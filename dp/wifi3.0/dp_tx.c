@@ -4582,8 +4582,8 @@ dp_tx_update_peer_extd_stats(struct hal_tx_completion_status *ts,
 }
 #endif
 
-#ifdef WLAN_FEATURE_11BE_MLO
-static inline int
+#if defined(WLAN_FEATURE_11BE_MLO) && defined(QCA_ENHANCED_STATS_SUPPORT)
+static inline uint8_t
 dp_tx_get_link_id_from_ppdu_id(struct dp_soc *soc,
 			       struct hal_tx_completion_status *ts,
 			       struct dp_txrx_peer *txrx_peer,
@@ -4599,13 +4599,19 @@ dp_tx_get_link_id_from_ppdu_id(struct dp_soc *soc,
 	link_id_offset = soc->link_id_offset;
 	link_id_bits = soc->link_id_bits;
 	ppdu_id = ts->ppdu_id;
-	hw_link_id = DP_GET_HW_LINK_ID_FRM_PPDU_ID(ppdu_id, link_id_offset,
-						   link_id_bits);
+	hw_link_id = ((DP_GET_HW_LINK_ID_FRM_PPDU_ID(ppdu_id, link_id_offset,
+						   link_id_bits)) + 1);
+	if (hw_link_id > DP_MAX_MLO_LINKS) {
+		hw_link_id = 0;
+		DP_PEER_PER_PKT_STATS_INC(
+				txrx_peer,
+				tx.inval_link_id_pkt_cnt, 1, hw_link_id);
+	}
 
-	return (hw_link_id + 1);
+	return hw_link_id;
 }
 #else
-static inline int
+static inline uint8_t
 dp_tx_get_link_id_from_ppdu_id(struct dp_soc *soc,
 			       struct hal_tx_completion_status *ts,
 			       struct dp_txrx_peer *txrx_peer,
@@ -5319,11 +5325,7 @@ void dp_tx_comp_process_tx_status(struct dp_soc *soc,
 	}
 	vdev = txrx_peer->vdev;
 
-#ifdef DP_MLO_LINK_STATS_SUPPORT
 	link_id = dp_tx_get_link_id_from_ppdu_id(soc, ts, txrx_peer, vdev);
-	if (link_id < 1 || link_id > DP_MAX_MLO_LINKS)
-		link_id = 0;
-#endif
 
 	dp_tx_update_connectivity_stats(soc, vdev, tx_desc, ts->status);
 	dp_tx_update_uplink_delay(soc, vdev, ts);
