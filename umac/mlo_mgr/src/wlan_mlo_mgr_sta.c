@@ -170,6 +170,42 @@ bool mlo_is_mld_disconnecting_connecting(struct wlan_objmgr_vdev *vdev)
 	return false;
 }
 
+bool mlo_is_ml_connection_in_progress(struct wlan_objmgr_psoc *psoc,
+				      uint8_t vdev_id)
+{
+	struct wlan_objmgr_vdev *vdev;
+	struct wlan_mlo_dev_context *mlo_dev_ctx;
+	uint8_t i = 0;
+	bool val = false;
+
+	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, vdev_id,
+						    WLAN_MLO_MGR_ID);
+
+	if (!vdev) {
+		mlo_err("Invalid vdev");
+		return false;
+	}
+
+	mlo_dev_ctx = vdev->mlo_dev_ctx;
+	if (!mlo_dev_ctx || !wlan_vdev_mlme_is_mlo_vdev(vdev))
+		goto end;
+
+	for (i =  0; i < WLAN_UMAC_MLO_MAX_VDEVS; i++) {
+		if (!mlo_dev_ctx->wlan_vdev_list[i])
+			continue;
+		if (qdf_test_bit(i, mlo_dev_ctx->sta_ctx->wlan_connected_links)) {
+			if (!wlan_cm_is_vdev_connected(mlo_dev_ctx->wlan_vdev_list[i])) {
+				val = true;
+				goto end;
+			}
+		}
+	}
+
+end:
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_MLO_MGR_ID);
+	return val;
+}
+
 bool ucfg_mlo_is_mld_disconnected(struct wlan_objmgr_vdev *vdev)
 {
 	return mlo_is_mld_disconnected(vdev);
