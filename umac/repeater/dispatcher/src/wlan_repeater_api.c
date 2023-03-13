@@ -477,11 +477,8 @@ wlan_rptr_vdev_create_complete(struct wlan_objmgr_vdev *vdev,
 #ifdef CONFIG_MLO_SINGLE_DEV
 				osdev = ath_netdev_priv(wrap_dev);
 				mldev = osdev->mldev;
-				if (!mldev) {
-					RPTR_LOGE("MLD not configured on Wireless client!\n");
-					return;
-				}
-				wrap_dev = mldev->mld_dev;
+				if (mldev)
+					wrap_dev = mldev->mld_dev;
 #endif
 				oma_addr = dp_wrap_vdev_get_oma(vdev);
 				vma_addr = dp_wrap_vdev_get_vma(vdev);
@@ -545,11 +542,8 @@ wlan_rptr_vdev_delete_start(struct wlan_objmgr_vdev *vdev)
 #ifdef CONFIG_MLO_SINGLE_DEV
 				osdev = ath_netdev_priv(wrap_dev);
 				mldev = osdev->mldev;
-				if (!mldev) {
-					RPTR_LOGE("MLD not configured on Wireless client!\n");
-					return;
-				}
-				wrap_dev = mldev->mld_dev;
+				if (mldev)
+					wrap_dev = mldev->mld_dev;
 #endif
 				oma_addr = dp_wrap_vdev_get_oma(vdev);
 				vma_addr = dp_wrap_vdev_get_vma(vdev);
