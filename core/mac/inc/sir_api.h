@@ -1307,17 +1307,6 @@ struct missed_beacon_ind {
 	int32_t rssi;
 };
 
-/* / Definition for Set Context request */
-/* / ---> MAC */
-struct set_context_req {
-	uint16_t messageType;   /* eWNI_SME_SET_CONTEXT_REQ */
-	uint16_t length;
-	uint8_t vdev_id;      /* vdev ID */
-	struct qdf_mac_addr peer_macaddr;
-	struct qdf_mac_addr bssid;      /* BSSID */
-	tSirKeyMaterial keyMaterial;
-};
-
 /* / Definition for Set Context response */
 /* / MAC ---> */
 struct set_context_rsp {
