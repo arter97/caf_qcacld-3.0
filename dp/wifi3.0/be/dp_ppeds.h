@@ -26,6 +26,16 @@ struct dp_ppe_ds_idxs {
 };
 
 /**
+ * dp_ppeds_target_supported - Check target supports ppeds
+ * @target_type: Device ID
+ *
+ * Check target supports ppeds
+ *
+ * Return: true if supported , false if not supported
+ */
+bool dp_ppeds_target_supported(int target_type);
+
+/**
  * dp_ppeds_init_ppe_vp_tbl_be - Attach ppeds soc instance
  * @be_soc: BE SoC
  *
