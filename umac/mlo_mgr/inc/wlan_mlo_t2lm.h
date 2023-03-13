@@ -711,6 +711,15 @@ QDF_STATUS wlan_process_bcn_prbrsp_t2lm_ie(struct wlan_objmgr_vdev *vdev,
  */
 QDF_STATUS wlan_send_tid_to_link_mapping(struct wlan_objmgr_vdev *vdev,
 					 struct wlan_t2lm_info *t2lm);
+/**
+ * wlan_get_t2lm_mapping_status() - API to get T2LM info
+ * @vdev: Pointer to vdev
+ * @t2lm: T2LM info
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS wlan_get_t2lm_mapping_status(struct wlan_objmgr_vdev *vdev,
+					struct wlan_t2lm_info *t2lm);
 #else
 static inline QDF_STATUS wlan_mlo_parse_t2lm_ie(
 	struct wlan_t2lm_onging_negotiation_info *t2lm, uint8_t *ie)
