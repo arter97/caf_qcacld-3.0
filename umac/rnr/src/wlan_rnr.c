@@ -159,6 +159,11 @@ void wlan_rnr_6ghz_iterator(wlan_rnr_handler handler, void *arg1, void *arg2)
 
 	for (i = 0; i < MAX_6GHZ_LINKS && g_rnr_info.soc_info[i].soc; i++) {
 		for (j = 0; j < WLAN_UMAC_MAX_PDEVS; j++) {
+			if (!(g_rnr_info.soc_info[i].pdev_6ghz_ctx[j].pdev_6ghz)) {
+			    qdf_debug("pdev is null");
+			    continue;
+			}
+
 			ic = wlan_pdev_get_mlme_ext_obj(
 					g_rnr_info.soc_info[i].
 					pdev_6ghz_ctx[j].pdev_6ghz);
@@ -166,9 +171,8 @@ void wlan_rnr_6ghz_iterator(wlan_rnr_handler handler, void *arg1, void *arg2)
 			if (!ic)
 				continue;
 
-			qdf_info("Calling rnr_handler() for pdev_id: %d",
+			qdf_debug("Calling rnr_handler() for pdev_id: %d",
 				wlan_objmgr_pdev_get_pdev_id(ic->ic_pdev_obj));
-
 			/* Extend to call with arg2 if required later */
 			handler(ic, arg1);
 		}
