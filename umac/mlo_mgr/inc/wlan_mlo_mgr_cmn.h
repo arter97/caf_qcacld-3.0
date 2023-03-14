@@ -316,6 +316,7 @@ void mlo_mlme_handle_sta_csa_param(struct wlan_objmgr_vdev *vdev,
 #define WLAN_MLO_INVALID_NUM_LINKS             (-1)
 #ifdef WLAN_MLO_MULTI_CHIP
 #define WLAN_MLO_GROUP_INVALID                 (-1)
+#define WLAN_MLO_CHIP_ID_INVALID                 (-1)
 /**
  * wlan_mlo_get_max_num_links() - Get the maximum number of MLO links
  * possible in the system
@@ -359,6 +360,14 @@ uint16_t wlan_mlo_get_pdev_hw_link_id(struct wlan_objmgr_pdev *pdev);
  * Return: MLO group id of the psoc
  */
 uint8_t wlan_mlo_get_psoc_group_id(struct wlan_objmgr_psoc *psoc);
+
+/**
+ * wlan_mlo_get_psoc_mlo_chip_id() - Get MLO chip id of psoc
+ * @psoc: psoc object
+ *
+ * Return: MLO group id of the psoc
+ */
+uint8_t wlan_mlo_get_psoc_mlo_chip_id(struct wlan_objmgr_psoc *psoc);
 
 /**
  * wlan_mlo_get_psoc_capable() - Get if MLO capable psoc
