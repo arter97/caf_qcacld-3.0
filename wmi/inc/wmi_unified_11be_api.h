@@ -142,6 +142,14 @@ QDF_STATUS wmi_send_mlo_peer_tid_to_link_map_cmd(
 QDF_STATUS wmi_send_mlo_vdev_tid_to_link_map_cmd(
 		wmi_unified_t wmi,
 		struct wmi_host_tid_to_link_map_ap_params *params);
+/**
+ * wmi_send_mlo_link_state_request_cmd - send mlo link status command
+ * @wmi: wmi handle
+ * @params: Pointer to link state params
+ */
+QDF_STATUS wmi_send_mlo_link_state_request_cmd(
+		wmi_unified_t wmi,
+		struct wmi_host_link_state_params *params);
 
 /**
  * wmi_extract_mlo_vdev_tid_to_link_map_event() - extract mlo t2lm info for vdev
@@ -174,6 +182,18 @@ wmi_extract_mlo_vdev_bcast_tid_to_link_map_event(
 				     wmi_unified_t wmi,
 				     void *evt_buf,
 				     struct mlo_bcast_t2lm_info *bcast);
+
+/**
+ * wmi_extract_mlo_link_state_info_event - extract mlo link status info
+ * @wmi: wmi handle
+ * @evt_buf: pointer to event buffer
+ * @params: pointer to host struct to get mlo link state
+ */
+QDF_STATUS wmi_extract_mlo_link_state_info_event(
+			wmi_unified_t wmi,
+			void *evt_buf,
+			struct ml_link_state_info_event *params);
+
 #endif /* WLAN_FEATURE_11BE */
 
 #endif /*_WMI_UNIFIED_11BE_API_H_*/

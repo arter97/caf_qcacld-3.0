@@ -1026,6 +1026,103 @@ static uint8_t *populate_link_control_tlv(
 }
 #endif
 
+static QDF_STATUS
+send_link_state_request_cmd_tlv(wmi_unified_t wmi_handle,
+				struct wmi_host_link_state_params *params)
+{
+	wmi_mlo_vdev_get_link_info_cmd_fixed_param *cmd;
+	wmi_buf_t buf;
+	uint8_t *buf_ptr;
+	QDF_STATUS ret = QDF_STATUS_SUCCESS;
+	uint32_t buf_len = 0;
+
+	buf_len = sizeof(wmi_mlo_vdev_get_link_info_cmd_fixed_param);
+
+	buf = wmi_buf_alloc(wmi_handle, buf_len);
+	if (!buf) {
+		wmi_err("wmi buf alloc failed for vdev id %d while link state cmd send: ",
+			params->vdev_id);
+		return QDF_STATUS_E_NOMEM;
+	}
+
+	buf_ptr = (uint8_t *)wmi_buf_data(buf);
+	cmd = (wmi_mlo_vdev_get_link_info_cmd_fixed_param *)buf_ptr;
+
+	WMITLV_SET_HDR(
+		&cmd->tlv_header,
+		WMITLV_TAG_STRUC_wmi_mlo_vdev_get_link_info_cmd_fixed_param,
+		WMITLV_GET_STRUCT_TLVLEN(
+		wmi_mlo_vdev_get_link_info_cmd_fixed_param));
+
+	cmd->vdev_id = params->vdev_id;
+	WMI_CHAR_ARRAY_TO_MAC_ADDR(params->mld_mac, &cmd->mld_macaddr);
+	buf_ptr += sizeof(wmi_mlo_vdev_get_link_info_cmd_fixed_param);
+	wmi_mtrace(WMI_MLO_VDEV_GET_LINK_INFO_CMDID, cmd->vdev_id, 0);
+	ret = wmi_unified_cmd_send(wmi_handle, buf, buf_len,
+				   WMI_MLO_VDEV_GET_LINK_INFO_CMDID);
+	if (ret) {
+		wmi_err("Failed to send ml link state command to FW: %d vdev id %d",
+			ret, cmd->vdev_id);
+		wmi_buf_free(buf);
+	}
+	return ret;
+}
+
+static QDF_STATUS
+extract_mlo_link_state_event_tlv(struct wmi_unified *wmi_handle,
+				 void *buf,
+				 struct  ml_link_state_info_event *params)
+{
+	WMI_MLO_VDEV_LINK_INFO_EVENTID_param_tlvs *param_buf;
+	wmi_mlo_vdev_link_info_event_fixed_param *ev;
+	wmi_mlo_vdev_link_info  *link_info = NULL;
+	int num_info = 0;
+	uint8_t *mld_addr;
+	uint32_t num_link_info = 0;
+
+	param_buf = (WMI_MLO_VDEV_LINK_INFO_EVENTID_param_tlvs *)buf;
+
+	if (!param_buf) {
+		wmi_err_rl("Param_buf is NULL");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	ev = (wmi_mlo_vdev_link_info_event_fixed_param *)
+	param_buf->fixed_param;
+	link_info = (wmi_mlo_vdev_link_info *)param_buf->mlo_vdev_link_info;
+
+	num_link_info = param_buf->num_mlo_vdev_link_info;
+	params->status = ev->status;
+	params->vdev_id = ev->vdev_id;
+	params->hw_mode_index = ev->hw_mode_index;
+	params->num_mlo_vdev_link_info = num_link_info;
+	mld_addr = params->mldaddr.bytes;
+	WMI_MAC_ADDR_TO_CHAR_ARRAY(&ev->mld_macaddr, mld_addr);
+
+	if (params->num_mlo_vdev_link_info > WLAN_MLO_MAX_VDEVS) {
+		wmi_err_rl("Invalid number of vdev link info");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	for (num_info = 0; num_info < num_link_info; num_info++) {
+		params->link_info[num_info].vdev_id =
+		WMI_MLO_VDEV_LINK_INFO_GET_VDEVID(link_info->link_info);
+
+		params->link_info[num_info].link_id =
+		WMI_MLO_VDEV_LINK_INFO_GET_LINKID(link_info->link_info);
+
+		params->link_info[num_info].link_status =
+		WMI_MLO_VDEV_LINK_INFO_GET_LINK_STATUS(link_info->link_info);
+
+		params->link_info[num_info].chan_freq =
+		link_info->chan_freq;
+
+		link_info++;
+	}
+
+	return QDF_STATUS_SUCCESS;
+}
+
 static QDF_STATUS send_mlo_peer_tid_to_link_map_cmd_tlv(
 		wmi_unified_t wmi_handle,
 		struct wmi_host_tid_to_link_map_params *params,
@@ -1684,10 +1781,14 @@ void wmi_11be_attach_tlv(wmi_unified_t wmi_handle)
 		send_mlo_peer_tid_to_link_map_cmd_tlv;
 	ops->send_mlo_vdev_tid_to_link_map =
 		send_mlo_vdev_tid_to_link_map_cmd_tlv;
+	ops->send_mlo_link_state_request =
+		send_link_state_request_cmd_tlv;
 	ops->extract_mlo_vdev_tid_to_link_map_event =
 		extract_mlo_vdev_tid_to_link_map_event_tlv;
 	ops->extract_mlo_vdev_bcast_tid_to_link_map_event =
 		extract_mlo_vdev_bcast_tid_to_link_map_event_tlv;
+	ops->extract_mlo_link_state_event =
+		extract_mlo_link_state_event_tlv;
 #endif /* WLAN_FEATURE_11BE */
 	ops->extract_mgmt_rx_ml_cu_params =
 		extract_mgmt_rx_ml_cu_params_tlv;

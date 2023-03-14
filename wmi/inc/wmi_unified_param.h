@@ -1191,6 +1191,17 @@ struct wmi_host_tid_to_link_map_resp {
 	enum wlan_t2lm_status status;
 	uint8_t mapping_switch_tsf;
 };
+
+/**
+ * struct wmi_host_link_state_params - MLO link state params
+ * @vdev_id: Vdev id
+ * @mld_mac: mld mac address
+ */
+struct wmi_host_link_state_params {
+	uint8_t vdev_id;
+	uint8_t mld_mac[QDF_MAC_ADDR_SIZE];
+};
+
 #endif /* WLAN_FEATURE_11BE */
 
 #ifdef WLAN_FEATURE_11BE_MLO
@@ -5279,6 +5290,9 @@ typedef enum {
 	wmi_vdev_standalone_sound_complete_eventid,
 #endif
 	wmi_csa_ie_received_event_id,
+#ifdef WLAN_FEATURE_11BE_MLO
+	wmi_mlo_link_state_info_eventid,
+#endif
 	wmi_events_max,
 } wmi_conv_event_id;
 

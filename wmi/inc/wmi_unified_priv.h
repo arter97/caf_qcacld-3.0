@@ -3165,6 +3165,11 @@ QDF_STATUS
 QDF_STATUS (*extract_quiet_offload_event)(
 				wmi_unified_t wmi_handle, void *evt_buf,
 				struct vdev_sta_quiet_event *quiet_event);
+
+QDF_STATUS (*extract_mlo_link_state_event)(
+				struct wmi_unified *wmi_handle,
+				void *buf,
+				struct ml_link_state_info_event *params);
 #endif
 
 #ifdef WLAN_SUPPORT_PPEDS
@@ -3187,6 +3192,10 @@ QDF_STATUS (*send_mlo_vdev_tid_to_link_map)(
 			wmi_unified_t wmi_handle,
 			struct wmi_host_tid_to_link_map_ap_params *params);
 
+QDF_STATUS (*send_mlo_link_state_request)(
+			wmi_unified_t wmi_handle,
+			struct wmi_host_link_state_params *params);
+
 QDF_STATUS (*extract_mlo_vdev_tid_to_link_map_event)(
 		struct wmi_unified *wmi_handle,
 		uint8_t *buf,
@@ -3196,6 +3205,7 @@ QDF_STATUS (*extract_mlo_vdev_bcast_tid_to_link_map_event)(
 			struct wmi_unified *wmi_handle,
 			void *buf,
 			struct mlo_bcast_t2lm_info *bcast_info);
+
 #endif /* WLAN_FEATURE_11BE */
 
 QDF_STATUS
