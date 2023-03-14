@@ -252,6 +252,64 @@ struct wlan_mlo_key_mgmt {
 	bool keys_saved;
 };
 
+#ifdef WLAN_FEATURE_11BE_MLO
+/**
+ * struct mlo_link_state_cmd_params - MLO link state params
+ * @vdev_id: Vdev id
+ * @mld_mac: mld mac address
+ */
+struct mlo_link_state_cmd_params {
+	uint8_t vdev_id;
+	uint8_t mld_mac[QDF_MAC_ADDR_SIZE];
+};
+
+/**
+ * struct ml_link_info - ml link information
+ * @vdev_id: vdev id for this link
+ * @link_id: link id defined as in 802.11 BE spec.
+ * @link_status: active 0, inactive 1
+ * @reserved: reserved bits
+ * @chan_freq: Channel frequency in MHz
+ */
+struct ml_link_info {
+	uint32_t vdev_id:8,
+		 link_id:8,
+		 link_status:2,
+		 reserved:14;
+	uint32_t chan_freq;
+};
+
+/**
+ * struct ml_link_state_info_event - ML link state info response
+ * @status: to indicate the status for ml link info
+ * @hw_mode_index: current hardware mode index
+ * @link_info: link information
+ * @num_mlo_vdev_link_info: number of mlo vdev link info
+ * @vdev_id: vdev_id
+ * @mldaddr: mld addr
+ */
+struct ml_link_state_info_event {
+	uint32_t status;
+	uint32_t hw_mode_index;
+	struct ml_link_info link_info[WLAN_MLO_MAX_VDEVS];
+	uint16_t num_mlo_vdev_link_info;
+	uint8_t vdev_id;
+	struct qdf_mac_addr mldaddr;
+};
+
+/**
+ * struct ml_link_state_cmd_info - ml link state command info
+ * @request_cookie: request cookie
+ * @ml_link_state_resp_cb: callback function to handle response
+ * @ml_link_state_req_context: request context
+ */
+struct ml_link_state_cmd_info {
+	void *request_cookie;
+	void (*ml_link_state_resp_cb)(struct ml_link_state_info_event *ev,
+				      void *cookie);
+	void *ml_link_state_req_context;
+};
+#endif
 /**
  * struct mlo_sta_csa_params - CSA request parameters in mlo mgr
  * @csa_param: csa parameters
@@ -314,7 +372,7 @@ struct mlo_sta_quiet_status {
  * @copied_reassoc_rsp: Reassoc response copied from assoc link roam handling
  *                      to re-use while link connect in case of deferred/need
  *                      basis link connect (e.g. MLO OWE roaming).
- *
+ * @ml_link_state: ml link state command info param
  * NB: not using kernel-doc format since the kernel-doc script doesn't
  *     handle the qdf_bitmap() macro
  */
@@ -336,6 +394,9 @@ struct wlan_mlo_sta {
 	struct wlan_cm_disconnect_req *disconn_req;
 #ifdef WLAN_FEATURE_ROAM_OFFLOAD
 	struct wlan_cm_connect_resp *copied_reassoc_rsp;
+#endif
+#ifdef WLAN_FEATURE_11BE_MLO
+	struct ml_link_state_cmd_info ml_link_state;
 #endif
 };
 
@@ -1006,4 +1067,5 @@ struct mgmt_rx_mlo_link_removal_info {
 	uint8_t hw_link_id;
 	uint16_t tbtt_count;
 };
+
 #endif

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -107,6 +107,22 @@ target_if_extract_mlo_link_removal_info_mgmt_rx(
 		wmi_unified_t wmi_handle,
 		void *evt_buf,
 		struct mgmt_rx_event_params *rx_event);
+
+/**
+ * target_if_mlo_register_mlo_link_state_info_event -
+ *  Register mlo link state event
+ * @wmi_handle: WMI handle
+ */
+void target_if_mlo_register_mlo_link_state_info_event(
+		struct wmi_unified *wmi_handle);
+
+/**
+ * target_if_mlo_unregister_mlo_link_state_info_event -
+ *  Unregister mlo link state event
+ * @wmi_handle: WMI handle
+ */
+void target_if_mlo_unregister_mlo_link_state_info_event(
+		struct wmi_unified *wmi_handle);
 
 /**
  * target_if_mlo_register_vdev_tid_to_link_map_event() - Register T2LM event

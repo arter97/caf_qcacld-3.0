@@ -722,6 +722,18 @@ mlo_allocate_and_copy_ies(struct wlan_cm_connect_req *target,
  */
 void
 mlo_free_connect_ies(struct wlan_cm_connect_req *connect_req);
+
+/**
+ * mlo_get_link_state_context() - get ml link context
+ * @psoc: psoc handler
+ * @resp_cb: api to handle link state callback
+ * @context: response context
+ * @vdev_id: vdev id
+ */
+QDF_STATUS
+mlo_get_link_state_context(struct wlan_objmgr_psoc *psoc,
+			   get_ml_link_state_cb *resp_cb,
+			   void **context, uint8_t vdev_id);
 #else
 static inline
 QDF_STATUS mlo_connect(struct wlan_objmgr_vdev *vdev,
@@ -903,5 +915,14 @@ void mlo_process_ml_reconfig_ie(struct wlan_objmgr_vdev *vdev,
 				uint8_t *ml_ie, qdf_size_t ml_ie_len,
 				struct mlo_partner_info *partner_info)
 { }
+#ifdef WLAN_FEATURE_11BE_MLO
+static inline QDF_STATUS
+mlo_get_link_state_context(struct wlan_objmgr_psoc *psoc,
+			   get_ml_link_state_cb *resp_cb,
+			   void **context, uint8_t vdev_id)
+{
+	return QDF_STATUS_SUCCESS;
+}
+#endif
 #endif
 #endif
