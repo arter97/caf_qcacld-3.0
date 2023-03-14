@@ -8584,7 +8584,7 @@ int wma_motion_det_host_event_handler(void *handle, uint8_t *event,
 				    QDF_MODULE_ID_PE);
 
 	if (!param_buf) {
-		wma_er("Invalid motion det host event buffer");
+		wma_err("Invalid motion det host event buffer");
 		return -EINVAL;
 	}
 
