@@ -25,6 +25,7 @@
 #include "host_diag_core_event.h"
 #include "wlan_reg_services_api.h"
 
+#ifdef IPA_OFFLOAD
 QDF_STATUS wlan_ipa_set_perf_level(struct wlan_ipa_priv *ipa_ctx,
 				    uint64_t tx_packets,
 				    uint64_t rx_packets)
@@ -542,3 +543,4 @@ bool wlan_ipa_is_rm_released(struct wlan_ipa_priv *ipa_ctx)
 	return true;
 }
 #endif /* CONFIG_IPA_WDI_UNIFIED_API */
+#endif

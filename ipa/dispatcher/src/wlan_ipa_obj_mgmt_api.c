@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2018, 2020-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -29,6 +29,7 @@
 #include "qdf_platform.h"
 #include "qdf_module.h"
 
+#ifdef IPA_OFFLOAD
 /* This is as per IPA capbility */
 #define MAX_INSTANCES_SUPPORTED 2
 
@@ -370,3 +371,4 @@ bool wlan_ipa_is_vlan_enabled(void)
 }
 
 qdf_export_symbol(wlan_ipa_is_vlan_enabled);
+#endif

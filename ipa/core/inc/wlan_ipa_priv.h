@@ -25,8 +25,6 @@
 #ifndef _WLAN_IPA_PRIV_STRUCT_H_
 #define _WLAN_IPA_PRIV_STRUCT_H_
 
-#ifdef IPA_OFFLOAD
-
 #include <linux/version.h>
 #include <linux/kernel.h>
 
@@ -48,6 +46,7 @@
 #include "cdp_txrx_ipa.h"
 #endif
 
+#ifdef IPA_OFFLOAD
 #define WLAN_IPA_RX_INACTIVITY_MSEC_DELAY   1000
 #define WLAN_IPA_UC_WLAN_8023_HDR_SIZE      14
 

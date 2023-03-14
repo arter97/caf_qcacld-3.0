@@ -30,6 +30,7 @@
 #include <target_if_ipa.h>
 #include <wlan_objmgr_psoc_obj.h>
 
+#ifdef IPA_OFFLOAD
 /**
  * target_if_ipa_uc_offload_control_req() - send IPA offload control to FW
  * @psoc: pointer to PSOC object
@@ -89,3 +90,4 @@ target_if_ipa_register_tx_ops(struct wlan_lmac_if_tx_ops *tx_ops)
 
 	return QDF_STATUS_SUCCESS;
 }
+#endif

@@ -20,10 +20,10 @@
 #ifndef _WLAN_IPA_CORE_H_
 #define _WLAN_IPA_CORE_H_
 
-#ifdef IPA_OFFLOAD
-
 #include "wlan_ipa_priv.h"
 #include "wlan_ipa_public_struct.h"
+
+#ifdef IPA_OFFLOAD
 
 /**
  * wlan_ipa_is_enabled() - Is IPA enabled?
