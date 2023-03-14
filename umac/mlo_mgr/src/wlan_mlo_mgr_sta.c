@@ -861,23 +861,24 @@ mlo_send_link_connect(struct wlan_objmgr_vdev *vdev,
 	}
 
 	mlo_dev_lock_acquire(mlo_dev_ctx);
-	if (wlan_cm_is_vdev_connected(vdev)) {
+	if (!wlan_cm_is_vdev_connected(vdev)) {
+		mlo_dev_lock_release(mlo_dev_ctx);
+		return;
+	}
+
+	for (j = 0; j < ml_parnter_info->num_partner_links; j++) {
 		for (i =  0; i < WLAN_UMAC_MLO_MAX_VDEVS; i++) {
 			if (!mlo_dev_ctx->wlan_vdev_list[i])
 				continue;
 			/*
-			 * mlo_connect: update wlan_connected_links bitmap from
-			 * assoc resp parsing
-			 */
+			* mlo_connect: update wlan_connected_links bitmap from
+			* assoc resp parsing
+			*/
 			if (qdf_test_bit(i, mlo_dev_ctx->sta_ctx->wlan_connected_links)) {
 				if (wlan_cm_is_vdev_disconnected(
 					mlo_dev_ctx->wlan_vdev_list[i])) {
-					for (j = 0; j < ml_parnter_info->num_partner_links; j++) {
-						if (mlo_dev_ctx->wlan_vdev_list[i]->vdev_mlme.mlo_link_id ==
-							ml_parnter_info->partner_link_info[j].link_id)
-							break;
-					}
-					if (j < ml_parnter_info->num_partner_links) {
+					if (mlo_dev_ctx->wlan_vdev_list[i]->vdev_mlme.mlo_link_id
+						== ml_parnter_info->partner_link_info[j].link_id) {
 						wlan_vdev_mlme_get_ssid(
 							vdev, ssid.ssid,
 							&ssid.length);
@@ -886,9 +887,9 @@ mlo_send_link_connect(struct wlan_objmgr_vdev *vdev,
 							*ml_parnter_info,
 							ml_parnter_info->partner_link_info[j],
 							ssid);
+						mlo_dev_lock_release(mlo_dev_ctx);
+						return;
 					}
-					mlo_dev_lock_release(mlo_dev_ctx);
-					return;
 				}
 			}
 		}
