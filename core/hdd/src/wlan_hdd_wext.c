@@ -2586,17 +2586,6 @@
  */
 #define WE_SET_BA_AGEING_TIMEOUT		9
 
-enum host_target_comm_log {
-	HTC_CREDIT_HISTORY_LOG = 0,
-	COMMAND_LOG,
-	COMMAND_TX_CMP_LOG,
-	MGMT_COMMAND_LOG,
-	MGMT_COMMAND_TX_CMP_LOG,
-	EVENT_LOG,
-	RX_EVENT_LOG,
-	MGMT_EVENT_LOG
-};
-
 /* (SIOCIWFIRSTPRIV + 29) is currently unused */
 
 /* 802.11p IOCTL */
@@ -8447,70 +8436,7 @@ static int iw_set_band_config(struct net_device *dev,
 	return errno;
 }
 
-static int printk_adapter(void *priv, const char *fmt, ...)
-{
-	int ret;
-	va_list args;
 
-	va_start(args, fmt);
-	ret = vprintk(fmt, args);
-	ret += printk("\n");
-	va_end(args);
-
-	return ret;
-}
-
-static void hdd_ioctl_log_buffer(int log_id, uint32_t count, qdf_abstract_print
-							     *custom_print,
-							     void *print_ctx)
-{
-	qdf_abstract_print *print;
-
-	if (custom_print)
-		print = custom_print;
-	else
-		print = &printk_adapter;
-	switch (log_id) {
-	case HTC_CREDIT_HISTORY_LOG:
-		cds_print_htc_credit_history(count, print, print_ctx);
-		break;
-	case COMMAND_LOG:
-		wma_print_wmi_cmd_log(count, print, print_ctx);
-		break;
-	case COMMAND_TX_CMP_LOG:
-		wma_print_wmi_cmd_tx_cmp_log(count, print, print_ctx);
-		break;
-	case MGMT_COMMAND_LOG:
-		wma_print_wmi_mgmt_cmd_log(count, print, print_ctx);
-		break;
-	case MGMT_COMMAND_TX_CMP_LOG:
-		wma_print_wmi_mgmt_cmd_tx_cmp_log(count, print, print_ctx);
-		break;
-	case EVENT_LOG:
-		wma_print_wmi_event_log(count, print, print_ctx);
-		break;
-	case RX_EVENT_LOG:
-		wma_print_wmi_rx_event_log(count, print, print_ctx);
-		break;
-	case MGMT_EVENT_LOG:
-		wma_print_wmi_mgmt_event_log(count, print, print_ctx);
-		break;
-	default:
-		print(print_ctx, "Invalid Log Id %d", log_id);
-		break;
-	}
-}
-
-#ifdef WLAN_DUMP_LOG_BUF_CNT
-void hdd_dump_log_buffer(void *print_ctx, qdf_abstract_print *custom_print)
-{
-	int i;
-
-	for (i = 0; i <= MGMT_EVENT_LOG; i++)
-		hdd_ioctl_log_buffer(i, WLAN_DUMP_LOG_BUF_CNT, custom_print,
-				     print_ctx);
-}
-#endif
 
 #ifdef CONFIG_DP_TRACE
 void hdd_set_dump_dp_trace(uint16_t cmd_type, uint16_t count)

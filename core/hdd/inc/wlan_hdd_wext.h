@@ -344,24 +344,6 @@ void hdd_wext_send_event(struct net_device *dev, unsigned int cmd,
 }
 #endif /* WLAN_WEXT_SUPPORT_ENABLE */
 
-#ifdef WLAN_DUMP_LOG_BUF_CNT
-/**
- * hdd_dump_log_buffer() - dump log buffer history
- * @print_ctx: print context for custom print function
- * @custom_print: custom print function pointer
- *
- * If custom print function is NULL, will default to printk
- *
- * Return: None
- */
-void hdd_dump_log_buffer(void *print_ctx, qdf_abstract_print *custom_print);
-#else
-static inline
-void hdd_dump_log_buffer(void *print_ctx, qdf_abstract_print *custom_print)
-{
-}
-#endif
-
 #if defined(WLAN_WEXT_SUPPORT_ENABLE) && defined(HASTINGS_BT_WAR)
 int hdd_hastings_bt_war_enable_fw(struct hdd_context *hdd_ctx);
 int hdd_hastings_bt_war_disable_fw(struct hdd_context *hdd_ctx);

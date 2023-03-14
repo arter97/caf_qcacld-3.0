@@ -50,6 +50,7 @@
 #include "wlan_hdd_thermal.h"
 #include "wlan_dp_ucfg_api.h"
 #include "qdf_ssr_driver_dump.h"
+#include "wlan_hdd_ioctl.h"
 
 #ifdef MODULE
 #ifdef WLAN_WEAR_CHIPSET
