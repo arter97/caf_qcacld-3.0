@@ -91,6 +91,7 @@
 #include <wlan_hdd_sysfs_direct_link_ut_cmd.h>
 #include <wlan_hdd_sysfs_runtime_pm.h>
 #include <wlan_hdd_sysfs_log_buffer.h>
+#include <wlan_hdd_sysfs_dfsnol.h>
 
 #define MAX_PSOC_ID_SIZE 10
 
@@ -870,11 +871,13 @@ hdd_sysfs_create_sap_adapter_root_obj(struct hdd_adapter *adapter)
 	hdd_sysfs_dp_tx_delay_stats_create(adapter);
 	hdd_sysfs_dp_traffic_end_indication_create(adapter);
 	hdd_sysfs_direct_link_ut_cmd_create(adapter);
+	hdd_sysfs_dfsnol_create(adapter);
 }
 
 static void
 hdd_sysfs_destroy_sap_adapter_root_obj(struct hdd_adapter *adapter)
 {
+	hdd_sysfs_dfsnol_destroy(adapter);
 	hdd_sysfs_direct_link_ut_destroy(adapter);
 	hdd_sysfs_dp_traffic_end_indication_destroy(adapter);
 	hdd_sysfs_dp_tx_delay_stats_destroy(adapter);
