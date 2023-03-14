@@ -931,7 +931,7 @@ dp_sawf_update_tx_delay(struct dp_soc *soc,
 			uint8_t host_q_idx)
 {
 	struct sawf_delay_stats *tx_delay;
-	struct wlan_sawf_scv_class_params *svclass_params;
+	struct wlan_sawf_svc_class_params *svclass_params;
 	uint8_t svc_id;
 	uint32_t num_pkt_win, hw_delay, sw_delay, nw_delay;
 	uint64_t nwdelay_win_avg, swdelay_win_avg, hwdelay_win_avg;

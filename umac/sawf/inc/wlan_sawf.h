@@ -117,7 +117,7 @@
 #define SAWF_SVC_CLASS_PARAM_DEFAULT_MSDU_LOSS_RATE    0
 
 /**
- * struct wlan_sawf_scv_class_params- Service Class Parameters
+ * struct wlan_sawf_svc_class_params- Service Class Parameters
  * @svc_id: Service ID
  * @app_name: Service class name
  * @min_thruput_rate: min throughput in kilobits per second
@@ -139,7 +139,7 @@
  * @peer_count: Number of peers having initialized a flow in this service class
  */
 
-struct wlan_sawf_scv_class_params {
+struct wlan_sawf_svc_class_params {
 	uint8_t svc_id;
 	char app_name[WLAN_MAX_SVC_CLASS_NAME];
 	uint32_t min_thruput_rate;
@@ -169,7 +169,7 @@ struct wlan_sawf_scv_class_params {
  */
 struct sawf_ctx {
 	qdf_spinlock_t lock;
-	struct wlan_sawf_scv_class_params svc_classes[SAWF_SVC_CLASS_MAX];
+	struct wlan_sawf_svc_class_params svc_classes[SAWF_SVC_CLASS_MAX];
 };
 
 struct psoc_peer_iter {
@@ -245,7 +245,7 @@ bool wlan_delay_bound_configured(uint8_t svc_id);
  * Return: pointer to service-class params
  * NULL otherwise
  */
-struct wlan_sawf_scv_class_params *
+struct wlan_sawf_svc_class_params *
 wlan_get_svc_class_params(uint8_t svc_id);
 
 /* wlan_print_service_class() - Print service class params
@@ -254,7 +254,7 @@ wlan_get_svc_class_params(uint8_t svc_id);
  *
  * Return: none
  */
-void wlan_print_service_class(struct wlan_sawf_scv_class_params *params);
+void wlan_print_service_class(struct wlan_sawf_svc_class_params *params);
 
 /* wlan_update_sawf_params() - Update service class params
  *
@@ -262,7 +262,7 @@ void wlan_print_service_class(struct wlan_sawf_scv_class_params *params);
  *
  * Return: none
  */
-void wlan_update_sawf_params(struct wlan_sawf_scv_class_params *params);
+void wlan_update_sawf_params(struct wlan_sawf_svc_class_params *params);
 
 /* wlan_update_sawf_params_nolock() - Update service class params
  *
@@ -271,7 +271,7 @@ void wlan_update_sawf_params(struct wlan_sawf_scv_class_params *params);
  *
  * Return: none
  */
-void wlan_update_sawf_params_nolock(struct wlan_sawf_scv_class_params *params);
+void wlan_update_sawf_params_nolock(struct wlan_sawf_svc_class_params *params);
 
 /* wlan_validate_sawf_params() - Validate service class params
  *
@@ -279,7 +279,7 @@ void wlan_update_sawf_params_nolock(struct wlan_sawf_scv_class_params *params);
  *
  * Return: QDF_STATUS
  */
-QDF_STATUS wlan_validate_sawf_params(struct wlan_sawf_scv_class_params *params);
+QDF_STATUS wlan_validate_sawf_params(struct wlan_sawf_svc_class_params *params);
 
 /* wlan_sawf_get_uplink_params() - Get service class uplink parameters
  *
