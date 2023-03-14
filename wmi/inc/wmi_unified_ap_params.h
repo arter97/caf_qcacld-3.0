@@ -934,6 +934,7 @@ typedef struct {
 #define MAX_ULOFDMA_MU_PEER 8
 #define WMI_HOST_ULOFDMA_SU_TRIGGER 0
 #define WMI_HOST_ULOFDMA_MU_TRIGGER 1
+#define MAX_ULOFDMA_CHAINS 8
 
 /**
  * enum wmi_host_ulofdma_trig_status - manual ulofdma trig response status
@@ -986,7 +987,51 @@ typedef struct {
 		} mu;
 	} u;
 } wmi_host_manual_ul_ofdma_trig_feedback_evt;
-#endif
+
+/**
+ * struct wmi_host_rx_peer_userinfo - Trigger response peer info
+ * @peer_mac: peer macaddr
+ * @resp_type: QOS DATA  or QOS NULL
+ * @mcs: Rx peer trig resp mcs
+ * @nss: Rx peer trig resp nss
+ * @gi_ltf_type: Rx peer trig resp gi ltf type
+ * @per_chain_rssi: Per chain rssi
+ */
+struct wmi_host_rx_peer_userinfo {
+	struct qdf_mac_addr peer_mac;
+	uint8_t resp_type;
+	uint8_t mcs;
+	uint8_t nss;
+	uint8_t gi_ltf_type;
+	uint32_t per_chain_rssi[MAX_ULOFDMA_CHAINS];
+};
+
+/**
+ * struct wmi_host_rx_peer_common_info - Trigger response common info
+ * @vdev_id: Associated vdev_id
+ * @rx_ppdu_resp_type: SU-0, MU-1
+ * @num_peer: Number of peers
+ * @rx_resp_bw: Rx trig response bandwidth
+ * @combined_rssi: Rx trig response combined rssi
+ */
+struct wmi_host_rx_peer_common_info {
+	uint8_t vdev_id;
+	uint8_t rx_ppdu_resp_type;
+	uint8_t num_peers;
+	uint8_t rx_resp_bw;
+	uint32_t combined_rssi;
+};
+
+/**
+ * struct wmi_host_rx_peer_userinfo_evt_data - Trigger response event
+ * @comm_info: Trigger response common info
+ * @peer_info: Trigger response peer info
+ */
+struct wmi_host_rx_peer_userinfo_evt_data {
+	struct wmi_host_rx_peer_common_info comm_info;
+	struct wmi_host_rx_peer_userinfo peer_info[MAX_ULOFDMA_MU_PEER];
+};
+#endif /* QCA_MANUAL_TRIGGERED_ULOFDMA */
 
 /**
  * struct wmi_host_chan_info_event - Channel info WMI event
