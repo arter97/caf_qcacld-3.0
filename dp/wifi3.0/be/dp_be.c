@@ -2823,7 +2823,7 @@ dp_primary_link_migration(struct dp_soc *soc, void *cb_ctxt,
 	mld_peer->txrx_peer->vdev = mld_peer->vdev;
 
 	params.osif_vdev = (void *)new_primary_peer->vdev->osif_vdev;
-	params.peer_mac = new_primary_peer->mac_addr.raw;
+	params.peer_mac = mld_peer->mac_addr.raw;
 	params.chip_id = pr_peer_info->chip_id;
 	params.pdev_id = new_primary_peer->vdev->pdev->pdev_id;
 
