@@ -14241,6 +14241,7 @@ static struct cdp_cmn_ops dp_ops_cmn = {
 	.get_peer_id = dp_get_peer_id,
 #ifdef QCA_SUPPORT_WDS_EXTENDED
 	.set_wds_ext_peer_rx = dp_wds_ext_set_peer_rx,
+	.get_wds_ext_peer_osif_handle = dp_wds_ext_get_peer_osif_handle,
 #endif /* QCA_SUPPORT_WDS_EXTENDED */
 
 #if defined(FEATURE_RUNTIME_PM) || defined(DP_POWER_SAVE)
@@ -16316,6 +16317,36 @@ QDF_STATUS dp_wds_ext_set_peer_rx(ol_txrx_soc_handle soc,
 	dp_peer_unref_delete(peer, DP_MOD_ID_CDP);
 
 	return status;
+}
+
+QDF_STATUS dp_wds_ext_get_peer_osif_handle(
+				ol_txrx_soc_handle soc,
+				uint8_t vdev_id,
+				uint8_t *mac,
+				ol_osif_peer_handle *osif_peer)
+{
+	struct dp_soc *dp_soc = (struct dp_soc *)soc;
+	struct dp_txrx_peer *txrx_peer = NULL;
+	struct dp_peer *peer = dp_peer_find_hash_find(dp_soc,
+						      mac, 0, vdev_id,
+						      DP_MOD_ID_CDP);
+
+	if (!peer) {
+		dp_cdp_debug("%pK: Peer is NULL!\n", dp_soc);
+		return QDF_STATUS_E_INVAL;
+	}
+
+	txrx_peer = dp_get_txrx_peer(peer);
+	if (!txrx_peer) {
+		dp_cdp_debug("%pK: TXRX Peer is NULL!\n", dp_soc);
+		dp_peer_unref_delete(peer, DP_MOD_ID_CDP);
+		return QDF_STATUS_E_INVAL;
+	}
+
+	*osif_peer = txrx_peer->wds_ext.osif_peer;
+	dp_peer_unref_delete(peer, DP_MOD_ID_CDP);
+
+	return QDF_STATUS_SUCCESS;
 }
 #endif /* QCA_SUPPORT_WDS_EXTENDED */
 

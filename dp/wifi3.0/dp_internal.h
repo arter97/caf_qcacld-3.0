@@ -4226,6 +4226,23 @@ QDF_STATUS dp_wds_ext_set_peer_rx(ol_txrx_soc_handle soc,
 				  uint8_t *mac,
 				  ol_txrx_rx_fp rx,
 				  ol_osif_peer_handle osif_peer);
+
+/**
+ * dp_wds_ext_get_peer_osif_handle(): function to get peer osif handle
+ * @soc: Datapath soc handle
+ * @vdev_id: vdev id
+ * @mac: Peer mac address
+ * @osif_peer: OSIF peer handle
+ *
+ * Return: QDF_STATUS_SUCCESS on success
+ *         QDF_STATUS_E_INVAL if peer is not found
+ */
+QDF_STATUS dp_wds_ext_get_peer_osif_handle(
+				ol_txrx_soc_handle soc,
+				uint8_t vdev_id,
+				uint8_t *mac,
+				ol_osif_peer_handle *osif_peer);
+
 #endif /* QCA_SUPPORT_WDS_EXTENDED */
 
 #ifdef DP_MEM_PRE_ALLOC

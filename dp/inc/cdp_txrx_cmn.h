@@ -2911,6 +2911,27 @@ cdp_wds_ext_set_peer_rx(ol_txrx_soc_handle soc, uint8_t vdev_id,
 	return soc->ops->cmn_drv_ops->set_wds_ext_peer_rx
 			(soc, vdev_id, mac, rx, osif_peer);
 }
+
+static inline QDF_STATUS
+cdp_wds_ext_get_peer_osif_handle(
+			ol_txrx_soc_handle soc, uint8_t vdev_id,
+			uint8_t *mac,
+			ol_osif_peer_handle *osif_peer)
+{
+	if (!soc || !soc->ops) {
+		dp_cdp_debug("Invalid Instance");
+		QDF_BUG(0);
+		return QDF_STATUS_E_FAULT;
+	}
+
+	if (!soc->ops->cmn_drv_ops ||
+	    !soc->ops->cmn_drv_ops->get_wds_ext_peer_osif_handle)
+		return QDF_STATUS_E_FAULT;
+
+	return soc->ops->cmn_drv_ops->get_wds_ext_peer_osif_handle
+			(soc, vdev_id, mac, osif_peer);
+}
+
 #endif /* QCA_SUPPORT_WDS_EXTENDED */
 
 /**
