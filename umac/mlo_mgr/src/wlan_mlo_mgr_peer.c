@@ -1360,6 +1360,9 @@ QDF_STATUS wlan_mlo_peer_create(struct wlan_objmgr_vdev *vdev,
 		}
 	}
 
+	if (wlan_vdev_mlme_get_opmode(vdev) == QDF_STA_MODE)
+		wlan_clear_peer_level_tid_to_link_mapping(vdev);
+
 	wlan_mlo_peer_release_ref(ml_peer);
 
 	return QDF_STATUS_SUCCESS;

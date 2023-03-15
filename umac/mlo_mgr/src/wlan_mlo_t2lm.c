@@ -26,6 +26,9 @@
 #include <wlan_mlo_mgr_cmn.h>
 #include <qdf_util.h>
 #include <wlan_cm_api.h>
+#if defined(WLAN_FEATURE_11BE_MLO) && defined(WLAN_FEATURE_11BE_MLO_ADV_FEATURE)
+#include <wlan_t2lm_api.h>
+#endif
 
 QDF_STATUS wlan_mlo_parse_t2lm_info(uint8_t *ie,
 				    struct wlan_t2lm_info *t2lm)
@@ -676,6 +679,8 @@ static void wlan_mlo_t2lm_handle_expected_duration_expiry(
 	t2lm_ctx->established_t2lm.disabled_link_bitmap = 0;
 	t2lm_ctx->established_t2lm.t2lm.link_mapping_size = 0;
 	t2lm_debug("Set established mapping to default mapping");
+
+	wlan_clear_peer_level_tid_to_link_mapping(vdev);
 }
 
 QDF_STATUS wlan_mlo_vdev_tid_to_link_map_event(
@@ -969,6 +974,24 @@ wlan_send_peer_level_tid_to_link_mapping(struct wlan_objmgr_vdev *vdev,
 	return status;
 }
 
+#if defined(WLAN_FEATURE_11BE_MLO) && defined(WLAN_FEATURE_11BE_MLO_ADV_FEATURE)
+void
+wlan_clear_peer_level_tid_to_link_mapping(struct wlan_objmgr_vdev *vdev)
+{
+	struct wlan_objmgr_peer *peer;
+
+	peer = wlan_objmgr_vdev_try_get_bsspeer(vdev, WLAN_MLO_MGR_ID);
+	if (!peer) {
+		t2lm_err("Peer not found");
+		return;
+	}
+
+	wlan_t2lm_clear_peer_negotiation(peer);
+
+	wlan_objmgr_peer_release_ref(peer, WLAN_MLO_MGR_ID);
+}
+#endif
+
 void wlan_mlo_t2lm_timer_expiry_handler(void *vdev)
 {
 	struct wlan_objmgr_vdev *vdev_ctx = (struct wlan_objmgr_vdev *)vdev;
@@ -1178,8 +1201,10 @@ static QDF_STATUS wlan_update_mapping_switch_time_expected_dur(
 
 	t2lm_dev_lock_acquire(t2lm_ctx);
 
-	if (t2lm_ctx->established_t2lm.t2lm.expected_duration_present &&
-	    rx_t2lm->established_t2lm.t2lm.expected_duration_present) {
+	if ((t2lm_ctx->established_t2lm.t2lm.expected_duration_present &&
+	    rx_t2lm->established_t2lm.t2lm.expected_duration_present) &&
+	    (rx_t2lm->established_t2lm.t2lm.expected_duration <
+	     t2lm_ctx->established_t2lm.t2lm.expected_duration)) {
 		/* Established T2LM is already saved in the T2LM context.
 		 * T2LM IE in the beacon/probe response frame has the updated
 		 * expected duration.
@@ -1210,6 +1235,7 @@ static QDF_STATUS wlan_update_mapping_switch_time_expected_dur(
 		/* Notify the registered caller about the link update*/
 		wlan_mlo_dev_t2lm_notify_link_update(vdev,
 					&t2lm_ctx->established_t2lm.t2lm);
+		wlan_clear_peer_level_tid_to_link_mapping(vdev);
 		wlan_send_tid_to_link_mapping(
 				vdev, &t2lm_ctx->established_t2lm.t2lm);
 	}

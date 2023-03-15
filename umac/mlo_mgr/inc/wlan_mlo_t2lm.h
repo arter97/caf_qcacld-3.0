@@ -868,4 +868,22 @@ wlan_send_peer_level_tid_to_link_mapping(struct wlan_objmgr_vdev *vdev,
 	return QDF_STATUS_SUCCESS;
 }
 #endif /* WLAN_FEATURE_11BE */
+
+#if defined(WLAN_FEATURE_11BE_MLO) && defined(WLAN_FEATURE_11BE_MLO_ADV_FEATURE)
+/**
+ * wlan_clear_peer_level_tid_to_link_mapping() - API to clear peer level T2LM
+ * info negotiated using action frames to FW.
+ *
+ * @vdev: Pointer to vdev
+ *
+ * Return: none
+ */
+void
+wlan_clear_peer_level_tid_to_link_mapping(struct wlan_objmgr_vdev *vdev);
+#else
+static inline void
+wlan_clear_peer_level_tid_to_link_mapping(struct wlan_objmgr_vdev *vdev)
+{
+}
+#endif
 #endif /* _WLAN_MLO_T2LM_H_ */
