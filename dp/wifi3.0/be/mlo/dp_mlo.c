@@ -1247,4 +1247,45 @@ bool dp_umac_reset_is_soc_ignored(struct dp_soc *soc)
 	return !qdf_atomic_test_bit(dp_mlo_get_chip_id(soc),
 				    &mlo_ctx->grp_umac_reset_ctx.partner_map);
 }
+
+QDF_STATUS dp_mlo_umac_reset_stats_print(struct dp_soc *soc)
+{
+	struct dp_mlo_ctxt *mlo_ctx;
+	struct dp_soc_be *be_soc;
+	struct dp_soc_mlo_umac_reset_ctx *grp_umac_reset_ctx;
+
+	be_soc = dp_get_be_soc_from_dp_soc(soc);
+	if (!be_soc) {
+		dp_umac_reset_err("null be_soc");
+		return QDF_STATUS_E_NULL_VALUE;
+	}
+
+	mlo_ctx = be_soc->ml_ctxt;
+	if (!mlo_ctx) {
+		/* This API can be called for non-MLO SOC as well. Hence, return
+		 * the status as success when mlo_ctx is NULL.
+		 */
+		return QDF_STATUS_SUCCESS;
+	}
+
+	grp_umac_reset_ctx = &mlo_ctx->grp_umac_reset_ctx;
+
+	DP_UMAC_RESET_PRINT_STATS("MLO UMAC RESET stats\n"
+		  "\t\tPartner map                   :%x\n"
+		  "\t\tRequest map                   :%x\n"
+		  "\t\tResponse map                  :%x\n"
+		  "\t\tIs target recovery            :%d\n"
+		  "\t\tIs Umac reset inprogress      :%d\n"
+		  "\t\tNumber of UMAC reset triggered:%d\n"
+		  "\t\tInitiator chip ID             :%d\n",
+		  grp_umac_reset_ctx->partner_map,
+		  grp_umac_reset_ctx->request_map,
+		  grp_umac_reset_ctx->response_map,
+		  grp_umac_reset_ctx->is_target_recovery,
+		  grp_umac_reset_ctx->umac_reset_in_progress,
+		  grp_umac_reset_ctx->umac_reset_count,
+		  grp_umac_reset_ctx->initiator_chip_id);
+
+	return QDF_STATUS_SUCCESS;
+}
 #endif

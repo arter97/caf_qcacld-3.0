@@ -55,6 +55,10 @@ enum umac_reset_action {
 #define dp_umac_reset_debug(params...) \
 	QDF_TRACE_DEBUG(QDF_MODULE_ID_DP_UMAC_RESET, params)
 
+#define DP_UMAC_RESET_PRINT_STATS(fmt, args ...)\
+	QDF_TRACE(QDF_MODULE_ID_DP_UMAC_RESET, QDF_TRACE_LEVEL_FATAL,\
+		  fmt, ## args)
+
 #define DP_UMAC_RESET_SHMEM_ALIGN 8
 #define DP_UMAC_RESET_SHMEM_MAGIC_NUM (0xDEADBEEF)
 
@@ -298,6 +302,14 @@ void dp_umac_reset_post_tx_cmd_via_shmem(struct dp_soc *soc, void *ctxt,
  * Return: true if Umac reset is in progress or false otherwise
  */
 bool dp_check_umac_reset_in_progress(struct dp_soc *soc);
+
+/**
+ * dp_umac_reset_stats_print - API to print UMAC reset stats
+ * @soc: dp soc handle
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS dp_umac_reset_stats_print(struct dp_soc *soc);
 #else
 static inline bool dp_check_umac_reset_in_progress(struct dp_soc *soc)
 {
@@ -329,6 +341,12 @@ static inline
 QDF_STATUS dp_umac_reset_notify_action_completion(
 		struct dp_soc *soc,
 		enum umac_reset_action action)
+{
+	return QDF_STATUS_SUCCESS;
+}
+
+static inline
+QDF_STATUS dp_umac_reset_stats_print(struct dp_soc *soc)
 {
 	return QDF_STATUS_SUCCESS;
 }
