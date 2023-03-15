@@ -645,9 +645,16 @@ void wma_get_rx_retry_cnt(struct mac_context *mac, uint8_t vdev_id,
 QDF_STATUS wma_set_wlm_latency_level(void *wma_ptr,
 			struct wlm_latency_level_param *latency_params);
 
-QDF_STATUS
-wma_ds_peek_rx_packet_info
-	(cds_pkt_t *vosDataBuff, void **ppRxHeader, bool bSwap);
+/**
+ * wma_ds_peek_rx_packet_info() - peek rx packet info
+ * @pkt: packet
+ * @pkt_meta: packet meta
+ *
+ * Function fills the rx packet meta info from the the cds packet
+ *
+ * Return: QDF status
+ */
+QDF_STATUS wma_ds_peek_rx_packet_info(cds_pkt_t *pkt, void **pkt_meta);
 
 /**
  * wma_tx_abort() - abort tx

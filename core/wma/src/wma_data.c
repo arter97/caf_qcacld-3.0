@@ -2899,18 +2899,7 @@ error:
 	return QDF_STATUS_E_FAILURE;
 }
 
-/**
- * wma_ds_peek_rx_packet_info() - peek rx packet info
- * @pkt: packet
- * @pkt_meta: packet meta
- * @bSwap: byte swap
- *
- * Function fills the rx packet meta info from the the cds packet
- *
- * Return: QDF status
- */
-QDF_STATUS wma_ds_peek_rx_packet_info(cds_pkt_t *pkt, void **pkt_meta,
-				      bool bSwap)
+QDF_STATUS wma_ds_peek_rx_packet_info(cds_pkt_t *pkt, void **pkt_meta)
 {
 	if (!pkt) {
 		wma_err("wma:Invalid parameter sent on wma_peek_rx_pkt_info");

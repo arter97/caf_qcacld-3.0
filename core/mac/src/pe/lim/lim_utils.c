@@ -9469,8 +9469,7 @@ QDF_STATUS lim_util_get_type_subtype(void *pkt, uint8_t *type,
 		pe_err("NULL packet received");
 		return QDF_STATUS_E_FAILURE;
 	}
-	status =
-		wma_ds_peek_rx_packet_info(cds_pkt, (void *)&rxpktinfor, false);
+	status = wma_ds_peek_rx_packet_info(cds_pkt, (void *)&rxpktinfor);
 	if (!QDF_IS_STATUS_SUCCESS(status)) {
 		pe_err("Failed extract cds packet. status %d", status);
 		return QDF_STATUS_E_FAILURE;

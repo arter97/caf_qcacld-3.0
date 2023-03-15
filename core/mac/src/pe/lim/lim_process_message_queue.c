@@ -861,8 +861,7 @@ static QDF_STATUS lim_allocate_and_get_bcn(
 	if (!pkt_l)
 		return QDF_STATUS_E_FAILURE;
 
-	status = wma_ds_peek_rx_packet_info(
-		pkt_l, (void *)&rx_pkt_info_l, false);
+	status = wma_ds_peek_rx_packet_info(pkt_l, (void *)&rx_pkt_info_l);
 	if (!QDF_IS_STATUS_SUCCESS(status)) {
 		pe_err("Failed to get Rx Pkt meta");
 		goto free;
@@ -1678,8 +1677,9 @@ static void lim_process_messages(struct mac_context *mac_ctx,
 		body_ptr = (cds_pkt_t *) new_msg.bodyptr;
 		cds_pkt_get_packet_length(body_ptr, &pkt_len);
 
-		qdf_status = wma_ds_peek_rx_packet_info(body_ptr,
-			(void **) &new_msg.bodyptr, false);
+		qdf_status =
+			wma_ds_peek_rx_packet_info(body_ptr,
+						   (void **) &new_msg.bodyptr);
 
 		if (!QDF_IS_STATUS_SUCCESS(qdf_status)) {
 			lim_decrement_pending_mgmt_count(mac_ctx);

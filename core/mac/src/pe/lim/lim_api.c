@@ -1260,7 +1260,7 @@ static QDF_STATUS pe_handle_mgmt_frame(struct wlan_objmgr_psoc *psoc,
 	}
 
 	qdf_status =
-		wma_ds_peek_rx_packet_info(pVosPkt, (void *)&pRxPacketInfo, false);
+		wma_ds_peek_rx_packet_info(pVosPkt, (void *)&pRxPacketInfo);
 
 	if (!QDF_IS_STATUS_SUCCESS(qdf_status)) {
 		cds_pkt_return_packet(pVosPkt);
