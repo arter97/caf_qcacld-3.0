@@ -172,14 +172,6 @@ QDF_STATUS wma_set_ppsconfig(uint8_t vdev_id, uint16_t pps_param,
  */
 
 #ifdef WLAN_FEATURE_ROAM_OFFLOAD
-/**
- * wma_register_roam_vdev_disc_event_handler() - API to register handler for
- * roam vdev disconnect event id
- * @wma_handle: wma handle
- *
- * Return: void
- */
-void wma_register_roam_vdev_disc_event_handler(tp_wma_handle wma_handle);
 
 #ifdef WLAN_FEATURE_FIPS
 /**
