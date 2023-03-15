@@ -659,9 +659,8 @@ hal_mpdu_desc_info_set_be(hal_soc_handle_t hal_soc_hdl,
 
 	HAL_RX_MPDU_DESC_INFO_SET(mpdu_desc_info,
 				  MSDU_COUNT, 0x1);
-	/* unset frag bit */
 	HAL_RX_MPDU_DESC_INFO_SET(mpdu_desc_info,
-				  FRAGMENT_FLAG, 0x0);
+				  FRAGMENT_FLAG, 0x1);
 	HAL_RX_MPDU_DESC_INFO_SET(mpdu_desc_info,
 				  RAW_MPDU, 0x0);
 }
