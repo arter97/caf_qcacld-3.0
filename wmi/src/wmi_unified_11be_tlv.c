@@ -424,7 +424,10 @@ force_reason_host_to_fw(enum mlo_link_force_reason host_reason,
 		*fw_reason = WMI_MLO_LINK_FORCE_REASON_NEW_CONNECT;
 		break;
 	case MLO_LINK_FORCE_REASON_DISCONNECT:
-		*fw_reason =  WMI_MLO_LINK_FORCE_REASON_NEW_DISCONNECT;
+		*fw_reason = WMI_MLO_LINK_FORCE_REASON_NEW_DISCONNECT;
+		break;
+	case MLO_LINK_FORCE_REASON_TDLS:
+		*fw_reason = WMI_MLO_LINK_FORCE_REASON_TDLS;
 		break;
 	case MLO_LINK_FORCE_REASON_LINK_REMOVAL:
 		*fw_reason =  WMI_MLO_LINK_FORCE_REASON_LINK_REMOVAL;

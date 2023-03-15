@@ -818,11 +818,14 @@ enum mlo_link_force_mode {
  *  Set force specific links because of new dis-connection
  * @MLO_LINK_FORCE_REASON_LINK_REMOVAL:
  *  Set force specific links because of AP side link removal
+ * @MLO_LINK_FORCE_REASON_TDLS:
+ *  Set force specific links because of TDLS operation
  */
 enum mlo_link_force_reason {
 	MLO_LINK_FORCE_REASON_CONNECT    = 1,
 	MLO_LINK_FORCE_REASON_DISCONNECT = 2,
 	MLO_LINK_FORCE_REASON_LINK_REMOVAL = 3,
+	MLO_LINK_FORCE_REASON_TDLS = 4,
 };
 
 /**

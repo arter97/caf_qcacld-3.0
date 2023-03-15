@@ -6234,6 +6234,11 @@ typedef enum {
 	wmi_service_tdls_ax_support,
 #endif
 #endif
+#ifdef WLAN_FEATURE_11BE_MLO
+#ifdef FEATURE_WLAN_TDLS
+	wmi_service_tdls_mlo_support,
+#endif
+#endif
 #ifdef WLAN_FEATURE_BIG_DATA_STATS
 	wmi_service_big_data_support,
 #endif

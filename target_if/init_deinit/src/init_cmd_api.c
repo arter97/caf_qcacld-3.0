@@ -455,6 +455,28 @@ static inline void init_deinit_derive_afc_dev_type_param(
 }
 #endif
 
+#ifdef WLAN_FEATURE_11BE_MLO
+#ifdef FEATURE_WLAN_TDLS
+static void
+init_deinit_set_tdls_mlo_vdev(struct wmi_init_cmd_param *init_param,
+			      struct wmi_unified *wmi_handle)
+{
+	if (wmi_service_enabled(wmi_handle, wmi_service_tdls_mlo_support))
+		init_param->res_cfg->num_tdls_vdevs = WLAN_UMAC_MLO_MAX_VDEVS;
+}
+#else
+static void
+init_deinit_set_tdls_mlo_vdev(struct wmi_init_cmd_param *init_param,
+			      struct wmi_unified *wmi_handle)
+{}
+#endif
+#else
+static void
+init_deinit_set_tdls_mlo_vdev(struct wmi_init_cmd_param *init_param,
+			      struct wmi_unified *wmi_handle)
+{}
+#endif
+
 void init_deinit_prepare_send_init_cmd(
 		 struct wlan_objmgr_psoc *psoc,
 		 struct target_psoc_info *tgt_hdl)
@@ -532,6 +554,8 @@ void init_deinit_prepare_send_init_cmd(
 
 	if (wmi_service_enabled(wmi_handle, wmi_service_v1a_v1b_supported))
 		info->wlan_res_cfg.dp_peer_meta_data_ver = 1;
+
+	init_deinit_set_tdls_mlo_vdev(&init_param, wmi_handle);
 
 	target_if_ext_res_cfg_enable(psoc, tgt_hdl, NULL);
 

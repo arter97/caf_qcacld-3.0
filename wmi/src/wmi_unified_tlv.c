@@ -21894,7 +21894,12 @@ static void populate_tlv_service(uint32_t *wmi_service)
 	wmi_service[wmi_service_tdls_concurrency_support] =
 			WMI_SERVICE_TDLS_CONCURRENCY_SUPPORT;
 #endif
-
+#ifdef FEATURE_WLAN_TDLS
+#ifdef WLAN_FEATURE_11BE
+	wmi_service[wmi_service_tdls_mlo_support] =
+			WMI_SERVICE_11BE_MLO_TDLS_SUPPORT;
+#endif
+#endif
 #ifdef WLAN_SUPPORT_TWT
 	wmi_service[wmi_service_twt_bcast_req_support] =
 			WMI_SERVICE_BROADCAST_TWT_REQUESTER;
