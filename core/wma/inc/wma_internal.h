@@ -1104,9 +1104,6 @@ int wma_link_status_event_handler(void *handle, uint8_t *cmd_param_info,
  */
 int wma_rso_cmd_status_event_handler(uint8_t vdev_id, uint32_t notif);
 
-int wma_stats_event_handler(void *handle, uint8_t *cmd_param_info,
-			    uint32_t len);
-
 QDF_STATUS wma_send_link_speed(uint32_t link_speed);
 
 int wma_link_speed_event_handler(void *handle, uint8_t *cmd_param_info,
