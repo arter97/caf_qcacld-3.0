@@ -172,9 +172,6 @@ QDF_STATUS wma_set_ppsconfig(uint8_t vdev_id, uint16_t pps_param,
  */
 
 #ifdef WLAN_FEATURE_ROAM_OFFLOAD
-int wma_roam_synch_event_handler(void *handle, uint8_t *event,
-					uint32_t len);
-
 /**
  * wma_register_roam_vdev_disc_event_handler() - API to register handler for
  * roam vdev disconnect event id
@@ -508,9 +505,6 @@ QDF_STATUS wma_scan_probe_setoui(tp_wma_handle wma,
 				 struct scan_mac_oui *set_oui);
 
 void wma_roam_better_ap_handler(tp_wma_handle wma, uint32_t vdev_id);
-
-int wma_roam_event_callback(WMA_HANDLE handle, uint8_t *event_buf,
-			    uint32_t len);
 
 /*
  * wma_dev_if.c functions declarations
