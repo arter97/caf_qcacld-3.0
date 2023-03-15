@@ -2661,8 +2661,8 @@ struct wlan_ie_tid_to_link_mapping {
  * - Mapping switch time (0 or 2 octet)
  * - Expected duration (0 or 3 octet)
  * - Link mapping presence indicator (0 or 1 octet)
- * - Link mapping of TID 0(optional) to TID 7(optional). Each field has 0 or 2
- *   octets.
+ * - Link mapping of TID 0(optional) to TID 7(optional). Each field has 0 or 1
+ *   or 2 octets.
  */
 
 /* Definitions related TID-to-link mapping control*/
@@ -2678,6 +2678,9 @@ struct wlan_ie_tid_to_link_mapping {
 /* Expected duration present bit */
 #define WLAN_T2LM_CONTROL_EXPECTED_DURATION_PRESENT_IDX         4
 #define WLAN_T2LM_CONTROL_EXPECTED_DURATION_PRESENT_BITS        1
+/* Link Mapping size bit */
+#define WLAN_T2LM_CONTROL_LINK_MAPPING_SIZE_IDX                 5
+#define WLAN_T2LM_CONTROL_LINK_MAPPING_SIZE_BITS                1
 /* Bits 5-7 are reserved */
 /* Link mapping presence indicator */
 #define WLAN_T2LM_CONTROL_LINK_MAPPING_PRESENCE_INDICATOR_IDX   8
