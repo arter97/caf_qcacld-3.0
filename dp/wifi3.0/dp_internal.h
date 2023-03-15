@@ -2753,6 +2753,22 @@ QDF_STATUS dp_mlo_umac_reset_stats_print(struct dp_soc *soc)
 
 #endif
 
+#if defined(DP_UMAC_HW_RESET_SUPPORT) && defined(WLAN_FEATURE_11BE_MLO) && defined(WLAN_MLO_MULTI_CHIP)
+/**
+ * dp_umac_reset_notify_asserted_soc() - API to notify the asserted SOC
+ * @soc: dp soc
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS dp_umac_reset_notify_asserted_soc(struct dp_soc *soc);
+#else
+static inline
+QDF_STATUS dp_umac_reset_notify_asserted_soc(struct dp_soc *soc)
+{
+	return QDF_STATUS_SUCCESS;
+}
+#endif
+
 QDF_STATUS dp_reo_send_cmd(struct dp_soc *soc, enum hal_reo_cmd_type type,
 			   struct hal_reo_cmd_params *params,
 			   void (*callback_fn), void *data);
