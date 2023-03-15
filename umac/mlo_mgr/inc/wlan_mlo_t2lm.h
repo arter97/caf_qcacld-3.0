@@ -169,6 +169,9 @@ struct wlan_preferred_links {
  * @ieee_link_map_tid: Indicates ieee link id mapping of all the TIDS
  * @hw_link_map_tid: Indicates hw link id mapping of all the TIDS
  * @timer_started: flag to check if T2LM timer is started for this T2LM IE
+ * @link_mapping_size: value 1 indicates the length of Link Mapping Of TIDn
+ *                     field is 1 octet, value 0 indicates the length of the
+ *                     Link Mapping of TIDn field is 2 octets
  */
 struct wlan_t2lm_info {
 	enum wlan_t2lm_direction direction;
@@ -180,6 +183,7 @@ struct wlan_t2lm_info {
 	uint16_t ieee_link_map_tid[T2LM_MAX_NUM_TIDS];
 	uint16_t hw_link_map_tid[T2LM_MAX_NUM_TIDS];
 	bool timer_started;
+	bool link_mapping_size;
 };
 
 /**
