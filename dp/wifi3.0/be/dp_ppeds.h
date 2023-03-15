@@ -106,6 +106,19 @@ void dp_ppeds_detach_vdev_be(struct cdp_soc_t *soc, uint8_t vdev_id,
 			     struct cdp_ds_vp_params *vp_params);
 
 /**
+ * dp_ppeds_vp_setup_on_fw_recovery - Setup DS VP on FW recovery
+ * @soc: CDP SoC Tx/Rx handle
+ * @vdev_id: vdev_id
+ * @profile_idx: DS profile index
+ * Setup DS VP on FW recovery
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS dp_ppeds_vp_setup_on_fw_recovery(struct cdp_soc_t *soc,
+					    uint8_t vdev_id,
+					    uint16_t profile_idx);
+
+/**
  * dp_ppeds_attach_vdev_be - PPE DS table entry alloc
  * @soc: CDP SoC Tx/Rx handle
  * @vdev_id: vdev_id

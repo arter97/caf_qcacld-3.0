@@ -1269,6 +1269,51 @@ static struct ppe_ds_wlan_ops ppeds_ops = {
 };
 
 /**
+ * dp_ppeds_vp_setup_on_fw_recovery() - Recover DS VP on FW recovery
+ * @soc_hdl: CDP SoC Tx/Rx handle
+ * @vdev_id: vdev id
+ * @vp_profile_idx: VP profile index
+ *
+ * Setup DS VP port on FW recovery.
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS dp_ppeds_vp_setup_on_fw_recovery(struct cdp_soc_t *soc_hdl,
+					    uint8_t vdev_id,
+					    uint16_t vp_profile_idx)
+{
+	struct dp_ppe_vp_profile *vp_profile = NULL;
+	struct dp_vdev *vdev;
+	struct dp_vdev_be *be_vdev;
+	struct dp_soc *soc = cdp_soc_t_to_dp_soc(soc_hdl);
+	struct dp_soc_be *be_soc;
+
+	be_soc = dp_get_be_soc_from_dp_soc(soc);
+
+	/*
+	 * Check DS handle
+	 */
+	if (!be_soc->ppeds_handle) {
+		dp_err("DS is not enabled on this SOC");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	vdev = dp_vdev_get_ref_by_id(soc, vdev_id, DP_MOD_ID_DS);
+	if (!vdev) {
+		dp_err("%p: Could not find vdev for id:%d", be_soc, vdev_id);
+		return QDF_STATUS_E_INVAL;
+	}
+
+	vp_profile = &be_soc->ppe_vp_profile[vp_profile_idx];
+
+	be_vdev = dp_get_be_vdev_from_dp_vdev(vdev);
+	dp_ppeds_setup_vp_entry_be(be_soc, be_vdev, vp_profile);
+
+	dp_vdev_unref_delete(soc, vdev, DP_MOD_ID_DS);
+	return QDF_STATUS_SUCCESS;
+}
+
+/**
  * dp_ppeds_attach_vdev_be() - PPE DS table entry alloc
  * @soc_hdl: CDP SoC Tx/Rx handle
  * @vdev_id: vdev id

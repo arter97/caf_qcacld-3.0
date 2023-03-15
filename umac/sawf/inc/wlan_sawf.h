@@ -132,6 +132,8 @@
  * @configured: indicating if the serivice class is configured.
  * @ul_service_interval: Uplink service interval
  * @ul_burst_size: Uplink Burst Size
+ * @ul_min_tput: Uplink min_throughput
+ * @ul_max_latency: Uplink max latency
  * @type: type of service class
  * @ref_count: Number of sawf/scs procedures using the service class
  * @peer_count: Number of peers having initialized a flow in this service class
@@ -152,6 +154,8 @@ struct wlan_sawf_scv_class_params {
 	bool configured;
 	uint32_t ul_service_interval;
 	uint32_t ul_burst_size;
+	uint32_t ul_min_tput;
+	uint32_t ul_max_latency;
 	uint8_t type;
 	uint32_t ref_count;
 	uint32_t peer_count;
@@ -283,12 +287,15 @@ QDF_STATUS wlan_validate_sawf_params(struct wlan_sawf_scv_class_params *params);
  * @tid: pointer to update TID
  * @service_interval: Pointer to update uplink Service Interval
  * @burst_size: Pointer to update uplink Burst Size
+ * @min_tput: Pointer to update minimum throughput
+ * @max_latency: Pointer to update max_latency
  *
  * Return: QDF_STATUS
  */
 QDF_STATUS
 wlan_sawf_get_uplink_params(uint8_t svc_id, uint8_t *tid,
-			    uint32_t *service_interval, uint32_t *burst_size);
+			    uint32_t *service_interval, uint32_t *burst_size,
+			    uint32_t *min_tput, uint32_t *max_latency);
 
 /* wlan_sawf_sla_process_sla_event() - Process SLA-related nl-event
  *

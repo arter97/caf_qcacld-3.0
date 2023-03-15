@@ -44,9 +44,9 @@
 /* MAX NL buffer size of station list */
 #define LIST_STATION_CFG_ALLOC_SIZE    (3500)
 /* MAX Radio count */
-#define MAX_RADIO_NUM                3
+#define MAX_RADIO_NUM                5
 /* MAX SoC count expected same as Radio count */
-#define MAX_SOC_NUM                  3
+#define MAX_SOC_NUM                  5
 /* MAX Possible VAP count based on radio count */
 #define MAX_VAP_NUM                  (17 * MAX_RADIO_NUM)
 /* This path is for network interfaces */

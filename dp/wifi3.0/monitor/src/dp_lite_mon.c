@@ -514,7 +514,7 @@ dp_lite_mon_set_tx_config(struct dp_pdev_be *be_pdev,
 		}
 
 		/* setupt tx lite mon filters */
-		dp_mon_filter_setup_tx_lite_mon(be_mon_pdev);
+		dp_mon_filter_setup_tx_lite_mon(&be_pdev->pdev);
 		status = dp_tx_mon_filter_update(&be_pdev->pdev);
 		if (status != QDF_STATUS_SUCCESS) {
 			dp_mon_err("Failed to setup tx lite mon filters");
