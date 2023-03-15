@@ -3725,6 +3725,39 @@ void hif_ce_stop(struct hif_softc *scn)
 	hif_state->started = false;
 }
 
+#ifdef CONFIG_SHADOW_V3
+void hif_preare_shadow_register_cfg_v3(struct hif_softc *scn)
+{
+	int shadow_cfg_idx = scn->num_shadow_registers_configured;
+	int i;
+
+	/* shadow reg config for CE SRC registers */
+	for (i = 0; i < scn->ce_count; i++) {
+		scn->shadow_regs[shadow_cfg_idx].addr =
+				CE_BASE_ADDRESS(i) + SR_WR_INDEX_ADDRESS;
+		shadow_cfg_idx++;
+	}
+
+	/* shadow reg config for CE DST registers */
+	for (i = 0; i < scn->ce_count; i++) {
+		scn->shadow_regs[shadow_cfg_idx].addr =
+				CE_BASE_ADDRESS(i) + DST_WR_INDEX_ADDRESS;
+		shadow_cfg_idx++;
+	}
+
+	scn->num_shadow_registers_configured = shadow_cfg_idx;
+}
+
+void hif_get_shadow_reg_config_v3(struct hif_softc *scn,
+				  struct pld_shadow_reg_v3_cfg **shadow_config,
+				  int *num_shadow_registers_configured)
+{
+	*shadow_config = scn->shadow_regs;
+	*num_shadow_registers_configured =
+				scn->num_shadow_registers_configured;
+}
+#endif
+
 static void hif_get_shadow_reg_cfg(struct hif_softc *scn,
 				   struct shadow_reg_cfg
 				   **target_shadow_reg_cfg_ret,
@@ -3879,8 +3912,8 @@ static inline QDF_STATUS hif_alloc_rri_on_ddr(struct hif_softc *scn)
 	qdf_dma_addr_t paddr_rri_on_ddr = 0;
 
 	scn->vaddr_rri_on_ddr =
-		(uint32_t *)qdf_mem_alloc_consistent(scn->qdf_dev,
-		scn->qdf_dev->dev, (CE_COUNT * sizeof(uint32_t)),
+		(void *)qdf_mem_alloc_consistent(scn->qdf_dev,
+		scn->qdf_dev->dev, RRI_ON_DDR_MEM_SIZE,
 		&paddr_rri_on_ddr);
 
 	if (!scn->vaddr_rri_on_ddr) {
@@ -3890,7 +3923,7 @@ static inline QDF_STATUS hif_alloc_rri_on_ddr(struct hif_softc *scn)
 
 	scn->paddr_rri_on_ddr = paddr_rri_on_ddr;
 
-	qdf_mem_zero(scn->vaddr_rri_on_ddr, CE_COUNT * sizeof(uint32_t));
+	qdf_mem_zero(scn->vaddr_rri_on_ddr, RRI_ON_DDR_MEM_SIZE);
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -3916,8 +3949,8 @@ static inline void hif_config_rri_on_ddr(struct hif_softc *scn)
 	if (hif_alloc_rri_on_ddr(scn) != QDF_STATUS_SUCCESS)
 		return;
 
-	low_paddr  = BITS0_TO_31(scn->paddr_rri_on_ddr);
-	high_paddr = BITS32_TO_35(scn->paddr_rri_on_ddr);
+	low_paddr  = RRI_ON_DDR_PADDR_LOW(scn->paddr_rri_on_ddr);
+	high_paddr = RRI_ON_DDR_PADDR_HIGH(scn->paddr_rri_on_ddr);
 
 	hif_debug("using srri and drri from DDR");
 
@@ -4006,6 +4039,7 @@ int hif_wlan_enable(struct hif_softc *scn)
 	case TARGET_TYPE_KIWI:
 	case TARGET_TYPE_MANGO:
 	case TARGET_TYPE_PEACH:
+	case TARGET_TYPE_WCN6450:
 		hif_prepare_hal_shadow_reg_cfg_v3(scn, &cfg);
 		break;
 	default:

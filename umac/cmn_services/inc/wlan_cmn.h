@@ -631,6 +631,7 @@ enum wifi_traffic_ac {
  * @WLAN_PEER_NDP:      NDP Peer
  * @WLAN_PEER_MLO_TEMP: MLO Peer Temp (host only node)
  * @WLAN_PEER_RTT_PASN: Ranging PASN peer
+ * @WLAN_PEER_MLO_BRIDGE: MLO Bridge peer
  */
 enum wlan_peer_type {
 	WLAN_PEER_SELF     = 1,
@@ -645,6 +646,7 @@ enum wlan_peer_type {
 	WLAN_PEER_NDP      = 10,
 	WLAN_PEER_MLO_TEMP = 11,
 	WLAN_PEER_RTT_PASN = 12,
+	WLAN_PEER_MLO_BRIDGE = 13,
 };
 
 /**

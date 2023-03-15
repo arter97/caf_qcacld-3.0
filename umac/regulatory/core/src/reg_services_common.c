@@ -3593,6 +3593,7 @@ is_freq_present_in_resp_list(uint32_t pcl_ch,
  * @iface_mode_mask: interface type
  * @band_mask: requested band mask
  * @count: no of usable channels
+ * @in_6g_pwr_mode: Input 6GHz power mode
  *
  * Return: void
  */
@@ -3601,7 +3602,8 @@ reg_update_usable_chan_resp(struct wlan_objmgr_pdev *pdev,
 			    struct get_usable_chan_res_params *res_msg,
 			    uint32_t *pcl_ch, uint32_t len,
 			    uint32_t iface_mode_mask,
-			    uint32_t band_mask, int *count)
+			    uint32_t band_mask, int *count,
+			    enum supported_6g_pwr_types in_6g_pwr_mode)
 {
 	int i;
 	struct ch_params ch_params = {0};
@@ -3620,10 +3622,10 @@ reg_update_usable_chan_resp(struct wlan_objmgr_pdev *pdev,
 			continue;
 
 		ch_params.ch_width = CH_WIDTH_MAX;
-		reg_set_channel_params_for_freq(
+		reg_set_channel_params_for_pwrmode(
 				pdev,
 				pcl_ch[i],
-				0, &ch_params, true);
+				0, &ch_params, in_6g_pwr_mode, true);
 		res_msg[index].freq = (qdf_freq_t)pcl_ch[i];
 		res_msg[index].iface_mode_mask |= 1 << iface_mode_mask;
 		res_msg[index].bw = ch_params.ch_width;
@@ -3648,6 +3650,7 @@ reg_update_usable_chan_resp(struct wlan_objmgr_pdev *pdev,
  * @iftype: interface type
  * @band_mask: requested band mask
  * @count: no of usable channels
+ * @in_6g_pwr_mode: Input 6GHz power mode
  *
  * Return: qdf status
  */
@@ -3657,7 +3660,8 @@ reg_update_conn_chan_list(struct wlan_objmgr_pdev *pdev,
 			  enum policy_mgr_con_mode mode,
 			  uint32_t iftype,
 			  uint32_t band_mask,
-			  uint32_t *count)
+			  uint32_t *count,
+			  enum supported_6g_pwr_types in_6g_pwr_mode)
 {
 	uint32_t *pcl_ch;
 	uint8_t *weight_list;
@@ -3700,7 +3704,8 @@ reg_update_conn_chan_list(struct wlan_objmgr_pdev *pdev,
 		goto err;
 	}
 	reg_update_usable_chan_resp(pdev, res_msg, pcl_ch, len,
-				    iftype, band_mask, count);
+				    iftype, band_mask, count,
+				    in_6g_pwr_mode);
 err:
 	qdf_mem_free(pcl_ch);
 	qdf_mem_free(weight_list);
@@ -3713,6 +3718,7 @@ err:
  * @req_msg: Request msg
  * @res_msg: Response msg
  * @count: no of usable channels
+ * @in_6g_pwr_mode: Input 6GHz power mode
  *
  * Return: qdf status
  */
@@ -3720,7 +3726,8 @@ static QDF_STATUS
 reg_get_usable_channel_con_filter(struct wlan_objmgr_pdev *pdev,
 				  struct get_usable_chan_req_params req_msg,
 				  struct get_usable_chan_res_params *res_msg,
-				  int *count)
+				  int *count,
+				  enum supported_6g_pwr_types in_6g_pwr_mode)
 {
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
 	uint32_t iface_mode_mask = req_msg.iface_mode_mask;
@@ -3730,32 +3737,36 @@ reg_get_usable_channel_con_filter(struct wlan_objmgr_pdev *pdev,
 			status =
 			reg_update_conn_chan_list(pdev, res_msg, PM_SAP_MODE,
 						  IFTYPE_AP, req_msg.band_mask,
-						  count);
+						  count, in_6g_pwr_mode);
 			iface_mode_mask &= ~(1 << IFTYPE_AP);
 		} else if (iface_mode_mask & 1 << IFTYPE_STATION) {
 			status =
 			reg_update_conn_chan_list(pdev, res_msg, PM_STA_MODE,
 						  IFTYPE_STATION,
-						  req_msg.band_mask, count);
+						  req_msg.band_mask, count,
+						  in_6g_pwr_mode);
 			iface_mode_mask &= ~(1 << IFTYPE_STATION);
 		} else if (iface_mode_mask & 1 << IFTYPE_P2P_GO) {
 			status =
 			reg_update_conn_chan_list(pdev, res_msg, PM_P2P_GO_MODE,
 						  IFTYPE_P2P_GO,
-						  req_msg.band_mask, count);
+						  req_msg.band_mask, count,
+						  in_6g_pwr_mode);
 			iface_mode_mask &= ~(1 << IFTYPE_P2P_GO);
 		} else if (iface_mode_mask & 1 << IFTYPE_P2P_CLIENT) {
 			status =
 			reg_update_conn_chan_list(pdev, res_msg,
 						  PM_P2P_CLIENT_MODE,
 						  IFTYPE_P2P_CLIENT,
-						  req_msg.band_mask, count);
+						  req_msg.band_mask, count,
+						  in_6g_pwr_mode);
 			iface_mode_mask &= ~(1 << IFTYPE_P2P_CLIENT);
 		} else if (iface_mode_mask & 1 << IFTYPE_NAN) {
 			status =
 			reg_update_conn_chan_list(pdev, res_msg,
 						  PM_NAN_DISC_MODE, IFTYPE_NAN,
-						  req_msg.band_mask, count);
+						  req_msg.band_mask, count,
+						  in_6g_pwr_mode);
 			iface_mode_mask &= ~(1 << IFTYPE_NAN);
 		} else {
 			reg_err("invalid mode");
@@ -4001,6 +4012,7 @@ reg_calculate_mode_mask(uint32_t iface_mode_mask)
  * @iface_mode_mask: interface mode mask
  * @chan_list: reg channel list
  * @count: no of usable channels
+ * @in_6g_pwr_mode: Input 6GHz power mode
  *
  * Return: qdf status
  */
@@ -4009,7 +4021,8 @@ reg_add_usable_channel_to_resp(struct wlan_objmgr_pdev *pdev,
 			       struct get_usable_chan_res_params *res_msg,
 			       uint32_t iface_mode_mask,
 			       struct regulatory_channel *chan_list,
-			       int *count)
+			       int *count,
+			       enum supported_6g_pwr_types in_6g_pwr_mode)
 {
 	enum channel_enum chan_enum;
 	struct ch_params ch_params = {0};
@@ -4021,10 +4034,11 @@ reg_add_usable_channel_to_resp(struct wlan_objmgr_pdev *pdev,
 	for (chan_enum = 0; chan_enum < *count &&
 	     chan_enum < NUM_CHANNELS; chan_enum++) {
 		ch_params.ch_width = CH_WIDTH_MAX;
-		reg_set_channel_params_for_freq(
+		reg_set_channel_params_for_pwrmode(
 				pdev,
 				chan_list[chan_enum].center_freq,
-				chan_list[chan_enum].max_bw, &ch_params, true);
+				chan_list[chan_enum].max_bw, &ch_params,
+				in_6g_pwr_mode, true);
 
 		res_msg[chan_enum].freq = chan_list[chan_enum].center_freq;
 		res_msg[chan_enum].iface_mode_mask = mode_mask;
@@ -4049,7 +4063,8 @@ QDF_STATUS
 wlan_reg_get_usable_channel(struct wlan_objmgr_pdev *pdev,
 			    struct get_usable_chan_req_params req_msg,
 			    struct get_usable_chan_res_params *res_msg,
-			    uint32_t *usable_channels)
+			    uint32_t *usable_channels,
+			    enum supported_6g_pwr_types in_6g_pwr_mode)
 {
 	struct regulatory_channel *chan_list;
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
@@ -4071,7 +4086,8 @@ wlan_reg_get_usable_channel(struct wlan_objmgr_pdev *pdev,
 		status =
 		reg_add_usable_channel_to_resp(pdev, res_msg,
 					       req_msg.iface_mode_mask,
-					       chan_list, usable_channels);
+					       chan_list, usable_channels,
+					       in_6g_pwr_mode);
 		if (QDF_IS_STATUS_ERROR(status)) {
 			qdf_mem_free(chan_list);
 			return status;
@@ -4081,7 +4097,8 @@ wlan_reg_get_usable_channel(struct wlan_objmgr_pdev *pdev,
 	if (req_msg.filter_mask & 1 << FILTER_WLAN_CONCURRENCY)
 		status =
 		reg_get_usable_channel_con_filter(pdev, req_msg, res_msg,
-						  usable_channels);
+						  usable_channels,
+						  in_6g_pwr_mode);
 
 	if (req_msg.filter_mask & 1 << FILTER_CELLULAR_COEX)
 		status =
@@ -5857,54 +5874,6 @@ static void reg_copy_ch_params(struct ch_params *ch_params,
 	ch_params->ch_width = chan_list.chan_param[0].ch_width;
 	ch_params->sec_ch_offset = chan_list.chan_param[0].sec_ch_offset;
 	ch_params->reg_punc_bitmap = chan_list.chan_param[0].reg_punc_bitmap;
-}
-
-void reg_set_channel_params_for_freq(struct wlan_objmgr_pdev *pdev,
-				     qdf_freq_t freq,
-				     qdf_freq_t sec_ch_2g_freq,
-				     struct ch_params *ch_params,
-				     bool treat_nol_chan_as_disabled)
-{
-	if (reg_is_5ghz_ch_freq(freq) || reg_is_6ghz_chan_freq(freq)) {
-		if (reg_is_ch_width_320(ch_params->ch_width)) {
-			struct reg_channel_list chan_list;
-
-			qdf_mem_zero(&chan_list, sizeof(chan_list));
-			/* For now sending center freq as 0 */
-			reg_fill_channel_list_for_pwrmode(
-						pdev, freq, sec_ch_2g_freq,
-						ch_params->ch_width, 0,
-						&chan_list,
-						REG_CURRENT_PWR_MODE,
-						treat_nol_chan_as_disabled);
-			reg_copy_ch_params(ch_params, chan_list);
-		} else {
-			reg_set_5g_channel_params_for_pwrmode(
-						pdev, freq,
-						ch_params,
-						REG_CURRENT_PWR_MODE,
-						treat_nol_chan_as_disabled);
-		}
-	} else if  (reg_is_24ghz_ch_freq(freq)) {
-		reg_set_2g_channel_params_for_freq(pdev, freq, ch_params,
-						   sec_ch_2g_freq);
-	}
-}
-#else /* WLAN_FEATURE_11BE */
-void reg_set_channel_params_for_freq(struct wlan_objmgr_pdev *pdev,
-				     qdf_freq_t freq,
-				     qdf_freq_t sec_ch_2g_freq,
-				     struct ch_params *ch_params,
-				     bool treat_nol_chan_as_disabled)
-{
-	if (reg_is_5ghz_ch_freq(freq) || reg_is_6ghz_chan_freq(freq))
-		reg_set_5g_channel_params_for_pwrmode(
-						pdev, freq, ch_params,
-						REG_CURRENT_PWR_MODE,
-						treat_nol_chan_as_disabled);
-	else if  (reg_is_24ghz_ch_freq(freq))
-		reg_set_2g_channel_params_for_freq(pdev, freq, ch_params,
-						   sec_ch_2g_freq);
 }
 #endif /* WLAN_FEATURE_11BE */
 

@@ -603,6 +603,7 @@ struct wlan_mlo_peer_context {
  * struct mlo_link_info - ML link info
  * @link_addr: link mac address
  * @link_id: link index
+ * @is_bridge : Bridge peer or not
  * @chan_freq: Operating channel frequency
  * @nawds_config: peer's NAWDS configurarion
  * @vdev_id: VDEV ID
@@ -611,6 +612,7 @@ struct wlan_mlo_peer_context {
 struct mlo_link_info {
 	struct qdf_mac_addr link_addr;
 	uint8_t link_id;
+	bool is_bridge;
 	uint16_t chan_freq;
 #ifdef UMAC_SUPPORT_MLNAWDS
 	struct mlnawds_config nawds_config;
@@ -724,6 +726,7 @@ struct mlo_tgt_partner_info {
  * @mlo_mlme_ext_validate_conn_req: Callback to validate connect request
  * @mlo_mlme_ext_create_link_vdev: Callback to create link vdev for ML STA
  * @mlo_mlme_ext_peer_create: Callback to create link peer
+ * @mlo_mlme_ext_bridge_peer_create: Callback to create bridge peer
  * @mlo_mlme_ext_peer_assoc: Callback to initiate peer assoc
  * @mlo_mlme_ext_peer_assoc_fail: Callback to notify peer assoc failure
  * @mlo_mlme_ext_peer_delete: Callback to initiate link peer delete
@@ -741,6 +744,10 @@ struct mlo_mlme_ext_ops {
 	QDF_STATUS (*mlo_mlme_ext_create_link_vdev)(
 		    struct vdev_mlme_obj *vdev_mlme, void *ext_data);
 	QDF_STATUS (*mlo_mlme_ext_peer_create)(struct wlan_objmgr_vdev *vdev,
+					struct wlan_mlo_peer_context *ml_peer,
+					struct qdf_mac_addr *addr,
+					qdf_nbuf_t frm_buf);
+	QDF_STATUS (*mlo_mlme_ext_bridge_peer_create)(struct wlan_objmgr_vdev *vdev,
 					struct wlan_mlo_peer_context *ml_peer,
 					struct qdf_mac_addr *addr,
 					qdf_nbuf_t frm_buf);

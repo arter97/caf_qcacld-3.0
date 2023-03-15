@@ -3206,6 +3206,7 @@ static QDF_STATUS util_scan_parse_mbssid(struct wlan_objmgr_pdev *pdev,
 					 struct mgmt_rx_event_params *rx_param,
 					 qdf_list_t *scan_list)
 {
+	struct wlan_scan_obj *scan_obj;
 	struct wlan_bcn_frame *bcn;
 	struct wlan_frame_hdr *hdr;
 	struct scan_mbssid_info mbssid_info = {0};
@@ -3220,6 +3221,10 @@ static QDF_STATUS util_scan_parse_mbssid(struct wlan_objmgr_pdev *pdev,
 	int new_frame_len = 0, split_prof_len = 0;
 	enum nontx_profile_reasoncode retval;
 	uint8_t *nontx_profile = NULL;
+
+	scan_obj = wlan_pdev_get_scan_obj(pdev);
+	if (!scan_obj)
+		return QDF_STATUS_E_INVAL;
 
 	hdr = (struct wlan_frame_hdr *)frame;
 	bcn = (struct wlan_bcn_frame *)(frame + sizeof(struct wlan_frame_hdr));
@@ -3488,6 +3493,11 @@ static QDF_STATUS util_scan_parse_mbssid(struct wlan_objmgr_pdev *pdev,
 				     offsetof(struct wlan_bcn_frame, ie) +
 				     sizeof(struct wlan_frame_hdr),
 				     new_ie, new_ie_len);
+			if (scan_obj->cb.inform_mbssid_bcn_prb_rsp)
+				scan_obj->cb.inform_mbssid_bcn_prb_rsp(
+						       new_frame, new_frame_len,
+						       frm_subtype, new_bssid);
+
 			status = util_scan_gen_scan_entry(pdev, new_frame,
 							  new_frame_len,
 							  frm_subtype,

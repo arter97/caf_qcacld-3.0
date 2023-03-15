@@ -358,12 +358,13 @@ bool dp_rx_data_is_specific(hal_soc_handle_t hal_soc_hdl,
 #ifdef DP_RX_DISABLE_NDI_MDNS_FORWARDING
 static inline
 bool dp_rx_check_ndi_mdns_fwding(struct dp_txrx_peer *ta_txrx_peer,
-				 qdf_nbuf_t nbuf)
+				 qdf_nbuf_t nbuf, uint8_t link_id)
 {
 	if (ta_txrx_peer->vdev->opmode == wlan_op_mode_ndi &&
 	    qdf_nbuf_is_ipv6_mdns_pkt(nbuf)) {
 		DP_PEER_PER_PKT_STATS_INC(ta_txrx_peer,
-					  rx.intra_bss.mdns_no_fwd, 1);
+					  rx.intra_bss.mdns_no_fwd,
+					  1, link_id);
 		return false;
 	}
 	return true;
@@ -371,7 +372,7 @@ bool dp_rx_check_ndi_mdns_fwding(struct dp_txrx_peer *ta_txrx_peer,
 #else
 static inline
 bool dp_rx_check_ndi_mdns_fwding(struct dp_txrx_peer *ta_txrx_peer,
-				 qdf_nbuf_t nbuf)
+				 qdf_nbuf_t nbuf, uint8_t link_id)
 {
 	return true;
 }
@@ -956,38 +957,6 @@ dp_rx_process(struct dp_intr *int_ctx, hal_ring_handle_t hal_ring_hdl,
 	      uint32_t quota);
 
 /**
- * dp_rx_err_process() - Processes error frames routed to REO error ring
- * @int_ctx: pointer to DP interrupt context
- * @soc: core txrx main context
- * @hal_ring_hdl: opaque pointer to the HAL Rx Error Ring, which will be serviced
- * @quota: No. of units (packets) that can be serviced in one shot.
- *
- * This function implements error processing and top level demultiplexer
- * for all the frames routed to REO error ring.
- *
- * Return: uint32_t: No. of elements processed
- */
-uint32_t dp_rx_err_process(struct dp_intr *int_ctx, struct dp_soc *soc,
-			   hal_ring_handle_t hal_ring_hdl, uint32_t quota);
-
-/**
- * dp_rx_wbm_err_process() - Processes error frames routed to WBM release ring
- * @int_ctx: pointer to DP interrupt context
- * @soc: core txrx main context
- * @hal_ring_hdl: opaque pointer to the HAL Rx Error Ring, which will be
- *                serviced
- * @quota: No. of units (packets) that can be serviced in one shot.
- *
- * This function implements error processing and top level demultiplexer
- * for all the frames routed to WBM2HOST sw release ring.
- *
- * Return: uint32_t: No. of elements processed
- */
-uint32_t
-dp_rx_wbm_err_process(struct dp_intr *int_ctx, struct dp_soc *soc,
-		      hal_ring_handle_t hal_ring_hdl, uint32_t quota);
-
-/**
  * dp_rx_sg_create() - create a frag_list for MSDUs which are spread across
  *		     multiple nbufs.
  * @soc: core txrx main context
@@ -1073,12 +1042,13 @@ void dp_rx_desc_pool_free(struct dp_soc *soc,
  *				decapsulate the pkt.
  * @vdev: vdev on which RAW mode is enabled
  * @nbuf_list: list of RAW pkts to process
- * @txrx_peer: peer object from which the pkt is rx
+ * @peer: peer object from which the pkt is rx
+ * @link_id: link Id on which the packet is received
  *
  * Return: void
  */
 void dp_rx_deliver_raw(struct dp_vdev *vdev, qdf_nbuf_t nbuf_list,
-				struct dp_txrx_peer *txrx_peer);
+		       struct dp_txrx_peer *peer, uint8_t link_id);
 
 #ifdef RX_DESC_LOGGING
 /**
@@ -1210,38 +1180,6 @@ uint8_t dp_rx_process_invalid_peer(struct dp_soc *soc, qdf_nbuf_t nbuf,
  */
 void dp_rx_process_invalid_peer_wrapper(struct dp_soc *soc,
 		qdf_nbuf_t mpdu, bool mpdu_done, uint8_t mac_id);
-
-/**
- * dp_rx_process_mic_error(): Function to pass mic error indication to umac
- * @soc: core DP main context
- * @nbuf: buffer pointer
- * @rx_tlv_hdr: start of rx tlv header
- * @txrx_peer: txrx peer handle
- *
- * Return: void
- */
-void dp_rx_process_mic_error(struct dp_soc *soc, qdf_nbuf_t nbuf,
-			     uint8_t *rx_tlv_hdr,
-			     struct dp_txrx_peer *txrx_peer);
-
-/**
- * dp_2k_jump_handle() - Function to handle 2k jump exception
- *                        on WBM ring
- * @soc: core DP main context
- * @nbuf: buffer pointer
- * @rx_tlv_hdr: start of rx tlv header
- * @peer_id: peer id of first msdu
- * @tid: Tid for which exception occurred
- *
- * This function handles 2k jump violations arising out
- * of receiving aggregates in non BA case. This typically
- * may happen if aggregates are received on a QOS enabled TID
- * while Rx window size is still initialized to value of 2. Or
- * it may also happen if negotiated window size is 1 but peer
- * sends aggregates.
- */
-void dp_2k_jump_handle(struct dp_soc *soc, qdf_nbuf_t nbuf, uint8_t *rx_tlv_hdr,
-		       uint16_t peer_id, uint8_t tid);
 
 #define DP_RX_HEAD_APPEND(head, elem) \
 	do {                                                            \
@@ -1497,13 +1435,15 @@ bool dp_rx_intrabss_eapol_drop_check(struct dp_soc *soc,
  * @rx_tlv_hdr: start address of rx tlvs
  * @nbuf: nbuf that has to be intrabss forwarded
  * @tid_stats: tid stats pointer
+ * @link_id: link Id on which packet is received
  *
  * Return: bool: true if it is forwarded else false
  */
 bool dp_rx_intrabss_mcbc_fwd(struct dp_soc *soc,
 			     struct dp_txrx_peer *ta_peer,
 			     uint8_t *rx_tlv_hdr, qdf_nbuf_t nbuf,
-			     struct cdp_tid_rx_stats *tid_stats);
+			     struct cdp_tid_rx_stats *tid_stats,
+			     uint8_t link_id);
 
 /**
  * dp_rx_intrabss_ucast_fwd() - Does intrabss forward for unicast packets
@@ -1513,6 +1453,7 @@ bool dp_rx_intrabss_mcbc_fwd(struct dp_soc *soc,
  * @rx_tlv_hdr: start address of rx tlvs
  * @nbuf: nbuf that has to be intrabss forwarded
  * @tid_stats: tid stats pointer
+ * @link_id: link Id on which packet is received
  *
  * Return: bool: true if it is forwarded else false
  */
@@ -1520,7 +1461,8 @@ bool dp_rx_intrabss_ucast_fwd(struct dp_soc *soc,
 			      struct dp_txrx_peer *ta_peer,
 			      uint8_t tx_vdev_id,
 			      uint8_t *rx_tlv_hdr, qdf_nbuf_t nbuf,
-			      struct cdp_tid_rx_stats *tid_stats);
+			      struct cdp_tid_rx_stats *tid_stats,
+			      uint8_t link_id);
 
 /**
  * dp_rx_defrag_concat() - Concatenate the fragments
@@ -1827,48 +1769,6 @@ dp_pdev_rx_buffers_attach(struct dp_soc *dp_soc, uint32_t mac_id,
 			  uint32_t num_req_buffers);
 
 /**
- * dp_rx_link_desc_return() - Return a MPDU link descriptor to HW
- *			      (WBM), following error handling
- *
- * @soc: core DP main context
- * @ring_desc: opaque pointer to the REO error ring descriptor
- * @bm_action: put to idle_list or release to msdu_list
- *
- * Return: QDF_STATUS_E_FAILURE for failure else QDF_STATUS_SUCCESS
- */
-QDF_STATUS
-dp_rx_link_desc_return(struct dp_soc *soc, hal_ring_desc_t ring_desc,
-		       uint8_t bm_action);
-
-/**
- * dp_rx_link_desc_return_by_addr - Return a MPDU link descriptor to
- *					(WBM) by address
- *
- * @soc: core DP main context
- * @link_desc_addr: link descriptor addr
- * @bm_action: put to idle_list or release to msdu_list
- *
- * Return: QDF_STATUS_E_FAILURE for failure else QDF_STATUS_SUCCESS
- */
-QDF_STATUS
-dp_rx_link_desc_return_by_addr(struct dp_soc *soc,
-			       hal_buff_addrinfo_t link_desc_addr,
-			       uint8_t bm_action);
-
-/**
- * dp_rxdma_err_process() - RxDMA error processing functionality
- * @int_ctx: pointer to DP interrupt context
- * @soc: core txrx main context
- * @mac_id: mac id which is one of 3 mac_ids
- * @quota: No. of units (packets) that can be serviced in one shot.
- *
- * Return: num of buffers processed
- */
-uint32_t
-dp_rxdma_err_process(struct dp_intr *int_ctx, struct dp_soc *soc,
-		     uint32_t mac_id, uint32_t quota);
-
-/**
  * dp_rx_fill_mesh_stats() - Fills the mesh per packet receive stats
  * @vdev: DP Virtual device handle
  * @nbuf: Buffer pointer
@@ -1901,21 +1801,6 @@ QDF_STATUS dp_rx_filter_mesh_packets(struct dp_vdev *vdev, qdf_nbuf_t nbuf,
 
 int dp_wds_rx_policy_check(uint8_t *rx_tlv_hdr, struct dp_vdev *vdev,
 			   struct dp_txrx_peer *peer);
-
-/**
- * dp_rx_dump_info_and_assert() - dump RX Ring info and Rx Desc info
- *
- * @soc: core txrx main context
- * @hal_ring_hdl: opaque pointer to the HAL Rx Ring, which will be serviced
- * @ring_desc: opaque pointer to the RX ring descriptor
- * @rx_desc: host rx descriptor
- *
- * Return: void
- */
-void dp_rx_dump_info_and_assert(struct dp_soc *soc,
-				hal_ring_handle_t hal_ring_hdl,
-				hal_ring_desc_t ring_desc,
-				struct dp_rx_desc *rx_desc);
 
 /**
  * dp_rx_compute_delay() - Compute and fill in all timestamps
@@ -2074,24 +1959,6 @@ bool dp_rx_desc_paddr_sanity_check(struct dp_rx_desc *rx_desc,
 void dp_rx_enable_mon_dest_frag(struct rx_desc_pool *rx_desc_pool,
 				bool is_mon_dest_desc);
 
-/**
- * dp_rx_process_rxdma_err() - Function to deliver rxdma unencrypted_err
- *			       frames to OS or wifi parse errors.
- * @soc: core DP main context
- * @nbuf: buffer pointer
- * @rx_tlv_hdr: start of rx tlv header
- * @txrx_peer: peer reference
- * @err_code: rxdma err code
- * @mac_id: mac_id which is one of 3 mac_ids(Assuming mac_id and
- * pool_id has same mapping)
- *
- * Return: None
- */
-void
-dp_rx_process_rxdma_err(struct dp_soc *soc, qdf_nbuf_t nbuf,
-			uint8_t *rx_tlv_hdr, struct dp_txrx_peer *txrx_peer,
-			uint8_t err_code, uint8_t mac_id);
-
 #ifndef QCA_MULTIPASS_SUPPORT
 static inline
 bool dp_rx_multipass_process(struct dp_txrx_peer *peer, qdf_nbuf_t nbuf,
@@ -2170,88 +2037,6 @@ QDF_STATUS dp_rx_eapol_deliver_to_stack(struct dp_soc *soc,
 
 #ifndef QCA_HOST_MODE_WIFI_DISABLED
 
-#ifdef QCA_OL_RX_LOCK_LESS_ACCESS
-/**
- * dp_rx_srng_access_start()- Wrapper function to log access start of a hal ring
- * @int_ctx: pointer to DP interrupt context
- * @soc: DP soc structure pointer
- * @hal_ring_hdl: HAL ring handle
- *
- * Return: 0 on success; error on failure
- */
-static inline int
-dp_rx_srng_access_start(struct dp_intr *int_ctx, struct dp_soc *soc,
-			hal_ring_handle_t hal_ring_hdl)
-{
-	return hal_srng_access_start_unlocked(soc->hal_soc, hal_ring_hdl);
-}
-
-/**
- * dp_rx_srng_access_end()- Wrapper function to log access end of a hal ring
- * @int_ctx: pointer to DP interrupt context
- * @soc: DP soc structure pointer
- * @hal_ring_hdl: HAL ring handle
- *
- * Return: None
- */
-static inline void
-dp_rx_srng_access_end(struct dp_intr *int_ctx, struct dp_soc *soc,
-		      hal_ring_handle_t hal_ring_hdl)
-{
-	hal_srng_access_end_unlocked(soc->hal_soc, hal_ring_hdl);
-}
-#else
-static inline int
-dp_rx_srng_access_start(struct dp_intr *int_ctx, struct dp_soc *soc,
-			hal_ring_handle_t hal_ring_hdl)
-{
-	return dp_srng_access_start(int_ctx, soc, hal_ring_hdl);
-}
-
-static inline void
-dp_rx_srng_access_end(struct dp_intr *int_ctx, struct dp_soc *soc,
-		      hal_ring_handle_t hal_ring_hdl)
-{
-	dp_srng_access_end(int_ctx, soc, hal_ring_hdl);
-}
-#endif
-
-#endif /* QCA_HOST_MODE_WIFI_DISABLED */
-
-/**
- * dp_rx_wbm_sg_list_reset() - Initialize sg list
- *
- * This api should be called at soc init and afterevery sg processing.
- *@soc: DP SOC handle
- */
-static inline void dp_rx_wbm_sg_list_reset(struct dp_soc *soc)
-{
-	if (soc) {
-		soc->wbm_sg_param.wbm_is_first_msdu_in_sg = false;
-		soc->wbm_sg_param.wbm_sg_nbuf_head = NULL;
-		soc->wbm_sg_param.wbm_sg_nbuf_tail = NULL;
-		soc->wbm_sg_param.wbm_sg_desc_msdu_len = 0;
-	}
-}
-
-/**
- * dp_rx_wbm_sg_list_deinit() - De-initialize sg list
- *
- * This api should be called in down path, to avoid any leak.
- *@soc: DP SOC handle
- */
-static inline void dp_rx_wbm_sg_list_deinit(struct dp_soc *soc)
-{
-	if (soc) {
-		if (soc->wbm_sg_param.wbm_sg_nbuf_head)
-			qdf_nbuf_list_free(soc->wbm_sg_param.wbm_sg_nbuf_head);
-
-		dp_rx_wbm_sg_list_reset(soc);
-	}
-}
-
-#ifndef QCA_HOST_MODE_WIFI_DISABLED
-
 #ifdef WLAN_FEATURE_RX_PREALLOC_BUFFER_POOL
 #define DP_RX_PROCESS_NBUF(soc, head, tail, ebuf_head, ebuf_tail, rx_desc) \
 	do {								   \
@@ -2275,20 +2060,6 @@ static inline void dp_rx_wbm_sg_list_deinit(struct dp_soc *soc)
 #endif /* WLAN_FEATURE_RX_PREALLOC_BUFFER_POOL */
 
 #endif /* QCA_HOST_MODE_WIFI_DISABLED */
-
-/**
- * dp_rx_link_desc_refill_duplicate_check() - check if link desc duplicate
- *					      to refill
- * @soc: DP SOC handle
- * @buf_info: the last link desc buf info
- * @ring_buf_info: current buf address pointor including link desc
- *
- * Return: none.
- */
-void dp_rx_link_desc_refill_duplicate_check(
-				struct dp_soc *soc,
-				struct hal_buf_info *buf_info,
-				hal_buff_addrinfo_t ring_buf_info);
 
 #ifdef WLAN_FEATURE_PKT_CAPTURE_V2
 /**
@@ -2377,6 +2148,7 @@ void dp_rx_fill_gro_info(struct dp_soc *soc, uint8_t *rx_tlv,
  * @txrx_peer: pointer to the txrx peer object.
  * @ring_id: reo dest ring number on which pkt is reaped.
  * @tid_stats: per tid rx stats.
+ * @link_id: link Id on which packet is received
  *
  * update all the per msdu stats for that nbuf.
  *
@@ -2386,7 +2158,8 @@ void dp_rx_msdu_stats_update(struct dp_soc *soc, qdf_nbuf_t nbuf,
 			     uint8_t *rx_tlv_hdr,
 			     struct dp_txrx_peer *txrx_peer,
 			     uint8_t ring_id,
-			     struct cdp_tid_rx_stats *tid_stats);
+			     struct cdp_tid_rx_stats *tid_stats,
+			     uint8_t link_id);
 
 /**
  * dp_rx_deliver_to_stack_no_peer() - try deliver rx data even if
@@ -2402,64 +2175,7 @@ void dp_rx_msdu_stats_update(struct dp_soc *soc, qdf_nbuf_t nbuf,
  */
 void dp_rx_deliver_to_stack_no_peer(struct dp_soc *soc, qdf_nbuf_t nbuf);
 
-/**
- * dp_rx_srng_get_num_pending() - get number of pending entries
- * @hal_soc: hal soc opaque pointer
- * @hal_ring_hdl: opaque pointer to the HAL Rx Ring
- * @num_entries: number of entries in the hal_ring.
- * @near_full: pointer to a boolean. This is set if ring is near full.
- *
- * The function returns the number of entries in a destination ring which are
- * yet to be reaped. The function also checks if the ring is near full.
- * If more than half of the ring needs to be reaped, the ring is considered
- * approaching full.
- * The function uses hal_srng_dst_num_valid_locked to get the number of valid
- * entries. It should not be called within a SRNG lock. HW pointer value is
- * synced into cached_hp.
- *
- * Return: Number of pending entries if any
- */
-uint32_t dp_rx_srng_get_num_pending(hal_soc_handle_t hal_soc,
-				    hal_ring_handle_t hal_ring_hdl,
-				    uint32_t num_entries,
-				    bool *near_full);
-
-#ifdef WLAN_FEATURE_DP_RX_RING_HISTORY
-/**
- * dp_rx_ring_record_entry() - Record an entry into the rx ring history.
- * @soc: Datapath soc structure
- * @ring_num: REO ring number
- * @ring_desc: REO ring descriptor
- *
- * Return: None
- */
-void dp_rx_ring_record_entry(struct dp_soc *soc, uint8_t ring_num,
-			     hal_ring_desc_t ring_desc);
-#else
-static inline void
-dp_rx_ring_record_entry(struct dp_soc *soc, uint8_t ring_num,
-			hal_ring_desc_t ring_desc)
-{
-}
-#endif
-
 #ifndef QCA_HOST_MODE_WIFI_DISABLED
-#ifdef RX_DESC_SANITY_WAR
-QDF_STATUS dp_rx_desc_sanity(struct dp_soc *soc, hal_soc_handle_t hal_soc,
-			     hal_ring_handle_t hal_ring_hdl,
-			     hal_ring_desc_t ring_desc,
-			     struct dp_rx_desc *rx_desc);
-#else
-static inline
-QDF_STATUS dp_rx_desc_sanity(struct dp_soc *soc, hal_soc_handle_t hal_soc,
-			     hal_ring_handle_t hal_ring_hdl,
-			     hal_ring_desc_t ring_desc,
-			     struct dp_rx_desc *rx_desc)
-{
-	return QDF_STATUS_SUCCESS;
-}
-#endif
-
 #ifdef DP_RX_DROP_RAW_FRM
 /**
  * dp_rx_is_raw_frame_dropped() - if raw frame nbuf, free and drop
@@ -2474,29 +2190,6 @@ static inline
 bool dp_rx_is_raw_frame_dropped(qdf_nbuf_t nbuf)
 {
 	return false;
-}
-#endif
-
-#ifdef RX_DESC_DEBUG_CHECK
-/**
- * dp_rx_desc_nbuf_sanity_check - Add sanity check to catch REO rx_desc paddr
- *				  corruption
- * @soc: DP SoC context
- * @ring_desc: REO ring descriptor
- * @rx_desc: Rx descriptor
- *
- * Return: NONE
- */
-QDF_STATUS dp_rx_desc_nbuf_sanity_check(struct dp_soc *soc,
-					hal_ring_desc_t ring_desc,
-					struct dp_rx_desc *rx_desc);
-#else
-static inline
-QDF_STATUS dp_rx_desc_nbuf_sanity_check(struct dp_soc *soc,
-					hal_ring_desc_t ring_desc,
-					struct dp_rx_desc *rx_desc)
-{
-	return QDF_STATUS_SUCCESS;
 }
 #endif
 
@@ -2630,103 +2323,17 @@ static inline int dp_rx_get_loop_pkt_limit(struct dp_soc *soc)
 
 void dp_rx_update_stats(struct dp_soc *soc, qdf_nbuf_t nbuf);
 
-#ifdef QCA_SUPPORT_WDS_EXTENDED
-/**
- * dp_rx_is_list_ready() - Make different lists for 4-address
- *			   and 3-address frames
- * @nbuf_head: skb list head
- * @vdev: vdev
- * @txrx_peer : txrx_peer
- * @peer_id: peer id of new received frame
- * @vdev_id: vdev_id of new received frame
- *
- * Return: true if peer_ids are different.
- */
-static inline bool
-dp_rx_is_list_ready(qdf_nbuf_t nbuf_head,
-		    struct dp_vdev *vdev,
-		    struct dp_txrx_peer *txrx_peer,
-		    uint16_t peer_id,
-		    uint8_t vdev_id)
-{
-	if (nbuf_head && txrx_peer && txrx_peer->peer_id != peer_id)
-		return true;
-
-	return false;
-}
-#else
-static inline bool
-dp_rx_is_list_ready(qdf_nbuf_t nbuf_head,
-		    struct dp_vdev *vdev,
-		    struct dp_txrx_peer *txrx_peer,
-		    uint16_t peer_id,
-		    uint8_t vdev_id)
-{
-	if (nbuf_head && vdev && (vdev->vdev_id != vdev_id))
-		return true;
-
-	return false;
-}
-#endif
-
-#ifdef WLAN_FEATURE_MARK_FIRST_WAKEUP_PACKET
-/**
- * dp_rx_mark_first_packet_after_wow_wakeup - get first packet after wow wakeup
- * @pdev: pointer to dp_pdev structure
- * @rx_tlv: pointer to rx_pkt_tlvs structure
- * @nbuf: pointer to skb buffer
- *
- * Return: None
- */
-void dp_rx_mark_first_packet_after_wow_wakeup(struct dp_pdev *pdev,
-					      uint8_t *rx_tlv,
-					      qdf_nbuf_t nbuf);
-#else
-static inline void
-dp_rx_mark_first_packet_after_wow_wakeup(struct dp_pdev *pdev,
-					 uint8_t *rx_tlv,
-					 qdf_nbuf_t nbuf)
-{
-}
-#endif
-
-#if defined(WLAN_MAX_PDEVS) && (WLAN_MAX_PDEVS == 1)
-static inline uint8_t
-dp_rx_get_defrag_bm_id(struct dp_soc *soc)
-{
-	return DP_DEFRAG_RBM(soc->wbm_sw0_bm_id);
-}
-
-static inline uint8_t
-dp_rx_get_rx_bm_id(struct dp_soc *soc)
-{
-	return DP_WBM2SW_RBM(soc->wbm_sw0_bm_id);
-}
-#else
-static inline uint8_t
-dp_rx_get_rx_bm_id(struct dp_soc *soc)
-{
-	struct wlan_cfg_dp_soc_ctxt *cfg_ctx = soc->wlan_cfg_ctx;
-	uint8_t wbm2_sw_rx_rel_ring_id;
-
-	wbm2_sw_rx_rel_ring_id = wlan_cfg_get_rx_rel_ring_id(cfg_ctx);
-
-	return HAL_RX_BUF_RBM_SW_BM(soc->wbm_sw0_bm_id,
-				    wbm2_sw_rx_rel_ring_id);
-}
-
-static inline uint8_t
-dp_rx_get_defrag_bm_id(struct dp_soc *soc)
-{
-	return dp_rx_get_rx_bm_id(soc);
-}
-#endif
-
 static inline uint16_t
 dp_rx_peer_metadata_peer_id_get(struct dp_soc *soc, uint32_t peer_metadata)
 {
 	return soc->arch_ops.dp_rx_peer_metadata_peer_id_get(soc,
 							     peer_metadata);
+}
+
+static inline uint8_t
+dp_rx_peer_mdata_link_id_get(struct dp_soc *soc, uint32_t peer_metadata)
+{
+	return soc->arch_ops.dp_rx_peer_mdata_link_id_get(peer_metadata);
 }
 
 /**
@@ -3356,4 +2963,442 @@ dp_rx_deliver_to_osif_stack(struct dp_soc *soc,
 			    qdf_nbuf_t nbuf,
 			    qdf_nbuf_t tail,
 			    bool is_eapol);
+
+#ifndef WLAN_SOFTUMAC_SUPPORT /* WLAN_SOFTUMAC_SUPPORT */
+/**
+ * dp_rx_dump_info_and_assert() - dump RX Ring info and Rx Desc info
+ *
+ * @soc: core txrx main context
+ * @hal_ring_hdl: opaque pointer to the HAL Rx Ring, which will be serviced
+ * @ring_desc: opaque pointer to the RX ring descriptor
+ * @rx_desc: host rx descriptor
+ *
+ * Return: void
+ */
+void dp_rx_dump_info_and_assert(struct dp_soc *soc,
+				hal_ring_handle_t hal_ring_hdl,
+				hal_ring_desc_t ring_desc,
+				struct dp_rx_desc *rx_desc);
+
+/**
+ * dp_rx_link_desc_return() - Return a MPDU link descriptor to HW
+ *			      (WBM), following error handling
+ *
+ * @soc: core DP main context
+ * @ring_desc: opaque pointer to the REO error ring descriptor
+ * @bm_action: put to idle_list or release to msdu_list
+ *
+ * Return: QDF_STATUS_E_FAILURE for failure else QDF_STATUS_SUCCESS
+ */
+QDF_STATUS
+dp_rx_link_desc_return(struct dp_soc *soc, hal_ring_desc_t ring_desc,
+		       uint8_t bm_action);
+
+/**
+ * dp_rx_link_desc_return_by_addr - Return a MPDU link descriptor to
+ *					(WBM) by address
+ *
+ * @soc: core DP main context
+ * @link_desc_addr: link descriptor addr
+ * @bm_action: put to idle_list or release to msdu_list
+ *
+ * Return: QDF_STATUS_E_FAILURE for failure else QDF_STATUS_SUCCESS
+ */
+QDF_STATUS
+dp_rx_link_desc_return_by_addr(struct dp_soc *soc,
+			       hal_buff_addrinfo_t link_desc_addr,
+			       uint8_t bm_action);
+
+/**
+ * dp_rxdma_err_process() - RxDMA error processing functionality
+ * @int_ctx: pointer to DP interrupt context
+ * @soc: core txrx main context
+ * @mac_id: mac id which is one of 3 mac_ids
+ * @quota: No. of units (packets) that can be serviced in one shot.
+ *
+ * Return: num of buffers processed
+ */
+uint32_t
+dp_rxdma_err_process(struct dp_intr *int_ctx, struct dp_soc *soc,
+		     uint32_t mac_id, uint32_t quota);
+
+/**
+ * dp_rx_process_rxdma_err() - Function to deliver rxdma unencrypted_err
+ *			       frames to OS or wifi parse errors.
+ * @soc: core DP main context
+ * @nbuf: buffer pointer
+ * @rx_tlv_hdr: start of rx tlv header
+ * @txrx_peer: peer reference
+ * @err_code: rxdma err code
+ * @mac_id: mac_id which is one of 3 mac_ids(Assuming mac_id and
+ * pool_id has same mapping)
+ * @link_id: link Id on which the packet is received
+ *
+ * Return: None
+ */
+void
+dp_rx_process_rxdma_err(struct dp_soc *soc, qdf_nbuf_t nbuf,
+			uint8_t *rx_tlv_hdr, struct dp_txrx_peer *txrx_peer,
+			uint8_t err_code, uint8_t mac_id, uint8_t link_id);
+
+/**
+ * dp_rx_process_mic_error(): Function to pass mic error indication to umac
+ * @soc: core DP main context
+ * @nbuf: buffer pointer
+ * @rx_tlv_hdr: start of rx tlv header
+ * @txrx_peer: txrx peer handle
+ *
+ * Return: void
+ */
+void dp_rx_process_mic_error(struct dp_soc *soc, qdf_nbuf_t nbuf,
+			     uint8_t *rx_tlv_hdr,
+			     struct dp_txrx_peer *txrx_peer);
+
+/**
+ * dp_2k_jump_handle() - Function to handle 2k jump exception
+ *                        on WBM ring
+ * @soc: core DP main context
+ * @nbuf: buffer pointer
+ * @rx_tlv_hdr: start of rx tlv header
+ * @peer_id: peer id of first msdu
+ * @tid: Tid for which exception occurred
+ *
+ * This function handles 2k jump violations arising out
+ * of receiving aggregates in non BA case. This typically
+ * may happen if aggregates are received on a QOS enabled TID
+ * while Rx window size is still initialized to value of 2. Or
+ * it may also happen if negotiated window size is 1 but peer
+ * sends aggregates.
+ */
+void dp_2k_jump_handle(struct dp_soc *soc, qdf_nbuf_t nbuf, uint8_t *rx_tlv_hdr,
+		       uint16_t peer_id, uint8_t tid);
+
+#ifndef QCA_HOST_MODE_WIFI_DISABLED
+
+/**
+ * dp_rx_err_process() - Processes error frames routed to REO error ring
+ * @int_ctx: pointer to DP interrupt context
+ * @soc: core txrx main context
+ * @hal_ring_hdl: opaque pointer to the HAL Rx Error Ring, which will be serviced
+ * @quota: No. of units (packets) that can be serviced in one shot.
+ *
+ * This function implements error processing and top level demultiplexer
+ * for all the frames routed to REO error ring.
+ *
+ * Return: uint32_t: No. of elements processed
+ */
+uint32_t dp_rx_err_process(struct dp_intr *int_ctx, struct dp_soc *soc,
+			   hal_ring_handle_t hal_ring_hdl, uint32_t quota);
+
+/**
+ * dp_rx_wbm_err_process() - Processes error frames routed to WBM release ring
+ * @int_ctx: pointer to DP interrupt context
+ * @soc: core txrx main context
+ * @hal_ring_hdl: opaque pointer to the HAL Rx Error Ring, which will be
+ *                serviced
+ * @quota: No. of units (packets) that can be serviced in one shot.
+ *
+ * This function implements error processing and top level demultiplexer
+ * for all the frames routed to WBM2HOST sw release ring.
+ *
+ * Return: uint32_t: No. of elements processed
+ */
+uint32_t
+dp_rx_wbm_err_process(struct dp_intr *int_ctx, struct dp_soc *soc,
+		      hal_ring_handle_t hal_ring_hdl, uint32_t quota);
+
+#ifdef QCA_OL_RX_LOCK_LESS_ACCESS
+/**
+ * dp_rx_srng_access_start()- Wrapper function to log access start of a hal ring
+ * @int_ctx: pointer to DP interrupt context
+ * @soc: DP soc structure pointer
+ * @hal_ring_hdl: HAL ring handle
+ *
+ * Return: 0 on success; error on failure
+ */
+static inline int
+dp_rx_srng_access_start(struct dp_intr *int_ctx, struct dp_soc *soc,
+			hal_ring_handle_t hal_ring_hdl)
+{
+	return hal_srng_access_start_unlocked(soc->hal_soc, hal_ring_hdl);
+}
+
+/**
+ * dp_rx_srng_access_end()- Wrapper function to log access end of a hal ring
+ * @int_ctx: pointer to DP interrupt context
+ * @soc: DP soc structure pointer
+ * @hal_ring_hdl: HAL ring handle
+ *
+ * Return: None
+ */
+static inline void
+dp_rx_srng_access_end(struct dp_intr *int_ctx, struct dp_soc *soc,
+		      hal_ring_handle_t hal_ring_hdl)
+{
+	hal_srng_access_end_unlocked(soc->hal_soc, hal_ring_hdl);
+}
+#else
+static inline int
+dp_rx_srng_access_start(struct dp_intr *int_ctx, struct dp_soc *soc,
+			hal_ring_handle_t hal_ring_hdl)
+{
+	return dp_srng_access_start(int_ctx, soc, hal_ring_hdl);
+}
+
+static inline void
+dp_rx_srng_access_end(struct dp_intr *int_ctx, struct dp_soc *soc,
+		      hal_ring_handle_t hal_ring_hdl)
+{
+	dp_srng_access_end(int_ctx, soc, hal_ring_hdl);
+}
+#endif
+
+#ifdef RX_DESC_SANITY_WAR
+QDF_STATUS dp_rx_desc_sanity(struct dp_soc *soc, hal_soc_handle_t hal_soc,
+			     hal_ring_handle_t hal_ring_hdl,
+			     hal_ring_desc_t ring_desc,
+			     struct dp_rx_desc *rx_desc);
+#else
+static inline
+QDF_STATUS dp_rx_desc_sanity(struct dp_soc *soc, hal_soc_handle_t hal_soc,
+			     hal_ring_handle_t hal_ring_hdl,
+			     hal_ring_desc_t ring_desc,
+			     struct dp_rx_desc *rx_desc)
+{
+	return QDF_STATUS_SUCCESS;
+}
+#endif
+
+#ifdef RX_DESC_DEBUG_CHECK
+/**
+ * dp_rx_desc_nbuf_sanity_check - Add sanity check to catch REO rx_desc paddr
+ *				  corruption
+ * @soc: DP SoC context
+ * @ring_desc: REO ring descriptor
+ * @rx_desc: Rx descriptor
+ *
+ * Return: NONE
+ */
+QDF_STATUS dp_rx_desc_nbuf_sanity_check(struct dp_soc *soc,
+					hal_ring_desc_t ring_desc,
+					struct dp_rx_desc *rx_desc);
+#else
+static inline
+QDF_STATUS dp_rx_desc_nbuf_sanity_check(struct dp_soc *soc,
+					hal_ring_desc_t ring_desc,
+					struct dp_rx_desc *rx_desc)
+{
+	return QDF_STATUS_SUCCESS;
+}
+#endif
+#endif /* QCA_HOST_MODE_WIFI_DISABLED */
+
+/**
+ * dp_rx_wbm_sg_list_reset() - Initialize sg list
+ *
+ * This api should be called at soc init and afterevery sg processing.
+ *@soc: DP SOC handle
+ */
+static inline void dp_rx_wbm_sg_list_reset(struct dp_soc *soc)
+{
+	if (soc) {
+		soc->wbm_sg_param.wbm_is_first_msdu_in_sg = false;
+		soc->wbm_sg_param.wbm_sg_nbuf_head = NULL;
+		soc->wbm_sg_param.wbm_sg_nbuf_tail = NULL;
+		soc->wbm_sg_param.wbm_sg_desc_msdu_len = 0;
+	}
+}
+
+/**
+ * dp_rx_wbm_sg_list_deinit() - De-initialize sg list
+ *
+ * This api should be called in down path, to avoid any leak.
+ *@soc: DP SOC handle
+ */
+static inline void dp_rx_wbm_sg_list_deinit(struct dp_soc *soc)
+{
+	if (soc) {
+		if (soc->wbm_sg_param.wbm_sg_nbuf_head)
+			qdf_nbuf_list_free(soc->wbm_sg_param.wbm_sg_nbuf_head);
+
+		dp_rx_wbm_sg_list_reset(soc);
+	}
+}
+
+/**
+ * dp_rx_link_desc_refill_duplicate_check() - check if link desc duplicate
+ *					      to refill
+ * @soc: DP SOC handle
+ * @buf_info: the last link desc buf info
+ * @ring_buf_info: current buf address pointor including link desc
+ *
+ * Return: none.
+ */
+void dp_rx_link_desc_refill_duplicate_check(
+				struct dp_soc *soc,
+				struct hal_buf_info *buf_info,
+				hal_buff_addrinfo_t ring_buf_info);
+/**
+ * dp_rx_srng_get_num_pending() - get number of pending entries
+ * @hal_soc: hal soc opaque pointer
+ * @hal_ring_hdl: opaque pointer to the HAL Rx Ring
+ * @num_entries: number of entries in the hal_ring.
+ * @near_full: pointer to a boolean. This is set if ring is near full.
+ *
+ * The function returns the number of entries in a destination ring which are
+ * yet to be reaped. The function also checks if the ring is near full.
+ * If more than half of the ring needs to be reaped, the ring is considered
+ * approaching full.
+ * The function uses hal_srng_dst_num_valid_locked to get the number of valid
+ * entries. It should not be called within a SRNG lock. HW pointer value is
+ * synced into cached_hp.
+ *
+ * Return: Number of pending entries if any
+ */
+uint32_t dp_rx_srng_get_num_pending(hal_soc_handle_t hal_soc,
+				    hal_ring_handle_t hal_ring_hdl,
+				    uint32_t num_entries,
+				    bool *near_full);
+
+#ifdef WLAN_FEATURE_DP_RX_RING_HISTORY
+/**
+ * dp_rx_ring_record_entry() - Record an entry into the rx ring history.
+ * @soc: Datapath soc structure
+ * @ring_num: REO ring number
+ * @ring_desc: REO ring descriptor
+ *
+ * Return: None
+ */
+void dp_rx_ring_record_entry(struct dp_soc *soc, uint8_t ring_num,
+			     hal_ring_desc_t ring_desc);
+#else
+static inline void
+dp_rx_ring_record_entry(struct dp_soc *soc, uint8_t ring_num,
+			hal_ring_desc_t ring_desc)
+{
+}
+#endif
+
+#ifdef QCA_SUPPORT_WDS_EXTENDED
+/**
+ * dp_rx_is_list_ready() - Make different lists for 4-address
+ *			   and 3-address frames
+ * @nbuf_head: skb list head
+ * @vdev: vdev
+ * @txrx_peer : txrx_peer
+ * @peer_id: peer id of new received frame
+ * @vdev_id: vdev_id of new received frame
+ *
+ * Return: true if peer_ids are different.
+ */
+static inline bool
+dp_rx_is_list_ready(qdf_nbuf_t nbuf_head,
+		    struct dp_vdev *vdev,
+		    struct dp_txrx_peer *txrx_peer,
+		    uint16_t peer_id,
+		    uint8_t vdev_id)
+{
+	if (nbuf_head && txrx_peer && txrx_peer->peer_id != peer_id)
+		return true;
+
+	return false;
+}
+#else
+static inline bool
+dp_rx_is_list_ready(qdf_nbuf_t nbuf_head,
+		    struct dp_vdev *vdev,
+		    struct dp_txrx_peer *txrx_peer,
+		    uint16_t peer_id,
+		    uint8_t vdev_id)
+{
+	if (nbuf_head && vdev && (vdev->vdev_id != vdev_id))
+		return true;
+
+	return false;
+}
+#endif
+
+#ifdef WLAN_FEATURE_MARK_FIRST_WAKEUP_PACKET
+/**
+ * dp_rx_mark_first_packet_after_wow_wakeup - get first packet after wow wakeup
+ * @pdev: pointer to dp_pdev structure
+ * @rx_tlv: pointer to rx_pkt_tlvs structure
+ * @nbuf: pointer to skb buffer
+ *
+ * Return: None
+ */
+void dp_rx_mark_first_packet_after_wow_wakeup(struct dp_pdev *pdev,
+					      uint8_t *rx_tlv,
+					      qdf_nbuf_t nbuf);
+#else
+static inline void
+dp_rx_mark_first_packet_after_wow_wakeup(struct dp_pdev *pdev,
+					 uint8_t *rx_tlv,
+					 qdf_nbuf_t nbuf)
+{
+}
+#endif
+
+#if defined(WLAN_MAX_PDEVS) && (WLAN_MAX_PDEVS == 1)
+static inline uint8_t
+dp_rx_get_defrag_bm_id(struct dp_soc *soc)
+{
+	return DP_DEFRAG_RBM(soc->wbm_sw0_bm_id);
+}
+
+static inline uint8_t
+dp_rx_get_rx_bm_id(struct dp_soc *soc)
+{
+	return DP_WBM2SW_RBM(soc->wbm_sw0_bm_id);
+}
+#else
+static inline uint8_t
+dp_rx_get_rx_bm_id(struct dp_soc *soc)
+{
+	struct wlan_cfg_dp_soc_ctxt *cfg_ctx = soc->wlan_cfg_ctx;
+	uint8_t wbm2_sw_rx_rel_ring_id;
+
+	wbm2_sw_rx_rel_ring_id = wlan_cfg_get_rx_rel_ring_id(cfg_ctx);
+
+	return HAL_RX_BUF_RBM_SW_BM(soc->wbm_sw0_bm_id,
+				    wbm2_sw_rx_rel_ring_id);
+}
+
+static inline uint8_t
+dp_rx_get_defrag_bm_id(struct dp_soc *soc)
+{
+	return dp_rx_get_rx_bm_id(soc);
+}
+#endif
+
+#else
+static inline QDF_STATUS
+dp_rx_link_desc_return_by_addr(struct dp_soc *soc,
+			       hal_buff_addrinfo_t link_desc_addr,
+			       uint8_t bm_action)
+{
+	return QDF_STATUS_SUCCESS;
+}
+
+static inline void dp_rx_wbm_sg_list_reset(struct dp_soc *soc)
+{
+}
+
+static inline void dp_rx_wbm_sg_list_deinit(struct dp_soc *soc)
+{
+}
+
+static inline uint8_t
+dp_rx_get_defrag_bm_id(struct dp_soc *soc)
+{
+	return 0;
+}
+
+static inline uint8_t
+dp_rx_get_rx_bm_id(struct dp_soc *soc)
+{
+	return 0;
+}
+#endif /* WLAN_SOFTUMAC_SUPPORT */
+
 #endif /* _DP_RX_H */

@@ -18,6 +18,33 @@
 #define _CDP_TXRX_PPE_H_
 
 /**
+ * cdp_ppesds_vp_setup_fw_recovery() - Setup DS VP on FW recovery.
+ * @soc: data path soc handle
+ * @vdev_id: vdev id
+ * @profile_idx: DS profile index.
+ *
+ * return: qdf_status where DS VP setup is done or not.
+ */
+static inline
+QDF_STATUS cdp_ppesds_vp_setup_fw_recovery(struct cdp_soc_t *soc,
+					   uint8_t vdev_id,
+					   uint16_t profile_idx)
+{
+	if (!soc || !soc->ops || !soc->ops->ppeds_ops) {
+		QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_FATAL,
+			  "%s invalid instance", __func__);
+		return QDF_STATUS_E_NOSUPPORT;
+	}
+
+	if (soc->ops->ppeds_ops->ppeds_vp_setup_recovery)
+		return soc->ops->ppeds_ops->ppeds_vp_setup_recovery(soc,
+								    vdev_id,
+								    profile_idx);
+
+	return QDF_STATUS_E_INVAL;
+}
+
+/**
  * cdp_ppesds_entry_attach() - attach the ppe vp interface.
  * @soc: data path soc handle
  * @vdev_id: vdev id

@@ -864,6 +864,12 @@ wlan_scan_get_entry_by_mac_addr(struct wlan_objmgr_pdev *pdev,
 	return scm_scan_get_entry_by_mac_addr(pdev, bssid, frame);
 }
 
+QDF_STATUS wlan_scan_register_mbssid_cb(struct wlan_objmgr_psoc *psoc,
+					update_mbssid_bcn_prb_rsp cb)
+{
+	return scm_scan_register_mbssid_cb(psoc, cb);
+}
+
 struct scan_cache_entry *
 wlan_scan_get_entry_by_bssid(struct wlan_objmgr_pdev *pdev,
 			     struct qdf_mac_addr *bssid)

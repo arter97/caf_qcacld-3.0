@@ -134,6 +134,8 @@ enum wlan_vdev_state {
  * @WLAN_VDEV_SM_EV_MLO_SYNC_COMPLETE:   MLO mgr triggers this event for the mlo
  *                                       sap in vdev wait up state, if all the
  *                                       links finish vdev start rsp.
+ * @WLAN_VDEV_SM_EV_SUSPEND_CSA_RESTART: Invoke peer deletion for only legacy
+ *					 peers
  */
 enum wlan_vdev_sm_evt {
 	WLAN_VDEV_SM_EV_START = 0,
@@ -168,6 +170,7 @@ enum wlan_vdev_sm_evt {
 	WLAN_VDEV_SM_EV_STOP_REQ = 29,
 	WLAN_VDEV_SM_EV_CHAN_SWITCH_DISABLED = 30,
 	WLAN_VDEV_SM_EV_MLO_SYNC_COMPLETE = 31,
+	WLAN_VDEV_SM_EV_SUSPEND_CSA_RESTART = 32,
 };
 
 /**

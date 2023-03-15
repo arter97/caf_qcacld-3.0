@@ -29,12 +29,13 @@
 #include <wlan_lmac_if_api.h>
 #include <init_deinit_lmac.h>
 #include <wlan_mlo_mgr_setup.h>
+
 /**
  * target_if_mgmt_rx_reo_fw_consumed_event_handler() - WMI event handler to
  * process MGMT Rx FW consumed event handler
  * @scn: Pointer to scn object
- * @data_buf: Pointer to event buffer
- * @data_len: Length of event buffer
+ * @data: Pointer to event buffer
+ * @datalen: Length of event buffer
  *
  * Return: 0 for success, else failure
  */
@@ -251,6 +252,7 @@ target_if_mgmt_rx_reo_get_valid_hw_link_bitmap(struct wlan_objmgr_psoc *psoc,
  * @mgmt_rx_reo_snapshot_low: Pointer to lower 32 bits of snapshot value
  * @mgmt_rx_reo_snapshot_high: Pointer to higher 32 bits of snapshot value
  * @snapshot_version: snapshot version
+ * @raw_snapshot: Raw snapshot data
  *
  * Read raw value of management rx-reorder snapshots.
  *
@@ -324,6 +326,7 @@ target_if_mgmt_rx_reo_read_snapshot_raw
  * @snapshot_info: Snapshot info
  * @id: Snapshot ID
  * @snapshot_value: Pointer to snapshot value
+ * @raw_snapshot: Raw snapshot data
  *
  * Read management rx-reorder snapshots from target.
  *
@@ -609,7 +612,7 @@ target_if_mgmt_rx_reo_extract_reo_params(
 /**
  * target_if_mgmt_rx_reo_schedule_delivery() - Schedule the delivery of
  * management frames of the given psoc
- * @soc: Pointer to psoc object
+ * @psoc: Pointer to psoc object
  *
  * Return: QDF_STATUS
  */
@@ -637,7 +640,7 @@ target_if_mgmt_rx_reo_schedule_delivery(struct wlan_objmgr_psoc *psoc)
 /**
  * target_if_mgmt_rx_reo_cancel_scheduled_delivery() - Cancel the scheduled
  * delivery of management frames of the given psoc
- * @soc: Pointer to psoc object
+ * @psoc: Pointer to psoc object
  *
  * Return: QDF_STATUS
  */

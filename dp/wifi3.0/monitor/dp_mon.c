@@ -1426,15 +1426,21 @@ void dp_peer_get_tx_rx_stats(struct dp_peer *peer,
 {
 	struct dp_txrx_peer *txrx_peer = NULL;
 	struct dp_peer *tgt_peer = NULL;
+	uint8_t inx = 0;
+	uint8_t stats_arr_size;
 
 	tgt_peer = dp_get_tgt_peer_from_peer(peer);
 	txrx_peer = tgt_peer->txrx_peer;
 	peer_stats_intf->rx_packet_count = txrx_peer->to_stack.num;
 	peer_stats_intf->rx_byte_count = txrx_peer->to_stack.bytes;
-	peer_stats_intf->tx_packet_count =
-			txrx_peer->stats.per_pkt_stats.tx.ucast.num;
-	peer_stats_intf->tx_byte_count =
-			txrx_peer->stats.per_pkt_stats.tx.tx_success.bytes;
+	stats_arr_size = txrx_peer->stats_arr_size;
+
+	for (inx = 0; inx < stats_arr_size; inx++) {
+		peer_stats_intf->tx_packet_count +=
+			txrx_peer->stats[inx].per_pkt_stats.tx.ucast.num;
+		peer_stats_intf->tx_byte_count +=
+			txrx_peer->stats[inx].per_pkt_stats.tx.tx_success.bytes;
+	}
 }
 #endif
 
@@ -1935,12 +1941,13 @@ static void dp_mon_tx_enable_enhanced_stats(struct dp_pdev *pdev)
  *
  * Return: QDF_STATUS
  */
-static QDF_STATUS
+QDF_STATUS
 dp_enable_enhanced_stats(struct cdp_soc_t *soc, uint8_t pdev_id)
 {
 	struct dp_pdev *pdev = NULL;
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
 	struct dp_mon_pdev *mon_pdev;
+	struct dp_soc *dp_soc = cdp_soc_t_to_dp_soc(soc);
 
 	pdev = dp_get_pdev_from_soc_pdev_id_wifi3((struct dp_soc *)soc,
 						  pdev_id);
@@ -1957,7 +1964,9 @@ dp_enable_enhanced_stats(struct cdp_soc_t *soc, uint8_t pdev_id)
 		dp_cal_client_timer_start(mon_pdev->cal_client_ctx);
 
 	mon_pdev->enhanced_stats_en = 1;
-	pdev->enhanced_stats_en = true;
+	pdev->enhanced_stats_en = 1;
+	pdev->link_peer_stats = wlan_cfg_is_peer_link_stats_enabled(
+							dp_soc->wlan_cfg_ctx);
 
 	dp_mon_filter_setup_enhanced_stats(pdev);
 	status = dp_mon_filter_update(pdev);
@@ -1966,7 +1975,8 @@ dp_enable_enhanced_stats(struct cdp_soc_t *soc, uint8_t pdev_id)
 		dp_mon_filter_reset_enhanced_stats(pdev);
 		dp_cal_client_timer_stop(mon_pdev->cal_client_ctx);
 		mon_pdev->enhanced_stats_en = 0;
-		pdev->enhanced_stats_en = false;
+		pdev->enhanced_stats_en = 0;
+		pdev->link_peer_stats = 0;
 		return QDF_STATUS_E_FAILURE;
 	}
 
@@ -1999,7 +2009,7 @@ static void dp_mon_tx_disable_enhanced_stats(struct dp_pdev *pdev)
  *
  * Return: QDF_STATUS
  */
-static QDF_STATUS
+QDF_STATUS
 dp_disable_enhanced_stats(struct cdp_soc_t *soc, uint8_t pdev_id)
 {
 	struct dp_pdev *pdev =
@@ -2017,7 +2027,8 @@ dp_disable_enhanced_stats(struct cdp_soc_t *soc, uint8_t pdev_id)
 		dp_cal_client_timer_stop(mon_pdev->cal_client_ctx);
 
 	mon_pdev->enhanced_stats_en = 0;
-	pdev->enhanced_stats_en = false;
+	pdev->enhanced_stats_en = 0;
+	pdev->link_peer_stats = 0;
 
 	dp_mon_tx_disable_enhanced_stats(pdev);
 
@@ -2404,6 +2415,8 @@ dp_peer_cal_clients_stats_update(struct dp_soc *soc,
 	struct cdp_calibr_stats_intf peer_stats_intf = {0};
 	struct dp_peer *tgt_peer = NULL;
 	struct dp_txrx_peer *txrx_peer = NULL;
+	uint8_t inx = 0;
+	uint8_t stats_arr_size;
 
 	if (!dp_peer_is_primary_link_peer(peer))
 		return;
@@ -2414,10 +2427,18 @@ dp_peer_cal_clients_stats_update(struct dp_soc *soc,
 
 	txrx_peer = tgt_peer->txrx_peer;
 	peer_stats_intf.to_stack = txrx_peer->to_stack;
-	peer_stats_intf.tx_success =
-				txrx_peer->stats.per_pkt_stats.tx.tx_success;
-	peer_stats_intf.tx_ucast =
-				txrx_peer->stats.per_pkt_stats.tx.ucast;
+	stats_arr_size = txrx_peer->stats_arr_size;
+
+	for (inx = 0; inx < stats_arr_size; inx++) {
+		peer_stats_intf.tx_success.num +=
+			txrx_peer->stats[inx].per_pkt_stats.tx.tx_success.num;
+		peer_stats_intf.tx_success.bytes +=
+			txrx_peer->stats[inx].per_pkt_stats.tx.tx_success.bytes;
+		peer_stats_intf.tx_ucast.num +=
+			txrx_peer->stats[inx].per_pkt_stats.tx.ucast.num;
+		peer_stats_intf.tx_ucast.bytes +=
+			txrx_peer->stats[inx].per_pkt_stats.tx.ucast.bytes;
+	}
 
 	dp_cal_client_update_peer_stats_wifi3(&peer_stats_intf,
 					      &tgt_peer->stats);
@@ -2750,6 +2771,8 @@ void dp_send_stats_event(struct dp_pdev *pdev, struct dp_peer *peer,
 	struct cdp_interface_peer_stats peer_stats_intf = {0};
 	struct dp_mon_peer *mon_peer = peer->monitor_peer;
 	struct dp_txrx_peer *txrx_peer = NULL;
+	uint8_t inx = 0;
+	uint8_t stats_arr_size;
 
 	if (qdf_unlikely(!mon_peer))
 		return;
@@ -2759,9 +2782,11 @@ void dp_send_stats_event(struct dp_pdev *pdev, struct dp_peer *peer,
 
 	txrx_peer = dp_get_txrx_peer(peer);
 	if (qdf_likely(txrx_peer)) {
+		stats_arr_size = txrx_peer->stats_arr_size;
 		peer_stats_intf.rx_byte_count = txrx_peer->to_stack.bytes;
-		peer_stats_intf.tx_byte_count =
-			txrx_peer->stats.per_pkt_stats.tx.tx_success.bytes;
+		for (inx = 0; inx < stats_arr_size; inx++)
+			peer_stats_intf.tx_byte_count +=
+			txrx_peer->stats[inx].per_pkt_stats.tx.tx_success.bytes;
 	}
 
 	dp_wdi_event_handler(WDI_EVENT_UPDATE_DP_STATS, pdev->soc,
@@ -6430,12 +6455,6 @@ void dp_mon_cdp_ops_register(struct dp_soc *soc)
 	ops->ctrl_ops->txrx_update_peer_pkt_capture_params =
 				 dp_peer_update_pkt_capture_params;
 #endif /* WLAN_TX_PKT_CAPTURE_ENH || WLAN_RX_PKT_CAPTURE_ENH */
-#ifdef QCA_ENHANCED_STATS_SUPPORT
-	ops->host_stats_ops->txrx_enable_enhanced_stats =
-					dp_enable_enhanced_stats;
-	ops->host_stats_ops->txrx_disable_enhanced_stats =
-					dp_disable_enhanced_stats;
-#endif /* QCA_ENHANCED_STATS_SUPPORT */
 #ifdef WDI_EVENT_ENABLE
 	ops->ctrl_ops->txrx_get_pldev = dp_get_pldev;
 #endif
@@ -6495,10 +6514,6 @@ void dp_mon_cdp_ops_deregister(struct dp_soc *soc)
 #if defined(WLAN_TX_PKT_CAPTURE_ENH) || defined(WLAN_RX_PKT_CAPTURE_ENH)
 	ops->ctrl_ops->txrx_update_peer_pkt_capture_params = NULL;
 #endif /* WLAN_TX_PKT_CAPTURE_ENH || WLAN_RX_PKT_CAPTURE_ENH */
-#ifdef FEATURE_PERPKT_INFO
-	ops->host_stats_ops->txrx_enable_enhanced_stats = NULL;
-	ops->host_stats_ops->txrx_disable_enhanced_stats = NULL;
-#endif /* FEATURE_PERPKT_INFO */
 #ifdef WDI_EVENT_ENABLE
 	ops->ctrl_ops->txrx_get_pldev = NULL;
 #endif

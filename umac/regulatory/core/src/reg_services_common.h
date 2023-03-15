@@ -965,9 +965,9 @@ enum channel_enum reg_get_chan_enum_for_freq(qdf_freq_t freq);
  * reg_get_min_max_bw_on_cur_chan_list() - To get min and max BW supported
  * by channel enum
  * @pdev: pointer to pdev
- * @chn_idx: enum channel_enum
- * @min bw: min bw
- * @max bw: max bw
+ * @chan_idx: enum channel_enum
+ * @min_bw: min bw
+ * @max_bw: max bw
  *
  * Return: SUCCESS/FAILURE
  */
@@ -1059,24 +1059,6 @@ reg_get_2g_bonded_channel_state_for_freq(struct wlan_objmgr_pdev *pdev,
 					 qdf_freq_t oper_ch_freq,
 					 qdf_freq_t sec_ch_freq,
 					 enum phy_ch_width bw);
-
-/**
- * reg_set_channel_params_for_freq() - Sets channel parameteres for given
- * bandwidth
- * @pdev: Pointer to pdev
- * @freq: Channel center frequency.
- * @sec_ch_2g_freq: Secondary 2G channel frequency
- * @ch_params: pointer to the channel parameters.
- * @treat_nol_chan_as_disabled: bool to treat nol channel as enabled or
- * disabled. If set to true, nol chan is considered as disabled in chan search.
- *
- * Return: None
- */
-void reg_set_channel_params_for_freq(struct wlan_objmgr_pdev *pdev,
-				     qdf_freq_t freq,
-				     qdf_freq_t sec_ch_2g_freq,
-				     struct ch_params *ch_params,
-				     bool treat_nol_chan_as_disabled);
 
 #ifdef CONFIG_REG_6G_PWRMODE
 /**

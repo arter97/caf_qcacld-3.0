@@ -43,6 +43,7 @@
 #ifdef HIF_CE_LOG_INFO
 #include "qdf_notifier.h"
 #endif
+#include "pld_common.h"
 
 #define HIF_MIN_SLEEP_INACTIVITY_TIME_MS     50
 #define HIF_SLEEP_INACTIVITY_TIMER_PERIOD_MS 60
@@ -158,6 +159,12 @@
 
 #define CE_INTERRUPT_IDX(x) x
 
+#ifdef WLAN_64BIT_DATA_SUPPORT
+#define RRI_ON_DDR_MEM_SIZE CE_COUNT * sizeof(uint64_t)
+#else
+#define RRI_ON_DDR_MEM_SIZE CE_COUNT * sizeof(uint32_t)
+#endif
+
 struct ce_int_assignment {
 	uint8_t msi_idx[NUM_CE_AVAILABLE];
 };
@@ -250,6 +257,8 @@ struct hif_umac_reset_ctx {
 };
 #endif
 
+#define MAX_SHADOW_REGS 40
+
 struct hif_softc {
 	struct hif_opaque_softc osc;
 	struct hif_config_info hif_config;
@@ -287,7 +296,7 @@ struct hif_softc {
 	atomic_t active_tasklet_cnt;
 	atomic_t active_grp_tasklet_cnt;
 	atomic_t link_suspended;
-	uint32_t *vaddr_rri_on_ddr;
+	void *vaddr_rri_on_ddr;
 	qdf_dma_addr_t paddr_rri_on_ddr;
 #ifdef CONFIG_BYPASS_QMI
 	uint32_t *vaddr_qmi_bypass;
@@ -372,6 +381,10 @@ struct hif_softc {
 	uint64_t cmem_size;
 #ifdef DP_UMAC_HW_RESET_SUPPORT
 	struct hif_umac_reset_ctx umac_reset_ctx;
+#endif
+#ifdef CONFIG_SHADOW_V3
+	struct pld_shadow_reg_v3_cfg shadow_regs[MAX_SHADOW_REGS];
+	int num_shadow_registers_configured;
 #endif
 };
 

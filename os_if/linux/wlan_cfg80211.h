@@ -496,6 +496,22 @@ wlan_cfg80211_nla_parse_nested(struct nlattr *tb[],
 #define nla_parse(...) (obsolete, use wlan_cfg80211_nla_parse)
 #define nla_parse_nested(...) (obsolete, use wlan_cfg80211_nla_parse_nested)
 
+/**
+ * wlan_cfg80211_nla_put_u64() - Add u64 attribute to an skb and align it
+ * @skb: SKB to add attribute(s) to
+ * @attrtype: u64 attribute id
+ * @value: u64 attribute value
+ *
+ * This function adds a u64 attribute, and optionally a pad attribute, to the
+ * skb. If this function adds a pad attribute, that pad attribute is defined
+ * in enum qca_wlan_vendor_attr, so only 64-bit attributes that are defined
+ * in enum qca_wlan_vendor_attr should use this interface. For other u64
+ * attributes, use function wlan_cfg80211_nla_put_u64_64bit() since that
+ * allows the pad attribute to be specified.
+ *
+ * Return: 0 if u64 attribute and optional pad attribute added to skb,
+ *         negative errno if operation fails
+ */
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(4, 7, 0))
 static inline int
 wlan_cfg80211_nla_put_u64(struct sk_buff *skb, int attrtype, u64 value)
@@ -507,6 +523,38 @@ static inline int
 wlan_cfg80211_nla_put_u64(struct sk_buff *skb, int attrtype, u64 value)
 {
 	return nla_put_u64_64bit(skb, attrtype, value, NL80211_ATTR_PAD);
+}
+#endif
+
+/**
+ * wlan_cfg80211_nla_put_u64_64bit() - Add u64 attribute to an skb and align it
+ * @skb: SKB to add attribute(s) to
+ * @attrtype: u64 attribute id
+ * @value: u64 attribute value
+ * @padattr: padding attribute id
+ *
+ * This function adds a u64 attribute, and optionally a pad attribute,
+ * to the skb. Unlike wlan_cfg80211_nla_put_u64() which can only be
+ * used with attributes defined in enum qca_wlan_vendor_attr, this
+ * function can be used with attributes defined in any enum, provided
+ * that the enum also defines a pad attribute.
+ *
+ * Return: 0 if u64 attribute and optional pad attribute added to skb,
+ *         negative errno if operation fails
+ */
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(4, 7, 0))
+static inline int
+wlan_cfg80211_nla_put_u64_64bit(struct sk_buff *skb, int attrtype,
+				u64 value, int padattr)
+{
+	return nla_put_u64(skb, attrtype, value);
+}
+#else
+static inline int
+wlan_cfg80211_nla_put_u64_64bit(struct sk_buff *skb, int attrtype,
+				u64 value, int padattr)
+{
+	return nla_put_u64_64bit(skb, attrtype, value, padattr);
 }
 #endif
 

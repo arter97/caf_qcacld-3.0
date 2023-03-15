@@ -1169,7 +1169,7 @@ void hif_uninit_rri_on_ddr(struct hif_softc *scn)
 {
 	if (scn->vaddr_rri_on_ddr)
 		qdf_mem_free_consistent(scn->qdf_dev, scn->qdf_dev->dev,
-					(CE_COUNT * sizeof(uint32_t)),
+					RRI_ON_DDR_MEM_SIZE,
 					scn->vaddr_rri_on_ddr,
 					scn->paddr_rri_on_ddr, 0);
 	scn->vaddr_rri_on_ddr = NULL;

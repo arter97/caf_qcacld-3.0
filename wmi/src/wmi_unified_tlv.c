@@ -437,6 +437,8 @@ static const uint32_t pdev_param_tlv[] = {
 	PARAM_MAP(pdev_param_default_6ghz_rate, PDEV_PARAM_DEFAULT_6GHZ_RATE),
 	PARAM_MAP(pdev_param_scan_blanking_mode,
 		  PDEV_PARAM_SET_SCAN_BLANKING_MODE),
+	PARAM_MAP(pdev_param_set_conc_low_latency_mode,
+		  PDEV_PARAM_SET_CONC_LOW_LATENCY_MODE),
 };
 
 /* Populate vdev_param array whose index is host param, value is target param */
@@ -710,6 +712,8 @@ static const uint32_t vdev_param_tlv[] = {
 		  VDEV_PARAM_SET_PROFILE),
 	PARAM_MAP(vdev_param_set_disabled_modes,
 		  VDEV_PARAM_SET_DISABLED_SCHED_MODES),
+	PARAM_MAP(vdev_param_set_sap_ps_with_twt,
+		  VDEV_PARAM_SET_SAP_PS_WITH_TWT),
 };
 #endif
 
@@ -1875,10 +1879,13 @@ static QDF_STATUS send_vdev_up_cmd_tlv(wmi_unified_t wmi,
 static uint32_t convert_peer_type_host_to_target(uint32_t peer_type)
 {
 	/* Host sets the peer_type as 0 for the peer create command sent to FW
-	 * other than PASN peer create command.
+	 * other than PASN and BRIDGE peer create command.
 	 */
 	if (peer_type == WLAN_PEER_RTT_PASN)
 		return WMI_PEER_TYPE_PASN;
+
+	if (peer_type == WLAN_PEER_MLO_BRIDGE)
+		return WMI_PEER_TYPE_BRIDGE;
 
 	return peer_type;
 }
@@ -2728,7 +2735,7 @@ static QDF_STATUS send_set_sta_ps_param_cmd_tlv(wmi_unified_t wmi_handle,
 /**
  * send_crash_inject_cmd_tlv() - inject fw crash
  * @wmi_handle: wmi handle
- * @param: ponirt to crash inject parameter structure
+ * @param: pointer to crash inject parameter structure
  *
  * Return: QDF_STATUS_SUCCESS for success or return error
  */
@@ -21436,6 +21443,14 @@ static void populate_tlv_events_id(WMI_EVT_ID *event_ids)
 #endif
 	event_ids[wmi_pdev_set_tgtr2p_table_eventid] =
 		WMI_PDEV_SET_TGTR2P_TABLE_EVENTID;
+#ifdef QCA_MANUAL_TRIGGERED_ULOFDMA
+	event_ids[wmi_manual_ul_ofdma_trig_feedback_eventid] =
+		WMI_MANUAL_UL_OFDMA_TRIG_FEEDBACK_EVENTID;
+#endif
+#ifdef QCA_STANDALONE_SOUNDING_TRIGGER
+	event_ids[wmi_vdev_standalone_sound_complete_eventid] =
+		WMI_VDEV_STANDALONE_SOUND_COMPLETE_EVENTID;
+#endif
 }
 
 #ifdef WLAN_FEATURE_LINK_LAYER_STATS
@@ -21975,8 +21990,21 @@ static void populate_tlv_service(uint32_t *wmi_service)
 #endif
 	wmi_service[wmi_service_wpa3_sha384_roam_support] =
 			WMI_SERVICE_WMI_SERVICE_WPA3_SHA384_ROAM_SUPPORT;
+	wmi_service[wmi_service_self_mld_roam_between_dbs_and_hbs] =
+			WMI_SERVICE_SELF_MLD_ROAM_BETWEEN_DBS_AND_HBS;
+	/* TODO: Assign FW Enum after FW Shared header changes are merged */
 	wmi_service[wmi_service_v1a_v1b_supported] =
 			WMI_SERVICE_PEER_METADATA_V1A_V1B_SUPPORT;
+#ifdef QCA_MANUAL_TRIGGERED_ULOFDMA
+	wmi_service[wmi_service_manual_ulofdma_trigger_support] =
+			WMI_SERVICE_MANUAL_ULOFDMA_TRIGGER_SUPPORT;
+#endif
+	wmi_service[wmi_service_pre_rx_timeout] =
+				WMI_SERVICE_PRE_RX_TO;
+#ifdef QCA_STANDALONE_SOUNDING_TRIGGER
+	wmi_service[wmi_service_standalone_sound] =
+			WMI_SERVICE_STANDALONE_SOUND;
+#endif
 }
 
 /**

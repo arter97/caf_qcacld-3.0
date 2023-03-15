@@ -307,9 +307,11 @@ enum hal_srng_ring_id {
 	HAL_SRNG_WIFI_POS_SRC_DMA_RING,
 	HAL_SRNG_DIR_BUF_RX_SRC_DMA_RING,
 	HAL_SRNG_DIR_BUF_RX_SRC_DMA_RING1,
+	HAL_SRNG_DIR_BUF_RX_SRC_DMA_RING2,
 #else
 	HAL_SRNG_DIR_BUF_RX_SRC_DMA_RING,
 	HAL_SRNG_DIR_BUF_RX_SRC_DMA_RING1,
+	HAL_SRNG_DIR_BUF_RX_SRC_DMA_RING2,
 #endif
 	HAL_SRNG_WMAC1_TXMON2SW0,
 	HAL_SRNG_SW2TXMON_BUF0,
@@ -368,6 +370,7 @@ enum SRNG_REGISTERS {
 	DST_MSI1_BASE_LSB,
 	DST_MSI1_BASE_MSB,
 	DST_MSI1_DATA,
+	DST_MISC_1,
 #ifdef CONFIG_BERYLLIUM
 	DST_MSI2_BASE_LSB,
 	DST_MSI2_BASE_MSB,
@@ -800,6 +803,10 @@ struct hal_srng {
 #ifdef WLAN_DP_SRNG_USAGE_WM_TRACKING
 	struct hal_srng_high_wm_info high_wm;
 #endif
+	/* Timer threshold to issue ring pointer update - in micro seconds */
+	uint16_t pointer_timer_threshold;
+	/* Number threshold of ring entries to issue pointer update */
+	uint8_t pointer_num_threshold;
 };
 
 /* HW SRNG configuration table */
@@ -1282,6 +1289,7 @@ struct hal_hw_txrx_ops {
 					       qdf_frag_t status_frag);
 	uint32_t (*hal_txmon_status_get_num_users)(void *tx_tlv_hdr,
 						   uint8_t *num_users);
+	void (*hal_txmon_set_word_mask)(void *wmask);
 #endif /* QCA_MONITOR_2_0_SUPPORT */
 	QDF_STATUS (*hal_reo_shared_qaddr_setup)(hal_soc_handle_t hal_soc_hdl,
 						 struct reo_queue_ref_table

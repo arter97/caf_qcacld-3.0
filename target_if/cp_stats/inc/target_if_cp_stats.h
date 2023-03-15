@@ -35,7 +35,7 @@
 
 /**
  * target_if_cp_stats_get_rx_ops() - get rx ops
- * @tx_ops: pointer to lmac tx ops
+ * @psoc: pointer to psoc object
  *
  * Return: pointer to rx ops
  */
@@ -55,7 +55,7 @@ target_if_cp_stats_get_rx_ops(struct wlan_objmgr_psoc *psoc)
 
 /**
  * target_if_cp_stats_get_tx_ops() - get tx ops
- * @tx_ops: pointer to lmac tx ops
+ * @psoc: pointer to psoc object
  *
  * Return: pointer to tx ops
  */
@@ -84,7 +84,7 @@ target_if_cp_stats_register_tx_ops(struct wlan_lmac_if_tx_ops *tx_ops);
 
 #ifdef WLAN_SUPPORT_LEGACY_CP_STATS_HANDLERS
 /**
- * @target_if_cp_stats_register_legacy_event_handler() - Register handler
+ * target_if_cp_stats_register_legacy_event_handler() - Register handler
  * specific to legacy components
  * @psoc: pointer to psoc object
  *
@@ -95,7 +95,7 @@ QDF_STATUS
 target_if_cp_stats_register_legacy_event_handler(struct wlan_objmgr_psoc *psoc);
 
 /**
- * @target_if_cp_stats_unregister_legacy_event_handler() - Unregister handler
+ * target_if_cp_stats_unregister_legacy_event_handler() - Unregister handler
  * specific to legacy components
  * @psoc: pointer to psoc object
  *

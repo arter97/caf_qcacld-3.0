@@ -551,4 +551,27 @@ struct dp_mon_pdev_be *dp_get_be_mon_pdev_from_dp_mon_pdev(struct dp_mon_pdev *m
 	return (struct dp_mon_pdev_be *)mon_pdev;
 }
 #endif
+
+#ifdef QCA_ENHANCED_STATS_SUPPORT
+/*
+ * dp_enable_enhanced_stats_2_0() - BE Wrapper to enable stats
+ * @soc: Datapath soc handle
+ * @pdev_id: Pdev Id on which stats will get enable
+ *
+ * Return: status success/failure
+ */
+QDF_STATUS
+dp_enable_enhanced_stats_2_0(struct cdp_soc_t *soc, uint8_t pdev_id);
+
+/*
+ * dp_disable_enhanced_stats_2_0() - BE Wrapper to disable stats
+ * @soc: Datapath soc handle
+ * @pdev_id: Pdev Id on which stats will get disable
+ *
+ * Return: status success/failure
+ */
+QDF_STATUS
+dp_disable_enhanced_stats_2_0(struct cdp_soc_t *soc, uint8_t pdev_id);
+#endif /* QCA_ENHANCED_STATS_SUPPORT */
+
 #endif /* _DP_MON_2_0_H_ */

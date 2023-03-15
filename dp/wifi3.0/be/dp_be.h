@@ -528,16 +528,16 @@ void dp_mcast_mlo_iter_ptnr_vdev(struct dp_soc_be *be_soc,
 				 void *arg,
 				 enum dp_mod_id mod_id);
 /**
- * dp_mcast_mlo_iter_ptnr_soc() - API to iterate through ptnr soc list
+ * dp_mlo_iter_ptnr_soc() - API to iterate through ptnr soc list
  * @be_soc: dp_soc_be pointer
  * @func: function to be called for each peer
  * @arg: argument need to be passed to func
  *
  * Return: None
  */
-void dp_mcast_mlo_iter_ptnr_soc(struct dp_soc_be *be_soc,
-				dp_ptnr_soc_iter_func func,
-				void *arg);
+void dp_mlo_iter_ptnr_soc(struct dp_soc_be *be_soc,
+			  dp_ptnr_soc_iter_func func,
+			  void *arg);
 /**
  * dp_mlo_get_mcast_primary_vdev() - get ref to mcast primary vdev
  * @be_soc: dp_soc_be pointer

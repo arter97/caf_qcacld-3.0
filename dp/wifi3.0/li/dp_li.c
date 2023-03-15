@@ -515,7 +515,8 @@ static QDF_STATUS dp_txrx_set_vdev_param_li(struct dp_soc *soc,
 bool
 dp_rx_intrabss_handle_nawds_li(struct dp_soc *soc, struct dp_txrx_peer *ta_peer,
 			       qdf_nbuf_t nbuf_copy,
-			       struct cdp_tid_rx_stats *tid_stats)
+			       struct cdp_tid_rx_stats *tid_stats,
+			       uint8_t link_id)
 {
 	return false;
 }
@@ -595,6 +596,11 @@ static QDF_STATUS dp_txrx_get_vdev_mcast_param_li(struct dp_soc *soc,
 	return QDF_STATUS_SUCCESS;
 }
 
+static uint8_t dp_get_hw_link_id_li(struct dp_pdev *pdev)
+{
+	return 0;
+}
+
 void dp_initialize_arch_ops_li(struct dp_arch_ops *arch_ops)
 {
 #ifndef QCA_HOST_MODE_WIFI_DISABLED
@@ -651,6 +657,8 @@ void dp_initialize_arch_ops_li(struct dp_arch_ops *arch_ops)
 	arch_ops->dp_rxdma_ring_sel_cfg = dp_rxdma_ring_sel_cfg_li;
 	arch_ops->dp_rx_peer_metadata_peer_id_get =
 					dp_rx_peer_metadata_peer_id_get_li;
+	arch_ops->dp_rx_peer_mdata_link_id_get =
+					dp_rx_peer_mdata_link_id_get_li;
 	arch_ops->soc_cfg_attach = dp_soc_cfg_attach_li;
 	arch_ops->tx_implicit_rbm_set = dp_tx_implicit_rbm_set_li;
 	arch_ops->txrx_set_vdev_param = dp_txrx_set_vdev_param_li;
@@ -664,6 +672,7 @@ void dp_initialize_arch_ops_li(struct dp_arch_ops *arch_ops)
 	arch_ops->dp_soc_get_num_soc = dp_soc_get_num_soc_li;
 	arch_ops->get_reo_qdesc_addr = dp_rx_get_reo_qdesc_addr_li;
 	arch_ops->txrx_get_vdev_mcast_param = dp_txrx_get_vdev_mcast_param_li;
+	arch_ops->get_hw_link_id = dp_get_hw_link_id_li;
 }
 
 #ifdef QCA_DP_TX_HW_SW_NBUF_DESC_PREFETCH

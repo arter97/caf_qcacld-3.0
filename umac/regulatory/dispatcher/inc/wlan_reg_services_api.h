@@ -1396,6 +1396,7 @@ wlan_reg_disable_chan_coex(struct wlan_objmgr_pdev *pdev,
  * @req_msg: Request msg
  * @res_msg: Response msg
  * @count: no of usable channels
+ * @in_6g_pwr_mode: Input 6GHz power mode
  *
  * Return: qdf status
  */
@@ -1403,7 +1404,8 @@ QDF_STATUS
 wlan_reg_get_usable_channel(struct wlan_objmgr_pdev *pdev,
 			    struct get_usable_chan_req_params req_msg,
 			    struct get_usable_chan_res_params *res_msg,
-			    uint32_t *count);
+			    uint32_t *count,
+			    enum supported_6g_pwr_types in_6g_pwr_mode);
 #endif
 
 #ifdef CONFIG_CHAN_FREQ_API
@@ -1433,9 +1435,9 @@ enum channel_enum wlan_reg_get_chan_enum_for_freq(qdf_freq_t freq);
  * wlan_reg_get_min_max_bw_for_chan_index() - To get min and max BW supported
  * by channel enum
  * @pdev: pointer to pdev
- * @chn_idx: enum channel_enum
- * @min bw: min bw
- * @max bw: max bw
+ * @chan_idx: enum channel_enum
+ * @min_bw: min bw
+ * @max_bw: max bw
  *
  * Return: SUCCESS/FAILURE
  */

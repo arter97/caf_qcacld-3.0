@@ -3354,13 +3354,14 @@ static qdf_nbuf_t dp_ipa_intrabss_send(struct dp_pdev *pdev,
 
 	if (dp_tx_send((struct cdp_soc_t *)pdev->soc, vdev->vdev_id, nbuf)) {
 		DP_PEER_PER_PKT_STATS_INC_PKT(vdev_peer->txrx_peer,
-					      rx.intra_bss.fail, 1, len);
+					      rx.intra_bss.fail, 1, len,
+					      0);
 		dp_peer_unref_delete(vdev_peer, DP_MOD_ID_IPA);
 		return nbuf;
 	}
 
 	DP_PEER_PER_PKT_STATS_INC_PKT(vdev_peer->txrx_peer,
-				      rx.intra_bss.pkts, 1, len);
+				      rx.intra_bss.pkts, 1, len, 0);
 	dp_peer_unref_delete(vdev_peer, DP_MOD_ID_IPA);
 	return NULL;
 }
@@ -3788,10 +3789,10 @@ QDF_STATUS dp_ipa_update_peer_rx_stats(struct cdp_soc_t *soc,
 
 	if (da_is_bcmc) {
 		DP_PEER_PER_PKT_STATS_INC_PKT(txrx_peer, rx.multicast, 1,
-					      qdf_nbuf_len(nbuf));
+					      qdf_nbuf_len(nbuf), 0);
 		if (QDF_IS_ADDR_BROADCAST(eh->ether_dhost))
 			DP_PEER_PER_PKT_STATS_INC_PKT(txrx_peer, rx.bcast,
-						      1, qdf_nbuf_len(nbuf));
+						      1, qdf_nbuf_len(nbuf), 0);
 	}
 
 	dp_peer_unref_delete(peer, DP_MOD_ID_IPA);
@@ -3822,9 +3823,9 @@ dp_peer_aggregate_tid_stats(struct dp_peer *peer)
 	}
 
 	DP_PEER_PER_PKT_STATS_UPD(txrx_peer, rx.rx_total.num,
-				  rx_total.num);
+				  rx_total.num, 0);
 	DP_PEER_PER_PKT_STATS_UPD(txrx_peer, rx.rx_total.bytes,
-				  rx_total.bytes);
+				  rx_total.bytes, 0);
 }
 
 /**

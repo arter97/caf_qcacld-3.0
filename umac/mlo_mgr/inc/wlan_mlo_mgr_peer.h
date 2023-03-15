@@ -24,6 +24,7 @@
 #include "wlan_objmgr_peer_obj.h"
 
 #define WLAN_LINK_ID_INVALID    0xff
+#define WLAN_NUM_TWO_LINK_PSOC  2
 
 /**
  * mlo_peer_create - Initiatiate peer create on secondary link(s)
@@ -435,6 +436,19 @@ struct wlan_mlo_peer_context *wlan_mlo_get_mlpeer_by_mld_mac(
 				struct qdf_mac_addr *mld_mac);
 
 /**
+ * wlan_mlo_get_mlpeer_by_peer_mladdr() - Get ML peer from the list of MLD's
+ *                                        using MLD MAC address
+ *
+ * @mldaddr: MAC address of the ML peer
+ * @mldev: Update corresponding ML dev context in which peer is found
+ *
+ * Return: Pointer to mlo peer context
+ */
+struct wlan_mlo_peer_context
+*wlan_mlo_get_mlpeer_by_peer_mladdr(struct qdf_mac_addr *mldaddr,
+				    struct wlan_mlo_dev_context **mldev);
+
+/**
  * wlan_mlo_get_mlpeer_by_aid() - find ML peer by AID
  * @ml_dev: MLO DEV object
  * @assoc_id:  AID
@@ -635,4 +649,16 @@ mlo_peer_free_auth_param(struct mlpeer_auth_params *auth_params)
  * Return: true, if MLO peer can be deleted
  */
 bool wlan_mlo_partner_peer_delete_is_allowed(struct wlan_objmgr_peer *src_peer);
+
+#ifdef QCA_SUPPORT_PRIMARY_LINK_MIGRATE
+/**
+ * wlan_objmgr_mlo_update_primary_info() - Update is_primary flag
+ * @peer: new primary link peer object
+ *
+ * API to update is_primary flag in peer list
+ *
+ * Return: void
+ */
+void wlan_objmgr_mlo_update_primary_info(struct wlan_objmgr_peer *peer);
+#endif
 #endif

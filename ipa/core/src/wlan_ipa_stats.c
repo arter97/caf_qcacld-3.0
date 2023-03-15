@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2013-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -759,8 +759,6 @@ void wlan_ipa_uc_stat(struct wlan_ipa_priv *ipa_ctx)
 /**
  * __wlan_ipa_wdi_meter_notifier_cb() - WLAN to IPA callback handler.
  * IPA calls to get WLAN stats or set quota limit.
- * @priv: pointer to private data registered with IPA (we register a
- *	  pointer to the IPA context)
  * @evt: the IPA event which triggered the callback
  * @data: data associated with the event
  *
@@ -876,8 +874,6 @@ static void wlan_ipa_uc_set_quota(struct wlan_ipa_priv *ipa_ctx,
 /**
  * __wlan_ipa_wdi_meter_notifier_cb() - WLAN to IPA callback handler.
  * IPA calls to get WLAN stats or set quota limit.
- * @priv: pointer to private data registered with IPA (we register a
- *	  pointer to the IPA context)
  * @evt: the IPA event which triggered the callback
  * @data: data associated with the event
  *
@@ -1023,16 +1019,6 @@ QDF_STATUS wlan_ipa_uc_op_metering(struct wlan_ipa_priv *ipa_ctx,
 }
 #endif /* WDI3_STATS_UPDATE */
 
-/**
- * wlan_ipa_wdi_meter_notifier_cb() - SSR wrapper for
- * __wlan_ipa_wdi_meter_notifier_cb
- * @priv: pointer to private data registered with IPA (we register a
- *	  pointer to the IPA context)
- * @evt: the IPA event which triggered the callback
- * @data: data associated with the event
- *
- * Return: None
- */
 void wlan_ipa_wdi_meter_notifier_cb(qdf_ipa_wdi_meter_evt_type_t evt,
 				    void *data)
 {

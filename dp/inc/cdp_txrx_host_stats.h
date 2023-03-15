@@ -153,11 +153,11 @@ cdp_enable_enhanced_stats(ol_txrx_soc_handle soc, uint8_t pdev_id)
 		return QDF_STATUS_E_FAILURE;
 	}
 
-	if (!soc->ops->host_stats_ops ||
-	    !soc->ops->host_stats_ops->txrx_enable_enhanced_stats)
+	if (!soc->ops->mon_ops ||
+	    !soc->ops->mon_ops->txrx_enable_enhanced_stats)
 		return QDF_STATUS_E_FAILURE;
 
-	return soc->ops->host_stats_ops->txrx_enable_enhanced_stats
+	return soc->ops->mon_ops->txrx_enable_enhanced_stats
 			(soc, pdev_id);
 }
 
@@ -177,11 +177,11 @@ cdp_disable_enhanced_stats(ol_txrx_soc_handle soc, uint8_t pdev_id)
 		return QDF_STATUS_E_FAILURE;
 	}
 
-	if (!soc->ops->host_stats_ops ||
-	    !soc->ops->host_stats_ops->txrx_disable_enhanced_stats)
+	if (!soc->ops->mon_ops ||
+	    !soc->ops->mon_ops->txrx_disable_enhanced_stats)
 		return QDF_STATUS_E_FAILURE;
 
-	return soc->ops->host_stats_ops->txrx_disable_enhanced_stats
+	return soc->ops->mon_ops->txrx_disable_enhanced_stats
 			(soc, pdev_id);
 }
 

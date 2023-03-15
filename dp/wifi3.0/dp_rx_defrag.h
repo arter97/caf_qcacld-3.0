@@ -49,6 +49,7 @@ struct dp_rx_defrag_cipher {
 	uint8_t ic_miclen;
 };
 
+#ifndef WLAN_SOFTUMAC_SUPPORT /* WLAN_SOFTUMAC_SUPPORT */
 /**
  * dp_rx_frag_handle() - Handles fragmented Rx frames
  *
@@ -73,6 +74,7 @@ uint32_t dp_rx_frag_handle(struct dp_soc *soc, hal_ring_desc_t  ring_desc,
 			   struct dp_rx_desc *rx_desc,
 			   uint8_t *mac_id,
 			   uint32_t quota);
+#endif /* WLAN_SOFTUMAC_SUPPORT */
 
 /**
  * dp_rx_frag_get_mac_hdr() - Return pointer to the mac hdr
@@ -155,6 +157,51 @@ uint8_t dp_rx_get_pkt_dir(struct dp_soc *soc, uint8_t *rx_desc_info)
 
 	return mac_hdr->i_fc[1] & IEEE80211_FC1_DIR_MASK;
 }
+
+/**
+ * dp_rx_defrag_fraglist_insert() - Create a per-sequence fragment list
+ * @txrx_peer: Pointer to the peer data structure
+ * @tid: Transmit ID (TID)
+ * @head_addr: Pointer to head list
+ * @tail_addr: Pointer to tail list
+ * @frag: Incoming fragment
+ * @all_frag_present: Flag to indicate whether all fragments are received
+ *
+ * Build a per-tid, per-sequence fragment list.
+ *
+ * Return: Success, if inserted
+ */
+QDF_STATUS
+dp_rx_defrag_fraglist_insert(struct dp_txrx_peer *txrx_peer, unsigned int tid,
+			     qdf_nbuf_t *head_addr, qdf_nbuf_t *tail_addr,
+			     qdf_nbuf_t frag, uint8_t *all_frag_present);
+
+/**
+ * dp_rx_defrag_waitlist_add() - Update per-PDEV defrag wait list
+ * @txrx_peer: Pointer to the peer data structure
+ * @tid: Transmit ID (TID)
+ *
+ * Appends per-tid fragments to global fragment wait list
+ *
+ * Return: None
+ */
+void dp_rx_defrag_waitlist_add(struct dp_txrx_peer *txrx_peer,
+			       unsigned int tid);
+
+/**
+ * dp_rx_defrag() - Defragment the fragment chain
+ * @txrx_peer: Pointer to the peer
+ * @tid: Transmit Identifier
+ * @frag_list_head: Pointer to head list
+ * @frag_list_tail: Pointer to tail list
+ *
+ * Defragment the fragment chain
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS dp_rx_defrag(struct dp_txrx_peer *txrx_peer, unsigned int tid,
+			qdf_nbuf_t frag_list_head,
+			qdf_nbuf_t frag_list_tail);
 
 /**
  * dp_rx_defrag_waitlist_flush() - Flush SOC defrag wait list

@@ -73,6 +73,7 @@
  * @u.rx.dev.priv_cb_m.lmac_id: lmac id for RX packet
  * @u.rx.dev.priv_cb_m.fr_ds: from DS bit in RX packet
  * @u.rx.dev.priv_cb_m.to_ds: to DS bit in RX packet
+ * @u.rx.dev.priv_cb_m.logical_link_id: link id of RX packet
  * @u.rx.dev.priv_cb_m.reserved1: reserved bits
  * @u.rx.dev.priv_cb_m.tcp_seq_num: TCP sequence number
  * @u.rx.dev.priv_cb_m.tcp_ack_num: TCP ACK number
@@ -215,7 +216,8 @@ struct qdf_nbuf_cb {
 						 lmac_id:2,
 						 fr_ds:1,
 						 to_ds:1,
-						 reserved1:14;
+						 logical_link_id:4,
+						 reserved1:10;
 					uint32_t tcp_seq_num;
 					uint32_t tcp_ack_num;
 					union {
@@ -601,6 +603,10 @@ QDF_COMPILE_TIME_ASSERT(qdf_nbuf_cb_size,
 #define  QDF_NBUF_CB_RX_PACKET_LMAC_ID(skb) \
 	(((struct qdf_nbuf_cb *)((skb)->cb))->u.rx.dev.priv_cb_m. \
 	lmac_id)
+
+#define QDF_NBUF_CB_RX_LOGICAL_LINK_ID(skb) \
+	(((struct qdf_nbuf_cb *)((skb)->cb))->u.rx.dev.priv_cb_m. \
+	logical_link_id)
 
 #define __qdf_nbuf_ipa_owned_get(skb) \
 	QDF_NBUF_CB_TX_IPA_OWNED(skb)

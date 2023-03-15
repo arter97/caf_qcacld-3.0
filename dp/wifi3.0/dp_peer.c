@@ -123,11 +123,11 @@ static int dp_update_wds_entry_wrapper(struct dp_soc *soc,
  *
  * Return: None
  */
-static void dp_del_wds_entry_wrapper(struct dp_soc *soc,
-				     uint8_t vdev_id,
-				     uint8_t *wds_macaddr,
-				     uint8_t type,
-				     uint8_t delete_in_fw)
+void dp_del_wds_entry_wrapper(struct dp_soc *soc,
+			      uint8_t vdev_id,
+			      uint8_t *wds_macaddr,
+			      uint8_t type,
+			      uint8_t delete_in_fw)
 {
 	target_if_del_wds_entry(soc->ctrl_psoc, vdev_id,
 				wds_macaddr, type, delete_in_fw);
@@ -171,11 +171,11 @@ static int dp_update_wds_entry_wrapper(struct dp_soc *soc,
 	return status;
 }
 
-static void dp_del_wds_entry_wrapper(struct dp_soc *soc,
-				     uint8_t vdev_id,
-				     uint8_t *wds_macaddr,
-				     uint8_t type,
-				     uint8_t delete_in_fw)
+void dp_del_wds_entry_wrapper(struct dp_soc *soc,
+			      uint8_t vdev_id,
+			      uint8_t *wds_macaddr,
+			      uint8_t type,
+			      uint8_t delete_in_fw)
 {
 	soc->cdp_soc.ol_ops->peer_del_wds_entry(soc->ctrl_psoc,
 						vdev_id,
@@ -183,8 +183,16 @@ static void dp_del_wds_entry_wrapper(struct dp_soc *soc,
 						type,
 						delete_in_fw);
 }
-#endif
-#endif
+#endif /* BYPASS_OL_OPS */
+#else
+void dp_del_wds_entry_wrapper(struct dp_soc *soc,
+			      uint8_t vdev_id,
+			      uint8_t *wds_macaddr,
+			      uint8_t type,
+			      uint8_t delete_in_fw)
+{
+}
+#endif /* FEATURE_AST */
 
 #ifdef FEATURE_WDS
 static inline bool
@@ -2696,14 +2704,12 @@ static inline struct dp_peer *dp_peer_find_add_id(struct dp_soc *soc,
 
 #ifdef WLAN_FEATURE_11BE_MLO
 #ifdef DP_USE_REDUCED_PEER_ID_FIELD_WIDTH
-static inline uint16_t dp_gen_ml_peer_id(struct dp_soc *soc,
-					 uint16_t peer_id)
+uint16_t dp_gen_ml_peer_id(struct dp_soc *soc, uint16_t peer_id)
 {
 	return ((peer_id & soc->peer_id_mask) | (1 << soc->peer_id_shift));
 }
 #else
-static inline uint16_t dp_gen_ml_peer_id(struct dp_soc *soc,
-					 uint16_t peer_id)
+uint16_t dp_gen_ml_peer_id(struct dp_soc *soc, uint16_t peer_id)
 {
 	return (peer_id | (1 << HTT_RX_PEER_META_DATA_V1_ML_PEER_VALID_S));
 }
@@ -2724,7 +2730,7 @@ dp_rx_mlo_peer_map_handler(struct dp_soc *soc, uint16_t peer_id,
 	uint16_t ml_peer_id = dp_gen_ml_peer_id(soc, peer_id);
 	enum cdp_txrx_ast_entry_type type = CDP_TXRX_AST_TYPE_STATIC;
 	QDF_STATUS err = QDF_STATUS_SUCCESS;
-	struct dp_soc *primary_soc;
+	struct dp_soc *primary_soc = NULL;
 
 	dp_cfg_event_record_peer_map_unmap_evt(soc, DP_CFG_EVENT_MLO_PEER_MAP,
 					       NULL, peer_mac_addr,
@@ -2802,6 +2808,9 @@ dp_rx_mlo_peer_map_handler(struct dp_soc *soc, uint16_t peer_id,
 		}
 	}
 
+	if (!primary_soc)
+		primary_soc = soc;
+
 	err = dp_peer_map_ast(soc, peer, peer_mac_addr, hw_peer_id,
 			      vdev_id, ast_hash, is_wds);
 
@@ -2810,7 +2819,7 @@ dp_rx_mlo_peer_map_handler(struct dp_soc *soc, uint16_t peer_id,
 	 * host based on mlo peer map event from FW
 	 */
 	if (soc->ast_offload_support && soc->host_ast_db_enable) {
-		dp_peer_host_add_map_ast(soc, ml_peer_id, peer_mac_addr,
+		dp_peer_host_add_map_ast(primary_soc, ml_peer_id, peer_mac_addr,
 					 hw_peer_id, vdev_id,
 					 ast_hash, is_wds);
 	}
@@ -3035,6 +3044,14 @@ dp_rx_peer_unmap_handler(struct dp_soc *soc, uint16_t peer_id,
 				     (void *)&params, peer_id,
 				     WDI_NO_VAL, vdev->pdev->pdev_id);
 	}
+
+	/*
+	 * In scenario where assoc peer soc id is different from
+	 * primary soc id, reset the soc to point to primary psoc.
+	 * Since map is received on primary soc, the unmap should
+	 * also delete ast on primary soc.
+	 */
+	soc = peer->vdev->pdev->soc;
 
 	/* If V2 Peer map messages are enabled AST entry has to be
 	 * freed here

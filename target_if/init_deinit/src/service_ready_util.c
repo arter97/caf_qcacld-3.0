@@ -263,7 +263,7 @@ static bool new_hw_mode_preferred(uint32_t current_hw_mode,
 }
 
 /**
- * select_preferred_mode() - Select preferred hw mode based on current mode.
+ * select_preferred_hw_mode() - Select preferred hw mode based on current mode.
  * @tgt_hdl: target_psoc_info object
  * @hw_mode_caps: HW mode caps of new mode id that needs to checked for
  *                selection.
@@ -645,7 +645,7 @@ qdf_export_symbol(init_deinit_spectral_scaling_params_free);
  * init_deinit_update_phy_reg_cap() - Update the low/high frequency for phy0.
  * @psoc: PSOC common object
  * @info: FW or lower layer related info
- * @wlan_psoc_host_hal_reg_capabilities_ext: Reg caps per PHY
+ * @reg_cap: Reg caps per PHY
  *
  * For the DBS_SBS capable board, update the low or high frequency
  * for phy0 by leveraging the frequency populated for phy2

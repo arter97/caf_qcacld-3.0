@@ -641,7 +641,12 @@ cm_handle_discon_req_in_non_connected_state(struct cnx_mgr *cm_ctx,
 		mlme_cm_osif_update_id_and_src(cm_ctx->vdev,
 					       CM_SOURCE_INVALID,
 					       CM_ID_INVALID);
-		cm_flush_pending_request(cm_ctx, DISCONNECT_REQ_PREFIX, false);
+
+		/* Flush for non mlo link vdev only */
+		if (!wlan_vdev_mlme_is_mlo_vdev(cm_ctx->vdev) ||
+		    !wlan_vdev_mlme_is_mlo_link_vdev(cm_ctx->vdev))
+			cm_flush_pending_request(cm_ctx, DISCONNECT_REQ_PREFIX,
+						 false);
 		/*
 		 * Flush failed pending connect req as new req is received
 		 * and its no longer the latest one.
@@ -774,15 +779,18 @@ QDF_STATUS cm_disconnect_start_req_sync(struct wlan_objmgr_vdev *vdev,
 {
 	struct cnx_mgr *cm_ctx;
 	QDF_STATUS status;
+	uint32_t timeout;
+	bool is_assoc_vdev = false;
 
 	cm_ctx = cm_get_cm_ctx(vdev);
 	if (!cm_ctx)
 		return QDF_STATUS_E_INVAL;
 
 	if (wlan_vdev_mlme_is_mlo_vdev(vdev) &&
-	    !wlan_vdev_mlme_is_mlo_link_vdev(vdev))
+	    !wlan_vdev_mlme_is_mlo_link_vdev(vdev)) {
 		req->is_no_disassoc_disconnect = 1;
-
+		is_assoc_vdev = true;
+	}
 	qdf_event_reset(&cm_ctx->disconnect_complete);
 	status = cm_disconnect_start_req(vdev, req);
 	if (QDF_IS_STATUS_ERROR(status)) {
@@ -790,8 +798,13 @@ QDF_STATUS cm_disconnect_start_req_sync(struct wlan_objmgr_vdev *vdev,
 		return status;
 	}
 
+	if (is_assoc_vdev)
+		timeout = CM_DISCONNECT_CMD_TIMEOUT +
+			  CM_DISCONNECT_ASSOC_VDEV_EXTRA_TIMEOUT;
+	else
+		timeout = CM_DISCONNECT_CMD_TIMEOUT;
 	status = qdf_wait_single_event(&cm_ctx->disconnect_complete,
-				       CM_DISCONNECT_CMD_TIMEOUT);
+				       timeout);
 	if (QDF_IS_STATUS_ERROR(status))
 		mlme_err("Disconnect timeout with status %d", status);
 

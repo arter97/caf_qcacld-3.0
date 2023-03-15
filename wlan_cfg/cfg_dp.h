@@ -1354,6 +1354,16 @@
 	CFG_INI_BOOL("tx_litemon_sw_peer_filtering", false, \
 		     "Enable SW based tx monitor peer fitlering")
 
+#define CFG_DP_POINTER_TIMER_THRESHOLD_RX \
+	CFG_INI_UINT("dp_rx_ptr_timer_threshold", \
+	0, 0xFFFF, 0, \
+	CFG_VALUE_OR_DEFAULT, "RX pointer update timer threshold")
+
+#define CFG_DP_POINTER_NUM_THRESHOLD_RX \
+	CFG_INI_UINT("dp_rx_ptr_num_threshold", \
+	0, 63, 0, \
+	CFG_VALUE_OR_DEFAULT, "RX pointer update entries number threshold")
+
 /*
  * <ini>
  * dp_rx_fisa_enable - Control Rx datapath FISA
@@ -1445,6 +1455,16 @@
 #define CFG_DP_PEER_EXT_STATS \
 		CFG_INI_BOOL("peer_ext_stats", \
 		false, "Peer extended stats")
+
+#ifdef QCA_ENHANCED_STATS_SUPPORT
+#define DEFAULT_PEER_LINK_STATS_VALUE true
+#else
+#define DEFAULT_PEER_LINK_STATS_VALUE false
+#endif /* QCA_ENHANCED_STATS_SUPPORT */
+
+#define CFG_DP_PEER_LINK_STATS \
+		CFG_INI_BOOL("peer_link_stats", \
+		DEFAULT_PEER_LINK_STATS_VALUE, "Peer Link stats")
 
 #define CFG_DP_PEER_JITTER_STATS \
 		CFG_INI_BOOL("peer_jitter_stats", \
@@ -1973,6 +1993,7 @@
 		CFG(CFG_DP_REO_RINGS_MAP) \
 		CFG(CFG_DP_PEER_EXT_STATS) \
 		CFG(CFG_DP_PEER_JITTER_STATS) \
+		CFG(CFG_DP_PEER_LINK_STATS) \
 		CFG(CFG_DP_RX_BUFF_POOL_ENABLE) \
 		CFG(CFG_DP_RX_REFILL_BUFF_POOL_ENABLE) \
 		CFG(CFG_DP_RX_PENDING_HL_THRESHOLD) \
@@ -2004,5 +2025,7 @@
 		CFG_DP_SAWF_STATS_CONFIG \
 		CFG(CFG_DP_HANDLE_INVALID_DECAP_TYPE_DISABLE) \
 		CFG(CFG_DP_TXMON_SW_PEER_FILTERING) \
-		CFG_TX_PKT_INSPECT_FOR_ILP_CFG
+		CFG_TX_PKT_INSPECT_FOR_ILP_CFG \
+		CFG(CFG_DP_POINTER_TIMER_THRESHOLD_RX) \
+		CFG(CFG_DP_POINTER_NUM_THRESHOLD_RX)
 #endif /* _CFG_DP_H_ */

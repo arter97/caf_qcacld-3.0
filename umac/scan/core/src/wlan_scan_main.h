@@ -508,11 +508,13 @@ struct scan_default_params {
  * @inform_beacon: cb to indicate frame to OS
  * @update_beacon: cb to indicate frame to MLME
  * @unlink_bss: cb to unlink bss from kernel cache
+ * @inform_mbssid_bcn_prb_rsp: cb to indicate frames with mbssid
  */
 struct scan_cb {
 	update_beacon_cb inform_beacon;
 	update_beacon_cb update_beacon;
 	update_beacon_cb unlink_bss;
+	update_mbssid_bcn_prb_rsp inform_mbssid_bcn_prb_rsp;
 	/* Define nif/sif function callbacks here */
 };
 

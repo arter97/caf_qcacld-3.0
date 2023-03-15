@@ -188,6 +188,7 @@ extract_mgmt_rx_reo_snapshot_tlv(uint8_t *data, size_t remaining_len,
  * RX_REO_PER_LINK_SNAPSHOT_INFO TLV
  * @data: Pointer to start of the TLV
  * @remaining_len: Length (in bytes) remaining in the arena from @data pointer
+ * @link_id: link ID of interest
  * @link_info: Pointer to MGMT Rx REO per link info. Extracted information
  * will be populated in this data structure.
  *
@@ -218,7 +219,7 @@ extract_mlo_glb_rx_reo_per_link_info_tlv(
 
 	link_info->link_id = link_id;
 
-	/**
+	/*
 	 * Get the pointer to the fw_consumed snapshot with in the TLV.
 	 * Note that snapshots are nested TLVs within link_sanpshot_info TLV.
 	 */
@@ -249,7 +250,7 @@ extract_mlo_glb_rx_reo_per_link_info_tlv(
 	validate_parsed_bytes_advance_data_pointer(len, data, remaining_len);
 	parsed_bytes += len;
 
-	/**
+	/*
 	 * Return the length of link_sanpshot_info TLV itself as the snapshots
 	 * are nested inside link_sanpshot_info TLV and hence no need to add
 	 * their lengths separately.

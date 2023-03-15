@@ -81,9 +81,8 @@
  *
  * @u.rx.hw_info.desc_tlv_members.peer_id: peer id
  * @u.rx.hw_info.desc_tlv_members.ml_peer_valid: is ml peer valid
- * @u.rx.hw_info.desc_tlv_members.logical_link_id: logical link id
  * @u.rx.hw_info.desc_tlv_members.vdev_id: vdev id
- * @u.rx.hw_info.desc_tlv_members.lmac_id: lmac id
+ * @u.rx.hw_info.desc_tlv_members.hw_link_id: link id of RX packet
  * @u.rx.hw_info.desc_tlv_members.chip_id: chip id
  * @u.rx.hw_info.desc_tlv_members.reserved2: reserved
  *
@@ -214,9 +213,8 @@ struct qdf_nbuf_cb {
 					/* 2nd word rx_mpdu_desc_info */
 					uint32_t peer_id:13,
 						 ml_peer_valid:1,
-						 logical_link_id:2,
 						 vdev_id:8,
-						 lmac_id:2,
+						 hw_link_id:4,
 						 chip_id:3,
 						 reserved2:3;
 #ifndef BIG_ENDIAN_HOST
@@ -429,13 +427,13 @@ QDF_COMPILE_TIME_ASSERT(qdf_nbuf_cb_size,
 	(((struct qdf_nbuf_cb *) \
 	  ((skb)->cb))->u.rx.hw_info.desc_tlv_members.peer_id)
 
+#define QDF_NBUF_CB_RX_ML_PEER_VALID(skb) \
+	(((struct qdf_nbuf_cb *) \
+	  ((skb)->cb))->u.rx.hw_info.desc_tlv_members.ml_peer_valid)
+
 #define QDF_NBUF_CB_RX_VDEV_ID(skb) \
 	(((struct qdf_nbuf_cb *) \
 	  ((skb)->cb))->u.rx.hw_info.desc_tlv_members.vdev_id)
-
-#define  QDF_NBUF_CB_RX_PACKET_LMAC_ID(skb) \
-	(((struct qdf_nbuf_cb *) \
-	  ((skb)->cb))->u.rx.hw_info.desc_tlv_members.lmac_id)
 
 #define QDF_NBUF_CB_RX_PKT_LEN(skb) \
 	(((struct qdf_nbuf_cb *) \
@@ -629,6 +627,10 @@ QDF_COMPILE_TIME_ASSERT(qdf_nbuf_cb_size,
 #define QDF_NBUF_CB_RX_FLOW_IDX_TIMEOUT(skb) \
 		(((struct qdf_nbuf_cb *) \
 		((skb)->cb))->u.rx.flow_idx_timeout)
+
+#define QDF_NBUF_CB_RX_HW_LINK_ID(skb) \
+		(((struct qdf_nbuf_cb *) \
+		((skb)->cb))->u.rx.hw_info.desc_tlv_members.hw_link_id)
 
 #define __qdf_nbuf_set_rx_flow_idx_timeout(skb, val) \
 		((QDF_NBUF_CB_RX_FLOW_IDX_TIMEOUT((skb))) = val)

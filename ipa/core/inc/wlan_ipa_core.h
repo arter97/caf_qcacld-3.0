@@ -373,8 +373,6 @@ QDF_STATUS wlan_ipa_uc_op_metering(struct wlan_ipa_priv *ipa_ctx,
 /**
  * wlan_ipa_wdi_meter_notifier_cb() - SSR wrapper for
  * __wlan_ipa_wdi_meter_notifier_cb
- * @priv: pointer to private data registered with IPA (we register a
- *        pointer to the global IPA context)
  * @evt: the IPA event which triggered the callback
  * @data: data associated with the event
  *
@@ -466,6 +464,7 @@ void wlan_ipa_uc_info(struct wlan_ipa_priv *ipa_ctx);
 /**
  * wlan_ipa_print_fw_wdi_stats() - Print FW IPA WDI stats
  * @ipa_ctx: IPA context
+ * @uc_fw_stat: stats to print
  *
  * Return: None
  */
@@ -602,7 +601,7 @@ void wlan_ipa_reg_rps_enable_cb(struct wlan_ipa_priv *ipa_ctx,
 }
 
 /**
- * ipa_set_rps_enable(): Enable/disable RPS for all interfaces of specific mode
+ * ipa_set_rps(): Enable/disable RPS for all interfaces of specific mode
  * @ipa_ctx: IPA context
  * @mode: mode of interface for which RPS needs to be enabled
  * @enable: Set true to enable RPS
@@ -776,9 +775,10 @@ static inline void wlan_ipa_mcc_work_handler(void *data)
  * @net_dev: Interface net device
  * @device_mode: Net interface device mode
  * @session_id: session id for the event
- * @type: event enum of type ipa_wlan_event
- * @mac_address: MAC address associated with the event
+ * @ipa_event_type: event enum of type ipa_wlan_event
+ * @mac_addr: MAC address associated with the event
  * @is_2g_iface: true if interface is operating on 2G band, otherwise false
+ * @ipa_obj: IPA context
  *
  * Return: QDF_STATUS
  */
@@ -863,7 +863,7 @@ void wlan_ipa_fw_rejuvenate_send_msg(struct wlan_ipa_priv *ipa_ctx);
 /**
  * wlan_ipa_flush_pending_vdev_events() - flush pending vdev ipa events
  * @ipa_ctx: IPA context
- * vdev_id: vdev id
+ * @vdev_id: vdev id
  *
  * This function is to flush vdev wlan ipa pending events
  *
@@ -875,8 +875,8 @@ void wlan_ipa_flush_pending_vdev_events(struct wlan_ipa_priv *ipa_ctx,
 #ifdef IPA_OPT_WIFI_DP
 /**
  * wlan_ipa_wdi_opt_dpath_flt_rsrv_cb() - reserve cce super rules for Rx filter
- * @ipa_ctx - ipa_context
- * out_params - filter reservation params
+ * @ipa_ctx: ipa_context
+ * @out_params: filter reservation params
  *
  * Return:int 0 on success, negative on failure
  *
@@ -888,17 +888,16 @@ int wlan_ipa_wdi_opt_dpath_flt_rsrv_cb(
 /**
  * wlan_ipa_wdi_opt_dpath_notify_flt_rsvd() - notify filter reservation
  * response to IPA
+ * @is_success: result of filter reservation
  *
- * @is_success : result of filter reservation
- *
- * @Return 0 on success, negative on failure
+ * Return 0 on success, negative on failure
  */
 int wlan_ipa_wdi_opt_dpath_notify_flt_rsvd(bool is_success);
 
 /**
  * wlan_ipa_wdi_opt_dpath_flt_add_cb - Add rx filter tuple to cce filter
  * @ipa_ctx: IPA context
- * in_out - filter tuple info
+ * @in_out: filter tuple info
  *
  * Return: 0 on success, negative on failure
  */
@@ -909,7 +908,7 @@ int wlan_ipa_wdi_opt_dpath_flt_add_cb(
 /**
  * wlan_ipa_wdi_opt_dpath_flt_rem_cb() - Remove rx filter tuple from cce filter
  * @ipa_ctx: IPA context
- * in - filter tuple info
+ * @in: filter tuple info
  *
  * Return: 0 on success, negative on failure
  */
@@ -920,9 +919,8 @@ int wlan_ipa_wdi_opt_dpath_flt_rem_cb(
 /**
  * wlan_ipa_wdi_opt_dpath_notify_flt_add_rem_cb() - notify filter add/remove
  * result to IPA
- *
- * @result0 : result of add/remove filter0
- * @result1 : result of add/remove filter1
+ * @result0: result of add/remove filter0
+ * @result1: result of add/remove filter1
  *
  * Return: void
  */
@@ -940,11 +938,10 @@ int wlan_ipa_wdi_opt_dpath_flt_rsrv_rel_cb(void *ipa_ctx);
 /**
  * wlan_ipa_wdi_opt_dpath_notify_flt_rlsd() - notify filter release
  * response to IPA
+ * @result0: result of filter0 release
+ * @result1: result of filter1 release
  *
- * @result0 : result of filter0 release
- * @result1 : result of filter1 release
- *
- * @Return: 0 on success, negative on failure
+ * Return: 0 on success, negative on failure
  */
 int wlan_ipa_wdi_opt_dpath_notify_flt_rlsd(int result0, int result1);
 

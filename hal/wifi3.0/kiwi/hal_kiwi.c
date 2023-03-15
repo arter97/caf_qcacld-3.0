@@ -135,6 +135,9 @@
 #define FW_QTIME_CYCLES_PER_10_USEC 192
 #endif
 
+struct wbm2sw_completion_ring_tx gwbm2sw_tx_comp_symbol __attribute__((used));
+struct wbm2sw_completion_ring_rx gwbm2sw_rx_comp_symbol __attribute__((used));
+
 static uint32_t hal_get_link_desc_size_kiwi(void)
 {
 	return LINK_DESC_SIZE;
@@ -2009,10 +2012,85 @@ static QDF_STATUS hal_rx_reo_ent_get_src_link_id_kiwi(hal_rxdma_desc_t rx_desc,
 	return QDF_STATUS_SUCCESS;
 }
 
+#ifdef QCA_WIFI_KIWI_V2
+/**
+ * hal_srng_dst_hw_init_misc_1_kiwi() - Function to initialize MISC_1 register
+ *                                      of destination ring HW
+ * @srng: SRNG ring pointer
+ *
+ * Return: None
+ */
+static inline
+void hal_srng_dst_hw_init_misc_1_kiwi(struct hal_srng *srng)
+{
+	uint32_t reg_val = 0;
+
+	/* number threshold for pointer update */
+	if (srng->pointer_num_threshold)
+		reg_val |= SRNG_SM(SRNG_DST_HW_FLD(MISC_1,
+						   NUM_THRESHOLD_TO_UPDATE),
+				   srng->pointer_num_threshold);
+	/* timer threshold for pointer update */
+	if (srng->pointer_timer_threshold)
+		reg_val |= SRNG_SM(SRNG_DST_HW_FLD(MISC_1,
+						   TIME_THRESHOLD_TO_UPDATE),
+				   srng->pointer_timer_threshold);
+
+	if (reg_val)
+		SRNG_DST_REG_WRITE(srng, MISC_1, reg_val);
+}
+
+/**
+ * hal_srng_hw_reg_offset_init_misc_1_kiwi() - Initialize the HW srng register
+ *                                             offset of MISC_1
+ * @hal_soc: HAL Soc handle
+ *
+ * Return: None
+ */
+static inline
+void hal_srng_hw_reg_offset_init_misc_1_kiwi(struct hal_soc *hal_soc)
+{
+	int32_t *hw_reg_offset = hal_soc->hal_hw_reg_offset;
+
+	hw_reg_offset[DST_MISC_1] = REG_OFFSET(DST, MISC_1);
+}
+#else
+static inline
+void hal_srng_dst_hw_init_misc_1_kiwi(struct hal_srng *srng)
+{
+}
+
+static inline
+void hal_srng_hw_reg_offset_init_misc_1_kiwi(struct hal_soc *hal_soc)
+{
+}
+#endif
+
+/**
+ * hal_srng_dst_hw_init_kiwi() - Function to initialize SRNG
+ *                               destination ring HW
+ * @hal_soc: HAL SOC handle
+ * @srng: SRNG ring pointer
+ * @idle_check: Check if ring is idle
+ * @idx: Ring index
+ *
+ * Return: None
+ */
+static inline
+void hal_srng_dst_hw_init_kiwi(struct hal_soc *hal_soc,
+			       struct hal_srng *srng,
+			       bool idle_check,
+			       uint32_t idx)
+{
+	hal_srng_dst_hw_init_misc_1_kiwi(srng);
+
+	hal_srng_dst_hw_init_generic(hal_soc, srng, idle_check, idx);
+}
+
 static void hal_hw_txrx_ops_attach_kiwi(struct hal_soc *hal_soc)
 {
 	/* init and setup */
-	hal_soc->ops->hal_srng_dst_hw_init = hal_srng_dst_hw_init_generic;
+	hal_soc->ops->hal_srng_dst_hw_init = hal_srng_dst_hw_init_kiwi;
 	hal_soc->ops->hal_srng_src_hw_init = hal_srng_src_hw_init_generic;
 	hal_soc->ops->hal_get_hw_hptp = hal_get_hw_hptp_generic;
 	hal_soc->ops->hal_get_window_address = hal_get_window_address_kiwi;
@@ -2706,6 +2784,7 @@ static inline void hal_srng_hw_reg_offset_init_kiwi(struct hal_soc *hal_soc)
 	hw_reg_offset[DST_MSI2_DATA] = REG_OFFSET(DST, MSI2_DATA),
 	hw_reg_offset[DST_PRODUCER_INT2_SETUP] =
 					REG_OFFSET(DST, PRODUCER_INT2_SETUP);
+	hal_srng_hw_reg_offset_init_misc_1_kiwi(hal_soc);
 }
 
 void hal_kiwi_attach(struct hal_soc *hal_soc)

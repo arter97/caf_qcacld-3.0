@@ -958,7 +958,7 @@ static inline void wlan_crypto_free_vdev_key(struct wlan_objmgr_vdev *vdev)
 {
 }
 
-static inline void wlan_crypto_reset_vdev_prarams(struct wlan_objmgr_vdev *vdev)
+static inline void wlan_crypto_reset_vdev_params(struct wlan_objmgr_vdev *vdev)
 {
 }
 #endif /* CRYPTO_SET_KEY_CONVERGED */

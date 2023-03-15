@@ -1258,6 +1258,22 @@ QDF_STATUS dp_peer_ast_hash_attach(struct dp_soc *soc);
  */
 QDF_STATUS dp_peer_mec_hash_attach(struct dp_soc *soc);
 
+/**
+ * dp_del_wds_entry_wrapper() - delete a WDS AST entry
+ * @soc: DP soc structure pointer
+ * @vdev_id: vdev_id
+ * @wds_macaddr: MAC address of ast node
+ * @type: type from enum cdp_txrx_ast_entry_type
+ * @delete_in_fw: Flag to indicate if entry needs to be deleted in fw
+ *
+ * This API is used to delete an AST entry from fw
+ *
+ * Return: None
+ */
+void dp_del_wds_entry_wrapper(struct dp_soc *soc, uint8_t vdev_id,
+			      uint8_t *wds_macaddr, uint8_t type,
+			      uint8_t delete_in_fw);
+
 void dp_soc_wds_attach(struct dp_soc *soc);
 
 /**
@@ -2446,4 +2462,14 @@ static inline void dp_peer_rx_reo_shared_qaddr_delete(struct dp_soc *soc,
  * Return: True for WDS ext peer, false otherwise
  */
 bool dp_peer_check_wds_ext_peer(struct dp_peer *peer);
+
+/**
+ * dp_gen_ml_peer_id() - Generate MLD peer id for DP
+ *
+ * @soc: DP soc context
+ * @peer_id: mld peer id
+ *
+ * Return: DP MLD peer id
+ */
+uint16_t dp_gen_ml_peer_id(struct dp_soc *soc, uint16_t peer_id);
 #endif /* _DP_PEER_H_ */

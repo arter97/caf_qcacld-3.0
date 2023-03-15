@@ -1021,6 +1021,10 @@ struct hal_srng_params {
 	/* Safe threshold */
 	uint16_t safe_thresh;
 #endif
+	/* Timer threshold to issue ring pointer update - in micro seconds */
+	uint16_t pointer_timer_threshold;
+	/* Number threshold of ring entries to issue pointer update */
+	uint8_t pointer_num_threshold;
 };
 
 /**

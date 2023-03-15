@@ -4291,6 +4291,22 @@ reg_client_afc_populate_channels(struct wlan_objmgr_psoc *psoc,
 #endif
 
 /**
+ * reg_reset_chan_list_and_power_event() - Reset AFC master chan list and
+ * super channel list. Set is_6g_afc_power_event_received to false
+ * @pdev_priv_obj: Pointer to pdev_priv_obj
+ *
+ * Return: void
+ */
+static void reg_reset_chan_list_and_power_event(
+		struct wlan_regulatory_pdev_priv_obj *pdev_priv_obj)
+{
+	reg_debug("Resetting the afc mas chan list and disabling SP channels");
+	pdev_priv_obj->is_6g_afc_power_event_received = false;
+	reg_disable_afc_mas_chan_list_channels(pdev_priv_obj);
+	reg_disable_sp_channels_in_super_chan_list(pdev_priv_obj);
+}
+
+/**
  * reg_process_afc_expiry_event() - Process the afc expiry event and get the
  * afc request id
  * @afc_info: Pointer to afc info
@@ -4357,9 +4373,7 @@ reg_process_afc_expiry_event(struct afc_regulatory_info *afc_info)
 		break;
 	case REG_AFC_EXPIRY_EVENT_SWITCH_TO_LPI:
 	case REG_AFC_EXPIRY_EVENT_STOP_TX:
-		pdev_priv_obj->is_6g_afc_power_event_received = false;
-		reg_disable_afc_mas_chan_list_channels(pdev_priv_obj);
-		reg_disable_sp_channels_in_super_chan_list(pdev_priv_obj);
+		reg_reset_chan_list_and_power_event(pdev_priv_obj);
 		reg_client_afc_populate_channels(psoc, pdev);
 		if (tx_ops->trigger_acs_for_afc)
 			tx_ops->trigger_acs_for_afc(pdev);
@@ -4660,6 +4674,183 @@ static void reg_find_high_limit_chan_enum_for_6g(
 }
 
 /**
+ * reg_find_range_for_chan_idx() - Compute freq range object for the
+ * given chan_enum in the given channel list.
+ * @chan_enum: Channel enum
+ * @afc_chan_list: Pointer to regulatory channel list
+ * @range: Pointer to frequency range to be filled
+ *
+ * Return: None
+ */
+static void
+reg_find_range_for_chan_idx(enum channel_enum chan_enum,
+			    struct regulatory_channel *afc_chan_list,
+			    struct freq_range *range)
+{
+	qdf_freq_t center_freq = afc_chan_list[chan_enum].center_freq;
+	uint16_t min_bw = afc_chan_list[chan_enum].min_bw;
+
+	range->left = center_freq - min_bw / 2;
+	range->right = center_freq + min_bw / 2;
+}
+
+/**
+ * reg_is_range_subset_of_freq_obj() - Return true if the given range
+ * fits into the freq_obj range
+ * @range: Pointer to range
+ * @freq_obj: Pointer to frequency object
+ *
+ * Return: True if the range fits, false otherwise
+ */
+static bool
+reg_is_range_subset_of_freq_obj(struct freq_range *range,
+				struct afc_freq_obj *freq_obj)
+{
+	return (range->left >= freq_obj->low_freq &&
+		range->right <= freq_obj->high_freq);
+}
+
+/**
+ * reg_coalesce_afc_freq_info() - Coalesce the frequency objects of the
+ * AFC payload.
+ *
+ * @power_info: Pointer to afc payload
+ * @in_range: Pointer to the current freq range.
+ * @in_out_freq_index: frequency index, is both an input and output value.
+ * @out_coal_freq_obj: Pointer to coalesced freq range
+ *
+ * If the high freq of n_freq_obj is same as low_freq of
+ * n+1_freq_obj, coalescing can be done. The coalesced object is the
+ * minimum length object that includes the given @in_range. The in_range should
+ * completely fall within the output coalesced frequency object.
+ * "in_out_freq_index" is updated to the new index only if range fits
+ * in the coalesced freq object and it is based on the number of
+ * frequency objects coalesced.
+ *
+ * Return: None
+ */
+static void
+reg_coalesce_afc_freq_info(struct reg_fw_afc_power_event *power_info,
+			   struct freq_range *in_range,
+			   uint8_t *in_out_freq_index,
+			   struct afc_freq_obj *out_coal_freq_obj)
+{
+	struct afc_freq_obj *cur_freq_obj, *n_freq_obj, coal_freq_obj;
+	uint8_t cur_freq_index = *in_out_freq_index;
+	uint8_t nxt_freq_index = cur_freq_index + 1;
+
+	coal_freq_obj = power_info->afc_freq_info[cur_freq_index];
+	*out_coal_freq_obj = coal_freq_obj;
+
+	/* The low edge of the input range must fall within freq object
+	 * else coalescing is meaningless.
+	 * eg: center freq 6135 cannot fit in the range 6123-6129 and hence
+	 * considering this range need not be considered for any tx power
+	 * manipulation.
+	 */
+	if (!IS_WITHIN_RANGE_ASYM(in_range->left, coal_freq_obj.low_freq,
+				  coal_freq_obj.high_freq))
+		return;
+
+	/* Coalesecing is not needed if the input range is already a subset of
+	 * freq obj range of the afc payload.
+	 */
+	if (reg_is_range_subset_of_freq_obj(in_range, &coal_freq_obj))
+		return;
+
+	/* The input range is not within the first freq object.
+	 * Keep coalescing until the input range is found in the
+	 * coalesced object.
+	 */
+	while (nxt_freq_index < power_info->num_freq_objs) {
+		cur_freq_obj = &power_info->afc_freq_info[cur_freq_index];
+		n_freq_obj = &power_info->afc_freq_info[nxt_freq_index];
+
+		if (cur_freq_obj->high_freq == n_freq_obj->low_freq) {
+			coal_freq_obj.high_freq = n_freq_obj->high_freq;
+			coal_freq_obj.max_psd = qdf_min(coal_freq_obj.max_psd,
+							n_freq_obj->max_psd);
+			/* Exit if the coalesced object already
+			 * includes the input range.
+			 */
+			if (reg_is_range_subset_of_freq_obj(in_range,
+							    &coal_freq_obj)) {
+				/* Since the coalesced object includes upto
+				 * nxt_freq_index, update the in_out_freq_index
+				 * so that it is used in the caller to skip
+				 * the last processed index.
+				 */
+				*in_out_freq_index = nxt_freq_index;
+				*out_coal_freq_obj = coal_freq_obj;
+				return;
+			}
+		} else {
+			/* current object and next object not continuous */
+			break;
+		}
+		cur_freq_index++;
+		nxt_freq_index++;
+	}
+
+	reg_debug("Coalesced freq range: low: %u, high: %u, psd: %d\n",
+		  out_coal_freq_obj->low_freq, out_coal_freq_obj->high_freq,
+		  out_coal_freq_obj->max_psd);
+}
+
+/**
+ * reg_find_low_and_high_limit() - Find low_limit and high_limit channel enum
+ * for the given freq range.
+ * @afc_chan_list: Pointer to regulatory_channel
+ * @freq_obj: Pointer to struct afc_freq_obj
+ * @low_limit_enum: Pointer to low limit channel enum
+ * @high_limit_enum: Pointer to high limit channel enum
+ */
+static void
+reg_find_low_and_high_limit(struct regulatory_channel *afc_chan_list,
+			    struct afc_freq_obj *freq_obj,
+			    enum channel_enum *low_limit_enum,
+			    enum channel_enum *high_limit_enum)
+{
+	reg_find_low_limit_chan_enum_for_6g(afc_chan_list,
+					    freq_obj->low_freq,
+					    low_limit_enum);
+	reg_find_high_limit_chan_enum_for_6g(afc_chan_list,
+					     freq_obj->high_freq,
+					     high_limit_enum);
+}
+
+/**
+ * reg_try_coalescing_freq_objs() - Try to coalesce frequency objects.
+ *
+ * @chan_enum: channel enum @afc_chan_list, that may be ignored by the
+ * current frequency object power_info[*cur_freq_index], if coalescing
+ * does not happen.
+ * @afc_chan_list: Pointer to afc channel list
+ * @power_info: Pointer to reg_fw_afc_power_event
+ * @cur_freq_index: Pointer to freq_index of the afc payload
+ * @coal_freq_obj: Pointer to coal_freq_obj
+ *
+ * Try to coalesce adjacent frequency objects of the afc response
+ * if coalescing is needed. After coalescing,  return the coalesced_freq_obj
+ * if it is valid. If invalid, return the current freq object.
+ *
+ * Return: None
+ */
+static void
+reg_try_coalescing_freq_objs(enum channel_enum chan_enum,
+			     struct regulatory_channel *afc_chan_list,
+			     struct reg_fw_afc_power_event *power_info,
+			     uint8_t *cur_freq_index,
+			     struct afc_freq_obj *coal_freq_obj)
+{
+	struct freq_range range;
+
+	reg_find_range_for_chan_idx(chan_enum, afc_chan_list, &range);
+	reg_coalesce_afc_freq_info(power_info, &range, cur_freq_index,
+				   coal_freq_obj);
+}
+
+/**
  * reg_fill_max_psd_in_afc_chan_list() - Fill max_psd in the afc master chan
  * list
  * @pdev_priv_obj: Pointer to pdev_priv_obj
@@ -4676,6 +4867,8 @@ static QDF_STATUS reg_fill_max_psd_in_afc_chan_list(
 	uint8_t i;
 	struct regulatory_channel *sp_chan_list;
 	struct regulatory_channel *cfi_chan_list;
+	enum channel_enum last_enum = reg_convert_enum_to_6g_idx(MIN_6GHZ_CHANNEL);
+	struct afc_freq_obj coal_freq_obj = {};
 
 	if (!power_info) {
 		reg_err("power_info is NULL");
@@ -4702,16 +4895,18 @@ static QDF_STATUS reg_fill_max_psd_in_afc_chan_list(
 				  power_info);
 
 	for (i = 0; i < power_info->num_freq_objs; i++) {
-		struct afc_freq_obj *freq_obj = &power_info->afc_freq_info[i];
 		enum channel_enum low_limit_enum, high_limit_enum;
 		uint8_t j;
 
-		reg_find_low_limit_chan_enum_for_6g(afc_chan_list,
-						    freq_obj->low_freq,
-						    &low_limit_enum);
-		reg_find_high_limit_chan_enum_for_6g(afc_chan_list,
-						     freq_obj->high_freq,
-						     &high_limit_enum);
+		/* Counter variable 'i' may be incremented in the following
+		 * function. The following function guarantees that  'i'
+		 * shall never be greater than the number of frequency objects.
+		 */
+		reg_try_coalescing_freq_objs(last_enum, afc_chan_list,
+					     power_info, &i, &coal_freq_obj);
+		reg_find_low_and_high_limit(afc_chan_list, &coal_freq_obj,
+					    &low_limit_enum, &high_limit_enum);
+
 		for (j = low_limit_enum; j <= high_limit_enum; j++) {
 			if ((sp_chan_list[j].state == CHANNEL_STATE_ENABLE) &&
 			    (cfi_chan_list[j].state == CHANNEL_STATE_ENABLE)) {
@@ -4723,13 +4918,13 @@ static QDF_STATUS reg_fill_max_psd_in_afc_chan_list(
 				 * target sends the PSD in the units of
 				 * 0.01 dbm/MHz.
 				 */
-				afc_chan_list[j].psd_eirp =
-							freq_obj->max_psd / 100;
+				afc_chan_list[j].psd_eirp = coal_freq_obj.max_psd / 100;
 				afc_chan_list[j].psd_flag = true;
 				afc_chan_list[j].tx_power =
 						cfi_chan_list[j].tx_power;
 			}
 		}
+		last_enum = j;
 	}
 
 	qdf_mem_free(cfi_chan_list);
@@ -4784,13 +4979,6 @@ reg_process_afc_power_event(struct afc_regulatory_info *afc_info)
 	QDF_TRACE(QDF_MODULE_ID_AFC, QDF_TRACE_LEVEL_DEBUG,
 		  "Processing AFC Power event");
 
-	if (afc_info->power_info->fw_status_code !=
-	    REG_FW_AFC_POWER_EVENT_SUCCESS) {
-		reg_err_rl("AFC Power event failure status code %d",
-			   afc_info->power_info->fw_status_code);
-		return QDF_STATUS_E_FAILURE;
-	}
-
 	psoc = afc_info->psoc;
 	soc_reg = reg_get_psoc_obj(psoc);
 
@@ -4812,13 +5000,6 @@ reg_process_afc_power_event(struct afc_regulatory_info *afc_info)
 	else
 		dbg_id = WLAN_REGULATORY_SB_ID;
 
-	reg_debug("process reg afc master chan list");
-	this_mchan_params = &soc_reg->mas_chan_params[phy_id];
-	afc_mas_chan_list = this_mchan_params->mas_chan_list_6g_afc;
-	qdf_mem_zero(afc_mas_chan_list,
-		     NUM_6GHZ_CHANNELS * sizeof(struct regulatory_channel));
-	reg_init_6ghz_master_chan(afc_mas_chan_list, soc_reg);
-	soc_reg->mas_chan_params[phy_id].is_6g_afc_power_event_received = true;
 	pdev = wlan_objmgr_get_pdev_by_id(psoc, pdev_id, dbg_id);
 
 	if (!pdev) {
@@ -4833,6 +5014,24 @@ reg_process_afc_power_event(struct afc_regulatory_info *afc_info)
 		wlan_objmgr_pdev_release_ref(pdev, dbg_id);
 		return QDF_STATUS_E_FAILURE;
 	}
+
+	if (afc_info->power_info->fw_status_code !=
+	    REG_FW_AFC_POWER_EVENT_SUCCESS) {
+		reg_err_rl("AFC Power event failure status code %d",
+			   afc_info->power_info->fw_status_code);
+		reg_reset_chan_list_and_power_event(pdev_priv_obj);
+		reg_send_afc_power_event(pdev, afc_info->power_info);
+		wlan_objmgr_pdev_release_ref(pdev, dbg_id);
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	reg_debug("process reg afc master chan list");
+	this_mchan_params = &soc_reg->mas_chan_params[phy_id];
+	afc_mas_chan_list = this_mchan_params->mas_chan_list_6g_afc;
+	qdf_mem_zero(afc_mas_chan_list,
+		     NUM_6GHZ_CHANNELS * sizeof(struct regulatory_channel));
+	reg_init_6ghz_master_chan(afc_mas_chan_list, soc_reg);
+	soc_reg->mas_chan_params[phy_id].is_6g_afc_power_event_received = true;
 
 	reg_init_pdev_super_chan_list(pdev_priv_obj);
 	reg_init_6ghz_master_chan(pdev_priv_obj->afc_chan_list, soc_reg);

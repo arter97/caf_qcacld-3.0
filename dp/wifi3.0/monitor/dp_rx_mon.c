@@ -398,6 +398,23 @@ dp_rx_inc_rusize_cnt(struct dp_pdev *pdev,
 	return is_data;
 }
 
+#ifdef QCA_MANUAL_TRIGGERED_ULOFDMA
+static inline void
+dp_rx_update_manual_ulofdma_trig(struct mon_rx_user_status *rx_user_status,
+				 struct cdp_rx_stats_ppdu_user *user)
+{
+	user->is_manual_ulofdma_trig =
+		HTT_UL_OFDMA_USER_INFO_V0_W0_MANUAL_ULOFDMA_TRIG_GET(
+		rx_user_status->mu_ul_user_v0_word0);
+}
+#else
+static inline void
+dp_rx_update_manual_ulofdma_trig(struct mon_rx_user_status *rx_user_status,
+				 struct cdp_rx_stats_ppdu_user *user)
+{
+}
+#endif
+
 /**
  * dp_rx_populate_cdp_indication_ppdu_user() - Populate per user cdp indication
  * @pdev: pdev ctx
@@ -501,6 +518,9 @@ dp_rx_populate_cdp_indication_ppdu_user(struct dp_pdev *pdev,
 		cdp_rx_ppdu->vdev_id = peer->vdev->vdev_id;
 		rx_stats_peruser->vdev_id = peer->vdev->vdev_id;
 		rx_stats_peruser->mu_ul_info_valid = 0;
+
+		dp_rx_update_manual_ulofdma_trig(rx_user_status,
+						 rx_stats_peruser);
 
 		mon_ops = dp_mon_ops_get(soc);
 		if (mon_ops && mon_ops->mon_rx_populate_ppdu_usr_info)

@@ -746,7 +746,7 @@ hal_be_get_mon_dest_status(hal_soc_handle_t hal_soc,
 }
 #endif
 
-#if defined(RX_PPDU_END_USER_STATS_OFDMA_INFO_VALID_OFFSET) && \
+#if defined(RX_PPDU_END_USER_STATS_SW_RESPONSE_REFERENCE_PTR_OFFSET) && \
 defined(RX_PPDU_END_USER_STATS_SW_RESPONSE_REFERENCE_PTR_EXT_OFFSET)
 
 static inline void
@@ -1431,6 +1431,27 @@ hal_tx_status_get_tlv_tag(void *tx_tlv_hdr)
 	tlv_tag = HAL_RX_GET_USER_TLV32_TYPE(tx_tlv_hdr);
 
 	return tlv_tag;
+}
+
+/**
+ * hal_txmon_set_word_mask() - api to set word mask for tx monitor
+ * @hal_soc_hdl: HAL soc handle
+ * @wmask: pointer to hal_txmon_word_mask_config_t
+ *
+ * Return: bool
+ */
+static inline bool
+hal_txmon_set_word_mask(hal_soc_handle_t hal_soc_hdl,
+			hal_txmon_word_mask_config_t *wmask)
+{
+	struct hal_soc *hal_soc = (struct hal_soc *)hal_soc_hdl;
+
+	if (hal_soc->ops->hal_txmon_set_word_mask) {
+		hal_soc->ops->hal_txmon_set_word_mask(wmask);
+		return true;
+	}
+
+	return false;
 }
 #endif
 

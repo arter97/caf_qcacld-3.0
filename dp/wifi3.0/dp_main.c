@@ -1187,6 +1187,37 @@ static QDF_STATUS dp_peer_ast_entry_del_by_pdev(struct cdp_soc_t *soc_handle,
 }
 
 /**
+ * dp_peer_HMWDS_ast_entry_del() - delete the ast entry from soc AST hash
+ *                                 table if HMWDS rem-addr command is issued
+ *
+ * @soc_handle: data path soc handle
+ * @vdev_id: vdev id
+ * @wds_macaddr: AST entry mac address to delete
+ * @type: cdp_txrx_ast_entry_type to send to FW
+ * @delete_in_fw: flag to indicate AST entry deletion in FW
+ *
+ * Return: QDF_STATUS_SUCCESS if ast entry found with ast_mac_addr and delete
+ *         is sent
+ *         QDF_STATUS_E_INVAL false if ast entry not found
+ */
+static QDF_STATUS dp_peer_HMWDS_ast_entry_del(struct cdp_soc_t *soc_handle,
+					      uint8_t vdev_id,
+					      uint8_t *wds_macaddr,
+					      uint8_t type,
+					      uint8_t delete_in_fw)
+{
+	struct dp_soc *soc = (struct dp_soc *)soc_handle;
+
+	if (soc->ast_offload_support) {
+		dp_del_wds_entry_wrapper(soc, vdev_id, wds_macaddr, type,
+					 delete_in_fw);
+		return QDF_STATUS_SUCCESS;
+	}
+
+	return -QDF_STATUS_E_INVAL;
+}
+
+/**
  * dp_srng_find_ring_in_mask() - find which ext_group a ring belongs
  * @ring_num: ring num of the ring being queried
  * @grp_mask: the grp_mask array for the ring type in question.
@@ -1860,6 +1891,37 @@ static void dp_print_peer_table(struct dp_vdev *vdev)
 			     DP_MOD_ID_GENERIC_STATS);
 }
 
+/**
+ * dp_srng_configure_pointer_update_thresholds() - Retrieve pointer
+ * update threshold value from wlan_cfg_ctx
+ * @soc: device handle
+ * @ring_params: per ring specific parameters
+ * @ring_type: Ring type
+ * @ring_num: Ring number for a given ring type
+ * @num_entries: number of entries to fill
+ *
+ * Fill the ring params with the pointer update threshold
+ * configuration parameters available in wlan_cfg_ctx
+ *
+ * Return: None
+ */
+static void
+dp_srng_configure_pointer_update_thresholds(
+				struct dp_soc *soc,
+				struct hal_srng_params *ring_params,
+				int ring_type, int ring_num,
+				int num_entries)
+{
+	if (ring_type == REO_DST) {
+		ring_params->pointer_timer_threshold =
+			wlan_cfg_get_pointer_timer_threshold_rx(
+						soc->wlan_cfg_ctx);
+		ring_params->pointer_num_threshold =
+			wlan_cfg_get_pointer_num_threshold_rx(
+						soc->wlan_cfg_ctx);
+	}
+}
+
 #ifdef WLAN_DP_PER_RING_TYPE_CONFIG
 /**
  * dp_srng_configure_interrupt_thresholds() - Retrieve interrupt
@@ -2376,6 +2438,9 @@ QDF_STATUS dp_srng_init_idx(struct dp_soc *soc, struct dp_srng *srng,
 					       srng->num_entries);
 
 	dp_srng_set_nf_thresholds(soc, srng, &ring_params);
+	dp_srng_configure_pointer_update_thresholds(soc, &ring_params,
+						    ring_type, ring_num,
+						    srng->num_entries);
 
 	if (srng->cached)
 		ring_params.flags |= HAL_SRNG_CACHED_DESC;
@@ -7840,13 +7905,29 @@ static QDF_STATUS dp_txrx_peer_detach(struct dp_soc *soc, struct dp_peer *peer)
 	return QDF_STATUS_SUCCESS;
 }
 
+static inline
+uint8_t dp_txrx_peer_calculate_stats_size(struct dp_soc *soc,
+					  struct dp_peer *peer)
+{
+	if ((wlan_cfg_is_peer_link_stats_enabled(soc->wlan_cfg_ctx)) &&
+	    IS_MLO_DP_MLD_PEER(peer)) {
+		return (DP_MAX_MLO_LINKS + 1);
+	}
+	return 1;
+}
+
 static QDF_STATUS dp_txrx_peer_attach(struct dp_soc *soc, struct dp_peer *peer)
 {
 	struct dp_txrx_peer *txrx_peer;
 	struct dp_pdev *pdev;
 	struct cdp_txrx_peer_params_update params = {0};
+	uint8_t stats_arr_size = 0;
 
-	txrx_peer = (struct dp_txrx_peer *)qdf_mem_malloc(sizeof(*txrx_peer));
+	stats_arr_size = dp_txrx_peer_calculate_stats_size(soc, peer);
+
+	txrx_peer = (struct dp_txrx_peer *)qdf_mem_malloc(sizeof(*txrx_peer) +
+							  (stats_arr_size *
+							   sizeof(struct dp_peer_stats)));
 
 	if (!txrx_peer)
 		return QDF_STATUS_E_NOMEM; /* failure */
@@ -7855,8 +7936,14 @@ static QDF_STATUS dp_txrx_peer_attach(struct dp_soc *soc, struct dp_peer *peer)
 	/* initialize the peer_id */
 	txrx_peer->vdev = peer->vdev;
 	pdev = peer->vdev->pdev;
+	txrx_peer->stats_arr_size = stats_arr_size;
 
-	DP_STATS_INIT(txrx_peer);
+	DP_TXRX_PEER_STATS_INIT(txrx_peer,
+				(txrx_peer->stats_arr_size *
+				sizeof(struct dp_peer_stats)));
+
+	if (!IS_DP_LEGACY_PEER(peer))
+		txrx_peer->is_mld_peer = 1;
 
 	dp_wds_ext_peer_init(txrx_peer);
 	dp_peer_rx_bufq_resources_init(txrx_peer);
@@ -7912,7 +7999,9 @@ void dp_txrx_peer_stats_clr(struct dp_txrx_peer *txrx_peer)
 	txrx_peer->to_stack.num = 0;
 	txrx_peer->to_stack.bytes = 0;
 
-	DP_STATS_CLR(txrx_peer);
+	DP_TXRX_PEER_STATS_CLR(txrx_peer,
+			       (txrx_peer->stats_arr_size *
+			       sizeof(struct dp_peer_stats)));
 	dp_peer_delay_stats_ctx_clr(txrx_peer);
 	dp_peer_jitter_stats_ctx_clr(txrx_peer);
 }
@@ -8277,7 +8366,7 @@ QDF_STATUS dp_peer_mlo_setup(
 		dp_link_peer_add_mld_peer(peer, mld_peer);
 		dp_mld_peer_add_link_peer(mld_peer, peer);
 
-		mld_peer->txrx_peer->mld_peer = 1;
+		mld_peer->txrx_peer->is_mld_peer = 1;
 		dp_peer_unref_delete(mld_peer, DP_MOD_ID_CDP);
 	} else {
 		peer->mld_peer = NULL;
@@ -9972,6 +10061,7 @@ void dp_get_peer_basic_stats(struct dp_peer *peer,
 	peer_stats->rx.to_stack.bytes += txrx_peer->to_stack.bytes;
 }
 
+#ifdef QCA_ENHANCED_STATS_SUPPORT
 /**
  * dp_get_peer_per_pkt_stats()- Get peer per pkt stats
  * @peer: Datapath peer
@@ -9985,15 +10075,33 @@ void dp_get_peer_per_pkt_stats(struct dp_peer *peer,
 {
 	struct dp_txrx_peer *txrx_peer;
 	struct dp_peer_per_pkt_stats *per_pkt_stats;
+	uint8_t inx = 0, link_id = 0;
+	struct dp_pdev *pdev;
+	struct dp_soc *soc;
+	uint8_t stats_arr_size;
 
 	txrx_peer = dp_get_txrx_peer(peer);
+	pdev = peer->vdev->pdev;
+
 	if (!txrx_peer)
 		return;
 
-	per_pkt_stats = &txrx_peer->stats.per_pkt_stats;
-	DP_UPDATE_PER_PKT_STATS(peer_stats, per_pkt_stats);
+	if (!IS_MLO_DP_LINK_PEER(peer)) {
+		stats_arr_size = txrx_peer->stats_arr_size;
+		for (inx = 0; inx < stats_arr_size; inx++) {
+			per_pkt_stats = &txrx_peer->stats[inx].per_pkt_stats;
+			DP_UPDATE_PER_PKT_STATS(peer_stats, per_pkt_stats);
+		}
+	} else {
+		soc = pdev->soc;
+		link_id = dp_get_peer_hw_link_id(soc, pdev);
+		per_pkt_stats =
+			&txrx_peer->stats[link_id].per_pkt_stats;
+		DP_UPDATE_PER_PKT_STATS(peer_stats, per_pkt_stats);
+	}
 }
 
+#ifdef WLAN_FEATURE_11BE_MLO
 /**
  * dp_get_peer_extd_stats()- Get peer extd stats
  * @peer: Datapath peer
@@ -10001,8 +10109,6 @@ void dp_get_peer_per_pkt_stats(struct dp_peer *peer,
  *
  * Return: none
  */
-#ifdef QCA_ENHANCED_STATS_SUPPORT
-#ifdef WLAN_FEATURE_11BE_MLO
 static inline
 void dp_get_peer_extd_stats(struct dp_peer *peer,
 			    struct cdp_peer_stats *peer_stats)
@@ -10043,6 +10149,21 @@ void dp_get_peer_extd_stats(struct dp_peer *peer,
 #endif
 #else
 static inline
+void dp_get_peer_per_pkt_stats(struct dp_peer *peer,
+			       struct cdp_peer_stats *peer_stats)
+{
+	struct dp_txrx_peer *txrx_peer;
+	struct dp_peer_per_pkt_stats *per_pkt_stats;
+
+	txrx_peer = dp_get_txrx_peer(peer);
+	if (!txrx_peer)
+		return;
+
+	per_pkt_stats = &txrx_peer->stats[0].per_pkt_stats;
+	DP_UPDATE_PER_PKT_STATS(peer_stats, per_pkt_stats);
+}
+
+static inline
 void dp_get_peer_extd_stats(struct dp_peer *peer,
 			    struct cdp_peer_stats *peer_stats)
 {
@@ -10055,7 +10176,7 @@ void dp_get_peer_extd_stats(struct dp_peer *peer,
 		return;
 	}
 
-	extd_stats = &txrx_peer->stats.extd_stats;
+	extd_stats = &txrx_peer->stats[0].extd_stats;
 	DP_UPDATE_EXTD_STATS(peer_stats, extd_stats);
 }
 #endif
@@ -13779,6 +13900,11 @@ static void dp_reinit_rings(struct dp_soc *soc)
  */
 static QDF_STATUS dp_umac_reset_handle_pre_reset(struct dp_soc *soc)
 {
+	if (wlan_cfg_get_dp_soc_is_ppeds_enabled(soc->wlan_cfg_ctx)) {
+		dp_err("Umac reset is currently not supported in DS config");
+		qdf_assert_always(0);
+	}
+
 	dp_reset_interrupt_ring_masks(soc);
 
 	dp_pause_tx_hardstart(soc);
@@ -14035,6 +14161,7 @@ static struct cdp_cmn_ops dp_ops_cmn = {
 		dp_peer_ast_entry_del_by_soc,
 	.txrx_peer_ast_delete_by_pdev =
 		dp_peer_ast_entry_del_by_pdev,
+	.txrx_peer_HMWDS_ast_delete = dp_peer_HMWDS_ast_entry_del,
 	.txrx_peer_delete = dp_peer_delete_wifi3,
 #ifdef DP_RX_UDP_OVER_PEER_ROAM
 	.txrx_update_roaming_peer = dp_update_roaming_peer_wifi3,

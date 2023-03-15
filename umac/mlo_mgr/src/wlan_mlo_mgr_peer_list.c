@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -290,6 +290,38 @@ struct wlan_mlo_peer_context *wlan_mlo_get_mlpeer_by_mld_mac(
 		return mld_mac_arg.ml_peer;
 
 	/* TODO: Take ref */
+
+	return NULL;
+}
+
+struct wlan_mlo_peer_context
+*wlan_mlo_get_mlpeer_by_peer_mladdr(struct qdf_mac_addr *mldaddr,
+				struct wlan_mlo_dev_context **mldev)
+{
+	struct wlan_mlo_dev_context *mld_cur;
+	struct wlan_mlo_dev_context *mld_next;
+	struct wlan_mlo_peer_context *ml_peer;
+	qdf_list_t *ml_list;
+	struct mlo_mgr_context *mlo_mgr_ctx = wlan_objmgr_get_mlo_ctx();
+
+	if (!mlo_mgr_ctx)
+		return NULL;
+
+	ml_link_lock_acquire(mlo_mgr_ctx);
+	ml_list = &mlo_mgr_ctx->ml_dev_list;
+	mld_cur = wlan_mlo_list_peek_head(ml_list);
+
+	while (mld_cur) {
+		ml_peer = mlo_get_mlpeer(mld_cur, mldaddr);
+		if (ml_peer != NULL) {
+			*mldev = mld_cur;
+			ml_link_lock_release(mlo_mgr_ctx);
+			return ml_peer;
+		}
+		mld_next = wlan_mlo_get_next_mld_ctx(ml_list, mld_cur);
+		mld_cur = mld_next;
+	}
+	ml_link_lock_release(mlo_mgr_ctx);
 
 	return NULL;
 }

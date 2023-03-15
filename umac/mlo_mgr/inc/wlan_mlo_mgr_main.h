@@ -887,6 +887,30 @@ struct wlan_mlo_dev_context
 *wlan_mlo_get_mld_ctx_by_mldaddr(struct qdf_mac_addr *mldaddr);
 
 /**
+ * wlan_mlo_list_peek_head() - Returns the head of linked list
+ *
+ * @ml_list: Pointer to the list of MLDs
+ *
+ * API to retrieve the head from the list of active MLDs
+ *
+ * Return: Pointer to mlo device context
+ */
+struct wlan_mlo_dev_context *wlan_mlo_list_peek_head(qdf_list_t *ml_list);
+
+/**
+ * wlan_mlo_get_next_mld_ctx() - Return next mlo dev node from the list
+ *
+ * @ml_list:  Pointer to the list of MLDs
+ * @mld_cur: Pointer to the current mlo dev node
+ *
+ * API to retrieve the next node from the list of active MLDs
+ *
+ * Return: Pointer to mlo device context
+ */
+struct wlan_mlo_dev_context *wlan_mlo_get_next_mld_ctx(qdf_list_t *ml_list,
+					struct wlan_mlo_dev_context *mld_cur);
+
+/**
  * wlan_mlo_check_valid_config() - Check vap config is valid for mld
  *
  * @ml_dev: Pointer to structure of mlo device context

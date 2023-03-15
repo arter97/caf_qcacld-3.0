@@ -1203,10 +1203,14 @@ mlo_send_link_disconnect_sync(struct wlan_mlo_dev_context *mlo_dev_ctx,
 		if (!mlo_dev_ctx->wlan_vdev_list[i])
 			continue;
 
+		/*
+		 * To initiate disconnect on all links at once, no need to use
+		 * sync API for link Vdev
+		 */
 		if (mlo_dev_ctx->wlan_vdev_list[i] !=
 		    mlo_get_assoc_link_vdev(mlo_dev_ctx))
-			wlan_cm_disconnect_sync(mlo_dev_ctx->wlan_vdev_list[i],
-						source, reason_code);
+			wlan_cm_disconnect(mlo_dev_ctx->wlan_vdev_list[i],
+					   source, reason_code, NULL);
 	}
 
 	wlan_cm_disconnect_sync(assoc_vdev,

@@ -917,8 +917,20 @@ bool dp_tx_mlo_is_mcast_primary_be(struct dp_soc *soc,
 #endif
 
 #ifdef CONFIG_SAWF
+/**
+ * dp_sawf_config_be - Configure sawf specific fields in tcl
+ *
+ * @soc: DP soc handle
+ * @hal_tx_desc_cached: tx descriptor
+ * @fw_metadata: firmware metadata
+ * @nbuf: skb buffer
+ * @msdu_info: msdu info
+ *
+ * Return: void
+ */
 void dp_sawf_config_be(struct dp_soc *soc, uint32_t *hal_tx_desc_cached,
-		       uint16_t *fw_metadata, qdf_nbuf_t nbuf)
+		       uint16_t *fw_metadata, qdf_nbuf_t nbuf,
+		       struct dp_tx_msdu_info_s *msdu_info)
 {
 	uint8_t q_id = 0;
 
@@ -930,6 +942,7 @@ void dp_sawf_config_be(struct dp_soc *soc, uint32_t *hal_tx_desc_cached,
 
 	if (q_id == DP_SAWF_DEFAULT_Q_INVALID)
 		return;
+	msdu_info->tid = (q_id & (CDP_DATA_TID_MAX - 1));
 	hal_tx_desc_set_hlos_tid(hal_tx_desc_cached,
 				 (q_id & (CDP_DATA_TID_MAX - 1)));
 	hal_tx_desc_set_flow_override_enable(hal_tx_desc_cached,
@@ -944,7 +957,8 @@ void dp_sawf_config_be(struct dp_soc *soc, uint32_t *hal_tx_desc_cached,
 
 static inline
 void dp_sawf_config_be(struct dp_soc *soc, uint32_t *hal_tx_desc_cached,
-		       uint16_t *fw_metadata, qdf_nbuf_t nbuf)
+		       uint16_t *fw_metadata, qdf_nbuf_t nbuf,
+		       struct dp_tx_msdu_info_s *msdu_info)
 {
 }
 
@@ -1141,7 +1155,7 @@ dp_tx_hw_enqueue_be(struct dp_soc *soc, struct dp_vdev *vdev,
 	int coalesce = 0;
 	struct dp_tx_queue *tx_q = &msdu_info->tx_queue;
 	uint8_t ring_id = tx_q->ring_id;
-	uint8_t tid = msdu_info->tid;
+	uint8_t tid;
 	struct dp_vdev_be *be_vdev;
 	uint8_t cached_desc[HAL_TX_DESC_LEN_BYTES] = { 0 };
 	uint8_t bm_id = dp_tx_get_rbm_id_be(soc, ring_id);
@@ -1178,7 +1192,7 @@ dp_tx_hw_enqueue_be(struct dp_soc *soc, struct dp_vdev *vdev,
 
 	if (dp_sawf_tag_valid_get(tx_desc->nbuf)) {
 		dp_sawf_config_be(soc, hal_tx_desc_cached,
-				  &fw_metadata, tx_desc->nbuf);
+				  &fw_metadata, tx_desc->nbuf, msdu_info);
 		dp_sawf_tx_enqueue_peer_stats(soc, tx_desc);
 	}
 
@@ -1217,6 +1231,7 @@ dp_tx_hw_enqueue_be(struct dp_soc *soc, struct dp_vdev *vdev,
 
 	dp_tx_vdev_id_set_hal_tx_desc(hal_tx_desc_cached, vdev, msdu_info);
 
+	tid = msdu_info->tid;
 	if (tid != HTT_TX_EXT_TID_INVALID)
 		hal_tx_desc_set_hlos_tid(hal_tx_desc_cached, tid);
 

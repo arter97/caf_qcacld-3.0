@@ -276,6 +276,10 @@ struct cdp_cmn_ops {
 		txrx_ast_free_cb callback,
 		void *cookie);
 
+	QDF_STATUS (*txrx_peer_HMWDS_ast_delete)
+		(ol_txrx_soc_handle soc, uint8_t vdev_id, uint8_t *dest_mac,
+		 uint8_t type, uint8_t delete_in_fw);
+
 	QDF_STATUS
 	(*txrx_peer_delete)(struct cdp_soc_t *soc, uint8_t vdev_id,
 			    uint8_t *peer_mac, uint32_t bitmap,
@@ -980,6 +984,8 @@ struct cdp_me_ops {
  * @txrx_set_lite_mon_peer_config: set lite monitor peer config
  * @txrx_get_lite_mon_peer_config: get lite monitor peer list
  * @txrx_is_lite_mon_enabled: get lite monitor enable/disable status
+ * @txrx_enable_enhanced_stats: Enable enhanced stats
+ * @txrx_disable_enhanced_stats: Disable enhanced stats
  * @txrx_get_lite_mon_legacy_feature_enabled: returns the legacy filter enabled
  * @txrx_set_mon_pdev_params_rssi_dbm_conv: To set RSSI dbm conversion params
  *                                           in monitor pdev
@@ -1010,6 +1016,12 @@ struct cdp_mon_ops {
 	bool (*txrx_enable_mon_reap_timer)(struct cdp_soc_t *soc_hdl,
 					   enum cdp_mon_reap_source source,
 					   bool enable);
+
+	QDF_STATUS (*txrx_enable_enhanced_stats)(struct cdp_soc_t *soc,
+						 uint8_t pdev_id);
+
+	QDF_STATUS (*txrx_disable_enhanced_stats)(struct cdp_soc_t *soc,
+						  uint8_t pdev_id);
 
 #ifdef QCA_SUPPORT_LITE_MONITOR
 	QDF_STATUS
@@ -1064,8 +1076,6 @@ struct cdp_mon_ops {
  * @txrx_host_stats_clr:
  * @txrx_host_ce_stats:
  * @txrx_stats_publish:
- * @txrx_enable_enhanced_stats: Enable enhanced stats functionality.
- * @txrx_disable_enhanced_stats: Disable enhanced stats functionality.
  * @tx_print_tso_stats:
  * @tx_rst_tso_stats:
  * @tx_print_sg_stats:
@@ -1123,10 +1133,6 @@ struct cdp_host_stats_ops {
 
 	int (*txrx_stats_publish)(struct cdp_soc_t *soc, uint8_t pdev_id,
 				  struct cdp_stats_extd *buf);
-	QDF_STATUS (*txrx_enable_enhanced_stats)(struct cdp_soc_t *soc,
-						 uint8_t pdev_id);
-	QDF_STATUS (*txrx_disable_enhanced_stats)(struct cdp_soc_t *soc,
-						  uint8_t pdev_id);
 
 	QDF_STATUS
 		(*tx_print_tso_stats)(struct cdp_soc_t *soc, uint8_t vdev_id);
@@ -1458,6 +1464,11 @@ struct ol_if_ops {
 				   qdf_nbuf_t nbuf,
 				   uint16_t hdr_space);
 
+#ifdef QCA_SUPPORT_PRIMARY_LINK_MIGRATE
+	void (*update_primary_link)(struct cdp_ctrl_objmgr_psoc *psoc,
+				    uint8_t *mac_addr);
+#endif
+
 	uint8_t (*freq_to_channel)(struct cdp_ctrl_objmgr_psoc *psoc,
 				   uint8_t pdev_id, uint16_t freq);
 
@@ -1569,8 +1580,8 @@ struct ol_if_ops {
 				      uint8_t vdev_id, uint8_t *peer_mac,
 				      uint8_t tid, uint8_t ac,
 				      uint32_t service_interval,
-				      uint32_t burst_size,
-				      uint8_t add_sub);
+				      uint32_t burst_size, uint32_t min_tput,
+				      uint32_t max_latency, uint8_t add_sub);
 #endif
 	uint32_t (*dp_get_tx_inqueue)(ol_txrx_soc_handle soc);
 	QDF_STATUS(*dp_send_unit_test_cmd)(uint32_t vdev_id,
@@ -2337,6 +2348,7 @@ struct cdp_sawf_ops {
 	QDF_STATUS
 	(*peer_config_ul)(struct cdp_soc_t *hdl, uint8_t *mac_addr, uint8_t tid,
 			  uint32_t service_interval, uint32_t burst_size,
+			  uint32_t min_tput, uint32_t max_latency,
 			  uint8_t add_or_sub);
 	bool
 	(*swaf_peer_is_sla_configured)(struct cdp_soc_t *soc,
@@ -2348,6 +2360,9 @@ struct cdp_sawf_ops {
 
 #ifdef WLAN_SUPPORT_PPEDS
 struct cdp_ppeds_txrx_ops {
+	QDF_STATUS
+	(*ppeds_vp_setup_recovery)(struct cdp_soc_t *soc,
+				   uint8_t vdev_id, uint16_t profile_idx);
 	QDF_STATUS
 	(*ppeds_entry_attach)(struct cdp_soc_t *soc,
 			      uint8_t vdev_id, void *vpai,

@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2018-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -88,7 +88,7 @@ bool ucfg_ipa_is_enabled(void);
 bool ucfg_ipa_uc_is_enabled(void);
 
 /**
- * ucfg_ipa_is_vlan enabled() - get IPA vlan support enable status
+ * ucfg_ipa_is_vlan_enabled() - get IPA vlan support enable status
  *
  * Return: true - ipa vlan support is enabled
  *         false - ipa vlan support is not enabled
@@ -318,6 +318,7 @@ bool ucfg_ipa_is_tx_pending(struct wlan_objmgr_pdev *pdev);
 
 /**
  * ucfg_ipa_send_mcc_scc_msg() - Send IPA WLAN_SWITCH_TO_MCC/SCC message
+ * @pdev: pdev obj
  * @mcc_mode: 0=MCC/1=SCC
  *
  * Return: QDF STATUS
@@ -331,8 +332,8 @@ QDF_STATUS ucfg_ipa_send_mcc_scc_msg(struct wlan_objmgr_pdev *pdev,
  * @net_dev: Interface net device
  * @device_mode: Net interface device mode
  * @session_id: session id for the event
- * @type: event enum of type ipa_wlan_event
- * @mac_address: MAC address associated with the event
+ * @ipa_event_type: event enum of type ipa_wlan_event
+ * @mac_addr: MAC address associated with the event
  * @is_2g_iface: true if interface is operating on 2G band, otherwise false
  *
  * Return: QDF_STATUS
@@ -432,7 +433,7 @@ void ucfg_ipa_component_config_update(struct wlan_objmgr_psoc *psoc);
 void ucfg_ipa_component_config_free(void);
 
 /**
- * ucfg_get_ipa_tx_buf_count() - get IPA tx buffer count
+ * ucfg_ipa_get_tx_buf_count() - get IPA tx buffer count
  *
  * Return: IPA tx buffer count
  */

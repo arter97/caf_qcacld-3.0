@@ -45,19 +45,13 @@
 #include <hal_api.h>
 #include <hal_api_mon.h>
 #include "hal_rx.h"
-//#include "hal_rx_flow.h"
 
 #define MAX_BW 8
 #define MAX_RETRIES 4
 #define MAX_RECEPTION_TYPES 4
 
 #define MINIDUMP_STR_SIZE 25
-#ifndef REMOVE_PKT_LOG
-#include <pktlog.h>
-#endif
 #include <dp_umac_reset.h>
-
-//#include "dp_tx.h"
 
 #define REPT_MU_MIMO 1
 #define REPT_MU_OFDMA_MIMO 3
@@ -2160,6 +2154,7 @@ enum dp_context_type {
  * @dp_service_near_full_srngs: Handler for servicing the near full IRQ
  * @tx_implicit_rbm_set:
  * @dp_rx_peer_metadata_peer_id_get:
+ * @dp_rx_peer_mdata_link_id_get: Handle to get link id
  * @dp_rx_chain_msdus:
  * @txrx_set_vdev_param: target specific ops while setting vdev params
  * @txrx_get_vdev_mcast_param: target specific ops for getting vdev
@@ -2177,6 +2172,7 @@ enum dp_context_type {
  * @mlo_peer_find_hash_add:
  * @mlo_peer_find_hash_remove:
  * @mlo_peer_find_hash_find:
+ * @get_hw_link_id:
  * @get_reo_qdesc_addr:
  * @get_rx_hash_key:
  * @dp_set_rx_fst:
@@ -2292,7 +2288,8 @@ struct dp_arch_ops {
 	(*dp_rx_intrabss_mcast_handler)(struct dp_soc *soc,
 					struct dp_txrx_peer *ta_txrx_peer,
 					qdf_nbuf_t nbuf_copy,
-					struct cdp_tid_rx_stats *tid_stats);
+					struct cdp_tid_rx_stats *tid_stats,
+					uint8_t link_id);
 
 	void (*dp_rx_word_mask_subscribe)(
 				struct dp_soc *soc,
@@ -2308,6 +2305,7 @@ struct dp_arch_ops {
 				    uint8_t bm_id);
 	uint16_t (*dp_rx_peer_metadata_peer_id_get)(struct dp_soc *soc,
 						    uint32_t peer_metadata);
+	uint8_t (*dp_rx_peer_mdata_link_id_get)(uint32_t peer_metadata);
 	bool (*dp_rx_chain_msdus)(struct dp_soc *soc, qdf_nbuf_t nbuf,
 				  uint8_t *rx_tlv_hdr, uint8_t mac_id);
 	/* Control Arch Ops */
@@ -2335,7 +2333,8 @@ struct dp_arch_ops {
 	void (*dp_tx_mcast_handler)(struct dp_soc *soc, struct dp_vdev *vdev,
 				    qdf_nbuf_t nbuf);
 	bool (*dp_rx_mcast_handler)(struct dp_soc *soc, struct dp_vdev *vdev,
-				    struct dp_txrx_peer *peer, qdf_nbuf_t nbuf);
+				    struct dp_txrx_peer *peer, qdf_nbuf_t nbuf,
+				    uint8_t link_id);
 	bool (*dp_tx_is_mcast_primary)(struct dp_soc *soc,
 				       struct dp_vdev *vdev);
 #endif
@@ -2355,6 +2354,7 @@ struct dp_arch_ops {
 						   enum dp_mod_id mod_id,
 						   uint8_t vdev_id);
 #endif
+	uint8_t (*get_hw_link_id)(struct dp_pdev *pdev);
 	uint64_t (*get_reo_qdesc_addr)(hal_soc_handle_t hal_soc_hdl,
 				       uint8_t *dst_ring_desc,
 				       uint8_t *buf,
@@ -2426,7 +2426,8 @@ struct dp_arch_ops {
 					       uint8_t *rx_tlv_hdr,
 					       uint8_t pool_id,
 					       struct dp_txrx_peer *txrx_peer,
-					       bool is_reo_exception);
+					       bool is_reo_exception,
+					       uint8_t link_id);
 };
 
 /**
@@ -3390,7 +3391,8 @@ struct dp_pdev {
 	bool is_pdev_down;
 
 	/* Enhanced Stats is enabled */
-	bool enhanced_stats_en;
+	uint8_t enhanced_stats_en:1,
+		link_peer_stats:1;
 
 	/* Flag to indicate fast RX */
 	bool rx_fast_flag;
@@ -4154,7 +4156,7 @@ struct dp_peer_mesh_latency_parameter {
 
 #ifdef WLAN_FEATURE_11BE_MLO
 /* Max number of links for MLO connection */
-#define DP_MAX_MLO_LINKS 3
+#define DP_MAX_MLO_LINKS 4
 
 /**
  * struct dp_peer_link_info - link peer information for MLO
@@ -4180,6 +4182,8 @@ struct dp_mld_link_peers {
 	struct dp_peer *link_peers[DP_MAX_MLO_LINKS];
 	uint8_t num_links;
 };
+#else
+#define DP_MAX_MLO_LINKS 0
 #endif
 
 typedef void *dp_txrx_ref_handle;
@@ -4589,11 +4593,10 @@ struct dp_peer_stats {
  * @authorize: Set when authorized
  * @in_twt: in TWT session
  * @hw_txrx_stats_en: Indicate HW offload vdev stats
- * @mld_peer:1: MLD peer
+ * @is_mld_peer:1: MLD peer
  * @tx_failed: Total Tx failure
  * @comp_pkt: Pkt Info for which completions were received
  * @to_stack: Total packets sent up the stack
- * @stats: Peer stats
  * @delay_stats: Peer delay stats
  * @jitter_stats: Peer jitter stats
  * @security: Security credentials
@@ -4612,6 +4615,8 @@ struct dp_peer_stats {
  * @sawf_stats:
  * @bw: bandwidth of peer connection
  * @mpdu_retry_threshold: MPDU retry threshold to increment tx bad count
+ * @stats_arr_size: peer stats array size
+ * @stats: Peer link and mld statistics
  */
 struct dp_txrx_peer {
 	struct dp_vdev *vdev;
@@ -4619,12 +4624,10 @@ struct dp_txrx_peer {
 	uint8_t authorize:1,
 		in_twt:1,
 		hw_txrx_stats_en:1,
-		mld_peer:1;
+		is_mld_peer:1;
 	uint32_t tx_failed;
 	struct cdp_pkt_info comp_pkt;
 	struct cdp_pkt_info to_stack;
-
-	struct dp_peer_stats stats;
 
 	struct dp_peer_delay_stats *delay_stats;
 
@@ -4662,6 +4665,10 @@ struct dp_txrx_peer {
 	enum cdp_peer_bw bw;
 	uint8_t mpdu_retry_threshold;
 #endif
+	uint8_t stats_arr_size;
+
+	/* dp_peer_stats should be the last member in the structure */
+	struct dp_peer_stats stats[];
 };
 
 /* Peer structure for data path state */
@@ -4864,6 +4871,7 @@ struct dp_fisa_stats {
 	/* workqueue deferred due to suspend */
 	uint32_t update_deferred;
 	struct dp_fisa_reo_mismatch_stats reo_mismatch;
+	uint32_t incorrect_rdi;
 };
 
 enum fisa_aggr_ret {
