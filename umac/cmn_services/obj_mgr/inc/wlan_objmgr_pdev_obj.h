@@ -549,6 +549,19 @@ struct wlan_objmgr_vdev *wlan_objmgr_pdev_get_first_vdev(
 #endif
 
 /**
+ * wlan_objmgr_pdev_get_roam_vdev() - Get roam vdev of pdev
+ * @pdev: PDEV object
+ * @dbg_id: Object Manager ref debug id
+ *
+ * API to get reference to vdev which is in roaming from pdev.
+ *
+ * Return: reference to roam vdev
+ */
+struct wlan_objmgr_vdev *wlan_objmgr_pdev_get_roam_vdev(
+						struct wlan_objmgr_pdev *pdev,
+						wlan_objmgr_ref_dbgid dbg_id);
+
+/**
  * wlan_objmgr_pdev_get_comp_private_obj() - get pdev component private object
  * @pdev: PDEV object
  * @id: Component id

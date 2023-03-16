@@ -32,6 +32,7 @@
 #include "wlan_objmgr_psoc_obj_i.h"
 #include "wlan_objmgr_pdev_obj_i.h"
 #include <wlan_utility.h>
+#include <wlan_cm_api.h>
 
 /*
  * APIs to Create/Delete Global object APIs
@@ -819,6 +820,47 @@ struct wlan_objmgr_vdev *wlan_objmgr_pdev_get_first_vdev(
 
 qdf_export_symbol(wlan_objmgr_pdev_get_first_vdev);
 #endif
+
+struct wlan_objmgr_vdev *wlan_objmgr_pdev_get_roam_vdev(
+		struct wlan_objmgr_pdev *pdev,
+		wlan_objmgr_ref_dbgid dbg_id)
+{
+	struct wlan_objmgr_pdev_objmgr *objmgr = &pdev->pdev_objmgr;
+	qdf_list_t *vdev_list = NULL;
+	struct wlan_objmgr_vdev *vdev;
+	qdf_list_node_t *node = NULL;
+	qdf_list_node_t *prev_node = NULL;
+
+	wlan_pdev_obj_lock(pdev);
+
+	/* VDEV list */
+	vdev_list = &objmgr->wlan_vdev_list;
+	if (qdf_list_peek_front(vdev_list, &node) != QDF_STATUS_SUCCESS) {
+		wlan_pdev_obj_unlock(pdev);
+		return NULL;
+	}
+
+	do {
+		vdev = qdf_container_of(node, struct wlan_objmgr_vdev,
+					vdev_node);
+		if (wlan_objmgr_vdev_try_get_ref(vdev, dbg_id) ==
+						QDF_STATUS_SUCCESS) {
+			if (wlan_cm_is_vdev_roaming(vdev)) {
+				wlan_pdev_obj_unlock(pdev);
+				return vdev;
+			}
+
+			wlan_objmgr_vdev_release_ref(vdev, dbg_id);
+		}
+
+		prev_node = node;
+	} while (qdf_list_peek_next(vdev_list, prev_node, &node) ==
+						QDF_STATUS_SUCCESS);
+
+	wlan_pdev_obj_unlock(pdev);
+
+	return NULL;
+}
 
 #ifdef WLAN_OBJMGR_REF_ID_TRACE
 struct wlan_objmgr_vdev *wlan_objmgr_get_vdev_by_id_from_pdev_debug(

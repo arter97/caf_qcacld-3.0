@@ -297,6 +297,7 @@ typedef void (*wlan_objmgr_peer_status_handler)(
  * @WLAN_QMI_ID:                QMI component id
  * @WLAN_AFC_ID:                AFC reference id
  * @WLAN_INTRA_BSS:             Intra bss reference id
+ * @WLAN_ROAM_ID:               Roam reference id
  * @WLAN_REF_ID_MAX:            Max id used to generate ref count tracking array
  */
  /* New value added to the enum must also be reflected in function
@@ -408,6 +409,7 @@ typedef enum {
 	WLAN_QMI_ID           = 101,
 	WLAN_AFC_ID           = 102,
 	WLAN_INTRA_BSS        = 103,
+	WLAN_ROAM_ID          = 104,
 	WLAN_REF_ID_MAX,
 } wlan_objmgr_ref_dbgid;
 
@@ -524,7 +526,8 @@ static inline const char *string_from_dbgid(wlan_objmgr_ref_dbgid id)
 					"WLAN_SAWF_ID",
 					"WLAN_QMI_ID",
 					"WLAN_AFC_ID",
-					"WLAN_INTRA_BSS"
+					"WLAN_INTRA_BSS",
+					"WLAN_ROAM_ID"
 					};
 
 	if (id >= WLAN_REF_ID_MAX)
