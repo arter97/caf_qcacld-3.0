@@ -551,11 +551,14 @@ static bool is_interface_active(const char *if_name, enum stats_object_e obj)
 	if (ioctl(g_sock_ctx.sock_fd, SIOCGIFFLAGS, &dev) < 0)
 		return false;
 
-	if ((dev.ifr_flags & IFF_RUNNING) &&
-	    ((obj == STATS_OBJ_RADIO) || (dev.ifr_flags & IFF_UP)))
-		return true;
+	if ((obj == STATS_OBJ_RADIO) && !(dev.ifr_flags & IFF_RUNNING))
+		return false;
 
-	return false;
+	if ((obj == STATS_OBJ_VAP) && !(dev.ifr_flags & IFF_UP) &&
+	    !(dev.ifr_flags & IFF_RUNNING))
+		return false;
+
+	return true;
 }
 
 static bool is_vap_radiochild(const char *rif_name, const uint8_t *rhw_addr,
