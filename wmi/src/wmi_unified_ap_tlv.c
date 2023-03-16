@@ -4319,6 +4319,15 @@ QDF_STATUS send_sawf_create_cmd_tlv(wmi_unified_t wmi_handle,
 		param->tid = tid;
 	}
 
+	wmi_debug("Service class params - ID:%u, min_thruput_rate:%u, "
+		  "burst_size:%u, service_interval:%u, delay_bound:%u, tid:%u, "
+		  "priority:%u, max_thruput_rate:%u, msdu_ttl:%u, "
+		  "msdu_rate_loss:%u", cmd->svc_class_id, cmd->min_thruput_kbps,
+		  cmd->burst_size_bytes, cmd->svc_interval_ms,
+		  cmd->delay_bound_ms, cmd->tid, cmd->priority,
+		  cmd->max_thruput_kbps, cmd->time_to_live_ms,
+		  cmd->msdu_loss_rate_ppm);
+
 	ret = wmi_unified_cmd_send(wmi_handle, buf, len,
 				   WMI_SAWF_SVC_CLASS_CFG_CMDID);
 	if (QDF_IS_STATUS_ERROR(ret)) {
