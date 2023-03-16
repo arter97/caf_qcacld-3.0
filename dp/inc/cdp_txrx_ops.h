@@ -2343,6 +2343,8 @@ struct cdp_sawf_ops {
 					  uint8_t *mac_addr);
 #ifdef CONFIG_SAWF
 	QDF_STATUS
+	(*sawf_get_peer_msduq_info)(struct cdp_soc_t *soc, uint8_t *mac_addr);
+	QDF_STATUS
 	(*txrx_get_peer_sawf_delay_stats)(struct cdp_soc_t *soc,
 					  uint32_t svc_id, uint8_t *mac,
 					  void *data);
