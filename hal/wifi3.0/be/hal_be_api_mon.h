@@ -746,7 +746,7 @@ hal_be_get_mon_dest_status(hal_soc_handle_t hal_soc,
 }
 #endif
 
-#if defined(RX_PPDU_END_USER_STATS_SW_RESPONSE_REFERENCE_PTR_OFFSET) && \
+#if defined(RX_PPDU_END_USER_STATS_OFDMA_INFO_VALID_OFFSET) && \
 defined(RX_PPDU_END_USER_STATS_SW_RESPONSE_REFERENCE_PTR_EXT_OFFSET)
 
 static inline void
