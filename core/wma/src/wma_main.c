@@ -7213,6 +7213,8 @@ int wma_rx_service_ready_ext_event(void *handle, uint8_t *event,
 		return -EINVAL;
 
 	wmi_handle = get_wmi_unified_hdl_from_psoc(wma_handle->psoc);
+	if (wmi_validate_handle(wmi_handle))
+		return -EINVAL;
 
 	tgt_hdl = wlan_psoc_get_tgt_if_handle(wma_handle->psoc);
 	if (!tgt_hdl) {
