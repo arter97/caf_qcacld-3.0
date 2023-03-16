@@ -486,9 +486,10 @@ enum wlan_mlme_cfg_id;
  * @vdev_mgr_rsp_timer_stop:
  * @get_hw_link_id: Get hw_link_id for pdev
  * @get_psoc_mlo_group_id: Get MLO Group ID for the psoc
- * @target_if_mlo_setup_req:
- * @target_if_mlo_ready:
- * @target_if_mlo_teardown_req:
+ * @get_psoc_mlo_chip_id: Get MLO chip ID for the psoc
+ * @target_if_mlo_setup_req: MLO setup request
+ * @target_if_mlo_ready: MLO ready event
+ * @target_if_mlo_teardown_req: MLO teardown
  * @vdev_send_set_mac_addr: API to send set MAC address request to FW
  * @vdev_peer_set_param_send: API to send peer param to FW
  */
@@ -576,6 +577,7 @@ struct wlan_lmac_if_mlme_tx_ops {
 #if defined(WLAN_FEATURE_11BE_MLO) && defined(WLAN_MLO_MULTI_CHIP)
 	uint16_t (*get_hw_link_id)(struct wlan_objmgr_pdev *pdev);
 	uint8_t (*get_psoc_mlo_group_id)(struct wlan_objmgr_psoc *psoc);
+	uint8_t (*get_psoc_mlo_chip_id)(struct wlan_objmgr_psoc *psoc);
 	QDF_STATUS (*target_if_mlo_setup_req)(struct wlan_objmgr_pdev **pdev,
 					      uint8_t num_pdevs,
 					      uint8_t grp_id);
