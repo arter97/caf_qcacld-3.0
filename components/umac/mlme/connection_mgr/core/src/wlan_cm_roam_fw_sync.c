@@ -1258,7 +1258,8 @@ cm_disconnect_roam_abort_fail(struct wlan_objmgr_vdev *vdev,
 
 	if (source == CM_ROAMING_HOST ||
 	    (source == CM_ROAMING_NUD_FAILURE && nud_disconnect) ||
-	     source == CM_ROAMING_LINK_REMOVAL)
+	     source == CM_ROAMING_LINK_REMOVAL ||
+	     qdf_is_macaddr_zero(bssid))
 		status = mlo_disconnect(vdev, CM_ROAM_DISCONNECT,
 					REASON_USER_TRIGGERED_ROAM_FAILURE,
 					NULL);
