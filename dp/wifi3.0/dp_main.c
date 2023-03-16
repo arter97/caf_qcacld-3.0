@@ -14458,6 +14458,7 @@ static struct cdp_sawf_ops dp_ops_sawf = {
 	.sawf_def_queues_get_map_report =
 		dp_sawf_def_queues_get_map_report,
 #ifdef CONFIG_SAWF_STATS
+	.sawf_get_peer_msduq_info = dp_sawf_get_peer_msduq_info,
 	.txrx_get_peer_sawf_delay_stats = dp_sawf_get_peer_delay_stats,
 	.txrx_get_peer_sawf_tx_stats = dp_sawf_get_peer_tx_stats,
 	.sawf_mpdu_stats_req = dp_sawf_mpdu_stats_req,

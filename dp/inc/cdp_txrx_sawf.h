@@ -76,6 +76,23 @@ cdp_sawf_peer_get_map_conf(ol_txrx_soc_handle soc,
 	return soc->ops->sawf_ops->sawf_def_queues_get_map_report(soc, mac);
 }
 
+static inline QDF_STATUS
+cdp_sawf_peer_get_msduq_info(ol_txrx_soc_handle soc, uint8_t *mac)
+{
+	if (!soc || !soc->ops) {
+		dp_cdp_debug("Invalid Instance");
+		QDF_BUG(0);
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	if (!soc->ops->sawf_ops ||
+	    !soc->ops->sawf_ops->sawf_get_peer_msduq_info) {
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	return soc->ops->sawf_ops->sawf_get_peer_msduq_info(soc, mac);
+}
+
 #ifdef CONFIG_SAWF
 /**
  * cdp_get_peer_sawf_delay_stats() - Call to get SAWF delay stats
