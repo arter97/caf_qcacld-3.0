@@ -43,6 +43,11 @@
 #define WLAN_UMAC_MLO_MAX_DEV 2
 #endif
 
+/* MAX MLO Assoc Links per MLD */
+#ifndef WLAN_UMAC_MLO_ASSOC_MAX_SUPPORTED_LINKS
+#define WLAN_UMAC_MLO_ASSOC_MAX_SUPPORTED_LINKS 1
+#endif
+
 /* Max PEER support */
 #define MAX_MLO_PEER 512
 

@@ -1025,6 +1025,15 @@ QDF_STATUS wlan_mlo_peer_create(struct wlan_objmgr_vdev *vdev,
 				QDF_MAC_ADDR_REF(link_peer->mldaddr));
 			return QDF_STATUS_E_FAILURE;
 		}
+		/* Limit max assoc links */
+		if (ml_info->num_partner_links > WLAN_UMAC_MLO_ASSOC_MAX_SUPPORTED_LINKS) {
+			mlo_err("MLD ID %d ML Peer " QDF_MAC_ADDR_FMT " exceeds MAX assoc limit of %d",
+				ml_dev->mld_id,
+				QDF_MAC_ADDR_REF(link_peer->mldaddr),
+				WLAN_UMAC_MLO_ASSOC_MAX_SUPPORTED_LINKS);
+			return QDF_STATUS_E_RESOURCES;
+		}
+
 		status = mlo_dev_get_link_vdevs(vdev, ml_dev,
 						ml_info, link_vdevs);
 		if (QDF_IS_STATUS_ERROR(status)) {
