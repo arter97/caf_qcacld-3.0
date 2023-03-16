@@ -516,4 +516,14 @@ dp_sawf_peer_config_ul(struct cdp_soc_t *soc_hdl, uint8_t *mac_addr,
  */
 bool
 dp_swaf_peer_is_sla_configured(struct cdp_soc_t *soc_hdl, uint8_t *mac_addr);
+
+/**
+ * dp_sawf_get_peer_msduq_info - get peer MSDU Queue information
+ * @soc: soc handle
+ * @mac_addr: mac address
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+dp_sawf_get_peer_msduq_info(struct cdp_soc_t *soc_hdl, uint8_t *mac_addr);
 #endif /* DP_SAWF_H*/
