@@ -8236,8 +8236,10 @@ hdd_convert_roam_failures_reason(enum wlan_roam_failure_reason_code fail)
 	case ROAM_FAIL_REASON_MLME:
 	case ROAM_FAIL_REASON_INTERNAL_ABORT:
 	case ROAM_FAIL_REASON_UNABLE_TO_START_ROAM_HO:
+	case ROAM_FAIL_REASON_NO_AP_FOUND_AND_FINAL_BMISS_SENT:
+	case ROAM_FAIL_REASON_NO_CAND_AP_FOUND_AND_FINAL_BMISS_SENT:
 	case ROAM_FAIL_REASON_UNKNOWN:
-		hdd_err("Invalid roam failres reason");
+		hdd_err("Invalid roam failures reason");
 		break;
 	}
 
