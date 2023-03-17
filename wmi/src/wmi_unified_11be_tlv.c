@@ -1147,6 +1147,10 @@ static void update_t2lm_ie_info_params(
 			info->tid_to_link_map_ctrl,
 			params->expected_duration_present);
 
+	WMI_MLO_VDEV_TID_TO_LINK_MAP_CTRL_LINK_MAP_SIZE_SET(
+			info->tid_to_link_map_ctrl,
+			params->link_mapping_size);
+
 	wmi_debug("tid_to_link_map_ctrl:%x map_switch_time:%d expected_duration:%d",
 		  info->tid_to_link_map_ctrl, info->map_switch_time,
 		  info->expected_duration);
