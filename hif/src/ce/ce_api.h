@@ -424,6 +424,14 @@ ce_disable_custom_cb(struct CE_handle *copyeng);
 struct CE_handle *ce_init(struct hif_softc *scn,
 			  unsigned int CE_id, struct CE_attr *attr);
 
+/*
+ * hif_ce_desc_history_log_register() - Register hif_ce_desc_history buffers
+ * to SSR driver dump.
+ *
+ * Return: None
+ */
+void hif_ce_desc_history_log_register(void);
+
 /*==================CE Engine Shutdown=======================================*/
 /*
  * Support clean shutdown by allowing the caller to revoke
@@ -451,6 +459,14 @@ ce_cancel_send_next(struct CE_handle *copyeng,
 		    uint32_t *toeplitz_hash_result);
 
 void ce_fini(struct CE_handle *copyeng);
+
+/*
+ * hif_ce_desc_history_log_unregister() - unregister hif_ce_desc_history
+ * buffers from SSR driver dump.
+ *
+ * Return: None
+ */
+void hif_ce_desc_history_log_unregister(void);
 
 /*==================CE Interrupt Handlers====================================*/
 void ce_per_engine_service_any(int irq, struct hif_softc *scn);
