@@ -1109,8 +1109,6 @@ QDF_STATUS wmi_extract_standalone_sounding_evt_params(
 		struct wmi_host_standalone_sounding_evt_params *ss_params);
 #endif /* QCA_STANDALONE_SOUNDING_TRIGGER */
 
-#endif /* _WMI_UNIFIED_AP_API_H_ */
-
 /**
  * wmi_unified_tdma_schedule_send() - Send tdma schedule command to FW
  * @wmi_handle: wmi handle
@@ -1121,3 +1119,4 @@ QDF_STATUS wmi_extract_standalone_sounding_evt_params(
 QDF_STATUS wmi_unified_tdma_schedule_send(
 		struct wmi_unified *wmi_handle,
 		struct wlan_tdma_sched_cmd_param *param);
+#endif /* _WMI_UNIFIED_AP_API_H_ */
