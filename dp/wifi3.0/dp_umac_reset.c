@@ -363,6 +363,8 @@ static QDF_STATUS dp_umac_reset_handle_action_cb(struct dp_soc *soc,
 				struct dp_soc_umac_reset_ctx *umac_reset_ctx,
 				enum umac_reset_action action)
 {
+	QDF_STATUS status = QDF_STATUS_SUCCESS;
+
 	if (!umac_reset_ctx->rx_actions.cb[action]) {
 		dp_umac_reset_err("rx callback is NULL");
 		return QDF_STATUS_E_FAILURE;
