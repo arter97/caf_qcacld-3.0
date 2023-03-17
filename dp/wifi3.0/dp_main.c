@@ -8352,7 +8352,7 @@ QDF_STATUS dp_peer_mlo_setup(
 					mld_peer->vdev);
 
 			params.osif_vdev = (void *)peer->vdev->osif_vdev;
-			params.peer_mac = peer->mac_addr.raw;
+			params.peer_mac = mld_peer->mac_addr.raw;
 			params.chip_id = dp_mlo_get_chip_id(soc);
 			params.pdev_id = peer->vdev->pdev->pdev_id;
 
