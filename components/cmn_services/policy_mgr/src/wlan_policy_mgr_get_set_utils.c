@@ -1627,9 +1627,6 @@ QDF_STATUS policy_mgr_update_sbs_freq(struct wlan_objmgr_psoc *psoc,
 	policy_mgr_debug("sbs_lower_band_end_freq %d",
 			 info->sbs_lower_band_end_freq);
 	policy_mgr_update_sbs_lowr_band_end_frq(pm_ctx, info);
-	/* no need to update if sbs_lower_band_end_freq is not set */
-	if (!pm_ctx->hw_mode.sbs_lower_band_end_freq)
-		return QDF_STATUS_SUCCESS;
 
 	policy_mgr_update_hw_mode_list(psoc, tgt_hdl);
 
