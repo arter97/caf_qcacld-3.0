@@ -32,7 +32,9 @@
 #include "dp_htt.h"
 #include <dp_mon.h>
 #endif
-
+#ifdef IPA_OFFLOAD
+#include "dp_ipa.h"
+#endif
 #define DP_MAX_STRING_LEN 500
 #define DP_HTT_TX_RX_EXPECTED_TLVS (((uint64_t)1 << HTT_STATS_TX_PDEV_CMN_TAG) |\
 	((uint64_t)1 << HTT_STATS_TX_PDEV_UNDERRUN_TAG) |\
@@ -5930,6 +5932,39 @@ void dp_print_mon_ring_stat_from_hal(struct dp_pdev *pdev, uint8_t mac_id)
 					RXDMA_MONITOR_STATUS);
 }
 
+#if defined(IPA_OFFLOAD) && defined(QCA_WIFI_QCN9224)
+/**
+ * dp_print_wbm2sw_ring_stats_from_hal() - Print ring stats from hal for ipa
+ *                                         use case
+ * @pdev : physical device handle
+ *
+ * Return: void
+ */
+static inline void
+dp_print_wbm2sw_ring_stats_from_hal(struct dp_pdev *pdev)
+{
+	uint8_t i = 0;
+
+	for (i = 0; i < pdev->soc->num_tcl_data_rings; i++) {
+		if (i != IPA_TX_COMP_RING_IDX)
+			dp_print_ring_stat_from_hal(pdev->soc,
+						    &pdev->soc->tx_comp_ring[i],
+						    WBM2SW_RELEASE);
+	}
+}
+#else
+static inline void
+dp_print_wbm2sw_ring_stats_from_hal(struct dp_pdev *pdev)
+{
+	uint8_t i = 0;
+
+	for (i = 0; i < pdev->soc->num_tcl_data_rings; i++)
+		dp_print_ring_stat_from_hal(pdev->soc,
+					    &pdev->soc->tx_comp_ring[i],
+					    WBM2SW_RELEASE);
+}
+#endif
+
 void
 dp_print_ring_stats(struct dp_pdev *pdev)
 {
@@ -5977,10 +6012,7 @@ dp_print_ring_stats(struct dp_pdev *pdev)
 		dp_print_ring_stat_from_hal(pdev->soc,
 					    &pdev->soc->tcl_data_ring[i],
 					    TCL_DATA);
-	for (i = 0; i < pdev->soc->num_tcl_data_rings; i++)
-		dp_print_ring_stat_from_hal(pdev->soc,
-					    &pdev->soc->tx_comp_ring[i],
-					    WBM2SW_RELEASE);
+	dp_print_wbm2sw_ring_stats_from_hal(pdev);
 
 	if (pdev->soc->features.dmac_cmn_src_rxbuf_ring_enabled) {
 		for (i = 0; i < pdev->soc->num_rx_refill_buf_rings; i++) {
