@@ -6301,6 +6301,7 @@ typedef enum {
 	wmi_service_rtt_11az_mac_sec_support,
 	wmi_service_rtt_11az_ntb_support,
 	wmi_service_rtt_11az_tb_support,
+	wmi_service_rtt_11az_tb_rsta_support,
 #endif
 	wmi_service_pktlog_decode_info_support,
 #ifdef WLAN_FEATURE_ROAM_OFFLOAD
