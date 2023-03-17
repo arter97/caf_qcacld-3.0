@@ -14789,6 +14789,7 @@ void sme_set_he_testbed_def(mac_handle_t mac_handle, uint8_t vdev_id)
 		return;
 	}
 	sme_debug("set HE testbed defaults");
+	mac_ctx->mlme_cfg->he_caps.dot11_he_cap.htc_he = 0;
 	mac_ctx->mlme_cfg->he_caps.dot11_he_cap.amsdu_in_ampdu = 0;
 	mac_ctx->mlme_cfg->he_caps.dot11_he_cap.twt_request = 0;
 	mac_ctx->mlme_cfg->he_caps.dot11_he_cap.broadcast_twt = 0;
@@ -14985,13 +14986,16 @@ void sme_set_eht_testbed_def(mac_handle_t mac_handle, uint8_t vdev_id)
 	}
 	mlme_eht_cap = &mac_ctx->mlme_cfg->eht_caps.dot11_eht_cap;
 	sme_debug("set EHT caps testbed defaults");
+	mlme_eht_cap->epcs_pri_access = 0;
+	mlme_eht_cap->eht_om_ctl = 0;
+	mlme_eht_cap->triggered_txop_sharing_mode1 = 0;
 	mlme_eht_cap->restricted_twt = 0;
 	mlme_eht_cap->support_320mhz_6ghz = 0;
 	mlme_eht_cap->partial_bw_mu_mimo = 0;
 	mlme_eht_cap->su_beamformer = 0;
 	mlme_eht_cap->su_beamformee = 1;
 	mlme_eht_cap->bfee_ss_le_80mhz = 3;
-	mlme_eht_cap->bfee_ss_160mhz = 3;
+	mlme_eht_cap->bfee_ss_160mhz = 0;
 	mlme_eht_cap->bfee_ss_320mhz = 0;
 	mlme_eht_cap->num_sounding_dim_le_80mhz = 0;
 	mlme_eht_cap->num_sounding_dim_160mhz = 0;
@@ -15019,9 +15023,6 @@ void sme_set_eht_testbed_def(mac_handle_t mac_handle, uint8_t vdev_id)
 	mlme_eht_cap->rx_4k_qam_in_wider_bw_dl_ofdma = 0;
 	mlme_eht_cap->rx_1k_qam_in_wider_bw_dl_ofdma = 0;
 	mlme_eht_cap->tb_sounding_feedback_rl = 0;
-	mlme_eht_cap->non_ofdma_ul_mu_mimo_320mhz = 0;
-	mlme_eht_cap->non_ofdma_ul_mu_mimo_160mhz = 0;
-	mlme_eht_cap->non_ofdma_ul_mu_mimo_le_80mhz = 0;
 	mlme_eht_cap->op_sta_rx_ndp_wider_bw_20mhz = 0;
 	mlme_eht_cap->eht_dup_6ghz = 0;
 	mlme_eht_cap->mcs_15 = 0;

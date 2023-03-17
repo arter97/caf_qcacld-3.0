@@ -1890,8 +1890,10 @@ static void lim_check_oui_and_update_session(struct mac_context *mac_ctx,
 	 * control enabled, SAP can't decode unicast pkt from DUT.
 	 * Fix it by clearing ht control bit in he cap when send peer assoc cmd
 	 * to firmware when connect such IOT AP with 11ax mode.
+	 * New requirement is to change default setting for HT control to false.
 	 */
-	lim_update_he_caps_htc(session, !is_vendor_ap_present);
+	if (is_vendor_ap_present)
+		lim_update_he_caps_htc(session, !is_vendor_ap_present);
 }
 
 static enum mlme_dot11_mode
