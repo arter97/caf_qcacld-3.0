@@ -18,6 +18,7 @@
 #include <wlan_mlo_mgr_cmn.h>
 #include <wlan_mlo_mgr_public_structs.h>
 #include "wlan_mlo_mgr_main.h"
+#include "qdf_module.h"
 #include "qdf_types.h"
 #include "wlan_cmn.h"
 #include "wlan_mlo_mgr_peer.h"
@@ -293,6 +294,8 @@ struct wlan_mlo_peer_context *wlan_mlo_get_mlpeer_by_mld_mac(
 
 	return NULL;
 }
+
+qdf_export_symbol(wlan_mlo_get_mlpeer_by_mld_mac);
 
 struct wlan_mlo_peer_context
 *wlan_mlo_get_mlpeer_by_peer_mladdr(struct qdf_mac_addr *mldaddr,
