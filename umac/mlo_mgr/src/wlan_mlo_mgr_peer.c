@@ -228,6 +228,8 @@ struct wlan_objmgr_peer *wlan_mlo_peer_get_assoc_peer(
 	return assoc_peer;
 }
 
+qdf_export_symbol(wlan_mlo_peer_get_assoc_peer);
+
 bool mlo_peer_is_assoc_peer(struct wlan_mlo_peer_context *ml_peer,
 			    struct wlan_objmgr_peer *peer)
 {
