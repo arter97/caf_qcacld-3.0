@@ -3227,6 +3227,28 @@ void dp_tx_nawds_handler(struct dp_soc *soc, struct dp_vdev *vdev,
 	qdf_spin_unlock_bh(&vdev->peer_list_lock);
 }
 
+#ifdef WLAN_MCAST_MLO
+static inline bool
+dp_tx_check_mesh_vdev(struct dp_vdev *vdev,
+		      struct cdp_tx_exception_metadata *tx_exc_metadata)
+{
+	if (!tx_exc_metadata->is_mlo_mcast && qdf_unlikely(vdev->mesh_vdev))
+		return true;
+
+	return false;
+}
+#else
+static inline bool
+dp_tx_check_mesh_vdev(struct dp_vdev *vdev,
+		      struct cdp_tx_exception_metadata *tx_exc_metadata)
+{
+	if (qdf_unlikely(vdev->mesh_vdev))
+		return true;
+
+	return false;
+}
+#endif
+
 qdf_nbuf_t
 dp_tx_send_exception(struct cdp_soc_t *soc_hdl, uint8_t vdev_id,
 		     qdf_nbuf_t nbuf,
@@ -3274,7 +3296,7 @@ dp_tx_send_exception(struct cdp_soc_t *soc_hdl, uint8_t vdev_id,
 	/* Basic sanity checks for unsupported packets */
 
 	/* MESH mode */
-	if (qdf_unlikely(vdev->mesh_vdev)) {
+	if (dp_tx_check_mesh_vdev(vdev, tx_exc_metadata)) {
 		dp_tx_err("Mesh mode is not supported in exception path");
 		goto fail;
 	}
