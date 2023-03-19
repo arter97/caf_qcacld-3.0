@@ -2506,6 +2506,20 @@ void dp_audio_smmu_unmap(qdf_device_t qdf_dev, qdf_dma_addr_t iova,
 
 #if defined(QCA_DP_RX_NBUF_NO_MAP_UNMAP) && !defined(BUILD_X86)
 static inline
+void dp_rx_set_err_info(struct dp_soc *soc, qdf_nbuf_t nbuf,
+			struct hal_wbm_err_desc_info wbm_err_info)
+{
+	QDF_NBUF_CB_RX_ERR_CODES(nbuf) = *((uint32_t *)&wbm_err_info);
+}
+
+static inline
+struct hal_wbm_err_desc_info dp_rx_get_err_info(struct dp_soc *soc,
+						qdf_nbuf_t nbuf)
+{
+	return *(struct hal_wbm_err_desc_info *)&QDF_NBUF_CB_RX_ERR_CODES(nbuf);
+}
+
+static inline
 QDF_STATUS dp_pdev_rx_buffers_attach_simple(struct dp_soc *soc, uint32_t mac_id,
 					    struct dp_srng *rxdma_srng,
 					    struct rx_desc_pool *rx_desc_pool,
@@ -2577,22 +2591,9 @@ qdf_dma_addr_t dp_rx_nbuf_sync_no_dsb(struct dp_soc *dp_soc,
 	if (unlikely(!nbuf->fast_recycled)) {
 		qdf_nbuf_dma_inv_range_no_dsb((void *)nbuf->data,
 					      (void *)(nbuf->data + buf_size));
-	} else {
-		/*
-		 * In case of fast_recycled is set we can avoid invalidating
-		 * the complete buffer as it would have been invalidated
-		 * by tx driver before giving to recycler.
-		 *
-		 * But we need to still invalidate rx_pkt_tlv_size as this
-		 * area will not be invalidated in TX path
-		 */
-		DP_STATS_INC(dp_soc, rx.fast_recycled, 1);
-		qdf_nbuf_dma_inv_range_no_dsb((void *)nbuf->data,
-					      (void *)(nbuf->data +
-						       dp_soc->rx_pkt_tlv_size +
-						       L3_HEADER_PAD));
 	}
 
+	DP_STATS_INC(dp_soc, rx.fast_recycled, 1);
 	nbuf->fast_recycled = 0;
 
 	return (qdf_dma_addr_t)qdf_mem_virt_to_phys(nbuf->data);
@@ -2672,6 +2673,29 @@ void  dp_rx_nbuf_free(qdf_nbuf_t nbuf)
 	qdf_nbuf_free_simple(nbuf);
 }
 #else
+static inline
+void dp_rx_set_err_info(struct dp_soc *soc, qdf_nbuf_t nbuf,
+			struct hal_wbm_err_desc_info wbm_err_info)
+{
+	hal_rx_priv_info_set_in_tlv(soc->hal_soc,
+				    qdf_nbuf_data(nbuf),
+				    (uint8_t *)&wbm_err_info,
+				    sizeof(wbm_err_info));
+}
+
+static inline
+struct hal_wbm_err_desc_info dp_rx_get_err_info(struct dp_soc *soc,
+						qdf_nbuf_t nbuf)
+{
+	struct hal_wbm_err_desc_info wbm_err_info = { 0 };
+
+	hal_rx_priv_info_get_from_tlv(soc->hal_soc, qdf_nbuf_data(nbuf),
+				      (uint8_t *)&wbm_err_info,
+				      sizeof(struct hal_wbm_err_desc_info));
+
+	return wbm_err_info;
+}
+
 static inline
 QDF_STATUS dp_pdev_rx_buffers_attach_simple(struct dp_soc *soc, uint32_t mac_id,
 					    struct dp_srng *rxdma_srng,

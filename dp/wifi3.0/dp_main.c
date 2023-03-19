@@ -1329,13 +1329,8 @@ void dp_pdev_update_fast_rx_flag(struct dp_soc *soc, struct dp_pdev *pdev)
 	struct dp_vdev *vdev = NULL;
 	uint8_t rx_fast_flag = true;
 
-	if (wlan_cfg_is_rx_flow_tag_enabled(soc->wlan_cfg_ctx)) {
-		rx_fast_flag = false;
-		goto update_flag;
-	}
-
 	/* Check if protocol tagging enable */
-	if (pdev->is_rx_protocol_tagging_enabled) {
+	if (pdev->is_rx_protocol_tagging_enabled && !pdev->enhanced_stats_en) {
 		rx_fast_flag = false;
 		goto update_flag;
 	}
@@ -1356,12 +1351,6 @@ void dp_pdev_update_fast_rx_flag(struct dp_soc *soc, struct dp_pdev *pdev)
 
 		/* Check if any VDEV has mesh enabled */
 		if (vdev->mesh_vdev) {
-			rx_fast_flag = false;
-			break;
-		}
-
-		/* Check if any VDEV has WDS ext enabled */
-		if (dp_vdev_is_wds_ext_enabled(vdev)) {
 			rx_fast_flag = false;
 			break;
 		}
