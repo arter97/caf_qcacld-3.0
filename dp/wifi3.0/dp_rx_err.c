@@ -2372,10 +2372,7 @@ dp_rx_wbm_err_process(struct dp_intr *int_ctx, struct dp_soc *soc,
 		 * retrieve the wbm desc info from nbuf TLV, so we can
 		 * handle error cases appropriately
 		 */
-		hal_rx_priv_info_get_from_tlv(soc->hal_soc, rx_tlv_hdr,
-					      (uint8_t *)&wbm_err_info,
-					      sizeof(wbm_err_info));
-
+		wbm_err_info = dp_rx_get_err_info(soc, nbuf);
 		peer_meta_data = hal_rx_tlv_peer_meta_data_get(soc->hal_soc,
 							       rx_tlv_hdr);
 		peer_id = dp_rx_peer_metadata_peer_id_get(soc, peer_meta_data);
