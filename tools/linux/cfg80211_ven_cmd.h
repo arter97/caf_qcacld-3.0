@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2020-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -862,6 +862,16 @@ enum {
 	IEEE80211_PARAM_HW_LINK_ID = 800,
 	IEEE80211_PARAM_IEEE_LINK_ID = 801,
 #endif
+	IEEE80211_PARAM_T2LM_CAPABILITY = 802,
+	IEEE80211_PARAM_FREQ_SEP_CAPABILITY = 803,
+	IEEE80211_PARAM_EMLMR_CAPABILITY = 804,
+	IEEE80211_PARAM_EMLSR_CAPABILITY = 805,
+	IEEE80211_PARAM_STR_CAPABILITY = 806,
+	IEEE80211_PARAM_NSTR_CAPABILITY = 807,
+	IEEE80211_PARAM_EMLMR_CONFIG = 808,
+	IEEE80211_PARAM_EMLSR_CONFIG = 809,
+	IEEE80211_PARAM_STR_CONFIG = 810,
+	IEEE80211_PARAM_NSTR_CONFIG = 811,
 };
 
 enum {
@@ -1451,6 +1461,9 @@ enum _ol_ath_param_t {
 	OL_ATH_PARAM_MBSS_GET_GROUP_SIZE = 524,
 	OL_ATH_PARAM_SCAN_BLANKING_MODE = 525,
 	OL_ATH_PARAM_I2R_LMR_FEEDBACK_POLICY = 526,
+	OL_ATH_PARAM_MLD_SUPPORT = 527,
+	OL_ATH_PARAM_MAX_MLD_SUPPORTED = 528,
+	OL_ATH_PARAM_MAX_ML_LINK_SUPPORTED = 529,
 };
 
 #ifdef CONFIG_SUPPORT_VENCMDTABLE
@@ -2561,6 +2574,21 @@ struct vendor_commands vap_vendor_cmds[] = {
 	{"get_hw_link_id", IEEE80211_PARAM_HW_LINK_ID, GET_PARAM, 0},
 	{"get_ieee_link_id", IEEE80211_PARAM_IEEE_LINK_ID, GET_PARAM, 0},
 #endif
+	{"g_t2lm_capability",  IEEE80211_PARAM_T2LM_CAPABILITY, GET_PARAM, 0},
+	{"g_freq_sep_capability", IEEE80211_PARAM_FREQ_SEP_CAPABILITY,
+	 GET_PARAM, 0},
+	{"g_emlmr_capability", IEEE80211_PARAM_EMLMR_CAPABILITY, GET_PARAM, 0},
+	{"g_emlsr_capability", IEEE80211_PARAM_EMLSR_CAPABILITY, GET_PARAM, 0},
+	{"g_str_capability",   IEEE80211_PARAM_STR_CAPABILITY, GET_PARAM, 0},
+	{"g_nstr_capability",  IEEE80211_PARAM_NSTR_CAPABILITY, GET_PARAM, 0},
+	{"emlmr_config", IEEE80211_PARAM_EMLMR_CONFIG, SET_PARAM, 1},
+	{"g_emlmr_config", IEEE80211_PARAM_EMLMR_CONFIG, GET_PARAM, 0},
+	{"emlsr_config", IEEE80211_PARAM_EMLSR_CONFIG, SET_PARAM, 1},
+	{"g_emlsr_config", IEEE80211_PARAM_EMLSR_CONFIG, GET_PARAM, 0},
+	{"str_config",   IEEE80211_PARAM_STR_CONFIG, SET_PARAM, 1},
+	{"g_str_config",   IEEE80211_PARAM_STR_CONFIG, GET_PARAM, 0},
+	{"nstr_config",  IEEE80211_PARAM_NSTR_CONFIG, SET_PARAM, 1},
+	{"g_nstr_config",  IEEE80211_PARAM_NSTR_CONFIG, GET_PARAM, 0},
 };
 
 struct vendor_commands radio_vendor_cmds[] = {
@@ -3812,6 +3840,14 @@ struct vendor_commands radio_vendor_cmds[] = {
 		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_LIST_5GHZ_CHAN_INFO,
 		GET_PARAM, 0},
 #endif
+	{"g_mld_capability",
+		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_MLD_SUPPORT, GET_PARAM, 0},
+	{"g_max_mld_capability",
+		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_MAX_MLD_SUPPORTED,
+		GET_PARAM, 0},
+	{"g_max_ml_link_capability",
+		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_MAX_ML_LINK_SUPPORTED,
+		GET_PARAM, 0},
 };
 #endif
 
