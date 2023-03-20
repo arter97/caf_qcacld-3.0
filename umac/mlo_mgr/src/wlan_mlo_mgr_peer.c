@@ -1642,29 +1642,3 @@ bool wlan_mlo_partner_peer_delete_is_allowed(struct wlan_objmgr_peer *src_peer)
 	return true;
 }
 #endif
-
-#ifdef QCA_SUPPORT_PRIMARY_LINK_MIGRATE
-void wlan_objmgr_mlo_update_primary_info(struct wlan_objmgr_peer *peer)
-{
-	struct wlan_mlo_peer_context *ml_peer = NULL;
-	struct wlan_mlo_link_peer_entry *peer_ent_iter;
-	uint8_t i;
-
-	ml_peer = peer->mlo_peer_ctx;
-
-	for (i = 0; i < MAX_MLO_LINK_PEERS; i++) {
-		peer_ent_iter = &ml_peer->peer_list[i];
-
-		if (!peer_ent_iter->link_peer)
-			continue;
-
-		if (peer_ent_iter->is_primary)
-			peer_ent_iter->is_primary = false;
-
-		if (peer_ent_iter->link_peer == peer)
-			peer_ent_iter->is_primary = true;
-	}
-}
-
-qdf_export_symbol(wlan_objmgr_mlo_update_primary_info);
-#endif
