@@ -235,6 +235,23 @@ wlan_peer_update_avg_rx_rate_stats_user(struct wlan_avg_rate_stats *avg,
 	avg->rx[type].num_mpdu += user->mpdu_cnt_fcs_ok;
 	avg->rx[type].num_retry += user->mpdu_cnt_fcs_err;
 
+	switch (ppdu->u.bw) {
+	case CMN_BW_20MHZ:
+		avg->rx[type].sum_snr += PKT_BW_GAIN_20MHZ;
+		break;
+	case CMN_BW_40MHZ:
+		avg->rx[type].sum_snr += PKT_BW_GAIN_40MHZ;
+		break;
+	case CMN_BW_80MHZ:
+		avg->rx[type].sum_snr += PKT_BW_GAIN_80MHZ;
+		break;
+	case CMN_BW_160MHZ:
+		avg->rx[type].sum_snr += PKT_BW_GAIN_160MHZ;
+		break;
+	default:
+		dp_info("Invalid BW index = %d", ppdu->u.bw);
+	}
+
 	flush = 0;
 	flush |= avg->rx[type].num_ppdu & FLUSH_OVERFLOW_CHECK;
 	flush |= avg->rx[type].sum_mbps & FLUSH_OVERFLOW_CHECK;
