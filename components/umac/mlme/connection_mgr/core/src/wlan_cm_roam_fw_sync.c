@@ -596,7 +596,7 @@ cm_fill_roam_info(struct wlan_objmgr_vdev *vdev,
 	roaming_info->roam_reason =
 		roam_synch_data->roam_reason & ROAM_REASON_MASK;
 	roaming_info->subnet_change_status =
-			CM_GET_SUBNET_STATUS(roaming_info->roam_reason);
+			CM_GET_SUBNET_STATUS(roam_synch_data->roam_reason);
 	roaming_info->pmk_len = roam_synch_data->pmk_len;
 	if (roaming_info->pmk_len)
 		qdf_mem_copy(roaming_info->pmk, roam_synch_data->pmk,
