@@ -1426,10 +1426,6 @@ enum _ol_ath_param_t {
 #ifdef WLAN_MGMT_RX_REO_SUPPORT
 	OL_ATH_PARAM_MGMT_RX_REO_STATUS = 518,
 #endif
-
-#ifdef DP_UMAC_HW_RESET_SUPPORT
-	OL_ATH_PARAM_UMAC_RST_SKEL = 519,
-#endif
 	OL_ATH_PARAM_MON_MAC_FILTER = 520,
 	OL_ATH_PARAM_PUNC_EIRP_THRES = 521,
 	/* Display the current 6G client type */
@@ -1438,6 +1434,7 @@ enum _ol_ath_param_t {
 	OL_ATH_PARAM_MBSS_GET_GROUP_SIZE = 524,
 	OL_ATH_PARAM_SCAN_BLANKING_MODE = 525,
 	OL_ATH_PARAM_I2R_LMR_FEEDBACK_POLICY = 526,
+	/* Param number 519 is unused. Please use this for the new param addition */
 };
 
 #ifdef CONFIG_SUPPORT_VENCMDTABLE
@@ -3761,12 +3758,6 @@ struct vendor_commands radio_vendor_cmds[] = {
 	{"g_mgmt_rx_reo_status",
 		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_MGMT_RX_REO_STATUS,
 		GET_PARAM, 0},
-#endif
-#ifdef DP_UMAC_HW_RESET_SUPPORT
-	{"umac_rst_skel",
-		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_UMAC_RST_SKEL, SET_PARAM, 1},
-	{"g_umac_rst_skel",
-		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_UMAC_RST_SKEL, GET_PARAM, 0},
 #endif
 	{"mon_mac_filter",
 		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_MON_MAC_FILTER, SET_PARAM, 1},
