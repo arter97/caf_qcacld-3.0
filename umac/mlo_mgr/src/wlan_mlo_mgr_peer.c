@@ -25,6 +25,7 @@
 #include "wlan_mlo_mgr_ap.h"
 #include "wlan_crypto_global_api.h"
 #include "wlan_mlo_mgr_setup.h"
+#include "wlan_utility.h"
 
 static void mlo_partner_peer_create_post(struct wlan_mlo_dev_context *ml_dev,
 					 struct wlan_objmgr_vdev *vdev_link,
@@ -937,7 +938,7 @@ wlan_mlo_check_and_create_bridge_peer(struct wlan_objmgr_vdev *vdev,
 		return QDF_STATUS_SUCCESS;
 	for (i = 0; i < WLAN_UMAC_MLO_MAX_VDEVS; i++) {
 		ml_vdev = ml_dev->wlan_vdev_list[i];
-		if (!ml_vdev)
+		if (!ml_vdev || (wlan_vdev_is_up(vdev) != QDF_STATUS_SUCCESS))
 			continue;
 		comp_psoc_id = wlan_vdev_get_psoc_id(ml_vdev);
 		if ((comp_psoc_id != psoc_ids[0]) &&
