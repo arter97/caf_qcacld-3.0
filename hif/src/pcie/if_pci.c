@@ -187,6 +187,11 @@ char *legacy_ic_irqname[] = {
 char dp_irqname[WLAN_CFG_MAX_PCIE_GROUPS][WLAN_CFG_INT_NUM_CONTEXTS][DP_IRQ_NAME_LEN] = {};
 char ce_irqname[WLAN_CFG_MAX_PCIE_GROUPS][WLAN_CFG_MAX_CE_COUNT][DP_IRQ_NAME_LEN] = {};
 
+#ifdef QCA_SUPPORT_LEGACY_INTERRUPTS
+#define WLAN_CFG_MAX_LEGACY_IRQ_COUNT 160
+char dp_legacy_irqname[WLAN_CFG_MAX_PCIE_GROUPS][WLAN_CFG_MAX_LEGACY_IRQ_COUNT][DP_IRQ_NAME_LEN] = {};
+#endif
+
 static inline int hif_get_pci_slot(struct hif_softc *scn)
 {
 	int pci_slot = pld_get_pci_slot(scn->qdf_dev->dev);
@@ -3405,10 +3410,14 @@ static int hif_grp_configure_legacyirq(struct hif_softc *scn,
 		hif_debug("request_irq = %d for grp %d",
 			  irq, hif_ext_group->grp_id);
 
+		qdf_scnprintf(dp_legacy_irqname[pci_slot][hif_ext_group->irq[j]],
+			      DP_IRQ_NAME_LEN, "pci%u_%s", pci_slot,
+			      legacy_ic_irqname[hif_ext_group->irq[j]]);
+
 		ret = pfrm_request_irq(scn->qdf_dev->dev, irq,
 				       hif_ext_group_interrupt_handler,
 				       IRQF_SHARED | IRQF_NO_SUSPEND,
-				       legacy_ic_irqname[hif_ext_group->irq[j]],
+				       dp_legacy_irqname[pci_slot][hif_ext_group->irq[j]],
 				       hif_ext_group);
 		if (ret) {
 			hif_err("request_irq failed ret = %d", ret);
