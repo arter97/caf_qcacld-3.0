@@ -1475,6 +1475,28 @@ QDF_STATUS wlan_vdev_get_bss_peer_mld_mac(struct wlan_objmgr_vdev *vdev,
 	return QDF_STATUS_SUCCESS;
 }
 
+bool wlan_vdev_mlme_is_tdls_vdev(struct wlan_objmgr_vdev *vdev)
+{
+	bool is_tdls_vdev;
+
+	if (!vdev) {
+		obj_mgr_err("vdev is NULL");
+		return false;
+	}
+
+	wlan_acquire_vdev_mlo_lock(vdev);
+
+	is_tdls_vdev =
+		wlan_vdev_mlme_feat_ext2_cap_get(vdev,
+						 WLAN_VDEV_FEXT2_MLO_STA_TDLS);
+
+	wlan_release_vdev_mlo_lock(vdev);
+
+	return is_tdls_vdev;
+}
+
+qdf_export_symbol(wlan_vdev_mlme_is_tdls_vdev);
+
 bool wlan_vdev_mlme_is_mlo_vdev(struct wlan_objmgr_vdev *vdev)
 {
 	bool is_mlo_vdev;

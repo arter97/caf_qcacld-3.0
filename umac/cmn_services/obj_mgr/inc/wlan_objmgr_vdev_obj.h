@@ -168,6 +168,8 @@
 #define WLAN_VDEV_FEXT2_MLO_MCAST           0x00000004
 	/* 20TU BCAST PROBE RESP on 6G SAP*/
 #define WLAN_VDEV_FEXT2_20TU_PRB_RESP       0x00000008
+	/* STA VDEV is TDLS link type */
+#define WLAN_VDEV_FEXT2_MLO_STA_TDLS        0x00000010
 
 /* VDEV OP flags  */
   /* if the vap destroyed by user */
@@ -1617,6 +1619,15 @@ static inline bool wlan_vdev_mlme_is_ap(struct wlan_objmgr_vdev *vdev)
  * Return: True if it is MLO, otherwise false.
  */
 bool wlan_vdev_mlme_is_mlo_vdev(struct wlan_objmgr_vdev *vdev);
+
+/**
+ * wlan_vdev_mlme_is_tdls_vdev() - Determine whether the given vdev is tdls MLO
+ * vdev or not
+ * @vdev: VDEV object
+ *
+ * Return: True if it is tdls MLO, otherwise false.
+ */
+bool wlan_vdev_mlme_is_tdls_vdev(struct wlan_objmgr_vdev *vdev);
 
 /**
  * wlan_vdev_mlme_is_mlo_ap() - whether it is mlo ap or not

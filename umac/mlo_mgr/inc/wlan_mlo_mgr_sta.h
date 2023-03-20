@@ -165,6 +165,15 @@ void ucfg_mlo_mld_clear_mlo_cap(struct wlan_objmgr_vdev *vdev);
 #endif
 
 /**
+ * wlan_mlo_get_tdls_link_vdev() - API to get tdls link vdev
+ * @vdev: vdev object
+ *
+ * Return: MLD tdls link vdev
+ */
+struct wlan_objmgr_vdev *
+wlan_mlo_get_tdls_link_vdev(struct wlan_objmgr_vdev *vdev);
+
+/**
  * ucfg_mlo_get_assoc_link_vdev - API to get assoc link vdev
  * @vdev: vdev object
  *
