@@ -169,13 +169,75 @@ static uint8_t *sap_hdd_event_to_string(eSapHddEvent event)
 	}
 }
 
-/*----------------------------------------------------------------------------
- * Externalized Function Definitions
- * -------------------------------------------------------------------------*/
+#ifdef QCA_DFS_BW_PUNCTURE
+/**
+ * sap_is_chan_change_needed() - Check if SAP channel change needed
+ * @sap_ctx: sap context.
+ *
+ * Even some 20 MHz sub channel disabled for nol, if puncture pattern is valid,
+ * SAP still can keep current channel width and primary channel, don't need
+ * change channel.
+ *
+ * Return: bool, true: channel change needed
+ */
+static bool
+sap_is_chan_change_needed(struct sap_context *sap_ctx)
+{
+	uint8_t ch_wd;
+	uint16_t pri_freq_puncture = 0;
+	struct ch_params *ch_params;
+	QDF_STATUS status;
+	struct mac_context *mac_ctx;
 
-/*----------------------------------------------------------------------------
- * Function Declarations and Documentation
- * -------------------------------------------------------------------------*/
+	mac_ctx = sap_get_mac_context();
+	if (!mac_ctx) {
+		sap_err("Invalid MAC context");
+		return true;
+	}
+
+	ch_params = &mac_ctx->sap.SapDfsInfo.new_ch_params;
+	if (mac_ctx->sap.SapDfsInfo.orig_chanWidth == 0) {
+		ch_wd = sap_ctx->ch_width_orig;
+		mac_ctx->sap.SapDfsInfo.orig_chanWidth = ch_wd;
+	} else {
+		ch_wd = mac_ctx->sap.SapDfsInfo.orig_chanWidth;
+	}
+
+	ch_params->ch_width = ch_wd;
+
+	if (sap_phymode_is_eht(sap_ctx->phyMode))
+		wlan_reg_set_create_punc_bitmap(ch_params, true);
+	wlan_reg_set_channel_params_for_pwrmode(mac_ctx->pdev,
+						sap_ctx->chan_freq,
+						0,
+						ch_params,
+						REG_CURRENT_PWR_MODE);
+	if (ch_params->ch_width == sap_ctx->ch_params.ch_width) {
+		status = wlan_reg_extract_puncture_by_bw(ch_params->ch_width,
+							 ch_params->reg_punc_bitmap,
+							 sap_ctx->chan_freq,
+							 ch_params->mhz_freq_seg1,
+							 CH_WIDTH_20MHZ,
+							 &pri_freq_puncture);
+		if (QDF_IS_STATUS_SUCCESS(status) && !pri_freq_puncture) {
+			sap_debug("Eht valid puncture : 0x%x, keep freq %d",
+				  ch_params->reg_punc_bitmap,
+				  sap_ctx->chan_freq);
+			mac_ctx->sap.SapDfsInfo.new_chanWidth =
+						ch_params->ch_width;
+			return false;
+		}
+	}
+
+	return true;
+}
+#else
+static inline bool
+sap_is_chan_change_needed(struct sap_context *sap_ctx)
+{
+	return true;
+}
+#endif
 
 #ifdef DFS_COMPONENT_ENABLE
 /**
@@ -271,6 +333,7 @@ static qdf_freq_t sap_random_channel_sel(struct sap_context *sap_ctx)
 				     (void *)eSAP_STATUS_SUCCESS);
 		return 0;
 	}
+
 	mac_ctx->sap.SapDfsInfo.new_chanWidth = ch_params->ch_width;
 	sap_ctx->ch_params.ch_width = ch_params->ch_width;
 	sap_ctx->ch_params.sec_ch_offset = ch_params->sec_ch_offset;
@@ -1292,6 +1355,25 @@ static void sap_acs_scan_freq_list_optimize(struct sap_context *sap_ctx,
 }
 #endif
 
+#ifdef WLAN_FEATURE_SAP_ACS_OPTIMIZE
+/**
+ * sap_reset_clean_freq_array(): clear freq array that contains info
+ * channel is free or not
+ * @sap_context: sap context
+ *
+ * Return: void
+ */
+static
+void sap_reset_clean_freq_array(struct sap_context *sap_context)
+{
+	memset(sap_context->clean_channel_array, 0, NUM_CHANNELS);
+}
+#else
+static inline
+void sap_reset_clean_freq_array(struct sap_context *sap_context)
+{}
+#endif
+
 QDF_STATUS sap_channel_sel(struct sap_context *sap_context)
 {
 	QDF_STATUS qdf_ret_status;
@@ -1400,6 +1482,7 @@ QDF_STATUS sap_channel_sel(struct sap_context *sap_context)
 		sap_context->freq_list = freq_list;
 		sap_context->num_of_channel = num_of_channels;
 		sap_context->optimize_acs_chan_selected = false;
+		sap_reset_clean_freq_array(sap_context);
 		/* Set requestType to Full scan */
 
 		/*
@@ -2082,9 +2165,10 @@ void sap_append_cac_history(struct mac_context *mac_ctx,
 		enum channel_state state;
 		const struct bonded_channel_freq *bonded_chan_ptr = NULL;
 
-		state = wlan_reg_get_5g_bonded_channel_and_state_for_freq
+		state = wlan_reg_get_5g_bonded_channel_and_state_for_pwrmode
 			(mac_ctx->pdev, ch_param.mhz_freq_seg0,
-			 ch_param.ch_width, &bonded_chan_ptr);
+			 ch_param.ch_width, &bonded_chan_ptr,
+			 REG_CURRENT_PWR_MODE, NO_SCHANS_PUNC);
 		if (!bonded_chan_ptr || state == CHANNEL_STATE_INVALID) {
 			sap_debug("invalid freq %d", ch_param.mhz_freq_seg0);
 			return;
@@ -4518,6 +4602,9 @@ qdf_freq_t sap_indicate_radar(struct sap_context *sap_ctx)
 	    sap_signal_hdd_event(sap_ctx, NULL, eSAP_DFS_NEXT_CHANNEL_REQ,
 	    (void *) eSAP_STATUS_SUCCESS)))
 		return 0;
+
+	if (!sap_is_chan_change_needed(sap_ctx))
+		return sap_ctx->chan_freq;
 
 	chan_freq = sap_random_channel_sel(sap_ctx);
 	if (!chan_freq)

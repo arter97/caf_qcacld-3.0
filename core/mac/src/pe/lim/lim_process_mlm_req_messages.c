@@ -1039,9 +1039,9 @@ lim_process_mlm_disassoc_req_ntf(struct mac_context *mac_ctx,
 	case eLIM_STA_ROLE:
 		if (!qdf_is_macaddr_equal(&mlm_disassocreq->peer_macaddr,
 				     &curr_bssid)) {
-			pe_warn("received MLM_DISASSOC_REQ with invalid BSS id");
-			lim_print_mac_addr(mac_ctx,
-				mlm_disassocreq->peer_macaddr.bytes, LOGW);
+			pe_warn("received MLM_DISASSOC_REQ with invalid BSS: "QDF_MAC_ADDR_FMT,
+				QDF_MAC_ADDR_REF(
+				mlm_disassocreq->peer_macaddr.bytes));
 
 			/*
 			 * Disassociation response due to host triggered
@@ -1843,7 +1843,6 @@ static void lim_process_auth_retry_timer(struct mac_context *mac_ctx)
 						SIR_MAC_AUTH_FRAME_1;
 			auth_frame->authStatusCode = 0;
 			pe_debug("Retry Auth");
-			mac_ctx->auth_ack_status = LIM_ACK_NOT_RCD;
 			lim_increase_fils_sequence_number(session_entry);
 			lim_send_auth_mgmt_frame(mac_ctx, auth_frame,
 				mac_ctx->lim.gpLimMlmAuthReq->peerMacAddr,
@@ -1924,6 +1923,7 @@ void lim_process_auth_failure_timeout(struct mac_context *mac_ctx)
 		lim_restore_from_auth_state(mac_ctx,
 				eSIR_SME_AUTH_TIMEOUT_RESULT_CODE,
 				proto_status_code, session);
+		mac_ctx->auth_ack_status = LIM_ACK_NOT_RCD;
 		break;
 	default:
 		/*

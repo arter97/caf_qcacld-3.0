@@ -424,8 +424,6 @@ static bool sap_chan_sel_init(mac_handle_t mac_handle,
 	bool include_dfs_ch = true;
 	uint8_t sta_sap_scc_on_dfs_chnl_config_value;
 	bool ch_support_puncture;
-	bool is_sta_sap_scc;
-	bool sta_sap_scc_on_indoor_channel;
 
 	pSpectInfoParams->numSpectChans =
 		mac->scan.base_channels.numChannels;
@@ -450,9 +448,6 @@ static bool sap_chan_sel_init(mac_handle_t mac_handle,
 	if (!mac->mlme_cfg->dfs_cfg.dfs_master_capable ||
 	    ACS_DFS_MODE_DISABLE == sap_ctx->dfs_mode)
 		include_dfs_ch = false;
-
-	sta_sap_scc_on_indoor_channel =
-		policy_mgr_get_sta_sap_scc_allowed_on_indoor_chnl(mac->psoc);
 
 	/* Fill the channel number in the spectrum in the operating freq band */
 	for (channelnum = 0;
@@ -514,12 +509,9 @@ static bool sap_chan_sel_init(mac_handle_t mac_handle,
 			continue;
 
 		/* Skip indoor channels for non-scc indoor scenario*/
-		is_sta_sap_scc = policy_mgr_is_sta_sap_scc(mac->psoc,
-							   *pChans);
-		if (!(is_sta_sap_scc && sta_sap_scc_on_indoor_channel) &&
-		    !policy_mgr_sap_allowed_on_indoor_freq(mac->psoc,
-							   mac->pdev,
-							   *pChans)) {
+		if (!policy_mgr_is_sap_allowed_on_indoor(mac->pdev,
+							 sap_ctx->sessionId,
+							 *pChans)) {
 			sap_debug("Do not allow SAP on indoor frequency %u",
 				  *pChans);
 			continue;
@@ -1675,6 +1667,37 @@ static void sap_sort_chl_weight(tSapChSelSpectInfo *pSpectInfoParams)
 }
 
 /**
+ * sap_override_6ghz_psc_minidx() - override mindex to 6 GHz PSC channel's idx
+ * @mac_ctx: pointer to max context
+ * @spectinfo: Pointer to array of tSapSpectChInfo
+ * @count: number of tSapSpectChInfo element to search
+ * @minidx: index to be overridden
+ *
+ * Return: QDF STATUS
+ */
+static void
+sap_override_6ghz_psc_minidx(struct mac_context *mac_ctx,
+			     tSapSpectChInfo *spectinfo,
+			     uint8_t count,
+			     uint8_t *minidx)
+{
+	uint8_t i;
+
+	if (!mac_ctx->mlme_cfg->acs.acs_prefer_6ghz_psc)
+		return;
+
+	for (i = 0; i < count; i++) {
+		if (wlan_reg_is_6ghz_chan_freq(
+				spectinfo[i].chan_freq) &&
+		    wlan_reg_is_6ghz_psc_chan_freq(
+				spectinfo[i].chan_freq)) {
+			*minidx = i;
+			return;
+		}
+	}
+}
+
+/**
  * sap_sort_chl_weight_80_mhz() - to sort the channels with the least weight
  * @mac_ctx: pointer to max context
  * @sap_ctx: Pointer to the struct sap_context *structure
@@ -1787,6 +1810,8 @@ sap_sort_chl_weight_80_mhz(struct mac_context *mac_ctx,
 			pSpectInfo[j + i].weight = SAP_ACS_WEIGHT_MAX * 4;
 			pSpectInfo[j + i].weight_calc_done = true;
 		}
+		sap_override_6ghz_psc_minidx(mac_ctx, &pSpectInfo[j], 4,
+					     &minIdx);
 
 		pSpectInfo[j + minIdx].weight = combined_weight;
 
@@ -1958,6 +1983,8 @@ sap_sort_chl_weight_160_mhz(struct mac_context *mac_ctx,
 			pSpectInfo[j + i].weight = SAP_ACS_WEIGHT_MAX * 8;
 			pSpectInfo[j + i].weight_calc_done = true;
 		}
+		sap_override_6ghz_psc_minidx(mac_ctx, &pSpectInfo[j], 8,
+					     &minIdx);
 
 		pSpectInfo[j + minIdx].weight = combined_weight;
 
@@ -2201,6 +2228,8 @@ sap_sort_chl_weight_320_mhz(struct mac_context *mac_ctx,
 			pSpectInfo[j + i].weight = SAP_ACS_WEIGHT_MAX * 16;
 			pSpectInfo[j + i].weight_calc_done = true;
 		}
+		sap_override_6ghz_psc_minidx(mac_ctx, &pSpectInfo[j], 16,
+					     &minIdx);
 
 		pSpectInfo[j + minIdx].weight = combined_weight;
 
@@ -2516,6 +2545,8 @@ sap_sort_chl_weight_40_mhz(struct mac_context *mac_ctx,
 			pSpectInfo[j + i].weight = SAP_ACS_WEIGHT_MAX * 2;
 			pSpectInfo[j + i].weight_calc_done = true;
 		}
+		sap_override_6ghz_psc_minidx(mac_ctx, &pSpectInfo[j], 2,
+					     &minIdx);
 
 		pSpectInfo[j + minIdx].weight = combined_weight;
 

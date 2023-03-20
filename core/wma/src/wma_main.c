@@ -120,6 +120,7 @@
 #include "wlan_fwol_ucfg_api.h"
 #include "wlan_tdls_api.h"
 #include "wlan_twt_cfg_ext_api.h"
+#include "wlan_mlo_mgr_sta.h"
 
 #define WMA_LOG_COMPLETION_TIMER 500 /* 500 msecs */
 #define WMI_TLV_HEADROOM 128
@@ -1195,6 +1196,50 @@ static inline wmi_traffic_ac wma_convert_ac_value(uint32_t ac_value)
 	return WMI_AC_MAX;
 }
 
+#ifdef WLAN_FEATURE_11BE
+/**
+ * wma_set_per_link_amsdu_cap() - Set AMSDU/AMPDU capability per link to FW.
+ * @wma: wma handle
+ * @privcmd: pointer to set command parameters
+ * @aggr_type: aggregration type
+ *
+ * Return: QDF_STATUS_SUCCESS if set command is sent successfully, else
+ * QDF_STATUS_E_FAILURE
+ */
+static QDF_STATUS
+wma_set_per_link_amsdu_cap(tp_wma_handle wma, wma_cli_set_cmd_t *privcmd,
+			   wmi_vdev_custom_aggr_type_t aggr_type)
+{
+	uint8_t vdev_id;
+	uint8_t op_mode;
+	QDF_STATUS ret = QDF_STATUS_E_FAILURE;
+
+	for (vdev_id = 0; vdev_id < WLAN_MAX_VDEVS; vdev_id++) {
+		op_mode = wlan_get_opmode_from_vdev_id(wma->pdev, vdev_id);
+		if (op_mode == QDF_STA_MODE) {
+			ret = wma_set_tx_rx_aggr_size(vdev_id,
+						      privcmd->param_value,
+						      privcmd->param_value,
+						      aggr_type);
+			if (QDF_IS_STATUS_ERROR(ret)) {
+				wma_err("set_aggr_size failed for vdev: %d, ret %d",
+					vdev_id, ret);
+				return ret;
+			}
+		}
+	}
+
+	return ret;
+}
+#else
+static inline QDF_STATUS
+wma_set_per_link_amsdu_cap(tp_wma_handle wma, wma_cli_set_cmd_t *privcmd,
+			   wmi_vdev_custom_aggr_type_t aggr_type)
+{
+	return QDF_STATUS_SUCCESS;
+}
+#endif
+
 /**
  * wma_process_cli_set_cmd() - set parameters to fw
  * @wma: wma handle
@@ -1213,6 +1258,7 @@ static void wma_process_cli_set_cmd(tp_wma_handle wma,
 	struct pdev_params pdev_param = {0};
 	void *soc = cds_get_context(QDF_MODULE_ID_SOC);
 	struct target_psoc_info *tgt_hdl;
+	enum wlan_eht_mode eht_mode;
 
 	if (!mac) {
 		wma_err("Failed to get mac");
@@ -1318,13 +1364,24 @@ static void wma_process_cli_set_cmd(tp_wma_handle wma,
 					WMI_VDEV_CUSTOM_AGGR_TYPE_AMPDU;
 			}
 
-			ret = wma_set_tx_rx_aggr_size(vid,
-						      privcmd->param_value,
-						      privcmd->param_value,
-						      aggr_type);
-			if (QDF_IS_STATUS_ERROR(ret)) {
-				wma_err("set_aggr_size failed ret %d", ret);
-				return;
+			wlan_mlme_get_eht_mode(wma->psoc, &eht_mode);
+			if (eht_mode == WLAN_EHT_MODE_MLSR ||
+			    eht_mode == WLAN_EHT_MODE_MLMR) {
+				ret = wma_set_per_link_amsdu_cap(wma, privcmd,
+								 aggr_type);
+				if (QDF_IS_STATUS_ERROR(ret))
+					return;
+			} else {
+				ret = wma_set_tx_rx_aggr_size(
+							vid,
+							privcmd->param_value,
+							privcmd->param_value,
+							aggr_type);
+				if (QDF_IS_STATUS_ERROR(ret)) {
+					wma_err("set_aggr_size failed ret %d",
+						ret);
+					return;
+				}
 			}
 			break;
 		case GEN_PARAM_CRASH_INJECT:
@@ -1754,8 +1811,8 @@ static void wma_process_cli_set_cmd(tp_wma_handle wma,
 					      privcmd->param_value);
 			break;
 		default:
-			wma_debug("Invalid wma_cli_set vdev command/Not yet implemented 0x%x",
-				 privcmd->param_id);
+			wma_debug("vdev cmd is not part vdev_cli_config 0x%x",
+				  privcmd->param_id);
 			break;
 		}
 	} else if (2 == privcmd->param_vp_dev) {
@@ -9285,11 +9342,6 @@ static QDF_STATUS wma_mc_process_msg(struct scheduler_msg *msg)
 			(struct sir_antenna_mode_param *)msg->bodyptr);
 		qdf_mem_free(msg->bodyptr);
 		break;
-	case WMA_LRO_CONFIG_CMD:
-		wma_lro_config_cmd(wma_handle,
-			(struct cdp_lro_hash_config *)msg->bodyptr);
-		qdf_mem_free(msg->bodyptr);
-		break;
 	case WMA_GW_PARAM_UPDATE_REQ:
 		wma_set_gateway_params(wma_handle, msg->bodyptr);
 		qdf_mem_free(msg->bodyptr);
@@ -9924,35 +9976,6 @@ QDF_STATUS wma_crash_inject(WMA_HANDLE wma_handle, uint32_t type,
 	param.delay_time_ms = delay_time_ms;
 	return wmi_crash_inject(wma->wmi_handle, &param);
 }
-
-#ifdef RECEIVE_OFFLOAD
-int wma_lro_init(struct cdp_lro_hash_config *lro_config)
-{
-	struct scheduler_msg msg = {0};
-	struct cdp_lro_hash_config *iwcmd;
-
-	iwcmd = qdf_mem_malloc(sizeof(*iwcmd));
-	if (!iwcmd)
-		return -ENOMEM;
-
-	*iwcmd = *lro_config;
-
-	msg.type = WMA_LRO_CONFIG_CMD;
-	msg.reserved = 0;
-	msg.bodyptr = iwcmd;
-
-	if (QDF_STATUS_SUCCESS !=
-		scheduler_post_message(QDF_MODULE_ID_WMA,
-				       QDF_MODULE_ID_WMA,
-				       QDF_MODULE_ID_WMA, &msg)) {
-		qdf_mem_free(iwcmd);
-		return -EAGAIN;
-	}
-
-	wma_debug("sending the LRO configuration to the fw");
-	return 0;
-}
-#endif
 
 QDF_STATUS wma_configure_smps_params(uint32_t vdev_id, uint32_t param_id,
 							uint32_t param_val)

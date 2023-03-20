@@ -124,7 +124,6 @@
  * Preprocessor definitions and constants
  */
 
-static qdf_atomic_t dp_protect_entry_count;
 /* Milli seconds to delay SSR thread when an packet is getting processed */
 #define SSR_WAIT_SLEEP_TIME 200
 /* MAX iteration count to wait for dp tx to complete */
@@ -463,18 +462,6 @@ enum hdd_nb_cmd_id {
 #define INTF_MACADDR_MASK       0x7
 
 /**
- * enum hdd_auth_key_mgmt - auth key mgmt protocols
- * @HDD_AUTH_KEY_MGMT_802_1X: 802.1x
- * @HDD_AUTH_KEY_MGMT_PSK: PSK
- * @HDD_AUTH_KEY_MGMT_CCKM: CCKM
- */
-enum hdd_auth_key_mgmt {
-	HDD_AUTH_KEY_MGMT_802_1X = BIT(0),
-	HDD_AUTH_KEY_MGMT_PSK = BIT(1),
-	HDD_AUTH_KEY_MGMT_CCKM = BIT(2)
-};
-
-/**
  * typedef wlan_net_dev_ref_dbgid - Debug IDs to detect net device reference
  *                                  leaks.
  * NOTE: New values added to the enum must also be reflected in function
@@ -620,16 +607,12 @@ struct hdd_stats {
  * @peer_mac: Peer MAC address for IBSS connection
  * @roam_id: Unique identifier for a roaming instance
  * @roam_status: Current roam command status
- * @defer_key_complete: Should key complete be deferred?
- *
  */
 struct hdd_roaming_info {
 	tSirMacAddr bssid;
 	tSirMacAddr peer_mac;
 	uint32_t roam_id;
 	eRoamCmdStatus roam_status;
-	bool defer_key_complete;
-
 };
 
 #ifdef FEATURE_WLAN_WAPI
@@ -1885,8 +1868,6 @@ enum wlan_state_ctrl_str_id {
  * @pm_qos_req:
  * @qos_cpu_mask: voted cpu core mask
  * @pm_qos_req: pm_qos request for all cpu cores
- * @enable_pkt_capture_support: enable packet capture support
- * @val_pkt_capture_mode: value for packet capturte mode
  * @roam_ch_from_fw_supported:
  * @dutycycle_off_percent:
  * @pm_qos_request_flags:
@@ -1897,7 +1878,6 @@ enum wlan_state_ctrl_str_id {
  * @ll_stats_per_chan_rx_tx_time:
  * @is_get_station_clubbed_in_ll_stats_req:
  * @multi_client_thermal_mitigation: Multi client thermal mitigation by fw
- * @disconnect_for_sta_mon_conc: disconnect if sta monitor intf concurrency
  * @is_dual_mac_cfg_updated: indicate whether dual mac cfg has been updated
  * @is_regulatory_update_in_progress:
  * @regulatory_update_event:
@@ -2148,12 +2128,6 @@ struct hdd_context {
 #elif defined(CLD_PM_QOS)
 	struct pm_qos_request pm_qos_req;
 #endif
-#ifdef WLAN_FEATURE_PKT_CAPTURE
-	/* enable packet capture support */
-	bool enable_pkt_capture_support;
-	/* value for packet capturte mode */
-	uint8_t val_pkt_capture_mode;
-#endif
 	bool roam_ch_from_fw_supported;
 #ifdef FW_THERMAL_THROTTLE_SUPPORT
 	uint8_t dutycycle_off_percent;
@@ -2170,7 +2144,6 @@ struct hdd_context {
 #ifdef FEATURE_WPSS_THERMAL_MITIGATION
 	bool multi_client_thermal_mitigation;
 #endif
-	bool disconnect_for_sta_mon_conc;
 	bool is_dual_mac_cfg_updated;
 	bool is_regulatory_update_in_progress;
 	qdf_event_t regulatory_update_event;
@@ -4827,25 +4800,6 @@ QDF_STATUS hdd_stop_adapter_ext(struct hdd_context *hdd_ctx,
  * released.
  */
 void hdd_check_for_net_dev_ref_leak(struct hdd_adapter *adapter);
-
-/**
- * hdd_wait_for_dp_tx: Wait for packet tx to complete
- *
- * This function waits for dp packet tx to complete
- *
- * Return: None
- */
-void hdd_wait_for_dp_tx(void);
-
-static inline void hdd_dp_ssr_protect(void)
-{
-	qdf_atomic_inc_return(&dp_protect_entry_count);
-}
-
-static inline void hdd_dp_ssr_unprotect(void)
-{
-	qdf_atomic_dec(&dp_protect_entry_count);
-}
 
 #ifdef WLAN_FEATURE_DYNAMIC_MAC_ADDR_UPDATE
 /**

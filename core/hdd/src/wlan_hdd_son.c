@@ -1327,7 +1327,7 @@ static int hdd_son_add_acl_mac(struct wlan_objmgr_vdev *vdev,
 	}
 	qdf_status = wlansap_modify_acl(WLAN_HDD_GET_SAP_CTX_PTR(adapter),
 					acl_mac->bytes, list_type,
-					ADD_STA_TO_ACL);
+					ADD_STA_TO_ACL_NO_DEAUTH);
 	if (QDF_IS_STATUS_ERROR(qdf_status)) {
 		hdd_err("Modify ACL failed");
 		return -EIO;
@@ -1383,7 +1383,7 @@ static int hdd_son_del_acl_mac(struct wlan_objmgr_vdev *vdev,
 		return -EINVAL;
 	}
 	qdf_status = wlansap_modify_acl(sap_ctx, acl_mac->bytes, list_type,
-					DELETE_STA_FROM_ACL);
+					DELETE_STA_FROM_ACL_NO_DEAUTH);
 	if (QDF_IS_STATUS_ERROR(qdf_status)) {
 		hdd_err("Modify ACL failed");
 		return -EIO;
@@ -2281,7 +2281,7 @@ static const uint8_t wlanphymode2ieeephymode[WLAN_PHYMODE_MAX] = {
 	[WLAN_PHYMODE_11A] = IEEE80211_MODE_11A,
 	[WLAN_PHYMODE_11B] = IEEE80211_MODE_11B,
 	[WLAN_PHYMODE_11G] = IEEE80211_MODE_11G,
-	[WLAN_PHYMODE_11G_ONLY] = 0,
+	[WLAN_PHYMODE_11G_ONLY] = IEEE80211_MODE_11G,
 	[WLAN_PHYMODE_11NA_HT20] = IEEE80211_MODE_11NA_HT20,
 	[WLAN_PHYMODE_11NG_HT20] = IEEE80211_MODE_11NG_HT20,
 	[WLAN_PHYMODE_11NA_HT40] = IEEE80211_MODE_11NA_HT40,
@@ -2289,13 +2289,13 @@ static const uint8_t wlanphymode2ieeephymode[WLAN_PHYMODE_MAX] = {
 	[WLAN_PHYMODE_11NG_HT40MINUS] = IEEE80211_MODE_11NG_HT40MINUS,
 	[WLAN_PHYMODE_11NG_HT40] = IEEE80211_MODE_11NG_HT40,
 	[WLAN_PHYMODE_11AC_VHT20] = IEEE80211_MODE_11AC_VHT20,
-	[WLAN_PHYMODE_11AC_VHT20_2G] = 0,
+	[WLAN_PHYMODE_11AC_VHT20_2G] = IEEE80211_MODE_11AC_VHT20,
 	[WLAN_PHYMODE_11AC_VHT40] = IEEE80211_MODE_11AC_VHT40,
 	[WLAN_PHYMODE_11AC_VHT40PLUS_2G] = IEEE80211_MODE_11AC_VHT40PLUS,
 	[WLAN_PHYMODE_11AC_VHT40MINUS_2G] = IEEE80211_MODE_11AC_VHT40MINUS,
-	[WLAN_PHYMODE_11AC_VHT40_2G] = 0,
+	[WLAN_PHYMODE_11AC_VHT40_2G] = IEEE80211_MODE_11AC_VHT40,
 	[WLAN_PHYMODE_11AC_VHT80] = IEEE80211_MODE_11AC_VHT80,
-	[WLAN_PHYMODE_11AC_VHT80_2G] = 0,
+	[WLAN_PHYMODE_11AC_VHT80_2G] = IEEE80211_MODE_11AC_VHT80,
 	[WLAN_PHYMODE_11AC_VHT160] = IEEE80211_MODE_11AC_VHT160,
 	[WLAN_PHYMODE_11AC_VHT80_80] = IEEE80211_MODE_11AC_VHT80_80,
 	[WLAN_PHYMODE_11AXA_HE20] = IEEE80211_MODE_11AXA_HE20,
@@ -2305,7 +2305,6 @@ static const uint8_t wlanphymode2ieeephymode[WLAN_PHYMODE_MAX] = {
 	[WLAN_PHYMODE_11AXG_HE40MINUS] = IEEE80211_MODE_11AXG_HE40MINUS,
 	[WLAN_PHYMODE_11AXG_HE40] = IEEE80211_MODE_11AXG_HE40,
 	[WLAN_PHYMODE_11AXA_HE80] = IEEE80211_MODE_11AXA_HE80,
-	[WLAN_PHYMODE_11AXA_HE80] = 0,
 	[WLAN_PHYMODE_11AXA_HE160] = IEEE80211_MODE_11AXA_HE160,
 	[WLAN_PHYMODE_11AXA_HE80_80] = IEEE80211_MODE_11AXA_HE80_80,
 #ifdef WLAN_FEATURE_11BE
@@ -2331,12 +2330,41 @@ wlan_hdd_son_get_ieee_phymode(enum wlan_phymode wlan_phymode)
 	return wlanphymode2ieeephymode[wlan_phymode];
 }
 
+/**
+ * hdd_son_get_peer_tx_rate() - Get peer tx rate from FW
+ * @vdev: pointer to object mgr vdev
+ * @peer_macaddr: peer mac address
+ *
+ * Return: tx rate in Kbps
+ */
+static uint32_t hdd_son_get_peer_tx_rate(struct wlan_objmgr_vdev *vdev,
+					 uint8_t *peer_macaddr)
+{
+	uint32_t tx_rate = 0;
+	struct stats_event *stats;
+	int retval = 0;
+
+	stats = wlan_cfg80211_mc_cp_stats_get_peer_stats(vdev,
+							 peer_macaddr,
+							 &retval);
+	if (retval || !stats) {
+		if (stats)
+			wlan_cfg80211_mc_cp_stats_free_stats_event(stats);
+		hdd_err("Unable to get peer tx rate from fw");
+		return tx_rate;
+	}
+
+	tx_rate = stats->peer_stats_info_ext->tx_rate;
+	wlan_cfg80211_mc_cp_stats_free_stats_event(stats);
+
+	return tx_rate;
+}
+
 static QDF_STATUS hdd_son_get_node_info_sta(struct wlan_objmgr_vdev *vdev,
 					    uint8_t *mac_addr,
 					    wlan_node_info *node_info)
 {
 	struct hdd_adapter *adapter = wlan_hdd_get_adapter_from_objmgr(vdev);
-	struct hdd_station_ctx *sta_ctx;
 	struct hdd_context *hdd_ctx;
 
 	hdd_ctx = adapter->hdd_ctx;
@@ -2349,12 +2377,11 @@ static QDF_STATUS hdd_son_get_node_info_sta(struct wlan_objmgr_vdev *vdev,
 		return QDF_STATUS_SUCCESS;
 	}
 
-	hdd_get_max_tx_bitrate(hdd_ctx, adapter);
+	node_info->tx_bitrate = hdd_son_get_peer_tx_rate(vdev, mac_addr);
+	/* convert it to Mbps */
+	node_info->tx_bitrate = qdf_do_div(node_info->tx_bitrate, 1000);
+	hdd_debug_rl("tx_bitrate %u", node_info->tx_bitrate);
 
-	sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter);
-	node_info->tx_bitrate = cfg80211_calculate_bitrate(
-			&sta_ctx->cache_conn_info.max_tx_bitrate);
-	hdd_debug("tx_bitrate %u", node_info->tx_bitrate);
 	return QDF_STATUS_SUCCESS;
 }
 
@@ -2379,9 +2406,12 @@ static QDF_STATUS hdd_son_get_node_info_sap(struct wlan_objmgr_vdev *vdev,
 		return QDF_STATUS_E_FAILURE;
 	}
 
+	node_info->tx_bitrate = hdd_son_get_peer_tx_rate(vdev, mac_addr);
+	/* convert it to Mbps */
+	node_info->tx_bitrate = qdf_do_div(node_info->tx_bitrate, 1000);
 	node_info->max_chwidth =
 			hdd_chan_width_to_son_chwidth(sta_info->ch_width);
-	node_info->num_streams = (sta_info->max_mcs_idx >= 8) ? 2 : 1;
+	node_info->num_streams = sta_info->nss;
 	ucfg_mlme_get_peer_phymode(psoc, mac_addr, &peer_phymode);
 	node_info->phymode = wlan_hdd_son_get_ieee_phymode(peer_phymode);
 	node_info->max_txpower = ucfg_son_get_tx_power(sta_info->assoc_req_ies);

@@ -43,6 +43,11 @@
 #define CHANNEL_SWITCH_COMPLETE_TIMEOUT   (2000)
 #define MAX_NOA_TIME (3000)
 
+/* Defer SAP force SCC check by 2000ms due to another SAP/GO start AP in
+ * progress
+ */
+#define SAP_CONC_CHECK_DEFER_TIMEOUT_MS (2000)
+
 /*
  * Policy Mgr hardware mode list bit-mask definitions.
  * Bits 4:0, 31:29 are unused.
@@ -273,6 +278,8 @@ extern enum policy_mgr_conc_next_action
  * @sr_in_same_mac_conc: Enable/Disable SR in same MAC concurrency
  * @use_sap_original_bw: Enable/Disable sap original BW as default
  *                       BW when do restart
+ * @move_sap_go_1st_on_dfs_sta_csa: Enable/Disable SAP / GO's movement
+ *				    to non-DFS channel before STA
  */
 struct policy_mgr_cfg {
 	uint8_t mcc_to_scc_switch;
@@ -302,6 +309,7 @@ struct policy_mgr_cfg {
 	bool sr_in_same_mac_conc;
 #endif
 	bool use_sap_original_bw;
+	bool move_sap_go_1st_on_dfs_sta_csa;
 };
 
 /**

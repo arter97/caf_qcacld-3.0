@@ -1315,6 +1315,15 @@ lim_process_assoc_rsp_frame(struct mac_context *mac_ctx, uint8_t *rx_pkt_info,
 			session_entry->pLimMlmJoinReq = NULL;
 		}
 
+		if (session_entry->limAssocResponseData) {
+			tpSirAssocRsp pre_assoc_rsp;
+
+			pre_assoc_rsp = (tpSirAssocRsp)
+					session_entry->limAssocResponseData;
+			qdf_mem_free(pre_assoc_rsp->sha384_ft_subelem.gtk);
+			qdf_mem_free(pre_assoc_rsp->sha384_ft_subelem.igtk);
+			qdf_mem_free(session_entry->limAssocResponseData);
+		}
 		session_entry->limAssocResponseData = (void *)assoc_rsp;
 		/*
 		 * Store the ReAssocRsp Frame in DphTable
@@ -1326,8 +1335,8 @@ lim_process_assoc_rsp_frame(struct mac_context *mac_ctx, uint8_t *rx_pkt_info,
 				&session_entry->dph.dphHashTable);
 
 		if (!sta_ds) {
-			pe_err("could not get hash entry at DPH for");
-			lim_print_mac_addr(mac_ctx, hdr->sa, LOGE);
+			pe_err("could not get hash entry at DPH for SA: "QDF_MAC_ADDR_FMT,
+			       QDF_MAC_ADDR_REF(hdr->sa));
 			assoc_cnf.resultCode =
 				eSIR_SME_INVALID_ASSOC_RSP_RXED;
 			assoc_cnf.protStatusCode =
@@ -1429,8 +1438,8 @@ lim_process_assoc_rsp_frame(struct mac_context *mac_ctx, uint8_t *rx_pkt_info,
 			&session_entry->dph.dphHashTable);
 	if (!sta_ds) {
 		/* Could not add hash table entry */
-		pe_err("could not get hash entry at DPH");
-		lim_print_mac_addr(mac_ctx, hdr->sa, LOGE);
+		pe_err("could not get hash entry at DPH SA: "QDF_MAC_ADDR_FMT,
+		       QDF_MAC_ADDR_REF(hdr->sa));
 		assoc_cnf.resultCode = eSIR_SME_RESOURCES_UNAVAILABLE;
 		assoc_cnf.protStatusCode = eSIR_SME_SUCCESS;
 		lim_post_sme_message(mac_ctx, LIM_MLM_ASSOC_CNF,

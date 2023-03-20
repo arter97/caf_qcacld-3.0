@@ -613,9 +613,11 @@ enum phy_ch_width wlan_sap_get_concurrent_bw(struct wlan_objmgr_pdev *pdev,
 {
 	enum hw_mode_bandwidth sta_ch_width;
 	enum phy_ch_width sta_chan_width = CH_WIDTH_20MHZ;
-	bool sta_present, is_con_chan_dfs = false, is_con_sta_indoor = false;
+	bool scc_sta_present, is_con_chan_dfs = false;
+	bool is_con_sta_indoor = false;
 	uint8_t sta_vdev_id;
 	uint8_t sta_sap_scc_on_dfs_chnl;
+	uint8_t sta_count = 0;
 	bool is_hw_dbs_capable = false;
 
 	if (WLAN_REG_IS_24GHZ_CH_FREQ(con_ch_freq))
@@ -624,11 +626,18 @@ enum phy_ch_width wlan_sap_get_concurrent_bw(struct wlan_objmgr_pdev *pdev,
 	if (wlan_reg_is_6ghz_chan_freq(con_ch_freq))
 		return channel_width;
 
-	sta_present = policy_mgr_is_sta_present_on_freq(psoc,
-							&sta_vdev_id,
-							con_ch_freq,
-							&sta_ch_width);
-	if (sta_present) {
+	/* sta_count is to check if there is STA present on any other
+	 * channel freq irrespective of concurrent channel.
+	 */
+	sta_count = policy_mgr_mode_specific_connection_count(
+							psoc,
+							PM_STA_MODE,
+							NULL);
+	scc_sta_present = policy_mgr_is_sta_present_on_freq(psoc,
+							    &sta_vdev_id,
+							    con_ch_freq,
+							    &sta_ch_width);
+	if (scc_sta_present) {
 		sta_chan_width = policy_mgr_get_ch_width(sta_ch_width);
 		sap_debug("sta_chan_width:%d, channel_width:%d",
 			  sta_chan_width, channel_width);
@@ -642,8 +651,9 @@ enum phy_ch_width wlan_sap_get_concurrent_bw(struct wlan_objmgr_pdev *pdev,
 
 	policy_mgr_get_sta_sap_scc_on_dfs_chnl(psoc, &sta_sap_scc_on_dfs_chnl);
 	is_hw_dbs_capable = policy_mgr_is_hw_dbs_capable(psoc);
-	sap_debug("sta_sap_scc_on_dfs_chnl:%d, is_hw_dbs_capable:%d",
-		  sta_sap_scc_on_dfs_chnl, is_hw_dbs_capable);
+	sap_debug("sta_sap_scc_on_dfs_chnl:%d, is_hw_dbs_capable:%d, sta_count:%d, scc_sta_present:%d",
+		  sta_sap_scc_on_dfs_chnl,
+		  is_hw_dbs_capable, sta_count, scc_sta_present);
 
 	if (!is_hw_dbs_capable)
 		goto dfs_master_mode_check;
@@ -664,15 +674,17 @@ enum phy_ch_width wlan_sap_get_concurrent_bw(struct wlan_objmgr_pdev *pdev,
 	} else {
 		/* Handle "DBS + active channel" concurrency/standalone SAP */
 		sap_debug("STA + SAP/GO or standalone SAP on active channel");
-		if (sta_present)
+		if (scc_sta_present)
 			return  QDF_MAX(sta_chan_width, CH_WIDTH_80MHZ);
+		else if (sta_count)
+			return  QDF_MIN(channel_width, CH_WIDTH_80MHZ);
 		return channel_width;
 	}
 
 dfs_master_mode_check:
 	/* Handle "DBS/non-DBS + dfs channels" concurrency */
 	if (sta_sap_scc_on_dfs_chnl == PM_STA_SAP_ON_DFS_MASTER_MODE_FLEX) {
-		if (sta_present) {
+		if (scc_sta_present) {
 			sap_debug("STA+SAP/GO: limit the SAP channel width");
 			return QDF_MIN(sta_chan_width, channel_width);
 		}
@@ -681,7 +693,7 @@ dfs_master_mode_check:
 		return channel_width;
 	} else if (sta_sap_scc_on_dfs_chnl ==
 		   PM_STA_SAP_ON_DFS_MASTER_MODE_DISABLED) {
-		if (sta_present) {
+		if (scc_sta_present) {
 			sap_debug("STA present: Limit the SAP channel width");
 			channel_width = QDF_MIN(sta_chan_width, channel_width);
 			return channel_width;
@@ -699,7 +711,7 @@ dfs_master_mode_check:
 	 * sta_sap_scc_on_dfs_chnl = 0, not allow STA+SAP SCC on DFS.
 	 * Limit SAP to 80Mhz if STA present.
 	 */
-	if (sta_present) {
+	if (sta_count) {
 		sap_debug("STA present, Limit SAP/GO to 80Mhz");
 		return QDF_MIN(channel_width, CH_WIDTH_80MHZ);
 	}
@@ -1090,7 +1102,7 @@ QDF_STATUS wlansap_modify_acl(struct sap_context *sap_ctx,
 
 	switch (list_type) {
 	case SAP_ALLOW_LIST:
-		if (cmd == ADD_STA_TO_ACL) {
+		if (cmd == ADD_STA_TO_ACL || cmd == ADD_STA_TO_ACL_NO_DEAUTH) {
 			/* error check */
 			/* if list is already at max, return failure */
 			if (sap_ctx->nAcceptMac == MAX_ACL_MAC_ADDRESS) {
@@ -1126,7 +1138,8 @@ QDF_STATUS wlansap_modify_acl(struct sap_context *sap_ctx,
 				sap_debug("size of accept and deny lists %d %d",
 					  sap_ctx->nAcceptMac,
 					  sap_ctx->nDenyMac);
-		} else if (cmd == DELETE_STA_FROM_ACL) {
+		} else if (cmd == DELETE_STA_FROM_ACL ||
+			   cmd == DELETE_STA_FROM_ACL_NO_DEAUTH) {
 			if (sta_allow_list) {
 
 				struct csr_del_sta_params delStaParams;
@@ -1138,14 +1151,18 @@ QDF_STATUS wlansap_modify_acl(struct sap_context *sap_ctx,
 				/* If a client is deleted from allow list and */
 				/* it is connected, send deauth
 				 */
-				wlansap_populate_del_sta_params(peer_sta_mac,
-					eCsrForcedDeauthSta,
-					SIR_MAC_MGMT_DEAUTH,
-					&delStaParams);
-				wlansap_deauth_sta(sap_ctx, &delStaParams);
-				sap_debug("size of accept and deny lists %d %d",
-					  sap_ctx->nAcceptMac,
-					  sap_ctx->nDenyMac);
+				if (cmd == DELETE_STA_FROM_ACL) {
+					wlansap_populate_del_sta_params(
+						peer_sta_mac,
+						eCsrForcedDeauthSta,
+						SIR_MAC_MGMT_DEAUTH,
+						&delStaParams);
+					wlansap_deauth_sta(sap_ctx,
+							   &delStaParams);
+					sap_debug("size of accept and deny lists %d %d",
+						  sap_ctx->nAcceptMac,
+						  sap_ctx->nDenyMac);
+				}
 			} else {
 				sap_warn("MAC address to be deleted is not present in the allow list "
 					 QDF_MAC_ADDR_FMT,
@@ -1160,7 +1177,7 @@ QDF_STATUS wlansap_modify_acl(struct sap_context *sap_ctx,
 
 	case SAP_DENY_LIST:
 
-		if (cmd == ADD_STA_TO_ACL) {
+		if (cmd == ADD_STA_TO_ACL || cmd == ADD_STA_TO_ACL_NO_DEAUTH) {
 			struct csr_del_sta_params delStaParams;
 			/* error check */
 			/* if list is already at max, return failure */
@@ -1193,18 +1210,22 @@ QDF_STATUS wlansap_modify_acl(struct sap_context *sap_ctx,
 			/* If we are adding a client to the deny list; */
 			/* if its connected, send deauth
 			 */
-			wlansap_populate_del_sta_params(peer_sta_mac,
-				eCsrForcedDeauthSta,
-				SIR_MAC_MGMT_DEAUTH,
-				&delStaParams);
-			wlansap_deauth_sta(sap_ctx, &delStaParams);
+			if (cmd == ADD_STA_TO_ACL) {
+				wlansap_populate_del_sta_params(
+					peer_sta_mac,
+					eCsrForcedDeauthSta,
+					SIR_MAC_MGMT_DEAUTH,
+					&delStaParams);
+				wlansap_deauth_sta(sap_ctx, &delStaParams);
+			}
 			sap_info("... Now add to deny list");
 			sap_add_mac_to_acl(sap_ctx->denyMacList,
 				       &sap_ctx->nDenyMac, peer_sta_mac);
 			sap_debug("size of accept and deny lists %d %d",
 				  sap_ctx->nAcceptMac,
 				  sap_ctx->nDenyMac);
-		} else if (cmd == DELETE_STA_FROM_ACL) {
+		} else if (cmd == DELETE_STA_FROM_ACL ||
+			   cmd == DELETE_STA_FROM_ACL_NO_DEAUTH) {
 			if (sta_deny_list) {
 				sap_info("Delete from deny list");
 				sap_remove_mac_from_acl(sap_ctx->denyMacList,
@@ -1824,6 +1845,21 @@ void wlansap_get_sec_channel(uint8_t sec_ch_offset,
 	}
 }
 
+#ifdef WLAN_FEATURE_11BE
+static void
+wlansap_fill_channel_change_puncture(struct channel_change_req *req,
+				     struct ch_params *ch_param)
+{
+	req->target_punc_bitmap = ch_param->reg_punc_bitmap;
+}
+#else
+static inline void
+wlansap_fill_channel_change_puncture(struct channel_change_req *req,
+				     struct ch_params *ch_param)
+{
+}
+#endif
+
 /**
  * wlansap_fill_channel_change_request() - Fills the channel change request
  * @sap_ctx: sap context
@@ -1868,6 +1904,8 @@ wlansap_fill_channel_change_request(struct sap_context *sap_ctx,
 	req->ch_width =  sap_ctx->ch_params.ch_width;
 	req->center_freq_seg0 = sap_ctx->ch_params.center_freq_seg0;
 	req->center_freq_seg1 = sap_ctx->ch_params.center_freq_seg1;
+	wlansap_fill_channel_change_puncture(req, &sap_ctx->ch_params);
+
 	req->dot11mode = dot11_cfg.dot11_mode;
 	req->nw_type = dot11_cfg.nw_type;
 
@@ -3753,7 +3791,7 @@ QDF_STATUS wlansap_dcs_set_wlan_interference_mitigation_on_band(
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
 	bool wlan_interference_mitigation_enable = false;
 
-	if (WLAN_REG_IS_5GHZ_CH_FREQ(sap_cfg->acs_cfg.pri_ch_freq))
+	if (!WLAN_REG_IS_24GHZ_CH_FREQ(sap_cfg->acs_cfg.pri_ch_freq))
 		wlan_interference_mitigation_enable = true;
 
 	status = wlansap_dcs_set_vdev_wlan_interference_mitigation(

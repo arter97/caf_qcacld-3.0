@@ -749,8 +749,14 @@ static int __hdd_soc_recovery_reinit(struct device *dev,
 				     enum qdf_bus_type bus_type)
 {
 	int errno;
+	struct hdd_context *hdd_ctx = cds_get_context(QDF_MODULE_ID_HDD);
 
 	hdd_info("re-probing driver");
+
+	if (!hdd_ctx) {
+		hdd_err("hdd_ctx is null!");
+		return qdf_status_to_os_return(QDF_STATUS_E_RESOURCES);
+	}
 
 	hdd_soc_load_lock(dev);
 	cds_set_driver_in_bad_state(false);
@@ -778,6 +784,11 @@ static int __hdd_soc_recovery_reinit(struct device *dev,
 	if (!qdf_is_fw_down()) {
 		cds_set_recovery_in_progress(false);
 		hdd_handle_cached_commands();
+	}
+
+	if (!hdd_is_any_interface_open(hdd_ctx)) {
+		hdd_debug("restarting idle shutdown timer");
+		hdd_psoc_idle_timer_start(hdd_ctx);
 	}
 
 	hdd_soc_load_unlock(dev);
@@ -942,6 +953,7 @@ static void hdd_send_hang_data(uint8_t *data, size_t data_len)
  */
 static void hdd_psoc_shutdown_notify(struct hdd_context *hdd_ctx)
 {
+	hdd_enter();
 	wlan_cfg80211_cleanup_scan_queue(hdd_ctx->pdev, NULL);
 
 	if (ucfg_ipa_is_enabled()) {
@@ -956,6 +968,7 @@ static void hdd_psoc_shutdown_notify(struct hdd_context *hdd_ctx)
 	cds_shutdown_notifier_purge();
 
 	hdd_wlan_ssr_shutdown_event();
+	hdd_exit();
 }
 
 /**
@@ -971,6 +984,7 @@ static void hdd_soc_recovery_cleanup(void)
 {
 	struct hdd_context *hdd_ctx;
 
+	hdd_enter();
 	hdd_ctx = cds_get_context(QDF_MODULE_ID_HDD);
 	if (!hdd_ctx)
 		return;
@@ -991,6 +1005,7 @@ static void hdd_soc_recovery_cleanup(void)
 	}
 
 	hdd_psoc_shutdown_notify(hdd_ctx);
+	hdd_exit();
 }
 
 static void __hdd_soc_recovery_shutdown(void)

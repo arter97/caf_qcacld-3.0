@@ -1212,35 +1212,6 @@ QDF_STATUS ucfg_dp_deinit_txrx(struct wlan_objmgr_vdev *vdev)
 	return QDF_STATUS_SUCCESS;
 }
 
-QDF_STATUS ucfg_dp_softap_init_txrx(struct wlan_objmgr_vdev *vdev)
-{
-	struct wlan_dp_intf *dp_intf;
-
-	dp_intf = dp_get_vdev_priv_obj(vdev);
-	if (unlikely(!dp_intf)) {
-		dp_err("DP interface not found");
-		return QDF_STATUS_E_INVAL;
-	}
-
-	qdf_mem_zero(&dp_intf->stats, sizeof(qdf_net_dev_stats));
-	return QDF_STATUS_SUCCESS;
-}
-
-QDF_STATUS ucfg_dp_softap_deinit_txrx(struct wlan_objmgr_vdev *vdev)
-{
-	struct wlan_dp_intf *dp_intf;
-
-	dp_intf = dp_get_vdev_priv_obj(vdev);
-	if (unlikely(!dp_intf)) {
-		dp_err("DP interface not found");
-		return QDF_STATUS_E_INVAL;
-	}
-
-	dp_intf->tx_fn = NULL;
-	dp_intf->sap_tx_block_mask |= DP_TX_FN_CLR;
-	return QDF_STATUS_SUCCESS;
-}
-
 QDF_STATUS ucfg_dp_start_xmit(qdf_nbuf_t nbuf, struct wlan_objmgr_vdev *vdev)
 {
 	struct wlan_dp_intf *dp_intf;
@@ -1376,6 +1347,18 @@ ucfg_dp_is_roam_after_nud_enabled(struct wlan_objmgr_psoc *psoc)
 
 	if (dp_cfg->enable_nud_tracking == DP_ROAM_AFTER_NUD_FAIL ||
 	    dp_cfg->enable_nud_tracking == DP_DISCONNECT_AFTER_ROAM_FAIL)
+		return true;
+
+	return false;
+}
+
+bool
+ucfg_dp_is_disconect_after_roam_fail(struct wlan_objmgr_psoc *psoc)
+{
+	struct wlan_dp_psoc_context *dp_ctx = dp_psoc_get_priv(psoc);
+	struct wlan_dp_psoc_cfg *dp_cfg = &dp_ctx->dp_cfg;
+
+	if (dp_cfg->enable_nud_tracking == DP_DISCONNECT_AFTER_ROAM_FAIL)
 		return true;
 
 	return false;

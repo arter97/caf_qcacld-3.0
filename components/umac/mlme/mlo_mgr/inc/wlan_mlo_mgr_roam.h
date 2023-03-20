@@ -149,15 +149,17 @@ QDF_STATUS mlo_enable_rso(struct wlan_objmgr_pdev *pdev,
 /**
  * mlo_roam_copy_partner_info - copy partner link info to connect response
  *
+ * @partner_info: Destination buffer to fill partner info from roam sync ind
  * @sync_ind: roam sync ind pointer
- * @connect_rsp: connect resp structure pointer
+ * @skip_vdev_id: Skip to copy the link info corresponds to this vdev_id
  *
  * This api will be called to copy partner link info to connect response.
  *
  * Return: none
  */
-void mlo_roam_copy_partner_info(struct wlan_cm_connect_resp *connect_rsp,
-				struct roam_offload_synch_ind *sync_ind);
+void mlo_roam_copy_partner_info(struct mlo_partner_info *partner_info,
+				struct roam_offload_synch_ind *sync_ind,
+				uint8_t skip_vdev_id);
 
 /**
  * mlo_roam_init_cu_bpcc() - init cu bpcc per roam sync data
@@ -291,19 +293,23 @@ mlo_roam_is_auth_status_connected(struct wlan_objmgr_psoc *psoc,
 
 /**
  * mlo_roam_connect_complete - roam connect complete api
- * @psoc: psoc pointer
- * @pdev: pdev pointer
  * @vdev: vdev pointer
- * @rsp: connect rsp pointer
  *
  * This api will be called after connect complete for roam 1x case.
  *
  * Return: none
  */
-void mlo_roam_connect_complete(struct wlan_objmgr_psoc *psoc,
-			       struct wlan_objmgr_pdev *pdev,
-			       struct wlan_objmgr_vdev *vdev,
-			       struct wlan_cm_connect_resp *rsp);
+void mlo_roam_connect_complete(struct wlan_objmgr_vdev *vdev);
+
+/**
+ * mlo_roam_free_copied_reassoc_rsp - roam free copied reassoc rsp
+ * @vdev: vdev pointer
+ *
+ * This api will be called to free copied reassoc rsp.
+ *
+ * Return: none
+ */
+void mlo_roam_free_copied_reassoc_rsp(struct wlan_objmgr_vdev *vdev);
 
 #ifdef WLAN_FEATURE_11BE_MLO_ADV_FEATURE
 /**
@@ -318,8 +324,9 @@ void mlo_roam_connect_complete(struct wlan_objmgr_psoc *psoc,
  *
  * Return: qdf status
  */
-void mlo_cm_roam_sync_cb(struct wlan_objmgr_vdev *vdev,
-			 void *event, uint32_t event_data_len);
+QDF_STATUS
+mlo_cm_roam_sync_cb(struct wlan_objmgr_vdev *vdev,
+		    void *event, uint32_t event_data_len);
 #endif /* WLAN_FEATURE_11BE_MLO_ADV_FEATURE */
 
 /**
@@ -397,13 +404,15 @@ mlo_roam_get_link_id(uint8_t vdev_id,
 }
 
 #ifdef WLAN_FEATURE_11BE_MLO_ADV_FEATURE
-void mlo_cm_roam_sync_cb(struct wlan_objmgr_vdev *vdev,
-			 void *event, uint32_t event_data_len);
+QDF_STATUS mlo_cm_roam_sync_cb(struct wlan_objmgr_vdev *vdev,
+			       void *event, uint32_t event_data_len);
 #else
-static inline void
+static inline QDF_STATUS
 mlo_cm_roam_sync_cb(struct wlan_objmgr_vdev *vdev,
 		    void *event, uint32_t event_data_len)
-{}
+{
+	return QDF_STATUS_SUCCESS;
+}
 #endif
 
 static inline bool
@@ -421,8 +430,9 @@ QDF_STATUS mlo_enable_rso(struct wlan_objmgr_pdev *pdev,
 }
 
 static inline void
-mlo_roam_copy_partner_info(struct wlan_cm_connect_resp *connect_rsp,
-			   struct roam_offload_synch_ind *sync_ind)
+mlo_roam_copy_partner_info(struct mlo_partner_info *partner_info,
+			   struct roam_offload_synch_ind *sync_ind,
+			   uint8_t skip_vdev_id)
 {}
 
 static inline
@@ -496,10 +506,11 @@ mlo_roam_is_auth_status_connected(struct wlan_objmgr_psoc *psoc,
 }
 
 static inline void
-mlo_roam_connect_complete(struct wlan_objmgr_psoc *psoc,
-			  struct wlan_objmgr_pdev *pdev,
-			  struct wlan_objmgr_vdev *vdev,
-			  struct wlan_cm_connect_resp *rsp)
+mlo_roam_connect_complete(struct wlan_objmgr_vdev *vdev)
+{}
+
+static inline void
+mlo_roam_free_copied_reassoc_rsp(struct wlan_objmgr_vdev *vdev)
 {}
 
 static inline QDF_STATUS
@@ -509,5 +520,11 @@ mlo_get_link_mac_addr_from_reassoc_rsp(struct wlan_objmgr_vdev *vdev,
 	return QDF_STATUS_E_NOSUPPORT;
 }
 
+static inline uint32_t
+mlo_roam_get_link_freq_from_mac_addr(struct roam_offload_synch_ind *sync_ind,
+				     uint8_t *link_mac_addr)
+{
+	return 0;
+}
 #endif /* WLAN_FEATURE_11BE_MLO */
 #endif

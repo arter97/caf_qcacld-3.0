@@ -2021,87 +2021,6 @@ void wma_update_frag_params(tp_wma_handle wma, uint32_t value)
 	}
 }
 
-#ifdef FEATURE_WLAN_WAPI
-#define WPI_IV_LEN 16
-#if defined(CONFIG_LITHIUM) || defined(CONFIG_BERYLLIUM)
-/**
- * wma_fill_in_wapi_key_params() - update key parameters about wapi
- * @key_params: wma key parameters
- * @params: parameters pointer to be set
- * @mode: operation mode
- *
- * Return: None
- */
-static inline void wma_fill_in_wapi_key_params(
-		struct wma_set_key_params *key_params,
-		struct set_key_params *params, uint8_t mode)
-{
-	/*
-	 * Since MCL shares same FW with WIN for Napier/Hasting, FW WAPI logic
-	 * is fit for WIN, change it to align with WIN.
-	 */
-	unsigned char iv_init_ap[16] = { 0x5c, 0x36, 0x5c, 0x36, 0x5c, 0x36,
-					 0x5c, 0x36, 0x5c, 0x36, 0x5c, 0x36,
-					 0x5c, 0x36, 0x5c, 0x37};
-	unsigned char iv_init_sta[16] = { 0x5c, 0x36, 0x5c, 0x36, 0x5c, 0x36,
-					  0x5c, 0x36, 0x5c, 0x36, 0x5c, 0x36,
-					  0x5c, 0x36, 0x5c, 0x36};
-
-	if (mode == wlan_op_mode_ap) {
-		qdf_mem_copy(params->rx_iv, iv_init_sta,
-			     WPI_IV_LEN);
-		qdf_mem_copy(params->tx_iv, iv_init_ap,
-			     WPI_IV_LEN);
-	} else {
-		qdf_mem_copy(params->rx_iv, iv_init_ap,
-			     WPI_IV_LEN);
-		qdf_mem_copy(params->tx_iv, iv_init_sta,
-			     WPI_IV_LEN);
-	}
-
-	params->key_txmic_len = WMA_TXMIC_LEN;
-	params->key_rxmic_len = WMA_RXMIC_LEN;
-
-	params->key_cipher = WMI_CIPHER_WAPI;
-}
-#else
-static inline void wma_fill_in_wapi_key_params(
-		struct wma_set_key_params *key_params,
-		struct set_key_params *params, uint8_t mode)
-{
-	/*initialize receive and transmit IV with default values */
-	/* **Note: tx_iv must be sent in reverse** */
-	unsigned char tx_iv[16] = { 0x36, 0x5c, 0x36, 0x5c, 0x36, 0x5c,
-				    0x36, 0x5c, 0x36, 0x5c, 0x36, 0x5c,
-				    0x36, 0x5c, 0x36, 0x5c};
-	unsigned char rx_iv[16] = { 0x5c, 0x36, 0x5c, 0x36, 0x5c, 0x36,
-				    0x5c, 0x36, 0x5c, 0x36, 0x5c, 0x36,
-				    0x5c, 0x36, 0x5c, 0x37};
-	if (mode == wlan_op_mode_ap) {
-		/* Authenticator initializes the value of PN as
-		 * 0x5C365C365C365C365C365C365C365C36 for MCastkeyUpdate
-		 */
-		if (key_params->unicast)
-			tx_iv[0] = 0x37;
-
-		rx_iv[WPI_IV_LEN - 1] = 0x36;
-	} else {
-		if (!key_params->unicast)
-			rx_iv[WPI_IV_LEN - 1] = 0x36;
-	}
-
-	params->key_txmic_len = WMA_TXMIC_LEN;
-	params->key_rxmic_len = WMA_RXMIC_LEN;
-
-	qdf_mem_copy(params->rx_iv, &rx_iv,
-		     WPI_IV_LEN);
-	qdf_mem_copy(params->tx_iv, &tx_iv,
-		     WPI_IV_LEN);
-	params->key_cipher = WMI_CIPHER_WAPI;
-}
-#endif
-#endif
-
 /**
  * wma_process_update_edca_param_req() - update EDCA params
  * @handle: wma handle
@@ -2674,7 +2593,7 @@ void wma_set_keepalive_req(tp_wma_handle wma,
  * wma_beacon_miss_handler() - beacon miss event handler
  * @wma: wma handle
  * @vdev_id: vdev id
- * @riis: rssi value
+ * @rssi: rssi value
  *
  * This function send beacon miss indication to upper layers.
  *
@@ -3893,13 +3812,12 @@ static int wma_mgmt_rx_process(void *handle, uint8_t *data,
 
 	mgmt_rx_params = qdf_mem_malloc(sizeof(*mgmt_rx_params));
 	if (!mgmt_rx_params) {
-		wma_err("memory allocation failed");
 		return -ENOMEM;
 	}
 
 	if (wmi_extract_mgmt_rx_params(wma_handle->wmi_handle,
 			data, mgmt_rx_params, &bufp) != QDF_STATUS_SUCCESS) {
-		wma_err("Extraction of mgmt rx params failed");
+		wma_err_rl("Extraction of mgmt rx params failed");
 		qdf_mem_free(mgmt_rx_params);
 		return -EINVAL;
 	}
@@ -3907,8 +3825,8 @@ static int wma_mgmt_rx_process(void *handle, uint8_t *data,
 	if (mgmt_rx_params->buf_len > data_len ||
 	    !mgmt_rx_params->buf_len ||
 	    !bufp) {
-		wma_err("Invalid data_len %u, buf_len %u bufp %pK",
-			data_len, mgmt_rx_params->buf_len, bufp);
+		wma_err_rl("Invalid data_len %u, buf_len %u bufp %pK",
+			   data_len, mgmt_rx_params->buf_len, bufp);
 		qdf_mem_free(mgmt_rx_params);
 		return -EINVAL;
 	}

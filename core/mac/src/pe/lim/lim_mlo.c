@@ -57,8 +57,10 @@ QDF_STATUS lim_cu_info_from_rnr_per_link_id(const uint8_t *rnr,
 		tbtt_len = neighbor_ap_info->tbtt_header.tbtt_info_length;
 		tbtt_type = neighbor_ap_info->tbtt_header.tbbt_info_fieldtype;
 		len = tbtt_len * (tbtt_count + 1) + nbr_ap_info_len;
-		if (data + len > rnr_end)
+		if (data + len > rnr_end) {
+			pe_debug("error about rnr length");
 			return QDF_STATUS_E_INVAL;
+		}
 
 		if (tbtt_len >=
 		    TBTT_NEIGHBOR_AP_BSSID_S_SSID_BSS_PARAM_20MHZ_PSD_MLD_PARAM)
@@ -105,6 +107,7 @@ QDF_STATUS lim_get_bpcc_from_mlo_ie(tSchBeaconStruct *bcn, uint8_t *bpcc)
 	if (mlo_ie->mlo_ie_present &&
 	    mlo_ie->mlo_ie.bss_param_change_cnt_present) {
 		*bpcc = mlo_ie->mlo_ie.bss_param_change_count;
+		pe_debug("mlie bpcc %d", *bpcc);
 		status = QDF_STATUS_SUCCESS;
 	} else {
 		*bpcc = 0;
@@ -131,8 +134,8 @@ bool lim_check_cu_happens(struct wlan_objmgr_vdev *vdev, uint8_t new_bpcc)
 	if (new_bpcc == 0 && bpcc == 0)
 		return false;
 
-	pe_debug("new bpcc %d, old bpcc %d, vdev id %d",
-		 new_bpcc, bpcc, vdev_id);
+	pe_debug_rl("vdev id %d new bpcc %d, old bpcc %d",
+		    vdev_id, new_bpcc, bpcc);
 	if (new_bpcc && new_bpcc < bpcc)
 		return false;
 
@@ -545,7 +548,7 @@ QDF_STATUS lim_mlo_proc_assoc_req_frm(struct wlan_objmgr_vdev *vdev,
 	tSirMacFrameCtl fc;
 	tpSirAssocReq assoc_req;
 	QDF_STATUS status;
-	qdf_size_t link_frame_len;
+	qdf_size_t link_frame_len = 0;
 	struct qdf_mac_addr link_bssid;
 
 	if (!vdev) {
@@ -626,6 +629,7 @@ QDF_STATUS lim_mlo_proc_assoc_req_frm(struct wlan_objmgr_vdev *vdev,
 	qdf_copy_macaddr(&link_bssid, (struct qdf_mac_addr *)session->bssId);
 	status = util_gen_link_assoc_req(
 				frm_body, frame_len, sub_type == LIM_REASSOC,
+				0,
 				link_bssid,
 				qdf_nbuf_data(assoc_req->assoc_req_buf),
 				qdf_nbuf_len(assoc_req->assoc_req_buf),
@@ -1098,8 +1102,8 @@ QDF_STATUS lim_store_mlo_ie_raw_info(uint8_t *ie, uint8_t *sta_prof_ie,
 	}
 	ml_ie_len = total_len - frag_num * MIN_IE_LEN;
 
-	pe_debug("ml_ie_len: %d, total_len: %d, frag_num: %d", ml_ie_len,
-		 total_len, frag_num);
+	pe_debug_rl("ml_ie_len: %d, total_len: %d, frag_num: %d", ml_ie_len,
+		    total_len, frag_num);
 
 	buf = qdf_mem_malloc(total_len);
 	if (!buf)
@@ -1153,8 +1157,8 @@ QDF_STATUS lim_store_mlo_ie_raw_info(uint8_t *ie, uint8_t *sta_prof_ie,
 			}
 			pfrm += pfrm[TAG_LEN_POS] + MIN_IE_LEN;
 		} while (frag);
-		pe_debug("sta index: %d, sta_data len: %d, copied: %d",
-			 sta_index, index, copied);
+		pe_debug_rl("sta index: %d, sta_data len: %d, copied: %d",
+			    sta_index, index, copied);
 		sta_index++;
 	}
 
@@ -1257,6 +1261,22 @@ lim_send_bcn_frame_mlo(struct mac_context *mac_ctx,
 	session->mlo_ie_total_len = 0;
 	qdf_mem_zero(&session->mlo_ie, sizeof(session->mlo_ie));
 	status = populate_dot11f_bcn_mlo_ie(mac_ctx, session);
+	if (QDF_IS_STATUS_SUCCESS(status))
+		session->mlo_ie_total_len =
+				lim_caculate_mlo_ie_length(&session->mlo_ie);
+
+	return session->mlo_ie_total_len;
+}
+
+uint16_t
+lim_send_probe_req_frame_mlo(struct mac_context *mac_ctx,
+			     struct pe_session *session)
+{
+	QDF_STATUS status;
+
+	session->mlo_ie_total_len = 0;
+	qdf_mem_zero(&session->mlo_ie, sizeof(session->mlo_ie));
+	status = populate_dot11f_probe_req_mlo_ie(mac_ctx, session);
 	if (QDF_IS_STATUS_SUCCESS(status))
 		session->mlo_ie_total_len =
 				lim_caculate_mlo_ie_length(&session->mlo_ie);

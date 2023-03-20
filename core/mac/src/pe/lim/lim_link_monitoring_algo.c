@@ -255,8 +255,8 @@ void lim_delete_sta_context(struct mac_context *mac_ctx,
 		break;
 
 	case HAL_DEL_STA_REASON_CODE_UNKNOWN_A2:
-		pe_err("Deleting Unknown station");
-		lim_print_mac_addr(mac_ctx, msg->addr2, LOGE);
+		pe_err("Deleting Unknown station:  "QDF_MAC_ADDR_FMT,
+		       QDF_MAC_ADDR_REF(msg->addr2));
 		lim_send_deauth_mgmt_frame(mac_ctx,
 			REASON_CLASS3_FRAME_FROM_NON_ASSOC_STA,
 			msg->addr2, session_entry, false);

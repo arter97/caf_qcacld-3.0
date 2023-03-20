@@ -1218,6 +1218,50 @@ wlan_cm_roam_set_full_scan_6ghz_on_disc(struct wlan_objmgr_psoc *psoc,
  */
 uint8_t wlan_cm_roam_get_full_scan_6ghz_on_disc(struct wlan_objmgr_psoc *psoc);
 
+#ifdef WLAN_FEATURE_ROAM_INFO_STATS
+/**
+ * mlme_cm_alloc_roam_stats_info() - alloc roam stats info buffer
+ * @vdev_mlme: MLME-private vdev context
+ *
+ * Return: None
+ */
+void mlme_cm_alloc_roam_stats_info(struct vdev_mlme_obj *vdev_mlme);
+
+/**
+ * mlme_cm_free_roam_stats_info() - free roam stats info buffer in
+ * struct mlme_legacy_priv
+ * @ext_hdl: mlme_legacy_priv pointer
+ *
+ * Return: None
+ */
+void mlme_cm_free_roam_stats_info(mlme_vdev_ext_t *ext_hdl);
+
+/**
+ * wlan_cm_roam_stats_info_get() - get vdev roam stats info
+ *
+ * @vdev: pointer to vdev
+ * @roam_info: pointer to buffer to copy roam stats info
+ * @roam_num: pointer to valid roam stats num
+ *
+ * Return: QDF_STATUS
+ */
+
+QDF_STATUS
+wlan_cm_roam_stats_info_get(struct wlan_objmgr_vdev *vdev,
+			    struct enhance_roam_info **roam_info,
+			    uint32_t  *roam_num);
+#else
+static inline
+void mlme_cm_alloc_roam_stats_info(struct vdev_mlme_obj *vdev_mlme)
+{
+}
+
+static inline
+void mlme_cm_free_roam_stats_info(mlme_vdev_ext_t *ext_hdl)
+{
+}
+#endif
+
 #else
 static inline
 void wlan_cm_roam_activate_pcl_per_vdev(struct wlan_objmgr_psoc *psoc,
@@ -1434,6 +1478,16 @@ static inline uint8_t
 wlan_cm_roam_get_full_scan_6ghz_on_disc(struct wlan_objmgr_psoc *psoc)
 {
 	return 0;
+}
+
+static inline
+void mlme_cm_alloc_roam_stats_info(struct vdev_mlme_obj *vdev_mlme)
+{
+}
+
+static inline
+void mlme_cm_free_roam_stats_info(mlme_vdev_ext_t *ext_hdl)
+{
 }
 
 #endif /* WLAN_FEATURE_ROAM_OFFLOAD */
@@ -1831,4 +1885,11 @@ wlan_cm_set_assoc_btm_cap(struct wlan_objmgr_vdev *vdev, bool val);
 bool
 wlan_cm_get_assoc_btm_cap(struct wlan_objmgr_vdev *vdev);
 
+/**
+ * wlan_cm_is_self_mld_roam_supported() - Is self mld roam supported
+ * @psoc: pointer to psoc object
+ *
+ * Return: bool, true: self mld roam supported
+ */
+bool wlan_cm_is_self_mld_roam_supported(struct wlan_objmgr_psoc *psoc);
 #endif  /* WLAN_CM_ROAM_API_H__ */

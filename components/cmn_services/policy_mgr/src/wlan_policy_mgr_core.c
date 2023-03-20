@@ -1064,9 +1064,63 @@ set_done_event:
 		policy_mgr_err("ERROR: set opportunistic_update event failed");
 }
 
+static char *
+ml_sta_prefix(struct wlan_objmgr_psoc *psoc, uint32_t vdev_id)
+{
+	struct wlan_objmgr_vdev *vdev;
+
+	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc,
+						    vdev_id,
+						    WLAN_POLICY_MGR_ID);
+	if (!vdev) {
+		policy_mgr_err("invalid vdev for id %d",
+			       vdev_id);
+		return "STA";
+	}
+
+	if (wlan_vdev_mlme_is_mlo_vdev(vdev)) {
+		wlan_objmgr_vdev_release_ref(vdev, WLAN_POLICY_MGR_ID);
+		return "ML STA";
+	}
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_POLICY_MGR_ID);
+
+	return "STA";
+}
+
+static void
+policy_mgr_dump_ml_sta_conc(struct wlan_objmgr_psoc *psoc,
+			    uint8_t *num_mlo_sta)
+{
+	struct policy_mgr_psoc_priv_obj *pm_ctx;
+
+	if (!num_mlo_sta)
+		return;
+
+	pm_ctx = policy_mgr_get_context(psoc);
+	if (!pm_ctx) {
+		policy_mgr_err("Invalid Context");
+		return;
+	}
+
+	qdf_mutex_acquire(&pm_ctx->qdf_conc_list_lock);
+
+	if (policy_mgr_is_mlo_in_mode_dbs(psoc, PM_STA_MODE, NULL,
+					  num_mlo_sta))
+		policy_mgr_debug("ML STA %d links in DBS band", *num_mlo_sta);
+	else if (policy_mgr_is_mlo_in_mode_sbs(psoc, PM_STA_MODE, NULL,
+					       num_mlo_sta))
+		policy_mgr_debug("ML STA %d links in SBS band", *num_mlo_sta);
+	else if (*num_mlo_sta > 1)
+		policy_mgr_debug("ML STA %d links in same mac MLSR",
+				 *num_mlo_sta);
+
+	qdf_mutex_release(&pm_ctx->qdf_conc_list_lock);
+}
+
 /**
  * policy_mgr_dump_current_concurrency_one_connection() - To dump the
  * current concurrency info with one connection
+ * @psoc: psoc object
  * @cc_mode: connection string
  * @length: Maximum size of the string
  *
@@ -1075,6 +1129,7 @@ set_done_event:
  * Return: length of the string
  */
 static uint32_t policy_mgr_dump_current_concurrency_one_connection(
+		struct wlan_objmgr_psoc *psoc,
 		char *cc_mode, uint32_t length)
 {
 	uint32_t count = 0;
@@ -1087,8 +1142,10 @@ static uint32_t policy_mgr_dump_current_concurrency_one_connection(
 
 	switch (mode) {
 	case PM_STA_MODE:
-		count = strlcat(cc_mode, "STA",
-					length);
+		count = strlcat(cc_mode,
+				ml_sta_prefix(
+				psoc, pm_conc_connection_list[0].vdev_id),
+				length);
 		break;
 	case PM_SAP_MODE:
 		count = strlcat(cc_mode, "SAP",
@@ -1120,6 +1177,7 @@ static uint32_t policy_mgr_dump_current_concurrency_one_connection(
 /**
  * policy_mgr_dump_current_concurrency_two_connection() - To dump the
  * current concurrency info with two connections
+ * @psoc: psoc object
  * @cc_mode: connection string
  * @length: Maximum size of the string
  *
@@ -1128,6 +1186,7 @@ static uint32_t policy_mgr_dump_current_concurrency_one_connection(
  * Return: length of the string
  */
 static uint32_t policy_mgr_dump_current_concurrency_two_connection(
+		struct wlan_objmgr_psoc *psoc,
 		char *cc_mode, uint32_t length)
 {
 	uint32_t count = 0;
@@ -1141,37 +1200,40 @@ static uint32_t policy_mgr_dump_current_concurrency_two_connection(
 	switch (mode) {
 	case PM_STA_MODE:
 		count = policy_mgr_dump_current_concurrency_one_connection(
-				cc_mode, length);
-		count += strlcat(cc_mode, "+STA",
-					length);
+				psoc, cc_mode, length);
+		count += strlcat(cc_mode, "+", length);
+		count += strlcat(cc_mode,
+				 ml_sta_prefix(
+				 psoc, pm_conc_connection_list[1].vdev_id),
+				 length);
 		break;
 	case PM_SAP_MODE:
 		count = policy_mgr_dump_current_concurrency_one_connection(
-				cc_mode, length);
+				psoc, cc_mode, length);
 		count += strlcat(cc_mode, "+SAP",
 					length);
 		break;
 	case PM_P2P_CLIENT_MODE:
 		count = policy_mgr_dump_current_concurrency_one_connection(
-				cc_mode, length);
+				psoc, cc_mode, length);
 		count += strlcat(cc_mode, "+P2P CLI",
 					length);
 		break;
 	case PM_P2P_GO_MODE:
 		count = policy_mgr_dump_current_concurrency_one_connection(
-				cc_mode, length);
+				psoc, cc_mode, length);
 		count += strlcat(cc_mode, "+P2P GO",
 					length);
 		break;
 	case PM_NDI_MODE:
 		count = policy_mgr_dump_current_concurrency_one_connection(
-				cc_mode, length);
+				psoc, cc_mode, length);
 		count += strlcat(cc_mode, "+NDI",
 					length);
 		break;
 	case PM_NAN_DISC_MODE:
 		count = policy_mgr_dump_current_concurrency_one_connection(
-				cc_mode, length);
+				psoc, cc_mode, length);
 		count += strlcat(cc_mode, "+NAN Disc", length);
 		break;
 	default:
@@ -1186,6 +1248,7 @@ static uint32_t policy_mgr_dump_current_concurrency_two_connection(
 /**
  * policy_mgr_dump_current_concurrency_three_connection() - To dump the
  * current concurrency info with three connections
+ * @psoc: psoc object
  * @cc_mode: connection string
  * @length: Maximum size of the string
  *
@@ -1194,6 +1257,7 @@ static uint32_t policy_mgr_dump_current_concurrency_two_connection(
  * Return: length of the string
  */
 static uint32_t policy_mgr_dump_current_concurrency_three_connection(
+		struct wlan_objmgr_psoc *psoc,
 		char *cc_mode, uint32_t length)
 {
 	uint32_t count = 0;
@@ -1207,37 +1271,40 @@ static uint32_t policy_mgr_dump_current_concurrency_three_connection(
 	switch (mode) {
 	case PM_STA_MODE:
 		count = policy_mgr_dump_current_concurrency_two_connection(
-				cc_mode, length);
-		count += strlcat(cc_mode, "+STA",
-					length);
+				psoc, cc_mode, length);
+		count += strlcat(cc_mode, "+", length);
+		count += strlcat(cc_mode,
+				 ml_sta_prefix(
+				 psoc, pm_conc_connection_list[2].vdev_id),
+				 length);
 		break;
 	case PM_SAP_MODE:
 		count = policy_mgr_dump_current_concurrency_two_connection(
-				cc_mode, length);
+				psoc, cc_mode, length);
 		count += strlcat(cc_mode, "+SAP",
 					length);
 		break;
 	case PM_P2P_CLIENT_MODE:
 		count = policy_mgr_dump_current_concurrency_two_connection(
-				cc_mode, length);
+				psoc, cc_mode, length);
 		count += strlcat(cc_mode, "+P2P CLI",
 					length);
 		break;
 	case PM_P2P_GO_MODE:
 		count = policy_mgr_dump_current_concurrency_two_connection(
-				cc_mode, length);
+				psoc, cc_mode, length);
 		count += strlcat(cc_mode, "+P2P GO",
 					length);
 		break;
 	case PM_NAN_DISC_MODE:
 		count = policy_mgr_dump_current_concurrency_two_connection(
-				cc_mode, length);
+				psoc, cc_mode, length);
 		count += strlcat(cc_mode, "+NAN Disc",
 					length);
 		break;
 	case PM_NDI_MODE:
 		count = policy_mgr_dump_current_concurrency_two_connection(
-				cc_mode, length);
+				psoc, cc_mode, length);
 		count += strlcat(cc_mode, "+NDI",
 					length);
 		break;
@@ -1392,6 +1459,7 @@ policy_mgr_dump_disabled_ml_links(struct policy_mgr_psoc_priv_obj *pm_ctx)
 /**
  * policy_mgr_dump_current_concurrency_4_connection() - To dump the
  * current concurrency info with 4 connections
+ * @psoc: psoc object
  * @cc_mode: connection string
  * @length: Maximum size of the string
  *
@@ -1400,7 +1468,7 @@ policy_mgr_dump_disabled_ml_links(struct policy_mgr_psoc_priv_obj *pm_ctx)
  * Return: length of the string
  */
 static uint32_t policy_mgr_dump_current_concurrency_4_connection(
-		char *cc_mode, uint32_t length)
+		struct wlan_objmgr_psoc *psoc, char *cc_mode, uint32_t length)
 {
 	uint32_t count = 0;
 	enum policy_mgr_con_mode mode;
@@ -1413,37 +1481,40 @@ static uint32_t policy_mgr_dump_current_concurrency_4_connection(
 	switch (mode) {
 	case PM_STA_MODE:
 		count = policy_mgr_dump_current_concurrency_three_connection(
-				cc_mode, length);
-		count += strlcat(cc_mode, "+STA",
-					length);
+				psoc, cc_mode, length);
+		count += strlcat(cc_mode, "+", length);
+		count += strlcat(cc_mode,
+				 ml_sta_prefix(
+				 psoc, pm_conc_connection_list[3].vdev_id),
+				 length);
 		break;
 	case PM_SAP_MODE:
 		count = policy_mgr_dump_current_concurrency_three_connection(
-				cc_mode, length);
+				psoc, cc_mode, length);
 		count += strlcat(cc_mode, "+SAP",
 					length);
 		break;
 	case PM_P2P_CLIENT_MODE:
 		count = policy_mgr_dump_current_concurrency_three_connection(
-				cc_mode, length);
+				psoc, cc_mode, length);
 		count += strlcat(cc_mode, "+P2P CLI",
 					length);
 		break;
 	case PM_P2P_GO_MODE:
 		count = policy_mgr_dump_current_concurrency_three_connection(
-				cc_mode, length);
+				psoc, cc_mode, length);
 		count += strlcat(cc_mode, "+P2P GO",
 					length);
 		break;
 	case PM_NAN_DISC_MODE:
 		count = policy_mgr_dump_current_concurrency_three_connection(
-				cc_mode, length);
+				psoc, cc_mode, length);
 		count += strlcat(cc_mode, "+NAN Disc",
 					length);
 		break;
 	case PM_NDI_MODE:
 		count = policy_mgr_dump_current_concurrency_three_connection(
-				cc_mode, length);
+				psoc, cc_mode, length);
 		count += strlcat(cc_mode, "+NDI",
 					length);
 		break;
@@ -1468,7 +1539,8 @@ policy_mgr_handle_dump_4th_connection(struct policy_mgr_psoc_priv_obj *pm_ctx,
 
 	qdf_mutex_acquire(&pm_ctx->qdf_conc_list_lock);
 
-	count = policy_mgr_dump_current_concurrency_4_connection(cc_mode, len);
+	count = policy_mgr_dump_current_concurrency_4_connection(
+		pm_ctx->psoc, cc_mode, len);
 
 	if (policy_mgr_is_current_hwmode_dbs(pm_ctx->psoc))
 		policy_mgr_dump_dbs_concurrency(pm_ctx->psoc, cc_mode, len);
@@ -1498,6 +1570,7 @@ void policy_mgr_dump_current_concurrency(struct wlan_objmgr_psoc *psoc)
 	uint32_t count = 0;
 	struct policy_mgr_psoc_priv_obj *pm_ctx;
 	uint32_t len = POLICY_MGR_MAX_CON_STRING_LEN;
+	uint8_t num_mlo_sta = 0;
 
 	pm_ctx = policy_mgr_get_context(psoc);
 	if (!pm_ctx) {
@@ -1514,15 +1587,17 @@ void policy_mgr_dump_current_concurrency(struct wlan_objmgr_psoc *psoc)
 		return;
 
 	policy_mgr_dump_connection_status_info(psoc);
+	policy_mgr_dump_ml_sta_conc(psoc, &num_mlo_sta);
 	switch (num_connections) {
 	case 1:
-		policy_mgr_dump_current_concurrency_one_connection(cc_mode,
+		policy_mgr_dump_current_concurrency_one_connection(psoc,
+								   cc_mode,
 								   len);
 		policy_mgr_debug("%s Standalone", cc_mode);
 		break;
 	case 2:
 		count = policy_mgr_dump_current_concurrency_two_connection(
-			cc_mode, len);
+			psoc, cc_mode, len);
 		qdf_mutex_acquire(&pm_ctx->qdf_conc_list_lock);
 		if (pm_conc_connection_list[0].freq ==
 			pm_conc_connection_list[1].freq) {
@@ -1532,14 +1607,17 @@ void policy_mgr_dump_current_concurrency(struct wlan_objmgr_psoc *psoc)
 		} else if (policy_mgr_is_current_hwmode_sbs(psoc)) {
 			strlcat(cc_mode, " SBS", len);
 		} else {
-			strlcat(cc_mode, " MCC", len);
+			if (num_mlo_sta < 2)
+				strlcat(cc_mode, " MCC", len);
+			else
+				strlcat(cc_mode, " SMM", len);
 		}
 		qdf_mutex_release(&pm_ctx->qdf_conc_list_lock);
 		policy_mgr_debug("%s", cc_mode);
 		break;
 	case 3:
 		count = policy_mgr_dump_current_concurrency_three_connection(
-			cc_mode, len);
+			psoc, cc_mode, len);
 		qdf_mutex_acquire(&pm_ctx->qdf_conc_list_lock);
 		if (pm_conc_connection_list[0].freq ==
 		    pm_conc_connection_list[1].freq &&
@@ -1552,7 +1630,10 @@ void policy_mgr_dump_current_concurrency(struct wlan_objmgr_psoc *psoc)
 				pm_conc_connection_list[1].freq,
 				pm_conc_connection_list[2].freq)) {
 			qdf_mutex_release(&pm_ctx->qdf_conc_list_lock);
-			strlcat(cc_mode, " MCC on single MAC", len);
+			if (num_mlo_sta < 2)
+				strlcat(cc_mode, " MCC on single MAC", len);
+			else
+				strlcat(cc_mode, " on single MAC", len);
 		} else {
 			qdf_mutex_release(&pm_ctx->qdf_conc_list_lock);
 			if (policy_mgr_is_current_hwmode_dbs(psoc))
@@ -1561,8 +1642,10 @@ void policy_mgr_dump_current_concurrency(struct wlan_objmgr_psoc *psoc)
 			else if (policy_mgr_is_current_hwmode_sbs(psoc))
 				policy_mgr_dump_sbs_concurrency(psoc, cc_mode,
 								len);
-			else
+			else if (num_mlo_sta < 2)
 				strlcat(cc_mode, " MCC", len);
+			else
+				strlcat(cc_mode, " SMM", len);
 		}
 		policy_mgr_debug("%s", cc_mode);
 		break;
@@ -3004,6 +3087,8 @@ QDF_STATUS policy_mgr_get_channel_list(struct wlan_objmgr_psoc *psoc,
 		policy_mgr_err("Error in getting valid channels");
 		goto end;
 	}
+
+	num_channels = QDF_MIN(num_channels, NUM_CHANNELS);
 
 	/* Let's divide the list in 2.4 & 5 Ghz lists */
 	for (i = 0; i < num_channels; i++) {
