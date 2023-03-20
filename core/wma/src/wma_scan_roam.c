@@ -3021,6 +3021,7 @@ cm_roam_pe_sync_callback(struct roam_offload_synch_ind *sync_ind,
 {
 	tp_wma_handle wma = cds_get_context(QDF_MODULE_ID_WMA);
 	struct pe_session *pe_session;
+	bool new_link_session = false;
 	QDF_STATUS status;
 
 	if (!wma)
@@ -3028,6 +3029,7 @@ cm_roam_pe_sync_callback(struct roam_offload_synch_ind *sync_ind,
 
 	pe_session = pe_find_session_by_vdev_id(wma->mac_context, vdev_id);
 	if (!pe_session) {
+		new_link_session = true;
 		/* Legacy to MLO roaming: create new pe session */
 		status = lim_create_and_fill_link_session(wma->mac_context,
 							  vdev_id,
@@ -3043,6 +3045,13 @@ cm_roam_pe_sync_callback(struct roam_offload_synch_ind *sync_ind,
 				vdev_id, sync_ind, ie_len,
 				SIR_ROAM_SYNCH_PROPAGATION);
 
+	/* delete newly added pe session in case of failure */
+	if (new_link_session && QDF_IS_STATUS_ERROR(status)) {
+		pe_session = pe_find_session_by_vdev_id(wma->mac_context,
+							vdev_id);
+		if (pe_session)
+			pe_delete_session(wma->mac_context, pe_session);
+	}
 	return status;
 }
 
