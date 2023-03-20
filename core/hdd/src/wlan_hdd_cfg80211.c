@@ -12334,6 +12334,7 @@ __wlan_hdd_cfg80211_set_wifi_test_config(struct wiphy *wiphy,
 	struct set_wfatest_params wfa_param = {0};
 	struct hdd_station_ctx *hdd_sta_ctx =
 		WLAN_HDD_GET_STATION_CTX_PTR(adapter->deflink);
+	uint8_t op_mode;
 
 	hdd_enter_dev(dev);
 
@@ -12425,13 +12426,14 @@ __wlan_hdd_cfg80211_set_wifi_test_config(struct wiphy *wiphy,
 			hdd_debug("BA operating mode is set to Manual");
 		}
 
-		ret_val = wma_cli_set_command(adapter->deflink->vdev_id,
-					      wmi_vdev_param_set_ba_mode,
-					      set_val, VDEV_CMD);
-		if (ret_val) {
-			hdd_err("Set BA operating mode failed");
-			goto send_err;
-		}
+		op_mode = wlan_get_opmode_from_vdev_id(
+						hdd_ctx->pdev,
+						adapter->deflink->vdev_id);
+		if (op_mode == QDF_STA_MODE)
+			sme_set_ba_opmode(mac_handle,
+					  adapter->deflink->vdev_id,
+					  set_val);
+
 		if (!cfg_val) {
 			ret_val = wma_cli_set_command(
 				adapter->deflink->vdev_id,

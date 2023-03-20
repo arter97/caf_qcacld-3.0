@@ -3034,6 +3034,17 @@ int sme_set_auto_rate_ldpc(mac_handle_t mac_handle, uint8_t session_id,
 int sme_set_auto_rate_he_ltf(mac_handle_t mac_handle, uint8_t session_id,
 			     uint8_t cfg_val);
 
+/**
+ * sme_set_ba_opmode() - sets the BA op mode
+ * @mac_handle: Opaque handle to the global MAC context
+ * @session_id: SME session id
+ * @cfg_val: BA mode
+ *
+ * Return: None
+ */
+void sme_set_ba_opmode(mac_handle_t mac_handle, uint8_t session_id,
+		       bool cfg_val);
+
 #ifdef WLAN_FEATURE_11BE
 /**
  * sme_update_tgt_eht_cap() - sets the EHT caps to pmac

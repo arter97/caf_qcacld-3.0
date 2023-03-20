@@ -10488,6 +10488,15 @@ int sme_update_tx_bfee_nsts(mac_handle_t mac_handle, uint8_t session_id,
 	return sme_update_he_tx_bfee_nsts(mac_handle, session_id, nsts_set_val);
 }
 
+void sme_set_ba_opmode(mac_handle_t mac_handle, uint8_t session_id,
+		       bool ba_opmode)
+{
+	struct mac_context *mac_ctx = MAC_CONTEXT(mac_handle);
+
+	mac_ctx->ba_mode = ba_opmode;
+	sme_debug("BA mode %d", mac_ctx->ba_mode);
+}
+
 #ifdef WLAN_FEATURE_11BE
 void sme_update_tgt_eht_cap(mac_handle_t mac_handle,
 			    struct wma_tgt_cfg *cfg,
