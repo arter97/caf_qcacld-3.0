@@ -319,7 +319,8 @@ const int dp_stats_mapping_table[][STATS_TYPE_MAX] = {
 	{TXRX_FW_STATS_INVALID, TXRX_SOC_WBM_IDLE_HPTP_DUMP},
 	{TXRX_FW_STATS_INVALID, TXRX_SRNG_USAGE_WM_STATS},
 	{HTT_DBG_EXT_STATS_PDEV_RX_RATE_EXT, TXRX_HOST_STATS_INVALID},
-	{HTT_DBG_EXT_STATS_TX_SOUNDING_INFO, TXRX_HOST_STATS_INVALID}
+	{HTT_DBG_EXT_STATS_TX_SOUNDING_INFO, TXRX_HOST_STATS_INVALID},
+	{TXRX_FW_STATS_INVALID, TXRX_PEER_STATS},
 };
 
 /* MCL specific functions */
@@ -6638,6 +6639,10 @@ dp_print_host_stats(struct dp_vdev *vdev,
 	case TXRX_SRNG_USAGE_WM_STATS:
 		/* Dump usage watermark stats for all SRNGs */
 		dp_dump_srng_high_wm_stats(soc, 0xFF);
+		break;
+	case TXRX_PEER_STATS:
+		dp_print_per_link_stats((struct cdp_soc_t *)pdev->soc,
+					vdev->vdev_id);
 		break;
 	default:
 		dp_info("Wrong Input For TxRx Host Stats");

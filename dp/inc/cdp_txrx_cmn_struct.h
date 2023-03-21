@@ -312,6 +312,7 @@ enum htt_cmn_dbg_stats_type {
  * @TXRX_SOC_REO_HW_DESC_DUMP: HW REO queue desc dump
  * @TXRX_SOC_WBM_IDLE_HPTP_DUMP: WBM idle link desc SRNG HP/TP dump
  * @TXRX_SRNG_USAGE_WM_STATS: SRNG usage watermark stats
+ * @TXRX_PEER_STATS: Per link peer stats
  * @TXRX_HOST_STATS_MAX:
  */
 enum cdp_host_txrx_stats {
@@ -334,6 +335,7 @@ enum cdp_host_txrx_stats {
 	TXRX_SOC_REO_HW_DESC_DUMP = 15,
 	TXRX_SOC_WBM_IDLE_HPTP_DUMP = 16,
 	TXRX_SRNG_USAGE_WM_STATS = 17,
+	TXRX_PEER_STATS   = 18,
 	TXRX_HOST_STATS_MAX,
 };
 

@@ -5360,4 +5360,13 @@ dp_get_peer_hw_link_id(struct dp_soc *soc,
  */
 void dp_tx_remove_vlan_tag(struct dp_vdev *vdev, qdf_nbuf_t nbuf);
 #endif
+
+/**
+ * dp_print_per_link_stats() - Print per link peer stats.
+ * @soc_hdl: soc handle.
+ * @vdev_id: vdev_id.
+ *
+ * Return: None.
+ */
+void dp_print_per_link_stats(struct cdp_soc_t *soc_hdl, uint8_t vdev_id);
 #endif /* #ifndef _DP_INTERNAL_H_ */

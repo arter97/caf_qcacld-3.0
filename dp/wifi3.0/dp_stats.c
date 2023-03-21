@@ -9571,3 +9571,529 @@ dp_update_pdev_chan_util_stats(struct cdp_soc_t *soc_hdl, uint8_t pdev_id,
 	return QDF_STATUS_SUCCESS;
 }
 #endif
+#ifndef CONFIG_AP_PLATFORM
+#if defined WLAN_FEATURE_11BE_MLO && defined DP_MLO_LINK_STATS_SUPPORT
+/**
+ * dp_print_per_link_peer_txrx_stats() - print link peer stats
+ * @peer_stats: buffer holding peer stats
+ * @pdev: DP pdev handle
+ *
+ * return None
+ */
+static inline void
+dp_print_per_link_peer_txrx_stats(struct cdp_peer_stats *peer_stats,
+				  struct dp_pdev *pdev)
+{
+	uint8_t i;
+	uint32_t index;
+	uint32_t j;
+	char nss[DP_NSS_LENGTH];
+	char mu_group_id[DP_MU_GROUP_LENGTH];
+	uint32_t *pnss;
+	enum cdp_mu_packet_type rx_mu_type;
+	struct cdp_rx_mu *rx_mu;
+
+	DP_PRINT_STATS("peer_mac_addr = " QDF_MAC_ADDR_FMT,
+		       QDF_MAC_ADDR_REF(peer_stats->mac_addr.bytes));
+	DP_PRINT_STATS("Node Tx Stats:");
+	DP_PRINT_STATS("Success Packets = %u",
+		       peer_stats->tx.tx_success.num);
+	DP_PRINT_STATS("Success Bytes = %llu",
+		       peer_stats->tx.tx_success.bytes);
+	DP_PRINT_STATS("Success Packets in TWT Session = %u",
+		       peer_stats->tx.tx_success_twt.num);
+	DP_PRINT_STATS("Success Bytes in TWT Session = %llu",
+		       peer_stats->tx.tx_success_twt.bytes);
+	DP_PRINT_STATS("Unicast Success Packets = %u",
+		       peer_stats->tx.ucast.num);
+	DP_PRINT_STATS("Unicast Success Bytes = %llu",
+		       peer_stats->tx.ucast.bytes);
+	DP_PRINT_STATS("Multicast Success Packets = %u",
+		       peer_stats->tx.mcast.num);
+	DP_PRINT_STATS("Multicast Success Bytes = %llu",
+		       peer_stats->tx.mcast.bytes);
+	DP_PRINT_STATS("Broadcast Success Packets = %u",
+		       peer_stats->tx.bcast.num);
+	DP_PRINT_STATS("Broadcast Success Bytes = %llu",
+		       peer_stats->tx.bcast.bytes);
+	DP_PRINT_STATS("Packets Successfully Sent after one or more retry = %u",
+		       peer_stats->tx.retry_count);
+	DP_PRINT_STATS("Packets  Sent Success after more than one retry = %u",
+		       peer_stats->tx.multiple_retry_count);
+	DP_PRINT_STATS("Packets Failed due to retry threshold breach = %u",
+		       peer_stats->tx.failed_retry_count);
+	DP_PRINT_STATS("Packets In OFDMA = %u",
+		       peer_stats->tx.ofdma);
+	DP_PRINT_STATS("Packets In STBC = %u",
+		       peer_stats->tx.stbc);
+	DP_PRINT_STATS("Packets In LDPC = %u",
+		       peer_stats->tx.ldpc);
+	DP_PRINT_STATS("Packet Retries = %u",
+		       peer_stats->tx.retries);
+	DP_PRINT_STATS("MSDU's Part of AMSDU = %u",
+		       peer_stats->tx.amsdu_cnt);
+	DP_PRINT_STATS("Msdu's As Part of Ampdu = %u",
+		       peer_stats->tx.non_ampdu_cnt);
+	DP_PRINT_STATS("Msdu's As Ampdu = %u",
+		       peer_stats->tx.ampdu_cnt);
+	DP_PRINT_STATS("Last Packet RSSI = %u",
+		       peer_stats->tx.last_ack_rssi);
+	DP_PRINT_STATS("Dropped At FW: Removed Pkts = %u",
+		       peer_stats->tx.dropped.fw_rem.num);
+	DP_PRINT_STATS("Release source not TQM = %u",
+		       peer_stats->tx.release_src_not_tqm);
+	if (pdev &&
+	    !wlan_cfg_get_dp_pdev_nss_enabled(pdev->wlan_cfg_ctx)) {
+		DP_PRINT_STATS("Dropped At FW: Removed bytes = %llu",
+			       peer_stats->tx.dropped.fw_rem.bytes);
+	}
+	DP_PRINT_STATS("Dropped At FW: Removed transmitted = %u",
+		       peer_stats->tx.dropped.fw_rem_tx);
+	DP_PRINT_STATS("Dropped At FW: Removed Untransmitted = %u",
+		       peer_stats->tx.dropped.fw_rem_notx);
+	DP_PRINT_STATS("Dropped At FW: removed untransmitted fw_reason1 = %u",
+		       peer_stats->tx.dropped.fw_reason1);
+	DP_PRINT_STATS("Dropped At FW: removed untransmitted fw_reason2 = %u",
+		       peer_stats->tx.dropped.fw_reason2);
+	DP_PRINT_STATS("Dropped At FW: removed untransmitted fw_reason3 = %u",
+		       peer_stats->tx.dropped.fw_reason3);
+	DP_PRINT_STATS("Dropped At FW:removed untransmitted disable queue = %u",
+		       peer_stats->tx.dropped.fw_rem_queue_disable);
+	DP_PRINT_STATS("Dropped At FW: removed untransmitted no match = %u",
+		       peer_stats->tx.dropped.fw_rem_no_match);
+	DP_PRINT_STATS("Dropped due to HW threshold criteria = %u",
+		       peer_stats->tx.dropped.drop_threshold);
+	DP_PRINT_STATS("Dropped due Link desc not available drop in HW = %u",
+		       peer_stats->tx.dropped.drop_link_desc_na);
+	DP_PRINT_STATS("Drop bit set or invalid flow = %u",
+		       peer_stats->tx.dropped.invalid_drop);
+	DP_PRINT_STATS("MCAST vdev drop in HW = %u",
+		       peer_stats->tx.dropped.mcast_vdev_drop);
+	DP_PRINT_STATS("Dropped : Age Out = %u",
+		       peer_stats->tx.dropped.age_out);
+	DP_PRINT_STATS("Dropped : Invalid Reason = %u",
+		       peer_stats->tx.dropped.invalid_rr);
+	DP_PRINT_STATS("NAWDS : ");
+	DP_PRINT_STATS("Nawds multicast Drop Tx Packet = %u",
+		       peer_stats->tx.nawds_mcast_drop);
+	DP_PRINT_STATS("	Nawds multicast  Tx Packet Count = %u",
+		       peer_stats->tx.nawds_mcast.num);
+	DP_PRINT_STATS("	Nawds multicast Tx Packet Bytes = %llu",
+		       peer_stats->tx.nawds_mcast.bytes);
+
+	DP_PRINT_STATS("PPDU's = %u", peer_stats->tx.tx_ppdus);
+	DP_PRINT_STATS("Number of PPDU's with Punctured Preamble = %u",
+		       peer_stats->tx.pream_punct_cnt);
+	DP_PRINT_STATS("MPDU's Successful = %u",
+		       peer_stats->tx.tx_mpdus_success);
+	DP_PRINT_STATS("MPDU's Tried = %u",
+		       peer_stats->tx.tx_mpdus_tried);
+
+	DP_PRINT_STATS("Rate Info:");
+	dp_print_common_rates_info(peer_stats->tx.pkt_type);
+	DP_PRINT_STATS("SGI = 0.8us %u 0.4us %u 1.6us %u 3.2us %u",
+		       peer_stats->tx.sgi_count[0],
+		       peer_stats->tx.sgi_count[1],
+		       peer_stats->tx.sgi_count[2],
+		       peer_stats->tx.sgi_count[3]);
+
+	DP_PRINT_STATS("Wireless Mutlimedia ");
+	DP_PRINT_STATS("	 Best effort = %u",
+		       peer_stats->tx.wme_ac_type[0]);
+	DP_PRINT_STATS("	 Background= %u",
+		       peer_stats->tx.wme_ac_type[1]);
+	DP_PRINT_STATS("	 Video = %u",
+		       peer_stats->tx.wme_ac_type[2]);
+	DP_PRINT_STATS("	 Voice = %u",
+		       peer_stats->tx.wme_ac_type[3]);
+
+	DP_PRINT_STATS("Excess Retries per AC ");
+	DP_PRINT_STATS("	 Best effort = %u",
+		       peer_stats->tx.excess_retries_per_ac[0]);
+	DP_PRINT_STATS("	 Background= %u",
+		       peer_stats->tx.excess_retries_per_ac[1]);
+	DP_PRINT_STATS("	 Video = %u",
+		       peer_stats->tx.excess_retries_per_ac[2]);
+	DP_PRINT_STATS("	 Voice = %u",
+		       peer_stats->tx.excess_retries_per_ac[3]);
+
+	pnss = &peer_stats->tx.nss[0];
+	dp_print_nss(nss, pnss, SS_COUNT);
+
+	DP_PRINT_STATS("NSS(1-8) = %s", nss);
+
+	DP_PRINT_STATS("Transmit Type :");
+	DP_PRINT_STATS("MSDUs Success: SU %u, MU_MIMO %u, MU_OFDMA %u, MU_MIMO_OFDMA %u",
+		       peer_stats->tx.transmit_type[SU].num_msdu,
+		       peer_stats->tx.transmit_type[MU_MIMO].num_msdu,
+		       peer_stats->tx.transmit_type[MU_OFDMA].num_msdu,
+		       peer_stats->tx.transmit_type[MU_MIMO_OFDMA].num_msdu);
+
+	DP_PRINT_STATS("MPDUs Success: SU %u, MU_MIMO %u, MU_OFDMA %u, MU_MIMO_OFDMA %u",
+		       peer_stats->tx.transmit_type[SU].num_mpdu,
+		       peer_stats->tx.transmit_type[MU_MIMO].num_mpdu,
+		       peer_stats->tx.transmit_type[MU_OFDMA].num_mpdu,
+		       peer_stats->tx.transmit_type[MU_MIMO_OFDMA].num_mpdu);
+
+	DP_PRINT_STATS("MPDUs Tried: SU %u, MU_MIMO %u, MU_OFDMA %u, MU_MIMO_OFDMA %u",
+		       peer_stats->tx.transmit_type[SU].mpdu_tried,
+		       peer_stats->tx.transmit_type[MU_MIMO].mpdu_tried,
+		       peer_stats->tx.transmit_type[MU_OFDMA].mpdu_tried,
+		       peer_stats->tx.transmit_type[MU_MIMO_OFDMA].mpdu_tried);
+
+	for (i = 0; i < MAX_MU_GROUP_ID;) {
+		index = 0;
+		for (j = 0; j < DP_MU_GROUP_SHOW && i < MAX_MU_GROUP_ID;
+			j++) {
+			index += qdf_snprint(&mu_group_id[index],
+					     DP_MU_GROUP_LENGTH - index,
+					     " %u",
+					     peer_stats->tx.mu_group_id[i]);
+			i++;
+		}
+
+		DP_PRINT_STATS("User position list for GID %02d->%u: [%s]",
+			       i - DP_MU_GROUP_SHOW, i - 1,
+			       mu_group_id);
+	}
+
+	DP_PRINT_STATS("Last Packet RU index [%u], Size [%u]",
+		       peer_stats->tx.ru_start,
+		       peer_stats->tx.ru_tones);
+
+	DP_PRINT_STATS("Aggregation:");
+	DP_PRINT_STATS("Number of Msdu's Part of Amsdu = %u",
+		       peer_stats->tx.amsdu_cnt);
+	DP_PRINT_STATS("Number of Msdu's With No Msdu Level Aggregation = %u",
+		       peer_stats->tx.non_amsdu_cnt);
+
+	if (pdev && pdev->soc->arch_ops.txrx_print_peer_stats)
+		pdev->soc->arch_ops.txrx_print_peer_stats(peer_stats,
+							PEER_TX_STATS);
+
+	DP_PRINT_STATS("Node Rx Stats:");
+	for (i = 0; i <  CDP_MAX_RX_RINGS; i++) {
+		DP_PRINT_STATS("Ring Id = %u", i);
+		DP_PRINT_STATS("	Packets Received = %u",
+			       peer_stats->rx.rcvd_reo[i].num);
+		DP_PRINT_STATS("	Bytes Received = %llu",
+			       peer_stats->rx.rcvd_reo[i].bytes);
+	}
+	for (i = 0; i < CDP_MAX_LMACS; i++)
+		DP_PRINT_STATS("Packets Received on lmac[%u] = %u ( %llu ),",
+			       i, peer_stats->rx.rx_lmac[i].num,
+			       peer_stats->rx.rx_lmac[i].bytes);
+
+	DP_PRINT_STATS("Unicast Packets Received = %u",
+		       peer_stats->rx.unicast.num);
+	DP_PRINT_STATS("Unicast Bytes Received = %llu",
+		       peer_stats->rx.unicast.bytes);
+	DP_PRINT_STATS("Multicast Packets Received = %u",
+		       peer_stats->rx.multicast.num);
+	DP_PRINT_STATS("Multicast Bytes Received = %llu",
+		       peer_stats->rx.multicast.bytes);
+	DP_PRINT_STATS("Broadcast Packets Received = %u",
+		       peer_stats->rx.bcast.num);
+	DP_PRINT_STATS("Broadcast Bytes Received = %llu",
+		       peer_stats->rx.bcast.bytes);
+	DP_PRINT_STATS("Packets Sent To Stack in TWT Session = %u",
+		       peer_stats->rx.to_stack_twt.num);
+	DP_PRINT_STATS("Bytes Sent To Stack in TWT Session = %llu",
+		       peer_stats->rx.to_stack_twt.bytes);
+	DP_PRINT_STATS("Intra BSS Packets Received = %u",
+		       peer_stats->rx.intra_bss.pkts.num);
+	DP_PRINT_STATS("Intra BSS Bytes Received = %llu",
+		       peer_stats->rx.intra_bss.pkts.bytes);
+	DP_PRINT_STATS("Intra BSS Packets Failed = %u",
+		       peer_stats->rx.intra_bss.fail.num);
+	DP_PRINT_STATS("Intra BSS Bytes Failed = %llu",
+		       peer_stats->rx.intra_bss.fail.bytes);
+	DP_PRINT_STATS("Intra BSS MDNS Packets Not Forwarded  = %u",
+		       peer_stats->rx.intra_bss.mdns_no_fwd);
+	DP_PRINT_STATS("Raw Packets Received = %u",
+		       peer_stats->rx.raw.num);
+	DP_PRINT_STATS("Raw Bytes Received = %llu",
+		       peer_stats->rx.raw.bytes);
+	DP_PRINT_STATS("Errors: MIC Errors = %u",
+		       peer_stats->rx.err.mic_err);
+	DP_PRINT_STATS("Errors: Decryption Errors = %u",
+		       peer_stats->rx.err.decrypt_err);
+	DP_PRINT_STATS("Errors: PN Errors = %u",
+		       peer_stats->rx.err.pn_err);
+	DP_PRINT_STATS("Errors: OOR Errors = %u",
+		       peer_stats->rx.err.oor_err);
+	DP_PRINT_STATS("Errors: 2k Jump Errors = %u",
+		       peer_stats->rx.err.jump_2k_err);
+	DP_PRINT_STATS("Errors: RXDMA Wifi Parse Errors = %u",
+		       peer_stats->rx.err.rxdma_wifi_parse_err);
+	DP_PRINT_STATS("Msdu's Received As Part of Ampdu = %u",
+		       peer_stats->rx.non_ampdu_cnt);
+	DP_PRINT_STATS("Msdu's Received As Ampdu = %u",
+		       peer_stats->rx.ampdu_cnt);
+	DP_PRINT_STATS("Msdu's Received Not Part of Amsdu's = %u",
+		       peer_stats->rx.non_amsdu_cnt);
+	DP_PRINT_STATS("MSDUs Received As Part of Amsdu = %u",
+		       peer_stats->rx.amsdu_cnt);
+	DP_PRINT_STATS("MSDU Rx Retries= %u",
+		       peer_stats->rx.rx_retries);
+	DP_PRINT_STATS("MPDU Rx Retries= %u",
+		       peer_stats->rx.mpdu_retry_cnt);
+	DP_PRINT_STATS("NAWDS : ");
+	DP_PRINT_STATS("	Nawds multicast Drop Rx Packet = %u",
+		       peer_stats->rx.nawds_mcast_drop);
+	DP_PRINT_STATS(" 3address multicast Drop Rx Packet = %u",
+		       peer_stats->rx.mcast_3addr_drop);
+	DP_PRINT_STATS("SGI = 0.8us %u 0.4us %u 1.6us %u 3.2us %u",
+		       peer_stats->rx.sgi_count[0],
+		       peer_stats->rx.sgi_count[1],
+		       peer_stats->rx.sgi_count[2],
+		       peer_stats->rx.sgi_count[3]);
+
+	DP_PRINT_STATS("Wireless Mutlimedia ");
+	DP_PRINT_STATS("	 Best effort = %u",
+		       peer_stats->rx.wme_ac_type[0]);
+	DP_PRINT_STATS("	 Background= %u",
+		       peer_stats->rx.wme_ac_type[1]);
+	DP_PRINT_STATS("	 Video = %u",
+		       peer_stats->rx.wme_ac_type[2]);
+	DP_PRINT_STATS("	 Voice = %u",
+		       peer_stats->rx.wme_ac_type[3]);
+
+	DP_PRINT_STATS(" Total Rx PPDU Count = %u",
+		       peer_stats->rx.rx_ppdus);
+	DP_PRINT_STATS(" Total Rx MPDU Count = %u",
+		       peer_stats->rx.rx_mpdus);
+	DP_PRINT_STATS("MSDU Reception Type");
+	DP_PRINT_STATS("SU %u MU_MIMO %u MU_OFDMA %u MU_OFDMA_MIMO %u",
+		       peer_stats->rx.reception_type[0],
+		       peer_stats->rx.reception_type[1],
+		       peer_stats->rx.reception_type[2],
+		       peer_stats->rx.reception_type[3]);
+	DP_PRINT_STATS("PPDU Reception Type");
+	DP_PRINT_STATS("SU %u MU_MIMO %u MU_OFDMA %u MU_OFDMA_MIMO %u",
+		       peer_stats->rx.ppdu_cnt[0],
+		       peer_stats->rx.ppdu_cnt[1],
+		       peer_stats->rx.ppdu_cnt[2],
+		       peer_stats->rx.ppdu_cnt[3]);
+
+	dp_print_common_rates_info(peer_stats->rx.pkt_type);
+	dp_print_common_ppdu_rates_info(&peer_stats->rx.su_ax_ppdu_cnt,
+					DOT11_AX);
+	dp_print_mu_ppdu_rates_info(&peer_stats->rx.rx_mu[0]);
+
+	pnss = &peer_stats->rx.nss[0];
+	dp_print_nss(nss, pnss, SS_COUNT);
+	DP_PRINT_STATS("MSDU Count");
+	DP_PRINT_STATS("	NSS(1-8) = %s", nss);
+
+	DP_PRINT_STATS("reception mode SU");
+	pnss = &peer_stats->rx.ppdu_nss[0];
+	dp_print_nss(nss, pnss, SS_COUNT);
+
+	DP_PRINT_STATS("	PPDU Count");
+	DP_PRINT_STATS("	NSS(1-8) = %s", nss);
+
+	DP_PRINT_STATS("	MPDU OK = %u, MPDU Fail = %u",
+		       peer_stats->rx.mpdu_cnt_fcs_ok,
+		       peer_stats->rx.mpdu_cnt_fcs_err);
+
+	for (rx_mu_type = 0; rx_mu_type < TXRX_TYPE_MU_MAX;
+	     rx_mu_type++) {
+		DP_PRINT_STATS("reception mode %s",
+			       mu_reception_mode[rx_mu_type]);
+		rx_mu = &peer_stats->rx.rx_mu[rx_mu_type];
+
+		pnss = &rx_mu->ppdu_nss[0];
+		dp_print_nss(nss, pnss, SS_COUNT);
+		DP_PRINT_STATS("	PPDU Count");
+		DP_PRINT_STATS("	NSS(1-8) = %s", nss);
+
+		DP_PRINT_STATS("	MPDU OK = %u, MPDU Fail = %u",
+			       rx_mu->mpdu_cnt_fcs_ok,
+			       rx_mu->mpdu_cnt_fcs_err);
+	}
+
+	DP_PRINT_STATS("Aggregation:");
+	DP_PRINT_STATS("   Msdu's Part of Ampdu = %u",
+		       peer_stats->rx.ampdu_cnt);
+	DP_PRINT_STATS("   Msdu's With No Mpdu Level Aggregation = %u",
+		       peer_stats->rx.non_ampdu_cnt);
+	DP_PRINT_STATS("   Msdu's Part of Amsdu = %u",
+		       peer_stats->rx.amsdu_cnt);
+	DP_PRINT_STATS("   Msdu's With No Msdu Level Aggregation = %u",
+		       peer_stats->rx.non_amsdu_cnt);
+	DP_PRINT_STATS("MEC Packet Drop = %u",
+		       peer_stats->rx.mec_drop.num);
+	DP_PRINT_STATS("MEC Byte Drop = %llu",
+		       peer_stats->rx.mec_drop.bytes);
+	DP_PRINT_STATS("Multipass Rx Packet Drop = %u",
+		       peer_stats->rx.multipass_rx_pkt_drop);
+	DP_PRINT_STATS("Peer Unauth Rx Packet Drop = %u",
+		       peer_stats->rx.peer_unauth_rx_pkt_drop);
+	DP_PRINT_STATS("Policy Check Rx Packet Drop = %u",
+		       peer_stats->rx.policy_check_drop);
+	if (pdev && pdev->soc->arch_ops.txrx_print_peer_stats)
+		pdev->soc->arch_ops.txrx_print_peer_stats(peer_stats,
+							PEER_RX_STATS);
+}
+
+/**
+ * dp_print_per_link_peer_stats() - print per link peer stats of MLD peer
+ * @peer: MLD DP_PEER handle
+ * @peer_stats: buffer holding peer stats
+ * @num_links: Number of Link peers.
+ *
+ * This API should only be called with MLD peer and peer_stats should
+ * point to buffer of size = (sizeof(*peer_stats) * num_links).
+ *
+ * return None
+ */
+static
+void dp_print_per_link_peer_stats(struct dp_peer *peer,
+				  struct cdp_peer_stats *peer_stats,
+				  uint8_t num_links)
+{
+	uint8_t index;
+	struct dp_pdev *pdev = peer->vdev->pdev;
+
+	if (!IS_MLO_DP_MLD_PEER(peer))
+		return;
+
+	DP_PRINT_STATS("Node Tx ML peer Stats:\n");
+	DP_PRINT_STATS("Total Packet Completions = %u",
+		       peer_stats->tx.comp_pkt.num);
+	DP_PRINT_STATS("Total Bytes Completions = %llu",
+		       peer_stats->tx.comp_pkt.bytes);
+	DP_PRINT_STATS("Packets Failed = %u",
+		       peer_stats->tx.tx_failed);
+	DP_PRINT_STATS("Bytes and Packets transmitted  in last one sec:");
+	DP_PRINT_STATS("	Bytes transmitted in last sec: %u",
+		       peer_stats->tx.tx_byte_rate);
+	DP_PRINT_STATS("	Data transmitted in last sec: %u",
+		       peer_stats->tx.tx_data_rate);
+
+	if (!IS_MLO_DP_LINK_PEER(peer)) {
+		dp_print_jitter_stats(peer, pdev);
+		dp_peer_print_tx_delay_stats(pdev, peer);
+	}
+
+	DP_PRINT_STATS("Node Rx ML peer Stats:\n");
+	DP_PRINT_STATS("Packets Sent To Stack = %u",
+		       peer_stats->rx.to_stack.num);
+	DP_PRINT_STATS("Bytes Sent To Stack = %llu",
+		       peer_stats->rx.to_stack.bytes);
+	DP_PRINT_STATS("Bytes and Packets received in last one sec:");
+	DP_PRINT_STATS("	Bytes received in last sec: %u",
+		       peer_stats->rx.rx_byte_rate);
+	DP_PRINT_STATS("	Data received in last sec: %u",
+		       peer_stats->rx.rx_data_rate);
+	if (!IS_MLO_DP_LINK_PEER(peer))
+		dp_peer_print_rx_delay_stats(pdev, peer);
+
+	dp_peer_print_reo_qref_table(peer);
+	DP_PRINT_STATS("Per Link TxRx Stats:\n");
+	for (index = 0; index < num_links; index++) {
+		DP_PRINT_STATS("Link %u TxRx Stats:\n", index);
+		dp_print_per_link_peer_txrx_stats(&peer_stats[index], pdev);
+	}
+}
+
+void dp_print_per_link_stats(struct cdp_soc_t *soc_hdl, uint8_t vdev_id)
+{
+	struct dp_mld_link_peers link_peers_info;
+	struct dp_peer *peer, *ml_peer = NULL;
+	struct cdp_peer_stats *peer_stats = NULL;
+	struct dp_soc *soc = (struct dp_soc *)soc_hdl;
+	struct dp_vdev *vdev = dp_vdev_get_ref_by_id(soc, vdev_id,
+						     DP_MOD_ID_GENERIC_STATS);
+	if (!vdev) {
+		dp_err_rl("vdev is NULL, vdev_id: %u", vdev_id);
+		return;
+	}
+	peer = dp_vdev_bss_peer_ref_n_get(soc, vdev, DP_MOD_ID_GENERIC_STATS);
+
+	if (!peer) {
+		dp_err("Peer is NULL, vdev_id: %u", vdev_id);
+		dp_vdev_unref_delete(soc, vdev, DP_MOD_ID_GENERIC_STATS);
+		return;
+	}
+	if (IS_MLO_DP_LINK_PEER(peer))
+		ml_peer = peer->mld_peer;
+	if (ml_peer) {
+		dp_get_link_peers_ref_from_mld_peer(soc, ml_peer,
+						    &link_peers_info,
+						    DP_MOD_ID_GENERIC_STATS);
+		peer_stats = qdf_mem_malloc(sizeof(*peer_stats) *
+					    link_peers_info.num_links);
+		if (!peer_stats) {
+			dp_err("malloc failed, vdev_id: %u, ML peer_id: %u",
+			       vdev_id, ml_peer->peer_id);
+			dp_release_link_peers_ref(&link_peers_info,
+						  DP_MOD_ID_GENERIC_STATS);
+			goto fail;
+		}
+
+		dp_get_per_link_peer_stats(ml_peer, peer_stats,
+					   ml_peer->peer_type,
+					   link_peers_info.num_links);
+		dp_print_per_link_peer_stats(ml_peer, peer_stats,
+					     link_peers_info.num_links);
+		dp_release_link_peers_ref(&link_peers_info,
+					  DP_MOD_ID_GENERIC_STATS);
+		qdf_mem_free(peer_stats);
+	} else {
+		peer_stats = qdf_mem_malloc(sizeof(*peer_stats));
+		if (!peer_stats) {
+			dp_err("malloc failed, vdev_id: %u, peer_id: %u",
+			       vdev_id, peer->peer_id);
+			goto fail;
+		}
+		dp_get_peer_stats(peer, peer_stats);
+		dp_print_peer_stats(peer, peer_stats);
+		qdf_mem_free(peer_stats);
+	}
+
+fail:
+	dp_peer_unref_delete(peer, DP_MOD_ID_GENERIC_STATS);
+	dp_vdev_unref_delete(soc, vdev, DP_MOD_ID_GENERIC_STATS);
+}
+#else
+void dp_print_per_link_stats(struct cdp_soc_t *soc_hdl, uint8_t vdev_id)
+{
+	struct dp_peer *peer;
+	struct cdp_peer_stats *peer_stats = NULL;
+	struct dp_soc *soc = (struct dp_soc *)soc_hdl;
+	struct dp_vdev *vdev = dp_vdev_get_ref_by_id(soc, vdev_id,
+						     DP_MOD_ID_GENERIC_STATS);
+	if (!vdev) {
+		dp_err_rl("vdev is null for vdev_id: %u", vdev_id);
+		return;
+	}
+	peer = dp_vdev_bss_peer_ref_n_get(soc, vdev, DP_MOD_ID_GENERIC_STATS);
+
+	if (!peer) {
+		dp_err_rl("Peer is NULL, vdev_id: %u", vdev_id);
+		dp_vdev_unref_delete(soc, vdev, DP_MOD_ID_GENERIC_STATS);
+		return;
+	}
+	peer_stats = qdf_mem_malloc(sizeof(*peer_stats));
+	if (!peer_stats) {
+		dp_err_rl("peer_stats malloc failed, vdev_id: %u, peer_id: %u",
+			  vdev_id, peer->peer_id);
+		goto fail;
+	}
+
+	dp_get_peer_stats(peer, peer_stats);
+	dp_print_peer_stats(peer, peer_stats);
+	qdf_mem_free(peer_stats);
+
+fail:
+	dp_peer_unref_delete(peer, DP_MOD_ID_GENERIC_STATS);
+	dp_vdev_unref_delete(soc, vdev, DP_MOD_ID_GENERIC_STATS);
+}
+#endif /* DP_MLO_LINK_STATS_SUPPORT */
+#else
+void dp_print_per_link_stats(struct cdp_soc_t *soc_hdl, uint8_t vdev_id)
+{
+}
+#endif /* CONFIG_AP_PLATFORM */
