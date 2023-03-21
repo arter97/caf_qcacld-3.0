@@ -1217,7 +1217,7 @@ dp_rx_mon_flush_packet_tlv(struct dp_pdev *pdev, void *buf, uint16_t end_offset,
 
 	ppdu_info = &mon_pdev->ppdu_info;
 	if (!ppdu_info) {
-		dp_mon_err("ppdu_info malloc failed pdev: %pK", pdev);
+		dp_mon_debug("ppdu_info malloc failed pdev: %pK", pdev);
 		return work_done;
 	}
 	qdf_mem_zero(ppdu_info, sizeof(struct hal_rx_ppdu_info));
@@ -1759,7 +1759,7 @@ dp_rx_mon_process_status_tlv(struct dp_pdev *pdev)
 	ppdu_info = dp_rx_mon_get_ppdu_info(mon_pdev);
 
 	if (!ppdu_info) {
-		dp_mon_err("ppdu_info malloc failed pdev: %pK", pdev);
+		dp_mon_debug("ppdu_info malloc failed pdev: %pK", pdev);
 		dp_rx_mon_flush_status_buf_queue(pdev);
 		return NULL;
 	}
