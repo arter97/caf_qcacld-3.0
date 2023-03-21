@@ -848,6 +848,9 @@ enum {
 #if QCA_AIRTIME_FAIRNESS
 	IEEE80211_PARAM_ATF_VIP_INFRA = 795,
 #endif
+#ifdef WLAN_FEATURE_11BE
+	IEEE80211_PARAM_EHT_NUM_SD = 796, /* EHT Beamformer num sounding dimentions */
+#endif
 #ifdef CONFIG_MLO_SINGLE_DEV
 	IEEE80211_PARAM_GET_MLD_PEER = 797,
 #endif
@@ -2481,6 +2484,8 @@ struct vendor_commands vap_vendor_cmds[] = {
 	{"get_eht_su_bfme", IEEE80211_PARAM_EHT_SU_BFME, GET_PARAM, 0},
 	{"set_eht_bfme_ss", IEEE80211_PARAM_EHT_BFME_SS, SET_PARAM, 3},
 	{"get_eht_bfme_ss", IEEE80211_PARAM_EHT_BFME_SS, GET_PARAM, 0},
+	{"set_eht_num_sd", IEEE80211_PARAM_EHT_NUM_SD, SET_PARAM, 3},
+	{"get_eht_num_sd", IEEE80211_PARAM_EHT_NUM_SD, GET_PARAM, 0},
 	{"set_eht_4x_eht_ltf_and_800ns_gi", IEEE80211_PARAM_EHT_4X_EHT_LTF_AND_800NS_GI, SET_PARAM, 1},
 	{"get_eht_4x_eht_ltf_and_800ns_gi", IEEE80211_PARAM_EHT_4X_EHT_LTF_AND_800NS_GI, GET_PARAM, 0},
 	{"set_eht_max_nc", IEEE80211_PARAM_EHT_MAX_NC, SET_PARAM, 1},
