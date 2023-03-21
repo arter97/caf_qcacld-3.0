@@ -1253,7 +1253,7 @@ QDF_STATUS hif_register_umac_reset_handler(struct hif_opaque_softc *hif_scn,
 	/* Register the interrupt handler */
 	ret  = pfrm_request_irq(hif_sc->qdf_dev->dev, irq,
 				hif_umac_reset_irq_handler,
-				IRQF_SHARED | IRQF_NO_SUSPEND,
+				IRQF_NO_SUSPEND,
 				"umac_hw_reset_irq",
 				umac_reset_ctx);
 	if (ret) {
