@@ -4755,6 +4755,7 @@ wlan_mgmt_rx_reo_algo_entry(struct wlan_objmgr_pdev *pdev,
 	if (QDF_IS_STATUS_ERROR(ret))
 		goto failure;
 
+	ctx_info.in_reo_params = *desc->rx_params->reo_params;
 	/* Update ingress and egress list */
 	ret = mgmt_rx_reo_update_lists(ingress_list, egress_list, desc,
 				       is_queued);
@@ -4777,8 +4778,8 @@ wlan_mgmt_rx_reo_algo_entry(struct wlan_objmgr_pdev *pdev,
 		return ret;
 
 	ctx_info.context = MGMT_RX_REO_CONTEXT_MGMT_RX;
-	ctx_info.in_reo_params = *desc->rx_params->reo_params;
 	ctx_info.context_id = context_id;
+
 	/* Finally, release the entries for which pending frame is received */
 	return mgmt_rx_reo_release_egress_list_entries(reo_ctx, 1 << cur_link,
 						       &ctx_info);
