@@ -162,3 +162,22 @@ void dfs_set_dfs_puncture(struct wlan_dfs *dfs,
 void dfs_get_dfs_puncture(struct wlan_dfs *dfs,
 			  bool *is_dfs_punc_en);
 #endif /* QCA_DFS_BW_PUNCTURE */
+
+#ifdef WLAN_DISP_CHAN_INFO
+/**
+ * dfs_get_cac_nol_time() - Get CAC and NOL NOL time related values
+ * @dfs: Pointer to wlan_dfs
+ * @index: Channel index
+ * @rem_cac_time: Pointer to remaining cac time field
+ * @cac_comp_time: Pointer to cac completion time field
+ * @rem_nol_time: Pointer to remaining nol time field
+ * @freq: Frequency in MHz
+ *
+ * Return: None
+ */
+void dfs_get_cac_nol_time(struct wlan_dfs *dfs, int8_t index,
+			  uint32_t *rem_cac_time,
+			  uint64_t *cac_comp_time, uint32_t *rem_nol_time,
+			  qdf_freq_t freq);
+
+#endif
