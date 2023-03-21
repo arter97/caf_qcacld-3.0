@@ -674,6 +674,7 @@ void dp_mon_filter_set_status_cmn(struct dp_mon_pdev *mon_pdev,
 	filter->tlv_filter.ppdu_end_user_stats = 1;
 	filter->tlv_filter.ppdu_end_user_stats_ext = 1;
 	filter->tlv_filter.ppdu_end_status_done = 1;
+	filter->tlv_filter.ppdu_start_user_info = 1;
 	filter->tlv_filter.enable_fp = 1;
 	filter->tlv_filter.enable_md = 0;
 	filter->tlv_filter.fp_mgmt_filter = FILTER_MGMT_ALL;
@@ -705,6 +706,7 @@ void dp_mon_filter_set_status_cbf(struct dp_pdev *pdev,
 	filter->tlv_filter.ppdu_end_user_stats = 1;
 	filter->tlv_filter.ppdu_end_user_stats_ext = 1;
 	filter->tlv_filter.ppdu_end_status_done = 1;
+	filter->tlv_filter.ppdu_start_user_info = 1;
 	filter->tlv_filter.enable_fp = 1;
 	filter->tlv_filter.enable_md = 0;
 	filter->tlv_filter.fp_mgmt_filter = FILTER_MGMT_ACT_NO_ACK;
@@ -728,6 +730,7 @@ void dp_mon_filter_set_cbf_cmn(struct dp_pdev *pdev,
 	filter->tlv_filter.ppdu_end_user_stats = 0;
 	filter->tlv_filter.ppdu_end_user_stats_ext = 0;
 	filter->tlv_filter.ppdu_end_status_done = 0;
+	filter->tlv_filter.ppdu_start_user_info = 0;
 	filter->tlv_filter.enable_fp = 1;
 	filter->tlv_filter.enable_md = 0;
 	filter->tlv_filter.fp_mgmt_filter = FILTER_MGMT_ACT_NO_ACK;
