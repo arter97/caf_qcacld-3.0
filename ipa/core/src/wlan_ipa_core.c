@@ -4892,7 +4892,25 @@ int wlan_ipa_wdi_opt_dpath_flt_rsrv_cb(
 {
 	struct wifi_dp_flt_setup *dp_flt_params = NULL;
 	struct wlan_ipa_priv *ipa_obj = (struct wlan_ipa_priv *)ipa_ctx;
-	int i;
+	int i, pdev_id, param_val;
+	struct wlan_objmgr_pdev *pdev;
+	int response = 0;
+
+	pdev = ipa_obj->pdev;
+	pdev_id = ipa_obj->dp_pdev_id;
+	/* Disable Low power features before filter reservation */
+	ipa_info("opt_dp: Disable low power features to reserve filter");
+	param_val = 0;
+	response = cdp_ipa_opt_dp_enable_disable_low_power_mode(pdev, pdev_id,
+								param_val);
+	if (response) {
+		ipa_err("Low power feature disable failed. status %d",
+			response);
+		return QDF_STATUS_FILT_REQ_ERROR;
+	}
+
+	response = cdp_ipa_pcie_link_up(ipa_obj->dp_soc);
+	ipa_info("opt_dp: Pcie link up status %d", response);
 
 	ipa_info("opt_dp: Send filter reserve req");
 	dp_flt_params = &(ipa_obj->dp_cce_super_rule_flt_param);
@@ -4912,11 +4930,10 @@ int wlan_ipa_wdi_opt_dpath_flt_add_cb(
 	struct ipa_wdi_opt_dpath_flt_add_cb_params *ipa_flt =
 			 (struct ipa_wdi_opt_dpath_flt_add_cb_params *)(in_out);
 	struct wlan_ipa_priv *ipa_obj = (struct wlan_ipa_priv *)ipa_ctx;
-	int i, j, flt, param_val, pdev_id;
+	int i, j, flt, response = 0;
 	uint8_t num_flts;
 	uint32_t src_ip_addr, dst_ip_addr;
 	uint32_t *host_ipv6;
-	int response = 0;
 	struct wlan_objmgr_pdev *pdev;
 	struct wlan_objmgr_psoc *psoc;
 	struct wifi_dp_flt_setup *dp_flt_param = NULL;
@@ -4924,9 +4941,7 @@ int wlan_ipa_wdi_opt_dpath_flt_add_cb(
 
 	pdev = ipa_obj->pdev;
 	psoc = wlan_pdev_get_psoc(pdev);
-	pdev_id = ipa_obj->dp_pdev_id;
 	num_flts = ipa_flt->num_tuples;
-
 	htc_handle = lmac_get_htc_hdl(psoc);
 	if (!htc_handle) {
 		ipa_err("HTC Handle is null");
@@ -4939,19 +4954,6 @@ int wlan_ipa_wdi_opt_dpath_flt_add_cb(
 		ipa_err("Wrong IPA flt count %d", num_flts);
 		return QDF_STATUS_FILT_REQ_ERROR;
 	}
-
-	/* Disable Low power features before filter addition */
-	ipa_info("opt_dp: Disable low power features to add filter param");
-	param_val = 0;
-	response = cdp_ipa_opt_dp_enable_disable_low_power_mode(pdev, pdev_id,
-								param_val);
-	if (response) {
-		ipa_err("Low power feature disable failed. status %d",
-			response);
-		return QDF_STATUS_FILT_REQ_ERROR;
-	}
-	response = cdp_ipa_pcie_link_up(ipa_obj->dp_soc);
-	ipa_info("opt_dp: Pcie link up status %d", response);
 
 	for (flt = 0; flt < num_flts; flt++) {
 		for (i = 0; i < IPA_WDI_MAX_FILTER; i++)
@@ -5063,14 +5065,12 @@ int wlan_ipa_wdi_opt_dpath_flt_rem_cb(
 	struct wlan_ipa_priv *ipa_obj = (struct wlan_ipa_priv *)ipa_ctx;
 	struct wlan_objmgr_pdev *pdev;
 	struct wlan_objmgr_psoc *psoc;
-	int pdev_id;
 	uint8_t num_flts;
-	uint32_t i, j, response = 0, param_val = 0;
+	uint32_t i, j, response = 0;
 	void *htc_handle;
 
 	pdev = ipa_obj->pdev;
 	psoc = wlan_pdev_get_psoc(pdev);
-	pdev_id = ipa_obj->dp_pdev_id;
 	num_flts = rem_flt->num_tuples;
 
 	htc_handle = lmac_get_htc_hdl(psoc);
@@ -5078,18 +5078,6 @@ int wlan_ipa_wdi_opt_dpath_flt_rem_cb(
 		ipa_err("HTC Handle is null");
 		return QDF_STATUS_FILT_REQ_ERROR;
 	}
-	/* Enable Low power features before filter deletion */
-	ipa_info("opt_dp: Enable low power features to delete filter param");
-	param_val = 1;
-	response = cdp_ipa_opt_dp_enable_disable_low_power_mode(pdev, pdev_id,
-								param_val);
-	if (response) {
-		ipa_err("Low power feature enable failed. status %d", response);
-		return QDF_STATUS_FILT_REQ_ERROR;
-	}
-
-	response = cdp_ipa_pcie_link_up(ipa_obj->dp_soc);
-	ipa_info("opt_dp: Vote for PCIe link up");
 
 	dp_flt_params = &(ipa_obj->dp_cce_super_rule_flt_param);
 	for (i = 0; i < num_flts; i++) {
@@ -5146,8 +5134,25 @@ int wlan_ipa_wdi_opt_dpath_flt_rsrv_rel_cb(void *ipa_ctx)
 {
 	struct wifi_dp_flt_setup *dp_flt_params = NULL;
 	struct wlan_ipa_priv *ipa_obj = (struct wlan_ipa_priv *)ipa_ctx;
-	int i;
+	int i, param_val = 0;
+	struct wlan_objmgr_pdev *pdev;
+	int pdev_id;
+	int response = 0;
 
+	pdev = ipa_obj->pdev;
+	pdev_id = ipa_obj->dp_pdev_id;
+	/* Enable Low power features before filter release */
+	ipa_info("opt_dp: Enable low power features to release filter");
+	param_val = 1;
+	response = cdp_ipa_opt_dp_enable_disable_low_power_mode(pdev, pdev_id,
+								param_val);
+	if (response) {
+		ipa_err("Low power feature enable failed. status %d", response);
+		return QDF_STATUS_FILT_REQ_ERROR;
+	}
+
+	response = cdp_ipa_pcie_link_down(ipa_obj->dp_soc);
+	ipa_info("opt_dp: Vote for PCIe link down");
 	dp_flt_params = &(ipa_obj->dp_cce_super_rule_flt_param);
 	for (i = 0; i < IPA_WDI_MAX_FILTER; i++)
 		 dp_flt_params->flt_addr_params[i].valid = 0;

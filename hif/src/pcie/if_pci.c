@@ -4290,11 +4290,36 @@ void hif_allow_link_low_power_states(struct hif_opaque_softc *hif)
 #ifdef IPA_OPT_WIFI_DP
 int hif_prevent_l1(struct hif_opaque_softc *hif)
 {
-	return hif_force_wake_request(hif);
+	struct hif_softc *hif_softc = (struct hif_softc *)hif;
+	int status;
+
+	status = hif_force_wake_request(hif);
+	if (status) {
+		hif_err("Force wake request error");
+		return status;
+	}
+
+	qdf_atomic_inc(&hif_softc->opt_wifi_dp_rtpm_cnt);
+	hif_info("opt_dp: pcie link up count %d",
+		 qdf_atomic_read(&hif_softc->opt_wifi_dp_rtpm_cnt));
+	return status;
 }
 
 void hif_allow_l1(struct hif_opaque_softc *hif)
 {
-	hif_force_wake_release(hif);
+	struct hif_softc *hif_softc = (struct hif_softc *)hif;
+	int status;
+
+	if (qdf_atomic_read(&hif_softc->opt_wifi_dp_rtpm_cnt) > 0) {
+		status = hif_force_wake_release(hif);
+		if (status) {
+			hif_err("Force wake release error");
+			return;
+		}
+
+		qdf_atomic_dec(&hif_softc->opt_wifi_dp_rtpm_cnt);
+		hif_info("opt_dp: pcie link down count %d",
+			 qdf_atomic_read(&hif_softc->opt_wifi_dp_rtpm_cnt));
+	}
 }
 #endif

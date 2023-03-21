@@ -1354,6 +1354,36 @@ void dp_rx_alt_ipa_uc_detach(struct dp_soc *soc, struct dp_pdev *pdev)
 { }
 #endif
 
+/**
+ * dp_ipa_opt_wifi_dp_cleanup() - Cleanup ipa opt wifi dp filter setup
+ * @soc: data path instance
+ * @pdev: core txrx pdev context
+ *
+ * This function will cleanup filter setup for optional wifi dp.
+ *
+ * Return: none
+ */
+
+#ifdef IPA_OPT_WIFI_DP
+static void dp_ipa_opt_wifi_dp_cleanup(struct dp_soc *soc, struct dp_pdev *pdev)
+{
+	struct hal_soc *hal_soc = (struct hal_soc *)soc->hal_soc;
+	struct hif_softc *hif = (struct hif_softc *)(hal_soc->hif_handle);
+	int count = qdf_atomic_read(&hif->opt_wifi_dp_rtpm_cnt);
+	int i;
+
+	for (i = count; i > 0; i--) {
+		dp_info("opt_dp: cleanup call pcie link down");
+		dp_ipa_pcie_link_down((struct cdp_soc_t *)soc);
+	}
+}
+#else
+static inline
+void dp_opt_wifi_dp(struct dp_soc *soc, struct dp_pdev *pdev)
+{
+}
+#endif
+
 int dp_ipa_uc_detach(struct dp_soc *soc, struct dp_pdev *pdev)
 {
 	if (!wlan_cfg_is_ipa_enabled(soc->wlan_cfg_ctx))
@@ -1370,6 +1400,8 @@ int dp_ipa_uc_detach(struct dp_soc *soc, struct dp_pdev *pdev)
 
 	/* Cleanup 2nd RX pipe resources */
 	dp_rx_alt_ipa_uc_detach(soc, pdev);
+
+	dp_ipa_opt_wifi_dp_cleanup(soc, pdev);
 
 	return QDF_STATUS_SUCCESS;	/* success */
 }

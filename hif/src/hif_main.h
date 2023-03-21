@@ -348,6 +348,9 @@ struct hif_softc {
 #ifdef IPA_OFFLOAD
 	qdf_shared_mem_t *ipa_ce_ring;
 #endif
+#ifdef IPA_OPT_WIFI_DP
+	qdf_atomic_t opt_wifi_dp_rtpm_cnt;
+#endif
 	struct hif_cfg ini_cfg;
 #ifdef HIF_CE_LOG_INFO
 	qdf_notif_block hif_recovery_notifier;
