@@ -474,6 +474,9 @@ hal_txmon_parse_response_end_status(void *tx_tlv,
 		resp_end_status->mba_user_count;
 	TXMON_STATUS_INFO(tx_status_info, mba_fake_bitmap_count) =
 		resp_end_status->mba_fake_bitmap_count;
+	TXMON_HAL_STATUS(ppdu_info, ppdu_timestamp) =
+		(resp_end_status->start_of_frame_timestamp_15_0 |
+		 (resp_end_status->start_of_frame_timestamp_31_16 << 16));
 }
 
 /**
