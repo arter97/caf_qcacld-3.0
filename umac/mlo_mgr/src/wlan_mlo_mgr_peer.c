@@ -1173,6 +1173,25 @@ QDF_STATUS wlan_mlo_peer_create(struct wlan_objmgr_vdev *vdev,
 	if ((wlan_vdev_mlme_get_opmode(vdev) == QDF_SAP_MODE) ||
 		((wlan_vdev_mlme_get_opmode(vdev) == QDF_STA_MODE) &&
 			!is_ml_peer_attached)) {
+		/* Reject creation for AP mode, If ML peer is present with
+		 * MLD MAC address, For PSTA case, all MLD STAs are connected
+		 * to same MLD AP, it can have duplicate MLD address entries
+		 * for STA MLDs
+		 */
+		if ((wlan_vdev_mlme_get_opmode(vdev) == QDF_SAP_MODE) &&
+		    mlo_mgr_ml_peer_exist_on_diff_ml_ctx(&link_peer->mldaddr[0],
+							 NULL)) {
+			mlo_reset_link_peer(ml_peer, link_peer);
+			mlo_peer_free(ml_peer);
+			mlo_dev_release_link_vdevs(link_vdevs);
+			wlan_objmgr_peer_release_ref(link_peer,
+						     WLAN_MLO_MGR_ID);
+			mlo_err("MLD ID %d ML Peer " QDF_MAC_ADDR_FMT " is exists, creation failed",
+				ml_dev->mld_id,
+				QDF_MAC_ADDR_REF(ml_peer->peer_mld_addr.bytes));
+			return QDF_STATUS_E_EXISTS;
+		}
+
 		/* Attach MLO peer to ML Peer table */
 		status = mlo_dev_mlpeer_attach(ml_dev, ml_peer);
 		if (status != QDF_STATUS_SUCCESS) {
