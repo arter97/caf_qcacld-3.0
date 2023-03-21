@@ -26,7 +26,7 @@
 #define DP_MAX_MLO_PEER 512
 
 /* Max number of chips supported */
-#define DP_MLO_MAX_DEST_CHIP_ID 3
+#define DP_MLO_MAX_DEST_CHIP_ID 4
 
 /*
  * NB: intentionally not using kernel-doc comment because the kernel-doc
