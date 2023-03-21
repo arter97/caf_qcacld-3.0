@@ -1444,7 +1444,7 @@ QDF_STATUS policy_mgr_next_actions(
 
 QDF_STATUS
 policy_mgr_handle_conc_multiport(struct wlan_objmgr_psoc *psoc,
-				 uint8_t session_id, uint32_t ch_freq,
+				 uint8_t vdev_id, uint32_t ch_freq,
 				 enum policy_mgr_conn_update_reason reason,
 				 uint32_t request_id)
 {
@@ -1452,12 +1452,11 @@ policy_mgr_handle_conc_multiport(struct wlan_objmgr_psoc *psoc,
 	uint8_t num_cxn_del = 0;
 	struct policy_mgr_conc_connection_info info = {0};
 
-	policy_mgr_store_and_del_conn_info_by_vdev_id(psoc, session_id,
+	policy_mgr_store_and_del_conn_info_by_vdev_id(psoc, vdev_id,
 						      &info, &num_cxn_del);
 
-	if (!policy_mgr_check_for_session_conc(psoc, session_id, ch_freq)) {
-		policy_mgr_err("Conc not allowed for the session %d",
-			session_id);
+	if (!policy_mgr_check_for_session_conc(psoc, vdev_id, ch_freq)) {
+		policy_mgr_err("Conc not allowed for the vdev %d", vdev_id);
 		return QDF_STATUS_E_FAILURE;
 	}
 
@@ -1465,7 +1464,7 @@ policy_mgr_handle_conc_multiport(struct wlan_objmgr_psoc *psoc,
 	if (!QDF_IS_STATUS_SUCCESS(status))
 		policy_mgr_err("clearing event failed");
 
-	status = policy_mgr_current_connections_update(psoc, session_id,
+	status = policy_mgr_current_connections_update(psoc, vdev_id,
 						       ch_freq, reason,
 						       request_id);
 	if (QDF_STATUS_E_FAILURE == status)

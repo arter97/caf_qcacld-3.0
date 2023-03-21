@@ -7634,7 +7634,7 @@ bool policy_mgr_is_mcc_in_24G(struct wlan_objmgr_psoc *psoc)
 }
 
 bool policy_mgr_check_for_session_conc(struct wlan_objmgr_psoc *psoc,
-				       uint8_t session_id, uint32_t ch_freq)
+				       uint8_t vdev_id, uint32_t ch_freq)
 {
 	enum policy_mgr_con_mode mode;
 	bool ret;
@@ -7650,7 +7650,7 @@ bool policy_mgr_check_for_session_conc(struct wlan_objmgr_psoc *psoc,
 
 	if (pm_ctx->hdd_cbacks.get_mode_for_non_connected_vdev) {
 		mode = pm_ctx->hdd_cbacks.get_mode_for_non_connected_vdev(
-			psoc, session_id);
+			psoc, vdev_id);
 		if (PM_MAX_NUM_OF_MODE == mode) {
 			policy_mgr_err("Invalid mode");
 			return false;
@@ -7663,13 +7663,13 @@ bool policy_mgr_check_for_session_conc(struct wlan_objmgr_psoc *psoc,
 		return false;
 	}
 
-	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, session_id,
+	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, vdev_id,
 						    WLAN_POLICY_MGR_ID);
 
 	/* Take care of 160MHz and 80+80Mhz later */
 	conc_ext_flags = policy_mgr_get_conc_ext_flags(vdev, false);
 	ret = policy_mgr_allow_concurrency(psoc, mode, ch_freq, HW_MODE_20_MHZ,
-					   conc_ext_flags, session_id);
+					   conc_ext_flags, vdev_id);
 	if (vdev)
 		wlan_objmgr_vdev_release_ref(vdev, WLAN_POLICY_MGR_ID);
 

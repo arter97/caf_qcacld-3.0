@@ -667,7 +667,7 @@ bool policy_mgr_is_pcl_weightage_required(struct wlan_objmgr_psoc *psoc);
  * policy_mgr_check_for_session_conc() - Check if concurrency is
  * allowed for a session
  * @psoc: PSOC object information
- * @session_id: Session ID
+ * @vdev_id: Vdev ID
  * @ch_freq: Channel frequency
  *
  * Checks if connection is allowed for a given session_id
@@ -675,12 +675,12 @@ bool policy_mgr_is_pcl_weightage_required(struct wlan_objmgr_psoc *psoc);
  * True if the concurrency is allowed, false otherwise
  */
 bool policy_mgr_check_for_session_conc(struct wlan_objmgr_psoc *psoc,
-				       uint8_t session_id, uint32_t ch_freq);
+				       uint8_t vdev_id, uint32_t ch_freq);
 
 /**
  * policy_mgr_handle_conc_multiport() - to handle multiport concurrency
  * @psoc: PSOC object information
- * @session_id: Session ID
+ * @vdev_id: Vdev ID
  * @ch_freq: Channel frequency
  * @reason: reason for connection update
  * @request_id: Request id provided by the requester, can be used while
@@ -693,7 +693,7 @@ bool policy_mgr_check_for_session_conc(struct wlan_objmgr_psoc *psoc,
  */
 QDF_STATUS
 policy_mgr_handle_conc_multiport(struct wlan_objmgr_psoc *psoc,
-				 uint8_t session_id, uint32_t ch_freq,
+				 uint8_t vdev_id, uint32_t ch_freq,
 				 enum policy_mgr_conn_update_reason reason,
 				 uint32_t request_id);
 
