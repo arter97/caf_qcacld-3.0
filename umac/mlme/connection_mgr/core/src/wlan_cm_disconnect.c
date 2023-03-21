@@ -29,6 +29,9 @@
 #include "wlan_dlm_api.h"
 #endif
 #include <wlan_mlo_mgr_sta.h>
+#ifdef WLAN_FEATURE_11BE_MLO
+#include <wlan_mlo_mgr_peer.h>
+#endif
 
 void cm_send_disconnect_resp(struct cnx_mgr *cm_ctx, wlan_cm_id cm_id)
 {
@@ -539,6 +542,8 @@ cm_clear_vdev_mlo_cap(struct wlan_objmgr_vdev *vdev,
 		wlan_vdev_mlme_clear_mlo_vdev(vdev);
 		wlan_vdev_mlme_clear_mlo_link_vdev(vdev);
 	}
+
+	wlan_vdev_set_link_id(vdev, WLAN_LINK_ID_INVALID);
 }
 #endif /*WLAN_FEATURE_11BE_MLO_ADV_FEATURE*/
 #else /*WLAN_FEATURE_11BE_MLO*/
