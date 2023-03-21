@@ -4963,27 +4963,27 @@ int wlan_ipa_wdi_opt_dpath_flt_add_cb(
 			return QDF_STATUS_FILT_REQ_ERROR;
 		}
 
-		ipa_flt->flt_info[i].out_hdl = (WLAN_HDL_FILTER1 + i);
+		ipa_flt->flt_info[flt].out_hdl = (WLAN_HDL_FILTER1 + i);
 		dp_flt_param->flt_addr_params[i].valid = 1;
 		dp_flt_param->flt_addr_params[i].flt_hdl =
-						ipa_flt->flt_info[i].out_hdl;
+						ipa_flt->flt_info[flt].out_hdl;
 		dp_flt_param->flt_addr_params[i].ipa_flt_evnt_required = 1;
 		dp_flt_param->flt_addr_params[i].ipa_flt_in_use = true;
 
-		if (ipa_flt->flt_info[i].version == 0) {
+		if (ipa_flt->flt_info[flt].version == 0) {
 			dp_flt_param->flt_addr_params[i].l3_type = IPV4;
-		} else if (ipa_flt->flt_info[i].version == 1) {
+		} else if (ipa_flt->flt_info[flt].version == 1) {
 			dp_flt_param->flt_addr_params[i].l3_type = IPV6;
 		} else {
 			ipa_err("Wrong IPA version %d",
-				ipa_flt->flt_info[i].version);
+				ipa_flt->flt_info[flt].version);
 			return QDF_STATUS_FILT_REQ_ERROR;
 		}
 
 		if (dp_flt_param->flt_addr_params[i].l3_type == IPV4) {
-			src_ip_addr = qdf_ntohl(ipa_flt->flt_info[i].
+			src_ip_addr = qdf_ntohl(ipa_flt->flt_info[flt].
 						ipv4_addr.ipv4_saddr);
-			dst_ip_addr = qdf_ntohl(ipa_flt->flt_info[i].
+			dst_ip_addr = qdf_ntohl(ipa_flt->flt_info[flt].
 						ipv4_addr.ipv4_daddr);
 			qdf_mem_copy(
 				dp_flt_param->flt_addr_params[i].src_ipv4_addr,
@@ -4994,14 +4994,14 @@ int wlan_ipa_wdi_opt_dpath_flt_add_cb(
 				(&dst_ip_addr),
 				IPV4BYTES);
 			ipa_info("ipv4 src addr rxed from ipa 0x%x",
-				 ipa_flt->flt_info[i].ipv4_addr.ipv4_saddr);
+				 ipa_flt->flt_info[flt].ipv4_addr.ipv4_saddr);
 			ipa_info("ipv4 sent to FW 0x%x", src_ip_addr);
 		} else if (dp_flt_param->flt_addr_params[i].l3_type == IPV6) {
 			host_ipv6 = (uint32_t *)dp_flt_param->flt_addr_params[i].
 				    src_ipv6_addr;
 
 			for (j = 0; j < IPV6ARRAY; j++) {
-				src_ip_addr = qdf_ntohl(ipa_flt->flt_info[i].
+				src_ip_addr = qdf_ntohl(ipa_flt->flt_info[flt].
 							ipv6_addr.ipv6_saddr[j]);
 				qdf_mem_copy(host_ipv6,
 					     &src_ip_addr,
@@ -5010,7 +5010,7 @@ int wlan_ipa_wdi_opt_dpath_flt_add_cb(
 			}
 			for (j = 0; j < IPV6ARRAY; j++) {
 				ipa_info("ipv6 src addr rxed from ipa 0x%x",
-					 ipa_flt->flt_info[i].ipv6_addr.
+					 ipa_flt->flt_info[flt].ipv6_addr.
 					 ipv6_saddr[j]);
 			}
 			for (j = 0; j < IPV6ARRAY; j++)
