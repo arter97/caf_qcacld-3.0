@@ -1255,6 +1255,38 @@ int htt_h2t_tx_ring_cfg(struct htt_soc *htt_soc, int pdev_id,
 	HTT_TX_MONITOR_CFG_DMA_MPDU_DATA_SET(*msg_word,
 					     htt_tlv_filter->data_mpdu_log);
 
+	/* word 10 */
+	msg_word++;
+	*msg_word = 0;
+
+	if (htt_tlv_filter->wmask.tx_queue_ext)
+		HTT_TX_MONITOR_CFG_TX_QUEUE_EXT_V2_WORD_MASK_SET(*msg_word,
+				htt_tlv_filter->wmask.tx_queue_ext);
+
+	if (htt_tlv_filter->wmask.tx_peer_entry)
+		HTT_TX_MONITOR_CFG_TX_PEER_ENTRY_V2_WORD_MASK_SET(*msg_word,
+				htt_tlv_filter->wmask.tx_peer_entry);
+
+	/* word 11 */
+	msg_word++;
+	*msg_word = 0;
+
+	if (htt_tlv_filter->wmask.tx_fes_status_end)
+		HTT_TX_MONITOR_CFG_FES_STATUS_END_WORD_MASK_SET(*msg_word,
+				htt_tlv_filter->wmask.tx_fes_status_end);
+
+	if (htt_tlv_filter->wmask.response_end_status)
+		HTT_TX_MONITOR_CFG_RESPONSE_END_STATUS_WORD_MASK_SET(*msg_word,
+				htt_tlv_filter->wmask.response_end_status);
+
+	/* word 12 */
+	msg_word++;
+	*msg_word = 0;
+
+	if (htt_tlv_filter->wmask.tx_fes_status_prot)
+		HTT_TX_MONITOR_CFG_FES_STATUS_PROT_WORD_MASK_SET(*msg_word,
+				htt_tlv_filter->wmask.tx_fes_status_prot);
+
 	pkt = htt_htc_pkt_alloc(soc);
 	if (!pkt)
 		goto fail1;
