@@ -313,6 +313,8 @@ wlan_mlme_convert_ap_policy_config(
 		return HOST_CONCURRENT_AP_POLICY_GAMING_AUDIO;
 	case QCA_WLAN_CONCURRENT_AP_POLICY_LOSSLESS_AUDIO_STREAMING:
 		return HOST_CONCURRENT_AP_POLICY_LOSSLESS_AUDIO_STREAMING;
+	case QCA_WLAN_CONCURRENT_AP_POLICY_XR:
+		return HOST_CONCURRENT_AP_POLICY_XR;
 	default:
 		return HOST_CONCURRENT_AP_POLICY_UNSPECIFIED;
 	}
@@ -2854,11 +2856,7 @@ QDF_STATUS wlan_mlme_set_primary_interface(struct wlan_objmgr_psoc *psoc,
 
 bool wlan_mlme_is_primary_interface_configured(struct wlan_objmgr_psoc *psoc)
 {
-	uint8_t dual_sta_config = 0xFF;
-
-	wlan_mlme_get_dual_sta_policy(psoc, &dual_sta_config);
-	return (dual_sta_config ==
-		QCA_WLAN_CONCURRENT_STA_POLICY_PREFER_PRIMARY);
+	return wlan_cm_same_band_sta_allowed(psoc);
 }
 
 QDF_STATUS wlan_mlme_peer_get_assoc_rsp_ies(struct wlan_objmgr_peer *peer,

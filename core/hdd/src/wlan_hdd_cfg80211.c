@@ -212,6 +212,16 @@
 
 #define WLAN_WAIT_WLM_LATENCY_LEVEL 1000
 
+/*
+ * BIT map values for vdev_param_set_profile
+ * bit 0: 0 - XR SAP profile disabled
+ *        1 - XR SAP profile enabled
+ * bit 1: 0 - XPAN profile disabled
+ *        1 - XPAN profile enabled
+ */
+#define AP_PROFILE_XR_ENABLE 0x1
+#define AP_PROFILE_XPAN_ENABLE 0x2
+
 /**
  * rtt_is_enabled - Macro to check if the bitmap has any RTT roles set
  * @bitmap: The bitmap to be checked
@@ -3153,8 +3163,9 @@ void wlan_hdd_handle_zero_acs_list(struct hdd_context *hdd_ctx,
 				   uint8_t org_ch_list_count)
 {
 	uint16_t i, sta_count;
-	uint32_t acs_chan_default = 0;
+	uint32_t acs_chan_default = 0, acs_dfs_chan = 0;
 	bool force_sap_allowed = false;
+	enum channel_state state;
 
 	if (!acs_ch_list_count || *acs_ch_list_count > 0 ||
 	    !acs_freq_list) {
@@ -3177,8 +3188,11 @@ void wlan_hdd_handle_zero_acs_list(struct hdd_context *hdd_ctx,
 	wlan_hdd_dump_freq_list(org_freq_list, org_ch_list_count);
 
 	for (i = 0; i < org_ch_list_count; i++) {
-		if (wlan_reg_is_dfs_for_freq(hdd_ctx->pdev,
-					     org_freq_list[i]))
+		state = wlan_reg_get_channel_state_for_pwrmode(
+				hdd_ctx->pdev, org_freq_list[i],
+				REG_CURRENT_PWR_MODE);
+		if (state == CHANNEL_STATE_DISABLE ||
+		    state == CHANNEL_STATE_INVALID)
 			continue;
 
 		if (wlan_reg_is_6ghz_chan_freq(org_freq_list[i]) &&
@@ -3188,11 +3202,21 @@ void wlan_hdd_handle_zero_acs_list(struct hdd_context *hdd_ctx,
 		if (!policy_mgr_is_safe_channel(hdd_ctx->psoc,
 						org_freq_list[i]))
 			continue;
+		/* Make dfs channel as last choice */
+		if (state == CHANNEL_STATE_DFS ||
+		    state == CHANNEL_STATE_PASSIVE) {
+			acs_dfs_chan = org_freq_list[i];
+			continue;
+		}
 		acs_chan_default = org_freq_list[i];
 		break;
 	}
-	if (!acs_chan_default)
-		acs_chan_default = org_freq_list[0];
+	if (!acs_chan_default) {
+		if (acs_dfs_chan)
+			acs_chan_default = acs_dfs_chan;
+		else
+			acs_chan_default = org_freq_list[0];
+	}
 
 	acs_freq_list[0] = acs_chan_default;
 	*acs_ch_list_count = 1;
@@ -6673,8 +6697,7 @@ wlan_hdd_cfg80211_set_ext_roam_params(struct wiphy *wiphy,
 #define RATEMASK_PARAMS_MAX QCA_WLAN_VENDOR_ATTR_RATEMASK_PARAMS_MAX
 const struct nla_policy wlan_hdd_set_ratemask_param_policy[
 			RATEMASK_PARAMS_MAX + 1] = {
-	[QCA_WLAN_VENDOR_ATTR_RATEMASK_PARAMS_LIST] =
-		VENDOR_NLA_POLICY_NESTED(wlan_hdd_set_ratemask_param_policy),
+	[QCA_WLAN_VENDOR_ATTR_RATEMASK_PARAMS_LIST] = {.type = NLA_NESTED},
 	[QCA_WLAN_VENDOR_ATTR_RATEMASK_PARAMS_TYPE] = {.type = NLA_U8},
 	[QCA_WLAN_VENDOR_ATTR_RATEMASK_PARAMS_BITMAP] = {.type = NLA_BINARY,
 					.len = RATEMASK_PARAMS_BITMAP_MAX},
@@ -10008,7 +10031,7 @@ static int hdd_set_primary_interface(struct hdd_adapter *adapter,
 	 * If dual sta roaming NOT enabled then need to enable roaming on
 	 * primary vdev for sta concurrency on different mac.
 	 */
-	if (primary_vdev_id !=  WLAN_UMAC_VDEV_ID_MAX)
+	if (wlan_mlme_is_primary_interface_configured(hdd_ctx->psoc))
 		if ((ucfg_mlme_get_dual_sta_roaming_enabled(hdd_ctx->psoc) &&
 		     !policy_mgr_concurrent_sta_on_different_mac(hdd_ctx->psoc)) ||
 		    !ucfg_mlme_get_dual_sta_roaming_enabled(hdd_ctx->psoc)) {
@@ -12396,7 +12419,7 @@ __wlan_hdd_cfg80211_set_wifi_test_config(struct wiphy *wiphy,
 					status);
 		} else {
 			hdd_update_channel_width(
-					adapter, eHT_CHANNEL_WIDTH_80MHZ,
+					adapter, eHT_CHANNEL_WIDTH_160MHZ,
 					WNI_CFG_CHANNEL_BONDING_MODE_ENABLE);
 			hdd_set_tx_stbc(adapter, 1);
 			hdd_set_11ax_rate(adapter, 0xFFFF, NULL);
@@ -14501,33 +14524,54 @@ static int __wlan_hdd_cfg80211_ap_policy(struct wlan_objmgr_vdev *vdev,
 					 struct nlattr **tb)
 {
 	QDF_STATUS status;
+	uint8_t vdev_id;
+	int ret;
 	uint8_t ap_cfg_policy;
+	uint32_t profile = 0;
+	enum QDF_OPMODE device_mode;
 	uint8_t ap_config =
-			QCA_WLAN_CONCURRENT_AP_POLICY_LOSSLESS_AUDIO_STREAMING;
+		QCA_WLAN_CONCURRENT_AP_POLICY_LOSSLESS_AUDIO_STREAMING;
+
+	vdev_id = wlan_vdev_get_id(vdev);
+	device_mode = hdd_get_device_mode(vdev_id);
+	if (device_mode != QDF_SAP_MODE) {
+		hdd_err_rl("command not allowed in %d mode, vdev_id: %d",
+			   device_mode, vdev_id);
+		return -EINVAL;
+	}
 
 	ap_config = nla_get_u8(
 		tb[QCA_WLAN_VENDOR_ATTR_CONCURRENT_POLICY_AP_CONFIG]);
 	hdd_debug("AP policy : %d", ap_config);
 
-	if (ap_config > QCA_WLAN_CONCURRENT_AP_POLICY_LOSSLESS_AUDIO_STREAMING) {
+	if (ap_config > QCA_WLAN_CONCURRENT_AP_POLICY_XR) {
 		hdd_err_rl("Invalid concurrent policy ap config %d", ap_config);
 		return -EINVAL;
 	}
 
 	ap_cfg_policy = wlan_mlme_convert_ap_policy_config(ap_config);
-
+	if (ap_cfg_policy == HOST_CONCURRENT_AP_POLICY_XR)
+		profile = AP_PROFILE_XR_ENABLE;
+	else if (ap_cfg_policy == HOST_CONCURRENT_AP_POLICY_GAMING_AUDIO ||
+		 ap_cfg_policy ==
+		 HOST_CONCURRENT_AP_POLICY_LOSSLESS_AUDIO_STREAMING)
+		profile = AP_PROFILE_XPAN_ENABLE;
+	ret = wma_cli_set_command(vdev_id, wmi_vdev_param_set_profile,
+				  profile, VDEV_CMD);
+	if (ret) {
+		hdd_err("Failed to set profile %d", profile);
+		return -EINVAL;
+	}
 	status = wlan_hdd_config_dp_direct_link_profile(vdev, ap_cfg_policy);
 	if (QDF_IS_STATUS_ERROR(status)) {
 		hdd_err("failed to set DP ap config");
 		return -EINVAL;
 	}
-
 	status = ucfg_mlme_set_ap_policy(vdev, ap_cfg_policy);
 	if (QDF_IS_STATUS_ERROR(status)) {
 		hdd_err("failed to set MLME ap config");
 		return -EINVAL;
 	}
-
 	return 0;
 }
 
@@ -25513,6 +25557,8 @@ static int __wlan_hdd_cfg80211_get_channel(struct wiphy *wiphy,
 	bool is_legacy_phymode = false;
 	struct wlan_objmgr_vdev *vdev;
 	uint32_t chan_freq;
+	struct hdd_adapter *link_adapter;
+	uint8_t vdev_id;
 
 	hdd_enter_dev(wdev->netdev);
 
@@ -25563,6 +25609,16 @@ static int __wlan_hdd_cfg80211_get_channel(struct wiphy *wiphy,
 	vdev = wlan_key_get_link_vdev(adapter, WLAN_OSIF_ID, link_id);
 	if (!vdev)
 		return -EINVAL;
+
+	if (adapter->device_mode == QDF_STA_MODE) {
+		vdev_id = wlan_vdev_get_id(vdev);
+		link_adapter = hdd_get_adapter_by_vdev(hdd_ctx, vdev_id);
+		if (link_adapter &&
+		    !hdd_cm_is_vdev_associated(link_adapter)) {
+			wlan_key_put_link_vdev(vdev, WLAN_OSIF_ID);
+			return -EBUSY;
+		}
+	}
 
 	chan_freq = vdev->vdev_mlme.des_chan->ch_freq;
 	chandef->center_freq1 = vdev->vdev_mlme.des_chan->ch_cfreq1;

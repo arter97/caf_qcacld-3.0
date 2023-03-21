@@ -1512,6 +1512,7 @@ struct acs_weight_range {
  * @num_weight_range: num of ranges provided by user
  * @force_sap_start: Force SAP start when no channel is found suitable
  * by ACS
+ * @acs_prefer_6ghz_psc: Select 6 GHz PSC channel as priority
  * @np_chan_weightage: Weightage to be given to non preferred channels.
  */
 struct wlan_mlme_acs {
@@ -1525,6 +1526,7 @@ struct wlan_mlme_acs {
 	struct acs_weight_range normalize_weight_range[MAX_ACS_WEIGHT_RANGE];
 	uint16_t num_weight_range;
 	bool force_sap_start;
+	bool acs_prefer_6ghz_psc;
 	uint32_t np_chan_weightage;
 };
 
@@ -1964,6 +1966,8 @@ struct fw_scan_channels {
  * are already scanned as part of partial scan.
  * @roam_full_scan_6ghz_on_disc: Include the 6 GHz channels in roam full scan
  * only on prior discovery of any 6 GHz support in the environment.
+ * @disconnect_on_nud_roam_invoke_fail: indicate whether disconnect ap when
+ * roam invoke fail on nud.
  */
 struct wlan_mlme_lfr_cfg {
 	bool mawc_roam_enabled;
@@ -2090,6 +2094,7 @@ struct wlan_mlme_lfr_cfg {
 	uint16_t roam_ho_delay_config;
 	uint8_t exclude_rm_partial_scan_freq;
 	uint8_t roam_full_scan_6ghz_on_disc;
+	bool disconnect_on_nud_roam_invoke_fail;
 };
 
 /**
@@ -2893,10 +2898,12 @@ struct wlan_mlme_features {
  * @HOST_CONCURRENT_AP_POLICY_GAMING_AUDIO: Gaming audio concurrent policy value
  * @HOST_CONCURRENT_AP_POLICY_LOSSLESS_AUDIO_STREAMING: Lossless audio
  * concurrent streaming policy value
+ * @HOST_CONCURRENT_AP_POLICY_XR: Concurrent policy to meet AR/VR requirements.
  */
 enum host_concurrent_ap_policy {
 	HOST_CONCURRENT_AP_POLICY_UNSPECIFIED = 0,
 	HOST_CONCURRENT_AP_POLICY_GAMING_AUDIO = 1,
-	HOST_CONCURRENT_AP_POLICY_LOSSLESS_AUDIO_STREAMING = 2
+	HOST_CONCURRENT_AP_POLICY_LOSSLESS_AUDIO_STREAMING = 2,
+	HOST_CONCURRENT_AP_POLICY_XR = 3
 };
 #endif
