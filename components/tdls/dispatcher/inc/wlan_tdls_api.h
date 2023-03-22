@@ -63,12 +63,14 @@ void wlan_tdls_get_features_info(struct wlan_objmgr_psoc *psoc,
 QDF_STATUS wlan_tdls_teardown_links(struct wlan_objmgr_psoc *psoc);
 
 /**
- * wlan_tdls_teardown_links_sync() - teardown all the TDLS links
+ * wlan_tdls_check_and_teardown_links_sync() - teardown all the TDLS links
  * @psoc: psoc object
+ * @vdev: Vdev object pointer
  *
  * Return: None
  */
-void wlan_tdls_teardown_links_sync(struct wlan_objmgr_psoc *psoc);
+void wlan_tdls_check_and_teardown_links_sync(struct wlan_objmgr_psoc *psoc,
+					     struct wlan_objmgr_vdev *vdev);
 
 /**
  * wlan_tdls_notify_sta_disconnect() - notify sta disconnect
@@ -127,10 +129,62 @@ void wlan_tdls_update_rx_pkt_cnt(struct wlan_objmgr_vdev *vdev,
 /**
  * wlan_tdls_notify_start_bss() - Notify TDLS module on start bss
  * @psoc: Pointer to PSOC object
+ * @vdev: Vdev object pointer
  *
  * Return: None
  */
-void wlan_tdls_notify_start_bss(struct wlan_objmgr_psoc *psoc);
+void wlan_tdls_notify_start_bss(struct wlan_objmgr_psoc *psoc,
+				struct wlan_objmgr_vdev *vdev);
+
+#ifdef WLAN_FEATURE_TDLS_CONCURRENCIES
+/**
+ * wlan_tdls_notify_channel_switch_complete() - Notify TDLS module about the
+ * channel switch completion
+ * @psoc: Pointer to PSOC object
+ * @vdev_id: vdev id
+ *
+ * Return: None
+ */
+void wlan_tdls_notify_channel_switch_complete(struct wlan_objmgr_psoc *psoc,
+					      uint8_t vdev_id);
+
+/**
+ * wlan_tdls_notify_channel_switch_start() - Process channel switch start
+ * for SAP/P2P GO vdev. For STA vdev, TDLS teardown happens, so explicit
+ * disable off channel is not required.
+ * @psoc: Pointer to PSOC object
+ * @vdev: Pointer to current vdev on which CSA is triggered
+ *
+ * Return: None
+ */
+void wlan_tdls_notify_channel_switch_start(struct wlan_objmgr_psoc *psoc,
+					   struct wlan_objmgr_vdev *vdev);
+
+/**
+ * wlan_tdls_handle_p2p_client_connect() - Handle P2P Client connect start
+ * @psoc: Pointer to PSOC object
+ * @vdev: Pointer to P2P client vdev
+ *
+ * Return: None
+ */
+void wlan_tdls_handle_p2p_client_connect(struct wlan_objmgr_psoc *psoc,
+					 struct wlan_objmgr_vdev *vdev);
+#else
+static inline
+void wlan_tdls_notify_channel_switch_complete(struct wlan_objmgr_psoc *psoc,
+					      uint8_t vdev_id)
+{}
+
+static inline
+void wlan_tdls_notify_channel_switch_start(struct wlan_objmgr_psoc *psoc,
+					   struct wlan_objmgr_vdev *vdev)
+{}
+
+static inline
+void wlan_tdls_handle_p2p_client_connect(struct wlan_objmgr_psoc *psoc,
+					 struct wlan_objmgr_vdev *vdev)
+{}
+#endif /* WLAN_FEATURE_TDLS_CONCURRENCIES */
 #else
 
 #ifdef FEATURE_SET
@@ -152,7 +206,9 @@ static inline QDF_STATUS wlan_tdls_teardown_links(struct wlan_objmgr_psoc *psoc)
 	return QDF_STATUS_SUCCESS;
 }
 
-static inline void wlan_tdls_teardown_links_sync(struct wlan_objmgr_psoc *psoc)
+static inline void
+wlan_tdls_check_and_teardown_links_sync(struct wlan_objmgr_psoc *psoc,
+					struct wlan_objmgr_vdev *vdev)
 {}
 
 static inline
@@ -181,7 +237,23 @@ void wlan_tdls_update_rx_pkt_cnt(struct wlan_objmgr_vdev *vdev,
 }
 
 static inline
-void wlan_tdls_notify_start_bss(struct wlan_objmgr_psoc *psoc)
+void wlan_tdls_notify_start_bss(struct wlan_objmgr_psoc *psoc,
+				struct wlan_objmgr_vdev *vdev)
+{}
+
+static inline
+void wlan_tdls_notify_channel_switch_complete(struct wlan_objmgr_psoc *psoc,
+					      uint8_t vdev_id)
+{}
+
+static inline
+void wlan_tdls_notify_channel_switch_start(struct wlan_objmgr_psoc *psoc,
+					   struct wlan_objmgr_vdev *vdev)
+{}
+
+static inline
+void wlan_tdls_handle_p2p_client_connect(struct wlan_objmgr_psoc *psoc,
+					 struct wlan_objmgr_vdev *vdev)
 {}
 #endif
 #endif

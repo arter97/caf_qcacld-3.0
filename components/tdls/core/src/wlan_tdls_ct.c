@@ -1474,7 +1474,7 @@ void tdls_disable_offchan_and_teardown_links(
 				tdls_soc->tdls_configs.tdls_pre_off_chan_num);
 	tdls_set_tdls_secoffchanneloffset(tdls_soc,
 			TDLS_SEC_OFFCHAN_OFFSET_40PLUS);
-	tdls_set_tdls_offchannelmode(vdev, DISABLE_CHANSWITCH);
+	tdls_set_tdls_offchannelmode(vdev, DISABLE_ACTIVE_CHANSWITCH);
 
 	/* Send Msg to PE for deleting all the TDLS peers */
 	tdls_delete_all_tdls_peers(vdev, tdls_soc);

@@ -2635,10 +2635,17 @@ static int __wlan_hdd_cfg80211_suspend_wlan(struct wiphy *wiphy,
 								  hapd_state,
 								  &params);
 			}
-		} else if (QDF_TDLS_MODE == adapter->device_mode) {
-			if (ucfg_pmo_get_disconnect_sap_tdls_in_wow(
-								hdd_ctx->psoc))
-				ucfg_tdls_teardown_links_sync(hdd_ctx->psoc);
+		} else if (QDF_TDLS_MODE == adapter->device_mode &&
+			   ucfg_pmo_get_disconnect_sap_tdls_in_wow(
+							hdd_ctx->psoc)) {
+			vdev = hdd_objmgr_get_vdev_by_user(adapter,
+							   WLAN_TDLS_NB_ID);
+			if (vdev) {
+				ucfg_tdls_teardown_links_sync(hdd_ctx->psoc,
+							      vdev);
+				hdd_objmgr_put_vdev_by_user(vdev,
+							    WLAN_TDLS_NB_ID);
+			}
 		}
 		hdd_adapter_dev_put_debug(adapter, dbgid);
 	}

@@ -26,6 +26,8 @@
 #ifndef _WLAN_TDLS_MGMT_H_
 #define _WLAN_TDLS_MGMT_H_
 
+#include "wlan_tdls_cmds_process.h"
+
 #define TDLS_PUBLIC_ACTION_FRAME_OFFSET 24
 /* TDLS_PUBLIC_ACTION_FRAME_OFFSET(category[1]) + action[1] + dialog[1]
  * + cap[2]

@@ -29,7 +29,6 @@
 #include "wlan_mgmt_txrx_utils_api.h"
 #include "wlan_tdls_peer.h"
 #include "wlan_tdls_ct.h"
-#include "wlan_tdls_cmds_process.h"
 #include "wlan_tdls_mgmt.h"
 #include "wlan_policy_mgr_api.h"
 #include <wlan_reg_services_api.h>

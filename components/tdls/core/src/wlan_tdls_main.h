@@ -278,6 +278,7 @@ struct tdls_soc_priv_obj {
  * @discovery_sent_cnt: discovery sent count
  * @curr_candidate: current candidate
  * @ct_peer_table: linear mac address table for counting the packets
+ * @tdls_caps: AP TDLS capabilities
  * @valid_mac_entries: number of valid mac entry in @ct_peer_mac_table
  * @rx_mgmt: the pointer of rx mgmt info
  * @link_score: select tdls vdev per the score
@@ -297,6 +298,7 @@ struct tdls_vdev_priv_obj {
 	struct tdls_peer *curr_candidate;
 	struct tdls_conn_tracker_mac_table
 			ct_peer_table[WLAN_TDLS_CT_TABLE_SIZE];
+	struct tdls_sta_notify_params tdls_caps;
 	uint8_t valid_mac_entries;
 	struct tdls_rx_mgmt_frame *rx_mgmt;
 	uint32_t link_score;
@@ -605,6 +607,15 @@ QDF_STATUS tdls_set_operation_mode(struct tdls_set_mode_params *tdls_set_mode);
  * Return: QDF_STATUS
  */
 QDF_STATUS tdls_notify_sta_connect(struct tdls_sta_notify_params *notify);
+
+/**
+ * tdls_process_enable_for_vdev() - Enable TDLS in firmware and activate the
+ * connection tracker
+ * @vdev: Pointer to vdev object
+ *
+ * Return: None
+ */
+void tdls_process_enable_for_vdev(struct wlan_objmgr_vdev *vdev);
 
 /**
  * tdls_notify_sta_disconnect() - Update tdls state for every

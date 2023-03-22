@@ -298,10 +298,12 @@ QDF_STATUS ucfg_tdls_teardown_links(struct wlan_objmgr_psoc *psoc);
 /**
  * ucfg_tdls_teardown_links_sync() - teardown all TDLS links.
  * @psoc: psoc object
+ * @vdev: Vdev object pointer
  *
  * Return: None
  */
-void ucfg_tdls_teardown_links_sync(struct wlan_objmgr_psoc *psoc);
+void ucfg_tdls_teardown_links_sync(struct wlan_objmgr_psoc *psoc,
+				   struct wlan_objmgr_vdev *vdev);
 
 /**
  * ucfg_tdls_notify_reset_adapter() - notify reset adapter
@@ -534,7 +536,8 @@ QDF_STATUS ucfg_tdls_teardown_links(struct wlan_objmgr_psoc *psoc)
 }
 
 static inline
-void ucfg_tdls_teardown_links_sync(struct wlan_objmgr_psoc *psoc)
+void ucfg_tdls_teardown_links_sync(struct wlan_objmgr_psoc *psoc,
+				   struct wlan_objmgr_vdev *vdev)
 {
 }
 

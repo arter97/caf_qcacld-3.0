@@ -985,9 +985,10 @@ QDF_STATUS ucfg_tdls_responder(struct tdls_set_responder_req *req)
 	return status;
 }
 
-void ucfg_tdls_teardown_links_sync(struct wlan_objmgr_psoc *psoc)
+void ucfg_tdls_teardown_links_sync(struct wlan_objmgr_psoc *psoc,
+				   struct wlan_objmgr_vdev *vdev)
 {
-	return wlan_tdls_teardown_links_sync(psoc);
+	return wlan_tdls_check_and_teardown_links_sync(psoc, vdev);
 }
 
 QDF_STATUS ucfg_tdls_teardown_links(struct wlan_objmgr_psoc *psoc)

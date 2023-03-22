@@ -2202,7 +2202,22 @@ static void hdd_roam_channel_switch_handler(struct hdd_adapter *adapter,
 		policy_mgr_check_concurrent_intf_and_restart_sap(
 		   hdd_ctx->psoc,
 		   !!adapter->deflink->session.ap.sap_config.acs_cfg.acs_mode);
+
 	wlan_twt_concurrency_update(hdd_ctx);
+	if (adapter->device_mode == QDF_STA_MODE ||
+	    adapter->device_mode == QDF_P2P_CLIENT_MODE) {
+		vdev = hdd_objmgr_get_vdev_by_user(adapter,
+						   WLAN_OSIF_ID);
+		if (!vdev)
+			return;
+
+		status = ucfg_if_mgr_deliver_event(
+				vdev, WLAN_IF_MGR_EV_STA_CSA_COMPLETE, NULL);
+		if (QDF_IS_STATUS_ERROR(status))
+			hdd_debug("Failed to deliver CSA complete evt");
+
+		hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
+	}
 }
 
 #ifdef WLAN_FEATURE_HOST_ROAM

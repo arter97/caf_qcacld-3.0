@@ -7134,13 +7134,24 @@ QDF_STATUS csr_send_ext_change_freq(struct mac_context *mac_ctx,
 	return status;
 }
 
-QDF_STATUS csr_csa_restart(struct mac_context *mac_ctx, uint8_t session_id)
+QDF_STATUS csr_csa_restart(struct mac_context *mac_ctx, uint8_t vdev_id)
 {
 	QDF_STATUS status;
+	struct wlan_objmgr_vdev *vdev;
 	struct scheduler_msg message = {0};
 
+	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(mac_ctx->psoc, vdev_id,
+						    WLAN_LEGACY_MAC_ID);
+	if (!vdev) {
+		sme_err("VDEV not found for vdev id: %d", vdev_id);
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	if_mgr_deliver_event(vdev, WLAN_IF_MGR_EV_AP_CSA_START, NULL);
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_MAC_ID);
+
 	/* Serialize the req through MC thread */
-	message.bodyval = session_id;
+	message.bodyval = vdev_id;
 	message.type    = eWNI_SME_CSA_RESTART_REQ;
 	status = scheduler_post_message(QDF_MODULE_ID_SME, QDF_MODULE_ID_PE,
 					QDF_MODULE_ID_PE, &message);
