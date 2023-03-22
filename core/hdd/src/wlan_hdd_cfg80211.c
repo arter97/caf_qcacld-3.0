@@ -21059,7 +21059,6 @@ static bool hdd_is_btk_enc_type(uint32_t cipher_type)
 #endif
 
 #ifdef WLAN_FEATURE_11BE_MLO
-static inline
 struct wlan_objmgr_vdev *wlan_key_get_link_vdev(struct hdd_adapter *adapter,
 						wlan_objmgr_ref_dbgid id,
 						int link_id)
@@ -21079,7 +21078,6 @@ struct wlan_objmgr_vdev *wlan_key_get_link_vdev(struct hdd_adapter *adapter,
 	return link_vdev;
 }
 
-static inline
 void wlan_key_put_link_vdev(struct wlan_objmgr_vdev *link_vdev,
 			    wlan_objmgr_ref_dbgid id)
 {
@@ -21091,7 +21089,6 @@ void wlan_key_put_link_vdev(struct wlan_objmgr_vdev *link_vdev,
 	mlo_release_vdev_ref(link_vdev);
 }
 #else
-static inline
 struct wlan_objmgr_vdev *wlan_key_get_link_vdev(struct hdd_adapter *adapter,
 						wlan_objmgr_ref_dbgid id,
 						int link_id)
@@ -21105,7 +21102,6 @@ struct wlan_objmgr_vdev *wlan_key_get_link_vdev(struct hdd_adapter *adapter,
 	return vdev;
 }
 
-static inline
 void wlan_key_put_link_vdev(struct wlan_objmgr_vdev *link_vdev,
 			    wlan_objmgr_ref_dbgid id)
 {

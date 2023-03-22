@@ -1041,6 +1041,27 @@ wlan_hdd_mlo_copy_partner_addr_from_mlie(struct wlan_objmgr_vdev *vdev,
 }
 #endif /* WLAN_FEATURE_11BE_MLO */
 
+/**
+ * wlan_key_get_link_vdev() - get vdev per link id
+ * @adapter: hdd adapter object
+ * @id: reference dbg id
+ * @link_id: link id
+ *
+ * Return: pointer of wlan_objmgr_vdev or NULL if fail
+ */
+struct wlan_objmgr_vdev *wlan_key_get_link_vdev(struct hdd_adapter *adapter,
+						wlan_objmgr_ref_dbgid id,
+						int link_id);
+/**
+ * wlan_key_put_link_vdev() - put link vdev reference
+ * @link_vdev: the pointer to link vdev
+ * @id: reference dbg id
+ *
+ * Return: void
+ */
+void wlan_key_put_link_vdev(struct wlan_objmgr_vdev *link_vdev,
+			    wlan_objmgr_ref_dbgid id);
+
 #if defined(WLAN_FEATURE_11BE_MLO) && \
 	defined(CFG80211_SINGLE_NETDEV_MULTI_LINK_SUPPORT)
 /**
