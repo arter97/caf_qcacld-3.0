@@ -953,6 +953,13 @@ util_scan_parse_chan_switch_wrapper_ie(struct scan_cache_entry *scan_params,
 				return QDF_STATUS_E_INVAL;
 			scan_params->ie_list.txpwrenvlp = (uint8_t *)sub_ie;
 			break;
+#ifdef WLAN_FEATURE_11BE
+		case WLAN_EXTN_ELEMID_BW_IND:
+			if (sub_ie->ie_len < WLAN_BW_IND_IE_MIN_LEN)
+				return QDF_STATUS_E_INVAL;
+			scan_params->ie_list.bw_ind = (uint8_t *)sub_ie;
+			break;
+#endif
 		}
 		/* Consume sub info element */
 		sub_ie_len -= sub_ie->ie_len;

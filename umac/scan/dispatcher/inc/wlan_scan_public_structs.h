@@ -209,6 +209,7 @@ struct channel_info {
  * @rsnxe: Pointer to rsnxe IE
  * @ehtcap: pointer to ehtcap ie
  * @ehtop: pointer to eht op ie
+ * @bw_ind: pointer to bandwidth indication element sub ie
  * @multi_link_bv: pointer to multi link basic variant IE
  * @multi_link_rv: pointer to multi link reconfig IE
  * @t2lm: array of pointers to t2lm op ie
@@ -276,6 +277,7 @@ struct ie_list {
 #ifdef WLAN_FEATURE_11BE
 	uint8_t *ehtcap;
 	uint8_t *ehtop;
+	uint8_t *bw_ind;
 #endif
 #ifdef WLAN_FEATURE_11BE_MLO
 	uint8_t *multi_link_bv;
