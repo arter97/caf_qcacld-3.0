@@ -202,6 +202,7 @@ struct tdls_set_state_info {
  * @fw_tdls_6g_capability: bool for tdls 6g fw capability
  * @bss_sta_power: bss sta power
  * @bss_sta_power_type: bss sta power type
+ * @timer_cnt: used for mlo tdls to monitor discovery response
  * @fw_tdls_wideband_capability: bool for tdls wideband fw capability
  */
 struct tdls_soc_priv_obj {
@@ -258,6 +259,7 @@ struct tdls_soc_priv_obj {
 	uint8_t bss_sta_power;
 	uint8_t bss_sta_power_type;
 #endif
+	qdf_atomic_t timer_cnt;
 	bool fw_tdls_wideband_capability;
 };
 
@@ -747,6 +749,29 @@ tdls_process_policy_mgr_notification(struct wlan_objmgr_psoc *psoc);
  */
 QDF_STATUS
 tdls_process_decrement_active_session(struct wlan_objmgr_psoc *psoc);
+
+/**
+ * wlan_tdls_get_mlo_vdev() - get mlo vdev for tdls
+ * @vdev: vdev object
+ * @index: index of vdev in mlo list
+ * @dbg_id: debug id
+ *
+ * Return: vdev pointer
+ */
+struct wlan_objmgr_vdev *wlan_tdls_get_mlo_vdev(struct wlan_objmgr_vdev *vdev,
+						uint8_t index,
+						wlan_objmgr_ref_dbgid dbg_id);
+
+/**
+ * wlan_tdls_release_mlo_vdev() - release mlo vdev for tdls
+ * @vdev: vdev object
+ * @dbg_id: debug id
+ *
+ * Return: void
+ */
+void wlan_tdls_release_mlo_vdev(struct wlan_objmgr_vdev *vdev,
+				wlan_objmgr_ref_dbgid dbg_id);
+
 /**
  * tdls_scan_complete_event_handler() - scan complete event handler for tdls
  * @vdev: vdev object

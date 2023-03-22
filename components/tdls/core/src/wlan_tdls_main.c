@@ -1210,6 +1210,51 @@ release_ref:
 	return QDF_STATUS_SUCCESS;
 }
 
+#ifdef WLAN_FEATURE_11BE_MLO
+struct wlan_objmgr_vdev *wlan_tdls_get_mlo_vdev(struct wlan_objmgr_vdev *vdev,
+						uint8_t index,
+						wlan_objmgr_ref_dbgid dbg_id)
+{
+	struct wlan_mlo_dev_context *mlo_dev_ctx;
+	struct wlan_objmgr_vdev *mlo_vdev;
+
+	if (!vdev)
+		return NULL;
+
+	mlo_dev_ctx = vdev->mlo_dev_ctx;
+	if (!mlo_dev_ctx)
+		return NULL;
+
+	mlo_vdev = mlo_dev_ctx->wlan_vdev_list[index];
+	if (mlo_vdev &&
+	    wlan_objmgr_vdev_try_get_ref(mlo_vdev, dbg_id) ==
+							QDF_STATUS_SUCCESS)
+		return mlo_vdev;
+
+	return NULL;
+}
+
+void wlan_tdls_release_mlo_vdev(struct wlan_objmgr_vdev *vdev,
+				wlan_objmgr_ref_dbgid dbg_id)
+{
+	if (!vdev)
+		return;
+
+	wlan_objmgr_vdev_release_ref(vdev, dbg_id);
+}
+#else
+struct wlan_objmgr_vdev *wlan_tdls_get_mlo_vdev(struct wlan_objmgr_vdev *vdev,
+						uint8_t index,
+						wlan_objmgr_ref_dbgid dbg_id)
+{
+	return NULL;
+}
+
+void wlan_tdls_release_mlo_vdev(struct wlan_objmgr_vdev *vdev,
+				wlan_objmgr_ref_dbgid dbg_id)
+{
+}
+#endif
 /**
  * tdls_get_vdev() - Get tdls specific vdev object manager
  * @psoc: wlan psoc object manager

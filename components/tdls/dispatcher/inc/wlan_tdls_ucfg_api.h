@@ -336,6 +336,35 @@ QDF_STATUS ucfg_set_tdls_secoffchanneloffset(struct wlan_objmgr_vdev *vdev,
 					     int offchanoffset);
 
 /**
+ * ucfg_tdls_discovery_on_going() - check discovery is on going
+ * @vdev: vdev object
+ *
+ * Return: true if tdls discovery on going else false
+ */
+bool ucfg_tdls_discovery_on_going(struct wlan_objmgr_vdev *vdev);
+
+/**
+ * ucfg_tdls_get_mlo_vdev() - get mlo vdev for tdls
+ * @vdev: vdev object
+ * @index: index of vdev in mlo list
+ * @dbg_id: debug id
+ *
+ * Return: vdev pointer
+ */
+struct wlan_objmgr_vdev *ucfg_tdls_get_mlo_vdev(struct wlan_objmgr_vdev *vdev,
+						uint8_t index,
+						wlan_objmgr_ref_dbgid dbg_id);
+
+/**
+ * ucfg_tdls_release_mlo_vdev() - release mlo vdev for tdls
+ * @vdev: vdev object
+ * @dbg_id: debug id
+ *
+ * Return: void
+ */
+void ucfg_tdls_release_mlo_vdev(struct wlan_objmgr_vdev *vdev,
+				wlan_objmgr_ref_dbgid dbg_id);
+/**
  * ucfg_tdls_set_rssi() - API to set TDLS RSSI on peer given by mac
  * @vdev: vdev object
  * @mac: MAC address of Peer

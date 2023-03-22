@@ -864,8 +864,8 @@ QDF_STATUS ucfg_tdls_send_mgmt_frame(
 		mgmt_req->tdls_mgmt.len = 0;
 	}
 
-	tdls_debug("vdev id: %d, session id : %d", mgmt_req->vdev_id,
-		    mgmt_req->session_id);
+	tdls_debug("vdev id: %d, session id : %d, action %d", mgmt_req->vdev_id,
+		   mgmt_req->session_id, req->chk_frame.action_code);
 	status = wlan_objmgr_vdev_try_get_ref(req->vdev, WLAN_TDLS_NB_ID);
 
 	if (QDF_IS_STATUS_ERROR(status)) {
@@ -1176,6 +1176,33 @@ dec_ref:
 free:
 	qdf_mem_free(req);
 	return status;
+}
+
+struct wlan_objmgr_vdev *ucfg_tdls_get_mlo_vdev(struct wlan_objmgr_vdev *vdev,
+						uint8_t index,
+						wlan_objmgr_ref_dbgid dbg_id)
+{
+	return wlan_tdls_get_mlo_vdev(vdev, index, dbg_id);
+}
+
+void ucfg_tdls_release_mlo_vdev(struct wlan_objmgr_vdev *vdev,
+				wlan_objmgr_ref_dbgid dbg_id)
+{
+	return wlan_tdls_release_mlo_vdev(vdev, dbg_id);
+}
+
+bool ucfg_tdls_discovery_on_going(struct wlan_objmgr_vdev *vdev)
+{
+	struct tdls_soc_priv_obj *tdls_soc;
+	uint8_t count;
+
+	tdls_soc = wlan_vdev_get_tdls_soc_obj(vdev);
+	if (!tdls_soc)
+		return false;
+	count = qdf_atomic_read(&tdls_soc->timer_cnt);
+	tdls_debug("discovery req timer count %d", count);
+
+	return count ? true : false;
 }
 
 QDF_STATUS ucfg_tdls_set_rssi(struct wlan_objmgr_vdev *vdev,
