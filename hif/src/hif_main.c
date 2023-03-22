@@ -1258,6 +1258,9 @@ QDF_STATUS hif_try_complete_tasks(struct hif_softc *scn)
 		if (++task_drain_wait_cnt > HIF_TASK_DRAIN_WAIT_CNT) {
 			hif_err("pending tasklets %d grp tasklets %d work %d",
 				tasklet, grp_tasklet, work);
+			QDF_DEBUG_PANIC("Complete tasks takes more than %u ms: tasklets %d grp tasklets %d work %d",
+					HIF_TASK_DRAIN_WAIT_CNT * 10,
+					tasklet, grp_tasklet, work);
 			return QDF_STATUS_E_FAULT;
 		}
 		hif_info("waiting for tasklets %d grp tasklets %d work %d",
