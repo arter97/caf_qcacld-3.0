@@ -3272,15 +3272,10 @@ void reg_propagate_mas_chan_list_to_pdev(struct wlan_objmgr_psoc *psoc,
 	reg_modify_chan_list_for_outdoor(pdev_priv_obj);
 	reg_compute_pdev_current_chan_list(pdev_priv_obj);
 
-	if (reg_tx_ops->fill_umac_legacy_chanlist) {
-		reg_tx_ops->fill_umac_legacy_chanlist(
-				pdev, pdev_priv_obj->cur_chan_list);
-	} else {
-		if (*dir == NORTHBOUND)
-			reg_send_scheduler_msg_nb(psoc, pdev);
-		else
-			reg_send_scheduler_msg_sb(psoc, pdev);
-	}
+	if (*dir == NORTHBOUND)
+		reg_send_scheduler_msg_nb(psoc, pdev);
+	else
+		reg_send_scheduler_msg_sb(psoc, pdev);
 }
 
 /**
@@ -3600,6 +3595,30 @@ static inline QDF_STATUS reg_set_psoc_fcc_rules(
 	return QDF_STATUS_SUCCESS;
 }
 #endif
+
+static QDF_STATUS
+reg_propagate_mas_chan_list_and_fill_legacy_list(struct wlan_objmgr_psoc *psoc,
+						 struct wlan_objmgr_pdev *pdev,
+						 enum direction dir,
+						 wlan_objmgr_ref_dbgid dbg_id)
+{
+	struct wlan_lmac_if_reg_tx_ops *reg_tx_ops;
+	struct wlan_regulatory_pdev_priv_obj *pdev_priv_obj;
+
+	reg_tx_ops = reg_get_psoc_tx_ops(psoc);
+	pdev_priv_obj = reg_get_pdev_obj(pdev);
+	if (!IS_VALID_PDEV_REG_OBJ(pdev_priv_obj)) {
+		reg_err("reg pdev priv obj is NULL");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	reg_propagate_mas_chan_list_to_pdev(psoc, pdev, &dir);
+	if (reg_tx_ops->fill_umac_legacy_chanlist)
+		reg_tx_ops->fill_umac_legacy_chanlist(pdev,
+						      pdev_priv_obj->cur_chan_list);
+
+	return QDF_STATUS_SUCCESS;
+}
 
 #ifdef CONFIG_BAND_6GHZ
 static void reg_init_2g_5g_master_chan(struct regulatory_channel *dst_list,
@@ -4271,8 +4290,12 @@ QDF_STATUS reg_process_master_chan_list_ext(
 
 	pdev = wlan_objmgr_get_pdev_by_id(psoc, pdev_id, dbg_id);
 	if (pdev) {
-		reg_propagate_mas_chan_list_to_pdev(psoc, pdev, &dir);
+		status = reg_propagate_mas_chan_list_and_fill_legacy_list(psoc,
+									  pdev,
+									  dir,
+									  dbg_id);
 		wlan_objmgr_pdev_release_ref(pdev, dbg_id);
+		return status;
 	}
 
 	return QDF_STATUS_SUCCESS;
@@ -5456,8 +5479,12 @@ QDF_STATUS reg_process_master_chan_list(
 
 	pdev = wlan_objmgr_get_pdev_by_id(psoc, pdev_id, dbg_id);
 	if (pdev) {
-		reg_propagate_mas_chan_list_to_pdev(psoc, pdev, &dir);
+		status = reg_propagate_mas_chan_list_and_fill_legacy_list(psoc,
+									  pdev,
+									  dir,
+									  dbg_id);
 		wlan_objmgr_pdev_release_ref(pdev, dbg_id);
+		return status;
 	}
 
 	return QDF_STATUS_SUCCESS;
