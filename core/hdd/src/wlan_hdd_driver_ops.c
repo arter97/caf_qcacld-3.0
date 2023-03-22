@@ -1801,6 +1801,9 @@ static int wlan_hdd_pld_probe(struct device *dev,
 		hdd_err("Invalid bus type %d->%d", pld_bus_type, bus_type);
 		return -EINVAL;
 	}
+	qdf_ssr_driver_dump_register_region("hang_event_data",
+					    g_fw_host_hang_event,
+					    sizeof(g_fw_host_hang_event));
 
 	return hdd_soc_probe(dev, bdev, id, bus_type);
 }
@@ -1817,6 +1820,7 @@ static void wlan_hdd_pld_remove(struct device *dev, enum pld_bus_type bus_type)
 	hdd_enter();
 
 	hdd_soc_remove(dev);
+	qdf_ssr_driver_dump_unregister_region("hang_event_data");
 
 	hdd_exit();
 }
