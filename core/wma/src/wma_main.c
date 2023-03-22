@@ -121,6 +121,7 @@
 #include "wlan_tdls_api.h"
 #include "wlan_twt_cfg_ext_api.h"
 #include "wlan_mlo_mgr_sta.h"
+#include "wlan_dp_api.h"
 
 #define WMA_LOG_COMPLETION_TIMER 500 /* 500 msecs */
 #define WMI_TLV_HEADROOM 128
@@ -7256,6 +7257,8 @@ int wma_rx_service_ready_ext_event(void *handle, uint8_t *event,
 	wma_update_hw_mode_config(wma_handle, tgt_hdl);
 
 	target_psoc_set_num_radios(tgt_hdl, 1);
+
+	wlan_dp_update_peer_map_unmap_version(&wlan_res_cfg->peer_map_unmap_version);
 
 	if (wmi_service_enabled(wmi_handle,
 				wmi_service_new_htt_msg_format)) {

@@ -2586,6 +2586,7 @@ DP_COMP_INC	:= -I$(WLAN_ROOT)/components/dp/core/inc	\
 
 WLAN_DP_COMP_OBJS := $(DP_COMP_CORE_DIR)/wlan_dp_main.o \
 		 $(DP_COMP_UCFG_DIR)/wlan_dp_ucfg_api.o \
+		$(DP_COMP_UCFG_DIR)/wlan_dp_api.o \
 		 $(DP_COMP_OS_IF_DIR)/os_if_dp.o \
 		 $(DP_COMP_OS_IF_DIR)/os_if_dp_txrx.o \
 		 $(DP_COMP_CORE_DIR)/wlan_dp_bus_bandwidth.o \
