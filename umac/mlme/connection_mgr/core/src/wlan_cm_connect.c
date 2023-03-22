@@ -1093,7 +1093,7 @@ static void cm_teardown_tdls(struct wlan_objmgr_vdev *vdev)
 	if (!psoc)
 		return;
 
-	wlan_tdls_teardown_links_sync(psoc);
+	wlan_tdls_check_and_teardown_links_sync(psoc, vdev);
 }
 
 #else
