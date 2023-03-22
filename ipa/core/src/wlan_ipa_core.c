@@ -5112,7 +5112,7 @@ int wlan_ipa_wdi_opt_dpath_flt_rem_cb(
 	}
 	dp_flt_params->op = HTT_RX_CCE_SUPER_RULE_INSTALL;
 	dp_flt_params->pdev_id = ipa_obj->dp_pdev_id;
-	dp_flt_params->num_filters = IPA_WDI_MAX_FILTER;
+	dp_flt_params->num_filters = num_flts;
 	qdf_event_reset(&ipa_obj->ipa_flt_evnt);
 
 	ipa_info("opt_dp: op %d, pdev_id %d. num_flts %d,",

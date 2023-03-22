@@ -523,7 +523,7 @@ QDF_STATUS htt_h2t_rx_cce_super_rule_setup(struct htt_soc *soc, void *param)
 	HTT_RX_CCE_SUPER_RULE_SETUP_OPERATION_SET(*msg_word, op);
 
 	/* Set cce_super_rule_params */
-	for (i = 0; i < num_filters; i++) {
+	for (i = 0; i < RX_CCE_SUPER_RULE_SETUP_NUM; i++) {
 		valid = flt_params->flt_addr_params[i].valid;
 		ver = flt_params->flt_addr_params[i].l3_type;
 		msg_word++;
@@ -537,8 +537,7 @@ QDF_STATUS htt_h2t_rx_cce_super_rule_setup(struct htt_soc *soc, void *param)
 				msg_word,
 				flt_params->flt_addr_params[i].src_ipv6_addr);
 		} else {
-			dp_htt_err("Wrong ip version. Cannot set src_addr.");
-			return QDF_STATUS_FILT_REQ_ERROR;
+			dp_htt_debug("Filter %d not in use.", i);
 		}
 
 		/* move uint32_t *msg_word by IPV6 addr size */
@@ -553,8 +552,7 @@ QDF_STATUS htt_h2t_rx_cce_super_rule_setup(struct htt_soc *soc, void *param)
 				msg_word,
 				flt_params->flt_addr_params[i].dst_ipv6_addr);
 		} else {
-			dp_htt_err("Wrong ip version. Cannot set dst_addr.");
-			return QDF_STATUS_FILT_REQ_ERROR;
+			dp_htt_debug("Filter %d not in use.", i);
 		}
 
 		/* move uint32_t *msg_word by IPV6 addr size */
