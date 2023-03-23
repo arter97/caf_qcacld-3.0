@@ -1412,7 +1412,7 @@ uint8_t dp_rx_mon_process_tlv_status(struct dp_pdev *pdev,
 			 *                          * mapped via nr frags
 			 *                                                   */
 			if (qdf_unlikely(!nbuf)) {
-				dp_mon_err("malloc failed pdev: %pK ", pdev);
+				dp_mon_debug("malloc failed pdev: %pK ", pdev);
 				return num_buf_reaped;
 			}
 
