@@ -1506,6 +1506,7 @@ QDF_STATUS dfs_init_chan_state_array(struct wlan_objmgr_pdev *pdev)
 
 	if (wlan_reg_get_current_chan_list(
 				pdev, cur_chan_list) != QDF_STATUS_SUCCESS) {
+		qdf_mem_free(cur_chan_list);
 		dfs_alert(dfs, WLAN_DEBUG_DFS_ALWAYS,
 			  "failed to get curr channel list");
 		return QDF_STATUS_E_FAILURE;
