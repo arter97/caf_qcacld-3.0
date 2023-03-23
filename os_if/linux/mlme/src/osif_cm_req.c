@@ -33,6 +33,10 @@
 #endif
 #include <wlan_mlo_mgr_sta.h>
 #include <utils_mlo.h>
+#include <wlan_mgmt_txrx_rx_reo_utils_api.h>
+#if defined(WLAN_FEATURE_11BE_MLO) && defined(WLAN_MLO_MULTI_CHIP)
+#include <wlan_mlo_mgr_setup.h>
+#endif
 
 static void osif_cm_free_wep_key_params(struct wlan_cm_connect_req *connect_req)
 {
@@ -526,12 +530,24 @@ QDF_STATUS osif_update_mlo_partner_info(
 	uint8_t linkid = 0;
 	enum wlan_ml_variant variant;
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
+	uint8_t psoc_ids[WLAN_UMAC_MLO_MAX_VDEVS];
+	uint8_t i, idx = 0;
+	uint8_t central_umac_id;
+	uint8_t tot_grp_socs, ml_grp_id;
+	struct wlan_objmgr_pdev *pdev = NULL;
+	struct wlan_objmgr_vdev *vdev_iter;
 
 	if (!vdev || !connect_req || !req)
 		return status;
 
 	if (!vdev->mlo_dev_ctx) {
 		osif_debug("ML ctx is NULL, ignore ML IE");
+		return QDF_STATUS_SUCCESS;
+	}
+	pdev = wlan_vdev_get_pdev(vdev);
+
+	if (!pdev) {
+		osif_debug("null pdev");
 		return QDF_STATUS_SUCCESS;
 	}
 
@@ -597,6 +613,36 @@ QDF_STATUS osif_update_mlo_partner_info(
 		mlo_clear_connect_req_links_bmap(vdev);
 		mlo_update_connect_req_links(vdev, 1);
 		osif_update_partner_vdev_info(vdev, partner_info);
+
+		/* Incase of 4-LINK RDP in 3-LINK NON-AP MLD mode there is
+		 * restriction to have the primary umac and association
+		 * link to be same.
+		 * Note: It also means restriction on umac migration
+		 */
+		ml_grp_id = wlan_get_mlo_grp_id_from_pdev(pdev);
+		tot_grp_socs = mlo_setup_get_total_socs(ml_grp_id);
+		if (tot_grp_socs == WLAN_UMAC_MLO_MAX_VDEVS) {
+			for (i = 0; i < WLAN_UMAC_MLO_MAX_VDEVS; i++) {
+				vdev_iter = vdev->mlo_dev_ctx->wlan_vdev_list[i];
+				if (!vdev_iter)
+					continue;
+				/* Store the psoc_ids of the links */
+				psoc_ids[idx] = wlan_vdev_get_psoc_id(vdev_iter);
+				idx++;
+			}
+			/* Check if the primary umac and assoc links are same */
+			if (idx == WLAN_UMAC_MLO_ASSOC_MAX_SUPPORTED_LINKS) {
+				central_umac_id = mlo_get_central_umac_id(psoc_ids);
+				if (central_umac_id != -1) {
+					if (wlan_vdev_get_psoc_id(vdev) != central_umac_id) {
+						osif_err("Rejecting connection as primary umac soc %d and assoc link %d are different ",
+							 central_umac_id, wlan_vdev_get_psoc_id(vdev));
+						return QDF_STATUS_E_FAILURE;
+					}
+				}
+			}
+		}
+
 		mlo_mlme_sta_op_class(vdev, ml_ie);
 	}
 
