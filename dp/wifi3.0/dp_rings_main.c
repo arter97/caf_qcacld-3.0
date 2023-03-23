@@ -4146,7 +4146,7 @@ QDF_STATUS dp_runtime_resume(struct cdp_soc_t *soc_hdl, uint8_t pdev_id)
 
 #ifdef WLAN_FEATURE_STATS_EXT
 /* rx hw stats event wait timeout in ms */
-#define DP_REO_STATUS_STATS_TIMEOUT 850
+#define DP_REO_STATUS_STATS_TIMEOUT 100
 
 /**
  * dp_rx_hw_stats_cb() - request rx hw stats response callback
