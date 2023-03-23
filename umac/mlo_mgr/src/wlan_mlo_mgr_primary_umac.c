@@ -455,25 +455,17 @@ static void mlo_peer_calculate_avg_rssi(
 }
 
 #ifdef WLAN_MLO_MULTI_CHIP
-static QDF_STATUS mlo_set_3_link_primary_umac(
-		struct wlan_mlo_peer_context *ml_peer,
-		struct wlan_objmgr_vdev *link_vdevs[])
+int8_t mlo_get_central_umac_id(
+		uint8_t *psoc_ids)
 {
-	uint8_t prim_psoc_id, psoc_ids[MAX_MLO_CHIPS];
+	uint8_t prim_psoc_id = -1;
 	uint8_t adjacent = 0;
-
-	if (ml_peer->max_links != 3)
-		return QDF_STATUS_E_FAILURE;
 
 	/* Some 3 link RDPs have restriction on the primary umac.
 	 * Only the link that is adjacent to both the links can be
 	 * a primary umac.
 	 * Note: it means umac migration is also restricted.
 	 */
-	psoc_ids[0] = wlan_vdev_get_psoc_id(link_vdevs[0]);
-	psoc_ids[1] = wlan_vdev_get_psoc_id(link_vdevs[1]);
-	psoc_ids[2] = wlan_vdev_get_psoc_id(link_vdevs[2]);
-
 	mlo_chip_adjacent(psoc_ids[0], psoc_ids[1], &adjacent);
 	if (!adjacent) {
 		prim_psoc_id = psoc_ids[2];
@@ -491,11 +483,38 @@ static QDF_STATUS mlo_set_3_link_primary_umac(
 			if (!adjacent)
 				prim_psoc_id = psoc_ids[0];
 			else
-				return QDF_STATUS_E_FAILURE;
+				return prim_psoc_id;
 		}
 	}
 
-	ml_peer->primary_umac_psoc_id = prim_psoc_id;
+	return prim_psoc_id;
+}
+
+static QDF_STATUS mlo_set_3_link_primary_umac(
+		struct wlan_mlo_peer_context *ml_peer,
+		struct wlan_objmgr_vdev *link_vdevs[])
+{
+	uint8_t psoc_ids[WLAN_UMAC_MLO_MAX_VDEVS];
+	int8_t central_umac_id;
+
+	if (ml_peer->max_links != 3)
+		return QDF_STATUS_E_FAILURE;
+
+	/* Some 3 link RDPs have restriction on the primary umac.
+	 * Only the link that is adjacent to both the links can be
+	 * a primary umac.
+	 * Note: it means umac migration is also restricted.
+	 */
+	psoc_ids[0] = wlan_vdev_get_psoc_id(link_vdevs[0]);
+	psoc_ids[1] = wlan_vdev_get_psoc_id(link_vdevs[1]);
+	psoc_ids[2] = wlan_vdev_get_psoc_id(link_vdevs[2]);
+
+	central_umac_id = mlo_get_central_umac_id(psoc_ids);
+	if (central_umac_id != -1)
+		ml_peer->primary_umac_psoc_id = central_umac_id;
+	else
+		return QDF_STATUS_E_FAILURE;
+
 	mlo_peer_assign_primary_umac(ml_peer,
 				     &ml_peer->peer_list[0]);
 

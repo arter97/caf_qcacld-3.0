@@ -164,6 +164,17 @@ bool ucfg_mlo_is_mld_connected(struct wlan_objmgr_vdev *vdev);
 void ucfg_mlo_mld_clear_mlo_cap(struct wlan_objmgr_vdev *vdev);
 #endif
 
+#ifdef WLAN_MLO_MULTI_CHIP
+/**
+ * mlo_get_central_umac_id - get central umac in 3 link topology
+ * @psoc_ids: pointer to psoc_ids
+ *
+ * Return: central umac if success, -1 all soc are adjacent to each other
+ */
+
+int8_t mlo_get_central_umac_id(uint8_t *psoc_ids);
+#endif
+
 /**
  * wlan_mlo_get_tdls_link_vdev() - API to get tdls link vdev
  * @vdev: vdev object
