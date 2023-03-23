@@ -18937,6 +18937,7 @@ extract_roam_trigger_stats_tlv(wmi_unified_t wmi_handle, void *evt_buf,
 		trig->trigger_reason =
 			wmi_convert_fw_to_cm_trig_reason(trig_reason);
 		trig->timestamp = cmn_data->timestamp;
+		trig->common_roam = true;
 	} else if (src_data) {
 		trig_reason = src_data->trigger_reason;
 		trig->trigger_reason =
@@ -18945,6 +18946,7 @@ extract_roam_trigger_stats_tlv(wmi_unified_t wmi_handle, void *evt_buf,
 			wmi_convert_roam_sub_reason(src_data->trigger_sub_reason);
 		trig->current_rssi = src_data->current_rssi;
 		trig->timestamp = src_data->timestamp;
+		trig->common_roam = false;
 	}
 
 	if (param_buf->roam_trigger_rssi)

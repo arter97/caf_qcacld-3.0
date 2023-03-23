@@ -9219,6 +9219,7 @@ struct wmi_neighbor_report_data {
 /**
  * struct wmi_roam_trigger_info() - Roam trigger related details
  * @present:            Flag to check if the roam_trigger_info tlv is present
+ * @common_roam:        Flag to indicate common roam or special roam
  * @trigger_reason:     Roam trigger reason(enum WMI_ROAM_TRIGGER_REASON_ID)
  * @trigger_sub_reason: Sub reason for roam trigger if multiple roam scans
  * @current_rssi:       Connected AP RSSI
@@ -9244,6 +9245,7 @@ struct wmi_neighbor_report_data {
  */
 struct wmi_roam_trigger_info {
 	bool present;
+	bool common_roam;
 	uint32_t trigger_reason;
 	uint32_t trigger_sub_reason;
 	uint32_t current_rssi;
