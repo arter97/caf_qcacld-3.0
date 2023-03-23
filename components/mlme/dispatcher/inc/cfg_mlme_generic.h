@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -55,6 +55,27 @@ enum wlan_wds_mode {
 	/* keep this last */
 	WLAN_WDS_MODE_LAST,
 	WLAN_WDS_MODE_MAX = WLAN_WDS_MODE_LAST - 1,
+};
+
+/**
+ * enum wlan_eht_mode - EHT mode of operation
+ * @WLAN_EHT_MODE_DISABLED: EHT is disabled
+ * @WLAN_EHT_MODE_SLO: Single-link operation mode
+ * @WLAN_EHT_MODE_MLSR: Multi-link Single-Radio mode
+ * @WLAN_EHT_MODE_MLMR: Multi-link Multi-Radio mode
+ * @WLAN_EHT_MODE_LAST: last value in enum
+ * @WLAN_EHT_MODE_MAX: max value supported
+ *
+ * This is used for 'type' values in eht_mode
+ */
+enum wlan_eht_mode {
+	WLAN_EHT_MODE_DISABLED  = 0,
+	WLAN_EHT_MODE_SLO       = 1,
+	WLAN_EHT_MODE_MLSR      = 2,
+	WLAN_EHT_MODE_MLMR      = 3,
+	/* keep this last */
+	WLAN_EHT_MODE_LAST,
+	WLAN_EHT_MODE_MAX = WLAN_EHT_MODE_LAST - 1,
 };
 
 /**
@@ -222,6 +243,29 @@ enum t2lm_negotiation_support {
 		"rf_test_mode_enabled", \
 		0, \
 		"rf test mode Enable Flag")
+
+#ifdef CONFIG_BAND_6GHZ
+/*
+ * standard_6ghz_connection_policy - Enable 6 GHz standard connection policy
+ * @Min: 0
+ * @Max: 1
+ * @Default: 1
+ *
+ * This ini is used to set standard 6 GHz policies where STA will be
+ * allowed to scan and connect to any 6 GHz AP.
+ *
+ * Related: None
+ *
+ * Supported Feature: STA
+ */
+#define CFG_6GHZ_STANDARD_CONNECTION_POLICY CFG_INI_BOOL( \
+		"standard_6ghz_connection_policy", \
+		1, \
+		"6ghz standard 6 GHZ connection policy")
+#define CFG_6GHZ_STD_CONN_POLICY	CFG(CFG_6GHZ_STANDARD_CONNECTION_POLICY)
+#else
+#define CFG_6GHZ_STD_CONN_POLICY
+#endif
 
 #ifdef CONFIG_BAND_6GHZ
 /*
@@ -1153,6 +1197,7 @@ enum t2lm_negotiation_support {
 	CFG(CFG_TX_RETRY_MULTIPLIER) \
 	CFG(CFG_MGMT_FRAME_HW_TX_RETRY_COUNT) \
 	CFG_RELAX_6GHZ_CONN_POLICY \
+	CFG_6GHZ_STD_CONN_POLICY \
 	CFG_EMLSR_MODE_ENABLED \
 	CFG_SR_ENABLE_MODES_ALL \
 	CFG_T2LM_NEGOTIATION_SUPPORTED

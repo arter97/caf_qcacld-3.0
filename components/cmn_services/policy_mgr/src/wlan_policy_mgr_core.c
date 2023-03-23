@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -65,21 +65,6 @@ struct policy_mgr_psoc_priv_obj *policy_mgr_get_context(
 	return pm_ctx;
 }
 
-/**
- * policy_mgr_get_updated_scan_config() - Get the updated scan configuration
- * @scan_config: Pointer containing the updated scan config
- * @dbs_scan: 0 or 1 indicating if DBS scan needs to be enabled/disabled
- * @dbs_plus_agile_scan: 0 or 1 indicating if DBS plus agile scan needs to be
- * enabled/disabled
- * @single_mac_scan_with_dfs: 0 or 1 indicating if single MAC scan with DFS
- * needs to be enabled/disabled
- *
- * Takes the current scan configuration and set the necessary scan config
- * bits to either 0/1 and provides the updated value to the caller who
- * can use this to pass it on to the FW
- *
- * Return: 0 on success
- */
 QDF_STATUS policy_mgr_get_updated_scan_config(
 		struct wlan_objmgr_psoc *psoc,
 		uint32_t *scan_config,
@@ -118,19 +103,6 @@ QDF_STATUS policy_mgr_get_updated_scan_config(
 	return QDF_STATUS_SUCCESS;
 }
 
-/**
- * policy_mgr_get_updated_fw_mode_config() - Get the updated fw
- * mode configuration
- * @fw_mode_config: Pointer containing the updated fw mode config
- * @dbs: 0 or 1 indicating if DBS needs to be enabled/disabled
- * @agile_dfs: 0 or 1 indicating if agile DFS needs to be enabled/disabled
- *
- * Takes the current fw mode configuration and set the necessary fw mode config
- * bits to either 0/1 and provides the updated value to the caller who
- * can use this to pass it on to the FW
- *
- * Return: 0 on success
- */
 QDF_STATUS policy_mgr_get_updated_fw_mode_config(
 		struct wlan_objmgr_psoc *psoc,
 		uint32_t *fw_mode_config,
@@ -153,14 +125,6 @@ QDF_STATUS policy_mgr_get_updated_fw_mode_config(
 	return QDF_STATUS_SUCCESS;
 }
 
-/**
- * policy_mgr_is_dual_mac_disabled_in_ini() - Check if dual mac
- * is disabled in INI
- *
- * Checks if the dual mac feature is disabled in INI
- *
- * Return: true if the dual mac connection is disabled from INI
- */
 bool policy_mgr_is_dual_mac_disabled_in_ini(
 		struct wlan_objmgr_psoc *psoc)
 {
@@ -217,13 +181,6 @@ bool policy_mgr_get_same_mac_conc_sr_status(struct wlan_objmgr_psoc *psoc)
 }
 #endif
 
-/**
- * policy_mgr_get_dbs_config() - Get DBS bit
- *
- * Gets the DBS bit of fw_mode_config_bits
- *
- * Return: 0 or 1 to indicate the DBS bit
- */
 bool policy_mgr_get_dbs_config(struct wlan_objmgr_psoc *psoc)
 {
 	struct policy_mgr_psoc_priv_obj *pm_ctx;
@@ -244,13 +201,6 @@ bool policy_mgr_get_dbs_config(struct wlan_objmgr_psoc *psoc)
 	return WMI_DBS_FW_MODE_CFG_DBS_GET(fw_mode_config);
 }
 
-/**
- * policy_mgr_get_agile_dfs_config() - Get Agile DFS bit
- *
- * Gets the Agile DFS bit of fw_mode_config_bits
- *
- * Return: 0 or 1 to indicate the Agile DFS bit
- */
 bool policy_mgr_get_agile_dfs_config(struct wlan_objmgr_psoc *psoc)
 {
 	struct policy_mgr_psoc_priv_obj *pm_ctx;
@@ -271,13 +221,6 @@ bool policy_mgr_get_agile_dfs_config(struct wlan_objmgr_psoc *psoc)
 	return WMI_DBS_FW_MODE_CFG_AGILE_DFS_GET(fw_mode_config);
 }
 
-/**
- * policy_mgr_get_dbs_scan_config() - Get DBS scan bit
- *
- * Gets the DBS scan bit of concurrent_scan_config_bits
- *
- * Return: 0 or 1 to indicate the DBS scan bit
- */
 bool policy_mgr_get_dbs_scan_config(struct wlan_objmgr_psoc *psoc)
 {
 	uint32_t scan_config;
@@ -298,17 +241,6 @@ bool policy_mgr_get_dbs_scan_config(struct wlan_objmgr_psoc *psoc)
 	return WMI_DBS_CONC_SCAN_CFG_DBS_SCAN_GET(scan_config);
 }
 
-/**
- * policy_mgr_get_tx_rx_ss_from_config() - Get Tx/Rx spatial
- * stream from HW mode config
- * @mac_ss: Config which indicates the HW mode as per 'hw_mode_ss_config'
- * @tx_ss: Contains the Tx spatial stream
- * @rx_ss: Contains the Rx spatial stream
- *
- * Returns the number of spatial streams of Tx and Rx
- *
- * Return: None
- */
 void policy_mgr_get_tx_rx_ss_from_config(enum hw_mode_ss_config mac_ss,
 		uint32_t *tx_ss, uint32_t *rx_ss)
 {
@@ -339,31 +271,6 @@ void policy_mgr_get_tx_rx_ss_from_config(enum hw_mode_ss_config mac_ss,
 	}
 }
 
-/**
- * policy_mgr_get_matching_hw_mode_index() - Get matching HW mode index
- * @psoc: psoc handle
- * @mac0_tx_ss: Number of tx spatial streams of MAC0
- * @mac0_rx_ss: Number of rx spatial streams of MAC0
- * @mac0_bw: Bandwidth of MAC0 of type 'hw_mode_bandwidth'
- * @mac1_tx_ss: Number of tx spatial streams of MAC1
- * @mac1_rx_ss: Number of rx spatial streams of MAC1
- * @mac1_bw: Bandwidth of MAC1 of type 'hw_mode_bandwidth'
- * @mac0_band_cap: mac0 band capability requirement
- *     (0: Don't care, 1: 2.4G, 2: 5G)
- * @dbs: DBS capability of type 'hw_mode_dbs_capab'
- * @dfs: Agile DFS capability of type 'hw_mode_agile_dfs_capab'
- * @sbs: SBS capability of type 'hw_mode_sbs_capab'
- *
- * Fetches the HW mode index corresponding to the HW mode provided.
- * In Genoa two DBS HW modes (2x2 5G + 1x1 2G, 2x2 2G + 1x1 5G),
- * the "ss" number and "bw" value are not enough to specify the expected
- * HW mode. But in both HW mode, the mac0 can support either 5G or 2G.
- * So, the Parameter "mac0_band_cap" will specify the expected band support
- * requirement on mac 0 to find the expected HW mode.
- *
- * Return: Positive hw mode index in case a match is found or a negative
- * value, otherwise
- */
 int8_t policy_mgr_get_matching_hw_mode_index(
 		struct wlan_objmgr_psoc *psoc,
 		uint32_t mac0_tx_ss, uint32_t mac0_rx_ss,
@@ -455,29 +362,6 @@ int8_t policy_mgr_get_matching_hw_mode_index(
 	return found;
 }
 
-/**
- * policy_mgr_get_hw_mode_from_dbs_hw_list() - Get hw_mode index
- * @mac0_ss: MAC0 spatial stream configuration
- * @mac0_bw: MAC0 bandwidth configuration
- * @mac1_ss: MAC1 spatial stream configuration
- * @mac1_bw: MAC1 bandwidth configuration
- * @mac0_band_cap: mac0 band capability requirement
- *     (0: Don't care, 1: 2.4G, 2: 5G)
- * @dbs: HW DBS capability
- * @dfs: HW Agile DFS capability
- * @sbs: HW SBS capability
- *
- * Get the HW mode index corresponding to the HW modes spatial stream,
- * bandwidth, DBS, Agile DFS and SBS capability
- *
- * In Genoa two DBS HW modes (2x2 5G + 1x1 2G, 2x2 2G + 1x1 5G),
- * the "ss" number and "bw" value are not enough to specify the expected
- * HW mode. But in both HW mode, the mac0 can support either 5G or 2G.
- * So, the Parameter "mac0_band_cap" will specify the expected band support
- * requirement on mac 0 to find the expected HW mode.
- *
- * Return: Index number if a match is found or -negative value if not found
- */
 int8_t policy_mgr_get_hw_mode_idx_from_dbs_hw_list(
 		struct wlan_objmgr_psoc *psoc,
 		enum hw_mode_ss_config mac0_ss,
@@ -511,16 +395,6 @@ int8_t policy_mgr_get_hw_mode_idx_from_dbs_hw_list(
 						dbs, dfs, sbs);
 }
 
-/**
- * policy_mgr_get_hw_mode_from_idx() - Get HW mode based on index
- * @psoc: psoc object
- * @idx: HW mode id
- * @hw_mode: HW mode params
- *
- * Fetches the HW mode parameters
- *
- * Return: Success if hw mode is obtained and the hw mode params
- */
 QDF_STATUS policy_mgr_get_hw_mode_from_idx(
 		struct wlan_objmgr_psoc *psoc,
 		uint32_t idx,
@@ -582,19 +456,6 @@ QDF_STATUS policy_mgr_get_hw_mode_from_idx(
 	return QDF_STATUS_SUCCESS;
 }
 
-/**
- * policy_mgr_get_old_and_new_hw_index() - Get the old and new HW index
- * @old_hw_mode_index: Value at this pointer contains the old HW mode index
- * Default value when not configured is POLICY_MGR_DEFAULT_HW_MODE_INDEX
- * @new_hw_mode_index: Value at this pointer contains the new HW mode index
- * Default value when not configured is POLICY_MGR_DEFAULT_HW_MODE_INDEX
- *
- * Get the old and new HW index configured in the driver
- *
- * Return: Failure in case the HW mode indices cannot be fetched and Success
- * otherwise. When no HW mode transition has happened the values of
- * old_hw_mode_index and new_hw_mode_index will be the same.
- */
 QDF_STATUS policy_mgr_get_old_and_new_hw_index(
 		struct wlan_objmgr_psoc *psoc,
 		uint32_t *old_hw_mode_index,
@@ -680,6 +541,7 @@ void policy_mgr_update_conc_list(struct wlan_objmgr_psoc *psoc,
 
 /**
  * policy_mgr_store_and_del_conn_info() - Store and del a connection info
+ * @psoc: psoc handle
  * @mode: Mode whose entry has to be deleted
  * @all_matching_cxn_to_del: All the specified mode entries should be deleted
  * @info: Structure array pointer where the connection info will be saved
@@ -854,6 +716,7 @@ void policy_mgr_store_and_del_conn_info_by_chan_and_mode(
 
 /**
  * policy_mgr_restore_deleted_conn_info() - Restore connection info
+ * @psoc: psoc handle
  * @info: An array saving connection info that is to be restored
  * @num_cxn_del: Number of connection temporary deleted
  *
@@ -1051,6 +914,7 @@ policy_mgr_update_curr_mac_freq(uint32_t num_mac_freq,
 /**
  * policy_mgr_update_hw_mode_conn_info() - Update connection
  * info based on HW mode
+ * @psoc: psoc handle
  * @num_vdev_mac_entries: Number of vdev-mac id entries that follow
  * @vdev_mac_map: Mapping of vdev-mac id
  * @hw_mode: HW mode
@@ -1200,9 +1064,63 @@ set_done_event:
 		policy_mgr_err("ERROR: set opportunistic_update event failed");
 }
 
+static char *
+ml_sta_prefix(struct wlan_objmgr_psoc *psoc, uint32_t vdev_id)
+{
+	struct wlan_objmgr_vdev *vdev;
+
+	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc,
+						    vdev_id,
+						    WLAN_POLICY_MGR_ID);
+	if (!vdev) {
+		policy_mgr_err("invalid vdev for id %d",
+			       vdev_id);
+		return "STA";
+	}
+
+	if (wlan_vdev_mlme_is_mlo_vdev(vdev)) {
+		wlan_objmgr_vdev_release_ref(vdev, WLAN_POLICY_MGR_ID);
+		return "ML STA";
+	}
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_POLICY_MGR_ID);
+
+	return "STA";
+}
+
+static void
+policy_mgr_dump_ml_sta_conc(struct wlan_objmgr_psoc *psoc,
+			    uint8_t *num_mlo_sta)
+{
+	struct policy_mgr_psoc_priv_obj *pm_ctx;
+
+	if (!num_mlo_sta)
+		return;
+
+	pm_ctx = policy_mgr_get_context(psoc);
+	if (!pm_ctx) {
+		policy_mgr_err("Invalid Context");
+		return;
+	}
+
+	qdf_mutex_acquire(&pm_ctx->qdf_conc_list_lock);
+
+	if (policy_mgr_is_mlo_in_mode_dbs(psoc, PM_STA_MODE, NULL,
+					  num_mlo_sta))
+		policy_mgr_debug("ML STA %d links in DBS band", *num_mlo_sta);
+	else if (policy_mgr_is_mlo_in_mode_sbs(psoc, PM_STA_MODE, NULL,
+					       num_mlo_sta))
+		policy_mgr_debug("ML STA %d links in SBS band", *num_mlo_sta);
+	else if (*num_mlo_sta > 1)
+		policy_mgr_debug("ML STA %d links in same mac MLSR",
+				 *num_mlo_sta);
+
+	qdf_mutex_release(&pm_ctx->qdf_conc_list_lock);
+}
+
 /**
  * policy_mgr_dump_current_concurrency_one_connection() - To dump the
  * current concurrency info with one connection
+ * @psoc: psoc object
  * @cc_mode: connection string
  * @length: Maximum size of the string
  *
@@ -1211,6 +1129,7 @@ set_done_event:
  * Return: length of the string
  */
 static uint32_t policy_mgr_dump_current_concurrency_one_connection(
+		struct wlan_objmgr_psoc *psoc,
 		char *cc_mode, uint32_t length)
 {
 	uint32_t count = 0;
@@ -1223,8 +1142,10 @@ static uint32_t policy_mgr_dump_current_concurrency_one_connection(
 
 	switch (mode) {
 	case PM_STA_MODE:
-		count = strlcat(cc_mode, "STA",
-					length);
+		count = strlcat(cc_mode,
+				ml_sta_prefix(
+				psoc, pm_conc_connection_list[0].vdev_id),
+				length);
 		break;
 	case PM_SAP_MODE:
 		count = strlcat(cc_mode, "SAP",
@@ -1256,6 +1177,7 @@ static uint32_t policy_mgr_dump_current_concurrency_one_connection(
 /**
  * policy_mgr_dump_current_concurrency_two_connection() - To dump the
  * current concurrency info with two connections
+ * @psoc: psoc object
  * @cc_mode: connection string
  * @length: Maximum size of the string
  *
@@ -1264,6 +1186,7 @@ static uint32_t policy_mgr_dump_current_concurrency_one_connection(
  * Return: length of the string
  */
 static uint32_t policy_mgr_dump_current_concurrency_two_connection(
+		struct wlan_objmgr_psoc *psoc,
 		char *cc_mode, uint32_t length)
 {
 	uint32_t count = 0;
@@ -1277,37 +1200,40 @@ static uint32_t policy_mgr_dump_current_concurrency_two_connection(
 	switch (mode) {
 	case PM_STA_MODE:
 		count = policy_mgr_dump_current_concurrency_one_connection(
-				cc_mode, length);
-		count += strlcat(cc_mode, "+STA",
-					length);
+				psoc, cc_mode, length);
+		count += strlcat(cc_mode, "+", length);
+		count += strlcat(cc_mode,
+				 ml_sta_prefix(
+				 psoc, pm_conc_connection_list[1].vdev_id),
+				 length);
 		break;
 	case PM_SAP_MODE:
 		count = policy_mgr_dump_current_concurrency_one_connection(
-				cc_mode, length);
+				psoc, cc_mode, length);
 		count += strlcat(cc_mode, "+SAP",
 					length);
 		break;
 	case PM_P2P_CLIENT_MODE:
 		count = policy_mgr_dump_current_concurrency_one_connection(
-				cc_mode, length);
+				psoc, cc_mode, length);
 		count += strlcat(cc_mode, "+P2P CLI",
 					length);
 		break;
 	case PM_P2P_GO_MODE:
 		count = policy_mgr_dump_current_concurrency_one_connection(
-				cc_mode, length);
+				psoc, cc_mode, length);
 		count += strlcat(cc_mode, "+P2P GO",
 					length);
 		break;
 	case PM_NDI_MODE:
 		count = policy_mgr_dump_current_concurrency_one_connection(
-				cc_mode, length);
+				psoc, cc_mode, length);
 		count += strlcat(cc_mode, "+NDI",
 					length);
 		break;
 	case PM_NAN_DISC_MODE:
 		count = policy_mgr_dump_current_concurrency_one_connection(
-				cc_mode, length);
+				psoc, cc_mode, length);
 		count += strlcat(cc_mode, "+NAN Disc", length);
 		break;
 	default:
@@ -1322,6 +1248,7 @@ static uint32_t policy_mgr_dump_current_concurrency_two_connection(
 /**
  * policy_mgr_dump_current_concurrency_three_connection() - To dump the
  * current concurrency info with three connections
+ * @psoc: psoc object
  * @cc_mode: connection string
  * @length: Maximum size of the string
  *
@@ -1330,6 +1257,7 @@ static uint32_t policy_mgr_dump_current_concurrency_two_connection(
  * Return: length of the string
  */
 static uint32_t policy_mgr_dump_current_concurrency_three_connection(
+		struct wlan_objmgr_psoc *psoc,
 		char *cc_mode, uint32_t length)
 {
 	uint32_t count = 0;
@@ -1343,37 +1271,40 @@ static uint32_t policy_mgr_dump_current_concurrency_three_connection(
 	switch (mode) {
 	case PM_STA_MODE:
 		count = policy_mgr_dump_current_concurrency_two_connection(
-				cc_mode, length);
-		count += strlcat(cc_mode, "+STA",
-					length);
+				psoc, cc_mode, length);
+		count += strlcat(cc_mode, "+", length);
+		count += strlcat(cc_mode,
+				 ml_sta_prefix(
+				 psoc, pm_conc_connection_list[2].vdev_id),
+				 length);
 		break;
 	case PM_SAP_MODE:
 		count = policy_mgr_dump_current_concurrency_two_connection(
-				cc_mode, length);
+				psoc, cc_mode, length);
 		count += strlcat(cc_mode, "+SAP",
 					length);
 		break;
 	case PM_P2P_CLIENT_MODE:
 		count = policy_mgr_dump_current_concurrency_two_connection(
-				cc_mode, length);
+				psoc, cc_mode, length);
 		count += strlcat(cc_mode, "+P2P CLI",
 					length);
 		break;
 	case PM_P2P_GO_MODE:
 		count = policy_mgr_dump_current_concurrency_two_connection(
-				cc_mode, length);
+				psoc, cc_mode, length);
 		count += strlcat(cc_mode, "+P2P GO",
 					length);
 		break;
 	case PM_NAN_DISC_MODE:
 		count = policy_mgr_dump_current_concurrency_two_connection(
-				cc_mode, length);
+				psoc, cc_mode, length);
 		count += strlcat(cc_mode, "+NAN Disc",
 					length);
 		break;
 	case PM_NDI_MODE:
 		count = policy_mgr_dump_current_concurrency_two_connection(
-				cc_mode, length);
+				psoc, cc_mode, length);
 		count += strlcat(cc_mode, "+NDI",
 					length);
 		break;
@@ -1450,7 +1381,9 @@ policy_mgr_dump_dual_mac_concurrency(struct policy_mgr_psoc_priv_obj *pm_ctx,
 /**
  * policy_mgr_dump_dbs_concurrency() - To dump the dbs concurrency
  * combination
+ * @psoc: psoc handle
  * @cc_mode: connection string
+ * @length: Maximum size of the string
  *
  * This routine is called to dump the concurrency info
  *
@@ -1474,7 +1407,9 @@ static void policy_mgr_dump_dbs_concurrency(struct wlan_objmgr_psoc *psoc,
 /**
  * policy_mgr_dump_sbs_concurrency() - To dump the sbs concurrency
  * combination
+ * @psoc: psoc handle
  * @cc_mode: connection string
+ * @length: Maximum size of the string
  *
  * This routine is called to dump the concurrency info
  *
@@ -1524,6 +1459,7 @@ policy_mgr_dump_disabled_ml_links(struct policy_mgr_psoc_priv_obj *pm_ctx)
 /**
  * policy_mgr_dump_current_concurrency_4_connection() - To dump the
  * current concurrency info with 4 connections
+ * @psoc: psoc object
  * @cc_mode: connection string
  * @length: Maximum size of the string
  *
@@ -1532,7 +1468,7 @@ policy_mgr_dump_disabled_ml_links(struct policy_mgr_psoc_priv_obj *pm_ctx)
  * Return: length of the string
  */
 static uint32_t policy_mgr_dump_current_concurrency_4_connection(
-		char *cc_mode, uint32_t length)
+		struct wlan_objmgr_psoc *psoc, char *cc_mode, uint32_t length)
 {
 	uint32_t count = 0;
 	enum policy_mgr_con_mode mode;
@@ -1545,37 +1481,40 @@ static uint32_t policy_mgr_dump_current_concurrency_4_connection(
 	switch (mode) {
 	case PM_STA_MODE:
 		count = policy_mgr_dump_current_concurrency_three_connection(
-				cc_mode, length);
-		count += strlcat(cc_mode, "+STA",
-					length);
+				psoc, cc_mode, length);
+		count += strlcat(cc_mode, "+", length);
+		count += strlcat(cc_mode,
+				 ml_sta_prefix(
+				 psoc, pm_conc_connection_list[3].vdev_id),
+				 length);
 		break;
 	case PM_SAP_MODE:
 		count = policy_mgr_dump_current_concurrency_three_connection(
-				cc_mode, length);
+				psoc, cc_mode, length);
 		count += strlcat(cc_mode, "+SAP",
 					length);
 		break;
 	case PM_P2P_CLIENT_MODE:
 		count = policy_mgr_dump_current_concurrency_three_connection(
-				cc_mode, length);
+				psoc, cc_mode, length);
 		count += strlcat(cc_mode, "+P2P CLI",
 					length);
 		break;
 	case PM_P2P_GO_MODE:
 		count = policy_mgr_dump_current_concurrency_three_connection(
-				cc_mode, length);
+				psoc, cc_mode, length);
 		count += strlcat(cc_mode, "+P2P GO",
 					length);
 		break;
 	case PM_NAN_DISC_MODE:
 		count = policy_mgr_dump_current_concurrency_three_connection(
-				cc_mode, length);
+				psoc, cc_mode, length);
 		count += strlcat(cc_mode, "+NAN Disc",
 					length);
 		break;
 	case PM_NDI_MODE:
 		count = policy_mgr_dump_current_concurrency_three_connection(
-				cc_mode, length);
+				psoc, cc_mode, length);
 		count += strlcat(cc_mode, "+NDI",
 					length);
 		break;
@@ -1600,7 +1539,8 @@ policy_mgr_handle_dump_4th_connection(struct policy_mgr_psoc_priv_obj *pm_ctx,
 
 	qdf_mutex_acquire(&pm_ctx->qdf_conc_list_lock);
 
-	count = policy_mgr_dump_current_concurrency_4_connection(cc_mode, len);
+	count = policy_mgr_dump_current_concurrency_4_connection(
+		pm_ctx->psoc, cc_mode, len);
 
 	if (policy_mgr_is_current_hwmode_dbs(pm_ctx->psoc))
 		policy_mgr_dump_dbs_concurrency(pm_ctx->psoc, cc_mode, len);
@@ -1623,14 +1563,6 @@ policy_mgr_handle_dump_4th_connection(struct policy_mgr_psoc_priv_obj *pm_ctx,
 }
 #endif
 
-/**
- * policy_mgr_dump_current_concurrency() - To dump the current
- * concurrency combination
- *
- * This routine is called to dump the concurrency info
- *
- * Return: None
- */
 void policy_mgr_dump_current_concurrency(struct wlan_objmgr_psoc *psoc)
 {
 	uint32_t num_connections = 0;
@@ -1638,6 +1570,7 @@ void policy_mgr_dump_current_concurrency(struct wlan_objmgr_psoc *psoc)
 	uint32_t count = 0;
 	struct policy_mgr_psoc_priv_obj *pm_ctx;
 	uint32_t len = POLICY_MGR_MAX_CON_STRING_LEN;
+	uint8_t num_mlo_sta = 0;
 
 	pm_ctx = policy_mgr_get_context(psoc);
 	if (!pm_ctx) {
@@ -1654,15 +1587,17 @@ void policy_mgr_dump_current_concurrency(struct wlan_objmgr_psoc *psoc)
 		return;
 
 	policy_mgr_dump_connection_status_info(psoc);
+	policy_mgr_dump_ml_sta_conc(psoc, &num_mlo_sta);
 	switch (num_connections) {
 	case 1:
-		policy_mgr_dump_current_concurrency_one_connection(cc_mode,
+		policy_mgr_dump_current_concurrency_one_connection(psoc,
+								   cc_mode,
 								   len);
 		policy_mgr_debug("%s Standalone", cc_mode);
 		break;
 	case 2:
 		count = policy_mgr_dump_current_concurrency_two_connection(
-			cc_mode, len);
+			psoc, cc_mode, len);
 		qdf_mutex_acquire(&pm_ctx->qdf_conc_list_lock);
 		if (pm_conc_connection_list[0].freq ==
 			pm_conc_connection_list[1].freq) {
@@ -1672,14 +1607,17 @@ void policy_mgr_dump_current_concurrency(struct wlan_objmgr_psoc *psoc)
 		} else if (policy_mgr_is_current_hwmode_sbs(psoc)) {
 			strlcat(cc_mode, " SBS", len);
 		} else {
-			strlcat(cc_mode, " MCC", len);
+			if (num_mlo_sta < 2)
+				strlcat(cc_mode, " MCC", len);
+			else
+				strlcat(cc_mode, " SMM", len);
 		}
 		qdf_mutex_release(&pm_ctx->qdf_conc_list_lock);
 		policy_mgr_debug("%s", cc_mode);
 		break;
 	case 3:
 		count = policy_mgr_dump_current_concurrency_three_connection(
-			cc_mode, len);
+			psoc, cc_mode, len);
 		qdf_mutex_acquire(&pm_ctx->qdf_conc_list_lock);
 		if (pm_conc_connection_list[0].freq ==
 		    pm_conc_connection_list[1].freq &&
@@ -1692,7 +1630,10 @@ void policy_mgr_dump_current_concurrency(struct wlan_objmgr_psoc *psoc)
 				pm_conc_connection_list[1].freq,
 				pm_conc_connection_list[2].freq)) {
 			qdf_mutex_release(&pm_ctx->qdf_conc_list_lock);
-			strlcat(cc_mode, " MCC on single MAC", len);
+			if (num_mlo_sta < 2)
+				strlcat(cc_mode, " MCC on single MAC", len);
+			else
+				strlcat(cc_mode, " on single MAC", len);
 		} else {
 			qdf_mutex_release(&pm_ctx->qdf_conc_list_lock);
 			if (policy_mgr_is_current_hwmode_dbs(psoc))
@@ -1701,8 +1642,10 @@ void policy_mgr_dump_current_concurrency(struct wlan_objmgr_psoc *psoc)
 			else if (policy_mgr_is_current_hwmode_sbs(psoc))
 				policy_mgr_dump_sbs_concurrency(psoc, cc_mode,
 								len);
-			else
+			else if (num_mlo_sta < 2)
 				strlcat(cc_mode, " MCC", len);
+			else
+				strlcat(cc_mode, " SMM", len);
 		}
 		policy_mgr_debug("%s", cc_mode);
 		break;
@@ -1728,6 +1671,7 @@ void policy_mgr_dump_current_concurrency(struct wlan_objmgr_psoc *psoc)
 
 /**
  * policy_mgr_set_pcl_for_existing_combo() - Set PCL for existing connection
+ * @psoc: psoc handle
  * @mode: Connection mode of type 'policy_mgr_con_mode'
  * @vdev_id: Vdev Id
  *
@@ -3066,6 +3010,7 @@ policy_mgr_2ghz_connection_present(struct policy_mgr_psoc_priv_obj *pm_ctx)
 /**
  * policy_mgr_get_channel_list() - provides the channel list
  * suggestion for new connection
+ * @psoc: psoc handle
  * @pcl: The preferred channel list enum
  * @mode: concurrency mode for which channel list is requested
  * @pcl_channels: PCL channels
@@ -3142,6 +3087,8 @@ QDF_STATUS policy_mgr_get_channel_list(struct wlan_objmgr_psoc *psoc,
 		policy_mgr_err("Error in getting valid channels");
 		goto end;
 	}
+
+	num_channels = QDF_MIN(num_channels, NUM_CHANNELS);
 
 	/* Let's divide the list in 2.4 & 5 Ghz lists */
 	for (i = 0; i < num_channels; i++) {
@@ -4548,7 +4495,7 @@ sbs_check:
 /**
  * policy_mgr_nss_update_cb() - callback from SME confirming nss
  * update
- * @hdd_ctx:	HDD Context
+ * @psoc: psoc handle
  * @tx_status: tx completion status for updated beacon with new
  *		nss value
  * @vdev_id: vdev id for the specific connection
@@ -4556,6 +4503,7 @@ sbs_check:
  *		beacon update
  * @reason: Reason for nss update
  * @original_vdev_id: original request hwmode change vdev id
+ * @request_id: request ID
  *
  * This function is the callback registered with SME at nss
  * update request time
@@ -4801,15 +4749,6 @@ QDF_STATUS policy_mgr_init_connection_update(
 	return QDF_STATUS_SUCCESS;
 }
 
-/**
- * policy_mgr_get_current_pref_hw_mode_dbs_2x2() - Get the
- * current preferred hw mode
- *
- * Get the preferred hw mode based on the current connection combinations
- *
- * Return: No change (PM_NOP), MCC (PM_SINGLE_MAC),
- *         DBS (PM_DBS), SBS (PM_SBS)
- */
 enum policy_mgr_conc_next_action
 		policy_mgr_get_current_pref_hw_mode_dbs_2x2(
 		struct wlan_objmgr_psoc *psoc)
@@ -4907,15 +4846,6 @@ enum policy_mgr_conc_next_action
 	}
 }
 
-/**
- * policy_mgr_get_current_pref_hw_mode_dbs_1x1() - Get the
- * current preferred hw mode
- *
- * Get the preferred hw mode based on the current connection combinations
- *
- * Return: No change (PM_NOP), MCC (PM_SINGLE_MAC_UPGRADE),
- *         DBS (PM_DBS_DOWNGRADE)
- */
 enum policy_mgr_conc_next_action
 		policy_mgr_get_current_pref_hw_mode_dbs_1x1(
 		struct wlan_objmgr_psoc *psoc)
@@ -5028,13 +4958,6 @@ policy_mgr_get_current_pref_hw_mode_dual_dbs(
 	return next_action;
 }
 
-/**
- * policy_mgr_reset_sap_mandatory_channels() - Reset the SAP mandatory channels
- *
- * Resets the SAP mandatory channel list and the length of the list
- *
- * Return: QDF_STATUS
- */
 QDF_STATUS policy_mgr_reset_sap_mandatory_channels(
 		struct policy_mgr_psoc_priv_obj *pm_ctx)
 {

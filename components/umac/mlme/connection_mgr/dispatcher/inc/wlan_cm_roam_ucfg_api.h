@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2020-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -144,7 +144,7 @@ void ucfg_cm_roam_link_speed_update(struct wlan_objmgr_psoc *psoc,
 }
 
 /**
- * ucfg_mlme_is_linkspeed_roam_trigger_supported() - Get roam linkspeed check
+ * ucfg_cm_is_linkspeed_roam_trigger_supported() - Get roam linkspeed check
  * @psoc: pointer to psoc object
  *
  * Return: bool, true: Linkspeed check for low rssi roaming supported
@@ -433,10 +433,11 @@ ucfg_cm_roam_full_scan_6ghz_on_disc(struct wlan_objmgr_pdev *pdev,
 /**
  * ucfg_cm_roam_send_vendor_handoff_param_req() - send vendor handoff params
  * command request to FW
- * @pdev: Pointer to pdev
+ * @psoc: Pointer to psoc
  * @vdev_id: vdev id
  * @param_id: Vendor Control Param ID from
  * enum WMI_ROAM_GET_VENDOR_CONTROL_PARAM_ID
+ * @vendor_handoff_context:
  *
  * Return: QDF_STATUS
  */
@@ -464,6 +465,7 @@ ucfg_cm_roam_is_vendor_handoff_control_enable(struct wlan_objmgr_psoc *psoc)
 
 /**
  * ucfg_cm_get_sae_auth_ta() - Get SAE auth tx address
+ * @pdev: pointer to pdev object
  * @vdev_id: Vdev id
  * @sae_auth_ta: SAE auth tx address
  *
@@ -477,7 +479,7 @@ ucfg_cm_get_sae_auth_ta(struct wlan_objmgr_pdev *pdev,
 	return wlan_cm_get_sae_auth_ta(pdev, vdev_id, sae_auth_ta);
 }
 
-/*
+/**
  * ucfg_cm_get_roam_intra_band() - get Intra band roaming
  * @psoc: pointer to psoc object
  * @val:  Infra band value
@@ -674,4 +676,51 @@ QDF_STATUS
 ucfg_cm_get_empty_scan_refresh_period_global(struct wlan_objmgr_psoc *psoc,
 					     uint16_t *roam_scan_period_global);
 
+#if defined(WLAN_FEATURE_ROAM_OFFLOAD) && defined(WLAN_FEATURE_ROAM_INFO_STATS)
+/**
+ * ucfg_cm_roam_stats_info_get() - get vdev roam stats info
+ *
+ * @vdev: pointer to vdev
+ * @roam_info: pointer to buffer to copy roam stats info
+ * @roam_num: pointer to valid roam stats num
+ *
+ * After use, roam_info must be released by using
+ * ucfg_cm_roam_stats_info_put()
+ *
+ * Return: QDF_STATUS
+ */
+static inline QDF_STATUS
+ucfg_cm_roam_stats_info_get(struct wlan_objmgr_vdev *vdev,
+			    struct enhance_roam_info **roam_info,
+			    uint32_t *roam_num)
+{
+	return wlan_cm_roam_stats_info_get(vdev, roam_info, roam_num);
+}
+
+/**
+ * ucfg_cm_roam_stats_info_put() - put vdev roam stats info
+ *
+ * @roam_info: pointer to buffer of roam stats info
+ *
+ * Return: QDF_STATUS
+ */
+static inline void
+ucfg_cm_roam_stats_info_put(struct enhance_roam_info *roam_info)
+{
+	qdf_mem_free(roam_info);
+}
+#else
+static inline QDF_STATUS
+ucfg_cm_roam_stats_info_get(struct wlan_objmgr_vdev *vdev,
+			    struct enhance_roam_info **roam_info,
+			    uint32_t *roam_num)
+{
+	return QDF_STATUS_E_NOSUPPORT;
+}
+
+static inline void
+ucfg_cm_roam_stats_info_put(struct enhance_roam_info *roam_info)
+{
+}
+#endif
 #endif /* _WLAN_CM_ROAM_UCFG_API_H_ */

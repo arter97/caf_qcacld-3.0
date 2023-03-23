@@ -31,6 +31,13 @@ ifneq ($(ANDROID_BUILD_TOP),)
       override WLAN_ROOT := $(ANDROID_BUILD_TOP_REL)/$(WLAN_ROOT)
       override WLAN_COMMON_INC := $(ANDROID_BUILD_TOP_REL)/$(WLAN_COMMON_INC)
       override WLAN_FW_API := $(ANDROID_BUILD_TOP_REL)/$(WLAN_FW_API)
+else ifneq ($(LINUX_BUILD_TOP),)
+      LINUX_BUILD_TOP_REL := $(shell python -c "import os.path; print(os.path.relpath('$(LINUX_BUILD_TOP)'))")
+      $(warning "LINUX_BUILD_TOP_REL=: $(LINUX_BUILD_TOP_REL)")
+      override WLAN_ROOT := $(LINUX_BUILD_TOP_REL)/qcacld-3.0
+      override WLAN_COMMON_ROOT ?= cmn
+      override WLAN_COMMON_INC ?= $(WLAN_ROOT)/$(WLAN_COMMON_ROOT)
+      override WLAN_FW_API := $(WLAN_ROOT)/../fw-api
 endif
 endif
 
@@ -462,6 +469,15 @@ endif
 ifeq ($(CONFIG_WLAN_SYSFS_EHT_RATE), y)
 HDD_OBJS += $(HDD_SRC_DIR)/wlan_hdd_sysfs_eht_rate.o
 endif
+
+ifeq ($(CONFIG_FEATURE_DIRECT_LINK), y)
+HDD_OBJS += $(HDD_SRC_DIR)/wlan_hdd_sysfs_direct_link_ut_cmd.o
+endif
+
+ifeq ($(CONFIG_BUS_AUTO_SUSPEND), y)
+HDD_OBJS += $(HDD_SRC_DIR)/wlan_hdd_sysfs_runtime_pm.o
+endif
+
 endif # CONFIG_WLAN_SYSFS
 
 ifeq ($(CONFIG_QCACLD_FEATURE_FW_STATE), y)
@@ -968,6 +984,10 @@ QDF_OBJS := \
 	$(QDF_OBJ_DIR)/qdf_talloc.o \
 	$(QDF_OBJ_DIR)/qdf_types.o \
 
+ifeq ($(CONFIG_CNSS2_SSR_DRIVER_DUMP), y)
+QDF_OBJS += $(QDF_LINUX_OBJ_DIR)/qdf_ssr_driver_dump.o
+endif
+
 ifeq ($(CONFIG_WLAN_DEBUGFS), y)
 QDF_OBJS += $(QDF_LINUX_OBJ_DIR)/qdf_debugfs.o
 endif
@@ -1374,6 +1394,7 @@ ifeq ($(CONFIG_WLAN_FEATURE_11BE_MLO), y)
 UMAC_MLO_MGR_OBJS := $(UMAC_MLO_MGR_CMN_DIR)/src/wlan_mlo_mgr_main.o \
 			  $(UMAC_MLO_MGR_CMN_DIR)/src/wlan_mlo_mgr_cmn.o \
 			  $(UMAC_MLO_MGR_CMN_DIR)/src/wlan_mlo_mgr_sta.o \
+			  $(UMAC_MLO_MGR_CMN_DIR)/src/wlan_mlo_mgr_op.o \
 			  $(UMAC_MLO_MGR_CMN_DIR)/src/utils_mlo.o \
 			  $(UMAC_MLO_MGR_CMN_DIR)/src/wlan_mlo_mgr_ap.o \
 			  $(UMAC_MLO_MGR_CMN_DIR)/src/wlan_mlo_mgr_peer_list.o \
@@ -1536,6 +1557,7 @@ UMAC_MLME_OBJS := $(WLAN_COMMON_ROOT)/umac/mlme/mlme_objmgr/dispatcher/src/wlan_
 		$(WLAN_COMMON_ROOT)/umac/mlme/vdev_mgr/dispatcher/src/wlan_vdev_mgr_tgt_if_rx_api.o \
 		$(WLAN_COMMON_ROOT)/umac/mlme/vdev_mgr/dispatcher/src/wlan_vdev_mgr_tgt_if_tx_api.o \
 		$(WLAN_COMMON_ROOT)/umac/mlme/vdev_mgr/dispatcher/src/wlan_vdev_mgr_ucfg_api.o \
+		$(WLAN_COMMON_ROOT)/umac/mlme/vdev_mgr/dispatcher/src/wlan_vdev_mgr_api.o \
 		$(WLAN_COMMON_ROOT)/umac/mlme/vdev_mgr/dispatcher/src/wlan_vdev_mgr_utils_api.o \
 		$(WLAN_COMMON_ROOT)/umac/mlme/mlme_objmgr/dispatcher/src/wlan_cmn_mlme_main.o \
 		$(WLAN_COMMON_ROOT)/umac/mlme/mlme_objmgr/dispatcher/src/wlan_pdev_mlme_main.o \
@@ -2511,6 +2533,7 @@ ifeq ($(CONFIG_QCACLD_FEATURE_NAN), y)
 WLAN_NAN_OBJS := $(NAN_CORE_DIR)/nan_main.o \
 		 $(NAN_CORE_DIR)/nan_api.o \
 		 $(NAN_UCFG_DIR)/nan_ucfg_api.o \
+		 $(NAN_UCFG_DIR)/wlan_nan_api.o \
 		 $(NAN_UCFG_DIR)/cfg_nan.o \
 		 $(NAN_TGT_DIR)/target_if_nan.o \
 		 $(NAN_OS_IF_DIR)/os_if_nan.o
@@ -2803,7 +2826,7 @@ endif
 
 HIF_CE_OBJS +=  $(WLAN_COMMON_ROOT)/$(HIF_CE_DIR)/ce_service_srng.o
 else ifeq ($(CONFIG_BERYLLIUM), y)
-ifeq (y,$(findstring y,$(CONFIG_CNSS_KIWI) $(CONFIG_CNSS_KIWI_V2)))
+ifeq (y,$(findstring y,$(CONFIG_CNSS_KIWI) $(CONFIG_CNSS_KIWI_V2) $CONFIG_CNSS_PEACH))
 HIF_CE_OBJS +=  $(WLAN_COMMON_ROOT)/$(HIF_DIR)/src/kiwidef.o
 endif
 
@@ -2931,7 +2954,7 @@ HAL_OBJS +=	$(WLAN_COMMON_ROOT)/$(HAL_DIR)/wifi3.0/be/hal_be_generic_api.o
 
 HAL_OBJS +=	$(WLAN_COMMON_ROOT)/$(HAL_DIR)/wifi3.0/be/hal_be_reo.o \
 
-ifeq (y,$(findstring y,$(CONFIG_CNSS_KIWI) $(CONFIG_CNSS_KIWI_V2)))
+ifeq (y,$(findstring y,$(CONFIG_CNSS_KIWI) $(CONFIG_CNSS_KIWI_V2) $(CONFIG_CNSS_PEACH)))
 HAL_INC += -I$(WLAN_COMMON_INC)/$(HAL_DIR)/wifi3.0/kiwi
 HAL_OBJS += $(WLAN_COMMON_ROOT)/$(HAL_DIR)/wifi3.0/kiwi/hal_kiwi.o
 else
@@ -3068,11 +3091,15 @@ ifeq ($(CONFIG_CNSS_QCA6750), y)
 TARGET_INC +=	-I$(WLAN_FW_API)/hw/qca6750/v1
 endif
 
+ifeq ($(CONFIG_CNSS_PEACH), y)
+TARGET_INC +=	-I$(WLAN_FW_API)/hw/peach/v1/
+else
 ifeq ($(CONFIG_CNSS_KIWI_V2), y)
 TARGET_INC +=	-I$(WLAN_FW_API)/hw/kiwi/v2/
 else
 ifeq ($(CONFIG_CNSS_KIWI), y)
 TARGET_INC +=	-I$(WLAN_FW_API)/hw/kiwi/v1/
+endif
 endif
 endif
 
@@ -3241,7 +3268,6 @@ cppflags-$(CONFIG_THERMAL_STATS_SUPPORT) += -DTHERMAL_STATS_SUPPORT
 cppflags-$(CONFIG_PTT_SOCK_SVC_ENABLE) += -DPTT_SOCK_SVC_ENABLE
 cppflags-$(CONFIG_FEATURE_WLAN_WAPI) += -DFEATURE_WLAN_WAPI
 cppflags-$(CONFIG_FEATURE_WLAN_WAPI) += -DATH_SUPPORT_WAPI
-cppflags-$(CONFIG_AGEIE_ON_SCAN_RESULTS) += -DWLAN_ENABLE_AGEIE_ON_SCAN_RESULTS
 cppflags-$(CONFIG_SOFTAP_CHANNEL_RANGE) += -DSOFTAP_CHANNEL_RANGE
 cppflags-$(CONFIG_FEATURE_WLAN_SCAN_PNO) += -DFEATURE_WLAN_SCAN_PNO
 cppflags-$(CONFIG_WLAN_FEATURE_PACKET_FILTERING) += -DWLAN_FEATURE_PACKET_FILTERING
@@ -3258,7 +3284,6 @@ cppflags-$(CONFIG_FEATURE_CLUB_LL_STATS_AND_GET_STATION) += -DFEATURE_CLUB_LL_ST
 cppflags-$(CONFIG_WLAN_FEATURE_MIB_STATS) += -DWLAN_FEATURE_MIB_STATS
 cppflags-$(CONFIG_FEATURE_WLAN_EXTSCAN) += -DFEATURE_WLAN_EXTSCAN
 cppflags-$(CONFIG_160MHZ_SUPPORT) += -DCONFIG_160MHZ_SUPPORT
-cppflags-$(CONFIG_MCL) += -DCONFIG_MCL
 cppflags-$(CONFIG_REG_CLIENT) += -DCONFIG_REG_CLIENT
 cppflags-$(CONFIG_WLAN_PMO_ENABLE) += -DWLAN_PMO_ENABLE
 cppflags-$(CONFIG_CONVERGED_P2P_ENABLE) += -DCONVERGED_P2P_ENABLE
@@ -3524,6 +3549,7 @@ endif
 cppflags-y += -DCONN_MGR_ADV_FEATURE
 
 cppflags-$(CONFIG_QCACLD_WLAN_LFR3) += -DWLAN_FEATURE_ROAM_OFFLOAD
+cppflags-$(CONFIG_WLAN_FEATURE_ROAM_INFO_STATS) += -DWLAN_FEATURE_ROAM_INFO_STATS
 cppflags-$(CONFIG_QCACLD_WLAN_CONNECTIVITY_LOGGING) += -DWLAN_FEATURE_CONNECTIVITY_LOGGING
 cppflags-$(CONFIG_QCACLD_WLAN_CONNECTIVITY_DIAG_EVENT) += -DCONNECTIVITY_DIAG_EVENT
 cppflags-$(CONFIG_OFDM_SCRAMBLER_SEED) += -DWLAN_FEATURE_OFDM_SCRAMBLER_SEED
@@ -3782,6 +3808,9 @@ cppflags-$(CONFIG_CHECKSUM_OFFLOAD) += -DCHECKSUM_OFFLOAD
 #Enable IPA Offload support
 cppflags-$(CONFIG_IPA_OFFLOAD) += -DIPA_OFFLOAD
 
+#Enable IPA optional Wifi datapath
+cppflags-$(CONFIG_IPA_OPT_WIFI_DP) += -DIPA_OPT_WIFI_DP
+
 cppflags-$(CONFIG_WDI3_IPA_OVER_GSI) += -DIPA_WDI3_GSI
 cppflags-$(CONFIG_WDI2_IPA_OVER_GSI) += -DIPA_WDI2_GSI
 
@@ -4013,6 +4042,7 @@ cppflags-$(CONFIG_QCA_WIFI_QCA6750) += -DQCA_WIFI_QCA6750
 cppflags-$(CONFIG_QCA_WIFI_KIWI) += -DQCA_WIFI_KIWI
 cppflags-$(CONFIG_CNSS_KIWI_V2) += -DQCA_WIFI_KIWI_V2
 cppflags-$(CONFIG_CNSS_MANGO) += -DQCA_WIFI_MANGO
+cppflags-$(CONFIG_CNSS_PEACH) += -DQCA_WIFI_PEACH
 cppflags-$(CONFIG_QCA_WIFI_QCA8074) += -DQCA_WIFI_QCA8074
 cppflags-$(CONFIG_SCALE_INCLUDES) += -DSCALE_INCLUDES
 cppflags-$(CONFIG_QCA_WIFI_QCA8074_VP) += -DQCA_WIFI_QCA8074_VP
@@ -4079,6 +4109,7 @@ cppflags-$(CONFIG_WLAN_DP_DISABLE_TCL_CMD_CRED_SRNG) += -DWLAN_DP_DISABLE_TCL_CM
 cppflags-$(CONFIG_WLAN_DP_DISABLE_TCL_STATUS_SRNG) += -DWLAN_DP_DISABLE_TCL_STATUS_SRNG
 cppflags-$(CONFIG_DP_WAR_VALIDATE_RX_ERR_MSDU_COOKIE) += -DDP_WAR_VALIDATE_RX_ERR_MSDU_COOKIE
 cppflags-$(CONFIG_WLAN_DP_SRNG_USAGE_WM_TRACKING) += -DWLAN_DP_SRNG_USAGE_WM_TRACKING
+cppflags-$(CONFIG_WLAN_FEATURE_DP_CFG_EVENT_HISTORY) += -DWLAN_FEATURE_DP_CFG_EVENT_HISTORY
 
 # Enable Low latency
 cppflags-$(CONFIG_WLAN_FEATURE_LL_MODE) += -DWLAN_FEATURE_LL_MODE
@@ -4112,6 +4143,10 @@ cppflags-$(CONFIG_FEATURE_STATS_EXT_V2) += -DFEATURE_STATS_EXT_V2
 cppflags-$(CONFIG_WLAN_FEATURE_CAL_FAILURE_TRIGGER) += -DWLAN_FEATURE_CAL_FAILURE_TRIGGER
 cppflags-$(CONFIG_WLAN_FEATURE_DYNAMIC_MAC_ADDR_UPDATE) += -DWLAN_FEATURE_DYNAMIC_MAC_ADDR_UPDATE
 cppflags-$(CONFIG_WLAN_FEATURE_SAP_ACS_OPTIMIZE) += -DWLAN_FEATURE_SAP_ACS_OPTIMIZE
+cppflags-$(CONFIG_WLAN_FEATURE_NO_STA_SAP_CONCURRENCY) += -DWLAN_FEATURE_NO_STA_SAP_CONCURRENCY
+cppflags-$(CONFIG_WLAN_FEATURE_NO_STA_NAN_CONCURRENCY) += -DWLAN_FEATURE_NO_STA_NAN_CONCURRENCY
+cppflags-$(CONFIG_WLAN_FEATURE_NO_P2P_CONCURRENCY) += -DWLAN_FEATURE_NO_P2P_CONCURRENCY
+cppflags-$(CONFIG_WLAN_FEATURE_NO_SAP_NAN_CONCURRENCY) += -DWLAN_FEATURE_NO_SAP_NAN_CONCURRENCY
 
 cppflags-$(CONFIG_VERBOSE_DEBUG) += -DENABLE_VERBOSE_DEBUG
 cppflags-$(CONFIG_RX_DESC_DEBUG_CHECK) += -DRX_DESC_DEBUG_CHECK
@@ -4186,6 +4221,7 @@ endif
 cppflags-$(CONFIG_WLAN_DFS_MASTER_ENABLE) += -DDFS_COMPONENT_ENABLE
 cppflags-$(CONFIG_WLAN_DFS_MASTER_ENABLE) += -DQCA_DFS_USE_POLICY_MANAGER
 cppflags-$(CONFIG_WLAN_DFS_MASTER_ENABLE) += -DQCA_DFS_NOL_PLATFORM_DRV_SUPPORT
+cppflags-$(CONFIG_QCA_DFS_BW_PUNCTURE) += -DQCA_DFS_BW_PUNCTURE
 
 cppflags-$(CONFIG_WLAN_DEBUGFS) += -DWLAN_DEBUGFS
 cppflags-$(CONFIG_WLAN_STREAMFS) += -DWLAN_STREAMFS
@@ -4464,7 +4500,7 @@ ccflags-y += -DWLAN_PDEV_MAX_VDEVS=$(CONFIG_WLAN_PDEV_MAX_VDEVS)
 CONFIG_WLAN_PSOC_MAX_VDEVS ?= $(CONFIG_WLAN_MAX_VDEVS)
 ccflags-y += -DWLAN_PSOC_MAX_VDEVS=$(CONFIG_WLAN_PSOC_MAX_VDEVS)
 
-CONFIG_MAX_SCAN_CACHE_SIZE ?= 300
+CONFIG_MAX_SCAN_CACHE_SIZE ?= 500
 ccflags-y += -DMAX_SCAN_CACHE_SIZE=$(CONFIG_MAX_SCAN_CACHE_SIZE)
 CONFIG_SCAN_MAX_REST_TIME ?= 0
 ccflags-y += -DSCAN_MAX_REST_TIME=$(CONFIG_SCAN_MAX_REST_TIME)
@@ -4662,7 +4698,9 @@ cppflags-y += -DHW_TX_DELAY_STATS_ENABLE
 endif
 
 #Flags to enable/disable Dynamic WLAN interface control feature
-cppflags-$(CONFIG_CNSS_HW_SECURE_DISABLE) += -DFEATURE_CNSS_HW_SECURE_DISABLE
+ifeq ($(CONFIG_CNSS_HW_SECURE_DISABLE), y)
+cppflags-y += -DFEATURE_CNSS_HW_SECURE_DISABLE
+endif
 
 #DBAM feature needs COEX feature to be enabled
 ifeq ($(CONFIG_FEATURE_COEX), y)
@@ -4671,6 +4709,9 @@ endif
 
 # Flag to enable Constrained Application Protocol feature
 cppflags-$(CONFIG_WLAN_FEATURE_COAP) += -DWLAN_FEATURE_COAP
+
+# SSR driver dump config
+cppflags-$(CONFIG_CNSS2_SSR_DRIVER_DUMP) += -DWLAN_FEATURE_SSR_DRIVER_DUMP
 
 KBUILD_CPPFLAGS += $(cppflags-y)
 

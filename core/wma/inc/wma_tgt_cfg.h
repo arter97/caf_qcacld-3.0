@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2013-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -209,6 +209,10 @@ struct board_info {
  * @restricted_80p80_bw_supp: Restricted 80+80MHz(165MHz BW) support
  * @twt_bcast_req_support: twt bcast requestor support
  * @twt_bcast_res_support: twt bcast responder support
+ * @twt_nudge_enabled: twt nudge enable
+ * @all_twt_enabled: all twt enabled
+ * @twt_stats_enabled: twt stats enabled
+ *
  */
 struct wma_tgt_cfg {
 	uint32_t target_fw_version;

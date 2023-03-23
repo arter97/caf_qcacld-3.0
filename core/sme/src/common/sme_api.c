@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -3315,7 +3315,7 @@ QDF_STATUS sme_roam_ndi_stop(mac_handle_t mac_handle, uint8_t vdev_id)
 			 0));
 
 	if (!CSR_IS_SESSION_VALID(mac_ctx, vdev_id)) {
-		sme_err("Invalid sessionID: %d", vdev_id);
+		sme_debug("Invalid sessionID: %d", vdev_id);
 		return QDF_STATUS_E_INVAL;
 	}
 
@@ -3943,6 +3943,39 @@ QDF_STATUS sme_neighbor_report_request(
 	}
 
 	return status;
+}
+
+void sme_register_ssr_on_pagefault_cb(mac_handle_t mac_handle,
+				      void (*hdd_ssr_on_pagefault_cb)(void))
+{
+	QDF_STATUS status;
+	struct mac_context *mac = MAC_CONTEXT(mac_handle);
+
+	SME_ENTER();
+
+	status = sme_acquire_global_lock(&mac->sme);
+	if (QDF_IS_STATUS_SUCCESS(status)) {
+		mac->sme.ssr_on_pagefault_cb = hdd_ssr_on_pagefault_cb;
+		sme_release_global_lock(&mac->sme);
+	}
+
+	SME_EXIT();
+}
+
+void sme_deregister_ssr_on_pagefault_cb(mac_handle_t mac_handle)
+{
+	QDF_STATUS status;
+	struct mac_context *mac = MAC_CONTEXT(mac_handle);
+
+	SME_ENTER();
+
+	status = sme_acquire_global_lock(&mac->sme);
+	if (QDF_IS_STATUS_SUCCESS(status)) {
+		mac->sme.ssr_on_pagefault_cb = NULL;
+		sme_release_global_lock(&mac->sme);
+	}
+
+	SME_EXIT();
 }
 
 #ifdef FEATURE_OEM_DATA_SUPPORT
@@ -8345,6 +8378,10 @@ QDF_STATUS sme_init_thermal_info(mac_handle_t mac_handle)
 				thermal_temp.throttle_dutycycle_level[2];
 	pWmaParam->throttle_duty_cycle_tbl[3] =
 				thermal_temp.throttle_dutycycle_level[3];
+	pWmaParam->throttle_duty_cycle_tbl[4] =
+				thermal_temp.throttle_dutycycle_level[4];
+	pWmaParam->throttle_duty_cycle_tbl[5] =
+				thermal_temp.throttle_dutycycle_level[5];
 
 	pWmaParam->thermalLevels[0].minTempThreshold =
 				thermal_temp.thermal_temp_min_level[0];
@@ -8362,6 +8399,14 @@ QDF_STATUS sme_init_thermal_info(mac_handle_t mac_handle)
 				thermal_temp.thermal_temp_min_level[3];
 	pWmaParam->thermalLevels[3].maxTempThreshold =
 				thermal_temp.thermal_temp_max_level[3];
+	pWmaParam->thermalLevels[4].minTempThreshold =
+				thermal_temp.thermal_temp_min_level[4];
+	pWmaParam->thermalLevels[4].maxTempThreshold =
+				thermal_temp.thermal_temp_max_level[4];
+	pWmaParam->thermalLevels[5].minTempThreshold =
+				thermal_temp.thermal_temp_min_level[5];
+	pWmaParam->thermalLevels[5].maxTempThreshold =
+				thermal_temp.thermal_temp_max_level[5];
 	pWmaParam->thermal_action = thermal_temp.thermal_action;
 	if (QDF_STATUS_SUCCESS == sme_acquire_global_lock(&mac->sme)) {
 		msg.type = WMA_INIT_THERMAL_INFO_CMD;
@@ -10436,11 +10481,6 @@ void sme_update_tgt_eht_cap(mac_handle_t mac_handle,
 		     sizeof(tDot11fIEeht_cap));
 }
 
-void sme_update_eht_cap_nss(mac_handle_t mac_handle, uint8_t session_id,
-			    uint8_t nss)
-{
-}
-
 void sme_set_eht_bw_cap(mac_handle_t mac_handle, uint8_t vdev_id,
 			enum eSirMacHTChannelWidth chwidth)
 {
@@ -10466,6 +10506,27 @@ void sme_set_eht_bw_cap(mac_handle_t mac_handle, uint8_t vdev_id,
 		     sizeof(tDot11fIEeht_cap));
 
 	csr_update_session_eht_cap(mac_ctx, session);
+}
+
+int sme_update_eht_om_ctrl_supp(mac_handle_t mac_handle, uint8_t session_id,
+				uint8_t cfg_val)
+{
+	struct mac_context *mac_ctx = MAC_CONTEXT(mac_handle);
+	struct csr_roam_session *session;
+
+	session = CSR_GET_SESSION(mac_ctx, session_id);
+
+	if (!session) {
+		sme_err("No session for id %d", session_id);
+		return -EINVAL;
+	}
+	mac_ctx->mlme_cfg->eht_caps.dot11_eht_cap.eht_om_ctl = cfg_val;
+	mac_ctx->eht_cap_2g.eht_om_ctl = cfg_val;
+	mac_ctx->eht_cap_5g.eht_om_ctl = cfg_val;
+
+	csr_update_session_eht_cap(mac_ctx, session);
+
+	return 0;
 }
 #endif
 
@@ -10585,6 +10646,25 @@ void sme_update_he_cap_nss(mac_handle_t mac_handle, uint8_t session_id,
 	if (cfg_in_range(CFG_HE_TX_MCS_MAP_LT_80, tx_mcs_map))
 		mac_ctx->mlme_cfg->he_caps.dot11_he_cap.tx_he_mcs_map_lt_80 =
 		tx_mcs_map;
+	if (cfg_in_range(CFG_HE_RX_MCS_MAP_160, rx_mcs_map))
+		qdf_mem_copy(mac_ctx->mlme_cfg->he_caps.dot11_he_cap.
+			     rx_he_mcs_map_160,
+			     &rx_mcs_map, sizeof(uint16_t));
+	if (cfg_in_range(CFG_HE_TX_MCS_MAP_160, tx_mcs_map))
+		qdf_mem_copy(mac_ctx->mlme_cfg->he_caps.dot11_he_cap.
+			     tx_he_mcs_map_160,
+			     &tx_mcs_map, sizeof(uint16_t));
+
+	mac_ctx->he_cap_2g.rx_he_mcs_map_lt_80 = rx_mcs_map;
+	mac_ctx->he_cap_2g.tx_he_mcs_map_lt_80 = tx_mcs_map;
+	mac_ctx->he_cap_5g.rx_he_mcs_map_lt_80 = rx_mcs_map;
+	mac_ctx->he_cap_5g.tx_he_mcs_map_lt_80 = tx_mcs_map;
+	qdf_mem_copy(mac_ctx->he_cap_5g.rx_he_mcs_map_160,
+		     mac_ctx->mlme_cfg->he_caps.dot11_he_cap.rx_he_mcs_map_160,
+		     sizeof(uint16_t));
+	qdf_mem_copy(mac_ctx->he_cap_5g.tx_he_mcs_map_160,
+		     mac_ctx->mlme_cfg->he_caps.dot11_he_cap.tx_he_mcs_map_160,
+		     sizeof(uint16_t));
 	csr_update_session_he_cap(mac_ctx, csr_session);
 
 }
@@ -10596,12 +10676,26 @@ int sme_update_he_mcs(mac_handle_t mac_handle, uint8_t session_id,
 	struct csr_roam_session *csr_session;
 	uint16_t mcs_val = 0;
 	uint16_t mcs_map = HE_MCS_ALL_DISABLED;
+	uint16_t mcs_map_cfg;
+	uint8_t nss = 0, i;
+	uint16_t mcs_mask = 0x3;
 
 	csr_session = CSR_GET_SESSION(mac_ctx, session_id);
 	if (!csr_session) {
 		sme_err("No session for id %d", session_id);
 		return -EINVAL;
 	}
+
+	mcs_map_cfg =
+		mac_ctx->mlme_cfg->he_caps.dot11_he_cap.rx_he_mcs_map_lt_80;
+	for (nss = 0; nss < VHT_MAX_NSS; nss++) {
+		if ((mcs_map_cfg & mcs_mask) ==  mcs_mask)
+			break;
+		mcs_mask = (mcs_mask << 2);
+	}
+	if (nss > 2)
+		nss = 2;
+
 	if ((he_mcs & 0x3) == HE_MCS_DISABLE) {
 		sme_err("Invalid HE MCS 0x%0x, can't disable 0-7 for 1ss",
 			he_mcs);
@@ -10612,24 +10706,29 @@ int sme_update_he_mcs(mac_handle_t mac_handle, uint8_t session_id,
 	case HE_80_MCS0_7:
 	case HE_80_MCS0_9:
 	case HE_80_MCS0_11:
-		if (mac_ctx->mlme_cfg->vht_caps.vht_cap_info.enable2x2) {
-			mcs_map = HE_SET_MCS_4_NSS(mcs_map, mcs_val, 1);
-			mcs_map = HE_SET_MCS_4_NSS(mcs_map, mcs_val, 2);
-		} else {
-			mcs_map = HE_SET_MCS_4_NSS(mcs_map, mcs_val, 1);
-		}
+		for (i = 1; i <= nss; i++)
+			mcs_map = HE_SET_MCS_4_NSS(mcs_map, mcs_val, i);
+
+		sme_debug("HE 80 nss: %d, mcs: 0x%0X", nss, mcs_map);
 		if (cfg_in_range(CFG_HE_TX_MCS_MAP_LT_80, mcs_map))
 			mac_ctx->mlme_cfg->he_caps.dot11_he_cap.
 			tx_he_mcs_map_lt_80 = mcs_map;
 		if (cfg_in_range(CFG_HE_RX_MCS_MAP_LT_80, mcs_map))
 			mac_ctx->mlme_cfg->he_caps.dot11_he_cap.
 			rx_he_mcs_map_lt_80 = mcs_map;
+		mac_ctx->he_cap_2g.tx_he_mcs_map_lt_80 = mcs_map;
+		mac_ctx->he_cap_2g.rx_he_mcs_map_lt_80 = mcs_map;
+		mac_ctx->he_cap_5g.tx_he_mcs_map_lt_80 = mcs_map;
+		mac_ctx->he_cap_5g.rx_he_mcs_map_lt_80 = mcs_map;
 		break;
 
 	case HE_160_MCS0_7:
 	case HE_160_MCS0_9:
 	case HE_160_MCS0_11:
-		mcs_map = HE_SET_MCS_4_NSS(mcs_map, mcs_val, 1);
+		for (i = 1; i <= nss; i++)
+			mcs_map = HE_SET_MCS_4_NSS(mcs_map, mcs_val, i);
+
+		sme_debug("HE 160 nss: %d, mcs: 0x%0X", nss, mcs_map);
 		if (cfg_in_range(CFG_HE_TX_MCS_MAP_160, mcs_map))
 			qdf_mem_copy(mac_ctx->mlme_cfg->he_caps.dot11_he_cap.
 				     tx_he_mcs_map_160, &mcs_map,
@@ -10638,6 +10737,14 @@ int sme_update_he_mcs(mac_handle_t mac_handle, uint8_t session_id,
 			qdf_mem_copy(mac_ctx->mlme_cfg->he_caps.dot11_he_cap.
 				     rx_he_mcs_map_160, &mcs_map,
 				     sizeof(uint16_t));
+		qdf_mem_copy(mac_ctx->he_cap_5g.tx_he_mcs_map_160,
+			     mac_ctx->mlme_cfg->he_caps.dot11_he_cap.
+			     tx_he_mcs_map_160,
+			     sizeof(uint16_t));
+		qdf_mem_copy(mac_ctx->he_cap_5g.rx_he_mcs_map_160,
+			     mac_ctx->mlme_cfg->he_caps.dot11_he_cap.
+			     rx_he_mcs_map_160,
+			     sizeof(uint16_t));
 		break;
 
 	case HE_80p80_MCS0_7:
@@ -10659,6 +10766,7 @@ int sme_update_he_mcs(mac_handle_t mac_handle, uint8_t session_id,
 		return -EINVAL;
 	}
 	sme_debug("new HE MCS 0x%0x", mcs_map);
+	sme_set_vdev_ies_per_band(mac_handle, session_id, QDF_STA_MODE);
 	csr_update_session_he_cap(mac_ctx, csr_session);
 
 	return 0;
@@ -10816,6 +10924,8 @@ int sme_update_he_om_ctrl_supp(mac_handle_t mac_handle, uint8_t session_id,
 		return -EINVAL;
 	}
 	mac_ctx->mlme_cfg->he_caps.dot11_he_cap.omi_a_ctrl = cfg_val;
+	mac_ctx->he_cap_2g.omi_a_ctrl = cfg_val;
+	mac_ctx->he_cap_5g.omi_a_ctrl = cfg_val;
 
 	csr_update_session_he_cap(mac_ctx, session);
 	return 0;
@@ -14909,14 +15019,14 @@ void sme_set_eht_testbed_def(mac_handle_t mac_handle, uint8_t vdev_id)
 	mlme_eht_cap->bw_le_80_tx_max_nss_for_mcs_10_and_11 = 0;
 	mlme_eht_cap->bw_le_80_rx_max_nss_for_mcs_12_and_13 = 0;
 	mlme_eht_cap->bw_le_80_tx_max_nss_for_mcs_12_and_13 = 0;
-	mlme_eht_cap->bw_160_rx_max_nss_for_mcs_0_to_9 = 0;
-	mlme_eht_cap->bw_160_tx_max_nss_for_mcs_0_to_9 = 0;
+	mlme_eht_cap->bw_160_rx_max_nss_for_mcs_0_to_9 = 1;
+	mlme_eht_cap->bw_160_tx_max_nss_for_mcs_0_to_9 = 1;
 	mlme_eht_cap->bw_160_rx_max_nss_for_mcs_10_and_11 = 0;
 	mlme_eht_cap->bw_160_tx_max_nss_for_mcs_10_and_11 = 0;
 	mlme_eht_cap->bw_160_rx_max_nss_for_mcs_12_and_13 = 0;
 	mlme_eht_cap->bw_160_tx_max_nss_for_mcs_12_and_13 = 0;
-	mlme_eht_cap->bw_320_rx_max_nss_for_mcs_0_to_9 = 0;
-	mlme_eht_cap->bw_320_tx_max_nss_for_mcs_0_to_9 = 0;
+	mlme_eht_cap->bw_320_rx_max_nss_for_mcs_0_to_9 = 1;
+	mlme_eht_cap->bw_320_tx_max_nss_for_mcs_0_to_9 = 1;
 	mlme_eht_cap->bw_320_rx_max_nss_for_mcs_10_and_11 = 0;
 	mlme_eht_cap->bw_320_tx_max_nss_for_mcs_10_and_11 = 0;
 	mlme_eht_cap->bw_320_rx_max_nss_for_mcs_12_and_13 = 0;
@@ -14970,7 +15080,230 @@ void sme_reset_eht_caps(mac_handle_t mac_handle, uint8_t vdev_id)
 	wlan_mlme_set_sta_mlo_conn_band_bmp(mac_ctx->psoc, 0x77);
 	wlan_mlme_set_sta_mlo_conn_max_num(mac_ctx->psoc, 2);
 }
+
+void sme_update_eht_cap_nss(mac_handle_t mac_handle, uint8_t vdev_id,
+			    uint8_t nss)
+{
+	struct mac_context *mac_ctx = MAC_CONTEXT(mac_handle);
+	struct csr_roam_session *session;
+	tDot11fIEeht_cap *mlme_eht_cap;
+
+	session = CSR_GET_SESSION(mac_ctx, vdev_id);
+
+	if (!session) {
+		sme_err("No session for id %d", vdev_id);
+		return;
+	}
+	mlme_eht_cap = &mac_ctx->mlme_cfg->eht_caps.dot11_eht_cap;
+	if (!nss || (nss > 2)) {
+		sme_err("invalid Nss value nss %d", nss);
+		return;
+	}
+	sme_debug("Nss value %d", nss);
+	mlme_eht_cap->bw_20_rx_max_nss_for_mcs_0_to_7 = nss;
+	mlme_eht_cap->bw_20_tx_max_nss_for_mcs_0_to_7 = nss;
+	mlme_eht_cap->bw_20_rx_max_nss_for_mcs_8_and_9 = nss;
+	mlme_eht_cap->bw_20_tx_max_nss_for_mcs_8_and_9 = nss;
+	if (mlme_eht_cap->bw_20_rx_max_nss_for_mcs_10_and_11) {
+		mlme_eht_cap->bw_20_rx_max_nss_for_mcs_10_and_11 = nss;
+		mlme_eht_cap->bw_20_tx_max_nss_for_mcs_10_and_11 = nss;
+	}
+	if (mlme_eht_cap->bw_20_rx_max_nss_for_mcs_12_and_13) {
+		mlme_eht_cap->bw_20_rx_max_nss_for_mcs_12_and_13 = nss;
+		mlme_eht_cap->bw_20_tx_max_nss_for_mcs_12_and_13 = nss;
+	}
+	mlme_eht_cap->bw_le_80_rx_max_nss_for_mcs_0_to_9 = nss;
+	mlme_eht_cap->bw_le_80_tx_max_nss_for_mcs_0_to_9 = nss;
+	if (mlme_eht_cap->bw_le_80_rx_max_nss_for_mcs_10_and_11) {
+		mlme_eht_cap->bw_le_80_rx_max_nss_for_mcs_10_and_11 = nss;
+		mlme_eht_cap->bw_le_80_tx_max_nss_for_mcs_10_and_11 = nss;
+	}
+	if (mlme_eht_cap->bw_le_80_rx_max_nss_for_mcs_12_and_13) {
+		mlme_eht_cap->bw_le_80_rx_max_nss_for_mcs_12_and_13 = nss;
+		mlme_eht_cap->bw_le_80_tx_max_nss_for_mcs_12_and_13 = nss;
+	}
+	mlme_eht_cap->bw_160_rx_max_nss_for_mcs_0_to_9 = nss;
+	mlme_eht_cap->bw_160_tx_max_nss_for_mcs_0_to_9 = nss;
+	if (mlme_eht_cap->bw_160_rx_max_nss_for_mcs_10_and_11) {
+		mlme_eht_cap->bw_160_rx_max_nss_for_mcs_10_and_11 = nss;
+		mlme_eht_cap->bw_160_tx_max_nss_for_mcs_10_and_11 = nss;
+	}
+	if (mlme_eht_cap->bw_160_rx_max_nss_for_mcs_12_and_13) {
+		mlme_eht_cap->bw_160_rx_max_nss_for_mcs_12_and_13 = nss;
+		mlme_eht_cap->bw_160_tx_max_nss_for_mcs_12_and_13 = nss;
+	}
+	mlme_eht_cap->bw_320_rx_max_nss_for_mcs_0_to_9 = nss;
+	mlme_eht_cap->bw_320_tx_max_nss_for_mcs_0_to_9 = nss;
+
+	if (mlme_eht_cap->bw_320_rx_max_nss_for_mcs_10_and_11) {
+		mlme_eht_cap->bw_320_rx_max_nss_for_mcs_10_and_11 = nss;
+		mlme_eht_cap->bw_320_tx_max_nss_for_mcs_10_and_11 = nss;
+	}
+	if (mlme_eht_cap->bw_320_rx_max_nss_for_mcs_12_and_13) {
+		mlme_eht_cap->bw_320_rx_max_nss_for_mcs_12_and_13 = nss;
+		mlme_eht_cap->bw_320_tx_max_nss_for_mcs_12_and_13 = nss;
+	}
+
+	csr_update_session_eht_cap(mac_ctx, session);
+
+	qdf_mem_copy(&mac_ctx->eht_cap_2g, mlme_eht_cap,
+		     sizeof(tDot11fIEeht_cap));
+
+	qdf_mem_copy(&mac_ctx->eht_cap_5g, mlme_eht_cap,
+		     sizeof(tDot11fIEeht_cap));
+}
+
+void sme_update_eht_cap_mcs(mac_handle_t mac_handle, uint8_t vdev_id,
+			    uint8_t mcs)
+{
+	struct mac_context *mac_ctx = MAC_CONTEXT(mac_handle);
+	struct csr_roam_session *session;
+	tDot11fIEeht_cap *mlme_eht_cap;
+	uint8_t nss;
+
+	session = CSR_GET_SESSION(mac_ctx, vdev_id);
+
+	if (!session) {
+		sme_err("No session for id %d", vdev_id);
+		return;
+	}
+	mlme_eht_cap = &mac_ctx->mlme_cfg->eht_caps.dot11_eht_cap;
+	nss = mlme_eht_cap->bw_20_rx_max_nss_for_mcs_0_to_7;
+
+	if (!nss)
+		nss = mlme_eht_cap->bw_le_80_rx_max_nss_for_mcs_0_to_9;
+	if (!nss) {
+		sme_err("No valid Nss");
+		return;
+	}
+	sme_debug("nss %d, mcs %d", nss, mcs);
+
+	mlme_eht_cap->bw_20_rx_max_nss_for_mcs_10_and_11 = 0;
+	mlme_eht_cap->bw_20_tx_max_nss_for_mcs_10_and_11 = 0;
+	mlme_eht_cap->bw_20_rx_max_nss_for_mcs_12_and_13 = 0;
+	mlme_eht_cap->bw_20_tx_max_nss_for_mcs_12_and_13 = 0;
+	mlme_eht_cap->bw_le_80_rx_max_nss_for_mcs_10_and_11 = 0;
+	mlme_eht_cap->bw_le_80_tx_max_nss_for_mcs_10_and_11 = 0;
+	mlme_eht_cap->bw_le_80_rx_max_nss_for_mcs_12_and_13 = 0;
+	mlme_eht_cap->bw_le_80_tx_max_nss_for_mcs_12_and_13 = 0;
+	mlme_eht_cap->bw_160_rx_max_nss_for_mcs_10_and_11 = 0;
+	mlme_eht_cap->bw_160_tx_max_nss_for_mcs_10_and_11 = 0;
+	mlme_eht_cap->bw_160_rx_max_nss_for_mcs_12_and_13 = 0;
+	mlme_eht_cap->bw_160_tx_max_nss_for_mcs_12_and_13 = 0;
+	mlme_eht_cap->bw_320_rx_max_nss_for_mcs_10_and_11 = 0;
+	mlme_eht_cap->bw_320_tx_max_nss_for_mcs_10_and_11 = 0;
+	mlme_eht_cap->bw_320_rx_max_nss_for_mcs_12_and_13 = 0;
+	mlme_eht_cap->bw_320_tx_max_nss_for_mcs_12_and_13 = 0;
+
+	if (mcs > 1) { /* 0 - 11*/
+		mlme_eht_cap->bw_20_rx_max_nss_for_mcs_10_and_11 = nss;
+		mlme_eht_cap->bw_20_tx_max_nss_for_mcs_10_and_11 = nss;
+		mlme_eht_cap->bw_le_80_rx_max_nss_for_mcs_10_and_11 = nss;
+		mlme_eht_cap->bw_le_80_tx_max_nss_for_mcs_10_and_11 = nss;
+		mlme_eht_cap->bw_160_rx_max_nss_for_mcs_10_and_11 = nss;
+		mlme_eht_cap->bw_160_tx_max_nss_for_mcs_10_and_11 = nss;
+		mlme_eht_cap->bw_320_rx_max_nss_for_mcs_10_and_11 = nss;
+		mlme_eht_cap->bw_320_tx_max_nss_for_mcs_10_and_11 = nss;
+		mlme_eht_cap->rx_1024_4096_qam_lt_242_tone_ru = 1;
+		mlme_eht_cap->tx_1024_4096_qam_lt_242_tone_ru = 1;
+	}
+
+	if (mcs == 3) { /* 0 - 13*/
+		mlme_eht_cap->bw_20_rx_max_nss_for_mcs_12_and_13 = nss;
+		mlme_eht_cap->bw_20_tx_max_nss_for_mcs_12_and_13 = nss;
+		mlme_eht_cap->bw_le_80_rx_max_nss_for_mcs_12_and_13 = nss;
+		mlme_eht_cap->bw_le_80_tx_max_nss_for_mcs_12_and_13 = nss;
+		mlme_eht_cap->bw_160_rx_max_nss_for_mcs_12_and_13 = nss;
+		mlme_eht_cap->bw_160_tx_max_nss_for_mcs_12_and_13 = nss;
+		mlme_eht_cap->bw_320_rx_max_nss_for_mcs_12_and_13 = nss;
+		mlme_eht_cap->bw_320_tx_max_nss_for_mcs_12_and_13 = nss;
+	}
+	csr_update_session_eht_cap(mac_ctx, session);
+
+	qdf_mem_copy(&mac_ctx->eht_cap_2g, mlme_eht_cap,
+		     sizeof(tDot11fIEeht_cap));
+
+	qdf_mem_copy(&mac_ctx->eht_cap_5g, mlme_eht_cap,
+		     sizeof(tDot11fIEeht_cap));
+}
+
+void sme_activate_mlo_links(mac_handle_t mac_handle, uint8_t session_id,
+			    uint8_t num_links,
+			    struct qdf_mac_addr active_link_addr[2])
+{
+	struct mac_context *mac_ctx = MAC_CONTEXT(mac_handle);
+	struct csr_roam_session *session;
+
+	session = CSR_GET_SESSION(mac_ctx, session_id);
+
+	if (!session) {
+		sme_err("No session for id %d", session_id);
+		return;
+	}
+
+	policy_mgr_activate_mlo_links(mac_ctx->psoc, session_id, num_links,
+				      active_link_addr);
+}
+
+int sme_update_eht_caps(mac_handle_t mac_handle, uint8_t session_id,
+			uint8_t cfg_val, enum sme_eht_tx_bfee_cap_type cap_type,
+			enum QDF_OPMODE op_mode)
+{
+	struct mac_context *mac_ctx = MAC_CONTEXT(mac_handle);
+	struct csr_roam_session *session;
+	tDot11fIEeht_cap *cfg_eht_cap;
+
+	session = CSR_GET_SESSION(mac_ctx, session_id);
+
+	if (!session) {
+		sme_err("No session for id %d", session_id);
+		return -EINVAL;
+	}
+	cfg_eht_cap = &mac_ctx->mlme_cfg->eht_caps.dot11_eht_cap;
+
+	switch (cap_type) {
+	case EHT_TX_BFEE_ENABLE:
+		cfg_eht_cap->su_beamformee = cfg_val;
+		break;
+	case EHT_TX_BFEE_SS_80MHZ:
+		cfg_eht_cap->bfee_ss_le_80mhz = cfg_val;
+		break;
+	case EHT_TX_BFEE_SS_160MHZ:
+		cfg_eht_cap->bfee_ss_160mhz = cfg_val;
+		break;
+	case EHT_TX_BFEE_SS_320MHZ:
+		cfg_eht_cap->bfee_ss_320mhz = cfg_val;
+		break;
+	case EHT_TX_BFEE_SOUNDING_FEEDBACK_RATELIMIT:
+		cfg_eht_cap->tb_sounding_feedback_rl = cfg_val;
+		break;
+	default:
+		sme_debug("default: Unhandled cap type %d", cap_type);
+		return -EINVAL;
+	}
+
+	sme_debug("EHT cap: cap type %d, cfg val %d", cap_type, cfg_val);
+	csr_update_session_eht_cap(mac_ctx, session);
+
+	qdf_mem_copy(&mac_ctx->eht_cap_2g, cfg_eht_cap,
+		     sizeof(tDot11fIEeht_cap));
+	qdf_mem_copy(&mac_ctx->eht_cap_5g, cfg_eht_cap,
+		     sizeof(tDot11fIEeht_cap));
+	sme_set_vdev_ies_per_band(mac_handle, session_id, op_mode);
+
+	return 0;
+}
 #endif
+
+void sme_set_nss_capability(mac_handle_t mac_handle, uint8_t vdev_id,
+			    uint8_t nss, enum QDF_OPMODE op_mode)
+{
+	sme_debug("Nss cap update, NSS %d", nss);
+
+	sme_update_he_cap_nss(mac_handle, vdev_id, nss);
+	sme_update_eht_cap_nss(mac_handle, vdev_id, nss);
+	sme_set_vdev_ies_per_band(mac_handle, vdev_id, op_mode);
+}
 
 uint8_t sme_get_mcs_idx(uint16_t raw_rate, enum tx_rate_info rate_flags,
 			bool is_he_mcs_12_13_supported,

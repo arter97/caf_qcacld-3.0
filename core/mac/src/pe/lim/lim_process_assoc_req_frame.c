@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -800,8 +800,8 @@ static bool lim_chk_is_11b_sta_supported(struct mac_context *mac_ctx,
 				STATUS_ASSOC_DENIED_RATES,
 				1, sa, sub_type, 0, session, false);
 
-			pe_warn("Rejecting Re/Assoc req from 11b STA:");
-			lim_print_mac_addr(mac_ctx, sa, LOGW);
+			pe_warn("Rejecting Re/Assoc req from 11b STA: "QDF_MAC_ADDR_FMT,
+				QDF_MAC_ADDR_REF(sa));
 
 #ifdef WLAN_DEBUG
 			mac_ctx->lim.gLim11bStaAssocRejectCount++;
@@ -2668,14 +2668,6 @@ void lim_process_assoc_req_frame(struct mac_context *mac_ctx,
 			sub_type, GET_LIM_SYSTEM_ROLE(session),
 			QDF_MAC_ADDR_REF(hdr->sa));
 			return;
-		} else if (sta_ds->mlmStaContext.akm_type == ANI_AKM_TYPE_FT_RSN_PSK) {
-			pe_debug("FT Assoc Req, delete STA hash entry");
-			lim_release_peer_idx(mac_ctx, sta_ds->assocId, session);
-			if (dph_delete_hash_entry(mac_ctx, hdr->sa,
-						  sta_ds->assocId,
-						  &session->dph.dphHashTable)
-			    != QDF_STATUS_SUCCESS)
-				pe_err("error deleting hash entry");
 		} else if (!sta_ds->rmfEnabled && (sub_type == LIM_REASSOC)) {
 			/*
 			 * SAP should send reassoc response with reject code

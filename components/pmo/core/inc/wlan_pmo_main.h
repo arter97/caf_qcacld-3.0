@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2017-2019 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -130,6 +131,7 @@ bool pmo_is_vdev_in_beaconning_mode(enum QDF_OPMODE vdev_opmode);
 
 /**
  * pmo_core_is_ap_mode_supports_arp_ns() - To check ap mode supports arp/ns
+ * @psoc: objmgr psoc handle
  * @vdev_opmode: vdev opmode
  *
  * API to check if ap mode supports arp/ns offload
@@ -382,6 +384,40 @@ pmo_intersect_packet_filter(struct pmo_psoc_priv_obj *psoc_ctx)
 	return psoc_ctx->psoc_cfg.packet_filter_enabled &&
 		psoc_ctx->caps.packet_filter;
 }
+
+/*
+ * pmo_enable_ssr_on_page_fault: Enable/disable ssr on pagefault
+ * @psoc: objmgr psoc
+ *
+ * Return: True if SSR is enabled on pagefault
+ */
+bool pmo_enable_ssr_on_page_fault(struct wlan_objmgr_psoc *psoc);
+
+/*
+ * pmo_get_max_pagefault_wakeups_for_ssr: get pagefault wakeups for ssr
+ * @psoc: objmgr psoc
+ *
+ * Return: SSR interval for pagefault
+ */
+uint8_t
+pmo_get_max_pagefault_wakeups_for_ssr(struct wlan_objmgr_psoc *psoc);
+
+/*
+ * pmo_get_interval_for_pagefault_wakeup_counts: get ssr interval for pagefault
+ * @psoc: objmgr psoc
+ *
+ * Return: SSR interval for pagefault
+ */
+uint32_t
+pmo_get_interval_for_pagefault_wakeup_counts(struct wlan_objmgr_psoc *psoc);
+
+/*
+ * pmo_get_ssr_frequency_on_pagefault: get ssr frequency on pagefault
+ * @psoc: objmgr psoc
+ *
+ * Return: SSR frequency on pagefault
+ */
+uint32_t pmo_get_ssr_frequency_on_pagefault(struct wlan_objmgr_psoc *psoc);
 
 #endif /* WLAN_POWER_MANAGEMENT_OFFLOAD */
 

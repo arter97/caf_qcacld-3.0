@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2013-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -120,6 +120,7 @@
 #include "wlan_fwol_ucfg_api.h"
 #include "wlan_tdls_api.h"
 #include "wlan_twt_cfg_ext_api.h"
+#include "wlan_mlo_mgr_sta.h"
 
 #define WMA_LOG_COMPLETION_TIMER 500 /* 500 msecs */
 #define WMI_TLV_HEADROOM 128
@@ -325,6 +326,23 @@ wma_get_concurrency_support(struct wlan_objmgr_psoc *psoc)
 }
 
 /**
+ * wma_update_set_feature_version() - Update the set feature version
+ *
+ * @fs: Feature set structure in which version needs to be updated.
+ *
+ * Version 1 - Base feature version
+ * Version 2 - WMI_HOST_VENDOR1_REQ1_VERSION_3_30 updated.
+ * Version 3 - min sleep period for TWT and Scheduled PM in FW updated
+ * Version4 -  WMI_HOST_VENDOR1_REQ1_VERSION_3_40 updated.
+ *
+ * Return: None
+ */
+static void wma_update_set_feature_version(struct target_feature_set *fs)
+{
+	fs->feature_set_version = 4;
+}
+
+/**
  * wma_set_feature_set_info() - Set feature set info
  * @wma_handle: WMA handle
  * @feature_set: Feature set structure which needs to be filled
@@ -479,7 +497,7 @@ static void wma_set_feature_set_info(tp_wma_handle wma_handle,
 	feature_set->peer_bigdata_getbssinfo_support = true;
 	feature_set->peer_bigdata_assocreject_info_support = true;
 	feature_set->peer_getstainfo_support = true;
-	feature_set->feature_set_version = 2;
+	wma_update_set_feature_version(feature_set);
 }
 
 /**
@@ -1178,6 +1196,50 @@ static inline wmi_traffic_ac wma_convert_ac_value(uint32_t ac_value)
 	return WMI_AC_MAX;
 }
 
+#ifdef WLAN_FEATURE_11BE
+/**
+ * wma_set_per_link_amsdu_cap() - Set AMSDU/AMPDU capability per link to FW.
+ * @wma: wma handle
+ * @privcmd: pointer to set command parameters
+ * @aggr_type: aggregration type
+ *
+ * Return: QDF_STATUS_SUCCESS if set command is sent successfully, else
+ * QDF_STATUS_E_FAILURE
+ */
+static QDF_STATUS
+wma_set_per_link_amsdu_cap(tp_wma_handle wma, wma_cli_set_cmd_t *privcmd,
+			   wmi_vdev_custom_aggr_type_t aggr_type)
+{
+	uint8_t vdev_id;
+	uint8_t op_mode;
+	QDF_STATUS ret = QDF_STATUS_E_FAILURE;
+
+	for (vdev_id = 0; vdev_id < WLAN_MAX_VDEVS; vdev_id++) {
+		op_mode = wlan_get_opmode_from_vdev_id(wma->pdev, vdev_id);
+		if (op_mode == QDF_STA_MODE) {
+			ret = wma_set_tx_rx_aggr_size(vdev_id,
+						      privcmd->param_value,
+						      privcmd->param_value,
+						      aggr_type);
+			if (QDF_IS_STATUS_ERROR(ret)) {
+				wma_err("set_aggr_size failed for vdev: %d, ret %d",
+					vdev_id, ret);
+				return ret;
+			}
+		}
+	}
+
+	return ret;
+}
+#else
+static inline QDF_STATUS
+wma_set_per_link_amsdu_cap(tp_wma_handle wma, wma_cli_set_cmd_t *privcmd,
+			   wmi_vdev_custom_aggr_type_t aggr_type)
+{
+	return QDF_STATUS_SUCCESS;
+}
+#endif
+
 /**
  * wma_process_cli_set_cmd() - set parameters to fw
  * @wma: wma handle
@@ -1196,6 +1258,7 @@ static void wma_process_cli_set_cmd(tp_wma_handle wma,
 	struct pdev_params pdev_param = {0};
 	void *soc = cds_get_context(QDF_MODULE_ID_SOC);
 	struct target_psoc_info *tgt_hdl;
+	enum wlan_eht_mode eht_mode;
 
 	if (!mac) {
 		wma_err("Failed to get mac");
@@ -1301,13 +1364,24 @@ static void wma_process_cli_set_cmd(tp_wma_handle wma,
 					WMI_VDEV_CUSTOM_AGGR_TYPE_AMPDU;
 			}
 
-			ret = wma_set_tx_rx_aggr_size(vid,
-						      privcmd->param_value,
-						      privcmd->param_value,
-						      aggr_type);
-			if (QDF_IS_STATUS_ERROR(ret)) {
-				wma_err("set_aggr_size failed ret %d", ret);
-				return;
+			wlan_mlme_get_eht_mode(wma->psoc, &eht_mode);
+			if (eht_mode == WLAN_EHT_MODE_MLSR ||
+			    eht_mode == WLAN_EHT_MODE_MLMR) {
+				ret = wma_set_per_link_amsdu_cap(wma, privcmd,
+								 aggr_type);
+				if (QDF_IS_STATUS_ERROR(ret))
+					return;
+			} else {
+				ret = wma_set_tx_rx_aggr_size(
+							vid,
+							privcmd->param_value,
+							privcmd->param_value,
+							aggr_type);
+				if (QDF_IS_STATUS_ERROR(ret)) {
+					wma_err("set_aggr_size failed ret %d",
+						ret);
+					return;
+				}
 			}
 			break;
 		case GEN_PARAM_CRASH_INJECT:
@@ -1737,8 +1811,8 @@ static void wma_process_cli_set_cmd(tp_wma_handle wma,
 					      privcmd->param_value);
 			break;
 		default:
-			wma_debug("Invalid wma_cli_set vdev command/Not yet implemented 0x%x",
-				 privcmd->param_id);
+			wma_debug("vdev cmd is not part vdev_cli_config 0x%x",
+				  privcmd->param_id);
 			break;
 		}
 	} else if (2 == privcmd->param_vp_dev) {
@@ -3388,6 +3462,15 @@ QDF_STATUS wma_open(struct wlan_objmgr_psoc *psoc,
 	}
 	wma_handle->psoc = psoc;
 
+	if (wlan_pmo_enable_ssr_on_page_fault(psoc)) {
+		wma_handle->pagefault_wakeups_ts =
+			qdf_mem_malloc(
+			wlan_pmo_get_max_pagefault_wakeups_for_ssr(psoc) *
+			sizeof(qdf_time_t));
+		if (!wma_handle->pagefault_wakeups_ts)
+			goto err_wma_handle;
+	}
+
 	wma_target_if_open(wma_handle);
 
 	/*
@@ -4812,6 +4895,9 @@ QDF_STATUS wma_close(void)
 	wmi_handle = wma_handle->wmi_handle;
 	if (wmi_validate_handle(wmi_handle))
 		return QDF_STATUS_E_INVAL;
+
+	if (wlan_pmo_enable_ssr_on_page_fault(wma_handle->psoc))
+		qdf_mem_free(wma_handle->pagefault_wakeups_ts);
 
 	qdf_atomic_set(&wma_handle->sap_num_clients_connected, 0);
 	qdf_atomic_set(&wma_handle->go_num_clients_connected, 0);
@@ -9256,11 +9342,6 @@ static QDF_STATUS wma_mc_process_msg(struct scheduler_msg *msg)
 			(struct sir_antenna_mode_param *)msg->bodyptr);
 		qdf_mem_free(msg->bodyptr);
 		break;
-	case WMA_LRO_CONFIG_CMD:
-		wma_lro_config_cmd(wma_handle,
-			(struct cdp_lro_hash_config *)msg->bodyptr);
-		qdf_mem_free(msg->bodyptr);
-		break;
 	case WMA_GW_PARAM_UPDATE_REQ:
 		wma_set_gateway_params(wma_handle, msg->bodyptr);
 		qdf_mem_free(msg->bodyptr);
@@ -9895,35 +9976,6 @@ QDF_STATUS wma_crash_inject(WMA_HANDLE wma_handle, uint32_t type,
 	param.delay_time_ms = delay_time_ms;
 	return wmi_crash_inject(wma->wmi_handle, &param);
 }
-
-#ifdef RECEIVE_OFFLOAD
-int wma_lro_init(struct cdp_lro_hash_config *lro_config)
-{
-	struct scheduler_msg msg = {0};
-	struct cdp_lro_hash_config *iwcmd;
-
-	iwcmd = qdf_mem_malloc(sizeof(*iwcmd));
-	if (!iwcmd)
-		return -ENOMEM;
-
-	*iwcmd = *lro_config;
-
-	msg.type = WMA_LRO_CONFIG_CMD;
-	msg.reserved = 0;
-	msg.bodyptr = iwcmd;
-
-	if (QDF_STATUS_SUCCESS !=
-		scheduler_post_message(QDF_MODULE_ID_WMA,
-				       QDF_MODULE_ID_WMA,
-				       QDF_MODULE_ID_WMA, &msg)) {
-		qdf_mem_free(iwcmd);
-		return -EAGAIN;
-	}
-
-	wma_debug("sending the LRO configuration to the fw");
-	return 0;
-}
-#endif
 
 QDF_STATUS wma_configure_smps_params(uint32_t vdev_id, uint32_t param_id,
 							uint32_t param_val)

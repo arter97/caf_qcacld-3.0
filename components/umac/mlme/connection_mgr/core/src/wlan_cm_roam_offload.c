@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -823,7 +823,8 @@ QDF_STATUS cm_roam_update_vendor_handoff_config(struct wlan_objmgr_psoc *psoc,
 	struct rso_cfg_params *cfg_params;
 	uint8_t vdev_id;
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
-	uint32_t param_id, param_value, i;
+	uint32_t param_value, i;
+	enum vendor_control_roam_param param_id;
 
 	vdev_id = list->vdev_id;
 
@@ -851,30 +852,30 @@ QDF_STATUS cm_roam_update_vendor_handoff_config(struct wlan_objmgr_psoc *psoc,
 		mlme_debug("param id:%d, param value:%d", param_id,
 			   param_value);
 		switch (param_id) {
-		case ROAM_VENDOR_CONTROL_PARAM_TRIGGER:
+		case VENDOR_CONTROL_PARAM_ROAM_TRIGGER:
 			cfg_params->neighbor_lookup_threshold =
 							abs(param_value);
 			break;
-		case ROAM_VENDOR_CONTROL_PARAM_DELTA:
+		case VENDOR_CONTROL_PARAM_ROAM_DELTA:
 			cfg_params->roam_rssi_diff = param_value;
 			break;
-		case ROAM_VENDOR_CONTROL_PARAM_FULL_SCANPERIOD:
+		case VENDOR_CONTROL_PARAM_ROAM_FULL_SCANPERIOD:
 			cfg_params->full_roam_scan_period = param_value;
 			break;
-		case ROAM_VENDOR_CONTROL_PARAM_PARTIAL_SCANPERIOD:
+		case VENDOR_CONTROL_PARAM_ROAM_PARTIAL_SCANPERIOD:
 			cfg_params->empty_scan_refresh_period =
 							param_value * 1000;
 			break;
-		case ROAM_VENDOR_CONTROL_PARAM_ACTIVE_CH_DWELLTIME:
+		case VENDOR_CONTROL_PARAM_ROAM_ACTIVE_CH_DWELLTIME:
 			cfg_params->max_chan_scan_time = param_value;
 			break;
-		case ROAM_VENDOR_CONTROL_PARAM_PASSIVE_CH_DWELLTIME:
+		case VENDOR_CONTROL_PARAM_ROAM_PASSIVE_CH_DWELLTIME:
 			cfg_params->passive_max_chan_time = param_value;
 			break;
-		case ROAM_VENDOR_CONTROL_PARAM_HOME_CH_TIME:
+		case VENDOR_CONTROL_PARAM_ROAM_HOME_CH_TIME:
 			cfg_params->neighbor_scan_period = param_value;
 			break;
-		case ROAM_VENDOR_CONTROL_PARAM_AWAY_TIME:
+		case VENDOR_CONTROL_PARAM_ROAM_AWAY_TIME:
 			cfg_params->roam_scan_home_away_time = param_value;
 			break;
 		default:
@@ -1083,7 +1084,7 @@ end:
  * cm_roam_init_req() - roam init request handling
  * @psoc: psoc pointer
  * @vdev_id: vdev id
- * @reason: reason for changing roam state for the requested vdev id
+ * @enable: should the offload be enabled
  *
  * Return: QDF_STATUS
  */
@@ -2863,8 +2864,7 @@ cm_roam_scan_btm_offload(struct wlan_objmgr_psoc *psoc,
  * cm_roam_mlo_config() - set roam mlo offload parameters
  * @psoc: psoc ctx
  * @vdev: vdev
- * @params:  roam mlo offload parameters
- * @rso_cfg: rso config
+ * @start_req: request to fill
  *
  * This function is used to set roam mlo offload related parameters
  *
@@ -3294,7 +3294,7 @@ cm_roam_stop_req(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 
 	if (wlan_vdev_mlme_get_is_mlo_link(psoc, vdev_id)) {
 		mlme_debug("MLO ROAM: skip RSO cmd for link vdev %d", vdev_id);
-		return QDF_STATUS_SUCCESS;
+		goto rel_vdev_ref;
 	}
 
 	rso_cfg = wlan_cm_get_rso_config(vdev);
@@ -3371,7 +3371,7 @@ free_mem:
 /**
  * cm_roam_fill_per_roam_request() - create PER roam offload config request
  * @psoc: psoc context
- * @vdev_id: vdev id
+ * @req: request to fill
  *
  * Return: QDF_STATUS
  */
@@ -3767,6 +3767,8 @@ QDF_STATUS cm_roam_send_rso_cmd(struct wlan_objmgr_psoc *psoc,
  * @pdev: pdev pointer
  * @vdev_id: vdev id
  * @reason: reason for changing roam state for the requested vdev id
+ * @send_resp:
+ * @start_timer:
  *
  * This function is used for WLAN_ROAM_RSO_STOPPED roam state handling
  *
@@ -4337,6 +4339,7 @@ cm_roam_switch_to_roam_sync(struct wlan_objmgr_pdev *pdev,
 #ifdef FEATURE_ROAM_DEBUG
 /**
  * union rso_rec_arg1 - argument 1 record rso state change
+ * @value: aggregate value of the structured param
  * @request_st: requested rso state
  * @cur_st: current rso state
  * @new_st: new rso state
@@ -4379,6 +4382,7 @@ static uint32_t get_rso_arg1(enum roam_offload_state request_st,
 
 /**
  * union rso_rec_arg2 - argument 2 record rso state change
+ * @value: aggregate value of the structured param
  * @is_up: vdev is up
  * @supp_dis_roam: supplicant disable roam
  * @roam_progress: roam in progress
@@ -4432,7 +4436,7 @@ static uint32_t get_rso_arg2(bool is_up,
  * @pdev: pdev object
  * @vdev_id: vdev id
  * @cur_st: current state
- * @request_state: requested state
+ * @requested_state: requested state
  * @reason: reason
  * @is_up: vdev is up
  * @status: request result code
@@ -4487,7 +4491,7 @@ cm_record_state_change(struct wlan_objmgr_pdev *pdev,
 #ifdef WLAN_FEATURE_11BE_MLO
 /**
  * cm_mlo_roam_switch_for_link() - roam state handling during mlo roam
-  for link/s.
+ *  for link/s.
  * @pdev: pdev pointer
  * @vdev_id: vdev id
  * @reason: reason for changing roam state for the requested vdev id
@@ -5650,6 +5654,10 @@ QDF_STATUS cm_start_roam_invoke(struct wlan_objmgr_psoc *psoc,
 	/* Ignore BSSID and channel validation for FW host roam */
 	if (source == CM_ROAMING_FW)
 		goto send_evt;
+	if (source == CM_ROAMING_LINK_REMOVAL) {
+		cm_req->roam_req.req.forced_roaming = true;
+		goto send_evt;
+	}
 
 	if (cm_dlm_is_bssid_in_reject_list(psoc, bssid, vdev_id)) {
 		mlme_debug("BSSID is in reject list, aborting roam invoke");
@@ -5868,6 +5876,10 @@ void cm_roam_scan_info_event(struct wlan_objmgr_psoc *psoc,
 		status = mlme_get_fw_scan_channels(psoc, chan_freq, &num_chan);
 		if (QDF_IS_STATUS_ERROR(status))
 			goto out;
+		if (num_chan > NUM_CHANNELS) {
+			mlme_err("unexpected num chan %d", num_chan);
+			goto out;
+		}
 
 		status = wlan_mlme_get_band_capability(psoc, &band_capability);
 		if (QDF_IS_STATUS_ERROR(status))
@@ -5877,8 +5889,7 @@ void cm_roam_scan_info_event(struct wlan_objmgr_psoc *psoc,
 			policy_mgr_get_connected_roaming_vdev_band_mask(psoc,
 									vdev_id);
 
-		if (num_chan > WLAN_MAX_LOGGING_FREQ)
-			num_chan = WLAN_MAX_LOGGING_FREQ;
+		num_chan = QDF_MIN(WLAN_MAX_LOGGING_FREQ, NUM_CHANNELS);
 
 		for (i = 0; i < num_chan; i++) {
 			if (!wlan_is_valid_frequency(chan_freq[i],
@@ -6696,6 +6707,53 @@ cm_roam_btm_query_event(struct wmi_neighbor_report_data *btm_data,
 	return status;
 }
 
+void
+cm_roam_neigh_rpt_req_event(struct wmi_neighbor_report_data *neigh_rpt,
+			    struct wlan_objmgr_vdev *vdev)
+{
+	WLAN_HOST_DIAG_EVENT_DEF(wlan_diag_event, struct wlan_diag_nbr_rpt);
+
+	qdf_mem_zero(&wlan_diag_event, sizeof(wlan_diag_event));
+
+	populate_diag_cmn(&wlan_diag_event.diag_cmn, wlan_vdev_get_id(vdev),
+			  (uint64_t)neigh_rpt->timestamp, NULL);
+
+	wlan_diag_event.subtype = WLAN_CONN_DIAG_NBR_RPT_REQ_EVENT;
+	wlan_diag_event.version = DIAG_NBR_RPT_VERSION;
+	wlan_diag_event.token = neigh_rpt->req_token;
+
+	wlan_vdev_mlme_get_ssid(vdev, wlan_diag_event.ssid,
+				(uint8_t *)&wlan_diag_event.ssid_len);
+
+	WLAN_HOST_DIAG_EVENT_REPORT(&wlan_diag_event, EVENT_WLAN_NBR_RPT);
+}
+
+void
+cm_roam_neigh_rpt_resp_event(struct wmi_neighbor_report_data *neigh_rpt,
+			     uint8_t vdev_id)
+{
+	uint8_t i;
+
+	WLAN_HOST_DIAG_EVENT_DEF(wlan_diag_event, struct wlan_diag_nbr_rpt);
+
+	qdf_mem_zero(&wlan_diag_event, sizeof(wlan_diag_event));
+
+	populate_diag_cmn(&wlan_diag_event.diag_cmn, vdev_id,
+			  (uint64_t)neigh_rpt->timestamp, NULL);
+
+	wlan_diag_event.subtype = WLAN_CONN_DIAG_NBR_RPT_RESP_EVENT;
+	wlan_diag_event.version = DIAG_NBR_RPT_VERSION;
+	wlan_diag_event.token = neigh_rpt->resp_token;
+	wlan_diag_event.num_freq = neigh_rpt->num_freq;
+
+	for (i = 0; i < neigh_rpt->num_freq; i++)
+		wlan_diag_event.freq[i] = neigh_rpt->freq[i];
+
+	wlan_diag_event.num_rpt = neigh_rpt->num_rpt;
+
+	WLAN_HOST_DIAG_EVENT_REPORT(&wlan_diag_event, EVENT_WLAN_NBR_RPT);
+}
+
 #define WTC_BTM_RESPONSE_SUBCODE 0xFF
 static void
 cm_roam_wtc_btm_event(struct wmi_roam_trigger_info *trigger_info,
@@ -6773,6 +6831,7 @@ cm_roam_btm_resp_event(struct wmi_roam_trigger_info *trigger_info,
  * cm_roam_btm_candidate_event()  - Send BTM roam candidate logging event
  * @btm_data: BTM data
  * @vdev_id: Vdev id
+ * @idx: Candidate instance
  *
  * Return: QDF_STATUS
  */
@@ -7053,6 +7112,7 @@ cm_roam_btm_resp_event(struct wmi_roam_trigger_info *trigger_info,
  * cm_roam_btm_candidate_event()  - Send BTM roam candidate logging event
  * @btm_data: BTM data
  * @vdev_id: Vdev id
+ * @idx: Candidate instance
  *
  * Return: QDF_STATUS
  */

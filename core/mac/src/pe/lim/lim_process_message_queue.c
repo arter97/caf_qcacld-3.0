@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2011-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -1026,8 +1026,8 @@ static void lim_handle_unknown_a2_index_frames(struct mac_context *mac_ctx,
 	mac_hdr = WMA_GET_RX_MPDUHEADER3A(rx_pkt_buffer);
 
 	if (IEEE80211_IS_MULTICAST(mac_hdr->addr2)) {
-		pe_debug("Ignoring A2 Invalid Packet received for MC/BC:");
-		lim_print_mac_addr(mac_ctx, mac_hdr->addr2, LOGD);
+		pe_debug("Ignoring A2 Invalid Packet received for MC/BC: "
+			 QDF_MAC_ADDR_FMT, QDF_MAC_ADDR_REF(mac_hdr->addr2));
 		return;
 	}
 	pe_debug("type=0x%x, subtype=0x%x",
@@ -1313,10 +1313,10 @@ lim_handle80211_frames(struct mac_context *mac, struct scheduler_msg *limMsg,
 						 &sessionId);
 	if (!pe_session) {
 		if (fc.subType == SIR_MAC_MGMT_AUTH) {
-			pe_debug("ProtVersion %d, Type %d, Subtype %d rateIndex=%d",
-				fc.protVer, fc.type, fc.subType,
-				WMA_GET_RX_MAC_RATE_IDX(pRxPacketInfo));
-			lim_print_mac_addr(mac, pHdr->bssId, LOGD);
+			pe_debug("ProtVersion %d, Type %d, Subtype %d rateIndex=%d bssid=" QDF_MAC_ADDR_FMT,
+				 fc.protVer, fc.type, fc.subType,
+				 WMA_GET_RX_MAC_RATE_IDX(pRxPacketInfo),
+				 QDF_MAC_ADDR_REF(pHdr->bssId));
 			if (lim_process_auth_frame_no_session
 				    (mac, pRxPacketInfo,
 				    limMsg->bodyptr) == QDF_STATUS_SUCCESS) {
@@ -1332,8 +1332,8 @@ lim_handle80211_frames(struct mac_context *mac, struct scheduler_msg *limMsg,
 			pe_session = pe_find_session_by_peer_sta(mac,
 						pHdr->sa, &sessionId);
 			if (!pe_session) {
-				pe_debug("session does not exist for bssId");
-				lim_print_mac_addr(mac, pHdr->sa, LOGD);
+				pe_debug("session does not exist for bssId: "QDF_MAC_ADDR_FMT,
+					 QDF_MAC_ADDR_REF(pHdr->sa));
 				goto end;
 			} else {
 				pe_debug("SessionId:%d exists for given Bssid",
@@ -1631,11 +1631,6 @@ static void lim_process_messages(struct mac_context *mac_ctx,
 	case SIR_LIM_UPDATE_BEACON:
 		lim_update_beacon(mac_ctx);
 		break;
-#ifdef ANI_SIR_IBSS_PEER_CACHING
-	case WMA_IBSS_STA_ADD:
-		lim_ibss_sta_add(mac_ctx, msg->bodyptr);
-		break;
-#endif
 	case SIR_BB_XPORT_MGMT_MSG:
 		/* These messages are from Peer MAC entity. */
 #ifdef WLAN_DEBUG

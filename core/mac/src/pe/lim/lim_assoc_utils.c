@@ -2229,7 +2229,7 @@ static bool lim_is_eht_connection_op_info_present(struct pe_session *pe_session,
 /**
  * lim_update_peer_twt_caps() - Update peer twt caps to add sta params
  * @add_sta_params: pointer to add sta params
- * @@session_entry: pe session entry
+ * @session_entry: pe session entry
  *
  * Return: None
  */
@@ -3033,9 +3033,8 @@ void lim_handle_cnf_wait_timeout(struct mac_context *mac, uint16_t staId)
 
 	switch (sta->mlmStaContext.mlmState) {
 	case eLIM_MLM_WT_ASSOC_CNF_STATE:
-		pe_debug("Did not receive Assoc Cnf in eLIM_MLM_WT_ASSOC_CNF_STATE sta Assoc id %d",
-				sta->assocId);
-		lim_print_mac_addr(mac, sta->staAddr, LOGD);
+		pe_debug("Did not receive Assoc Cnf in eLIM_MLM_WT_ASSOC_CNF_STATE sta Assoc id %d and STA: "QDF_MAC_ADDR_FMT,
+			 sta->assocId, QDF_MAC_ADDR_REF(sta->staAddr));
 
 		if (LIM_IS_AP_ROLE(pe_session)) {
 			lim_reject_association(mac, sta->staAddr,
@@ -4725,16 +4724,4 @@ void lim_extract_ies_from_deauth_disassoc(struct pe_session *session,
 	ie.len = deauth_disassoc_frame_len - ie_offset;
 
 	mlme_set_peer_disconnect_ies(session->vdev, &ie);
-}
-
-uint8_t *lim_get_src_addr_from_frame(struct element_info *frame)
-{
-	struct wlan_frame_hdr *hdr;
-
-	if (!frame || !frame->len || frame->len < WLAN_MAC_HDR_LEN_3A)
-		return NULL;
-
-	hdr = (struct wlan_frame_hdr *)frame->ptr;
-
-	return hdr->i_addr2;
 }

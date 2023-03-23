@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2012-2017, 2019-2020 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -21,7 +22,7 @@
 
 #include "wlan_policy_mgr_api.h"
 
-/**
+/*
  * second_connection_pcl_nodbs_table - table which provides PCL
  * for the 2nd connection, when we have a connection already in
  * the system (with DBS not supported by HW)
@@ -184,7 +185,7 @@ second_connection_pcl_nodbs_table[PM_MAX_ONE_CONNECTION_MODE]
 	[PM_NDI_MODE] = {PM_NONE, PM_NONE, PM_NONE} },
 };
 
-/**
+/*
  * third_connection_pcl_nodbs_table - table which provides PCL
  * for the 3rd connection, when we have two connections already
  * in the system (with DBS not supported by HW). For helium that is NON-DBS,
@@ -1530,7 +1531,7 @@ third_connection_pcl_nodbs_table[PM_MAX_TWO_CONNECTION_MODE]
 
 #ifdef FEATURE_NO_DBS_INTRABAND_MCC_SUPPORT
 
-/**
+/*
  * second_connection_pcl_nodbs_no_interband_mcc_table - table
  * which provides PCL for the 2nd connection, when we have a
  * connection already in the system (when DBS and interband mcc
@@ -1714,7 +1715,7 @@ second_connection_pcl_nodbs_no_interband_mcc_table[PM_MAX_ONE_CONNECTION_MODE]
 	[PM_NDI_MODE] = {PM_SCC_CH_24G, PM_SCC_CH_24G, PM_SCC_CH_24G} },
 };
 
-/**
+/*
  * third_connection_pcl_nodbs_no_interband_mcc_table - table which provides
  * PCL for the 3rd connection, when we have two connections already in
  * the system (when DBS and interband mcc are not supported by HW)

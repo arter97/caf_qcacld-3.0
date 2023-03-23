@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -57,10 +57,10 @@
 # define RoamIdle_TriggerBand_default 3
 # define RoamIdle_MinRSSI_min -70
 # define RoamIdle_MinRSSI_max -50
-# define RoamIdle_MinRSSI_default -60
+# define RoamIdle_MinRSSI_default -65
 # define RoamIdle_RSSIVariation_min 0
 # define RoamIdle_RSSIVariation_max 10
-# define RoamIdle_RSSIVariation_default 5
+# define RoamIdle_RSSIVariation_default 8
 # define RoamIdle_InactivePacketCount_min 0
 # define RoamIdle_InactivePacketCount_max 20
 # define RoamIdle_InactivePacketCount_default 5
@@ -73,6 +73,7 @@
 # define ROAMCU_6GRSSIRANGE_MIN -70
 # define ROAMCU_6GRSSIRANGE_MAX -50
 # define ROAMCU_6GRSSIRANGE_DEFAULT -70
+# define RoamIdle_InactiveTime_default 5
 #else
 # define RoamScan_ActiveCH_DwellTime_min 3
 # define RoamScan_ActiveCH_DwellTime_max 300
@@ -122,6 +123,7 @@
 # define ROAMCU_6GRSSIRANGE_MIN -120
 # define ROAMCU_6GRSSIRANGE_MAX 0
 # define ROAMCU_6GRSSIRANGE_DEFAULT -70
+# define RoamIdle_InactiveTime_default 10
 #endif
 
 /*
@@ -1994,8 +1996,8 @@
  * <ini>
  * gRoamScanHiRssiDelta - Sets RSSI Delta for scan trigger
  * @Min: 0
- * @Max: 16
- * @Default: 10
+ * @Max: 40
+ * @Default: 23
  *
  * This INI is used to set change in RSSI at which scan is triggered
  * in 5GHz.
@@ -2011,8 +2013,8 @@
 #define CFG_LFR_ROAM_SCAN_HI_RSSI_DELTA CFG_INI_UINT( \
 	"gRoamScanHiRssiDelta", \
 	0, \
-	16, \
-	10, \
+	40, \
+	23, \
 	CFG_VALUE_OR_DEFAULT, \
 	"RSSI Delta for scan trigger")
 
@@ -2721,7 +2723,7 @@
 	"RoamIdle_InactiveTime", \
 	0, \
 	20, \
-	10, \
+	RoamIdle_InactiveTime_default, \
 	CFG_VALUE_OR_DEFAULT, \
 	"Configure RSSI delta to start idle roam")
 
@@ -3304,6 +3306,32 @@
 #define ROAM_REASON_VSIE_ALL
 #endif
 
+/*
+ * <ini>
+ * groam_info_stats_num - number of wlan driver cache roam information
+ * @Min: 0
+ * @Max: 32
+ * @Default: 5
+ *
+ * This ini is used to set the cache number of enhanced roam
+ * information, including roam trigger, scan information and
+ * roam frame information.
+ * If ini set to 0, enhanced roam feature not support
+ *
+ * Related: LFR
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
+#define CFG_LFR3_ROAM_INFO_STATS_NUM CFG_INI_UINT( \
+		"groam_info_stats_num", \
+		0, \
+		32, \
+		5, \
+		CFG_VALUE_OR_DEFAULT, \
+		"Roam information cache number in wlan driver")
+
 #define CFG_LFR_ALL \
 	CFG(CFG_LFR_MAWC_ROAM_ENABLED) \
 	CFG(CFG_LFR_MAWC_ROAM_TRAFFIC_THRESHOLD) \
@@ -3405,6 +3433,7 @@
 	SAE_SINGLE_PMK_ALL \
 	ROAM_REASON_VSIE_ALL \
 	CFG(CFG_LFR_BEACONLOSS_TIMEOUT_ON_WAKEUP) \
-	CFG(CFG_LFR_BEACONLOSS_TIMEOUT_ON_SLEEP)
+	CFG(CFG_LFR_BEACONLOSS_TIMEOUT_ON_SLEEP) \
+	CFG(CFG_LFR3_ROAM_INFO_STATS_NUM)
 
 #endif /* CFG_MLME_LFR_H__ */

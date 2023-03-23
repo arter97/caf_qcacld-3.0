@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -818,7 +818,8 @@ QDF_STATUS cds_open(struct wlan_objmgr_psoc *psoc)
 			}
 		hdd_ctx->is_wifi3_0_target = true;
 	} else if (hdd_ctx->target_type == TARGET_TYPE_KIWI ||
-		   hdd_ctx->target_type == TARGET_TYPE_MANGO) {
+		   hdd_ctx->target_type == TARGET_TYPE_MANGO ||
+		   hdd_ctx->target_type == TARGET_TYPE_PEACH) {
 		gp_cds_context->dp_soc =
 			cdp_soc_attach(BERYLLIUM_DP,
 				       gp_cds_context->hif_context,
@@ -966,7 +967,8 @@ QDF_STATUS cds_dp_open(struct wlan_objmgr_psoc *psoc)
 	    hdd_ctx->target_type == TARGET_TYPE_QCA6490 ||
 	    hdd_ctx->target_type == TARGET_TYPE_QCA6750 ||
 	    hdd_ctx->target_type == TARGET_TYPE_KIWI ||
-	    hdd_ctx->target_type == TARGET_TYPE_MANGO) {
+	    hdd_ctx->target_type == TARGET_TYPE_MANGO ||
+	    hdd_ctx->target_type == TARGET_TYPE_PEACH) {
 		qdf_status = cdp_pdev_init(cds_get_context(QDF_MODULE_ID_SOC),
 					   gp_cds_context->htc_ctx,
 					   gp_cds_context->qdf_ctx, 0);

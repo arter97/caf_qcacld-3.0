@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -1870,6 +1870,32 @@ void hdd_svc_fw_shutdown_ind(struct device *dev)
 }
 
 /**
+ * wlan_hdd_set_twt_responder() - wrapper to configure twt responder
+ * in sap_config
+ * @hdd_ctx: Pointer to hdd context
+ * @adapter: Pointer to hostapd hdd adapter
+ *
+ * Return: none
+ */
+#if defined(WLAN_SUPPORT_TWT) && \
+	((LINUX_VERSION_CODE >= KERNEL_VERSION(5, 3, 0)) || \
+	  defined(CFG80211_TWT_RESPONDER_SUPPORT))
+static void wlan_hdd_set_twt_responder(struct hdd_context *hdd_ctx,
+				       struct hdd_adapter *adapter)
+{
+	bool twt_responder;
+
+	twt_responder = adapter->session.ap.sap_config.cfg80211_twt_responder;
+	wlan_hdd_configure_twt_responder(hdd_ctx, twt_responder);
+}
+#else
+static inline void wlan_hdd_set_twt_responder(struct hdd_context *hdd_ctx,
+					      struct hdd_adapter *adapter)
+{
+}
+#endif
+
+/**
  * hdd_ssr_restart_sap() - restart sap on SSR
  * @hdd_ctx:   hdd context
  *
@@ -1888,6 +1914,8 @@ static void hdd_ssr_restart_sap(struct hdd_context *hdd_ctx)
 				hdd_debug(
 				"Restart prev SAP session, event_flags 0x%lx(%s)",
 				adapter->event_flags, (adapter->dev)->name);
+				wlan_hdd_set_twt_responder(hdd_ctx,
+							   adapter);
 				wlan_hdd_start_sap(adapter, true);
 			}
 		}
@@ -3334,7 +3362,6 @@ static int __wlan_hdd_cfg80211_get_txpower(struct wiphy *wiphy,
 			      hdd_ctx->config->nb_commands_interval);
 	if (hdd_ctx->driver_status != DRIVER_MODULES_ENABLED ||
 	    is_rate_limited) {
-		hdd_debug("Modules not enabled/rate limited, use cached stats");
 		/* Send cached data to upperlayer*/
 		vdev = hdd_objmgr_get_vdev_by_user(adapter, WLAN_OSIF_POWER_ID);
 		if (!vdev) {
@@ -3343,6 +3370,8 @@ static int __wlan_hdd_cfg80211_get_txpower(struct wiphy *wiphy,
 		}
 		ucfg_mc_cp_stats_get_tx_power(vdev, dbm);
 		hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_POWER_ID);
+		hdd_debug("Modules not enabled/rate limited, cached tx power = %d",
+			  *dbm);
 		return 0;
 	}
 

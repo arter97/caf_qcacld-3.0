@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2016-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -120,6 +120,36 @@ out:
 	osif_psoc_sync_destroy(psoc_sync);
 }
 
+/**
+ * pld_pcie_set_thermal_state() - Set thermal state for thermal mitigation
+ * @pdev: PCIE device
+ * @thermal_state: Thermal state set by thermal subsystem
+ * @mon_id: Thermal cooling device ID
+ *
+ * This function will be called when thermal subsystem notifies platform
+ * driver about change in thermal state.
+ *
+ * Return: 0 for success
+ * Non zero failure code for errors
+ */
+static int pld_pcie_set_thermal_state(struct pci_dev *pdev,
+				      unsigned long thermal_state,
+				      int mon_id)
+{
+	struct pld_context *pld_context;
+
+	pld_context = pld_get_global_context();
+	if (!pld_context)
+		return -EINVAL;
+
+	if (pld_context->ops->set_curr_therm_cdev_state)
+		return pld_context->ops->set_curr_therm_cdev_state(&pdev->dev,
+								thermal_state,
+								mon_id);
+
+	return -ENOTSUPP;
+}
+
 #ifdef CONFIG_PLD_PCIE_CNSS
 /**
  * pld_pcie_idle_restart_cb() - Perform idle restart
@@ -146,7 +176,6 @@ static int pld_pcie_idle_restart_cb(struct pci_dev *pdev,
 /**
  * pld_pcie_idle_shutdown_cb() - Perform idle shutdown
  * @pdev: PCIE device
- * @id: PCIE device ID
  *
  * This function will be called if there is an idle shutdown request
  *
@@ -244,7 +273,7 @@ static void pld_pcie_notify_handler(struct pci_dev *pdev, int state)
 /**
  * pld_pcie_uevent() - update wlan driver status callback function
  * @pdev: PCIE device
- * @status driver uevent status
+ * @status: driver uevent status
  *
  * This function will be called when platform driver wants to update wlan
  * driver's status.
@@ -278,6 +307,28 @@ out:
 	return;
 }
 
+#ifdef WLAN_FEATURE_SSR_DRIVER_DUMP
+static int
+pld_pcie_collect_driver_dump(struct pci_dev *pdev,
+			     struct cnss_ssr_driver_dump_entry *input_array,
+			     size_t *num_entries)
+{
+	struct pld_context *pld_context;
+	struct pld_driver_ops *ops;
+	int ret = -EINVAL;
+
+	pld_context = pld_get_global_context();
+	ops = pld_context->ops;
+	if (ops->collect_driver_dump) {
+		ret =  ops->collect_driver_dump(&pdev->dev,
+						PLD_BUS_TYPE_PCIE,
+						input_array,
+						num_entries);
+	}
+	return ret;
+}
+#endif
+
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 19, 0))
 /**
  * pld_bus_event_type_convert() - Convert enum cnss_bus_event_type
@@ -308,7 +359,7 @@ enum pld_bus_event pld_bus_event_type_convert(enum cnss_bus_event_type etype)
 /**
  * pld_pcie_update_event() - update wlan driver status callback function
  * @pdev: PCIE device
- * @cnss_uevent_data: driver uevent data
+ * @uevent_data: driver uevent data
  *
  * This function will be called when platform driver wants to update wlan
  * driver's status.
@@ -641,7 +692,9 @@ static struct pci_device_id pld_pcie_id_table[] = {
 #elif defined(QCA_WIFI_QCA6490)
 	{ 0x17cb, 0x1103, PCI_ANY_ID, PCI_ANY_ID },
 #elif defined(QCA_WIFI_KIWI)
-#if defined(QCA_WIFI_MANGO)
+#if defined(QCA_WIFI_PEACH)
+	{ 0x17cb, 0x110E, PCI_ANY_ID, PCI_ANY_ID },
+#elif defined(QCA_WIFI_MANGO)
 	{ 0x17cb, 0x110A, PCI_ANY_ID, PCI_ANY_ID },
 #else
 	{ 0x17cb, 0x1107, PCI_ANY_ID, PCI_ANY_ID },
@@ -683,6 +736,9 @@ struct cnss_wlan_driver pld_pcie_ops = {
 	.crash_shutdown = pld_pcie_crash_shutdown,
 	.modem_status   = pld_pcie_notify_handler,
 	.update_status  = pld_pcie_uevent,
+#ifdef WLAN_FEATURE_SSR_DRIVER_DUMP
+	.collect_driver_dump = pld_pcie_collect_driver_dump,
+#endif
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 19, 0))
 	.update_event = pld_pcie_update_event,
 #endif
@@ -701,23 +757,14 @@ struct cnss_wlan_driver pld_pcie_ops = {
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 10, 0))
 	.chip_version = CHIP_VERSION,
 #endif
+	.set_therm_cdev_state = pld_pcie_set_thermal_state,
 };
 
-/**
- * pld_pcie_register_driver() - Register PCIE device callback functions
- *
- * Return: int
- */
 int pld_pcie_register_driver(void)
 {
 	return cnss_wlan_register_driver(&pld_pcie_ops);
 }
 
-/**
- * pld_pcie_unregister_driver() - Unregister PCIE device callback functions
- *
- * Return: void
- */
 void pld_pcie_unregister_driver(void)
 {
 	cnss_wlan_unregister_driver(&pld_pcie_ops);
@@ -754,13 +801,6 @@ void pld_pcie_unregister_driver(void)
 }
 #endif
 
-/**
- * pld_pcie_get_ce_id() - Get CE number for the provided IRQ
- * @dev: device
- * @irq: IRQ number
- *
- * Return: CE number
- */
 int pld_pcie_get_ce_id(struct device *dev, int irq)
 {
 	int ce_id = irq - 100;
@@ -788,19 +828,6 @@ pld_pcie_populate_shadow_v3_cfg(struct cnss_wlan_enable_cfg *cfg,
 {
 }
 #endif
-/**
- * pld_pcie_wlan_enable() - Enable WLAN
- * @dev: device
- * @config: WLAN configuration data
- * @mode: WLAN mode
- * @host_version: host software version
- *
- * This function enables WLAN FW. It passed WLAN configuration data,
- * WLAN mode and host software version to FW.
- *
- * Return: 0 for success
- *         Non zero failure code for errors
- */
 int pld_pcie_wlan_enable(struct device *dev, struct pld_wlan_enable_cfg *config,
 			 enum pld_driver_mode mode, const char *host_version)
 {
@@ -843,33 +870,11 @@ int pld_pcie_wlan_enable(struct device *dev, struct pld_wlan_enable_cfg *config,
 	return cnss_wlan_enable(dev, &cfg, cnss_mode, host_version);
 }
 
-/**
- * pld_pcie_wlan_disable() - Disable WLAN
- * @dev: device
- * @mode: WLAN mode
- *
- * This function disables WLAN FW. It passes WLAN mode to FW.
- *
- * Return: 0 for success
- *         Non zero failure code for errors
- */
 int pld_pcie_wlan_disable(struct device *dev, enum pld_driver_mode mode)
 {
 	return cnss_wlan_disable(dev, CNSS_OFF);
 }
 
-/**
- * pld_pcie_get_fw_files_for_target() - Get FW file names
- * @dev: device
- * @pfw_files: buffer for FW file names
- * @target_type: target type
- * @target_version: target version
- *
- * Return target specific FW file names to the buffer.
- *
- * Return: 0 for success
- *         Non zero failure code for errors
- */
 int pld_pcie_get_fw_files_for_target(struct device *dev,
 				     struct pld_fw_files *pfw_files,
 				     u32 target_type, u32 target_version)
@@ -905,16 +910,6 @@ int pld_pcie_get_fw_files_for_target(struct device *dev,
 	return 0;
 }
 
-/**
- * pld_pcie_get_platform_cap() - Get platform capabilities
- * @dev: device
- * @cap: buffer to the capabilities
- *
- * Return capabilities to the buffer.
- *
- * Return: 0 for success
- *         Non zero failure code for errors
- */
 int pld_pcie_get_platform_cap(struct device *dev, struct pld_platform_cap *cap)
 {
 	int ret = 0;
@@ -931,16 +926,6 @@ int pld_pcie_get_platform_cap(struct device *dev, struct pld_platform_cap *cap)
 	return 0;
 }
 
-/**
- * pld_pcie_get_soc_info() - Get SOC information
- * @dev: device
- * @info: buffer to SOC information
- *
- * Return SOC info to the buffer.
- *
- * Return: 0 for success
- *         Non zero failure code for errors
- */
 int pld_pcie_get_soc_info(struct device *dev, struct pld_soc_info *info)
 {
 	int ret = 0, i;
@@ -980,13 +965,6 @@ int pld_pcie_get_soc_info(struct device *dev, struct pld_soc_info *info)
 	return 0;
 }
 
-/**
- * pld_pcie_schedule_recovery_work() - schedule recovery work
- * @dev: device
- * @reason: recovery reason
- *
- * Return: void
- */
 void pld_pcie_schedule_recovery_work(struct device *dev,
 				     enum pld_recovery_reason reason)
 {
@@ -1003,13 +981,6 @@ void pld_pcie_schedule_recovery_work(struct device *dev,
 	cnss_schedule_recovery(dev, cnss_reason);
 }
 
-/**
- * pld_pcie_device_self_recovery() - device self recovery
- * @dev: device
- * @reason: recovery reason
- *
- * Return: void
- */
 void pld_pcie_device_self_recovery(struct device *dev,
 				   enum pld_recovery_reason reason)
 {

@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -444,12 +444,6 @@ qdf_napi_struct
 }
 #endif
 
-uint32_t hdd_txrx_get_tx_ack_count(struct hdd_adapter *adapter)
-{
-	return cdp_get_tx_ack_stats(cds_get_context(QDF_MODULE_ID_SOC),
-				    adapter->vdev_id);
-}
-
 int hdd_set_udp_qos_upgrade_config(struct hdd_adapter *adapter,
 				   uint8_t priority)
 {
@@ -626,11 +620,7 @@ static void __hdd_hard_start_xmit(struct sk_buff *skb,
  */
 netdev_tx_t hdd_hard_start_xmit(struct sk_buff *skb, struct net_device *net_dev)
 {
-	hdd_dp_ssr_protect();
-
 	__hdd_hard_start_xmit(skb, net_dev);
-
-	hdd_dp_ssr_unprotect();
 
 	return NETDEV_TX_OK;
 }
@@ -1459,8 +1449,6 @@ void hdd_dp_cfg_update(struct wlan_objmgr_psoc *psoc,
 
 	config->napi_cpu_affinity_mask =
 		cfg_get(psoc, CFG_DP_NAPI_CE_CPU_MASK);
-	config->enable_fisa_lru_deletion =
-				cfg_get(psoc, CFG_DP_RX_FISA_LRU_DEL_ENABLE);
 	config->cfg_wmi_credit_cnt = cfg_get(psoc, CFG_DP_HTC_WMI_CREDIT_CNT);
 
 	hdd_ini_tx_flow_control(config, psoc);

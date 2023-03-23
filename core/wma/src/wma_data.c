@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2013-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -84,6 +84,8 @@
 #include "wlan_pkt_capture_ucfg_api.h"
 #include "wma_eht.h"
 #include "wlan_mlo_mgr_sta.h"
+#include "wlan_fw_offload_main.h"
+#include "target_if_fwol.h"
 
 struct wma_search_rate {
 	int32_t rate;
@@ -1818,11 +1820,15 @@ QDF_STATUS wma_process_init_thermal_info(tp_wma_handle wma,
 		 "0 %d\n"
 		 "1 %d\n"
 		 "2 %d\n"
-		 "3 %d",
+		 "3 %d\n"
+		 "4 %d\n"
+		 "5 %d",
 		 pThermalParams->throttle_duty_cycle_tbl[0],
 		 pThermalParams->throttle_duty_cycle_tbl[1],
 		 pThermalParams->throttle_duty_cycle_tbl[2],
-		 pThermalParams->throttle_duty_cycle_tbl[3]);
+		 pThermalParams->throttle_duty_cycle_tbl[3],
+		 pThermalParams->throttle_duty_cycle_tbl[4],
+		 pThermalParams->throttle_duty_cycle_tbl[5]);
 
 	wma->thermal_mgmt_info.thermalMgmtEnabled =
 		pThermalParams->thermalMgmtEnabled;
@@ -1842,13 +1848,23 @@ QDF_STATUS wma_process_init_thermal_info(tp_wma_handle wma,
 		pThermalParams->thermalLevels[3].minTempThreshold;
 	wma->thermal_mgmt_info.thermalLevels[3].maxTempThreshold =
 		pThermalParams->thermalLevels[3].maxTempThreshold;
+	wma->thermal_mgmt_info.thermalLevels[4].minTempThreshold =
+		pThermalParams->thermalLevels[4].minTempThreshold;
+	wma->thermal_mgmt_info.thermalLevels[4].maxTempThreshold =
+		pThermalParams->thermalLevels[4].maxTempThreshold;
+	wma->thermal_mgmt_info.thermalLevels[5].minTempThreshold =
+		pThermalParams->thermalLevels[5].minTempThreshold;
+	wma->thermal_mgmt_info.thermalLevels[5].maxTempThreshold =
+		pThermalParams->thermalLevels[5].maxTempThreshold;
 	wma->thermal_mgmt_info.thermalCurrLevel = WLAN_WMA_THERMAL_LEVEL_0;
 	wma->thermal_mgmt_info.thermal_action = pThermalParams->thermal_action;
 	wma_nofl_debug("TM level min max:\n"
 		 "0 %d   %d\n"
 		 "1 %d   %d\n"
 		 "2 %d   %d\n"
-		 "3 %d   %d",
+		 "3 %d   %d\n"
+		 "4 %d   %d\n"
+		 "5 %d   %d",
 		 wma->thermal_mgmt_info.thermalLevels[0].minTempThreshold,
 		 wma->thermal_mgmt_info.thermalLevels[0].maxTempThreshold,
 		 wma->thermal_mgmt_info.thermalLevels[1].minTempThreshold,
@@ -1856,7 +1872,11 @@ QDF_STATUS wma_process_init_thermal_info(tp_wma_handle wma,
 		 wma->thermal_mgmt_info.thermalLevels[2].minTempThreshold,
 		 wma->thermal_mgmt_info.thermalLevels[2].maxTempThreshold,
 		 wma->thermal_mgmt_info.thermalLevels[3].minTempThreshold,
-		 wma->thermal_mgmt_info.thermalLevels[3].maxTempThreshold);
+		 wma->thermal_mgmt_info.thermalLevels[3].maxTempThreshold,
+		 wma->thermal_mgmt_info.thermalLevels[4].minTempThreshold,
+		 wma->thermal_mgmt_info.thermalLevels[4].maxTempThreshold,
+		 wma->thermal_mgmt_info.thermalLevels[5].minTempThreshold,
+		 wma->thermal_mgmt_info.thermalLevels[5].maxTempThreshold);
 
 #ifdef FW_THERMAL_THROTTLE_SUPPORT
 	for (i = 0; i < THROTTLE_LEVEL_MAX; i++)
@@ -2024,6 +2044,31 @@ static uint8_t wma_thermal_mgmt_get_level(void *handle, uint32_t temp)
 }
 
 /**
+ * wms_thermal_level_to_host() - Convert wma thermal level to host enum
+ * @level: current thermal throttle level
+ *
+ * Return: host thermal throttle level
+ */
+static enum thermal_throttle_level
+wma_thermal_level_to_host(uint8_t level)
+{
+	switch (level) {
+	case WLAN_WMA_THERMAL_LEVEL_0:
+		return THERMAL_FULLPERF;
+	case WLAN_WMA_THERMAL_LEVEL_1:
+	case WLAN_WMA_THERMAL_LEVEL_2:
+	case WLAN_WMA_THERMAL_LEVEL_3:
+		return THERMAL_MITIGATION;
+	case WLAN_WMA_THERMAL_LEVEL_4:
+		return THERMAL_SHUTOFF;
+	case WLAN_WMA_THERMAL_LEVEL_5:
+		return THERMAL_SHUTDOWN_TARGET;
+	default:
+		return THERMAL_UNKNOWN;
+	}
+}
+
+/**
  * wma_thermal_mgmt_evt_handler() - thermal mgmt event handler
  * @wma_handle: Pointer to WMA handle
  * @event: Thermal event information
@@ -2040,6 +2085,8 @@ int wma_thermal_mgmt_evt_handler(void *handle, uint8_t *event, uint32_t len)
 	uint8_t thermal_level;
 	t_thermal_cmd_params thermal_params = {0};
 	WMI_THERMAL_MGMT_EVENTID_param_tlvs *param_buf;
+	struct wlan_objmgr_psoc *psoc;
+	struct thermal_throttle_info info = {0};
 
 	if (!event || !handle) {
 		wma_err("Invalid thermal mitigation event buffer");
@@ -2050,6 +2097,12 @@ int wma_thermal_mgmt_evt_handler(void *handle, uint8_t *event, uint32_t len)
 
 	if (wma_validate_handle(wma))
 		return -EINVAL;
+
+	psoc = wma->psoc;
+	if (!psoc) {
+		wma_err("NULL psoc");
+		return -EINVAL;
+	}
 
 	param_buf = (WMI_THERMAL_MGMT_EVENTID_param_tlvs *) event;
 
@@ -2075,6 +2128,8 @@ int wma_thermal_mgmt_evt_handler(void *handle, uint8_t *event, uint32_t len)
 	}
 
 	wma->thermal_mgmt_info.thermalCurrLevel = thermal_level;
+	info.level = wma_thermal_level_to_host(thermal_level);
+	target_if_fwol_notify_thermal_throttle(psoc, &info);
 
 	if (!wma->fw_therm_throt_support) {
 		/* Inform txrx */
@@ -3022,42 +3077,6 @@ void wma_tx_abort(uint8_t vdev_id)
 	param.vdev_id = vdev_id;
 	wmi_unified_peer_flush_tids_send(wma->wmi_handle, bssid,
 					 &param);
-}
-
-/**
- * wma_lro_config_cmd() - process the LRO config command
- * @wma: Pointer to WMA handle
- * @wma_lro_cmd: Pointer to LRO configuration parameters
- *
- * This function sends down the LRO configuration parameters to
- * the firmware to enable LRO, sets the TCP flags and sets the
- * seed values for the toeplitz hash generation
- *
- * Return: QDF_STATUS_SUCCESS for success otherwise failure
- */
-QDF_STATUS wma_lro_config_cmd(void *handle,
-	 struct cdp_lro_hash_config *wma_lro_cmd)
-{
-	struct wmi_lro_config_cmd_t wmi_lro_cmd = {0};
-	tp_wma_handle wma = cds_get_context(QDF_MODULE_ID_WMA);
-
-	if (!wma || !wma_lro_cmd) {
-		wma_err("Invalid input!");
-		return QDF_STATUS_E_FAILURE;
-	}
-
-	wmi_lro_cmd.lro_enable = wma_lro_cmd->lro_enable;
-	wmi_lro_cmd.tcp_flag = wma_lro_cmd->tcp_flag;
-	wmi_lro_cmd.tcp_flag_mask = wma_lro_cmd->tcp_flag_mask;
-	qdf_mem_copy(wmi_lro_cmd.toeplitz_hash_ipv4,
-			wma_lro_cmd->toeplitz_hash_ipv4,
-			LRO_IPV4_SEED_ARR_SZ * sizeof(uint32_t));
-	qdf_mem_copy(wmi_lro_cmd.toeplitz_hash_ipv6,
-			wma_lro_cmd->toeplitz_hash_ipv6,
-			LRO_IPV6_SEED_ARR_SZ * sizeof(uint32_t));
-
-	return wmi_unified_lro_config_cmd(wma->wmi_handle,
-						&wmi_lro_cmd);
 }
 
 void wma_delete_invalid_peer_entries(uint8_t vdev_id, uint8_t *peer_mac_addr)
