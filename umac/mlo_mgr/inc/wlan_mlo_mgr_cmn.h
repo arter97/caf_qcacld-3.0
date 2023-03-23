@@ -315,8 +315,8 @@ void mlo_mlme_handle_sta_csa_param(struct wlan_objmgr_vdev *vdev,
 #define INVALID_HW_LINK_ID 0xFFFF
 #define WLAN_MLO_INVALID_NUM_LINKS             (-1)
 #ifdef WLAN_MLO_MULTI_CHIP
-#define WLAN_MLO_GROUP_INVALID                 (-1)
-#define WLAN_MLO_CHIP_ID_INVALID                 (-1)
+#define WLAN_MLO_GROUP_INVALID                 0xFF
+#define WLAN_MLO_CHIP_ID_INVALID               0xFF
 /**
  * wlan_mlo_get_max_num_links() - Get the maximum number of MLO links
  * possible in the system
