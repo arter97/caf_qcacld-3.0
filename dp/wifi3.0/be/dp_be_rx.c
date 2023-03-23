@@ -565,7 +565,6 @@ done:
 
 		rx_bufs_used++;
 
-#ifdef DP_MLO_LINK_STATS_SUPPORT
 		/* MLD Link Peer Statistics support */
 		if (txrx_peer->is_mld_peer && rx_pdev->link_peer_stats) {
 			link_id = dp_rx_get_stats_arr_idx_from_link_id(
@@ -574,7 +573,6 @@ done:
 		} else {
 			link_id = 0;
 		}
-#endif
 
 		/* when hlos tid override is enabled, save tid in
 		 * skb->priority
