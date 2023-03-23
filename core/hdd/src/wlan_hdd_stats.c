@@ -270,6 +270,7 @@ static int copy_station_stats_to_adapter(struct hdd_adapter *adapter,
 			stats->peer_adv_stats->rx_bytes;
 	adapter->hdd_stats.peer_stats.fcs_count =
 			stats->peer_adv_stats->fcs_count;
+	adapter->tx_pwr = stats->pdev_stats->max_pwr;
 
 	dynamic_cfg = mlme_get_dynamic_vdev_config(vdev);
 	if (!dynamic_cfg) {
@@ -2076,7 +2077,7 @@ static void cache_station_stats_cb(struct stats_event *ev, void *cookie)
 	wlan_net_dev_ref_dbgid dbgid = NET_DEV_HOLD_DISPLAY_TXRX_STATS;
 
 	if (!ev->vdev_summary_stats || !ev->vdev_chain_rssi ||
-	    !ev->peer_adv_stats) {
+	    !ev->peer_adv_stats || !ev->pdev_stats) {
 		hdd_debug("Invalid stats");
 		return;
 	}
@@ -7648,16 +7649,23 @@ int wlan_hdd_get_station_stats(struct hdd_adapter *adapter)
 
 	stats = wlan_cfg80211_mc_cp_stats_get_station_stats(vdev, &ret);
 	if (ret || !stats) {
-		wlan_cfg80211_mc_cp_stats_free_stats_event(stats);
+		hdd_err("Invalid stats");
+		goto out;
+	}
+
+	if (!stats->vdev_summary_stats || !stats->vdev_chain_rssi ||
+	    !stats->peer_adv_stats || !stats->pdev_stats) {
+		hdd_err("Invalid stats");
+		ret = -EINVAL;
 		goto out;
 	}
 
 	/* update get stats cached time stamp */
 	hdd_update_station_stats_cached_timestamp(adapter);
 	copy_station_stats_to_adapter(adapter, stats);
-	wlan_cfg80211_mc_cp_stats_free_stats_event(stats);
 
 out:
+	wlan_cfg80211_mc_cp_stats_free_stats_event(stats);
 	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_STATS_ID);
 	return ret;
 }

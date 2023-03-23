@@ -1160,6 +1160,7 @@ struct wlan_hdd_link_info {
  * @is_dbam_configured:
  * @deflink: Default link pointing to the 0th index of the linkinfo array
  * @link_info: Data structure to hold link specific information
+ * @tx_pwr: connection tx power sent by firmware
  */
 struct hdd_adapter {
 	uint32_t magic;
@@ -1355,6 +1356,7 @@ struct hdd_adapter {
 #endif
 	struct wlan_hdd_link_info *deflink;
 	struct wlan_hdd_link_info link_info[WLAN_MAX_MLD];
+	int tx_pwr;
 };
 
 #define WLAN_HDD_GET_STATION_CTX_PTR(adapter) \
