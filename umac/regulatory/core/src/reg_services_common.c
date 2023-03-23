@@ -6904,7 +6904,7 @@ reg_intersect_ranges(struct freq_range *first_range,
 
 	if (l_freq > r_freq) {
 		l_freq = 0;
-		l_freq = 0;
+		r_freq = 0;
 
 		reg_debug("Ranges do not overlap first= [%u, %u], second = [%u, %u]",
 			  first_range->left,
