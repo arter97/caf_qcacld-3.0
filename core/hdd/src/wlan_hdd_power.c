@@ -3172,20 +3172,39 @@ int wlan_hdd_cfg80211_set_txpower(struct wiphy *wiphy,
 	return errno;
 }
 
-static void wlan_hdd_get_tx_power(struct hdd_adapter *adapter, int *dbm)
+#ifdef FEATURE_CLUB_LL_STATS_AND_GET_STATION
+static int wlan_hdd_get_tx_power(struct hdd_adapter *adapter, int *dbm)
+{
+	if (hdd_validate_adapter(adapter)) {
+		hdd_err("Invalid adapter");
+		return -EINVAL;
+	}
+	/* TX_POWER is sent by STATION_STATS by firmware and
+	 * is copied into the adapter. So, return the cached value.
+	 */
+	*dbm = adapter->tx_pwr;
+	hdd_nofl_debug("cached tx_power: %d", *dbm);
 
+	return 0;
+}
+#else
+static int wlan_hdd_get_tx_power(struct hdd_adapter *adapter, int *dbm)
 {
 	struct wlan_objmgr_vdev *vdev;
+	int ret;
 
 	vdev = hdd_objmgr_get_vdev_by_user(adapter, WLAN_OSIF_POWER_ID);
 	if (!vdev) {
 		hdd_info("vdev is NULL");
-		return;
+		return -EINVAL;
 	}
 
-	wlan_cfg80211_mc_cp_stats_get_tx_power(vdev, dbm);
+	ret = wlan_cfg80211_mc_cp_stats_get_tx_power(vdev, dbm);
 	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_POWER_ID);
+	hdd_debug("power: %d", *dbm);
+	return ret;
 }
+#endif
 
 #ifdef FEATURE_ANI_LEVEL_REQUEST
 static void hdd_get_ani_level_cb(struct wmi_host_ani_level_event *ani,
@@ -3375,10 +3394,7 @@ static int __wlan_hdd_cfg80211_get_txpower(struct wiphy *wiphy,
 		   TRACE_CODE_HDD_CFG80211_GET_TXPOWER,
 		   adapter->vdev_id, adapter->device_mode);
 
-	wlan_hdd_get_tx_power(adapter, dbm);
-	hdd_debug("power: %d", *dbm);
-
-	return 0;
+	return wlan_hdd_get_tx_power(adapter, dbm);
 }
 
 int wlan_hdd_cfg80211_get_txpower(struct wiphy *wiphy,

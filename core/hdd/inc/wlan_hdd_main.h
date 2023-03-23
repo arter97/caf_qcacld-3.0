@@ -1031,6 +1031,7 @@ struct wlm_multi_client_info_table {
  * @set_mac_addr_req_ctx: Set MAC address command request context
  * @delta_qtime: delta between host qtime and monotonic time
  * @traffic_end_ind_en: traffic end indication feature enable/disable
+ * @tx_pwr: connection tx power sent by firmware
  */
 struct hdd_adapter {
 	/* Magic cookie for adapter sanity verification.  Note that this
@@ -1326,6 +1327,7 @@ struct hdd_adapter {
 #ifdef WLAN_FEATURE_DBAM_CONFIG
 	bool is_dbam_configured;
 #endif
+	int tx_pwr;
 };
 
 #define WLAN_HDD_GET_STATION_CTX_PTR(adapter) (&(adapter)->session.station)

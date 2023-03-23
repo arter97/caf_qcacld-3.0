@@ -265,6 +265,7 @@ static int copy_station_stats_to_adapter(struct hdd_adapter *adapter,
 			stats->peer_adv_stats->rx_bytes;
 	adapter->hdd_stats.peer_stats.fcs_count =
 			stats->peer_adv_stats->fcs_count;
+	adapter->tx_pwr = stats->pdev_stats->max_pwr;
 
 	dynamic_cfg = mlme_get_dynamic_vdev_config(vdev);
 	if (!dynamic_cfg) {
@@ -2054,7 +2055,7 @@ static void cache_station_stats_cb(struct stats_event *ev, void *cookie)
 	wlan_net_dev_ref_dbgid dbgid = NET_DEV_HOLD_DISPLAY_TXRX_STATS;
 
 	if (!ev->vdev_summary_stats || !ev->vdev_chain_rssi ||
-	    !ev->peer_adv_stats) {
+	    !ev->peer_adv_stats || !ev->pdev_stats) {
 		hdd_debug("Invalid stats");
 		return;
 	}
