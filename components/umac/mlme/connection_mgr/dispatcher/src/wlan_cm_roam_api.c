@@ -3492,11 +3492,6 @@ wlan_cm_update_roam_trigger_info(struct mlme_legacy_priv *mlme_priv,
 	uint32_t index;
 	struct enhance_roam_info *info;
 
-	if (!mlme_priv->roam_info) {
-		mlme_err("enhance_roam_info buffer is NULL");
-		return;
-	}
-
 	index = mlme_priv->roam_write_index;
 	info = &mlme_priv->roam_info[index];
 
@@ -3731,11 +3726,6 @@ wlan_cm_update_roam_scan_info(struct wlan_objmgr_vdev *vdev,
 		return;
 	}
 
-	if (!mlme_priv->roam_info) {
-		mlme_err("enhance_roam_info buffer is NULL");
-		return;
-	}
-
 	index = mlme_priv->roam_write_index;
 	info = &mlme_priv->roam_info[index];
 	info->scan.num_channels = scan->num_chan;
@@ -3844,11 +3834,6 @@ wlan_cm_update_roam_frame_info(struct mlme_legacy_priv *mlme_priv,
 	uint32_t i, j, index;
 	uint8_t subtype;
 
-	if (!mlme_priv->roam_info) {
-		mlme_err("enhance_roam_info buffer is NULL");
-		return;
-	}
-
 	index = mlme_priv->roam_write_index;
 	info = &mlme_priv->roam_info[index];
 
@@ -3876,6 +3861,24 @@ wlan_cm_update_roam_frame_info(struct mlme_legacy_priv *mlme_priv,
 			   info->timestamp[j].timestamp,
 			   info->timestamp[j].status, j);
 	}
+}
+
+/**
+ * wlan_cm_clear_current_roam_stats_info() - API to clear roam stats buffer date
+ * @mlme_priv: Pointer to Pointer to vdev mlme legacy priv struct
+ *
+ * clear the roam stats buffer data before write
+ *
+ * Return: void
+ */
+static void
+wlan_cm_clear_current_roam_stats_info(struct mlme_legacy_priv *mlme_priv)
+{
+	uint32_t index;
+
+	index = mlme_priv->roam_write_index;
+	qdf_mem_set(&mlme_priv->roam_info[index],
+		    sizeof(struct enhance_roam_info), 0);
 }
 
 /**
@@ -3917,9 +3920,15 @@ wlan_cm_update_roam_stats_info(struct wlan_objmgr_psoc *psoc,
 		return;
 	}
 
+	if (!mlme_priv->roam_info) {
+		mlme_err("enhance_roam_info buffer is NULL");
+		return;
+	}
+
 	qdf_mutex_acquire(&mlme_priv->roam_rd_wr_lock);
 
 	if (stats_info->trigger[index].present) {
+		wlan_cm_clear_current_roam_stats_info(mlme_priv);
 		wlan_cm_update_roam_trigger_info(mlme_priv,
 						 &stats_info->trigger[index]);
 		if (stats_info->scan[index].present)
