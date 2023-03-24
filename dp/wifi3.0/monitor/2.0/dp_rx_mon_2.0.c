@@ -1359,12 +1359,14 @@ dp_rx_mon_handle_flush_n_trucated_ppdu(struct dp_soc *soc,
 	dp_rx_mon_flush_status_buf_queue(pdev);
 	buf = mon_desc->buf_addr;
 	end_offset = mon_desc->end_offset;
-	qdf_frag_free(mon_desc->buf_addr);
-	DP_STATS_INC(mon_soc, frag_free, 1);
 	dp_mon_add_to_free_desc_list(&desc_list, &tail, mon_desc);
 	work_done = 1;
 	work_done += dp_rx_mon_flush_packet_tlv(pdev, buf, end_offset,
 						&desc_list, &tail);
+	if (buf) {
+		qdf_frag_free(buf);
+		DP_STATS_INC(mon_soc, frag_free, 1);
+	}
 	if (desc_list)
 		dp_mon_add_desc_list_to_free_list(soc, &desc_list, &tail,
 						  rx_mon_desc_pool);
