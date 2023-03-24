@@ -4829,6 +4829,11 @@ struct dp_peer {
 	enum cdp_peer_type peer_type;
 	/*---------for link peer---------*/
 	struct dp_peer *mld_peer;
+
+	/*Link ID of link peer*/
+	uint8_t link_id;
+	bool link_id_valid;
+
 	/*---------for mld peer----------*/
 	struct dp_peer_link_info link_peers[DP_MAX_MLO_LINKS];
 	uint8_t num_links;
