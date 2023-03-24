@@ -1842,6 +1842,9 @@ irqreturn_t dp_ppeds_handle_tx_comp(int irq, void *ctxt)
 			dp_get_be_soc_from_dp_soc((struct dp_soc *)ctxt);
 	struct napi_struct *napi = &be_soc->ppeds_napi_ctxt.napi;
 
+	if (!be_soc->ppeds_handle)
+		return IRQ_NONE;
+
 	dp_ppeds_disable_irq(&be_soc->soc, &be_soc->ppeds_wbm_release_ring);
 
 	napi_schedule(napi);
