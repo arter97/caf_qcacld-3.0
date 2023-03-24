@@ -2822,7 +2822,10 @@ cm_roam_stats_print_trigger_info(struct wlan_objmgr_psoc *psoc,
 
 	/* Update roam trigger info to userspace */
 	cm_roam_trigger_info_event(data, scan_data, vdev_id, is_full_scan);
-	mlme_nofl_info("%s [ROAM_TRIGGER]: VDEV[%d] %s", time, vdev_id, buf);
+
+	if (!data->common_roam)
+		mlme_nofl_info("%s [ROAM_TRIGGER]: VDEV[%d] %s",
+			       time, vdev_id, buf);
 	qdf_mem_free(buf);
 
 	status = wlan_cm_update_roam_states(psoc, vdev_id, data->trigger_reason,
