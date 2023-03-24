@@ -5010,8 +5010,8 @@ policy_mgr_is_conc_sap_present_on_sta_freq(struct wlan_objmgr_psoc *psoc,
 uint32_t policy_mgr_get_connection_count_with_ch_freq(uint32_t ch_freq);
 
 /**
- * policy_mgr_is_sap_allowed_on_indoor() - Check if the SAP operation
- * is allowed in the indoor channel
+ * policy_mgr_is_sap_go_interface_allowed_on_indoor() - Check if SAP or GO
+ * interface is allowed on the indoor channel
  *
  * @pdev: pointer to pdev
  * @vdev_id: vdev id
@@ -5019,8 +5019,10 @@ uint32_t policy_mgr_get_connection_count_with_ch_freq(uint32_t ch_freq);
  *
  * Return: is SAP allowed
  */
-bool policy_mgr_is_sap_allowed_on_indoor(struct wlan_objmgr_pdev *pdev,
-					 uint8_t vdev_id, qdf_freq_t ch_freq);
+bool
+policy_mgr_is_sap_go_interface_allowed_on_indoor(struct wlan_objmgr_pdev *pdev,
+						 uint8_t vdev_id,
+						 qdf_freq_t ch_freq);
 
 #ifdef WLAN_FEATURE_TDLS_CONCURRENCIES
 /**

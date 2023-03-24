@@ -3311,9 +3311,10 @@ int hdd_softap_set_channel_change(struct net_device *dev, int target_chan_freq,
 		return status;
 	}
 
-	if (!policy_mgr_is_sap_allowed_on_indoor(hdd_ctx->pdev,
-						 adapter->deflink->vdev_id,
-						 target_chan_freq)) {
+	if (!policy_mgr_is_sap_go_interface_allowed_on_indoor(
+						hdd_ctx->pdev,
+						adapter->deflink->vdev_id,
+						target_chan_freq)) {
 		hdd_debug("Channel switch is not allowed to indoor frequency %d",
 			  target_chan_freq);
 		return -EINVAL;
@@ -7616,7 +7617,7 @@ static int __wlan_hdd_cfg80211_start_ap(struct wiphy *wiphy,
 	if (!status)
 		return -EINVAL;
 
-	status = policy_mgr_is_sap_allowed_on_indoor(
+	status = policy_mgr_is_sap_go_interface_allowed_on_indoor(
 						hdd_ctx->pdev,
 						adapter->deflink->vdev_id,
 						chandef->chan->center_freq);

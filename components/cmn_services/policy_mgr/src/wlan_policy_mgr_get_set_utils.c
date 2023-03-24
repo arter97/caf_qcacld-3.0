@@ -9085,8 +9085,10 @@ bool policy_mgr_is_sap_allowed_on_dfs_freq(struct wlan_objmgr_pdev *pdev,
 	return true;
 }
 
-bool policy_mgr_is_sap_allowed_on_indoor(struct wlan_objmgr_pdev *pdev,
-					 uint8_t vdev_id, qdf_freq_t ch_freq)
+bool
+policy_mgr_is_sap_go_interface_allowed_on_indoor(struct wlan_objmgr_pdev *pdev,
+						 uint8_t vdev_id,
+						 qdf_freq_t ch_freq)
 {
 	struct wlan_objmgr_psoc *psoc;
 	bool is_scc = false, indoor_support = false;
@@ -9110,7 +9112,7 @@ bool policy_mgr_is_sap_allowed_on_indoor(struct wlan_objmgr_pdev *pdev,
 	 *      a) Restrict 6 GHz SAP
 	 *      b) Restrict standalone 5 GHz SAP
 	 *
-	 * If p2p_go_on_indoor_chan is enabled - Allow GO
+	 * If p2p_go_on_5ghz_indoor_chan is enabled - Allow GO
 	 * with or without concurrency
 	 *
 	 * If sta_sap_scc_on_indoor_chan is enabled - Allow
@@ -9118,18 +9120,30 @@ bool policy_mgr_is_sap_allowed_on_indoor(struct wlan_objmgr_pdev *pdev,
 	 *
 	 * Restrict all other operations on indoor
 	 */
-	if (indoor_support) {
+
+	if (indoor_support)
 		return true;
-	} else if (WLAN_REG_IS_6GHZ_CHAN_FREQ(ch_freq) ||
-		   (!is_scc && mode == QDF_SAP_MODE)) {
+
+	if (WLAN_REG_IS_6GHZ_CHAN_FREQ(ch_freq)) {
+		policy_mgr_rl_debug("SAP operation is not allowed on 6 GHz indoor channel");
+		return false;
+	}
+
+	if (mode == QDF_SAP_MODE) {
+		if (is_scc &&
+		    policy_mgr_get_sta_sap_scc_allowed_on_indoor_chnl(psoc))
+			return true;
 		policy_mgr_rl_debug("SAP operation is not allowed on indoor channel");
 		return false;
-	} else if (mode == QDF_P2P_GO_MODE &&
-		   ucfg_p2p_get_indoor_ch_support(psoc)) {
-		return true;
-	} else if (is_scc &&
-		  policy_mgr_get_sta_sap_scc_allowed_on_indoor_chnl(psoc)) {
-		return true;
+	}
+
+	if (mode == QDF_P2P_GO_MODE) {
+		if (ucfg_p2p_get_indoor_ch_support(psoc) ||
+		    (is_scc &&
+		    policy_mgr_get_sta_sap_scc_allowed_on_indoor_chnl(psoc)))
+			return true;
+		policy_mgr_rl_debug("GO operation is not allowed on indoor channel");
+		return false;
 	}
 
 	policy_mgr_rl_debug("SAP operation is not allowed on indoor channel");
@@ -9898,9 +9912,9 @@ bool policy_mgr_is_restart_sap_required(struct wlan_objmgr_psoc *psoc,
 		if (connection[i].freq != freq &&
 		    WLAN_REG_IS_24GHZ_CH_FREQ(connection[i].freq) &&
 		    WLAN_REG_IS_5GHZ_CH_FREQ(freq) &&
-		    !policy_mgr_is_sap_allowed_on_indoor(pm_ctx->pdev,
-							 vdev_id,
-							 freq)) {
+		    !policy_mgr_is_sap_go_interface_allowed_on_indoor(
+							pm_ctx->pdev,
+							vdev_id, freq)) {
 			policy_mgr_debug("SAP in indoor freq: sta:%d sap:%d",
 					 connection[i].freq, freq);
 			restart_required = true;

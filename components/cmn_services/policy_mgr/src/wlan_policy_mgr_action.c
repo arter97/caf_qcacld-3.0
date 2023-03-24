@@ -1723,9 +1723,10 @@ bool policy_mgr_is_sap_restart_required_after_sta_disconnect(
 		 * channel.
 		 */
 		if (pm_ctx->last_disconn_sta_freq == op_ch_freq_list[i] &&
-		    !policy_mgr_is_sap_allowed_on_indoor(pm_ctx->pdev,
-							 sap_vdev_id,
-							 op_ch_freq_list[i])) {
+		    !policy_mgr_is_sap_go_interface_allowed_on_indoor(
+							pm_ctx->pdev,
+							sap_vdev_id,
+							op_ch_freq_list[i])) {
 			curr_sap_freq = op_ch_freq_list[i];
 			policy_mgr_debug("indoor sap_ch_freq %u",
 					 curr_sap_freq);
@@ -1781,9 +1782,10 @@ bool policy_mgr_is_sap_restart_required_after_sta_disconnect(
 		 * on indoor which is not removed in policy_mgr_get_pcl
 		 */
 		if (!sta_gc_present &&
-		    !policy_mgr_is_sap_allowed_on_indoor(pm_ctx->pdev,
-							 sap_vdev_id,
-							 pcl_channels[i])) {
+		    !policy_mgr_is_sap_go_interface_allowed_on_indoor(
+							pm_ctx->pdev,
+							sap_vdev_id,
+							pcl_channels[i])) {
 			policy_mgr_debug("Do not allow SAP on indoor frequency, STA is absent");
 			continue;
 		}
@@ -2628,9 +2630,9 @@ policy_mgr_valid_sap_conc_channel_check(struct wlan_objmgr_psoc *psoc,
 		find_alternate = true;
 		policymgr_nofl_debug("sap not capable on SRD con ch_freq %d",
 				     ch_freq);
-	} else if (!policy_mgr_is_sap_allowed_on_indoor(pm_ctx->pdev,
-							sap_vdev_id,
-							ch_freq)) {
+	} else if (!policy_mgr_is_sap_go_interface_allowed_on_indoor(
+							pm_ctx->pdev,
+							sap_vdev_id, ch_freq)) {
 		policymgr_nofl_debug("sap not capable on indoor con ch_freq %d is_sta_sap_scc:%d",
 				     ch_freq, is_sta_sap_scc);
 		find_alternate = true;
