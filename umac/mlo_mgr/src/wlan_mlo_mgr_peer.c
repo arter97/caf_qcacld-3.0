@@ -938,7 +938,8 @@ wlan_mlo_check_and_create_bridge_peer(struct wlan_objmgr_vdev *vdev,
 		return QDF_STATUS_SUCCESS;
 	for (i = 0; i < WLAN_UMAC_MLO_MAX_VDEVS; i++) {
 		ml_vdev = ml_dev->wlan_vdev_list[i];
-		if (!ml_vdev || (wlan_vdev_is_up(vdev) != QDF_STATUS_SUCCESS))
+		if (!ml_vdev ||
+		    (wlan_vdev_is_up(ml_vdev) != QDF_STATUS_SUCCESS))
 			continue;
 		comp_psoc_id = wlan_vdev_get_psoc_id(ml_vdev);
 		if ((comp_psoc_id != psoc_ids[0]) &&
