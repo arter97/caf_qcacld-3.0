@@ -1602,6 +1602,11 @@ config WLAN_SYSFS_WLAN_DBG
 	depends on WLAN_SYSFS
 	default n
 
+config WLAN_SYSFS_BITRATES
+	bool "enable WLAN_SYSFS_BITRATES"
+	depends on WLAN_SYSFS
+	default n
+
 config WLAN_THERMAL_CFG
 	bool "Enable WLAN_THERMAL_CFG"
 	default n
