@@ -723,4 +723,46 @@ ucfg_cm_roam_stats_info_put(struct enhance_roam_info *roam_info)
 {
 }
 #endif
+
+#ifdef WLAN_FEATURE_11BE_MLO
+/**
+ * ucfg_cm_is_sae_auth_addr_conversion_required() - this api is wrapper for
+ * "wlan_cm_is_sae_auth_addr_conversion_required" function
+ * @vdev: pointer to vdev
+ *
+ * Return: true for address conversion otherwise false
+ */
+static inline bool
+ucfg_cm_is_sae_auth_addr_conversion_required(struct wlan_objmgr_vdev *vdev)
+{
+	return wlan_cm_is_sae_auth_addr_conversion_required(vdev);
+}
+#else
+static inline bool
+ucfg_cm_is_sae_auth_addr_conversion_required(struct wlan_objmgr_vdev *vdev)
+{
+	return false;
+}
+#endif
+
+#if defined(WLAN_FEATURE_ROAM_OFFLOAD) && defined(WLAN_FEATURE_11BE_MLO)
+/**
+ * ucfg_cm_roaming_get_peer_mld_addr() - this api is wrapper for
+ * "wlan_cm_roaming_get_peer_mld_addr" function.
+ * @vdev: pointer to vdev
+ *
+ * Return: mld address of peer
+ */
+static inline struct qdf_mac_addr *
+ucfg_cm_roaming_get_peer_mld_addr(struct wlan_objmgr_vdev *vdev)
+{
+	return wlan_cm_roaming_get_peer_mld_addr(vdev);
+}
+#else
+static inline struct qdf_mac_addr *
+ucfg_cm_roaming_get_peer_mld_addr(struct wlan_objmgr_vdev *vdev)
+{
+	return NULL;
+}
+#endif
 #endif /* _WLAN_CM_ROAM_UCFG_API_H_ */
