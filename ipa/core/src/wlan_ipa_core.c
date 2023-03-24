@@ -4115,12 +4115,6 @@ QDF_STATUS wlan_ipa_setup(struct wlan_ipa_priv *ipa_ctx,
 
 		status = wlan_ipa_wdi_init(ipa_ctx);
 
-		/* Register call backs for opt wifi dp */
-		if (ipa_ctx->opt_wifi_datapath) {
-			status = wlan_ipa_reg_flt_cbs(ipa_ctx);
-			ipa_info("opt_dp: Register cb status %d", status);
-		}
-
 		if (status == QDF_STATUS_SUCCESS) {
 			/* Setup IPA system pipes */
 			if (wlan_ipa_uc_sta_is_enabled(ipa_ctx->config)) {
@@ -4146,6 +4140,12 @@ QDF_STATUS wlan_ipa_setup(struct wlan_ipa_priv *ipa_ctx,
 		ret = wlan_ipa_setup_sys_pipe(ipa_ctx);
 		if (ret)
 			goto ipa_wdi_destroy;
+	}
+
+	/* Register call backs for opt wifi dp */
+	if (ipa_ctx->opt_wifi_datapath) {
+		status = wlan_ipa_reg_flt_cbs(ipa_ctx);
+		ipa_info("opt_dp: Register cb status %d", status);
 	}
 
 	qdf_event_create(&ipa_ctx->ipa_resource_comp);
@@ -4215,7 +4215,8 @@ QDF_STATUS wlan_ipa_cleanup(struct wlan_ipa_priv *ipa_ctx)
 	if (!wlan_ipa_uc_is_enabled(ipa_ctx->config))
 		wlan_ipa_teardown_sys_pipe(ipa_ctx);
 
-	wlan_ipa_destroy_opt_wifi_flt_cb_event(ipa_ctx);
+	if (ipa_ctx->uc_loaded)
+		wlan_ipa_destroy_opt_wifi_flt_cb_event(ipa_ctx);
 
 	/* Teardown IPA sys_pipe for MCC */
 	if (wlan_ipa_uc_sta_is_enabled(ipa_ctx->config)) {
