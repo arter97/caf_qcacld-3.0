@@ -101,7 +101,7 @@ wlan_peer_update_avg_tx_rate_stats_user(
 		return 0;
 	}
 
-	if (!is_pm && is_data && !user->is_bss_peer) {
+	if (!is_pm && is_data) {
 		avg->tx[type].num_ppdu++;
 		avg->tx[type].sum_mbps += kbps / CDP_NUM_KB_IN_MB;
 	}
@@ -225,7 +225,7 @@ wlan_peer_update_avg_rx_rate_stats_user(struct wlan_avg_rate_stats *avg,
 		return 0;
 	}
 
-	if (!is_pm && is_data && !user->is_bss_peer) {
+	if (!is_pm && is_data) {
 		avg->rx[type].num_ppdu++;
 		avg->rx[type].sum_mbps += kbps / CDP_NUM_KB_IN_MB;
 	}
