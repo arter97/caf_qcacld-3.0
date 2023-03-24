@@ -1259,7 +1259,8 @@ QDF_STATUS wlan_mlo_peer_create(struct wlan_objmgr_vdev *vdev,
 	 */
 	if ((wlan_vdev_mlme_get_opmode(vdev) == QDF_SAP_MODE) &&
 	    (!wlan_mlo_peer_is_nawds(ml_peer))) {
-		if (ml_peer->max_links == ml_peer->link_peer_cnt) {
+		if ((ml_peer->max_links == 1) &&
+		    (ml_peer->link_peer_cnt == 1)) {
 			assoc_peer = ml_peer->peer_list[0].link_peer;
 			if (assoc_peer)
 				mlo_mlme_peer_assoc_resp(assoc_peer);
