@@ -19170,7 +19170,7 @@ static void wlan_hdd_update_ap_sme_cap_wiphy(struct hdd_context *hdd_ctx)
  */
 void wlan_hdd_update_wiphy(struct hdd_context *hdd_ctx)
 {
-	int value;
+	int value = 0;
 	bool fils_enabled, mac_spoofing_enabled;
 	bool dfs_master_capable = true, is_oce_sta_enabled = false;
 	QDF_STATUS status;
