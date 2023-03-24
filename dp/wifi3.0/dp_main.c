@@ -9222,7 +9222,9 @@ static void
 dp_peer_flush_rate_stats_req(struct dp_soc *soc, struct dp_peer *peer,
 			     void *arg)
 {
-	if (peer->bss_peer)
+	/* Skip self peer */
+	if (!qdf_mem_cmp(peer->mac_addr.raw, peer->vdev->mac_addr.raw,
+			 QDF_MAC_ADDR_SIZE))
 		return;
 
 	dp_wdi_event_handler(
