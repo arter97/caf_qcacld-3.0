@@ -962,14 +962,12 @@ wlan_mlo_t2lm_timer_stop(struct wlan_objmgr_vdev *vdev)
 		return QDF_STATUS_E_NULL_VALUE;
 	}
 
-	t2lm_dev_lock_acquire(&vdev->mlo_dev_ctx->t2lm_ctx);
 	if (t2lm_timer->timer_started) {
 		qdf_timer_stop(&t2lm_timer->t2lm_timer);
 		t2lm_timer->timer_started = false;
 		t2lm_timer->timer_interval = 0;
 		t2lm_timer->timer_out_time = 0;
 	}
-	t2lm_dev_lock_release(&vdev->mlo_dev_ctx->t2lm_ctx);
 	return QDF_STATUS_SUCCESS;
 }
 
