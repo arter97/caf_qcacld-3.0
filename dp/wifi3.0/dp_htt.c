@@ -3824,10 +3824,7 @@ void dp_htt_t2h_msg_handler(void *context, HTC_PACKET *pkt)
 			u_int8_t vdev_id;
 			bool is_wds;
 			u_int16_t ast_hash;
-			struct dp_ast_flow_override_info ast_flow_info;
-
-			qdf_mem_set(&ast_flow_info, 0,
-					    sizeof(struct dp_ast_flow_override_info));
+			struct dp_ast_flow_override_info ast_flow_info = {0};
 
 			peer_id = HTT_RX_PEER_MAP_V2_SW_PEER_ID_GET(*msg_word);
 			hw_peer_id =
