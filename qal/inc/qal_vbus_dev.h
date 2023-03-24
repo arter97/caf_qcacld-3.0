@@ -61,6 +61,82 @@ QDF_STATUS
 qal_vbus_release_iorsc(int devnum);
 
 /**
+ * qal_vbus_allocate_iorsc() - allocate io resource
+ * @pinnum: pin Number
+ * @label: pin name string
+ *
+ * This function will allocate the io resource for a device
+ *
+ * Return: QDF_STATUS_SUCCESS on success
+ */
+QDF_STATUS
+qal_vbus_allocate_iorsc(unsigned int pinnum, const char *label);
+
+/**
+ * qal_vbus_iorsc_dir_output() - set pin dirction to output
+ * @pin: pin Number
+ * @val: value
+ *
+ * This function set the gpio pin direction to output
+ *
+ * Return: 0 on success, error no on failure
+ */
+QDF_STATUS
+qal_vbus_iorsc_dir_output(unsigned int pin, int val);
+
+/**
+ * qal_vbus_iorsc_set_value() - set pin direction
+ * @pin: pin Number
+ * @val: value
+ *
+ * This function set the gpio pin direction based on value
+ *
+ * Return: QDF_STATUS_SUCCESS on success
+ */
+QDF_STATUS
+qal_vbus_iorsc_set_value(unsigned int pin, int val);
+
+/**
+ * qal_vbus_iorsc_toirq() - set irq number to gpio
+ * @pin: pin Number
+ *
+ * This function set the irq number to gpio pin
+ *
+ * Return: QDF_STATUS_SUCCESS on success
+ */
+QDF_STATUS
+qal_vbus_iorsc_toirq(unsigned int pin);
+
+/**
+ * qal_vbus_request_irq() - set interrupt handler
+ * @irqnum: irq Number
+ * @handler: function handler to be called
+ * @flags: irq flags
+ * @dev_name: device name
+ * @ctx: pointer to device context
+ * This function set up the handling of the interrupt
+ *
+ * Return: QDF_STATUS_SUCCESS on success, Error code on failure
+ */
+QDF_STATUS
+qal_vbus_request_irq(unsigned int irqnum,
+		     irqreturn_t (*handler)(int irq, void *arg),
+		     unsigned long flags, const char *dev_name,
+		     void *ctx);
+
+/**
+ * __qal_vbus_free_irq() - free irq
+ * @irqnum: irq Number
+ * @ctx: pointer to device context
+ *
+ * This function free the irq number set to gpio pin
+ *
+ * Return: QDF_STATUS_SUCCESS on success
+ */
+static inline QDF_STATUS
+__qal_vbus_free_irq(unsigned int irqnum, void *ctx);
+
+/**
  * qal_vbus_enable_devclk() - enable device clock
  * @clk: Device clock
  *
@@ -221,9 +297,47 @@ qal_vbus_get_iorsc(int devnum, uint32_t flag, char *devname)
 }
 
 static inline QDF_STATUS
+qal_vbus_allocate_iorsc(unsigned int pinnum, const char *label)
+{
+	return __qal_vbus_allocate_iorsc(pinnum, label);
+}
+
+static inline QDF_STATUS
+qal_vbus_iorsc_dir_output(unsigned int pin, int val)
+{
+	return __qal_vbus_iorsc_dir_output(pin, val);
+}
+
+static inline QDF_STATUS
+qal_vbus_iorsc_set_value(unsigned int pin, int val)
+{
+	return __qal_vbus_iorsc_set_value(pin, val);
+}
+
+static inline QDF_STATUS
 qal_vbus_release_iorsc(int devnum)
 {
 	return __qal_vbus_release_iorsc(devnum);
+}
+
+static inline QDF_STATUS
+qal_vbus_iorsc_toirq(unsigned int pin)
+{
+	return __qal_vbus_iorsc_toirq(pin);
+}
+
+static inline QDF_STATUS
+qal_vbus_request_irq(unsigned int irqnum,
+		     irqreturn_t (*handler)(int irq, void *arg),
+		     unsigned long flags, const char *dev_name, void *ctx)
+{
+	return __qal_vbus_request_irq(irqnum, handler, flags, dev_name, ctx);
+}
+
+static inline QDF_STATUS
+qal_vbus_free_irq(unsigned int irqnum, void *ctx)
+{
+	return __qal_vbus_free_irq(irqnum, ctx);
 }
 
 static inline QDF_STATUS
@@ -310,5 +424,4 @@ qal_vbus_rcu_read_unlock(void)
 	return __qal_vbus_rcu_read_unlock();
 }
 #endif
-
 #endif  /* __QAL_VBUS_DEV_H */
