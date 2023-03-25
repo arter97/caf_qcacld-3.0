@@ -1429,6 +1429,9 @@ enum _ol_ath_param_t {
 #ifdef WLAN_MGMT_RX_REO_SUPPORT
 	OL_ATH_PARAM_MGMT_RX_REO_STATUS = 518,
 #endif
+#ifdef WLAN_DISP_CHAN_INFO
+	OL_ATH_PARAM_LIST_5GHZ_CHAN_INFO = 519,
+#endif
 	OL_ATH_PARAM_MON_MAC_FILTER = 520,
 	OL_ATH_PARAM_PUNC_EIRP_THRES = 521,
 	/* Display the current 6G client type */
@@ -1437,7 +1440,6 @@ enum _ol_ath_param_t {
 	OL_ATH_PARAM_MBSS_GET_GROUP_SIZE = 524,
 	OL_ATH_PARAM_SCAN_BLANKING_MODE = 525,
 	OL_ATH_PARAM_I2R_LMR_FEEDBACK_POLICY = 526,
-	/* Param number 519 is unused. Please use this for the new param addition */
 };
 
 #ifdef CONFIG_SUPPORT_VENCMDTABLE
@@ -3784,6 +3786,11 @@ struct vendor_commands radio_vendor_cmds[] = {
 		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_SCAN_BLANKING_MODE, GET_PARAM, 0},
 	{"set_i2r_lmr_feedback_policy",
 		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_I2R_LMR_FEEDBACK_POLICY, SET_PARAM, 1},
+#ifdef WLAN_DISP_CHAN_INFO
+	{"list_5ghz_chan_info",
+		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_LIST_5GHZ_CHAN_INFO,
+		GET_PARAM, 0},
+#endif
 };
 #endif
 
