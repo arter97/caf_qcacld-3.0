@@ -2421,7 +2421,7 @@ dp_h2t_ptqm_migration_msg_send(struct dp_soc *dp_soc, uint16_t vdev_id,
 
 	msg = qdf_nbuf_alloc(
 			soc->osdev,
-			HTT_MSG_BUF_SIZE(HTT_H2T_REO_MIGRATION_RESP_MSG_SZ),
+			HTT_MSG_BUF_SIZE(sizeof(htt_h2t_primary_link_peer_migrate_resp_t)),
 			HTC_HEADER_LEN + HTC_HDR_ALIGNMENT_PADDING, 4, TRUE);
 
 	if (!msg)
@@ -2433,7 +2433,7 @@ dp_h2t_ptqm_migration_msg_send(struct dp_soc *dp_soc, uint16_t vdev_id,
 	 * separately during the below call to qdf_nbuf_push_head.
 	 * The contribution from the HTC header is added separately inside HTC.
 	 */
-	if (qdf_nbuf_put_tail(msg, HTT_H2T_REO_MIGRATION_RESP_MSG_SZ)
+	if (qdf_nbuf_put_tail(msg, sizeof(htt_h2t_primary_link_peer_migrate_resp_t))
 			      == NULL) {
 		dp_htt_err("Failed to expand head for"
 			   "HTT_H2T_MSG_TYPE_PRIMARY_LINK_PEER_MIGRATE_RESP");
@@ -2442,7 +2442,7 @@ dp_h2t_ptqm_migration_msg_send(struct dp_soc *dp_soc, uint16_t vdev_id,
 	}
 
 	msg_word = (uint32_t *)qdf_nbuf_data(msg);
-	memset(msg_word, 0, HTT_H2T_REO_MIGRATION_RESP_MSG_SZ);
+	memset(msg_word, 0, sizeof(htt_h2t_primary_link_peer_migrate_resp_t));
 
 	qdf_nbuf_push_head(msg, HTC_HDR_ALIGNMENT_PADDING);
 	htt_logger_bufp = (uint8_t *)msg_word;
@@ -2464,8 +2464,8 @@ dp_h2t_ptqm_migration_msg_send(struct dp_soc *dp_soc, uint16_t vdev_id,
 	/* word 1 */
 	msg_word++;
 	*msg_word = 0;
-	HTT_H2T_PRIMARY_LINK_PEER_MIGRATE_SRCINFO_SET(*msg_word,
-						      src_info);
+	HTT_H2T_PRIMARY_LINK_PEER_MIGRATE_SRC_INFO_SET(*msg_word,
+						       src_info);
 	HTT_H2T_PRIMARY_LINK_PEER_MIGRATE_STATUS_SET(*msg_word,
 						     status);
 
