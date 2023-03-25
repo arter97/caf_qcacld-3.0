@@ -194,6 +194,26 @@ QDF_STATUS
 wlan_twt_cfg_get_bcast_responder(struct wlan_objmgr_psoc *psoc, bool *val);
 
 /**
+ * wlan_twt_cfg_get_rtwt_requestor() - get rtwt requestor
+ * @psoc: Pointer to global psoc
+ * @val: pointer to output variable
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+wlan_twt_cfg_get_rtwt_requestor(struct wlan_objmgr_psoc *psoc, bool *val);
+
+/**
+ * wlan_twt_cfg_get_rtwt_responder() - get rtwt responder
+ * @psoc: Pointer to global psoc
+ * @val: pointer to output variable
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+wlan_twt_cfg_get_rtwt_responder(struct wlan_objmgr_psoc *psoc, bool *val);
+
+/**
  * wlan_twt_cfg_get_support_in_11n_mode() - Get TWT support in 11n mode
  * @psoc: Pointer to global psoc
  * @val: pointer to output variable
@@ -203,6 +223,15 @@ wlan_twt_cfg_get_bcast_responder(struct wlan_objmgr_psoc *psoc, bool *val);
 QDF_STATUS
 wlan_twt_cfg_get_support_in_11n_mode(struct wlan_objmgr_psoc *psoc,
 				     bool *val);
+/**
+ * wlan_twt_get_restricted_support() - Get rTWT support
+ * @psoc: Pointer to global psoc
+ * @val: pointer to output variable
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+wlan_twt_get_restricted_support(struct wlan_objmgr_psoc *psoc, bool *val);
 
 #else
 
@@ -310,6 +339,12 @@ wlan_twt_cfg_get_bcast_responder(struct wlan_objmgr_psoc *psoc, bool *val)
 static inline QDF_STATUS
 wlan_twt_cfg_get_support_in_11n_mode(struct wlan_objmgr_psoc *psoc,
 				     bool *val)
+{
+	return QDF_STATUS_SUCCESS;
+}
+
+static inline QDF_STATUS
+wlan_twt_get_restricted_support(struct wlan_objmgr_psoc *psoc, bool *val)
 {
 	return QDF_STATUS_SUCCESS;
 }

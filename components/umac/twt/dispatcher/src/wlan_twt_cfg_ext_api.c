@@ -55,6 +55,12 @@ wlan_twt_cfg_get_support_requestor(struct wlan_objmgr_psoc *psoc, bool *val)
 	return wlan_twt_cfg_get_requestor(psoc, val);
 }
 
+QDF_STATUS
+wlan_twt_get_rtwt_support(struct wlan_objmgr_psoc *psoc, bool *val)
+{
+	return wlan_twt_get_restricted_support(psoc, val);
+}
+
 #ifdef FEATURE_SET
 void wlan_twt_get_feature_info(struct wlan_objmgr_psoc *psoc,
 			       struct wlan_twt_features *twt_feature_set)
