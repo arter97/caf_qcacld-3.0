@@ -136,6 +136,7 @@
 #endif
 #define STATS_IF_SS_COUNT            8
 #define STATS_IF_MAX_USERS           37
+#define STATS_IF_MAX_MIMO_USERS      8
 #define STATS_IF_DATA_TID_MAX        8
 
 /**
@@ -1489,8 +1490,8 @@ struct stats_if_ul_trigger_status {
 struct debug_pdev_data_deter {
 	uint64_t dl_ofdma_usr[STATS_IF_MAX_USERS];
 	uint64_t ul_ofdma_usr[STATS_IF_MAX_USERS];
-	uint64_t dl_mimo_usr[STATS_IF_MAX_USERS];
-	uint64_t ul_mimo_usr[STATS_IF_MAX_USERS];
+	uint64_t dl_mimo_usr[STATS_IF_MAX_MIMO_USERS];
+	uint64_t ul_mimo_usr[STATS_IF_MAX_MIMO_USERS];
 	uint64_t dl_mode_cnt[STATS_IF_TXDL_MAX];
 	uint64_t ul_mode_cnt[STATS_IF_TXUL_MAX];
 	uint64_t rx_su_cnt;

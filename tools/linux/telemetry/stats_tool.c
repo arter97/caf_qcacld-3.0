@@ -3409,17 +3409,17 @@ void print_debug_radio_deter_stats(struct debug_pdev_data_deter *deter)
 	STATS_64(stdout, "RX SU:", deter->rx_su_cnt);
 
 	STATS_PRINT("----DL OFDMA Num Users: ----\n");
-	for (user = 1; user < STATS_IF_MAX_USERS; user++)
-		STATS_PRINT("Num Users [%u]: %ju\n", user, deter->dl_ofdma_usr[user]);
+	for (user = 0; user < STATS_IF_MAX_USERS; user++)
+		STATS_PRINT("Num Users [%u]: %ju\n", user + 1, deter->dl_ofdma_usr[user]);
 	STATS_PRINT("----UL OFDMA Num Users: ----\n");
-	for (user = 1; user < STATS_IF_MAX_USERS; user++)
-		STATS_PRINT("Num Users [%u]: %ju\n", user, deter->ul_ofdma_usr[user]);
+	for (user = 0; user < STATS_IF_MAX_USERS; user++)
+		STATS_PRINT("Num Users [%u]: %ju\n", user + 1, deter->ul_ofdma_usr[user]);
 	STATS_PRINT("----DL MIMO Num Users: ----\n");
-	for (user = 1; user < STATS_IF_MAX_USERS; user++)
-		STATS_PRINT("Num Users [%u]: %ju\n", user, deter->dl_mimo_usr[user]);
+	for (user = 0; user < STATS_IF_MAX_MIMO_USERS; user++)
+		STATS_PRINT("Num Users [%u]: %ju\n", user + 1, deter->dl_mimo_usr[user]);
 	STATS_PRINT("----UL MIMO Num Users: ----\n");
-	for (user = 1; user < STATS_IF_MAX_USERS; user++)
-		STATS_PRINT("Num Users [%u]: %ju\n", user, deter->ul_mimo_usr[user]);
+	for (user = 0; user < STATS_IF_MAX_MIMO_USERS; user++)
+		STATS_PRINT("Num Users [%u]: %ju\n", user + 1, deter->ul_mimo_usr[user]);
 
 	STATS_PRINT("----Trigger Status: ----\n");
 	STATS_64(stdout, "UL OFDMA Success:", deter->ts[STATS_IF_TXUL_OFDMA_BASIC_TRIGGER_DATA].trigger_success);
