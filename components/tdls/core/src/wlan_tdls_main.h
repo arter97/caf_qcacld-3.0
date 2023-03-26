@@ -167,7 +167,6 @@ struct tdls_set_state_info {
  * @tdls_external_peer_count: external tdls peer count
  * @tdls_nss_switch_in_progress: tdls antenna switch in progress
  * @tdls_nss_teardown_complete: tdls tear down complete
- * @tdls_disable_in_progress: tdls is disable in progress
  * @tdls_nss_transition_mode: tdls nss transition mode
  * @tdls_teardown_peers_cnt: tdls tear down peer count
  * @set_state_info: set tdls state info
@@ -223,7 +222,6 @@ struct tdls_soc_priv_obj {
 	uint8_t tdls_external_peer_count;
 	bool tdls_nss_switch_in_progress;
 	bool tdls_nss_teardown_complete;
-	bool tdls_disable_in_progress;
 	enum tdls_nss_transition_state tdls_nss_transition_mode;
 	int32_t tdls_teardown_peers_cnt;
 	struct tdls_set_state_info set_state_info;

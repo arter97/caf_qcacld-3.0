@@ -289,7 +289,6 @@ static QDF_STATUS tdls_global_init(struct tdls_soc_priv_obj *soc_obj)
 	soc_obj->tdls_nss_transition_mode = TDLS_NSS_TRANSITION_S_UNKNOWN;
 	soc_obj->enable_tdls_connection_tracker = false;
 	soc_obj->tdls_external_peer_count = 0;
-	soc_obj->tdls_disable_in_progress = false;
 
 	qdf_spinlock_create(&soc_obj->tdls_ct_spinlock);
 	tdls_wow_init(soc_obj);

@@ -1547,9 +1547,6 @@ void tdls_process_enable_for_vdev(struct wlan_objmgr_vdev *vdev)
 	if (QDF_IS_STATUS_ERROR(status))
 		return;
 
-	if (tdls_soc_obj->tdls_disable_in_progress)
-		return;
-
 	tdls_send_update_to_fw(tdls_vdev_obj, tdls_soc_obj,
 			       mlme_get_tdls_prohibited(vdev),
 			       mlme_get_tdls_chan_switch_prohibited(vdev),
@@ -1617,15 +1614,14 @@ tdls_process_sta_disconnect(struct tdls_sta_notify_params *notify)
 		   notify->session_id);
 
 	/* Disassociation event */
-	if (!tdls_soc_obj->tdls_disable_in_progress)
-		tdls_send_update_to_fw(tdls_vdev_obj, tdls_soc_obj, false,
-				       false, false, notify->session_id);
+	tdls_send_update_to_fw(tdls_vdev_obj, tdls_soc_obj, false,
+			       false, false, notify->session_id);
 
 	/* If concurrency is not marked, then we have to
 	 * check, whether TDLS could be enabled in the
 	 * system after this disassoc event.
 	 */
-	if (notify->lfr_roam || tdls_soc_obj->tdls_disable_in_progress)
+	if (notify->lfr_roam)
 		return status;
 
 	temp_vdev = tdls_get_vdev(tdls_soc_obj->soc, WLAN_TDLS_NB_ID);
