@@ -2313,8 +2313,6 @@ QDF_STATUS hdd_hostapd_sap_event_cb(struct sap_event *sap_event,
 	case eSAP_DFS_RADAR_DETECT:
 	{
 		int i;
-		struct sap_config *sap_config =
-				&adapter->deflink->session.ap.sap_config;
 
 		hdd_dfs_indicate_radar(hdd_ctx);
 		wlan_hdd_send_svc_nlink_msg(hdd_ctx->radio_index,
@@ -2868,8 +2866,7 @@ QDF_STATUS hdd_hostapd_sap_event_cb(struct sap_event *sap_event,
 			      ap_ctx->sap_config.acs_cfg.pri_ch_freq,
 			      ap_ctx->sap_config.acs_cfg.ch_width);
 
-		if (qdf_atomic_read(
-		    &adapter->deflink->session.ap.acs_in_progress) &&
+		if (qdf_atomic_read(&ap_ctx->acs_in_progress) &&
 		    test_bit(SOFTAP_BSS_STARTED, &adapter->event_flags)) {
 			hdd_dcs_chan_select_complete(adapter);
 		} else {
@@ -5171,7 +5168,7 @@ QDF_STATUS wlan_hdd_config_acs(struct hdd_context *hdd_ctx,
 
 		if (con_sap_adapter)
 			con_sap_config =
-			    &con_sap_adapter->deflink->session.ap.sap_config;
+				&con_sap_adapter->deflink->session.ap.sap_config;
 
 		sap_config->acs_cfg.skip_scan_status = eSAP_DO_NEW_ACS_SCAN;
 
@@ -6799,10 +6796,8 @@ int hdd_destroy_acs_timer(struct hdd_adapter *adapter)
 	ap_ctx->vendor_acs_timer_initialized = false;
 
 	clear_bit(VENDOR_ACS_RESPONSE_PENDING, &adapter->event_flags);
-	if (QDF_TIMER_STATE_RUNNING ==
-			ap_ctx->vendor_acs_timer.state) {
-		qdf_status =
-			qdf_mc_timer_stop(&ap_ctx->vendor_acs_timer);
+	if (QDF_TIMER_STATE_RUNNING == ap_ctx->vendor_acs_timer.state) {
+		qdf_status = qdf_mc_timer_stop(&ap_ctx->vendor_acs_timer);
 		if (!QDF_IS_STATUS_SUCCESS(qdf_status))
 			hdd_err("Failed to stop ACS timer");
 	}
@@ -8138,8 +8133,8 @@ bool hdd_sap_is_acs_in_progress(struct wlan_objmgr_vdev *vdev)
 		return in_progress;
 	}
 
-	in_progress = qdf_atomic_read(
-				&adapter->deflink->session.ap.acs_in_progress);
+	in_progress =
+		qdf_atomic_read(&adapter->deflink->session.ap.acs_in_progress);
 
 	return in_progress;
 }

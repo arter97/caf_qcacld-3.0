@@ -92,8 +92,8 @@ static uint32_t hdd_son_is_acs_in_progress(struct wlan_objmgr_vdev *vdev)
 		return in_progress;
 	}
 
-	in_progress = qdf_atomic_read(
-			&adapter->deflink->session.ap.acs_in_progress);
+	in_progress =
+		qdf_atomic_read(&adapter->deflink->session.ap.acs_in_progress);
 
 	return in_progress;
 }

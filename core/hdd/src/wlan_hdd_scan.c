@@ -820,12 +820,13 @@ static inline void wlan_hdd_copy_bssid(struct cfg80211_scan_request *request,
 
 static void hdd_process_vendor_acs_response(struct hdd_adapter *adapter)
 {
+	qdf_mc_timer_t *vendor_acs_timer;
+
+	vendor_acs_timer = &adapter->deflink->session.ap.vendor_acs_timer;
 	if (test_bit(VENDOR_ACS_RESPONSE_PENDING, &adapter->event_flags)) {
 		if (QDF_TIMER_STATE_RUNNING ==
-		    qdf_mc_timer_get_current_state(
-			&adapter->deflink->session.ap.vendor_acs_timer)) {
-			qdf_mc_timer_stop(
-				&adapter->deflink->session.ap.vendor_acs_timer);
+		    qdf_mc_timer_get_current_state(vendor_acs_timer)) {
+			qdf_mc_timer_stop(vendor_acs_timer);
 		}
 	}
 }

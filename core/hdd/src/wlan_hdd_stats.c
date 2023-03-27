@@ -920,9 +920,7 @@ bool hdd_get_interface_info(struct hdd_adapter *adapter,
 	    (adapter->device_mode == QDF_P2P_GO_MODE)) {
 		if (test_bit(SOFTAP_BSS_STARTED, &adapter->event_flags)) {
 			config = &adapter->deflink->session.ap.sap_config;
-
-			qdf_copy_macaddr(&info->bssid,
-					 &config->self_macaddr);
+			qdf_copy_macaddr(&info->bssid, &config->self_macaddr);
 		}
 	}
 	wlan_reg_get_cc_and_src(adapter->hdd_ctx->psoc, info->countryStr);

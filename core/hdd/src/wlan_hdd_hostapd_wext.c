@@ -999,10 +999,9 @@ static __iw_softap_setparam(struct net_device *dev,
 	}
 	case QCSAP_START_FW_PROFILING:
 		hdd_debug("QCSAP_START_FW_PROFILING %d", set_value);
-		ret = wma_cli_set_command(
-					adapter->deflink->vdev_id,
-					WMI_WLAN_PROFILE_TRIGGER_CMDID,
-					set_value, DBG_CMD);
+		ret = wma_cli_set_command(adapter->deflink->vdev_id,
+					  WMI_WLAN_PROFILE_TRIGGER_CMDID,
+					  set_value, DBG_CMD);
 		break;
 	case QCASAP_PARAM_LDPC:
 		ret = hdd_set_ldpc(adapter, set_value);
@@ -1015,8 +1014,7 @@ static __iw_softap_setparam(struct net_device *dev,
 		break;
 	case QCASAP_SET_11AX_RATE:
 		ret = hdd_set_11ax_rate(adapter, set_value,
-					&adapter->deflink->session.ap.
-					sap_config);
+					&adapter->deflink->session.ap.sap_config);
 		break;
 	case QCASAP_PARAM_DCM:
 		hdd_debug("Set wmi_vdev_param_he_dcm_enable: %d", set_value);

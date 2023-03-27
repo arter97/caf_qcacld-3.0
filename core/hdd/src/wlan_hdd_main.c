@@ -504,10 +504,8 @@ QDF_STATUS hdd_common_roam_callback(struct wlan_objmgr_psoc *psoc,
 		break;
 	case QDF_SAP_MODE:
 	case QDF_P2P_GO_MODE:
-		status = wlansap_roam_callback(
-				adapter->deflink->session.ap.sap_context,
-				roam_info, roam_status,
-				roam_result);
+		status = wlansap_roam_callback(adapter->deflink->session.ap.sap_context,
+					       roam_info, roam_status, roam_result);
 		break;
 	default:
 		hdd_err("Wrong device mode");
@@ -684,8 +682,7 @@ enum phy_ch_width hdd_get_adapter_width(struct hdd_adapter *adapter)
 	if ((adapter->device_mode == QDF_SAP_MODE ||
 	     adapter->device_mode == QDF_P2P_GO_MODE) &&
 	    test_bit(SOFTAP_BSS_STARTED, &adapter->event_flags)) {
-		width =
-		adapter->deflink->session.ap.sap_config.ch_params.ch_width;
+		width = adapter->deflink->session.ap.sap_config.ch_params.ch_width;
 	} else if ((adapter->device_mode == QDF_STA_MODE ||
 		    adapter->device_mode == QDF_P2P_CLIENT_MODE) &&
 		   hdd_cm_is_vdev_associated(adapter)) {
@@ -8103,7 +8100,7 @@ QDF_STATUS hdd_stop_adapter_ext(struct hdd_context *hdd_ctx,
 {
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
 	struct hdd_station_ctx *sta_ctx;
-	struct sap_context *sap_ctx;
+	struct hdd_ap_ctx *ap_ctx;
 	union iwreq_data wrqu;
 	tSirUpdateIE update_ie;
 	unsigned long rc;
@@ -8304,12 +8301,11 @@ QDF_STATUS hdd_stop_adapter_ext(struct hdd_context *hdd_ctx,
 		fallthrough;
 
 	case QDF_P2P_GO_MODE:
-		sap_ctx = WLAN_HDD_GET_SAP_CTX_PTR(adapter);
-		wlansap_cleanup_cac_timer(sap_ctx);
+		ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(adapter);
+		wlansap_cleanup_cac_timer(ap_ctx->sap_context);
 
 		cds_flush_work(&adapter->sap_stop_bss_work);
-		if (qdf_atomic_read(
-			&adapter->deflink->session.ap.acs_in_progress)) {
+		if (qdf_atomic_read(&ap_ctx->acs_in_progress)) {
 			hdd_info("ACS in progress, wait for complete");
 			qdf_wait_for_event_completion(
 				&adapter->acs_complete_event,
@@ -8386,8 +8382,8 @@ QDF_STATUS hdd_stop_adapter_ext(struct hdd_context *hdd_ctx,
 		 */
 		if (!cds_is_driver_recovering()) {
 			clear_bit(SOFTAP_INIT_DONE, &adapter->event_flags);
-			qdf_mem_free(adapter->deflink->session.ap.beacon);
-			adapter->deflink->session.ap.beacon = NULL;
+			qdf_mem_free(ap_ctx->beacon);
+			ap_ctx->beacon = NULL;
 		}
 
 		/* Clear all the cached sta info */
@@ -8600,8 +8596,7 @@ static void hdd_reset_scan_operation(struct hdd_context *hdd_ctx,
 		wlan_hdd_cleanup_remain_on_channel_ctx(adapter);
 		break;
 	case QDF_SAP_MODE:
-		qdf_atomic_set(&adapter->deflink->session.ap.acs_in_progress,
-			       0);
+		qdf_atomic_set(&adapter->deflink->session.ap.acs_in_progress, 0);
 		break;
 	default:
 		break;
@@ -11681,20 +11676,20 @@ int hdd_update_acs_timer_reason(struct hdd_adapter *adapter, uint8_t reason)
 	struct hdd_external_acs_timer_context *timer_context;
 	int status;
 	QDF_STATUS qdf_status;
+	qdf_mc_timer_t *vendor_acs_timer;
 
 	set_bit(VENDOR_ACS_RESPONSE_PENDING, &adapter->event_flags);
 
-	if (QDF_TIMER_STATE_RUNNING == qdf_mc_timer_get_current_state(
-			&adapter->deflink->session.ap.vendor_acs_timer)) {
-		qdf_mc_timer_stop(
-			&adapter->deflink->session.ap.vendor_acs_timer);
+	vendor_acs_timer = &adapter->deflink->session.ap.vendor_acs_timer;
+	if (QDF_TIMER_STATE_RUNNING ==
+	    qdf_mc_timer_get_current_state(vendor_acs_timer)) {
+		qdf_mc_timer_stop(vendor_acs_timer);
 	}
-	timer_context = (struct hdd_external_acs_timer_context *)
-			adapter->deflink->session.ap.vendor_acs_timer.user_data;
+	timer_context =
+		(struct hdd_external_acs_timer_context *)vendor_acs_timer->user_data;
 	timer_context->reason = reason;
-	qdf_status = qdf_mc_timer_start(
-				&adapter->deflink->session.ap.vendor_acs_timer,
-				WLAN_VENDOR_ACS_WAIT_TIME);
+	qdf_status =
+		qdf_mc_timer_start(vendor_acs_timer, WLAN_VENDOR_ACS_WAIT_TIME);
 	if (qdf_status != QDF_STATUS_SUCCESS) {
 		hdd_err("failed to start external acs timer");
 		return -ENOSPC;
@@ -11768,7 +11763,7 @@ hdd_store_sap_restart_channel(qdf_freq_t restart_chan, qdf_freq_t *restart_chan_
 void hdd_unsafe_channel_restart_sap(struct hdd_context *hdd_ctxt)
 {
 	struct hdd_adapter *adapter, *next_adapter = NULL;
-	struct hdd_ap_ctx *ap_ctx = NULL;
+	struct hdd_ap_ctx *ap_ctx;
 	uint32_t i;
 	bool found = false;
 	qdf_freq_t restart_chan_store[SAP_MAX_NUM_SESSION] = {0};
@@ -11793,7 +11788,7 @@ void hdd_unsafe_channel_restart_sap(struct hdd_context *hdd_ctxt)
 			continue;
 		}
 
-		ap_chan_freq = adapter->deflink->session.ap.operating_chan_freq;
+		ap_chan_freq = ap_ctx->operating_chan_freq;
 
 		found = false;
 		status =
@@ -11805,13 +11800,10 @@ void hdd_unsafe_channel_restart_sap(struct hdd_context *hdd_ctxt)
 		 * If STA+SAP is doing SCC & g_sta_sap_scc_on_lte_coex_chan
 		 * is set, no need to move SAP.
 		 */
-		if ((policy_mgr_is_sta_sap_scc(
-		    hdd_ctxt->psoc,
-		    adapter->deflink->session.ap.operating_chan_freq) &&
-		    scc_on_lte_coex) ||
-		    policy_mgr_nan_sap_scc_on_unsafe_ch_chk(
-		    hdd_ctxt->psoc,
-		    adapter->deflink->session.ap.operating_chan_freq)) {
+		if ((policy_mgr_is_sta_sap_scc(hdd_ctxt->psoc, ap_ctx->operating_chan_freq) &&
+		     scc_on_lte_coex) ||
+		    policy_mgr_nan_sap_scc_on_unsafe_ch_chk(hdd_ctxt->psoc,
+							    ap_ctx->operating_chan_freq)) {
 			hdd_debug("SAP allowed in unsafe SCC channel");
 		} else {
 			for (i = 0; i < hdd_ctxt->unsafe_channel_count; i++) {

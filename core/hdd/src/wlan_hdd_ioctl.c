@@ -6394,6 +6394,7 @@ static void disconnect_sta_and_restart_sap(struct hdd_context *hdd_ctx,
 {
 	struct hdd_adapter *adapter, *next = NULL;
 	QDF_STATUS status;
+	struct hdd_ap_ctx *ap_ctx;
 
 	if (!hdd_ctx)
 		return;
@@ -6402,15 +6403,16 @@ static void disconnect_sta_and_restart_sap(struct hdd_context *hdd_ctx,
 
 	status = hdd_get_front_adapter(hdd_ctx, &adapter);
 	while (adapter && (status == QDF_STATUS_SUCCESS)) {
-		if (!hdd_validate_adapter(adapter) &&
-		    adapter->device_mode == QDF_SAP_MODE) {
-			if (check_disable_channels(hdd_ctx,
-			    adapter->deflink->session.ap.operating_chan_freq))
-				policy_mgr_check_sap_restart(
-						hdd_ctx->psoc,
-						adapter->deflink->vdev_id);
+		if (hdd_validate_adapter(adapter) ||
+		    adapter->device_mode != QDF_SAP_MODE) {
+			goto next_adapter;
 		}
 
+		ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(adapter);
+		if (check_disable_channels(hdd_ctx, ap_ctx->operating_chan_freq))
+			policy_mgr_check_sap_restart(hdd_ctx->psoc,
+						     adapter->deflink->vdev_id);
+next_adapter:
 		status = hdd_get_next_adapter(hdd_ctx, adapter, &next);
 		adapter = next;
 	}

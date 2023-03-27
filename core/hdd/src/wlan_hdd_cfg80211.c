@@ -2337,8 +2337,7 @@ int wlan_hdd_cfg80211_start_acs(struct hdd_adapter *adapter)
 	 * so no need to set acs in progress
 	 */
 	if (!sap_config->acs_cfg.skip_acs_scan)
-		qdf_atomic_set(&adapter->deflink->session.ap.acs_in_progress,
-			       1);
+		qdf_atomic_set(&adapter->deflink->session.ap.acs_in_progress, 1);
 
 	return 0;
 }
@@ -3674,8 +3673,7 @@ static int __wlan_hdd_cfg80211_do_acs(struct wiphy *wiphy,
 		return -EINVAL;
 	}
 
-	if (qdf_atomic_read(
-		&adapter->deflink->session.ap.acs_in_progress) > 0) {
+	if (qdf_atomic_read(&adapter->deflink->session.ap.acs_in_progress) > 0) {
 		if (wlan_hdd_check_is_acs_request_same(adapter,
 						       data, data_len)) {
 			hdd_debug("Same ACS req as ongoing is received, return success");
@@ -15753,8 +15751,7 @@ static int hdd_update_acs_channel(struct hdd_adapter *adapter, uint8_t reason,
 
 	if (QDF_TIMER_STATE_RUNNING ==
 	    qdf_mc_timer_get_current_state(&hdd_ap_ctx->vendor_acs_timer)) {
-		qdf_mc_timer_stop(
-			&hdd_ap_ctx->vendor_acs_timer);
+		qdf_mc_timer_stop(&hdd_ap_ctx->vendor_acs_timer);
 	}
 
 	if (channel_list->pri_chan_freq == 0) {
