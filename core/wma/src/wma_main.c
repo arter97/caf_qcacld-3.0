@@ -356,9 +356,9 @@ static void wma_set_feature_set_info(tp_wma_handle wma_handle,
 	struct cds_context *cds_ctx =
 		(struct cds_context *)(wma_handle->cds_context);
 	struct wlan_objmgr_psoc *psoc;
-	struct wlan_scan_features scan_feature_set;
-	struct wlan_twt_features twt_feature_set;
-	struct wlan_mlme_features mlme_feature_set;
+	struct wlan_scan_features scan_feature_set = {0};
+	struct wlan_twt_features twt_feature_set = {0};
+	struct wlan_mlme_features mlme_feature_set = {0};
 	struct wlan_tdls_features tdls_feature_set = {0};
 
 	psoc = wma_handle->psoc;
