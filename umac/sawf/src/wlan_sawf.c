@@ -79,7 +79,7 @@ struct sawf_ctx *wlan_get_sawf_ctx(void)
 }
 qdf_export_symbol(wlan_get_sawf_ctx);
 
-void wlan_print_service_class(struct wlan_sawf_scv_class_params *params)
+void wlan_print_service_class(struct wlan_sawf_svc_class_params *params)
 {
 	qdf_nofl_info(SAWF_LINE_FORMAT);
 	qdf_nofl_info("Service ID          :%d", params->svc_id);
@@ -153,7 +153,7 @@ qdf_export_symbol(wlan_service_id_tid_nolock);
 bool wlan_delay_bound_configured_nolock(uint8_t svc_id)
 {
 	struct sawf_ctx *sawf;
-	struct wlan_sawf_scv_class_params *svclass_param;
+	struct wlan_sawf_svc_class_params *svclass_param;
 
 	sawf = wlan_get_sawf_ctx();
 	if (!sawf) {
@@ -176,11 +176,11 @@ bool wlan_delay_bound_configured_nolock(uint8_t svc_id)
 
 qdf_export_symbol(wlan_delay_bound_configured_nolock);
 
-struct wlan_sawf_scv_class_params *
+struct wlan_sawf_svc_class_params *
 wlan_get_svc_class_params(uint8_t svc_id)
 {
 	struct sawf_ctx *sawf;
-	struct wlan_sawf_scv_class_params *svclass_param;
+	struct wlan_sawf_svc_class_params *svclass_param;
 
 	sawf = wlan_get_sawf_ctx();
 	if (!sawf) {
@@ -201,10 +201,10 @@ wlan_get_svc_class_params(uint8_t svc_id)
 
 qdf_export_symbol(wlan_get_svc_class_params);
 
-void wlan_update_sawf_params_nolock(struct wlan_sawf_scv_class_params *params)
+void wlan_update_sawf_params_nolock(struct wlan_sawf_svc_class_params *params)
 {
 	struct sawf_ctx *sawf;
-	struct wlan_sawf_scv_class_params *new_param;
+	struct wlan_sawf_svc_class_params *new_param;
 
 	sawf = wlan_get_sawf_ctx();
 	if (!sawf) {
@@ -231,7 +231,7 @@ void wlan_update_sawf_params_nolock(struct wlan_sawf_scv_class_params *params)
 
 qdf_export_symbol(wlan_update_sawf_params_nolock);
 
-QDF_STATUS wlan_validate_sawf_params(struct wlan_sawf_scv_class_params *params)
+QDF_STATUS wlan_validate_sawf_params(struct wlan_sawf_svc_class_params *params)
 {
 	uint32_t value;
 
@@ -309,7 +309,7 @@ wlan_sawf_get_uplink_params(uint8_t svc_id, uint8_t *tid,
 			    uint32_t *min_tput, uint32_t *max_latency)
 {
 	struct sawf_ctx *sawf;
-	struct wlan_sawf_scv_class_params *svc_param;
+	struct wlan_sawf_svc_class_params *svc_param;
 
 	if (!wlan_service_id_valid(svc_id) ||
 	    !wlan_service_id_configured(svc_id))
@@ -589,7 +589,7 @@ bool wlan_delay_bound_configured(uint8_t svc_id)
 
 qdf_export_symbol(wlan_delay_bound_configured);
 
-void wlan_update_sawf_params(struct wlan_sawf_scv_class_params *params)
+void wlan_update_sawf_params(struct wlan_sawf_svc_class_params *params)
 {
 	struct sawf_ctx *sawf;
 
@@ -892,7 +892,7 @@ qdf_export_symbol(wlan_service_id_get_peer_count);
 void wlan_disable_service_class(uint8_t svc_id)
 {
 	struct sawf_ctx *sawf;
-	struct wlan_sawf_scv_class_params *svclass_param;
+	struct wlan_sawf_svc_class_params *svclass_param;
 
 	sawf = wlan_get_sawf_ctx();
 	if (!sawf) {
@@ -903,7 +903,7 @@ void wlan_disable_service_class(uint8_t svc_id)
 	qdf_spin_lock_bh(&sawf->lock);
 	svclass_param = &sawf->svc_classes[svc_id - 1];
 	qdf_mem_zero(svclass_param,
-		     sizeof(struct wlan_sawf_scv_class_params));
+		     sizeof(struct wlan_sawf_svc_class_params));
 	qdf_spin_unlock_bh(&sawf->lock);
 }
 
