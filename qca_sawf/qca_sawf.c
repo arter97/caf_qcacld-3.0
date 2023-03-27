@@ -116,6 +116,15 @@ void qca_sawf_config_ul(uint8_t *dst_mac, uint8_t *src_mac,
 						add_or_sub);
 	}
 }
+
+void qca_sawf_config_ul_v2(struct net_device *dst_dev, uint8_t *dst_mac,
+			   struct net_device *src_dev, uint8_t *src_mac,
+			   uint8_t fw_service_id, uint8_t rv_service_id,
+			   uint8_t add_or_sub)
+{
+	qca_sawf_config_ul(dst_mac, src_mac, fw_service_id, rv_service_id,
+			   add_or_sub);
+}
 #else
 
 #include "qdf_module.h"
@@ -130,6 +139,12 @@ void qca_sawf_config_ul(uint8_t *dst_mac, uint8_t *src_mac,
 			uint8_t fw_service_id, uint8_t rv_service_id,
 			uint8_t add_or_sub)
 {}
+
+void qca_sawf_config_ul_v2(struct net_device *dst_dev, uint8_t *dst_mac,
+			   struct net_device *src_dev, uint8_t *src_mac,
+			   uint8_t fw_service_id, uint8_t rv_service_id,
+			   uint8_t add_or_sub)
+{}
 #endif
 
 uint16_t qca_sawf_get_msdu_queue(struct net_device *netdev,
@@ -142,3 +157,4 @@ uint16_t qca_sawf_get_msdu_queue(struct net_device *netdev,
 qdf_export_symbol(qca_sawf_get_msduq);
 qdf_export_symbol(qca_sawf_get_msdu_queue);
 qdf_export_symbol(qca_sawf_config_ul);
+qdf_export_symbol(qca_sawf_config_ul_v2);
