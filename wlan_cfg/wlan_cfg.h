@@ -2448,6 +2448,20 @@ wlan_cfg_get_tx_capt_max_mem(struct wlan_cfg_dp_soc_ctxt *cfg)
 }
 #endif /* WLAN_TX_PKT_CAPTURE_ENH */
 
+#ifdef DP_TX_PACKET_INSPECT_FOR_ILP
+/**
+ * wlan_cfg_get_tx_ilp_inspect_config() - Get TX ILP configuration
+ * @cfg: Configuration Handle
+ *
+ * Return: TX ILP enable or not
+ */
+static inline bool
+wlan_cfg_get_tx_ilp_inspect_config(struct wlan_cfg_dp_soc_ctxt *cfg)
+{
+	return cfg->tx_pkt_inspect_for_ilp;
+}
+#endif
+
 /**
  * wlan_cfg_get_napi_scale_factor() - Get napi scale factor
  * @cfg: soc configuration context

@@ -10101,6 +10101,62 @@ void dp_set_tx_pause(struct cdp_soc_t *soc_hdl, bool flag)
 	soc->is_tx_pause = flag;
 }
 
+#ifdef DP_TX_PACKET_INSPECT_FOR_ILP
+/**
+ * dp_evaluate_update_tx_ilp_config() - Evaluate and update DP TX
+ *                                      ILP configuration
+ * @soc_hdl: CDP SOC handle
+ * @num_msdu_idx_map: Number of HTT msdu index to qtype map in array
+ * @msdu_idx_map_arr: Pointer to HTT msdu index to qtype map array
+ *
+ * This function will check: (a) TX ILP INI configuration,
+ * (b) index 3 value in array same as HTT_MSDU_QTYPE_LATENCY_TOLERANT,
+ * only if both (a) and (b) condition is met, then TX ILP feature is
+ * considered to be enabled.
+ *
+ * Return: Final updated TX ILP enable result in dp_soc,
+ *         true is enabled, false is not
+ */
+static
+bool dp_evaluate_update_tx_ilp_config(struct cdp_soc_t *soc_hdl,
+				      uint8_t num_msdu_idx_map,
+				      uint8_t *msdu_idx_map_arr)
+{
+	struct dp_soc *soc = cdp_soc_t_to_dp_soc(soc_hdl);
+	bool enable_tx_ilp = false;
+
+	/**
+	 * Check INI configuration firstly, if it's disabled,
+	 * then keep feature disabled.
+	 */
+	if (!wlan_cfg_get_tx_ilp_inspect_config(soc->wlan_cfg_ctx)) {
+		dp_info("TX ILP INI is disabled already");
+		goto update_tx_ilp;
+	}
+
+	/* Check if the msdu index to qtype map table is valid */
+	if (num_msdu_idx_map != HTT_MSDUQ_MAX_INDEX || !msdu_idx_map_arr) {
+		dp_info("Invalid msdu_idx qtype map num: 0x%x, arr_addr %pK",
+			num_msdu_idx_map, msdu_idx_map_arr);
+		goto update_tx_ilp;
+	}
+
+	dp_info("msdu_idx_map_arr idx 0x%x value 0x%x",
+		HTT_MSDUQ_INDEX_CUSTOM_PRIO_1,
+		msdu_idx_map_arr[HTT_MSDUQ_INDEX_CUSTOM_PRIO_1]);
+
+	if (HTT_MSDU_QTYPE_LATENCY_TOLERANT ==
+	    msdu_idx_map_arr[HTT_MSDUQ_INDEX_CUSTOM_PRIO_1])
+		enable_tx_ilp = true;
+
+update_tx_ilp:
+	soc->tx_ilp_enable = enable_tx_ilp;
+	dp_info("configure tx ilp enable %d", soc->tx_ilp_enable);
+
+	return soc->tx_ilp_enable;
+}
+#endif
+
 static struct cdp_cmn_ops dp_ops_cmn = {
 	.txrx_soc_attach_target = dp_soc_attach_target_wifi3,
 	.txrx_vdev_attach = dp_vdev_attach_wifi3,
@@ -10914,6 +10970,9 @@ static struct cdp_misc_ops dp_ops_misc = {
 	.set_bus_vote_lvl_high = dp_set_bus_vote_lvl_high,
 	.get_bus_vote_lvl_high = dp_get_bus_vote_lvl_high,
 #endif
+#ifdef DP_TX_PACKET_INSPECT_FOR_ILP
+	.evaluate_update_tx_ilp_cfg = dp_evaluate_update_tx_ilp_config,
+#endif
 };
 #endif
 
@@ -11225,6 +11284,19 @@ dp_get_link_desc_id_start(uint16_t arch_id)
 	}
 }
 
+#ifdef DP_TX_PACKET_INSPECT_FOR_ILP
+static inline
+void dp_soc_init_tx_ilp(struct dp_soc *soc)
+{
+	soc->tx_ilp_enable = false;
+}
+#else
+static inline
+void dp_soc_init_tx_ilp(struct dp_soc *soc)
+{
+}
+#endif
+
 /**
  * dp_soc_attach() - Attach txrx SOC
  * @ctrl_psoc: Opaque SOC handle from control plane
@@ -11275,6 +11347,7 @@ dp_soc_attach(struct cdp_ctrl_objmgr_psoc *ctrl_psoc,
 	soc->ctrl_psoc = ctrl_psoc;
 	soc->osdev = qdf_osdev;
 	soc->num_hw_dscp_tid_map = HAL_MAX_HW_DSCP_TID_MAPS;
+	dp_soc_init_tx_ilp(soc);
 	hal_rx_get_tlv_size(soc->hal_soc, &soc->rx_pkt_tlv_size,
 			    &soc->rx_mon_pkt_tlv_size);
 	soc->idle_link_bm_id = hal_get_idle_link_bm_id(soc->hal_soc,

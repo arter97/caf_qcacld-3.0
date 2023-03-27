@@ -3071,6 +3071,10 @@ struct dp_soc {
 #endif
 	/* Reo queue ref table items */
 	struct reo_queue_ref_table reo_qref;
+#ifdef DP_TX_PACKET_INSPECT_FOR_ILP
+	/* Flag to show if TX ILP is enabled */
+	bool tx_ilp_enable;
+#endif
 };
 
 #ifdef IPA_OFFLOAD
