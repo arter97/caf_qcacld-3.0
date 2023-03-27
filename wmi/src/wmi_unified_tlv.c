@@ -14278,6 +14278,9 @@ extract_service_ready_ext2_tlv(wmi_unified_t wmi_handle, uint8_t *event,
 
 	param->num_dbr_ring_caps = param_buf->num_dma_ring_caps;
 
+	param->num_msdu_idx_qtype_map =
+				param_buf->num_htt_msdu_idx_to_qtype_map;
+
 	if (param_buf->nan_cap)
 		param->max_ndp_sessions =
 			param_buf->nan_cap->max_ndp_sessions;
@@ -14918,6 +14921,39 @@ static QDF_STATUS extract_scan_radio_cap_service_ready_ext2_tlv(
 		WMI_SCAN_RADIO_CAP_DFS_FLAG_GET(scan_radio_caps->flags);
 	param->blanking_en =
 		WMI_SCAN_RADIO_CAP_BLANKING_SUPPORT_GET(scan_radio_caps->flags);
+
+	return QDF_STATUS_SUCCESS;
+}
+
+static QDF_STATUS extract_msdu_idx_qtype_map_service_ready_ext2_tlv(
+			wmi_unified_t wmi_handle,
+			uint8_t *event, uint8_t idx,
+			uint8_t *msdu_qtype)
+{
+	WMI_SERVICE_READY_EXT2_EVENTID_param_tlvs *param_buf;
+	wmi_htt_msdu_idx_to_htt_msdu_qtype *msdu_idx_to_qtype;
+	uint8_t wmi_htt_msdu_idx;
+
+	param_buf = (WMI_SERVICE_READY_EXT2_EVENTID_param_tlvs *)event;
+	if (!param_buf)
+		return QDF_STATUS_E_INVAL;
+
+	if (idx >= param_buf->num_htt_msdu_idx_to_qtype_map)
+		return QDF_STATUS_E_INVAL;
+
+	msdu_idx_to_qtype = &param_buf->htt_msdu_idx_to_qtype_map[idx];
+	wmi_htt_msdu_idx =
+		WMI_HTT_MSDUQ_IDX_TO_MSDUQ_QTYPE_INDEX_GET(
+					msdu_idx_to_qtype->index_and_type);
+	if (wmi_htt_msdu_idx != idx) {
+		wmi_err("wmi_htt_msdu_idx 0x%x is not same as idx 0x%x",
+			wmi_htt_msdu_idx, idx);
+		return QDF_STATUS_E_INVAL;
+	}
+
+	*msdu_qtype =
+		WMI_HTT_MSDUQ_IDX_TO_MSDUQ_QTYPE_TYPE_GET(
+					msdu_idx_to_qtype->index_and_type);
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -20805,6 +20841,8 @@ struct wmi_ops tlv_ops =  {
 				extract_dbr_ring_cap_service_ready_ext2_tlv,
 	.extract_scan_radio_cap_service_ready_ext2 =
 				extract_scan_radio_cap_service_ready_ext2_tlv,
+	.extract_msdu_idx_qtype_map_service_ready_ext2 =
+			extract_msdu_idx_qtype_map_service_ready_ext2_tlv,
 	.extract_sw_cal_ver_ext2 = extract_sw_cal_ver_ext2_tlv,
 	.extract_sar_cap_service_ready_ext =
 				extract_sar_cap_service_ready_ext_tlv,

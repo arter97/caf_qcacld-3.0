@@ -528,6 +528,14 @@ static int init_deinit_service_ext2_ready_event_handler(ol_scn_t scn_handle,
 		goto exit;
 	}
 
+	err_code = init_deinit_populate_msdu_idx_qtype_map_ext2(wmi_handle,
+								event, info);
+
+	if (err_code) {
+		target_if_err("failed to populate msdu index qtype map ext2");
+		goto exit;
+	}
+
 	err_code = init_deinit_populate_twt_cap_ext2(psoc, wmi_handle, event,
 						     info);
 

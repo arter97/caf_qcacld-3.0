@@ -2253,6 +2253,11 @@ QDF_STATUS (*extract_scan_radio_cap_service_ready_ext2)(
 			uint8_t *evt_buf, uint8_t idx,
 			struct wlan_psoc_host_scan_radio_caps *param);
 
+QDF_STATUS (*extract_msdu_idx_qtype_map_service_ready_ext2)(
+			wmi_unified_t wmi_handle,
+			uint8_t *evt_buf, uint8_t idx,
+			uint8_t *msdu_qtype);
+
 QDF_STATUS (*extract_sw_cal_ver_ext2)(wmi_unified_t wmi_handle,
 				      uint8_t *event,
 				      struct wmi_host_sw_cal_ver *cal);
