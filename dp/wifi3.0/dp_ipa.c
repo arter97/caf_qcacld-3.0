@@ -1379,7 +1379,7 @@ static void dp_ipa_opt_wifi_dp_cleanup(struct dp_soc *soc, struct dp_pdev *pdev)
 }
 #else
 static inline
-void dp_opt_wifi_dp(struct dp_soc *soc, struct dp_pdev *pdev)
+void dp_ipa_opt_wifi_dp_cleanup(struct dp_soc *soc, struct dp_pdev *pdev)
 {
 }
 #endif
