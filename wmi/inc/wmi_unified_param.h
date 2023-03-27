@@ -6716,6 +6716,7 @@ struct target_feature_set {
  * @notify_frame_support: capability to mark notify frames from host
  * @dp_peer_meta_data_ver: datapath peer meta data version flag
  * @tx_ilp_enable: capability to support TX ILP from host
+ * @rf_path: Indicates RF path 0 primary, 1 secondary
  */
 typedef struct {
 	uint32_t num_vdevs;
@@ -6847,6 +6848,7 @@ typedef struct {
 #ifdef DP_TX_PACKET_INSPECT_FOR_ILP
 	uint8_t tx_ilp_enable;
 #endif
+	bool rf_path;
 } target_resource_config;
 
 /**
