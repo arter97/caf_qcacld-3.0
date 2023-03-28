@@ -74,6 +74,8 @@
 #define DP_SAWF_DEFINED_Q_PTID_MAX 2
 #define DP_SAWF_DEFAULT_Q_PTID_MAX 2
 #define DP_SAWF_TID_MAX 8
+#define DP_SAWF_DEFAULT_QUEUE_MIN 0
+#define DP_SAWF_DEFAULT_QUEUE_MAX (DP_SAWF_DEFAULT_QUEUE_MIN + DP_SAWF_TID_MAX)
 #define DP_SAWF_Q_MAX (DP_SAWF_DEFINED_Q_PTID_MAX * DP_SAWF_TID_MAX)
 #define DP_SAWF_DEFAULT_Q_MAX (DP_SAWF_DEFAULT_Q_PTID_MAX * DP_SAWF_TID_MAX)
 #define dp_sawf(peer, msduq_num, field) ((peer)->sawf->msduq[msduq_num].field)

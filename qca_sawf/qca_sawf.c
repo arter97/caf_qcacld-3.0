@@ -18,7 +18,9 @@
 #include <dp_sawf.h>
 #include <wlan_sawf.h>
 #include <cdp_txrx_sawf.h>
-
+#ifdef WLAN_SUPPORT_SCS
+#include <qca_scs_if.h>
+#endif
 uint16_t qca_sawf_get_msduq(struct net_device *netdev, uint8_t *peer_mac,
 			    uint32_t service_id)
 {
@@ -28,6 +30,106 @@ uint16_t qca_sawf_get_msduq(struct net_device *netdev, uint8_t *peer_mac,
 	}
 
 	return dp_sawf_get_msduq(netdev, peer_mac, service_id);
+}
+
+/* qca_sawf_get_vdev() - Fetch vdev from netdev
+ *
+ * @netdev : Netdevice
+ *
+ * Return: Pointer to struct wlan_objmgr_vdev
+ */
+static struct wlan_objmgr_vdev *qca_sawf_get_vdev(struct net_device *netdev)
+{
+	struct wlan_objmgr_vdev *vdev = NULL;
+	osif_dev *osdev = NULL;
+
+	osdev = ath_netdev_priv(netdev);
+
+#ifdef QCA_SUPPORT_WDS_EXTENDED
+	if (osdev->dev_type == OSIF_NETDEV_TYPE_WDS_EXT) {
+		osif_peer_dev *osifp = NULL;
+		osif_dev *parent_osdev = NULL;
+
+		osifp = ath_netdev_priv(netdev);
+		if (!osifp->parent_netdev)
+			return NULL;
+
+		parent_osdev = ath_netdev_priv(osifp->parent_netdev);
+		osdev = parent_osdev;
+	}
+#endif
+	vdev = osdev->ctrl_vdev;
+	return vdev;
+}
+
+/* qca_sawf_get_default_msduq() - Return default msdu queue_id
+ *
+ * @netdev : Netdevice
+ * @peer_mac : Destination peer mac address
+ * @service_id : Service class id
+ * @rule_id : Rule id
+ *
+ * Return: 16 bits msdu queue_id
+ */
+#ifdef WLAN_SUPPORT_SCS
+
+#define SVC_ID_TO_QUEUE_ID(svc_id) (svc_id - SAWF_SCS_SVC_CLASS_MIN)
+
+static uint16_t qca_sawf_get_default_msduq(struct net_device *netdev,
+					   uint8_t *peer_mac,
+					   uint32_t service_id,
+					   uint32_t rule_id)
+{
+	struct wlan_objmgr_vdev *vdev = NULL;
+	struct wlan_objmgr_psoc *psoc = NULL;
+	uint16_t queue_id = DP_SAWF_PEER_Q_INVALID;
+
+	vdev = qca_sawf_get_vdev(netdev);
+	if (vdev) {
+		psoc = wlan_vdev_get_psoc(vdev);
+
+		/**
+		 * When device is operating in WDS_EXT mode, then mac address
+		 * is also populated in the rule which makes the rule peer
+		 * specific and hence there is not need of rule check against
+		 * the peer, else rule check has to be against the peer when
+		 * operating in non WDS_EXT mode.
+		 */
+		if (psoc &&
+		    wlan_psoc_nif_feat_cap_get(psoc, WLAN_SOC_F_WDS_EXTENDED)) {
+			queue_id = SVC_ID_TO_QUEUE_ID(service_id);
+		} else {
+			if (qca_scs_peer_lookup_n_rule_match(rule_id,
+							     peer_mac))
+				queue_id = SVC_ID_TO_QUEUE_ID(service_id);
+		}
+	}
+
+	return queue_id;
+}
+#else
+static uint16_t qca_sawf_get_default_msduq(struct net_device *netdev,
+					   uint8_t *peer_mac,
+					   uint32_t service_id,
+					   uint32_t rule_id)
+{
+	return DP_SAWF_PEER_Q_INVALID;
+}
+#endif
+
+uint16_t qca_sawf_get_msduq_v2(struct net_device *netdev, uint8_t *peer_mac,
+			       uint32_t service_id, uint32_t dscp,
+			       uint32_t rule_id, uint8_t sawf_rule_type)
+{
+	if (!netdev->ieee80211_ptr)
+		return DP_SAWF_PEER_Q_INVALID;
+
+	/* Return default queue_id in case of valid SAWF_SCS */
+	if (wlan_service_id_scs_valid(sawf_rule_type, service_id))
+		return qca_sawf_get_default_msduq(netdev, peer_mac,
+						  service_id, rule_id);
+
+	return qca_sawf_get_msduq(netdev, peer_mac, service_id);
 }
 
 struct psoc_sawf_ul_itr {
@@ -169,6 +271,13 @@ uint16_t qca_sawf_get_msduq(struct net_device *netdev, uint8_t *peer_mac,
 	return DP_SAWF_PEER_Q_INVALID;
 }
 
+uint16_t qca_sawf_get_msduq_v2(struct net_device *netdev, uint8_t *peer_mac,
+			       uint32_t service_id, uint32_t dscp,
+			       uint32_t rule_id, uint8_t sawf_rule_type)
+{
+	return DP_SAWF_PEER_Q_INVALID;
+}
+
 void qca_sawf_config_ul(uint8_t *dst_mac, uint8_t *src_mac,
 			uint8_t fw_service_id, uint8_t rv_service_id,
 			uint8_t add_or_sub)
@@ -183,5 +292,6 @@ uint16_t qca_sawf_get_msdu_queue(struct net_device *netdev,
 }
 
 qdf_export_symbol(qca_sawf_get_msduq);
+qdf_export_symbol(qca_sawf_get_msduq_v2);
 qdf_export_symbol(qca_sawf_get_msdu_queue);
 qdf_export_symbol(qca_sawf_config_ul);
