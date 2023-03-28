@@ -396,13 +396,18 @@ void dp_sawf_config_li(struct dp_soc *soc, uint32_t *hal_tx_desc_cached,
 	if (q_id == DP_SAWF_DEFAULT_Q_INVALID)
 		return;
 
+	msdu_info->tid = (q_id & (CDP_DATA_TID_MAX - 1));
+	hal_tx_desc_set_hlos_tid(hal_tx_desc_cached,
+				 (q_id & (CDP_DATA_TID_MAX - 1)));
+
+	if ((q_id >= DP_SAWF_DEFAULT_QUEUE_MIN) &&
+	    (q_id < DP_SAWF_DEFAULT_QUEUE_MAX))
+		return;
+
 	dp_sawf_tcl_cmd(fw_metadata, nbuf);
 
 	search_index = dp_sawf_get_search_index(soc, nbuf, vdev_id,
 						q_id);
-	msdu_info->tid = (q_id & (CDP_DATA_TID_MAX - 1));
-	hal_tx_desc_set_hlos_tid(hal_tx_desc_cached,
-				 (q_id & (CDP_DATA_TID_MAX - 1)));
 	hal_tx_desc_set_search_type_li(soc->hal_soc, hal_tx_desc_cached,
 				       HAL_TX_ADDR_INDEX_SEARCH);
 	hal_tx_desc_set_search_index_li(soc->hal_soc, hal_tx_desc_cached,
