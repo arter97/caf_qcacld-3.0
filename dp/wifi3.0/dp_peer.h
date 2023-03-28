@@ -711,6 +711,22 @@ QDF_STATUS dp_peer_add_ast(struct dp_soc *soc, struct dp_peer *peer,
 			   uint32_t flags);
 
 /**
+ * dp_peer_add_ast_hmwds() - Allocate and add hmwds AST entry into peer list
+ * @soc: SoC handle
+ * @peer: peer to which ast node belongs
+ * @mac_addr: MAC address of ast node
+ * @type: AST entry type
+ * @flags: AST configuration flags
+ *
+ * This function adds new HMWDS AST entry into peer AST list
+ *
+ * Return: QDF_STATUS code
+ */
+QDF_STATUS dp_peer_add_ast_hmwds(struct dp_soc *soc, struct dp_peer *peer,
+				 uint8_t *mac_addr,
+				 enum cdp_txrx_ast_entry_type type,
+				 uint32_t flags);
+/**
  * dp_peer_del_ast() - Delete and free AST entry
  * @soc: SoC handle
  * @ast_entry: AST entry of the node
