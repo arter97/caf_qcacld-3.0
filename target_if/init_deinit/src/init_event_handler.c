@@ -33,6 +33,9 @@
 #include <service_ready_param.h>
 #include <init_cmd_api.h>
 #include <cdp_txrx_cmn.h>
+#ifdef DP_TX_PACKET_INSPECT_FOR_ILP
+#include <cdp_txrx_misc.h>
+#endif
 #include <wlan_reg_ucfg_api.h>
 #if defined(WLAN_FEATURE_11BE_MLO) && defined(WLAN_MLO_MULTI_CHIP)
 #include <wlan_mlo_mgr_cmn.h>
@@ -134,6 +137,27 @@ static inline void
 init_deinit_update_roam_stats_cap(struct wmi_unified *wmi_handle,
 				  struct wlan_objmgr_psoc *psoc)
 {}
+#endif
+
+#ifdef DP_TX_PACKET_INSPECT_FOR_ILP
+static void
+init_deinit_update_tx_ilp_cap(struct wlan_objmgr_psoc *psoc,
+			      struct tgt_info *info)
+{
+	ol_txrx_soc_handle soc;
+
+	soc = wlan_psoc_get_dp_handle(psoc);
+	info->wlan_res_cfg.tx_ilp_enable =
+		cdp_evaluate_update_tx_ilp_cfg(
+			soc, info->service_ext2_param.num_msdu_idx_qtype_map,
+			info->msdu_idx_qtype_map);
+}
+#else
+static void
+init_deinit_update_tx_ilp_cap(struct wlan_objmgr_psoc *psoc,
+			      struct tgt_info *info)
+{
+}
 #endif
 
 #ifdef MULTI_CLIENT_LL_SUPPORT
@@ -535,6 +559,8 @@ static int init_deinit_service_ext2_ready_event_handler(ol_scn_t scn_handle,
 		target_if_err("failed to populate msdu index qtype map ext2");
 		goto exit;
 	}
+
+	init_deinit_update_tx_ilp_cap(psoc, info);
 
 	err_code = init_deinit_populate_twt_cap_ext2(psoc, wmi_handle, event,
 						     info);
