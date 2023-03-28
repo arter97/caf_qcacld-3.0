@@ -2190,6 +2190,7 @@ ifneq ($(CONFIG_RHINE), y)
 DP_OBJS += $(DP_SRC)/dp_rings_main.o
 DP_OBJS += $(DP_SRC)/dp_reo.o
 DP_OBJS += $(DP_SRC)/dp_rx_err.o
+DP_OBJS += $(DP_SRC)/dp_rx_tid.o
 endif
 
 ifeq ($(CONFIG_WIFI_MONITOR_SUPPORT), y)
