@@ -2624,7 +2624,7 @@ struct wlan_ml_prv_linfo_perstaprof {
 /* End of definitions related to Probe Request variant Multi-Link element. */
 
 /* Definitions related to Reconfiguration variant Multi-Link element (per
- * IEEE802.11be D2.1.1)
+ * IEEE802.11be D3.0)
  */
 
 /* Definitions for bits in the Presence Bitmap subfield in Reconfiguration
@@ -2641,6 +2641,13 @@ struct wlan_ml_prv_linfo_perstaprof {
  * Reconfiguration variant Multi-Link element.
  */
 #define WLAN_ML_RV_CINFO_LENGTH_SIZE                               1
+
+/* Max value in octets of Common Info Length subfield of Common Info field in
+ * Reconfiguration variant Multi-Link element
+ */
+#define WLAN_ML_RV_CINFO_LENGTH_MAX \
+	(WLAN_ML_RV_CINFO_LENGTH_SIZE + \
+	 QDF_MAC_ADDR_SIZE)
 
 /* End of definitions related to Reconfiguration variant Multi-Link element
  * Common Info field.
@@ -2682,12 +2689,32 @@ struct wlan_ml_rv_linfo_perstaprof {
 /* Complete Profile */
 #define WLAN_ML_RV_LINFO_PERSTAPROF_STACTRL_CMPLTPROF_IDX           4
 #define WLAN_ML_RV_LINFO_PERSTAPROF_STACTRL_CMPLTPROF_BITS          1
-/* MAC Address Present */
-#define WLAN_ML_RV_LINFO_PERSTAPROF_STACTRL_MACADDRP_IDX            5
-#define WLAN_ML_RV_LINFO_PERSTAPROF_STACTRL_MACADDRP_BITS           1
-/* Delete Timer Present */
-#define WLAN_ML_RV_LINFO_PERSTAPROF_STACTRL_DELTIMERP_IDX           6
-#define WLAN_ML_RV_LINFO_PERSTAPROF_STACTRL_DELTIMERP_BITS          1
+/* STA MAC Address Present */
+#define WLAN_ML_RV_LINFO_PERSTAPROF_STACTRL_STAMACADDRP_IDX         5
+#define WLAN_ML_RV_LINFO_PERSTAPROF_STACTRL_STAMACADDRP_BITS        1
+/* AP Removal Timer Present */
+#define WLAN_ML_RV_LINFO_PERSTAPROF_STACTRL_APREMOVALTIMERP_IDX     6
+#define WLAN_ML_RV_LINFO_PERSTAPROF_STACTRL_APREMOVALTIMERP_BITS    1
+/* Operation Update Type */
+#define WLAN_ML_RV_LINFO_PERSTAPROF_STACTRL_OPUPDATETYPE_IDX        7
+#define WLAN_ML_RV_LINFO_PERSTAPROF_STACTRL_OPUPDATETYPE_BITS       4
+/* Operation Parameters Present */
+#define WLAN_ML_RV_LINFO_PERSTAPROF_STACTRL_OPPARAMSP_IDX           11
+#define WLAN_ML_RV_LINFO_PERSTAPROF_STACTRL_OPPARAMSP_BITS          1
+
+/**
+ * enum wlan_ml_operation_update_type - Encoding for the Operation Update Type
+ * subfield in STA Control field of Per-STA Profile subelement in
+ * Reconfiguration variant Multi-Link element Link Info field. Note: In case of
+ * future holes in the enumeration, scheme for reserved value determination
+ * should be changed.
+ * @WLAN_ML_OPERATION_UPDATE_TYPE_OPPARAMUPDATE: Operation Parameter Update
+ * @WLAN_ML_OPERATION_UPDATE_TYPE_RESERVEDSTART: Start of reserved value range
+ */
+enum wlan_ml_operation_update_type {
+	WLAN_ML_OPERATION_UPDATE_TYPE_OPPARAMUPDATE = 0,
+	WLAN_ML_OPERATION_UPDATE_TYPE_RESERVEDSTART,
+};
 
 /* Definitions for subfields in STA Info field of Per-STA Profile subelement
  * in Reconfiguration variant Multi-Link element Link Info field.
@@ -2696,11 +2723,40 @@ struct wlan_ml_rv_linfo_perstaprof {
 /* STA Info Length */
 #define WLAN_ML_RV_LINFO_PERSTAPROF_STAINFO_LENGTH_SIZE             1
 
-/* Size in octets of the Delete Timer subfield in STA info field of Per-STA
+/* Size in octets of the AP Removal Timer subfield in STA info field of Per-STA
  * Profile subelement in Reconfiguration variant Multi-Link element Link Info
  * field.
  */
-#define WLAN_ML_RV_LINFO_PERSTAPROF_STAINFO_DELTIMER_SIZE           2
+#define WLAN_ML_RV_LINFO_PERSTAPROF_STAINFO_APREMOVALTIMER_SIZE     2
+
+/**
+ * struct wlan_ml_rv_linfo_perstaprof_stainfo_opparams - Operation Parameters in
+ * STA info in Per-STA Profile subelement in Reconfiguration variant Multi-Link
+ * element Link Info field.
+ * @presence_ind: Presence Indication
+ * @opparam_info: Operation Parameter Info
+ */
+struct wlan_ml_rv_linfo_perstaprof_stainfo_opparams {
+	uint8_t presence_ind;
+	uint16_t opparam_info;
+} qdf_packed;
+
+/* Definitions for bits in the Presence Indication subfield in Operation
+ * Parameters in STA info in Per-STA Profile subelement in Reconfiguration
+ * variant Multi-Link element Link Info field. Any unused bits are reserved.
+ */
+/* Maximum MPDU Length Present */
+#define WLAN_ML_RV_LINFO_PERSTAPROF_STAINFO_OPPARAMS_PIND_MAXMPDULEN_P  \
+	((uint8_t)BIT(0))
+/* Maximum A-MSDU Length Present */
+#define WLAN_ML_RV_LINFO_PERSTAPROF_STAINFO_OPPARAMS_PIND_MAXAMSDULEN_P  \
+	((uint8_t)BIT(1))
+
+/* Note: The contents are variable in the Operation Parameter Info subfield in
+ * Operation Parameters in STA info in Per-STA Profile subelement in
+ * Reconfiguration variant Multi-Link element Link Info field. Please refer to
+ * the IEEE802.11be standard.
+ */
 
 /* Max value in octets of STA Info Length in STA Info field of Per-STA Profile
  * subelement in Reconfiguration variant Multi-Link element Link Info field.
@@ -2708,7 +2764,8 @@ struct wlan_ml_rv_linfo_perstaprof {
 #define WLAN_ML_RV_LINFO_PERSTAPROF_STAINFO_LENGTH_MAX \
 	(WLAN_ML_RV_LINFO_PERSTAPROF_STAINFO_LENGTH_SIZE + \
 	 QDF_MAC_ADDR_SIZE + \
-	 WLAN_ML_RV_LINFO_PERSTAPROF_STAINFO_DELTIMER_SIZE)
+	 WLAN_ML_RV_LINFO_PERSTAPROF_STAINFO_APREMOVALTIMER_SIZE + \
+	 sizeof(struct wlan_ml_rv_linfo_perstaprof_stainfo_opparams))
 
 /* End of definitions related to Reconfiguration variant Multi-Link element Link
  * Info field.
