@@ -2740,6 +2740,30 @@ lim_update_sae_single_pmk_ap_cap(struct mac_context *mac,
 }
 #endif
 
+#ifdef WLAN_FEATURE_11BE_MLO
+static void lim_get_mld_peer(struct wlan_objmgr_vdev *vdev,
+			     struct qdf_mac_addr *bssid)
+{
+	struct wlan_objmgr_peer *peer;
+
+	if (!vdev || !wlan_vdev_mlme_is_mlo_vdev(vdev))
+		return;
+
+	peer = wlan_vdev_get_bsspeer(vdev);
+	if (!peer)
+		return;
+
+	qdf_mem_copy(bssid->bytes, peer->mldaddr, QDF_MAC_ADDR_SIZE);
+	pe_debug("Retrieve PMKSA for peer MLD: " QDF_MAC_ADDR_FMT,
+		 QDF_MAC_ADDR_REF(bssid->bytes));
+}
+#else
+static void lim_get_mld_peer(struct wlan_objmgr_vdev *vdev,
+			     struct qdf_mac_addr *bssid)
+{
+}
+#endif
+
 #ifdef WLAN_FEATURE_SAE
 static void lim_update_sae_config(struct mac_context *mac,
 				  struct pe_session *session)
@@ -2750,15 +2774,16 @@ static void lim_update_sae_config(struct mac_context *mac,
 	qdf_mem_copy(bssid.bytes, session->bssId,
 		     QDF_MAC_ADDR_SIZE);
 
-
+	/* For MLO connection, override BSSID with peer mldaddr */
+	lim_get_mld_peer(session->vdev, &bssid);
 
 	pmksa = wlan_crypto_get_pmksa(session->vdev, &bssid);
 	if (!pmksa)
 		return;
 
 	session->sae_pmk_cached = true;
-	pe_debug("Found for BSSID=" QDF_MAC_ADDR_FMT,
-		 QDF_MAC_ADDR_REF(session->bssId));
+	pe_debug("PMKSA Found for BSSID=" QDF_MAC_ADDR_FMT,
+		 QDF_MAC_ADDR_REF(bssid.bytes));
 }
 #else
 static inline void lim_update_sae_config(struct mac_context *mac,
@@ -3728,7 +3753,7 @@ lim_is_rsnxe_cap_set(struct mac_context *mac_ctx,
 		     WLAN_CRYPTO_RSNX_CAP_SAE_PK |
 		     WLAN_CRYPTO_RSNX_CAP_SECURE_LTF |
 		     WLAN_CRYPTO_RSNX_CAP_SECURE_RTT |
-		     WLAN_CRYPTO_RSNX_CAP_PROT_RANGE_NEG);
+		     WLAN_CRYPTO_RSNX_CAP_URNM_MFPR);
 
 	/* Check if any other bits are set than cap_mask */
 	for (cap_index = 0; cap_index <= cap_len; cap_index++) {
@@ -3867,18 +3892,18 @@ lim_fill_rsn_ie(struct mac_context *mac_ctx, struct pe_session *session,
 		qdf_mem_copy(pmksa.cache_id,
 			     bss_desc->fils_info_element.cache_id,
 			     CACHE_ID_LEN);
-		pe_debug("FILS: Cache id =0x%x 0x%x", pmksa.cache_id[0],
-			 pmksa.cache_id[1]);
+		pe_debug("FILS: vdev %d Cache id =0x%x 0x%x ssid: " QDF_SSID_FMT,
+			 session->vdev_id, pmksa.cache_id[0], pmksa.cache_id[1],
+			 QDF_SSID_REF(pmksa.ssid_len, pmksa.ssid));
 	} else {
 		qdf_mem_copy(&pmksa.bssid, session->bssId, QDF_MAC_ADDR_SIZE);
+		/* For MLO connection, override BSSID with peer mldaddr */
+		lim_get_mld_peer(session->vdev, &pmksa.bssid);
 	}
 
 	pmksa_peer = wlan_crypto_get_peer_pmksa(session->vdev, &pmksa);
-	if (!pmksa_peer)
-		pe_debug("FILS: vdev:%d Peer PMKSA not found ssid:" QDF_SSID_FMT " cache_id_present:%d",
-			 session->vdev_id,
-			 QDF_SSID_REF(pmksa.ssid_len, pmksa.ssid),
-			 bss_desc->fils_info_element.is_cache_id_present);
+	if (pmksa_peer)
+		pe_debug("PMKSA found");
 
 	lim_update_connect_rsn_ie(session, rsn_ie, pmksa_peer);
 	qdf_mem_free(rsn_ie);
@@ -5441,7 +5466,7 @@ uint32_t lim_get_num_pwr_levels(bool is_psd,
 			num_pwr_levels = 8;
 			break;
 		default:
-			pe_err("Invalid channel width");
+			pe_err_rl("Invalid channel width");
 			return 0;
 		}
 	} else {
@@ -5459,7 +5484,7 @@ uint32_t lim_get_num_pwr_levels(bool is_psd,
 			num_pwr_levels = 4;
 			break;
 		default:
-			pe_err("Invalid channel width");
+			pe_err_rl("Invalid channel width");
 			return 0;
 		}
 	}
@@ -5628,7 +5653,9 @@ void lim_calculate_tpc(struct mac_context *mac,
 							&is_psd_power,
 							&tx_power_within_bw,
 							&psd_power_within_bw,
-							&ap_power_type_6g) ==
+							&ap_power_type_6g,
+							REG_BEST_PWR_MODE,
+							NO_SCHANS_PUNC) ==
 							QDF_STATUS_SUCCESS) {
 						pe_debug("get pwr attr from secondary list");
 						reg_max = tx_power_within_bw;
@@ -6698,9 +6725,9 @@ void __lim_process_sme_assoc_cnf_new(struct mac_context *mac_ctx, uint32_t msg_t
 	sta_ds = dph_get_hash_entry(mac_ctx, assoc_cnf.aid,
 			&session_entry->dph.dphHashTable);
 	if (!sta_ds) {
-		pe_err("Rcvd invalid msg %X due to no STA ctx, aid %d, peer",
-				msg_type, assoc_cnf.aid);
-		lim_print_mac_addr(mac_ctx, assoc_cnf.peer_macaddr.bytes, LOGE);
+		pe_err("Rcvd invalid msg %X due to no STA ctx, aid %d, peer "QDF_MAC_ADDR_FMT,
+		       msg_type, assoc_cnf.aid,
+		       QDF_MAC_ADDR_REF(assoc_cnf.peer_macaddr.bytes));
 
 		/*
 		 * send a DISASSOC_IND message to WSM to make sure
@@ -6716,9 +6743,9 @@ void __lim_process_sme_assoc_cnf_new(struct mac_context *mac_ctx, uint32_t msg_t
 	if (qdf_mem_cmp((uint8_t *)sta_ds->staAddr,
 				(uint8_t *) assoc_cnf.peer_macaddr.bytes,
 				QDF_MAC_ADDR_SIZE)) {
-		pe_debug("peerMacAddr mismatched for aid %d, peer ",
-				assoc_cnf.aid);
-		lim_print_mac_addr(mac_ctx, assoc_cnf.peer_macaddr.bytes, LOGD);
+		pe_debug("peerMacAddr mismatched for aid %d, peer "QDF_MAC_ADDR_FMT,
+			 assoc_cnf.aid,
+			 QDF_MAC_ADDR_REF(assoc_cnf.peer_macaddr.bytes));
 		goto end;
 	}
 
@@ -6727,10 +6754,9 @@ void __lim_process_sme_assoc_cnf_new(struct mac_context *mac_ctx, uint32_t msg_t
 		 (msg_type != eWNI_SME_ASSOC_CNF)) ||
 		((sta_ds->mlmStaContext.subType == LIM_REASSOC) &&
 		 (msg_type != eWNI_SME_ASSOC_CNF))) {
-		pe_debug("not in MLM_WT_ASSOC_CNF_STATE, for aid %d, peer"
-			"StaD mlmState: %d",
-			assoc_cnf.aid, sta_ds->mlmStaContext.mlmState);
-		lim_print_mac_addr(mac_ctx, assoc_cnf.peer_macaddr.bytes, LOGD);
+		pe_debug("peer " QDF_MAC_ADDR_FMT " not in WT_ASSOC_CNF_STATE, for aid %d, sta mlmstate %d",
+			 QDF_MAC_ADDR_REF(assoc_cnf.peer_macaddr.bytes),
+			 assoc_cnf.aid, sta_ds->mlmStaContext.mlmState);
 		goto end;
 	}
 	/*
@@ -7527,8 +7553,8 @@ static void __lim_process_sme_set_ht2040_mode(struct mac_context *mac,
 				pSetHT2040Mode->bssid.bytes,
 				&sessionId);
 	if (!pe_session) {
-		pe_debug("Session does not exist for given BSSID");
-		lim_print_mac_addr(mac, pSetHT2040Mode->bssid.bytes, LOGD);
+		pe_debug("Session does not exist for given BSSID: "QDF_MAC_ADDR_FMT,
+			 QDF_MAC_ADDR_REF(pSetHT2040Mode->bssid.bytes));
 		return;
 	}
 
@@ -8482,8 +8508,8 @@ static void lim_process_sme_start_beacon_req(struct mac_context *mac, uint32_t *
 				pBeaconStartInd->bssid,
 				&sessionId);
 	if (!pe_session) {
-		lim_print_mac_addr(mac, pBeaconStartInd->bssid, LOGE);
-		pe_err("Session does not exist for given bssId");
+		pe_err("Session does not exist for given bssId: "QDF_MAC_ADDR_FMT,
+		       QDF_MAC_ADDR_REF(pBeaconStartInd->bssid));
 		return;
 	}
 
@@ -8554,6 +8580,27 @@ static void lim_change_channel(
 					      session_entry);
 }
 
+#ifdef WLAN_FEATURE_11BE
+static bool
+lim_is_puncture_bitmap_changed(struct pe_session *session,
+			       struct channel_change_req *ch_change_req)
+{
+	uint16_t ori_puncture_bitmap;
+
+	ori_puncture_bitmap =
+		*(uint16_t *)session->eht_op.disabled_sub_chan_bitmap;
+
+	return ori_puncture_bitmap != ch_change_req->target_punc_bitmap;
+}
+#else
+static inline bool
+lim_is_puncture_bitmap_changed(struct pe_session *session,
+			       struct channel_change_req *ch_change_req)
+{
+	return false;
+}
+#endif
+
 /**
  * lim_process_sme_channel_change_request() - process sme ch change req
  *
@@ -8598,8 +8645,10 @@ static void lim_process_sme_channel_change_request(struct mac_context *mac_ctx,
 		return;
 	}
 
-	if (session_entry->curr_op_freq == target_freq &&
-	    session_entry->ch_width == ch_change_req->ch_width) {
+	if ((session_entry->curr_op_freq == target_freq &&
+	     session_entry->ch_width == ch_change_req->ch_width) &&
+	    (!IS_DOT11_MODE_EHT(session_entry->dot11mode) ||
+	     !lim_is_puncture_bitmap_changed(session_entry, ch_change_req))) {
 		pe_err("Target channel and mode is same as current channel and mode channel freq %d and mode %d",
 		       session_entry->curr_op_freq, session_entry->ch_width);
 		return;
@@ -9163,6 +9212,14 @@ static void lim_process_sme_dfs_csa_ie_request(struct mac_context *mac_ctx,
 	session_entry->dfsIncludeChanSwIe = true;
 	session_entry->gLimChannelSwitch.switchCount =
 		 dfs_csa_ie_req->ch_switch_beacon_cnt;
+
+	wlan_reg_set_create_punc_bitmap(&dfs_csa_ie_req->ch_params, false);
+	wlan_reg_set_channel_params_for_pwrmode(mac_ctx->pdev,
+						dfs_csa_ie_req->target_chan_freq,
+						0,
+						&dfs_csa_ie_req->ch_params,
+						REG_CURRENT_PWR_MODE);
+
 	ch_width = dfs_csa_ie_req->ch_params.ch_width;
 	if (ch_width >= CH_WIDTH_160MHZ &&
 	    wma_get_vht_ch_width() < WNI_CFG_VHT_CHANNEL_WIDTH_160MHZ) {

@@ -638,16 +638,23 @@ def_chan:
 			hdd_ctx->psoc, PM_SAP_MODE, true);
 		if (WLAN_REG_IS_5GHZ_CH_FREQ(ch_freq) &&
 		    ch_bw > CH_WIDTH_20MHZ) {
+			struct ch_params ch_params;
+
+			qdf_mem_zero(&ch_params, sizeof(ch_params));
+			ch_params.ch_width = ch_bw;
 			ch_state =
-				wlan_reg_get_5g_bonded_channel_state_for_freq(
-					hdd_ctx->pdev, ch_freq, ch_bw);
+			wlan_reg_get_5g_bonded_channel_state_for_pwrmode(
+					hdd_ctx->pdev, ch_freq, &ch_params,
+					REG_CURRENT_PWR_MODE);
 			while (ch_bw > CH_WIDTH_20MHZ &&
 			       ch_state != CHANNEL_STATE_ENABLE) {
 				ch_bw =
 				wlan_reg_get_next_lower_bandwidth(ch_bw);
+				ch_params.ch_width = ch_bw;
 				ch_state =
-				wlan_reg_get_5g_bonded_channel_state_for_freq(
-					hdd_ctx->pdev, ch_freq, ch_bw);
+				wlan_reg_get_5g_bonded_channel_state_for_pwrmode
+					(hdd_ctx->pdev, ch_freq, &ch_params,
+					REG_CURRENT_PWR_MODE);
 			}
 			hdd_debug("bw change from %d to %d",
 				  hdd_ap_ctx->sap_config.ch_width_orig,
@@ -1567,10 +1574,9 @@ QDF_STATUS hdd_cm_send_vdev_keys(struct wlan_objmgr_vdev *vdev,
 
 #ifdef WLAN_VENDOR_HANDOFF_CONTROL
 #define WLAN_WAIT_TIME_HANDOFF_PARAMS 1000
-
 QDF_STATUS hdd_cm_get_handoff_param(struct wlan_objmgr_psoc *psoc,
-				    struct hdd_adapter *adapter,
-				    uint8_t vdev_id, uint32_t param_id)
+				    uint8_t vdev_id,
+				    enum vendor_control_roam_param param_id)
 {
 	QDF_STATUS status;
 	int retval;
@@ -1633,6 +1639,42 @@ hdd_cm_get_vendor_handoff_params(struct wlan_objmgr_psoc *psoc,
 	return QDF_STATUS_SUCCESS;
 }
 #endif
+
+QDF_STATUS
+hdd_cm_get_scan_ie_params(struct wlan_objmgr_vdev *vdev,
+			  struct element_info *scan_ie,
+			  enum dot11_mode_filter *dot11mode_filter)
+{
+	struct hdd_context *hdd_ctx = cds_get_context(QDF_MODULE_ID_HDD);
+	struct hdd_adapter *adapter;
+
+	if (!hdd_ctx) {
+		hdd_err("hdd_ctx is NULL");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	adapter = hdd_get_adapter_by_vdev(hdd_ctx, wlan_vdev_get_id(vdev));
+	if (!adapter) {
+		hdd_err("adapter is NULL for vdev %d", wlan_vdev_get_id(vdev));
+		return QDF_STATUS_E_INVAL;
+	}
+
+	if (adapter->device_mode == QDF_P2P_CLIENT_MODE) {
+		scan_ie->ptr =
+			&adapter->scan_info.scan_add_ie.addIEdata[0];
+		scan_ie->len = adapter->scan_info.scan_add_ie.length;
+	} else if (adapter->scan_info.default_scan_ies) {
+		scan_ie->ptr = adapter->scan_info.default_scan_ies;
+		scan_ie->len = adapter->scan_info.default_scan_ies_len;
+	} else if (adapter->scan_info.scan_add_ie.length) {
+		scan_ie->ptr = adapter->scan_info.scan_add_ie.addIEdata;
+		scan_ie->len = adapter->scan_info.scan_add_ie.length;
+	}
+
+	*dot11mode_filter = hdd_get_dot11mode_filter(hdd_ctx);
+
+	return QDF_STATUS_SUCCESS;
+}
 
 #ifdef WLAN_FEATURE_ROAM_OFFLOAD
 #ifdef WLAN_FEATURE_FILS_SK

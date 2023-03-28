@@ -3274,6 +3274,14 @@ int hdd_softap_set_channel_change(struct net_device *dev, int target_chan_freq,
 		return status;
 	}
 
+	if (!policy_mgr_is_sap_allowed_on_indoor(hdd_ctx->pdev,
+						 adapter->vdev_id,
+						 target_chan_freq)) {
+		hdd_debug("Channel switch is not allowed to indoor frequency %d",
+			  target_chan_freq);
+		return -EINVAL;
+	}
+
 	if (!sta_cnt && !policy_mgr_is_hw_dbs_capable(hdd_ctx->psoc) &&
 	    (sta_sap_scc_on_dfs_chnl ==
 	     PM_STA_SAP_ON_DFS_MASTER_MODE_DISABLED) &&
@@ -4111,11 +4119,6 @@ QDF_STATUS hdd_init_ap_mode(struct hdd_adapter *adapter, bool reinit)
 	/* Cache station count initialize to zero */
 	qdf_atomic_init(&adapter->cache_sta_count);
 
-	/* Initialize the data path module */
-	vdev = hdd_objmgr_get_vdev_by_user(adapter, WLAN_DP_ID);
-	if (vdev)
-		ucfg_dp_softap_init_txrx(vdev);
-
 	status = hdd_wmm_adapter_init(adapter);
 	if (!QDF_IS_STATUS_SUCCESS(status)) {
 		hdd_err("hdd_wmm_adapter_init() failed code: %08d [x%08x]",
@@ -4137,11 +4140,15 @@ QDF_STATUS hdd_init_ap_mode(struct hdd_adapter *adapter, bool reinit)
 		hdd_err("wmi_pdev_param_burst_enable set failed: %d", ret);
 
 
+	vdev = hdd_objmgr_get_vdev_by_user(adapter, WLAN_OSIF_ID);
 	ucfg_mlme_is_6g_sap_fd_enabled(hdd_ctx->psoc, &is_6g_sap_fd_enabled);
 	hdd_debug("6g sap fd enabled %d", is_6g_sap_fd_enabled);
 	if (is_6g_sap_fd_enabled && vdev)
 		wlan_vdev_mlme_feat_ext_cap_set(vdev,
 						WLAN_VDEV_FEXT_FILS_DISC_6G_SAP);
+
+	if (vdev)
+		hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
 
 	hdd_set_netdev_flags(adapter);
 
@@ -4159,18 +4166,12 @@ QDF_STATUS hdd_init_ap_mode(struct hdd_adapter *adapter, bool reinit)
 	/* rcpi info initialization */
 	qdf_mem_zero(&adapter->rcpi, sizeof(adapter->rcpi));
 
-	if (vdev)
-		hdd_objmgr_put_vdev_by_user(vdev, WLAN_DP_ID);
 	hdd_exit();
 
 	return status;
 
 error_release_softap_tx_rx:
 	hdd_unregister_wext(adapter->dev);
-	if (vdev) {
-		ucfg_dp_softap_deinit_txrx(vdev);
-		hdd_objmgr_put_vdev_by_user(vdev, WLAN_DP_ID);
-	}
 error_deinit_sap_session:
 	hdd_hostapd_deinit_sap_session(adapter);
 error_release_vdev:
@@ -4182,8 +4183,6 @@ void hdd_deinit_ap_mode(struct hdd_context *hdd_ctx,
 			struct hdd_adapter *adapter,
 			bool rtnl_held)
 {
-	struct wlan_objmgr_vdev *vdev;
-
 	hdd_enter_dev(adapter->dev);
 
 	if (test_bit(WMM_INIT_DONE, &adapter->event_flags)) {
@@ -4197,12 +4196,6 @@ void hdd_deinit_ap_mode(struct hdd_context *hdd_ctx,
 
 		/* Re-enable roaming on all connected STA vdev */
 		wlan_hdd_enable_roaming(adapter, RSO_SAP_CHANNEL_CHANGE);
-	}
-
-	vdev = hdd_objmgr_get_vdev_by_user(adapter, WLAN_DP_ID);
-	if (vdev) {
-		ucfg_dp_softap_deinit_txrx(vdev);
-		hdd_objmgr_put_vdev_by_user(vdev, WLAN_DP_ID);
 	}
 
 	if (hdd_hostapd_deinit_sap_session(adapter))
@@ -7322,9 +7315,8 @@ hdd_sap_nan_check_and_disable_unsupported_ndi(struct wlan_objmgr_psoc *psoc,
 	((LINUX_VERSION_CODE >= KERNEL_VERSION(5, 3, 0)) || \
 	  defined(CFG80211_TWT_RESPONDER_SUPPORT))
 #ifdef WLAN_TWT_CONV_SUPPORTED
-static void
-wlan_hdd_update_twt_responder(struct hdd_context *hdd_ctx,
-			      struct cfg80211_ap_settings *params)
+void wlan_hdd_configure_twt_responder(struct hdd_context *hdd_ctx,
+				      bool twt_responder)
 {
 	bool twt_res_svc_cap, enable_twt;
 	uint32_t reason;
@@ -7334,19 +7326,31 @@ wlan_hdd_update_twt_responder(struct hdd_context *hdd_ctx,
 	ucfg_twt_cfg_set_responder(hdd_ctx->psoc,
 				   QDF_MIN(twt_res_svc_cap,
 					   (enable_twt &&
-					    params->twt_responder)));
-	hdd_debug("cfg80211 TWT responder:%d", params->twt_responder);
-	if (enable_twt && params->twt_responder) {
+					    twt_responder)));
+	hdd_debug("cfg80211 TWT responder:%d", twt_responder);
+	if (enable_twt && twt_responder) {
 		hdd_send_twt_responder_enable_cmd(hdd_ctx);
 	} else {
 		reason = HOST_TWT_DISABLE_REASON_NONE;
 		hdd_send_twt_responder_disable_cmd(hdd_ctx, reason);
 	}
+
 }
-#else
+
 static void
-wlan_hdd_update_twt_responder(struct hdd_context *hdd_ctx,
+wlan_hdd_update_twt_responder(struct hdd_adapter *adapter,
 			      struct cfg80211_ap_settings *params)
+{
+	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
+
+	adapter->session.ap.sap_config.cfg80211_twt_responder =
+							params->twt_responder;
+	wlan_hdd_configure_twt_responder(hdd_ctx, params->twt_responder);
+}
+
+#else
+void wlan_hdd_configure_twt_responder(struct hdd_context *hdd_ctx,
+				      bool twt_responder)
 {
 	bool twt_res_svc_cap, enable_twt;
 	uint32_t reason;
@@ -7355,20 +7359,35 @@ wlan_hdd_update_twt_responder(struct hdd_context *hdd_ctx,
 	ucfg_mlme_get_twt_res_service_cap(hdd_ctx->psoc, &twt_res_svc_cap);
 	ucfg_mlme_set_twt_responder(hdd_ctx->psoc,
 				    QDF_MIN(twt_res_svc_cap,
-					    (enable_twt && params->twt_responder)));
-	hdd_debug("cfg80211 TWT responder:%d", params->twt_responder);
-	if (enable_twt && params->twt_responder) {
+					    (enable_twt && twt_responder)));
+	hdd_debug("cfg80211 TWT responder:%d", twt_responder);
+	if (enable_twt && twt_responder) {
 		hdd_send_twt_responder_enable_cmd(hdd_ctx);
 	} else {
 		reason = HOST_TWT_DISABLE_REASON_NONE;
 		hdd_send_twt_responder_disable_cmd(hdd_ctx, reason);
 	}
 }
+
+static void
+wlan_hdd_update_twt_responder(struct hdd_adapter *adapter,
+			      struct cfg80211_ap_settings *params)
+{
+	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
+
+	adapter->session.ap.sap_config.cfg80211_twt_responder =
+							params->twt_responder;
+	wlan_hdd_configure_twt_responder(hdd_ctx, params->twt_responder);
+}
 #endif
 #else
 static inline void
-wlan_hdd_update_twt_responder(struct hdd_context *hdd_ctx,
+wlan_hdd_update_twt_responder(struct hdd_adapter *adapter,
 			      struct cfg80211_ap_settings *params)
+{}
+
+void wlan_hdd_configure_twt_responder(struct hdd_context *hdd_ctx,
+				      bool twt_responder)
 {}
 #endif
 
@@ -7549,6 +7568,16 @@ static int __wlan_hdd_cfg80211_start_ap(struct wiphy *wiphy,
 	if (!status)
 		return -EINVAL;
 
+	status = policy_mgr_is_sap_allowed_on_indoor(
+						hdd_ctx->pdev,
+						adapter->vdev_id,
+						chandef->chan->center_freq);
+	if (!status) {
+		hdd_debug("SAP start not allowed on indoor channel %d",
+			  chandef->chan->center_freq);
+		return -EINVAL;
+	}
+
 	intf_pm_mode = policy_mgr_convert_device_mode_to_qdf_type(
 							adapter->device_mode);
 	status = policy_mgr_is_multi_sap_allowed_on_same_band(
@@ -7572,6 +7601,7 @@ static int __wlan_hdd_cfg80211_start_ap(struct wiphy *wiphy,
 		enum channel_state ch_state;
 		enum phy_ch_width sub_20_ch_width = CH_WIDTH_INVALID;
 		struct sap_config *sap_cfg = &adapter->session.ap.sap_config;
+		struct ch_params ch_params;
 
 		if (CHANNEL_STATE_DFS ==
 		    wlan_reg_get_channel_state_from_secondary_list_for_freq(
@@ -7589,9 +7619,13 @@ static int __wlan_hdd_cfg80211_start_ap(struct wiphy *wiphy,
 			sub_20_ch_width = CH_WIDTH_5MHZ;
 		if (cds_is_10_mhz_enabled())
 			sub_20_ch_width = CH_WIDTH_10MHZ;
+		qdf_mem_zero(&ch_params, sizeof(ch_params));
+		ch_params.ch_width = sub_20_ch_width;
 		if (WLAN_REG_IS_5GHZ_CH_FREQ(freq))
-			ch_state = wlan_reg_get_5g_bonded_channel_state_for_freq(hdd_ctx->pdev, freq,
-										 sub_20_ch_width);
+			ch_state =
+			wlan_reg_get_5g_bonded_channel_state_for_pwrmode(
+						hdd_ctx->pdev, freq, &ch_params,
+						REG_CURRENT_PWR_MODE);
 		else
 			ch_state = wlan_reg_get_2g_bonded_channel_state_for_freq(hdd_ctx->pdev, freq,
 										 sub_20_ch_width, 0);
@@ -7752,7 +7786,7 @@ static int __wlan_hdd_cfg80211_start_ap(struct wiphy *wiphy,
 		 * Enable/disable TWT responder based on
 		 * the twt_responder flag
 		 */
-		wlan_hdd_update_twt_responder(hdd_ctx, params);
+		wlan_hdd_update_twt_responder(adapter, params);
 
 		/* Enable/disable non-srg obss pd spatial reuse */
 		hdd_update_he_obss_pd(adapter, params);

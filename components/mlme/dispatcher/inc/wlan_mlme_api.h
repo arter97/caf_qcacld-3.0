@@ -2511,6 +2511,27 @@ wlan_mlme_set_relaxed_6ghz_conn_policy(struct wlan_objmgr_psoc *psoc,
 
 #ifdef WLAN_FEATURE_11BE_MLO
 /**
+ * wlan_mlme_get_eht_mode() - Get the EHT mode of operations
+ * @psoc: psoc context
+ * @value: EHT mode value ptr
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+wlan_mlme_get_eht_mode(struct wlan_objmgr_psoc *psoc,
+		       enum wlan_eht_mode *value);
+
+/**
+ * wlan_mlme_set_eht_mode() - Set the EHT mode of operation
+ * @psoc: psoc context
+ * @value: EHT mode value
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+wlan_mlme_set_eht_mode(struct wlan_objmgr_psoc *psoc, enum wlan_eht_mode value);
+
+/**
  * wlan_mlme_get_emlsr_mode_enabled() - Get the eMLSR mode flag
  * @psoc: psoc context
  * @value: Enable/Disable value ptr.
@@ -2554,6 +2575,19 @@ wlan_mlme_get_eml_params(struct wlan_objmgr_psoc *psoc,
 			 struct wlan_mlo_eml_cap *cap);
 
 /**
+ * wlan_mlme_cfg_set_emlsr_pad_delay() - Configure EMLSR padding delay subfield
+ * @psoc: psoc context
+ * @val: EMLSR padding delay subfield value
+ *
+ * API to configure EMLSR padding delay subfield in psoc mlme obj with user
+ * requested value if it greater than the value configured by FW during boot-up.
+ *
+ * Return: none
+ */
+void
+wlan_mlme_cfg_set_emlsr_pad_delay(struct wlan_objmgr_psoc *psoc, uint8_t val);
+
+/**
  * wlan_mlme_get_t2lm_negotiation_supported() - Get the T2LM
  * negotiation supported value
  * @psoc: psoc context
@@ -2576,6 +2610,19 @@ wlan_mlme_set_t2lm_negotiation_supported(struct wlan_objmgr_psoc *psoc,
 					 uint8_t value);
 #else
 static inline QDF_STATUS
+wlan_mlme_get_eht_mode(struct wlan_objmgr_psoc *psoc, enum wlan_eht_mode *value)
+{
+	*value = WLAN_EHT_MODE_DISABLED;
+	return QDF_STATUS_SUCCESS;
+}
+
+static inline QDF_STATUS
+wlan_mlme_set_eht_mode(struct wlan_objmgr_psoc *psoc, enum wlan_eht_mode value)
+{
+	return QDF_STATUS_SUCCESS;
+}
+
+static inline QDF_STATUS
 wlan_mlme_get_emlsr_mode_enabled(struct wlan_objmgr_psoc *psoc, bool *value)
 {
 	*value = false;
@@ -2597,6 +2644,11 @@ wlan_mlme_set_eml_params(struct wlan_objmgr_psoc *psoc,
 static inline void
 wlan_mlme_get_eml_params(struct wlan_objmgr_psoc *psoc,
 			 struct wlan_mlo_eml_cap *cap)
+{
+}
+
+static inline void
+wlan_mlme_cfg_set_emlsr_pad_delay(struct wlan_objmgr_psoc *psoc, uint8_t val)
 {
 }
 
@@ -3134,6 +3186,16 @@ wlan_mlme_get_enable_idle_roam(struct wlan_objmgr_psoc *psoc, bool *val);
 QDF_STATUS
 wlan_mlme_get_idle_roam_rssi_delta(struct wlan_objmgr_psoc *psoc,
 				   uint32_t *val);
+
+/**
+ * wlan_mlme_get_roam_info_stats_num() - Get roam information statistics number
+ * @psoc: pointer to psoc object
+ * @val:  Pointer to roam_info_stats_num
+ *
+ * Return: QDF Status
+ */
+QDF_STATUS
+wlan_mlme_get_roam_info_stats_num(struct wlan_objmgr_psoc *psoc, uint32_t *val);
 
 /**
  * wlan_mlme_get_idle_roam_inactive_time() - Get idle roam inactive time
@@ -4173,4 +4235,14 @@ QDF_STATUS
 wlan_mlme_stats_get_periodic_display_time(struct wlan_objmgr_psoc *psoc,
 					  uint32_t *periodic_display_time);
 
+/**
+ * wlan_mlme_is_bcn_prot_disabled_for_sap() - Is beacon protection config
+ * disabled for SAP interface
+ *
+ * @psoc: pointer to psoc object
+ *
+ * Return: is beacon protection disabled
+ */
+bool
+wlan_mlme_is_bcn_prot_disabled_for_sap(struct wlan_objmgr_psoc *psoc);
 #endif /* _WLAN_MLME_API_H_ */

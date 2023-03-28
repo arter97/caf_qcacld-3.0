@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -116,23 +116,14 @@ hdd_cm_get_vendor_handoff_params(struct wlan_objmgr_psoc *psoc,
 /**
  * hdd_cm_get_handoff_param() - send get vendor handoff param request to fw
  * @psoc: psoc common object
- * @hdd_adapter: adapter context
  * @vdev_id: vdev id
- * @param_id: Param ID from enum WMI_ROAM_GET_VENDOR_CONTROL_PARAM_ID
+ * @param_id: param id from enum vendor_control_roam_param
  *
  * Return: QDF_STATUS
  */
 QDF_STATUS hdd_cm_get_handoff_param(struct wlan_objmgr_psoc *psoc,
-				    struct hdd_adapter *hdd_adapter,
-				    uint8_t vdev_id, uint32_t param_id);
-#else
-static inline QDF_STATUS
-hdd_cm_get_handoff_param(struct wlan_objmgr_psoc *psoc,
-			 struct hdd_adapter *hdd_adapter,
-			 uint8_t vdev_id, uint32_t param_value)
-{
-	return QDF_STATUS_SUCCESS;
-}
+				    uint8_t vdev_id,
+				    enum vendor_control_roam_param param_id);
 #endif
 
 /**
@@ -355,4 +346,16 @@ bool hdd_cm_is_disconnected(struct hdd_adapter *adapter);
  */
 bool hdd_cm_is_vdev_roaming(struct hdd_adapter *adapter);
 
+/**
+ * hdd_cm_get_scan_ie_params() - to get scan ie params
+ * @vdev: Pointer to vdev object
+ * @scan_ie: pointer to scan ie element struct
+ * @dot11mode_filter: Pointer to dot11mode_filter enum
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+hdd_cm_get_scan_ie_params(struct wlan_objmgr_vdev *vdev,
+			  struct element_info *scan_ie,
+			  enum dot11_mode_filter *dot11mode_filter);
 #endif /* __WLAN_HDD_CM_API_H */

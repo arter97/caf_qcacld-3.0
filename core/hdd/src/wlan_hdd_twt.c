@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2018-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -1085,7 +1085,7 @@ hdd_twt_get_peer_session_params(struct hdd_context *hdd_ctx,
 }
 
 /**
- * hdd_sap_twt_get_session_params() - Parses twt nl attrributes, obtains twt
+ * hdd_sap_twt_get_session_params() - Parses twt nl attributes, obtains twt
  * session parameters based on dialog_id and returns to user via nl layer
  * @adapter: hdd_adapter
  * @twt_param_attr: twt nl attributes
@@ -1162,7 +1162,7 @@ done:
 }
 
 /**
- * hdd_sta_twt_get_session_params() - Parses twt nl attrributes, obtains twt
+ * hdd_sta_twt_get_session_params() - Parses twt nl attributes, obtains twt
  * session parameters based on dialog_id and returns to user via nl layer
  * @adapter: hdd_adapter
  * @twt_param_attr: twt nl attributes
@@ -1234,7 +1234,7 @@ static int hdd_sta_twt_get_session_params(struct hdd_adapter *adapter,
 }
 
 /**
- * hdd_twt_get_session_params() - Parses twt nl attrributes, obtains twt
+ * hdd_twt_get_session_params() - Parses twt nl attributes, obtains twt
  * session parameters based on dialog_id and returns to user via nl layer
  * @adapter: hdd_adapter
  * @twt_param_attr: twt nl attributes
@@ -3894,7 +3894,7 @@ hdd_twt_pack_get_stats_resp_nlmsg(struct hdd_context *hdd_ctx,
 }
 
 /**
- * hdd_twt_clear_session_traffic_stats() - Parses twt nl attrributes and
+ * hdd_twt_clear_session_traffic_stats() - Parses twt nl attributes and
  * sends clear twt stats request for a single or all sessions
  * @adapter: hdd_adapter
  * @twt_param_attr: twt nl attributes

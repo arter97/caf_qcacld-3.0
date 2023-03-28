@@ -2025,8 +2025,8 @@ extract_roam_frame_info_tlv(wmi_unified_t wmi_handle, void *evt_buf,
 	if (!param_buf || !param_buf->roam_frame_info ||
 	    !param_buf->num_roam_frame_info ||
 	    (frame_idx + num_frames) > param_buf->num_roam_frame_info) {
-		wmi_debug("Empty roam_frame_info param buf frame_idx:%d num_frames:%d",
-			  frame_idx, num_frames);
+		wmi_err("Empty roam_frame_info param buf frame_idx:%d num_frames:%d",
+			frame_idx, num_frames);
 		return QDF_STATUS_SUCCESS;
 	}
 
@@ -2105,15 +2105,15 @@ wmi_fill_data_synch_frame_event(struct rso_config *rso_cfg,
 	uint8_t *reassoc_req_ptr;
 
 	/* Beacon/Probe Rsp data */
-	roam_sync_ind->beaconProbeRespOffset =
+	roam_sync_ind->beacon_probe_resp_offset =
 		sizeof(struct roam_offload_synch_ind);
 	bcn_probersp_ptr = (uint8_t *)roam_sync_ind +
-		roam_sync_ind->beaconProbeRespOffset;
-	roam_sync_ind->beaconProbeRespLength =
+		roam_sync_ind->beacon_probe_resp_offset;
+	roam_sync_ind->beacon_probe_resp_length =
 		rso_cfg->roam_sync_frame_ind.bcn_probe_rsp_len;
 	qdf_mem_copy(bcn_probersp_ptr,
 		     rso_cfg->roam_sync_frame_ind.bcn_probe_rsp,
-		     roam_sync_ind->beaconProbeRespLength);
+		     roam_sync_ind->beacon_probe_resp_length);
 	qdf_mem_free(rso_cfg->roam_sync_frame_ind.bcn_probe_rsp);
 	rso_cfg->roam_sync_frame_ind.bcn_probe_rsp = NULL;
 
@@ -2121,7 +2121,7 @@ wmi_fill_data_synch_frame_event(struct rso_config *rso_cfg,
 	if (rso_cfg->roam_sync_frame_ind.link_bcn_probe_rsp) {
 		roam_sync_ind->link_beacon_probe_resp_offset =
 			sizeof(struct roam_offload_synch_ind) +
-			roam_sync_ind->beaconProbeRespLength;
+			roam_sync_ind->beacon_probe_resp_length;
 		roam_sync_ind->link_beacon_probe_resp_length =
 			rso_cfg->roam_sync_frame_ind.link_bcn_probe_rsp_len;
 		roam_sync_ind->is_link_beacon =
@@ -2136,26 +2136,26 @@ wmi_fill_data_synch_frame_event(struct rso_config *rso_cfg,
 	}
 
 	/* ReAssoc Rsp data */
-	roam_sync_ind->reassocRespOffset =
+	roam_sync_ind->reassoc_resp_offset =
 		sizeof(struct roam_offload_synch_ind) +
-		roam_sync_ind->beaconProbeRespLength +
+		roam_sync_ind->beacon_probe_resp_length +
 		roam_sync_ind->link_beacon_probe_resp_length;
-	roam_sync_ind->reassocRespLength =
+	roam_sync_ind->reassoc_resp_length =
 		rso_cfg->roam_sync_frame_ind.reassoc_rsp_len;
 	reassoc_rsp_ptr = (uint8_t *)roam_sync_ind +
-			  roam_sync_ind->reassocRespOffset;
+			  roam_sync_ind->reassoc_resp_offset;
 	qdf_mem_copy(reassoc_rsp_ptr,
 		     rso_cfg->roam_sync_frame_ind.reassoc_rsp,
-		     roam_sync_ind->reassocRespLength);
+		     roam_sync_ind->reassoc_resp_length);
 	qdf_mem_free(rso_cfg->roam_sync_frame_ind.reassoc_rsp);
 	rso_cfg->roam_sync_frame_ind.reassoc_rsp = NULL;
 
 	/* ReAssoc Req data */
 	roam_sync_ind->reassoc_req_offset =
 		sizeof(struct roam_offload_synch_ind) +
-		roam_sync_ind->beaconProbeRespLength +
+		roam_sync_ind->beacon_probe_resp_length +
 		roam_sync_ind->link_beacon_probe_resp_length +
-		roam_sync_ind->reassocRespLength;
+		roam_sync_ind->reassoc_resp_length;
 	roam_sync_ind->reassoc_req_length =
 		rso_cfg->roam_sync_frame_ind.reassoc_req_len;
 	reassoc_req_ptr = (uint8_t *)roam_sync_ind +
@@ -2192,34 +2192,34 @@ wmi_fill_data_synch_event(struct roam_offload_synch_ind *roam_sync_ind,
 	synch_event = param_buf->fixed_param;
 
 	/* Beacon/Probe Rsp data */
-	roam_sync_ind->beaconProbeRespOffset =
+	roam_sync_ind->beacon_probe_resp_offset =
 		sizeof(struct roam_offload_synch_ind);
 	bcn_probersp_ptr = (uint8_t *)roam_sync_ind +
-		roam_sync_ind->beaconProbeRespOffset;
-	roam_sync_ind->beaconProbeRespLength =
+		roam_sync_ind->beacon_probe_resp_offset;
+	roam_sync_ind->beacon_probe_resp_length =
 		synch_event->bcn_probe_rsp_len;
 	qdf_mem_copy(bcn_probersp_ptr, param_buf->bcn_probe_rsp_frame,
-		     roam_sync_ind->beaconProbeRespLength);
+		     roam_sync_ind->beacon_probe_resp_length);
 	/*
 	 * Firmware doesn't support link beacon/Probe Rsp data in roam sync
 	 * event. It's always sent in sync_frame event
 	 */
 	/* ReAssoc Rsp data */
-	roam_sync_ind->reassocRespOffset =
+	roam_sync_ind->reassoc_resp_offset =
 		sizeof(struct roam_offload_synch_ind) +
-		roam_sync_ind->beaconProbeRespLength;
-	roam_sync_ind->reassocRespLength = synch_event->reassoc_rsp_len;
+		roam_sync_ind->beacon_probe_resp_length;
+	roam_sync_ind->reassoc_resp_length = synch_event->reassoc_rsp_len;
 	reassoc_rsp_ptr = (uint8_t *)roam_sync_ind +
-			  roam_sync_ind->reassocRespOffset;
+			  roam_sync_ind->reassoc_resp_offset;
 	qdf_mem_copy(reassoc_rsp_ptr,
 		     param_buf->reassoc_rsp_frame,
-		     roam_sync_ind->reassocRespLength);
+		     roam_sync_ind->reassoc_resp_length);
 
 	/* ReAssoc Req data */
 	roam_sync_ind->reassoc_req_offset =
 		sizeof(struct roam_offload_synch_ind) +
-		roam_sync_ind->beaconProbeRespLength +
-		roam_sync_ind->reassocRespLength;
+		roam_sync_ind->beacon_probe_resp_length +
+		roam_sync_ind->reassoc_resp_length;
 	roam_sync_ind->reassoc_req_length = synch_event->reassoc_req_len;
 	reassoc_req_ptr = (uint8_t *)roam_sync_ind +
 			  roam_sync_ind->reassoc_req_offset;
@@ -2312,7 +2312,7 @@ wmi_fill_roam_sync_buffer(wmi_unified_t wmi_handle,
 	void *soc = cds_get_context(QDF_MODULE_ID_SOC);
 	wmi_channel *chan = NULL;
 	wmi_key_material *key;
-	wmi_key_material_ext *key_ft;
+	wmi_key_material_ext *key_ext;
 	wmi_roam_fils_synch_tlv_param *fils_info;
 	wmi_roam_pmk_cache_synch_tlv_param *pmk_cache_info;
 	QDF_STATUS status = QDF_STATUS_E_FAILURE;
@@ -2324,15 +2324,16 @@ wmi_fill_roam_sync_buffer(wmi_unified_t wmi_handle,
 	roam_sync_ind->auth_status = synch_event->auth_status;
 	roam_sync_ind->roam_reason = synch_event->roam_reason;
 	roam_sync_ind->rssi = synch_event->rssi;
+	roam_sync_ind->is_beacon = synch_event->is_beacon;
 
 	WMI_MAC_ADDR_TO_CHAR_ARRAY(&synch_event->bssid,
 				   roam_sync_ind->bssid.bytes);
-	wmi_debug("roamedVdevId %d authStatus %d roamReason %d rssi %d isBeacon %d",
+	wmi_debug("roamed_vdev_id %d auth_status %d roam_reason %d rssi %d is_beacon %d",
 		  roam_sync_ind->roamed_vdev_id,
 		  roam_sync_ind->auth_status,
 		  roam_sync_ind->roam_reason,
 		  roam_sync_ind->rssi,
-		  roam_sync_ind->isBeacon);
+		  roam_sync_ind->is_beacon);
 
 	cdp_update_roaming_peer_in_vdev(soc, synch_event->vdev_id,
 					roam_sync_ind->bssid.bytes,
@@ -2379,7 +2380,7 @@ wmi_fill_roam_sync_buffer(wmi_unified_t wmi_handle,
 	}
 
 	key = param_buf->key;
-	key_ft = param_buf->key_ext;
+	key_ext = param_buf->key_ext;
 	if (key) {
 		roam_sync_ind->kck_len = KCK_KEY_LEN;
 		qdf_mem_copy(roam_sync_ind->kck, key->kck,
@@ -2389,29 +2390,27 @@ wmi_fill_roam_sync_buffer(wmi_unified_t wmi_handle,
 			     KEK_KEY_LEN);
 		qdf_mem_copy(roam_sync_ind->replay_ctr,
 			     key->replay_counter, REPLAY_CTR_LEN);
-	} else if (key_ft) {
+	} else if (key_ext) {
 		/*
-		 * For AKM 00:0F:AC (FT suite-B-SHA384)
-		 * KCK-bits:192 KEK-bits:256
-		 * Firmware sends wmi_key_material_ext tlv now only if
-		 * auth is FT Suite-B SHA-384 auth. If further new suites
-		 * are added, add logic to get kck, kek bits based on
-		 * akm protocol
+		 * key_ext carries key materials whose size
+		 * is greater than conventional 16bytes.
 		 */
-		kck_len = KCK_192BIT_KEY_LEN;
-		kek_len = KEK_256BIT_KEY_LEN;
+		kck_len = key_ext->kck_len ?
+				key_ext->kck_len : KCK_192BIT_KEY_LEN;
+		kek_len = key_ext->kek_len ?
+				key_ext->kek_len : KEK_256BIT_KEY_LEN;
 
 		roam_sync_ind->kck_len = kck_len;
 		qdf_mem_copy(roam_sync_ind->kck,
-			     key_ft->key_buffer, kck_len);
+			     key_ext->key_buffer, kck_len);
 
 		roam_sync_ind->kek_len = kek_len;
 		qdf_mem_copy(roam_sync_ind->kek,
-			     (key_ft->key_buffer + kck_len),
+			     (key_ext->key_buffer + kck_len),
 			     kek_len);
 
 		qdf_mem_copy(roam_sync_ind->replay_ctr,
-			     (key_ft->key_buffer + kek_len + kck_len),
+			     (key_ext->key_buffer + kek_len + kck_len),
 			     REPLAY_CTR_LEN);
 	}
 
@@ -3464,6 +3463,77 @@ extract_roam_candidate_frame_tlv(wmi_unified_t wmi_handle, uint8_t *event,
 }
 
 #ifdef WLAN_VENDOR_HANDOFF_CONTROL
+/**
+ * convert_roam_vendor_control_param() - Function to convert
+ * vendor_control_roam_param enum to TLV specific
+ * WMI_ROAM_GET_VENDOR_CONTROL_PARAM_ID
+ * @param_id: Roam vendor control param id
+ *
+ * Return: wmi roam vendor control param id
+ */
+static WMI_ROAM_GET_VENDOR_CONTROL_PARAM_ID
+convert_roam_vendor_control_param(enum vendor_control_roam_param param_id)
+{
+	switch (param_id) {
+	case VENDOR_CONTROL_PARAM_ROAM_TRIGGER:
+		return ROAM_VENDOR_CONTROL_PARAM_TRIGGER;
+	case VENDOR_CONTROL_PARAM_ROAM_DELTA:
+		return ROAM_VENDOR_CONTROL_PARAM_DELTA;
+	case VENDOR_CONTROL_PARAM_ROAM_FULL_SCANPERIOD:
+		return ROAM_VENDOR_CONTROL_PARAM_FULL_SCANPERIOD;
+	case VENDOR_CONTROL_PARAM_ROAM_PARTIAL_SCANPERIOD:
+		return ROAM_VENDOR_CONTROL_PARAM_PARTIAL_SCANPERIOD;
+	case VENDOR_CONTROL_PARAM_ROAM_ACTIVE_CH_DWELLTIME:
+		return ROAM_VENDOR_CONTROL_PARAM_ACTIVE_CH_DWELLTIME;
+	case VENDOR_CONTROL_PARAM_ROAM_PASSIVE_CH_DWELLTIME:
+		return ROAM_VENDOR_CONTROL_PARAM_PASSIVE_CH_DWELLTIME;
+	case VENDOR_CONTROL_PARAM_ROAM_HOME_CH_TIME:
+		return ROAM_VENDOR_CONTROL_PARAM_HOME_CH_TIME;
+	case VENDOR_CONTROL_PARAM_ROAM_AWAY_TIME:
+		return ROAM_VENDOR_CONTROL_PARAM_AWAY_TIME;
+	case VENDOR_CONTROL_PARAM_ROAM_ALL:
+		return ROAM_VENDOR_CONTROL_PARAM_ALL;
+	default:
+		wmi_debug("Invalid param id");
+		return 0;
+	}
+}
+
+/**
+ * convert_wmi_roam_vendor_control_param() - Function to convert TLV specific
+ * WMI_ROAM_GET_VENDOR_CONTROL_PARAM_ID to vendor_control_roam_param
+ * @param_id: wmi vendor control param id
+ *
+ * Return: roam vendor control param id
+ */
+static enum vendor_control_roam_param convert_wmi_roam_vendor_control_param(
+			WMI_ROAM_GET_VENDOR_CONTROL_PARAM_ID param_id)
+{
+	switch (param_id) {
+	case ROAM_VENDOR_CONTROL_PARAM_TRIGGER:
+		return VENDOR_CONTROL_PARAM_ROAM_TRIGGER;
+	case ROAM_VENDOR_CONTROL_PARAM_DELTA:
+		return VENDOR_CONTROL_PARAM_ROAM_DELTA;
+	case ROAM_VENDOR_CONTROL_PARAM_FULL_SCANPERIOD:
+		return VENDOR_CONTROL_PARAM_ROAM_FULL_SCANPERIOD;
+	case ROAM_VENDOR_CONTROL_PARAM_PARTIAL_SCANPERIOD:
+		return VENDOR_CONTROL_PARAM_ROAM_PARTIAL_SCANPERIOD;
+	case ROAM_VENDOR_CONTROL_PARAM_ACTIVE_CH_DWELLTIME:
+		return VENDOR_CONTROL_PARAM_ROAM_ACTIVE_CH_DWELLTIME;
+	case ROAM_VENDOR_CONTROL_PARAM_PASSIVE_CH_DWELLTIME:
+		return VENDOR_CONTROL_PARAM_ROAM_PASSIVE_CH_DWELLTIME;
+	case ROAM_VENDOR_CONTROL_PARAM_HOME_CH_TIME:
+		return VENDOR_CONTROL_PARAM_ROAM_HOME_CH_TIME;
+	case ROAM_VENDOR_CONTROL_PARAM_AWAY_TIME:
+		return VENDOR_CONTROL_PARAM_ROAM_AWAY_TIME;
+	case ROAM_VENDOR_CONTROL_PARAM_ALL:
+		return VENDOR_CONTROL_PARAM_ROAM_ALL;
+	default:
+		wmi_debug("Invalid param id");
+		return 0;
+	}
+}
+
 static QDF_STATUS
 extract_roam_vendor_control_param_event_tlv(wmi_unified_t wmi_handle,
 				uint8_t *event, uint32_t len,
@@ -3517,7 +3587,8 @@ extract_roam_vendor_control_param_event_tlv(wmi_unified_t wmi_handle,
 
 	param_info = &dst_list->param_info[0];
 	for (i = 0; i < num_entries; i++) {
-		param_info->param_id = src_list->param_id;
+		param_info->param_id =
+		     convert_wmi_roam_vendor_control_param(src_list->param_id);
 		param_info->param_value = src_list->param_value;
 		wmi_debug("param_info->param_id:%d, param_info->param_value:%d",
 			  param_info->param_id, param_info->param_value);
@@ -3564,7 +3635,7 @@ send_process_roam_vendor_handoff_req_cmd_tlv(wmi_unified_t wmi_handle,
 	     WMITLV_GET_STRUCT_TLVLEN
 		       (wmi_roam_get_vendor_control_param_cmd_fixed_param));
 	cmd->vdev_id = vdev_id;
-	cmd->param_id = param_id;
+	cmd->param_id = convert_roam_vendor_control_param(param_id);
 	wmi_debug("Send GET_VENDOR_CONTROL_PARAM cmd vdev_id:%d, param_id:0x%x",
 		cmd->vdev_id, cmd->param_id);
 	wmi_mtrace(WMI_ROAM_GET_VENDOR_CONTROL_PARAM_CMDID, cmd->vdev_id, 0);

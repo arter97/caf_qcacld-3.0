@@ -3306,6 +3306,32 @@
 #define ROAM_REASON_VSIE_ALL
 #endif
 
+/*
+ * <ini>
+ * groam_info_stats_num - number of wlan driver cache roam information
+ * @Min: 0
+ * @Max: 32
+ * @Default: 5
+ *
+ * This ini is used to set the cache number of enhanced roam
+ * information, including roam trigger, scan information and
+ * roam frame information.
+ * If ini set to 0, enhanced roam feature not support
+ *
+ * Related: LFR
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
+#define CFG_LFR3_ROAM_INFO_STATS_NUM CFG_INI_UINT( \
+		"groam_info_stats_num", \
+		0, \
+		32, \
+		5, \
+		CFG_VALUE_OR_DEFAULT, \
+		"Roam information cache number in wlan driver")
+
 #define CFG_LFR_ALL \
 	CFG(CFG_LFR_MAWC_ROAM_ENABLED) \
 	CFG(CFG_LFR_MAWC_ROAM_TRAFFIC_THRESHOLD) \
@@ -3407,6 +3433,7 @@
 	SAE_SINGLE_PMK_ALL \
 	ROAM_REASON_VSIE_ALL \
 	CFG(CFG_LFR_BEACONLOSS_TIMEOUT_ON_WAKEUP) \
-	CFG(CFG_LFR_BEACONLOSS_TIMEOUT_ON_SLEEP)
+	CFG(CFG_LFR_BEACONLOSS_TIMEOUT_ON_SLEEP) \
+	CFG(CFG_LFR3_ROAM_INFO_STATS_NUM)
 
 #endif /* CFG_MLME_LFR_H__ */

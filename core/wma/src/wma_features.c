@@ -748,7 +748,7 @@ QDF_STATUS wma_sr_update(tp_wma_handle wma, uint8_t vdev_id, bool enable)
 	}
 
 	if (!wlan_vdev_mlme_get_he_spr_enabled(vdev)) {
-		wma_err("Spatial Reuse disabled for vdev_id: %u", vdev_id);
+		wma_debug("Spatial Reuse disabled for vdev_id: %u", vdev_id);
 		status = QDF_STATUS_E_NOSUPPORT;
 		goto release_ref;
 	}
@@ -3082,6 +3082,11 @@ wma_wow_wakeup_host_trigger_ssr(t_wma_handle *wma, uint32_t reason)
 
 	if (!wlan_pmo_enable_ssr_on_page_fault(wma->psoc))
 		return;
+
+	if (wmi_get_runtime_pm_inprogress(wma->wmi_handle)) {
+		wma_debug("Ignore run time pm wakeup");
+		return;
+	}
 
 	pagefault_wakeups_for_ssr =
 			wlan_pmo_get_max_pagefault_wakeups_for_ssr(wma->psoc);

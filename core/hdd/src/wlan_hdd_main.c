@@ -217,6 +217,7 @@
 #ifdef WLAN_FEATURE_11BE_MLO
 #include <wlan_mlo_mgr_ap.h>
 #endif
+#include "wlan_osif_features.h"
 #include "wlan_vdev_mgr_ucfg_api.h"
 #include <wlan_objmgr_psoc_obj_i.h>
 #include <wlan_objmgr_vdev_obj_i.h>
@@ -3770,7 +3771,6 @@ static void hdd_check_for_objmgr_leaks(struct hdd_context *hdd_ctx)
 	if (!psoc)
 		return;
 
-	wlan_psoc_obj_lock(psoc);
 
 	hdd_check_for_objmgr_peer_leaks(psoc);
 
@@ -3794,7 +3794,6 @@ static void hdd_check_for_objmgr_leaks(struct hdd_context *hdd_ctx)
 		wlan_objmgr_for_each_refs(ref_id_dbg, ref_id, refs)
 			wlan_objmgr_pdev_release_ref(pdev, ref_id);
 	}
-	wlan_psoc_obj_unlock(psoc);
 }
 
 static void hdd_check_for_leaks(struct hdd_context *hdd_ctx, bool is_ssr)
@@ -5518,8 +5517,8 @@ void wlan_hdd_release_intf_addr(struct hdd_context *hdd_ctx,
 
 	}
 	if (i == QDF_MAX_CONCURRENCY_PERSONA)
-		hdd_err("Releasing non existing MAC "QDF_MAC_ADDR_FMT,
-			QDF_MAC_ADDR_REF(releaseAddr));
+		hdd_debug("Releasing non existing MAC " QDF_MAC_ADDR_FMT,
+			  QDF_MAC_ADDR_REF(releaseAddr));
 }
 
 /**
@@ -6316,7 +6315,7 @@ static int hdd_vdev_destroy_event_wait(struct hdd_context *hdd_ctx,
 		return -EINVAL;
 	}
 
-	hdd_nofl_debug("vdev %d destroyed successfully", vdev_id);
+	hdd_nofl_info("vdev %d destroyed successfully", vdev_id);
 	return 0;
 }
 
@@ -6491,6 +6490,22 @@ hdd_populate_vdev_create_params(struct hdd_adapter *adapter,
 }
 #endif
 
+#if defined(WLAN_FEATURE_11BE_MLO) && defined(WLAN_EXTERNAL_AUTH_MLO_SUPPORT)
+static void
+hdd_set_vdev_mlo_external_sae_auth_conversion(struct wlan_objmgr_vdev *vdev,
+					      enum QDF_OPMODE mode)
+{
+	if (mode == QDF_STA_MODE || mode == QDF_SAP_MODE)
+		wlan_vdev_set_mlo_external_sae_auth_conversion(vdev, true);
+}
+#else
+static inline void
+hdd_set_vdev_mlo_external_sae_auth_conversion(struct wlan_objmgr_vdev *vdev,
+					      enum QDF_OPMODE mode)
+{
+}
+#endif
+
 int hdd_vdev_create(struct hdd_adapter *adapter)
 {
 	QDF_STATUS status;
@@ -6589,6 +6604,9 @@ int hdd_vdev_create(struct hdd_adapter *adapter)
 		VDEV_CMD);
 	}
 	hdd_store_nss_chains_cfg_in_vdev(adapter);
+
+	hdd_set_vdev_mlo_external_sae_auth_conversion(vdev,
+						      adapter->device_mode);
 
 	/* Configure vdev params */
 	ucfg_fwol_configure_vdev_params(hdd_ctx->psoc, hdd_ctx->pdev,

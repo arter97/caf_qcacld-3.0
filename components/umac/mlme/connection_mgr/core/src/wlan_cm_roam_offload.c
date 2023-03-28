@@ -823,7 +823,8 @@ QDF_STATUS cm_roam_update_vendor_handoff_config(struct wlan_objmgr_psoc *psoc,
 	struct rso_cfg_params *cfg_params;
 	uint8_t vdev_id;
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
-	uint32_t param_id, param_value, i;
+	uint32_t param_value, i;
+	enum vendor_control_roam_param param_id;
 
 	vdev_id = list->vdev_id;
 
@@ -851,30 +852,30 @@ QDF_STATUS cm_roam_update_vendor_handoff_config(struct wlan_objmgr_psoc *psoc,
 		mlme_debug("param id:%d, param value:%d", param_id,
 			   param_value);
 		switch (param_id) {
-		case ROAM_VENDOR_CONTROL_PARAM_TRIGGER:
+		case VENDOR_CONTROL_PARAM_ROAM_TRIGGER:
 			cfg_params->neighbor_lookup_threshold =
 							abs(param_value);
 			break;
-		case ROAM_VENDOR_CONTROL_PARAM_DELTA:
+		case VENDOR_CONTROL_PARAM_ROAM_DELTA:
 			cfg_params->roam_rssi_diff = param_value;
 			break;
-		case ROAM_VENDOR_CONTROL_PARAM_FULL_SCANPERIOD:
+		case VENDOR_CONTROL_PARAM_ROAM_FULL_SCANPERIOD:
 			cfg_params->full_roam_scan_period = param_value;
 			break;
-		case ROAM_VENDOR_CONTROL_PARAM_PARTIAL_SCANPERIOD:
+		case VENDOR_CONTROL_PARAM_ROAM_PARTIAL_SCANPERIOD:
 			cfg_params->empty_scan_refresh_period =
 							param_value * 1000;
 			break;
-		case ROAM_VENDOR_CONTROL_PARAM_ACTIVE_CH_DWELLTIME:
+		case VENDOR_CONTROL_PARAM_ROAM_ACTIVE_CH_DWELLTIME:
 			cfg_params->max_chan_scan_time = param_value;
 			break;
-		case ROAM_VENDOR_CONTROL_PARAM_PASSIVE_CH_DWELLTIME:
+		case VENDOR_CONTROL_PARAM_ROAM_PASSIVE_CH_DWELLTIME:
 			cfg_params->passive_max_chan_time = param_value;
 			break;
-		case ROAM_VENDOR_CONTROL_PARAM_HOME_CH_TIME:
+		case VENDOR_CONTROL_PARAM_ROAM_HOME_CH_TIME:
 			cfg_params->neighbor_scan_period = param_value;
 			break;
-		case ROAM_VENDOR_CONTROL_PARAM_AWAY_TIME:
+		case VENDOR_CONTROL_PARAM_ROAM_AWAY_TIME:
 			cfg_params->roam_scan_home_away_time = param_value;
 			break;
 		default:
@@ -3293,7 +3294,7 @@ cm_roam_stop_req(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 
 	if (wlan_vdev_mlme_get_is_mlo_link(psoc, vdev_id)) {
 		mlme_debug("MLO ROAM: skip RSO cmd for link vdev %d", vdev_id);
-		return QDF_STATUS_SUCCESS;
+		goto rel_vdev_ref;
 	}
 
 	rso_cfg = wlan_cm_get_rso_config(vdev);
@@ -5653,6 +5654,10 @@ QDF_STATUS cm_start_roam_invoke(struct wlan_objmgr_psoc *psoc,
 	/* Ignore BSSID and channel validation for FW host roam */
 	if (source == CM_ROAMING_FW)
 		goto send_evt;
+	if (source == CM_ROAMING_LINK_REMOVAL) {
+		cm_req->roam_req.req.forced_roaming = true;
+		goto send_evt;
+	}
 
 	if (cm_dlm_is_bssid_in_reject_list(psoc, bssid, vdev_id)) {
 		mlme_debug("BSSID is in reject list, aborting roam invoke");
@@ -5871,6 +5876,10 @@ void cm_roam_scan_info_event(struct wlan_objmgr_psoc *psoc,
 		status = mlme_get_fw_scan_channels(psoc, chan_freq, &num_chan);
 		if (QDF_IS_STATUS_ERROR(status))
 			goto out;
+		if (num_chan > NUM_CHANNELS) {
+			mlme_err("unexpected num chan %d", num_chan);
+			goto out;
+		}
 
 		status = wlan_mlme_get_band_capability(psoc, &band_capability);
 		if (QDF_IS_STATUS_ERROR(status))
@@ -5880,8 +5889,7 @@ void cm_roam_scan_info_event(struct wlan_objmgr_psoc *psoc,
 			policy_mgr_get_connected_roaming_vdev_band_mask(psoc,
 									vdev_id);
 
-		if (num_chan > WLAN_MAX_LOGGING_FREQ)
-			num_chan = WLAN_MAX_LOGGING_FREQ;
+		num_chan = QDF_MIN(WLAN_MAX_LOGGING_FREQ, NUM_CHANNELS);
 
 		for (i = 0; i < num_chan; i++) {
 			if (!wlan_is_valid_frequency(chan_freq[i],

@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -467,7 +467,7 @@ typedef struct sAniSirLim {
 
 	/* Used on STA for AC downgrade. This is a dynamic mask
 	 * setting which keep tracks of ACs being admitted.
-	 * If bit is set to 0: That partiular AC is not admitted
+	 * If bit is set to 0: That particular AC is not admitted
 	 * If bit is set to 1: That particular AC is admitted
 	 */
 	uint8_t gAcAdmitMask[SIR_MAC_DIRECTION_DIRECT];

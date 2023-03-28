@@ -1011,8 +1011,8 @@ __lim_process_sm_power_save_update(struct mac_context *mac, uint8_t *pRxPacketIn
 		dph_lookup_hash_entry(mac, pHdr->sa, &aid,
 				      &pe_session->dph.dphHashTable);
 	if (!pSta) {
-		pe_err("STA context not found - ignoring UpdateSM PSave Mode from");
-		lim_print_mac_addr(mac, pHdr->sa, LOGE);
+		pe_err("STA context not found - ignoring UpdateSM PSave Mode from SA: "QDF_MAC_ADDR_FMT,
+		       QDF_MAC_ADDR_REF(pHdr->sa));
 		return;
 	}
 
@@ -2193,6 +2193,9 @@ void lim_process_action_frame(struct mac_context *mac_ctx,
 			action_hdr->category);
 		break;
 	}
+
+	if (peer)
+		wlan_objmgr_peer_release_ref(peer, WLAN_LEGACY_MAC_ID);
 }
 
 /**
@@ -2274,8 +2277,8 @@ void lim_process_action_frame_no_session(struct mac_context *mac, uint8_t *pBd)
 					RXMGMT_FLAG_NONE);
 			break;
 		default:
-			pe_warn("Unhandled public action frame: %x",
-				       action_hdr->actionID);
+			pe_info_rl("Unhandled public action frame: %x",
+				   action_hdr->actionID);
 			break;
 		}
 		break;

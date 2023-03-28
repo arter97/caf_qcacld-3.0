@@ -188,8 +188,6 @@ static void pmo_configure_vdev_suspend_params(
 	uint8_t  ito_repeat_count_value = 0;
 	uint32_t non_wow_inactivity_time, wow_inactivity_time;
 
-	pmo_enter();
-
 	vdev_id = pmo_vdev_get_id(vdev);
 	if (!PMO_VDEV_IN_STA_MODE(opmode))
 		return;
@@ -243,8 +241,6 @@ static void pmo_configure_vdev_resume_params(
 		pmo_debug("Failed to Set inactivity timeout vdevId %d",
 			  vdev_id);
 	}
-
-	pmo_exit();
 }
 
 /**
@@ -482,8 +478,6 @@ static QDF_STATUS pmo_core_psoc_configure_suspend(struct wlan_objmgr_psoc *psoc,
 {
 	struct pmo_psoc_priv_obj *psoc_ctx;
 
-	pmo_enter();
-
 	psoc_ctx = pmo_psoc_get_priv(psoc);
 
 	if (is_runtime_pm)
@@ -548,8 +542,6 @@ QDF_STATUS pmo_core_psoc_user_space_suspend_req(struct wlan_objmgr_psoc *psoc,
 
 	pmo_psoc_put_ref(psoc);
 out:
-	pmo_exit();
-
 	return status;
 }
 
@@ -678,8 +670,6 @@ static QDF_STATUS pmo_core_psoc_configure_resume(struct wlan_objmgr_psoc *psoc,
 {
 	struct pmo_psoc_priv_obj *psoc_ctx;
 
-	pmo_enter();
-
 	psoc_ctx = pmo_psoc_get_priv(psoc);
 	if (is_runtime_pm)
 		pmo_core_disable_runtime_pm_offloads(psoc);
@@ -693,8 +683,6 @@ static QDF_STATUS pmo_core_psoc_configure_resume(struct wlan_objmgr_psoc *psoc,
 		pmo_core_set_resume_dtim(psoc);
 	pmo_core_update_wow_bus_suspend(psoc, psoc_ctx, false);
 	pmo_unpause_all_vdev(psoc, psoc_ctx);
-
-	pmo_exit();
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -743,8 +731,6 @@ pmo_core_enable_wow_in_fw(struct wlan_objmgr_psoc *psoc,
 	struct pmo_psoc_cfg *psoc_cfg = &psoc_ctx->psoc_cfg;
 	QDF_STATUS status;
 	void *hif_ctx;
-
-	pmo_enter();
 
 	hif_ctx = pmo_core_psoc_get_hif_handle(psoc);
 	qdf_event_reset(&psoc_ctx->wow.target_suspend);
@@ -891,8 +877,6 @@ pmo_core_enable_wow_in_fw(struct wlan_objmgr_psoc *psoc,
 	pmo_core_update_wow_enable_cmd_sent(psoc_ctx, true);
 
 out:
-	pmo_exit();
-
 	return status;
 }
 
@@ -943,7 +927,6 @@ QDF_STATUS pmo_core_psoc_bus_suspend_req(struct wlan_objmgr_psoc *psoc,
 	bool wow_mode_selected = false;
 	qdf_time_t begin, end;
 
-	pmo_enter();
 	if (!psoc) {
 		pmo_err("psoc is NULL");
 		status = QDF_STATUS_E_NULL_VALUE;
@@ -965,7 +948,6 @@ QDF_STATUS pmo_core_psoc_bus_suspend_req(struct wlan_objmgr_psoc *psoc,
 	psoc_ctx = pmo_psoc_get_priv(psoc);
 
 	wow_mode_selected = pmo_core_is_wow_enabled(psoc_ctx);
-	pmo_debug("wow mode selected %d", wow_mode_selected);
 
 	begin = qdf_get_log_timestamp_usecs();
 	if (wow_mode_selected)
@@ -980,8 +962,6 @@ QDF_STATUS pmo_core_psoc_bus_suspend_req(struct wlan_objmgr_psoc *psoc,
 
 	pmo_psoc_put_ref(psoc);
 out:
-	pmo_exit();
-
 	return status;
 }
 
@@ -1335,8 +1315,6 @@ dec_psoc_ref:
 	pmo_psoc_put_ref(psoc);
 
 out:
-	pmo_exit();
-
 	return status;
 }
 #endif
@@ -1358,8 +1336,6 @@ QDF_STATUS pmo_core_psoc_send_host_wakeup_ind_to_fw(
 {
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
 	void *hif_ctx;
-
-	pmo_enter();
 
 	hif_ctx = pmo_core_psoc_get_hif_handle(psoc);
 
@@ -1399,8 +1375,6 @@ QDF_STATUS pmo_core_psoc_send_host_wakeup_ind_to_fw(
 				       HIF_EP_VOTE_ACCESS_ENABLE);
 	}
 out:
-	pmo_exit();
-
 	return status;
 }
 
@@ -1417,7 +1391,6 @@ QDF_STATUS pmo_core_psoc_disable_wow_in_fw(struct wlan_objmgr_psoc *psoc,
 {
 	QDF_STATUS ret;
 
-	pmo_enter();
 	ret = pmo_core_psoc_send_host_wakeup_ind_to_fw(psoc, psoc_ctx);
 	if (ret != QDF_STATUS_SUCCESS)
 		goto out;
@@ -1429,8 +1402,6 @@ QDF_STATUS pmo_core_psoc_disable_wow_in_fw(struct wlan_objmgr_psoc *psoc,
 	/* Unpause the vdev as we are resuming */
 	pmo_unpause_all_vdev(psoc, psoc_ctx);
 out:
-	pmo_exit();
-
 	return ret;
 }
 
@@ -1447,7 +1418,6 @@ QDF_STATUS pmo_core_psoc_resume_target(struct wlan_objmgr_psoc *psoc,
 {
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
 
-	pmo_enter();
 	qdf_event_reset(&psoc_ctx->wow.target_resume);
 
 	status = pmo_tgt_psoc_send_target_resume_req(psoc);
@@ -1471,8 +1441,6 @@ QDF_STATUS pmo_core_psoc_resume_target(struct wlan_objmgr_psoc *psoc,
 		pmo_tgt_update_target_suspend_acked_flag(psoc, false);
 	}
 out:
-	pmo_exit();
-
 	return status;
 }
 
@@ -1484,7 +1452,6 @@ QDF_STATUS pmo_core_psoc_bus_resume_req(struct wlan_objmgr_psoc *psoc,
 	QDF_STATUS status;
 	qdf_time_t begin, end;
 
-	pmo_enter();
 	if (!psoc) {
 		pmo_err("psoc is null");
 		status = QDF_STATUS_E_NULL_VALUE;
@@ -1524,8 +1491,6 @@ QDF_STATUS pmo_core_psoc_bus_resume_req(struct wlan_objmgr_psoc *psoc,
 	pmo_psoc_put_ref(psoc);
 
 out:
-	pmo_exit();
-
 	return status;
 }
 
@@ -1536,7 +1501,6 @@ void pmo_core_psoc_target_suspend_acknowledge(void *context, bool wow_nack)
 	void *dp_soc = pmo_core_psoc_get_dp_handle(psoc);
 	QDF_STATUS status;
 
-	pmo_enter();
 	if (!psoc) {
 		pmo_err("psoc is null");
 		goto out;
@@ -1570,17 +1534,14 @@ void pmo_core_psoc_wakeup_host_event_received(struct wlan_objmgr_psoc *psoc)
 {
 	struct pmo_psoc_priv_obj *psoc_ctx;
 
-	pmo_enter();
 	if (!psoc) {
 		pmo_err("psoc is null");
-		goto out;
+		return;
 	}
 
 	psoc_ctx = pmo_psoc_get_priv(psoc);
 	psoc_ctx->wow.wow_state = pmo_wow_state_none;
 	qdf_event_set(&psoc_ctx->wow.target_resume);
-out:
-	pmo_exit();
 }
 
 int pmo_core_psoc_is_target_wake_up_received(struct wlan_objmgr_psoc *psoc)
@@ -1640,8 +1601,6 @@ int pmo_core_psoc_clear_target_wake_up(struct wlan_objmgr_psoc *psoc)
 
 	pmo_psoc_put_ref(psoc);
 out:
-	pmo_exit();
-
 	return ret;
 }
 
@@ -1650,17 +1609,13 @@ void pmo_core_psoc_handle_initial_wake_up(void *cb_ctx)
 	struct pmo_psoc_priv_obj *psoc_ctx;
 	struct wlan_objmgr_psoc *psoc = (struct wlan_objmgr_psoc *)cb_ctx;
 
-	pmo_enter();
 	if (!psoc) {
 		pmo_err("cb ctx/psoc is null");
-		goto out;
+		return;
 	}
 
 	psoc_ctx = pmo_psoc_get_priv(psoc);
 	pmo_core_update_wow_initial_wake_up(psoc_ctx, 1);
-
-out:
-	pmo_exit();
 }
 
 QDF_STATUS pmo_core_config_listen_interval(struct wlan_objmgr_vdev *vdev,

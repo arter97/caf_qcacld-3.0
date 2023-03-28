@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -115,6 +115,10 @@
 #else
 #define MAX_NUM_PWR_LEVELS 8
 #endif
+
+/* SR is disabled if NON_SRG is disallowed and SRG INFO is not present */
+#define SR_DISABLE NON_SRG_PD_SR_DISALLOWED & (~SRG_INFO_PRESENT & 0x0F)
+
 typedef union uPmfSaQueryTimerId {
 	struct {
 		uint8_t sessionId;
@@ -473,8 +477,6 @@ void lim_decide_sta_protection_on_assoc(struct mac_context *mac,
 void lim_update_sta_run_time_ht_switch_chnl_params(struct mac_context *mac,
 						 tDot11fIEHTInfo *pHTInfo,
 						 struct pe_session *pe_session);
-/* Print MAC address utility function */
-void lim_print_mac_addr(struct mac_context *, tSirMacAddr, uint8_t);
 
 /* Deferred Message Queue read/write */
 uint8_t lim_write_deferred_msg_q(struct mac_context *mac,

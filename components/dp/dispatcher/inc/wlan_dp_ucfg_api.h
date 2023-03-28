@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -44,9 +44,18 @@
 #ifdef WLAN_NUD_TRACKING
 bool
 ucfg_dp_is_roam_after_nud_enabled(struct wlan_objmgr_psoc *psoc);
+
+bool
+ucfg_dp_is_disconect_after_roam_fail(struct wlan_objmgr_psoc *psoc);
 #else
 static inline bool
 ucfg_dp_is_roam_after_nud_enabled(struct wlan_objmgr_psoc *psoc)
+{
+	return false;
+}
+
+static inline bool
+ucfg_dp_is_disconect_after_roam_fail(struct wlan_objmgr_psoc *psoc)
 {
 	return false;
 }
@@ -310,22 +319,6 @@ QDF_STATUS ucfg_dp_init_txrx(struct wlan_objmgr_vdev *vdev);
  * Return: 0 on success and non zero on failure.
  */
 QDF_STATUS ucfg_dp_deinit_txrx(struct wlan_objmgr_vdev *vdev);
-
-/**
- * ucfg_dp_softap_init_txrx() - Initialize SAP DP init TX/RX
- * @vdev: vdev mapped to SAP DP interface
- *
- * Return: 0 on success and non zero on failure.
- */
-QDF_STATUS ucfg_dp_softap_init_txrx(struct wlan_objmgr_vdev *vdev);
-
-/**
- * ucfg_dp_softap_deinit_txrx() - Deinitialize SAP DP init TX/RX
- * @vdev: vdev mapped to SAP DP interface
- *
- * Return: 0 on success and non zero on failure.
- */
-QDF_STATUS ucfg_dp_softap_deinit_txrx(struct wlan_objmgr_vdev *vdev);
 
 /**
  * ucfg_dp_start_xmit() - Transmit packet on STA interface
