@@ -1456,7 +1456,7 @@
 		CFG_INI_BOOL("peer_ext_stats", \
 		false, "Peer extended stats")
 
-#ifdef QCA_ENHANCED_STATS_SUPPORT
+#if defined QCA_ENHANCED_STATS_SUPPORT || defined DP_MLO_LINK_STATS_SUPPORT
 #define DEFAULT_PEER_LINK_STATS_VALUE true
 #else
 #define DEFAULT_PEER_LINK_STATS_VALUE false
