@@ -516,8 +516,6 @@ struct wlan_mlo_ie_info {
  * @enableVhtGid:
  * @gLimWiderBWChannelSwitch:
  * @enableAmpduPs:
- * @enableHtSmps:
- * @htSmpsvalue:
  * @send_smps_action:
  * @spectrumMgtEnabled:
  * @gLimSpecMgmt:
@@ -832,8 +830,6 @@ struct pe_session {
 	uint8_t enableVhtGid;
 	tLimWiderBWChannelSwitchInfo gLimWiderBWChannelSwitch;
 	uint8_t enableAmpduPs;
-	uint8_t enableHtSmps;
-	uint8_t htSmpsvalue;
 	bool send_smps_action;
 	uint8_t spectrumMgtEnabled;
 

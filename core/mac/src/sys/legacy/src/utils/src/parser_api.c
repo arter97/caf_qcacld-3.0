@@ -1092,11 +1092,11 @@ populate_dot11f_ht_caps(struct mac_context *mac,
 	 */
 	if (pe_session &&
 	    LIM_IS_STA_ROLE(pe_session) &&
-	    (pe_session->enableHtSmps) &&
+	    (mac->mlme_cfg->ht_caps.enable_smps) &&
 	    (!pe_session->supported_nss_1x1)) {
 		pe_debug("Add SM power save IE: %d",
-			pe_session->htSmpsvalue);
-		pDot11f->mimoPowerSave = pe_session->htSmpsvalue;
+			 mac->mlme_cfg->ht_caps.smps);
+		pDot11f->mimoPowerSave = mac->mlme_cfg->ht_caps.smps;
 	}
 
 	pDot11f->pco = mac->mlme_cfg->ht_caps.ext_cap_info.pco;

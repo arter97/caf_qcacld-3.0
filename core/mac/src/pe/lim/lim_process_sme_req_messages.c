@@ -3161,8 +3161,6 @@ lim_fill_pe_session(struct mac_context *mac_ctx, struct pe_session *session,
 	session->nwType = bss_desc->nwType;
 	session->enableAmpduPs =
 		mac_ctx->mlme_cfg->ht_caps.enable_ampdu_ps;
-	session->enableHtSmps = mac_ctx->mlme_cfg->ht_caps.enable_smps;
-	session->htSmpsvalue = mac_ctx->mlme_cfg->ht_caps.smps;
 	session->send_smps_action =
 		mac_ctx->roam.configParam.send_smps_action;
 	session->vhtCapability =
@@ -4342,7 +4340,8 @@ lim_cm_handle_join_req(struct cm_vdev_join_req *req)
 		 pe_session->curr_op_freq, pe_session->ch_width,
 		 pe_session->ch_center_freq_seg0,
 		 pe_session->ch_center_freq_seg1,
-		 pe_session->enableHtSmps, pe_session->htSmpsvalue,
+		 mac_ctx->mlme_cfg->ht_caps.enable_smps,
+		 mac_ctx->mlme_cfg->ht_caps.smps,
 		 pe_session->send_smps_action, pe_session->supported_nss_1x1,
 		 pe_session->vdev_nss, pe_session->nss,
 		 pe_session->htSupportedChannelWidthSet,
@@ -4872,13 +4871,11 @@ static void lim_handle_reassoc_req(struct cm_vdev_join_req *req)
 		session_entry->vht_config.su_beam_formee,
 		session_entry->vht_config.su_beam_former);
 
-	session_entry->enableHtSmps = mac_ctx->mlme_cfg->ht_caps.enable_smps;
-	session_entry->htSmpsvalue = mac_ctx->mlme_cfg->ht_caps.smps;
 	session_entry->send_smps_action =
 		mac_ctx->roam.configParam.send_smps_action;
 	pe_debug("enableHtSmps: %d htSmps: %d send action: %d supported nss 1x1: %d",
-		session_entry->enableHtSmps,
-		session_entry->htSmpsvalue,
+		mac_ctx->mlme_cfg->ht_caps.enable_smps,
+		mac_ctx->mlme_cfg->ht_caps.smps,
 		session_entry->send_smps_action,
 		session_entry->supported_nss_1x1);
 	session_entry->lim_join_req = NULL;
