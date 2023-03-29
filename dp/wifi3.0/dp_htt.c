@@ -409,7 +409,7 @@ static int dp_htt_h2t_add_tcl_metadata_ver_v2(struct htt_soc *soc,
 	HTT_OPTION_TLV_TAG_SET(*msg_word, HTT_OPTION_TLV_TAG_TCL_METADATA_VER);
 	HTT_OPTION_TLV_LENGTH_SET(*msg_word, HTT_TCL_METADATA_VER_SZ);
 	HTT_OPTION_TLV_TCL_METADATA_VER_SET(*msg_word,
-					    HTT_OPTION_TLV_TCL_METADATA_V2);
+					    HTT_OPTION_TLV_TCL_METADATA_V21);
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -2721,6 +2721,21 @@ static void dp_sawf_msduq_map(struct htt_soc *soc, uint32_t *msg_word,
 }
 
 /**
+ * dp_sawf_dynamic_ast_update() - Dynamic AST index update for SAWF peer
+ * from target
+ * @soc: soc handle.
+ * @msg_word: Pointer to htt msg word.
+ * @htt_t2h_msg: HTT message nbuf
+ *
+ * Return: void
+ */
+static void dp_sawf_dynamic_ast_update(struct htt_soc *soc, uint32_t *msg_word,
+				       qdf_nbuf_t htt_t2h_msg)
+{
+	dp_htt_sawf_dynamic_ast_update(soc, msg_word, htt_t2h_msg);
+}
+
+/**
  * dp_sawf_mpdu_stats_handler() - HTT message handler for MPDU stats
  * @soc: soc handle.
  * @htt_t2h_msg: HTT message nbuf
@@ -2738,6 +2753,9 @@ static void dp_sawf_msduq_map(struct htt_soc *soc, uint32_t *msg_word,
 {}
 
 static void dp_sawf_mpdu_stats_handler(struct htt_soc *soc,
+				       qdf_nbuf_t htt_t2h_msg)
+{}
+static void dp_sawf_dynamic_ast_update(struct htt_soc *soc, uint32_t *msg_word,
 				       qdf_nbuf_t htt_t2h_msg)
 {}
 #endif
@@ -4074,6 +4092,11 @@ void dp_htt_t2h_msg_handler(void *context, HTC_PACKET *pkt)
 	case HTT_T2H_SAWF_MSDUQ_INFO_IND:
 	{
 		dp_sawf_msduq_map(soc, msg_word, htt_t2h_msg);
+		break;
+	}
+	case HTT_T2H_MSG_TYPE_PEER_AST_OVERRIDE_INDEX_IND:
+	{
+		dp_sawf_dynamic_ast_update(soc, msg_word, htt_t2h_msg);
 		break;
 	}
 	case HTT_T2H_MSG_TYPE_STREAMING_STATS_IND:
