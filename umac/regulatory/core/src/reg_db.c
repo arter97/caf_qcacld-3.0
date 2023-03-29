@@ -1148,7 +1148,6 @@ enum reg_rules_5g {
 	CHAN_5735_5835_5,
 	CHAN_5735_5835_6,
 	CHAN_5735_5835_7,
-	CHAN_5735_5835_8,
 	CHAN_5735_5835_9,
 	CHAN_5735_5835_10,
 	CHAN_5735_5875_1,
@@ -1257,7 +1256,6 @@ const struct regulatory_rule reg_rules_5g[] = {
 	[CHAN_5735_5835_5] = {5735, 5835, 80, 20, REGULATORY_CHAN_NO_IR},
 	[CHAN_5735_5835_6] = {5735, 5835, 80, 24, 0},
 	[CHAN_5735_5835_7] = {5735, 5835, 80, 36, 0},
-	[CHAN_5735_5835_8] = {5735, 5835, 80, 23, 0},
 	[CHAN_5735_5835_9] = {5735, 5835, 80, 30, REGULATORY_CHAN_RADAR},
 	[CHAN_5735_5835_10] = {5735, 5835, 80, 14, REGULATORY_CHAN_INDOOR_ONLY},
 	[CHAN_5735_5875_1] = {5735, 5875, 20, 27, REGULATORY_CHAN_RADAR},
@@ -1410,7 +1408,7 @@ const struct regdomain regdomains_5g[] = {
 	[ETSI12] = {CTL_ETSI, DFS_ETSI_REGION, 2, 320, 0, 4, {CHAN_5170_5250_8,
 							      CHAN_5250_5330_12,
 							      CHAN_5490_5730_5,
-							      CHAN_5735_5835_8}
+							      CHAN_5735_5835_1}
 							      },
 
 	[ETSI13] = {CTL_ETSI, DFS_ETSI_REGION, 2, 160, 0, 4, {CHAN_5170_5250_8,
@@ -1547,13 +1545,14 @@ const struct regdomain regdomains_5g[] = {
 							     CHAN_5735_5835_7}
 							    },
 
-	[APL26] = {CTL_ETSI, DFS_ETSI_REGION, 2, 320, 0, 3, {CHAN_5170_5330_3,
-							     CHAN_5490_5730_3,
-							     CHAN_5735_5835_7}
-							    },
+	[APL26] = {CTL_ETSI, DFS_ETSI_REGION, 2, 320, 0, 4, {CHAN_5170_5250_8,
+							    CHAN_5250_5330_12,
+							    CHAN_5490_5730_5,
+							    CHAN_5735_5835_7} },
+
 	[APL27] = {CTL_FCC, DFS_ETSI_REGION, 2, 320, 0, 4, {CHAN_5170_5250_13,
-							    CHAN_5250_5330_10,
-							    CHAN_5490_5730_4,
+							    CHAN_5250_5330_7,
+							    CHAN_5490_5730_1,
 							    CHAN_5735_5835_2} },
 
 	[APL28] = {CTL_ETSI, DFS_ETSI_REGION, 2, 320, 0, 4, {CHAN_5170_5250_8,
