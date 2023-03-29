@@ -1159,10 +1159,6 @@ wlan_rptr_conn_up_dbdc_process(struct wlan_objmgr_vdev *vdev,
 		if (flags.dbdc_process_enable) {
 			qca_multi_link_set_dbdc_enable(true);
 
-			/*Disable legacy DBDC model when multi link dbdb is enabled.*/
-			if (ext_cb->target_lithium(pdev))
-				dp_lag_soc_enable(pdev, 0);
-
 		}
 	}
 
@@ -1175,7 +1171,6 @@ wlan_rptr_conn_up_dbdc_process(struct wlan_objmgr_vdev *vdev,
 		RPTR_GLOBAL_UNLOCK(&g_priv->rptr_global_lock);
 		if (flags.delay_stavap_connection) {
 			RPTR_LOGI("Setting drop_secondary_mcast and starting timer");
-			dp_lag_soc_set_drop_secondary_mcast(pdev, 1);
 			ext_cb->delay_stavap_conn_process_up(vdev);
 		}
 		if (flags.dbdc_process_enable) {
@@ -1269,7 +1264,6 @@ wlan_rptr_conn_down_dbdc_process(struct wlan_objmgr_vdev *vdev,
 	RPTR_GLOBAL_LOCK(&g_priv->rptr_global_lock);
 	if (g_priv->num_stavaps_up == 1) {
 		RPTR_GLOBAL_UNLOCK(&g_priv->rptr_global_lock);
-		dp_lag_soc_enable(pdev, 0);
 		qca_multi_link_set_dbdc_enable(false);
 #ifdef QCA_NSS_WIFI_OFFLOAD_SUPPORT
 		ext_cb->nss_dbdc_process_mac_db_down(vdev);
@@ -1277,7 +1271,6 @@ wlan_rptr_conn_down_dbdc_process(struct wlan_objmgr_vdev *vdev,
 		if (flags.delay_stavap_connection) {
 			RPTR_LOGI("clearing drop_secondary_mcast and starting timer");
 			qca_multi_link_set_drop_sec_mcast(false);
-			dp_lag_soc_set_drop_secondary_mcast(pdev, 0);
 			ext_cb->delay_stavap_conn_process_down(vdev);
 		}
 	} else {
