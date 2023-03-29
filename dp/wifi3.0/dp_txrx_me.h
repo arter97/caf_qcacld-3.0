@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2016-2020 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -47,9 +47,10 @@ QDF_STATUS
 dp_tx_prepare_send_igmp_me(struct dp_vdev *vdev, qdf_nbuf_t nbuf);
 extern int
 dp_me_mcast_convert(struct cdp_soc_t *soc,
-		    uint8_t vdev_id,
-		    uint8_t pdev_id,
-		    qdf_nbuf_t wbuf);
+			uint8_t vdev_id,
+			uint8_t pdev_id,
+			qdf_nbuf_t wbuf,
+			uint32_t flag);
 extern int
 dp_igmp_me_mcast_convert(struct cdp_soc_t *soc,
 			 uint8_t vdev_id,
