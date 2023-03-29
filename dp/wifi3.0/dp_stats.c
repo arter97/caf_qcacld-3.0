@@ -4312,7 +4312,7 @@ dp_print_rx_soc_fw_refill_ring_num_rxdma_err_tlv(uint32_t *tag_buf)
 
 	uint8_t i;
 	uint16_t index = 0;
-	char rxdma_err_cnt[DP_MAX_STRING_LEN];
+	char rxdma_err_cnt[DP_MAX_STRING_LEN] = {'\0'};
 	uint32_t tag_len = (HTT_STATS_TLV_LENGTH_GET(*tag_buf) >> 2);
 	uint64_t total_rxdma_err_cnt = 0;
 
@@ -4347,7 +4347,7 @@ static void dp_print_rx_soc_fw_refill_ring_num_reo_err_tlv(uint32_t *tag_buf)
 
 	uint8_t i;
 	uint16_t index = 0;
-	char reo_err_cnt[DP_MAX_STRING_LEN];
+	char reo_err_cnt[DP_MAX_STRING_LEN] = {'\0'};
 	uint32_t tag_len = (HTT_STATS_TLV_LENGTH_GET(*tag_buf) >> 2);
 
 	tag_len = qdf_min(tag_len, (uint32_t)HTT_RX_REO_MAX_ERR_CODE);
@@ -5549,7 +5549,7 @@ void dp_print_soc_cfg_params(struct dp_soc *soc)
 {
 	struct wlan_cfg_dp_soc_ctxt *soc_cfg_ctx;
 	uint8_t index = 0, i = 0;
-	char ring_mask[DP_MAX_INT_CONTEXTS_STRING_LENGTH];
+	char ring_mask[DP_MAX_INT_CONTEXTS_STRING_LENGTH] = {'\0'};
 	int num_of_int_contexts;
 
 	if (!soc) {
