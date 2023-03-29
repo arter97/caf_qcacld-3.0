@@ -934,10 +934,6 @@ int32_t wmi_unified_send_txbf(tp_wma_handle wma, tpAddStaParams params);
  */
 QDF_STATUS wma_check_txrx_chainmask(int num_rf_chains, int cmd_value);
 
-int wma_peer_state_change_event_handler(void *handle,
-					       uint8_t *event_buff,
-					       uint32_t len);
-
 QDF_STATUS wma_set_enable_disable_mcc_adaptive_scheduler(uint32_t
 						mcc_adaptive_scheduler);
 

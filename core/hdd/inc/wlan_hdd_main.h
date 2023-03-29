@@ -1062,7 +1062,6 @@ struct wlan_hdd_link_info {
  * @qdf_monitor_mode_vdev_up_event: QDF event for monitor mode vdev up
  * @disconnect_comp_var: completion variable for disconnect callback
  * @linkup_event_var: completion variable for Linkup Event
- * @sta_authorized_event:
  * @is_link_up_service_needed: Track whether the linkup handling is needed
  * @hdd_wmm_status: WMM Status
  * @sta_info:
@@ -1199,8 +1198,6 @@ struct hdd_adapter {
 	/* TODO: move these to sta ctx. These may not be used in AP */
 	struct completion disconnect_comp_var;
 	struct completion linkup_event_var;
-
-	struct completion sta_authorized_event;
 
 	bool is_link_up_service_needed;
 

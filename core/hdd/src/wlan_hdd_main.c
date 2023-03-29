@@ -7542,7 +7542,6 @@ static void hdd_init_completion(struct hdd_adapter *adapter)
 {
 	init_completion(&adapter->disconnect_comp_var);
 	init_completion(&adapter->linkup_event_var);
-	init_completion(&adapter->sta_authorized_event);
 	init_completion(&adapter->lfr_fw_status.disable_lfr_event);
 }
 
