@@ -151,6 +151,7 @@ dp_peer_sawf_ctx_alloc(struct dp_soc *soc,
 		       struct dp_peer *peer)
 {
 	struct dp_peer_sawf *sawf_ctx;
+	uint8_t index = 0;
 
 	/*
 	 * In MLO case, primary link peer holds SAWF ctx.
@@ -167,7 +168,11 @@ dp_peer_sawf_ctx_alloc(struct dp_soc *soc,
 		return QDF_STATUS_E_FAILURE;
 	}
 
+	for (index = 0; index < DP_SAWF_MAX_DYNAMIC_AST; index++)
+		sawf_ctx->dynamic_ast_idx[index] = DP_SAWF_INVALID_AST_IDX;
+
 	peer->sawf = sawf_ctx;
+
 	return QDF_STATUS_SUCCESS;
 }
 
@@ -496,30 +501,40 @@ uint16_t dp_sawf_get_peerid(struct dp_soc *soc, uint8_t *dest_mac,
 	return peer_id;
 }
 
-uint32_t dp_sawf_get_search_index(struct dp_soc *soc, qdf_nbuf_t nbuf,
-				  uint8_t vdev_id, uint16_t queue_id)
+bool dp_sawf_get_search_index(struct dp_soc *soc, qdf_nbuf_t nbuf,
+			      uint8_t vdev_id, uint16_t queue_id,
+			      uint32_t *flow_index)
 {
 	struct dp_peer *peer = NULL;
-	uint32_t search_index = DP_SAWF_INVALID_AST_IDX;
 	uint16_t peer_id = SAWF_PEER_ID_GET(qdf_nbuf_get_mark(nbuf));
-	uint8_t index = queue_id / DP_SAWF_TID_MAX;
+	uint8_t index;
+	uint16_t dyn_ast_idx = 0;
+	bool status = false;
 
-	if (index >= DP_PEER_AST_FLOWQ_MAX) {
-		qdf_warn("invalid index:%d", index);
-		return DP_SAWF_INVALID_AST_IDX;
+	index = (queue_id - DP_SAWF_DEFAULT_Q_MAX) / DP_SAWF_TID_MAX;
+	if (index > DP_PEER_AST_FLOWQ_LOW_PRIO) {
+		dp_sawf_warn("Invalid index:%d", index);
+		return status;
 	}
 
 	peer = dp_peer_get_ref_by_id(soc, peer_id, DP_MOD_ID_SAWF);
-
 	if (!peer) {
-		qdf_warn("NULL peer");
-		return DP_SAWF_INVALID_AST_IDX;
+		dp_sawf_warn("NULL peer");
+		return status;
 	}
 
-	search_index = peer->peer_ast_flowq_idx[index].ast_idx;
+	dyn_ast_idx = peer->sawf->dynamic_ast_idx[index];
+
+	if (dyn_ast_idx == DP_SAWF_INVALID_AST_IDX) {
+		*flow_index =  peer->peer_ast_flowq_idx[0].ast_idx;
+	} else {
+		*flow_index =  dyn_ast_idx;
+		status = true;
+	}
+
 	dp_peer_unref_delete(peer, DP_MOD_ID_SAWF);
 
-	return search_index;
+	return status;
 }
 
 #ifdef QCA_SUPPORT_WDS_EXTENDED

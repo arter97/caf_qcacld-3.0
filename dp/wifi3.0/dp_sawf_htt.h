@@ -41,6 +41,18 @@ dp_htt_sawf_msduq_map(struct htt_soc *soc, uint32_t *msg_word,
 		      qdf_nbuf_t htt_t2h_msg);
 
 /*
+ * dp_htt_sawf_dynamic_ast_update() - Handle dynamic AST update for SAWF peers
+ * @soc: HTT SOC handle
+ * @msg_word: Pointer to htt msg word.
+ * @htt_t2h_msg: HTT buffer
+ *
+ * @Return: QDF_STATUS_SUCCESS on success
+ */
+QDF_STATUS
+dp_htt_sawf_dynamic_ast_update(struct htt_soc *soc, uint32_t *msg_word,
+			       qdf_nbuf_t htt_t2h_msg);
+
+/*
  * dp_sawf_htt_h2t_mpdu_stats_req() - Send MPDU stats request to target
  * @soc: HTT SOC handle
  * @stats_type: MPDU stats type

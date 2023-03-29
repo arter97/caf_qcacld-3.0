@@ -80,6 +80,7 @@
 #define DP_SAWF_DEFAULT_Q_INVALID 0xff
 #define DP_SAWF_PEER_Q_INVALID 0xffff
 #define DP_SAWF_INVALID_AST_IDX 0xffff
+#define DP_SAWF_MAX_DYNAMIC_AST 2
 
 #define DP_SAWF_DELAY_BOUND_MS_MULTIPLER 1000
 
@@ -407,13 +408,16 @@ struct dp_peer_sawf {
 	       msduq_map[DP_SAWF_TID_MAX][DP_SAWF_DEFINED_Q_PTID_MAX];
 	struct sawf_def_queue_report tid_reports[DP_SAWF_TID_MAX];
 	uint16_t sla_mask;
+	bool is_sla;
+	uint16_t dynamic_ast_idx[DP_SAWF_MAX_DYNAMIC_AST];
 	void *telemetry_ctx;
 };
 
 uint16_t dp_sawf_get_msduq(struct net_device *netdev, uint8_t *peer_mac,
 			   uint32_t service_id);
-uint32_t dp_sawf_get_search_index(struct dp_soc *soc, qdf_nbuf_t nbuf,
-				  uint8_t vdev_id, uint16_t queue_id);
+bool dp_sawf_get_search_index(struct dp_soc *soc, qdf_nbuf_t nbuf,
+			      uint8_t vdev_id, uint16_t queue_id,
+			      uint32_t *flow_index);
 uint32_t dp_sawf_queue_id_get(qdf_nbuf_t nbuf);
 void dp_sawf_tcl_cmd(uint16_t *htt_tcl_metadata, qdf_nbuf_t nbuf);
 bool dp_sawf_tag_valid_get(qdf_nbuf_t nbuf);
