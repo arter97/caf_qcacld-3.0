@@ -139,6 +139,15 @@ uint16_t qca_sawf_get_msdu_queue(struct net_device *netdev,
 	return qca_sawf_get_msduq(netdev, peer_mac, service_id);
 }
 
+uint16_t qca_sawf_get_msduq_v2(struct net_device *netdev, uint8_t *peer_mac,
+			       uint32_t service_id, uint32_t dscp,
+			       uint32_t rule_id, bool scs_based_rule)
+{
+	return qca_sawf_get_msduq(netdev, peer_mac, service_id);
+}
+
+
 qdf_export_symbol(qca_sawf_get_msduq);
+qdf_export_symbol(qca_sawf_get_msduq_v2);
 qdf_export_symbol(qca_sawf_get_msdu_queue);
 qdf_export_symbol(qca_sawf_config_ul);
