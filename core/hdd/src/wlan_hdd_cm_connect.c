@@ -640,6 +640,16 @@ def_chan:
 		return true;
 	}
 
+	if (policy_mgr_is_hw_sbs_capable(hdd_ctx->psoc) &&
+	    ch_freq &&
+	    policy_mgr_are_sbs_chan(hdd_ctx->psoc,
+				    ch_freq,
+				    hdd_ap_ctx->operating_chan_freq)) {
+		hdd_debug("sta freq %d sap freq %d in sbs mode is allowed",
+			  ch_freq, hdd_ap_ctx->operating_chan_freq);
+		return true;
+	}
+
 	/*
 	 * If channel is 0 or DFS or LTE unsafe then better to call pcl and
 	 * find out the best channel. If channel is non-dfs 5 GHz then
