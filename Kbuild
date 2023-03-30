@@ -3875,7 +3875,11 @@ cppflags-$(CONFIG_CHECKSUM_OFFLOAD) += -DCHECKSUM_OFFLOAD
 cppflags-$(CONFIG_IPA_OFFLOAD) += -DIPA_OFFLOAD
 
 #Enable IPA optional Wifi datapath
+ifeq ($(CONFIG_IPA_OPT_WIFI_DP), y)
+ifeq ($(CONFIG_IPA_OFFLOAD), y)
 cppflags-$(CONFIG_IPA_OPT_WIFI_DP) += -DIPA_OPT_WIFI_DP
+endif
+endif
 
 cppflags-$(CONFIG_WDI3_IPA_OVER_GSI) += -DIPA_WDI3_GSI
 cppflags-$(CONFIG_WDI2_IPA_OVER_GSI) += -DIPA_WDI2_GSI
