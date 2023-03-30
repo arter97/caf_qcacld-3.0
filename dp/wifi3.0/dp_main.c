@@ -100,6 +100,9 @@ cdp_dump_flow_pool_info(struct cdp_soc_t *soc)
 #ifdef CONFIG_SAWF_DEF_QUEUES
 #include "dp_sawf.h"
 #endif
+#ifdef WLAN_SUPPORT_RX_FLOW_TAG
+#include "dp_rx_tag.h"
+#endif
 #ifdef WLAN_FEATURE_PEER_TXQ_FLUSH_CONF
 #include <target_if_dp.h>
 #endif
@@ -11014,6 +11017,13 @@ static struct cdp_scs_ops dp_ops_scs = {
 };
 #endif
 
+#ifdef WLAN_SUPPORT_RX_FLOW_TAG
+static struct cdp_fse_ops dp_ops_fse = {
+	.fse_rule_add = NULL,
+	.fse_rule_delete = NULL,
+};
+#endif
+
 #ifdef CONFIG_SAWF_DEF_QUEUES
 static struct cdp_sawf_ops dp_ops_sawf = {
 	.sawf_def_queues_map_req = dp_sawf_def_queues_map_req,
@@ -11884,6 +11894,9 @@ static void dp_soc_txrx_ops_attach(struct dp_soc *soc)
 #endif
 #ifdef WLAN_SUPPORT_SCS
 	soc->cdp_soc.ops->scs_ops = &dp_ops_scs;
+#endif
+#ifdef WLAN_SUPPORT_RX_FLOW_TAG
+	soc->cdp_soc.ops->fse_ops = &dp_ops_fse;
 #endif
 };
 

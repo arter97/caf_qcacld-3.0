@@ -44,8 +44,19 @@
 static inline void
 dp_rx_update_flow_info(qdf_nbuf_t nbuf, uint8_t *rx_tlv_hdr)
 {
+	uint32_t fse_metadata;
+
 	/* Set the flow idx valid flag only when there is no timeout */
 	if (hal_rx_msdu_flow_idx_timeout_be(rx_tlv_hdr))
+		return;
+
+	/*
+	 * If invalid bit is not set and the fse metadata indicates that it is
+	 * a valid SFE flow match in FSE, do not set the rx flow tag and let it
+	 * go via stack instead of VP.
+	 */
+	fse_metadata = hal_rx_msdu_fse_metadata_get_be(rx_tlv_hdr);
+	if (!hal_rx_msdu_flow_idx_invalid_be(rx_tlv_hdr) && (fse_metadata == DP_RX_FSE_FLOW_MATCH_SFE))
 		return;
 
 	qdf_nbuf_set_rx_flow_idx_valid(nbuf,

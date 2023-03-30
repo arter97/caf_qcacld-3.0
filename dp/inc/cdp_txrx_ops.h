@@ -2456,6 +2456,21 @@ struct cdp_ppeds_txrx_ops {
 };
 #endif /* WLAN_SUPPORT_PPEDS */
 
+#ifdef WLAN_SUPPORT_RX_FLOW_TAG
+struct cdp_fse_ops {
+	QDF_STATUS
+	(*fse_rule_add)(struct cdp_soc_t *soc,
+			uint32_t *src_ip, uint32_t src_port,
+			uint32_t *dest_ip, uint32_t dest_port,
+			uint8_t protocol, uint8_t version);
+	QDF_STATUS
+	(*fse_rule_delete)(struct cdp_soc_t *soc,
+			   uint32_t *src_ip, uint32_t src_port,
+			   uint32_t *dest_ip, uint32_t dest_port,
+			   uint8_t protocol, uint8_t version);
+};
+#endif /* WLAN_SUPPORT_RX_FLOW_TAG */
+
 struct cdp_ops {
 	struct cdp_cmn_ops          *cmn_drv_ops;
 	struct cdp_ctrl_ops         *ctrl_ops;
@@ -2508,6 +2523,9 @@ struct cdp_ops {
 #endif
 #ifdef WLAN_SUPPORT_PPEDS
 	struct cdp_ppeds_txrx_ops *ppeds_ops;
+#endif
+#ifdef WLAN_SUPPORT_RX_FLOW_TAG
+	struct cdp_fse_ops *fse_ops;
 #endif
 };
 #endif
