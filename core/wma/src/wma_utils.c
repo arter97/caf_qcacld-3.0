@@ -1656,6 +1656,30 @@ static int wma_ll_stats_evt_handler(void *handle, u_int8_t *event,
 }
 
 /**
+ * wma_get_dp_peer_stats() - get host dp peer stats
+ * @dp_stats: buffer to store stats
+ * @peer_mac: peer mac address
+ *
+ * Return: 0 on success or error code
+ */
+static QDF_STATUS wma_get_dp_peer_stats(struct cdp_peer_stats *dp_stats,
+					uint8_t *peer_mac)
+{
+	void *dp_soc = cds_get_context(QDF_MODULE_ID_SOC);
+	uint8_t vdev_id;
+	QDF_STATUS status;
+
+	status = cdp_peer_get_vdevid(dp_soc, peer_mac, &vdev_id);
+	if (!QDF_IS_STATUS_SUCCESS(status)) {
+		wma_err("Unable to find peer ["QDF_MAC_ADDR_FMT"]",
+			QDF_MAC_ADDR_REF(peer_mac));
+		return status;
+	}
+
+	return cdp_host_get_peer_stats(dp_soc, vdev_id, peer_mac, dp_stats);
+}
+
+/**
  * wma_unified_link_peer_stats_event_handler() - peer stats event handler
  * @handle:          wma handle
  * @cmd_param_info:  data received with event from fw
@@ -1681,9 +1705,8 @@ static int wma_unified_link_peer_stats_event_handler(void *handle,
 	bool excess_data = false;
 	uint32_t buf_len = 0;
 	struct cdp_peer_stats *dp_stats;
-	void *dp_soc = cds_get_context(QDF_MODULE_ID_SOC);
 	QDF_STATUS status;
-	uint8_t mcs_index, vdev_id;
+	uint8_t mcs_index;
 
 	struct mac_context *mac = cds_get_context(QDF_MODULE_ID_PE);
 
@@ -1799,14 +1822,7 @@ static int wma_unified_link_peer_stats_event_handler(void *handle,
 		next_res_offset += peer_info_size;
 
 		peer_mac = (uint8_t *)&peer_stats->peer_mac_address;
-		status = cdp_peer_get_vdevid(dp_soc, peer_mac, &vdev_id);
-		if (!QDF_IS_STATUS_SUCCESS(status)) {
-			wma_err("Unable to find peer ["QDF_MAC_ADDR_FMT"]",
-				QDF_MAC_ADDR_REF(peer_mac));
-			return -EINVAL;
-		}
-		status = cdp_host_get_peer_stats(dp_soc, vdev_id,
-						 peer_mac, dp_stats);
+		status = wma_get_dp_peer_stats(dp_stats, peer_mac);
 
 		/* Copy rate stats associated with this peer */
 		for (count = 0; count < peer_stats->num_rates; count++) {
