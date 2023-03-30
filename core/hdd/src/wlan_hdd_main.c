@@ -7925,6 +7925,18 @@ wlan_hdd_set_ml_cap_for_sap_intf(struct hdd_adapter_create_param *create_params,
 }
 #endif
 
+static void hdd_adapter_init_link_info(struct hdd_adapter *adapter)
+{
+	uint8_t link_idx;
+	struct wlan_hdd_link_info *link_info;
+
+	/* Assign the adapter back pointer in all link_info structs */
+	hdd_adapter_for_each_link_entry(adapter, link_idx) {
+		link_info = &adapter->link_info[link_idx];
+		link_info->adapter = adapter;
+	}
+}
+
 /**
  * hdd_open_adapter() - open and setup the hdd adapter
  * @hdd_ctx: global hdd context
@@ -8149,6 +8161,8 @@ struct hdd_adapter *hdd_open_adapter(struct hdd_context *hdd_ctx,
 		QDF_ASSERT(0);
 		return NULL;
 	}
+
+	hdd_adapter_init_link_info(adapter);
 
 	ucfg_psoc_mlme_get_11be_capab(hdd_ctx->psoc, &eht_capab);
 	if (params->is_ml_adapter && eht_capab) {

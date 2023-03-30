@@ -996,6 +996,7 @@ enum udp_qos_upgrade {
 
 /**
  * struct wlan_hdd_link_info - Data structure to store the link specific info
+ * @adapter: Reverse pointer to HDD adapter
  * @vdev_id: Unique value to identify VDEV. Equal to WLAN_UMAC_VDEV_ID_MAX
  *           for invalid VDEVs.
  * @vdev_lock: Lock to protect VDEV pointer access.
@@ -1022,6 +1023,7 @@ enum udp_qos_upgrade {
  * @is_mlo_vdev_active: is the mlo vdev currently active
  */
 struct wlan_hdd_link_info {
+	struct hdd_adapter *adapter;
 	uint8_t vdev_id;
 	qdf_spinlock_t vdev_lock;
 	struct wlan_objmgr_vdev *vdev;
@@ -2590,6 +2592,14 @@ void hdd_validate_next_adapter(struct hdd_adapter **curr,
 	for (__hdd_adapter_deflink_idx(link_idx); \
 		__hdd_is_link_idx_valid(link_idx); \
 		__hdd_adapter_next_link_idx(link_idx))
+
+static inline uint8_t
+hdd_adapter_get_index_of_link_info(struct wlan_hdd_link_info *link_info)
+{
+	unsigned long offset = link_info - link_info->adapter->deflink;
+
+	return (offset / sizeof(struct wlan_hdd_link_info));
+}
 
 /**
  * wlan_hdd_get_adapter_from_objmgr() - Fetch adapter from objmgr
