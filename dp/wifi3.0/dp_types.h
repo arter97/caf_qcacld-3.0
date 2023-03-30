@@ -158,6 +158,10 @@
 #define DP_RX_REFILL_THRD_THRESHOLD  512
 #endif
 
+#ifdef WLAN_SUPPORT_RX_FLOW_TAG
+#define DP_RX_FSE_FLOW_MATCH_SFE 0xAAAA
+#endif
+
 #ifdef WLAN_VENDOR_SPECIFIC_BAR_UPDATE
 #define DP_SKIP_BAR_UPDATE_TIMEOUT 5000
 #endif
@@ -4908,6 +4912,8 @@ struct dp_rx_fst {
 	qdf_atomic_t is_cache_update_pending;
 	/* Flag to indicate completion of FSE setup in HW/FW */
 	bool fse_setup_done;
+	/* Last ring id used to add a flow */
+	uint8_t ring_id;
 };
 
 #define DP_RX_GET_SW_FT_ENTRY_SIZE sizeof(struct dp_rx_fse)
