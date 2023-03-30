@@ -1029,6 +1029,11 @@ scm_update_channel_list(struct scan_start_request *req,
 		uint32_t freq;
 
 		freq = req->scan_req.chan_list.chan[i].freq;
+		if ((wlan_reg_is_6ghz_chan_freq(freq) &&
+		     !wlan_reg_is_6ghz_band_set(pdev))) {
+			scm_nofl_debug("Skip 6 GHz freq = %d", freq);
+			continue;
+		}
 		if (skip_dfs_ch &&
 		    wlan_reg_chan_has_dfs_attribute_for_freq(pdev, freq)) {
 			scm_nofl_debug("Skip DFS freq %d", freq);
