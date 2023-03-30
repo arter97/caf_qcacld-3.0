@@ -2649,17 +2649,17 @@ QDF_STATUS hdd_reset_all_adapters(struct hdd_context *hdd_ctx);
 QDF_STATUS hdd_start_all_adapters(struct hdd_context *hdd_ctx);
 
 /**
- * hdd_get_adapter_by_vdev() - Return adapter with the given vdev id
+ * hdd_get_link_info_by_vdev() - Return link info with the given vdev id
  * @hdd_ctx: hdd context.
- * @vdev_id: vdev id for the adapter to get.
+ * @vdev_id: vdev id for the link info to get.
  *
- * This function is used to get the adapter with provided vdev id
+ * This function is used to get the link info with provided vdev id
  *
  * Return: adapter pointer if found
  *
  */
-struct hdd_adapter *hdd_get_adapter_by_vdev(struct hdd_context *hdd_ctx,
-					    uint32_t vdev_id);
+struct wlan_hdd_link_info *
+hdd_get_link_info_by_vdev(struct hdd_context *hdd_ctx, uint32_t vdev_id);
 
 /**
  * hdd_adapter_get_by_reference() - Return adapter with the given reference

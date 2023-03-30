@@ -948,21 +948,22 @@ int wlan_hdd_tdls_antenna_switch(struct hdd_context *hdd_ctx,
 QDF_STATUS hdd_tdls_register_peer(void *userdata, uint32_t vdev_id,
 				  const uint8_t *mac, uint8_t qos)
 {
-	struct hdd_adapter *adapter;
 	struct hdd_context *hddctx;
+	struct wlan_hdd_link_info *link_info;
 
 	hddctx = userdata;
 	if (!hddctx) {
 		hdd_err("Invalid hddctx");
 		return QDF_STATUS_E_INVAL;
 	}
-	adapter = hdd_get_adapter_by_vdev(hddctx, vdev_id);
-	if (!adapter) {
-		hdd_err("Invalid adapter");
+
+	link_info = hdd_get_link_info_by_vdev(hddctx, vdev_id);
+	if (!link_info) {
+		hdd_err("Invalid vdev");
 		return QDF_STATUS_E_FAILURE;
 	}
 
-	return hdd_roam_register_tdlssta(adapter, mac, qos);
+	return hdd_roam_register_tdlssta(link_info->adapter, mac, qos);
 }
 
 void hdd_init_tdls_config(struct tdls_start_params *tdls_cfg)

@@ -128,6 +128,7 @@ void hdd_nud_failure_work(hdd_cb_handle context, uint8_t vdev_id)
 {
 	struct hdd_context *hdd_ctx;
 	struct hdd_adapter *adapter;
+	struct wlan_hdd_link_info *link_info;
 	struct osif_vdev_sync *vdev_sync;
 
 	hdd_ctx = hdd_cb_handle_to_context(context);
@@ -135,12 +136,14 @@ void hdd_nud_failure_work(hdd_cb_handle context, uint8_t vdev_id)
 		hdd_err("hdd_ctx is null");
 		return;
 	}
-	adapter = hdd_get_adapter_by_vdev(hdd_ctx, vdev_id);
-	if (!adapter) {
-		hdd_err("adapter is null");
+
+	link_info = hdd_get_link_info_by_vdev(hdd_ctx, vdev_id);
+	if (!link_info) {
+		hdd_err("Invalid vdev");
 		return;
 	}
 
+	adapter = link_info->adapter;
 	if (osif_vdev_sync_op_start(adapter->dev, &vdev_sync))
 		return;
 

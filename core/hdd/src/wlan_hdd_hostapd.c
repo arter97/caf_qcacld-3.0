@@ -5596,7 +5596,7 @@ hdd_handle_acs_2g_preferred_sap_conc(struct wlan_objmgr_psoc *psoc,
 	struct hdd_hostapd_state *hostapd_state;
 	uint8_t go_vdev_id = WLAN_UMAC_VDEV_ID_MAX;
 	qdf_freq_t go_ch_freq = 0, go_new_ch_freq;
-	struct hdd_adapter *go_adapter;
+	struct wlan_hdd_link_info *go_link_info;
 
 	if (adapter->device_mode != QDF_SAP_MODE)
 		return;
@@ -5642,17 +5642,19 @@ hdd_handle_acs_2g_preferred_sap_conc(struct wlan_objmgr_psoc *psoc,
 		hdd_err("no available 5G channel");
 		return;
 	}
-	go_adapter = hdd_get_adapter_by_vdev(adapter->hdd_ctx, go_vdev_id);
-	if (hdd_validate_adapter(go_adapter))
+
+	go_link_info = hdd_get_link_info_by_vdev(adapter->hdd_ctx, go_vdev_id);
+	if (!go_link_info || hdd_validate_adapter(go_link_info->adapter))
 		return;
 
 	wlan_hdd_set_sap_csa_reason(psoc, go_vdev_id,
 				    CSA_REASON_SAP_ACS);
-	hostapd_state = WLAN_HDD_GET_HOSTAP_STATE_PTR(go_adapter->deflink);
+	hostapd_state = WLAN_HDD_GET_HOSTAP_STATE_PTR(go_link_info);
 	qdf_event_reset(&hostapd_state->qdf_event);
 
-	ret = hdd_softap_set_channel_change(go_adapter->dev, go_new_ch_freq,
-					    CH_WIDTH_80MHZ, false);
+	ret = hdd_softap_set_channel_change(go_link_info->adapter->dev,
+					    go_new_ch_freq, CH_WIDTH_80MHZ,
+					    false);
 	if (ret) {
 		hdd_err("CSA failed to %d, ret %d", go_new_ch_freq, ret);
 		return;
@@ -5695,7 +5697,7 @@ hdd_handle_p2p_go_for_3rd_ap_conc(struct wlan_objmgr_psoc *psoc,
 	struct hdd_hostapd_state *hostapd_state;
 	uint8_t go_vdev_id;
 	qdf_freq_t go_ch_freq, go_new_ch_freq;
-	struct hdd_adapter *go_adapter;
+	struct wlan_hdd_link_info *go_link_info;
 
 	if (adapter->device_mode != QDF_SAP_MODE)
 		return false;
@@ -5742,17 +5744,18 @@ hdd_handle_p2p_go_for_3rd_ap_conc(struct wlan_objmgr_psoc *psoc,
 		return false;
 	}
 
-	go_adapter = hdd_get_adapter_by_vdev(adapter->hdd_ctx, go_vdev_id);
-	if (hdd_validate_adapter(go_adapter))
+	go_link_info = hdd_get_link_info_by_vdev(adapter->hdd_ctx, go_vdev_id);
+	if (!go_link_info || hdd_validate_adapter(go_link_info->adapter))
 		return false;
 
 	wlan_hdd_set_sap_csa_reason(psoc, go_vdev_id,
 				    CSA_REASON_SAP_FIX_CH_CONC_WITH_GO);
-	hostapd_state = WLAN_HDD_GET_HOSTAP_STATE_PTR(go_adapter->deflink);
+	hostapd_state = WLAN_HDD_GET_HOSTAP_STATE_PTR(go_link_info);
 	qdf_event_reset(&hostapd_state->qdf_event);
 
-	ret = hdd_softap_set_channel_change(go_adapter->dev, go_new_ch_freq,
-					    CH_WIDTH_80MHZ, false);
+	ret = hdd_softap_set_channel_change(go_link_info->adapter->dev,
+					    go_new_ch_freq, CH_WIDTH_80MHZ,
+					    false);
 	if (ret) {
 		hdd_err("CSA failed to %d, ret %d", go_new_ch_freq, ret);
 		return false;
@@ -7254,18 +7257,18 @@ wlan_hdd_get_sap_ch_params(struct hdd_context *hdd_ctx,
 			   uint8_t vdev_id, uint32_t freq,
 			   struct ch_params *ch_params)
 {
-	struct hdd_adapter *adapter;
+	struct wlan_hdd_link_info *link_info;
 
 	if (!hdd_ctx || !ch_params) {
 		hdd_err("invalid hdd_ctx or ch_params");
 		return QDF_STATUS_E_INVAL;
 	}
 
-	adapter = hdd_get_adapter_by_vdev(hdd_ctx, vdev_id);
-	if (!adapter)
+	link_info = hdd_get_link_info_by_vdev(hdd_ctx, vdev_id);
+	if (!link_info)
 		return QDF_STATUS_E_INVAL;
 
-	if (!wlan_sap_get_ch_params(WLAN_HDD_GET_SAP_CTX_PTR(adapter->deflink),
+	if (!wlan_sap_get_ch_params(WLAN_HDD_GET_SAP_CTX_PTR(link_info),
 				    ch_params))
 		wlan_reg_set_channel_params_for_pwrmode(hdd_ctx->pdev, freq, 0,
 							ch_params,

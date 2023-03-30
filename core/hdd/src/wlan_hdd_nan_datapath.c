@@ -873,6 +873,7 @@ int hdd_ndi_delete(uint8_t vdev_id, const char *iface_name,
 {
 	int ret;
 	struct hdd_adapter *adapter;
+	struct wlan_hdd_link_info *link_info;
 	struct hdd_station_ctx *sta_ctx;
 	struct hdd_context *hdd_ctx = cds_get_context(QDF_MODULE_ID_HDD);
 	struct wlan_objmgr_vdev *vdev;
@@ -881,19 +882,16 @@ int hdd_ndi_delete(uint8_t vdev_id, const char *iface_name,
 		return -EINVAL;
 
 	/* check if adapter by vdev_id is valid NDI */
-	adapter = hdd_get_adapter_by_vdev(hdd_ctx, vdev_id);
-	if (!adapter || !WLAN_HDD_IS_NDI(adapter)) {
+	link_info = hdd_get_link_info_by_vdev(hdd_ctx, vdev_id);
+	if (!link_info || !WLAN_HDD_IS_NDI(link_info->adapter)) {
 		hdd_err("NAN data interface %s is not available", iface_name);
 		return -EINVAL;
 	}
 
-	sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter->deflink);
-	if (!sta_ctx) {
-		hdd_err("sta_ctx is NULL");
-		return -EINVAL;
-	}
+	adapter = link_info->adapter;
+	sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(link_info);
 
-	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink, WLAN_OSIF_NAN_ID);
+	vdev = hdd_objmgr_get_vdev_by_user(link_info, WLAN_OSIF_NAN_ID);
 	if (!vdev) {
 		hdd_err("vdev is NULL");
 		return -EINVAL;
@@ -920,6 +918,7 @@ void hdd_ndi_drv_ndi_create_rsp_handler(uint8_t vdev_id,
 {
 	struct hdd_context *hdd_ctx;
 	struct hdd_adapter *adapter;
+	struct wlan_hdd_link_info *link_info;
 	struct hdd_station_ctx *sta_ctx;
 	struct csr_roam_info *roam_info;
 	uint16_t ndp_inactivity_timeout = 0;
@@ -934,17 +933,14 @@ void hdd_ndi_drv_ndi_create_rsp_handler(uint8_t vdev_id,
 	if (!hdd_ctx)
 		return;
 
-	adapter = hdd_get_adapter_by_vdev(hdd_ctx, vdev_id);
-	if (!adapter) {
-		hdd_err("adapter is null");
+	link_info = hdd_get_link_info_by_vdev(hdd_ctx, vdev_id);
+	if (!link_info) {
+		hdd_err("Invalid vdev");
 		return;
 	}
 
-	sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter->deflink);
-	if (!sta_ctx) {
-		hdd_err("sta_ctx is null");
-		return;
-	}
+	sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(link_info);
+	adapter = link_info->adapter;
 
 	roam_info = qdf_mem_malloc(sizeof(*roam_info));
 	if (!roam_info)
@@ -952,8 +948,7 @@ void hdd_ndi_drv_ndi_create_rsp_handler(uint8_t vdev_id,
 
 	if (ndi_rsp->status == QDF_STATUS_SUCCESS) {
 		hdd_alert("NDI interface successfully created");
-		vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink,
-						   WLAN_OSIF_NAN_ID);
+		vdev = hdd_objmgr_get_vdev_by_user(link_info, WLAN_OSIF_NAN_ID);
 		if (!vdev) {
 			qdf_mem_free(roam_info);
 			hdd_err("vdev is NULL");
@@ -994,10 +989,9 @@ void hdd_ndi_drv_ndi_create_rsp_handler(uint8_t vdev_id,
 				goto error;
 			}
 		}
-		status = sme_send_multi_pdev_vdev_set_params(
-						    MLME_VDEV_SETPARAM,
-						    adapter->deflink->vdev_id,
-						    setparam, index);
+		status = sme_send_multi_pdev_vdev_set_params(MLME_VDEV_SETPARAM,
+							     link_info->vdev_id,
+							     setparam, index);
 		if (QDF_IS_STATUS_ERROR(status))
 			hdd_err("failed to send vdev set params");
 	} else {
@@ -1017,26 +1011,27 @@ error:
 void hdd_ndi_close(uint8_t vdev_id)
 {
 	struct hdd_context *hdd_ctx;
-	struct hdd_adapter *adapter;
+	struct wlan_hdd_link_info *link_info;
 
 	hdd_ctx = cds_get_context(QDF_MODULE_ID_HDD);
 	if (!hdd_ctx)
 		return;
 
-	adapter = hdd_get_adapter_by_vdev(hdd_ctx, vdev_id);
-	if (!adapter) {
-		hdd_err("adapter is null");
+	link_info = hdd_get_link_info_by_vdev(hdd_ctx, vdev_id);
+	if (!link_info) {
+		hdd_err("Invalid vdev");
 		return;
 	}
 
-	adapter->is_virtual_iface = true;
-	hdd_close_ndi(adapter);
+	link_info->adapter->is_virtual_iface = true;
+	hdd_close_ndi(link_info->adapter);
 }
 
 void hdd_ndi_drv_ndi_delete_rsp_handler(uint8_t vdev_id)
 {
 	struct hdd_context *hdd_ctx;
 	struct hdd_adapter *adapter;
+	struct wlan_hdd_link_info *link_info;
 	struct hdd_station_ctx *sta_ctx;
 	struct qdf_mac_addr bc_mac_addr = QDF_MAC_ADDR_BCAST_INIT;
 
@@ -1044,17 +1039,14 @@ void hdd_ndi_drv_ndi_delete_rsp_handler(uint8_t vdev_id)
 	if (!hdd_ctx)
 		return;
 
-	adapter = hdd_get_adapter_by_vdev(hdd_ctx, vdev_id);
-	if (!adapter) {
-		hdd_err("adapter is null");
+	link_info = hdd_get_link_info_by_vdev(hdd_ctx, vdev_id);
+	if (!link_info) {
+		hdd_err("Invalid vdev");
 		return;
 	}
 
-	sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter->deflink);
-	if (!sta_ctx) {
-		hdd_err("sta_ctx is null");
-		return;
-	}
+	adapter = link_info->adapter;
+	sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(link_info);
 
 	hdd_delete_peer(sta_ctx, &bc_mac_addr);
 
@@ -1114,6 +1106,7 @@ int hdd_ndp_new_peer_handler(uint8_t vdev_id, uint16_t sta_id,
 {
 	struct hdd_context *hdd_ctx;
 	struct hdd_adapter *adapter;
+	struct wlan_hdd_link_info *link_info;
 	struct hdd_station_ctx *sta_ctx;
 	struct csr_roam_info *roam_info;
 	struct wlan_objmgr_vdev *vdev;
@@ -1122,17 +1115,14 @@ int hdd_ndp_new_peer_handler(uint8_t vdev_id, uint16_t sta_id,
 	if (!hdd_ctx)
 		return -EINVAL;
 
-	adapter = hdd_get_adapter_by_vdev(hdd_ctx, vdev_id);
-	if (!adapter) {
-		hdd_err("adapter is null");
+	link_info = hdd_get_link_info_by_vdev(hdd_ctx, vdev_id);
+	if (!link_info) {
+		hdd_err("Invalid vdev");
 		return -EINVAL;
 	}
 
-	sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter->deflink);
-	if (!sta_ctx) {
-		hdd_err("sta_ctx is null");
-		return -EINVAL;
-	}
+	adapter = link_info->adapter;
+	sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(link_info);
 
 	/* save peer in ndp ctx */
 	if (!hdd_save_peer(sta_ctx, peer_mac_addr)) {
@@ -1160,7 +1150,7 @@ int hdd_ndp_new_peer_handler(uint8_t vdev_id, uint16_t sta_id,
 		hdd_disable_rx_ol_in_concurrency(true);
 	}
 
-	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink, WLAN_DP_ID);
+	vdev = hdd_objmgr_get_vdev_by_user(link_info, WLAN_DP_ID);
 	if (vdev) {
 		ucfg_dp_bus_bw_compute_prev_txrx_stats(vdev);
 		hdd_objmgr_put_vdev_by_user(vdev, WLAN_DP_ID);
@@ -1227,30 +1217,28 @@ void hdd_ndp_peer_departed_handler(uint8_t vdev_id, uint16_t sta_id,
 {
 	struct hdd_context *hdd_ctx;
 	struct hdd_adapter *adapter;
+	struct wlan_hdd_link_info *link_info;
 	struct hdd_station_ctx *sta_ctx;
 
 	hdd_ctx = cds_get_context(QDF_MODULE_ID_HDD);
 	if (!hdd_ctx)
 		return;
 
-	adapter = hdd_get_adapter_by_vdev(hdd_ctx, vdev_id);
-	if (!adapter) {
-		hdd_err("adapter is null");
+	link_info = hdd_get_link_info_by_vdev(hdd_ctx, vdev_id);
+	if (!link_info) {
+		hdd_err("Invalid vdev");
 		return;
 	}
 
-	sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter->deflink);
-	if (!sta_ctx) {
-		hdd_err("sta_ctx is null");
-		return;
-	}
+	adapter = link_info->adapter;
+	sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(link_info);
 
 	hdd_delete_peer(sta_ctx, peer_mac_addr);
 
 	if (last_peer) {
 		hdd_debug("No more ndp peers.");
 		ucfg_nan_clear_peer_mc_list(hdd_ctx->psoc,
-					    adapter->deflink->vdev,
+					    link_info->vdev,
 					    peer_mac_addr);
 		hdd_cleanup_ndi(hdd_ctx, adapter);
 		qdf_event_set(&adapter->peer_cleanup_done);

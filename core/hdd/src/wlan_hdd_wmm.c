@@ -2625,15 +2625,17 @@ bool hdd_wmm_is_acm_allowed(uint8_t vdev_id)
 	struct hdd_adapter *adapter;
 	struct hdd_wmm_ac_status *wmm_ac_status;
 	struct hdd_context *hdd_ctx;
+	struct wlan_hdd_link_info *link_info;
 
 	hdd_ctx = cds_get_context(QDF_MODULE_ID_HDD);
 	if (!hdd_ctx)
 		return false;
 
-	adapter = hdd_get_adapter_by_vdev(hdd_ctx, vdev_id);
-	if (hdd_validate_adapter(adapter))
+	link_info = hdd_get_link_info_by_vdev(hdd_ctx, vdev_id);
+	if (!link_info || hdd_validate_adapter(link_info->adapter))
 		return false;
 
+	adapter = link_info->adapter;
 	wmm_ac_status = adapter->hdd_wmm_status.ac_status;
 
 	if (hdd_wmm_is_active(adapter) &&

@@ -338,18 +338,20 @@ hdd_cm_disconnect_complete_pre_user_update(struct wlan_objmgr_vdev *vdev,
 {
 	struct hdd_context *hdd_ctx = cds_get_context(QDF_MODULE_ID_HDD);
 	struct hdd_adapter *adapter;
+	struct wlan_hdd_link_info *link_info;
 
 	if (!hdd_ctx) {
 		hdd_err("hdd_ctx is NULL");
 		return QDF_STATUS_E_INVAL;
 	}
 
-	adapter = hdd_get_adapter_by_vdev(hdd_ctx, wlan_vdev_get_id(vdev));
-	if (!adapter) {
+	link_info = hdd_get_link_info_by_vdev(hdd_ctx, wlan_vdev_get_id(vdev));
+	if (!link_info) {
 		hdd_err("adapter is NULL for vdev %d", wlan_vdev_get_id(vdev));
 		return QDF_STATUS_E_INVAL;
 	}
 
+	adapter = link_info->adapter;
 	hdd_conn_set_authenticated(adapter, false);
 	hdd_napi_serialize(0);
 	hdd_disable_and_flush_mc_addr_list(adapter, pmo_peer_disconnect);
@@ -357,7 +359,7 @@ hdd_cm_disconnect_complete_pre_user_update(struct wlan_objmgr_vdev *vdev,
 
 	hdd_handle_disassociation_event(adapter, &rsp->req.req.bssid);
 
-	wlan_rec_conn_info(adapter->deflink->vdev_id,
+	wlan_rec_conn_info(link_info->vdev_id,
 			   DEBUG_CONN_DISCONNECT_HANDLER,
 			   rsp->req.req.bssid.bytes,
 			   rsp->req.cm_id,
@@ -530,18 +532,20 @@ hdd_cm_disconnect_complete_post_user_update(struct wlan_objmgr_vdev *vdev,
 {
 	struct hdd_context *hdd_ctx = cds_get_context(QDF_MODULE_ID_HDD);
 	struct hdd_adapter *adapter;
+	struct wlan_hdd_link_info *link_info;
 
 	if (!hdd_ctx) {
 		hdd_err("hdd_ctx is NULL");
 		return QDF_STATUS_E_INVAL;
 	}
 
-	adapter = hdd_get_adapter_by_vdev(hdd_ctx, wlan_vdev_get_id(vdev));
-	if (!adapter) {
+	link_info = hdd_get_link_info_by_vdev(hdd_ctx, wlan_vdev_get_id(vdev));
+	if (!link_info) {
 		hdd_err("adapter is NULL for vdev %d", wlan_vdev_get_id(vdev));
 		return QDF_STATUS_E_INVAL;
 	}
 
+	adapter = link_info->adapter;
 	if (adapter->device_mode == QDF_STA_MODE) {
 	/* Inform FTM TIME SYNC about the disconnection with the AP */
 		hdd_ftm_time_sync_sta_state_notify(
@@ -628,20 +632,20 @@ QDF_STATUS hdd_cm_netif_queue_control(struct wlan_objmgr_vdev *vdev,
 				      enum netif_reason_type reason)
 {
 	struct hdd_context *hdd_ctx = cds_get_context(QDF_MODULE_ID_HDD);
-	struct hdd_adapter *adapter;
+	struct wlan_hdd_link_info *link_info;
 
 	if (!hdd_ctx) {
 		hdd_err("hdd_ctx is NULL");
 		return QDF_STATUS_E_INVAL;
 	}
 
-	adapter = hdd_get_adapter_by_vdev(hdd_ctx, wlan_vdev_get_id(vdev));
-	if (!adapter) {
+	link_info = hdd_get_link_info_by_vdev(hdd_ctx, wlan_vdev_get_id(vdev));
+	if (!link_info) {
 		hdd_err("adapter is NULL for vdev %d", wlan_vdev_get_id(vdev));
 		return QDF_STATUS_E_INVAL;
 	}
 
-	wlan_hdd_netif_queue_control(adapter, action, reason);
+	wlan_hdd_netif_queue_control(link_info->adapter, action, reason);
 
 	return QDF_STATUS_SUCCESS;
 }

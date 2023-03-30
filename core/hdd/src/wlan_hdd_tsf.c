@@ -3136,6 +3136,7 @@ int hdd_get_tsf_cb(void *pcb_cxt, struct stsf *ptsf)
 {
 	struct hdd_context *hddctx;
 	struct hdd_adapter *adapter;
+	struct wlan_hdd_link_info *link_info;
 	int ret;
 	uint64_t tsf_sync_soc_time;
 	QDF_TIMER_STATE capture_req_timer_status;
@@ -3152,13 +3153,13 @@ int hdd_get_tsf_cb(void *pcb_cxt, struct stsf *ptsf)
 	if (0 != ret)
 		return -EINVAL;
 
-	adapter = hdd_get_adapter_by_vdev(hddctx, ptsf->vdev_id);
-
-	if (!adapter) {
+	link_info = hdd_get_link_info_by_vdev(hddctx, ptsf->vdev_id);
+	if (!link_info) {
 		hdd_err("failed to find adapter");
 		return -EINVAL;
 	}
 
+	adapter = link_info->adapter;
 	/* Intercept tsf report and check if it is for uplink delay.
 	 * If yes, return in advance and skip the legacy BSS TSF
 	 * report. Otherwise continue on to the legacy BSS TSF

@@ -362,11 +362,13 @@ void hdd_get_tx_resource(uint8_t vdev_id,
 	struct hdd_adapter *adapter;
 	struct hdd_context *hdd_ctx = cds_get_context(QDF_MODULE_ID_HDD);
 	uint16_t timer_value = WLAN_HDD_TX_FLOW_CONTROL_OS_Q_BLOCK_TIME;
+	struct wlan_hdd_link_info *link_info;
 
-	adapter = hdd_get_adapter_by_vdev(hdd_ctx, vdev_id);
-	if (!adapter)
+	link_info = hdd_get_link_info_by_vdev(hdd_ctx, vdev_id);
+	if (!link_info)
 		return;
 
+	adapter = link_info->adapter;
 	if (adapter->device_mode == QDF_P2P_GO_MODE ||
 	    adapter->device_mode == QDF_SAP_MODE)
 		timer_value = WLAN_SAP_HDD_TX_FLOW_CONTROL_OS_Q_BLOCK_TIME;
@@ -399,13 +401,13 @@ unsigned int
 hdd_get_tx_flow_low_watermark(hdd_cb_handle cb_ctx, uint8_t intf_id)
 {
 	struct hdd_context *hdd_ctx = hdd_cb_handle_to_context(cb_ctx);
-	struct hdd_adapter *adapter;
+	struct wlan_hdd_link_info *link_info;
 
-	adapter = hdd_get_adapter_by_vdev(hdd_ctx, intf_id);
-	if (!adapter)
+	link_info = hdd_get_link_info_by_vdev(hdd_ctx, intf_id);
+	if (!link_info)
 		return 0;
 
-	return adapter->tx_flow_low_watermark;
+	return link_info->adapter->tx_flow_low_watermark;
 }
 #endif /* QCA_LL_LEGACY_TX_FLOW_CONTROL */
 
@@ -725,14 +727,14 @@ void hdd_tsf_timestamp_rx(hdd_cb_handle ctx, qdf_nbuf_t netbuf)
 void hdd_get_tsf_time_cb(uint8_t vdev_id, uint64_t input_time,
 			 uint64_t *tsf_time)
 {
-	struct hdd_adapter *adapter;
 	struct hdd_context *hdd_ctx = cds_get_context(QDF_MODULE_ID_HDD);
+	struct wlan_hdd_link_info *link_info;
 
-	adapter = hdd_get_adapter_by_vdev(hdd_ctx, vdev_id);
-	if (!adapter)
+	link_info = hdd_get_link_info_by_vdev(hdd_ctx, vdev_id);
+	if (!link_info)
 		return;
 
-	hdd_get_tsf_time(adapter, input_time, tsf_time);
+	hdd_get_tsf_time(link_info->adapter, input_time, tsf_time);
 }
 #endif
 
@@ -1358,7 +1360,7 @@ void hdd_tx_queue_cb(hdd_handle_t hdd_handle, uint32_t vdev_id,
 		     enum netif_reason_type reason)
 {
 	struct hdd_context *hdd_ctx = hdd_handle_to_context(hdd_handle);
-	struct hdd_adapter *adapter;
+	struct wlan_hdd_link_info *link_info;
 
 	/*
 	 * Validating the context is not required here.
@@ -1372,14 +1374,14 @@ void hdd_tx_queue_cb(hdd_handle_t hdd_handle, uint32_t vdev_id,
 		return;
 	}
 
-	adapter = hdd_get_adapter_by_vdev(hdd_ctx, vdev_id);
-	if (!adapter) {
+	link_info = hdd_get_link_info_by_vdev(hdd_ctx, vdev_id);
+	if (!link_info) {
 		hdd_err("vdev_id %d does not exist with host", vdev_id);
 		return;
 	}
 	hdd_debug("Tx Queue action %d on vdev %d", action, vdev_id);
 
-	wlan_hdd_netif_queue_control(adapter, action, reason);
+	wlan_hdd_netif_queue_control(link_info->adapter, action, reason);
 }
 
 #ifdef QCA_LL_LEGACY_TX_FLOW_CONTROL

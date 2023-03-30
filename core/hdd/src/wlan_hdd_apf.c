@@ -423,10 +423,10 @@ hdd_apf_read_memory_callback(void *hdd_context,
 			     struct wmi_apf_read_memory_resp_event_params *evt)
 {
 	struct hdd_context *hdd_ctx = hdd_context;
-	struct hdd_adapter *adapter;
 	struct hdd_apf_context *context;
 	uint8_t *buf_ptr;
 	uint32_t pkt_offset;
+	struct wlan_hdd_link_info *link_info;
 
 	hdd_enter();
 
@@ -436,10 +436,11 @@ hdd_apf_read_memory_callback(void *hdd_context,
 		return;
 	}
 
-	adapter = hdd_get_adapter_by_vdev(hdd_ctx, evt->vdev_id);
-	if (hdd_validate_adapter(adapter))
+	link_info = hdd_get_link_info_by_vdev(hdd_ctx, evt->vdev_id);
+	if (!link_info || hdd_validate_adapter(link_info->adapter))
 		return;
-	context = &adapter->apf_context;
+
+	context = &link_info->adapter->apf_context;
 
 	if (context->magic != APF_CONTEXT_MAGIC) {
 		/* The caller presumably timed out, nothing to do */

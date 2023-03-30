@@ -1054,11 +1054,11 @@ static void
 hdd_cache_ll_iface_stats(struct hdd_context *hdd_ctx,
 			 struct wifi_interface_stats *if_stat)
 {
-	struct hdd_adapter *adapter;
+	struct wlan_hdd_link_info *link_info;
 
-	adapter = hdd_get_adapter_by_vdev(hdd_ctx, if_stat->vdev_id);
-	if (!adapter) {
-		hdd_err("Invalid adapter for LL_STATS");
+	link_info = hdd_get_link_info_by_vdev(hdd_ctx, if_stat->vdev_id);
+	if (!link_info) {
+		hdd_err("Invalid vdev");
 		return;
 	}
 	/*
@@ -1069,7 +1069,7 @@ hdd_cache_ll_iface_stats(struct hdd_context *hdd_ctx,
 	 * required.
 	 */
 	hdd_nofl_debug("Copying iface stats into the adapter");
-	adapter->ll_iface_stats = *if_stat;
+	link_info->adapter->ll_iface_stats = *if_stat;
 }
 #else
 static void
@@ -1725,7 +1725,7 @@ void wlan_hdd_cfg80211_link_layer_stats_callback(hdd_handle_t hdd_handle,
 {
 	struct hdd_context *hdd_ctx = hdd_handle_to_context(hdd_handle);
 	struct hdd_ll_stats_priv *priv;
-	struct hdd_adapter *adapter = NULL;
+	struct wlan_hdd_link_info *link_info;
 	int status;
 	struct osif_request *request;
 
@@ -1758,14 +1758,15 @@ void wlan_hdd_cfg80211_link_layer_stats_callback(hdd_handle_t hdd_handle,
 			return;
 		}
 
-		adapter = hdd_get_adapter_by_vdev(hdd_ctx, results->ifaceId);
-		if (!adapter) {
+		link_info =
+			hdd_get_link_info_by_vdev(hdd_ctx, results->ifaceId);
+		if (!link_info) {
 			hdd_debug_rl("invalid vdev_id %d sent by FW",
 				     results->ifaceId);
 			/* for peer stats FW doesn't update the vdev_id info*/
-			adapter = hdd_get_adapter_by_vdev(hdd_ctx,
-							  priv->vdev_id);
-			if (!adapter) {
+			link_info = hdd_get_link_info_by_vdev(hdd_ctx,
+							      priv->vdev_id);
+			if (!link_info) {
 				hdd_err("invalid vdev %d", priv->vdev_id);
 				osif_request_put(request);
 				return;
@@ -1774,7 +1775,8 @@ void wlan_hdd_cfg80211_link_layer_stats_callback(hdd_handle_t hdd_handle,
 		wlan_hdd_update_ll_stats_request_bitmap(hdd_ctx, request,
 							results);
 		if (results->rspId == DEBUGFS_LLSTATS_REQID) {
-			hdd_debugfs_process_ll_stats(adapter, results, request);
+			hdd_debugfs_process_ll_stats(link_info->adapter,
+						     results, request);
 		 } else {
 			hdd_process_ll_stats(results, request);
 		}
@@ -1793,7 +1795,7 @@ void hdd_lost_link_info_cb(hdd_handle_t hdd_handle,
 {
 	struct hdd_context *hdd_ctx = hdd_handle_to_context(hdd_handle);
 	int status;
-	struct hdd_adapter *adapter;
+	struct wlan_hdd_link_info *link_info;
 	struct hdd_station_ctx *sta_ctx;
 
 	status = wlan_hdd_validate_context(hdd_ctx);
@@ -1810,17 +1812,16 @@ void hdd_lost_link_info_cb(hdd_handle_t hdd_handle,
 		return;
 	}
 
-	adapter = hdd_get_adapter_by_vdev(hdd_ctx, lost_link_info->vdev_id);
-	if (!adapter) {
-		hdd_err("invalid adapter");
+	link_info = hdd_get_link_info_by_vdev(hdd_ctx, lost_link_info->vdev_id);
+	if (!link_info) {
+		hdd_err("invalid vdev");
 		return;
 	}
 
-	sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter->deflink);
+	sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(link_info);
 
-	adapter->deflink->rssi_on_disconnect = lost_link_info->rssi;
-	hdd_debug("rssi on disconnect %d",
-		  adapter->deflink->rssi_on_disconnect);
+	link_info->rssi_on_disconnect = lost_link_info->rssi;
+	hdd_debug("rssi on disconnect %d", link_info->rssi_on_disconnect);
 
 	sta_ctx->cache_conn_info.signal = lost_link_info->rssi;
 }
@@ -3322,7 +3323,7 @@ void wlan_hdd_cfg80211_link_layer_stats_ext_callback(hdd_handle_t ctx,
 	struct hdd_context *hdd_ctx;
 	struct sk_buff *skb;
 	uint32_t param_id, index;
-	struct hdd_adapter *adapter;
+	struct wlan_hdd_link_info *link_info;
 	struct wifi_peer_stat *peer_stats;
 	uint8_t *results;
 	int status;
@@ -3339,11 +3340,9 @@ void wlan_hdd_cfg80211_link_layer_stats_ext_callback(hdd_handle_t ctx,
 	if (0 != status)
 		return;
 
-	adapter = hdd_get_adapter_by_vdev(hdd_ctx, rsp->ifaceId);
-
-	if (!adapter) {
-		hdd_err("vdev_id %d does not exist with host.",
-			rsp->ifaceId);
+	link_info = hdd_get_link_info_by_vdev(hdd_ctx, rsp->ifaceId);
+	if (!link_info) {
+		hdd_err("vdev_id %d does not exist with host.", rsp->ifaceId);
 		return;
 	}
 
@@ -4111,7 +4110,7 @@ void wlan_hdd_cfg80211_stats_ext_callback(hdd_handle_t hdd_handle,
 	struct sk_buff *vendor_event;
 	int status;
 	int ret_val;
-	struct hdd_adapter *adapter;
+	struct wlan_hdd_link_info *link_info;
 	enum qca_nl80211_vendor_subcmds_index index =
 		QCA_NL80211_VENDOR_SUBCMD_STATS_EXT_INDEX;
 
@@ -4119,8 +4118,8 @@ void wlan_hdd_cfg80211_stats_ext_callback(hdd_handle_t hdd_handle,
 	if (status)
 		return;
 
-	adapter = hdd_get_adapter_by_vdev(hdd_ctx, data->vdev_id);
-	if (!adapter) {
+	link_info = hdd_get_link_info_by_vdev(hdd_ctx, data->vdev_id);
+	if (!link_info) {
 		hdd_err("vdev_id %d does not exist with host", data->vdev_id);
 		return;
 	}
@@ -4137,7 +4136,7 @@ void wlan_hdd_cfg80211_stats_ext_callback(hdd_handle_t hdd_handle,
 	}
 
 	ret_val = nla_put_u32(vendor_event, QCA_WLAN_VENDOR_ATTR_IFINDEX,
-			      adapter->dev->ifindex);
+			      link_info->adapter->dev->ifindex);
 	if (ret_val) {
 		hdd_err("QCA_WLAN_VENDOR_ATTR_IFINDEX put fail");
 		wlan_cfg80211_vendor_free_skb(vendor_event);
@@ -4469,7 +4468,7 @@ wlan_hdd_cfg80211_roam_events_callback(struct roam_stats_event *roam_stats,
 	int status;
 	uint32_t data_size, roam_event_type = 0;
 	struct sk_buff *vendor_event;
-	struct hdd_adapter *adapter;
+	struct wlan_hdd_link_info *link_info;
 
 	status = wlan_hdd_validate_context(hdd_ctx);
 	if (status) {
@@ -4482,9 +4481,8 @@ wlan_hdd_cfg80211_roam_events_callback(struct roam_stats_event *roam_stats,
 		return;
 	}
 
-	adapter = hdd_get_adapter_by_vdev(hdd_ctx,
-					  roam_stats->vdev_id);
-	if (!adapter) {
+	link_info = hdd_get_link_info_by_vdev(hdd_ctx, roam_stats->vdev_id);
+	if (!link_info) {
 		hdd_err("vdev_id %d does not exist with host",
 			roam_stats->vdev_id);
 		return;
@@ -4499,7 +4497,7 @@ wlan_hdd_cfg80211_roam_events_callback(struct roam_stats_event *roam_stats,
 	data_size += NLMSG_HDRLEN;
 	vendor_event =
 		wlan_cfg80211_vendor_event_alloc(hdd_ctx->wiphy,
-						 &adapter->wdev,
+						 &link_info->adapter->wdev,
 						 data_size,
 						 SUBCMD_ROAM_EVENTS_INDEX,
 						 GFP_KERNEL);
@@ -7874,7 +7872,7 @@ int wlan_hdd_get_temperature(struct hdd_adapter *adapter, int *temperature)
 void wlan_hdd_display_tx_multiq_stats(hdd_cb_handle context, uint8_t vdev_id)
 {
 	struct hdd_context *hdd_ctx;
-	struct hdd_adapter *adapter;
+	struct wlan_hdd_link_info *link_info;
 	struct hdd_tx_rx_stats *stats;
 	uint32_t total_inv_sk_and_skb_hash = 0;
 	uint32_t total_qselect_existing_skb_hash = 0;
@@ -7887,12 +7885,13 @@ void wlan_hdd_display_tx_multiq_stats(hdd_cb_handle context, uint8_t vdev_id)
 		hdd_err("hdd_ctx is null");
 		return;
 	}
-	adapter = hdd_get_adapter_by_vdev(hdd_ctx, vdev_id);
-	if (!adapter) {
-		hdd_err("adapter is null");
+
+	link_info = hdd_get_link_info_by_vdev(hdd_ctx, vdev_id);
+	if (!link_info) {
+		hdd_err("Invalid vdev");
 		return;
 	}
-	stats = &adapter->hdd_stats.tx_rx_stats;
+	stats = &link_info->adapter->hdd_stats.tx_rx_stats;
 
 	for (i = 0; i < NUM_CPUS; i++) {
 		total_inv_sk_and_skb_hash +=
@@ -7925,35 +7924,34 @@ void wlan_hdd_display_tx_multiq_stats(hdd_cb_handle context, uint8_t vdev_id)
 static void hdd_lost_link_cp_stats_info_cb(void *stats_ev)
 {
 	struct hdd_context *hdd_ctx = cds_get_context(QDF_MODULE_ID_HDD);
-	struct hdd_adapter *adapter;
 	struct stats_event *ev = stats_ev;
-	uint8_t i;
+	uint8_t i, vdev_id;
 	int8_t rssi;
 	struct hdd_station_ctx *sta_ctx;
+	struct wlan_hdd_link_info *link_info;
 
 	if (wlan_hdd_validate_context(hdd_ctx))
 		return;
 
 	for (i = 0; i < ev->num_summary_stats; i++) {
-		adapter = hdd_get_adapter_by_vdev(
-					hdd_ctx,
-					ev->vdev_summary_stats[i].vdev_id);
-		if (!adapter) {
-			hdd_debug("invalid adapter");
+		vdev_id = ev->vdev_summary_stats[i].vdev_id;
+		link_info = hdd_get_link_info_by_vdev(hdd_ctx, vdev_id);
+		if (!link_info) {
+			hdd_debug("invalid vdev");
 			continue;
 		}
 
-		sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter->deflink);
+		sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(link_info);
 
 		rssi = ev->vdev_summary_stats[i].stats.rssi;
 		if (rssi == 0) {
 			hdd_debug_rl("Invalid RSSI value sent by FW");
 			return;
 		}
-		adapter->deflink->rssi_on_disconnect = rssi;
+		link_info->rssi_on_disconnect = rssi;
 		hdd_debug("rssi %d for " QDF_MAC_ADDR_FMT,
-			  adapter->deflink->rssi_on_disconnect,
-			  QDF_MAC_ADDR_REF(adapter->mac_addr.bytes));
+			  link_info->rssi_on_disconnect,
+			  QDF_MAC_ADDR_REF(link_info->adapter->mac_addr.bytes));
 
 		sta_ctx->cache_conn_info.signal = rssi;
 	}
