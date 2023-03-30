@@ -1560,6 +1560,10 @@ static void dp_soc_interrupt_map_calculate_wifi3_pci_legacy(struct dp_soc *soc,
 					soc->wlan_cfg_ctx, intr_ctx_num);
 	int host2rxdma_mon_ring_mask = wlan_cfg_get_host2rxdma_mon_ring_mask(
 					soc->wlan_cfg_ctx, intr_ctx_num);
+	int host2txmon_ring_mask = wlan_cfg_get_host2txmon_ring_mask(
+					soc->wlan_cfg_ctx, intr_ctx_num);
+	int txmon2host_mon_ring_mask = wlan_cfg_get_tx_mon_ring_mask(
+					soc->wlan_cfg_ctx, intr_ctx_num);
 	soc->intr_mode = DP_INTR_LEGACY_VIRTUAL_IRQ;
 	for (j = 0; j < HIF_MAX_GRP_IRQ; j++) {
 		if (tx_mask & (1 << j))
@@ -1580,6 +1584,10 @@ static void dp_soc_interrupt_map_calculate_wifi3_pci_legacy(struct dp_soc *soc,
 			irq_id_map[num_irq++] = (sw2rxdma_0 - j);
 		if (host2rxdma_mon_ring_mask & (1 << j))
 			irq_id_map[num_irq++] = (sw2rxmon_src_ring - j);
+		if (host2txmon_ring_mask & (1 << j))
+			irq_id_map[num_irq++] = sw2txmon_src_ring;
+		if (txmon2host_mon_ring_mask & (1 << j))
+			irq_id_map[num_irq++] = (txmon2sw_p0_dest0 - j);
 	}
 	*num_irq_r = num_irq;
 }
