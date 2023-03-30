@@ -1014,52 +1014,6 @@ dfs_process_radar_ind(struct wlan_dfs *dfs,
 	return status;
 }
 
-#if defined(QCA_DFS_BW_PUNCTURE) && defined(WLAN_FEATURE_11BE)
-/**
- * dfs_is_ignore_radar_for_punctured_chans() - Store the radar bitmap and check
- *                                             if radar is found in already
- *                                             punctured channel and ignore the
- *                                             radar.
- * @dfs: Wlan_dfs structure
- * @dfs_radar_bitmap: Variable to store radar bitmap.
- * @freq_list: output array of sub-channel frequencies.
- * @num_channels: Number of sub-channels in target DFS channel.
- *
- * Return: If radar is found on punctured channel then return true.
- * Else return false.
- */
-static
-bool dfs_is_ignore_radar_for_punctured_chans(struct wlan_dfs *dfs,
-					     uint16_t *dfs_radar_bitmap,
-					     uint16_t *freq_list,
-					     uint8_t num_channels)
-{
-	uint16_t dfs_punc_pattern = dfs->dfs_curchan->dfs_ch_punc_pattern;
-
-	*dfs_radar_bitmap = dfs_generate_radar_bitmap(dfs,
-						      freq_list,
-						      num_channels);
-	*dfs_radar_bitmap |= dfs_punc_pattern;
-
-	if (*dfs_radar_bitmap == dfs_punc_pattern) {
-		dfs_err(dfs, WLAN_DEBUG_DFS,
-			"radar event received on invalid channel");
-		return true;
-	}
-
-	return false;
-}
-#else
-static
-bool dfs_is_ignore_radar_for_punctured_chans(struct wlan_dfs *dfs,
-					     uint16_t *dfs_radar_bitmap,
-					     uint16_t *freq_list,
-					     uint8_t num_channels)
-{
-	return false;
-}
-#endif /* QCA_DFS_BW_PUNCTURE */
-
 QDF_STATUS
 dfs_process_radar_ind_on_home_chan(struct wlan_dfs *dfs,
 				   struct radar_found_info *radar_found)
@@ -1103,12 +1057,17 @@ dfs_process_radar_ind_on_home_chan(struct wlan_dfs *dfs,
 							freq_list,
 							freq_center);
 
-	if (dfs->dfs_use_puncture &&
-	    dfs_is_ignore_radar_for_punctured_chans(dfs,
-						    &dfs_radar_bitmap,
-						    freq_list,
-						    num_channels))
-		goto exit;
+	if (dfs->dfs_use_puncture) {
+		bool is_ignore_radar_puncture = false;
+
+		dfs_handle_radar_puncturing(dfs,
+					    &dfs_radar_bitmap,
+					    freq_list,
+					    num_channels,
+					    &is_ignore_radar_puncture);
+		if (is_ignore_radar_puncture)
+			goto exit;
+	}
 
 	if (!dfs->dfs_use_nol) {
 		if (!dfs->dfs_is_offload_enabled)
