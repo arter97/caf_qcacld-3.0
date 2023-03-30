@@ -4964,10 +4964,42 @@ QDF_STATUS policy_mgr_get_sbs_cfg(struct wlan_objmgr_psoc *psoc, bool *sbs);
  * policy_mgr_get_ll_sap_freq()- Function to get ll sap freq if it's present
  * @psoc: PSOC object
  *
- * Return: True if it's LL SAP otherwise false
+ * Based on vdev id ap profile set via vendor command is get and compared with
+ * ll_type_any AP type and return freq for that SAP if profile set is latency
+ * sensitive or throghput sensitive.
+ *
+ * Return: freq if it's LL SAP otherwise 0
  *
  */
 qdf_freq_t policy_mgr_get_ll_sap_freq(struct wlan_objmgr_psoc *psoc);
+
+/**
+ * policy_mgr_get_lt_ll_sap_freq()- Function to get LT LL sap freq if it's
+ * present
+ * @psoc: PSOC object
+ *
+ * Based on vdev id ap profile set via vendor command is get and compared with
+ * lt_ll_type AP type and return freq for that SAP if profile set is latency
+ * sensitive example gaming or losless audio.
+ *
+ * Return: freq if it's LT LL SAP otherwise 0
+ *
+ */
+qdf_freq_t policy_mgr_get_lt_ll_sap_freq(struct wlan_objmgr_psoc *psoc);
+
+/**
+ * policy_mgr_get_ht_ll_sap_freq()- Function to get HT LL sap freq if it's
+ * present
+ * @psoc: PSOC object
+ *
+ * Based on vdev id ap profile set via vendor command is get and compared with
+ * ht_ll_type AP type and return freq for that SAP if profile set is throghput
+ * sensitive.
+ *
+ * Return: freq if it's HT LL SAP otherwise 0
+ *
+ */
+qdf_freq_t policy_mgr_get_ht_ll_sap_freq(struct wlan_objmgr_psoc *psoc);
 
 /**
  * policy_mgr_is_ll_sap_concurrency_valid() - Function to check whether
