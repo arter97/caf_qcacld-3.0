@@ -798,29 +798,31 @@ dp_rx_ppe_add_flow_entry(struct ppe_drv_fse_rule_info *ppe_flow_info)
 	flow_info.flow_tuple_info.dest_port = ppe_flow_info->tuple.dest_port;
 	flow_info.flow_tuple_info.l4_protocol = ppe_flow_info->tuple.protocol;
 	flow_info.fse_metadata = ppe_flow_info->vp_num;
-	flow_info.flow_tuple_info.src_ip_31_0 =
-		ntohl(ppe_flow_info->tuple.src_ip[0]);
-	flow_info.flow_tuple_info.dest_ip_31_0 =
-		ntohl(ppe_flow_info->tuple.dest_ip[0]);
 
 	if (ppe_flow_info->flags & PPE_DRV_FSE_IPV4) {
 		flow_info.is_addr_ipv4 = 1;
-	} else if (ppe_flow_info->flags & PPE_DRV_FSE_IPV6)  {
-		flow_info.flow_tuple_info.src_ip_63_32 =
-			ntohl(ppe_flow_info->tuple.src_ip[1]);
-		flow_info.flow_tuple_info.src_ip_95_64 =
-			ntohl(ppe_flow_info->tuple.src_ip[2]);
-		flow_info.flow_tuple_info.src_ip_127_96 =
-			ntohl(ppe_flow_info->tuple.src_ip[3]);
-
+		flow_info.flow_tuple_info.src_ip_31_0 =
+			ntohl(ppe_flow_info->tuple.src_ip[0]);
 		flow_info.flow_tuple_info.dest_ip_31_0 =
 			ntohl(ppe_flow_info->tuple.dest_ip[0]);
+	} else if (ppe_flow_info->flags & PPE_DRV_FSE_IPV6) {
+		flow_info.flow_tuple_info.src_ip_31_0 =
+					ntohl(ppe_flow_info->tuple.src_ip[3]);
+		flow_info.flow_tuple_info.src_ip_63_32 =
+					ntohl(ppe_flow_info->tuple.src_ip[2]);
+		flow_info.flow_tuple_info.src_ip_95_64 =
+					ntohl(ppe_flow_info->tuple.src_ip[1]);
+		flow_info.flow_tuple_info.src_ip_127_96 =
+					ntohl(ppe_flow_info->tuple.src_ip[0]);
+
+		flow_info.flow_tuple_info.dest_ip_31_0 =
+					ntohl(ppe_flow_info->tuple.dest_ip[3]);
 		flow_info.flow_tuple_info.dest_ip_63_32 =
-			ntohl(ppe_flow_info->tuple.dest_ip[1]);
+					ntohl(ppe_flow_info->tuple.dest_ip[2]);
 		flow_info.flow_tuple_info.dest_ip_95_64 =
-			ntohl(ppe_flow_info->tuple.dest_ip[2]);
+					ntohl(ppe_flow_info->tuple.dest_ip[1]);
 		flow_info.flow_tuple_info.dest_ip_127_96 =
-			ntohl(ppe_flow_info->tuple.dest_ip[3]);
+					ntohl(ppe_flow_info->tuple.dest_ip[0]);
 	}
 
 	if (ppe_flow_info->flags & PPE_DRV_FSE_DS)
@@ -882,29 +884,31 @@ dp_rx_ppe_del_flow_entry(struct ppe_drv_fse_rule_info *ppe_flow_info)
 	flow_info.flow_tuple_info.dest_port = ppe_flow_info->tuple.dest_port;
 	flow_info.flow_tuple_info.l4_protocol = ppe_flow_info->tuple.protocol;
 	flow_info.fse_metadata = ppe_flow_info->vp_num;
-	flow_info.flow_tuple_info.src_ip_31_0 =
-		ntohl(ppe_flow_info->tuple.src_ip[0]);
-	flow_info.flow_tuple_info.dest_ip_31_0 =
-		ntohl(ppe_flow_info->tuple.dest_ip[0]);
 
 	if (ppe_flow_info->flags & PPE_DRV_FSE_IPV4) {
 		flow_info.is_addr_ipv4 = 1;
-	} else if (ppe_flow_info->flags & PPE_DRV_FSE_IPV6) {
-		flow_info.flow_tuple_info.src_ip_63_32 =
-			ntohl(ppe_flow_info->tuple.src_ip[1]);
-		flow_info.flow_tuple_info.src_ip_95_64 =
-			ntohl(ppe_flow_info->tuple.src_ip[2]);
-		flow_info.flow_tuple_info.src_ip_127_96 =
-			ntohl(ppe_flow_info->tuple.src_ip[3]);
-
+		flow_info.flow_tuple_info.src_ip_31_0 =
+			ntohl(ppe_flow_info->tuple.src_ip[0]);
 		flow_info.flow_tuple_info.dest_ip_31_0 =
 			ntohl(ppe_flow_info->tuple.dest_ip[0]);
+	} else if (ppe_flow_info->flags & PPE_DRV_FSE_IPV6) {
+		flow_info.flow_tuple_info.src_ip_31_0 =
+					ntohl(ppe_flow_info->tuple.src_ip[3]);
+		flow_info.flow_tuple_info.src_ip_63_32 =
+					ntohl(ppe_flow_info->tuple.src_ip[2]);
+		flow_info.flow_tuple_info.src_ip_95_64 =
+					ntohl(ppe_flow_info->tuple.src_ip[1]);
+		flow_info.flow_tuple_info.src_ip_127_96 =
+					ntohl(ppe_flow_info->tuple.src_ip[0]);
+
+		flow_info.flow_tuple_info.dest_ip_31_0 =
+					ntohl(ppe_flow_info->tuple.dest_ip[3]);
 		flow_info.flow_tuple_info.dest_ip_63_32 =
-			ntohl(ppe_flow_info->tuple.dest_ip[1]);
+					ntohl(ppe_flow_info->tuple.dest_ip[2]);
 		flow_info.flow_tuple_info.dest_ip_95_64 =
-			ntohl(ppe_flow_info->tuple.dest_ip[2]);
+					ntohl(ppe_flow_info->tuple.dest_ip[1]);
 		flow_info.flow_tuple_info.dest_ip_127_96 =
-			ntohl(ppe_flow_info->tuple.dest_ip[3]);
+					ntohl(ppe_flow_info->tuple.dest_ip[0]);
 	}
 
 	if (ppe_flow_info->flags & PPE_DRV_FSE_DS)
