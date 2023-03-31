@@ -5113,6 +5113,18 @@ struct ppdu_info *dp_get_ppdu_desc(struct dp_pdev *pdev, uint32_t ppdu_id,
 	return ppdu_info;
 }
 
+#define DP_HTT_PPDU_ID_MASK 0x00FFFFFF
+/**
+ * dp_htt_mask_ppdu_id() - Function to mask ppdu_id
+ * @ppdu_id: PPDU ID
+ *
+ * Return: Masked ppdu_id
+ */
+static inline uint32_t dp_htt_mask_ppdu_id(uint32_t ppdu_id)
+{
+	return (ppdu_id & DP_HTT_PPDU_ID_MASK);
+}
+
 /**
  * dp_htt_process_tlv() - Function to process each PPDU TLVs
  * @pdev: DP pdev handle
@@ -5140,6 +5152,7 @@ static struct ppdu_info *dp_htt_process_tlv(struct dp_pdev *pdev,
 
 	msg_word = msg_word + 1;
 	ppdu_id = HTT_T2H_PPDU_STATS_PPDU_ID_GET(*msg_word);
+	ppdu_id = dp_htt_mask_ppdu_id(ppdu_id);
 
 	msg_word = msg_word + 1;
 	tsf_l32 = (uint32_t)(*msg_word);
