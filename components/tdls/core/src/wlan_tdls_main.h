@@ -279,6 +279,8 @@ struct tdls_soc_priv_obj {
  * @curr_candidate: current candidate
  * @ct_peer_table: linear mac address table for counting the packets
  * @valid_mac_entries: number of valid mac entry in @ct_peer_mac_table
+ * @rx_mgmt: the pointer of rx mgmt info
+ * @link_score: select tdls vdev per the score
  * @magic: magic
  * @session_id: vdev ID
  * @tx_queue: tx frame queue
@@ -296,6 +298,8 @@ struct tdls_vdev_priv_obj {
 	struct tdls_conn_tracker_mac_table
 			ct_peer_table[WLAN_TDLS_CT_TABLE_SIZE];
 	uint8_t valid_mac_entries;
+	struct tdls_rx_mgmt_frame *rx_mgmt;
+	uint32_t link_score;
 	uint32_t magic;
 	uint8_t session_id;
 	qdf_list_t tx_queue;
