@@ -3658,7 +3658,8 @@ static qdf_freq_t sap_get_safe_channel_freq(struct sap_context *sap_ctx)
 	freq = wlan_pre_cac_get_freq_before_pre_cac(sap_ctx->vdev);
 	if (!freq)
 		freq = wlansap_get_safe_channel_from_pcl_and_acs_range(
-								sap_ctx);
+								sap_ctx,
+								NULL);
 
 	sap_debug("new selected freq %d as target chan as current freq unsafe %d",
 		  freq, sap_ctx->chan_freq);
