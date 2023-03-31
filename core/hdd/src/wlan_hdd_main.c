@@ -492,12 +492,14 @@ QDF_STATUS hdd_common_roam_callback(struct wlan_objmgr_psoc *psoc,
 {
 	struct hdd_context *hdd_ctx;
 	struct hdd_adapter *adapter;
+	struct wlan_hdd_link_info *link_info;
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
 
-	adapter = wlan_hdd_get_adapter_from_vdev(psoc, session_id);
-	if (!adapter)
+	link_info = wlan_hdd_get_link_info_from_vdev(psoc, session_id);
+	if (!link_info)
 		return QDF_STATUS_E_INVAL;
 
+	adapter = link_info->adapter;
 	hdd_ctx = WLAN_HDD_GET_CTX(adapter);
 	if (!hdd_ctx)
 		return QDF_STATUS_E_INVAL;
@@ -512,8 +514,10 @@ QDF_STATUS hdd_common_roam_callback(struct wlan_objmgr_psoc *psoc,
 		break;
 	case QDF_SAP_MODE:
 	case QDF_P2P_GO_MODE:
-		status = wlansap_roam_callback(adapter->deflink->session.ap.sap_context,
-					       roam_info, roam_status, roam_result);
+		status =
+			wlansap_roam_callback(link_info->session.ap.sap_context,
+					      roam_info, roam_status,
+					      roam_result);
 		break;
 	default:
 		hdd_err("Wrong device mode");
@@ -1549,17 +1553,19 @@ static int hdd_update_tdls_config(struct hdd_context *hdd_ctx)
 void hdd_indicate_active_ndp_cnt(struct wlan_objmgr_psoc *psoc,
 				 uint8_t vdev_id, uint8_t cnt)
 {
-	struct hdd_adapter *adapter = NULL;
+	struct wlan_hdd_link_info *link_info;
 
-	adapter = wlan_hdd_get_adapter_from_vdev(psoc, vdev_id);
-	if (adapter && cfg_nan_is_roam_config_disabled(psoc)) {
-		hdd_debug("vdev_id:%d%s active ndp sessions present", vdev_id,
-			  cnt ? "" : " no more");
-		if (!cnt)
-			wlan_hdd_enable_roaming(adapter, RSO_NDP_CON_ON_NDI);
-		else
-			wlan_hdd_disable_roaming(adapter, RSO_NDP_CON_ON_NDI);
-	}
+	link_info = wlan_hdd_get_link_info_from_vdev(psoc, vdev_id);
+	if (!link_info || !cfg_nan_is_roam_config_disabled(psoc))
+		return;
+
+	hdd_debug("vdev_id:%d%s active ndp sessions present", vdev_id,
+		  cnt ? "" : " no more");
+	if (!cnt)
+		wlan_hdd_enable_roaming(link_info->adapter, RSO_NDP_CON_ON_NDI);
+	else
+		wlan_hdd_disable_roaming(link_info->adapter,
+					 RSO_NDP_CON_ON_NDI);
 }
 
 #ifdef WLAN_FEATURE_ROAM_OFFLOAD
@@ -20079,8 +20085,8 @@ int wlan_hdd_send_mcc_latency(struct hdd_adapter *adapter, int set_value)
 	return 0;
 }
 
-struct hdd_adapter *
-wlan_hdd_get_adapter_from_vdev(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id)
+struct wlan_hdd_link_info *
+wlan_hdd_get_link_info_from_vdev(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id)
 {
 	struct hdd_context *hdd_ctx = cds_get_context(QDF_MODULE_ID_HDD);
 	struct wlan_hdd_link_info *link_info;
@@ -20097,7 +20103,7 @@ wlan_hdd_get_adapter_from_vdev(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id)
 		return NULL;
 	}
 
-	return link_info->adapter;
+	return link_info;
 }
 
 int hdd_get_rssi_snr_by_bssid(struct hdd_adapter *adapter, const uint8_t *bssid,

@@ -1914,14 +1914,16 @@ hdd_twt_add_dialog_comp_cb(struct wlan_objmgr_psoc *psoc,
 			   bool renego_fail)
 {
 	struct hdd_adapter *adapter;
+	struct wlan_hdd_link_info *link_info;
 	uint8_t vdev_id = add_dialog_event->params.vdev_id;
 
-	adapter = wlan_hdd_get_adapter_from_vdev(psoc, vdev_id);
-	if (!adapter) {
-		hdd_err("adapter is NULL");
+	link_info = wlan_hdd_get_link_info_from_vdev(psoc, vdev_id);
+	if (!link_info) {
+		hdd_err("Invalid vdev");
 		return;
 	}
 
+	adapter = link_info->adapter;
 	hdd_debug("TWT: add dialog_id:%d, status:%d vdev_id:%d renego_fail:%d peer mac_addr "
 		  QDF_MAC_ADDR_FMT, add_dialog_event->params.dialog_id,
 		  add_dialog_event->params.status, vdev_id, renego_fail,
@@ -2334,8 +2336,7 @@ static void
 hdd_twt_del_dialog_comp_cb(struct wlan_objmgr_psoc *psoc,
 			   struct wmi_twt_del_dialog_complete_event_param *params)
 {
-	struct hdd_adapter *adapter =
-		wlan_hdd_get_adapter_from_vdev(psoc, params->vdev_id);
+	struct wlan_hdd_link_info *link_info;
 	struct wireless_dev *wdev;
 	struct hdd_context *hdd_ctx;
 	struct sk_buff *twt_vendor_event;
@@ -2344,16 +2345,17 @@ hdd_twt_del_dialog_comp_cb(struct wlan_objmgr_psoc *psoc,
 
 	hdd_enter();
 
-	if (!adapter) {
-		hdd_err("adapter is NULL");
+	link_info = wlan_hdd_get_link_info_from_vdev(psoc, params->vdev_id);
+	if (!link_info) {
+		hdd_err("Invalid vdev");
 		return;
 	}
 
-	hdd_ctx = WLAN_HDD_GET_CTX(adapter);
+	hdd_ctx = WLAN_HDD_GET_CTX(link_info->adapter);
 	if (!hdd_ctx || cds_is_load_or_unload_in_progress())
 		return;
 
-	wdev = adapter->dev->ieee80211_ptr;
+	wdev = &link_info->adapter->wdev;
 
 	data_len = hdd_get_twt_event_len() + nla_total_size(sizeof(u8));
 	data_len += NLA_HDRLEN;
@@ -2798,8 +2800,7 @@ static void hdd_twt_nudge_dialog_comp_cb(
 		struct wmi_twt_nudge_dialog_complete_event_param *params)
 {
 
-	struct hdd_adapter *adapter =
-		wlan_hdd_get_adapter_from_vdev(psoc, params->vdev_id);
+	struct wlan_hdd_link_info *link_info;
 	struct wireless_dev *wdev;
 	struct hdd_context *hdd_ctx;
 	struct sk_buff *twt_vendor_event;
@@ -2807,12 +2808,14 @@ static void hdd_twt_nudge_dialog_comp_cb(
 	QDF_STATUS status;
 
 	hdd_enter();
-	if (hdd_validate_adapter(adapter))
+
+	link_info = wlan_hdd_get_link_info_from_vdev(psoc, params->vdev_id);
+	if (!link_info || hdd_validate_adapter(link_info->adapter))
 		return;
 
-	hdd_ctx = WLAN_HDD_GET_CTX(adapter);
+	hdd_ctx = WLAN_HDD_GET_CTX(link_info->adapter);
 
-	wdev = adapter->dev->ieee80211_ptr;
+	wdev = &link_info->adapter->wdev;
 
 	hdd_debug("Nudge dialog_id:%d, status:%d vdev_id %d peer mac_addr "
 		  QDF_MAC_ADDR_FMT, params->dialog_id,
@@ -2911,8 +2914,7 @@ hdd_twt_pause_dialog_comp_cb(
 		struct wlan_objmgr_psoc *psoc,
 		struct wmi_twt_pause_dialog_complete_event_param *params)
 {
-	struct hdd_adapter *adapter =
-		wlan_hdd_get_adapter_from_vdev(psoc, params->vdev_id);
+	struct wlan_hdd_link_info *link_info;
 	struct wireless_dev *wdev;
 	struct hdd_context *hdd_ctx;
 	struct sk_buff *twt_vendor_event;
@@ -2921,17 +2923,18 @@ hdd_twt_pause_dialog_comp_cb(
 
 	hdd_enter();
 
-	if (!adapter) {
-		hdd_err("adapter is NULL");
+	link_info = wlan_hdd_get_link_info_from_vdev(psoc, params->vdev_id);
+	if (!link_info) {
+		hdd_err("Invalid vdev");
 		return;
 	}
 
-	hdd_ctx = WLAN_HDD_GET_CTX(adapter);
+	hdd_ctx = WLAN_HDD_GET_CTX(link_info->adapter);
 	status = wlan_hdd_validate_context(hdd_ctx);
 	if (QDF_IS_STATUS_ERROR(status))
 		return;
 
-	wdev = adapter->dev->ieee80211_ptr;
+	wdev = &link_info->adapter->wdev;
 
 	hdd_debug("pause dialog_id:%d, status:%d vdev_id %d peer mac_addr "
 		  QDF_MAC_ADDR_FMT, params->dialog_id,
@@ -3373,8 +3376,7 @@ static void hdd_twt_resume_dialog_comp_cb(
 		struct wlan_objmgr_psoc *psoc,
 		struct wmi_twt_resume_dialog_complete_event_param *params)
 {
-	struct hdd_adapter *adapter =
-		wlan_hdd_get_adapter_from_vdev(psoc, params->vdev_id);
+	struct wlan_hdd_link_info *link_info;
 	struct hdd_context *hdd_ctx;
 	struct wireless_dev *wdev;
 	struct sk_buff *twt_vendor_event;
@@ -3383,17 +3385,18 @@ static void hdd_twt_resume_dialog_comp_cb(
 
 	hdd_enter();
 
-	if (!adapter) {
-		hdd_err("adapter is NULL");
+	link_info = wlan_hdd_get_link_info_from_vdev(psoc, params->vdev_id);
+	if (!link_info) {
+		hdd_err("Invalid vdev");
 		return;
 	}
 
-	hdd_ctx = WLAN_HDD_GET_CTX(adapter);
+	hdd_ctx = WLAN_HDD_GET_CTX(link_info->adapter);
 	status = wlan_hdd_validate_context(hdd_ctx);
 	if (QDF_IS_STATUS_ERROR(status))
 		return;
 
-	wdev = adapter->dev->ieee80211_ptr;
+	wdev = &link_info->adapter->wdev;
 
 	hdd_debug("TWT: resume dialog_id:%d status:%d vdev_id %d peer mac_addr "
 		  QDF_MAC_ADDR_FMT, params->dialog_id,
@@ -4156,8 +4159,7 @@ static void
 hdd_twt_notify_cb(struct wlan_objmgr_psoc *psoc,
 		  struct wmi_twt_notify_event_param *params)
 {
-	struct hdd_adapter *adapter =
-		wlan_hdd_get_adapter_from_vdev(psoc, params->vdev_id);
+	struct wlan_hdd_link_info *link_info;
 	struct wireless_dev *wdev;
 	struct sk_buff *twt_vendor_event;
 	size_t data_len;
@@ -4165,16 +4167,17 @@ hdd_twt_notify_cb(struct wlan_objmgr_psoc *psoc,
 
 	hdd_enter();
 
-	if (hdd_validate_adapter(adapter))
+	link_info = wlan_hdd_get_link_info_from_vdev(psoc, params->vdev_id);
+	if (!link_info || hdd_validate_adapter(link_info->adapter))
 		return;
 
-	wdev = adapter->dev->ieee80211_ptr;
+	wdev = &link_info->adapter->wdev;
 
 	data_len = NLA_HDRLEN;
 	data_len += nla_total_size(sizeof(u8));
 
 	twt_vendor_event = wlan_cfg80211_vendor_event_alloc(
-				adapter->wdev.wiphy, wdev,
+				wdev->wiphy, wdev,
 				data_len,
 				QCA_NL80211_VENDOR_SUBCMD_CONFIG_TWT_INDEX,
 				GFP_KERNEL);

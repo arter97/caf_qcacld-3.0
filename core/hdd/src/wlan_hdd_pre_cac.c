@@ -515,16 +515,18 @@ wlan_hdd_pre_cac_conditional_freq_switch_ind(struct wlan_objmgr_vdev *vdev,
 	struct wlan_objmgr_psoc *psoc = wlan_vdev_get_psoc(vdev);
 	uint8_t vdev_id = vdev->vdev_objmgr.vdev_id;
 	struct hdd_adapter *adapter;
+	struct wlan_hdd_link_info *link_info;
 	struct hdd_ap_ctx *ap_ctx;
 
-	adapter = wlan_hdd_get_adapter_from_vdev(psoc, vdev_id);
-	if (!adapter) {
-		hdd_err("Invalid adapter");
+	link_info = wlan_hdd_get_link_info_from_vdev(psoc, vdev_id);
+	if (!link_info) {
+		hdd_err("Invalid vdev");
 		return;
 	}
 
+	adapter = link_info->adapter;
 	if (completed) {
-		ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(adapter->deflink);
+		ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(link_info);
 		ap_ctx->dfs_cac_block_tx = false;
 		ucfg_ipa_set_dfs_cac_tx(adapter->hdd_ctx->pdev,
 					ap_ctx->dfs_cac_block_tx);
@@ -543,18 +545,18 @@ wlan_hdd_pre_cac_complete(struct wlan_objmgr_psoc *psoc,
 			  uint8_t vdev_id,
 			  QDF_STATUS status)
 {
-	struct hdd_adapter *adapter;
+	struct wlan_hdd_link_info *link_info;
 
-	adapter = wlan_hdd_get_adapter_from_vdev(psoc, vdev_id);
-	if (!adapter) {
-		hdd_err("Invalid adapter vdev %d", vdev_id);
+	link_info = wlan_hdd_get_link_info_from_vdev(psoc, vdev_id);
+	if (!link_info) {
+		hdd_err("Invalid vdev %d", vdev_id);
 		return;
 	}
 
 	if (QDF_IS_STATUS_SUCCESS(status))
-		wlan_hdd_pre_cac_success(adapter);
+		wlan_hdd_pre_cac_success(link_info->adapter);
 	else
-		wlan_hdd_pre_cac_failure(adapter);
+		wlan_hdd_pre_cac_failure(link_info->adapter);
 }
 
 struct osif_pre_cac_legacy_ops pre_cac_legacy_ops = {

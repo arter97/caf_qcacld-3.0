@@ -653,7 +653,7 @@ hdd_check_and_set_tdls_conn_params(struct wlan_objmgr_vdev *vdev)
 {
 	uint8_t vdev_id;
 	enum hdd_dot11_mode selfdot11mode;
-	struct hdd_adapter *adapter;
+	struct wlan_hdd_link_info *link_info;
 	struct wlan_objmgr_psoc *psoc;
 	struct hdd_context *hdd_ctx;
 
@@ -661,18 +661,15 @@ hdd_check_and_set_tdls_conn_params(struct wlan_objmgr_vdev *vdev)
 	if (!psoc)
 		return;
 
-	vdev_id = wlan_vdev_get_id(vdev);
-	adapter = wlan_hdd_get_adapter_from_vdev(psoc, vdev_id);
-	if (!adapter)
-		return;
-
 	/*
 	 * Only need to set this if STA link is in legacy mode
 	 */
-	if (!hdd_is_sta_legacy(adapter->deflink))
+	vdev_id = wlan_vdev_get_id(vdev);
+	link_info = wlan_hdd_get_link_info_from_vdev(psoc, vdev_id);
+	if (!link_info || !hdd_is_sta_legacy(link_info))
 		return;
 
-	hdd_ctx = WLAN_HDD_GET_CTX(adapter);
+	hdd_ctx = WLAN_HDD_GET_CTX(link_info->adapter);
 	if (!hdd_ctx)
 		return;
 
@@ -692,32 +689,29 @@ hdd_check_and_set_tdls_conn_params(struct wlan_objmgr_vdev *vdev)
 	    selfdot11mode == eHDD_DOT11_MODE_11ac ||
 	    selfdot11mode == eHDD_DOT11_MODE_11n ||
 	    selfdot11mode == eHDD_DOT11_MODE_11n_ONLY)
-		hdd_cm_netif_queue_enable(adapter);
+		hdd_cm_netif_queue_enable(link_info->adapter);
 }
 
 void
 hdd_check_and_set_tdls_disconn_params(struct wlan_objmgr_vdev *vdev)
 {
-	struct hdd_adapter *adapter;
 	uint8_t vdev_id;
 	struct wlan_objmgr_psoc *psoc;
+	struct wlan_hdd_link_info *link_info;
 
 	psoc = wlan_vdev_get_psoc(vdev);
 	if (!psoc)
 		return;
 
-	vdev_id = wlan_vdev_get_id(vdev);
-	adapter = wlan_hdd_get_adapter_from_vdev(psoc, vdev_id);
-	if (!adapter)
-		return;
-
 	/*
 	 * Only need to set this if STA link is in legacy mode
 	 */
-	if (!hdd_is_sta_legacy(adapter->deflink))
+	vdev_id = wlan_vdev_get_id(vdev);
+	link_info = wlan_hdd_get_link_info_from_vdev(psoc, vdev_id);
+	if (!link_info || !hdd_is_sta_legacy(link_info))
 		return;
 
-	hdd_cm_netif_queue_enable(adapter);
+	hdd_cm_netif_queue_enable(link_info->adapter);
 }
 
 /**

@@ -3677,38 +3677,36 @@ QDF_STATUS hdd_sap_restart_chan_switch_cb(struct wlan_objmgr_psoc *psoc,
 					  uint8_t vdev_id, uint32_t ch_freq,
 					  uint32_t channel_bw, bool forced)
 {
-	struct hdd_adapter *ap_adapter =
-		wlan_hdd_get_adapter_from_vdev(psoc, vdev_id);
+	struct wlan_hdd_link_info *link_info;
 
-	if (!ap_adapter) {
-		hdd_err("Adapter is NULL");
+	link_info = wlan_hdd_get_link_info_from_vdev(psoc, vdev_id);
+	if (!link_info) {
+		hdd_err("Invalid vdev");
 		return QDF_STATUS_E_INVAL;
 	}
 
-	return hdd_sap_restart_with_channel_switch(psoc,
-						   ap_adapter,
-						   ch_freq,
-						   channel_bw, forced);
+	return hdd_sap_restart_with_channel_switch(psoc, link_info->adapter,
+						   ch_freq, channel_bw, forced);
 }
 
 QDF_STATUS wlan_hdd_check_cc_intf_cb(struct wlan_objmgr_psoc *psoc,
 				     uint8_t vdev_id, uint32_t *ch_freq)
 {
-	struct hdd_adapter *ap_adapter;
+	struct wlan_hdd_link_info *link_info;
 	struct sap_context *sap_context;
 
-	ap_adapter = wlan_hdd_get_adapter_from_vdev(psoc, vdev_id);
-	if (!ap_adapter) {
-		hdd_err("ap_adapter is NULL");
+	link_info = wlan_hdd_get_link_info_from_vdev(psoc, vdev_id);
+	if (!link_info) {
+		hdd_err("Invalid vdev");
 		return QDF_STATUS_E_FAILURE;
 	}
 
-	if (!test_bit(SOFTAP_BSS_STARTED, &ap_adapter->event_flags)) {
+	if (!test_bit(SOFTAP_BSS_STARTED, &link_info->adapter->event_flags)) {
 		hdd_err("SOFTAP_BSS_STARTED not set");
 		return QDF_STATUS_E_FAILURE;
 	}
 
-	sap_context = WLAN_HDD_GET_SAP_CTX_PTR(ap_adapter->deflink);
+	sap_context = WLAN_HDD_GET_SAP_CTX_PTR(link_info);
 	if (!sap_context) {
 		hdd_err("sap_context is null");
 		return QDF_STATUS_E_FAILURE;
@@ -3728,31 +3726,33 @@ QDF_STATUS wlan_hdd_check_cc_intf_cb(struct wlan_objmgr_psoc *psoc,
 void wlan_hdd_set_sap_csa_reason(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 				 uint8_t reason)
 {
+	struct wlan_hdd_link_info *link_info;
 	struct sap_context *sap_ctx;
-	struct hdd_adapter *ap_adapter = wlan_hdd_get_adapter_from_vdev(
-				psoc, vdev_id);
-	if (!ap_adapter) {
-		hdd_err("ap adapter is NULL");
+
+	link_info = wlan_hdd_get_link_info_from_vdev(psoc, vdev_id);
+	if (!link_info) {
+		hdd_err("Invalid vdev");
 		return;
 	}
-	sap_ctx = WLAN_HDD_GET_SAP_CTX_PTR(ap_adapter->deflink);
+
+	sap_ctx = WLAN_HDD_GET_SAP_CTX_PTR(link_info);
 	if (sap_ctx)
 		sap_ctx->csa_reason = reason;
 	hdd_nofl_debug("set csa reason %d %s vdev %d",
 		       reason, sap_get_csa_reason_str(reason), vdev_id);
 }
 
-QDF_STATUS wlan_hdd_get_channel_for_sap_restart(
-				struct wlan_objmgr_psoc *psoc,
-				uint8_t vdev_id, uint32_t *ch_freq)
+QDF_STATUS wlan_hdd_get_channel_for_sap_restart(struct wlan_objmgr_psoc *psoc,
+						uint8_t vdev_id,
+						uint32_t *ch_freq)
 {
 	mac_handle_t mac_handle;
 	struct hdd_ap_ctx *hdd_ap_ctx;
 	struct hdd_context *hdd_ctx;
 	uint8_t mcc_to_scc_switch = 0;
 	struct ch_params ch_params = {0};
-	struct hdd_adapter *ap_adapter = wlan_hdd_get_adapter_from_vdev(
-					psoc, vdev_id);
+	struct hdd_adapter *ap_adapter;
+	struct wlan_hdd_link_info *link_info;
 	uint32_t sap_ch_freq, intf_ch_freq, temp_ch_freq;
 	struct sap_context *sap_context;
 	enum sap_csa_reason_code csa_reason =
@@ -3760,19 +3760,21 @@ QDF_STATUS wlan_hdd_get_channel_for_sap_restart(
 	QDF_STATUS status;
 	bool use_sap_original_bw = false;
 
-	if (!ap_adapter) {
-		hdd_err("ap_adapter is NULL");
+	if (!ch_freq) {
+		hdd_err("Null parameters");
 		return QDF_STATUS_E_FAILURE;
 	}
 
+	link_info = wlan_hdd_get_link_info_from_vdev(psoc, vdev_id);
+	if (!link_info) {
+		hdd_err("Invalid vdev");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	ap_adapter = link_info->adapter;
 	hdd_ctx = WLAN_HDD_GET_CTX(ap_adapter);
 	if (!hdd_ctx) {
 		hdd_err("hdd_ctx is NULL");
-		return QDF_STATUS_E_FAILURE;
-	}
-
-	if (!ch_freq) {
-		hdd_err("Null parameters");
 		return QDF_STATUS_E_FAILURE;
 	}
 
@@ -3781,7 +3783,7 @@ QDF_STATUS wlan_hdd_get_channel_for_sap_restart(
 		return QDF_STATUS_E_FAILURE;
 	}
 
-	hdd_ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(ap_adapter->deflink);
+	hdd_ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(link_info);
 	mac_handle = hdd_ctx->mac_handle;
 	if (!mac_handle) {
 		hdd_err("mac_handle is NULL");
@@ -3815,7 +3817,7 @@ QDF_STATUS wlan_hdd_get_channel_for_sap_restart(
 	 */
 	if (policy_mgr_is_sap_restart_required_after_sta_disconnect(
 	    psoc, vdev_id, &intf_ch_freq,
-	    !!ap_adapter->deflink->session.ap.sap_config.acs_cfg.acs_mode)) {
+	    !!link_info->session.ap.sap_config.acs_cfg.acs_mode)) {
 		hdd_debug("Move the sap (vdev %d) to user configured channel %u",
 			  vdev_id, intf_ch_freq);
 		goto sap_restart;
@@ -3921,26 +3923,24 @@ QDF_STATUS
 wlan_get_sap_acs_band(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 		      uint32_t *acs_band)
 {
-	struct hdd_adapter *ap_adapter = wlan_hdd_get_adapter_from_vdev(psoc,
-								vdev_id);
+	struct wlan_hdd_link_info *link_info;
 	struct sap_config *sap_config;
 
-	if (!ap_adapter || (ap_adapter->device_mode != QDF_SAP_MODE &&
-			    ap_adapter->device_mode != QDF_P2P_GO_MODE)) {
-		hdd_err("invalid adapter");
+	link_info = wlan_hdd_get_link_info_from_vdev(psoc, vdev_id);
+	if (!link_info || (link_info->adapter->device_mode != QDF_P2P_GO_MODE &&
+			   link_info->adapter->device_mode != QDF_SAP_MODE)) {
+		hdd_err("Invalid vdev or device mode");
 		return QDF_STATUS_E_FAILURE;
 	}
 	/*
 	 * If acs mode is false, that means acs is disabled and acs band can be
 	 * QCA_ACS_MODE_IEEE80211ANY
 	 */
-	sap_config = &ap_adapter->deflink->session.ap.sap_config;
-	if (sap_config->acs_cfg.acs_mode == false) {
+	sap_config = &link_info->session.ap.sap_config;
+	if (!sap_config->acs_cfg.acs_mode)
 		*acs_band = QCA_ACS_MODE_IEEE80211ANY;
-		return QDF_STATUS_SUCCESS;
-	}
-
-	*acs_band = sap_config->acs_cfg.band;
+	else
+		*acs_band = sap_config->acs_cfg.band;
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -3953,15 +3953,15 @@ wlan_get_ap_prefer_conc_ch_params(
 {
 	struct hdd_ap_ctx *hdd_ap_ctx;
 	struct sap_context *sap_context;
-	struct hdd_adapter *ap_adapter = wlan_hdd_get_adapter_from_vdev(
-					psoc, vdev_id);
+	struct wlan_hdd_link_info *link_info;
 
-	if (!ap_adapter || (ap_adapter->device_mode != QDF_SAP_MODE &&
-			    ap_adapter->device_mode != QDF_P2P_GO_MODE)) {
-		hdd_err("invalid adapter");
+	link_info = wlan_hdd_get_link_info_from_vdev(psoc, vdev_id);
+	if (!link_info || (link_info->adapter->device_mode != QDF_P2P_GO_MODE &&
+			   link_info->adapter->device_mode != QDF_SAP_MODE)) {
+		hdd_err("Invalid vdev or device mode");
 		return QDF_STATUS_E_FAILURE;
 	}
-	hdd_ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(ap_adapter->deflink);
+	hdd_ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(link_info);
 	sap_context = hdd_ap_ctx->sap_context;
 	if (!sap_context) {
 		hdd_err("sap_context is null");
@@ -3986,6 +3986,7 @@ uint32_t hdd_get_ap_6ghz_capable(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id)
 	struct wlan_objmgr_vdev *vdev;
 	int32_t keymgmt;
 	struct hdd_adapter *ap_adapter;
+	struct wlan_hdd_link_info *link_info;
 	struct hdd_ap_ctx *ap_ctx;
 	struct sap_context *sap_context;
 	struct sap_config *sap_config;
@@ -4003,14 +4004,14 @@ uint32_t hdd_get_ap_6ghz_capable(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id)
 		return 0;
 	}
 
-	ap_adapter = wlan_hdd_get_adapter_from_vdev(
-					psoc, vdev_id);
-	if (!ap_adapter) {
-		hdd_err("ap_adapter is NULL %d", vdev_id);
+	link_info = wlan_hdd_get_link_info_from_vdev(psoc, vdev_id);
+	if (!link_info) {
+		hdd_err("Invalid vdev %d", vdev_id);
 		wlan_objmgr_vdev_release_ref(vdev, WLAN_HDD_ID_OBJ_MGR);
 		return 0;
 	}
 
+	ap_adapter = link_info->adapter;
 	conn_mode = policy_mgr_convert_device_mode_to_qdf_type(
 			ap_adapter->device_mode);
 	if ((conn_mode != PM_SAP_MODE && conn_mode != PM_P2P_GO_MODE) ||
@@ -4020,7 +4021,7 @@ uint32_t hdd_get_ap_6ghz_capable(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id)
 		return 0;
 	}
 
-	ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(ap_adapter->deflink);
+	ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(link_info);
 	sap_config = &ap_ctx->sap_config;
 	sap_context = ap_ctx->sap_context;
 	if (QDF_IS_STATUS_ERROR(wlansap_context_get(sap_context))) {
@@ -4178,20 +4179,20 @@ void hdd_sap_destroy_ctx_all(struct hdd_context *hdd_ctx, bool is_ssr)
 static void
 hdd_indicate_peers_deleted(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id)
 {
-	struct hdd_adapter *adapter;
+	struct wlan_hdd_link_info *link_info;
 
 	if (!psoc) {
 		hdd_err("psoc obj is NULL");
 		return;
 	}
 
-	adapter = wlan_hdd_get_adapter_from_vdev(psoc, vdev_id);
-	if (hdd_validate_adapter(adapter)) {
-		hdd_err("invalid adapter");
+	link_info = wlan_hdd_get_link_info_from_vdev(psoc, vdev_id);
+	if (!link_info || hdd_validate_adapter(link_info->adapter)) {
+		hdd_err("invalid vdev or adapter");
 		return;
 	}
 
-	hdd_sap_indicate_disconnect_for_sta(adapter);
+	hdd_sap_indicate_disconnect_for_sta(link_info->adapter);
 }
 
 QDF_STATUS hdd_init_ap_mode(struct hdd_adapter *adapter, bool reinit)

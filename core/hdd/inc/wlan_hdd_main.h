@@ -4050,17 +4050,19 @@ int wlan_hdd_send_mcc_vdev_quota(struct hdd_adapter *adapter, int sval);
 int wlan_hdd_send_mcc_latency(struct hdd_adapter *adapter, int sval);
 
 /**
- * wlan_hdd_get_adapter_from_vdev()- Get adapter from vdev id
+ * wlan_hdd_get_link_info_from_vdev()- Get link info from vdev id
  * and PSOC object data
  * @psoc: Psoc object data
  * @vdev_id: vdev id
  *
- * Get adapter from vdev id and PSOC object data
+ * Get link info from vdev id and PSOC object data
  *
- * Return: adapter pointer
+ * Return: link info pointer
  */
-struct hdd_adapter *wlan_hdd_get_adapter_from_vdev(struct wlan_objmgr_psoc
-					*psoc, uint8_t vdev_id);
+struct wlan_hdd_link_info *
+wlan_hdd_get_link_info_from_vdev(struct wlan_objmgr_psoc *psoc,
+				 uint8_t vdev_id);
+
 /**
  * hdd_unregister_notifiers()- unregister kernel notifiers
  * @hdd_ctx: Hdd Context
