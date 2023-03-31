@@ -662,6 +662,7 @@ void wlan_objmgr_mlo_update_primary_info(struct wlan_objmgr_peer *peer)
 	uint8_t i;
 
 	ml_peer = peer->mlo_peer_ctx;
+	ml_peer->primary_umac_psoc_id = wlan_peer_get_psoc_id(peer);
 
 	for (i = 0; i < MAX_MLO_LINK_PEERS; i++) {
 		peer_ent_iter = &ml_peer->peer_list[i];
