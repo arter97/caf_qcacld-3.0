@@ -2372,7 +2372,7 @@ static QDF_STATUS hdd_son_get_node_info_sta(struct wlan_objmgr_vdev *vdev,
 	if (wlan_hdd_validate_context(hdd_ctx))
 		return QDF_STATUS_E_FAILURE;
 
-	if (!hdd_cm_is_vdev_associated(adapter)) {
+	if (!hdd_cm_is_vdev_associated(adapter->deflink)) {
 		hdd_debug_rl("STA adapter not connected");
 		/* Still return success and framework will see default stats */
 		return QDF_STATUS_SUCCESS;

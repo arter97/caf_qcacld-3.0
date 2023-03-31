@@ -1662,7 +1662,7 @@ void wlan_hdd_set_tx_flow_info(void)
 		case QDF_P2P_CLIENT_MODE:
 			sta_ctx =
 				WLAN_HDD_GET_STATION_CTX_PTR(adapter->deflink);
-			if (hdd_cm_is_vdev_associated(adapter)) {
+			if (hdd_cm_is_vdev_associated(adapter->deflink)) {
 				chan_freq = sta_ctx->conn_info.chan_freq;
 				sta_chan = wlan_reg_freq_to_chan(hdd_ctx->pdev,
 								 chan_freq);

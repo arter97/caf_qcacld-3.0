@@ -227,7 +227,7 @@ static int hdd_set_reset_apf_offload(struct hdd_context *hdd_ctx,
 	int prog_len;
 	int ret = 0;
 
-	if (!hdd_cm_is_vdev_associated(adapter)) {
+	if (!hdd_cm_is_vdev_associated(adapter->deflink)) {
 		hdd_err("Not in Connected state!");
 		return -ENOTSUPP;
 	}

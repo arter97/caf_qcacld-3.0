@@ -95,7 +95,7 @@ static QDF_STATUS hdd_dcs_switch_chan_cb(struct wlan_objmgr_vdev *vdev,
 
 	switch (adapter->device_mode) {
 	case QDF_STA_MODE:
-		if (!hdd_cm_is_vdev_associated(adapter))
+		if (!hdd_cm_is_vdev_associated(adapter->deflink))
 			return QDF_STATUS_E_INVAL;
 
 		bssid = &adapter->deflink->session.station.conn_info.bssid;

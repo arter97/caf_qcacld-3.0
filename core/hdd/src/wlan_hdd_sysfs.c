@@ -423,7 +423,7 @@ static ssize_t __show_beacon_reception_stats(struct net_device *net_dev,
 		return -ENOTSUPP;
 	}
 
-	if (!hdd_cm_is_vdev_associated(adapter)) {
+	if (!hdd_cm_is_vdev_associated(adapter->deflink)) {
 		hdd_err("Adapter is not in connected state");
 		return -EINVAL;
 	}

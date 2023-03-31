@@ -282,7 +282,7 @@ static int hdd_handle_beacon_reporting_stop_op(struct hdd_context *hdd_ctx,
 		return errno;
 	}
 
-	if (hdd_cm_is_vdev_associated(adapter))
+	if (hdd_cm_is_vdev_associated(adapter->deflink))
 		/* Add beacon filter */
 		if (hdd_add_beacon_filter(adapter)) {
 			hdd_err("Beacon filter addition failed");
@@ -337,7 +337,7 @@ static int __wlan_hdd_cfg80211_bcn_rcv_op(struct wiphy *wiphy,
 		return -EINVAL;
 	}
 
-	if (!hdd_cm_is_vdev_associated(adapter)) {
+	if (!hdd_cm_is_vdev_associated(adapter->deflink)) {
 		hdd_err("STA not in connected state");
 		return -EINVAL;
 	}

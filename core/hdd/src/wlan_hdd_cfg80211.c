@@ -7161,7 +7161,7 @@ static bool wlan_hdd_check_dfs_channel_for_adapter(struct hdd_context *hdd_ctx,
 			 *  check if the channel has REGULATORY_CHAN_RADAR
 			 *  channel flag to identify if the channel is DFS
 			 */
-			if (hdd_cm_is_vdev_associated(adapter) &&
+			if (hdd_cm_is_vdev_associated(adapter->deflink) &&
 			    wlan_reg_is_dfs_for_freq(
 				    hdd_ctx->pdev,
 				    sta_ctx->conn_info.chan_freq)) {
@@ -13564,7 +13564,7 @@ wlan_hdd_add_tx_ptrn(struct hdd_adapter *adapter, struct hdd_context *hdd_ctx,
 	uint16_t eth_type = htons(ETH_P_IP);
 	mac_handle_t mac_handle;
 
-	if (!hdd_cm_is_vdev_associated(adapter)) {
+	if (!hdd_cm_is_vdev_associated(adapter->deflink)) {
 		hdd_err("Not in Connected state!");
 		return -ENOTSUPP;
 	}
@@ -14450,7 +14450,7 @@ static int __wlan_hdd_cfg80211_get_link_properties(struct wiphy *wiphy,
 	if (adapter->device_mode == QDF_STA_MODE ||
 	    adapter->device_mode == QDF_P2P_CLIENT_MODE) {
 		hdd_sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter->deflink);
-		if (!hdd_cm_is_vdev_associated(adapter) ||
+		if (!hdd_cm_is_vdev_associated(adapter->deflink) ||
 		    qdf_mem_cmp(hdd_sta_ctx->conn_info.bssid.bytes,
 			peer_mac, QDF_MAC_ADDR_SIZE)) {
 			hdd_err("Not Associated to mac "QDF_MAC_ADDR_FMT,
@@ -16657,7 +16657,7 @@ static int __wlan_hdd_cfg80211_set_fast_roaming(struct wiphy *wiphy,
 
 	ret = qdf_status_to_os_return(qdf_status);
 
-	if (hdd_cm_is_vdev_associated(adapter) &&
+	if (hdd_cm_is_vdev_associated(adapter->deflink) &&
 	    roaming_enabled &&
 	    QDF_IS_STATUS_SUCCESS(qdf_status) && !is_fast_roam_enabled) {
 		INIT_COMPLETION(adapter->lfr_fw_status.disable_lfr_event);
@@ -16939,7 +16939,7 @@ static int __wlan_hdd_cfg80211_set_nud_stats(struct wiphy *wiphy,
 		return -EINVAL;
 	}
 
-	if (!hdd_cm_is_vdev_associated(adapter)) {
+	if (!hdd_cm_is_vdev_associated(adapter->deflink)) {
 		hdd_debug("Not Associated");
 		return 0;
 	}
@@ -24247,7 +24247,7 @@ __wlan_hdd_cfg80211_update_ft_ies(struct wiphy *wiphy,
 		   adapter->deflink->vdev_id, 0);
 
 	/* Added for debug on reception of Re-assoc Req. */
-	if (!hdd_cm_is_vdev_associated(adapter)) {
+	if (!hdd_cm_is_vdev_associated(adapter->deflink)) {
 		hdd_err("Called with Ie of length = %zu when not associated",
 		       ftie->ie_len);
 		hdd_err("Should be Re-assoc Req IEs");
@@ -26357,7 +26357,7 @@ static int __wlan_hdd_cfg80211_get_channel(struct wiphy *wiphy,
 	    (adapter->device_mode == QDF_P2P_CLIENT_MODE)) {
 		struct hdd_station_ctx *sta_ctx;
 
-		if (!hdd_cm_is_vdev_associated(adapter))
+		if (!hdd_cm_is_vdev_associated(adapter->deflink))
 			return -EINVAL;
 
 		sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter->deflink);
@@ -26397,8 +26397,7 @@ static int __wlan_hdd_cfg80211_get_channel(struct wiphy *wiphy,
 	if (adapter->device_mode == QDF_STA_MODE) {
 		vdev_id = wlan_vdev_get_id(vdev);
 		link_info = hdd_get_link_info_by_vdev(hdd_ctx, vdev_id);
-		if (!link_info ||
-		    !hdd_cm_is_vdev_associated(link_info->adapter)) {
+		if (!link_info || !hdd_cm_is_vdev_associated(link_info)) {
 			wlan_key_put_link_vdev(vdev, WLAN_OSIF_ID);
 			return -EBUSY;
 		}

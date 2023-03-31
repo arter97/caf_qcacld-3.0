@@ -498,7 +498,7 @@ enum band_info hdd_conn_get_connected_band(struct hdd_adapter *adapter)
 	uint32_t sta_freq = 0;
 
 	sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter->deflink);
-	if (hdd_cm_is_vdev_associated(adapter))
+	if (hdd_cm_is_vdev_associated(adapter->deflink))
 		sta_freq = sta_ctx->conn_info.chan_freq;
 
 	if (wlan_reg_is_24ghz_ch_freq(sta_freq))
@@ -525,7 +525,7 @@ hdd_conn_get_connected_cipher_algo(struct hdd_adapter *adapter,
 {
 	bool connected = false;
 
-	connected = hdd_cm_is_vdev_associated(adapter);
+	connected = hdd_cm_is_vdev_associated(adapter->deflink);
 
 	if (pConnectedCipherAlgo)
 		*pConnectedCipherAlgo = sta_ctx->conn_info.uc_encrypt_type;
@@ -1653,7 +1653,7 @@ hdd_roam_mic_error_indication_handler(struct hdd_adapter *adapter,
 {
 	tSirMicFailureInfo *mic_failure_info;
 
-	if (!hdd_cm_is_vdev_associated(adapter))
+	if (!hdd_cm_is_vdev_associated(adapter->deflink))
 		return;
 
 	mic_failure_info = roam_info->u.pMICFailureInfo;

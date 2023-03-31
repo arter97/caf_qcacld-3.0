@@ -133,15 +133,14 @@ enum hdd_tsf_get_state hdd_tsf_check_conn_state(struct hdd_adapter *adapter)
 	enum hdd_tsf_get_state ret = TSF_RETURN;
 
 	if (adapter->device_mode == QDF_STA_MODE ||
-			adapter->device_mode == QDF_P2P_CLIENT_MODE) {
-		if (!hdd_cm_is_vdev_associated(adapter)) {
+	    adapter->device_mode == QDF_P2P_CLIENT_MODE) {
+		if (!hdd_cm_is_vdev_associated(adapter->deflink)) {
 			hdd_err("failed to cap tsf, not connect with ap");
 			ret = TSF_STA_NOT_CONNECTED_NO_TSF;
 		}
 	} else if ((adapter->device_mode == QDF_SAP_MODE ||
-				adapter->device_mode == QDF_P2P_GO_MODE) &&
-			!(test_bit(SOFTAP_BSS_STARTED,
-					&adapter->event_flags))) {
+		    adapter->device_mode == QDF_P2P_GO_MODE) &&
+		   !(test_bit(SOFTAP_BSS_STARTED, &adapter->event_flags))) {
 		hdd_err("Soft AP / P2p GO not beaconing");
 		ret = TSF_SAP_NOT_STARTED_NO_TSF;
 	}
@@ -1794,7 +1793,7 @@ static ssize_t __hdd_wlan_tsf_show(struct device *dev,
 				 "TSF sync is not initialized\n");
 
 	hdd_sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter->deflink);
-	if (!hdd_cm_is_vdev_associated(adapter) &&
+	if (!hdd_cm_is_vdev_associated(adapter->deflink) &&
 	    (adapter->device_mode == QDF_STA_MODE ||
 	    adapter->device_mode == QDF_P2P_CLIENT_MODE))
 		return scnprintf(buf, PAGE_SIZE, "NOT connected\n");
@@ -1958,7 +1957,7 @@ static ssize_t __hdd_wlan_tsf_show(struct device *dev,
 				 "TSF sync is not initialized\n");
 
 	hdd_sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter->deflink);
-	if (!hdd_cm_is_vdev_associated(adapter) &&
+	if (!hdd_cm_is_vdev_associated(adapter->deflink) &&
 	    (adapter->device_mode == QDF_STA_MODE ||
 	    adapter->device_mode == QDF_P2P_CLIENT_MODE))
 		return scnprintf(buf, PAGE_SIZE, "NOT connected\n");

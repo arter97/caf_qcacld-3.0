@@ -328,11 +328,11 @@ void hdd_cm_save_connect_status(struct hdd_adapter *adapter,
 
 /**
  * hdd_cm_is_vdev_associated() - Checks if vdev is associated or not
- * @adapter: pointer to the adapter structure
+ * @link_info: pointer to the link info structure
  *
  * Returns: True if vdev is associated else false
  */
-bool hdd_cm_is_vdev_associated(struct hdd_adapter *adapter);
+bool hdd_cm_is_vdev_associated(struct wlan_hdd_link_info *link_info);
 
 /**
  * hdd_cm_is_vdev_connected() - Checks if vdev is connected or not

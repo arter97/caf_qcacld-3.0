@@ -6367,7 +6367,7 @@ static int __iw_get_char_setnone(struct net_device *dev,
 		enable_snr_monitoring =
 				ucfg_scan_is_snr_monitor_enabled(hdd_ctx->psoc);
 		if (!enable_snr_monitoring ||
-		    !hdd_cm_is_vdev_associated(adapter)) {
+		    !hdd_cm_is_vdev_associated(adapter->deflink)) {
 			hdd_err("getSNR failed: Enable SNR Monitoring-%d",
 				enable_snr_monitoring);
 			return -ENONET;
@@ -7115,7 +7115,7 @@ static int __iw_add_tspec(struct net_device *dev, struct iw_request_info *info,
 		return -EPERM;
 
 	/* we must be associated in order to add a tspec */
-	if (!hdd_cm_is_vdev_associated(adapter)) {
+	if (!hdd_cm_is_vdev_associated(adapter->deflink)) {
 		*wmm_status = HDD_WLAN_WMM_STATUS_SETUP_FAILED_BAD_PARAM;
 		return 0;
 	}
@@ -7460,7 +7460,7 @@ static int __iw_set_fties(struct net_device *dev, struct iw_request_info *info,
 		return -EINVAL;
 	}
 	/* Added for debug on reception of Re-assoc Req. */
-	if (!hdd_cm_is_vdev_associated(adapter)) {
+	if (!hdd_cm_is_vdev_associated(adapter->deflink)) {
 		hdd_debug("Called with Ie of length = %d when not associated",
 		       wrqu->data.length);
 		hdd_debug("Should be Re-assoc Req IEs");
@@ -7564,7 +7564,7 @@ static int __iw_set_host_offload(struct net_device *dev,
 	if (0 != ret)
 		return ret;
 
-	if (!hdd_cm_is_vdev_associated(adapter)) {
+	if (!hdd_cm_is_vdev_associated(adapter->deflink)) {
 		hdd_err("dev is not in CONNECTED state, ignore!!!");
 		return -EINVAL;
 	}
@@ -7836,7 +7836,7 @@ static int __iw_set_packet_filter_params(struct net_device *dev,
 		return -ENOTSUPP;
 	}
 
-	if (!hdd_cm_is_vdev_associated(adapter)) {
+	if (!hdd_cm_is_vdev_associated(adapter->deflink)) {
 		hdd_err("Packet filter not supported in disconnected state");
 		return -ENOTSUPP;
 	}
@@ -7932,7 +7932,7 @@ static int __iw_get_statistics(struct net_device *dev,
 		return ret;
 
 	sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter->deflink);
-	if (!hdd_cm_is_vdev_associated(adapter)) {
+	if (!hdd_cm_is_vdev_associated(adapter->deflink)) {
 		wrqu->data.length = 0;
 		return 0;
 	}

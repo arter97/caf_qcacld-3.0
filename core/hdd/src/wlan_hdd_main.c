@@ -725,7 +725,7 @@ uint32_t hdd_get_adapter_home_channel(struct hdd_adapter *adapter)
 			adapter->deflink->session.ap.operating_chan_freq;
 	} else if ((adapter->device_mode == QDF_STA_MODE ||
 		    adapter->device_mode == QDF_P2P_CLIENT_MODE) &&
-		   hdd_cm_is_vdev_associated(adapter)) {
+		   hdd_cm_is_vdev_associated(adapter->deflink)) {
 		home_chan_freq =
 			adapter->deflink->session.station.conn_info.chan_freq;
 	}
@@ -750,7 +750,7 @@ enum phy_ch_width hdd_get_adapter_width(struct hdd_adapter *adapter)
 		width = adapter->deflink->session.ap.sap_config.ch_params.ch_width;
 	} else if ((adapter->device_mode == QDF_STA_MODE ||
 		    adapter->device_mode == QDF_P2P_CLIENT_MODE) &&
-		   hdd_cm_is_vdev_associated(adapter)) {
+		   hdd_cm_is_vdev_associated(adapter->deflink)) {
 		width = adapter->deflink->session.station.conn_info.ch_width;
 	}
 	return width;
@@ -5068,7 +5068,7 @@ static int __hdd_open(struct net_device *dev)
 	}
 
 	set_bit(DEVICE_IFACE_OPENED, &adapter->event_flags);
-	if (hdd_cm_is_vdev_associated(adapter)) {
+	if (hdd_cm_is_vdev_associated(adapter->deflink)) {
 		hdd_debug("Enabling Tx Queues");
 		/* Enable TX queues only when we are connected */
 		wlan_hdd_netif_queue_control(adapter,
@@ -6732,7 +6732,7 @@ bool hdd_is_vdev_in_conn_state(struct hdd_adapter *adapter)
 	case QDF_STA_MODE:
 	case QDF_P2P_CLIENT_MODE:
 	case QDF_P2P_DEVICE_MODE:
-		return hdd_cm_is_vdev_associated(adapter);
+		return hdd_cm_is_vdev_associated(adapter->deflink);
 	case QDF_SAP_MODE:
 	case QDF_P2P_GO_MODE:
 		return (test_bit(SOFTAP_BSS_STARTED,
@@ -10950,7 +10950,7 @@ bool wlan_hdd_sta_get_dot11mode(hdd_cb_handle context, uint8_t vdev_id,
 	if (!link_info)
 		return false;
 
-	if (!hdd_cm_is_vdev_associated(link_info->adapter))
+	if (!hdd_cm_is_vdev_associated(link_info))
 		return false;
 
 	sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(link_info);
@@ -11430,7 +11430,7 @@ __hdd_adapter_param_update_work(struct hdd_adapter *adapter)
 	 * the features that are to be updated.
 	 * So in case of interface disconnect skip feature update.
 	 */
-	if (!hdd_cm_is_vdev_associated(adapter))
+	if (!hdd_cm_is_vdev_associated(adapter->deflink))
 		return;
 
 	hdd_netdev_update_features(adapter);
@@ -16727,7 +16727,7 @@ wlan_hdd_disable_roaming(struct hdd_adapter *cur_adapter,
 		vdev_id = adapter->deflink->vdev_id;
 		if (cur_adapter->deflink->vdev_id != vdev_id &&
 		    adapter->device_mode == QDF_STA_MODE &&
-		    hdd_cm_is_vdev_associated(adapter)) {
+		    hdd_cm_is_vdev_associated(adapter->deflink)) {
 			hdd_debug("%d Disable roaming", vdev_id);
 			sme_stop_roaming(hdd_ctx->mac_handle, vdev_id,
 					 REASON_DRIVER_DISABLED,
@@ -16756,7 +16756,7 @@ wlan_hdd_enable_roaming(struct hdd_adapter *cur_adapter,
 		vdev_id = adapter->deflink->vdev_id;
 		if (cur_adapter->deflink->vdev_id != vdev_id &&
 		    adapter->device_mode == QDF_STA_MODE &&
-		    hdd_cm_is_vdev_associated(adapter)) {
+		    hdd_cm_is_vdev_associated(adapter->deflink)) {
 			hdd_debug("%d Enable roaming", vdev_id);
 			sme_start_roaming(hdd_ctx->mac_handle, vdev_id,
 					  REASON_DRIVER_ENABLED,
@@ -16887,6 +16887,8 @@ void wlan_hdd_auto_shutdown_enable(struct hdd_context *hdd_ctx, bool enable)
 	struct hdd_adapter *adapter, *next_adapter = NULL;
 	bool ap_connected = false, sta_connected = false;
 	mac_handle_t mac_handle;
+	struct wlan_hdd_link_info *link_info;
+	struct hdd_ap_ctx *ap_ctx;
 	wlan_net_dev_ref_dbgid dbgid = NET_DEV_HOLD_AUTO_SHUTDOWN_ENABLE;
 
 	mac_handle = hdd_ctx->mac_handle;
@@ -16910,8 +16912,9 @@ void wlan_hdd_auto_shutdown_enable(struct hdd_context *hdd_ctx, bool enable)
 	if (policy_mgr_concurrent_open_sessions_running(hdd_ctx->psoc)) {
 		hdd_for_each_adapter_dev_held_safe(hdd_ctx, adapter,
 						   next_adapter, dbgid) {
+			link_info = adapter->deflink;
 			if (adapter->device_mode == QDF_STA_MODE) {
-				if (hdd_cm_is_vdev_associated(adapter)) {
+				if (hdd_cm_is_vdev_associated(link_info)) {
 					sta_connected = true;
 					hdd_adapter_dev_put_debug(adapter,
 								  dbgid);
@@ -16924,8 +16927,8 @@ void wlan_hdd_auto_shutdown_enable(struct hdd_context *hdd_ctx, bool enable)
 			}
 
 			if (adapter->device_mode == QDF_SAP_MODE) {
-				if (WLAN_HDD_GET_AP_CTX_PTR(adapter->deflink)->
-				    ap_active == true) {
+				ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(link_info);
+				if (ap_ctx->ap_active == true) {
 					ap_connected = true;
 					hdd_adapter_dev_put_debug(adapter,
 								  dbgid);
@@ -17011,7 +17014,7 @@ bool hdd_is_any_adapter_connected(struct hdd_context *hdd_ctx)
 	hdd_for_each_adapter_dev_held_safe(hdd_ctx, adapter, next_adapter,
 					   dbgid) {
 		if (hdd_adapter_is_sta(adapter) &&
-		    hdd_cm_is_vdev_associated(adapter)) {
+		    hdd_cm_is_vdev_associated(adapter->deflink)) {
 			hdd_adapter_dev_put_debug(adapter, dbgid);
 			if (next_adapter)
 				hdd_adapter_dev_put_debug(next_adapter,
@@ -19781,7 +19784,7 @@ static QDF_STATUS hdd_is_connection_in_progress_iterator(
 		(QDF_P2P_DEVICE_MODE == adapter->device_mode)) {
 		hdd_sta_ctx =
 			WLAN_HDD_GET_STATION_CTX_PTR(adapter->deflink);
-		if (hdd_cm_is_vdev_associated(adapter)
+		if (hdd_cm_is_vdev_associated(adapter->deflink)
 		    && sme_is_sta_key_exchange_in_progress(
 		    mac_handle, adapter->deflink->vdev_id)) {
 			sta_mac = (uint8_t *)&(adapter->mac_addr.bytes[0]);

@@ -421,7 +421,7 @@ static int32_t hdd_add_tx_bitrate(struct sk_buff *skb,
 	sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter->deflink);
 
 	/* cfg80211_calculate_bitrate will return 0 for mcs >= 32 */
-	if (hdd_cm_is_vdev_associated(adapter))
+	if (hdd_cm_is_vdev_associated(adapter->deflink))
 		bitrate = cfg80211_calculate_bitrate(
 				&sta_ctx->cache_conn_info.max_tx_bitrate);
 	else
@@ -516,7 +516,7 @@ static int32_t hdd_add_sta_info(struct sk_buff *skb,
 		hdd_err("put fail");
 		goto fail;
 	}
-	if (hdd_cm_is_vdev_associated(adapter))
+	if (hdd_cm_is_vdev_associated(adapter->deflink))
 		hdd_get_max_tx_bitrate(hdd_ctx, adapter);
 
 	if (hdd_add_tx_bitrate(skb, adapter, NL80211_STA_INFO_TX_BITRATE)) {

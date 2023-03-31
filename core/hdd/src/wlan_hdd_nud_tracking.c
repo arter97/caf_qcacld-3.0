@@ -94,7 +94,7 @@ static void __hdd_nud_failure_work(struct hdd_adapter *adapter)
 	if (0 != status)
 		return;
 
-	if (!hdd_cm_is_vdev_associated(adapter)) {
+	if (!hdd_cm_is_vdev_associated(adapter->deflink)) {
 		hdd_debug("Not in Connected State");
 		return;
 	}

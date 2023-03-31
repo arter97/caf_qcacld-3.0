@@ -902,14 +902,14 @@ bool hdd_get_interface_info(struct hdd_adapter *adapter,
 				  adapter->deflink->vdev_id);
 			info->state = WIFI_ASSOCIATING;
 		}
-		if (hdd_cm_is_vdev_associated(adapter) &&
+		if (hdd_cm_is_vdev_associated(adapter->deflink) &&
 		    !sta_ctx->conn_info.is_authenticated) {
 			hdd_err("client " QDF_MAC_ADDR_FMT
 				" is in the middle of WPS/EAPOL exchange.",
 				QDF_MAC_ADDR_REF(adapter->mac_addr.bytes));
 			info->state = WIFI_AUTHENTICATING;
 		}
-		if (hdd_cm_is_vdev_associated(adapter)) {
+		if (hdd_cm_is_vdev_associated(adapter->deflink)) {
 			info->state = WIFI_ASSOCIATED;
 			qdf_copy_macaddr(&info->bssid,
 					 &sta_ctx->conn_info.bssid);
@@ -6531,7 +6531,7 @@ static int wlan_hdd_get_sta_stats(struct hdd_adapter *adapter,
 		   TRACE_CODE_HDD_CFG80211_GET_STA,
 		   adapter->deflink->vdev_id, 0);
 
-	if (!hdd_cm_is_vdev_associated(adapter)) {
+	if (!hdd_cm_is_vdev_associated(adapter->deflink)) {
 		hdd_debug("Not associated");
 		/*To keep GUI happy */
 		return 0;
@@ -7120,7 +7120,7 @@ static bool hdd_is_rcpi_applicable(struct hdd_adapter *adapter,
 	if (adapter->device_mode == QDF_STA_MODE ||
 	    adapter->device_mode == QDF_P2P_CLIENT_MODE) {
 		hdd_sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter->deflink);
-		if (!hdd_cm_is_vdev_associated(adapter))
+		if (!hdd_cm_is_vdev_associated(adapter->deflink))
 			return false;
 
 		if (hdd_cm_is_vdev_roaming(adapter)) {
@@ -7372,7 +7372,7 @@ QDF_STATUS wlan_hdd_get_rssi(struct hdd_adapter *adapter, int8_t *rssi_value)
 		return QDF_STATUS_SUCCESS;
 	}
 
-	if (!hdd_cm_is_vdev_associated(adapter)) {
+	if (!hdd_cm_is_vdev_associated(adapter->deflink)) {
 		hdd_debug("Not associated!, rssi on disconnect %d",
 			  adapter->deflink->rssi_on_disconnect);
 		*rssi_value = adapter->deflink->rssi_on_disconnect;
@@ -7622,7 +7622,7 @@ int wlan_hdd_get_link_speed(struct hdd_adapter *adapter, uint32_t *link_speed)
 		return -ENOTSUPP;
 	}
 
-	if (!hdd_cm_is_vdev_associated(adapter)) {
+	if (!hdd_cm_is_vdev_associated(adapter->deflink)) {
 		/* we are not connected so we don't have a classAstats */
 		*link_speed = 0;
 	} else {

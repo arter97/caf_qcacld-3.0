@@ -1603,7 +1603,7 @@ void hdd_enable_mc_addr_filtering(struct hdd_adapter *adapter,
 	if (wlan_hdd_validate_context(hdd_ctx))
 		return;
 
-	if (!hdd_cm_is_vdev_associated(adapter))
+	if (!hdd_cm_is_vdev_associated(adapter->deflink))
 		return;
 
 	status = ucfg_pmo_enable_mc_addr_filtering_in_fwr(
@@ -1624,7 +1624,7 @@ void hdd_disable_mc_addr_filtering(struct hdd_adapter *adapter,
 	if (wlan_hdd_validate_context(hdd_ctx))
 		return;
 
-	if (!hdd_cm_is_vdev_associated(adapter))
+	if (!hdd_cm_is_vdev_associated(adapter->deflink))
 		return;
 
 	status = ucfg_pmo_disable_mc_addr_filtering_in_fwr(
@@ -1650,7 +1650,7 @@ void hdd_disable_and_flush_mc_addr_list(struct hdd_adapter *adapter,
 	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
 	QDF_STATUS status;
 
-	if (!hdd_cm_is_vdev_associated(adapter))
+	if (!hdd_cm_is_vdev_associated(adapter->deflink))
 		goto flush_mc_list;
 
 	/* disable mc list first because the mc list is cached in PMO */
@@ -1679,7 +1679,7 @@ flush_mc_list:
 static void hdd_update_conn_state_mask(struct hdd_adapter *adapter,
 				       uint32_t *conn_state_mask)
 {
-	if (hdd_cm_is_vdev_associated(adapter))
+	if (hdd_cm_is_vdev_associated(adapter->deflink))
 		*conn_state_mask |= (1 << adapter->deflink->vdev_id);
 }
 
@@ -2918,7 +2918,7 @@ static int wlan_hdd_set_ps(struct wlan_objmgr_psoc *psoc,
 
 	status = wlan_hdd_set_powersave(adapter, allow_power_save, timeout);
 
-	if (!hdd_cm_is_vdev_associated(adapter)) {
+	if (!hdd_cm_is_vdev_associated(adapter->deflink)) {
 		hdd_debug("vdev[%d] mode %d disconnected ignore dhcp protection",
 			  adapter->deflink->vdev_id, adapter->device_mode);
 		return status;
@@ -3138,7 +3138,7 @@ static int __wlan_hdd_cfg80211_set_txpower(struct wiphy *wiphy,
 		struct hdd_station_ctx *sta_ctx =
 			WLAN_HDD_GET_STATION_CTX_PTR(adapter->deflink);
 
-		if (hdd_cm_is_vdev_associated(adapter))
+		if (hdd_cm_is_vdev_associated(adapter->deflink))
 			qdf_copy_macaddr(&bssid, &sta_ctx->conn_info.bssid);
 	}
 
@@ -3400,7 +3400,7 @@ static int __wlan_hdd_cfg80211_get_txpower(struct wiphy *wiphy,
 			hdd_debug("Roaming is in progress, rej this req");
 			return -EINVAL;
 		}
-		if (!hdd_cm_is_vdev_associated(adapter)) {
+		if (!hdd_cm_is_vdev_associated(adapter->deflink)) {
 			hdd_debug("Not associated");
 			return 0;
 		}

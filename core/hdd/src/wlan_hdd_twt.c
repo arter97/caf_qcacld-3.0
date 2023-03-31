@@ -601,7 +601,7 @@ int hdd_test_config_twt_setup_session(struct hdd_adapter *adapter,
 	}
 
 	hdd_sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter->deflink);
-	if (!hdd_cm_is_vdev_associated(adapter)) {
+	if (!hdd_cm_is_vdev_associated(adapter->deflink)) {
 		hdd_err_rl("Invalid state, vdev %d mode %d",
 			   adapter->deflink->vdev_id, adapter->device_mode);
 		return -EINVAL;
@@ -668,7 +668,7 @@ int hdd_test_config_twt_terminate_session(struct hdd_adapter *adapter,
 	}
 
 	hdd_sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter->deflink);
-	if (!hdd_cm_is_vdev_associated(adapter)) {
+	if (!hdd_cm_is_vdev_associated(adapter->deflink)) {
 		hdd_err_rl("Invalid state, vdev %d mode %d",
 			   adapter->deflink->vdev_id, adapter->device_mode);
 		return -EINVAL;
@@ -1017,7 +1017,7 @@ static int hdd_is_twt_command_allowed(struct hdd_adapter *adapter)
 	    adapter->device_mode != QDF_P2P_CLIENT_MODE)
 		return -EOPNOTSUPP;
 
-	if (!hdd_cm_is_vdev_associated(adapter)) {
+	if (!hdd_cm_is_vdev_associated(adapter->deflink)) {
 		hdd_err_rl("Invalid state, vdev %d mode %d",
 			   adapter->deflink->vdev_id, adapter->device_mode);
 		return -EAGAIN;
@@ -2394,7 +2394,7 @@ hdd_send_twt_del_all_sessions_to_userspace(struct hdd_adapter *adapter)
 	struct wmi_twt_del_dialog_complete_event_param params;
 
 	hdd_sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter->deflink);
-	if (!hdd_cm_is_vdev_associated(adapter)) {
+	if (!hdd_cm_is_vdev_associated(adapter->deflink)) {
 		hdd_debug("Not associated, vdev %d mode %d",
 			   adapter->deflink->vdev_id, adapter->device_mode);
 		return;
@@ -2625,7 +2625,7 @@ static int hdd_sta_twt_terminate_session(struct hdd_adapter *adapter,
 	int id, ret;
 
 	hdd_sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter->deflink);
-	if (!hdd_cm_is_vdev_associated(adapter)) {
+	if (!hdd_cm_is_vdev_associated(adapter->deflink)) {
 		hdd_err_rl("Invalid state, vdev %d mode %d",
 			   adapter->deflink->vdev_id, adapter->device_mode);
 
@@ -3633,7 +3633,7 @@ static int hdd_twt_get_capabilities(struct hdd_adapter *adapter,
 		return -EOPNOTSUPP;
 	}
 
-	if (!hdd_cm_is_vdev_associated(adapter)) {
+	if (!hdd_cm_is_vdev_associated(adapter->deflink)) {
 		hdd_err_rl("vdev %d not in connected state, mode %d",
 			   adapter->deflink->vdev_id, adapter->device_mode);
 		return -EAGAIN;

@@ -746,7 +746,7 @@ hdd_sendactionframe(struct hdd_adapter *adapter, const uint8_t *bssid,
 	hdd_ctx = WLAN_HDD_GET_CTX(adapter);
 
 	/* if not associated, no need to send action frame */
-	if (!hdd_cm_is_vdev_associated(adapter)) {
+	if (!hdd_cm_is_vdev_associated(adapter->deflink)) {
 		hdd_warn("Not associated");
 		ret = -EINVAL;
 		goto exit;
@@ -2227,7 +2227,7 @@ static int wlan_hdd_get_link_status(struct hdd_adapter *adapter)
 	}
 
 	sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter->deflink);
-	if (!hdd_cm_is_vdev_associated(adapter)) {
+	if (!hdd_cm_is_vdev_associated(adapter->deflink)) {
 		/* If not associated, then expected link status return
 		 * value is 0
 		 */
@@ -4420,7 +4420,7 @@ static int drv_cmd_fast_reassoc(struct hdd_adapter *adapter,
 	hdd_ctx = WLAN_HDD_GET_CTX(adapter);
 
 	/* if not associated, no need to proceed with reassoc */
-	if (!hdd_cm_is_vdev_associated(adapter)) {
+	if (!hdd_cm_is_vdev_associated(adapter->deflink)) {
 		hdd_warn("Not associated!");
 		ret = -EINVAL;
 		goto exit;
@@ -4779,7 +4779,7 @@ static int drv_cmd_get_tsm_stats(struct hdd_adapter *adapter,
 	sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter->deflink);
 
 	/* if not associated, return error */
-	if (!hdd_cm_is_vdev_associated(adapter)) {
+	if (!hdd_cm_is_vdev_associated(adapter->deflink)) {
 		hdd_err("Not associated!");
 		ret = -EINVAL;
 		goto exit;
@@ -4920,7 +4920,7 @@ static int drv_cmd_ccx_beacon_req(struct hdd_adapter *adapter,
 		goto exit;
 	}
 
-	if (!hdd_cm_is_vdev_associated(adapter)) {
+	if (!hdd_cm_is_vdev_associated(adapter->deflink)) {
 		hdd_debug("Not associated");
 
 		if (!req.numBcnReqIe)
@@ -5556,7 +5556,7 @@ static int hdd_set_rx_filter(struct hdd_adapter *adapter, bool action,
 	if (((adapter->device_mode == QDF_STA_MODE) ||
 		(adapter->device_mode == QDF_P2P_CLIENT_MODE)) &&
 		adapter->mc_addr_list.mc_cnt &&
-		hdd_cm_is_vdev_associated(adapter)) {
+		hdd_cm_is_vdev_associated(adapter->deflink)) {
 
 
 		filter = qdf_mem_malloc(sizeof(*filter));

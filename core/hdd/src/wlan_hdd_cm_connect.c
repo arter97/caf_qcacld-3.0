@@ -57,19 +57,19 @@
 #include "wlan_psoc_mlme_ucfg_api.h"
 #include "wlan_action_oui_ucfg_api.h"
 
-bool hdd_cm_is_vdev_associated(struct hdd_adapter *adapter)
+bool hdd_cm_is_vdev_associated(struct wlan_hdd_link_info *link_info)
 {
 	struct wlan_objmgr_vdev *vdev;
 	bool is_vdev_active;
 	enum QDF_OPMODE opmode;
 	struct hdd_station_ctx *sta_ctx;
 
-	sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter->deflink);
-	if (adapter->device_mode == QDF_NDI_MODE)
+	sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(link_info);
+	if (link_info->adapter->device_mode == QDF_NDI_MODE)
 		return (sta_ctx->conn_info.conn_state ==
 			eConnectionState_NdiConnected);
 
-	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink, WLAN_OSIF_CM_ID);
+	vdev = hdd_objmgr_get_vdev_by_user(link_info, WLAN_OSIF_CM_ID);
 	if (!vdev)
 		return false;
 
