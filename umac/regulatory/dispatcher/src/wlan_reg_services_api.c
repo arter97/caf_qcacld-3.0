@@ -1904,7 +1904,6 @@ QDF_STATUS wlan_reg_set_afc_power_event_received(struct wlan_objmgr_pdev *pdev,
 
 #endif
 
-#ifdef CONFIG_REG_CLIENT
 QDF_STATUS
 wlan_reg_recompute_current_chan_list(struct wlan_objmgr_psoc *psoc,
 				     struct wlan_objmgr_pdev *pdev)
@@ -1922,6 +1921,7 @@ wlan_reg_recompute_current_chan_list(struct wlan_objmgr_psoc *psoc,
 	return reg_send_scheduler_msg_nb(psoc, pdev);
 }
 
+#ifdef CONFIG_REG_CLIENT
 QDF_STATUS
 wlan_reg_modify_indoor_concurrency(struct wlan_objmgr_pdev *pdev,
 				   uint8_t vdev_id, uint32_t freq,

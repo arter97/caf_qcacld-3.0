@@ -2233,7 +2233,7 @@ QDF_STATUS
 wlan_reg_modify_indoor_concurrency(struct wlan_objmgr_pdev *pdev,
 				   uint8_t vdev_id, uint32_t freq,
 				   enum phy_ch_width width, bool add);
-
+#endif
 /**
  * wlan_reg_recompute_current_chan_list() - Recompute the current channel list
  * based on the regulatory change
@@ -2246,7 +2246,6 @@ wlan_reg_modify_indoor_concurrency(struct wlan_objmgr_pdev *pdev,
 QDF_STATUS
 wlan_reg_recompute_current_chan_list(struct wlan_objmgr_psoc *psoc,
 				     struct wlan_objmgr_pdev *pdev);
-#endif
 
 #if defined(CONFIG_BAND_6GHZ)
 /**
