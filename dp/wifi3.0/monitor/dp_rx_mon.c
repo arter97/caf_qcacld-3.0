@@ -426,7 +426,7 @@ dp_rx_populate_cdp_indication_ppdu_user(struct dp_pdev *pdev,
 
 	num_users = ppdu_info->com_info.num_users;
 	for (i = 0; i < num_users; i++) {
-		if (i > OFDMA_NUM_USERS)
+		if (i >= OFDMA_NUM_USERS)
 			return;
 
 		rx_user_status =  &ppdu_info->rx_user_status[i];
