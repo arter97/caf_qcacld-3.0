@@ -28,6 +28,15 @@ QDF_STATUS wlan_telemetry_agent_init(void);
 QDF_STATUS wlan_telemetry_agent_deinit(void);
 
 /**
+ * telemetry_agent_set_param- set telemetry agent params
+ * @command: command to set
+ * @value: value
+ *
+ * Return: 0 if success, negative value if error
+ */
+int telemetry_agent_set_param(int command, int value);
+
+/**
  * telemetry_sawf_peer_ctx_alloc - Allocate sawwf peer
  * @soc: opaque soc handle
  * @sawf_ctx: opaque sawf-peer ctx
@@ -254,6 +263,12 @@ static inline
 QDF_STATUS wlan_telemetry_agent_deinit(void)
 {
 	return QDF_STATUS_SUCCESS;
+}
+
+static inline
+int telemetry_agent_set_param(int command, int value)
+{
+	return 0;
 }
 
 static inline
