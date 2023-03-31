@@ -2604,13 +2604,13 @@ hdd_adapter_get_index_of_link_info(struct wlan_hdd_link_info *link_info)
 }
 
 /**
- * wlan_hdd_get_adapter_from_objmgr() - Fetch adapter from objmgr
+ * wlan_hdd_get_link_info_from_objmgr() - Fetch adapter from objmgr
  * @vdev: the vdev whose corresponding adapter has to be fetched
  *
- * Return: the address of the adapter
+ * Return: Address of link info pointer in HDD adapter corresponding to VDEV
  */
-struct hdd_adapter *
-wlan_hdd_get_adapter_from_objmgr(struct wlan_objmgr_vdev *vdev);
+struct wlan_hdd_link_info *
+wlan_hdd_get_link_info_from_objmgr(struct wlan_objmgr_vdev *vdev);
 
 struct hdd_adapter *hdd_open_adapter(struct hdd_context *hdd_ctx,
 				     uint8_t session_type,

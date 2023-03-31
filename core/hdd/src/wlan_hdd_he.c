@@ -375,18 +375,20 @@ static void hdd_sr_osif_events(struct wlan_objmgr_vdev *vdev,
 	QDF_STATUS status;
 	enum qca_wlan_sr_operation sr_nl_oper;
 	enum qca_wlan_sr_reason_code sr_nl_rc;
+	struct wlan_hdd_link_info *link_info;
 
 	if (!vdev) {
 		hdd_err("Null VDEV");
 		return;
 	}
 
-	adapter = wlan_hdd_get_adapter_from_objmgr(vdev);
-	if (!adapter) {
+	link_info = wlan_hdd_get_link_info_from_objmgr(vdev);
+	if (!link_info) {
 		hdd_err("Null adapter");
 		return;
 	}
 
+	adapter = link_info->adapter;
 	wlan_vdev_mlme_get_srg_pd_offset(vdev, &srg_max_pd_offset,
 					 &srg_min_pd_offset);
 	non_srg_max_pd_offset = wlan_vdev_mlme_get_non_srg_pd_offset(vdev);

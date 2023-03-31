@@ -6811,7 +6811,7 @@ static void hdd_store_vdev_info(struct hdd_adapter *adapter,
 	osif_priv = wlan_vdev_get_ospriv(vdev);
 	if (osif_priv) {
 		osif_priv->wdev = adapter->dev->ieee80211_ptr;
-		osif_priv->legacy_osif_priv = adapter;
+		osif_priv->legacy_osif_priv = adapter->deflink;
 	}
 
 	qdf_spin_lock_bh(&adapter->deflink->vdev_lock);
@@ -12547,8 +12547,8 @@ static inline void hdd_lte_coex_restart_sap(struct hdd_adapter *adapter,
 }
 #endif /* defined(FEATURE_WLAN_CH_AVOID) */
 
-struct hdd_adapter *
-wlan_hdd_get_adapter_from_objmgr(struct wlan_objmgr_vdev *vdev)
+struct wlan_hdd_link_info *
+wlan_hdd_get_link_info_from_objmgr(struct wlan_objmgr_vdev *vdev)
 {
 	if (!vdev) {
 		hdd_err("null vdev object");
@@ -12622,15 +12622,14 @@ void hdd_indicate_mgmt_frame(tSirSmeMgmtFrameInd *frame_ind)
 			if (!vdev)
 				continue;
 
-			adapter = wlan_hdd_get_adapter_from_objmgr(vdev);
-
-			if (!adapter) {
+			link_info = wlan_hdd_get_link_info_from_objmgr(vdev);
+			if (!link_info) {
 				wlan_objmgr_vdev_release_ref(vdev,
 							     WLAN_OSIF_ID);
 				continue;
 			}
 
-			hdd_indicate_mgmt_frame_to_user(adapter,
+			hdd_indicate_mgmt_frame_to_user(link_info->adapter,
 							frame_ind->frame_len,
 							frame_ind->frameBuf,
 							frame_ind->frameType,

@@ -8295,7 +8295,7 @@ bool hdd_is_peer_associated(struct hdd_adapter *adapter,
 #ifdef WLAN_FEATURE_SAP_ACS_OPTIMIZE
 bool hdd_sap_is_acs_in_progress(struct wlan_objmgr_vdev *vdev)
 {
-	struct hdd_adapter *adapter;
+	struct wlan_hdd_link_info *link_info;
 	bool in_progress = false;
 
 	if (!vdev) {
@@ -8303,19 +8303,18 @@ bool hdd_sap_is_acs_in_progress(struct wlan_objmgr_vdev *vdev)
 		return in_progress;
 	}
 
-	adapter = wlan_hdd_get_adapter_from_objmgr(vdev);
-	if (!adapter) {
+	link_info = wlan_hdd_get_link_info_from_objmgr(vdev);
+	if (!link_info) {
 		hdd_err("null adapter");
 		return in_progress;
 	}
 
-	if (!hdd_adapter_is_ap(adapter)) {
-		hdd_err("vdev id %d is not AP", adapter->deflink->vdev_id);
+	if (!hdd_adapter_is_ap(link_info->adapter)) {
+		hdd_err("vdev id %d is not AP", link_info->vdev_id);
 		return in_progress;
 	}
 
-	in_progress =
-		qdf_atomic_read(&adapter->deflink->session.ap.acs_in_progress);
+	in_progress = qdf_atomic_read(&link_info->session.ap.acs_in_progress);
 
 	return in_progress;
 }

@@ -27263,17 +27263,17 @@ QDF_STATUS hdd_mlo_dev_t2lm_notify_link_update(struct wlan_objmgr_vdev *vdev,
 					       struct wlan_t2lm_info *t2lm)
 {
 	struct cfg80211_mlo_tid_map map;
-	struct hdd_adapter *adapter;
+	struct wlan_hdd_link_info *link_info;
 	struct net_device *dev;
 	bool found = false;
 
-	adapter = wlan_hdd_get_adapter_from_objmgr(vdev);
-	if (!adapter) {
-		hdd_err("null adapter");
+	link_info = wlan_hdd_get_link_info_from_objmgr(vdev);
+	if (!link_info) {
+		hdd_err("Invalid VDEV");
 		return QDF_STATUS_E_FAILURE;
 	}
 
-	dev = adapter->dev;
+	dev = link_info->adapter->dev;
 	hdd_enter_dev(dev);
 
 	qdf_mem_zero(&map, sizeof(map));

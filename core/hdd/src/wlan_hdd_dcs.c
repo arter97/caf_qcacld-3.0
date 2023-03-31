@@ -72,8 +72,8 @@ static QDF_STATUS hdd_dcs_switch_chan_cb(struct wlan_objmgr_vdev *vdev,
 					 qdf_freq_t tgt_freq,
 					 enum phy_ch_width tgt_width)
 {
-	struct vdev_osif_priv *osif_priv;
 	struct hdd_adapter *adapter;
+	struct wlan_hdd_link_info *link_info;
 	mac_handle_t mac_handle;
 	struct qdf_mac_addr *bssid;
 	int ret;
@@ -81,24 +81,19 @@ static QDF_STATUS hdd_dcs_switch_chan_cb(struct wlan_objmgr_vdev *vdev,
 	struct wlan_objmgr_pdev *pdev;
 	struct wlan_objmgr_psoc *psoc;
 
-	osif_priv = wlan_vdev_get_ospriv(vdev);
-	if (!osif_priv) {
-		hdd_err("Invalid osif priv");
-		return QDF_STATUS_E_INVAL;
-	}
-
-	adapter = osif_priv->legacy_osif_priv;
-	if (!adapter) {
+	link_info = wlan_hdd_get_link_info_from_objmgr(vdev);
+	if (!link_info) {
 		hdd_err("Invalid adapter");
 		return QDF_STATUS_E_INVAL;
 	}
 
+	adapter = link_info->adapter;
 	switch (adapter->device_mode) {
 	case QDF_STA_MODE:
-		if (!hdd_cm_is_vdev_associated(adapter->deflink))
+		if (!hdd_cm_is_vdev_associated(link_info))
 			return QDF_STATUS_E_INVAL;
 
-		bssid = &adapter->deflink->session.station.conn_info.bssid;
+		bssid = &link_info->session.station.conn_info.bssid;
 
 		/* disconnect if got invalid freq or width */
 		if (tgt_freq == 0 || tgt_width == CH_WIDTH_INVALID) {
@@ -134,7 +129,7 @@ static QDF_STATUS hdd_dcs_switch_chan_cb(struct wlan_objmgr_vdev *vdev,
 		if (!psoc)
 			return QDF_STATUS_E_INVAL;
 
-		wlan_hdd_set_sap_csa_reason(psoc, adapter->deflink->vdev_id,
+		wlan_hdd_set_sap_csa_reason(psoc, link_info->vdev_id,
 					    CSA_REASON_DCS);
 		ret = hdd_softap_set_channel_change(adapter->dev, tgt_freq,
 						    tgt_width, true);
