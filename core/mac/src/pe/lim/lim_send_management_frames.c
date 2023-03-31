@@ -1320,7 +1320,7 @@ void lim_send_mscs_req_action_frame(struct mac_context *mac,
 			   TXRX_FRM_802_11_MGMT, ANI_TXDIR_TODS, 7,
 			   lim_tx_complete, frame, lim_mscs_req_tx_complete_cnf,
 			   HAL_USE_PEER_STA_REQUESTED_MASK,
-			   pe_session->vdev_id, false, 0, RATEID_DEFAULT, 0);
+			   pe_session->vdev_id, false, 0, RATEID_DEFAULT, 0, 0);
 	if (QDF_IS_STATUS_SUCCESS(qdf_status)) {
 		mlme_set_is_mscs_req_sent(pe_session->vdev, true);
 	} else {
@@ -1968,7 +1968,7 @@ lim_send_assoc_rsp_mgmt_frame(struct mac_context *mac_ctx,
 				ANI_TXDIR_TODS,
 				7, lim_tx_complete, frame,
 				lim_assoc_rsp_tx_complete, tx_flag,
-				sme_session, false, 0, RATEID_DEFAULT, 0);
+				sme_session, false, 0, RATEID_DEFAULT, 0, 0);
 	else
 		qdf_status = wma_tx_frame(
 				mac_ctx, packet, (uint16_t)bytes,
@@ -3090,7 +3090,7 @@ lim_send_assoc_req_mgmt_frame(struct mac_context *mac_ctx,
 			   TXRX_FRM_802_11_MGMT, ANI_TXDIR_TODS, 7,
 			   lim_tx_complete, frame, lim_assoc_tx_complete_cnf,
 			   tx_flag, vdev_id, false, 0,
-			   min_rid, peer_rssi);
+			   min_rid, peer_rssi, 0);
 	MTRACE(qdf_trace
 		       (QDF_MODULE_ID_PE, TRACE_CODE_TX_COMPLETE,
 		       pe_session->peSessionId, qdf_status));
@@ -3706,7 +3706,7 @@ alloc_packet:
 				 7, lim_tx_complete, frame,
 				 lim_auth_tx_complete_cnf,
 				 tx_flag, vdev_id, false,
-				 ch_freq_tx_frame, min_rid, peer_rssi);
+				 ch_freq_tx_frame, min_rid, peer_rssi, 0);
 	MTRACE(qdf_trace(QDF_MODULE_ID_PE, TRACE_CODE_TX_COMPLETE,
 		session->peSessionId, qdf_status));
 	if (!QDF_IS_STATUS_SUCCESS(qdf_status)) {
@@ -4219,7 +4219,7 @@ lim_send_disassoc_mgmt_frame(struct mac_context *mac,
 					 ANI_TXDIR_TODS, 7, lim_tx_complete,
 					 pFrame, lim_disassoc_tx_complete_cnf_handler,
 					 txFlag, smeSessionId, false, 0,
-					 RATEID_DEFAULT, 0);
+					 RATEID_DEFAULT, 0, 0);
 		MTRACE(qdf_trace
 			       (QDF_MODULE_ID_PE, TRACE_CODE_TX_COMPLETE,
 			       pe_session->peSessionId, qdf_status));
@@ -4455,7 +4455,7 @@ lim_send_deauth_mgmt_frame(struct mac_context *mac,
 					 ANI_TXDIR_TODS, 7, lim_tx_complete,
 					 pFrame, lim_deauth_tx_complete_cnf_handler,
 					 txFlag, smeSessionId, false, 0,
-					 RATEID_DEFAULT, 0);
+					 RATEID_DEFAULT, 0, 0);
 		MTRACE(qdf_trace
 			       (QDF_MODULE_ID_PE, TRACE_CODE_TX_COMPLETE,
 			       pe_session->peSessionId, qdf_status));
@@ -5179,7 +5179,7 @@ lim_p2p_oper_chan_change_confirm_action_frame(struct mac_context *mac_ctx,
 			TXRX_FRM_802_11_MGMT, ANI_TXDIR_TODS,
 			7, lim_tx_complete, frame,
 			lim_oper_chan_change_confirm_tx_complete_cnf,
-			tx_flag, vdev_id, false, 0, RATEID_DEFAULT, 0);
+			tx_flag, vdev_id, false, 0, RATEID_DEFAULT, 0, 0);
 
 	MTRACE(qdf_trace(QDF_MODULE_ID_PE, TRACE_CODE_TX_COMPLETE,
 			session_entry->peSessionId, qdf_status));
@@ -6261,7 +6261,7 @@ QDF_STATUS lim_send_addba_response_frame(struct mac_context *mac_ctx,
 						NULL, frame_ptr,
 						lim_addba_rsp_tx_complete_cnf,
 						tx_flag, vdev_id,
-						false, 0, RATEID_DEFAULT, 0);
+						false, 0, RATEID_DEFAULT, 0, 0);
 	MTRACE(qdf_trace(QDF_MODULE_ID_PE, TRACE_CODE_TX_COMPLETE,
 			 session->peSessionId, qdf_status));
 	if (QDF_STATUS_SUCCESS != qdf_status) {
@@ -6524,7 +6524,7 @@ QDF_STATUS lim_send_delba_action_frame(struct mac_context *mac_ctx,
 						NULL, frame_ptr,
 						lim_delba_tx_complete_cnf,
 						tx_flag, vdev_id,
-						false, 0, RATEID_DEFAULT, 0);
+						false, 0, RATEID_DEFAULT, 0, 0);
 	if (qdf_status != QDF_STATUS_SUCCESS) {
 		pe_err("delba wma_tx_frame FAILED! Status [%d]", qdf_status);
 		return qdf_status;
@@ -6608,7 +6608,7 @@ static void lim_tx_mgmt_frame(struct mac_context *mac_ctx, uint8_t vdev_id,
 					 7, lim_tx_complete, frame,
 					 lim_auth_tx_complete_cnf,
 					 0, vdev_id, false, channel_freq,
-					 min_rid, 0);
+					 min_rid, 0, 0);
 	MTRACE(qdf_trace(QDF_MODULE_ID_PE, TRACE_CODE_TX_COMPLETE,
 		session_id, qdf_status));
 	if (!QDF_IS_STATUS_SUCCESS(qdf_status)) {

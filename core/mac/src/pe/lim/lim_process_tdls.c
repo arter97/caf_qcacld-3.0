@@ -68,6 +68,7 @@
 #include "wma_types.h"
 #include "cds_regdomain.h"
 #include "cds_utils.h"
+#include "wlan_mlo_mgr_sta.h"
 #include "wlan_reg_services_api.h"
 #include "wlan_tdls_tgt_api.h"
 #include "wlan_mlme_public_struct.h"
@@ -336,6 +337,44 @@ static void populate_dot11f_tdls_offchannel_params(
 	return;
 }
 
+#ifdef WLAN_FEATURE_11BE_MLO
+/**
+ * lim_tdls_copy_self_mac() - copy mac address
+ * @session: pe session
+ * @init_sta_addr: the pointer to save the address
+ *
+ * For MLD device, it needs to copy mld mac address.
+ *
+ * Return: void
+ */
+static void lim_tdls_copy_self_mac(struct pe_session *session,
+				   uint8_t *init_sta_addr)
+{
+	struct wlan_mlo_dev_context *mlo_dev_ctx;
+
+	if (wlan_vdev_mlme_is_mlo_vdev(session->vdev)) {
+		mlo_dev_ctx = session->vdev->mlo_dev_ctx;
+		if (!mlo_dev_ctx) {
+			pe_debug("mlo_dev_ctx is NULL");
+			return;
+		}
+
+		qdf_mem_copy((uint8_t *)init_sta_addr,
+			     mlo_dev_ctx->mld_addr.bytes, QDF_MAC_ADDR_SIZE);
+	} else {
+		qdf_mem_copy((uint8_t *)init_sta_addr,
+			     session->self_mac_addr, QDF_MAC_ADDR_SIZE);
+	}
+}
+#else
+static void lim_tdls_copy_self_mac(struct pe_session *session,
+				   uint8_t *init_sta_addr)
+{
+	qdf_mem_copy((uint8_t *)init_sta_addr,
+		     session->self_mac_addr, QDF_MAC_ADDR_SIZE);
+}
+#endif
+
 /*
  * FUNCTION: Populate Link Identifier element IE
  *
@@ -347,20 +386,19 @@ static void populate_dot11f_link_iden(struct mac_context *mac,
 				      struct qdf_mac_addr peer_mac,
 				      uint8_t reqType)
 {
-	uint8_t *initStaAddr = NULL;
-	uint8_t *respStaAddr = NULL;
+	uint8_t *initaddr = NULL;
+	uint8_t *respaddr = NULL;
 
-	(reqType == TDLS_INITIATOR) ? ((initStaAddr = linkIden->InitStaAddr),
-				       (respStaAddr = linkIden->RespStaAddr))
-	: ((respStaAddr = linkIden->InitStaAddr),
-	   (initStaAddr = linkIden->RespStaAddr));
-	qdf_mem_copy((uint8_t *) linkIden->bssid,
-		     (uint8_t *) pe_session->bssId, QDF_MAC_ADDR_SIZE);
+	(reqType == TDLS_INITIATOR) ? ((initaddr = linkIden->InitStaAddr),
+				       (respaddr = linkIden->RespStaAddr))
+	: ((respaddr = linkIden->InitStaAddr),
+	   (initaddr = linkIden->RespStaAddr));
+	qdf_mem_copy((uint8_t *)linkIden->bssid,
+		     (uint8_t *)pe_session->bssId, QDF_MAC_ADDR_SIZE);
 
-	qdf_mem_copy((uint8_t *) initStaAddr,
-		     pe_session->self_mac_addr, QDF_MAC_ADDR_SIZE);
+	lim_tdls_copy_self_mac(pe_session, initaddr);
 
-	qdf_mem_copy((uint8_t *) respStaAddr, (uint8_t *) peer_mac.bytes,
+	qdf_mem_copy((uint8_t *)respaddr, (uint8_t *)peer_mac.bytes,
 		     QDF_MAC_ADDR_SIZE);
 
 	linkIden->present = 1;
@@ -536,6 +574,36 @@ static QDF_STATUS lim_mgmt_tdls_tx_complete(void *context,
 	return QDF_STATUS_SUCCESS;
 }
 
+#ifdef WLAN_FEATURE_11BE_MLO
+/**
+ * lim_get_assoc_link_vdev_id() - get vdev id
+ * @session: pe session
+ *
+ * Since fw only uses assoc link vdev to transmit data packets,
+ * it needs to fetch the right vdev id when transfer tdls management
+ * frame for partner link.
+ *
+ * Return: vdev id
+ */
+static uint8_t lim_get_assoc_link_vdev_id(struct pe_session *session)
+{
+	struct wlan_objmgr_vdev *assoc_vdev;
+
+	if (wlan_vdev_mlme_is_mlo_vdev(session->vdev)) {
+		assoc_vdev = wlan_mlo_get_assoc_link_vdev(session->vdev);
+		if (assoc_vdev)
+			return wlan_vdev_get_id(assoc_vdev);
+	}
+
+	return session->smeSessionId;
+}
+#else
+static uint8_t lim_get_assoc_link_vdev_id(struct pe_session *session)
+{
+	return session->smeSessionId;
+}
+#endif
+
 /*
  * This function can be used for bacst or unicast discovery request
  * We are not differentiating it here, it will all depend on peer MAC address,
@@ -554,6 +622,7 @@ static QDF_STATUS lim_send_tdls_dis_req_frame(struct mac_context *mac,
 	uint32_t header_offset = 0;
 	uint8_t *pFrame;
 	void *pPacket;
+	uint8_t vdev_id;
 	QDF_STATUS qdf_status;
 #ifndef NO_PAD_TDLS_MIN_8023_SIZE
 	uint32_t padLen = 0;
@@ -722,6 +791,8 @@ static QDF_STATUS lim_send_tdls_dis_req_frame(struct mac_context *mac,
 		QDF_MAC_ADDR_REF(peer_mac.bytes));
 
 	mac->lim.tdls_frm_session_id = pe_session->smeSessionId;
+	vdev_id = lim_get_assoc_link_vdev_id(pe_session);
+
 	lim_diag_mgmt_tx_event_report(mac, (tpSirMacMgmtHdr) pFrame,
 				      pe_session, QDF_STATUS_SUCCESS,
 				      QDF_STATUS_SUCCESS);
@@ -734,8 +805,8 @@ static QDF_STATUS lim_send_tdls_dis_req_frame(struct mac_context *mac,
 					lim_mgmt_tdls_tx_complete,
 					HAL_USE_BD_RATE2_FOR_MANAGEMENT_FRAME |
 					HAL_USE_PEER_STA_REQUESTED_MASK,
-					smeSessionId, false, 0,
-					RATEID_DEFAULT, 0);
+					vdev_id, false, 0,
+					RATEID_DEFAULT, 0, 0);
 	if (!QDF_IS_STATUS_SUCCESS(qdf_status)) {
 		mac->lim.tdls_frm_session_id = NO_SESSION;
 		pe_err("could not send TDLS Discovery Request frame");
@@ -1524,6 +1595,7 @@ static QDF_STATUS lim_send_tdls_dis_rsp_frame(struct mac_context *mac,
 	void *pPacket;
 	QDF_STATUS qdf_status;
 	uint32_t selfDot11Mode;
+	uint8_t  selfaddr[QDF_MAC_ADDR_SIZE];
 /*  Placeholder to support different channel bonding mode of TDLS than AP. */
 /*  Today, WNI_CFG_CHANNEL_BONDING_MODE will be overwritten when connecting to AP */
 /*  To support this feature, we need to introduce WNI_CFG_TDLS_CHANNEL_BONDING_MODE */
@@ -1672,10 +1744,10 @@ static QDF_STATUS lim_send_tdls_dis_rsp_frame(struct mac_context *mac,
 	 */
 
 	/* Make public Action Frame */
-
+	lim_tdls_copy_self_mac(pe_session, selfaddr);
 	lim_populate_mac_header(mac, pFrame, SIR_MAC_MGMT_FRAME,
 				SIR_MAC_MGMT_ACTION, peer_mac.bytes,
-				pe_session->self_mac_addr);
+				selfaddr);
 
 	{
 		tpSirMacMgmtHdr pMacHdr;
@@ -1756,7 +1828,8 @@ static QDF_STATUS lim_send_tdls_dis_rsp_frame(struct mac_context *mac,
 					      lim_mgmt_tdls_tx_complete,
 					      HAL_USE_SELF_STA_REQUESTED_MASK,
 					      smeSessionId, false, 0,
-					      RATEID_DEFAULT, 0);
+					      RATEID_DEFAULT, 0,
+					      TDLS_DISCOVERY_RESPONSE);
 	if (!QDF_IS_STATUS_SUCCESS(qdf_status)) {
 		mac->lim.tdls_frm_session_id = NO_SESSION;
 		pe_err("could not send TDLS Discovery Response frame!");
@@ -1840,7 +1913,7 @@ wma_tx_frame_with_tx_complete_send(struct mac_context *mac, void *pPacket,
 					  HAL_USE_BD_RATE2_FOR_MANAGEMENT_FRAME
 					  | HAL_USE_PEER_STA_REQUESTED_MASK,
 					  smeSessionId, flag, 0,
-					  RATEID_DEFAULT, 0);
+					  RATEID_DEFAULT, 0, 0);
 }
 #else
 
@@ -1861,7 +1934,7 @@ wma_tx_frame_with_tx_complete_send(struct mac_context *mac, void *pPacket,
 					  HAL_USE_BD_RATE2_FOR_MANAGEMENT_FRAME
 					  | HAL_USE_PEER_STA_REQUESTED_MASK,
 					  smeSessionId, false, 0,
-					  RATEID_DEFAULT, 0);
+					  RATEID_DEFAULT, 0, 0);
 }
 #endif
 
@@ -1895,6 +1968,7 @@ QDF_STATUS lim_send_tdls_link_setup_req_frame(struct mac_context *mac,
 	uint32_t payload = 0;
 	uint32_t nbytes = 0;
 	uint32_t header_offset = 0;
+	uint8_t vdev_id;
 	uint8_t *frame;
 	void *packet;
 	QDF_STATUS qdf_status;
@@ -2175,6 +2249,9 @@ QDF_STATUS lim_send_tdls_link_setup_req_frame(struct mac_context *mac,
 		QDF_MAC_ADDR_REF(peer_mac.bytes));
 
 	mac->lim.tdls_frm_session_id = pe_session->smeSessionId;
+
+	vdev_id = lim_get_assoc_link_vdev_id(pe_session);
+
 	lim_diag_mgmt_tx_event_report(mac, (tpSirMacMgmtHdr) frame,
 				      pe_session, QDF_STATUS_SUCCESS,
 				      QDF_STATUS_SUCCESS);
@@ -2183,7 +2260,7 @@ QDF_STATUS lim_send_tdls_link_setup_req_frame(struct mac_context *mac,
 							(uint16_t)nbytes,
 							TID_AC_VI,
 							frame,
-							smeSessionId, true);
+							vdev_id, true);
 
 	if (!QDF_IS_STATUS_SUCCESS(qdf_status)) {
 		mac->lim.tdls_frm_session_id = NO_SESSION;
@@ -2214,6 +2291,7 @@ QDF_STATUS lim_send_tdls_teardown_frame(struct mac_context *mac,
 	uint32_t header_offset = 0;
 	uint8_t *frame;
 	void *packet;
+	uint8_t vdev_id;
 	QDF_STATUS qdf_status;
 #ifndef NO_PAD_TDLS_MIN_8023_SIZE
 	uint32_t padlen = 0;
@@ -2382,6 +2460,9 @@ QDF_STATUS lim_send_tdls_teardown_frame(struct mac_context *mac,
 		QDF_MAC_ADDR_REF(peer_mac.bytes));
 
 	mac->lim.tdls_frm_session_id = pe_session->smeSessionId;
+
+	vdev_id = lim_get_assoc_link_vdev_id(pe_session);
+
 	lim_diag_mgmt_tx_event_report(mac, (tpSirMacMgmtHdr)frame,
 				      pe_session, QDF_STATUS_SUCCESS,
 				      QDF_STATUS_SUCCESS);
@@ -2390,7 +2471,7 @@ QDF_STATUS lim_send_tdls_teardown_frame(struct mac_context *mac,
 					(uint16_t)nbytes,
 					TID_AC_VI,
 					frame,
-					smeSessionId,
+					vdev_id,
 					(reason == REASON_TDLS_PEER_UNREACHABLE)
 					? true : false);
 
@@ -2428,6 +2509,7 @@ lim_send_tdls_setup_rsp_frame(struct mac_context *mac,
 	QDF_STATUS qdf_status;
 	uint32_t selfDot11Mode;
 	uint8_t max_sp_length = 0;
+	uint8_t vdev_id;
 /*  Placeholder to support different channel bonding mode of TDLS than AP. */
 /*  Today, WNI_CFG_CHANNEL_BONDING_MODE will be overwritten when connecting to AP */
 /*  To support this feature, we need to introduce WNI_CFG_TDLS_CHANNEL_BONDING_MODE */
@@ -2695,6 +2777,7 @@ lim_send_tdls_setup_rsp_frame(struct mac_context *mac,
 		QDF_MAC_ADDR_REF(peer_mac.bytes));
 
 	mac->lim.tdls_frm_session_id = pe_session->smeSessionId;
+	vdev_id = lim_get_assoc_link_vdev_id(pe_session);
 	lim_diag_mgmt_tx_event_report(mac, (tpSirMacMgmtHdr) pFrame,
 				      pe_session, QDF_STATUS_SUCCESS,
 				      QDF_STATUS_SUCCESS);
@@ -2703,7 +2786,7 @@ lim_send_tdls_setup_rsp_frame(struct mac_context *mac,
 						     (uint16_t) nBytes,
 						     TID_AC_VI,
 						     pFrame,
-						     smeSessionId, true);
+						     vdev_id, true);
 
 	if (!QDF_IS_STATUS_SUCCESS(qdf_status)) {
 		mac->lim.tdls_frm_session_id = NO_SESSION;
@@ -2735,6 +2818,7 @@ QDF_STATUS lim_send_tdls_link_setup_cnf_frame(struct mac_context *mac,
 	uint8_t *pFrame;
 	void *pPacket;
 	QDF_STATUS qdf_status;
+	uint8_t vdev_id;
 #ifndef NO_PAD_TDLS_MIN_8023_SIZE
 	uint32_t padLen = 0;
 #endif
@@ -2958,6 +3042,7 @@ QDF_STATUS lim_send_tdls_link_setup_cnf_frame(struct mac_context *mac,
 	       QDF_MAC_ADDR_REF(peer_mac.bytes));
 
 	mac->lim.tdls_frm_session_id = pe_session->smeSessionId;
+	vdev_id = lim_get_assoc_link_vdev_id(pe_session);
 	lim_diag_mgmt_tx_event_report(mac, (tpSirMacMgmtHdr) pFrame,
 				      pe_session, QDF_STATUS_SUCCESS,
 				      QDF_STATUS_SUCCESS);
@@ -2966,7 +3051,7 @@ QDF_STATUS lim_send_tdls_link_setup_cnf_frame(struct mac_context *mac,
 						     (uint16_t) nBytes,
 						     TID_AC_VI,
 						     pFrame,
-						     smeSessionId, true);
+						     vdev_id, true);
 
 	if (!QDF_IS_STATUS_SUCCESS(qdf_status)) {
 		mac->lim.tdls_frm_session_id = NO_SESSION;
