@@ -1312,6 +1312,9 @@ void dp_ppeds_stats_sync_be(struct cdp_soc_t *soc_hdl,
 		DP_PEER_STATS_FLAT_INC_PKT(txrx_peer, to_stack,
 					   vp_stats->rx_pkt_cnt,
 					   vp_stats->rx_byte_cnt);
+		DP_PEER_PER_PKT_STATS_INC_PKT(txrx_peer, rx.ppeds_drop,
+					      vp_stats->rx_drop_pkt_cnt,
+					      vp_stats->rx_drop_byte_cnt, 0);
 
 		dp_peer_unref_delete(dp_peer, DP_MOD_ID_DS);
 		dp_vdev_unref_delete(soc, vdev, DP_MOD_ID_DS);
@@ -1324,6 +1327,9 @@ void dp_ppeds_stats_sync_be(struct cdp_soc_t *soc_hdl,
 	 */
 	DP_STATS_INC_PKT(vdev, rx.to_stack, vp_stats->rx_pkt_cnt,
 			 vp_stats->rx_byte_cnt);
+	DP_STATS_INC_PKT(vdev, rx.ppeds_drop, vp_stats->rx_drop_pkt_cnt,
+			 vp_stats->rx_drop_byte_cnt);
+
 	dp_vdev_unref_delete(soc, vdev, DP_MOD_ID_DS);
 	return;
 }
