@@ -310,7 +310,7 @@ typedef void (*qdf_nbuf_free_t)(__qdf_nbuf_t);
  * @func: Function name of the call site
  * @line: line number of the call site
  *
- * This allocates an nbuf aligns if needed and reserves some space in the front,
+ * This allocates a nbuf aligns if needed and reserves some space in the front,
  * since the reserve is done after alignment the reserve value if being
  * unaligned will result in an unaligned address.
  *
@@ -344,6 +344,28 @@ __qdf_nbuf_t __qdf_nbuf_alloc_simple(__qdf_device_t osdev, size_t size,
 __qdf_nbuf_t __qdf_nbuf_alloc_ppe_ds(__qdf_device_t osdev, size_t size,
 				     const char *func, uint32_t line);
 #endif /* QCA_DP_NBUF_FAST_PPEDS */
+
+/**
+ * __qdf_nbuf_frag_alloc() - Allocate nbuf in page fragment way.
+ * @osdev: Device handle
+ * @size: Netbuf requested size
+ * @reserve: headroom to start with
+ * @align: Align
+ * @prio: Priority
+ * @func: Function name of the call site
+ * @line: line number of the call site
+ *
+ * This allocates a nbuf aligns if needed and reserves some space in the front,
+ * since the reserve is done after alignment the reserve value if being
+ * unaligned will result in an unaligned address.
+ * It will call into kernel page fragment APIs, long time keeping for scattered
+ * allocations should be considered for avoidance.
+ *
+ * Return: nbuf or %NULL if no memory
+ */
+__qdf_nbuf_t
+__qdf_nbuf_frag_alloc(__qdf_device_t osdev, size_t size, int reserve, int align,
+		      int prio, const char *func, uint32_t line);
 
 /**
  * __qdf_nbuf_alloc_no_recycler() - Allocates skb

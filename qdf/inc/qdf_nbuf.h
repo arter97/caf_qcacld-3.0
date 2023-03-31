@@ -2286,6 +2286,13 @@ qdf_nbuf_t qdf_nbuf_alloc_debug(qdf_device_t osdev, qdf_size_t size,
 				int reserve, int align, int prio,
 				const char *func, uint32_t line);
 
+#define qdf_nbuf_frag_alloc(d, s, r, a, p) \
+	qdf_nbuf_frag_alloc_debug(d, s, r, a, p, __func__, __LINE__)
+
+qdf_nbuf_t qdf_nbuf_frag_alloc_debug(qdf_device_t osdev, qdf_size_t size,
+				     int reserve, int align, int prio,
+				     const char *func, uint32_t line);
+
 /**
  * qdf_nbuf_alloc_no_recycler() - Allocates skb
  * @size: Size to be allocated for skb
@@ -2459,6 +2466,18 @@ qdf_nbuf_alloc_fl(qdf_device_t osdev, qdf_size_t size, int reserve, int align,
 		  int prio, const char *func, uint32_t line)
 {
 	return __qdf_nbuf_alloc(osdev, size, reserve, align, prio, func, line);
+}
+
+#define qdf_nbuf_frag_alloc(osdev, size, reserve, align, prio) \
+	qdf_nbuf_frag_alloc_fl(osdev, size, reserve, align, prio, \
+			  __func__, __LINE__)
+
+static inline qdf_nbuf_t
+qdf_nbuf_frag_alloc_fl(qdf_device_t osdev, qdf_size_t size, int reserve,
+		       int align, int prio, const char *func, uint32_t line)
+{
+	return __qdf_nbuf_frag_alloc(osdev, size, reserve, align, prio,
+				     func, line);
 }
 
 /**

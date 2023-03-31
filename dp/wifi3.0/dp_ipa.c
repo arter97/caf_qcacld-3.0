@@ -644,7 +644,8 @@ static int dp_ipa_tx_alt_pool_attach(struct dp_soc *soc)
 	 */
 	for (tx_buffer_count = 0;
 		tx_buffer_count < max_alloc_count - 1; tx_buffer_count++) {
-		nbuf = qdf_nbuf_alloc(soc->osdev, alloc_size, 0, 256, FALSE);
+		nbuf = qdf_nbuf_frag_alloc(soc->osdev, alloc_size, 0,
+					   256, FALSE);
 		if (!nbuf)
 			break;
 
@@ -1494,7 +1495,8 @@ static int dp_tx_ipa_uc_attach(struct dp_soc *soc, struct dp_pdev *pdev)
 	 */
 	for (tx_buffer_count = 0;
 		tx_buffer_count < max_alloc_count - 1; tx_buffer_count++) {
-		nbuf = qdf_nbuf_alloc(soc->osdev, alloc_size, 0, 256, FALSE);
+		nbuf = qdf_nbuf_frag_alloc(soc->osdev, alloc_size, 0,
+					   256, FALSE);
 		if (!nbuf)
 			break;
 
