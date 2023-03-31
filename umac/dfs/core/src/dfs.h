@@ -57,7 +57,7 @@
  * @dfs: The dfs object pointer or NULL if dfs is not defined.
  * @sm: Submodule BITMASK.
  * @level: QDF trace level.
- * @args...: Variable argument list.
+ * @args: Variable argument list.
  *
  * The logging is controlled by two bitmasks:
  * 1) submodule bitmask: sm
