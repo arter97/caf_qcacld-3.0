@@ -851,6 +851,9 @@ enum {
 #ifdef WLAN_FEATURE_11BE
 	IEEE80211_PARAM_EHT_NUM_SD = 796, /* EHT Beamformer num sounding dimentions */
 #endif
+#ifdef CONFIG_MLO_SINGLE_DEV
+	IEEE80211_PARAM_GET_MLD_PEER = 795,
+#endif
 };
 
 enum {
@@ -2540,6 +2543,9 @@ struct vendor_commands vap_vendor_cmds[] = {
 	{"get_wds_ext",        IEEE80211_PARAM_WDS_EXT_EN, GET_PARAM, 0},
 #endif
 	{"get_ppevp_type",     IEEE80211_PARAM_PPEVP_TYPE, GET_PARAM, 0},
+#ifdef CONFIG_MLO_SINGLE_DEV
+	{"get_mld_peer",     IEEE80211_PARAM_GET_MLD_PEER, GET_PARAM, 0},
+#endif
 };
 
 struct vendor_commands radio_vendor_cmds[] = {
