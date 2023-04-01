@@ -5297,7 +5297,7 @@ unsigned int qdf_nbuf_update_radiotap(struct mon_rx_status *rx_status,
 
 	/* IEEE80211_RADIOTAP_RATE  u8           500kb/s */
 	if (!rx_status->ht_flags && !rx_status->vht_flags &&
-	    !rx_status->he_flags) {
+	    !rx_status->he_flags && !rx_status->eht_flags) {
 		it_present_val |= (1 << IEEE80211_RADIOTAP_RATE);
 		rtap_buf[rtap_len] = rx_status->rate;
 	} else
