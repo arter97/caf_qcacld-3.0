@@ -239,6 +239,107 @@ dp_rx_intrabss_fwd_rh(struct dp_soc *soc,
 	return false;
 }
 
+#ifdef RX_DESC_DEBUG_CHECK
+static
+QDF_STATUS dp_rx_desc_nbuf_sanity_check_rh(struct dp_soc *soc,
+					   uint32_t *msg_word,
+					   struct dp_rx_desc *rx_desc)
+{
+	uint64_t paddr;
+
+	paddr = (HTT_RX_DATA_MSDU_INFO_BUFFER_ADDR_LOW_GET(*msg_word) |
+		 ((uint64_t)(HTT_RX_DATA_MSDU_INFO_BUFFER_ADDR_HIGH_GET(*(msg_word + 1))) << 32));
+
+	/* Sanity check for possible buffer paddr corruption */
+	if (dp_rx_desc_paddr_sanity_check(rx_desc, paddr))
+		return QDF_STATUS_SUCCESS;
+
+	return QDF_STATUS_E_FAILURE;
+}
+
+#else
+static inline
+QDF_STATUS dp_rx_desc_nbuf_sanity_check_rh(struct dp_soc *soc,
+					   uint32_t *msg_word,
+					   struct dp_rx_desc *rx_desc)
+#endif
+
+#ifdef DUP_RX_DESC_WAR
+static
+void dp_rx_dump_info_and_assert_rh(struct dp_soc *soc,
+				   uint32_t *msg_word,
+				   struct dp_rx_desc *rx_desc)
+{
+	QDF_TRACE_HEX_DUMP(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_INFO_HIGH,
+			   msg_word, HTT_RX_DATA_MSDU_INFO_SIZE);
+	dp_rx_desc_dump(rx_desc);
+}
+#else
+static
+void dp_rx_dump_info_and_assert_rh(struct dp_soc *soc,
+				   uint32_t *msg_word,
+				   struct dp_rx_desc *rx_desc)
+{
+	dp_rx_desc_dump(rx_desc);
+	QDF_TRACE_HEX_DUMP(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_INFO_HIGH,
+			   msg_word, HTT_RX_DATA_MSDU_INFO_SIZE);
+	qdf_assert_always(0);
+}
+#endif
+
+#ifdef WLAN_FEATURE_DP_RX_RING_HISTORY
+static void
+dp_rx_ring_record_entry_rh(struct dp_soc *soc, uint8_t ring_num,
+			   uint32_t *msg_word)
+{
+	struct dp_buf_info_record *record;
+	uint32_t idx;
+
+	if (qdf_unlikely(!soc->rx_ring_history[ring_num]))
+		return;
+
+	idx = dp_history_get_next_index(&soc->rx_ring_history[ring_num]->index,
+					DP_RX_HIST_MAX);
+
+	/* No NULL check needed for record since its an array */
+	record = &soc->rx_ring_history[ring_num]->entry[idx];
+
+	record->timestamp = qdf_get_log_timestamp();
+	record->hbi.paddr =
+		(HTT_RX_DATA_MSDU_INFO_BUFFER_ADDR_LOW_GET(*msg_word) |
+		((uint64_t)(HTT_RX_DATA_MSDU_INFO_BUFFER_ADDR_HIGH_GET(*(msg_word + 1))) << 32));
+	record->hbi.sw_cookie =
+		HTT_RX_DATA_MSDU_INFO_SW_BUFFER_COOKIE_GET(*(msg_word + 1));
+}
+#else
+static inline void
+dp_rx_ring_record_entry_rh(struct dp_soc *soc, uint8_t rx_ring_num,
+			   uint32_t *msg_word) {}
+#endif
+
+#ifdef WLAN_FEATURE_MARK_FIRST_WAKEUP_PACKET
+static inline void
+dp_rx_mark_first_packet_after_wow_wakeup_rh(struct dp_soc *soc,
+					    uint32_t *msg_word,
+					    qdf_nbuf_t nbuf)
+{
+	struct dp_pdev *pdev = soc->pdev_list[0];
+
+	if (!pdev->is_first_wakeup_packet)
+		return;
+
+	if (HTT_RX_DATA_MSDU_INFO_IS_FIRST_PKT_AFTER_WKP_GET(*(msg_word + 2))) {
+		qdf_nbuf_mark_wakeup_frame(nbuf);
+		dp_info("First packet after WOW Wakeup rcvd");
+	}
+}
+#else
+static inline void
+dp_rx_mark_first_packet_after_wow_wakeup_rh(struct dp_soc *soc,
+					    uint32_t *msg_word,
+					    qdf_nbuf_t nbuf) {}
+#endif
+
 void
 dp_rx_data_indication_handler(struct dp_soc *soc, qdf_nbuf_t data_ind,
 			      uint16_t vdev_id, uint16_t peer_id,
@@ -285,10 +386,9 @@ dp_rx_data_indication_handler(struct dp_soc *soc, qdf_nbuf_t data_ind,
 	uint32_t max_ast;
 	uint64_t current_time = 0;
 	uint32_t error;
+	QDF_STATUS status;
 
 	DP_HIST_INIT();
-
-	/* TODO implement dp_rx_dump_info_and_assert equivalent in RHINE */
 
 	qdf_assert_always(soc && msdu_count);
 	hal_soc = soc->hal_soc;
@@ -337,20 +437,32 @@ dp_rx_data_indication_handler(struct dp_soc *soc, qdf_nbuf_t data_ind,
 			qdf_assert_always(0);
 		}
 
+		dp_rx_ring_record_entry_rh(soc, rx_ctx_id, msg_word);
 		rx_buf_cookie =
 			HTT_RX_DATA_MSDU_INFO_SW_BUFFER_COOKIE_GET(*(msg_word + 1));
 		rx_desc = dp_rx_cookie_2_va_rxdma_buf(soc, rx_buf_cookie);
 		if (qdf_unlikely(!rx_desc && !rx_desc->nbuf &&
 				 !rx_desc->in_use)) {
-			dp_rx_err("Invalid RX descriptor");
+			dp_err("Invalid RX descriptor");
 			qdf_assert_always(0);
 			/* TODO handle this if its valid case */
+		}
+
+		status = dp_rx_desc_nbuf_sanity_check_rh(soc, msg_word,
+							 rx_desc);
+		if (qdf_unlikely(QDF_IS_STATUS_ERROR(status))) {
+			DP_STATS_INC(soc, rx.err.nbuf_sanity_fail, 1);
+			dp_info_rl("Nbuf sanity check failure!");
+			dp_rx_dump_info_and_assert_rh(soc, msg_word, rx_desc);
+			rx_desc->in_err_state = 1;
+			continue;
 		}
 
 		if (qdf_unlikely(!dp_rx_desc_check_magic(rx_desc))) {
 			dp_err("Invalid rx_desc cookie=%d", rx_buf_cookie);
 			DP_STATS_INC(soc, rx.err.rx_desc_invalid_magic, 1);
-			qdf_assert(0);
+			dp_rx_dump_info_and_assert_rh(soc, msg_word, rx_desc);
+			continue;
 		}
 
 		msdu_len =
@@ -398,6 +510,8 @@ dp_rx_data_indication_handler(struct dp_soc *soc, qdf_nbuf_t data_ind,
 		rx_bufs_reaped[rx_desc->pool_id]++;
 		QDF_NBUF_CB_RX_PEER_ID(rx_desc->nbuf) = peer_id;
 		QDF_NBUF_CB_RX_VDEV_ID(rx_desc->nbuf) = vdev_id;
+		dp_rx_mark_first_packet_after_wow_wakeup_rh(soc, msg_word,
+							    rx_desc->nbuf);
 
 		/*
 		 * save msdu flags first, last and continuation msdu in
@@ -762,12 +876,6 @@ dp_rx_data_indication_handler(struct dp_soc *soc, qdf_nbuf_t data_ind,
 		}
 
 		dp_rx_fill_gro_info(soc, rx_tlv_hdr, nbuf, &rx_ol_pkt_cnt);
-
-		/*
-		 * TODO mark first packet after wow get this from HTT desc
-		 * dp_rx_mark_first_packet_after_wow_wakeup(vdev->pdev,
-		 * rx_tlv_hdr, nbuf);
-		 */
 
 		dp_rx_update_stats(soc, nbuf);
 
