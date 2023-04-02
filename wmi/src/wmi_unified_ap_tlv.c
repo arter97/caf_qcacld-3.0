@@ -3377,7 +3377,7 @@ static QDF_STATUS send_lcr_cmd_tlv(wmi_unified_t wmi_handle,
 	civic_info = (uint8_t *)lcr_config->civic_info;
 	civic_info[0] = lcr_info->country_code[0];
 	civic_info[1] = lcr_info->country_code[1];
-	qdf_mem_copy(&civic_info[2], lcr_info->civic_info, lcr_info->civic_len);
+	qdf_mem_copy(&civic_info[2], lcr_info->civic_info, lcr_info_len);
 
 	if (wmi_handle->ops->send_start_oem_data_cmd)
 		ret = wmi_handle->ops->send_start_oem_data_cmd(wmi_handle,
