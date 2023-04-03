@@ -173,6 +173,12 @@ mld_get_best_primary_umac_w_rssi(struct wlan_mlo_peer_context *ml_peer,
 		if (id >= WLAN_OBJMGR_MAX_DEVICES)
 			continue;
 
+		if (wlan_vdev_skip_pumac(link_vdevs[i])) {
+			mlo_err("Skip Radio for Primary MLO umac");
+			mld_sta_links[id] = false;
+			continue;
+		}
+
 		tqm_params = &rssi_data.psoc_tqm_parms[id];
 		mld_sta_links[id] = true;
 
