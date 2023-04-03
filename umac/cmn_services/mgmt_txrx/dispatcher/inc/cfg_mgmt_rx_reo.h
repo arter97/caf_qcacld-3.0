@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -122,11 +122,37 @@
 		WLAN_MGMT_RX_REO_EGRESS_FRAME_DEBUG_LIST_SIZE_DEFAULT,\
 		CFG_VALUE_OR_CLAMP, "Size of egress frame debug list")
 
+/*
+ * <ini>
+ * mgmt_rx_reo_scheduler_debug_list_size - Size of the list which logs the
+ * frames which are scheduled by management rx reorder scheduler
+ * @Min: 0
+ * @Max: WLAN_MGMT_RX_REO_SCHEDULER_DEBUG_LIST_SIZE_MAX
+ * @Default: WLAN_MGMT_RX_REO_SCHEDULER_DEBUG_LIST_SIZE_DEFAULT
+ *
+ * This ini is used to configure the size of the list which logs the frames
+ * which are scheduled by management rx reorder scheduler
+ *
+ * Related: None
+ *
+ * Supported Feature: MGMT Rx REO
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
+#define CFG_MGMT_RX_REO_SCHEDULER_DEBUG_LIST_SIZE CFG_INI_UINT(\
+		"mgmt_rx_reo_scheduler_debug_list_size",\
+		0, WLAN_MGMT_RX_REO_SCHEDULER_DEBUG_LIST_SIZE_MAX,\
+		WLAN_MGMT_RX_REO_SCHEDULER_DEBUG_LIST_SIZE_DEFAULT,\
+		CFG_VALUE_OR_CLAMP, "Size of scheduler debug list")
+
 #define CFG_MGMT_RX_REO_ALL \
 	CFG(CFG_MGMT_RX_REO_ENABLE) \
 	CFG(CFG_MGMT_RX_REO_PKT_CTR_DELTA_THRESH) \
 	CFG(CFG_MGMT_RX_REO_INGRESS_FRAME_DEBUG_LIST_SIZE) \
-	CFG(CFG_MGMT_RX_REO_EGRESS_FRAME_DEBUG_LIST_SIZE)
+	CFG(CFG_MGMT_RX_REO_EGRESS_FRAME_DEBUG_LIST_SIZE) \
+	CFG(CFG_MGMT_RX_REO_SCHEDULER_DEBUG_LIST_SIZE)
 #else
 
 #define CFG_MGMT_RX_REO_ALL
