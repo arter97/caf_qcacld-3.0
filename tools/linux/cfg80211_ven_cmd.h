@@ -854,6 +854,7 @@ enum {
 #ifdef CONFIG_MLO_SINGLE_DEV
 	IEEE80211_PARAM_GET_MLD_PEER = 797,
 #endif
+	IEEE80211_PARAM_MLD_NETDEV_NAME = 798, /* MLD Intf name */
 };
 
 enum {

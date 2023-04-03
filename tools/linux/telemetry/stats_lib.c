@@ -99,21 +99,17 @@ struct interface {
  * @s_count: Number of socs
  * @r_count: Number of radios
  * @v_count: Number of vaps
- * @m_count: Number of mlds
  * @soc: Array of Soc Interface details
  * @radio: Array of Radio interface details
  * @vap: Array of vap interface details
- * @mld: Array of mld interface details
  */
 struct interface_list {
 	uint8_t s_count;
 	uint8_t r_count;
 	uint8_t v_count;
-	uint8_t m_count;
 	struct interface soc[MAX_SOC_NUM];
 	struct interface radio[MAX_RADIO_NUM];
 	struct interface vap[MAX_VAP_NUM];
-	struct interface mld[MAX_VAP_NUM];
 };
 
 /**
@@ -343,11 +339,6 @@ static void free_interface_list(struct interface_list *if_list)
 			free(if_list->vap[inx].name);
 	}
 	if_list->v_count = 0;
-	for (inx = 0; inx < MAX_VAP_NUM; inx++) {
-		if (if_list->mld[inx].name)
-			free(if_list->mld[inx].name);
-	}
-	if_list->m_count = 0;
 }
 
 static int get_active_radio_intf_for_soc(struct interface_list *if_list,
@@ -423,7 +414,6 @@ static int fetch_all_interfaces(struct interface_list *if_list)
 	u_int8_t rinx = 0;
 	u_int8_t vinx = 0;
 	u_int8_t sinx = 0;
-	u_int8_t minx = 0;
 	ssize_t size = 0;
 
 	dir = opendir(PATH_SYSNET_DEV);
@@ -495,21 +485,6 @@ static int fetch_all_interfaces(struct interface_list *if_list)
 			strlcpy(if_list->vap[vinx].name, temp_name, size);
 			if_list->vap[vinx].added = false;
 			vinx++;
-		} else if (libstats_is_ifname_valid(temp_name, STATS_OBJ_MLD)) {
-			if (minx >= MAX_VAP_NUM) {
-				STATS_WARN("Vap Interfaces exceeded limit\n");
-				continue;
-			}
-			size = strlen(temp_name) + 1;
-			if_list->mld[minx].name = (char *)malloc(size);
-			if (!if_list->mld[minx].name) {
-				STATS_ERR("Unable to Allocate Memory!\n");
-				closedir(dir);
-				return -ENOMEM;
-			}
-			strlcpy(if_list->mld[minx].name, temp_name, size);
-			if_list->mld[minx].added = false;
-			minx++;
 		}
 	}
 
@@ -517,7 +492,6 @@ static int fetch_all_interfaces(struct interface_list *if_list)
 	if_list->s_count = sinx;
 	if_list->r_count = rinx;
 	if_list->v_count = vinx;
-	if_list->m_count = minx;
 
 	return 0;
 }
@@ -2281,20 +2255,14 @@ static int32_t build_child_vap_list(struct interface_list *if_list,
 	struct object_list *temp_obj = NULL;
 	struct object_list *curr_obj = NULL;
 	char *ifname = NULL;
-	uint8_t minx;
-	FILE *fp;
-	bool is_mld_slave = false;
-	char *slave_intf_name = NULL;
-	char path[100];
-	char slaves_intf[100];
-	uint8_t path_size = sizeof(path);
-	uint8_t slaves_size = sizeof(slaves_intf);
-	char *temp_ptr = NULL;
 
 	if (!rifname || !rhw_addr || !parent_obj)
 		return -EINVAL;
 
 	for (inx = 0; inx < if_list->v_count; inx++) {
+		struct cfg80211_data buffer = {0};
+		char mld_intf[IFNAME_LEN] = {0};
+
 		ifname = if_list->vap[inx].name;
 		if (if_list->vap[inx].added)
 			continue;
@@ -2318,40 +2286,18 @@ static int32_t build_child_vap_list(struct interface_list *if_list,
 			curr_obj->next = temp_obj;
 		curr_obj = temp_obj;
 
-		is_mld_slave = false;
-		for (minx = 0; minx < if_list->m_count; minx++) {
-			if ((strlcpy(path, PATH_SYSNET_DEV, path_size) >= path_size) ||
-			    (strlcat(path, if_list->mld[minx].name, path_size) >= path_size) ||
-			    (strlcat(path, "/bonding/slaves", path_size) >= path_size))
-				break;
 
-			fp = fopen(path, "r");
-			if (fp) {
-				fgets(slaves_intf, slaves_size, fp);
-				fclose(fp);
-			} else {
-				continue;
-			}
+		buffer.data = mld_intf;
+		buffer.length = sizeof(mld_intf);
+		wifi_cfg80211_send_getparam_command(&g_sock_ctx.cfg80211_ctxt,
+						    QCA_NL80211_VENDOR_SUBCMD_WIFI_PARAMS,
+						    IEEE80211_PARAM_MLD_NETDEV_NAME,
+						    ifname, (char *)&buffer,
+						    buffer.length);
 
-			/* Replace new line character with NULL character */
-			if (slaves_intf[strlen(slaves_intf) - 1] == '\n')
-				slaves_intf[strlen(slaves_intf) - 1] = '\0';
-
-			temp_ptr = slaves_intf;
-			slave_intf_name = strtok_r(slaves_intf, " ", &temp_ptr);
-			while (slave_intf_name) {
-				if ((strlen(slave_intf_name) == strlen(ifname)) &&
-				    (!strncmp(slave_intf_name, ifname, strlen(ifname)))) {
-					temp_obj->is_mld_slave = true;
-					strlcpy(temp_obj->mld_ifname, if_list->mld[minx].name, sizeof(if_list->mld[minx].name));
-					is_mld_slave = true;
-					break;
-				}
-				slave_intf_name = strtok_r(NULL, " ", &temp_ptr);
-			}
-
-			if (is_mld_slave)
-				break;
+		if (mld_intf[0] && is_interface_active(mld_intf, STATS_OBJ_VAP)) {
+			temp_obj->is_mld_slave = true;
+			strlcpy(temp_obj->mld_ifname, mld_intf, IFNAME_LEN);
 		}
 
 		if (build_child_sta_list(ifname, curr_obj))
