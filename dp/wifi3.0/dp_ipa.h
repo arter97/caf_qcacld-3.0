@@ -97,6 +97,7 @@ struct dp_ipa_uc_rx_hdr {
 #define DP_IPA_HDL_INVALID	0xFF
 #define DP_IPA_HDL_FIRST	0
 #define DP_IPA_HDL_SECOND	1
+#define DP_IPA_HDL_THIRD	2
 /**
  * wlan_ipa_get_hdl() - Get ipa handle from IPA component
  * @psoc: control psoc object
