@@ -397,6 +397,19 @@ void wlan_mlo_peer_get_links_info(struct wlan_objmgr_peer *peer,
 uint8_t wlan_mlo_peer_get_primary_peer_link_id(struct wlan_objmgr_peer *peer);
 
 /**
+ * wlan_mlo_peer_get_primary_peer_link_id_by_ml_peer() - get vdev link ID of
+ * primary peer using ml peer.
+ * @ml_peer: ML peer
+ *
+ * This function checks for the peers and returns vdev link id of the primary
+ * peer.
+ *
+ * Return: link id of primary vdev
+ */
+uint8_t wlan_mlo_peer_get_primary_peer_link_id_by_ml_peer(
+				struct wlan_mlo_peer_context *ml_peer);
+
+/**
  * wlan_mlo_peer_get_partner_links_info() - get MLO peer partner links info
  * @peer: Link peer
  * @ml_links: structure to be filled with partner link info
