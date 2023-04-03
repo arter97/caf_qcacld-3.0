@@ -2756,6 +2756,7 @@ static int32_t send_request_per_object(struct stats_command *user_cmd,
 	struct object_list *root_obj = NULL;
 	int32_t ret = 0;
 	bool is_mld_req = false;
+	bool mld_intf_req_sent = false;
 
 	if (!obj_list) {
 		STATS_ERR("Invalid Object List\n");
@@ -2768,11 +2769,6 @@ static int32_t send_request_per_object(struct stats_command *user_cmd,
 	root_obj = find_head_object(user_cmd, obj_list, &is_mld_req);
 	if (!root_obj) {
 		STATS_ERR("No object found for %d obj type\n", user_cmd->obj);
-		return -EPERM;
-	}
-
-	if (is_mld_req && user_cmd->recursive) {
-		STATS_ERR("Recursive call not supported for MLD interface\n");
 		return -EPERM;
 	}
 
@@ -2808,20 +2804,40 @@ static int32_t send_request_per_object(struct stats_command *user_cmd,
 					       temp_obj->hw_addr, ETH_ALEN);
 			}
 			if (is_feat_valid_for_obj(&cmd)) {
-				ret = send_nl_command(&cmd, &buffer,
-						      temp_obj->ifname);
-				if (ret < 0)
-					break;
-			}
-		}
+				if (is_mld_req && !mld_intf_req_sent) {
+					/**
+					 * Send NL command for MLD interface
+					 */
+					ret = send_nl_command(&cmd, &buffer,
+							      temp_obj->mld_ifname);
+					if (ret < 0)
+						break;
 
-		/**
-		 * If request is for MLD interface, then find the next object
-		 * of the MLD group.
-		 */
-		if (is_mld_req) {
-			temp_obj = find_head_object(user_cmd, obj_list, &is_mld_req);
-			continue;
+					/**
+					 * Set mld_intf_req_sent to true to skip
+					 * sending MLD interface NL command in
+					 * case of recursive request from user
+					 */
+					mld_intf_req_sent = true;
+
+					/**
+					 * Send NL command for first MLD slave
+					 * interface on recursive request from
+					 * user
+					 */
+					if (user_cmd->recursive) {
+						ret = send_nl_command(&cmd, &buffer,
+								      temp_obj->ifname);
+						if (ret < 0)
+							break;
+					}
+				} else {
+					ret = send_nl_command(&cmd, &buffer,
+							      temp_obj->ifname);
+					if (ret < 0)
+						break;
+				}
+			}
 		}
 
 		if (!cmd.recursive)
@@ -2833,13 +2849,18 @@ static int32_t send_request_per_object(struct stats_command *user_cmd,
 		else
 			temp_obj = temp_obj->parent;
 
-		/**
-		 * Request is not for All stats.
-		 * So, break from here as we only need stats of this subtree.
-		 **/
 		if ((root_obj->obj_type != STATS_OBJ_AP) &&
-		    (root_obj->obj_type <= temp_obj->obj_type))
-			break;
+		    (root_obj->obj_type <= temp_obj->obj_type)) {
+			/**
+			 * If user gives recursive request for MLD interface,
+			 * then find the next object of the MLD group
+			 */
+			if (is_mld_req)
+				temp_obj = find_head_object(user_cmd, obj_list,
+							    &is_mld_req);
+			else
+				break;
+		}
 	}
 
 	return ret;
