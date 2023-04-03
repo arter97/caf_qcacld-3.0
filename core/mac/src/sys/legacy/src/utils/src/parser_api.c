@@ -10241,6 +10241,57 @@ QDF_STATUS populate_dot11f_bcn_mlo_ie(struct mac_context *mac_ctx,
 	return QDF_STATUS_SUCCESS;
 }
 
+QDF_STATUS populate_dot11f_tdls_mgmt_mlo_ie(struct mac_context *mac_ctx,
+					    struct pe_session *session)
+{
+	struct wlan_mlo_ie *mlo_ie;
+	uint8_t *p_ml_ie;
+	uint16_t len_remaining;
+	uint16_t presence_bitmap = 0;
+	uint8_t common_info_length = 0;
+
+	if (!mac_ctx || !session)
+		return QDF_STATUS_E_NULL_VALUE;
+
+	mlo_ie = &session->mlo_ie;
+
+	p_ml_ie = mlo_ie->data;
+	len_remaining = sizeof(mlo_ie->data);
+
+	*p_ml_ie++ = WLAN_ELEMID_EXTN_ELEM;
+	len_remaining--;
+	*p_ml_ie++ = 0;
+	len_remaining--;
+
+	*p_ml_ie++ = WLAN_EXTN_ELEMID_MULTI_LINK;
+	len_remaining--;
+
+	common_info_length += WLAN_ML_BV_CINFO_LENGTH_SIZE;
+	presence_bitmap |= WLAN_ML_BV_CTRL_PBM_BSSPARAMCHANGECNT_P;
+	common_info_length += WLAN_ML_BSSPARAMCHNGCNT_SIZE;
+
+	QDF_SET_BITS(*(uint16_t *)p_ml_ie, WLAN_ML_CTRL_TYPE_IDX,
+		     WLAN_ML_CTRL_TYPE_BITS, WLAN_ML_VARIANT_TDLS);
+	QDF_SET_BITS(*(uint16_t *)p_ml_ie, WLAN_ML_CTRL_PBM_IDX,
+		     WLAN_ML_CTRL_PBM_BITS, presence_bitmap);
+
+	p_ml_ie += WLAN_ML_CTRL_SIZE;
+	len_remaining -= WLAN_ML_CTRL_SIZE;
+
+	*p_ml_ie++ = common_info_length;
+	len_remaining--;
+
+	qdf_mem_copy(p_ml_ie, session->vdev->mlo_dev_ctx->mld_addr.bytes,
+		     QDF_MAC_ADDR_SIZE);
+
+	p_ml_ie += QDF_MAC_ADDR_SIZE;
+	len_remaining -= QDF_MAC_ADDR_SIZE;
+
+	mlo_ie->num_data = p_ml_ie - mlo_ie->data;
+
+	return QDF_STATUS_SUCCESS;
+}
+
 void populate_dot11f_mlo_rnr(struct mac_context *mac_ctx,
 			     struct pe_session *session,
 			     tDot11fIEreduced_neighbor_report *dot11f)
