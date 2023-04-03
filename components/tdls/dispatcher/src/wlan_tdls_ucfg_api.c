@@ -34,6 +34,7 @@
 #include "wlan_policy_mgr_api.h"
 #include "wlan_scan_ucfg_api.h"
 #include "cfg_tdls.h"
+#include "wlan_mlo_mgr_sta.h"
 #include "cfg_ucfg_api.h"
 #include "wlan_tdls_api.h"
 
@@ -517,6 +518,49 @@ QDF_STATUS ucfg_tdls_update_config(struct wlan_objmgr_psoc *psoc,
 			     QDF_MAC_ADDR_SIZE);
 	}
 	return QDF_STATUS_SUCCESS;
+}
+
+bool ucfg_tdls_link_vdev_is_matching(struct wlan_objmgr_vdev *vdev)
+{
+	struct wlan_objmgr_vdev *tdls_link_vdev;
+
+	tdls_link_vdev = tdls_mlo_get_tdls_link_vdev(vdev);
+	if (!tdls_link_vdev) {
+		wlan_vdev_mlme_feat_ext2_cap_set(vdev,
+						 WLAN_VDEV_FEXT2_MLO_STA_TDLS);
+		return true;
+	}
+
+	if (tdls_link_vdev && tdls_link_vdev != vdev) {
+		tdls_debug("tdls vdev has been created on vdev %d",
+			   wlan_vdev_get_id(tdls_link_vdev));
+		return false;
+	}
+
+	return true;
+}
+
+struct wlan_objmgr_vdev *
+ucfg_tdls_get_tdls_link_vdev(struct wlan_objmgr_vdev *vdev,
+			     wlan_objmgr_ref_dbgid dbg_id)
+{
+	struct wlan_objmgr_vdev *link_vdev;
+
+	link_vdev = tdls_mlo_get_tdls_link_vdev(vdev);
+	if (!link_vdev)
+		return NULL;
+
+	if (wlan_objmgr_vdev_try_get_ref(link_vdev, dbg_id) !=
+	    QDF_STATUS_SUCCESS)
+		return NULL;
+
+	return link_vdev;
+}
+
+void ucfg_tdls_put_tdls_link_vdev(struct wlan_objmgr_vdev *vdev,
+				  wlan_objmgr_ref_dbgid dbg_id)
+{
+	wlan_objmgr_vdev_release_ref(vdev, dbg_id);
 }
 
 QDF_STATUS ucfg_tdls_psoc_enable(struct wlan_objmgr_psoc *psoc)

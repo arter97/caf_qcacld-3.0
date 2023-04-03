@@ -21684,11 +21684,33 @@ static int wlan_hdd_add_key_mlo_vdev(mac_handle_t mac_handle,
 		}
 	}
 
-	if (pairwise && link_id == -1)
+	link_vdev = ucfg_tdls_get_tdls_link_vdev(vdev, WLAN_OSIF_TDLS_ID);
+	if (pairwise && link_id == -1 && !link_vdev)
 		return wlan_hdd_add_key_all_mlo_vdev(mac_handle, vdev,
 						     key_index, pairwise,
 						     mac_addr, params,
 						     link_id, adapter);
+
+	if (pairwise && link_id == -1 && link_vdev) {
+		hdd_ctx = WLAN_HDD_GET_CTX(adapter);
+		link_adapter =
+		      hdd_get_adapter_by_vdev(hdd_ctx,
+					      wlan_vdev_get_id(link_vdev));
+		link_id = wlan_vdev_get_link_id(link_vdev);
+		if (!link_adapter) {
+			ucfg_tdls_put_tdls_link_vdev(link_vdev,
+						     WLAN_OSIF_TDLS_ID);
+			hdd_err("couldn't set tdls key, link_id %d", link_id);
+			return -EINVAL;
+		}
+
+		errno = wlan_hdd_add_key_vdev(mac_handle, link_vdev, key_index,
+					      pairwise, mac_addr, params,
+					      link_id, link_adapter);
+		ucfg_tdls_put_tdls_link_vdev(link_vdev, WLAN_OSIF_TDLS_ID);
+
+		return errno;
+	}
 
 	if (wlan_vdev_get_link_id(adapter->deflink->vdev) == link_id) {
 		hdd_debug("add_key for same vdev: %d",
@@ -23234,6 +23256,19 @@ int wlan_hdd_cfg80211_del_station(struct wiphy *wiphy, struct net_device *dev,
 }
 #endif
 
+#ifdef TDLS_MGMT_VERSION5
+static inline
+uint8_t wlan_hdd_get_link_id(struct station_parameters *params)
+{
+	return params->link_sta_params.link_id;
+}
+#else
+static inline
+uint8_t wlan_hdd_get_link_id(struct station_parameters *params)
+{
+	return 255;
+}
+#endif
 /**
  * __wlan_hdd_cfg80211_add_station() - add station
  * @wiphy: Pointer to wiphy
@@ -23253,6 +23288,7 @@ static int __wlan_hdd_cfg80211_add_station(struct wiphy *wiphy,
 	struct hdd_adapter *adapter = WLAN_HDD_GET_PRIV_PTR(dev);
 	struct hdd_context *hdd_ctx = wiphy_priv(wiphy);
 	u32 mask, set;
+	uint8_t link_id;
 
 	hdd_enter();
 
@@ -23272,24 +23308,15 @@ static int __wlan_hdd_cfg80211_add_station(struct wiphy *wiphy,
 		return -EINVAL;
 
 	mask = params->sta_flags_mask;
-
 	set = params->sta_flags_set;
-
-	hdd_debug("mask 0x%x set 0x%x " QDF_MAC_ADDR_FMT, mask, set,
-		  QDF_MAC_ADDR_REF(mac));
+	link_id = wlan_hdd_get_link_id(params);
+	hdd_debug("mask 0x%x set 0x%x link_id %d " QDF_MAC_ADDR_FMT, mask, set,
+		  link_id, QDF_MAC_ADDR_REF(mac));
 
 	if (mask & BIT(NL80211_STA_FLAG_TDLS_PEER)) {
 		if (set & BIT(NL80211_STA_FLAG_TDLS_PEER)) {
-			struct wlan_objmgr_vdev *vdev;
-
-			vdev = hdd_objmgr_get_vdev_by_user(adapter,
-							   WLAN_OSIF_TDLS_ID);
-			if (vdev) {
-				status = wlan_cfg80211_tdls_add_peer(vdev,
-								     mac);
-				hdd_objmgr_put_vdev_by_user(vdev,
-							    WLAN_OSIF_TDLS_ID);
-			}
+			status = wlan_cfg80211_tdls_add_peer_mlo(adapter,
+								 mac, link_id);
 		}
 	}
 #endif

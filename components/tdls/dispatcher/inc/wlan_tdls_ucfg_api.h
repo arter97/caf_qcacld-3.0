@@ -182,6 +182,35 @@ void ucfg_tdls_update_fw_mlo_capability(struct wlan_objmgr_psoc *psoc,
 #endif
 
 /**
+ * ucfg_tdls_link_vdev_is_matching() - check whether vdev is matching link vdev
+ * @vdev: vdev object
+ *
+ * Return: bool
+ */
+bool ucfg_tdls_link_vdev_is_matching(struct wlan_objmgr_vdev *vdev);
+
+/**
+ * ucfg_tdls_get_tdls_link_vdev() - get tdls link vdev
+ * @vdev: vdev object
+ * @dbg_id: debug id
+ *
+ * Return: vdev pointer
+ */
+struct wlan_objmgr_vdev *
+ucfg_tdls_get_tdls_link_vdev(struct wlan_objmgr_vdev *vdev,
+			     wlan_objmgr_ref_dbgid dbg_id);
+
+/**
+ * ucfg_tdls_put_tdls_link_vdev() - put tdls link vdev
+ * @vdev: vdev odject
+ * @dbg_id: debug id
+ *
+ * Return: void
+ */
+void ucfg_tdls_put_tdls_link_vdev(struct wlan_objmgr_vdev *vdev,
+				  wlan_objmgr_ref_dbgid dbg_id);
+
+/**
  * ucfg_tdls_psoc_enable() - TDLS module enable API
  * @psoc: psoc object
  *
@@ -429,6 +458,25 @@ struct wlan_objmgr_vdev *ucfg_get_tdls_vdev(struct wlan_objmgr_psoc *psoc,
 					    wlan_objmgr_ref_dbgid dbg_id);
 
 #else
+static inline
+bool ucfg_tdls_link_vdev_is_matching(struct wlan_objmgr_vdev *vdev)
+{
+	return false;
+}
+
+static inline
+struct wlan_objmgr_vdev *
+ucfg_tdls_get_tdls_link_vdev(struct wlan_objmgr_vdev *vdev,
+			     wlan_objmgr_ref_dbgid dbg_id)
+{
+	return NULL;
+}
+
+static inline
+void ucfg_tdls_put_tdls_link_vdev(struct wlan_objmgr_vdev *vdev,
+				  wlan_objmgr_ref_dbgid dbg_id)
+{
+}
 
 static inline
 QDF_STATUS ucfg_tdls_init(void)

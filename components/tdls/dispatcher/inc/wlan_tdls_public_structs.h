@@ -1176,20 +1176,24 @@ struct tdls_get_all_peers {
  * @vdev: vdev object
  * @chk_frame: This struct used to validate mgmt frame
  * @session_id: session id
+ * @link_id: link id
  * @vdev_id: vdev id
  * @cmd_buf: cmd buffer
  * @len: length of the frame
  * @use_default_ac: access category
+ * @link_active: whether link active command send successfully
  * @tdls_mgmt: tdls management
  */
 struct tdls_action_frame_request {
 	struct wlan_objmgr_vdev *vdev;
 	struct tdls_validate_action_req chk_frame;
 	uint8_t session_id;
+	uint8_t link_id;
 	uint8_t vdev_id;
 	const uint8_t *cmd_buf;
 	uint8_t len;
 	bool use_default_ac;
+	bool link_active;
 	/* Variable length, do not add anything after this */
 	struct tdls_send_mgmt tdls_mgmt;
 };

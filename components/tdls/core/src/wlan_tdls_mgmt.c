@@ -634,14 +634,15 @@ static QDF_STATUS tdls_activate_send_mgmt_request_flush_cb(
 	return QDF_STATUS_SUCCESS;
 }
 
-static QDF_STATUS tdls_activate_send_mgmt_request(
-				struct tdls_action_frame_request *action_req)
+static QDF_STATUS
+tdls_activate_send_mgmt_request(struct tdls_action_frame_request *action_req)
 {
-	struct wlan_objmgr_peer *peer;
 	struct tdls_soc_priv_obj *tdls_soc_obj;
-	QDF_STATUS status = QDF_STATUS_SUCCESS;
-	struct scheduler_msg msg = {0};
+	QDF_STATUS status;
 	struct tdls_send_mgmt_request *tdls_mgmt_req;
+	struct wlan_objmgr_peer *peer;
+	struct scheduler_msg msg = {0};
+	struct tdls_vdev_priv_obj *tdls_vdev;
 
 	if (!action_req || !action_req->vdev)
 		return QDF_STATUS_E_NULL_VALUE;
@@ -684,6 +685,7 @@ static QDF_STATUS tdls_activate_send_mgmt_request(
 	if (!peer) {
 		tdls_err("bss peer is null");
 		qdf_mem_free(tdls_mgmt_req);
+		status = QDF_STATUS_E_NULL_VALUE;
 		goto release_cmd;
 	}
 
@@ -706,6 +708,25 @@ static QDF_STATUS tdls_activate_send_mgmt_request(
 		tdls_mgmt_req->ac = WIFI_AC_VI;
 	else
 		tdls_mgmt_req->ac = WIFI_AC_BK;
+
+	if (wlan_vdev_mlme_is_mlo_vdev(action_req->vdev) &&
+	    !tdls_mlo_get_tdls_link_vdev(action_req->vdev) &&
+	    tdls_mgmt_req->req_type == TDLS_DISCOVERY_REQUEST) {
+		tdls_vdev = wlan_vdev_get_tdls_vdev_obj(action_req->vdev);
+		if (QDF_TIMER_STATE_RUNNING !=
+		    qdf_mc_timer_get_current_state(
+					  &tdls_vdev->peer_discovery_timer)) {
+			tdls_timer_restart(tdls_vdev->vdev,
+				     &tdls_vdev->peer_discovery_timer,
+				     tdls_vdev->threshold_config.tx_period_t -
+				     TDLS_DISCOVERY_TIMEOUT_ERE_UPDATE);
+			qdf_atomic_inc(&tdls_soc_obj->timer_cnt);
+		} else {
+			qdf_mem_free(tdls_mgmt_req);
+			status = QDF_STATUS_E_NULL_VALUE;
+			goto release_cmd;
+		}
+	}
 
 	/* Send the request to PE. */
 	qdf_mem_zero(&msg, sizeof(msg));
@@ -781,6 +802,52 @@ tdls_send_mgmt_serialize_callback(struct wlan_serialization_command *cmd,
 	return status;
 }
 
+#ifdef WLAN_FEATURE_11BE_MLO
+static QDF_STATUS tdls_set_link_mode(struct tdls_action_frame_request *req)
+{
+	uint8_t mlo_vdev_lst[WLAN_UMAC_MLO_MAX_VDEVS] = {-1};
+	struct wlan_objmgr_psoc *psoc;
+	struct wlan_objmgr_vdev *mlo_tdls_vdev;
+	uint8_t vdev_count = 0;
+	bool is_mlo_vdev;
+	QDF_STATUS status = QDF_STATUS_SUCCESS;
+
+	is_mlo_vdev = wlan_vdev_mlme_is_mlo_vdev(req->vdev);
+	if (!is_mlo_vdev)
+		return status;
+
+	mlo_tdls_vdev = wlan_mlo_get_tdls_link_vdev(req->vdev);
+	if (mlo_tdls_vdev)
+		return status;
+
+	psoc = wlan_vdev_get_psoc(req->vdev);
+	if (!psoc) {
+		tdls_err("psoc is NULL");
+		return QDF_STATUS_E_NULL_VALUE;
+	}
+
+	if (req->tdls_mgmt.frame_type == TDLS_DISCOVERY_RESPONSE ||
+	    req->tdls_mgmt.frame_type == TDLS_DISCOVERY_REQUEST) {
+		mlo_vdev_lst[0] = wlan_vdev_get_id(req->vdev);
+		vdev_count = 1;
+
+		status = policy_mgr_mlo_sta_set_link(psoc,
+						     MLO_LINK_FORCE_REASON_TDLS,
+						     MLO_LINK_FORCE_MODE_ACTIVE,
+						     vdev_count, mlo_vdev_lst);
+		if (status == QDF_STATUS_SUCCESS)
+			req->link_active = true;
+	}
+
+	return status;
+}
+#else
+static QDF_STATUS tdls_set_link_mode(struct tdls_action_frame_request *req)
+{
+	return QDF_STATUS_SUCCESS;
+}
+#endif
+
 QDF_STATUS tdls_process_mgmt_req(
 			struct tdls_action_frame_request *tdls_mgmt_req)
 {
@@ -791,6 +858,14 @@ QDF_STATUS tdls_process_mgmt_req(
 	/* If connected and in Infra. Only then allow this */
 	status = tdls_validate_mgmt_request(tdls_mgmt_req);
 	if (status != QDF_STATUS_SUCCESS) {
+		status = tdls_internal_send_mgmt_tx_done(tdls_mgmt_req,
+							 status);
+		goto error_mgmt;
+	}
+
+	status = tdls_set_link_mode(tdls_mgmt_req);
+	if (status != QDF_STATUS_SUCCESS) {
+		tdls_err("failed to set link active");
 		status = tdls_internal_send_mgmt_tx_done(tdls_mgmt_req,
 							 status);
 		goto error_mgmt;

@@ -80,6 +80,7 @@ int wlan_hdd_tdls_get_all_peers(struct hdd_adapter *adapter,
 	int len;
 	struct hdd_context *hdd_ctx;
 	struct wlan_objmgr_vdev *vdev;
+	struct wlan_objmgr_vdev *link_vdev;
 	int ret;
 
 	hdd_enter();
@@ -103,7 +104,15 @@ int wlan_hdd_tdls_get_all_peers(struct hdd_adapter *adapter,
 		len = scnprintf(buf, buflen, "\nVDEV is NULL\n");
 		return len;
 	}
-	ret = wlan_cfg80211_tdls_get_all_peers(vdev, buf, buflen);
+
+	link_vdev = ucfg_tdls_get_tdls_link_vdev(vdev, WLAN_OSIF_TDLS_ID);
+	if (link_vdev) {
+		ret = wlan_cfg80211_tdls_get_all_peers(link_vdev, buf, buflen);
+		ucfg_tdls_put_tdls_link_vdev(link_vdev, WLAN_OSIF_TDLS_ID);
+	} else {
+		ret = wlan_cfg80211_tdls_get_all_peers(vdev, buf, buflen);
+	}
+
 	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_TDLS_ID);
 
 	return ret;
@@ -467,6 +476,9 @@ static int __wlan_hdd_cfg80211_tdls_mgmt(struct wiphy *wiphy,
 	struct hdd_adapter *adapter = WLAN_HDD_GET_PRIV_PTR(dev);
 	struct hdd_context *hdd_ctx = wiphy_priv(wiphy);
 	bool tdls_support;
+#ifndef TDLS_MGMT_VERSION5
+	int link_id = -1;
+#endif
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(3, 15, 0))
 #if !(TDLS_MGMT_VERSION2)
 	u32 peer_capability;
@@ -498,17 +510,12 @@ static int __wlan_hdd_cfg80211_tdls_mgmt(struct wiphy *wiphy,
 	}
 
 	if (hdd_ctx->tdls_umac_comp_active) {
-		struct wlan_objmgr_vdev *vdev;
 		int ret;
 
-		vdev = hdd_objmgr_get_vdev_by_user(adapter, WLAN_OSIF_TDLS_ID);
-		if (!vdev)
-			return -EINVAL;
-		ret = wlan_cfg80211_tdls_mgmt(vdev, peer,
-					      action_code, dialog_token,
-					      status_code, peer_capability,
-					      buf, len);
-		hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_TDLS_ID);
+		ret = wlan_cfg80211_tdls_mgmt_mlo(adapter, peer,
+						  action_code, dialog_token,
+						  status_code, peer_capability,
+						  buf, len, link_id);
 		return ret;
 	}
 

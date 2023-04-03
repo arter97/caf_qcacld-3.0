@@ -1008,6 +1008,7 @@ static void tdls_ct_process_handler(struct wlan_objmgr_vdev *vdev)
 void tdls_ct_handler(void *user_data)
 {
 	struct wlan_objmgr_vdev *vdev;
+	struct wlan_objmgr_vdev *link_vdev;
 
 	if (!user_data)
 		return;
@@ -1016,7 +1017,17 @@ void tdls_ct_handler(void *user_data)
 	if (!vdev)
 		return;
 
-	tdls_ct_process_handler(vdev);
+	link_vdev = tdls_mlo_get_tdls_link_vdev(vdev);
+	if (link_vdev) {
+		if (wlan_objmgr_vdev_try_get_ref(link_vdev, WLAN_TDLS_NB_ID) ==
+		    QDF_STATUS_SUCCESS) {
+			tdls_ct_process_handler(link_vdev);
+			wlan_objmgr_vdev_release_ref(link_vdev,
+						     WLAN_TDLS_NB_ID);
+		}
+	} else {
+		tdls_ct_process_handler(vdev);
+	}
 
 	wlan_objmgr_vdev_release_ref(vdev,
 				     WLAN_TDLS_NB_ID);
