@@ -745,6 +745,26 @@ static inline uint8_t wlan_vdev_get_psoc_id(struct wlan_objmgr_vdev *vdev)
 }
 
 /**
+ * wlan_vdev_skip_pumac() - get primary umac support
+ * @vdev: VDEV object
+ *
+ * API to get Primary umac support for MLO
+ *
+ * Return: get primary umac support (bool)
+ */
+static inline bool wlan_vdev_skip_pumac(struct wlan_objmgr_vdev *vdev)
+{
+	struct wlan_objmgr_psoc *psoc;
+
+	psoc = wlan_vdev_get_psoc(vdev);
+
+	if (wlan_psoc_get_pumac_skip(psoc))
+		return true;
+
+	return false;
+}
+
+/**
  * wlan_vdev_mlme_set_opmode() - set vdev opmode
  * @vdev: VDEV object
  * @mode: VDEV op mode
