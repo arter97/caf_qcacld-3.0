@@ -2637,14 +2637,20 @@ void lim_process_assoc_req_frame(struct mac_context *mac_ctx,
 	 */
 	sta_ds = dph_lookup_hash_entry(mac_ctx, hdr->sa, &assoc_id,
 				&session->dph.dphHashTable);
-	if (sta_ds) {
+	if (sta_ds && !sta_ds->rmfEnabled) {
+		/*
+		 * Drop only retries for non-PMF assoc requests.
+		 * For PMF case:
+		 * a) Before key installation - Drop assoc request
+		 * b) After key installation - Send SA query
+		 */
 		if (hdr->fc.retry > 0) {
 			pe_err("STA is initiating Assoc Req after ACK lost. Do not process sessionid: %d sys sub_type=%d for role=%d from: "
 				QDF_MAC_ADDR_FMT, session->peSessionId,
 			sub_type, GET_LIM_SYSTEM_ROLE(session),
 			QDF_MAC_ADDR_REF(hdr->sa));
 			return;
-		} else if (!sta_ds->rmfEnabled && (sub_type == LIM_REASSOC)) {
+		} else if (sub_type == LIM_REASSOC) {
 			/*
 			 * SAP should send reassoc response with reject code
 			 * to avoid IOT issues. as per the specification SAP
@@ -2658,7 +2664,7 @@ void lim_process_assoc_req_frame(struct mac_context *mac_ctx,
 				sub_type, sta_ds, session, false);
 			pe_err("Rejecting reassoc req from STA");
 			return;
-		} else if (!sta_ds->rmfEnabled) {
+		} else {
 			/*
 			 * Do this only for non PMF case.
 			 * STA might have missed the assoc response, so it is
@@ -2675,16 +2681,16 @@ void lim_process_assoc_req_frame(struct mac_context *mac_ctx,
 				session->limSystemRole,
 				QDF_MAC_ADDR_REF(hdr->sa));
 			return;
-		} else if (sta_ds->rmfEnabled && !sta_ds->is_key_installed) {
-			/* When PMF enabled, SA Query will be triggered
-			 * unexpectedly if duplicated assoc_req received -
-			 * 1) after pre_auth node deleted and
-			 * 2) before key installed.
-			 * Here drop such duplicated assoc_req frame.
-			 */
-			pe_err("Drop duplicate assoc_req before 4-way HS");
-			return;
 		}
+	} else if (sta_ds && sta_ds->rmfEnabled && !sta_ds->is_key_installed) {
+		/* When PMF enabled, SA Query will be triggered
+		 * unexpectedly if duplicated assoc_req received -
+		 * 1) after pre_auth node deleted and
+		 * 2) before key installed.
+		 * Here drop such duplicated assoc_req frame.
+		 */
+		pe_err("Drop duplicate assoc_req before 4-way HS");
+		return;
 	}
 
 	/* Get pointer to Re/Association Request frame body */
