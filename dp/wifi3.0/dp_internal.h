@@ -2733,6 +2733,20 @@ bool dp_umac_reset_target_recovery_check(struct dp_soc *soc);
  * Return: true if the soc is ignored or false otherwise
  */
 bool dp_umac_reset_is_soc_ignored(struct dp_soc *soc);
+
+/**
+ * dp_mlo_umac_reset_stats_print() - API to print MLO umac reset stats
+ * @soc: dp soc handle
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS dp_mlo_umac_reset_stats_print(struct dp_soc *soc);
+#else
+static inline
+QDF_STATUS dp_mlo_umac_reset_stats_print(struct dp_soc *soc)
+{
+	return QDF_STATUS_SUCCESS;
+}
 #endif
 
 #endif
