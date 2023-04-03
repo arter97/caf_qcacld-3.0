@@ -7691,8 +7691,8 @@ dp_print_pdev_tx_stats(struct dp_pdev *pdev)
 		       pdev->stats.ppdu_wrap_drop);
 
 	for (i = 0; i < CDP_WDI_NUM_EVENTS; i++) {
-		if (!pdev->stats.wdi_event[i])
-			DP_PRINT_STATS("Wdi msgs received from fw[%d]:%d",
+		if (pdev->stats.wdi_event[i])
+			DP_PRINT_STATS("Wdi msgs received for event ID[%d]:%d",
 				       i, pdev->stats.wdi_event[i]);
 	}
 
