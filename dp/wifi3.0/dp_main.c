@@ -8824,6 +8824,7 @@ dp_record_mscs_params(struct cdp_soc_t *soc_hdl, uint8_t *peer_mac,
 		      bool active)
 {
 	struct dp_peer *peer;
+	struct dp_peer *tgt_peer;
 	QDF_STATUS status = QDF_STATUS_E_INVAL;
 	struct dp_soc *soc = (struct dp_soc *)soc_hdl;
 
@@ -8834,37 +8835,42 @@ dp_record_mscs_params(struct cdp_soc_t *soc_hdl, uint8_t *peer_mac,
 		dp_err("Peer is NULL!");
 		goto fail;
 	}
+
+	tgt_peer = dp_get_tgt_peer_from_peer(peer);
+	if (!tgt_peer)
+		goto fail;
+
 	if (!active) {
 		dp_info("MSCS Procedure is terminated");
-		peer->mscs_active = active;
+		tgt_peer->mscs_active = active;
 		goto fail;
 	}
 
 	if (mscs_params->classifier_type == IEEE80211_TCLAS_MASK_CLA_TYPE_4) {
 		/* Populate entries inside IPV4 database first */
-		peer->mscs_ipv4_parameter.user_priority_bitmap =
+		tgt_peer->mscs_ipv4_parameter.user_priority_bitmap =
 			mscs_params->user_pri_bitmap;
-		peer->mscs_ipv4_parameter.user_priority_limit =
+		tgt_peer->mscs_ipv4_parameter.user_priority_limit =
 			mscs_params->user_pri_limit;
-		peer->mscs_ipv4_parameter.classifier_mask =
+		tgt_peer->mscs_ipv4_parameter.classifier_mask =
 			mscs_params->classifier_mask;
 
 		/* Populate entries inside IPV6 database */
-		peer->mscs_ipv6_parameter.user_priority_bitmap =
+		tgt_peer->mscs_ipv6_parameter.user_priority_bitmap =
 			mscs_params->user_pri_bitmap;
-		peer->mscs_ipv6_parameter.user_priority_limit =
+		tgt_peer->mscs_ipv6_parameter.user_priority_limit =
 			mscs_params->user_pri_limit;
-		peer->mscs_ipv6_parameter.classifier_mask =
+		tgt_peer->mscs_ipv6_parameter.classifier_mask =
 			mscs_params->classifier_mask;
-		peer->mscs_active = 1;
+		tgt_peer->mscs_active = 1;
 		dp_info("\n\tMSCS Procedure request based parameters for "QDF_MAC_ADDR_FMT"\n"
 			"\tClassifier_type = %d\tUser priority bitmap = %x\n"
 			"\tUser priority limit = %x\tClassifier mask = %x",
 			QDF_MAC_ADDR_REF(peer_mac),
 			mscs_params->classifier_type,
-			peer->mscs_ipv4_parameter.user_priority_bitmap,
-			peer->mscs_ipv4_parameter.user_priority_limit,
-			peer->mscs_ipv4_parameter.classifier_mask);
+			tgt_peer->mscs_ipv4_parameter.user_priority_bitmap,
+			tgt_peer->mscs_ipv4_parameter.user_priority_limit,
+			tgt_peer->mscs_ipv4_parameter.classifier_mask);
 	}
 
 	status = QDF_STATUS_SUCCESS;
