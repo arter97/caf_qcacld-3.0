@@ -135,4 +135,8 @@ config WLAN_TX_FLOW_CONTROL_V2
 	bool "Enable tx flow control version:2"
 	default n
 
+config QCA_DMA_PADDR_CHECK
+	bool "Enable dma memory addr check"
+	default n
+
 endif # QCA_CLD_WLAN

@@ -3984,6 +3984,8 @@ static int hdd_debug_domain_set(enum qdf_debug_domain domain)
 
 	return ret;
 }
+
+#define hdd_debug_domain_get() qdf_debug_domain_get()
 #else
 static void hdd_check_for_objmgr_peer_leaks(struct wlan_objmgr_psoc *psoc)
 {
@@ -4052,6 +4054,7 @@ static void hdd_check_for_leaks(struct hdd_context *hdd_ctx, bool is_ssr)
 }
 
 #define hdd_debug_domain_set(domain) 0
+#define hdd_debug_domain_get() DEFAULT_DEBUG_DOMAIN_INIT
 #endif /* CONFIG_LEAK_DETECTION */
 
 #ifdef FEATURE_WLAN_AP_AP_ACS_OPTIMIZE
@@ -15659,8 +15662,12 @@ int hdd_wlan_stop_modules(struct hdd_context *hdd_ctx, bool ftm_mode)
 	ucfg_dp_bbm_apply_independent_policy(hdd_ctx->psoc, &param);
 
 	hdd_deinit_adapter_ops_wq(hdd_ctx);
+	hdd_deinit_qdf_ctx(hdd_debug_domain_get());
+
 	hdd_check_for_leaks(hdd_ctx, is_recovery_stop);
 	hdd_debug_domain_set(QDF_DEBUG_DOMAIN_INIT);
+	hdd_deinit_qdf_ctx(hdd_debug_domain_get());
+	qdf_dma_invalid_buf_list_deinit();
 
 	/* Restore PS params for monitor mode */
 	if (hdd_get_conparam() == QDF_GLOBAL_MONITOR_MODE)

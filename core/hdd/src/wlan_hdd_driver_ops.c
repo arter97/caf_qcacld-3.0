@@ -534,10 +534,30 @@ static int hdd_init_qdf_ctx(struct device *dev, void *bdev,
 	qdf_dev->bus_type = bus_type;
 	qdf_dev->bid = bid;
 
+	qdf_dma_invalid_buf_list_init();
+
 	if (cds_smmu_mem_map_setup(qdf_dev, ucfg_ipa_is_ready()) !=
 		QDF_STATUS_SUCCESS) {
 		hdd_err("cds_smmu_mem_map_setup() failed");
 	}
+
+	return 0;
+}
+
+/**
+ * hdd_deinit_qdf_ctx() - API to Deinitialize global QDF Device structure
+ * @domain: Debug domain
+ *
+ * Return: 0 - success, < 0 - failure
+ */
+int hdd_deinit_qdf_ctx(uint8_t domain)
+{
+	qdf_device_t qdf_dev = cds_get_context(QDF_MODULE_ID_QDF_DEVICE);
+
+	if (!qdf_dev)
+		return -EINVAL;
+
+	qdf_dma_invalid_buf_free(qdf_dev->dev, domain);
 
 	return 0;
 }
