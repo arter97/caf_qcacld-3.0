@@ -1159,6 +1159,11 @@ static uint8_t hal_get_idle_link_bm_id_li(uint8_t chip_id)
 	return WBM_IDLE_DESC_LIST;
 }
 
+static inline uint8_t hal_rx_get_phy_ppdu_id_size_li(void)
+{
+	return sizeof(uint32_t);
+}
+
 void hal_hw_txrx_default_ops_attach_li(struct hal_soc *hal_soc)
 {
 	hal_soc->ops->hal_get_reo_qdesc_size = hal_get_reo_qdesc_size_li;
@@ -1251,4 +1256,6 @@ void hal_hw_txrx_default_ops_attach_li(struct hal_soc *hal_soc)
 	hal_soc->ops->hal_set_reo_ent_desc_reo_dest_ind =
 			hal_set_reo_ent_desc_reo_dest_ind_li;
 	hal_soc->ops->hal_get_idle_link_bm_id = hal_get_idle_link_bm_id_li;
+	hal_soc->ops->hal_rx_get_phy_ppdu_id_size =
+						hal_rx_get_phy_ppdu_id_size_li;
 }

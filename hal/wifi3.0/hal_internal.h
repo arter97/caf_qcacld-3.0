@@ -1376,6 +1376,7 @@ struct hal_hw_txrx_ops {
 	uint8_t *(*hal_get_reo_ent_desc_qdesc_addr)(uint8_t *desc);
 	uint64_t (*hal_rx_get_qdesc_addr)(uint8_t *dst_ring_desc,
 					  uint8_t *buf);
+	uint8_t (*hal_rx_get_phy_ppdu_id_size)(void);
 	void (*hal_set_reo_ent_desc_reo_dest_ind)(uint8_t *desc,
 						  uint32_t dst_ind);
 	QDF_STATUS

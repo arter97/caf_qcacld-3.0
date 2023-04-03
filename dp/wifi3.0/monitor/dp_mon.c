@@ -510,6 +510,7 @@ static QDF_STATUS dp_vdev_set_monitor_mode(struct cdp_soc_t *dp_soc,
 	}
 
 	mon_pdev->monitor_configured = true;
+	mon_pdev->phy_ppdu_id_size = hal_rx_get_phy_ppdu_id_size(soc->hal_soc);
 
 	/* If advance monitor filter is applied using lite_mon
 	 * via vap configuration, required filters are already applied

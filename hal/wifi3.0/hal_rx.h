@@ -3140,4 +3140,19 @@ bool hal_rx_en_mcast_fp_data_filter(hal_soc_handle_t hal_soc_hdl)
 
 	return hal_soc->ops->hal_rx_en_mcast_fp_data_filter();
 }
+
+/**
+ * hal_rx_get_phy_ppdu_id_size() - Get phy ppdu id size
+ * @hal_soc_hdl: HAL soc handle
+ *
+ * Return: phy ppdu id size
+ */
+static inline uint8_t
+hal_rx_get_phy_ppdu_id_size(hal_soc_handle_t hal_soc_hdl)
+{
+	struct hal_soc *hal_soc = (struct hal_soc *)hal_soc_hdl;
+
+	return hal_soc->ops->hal_rx_get_phy_ppdu_id_size();
+}
+
 #endif /* _HAL_RX_H */

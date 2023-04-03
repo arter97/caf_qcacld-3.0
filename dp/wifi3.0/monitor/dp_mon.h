@@ -1076,7 +1076,7 @@ struct  dp_mon_pdev {
 	/* Flag to hold on to monitor destination ring */
 	bool hold_mon_dest_ring;
 
-	/* Flag to inidicate monitor rings are initialized */
+	/* Flag to indicate monitor rings are initialized */
 	uint8_t pdev_mon_init;
 #ifndef REMOVE_PKT_LOG
 	bool pkt_log_init;
@@ -1209,6 +1209,7 @@ struct  dp_mon_pdev {
 
 	bool rssi_dbm_conv_support;
 	struct dp_rx_mon_rssi_offset rssi_offsets;
+	uint8_t phy_ppdu_id_size;
 };
 
 struct  dp_mon_vdev {
