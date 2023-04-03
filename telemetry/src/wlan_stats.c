@@ -4149,6 +4149,24 @@ get_pdev_tx_capture_stats(void *dp_soc_handle, uint8_t pdev_id,
 }
 #endif /* WLAN_TX_PKT_CAPTURE_ENH */
 
+#ifdef WLAN_CONFIG_TELEMETRY_AGENT
+static QDF_STATUS get_peer_deter_stats(
+				ol_txrx_soc_handle soc,
+				uint8_t vdev_id,
+				uint8_t *addr,
+				struct cdp_peer_deter_stats *deter)
+{
+	return cdp_get_peer_deter_stats(soc, vdev_id,
+					addr, deter);
+}
+static QDF_STATUS get_pdev_deter_stats(
+				ol_txrx_soc_handle soc,
+				uint8_t pdev_id,
+				struct cdp_pdev_deter_stats *deter)
+{
+	return cdp_get_pdev_deter_stats(soc, pdev_id, deter);
+}
+
 static QDF_STATUS
 get_debug_peer_deter_stats(struct unified_stats *stats,
 			   struct cdp_peer_deter_stats *deter)
@@ -4180,6 +4198,31 @@ get_debug_peer_deter_stats(struct unified_stats *stats,
 
 	return QDF_STATUS_SUCCESS;
 }
+#else
+static QDF_STATUS get_peer_deter_stats(
+				ol_txrx_soc_handle soc,
+				uint8_t vdev_id,
+				uint8_t *addr,
+				struct cdp_peer_deter_stats *deter)
+{
+	return QDF_STATUS_E_FAILURE;
+}
+
+static QDF_STATUS get_pdev_deter_stats(
+				ol_txrx_soc_handle soc,
+				uint8_t pdev_id,
+				struct cdp_pdev_deter_stats *stats)
+{
+	return QDF_STATUS_E_FAILURE;
+}
+
+static QDF_STATUS
+get_debug_peer_deter_stats(struct unified_stats *stats,
+			   struct cdp_peer_deter_stats *deter)
+{
+	return QDF_STATUS_E_FAILURE;
+}
+#endif
 
 static QDF_STATUS get_debug_peer_data(struct wlan_objmgr_psoc *psoc,
 				      struct wlan_objmgr_vdev *vdev,
@@ -4261,8 +4304,8 @@ static QDF_STATUS get_debug_peer_data(struct wlan_objmgr_psoc *psoc,
 			ret = QDF_STATUS_E_NOMEM;
 			goto get_failed;
 		}
-		ret = cdp_get_peer_deter_stats(dp_soc, vdev_id,
-					       peer_mac, deter);
+		ret = get_peer_deter_stats(dp_soc, vdev_id,
+					   peer_mac, deter);
 		if (ret == QDF_STATUS_SUCCESS)
 			ret = get_debug_peer_deter_stats(stats, deter);
 		if (ret != QDF_STATUS_SUCCESS)
@@ -5415,6 +5458,7 @@ static QDF_STATUS get_debug_pdev_ctrl_link(struct unified_stats *stats,
 	return QDF_STATUS_SUCCESS;
 }
 
+#ifdef WLAN_CONFIG_TELEMETRY_AGENT
 static QDF_STATUS
 get_debug_pdev_deter_stats(struct unified_stats *stats,
 			   struct cdp_pdev_deter_stats *deter)
@@ -5469,6 +5513,14 @@ get_debug_pdev_deter_stats(struct unified_stats *stats,
 
 	return QDF_STATUS_SUCCESS;
 }
+#else
+static QDF_STATUS
+get_debug_pdev_deter_stats(struct unified_stats *stats,
+			   struct cdp_pdev_deter_stats *deter)
+{
+	return QDF_STATUS_E_FAILURE;
+}
+#endif
 
 static void aggregate_debug_pdev_ctrl_tx(struct debug_pdev_ctrl_tx *tx,
 					 struct vdev_ic_cp_stats *cp_stats)
@@ -5661,7 +5713,7 @@ static QDF_STATUS get_debug_pdev_data(struct wlan_objmgr_psoc *psoc,
 			ret = QDF_STATUS_E_NOMEM;
 			goto get_failed;
 		}
-		ret = cdp_get_pdev_deter_stats(dp_soc, pdev_id, deter);
+		ret = get_pdev_deter_stats(dp_soc, pdev_id, deter);
 		if (ret == QDF_STATUS_SUCCESS)
 			ret = get_debug_pdev_deter_stats(stats, deter);
 		if (ret != QDF_STATUS_SUCCESS)
