@@ -118,11 +118,11 @@ cdp_update_mon_mac_filter(ol_txrx_soc_handle soc,
 		return QDF_STATUS_E_FAILURE;
 	}
 
-	if (!soc->ops->ctrl_ops ||
-	    !soc->ops->ctrl_ops->txrx_update_mon_mac_filter)
+	if (!soc->ops->mon_ops ||
+	    !soc->ops->mon_ops->txrx_update_mon_mac_filter)
 		return QDF_STATUS_E_FAILURE;
 
-	return soc->ops->ctrl_ops->txrx_update_mon_mac_filter
+	return soc->ops->mon_ops->txrx_update_mon_mac_filter
 			(soc, vdev_id, cmd);
 }
 
