@@ -2622,15 +2622,18 @@ void dp_peer_rx_reo_shared_qaddr_delete(struct dp_soc *soc,
 					struct dp_peer *peer)
 {
 	uint8_t tid;
+	uint16_t peer_id;
 
-	if (peer->peer_id > soc->max_peer_id)
+	peer_id = peer->peer_id;
+
+	if (peer_id > soc->max_peer_id)
 		return;
 	if (IS_MLO_DP_LINK_PEER(peer))
 		return;
 	if (hal_reo_shared_qaddr_is_enable(soc->hal_soc)) {
 		for (tid = 0; tid < DP_MAX_TIDS; tid++)
 			hal_reo_shared_qaddr_write(soc->hal_soc,
-						   peer->peer_id, tid, 0);
+						   peer_id, tid, 0);
 	}
 }
 #endif
