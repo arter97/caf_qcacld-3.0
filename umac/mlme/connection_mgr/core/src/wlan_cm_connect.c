@@ -1733,6 +1733,7 @@ static QDF_STATUS cm_get_valid_candidate(struct cnx_mgr *cm_ctx,
 	uint8_t vdev_id = wlan_vdev_get_id(cm_ctx->vdev);
 	bool use_same_candidate = false;
 	int32_t akm;
+	struct qdf_mac_addr *pmksa_mac;
 
 	psoc = wlan_vdev_get_psoc(cm_ctx->vdev);
 	if (!psoc) {
@@ -1858,9 +1859,19 @@ flush_single_pmk:
 	 */
 	if (prev_candidate && !use_same_candidate &&
 	    util_scan_entry_single_pmk(psoc, prev_candidate->entry) &&
-	    QDF_HAS_PARAM(akm, WLAN_CRYPTO_KEY_MGMT_SAE))
-		cm_delete_pmksa_for_single_pmk_bssid(cm_ctx,
-						&prev_candidate->entry->bssid);
+	    QDF_HAS_PARAM(akm, WLAN_CRYPTO_KEY_MGMT_SAE)) {
+		pmksa_mac = &prev_candidate->entry->bssid;
+		cm_delete_pmksa_for_single_pmk_bssid(cm_ctx, pmksa_mac);
+
+		/* If the candidate is ML capable, the PMKSA entry might
+		 * exist with it's MLD address, so check and purge the
+		 * PMKSA entry with MLD address for ML candidate.
+		 */
+		pmksa_mac = (struct qdf_mac_addr *)
+				util_scan_entry_mldaddr(prev_candidate->entry);
+		if (pmksa_mac)
+			cm_delete_pmksa_for_single_pmk_bssid(cm_ctx, pmksa_mac);
+	}
 
 	if (same_candidate_used)
 		*same_candidate_used = use_same_candidate;
@@ -2680,6 +2691,7 @@ QDF_STATUS cm_connect_rsp(struct wlan_objmgr_vdev *vdev,
 	QDF_STATUS qdf_status;
 	wlan_cm_id cm_id;
 	uint32_t prefix;
+	struct qdf_mac_addr pmksa_mac = QDF_MAC_ADDR_ZERO_INIT;
 
 	cm_ctx = cm_get_cm_ctx(vdev);
 	if (!cm_ctx)
@@ -2696,6 +2708,8 @@ QDF_STATUS cm_connect_rsp(struct wlan_objmgr_vdev *vdev,
 		goto post_err;
 	}
 
+	cm_connect_rsp_get_mld_addr_or_bssid(resp, &pmksa_mac);
+
 	if (QDF_IS_STATUS_SUCCESS(resp->connect_status)) {
 		/*
 		 * On successful connection to sae single pmk AP,
@@ -2703,7 +2717,7 @@ QDF_STATUS cm_connect_rsp(struct wlan_objmgr_vdev *vdev,
 		 */
 		if (cm_is_cm_id_current_candidate_single_pmk(cm_ctx, cm_id))
 			wlan_crypto_selective_clear_sae_single_pmk_entries(vdev,
-								&resp->bssid);
+								&pmksa_mac);
 		qdf_status =
 			cm_sm_deliver_event(vdev,
 					    WLAN_CM_SM_EV_CONNECT_SUCCESS,
@@ -2724,7 +2738,7 @@ QDF_STATUS cm_connect_rsp(struct wlan_objmgr_vdev *vdev,
 	 * the same stale PMKID. when connection is tried again with this AP.
 	 */
 	if (resp->status_code == STATUS_INVALID_PMKID)
-		cm_delete_pmksa_for_bssid(cm_ctx, &resp->bssid);
+		cm_delete_pmksa_for_bssid(cm_ctx, &pmksa_mac);
 
 	/* In case of failure try with next candidate */
 	qdf_status =
@@ -2739,7 +2753,7 @@ QDF_STATUS cm_connect_rsp(struct wlan_objmgr_vdev *vdev,
 	 * entry in case of post failure.
 	 */
 	if (cm_is_cm_id_current_candidate_single_pmk(cm_ctx, cm_id))
-		cm_delete_pmksa_for_single_pmk_bssid(cm_ctx, &resp->bssid);
+		cm_delete_pmksa_for_single_pmk_bssid(cm_ctx, &pmksa_mac);
 post_err:
 	/*
 	 * If there is a event posting error it means the SM state is not in

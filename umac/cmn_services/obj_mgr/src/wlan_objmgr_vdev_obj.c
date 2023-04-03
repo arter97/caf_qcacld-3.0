@@ -1422,6 +1422,16 @@ void wlan_objmgr_vdev_peer_freed_notify(struct wlan_objmgr_vdev *vdev)
 	}
 }
 
+QDF_STATUS
+wlan_vdev_get_bss_peer_mac_for_pmksa(struct wlan_objmgr_vdev *vdev,
+				     struct qdf_mac_addr *bss_peer_mac)
+{
+	if (wlan_vdev_mlme_is_mlo_vdev(vdev))
+		return wlan_vdev_get_bss_peer_mld_mac(vdev, bss_peer_mac);
+
+	return wlan_vdev_get_bss_peer_mac(vdev, bss_peer_mac);
+}
+
 QDF_STATUS wlan_vdev_get_bss_peer_mac(struct wlan_objmgr_vdev *vdev,
 				      struct qdf_mac_addr *bss_peer_mac)
 {
