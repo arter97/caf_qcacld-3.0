@@ -241,6 +241,7 @@
 #include "os_if_qmi.h"
 #include "wlan_qmi_ucfg_api.h"
 #include "ce_api.h"
+#include "wlan_psoc_mlme_ucfg_api.h"
 
 #ifdef MULTI_CLIENT_LL_SUPPORT
 #define WLAM_WLM_HOST_DRIVER_PORT_ID 0xFFFFFF
@@ -11751,6 +11752,52 @@ hdd_store_sap_restart_channel(qdf_freq_t restart_chan, qdf_freq_t *restart_chan_
 }
 
 /**
+ * hdd_check_chn_bw_boundary_unsafe() - check channel range unsafe
+ * @hdd_ctxt: hdd context pointer
+ * @adapter:  hdd adapter pointer
+ *
+ * hdd_check_chn_bw_boundary_unsafe check SAP channel range with certain
+ * bandwidth whether cover all unsafe channel list.
+ *
+ * Return - bool
+ */
+static bool
+hdd_check_chn_bw_boundary_unsafe(struct hdd_context *hdd_ctxt,
+				 struct hdd_adapter *adapter)
+{
+	uint32_t freq;
+	uint32_t start_freq = 0;
+	uint32_t end_freq = 0;
+	uint32_t i;
+	uint8_t ch_width;
+	const struct bonded_channel_freq *bonded_chan_ptr_ptr = NULL;
+
+	freq = adapter->deflink->session.ap.operating_chan_freq;
+	ch_width = adapter->deflink->session.ap.sap_config.acs_cfg.ch_width;
+
+	if (ch_width > CH_WIDTH_20MHZ)
+		bonded_chan_ptr_ptr =
+			wlan_reg_get_bonded_chan_entry(freq, ch_width, 0);
+
+	if (bonded_chan_ptr_ptr) {
+		start_freq = bonded_chan_ptr_ptr->start_freq;
+		end_freq   = bonded_chan_ptr_ptr->end_freq;
+	}
+
+	for (i = 0; i < hdd_ctxt->unsafe_channel_count; i++) {
+		if ((freq == hdd_ctxt->unsafe_channel_list[i]) ||
+		    (start_freq <= hdd_ctxt->unsafe_channel_list[i] &&
+		     hdd_ctxt->unsafe_channel_list[i] <= end_freq)) {
+			hdd_debug("op chn freq:%u is unsafe for chn list:%u",
+				  freq, hdd_ctxt->unsafe_channel_list[i]);
+			return true;
+		}
+	}
+
+	return false;
+}
+
+/**
  * hdd_unsafe_channel_restart_sap() - restart sap if sap is on unsafe channel
  * @hdd_ctxt: hdd context pointer
  *
@@ -11803,19 +11850,11 @@ void hdd_unsafe_channel_restart_sap(struct hdd_context *hdd_ctxt)
 		if ((policy_mgr_is_sta_sap_scc(hdd_ctxt->psoc, ap_ctx->operating_chan_freq) &&
 		     scc_on_lte_coex) ||
 		    policy_mgr_nan_sap_scc_on_unsafe_ch_chk(hdd_ctxt->psoc,
-							    ap_ctx->operating_chan_freq)) {
+							    ap_chan_freq))
 			hdd_debug("SAP allowed in unsafe SCC channel");
-		} else {
-			for (i = 0; i < hdd_ctxt->unsafe_channel_count; i++) {
-				if (ap_chan_freq ==
-				    hdd_ctxt->unsafe_channel_list[i]) {
-					found = true;
-					hdd_debug("op ch freq:%d is unsafe",
-						  ap_chan_freq);
-					break;
-				}
-			}
-		}
+		else
+			found = hdd_check_chn_bw_boundary_unsafe(hdd_ctxt,
+								 adapter);
 		if (!found) {
 			hdd_store_sap_restart_channel(
 				ap_chan_freq,
