@@ -46,7 +46,7 @@ struct __attribute__((__packed__)) dp_tx_comp_peer_id {
 	(((_var) & 0x30) >> 4)
 #define DP_TX_FLOW_OVERRIDE_ENABLE 0x1
 
-#define DP_TX_FAST_DESC_SIZE	24
+#define DP_TX_FAST_DESC_SIZE	28
 #define DP_TX_L3_L4_CSUM_ENABLE	0x1f
 
 #ifdef DP_USE_REDUCED_PEER_ID_FIELD_WIDTH
