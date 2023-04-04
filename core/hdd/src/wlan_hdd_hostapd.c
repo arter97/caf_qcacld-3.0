@@ -6813,10 +6813,15 @@ error:
 free:
 	wlan_twt_concurrency_update(hdd_ctx);
 	if (deliver_start_evt) {
+		struct if_mgr_event_data evt_data;
+
+		evt_data.status = QDF_STATUS_SUCCESS;
+		if (ret < 0)
+			evt_data.status = QDF_STATUS_E_FAILURE;
+
 		status = ucfg_if_mgr_deliver_event(
-					vdev,
-					WLAN_IF_MGR_EV_AP_START_BSS_COMPLETE,
-					NULL);
+				vdev, WLAN_IF_MGR_EV_AP_START_BSS_COMPLETE,
+				&evt_data);
 		if (!QDF_IS_STATUS_SUCCESS(status)) {
 			hdd_err("start bss complete failed!!");
 			ret = -EINVAL;

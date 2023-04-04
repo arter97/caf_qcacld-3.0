@@ -125,6 +125,14 @@ void wlan_tdls_update_tx_pkt_cnt(struct wlan_objmgr_vdev *vdev,
 void wlan_tdls_update_rx_pkt_cnt(struct wlan_objmgr_vdev *vdev,
 				 struct qdf_mac_addr *mac_addr,
 				 struct qdf_mac_addr *dest_mac_addr);
+/**
+ * wlan_tdls_notify_start_bss_failure() - Notify TDLS module on start bss
+ * failure
+ * @psoc: Pointer to PSOC object
+ *
+ * Return: None
+ */
+void wlan_tdls_notify_start_bss_failure(struct wlan_objmgr_psoc *psoc);
 
 /**
  * wlan_tdls_notify_start_bss() - Notify TDLS module on start bss
@@ -254,6 +262,10 @@ void wlan_tdls_notify_channel_switch_start(struct wlan_objmgr_psoc *psoc,
 static inline
 void wlan_tdls_handle_p2p_client_connect(struct wlan_objmgr_psoc *psoc,
 					 struct wlan_objmgr_vdev *vdev)
+{}
+
+static inline
+void wlan_tdls_notify_start_bss_failure(struct wlan_objmgr_psoc *psoc)
 {}
 #endif
 #endif

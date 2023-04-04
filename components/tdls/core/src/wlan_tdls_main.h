@@ -840,17 +840,19 @@ QDF_STATUS tdls_set_offchan_mode(struct wlan_objmgr_psoc *psoc,
 				     struct tdls_channel_switch_params *param);
 
 /**
- * tdls_delete_all_peers_indication() - update tdls status info
+ * tdls_check_and_indicate_delete_all_peers() - Check if delete all peers is
+ * allowed for the vdev based on current concurrency.
  * @psoc: soc object
  * @vdev_id: vdev id
  *
- * Notify tdls component to cleanup all peers
+ * Notify tdls component to cleanup all peers based on current concurrency
+ * combination.
  *
- * Return: QDF_STATUS.
+ * Return: QDF_STATUS
  */
-
-QDF_STATUS tdls_delete_all_peers_indication(struct wlan_objmgr_psoc *psoc,
-					    uint8_t vdev_id);
+QDF_STATUS
+tdls_check_and_indicate_delete_all_peers(struct wlan_objmgr_psoc *psoc,
+					 uint8_t vdev_id);
 
 /**
  * tdls_get_opclass_from_bandwidth() - Return opclass for corresponding BW and

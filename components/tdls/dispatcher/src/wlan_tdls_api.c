@@ -269,7 +269,7 @@ void wlan_tdls_notify_channel_switch_start(struct wlan_objmgr_psoc *psoc,
 void wlan_tdls_handle_p2p_client_connect(struct wlan_objmgr_psoc *psoc,
 					 struct wlan_objmgr_vdev *vdev)
 {
-	if (policy_mgr_get_connection_count(psoc) < 2)
+	if (!policy_mgr_get_connection_count(psoc))
 		return;
 
 	/*
@@ -294,6 +294,11 @@ void wlan_tdls_notify_start_bss(struct wlan_objmgr_psoc *psoc,
 	}
 
 	wlan_tdls_check_and_teardown_links_sync(psoc, vdev);
+}
+
+void wlan_tdls_notify_start_bss_failure(struct wlan_objmgr_psoc *psoc)
+{
+	tdls_notify_decrement_session(psoc);
 }
 
 static QDF_STATUS tdls_notify_flush_cb(struct scheduler_msg *msg)

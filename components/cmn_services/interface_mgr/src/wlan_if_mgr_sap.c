@@ -31,6 +31,7 @@
 #include "wlan_mlme_vdev_mgr_interface.h"
 #include "wlan_p2p_ucfg_api.h"
 #include "wlan_vdev_mgr_utils_api.h"
+#include "wlan_tdls_tgt_api.h"
 
 QDF_STATUS if_mgr_ap_start_bss(struct wlan_objmgr_vdev *vdev,
 			       struct if_mgr_event_data *event_data)
@@ -113,6 +114,11 @@ if_mgr_ap_start_bss_complete(struct wlan_objmgr_vdev *vdev,
 	ifmgr_debug("check for SAP restart");
 	policy_mgr_check_concurrent_intf_and_restart_sap(psoc,
 				wlan_util_vdev_mgr_get_acs_mode_for_vdev(vdev));
+	/*
+	 * Enable TDLS again on concurrent STA
+	 */
+	if (event_data && QDF_IS_STATUS_ERROR(event_data->status))
+		wlan_tdls_notify_start_bss_failure(psoc);
 
 	return QDF_STATUS_SUCCESS;
 }

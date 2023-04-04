@@ -1656,14 +1656,36 @@ tdls_process_sta_disconnect(struct tdls_sta_notify_params *notify)
 QDF_STATUS tdls_notify_sta_disconnect(struct tdls_sta_notify_params *notify)
 {
 	QDF_STATUS status;
+	struct wlan_objmgr_vdev *vdev;
+	enum QDF_OPMODE opmode;
+	struct wlan_objmgr_psoc *psoc;
+	uint8_t sta_count;
 
 	if (!notify) {
 		tdls_err("invalid param");
 		return QDF_STATUS_E_INVAL;
 	}
 
-	if (!notify->vdev) {
+	vdev = notify->vdev;
+	if (!vdev) {
 		tdls_err("invalid param");
+		qdf_mem_free(notify);
+		return QDF_STATUS_E_INVAL;
+	}
+
+	psoc = wlan_vdev_get_psoc(vdev);
+	if (!psoc) {
+		wlan_objmgr_vdev_release_ref(notify->vdev, WLAN_TDLS_NB_ID);
+		qdf_mem_free(notify);
+		return QDF_STATUS_E_INVAL;
+	}
+
+	opmode = wlan_vdev_mlme_get_opmode(vdev);
+	sta_count = policy_mgr_mode_specific_connection_count(psoc, PM_STA_MODE,
+							      NULL);
+	if (opmode == QDF_P2P_CLIENT_MODE && sta_count) {
+		tdls_debug("STA + P2P concurrency. No action on P2P vdev");
+		wlan_objmgr_vdev_release_ref(notify->vdev, WLAN_TDLS_NB_ID);
 		qdf_mem_free(notify);
 		return QDF_STATUS_E_INVAL;
 	}
@@ -1750,6 +1772,7 @@ QDF_STATUS tdls_peers_deleted_notification(struct wlan_objmgr_psoc *psoc,
 	return QDF_STATUS_SUCCESS;
 }
 
+static
 QDF_STATUS tdls_delete_all_peers_indication(struct wlan_objmgr_psoc *psoc,
 					    uint8_t vdev_id)
 {
@@ -1762,13 +1785,10 @@ QDF_STATUS tdls_delete_all_peers_indication(struct wlan_objmgr_psoc *psoc,
 	if (!indication)
 		return QDF_STATUS_E_NULL_VALUE;
 
-	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc,
-						    vdev_id,
+	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, vdev_id,
 						    WLAN_TDLS_SB_ID);
-
 	if (!vdev) {
-		tdls_err("vdev not exist for the session id %d",
-			 vdev_id);
+		tdls_err("vdev:%d does not exist", vdev_id);
 		qdf_mem_free(indication);
 		return QDF_STATUS_E_INVAL;
 	}
@@ -1791,6 +1811,40 @@ QDF_STATUS tdls_delete_all_peers_indication(struct wlan_objmgr_psoc *psoc,
 	}
 
 	return QDF_STATUS_SUCCESS;
+}
+
+QDF_STATUS
+tdls_check_and_indicate_delete_all_peers(struct wlan_objmgr_psoc *psoc,
+					 uint8_t vdev_id)
+{
+	struct wlan_objmgr_pdev *pdev;
+	uint32_t pdev_id;
+	enum QDF_OPMODE opmode;
+	uint8_t sta_count =
+		policy_mgr_mode_specific_connection_count(psoc, PM_STA_MODE,
+							  NULL);
+
+	pdev_id = wlan_get_pdev_id_from_vdev_id(psoc, vdev_id, WLAN_TDLS_SB_ID);
+	if (pdev_id == WLAN_INVALID_PDEV_ID) {
+		tdls_debug("Invalid pdev id");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	pdev = wlan_objmgr_get_pdev_by_id(psoc, pdev_id, WLAN_TDLS_SB_ID);
+	if (!pdev) {
+		tdls_debug("pdev is NULL");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	opmode = wlan_get_opmode_from_vdev_id(pdev, vdev_id);
+	wlan_objmgr_pdev_release_ref(pdev, WLAN_TDLS_SB_ID);
+
+	if (opmode == QDF_P2P_CLIENT_MODE && sta_count) {
+		tdls_debug("STA + P2P concurrency. No action on P2P vdev");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	return tdls_delete_all_peers_indication(psoc, vdev_id);
 }
 
 /**
