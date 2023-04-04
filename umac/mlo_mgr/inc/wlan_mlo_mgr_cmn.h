@@ -595,3 +595,28 @@ util_parse_bw_ind(struct wlan_ie_bw_ind *bw_ind, uint8_t *ccfs0,
 		  uint8_t *ccfs1, enum phy_ch_width *ch_width,
 		  uint16_t *puncture_bitmap);
 #endif
+
+#ifdef QCA_SUPPORT_PRIMARY_LINK_MIGRATE
+/**
+ * mlo_mlme_ptqm_migrate_timer_cb() - Timer callback for ptqm migration
+ * @arg: timer function argument
+ *
+ * Return: None
+ */
+void mlo_mlme_ptqm_migrate_timer_cb(void *arg);
+
+/*
+ * wlan_mlo_set_ptqm_migration() - API to trigger ptqm migration.
+ * @vdev: vdev object
+ * @ml_peer: ml peer object
+ * @link_migration: flag to indicate if all peers of vdev need migration
+ * or individual peer migration
+ * @link_id: link id for new ptqm
+ *
+ * Return: Success if migration is triggered, else failure
+ */
+QDF_STATUS wlan_mlo_set_ptqm_migration(struct wlan_objmgr_vdev *vdev,
+				       struct wlan_mlo_peer_context *ml_peer,
+				       bool link_migration,
+				       uint32_t link_id);
+#endif

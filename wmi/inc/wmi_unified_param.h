@@ -5273,6 +5273,9 @@ typedef enum {
 #ifdef QCA_STANDALONE_SOUNDING_TRIGGER
 	wmi_vdev_standalone_sound_complete_eventid,
 #endif
+#ifdef QCA_SUPPORT_PRIMARY_LINK_MIGRATE
+	wmi_peer_ptqm_migration_response_eventid,
+#endif
 	wmi_events_max,
 } wmi_conv_event_id;
 
