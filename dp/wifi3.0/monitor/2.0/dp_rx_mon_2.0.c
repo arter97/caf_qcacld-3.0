@@ -106,7 +106,7 @@ dp_rx_mon_get_ppdu_info(struct dp_mon_pdev *mon_pdev)
 	qdf_spin_lock_bh(&mon_pdev_be->ppdu_info_lock);
 	TAILQ_FOREACH_SAFE(ppdu_info,
 			   &mon_pdev_be->rx_mon_free_queue,
-			   ppdu_list_elem,
+			   ppdu_free_list_elem,
 			   temp_ppdu_info) {
 		TAILQ_REMOVE(&mon_pdev_be->rx_mon_free_queue,
 			     ppdu_info, ppdu_free_list_elem);
