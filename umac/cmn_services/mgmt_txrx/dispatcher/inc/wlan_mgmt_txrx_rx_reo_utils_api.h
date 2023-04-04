@@ -385,6 +385,16 @@ wlan_mgmt_rx_reo_get_egress_frame_debug_list_size
 					(struct wlan_objmgr_psoc *psoc);
 
 /**
+ * wlan_mgmt_rx_reo_get_scheduler_debug_list_size() - Get the size of
+ * scheduler debug list
+ * @psoc: pointer to psoc object
+ *
+ * Return: Size of scheduler debug list
+ */
+uint16_t
+wlan_mgmt_rx_reo_get_scheduler_debug_list_size(struct wlan_objmgr_psoc *psoc);
+
+/**
  * wlan_mgmt_rx_reo_is_simulation_in_progress() - API to check whether
  * simulation is in progress
  * @ml_grp_id: MLO group id of the required mlo context

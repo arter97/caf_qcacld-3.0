@@ -1555,11 +1555,14 @@ static QDF_STATUS
 mgmt_rx_reo_debug_print_egress_frame_stats(struct mgmt_rx_reo_context *reo_ctx)
 {
 	struct reo_egress_frame_stats *stats;
+	struct reo_scheduler_stats *scheduler_stats;
 	uint8_t link_id;
 	uint8_t reason;
 	uint64_t total_delivery_attempts_count = 0;
 	uint64_t total_delivery_success_count = 0;
 	uint64_t total_premature_delivery_count = 0;
+	uint64_t total_scheduled_count = 0;
+	uint64_t total_rescheduled_count = 0;
 	uint64_t delivery_count_per_link[MAX_MLO_LINKS] = {0};
 	uint64_t delivery_count_per_reason[RELEASE_REASON_MAX] = {0};
 	uint64_t total_delivery_count = 0;
@@ -1570,6 +1573,7 @@ mgmt_rx_reo_debug_print_egress_frame_stats(struct mgmt_rx_reo_context *reo_ctx)
 		return QDF_STATUS_E_NULL_VALUE;
 
 	stats = &reo_ctx->egress_frame_debug_info.stats;
+	scheduler_stats = &reo_ctx->scheduler_debug_info.stats;
 
 	for (link_id = 0; link_id < MAX_MLO_LINKS; link_id++) {
 		total_delivery_attempts_count +=
@@ -1578,6 +1582,10 @@ mgmt_rx_reo_debug_print_egress_frame_stats(struct mgmt_rx_reo_context *reo_ctx)
 				stats->delivery_success_count[link_id];
 		total_premature_delivery_count +=
 				stats->premature_delivery_count[link_id];
+		total_scheduled_count +=
+				scheduler_stats->scheduled_count[link_id];
+		total_rescheduled_count +=
+				scheduler_stats->rescheduled_count[link_id];
 	}
 
 	for (link_id = 0; link_id < MAX_MLO_LINKS; link_id++) {
@@ -1654,6 +1662,21 @@ mgmt_rx_reo_debug_print_egress_frame_stats(struct mgmt_rx_reo_context *reo_ctx)
 			  delivery_count_per_link[4],
 			  delivery_count_per_link[5],
 			  total_delivery_count);
+
+	mgmt_rx_reo_alert("\t3) Scheduler stats:");
+	mgmt_rx_reo_alert("\t------------------------------------");
+	mgmt_rx_reo_alert("\t|link id   |Scheduled |Rescheduled |");
+	mgmt_rx_reo_alert("\t|          | count    | count      |");
+	mgmt_rx_reo_alert("\t------------------------------------");
+	for (link_id = 0; link_id < MAX_MLO_LINKS; link_id++) {
+		mgmt_rx_reo_alert("\t|%10u|%10llu|%12llu|", link_id,
+				  scheduler_stats->scheduled_count[link_id],
+				  scheduler_stats->rescheduled_count[link_id]);
+	mgmt_rx_reo_alert("\t------------------------------------");
+	}
+	mgmt_rx_reo_alert("\t%11s|%10llu|%12llu|\n\n", "",
+			  total_scheduled_count,
+			  total_rescheduled_count);
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -2165,6 +2188,116 @@ mgmt_rx_reo_is_entry_ready_to_send_up(struct mgmt_rx_reo_list_entry *entry)
 	       LIST_ENTRY_IS_OLDER_THAN_READY_TO_DELIVER_FRAMES(entry);
 }
 
+#ifdef WLAN_MGMT_RX_REO_DEBUG_SUPPORT
+/**
+ * mgmt_rx_reo_scheduler_debug_info_enabled() - API to check whether scheduler
+ * debug feaure is enabled
+ * @scheduler_debug_info: Pointer to scheduler debug info object
+ *
+ * Return: true or false
+ */
+static bool
+mgmt_rx_reo_scheduler_debug_info_enabled
+			(struct reo_scheduler_debug_info *scheduler_debug_info)
+{
+	return scheduler_debug_info->frame_list_size;
+}
+
+/**
+ * mgmt_rx_reo_log_scheduler_debug_info() - Log the information about a
+ * frame getting scheduled by mgmt rx reo scheduler
+ * @reo_ctx: management rx reorder context
+ * @entry: Pointer to reorder list entry
+ * @context: Current execution context
+ * @reschedule: Indicates rescheduling
+ *
+ * Return: QDF_STATUS of operation
+ */
+static QDF_STATUS
+mgmt_rx_reo_log_scheduler_debug_info(struct mgmt_rx_reo_context *reo_ctx,
+				     struct mgmt_rx_reo_list_entry *entry,
+				     enum mgmt_rx_reo_execution_context context,
+				     bool reschedule)
+{
+	struct reo_scheduler_debug_info *scheduler_debug_info;
+	struct reo_scheduler_debug_frame_info *cur_frame_debug_info;
+	struct reo_scheduler_stats *stats;
+	uint8_t link_id;
+
+	if (!reo_ctx || !entry)
+		return QDF_STATUS_E_NULL_VALUE;
+
+	scheduler_debug_info = &reo_ctx->scheduler_debug_info;
+
+	stats = &scheduler_debug_info->stats;
+	link_id = mgmt_rx_reo_get_link_id(entry->rx_params);
+	stats->scheduled_count[link_id]++;
+	if (reschedule)
+		stats->rescheduled_count[link_id]++;
+
+	if (!mgmt_rx_reo_scheduler_debug_info_enabled(scheduler_debug_info))
+		return QDF_STATUS_SUCCESS;
+
+	cur_frame_debug_info = &scheduler_debug_info->frame_list
+			[scheduler_debug_info->next_index];
+
+	cur_frame_debug_info->link_id = link_id;
+	cur_frame_debug_info->mgmt_pkt_ctr =
+				mgmt_rx_reo_get_pkt_counter(entry->rx_params);
+	cur_frame_debug_info->global_timestamp =
+				mgmt_rx_reo_get_global_ts(entry->rx_params);
+	cur_frame_debug_info->initial_wait_count = entry->initial_wait_count;
+	cur_frame_debug_info->final_wait_count = entry->wait_count;
+	qdf_mem_copy(cur_frame_debug_info->shared_snapshots,
+		     entry->shared_snapshots,
+		     qdf_min(sizeof(cur_frame_debug_info->shared_snapshots),
+			     sizeof(entry->shared_snapshots)));
+	qdf_mem_copy(cur_frame_debug_info->host_snapshot, entry->host_snapshot,
+		     qdf_min(sizeof(cur_frame_debug_info->host_snapshot),
+			     sizeof(entry->host_snapshot)));
+	cur_frame_debug_info->ingress_timestamp = entry->ingress_timestamp;
+	cur_frame_debug_info->ingress_list_insertion_ts =
+					entry->ingress_list_insertion_ts;
+	cur_frame_debug_info->ingress_list_removal_ts =
+					entry->ingress_list_removal_ts;
+	cur_frame_debug_info->egress_list_insertion_ts =
+					entry->egress_list_insertion_ts;
+	cur_frame_debug_info->scheduled_ts = qdf_get_log_timestamp();
+	cur_frame_debug_info->release_reason = entry->release_reason;
+	cur_frame_debug_info->is_premature_delivery =
+						entry->is_premature_delivery;
+	cur_frame_debug_info->cpu_id = qdf_get_smp_processor_id();
+	cur_frame_debug_info->context = context;
+
+	scheduler_debug_info->next_index++;
+	scheduler_debug_info->next_index %=
+				scheduler_debug_info->frame_list_size;
+	if (scheduler_debug_info->next_index == 0)
+		scheduler_debug_info->wrap_aroud = true;
+
+	return QDF_STATUS_SUCCESS;
+}
+#else
+/**
+ * mgmt_rx_reo_log_scheduler_debug_info() - Log the information about a
+ * frame getting scheduled by mgmt rx reo scheduler
+ * @reo_ctx: management rx reorder context
+ * @entry: Pointer to reorder list entry
+ * @context: Current execution context
+ * @reschedule: Indicates rescheduling
+ *
+ * Return: QDF_STATUS of operation
+ */
+static inline QDF_STATUS
+mgmt_rx_reo_log_scheduler_debug_info(struct mgmt_rx_reo_context *reo_ctx,
+				     struct mgmt_rx_reo_list_entry *entry,
+				     enum mgmt_rx_reo_execution_context context,
+				     bool reschedule)
+{
+	return QDF_STATUS_SUCCESS;
+}
+#endif /* WLAN_MGMT_RX_REO_DEBUG_SUPPORT */
+
 /**
  * mgmt_rx_reo_defer_delivery() - Helper API to check whether a management
  * frame can be delivered in the current context or it has to be scheduled
@@ -2191,25 +2324,55 @@ mgmt_rx_reo_defer_delivery(struct mgmt_rx_reo_list_entry *entry,
 /**
  * mgmt_rx_reo_schedule_delivery() - Helper API to schedule the delivery of
  * a management frames.
+ * @reo_context: Pointer to reorder context
  * @entry: List entry corresponding to the frame which has to be scheduled
  * for delivery
+ * @context: Current execution context
  *
  * Return: QDF_STATUS
  */
 QDF_STATUS
-mgmt_rx_reo_schedule_delivery(struct mgmt_rx_reo_list_entry *entry)
+mgmt_rx_reo_schedule_delivery(struct mgmt_rx_reo_context *reo_context,
+			      struct mgmt_rx_reo_list_entry *entry,
+			      enum mgmt_rx_reo_execution_context context)
 {
 	int scheduled_count;
 	int8_t link_id;
 	uint8_t mlo_grp_id;
 	struct wlan_objmgr_pdev *pdev;
 	QDF_STATUS status;
+	bool reschedule;
+
+	if (!reo_context) {
+		mgmt_rx_reo_err("Reo context is null");
+		return QDF_STATUS_E_NULL_VALUE;
+	}
+
+	if (!entry) {
+		mgmt_rx_reo_err("List entry is null");
+		return QDF_STATUS_E_NULL_VALUE;
+	}
+
+	if (context >= MGMT_RX_REO_CONTEXT_MAX) {
+		mgmt_rx_reo_err("Invalid execution context %d", context);
+		return QDF_STATUS_E_NULL_VALUE;
+	}
 
 	scheduled_count = qdf_atomic_inc_return(&entry->scheduled_count);
 	qdf_assert_always(scheduled_count > 0);
 
-	if (scheduled_count > 1)
+	reschedule = (scheduled_count > 1);
+	status = mgmt_rx_reo_log_scheduler_debug_info(reo_context, entry,
+						      context, reschedule);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		mgmt_rx_reo_err("Failed to log scheduler debug info");
+		return status;
+	}
+
+	if (reschedule) {
+		entry->last_scheduled_ts = qdf_get_log_timestamp();
 		return QDF_STATUS_SUCCESS;
+	}
 
 	link_id = mgmt_rx_reo_get_link_id(entry->rx_params);
 	qdf_assert_always(link_id >= 0 && link_id < MAX_MLO_LINKS);
@@ -2222,6 +2385,7 @@ mgmt_rx_reo_schedule_delivery(struct mgmt_rx_reo_list_entry *entry)
 		return QDF_STATUS_E_NULL_VALUE;
 	}
 
+	entry->first_scheduled_ts = qdf_get_log_timestamp();
 	status = tgt_mgmt_rx_reo_schedule_delivery(wlan_pdev_get_psoc(pdev));
 	if (QDF_IS_STATUS_ERROR(status)) {
 		mgmt_rx_reo_err("Failed to schedule for link %u, group %u",
@@ -5896,6 +6060,56 @@ success:
 }
 
 /**
+ * mgmt_rx_reo_scheduler_debug_info_init() - Initialize the management
+ * rx-reorder scheduler debug info
+ * @psoc: Pointer to psoc
+ * @scheduler_debug_info_init_count: Initialization count
+ * @scheduler_debug_info: Scheduler debug info object
+ *
+ * API to initialize the management rx-reorder Scheduler debug info.
+ *
+ * Return: QDF_STATUS
+ */
+static QDF_STATUS
+mgmt_rx_reo_scheduler_debug_info_init
+		(struct wlan_objmgr_psoc *psoc,
+		 qdf_atomic_t *scheduler_debug_info_init_count,
+		 struct reo_scheduler_debug_info *scheduler_debug_info)
+{
+	if (!psoc) {
+		mgmt_rx_reo_err("psoc is null");
+		return QDF_STATUS_E_NULL_VALUE;
+	}
+
+	if (!scheduler_debug_info) {
+		mgmt_rx_reo_err("scheduler debug info is null");
+		return QDF_STATUS_E_NULL_VALUE;
+	}
+
+	/* We need to initialize only for the first invocation */
+	if (qdf_atomic_read(scheduler_debug_info_init_count))
+		goto success;
+
+	scheduler_debug_info->frame_list_size =
+		wlan_mgmt_rx_reo_get_scheduler_debug_list_size(psoc);
+
+	if (scheduler_debug_info->frame_list_size) {
+		scheduler_debug_info->frame_list = qdf_mem_malloc
+			(scheduler_debug_info->frame_list_size *
+			 sizeof(*scheduler_debug_info->frame_list));
+
+		if (!scheduler_debug_info->frame_list) {
+			mgmt_rx_reo_err("Failed to allocate debug info");
+			return QDF_STATUS_E_NOMEM;
+		}
+	}
+
+success:
+	qdf_atomic_inc(scheduler_debug_info_init_count);
+	return QDF_STATUS_SUCCESS;
+}
+
+/**
  * mgmt_rx_reo_debug_info_init() - Initialize the management rx-reorder debug
  * info
  * @pdev: pointer to pdev object
@@ -5935,6 +6149,14 @@ mgmt_rx_reo_debug_info_init(struct wlan_objmgr_pdev *pdev)
 			 &reo_context->egress_frame_debug_info);
 	if (QDF_IS_STATUS_ERROR(status)) {
 		mgmt_rx_reo_err("Failed to initialize egress debug info");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	status = mgmt_rx_reo_scheduler_debug_info_init
+			(psoc, &reo_context->scheduler_debug_info_init_count,
+			 &reo_context->scheduler_debug_info);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		mgmt_rx_reo_err("Failed to initialize scheduler debug info");
 		return QDF_STATUS_E_FAILURE;
 	}
 
@@ -6040,6 +6262,52 @@ success:
 }
 
 /**
+ * mgmt_rx_reo_scheduler_debug_info_deinit() - De initialize the management
+ * rx-reorder scheduler debug info
+ * @psoc: Pointer to psoc
+ * @scheduler_debug_info_init_count: Initialization count
+ * @scheduler_debug_info: Scheduler debug info object
+ *
+ * API to de initialize the management rx-reorder scheduler debug info.
+ *
+ * Return: QDF_STATUS
+ */
+static QDF_STATUS
+mgmt_rx_reo_scheduler_debug_info_deinit
+		(struct wlan_objmgr_psoc *psoc,
+		 qdf_atomic_t *scheduler_debug_info_init_count,
+		 struct reo_scheduler_debug_info *scheduler_debug_info)
+{
+	if (!psoc) {
+		mgmt_rx_reo_err("psoc is null");
+		return QDF_STATUS_E_NULL_VALUE;
+	}
+
+	if (!scheduler_debug_info) {
+		mgmt_rx_reo_err("Scheduler debug info is null");
+		return QDF_STATUS_E_NULL_VALUE;
+	}
+
+	if (!qdf_atomic_read(scheduler_debug_info_init_count)) {
+		mgmt_rx_reo_err("Scheduler debug info ref cnt is 0");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	/* We need to de-initialize only for the last invocation */
+	if (qdf_atomic_dec_and_test(scheduler_debug_info_init_count))
+		goto success;
+
+	if (scheduler_debug_info->frame_list) {
+		qdf_mem_free(scheduler_debug_info->frame_list);
+		scheduler_debug_info->frame_list = NULL;
+	}
+	scheduler_debug_info->frame_list_size = 0;
+
+success:
+	return QDF_STATUS_SUCCESS;
+}
+
+/**
  * mgmt_rx_reo_debug_info_deinit() - De initialize the management rx-reorder
  * debug info
  * @pdev: Pointer to pdev object
@@ -6079,6 +6347,14 @@ mgmt_rx_reo_debug_info_deinit(struct wlan_objmgr_pdev *pdev)
 			 &reo_context->egress_frame_debug_info);
 	if (QDF_IS_STATUS_ERROR(status)) {
 		mgmt_rx_reo_err("Failed to deinitialize egress debug info");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	status = mgmt_rx_reo_scheduler_debug_info_deinit
+			(psoc, &reo_context->scheduler_debug_info_init_count,
+			 &reo_context->scheduler_debug_info);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		mgmt_rx_reo_err("Failed to deinitialize scheduler debug info");
 		return QDF_STATUS_E_FAILURE;
 	}
 

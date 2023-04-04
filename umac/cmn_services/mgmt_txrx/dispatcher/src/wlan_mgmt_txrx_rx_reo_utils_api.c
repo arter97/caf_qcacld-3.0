@@ -335,6 +335,17 @@ wlan_mgmt_rx_reo_get_egress_frame_debug_list_size(struct wlan_objmgr_psoc *psoc)
 	return cfg_get(psoc, CFG_MGMT_RX_REO_EGRESS_FRAME_DEBUG_LIST_SIZE);
 }
 
+uint16_t
+wlan_mgmt_rx_reo_get_scheduler_debug_list_size(struct wlan_objmgr_psoc *psoc)
+{
+	if (!psoc) {
+		mgmt_rx_reo_err("psoc is NULL!");
+		return 0;
+	}
+
+	return cfg_get(psoc, CFG_MGMT_RX_REO_SCHEDULER_DEBUG_LIST_SIZE);
+}
+
 #ifndef WLAN_MGMT_RX_REO_SIM_SUPPORT
 bool
 wlan_mgmt_rx_reo_is_feature_enabled_at_psoc(struct wlan_objmgr_psoc *psoc)
