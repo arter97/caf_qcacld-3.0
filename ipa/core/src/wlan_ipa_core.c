@@ -2177,7 +2177,7 @@ static QDF_STATUS wlan_ipa_setup_iface(struct wlan_ipa_priv *ipa_ctx,
 	qdf_spin_unlock_bh(&iface_context->interface_lock);
 
 	status = cdp_ipa_setup_iface(ipa_ctx->dp_soc, net_dev->name,
-				     net_dev->dev_addr,
+				     (uint8_t *)net_dev->dev_addr,
 				     iface_context->prod_client,
 				     iface_context->cons_client,
 				     wlan_ipa_set_session_id(session_id,
@@ -4790,7 +4790,8 @@ void wlan_ipa_uc_cleanup_sta(struct wlan_ipa_priv *ipa_ctx,
 		if (iface_ctx && iface_ctx->device_mode == QDF_STA_MODE &&
 		    iface_ctx->dev && iface_ctx->dev == net_dev) {
 			wlan_ipa_uc_send_evt(net_dev, QDF_IPA_STA_DISCONNECT,
-					     net_dev->dev_addr, ipa_ctx);
+					     (uint8_t *)net_dev->dev_addr,
+					     ipa_ctx);
 			wlan_ipa_cleanup_iface(iface_ctx, NULL);
 		}
 	}
@@ -4809,7 +4810,8 @@ QDF_STATUS wlan_ipa_uc_disconnect_ap(struct wlan_ipa_priv *ipa_ctx,
 	iface_ctx = wlan_ipa_get_iface(ipa_ctx, QDF_SAP_MODE);
 	if (iface_ctx)
 		status = wlan_ipa_uc_send_evt(net_dev, QDF_IPA_AP_DISCONNECT,
-					      net_dev->dev_addr, ipa_ctx);
+					      (uint8_t *)net_dev->dev_addr,
+					      ipa_ctx);
 	else
 		return QDF_STATUS_E_INVAL;
 
@@ -4846,12 +4848,12 @@ void wlan_ipa_uc_ssr_cleanup(struct wlan_ipa_priv *ipa_ctx)
 			if (iface->device_mode == QDF_SAP_MODE)
 				wlan_ipa_uc_send_evt(iface->dev,
 						     QDF_IPA_AP_DISCONNECT,
-						     iface->dev->dev_addr,
+						     (uint8_t *)iface->dev->dev_addr,
 						     ipa_ctx);
 			else if (iface->device_mode == QDF_STA_MODE)
 				wlan_ipa_uc_send_evt(iface->dev,
 						     QDF_IPA_STA_DISCONNECT,
-						     iface->dev->dev_addr,
+						     (uint8_t *)iface->dev->dev_addr,
 						     ipa_ctx);
 			wlan_ipa_cleanup_iface(iface, NULL);
 		}

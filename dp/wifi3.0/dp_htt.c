@@ -577,7 +577,7 @@ QDF_STATUS htt_h2t_rx_cce_super_rule_setup(struct htt_soc *soc, void *param)
 
 	pkt = htt_htc_pkt_alloc(soc);
 	if (!pkt) {
-		dp_htt_err("%pK: Fail to allocate dp_htt_htc_pkt buffer");
+		dp_htt_err("Fail to allocate dp_htt_htc_pkt buffer");
 		qdf_assert(0);
 		qdf_nbuf_free(msg);
 		return QDF_STATUS_E_NOMEM;
