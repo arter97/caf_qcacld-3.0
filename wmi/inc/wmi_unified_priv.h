@@ -1396,6 +1396,10 @@ QDF_STATUS (*send_peer_update_wds_entry_cmd)(wmi_unified_t wmi_handle,
 		struct peer_update_wds_entry_params *param);
 #endif
 
+QDF_STATUS (*send_peer_vlan_config_cmd)(wmi_unified_t wmi,
+					uint8_t peer_addr[QDF_MAC_ADDR_SIZE],
+					struct peer_vlan_config_param *param);
+
 #ifdef WMI_AP_SUPPORT
 
 QDF_STATUS (*send_set_ctl_table_cmd)(wmi_unified_t wmi_handle,
@@ -1501,10 +1505,6 @@ QDF_STATUS
 QDF_STATUS (*set_rx_pkt_type_routing_tag_cmd)(
 	wmi_unified_t wmi_hdl, struct wmi_rx_pkt_protocol_routing_info *param);
 #endif /* WLAN_SUPPORT_RX_PROTOCOL_TYPE_TAG */
-
-QDF_STATUS (*send_peer_vlan_config_cmd)(wmi_unified_t wmi,
-					uint8_t peer_addr[QDF_MAC_ADDR_SIZE],
-					struct peer_vlan_config_param *param);
 
 #ifdef WLAN_SUPPORT_FILS
 QDF_STATUS (*extract_swfda_vdev_id)(wmi_unified_t wmi_handle, void *evt_buf,
