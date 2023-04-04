@@ -30,6 +30,7 @@
 
 struct mgmt_txrx_priv_pdev_context;
 
+#ifdef WLAN_MGMT_RX_REO_SUPPORT
 /**
  * wlan_get_mlo_link_id_from_pdev() - Helper API to get the MLO HW link id
  * from the pdev object.
@@ -65,6 +66,24 @@ wlan_get_mlo_grp_id_from_pdev(struct wlan_objmgr_pdev *pdev);
 struct wlan_objmgr_pdev *
 wlan_get_pdev_from_mlo_link_id(uint8_t mlo_link_id, uint8_t ml_grp_id,
 			       wlan_objmgr_ref_dbgid refdbgid);
+#else
+static inline int8_t
+wlan_get_mlo_link_id_from_pdev(struct wlan_objmgr_pdev *pdev)
+{
+	return 0;
+}
+static inline int8_t
+wlan_get_mlo_grp_id_from_pdev(struct wlan_objmgr_pdev *pdev)
+{
+	return 0;
+}
+static inline struct wlan_objmgr_pdev *
+wlan_get_pdev_from_mlo_link_id(uint8_t mlo_link_id, uint8_t ml_grp_id,
+			       wlan_objmgr_ref_dbgid refdbgid)
+{
+	return NULL;
+}
+#endif
 
 #ifdef WLAN_MGMT_RX_REO_SUPPORT
 
