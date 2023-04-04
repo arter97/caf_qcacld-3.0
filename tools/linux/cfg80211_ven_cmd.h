@@ -852,7 +852,7 @@ enum {
 	IEEE80211_PARAM_EHT_NUM_SD = 796, /* EHT Beamformer num sounding dimentions */
 #endif
 #ifdef CONFIG_MLO_SINGLE_DEV
-	IEEE80211_PARAM_GET_MLD_PEER = 795,
+	IEEE80211_PARAM_GET_MLD_PEER = 797,
 #endif
 };
 
