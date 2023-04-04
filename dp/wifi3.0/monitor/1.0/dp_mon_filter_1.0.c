@@ -1136,6 +1136,6 @@ static void dp_cfr_filter_1_0(struct cdp_soc_t *soc_hdl,
 
 void dp_cfr_filter_register_1_0(struct cdp_ops *ops)
 {
-	ops->cfr_ops->txrx_cfr_filter = dp_cfr_filter_1_0;
+	ops->mon_ops->txrx_cfr_filter = dp_cfr_filter_1_0;
 }
 #endif
