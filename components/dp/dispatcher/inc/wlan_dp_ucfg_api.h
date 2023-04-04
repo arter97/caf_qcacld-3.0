@@ -1340,10 +1340,11 @@ QDF_STATUS ucfg_dp_direct_link_init(struct wlan_objmgr_psoc *psoc);
 /**
  * ucfg_dp_direct_link_deinit() - De-initializes Direct Link datapath
  * @psoc: psoc handle
+ * @is_ssr: true if SSR is in progress else false
  *
  * Return: None
  */
-void ucfg_dp_direct_link_deinit(struct wlan_objmgr_psoc *psoc);
+void ucfg_dp_direct_link_deinit(struct wlan_objmgr_psoc *psoc, bool is_ssr);
 
 /**
  * ucfg_dp_wfds_handle_request_mem_ind() - Process request memory indication
@@ -1400,7 +1401,7 @@ QDF_STATUS ucfg_dp_direct_link_init(struct wlan_objmgr_psoc *psoc)
 }
 
 static inline
-void ucfg_dp_direct_link_deinit(struct wlan_objmgr_psoc *psoc)
+void ucfg_dp_direct_link_deinit(struct wlan_objmgr_psoc *psoc, bool is_ssr)
 {
 }
 
