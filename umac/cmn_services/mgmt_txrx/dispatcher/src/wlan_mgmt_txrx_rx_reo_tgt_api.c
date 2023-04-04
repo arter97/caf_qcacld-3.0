@@ -223,7 +223,7 @@ tgt_mgmt_rx_reo_release_frames(struct wlan_objmgr_psoc *psoc)
 				     psoc_get_hw_link_id_bmap,
 				     &link_bitmap, false, WLAN_MGMT_RX_REO_ID);
 
-	return QDF_STATUS_SUCCESS;
+	return wlan_mgmt_rx_reo_release_frames(mlo_grp_id, link_bitmap);
 }
 
 QDF_STATUS tgt_mgmt_rx_reo_filter_config(struct wlan_objmgr_pdev *pdev,

@@ -48,6 +48,27 @@
 
 /*
  * <ini>
+ * mgmt_rx_reo_scheduler_enable - Enable MGMT Rx REO scheduler
+ * @Min: 0
+ * @Max: 1
+ * @Default: 0
+ *
+ * This ini is used to enable MGMT Rx REO scheduler
+ *
+ * Related: None
+ *
+ * Supported Feature: MGMT Rx REO
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
+#define CFG_MGMT_RX_REO_SCHEDULER_ENABLE \
+	CFG_INI_BOOL("mgmt_rx_reo_scheduler_enable", false, \
+			"Enable MGMT Rx REO scheduler")
+
+/*
+ * <ini>
  * mgmt_rx_reo_pkt_ctr_delta_thresh - Packet counter delta threshold
  * @Min: 0
  * @Max: 0xFFFF
@@ -149,6 +170,7 @@
 
 #define CFG_MGMT_RX_REO_ALL \
 	CFG(CFG_MGMT_RX_REO_ENABLE) \
+	CFG(CFG_MGMT_RX_REO_SCHEDULER_ENABLE) \
 	CFG(CFG_MGMT_RX_REO_PKT_CTR_DELTA_THRESH) \
 	CFG(CFG_MGMT_RX_REO_INGRESS_FRAME_DEBUG_LIST_SIZE) \
 	CFG(CFG_MGMT_RX_REO_EGRESS_FRAME_DEBUG_LIST_SIZE) \

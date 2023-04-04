@@ -52,6 +52,7 @@
 #define STATUS_OLDER_THAN_LATEST_AGED_OUT_FRAME      (BIT(2))
 #define STATUS_INGRESS_LIST_OVERFLOW                 (BIT(3))
 #define STATUS_OLDER_THAN_READY_TO_DELIVER_FRAMES    (BIT(4))
+#define STATUS_EGRESS_LIST_OVERFLOW                  (BIT(5))
 
 #define MGMT_RX_REO_INVALID_LINK   (-1)
 
@@ -61,8 +62,9 @@
 #define RELEASE_REASON_OLDER_THAN_AGED_OUT_FRAME                (BIT(2))
 #define RELEASE_REASON_INGRESS_LIST_OVERFLOW                    (BIT(3))
 #define RELEASE_REASON_OLDER_THAN_READY_TO_DELIVER_FRAMES       (BIT(4))
+#define RELEASE_REASON_EGRESS_LIST_OVERFLOW                     (BIT(5))
 #define RELEASE_REASON_MAX  \
-		(RELEASE_REASON_OLDER_THAN_READY_TO_DELIVER_FRAMES << 1)
+		(RELEASE_REASON_EGRESS_LIST_OVERFLOW << 1)
 
 #define LIST_ENTRY_IS_WAITING_FOR_FRAME_ON_OTHER_LINK(entry)   \
 	((entry)->status & STATUS_WAIT_FOR_FRAME_ON_OTHER_LINKS)
@@ -74,6 +76,8 @@
 	((entry)->status & STATUS_INGRESS_LIST_OVERFLOW)
 #define LIST_ENTRY_IS_OLDER_THAN_READY_TO_DELIVER_FRAMES(entry)  \
 	((entry)->status & STATUS_OLDER_THAN_READY_TO_DELIVER_FRAMES)
+#define LIST_ENTRY_IS_REMOVED_DUE_TO_EGRESS_LIST_OVERFLOW(entry)  \
+	((entry)->status & STATUS_EGRESS_LIST_OVERFLOW)
 
 #ifdef WLAN_MGMT_RX_REO_DEBUG_SUPPORT
 #define MGMT_RX_REO_EGRESS_FRAME_DEBUG_INFO_BOARDER_MAX_SIZE   (848)
@@ -261,6 +265,19 @@ enum mgmt_rx_reo_execution_context {
 };
 
 /**
+ * struct mgmt_rx_reo_context_info - This structure holds the information
+ * about the current execution context
+ * @context: Current execution context
+ * @in_reo_params: Reo parameters of the current management frame
+ * @context_id: Context identifier
+ */
+struct mgmt_rx_reo_context_info {
+	enum mgmt_rx_reo_execution_context context;
+	struct mgmt_rx_reo_params in_reo_params;
+	int32_t context_id;
+};
+
+/**
  * struct mgmt_rx_reo_frame_info - This structure holds the information
  * about a management frame.
  * @valid: Indicates whether the structure content is valid
@@ -280,6 +297,7 @@ struct mgmt_rx_reo_frame_info {
  * @list_lock: Spin lock to protect the list
  * @max_list_size: Maximum size of the reorder list
  * @overflow_count: Number of times list overflow occurred
+ * @last_overflow_ts: Host time stamp of last overflow
  * @last_inserted_frame: Information about the last frame inserted to the list
  * @last_released_frame: Information about the last frame released from the list
  */
@@ -288,6 +306,7 @@ struct mgmt_rx_reo_list {
 	qdf_spinlock_t list_lock;
 	uint32_t max_list_size;
 	uint64_t overflow_count;
+	uint64_t last_overflow_ts;
 	struct mgmt_rx_reo_frame_info last_inserted_frame;
 	struct mgmt_rx_reo_frame_info last_released_frame;
 };
@@ -352,10 +371,12 @@ struct mgmt_rx_reo_wait_count {
  * by scheduler
  * @egress_timestamp: Host time stamp when this frame has exited reorder
  * module
+ * @egress_list_size: Egress list size just before removing this frame
  * @status: Status for this entry
  * @pdev: Pointer to pdev object corresponding to this frame
  * @release_reason: Release reason
  * @is_delivered: Indicates whether the frame is delivered successfully
+ * @is_dropped: Indciates whether the frame is dropped in reo layer
  * @is_premature_delivery: Indicates whether the frame is delivered
  * prematurely
  * @is_parallel_rx: Indicates that this frame is received in parallel to the
@@ -363,6 +384,7 @@ struct mgmt_rx_reo_wait_count {
  * @shared_snapshots: snapshots shared b/w host and target
  * @host_snapshot: host snapshot
  * @scheduled_count: Number of times scheduler is invoked for this frame
+ * @ctx_info: Execution context info
  */
 struct mgmt_rx_reo_list_entry {
 	qdf_list_node_t node;
@@ -378,16 +400,19 @@ struct mgmt_rx_reo_list_entry {
 	uint64_t first_scheduled_ts;
 	uint64_t last_scheduled_ts;
 	uint64_t egress_timestamp;
+	uint64_t egress_list_size;
 	uint32_t status;
 	struct wlan_objmgr_pdev *pdev;
 	uint8_t release_reason;
 	bool is_delivered;
+	bool is_dropped;
 	bool is_premature_delivery;
 	bool is_parallel_rx;
 	struct mgmt_rx_reo_snapshot_params shared_snapshots
 			[MAX_MLO_LINKS][MGMT_RX_REO_SHARED_SNAPSHOT_MAX];
 	struct mgmt_rx_reo_snapshot_params host_snapshot[MAX_MLO_LINKS];
 	qdf_atomic_t scheduled_count;
+	struct mgmt_rx_reo_context_info ctx_info;
 };
 
 #ifdef WLAN_MGMT_RX_REO_SIM_SUPPORT
@@ -595,6 +620,7 @@ struct mgmt_rx_reo_sim_context {
  * @reo_required: Indicates whether reorder is required for the current frame.
  * If reorder is not required, current frame will just be used for updating the
  * wait count of frames already part of the reorder list.
+ * @context_id: Context identifier
  */
 struct reo_ingress_debug_frame_info {
 	uint8_t link_id;
@@ -626,12 +652,14 @@ struct reo_ingress_debug_frame_info {
 	struct mgmt_rx_reo_snapshot_params host_snapshot[MAX_MLO_LINKS];
 	int cpu_id;
 	bool reo_required;
+	int32_t context_id;
 };
 
 /**
  * struct reo_egress_debug_frame_info - Debug information about a frame
  * leaving the reorder module
  * @is_delivered: Indicates whether the frame is delivered to upper layers
+ * @is_dropped: Indciates whether the frame is dropped in reo layer
  * @is_premature_delivery: Indicates whether the frame is delivered
  * prematurely
  * @link_id: link id
@@ -650,15 +678,23 @@ struct reo_ingress_debug_frame_info {
  * layer
  * @egress_duration: Duration in us taken by the upper layer to process
  * the frame.
+ * @egress_list_size: Egress list size just before removing this frame
+ * @first_scheduled_ts: Host time stamp when this entry is first scheduled for
+ * delivery
+ * @last_scheduled_ts: Host time stamp when this entry is last scheduled for
+ * delivery
+ * @scheduled_count: Number of times this entry is scheduled
  * @initial_wait_count: Wait count when the frame is queued
  * @final_wait_count: Wait count when frame is released to upper layer
  * @release_reason: Reason for delivering the frame to upper layers
  * @shared_snapshots: snapshots shared b/w host and target
  * @host_snapshot: host snapshot
  * @cpu_id: CPU index
+ * @ctx_info: Execution context info
  */
 struct reo_egress_debug_frame_info {
 	bool is_delivered;
+	bool is_dropped;
 	bool is_premature_delivery;
 	uint8_t link_id;
 	uint16_t mgmt_pkt_ctr;
@@ -670,6 +706,10 @@ struct reo_egress_debug_frame_info {
 	uint64_t egress_list_removal_ts;
 	uint64_t egress_timestamp;
 	uint64_t egress_duration;
+	uint64_t egress_list_size;
+	uint64_t first_scheduled_ts;
+	uint64_t last_scheduled_ts;
+	int32_t scheduled_count;
 	struct mgmt_rx_reo_wait_count initial_wait_count;
 	struct mgmt_rx_reo_wait_count final_wait_count;
 	uint8_t release_reason;
@@ -677,6 +717,7 @@ struct reo_egress_debug_frame_info {
 			[MAX_MLO_LINKS][MGMT_RX_REO_SHARED_SNAPSHOT_MAX];
 	struct mgmt_rx_reo_snapshot_params host_snapshot[MAX_MLO_LINKS];
 	int cpu_id;
+	struct mgmt_rx_reo_context_info ctx_info;
 };
 
 /**
@@ -698,6 +739,9 @@ struct reo_egress_debug_frame_info {
  * last frame delivered to upper layer is a stale frame.
  * @error_count: Number of frames dropped due to error occurred
  * within the reorder module
+ * @parallel_rx_count: Number of frames which are categorised as parallel rx
+ * @missing_count: Number of frames missing. This is calculated based on the
+ * packet counter holes.
  */
 struct reo_ingress_frame_stats {
 	uint64_t ingress_count
@@ -713,6 +757,9 @@ struct reo_ingress_frame_stats {
 			    [MGMT_RX_REO_FRAME_DESC_TYPE_MAX];
 	uint64_t error_count[MAX_MLO_LINKS]
 			    [MGMT_RX_REO_FRAME_DESC_TYPE_MAX];
+	uint64_t parallel_rx_count[MAX_MLO_LINKS]
+			    [MGMT_RX_REO_FRAME_DESC_TYPE_MAX];
+	uint64_t missing_count[MAX_MLO_LINKS];
 };
 
 /**
@@ -722,17 +769,22 @@ struct reo_ingress_frame_stats {
  * frames to upper layers
  * @delivery_success_count: Number of successful management frame
  * deliveries to upper layer
+ * @drop_count: Number of management frames dropped within reo layer
  * @premature_delivery_count:  Number of frames delivered
  * prematurely. Premature delivery is the delivery of a management frame
  * to the upper layers even before its wait count is reaching zero.
- * @delivery_count: Number frames delivered successfully for
- * each link and release  reason.
+ * @delivery_reason_count: Number frames delivered successfully for
+ * each link and release reason.
+ * @delivery_context_count: Number frames delivered successfully for
+ * each link and execution context.
  */
 struct reo_egress_frame_stats {
 	uint64_t delivery_attempts_count[MAX_MLO_LINKS];
 	uint64_t delivery_success_count[MAX_MLO_LINKS];
+	uint64_t drop_count[MAX_MLO_LINKS];
 	uint64_t premature_delivery_count[MAX_MLO_LINKS];
-	uint64_t delivery_count[MAX_MLO_LINKS][RELEASE_REASON_MAX];
+	uint64_t delivery_reason_count[MAX_MLO_LINKS][RELEASE_REASON_MAX];
+	uint64_t delivery_context_count[MAX_MLO_LINKS][MGMT_RX_REO_CONTEXT_MAX];
 };
 
 /**
@@ -778,8 +830,6 @@ struct reo_egress_debug_info {
 /**
  * struct reo_scheduler_debug_frame_info - Debug information about a frame
  * gettign scheduled by management Rx reo scheduler
- * @is_premature_delivery: Indicates whether the frame is delivered
- * prematurely
  * @link_id: link id
  * @mgmt_pkt_ctr: management packet counter
  * @global_timestamp: MLO global time stamp
@@ -791,16 +841,19 @@ struct reo_egress_debug_info {
  * @egress_list_insertion_ts: Host time stamp when this entry is inserted to
  * the egress list.
  * @scheduled_ts: Host time stamp when this entry is scheduled for delivery
+ * @first_scheduled_ts: Host time stamp when this entry is first scheduled for
+ * delivery
+ * @last_scheduled_ts: Host time stamp when this entry is last scheduled for
+ * delivery
+ * @scheduled_count: Number of times this entry is scheduled
  * @initial_wait_count: Wait count when the frame is queued
  * @final_wait_count: Wait count when frame is released to upper layer
- * @release_reason: Reason for delivering the frame to upper layers
  * @shared_snapshots: snapshots shared b/w host and target
  * @host_snapshot: host snapshot
  * @cpu_id: CPU index
- * @context: Execution context
+ * @ctx_info: Execution context info
  */
 struct reo_scheduler_debug_frame_info {
-	bool is_premature_delivery;
 	uint8_t link_id;
 	uint16_t mgmt_pkt_ctr;
 	uint32_t global_timestamp;
@@ -809,14 +862,16 @@ struct reo_scheduler_debug_frame_info {
 	uint64_t ingress_list_removal_ts;
 	uint64_t egress_list_insertion_ts;
 	uint64_t scheduled_ts;
+	uint64_t first_scheduled_ts;
+	uint64_t last_scheduled_ts;
+	int32_t scheduled_count;
 	struct mgmt_rx_reo_wait_count initial_wait_count;
 	struct mgmt_rx_reo_wait_count final_wait_count;
-	uint8_t release_reason;
 	struct mgmt_rx_reo_snapshot_params shared_snapshots
 			[MAX_MLO_LINKS][MGMT_RX_REO_SHARED_SNAPSHOT_MAX];
 	struct mgmt_rx_reo_snapshot_params host_snapshot[MAX_MLO_LINKS];
 	int cpu_id;
-	enum mgmt_rx_reo_execution_context context;
+	struct mgmt_rx_reo_context_info ctx_info;
 };
 
 /**
@@ -824,10 +879,12 @@ struct reo_scheduler_debug_frame_info {
  * frames scheduled by reo scheduler
  * @scheduled_count: Scheduled count
  * @rescheduled_count: Rescheduled count
+ * @scheduler_cb_count: Scheduler callback count
  */
 struct reo_scheduler_stats {
-	uint64_t scheduled_count[MAX_MLO_LINKS];
-	uint64_t rescheduled_count[MAX_MLO_LINKS];
+	uint64_t scheduled_count[MAX_MLO_LINKS][MGMT_RX_REO_CONTEXT_MAX];
+	uint64_t rescheduled_count[MAX_MLO_LINKS][MGMT_RX_REO_CONTEXT_MAX];
+	uint64_t scheduler_cb_count[MAX_MLO_LINKS];
 };
 
 /**
@@ -882,6 +939,7 @@ struct reo_scheduler_debug_info {
  * @simulation_in_progress: Flag to indicate whether simulation is
  * in progress
  * @mlo_grp_id: MLO Group ID which it belongs to
+ * @context_id: Context identifier
  */
 struct mgmt_rx_reo_context {
 	struct mgmt_rx_reo_ingress_list ingress_list;
@@ -901,6 +959,7 @@ struct mgmt_rx_reo_context {
 #endif /* WLAN_MGMT_RX_REO_DEBUG_SUPPORT */
 	bool simulation_in_progress;
 	uint8_t mlo_grp_id;
+	qdf_atomic_t context_id;
 };
 
 /**

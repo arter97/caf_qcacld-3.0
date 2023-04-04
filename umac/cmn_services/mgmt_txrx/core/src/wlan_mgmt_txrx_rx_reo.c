@@ -170,6 +170,9 @@ mgmt_rx_reo_is_stale_frame(
 	frame_desc->is_parallel_rx = false;
 	frame_desc->last_delivered_frame = *last_delivered_frame;
 
+	if (!frame_desc->reo_required)
+		return QDF_STATUS_SUCCESS;
+
 	if (!last_delivered_frame->valid)
 		return QDF_STATUS_SUCCESS;
 
@@ -1542,6 +1545,120 @@ mgmt_rx_reo_egress_frame_debug_info_enabled
 }
 
 /**
+ * mgmt_rx_reo_debug_print_scheduler_stats() - API to print the stats
+ * related to frames getting scheduled by mgmt rx reo scheduler
+ * @reo_ctx: Pointer to reorder context
+ *
+ * API to print the stats related to frames getting scheduled by management
+ * Rx reorder scheduler.
+ *
+ * Return: QDF_STATUS
+ */
+static QDF_STATUS
+mgmt_rx_reo_debug_print_scheduler_stats(struct mgmt_rx_reo_context *reo_ctx)
+{
+	struct reo_scheduler_stats *stats;
+	uint64_t scheduled_count_per_link[MAX_MLO_LINKS] = {0};
+	uint64_t scheduled_count_per_context[MGMT_RX_REO_CONTEXT_MAX] = {0};
+	uint64_t total_scheduled_count = 0;
+	uint64_t rescheduled_count_per_link[MAX_MLO_LINKS] = {0};
+	uint64_t rescheduled_count_per_context[MGMT_RX_REO_CONTEXT_MAX] = {0};
+	uint64_t total_rescheduled_count = 0;
+	uint64_t total_scheduler_cb_count = 0;
+	uint8_t link_id;
+	uint8_t ctx;
+
+	if (!reo_ctx)
+		return QDF_STATUS_E_NULL_VALUE;
+
+	stats = &reo_ctx->scheduler_debug_info.stats;
+
+	for (link_id = 0; link_id < MAX_MLO_LINKS; link_id++) {
+		for (ctx = 0; ctx < MGMT_RX_REO_CONTEXT_MAX; ctx++) {
+			scheduled_count_per_link[link_id] +=
+				stats->scheduled_count[link_id][ctx];
+			rescheduled_count_per_link[link_id] +=
+				stats->rescheduled_count[link_id][ctx];
+		}
+
+		total_scheduled_count += scheduled_count_per_link[link_id];
+		total_rescheduled_count += rescheduled_count_per_link[link_id];
+		total_scheduler_cb_count += stats->scheduler_cb_count[link_id];
+	}
+
+	for (ctx = 0; ctx < MGMT_RX_REO_CONTEXT_MAX; ctx++) {
+		for (link_id = 0; link_id < MAX_MLO_LINKS; link_id++) {
+			scheduled_count_per_context[ctx] +=
+				stats->scheduled_count[link_id][ctx];
+			rescheduled_count_per_context[ctx] +=
+				stats->rescheduled_count[link_id][ctx];
+		}
+	}
+
+	mgmt_rx_reo_alert("Scheduler stats:");
+	mgmt_rx_reo_alert("\t1) Scheduled count");
+	mgmt_rx_reo_alert("\t\t0 - MGMT_RX_REO_CONTEXT_MGMT_RX");
+	mgmt_rx_reo_alert("\t\t1 - MGMT_RX_REO_CONTEXT_INGRESS_LIST_TIMEOUT");
+	mgmt_rx_reo_alert("\t\t2 - MGMT_RX_REO_CONTEXT_SCHEDULER_CB");
+	mgmt_rx_reo_alert("\t------------------------------------");
+	mgmt_rx_reo_alert("\t|link id/  |       |       |       |");
+	mgmt_rx_reo_alert("\t|context   |      0|      1|      2|");
+	mgmt_rx_reo_alert("\t-------------------------------------------");
+
+	for (link_id = 0; link_id < MAX_MLO_LINKS; link_id++) {
+		mgmt_rx_reo_alert("\t|%10u|%7llu|%7llu|%7llu|%7llu", link_id,
+				  stats->scheduled_count[link_id][0],
+				  stats->scheduled_count[link_id][1],
+				  stats->scheduled_count[link_id][2],
+				  scheduled_count_per_link[link_id]);
+		mgmt_rx_reo_alert("\t-------------------------------------------");
+	}
+	mgmt_rx_reo_alert("\t           |%7llu|%7llu|%7llu|%7llu\n\n",
+			  scheduled_count_per_context[0],
+			  scheduled_count_per_context[1],
+			  scheduled_count_per_context[2],
+			  total_scheduled_count);
+
+	mgmt_rx_reo_alert("\t2) Rescheduled count");
+	mgmt_rx_reo_alert("\t\t0 - MGMT_RX_REO_CONTEXT_MGMT_RX");
+	mgmt_rx_reo_alert("\t\t1 - MGMT_RX_REO_CONTEXT_INGRESS_LIST_TIMEOUT");
+	mgmt_rx_reo_alert("\t\t2 - MGMT_RX_REO_CONTEXT_SCHEDULER_CB");
+	mgmt_rx_reo_alert("\t------------------------------------");
+	mgmt_rx_reo_alert("\t|link id/  |       |       |       |");
+	mgmt_rx_reo_alert("\t|context   |      0|      1|      2|");
+	mgmt_rx_reo_alert("\t-------------------------------------------");
+
+	for (link_id = 0; link_id < MAX_MLO_LINKS; link_id++) {
+		mgmt_rx_reo_alert("\t|%10u|%7llu|%7llu|%7llu|%7llu", link_id,
+				  stats->rescheduled_count[link_id][0],
+				  stats->rescheduled_count[link_id][1],
+				  stats->rescheduled_count[link_id][2],
+				  rescheduled_count_per_link[link_id]);
+		mgmt_rx_reo_alert("\t-------------------------------------------");
+	}
+	mgmt_rx_reo_alert("\t           |%7llu|%7llu|%7llu|%7llu\n\n",
+			  rescheduled_count_per_context[0],
+			  rescheduled_count_per_context[1],
+			  rescheduled_count_per_context[2],
+			  total_rescheduled_count);
+
+	mgmt_rx_reo_alert("\t3) Per link stats:");
+	mgmt_rx_reo_alert("\t----------------------");
+	mgmt_rx_reo_alert("\t|link id|Scheduler CB|");
+	mgmt_rx_reo_alert("\t|       |    Count   |");
+	mgmt_rx_reo_alert("\t----------------------");
+
+	for (link_id = 0; link_id < MAX_MLO_LINKS; link_id++) {
+		mgmt_rx_reo_alert("\t|%7u|%12llu|", link_id,
+				  stats->scheduler_cb_count[link_id]);
+		mgmt_rx_reo_alert("\t----------------------");
+	}
+	mgmt_rx_reo_alert("\t%8s|%12llu|\n\n", "", total_scheduler_cb_count);
+
+	return QDF_STATUS_SUCCESS;
+}
+
+/**
  * mgmt_rx_reo_debug_print_egress_frame_stats() - API to print the stats
  * related to frames going out of the reorder module
  * @reo_ctx: Pointer to reorder context
@@ -1555,68 +1672,71 @@ static QDF_STATUS
 mgmt_rx_reo_debug_print_egress_frame_stats(struct mgmt_rx_reo_context *reo_ctx)
 {
 	struct reo_egress_frame_stats *stats;
-	struct reo_scheduler_stats *scheduler_stats;
 	uint8_t link_id;
 	uint8_t reason;
+	uint8_t ctx;
 	uint64_t total_delivery_attempts_count = 0;
 	uint64_t total_delivery_success_count = 0;
+	uint64_t total_drop_count = 0;
 	uint64_t total_premature_delivery_count = 0;
-	uint64_t total_scheduled_count = 0;
-	uint64_t total_rescheduled_count = 0;
 	uint64_t delivery_count_per_link[MAX_MLO_LINKS] = {0};
 	uint64_t delivery_count_per_reason[RELEASE_REASON_MAX] = {0};
+	uint64_t delivery_count_per_context[MGMT_RX_REO_CONTEXT_MAX] = {0};
 	uint64_t total_delivery_count = 0;
 	char delivery_reason_stats_boarder_a[MGMT_RX_REO_EGRESS_FRAME_DELIVERY_REASON_STATS_BOARDER_A_MAX_SIZE + 1] = {0};
 	char delivery_reason_stats_boarder_b[MGMT_RX_REO_EGRESS_FRAME_DELIVERY_REASON_STATS_BOARDER_B_MAX_SIZE + 1] = {0};
+	QDF_STATUS status;
 
 	if (!reo_ctx)
 		return QDF_STATUS_E_NULL_VALUE;
 
 	stats = &reo_ctx->egress_frame_debug_info.stats;
-	scheduler_stats = &reo_ctx->scheduler_debug_info.stats;
 
 	for (link_id = 0; link_id < MAX_MLO_LINKS; link_id++) {
 		total_delivery_attempts_count +=
 				stats->delivery_attempts_count[link_id];
 		total_delivery_success_count +=
 				stats->delivery_success_count[link_id];
+		total_drop_count += stats->drop_count[link_id];
 		total_premature_delivery_count +=
 				stats->premature_delivery_count[link_id];
-		total_scheduled_count +=
-				scheduler_stats->scheduled_count[link_id];
-		total_rescheduled_count +=
-				scheduler_stats->rescheduled_count[link_id];
 	}
 
 	for (link_id = 0; link_id < MAX_MLO_LINKS; link_id++) {
 		for (reason = 0; reason < RELEASE_REASON_MAX;
 		     reason++)
 			delivery_count_per_link[link_id] +=
-				stats->delivery_count[link_id][reason];
+				stats->delivery_reason_count[link_id][reason];
 		total_delivery_count += delivery_count_per_link[link_id];
 	}
 	for (reason = 0; reason < RELEASE_REASON_MAX; reason++)
 		for (link_id = 0; link_id < MAX_MLO_LINKS; link_id++)
 			delivery_count_per_reason[reason] +=
-				stats->delivery_count[link_id][reason];
+				stats->delivery_reason_count[link_id][reason];
+	for (ctx = 0; ctx < MGMT_RX_REO_CONTEXT_MAX; ctx++)
+		for (link_id = 0; link_id < MAX_MLO_LINKS; link_id++)
+			delivery_count_per_context[ctx] +=
+				stats->delivery_context_count[link_id][ctx];
 
 	mgmt_rx_reo_alert("Egress frame stats:");
 	mgmt_rx_reo_alert("\t1) Delivery related stats:");
-	mgmt_rx_reo_alert("\t------------------------------------------");
-	mgmt_rx_reo_alert("\t|link id   |Attempts |Success |Premature |");
-	mgmt_rx_reo_alert("\t|          | count   | count  | count    |");
-	mgmt_rx_reo_alert("\t------------------------------------------");
+	mgmt_rx_reo_alert("\t------------------------------------------------");
+	mgmt_rx_reo_alert("\t|link id  |Attempts|Success |Premature|Drop    |");
+	mgmt_rx_reo_alert("\t|         | count  | count  | count   |count   |");
+	mgmt_rx_reo_alert("\t------------------------------------------------");
 	for (link_id = 0; link_id < MAX_MLO_LINKS; link_id++) {
-		mgmt_rx_reo_alert("\t|%10u|%9llu|%8llu|%10llu|", link_id,
+		mgmt_rx_reo_alert("\t|%9u|%8llu|%8llu|%9llu|%8llu|", link_id,
 				  stats->delivery_attempts_count[link_id],
 				  stats->delivery_success_count[link_id],
-				  stats->premature_delivery_count[link_id]);
-	mgmt_rx_reo_alert("\t------------------------------------------");
+				  stats->premature_delivery_count[link_id],
+				  stats->drop_count[link_id]);
+		mgmt_rx_reo_alert("\t------------------------------------------------");
 	}
-	mgmt_rx_reo_alert("\t%11s|%9llu|%8llu|%10llu|\n\n", "",
+	mgmt_rx_reo_alert("\t%10s|%8llu|%8llu|%9llu|%8llu|\n\n", "",
 			  total_delivery_attempts_count,
 			  total_delivery_success_count,
-			  total_premature_delivery_count);
+			  total_premature_delivery_count,
+			  total_drop_count);
 
 	mgmt_rx_reo_alert("\t2) Delivery reason related stats");
 	mgmt_rx_reo_alert("\tRelease Reason Values:-");
@@ -1630,6 +1750,8 @@ mgmt_rx_reo_debug_print_egress_frame_stats(struct mgmt_rx_reo_context *reo_ctx)
 			  RELEASE_REASON_INGRESS_LIST_OVERFLOW);
 	mgmt_rx_reo_alert("\tREASON_OLDER_THAN_READY_TO_DELIVER_FRAMES - 0x%lx",
 			  RELEASE_REASON_OLDER_THAN_READY_TO_DELIVER_FRAMES);
+	mgmt_rx_reo_alert("\tREASON_EGRESS_LIST_OVERFLOW - 0x%lx",
+			  RELEASE_REASON_EGRESS_LIST_OVERFLOW);
 
 	qdf_mem_set(delivery_reason_stats_boarder_a,
 		    MGMT_RX_REO_EGRESS_FRAME_DELIVERY_REASON_STATS_BOARDER_A_MAX_SIZE, '-');
@@ -1645,12 +1767,13 @@ mgmt_rx_reo_debug_print_egress_frame_stats(struct mgmt_rx_reo_context *reo_ctx)
 
 	for (reason = 0; reason < RELEASE_REASON_MAX; reason++) {
 		mgmt_rx_reo_alert("\t|%16x|%7llu|%7llu|%7llu|%7llu|%7llu|%7llu|%7llu",
-				  reason, stats->delivery_count[0][reason],
-				  stats->delivery_count[1][reason],
-				  stats->delivery_count[2][reason],
-				  stats->delivery_count[3][reason],
-				  stats->delivery_count[4][reason],
-				  stats->delivery_count[5][reason],
+				  reason,
+				  stats->delivery_reason_count[0][reason],
+				  stats->delivery_reason_count[1][reason],
+				  stats->delivery_reason_count[2][reason],
+				  stats->delivery_reason_count[3][reason],
+				  stats->delivery_reason_count[4][reason],
+				  stats->delivery_reason_count[5][reason],
 				  delivery_count_per_reason[reason]);
 		mgmt_rx_reo_alert("\t%s", delivery_reason_stats_boarder_b);
 	}
@@ -1663,20 +1786,38 @@ mgmt_rx_reo_debug_print_egress_frame_stats(struct mgmt_rx_reo_context *reo_ctx)
 			  delivery_count_per_link[5],
 			  total_delivery_count);
 
-	mgmt_rx_reo_alert("\t3) Scheduler stats:");
+	mgmt_rx_reo_alert("\t3) Delivery context related stats");
+	mgmt_rx_reo_alert("\t\t0 - MGMT_RX_REO_CONTEXT_MGMT_RX");
+	mgmt_rx_reo_alert("\t\t1 - MGMT_RX_REO_CONTEXT_INGRESS_LIST_TIMEOUT");
+	mgmt_rx_reo_alert("\t\t2 - MGMT_RX_REO_CONTEXT_SCHEDULER_CB");
 	mgmt_rx_reo_alert("\t------------------------------------");
-	mgmt_rx_reo_alert("\t|link id   |Scheduled |Rescheduled |");
-	mgmt_rx_reo_alert("\t|          | count    | count      |");
-	mgmt_rx_reo_alert("\t------------------------------------");
+	mgmt_rx_reo_alert("\t|link id/  |       |       |       |");
+	mgmt_rx_reo_alert("\t|context   |      0|      1|      2|");
+	mgmt_rx_reo_alert("\t-------------------------------------------");
+
 	for (link_id = 0; link_id < MAX_MLO_LINKS; link_id++) {
-		mgmt_rx_reo_alert("\t|%10u|%10llu|%12llu|", link_id,
-				  scheduler_stats->scheduled_count[link_id],
-				  scheduler_stats->rescheduled_count[link_id]);
-	mgmt_rx_reo_alert("\t------------------------------------");
+		mgmt_rx_reo_alert("\t|%10u|%7llu|%7llu|%7llu|%7llu", link_id,
+				  stats->delivery_context_count[link_id][0],
+				  stats->delivery_context_count[link_id][1],
+				  stats->delivery_context_count[link_id][2],
+				  delivery_count_per_link[link_id]);
+		mgmt_rx_reo_alert("\t-------------------------------------------");
 	}
-	mgmt_rx_reo_alert("\t%11s|%10llu|%12llu|\n\n", "",
-			  total_scheduled_count,
-			  total_rescheduled_count);
+	mgmt_rx_reo_alert("\t           |%7llu|%7llu|%7llu|%7llu\n\n",
+			  delivery_count_per_context[0],
+			  delivery_count_per_context[1],
+			  delivery_count_per_context[2],
+			  total_delivery_count);
+
+	mgmt_rx_reo_alert("\t4) Misc stats:");
+	mgmt_rx_reo_alert("\t\tEgress list overflow count = %llu\n\n",
+			  reo_ctx->egress_list.reo_list.overflow_count);
+
+	status = mgmt_rx_reo_debug_print_scheduler_stats(reo_ctx);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		mgmt_rx_reo_err("Failed to print scheduler stats");
+		return status;
+	}
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -1742,6 +1883,12 @@ mgmt_rx_reo_log_egress_frame_before_delivery(
 	cur_frame_debug_info->egress_list_removal_ts =
 					entry->egress_list_removal_ts;
 	cur_frame_debug_info->egress_timestamp = qdf_get_log_timestamp();
+	cur_frame_debug_info->egress_list_size = entry->egress_list_size;
+	cur_frame_debug_info->first_scheduled_ts = entry->first_scheduled_ts;
+	cur_frame_debug_info->last_scheduled_ts = entry->last_scheduled_ts;
+	cur_frame_debug_info->scheduled_count =
+				qdf_atomic_read(&entry->scheduled_count);
+	cur_frame_debug_info->ctx_info = entry->ctx_info;
 	cur_frame_debug_info->release_reason = entry->release_reason;
 	cur_frame_debug_info->is_premature_delivery =
 						entry->is_premature_delivery;
@@ -1769,19 +1916,27 @@ mgmt_rx_reo_log_egress_frame_after_delivery(
 	struct reo_egress_debug_info *egress_frame_debug_info;
 	struct reo_egress_debug_frame_info *cur_frame_debug_info;
 	struct reo_egress_frame_stats *stats;
+	uint8_t context;
 
 	if (!reo_ctx || !entry)
 		return QDF_STATUS_E_NULL_VALUE;
 
 	egress_frame_debug_info = &reo_ctx->egress_frame_debug_info;
+	context = entry->ctx_info.context;
+	if (context >= MGMT_RX_REO_CONTEXT_MAX)
+		return QDF_STATUS_E_INVAL;
 
 	stats = &egress_frame_debug_info->stats;
 	if (entry->is_delivered) {
 		uint8_t release_reason = entry->release_reason;
 
-		stats->delivery_count[link_id][release_reason]++;
+		stats->delivery_reason_count[link_id][release_reason]++;
+		stats->delivery_context_count[link_id][context]++;
 		stats->delivery_success_count[link_id]++;
 	}
+
+	if (entry->is_dropped)
+		stats->drop_count[link_id]++;
 
 	if (!mgmt_rx_reo_egress_frame_debug_info_enabled
 						(egress_frame_debug_info))
@@ -1791,6 +1946,7 @@ mgmt_rx_reo_log_egress_frame_after_delivery(
 			[egress_frame_debug_info->next_index];
 
 	cur_frame_debug_info->is_delivered = entry->is_delivered;
+	cur_frame_debug_info->is_dropped = entry->is_dropped;
 	cur_frame_debug_info->egress_duration = qdf_get_log_timestamp() -
 					cur_frame_debug_info->egress_timestamp;
 
@@ -2088,6 +2244,9 @@ mgmt_rx_reo_list_entry_get_release_reason(struct mgmt_rx_reo_list_entry *entry)
 	if (LIST_ENTRY_IS_OLDER_THAN_READY_TO_DELIVER_FRAMES(entry))
 		reason |= RELEASE_REASON_OLDER_THAN_READY_TO_DELIVER_FRAMES;
 
+	if (LIST_ENTRY_IS_REMOVED_DUE_TO_EGRESS_LIST_OVERFLOW(entry))
+		reason |= RELEASE_REASON_EGRESS_LIST_OVERFLOW;
+
 	return reason;
 }
 
@@ -2095,6 +2254,8 @@ mgmt_rx_reo_list_entry_get_release_reason(struct mgmt_rx_reo_list_entry *entry)
  * mgmt_rx_reo_list_entry_send_up() - API to send the frame to the upper layer.
  * @reo_context: Pointer to reorder context
  * @entry: List entry
+ * @deliver: Indicates whether this entry has to be delivered to upper layers
+ * or dropped in the reo layer itself.
  *
  * API to send the frame to the upper layer. This API has to be called only
  * for entries which can be released to upper layer. It is the caller's
@@ -2106,7 +2267,8 @@ mgmt_rx_reo_list_entry_get_release_reason(struct mgmt_rx_reo_list_entry *entry)
  */
 static QDF_STATUS
 mgmt_rx_reo_list_entry_send_up(struct mgmt_rx_reo_context *reo_context,
-			       struct mgmt_rx_reo_list_entry *entry)
+			       struct mgmt_rx_reo_list_entry *entry,
+			       bool deliver)
 {
 	uint8_t release_reason;
 	uint8_t link_id;
@@ -2125,6 +2287,7 @@ mgmt_rx_reo_list_entry_send_up(struct mgmt_rx_reo_context *reo_context,
 	qdf_assert_always(release_reason != 0);
 
 	entry->is_delivered = false;
+	entry->is_dropped = false;
 	entry->is_premature_delivery = false;
 	entry->release_reason = release_reason;
 
@@ -2141,16 +2304,23 @@ mgmt_rx_reo_list_entry_send_up(struct mgmt_rx_reo_context *reo_context,
 	if (QDF_IS_STATUS_ERROR(status))
 		goto exit;
 
-	status = wlan_mgmt_txrx_process_rx_frame(entry->pdev, entry->nbuf,
-						 entry->rx_params);
-	/* Above call frees nbuf and rx_params, make it null explicitly */
-	entry->nbuf = NULL;
-	entry->rx_params = NULL;
+	if (deliver) {
+		status = wlan_mgmt_txrx_process_rx_frame(entry->pdev,
+							 entry->nbuf,
+							 entry->rx_params);
+		/* Above call frees nbuf and rx_params, make them null */
+		entry->nbuf = NULL;
+		entry->rx_params = NULL;
 
-	if (QDF_IS_STATUS_ERROR(status))
-		goto exit_log;
+		if (QDF_IS_STATUS_ERROR(status))
+			goto exit_log;
 
-	entry->is_delivered = true;
+		entry->is_delivered = true;
+	} else {
+		free_mgmt_rx_event_params(entry->rx_params);
+		qdf_nbuf_free(entry->nbuf);
+		entry->is_dropped = true;
+	}
 
 	status = QDF_STATUS_SUCCESS;
 
@@ -2182,6 +2352,7 @@ mgmt_rx_reo_is_entry_ready_to_send_up(struct mgmt_rx_reo_list_entry *entry)
 	qdf_assert_always(entry);
 
 	return LIST_ENTRY_IS_REMOVED_DUE_TO_INGRESS_LIST_OVERFLOW(entry) ||
+	       LIST_ENTRY_IS_REMOVED_DUE_TO_EGRESS_LIST_OVERFLOW(entry) ||
 	       !LIST_ENTRY_IS_WAITING_FOR_FRAME_ON_OTHER_LINK(entry) ||
 	       LIST_ENTRY_IS_AGED_OUT(entry) ||
 	       LIST_ENTRY_IS_OLDER_THAN_LATEST_AGED_OUT_FRAME(entry) ||
@@ -2208,7 +2379,6 @@ mgmt_rx_reo_scheduler_debug_info_enabled
  * frame getting scheduled by mgmt rx reo scheduler
  * @reo_ctx: management rx reorder context
  * @entry: Pointer to reorder list entry
- * @context: Current execution context
  * @reschedule: Indicates rescheduling
  *
  * Return: QDF_STATUS of operation
@@ -2216,7 +2386,6 @@ mgmt_rx_reo_scheduler_debug_info_enabled
 static QDF_STATUS
 mgmt_rx_reo_log_scheduler_debug_info(struct mgmt_rx_reo_context *reo_ctx,
 				     struct mgmt_rx_reo_list_entry *entry,
-				     enum mgmt_rx_reo_execution_context context,
 				     bool reschedule)
 {
 	struct reo_scheduler_debug_info *scheduler_debug_info;
@@ -2231,9 +2400,9 @@ mgmt_rx_reo_log_scheduler_debug_info(struct mgmt_rx_reo_context *reo_ctx,
 
 	stats = &scheduler_debug_info->stats;
 	link_id = mgmt_rx_reo_get_link_id(entry->rx_params);
-	stats->scheduled_count[link_id]++;
+	stats->scheduled_count[link_id][entry->ctx_info.context]++;
 	if (reschedule)
-		stats->rescheduled_count[link_id]++;
+		stats->rescheduled_count[link_id][entry->ctx_info.context]++;
 
 	if (!mgmt_rx_reo_scheduler_debug_info_enabled(scheduler_debug_info))
 		return QDF_STATUS_SUCCESS;
@@ -2263,11 +2432,12 @@ mgmt_rx_reo_log_scheduler_debug_info(struct mgmt_rx_reo_context *reo_ctx,
 	cur_frame_debug_info->egress_list_insertion_ts =
 					entry->egress_list_insertion_ts;
 	cur_frame_debug_info->scheduled_ts = qdf_get_log_timestamp();
-	cur_frame_debug_info->release_reason = entry->release_reason;
-	cur_frame_debug_info->is_premature_delivery =
-						entry->is_premature_delivery;
+	cur_frame_debug_info->first_scheduled_ts = entry->first_scheduled_ts;
+	cur_frame_debug_info->last_scheduled_ts = entry->last_scheduled_ts;
+	cur_frame_debug_info->scheduled_count =
+				qdf_atomic_read(&entry->scheduled_count);
 	cur_frame_debug_info->cpu_id = qdf_get_smp_processor_id();
-	cur_frame_debug_info->context = context;
+	cur_frame_debug_info->ctx_info = entry->ctx_info;
 
 	scheduler_debug_info->next_index++;
 	scheduler_debug_info->next_index %=
@@ -2313,10 +2483,28 @@ mgmt_rx_reo_defer_delivery(struct mgmt_rx_reo_list_entry *entry,
 			   uint32_t link_bitmap)
 {
 	uint8_t link_id;
+	uint8_t mlo_grp_id;
+	struct wlan_objmgr_pdev *pdev;
 
 	qdf_assert_always(entry);
 
 	link_id = mgmt_rx_reo_get_link_id(entry->rx_params);
+	mlo_grp_id = entry->rx_params->reo_params->mlo_grp_id;
+
+	pdev = wlan_get_pdev_from_mlo_link_id(link_id, mlo_grp_id,
+					      WLAN_MGMT_RX_REO_ID);
+	if (!pdev) {
+		mgmt_rx_reo_err("pdev for link %u, group %u is null",
+				link_id, mlo_grp_id);
+		return false;
+	}
+
+	if (!wlan_mgmt_rx_reo_is_scheduler_enabled_at_pdev(pdev)) {
+		wlan_objmgr_pdev_release_ref(pdev, WLAN_MGMT_RX_REO_ID);
+		return false;
+	}
+
+	wlan_objmgr_pdev_release_ref(pdev, WLAN_MGMT_RX_REO_ID);
 
 	return !(link_bitmap & (1 << link_id));
 }
@@ -2327,14 +2515,12 @@ mgmt_rx_reo_defer_delivery(struct mgmt_rx_reo_list_entry *entry,
  * @reo_context: Pointer to reorder context
  * @entry: List entry corresponding to the frame which has to be scheduled
  * for delivery
- * @context: Current execution context
  *
  * Return: QDF_STATUS
  */
 QDF_STATUS
 mgmt_rx_reo_schedule_delivery(struct mgmt_rx_reo_context *reo_context,
-			      struct mgmt_rx_reo_list_entry *entry,
-			      enum mgmt_rx_reo_execution_context context)
+			      struct mgmt_rx_reo_list_entry *entry)
 {
 	int scheduled_count;
 	int8_t link_id;
@@ -2353,17 +2539,12 @@ mgmt_rx_reo_schedule_delivery(struct mgmt_rx_reo_context *reo_context,
 		return QDF_STATUS_E_NULL_VALUE;
 	}
 
-	if (context >= MGMT_RX_REO_CONTEXT_MAX) {
-		mgmt_rx_reo_err("Invalid execution context %d", context);
-		return QDF_STATUS_E_NULL_VALUE;
-	}
-
 	scheduled_count = qdf_atomic_inc_return(&entry->scheduled_count);
 	qdf_assert_always(scheduled_count > 0);
 
 	reschedule = (scheduled_count > 1);
 	status = mgmt_rx_reo_log_scheduler_debug_info(reo_context, entry,
-						      context, reschedule);
+						      reschedule);
 	if (QDF_IS_STATUS_ERROR(status)) {
 		mgmt_rx_reo_err("Failed to log scheduler debug info");
 		return status;
@@ -2390,8 +2571,10 @@ mgmt_rx_reo_schedule_delivery(struct mgmt_rx_reo_context *reo_context,
 	if (QDF_IS_STATUS_ERROR(status)) {
 		mgmt_rx_reo_err("Failed to schedule for link %u, group %u",
 				link_id, mlo_grp_id);
+		wlan_objmgr_pdev_release_ref(pdev, WLAN_MGMT_RX_REO_ID);
 		return status;
 	}
+	wlan_objmgr_pdev_release_ref(pdev, WLAN_MGMT_RX_REO_ID);
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -2400,6 +2583,9 @@ mgmt_rx_reo_schedule_delivery(struct mgmt_rx_reo_context *reo_context,
  * mgmt_rx_reo_release_egress_list_entries() - Release entries from the
  * egress list
  * @reo_context: Pointer to management Rx reorder context
+ * @link_bitmap: Bitmap of links for which frames can be released in the current
+ * context
+ * @ctx: Current execution context info
  *
  * This API releases the entries from the egress list based on the following
  * conditions.
@@ -2413,7 +2599,9 @@ mgmt_rx_reo_schedule_delivery(struct mgmt_rx_reo_context *reo_context,
  * Return: QDF_STATUS
  */
 static QDF_STATUS
-mgmt_rx_reo_release_egress_list_entries(struct mgmt_rx_reo_context *reo_context)
+mgmt_rx_reo_release_egress_list_entries(struct mgmt_rx_reo_context *reo_context,
+					uint32_t link_bitmap,
+					struct mgmt_rx_reo_context_info *ctx)
 {
 	QDF_STATUS status;
 	struct mgmt_rx_reo_egress_list *egress_list;
@@ -2440,7 +2628,9 @@ mgmt_rx_reo_release_egress_list_entries(struct mgmt_rx_reo_context *reo_context)
 		struct mgmt_rx_reo_frame_info *last_released_frame =
 					&reo_egress_list->last_released_frame;
 		uint32_t last_released_frame_ts;
-		bool deliver;
+		bool ready;
+		bool defer;
+		bool overflow;
 
 		qdf_spin_lock_bh(&reo_egress_list->list_lock);
 
@@ -2452,11 +2642,23 @@ mgmt_rx_reo_release_egress_list_entries(struct mgmt_rx_reo_context *reo_context)
 			goto exit_unlock_egress_list_lock;
 		}
 
-		deliver = mgmt_rx_reo_is_entry_ready_to_send_up(first_entry);
-		qdf_assert_always(deliver);
+		ready = mgmt_rx_reo_is_entry_ready_to_send_up(first_entry);
+		qdf_assert_always(ready);
 
-		rx_params = first_entry->rx_params;
+		first_entry->ctx_info = *ctx;
+		defer = mgmt_rx_reo_defer_delivery(first_entry, link_bitmap);
+		overflow =
+		 LIST_ENTRY_IS_REMOVED_DUE_TO_EGRESS_LIST_OVERFLOW(first_entry);
+		if (defer && !overflow) {
+			status = mgmt_rx_reo_schedule_delivery(reo_context,
+							       first_entry);
+			if (QDF_IS_STATUS_ERROR(status))
+				mgmt_rx_reo_err("Failed to schedule delivery");
+			goto exit_unlock_egress_list_lock;
+		}
 
+		first_entry->egress_list_size =
+					qdf_list_size(&reo_egress_list->list);
 		status = qdf_list_remove_node(&reo_egress_list->list,
 					      &first_entry->node);
 		if (QDF_IS_STATUS_ERROR(status)) {
@@ -2476,6 +2678,7 @@ mgmt_rx_reo_release_egress_list_entries(struct mgmt_rx_reo_context *reo_context)
 		 * global time stamp, deliver the current frame to upper layer
 		 * and update the last released frame global time stamp.
 		 */
+		rx_params = first_entry->rx_params;
 		first_entry_ts = mgmt_rx_reo_get_global_ts(rx_params);
 		last_released_frame_ts =
 			last_released_frame->reo_params.global_timestamp;
@@ -2503,7 +2706,8 @@ mgmt_rx_reo_release_egress_list_entries(struct mgmt_rx_reo_context *reo_context)
 		qdf_spin_unlock_bh(&reo_egress_list->list_lock);
 
 		status = mgmt_rx_reo_list_entry_send_up(reo_context,
-							first_entry);
+							first_entry,
+							!defer || !overflow);
 		if (QDF_IS_STATUS_ERROR(status)) {
 			status = QDF_STATUS_E_FAILURE;
 			qdf_mem_free(first_entry);
@@ -2518,6 +2722,8 @@ mgmt_rx_reo_release_egress_list_entries(struct mgmt_rx_reo_context *reo_context)
 	goto exit_unlock_frame_release_lock;
 
 exit_unlock_egress_list_lock:
+	qdf_assert_always(qdf_list_size(&reo_egress_list->list) <=
+					reo_egress_list->max_list_size);
 	qdf_spin_unlock_bh(&reo_egress_list->list_lock);
 exit_unlock_frame_release_lock:
 	qdf_spin_unlock(&reo_context->frame_release_lock);
@@ -2529,11 +2735,32 @@ QDF_STATUS
 mgmt_rx_reo_release_frames(uint8_t mlo_grp_id, uint32_t link_bitmap)
 {
 	struct mgmt_rx_reo_context *reo_context;
+	QDF_STATUS ret;
+	struct mgmt_rx_reo_context_info ctx_info = {0};
+	uint8_t link;
 
 	reo_context = mgmt_rx_reo_get_context(mlo_grp_id);
 	if (!reo_context) {
 		mgmt_rx_reo_err("Mgmt rx reo context is null");
 		return QDF_STATUS_E_NULL_VALUE;
+	}
+
+	for (link = 0; link < MAX_MLO_LINKS; link++)
+		if (link_bitmap & (1 << link)) {
+			struct reo_scheduler_stats *stats;
+
+			stats = &reo_context->scheduler_debug_info.stats;
+			stats->scheduler_cb_count[link]++;
+		}
+
+	ctx_info.context = MGMT_RX_REO_CONTEXT_SCHEDULER_CB;
+	ctx_info.context_id = qdf_atomic_inc_return(&reo_context->context_id);
+	ret = mgmt_rx_reo_release_egress_list_entries(reo_context, link_bitmap,
+						      &ctx_info);
+	if (QDF_IS_STATUS_ERROR(ret)) {
+		mgmt_rx_reo_err("Failure to release frames grp = %u bm = 0x%x",
+				mlo_grp_id, link_bitmap);
+		return ret;
 	}
 
 	return QDF_STATUS_SUCCESS;
@@ -2656,6 +2883,48 @@ mgmt_rx_reo_check_sanity_lists(struct mgmt_rx_reo_list *reo_egress_list,
 }
 
 /**
+ * mgmt_rx_reo_handle_egress_overflow() - Handle overflow of management
+ * rx reorder egress list
+ * @reo_egress_list: Pointer to egress reorder list
+ *
+ * API to handle overflow of management rx reorder egress list.
+ *
+ * Return: QDF_STATUS
+ */
+static QDF_STATUS
+mgmt_rx_reo_handle_egress_overflow(struct mgmt_rx_reo_list *reo_egress_list)
+{
+	struct mgmt_rx_reo_list_entry *cur_entry;
+	uint32_t egress_list_max_size;
+	uint32_t egress_list_cur_size;
+	uint32_t num_overflow_frames;
+
+	if (!reo_egress_list) {
+		mgmt_rx_reo_err("Egress reorder list is null");
+		return QDF_STATUS_E_NULL_VALUE;
+	}
+
+	reo_egress_list->overflow_count++;
+	reo_egress_list->last_overflow_ts = qdf_get_log_timestamp();
+	mgmt_rx_reo_err_rl("Egress overflow, cnt:%llu size:%u",
+			   reo_egress_list->overflow_count,
+			   qdf_list_size(&reo_egress_list->list));
+
+	egress_list_cur_size = qdf_list_size(&reo_egress_list->list);
+	egress_list_max_size = reo_egress_list->max_list_size;
+	num_overflow_frames = egress_list_cur_size - egress_list_max_size;
+
+	qdf_list_for_each(&reo_egress_list->list, cur_entry, node) {
+		if (num_overflow_frames > 0) {
+			cur_entry->status |= STATUS_EGRESS_LIST_OVERFLOW;
+			num_overflow_frames--;
+		}
+	}
+
+	return QDF_STATUS_SUCCESS;
+}
+
+/**
  * mgmt_rx_reo_move_entries_ingress_to_egress_list() - Moves frames in
  * the ingress list which are ready to be delivered to the egress list
  * @ingress_list: Pointer to ingress list
@@ -2740,10 +3009,17 @@ mgmt_rx_reo_move_entries_ingress_to_egress_list
 				       &temp_list_frames_ready_to_deliver);
 		qdf_assert_always(QDF_IS_STATUS_SUCCESS(status));
 
+		if (mgmt_rx_reo_list_overflowed(reo_egress_list)) {
+			status =
+			    mgmt_rx_reo_handle_egress_overflow(reo_egress_list);
+			if (QDF_IS_STATUS_ERROR(status)) {
+				mgmt_rx_reo_err("Failed to handle overflow");
+				qdf_assert_always(0);
+			}
+		}
+
 		qdf_assert_always(qdf_list_size(&reo_ingress_list->list) <=
 				  reo_ingress_list->max_list_size);
-		qdf_assert_always(qdf_list_size(&reo_egress_list->list) <=
-						reo_egress_list->max_list_size);
 
 		status = mgmt_rx_reo_check_sanity_lists(reo_egress_list,
 							reo_ingress_list);
@@ -2838,6 +3114,7 @@ mgmt_rx_reo_ingress_list_ageout_timer_handler(void *arg)
 	 * list which has the largest global time stamp value.
 	 */
 	struct mgmt_rx_reo_list_entry *latest_aged_out_entry = NULL;
+	struct mgmt_rx_reo_context_info ctx_info = {0};
 
 	qdf_assert_always(ingress_list);
 	reo_ctx = mgmt_rx_reo_get_context_from_ingress_list(ingress_list);
@@ -2865,7 +3142,9 @@ mgmt_rx_reo_ingress_list_ageout_timer_handler(void *arg)
 		return;
 	}
 
-	ret = mgmt_rx_reo_release_egress_list_entries(reo_ctx);
+	ctx_info.context = MGMT_RX_REO_CONTEXT_INGRESS_LIST_TIMEOUT;
+	ctx_info.context_id = qdf_atomic_inc_return(&reo_ctx->context_id);
+	ret = mgmt_rx_reo_release_egress_list_entries(reo_ctx, 0, &ctx_info);
 	if (QDF_IS_STATUS_ERROR(ret)) {
 		mgmt_rx_reo_err("Failure to release entries, ret = %d", ret);
 		return;
@@ -3159,6 +3438,8 @@ mgmt_rx_reo_update_ingress_list(struct mgmt_rx_reo_ingress_list *ingress_list,
 			qdf_list_t *ingress_list_ptr = &reo_ingress_list->list;
 
 			reo_ingress_list->overflow_count++;
+			reo_ingress_list->last_overflow_ts =
+							qdf_get_log_timestamp();
 			mgmt_rx_reo_err_rl("Ingress overflow, cnt:%llu size:%u",
 					   reo_ingress_list->overflow_count,
 					   qdf_list_size(ingress_list_ptr));
@@ -3335,6 +3616,14 @@ mgmt_rx_reo_update_egress_list(struct mgmt_rx_reo_egress_list *egress_list,
 				     &least_greater->node);
 	if (QDF_IS_STATUS_ERROR(ret))
 		return ret;
+
+	if (mgmt_rx_reo_list_overflowed(reo_egress_list)) {
+		ret = mgmt_rx_reo_handle_egress_overflow(reo_egress_list);
+		if (QDF_IS_STATUS_ERROR(ret)) {
+			mgmt_rx_reo_err("Failed to handle egress overflow");
+			qdf_assert_always(0);
+		}
+	}
 
 	*is_queued = true;
 	frame_desc->queued_list = MGMT_RX_REO_LIST_TYPE_EGRESS;
@@ -3697,9 +3986,13 @@ mgmt_rx_reo_debug_print_ingress_frame_stats(struct mgmt_rx_reo_context *reo_ctx)
 	uint64_t stale_count_per_link[MAX_MLO_LINKS] = {0};
 	uint64_t stale_count_per_desc_type[MGMT_RX_REO_FRAME_DESC_TYPE_MAX] = {0};
 	uint64_t total_stale_count = 0;
+	uint64_t parallel_rx_count_per_link[MAX_MLO_LINKS] = {0};
+	uint64_t parallel_rx_per_desc[MGMT_RX_REO_FRAME_DESC_TYPE_MAX] = {0};
+	uint64_t total_parallel_rx_count = 0;
 	uint64_t error_count_per_link[MAX_MLO_LINKS] = {0};
 	uint64_t error_count_per_desc_type[MGMT_RX_REO_FRAME_DESC_TYPE_MAX] = {0};
 	uint64_t total_error_count = 0;
+	uint64_t total_missing_count = 0;
 	uint64_t total_queued = 0;
 	uint64_t queued_per_list[MGMT_RX_REO_LIST_TYPE_MAX] = {0};
 	uint64_t queued_per_link[MAX_MLO_LINKS] = {0};
@@ -3726,12 +4019,16 @@ mgmt_rx_reo_debug_print_ingress_frame_stats(struct mgmt_rx_reo_context *reo_ctx)
 					stats->stale_count[link_id][desc_type];
 			error_count_per_link[link_id] +=
 					stats->error_count[link_id][desc_type];
+			parallel_rx_count_per_link[link_id] +=
+				   stats->parallel_rx_count[link_id][desc_type];
 		}
 
 		total_ingress_count += ingress_count_per_link[link_id];
 		total_reo_count += reo_count_per_link[link_id];
 		total_stale_count += stale_count_per_link[link_id];
 		total_error_count += error_count_per_link[link_id];
+		total_parallel_rx_count += parallel_rx_count_per_link[link_id];
+		total_missing_count += stats->missing_count[link_id];
 	}
 
 	for (desc_type = 0; desc_type < MGMT_RX_REO_FRAME_DESC_TYPE_MAX;
@@ -3745,6 +4042,8 @@ mgmt_rx_reo_debug_print_ingress_frame_stats(struct mgmt_rx_reo_context *reo_ctx)
 					stats->stale_count[link_id][desc_type];
 			error_count_per_desc_type[desc_type] +=
 					stats->error_count[link_id][desc_type];
+			parallel_rx_per_desc[desc_type] +=
+				stats->parallel_rx_count[link_id][desc_type];
 		}
 	}
 
@@ -3842,7 +4141,24 @@ mgmt_rx_reo_debug_print_ingress_frame_stats(struct mgmt_rx_reo_context *reo_ctx)
 			  stale_count_per_desc_type[2],
 			  total_stale_count);
 
-	mgmt_rx_reo_alert("\t4) Error Frame Count:");
+	mgmt_rx_reo_alert("\t4) Parallel rx Frame Count:");
+	mgmt_rx_reo_alert("\t------------------------------------");
+	mgmt_rx_reo_alert("\t|link id/  |       |       |       |");
+	mgmt_rx_reo_alert("\t|desc type |      0|      1|      2|");
+	mgmt_rx_reo_alert("\t-------------------------------------------");
+	for (link_id = 0; link_id < MAX_MLO_LINKS; link_id++) {
+		mgmt_rx_reo_alert("\t|%10u|%7llu|%7llu|%7llu|%7llu", link_id,
+				  stats->parallel_rx_count[link_id][0],
+				  stats->parallel_rx_count[link_id][1],
+				  stats->parallel_rx_count[link_id][2],
+				  parallel_rx_count_per_link[link_id]);
+		mgmt_rx_reo_alert("\t-------------------------------------------");
+	}
+	mgmt_rx_reo_alert("\t           |%7llu|%7llu|%7llu|%7llu\n\n",
+			  parallel_rx_per_desc[0], parallel_rx_per_desc[1],
+			  parallel_rx_per_desc[2], total_parallel_rx_count);
+
+	mgmt_rx_reo_alert("\t5) Error Frame Count:");
 	mgmt_rx_reo_alert("\t------------------------------------");
 	mgmt_rx_reo_alert("\t|link id/  |       |       |       |");
 	mgmt_rx_reo_alert("\t|desc type |      0|      1|      2|");
@@ -3861,7 +4177,19 @@ mgmt_rx_reo_debug_print_ingress_frame_stats(struct mgmt_rx_reo_context *reo_ctx)
 			  error_count_per_desc_type[2],
 			  total_error_count);
 
-	mgmt_rx_reo_alert("\t5) Host consumed frames related stats:");
+	mgmt_rx_reo_alert("\t6) Per link stats:");
+	mgmt_rx_reo_alert("\t----------------------------");
+	mgmt_rx_reo_alert("\t|link id   | Missing frame |");
+	mgmt_rx_reo_alert("\t|          |     count     |");
+	mgmt_rx_reo_alert("\t----------------------------");
+	for (link_id = 0; link_id < MAX_MLO_LINKS; link_id++) {
+		mgmt_rx_reo_alert("\t|%10u|%15llu|", link_id,
+				  stats->missing_count[link_id]);
+		mgmt_rx_reo_alert("\t----------------------------");
+	}
+	mgmt_rx_reo_alert("\t%11s|%15llu|\n\n", "", total_missing_count);
+
+	mgmt_rx_reo_alert("\t7) Host consumed frames related stats:");
 	mgmt_rx_reo_alert("\tOverall:");
 	mgmt_rx_reo_alert("\t------------------------------------------------");
 	mgmt_rx_reo_alert("\t|link id   |Queued frame |Zero wait |Immediate |");
@@ -3913,6 +4241,10 @@ mgmt_rx_reo_debug_print_ingress_frame_stats(struct mgmt_rx_reo_context *reo_ctx)
 			  zero_wait_count_rx_per_list[1],
 			  immediate_delivery_per_list[1]);
 
+	mgmt_rx_reo_alert("\t8) Misc stats:");
+	mgmt_rx_reo_alert("\t\tIngress list overflow count = %llu\n\n",
+			  reo_ctx->ingress_list.reo_list.overflow_count);
+
 	return QDF_STATUS_SUCCESS;
 }
 
@@ -3923,13 +4255,15 @@ mgmt_rx_reo_debug_print_ingress_frame_stats(struct mgmt_rx_reo_context *reo_ctx)
  * @desc: Pointer to frame descriptor
  * @is_queued: Indicates whether this frame is queued to reorder list
  * @is_error: Indicates whether any error occurred during processing this frame
+ * @context_id: context identifier
  *
  * Return: QDF_STATUS of operation
  */
 static QDF_STATUS
 mgmt_rx_reo_log_ingress_frame(struct mgmt_rx_reo_context *reo_ctx,
 			      struct mgmt_rx_reo_frame_descriptor *desc,
-			      bool is_queued, bool is_error)
+			      bool is_queued, bool is_error,
+			      int32_t context_id)
 {
 	struct reo_ingress_debug_info *ingress_frame_debug_info;
 	struct reo_ingress_debug_frame_info *cur_frame_debug_info;
@@ -3958,6 +4292,10 @@ mgmt_rx_reo_log_ingress_frame(struct mgmt_rx_reo_context *reo_ctx,
 		stats->error_count[link_id][desc->type]++;
 	if (desc->is_stale)
 		stats->stale_count[link_id][desc->type]++;
+	if (desc->pkt_ctr_delta > 1)
+		stats->missing_count[link_id] += desc->pkt_ctr_delta - 1;
+	if (desc->is_parallel_rx)
+		stats->parallel_rx_count[link_id][desc->type]++;
 
 	if (!mgmt_rx_reo_ingress_frame_debug_info_enabled
 						(ingress_frame_debug_info))
@@ -4009,6 +4347,7 @@ mgmt_rx_reo_log_ingress_frame(struct mgmt_rx_reo_context *reo_ctx,
 					desc->egress_list_insertion_pos;
 	cur_frame_debug_info->cpu_id = qdf_get_smp_processor_id();
 	cur_frame_debug_info->reo_required = desc->reo_required;
+	cur_frame_debug_info->context_id = context_id;
 
 	ingress_frame_debug_info->next_index++;
 	ingress_frame_debug_info->next_index %=
@@ -4249,13 +4588,15 @@ mgmt_rx_reo_debug_print_ingress_frame_stats(struct mgmt_rx_reo_context *reo_ctx)
  * @desc: Pointer to frame descriptor
  * @is_queued: Indicates whether this frame is queued to reorder list
  * @is_error: Indicates whether any error occurred during processing this frame
+ * @context_id: context identifier
  *
  * Return: QDF_STATUS of operation
  */
 static QDF_STATUS
 mgmt_rx_reo_log_ingress_frame(struct mgmt_rx_reo_context *reo_ctx,
 			      struct mgmt_rx_reo_frame_descriptor *desc,
-			      bool is_queued, bool is_error)
+			      bool is_queued, bool is_error,
+			      int32_t context_id)
 {
 	return QDF_STATUS_SUCCESS;
 }
@@ -4283,6 +4624,9 @@ wlan_mgmt_rx_reo_algo_entry(struct wlan_objmgr_pdev *pdev,
 	struct mgmt_rx_reo_ingress_list *ingress_list;
 	struct mgmt_rx_reo_egress_list *egress_list;
 	QDF_STATUS ret;
+	int16_t cur_link;
+	struct mgmt_rx_reo_context_info ctx_info = {0};
+	int32_t context_id = 0;
 
 	if (!is_queued) {
 		mgmt_rx_reo_err("Pointer to queued indication is null");
@@ -4393,6 +4737,7 @@ wlan_mgmt_rx_reo_algo_entry(struct wlan_objmgr_pdev *pdev,
 	 */
 	qdf_spin_lock(&reo_ctx->reo_algo_entry_lock);
 
+	cur_link = mgmt_rx_reo_get_link_id(desc->rx_params);
 	qdf_assert_always(desc->rx_params->reo_params->valid);
 	qdf_assert_always(desc->frame_type == IEEE80211_FC0_TYPE_MGT);
 
@@ -4416,8 +4761,9 @@ wlan_mgmt_rx_reo_algo_entry(struct wlan_objmgr_pdev *pdev,
 	if (QDF_IS_STATUS_ERROR(ret))
 		goto failure;
 
-	ret = mgmt_rx_reo_log_ingress_frame(reo_ctx, desc,
-					    *is_queued, false);
+	context_id = qdf_atomic_inc_return(&reo_ctx->context_id);
+	ret = mgmt_rx_reo_log_ingress_frame(reo_ctx, desc, *is_queued, false,
+					    context_id);
 	if (QDF_IS_STATUS_ERROR(ret)) {
 		qdf_spin_unlock(&reo_ctx->reo_algo_entry_lock);
 		return ret;
@@ -4430,15 +4776,20 @@ wlan_mgmt_rx_reo_algo_entry(struct wlan_objmgr_pdev *pdev,
 	if (QDF_IS_STATUS_ERROR(ret))
 		return ret;
 
+	ctx_info.context = MGMT_RX_REO_CONTEXT_MGMT_RX;
+	ctx_info.in_reo_params = *desc->rx_params->reo_params;
+	ctx_info.context_id = context_id;
 	/* Finally, release the entries for which pending frame is received */
-	return mgmt_rx_reo_release_egress_list_entries(reo_ctx);
+	return mgmt_rx_reo_release_egress_list_entries(reo_ctx, 1 << cur_link,
+						       &ctx_info);
 
 failure:
 	/**
 	 * Ignore the return value of this function call, return
 	 * the actual reason for failure.
 	 */
-	mgmt_rx_reo_log_ingress_frame(reo_ctx, desc, *is_queued, true);
+	mgmt_rx_reo_log_ingress_frame(reo_ctx, desc, *is_queued, true,
+				      context_id);
 
 	qdf_spin_unlock(&reo_ctx->reo_algo_entry_lock);
 
@@ -6562,6 +6913,7 @@ mgmt_rx_reo_init_context(uint8_t ml_grp_id)
 
 	qdf_spinlock_create(&reo_context->reo_algo_entry_lock);
 	qdf_spinlock_create(&reo_context->frame_release_lock);
+	qdf_atomic_init(&reo_context->context_id);
 
 	return QDF_STATUS_SUCCESS;
 
