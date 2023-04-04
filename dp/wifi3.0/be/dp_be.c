@@ -1251,7 +1251,7 @@ int dp_register_ppeds_interrupts(struct dp_soc *soc, struct dp_srng *srng,
 			 "pci%d_ppe2tcl", pci_slot);
 		ret = pld_pfrm_request_irq(soc->osdev->dev, irq,
 					   dp_ppe_ds_ppe2tcl_irq_handler,
-					   IRQF_SHARED | IRQF_NO_SUSPEND,
+					   IRQF_NO_SUSPEND,
 					   be_soc->irq_name[1],
 					   dp_get_ppe_ds_ctxt(soc));
 		if (ret)
