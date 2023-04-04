@@ -1999,6 +1999,9 @@ is_nbuf_frm_rmnet(qdf_nbuf_t nbuf, struct dp_tx_msdu_info_s *msdu_info)
 
 	ingress_dev = dev_get_by_index(dev_net(nbuf->dev), nbuf->skb_iif);
 
+	if (!ingress_dev)
+		return false;
+
 	if ((ingress_dev->priv_flags & IFF_PHONY_HEADROOM)) {
 		dev_put(ingress_dev);
 		frag = &(skb_shinfo(nbuf)->frags[0]);
