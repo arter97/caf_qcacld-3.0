@@ -8779,6 +8779,23 @@ void lim_update_stads_eht_capable(tpDphHashNode sta_ds, tpSirAssocReq assoc_req)
 	sta_ds->mlmStaContext.eht_capable = assoc_req->eht_cap.present;
 }
 
+#ifdef FEATURE_WLAN_TDLS
+#ifdef WLAN_FEATURE_11BE
+void lim_update_tdls_sta_eht_capable(struct mac_context *mac,
+				     tpAddStaParams add_sta_params,
+				     tpDphHashNode sta_ds,
+				     struct pe_session *session_entry)
+{
+	if (sta_ds->staType == STA_ENTRY_TDLS_PEER) {
+		if (!sta_ds->eht_config.present)
+			add_sta_params->eht_capable = 0;
+	}
+
+	pe_debug("tdls eht_capable: %d", add_sta_params->eht_capable);
+}
+#endif
+#endif
+
 void lim_update_sta_eht_capable(struct mac_context *mac,
 				tpAddStaParams add_sta_params,
 				tpDphHashNode sta_ds,

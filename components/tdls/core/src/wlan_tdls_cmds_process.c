@@ -432,6 +432,27 @@ static void tdls_pe_update_peer_he_capa(struct tdls_add_sta_req *addstareq,
 {
 }
 #endif
+
+#ifdef WLAN_FEATURE_11BE
+static inline void
+tdls_pe_update_peer_eht_capa(struct tdls_add_sta_req *addstareq,
+			     struct tdls_update_peer_params *update_peer)
+{
+	if (update_peer->ehtcap_present) {
+		addstareq->ehtcap_present = update_peer->ehtcap_present;
+		addstareq->eht_cap_len = update_peer->eht_cap_len;
+		qdf_mem_copy(&addstareq->eht_cap,
+			     &update_peer->eht_cap,
+			     sizeof(update_peer->eht_cap));
+	}
+}
+#else
+static inline void
+tdls_pe_update_peer_eht_capa(struct tdls_add_sta_req *addstareq,
+			     struct tdls_update_peer_params *update_peer)
+{
+}
+#endif
 /**
  * tdls_pe_update_peer() - send TDLS update peer request to PE
  * @req: TDLS update peer request
@@ -493,6 +514,7 @@ static QDF_STATUS tdls_pe_update_peer(struct tdls_update_peer_request *req)
 		     &update_peer->vht_cap,
 		     sizeof(update_peer->vht_cap));
 	tdls_pe_update_peer_he_capa(addstareq, update_peer);
+	tdls_pe_update_peer_eht_capa(addstareq, update_peer);
 	addstareq->supported_rates_length = update_peer->supported_rates_len;
 	addstareq->is_pmf = update_peer->is_pmf;
 	qdf_mem_copy(&addstareq->supported_rates,

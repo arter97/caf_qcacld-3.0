@@ -3420,6 +3420,27 @@ lim_reg_bw_to_ht_ch_width(uint16_t reg_max_bw)
 	return reg_max_bw > 20 ? CH_WIDTH_40MHZ : CH_WIDTH_20MHZ;
 }
 
+#ifdef WLAN_FEATURE_11BE
+static void
+lim_tdls_populate_dot11f_eht_caps(struct pe_session *pe_session,
+				  tDphHashNode *sta,
+				  struct tdls_add_sta_req *add_sta_req)
+{
+	if (add_sta_req->ehtcap_present) {
+		pe_debug("copy eht config from pe_session");
+		qdf_mem_copy(&sta->eht_config, &pe_session->eht_config,
+			     sizeof(sta->eht_config));
+	}
+}
+#else
+static inline void
+lim_tdls_populate_dot11f_eht_caps(struct pe_session *pe_session,
+				  tDphHashNode *sta,
+				  struct tdls_add_sta_req *add_sta_req)
+{
+}
+#endif
+
 /*
  * update HASH node entry info
  */
@@ -3445,6 +3466,8 @@ static void lim_tdls_update_hash_node_info(struct mac_context *mac,
 						 add_sta_req, &htCap);
 		sta->rmfEnabled = add_sta_req->is_pmf;
 	}
+
+	lim_tdls_populate_dot11f_eht_caps(pe_session, sta, add_sta_req);
 
 	reg_max_bw = wlan_reg_get_max_chwidth(mac->pdev,
 					      pe_session->curr_op_freq);

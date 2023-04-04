@@ -843,6 +843,28 @@ struct hecap_6ghz {
 };
 #endif
 
+#ifdef WLAN_FEATURE_11BE
+/**
+ * struct ehtcapfixed - EHT capabilities fixed data
+ * @mac_cap_info: MAC capabilities
+ * @phy_cap_info: PHY capabilities
+ */
+struct ehtcapfixed {
+	uint8_t mac_cap_info[2];
+	uint8_t phy_cap_info[9];
+};
+
+/**
+ * struct ehtcap - EHT capabilities
+ * @eht_cap_fixed: fixed parts, see &ehtcapfixed
+ * @optional: optional parts
+ */
+struct ehtcap {
+	struct ehtcapfixed eht_cap_fixed;
+	uint8_t optional[];
+} qdf_packed;
+#endif
+
 struct tdls_update_peer_params {
 	uint8_t peer_addr[QDF_MAC_ADDR_SIZE];
 	uint32_t peer_type;
@@ -859,6 +881,11 @@ struct tdls_update_peer_params {
 	uint8_t he_cap_len;
 	struct hecap he_cap;
 	struct hecap_6ghz he_6ghz_cap;
+#endif
+#ifdef WLAN_FEATURE_11BE
+	uint8_t ehtcap_present;
+	uint8_t eht_cap_len;
+	struct ehtcap eht_cap;
 #endif
 	uint8_t uapsd_queues;
 	uint8_t max_sp;
@@ -1395,6 +1422,9 @@ struct tdls_send_mgmt_request {
  * @he_cap_len: he capability length
  * @he_cap: he capability
  * @he_6ghz_cap: HE 6 GHz capability
+ * @ehtcap_present: eht capability present
+ * @eht_cap_len: eht capability length
+ * @eht_cap: eht capability
  * @uapsd_queues: uapsd queue as sSirMacQosInfoStation
  * @max_sp: maximum service period
  * @is_pmf: is PMF active
@@ -1419,6 +1449,11 @@ struct tdls_add_sta_req {
 	uint8_t he_cap_len;
 	struct hecap he_cap;
 	struct hecap_6ghz he_6ghz_cap;
+#endif
+#ifdef WLAN_FEATURE_11BE
+	uint8_t ehtcap_present;
+	uint8_t eht_cap_len;
+	struct ehtcap eht_cap;
 #endif
 	uint8_t uapsd_queues;
 	uint8_t max_sp;

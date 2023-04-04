@@ -396,6 +396,30 @@ wlan_cfg80211_tdls_extract_he_params(struct tdls_update_peer_params *req_info,
 }
 #endif
 
+#ifdef WLAN_FEATURE_11BE
+static void
+wlan_cfg80211_tdls_extract_eht_params(struct tdls_update_peer_params *req_info,
+				      struct station_parameters *params)
+{
+	if (params->link_sta_params.eht_capa) {
+		osif_debug("eht capa is present");
+		req_info->ehtcap_present = 1;
+		req_info->eht_cap_len = params->link_sta_params.eht_capa_len;
+		qdf_mem_copy(&req_info->eht_cap,
+			     params->link_sta_params.eht_capa,
+			     sizeof(struct ehtcap));
+	} else {
+		req_info->ehtcap_present = 0;
+	}
+}
+#else
+static void
+wlan_cfg80211_tdls_extract_eht_params(struct tdls_update_peer_params *req_info,
+				      struct station_parameters *params)
+{
+}
+#endif
+
 #ifdef CFG80211_LINK_STA_PARAMS_PRESENT
 static void
 wlan_cfg80211_tdls_extract_params(struct wlan_objmgr_vdev *vdev,
@@ -489,6 +513,8 @@ wlan_cfg80211_tdls_extract_params(struct wlan_objmgr_vdev *vdev,
 						     tdls_6g_support);
 	else
 		osif_debug("tdls ax disabled");
+
+	wlan_cfg80211_tdls_extract_eht_params(req_info, params);
 }
 #else
 static void
@@ -580,6 +606,8 @@ wlan_cfg80211_tdls_extract_params(struct wlan_objmgr_vdev *vdev,
 						     tdls_6g_support);
 	else
 		osif_debug("tdls ax disabled");
+
+	wlan_cfg80211_tdls_extract_eht_params(req_info, params);
 }
 #endif
 
