@@ -145,6 +145,8 @@ KBUILD_OPTIONS += DEVNAME=$(LOCAL_DEV_NAME)
 KBUILD_OPTIONS += BOARD_PLATFORM=$(TARGET_BOARD_PLATFORM)
 KBUILD_OPTIONS += $(WLAN_SELECT)
 
+KBUILD_REQUIRED_KOS := ipam.ko
+
 ifneq ($(WLAN_CFG_OVERRIDE_$(LOCAL_DEV_NAME)),)
 KBUILD_OPTIONS += WLAN_CFG_OVERRIDE="$(WLAN_CFG_OVERRIDE_$(LOCAL_DEV_NAME))"
 endif
@@ -194,7 +196,7 @@ KBUILD_OPTIONS += $(foreach wlan_platform_kbuild_option, \
 		   $(WLAN_PLATFORM_KBUILD_OPTIONS), \
 		   $(wlan_platform_kbuild_option))
 
-KBUILD_OPTIONS += KBUILD_EXTRA_SYMBOLS=$(shell pwd)/$(call intermediates-dir-for,DLKM,wlan-platform-module-symvers)/Module.symvers
+KBUILD_OPTIONS += KBUILD_EXTRA_SYMBOLS+=$(shell pwd)/$(call intermediates-dir-for,DLKM,wlan-platform-module-symvers)/Module.symvers
 endif
 
 include $(CLEAR_VARS)
