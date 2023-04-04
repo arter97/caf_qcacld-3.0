@@ -3012,6 +3012,74 @@ void hif_send_complete_check(struct hif_opaque_softc *hif_ctx, uint8_t pipe,
 #endif
 }
 
+#ifdef CUSTOM_CB_SCHEDULER_SUPPORT
+QDF_STATUS
+hif_register_ce_custom_cb(struct hif_opaque_softc *hif_ctx, uint8_t pipe,
+			  void (*custom_cb)(void *), void *custom_cb_context)
+{
+	struct hif_softc *scn = HIF_GET_SOFTC(hif_ctx);
+	struct HIF_CE_state *hif_state = HIF_GET_CE_STATE(scn);
+	struct HIF_CE_pipe_info *pipe_info;
+
+	if (pipe >= CE_COUNT_MAX)
+		return QDF_STATUS_E_INVAL;
+
+	pipe_info = &hif_state->pipe_info[pipe];
+	ce_register_custom_cb(pipe_info->ce_hdl, custom_cb, custom_cb_context);
+
+	return QDF_STATUS_SUCCESS;
+}
+
+QDF_STATUS
+hif_unregister_ce_custom_cb(struct hif_opaque_softc *hif_ctx, uint8_t pipe)
+{
+	struct hif_softc *scn = HIF_GET_SOFTC(hif_ctx);
+	struct HIF_CE_state *hif_state = HIF_GET_CE_STATE(scn);
+	struct HIF_CE_pipe_info *pipe_info;
+
+	if (pipe >= CE_COUNT_MAX)
+		return QDF_STATUS_E_INVAL;
+
+	pipe_info = &hif_state->pipe_info[pipe];
+	ce_unregister_custom_cb(pipe_info->ce_hdl);
+
+	return QDF_STATUS_SUCCESS;
+}
+
+QDF_STATUS
+hif_enable_ce_custom_cb(struct hif_opaque_softc *hif_ctx, uint8_t pipe)
+{
+	struct hif_softc *scn = HIF_GET_SOFTC(hif_ctx);
+	struct HIF_CE_state *hif_state = HIF_GET_CE_STATE(scn);
+	struct HIF_CE_pipe_info *pipe_info;
+
+	if (pipe >= CE_COUNT_MAX)
+		return QDF_STATUS_E_INVAL;
+
+	pipe_info = &hif_state->pipe_info[pipe];
+	ce_enable_custom_cb(pipe_info->ce_hdl);
+	ce_dispatch_interrupt(pipe, &hif_state->tasklets[pipe]);
+
+	return QDF_STATUS_SUCCESS;
+}
+
+QDF_STATUS
+hif_disable_ce_custom_cb(struct hif_opaque_softc *hif_ctx, uint8_t pipe)
+{
+	struct hif_softc *scn = HIF_GET_SOFTC(hif_ctx);
+	struct HIF_CE_state *hif_state = HIF_GET_CE_STATE(scn);
+	struct HIF_CE_pipe_info *pipe_info;
+
+	if (pipe >= CE_COUNT_MAX)
+		return QDF_STATUS_E_INVAL;
+
+	pipe_info = &hif_state->pipe_info[pipe];
+	ce_disable_custom_cb(pipe_info->ce_hdl);
+
+	return QDF_STATUS_SUCCESS;
+}
+#endif /* CUSTOM_CB_SCHEDULER_SUPPORT */
+
 #if defined(CE_TASKLET_SCHEDULE_ON_FULL) && defined(CE_TASKLET_DEBUG_ENABLE)
 #define CE_RING_FULL_THRESHOLD_TIME 3000000
 #define CE_RING_FULL_THRESHOLD 1024
