@@ -1908,8 +1908,8 @@ void lim_handle_sta_csa_param(struct mac_context *mac_ctx,
 
 	session_entry->htSupportedChannelWidthSet = false;
 	wlan_reg_read_current_country(mac_ctx->psoc, country_code);
-	if (!csa_params->ies_present_flag) {
-		/* no ies, means triggered by host */
+	if (!csa_params->ies_present_flag ||
+	    (csa_params->ies_present_flag & MLME_CSWRAP_IE_EXT_V2_PRESENT)) {
 		pe_debug("new freq: %u, width: %d", csa_params->csa_chan_freq,
 			 csa_params->new_ch_width);
 		ch_params.ch_width = csa_params->new_ch_width;
