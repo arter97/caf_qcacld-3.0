@@ -6299,6 +6299,11 @@ static int hdd_vdev_destroy_event_wait(struct hdd_context *hdd_ctx,
 
 	vdev_id = wlan_vdev_get_id(vdev);
 	adapter = hdd_get_adapter_by_vdev(hdd_ctx, vdev_id);
+	if (!adapter) {
+		hdd_err("adapter is NULL, return");
+		return -EINVAL;
+	}
+
 	/* close sme session (destroy vdev in firmware via legacy API) */
 	INIT_COMPLETION(adapter->deflink->vdev_destroy_event);
 	status = sme_vdev_delete(hdd_ctx->mac_handle, vdev);
