@@ -627,6 +627,19 @@ void policy_mgr_clear_concurrency_mode(struct wlan_objmgr_psoc *psoc,
 uint32_t policy_mgr_get_connection_count(struct wlan_objmgr_psoc *psoc);
 
 /**
+ * policy_mgr_get_connection_count_with_mlo() - provides the count of
+ * current connections
+ * @psoc: PSOC object information
+ *
+ * This function provides the count of current connections, MLD dev count
+ * 1 connection no matter how many links connection.
+ *
+ * Return: connection count
+ */
+uint32_t
+policy_mgr_get_connection_count_with_mlo(struct wlan_objmgr_psoc *psoc);
+
+/**
  * policy_mgr_get_concurrency_mode() - return concurrency mode
  * @psoc: PSOC object information
  *

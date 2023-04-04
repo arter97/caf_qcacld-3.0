@@ -1003,7 +1003,8 @@ bool tdls_check_is_tdls_allowed(struct wlan_objmgr_vdev *vdev)
 		goto exit;
 	}
 
-	connection_count = policy_mgr_get_connection_count(tdls_soc_obj->soc);
+	connection_count =
+		policy_mgr_get_connection_count_with_mlo(tdls_soc_obj->soc);
 	sta_count =
 		policy_mgr_mode_specific_connection_count(tdls_soc_obj->soc,
 							  PM_STA_MODE, NULL);
@@ -1040,7 +1041,7 @@ bool tdls_is_concurrency_allowed(struct wlan_objmgr_psoc *psoc)
 					   WLAN_TDLS_CONCURRENCIES_SUPPORT))
 		return false;
 
-	if (policy_mgr_get_connection_count(psoc) >
+	if (policy_mgr_get_connection_count_with_mlo(psoc) >
 	    WLAN_TDLS_MAX_CONCURRENT_VDEV_SUPPORTED)
 		return false;
 
@@ -1058,7 +1059,7 @@ bool tdls_is_concurrency_allowed(struct wlan_objmgr_psoc *psoc)
 	/*
 	 * Don't enable TDLS for P2P_CLI in concurrency cases
 	 */
-	if (policy_mgr_get_connection_count(psoc) > 1 &&
+	if (policy_mgr_get_connection_count_with_mlo(psoc) > 1 &&
 	    !policy_mgr_mode_specific_connection_count(psoc, PM_STA_MODE,
 						       NULL))
 		return false;
@@ -1101,7 +1102,8 @@ void tdls_set_ct_mode(struct wlan_objmgr_psoc *psoc,
 							  PM_P2P_CLIENT_MODE,
 							  NULL);
 	if (sta_count == 1 ||
-	    (policy_mgr_get_connection_count(psoc) == 1 && p2p_count == 1)) {
+	    (policy_mgr_get_connection_count_with_mlo(psoc) == 1 &&
+	     p2p_count == 1)) {
 		state = true;
 		/*
 		 * In case of TDLS external control, peer should be added
@@ -1270,7 +1272,7 @@ struct wlan_objmgr_vdev *tdls_get_vdev(struct wlan_objmgr_psoc *psoc,
 {
 	uint32_t vdev_id;
 
-	if (policy_mgr_get_connection_count(psoc) > 1 &&
+	if (policy_mgr_get_connection_count_with_mlo(psoc) > 1 &&
 	    !tdls_is_concurrency_allowed(psoc))
 		return NULL;
 
@@ -1285,7 +1287,7 @@ struct wlan_objmgr_vdev *tdls_get_vdev(struct wlan_objmgr_psoc *psoc,
 	 */
 	vdev_id = policy_mgr_mode_specific_vdev_id(psoc, PM_P2P_CLIENT_MODE);
 	if (WLAN_INVALID_VDEV_ID != vdev_id &&
-	    policy_mgr_get_connection_count(psoc) == 1)
+	    policy_mgr_get_connection_count_with_mlo(psoc) == 1)
 		return wlan_objmgr_get_vdev_by_id_from_psoc(psoc, vdev_id,
 							    dbg_id);
 
