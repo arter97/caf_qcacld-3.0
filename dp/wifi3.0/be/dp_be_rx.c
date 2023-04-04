@@ -761,15 +761,6 @@ done:
 			dp_rx_update_flow_tag(soc, vdev, nbuf, rx_tlv_hdr,
 					      true);
 
-			if (qdf_likely(vdev->rx_decap_type ==
-				       htt_cmn_pkt_type_ethernet) &&
-			    qdf_likely(!vdev->mesh_vdev)) {
-				dp_rx_wds_learn(soc, vdev,
-						rx_tlv_hdr,
-						txrx_peer,
-						nbuf);
-			}
-
 			if (qdf_unlikely(vdev->mesh_vdev)) {
 				if (dp_rx_filter_mesh_packets(vdev, nbuf,
 							      rx_tlv_hdr)
@@ -787,6 +778,15 @@ done:
 				dp_rx_fill_mesh_stats(vdev, nbuf, rx_tlv_hdr,
 						      txrx_peer);
 			}
+		}
+
+		if (qdf_likely(vdev->rx_decap_type ==
+			       htt_cmn_pkt_type_ethernet) &&
+		    qdf_likely(!vdev->mesh_vdev)) {
+			dp_rx_wds_learn(soc, vdev,
+					rx_tlv_hdr,
+					txrx_peer,
+					nbuf);
 		}
 
 		dp_rx_msdu_stats_update(soc, nbuf, rx_tlv_hdr, txrx_peer,
@@ -1907,12 +1907,9 @@ dp_rx_wbm_err_reap_desc_be(struct dp_intr *int_ctx, struct dp_soc *soc,
 		 * info when we do the actual nbuf processing
 		 */
 		wbm_err_info.pool_id = rx_desc->pool_id;
-		hal_rx_priv_info_set_in_tlv(soc->hal_soc,
-					    qdf_nbuf_data(nbuf),
-					    (uint8_t *)&wbm_err_info,
-					    sizeof(wbm_err_info));
 
-		dp_rx_err_tlv_invalidate(soc, nbuf);
+		dp_rx_set_err_info(soc, nbuf, wbm_err_info);
+
 		rx_bufs_reaped[rx_desc->chip_id][rx_desc->pool_id]++;
 
 		if (qdf_nbuf_is_rx_chfrag_cont(nbuf) || process_sg_buf) {
@@ -1969,12 +1966,12 @@ done:
 
 			rx_desc_pool = &replenish_soc->rx_desc_buf[mac_id];
 
-			dp_rx_buffers_replenish(replenish_soc, mac_id,
+			dp_rx_buffers_replenish_simple(replenish_soc, mac_id,
 						dp_rxdma_srng,
 						rx_desc_pool,
 						rx_bufs_reaped[chip_id][mac_id],
 						&head[chip_id][mac_id],
-						&tail[chip_id][mac_id], false);
+						&tail[chip_id][mac_id]);
 			*rx_bufs_used += rx_bufs_reaped[chip_id][mac_id];
 		}
 	}
