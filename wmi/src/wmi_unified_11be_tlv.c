@@ -1876,6 +1876,171 @@ QDF_STATUS extract_mgmt_rx_ml_cu_params_tlv(wmi_unified_t wmi_handle,
 	return QDF_STATUS_SUCCESS;
 }
 
+#ifdef QCA_SUPPORT_PRIMARY_LINK_MIGRATE
+/**
+ * send_peer_ptqm_migrate_cmd_tlv() - send PEER ptqm migrate command to fw
+ * @wmi_handle: wmi handle
+ * @param: pointer to hold peer ptqm migrate parameter
+ *
+ * Return: QDF_STATUS_SUCCESS for success else error code
+ */
+static QDF_STATUS send_peer_ptqm_migrate_cmd_tlv(
+				wmi_unified_t wmi_handle,
+				struct peer_ptqm_migrate_params *param)
+{
+	/* Todo: copy send_peer_delete_all_cmd_tlv */
+	uint16_t i = 0;
+	wmi_buf_t buf;
+	uint8_t *buf_ptr;
+	wmi_mlo_primary_link_peer_migration_fixed_param *cmd;
+	uint32_t len = sizeof(*cmd);
+	uint16_t num_entry = 0;
+	uint16_t max_entry_per_cmd = 0, max_entry_cnt = 0;
+	struct peer_ptqm_migrate_entry *param_list = param->peer_list;
+	wmi_mlo_new_primary_link_peer_info *entry;
+	uint32_t pending_cnt = param->num_peers;
+
+	/* Get max entries which can be send in a single WMI command.
+	 * If no. of entries is more than max entries supported, multiple
+	 * WMI commands will be send.
+	 */
+	max_entry_per_cmd = (wmi_get_max_msg_len(wmi_handle) -
+			     sizeof(*cmd) - WMI_TLV_HDR_SIZE) /
+			     (sizeof(wmi_mlo_new_primary_link_peer_info));
+
+	if (param->num_peers > max_entry_per_cmd)
+		max_entry_cnt = max_entry_per_cmd;
+	else
+		max_entry_cnt = param->num_peers;
+
+	wmi_debug("Setting max entry limit as %u", max_entry_cnt);
+	while (pending_cnt > 0) {
+		len = sizeof(*cmd) + WMI_TLV_HDR_SIZE;
+		if (pending_cnt >= max_entry_cnt)
+			num_entry = max_entry_cnt;
+		else
+			num_entry = pending_cnt;
+
+		len += num_entry * sizeof(wmi_mlo_new_primary_link_peer_info);
+		buf = wmi_buf_alloc(wmi_handle, len);
+		if (!buf)
+			return QDF_STATUS_E_NOMEM;
+
+		buf_ptr = (uint8_t *)wmi_buf_data(buf);
+
+		cmd = (wmi_mlo_primary_link_peer_migration_fixed_param *)
+						wmi_buf_data(buf);
+		WMITLV_SET_HDR(
+			&cmd->tlv_header,
+			WMITLV_TAG_STRUC_wmi_mlo_primary_link_peer_migration_fixed_param,
+			WMITLV_GET_STRUCT_TLVLEN
+			(wmi_mlo_primary_link_peer_migration_fixed_param));
+		buf_ptr += sizeof(*cmd);
+		cmd->vdev_id = param->vdev_id;
+		WMITLV_SET_HDR(buf_ptr, WMITLV_TAG_ARRAY_STRUC,
+			       num_entry * sizeof(wmi_mlo_new_primary_link_peer_info));
+		buf_ptr += WMI_TLV_HDR_SIZE;
+		entry = (wmi_mlo_new_primary_link_peer_info *)buf_ptr;
+		for (i = 0; i < num_entry; i++) {
+			WMITLV_SET_HDR(&entry[i].tlv_header,
+				       WMITLV_TAG_STRUC_wmi_mlo_new_primary_link_peer_info,
+				       WMITLV_GET_STRUCT_TLVLEN(wmi_mlo_new_primary_link_peer_info));
+			WMI_MLO_PRIMARY_LINK_PEER_MIGRATION_ML_PEER_ID_SET(
+					entry[i].new_link_info,
+					param_list[i].ml_peer_id);
+			WMI_MLO_PRIMARY_LINK_PEER_MIGRATION_HW_LINK_ID_SET(
+					entry[i].new_link_info,
+					param_list[i].hw_link_id);
+			wmi_debug("i:%d, ml_peer_id:%d, hw_link_id:%d",
+				  i, entry[i].ml_peer_id, entry[i].hw_link_id);
+		}
+		pending_cnt -= num_entry;
+		param_list += num_entry;
+
+		wmi_mtrace(WMI_MLO_PRIMARY_LINK_PEER_MIGRATION_CMDID,
+			   cmd->vdev_id, 0);
+
+		if (wmi_unified_cmd_send(wmi_handle, buf, len,
+					 WMI_MLO_PRIMARY_LINK_PEER_MIGRATION_CMDID)) {
+			wmi_err("num_entries:%d failed!",
+				param->num_peers);
+			wmi_buf_free(buf);
+			return QDF_STATUS_E_FAILURE;
+		}
+		wmi_debug("num_entries:%d done!",
+			  num_entry);
+	}
+
+	return QDF_STATUS_SUCCESS;
+}
+
+static QDF_STATUS
+extract_peer_ptqm_migrate_evt_param_tlv(
+		struct wmi_unified *wmi_handle,
+		uint8_t *buf,
+		struct peer_ptqm_migrate_event_params *params)
+{
+	WMI_MLO_PRIMARY_LINK_PEER_MIGRATION_EVENTID_param_tlvs *param_buf;
+	wmi_mlo_primary_link_peer_migration_compl_fixed_param *ev;
+
+	param_buf =
+		(WMI_MLO_PRIMARY_LINK_PEER_MIGRATION_EVENTID_param_tlvs *)buf;
+	if (!param_buf) {
+		wmi_err_rl("Param_buf is NULL");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	if (!param_buf->primary_link_peer_migration_status) {
+		wmi_err_rl("primary_link_peer_migration_status not present in event");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	ev = (wmi_mlo_primary_link_peer_migration_compl_fixed_param *)
+		param_buf->fixed_param;
+
+	params->vdev_id = ev->vdev_id;
+	params->num_peers = param_buf->num_primary_link_peer_migration_status;
+
+	return QDF_STATUS_SUCCESS;
+}
+
+static QDF_STATUS
+extract_peer_entry_ptqm_migrate_evt_param_tlv(
+		struct wmi_unified *wmi_handle,
+		uint8_t *buf,
+		uint32_t index,
+		struct peer_entry_ptqm_migrate_event_params *params)
+{
+	WMI_MLO_PRIMARY_LINK_PEER_MIGRATION_EVENTID_param_tlvs *param_buf;
+
+	param_buf =
+		(WMI_MLO_PRIMARY_LINK_PEER_MIGRATION_EVENTID_param_tlvs *)buf;
+	if (!param_buf) {
+		wmi_err_rl("Param_buf is NULL");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	if (index > param_buf->num_primary_link_peer_migration_status) {
+		wmi_err_rl("Index greater than total peer entries");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	if (!param_buf->primary_link_peer_migration_status) {
+		wmi_err_rl("primary_link_peer_migration_status not present in event");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	params->ml_peer_id =
+		WMI_MLO_PRIMARY_LINK_PEER_MIGRATION_STATUS_ML_PEER_ID_GET(
+			param_buf->primary_link_peer_migration_status[index].status_info);
+
+	params->status =
+		WMI_MLO_PRIMARY_LINK_PEER_MIGRATION_STATUS_STATUS_GET(
+			param_buf->primary_link_peer_migration_status[index].status_info);
+	return QDF_STATUS_SUCCESS;
+}
+#endif /* QCA_SUPPORT_PRIMARY_LINK_MIGRATE */
+
 void wmi_11be_attach_tlv(wmi_unified_t wmi_handle)
 {
 	struct wmi_ops *ops = wmi_handle->ops;
@@ -1912,4 +2077,9 @@ void wmi_11be_attach_tlv(wmi_unified_t wmi_handle)
 			extract_mlo_link_disable_request_evt_param_tlv;
 	ops->send_mlo_vdev_pause =
 			send_mlo_vdev_pause_cmd_tlv;
+#ifdef QCA_SUPPORT_PRIMARY_LINK_MIGRATE
+	ops->send_peer_ptqm_migrate_cmd = send_peer_ptqm_migrate_cmd_tlv;
+	ops->extract_peer_ptqm_migrate_event = extract_peer_ptqm_migrate_evt_param_tlv;
+	ops->extract_peer_entry_ptqm_migrate_event = extract_peer_entry_ptqm_migrate_evt_param_tlv;
+#endif /* QCA_SUPPORT_PRIMARY_LINK_MIGRATE */
 }

@@ -3311,6 +3311,22 @@ QDF_STATUS
 (*extract_csa_ie_received_ev_params)(wmi_unified_t wmi_handle,
 				     void *evt_buf, uint8_t *vdev_id,
 				     struct csa_offload_params *csa_event);
+#ifdef QCA_SUPPORT_PRIMARY_LINK_MIGRATE
+QDF_STATUS (*send_peer_ptqm_migrate_cmd)(
+				wmi_unified_t wmi,
+				struct peer_ptqm_migrate_params *param);
+
+QDF_STATUS (*extract_peer_ptqm_migrate_event)(
+		struct wmi_unified *wmi_handle,
+		uint8_t *buf,
+		struct peer_ptqm_migrate_event_params *params);
+
+QDF_STATUS (*extract_peer_entry_ptqm_migrate_event)(
+		struct wmi_unified *wmi_handle,
+		uint8_t *buf,
+		uint32_t index,
+		struct peer_entry_ptqm_migrate_event_params *entry);
+#endif /* QCA_SUPPORT_PRIMARY_LINK_MIGRATE */
 };
 
 /* Forward declaration for psoc*/

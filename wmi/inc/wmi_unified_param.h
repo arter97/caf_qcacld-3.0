@@ -5310,6 +5310,9 @@ typedef enum {
 #ifdef WLAN_FEATURE_11BE_MLO
 	wmi_mlo_link_state_info_eventid,
 #endif
+#ifdef QCA_SUPPORT_PRIMARY_LINK_MIGRATE
+	wmi_peer_ptqm_migration_response_eventid,
+#endif
 	wmi_events_max,
 } wmi_conv_event_id;
 

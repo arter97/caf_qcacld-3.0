@@ -468,6 +468,11 @@ struct wlan_mlo_peer_list {
  * @ap_ctx: AP related information
  * @t2lm_ctx: T2LM related information
  * @epcs_ctx: EPCS related information
+ * @ptqm_migrate_timer: timer for ptqm migration
+ * @mlo_peer_id_bmap: mlo_peer_id bitmap for ptqm migration
+ *
+ * NB: Not using kernel-doc format since the kernel-doc script doesn't
+ *     handle the qdf_bitmap() macro
  */
 struct wlan_mlo_dev_context {
 	qdf_list_node_t node;
@@ -490,6 +495,10 @@ struct wlan_mlo_dev_context {
 	struct wlan_mlo_ap *ap_ctx;
 	struct wlan_t2lm_context t2lm_ctx;
 	struct wlan_epcs_context epcs_ctx;
+#ifdef QCA_SUPPORT_PRIMARY_LINK_MIGRATE
+	qdf_timer_t ptqm_migrate_timer;
+	qdf_bitmap(mlo_peer_id_bmap, MAX_MLO_PEER_ID);
+#endif
 };
 
 /**
@@ -1152,4 +1161,90 @@ struct mlo_link_disable_request_evt_params {
 	struct qdf_mac_addr mld_addr;
 	uint32_t link_id_bitmap;
 };
+
+#ifdef QCA_SUPPORT_PRIMARY_LINK_MIGRATE
+/**
+ * struct peer_ptqm_migrate_entry - peer ptqm migrate entry
+ * @ml_peer_id: ML peer id
+ * @hw_link_id: HW link id
+ */
+struct peer_ptqm_migrate_entry {
+	uint16_t ml_peer_id;
+	uint16_t hw_link_id;
+};
+
+/**
+ * struct peer_ptqm_migrate_params - peer ptqm migrate request parameter
+ * @vdev_id: vdev id
+ * @num_peers: peer count
+ * @peer_list: list of peers to be migrated
+ */
+struct peer_ptqm_migrate_params {
+	uint8_t vdev_id;
+	uint16_t num_peers;
+	struct peer_ptqm_migrate_entry *peer_list;
+};
+
+/**
+ * struct peer_ptqm_migrate_list_entry - peer ptqm migrate list
+ * @peer: objmgr peer object
+ * @mlo_peer_id: mlo peer id
+ * @new_hw_link_id: hw link id of new primary
+ * @peer_list_elem: peer ptqm migrate entry list
+ */
+struct peer_ptqm_migrate_list_entry {
+	struct wlan_objmgr_peer *peer;
+	uint32_t mlo_peer_id;
+	uint8_t new_hw_link_id;
+
+	TAILQ_ENTRY(peer_ptqm_migrate_list_entry) peer_list_elem;
+};
+
+/**
+ * struct peer_migrate_ptqm_multi_entries - multi ptqm migrate peer entry params
+ * @num_entries: Number of entries in the peer_list list
+ * @peer_list: List to hold the peer entries to be migrated
+ *
+ * NB: Not using kernel-doc format since the kernel-doc script doesn't
+ *     handle the TAILQ_HEAD() macro
+ */
+struct peer_migrate_ptqm_multi_entries {
+	uint16_t num_entries;
+
+	TAILQ_HEAD(, peer_ptqm_migrate_list_entry) peer_list;
+};
+
+enum primary_link_peer_migration_evenr_status {
+	PRIMARY_LINK_PEER_MIGRATION_SUCCESS,
+	PRIMARY_LINK_PEER_MIGRATION_IN_PROGRESS,
+	PRIMARY_LINK_PEER_MIGRATION_DELETE_IN_PROGRESS,
+	PRIMARY_LINK_PEER_MIGRATION_DELETED,
+	PRIMARY_LINK_PEER_MIGRATION_TX_PIPES_FAILED,
+	PRIMARY_LINK_PEER_MIGRATION_RX_PIPES_FAILED,
+
+	/* Add any new status above this line */
+	PRIMARY_LINK_PEER_MIGRATION_FAIL = 255,
+};
+
+/**
+ * struct peer_ptqm_migrate_event_params - peer ptqm migrate event parameter
+ * @vdev_id: vdev id
+ * @num_peers: peer count
+ */
+struct peer_ptqm_migrate_event_params {
+	uint8_t vdev_id;
+	uint16_t num_peers;
+};
+
+/**
+ * struct peer_entry_ptqm_migrate_event_params - peer entry ptqm migrate
+ * event parameter
+ * @ml_peer_id: ML peer id
+ * @status: migration status
+ */
+struct peer_entry_ptqm_migrate_event_params {
+	uint16_t ml_peer_id;
+	enum primary_link_peer_migration_evenr_status status;
+};
+#endif /* QCA_SUPPORT_PRIMARY_LINK_MIGRATE */
 #endif

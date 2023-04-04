@@ -211,3 +211,42 @@ QDF_STATUS wmi_extract_mgmt_rx_mlo_link_removal_info(
 
 	return QDF_STATUS_E_FAILURE;
 }
+
+#ifdef QCA_SUPPORT_PRIMARY_LINK_MIGRATE
+QDF_STATUS wmi_unified_peer_ptqm_migrate_send(
+					wmi_unified_t wmi_hdl,
+					struct peer_ptqm_migrate_params *param)
+{
+	if (wmi_hdl->ops->send_peer_ptqm_migrate_cmd)
+		return wmi_hdl->ops->send_peer_ptqm_migrate_cmd(wmi_hdl, param);
+
+	return QDF_STATUS_E_FAILURE;
+}
+
+QDF_STATUS
+wmi_extract_peer_ptqm_migrate_event(
+		wmi_unified_t wmi, void *evt_buf,
+		struct peer_ptqm_migrate_event_params *resp)
+{
+	if (wmi->ops->extract_peer_ptqm_migrate_event) {
+		return wmi->ops->extract_peer_ptqm_migrate_event(wmi,
+								 evt_buf,
+								 resp);
+	}
+	return QDF_STATUS_E_FAILURE;
+}
+
+QDF_STATUS
+wmi_extract_peer_ptqm_entry_param(
+		wmi_unified_t wmi_handle, void *evt_buf,
+		uint32_t index,
+		struct peer_entry_ptqm_migrate_event_params *entry)
+{
+	if (wmi_handle->ops->extract_peer_entry_ptqm_migrate_event)
+		return wmi_handle->ops->extract_peer_entry_ptqm_migrate_event(
+			wmi_handle, evt_buf,
+			index, entry);
+
+	return QDF_STATUS_E_FAILURE;
+}
+#endif /* QCA_SUPPORT_PRIMARY_LINK_MIGRATE */

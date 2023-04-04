@@ -219,4 +219,46 @@ QDF_STATUS wmi_extract_mlo_link_disable_request_evt(
 		struct mlo_link_disable_request_evt_params *params);
 #endif /* WLAN_FEATURE_11BE */
 
+#ifdef QCA_SUPPORT_PRIMARY_LINK_MIGRATE
+/**
+ * wmi_unified_peer_ptqm_migrate_send() - send PEER ptqm migrate command to fw
+ * @wmi_hdl: wmi handle
+ * @param: pointer to hold peer ptqm migrate parameters
+ *
+ * Return: QDF_STATUS_SUCCESS on success and QDF_STATUS_E_FAILURE for failure
+ */
+QDF_STATUS wmi_unified_peer_ptqm_migrate_send(
+					wmi_unified_t wmi_hdl,
+					struct peer_ptqm_migrate_params *param);
+
+/**
+ * wmi_extract_peer_ptqm_migrate_event() - extract peer ptqm migrate event params
+ * @wmi: wmi handle
+ * @evt_buf: pointer to event buffer
+ * @resp: Pointer to host structure to get the event params
+ *
+ * This function gets called to extract peer ptqm migrate event params
+ *
+ * Return: QDF_STATUS_SUCCESS on success and QDF_STATUS_E_FAILURE for failure
+ */
+QDF_STATUS
+wmi_extract_peer_ptqm_migrate_event(
+		wmi_unified_t wmi, void *evt_buf,
+		struct peer_ptqm_migrate_event_params *resp);
+
+/**
+ * wmi_extract_peer_ptqm_entry_param() - extract peer entry ptqm migrate param
+ * @wmi_handle: wmi handle
+ * @evt_buf: pointer to event buffer
+ * @index: Index into pdev stats
+ * @entry: Pointer to peer entry params
+ *
+ * Return: QDF_STATUS_SUCCESS on success and QDF_STATUS_E_FAILURE for failure
+ */
+QDF_STATUS
+wmi_extract_peer_ptqm_entry_param(
+		wmi_unified_t wmi_handle, void *evt_buf,
+		uint32_t index,
+		struct peer_entry_ptqm_migrate_event_params *entry);
+#endif /* QCA_SUPPORT_PRIMARY_LINK_MIGRATE */
 #endif /*_WMI_UNIFIED_11BE_API_H_*/

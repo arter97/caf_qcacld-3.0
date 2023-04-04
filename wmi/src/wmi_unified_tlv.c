@@ -21774,6 +21774,11 @@ static void populate_tlv_events_id(WMI_EVT_ID *event_ids)
 #endif
 	event_ids[wmi_csa_ie_received_event_id] =
 		WMI_CSA_IE_RECEIVED_EVENTID;
+
+#ifdef QCA_SUPPORT_PRIMARY_LINK_MIGRATE
+	event_ids[wmi_peer_ptqm_migration_response_eventid] =
+			WMI_MLO_PRIMARY_LINK_PEER_MIGRATION_EVENTID;
+#endif
 }
 
 #ifdef WLAN_FEATURE_LINK_LAYER_STATS
