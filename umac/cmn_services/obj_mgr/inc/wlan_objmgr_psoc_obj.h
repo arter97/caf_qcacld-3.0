@@ -259,6 +259,11 @@
 /* 11AZ Trigger based ranging Responder support */
 #define WLAN_RTT_11AZ_TB_RSTA_SUPPORT 0x00000200
 
+/* CCA busy info for each 20Mhz subband of wideband scan channel support */
+#define WLAN_CCA_BUSY_INFO_FOREACH_20MHZ               0x00000400
+/* ch width notify support */
+#define WLAN_VDEV_PARAM_CHWIDTH_WITH_NOTIFY_SUPPORT    0x00000800
+
 /* PSOC op flags */
 
 	/* Invalid VHT cap */

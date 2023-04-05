@@ -451,6 +451,15 @@ static int init_deinit_service_ready_event_handler(ol_scn_t scn_handle,
 
 	init_deinit_update_vendor_handoff_control_caps(wmi_handle, psoc);
 
+	if (wmi_service_enabled(wmi_handle,
+				wmi_service_cca_busy_info_for_each_20mhz))
+		wlan_psoc_nif_fw_ext2_cap_set(psoc,
+					WLAN_CCA_BUSY_INFO_FOREACH_20MHZ);
+	if (wmi_service_enabled(wmi_handle,
+			wmi_service_vdev_param_chwidth_with_notify_support))
+		wlan_psoc_nif_fw_ext2_cap_set(psoc,
+				WLAN_VDEV_PARAM_CHWIDTH_WITH_NOTIFY_SUPPORT);
+
 	if (wmi_service_enabled(wmi_handle, wmi_service_ext_msg)) {
 		target_if_debug("Wait for EXT message");
 	} else {

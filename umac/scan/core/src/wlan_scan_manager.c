@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2017-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -607,8 +607,15 @@ static void scm_req_update_concurrency_params(struct wlan_objmgr_vdev *vdev,
 		if (!req->scan_req.scan_f_passive)
 			req->scan_req.dwell_time_active =
 				scan_obj->scan_def.conc_active_dwell;
-		req->scan_req.dwell_time_passive =
-			scan_obj->scan_def.conc_passive_dwell;
+		/*
+		 * Irrespective of any concurrency, if a scan request is
+		 * triggered to get channel utilization for the current
+		 * connected channel, passive scan dwell time should be
+		 * MLME_GET_CHAN_STATS_PASSIVE_SCAN_TIME
+		 */
+		if (!req->scan_req.scan_f_pause_home_channel)
+			req->scan_req.dwell_time_passive =
+				scan_obj->scan_def.conc_passive_dwell;
 		req->scan_req.max_rest_time =
 				scan_obj->scan_def.conc_max_rest_time;
 		req->scan_req.min_rest_time =
@@ -797,7 +804,14 @@ static void scm_req_update_concurrency_params(struct wlan_objmgr_vdev *vdev,
 	if (sta_active) {
 		req->scan_req.dwell_time_active_6g =
 				scan_obj->scan_def.active_dwell_time_6g_conc;
-		req->scan_req.dwell_time_passive_6g =
+		/*
+		 * Irrespective of any concurrency, if a scan request is
+		 * triggered to get channel utilization for the current
+		 * connected channel, 6g passive scan dwell time should be
+		 * MLME_GET_CHAN_STATS_WIDE_BAND_PASSIVE_SCAN_TIME
+		 */
+		if (!req->scan_req.scan_f_pause_home_channel)
+			req->scan_req.dwell_time_passive_6g =
 				scan_obj->scan_def.passive_dwell_time_6g_conc;
 	}
 }
