@@ -4425,6 +4425,9 @@ enum qca_wlan_vendor_attr_nd_offload {
  *	measurement management frames. If
  *	NL80211_EXT_FEATURE_PROT_RANGE_NEGO_AND_MEASURE is set, then
  *	QCA_WLAN_VENDOR_FEATURE_PROT_RANGE_NEGO_AND_MEASURE_AP will be ignored.
+ * @QCA_WLAN_VENDOR_FEATURE_AP_ALLOWED_FREQ_LIST: Flag indicates that the device
+ *	in AP mode supports configuring allowed frequency list for AP operation
+ *	with %QCA_WLAN_VENDOR_ATTR_CONFIG_AP_ALLOWED_FREQ_LIST.
  * @NUM_QCA_WLAN_VENDOR_FEATURES: Number of assigned feature bits
  */
 enum qca_wlan_vendor_features {
@@ -4450,6 +4453,7 @@ enum qca_wlan_vendor_features {
 	QCA_WLAN_VENDOR_FEATURE_SECURE_RTT_AP		= 19,
 	QCA_WLAN_VENDOR_FEATURE_PROT_RANGE_NEGO_AND_MEASURE_STA = 20,
 	QCA_WLAN_VENDOR_FEATURE_PROT_RANGE_NEGO_AND_MEASURE_AP = 21,
+	QCA_WLAN_VENDOR_FEATURE_AP_ALLOWED_FREQ_LIST = 22,
 	NUM_QCA_WLAN_VENDOR_FEATURES /* keep last */
 };
 
