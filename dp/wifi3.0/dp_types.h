@@ -179,6 +179,13 @@
 typedef void dp_ptnr_soc_iter_func(struct dp_soc *ptnr_soc, void *arg,
 				   int chip_id);
 
+#ifdef CONFIG_MLO_SINGLE_DEV
+#define DP_MLD_MODE_UNIFIED_NONBOND 0
+#define DP_MLD_MODE_UNIFIED_BOND    1
+#define DP_MLD_MODE_HYBRID_NONBOND  2
+#define DP_MLD_MODE_MAX             DP_MLD_MODE_HYBRID_NONBOND
+#endif
+
 enum rx_pktlog_mode {
 	DP_RX_PKTLOG_DISABLED = 0,
 	DP_RX_PKTLOG_FULL,
@@ -303,6 +310,18 @@ enum dp_mod_id {
 	DP_MOD_ID_TX_MCAST,
 	DP_MOD_ID_DS,
 	DP_MOD_ID_MAX,
+};
+
+/**
+ * enum dp_peer_type - DP peer type
+ * @DP_PEER_TYPE_LEGACY:
+ * @DP_PEER_TYPE_MLO_LINK:
+ * @DP_PEER_TYPE_MLO:
+ */
+enum dp_peer_type {
+	DP_PEER_TYPE_LEGACY,
+	DP_PEER_TYPE_MLO_LINK,
+	DP_PEER_TYPE_MLO,
 };
 
 #define DP_PDEV_ITERATE_VDEV_LIST(_pdev, _vdev) \
@@ -2204,6 +2223,7 @@ enum dp_context_type {
  * @dp_free_ppeds_interrupts:
  * @dp_rx_wbm_err_reap_desc: Reap WBM Error Ring Descriptor
  * @dp_rx_null_q_desc_handle: Handle Null Queue Exception Error
+ * @dp_get_vdev_stats_for_unmap_peer: Get vdev stats pointer for unmap peer
  * @ppeds_handle_attached:
  * @txrx_soc_ppeds_interrupt_stop:
  * @txrx_soc_ppeds_interrupt_start:
@@ -2438,6 +2458,10 @@ struct dp_arch_ops {
 					       struct dp_txrx_peer *txrx_peer,
 					       bool is_reo_exception,
 					       uint8_t link_id);
+	void (*dp_get_vdev_stats_for_unmap_peer)(
+					struct dp_vdev *vdev,
+					struct dp_peer *peer,
+					struct cdp_vdev_stats **vdev_stats);
 #ifdef WLAN_SUPPORT_PPEDS
 	void (*txrx_soc_ppeds_interrupt_stop)(struct dp_soc *soc);
 	void (*txrx_soc_ppeds_interrupt_start)(struct dp_soc *soc);
@@ -3048,6 +3072,9 @@ struct dp_soc {
 #endif
 	/* Reo queue ref table items */
 	struct reo_queue_ref_table reo_qref;
+#ifdef CONFIG_MLO_SINGLE_DEV
+	uint8_t mld_mode_ap;
+#endif
 };
 
 #ifdef IPA_OFFLOAD

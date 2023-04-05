@@ -9609,7 +9609,6 @@ void dp_rx_bar_stats_cb(struct dp_soc *soc, void *cb_ctxt,
 void dp_aggregate_vdev_stats(struct dp_vdev *vdev,
 			     struct cdp_vdev_stats *vdev_stats)
 {
-
 	if (!vdev || !vdev->pdev)
 		return;
 
@@ -9624,8 +9623,8 @@ void dp_aggregate_vdev_stats(struct dp_vdev *vdev,
 
 #if defined(FEATURE_PERPKT_INFO) && WDI_EVENT_ENABLE
 	dp_wdi_event_handler(WDI_EVENT_UPDATE_DP_STATS, vdev->pdev->soc,
-			     vdev_stats, vdev->vdev_id,
-			     UPDATE_VDEV_STATS, vdev->pdev->pdev_id);
+			    vdev_stats, vdev->vdev_id,
+			    UPDATE_VDEV_STATS, vdev->pdev->pdev_id);
 #endif
 }
 
@@ -10163,8 +10162,8 @@ void dp_get_peer_extd_stats(struct dp_peer *peer,
 
 	dp_monitor_peer_get_stats(soc, peer, peer_stats, UPDATE_PEER_STATS);
 }
-#endif
-#else
+#endif /* WLAN_FEATURE_11BE_MLO */
+#else /* QCA_ENHANCED_STATS_SUPPORT */
 static inline
 void dp_get_peer_per_pkt_stats(struct dp_peer *peer,
 			       struct cdp_peer_stats *peer_stats)
@@ -10196,7 +10195,7 @@ void dp_get_peer_extd_stats(struct dp_peer *peer,
 	extd_stats = &txrx_peer->stats[0].extd_stats;
 	DP_UPDATE_EXTD_STATS(peer_stats, extd_stats);
 }
-#endif
+#endif /* QCA_ENHANCED_STATS_SUPPORT */
 
 /**
  * dp_get_peer_tx_per()- Get peer packet error ratio
@@ -11732,10 +11731,11 @@ dp_txrx_reset_peer_stats(struct cdp_soc_t *soc, uint8_t vdev_id,
  * @buf: buffer for vdev stats
  * @is_aggregate: are aggregate stats being collected
  *
- * Return: int
+ * Return: QDF_STATUS
  */
-static int dp_txrx_get_vdev_stats(struct cdp_soc_t *soc_hdl, uint8_t vdev_id,
-				  void *buf, bool is_aggregate)
+static QDF_STATUS
+dp_txrx_get_vdev_stats(struct cdp_soc_t *soc_hdl, uint8_t vdev_id,
+		       void *buf, bool is_aggregate)
 {
 	struct dp_soc *soc = cdp_soc_t_to_dp_soc(soc_hdl);
 	struct cdp_vdev_stats *vdev_stats;
@@ -11743,7 +11743,7 @@ static int dp_txrx_get_vdev_stats(struct cdp_soc_t *soc_hdl, uint8_t vdev_id,
 						     DP_MOD_ID_CDP);
 
 	if (!vdev)
-		return 1;
+		return QDF_STATUS_E_RESOURCES;
 
 	vdev_stats = (struct cdp_vdev_stats *)buf;
 
@@ -11754,7 +11754,7 @@ static int dp_txrx_get_vdev_stats(struct cdp_soc_t *soc_hdl, uint8_t vdev_id,
 	}
 
 	dp_vdev_unref_delete(soc, vdev, DP_MOD_ID_CDP);
-	return 0;
+	return QDF_STATUS_SUCCESS;
 }
 
 /**
@@ -14526,6 +14526,11 @@ static struct cdp_host_stats_ops dp_ops_host_stats = {
 					dp_get_peer_extd_rate_link_stats,
 	.get_pdev_obss_stats = dp_get_obss_stats,
 	.clear_pdev_obss_pd_stats = dp_clear_pdev_obss_pd_stats,
+#ifdef CONFIG_MLO_SINGLE_DEV
+	.txrx_get_interface_stats  = dp_txrx_get_interface_stats,
+#else
+	.txrx_get_interface_stats  = dp_txrx_get_vdev_stats,
+#endif
 	/* TODO */
 };
 
