@@ -1226,7 +1226,7 @@ tgt_mc_cp_stats_prepare_n_send_raw_station_stats(struct wlan_objmgr_psoc *psoc,
 		qdf_mem_copy(last_req->peer_mac_addr,
 			     &(last_req->ml_peer_mac_addr[i][0]),
 			     QDF_MAC_ADDR_SIZE);
-		cp_stats_nofl_debug("Invoking get_station_cb for vdev_id[%d]",
+		cp_stats_nofl_debug("Invoking get_station_cb for ml vdev_id[%d]",
 				    last_req->vdev_id);
 		tgt_mc_cp_stats_send_raw_station_stats(psoc, last_req);
 	}
