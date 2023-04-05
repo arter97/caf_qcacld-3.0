@@ -544,27 +544,178 @@ static void dp_mlo_update_mlo_ts_offset(struct cdp_soc_t *soc_hdl,
 }
 
 #ifdef CONFIG_MLO_SINGLE_DEV
-static void dp_mlo_aggregate_mld_vdev_stats(struct dp_vdev_be *be_vdev,
-					    struct dp_vdev *ptnr_vdev,
-					    void *arg)
+/**
+ * dp_aggregate_vdev_ingress_stats() - aggregate vdev ingress stats
+ * @tgt_vdev_stats: target vdev buffer
+ * @src_vdev_stats: source vdev buffer
+ *
+ * return: void
+ */
+static inline
+void dp_aggregate_vdev_ingress_stats(
+			struct cdp_vdev_stats *tgt_vdev_stats,
+			struct cdp_vdev_stats *src_vdev_stats)
 {
-	struct cdp_vdev_stats *tgt_vdev_stats = (struct cdp_vdev_stats *)arg;
-	struct cdp_vdev_stats *src_vdev_stats = &ptnr_vdev->stats;
-
 	/* Aggregate vdev ingress stats */
 	DP_UPDATE_INGRESS_STATS(tgt_vdev_stats, src_vdev_stats);
+}
 
+/**
+ * dp_aggregate_vdev_stats_for_unmapped_peers() - aggregate unmap peer stats
+ * @tgt_vdev_stats: target vdev buffer
+ * @src_vdev_stats: source vdev buffer
+ *
+ * return: void
+ */
+static inline
+void dp_aggregate_vdev_stats_for_unmapped_peers(
+			struct cdp_vdev_stats *tgt_vdev_stats,
+			struct cdp_vdev_stats *src_vdev_stats)
+{
 	/* Aggregate unmapped peers stats */
-	DP_UPDATE_PER_PKT_STATS(tgt_vdev_stats, src_vdev_stats);
-	DP_UPDATE_EXTD_STATS(tgt_vdev_stats, src_vdev_stats);
+	DP_UPDATE_VDEV_STATS_FOR_UNMAPPED_PEERS(tgt_vdev_stats, src_vdev_stats);
+}
 
-	/* Aggregate associated peers stats */
-	dp_vdev_iterate_peer(ptnr_vdev, dp_update_vdev_stats, tgt_vdev_stats,
+/**
+ * dp_aggregate_all_vdev_stats() - aggregate vdev ingress and unmap peer stats
+ * @tgt_vdev_stats: target vdev buffer
+ * @src_vdev_stats: source vdev buffer
+ *
+ * return: void
+ */
+static inline
+void dp_aggregate_all_vdev_stats(
+			struct cdp_vdev_stats *tgt_vdev_stats,
+			struct cdp_vdev_stats *src_vdev_stats)
+{
+	dp_aggregate_vdev_ingress_stats(tgt_vdev_stats, src_vdev_stats);
+	dp_aggregate_vdev_stats_for_unmapped_peers(tgt_vdev_stats,
+						   src_vdev_stats);
+}
+
+/**
+ * dp_aggregate_interface_stats_based_on_peer_type() - aggregate stats at
+ * VDEV level based on peer type connected to vdev
+ * @vdev: DP VDEV handle
+ * @vdev_stats: target vdev stats pointer
+ * @peer_type: type of peer - MLO Link or Legacy peer
+ *
+ * return: void
+ */
+static
+void dp_aggregate_interface_stats_based_on_peer_type(
+					struct dp_vdev *vdev,
+					struct cdp_vdev_stats *vdev_stats,
+					enum dp_peer_type peer_type)
+{
+	struct cdp_vdev_stats *tgt_vdev_stats = NULL;
+	struct dp_vdev_be *be_vdev = NULL;
+
+	if (!vdev || !vdev->pdev)
+		return;
+
+	tgt_vdev_stats = vdev_stats;
+	be_vdev = dp_get_be_vdev_from_dp_vdev(vdev);
+	if (!be_vdev)
+		return;
+
+	if (peer_type == DP_PEER_TYPE_LEGACY) {
+		dp_aggregate_all_vdev_stats(tgt_vdev_stats,
+					    &vdev->stats);
+	} else {
+		dp_aggregate_vdev_ingress_stats(tgt_vdev_stats,
+						&vdev->stats);
+		dp_aggregate_vdev_stats_for_unmapped_peers(
+						tgt_vdev_stats,
+						&be_vdev->mlo_stats);
+	}
+
+	/* Aggregate associated peer stats */
+	dp_vdev_iterate_specific_peer_type(vdev,
+					   dp_update_vdev_stats,
+					   vdev_stats,
+					   DP_MOD_ID_GENERIC_STATS,
+					   peer_type);
+}
+
+/**
+ * dp_aggregate_interface_stats() - aggregate stats at VDEV level
+ * @vdev: DP VDEV handle
+ * @vdev_stats: target vdev stats pointer
+ *
+ * return: void
+ */
+static
+void dp_aggregate_interface_stats(struct dp_vdev *vdev,
+				  struct cdp_vdev_stats *vdev_stats)
+{
+	struct dp_vdev_be *be_vdev = NULL;
+
+	if (!vdev || !vdev->pdev)
+		return;
+
+	be_vdev = dp_get_be_vdev_from_dp_vdev(vdev);
+	if (!be_vdev)
+		return;
+
+	dp_aggregate_all_vdev_stats(vdev_stats, &be_vdev->mlo_stats);
+	dp_aggregate_all_vdev_stats(vdev_stats, &vdev->stats);
+
+	dp_vdev_iterate_peer(vdev, dp_update_vdev_stats, vdev_stats,
 			     DP_MOD_ID_GENERIC_STATS);
+
+	dp_update_vdev_rate_stats(vdev_stats, &vdev->stats);
+
+#if defined(FEATURE_PERPKT_INFO) && WDI_EVENT_ENABLE
+	dp_wdi_event_handler(WDI_EVENT_UPDATE_DP_STATS, vdev->pdev->soc,
+			     vdev_stats, vdev->vdev_id,
+			     UPDATE_VDEV_STATS, vdev->pdev->pdev_id);
+#endif
+}
+
+/**
+ * dp_mlo_aggr_ptnr_iface_stats() - aggregate mlo partner vdev stats
+ * @be_vdev: vdev handle
+ * @ptnr_vdev: partner vdev handle
+ * @arg: target buffer for aggregation
+ *
+ * return: void
+ */
+static
+void dp_mlo_aggr_ptnr_iface_stats(struct dp_vdev_be *be_vdev,
+				  struct dp_vdev *ptnr_vdev,
+				  void *arg)
+{
+	struct cdp_vdev_stats *tgt_vdev_stats = (struct cdp_vdev_stats *)arg;
+
+	dp_aggregate_interface_stats(ptnr_vdev, tgt_vdev_stats);
+}
+
+/**
+ * dp_mlo_aggr_ptnr_iface_stats_mlo_links() - aggregate mlo partner vdev stats
+ * based on peer type
+ * @be_vdev: vdev handle
+ * @ptnr_vdev: partner vdev handle
+ * @arg: target buffer for aggregation
+ *
+ * return: void
+ */
+static
+void dp_mlo_aggr_ptnr_iface_stats_mlo_links(
+					struct dp_vdev_be *be_vdev,
+					struct dp_vdev *ptnr_vdev,
+					void *arg)
+{
+	struct cdp_vdev_stats *tgt_vdev_stats = (struct cdp_vdev_stats *)arg;
+
+	dp_aggregate_interface_stats_based_on_peer_type(ptnr_vdev,
+							tgt_vdev_stats,
+							DP_PEER_TYPE_MLO_LINK);
 }
 
 static QDF_STATUS dp_mlo_get_mld_vdev_stats(struct cdp_soc_t *soc_hdl,
-					    uint8_t vdev_id, void *buf)
+					    uint8_t vdev_id, void *buf,
+					    bool link_vdev_only)
 {
 	struct dp_soc *soc = cdp_soc_t_to_dp_soc(soc_hdl);
 	struct dp_soc_be *be_soc = dp_get_be_soc_from_dp_soc(soc);
@@ -584,12 +735,56 @@ static QDF_STATUS dp_mlo_get_mld_vdev_stats(struct cdp_soc_t *soc_hdl,
 
 	vdev_stats = (struct cdp_vdev_stats *)buf;
 
-	dp_aggregate_vdev_stats(vdev, buf);
+	if (DP_MLD_MODE_HYBRID_NONBOND == soc->mld_mode_ap &&
+	    vdev->opmode == wlan_op_mode_ap) {
+		dp_aggregate_interface_stats_based_on_peer_type(
+						vdev, buf,
+						DP_PEER_TYPE_MLO_LINK);
+		if (link_vdev_only)
+			goto complete;
 
-	/* Aggregate stats from partner vdevs */
-	dp_mlo_iter_ptnr_vdev(be_soc, vdev_be,
-			      dp_mlo_aggregate_mld_vdev_stats, buf,
-			      DP_MOD_ID_GENERIC_STATS);
+		/* Aggregate stats from partner vdevs */
+		dp_mlo_iter_ptnr_vdev(be_soc, vdev_be,
+				      dp_mlo_aggr_ptnr_iface_stats_mlo_links,
+				      buf,
+				      DP_MOD_ID_GENERIC_STATS);
+	} else {
+		dp_aggregate_interface_stats(vdev, buf);
+
+		if (link_vdev_only)
+			goto complete;
+
+		/* Aggregate stats from partner vdevs */
+		dp_mlo_iter_ptnr_vdev(be_soc, vdev_be,
+				      dp_mlo_aggr_ptnr_iface_stats, buf,
+				      DP_MOD_ID_GENERIC_STATS);
+	}
+
+complete:
+	dp_vdev_unref_delete(soc, vdev, DP_MOD_ID_GENERIC_STATS);
+	return QDF_STATUS_SUCCESS;
+}
+
+QDF_STATUS
+dp_txrx_get_interface_stats(struct cdp_soc_t *soc_hdl,
+			    uint8_t vdev_id,
+			    void *buf,
+			    bool is_aggregate)
+{
+	struct dp_soc *soc = cdp_soc_t_to_dp_soc(soc_hdl);
+	struct dp_vdev *vdev = dp_vdev_get_ref_by_id(soc, vdev_id,
+						     DP_MOD_ID_GENERIC_STATS);
+	if (!vdev)
+		return QDF_STATUS_E_FAILURE;
+
+	if (DP_MLD_MODE_HYBRID_NONBOND == soc->mld_mode_ap &&
+	    vdev->opmode == wlan_op_mode_ap) {
+		dp_aggregate_interface_stats_based_on_peer_type(
+						vdev, buf,
+						DP_PEER_TYPE_LEGACY);
+	} else {
+		dp_aggregate_interface_stats(vdev, buf);
+	}
 
 	dp_vdev_unref_delete(soc, vdev, DP_MOD_ID_GENERIC_STATS);
 

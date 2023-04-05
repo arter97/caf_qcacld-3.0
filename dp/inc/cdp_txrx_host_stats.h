@@ -1240,4 +1240,32 @@ static inline QDF_STATUS cdp_clear_pdev_obss_pd_stats(
 	return soc->ops->host_stats_ops->clear_pdev_obss_pd_stats(
 					soc, pdev_id, req);
 }
+
+/*
+ * cdp_host_get_interface_stats - Get vdev stats for ath interface
+ * @soc: soc handle
+ * @vdev_id: vdev_id
+ * @buf: buffer to hold vdev_stats
+ *
+ * return: QDF_STATUS
+ */
+static inline QDF_STATUS
+cdp_host_get_interface_stats(ol_txrx_soc_handle soc,
+			     uint8_t vdev_id,
+			     struct cdp_vdev_stats *buf)
+{
+	if (!soc || !soc->ops) {
+		QDF_BUG(0);
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	if (!soc->ops->host_stats_ops ||
+	    !soc->ops->host_stats_ops->txrx_get_interface_stats)
+		return QDF_STATUS_E_FAILURE;
+
+	return soc->ops->host_stats_ops->txrx_get_interface_stats(soc,
+								  vdev_id,
+								  buf,
+								  true);
+}
 #endif /* _CDP_TXRX_HOST_STATS_H_ */

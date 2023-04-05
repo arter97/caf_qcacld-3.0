@@ -635,6 +635,13 @@ static uint8_t dp_get_hw_link_id_li(struct dp_pdev *pdev)
 	return 0;
 }
 
+static void dp_get_vdev_stats_for_unmap_peer_li(
+					struct dp_vdev *vdev,
+					struct dp_peer *peer,
+					struct cdp_vdev_stats **vdev_stats)
+{
+}
+
 void dp_initialize_arch_ops_li(struct dp_arch_ops *arch_ops)
 {
 #ifndef QCA_HOST_MODE_WIFI_DISABLED
@@ -710,6 +717,8 @@ void dp_initialize_arch_ops_li(struct dp_arch_ops *arch_ops)
 	arch_ops->txrx_get_vdev_mcast_param = dp_txrx_get_vdev_mcast_param_li;
 	arch_ops->get_hw_link_id = dp_get_hw_link_id_li;
 	arch_ops->txrx_srng_init = dp_srng_init_li;
+	arch_ops->dp_get_vdev_stats_for_unmap_peer =
+					dp_get_vdev_stats_for_unmap_peer_li;
 #if defined(DP_POWER_SAVE) || defined(FEATURE_RUNTIME_PM)
 	arch_ops->dp_update_ring_hptp = dp_update_ring_hptp;
 #endif

@@ -180,7 +180,8 @@ struct cdp_mlo_ops {
 	void (*mlo_update_mlo_ts_offset)(struct cdp_soc_t *soc_hdl,
 					 uint64_t offset);
 	QDF_STATUS (*mlo_get_mld_vdev_stats)(struct cdp_soc_t *soc,
-					     uint8_t vdev_id, void *buf);
+					     uint8_t vdev_id, void *buf,
+					     bool link_vdev_only);
 };
 #endif
 
@@ -1167,6 +1168,7 @@ struct cdp_mon_ops {
  * @txrx_get_peer_extd_rate_link_stats:
  * @get_pdev_obss_stats:
  * @clear_pdev_obss_pd_stats:
+ * @txrx_get_interface_stats:
  */
 struct cdp_host_stats_ops {
 	int (*txrx_host_stats_get)(struct cdp_soc_t *soc, uint8_t vdev_id,
@@ -1253,7 +1255,7 @@ struct cdp_host_stats_ops {
 	QDF_STATUS
 		(*txrx_reset_peer_stats)(struct cdp_soc_t *soc,
 					 uint8_t vdev_id, uint8_t *peer_mac);
-	int
+	QDF_STATUS
 		(*txrx_get_vdev_stats)(struct cdp_soc_t *soc, uint8_t vdev_id,
 				       void *buf, bool is_aggregate);
 	int
@@ -1366,6 +1368,10 @@ struct cdp_host_stats_ops {
 	QDF_STATUS (*clear_pdev_obss_pd_stats)(struct cdp_soc_t *soc,
 					       uint8_t pdev_id,
 					       struct cdp_txrx_stats_req *req);
+	QDF_STATUS (*txrx_get_interface_stats)(struct cdp_soc_t *soc,
+					       uint8_t vdev_id,
+					       void *buf,
+					       bool is_aggregate);
 };
 
 /**

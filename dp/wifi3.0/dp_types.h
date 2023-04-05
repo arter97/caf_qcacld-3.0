@@ -328,6 +328,18 @@ enum dp_mod_id {
 	DP_MOD_ID_MAX,
 };
 
+/**
+ * enum dp_peer_type - DP peer type
+ * @DP_PEER_TYPE_LEGACY:
+ * @DP_PEER_TYPE_MLO_LINK:
+ * @DP_PEER_TYPE_MLO:
+ */
+enum dp_peer_type {
+	DP_PEER_TYPE_LEGACY,
+	DP_PEER_TYPE_MLO_LINK,
+	DP_PEER_TYPE_MLO,
+};
+
 #define DP_PDEV_ITERATE_VDEV_LIST(_pdev, _vdev) \
 	TAILQ_FOREACH((_vdev), &(_pdev)->vdev_list, vdev_list_elem)
 
@@ -2247,6 +2259,7 @@ enum dp_context_type {
  * @dp_tx_desc_pool_alloc: Allocate arch specific TX descriptor pool
  * @dp_tx_desc_pool_free: Free arch specific TX descriptor pool
  * @txrx_srng_init: Init txrx srng
+ * @dp_get_vdev_stats_for_unmap_peer: Get vdev stats pointer for unmap peer
  * @ppeds_handle_attached:
  * @txrx_soc_ppeds_interrupt_stop:
  * @txrx_soc_ppeds_interrupt_start:
@@ -2493,6 +2506,11 @@ struct dp_arch_ops {
 
 	QDF_STATUS (*txrx_srng_init)(struct dp_soc *soc, struct dp_srng *srng,
 				     int ring_type, int ring_num, int mac_id);
+
+	void (*dp_get_vdev_stats_for_unmap_peer)(
+					struct dp_vdev *vdev,
+					struct dp_peer *peer,
+					struct cdp_vdev_stats **vdev_stats);
 #ifdef WLAN_SUPPORT_PPEDS
 	void (*txrx_soc_ppeds_interrupt_stop)(struct dp_soc *soc);
 	void (*txrx_soc_ppeds_interrupt_start)(struct dp_soc *soc);

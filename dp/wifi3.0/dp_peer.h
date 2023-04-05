@@ -2330,6 +2330,51 @@ dp_peer_update_state(struct dp_soc *soc,
 		QDF_MAC_ADDR_REF(peer->mac_addr.raw));
 }
 
+/**
+ * dp_vdev_iterate_specific_peer_type() - API to iterate through vdev peer
+ * list based on type of peer (Legacy or MLD peer)
+ *
+ * @vdev: DP vdev context
+ * @func: function to be called for each peer
+ * @arg: argument need to be passed to func
+ * @mod_id: module_id
+ * @peer_type: type of peer - MLO Link Peer or Legacy Peer
+ *
+ * Return: void
+ */
+static inline void
+dp_vdev_iterate_specific_peer_type(struct dp_vdev *vdev,
+				   dp_peer_iter_func *func,
+				   void *arg, enum dp_mod_id mod_id,
+				   enum dp_peer_type peer_type)
+{
+	struct dp_peer *peer;
+	struct dp_peer *tmp_peer;
+	struct dp_soc *soc = NULL;
+
+	if (!vdev || !vdev->pdev || !vdev->pdev->soc)
+		return;
+
+	soc = vdev->pdev->soc;
+
+	qdf_spin_lock_bh(&vdev->peer_list_lock);
+	TAILQ_FOREACH_SAFE(peer, &vdev->peer_list,
+			   peer_list_elem,
+			   tmp_peer) {
+		if (dp_peer_get_ref(soc, peer, mod_id) ==
+					QDF_STATUS_SUCCESS) {
+			if ((peer_type == DP_PEER_TYPE_LEGACY &&
+			     (IS_DP_LEGACY_PEER(peer))) ||
+			    (peer_type == DP_PEER_TYPE_MLO_LINK &&
+			     (IS_MLO_DP_LINK_PEER(peer)))) {
+				(*func)(soc, peer, arg);
+			}
+			dp_peer_unref_delete(peer, mod_id);
+		}
+	}
+	qdf_spin_unlock_bh(&vdev->peer_list_lock);
+}
+
 #ifdef REO_SHARED_QREF_TABLE_EN
 void dp_peer_rx_reo_shared_qaddr_delete(struct dp_soc *soc,
 					struct dp_peer *peer);

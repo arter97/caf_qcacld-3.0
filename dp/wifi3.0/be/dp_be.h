@@ -399,6 +399,7 @@ struct dp_pdev_be {
  * @bank_id: bank_id to be used for TX
  * @vdev_id_check_en: flag if HW vdev_id check is enabled for vdev
  * @partner_vdev_list: partner list used for Intra-BSS
+ * @mlo_stats: structure to hold stats for mlo unmapped peers
  * @seq_num: DP MLO seq number
  * @mcast_primary: MLO Mcast primary vdev
  */
@@ -408,6 +409,7 @@ struct dp_vdev_be {
 	uint8_t vdev_id_check_en;
 #ifdef WLAN_MLO_MULTI_CHIP
 	uint8_t partner_vdev_list[WLAN_MAX_MLO_CHIPS][WLAN_MAX_MLO_LINKS_PER_SOC];
+	struct cdp_vdev_stats mlo_stats;
 #ifdef WLAN_FEATURE_11BE_MLO
 #ifdef WLAN_MCAST_MLO
 	uint16_t seq_num;

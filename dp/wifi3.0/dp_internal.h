@@ -1891,6 +1891,15 @@ void dp_update_vdev_stats_on_peer_unmap(struct dp_vdev *vdev,
 #define DP_UPDATE_11BE_STATS(_tgtobj, _srcobj)
 #endif
 
+#define DP_UPDATE_BASIC_STATS(_tgtobj, _srcobj) \
+	do { \
+		_tgtobj->tx.comp_pkt.num += _srcobj->tx.comp_pkt.num; \
+		_tgtobj->tx.comp_pkt.bytes += _srcobj->tx.comp_pkt.bytes; \
+		_tgtobj->tx.tx_failed += _srcobj->tx.tx_failed; \
+		_tgtobj->rx.to_stack.num += _srcobj->rx.to_stack.num; \
+		_tgtobj->rx.to_stack.bytes += _srcobj->rx.to_stack.bytes; \
+	} while (0)
+
 #define DP_UPDATE_PER_PKT_STATS(_tgtobj, _srcobj) \
 	do { \
 		uint8_t i; \
@@ -2174,6 +2183,13 @@ void dp_update_vdev_stats_on_peer_unmap(struct dp_vdev *vdev,
 			_tgtobj->rx.bw[i] += _srcobj->rx.bw[i]; \
 		} \
 		DP_UPDATE_11BE_STATS(_tgtobj, _srcobj); \
+	} while (0)
+
+#define DP_UPDATE_VDEV_STATS_FOR_UNMAPPED_PEERS(_tgtobj, _srcobj) \
+	do { \
+		DP_UPDATE_BASIC_STATS(_tgtobj, _srcobj); \
+		DP_UPDATE_PER_PKT_STATS(_tgtobj, _srcobj); \
+		DP_UPDATE_EXTD_STATS(_tgtobj, _srcobj); \
 	} while (0)
 
 #define DP_UPDATE_INGRESS_STATS(_tgtobj, _srcobj) \
@@ -2831,6 +2847,22 @@ uint32_t dp_reo_status_ring_handler(struct dp_intr *int_ctx,
  */
 void dp_aggregate_vdev_stats(struct dp_vdev *vdev,
 			     struct cdp_vdev_stats *vdev_stats);
+
+/**
+ * dp_txrx_get_interface_stats() - get vdev stats for ath interface
+ * @soc_hdl: CDP SoC handle
+ * @vdev_id: vdev Id
+ * @buf: buffer for vdev stats
+ * @is_aggregate: for aggregation
+ *
+ * Return: QDF_STATUS
+ */
+
+QDF_STATUS
+dp_txrx_get_interface_stats(struct cdp_soc_t *soc_hdl,
+			    uint8_t vdev_id,
+			    void *buf,
+			    bool is_aggregate);
 
 /**
  * dp_rx_bar_stats_cb() - BAR received stats callback
