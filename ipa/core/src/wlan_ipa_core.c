@@ -818,6 +818,7 @@ static void wlan_ipa_pm_flush(void *data)
 	struct wlan_ipa_pm_tx_cb *pm_tx_cb = NULL;
 	qdf_nbuf_t skb;
 	uint32_t dequeued = 0;
+	qdf_netdev_t ndev;
 
 	qdf_spin_lock_bh(&ipa_ctx->pm_lock);
 	while (((skb = qdf_nbuf_queue_remove(&ipa_ctx->pm_queue_head)) !=
@@ -833,6 +834,15 @@ static void wlan_ipa_pm_flush(void *data)
 				ipa_ctx->softap_xmit(skb,
 						pm_tx_cb->iface_context->dev);
 				ipa_ctx->stats.num_tx_fwd_ok++;
+			} else {
+				dev_kfree_skb_any(skb);
+			}
+		} else if (pm_tx_cb->send_to_nw) {
+			ndev = pm_tx_cb->iface_context->dev;
+
+			if (ipa_ctx->send_to_nw && ndev) {
+				ipa_ctx->send_to_nw(skb, ndev);
+				ipa_ctx->ipa_rx_net_send_count++;
 			} else {
 				dev_kfree_skb_any(skb);
 			}
@@ -1184,6 +1194,109 @@ static int wlan_ipa_send_sta_eapol_to_nw(qdf_nbuf_t skb,
 	return 0;
 }
 
+#ifndef QCA_IPA_LL_TX_FLOW_CONTROL
+
+#ifdef SAP_DHCP_FW_IND
+/**
+ * wlan_ipa_send_to_nw_sap_dhcp - Check if SAP mode and skb is a DHCP packet
+ * @iface_ctx: IPA per-interface ctx
+ * @skb: socket buffer
+ *
+ * Check if @iface_ctx is SAP and @skb is a DHCP packet.
+ *
+ * When SAP_DHCP_FW_IND feature is enabled, DHCP packets received will be
+ * notified to target via WMI cmd. However if system is suspended, WMI
+ * cmd is not allowed from Host to Target.
+ *
+ * Return: true if iface is SAP mode and skb is a DHCP packet. Otherwise false
+ */
+static bool
+wlan_ipa_send_to_nw_sap_dhcp(struct wlan_ipa_iface_context *iface_ctx,
+			     qdf_nbuf_t skb)
+{
+	if (iface_ctx->device_mode == QDF_SAP_MODE &&
+	    qdf_nbuf_is_ipv4_dhcp_pkt(skb) == true)
+		return true;
+
+	return false;
+}
+#else /* !SAP_DHCP_FW_IND */
+static inline bool
+wlan_ipa_send_to_nw_sap_dhcp(struct wlan_ipa_iface_context *iface_ctx,
+			     qdf_nbuf_t skb)
+{
+	return false;
+}
+#endif /* SAP_DHCP_FW_IND */
+
+/**
+ * wlan_ipa_send_to_nw_defer - Check if skb needs to deferred to network stack
+ * @iface_ctx: IPA per-interface ctx
+ * @skb: socket buffer
+ *
+ * Check if @skb received on @iface_ctx needs to be deferred to be passed
+ * up to network stack.
+ *
+ * Return: true if needs to be deferred, otherwise false
+ */
+static bool wlan_ipa_send_to_nw_defer(struct wlan_ipa_iface_context *iface_ctx,
+				      qdf_nbuf_t skb)
+{
+	struct wlan_ipa_priv *ipa_ctx = iface_ctx->ipa_ctx;
+
+	qdf_spin_lock_bh(&ipa_ctx->pm_lock);
+	if (!ipa_ctx->suspended) {
+		qdf_spin_unlock_bh(&ipa_ctx->pm_lock);
+		return false;
+	}
+	qdf_spin_unlock_bh(&ipa_ctx->pm_lock);
+
+	return wlan_ipa_send_to_nw_sap_dhcp(iface_ctx, skb);
+}
+
+/**
+ * wlan_ipa_send_to_nw_queue - Add skb to pm_queue_head if deferred
+ * @iface_ctx: IPA per-interface ctx
+ * @skb: socket buffer
+ *
+ * Add @skb to pm_queue_head to defer passing up to network stack due to
+ * system suspended.
+ *
+ * Return: None
+ */
+static void wlan_ipa_send_to_nw_queue(struct wlan_ipa_iface_context *iface_ctx,
+				      qdf_nbuf_t skb)
+{
+	struct wlan_ipa_priv *ipa_ctx = iface_ctx->ipa_ctx;
+	struct wlan_ipa_pm_tx_cb *pm_cb;
+
+	qdf_mem_zero(skb->cb, sizeof(skb->cb));
+	pm_cb = (struct wlan_ipa_pm_tx_cb *)skb->cb;
+
+	pm_cb->send_to_nw = true;
+	pm_cb->iface_context = iface_ctx;
+
+	qdf_spin_lock_bh(&ipa_ctx->pm_lock);
+	qdf_nbuf_queue_add(&ipa_ctx->pm_queue_head, skb);
+	qdf_spin_unlock_bh(&ipa_ctx->pm_lock);
+
+	ipa_ctx->stats.num_tx_queued++;
+}
+#else /* QCA_IPA_LL_TX_FLOW_CONTROL */
+static inline bool
+wlan_ipa_send_to_nw_defer(struct wlan_ipa_iface_context *iface_ctx,
+			  qdf_nbuf_t skb)
+{
+	return false;
+}
+
+static inline void
+wlan_ipa_send_to_nw_queue(struct wlan_ipa_iface_context *iface_ctx,
+			  qdf_nbuf_t skb)
+{
+}
+#endif /* QCA_IPA_LL_TX_FLOW_CONTROL */
+
 /**
  * wlan_ipa_send_skb_to_network() - Send skb to kernel
  * @skb: network buffer
@@ -1211,10 +1324,14 @@ wlan_ipa_send_skb_to_network(qdf_nbuf_t skb,
 
 	skb->destructor = wlan_ipa_uc_rt_debug_destructor;
 
-	if (ipa_ctx->send_to_nw)
-		ipa_ctx->send_to_nw(skb, iface_ctx->dev);
+	if (wlan_ipa_send_to_nw_defer(iface_ctx, skb)) {
+		wlan_ipa_send_to_nw_queue(iface_ctx, skb);
+	} else {
+		if (ipa_ctx->send_to_nw)
+			ipa_ctx->send_to_nw(skb, iface_ctx->dev);
 
-	ipa_ctx->ipa_rx_net_send_count++;
+		ipa_ctx->ipa_rx_net_send_count++;
+	}
 }
 
 /**
@@ -4199,7 +4316,7 @@ void wlan_ipa_flush(struct wlan_ipa_priv *ipa_ctx)
 
 		pm_tx_cb = (struct wlan_ipa_pm_tx_cb *)skb->cb;
 
-		if (pm_tx_cb->exception) {
+		if (pm_tx_cb->exception || pm_tx_cb->send_to_nw) {
 			dev_kfree_skb_any(skb);
 		} else {
 			if (pm_tx_cb->ipa_tx_desc)
