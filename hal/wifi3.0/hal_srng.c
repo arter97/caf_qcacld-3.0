@@ -1711,6 +1711,22 @@ void *hal_srng_setup_idx(void *hal_soc, int ring_type, int ring_num, int mac_id,
 	}
 
 	if (!(ring_config->lmac_ring)) {
+		/*
+		 * UMAC reset has idle check enabled.
+		 * During UMAC reset Tx ring halt is set
+		 * by Wi-Fi FW during pre-reset stage,
+		 * avoid Tx ring halt again.
+		 */
+		if (idle_check && idx) {
+			if (!hal->ops->hal_tx_ring_halt_get(hal_hdl)) {
+				qdf_print("\nTx ring halt not set:Ring(%d, %d)",
+					  ring_type, ring_num);
+				qdf_assert_always(0);
+			}
+			hal_srng_hw_init(hal, srng, idle_check, idx);
+			goto ce_setup;
+		}
+
 		if (idx) {
 			hal->ops->hal_tx_ring_halt_set(hal_hdl);
 			do {
@@ -1723,7 +1739,7 @@ void *hal_srng_setup_idx(void *hal_soc, int ring_type, int ring_num, int mac_id,
 			hal->ops->hal_tx_ring_halt_reset(hal_hdl);
 		}
 
-
+ce_setup:
 		if (ring_type == CE_DST) {
 			srng->u.dst_ring.max_buffer_length = ring_params->max_buffer_length;
 			hal_ce_dst_setup(hal, srng, ring_num);
@@ -1769,12 +1785,14 @@ void *hal_srng_setup(void *hal_soc, int ring_type, int ring_num,
 }
 qdf_export_symbol(hal_srng_setup);
 
-void hal_srng_cleanup(void *hal_soc, hal_ring_handle_t hal_ring_hdl)
+void hal_srng_cleanup(void *hal_soc, hal_ring_handle_t hal_ring_hdl,
+		      bool umac_reset_inprogress)
 {
 	struct hal_srng *srng = (struct hal_srng *)hal_ring_hdl;
 	SRNG_LOCK_DESTROY(&srng->lock);
 	srng->initialized = 0;
-	hal_srng_hw_disable(hal_soc, srng);
+	if (umac_reset_inprogress)
+		hal_srng_hw_disable(hal_soc, srng);
 }
 qdf_export_symbol(hal_srng_cleanup);
 

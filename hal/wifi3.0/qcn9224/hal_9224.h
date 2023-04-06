@@ -1821,6 +1821,7 @@ static void hal_hw_txrx_ops_attach_qcn9224(struct hal_soc *hal_soc)
 					hal_tx_ppe2tcl_ring_halt_done_9224;
 	hal_soc->ops->hal_tx_get_num_ppe_vp_search_idx_tbl_entries =
 			hal_tx_get_num_ppe_vp_search_idx_reg_entries_9224;
+	hal_soc->ops->hal_tx_ring_halt_get = hal_tx_ppe2tcl_ring_halt_get_9224;
 };
 
 /**
