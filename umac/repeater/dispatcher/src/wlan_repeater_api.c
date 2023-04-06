@@ -453,7 +453,7 @@ wlan_rptr_vdev_create_complete(struct wlan_objmgr_vdev *vdev,
 	u8 *oma_addr = NULL;
 	u8 *vma_addr = NULL;
 	struct net_device *wrap_dev;
-#ifdef CONFIG_MLO_SINGLE_DEV
+#ifdef WLAN_FEATURE_11BE_MLO
 	osif_dev  *osdev;
 	struct osif_mldev *mldev;
 #endif
@@ -474,7 +474,7 @@ wlan_rptr_vdev_create_complete(struct wlan_objmgr_vdev *vdev,
 			wrap_dev = dp_wrap_vdev_get_netdev(
 					dp_wrap_get_vdev(pdev));
 			if (wrap_dev) {
-#ifdef CONFIG_MLO_SINGLE_DEV
+#ifdef WLAN_FEATURE_11BE_MLO
 				osdev = ath_netdev_priv(wrap_dev);
 				mldev = osdev->mldev;
 				if (mldev)
@@ -522,7 +522,7 @@ wlan_rptr_vdev_delete_start(struct wlan_objmgr_vdev *vdev)
 	u8 *oma_addr = NULL;
 	u8 *vma_addr = NULL;
 	struct net_device *wrap_dev;
-#ifdef CONFIG_MLO_SINGLE_DEV
+#ifdef WLAN_FEATURE_11BE_MLO
 	osif_dev  *osdev;
 	struct osif_mldev *mldev;
 #endif
@@ -539,7 +539,7 @@ wlan_rptr_vdev_delete_start(struct wlan_objmgr_vdev *vdev)
 			wrap_dev = dp_wrap_vdev_get_netdev(
 						dp_wrap_get_vdev(pdev));
 			if (wrap_dev) {
-#ifdef CONFIG_MLO_SINGLE_DEV
+#ifdef WLAN_FEATURE_11BE_MLO
 				osdev = ath_netdev_priv(wrap_dev);
 				mldev = osdev->mldev;
 				if (mldev)
