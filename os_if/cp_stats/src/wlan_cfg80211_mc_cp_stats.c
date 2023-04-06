@@ -585,7 +585,7 @@ static void get_station_stats_cb(struct stats_event *ev, void *cookie)
 {
 	struct stats_event *priv;
 	struct osif_request *request;
-	uint32_t summary_size, rssi_size, peer_adv_size = 0;
+	uint32_t summary_size, rssi_size, peer_adv_size = 0, pdev_size;
 
 	request = osif_request_get(cookie);
 	if (!request) {
@@ -633,6 +633,15 @@ static void get_station_stats_cb(struct stats_event *ev, void *cookie)
 
 		qdf_mem_copy(priv->peer_adv_stats, ev->peer_adv_stats,
 			     peer_adv_size);
+	}
+
+	if (ev->num_pdev_stats && ev->pdev_stats) {
+		pdev_size = sizeof(*ev->pdev_stats) * ev->num_pdev_stats;
+		priv->pdev_stats = qdf_mem_malloc(pdev_size);
+		if (!priv->pdev_stats)
+			goto station_stats_cb_fail;
+
+		qdf_mem_copy(priv->pdev_stats, ev->pdev_stats, pdev_size);
 	}
 
 	priv->num_summary_stats = ev->num_summary_stats;
@@ -1105,6 +1114,10 @@ wlan_cfg80211_mc_cp_stats_get_station_stats(struct wlan_objmgr_vdev *vdev,
 	if (priv->peer_adv_stats)
 		out->peer_adv_stats = priv->peer_adv_stats;
 	priv->peer_adv_stats = NULL;
+	if (priv->pdev_stats)
+		out->pdev_stats = priv->pdev_stats;
+	priv->pdev_stats = NULL;
+
 	out->bcn_protect_stats = priv->bcn_protect_stats;
 	osif_request_put(request);
 
