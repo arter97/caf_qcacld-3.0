@@ -1311,9 +1311,19 @@ dp_rx_intrabss_ucast_check_be(qdf_nbuf_t nbuf,
 	if (!qdf_nbuf_is_intra_bss(nbuf))
 		return false;
 
+	hal_rx_tlv_get_dest_chip_pmac_id(rx_tlv_hdr,
+					 &dest_chip_id,
+					 &dest_chip_pmac_id);
+
+	params->dest_soc =
+		dp_mlo_get_soc_ref_by_chip_id(be_soc->ml_ctxt,
+					      dest_chip_id);
+	if (!params->dest_soc)
+		return false;
+
 	da_peer_id = HAL_RX_PEER_ID_GET(msdu_metadata);
 
-	da_peer = dp_peer_get_tgt_peer_by_id(&be_soc->soc, da_peer_id,
+	da_peer = dp_peer_get_tgt_peer_by_id(params->dest_soc, da_peer_id,
 					     DP_MOD_ID_RX);
 	if (da_peer) {
 		if (da_peer->bss_peer || (da_peer->txrx_peer == ta_peer)) {
@@ -1322,10 +1332,6 @@ dp_rx_intrabss_ucast_check_be(qdf_nbuf_t nbuf,
 		}
 		dp_peer_unref_delete(da_peer, DP_MOD_ID_RX);
 	}
-
-	hal_rx_tlv_get_dest_chip_pmac_id(rx_tlv_hdr,
-					 &dest_chip_id,
-					 &dest_chip_pmac_id);
 
 	qdf_assert_always(dest_chip_id <= (DP_MLO_MAX_DEST_CHIP_ID - 1));
 
@@ -1341,12 +1347,6 @@ dp_rx_intrabss_ucast_check_be(qdf_nbuf_t nbuf,
 
 	params->tx_vdev_id =
 		be_vdev->partner_vdev_list[dest_chip_id][dest_chip_pmac_id];
-
-	params->dest_soc =
-		dp_mlo_get_soc_ref_by_chip_id(be_soc->ml_ctxt,
-					      dest_chip_id);
-	if (!params->dest_soc)
-		return false;
 
 	return true;
 }
@@ -1560,10 +1560,12 @@ bool dp_rx_intrabss_mlo_mcbc_fwd(struct dp_soc *soc, struct dp_vdev *vdev,
 	struct dp_soc_be *be_soc = dp_get_be_soc_from_dp_soc(soc);
 	struct cdp_tx_exception_metadata tx_exc_metadata = {0};
 
-	if (!vdev->mlo_vdev)
-		return false;
-
 	tx_exc_metadata.is_mlo_mcast = 1;
+	tx_exc_metadata.tx_encap_type = CDP_INVALID_TX_ENCAP_TYPE;
+	tx_exc_metadata.sec_type = CDP_INVALID_SEC_TYPE;
+	tx_exc_metadata.peer_id = CDP_INVALID_PEER;
+	tx_exc_metadata.tid = CDP_INVALID_TID;
+
 	mcast_primary_vdev = dp_mlo_get_mcast_primary_vdev(be_soc,
 							   be_vdev,
 							   DP_MOD_ID_RX);
