@@ -1162,7 +1162,9 @@ tgt_send_pdev_mc_cp_stats(struct wlan_objmgr_psoc *psoc,
 
 	wlan_cp_stats_pdev_obj_lock(pdev_cp_stats_priv);
 	pdev_mc_stats = pdev_cp_stats_priv->pdev_stats;
-	ev->pdev_stats->max_pwr = pdev_mc_stats->max_pwr;
+	qdf_mem_copy(ev->pdev_stats,
+		     pdev_mc_stats,
+		     sizeof(*pdev_mc_stats));
 	wlan_cp_stats_pdev_obj_unlock(pdev_cp_stats_priv);
 	wlan_objmgr_vdev_release_ref(vdev, WLAN_CP_STATS_ID);
 
