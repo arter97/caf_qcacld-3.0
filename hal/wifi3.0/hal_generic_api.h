@@ -245,6 +245,8 @@ void hal_srng_src_hw_init_generic(struct hal_soc *hal,
 	uint32_t reg_val = 0;
 	uint64_t tp_addr = 0;
 
+	hal_debug("hw_init srng %d", srng->ring_id);
+
 	if (idle_check) {
 		reg_val = SRNG_SRC_REG_READ(srng, MISC);
 		if (!(reg_val & SRNG_IDLE_STATE_BIT)) {
@@ -254,12 +256,10 @@ void hal_srng_src_hw_init_generic(struct hal_soc *hal,
 
 		hal_srng_src_hw_write_cons_prefetch_timer(srng,
 							  srng->prefetch_timer);
+	} else {
+		reg_val = SRNG_SRC_REG_READ(srng, MISC) & ~(SRNG_ENABLE_BIT);
+		SRNG_SRC_REG_WRITE(srng, MISC, reg_val);
 	}
-
-	hal_debug("hw_init srng %d", srng->ring_id);
-
-	reg_val = SRNG_SRC_REG_READ(srng, MISC) & ~(SRNG_ENABLE_BIT);
-	SRNG_SRC_REG_WRITE(srng, MISC, reg_val);
 
 	reg_val = 0;
 
@@ -440,19 +440,18 @@ void hal_srng_dst_hw_init_generic(struct hal_soc *hal,
 	uint32_t reg_val = 0;
 	uint64_t hp_addr = 0;
 
+	hal_debug("hw_init srng %d", srng->ring_id);
+
 	if (idle_check) {
 		reg_val = SRNG_DST_REG_READ(srng, MISC);
 		if (!(reg_val & SRNG_IDLE_STATE_BIT)) {
 			hal_err("ring_id %d not in idle state", srng->ring_id);
 			qdf_assert_always(0);
 		}
+	} else {
+		reg_val = SRNG_DST_REG_READ(srng, MISC) & ~(SRNG_ENABLE_BIT);
+		SRNG_DST_REG_WRITE(srng, MISC, reg_val);
 	}
-
-	hal_debug("hw_init srng %d", srng->ring_id);
-
-	reg_val = SRNG_DST_REG_READ(srng, MISC) & ~(SRNG_ENABLE_BIT);
-
-	SRNG_DST_REG_WRITE(srng, MISC, reg_val);
 
 	reg_val = 0;
 
