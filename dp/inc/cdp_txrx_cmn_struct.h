@@ -206,11 +206,13 @@ struct cdp_stats_cookie;
  * enum cdp_cfg_param_type - DP configuration parameters
  * @CDP_CFG_MAX_PEER_ID: Maximum peer id
  * @CDP_CFG_CCE_DISABLE: CCE disable
+ * @CDP_CFG_MLD_NETDEV_MODE_AP: Ap's mld netdev model
  * @CDP_CFG_NUM_PARAMS: Total number of params
  */
 enum cdp_cfg_param_type {
 	CDP_CFG_MAX_PEER_ID,
 	CDP_CFG_CCE_DISABLE,
+	CDP_CFG_MLD_NETDEV_MODE_AP,
 	CDP_CFG_NUM_PARAMS
 };
 

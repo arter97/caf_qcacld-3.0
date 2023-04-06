@@ -4377,6 +4377,29 @@ static void dp_soc_cfg_init(struct dp_soc *soc)
 }
 
 /**
+ * dp_soc_get_ap_mld_mode() - store ap mld mode from ini
+ * @soc: Opaque DP SOC handle
+ *
+ * Return: none
+ */
+#if defined(WLAN_FEATURE_11BE_MLO) && defined(WLAN_MLO_MULTI_CHIP)
+static inline void dp_soc_get_ap_mld_mode(struct dp_soc *soc)
+{
+	if (soc->cdp_soc.ol_ops->get_dp_cfg_param) {
+		soc->mld_mode_ap =
+		soc->cdp_soc.ol_ops->get_dp_cfg_param(soc->ctrl_psoc,
+					CDP_CFG_MLD_NETDEV_MODE_AP);
+	}
+	qdf_info("DP mld_mode_ap-%u\n", soc->mld_mode_ap);
+}
+#else
+static inline void dp_soc_get_ap_mld_mode(struct dp_soc *soc)
+{
+	(void)soc;
+}
+#endif
+
+/**
  * dp_soc_init() - Initialize txrx SOC
  * @soc: Opaque DP SOC handle
  * @htc_handle: Opaque HTC handle
@@ -4558,6 +4581,8 @@ void *dp_soc_init(struct dp_soc *soc, HTC_HANDLE htc_handle,
 		qdf_skb_total_mem_stats_read());
 
 	soc->vdev_stats_id_map = 0;
+
+	dp_soc_get_ap_mld_mode(soc);
 
 	return soc;
 fail7:

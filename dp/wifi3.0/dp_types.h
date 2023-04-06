@@ -195,6 +195,13 @@
 typedef void dp_ptnr_soc_iter_func(struct dp_soc *ptnr_soc, void *arg,
 				   int chip_id);
 
+#if defined(WLAN_FEATURE_11BE_MLO) && defined(WLAN_MLO_MULTI_CHIP)
+#define DP_MLD_MODE_UNIFIED_NONBOND 0
+#define DP_MLD_MODE_UNIFIED_BOND    1
+#define DP_MLD_MODE_HYBRID_NONBOND  2
+#define DP_MLD_MODE_MAX             DP_MLD_MODE_HYBRID_NONBOND
+#endif
+
 enum rx_pktlog_mode {
 	DP_RX_PKTLOG_DISABLED = 0,
 	DP_RX_PKTLOG_FULL,
@@ -3102,6 +3109,9 @@ struct dp_soc {
 #ifdef DP_TX_PACKET_INSPECT_FOR_ILP
 	/* Flag to show if TX ILP is enabled */
 	bool tx_ilp_enable;
+#endif
+#if defined(WLAN_FEATURE_11BE_MLO) && defined(WLAN_MLO_MULTI_CHIP)
+	uint8_t mld_mode_ap;
 #endif
 };
 

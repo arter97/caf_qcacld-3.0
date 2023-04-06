@@ -1534,7 +1534,7 @@ fail:
 }
 
 #if defined(WLAN_FEATURE_11BE_MLO) && defined(WLAN_MLO_MULTI_CHIP) && \
-	defined(WLAN_MCAST_MLO) && !defined(CONFIG_MLO_SINGLE_DEV)
+	defined(WLAN_MCAST_MLO)
 static bool dp_rx_igmp_handler(struct dp_soc *soc,
 			       struct dp_vdev *vdev,
 			       struct dp_txrx_peer *peer,
@@ -1649,6 +1649,7 @@ dp_rx_err_route_hdl(struct dp_soc *soc, qdf_nbuf_t nbuf,
 		qdf_nbuf_pull_head(nbuf, (msdu_metadata.l3_hdr_pad +
 				   soc->rx_pkt_tlv_size));
 
+	QDF_NBUF_CB_RX_PEER_ID(nbuf) = txrx_peer->peer_id;
 	if (dp_rx_igmp_handler(soc, vdev, txrx_peer, nbuf, link_id))
 		return;
 
