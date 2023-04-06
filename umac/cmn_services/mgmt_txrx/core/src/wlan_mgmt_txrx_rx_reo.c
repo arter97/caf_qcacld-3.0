@@ -2183,15 +2183,16 @@ mgmt_rx_reo_log_egress_frame_before_delivery(
  * frame exiting the reorder module. Logging is done after attempting the frame
  * delivery to upper layer.
  * @reo_ctx: management rx reorder context
- * @is_delivered: Flag to indicate whether the frame is delivered to upper
- * layers
+ * @entry: Pointer to reorder list entry
+ * @link_id: multi-link link ID
  *
  * Return: QDF_STATUS of operation
  */
 static QDF_STATUS
 mgmt_rx_reo_log_egress_frame_after_delivery(
 					struct mgmt_rx_reo_context *reo_ctx,
-					bool is_delivered)
+					struct mgmt_rx_reo_list_entry *entry,
+					uint8_t link_id)
 {
 	return QDF_STATUS_SUCCESS;
 }
@@ -2453,7 +2454,6 @@ mgmt_rx_reo_log_scheduler_debug_info(struct mgmt_rx_reo_context *reo_ctx,
  * frame getting scheduled by mgmt rx reo scheduler
  * @reo_ctx: management rx reorder context
  * @entry: Pointer to reorder list entry
- * @context: Current execution context
  * @reschedule: Indicates rescheduling
  *
  * Return: QDF_STATUS of operation
@@ -2461,7 +2461,6 @@ mgmt_rx_reo_log_scheduler_debug_info(struct mgmt_rx_reo_context *reo_ctx,
 static inline QDF_STATUS
 mgmt_rx_reo_log_scheduler_debug_info(struct mgmt_rx_reo_context *reo_ctx,
 				     struct mgmt_rx_reo_list_entry *entry,
-				     enum mgmt_rx_reo_execution_context context,
 				     bool reschedule)
 {
 	return QDF_STATUS_SUCCESS;
@@ -2731,19 +2730,21 @@ exit_unlock_frame_release_lock:
 	return status;
 }
 
-QDF_STATUS
-mgmt_rx_reo_release_frames(uint8_t mlo_grp_id, uint32_t link_bitmap)
+#ifdef WLAN_MGMT_RX_REO_DEBUG_SUPPORT
+/**
+ * mgmt_rx_reo_scheduler_cb_stats_inc() - API to increment scheduler_cb_count.
+ * @link_bitmap: Bitmap of links for which frames can be released in the current
+ * context
+ * @reo_context: Pointer to management Rx reorder context
+ *
+ * This API increments the scheduler_cb_count of links for which frames can be
+ * released in the current context
+ */
+static void mgmt_rx_reo_scheduler_cb_stats_inc(uint32_t link_bitmap,
+					       struct mgmt_rx_reo_context
+					       *reo_context)
 {
-	struct mgmt_rx_reo_context *reo_context;
-	QDF_STATUS ret;
-	struct mgmt_rx_reo_context_info ctx_info = {0};
 	uint8_t link;
-
-	reo_context = mgmt_rx_reo_get_context(mlo_grp_id);
-	if (!reo_context) {
-		mgmt_rx_reo_err("Mgmt rx reo context is null");
-		return QDF_STATUS_E_NULL_VALUE;
-	}
 
 	for (link = 0; link < MAX_MLO_LINKS; link++)
 		if (link_bitmap & (1 << link)) {
@@ -2752,7 +2753,28 @@ mgmt_rx_reo_release_frames(uint8_t mlo_grp_id, uint32_t link_bitmap)
 			stats = &reo_context->scheduler_debug_info.stats;
 			stats->scheduler_cb_count[link]++;
 		}
+}
+#else
+static void mgmt_rx_reo_scheduler_cb_stats_inc(uint32_t link_bitmap,
+					       struct mgmt_rx_reo_context
+					       *reo_context)
+{
+}
+#endif
 
+QDF_STATUS
+mgmt_rx_reo_release_frames(uint8_t mlo_grp_id, uint32_t link_bitmap)
+{
+	struct mgmt_rx_reo_context *reo_context;
+	QDF_STATUS ret;
+	struct mgmt_rx_reo_context_info ctx_info = {0};
+
+	reo_context = mgmt_rx_reo_get_context(mlo_grp_id);
+	if (!reo_context) {
+		mgmt_rx_reo_err("Mgmt rx reo context is null");
+		return QDF_STATUS_E_NULL_VALUE;
+	}
+	mgmt_rx_reo_scheduler_cb_stats_inc(link_bitmap, reo_context);
 	ctx_info.context = MGMT_RX_REO_CONTEXT_SCHEDULER_CB;
 	ctx_info.context_id = qdf_atomic_inc_return(&reo_context->context_id);
 	ret = mgmt_rx_reo_release_egress_list_entries(reo_context, link_bitmap,
@@ -6714,13 +6736,13 @@ mgmt_rx_reo_debug_info_deinit(struct wlan_objmgr_pdev *pdev)
 }
 #else
 static QDF_STATUS
-mgmt_rx_reo_debug_info_init(struct wlan_objmgr_psoc *psoc)
+mgmt_rx_reo_debug_info_init(struct wlan_objmgr_pdev *pdev)
 {
 	return QDF_STATUS_SUCCESS;
 }
 
 static QDF_STATUS
-mgmt_rx_reo_debug_info_deinit(struct wlan_objmgr_psoc *psoc)
+mgmt_rx_reo_debug_info_deinit(struct wlan_objmgr_pdev *pdev)
 {
 	return QDF_STATUS_SUCCESS;
 }
