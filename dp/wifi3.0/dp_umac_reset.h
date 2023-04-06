@@ -228,11 +228,11 @@ struct dp_soc_umac_reset_ctx {
 
 /**
  * dp_soc_umac_reset_init() - Initialize UMAC reset context
- * @soc: DP soc object
+ * @txrx_soc: DP soc object
  *
  * Return: QDF status of operation
  */
-QDF_STATUS dp_soc_umac_reset_init(struct dp_soc *soc);
+QDF_STATUS dp_soc_umac_reset_init(struct cdp_soc_t *txrx_soc);
 
 /**
  * dp_soc_umac_reset_deinit() - De-initialize UMAC reset context
@@ -334,7 +334,7 @@ static inline bool dp_check_umac_reset_in_progress(struct dp_soc *soc)
 }
 
 static inline
-QDF_STATUS dp_soc_umac_reset_init(struct dp_soc *soc)
+QDF_STATUS dp_soc_umac_reset_init(struct cdp_soc_t *txrx_soc)
 {
 	return QDF_STATUS_SUCCESS;
 }

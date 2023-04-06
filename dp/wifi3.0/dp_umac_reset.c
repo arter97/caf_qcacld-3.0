@@ -82,8 +82,9 @@ dp_umac_reset_send_setup_cmd(struct dp_soc *soc)
 	return dp_htt_umac_reset_send_setup_cmd(soc, &params);
 }
 
-QDF_STATUS dp_soc_umac_reset_init(struct dp_soc *soc)
+QDF_STATUS dp_soc_umac_reset_init(struct cdp_soc_t *txrx_soc)
 {
+	struct dp_soc *soc = (struct dp_soc *)txrx_soc;
 	struct dp_soc_umac_reset_ctx *umac_reset_ctx;
 	size_t alloc_size;
 	QDF_STATUS status;
