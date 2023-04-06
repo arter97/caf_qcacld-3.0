@@ -7507,7 +7507,7 @@ int wlan_hdd_get_station_stats(struct hdd_adapter *adapter)
 
 	if (!stats->vdev_summary_stats || !stats->vdev_chain_rssi ||
 	    !stats->peer_adv_stats || !stats->pdev_stats) {
-		hdd_err("Invalid:%s%s%s%s",
+		hdd_err("Invalid: %s%s%s%s",
 			stats->vdev_summary_stats ? "" : " vdev_summary_stats",
 			stats->vdev_chain_rssi ? "" : " vdev_chain_rssi",
 			stats->peer_adv_stats ? "" : " peer_adv_stats",
