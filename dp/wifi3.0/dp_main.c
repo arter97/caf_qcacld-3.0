@@ -581,15 +581,13 @@ dp_peer_reset_ast_entries(struct dp_soc *soc, struct dp_peer *peer, void *arg)
  * @wds_macaddr:	WDS entry MAC Address
  * @peer_mac_addr:	WDS entry MAC Address
  * @vdev_id:		id of vdev handle
- * @type:		Type of AST entry
  *
  * Return: QDF_STATUS
  */
 static QDF_STATUS dp_wds_reset_ast_wifi3(struct cdp_soc_t *soc_hdl,
 					 uint8_t *wds_macaddr,
 					 uint8_t *peer_mac_addr,
-					 uint8_t vdev_id,
-					 enum cdp_txrx_ast_entry_type type)
+					 uint8_t vdev_id)
 {
 	struct dp_soc *soc = (struct dp_soc *)soc_hdl;
 	struct dp_ast_entry *ast_entry = NULL;
@@ -597,7 +595,7 @@ static QDF_STATUS dp_wds_reset_ast_wifi3(struct cdp_soc_t *soc_hdl,
 	struct dp_pdev *pdev;
 	struct dp_vdev *vdev;
 
-	if (soc->ast_offload_support && type != CDP_TXRX_AST_TYPE_WDS_HM)
+	if (soc->ast_offload_support)
 		return QDF_STATUS_E_FAILURE;
 
 	vdev = dp_vdev_get_ref_by_id(soc, vdev_id, DP_MOD_ID_CDP);
@@ -641,17 +639,16 @@ static QDF_STATUS dp_wds_reset_ast_wifi3(struct cdp_soc_t *soc_hdl,
  * dp_wds_reset_ast_table_wifi3() - Reset the is_active param for all ast entry
  * @soc_hdl:		Datapath SOC handle
  * @vdev_id:		id of vdev object
- * @type:		Type of AST entry
  *
  * Return: QDF_STATUS
  */
 static QDF_STATUS
 dp_wds_reset_ast_table_wifi3(struct cdp_soc_t  *soc_hdl,
-			     uint8_t vdev_id, enum cdp_txrx_ast_entry_type type)
+			     uint8_t vdev_id)
 {
 	struct dp_soc *soc = (struct dp_soc *) soc_hdl;
 
-	if (soc->ast_offload_support && type != CDP_TXRX_AST_TYPE_WDS_HM)
+	if (soc->ast_offload_support)
 		return QDF_STATUS_SUCCESS;
 
 	qdf_spin_lock_bh(&soc->ast_lock);
@@ -975,6 +972,7 @@ static QDF_STATUS dp_peer_ast_entry_del_by_pdev(struct cdp_soc_t *soc_handle,
  * @vdev_id: vdev id
  * @wds_macaddr: AST entry mac address to delete
  * @type: cdp_txrx_ast_entry_type to send to FW
+ * @delete_in_fw: flag to indicate AST entry deletion in FW
  *
  * Return: QDF_STATUS_SUCCESS if ast entry found with ast_mac_addr and delete
  *         is sent
@@ -983,13 +981,14 @@ static QDF_STATUS dp_peer_ast_entry_del_by_pdev(struct cdp_soc_t *soc_handle,
 static QDF_STATUS dp_peer_HMWDS_ast_entry_del(struct cdp_soc_t *soc_handle,
 					      uint8_t vdev_id,
 					      uint8_t *wds_macaddr,
-					      uint8_t type)
+					      uint8_t type,
+					      uint8_t delete_in_fw)
 {
 	struct dp_soc *soc = (struct dp_soc *)soc_handle;
 
 	if (soc->ast_offload_support) {
-		dp_wds_reset_ast_wifi3(soc_handle, wds_macaddr, NULL, vdev_id,
-				       type);
+		dp_del_wds_entry_wrapper(soc, vdev_id, wds_macaddr, type,
+					 delete_in_fw);
 		return QDF_STATUS_SUCCESS;
 	}
 
