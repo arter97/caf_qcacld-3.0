@@ -354,6 +354,23 @@ bool ucfg_tdls_is_fw_wideband_capable(struct wlan_objmgr_psoc *psoc)
 	return soc_obj->fw_tdls_wideband_capability;
 }
 
+#ifdef WLAN_FEATURE_11BE
+void ucfg_tdls_update_fw_mlo_capability(struct wlan_objmgr_psoc *psoc,
+					bool is_fw_tdls_mlo_capable)
+{
+	struct tdls_soc_priv_obj *soc_obj;
+
+	soc_obj = wlan_objmgr_psoc_get_comp_private_obj(psoc,
+							WLAN_UMAC_COMP_TDLS);
+	if (!soc_obj) {
+		tdls_err("Failed to get tdls psoc component");
+		return;
+	}
+
+	soc_obj->fw_tdls_mlo_capable = is_fw_tdls_mlo_capable;
+}
+#endif
+
 #ifdef WLAN_FEATURE_11AX
 void ucfg_tdls_update_fw_11ax_capability(struct wlan_objmgr_psoc *psoc,
 					 bool is_fw_tdls_11ax_capable)

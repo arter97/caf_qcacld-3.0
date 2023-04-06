@@ -71,6 +71,23 @@ QDF_STATUS wlan_tdls_teardown_links(struct wlan_objmgr_psoc *psoc)
 	return status;
 }
 
+#ifdef WLAN_FEATURE_11BE_MLO
+bool wlan_tdls_is_fw_11be_mlo_capable(struct wlan_objmgr_psoc *psoc)
+{
+	struct tdls_soc_priv_obj *soc_obj;
+
+	soc_obj = wlan_objmgr_psoc_get_comp_private_obj(psoc,
+							WLAN_UMAC_COMP_TDLS);
+	if (!soc_obj) {
+		tdls_err("Failed to get tdls psoc component");
+		return false;
+	}
+	tdls_debug("FW 11BE capability %d", soc_obj->fw_tdls_mlo_capable);
+
+	return soc_obj->fw_tdls_mlo_capable;
+}
+#endif
+
 void  wlan_tdls_teardown_links_sync(struct wlan_objmgr_psoc *psoc)
 {
 	struct tdls_vdev_priv_obj *vdev_priv_obj;

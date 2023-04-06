@@ -1522,6 +1522,20 @@ static void hdd_update_fw_tdls_wideband_capability(struct hdd_context *hdd_ctx,
 						cfg->en_tdls_wideband_support);
 }
 
+#ifdef WLAN_FEATURE_11BE
+static void hdd_update_fw_tdls_mlo_capability(struct hdd_context *hdd_ctx,
+					      struct wma_tgt_services *cfg)
+{
+	ucfg_tdls_update_fw_mlo_capability(hdd_ctx->psoc,
+					   cfg->en_tdls_mlo_support);
+}
+#else
+static inline
+void hdd_update_fw_tdls_mlo_capability(struct hdd_context *hdd_ctx,
+				       struct wma_tgt_services *cfg)
+{}
+#endif
+
 #ifdef WLAN_FEATURE_11AX
 static void hdd_update_fw_tdls_11ax_capability(struct hdd_context *hdd_ctx,
 					       struct wma_tgt_services *cfg)
@@ -1548,6 +1562,11 @@ void hdd_update_fw_tdls_6g_capability(struct hdd_context *hdd_ctx,
 {}
 #endif
 #else
+static inline
+void hdd_update_fw_tdls_mlo_capability(struct hdd_context *hdd_ctx,
+				       struct wma_tgt_services *cfg)
+{}
+
 static inline
 void hdd_update_fw_tdls_11ax_capability(struct hdd_context *hdd_ctx,
 					struct wma_tgt_services *cfg)
@@ -1693,6 +1712,7 @@ static void hdd_update_tgt_services(struct hdd_context *hdd_ctx,
 				cfg_get(hdd_ctx->psoc,
 					CFG_THERMAL_MITIGATION_ENABLE);
 	hdd_update_fw_tdls_11ax_capability(hdd_ctx, cfg);
+	hdd_update_fw_tdls_mlo_capability(hdd_ctx, cfg);
 	hdd_set_dynamic_macaddr_update_capability(hdd_ctx, cfg);
 	hdd_update_fw_tdls_6g_capability(hdd_ctx, cfg);
 	hdd_update_fw_tdls_wideband_capability(hdd_ctx, cfg);

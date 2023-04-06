@@ -41,6 +41,7 @@
  * @en_tdls_wideband_support: Get TDLS wideband support
  * @en_tdls_11ax_support: Get TDLS ax support
  * @en_tdls_6g_support: Get TDLS 6g fw capability
+ * @en_tdls_mlo_support: Get TDLS mlo fw support
  * @en_roam_offload: enable roam offload
  * @en_11ax: enable 11ax
  * @is_fw_mawc_capable: Motion Aided Wireless Connectivity feature
@@ -79,6 +80,9 @@ struct wma_tgt_services {
 #ifdef WLAN_FEATURE_11AX
 	bool en_tdls_11ax_support;
 	bool en_tdls_6g_support;
+#endif
+#ifdef WLAN_FEATURE_11BE
+	bool en_tdls_mlo_support;
 #endif
 #endif /* FEATURE_WLAN_TDLS */
 #ifdef WLAN_FEATURE_ROAM_OFFLOAD

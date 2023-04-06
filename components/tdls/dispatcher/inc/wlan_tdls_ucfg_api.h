@@ -163,6 +163,24 @@ return false;
 }
 #endif
 
+#ifdef WLAN_FEATURE_11BE
+/**
+ * ucfg_tdls_update_fw_mlo_capability() - update fw mlo capability
+ * @psoc: psoc object
+ * @is_fw_tdls_mlo_capable: bool value
+ *
+ * Return: none
+ */
+void ucfg_tdls_update_fw_mlo_capability(struct wlan_objmgr_psoc *psoc,
+					bool is_fw_tdls_mlo_capable);
+#else
+static inline
+void ucfg_tdls_update_fw_mlo_capability(struct wlan_objmgr_psoc *psoc,
+					bool is_fw_tdls_mlo_capable)
+{
+}
+#endif
+
 /**
  * ucfg_tdls_psoc_enable() - TDLS module enable API
  * @psoc: psoc object

@@ -26,7 +26,21 @@
 #include "wlan_objmgr_vdev_obj.h"
 
 #ifdef FEATURE_WLAN_TDLS
-
+#ifdef WLAN_FEATURE_11BE_MLO
+/**
+ * wlan_tdls_is_fw_11be_mlo_capable() - Get TDLS 11be mlo capab
+ * @psoc: psoc context
+ *
+ * Return: True if 11be mlo capable
+ */
+bool wlan_tdls_is_fw_11be_mlo_capable(struct wlan_objmgr_psoc *psoc);
+#else
+static inline
+bool wlan_tdls_is_fw_11be_mlo_capable(struct wlan_objmgr_psoc *psoc)
+{
+	return false;
+}
+#endif
 #ifdef FEATURE_SET
 /**
  * wlan_tdls_get_features_info() - Get tdls features info
@@ -126,6 +140,12 @@ void wlan_tdls_get_features_info(struct wlan_objmgr_psoc *psoc,
 {
 }
 #endif
+
+static inline
+bool wlan_tdls_is_fw_11be_mlo_capable(struct wlan_objmgr_psoc *psoc)
+{
+	return false;
+}
 
 static inline QDF_STATUS wlan_tdls_teardown_links(struct wlan_objmgr_psoc *psoc)
 {

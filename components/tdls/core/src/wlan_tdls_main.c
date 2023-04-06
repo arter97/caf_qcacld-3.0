@@ -28,6 +28,7 @@
 #include "wlan_tdls_peer.h"
 #include "wlan_tdls_ct.h"
 #include "wlan_tdls_mgmt.h"
+#include "wlan_tdls_api.h"
 #include "wlan_tdls_tgt_api.h"
 #include "wlan_policy_mgr_public_struct.h"
 #include "wlan_policy_mgr_api.h"
@@ -993,7 +994,8 @@ bool tdls_check_is_tdls_allowed(struct wlan_objmgr_vdev *vdev)
 		goto exit;
 	}
 
-	if (wlan_vdev_mlme_is_mlo_vdev(vdev)) {
+	if (wlan_vdev_mlme_is_mlo_vdev(vdev) &&
+	    !wlan_tdls_is_fw_11be_mlo_capable(tdls_soc_obj->soc)) {
 		tdls_debug("TDLS not supported on MLO vdev");
 		goto exit;
 	}
@@ -1075,6 +1077,7 @@ void tdls_set_ct_mode(struct wlan_objmgr_psoc *psoc,
 	struct tdls_vdev_priv_obj *tdls_vdev_obj;
 	uint32_t tdls_feature_flags = 0, sta_count, p2p_count;
 	bool state = false;
+	bool tdls_mlo;
 	QDF_STATUS status;
 
 	if (!tdls_check_is_tdls_allowed(vdev))
@@ -1101,7 +1104,8 @@ void tdls_set_ct_mode(struct wlan_objmgr_psoc *psoc,
 		policy_mgr_mode_specific_connection_count(psoc,
 							  PM_P2P_CLIENT_MODE,
 							  NULL);
-	if (sta_count == 1 ||
+	tdls_mlo = wlan_tdls_is_fw_11be_mlo_capable(psoc);
+	if (sta_count == 1 || (sta_count >= 2 && tdls_mlo) ||
 	    (policy_mgr_get_connection_count_with_mlo(psoc) == 1 &&
 	     p2p_count == 1)) {
 		state = true;
@@ -1370,6 +1374,7 @@ void tdls_send_update_to_fw(struct tdls_vdev_priv_obj *tdls_vdev_obj,
 	uint32_t tdls_feature_flags;
 	QDF_STATUS status;
 	uint8_t set_state_cnt;
+	bool tdls_mlo;
 
 	tdls_feature_flags = tdls_soc_obj->tdls_configs.tdls_feature_flags;
 	if (!TDLS_IS_ENABLED(tdls_feature_flags)) {
@@ -1378,6 +1383,14 @@ void tdls_send_update_to_fw(struct tdls_vdev_priv_obj *tdls_vdev_obj,
 	}
 
 	set_state_cnt = tdls_soc_obj->set_state_info.set_state_cnt;
+	tdls_mlo = wlan_tdls_is_fw_11be_mlo_capable(tdls_soc_obj->soc);
+
+	/* for mld tdls, it needs to set the second vdev,
+	 * set set_state_cnt to 0 to bypass the following check.
+	 */
+	if (tdls_mlo && sta_connect_event && set_state_cnt == 1)
+		set_state_cnt = 0;
+
 	if ((set_state_cnt == 0 && !sta_connect_event) ||
 	    (set_state_cnt && sta_connect_event)) {
 		tdls_debug("FW TDLS state is already in requested state");
@@ -1433,7 +1446,8 @@ void tdls_send_update_to_fw(struct tdls_vdev_priv_obj *tdls_vdev_obj,
 	 * channel switch
 	 */
 	if (TDLS_IS_OFF_CHANNEL_ENABLED(tdls_feature_flags) &&
-	    !tdls_chan_swit_prohibited)
+	    (!tdls_chan_swit_prohibited) &&
+	    (!wlan_tdls_is_fw_11be_mlo_capable(tdls_soc_obj->soc)))
 		tdls_info_to_fw->tdls_options = ENA_TDLS_OFFCHAN;
 
 	if (TDLS_IS_BUFFER_STA_ENABLED(tdls_feature_flags))

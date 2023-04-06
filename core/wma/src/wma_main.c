@@ -3358,6 +3358,25 @@ static void wma_get_service_cap_club_get_sta_in_ll_stats_req(
 }
 #endif /* FEATURE_CLUB_LL_STATS_AND_GET_STATION */
 
+#ifdef WLAN_FEATURE_11BE_MLO
+static void
+wma_update_num_tdls_vdevs_if_11be_mlo(struct wlan_objmgr_psoc *psoc,
+				      target_resource_config *wlan_res_cfg)
+{
+	if (!wlan_tdls_is_fw_11be_mlo_capable(psoc))
+		return;
+
+	wlan_res_cfg->num_tdls_vdevs = WLAN_UMAC_MLO_MAX_VDEVS;
+	wma_debug("update tdls num vdevs %d", wlan_res_cfg->num_tdls_vdevs);
+}
+#else
+static void
+wma_update_num_tdls_vdevs_if_11be_mlo(struct wlan_objmgr_psoc *psoc,
+				      target_resource_config *wlan_res_cfg)
+{
+}
+#endif
+
 /**
  * wma_open() - Allocate wma context and initialize it.
  * @cds_context:  cds context
@@ -3545,6 +3564,7 @@ QDF_STATUS wma_open(struct wlan_objmgr_psoc *psoc,
 	}
 
 	wma_set_default_tgt_config(wma_handle, wlan_res_cfg, cds_cfg);
+	wma_update_num_tdls_vdevs_if_11be_mlo(psoc, wlan_res_cfg);
 
 	qdf_status = wlan_mlme_get_tx_chainmask_cck(psoc, &val);
 	if (qdf_status != QDF_STATUS_SUCCESS) {
@@ -5058,6 +5078,31 @@ wma_get_tdls_wideband_support(struct wmi_unified *wmi_handle,
 					     wmi_service_tdls_wideband_support);
 }
 
+#ifdef WLAN_FEATURE_11BE
+/**
+ * wma_get_tdls_mlo_support() - update tgt service with service tdls
+ * be support
+ * @wmi_handle: Unified wmi handle
+ * @cfg: target services
+ *
+ * Return: none
+ */
+static inline void
+wma_get_tdls_mlo_support(struct wmi_unified *wmi_handle,
+			 struct wma_tgt_services *cfg)
+{
+	cfg->en_tdls_mlo_support =
+		wmi_service_enabled(wmi_handle,
+				    wmi_service_tdls_mlo_support);
+}
+#else
+static inline void
+wma_get_tdls_mlo_support(struct wmi_unified *wmi_handle,
+			 struct wma_tgt_services *cfg)
+{
+}
+#endif /* WLAN_FEATURE_11BE */
+
 #ifdef WLAN_FEATURE_11AX
 /**
  * wma_get_tdls_ax_support() - update tgt service with service tdls ax support
@@ -5097,6 +5142,12 @@ wma_get_tdls_6g_support(struct wmi_unified *wmi_handle,
 
 #endif
 #else
+static inline void
+wma_get_tdls_mlo_support(struct wmi_unified *wmi_handle,
+			 struct wma_tgt_services *cfg)
+{
+}
+
 static inline void
 wma_get_tdls_ax_support(struct wmi_unified *wmi_handle,
 			struct wma_tgt_services *cfg)
@@ -5272,6 +5323,7 @@ static inline void wma_update_target_services(struct wmi_unified *wmi_handle,
 
 	wma_get_igmp_offload_enable(wmi_handle, cfg);
 	wma_get_tdls_ax_support(wmi_handle, cfg);
+	wma_get_tdls_mlo_support(wmi_handle, cfg);
 	wma_get_tdls_6g_support(wmi_handle, cfg);
 	wma_get_tdls_wideband_support(wmi_handle, cfg);
 	wma_get_dynamic_vdev_macaddr_support(wmi_handle, cfg);

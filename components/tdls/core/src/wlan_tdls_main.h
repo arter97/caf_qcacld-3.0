@@ -195,6 +195,7 @@ struct tdls_set_state_info {
  * based on this flag.
  * @wake_lock: wake lock
  * @runtime_lock: runtime lock
+ * @fw_tdls_mlo_capable: is fw tdls mlo capable
  * @tdls_osif_init_cb: Callback to initialize the tdls private
  * @tdls_osif_deinit_cb: Callback to deinitialize the tdls private
  * @tdls_osif_update_cb: Callback for updating osif params
@@ -249,6 +250,9 @@ struct tdls_soc_priv_obj {
 	bool is_drv_supported;
 	qdf_wake_lock_t wake_lock;
 	qdf_runtime_lock_t runtime_lock;
+#endif
+#ifdef WLAN_FEATURE_11BE_MLO
+	bool fw_tdls_mlo_capable;
 #endif
 	tdls_vdev_init_cb tdls_osif_init_cb;
 	tdls_vdev_deinit_cb tdls_osif_deinit_cb;
