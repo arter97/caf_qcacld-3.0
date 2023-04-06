@@ -6459,7 +6459,7 @@ hdd_vdev_configure_rtt_params(struct wlan_objmgr_vdev *vdev)
 	status = mlme_check_index_setparam(
 			vdevsetparam,
 			wmi_vdev_param_enable_disable_rtt_initiator_role,
-			(fine_time_meas_cap & wmi_fw_rtt_respr), index++,
+			(fine_time_meas_cap & wmi_fw_rtt_initr), index++,
 			MAX_VDEV_RTT_PARAMS);
 	if (QDF_IS_STATUS_ERROR(status))
 		return status;
