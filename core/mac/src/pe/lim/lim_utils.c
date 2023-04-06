@@ -7405,6 +7405,12 @@ lim_revise_req_he_cap_per_band(struct mlme_legacy_priv *mlme_priv,
 			he_config->ul_2x996_tone_ru_supp =
 				 mac->he_cap_5g.ul_2x996_tone_ru_supp;
 		}
+		he_config->su_feedback_tone16 =
+					mac->he_cap_5g.su_feedback_tone16;
+		he_config->mu_feedback_tone16 =
+					mac->he_cap_5g.mu_feedback_tone16;
+		he_config->codebook_su = mac->he_cap_5g.codebook_su;
+		he_config->codebook_mu = mac->he_cap_5g.codebook_mu;
 	}
 }
 
