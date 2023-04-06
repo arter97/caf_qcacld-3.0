@@ -15066,10 +15066,6 @@ void sme_set_eht_testbed_def(mac_handle_t mac_handle, uint8_t vdev_id)
 	qdf_mem_copy(&mac_ctx->eht_cap_5g, mlme_eht_cap,
 		     sizeof(tDot11fIEeht_cap));
 
-	mac_ctx->eht_cap_5g.bw_20_rx_max_nss_for_mcs_0_to_7 = 0;
-	mac_ctx->eht_cap_5g.bw_20_tx_max_nss_for_mcs_0_to_7 = 0;
-	mac_ctx->eht_cap_5g.bw_20_rx_max_nss_for_mcs_8_and_9 = 0;
-	mac_ctx->eht_cap_5g.bw_20_tx_max_nss_for_mcs_8_and_9 = 0;
 	mac_ctx->usr_eht_testbed_cfg = true;
 	mac_ctx->roam.configParam.channelBondingMode24GHz = 0;
 	wlan_mlme_set_sta_mlo_conn_max_num(mac_ctx->psoc, 1);
