@@ -413,6 +413,8 @@ ndi_remove_and_update_primary_connection(struct wlan_objmgr_psoc *psoc,
 	struct nan_peer_priv_obj *peer_nan_obj = NULL;
 	struct wlan_objmgr_peer *peer, *peer_next;
 	qdf_list_t *peer_list;
+	void (*nan_conc_callback)(void);
+
 
 	psoc_nan_obj = nan_get_psoc_priv_obj(psoc);
 	if (!psoc_nan_obj) {
@@ -455,6 +457,11 @@ ndi_remove_and_update_primary_connection(struct wlan_objmgr_psoc *psoc,
 		policy_mgr_decr_session_set_pcl(psoc, QDF_NDI_MODE,
 						wlan_vdev_get_id(vdev));
 		vdev_nan_obj->ndp_init_done = false;
+
+		nan_conc_callback = psoc_nan_obj->cb_obj.nan_concurrency_update;
+		if (nan_conc_callback)
+			nan_conc_callback();
+
 		return QDF_STATUS_SUCCESS;
 	}
 
@@ -557,6 +564,7 @@ static QDF_STATUS nan_handle_confirm(struct nan_datapath_confirm_event *confirm)
 	struct nan_psoc_priv_obj *psoc_nan_obj;
 	struct nan_vdev_priv_obj *vdev_nan_obj;
 	struct wlan_objmgr_peer *peer;
+	void (*nan_conc_callback)(void);
 
 	vdev_id = wlan_vdev_get_id(confirm->vdev);
 	psoc = wlan_vdev_get_psoc(confirm->vdev);
@@ -625,6 +633,10 @@ static QDF_STATUS nan_handle_confirm(struct nan_datapath_confirm_event *confirm)
 			ndi_update_policy_mgr_conn_table(confirm, psoc,
 							 vdev_id);
 			vdev_nan_obj->ndp_init_done = true;
+
+			nan_conc_callback = psoc_nan_obj->cb_obj.nan_concurrency_update;
+			if (nan_conc_callback)
+				nan_conc_callback();
 		}
 	}
 

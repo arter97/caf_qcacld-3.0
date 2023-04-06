@@ -1174,8 +1174,6 @@ int hdd_ndp_new_peer_handler(uint8_t vdev_id, uint16_t sta_id,
 		if (!NDI_CONCURRENCY_SUPPORTED(hdd_ctx->psoc))
 			hdd_indicate_active_ndp_cnt(hdd_ctx->psoc, vdev_id, 1);
 		hdd_send_obss_scan_req(hdd_ctx, true);
-
-		wlan_twt_concurrency_update(hdd_ctx);
 	}
 	qdf_mem_free(roam_info);
 	return 0;
@@ -1256,7 +1254,5 @@ void hdd_ndp_peer_departed_handler(uint8_t vdev_id, uint16_t sta_id,
 		if (!NDI_CONCURRENCY_SUPPORTED(hdd_ctx->psoc))
 			hdd_indicate_active_ndp_cnt(hdd_ctx->psoc, vdev_id, 0);
 		hdd_send_obss_scan_req(hdd_ctx, false);
-
-		wlan_twt_concurrency_update(hdd_ctx);
 	}
 }
