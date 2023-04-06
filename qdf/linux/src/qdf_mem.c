@@ -44,33 +44,6 @@
 #endif
 #endif
 
-/* cnss prealloc maintains various prealloc pools of 8Kb, 16Kb, 32Kb and so
- * on and allocates buffer from the pool for wlan driver. When wlan driver
- * requests to free the memory buffer then cnss prealloc derives slab_cache
- * from virtual memory via page struct to identify prealloc pool id to put
- * back memory buffer into the pool. Kernel 5.17 removed slab_cache from page
- * struct. So add headroom to store cache pointer at the beginning of
- * allocated memory buffer to use it later in identifying prealloc pool id.
- */
-#if defined(CNSS_MEM_PRE_ALLOC) && defined(CONFIG_CNSS_OUT_OF_TREE)
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 17, 0))
-static inline bool add_headroom_for_cnss_prealloc_cache_ptr(void)
-{
-	return true;
-}
-#else /* (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 17, 0)) */
-static inline bool add_headroom_for_cnss_prealloc_cache_ptr(void)
-{
-	return false;
-}
-#endif /* (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 17, 0)) */
-#else /* defined(CNSS_MEM_PRE_ALLOC) && defined(CONFIG_CNSS_OUT_OF_TREE) */
-static inline bool add_headroom_for_cnss_prealloc_cache_ptr(void)
-{
-	return false;
-}
-#endif /* defined(CNSS_MEM_PRE_ALLOC) && defined(CONFIG_CNSS_OUT_OF_TREE) */
-
 #if defined(MEMORY_DEBUG) || defined(NBUF_MEMORY_DEBUG)
 static bool mem_debug_disabled;
 qdf_declare_param(mem_debug_disabled, bool);
@@ -1391,9 +1364,6 @@ static void *qdf_mem_prealloc_get(size_t size)
 	if (!ptr)
 		return NULL;
 
-	if (add_headroom_for_cnss_prealloc_cache_ptr())
-		ptr += sizeof(void *);
-
 	memset(ptr, 0, size);
 
 	return ptr;
@@ -1552,9 +1522,6 @@ void *qdf_mem_malloc_debug(size_t size, const char *func, uint32_t line,
 		return NULL;
 	}
 
-	if (add_headroom_for_cnss_prealloc_cache_ptr())
-		size += sizeof(void *);
-
 	ptr = qdf_mem_prealloc_get(size);
 	if (ptr)
 		return ptr;
@@ -1587,9 +1554,6 @@ void *qdf_mem_malloc_debug(size_t size, const char *func, uint32_t line,
 
 	qdf_mem_kmalloc_inc(ksize(header));
 
-	if (add_headroom_for_cnss_prealloc_cache_ptr())
-		ptr += sizeof(void *);
-
 	return ptr;
 }
 qdf_export_symbol(qdf_mem_malloc_debug);
@@ -1611,9 +1575,6 @@ void *qdf_mem_malloc_atomic_debug(size_t size, const char *func,
 		qdf_err("Cannot malloc %zu bytes @ %s:%d", size, func, line);
 		return NULL;
 	}
-
-	if (add_headroom_for_cnss_prealloc_cache_ptr())
-		size += sizeof(void *);
 
 	ptr = qdf_mem_prealloc_get(size);
 	if (ptr)
@@ -1644,9 +1605,6 @@ void *qdf_mem_malloc_atomic_debug(size_t size, const char *func,
 
 	qdf_mem_kmalloc_inc(ksize(header));
 
-	if (add_headroom_for_cnss_prealloc_cache_ptr())
-		ptr += sizeof(void *);
-
 	return ptr;
 }
 
@@ -1663,9 +1621,6 @@ void *qdf_mem_malloc_atomic_debug_fl(size_t size, const char *func,
 		return NULL;
 	}
 
-	if (add_headroom_for_cnss_prealloc_cache_ptr())
-		size += sizeof(void *);
-
 	ptr = qdf_mem_prealloc_get(size);
 	if (ptr)
 		return ptr;
@@ -1678,9 +1633,6 @@ void *qdf_mem_malloc_atomic_debug_fl(size_t size, const char *func,
 	}
 
 	qdf_mem_kmalloc_inc(ksize(ptr));
-
-	if (add_headroom_for_cnss_prealloc_cache_ptr())
-		ptr += sizeof(void *);
 
 	return ptr;
 }
@@ -1701,9 +1653,6 @@ void qdf_mem_free_debug(void *ptr, const char *func, uint32_t line)
 	/* freeing a null pointer is valid */
 	if (qdf_unlikely(!ptr))
 		return;
-
-	if (add_headroom_for_cnss_prealloc_cache_ptr())
-		ptr = ptr - sizeof(void *);
 
 	if (qdf_mem_prealloc_put(ptr))
 		return;
@@ -1897,9 +1846,6 @@ void *qdf_mem_malloc_atomic_fl(size_t size, const char *func, uint32_t line)
 		return NULL;
 	}
 
-	if (add_headroom_for_cnss_prealloc_cache_ptr())
-		size += sizeof(void *);
-
 	ptr = qdf_mem_prealloc_get(size);
 	if (ptr)
 		return ptr;
@@ -1912,9 +1858,6 @@ void *qdf_mem_malloc_atomic_fl(size_t size, const char *func, uint32_t line)
 	}
 
 	qdf_mem_kmalloc_inc(ksize(ptr));
-
-	if (add_headroom_for_cnss_prealloc_cache_ptr())
-		ptr += sizeof(void *);
 
 	return ptr;
 }
@@ -2073,9 +2016,6 @@ void __qdf_mem_free(void *ptr)
 	if (!ptr)
 		return;
 
-	if (add_headroom_for_cnss_prealloc_cache_ptr())
-		ptr = ptr - sizeof(void *);
-
 	if (qdf_might_be_prealloc(ptr)) {
 		if (qdf_mem_prealloc_put(ptr))
 			return;
@@ -2098,9 +2038,6 @@ void *__qdf_mem_malloc(size_t size, const char *func, uint32_t line)
 		return NULL;
 	}
 
-	if (add_headroom_for_cnss_prealloc_cache_ptr())
-		size += sizeof(void *);
-
 	ptr = qdf_mem_prealloc_get(size);
 	if (ptr)
 		return ptr;
@@ -2110,9 +2047,6 @@ void *__qdf_mem_malloc(size_t size, const char *func, uint32_t line)
 		return NULL;
 
 	qdf_mem_kmalloc_inc(ksize(ptr));
-
-	if (add_headroom_for_cnss_prealloc_cache_ptr())
-		ptr += sizeof(void *);
 
 	return ptr;
 }
