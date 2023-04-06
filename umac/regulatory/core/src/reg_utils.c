@@ -425,6 +425,11 @@ reg_get_best_6g_power_type(struct wlan_objmgr_psoc *psoc,
 		}
 	} else if (ap_pwr_type == REG_STANDARD_POWER_AP) {
 		if (pdev_priv_obj->reg_rules.num_of_6g_client_reg_rules[REG_VERY_LOW_POWER_AP]) {
+			if (wlan_cm_get_disable_vlp_sta_conn_to_sp_ap(psoc)) {
+				reg_debug("AP SP and STA VLP connection disabled");
+				return QDF_STATUS_E_NOSUPPORT;
+			}
+
 			*pwr_type_6g = REG_VERY_LOW_POWER_AP;
 			reg_debug("AP power type = %d, selected power type = %d",
 				  ap_pwr_type, *pwr_type_6g);
