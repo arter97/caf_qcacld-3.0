@@ -6006,6 +6006,7 @@ void cm_roam_trigger_info_event(struct wmi_roam_trigger_info *data,
 
 	wlan_diag_event.trigger_reason =
 		cm_get_diag_roam_reason(data->trigger_reason);
+
 	wlan_diag_event.trigger_sub_reason =
 		cm_get_diag_roam_sub_reason(data->trigger_sub_reason);
 
@@ -6032,9 +6033,14 @@ void cm_roam_trigger_info_event(struct wmi_roam_trigger_info *data,
 	}
 
 	if (data->trigger_reason == ROAM_TRIGGER_REASON_PERIODIC ||
-	    data->trigger_reason == ROAM_TRIGGER_REASON_LOW_RSSI)
-		wlan_diag_event.rssi_thresh =
+	    data->trigger_reason == ROAM_TRIGGER_REASON_LOW_RSSI) {
+		if (data->common_roam)
+			wlan_diag_event.rssi_thresh =
+					(-1) * data->low_rssi_trig_data.roam_rssi_threshold;
+		else
+			wlan_diag_event.rssi_thresh =
 					(-1) * data->rssi_trig_data.threshold;
+	}
 
 	wlan_diag_event.is_full_scan = is_full_scan;
 
@@ -6299,9 +6305,14 @@ void cm_roam_trigger_info_event(struct wmi_roam_trigger_info *data,
 	}
 
 	if (data->trigger_reason == ROAM_TRIGGER_REASON_PERIODIC ||
-	    data->trigger_reason == ROAM_TRIGGER_REASON_LOW_RSSI)
-		log_record->roam_trig.rssi_threshold =
-			(-1) * data->rssi_trig_data.threshold;
+	    data->trigger_reason == ROAM_TRIGGER_REASON_LOW_RSSI) {
+		if (data->common_roam)
+			log_record->roam_trig.rssi_threshold =
+				(-1) * data->low_rssi_trig_data.roam_rssi_threshold;
+		else
+			log_record->roam_trig.rssi_threshold =
+				(-1) * data->rssi_trig_data.threshold;
+	}
 
 	log_record->roam_trig.is_full_scan = is_full_scan;
 	log_record->fw_timestamp_us = (uint64_t)data->timestamp * 1000;

@@ -2748,10 +2748,16 @@ cm_roam_stats_get_trigger_detail_str(struct wmi_roam_trigger_info *ptr,
 		 * ptr->rssi_trig_data.threshold gives the rssi threshold
 		 * for the Low Rssi/Periodic scan trigger.
 		 */
-		buf_cons = qdf_snprint(temp, buf_left,
-				       "Cur_Rssi threshold:%d Current AP RSSI: %d",
-				       ptr->rssi_trig_data.threshold,
-				       ptr->current_rssi);
+		if (ptr->common_roam)
+			buf_cons = qdf_snprint(temp, buf_left,
+					       "Cur_Rssi threshold:%d Current AP RSSI: %d",
+					       ptr->low_rssi_trig_data.roam_rssi_threshold,
+					       ptr->low_rssi_trig_data.current_rssi);
+		else
+			buf_cons = qdf_snprint(temp, buf_left,
+					       "Cur_Rssi threshold:%d Current AP RSSI: %d",
+					       ptr->rssi_trig_data.threshold,
+					       ptr->current_rssi);
 		temp += buf_cons;
 		buf_left -= buf_cons;
 		break;
@@ -2823,9 +2829,8 @@ cm_roam_stats_print_trigger_info(struct wlan_objmgr_psoc *psoc,
 	/* Update roam trigger info to userspace */
 	cm_roam_trigger_info_event(data, scan_data, vdev_id, is_full_scan);
 
-	if (!data->common_roam)
-		mlme_nofl_info("%s [ROAM_TRIGGER]: VDEV[%d] %s",
-			       time, vdev_id, buf);
+	mlme_nofl_info("%s [ROAM_TRIGGER]: VDEV[%d] %s",
+		       time, vdev_id, buf);
 	qdf_mem_free(buf);
 
 	status = wlan_cm_update_roam_states(psoc, vdev_id, data->trigger_reason,
