@@ -1845,6 +1845,25 @@ static inline void cdp_txrx_ppeds_stop(ol_txrx_soc_handle soc)
 }
 
 /**
+ * cdp_txrx_umac_reset_init(): De-initialize UMAC HW reset module
+ * @soc: soc handle
+ */
+static inline void cdp_txrx_umac_reset_init(ol_txrx_soc_handle soc)
+{
+	if (!soc || !soc->ops) {
+		dp_cdp_debug("Invalid Instance:");
+		QDF_BUG(0);
+		return;
+	}
+
+	if (!soc->ops->cmn_drv_ops ||
+	    !soc->ops->cmn_drv_ops->txrx_umac_reset_init)
+		return;
+
+	soc->ops->cmn_drv_ops->txrx_umac_reset_init(soc);
+}
+
+/**
  * cdp_txrx_umac_reset_deinit(): De-initialize UMAC HW reset module
  * @soc: soc handle
  */
