@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -477,6 +477,7 @@ struct reply_buffer {
  * @obj:       Stats object
  * @type:      Stats traffic type
  * @recursive: Stats recursiveness
+ * @mld_link:  Stats for mld link
  * @serviceid: Stats serviceid
  * @feat_flag: Stats requested for combination of Features
  * @sta_mac:   Station MAC address if Stats requested for STA object
@@ -488,6 +489,7 @@ struct stats_command {
 	enum stats_object_e obj;
 	enum stats_type_e type;
 	bool recursive;
+	bool mld_link;
 	uint8_t serviceid;
 	char if_name[IFNAME_LEN];
 	u_int64_t feat_flag;

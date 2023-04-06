@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -596,6 +596,11 @@ static int is_valid_cmd(struct stats_command *cmd)
 			STATS_ERR("VAP Interface name invalid.\n");
 			return -EINVAL;
 		}
+		if (libstats_is_ifname_valid(cmd->if_name, STATS_OBJ_MLD) &&
+		    cmd->mld_link) {
+			STATS_ERR("Invalid mld_link stats command.\n");
+			return -EINVAL;
+		}
 		if (sta_mac[0])
 			STATS_WARN("Ignore STA MAC address input for VAP\n");
 		break;
@@ -639,6 +644,11 @@ static int32_t prepare_request(struct nl_msg *nlmsg, struct stats_command *cmd)
 	if (nla_put_u64(nlmsg, QCA_WLAN_VENDOR_ATTR_TELEMETRIC_FEATURE_FLAG,
 			cmd->feat_flag)) {
 		STATS_ERR("failed to put feature flag\n");
+		return -EIO;
+	}
+	if (cmd->mld_link &&
+	    nla_put_flag(nlmsg, QCA_WLAN_VENDOR_ATTR_TELEMETRIC_MLD_LINK)) {
+		STATS_ERR("failed to put mld link flag\n");
 		return -EIO;
 	}
 	if (cmd->obj == STATS_OBJ_STA) {
@@ -2750,8 +2760,14 @@ static int32_t send_request_per_object(struct stats_command *user_cmd,
 		return -EINVAL;
 	}
 
+	if (user_cmd->mld_link && !temp_obj->is_mld_slave) {
+		STATS_ERR("Link not part of MLD \n");
+		return -EINVAL;
+	}
+
 	memcpy(&cmd, user_cmd, sizeof(struct stats_command));
 	cmd.recursive = user_cmd->recursive;
+	cmd.mld_link = user_cmd->mld_link;
 	memset(&buffer, 0, sizeof(struct cfg80211_data));
 	buffer.data = &cmd;
 	buffer.length = sizeof(struct stats_command);
@@ -2793,6 +2809,14 @@ static int32_t send_request_per_object(struct stats_command *user_cmd,
 					 * user
 					 */
 					if (user_cmd->recursive) {
+						/**
+						 * For recursive calls, we
+						 * need ML related stats for
+						 * that particular interface,
+						 * hence we are issuing the
+						 * command with mld_link as true
+						 */
+						cmd.mld_link = true;
 						ret = send_nl_command(&cmd, &buffer,
 								      temp_obj->ifname);
 						if (ret < 0)
