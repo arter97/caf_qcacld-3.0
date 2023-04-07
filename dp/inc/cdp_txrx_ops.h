@@ -278,7 +278,7 @@ struct cdp_cmn_ops {
 
 	QDF_STATUS (*txrx_peer_HMWDS_ast_delete)
 		(ol_txrx_soc_handle soc, uint8_t vdev_id, uint8_t *dest_mac,
-		 uint8_t type);
+		 uint8_t type, uint8_t delete_in_fw);
 
 	QDF_STATUS
 	(*txrx_peer_delete)(struct cdp_soc_t *soc, uint8_t vdev_id,
@@ -593,12 +593,10 @@ struct cdp_cmn_ops {
 
 	QDF_STATUS (*txrx_peer_reset_ast)
 		(ol_txrx_soc_handle soc, uint8_t *ast_macaddr,
-		 uint8_t *peer_macaddr, uint8_t vdev_id,
-		 enum cdp_txrx_ast_entry_type type);
+		 uint8_t *peer_macaddr, uint8_t vdev_id);
 
-	QDF_STATUS (*txrx_peer_reset_ast_table)
-		(ol_txrx_soc_handle soc, uint8_t vdev_id,
-		 enum cdp_txrx_ast_entry_type type);
+	QDF_STATUS (*txrx_peer_reset_ast_table)(ol_txrx_soc_handle soc,
+						uint8_t vdev_id);
 
 	void (*txrx_peer_flush_ast_table)(ol_txrx_soc_handle soc);
 	void (*txrx_set_ba_aging_timeout)(struct cdp_soc_t *soc_handle,
