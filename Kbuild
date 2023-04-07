@@ -41,6 +41,8 @@ else ifneq ($(LINUX_BUILD_TOP),)
 endif
 endif
 
+cppflags-y += -include $(WLAN_ROOT)/configs/default_config.h
+
 # CFG80211_MLO_KEY_OPERATION_SUPPORT
 # Used to indicate the Linux Kernel contains support for ML key operation
 # support.
@@ -2096,8 +2098,6 @@ WMI_OBJS += $(WMI_OBJ_DIR)/wmi_unified_wds_api.o
 WMI_OBJS += $(WMI_OBJ_DIR)/wmi_unified_wds_tlv.o
 endif
 
-cppflags-y += -DSERIALIZE_WMI_RX_EXECUTION_CTX
-
 $(call add-wlan-objs,wmi,$(WMI_OBJS))
 
 ########### FWLOG ###########
@@ -3318,10 +3318,8 @@ INCS +=		$(COAP_WMI_INC)
 
 ccflags-y += $(INCS)
 
-cppflags-y +=	-DANI_OS_TYPE_ANDROID=6 \
-		-Wall\
-		-Werror\
-		-D__linux__
+cppflags-y +=	-Wall\
+		-Werror
 
 cppflags-$(CONFIG_DP_TRAFFIC_END_INDICATION) += -DDP_TRAFFIC_END_INDICATION
 cppflags-$(CONFIG_THERMAL_STATS_SUPPORT) += -DTHERMAL_STATS_SUPPORT
@@ -3407,7 +3405,6 @@ cppflags-$(CONFIG_FEATURE_MOTION_DETECTION) += -DWLAN_FEATURE_MOTION_DETECTION
 cppflags-$(CONFIG_WLAN_FW_OFFLOAD) += -DWLAN_FW_OFFLOAD
 cppflags-$(CONFIG_WLAN_FEATURE_ELNA) += -DWLAN_FEATURE_ELNA
 cppflags-$(CONFIG_FEATURE_COEX) += -DFEATURE_COEX
-cppflags-y += -DWLAN_FEATURE_INTERFACE_MGR
 cppflags-$(CONFIG_HOST_WAKEUP_OVER_QMI) += -DHOST_WAKEUP_OVER_QMI
 cppflags-$(CONFIG_DISABLE_STATUS_RING_TIMER_WAR) += -DWLAN_DISABLE_STATUS_RING_TIMER_WAR
 cppflags-$(CONFIG_CE_DISABLE_SRNG_TIMER_IRQ) += -DWLAN_WAR_CE_DISABLE_SRNG_TIMER_IRQ
@@ -3418,7 +3415,6 @@ cppflags-$(CONFIG_WLAN_RESIDENT_DRIVER) += -DFEATURE_WLAN_RESIDENT_DRIVER
 cppflags-$(CONFIG_FEATURE_GPIO_CFG) += -DWLAN_FEATURE_GPIO_CFG
 cppflags-$(CONFIG_FEATURE_BUS_BANDWIDTH_MGR) += -DFEATURE_BUS_BANDWIDTH_MGR
 cppflags-$(CONFIG_DP_BE_WAR) += -DDP_BE_WAR
-cppflags-y += -DWLAN_REG_PARTIAL_OFFLOAD
 
 ifeq ($(CONFIG_IPCIE_FW_SIM), y)
 cppflags-y += -DCONFIG_PLD_IPCIE_FW_SIM
@@ -3511,8 +3507,6 @@ ccflags-$(CONFIG_CNSS_OUT_OF_TREE) += -I$(WLAN_PLATFORM_INC)
 cppflags-$(CONFIG_WLAN_FEATURE_DP_BUS_BANDWIDTH) += -DWLAN_FEATURE_DP_BUS_BANDWIDTH
 cppflags-$(CONFIG_WLAN_FEATURE_PERIODIC_STA_STATS) += -DWLAN_FEATURE_PERIODIC_STA_STATS
 
-cppflags-y +=	-DQCA_SUPPORT_TXRX_LOCAL_PEER_ID
-
 cppflags-$(CONFIG_WLAN_TX_FLOW_CONTROL_V2) += -DQCA_LL_TX_FLOW_CONTROL_V2
 cppflags-$(CONFIG_WLAN_TX_FLOW_CONTROL_V2) += -DQCA_LL_TX_FLOW_GLOBAL_MGMT_POOL
 cppflags-$(CONFIG_WLAN_TX_FLOW_CONTROL_LEGACY) += -DQCA_LL_LEGACY_TX_FLOW_CONTROL
@@ -3585,9 +3579,6 @@ cppflags-y += \
 	-DWLAN_PERIODIC_WORK_DEBUG
 endif
 
-cppflags-y += -DWLAN_FEATURE_P2P
-cppflags-y += -DWLAN_FEATURE_WFD
-
 ifeq ($(CONFIG_QCOM_VOWIFI_11R), y)
 cppflags-y += -DKERNEL_SUPPORT_11R_CFG80211
 cppflags-y += -DUSE_80211_WMMTSPEC_FOR_RIC
@@ -3611,8 +3602,6 @@ cppflags-$(CONFIG_QCACLD_WLAN_LFR2) += -DWLAN_FEATURE_PREAUTH_ENABLE
 ifeq ($(CONFIG_CM_UTF_ENABLE), y)
 cppflags-y += -DFEATURE_CM_UTF_ENABLE
 endif
-
-cppflags-y += -DCONN_MGR_ADV_FEATURE
 
 cppflags-$(CONFIG_QCACLD_WLAN_LFR3) += -DWLAN_FEATURE_ROAM_OFFLOAD
 cppflags-$(CONFIG_WLAN_FEATURE_ROAM_INFO_STATS) += -DWLAN_FEATURE_ROAM_INFO_STATS
@@ -3826,9 +3815,6 @@ cppflags-$(CONFIG_WLAN_SYNC_TSF_PLUS_EXT_GPIO_IRQ) += -DWLAN_FEATURE_TSF_PLUS_EX
 cppflags-$(CONFIG_WLAN_SYNC_TSF_PLUS_EXT_GPIO_SYNC) += -DWLAN_FEATURE_TSF_PLUS_EXT_GPIO_SYNC
 cppflags-$(CONFIG_TX_DESC_HI_PRIO_RESERVE) += -DCONFIG_TX_DESC_HI_PRIO_RESERVE
 
-#Enable FW logs through ini
-cppflags-y += -DCONFIG_FW_LOGS_BASED_ON_INI
-
 #Enable power management suspend/resume functionality
 cppflags-$(CONFIG_ATH_BUS_PM) += -DATH_BUS_PM
 
@@ -3856,9 +3842,6 @@ else
 cppflags-y += -DANI_BIG_BYTE_ENDIAN
 cppflags-y += -DBIG_ENDIAN_HOST
 endif
-
-#Enable MWS COEX support for 4G quick TDM and 5G NR pwr limit
-cppflags-y += -DMWS_COEX
 
 #Enable TX reclaim support
 cppflags-$(CONFIG_TX_CREDIT_RECLAIM_SUPPORT) += -DTX_CREDIT_RECLAIM_SUPPORT
@@ -3944,9 +3927,6 @@ cppflags-$(CONFIG_CHNL_MATRIX_RESTRICTION) += -DWLAN_ENABLE_CHNL_MATRIX_RESTRICT
 #Enable ICMP packet disable powersave feature
 cppflags-$(CONFIG_ICMP_DISABLE_PS) += -DWLAN_ICMP_DISABLE_PS
 
-#Enable OBSS feature
-cppflags-y += -DQCA_HT_2040_COEX
-
 #enable MCC TO SCC switch
 cppflags-$(CONFIG_FEATURE_WLAN_MCC_TO_SCC_SWITCH) += -DFEATURE_WLAN_MCC_TO_SCC_SWITCH
 
@@ -3976,17 +3956,6 @@ cppflags-$(CONFIG_QCACLD_FEATURE_GAP_LL_PS_MODE) += -DWLAN_SUPPORT_GAP_LL_PS_MOD
 cppflags-$(CONFIG_QCACLD_FEATURE_APF) += -DFEATURE_WLAN_APF
 
 cppflags-$(CONFIG_WLAN_FEATURE_SARV1_TO_SARV2) += -DWLAN_FEATURE_SARV1_TO_SARV2
-#CRYPTO Coverged Component
-cppflags-$(CONFIG_CRYPTO_COMPONENT) += -DWLAN_CONV_CRYPTO_SUPPORTED \
-                                       -DCRYPTO_SET_KEY_CONVERGED \
-                                       -DWLAN_CRYPTO_WEP_OS_DERIVATIVE \
-                                       -DWLAN_CRYPTO_TKIP_OS_DERIVATIVE \
-                                       -DWLAN_CRYPTO_CCMP_OS_DERIVATIVE \
-                                       -DWLAN_CRYPTO_GCMP_OS_DERIVATIVE \
-                                       -DWLAN_CRYPTO_WAPI_OS_DERIVATIVE \
-                                       -DWLAN_CRYPTO_GCM_OS_DERIVATIVE \
-                                       -DWLAN_CRYPTO_FILS_OS_DERIVATIVE \
-                                       -DWLAN_CRYPTO_OMAC1_OS_DERIVATIVE
 
 cppflags-$(CONFIG_FEATURE_WLAN_FT_IEEE8021X) += -DFEATURE_WLAN_FT_IEEE8021X
 cppflags-$(CONFIG_FEATURE_WLAN_FT_PSK) += -DFEATURE_WLAN_FT_PSK
@@ -4264,21 +4233,6 @@ cppflags-$(CONFIG_WMI_ROAM_SUPPORT) += -DWMI_ROAM_SUPPORT
 cppflags-$(CONFIG_WMI_CONCURRENCY_SUPPORT) += -DWMI_CONCURRENCY_SUPPORT
 cppflags-$(CONFIG_WMI_STA_SUPPORT) += -DWMI_STA_SUPPORT
 
-cppflags-y += -DWMI_MULTI_MAC_SVC
-
-# Dummy flag for WIN/MCL converged data path compilation
-cppflags-y += -DDP_PRINT_ENABLE=0
-cppflags-y += -DATH_SUPPORT_WRAP=0
-cppflags-y += -DQCA_HOST2FW_RXBUF_RING
-cppflags-y += -DDP_FLOW_CTL
-cppflags-y += -DDP_PEER_EXTENDED_API
-cppflags-y += -DDP_POWER_SAVE
-cppflags-y += -DDP_CON_MON
-cppflags-y += -DDP_MOB_DEFS
-cppflags-y += -DDP_PRINT_NO_CONSOLE
-cppflags-y += -DDP_INTR_POLL_BOTH
-cppflags-y += -DDP_INVALID_PEER_ASSERT
-
 ifdef CONFIG_HIF_LARGE_CE_RING_HISTORY
 ccflags-y += -DHIF_CE_HISTORY_MAX=$(CONFIG_HIF_LARGE_CE_RING_HISTORY)
 endif
@@ -4286,7 +4240,6 @@ endif
 cppflags-$(CONFIG_WLAN_HANG_EVENT) += -DHIF_CE_LOG_INFO
 cppflags-$(CONFIG_WLAN_HANG_EVENT) += -DHIF_BUS_LOG_INFO
 cppflags-$(CONFIG_WLAN_HANG_EVENT) += -DDP_SUPPORT_RECOVERY_NOTIFY
-#endof dummy flags
 
 ccflags-$(CONFIG_ENABLE_SIZE_OPTIMIZE) += -Os
 
@@ -4645,27 +4598,12 @@ ifdef CONFIG_FW_THERMAL_THROTTLE
 ccflags-y += -DFW_THERMAL_THROTTLE_SUPPORT
 endif
 
-cppflags-y += -DFEATURE_NBUFF_REPLENISH_TIMER
-cppflags-y += -DPEER_CACHE_RX_PKTS
-cppflags-y += -DPCIE_REG_WINDOW_LOCAL_NO_CACHE
-
-cppflags-y += -DSERIALIZE_VDEV_RESP
-cppflags-y += -DTGT_IF_VDEV_MGR_CONV
-
-cppflags-y += -DCONFIG_CHAN_NUM_API
-cppflags-y += -DCONFIG_CHAN_FREQ_API
-
-#Flag to enable/disable MCC specific feature regarding unallowed phymodes
-cppflags-y += -DCHECK_REG_PHYMODE
-
 cppflags-$(CONFIG_FEATURE_RX_LINKSPEED_ROAM_TRIGGER) += -DFEATURE_RX_LINKSPEED_ROAM_TRIGGER
 #DP_RATETABLE_SUPPORT is enabled when CONFIG_FEATURE_RX_LINKSPEED_ROAM_TRIGGER is enabled
 cppflags-$(CONFIG_FEATURE_RX_LINKSPEED_ROAM_TRIGGER) += -DDP_RATETABLE_SUPPORT
-ccflags-y += -DALL_POSSIBLE_RATES_SUPPORTED=1
 
 cppflags-$(CONFIG_BAND_6GHZ) += -DCONFIG_BAND_6GHZ
 cppflags-$(CONFIG_6G_SCAN_CHAN_SORT_ALGO) += -DFEATURE_6G_SCAN_CHAN_SORT_ALGO
-cppflags-y += -DCONFIG_REG_6G_PWRMODE
 cppflags-$(CONFIG_AFC_SUPPORT) += -DCONFIG_AFC_SUPPORT
 cppflags-$(CONFIG_WLAN_FEATURE_AFC_DCS_SKIP_ACS_RANGE) += -DWLAN_FEATURE_AFC_DCS_SKIP_ACS_RANGE
 
@@ -4855,25 +4793,6 @@ endif #DYNAMIC_SINGLE_CHIP
 ifdef WLAN_HDD_ADAPTER_MAGIC
 ccflags-y += -DWLAN_HDD_ADAPTER_MAGIC=$(WLAN_HDD_ADAPTER_MAGIC)
 endif
-
-# Max no of Serialization msg queue depth for MCL. If it is not
-# defined, then SCHEDULER_CORE_MAX_MESSAGES will be 4000 for
-# WIN.
-
-ccflags-y += -DSCHEDULER_CORE_MAX_MESSAGES=1000
-
-ccflags-y += -DLOG_DEL_OBJ_TIMEOUT_VALUE_MSEC=4000
-
-ccflags-y += -DLOG_DEL_OBJ_DESTROY_DURATION_SEC=4
-
-ccflags-y += -DWLAN_OBJMGR_RATELIMIT_THRESH=0
-
-# Defining Reduction Limit 0 for MCL. If it is not defined,
-#then WLAN_SCHED_REDUCTION_LIMIT will be 32 for
-# WIN.
-ccflags-y += -DWLAN_SCHED_REDUCTION_LIMIT=0
-
-ccflags-y += -DIRQ_DISABLED_MAX_DURATION_NS=100000000
 
 # Determine if we are building against an arm architecture host
 ifeq ($(findstring arm, $(ARCH)),)
