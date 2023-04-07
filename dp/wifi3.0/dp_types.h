@@ -176,6 +176,9 @@
 	(comb_peer_id_tid & DP_PEER_REO_STATS_PEER_ID_MASK)
 #endif
 
+typedef void dp_ptnr_soc_iter_func(struct dp_soc *ptnr_soc, void *arg,
+				   int chip_id);
+
 enum rx_pktlog_mode {
 	DP_RX_PKTLOG_DISABLED = 0,
 	DP_RX_PKTLOG_FULL,

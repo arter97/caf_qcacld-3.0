@@ -24,7 +24,20 @@
 #include <dp_internal.h>
 #include <wlan_cfg.h>
 #include <wlan_mlo_mgr_cmn.h>
+#include "dp_umac_reset.h"
 
+#ifdef DP_UMAC_HW_RESET_SUPPORT
+/**
+ * dp_umac_reset_update_partner_map() - Update Umac reset partner map
+ * @mlo_ctx: mlo soc context
+ * @chip_id: chip id
+ * @set: flag indicating whether to set or clear the bit
+ *
+ * Return: void
+ */
+static void dp_umac_reset_update_partner_map(struct dp_mlo_ctxt *mlo_ctx,
+					     int chip_id, bool set);
+#endif
 /**
  * dp_mlo_ctxt_attach_wifi3() - Attach DP MLO context
  * @ctrl_ctxt: CDP control context
@@ -59,6 +72,7 @@ dp_mlo_ctxt_attach_wifi3(struct cdp_ctrl_mlo_mgr *ctrl_ctxt)
 			      LRO_IPV6_SEED_ARR_SZ));
 
 	qdf_spinlock_create(&mlo_ctxt->ml_soc_list_lock);
+	qdf_spinlock_create(&mlo_ctxt->grp_umac_reset_ctx.grp_ctx_lock);
 	return dp_mlo_ctx_to_cdp(mlo_ctxt);
 }
 
@@ -75,6 +89,7 @@ static void dp_mlo_ctxt_detach_wifi3(struct cdp_mlo_ctxt *cdp_ml_ctxt)
 	if (!cdp_ml_ctxt)
 		return;
 
+	qdf_spinlock_destroy(&mlo_ctxt->grp_umac_reset_ctx.grp_ctx_lock);
 	qdf_spinlock_destroy(&mlo_ctxt->ml_soc_list_lock);
 	dp_mlo_peer_find_hash_detach_be(mlo_ctxt);
 	qdf_mem_free(mlo_ctxt);
@@ -102,6 +117,8 @@ static void dp_mlo_set_soc_by_chip_id(struct dp_mlo_ctxt *ml_ctxt,
 		ml_ctxt->ml_soc_cnt++;
 	else
 		ml_ctxt->ml_soc_cnt--;
+
+	dp_umac_reset_update_partner_map(ml_ctxt, chip_id, !!soc);
 
 	qdf_spin_unlock_bh(&ml_ctxt->ml_soc_list_lock);
 }
@@ -164,7 +181,7 @@ static QDF_STATUS dp_partner_soc_rx_hw_cc_init(struct dp_mlo_ctxt *mlo_ctxt,
 	return qdf_status;
 }
 
-static void dp_mlo_soc_drain_rx_buf(struct dp_soc *soc, void *arg)
+static void dp_mlo_soc_drain_rx_buf(struct dp_soc *soc, void *arg, int chip_id)
 {
 	uint8_t i = 0;
 	uint8_t cpu = 0;
@@ -814,25 +831,6 @@ dp_soc_get_by_idle_bm_id(struct dp_soc *soc, uint8_t idle_bm_id)
 }
 
 #ifdef WLAN_MCAST_MLO
-void dp_mlo_iter_ptnr_soc(struct dp_soc_be *be_soc,
-			  dp_ptnr_soc_iter_func func,
-			  void *arg)
-{
-	int i = 0;
-	struct dp_mlo_ctxt *dp_mlo = be_soc->ml_ctxt;
-
-	for (i = 0; i < WLAN_MAX_MLO_CHIPS ; i++) {
-		struct dp_soc *ptnr_soc =
-				dp_mlo_get_soc_ref_by_chip_id(dp_mlo, i);
-
-		if (!ptnr_soc)
-			continue;
-		(*func)(ptnr_soc, arg);
-	}
-}
-
-qdf_export_symbol(dp_mlo_iter_ptnr_soc);
-
 void dp_mcast_mlo_iter_ptnr_vdev(struct dp_soc_be *be_soc,
 				 struct dp_vdev_be *be_vdev,
 				 dp_ptnr_vdev_iter_func func,
@@ -906,6 +904,37 @@ struct dp_vdev *dp_mlo_get_mcast_primary_vdev(struct dp_soc_be *be_soc,
 qdf_export_symbol(dp_mlo_get_mcast_primary_vdev);
 #endif
 
+/**
+ * dp_mlo_iter_ptnr_soc() - iterate through mlo soc list and call the callback
+ * @be_soc: dp_soc_be pointer
+ * @func: Function to be called for each soc
+ * @arg: context to be passed to the callback
+ *
+ * Return: true if mlo is enabled, false if mlo is disabled
+ */
+bool dp_mlo_iter_ptnr_soc(struct dp_soc_be *be_soc, dp_ptnr_soc_iter_func func,
+			  void *arg)
+{
+	int i = 0;
+	struct dp_mlo_ctxt *dp_mlo = be_soc->ml_ctxt;
+
+	if (!be_soc->mlo_enabled || !be_soc->ml_ctxt)
+		return false;
+
+	for (i = 0; i < WLAN_MAX_MLO_CHIPS ; i++) {
+		struct dp_soc *ptnr_soc =
+				dp_mlo_get_soc_ref_by_chip_id(dp_mlo, i);
+
+		if (!ptnr_soc)
+			continue;
+		(*func)(ptnr_soc, arg, i);
+	}
+
+	return true;
+}
+
+qdf_export_symbol(dp_mlo_iter_ptnr_soc);
+
 static inline uint64_t dp_mlo_get_mlo_ts_offset(struct dp_pdev_be *be_pdev)
 {
 	struct dp_soc *soc;
@@ -959,3 +988,272 @@ int32_t dp_mlo_get_delta_tqm_wrt_mlo_offset(struct dp_soc *soc)
 
 	return delta_tqm_mlo_offset;
 }
+
+#ifdef DP_UMAC_HW_RESET_SUPPORT
+/**
+ * dp_umac_reset_update_partner_map() - Update Umac reset partner map
+ * @mlo_ctx: DP ML context handle
+ * @chip_id: chip id
+ * @set: flag indicating whether to set or clear the bit
+ *
+ * Return: void
+ */
+static void dp_umac_reset_update_partner_map(struct dp_mlo_ctxt *mlo_ctx,
+					     int chip_id, bool set)
+{
+	struct dp_soc_mlo_umac_reset_ctx *grp_umac_reset_ctx =
+						&mlo_ctx->grp_umac_reset_ctx;
+
+	if (set)
+		qdf_atomic_set_bit(chip_id, &grp_umac_reset_ctx->partner_map);
+	else
+		qdf_atomic_clear_bit(chip_id, &grp_umac_reset_ctx->partner_map);
+}
+
+/**
+ * dp_umac_reset_complete_umac_recovery() - Complete Umac reset session
+ * @soc: dp soc handle
+ *
+ * Return: void
+ */
+void dp_umac_reset_complete_umac_recovery(struct dp_soc *soc)
+{
+	struct dp_soc_be *be_soc = dp_get_be_soc_from_dp_soc(soc);
+	struct dp_mlo_ctxt *mlo_ctx = be_soc->ml_ctxt;
+	struct dp_soc_mlo_umac_reset_ctx *grp_umac_reset_ctx;
+
+	if (!mlo_ctx) {
+		dp_umac_reset_alert("Umac reset was handled on soc %pK", soc);
+		return;
+	}
+
+	grp_umac_reset_ctx = &mlo_ctx->grp_umac_reset_ctx;
+	qdf_spin_lock_bh(&grp_umac_reset_ctx->grp_ctx_lock);
+
+	grp_umac_reset_ctx->umac_reset_in_progress = false;
+	grp_umac_reset_ctx->is_target_recovery = false;
+	grp_umac_reset_ctx->response_map = 0;
+	grp_umac_reset_ctx->request_map = 0;
+	grp_umac_reset_ctx->initiator_chip_id = 0;
+
+	qdf_spin_unlock_bh(&grp_umac_reset_ctx->grp_ctx_lock);
+
+	dp_umac_reset_alert("Umac reset was handled on mlo group ctxt %pK",
+			    mlo_ctx);
+}
+
+/**
+ * dp_umac_reset_initiate_umac_recovery() - Initiate Umac reset session
+ * @soc: dp soc handle
+ * @is_target_recovery: Flag to indicate if it is triggered for target recovery
+ *
+ * Return: void
+ */
+void dp_umac_reset_initiate_umac_recovery(struct dp_soc *soc,
+					  bool is_target_recovery)
+{
+	struct dp_soc_be *be_soc = dp_get_be_soc_from_dp_soc(soc);
+	struct dp_mlo_ctxt *mlo_ctx = be_soc->ml_ctxt;
+	struct dp_soc_mlo_umac_reset_ctx *grp_umac_reset_ctx;
+
+	if (!mlo_ctx)
+		return;
+
+	grp_umac_reset_ctx = &mlo_ctx->grp_umac_reset_ctx;
+	qdf_spin_lock_bh(&grp_umac_reset_ctx->grp_ctx_lock);
+
+	if (grp_umac_reset_ctx->umac_reset_in_progress) {
+		qdf_spin_unlock_bh(&grp_umac_reset_ctx->grp_ctx_lock);
+		return;
+	}
+
+	grp_umac_reset_ctx->umac_reset_in_progress = true;
+	grp_umac_reset_ctx->is_target_recovery = is_target_recovery;
+
+	/* We don't wait for the 'Umac trigger' message from all socs */
+	grp_umac_reset_ctx->request_map = grp_umac_reset_ctx->partner_map;
+	grp_umac_reset_ctx->response_map = grp_umac_reset_ctx->partner_map;
+	grp_umac_reset_ctx->initiator_chip_id = dp_mlo_get_chip_id(soc);
+	grp_umac_reset_ctx->umac_reset_count++;
+
+	qdf_spin_unlock_bh(&grp_umac_reset_ctx->grp_ctx_lock);
+}
+
+/**
+ * dp_umac_reset_handle_action_cb() - Function to call action callback
+ * @soc: dp soc handle
+ * @umac_reset_ctx: Umac reset context
+ * @action: Action to call the callback for
+ *
+ * Return: QDF_STATUS status
+ */
+QDF_STATUS
+dp_umac_reset_handle_action_cb(struct dp_soc *soc,
+			       struct dp_soc_umac_reset_ctx *umac_reset_ctx,
+			       enum umac_reset_action action)
+{
+	struct dp_soc_be *be_soc = dp_get_be_soc_from_dp_soc(soc);
+	struct dp_mlo_ctxt *mlo_ctx = be_soc->ml_ctxt;
+	struct dp_soc_mlo_umac_reset_ctx *grp_umac_reset_ctx;
+
+	if (!mlo_ctx) {
+		dp_umac_reset_debug("MLO context is Null");
+		goto handle;
+	}
+
+	grp_umac_reset_ctx = &mlo_ctx->grp_umac_reset_ctx;
+	qdf_spin_lock_bh(&grp_umac_reset_ctx->grp_ctx_lock);
+
+	qdf_atomic_set_bit(dp_mlo_get_chip_id(soc),
+			   &grp_umac_reset_ctx->request_map);
+
+	dp_umac_reset_debug("partner_map %u request_map %u",
+			    grp_umac_reset_ctx->partner_map,
+			    grp_umac_reset_ctx->request_map);
+
+	/* This logic is needed for synchronization between mlo socs */
+	if ((grp_umac_reset_ctx->partner_map & grp_umac_reset_ctx->request_map)
+			!= grp_umac_reset_ctx->partner_map) {
+		struct hif_softc *hif_sc = HIF_GET_SOFTC(soc->hif_handle);
+		struct hif_umac_reset_ctx *hif_umac_reset_ctx;
+
+		if (!hif_sc) {
+			hif_err("scn is null");
+			qdf_assert_always(0);
+			return QDF_STATUS_E_FAILURE;
+		}
+
+		hif_umac_reset_ctx = &hif_sc->umac_reset_ctx;
+
+		/* Mark the action as pending */
+		umac_reset_ctx->pending_action = action;
+		/* Reschedule the tasklet and exit */
+		tasklet_hi_schedule(&hif_umac_reset_ctx->intr_tq);
+		qdf_spin_unlock_bh(&grp_umac_reset_ctx->grp_ctx_lock);
+
+		return QDF_STATUS_SUCCESS;
+	}
+
+	qdf_spin_unlock_bh(&grp_umac_reset_ctx->grp_ctx_lock);
+	umac_reset_ctx->pending_action = UMAC_RESET_ACTION_NONE;
+
+handle:
+	if (!umac_reset_ctx->rx_actions.cb[action]) {
+		dp_umac_reset_err("rx callback is NULL");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	return umac_reset_ctx->rx_actions.cb[action](soc);
+}
+
+/**
+ * dp_umac_reset_post_tx_cmd() - Iterate partner socs and post Tx command
+ * @umac_reset_ctx: UMAC reset context
+ * @tx_cmd: Tx command to be posted
+ *
+ * Return: QDF status of operation
+ */
+QDF_STATUS
+dp_umac_reset_post_tx_cmd(struct dp_soc_umac_reset_ctx *umac_reset_ctx,
+			  enum umac_reset_tx_cmd tx_cmd)
+{
+	struct dp_soc *soc = container_of(umac_reset_ctx, struct dp_soc,
+					  umac_reset_ctx);
+	struct dp_soc_be *be_soc = dp_get_be_soc_from_dp_soc(soc);
+	struct dp_mlo_ctxt *mlo_ctx = be_soc->ml_ctxt;
+	struct dp_soc_mlo_umac_reset_ctx *grp_umac_reset_ctx;
+
+	if (!mlo_ctx) {
+		dp_umac_reset_post_tx_cmd_via_shmem(soc, &tx_cmd, 0);
+		return QDF_STATUS_SUCCESS;
+	}
+
+	grp_umac_reset_ctx = &mlo_ctx->grp_umac_reset_ctx;
+	qdf_spin_lock_bh(&grp_umac_reset_ctx->grp_ctx_lock);
+
+	qdf_atomic_set_bit(dp_mlo_get_chip_id(soc),
+			   &grp_umac_reset_ctx->response_map);
+
+	/* This logic is needed for synchronization between mlo socs */
+	if ((grp_umac_reset_ctx->partner_map & grp_umac_reset_ctx->response_map)
+				!= grp_umac_reset_ctx->partner_map) {
+		dp_umac_reset_debug(
+			"Response(s) pending : expected map %u current map %u",
+			grp_umac_reset_ctx->partner_map,
+			grp_umac_reset_ctx->response_map);
+
+		qdf_spin_unlock_bh(&grp_umac_reset_ctx->grp_ctx_lock);
+		return QDF_STATUS_SUCCESS;
+	}
+
+	dp_umac_reset_debug(
+		"All responses received: expected map %u current map %u",
+		grp_umac_reset_ctx->partner_map,
+		grp_umac_reset_ctx->response_map);
+
+	grp_umac_reset_ctx->response_map = 0;
+	grp_umac_reset_ctx->request_map = 0;
+	qdf_spin_unlock_bh(&grp_umac_reset_ctx->grp_ctx_lock);
+
+	dp_mlo_iter_ptnr_soc(be_soc, &dp_umac_reset_post_tx_cmd_via_shmem,
+			     &tx_cmd);
+
+	if (tx_cmd == UMAC_RESET_TX_CMD_POST_RESET_COMPLETE_DONE)
+		dp_umac_reset_complete_umac_recovery(soc);
+
+	return QDF_STATUS_SUCCESS;
+}
+
+/**
+ * dp_umac_reset_initiator_check() - Check if soc is the Umac reset initiator
+ * @soc: dp soc handle
+ *
+ * Return: true if the soc is initiator or false otherwise
+ */
+bool dp_umac_reset_initiator_check(struct dp_soc *soc)
+{
+	struct dp_soc_be *be_soc = dp_get_be_soc_from_dp_soc(soc);
+	struct dp_mlo_ctxt *mlo_ctx = be_soc->ml_ctxt;
+
+	if (!mlo_ctx)
+		return true;
+
+	return (mlo_ctx->grp_umac_reset_ctx.initiator_chip_id ==
+				dp_mlo_get_chip_id(soc));
+}
+
+/**
+ * dp_umac_reset_target_recovery_check() - Check if this is for target recovery
+ * @soc: dp soc handle
+ *
+ * Return: true if the session is for target recovery or false otherwise
+ */
+bool dp_umac_reset_target_recovery_check(struct dp_soc *soc)
+{
+	struct dp_soc_be *be_soc = dp_get_be_soc_from_dp_soc(soc);
+	struct dp_mlo_ctxt *mlo_ctx = be_soc->ml_ctxt;
+
+	if (!mlo_ctx)
+		return false;
+
+	return mlo_ctx->grp_umac_reset_ctx.is_target_recovery;
+}
+
+/**
+ * dp_umac_reset_is_soc_ignored() - Check if this soc is to be ignored
+ * @soc: dp soc handle
+ *
+ * Return: true if the soc is ignored or false otherwise
+ */
+bool dp_umac_reset_is_soc_ignored(struct dp_soc *soc)
+{
+	struct dp_soc_be *be_soc = dp_get_be_soc_from_dp_soc(soc);
+	struct dp_mlo_ctxt *mlo_ctx = be_soc->ml_ctxt;
+
+	if (!mlo_ctx)
+		return false;
+
+	return !qdf_atomic_test_bit(dp_mlo_get_chip_id(soc),
+				    &mlo_ctx->grp_umac_reset_ctx.partner_map);
+}
+#endif
