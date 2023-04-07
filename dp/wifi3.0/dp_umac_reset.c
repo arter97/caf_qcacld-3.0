@@ -931,3 +931,84 @@ QDF_STATUS dp_soc_umac_reset_deinit(struct cdp_soc_t *txrx_soc)
 	return QDF_STATUS_SUCCESS;
 }
 
+static inline const char *dp_umac_reset_current_state_to_str(
+		enum umac_reset_state current_state)
+{
+	switch (current_state) {
+	case UMAC_RESET_STATE_WAIT_FOR_TRIGGER:
+		return "UMAC_RESET_STATE_WAIT_FOR_TRIGGER";
+	case UMAC_RESET_STATE_DO_TRIGGER_RECEIVED:
+		return "UMAC_RESET_STATE_DO_TRIGGER_RECEIVED";
+	case UMAC_RESET_STATE_HOST_TRIGGER_DONE:
+		return "UMAC_RESET_STATE_HOST_TRIGGER_DONE";
+	case UMAC_RESET_STATE_WAIT_FOR_DO_PRE_RESET:
+		return "UMAC_RESET_STATE_WAIT_FOR_DO_PRE_RESET";
+	case UMAC_RESET_STATE_DO_PRE_RESET_RECEIVED:
+		return "UMAC_RESET_STATE_DO_PRE_RESET_RECEIVED";
+	case UMAC_RESET_STATE_HOST_PRE_RESET_DONE:
+		return "UMAC_RESET_STATE_HOST_PRE_RESET_DONE";
+	case UMAC_RESET_STATE_WAIT_FOR_DO_POST_RESET_START:
+		return "UMAC_RESET_STATE_WAIT_FOR_DO_POST_RESET_START";
+	case UMAC_RESET_STATE_DO_POST_RESET_START_RECEIVED:
+		return "UMAC_RESET_STATE_DO_POST_RESET_START_RECEIVED";
+	case UMAC_RESET_STATE_HOST_POST_RESET_START_DONE:
+		return "UMAC_RESET_STATE_HOST_POST_RESET_START_DONE";
+	case UMAC_RESET_STATE_WAIT_FOR_DO_POST_RESET_COMPLETE:
+		return "UMAC_RESET_STATE_WAIT_FOR_DO_POST_RESET_COMPLETE";
+	case UMAC_RESET_STATE_DO_POST_RESET_COMPLETE_RECEIVED:
+		return "UMAC_RESET_STATE_DO_POST_RESET_COMPLETE_RECEIVED";
+	case UMAC_RESET_STATE_HOST_POST_RESET_COMPLETE_DONE:
+		return "UMAC_RESET_STATE_HOST_POST_RESET_COMPLETE_DONE";
+	default:
+		return "Invalid UMAC Reset state";
+	}
+}
+
+static inline const char *dp_umac_reset_pending_action_to_str(
+		enum umac_reset_rx_event pending_action)
+{
+	switch (pending_action) {
+	case UMAC_RESET_RX_EVENT_NONE:
+		return "UMAC_RESET_RX_EVENT_NONE";
+	case UMAC_RESET_RX_EVENT_DO_TRIGGER_RECOVERY:
+		return "UMAC_RESET_RX_EVENT_DO_TRIGGER_RECOVERY";
+	case UMAC_RESET_RX_EVENT_DO_PRE_RESET:
+		return "UMAC_RESET_RX_EVENT_DO_PRE_RESET";
+	case UMAC_RESET_RX_EVENT_DO_POST_RESET_START:
+		return "UMAC_RESET_RX_EVENT_DO_POST_RESET_START";
+	case UMAC_RESET_RX_EVENT_DO_POST_RESET_COMPELTE:
+		return "UMAC_RESET_RX_EVENT_DO_POST_RESET_COMPELTE";
+	default:
+		return "Invalid pending action";
+	}
+}
+
+QDF_STATUS dp_umac_reset_stats_print(struct dp_soc *soc)
+{
+	struct dp_soc_umac_reset_ctx *umac_reset_ctx;
+
+	umac_reset_ctx = &soc->umac_reset_ctx;
+
+	DP_UMAC_RESET_PRINT_STATS("UMAC reset stats for soc:%pK\n"
+		  "\t\ttrigger time                  :%u us\n"
+		  "\t\tPre_reset time                :%u us\n"
+		  "\t\tPost_reset time               :%u us\n"
+		  "\t\tPost_reset_complete time      :%u us\n"
+		  "\t\tCurrent state                 :%s\n"
+		  "\t\tPending action                :%s",
+		  soc,
+		  umac_reset_ctx->ts.trigger_done -
+		  umac_reset_ctx->ts.trigger_start,
+		  umac_reset_ctx->ts.pre_reset_done -
+		  umac_reset_ctx->ts.pre_reset_start,
+		  umac_reset_ctx->ts.post_reset_done -
+		  umac_reset_ctx->ts.post_reset_start,
+		  umac_reset_ctx->ts.post_reset_complete_done -
+		  umac_reset_ctx->ts.post_reset_complete_start,
+		  dp_umac_reset_current_state_to_str(
+			  umac_reset_ctx->current_state),
+		  dp_umac_reset_pending_action_to_str(
+			  umac_reset_ctx->pending_action));
+
+	return dp_mlo_umac_reset_stats_print(soc);
+}

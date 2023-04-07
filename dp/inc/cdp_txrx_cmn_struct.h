@@ -1691,6 +1691,7 @@ enum cdp_vdev_param_type {
  * @CDP_UMAC_RST_SKEL_ENABLE: Enable Umac reset skeleton code for debug
  * @CDP_PPEDS_ENABLE: PPEDS is enabled or not
  * @CDP_SAWF_STATS: set SAWF stats config
+ * @CDP_UMAC_RESET_STATS: UMAC reset stats
  */
 enum cdp_psoc_param_type {
 	CDP_ENABLE_RATE_STATS,
@@ -1703,6 +1704,7 @@ enum cdp_psoc_param_type {
 	CDP_UMAC_RST_SKEL_ENABLE,
 	CDP_PPEDS_ENABLE,
 	CDP_SAWF_STATS,
+	CDP_UMAC_RESET_STATS,
 };
 
 #define TXRX_FW_STATS_TXSTATS                     1
