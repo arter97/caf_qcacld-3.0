@@ -544,6 +544,14 @@ struct cdp_cmn_ops {
 	QDF_STATUS (*display_stats)(struct cdp_soc_t *psoc, uint16_t value,
 				    enum qdf_stats_verbosity_level level);
 
+	/**
+	 * notify_asserted_soc() - Notified asserted soc info to UMAC Reset
+	 * @cdp_soc: soc handle
+	 *
+	 * Return: QDF_STATUS
+	 */
+	QDF_STATUS (*notify_asserted_soc)(struct cdp_soc_t *psoc);
+
 	QDF_STATUS (*txrx_intr_attach)(struct cdp_soc_t *soc_handle);
 	void (*txrx_intr_detach)(struct cdp_soc_t *soc_handle);
 	void (*txrx_ppeds_stop)(struct cdp_soc_t *soc_handle);
