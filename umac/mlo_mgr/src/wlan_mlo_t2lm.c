@@ -72,10 +72,16 @@ QDF_STATUS wlan_mlo_parse_t2lm_info(uint8_t *ie,
 			     WLAN_T2LM_CONTROL_EXPECTED_DURATION_PRESENT_IDX,
 			     WLAN_T2LM_CONTROL_EXPECTED_DURATION_PRESENT_BITS);
 
-	t2lm_debug("direction:%d default_link_mapping:%d mapping_switch_time_present:%d expected_duration_present:%d",
+	t2lm->link_mapping_size =
+		QDF_GET_BITS(t2lm_control,
+			     WLAN_T2LM_CONTROL_LINK_MAPPING_SIZE_IDX,
+			     WLAN_T2LM_CONTROL_LINK_MAPPING_SIZE_BITS);
+
+	t2lm_debug("direction:%d default_link_mapping:%d mapping_switch_time_present:%d expected_duration_present:%d link_mapping_size:%d",
 		   t2lm->direction, t2lm->default_link_mapping,
 		    t2lm->mapping_switch_time_present,
-		    t2lm->expected_duration_present);
+		    t2lm->expected_duration_present,
+		    t2lm->link_mapping_size);
 
 	if (t2lm->default_link_mapping) {
 		ie_ptr = t2lm_control_field + sizeof(uint8_t);
@@ -112,13 +118,18 @@ QDF_STATUS wlan_mlo_parse_t2lm_info(uint8_t *ie,
 		if (!(link_mapping_presence_ind & BIT(tid_num)))
 			continue;
 
-		t2lm->ieee_link_map_tid[tid_num] =
-		    qdf_le16_to_cpu(*(uint16_t *)link_mapping_of_tids);
+		if (!t2lm->link_mapping_size) {
+			t2lm->ieee_link_map_tid[tid_num] =
+				qdf_le16_to_cpu(*(uint16_t *)link_mapping_of_tids);
+			link_mapping_of_tids += sizeof(uint16_t);
+		} else {
+			t2lm->ieee_link_map_tid[tid_num] =
+				*(uint8_t *)link_mapping_of_tids;
+			link_mapping_of_tids += sizeof(uint8_t);
+		}
 
 		t2lm_rl_debug("link mapping of TID%d is %x", tid_num,
 			      t2lm->ieee_link_map_tid[tid_num]);
-
-		link_mapping_of_tids += sizeof(uint16_t);
 	}
 
 	return QDF_STATUS_SUCCESS;
@@ -266,6 +277,11 @@ uint8_t *wlan_mlo_add_t2lm_info_ie(uint8_t *frm, struct wlan_t2lm_info *t2lm,
 		     WLAN_T2LM_CONTROL_EXPECTED_DURATION_PRESENT_BITS,
 		     t2lm->expected_duration_present);
 
+	QDF_SET_BITS(t2lm_control,
+		     WLAN_T2LM_CONTROL_LINK_MAPPING_SIZE_IDX,
+		     WLAN_T2LM_CONTROL_LINK_MAPPING_SIZE_BITS,
+		     t2lm->link_mapping_size);
+
 	if (t2lm->default_link_mapping) {
 		/* Link mapping of TIDs are not present when default mapping is
 		 * set. Hence, the size of TID-To-Link mapping control is one
@@ -331,16 +347,31 @@ uint8_t *wlan_mlo_add_t2lm_info_ie(uint8_t *frm, struct wlan_t2lm_info *t2lm,
 		if (!t2lm->ieee_link_map_tid[tid_num])
 			continue;
 
-		*(uint16_t *)link_mapping_of_tids =
-			htole16(t2lm->ieee_link_map_tid[tid_num]);
-		t2lm_rl_debug("link mapping of TID%d is %x", tid_num,
-			      htole16(t2lm->ieee_link_map_tid[tid_num]));
-		link_mapping_of_tids += sizeof(uint16_t);
+		if (!t2lm->link_mapping_size) {
+			*(uint16_t *)link_mapping_of_tids =
+				htole16(t2lm->ieee_link_map_tid[tid_num]);
+			t2lm_rl_debug("link mapping of TID%d is %x",
+				      tid_num,
+				      htole16(t2lm->ieee_link_map_tid[tid_num]));
+			link_mapping_of_tids += sizeof(uint16_t);
+		} else {
+			*(uint8_t *)link_mapping_of_tids =
+				t2lm->ieee_link_map_tid[tid_num];
+			t2lm_rl_debug("link mapping of TID%d is %x",
+				      tid_num,
+				      t2lm->ieee_link_map_tid[tid_num]);
+			link_mapping_of_tids += sizeof(uint8_t);
+		}
 		num_tids++;
 	}
 
-	frm += num_tids * sizeof(uint16_t);
-	t2lm_ie->elem_len += (num_tids * sizeof(uint16_t));
+	if (!t2lm->link_mapping_size) {
+		frm += num_tids * sizeof(uint16_t);
+		t2lm_ie->elem_len += (num_tids * sizeof(uint16_t));
+	} else {
+		frm += num_tids * sizeof(uint8_t);
+		t2lm_ie->elem_len += (num_tids * sizeof(uint8_t));
+	}
 
 	return frm;
 }
@@ -644,6 +675,7 @@ static void wlan_mlo_t2lm_handle_expected_duration_expiry(
 	t2lm_ctx->established_t2lm.t2lm.direction = WLAN_T2LM_BIDI_DIRECTION;
 	t2lm_ctx->established_t2lm.t2lm.default_link_mapping = 1;
 	t2lm_ctx->established_t2lm.disabled_link_bitmap = 0;
+	t2lm_ctx->established_t2lm.t2lm.link_mapping_size = 0;
 	t2lm_debug("Set established mapping to default mapping");
 
 	/* Notify the registered caller about the link update*/
