@@ -12140,16 +12140,14 @@ fail0:
  */
 static QDF_STATUS dp_soc_notify_asserted_soc(struct cdp_soc_t *psoc)
 {
-	struct dp_soc *soc =
-		(struct dp_soc *)psoc;
-	QDF_STATUS status = QDF_STATUS_SUCCESS;
+	struct dp_soc *soc = (struct dp_soc *)psoc;
 
 	if (!soc) {
 		dp_cdp_err("%pK: soc is NULL", soc);
 		return QDF_STATUS_E_INVAL;
 	}
 
-	return status;
+	return dp_umac_reset_notify_asserted_soc(soc);
 }
 
 /**

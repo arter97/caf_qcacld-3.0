@@ -1010,6 +1010,30 @@ static void dp_umac_reset_update_partner_map(struct dp_mlo_ctxt *mlo_ctx,
 		qdf_atomic_clear_bit(chip_id, &grp_umac_reset_ctx->partner_map);
 }
 
+QDF_STATUS dp_umac_reset_notify_asserted_soc(struct dp_soc *soc)
+{
+	struct dp_mlo_ctxt *mlo_ctx;
+	struct dp_soc_be *be_soc;
+
+	be_soc = dp_get_be_soc_from_dp_soc(soc);
+	if (!be_soc) {
+		dp_umac_reset_err("null be_soc");
+		return QDF_STATUS_E_NULL_VALUE;
+	}
+
+	mlo_ctx = be_soc->ml_ctxt;
+	if (!mlo_ctx) {
+		/* This API can be called for non-MLO SOC as well. Hence, return
+		 * the status as success when mlo_ctx is NULL.
+		 */
+		return QDF_STATUS_SUCCESS;
+	}
+
+	dp_umac_reset_update_partner_map(mlo_ctx, be_soc->mlo_chip_id, false);
+
+	return QDF_STATUS_SUCCESS;
+}
+
 /**
  * dp_umac_reset_complete_umac_recovery() - Complete Umac reset session
  * @soc: dp soc handle
