@@ -100,6 +100,8 @@ void wlan_print_service_class(struct wlan_sawf_svc_class_params *params)
 	qdf_nofl_info("Service class type  :%d", params->type);
 	qdf_nofl_info("Ref count           :%d", params->ref_count);
 	qdf_nofl_info("Peer count          :%d", params->peer_count);
+	if (params->disabled_modes > 0)
+		qdf_nofl_info("Disabled_Modes     :%d", params->disabled_modes);
 }
 
 qdf_export_symbol(wlan_print_service_class);
