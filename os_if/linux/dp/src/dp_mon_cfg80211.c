@@ -170,7 +170,7 @@ wlan_cfg80211_set_phyrx_error_mask(struct wiphy *wiphy,
 		ret = -EOPNOTSUPP;
 	}
 
-	dp_mon_info("Configured mask(31-0): 0x%x mask(53-32): 0x%x\n",
+	dp_mon_info("Configured mask(31-0): 0x%x mask(63-32): 0x%x\n",
 		    ic->ic_phyrx_error_mask, ic->ic_phyrx_error_mask_cont);
 
 	return ret;
@@ -219,7 +219,7 @@ wlan_cfg80211_get_phyrx_error_mask(struct wiphy *wiphy,
 	val[1] = mask_cont;
 
 	snprintf(string, PHYRX_ERROR_MASK_STRING,
-		 "mask(31-0):0x%08X mask(53-32):0x%08X", val[0], val[1]);
+		 "mask(31-0):0x%08X mask(63-32):0x%08X", val[0], val[1]);
 
 	cfg80211_reply_command(wiphy, sizeof(string), string, 0);
 
