@@ -143,4 +143,8 @@ config QCA_DMA_PADDR_CHECK
 	bool "Enable dma memory addr check"
 	default n
 
+config PADDR_CHECK_ON_3RD_PARTY_PLATFORM
+	bool "Enable data path memory addr check on third-party platforms"
+	default n
+
 endif # QCA_CLD_WLAN
