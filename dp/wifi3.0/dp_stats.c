@@ -8519,9 +8519,6 @@ void dp_update_vdev_stats(struct dp_soc *soc, struct dp_peer *srcobj,
 	if (qdf_unlikely(!txrx_peer))
 		goto link_stats;
 
-	if (qdf_unlikely(dp_is_wds_extended(txrx_peer)))
-		return;
-
 	if (dp_peer_is_primary_link_peer(srcobj)) {
 		dp_update_vdev_basic_stats(txrx_peer, vdev_stats);
 		per_pkt_stats = &txrx_peer->stats[0].per_pkt_stats;
