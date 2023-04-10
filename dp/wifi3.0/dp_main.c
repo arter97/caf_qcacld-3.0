@@ -7441,10 +7441,6 @@ static QDF_STATUS dp_get_psoc_param(struct cdp_soc_t *cdp_soc,
 	case CDP_UMAC_RST_SKEL_ENABLE:
 		val->cdp_umac_rst_skel = dp_umac_rst_skel_enable_get(soc);
 		break;
-	case CDP_PPEDS_ENABLE:
-		val->cdp_psoc_param_ppeds_enabled =
-			wlan_cfg_get_dp_soc_is_ppeds_enabled(soc->wlan_cfg_ctx);
-		break;
 	default:
 		dp_warn("Invalid param");
 		break;

@@ -2231,6 +2231,7 @@ enum dp_context_type {
  * @dp_tx_desc_pool_alloc: Allocate arch specific TX descriptor pool
  * @dp_tx_desc_pool_free: Free arch specific TX descriptor pool
  * @txrx_srng_init: Init txrx srng
+ * @ppeds_handle_attached:
  * @txrx_soc_ppeds_interrupt_stop:
  * @txrx_soc_ppeds_interrupt_start:
  * @txrx_soc_ppeds_service_status_update:
@@ -2446,6 +2447,7 @@ struct dp_arch_ops {
 						     struct dp_vdev *vdev,
 						     bool peer_map);
 #endif
+	bool (*ppeds_handle_attached)(struct dp_soc *soc);
 	QDF_STATUS (*txrx_soc_ppeds_start)(struct dp_soc *soc);
 	void (*txrx_soc_ppeds_stop)(struct dp_soc *soc);
 	int (*dp_register_ppeds_interrupts)(struct dp_soc *soc,

@@ -4384,6 +4384,7 @@ void *dp_soc_init(struct dp_soc *soc, HTC_HANDLE htc_handle,
 	bool is_monitor_mode = false;
 	uint8_t i;
 	int num_dp_msi;
+	bool ppeds_attached = false;
 
 	htt_soc = htt_soc_attach(soc, htc_handle);
 	if (!htt_soc)
@@ -4422,8 +4423,12 @@ void *dp_soc_init(struct dp_soc *soc, HTC_HANDLE htc_handle,
 		goto fail3;
 	}
 
+	if (soc->arch_ops.ppeds_handle_attached)
+		ppeds_attached = soc->arch_ops.ppeds_handle_attached(soc);
+
 	wlan_cfg_fill_interrupt_mask(soc->wlan_cfg_ctx, num_dp_msi,
-				     soc->intr_mode, is_monitor_mode);
+				     soc->intr_mode, is_monitor_mode,
+				     ppeds_attached);
 
 	/* initialize WBM_IDLE_LINK ring */
 	if (dp_hw_link_desc_ring_init(soc)) {
