@@ -32,6 +32,16 @@
 #define WLAN_MAX_SVC_CLASS_NAME 64
 #define DISABLED_MODE_MAX_LEN 128
 
+#ifdef WLAN_SUPPORT_SCS
+#define SAWF_SCS_TID_MAX 8
+/*
+ * Service class defined for Pre-11BE SCS (Only TID based service class
+ * without other QoS attributes)
+ */
+#define SAWF_SCS_SVC_CLASS_MIN (SAWF_SVC_CLASS_MAX + 1)
+#define SAWF_SCS_SVC_CLASS_MAX (SAWF_SVC_CLASS_MAX + SAWF_SCS_TID_MAX)
+#endif
+
 #define SAWF_LINE_FORMAT "================================================"
 
 #define SAWF_DEF_PARAM_VAL 0xFFFFFFFF
@@ -473,4 +483,13 @@ void wlan_service_id_inc_peer_count(uint8_t svc_id);
  * Return: void
  */
 void wlan_disable_service_class(uint8_t svc_id);
+
+/* wlan_service_id_scs_valid() - Check if valid SCS service class
+ *
+ * @scs_based_rule : flag to indicate SCS based rule
+ * @svc_id : service-class id
+ *
+ * Return: bool
+ */
+bool wlan_service_id_scs_valid(bool scs_based_rule, uint8_t svc_id);
 #endif
