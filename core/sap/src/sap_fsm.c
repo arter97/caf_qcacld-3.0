@@ -2844,6 +2844,7 @@ static void wlansap_pre_cac_end_notify(struct sap_context *sap_context,
 	sap_warn("pre cac end notify on %d: move to state SAP_STARTED", intf);
 	wlan_pre_cac_handle_cac_end(sap_context->vdev);
 }
+#endif
 
 QDF_STATUS sap_cac_end_notify(mac_handle_t mac_handle,
 			      struct csr_roam_info *roamInfo)
@@ -2938,7 +2939,6 @@ QDF_STATUS sap_cac_end_notify(mac_handle_t mac_handle,
 	mac->sap.SapDfsInfo.cac_state = eSAP_DFS_SKIP_CAC;
 	return qdf_status;
 }
-#endif
 
 /**
  * sap_validate_dfs_nol() - Validate SAP channel with NOL list
