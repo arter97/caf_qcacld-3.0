@@ -32,6 +32,9 @@
 #ifdef FEATURE_PERPKT_INFO
 #include "dp_ratetable.h"
 #endif
+#ifdef QCA_SUPPORT_LITE_MONITOR
+#include "dp_lite_mon.h"
+#endif
 
 #define MAX_TX_MONITOR_STUCK 50
 
@@ -590,6 +593,25 @@ void dp_print_pdev_tx_monitor_stats_2_0(struct dp_pdev *pdev)
 	DP_PRINT_STATS("\t\ttlv drop : %llu", stats.tlv_drop_cnt);
 }
 
+#ifdef QCA_SUPPORT_LITE_MONITOR
+static void dp_lite_mon_free_tx_peers(struct dp_pdev *pdev)
+{
+	struct dp_mon_pdev *mon_pdev = pdev->monitor_pdev;
+	struct dp_mon_pdev_be *mon_pdev_be =
+			dp_get_be_mon_pdev_from_dp_mon_pdev(mon_pdev);
+	struct dp_lite_mon_tx_config *lite_mon_tx_config;
+
+	lite_mon_tx_config = mon_pdev_be->lite_mon_tx_config;
+	qdf_spin_lock_bh(&lite_mon_tx_config->lite_mon_tx_lock);
+	dp_lite_mon_free_peers(pdev, &lite_mon_tx_config->tx_config);
+	qdf_spin_unlock_bh(&lite_mon_tx_config->lite_mon_tx_lock);
+}
+#else
+static void dp_lite_mon_free_tx_peers(struct dp_pdev *pdev)
+{
+}
+#endif
+
 /*
  * dp_config_enh_tx_monitor_2_0()- API to enable/disable enhanced tx capture
  * @pdev_handle: DP_PDEV handle
@@ -617,6 +639,8 @@ dp_config_enh_tx_monitor_2_0(struct dp_pdev *pdev, uint8_t val)
 		tx_mon_be->mode = TX_MON_BE_DISABLE;
 		mon_pdev_be->tx_mon_mode = 0;
 		mon_pdev_be->tx_mon_filter_length = DMA_LENGTH_64B;
+		/* Free any peers that were added for tx peer filtering */
+		dp_lite_mon_free_tx_peers(pdev);
 		break;
 	}
 	case TX_MON_BE_FULL_CAPTURE:
