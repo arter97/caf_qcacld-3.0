@@ -588,9 +588,9 @@ wlan_hdd_tsf_reg_update_details(struct hdd_adapter *adapter, struct stsf *ptsf)
 		adapter->tsf.tsf_mac_id = ptsf->mac_id;
 		qdf_atomic_set(&adapter->tsf.tsf_details_valid, 1);
 	}
-	hdd_info("vdev_id %u tsf_id %u tsf_id_valid %u mac_id %u",
-		 adapter->deflink->vdev_id, ptsf->tsf_id, ptsf->tsf_id_valid,
-		 ptsf->mac_id);
+	hdd_debug("vdev_id %u tsf_id %u tsf_id_valid %u mac_id %u",
+		  adapter->deflink->vdev_id, ptsf->tsf_id, ptsf->tsf_id_valid,
+		  ptsf->mac_id);
 }
 
 static inline
@@ -641,7 +641,7 @@ wlan_hdd_tsf_reg_process_report(struct hdd_adapter *adapter,
 		return HDD_TSF_OP_FAIL;
 	}
 
-	hdd_info("device_mode is %d", adapter->device_mode);
+	hdd_debug("device_mode is %d", adapter->device_mode);
 
 	tsf = &adapter->tsf;
 	capture_timer = &tsf->host_capture_req_timer;
@@ -659,8 +659,8 @@ wlan_hdd_tsf_reg_process_report(struct hdd_adapter *adapter,
 
 	qdf_event_set(&tsf_sync_get_completion_evt);
 	hdd_update_tsf(adapter, tsf->cur_target_time);
-	hdd_info("vdev id=%u, tsf=%llu", adapter->deflink->vdev_id,
-		 tsf_report->tsf);
+	hdd_debug("vdev id=%u, tsf=%llu", adapter->deflink->vdev_id,
+		  tsf_report->tsf);
 	return HDD_TSF_OP_SUCC;
 }
 
@@ -744,7 +744,7 @@ static enum hdd_tsf_op_result hdd_capture_tsf_internal(
 	/* record adapter for cap_tsf_irq_handler  */
 	hddctx->tsf.cap_tsf_context = adapter;
 
-	hdd_info("+ioctl issue cap tsf cmd");
+	hdd_debug("+ioctl issue cap tsf cmd");
 	cap_timer = &adapter->tsf.host_capture_req_timer;
 	qdf_mc_timer_start(cap_timer, WLAN_HDD_CAPTURE_TSF_REQ_TIMEOUT_MS);
 
@@ -757,7 +757,7 @@ static enum hdd_tsf_op_result hdd_capture_tsf_internal(
 		return HDD_TSF_OP_SUCC;
 
 	ret = _hdd_capture_tsf_internal(adapter, buf, len);
-	hdd_info("-ioctl return cap tsf cmd");
+	hdd_debug("-ioctl return cap tsf cmd");
 
 	return ret;
 }
@@ -800,10 +800,10 @@ static enum hdd_tsf_op_result hdd_indicate_tsf_internal(
 	tsf_op_resp->soc_time = adapter->tsf.cur_tsf_sync_soc_time;
 
 	if (!qdf_atomic_read(&hddctx->tsf.cap_tsf_flag)) {
-		hdd_info("old: status=%u, tsf_time=%llu, tsf_soc_time=%llu",
-			 tsf_op_resp->status,
-			 tsf_op_resp->time,
-			 tsf_op_resp->soc_time);
+		hdd_debug("old: status=%u, tsf_time=%llu, tsf_soc_time=%llu",
+			  tsf_op_resp->status,
+			  tsf_op_resp->time,
+			  tsf_op_resp->soc_time);
 		return HDD_TSF_OP_SUCC;
 	}
 
@@ -815,10 +815,10 @@ static enum hdd_tsf_op_result hdd_indicate_tsf_internal(
 	}
 	hddctx->tsf.cap_tsf_context = NULL;
 	qdf_atomic_set(&hddctx->tsf.cap_tsf_flag, 0);
-	hdd_info("get tsf cmd,status=%u, tsf_time=%llu, tsf_soc_time=%llu",
-		 tsf_op_resp->status,
-							tsf_op_resp->time,
-							tsf_op_resp->soc_time);
+	hdd_debug("get tsf cmd,status=%u, tsf_time=%llu, tsf_soc_time=%llu",
+		  tsf_op_resp->status,
+		  tsf_op_resp->time,
+		  tsf_op_resp->soc_time);
 
 	return HDD_TSF_OP_SUCC;
 }
@@ -976,10 +976,10 @@ enum hdd_ts_status hdd_check_timestamp_status(
 	delta_ns = ((delta_target_time > delta_sync_time) ?
 			(delta_target_time - delta_sync_time) :
 			(delta_sync_time - delta_target_time));
-	hdd_warn("timestamps deviation - delta: %llu ns", delta_ns);
+	hdd_debug("timestamps deviation - delta: %llu ns", delta_ns);
 	/* the deviation should be smaller than a threshold */
 	if (!force_sync && delta_ns > MAX_ALLOWED_DEVIATION_NS) {
-		hdd_warn("Invalid timestamps - delta: %llu ns", delta_ns);
+		hdd_debug("Invalid timestamps - delta: %llu ns", delta_ns);
 		return HDD_TS_STATUS_INVALID;
 	}
 	return HDD_TS_STATUS_READY;
@@ -1621,8 +1621,8 @@ static irqreturn_t hdd_tsf_captured_irq_handler(int irq, void *arg)
 	if (adapter->dev)
 		name = adapter->dev->name;
 
-	hdd_info("irq: %d - iface: %s - host_time: %llu",
-		 irq, (!name ? "none" : name), host_time);
+	hdd_debug("irq: %d - iface: %s - host_time: %llu",
+		  irq, (!name ? "none" : name), host_time);
 
 	return IRQ_HANDLED;
 }
@@ -1707,7 +1707,7 @@ static void hdd_update_timestamp(struct hdd_adapter *adapter)
 	if (tsf->host_target_sync_force)
 		tsf->host_target_sync_force = false;
 
-	hdd_info("sync_status %d", sync_status);
+	hdd_debug("sync_status %d", sync_status);
 	switch (sync_status) {
 	case HDD_TS_STATUS_INVALID:
 		if (++tsf->continuous_error_count <
@@ -1718,7 +1718,7 @@ static void hdd_update_timestamp(struct hdd_adapter *adapter)
 			tsf->cur_tsf_sync_soc_time = 0;
 			break;
 		}
-		hdd_warn("Reach the max continuous error count");
+		hdd_debug("Reach the max continuous error count");
 
 		/* If reach MAX_CONTINUOUS_ERROR_CNT, treat it as valid pair */
 		fallthrough;
@@ -1731,10 +1731,10 @@ static void hdd_update_timestamp(struct hdd_adapter *adapter)
 		tsf->cur_target_time = 0;
 		tsf->cur_target_global_tsf_time = 0;
 		tsf->cur_tsf_sync_soc_time = 0;
-		hdd_info("ts-pair updated: target: %llu; g_target:%llu, Qtime: %llu",
-			 tsf->last_target_time,
-			 tsf->last_target_global_tsf_time,
-			 tsf->last_tsf_sync_soc_time);
+		hdd_debug("ts-pair updated: target: %llu; g_target:%llu, Qtime: %llu",
+			  tsf->last_target_time,
+			  tsf->last_target_global_tsf_time,
+			  tsf->last_tsf_sync_soc_time);
 
 		/*
 		 * TSF-HOST need to be updated in at most
@@ -1873,7 +1873,7 @@ static void hdd_update_timestamp(struct hdd_adapter *adapter,
 	if (tsf->host_target_sync_force)
 		tsf->host_target_sync_force = false;
 
-	hdd_info("sync_status %d", sync_status);
+	hdd_debug("sync_status %d", sync_status);
 	switch (sync_status) {
 	case HDD_TS_STATUS_INVALID:
 		if (++tsf->continuous_error_count <
@@ -1895,9 +1895,9 @@ static void hdd_update_timestamp(struct hdd_adapter *adapter,
 		tsf->last_host_time = tsf->cur_host_time;
 		tsf->cur_target_time = 0;
 		tsf->cur_host_time = 0;
-		hdd_info("ts-pair updated: target: %llu; host: %llu",
-			 tsf->last_target_time,
-			 tsf->last_host_time);
+		hdd_debug("ts-pair updated: target: %llu; host: %llu",
+			  tsf->last_target_time,
+			  tsf->last_host_time);
 
 		/*
 		 * TSF-HOST need to be updated in at most
@@ -3170,8 +3170,8 @@ int hdd_get_tsf_cb(void *pcb_cxt, struct stsf *ptsf)
 		return -EINVAL;
 	}
 
-	hdd_info("tsf cb handle event, device_mode is %d",
-		adapter->device_mode);
+	hdd_debug("tsf cb handle event, device_mode is %d",
+		  adapter->device_mode);
 
 	wlan_hdd_tsf_reg_update_details(adapter, ptsf);
 
@@ -3198,9 +3198,9 @@ int hdd_get_tsf_cb(void *pcb_cxt, struct stsf *ptsf)
 
 	qdf_event_set(&tsf_sync_get_completion_evt);
 	hdd_update_tsf(adapter, tsf->cur_target_time);
-	hdd_info("Vdev=%u, tsf_low=%u, tsf_high=%u ptsf->soc_timer_low=%u ptsf->soc_timer_high=%u",
-		 ptsf->vdev_id, ptsf->tsf_low, ptsf->tsf_high,
-		 ptsf->soc_timer_low, ptsf->soc_timer_high);
+	hdd_debug("Vdev=%u, tsf_low=%u, tsf_high=%u ptsf->soc_timer_low=%u ptsf->soc_timer_high=%u",
+		  ptsf->vdev_id, ptsf->tsf_low, ptsf->tsf_high,
+		  ptsf->soc_timer_low, ptsf->soc_timer_high);
 	return 0;
 }
 
