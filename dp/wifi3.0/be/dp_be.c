@@ -1427,6 +1427,7 @@ dp_rxdma_ring_sel_cfg_be(struct dp_soc *soc)
 	htt_tlv_filter.fp_mgmt_filter = 0;
 	htt_tlv_filter.fp_ctrl_filter = FILTER_CTRL_BA_REQ;
 	htt_tlv_filter.fp_data_filter = (FILTER_DATA_UCAST |
+					 FILTER_DATA_MCAST |
 					 FILTER_DATA_DATA);
 	htt_tlv_filter.mo_mgmt_filter = 0;
 	htt_tlv_filter.mo_ctrl_filter = 0;
@@ -1530,6 +1531,7 @@ dp_rxdma_ring_sel_cfg_be(struct dp_soc *soc)
 	htt_tlv_filter.fp_mgmt_filter = 0;
 	htt_tlv_filter.fp_ctrl_filter = FILTER_CTRL_BA_REQ;
 	htt_tlv_filter.fp_data_filter = (FILTER_DATA_UCAST |
+					 FILTER_DATA_MCAST |
 					 FILTER_DATA_DATA);
 	htt_tlv_filter.mo_mgmt_filter = 0;
 	htt_tlv_filter.mo_ctrl_filter = 0;
