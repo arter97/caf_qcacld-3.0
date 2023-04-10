@@ -932,6 +932,15 @@ struct dp_vdev *dp_mlo_get_mcast_primary_vdev(struct dp_soc_be *be_soc,
 	int i = 0;
 	int j = 0;
 	struct dp_mlo_ctxt *dp_mlo = be_soc->ml_ctxt;
+	struct dp_vdev *vdev = (struct dp_vdev *)be_vdev;
+
+	if (be_vdev->mcast_primary) {
+		if (dp_vdev_get_ref((struct dp_soc *)be_soc, vdev, mod_id) !=
+					QDF_STATUS_SUCCESS)
+			return NULL;
+
+		return vdev;
+	}
 
 	for (i = 0; i < WLAN_MAX_MLO_CHIPS ; i++) {
 		struct dp_soc *ptnr_soc =
