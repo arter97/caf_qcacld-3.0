@@ -1787,7 +1787,7 @@ QDF_STATUS mon_soc_ol_attach(struct wlan_objmgr_psoc *psoc)
 	for (i = 0; i < WMI_HOST_MAX_PDEV; i++) {
 		pdev = wlan_objmgr_get_pdev_by_id(psoc, i, WLAN_MLME_NB_ID);
 		if (!pdev) {
-			dp_mon_err("pdev object (id: %d) is NULL", i);
+			dp_mon_debug("pdev object (id: %d) is NULL", i);
 			continue;
 		}
 		scn = (struct ol_ath_softc_net80211 *)
@@ -1845,7 +1845,7 @@ void mon_soc_ol_detach(struct wlan_objmgr_psoc *psoc)
 	for (i = 0; i < WMI_HOST_MAX_PDEV; i++) {
 		pdev = wlan_objmgr_get_pdev_by_id(psoc, i, WLAN_MLME_NB_ID);
 		if (!pdev) {
-			dp_mon_err("pdev object (id: %d) is NULL", i);
+			dp_mon_debug("pdev object (id: %d) is NULL", i);
 			continue;
 		}
 		scn = (struct ol_ath_softc_net80211 *)
