@@ -6045,6 +6045,35 @@ bool lim_tdls_peer_support_he(tpDphHashNode sta_ds)
 }
 #endif
 
+#ifdef WLAN_FEATURE_11BE_MLO
+static
+void lim_prepare_tdls_with_mlo(struct pe_session *session,
+			       tSirMacAddr peer_mac, tSirMacAddr self_mac,
+			       uint16_t *action)
+{
+	uint8_t *mld_addr;
+
+	if (!sir_compare_mac_addr(session->bssId, peer_mac) &&
+	    wlan_mlo_get_tdls_link_vdev(session->vdev)) {
+		mld_addr = wlan_vdev_mlme_get_mldaddr(session->vdev);
+		sir_copy_mac_addr(self_mac, mld_addr);
+		*action = ACTION_CATEGORY_BACK << 8 | ADDBA_RESPONSE;
+	} else {
+		sir_copy_mac_addr(self_mac, session->self_mac_addr);
+		*action = 0;
+	}
+}
+#else
+static
+void lim_prepare_tdls_with_mlo(struct pe_session *session,
+			       tSirMacAddr peer_mac, tSirMacAddr self_mac,
+			       uint16_t *action)
+{
+	sir_copy_mac_addr(self_mac, session->self_mac_addr);
+	*action = 0;
+}
+#endif
+
 QDF_STATUS lim_send_addba_response_frame(struct mac_context *mac_ctx,
 		tSirMacAddr peer_mac, uint16_t tid,
 		struct pe_session *session, uint8_t addba_extn_present,
@@ -6069,6 +6098,8 @@ QDF_STATUS lim_send_addba_response_frame(struct mac_context *mac_ctx,
 	bool he_cap = false;
 	bool eht_cap = false;
 	struct wlan_mlme_qos *qos_aggr;
+	tSirMacAddr self_mac;
+	uint16_t action;
 
 	vdev_id = session->vdev_id;
 
@@ -6181,8 +6212,13 @@ QDF_STATUS lim_send_addba_response_frame(struct mac_context *mac_ctx,
 		}
 	}
 
+	/*
+	 * for TDLS MLO case, it needs to use MLD mac address for TA and
+	 * set action code to send out from specific vdev in fw.
+	 */
+	lim_prepare_tdls_with_mlo(session, peer_mac, self_mac, &action);
 	pe_debug("Sending a ADDBA Response from "QDF_MAC_ADDR_FMT" to "QDF_MAC_ADDR_FMT,
-		 QDF_MAC_ADDR_REF(session->self_mac_addr),
+		 QDF_MAC_ADDR_REF(self_mac),
 		 QDF_MAC_ADDR_REF(peer_mac));
 	pe_debug("tid %d dialog_token %d status %d buff_size %d amsdu_supp %d",
 		 tid, frm.DialogToken.token, frm.Status.status,
@@ -6216,7 +6252,7 @@ QDF_STATUS lim_send_addba_response_frame(struct mac_context *mac_ctx,
 	qdf_mem_zero(frame_ptr, num_bytes);
 
 	lim_populate_mac_header(mac_ctx, frame_ptr, SIR_MAC_MGMT_FRAME,
-		SIR_MAC_MGMT_ACTION, peer_mac, session->self_mac_addr);
+		SIR_MAC_MGMT_ACTION, peer_mac, self_mac);
 
 	/* Update A3 with the BSSID */
 	mgmt_hdr = (tpSirMacMgmtHdr) frame_ptr;
@@ -6261,7 +6297,8 @@ QDF_STATUS lim_send_addba_response_frame(struct mac_context *mac_ctx,
 						NULL, frame_ptr,
 						lim_addba_rsp_tx_complete_cnf,
 						tx_flag, vdev_id,
-						false, 0, RATEID_DEFAULT, 0, 0);
+						false, 0, RATEID_DEFAULT, 0,
+						action);
 	MTRACE(qdf_trace(QDF_MODULE_ID_PE, TRACE_CODE_TX_COMPLETE,
 			 session->peSessionId, qdf_status));
 	if (QDF_STATUS_SUCCESS != qdf_status) {

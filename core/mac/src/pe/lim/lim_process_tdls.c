@@ -1604,6 +1604,7 @@ static QDF_STATUS lim_send_tdls_dis_rsp_frame(struct mac_context *mac,
 	uint8_t smeSessionId = 0;
 	uint16_t mlo_ie_len = 0;
 	uint8_t *eht_cap_ie = NULL, eht_cap_ie_len = 0;
+	uint16_t action;
 
 	if (!pe_session) {
 		pe_err("pe_session is NULL");
@@ -1820,6 +1821,7 @@ static QDF_STATUS lim_send_tdls_dis_rsp_frame(struct mac_context *mac,
 	 * wma does not do header conversion to 802.3 before calling tx/rx
 	 * routine and subsequenly target also sends frame as is OTA
 	 */
+	action = ACTION_CATEGORY_PUBLIC << 8 | TDLS_DISCOVERY_RESPONSE;
 	qdf_status = wma_tx_frameWithTxComplete(mac, pPacket, (uint16_t) nBytes,
 					      TXRX_FRM_802_11_MGMT,
 					      ANI_TXDIR_IBSS,
@@ -1829,7 +1831,7 @@ static QDF_STATUS lim_send_tdls_dis_rsp_frame(struct mac_context *mac,
 					      HAL_USE_SELF_STA_REQUESTED_MASK,
 					      smeSessionId, false, 0,
 					      RATEID_DEFAULT, 0,
-					      TDLS_DISCOVERY_RESPONSE);
+					      action);
 	if (!QDF_IS_STATUS_SUCCESS(qdf_status)) {
 		mac->lim.tdls_frm_session_id = NO_SESSION;
 		pe_err("could not send TDLS Discovery Response frame!");
