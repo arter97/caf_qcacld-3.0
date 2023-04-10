@@ -4130,12 +4130,14 @@ wlan_parse_oce_ap_tx_pwr_ie(uint8_t *mbo_oce_ie, int8_t *ap_tx_pwr_dbm)
  * @MLME_XCSA_IE_PRESENT: extend CSA IE is present
  * @MLME_WBW_IE_PRESENT: wide bandwidth channel switch IE is present
  * @MLME_CSWRAP_IE_EXTENDED_PRESENT: channel switch wrapper IE is present
+ * @MLME_CSWRAP_IE_EXT_V2_PRESENT: channel switch wrapper IE V2 is present
  */
 enum mlme_csa_event_ies_present_flag {
 	MLME_CSA_IE_PRESENT    = 0x00000001,
 	MLME_XCSA_IE_PRESENT   = 0x00000002,
 	MLME_WBW_IE_PRESENT    = 0x00000004,
 	MLME_CSWRAP_IE_EXTENDED_PRESENT = 0x00000008,
+	MLME_CSWRAP_IE_EXT_V2_PRESENT    = 0x00000010,
 };
 
 /**
