@@ -11383,10 +11383,6 @@ static QDF_STATUS dp_get_psoc_param(struct cdp_soc_t *cdp_soc,
 	case CDP_UMAC_RST_SKEL_ENABLE:
 		val->cdp_umac_rst_skel = dp_umac_rst_skel_enable_get(soc);
 		break;
-	case CDP_PPEDS_ENABLE:
-		val->cdp_psoc_param_ppeds_enabled =
-			wlan_cfg_get_dp_soc_is_ppeds_enabled(soc->wlan_cfg_ctx);
-		break;
 	default:
 		dp_warn("Invalid param");
 		break;
@@ -15871,6 +15867,7 @@ static void *dp_soc_init(struct dp_soc *soc, HTC_HANDLE htc_handle,
 	bool is_monitor_mode = false;
 	uint8_t i;
 	int num_dp_msi;
+	bool ppeds_attached = false;
 
 	wlan_minidump_log(soc, sizeof(*soc), soc->ctrl_psoc,
 			  WLAN_MD_DP_SOC, "dp_soc");
@@ -15923,8 +15920,12 @@ static void *dp_soc_init(struct dp_soc *soc, HTC_HANDLE htc_handle,
 		goto fail3;
 	}
 
+	if (soc->arch_ops.ppeds_handle_attached)
+		ppeds_attached = soc->arch_ops.ppeds_handle_attached(soc);
+
 	wlan_cfg_fill_interrupt_mask(soc->wlan_cfg_ctx, num_dp_msi,
-				     soc->intr_mode, is_monitor_mode);
+				     soc->intr_mode, is_monitor_mode,
+				     ppeds_attached);
 
 	/* initialize WBM_IDLE_LINK ring */
 	if (dp_hw_link_desc_ring_init(soc)) {

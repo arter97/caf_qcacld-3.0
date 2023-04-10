@@ -3290,7 +3290,8 @@ static const uint8_t rx_fst_toeplitz_key[WLAN_CFG_RX_FST_TOEPLITZ_KEYLEN] = {
 void wlan_cfg_fill_interrupt_mask(struct wlan_cfg_dp_soc_ctxt *wlan_cfg_ctx,
 				  int num_dp_msi,
 				  int interrupt_mode,
-				  bool is_monitor_mode)
+				  bool is_monitor_mode,
+				  bool ppeds_attached)
 {	int i = 0;
 	const uint8_t *tx_ring_intr_mask =
 				wlan_cfg_get_tx_ring_int_mask(wlan_cfg_ctx);
@@ -3412,7 +3413,8 @@ wlan_cfg_mask_assignment(struct wlan_cfg_dp_soc_ctxt *wlan_cfg_ctx,
 void wlan_cfg_fill_interrupt_mask(struct wlan_cfg_dp_soc_ctxt *wlan_cfg_ctx,
 				     int num_dp_msi,
 				     int interrupt_mode,
-				     bool is_monitor_mode)
+				     bool is_monitor_mode,
+				     bool ppeds_attached)
 {
 	int i = 0;
 	int interrupt_index = 0;
@@ -3428,7 +3430,7 @@ void wlan_cfg_fill_interrupt_mask(struct wlan_cfg_dp_soc_ctxt *wlan_cfg_ctx,
 	}
 
 	for (i = 0; i < WLAN_CFG_INT_NUM_CONTEXTS; i++) {
-		if (!wlan_cfg_get_dp_soc_is_ppeds_enabled(wlan_cfg_ctx))
+		if (!ppeds_attached)
 			mask_assignment = &dp_mask_assignment[interrupt_index];
 		else if (interrupt_index == 8)
 			mask_assignment = &dp_ds_mask_assignment_8msi;
@@ -5130,7 +5132,7 @@ int wlan_cfg_ipa_tx_alt_comp_ring_size(struct wlan_cfg_dp_soc_ctxt *cfg)
 
 #ifdef WLAN_SUPPORT_PPEDS
 bool
-wlan_cfg_get_dp_soc_is_ppeds_enabled(struct wlan_cfg_dp_soc_ctxt *cfg)
+wlan_cfg_get_dp_soc_ppeds_enable(struct wlan_cfg_dp_soc_ctxt *cfg)
 {
 	return cfg->ppeds_enable;
 }
