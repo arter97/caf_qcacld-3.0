@@ -332,6 +332,7 @@ static bool mlo_handle_link_ready(struct wlan_objmgr_vdev *vdev)
 	uint8_t i;
 	uint8_t idx;
 	enum wlan_vdev_state state;
+	enum wlan_vdev_state substate;
 
 
 	if (!vdev || !vdev->mlo_dev_ctx) {
@@ -340,9 +341,28 @@ static bool mlo_handle_link_ready(struct wlan_objmgr_vdev *vdev)
 	}
 
 	mld_ctx = vdev->mlo_dev_ctx;
+	/*
+	 * The last vdev in MLD to receive start response is responsible for
+	 * dispatching MLO_SYNC_COMPLETE event all the partner vdevs and then to
+	 * self.
+	 *
+	 * If vdev_up_bmap is set, then return.
+	 */
+	idx = mlo_get_link_vdev_ix(mld_ctx, vdev);
+	if (idx == MLO_INVALID_LINK_IDX)
+		return false;
+
+	if (wlan_util_map_index_is_set(mld_ctx->ap_ctx->mlo_vdev_up_bmap,
+				       idx)) {
+		mlo_debug("Bmap is set for idx:%u mld_addr " QDF_MAC_ADDR_FMT,
+			  idx, QDF_MAC_ADDR_REF(mld_ctx->mld_addr.bytes));
+		return false;
+	}
+
 	mlo_ap_lock_acquire(vdev->mlo_dev_ctx->ap_ctx);
 	state = wlan_vdev_mlme_get_state(vdev);
-	if (state == WLAN_VDEV_S_UP) {
+	substate = wlan_vdev_mlme_get_substate(vdev);
+	if (state == WLAN_VDEV_S_UP && substate == WLAN_VDEV_SS_MLO_SYNC_WAIT) {
 		idx = mlo_get_link_vdev_ix(mld_ctx, vdev);
 		if (idx == MLO_INVALID_LINK_IDX) {
 			mlo_ap_lock_release(vdev->mlo_dev_ctx->ap_ctx);
@@ -350,6 +370,8 @@ static bool mlo_handle_link_ready(struct wlan_objmgr_vdev *vdev)
 		}
 		wlan_util_change_map_index(mld_ctx->ap_ctx->mlo_vdev_up_bmap,
 					   idx, 1);
+		mlo_debug("Setting Bmap for idx:%u mld_addr " QDF_MAC_ADDR_FMT,
+			  idx, QDF_MAC_ADDR_REF(mld_ctx->mld_addr.bytes));
 	}
 
 	if (!mlo_is_ap_vdev_up_allowed(vdev)) {
