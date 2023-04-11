@@ -1036,6 +1036,16 @@ struct wlan_hdd_link_info {
 };
 
 /**
+ * struct wlan_hdd_tx_power - Structure to store connection tx power info
+ * @tx_pwr: connection tx power sent by firmware
+ * @tx_pwr_cached_timestamp: timestamp when tx_pwr is cached into adapter
+ */
+struct wlan_hdd_tx_power {
+	int tx_pwr;
+	uint32_t tx_pwr_cached_timestamp;
+};
+
+/**
  * struct hdd_adapter - hdd vdev/net_device context
  * @magic: Magic cookie for adapter sanity verification.  Note that this
  *         needs to be at the beginning of the private data structure so
@@ -1159,7 +1169,7 @@ struct wlan_hdd_link_info {
  * @is_dbam_configured:
  * @deflink: Default link pointing to the 0th index of the linkinfo array
  * @link_info: Data structure to hold link specific information
- * @tx_pwr: connection tx power sent by firmware
+ * @tx_power: Structure to hold connection tx Power info
  */
 struct hdd_adapter {
 	uint32_t magic;
@@ -1353,7 +1363,7 @@ struct hdd_adapter {
 #endif
 	struct wlan_hdd_link_info *deflink;
 	struct wlan_hdd_link_info link_info[WLAN_MAX_MLD];
-	int tx_pwr;
+	struct wlan_hdd_tx_power tx_power;
 };
 
 #define WLAN_HDD_GET_STATION_CTX_PTR(adapter) \

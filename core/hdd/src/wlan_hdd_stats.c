@@ -270,7 +270,9 @@ static int copy_station_stats_to_adapter(struct hdd_adapter *adapter,
 			stats->peer_adv_stats->rx_bytes;
 	adapter->hdd_stats.peer_stats.fcs_count =
 			stats->peer_adv_stats->fcs_count;
-	adapter->tx_pwr = stats->pdev_stats->max_pwr;
+	adapter->tx_power.tx_pwr = stats->pdev_stats->max_pwr;
+	adapter->tx_power.tx_pwr_cached_timestamp =
+			qdf_system_ticks_to_msecs(qdf_system_ticks());
 
 	dynamic_cfg = mlme_get_dynamic_vdev_config(vdev);
 	if (!dynamic_cfg) {
@@ -7654,7 +7656,6 @@ int wlan_hdd_get_station_stats(struct hdd_adapter *adapter)
 	/* update get stats cached time stamp */
 	hdd_update_station_stats_cached_timestamp(adapter);
 	copy_station_stats_to_adapter(adapter, stats);
-
 out:
 	wlan_cfg80211_mc_cp_stats_free_stats_event(stats);
 	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_STATS_ID);
