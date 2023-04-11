@@ -3874,7 +3874,7 @@ QDF_STATUS lim_sta_send_add_bss(struct mac_context *mac, tpSirAssocRsp pAssocRsp
 			lim_intersect_ap_he_caps(pe_session,
 						 pAddBssParams,
 						 pBeaconStruct,
-						 pAssocRsp);
+						 pAssocRsp, bssDescription);
 			lim_update_he_stbc_capable(&pAddBssParams->staContext);
 			lim_update_he_mcs_12_13(&pAddBssParams->staContext,
 						sta);
@@ -3964,7 +3964,7 @@ QDF_STATUS lim_sta_send_add_bss(struct mac_context *mac, tpSirAssocRsp pAssocRsp
 			lim_intersect_ap_he_caps(pe_session,
 						 pAddBssParams,
 						 pBeaconStruct,
-						 pAssocRsp);
+						 pAssocRsp, bssDescription);
 			lim_update_he_stbc_capable(&pAddBssParams->staContext);
 			lim_update_he_mcs_12_13(&pAddBssParams->staContext,
 						sta);
@@ -4253,7 +4253,8 @@ QDF_STATUS lim_sta_send_add_bss_pre_assoc(struct mac_context *mac,
 		if (lim_is_session_he_capable(pe_session) &&
 			pBeaconStruct->he_cap.present)
 			lim_intersect_ap_he_caps(pe_session, pAddBssParams,
-					      pBeaconStruct, NULL);
+						 pBeaconStruct, NULL,
+						 bssDescription);
 
 		if (lim_is_session_eht_capable(pe_session) &&
 		    pBeaconStruct->eht_cap.present)

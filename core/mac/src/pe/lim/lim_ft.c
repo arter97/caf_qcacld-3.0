@@ -268,7 +268,9 @@ void lim_ft_prepare_add_bss_req(struct mac_context *mac,
 			if (lim_is_session_he_capable(ft_session) &&
 				pBeaconStruct->he_cap.present)
 				lim_intersect_ap_he_caps(ft_session,
-					pAddBssParams, pBeaconStruct, NULL);
+							 pAddBssParams,
+							 pBeaconStruct, NULL,
+							 bssDescription);
 
 			if (lim_is_session_eht_capable(ft_session) &&
 			    pBeaconStruct->eht_cap.present)
