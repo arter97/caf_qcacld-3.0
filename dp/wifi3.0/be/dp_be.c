@@ -2829,6 +2829,61 @@ dp_primary_link_migration(struct dp_soc *soc, void *cb_ctxt,
 	qdf_mem_free(pr_peer_info);
 }
 
+#ifdef WLAN_SUPPORT_PPEDS
+static QDF_STATUS dp_get_ppe_info_for_vap(struct cdp_soc_t *cdp_soc,
+					  struct dp_soc *mld_soc,
+					  struct dp_peer *pr_peer,
+					  uint16_t *src_info)
+{
+	struct dp_soc_be *be_soc_mld = NULL;
+	struct cdp_ds_vp_params vp_params = {0};
+	struct dp_ppe_vp_profile *ppe_vp_profile;
+	QDF_STATUS qdf_status = QDF_STATUS_SUCCESS;
+
+	/*
+	 * Extract the VP profile from the VAP
+	 */
+	if (!cdp_soc->ol_ops->get_ppeds_profile_info_for_vap) {
+		dp_err("%pK: Register get ppeds profile info first", cdp_soc);
+		return QDF_STATUS_E_NULL_VALUE;
+	}
+
+	/*
+	 * Check if PPE DS routing is enabled on the associated vap.
+	 */
+	qdf_status = cdp_soc->ol_ops->get_ppeds_profile_info_for_vap(
+							mld_soc->ctrl_psoc,
+							pr_peer->vdev->vdev_id,
+							&vp_params);
+
+	if (QDF_IS_STATUS_ERROR(qdf_status)) {
+		dp_err("Could not find ppeds profile info");
+		return QDF_STATUS_E_NULL_VALUE;
+	}
+
+	/* Check if PPE DS routing is enabled on
+	 * the associated vap.
+	 */
+	if (vp_params.ppe_vp_type != PPE_VP_USER_TYPE_DS)
+		return qdf_status;
+
+	be_soc_mld = dp_get_be_soc_from_dp_soc(mld_soc);
+	ppe_vp_profile = &be_soc_mld->ppe_vp_profile[
+				vp_params.ppe_vp_profile_idx];
+	*src_info = ppe_vp_profile->vp_num;
+
+	return qdf_status;
+}
+#else
+static QDF_STATUS dp_get_ppe_info_for_vap(struct cdp_soc_t *cdp_soc,
+					  struct dp_soc *mld_soc,
+					  struct dp_peer *pr_peer,
+					  uint16_t *src_info)
+{
+	return QDF_STATUS_E_NOSUPPORT;
+}
+#endif
+
 QDF_STATUS dp_htt_reo_migration(struct dp_soc *soc, uint16_t peer_id,
 				uint16_t ml_peer_id, uint16_t vdev_id,
 				uint8_t pdev_id, uint8_t chip_id)
@@ -2846,12 +2901,8 @@ QDF_STATUS dp_htt_reo_migration(struct dp_soc *soc, uint16_t peer_id,
 	struct dp_peer *current_pr_peer = NULL;
 	struct dp_peer_info *peer_info;
 	struct dp_vdev_be *be_vdev;
-	struct cdp_ds_vp_params vp_params = {0};
 	struct cdp_soc_t *cdp_soc;
-	struct dp_soc_be *be_soc_mld = NULL;
-	struct dp_ppe_vp_profile *ppe_vp_profile;
-	QDF_STATUS qdf_status = QDF_STATUS_SUCCESS;
-	uint16_t src_info;
+	uint16_t src_info = 0;
 	QDF_STATUS status;
 
 	if (!dp_mlo) {
@@ -2895,35 +2946,11 @@ QDF_STATUS dp_htt_reo_migration(struct dp_soc *soc, uint16_t peer_id,
 
 	mld_soc = mld_peer->vdev->pdev->soc;
 	cdp_soc = &mld_soc->cdp_soc;
-	/*
-	 * Extract the VP profile from the VAP
-	 */
-	if (!cdp_soc->ol_ops->get_ppeds_profile_info_for_vap) {
-		dp_err("%pK: Register get ppeds profile info first\n", cdp_soc);
-		return QDF_STATUS_E_NULL_VALUE;
+	status = dp_get_ppe_info_for_vap(cdp_soc, mld_soc, pr_peer, &src_info);
+	if (status == QDF_STATUS_E_NULL_VALUE) {
+		dp_htt_err("Invalid ppe info for the vdev");
+		return QDF_STATUS_E_FAILURE;
 	}
-
-	/*
-	 * Check if PPE DS routing is enabled on the associated vap.
-	 */
-	qdf_status = cdp_soc->ol_ops->get_ppeds_profile_info_for_vap(
-							mld_soc->ctrl_psoc,
-							pr_peer->vdev->vdev_id,
-							&vp_params);
-	if (qdf_status == QDF_STATUS_E_NULL_VALUE) {
-		dp_err("%pK: Could not find ppeds profile info \n", be_vdev);
-		return QDF_STATUS_E_NULL_VALUE;
-	}
-	/* Check if PPE DS routing is enabled on
-	 * the associated vap.
-	 */
-	if (vp_params.ppe_vp_type != PPE_VP_USER_TYPE_DS)
-		return qdf_status;
-
-	be_soc_mld = dp_get_be_soc_from_dp_soc(mld_soc);
-	ppe_vp_profile = &be_soc_mld->ppe_vp_profile[
-				vp_params.ppe_vp_profile_idx];
-	src_info = ppe_vp_profile->vp_num;
 
 	current_pr_soc = current_pr_peer->vdev->pdev->soc;
 	/* Making existing primary peer as non primary */
