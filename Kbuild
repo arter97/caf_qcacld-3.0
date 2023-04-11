@@ -3518,6 +3518,10 @@ ifdef CONFIG_WLAN_DP_FEATURE_DEFERRED_REO_QDESC_DESTROY
 cppflags-y += -DWLAN_DP_FEATURE_DEFERRED_REO_QDESC_DESTROY
 endif
 
+ifeq ($(CONFIG_WDI2_IPA_HW_V4), y)
+cppflags-y += -DIPA_WDI2_HW_V4
+endif
+
 ifeq ($(CONFIG_ARCH_SDX20), y)
 cppflags-y += -DSYNC_IPA_READY
 endif
