@@ -220,10 +220,10 @@ void target_if_cfr_fill_header(struct csi_cfr_header *hdr,
 		hdr->cmn.chip_type = CFR_CAPTURE_RADIO_ALDER;
 	} else {
 		if ((target_type == TARGET_TYPE_QCN9000) ||
-		    (target_type == TARGET_TYPE_QCN9160))
+		    (target_type == TARGET_TYPE_QCN9160) ||
+		    (target_type == TARGET_TYPE_QCN9224))
 			hdr->cmn.cfr_metadata_version = CFR_META_VERSION_9;
-		else if (target_type == TARGET_TYPE_QCN9224 ||
-			 target_type == TARGET_TYPE_QCA5332 ||
+		else if (target_type == TARGET_TYPE_QCA5332 ||
 			 target_type == TARGET_TYPE_QCA6490 ||
 			 target_type == TARGET_TYPE_QCA6750 ||
 			 target_type == TARGET_TYPE_KIWI ||
