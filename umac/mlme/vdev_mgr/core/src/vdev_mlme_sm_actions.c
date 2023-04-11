@@ -504,12 +504,12 @@ static QDF_STATUS mlme_vdev_restart_is_allowed(struct wlan_objmgr_pdev *pdev,
 
 	pdev_mlme = wlan_pdev_mlme_get_cmpt_obj(pdev);
 	if (!pdev_mlme) {
-		mlme_err(" PDEV MLME is NULL");
+		mlme_err("PDEV MLME is NULL");
 		return QDF_STATUS_E_FAILURE;
 	}
 
 	if (!wlan_pdev_mlme_op_get(pdev, WLAN_PDEV_OP_MBSSID_RESTART)) {
-		mlme_err(" No multivdev restart");
+		mlme_debug("No multivdev restart");
 		return status;
 	}
 
