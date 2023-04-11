@@ -41,44 +41,6 @@ else ifneq ($(LINUX_BUILD_TOP),)
 endif
 endif
 
-cppflags-y += -include $(WLAN_ROOT)/configs/default_config.h
-
-# CFG80211_MLO_KEY_OPERATION_SUPPORT
-# Used to indicate the Linux Kernel contains support for ML key operation
-# support.
-#
-# This feature was backported to Android Common Kernel 5.15 via:
-# https://android-review.googlesource.com/c/kernel/common/+/2173923
-found = $(shell if grep -qF "nl80211_validate_key_link_id" $(srctree)/net/wireless/nl80211.c; then echo "yes" ;else echo "no" ;fi;)
-ifeq ($(findstring yes, $(found)), yes)
-cppflags-y += -DCFG80211_MLO_KEY_OPERATION_SUPPORT
-endif
-
-found = $(shell if grep -qF "struct link_station_parameters" $(srctree)/include/net/cfg80211.h; then echo "yes"; else echo "no"; fi;)
-ifeq ($(findstring yes, $(found)), yes)
-cppflags-y += -DCFG80211_LINK_STA_PARAMS_PRESENT
-endif
-
-found = $(shell if grep -qF "nl80211_put_ru_punct_supp_bw" $(srctree)/net/wireless/nl80211.c; then echo "yes" ;else echo "no" ;fi;)
-ifeq ($(findstring yes, $(found)), yes)
-cppflags-y += -DCFG80211_RU_PUNCT_SUPPORT
-endif
-
-found = $(shell if grep -qF "unsigned int link_id, u16 punct_bitmap" $(srctree)/include/net/cfg80211.h; then echo "yes" ;else echo "no" ;fi;)
-ifeq ($(findstring yes, $(found)), yes)
-cppflags-y += -DCFG80211_RU_PUNCT_NOTIFY
-endif
-
-# CFG80211_EXTERNAL_AUTH_MLO_SUPPORT
-# Used to indicate Linux kernel contains support for ML external auth support.
-#
-# This feature was backported to Android Common Kernel 5.15 via:
-# https://android-review.googlesource.com/c/kernel/common/+/2450264
-found = $(shell if grep -qF "MLD address of the peer. Used by the authentication request event" $(srctree)/include/net/cfg80211.h; then echo "yes" ;else echo "no" ;fi;)
-ifeq ($(findstring yes, $(found)), yes)
-cppflags-y += -DCFG80211_EXTERNAL_AUTH_MLO_SUPPORT
-endif
-
 include $(WLAN_ROOT)/configs/$(CONFIG_QCA_CLD_WLAN_PROFILE)_defconfig
 
 # add configurations in WLAN_CFG_OVERRIDE
@@ -144,10 +106,6 @@ UAPI_INC :=	-I$(WLAN_ROOT)/$(UAPI_DIR)/linux
 ############ COMMON ############
 COMMON_DIR :=	core/common
 COMMON_INC :=	-I$(WLAN_ROOT)/$(COMMON_DIR)
-
-ifeq (qca_cld3, $(WLAN_WEAR_CHIPSET))
-	cppflags-y += -DWLAN_WEAR_CHIPSET
-endif
 
 ############ HDD ############
 HDD_DIR :=	core/hdd
@@ -644,11 +602,6 @@ endif
 
 $(call add-wlan-objs,dsc,$(DSC_OBJS))
 
-cppflags-$(CONFIG_ONE_MSI_VECTOR) += -DWLAN_ONE_MSI_VECTOR
-
-cppflags-$(CONFIG_DSC_DEBUG) += -DWLAN_DSC_DEBUG
-cppflags-$(CONFIG_DSC_TEST) += -DWLAN_DSC_TEST
-
 ########### HOST DIAG LOG ###########
 HOST_DIAG_LOG_DIR :=	$(WLAN_COMMON_ROOT)/utils/host_diag_log
 
@@ -1068,33 +1021,6 @@ QDF_OBJS +=     $(QDF_LINUX_OBJ_DIR)/qdf_lro.o
 endif
 
 $(call add-wlan-objs,qdf,$(QDF_OBJS))
-
-ifeq ($(CONFIG_LITHIUM), y)
-cppflags-y += -DCONFIG_LITHIUM
-endif
-
-ifeq ($(CONFIG_BERYLLIUM), y)
-cppflags-y += -DCONFIG_BERYLLIUM
-cppflags-y += -DDP_OFFLOAD_FRAME_WITH_SW_EXCEPTION
-endif
-
-ifeq ($(CONFIG_RHINE), y)
-cppflags-y += -DCONFIG_RHINE
-endif
-
-cppflags-$(CONFIG_TALLOC_DEBUG) += -DWLAN_TALLOC_DEBUG
-cppflags-$(CONFIG_QDF_TEST) += -DWLAN_DELAYED_WORK_TEST
-cppflags-$(CONFIG_QDF_TEST) += -DWLAN_HASHTABLE_TEST
-cppflags-$(CONFIG_QDF_TEST) += -DWLAN_PERIODIC_WORK_TEST
-cppflags-$(CONFIG_QDF_TEST) += -DWLAN_PTR_HASH_TEST
-cppflags-$(CONFIG_QDF_TEST) += -DWLAN_SLIST_TEST
-cppflags-$(CONFIG_QDF_TEST) += -DWLAN_TALLOC_TEST
-cppflags-$(CONFIG_QDF_TEST) += -DWLAN_TRACKER_TEST
-cppflags-$(CONFIG_QDF_TEST) += -DWLAN_TYPES_TEST
-cppflags-$(CONFIG_WLAN_HANG_EVENT) += -DWLAN_HANG_EVENT
-
-#Flag to enable pre_cac
-cppflags-$(CONFIG_FEATURE_WLAN_PRE_CAC)  += -DPRE_CAC_SUPPORT
 
 ############ WBUFF ############
 WBUFF_OS_DIR :=	wbuff
@@ -2435,8 +2361,6 @@ endif
 
 WIFI_POS_CLD_INC :=	-I$(WLAN_ROOT)/$(WIFI_POS_CLD_CORE_DIR)/inc \
 			-I$(WLAN_ROOT)/$(WIFI_POS_CLD_DISP_DIR)/inc
-
-cppflags-$(CONFIG_WIFI_POS_PASN) += -DWLAN_FEATURE_RTT_11AZ_SUPPORT
 endif
 
 $(call add-wlan-objs,wifi_pos,$(WIFI_POS_OBJS))
@@ -3076,9 +3000,6 @@ $(call add-wlan-objs,wma,$(WMA_OBJS))
 
 #######DIRECT_BUFFER_RX#########
 ifeq ($(CONFIG_DIRECT_BUF_RX_ENABLE), y)
-ifeq ($(CONFIG_DBR_HOLD_LARGE_MEM), y)
-cppflags-y += -DDBR_HOLD_LARGE_MEM
-endif
 DBR_DIR = $(WLAN_COMMON_ROOT)/target_if/direct_buf_rx
 UMAC_DBR_INC := -I$(WLAN_COMMON_INC)/target_if/direct_buf_tx/inc
 UMAC_DBR_OBJS := $(DBR_DIR)/src/target_if_direct_buf_rx_api.o \
@@ -3318,8 +3239,88 @@ INCS +=		$(COAP_WMI_INC)
 
 ccflags-y += $(INCS)
 
-cppflags-y +=	-Wall\
-		-Werror
+cppflags-y += -Wall -Werror
+cppflags-y += -include $(WLAN_ROOT)/configs/default_config.h
+
+# CFG80211_MLO_KEY_OPERATION_SUPPORT
+# Used to indicate the Linux Kernel contains support for ML key operation
+# support.
+#
+# This feature was backported to Android Common Kernel 5.15 via:
+# https://android-review.googlesource.com/c/kernel/common/+/2173923
+found = $(shell if grep -qF "nl80211_validate_key_link_id" $(srctree)/net/wireless/nl80211.c; then echo "yes" ;else echo "no" ;fi;)
+ifeq ($(findstring yes, $(found)), yes)
+cppflags-y += -DCFG80211_MLO_KEY_OPERATION_SUPPORT
+endif
+
+found = $(shell if grep -qF "struct link_station_parameters" $(srctree)/include/net/cfg80211.h; then echo "yes"; else echo "no"; fi;)
+ifeq ($(findstring yes, $(found)), yes)
+cppflags-y += -DCFG80211_LINK_STA_PARAMS_PRESENT
+endif
+
+found = $(shell if grep -qF "nl80211_put_ru_punct_supp_bw" $(srctree)/net/wireless/nl80211.c; then echo "yes" ;else echo "no" ;fi;)
+ifeq ($(findstring yes, $(found)), yes)
+cppflags-y += -DCFG80211_RU_PUNCT_SUPPORT
+endif
+
+found = $(shell if grep -qF "unsigned int link_id, u16 punct_bitmap" $(srctree)/include/net/cfg80211.h; then echo "yes" ;else echo "no" ;fi;)
+ifeq ($(findstring yes, $(found)), yes)
+cppflags-y += -DCFG80211_RU_PUNCT_NOTIFY
+endif
+
+# CFG80211_EXTERNAL_AUTH_MLO_SUPPORT
+# Used to indicate Linux kernel contains support for ML external auth support.
+#
+# This feature was backported to Android Common Kernel 5.15 via:
+# https://android-review.googlesource.com/c/kernel/common/+/2450264
+found = $(shell if grep -qF "MLD address of the peer. Used by the authentication request event" $(srctree)/include/net/cfg80211.h; then echo "yes" ;else echo "no" ;fi;)
+ifeq ($(findstring yes, $(found)), yes)
+cppflags-y += -DCFG80211_EXTERNAL_AUTH_MLO_SUPPORT
+endif
+
+ifeq (qca_cld3, $(WLAN_WEAR_CHIPSET))
+	cppflags-y += -DWLAN_WEAR_CHIPSET
+endif
+
+cppflags-$(CONFIG_ONE_MSI_VECTOR) += -DWLAN_ONE_MSI_VECTOR
+
+cppflags-$(CONFIG_DSC_DEBUG) += -DWLAN_DSC_DEBUG
+cppflags-$(CONFIG_DSC_TEST) += -DWLAN_DSC_TEST
+
+ifeq ($(CONFIG_LITHIUM), y)
+cppflags-y += -DCONFIG_LITHIUM
+endif
+
+ifeq ($(CONFIG_BERYLLIUM), y)
+cppflags-y += -DCONFIG_BERYLLIUM
+cppflags-y += -DDP_OFFLOAD_FRAME_WITH_SW_EXCEPTION
+endif
+
+ifeq ($(CONFIG_RHINE), y)
+cppflags-y += -DCONFIG_RHINE
+endif
+
+cppflags-$(CONFIG_TALLOC_DEBUG) += -DWLAN_TALLOC_DEBUG
+cppflags-$(CONFIG_QDF_TEST) += -DWLAN_DELAYED_WORK_TEST
+cppflags-$(CONFIG_QDF_TEST) += -DWLAN_HASHTABLE_TEST
+cppflags-$(CONFIG_QDF_TEST) += -DWLAN_PERIODIC_WORK_TEST
+cppflags-$(CONFIG_QDF_TEST) += -DWLAN_PTR_HASH_TEST
+cppflags-$(CONFIG_QDF_TEST) += -DWLAN_SLIST_TEST
+cppflags-$(CONFIG_QDF_TEST) += -DWLAN_TALLOC_TEST
+cppflags-$(CONFIG_QDF_TEST) += -DWLAN_TRACKER_TEST
+cppflags-$(CONFIG_QDF_TEST) += -DWLAN_TYPES_TEST
+cppflags-$(CONFIG_WLAN_HANG_EVENT) += -DWLAN_HANG_EVENT
+
+#Flag to enable pre_cac
+cppflags-$(CONFIG_FEATURE_WLAN_PRE_CAC)  += -DPRE_CAC_SUPPORT
+
+cppflags-$(CONFIG_WIFI_POS_PASN) += -DWLAN_FEATURE_RTT_11AZ_SUPPORT
+
+ifeq ($(CONFIG_DIRECT_BUF_RX_ENABLE), y)
+ifeq ($(CONFIG_DBR_HOLD_LARGE_MEM), y)
+cppflags-y += -DDBR_HOLD_LARGE_MEM
+endif
+endif
 
 cppflags-$(CONFIG_DP_TRAFFIC_END_INDICATION) += -DDP_TRAFFIC_END_INDICATION
 cppflags-$(CONFIG_THERMAL_STATS_SUPPORT) += -DTHERMAL_STATS_SUPPORT
