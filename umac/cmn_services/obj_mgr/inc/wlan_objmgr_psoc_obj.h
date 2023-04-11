@@ -409,6 +409,7 @@ struct wlan_soc_timer {
  * @tgt_if_handle:         target interface handle
  * @dp_handle:             DP module handle
  * @psoc_lock:             psoc lock
+ * @skip_mlo_pumac:        skip this psoc as MLO primary umac
  */
 struct wlan_objmgr_psoc {
 	struct wlan_objmgr_psoc_regulatory soc_reg;
@@ -423,6 +424,7 @@ struct wlan_objmgr_psoc {
 	struct target_psoc_info *tgt_if_handle;
 	void *dp_handle;
 	qdf_spinlock_t psoc_lock;
+	bool skip_mlo_pumac;
 };
 
 /**
@@ -1951,6 +1953,41 @@ static inline void *wlan_psoc_get_dp_handle(struct wlan_objmgr_psoc *psoc)
 	}
 
 	return psoc->dp_handle;
+}
+
+/**
+ * wlan_psoc_set_pumac_skip - set mlo primary umac skip setting
+ * @psoc: psoc object pointer
+ * @val: indicate support for MLO PUMAC feature on psoc
+ *
+ * Return: void
+ */
+static inline void wlan_psoc_set_pumac_skip(
+			struct wlan_objmgr_psoc *psoc,
+			bool val)
+{
+	if (qdf_unlikely(!psoc)) {
+		QDF_BUG(0);
+		return;
+	}
+
+	psoc->skip_mlo_pumac = val;
+}
+
+/**
+ * wlan_psoc_get_pumac_skip - get mlo primary umac skip setting
+ * @psoc: psoc object pointer
+ *
+ * Return: bool (primary umac support)
+ */
+static inline bool wlan_psoc_get_pumac_skip(struct wlan_objmgr_psoc *psoc)
+{
+	if (qdf_unlikely(!psoc)) {
+		QDF_BUG(0);
+		return false;
+	}
+
+	return psoc->skip_mlo_pumac;
 }
 
 struct wlan_logically_del_peer {
