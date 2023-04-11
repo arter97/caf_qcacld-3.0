@@ -2334,6 +2334,18 @@ typedef void
 (*afc_power_tx_evt_handler)(struct wlan_objmgr_pdev *pdev,
 			    struct reg_fw_afc_power_event *power_info,
 			    void *arg);
+
+/**
+ * typedef afc_payload_reset_tx_evt_handler() - Function prototype of AFC
+ * payload reset event sent handler
+ * @pdev: Pointer to pdev
+ * @arg: Pointer to void (opaque) argument object
+ *
+ * Return: void
+ */
+typedef void
+(*afc_payload_reset_tx_evt_handler)(struct wlan_objmgr_pdev *pdev,
+				    void *arg);
 #endif
 
 /**

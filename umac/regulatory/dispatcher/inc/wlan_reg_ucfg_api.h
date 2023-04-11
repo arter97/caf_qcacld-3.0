@@ -389,6 +389,32 @@ ucfg_reg_register_afc_power_event_callback(struct wlan_objmgr_pdev *pdev,
 QDF_STATUS
 ucfg_reg_unregister_afc_power_event_callback(struct wlan_objmgr_pdev *pdev,
 					     afc_power_tx_evt_handler cbf);
+
+/**
+ * ucfg_reg_register_afc_payload_reset_event_callback() - Add AFC payload reset
+ * event received callback
+ * @pdev: Pointer to pdev
+ * @cbf: Pointer to callback function
+ * @arg: Pointer to opaque argument
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS ucfg_reg_register_afc_payload_reset_event_callback(
+		struct wlan_objmgr_pdev *pdev,
+		afc_payload_reset_tx_evt_handler cbf,
+		void *arg);
+
+/**
+ * ucfg_reg_unregister_afc_payload_reset_event_callback() - Remove AFC payload
+ * reset event received callback
+ * @pdev: Pointer to pdev
+ * @cbf: Pointer to callback function
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS ucfg_reg_unregister_afc_payload_reset_event_callback(
+		struct wlan_objmgr_pdev *pdev,
+		afc_payload_reset_tx_evt_handler cbf);
 #endif
 
 /**
