@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -134,13 +134,15 @@ QDF_STATUS hdd_wlan_unregister_mlo_interfaces(struct hdd_adapter *adapter,
 	int i;
 	struct hdd_mlo_adapter_info *mlo_adapter_info;
 	struct hdd_adapter *link_adapter;
-	struct qdf_mac_addr adapter_mac;
 
 	mlo_adapter_info = &adapter->mlo_adapter_info;
 
 	if (mlo_adapter_info->is_link_adapter) {
-		qdf_copy_macaddr(&adapter_mac, &adapter->mac_addr);
-		ucfg_dp_destroy_intf(adapter->hdd_ctx->psoc, &adapter_mac);
+		if (!qdf_is_macaddr_equal(&adapter->mac_addr,
+					  &adapter->mld_addr)) {
+			ucfg_dp_destroy_intf(adapter->hdd_ctx->psoc,
+					     &adapter->mac_addr);
+		}
 		hdd_remove_front_adapter(adapter->hdd_ctx, &adapter);
 		return QDF_STATUS_E_AGAIN;
 	}
@@ -149,8 +151,11 @@ QDF_STATUS hdd_wlan_unregister_mlo_interfaces(struct hdd_adapter *adapter,
 		link_adapter = mlo_adapter_info->link_adapter[i];
 		if (!link_adapter)
 			continue;
-		qdf_copy_macaddr(&adapter_mac, &link_adapter->mac_addr);
-		ucfg_dp_destroy_intf(link_adapter->hdd_ctx->psoc, &adapter_mac);
+		if (!qdf_is_macaddr_equal(&link_adapter->mac_addr,
+					  &link_adapter->mld_addr)) {
+			ucfg_dp_destroy_intf(link_adapter->hdd_ctx->psoc,
+					     &link_adapter->mac_addr);
+		}
 		hdd_remove_adapter(link_adapter->hdd_ctx, link_adapter);
 		hdd_mlo_close_adapter(link_adapter, rtnl_held);
 	}
@@ -169,13 +174,15 @@ void hdd_wlan_register_mlo_interfaces(struct hdd_context *hdd_ctx)
 		/* if target supports MLO create a new dev */
 		params.only_wdev_register = true;
 		params.associate_with_ml_adapter = false;
-		status = hdd_open_adapter_no_trans(hdd_ctx, QDF_STA_MODE,
-						   "null", mac_addr, &params);
+		status = hdd_open_adapter_no_trans(hdd_ctx,
+						   QDF_STA_MODE,
+						   "null", mac_addr,
+						   &params);
 		if (QDF_IS_STATUS_ERROR(status))
 			hdd_err("Failed to register link adapter:%d", status);
 	}
 
-	qdf_mem_zero(&params, sizeof(struct hdd_adapter_create_param));
+	qdf_mem_zero(&params, sizeof(params));
 	params.only_wdev_register  = true;
 	params.associate_with_ml_adapter = true;
 	mac_addr = wlan_hdd_get_intf_addr(hdd_ctx, QDF_STA_MODE);

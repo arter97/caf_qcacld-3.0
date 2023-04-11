@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -40,6 +40,7 @@
 #include "lim_utils.h"
 #include "lim_send_messages.h"
 #include "rrm_api.h"
+#include "lim_mlo.h"
 
 #ifdef FEATURE_WLAN_DIAG_SUPPORT
 #include "host_diag_core_log.h"
@@ -49,6 +50,7 @@
 
 #include "wlan_lmac_if_def.h"
 #include "wlan_reg_services_api.h"
+#include "wlan_mlo_mgr_sta.h"
 
 static void
 ap_beacon_process_5_ghz(struct mac_context *mac_ctx, uint8_t *rx_pkt_info,
@@ -117,7 +119,7 @@ ap_beacon_process_24_ghz(struct mac_context *mac_ctx, uint8_t *rx_pkt_info,
 		if (!tmp_exp)
 			return;
 #ifdef FEATURE_WLAN_ESE
-		if (session->isESEconnection)
+		if (wlan_cm_get_ese_assoc(mac_ctx->pdev, session->vdev_id))
 			pe_info("[INFOLOG]ESE 11g erpPresent=%d useProtection=%d nonErpPresent=%d",
 				bcn_struct->erpPresent,
 				bcn_struct->erpIEInfo.useProtection,
@@ -142,7 +144,7 @@ ap_beacon_process_24_ghz(struct mac_context *mac_ctx, uint8_t *rx_pkt_info,
 		     bcn_struct->erpIEInfo.nonErpPresent));
 	if (tmp_exp) {
 #ifdef FEATURE_WLAN_ESE
-		if (session->isESEconnection) {
+		if (wlan_cm_get_ese_assoc(mac_ctx->pdev, session->vdev_id)) {
 			pe_info("[INFOLOG]ESE 11g erpPresent=%d useProtection=%d nonErpPresent=%d",
 				bcn_struct->erpPresent,
 				bcn_struct->erpIEInfo.useProtection,
@@ -541,6 +543,60 @@ sch_bcn_update_opmode_change(struct mac_context *mac_ctx, tpDphHashNode sta_ds,
 	}
 }
 
+#ifdef WLAN_FEATURE_SR
+/**
+ * lim_detect_change_in_srp() - Detect change in SRP IE
+ * of the beacon
+ *
+ * @mac_ctx: global mac context
+ * @sta: pointer to sta node
+ * @session: pointer to LIM session
+ * @bcn: beacon from associated AP
+ *
+ * Detect change in SRP IE of the beacon and update the params
+ * accordingly.
+ *
+ * Return: None
+ */
+static void lim_detect_change_in_srp(struct mac_context *mac_ctx,
+				     tpDphHashNode sta,
+				     struct pe_session *session,
+				     tpSchBeaconStruct bcn)
+{
+	tDot11fIEspatial_reuse sr_ie;
+
+	sr_ie = sta->parsed_ies.srp_ie;
+	if (!sr_ie.present) {
+		return;
+	} else if (!bcn->srp_ie.present) {
+		pe_err_rl("SRP IE is missing in beacon, disable SR");
+	} else if (!qdf_mem_cmp(&sr_ie, &bcn->srp_ie,
+				sizeof(tDot11fIEspatial_reuse))) {
+		/* No change in beacon SRP IE */
+		return;
+	}
+
+	/*
+	 * If SRP IE has changes, update the new params.
+	 * Else if the SRP IE is missing, disable SR
+	 */
+	sta->parsed_ies.srp_ie = bcn->srp_ie;
+	if (bcn->srp_ie.present)
+		lim_update_vdev_sr_elements(session, sta);
+	else
+		wlan_vdev_mlme_set_sr_ctrl(session->vdev, SR_DISABLE);
+
+	lim_handle_sr_cap(session->vdev, SR_REASON_CODE_BCN_IE_CHANGE);
+}
+#else
+static void lim_detect_change_in_srp(struct mac_context *mac_ctx,
+				     tpDphHashNode sta,
+				     struct pe_session *session,
+				     tpSchBeaconStruct bcn)
+{
+}
+#endif
+
 static void
 sch_bcn_process_sta_opmode(struct mac_context *mac_ctx,
 			    tpSchBeaconStruct bcn,
@@ -564,11 +620,12 @@ sch_bcn_process_sta_opmode(struct mac_context *mac_ctx,
 	/* check for VHT capability */
 	sta = dph_lookup_hash_entry(mac_ctx, pMh->sa, &aid,
 			&session->dph.dphHashTable);
-	if ((!sta))
+	if (!sta)
 		return;
 	sch_bcn_update_opmode_change(mac_ctx, sta, session, bcn, pMh,
 				     cb_mode);
 	sch_bcn_update_he_ies(mac_ctx, sta, session, bcn, pMh);
+	lim_detect_change_in_srp(mac_ctx, sta, session, bcn);
 	return;
 }
 
@@ -616,6 +673,19 @@ static void __sch_beacon_process_for_session(struct mac_context *mac_ctx,
 	uint8_t programmed_country[REG_ALPHA2_LEN + 1];
 	enum reg_6g_ap_type pwr_type_6g = REG_INDOOR_AP;
 	bool ctry_code_match = false;
+	uint8_t bpcc;
+	bool cu_flag = true;
+
+	if (mlo_is_mld_sta(session->vdev)) {
+		cu_flag = false;
+		status = lim_get_bpcc_from_mlo_ie(bcn, &bpcc);
+		if (QDF_IS_STATUS_SUCCESS(status))
+			cu_flag = lim_check_cu_happens(session->vdev, bpcc);
+		lim_process_ml_reconfig(mac_ctx, session, rx_pkt_info);
+	}
+
+	if (!cu_flag)
+		return;
 
 	qdf_mem_zero(&beaconParams, sizeof(tUpdateBeaconParams));
 	beaconParams.paramChangeBitmap = 0;
@@ -657,7 +727,7 @@ static void __sch_beacon_process_for_session(struct mac_context *mac_ctx,
 		wlan_reg_read_current_country(mac_ctx->psoc,
 					      programmed_country);
 		status = wlan_reg_get_6g_power_type_for_ctry(
-				mac_ctx->psoc,
+				mac_ctx->psoc, mac_ctx->pdev,
 				bcn->countryInfoParam.countryString,
 				programmed_country, &pwr_type_6g,
 				&ctry_code_match, REG_MAX_AP_TYPE);
@@ -772,6 +842,7 @@ static void __sch_beacon_process_for_session(struct mac_context *mac_ctx,
 							      session);
 		session->send_p2p_conf_frame = false;
 	}
+
 	lim_process_beacon_eht(mac_ctx, session, bcn);
 }
 
@@ -998,7 +1069,7 @@ sch_beacon_process(struct mac_context *mac_ctx, uint8_t *rx_pkt_info,
 		pe_err_rl("beacon parsing failed");
 		return;
 	}
-
+	lim_process_bcn_prb_rsp_t2lm(mac_ctx, session, &bcn);
 	sch_send_beacon_report(mac_ctx, &bcn, session);
 	__sch_beacon_process_for_session(mac_ctx, &bcn, rx_pkt_info, session);
 }

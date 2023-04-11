@@ -665,30 +665,6 @@ void lim_cleanup_mlm(struct mac_context *mac_ctx)
 	}
 } /*** end lim_cleanup_mlm() ***/
 
-/**
- * lim_print_mac_addr()
- *
- ***FUNCTION:
- * This function is called to print passed MAC address
- * in : format.
- *
- ***LOGIC:
- *
- ***ASSUMPTIONS:
- * NA
- *
- ***NOTE:
- * @param  macAddr  - MacAddr to be printed
- * @param  logLevel - Loglevel to be used
- *
- * @return None.
- */
-
-void lim_print_mac_addr(struct mac_context *mac, tSirMacAddr macAddr, uint8_t logLevel)
-{
-	pe_debug(QDF_MAC_ADDR_FMT, QDF_MAC_ADDR_REF(macAddr));
-} /****** end lim_print_mac_addr() ******/
-
 /*
  * lim_reset_deferred_msg_q()
  *
@@ -1057,15 +1033,13 @@ lim_update_prot_sta_params(struct mac_context *mac,
 {
 	uint32_t i;
 
-	pe_debug("Associated STA addr is:");
-	lim_print_mac_addr(mac, peerMacAddr, LOGD);
+	pe_debug("Associated STA addr is: "QDF_MAC_ADDR_FMT,
+		 QDF_MAC_ADDR_REF(peerMacAddr));
 
 	for (i = 0; i < LIM_PROT_STA_CACHE_SIZE; i++) {
 		if (pe_session->protStaCache[i].active) {
-			pe_debug("Addr:");
-				lim_print_mac_addr
-				(mac, pe_session->protStaCache[i].addr,
-				LOGD);
+			pe_debug("Addr:" QDF_MAC_ADDR_FMT,
+				 QDF_MAC_ADDR_REF(pe_session->protStaCache[i].addr));
 
 			if (!qdf_mem_cmp
 				    (pe_session->protStaCache[i].addr,
@@ -1290,9 +1264,8 @@ lim_update_short_preamble(struct mac_context *mac_ctx, tSirMacAddr peer_mac_addr
 	if (sta_ds->shortPreambleEnabled != eHAL_CLEAR)
 		return;
 
-	pe_debug("Short Preamble is not enabled in Assoc Req from");
-
-	lim_print_mac_addr(mac_ctx, peer_mac_addr, LOGD);
+	pe_debug("Short Preamble is not enabled in Assoc Req from "QDF_MAC_ADDR_FMT,
+		 QDF_MAC_ADDR_REF(peer_mac_addr));
 
 	for (i = 0; i < LIM_PROT_STA_CACHE_SIZE; i++) {
 		if (LIM_IS_AP_ROLE(psession_entry) &&
@@ -1327,14 +1300,14 @@ lim_update_short_preamble(struct mac_context *mac_ctx, tSirMacAddr peer_mac_addr
 		tLimNoShortParams *lim_params =
 				&psession_entry->gLimNoShortParams;
 		if (LIM_IS_AP_ROLE(psession_entry)) {
-			pe_err("No space in Short cache active: %d sta: %d for sta",
-				i, lim_params->numNonShortPreambleSta);
-			lim_print_mac_addr(mac_ctx, peer_mac_addr, LOGE);
+			pe_err("No space in Short cache active: %d sta: %d for sta "QDF_MAC_ADDR_FMT,
+			       i, lim_params->numNonShortPreambleSta,
+			       QDF_MAC_ADDR_REF(peer_mac_addr));
 			return;
 		} else {
-			pe_err("No space in Short cache active: %d sta: %d for sta",
-				i, lim_params->numNonShortPreambleSta);
-			lim_print_mac_addr(mac_ctx, peer_mac_addr, LOGE);
+			pe_err("No space in Short cache active: %d sta: %d for sta "QDF_MAC_ADDR_FMT,
+			       i, lim_params->numNonShortPreambleSta,
+			       QDF_MAC_ADDR_REF(peer_mac_addr));
 			return;
 		}
 
@@ -1405,8 +1378,8 @@ lim_update_short_slot_time(struct mac_context *mac_ctx, tSirMacAddr peer_mac_add
 	if (sta_ds->shortSlotTimeEnabled != eHAL_CLEAR)
 		return;
 
-	pe_debug("Short Slot Time is not enabled in Assoc Req from");
-	lim_print_mac_addr(mac_ctx, peer_mac_addr, LOGD);
+	pe_debug("Short Slot Time is not enabled in Assoc Req from "QDF_MAC_ADDR_FMT,
+		 QDF_MAC_ADDR_REF(peer_mac_addr));
 	for (i = 0; i < LIM_PROT_STA_CACHE_SIZE; i++) {
 		if (LIM_IS_AP_ROLE(session_entry) &&
 		    session_entry->gLimNoShortSlotParams.
@@ -1439,16 +1412,14 @@ lim_update_short_slot_time(struct mac_context *mac_ctx, tSirMacAddr peer_mac_add
 
 	if (i >= LIM_PROT_STA_CACHE_SIZE) {
 		if (LIM_IS_AP_ROLE(session_entry)) {
-			pe_err("No space in ShortSlot cache active: %d sta: %d for sta",
-				i, session_entry->gLimNoShortSlotParams.
-				numNonShortSlotSta);
-			lim_print_mac_addr(mac_ctx, peer_mac_addr, LOGE);
+			pe_err("No space in ShortSlot cache active: %d sta: %d for sta "QDF_MAC_ADDR_FMT,
+			       i, session_entry->gLimNoShortSlotParams.numNonShortSlotSta,
+			       QDF_MAC_ADDR_REF(peer_mac_addr));
 			return;
 		} else {
-			pe_err("No space in ShortSlot cache active: %d sta: %d for sta",
-				i, mac_ctx->lim.gLimNoShortSlotParams.
-				numNonShortSlotSta);
-			lim_print_mac_addr(mac_ctx, peer_mac_addr, LOGE);
+			pe_err("No space in ShortSlot cache active: %d sta: %d for sta "QDF_MAC_ADDR_FMT,
+			       i, mac_ctx->lim.gLimNoShortSlotParams.numNonShortSlotSta,
+			       QDF_MAC_ADDR_REF(peer_mac_addr));
 			return;
 		}
 	}
@@ -4840,8 +4811,8 @@ void lim_pmf_sa_query_timer_handler(void *pMacGlobal, uint32_t param)
 	maxretries = mac->mlme_cfg->gen.pmf_sa_query_max_retries;
 	pSta->pmfSaQueryRetryCount++;
 	if (pSta->pmfSaQueryRetryCount >= maxretries) {
-		pe_err("SA Query timed out,Deleting STA");
-		lim_print_mac_addr(mac, pSta->staAddr, LOGE);
+		pe_err("SA Query timed out,Deleting STA: "QDF_MAC_ADDR_FMT,
+		       QDF_MAC_ADDR_REF(pSta->staAddr));
 		lim_send_disassoc_mgmt_frame(mac,
 			REASON_DISASSOC_DUE_TO_INACTIVITY,
 			pSta->staAddr, pe_session, false);
@@ -7369,6 +7340,15 @@ void lim_update_he_caps_mcs(struct mac_context *mac, struct pe_session *session)
 	mlme_priv->he_config.rx_he_mcs_map_lt_80 = rx_mcs_map;
 	*((uint16_t *)mlme_priv->he_config.tx_he_mcs_map_160) = tx_mcs_map;
 	*((uint16_t *)mlme_priv->he_config.rx_he_mcs_map_160) = rx_mcs_map;
+	qdf_mem_copy(mlme_priv->he_config.tx_he_mcs_map_160, &tx_mcs_map,
+		     sizeof(u_int16_t));
+	qdf_mem_copy(mlme_priv->he_config.rx_he_mcs_map_160, &rx_mcs_map,
+		     sizeof(u_int16_t));
+
+	pe_debug("new HE80 mcs map tx: 0x%x, rx: 0x%x", tx_mcs_map, rx_mcs_map);
+	pe_debug("new HE160 mcs map tx: 0x%x, rx: 0x%x",
+		 *(uint16_t *)mlme_priv->he_config.tx_he_mcs_map_160,
+		 *(uint16_t *)mlme_priv->he_config.rx_he_mcs_map_160);
 }
 
 static void
@@ -7386,6 +7366,8 @@ lim_revise_req_he_cap_per_band(struct mlme_legacy_priv *mlme_priv,
 			mac->he_cap_2g.tx_he_mcs_map_lt_80;
 		he_config->rx_he_mcs_map_lt_80 =
 			mac->he_cap_2g.rx_he_mcs_map_lt_80;
+		he_config->max_ampdu_len_exp_ext =
+			mac->he_cap_2g.max_ampdu_len_exp_ext;
 		he_config->ul_2x996_tone_ru_supp = 0;
 		he_config->num_sounding_gt_80 = 0;
 		he_config->bfee_sts_gt_80 = 0;
@@ -7403,6 +7385,8 @@ lim_revise_req_he_cap_per_band(struct mlme_legacy_priv *mlme_priv,
 
 		he_config->num_sounding_lt_80 =
 			mac->he_cap_5g.num_sounding_lt_80;
+		he_config->max_ampdu_len_exp_ext =
+			mac->he_cap_5g.max_ampdu_len_exp_ext;
 		if (he_config->chan_width_2 ||
 		    he_config->chan_width_3) {
 			he_config->bfee_sts_gt_80 =
@@ -9485,8 +9469,7 @@ QDF_STATUS lim_util_get_type_subtype(void *pkt, uint8_t *type,
 		pe_err("NULL packet received");
 		return QDF_STATUS_E_FAILURE;
 	}
-	status =
-		wma_ds_peek_rx_packet_info(cds_pkt, (void *)&rxpktinfor, false);
+	status = wma_ds_peek_rx_packet_info(cds_pkt, (void *)&rxpktinfor);
 	if (!QDF_IS_STATUS_SUCCESS(status)) {
 		pe_err("Failed extract cds packet. status %d", status);
 		return QDF_STATUS_E_FAILURE;
@@ -9622,6 +9605,7 @@ void lim_send_sme_mgmt_frame_ind(struct mac_context *mac_ctx, uint8_t frame_type
 {
 	tpSirSmeMgmtFrameInd sme_mgmt_frame = NULL;
 	uint16_t length;
+	struct wlan_objmgr_vdev *vdev;
 
 	length = sizeof(tSirSmeMgmtFrameInd) + frame_len;
 
@@ -9634,8 +9618,22 @@ void lim_send_sme_mgmt_frame_ind(struct mac_context *mac_ctx, uint8_t frame_type
 		!vdev_id) {
 		pe_debug("Broadcast action frame");
 		vdev_id = SME_SESSION_ID_BROADCAST;
+		goto fill_frame;
 	}
 
+	if (frame_type != SIR_MAC_MGMT_ACTION)
+		goto fill_frame;
+
+	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(mac_ctx->psoc, vdev_id,
+						    WLAN_LEGACY_MAC_ID);
+
+	if (!vdev)
+		goto fill_frame;
+
+	wlan_mlo_update_action_frame_to_user(vdev, frame, frame_len);
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_MAC_ID);
+
+fill_frame:
 	sme_mgmt_frame->frame_len = frame_len;
 	sme_mgmt_frame->sessionId = vdev_id;
 	sme_mgmt_frame->frameType = frame_type;
@@ -10590,6 +10588,8 @@ QDF_STATUS lim_set_ch_phy_mode(struct wlan_objmgr_vdev *vdev, uint8_t dot11mode)
 			wlan_reg_chan_band_to_freq(mac_ctx->pdev,
 						   des_chan->ch_freq_seg1,
 						   band_mask);
+		} else if (bw_val >= 160) {
+			pe_debug("Skip center_freq check for bw %d", bw_val);
 		} else {
 			pe_err("Invalid cntr_freq for bw %d, drop to 20",
 			       bw_val);
@@ -10801,7 +10801,8 @@ QDF_STATUS lim_pre_vdev_start(struct mac_context *mac,
 		if (ch_params.mhz_freq_seg0 ==  session->curr_op_freq - 10)
 			sec_chan_freq = session->curr_op_freq - 20;
 	}
-	if (LIM_IS_AP_ROLE(session))
+	if (LIM_IS_AP_ROLE(session) &&
+	    !mlme_is_chan_switch_in_progress(mlme_obj->vdev))
 		lim_apply_puncture(mac, session, ch_params.mhz_freq_seg1);
 
 	if (IS_DOT11_MODE_EHT(session->dot11mode))

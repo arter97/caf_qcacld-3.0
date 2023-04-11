@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -43,7 +43,12 @@
 #define CHANNEL_SWITCH_COMPLETE_TIMEOUT   (2000)
 #define MAX_NOA_TIME (3000)
 
-/**
+/* Defer SAP force SCC check by 2000ms due to another SAP/GO start AP in
+ * progress
+ */
+#define SAP_CONC_CHECK_DEFER_TIMEOUT_MS (2000)
+
+/*
  * Policy Mgr hardware mode list bit-mask definitions.
  * Bits 4:0, 31:29 are unused.
  *
@@ -273,6 +278,8 @@ extern enum policy_mgr_conc_next_action
  * @sr_in_same_mac_conc: Enable/Disable SR in same MAC concurrency
  * @use_sap_original_bw: Enable/Disable sap original BW as default
  *                       BW when do restart
+ * @move_sap_go_1st_on_dfs_sta_csa: Enable/Disable SAP / GO's movement
+ *				    to non-DFS channel before STA
  */
 struct policy_mgr_cfg {
 	uint8_t mcc_to_scc_switch;
@@ -302,6 +309,7 @@ struct policy_mgr_cfg {
 	bool sr_in_same_mac_conc;
 #endif
 	bool use_sap_original_bw;
+	bool move_sap_go_1st_on_dfs_sta_csa;
 };
 
 /**
@@ -315,6 +323,8 @@ struct policy_mgr_cfg {
  *                         Mode opportunistically
  * @sap_restart_chan_switch_cb: Callback for channel switch
  *                            notification for SAP
+ * @hdd_cbacks: callbacks to be registered by HDD for
+ *            interaction with Policy Manager
  * @sme_cbacks: callbacks to be registered by SME for
  *            interaction with Policy Manager
  * @wma_cbacks: callbacks to be registered by SME for
@@ -322,6 +332,8 @@ struct policy_mgr_cfg {
  * @tdls_cbacks: callbacks to be registered by SME for
  * interaction with Policy Manager
  * @cdp_cbacks: callbacks to be registered by SME for
+ * interaction with Policy Manager
+ * @dp_cbacks: callbacks to be registered by Datapath for
  * interaction with Policy Manager
  * @conc_cbacks: callbacks to be registered by lim for
  * interaction with Policy Manager
@@ -338,6 +350,7 @@ struct policy_mgr_cfg {
  * @no_of_open_sessions: Number of active vdevs
  * @no_of_active_sessions: Number of active connections
  * @sta_ap_intf_check_work: delayed sap restart work
+ * @nan_sap_conc_work: Info related to nan sap conc work
  * @num_dbs_hw_modes: Number of different HW modes supported
  * @hw_mode: List of HW modes supported
  * @old_hw_mode_index: Old HW mode from hw_mode table
@@ -350,19 +363,23 @@ struct policy_mgr_cfg {
  *                            change is in progress
  * @enable_mcc_adaptive_scheduler: Enable MCC adaptive scheduler
  *      value from INI
+ * @user_cfg:
  * @unsafe_channel_list: LTE coex channel freq avoidance list
  * @unsafe_channel_count: LTE coex channel avoidance list count
  * @sta_ap_intf_check_work_info: Info related to sta_ap_intf_check_work
- * @nan_sap_conc_work: Info related to nan sap conc work
+ * @cur_conc_system_pref:
  * @opportunistic_update_done_evt: qdf event to synchronize host
  *                               & FW HW mode
  * @channel_switch_complete_evt: qdf event for channel switch completion check
  * @mode_change_cb: Mode change callback
  * @cfg: Policy manager config data
+ * @valid_ch_freq_list: valid frequencies
+ * @valid_ch_freq_list_count: number of valid frequencies
  * @dynamic_mcc_adaptive_sched: disable/enable mcc adaptive scheduler feature
  * @dynamic_dfs_master_disabled: current state of dynamic dfs master
  * @set_link_in_progress: To track if set link is in progress
  * @set_link_update_done_evt: qdf event to synchronize set link
+ * @restriction_mask:
  */
 struct policy_mgr_psoc_priv_obj {
 	struct wlan_objmgr_psoc *psoc;
@@ -472,17 +489,59 @@ bool policy_mgr_get_same_mac_conc_sr_status(struct wlan_objmgr_psoc *psoc)
 
 struct policy_mgr_psoc_priv_obj *policy_mgr_get_context(
 		struct wlan_objmgr_psoc *psoc);
+
+/**
+ * policy_mgr_get_updated_scan_config() - Get the updated scan configuration
+ * @psoc: psoc handle
+ * @scan_config: Pointer containing the updated scan config
+ * @dbs_scan: 0 or 1 indicating if DBS scan needs to be enabled/disabled
+ * @dbs_plus_agile_scan: 0 or 1 indicating if DBS plus agile scan needs to be
+ * enabled/disabled
+ * @single_mac_scan_with_dfs: 0 or 1 indicating if single MAC scan with DFS
+ * needs to be enabled/disabled
+ *
+ * Takes the current scan configuration and set the necessary scan config
+ * bits to either 0/1 and provides the updated value to the caller who
+ * can use this to pass it on to the FW
+ *
+ * Return: 0 on success
+ */
 QDF_STATUS policy_mgr_get_updated_scan_config(
 		struct wlan_objmgr_psoc *psoc,
 		uint32_t *scan_config,
 		bool dbs_scan,
 		bool dbs_plus_agile_scan,
 		bool single_mac_scan_with_dfs);
+
+/**
+ * policy_mgr_get_updated_fw_mode_config() - Get the updated fw
+ * mode configuration
+ * @psoc: psoc handle
+ * @fw_mode_config: Pointer containing the updated fw mode config
+ * @dbs: 0 or 1 indicating if DBS needs to be enabled/disabled
+ * @agile_dfs: 0 or 1 indicating if agile DFS needs to be enabled/disabled
+ *
+ * Takes the current fw mode configuration and set the necessary fw mode config
+ * bits to either 0/1 and provides the updated value to the caller who
+ * can use this to pass it on to the FW
+ *
+ * Return: 0 on success
+ */
 QDF_STATUS policy_mgr_get_updated_fw_mode_config(
 		struct wlan_objmgr_psoc *psoc,
 		uint32_t *fw_mode_config,
 		bool dbs,
 		bool agile_dfs);
+
+/**
+ * policy_mgr_is_dual_mac_disabled_in_ini() - Check if dual mac
+ * is disabled in INI
+ * @psoc: psoc handle
+ *
+ * Checks if the dual mac feature is disabled in INI
+ *
+ * Return: true if the dual mac connection is disabled from INI
+ */
 bool policy_mgr_is_dual_mac_disabled_in_ini(
 		struct wlan_objmgr_psoc *psoc);
 
@@ -507,11 +566,76 @@ bool policy_mgr_find_if_hwlist_has_dbs(struct wlan_objmgr_psoc *psoc);
  */
 uint32_t policy_mgr_get_mcc_to_scc_switch_mode(
 	struct wlan_objmgr_psoc *psoc);
+
+/**
+ * policy_mgr_get_dbs_config() - Get DBS bit
+ * @psoc: psoc handle
+ *
+ * Gets the DBS bit of fw_mode_config_bits
+ *
+ * Return: 0 or 1 to indicate the DBS bit
+ */
 bool policy_mgr_get_dbs_config(struct wlan_objmgr_psoc *psoc);
+
+/**
+ * policy_mgr_get_agile_dfs_config() - Get Agile DFS bit
+ * @psoc: psoc handle
+ *
+ * Gets the Agile DFS bit of fw_mode_config_bits
+ *
+ * Return: 0 or 1 to indicate the Agile DFS bit
+ */
 bool policy_mgr_get_agile_dfs_config(struct wlan_objmgr_psoc *psoc);
+
+/**
+ * policy_mgr_get_dbs_scan_config() - Get DBS scan bit
+ * @psoc: psoc handle
+ *
+ * Gets the DBS scan bit of concurrent_scan_config_bits
+ *
+ * Return: 0 or 1 to indicate the DBS scan bit
+ */
 bool policy_mgr_get_dbs_scan_config(struct wlan_objmgr_psoc *psoc);
+
+/**
+ * policy_mgr_get_tx_rx_ss_from_config() - Get Tx/Rx spatial
+ * stream from HW mode config
+ * @mac_ss: Config which indicates the HW mode as per 'hw_mode_ss_config'
+ * @tx_ss: Contains the Tx spatial stream
+ * @rx_ss: Contains the Rx spatial stream
+ *
+ * Returns the number of spatial streams of Tx and Rx
+ *
+ * Return: None
+ */
 void policy_mgr_get_tx_rx_ss_from_config(enum hw_mode_ss_config mac_ss,
 		uint32_t *tx_ss, uint32_t *rx_ss);
+
+/**
+ * policy_mgr_get_matching_hw_mode_index() - Get matching HW mode index
+ * @psoc: psoc handle
+ * @mac0_tx_ss: Number of tx spatial streams of MAC0
+ * @mac0_rx_ss: Number of rx spatial streams of MAC0
+ * @mac0_bw: Bandwidth of MAC0 of type 'hw_mode_bandwidth'
+ * @mac1_tx_ss: Number of tx spatial streams of MAC1
+ * @mac1_rx_ss: Number of rx spatial streams of MAC1
+ * @mac1_bw: Bandwidth of MAC1 of type 'hw_mode_bandwidth'
+ * @mac0_band_cap: mac0 band capability requirement
+ *     (0: Don't care, 1: 2.4G, 2: 5G)
+ * @dbs: DBS capability of type 'hw_mode_dbs_capab'
+ * @dfs: Agile DFS capability of type 'hw_mode_agile_dfs_capab'
+ * @sbs: SBS capability of type 'hw_mode_sbs_capab'
+ *
+ * Fetches the HW mode index corresponding to the HW mode provided.
+ * In Genoa two DBS HW modes (2x2 5G + 1x1 2G, 2x2 2G + 1x1 5G),
+ * the "ss" number and "bw" value are not enough to specify the expected
+ * HW mode. But in both HW mode, the mac0 can support either 5G or 2G.
+ * So, the Parameter "mac0_band_cap" will specify the expected band support
+ * requirement on mac 0 to find the expected HW mode.
+ *
+ * Return: Positive hw mode index in case a match is found or a negative
+ * value, otherwise
+ */
 int8_t policy_mgr_get_matching_hw_mode_index(
 		struct wlan_objmgr_psoc *psoc,
 		uint32_t mac0_tx_ss, uint32_t mac0_rx_ss,
@@ -522,6 +646,31 @@ int8_t policy_mgr_get_matching_hw_mode_index(
 		enum hw_mode_dbs_capab dbs,
 		enum hw_mode_agile_dfs_capab dfs,
 		enum hw_mode_sbs_capab sbs);
+
+/**
+ * policy_mgr_get_hw_mode_idx_from_dbs_hw_list() - Get hw_mode index
+ * @psoc: psoc handle
+ * @mac0_ss: MAC0 spatial stream configuration
+ * @mac0_bw: MAC0 bandwidth configuration
+ * @mac1_ss: MAC1 spatial stream configuration
+ * @mac1_bw: MAC1 bandwidth configuration
+ * @mac0_band_cap: mac0 band capability requirement
+ *     (0: Don't care, 1: 2.4G, 2: 5G)
+ * @dbs: HW DBS capability
+ * @dfs: HW Agile DFS capability
+ * @sbs: HW SBS capability
+ *
+ * Get the HW mode index corresponding to the HW modes spatial stream,
+ * bandwidth, DBS, Agile DFS and SBS capability
+ *
+ * In Genoa two DBS HW modes (2x2 5G + 1x1 2G, 2x2 2G + 1x1 5G),
+ * the "ss" number and "bw" value are not enough to specify the expected
+ * HW mode. But in both HW mode, the mac0 can support either 5G or 2G.
+ * So, the Parameter "mac0_band_cap" will specify the expected band support
+ * requirement on mac 0 to find the expected HW mode.
+ *
+ * Return: Index number if a match is found or -negative value if not found
+ */
 int8_t policy_mgr_get_hw_mode_idx_from_dbs_hw_list(
 		struct wlan_objmgr_psoc *psoc,
 		enum hw_mode_ss_config mac0_ss,
@@ -532,6 +681,21 @@ int8_t policy_mgr_get_hw_mode_idx_from_dbs_hw_list(
 		enum hw_mode_dbs_capab dbs,
 		enum hw_mode_agile_dfs_capab dfs,
 		enum hw_mode_sbs_capab sbs);
+
+/**
+ * policy_mgr_get_old_and_new_hw_index() - Get the old and new HW index
+ * @psoc: psoc handle
+ * @old_hw_mode_index: Value at this pointer contains the old HW mode index
+ * Default value when not configured is POLICY_MGR_DEFAULT_HW_MODE_INDEX
+ * @new_hw_mode_index: Value at this pointer contains the new HW mode index
+ * Default value when not configured is POLICY_MGR_DEFAULT_HW_MODE_INDEX
+ *
+ * Get the old and new HW index configured in the driver
+ *
+ * Return: Failure in case the HW mode indices cannot be fetched and Success
+ * otherwise. When no HW mode transition has happened the values of
+ * old_hw_mode_index and new_hw_mode_index will be the same.
+ */
 QDF_STATUS policy_mgr_get_old_and_new_hw_index(
 		struct wlan_objmgr_psoc *psoc,
 		uint32_t *old_hw_mode_index,
@@ -539,12 +703,14 @@ QDF_STATUS policy_mgr_get_old_and_new_hw_index(
 
 /**
  * policy_mgr_update_conc_list() - Update the concurrent connection list
+ * @psoc: PSOC object information
  * @conn_index: Connection index
  * @mode: Mode
- * @ch_freq: channel frequency
+ * @freq: channel frequency
  * @bw: Bandwidth
  * @mac: Mac id
  * @chain_mask: Chain mask
+ * @original_nss: Original number of spatial streams
  * @vdev_id: vdev id
  * @in_use: Flag to indicate if the index is in use or not
  * @update_conn: Flag to indicate if mode change event should
@@ -641,7 +807,17 @@ static inline void
 policy_mgr_dump_disabled_ml_links(struct policy_mgr_psoc_priv_obj *pm_ctx) {}
 #endif
 
+/**
+ * policy_mgr_dump_current_concurrency() - To dump the current
+ * concurrency combination
+ * @psoc: psoc handle
+ *
+ * This routine is called to dump the concurrency info
+ *
+ * Return: None
+ */
 void policy_mgr_dump_current_concurrency(struct wlan_objmgr_psoc *psoc);
+
 void pm_dbs_opportunistic_timer_handler(void *data);
 enum policy_mgr_con_mode policy_mgr_get_mode(uint8_t type,
 		uint8_t subtype);
@@ -686,6 +862,7 @@ bool policy_mgr_allow_new_home_channel(
 
 /**
  * policy_mgr_is_5g_channel_allowed() - check if 5g channel is allowed
+ * @psoc: PSOC object information
  * @ch_freq: channel frequency which needs to be validated
  * @list: list of existing connections.
  * @mode: mode against which channel needs to be validated
@@ -706,6 +883,7 @@ bool policy_mgr_is_5g_channel_allowed(struct wlan_objmgr_psoc *psoc,
  * policy_mgr_complete_action() - initiates actions needed on
  * current connections once channel has been decided for the new
  * connection
+ * @psoc: PSOC object information
  * @new_nss: the new nss value
  * @next_action: next action to happen at policy mgr after
  *		beacon update
@@ -723,14 +901,37 @@ QDF_STATUS policy_mgr_complete_action(struct wlan_objmgr_psoc *psoc,
 				uint8_t  new_nss, uint8_t next_action,
 				enum policy_mgr_conn_update_reason reason,
 				uint32_t session_id, uint32_t request_id);
+
 enum policy_mgr_con_mode policy_mgr_get_mode_by_vdev_id(
 		struct wlan_objmgr_psoc *psoc,
 		uint8_t vdev_id);
 QDF_STATUS policy_mgr_init_connection_update(
 		struct policy_mgr_psoc_priv_obj *pm_ctx);
+
+/**
+ * policy_mgr_get_current_pref_hw_mode_dbs_2x2() - Get the
+ * current preferred hw mode
+ * @psoc: psoc handle
+ *
+ * Get the preferred hw mode based on the current connection combinations
+ *
+ * Return: No change (PM_NOP), MCC (PM_SINGLE_MAC),
+ *         DBS (PM_DBS), SBS (PM_SBS)
+ */
 enum policy_mgr_conc_next_action
 		policy_mgr_get_current_pref_hw_mode_dbs_2x2(
 		struct wlan_objmgr_psoc *psoc);
+
+/**
+ * policy_mgr_get_current_pref_hw_mode_dbs_1x1() - Get the
+ * current preferred hw mode
+ * @psoc: psoc handle
+ *
+ * Get the preferred hw mode based on the current connection combinations
+ *
+ * Return: No change (PM_NOP), MCC (PM_SINGLE_MAC_UPGRADE),
+ *         DBS (PM_DBS_DOWNGRADE)
+ */
 enum policy_mgr_conc_next_action
 		policy_mgr_get_current_pref_hw_mode_dbs_1x1(
 		struct wlan_objmgr_psoc *psoc);
@@ -738,6 +939,7 @@ enum policy_mgr_conc_next_action
 /**
  * policy_mgr_get_current_pref_hw_mode_dual_dbs() - Get the
  * current preferred hw mode
+ * @psoc: PSOC object information
  *
  * Get the preferred hw mode based on the current connection combinations
  *
@@ -748,11 +950,19 @@ enum policy_mgr_conc_next_action
 		policy_mgr_get_current_pref_hw_mode_dual_dbs(
 		struct wlan_objmgr_psoc *psoc);
 
+/**
+ * policy_mgr_reset_sap_mandatory_channels() - Reset the SAP mandatory channels
+ * @pm_ctx: policy mgr context
+ *
+ * Resets the SAP mandatory channel list and the length of the list
+ *
+ * Return: QDF_STATUS
+ */
 QDF_STATUS policy_mgr_reset_sap_mandatory_channels(
 		struct policy_mgr_psoc_priv_obj *pm_ctx);
 
 /**
- * policy_mgr_update_hw_mode_list() - Function to print frequency range
+ * policy_mgr_dump_freq_range_per_mac() - Function to print frequency range
  * for both MAC 0 and MAC1 for given Hw mode
  *
  * @freq_range: Policy Mgr context
@@ -784,7 +994,7 @@ policy_mgr_fill_curr_mac_freq_by_hwmode(struct policy_mgr_psoc_priv_obj *pm_ctx,
 					enum policy_mgr_mode mode_hw);
 
 /**
- * policy_mgr_update_hw_mode_list() - Function to print every frequency range
+ * policy_mgr_dump_freq_range() - Function to print every frequency range
  * for both MAC 0 and MAC1 for every Hw mode
  *
  * @pm_ctx: Policy Mgr context
@@ -936,6 +1146,7 @@ bool policy_mgr_2_freq_same_mac_in_sbs(struct policy_mgr_psoc_priv_obj *pm_ctx,
 /**
  * policy_mgr_get_connection_for_vdev_id() - provides the
  * particular connection with the requested vdev id
+ * @psoc: PSOC object information
  * @vdev_id: vdev id of the connection
  *
  * This function provides the specific connection with the

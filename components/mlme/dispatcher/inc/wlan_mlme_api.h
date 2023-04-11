@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2018-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -2450,6 +2450,18 @@ wlan_mlme_set_rf_test_mode_enabled(struct wlan_objmgr_psoc *psoc, bool value);
 
 #ifdef CONFIG_BAND_6GHZ
 /**
+ * wlan_mlme_is_standard_6ghz_conn_policy_enabled() - Get the 6 GHz standard
+ *                                                    connection policy flag
+ * @psoc: psoc context
+ * @value: Enable/Disable value ptr.
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+wlan_mlme_is_standard_6ghz_conn_policy_enabled(struct wlan_objmgr_psoc *psoc,
+					       bool *value);
+
+/**
  * wlan_mlme_is_relaxed_6ghz_conn_policy_enabled() - Get the 6 GHz relaxed
  *                                                   connection policy flag
  * @psoc: psoc context
@@ -2474,6 +2486,14 @@ wlan_mlme_set_relaxed_6ghz_conn_policy(struct wlan_objmgr_psoc *psoc,
 				       bool value);
 #else
 static inline QDF_STATUS
+wlan_mlme_is_standard_6ghz_conn_policy_enabled(struct wlan_objmgr_psoc *psoc,
+					       bool *value)
+{
+	*value = false;
+	return QDF_STATUS_SUCCESS;
+}
+
+static inline QDF_STATUS
 wlan_mlme_is_relaxed_6ghz_conn_policy_enabled(struct wlan_objmgr_psoc *psoc,
 					      bool *value)
 {
@@ -2490,6 +2510,27 @@ wlan_mlme_set_relaxed_6ghz_conn_policy(struct wlan_objmgr_psoc *psoc,
 #endif
 
 #ifdef WLAN_FEATURE_11BE_MLO
+/**
+ * wlan_mlme_get_eht_mode() - Get the EHT mode of operations
+ * @psoc: psoc context
+ * @value: EHT mode value ptr
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+wlan_mlme_get_eht_mode(struct wlan_objmgr_psoc *psoc,
+		       enum wlan_eht_mode *value);
+
+/**
+ * wlan_mlme_set_eht_mode() - Set the EHT mode of operation
+ * @psoc: psoc context
+ * @value: EHT mode value
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+wlan_mlme_set_eht_mode(struct wlan_objmgr_psoc *psoc, enum wlan_eht_mode value);
+
 /**
  * wlan_mlme_get_emlsr_mode_enabled() - Get the eMLSR mode flag
  * @psoc: psoc context
@@ -2534,6 +2575,19 @@ wlan_mlme_get_eml_params(struct wlan_objmgr_psoc *psoc,
 			 struct wlan_mlo_eml_cap *cap);
 
 /**
+ * wlan_mlme_cfg_set_emlsr_pad_delay() - Configure EMLSR padding delay subfield
+ * @psoc: psoc context
+ * @val: EMLSR padding delay subfield value
+ *
+ * API to configure EMLSR padding delay subfield in psoc mlme obj with user
+ * requested value if it greater than the value configured by FW during boot-up.
+ *
+ * Return: none
+ */
+void
+wlan_mlme_cfg_set_emlsr_pad_delay(struct wlan_objmgr_psoc *psoc, uint8_t val);
+
+/**
  * wlan_mlme_get_t2lm_negotiation_supported() - Get the T2LM
  * negotiation supported value
  * @psoc: psoc context
@@ -2556,6 +2610,19 @@ wlan_mlme_set_t2lm_negotiation_supported(struct wlan_objmgr_psoc *psoc,
 					 uint8_t value);
 #else
 static inline QDF_STATUS
+wlan_mlme_get_eht_mode(struct wlan_objmgr_psoc *psoc, enum wlan_eht_mode *value)
+{
+	*value = WLAN_EHT_MODE_DISABLED;
+	return QDF_STATUS_SUCCESS;
+}
+
+static inline QDF_STATUS
+wlan_mlme_set_eht_mode(struct wlan_objmgr_psoc *psoc, enum wlan_eht_mode value)
+{
+	return QDF_STATUS_SUCCESS;
+}
+
+static inline QDF_STATUS
 wlan_mlme_get_emlsr_mode_enabled(struct wlan_objmgr_psoc *psoc, bool *value)
 {
 	*value = false;
@@ -2577,6 +2644,11 @@ wlan_mlme_set_eml_params(struct wlan_objmgr_psoc *psoc,
 static inline void
 wlan_mlme_get_eml_params(struct wlan_objmgr_psoc *psoc,
 			 struct wlan_mlo_eml_cap *cap)
+{
+}
+
+static inline void
+wlan_mlme_cfg_set_emlsr_pad_delay(struct wlan_objmgr_psoc *psoc, uint8_t val)
 {
 }
 
@@ -2872,15 +2944,6 @@ wlan_mlme_get_ignore_fw_reg_offload_ind(struct wlan_objmgr_psoc *psoc,
 char *mlme_get_roam_trigger_str(uint32_t roam_scan_trigger);
 
 /**
- * mlme_get_roam_scan_type_str() - Get the string for roam sacn type
- * @roam_scan_type: roam scan type coming from fw via
- * wmi_roam_scan_info tlv
- *
- *  Return: Meaningful string for roam sacn type
- */
-char *mlme_get_roam_scan_type_str(uint32_t roam_scan_type);
-
-/**
  * mlme_get_roam_status_str() - Get the string for roam status
  * @roam_status: roam status coming from fw via
  * wmi_roam_scan_info tlv
@@ -3123,6 +3186,16 @@ wlan_mlme_get_enable_idle_roam(struct wlan_objmgr_psoc *psoc, bool *val);
 QDF_STATUS
 wlan_mlme_get_idle_roam_rssi_delta(struct wlan_objmgr_psoc *psoc,
 				   uint32_t *val);
+
+/**
+ * wlan_mlme_get_roam_info_stats_num() - Get roam information statistics number
+ * @psoc: pointer to psoc object
+ * @val:  Pointer to roam_info_stats_num
+ *
+ * Return: QDF Status
+ */
+QDF_STATUS
+wlan_mlme_get_roam_info_stats_num(struct wlan_objmgr_psoc *psoc, uint32_t *val);
 
 /**
  * wlan_mlme_get_idle_roam_inactive_time() - Get idle roam inactive time
@@ -3661,6 +3734,23 @@ QDF_STATUS mlme_clear_mcs_rate(struct wlan_objmgr_vdev *vdev);
  */
 bool wlan_mlme_is_sta_mon_conc_supported(struct wlan_objmgr_psoc *psoc);
 
+/**
+ * wlan_mlme_get_phy_max_freq_range() - Get phy supported max channel
+ * frequency range
+ * @psoc: psoc for country information
+ * @low_2ghz_chan: 2.4 GHz low channel frequency
+ * @high_2ghz_chan: 2.4 GHz high channel frequency
+ * @low_5ghz_chan: 5 GHz low channel frequency
+ * @high_5ghz_chan: 5 GHz high channel frequency
+ *
+ * Return: QDF status
+ */
+QDF_STATUS wlan_mlme_get_phy_max_freq_range(struct wlan_objmgr_psoc *psoc,
+					    uint32_t *low_2ghz_chan,
+					    uint32_t *high_2ghz_chan,
+					    uint32_t *low_5ghz_chan,
+					    uint32_t *high_5ghz_chan);
+
 #ifdef FEATURE_WDS
 /**
  * wlan_mlme_get_wds_mode() - Check wds mode supported
@@ -4145,4 +4235,37 @@ QDF_STATUS
 wlan_mlme_stats_get_periodic_display_time(struct wlan_objmgr_psoc *psoc,
 					  uint32_t *periodic_display_time);
 
+/**
+ * wlan_mlme_is_bcn_prot_disabled_for_sap() - Is beacon protection config
+ * disabled for SAP interface
+ *
+ * @psoc: pointer to psoc object
+ *
+ * Return: is beacon protection disabled
+ */
+bool
+wlan_mlme_is_bcn_prot_disabled_for_sap(struct wlan_objmgr_psoc *psoc);
+
+/**
+ * wlan_mlme_get_src_addr_from_frame() - Get source address of the frame
+ * @frame: frame ptr
+ *
+ * Extract source mac address of the frame
+ *
+ * Return: Ptr for extracted src mac address
+ *
+ */
+uint8_t *
+wlan_mlme_get_src_addr_from_frame(struct element_info *frame);
+
+/*
+ * wlan_mlme_get_sap_ps_with_twt() - power save with twt config enabled/disabled
+ * for SAP interface
+ *
+ * @psoc: pointer to psoc object
+ *
+ * Return: power save enabled/disabled
+ */
+bool
+wlan_mlme_get_sap_ps_with_twt(struct wlan_objmgr_psoc *psoc);
 #endif /* _WLAN_MLME_API_H_ */

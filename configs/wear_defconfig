@@ -74,6 +74,13 @@ ifeq ($(CONFIG_QCA_WIFI_SDIO), y)
 	CONFIG_ROME_IF = sdio
 endif
 
+ifeq ($(CONFIG_CNSS_UTILS), m)
+	CONFIG_CNSS_UTILS_MODULE := y
+endif
+ifeq ($(CONFIG_WCNSS_MEM_PRE_ALLOC), m)
+	CONFIG_WCNSS_MEM_PRE_ALLOC_MODULE := y
+endif
+
 ifdef CONFIG_ICNSS
 	CONFIG_ROME_IF = snoc
 endif

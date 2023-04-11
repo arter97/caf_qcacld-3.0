@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2011-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -578,11 +578,6 @@ struct pe_session *pe_create_session(struct mac_context *mac,
 	session_ptr->limCurrentAuthType = eSIR_OPEN_SYSTEM;
 	pe_init_beacon_params(mac, &mac->lim.gpSession[i]);
 	session_ptr->is11Rconnection = false;
-#ifdef FEATURE_WLAN_ESE
-	session_ptr->isESEconnection = false;
-#endif
-	session_ptr->isFastTransitionEnabled = false;
-	session_ptr->isFastRoamIniFeatureEnabled = false;
 	*sessionId = i;
 	session_ptr->peSessionId = i;
 	session_ptr->bssType = bssType;
@@ -771,6 +766,28 @@ struct pe_session
 	}
 	pe_debug("Session lookup fails for vdev_id: %d, mlm state: %d",
 		 vdev_id, lim_state);
+
+	return NULL;
+}
+
+struct pe_session *
+pe_find_session_by_bssid_and_vdev_id(struct mac_context *mac,
+				     uint8_t *bssid,
+				     uint8_t vdev_id,
+				     uint8_t *sessionId)
+{
+	uint8_t i;
+
+	for (i = 0; i < mac->lim.maxBssId; i++) {
+		/* If BSSID matches return corresponding tables address */
+		if ((mac->lim.gpSession[i].valid) &&
+		    (mac->lim.gpSession[i].vdev_id == vdev_id) &&
+		    (sir_compare_mac_addr(mac->lim.gpSession[i].bssId,
+					    bssid))) {
+			*sessionId = i;
+			return &mac->lim.gpSession[i];
+		}
+	}
 
 	return NULL;
 }

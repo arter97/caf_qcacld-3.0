@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -119,6 +119,10 @@ typedef enum {
 typedef enum {
 	ADD_STA_TO_ACL = 0,       /* cmd to add STA to access control list */
 	DELETE_STA_FROM_ACL = 1,  /* cmd to del STA from access control list */
+	/* only add STA to ACL, do not trigger deauth */
+	ADD_STA_TO_ACL_NO_DEAUTH = 2,
+	/* only delete STA from ACL, do not trigger deauth */
+	DELETE_STA_FROM_ACL_NO_DEAUTH = 3,
 } eSapACLCmdType;
 
 typedef enum {
@@ -544,6 +548,9 @@ struct sap_config {
 	struct hdd_channel_info *channel_info;
 	uint32_t channel_info_count;
 	bool dfs_cac_offload;
+#ifdef WLAN_SUPPORT_TWT
+	bool cfg80211_twt_responder;
+#endif
 #ifdef WLAN_FEATURE_11BE_MLO
 	bool mlo_sap;
 	uint8_t link_id;
@@ -691,6 +698,7 @@ typedef struct tagSapStruct {
 #endif /* FEATURE_AP_MCC_CH_AVOIDANCE */
 	bool acs_with_more_param;
 	bool enable_dfs_phy_error_logs;
+	uint8_t one_time_csa_count;
 #ifdef DCS_INTERFERENCE_DETECTION
 	struct sap_dcs_info dcs_info;
 #endif
@@ -1858,7 +1866,6 @@ static inline void sap_acs_set_puncture_support(struct sap_context *sap_ctx,
 }
 #endif /* WLAN_FEATURE_11BE */
 
-#ifdef PRE_CAC_SUPPORT
 /**
  * sap_cac_end_notify() - Notify CAC end to HDD
  * @mac_handle: Opaque handle to the global MAC context
@@ -1870,14 +1877,6 @@ static inline void sap_acs_set_puncture_support(struct sap_context *sap_ctx,
  */
 QDF_STATUS sap_cac_end_notify(mac_handle_t mac_handle,
 			      struct csr_roam_info *roamInfo);
-#else
-static inline QDF_STATUS
-sap_cac_end_notify(mac_handle_t mac_handle,
-		   struct csr_roam_info *roamInfo)
-{
-	return QDF_STATUS_SUCCESS;
-}
-#endif /* PRE_CAC_SUPPORT */
 
 #ifdef WLAN_FEATURE_SAP_ACS_OPTIMIZE
 static inline bool sap_is_acs_scan_optimize_enable(void)

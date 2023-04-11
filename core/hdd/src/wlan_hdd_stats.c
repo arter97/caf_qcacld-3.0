@@ -48,6 +48,7 @@
 #include "wlan_hdd_object_manager.h"
 #include "wlan_hdd_eht.h"
 #include "wlan_dp_ucfg_api.h"
+#include "wlan_cm_roam_ucfg_api.h"
 
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(4, 0, 0)) && !defined(WITH_BACKPORTS)
 #define HDD_INFO_SIGNAL                 STATION_INFO_SIGNAL
@@ -793,6 +794,9 @@ static bool put_wifi_iface_stats(struct wifi_interface_stats *if_stat,
 	    nla_put_u32(vendor_event,
 			QCA_WLAN_VENDOR_ATTR_LL_STATS_IFACE_LEAKY_AP_GUARD_TIME,
 			link_stats->rx_leak_window) ||
+	    nla_put_s32(vendor_event,
+			QCA_WLAN_VENDOR_ATTR_LL_STATS_IFACE_NF_CAL_VAL,
+			link_stats->nf_cal_val) ||
 	    hdd_wlan_nla_put_u64(vendor_event,
 			QCA_WLAN_VENDOR_ATTR_LL_STATS_IFACE_AVERAGE_TSF_OFFSET,
 			average_tsf_offset) ||
@@ -1466,6 +1470,10 @@ static void hdd_process_ll_stats(tSirLLStatsResults *results,
 		struct wifi_radio_stats *rs_results, *stat_result;
 		u64 channel_size = 0, pwr_lvl_size = 0;
 		int i;
+
+		if (!results->num_radio)
+			goto exit;
+
 		stats = qdf_mem_malloc(sizeof(*stats));
 		if (!stats)
 			goto exit;
@@ -2100,6 +2108,8 @@ wlan_hdd_get_mlo_vdev_params(struct hdd_adapter *adapter,
 			     struct request_info *req_info,
 			     tSirLLStatsGetReq *req)
 {
+	struct wlan_objmgr_peer *peer;
+	struct wlan_objmgr_vdev *vdev;
 	struct wlan_objmgr_psoc *psoc = adapter->hdd_ctx->psoc;
 	struct mlo_stats_vdev_params *info = &req_info->ml_vdev_info;
 	int i;
@@ -2111,8 +2121,32 @@ wlan_hdd_get_mlo_vdev_params(struct hdd_adapter *adapter,
 	status = mlo_get_mlstats_vdev_params(psoc, info, adapter->vdev_id);
 	if (QDF_IS_STATUS_ERROR(status))
 		return status;
-	for (i = 0; i < info->ml_vdev_count; i++)
+	for (i = 0; i < info->ml_vdev_count; i++) {
 		bmap |= (1 << info->ml_vdev_id[i]);
+
+		vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc,
+							    info->ml_vdev_id[i],
+							    WLAN_OSIF_STATS_ID);
+		if (!vdev) {
+			hdd_err("vdev object is NULL for vdev %d",
+				info->ml_vdev_id[i]);
+			return QDF_STATUS_E_INVAL;
+		}
+
+		peer = wlan_objmgr_vdev_try_get_bsspeer(vdev,
+							WLAN_OSIF_STATS_ID);
+		if (!peer) {
+			hdd_err("peer is null");
+			hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_STATS_ID);
+			return QDF_STATUS_E_INVAL;
+		}
+
+		qdf_mem_copy(&(req_info->ml_peer_mac_addr[i][0]), peer->macaddr,
+			     QDF_MAC_ADDR_SIZE);
+
+		wlan_objmgr_peer_release_ref(peer, WLAN_OSIF_STATS_ID);
+		hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_STATS_ID);
+	}
 	req->mlo_vdev_id_bitmap = bmap;
 	return QDF_STATUS_SUCCESS;
 }
@@ -2152,6 +2186,7 @@ wlan_hdd_set_station_stats_request_pending(struct hdd_adapter *adapter,
 		status = wlan_hdd_get_mlo_vdev_params(adapter, &info, req);
 		if (QDF_IS_STATUS_ERROR(status)) {
 			hdd_err("unable to get vdev params for mlo stats");
+			hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_STATS_ID);
 			return status;
 		}
 	}
@@ -3928,6 +3963,7 @@ static int __wlan_hdd_cfg80211_stats_ext_request(struct wiphy *wiphy,
 	QDF_STATUS status;
 	struct hdd_context *hdd_ctx = wiphy_priv(wiphy);
 	ol_txrx_soc_handle soc = cds_get_context(QDF_MODULE_ID_SOC);
+	struct cdp_txrx_stats_req txrx_req = {0};
 
 	hdd_enter_dev(dev);
 
@@ -3938,6 +3974,18 @@ static int __wlan_hdd_cfg80211_stats_ext_request(struct wiphy *wiphy,
 	if (QDF_GLOBAL_FTM_MODE == hdd_get_conparam()) {
 		hdd_err("Command not allowed in FTM mode");
 		return -EPERM;
+	}
+
+	/**
+	 * HTT_DBG_EXT_STATS_PDEV_RX
+	 */
+	txrx_req.stats = 2;
+	/* default value of secondary parameter is 0(mac_id) */
+	txrx_req.mac_id = 0;
+	status = cdp_txrx_stats_request(soc, adapter->vdev_id, &txrx_req);
+	if (QDF_STATUS_SUCCESS != status) {
+		hdd_err_rl("Failed to get hw stats: %u", status);
+		ret_val = -EINVAL;
 	}
 
 	stats_ext_req.request_data_len = data_len;
@@ -4164,7 +4212,7 @@ hdd_get_roam_rt_stats_event_len(struct roam_stats_event *roam_stats,
 
 	if (roam_stats->scan[idx].present) {
 		if (roam_stats->scan[idx].num_chan &&
-		    !roam_stats->scan[idx].type)
+		    roam_stats->scan[idx].type == ROAM_STATS_SCAN_TYPE_PARTIAL)
 			for (i = 0; i < roam_stats->scan[idx].num_chan;)
 				i++;
 
@@ -4238,7 +4286,8 @@ roam_rt_stats_fill_scan_freq(struct sk_buff *vendor_event, uint8_t idx,
 		kfree_skb(vendor_event);
 		return;
 	}
-	if (roam_stats->scan[idx].num_chan && !roam_stats->scan[idx].type) {
+	if (roam_stats->scan[idx].num_chan &&
+	    roam_stats->scan[idx].type == ROAM_STATS_SCAN_TYPE_PARTIAL) {
 		for (i = 0; i < roam_stats->scan[idx].num_chan; i++) {
 			if (nla_put_u32(vendor_event, i,
 					roam_stats->scan[idx].chan_freq[i])) {
@@ -4269,7 +4318,8 @@ roam_rt_stats_fill_cand_info(struct sk_buff *vendor_event, uint8_t idx,
 	uint8_t i, num_cand = 0;
 
 	if (roam_stats->result[idx].present &&
-	    roam_stats->result[idx].fail_reason) {
+	    roam_stats->result[idx].fail_reason &&
+	    roam_stats->result[idx].fail_reason != ROAM_FAIL_REASON_UNKNOWN) {
 		num_cand++;
 		for (i = 0; i < roam_stats->scan[idx].num_ap; i++) {
 			if (roam_stats->scan[idx].ap[i].type == 0 &&
@@ -4345,10 +4395,10 @@ roam_rt_stats_fill_cand_info(struct sk_buff *vendor_event, uint8_t idx,
 }
 
 void
-wlan_hdd_cfg80211_roam_events_callback(hdd_handle_t hdd_handle, uint8_t idx,
-				       struct roam_stats_event *roam_stats)
+wlan_hdd_cfg80211_roam_events_callback(struct roam_stats_event *roam_stats,
+				       uint8_t idx)
 {
-	struct hdd_context *hdd_ctx = hdd_handle_to_context(hdd_handle);
+	struct hdd_context *hdd_ctx = cds_get_context(QDF_MODULE_ID_HDD);
 	int status;
 	uint32_t data_size, roam_event_type = 0;
 	struct sk_buff *vendor_event;
@@ -4753,7 +4803,7 @@ static void hdd_get_max_rate_vht(struct hdd_station_info *stainfo,
  * @rate_flags: HDD rate flags
  * @mcsidx: mcs index
  * @nss: number of streams
- * @vht: vht mode or not
+ * @rate_info_flag: rate info flags
  *
  * This function will fill ch width and mcs flags
  *
@@ -4763,18 +4813,32 @@ static void hdd_fill_bw_mcs(struct rate_info *rate_info,
 			    enum tx_rate_info rate_flags,
 			    uint8_t mcsidx,
 			    uint8_t nss,
-			    bool vht)
+			    uint8_t rate_info_flag)
 {
-	if (vht) {
+	if (rate_info_flag == RATE_INFO_FLAGS_HE_MCS) {
+		rate_info->nss = nss;
+		rate_info->mcs = mcsidx;
+		rate_info->flags |= RATE_INFO_FLAGS_HE_MCS;
+		if (rate_flags & TX_RATE_HE160)
+			rate_info->bw = RATE_INFO_BW_160;
+		else if (rate_flags & TX_RATE_HE80)
+			rate_info->bw = RATE_INFO_BW_80;
+		else if (rate_flags & TX_RATE_HE40)
+			rate_info->bw = RATE_INFO_BW_40;
+		else if (rate_flags & TX_RATE_HE20)
+			rate_info->bw = RATE_INFO_BW_20;
+	} else if (rate_info_flag == RATE_INFO_FLAGS_VHT_MCS) {
 		rate_info->nss = nss;
 		rate_info->mcs = mcsidx;
 		rate_info->flags |= RATE_INFO_FLAGS_VHT_MCS;
-		if (rate_flags & TX_RATE_VHT80)
+		if (rate_flags & TX_RATE_VHT160)
+			rate_info->bw = RATE_INFO_BW_160;
+		else if (rate_flags & TX_RATE_VHT80)
 			rate_info->bw = RATE_INFO_BW_80;
 		else if (rate_flags & TX_RATE_VHT40)
 			rate_info->bw = RATE_INFO_BW_40;
 		else if (rate_flags & TX_RATE_VHT20)
-			rate_info->flags |= RATE_INFO_FLAGS_VHT_MCS;
+			rate_info->bw = RATE_INFO_BW_20;
 	} else {
 		rate_info->mcs = (nss - 1) << 3;
 		rate_info->mcs |= mcsidx;
@@ -4790,7 +4854,7 @@ static void hdd_fill_bw_mcs(struct rate_info *rate_info,
  * @rate_flags: HDD rate flags
  * @mcsidx: mcs index
  * @nss: number of streams
- * @vht: vht mode or not
+ * @rate_info_flag: rate info flags
  *
  * This function will fill ch width and mcs flags
  *
@@ -4800,9 +4864,9 @@ static void hdd_fill_bw_mcs(struct rate_info *rate_info,
 			    enum tx_rate_info rate_flags,
 			    uint8_t mcsidx,
 			    uint8_t nss,
-			    bool vht)
+			    uint8_t rate_info_flag)
 {
-	if (vht) {
+	if (rate_info_flag == RATE_INFO_FLAGS_VHT_MCS) {
 		rate_info->nss = nss;
 		rate_info->mcs = mcsidx;
 		rate_info->flags |= RATE_INFO_FLAGS_VHT_MCS;
@@ -4811,7 +4875,7 @@ static void hdd_fill_bw_mcs(struct rate_info *rate_info,
 		else if (rate_flags & TX_RATE_VHT40)
 			rate_info->flags |= RATE_INFO_FLAGS_40_MHZ_WIDTH;
 		else if (rate_flags & TX_RATE_VHT20)
-			rate_info->flags |= RATE_INFO_FLAGS_VHT_MCS;
+			rate_info->bw = RATE_INFO_BW_20;
 	} else {
 		rate_info->mcs = (nss - 1) << 3;
 		rate_info->mcs |= mcsidx;
@@ -4821,25 +4885,6 @@ static void hdd_fill_bw_mcs(struct rate_info *rate_info,
 	}
 }
 #endif
-
-/**
- * hdd_fill_bw_mcs_vht() - fill ch width and mcs flags for VHT mode
- * @rate_info: pointer to struct rate_info
- * @rate_flags: HDD rate flags
- * @mcsidx: mcs index
- * @nss: number of streams
- *
- * This function will fill ch width and mcs flags for VHT mode
- *
- * Return: None
- */
-static void hdd_fill_bw_mcs_vht(struct rate_info *rate_info,
-				enum tx_rate_info rate_flags,
-				uint8_t mcsidx,
-				uint8_t nss)
-{
-	hdd_fill_bw_mcs(rate_info, rate_flags, mcsidx, nss, true);
-}
 
 /**
  * hdd_fill_sinfo_rate_info() - fill rate info of sinfo struct
@@ -4874,15 +4919,25 @@ static void hdd_fill_sinfo_rate_info(struct station_info *sinfo,
 	} else {
 		/* must be MCS */
 		if (rate_flags &
-				(TX_RATE_VHT80 |
-				 TX_RATE_VHT40 |
-				 TX_RATE_VHT20))
-			hdd_fill_bw_mcs_vht(rate_info, rate_flags, mcsidx, nss);
-
-		if (rate_flags & (TX_RATE_HT20 | TX_RATE_HT40))
+				(TX_RATE_HE160 |
+				 TX_RATE_HE80 |
+				 TX_RATE_HE40 |
+				 TX_RATE_HE20)) {
 			hdd_fill_bw_mcs(rate_info, rate_flags, mcsidx, nss,
-					false);
-
+					RATE_INFO_FLAGS_HE_MCS);
+		}
+		if (rate_flags &
+				(TX_RATE_VHT160 |
+				 TX_RATE_VHT80 |
+				 TX_RATE_VHT40 |
+				 TX_RATE_VHT20)) {
+			hdd_fill_bw_mcs(rate_info, rate_flags, mcsidx, nss,
+					RATE_INFO_FLAGS_VHT_MCS);
+		}
+		if (rate_flags & (TX_RATE_HT20 | TX_RATE_HT40)) {
+			hdd_fill_bw_mcs(rate_info, rate_flags, mcsidx, nss,
+					RATE_INFO_FLAGS_MCS);
+		}
 		if (rate_flags & TX_RATE_SGI) {
 			if (!(rate_info->flags & RATE_INFO_FLAGS_VHT_MCS))
 				rate_info->flags |= RATE_INFO_FLAGS_MCS;
@@ -6100,11 +6155,16 @@ static inline void wlan_hdd_mlo_update_stats_info(struct hdd_adapter *adapter)
 	uint32_t *snr, *link_snr;
 	uint8_t iter;
 	struct hdd_mlo_adapter_info *mlo_adapter_info;
-	struct hdd_adapter *link_adapter;
+	struct hdd_adapter *link_adapter, *ml_adapter;
 	struct wlan_objmgr_vdev *vdev;
 
-	rssi = &adapter->hdd_stats.summary_stat.rssi;
-	snr = &adapter->hdd_stats.summary_stat.snr;
+	if (hdd_adapter_is_link_adapter(adapter))
+		ml_adapter = hdd_adapter_get_mlo_adapter_from_link(adapter);
+	else
+		ml_adapter = adapter;
+
+	rssi = &ml_adapter->hdd_stats.summary_stat.rssi;
+	snr = &ml_adapter->hdd_stats.summary_stat.snr;
 
 	vdev = hdd_objmgr_get_vdev_by_user(adapter, WLAN_OSIF_STATS_ID);
 	if (!vdev)
@@ -6120,11 +6180,12 @@ static inline void wlan_hdd_mlo_update_stats_info(struct hdd_adapter *adapter)
 	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_STATS_ID);
 
 	hdd_debug("Link0: RSSI: %d, SNR: %d", *rssi, *snr);
-	mlo_adapter_info = &adapter->mlo_adapter_info;
+
+	mlo_adapter_info = &ml_adapter->mlo_adapter_info;
 	for (iter = 0; iter < WLAN_MAX_MLD; iter++) {
 		link_adapter = mlo_adapter_info->link_adapter[iter];
 		if (!link_adapter ||
-		    link_adapter->mlo_adapter_info.associate_with_ml_adapter)
+		    hdd_adapter_is_associated_with_ml_adapter(link_adapter))
 			continue;
 
 		link_rssi = &link_adapter->hdd_stats.summary_stat.rssi;
@@ -7810,5 +7871,1126 @@ void wlan_hdd_register_cp_stats_cb(struct hdd_context *hdd_ctx)
 	ucfg_mc_cp_stats_register_lost_link_info_cb(
 					hdd_ctx->psoc,
 					hdd_lost_link_cp_stats_info_cb);
+}
+#endif
+
+#if defined(WLAN_FEATURE_ROAM_OFFLOAD) && defined(WLAN_FEATURE_ROAM_INFO_STATS)
+#define ROAM_CACHED_STATS_MAX QCA_WLAN_VENDOR_ATTR_ROAM_CACHED_STATS_MAX
+
+#define EVENTS_CONFIGURE QCA_WLAN_VENDOR_ATTR_ROAM_EVENTS_CONFIGURE
+#define SUSPEND_STATE    QCA_WLAN_VENDOR_ATTR_ROAM_EVENTS_SUSPEND_STATE
+
+#define ROAM_STATS_ROAM_TRIGGER_TIMESTAMP \
+	QCA_WLAN_VENDOR_ATTR_ROAM_STATS_ROAM_TRIGGER_TIMESTAMP
+#define ROAM_STATS_TRIGGER_REASON \
+	QCA_WLAN_VENDOR_ATTR_ROAM_STATS_TRIGGER_REASON
+#define ROAM_STATS_PER_RXRATE_THRESHOLD_PERCENT \
+	QCA_WLAN_VENDOR_ATTR_ROAM_STATS_PER_RXRATE_THRESHOLD_PERCENT
+#define ROAM_STATS_PER_TXRATE_THRESHOLD_PERCENT \
+	QCA_WLAN_VENDOR_ATTR_ROAM_STATS_PER_TXRATE_THRESHOLD_PERCENT
+#define ROAM_STATS_FINAL_BMISS_CNT \
+	QCA_WLAN_VENDOR_ATTR_ROAM_STATS_FINAL_BMISS_CNT
+#define ROAM_STATS_CONSECUTIVE_BMISS_CNT \
+	QCA_WLAN_VENDOR_ATTR_ROAM_STATS_CONSECUTIVE_BMISS_CNT
+#define ROAM_STATS_BMISS_QOS_NULL_SUCCESS \
+	QCA_WLAN_VENDOR_ATTR_ROAM_STATS_BMISS_QOS_NULL_SUCCESS
+#define ROAM_STATS_POOR_RSSI_CURRENT_RSSI \
+	QCA_WLAN_VENDOR_ATTR_ROAM_STATS_POOR_RSSI_CURRENT_RSSI
+#define ROAM_STATS_POOR_RSSI_ROAM_RSSI_THRESHOLD \
+	QCA_WLAN_VENDOR_ATTR_ROAM_STATS_POOR_RSSI_ROAM_RSSI_THRESHOLD
+#define ROAM_STATS_POOR_RSSI_RX_LINKSPEED_STATUS \
+	QCA_WLAN_VENDOR_ATTR_ROAM_STATS_POOR_RSSI_RX_LINKSPEED_STATUS
+#define ROAM_STATS_BETTER_RSSI_CURRENT_RSSI \
+	QCA_WLAN_VENDOR_ATTR_ROAM_STATS_BETTER_RSSI_CURRENT_RSSI
+#define ROAM_STATS_BETTER_RSSI_HIGH_RSSI_THRESHOLD \
+	QCA_WLAN_VENDOR_ATTR_ROAM_STATS_BETTER_RSSI_HIGH_RSSI_THRESHOLD
+#define ROAM_STATS_CONGESTION_RX_TPUT \
+	QCA_WLAN_VENDOR_ATTR_ROAM_STATS_CONGESTION_RX_TPUT
+#define ROAM_STATS_CONGESTION_TX_TPUT \
+	QCA_WLAN_VENDOR_ATTR_ROAM_STATS_CONGESTION_TX_TPUT
+#define ROAM_STATS_CONGESTION_ROAMABLE_CNT \
+	QCA_WLAN_VENDOR_ATTR_ROAM_STATS_CONGESTION_ROAMABLE_CNT
+#define ROAM_STATS_USER_TRIGGER_INVOKE_REASON \
+	QCA_WLAN_VENDOR_ATTR_ROAM_STATS_USER_TRIGGER_INVOKE_REASON
+#define ROAM_STATS_BTM_REQUEST_MODE \
+	QCA_WLAN_VENDOR_ATTR_ROAM_STATS_BTM_REQUEST_MODE
+#define ROAM_STATS_BTM_DISASSOC_IMMINENT_TIME \
+	QCA_WLAN_VENDOR_ATTR_ROAM_STATS_BTM_DISASSOC_IMMINENT_TIME
+#define ROAM_STATS_BTM_VALID_INTERNAL \
+	QCA_WLAN_VENDOR_ATTR_ROAM_STATS_BTM_VALID_INTERNAL
+#define ROAM_STATS_BTM_CANDIDATE_LIST_CNT \
+	QCA_WLAN_VENDOR_ATTR_ROAM_STATS_BTM_CANDIDATE_LIST_CNT
+#define ROAM_STATS_BTM_RESPONSE_STATUS_CODE \
+	QCA_WLAN_VENDOR_ATTR_ROAM_STATS_BTM_RESPONSE_STATUS_CODE
+#define ROAM_STATS_BTM_BSS_TERMINATION_TIMEOUT \
+	QCA_WLAN_VENDOR_ATTR_ROAM_STATS_BTM_BSS_TERMINATION_TIMEOUT
+#define ROAM_STATS_BTM_MBO_ASSOC_RETRY_TIMEOUT \
+	QCA_WLAN_VENDOR_ATTR_ROAM_STATS_BTM_MBO_ASSOC_RETRY_TIMEOUT
+#define ROAM_STATS_BTM_REQ_DIALOG_TOKEN \
+	QCA_WLAN_VENDOR_ATTR_ROAM_STATS_BTM_REQ_DIALOG_TOKEN
+#define ROAM_STATS_BSS_CU_LOAD \
+	QCA_WLAN_VENDOR_ATTR_ROAM_STATS_BSS_CU_LOAD
+#define ROAM_STATS_DISCONNECTION_TYPE \
+	QCA_WLAN_VENDOR_ATTR_ROAM_STATS_DISCONNECTION_TYPE
+#define ROAM_STATS_DISCONNECTION_REASON \
+	QCA_WLAN_VENDOR_ATTR_ROAM_STATS_DISCONNECTION_REASON
+#define ROAM_STATS_PERIODIC_TIMER_MS \
+	QCA_WLAN_VENDOR_ATTR_ROAM_STATS_PERIODIC_TIMER_MS
+#define ROAM_STATS_BACKGROUND_SCAN_CURRENT_RSSI \
+	QCA_WLAN_VENDOR_ATTR_ROAM_STATS_BACKGROUND_SCAN_CURRENT_RSSI
+#define ROAM_STATS_BACKGROUND_SCAN_DATA_RSSI \
+	QCA_WLAN_VENDOR_ATTR_ROAM_STATS_BACKGROUND_SCAN_DATA_RSSI
+#define ROAM_STATS_BACKGROUND_SCAN_DATA_RSSI_TH \
+	QCA_WLAN_VENDOR_ATTR_ROAM_STATS_BACKGROUND_SCAN_DATA_RSSI_THRESH
+#define ROAM_STATS_TX_FAILURES_THRESHOLD \
+	QCA_WLAN_VENDOR_ATTR_ROAM_STATS_TX_FAILURES_THRESHOLD
+#define ROAM_STATS_TX_FAILURES_REASON \
+	QCA_WLAN_VENDOR_ATTR_ROAM_STATS_TX_FAILURES_REASON
+#define ROAM_STATS_ABORT_REASON \
+	QCA_WLAN_VENDOR_ATTR_ROAM_STATS_ABORT_REASON
+#define ROAM_STATS_DATA_RSSI \
+	QCA_WLAN_VENDOR_ATTR_ROAM_STATS_DATA_RSSI
+#define ROAM_STATS_DATA_RSSI_THRESHOLD \
+	QCA_WLAN_VENDOR_ATTR_ROAM_STATS_DATA_RSSI_THRESHOLD
+#define ROAM_STATS_DATA_RX_LINKSPEED_STATUS \
+	QCA_WLAN_VENDOR_ATTR_ROAM_STATS_DATA_RX_LINKSPEED_STATUS
+#define ROAM_STATS_SCAN_TYPE \
+	QCA_WLAN_VENDOR_ATTR_ROAM_STATS_SCAN_TYPE
+#define ROAM_STATS_ROAM_STATUS \
+	QCA_WLAN_VENDOR_ATTR_ROAM_STATS_ROAM_STATUS
+#define ROAM_STATS_FAIL_REASON \
+	QCA_WLAN_VENDOR_ATTR_ROAM_STATS_FAIL_REASON
+#define ROAM_STATS_SCAN_CHAN_INFO \
+	QCA_WLAN_VENDOR_ATTR_ROAM_STATS_SCAN_CHAN_INFO
+#define ROAM_STATS_TOTAL_SCAN_TIME \
+	QCA_WLAN_VENDOR_ATTR_ROAM_STATS_TOTAL_SCAN_TIME
+#define ROAM_STATS_FRAME_INFO  \
+	QCA_WLAN_VENDOR_ATTR_ROAM_STATS_FRAME_INFO
+#define ROAM_STATS_SCAN_CHANNEL_FREQ \
+	QCA_WLAN_VENDOR_ATTR_ROAM_STATS_SCAN_CHANNEL_FREQ
+#define ROAM_STATS_SCAN_DWELL_TYPE \
+	QCA_WLAN_VENDOR_ATTR_ROAM_STATS_SCAN_DWELL_TYPE
+#define ROAM_STATS_MAX_DWELL_TIME \
+	QCA_WLAN_VENDOR_ATTR_ROAM_STATS_MAX_DWELL_TIME
+#define ROAM_STATS_FRAME_SUBTYPE \
+	QCA_WLAN_VENDOR_ATTR_ROAM_STATS_FRAME_SUBTYPE
+#define ROAM_STATS_FRAME_STATUS \
+	QCA_WLAN_VENDOR_ATTR_ROAM_STATS_FRAME_STATUS
+#define ROAM_STATS_FRAME_TIMESTAMP \
+	QCA_WLAN_VENDOR_ATTR_ROAM_STATS_FRAME_TIMESTAMP
+
+static enum qca_roam_reason
+hdd_convert_roam_trigger_reason(enum roam_trigger_reason reason)
+{
+	switch (reason) {
+	case ROAM_TRIGGER_REASON_NONE:
+		return QCA_ROAM_REASON_UNKNOWN;
+	case ROAM_TRIGGER_REASON_PER:
+		return QCA_ROAM_REASON_PER;
+	case ROAM_TRIGGER_REASON_BMISS:
+		return QCA_ROAM_REASON_BEACON_MISS;
+	case ROAM_TRIGGER_REASON_LOW_RSSI:
+		return QCA_ROAM_REASON_POOR_RSSI;
+	case ROAM_TRIGGER_REASON_HIGH_RSSI:
+		return QCA_ROAM_REASON_BETTER_RSSI;
+	case ROAM_TRIGGER_REASON_PERIODIC:
+		return QCA_ROAM_REASON_PERIODIC_TIMER;
+	case ROAM_TRIGGER_REASON_DENSE:
+		return QCA_ROAM_REASON_CONGESTION;
+	case ROAM_TRIGGER_REASON_BACKGROUND:
+		return QCA_ROAM_REASON_BACKGROUND_SCAN;
+	case ROAM_TRIGGER_REASON_FORCED:
+		return QCA_ROAM_REASON_USER_TRIGGER;
+	case ROAM_TRIGGER_REASON_BTM:
+		return QCA_ROAM_REASON_BTM;
+	case ROAM_TRIGGER_REASON_BSS_LOAD:
+		return QCA_ROAM_REASON_BSS_LOAD;
+	case ROAM_TRIGGER_REASON_DEAUTH:
+		return QCA_ROAM_REASON_DISCONNECTION;
+	case ROAM_TRIGGER_REASON_STA_KICKOUT:
+		return QCA_ROAM_REASON_STA_KICKOUT;
+	default:
+		hdd_err("Invalid invoke reason received: %d", reason);
+		break;
+	}
+
+	return QCA_ROAM_REASON_UNKNOWN;
+}
+
+static enum qca_wlan_roam_stats_invoke_reason
+hdd_convert_roam_invoke_reason(enum roam_invoke_reason invoke)
+{
+	switch (invoke) {
+	case WLAN_ROAM_STATS_INVOKE_REASON_UNDEFINED:
+		return QCA_WLAN_ROAM_STATS_INVOKE_REASON_UNDEFINED;
+	case WLAN_ROAM_STATS_INVOKE_REASON_NUD_FAILURE:
+		return QCA_WLAN_ROAM_STATS_INVOKE_REASON_NUD_FAILURE;
+	case WLAN_ROAM_STATS_INVOKE_REASON_USER_SPACE:
+		return QCA_WLAN_ROAM_STATS_INVOKE_REASON_USER_SPACE;
+	default:
+		hdd_err("Invalid invoke reason received: %d", invoke);
+		break;
+	}
+
+	return QCA_WLAN_ROAM_STATS_INVOKE_REASON_UNDEFINED;
+}
+
+static enum qca_wlan_roam_stats_tx_failures_reason
+hdd_convert_roam_tx_failures_reason(enum roam_tx_failures_reason tx_failures)
+{
+	switch (tx_failures) {
+	case WLAN_ROAM_STATS_KICKOUT_REASON_UNSPECIFIED:
+		return QCA_WLAN_ROAM_STATS_KICKOUT_REASON_UNSPECIFIED;
+	case WLAN_ROAM_STATS_KICKOUT_REASON_XRETRY:
+		return QCA_WLAN_ROAM_STATS_KICKOUT_REASON_XRETRY;
+	case WLAN_ROAM_STATS_KICKOUT_REASON_INACTIVITY:
+		return QCA_WLAN_ROAM_STATS_KICKOUT_REASON_INACTIVITY;
+	case WLAN_ROAM_STATS_KICKOUT_REASON_IBSS_DISCONNECT:
+		return QCA_WLAN_ROAM_STATS_KICKOUT_REASON_IBSS_DISCONNECT;
+	case WLAN_ROAM_STATS_KICKOUT_REASON_TDLS_DISCONNECT:
+		return QCA_WLAN_ROAM_STATS_KICKOUT_REASON_TDLS_DISCONNECT;
+	case WLAN_ROAM_STATS_KICKOUT_REASON_SA_QUERY_TIMEOUT:
+		return QCA_WLAN_ROAM_STATS_KICKOUT_REASON_SA_QUERY_TIMEOUT;
+	case WLAN_ROAM_STATS_KICKOUT_REASON_ROAMING_EVENT:
+		return QCA_WLAN_ROAM_STATS_KICKOUT_REASON_ROAMING_EVENT;
+	default:
+		hdd_err("Invalid tx_failures reason received: %d", tx_failures);
+		break;
+	}
+
+	return QCA_WLAN_ROAM_STATS_KICKOUT_REASON_UNSPECIFIED;
+}
+
+static enum qca_wlan_roam_stats_abort_reason
+hdd_convert_roam_abort_reason(enum roam_abort_reason abort)
+{
+	switch (abort) {
+	case WLAN_ROAM_STATS_ABORT_UNSPECIFIED:
+		return QCA_WLAN_ROAM_STATS_ABORT_UNSPECIFIED;
+	case WLAN_ROAM_STATS_ABORT_LOWRSSI_DATA_RSSI_HIGH:
+		return QCA_WLAN_ROAM_STATS_ABORT_LOWRSSI_DATA_RSSI_HIGH;
+	case WLAN_ROAM_STATS_ABORT_LOWRSSI_LINK_SPEED_GOOD:
+		return QCA_WLAN_ROAM_STATS_ABORT_LOWRSSI_LINK_SPEED_GOOD;
+	case WLAN_ROAM_STATS_ABORT_BG_DATA_RSSI_HIGH:
+		return QCA_WLAN_ROAM_STATS_ABORT_BG_DATA_RSSI_HIGH;
+	case WLAN_ROAM_STATS_ABORT_BG_RSSI_ABOVE_THRESHOLD:
+		return QCA_WLAN_ROAM_STATS_ABORT_BG_RSSI_ABOVE_THRESHOLD;
+	default:
+		hdd_err("Invalid abort reason received: %d", abort);
+		break;
+	}
+
+	return QCA_WLAN_ROAM_STATS_ABORT_UNSPECIFIED;
+}
+
+static enum qca_wlan_roam_stats_scan_type
+hdd_convert_roam_scan_type(enum roam_stats_scan_type              type)
+{
+	switch (type) {
+	case ROAM_STATS_SCAN_TYPE_PARTIAL:
+		return QCA_WLAN_ROAM_STATS_SCAN_TYPE_PARTIAL;
+	case ROAM_STATS_SCAN_TYPE_FULL:
+		return QCA_WLAN_ROAM_STATS_SCAN_TYPE_FULL;
+	case ROAM_STATS_SCAN_TYPE_NO_SCAN:
+		return QCA_WLAN_ROAM_STATS_SCAN_TYPE_NO_SCAN;
+	case ROAM_STATS_SCAN_TYPE_HIGHER_BAND_5GHZ_6GHZ:
+		return QCA_WLAN_ROAM_STATS_SCAN_TYPE_HIGHER_BAND_5GHZ_6GHZ;
+	case ROAM_STATS_SCAN_TYPE_HIGHER_BAND_6GHZ:
+		return QCA_WLAN_ROAM_STATS_SCAN_TYPE_HIGHER_BAND_6GHZ;
+	default:
+		hdd_err("Invalid roam scan type received: %d", type);
+		break;
+	}
+
+	return QCA_WLAN_ROAM_STATS_SCAN_TYPE_PARTIAL;
+}
+
+static enum qca_wlan_roam_stats_scan_dwell_type
+hdd_convert_roam_chn_dwell_type(enum roam_scan_dwell_type type)
+{
+	switch (type) {
+	case WLAN_ROAM_DWELL_TYPE_UNSPECIFIED:
+		return QCA_WLAN_ROAM_STATS_DWELL_TYPE_UNSPECIFIED;
+	case WLAN_ROAM_DWELL_ACTIVE_TYPE:
+		return QCA_WLAN_ROAM_STATS_DWELL_TYPE_ACTIVE;
+	case WLAN_ROAM_DWELL_PASSIVE_TYPE:
+		return QCA_WLAN_ROAM_STATS_DWELL_TYPE_PASSIVE;
+	default:
+		hdd_err("Invalid abort reason received: %d", type);
+		break;
+	}
+
+	return QCA_WLAN_ROAM_STATS_DWELL_TYPE_UNSPECIFIED;
+}
+
+static enum qca_wlan_roam_stats_frame_subtype
+hdd_convert_roam_frame_type(enum eroam_frame_subtype type)
+{
+	switch (type) {
+	case WLAN_ROAM_STATS_FRAME_SUBTYPE_PREAUTH:
+		return QCA_WLAN_ROAM_STATS_FRAME_SUBTYPE_PREAUTH;
+	case WLAN_ROAM_STATS_FRAME_SUBTYPE_REASSOC:
+		return QCA_WLAN_ROAM_STATS_FRAME_SUBTYPE_REASSOC;
+	case WLAN_ROAM_STATS_FRAME_SUBTYPE_EAPOL_M1:
+		return QCA_WLAN_ROAM_STATS_FRAME_SUBTYPE_EAPOL_M1;
+	case WLAN_ROAM_STATS_FRAME_SUBTYPE_EAPOL_M2:
+		return QCA_WLAN_ROAM_STATS_FRAME_SUBTYPE_EAPOL_M2;
+	case WLAN_ROAM_STATS_FRAME_SUBTYPE_EAPOL_M3:
+		return QCA_WLAN_ROAM_STATS_FRAME_SUBTYPE_EAPOL_M3;
+	case WLAN_ROAM_STATS_FRAME_SUBTYPE_EAPOL_M4:
+		return QCA_WLAN_ROAM_STATS_FRAME_SUBTYPE_EAPOL_M4;
+	case WLAN_ROAM_STATS_FRAME_SUBTYPE_EAPOL_GTK_M1:
+		return QCA_WLAN_ROAM_STATS_FRAME_SUBTYPE_EAPOL_GTK_M1;
+	case WLAN_ROAM_STATS_FRAME_SUBTYPE_EAPOL_GTK_M2:
+		return QCA_WLAN_ROAM_STATS_FRAME_SUBTYPE_EAPOL_GTK_M2;
+	default:
+		hdd_err_rl("Invalid roam frame type received: %d", type);
+		break;
+	}
+
+	return QCA_WLAN_ROAM_STATS_FRAME_SUBTYPE_PREAUTH;
+};
+
+static enum qca_wlan_roam_stats_frame_status
+hdd_convert_roam_frame_status(enum eroam_frame_status status)
+{
+	switch (status) {
+	case WLAN_ROAM_STATS_FRAME_STATUS_SUCCESS:
+		return QCA_WLAN_ROAM_STATS_FRAME_STATUS_SUCCESS;
+	case WLAN_ROAM_STATS_FRAME_STATUS_FAIL:
+		return QCA_WLAN_ROAM_STATS_FRAME_STATUS_FAIL;
+	default:
+		hdd_err("Invalid roam frame status received: %d", status);
+		break;
+	}
+
+	return QCA_WLAN_ROAM_STATS_FRAME_STATUS_FAIL;
+};
+
+static enum qca_vendor_roam_fail_reasons
+hdd_convert_roam_failures_reason(enum wlan_roam_failure_reason_code fail)
+{
+	switch (fail) {
+	case ROAM_FAIL_REASON_NO_SCAN_START:
+		return QCA_ROAM_FAIL_REASON_SCAN_NOT_ALLOWED;
+	case ROAM_FAIL_REASON_NO_AP_FOUND:
+		return QCA_ROAM_FAIL_REASON_NO_AP_FOUND;
+	case ROAM_FAIL_REASON_NO_CAND_AP_FOUND:
+		return QCA_ROAM_FAIL_REASON_NO_CAND_AP_FOUND;
+	case ROAM_FAIL_REASON_HOST:
+		return QCA_ROAM_FAIL_REASON_HOST;
+	case ROAM_FAIL_REASON_AUTH_SEND:
+		return QCA_ROAM_FAIL_REASON_AUTH_SEND;
+	case ROAM_FAIL_REASON_NO_AUTH_RESP:
+		return QCA_ROAM_FAIL_REASON_NO_AUTH_RESP;
+	case ROAM_FAIL_REASON_AUTH_RECV:
+		return QCA_ROAM_FAIL_REASON_AUTH_RECV;
+	case ROAM_FAIL_REASON_REASSOC_SEND:
+		return QCA_ROAM_FAIL_REASON_REASSOC_SEND;
+	case ROAM_FAIL_REASON_REASSOC_RECV:
+		return QCA_ROAM_FAIL_REASON_REASSOC_RECV;
+	case ROAM_FAIL_REASON_NO_REASSOC_RESP:
+		return QCA_ROAM_FAIL_REASON_NO_REASSOC_RESP;
+	case ROAM_FAIL_REASON_EAPOL_TIMEOUT:
+		return QCA_ROAM_FAIL_REASON_EAPOL_M1_TIMEOUT;
+	case ROAM_FAIL_REASON_SCAN_START:
+		return QCA_ROAM_FAIL_REASON_SCAN_FAIL;
+	case ROAM_FAIL_REASON_AUTH_NO_ACK:
+		return QCA_ROAM_FAIL_REASON_AUTH_NO_ACK;
+	case ROAM_FAIL_REASON_AUTH_INTERNAL_DROP:
+		return QCA_ROAM_FAIL_REASON_AUTH_INTERNAL_DROP;
+	case ROAM_FAIL_REASON_REASSOC_NO_ACK:
+		return QCA_ROAM_FAIL_REASON_REASSOC_NO_ACK;
+	case ROAM_FAIL_REASON_REASSOC_INTERNAL_DROP:
+		return QCA_ROAM_FAIL_REASON_REASSOC_INTERNAL_DROP;
+	case ROAM_FAIL_REASON_EAPOL_M2_SEND:
+		return QCA_ROAM_FAIL_REASON_EAPOL_M2_SEND;
+	case ROAM_FAIL_REASON_EAPOL_M2_INTERNAL_DROP:
+		return QCA_ROAM_FAIL_REASON_EAPOL_M2_INTERNAL_DROP;
+	case ROAM_FAIL_REASON_EAPOL_M2_NO_ACK:
+		return QCA_ROAM_FAIL_REASON_EAPOL_M2_NO_ACK;
+	case ROAM_FAIL_REASON_EAPOL_M3_TIMEOUT:
+		return QCA_ROAM_FAIL_REASON_EAPOL_M3_TIMEOUT;
+	case ROAM_FAIL_REASON_EAPOL_M4_SEND:
+		return QCA_ROAM_FAIL_REASON_EAPOL_M4_SEND;
+	case ROAM_FAIL_REASON_EAPOL_M4_INTERNAL_DROP:
+		return QCA_ROAM_FAIL_REASON_EAPOL_M4_INTERNAL_DROP;
+	case ROAM_FAIL_REASON_EAPOL_M4_NO_ACK:
+		return QCA_ROAM_FAIL_REASON_EAPOL_M4_NO_ACK;
+	case ROAM_FAIL_REASON_NO_SCAN_FOR_FINAL_BMISS:
+		return QCA_ROAM_FAIL_REASON_NO_SCAN_FOR_FINAL_BEACON_MISS;
+	case ROAM_FAIL_REASON_DISCONNECT:
+		return QCA_ROAM_FAIL_REASON_DISCONNECT;
+	case ROAM_FAIL_REASON_SYNC:
+		return QCA_ROAM_FAIL_REASON_RESUME_ABORT;
+	case ROAM_FAIL_REASON_SAE_INVALID_PMKID:
+		return QCA_ROAM_FAIL_REASON_SAE_INVALID_PMKID;
+	case ROAM_FAIL_REASON_SAE_PREAUTH_TIMEOUT:
+		return QCA_ROAM_FAIL_REASON_SAE_PREAUTH_TIMEOUT;
+	case ROAM_FAIL_REASON_SAE_PREAUTH_FAIL:
+		return QCA_ROAM_FAIL_REASON_SAE_PREAUTH_FAIL;
+	case ROAM_FAIL_REASON_MLME:
+	case ROAM_FAIL_REASON_INTERNAL_ABORT:
+	case ROAM_FAIL_REASON_UNABLE_TO_START_ROAM_HO:
+	case ROAM_FAIL_REASON_UNKNOWN:
+		hdd_err("Invalid roam failres reason");
+		break;
+	}
+
+	return QCA_ROAM_FAIL_REASON_NONE;
+}
+
+/**
+ * hdd_get_roam_stats_individual_record_len() - calculates the required length
+ * of an individual record of roaming stats
+ *
+ * @roam_info: pointer to roam info
+ * @index:     index of roam info cached in driver
+ *
+ * Return: required length of an individual record of roaming stats
+ */
+static uint32_t hdd_get_roam_stats_individual_record_len(struct enhance_roam_info *roam_info,
+							 uint32_t index)
+{
+	struct enhance_roam_info *info;
+	enum qca_roam_reason vendor_trigger_reason;
+	uint32_t len, i;
+
+	if (!roam_info) {
+		hdd_err("invalid param");
+		return 0;
+	}
+
+	info  = &roam_info[index];
+	vendor_trigger_reason =
+		hdd_convert_roam_trigger_reason(info->trigger.trigger_reason);
+
+	len = 0;
+	/* ROAM_STATS_ROAM_TRIGGER_TIMESTAMP */
+	len += nla_total_size_64bit(sizeof(uint64_t));
+	/* ROAM_STATS_TRIGGER_REASON */
+	len += nla_total_size(sizeof(uint32_t));
+
+	switch (vendor_trigger_reason) {
+	case QCA_ROAM_REASON_PER:
+		/* ROAM_STATS_PER_RXRATE_THRESHOLD_PERCENT */
+		len += nla_total_size(sizeof(uint8_t));
+		/* ROAM_STATS_PER_TXRATE_THRESHOLD_PERCENT */
+		len += nla_total_size(sizeof(uint8_t));
+		break;
+	case QCA_ROAM_REASON_BEACON_MISS:
+		/* ROAM_STATS_FINAL_BMISS_CNT */
+		len += nla_total_size(sizeof(uint32_t));
+		/* ROAM_STATS_CONSECUTIVE_BMISS_CNT */
+		len += nla_total_size(sizeof(uint32_t));
+		/* ROAM_STATS_BMISS_QOS_NULL_SUCCESS */
+		len += nla_total_size(sizeof(uint8_t));
+		break;
+	case QCA_ROAM_REASON_POOR_RSSI:
+		/* ROAM_STATS_POOR_RSSI_CURRENT_RSSI */
+		len += nla_total_size(sizeof(int8_t));
+		/* ROAM_STATS_POOR_RSSI_ROAM_RSSI_THRESHOLD */
+		len += nla_total_size(sizeof(int8_t));
+		/* ROAM_STATS_POOR_RSSI_RX_LINKSPEED_STATUS */
+		len += nla_total_size(sizeof(uint8_t));
+		break;
+	case QCA_ROAM_REASON_BETTER_RSSI:
+		/* ROAM_STATS_BETTER_RSSI_CURRENT_RSSI */
+		len += nla_total_size(sizeof(int8_t));
+		/* ROAM_STATS_BETTER_RSSI_HIGH_RSSI_THRESHOLD */
+		len += nla_total_size(sizeof(int8_t));
+		break;
+	case QCA_ROAM_REASON_PERIODIC_TIMER:
+		/* ROAM_STATS_PERIODIC_TIMER_MS */
+		len += nla_total_size(sizeof(uint32_t));
+		break;
+	case QCA_ROAM_REASON_CONGESTION:
+		/* ROAM_STATS_CONGESTION_RX_TPUT */
+		len += nla_total_size(sizeof(uint32_t));
+		/* ROAM_STATS_CONGESTION_TX_TPUT */
+		len += nla_total_size(sizeof(uint32_t));
+		/* ROAM_STATS_CONGESTION_ROAMABLE_CNT */
+		len += nla_total_size(sizeof(uint8_t));
+		break;
+	case QCA_ROAM_REASON_BACKGROUND_SCAN:
+		/* ROAM_STATS_BACKGROUND_SCAN_CURRENT_RSSI */
+		len += nla_total_size(sizeof(int8_t));
+		/* ROAM_STATS_BACKGROUND_SCAN_DATA_RSSI */
+		len += nla_total_size(sizeof(int8_t));
+		/* ROAM_STATS_BACKGROUND_SCAN_DATA_RSSI_TH */
+		len += nla_total_size(sizeof(int8_t));
+		break;
+	case QCA_ROAM_REASON_USER_TRIGGER:
+		/* ROAM_STATS_USER_TRIGGER_INVOKE_REASON */
+		len += nla_total_size(sizeof(uint8_t));
+		break;
+	case QCA_ROAM_REASON_BTM:
+		/* ROAM_STATS_BTM_REQUEST_MODE */
+		len += nla_total_size(sizeof(uint8_t));
+		/* ROAM_STATS_BTM_DISASSOC_IMMINENT_TIME */
+		len += nla_total_size(sizeof(uint32_t));
+		/* ROAM_STATS_BTM_VALID_INTERNAL */
+		len += nla_total_size(sizeof(uint32_t));
+		/* ROAM_STATS_BTM_CANDIDATE_LIST_CNT */
+		len += nla_total_size(sizeof(uint8_t));
+		/* ROAM_STATS_BTM_RESPONSE_STATUS_CODE */
+		len += nla_total_size(sizeof(uint8_t));
+		/* ROAM_STATS_BTM_BSS_TERMINATION_TIMEOUT */
+		len += nla_total_size(sizeof(uint32_t));
+		/* ROAM_STATS_BTM_MBO_ASSOC_RETRY_TIMEOUT */
+		len += nla_total_size(sizeof(uint32_t));
+		/* ROAM_STATS_BTM_REQ_DIALOG_TOKEN */
+		len += nla_total_size(sizeof(uint8_t));
+		break;
+	case QCA_ROAM_REASON_BSS_LOAD:
+		/* ROAM_STATS_BSS_CU_LOAD */
+		len += nla_total_size(sizeof(uint8_t));
+		break;
+	case QCA_ROAM_REASON_DISCONNECTION:
+		/* ROAM_STATS_DISCONNECTION_TYPE */
+		len += nla_total_size(sizeof(uint8_t));
+		/* ROAM_STATS_DISCONNECTION_REASON */
+		len += nla_total_size(sizeof(uint16_t));
+		break;
+	case QCA_ROAM_REASON_STA_KICKOUT:
+		/* ROAM_STATS_TX_FAILURES_THRESHOLD */
+		len += nla_total_size(sizeof(uint32_t));
+		/* ROAM_STATS_TX_FAILURES_REASON */
+		len += nla_total_size(sizeof(uint8_t));
+		break;
+	default:
+		break;
+	}
+
+	/* ROAM_STATS_SCAN_TYPE */
+	len += nla_total_size(sizeof(uint8_t));
+	/* ROAM_STATS_ROAM_STATUS */
+	len += nla_total_size(sizeof(uint8_t));
+
+	if (info->trigger.roam_status) {
+		/* ROAM_STATS_FAIL_REASON */
+		len += nla_total_size(sizeof(uint8_t));
+		if (info->trigger.abort.abort_reason_code) {
+			/* ROAM_STATS_ABORT_REASON */
+			len += nla_total_size(sizeof(uint8_t));
+			/* ROAM_STATS_DATA_RSSI */
+			len += nla_total_size(sizeof(int8_t));
+			/* ROAM_STATS_DATA_RSSI_THRESHOLD */
+			len += nla_total_size(sizeof(int8_t));
+			/* ROAM_STATS_DATA_RX_LINKSPEED_STATUS */
+			len += nla_total_size(sizeof(uint8_t));
+		}
+	}
+
+	/* ROAM_STATS_SCAN_CHAN_INFO */
+	len += nla_total_size(0);
+	for (i = 0; i < info->scan.num_channels; i++) {
+		/* nest attribute */
+		len += nla_total_size(0);
+		/* ROAM_STATS_SCAN_CHANNEL_FREQ */
+		len += nla_total_size(sizeof(uint32_t));
+		/* ROAM_STATS_SCAN_DWELL_TYPE */
+		len += nla_total_size(sizeof(uint32_t));
+		/* ROAM_STATS_MAX_DWELL_TIME */
+		len += nla_total_size(sizeof(uint32_t));
+	}
+
+	/* ROAM_STATS_TOTAL_SCAN_TIME */
+	len += nla_total_size(sizeof(uint32_t));
+
+	/* ROAM_STATS_FRAME_INFO */
+	len += nla_total_size(0);
+	for (i = 0; i < ROAM_FRAME_NUM; i++) {
+		/* nest attribute */
+		len += nla_total_size(0);
+		/* ROAM_STATS_FRAME_SUBTYPE */
+		len += nla_total_size(sizeof(uint8_t));
+		/* ROAM_STATS_FRAME_STATUS */
+		len += nla_total_size(sizeof(uint8_t));
+		/* ROAM_STATS_FRAME_TIMESTAMP */
+		len += nla_total_size_64bit(sizeof(uint64_t));
+	}
+
+	return len;
+}
+
+/**
+ * hdd_get_roam_stats_info_len() - calculate the length required by skb
+ * @roam_info: pointer to roam info
+ * @roam_cache_num: roam cache number
+ *
+ * Calculate the required length to send roam stats to upper layer
+ *
+ * Return: required len
+ */
+static uint32_t
+hdd_get_roam_stats_info_len(struct enhance_roam_info *roam_info,
+			    uint8_t roam_cache_num)
+{
+	uint32_t len, i;
+
+	len = 0;
+	/* QCA_WLAN_VENDOR_ATTR_ROAM_STATS_INFO */
+	len += nla_total_size(0);
+	for (i = 0; i < roam_cache_num; i++) {
+		/* nest attribute */
+		len += nla_total_size(0);
+		len += hdd_get_roam_stats_individual_record_len(roam_info, i);
+	}
+
+	return len;
+}
+
+/**
+ * hdd_nla_put_roam_stats_info() - put roam statistics info attribute
+ * values to userspace
+ *
+ * @skb:       pointer to sk buff
+ * @roam_info: pointer to roam info
+ * @index:     index of roam info cached in driver
+ *
+ * Return: 0 if success else error status
+ */
+static int hdd_nla_put_roam_stats_info(struct sk_buff *skb,
+				       struct enhance_roam_info *roam_info,
+				       uint32_t index)
+{
+	struct nlattr *roam_chn_info, *roam_chn;
+	struct nlattr *roam_frame_info, *roam_frame;
+	struct enhance_roam_info *info;
+	enum roam_invoke_reason driver_invoke_reason;
+	enum qca_wlan_roam_stats_invoke_reason vendor_invoke_reason;
+	enum roam_tx_failures_reason driver_tx_failures_reason;
+	enum qca_wlan_roam_stats_tx_failures_reason vendor_tx_failures_reason;
+	enum roam_abort_reason driver_abort_reason;
+	enum qca_wlan_roam_stats_abort_reason vendor_abort_reason;
+	enum qca_wlan_roam_stats_scan_type vendor_scan_type;
+	enum roam_scan_dwell_type driver_dwell_type;
+	enum qca_wlan_roam_stats_scan_dwell_type vendor_dwell_type;
+	enum eroam_frame_subtype driver_frame_type;
+	enum qca_wlan_roam_stats_frame_subtype vendor_frame_type;
+	enum eroam_frame_status driver_frame_status;
+	enum qca_wlan_roam_stats_frame_status vendor_frame_status;
+	enum qca_roam_reason vendor_trigger_reason;
+	enum qca_vendor_roam_fail_reasons vendor_fail_reason;
+	uint32_t i;
+	int ret;
+
+	if (!roam_info) {
+		hdd_err("invalid param");
+		return -EINVAL;
+	}
+	info  = &roam_info[index];
+
+	vendor_trigger_reason =
+		hdd_convert_roam_trigger_reason(info->trigger.trigger_reason);
+
+	if (wlan_cfg80211_nla_put_u64(skb, ROAM_STATS_ROAM_TRIGGER_TIMESTAMP,
+				      info->trigger.timestamp)) {
+		hdd_err("timestamp put fail");
+		return -EINVAL;
+	}
+
+	if (nla_put_u32(skb, ROAM_STATS_TRIGGER_REASON, vendor_trigger_reason)) {
+		hdd_err(" put fail");
+		return -EINVAL;
+	}
+
+	switch (vendor_trigger_reason) {
+	case QCA_ROAM_REASON_PER:
+		if (nla_put_u8(skb,  ROAM_STATS_PER_RXRATE_THRESHOLD_PERCENT,
+			       info->trigger.condition.roam_per.rx_rate_thresh_percent)) {
+			hdd_err("roam_per.rx_rate_thresh_percent put fail");
+			return -EINVAL;
+		}
+		if (nla_put_u8(skb,  ROAM_STATS_PER_TXRATE_THRESHOLD_PERCENT,
+			       info->trigger.condition.roam_per.tx_rate_thresh_percent)) {
+			hdd_err("roam_per.rx_rate_thresh_percent put fail");
+			return -EINVAL;
+		}
+		break;
+	case QCA_ROAM_REASON_BEACON_MISS:
+		if (nla_put_u32(skb, ROAM_STATS_FINAL_BMISS_CNT,
+				info->trigger.condition.roam_bmiss.final_bmiss_cnt)) {
+			hdd_err("roam_bmiss.final_bmiss_cnt put fail");
+			return -EINVAL;
+		}
+		if (nla_put_u32(skb, ROAM_STATS_CONSECUTIVE_BMISS_CNT,
+				info->trigger.condition.roam_bmiss.consecutive_bmiss_cnt)) {
+			hdd_err("roam_bmiss.consecutive_bmiss_cnt put fail");
+			return -EINVAL;
+		}
+		if (nla_put_u8(skb, ROAM_STATS_BMISS_QOS_NULL_SUCCESS,
+			       info->trigger.condition.roam_bmiss.qos_null_success)) {
+			hdd_err("roam_bmiss.qos_null_success put fail");
+			return -EINVAL;
+		}
+		break;
+	case QCA_ROAM_REASON_POOR_RSSI:
+		if (nla_put_s8(skb, ROAM_STATS_POOR_RSSI_CURRENT_RSSI,
+			       info->trigger.condition.roam_poor_rssi.current_rssi)) {
+			hdd_err("roam_poor_rssi.current_rssi put fail");
+			return -EINVAL;
+		}
+		if (nla_put_s8(skb, ROAM_STATS_POOR_RSSI_ROAM_RSSI_THRESHOLD,
+			       info->trigger.condition.roam_poor_rssi.roam_rssi_threshold)) {
+			hdd_err("roam_poor_rssi.roam_rssi_threshold put fail");
+			return -EINVAL;
+		}
+		if (nla_put_u8(skb, ROAM_STATS_POOR_RSSI_RX_LINKSPEED_STATUS,
+			       info->trigger.condition.roam_poor_rssi.rx_linkspeed_status)) {
+			hdd_err("roam_poor_rssi.rx_linkspeed_status put fail");
+			return -EINVAL;
+		}
+		break;
+	case QCA_ROAM_REASON_BETTER_RSSI:
+		if (nla_put_s8(skb, ROAM_STATS_BETTER_RSSI_CURRENT_RSSI,
+			       info->trigger.condition.roam_better_rssi.current_rssi)) {
+			hdd_err("roam_better_rssi.current_rssi put fail");
+			return -EINVAL;
+		}
+		if (nla_put_s8(skb, ROAM_STATS_BETTER_RSSI_HIGH_RSSI_THRESHOLD,
+			       info->trigger.condition.roam_better_rssi.hi_rssi_threshold)) {
+			hdd_err("roam_better_rssi.hi_rssi_threshold put fail");
+			return -EINVAL;
+		}
+		break;
+	case QCA_ROAM_REASON_PERIODIC_TIMER:
+		if (nla_put_u32(skb, ROAM_STATS_PERIODIC_TIMER_MS,
+				info->trigger.condition.roam_periodic.periodic_timer_ms)) {
+			hdd_err("roam_periodic.periodic_timer_ms put fail");
+			return -EINVAL;
+		}
+		break;
+	case QCA_ROAM_REASON_CONGESTION:
+		if (nla_put_u32(skb, ROAM_STATS_CONGESTION_RX_TPUT,
+				info->trigger.condition.roam_congestion.rx_tput)) {
+			hdd_err("roam_congestion.rx_tput put fail");
+			return -EINVAL;
+		}
+		if (nla_put_u32(skb, ROAM_STATS_CONGESTION_TX_TPUT,
+				info->trigger.condition.roam_congestion.tx_tput)) {
+			hdd_err("roam_congestion.tx_tput put fail");
+			return -EINVAL;
+		}
+		if (nla_put_u8(skb, ROAM_STATS_CONGESTION_ROAMABLE_CNT,
+			       info->trigger.condition.roam_congestion.roamable_count)) {
+			hdd_err("roam_congestion.roamable_count put fail");
+			return -EINVAL;
+		}
+		break;
+	case QCA_ROAM_REASON_BACKGROUND_SCAN:
+		if (nla_put_s8(skb, ROAM_STATS_BACKGROUND_SCAN_CURRENT_RSSI,
+			       info->trigger.condition.roam_background.current_rssi)) {
+			hdd_err("roam_background.current_rssi put fail");
+			return -EINVAL;
+		}
+		if (nla_put_s8(skb, ROAM_STATS_BACKGROUND_SCAN_DATA_RSSI,
+			       info->trigger.condition.roam_background.data_rssi)) {
+			hdd_err("roam_background.data_rssi put fail");
+			return -EINVAL;
+		}
+		if (nla_put_s8(skb, ROAM_STATS_BACKGROUND_SCAN_DATA_RSSI_TH,
+			       info->trigger.condition.roam_background.data_rssi_threshold)) {
+			hdd_err("roam_background.data_rssi_threshold put fail");
+			return -EINVAL;
+		}
+		break;
+	case QCA_ROAM_REASON_USER_TRIGGER:
+		driver_invoke_reason =
+			info->trigger.condition.roam_user_trigger.invoke_reason;
+		vendor_invoke_reason = hdd_convert_roam_invoke_reason(driver_invoke_reason);
+		if (nla_put_u8(skb, ROAM_STATS_USER_TRIGGER_INVOKE_REASON,
+			       vendor_invoke_reason)) {
+			hdd_err("roam_user_trigger.invoke_reason put fail");
+			return -EINVAL;
+		}
+		break;
+	case QCA_ROAM_REASON_BTM:
+		if (nla_put_u8(skb, ROAM_STATS_BTM_REQUEST_MODE,
+			       info->trigger.condition.roam_btm.btm_request_mode)) {
+			hdd_err("roam_btm.btm_request_mode put fail");
+			return -EINVAL;
+		}
+		if (nla_put_u32(skb, ROAM_STATS_BTM_DISASSOC_IMMINENT_TIME,
+				info->trigger.condition.roam_btm.disassoc_imminent_timer)) {
+			hdd_err("roam_btm.disassoc_imminent_timer put fail");
+			return -EINVAL;
+		}
+		if (nla_put_u32(skb, ROAM_STATS_BTM_VALID_INTERNAL,
+				info->trigger.condition.roam_btm.validity_internal)) {
+			hdd_err("roam_btm.validity_internal put fail");
+			return -EINVAL;
+		}
+		if (nla_put_u8(skb, ROAM_STATS_BTM_CANDIDATE_LIST_CNT,
+			       info->trigger.condition.roam_btm.candidate_list_count)) {
+			hdd_err("roam_btm.candidate_list_count put fail");
+			return -EINVAL;
+		}
+		if (nla_put_u8(skb, ROAM_STATS_BTM_RESPONSE_STATUS_CODE,
+			       info->trigger.condition.roam_btm.btm_response_status_code)) {
+			hdd_err("roam_btm.btm_response_status_code put fail");
+			return -EINVAL;
+		}
+		if (nla_put_u32(skb, ROAM_STATS_BTM_BSS_TERMINATION_TIMEOUT,
+				info->trigger.condition.roam_btm.btm_bss_termination_timeout)) {
+			hdd_err("roam btm_bss_termination_timeout put fail");
+			return -EINVAL;
+		}
+		if (nla_put_u32(skb, ROAM_STATS_BTM_MBO_ASSOC_RETRY_TIMEOUT,
+				info->trigger.condition.roam_btm.btm_mbo_assoc_retry_timeout)) {
+			hdd_err("roam btm_mbo_assoc_retry_timeout put fail");
+			return -EINVAL;
+		}
+		if (nla_put_u8(skb, ROAM_STATS_BTM_REQ_DIALOG_TOKEN,
+			       info->trigger.condition.roam_btm.btm_req_dialog_token)) {
+			hdd_err("roam_btm.btm_req_dialog_token put fail");
+			return -EINVAL;
+		}
+		break;
+	case QCA_ROAM_REASON_BSS_LOAD:
+		if (nla_put_u8(skb, ROAM_STATS_BSS_CU_LOAD,
+			       info->trigger.condition.roam_bss_load.cu_load)) {
+			hdd_err("roam_bss_load.cu_load put fail");
+			return -EINVAL;
+		}
+		break;
+	case QCA_ROAM_REASON_DISCONNECTION:
+		if (nla_put_u8(skb, ROAM_STATS_DISCONNECTION_TYPE,
+			       info->trigger.condition.roam_disconnection.deauth_type)) {
+			hdd_err("roam_disconnection.deauth_type put fail");
+			return -EINVAL;
+		}
+		if (nla_put_u16(skb, ROAM_STATS_DISCONNECTION_REASON,
+				info->trigger.condition.roam_disconnection.deauth_reason)) {
+			hdd_err("roam_disconnection.deauth_reason put fail");
+			return -EINVAL;
+		}
+		break;
+	case QCA_ROAM_REASON_STA_KICKOUT:
+		driver_tx_failures_reason =
+			info->trigger.condition.roam_tx_failures.kickout_threshold;
+		vendor_tx_failures_reason =
+			hdd_convert_roam_tx_failures_reason(driver_tx_failures_reason);
+		if (nla_put_u32(skb, ROAM_STATS_TX_FAILURES_THRESHOLD,
+				vendor_tx_failures_reason)) {
+			hdd_err("roam_tx_failures.kickout_threshold put fail");
+			return -EINVAL;
+		}
+		if (nla_put_u8(skb, ROAM_STATS_TX_FAILURES_REASON,
+			       info->trigger.condition.roam_tx_failures.kickout_reason)) {
+			hdd_err("roam_tx_failures.kickout_reason put fail");
+			return -EINVAL;
+		}
+		break;
+	default:
+		break;
+	}
+
+	vendor_scan_type = hdd_convert_roam_scan_type(info->trigger.roam_scan_type);
+	if (nla_put_u8(skb, ROAM_STATS_SCAN_TYPE, vendor_scan_type)) {
+		hdd_err("roam_scan_type put fail");
+		return -EINVAL;
+	}
+
+	if (nla_put_u8(skb, ROAM_STATS_ROAM_STATUS,
+		       info->trigger.roam_status)) {
+		hdd_err("roam_status put fail");
+		return -EINVAL;
+	}
+
+	if (info->trigger.roam_status) {
+		vendor_fail_reason = hdd_convert_roam_failures_reason(info->trigger.roam_fail_reason);
+		if (nla_put_u8(skb, ROAM_STATS_FAIL_REASON,
+			       vendor_fail_reason)) {
+			hdd_err("roam_fail_reason put fail");
+			return -EINVAL;
+		}
+
+		driver_abort_reason = info->trigger.abort.abort_reason_code;
+		vendor_abort_reason = hdd_convert_roam_abort_reason(driver_abort_reason);
+		if (info->trigger.abort.abort_reason_code) {
+			if (nla_put_u8(skb, ROAM_STATS_ABORT_REASON, vendor_abort_reason)) {
+				hdd_err("abort.abort_reason_code put fail");
+				return -EINVAL;
+			}
+			if (nla_put_s8(skb, ROAM_STATS_DATA_RSSI,
+				       info->trigger.abort.data_rssi)) {
+				hdd_err("abort.data_rssi put fail");
+				return -EINVAL;
+			}
+			if (nla_put_s8(skb, ROAM_STATS_DATA_RSSI_THRESHOLD,
+				       info->trigger.abort.data_rssi_threshold)) {
+				hdd_err("abort.data_rssi_threshold put fail");
+				return -EINVAL;
+			}
+			if (nla_put_u8(skb, ROAM_STATS_DATA_RX_LINKSPEED_STATUS,
+				       info->trigger.abort.rx_linkspeed_status)) {
+				hdd_err("abort.rx_linkspeed_status put fail");
+				return -EINVAL;
+			}
+		}
+	}
+
+	roam_chn_info = nla_nest_start(skb, ROAM_STATS_SCAN_CHAN_INFO);
+	if (!roam_chn_info) {
+		hdd_err("nla_nest_start fail");
+		return -EINVAL;
+	}
+
+	for (i = 0; i < info->scan.num_channels; i++) {
+		roam_chn = nla_nest_start(skb, i);
+		if (!roam_chn) {
+			hdd_err("nla_nest_start fail");
+			return -EINVAL;
+		}
+
+		if (nla_put_u32(skb, ROAM_STATS_SCAN_CHANNEL_FREQ,
+				info->scan.roam_chn[i].chan_freq)) {
+			hdd_err("roam_chn[%u].chan_freq put fail", i);
+			return -EINVAL;
+		}
+
+		driver_dwell_type = info->scan.roam_chn[i].dwell_type;
+		vendor_dwell_type = hdd_convert_roam_chn_dwell_type(driver_dwell_type);
+		if (nla_put_u32(skb, ROAM_STATS_SCAN_DWELL_TYPE,
+				vendor_dwell_type)) {
+			hdd_err("roam_chn[%u].dwell_type put fail", i);
+			return -EINVAL;
+		}
+		if (nla_put_u32(skb, ROAM_STATS_MAX_DWELL_TIME,
+				info->scan.roam_chn[i].max_dwell_time)) {
+			hdd_err("roam_chn[%u].max_dwell_time put fail", i);
+			return -EINVAL;
+		}
+		nla_nest_end(skb, roam_chn);
+	}
+	nla_nest_end(skb, roam_chn_info);
+
+	if (nla_put_u32(skb, ROAM_STATS_TOTAL_SCAN_TIME,
+			info->scan.total_scan_time)) {
+		hdd_err("roam_scan total_scan_time put fail");
+		return -EINVAL;
+	}
+
+	roam_frame_info = nla_nest_start(skb, ROAM_STATS_FRAME_INFO);
+	if (!roam_frame_info) {
+		hdd_err("nla_nest_start fail");
+		return -EINVAL;
+	}
+
+	for (i = 0; i < ROAM_FRAME_NUM; i++) {
+		roam_frame = nla_nest_start(skb, i);
+		if (!roam_frame) {
+			hdd_err("nla_nest_start fail");
+			return -EINVAL;
+		}
+		driver_frame_type = info->timestamp[i].frame_type;
+		vendor_frame_type = hdd_convert_roam_frame_type(driver_frame_type);
+		ret = nla_put_u8(skb, ROAM_STATS_FRAME_SUBTYPE,
+				 vendor_frame_type);
+		if (ret) {
+			hdd_err("roam_frame[%u].type put fail %d", i, ret);
+			return -EINVAL;
+		}
+		driver_frame_status = info->timestamp[i].status;
+		vendor_frame_status = hdd_convert_roam_frame_status(driver_frame_status);
+		ret = nla_put_u8(skb, ROAM_STATS_FRAME_STATUS,
+				 vendor_frame_status);
+		if (ret) {
+			hdd_err("frame[%u].status put fail %d", i, ret);
+			return -EINVAL;
+		}
+		ret = wlan_cfg80211_nla_put_u64(skb, ROAM_STATS_FRAME_TIMESTAMP,
+						info->timestamp[i].timestamp);
+		if (ret) {
+			hdd_err("frame[%u].timestamp put fail %d", i, ret);
+			return -EINVAL;
+		}
+		nla_nest_end(skb, roam_frame);
+	}
+	nla_nest_end(skb, roam_frame_info);
+
+	return 0;
+}
+
+/**
+ * hdd_get_roam_stats_info() - get roam statistics info to userspace,
+ * for STA mode only
+ * @skb:     pointer to sk buff
+ * @hdd_ctx: pointer to hdd context
+ * @roam_info: pointer to roam info
+ * @roam_cache_num: roam cache number
+ *
+ * Return: 0 if success else error status
+ */
+static int hdd_get_roam_stats_info(struct sk_buff *skb,
+				   struct hdd_context *hdd_ctx,
+				   struct enhance_roam_info *roam_info,
+				   uint32_t  roam_cache_num)
+{
+	struct nlattr *config, *roam_params;
+	uint32_t i;
+	int ret;
+
+	config = nla_nest_start(skb, QCA_WLAN_VENDOR_ATTR_ROAM_STATS_INFO);
+	if (!config) {
+		hdd_err("nla nest start failure");
+		return -EINVAL;
+	}
+
+	/* Send all driver cached roam info to user space one time,
+	 * and don't flush them, since they will be cover by
+	 * new roam event info.
+	 */
+	for (i = 0; i < roam_cache_num; i++) {
+		roam_params = nla_nest_start(skb, i);
+		if (!roam_params)
+			return -EINVAL;
+
+		ret = hdd_nla_put_roam_stats_info(skb, roam_info, i);
+		if (ret) {
+			hdd_err("nla put failure");
+			return -EINVAL;
+		}
+
+		nla_nest_end(skb, roam_params);
+	}
+	nla_nest_end(skb, config);
+
+	return 0;
+}
+
+/**
+ * hdd_get_roam_stats() - send roam statistics info to userspace
+ * @hdd_ctx: pointer to hdd context
+ * @adapter: pointer to adapter
+ *
+ * Return: 0 if success else error status
+ */
+static int
+hdd_get_roam_stats(struct hdd_context *hdd_ctx,
+		   struct hdd_adapter *adapter)
+{
+	struct sk_buff *skb;
+	uint32_t skb_len;
+	int ret = 0;
+	struct wlan_objmgr_vdev *vdev;
+	QDF_STATUS status;
+	struct enhance_roam_info *roam_info = NULL;
+	uint32_t roam_num = 0;
+
+	vdev = hdd_objmgr_get_vdev_by_user(adapter, WLAN_OSIF_STATS_ID);
+	if (!vdev)
+		return -EINVAL;
+
+	status = ucfg_cm_roam_stats_info_get(vdev, &roam_info, &roam_num);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		hdd_err("Failed to get roam info : %d", status);
+		wlan_objmgr_vdev_release_ref(vdev, WLAN_OSIF_STATS_ID);
+		return qdf_status_to_os_return(status);
+	}
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_OSIF_STATS_ID);
+
+	skb_len = hdd_get_roam_stats_info_len(roam_info, roam_num);
+	if (!skb_len) {
+		hdd_err("No data requested");
+		ucfg_cm_roam_stats_info_put(roam_info);
+		return -EINVAL;
+	}
+
+	skb_len += NLMSG_HDRLEN;
+	skb = wlan_cfg80211_vendor_cmd_alloc_reply_skb(hdd_ctx->wiphy, skb_len);
+	if (!skb) {
+		hdd_info("wlan_cfg80211_vendor_cmd_alloc_reply_skb failed");
+		ucfg_cm_roam_stats_info_put(roam_info);
+		return -ENOMEM;
+	}
+
+	ret = hdd_get_roam_stats_info(skb, hdd_ctx, roam_info, roam_num);
+	if (ret) {
+		hdd_info("get roam stats fail");
+		wlan_cfg80211_vendor_free_skb(skb);
+		ucfg_cm_roam_stats_info_put(roam_info);
+		return -ENOMEM;
+	}
+
+	ucfg_cm_roam_stats_info_put(roam_info);
+
+	return wlan_cfg80211_vendor_cmd_reply(skb);
+}
+
+/**
+ * __wlan_hdd_cfg80211_get_roam_stats() - get roam statstics information
+ * @wiphy: wiphy pointer
+ * @wdev: pointer to struct wireless_dev
+ * @data: pointer to incoming NL vendor data
+ * @data_len: length of @data
+ *
+ * Return: 0 on success; error number otherwise.
+ */
+static int
+__wlan_hdd_cfg80211_get_roam_stats(struct wiphy *wiphy,
+				   struct wireless_dev *wdev,
+				   const void *data,
+				   int data_len)
+{
+	struct hdd_context *hdd_ctx = wiphy_priv(wiphy);
+	struct net_device *dev = wdev->netdev;
+	struct hdd_adapter *adapter = WLAN_HDD_GET_PRIV_PTR(dev);
+	int32_t status;
+
+	hdd_enter_dev(dev);
+
+	if (hdd_get_conparam() == QDF_GLOBAL_FTM_MODE ||
+	    hdd_get_conparam() == QDF_GLOBAL_MONITOR_MODE) {
+		hdd_err_rl("Command not allowed in FTM / Monitor mode");
+		status = -EPERM;
+		goto out;
+	}
+
+	status = wlan_hdd_validate_context(hdd_ctx);
+	if (status != 0)
+		goto out;
+
+	if (adapter->device_mode == QDF_STA_MODE) {
+		status = hdd_get_roam_stats(hdd_ctx, adapter);
+	} else {
+		hdd_err_rl("Invalid device_mode: %d", adapter->device_mode);
+		status = -EINVAL;
+	}
+
+	hdd_exit();
+out:
+	return status;
+}
+
+/**
+ * wlan_hdd_cfg80211_get_roam_stats() - get roam statstics information
+ * @wiphy: wiphy pointer
+ * @wdev: pointer to struct wireless_dev
+ * @data: pointer to incoming NL vendor data
+ * @data_len: length of @data
+ *
+ * Return: 0 on success; error number otherwise.
+ */
+int wlan_hdd_cfg80211_get_roam_stats(struct wiphy *wiphy,
+				     struct wireless_dev *wdev,
+				     const void *data,
+				     int data_len)
+{
+	int errno;
+	struct osif_vdev_sync *vdev_sync;
+
+	errno = osif_vdev_sync_op_start(wdev->netdev, &vdev_sync);
+	if (errno)
+		return errno;
+
+	errno = __wlan_hdd_cfg80211_get_roam_stats(wiphy, wdev,
+						   data, data_len);
+
+	osif_vdev_sync_op_stop(vdev_sync);
+
+	return errno;
 }
 #endif

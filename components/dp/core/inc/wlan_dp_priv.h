@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -89,6 +89,7 @@ struct dp_rtpm_tput_policy_context {
  * @bus_bw_super_high_threshold: bus bandwidth super high threshold
  * @bus_bw_ultra_high_threshold: bus bandwidth ultra high threshold
  * @bus_bw_very_high_threshold: bus bandwidth very high threshold
+ * @bus_bw_mid_high_threshold: bus bandwidth mid high threshold
  * @bus_bw_dbs_threshold: bus bandwidth for DBS mode threshold
  * @bus_bw_high_threshold: bus bandwidth high threshold
  * @bus_bw_medium_threshold: bandwidth threshold for medium bandwidth
@@ -151,6 +152,7 @@ struct wlan_dp_psoc_cfg {
 	uint32_t bus_bw_ultra_high_threshold;
 	uint32_t bus_bw_very_high_threshold;
 	uint32_t bus_bw_dbs_threshold;
+	uint32_t bus_bw_mid_high_threshold;
 	uint32_t bus_bw_high_threshold;
 	uint32_t bus_bw_medium_threshold;
 	uint32_t bus_bw_low_threshold;
@@ -514,8 +516,7 @@ struct dp_direct_link_context {
  * @txrx_hist: TxRx histogram
  * @bbm_ctx: bus bandwidth manager context
  * @dp_direct_link_ctx: DP Direct Link context
- * @rx_skip_qdisc_chk_conc:rx skip qdisc check connection
- * @arp_connectivity_map: ARP connectiviy map
+ * @arp_connectivity_map: ARP connectivity map
  * @rx_wake_lock: rx wake lock
  * @ol_enable: Enable/Disable offload
  */
@@ -583,8 +584,6 @@ struct wlan_dp_psoc_context {
 		uint32_t tc_ingress_prio;
 	}
 	dp_agg_param;
-
-	qdf_atomic_t rx_skip_qdisc_chk_conc;
 
 	uint32_t arp_connectivity_map;
 

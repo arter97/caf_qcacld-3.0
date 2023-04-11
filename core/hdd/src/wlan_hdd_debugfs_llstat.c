@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -93,7 +93,7 @@ void hdd_debugfs_process_iface_stats(struct hdd_adapter *adapter,
 	buffer += len;
 	ll_stats.len += len;
 	len = scnprintf(buffer, DEBUGFS_LLSTATS_BUF_SIZE - ll_stats.len,
-			"\nbeacon_rx: %u, mgmt_rx: %u, mgmt_action_rx: %u, mgmt_action_tx: %u, rssi_mgmt: %d, rssi_data: %d, rssi_ack: %d, is_leaky_ap: %u, avg_rx_frms_leaked: %u, rx_leak_window: %u, average_tsf_offset: %llu, Tx RTS success count: %u, Tx RTS fail count: %u, Tx ppdu success count: %u, Tx ppdu fail count: %u, Connected duration: %u, Disconnected duration: %u, RTT ranging duration: %u, RTT responder duration: %u, Num tx probes: %u, Num beacon miss: %u,\n\nNumber of AC: %d",
+			"\nbeacon_rx: %u, mgmt_rx: %u, mgmt_action_rx: %u, mgmt_action_tx: %u, rssi_mgmt: %d, rssi_data: %d, rssi_ack: %d, is_leaky_ap: %u, avg_rx_frms_leaked: %u, rx_leak_window: %u, average_tsf_offset: %llu, Tx RTS success count: %u, Tx RTS fail count: %u, Tx ppdu success count: %u, Tx ppdu fail count: %u, Connected duration: %u, Disconnected duration: %u, RTT ranging duration: %u, RTT responder duration: %u, Num tx probes: %u, Num beacon miss: %u, nf_cal %d\n\nNumber of AC: %d",
 			link_stats->beacon_rx, link_stats->mgmt_rx,
 			link_stats->mgmt_action_rx, link_stats->mgmt_action_tx,
 			link_stats->rssi_mgmt, link_stats->rssi_data,
@@ -109,6 +109,7 @@ void hdd_debugfs_process_iface_stats(struct hdd_adapter *adapter,
 			link_stats->rtt_ranging_duration,
 			link_stats->rtt_responder_duration,
 			link_stats->num_probes_tx, link_stats->num_beacon_miss,
+			link_stats->nf_cal_val,
 			link_stats->num_ac);
 
 	for (i = 0; i < link_stats->num_ac; i++) {

@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -800,11 +800,8 @@ struct pe_session {
 	bool is_adaptive_11r_connection;
 
 #ifdef FEATURE_WLAN_ESE
-	bool isESEconnection;
 	tEsePEContext eseContext;
 #endif
-	bool isFastTransitionEnabled;
-	bool isFastRoamIniFeatureEnabled;
 	tSirP2PNoaAttr p2pGoPsUpdate;
 	uint32_t defaultAuthFailureTimeout;
 
@@ -1085,6 +1082,25 @@ struct pe_session
 *pe_find_session_by_vdev_id_and_state(struct mac_context *mac,
 				      uint8_t vdev_id,
 				      enum eLimMlmStates lim_state);
+
+/**
+ * pe_find_session_by_bssid_and_vdev_id() - looks up the PE session given
+ * the BSSID and vdev id.
+ * @mac:          pointer to global adapter context
+ * @bssid:         BSSID of the new session
+ * @vdev_id:         vdev id the session
+ * @sessionId:     session ID is returned here, if session is created.
+ *
+ * This function returns the session context and the session ID if the session
+ * corresponding to the given BSSID and vdev id is found in the PE
+ * session table.
+ *
+ * Return: pointer to the session context or NULL if session is not found.
+ */
+struct pe_session *pe_find_session_by_bssid_and_vdev_id(struct mac_context *mac,
+							uint8_t *bssid,
+							uint8_t vdev_id,
+							uint8_t *sessionId);
 
 /**
  * pe_find_session_by_peer_sta() - looks up the PE session given the Peer

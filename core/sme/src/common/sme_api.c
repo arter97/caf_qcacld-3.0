@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -1206,6 +1206,7 @@ QDF_STATUS sme_start(mac_handle_t mac_handle)
 			sme_change_mcc_beacon_interval;
 		sme_cbacks.sme_rso_start_cb = sme_start_roaming;
 		sme_cbacks.sme_rso_stop_cb = sme_stop_roaming;
+		sme_cbacks.sme_change_sap_csa_count = sme_change_sap_csa_count;
 		status = policy_mgr_register_sme_cb(mac->psoc, &sme_cbacks);
 		if (!QDF_IS_STATUS_SUCCESS(status)) {
 			sme_err("Failed to register sme cb with Policy Manager: %d",
@@ -3315,7 +3316,7 @@ QDF_STATUS sme_roam_ndi_stop(mac_handle_t mac_handle, uint8_t vdev_id)
 			 0));
 
 	if (!CSR_IS_SESSION_VALID(mac_ctx, vdev_id)) {
-		sme_err("Invalid sessionID: %d", vdev_id);
+		sme_debug("Invalid sessionID: %d", vdev_id);
 		return QDF_STATUS_E_INVAL;
 	}
 
@@ -3943,6 +3944,39 @@ QDF_STATUS sme_neighbor_report_request(
 	}
 
 	return status;
+}
+
+void sme_register_ssr_on_pagefault_cb(mac_handle_t mac_handle,
+				      void (*hdd_ssr_on_pagefault_cb)(void))
+{
+	QDF_STATUS status;
+	struct mac_context *mac = MAC_CONTEXT(mac_handle);
+
+	SME_ENTER();
+
+	status = sme_acquire_global_lock(&mac->sme);
+	if (QDF_IS_STATUS_SUCCESS(status)) {
+		mac->sme.ssr_on_pagefault_cb = hdd_ssr_on_pagefault_cb;
+		sme_release_global_lock(&mac->sme);
+	}
+
+	SME_EXIT();
+}
+
+void sme_deregister_ssr_on_pagefault_cb(mac_handle_t mac_handle)
+{
+	QDF_STATUS status;
+	struct mac_context *mac = MAC_CONTEXT(mac_handle);
+
+	SME_ENTER();
+
+	status = sme_acquire_global_lock(&mac->sme);
+	if (QDF_IS_STATUS_SUCCESS(status)) {
+		mac->sme.ssr_on_pagefault_cb = NULL;
+		sme_release_global_lock(&mac->sme);
+	}
+
+	SME_EXIT();
 }
 
 #ifdef FEATURE_OEM_DATA_SUPPORT
@@ -4947,6 +4981,19 @@ QDF_STATUS sme_change_mcc_beacon_interval(uint8_t sessionId)
 		sme_release_global_lock(&mac_ctx->sme);
 	}
 	return status;
+}
+
+QDF_STATUS sme_change_sap_csa_count(uint8_t count)
+{
+	struct mac_context *mac_ctx = sme_get_mac_context();
+
+	if (!mac_ctx) {
+		sme_err("mac_ctx is NULL");
+		return QDF_STATUS_E_FAILURE;
+	}
+	mac_ctx->sap.one_time_csa_count = count;
+
+	return QDF_STATUS_SUCCESS;
 }
 
 /**
@@ -8345,6 +8392,10 @@ QDF_STATUS sme_init_thermal_info(mac_handle_t mac_handle)
 				thermal_temp.throttle_dutycycle_level[2];
 	pWmaParam->throttle_duty_cycle_tbl[3] =
 				thermal_temp.throttle_dutycycle_level[3];
+	pWmaParam->throttle_duty_cycle_tbl[4] =
+				thermal_temp.throttle_dutycycle_level[4];
+	pWmaParam->throttle_duty_cycle_tbl[5] =
+				thermal_temp.throttle_dutycycle_level[5];
 
 	pWmaParam->thermalLevels[0].minTempThreshold =
 				thermal_temp.thermal_temp_min_level[0];
@@ -8362,6 +8413,14 @@ QDF_STATUS sme_init_thermal_info(mac_handle_t mac_handle)
 				thermal_temp.thermal_temp_min_level[3];
 	pWmaParam->thermalLevels[3].maxTempThreshold =
 				thermal_temp.thermal_temp_max_level[3];
+	pWmaParam->thermalLevels[4].minTempThreshold =
+				thermal_temp.thermal_temp_min_level[4];
+	pWmaParam->thermalLevels[4].maxTempThreshold =
+				thermal_temp.thermal_temp_max_level[4];
+	pWmaParam->thermalLevels[5].minTempThreshold =
+				thermal_temp.thermal_temp_min_level[5];
+	pWmaParam->thermalLevels[5].maxTempThreshold =
+				thermal_temp.thermal_temp_max_level[5];
 	pWmaParam->thermal_action = thermal_temp.thermal_action;
 	if (QDF_STATUS_SUCCESS == sme_acquire_global_lock(&mac->sme)) {
 		msg.type = WMA_INIT_THERMAL_INFO_CMD;
@@ -10436,11 +10495,6 @@ void sme_update_tgt_eht_cap(mac_handle_t mac_handle,
 		     sizeof(tDot11fIEeht_cap));
 }
 
-void sme_update_eht_cap_nss(mac_handle_t mac_handle, uint8_t session_id,
-			    uint8_t nss)
-{
-}
-
 void sme_set_eht_bw_cap(mac_handle_t mac_handle, uint8_t vdev_id,
 			enum eSirMacHTChannelWidth chwidth)
 {
@@ -10466,6 +10520,27 @@ void sme_set_eht_bw_cap(mac_handle_t mac_handle, uint8_t vdev_id,
 		     sizeof(tDot11fIEeht_cap));
 
 	csr_update_session_eht_cap(mac_ctx, session);
+}
+
+int sme_update_eht_om_ctrl_supp(mac_handle_t mac_handle, uint8_t session_id,
+				uint8_t cfg_val)
+{
+	struct mac_context *mac_ctx = MAC_CONTEXT(mac_handle);
+	struct csr_roam_session *session;
+
+	session = CSR_GET_SESSION(mac_ctx, session_id);
+
+	if (!session) {
+		sme_err("No session for id %d", session_id);
+		return -EINVAL;
+	}
+	mac_ctx->mlme_cfg->eht_caps.dot11_eht_cap.eht_om_ctl = cfg_val;
+	mac_ctx->eht_cap_2g.eht_om_ctl = cfg_val;
+	mac_ctx->eht_cap_5g.eht_om_ctl = cfg_val;
+
+	csr_update_session_eht_cap(mac_ctx, session);
+
+	return 0;
 }
 #endif
 
@@ -10585,6 +10660,25 @@ void sme_update_he_cap_nss(mac_handle_t mac_handle, uint8_t session_id,
 	if (cfg_in_range(CFG_HE_TX_MCS_MAP_LT_80, tx_mcs_map))
 		mac_ctx->mlme_cfg->he_caps.dot11_he_cap.tx_he_mcs_map_lt_80 =
 		tx_mcs_map;
+	if (cfg_in_range(CFG_HE_RX_MCS_MAP_160, rx_mcs_map))
+		qdf_mem_copy(mac_ctx->mlme_cfg->he_caps.dot11_he_cap.
+			     rx_he_mcs_map_160,
+			     &rx_mcs_map, sizeof(uint16_t));
+	if (cfg_in_range(CFG_HE_TX_MCS_MAP_160, tx_mcs_map))
+		qdf_mem_copy(mac_ctx->mlme_cfg->he_caps.dot11_he_cap.
+			     tx_he_mcs_map_160,
+			     &tx_mcs_map, sizeof(uint16_t));
+
+	mac_ctx->he_cap_2g.rx_he_mcs_map_lt_80 = rx_mcs_map;
+	mac_ctx->he_cap_2g.tx_he_mcs_map_lt_80 = tx_mcs_map;
+	mac_ctx->he_cap_5g.rx_he_mcs_map_lt_80 = rx_mcs_map;
+	mac_ctx->he_cap_5g.tx_he_mcs_map_lt_80 = tx_mcs_map;
+	qdf_mem_copy(mac_ctx->he_cap_5g.rx_he_mcs_map_160,
+		     mac_ctx->mlme_cfg->he_caps.dot11_he_cap.rx_he_mcs_map_160,
+		     sizeof(uint16_t));
+	qdf_mem_copy(mac_ctx->he_cap_5g.tx_he_mcs_map_160,
+		     mac_ctx->mlme_cfg->he_caps.dot11_he_cap.tx_he_mcs_map_160,
+		     sizeof(uint16_t));
 	csr_update_session_he_cap(mac_ctx, csr_session);
 
 }
@@ -10596,12 +10690,26 @@ int sme_update_he_mcs(mac_handle_t mac_handle, uint8_t session_id,
 	struct csr_roam_session *csr_session;
 	uint16_t mcs_val = 0;
 	uint16_t mcs_map = HE_MCS_ALL_DISABLED;
+	uint16_t mcs_map_cfg;
+	uint8_t nss = 0, i;
+	uint16_t mcs_mask = 0x3;
 
 	csr_session = CSR_GET_SESSION(mac_ctx, session_id);
 	if (!csr_session) {
 		sme_err("No session for id %d", session_id);
 		return -EINVAL;
 	}
+
+	mcs_map_cfg =
+		mac_ctx->mlme_cfg->he_caps.dot11_he_cap.rx_he_mcs_map_lt_80;
+	for (nss = 0; nss < VHT_MAX_NSS; nss++) {
+		if ((mcs_map_cfg & mcs_mask) ==  mcs_mask)
+			break;
+		mcs_mask = (mcs_mask << 2);
+	}
+	if (nss > 2)
+		nss = 2;
+
 	if ((he_mcs & 0x3) == HE_MCS_DISABLE) {
 		sme_err("Invalid HE MCS 0x%0x, can't disable 0-7 for 1ss",
 			he_mcs);
@@ -10612,24 +10720,29 @@ int sme_update_he_mcs(mac_handle_t mac_handle, uint8_t session_id,
 	case HE_80_MCS0_7:
 	case HE_80_MCS0_9:
 	case HE_80_MCS0_11:
-		if (mac_ctx->mlme_cfg->vht_caps.vht_cap_info.enable2x2) {
-			mcs_map = HE_SET_MCS_4_NSS(mcs_map, mcs_val, 1);
-			mcs_map = HE_SET_MCS_4_NSS(mcs_map, mcs_val, 2);
-		} else {
-			mcs_map = HE_SET_MCS_4_NSS(mcs_map, mcs_val, 1);
-		}
+		for (i = 1; i <= nss; i++)
+			mcs_map = HE_SET_MCS_4_NSS(mcs_map, mcs_val, i);
+
+		sme_debug("HE 80 nss: %d, mcs: 0x%0X", nss, mcs_map);
 		if (cfg_in_range(CFG_HE_TX_MCS_MAP_LT_80, mcs_map))
 			mac_ctx->mlme_cfg->he_caps.dot11_he_cap.
 			tx_he_mcs_map_lt_80 = mcs_map;
 		if (cfg_in_range(CFG_HE_RX_MCS_MAP_LT_80, mcs_map))
 			mac_ctx->mlme_cfg->he_caps.dot11_he_cap.
 			rx_he_mcs_map_lt_80 = mcs_map;
+		mac_ctx->he_cap_2g.tx_he_mcs_map_lt_80 = mcs_map;
+		mac_ctx->he_cap_2g.rx_he_mcs_map_lt_80 = mcs_map;
+		mac_ctx->he_cap_5g.tx_he_mcs_map_lt_80 = mcs_map;
+		mac_ctx->he_cap_5g.rx_he_mcs_map_lt_80 = mcs_map;
 		break;
 
 	case HE_160_MCS0_7:
 	case HE_160_MCS0_9:
 	case HE_160_MCS0_11:
-		mcs_map = HE_SET_MCS_4_NSS(mcs_map, mcs_val, 1);
+		for (i = 1; i <= nss; i++)
+			mcs_map = HE_SET_MCS_4_NSS(mcs_map, mcs_val, i);
+
+		sme_debug("HE 160 nss: %d, mcs: 0x%0X", nss, mcs_map);
 		if (cfg_in_range(CFG_HE_TX_MCS_MAP_160, mcs_map))
 			qdf_mem_copy(mac_ctx->mlme_cfg->he_caps.dot11_he_cap.
 				     tx_he_mcs_map_160, &mcs_map,
@@ -10638,6 +10751,14 @@ int sme_update_he_mcs(mac_handle_t mac_handle, uint8_t session_id,
 			qdf_mem_copy(mac_ctx->mlme_cfg->he_caps.dot11_he_cap.
 				     rx_he_mcs_map_160, &mcs_map,
 				     sizeof(uint16_t));
+		qdf_mem_copy(mac_ctx->he_cap_5g.tx_he_mcs_map_160,
+			     mac_ctx->mlme_cfg->he_caps.dot11_he_cap.
+			     tx_he_mcs_map_160,
+			     sizeof(uint16_t));
+		qdf_mem_copy(mac_ctx->he_cap_5g.rx_he_mcs_map_160,
+			     mac_ctx->mlme_cfg->he_caps.dot11_he_cap.
+			     rx_he_mcs_map_160,
+			     sizeof(uint16_t));
 		break;
 
 	case HE_80p80_MCS0_7:
@@ -10659,6 +10780,7 @@ int sme_update_he_mcs(mac_handle_t mac_handle, uint8_t session_id,
 		return -EINVAL;
 	}
 	sme_debug("new HE MCS 0x%0x", mcs_map);
+	sme_set_vdev_ies_per_band(mac_handle, session_id, QDF_STA_MODE);
 	csr_update_session_he_cap(mac_ctx, csr_session);
 
 	return 0;
@@ -10816,6 +10938,8 @@ int sme_update_he_om_ctrl_supp(mac_handle_t mac_handle, uint8_t session_id,
 		return -EINVAL;
 	}
 	mac_ctx->mlme_cfg->he_caps.dot11_he_cap.omi_a_ctrl = cfg_val;
+	mac_ctx->he_cap_2g.omi_a_ctrl = cfg_val;
+	mac_ctx->he_cap_5g.omi_a_ctrl = cfg_val;
 
 	csr_update_session_he_cap(mac_ctx, session);
 	return 0;
@@ -14094,8 +14218,8 @@ void sme_add_qcn_ie(mac_handle_t mac_handle, uint8_t *ie_data,
 /**
  * sme_get_status_for_candidate() - Get bss transition status for candidate
  * @mac_handle: Opaque handle to the global MAC context
- * @conn_bss_desc: connected bss descriptor
- * @bss_desc: candidate bss descriptor
+ * @conn_bss: connected bss scan entry
+ * @candidate_bss: candidate bss scan entry
  * @info: candiadate bss information
  * @trans_reason: transition reason code
  * @is_bt_in_progress: bt activity indicator
@@ -14104,8 +14228,8 @@ void sme_add_qcn_ie(mac_handle_t mac_handle, uint8_t *ie_data,
  * @info->status. Otherwise returns false.
  */
 static bool sme_get_status_for_candidate(mac_handle_t mac_handle,
-					 struct bss_description *conn_bss_desc,
-					 struct bss_description *bss_desc,
+					 struct scan_cache_entry *conn_bss,
+					 struct scan_cache_entry *candidate_bss,
 					 struct bss_candidate_info *info,
 					 uint8_t trans_reason,
 					 bool is_bt_in_progress)
@@ -14128,18 +14252,19 @@ static bool sme_get_status_for_candidate(mac_handle_t mac_handle,
 	 * bss rssi is greater than mbo_current_rssi_thres, then reject the
 	 * candidate with MBO reason code 4.
 	 */
-	if ((bss_desc->rssi < mbo_cfg->mbo_candidate_rssi_thres) &&
-	    (conn_bss_desc->rssi > mbo_cfg->mbo_current_rssi_thres)) {
-		sme_err("Candidate BSS "QDF_MAC_ADDR_FMT" has LOW RSSI(%d), hence reject",
-			QDF_MAC_ADDR_REF(bss_desc->bssId), bss_desc->rssi);
+	if ((candidate_bss->rssi_raw < mbo_cfg->mbo_candidate_rssi_thres) &&
+	    (conn_bss->rssi_raw > mbo_cfg->mbo_current_rssi_thres)) {
+		sme_err("Candidate BSS " QDF_MAC_ADDR_FMT " has LOW RSSI(%d), hence reject",
+			QDF_MAC_ADDR_REF(candidate_bss->bssid.bytes),
+			candidate_bss->rssi_raw);
 		info->status = QCA_STATUS_REJECT_LOW_RSSI;
 		return true;
 	}
 
 	if (trans_reason == MBO_TRANSITION_REASON_LOAD_BALANCING ||
 	    trans_reason == MBO_TRANSITION_REASON_TRANSITIONING_TO_PREMIUM_AP) {
-		bss_chan_freq = bss_desc->chan_freq;
-		conn_bss_chan_freq = conn_bss_desc->chan_freq;
+		bss_chan_freq = candidate_bss->channel.chan_freq;
+		conn_bss_chan_freq = conn_bss->channel.chan_freq;
 		/*
 		 * MCC rejection
 		 * If moving to candidate's channel will result in MCC scenario
@@ -14148,10 +14273,10 @@ static bool sme_get_status_for_candidate(mac_handle_t mac_handle,
 		 * MBO reason code 3.
 		 */
 		current_rssi_mcc_thres = mbo_cfg->mbo_current_rssi_mcc_thres;
-		if ((conn_bss_desc->rssi > current_rssi_mcc_thres) &&
+		if ((conn_bss->rssi_raw > current_rssi_mcc_thres) &&
 		    csr_is_mcc_channel(mac_ctx, bss_chan_freq)) {
-			sme_err("Candidate BSS "QDF_MAC_ADDR_FMT" causes MCC, hence reject",
-				QDF_MAC_ADDR_REF(bss_desc->bssId));
+			sme_err("Candidate BSS "  QDF_MAC_ADDR_FMT " causes MCC, hence reject",
+				QDF_MAC_ADDR_REF(candidate_bss->bssid.bytes));
 			info->status =
 				QCA_STATUS_REJECT_INSUFFICIENT_QOS_CAPACITY;
 			return true;
@@ -14167,9 +14292,9 @@ static bool sme_get_status_for_candidate(mac_handle_t mac_handle,
 		if (WLAN_REG_IS_5GHZ_CH_FREQ(conn_bss_chan_freq) &&
 		    WLAN_REG_IS_24GHZ_CH_FREQ(bss_chan_freq) &&
 		    is_bt_in_progress &&
-		    (bss_desc->rssi < mbo_cfg->mbo_candidate_rssi_btc_thres)) {
-			sme_err("Candidate BSS "QDF_MAC_ADDR_FMT" causes BT coex, hence reject",
-				QDF_MAC_ADDR_REF(bss_desc->bssId));
+		    (candidate_bss->rssi_raw < mbo_cfg->mbo_candidate_rssi_btc_thres)) {
+			sme_err("Candidate BSS " QDF_MAC_ADDR_FMT " causes BT coex, hence reject",
+				QDF_MAC_ADDR_REF(candidate_bss->bssid.bytes));
 			info->status =
 				QCA_STATUS_REJECT_EXCESSIVE_DELAY_EXPECTED;
 			return true;
@@ -14187,8 +14312,8 @@ static bool sme_get_status_for_candidate(mac_handle_t mac_handle,
 
 		if (conn_bss_chan_safe && !bss_chan_safe) {
 			sme_err("High interference expected if transitioned to BSS "
-				QDF_MAC_ADDR_FMT" hence reject",
-				QDF_MAC_ADDR_REF(bss_desc->bssId));
+				QDF_MAC_ADDR_FMT " hence reject",
+				QDF_MAC_ADDR_REF(candidate_bss->bssid.bytes));
 			info->status =
 				QCA_STATUS_REJECT_HIGH_INTERFERENCE;
 			return true;
@@ -14207,48 +14332,57 @@ QDF_STATUS sme_get_bss_transition_status(mac_handle_t mac_handle,
 {
 	struct mac_context *mac_ctx = MAC_CONTEXT(mac_handle);
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
-	struct bss_description *bss_desc, *conn_bss_desc;
-	tCsrScanResultInfo *res, *conn_res;
 	uint16_t i;
+	qdf_list_t *bssid_list = NULL, *candidate_list = NULL;
+	struct scan_cache_node *conn_bss = NULL, *candidate_bss = NULL;
+	qdf_list_node_t *cur_lst = NULL;
 
 	if (!n_candidates || !info) {
 		sme_err("No candidate info available");
 		return QDF_STATUS_E_INVAL;
 	}
 
-	conn_res = qdf_mem_malloc(sizeof(tCsrScanResultInfo));
-	if (!conn_res)
-		return QDF_STATUS_E_NOMEM;
-
-	res = qdf_mem_malloc(sizeof(tCsrScanResultInfo));
-	if (!res) {
-		status = QDF_STATUS_E_NOMEM;
-		goto free;
-	}
-
 	/* Get the connected BSS descriptor */
-	status = csr_scan_get_result_for_bssid(mac_ctx, bssid, conn_res);
-	if (!QDF_IS_STATUS_SUCCESS(status)) {
-		sme_err("Failed to find connected BSS in scan list");
-		goto free;
+	status = csr_scan_get_result_for_bssid(mac_ctx, bssid, &bssid_list);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		sme_err("connected BSS: " QDF_MAC_ADDR_FMT " not present in scan db",
+			QDF_MAC_ADDR_REF(bssid->bytes));
+		goto purge;
 	}
-	conn_bss_desc = &conn_res->BssDescriptor;
+	qdf_list_peek_front(bssid_list, &cur_lst);
+	if (!cur_lst) {
+		sme_err("Failed to peek connected BSS : " QDF_MAC_ADDR_FMT,
+			QDF_MAC_ADDR_REF(bssid->bytes));
+		goto purge;
+	}
+
+	conn_bss =
+		qdf_container_of(cur_lst, struct scan_cache_node, node);
 
 	for (i = 0; i < n_candidates; i++) {
 		/* Get candidate BSS descriptors */
 		status = csr_scan_get_result_for_bssid(mac_ctx, &info[i].bssid,
-						       res);
-		if (!QDF_IS_STATUS_SUCCESS(status)) {
-			sme_err("BSS "QDF_MAC_ADDR_FMT" not present in scan list",
+						       &candidate_list);
+		if (QDF_IS_STATUS_ERROR(status)) {
+			sme_err("BSS " QDF_MAC_ADDR_FMT " not present in scan db",
 				QDF_MAC_ADDR_REF(info[i].bssid.bytes));
 			info[i].status = QCA_STATUS_REJECT_UNKNOWN;
 			continue;
 		}
+		cur_lst = NULL;
+		qdf_list_peek_front(candidate_list, &cur_lst);
+		if (!cur_lst) {
+			sme_err("Failed to peek candidate: " QDF_MAC_ADDR_FMT,
+				QDF_MAC_ADDR_REF(info[i].bssid.bytes));
+			goto next;
+		}
 
-		bss_desc = &res->BssDescriptor;
-		if (!sme_get_status_for_candidate(mac_handle, conn_bss_desc,
-						  bss_desc, &info[i],
-						  transition_reason,
+		candidate_bss =
+			qdf_container_of(cur_lst, struct scan_cache_node, node);
+		if (!sme_get_status_for_candidate(mac_handle,
+						  conn_bss->entry,
+						  candidate_bss->entry,
+						  &info[i], transition_reason,
 						  is_bt_in_progress)) {
 			/*
 			 * If status is not over written, it means it is a
@@ -14256,17 +14390,19 @@ QDF_STATUS sme_get_bss_transition_status(mac_handle_t mac_handle,
 			 */
 			info[i].status = QCA_STATUS_ACCEPT;
 		}
+next:
+		wlan_scan_purge_results(candidate_list);
+		candidate_list = NULL;
 	}
 
 	/* success */
 	status = QDF_STATUS_SUCCESS;
 
-free:
-	/* free allocated memory */
-	if (conn_res)
-		qdf_mem_free(conn_res);
-	if (res)
-		qdf_mem_free(res);
+purge:
+	if (bssid_list)
+		wlan_scan_purge_results(bssid_list);
+	if (candidate_list)
+		wlan_scan_purge_results(candidate_list);
 
 	return status;
 }
@@ -14909,14 +15045,14 @@ void sme_set_eht_testbed_def(mac_handle_t mac_handle, uint8_t vdev_id)
 	mlme_eht_cap->bw_le_80_tx_max_nss_for_mcs_10_and_11 = 0;
 	mlme_eht_cap->bw_le_80_rx_max_nss_for_mcs_12_and_13 = 0;
 	mlme_eht_cap->bw_le_80_tx_max_nss_for_mcs_12_and_13 = 0;
-	mlme_eht_cap->bw_160_rx_max_nss_for_mcs_0_to_9 = 0;
-	mlme_eht_cap->bw_160_tx_max_nss_for_mcs_0_to_9 = 0;
+	mlme_eht_cap->bw_160_rx_max_nss_for_mcs_0_to_9 = 1;
+	mlme_eht_cap->bw_160_tx_max_nss_for_mcs_0_to_9 = 1;
 	mlme_eht_cap->bw_160_rx_max_nss_for_mcs_10_and_11 = 0;
 	mlme_eht_cap->bw_160_tx_max_nss_for_mcs_10_and_11 = 0;
 	mlme_eht_cap->bw_160_rx_max_nss_for_mcs_12_and_13 = 0;
 	mlme_eht_cap->bw_160_tx_max_nss_for_mcs_12_and_13 = 0;
-	mlme_eht_cap->bw_320_rx_max_nss_for_mcs_0_to_9 = 0;
-	mlme_eht_cap->bw_320_tx_max_nss_for_mcs_0_to_9 = 0;
+	mlme_eht_cap->bw_320_rx_max_nss_for_mcs_0_to_9 = 1;
+	mlme_eht_cap->bw_320_tx_max_nss_for_mcs_0_to_9 = 1;
 	mlme_eht_cap->bw_320_rx_max_nss_for_mcs_10_and_11 = 0;
 	mlme_eht_cap->bw_320_tx_max_nss_for_mcs_10_and_11 = 0;
 	mlme_eht_cap->bw_320_rx_max_nss_for_mcs_12_and_13 = 0;
@@ -14970,7 +15106,230 @@ void sme_reset_eht_caps(mac_handle_t mac_handle, uint8_t vdev_id)
 	wlan_mlme_set_sta_mlo_conn_band_bmp(mac_ctx->psoc, 0x77);
 	wlan_mlme_set_sta_mlo_conn_max_num(mac_ctx->psoc, 2);
 }
+
+void sme_update_eht_cap_nss(mac_handle_t mac_handle, uint8_t vdev_id,
+			    uint8_t nss)
+{
+	struct mac_context *mac_ctx = MAC_CONTEXT(mac_handle);
+	struct csr_roam_session *session;
+	tDot11fIEeht_cap *mlme_eht_cap;
+
+	session = CSR_GET_SESSION(mac_ctx, vdev_id);
+
+	if (!session) {
+		sme_err("No session for id %d", vdev_id);
+		return;
+	}
+	mlme_eht_cap = &mac_ctx->mlme_cfg->eht_caps.dot11_eht_cap;
+	if (!nss || (nss > 2)) {
+		sme_err("invalid Nss value nss %d", nss);
+		return;
+	}
+	sme_debug("Nss value %d", nss);
+	mlme_eht_cap->bw_20_rx_max_nss_for_mcs_0_to_7 = nss;
+	mlme_eht_cap->bw_20_tx_max_nss_for_mcs_0_to_7 = nss;
+	mlme_eht_cap->bw_20_rx_max_nss_for_mcs_8_and_9 = nss;
+	mlme_eht_cap->bw_20_tx_max_nss_for_mcs_8_and_9 = nss;
+	if (mlme_eht_cap->bw_20_rx_max_nss_for_mcs_10_and_11) {
+		mlme_eht_cap->bw_20_rx_max_nss_for_mcs_10_and_11 = nss;
+		mlme_eht_cap->bw_20_tx_max_nss_for_mcs_10_and_11 = nss;
+	}
+	if (mlme_eht_cap->bw_20_rx_max_nss_for_mcs_12_and_13) {
+		mlme_eht_cap->bw_20_rx_max_nss_for_mcs_12_and_13 = nss;
+		mlme_eht_cap->bw_20_tx_max_nss_for_mcs_12_and_13 = nss;
+	}
+	mlme_eht_cap->bw_le_80_rx_max_nss_for_mcs_0_to_9 = nss;
+	mlme_eht_cap->bw_le_80_tx_max_nss_for_mcs_0_to_9 = nss;
+	if (mlme_eht_cap->bw_le_80_rx_max_nss_for_mcs_10_and_11) {
+		mlme_eht_cap->bw_le_80_rx_max_nss_for_mcs_10_and_11 = nss;
+		mlme_eht_cap->bw_le_80_tx_max_nss_for_mcs_10_and_11 = nss;
+	}
+	if (mlme_eht_cap->bw_le_80_rx_max_nss_for_mcs_12_and_13) {
+		mlme_eht_cap->bw_le_80_rx_max_nss_for_mcs_12_and_13 = nss;
+		mlme_eht_cap->bw_le_80_tx_max_nss_for_mcs_12_and_13 = nss;
+	}
+	mlme_eht_cap->bw_160_rx_max_nss_for_mcs_0_to_9 = nss;
+	mlme_eht_cap->bw_160_tx_max_nss_for_mcs_0_to_9 = nss;
+	if (mlme_eht_cap->bw_160_rx_max_nss_for_mcs_10_and_11) {
+		mlme_eht_cap->bw_160_rx_max_nss_for_mcs_10_and_11 = nss;
+		mlme_eht_cap->bw_160_tx_max_nss_for_mcs_10_and_11 = nss;
+	}
+	if (mlme_eht_cap->bw_160_rx_max_nss_for_mcs_12_and_13) {
+		mlme_eht_cap->bw_160_rx_max_nss_for_mcs_12_and_13 = nss;
+		mlme_eht_cap->bw_160_tx_max_nss_for_mcs_12_and_13 = nss;
+	}
+	mlme_eht_cap->bw_320_rx_max_nss_for_mcs_0_to_9 = nss;
+	mlme_eht_cap->bw_320_tx_max_nss_for_mcs_0_to_9 = nss;
+
+	if (mlme_eht_cap->bw_320_rx_max_nss_for_mcs_10_and_11) {
+		mlme_eht_cap->bw_320_rx_max_nss_for_mcs_10_and_11 = nss;
+		mlme_eht_cap->bw_320_tx_max_nss_for_mcs_10_and_11 = nss;
+	}
+	if (mlme_eht_cap->bw_320_rx_max_nss_for_mcs_12_and_13) {
+		mlme_eht_cap->bw_320_rx_max_nss_for_mcs_12_and_13 = nss;
+		mlme_eht_cap->bw_320_tx_max_nss_for_mcs_12_and_13 = nss;
+	}
+
+	csr_update_session_eht_cap(mac_ctx, session);
+
+	qdf_mem_copy(&mac_ctx->eht_cap_2g, mlme_eht_cap,
+		     sizeof(tDot11fIEeht_cap));
+
+	qdf_mem_copy(&mac_ctx->eht_cap_5g, mlme_eht_cap,
+		     sizeof(tDot11fIEeht_cap));
+}
+
+void sme_update_eht_cap_mcs(mac_handle_t mac_handle, uint8_t vdev_id,
+			    uint8_t mcs)
+{
+	struct mac_context *mac_ctx = MAC_CONTEXT(mac_handle);
+	struct csr_roam_session *session;
+	tDot11fIEeht_cap *mlme_eht_cap;
+	uint8_t nss;
+
+	session = CSR_GET_SESSION(mac_ctx, vdev_id);
+
+	if (!session) {
+		sme_err("No session for id %d", vdev_id);
+		return;
+	}
+	mlme_eht_cap = &mac_ctx->mlme_cfg->eht_caps.dot11_eht_cap;
+	nss = mlme_eht_cap->bw_20_rx_max_nss_for_mcs_0_to_7;
+
+	if (!nss)
+		nss = mlme_eht_cap->bw_le_80_rx_max_nss_for_mcs_0_to_9;
+	if (!nss) {
+		sme_err("No valid Nss");
+		return;
+	}
+	sme_debug("nss %d, mcs %d", nss, mcs);
+
+	mlme_eht_cap->bw_20_rx_max_nss_for_mcs_10_and_11 = 0;
+	mlme_eht_cap->bw_20_tx_max_nss_for_mcs_10_and_11 = 0;
+	mlme_eht_cap->bw_20_rx_max_nss_for_mcs_12_and_13 = 0;
+	mlme_eht_cap->bw_20_tx_max_nss_for_mcs_12_and_13 = 0;
+	mlme_eht_cap->bw_le_80_rx_max_nss_for_mcs_10_and_11 = 0;
+	mlme_eht_cap->bw_le_80_tx_max_nss_for_mcs_10_and_11 = 0;
+	mlme_eht_cap->bw_le_80_rx_max_nss_for_mcs_12_and_13 = 0;
+	mlme_eht_cap->bw_le_80_tx_max_nss_for_mcs_12_and_13 = 0;
+	mlme_eht_cap->bw_160_rx_max_nss_for_mcs_10_and_11 = 0;
+	mlme_eht_cap->bw_160_tx_max_nss_for_mcs_10_and_11 = 0;
+	mlme_eht_cap->bw_160_rx_max_nss_for_mcs_12_and_13 = 0;
+	mlme_eht_cap->bw_160_tx_max_nss_for_mcs_12_and_13 = 0;
+	mlme_eht_cap->bw_320_rx_max_nss_for_mcs_10_and_11 = 0;
+	mlme_eht_cap->bw_320_tx_max_nss_for_mcs_10_and_11 = 0;
+	mlme_eht_cap->bw_320_rx_max_nss_for_mcs_12_and_13 = 0;
+	mlme_eht_cap->bw_320_tx_max_nss_for_mcs_12_and_13 = 0;
+
+	if (mcs > 1) { /* 0 - 11*/
+		mlme_eht_cap->bw_20_rx_max_nss_for_mcs_10_and_11 = nss;
+		mlme_eht_cap->bw_20_tx_max_nss_for_mcs_10_and_11 = nss;
+		mlme_eht_cap->bw_le_80_rx_max_nss_for_mcs_10_and_11 = nss;
+		mlme_eht_cap->bw_le_80_tx_max_nss_for_mcs_10_and_11 = nss;
+		mlme_eht_cap->bw_160_rx_max_nss_for_mcs_10_and_11 = nss;
+		mlme_eht_cap->bw_160_tx_max_nss_for_mcs_10_and_11 = nss;
+		mlme_eht_cap->bw_320_rx_max_nss_for_mcs_10_and_11 = nss;
+		mlme_eht_cap->bw_320_tx_max_nss_for_mcs_10_and_11 = nss;
+		mlme_eht_cap->rx_1024_4096_qam_lt_242_tone_ru = 1;
+		mlme_eht_cap->tx_1024_4096_qam_lt_242_tone_ru = 1;
+	}
+
+	if (mcs == 3) { /* 0 - 13*/
+		mlme_eht_cap->bw_20_rx_max_nss_for_mcs_12_and_13 = nss;
+		mlme_eht_cap->bw_20_tx_max_nss_for_mcs_12_and_13 = nss;
+		mlme_eht_cap->bw_le_80_rx_max_nss_for_mcs_12_and_13 = nss;
+		mlme_eht_cap->bw_le_80_tx_max_nss_for_mcs_12_and_13 = nss;
+		mlme_eht_cap->bw_160_rx_max_nss_for_mcs_12_and_13 = nss;
+		mlme_eht_cap->bw_160_tx_max_nss_for_mcs_12_and_13 = nss;
+		mlme_eht_cap->bw_320_rx_max_nss_for_mcs_12_and_13 = nss;
+		mlme_eht_cap->bw_320_tx_max_nss_for_mcs_12_and_13 = nss;
+	}
+	csr_update_session_eht_cap(mac_ctx, session);
+
+	qdf_mem_copy(&mac_ctx->eht_cap_2g, mlme_eht_cap,
+		     sizeof(tDot11fIEeht_cap));
+
+	qdf_mem_copy(&mac_ctx->eht_cap_5g, mlme_eht_cap,
+		     sizeof(tDot11fIEeht_cap));
+}
+
+void sme_activate_mlo_links(mac_handle_t mac_handle, uint8_t session_id,
+			    uint8_t num_links,
+			    struct qdf_mac_addr active_link_addr[2])
+{
+	struct mac_context *mac_ctx = MAC_CONTEXT(mac_handle);
+	struct csr_roam_session *session;
+
+	session = CSR_GET_SESSION(mac_ctx, session_id);
+
+	if (!session) {
+		sme_err("No session for id %d", session_id);
+		return;
+	}
+
+	policy_mgr_activate_mlo_links(mac_ctx->psoc, session_id, num_links,
+				      active_link_addr);
+}
+
+int sme_update_eht_caps(mac_handle_t mac_handle, uint8_t session_id,
+			uint8_t cfg_val, enum sme_eht_tx_bfee_cap_type cap_type,
+			enum QDF_OPMODE op_mode)
+{
+	struct mac_context *mac_ctx = MAC_CONTEXT(mac_handle);
+	struct csr_roam_session *session;
+	tDot11fIEeht_cap *cfg_eht_cap;
+
+	session = CSR_GET_SESSION(mac_ctx, session_id);
+
+	if (!session) {
+		sme_err("No session for id %d", session_id);
+		return -EINVAL;
+	}
+	cfg_eht_cap = &mac_ctx->mlme_cfg->eht_caps.dot11_eht_cap;
+
+	switch (cap_type) {
+	case EHT_TX_BFEE_ENABLE:
+		cfg_eht_cap->su_beamformee = cfg_val;
+		break;
+	case EHT_TX_BFEE_SS_80MHZ:
+		cfg_eht_cap->bfee_ss_le_80mhz = cfg_val;
+		break;
+	case EHT_TX_BFEE_SS_160MHZ:
+		cfg_eht_cap->bfee_ss_160mhz = cfg_val;
+		break;
+	case EHT_TX_BFEE_SS_320MHZ:
+		cfg_eht_cap->bfee_ss_320mhz = cfg_val;
+		break;
+	case EHT_TX_BFEE_SOUNDING_FEEDBACK_RATELIMIT:
+		cfg_eht_cap->tb_sounding_feedback_rl = cfg_val;
+		break;
+	default:
+		sme_debug("default: Unhandled cap type %d", cap_type);
+		return -EINVAL;
+	}
+
+	sme_debug("EHT cap: cap type %d, cfg val %d", cap_type, cfg_val);
+	csr_update_session_eht_cap(mac_ctx, session);
+
+	qdf_mem_copy(&mac_ctx->eht_cap_2g, cfg_eht_cap,
+		     sizeof(tDot11fIEeht_cap));
+	qdf_mem_copy(&mac_ctx->eht_cap_5g, cfg_eht_cap,
+		     sizeof(tDot11fIEeht_cap));
+	sme_set_vdev_ies_per_band(mac_handle, session_id, op_mode);
+
+	return 0;
+}
 #endif
+
+void sme_set_nss_capability(mac_handle_t mac_handle, uint8_t vdev_id,
+			    uint8_t nss, enum QDF_OPMODE op_mode)
+{
+	sme_debug("Nss cap update, NSS %d", nss);
+
+	sme_update_he_cap_nss(mac_handle, vdev_id, nss);
+	sme_update_eht_cap_nss(mac_handle, vdev_id, nss);
+	sme_set_vdev_ies_per_band(mac_handle, vdev_id, op_mode);
+}
 
 uint8_t sme_get_mcs_idx(uint16_t raw_rate, enum tx_rate_info rate_flags,
 			bool is_he_mcs_12_13_supported,
@@ -16129,28 +16488,6 @@ p2p_self_peer_create:
 		}
 	}
 	return QDF_STATUS_SUCCESS;
-}
-#endif
-
-#ifdef WLAN_FEATURE_ROAM_OFFLOAD
-void sme_roam_events_register_callback(mac_handle_t mac_handle,
-				       void (*roam_rt_stats_cb)(
-				hdd_handle_t hdd_handle, uint8_t idx,
-				struct roam_stats_event *roam_stats))
-{
-	struct mac_context *mac = MAC_CONTEXT(mac_handle);
-
-	if (!mac) {
-		sme_err("Invalid mac context");
-		return;
-	}
-
-	mac->sme.roam_rt_stats_cb = roam_rt_stats_cb;
-}
-
-void sme_roam_events_deregister_callback(mac_handle_t mac_handle)
-{
-	sme_roam_events_register_callback(mac_handle, NULL);
 }
 #endif
 

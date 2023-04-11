@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -101,6 +101,12 @@ enum miracast_param {
  * we will split the printing.
  */
 #define NUM_OF_STA_DATA_TO_PRINT 16
+
+/*
+ * The host sends the maximum channel count in RCL(Roam channel list) via a
+ * supplicant vendor event to notify RCL on disconnection.
+ */
+#define MAX_RCL_CHANNEL_COUNT 30
 
 #ifdef WLAN_FEATURE_EXTWOW_SUPPORT
 /**
@@ -3272,7 +3278,7 @@ hdd_dump_roam_scan_ch_list(uint32_t *chan_list, uint16_t num_channels)
 
 /**
  * hdd_sort_roam_scan_ch_list() - Function to sort roam scan channel list in
- * ascending order before sending it to supplicant
+ * descending order before sending it to supplicant
  * @chan_list: pointer to channel list received from FW via an event
  * WMI_ROAM_SCAN_CHANNEL_LIST_EVENTID
  * @num_channels: Number of channels
@@ -3282,12 +3288,13 @@ hdd_dump_roam_scan_ch_list(uint32_t *chan_list, uint16_t num_channels)
 static void
 hdd_sort_roam_scan_ch_list(uint32_t *chan_list, uint16_t num_channels)
 {
-	uint8_t i, j, swap = 0;
+	uint8_t i, j;
+	uint32_t swap = 0;
 
 	for (i = 0; i < (num_channels - 1) &&
 	     i < WNI_CFG_VALID_CHANNEL_LIST_LEN; i++) {
 		for (j = 0; j < (num_channels - i - 1); j++) {
-			if (chan_list[j] > chan_list[j + 1]) {
+			if (chan_list[j] < chan_list[j + 1]) {
 				swap = chan_list[j];
 				chan_list[j] = chan_list[j + 1];
 				chan_list[j + 1] = swap;
@@ -3314,6 +3321,15 @@ void hdd_get_roam_scan_ch_cb(hdd_handle_t hdd_handle,
 	 * event raised by firmware.
 	 */
 	if (!roam_ch->command_resp) {
+		/*
+		 * Maximum allowed channel count is 30 in supplicant vendor
+		 * event of RCL list. So if number of channels present in
+		 * channel list received from FW is more than 30 channels then
+		 * restrict it to 30 channels only.
+		 */
+		if (roam_ch->num_channels > MAX_RCL_CHANNEL_COUNT)
+			roam_ch->num_channels =  MAX_RCL_CHANNEL_COUNT;
+
 		len = roam_ch->num_channels * sizeof(roam_ch->chan_list[0]);
 		if (!len) {
 			hdd_err("Invalid len");
@@ -3444,6 +3460,82 @@ hdd_get_roam_scan_freq(struct hdd_adapter *adapter, mac_handle_t mac_handle,
 	}
 
 	return ret;
+}
+#endif
+
+enum host_target_comm_log {
+	HTC_CREDIT_HISTORY_LOG = 0,
+	COMMAND_LOG,
+	COMMAND_TX_CMP_LOG,
+	MGMT_COMMAND_LOG,
+	MGMT_COMMAND_TX_CMP_LOG,
+	EVENT_LOG,
+	RX_EVENT_LOG,
+	MGMT_EVENT_LOG
+};
+
+static int printk_adapter(void *priv, const char *fmt, ...)
+{
+	int ret;
+	va_list args;
+
+	va_start(args, fmt);
+	ret = vprintk(fmt, args);
+	ret += printk("\n");
+	va_end(args);
+
+	return ret;
+}
+
+void hdd_ioctl_log_buffer(int log_id, uint32_t count, qdf_abstract_print
+							     *custom_print,
+							     void *print_ctx)
+{
+	qdf_abstract_print *print;
+
+	if (custom_print)
+		print = custom_print;
+	else
+		print = &printk_adapter;
+	switch (log_id) {
+	case HTC_CREDIT_HISTORY_LOG:
+		cds_print_htc_credit_history(count, print, print_ctx);
+		break;
+	case COMMAND_LOG:
+		wma_print_wmi_cmd_log(count, print, print_ctx);
+		break;
+	case COMMAND_TX_CMP_LOG:
+		wma_print_wmi_cmd_tx_cmp_log(count, print, print_ctx);
+		break;
+	case MGMT_COMMAND_LOG:
+		wma_print_wmi_mgmt_cmd_log(count, print, print_ctx);
+		break;
+	case MGMT_COMMAND_TX_CMP_LOG:
+		wma_print_wmi_mgmt_cmd_tx_cmp_log(count, print, print_ctx);
+		break;
+	case EVENT_LOG:
+		wma_print_wmi_event_log(count, print, print_ctx);
+		break;
+	case RX_EVENT_LOG:
+		wma_print_wmi_rx_event_log(count, print, print_ctx);
+		break;
+	case MGMT_EVENT_LOG:
+		wma_print_wmi_mgmt_event_log(count, print, print_ctx);
+		break;
+	default:
+		print(print_ctx, "Invalid Log Id %d", log_id);
+		break;
+	}
+}
+
+#ifdef WLAN_DUMP_LOG_BUF_CNT
+void hdd_dump_log_buffer(void *print_ctx, qdf_abstract_print *custom_print)
+{
+	int i;
+
+	for (i = 0; i <= MGMT_EVENT_LOG; i++)
+		hdd_ioctl_log_buffer(i, WLAN_DUMP_LOG_BUF_CNT, custom_print,
+				     print_ctx);
 }
 #endif
 
@@ -6163,12 +6255,15 @@ static int drv_cmd_set_channel_switch(struct hdd_adapter *adapter,
 		return status;
 	}
 
-	if ((chan_bw != 20) && (chan_bw != 40) && (chan_bw != 80)) {
+	if ((chan_bw != 20) && (chan_bw != 40) && (chan_bw != 80) &&
+	    (chan_bw != 160)) {
 		hdd_err("BW %d is not allowed for CHANNEL_SWITCH", chan_bw);
 		return -EINVAL;
 	}
 
-	if (chan_bw == 80)
+	if (chan_bw == 160)
+		width = CH_WIDTH_160MHZ;
+	else if (chan_bw == 80)
 		width = CH_WIDTH_80MHZ;
 	else if (chan_bw == 40)
 		width = CH_WIDTH_40MHZ;

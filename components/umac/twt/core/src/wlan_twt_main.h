@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -278,7 +278,7 @@ wlan_twt_get_session_state(struct wlan_objmgr_psoc *psoc,
  * @peer_mac: Pointer to peer mac address
  * @dialog_id: Dialog id
  * @cmd: TWT command
- * @active_cmd: Fill the active command in this output parameter
+ * @pactive_cmd: Fill the active command in this output parameter
  *
  * Return: True if given command is in progress.
  */

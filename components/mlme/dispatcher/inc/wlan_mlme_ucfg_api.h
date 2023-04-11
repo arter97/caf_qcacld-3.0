@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2018-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -136,6 +136,31 @@ static inline
 uint8_t ucfg_get_tx_power(struct wlan_objmgr_psoc *psoc, uint8_t band)
 {
 	return wlan_mlme_get_tx_power(psoc, band);
+}
+
+/**
+ * ucfg_mlme_get_phy_max_freq_range() - Get phy supported max channel
+ * frequency range
+ * @psoc: psoc for country information
+ * @low_2ghz_chan: 2.4 GHz low channel frequency
+ * @high_2ghz_chan: 2.4 GHz high channel frequency
+ * @low_5ghz_chan: 5 GHz low channel frequency
+ * @high_5ghz_chan: 5 GHz high channel frequency
+ *
+ * Return: QDF status
+ */
+static inline
+QDF_STATUS ucfg_mlme_get_phy_max_freq_range(struct wlan_objmgr_psoc *psoc,
+					    uint32_t *low_2ghz_chan,
+					    uint32_t *high_2ghz_chan,
+					    uint32_t *low_5ghz_chan,
+					    uint32_t *high_5ghz_chan)
+{
+	return wlan_mlme_get_phy_max_freq_range(psoc,
+						low_2ghz_chan,
+						high_2ghz_chan,
+						low_5ghz_chan,
+						high_5ghz_chan);
 }
 
 /**
@@ -350,6 +375,18 @@ QDF_STATUS ucfg_mlme_set_ap_policy(struct wlan_objmgr_vdev *vdev,
 				   enum host_concurrent_ap_policy ap_cfg_policy)
 {
 	return wlan_mlme_set_ap_policy(vdev, ap_cfg_policy);
+}
+
+/**
+ * ucfg_mlme_get_ap_policy() - Get the AP policy value
+ * @vdev: pointer to vdev object
+ *
+ * Return: enum host_concurrent_ap_policy
+ */
+static inline enum host_concurrent_ap_policy
+ucfg_mlme_get_ap_policy(struct wlan_objmgr_vdev *vdev)
+{
+	return wlan_mlme_get_ap_policy(vdev);
 }
 
 /**
@@ -2880,6 +2917,23 @@ ucfg_mlme_is_relaxed_6ghz_conn_policy_enabled(struct wlan_objmgr_psoc *psoc,
 }
 
 /**
+ * ucfg_mlme_is_standard_6ghz_conn_policy_enabled() - Get 6ghz standard
+ *                                                    connection policy flag
+ * @psoc: pointer to psoc object
+ * @value: pointer to hold the value of flag
+ *
+ * Inline UCFG API to be used by HDD/OSIF callers
+ *
+ * Return: QDF Status
+ */
+static inline QDF_STATUS
+ucfg_mlme_is_standard_6ghz_conn_policy_enabled(struct wlan_objmgr_psoc *psoc,
+					       bool *value)
+{
+	return wlan_mlme_is_standard_6ghz_conn_policy_enabled(psoc, value);
+}
+
+/**
  * ucfg_mlme_set_relaxed_6ghz_conn_policy() - Set 6ghz relaxed
  *                                            connection policy flag
  * @psoc: pointer to psoc object
@@ -2897,18 +2951,33 @@ ucfg_mlme_set_relaxed_6ghz_conn_policy(struct wlan_objmgr_psoc *psoc,
 }
 
 /**
- * ucfg_mlme_get_emlsr_mode_enabled() - Get eMLSR mode flag
+ * ucfg_mlme_set_eht_mode() - Set EHT mode of operation
  * @psoc: pointer to psoc object
- * @value: Value that needs to be set from the caller
+ * @value: EHT mode value that needs to be set from the caller
  *
  * Inline UCFG API to be used by HDD/OSIF callers
  *
  * Return: QDF Status
  */
 static inline QDF_STATUS
-ucfg_mlme_get_emlsr_mode_enabled(struct wlan_objmgr_psoc *psoc, bool *value)
+ucfg_mlme_set_eht_mode(struct wlan_objmgr_psoc *psoc, enum wlan_eht_mode value)
 {
-	return wlan_mlme_get_emlsr_mode_enabled(psoc, value);
+	return wlan_mlme_set_eht_mode(psoc, value);
+}
+
+/**
+ * ucfg_mlme_get_eht_mode() - Get EHT mode of operation
+ * @psoc: pointer to psoc object
+ * @value: EHT mode value that is set by the user
+ *
+ * Inline UCFG API to be used by HDD/OSIF callers
+ *
+ * Return: QDF Status
+ */
+static inline QDF_STATUS
+ucfg_mlme_get_eht_mode(struct wlan_objmgr_psoc *psoc, enum wlan_eht_mode *value)
+{
+	return wlan_mlme_get_eht_mode(psoc, value);
 }
 
 /**
@@ -2924,6 +2993,21 @@ static inline QDF_STATUS
 ucfg_mlme_set_emlsr_mode_enabled(struct wlan_objmgr_psoc *psoc, bool value)
 {
 	return wlan_mlme_set_emlsr_mode_enabled(psoc, value);
+}
+
+/**
+ * ucfg_mlme_get_emlsr_mode_enabled() - Get eMLSR mode flag
+ * @psoc: pointer to psoc object
+ * @value: Value that is set by the user
+ *
+ * Inline UCFG API to be used by HDD/OSIF callers
+ *
+ * Return: QDF Status
+ */
+static inline QDF_STATUS
+ucfg_mlme_get_emlsr_mode_enabled(struct wlan_objmgr_psoc *psoc, bool *value)
+{
+	return wlan_mlme_get_emlsr_mode_enabled(psoc, value);
 }
 
 /**

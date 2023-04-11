@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -33,7 +33,7 @@
 #include <wlan_cm_api.h>
 
 /**
- * target_if_dp_arp_stats_event_handler() - arp stats event handler
+ * target_if_dp_get_arp_stats_event_handler() - arp stats event handler
  * @scn: scn
  * @data: buffer with event
  * @datalen: buffer length
