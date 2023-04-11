@@ -25124,7 +25124,7 @@ static int wlan_hdd_cfg80211_tx_control_port(struct wiphy *wiphy,
 }
 
 #else
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 0, 0))
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 15, 0))
 static int wlan_hdd_cfg80211_tx_control_port(struct wiphy *wiphy,
 					     struct net_device *dev,
 					     const u8 *buf,
