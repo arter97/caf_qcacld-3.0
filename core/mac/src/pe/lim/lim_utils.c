@@ -8616,10 +8616,11 @@ static void lim_revise_req_eht_cap_per_mode(struct mlme_legacy_priv *mlme_priv,
 		pe_debug("Disable eht cap for SAP/GO");
 		mlme_priv->eht_config.tx_1024_4096_qam_lt_242_tone_ru = 0;
 		mlme_priv->eht_config.rx_1024_4096_qam_lt_242_tone_ru = 0;
-		mlme_priv->eht_config.non_ofdma_ul_mu_mimo_le_80mhz = 0;
-		mlme_priv->eht_config.non_ofdma_ul_mu_mimo_160mhz = 0;
-		mlme_priv->eht_config.non_ofdma_ul_mu_mimo_320mhz = 0;
 	}
+
+	mlme_priv->eht_config.non_ofdma_ul_mu_mimo_le_80mhz = 0;
+	mlme_priv->eht_config.non_ofdma_ul_mu_mimo_160mhz = 0;
+	mlme_priv->eht_config.non_ofdma_ul_mu_mimo_320mhz = 0;
 }
 
 void lim_copy_bss_eht_cap(struct pe_session *session)
@@ -8652,6 +8653,7 @@ void lim_copy_join_req_eht_cap(struct pe_session *session)
 	if (!mlme_priv)
 		return;
 	lim_revise_req_eht_cap_per_band(mlme_priv, session);
+	lim_revise_req_eht_cap_per_mode(mlme_priv, session);
 	qdf_mem_copy(&session->eht_config, &mlme_priv->eht_config,
 		     sizeof(session->eht_config));
 }
