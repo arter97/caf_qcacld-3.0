@@ -312,8 +312,22 @@ enum qcn_attribute_id {
 #define WLAN_TPE_IE_MAX_LEN                      9
 
 #ifdef WLAN_FEATURE_11BE
-/* Bandwidth indication element IE minimum length */
-#define WLAN_BW_IND_IE_MIN_LEN              3
+/* Bandwidth indication element IE maximum length */
+#define WLAN_BW_IND_IE_MAX_LEN              9
+
+/* header length is id(1) + length(1)*/
+#define WLAN_IE_HDR_LEN                     2
+
+/* 20MHz Operating Channel width */
+#define IEEE80211_11BEOP_CHWIDTH_20              0
+/* 40MHz Operating Channel width */
+#define IEEE80211_11BEOP_CHWIDTH_40              1
+/* 80MHz Operating Channel width */
+#define IEEE80211_11BEOP_CHWIDTH_80              2
+/* 160 MHz Operating Channel width */
+#define IEEE80211_11BEOP_CHWIDTH_160             3
+/* 320 MHz Operating Channel width */
+#define IEEE80211_11BEOP_CHWIDTH_320             4
 #endif
 
 /* Max channel switch time IE length */
@@ -1853,6 +1867,12 @@ struct subelem_header {
 
 #define EHTOP_INFO_CHAN_WIDTH_IDX          0
 #define EHTOP_INFO_CHAN_WIDTH_BITS         3
+
+#define BW_IND_PARAM_DISABLED_SC_BITMAP_PRESENT_IDX       1
+#define BW_IND_PARAM_DISABLED_SC_BITMAP_PRESENT_BITS      1
+
+#define BW_IND_CHAN_WIDTH_IDX              0
+#define BW_IND_CHAN_WIDTH_BITS             3
 
 #define EHTOP_RX_MCS_NSS_MAP_IDX                       0
 #define EHTOP_RX_MCS_NSS_MAP_BITS                      4
