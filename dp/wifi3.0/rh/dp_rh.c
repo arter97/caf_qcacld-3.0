@@ -27,6 +27,8 @@
 #include "dp_peer.h"
 #include <wlan_utility.h>
 #include <dp_rings.h>
+#include <ce_api.h>
+#include <ce_internal.h>
 
 static QDF_STATUS
 dp_srng_init_rh(struct dp_soc *soc, struct dp_srng *srng, int ring_type,
@@ -774,6 +776,17 @@ static void dp_get_rx_hash_key_rh(struct dp_soc *soc,
 	dp_get_rx_hash_key_bytes(lro_hash);
 }
 
+#if defined(DP_POWER_SAVE) || defined(FEATURE_RUNTIME_PM)
+static void dp_update_ring_hptp_rh(struct dp_soc *soc, bool force_flush)
+{
+	struct dp_pdev_rh *rh_pdev =
+			dp_get_rh_pdev_from_dp_pdev(soc->pdev_list[0]);
+	struct dp_tx_ep_info_rh *tx_ep_info = &rh_pdev->tx_ep_info;
+
+	ce_flush_tx_ring_write_idx(tx_ep_info->ce_tx_hdl, force_flush);
+}
+#endif
+
 void dp_initialize_arch_ops_rh(struct dp_arch_ops *arch_ops)
 {
 	arch_ops->tx_hw_enqueue = dp_tx_hw_enqueue_rh;
@@ -826,4 +839,7 @@ void dp_initialize_arch_ops_rh(struct dp_arch_ops *arch_ops)
 	arch_ops->reo_remap_config = dp_reo_remap_config_rh;
 	arch_ops->txrx_peer_setup = dp_peer_setup_rh;
 	arch_ops->txrx_srng_init = dp_srng_init_rh;
+#if defined(DP_POWER_SAVE) || defined(FEATURE_RUNTIME_PM)
+	arch_ops->dp_update_ring_hptp = dp_update_ring_hptp_rh;
+#endif
 }

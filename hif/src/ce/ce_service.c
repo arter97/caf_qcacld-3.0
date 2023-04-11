@@ -401,6 +401,41 @@ bool hif_ce_service_should_yield(struct hif_softc *scn,
 qdf_export_symbol(hif_ce_service_should_yield);
 #endif
 
+void ce_flush_tx_ring_write_idx(struct CE_handle *ce_tx_hdl, bool force_flush)
+{
+	struct CE_state *ce_state = (struct CE_state *)ce_tx_hdl;
+	struct CE_ring_state *src_ring = ce_state->src_ring;
+	struct hif_softc *scn = ce_state->scn;
+
+	if (force_flush)
+		ce_ring_set_event(src_ring, CE_RING_FLUSH_EVENT);
+
+	if (ce_ring_get_clear_event(src_ring, CE_RING_FLUSH_EVENT)) {
+		qdf_spin_lock_bh(&ce_state->ce_index_lock);
+		CE_SRC_RING_WRITE_IDX_SET(scn, ce_state->ctrl_addr,
+					  src_ring->write_index);
+		qdf_spin_unlock_bh(&ce_state->ce_index_lock);
+
+		src_ring->last_flush_ts = qdf_get_log_timestamp();
+		hif_debug("flushed");
+	}
+}
+
+/* Make sure this wrapper is called under ce_index_lock */
+void ce_tx_ring_write_idx_update_wrapper(struct CE_handle *ce_tx_hdl,
+					 bool flush)
+{
+	struct CE_state *ce_state = (struct CE_state *)ce_tx_hdl;
+	struct CE_ring_state *src_ring = ce_state->src_ring;
+	struct hif_softc *scn = ce_state->scn;
+
+	if (flush)
+		CE_SRC_RING_WRITE_IDX_SET(scn, ce_state->ctrl_addr,
+					  src_ring->write_index);
+	else
+		ce_ring_set_event(src_ring, CE_RING_FLUSH_EVENT);
+}
+
 /*
  * Guts of ce_send, used by both ce_send and ce_sendlist_send.
  * The caller takes responsibility for any needed locking.

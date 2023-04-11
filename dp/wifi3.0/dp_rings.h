@@ -369,42 +369,14 @@ dp_dump_wbm_idle_hptp(struct dp_soc *soc, struct dp_pdev *pdev);
 void dp_display_srng_info(struct cdp_soc_t *soc_hdl);
 
 #if defined(DP_POWER_SAVE) || defined(FEATURE_RUNTIME_PM)
-/**
- * dp_flush_ring_hptp() - Update ring shadow
- *			  register HP/TP address when runtime
- *                        resume
- * @soc: DP soc context
- * @hal_srng: HAL srng context
- *
- * Return: None
- */
-void dp_flush_ring_hptp(struct dp_soc *soc, hal_ring_handle_t hal_srng);
-
 void dp_drain_txrx(struct cdp_soc_t *soc_handle);
 
-#ifdef FEATURE_RUNTIME_PM
-/**
- * dp_runtime_suspend() - ensure DP is ready to runtime suspend
- * @soc_hdl: Datapath soc handle
- * @pdev_id: id of data path pdev handle
- *
- * DP is ready to runtime suspend if there are no pending TX packets.
- *
- * Return: QDF_STATUS
+/*
+ * dp_update_ring_hptp() - update dp rings hptp
+ * @soc: dp soc handler
+ * @force_flush_tx: force flush the Tx ring hp
  */
-QDF_STATUS dp_runtime_suspend(struct cdp_soc_t *soc_hdl, uint8_t pdev_id);
-
-/**
- * dp_runtime_resume() - ensure DP is ready to runtime resume
- * @soc_hdl: Datapath soc handle
- * @pdev_id: id of data path pdev handle
- *
- * Resume DP for runtime PM.
- *
- * Return: QDF_STATUS
- */
-QDF_STATUS dp_runtime_resume(struct cdp_soc_t *soc_hdl, uint8_t pdev_id);
-#endif
+void dp_update_ring_hptp(struct dp_soc *soc, bool force_flush_tx);
 #endif
 
 #ifdef WLAN_FEATURE_STATS_EXT
@@ -719,55 +691,9 @@ static inline void dp_display_srng_info(struct cdp_soc_t *soc_hdl)
 }
 
 #if defined(DP_POWER_SAVE) || defined(FEATURE_RUNTIME_PM)
-/**
- * dp_flush_ring_hptp() - Update ring shadow
- *			  register HP/TP address when runtime
- *                        resume
- * @soc: DP soc context
- * @hal_srng: HAL srng context
- *
- * Return: None
- */
-static inline void
-dp_flush_ring_hptp(struct dp_soc *soc, hal_ring_handle_t hal_srng)
-{
-}
-
 static inline void dp_drain_txrx(struct cdp_soc_t *soc_handle)
 {
 }
-
-#ifdef FEATURE_RUNTIME_PM
-/**
- * dp_runtime_suspend() - ensure DP is ready to runtime suspend
- * @soc_hdl: Datapath soc handle
- * @pdev_id: id of data path pdev handle
- *
- * DP is ready to runtime suspend if there are no pending TX packets.
- *
- * Return: QDF_STATUS
- */
-static inline
-QDF_STATUS dp_runtime_suspend(struct cdp_soc_t *soc_hdl, uint8_t pdev_id)
-{
-	return QDF_STATUS_SUCCESS;
-}
-
-/**
- * dp_runtime_resume() - ensure DP is ready to runtime resume
- * @soc_hdl: Datapath soc handle
- * @pdev_id: id of data path pdev handle
- *
- * Resume DP for runtime PM.
- *
- * Return: QDF_STATUS
- */
-static inline
-QDF_STATUS dp_runtime_resume(struct cdp_soc_t *soc_hdl, uint8_t pdev_id)
-{
-	return QDF_STATUS_SUCCESS;
-}
-#endif
 #endif
 #endif /* WLAN_SOFTUMAC_SUPPORT */
 

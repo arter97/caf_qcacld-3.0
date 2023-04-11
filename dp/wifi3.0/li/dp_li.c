@@ -708,6 +708,9 @@ void dp_initialize_arch_ops_li(struct dp_arch_ops *arch_ops)
 	arch_ops->txrx_get_vdev_mcast_param = dp_txrx_get_vdev_mcast_param_li;
 	arch_ops->get_hw_link_id = dp_get_hw_link_id_li;
 	arch_ops->txrx_srng_init = dp_srng_init_li;
+#if defined(DP_POWER_SAVE) || defined(FEATURE_RUNTIME_PM)
+	arch_ops->dp_update_ring_hptp = dp_update_ring_hptp;
+#endif
 }
 
 #ifdef QCA_DP_TX_HW_SW_NBUF_DESC_PREFETCH

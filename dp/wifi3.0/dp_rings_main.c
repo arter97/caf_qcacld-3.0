@@ -4011,7 +4011,7 @@ void dp_drain_txrx(struct cdp_soc_t *soc_handle)
  *
  * Return: None
  */
-void dp_flush_ring_hptp(struct dp_soc *soc, hal_ring_handle_t hal_srng)
+static void dp_flush_ring_hptp(struct dp_soc *soc, hal_ring_handle_t hal_srng)
 {
 	if (hal_srng && hal_srng_get_clear_event(hal_srng,
 						 HAL_SRNG_FLUSH_EVENT)) {
@@ -4025,102 +4025,27 @@ void dp_flush_ring_hptp(struct dp_soc *soc, hal_ring_handle_t hal_srng)
 		dp_debug("flushed");
 	}
 }
-#endif
 
-#ifdef FEATURE_RUNTIME_PM
-/**
- * dp_runtime_suspend() - ensure DP is ready to runtime suspend
- * @soc_hdl: Datapath soc handle
- * @pdev_id: id of data path pdev handle
- *
- * DP is ready to runtime suspend if there are no pending TX packets.
- *
- * Return: QDF_STATUS
- */
-QDF_STATUS dp_runtime_suspend(struct cdp_soc_t *soc_hdl, uint8_t pdev_id)
+void dp_update_ring_hptp(struct dp_soc *soc, bool force_flush_tx)
 {
-	struct dp_soc *soc = cdp_soc_t_to_dp_soc(soc_hdl);
-	struct dp_pdev *pdev;
-	uint8_t i;
-	int32_t tx_pending;
+	 uint8_t i;
 
-	pdev = dp_get_pdev_from_soc_pdev_id_wifi3(soc, pdev_id);
-	if (!pdev) {
-		dp_err("pdev is NULL");
-		return QDF_STATUS_E_INVAL;
-	}
-
-	/* Abort if there are any pending TX packets */
-	tx_pending = dp_get_tx_pending(dp_pdev_to_cdp_pdev(pdev));
-	if (tx_pending) {
-		dp_info_rl("%pK: Abort suspend due to pending TX packets %d",
-			   soc, tx_pending);
-		dp_find_missing_tx_comp(soc);
-		/* perform a force flush if tx is pending */
+	if (force_flush_tx) {
 		for (i = 0; i < soc->num_tcl_data_rings; i++) {
 			hal_srng_set_event(soc->tcl_data_ring[i].hal_srng,
 					   HAL_SRNG_FLUSH_EVENT);
 			dp_flush_ring_hptp(soc, soc->tcl_data_ring[i].hal_srng);
 		}
-		qdf_atomic_set(&soc->tx_pending_rtpm, 0);
 
-		return QDF_STATUS_E_AGAIN;
+		return;
 	}
 
-	if (dp_runtime_get_refcount(soc)) {
-		dp_init_info("refcount: %d", dp_runtime_get_refcount(soc));
-
-		return QDF_STATUS_E_AGAIN;
-	}
-
-	if (soc->intr_mode == DP_INTR_POLL)
-		qdf_timer_stop(&soc->int_timer);
-
-	dp_rx_fst_update_pm_suspend_status(soc, true);
-
-	return QDF_STATUS_SUCCESS;
-}
-
-#define DP_FLUSH_WAIT_CNT 10
-#define DP_RUNTIME_SUSPEND_WAIT_MS 10
-/**
- * dp_runtime_resume() - ensure DP is ready to runtime resume
- * @soc_hdl: Datapath soc handle
- * @pdev_id: id of data path pdev handle
- *
- * Resume DP for runtime PM.
- *
- * Return: QDF_STATUS
- */
-QDF_STATUS dp_runtime_resume(struct cdp_soc_t *soc_hdl, uint8_t pdev_id)
-{
-	struct dp_soc *soc = cdp_soc_t_to_dp_soc(soc_hdl);
-	int i, suspend_wait = 0;
-
-	if (soc->intr_mode == DP_INTR_POLL)
-		qdf_timer_mod(&soc->int_timer, DP_INTR_POLL_TIMER_MS);
-
-	/*
-	 * Wait until dp runtime refcount becomes zero or time out, then flush
-	 * pending tx for runtime suspend.
-	 */
-	while (dp_runtime_get_refcount(soc) &&
-	       suspend_wait < DP_FLUSH_WAIT_CNT) {
-		qdf_sleep(DP_RUNTIME_SUSPEND_WAIT_MS);
-		suspend_wait++;
-	}
-
-	for (i = 0; i < MAX_TCL_DATA_RINGS; i++) {
+	for (i = 0; i < soc->num_tcl_data_rings; i++)
 		dp_flush_ring_hptp(soc, soc->tcl_data_ring[i].hal_srng);
-	}
-	qdf_atomic_set(&soc->tx_pending_rtpm, 0);
 
 	dp_flush_ring_hptp(soc, soc->reo_cmd_ring.hal_srng);
-	dp_rx_fst_update_pm_suspend_status(soc, false);
-
-	return QDF_STATUS_SUCCESS;
 }
-#endif /* FEATURE_RUNTIME_PM */
+#endif
 
 #ifdef WLAN_FEATURE_STATS_EXT
 /* rx hw stats event wait timeout in ms */

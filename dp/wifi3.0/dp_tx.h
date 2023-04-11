@@ -1932,4 +1932,17 @@ static inline uint32_t dp_tx_get_pkt_len(struct dp_tx_desc_s *tx_desc)
 		tx_desc->msdu_ext_desc->tso_desc->seg.total_len :
 		qdf_nbuf_len(tx_desc->nbuf);
 }
+
+#ifdef FEATURE_RUNTIME_PM
+static inline int dp_get_rtpm_tput_policy_requirement(struct dp_soc *soc)
+{
+	return qdf_atomic_read(&soc->rtpm_high_tput_flag) &&
+		(hif_rtpm_get_state() <= HIF_RTPM_STATE_ON);
+}
+#else
+static inline int dp_get_rtpm_tput_policy_requirement(struct dp_soc *soc)
+{
+	return 0;
+}
+#endif
 #endif

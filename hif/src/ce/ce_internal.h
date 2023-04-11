@@ -62,6 +62,11 @@ enum ol_ath_hif_ce_ecodes {
 
 struct CE_src_desc;
 
+/* CE ring BIT mask
+ * CE_RING_FLUSH_EVENT: flush ce ring index in case of link down
+ */
+#define CE_RING_FLUSH_EVENT BIT(0)
+
 /* Copy Engine Ring internal state */
 struct CE_ring_state {
 
@@ -123,6 +128,11 @@ struct CE_ring_state {
 	uint8_t is_ring_prealloc;
 
 	OS_DMA_MEM_CONTEXT(ce_dmacontext); /* OS Specific DMA context */
+
+	/*ce ring event */
+	unsigned long event;
+	/* last flushed time stamp */
+	uint64_t last_flush_ts;
 };
 
 /* Copy Engine internal state */
@@ -870,4 +880,51 @@ void hif_ce_desc_record_rx_paddr(struct hif_softc *scn,
 {
 }
 #endif /* HIF_RECORD_PADDR */
+
+static inline void ce_ring_aquire_lock(struct CE_handle *handle)
+{
+	struct CE_state *ce_state = (struct CE_state *)handle;
+
+	qdf_spin_lock_bh(&ce_state->ce_index_lock);
+}
+
+static inline void ce_ring_release_lock(struct CE_handle *handle)
+{
+	struct CE_state *ce_state = (struct CE_state *)handle;
+
+	qdf_spin_unlock_bh(&ce_state->ce_index_lock);
+}
+
+/*
+ * ce_ring_clear_event() - Clear ring event
+ * @ring: Ring pointer
+ * @event: ring event type
+ *
+ */
+static inline void ce_ring_clear_event(struct CE_ring_state *ring, int event)
+{
+	qdf_atomic_clear_bit(event, &ring->event);
+}
+
+/*
+ * ce_ring_set_event() - Set ring event
+ * @ring: Ring pointer
+ * @event: Ring event type
+ *
+ */
+static inline void ce_ring_set_event(struct CE_ring_state *ring, int event)
+{
+	qdf_atomic_set_bit(event, &ring->event);
+}
+
+/*
+ * ce_ring_get_clear_event() - Clear ring event and return old value
+ * @ring: Ring pointer
+ * @event: Ring event type
+ *
+ */
+static inline int ce_ring_get_clear_event(struct CE_ring_state *ring, int event)
+{
+	return qdf_atomic_test_and_clear_bit(event, &ring->event);
+}
 #endif /* __COPY_ENGINE_INTERNAL_H__ */

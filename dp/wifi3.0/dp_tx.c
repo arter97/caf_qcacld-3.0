@@ -254,8 +254,6 @@ dp_tx_tso_history_add(struct dp_soc *soc, struct qdf_tso_info_t tso_info,
 }
 #endif /* WLAN_FEATURE_DP_TX_DESC_HISTORY */
 
-static int dp_get_rtpm_tput_policy_requirement(struct dp_soc *soc);
-
 /**
  * dp_is_tput_high() - Check if throughput is high
  *
@@ -1597,14 +1595,6 @@ dp_tx_check_and_flush_hp(struct dp_soc *soc,
 #endif
 
 #ifdef FEATURE_RUNTIME_PM
-static inline int dp_get_rtpm_tput_policy_requirement(struct dp_soc *soc)
-{
-	int ret;
-
-	ret = qdf_atomic_read(&soc->rtpm_high_tput_flag) &&
-	      (hif_rtpm_get_state() <= HIF_RTPM_STATE_ON);
-	return ret;
-}
 void
 dp_tx_ring_access_end_wrapper(struct dp_soc *soc,
 			      hal_ring_handle_t hal_ring_hdl,
@@ -1656,11 +1646,6 @@ dp_tx_ring_access_end_wrapper(struct dp_soc *soc,
 	}
 }
 #endif
-
-static inline int dp_get_rtpm_tput_policy_requirement(struct dp_soc *soc)
-{
-	return 0;
-}
 #endif
 
 /**
