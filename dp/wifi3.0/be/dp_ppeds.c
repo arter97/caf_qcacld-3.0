@@ -1273,6 +1273,61 @@ static struct ppe_ds_wlan_ops ppeds_ops = {
 	.release_rx_desc = dp_ppeds_release_rx_desc,
 };
 
+void dp_ppeds_stats_sync_be(struct cdp_soc_t *soc_hdl,
+			    uint16_t vdev_id,
+			    struct cdp_ds_vp_params *vp_params,
+			    void *stats) {
+	struct dp_peer *dp_peer = NULL;
+	struct dp_txrx_peer *txrx_peer;
+	struct dp_vdev *vdev;
+	struct dp_soc *soc = cdp_soc_t_to_dp_soc(soc_hdl);
+	ppe_vp_hw_stats_t *vp_stats = (ppe_vp_hw_stats_t *)stats;
+
+	vdev = dp_vdev_get_ref_by_id(soc, vdev_id, DP_MOD_ID_DS);
+	if (!vdev) {
+		dp_err("%pK: No vdev found for soc, vdev id %d", soc, vdev_id);
+		return;
+	}
+
+	/*
+	 * In case of wds ext mode, get the corresponding peer
+	 * and update the stats in the same.
+	 */
+	if (vp_params->wds_ext_mode) {
+		dp_peer = dp_peer_get_ref_by_id(soc, vp_params->peer_id, DP_MOD_ID_DS);
+		if (!dp_peer) {
+			dp_err("%pK: No peer found for WDS ext", vdev);
+			dp_vdev_unref_delete(soc, vdev, DP_MOD_ID_DS);
+			return;
+		}
+
+		txrx_peer = dp_get_txrx_peer(dp_peer);
+		if (!txrx_peer) {
+			dp_err("%pK: No txrx peer found for dp peer", dp_peer);
+			dp_peer_unref_delete(dp_peer, DP_MOD_ID_DS);
+			dp_vdev_unref_delete(soc, vdev, DP_MOD_ID_DS);
+			return;
+		}
+
+		DP_PEER_STATS_FLAT_INC_PKT(txrx_peer, to_stack,
+					   vp_stats->rx_pkt_cnt,
+					   vp_stats->rx_byte_cnt);
+
+		dp_peer_unref_delete(dp_peer, DP_MOD_ID_DS);
+		dp_vdev_unref_delete(soc, vdev, DP_MOD_ID_DS);
+		return;
+	}
+
+	/*
+	 * In case of non wds ext, update the stats in
+	 * vdev structure.
+	 */
+	DP_STATS_INC_PKT(vdev, rx.to_stack, vp_stats->rx_pkt_cnt,
+			 vp_stats->rx_byte_cnt);
+	dp_vdev_unref_delete(soc, vdev, DP_MOD_ID_DS);
+	return;
+}
+
 /**
  * dp_ppeds_vp_setup_on_fw_recovery() - Recover DS VP on FW recovery
  * @soc_hdl: CDP SoC Tx/Rx handle
