@@ -4403,7 +4403,7 @@ extract_standalone_sounding_evt_params_tlv(wmi_unified_t wmi_handle,
 	ss_params->buffer_uploaded = ev->buffer_uploaded;
 	ss_params->num_sounding_repeats = param_buf->num_snd_failed;
 
-	if (param_buf->num_snd_failed > sizeof(ss_params->snd_failed)) {
+	if (param_buf->num_snd_failed > MAX_NUM_SOUNDING_REPEATS) {
 		wmi_err("Invalid num_num_snd_failed:%u",
 			param_buf->num_snd_failed);
 		return QDF_STATUS_E_INVAL;
