@@ -212,6 +212,7 @@ wlan_twt_requestor_enable(struct wlan_objmgr_psoc *psoc,
 {
 	struct twt_psoc_priv_obj *twt_psoc;
 	bool requestor_en = false, twt_bcast_requestor = false;
+	bool rtwt_requestor = false, restricted_support = false;
 
 	twt_psoc = wlan_objmgr_psoc_get_comp_private_obj(psoc,
 							 WLAN_UMAC_COMP_TWT);
@@ -238,8 +239,14 @@ wlan_twt_requestor_enable(struct wlan_objmgr_psoc *psoc,
 	else
 		req->twt_oper = TWT_OPERATION_INDIVIDUAL;
 
-	twt_debug("TWT req enable: pdev_id:%d cong:%d bcast:%d",
-		  req->pdev_id, req->sta_cong_timer_ms, req->b_twt_enable);
+	wlan_twt_cfg_get_rtwt_requestor(psoc, &rtwt_requestor);
+	wlan_twt_tgt_caps_get_restricted_support(psoc, &restricted_support);
+
+	req->r_twt_enable = QDF_MIN(restricted_support, rtwt_requestor);
+
+	twt_debug("TWT req enable: pdev_id:%d cong:%d bcast:%d rtwt:%d",
+		  req->pdev_id, req->sta_cong_timer_ms, req->b_twt_enable,
+		  req->r_twt_enable);
 	twt_debug("TWT req enable: role:%d ext:%d oper:%d",
 		  req->twt_role, req->ext_conf_present, req->twt_oper);
 
