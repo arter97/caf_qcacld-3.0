@@ -10244,7 +10244,7 @@ bool dp_evaluate_update_tx_ilp_config(struct cdp_soc_t *soc_hdl,
 		HTT_MSDUQ_INDEX_CUSTOM_PRIO_1,
 		msdu_idx_map_arr[HTT_MSDUQ_INDEX_CUSTOM_PRIO_1]);
 
-	if (HTT_MSDU_QTYPE_LATENCY_TOLERANT ==
+	if (HTT_MSDU_QTYPE_USER_SPECIFIED ==
 	    msdu_idx_map_arr[HTT_MSDUQ_INDEX_CUSTOM_PRIO_1])
 		enable_tx_ilp = true;
 
