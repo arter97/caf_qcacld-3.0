@@ -151,7 +151,7 @@ int dp_wrap_dev_add(struct wlan_objmgr_vdev *vdev)
 void dp_wrap_dev_remove(struct wlan_objmgr_vdev *vdev)
 {
 	int hash;
-	struct dp_wrap_vdev *wrap_vdev, *wvdev, *temp;
+	struct dp_wrap_vdev *wrap_vdev, *wvdev, *wvdev_tailq, *temp;
 	struct dp_wrap_pdev *wrap_pdev;
 	struct dp_wrap_devt *wdt;
 	rwlock_state_t lock_state;
@@ -166,16 +166,27 @@ void dp_wrap_dev_remove(struct wlan_objmgr_vdev *vdev)
 		qwrap_err(" wrap_vdev is NULL");
 		return;
 	}
+
 	wdt = &wrap_pdev->wp_devt;
-	hash = WRAP_DEV_HASH(wrap_vdev->wrap_dev_oma);
 	OS_RWLOCK_WRITE_LOCK_BH(&wdt->wdt_lock, &lock_state);
+	hash = WRAP_DEV_HASH(wrap_vdev->wrap_dev_oma);
 	LIST_FOREACH_SAFE(wvdev, &wdt->wdt_hash[hash], wrap_dev_hash, temp) {
 		if ((wvdev == wrap_vdev) &&
 		    qdf_is_macaddr_equal((struct qdf_mac_addr *)
 			wvdev->wrap_dev_oma,
 			(struct qdf_mac_addr *)wrap_vdev->wrap_dev_oma)) {
 			LIST_REMOVE(wvdev, wrap_dev_hash);
-			TAILQ_REMOVE(&wdt->wdt_dev, wvdev, wrap_dev_list);
+			break;
+		}
+	}
+
+	TAILQ_FOREACH_SAFE(wvdev_tailq, &wdt->wdt_dev, wrap_dev_list, temp) {
+		if ((wvdev_tailq == wrap_vdev) &&
+		    qdf_is_macaddr_equal((struct qdf_mac_addr *)
+			wvdev_tailq->wrap_dev_oma,
+			(struct qdf_mac_addr *)wrap_vdev->wrap_dev_oma)) {
+			TAILQ_REMOVE(&wdt->wdt_dev, wvdev_tailq, wrap_dev_list);
+
 			OS_RWLOCK_WRITE_UNLOCK_BH(&wdt->wdt_lock, &lock_state);
 			qwrap_info("Removed vdev:%d from OMA list. pdev_id:%d",
 				   vdev->vdev_objmgr.vdev_id,
@@ -198,7 +209,7 @@ void dp_wrap_dev_remove(struct wlan_objmgr_vdev *vdev)
 void dp_wrap_dev_remove_vma(struct wlan_objmgr_vdev *vdev)
 {
 	int hash;
-	struct dp_wrap_vdev *wrap_vdev, *wvdev, *temp;
+	struct dp_wrap_vdev *wrap_vdev, *wvdev, *wvdev_tailq, *temp;
 	struct dp_wrap_pdev *wrap_pdev;
 	struct dp_wrap_devt *wdt;
 	rwlock_state_t lock_state;
@@ -213,9 +224,10 @@ void dp_wrap_dev_remove_vma(struct wlan_objmgr_vdev *vdev)
 		qwrap_err(" wrap_vdev is NULL");
 		return;
 	}
+
 	wdt = &wrap_pdev->wp_devt;
-	hash = WRAP_DEV_HASH(wrap_vdev->wrap_dev_vma);
 	OS_RWLOCK_WRITE_LOCK_BH(&wdt->wdt_lock, &lock_state);
+	hash = WRAP_DEV_HASH(wrap_vdev->wrap_dev_vma);
 	LIST_FOREACH_SAFE(wvdev, &wdt->wdt_hash_vma[hash],
 			  wrap_dev_hash_vma, temp) {
 		if ((wvdev == wrap_vdev) &&
@@ -223,7 +235,17 @@ void dp_wrap_dev_remove_vma(struct wlan_objmgr_vdev *vdev)
 			wvdev->wrap_dev_vma,
 			(struct qdf_mac_addr *)wrap_vdev->wrap_dev_vma)) {
 			LIST_REMOVE(wvdev, wrap_dev_hash_vma);
-			TAILQ_REMOVE(&wdt->wdt_dev_vma, wvdev,
+			break;
+		}
+	}
+
+	TAILQ_FOREACH_SAFE(wvdev_tailq, &wdt->wdt_dev_vma,
+			  wrap_dev_list_vma, temp) {
+		if ((wvdev_tailq == wrap_vdev) &&
+		    qdf_is_macaddr_equal((struct qdf_mac_addr *)
+			wvdev_tailq->wrap_dev_vma,
+			(struct qdf_mac_addr *)wrap_vdev->wrap_dev_vma)) {
+			TAILQ_REMOVE(&wdt->wdt_dev_vma, wvdev_tailq,
 				     wrap_dev_list_vma);
 			OS_RWLOCK_WRITE_UNLOCK_BH(&wdt->wdt_lock, &lock_state);
 			qwrap_info("Removed vdev:%d from vma list. pdev_id:%d",
