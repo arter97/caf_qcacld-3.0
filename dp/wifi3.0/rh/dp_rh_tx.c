@@ -153,6 +153,37 @@ static inline void dp_tx_fill_nbuf_data_attr_rh(qdf_nbuf_t nbuf)
 	qdf_nbuf_data_attr_set(nbuf, data_attr);
 }
 
+#ifdef DP_TX_HW_DESC_HISTORY
+static inline void
+dp_tx_record_hw_desc_rh(uint8_t *hal_tx_desc_cached, struct dp_soc *soc)
+{
+	struct dp_tx_hw_desc_history *tx_hw_desc_history =
+						&soc->tx_hw_desc_history;
+	struct dp_tx_hw_desc_evt *evt;
+	uint32_t idx = 0;
+	uint16_t slot = 0;
+
+	if (!tx_hw_desc_history->allocated)
+		return;
+
+	dp_get_frag_hist_next_atomic_idx(&tx_hw_desc_history->index, &idx,
+					 &slot,
+					 DP_TX_HW_DESC_HIST_SLOT_SHIFT,
+					 DP_TX_HW_DESC_HIST_PER_SLOT_MAX,
+					 DP_TX_HW_DESC_HIST_MAX);
+
+	evt = &tx_hw_desc_history->entry[slot][idx];
+	qdf_mem_copy(evt->tcl_desc, hal_tx_desc_cached, HAL_TX_DESC_LEN_BYTES);
+	evt->posted = qdf_get_log_timestamp();
+	evt->tcl_ring_id = 0;
+}
+#else
+static inline void
+dp_tx_record_hw_desc_rh(uint8_t *hal_tx_desc_cached, struct dp_soc *soc)
+{
+}
+#endif
+
 QDF_STATUS
 dp_tx_hw_enqueue_rh(struct dp_soc *soc, struct dp_vdev *vdev,
 		    struct dp_tx_desc_s *tx_desc, uint16_t fw_metadata,
@@ -264,6 +295,8 @@ dp_tx_hw_enqueue_rh(struct dp_soc *soc, struct dp_vdev *vdev,
 	dp_vdev_peer_stats_update_protocol_cnt_tx(vdev, nbuf);
 	DP_STATS_INC_PKT(vdev, tx_i.processed, 1, tx_desc->length);
 	status = QDF_STATUS_SUCCESS;
+
+	dp_tx_record_hw_desc_rh((uint8_t *)hal_tx_desc_cached, soc);
 
 enqueue_fail:
 	dp_pkt_add_timestamp(vdev, QDF_PKT_TX_DRIVER_EXIT,
