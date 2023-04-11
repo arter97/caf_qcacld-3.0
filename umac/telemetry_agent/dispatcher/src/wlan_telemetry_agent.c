@@ -23,6 +23,7 @@
 #include <wlan_objmgr_peer_obj.h>
 #include <wlan_objmgr_global_obj.h>
 #include "wlan_telemetry_agent.h"
+#include <cfg80211_ven_cmd.h>
 
 struct telemetry_agent_ops *g_agent_ops;
 
@@ -177,6 +178,40 @@ telemetry_agent_peer_delete_handler(struct wlan_objmgr_peer *peer,
 
 	return status;
 }
+
+static int telemetry_agent_convert_command_to_agent_command(int command)
+{
+	int cmd = AGENT_INVALID_PARAM;
+
+	switch (command) {
+	case IEEE80211_PARAM_TELEMETRY_AGENT_DEBUG_LEVEL:
+		cmd = AGENT_SET_DEBUG_LEVEL;
+		break;
+	default:
+		cmd = AGENT_INVALID_PARAM;
+		break;
+	}
+
+	return cmd;
+}
+
+int telemetry_agent_set_param(int command, int value)
+{
+	int cmd = 0;
+
+	cmd = telemetry_agent_convert_command_to_agent_command(command);
+	if (cmd == AGENT_INVALID_PARAM) {
+		qdf_err("invalid command %d", command);
+		return -1;
+	}
+
+	if (g_agent_ops)
+		return g_agent_ops->agent_set_param(cmd, value);
+
+	return 0;
+}
+
+qdf_export_symbol(telemetry_agent_set_param);
 
 void *telemetry_sawf_peer_ctx_alloc(void *soc, void *sawf_ctx,
 				    uint8_t *mac_addr,
