@@ -3239,7 +3239,6 @@ INCS +=		$(COAP_WMI_INC)
 
 ccflags-y += $(INCS)
 
-cppflags-y += -Wall -Werror
 cppflags-y += -include $(WLAN_ROOT)/configs/default_config.h
 
 # CFG80211_MLO_KEY_OPERATION_SUPPORT
