@@ -858,6 +858,10 @@ enum {
 #ifdef WLAN_CONFIG_TELEMETRY_AGENT
 	IEEE80211_PARAM_TELEMETRY_AGENT_DEBUG_LEVEL = 799, /* Telemetry agent debug level */
 #endif
+#ifdef WLAN_FEATURE_11BE_MLO
+	IEEE80211_PARAM_HW_LINK_ID = 800,
+	IEEE80211_PARAM_IEEE_LINK_ID = 801,
+#endif
 };
 
 enum {
@@ -2552,6 +2556,10 @@ struct vendor_commands vap_vendor_cmds[] = {
 #endif
 #ifdef WLAN_CONFIG_TELEMETRY_AGENT
 	{"telemetry_agent_dbg_lvl", IEEE80211_PARAM_TELEMETRY_AGENT_DEBUG_LEVEL, SET_PARAM, 1},
+#endif
+#ifdef WLAN_FEATURE_11BE_MLO
+	{"get_hw_link_id", IEEE80211_PARAM_HW_LINK_ID, GET_PARAM, 0},
+	{"get_ieee_link_id", IEEE80211_PARAM_IEEE_LINK_ID, GET_PARAM, 0},
 #endif
 };
 
