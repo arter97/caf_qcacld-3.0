@@ -235,6 +235,58 @@ struct dp_peer_sawf *dp_peer_sawf_ctx_get(struct dp_peer *peer)
 }
 
 QDF_STATUS
+dp_sawf_get_peer_msduq_info(struct cdp_soc_t *soc_hdl, uint8_t *mac_addr)
+{
+	struct dp_soc *dp_soc;
+	struct dp_peer *peer;
+	struct dp_peer_sawf *sawf_ctx;
+	struct dp_sawf_msduq *msduq;
+	int q_idx;
+
+	dp_soc = cdp_soc_t_to_dp_soc(soc_hdl);
+
+	if (!dp_soc) {
+		dp_sawf_err("Invalid soc");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	peer = dp_peer_find_hash_find(dp_soc, mac_addr, 0,
+				      DP_VDEV_ALL, DP_MOD_ID_SAWF);
+	if (!peer) {
+		dp_sawf_err("Invalid peer");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	sawf_ctx = dp_peer_sawf_ctx_get(peer);
+	if (!sawf_ctx) {
+		dp_sawf_err("Invalid SAWF ctx");
+		dp_peer_unref_delete(peer, DP_MOD_ID_SAWF);
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	dp_sawf_info("Peer : ", QDF_MAC_ADDR_FMT, QDF_MAC_ADDR_REF(mac_addr));
+
+	dp_sawf_nofl_err("------------------------------------");
+	dp_sawf_nofl_err("| Queue | TID | TID Queue | SVC ID |");
+	dp_sawf_nofl_err("------------------------------------");
+
+	for (q_idx = 0; q_idx < DP_SAWF_Q_MAX; q_idx++) {
+		msduq = &sawf_ctx->msduq[q_idx];
+		if (!msduq->is_used)
+			continue;
+		dp_sawf_nofl_err("|  %u   |  %u  |    %u      |   %u    |",
+				 q_idx + DP_SAWF_DEFAULT_Q_MAX,
+				 msduq->remapped_tid, msduq->htt_msduq,
+				 msduq->svc_id);
+	}
+	dp_sawf_nofl_err("------------------------------------");
+
+	dp_peer_unref_delete(peer, DP_MOD_ID_SAWF);
+
+	return QDF_STATUS_SUCCESS;
+}
+
+QDF_STATUS
 dp_sawf_def_queues_get_map_report(struct cdp_soc_t *soc_hdl,
 				  uint8_t *mac_addr)
 {
