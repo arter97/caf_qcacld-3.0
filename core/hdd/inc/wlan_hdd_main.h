@@ -1917,6 +1917,7 @@ enum wlan_state_ctrl_str_id {
  * @dbam_mode:
  * @last_pagefault_ssr_time: Time when last recovery was triggered because of
  * @host wakeup from fw with reason as pagefault
+ * @bridgeaddr: Bridge MAC address
  */
 struct hdd_context {
 	struct wlan_objmgr_psoc *psoc;
@@ -2200,6 +2201,7 @@ struct hdd_context {
 	enum coex_dbam_config_mode dbam_mode;
 #endif
 	qdf_time_t last_pagefault_ssr_time;
+	uint8_t bridgeaddr[QDF_MAC_ADDR_SIZE];
 };
 
 /**
@@ -2740,6 +2742,7 @@ int hdd_vdev_destroy(struct hdd_adapter *adapter);
 /**
  * hdd_vdev_ready() - Configure FW post VDEV create
  * @vdev: VDEV object.
+ * @bridgeaddr: Bridge MAC address
  *
  * The function is used send configuration to the FW
  * post VDEV creation.
@@ -2747,7 +2750,8 @@ int hdd_vdev_destroy(struct hdd_adapter *adapter);
  *
  * Return: 0 on success, negative value on failure.
  */
-int hdd_vdev_ready(struct wlan_objmgr_vdev *vdev);
+int hdd_vdev_ready(struct wlan_objmgr_vdev *vdev,
+		   struct qdf_mac_addr *bridgeaddr);
 
 QDF_STATUS hdd_init_station_mode(struct hdd_adapter *adapter);
 struct hdd_adapter *hdd_get_adapter(struct hdd_context *hdd_ctx,
