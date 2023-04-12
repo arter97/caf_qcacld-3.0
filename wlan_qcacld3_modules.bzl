@@ -649,6 +649,7 @@ _fixed_srcs = [
     "core/wma/src/wma_power.c",
     "core/wma/src/wma_scan_roam.c",
     "core/wma/src/wma_utils.c",
+    "core/wma/src/wma_pasn_peer_api.c",
     "os_if/dp/src/os_if_dp.c",
     "os_if/dp/src/os_if_dp_txrx.c",
     "os_if/p2p/src/wlan_cfg80211_p2p.c",
@@ -1447,7 +1448,6 @@ _conditional_srcs = {
             "cmn/umac/wifi_pos/src/wifi_pos_pasn_api.c",
             "components/wifi_pos/core/src/wlan_wifi_pos_interface.c",
             "core/hdd/src/wlan_hdd_wifi_pos_pasn.c",
-            "core/wma/src/wma_pasn_peer_api.c",
         ],
     },
     "CONFIG_WLAN_BCN_RECV_FEATURE": {

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022,2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -31,15 +31,16 @@
 #include "wifi_pos_pasn_api.h"
 #include "wifi_pos_api.h"
 #include "init_deinit_lmac.h"
+#include "wlan_nan_api_i.h"
 
 QDF_STATUS
 wma_pasn_peer_remove(struct wlan_objmgr_psoc *psoc,
 		     struct qdf_mac_addr *peer_addr,
-		     uint8_t vdev_id,  bool no_fw_peer_delete)
+		     uint8_t vdev_id, bool no_fw_peer_delete)
 {
 	tp_wma_handle wma = cds_get_context(QDF_MODULE_ID_WMA);
 	struct peer_delete_cmd_params del_param = {0};
-	QDF_STATUS qdf_status;
+	QDF_STATUS qdf_status = QDF_STATUS_SUCCESS;
 	uint8_t peer_vdev_id;
 
 	if (!wma) {
@@ -60,6 +61,9 @@ wma_pasn_peer_remove(struct wlan_objmgr_psoc *psoc,
 		return QDF_STATUS_E_INVAL;
 	}
 
+	if (no_fw_peer_delete)
+		goto host_peer_delete;
+
 	del_param.vdev_id = vdev_id;
 	qdf_status = wmi_unified_peer_delete_send(wma->wmi_handle,
 						  peer_addr->bytes,
@@ -70,16 +74,94 @@ wma_pasn_peer_remove(struct wlan_objmgr_psoc *psoc,
 		qdf_status = QDF_STATUS_E_FAILURE;
 	}
 
+host_peer_delete:
 	wma_remove_objmgr_peer(wma, wma->interfaces[vdev_id].vdev,
 			       peer_addr->bytes);
 
 	return qdf_status;
 }
 
+QDF_STATUS wma_nan_pasn_peer_remove(struct wlan_objmgr_psoc *psoc,
+				    uint8_t vdev_id,
+				    struct qdf_mac_addr *peer_addr,
+				    uint8_t type, bool objmgr_peer_delete)
+{
+	tp_wma_handle wma = cds_get_context(QDF_MODULE_ID_WMA);
+	struct peer_delete_cmd_params del_param = {0};
+	uint8_t peer_vdev_id;
+	struct wma_target_req *del_req;
+	struct pasn_peer_del_rsp_params *peer_del_resp;
+	QDF_STATUS qdf_status;
+
+	if (cds_is_driver_recovering())
+		return QDF_STATUS_E_FAILURE;
+
+	if (!wma) {
+		wma_err("wma_handle is NULL");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	if (!wma_objmgr_peer_exist(wma, peer_addr->bytes, &peer_vdev_id)) {
+		wma_err("peer doesn't exist peer_addr " QDF_MAC_ADDR_FMT " vdevid %d",
+			QDF_MAC_ADDR_REF(peer_addr->bytes), vdev_id);
+		return QDF_STATUS_E_INVAL;
+	}
+
+	if (peer_vdev_id != vdev_id) {
+		wma_err("peer " QDF_MAC_ADDR_FMT " is on vdev id %d but delete req on vdevid %d",
+			QDF_MAC_ADDR_REF(peer_addr->bytes),
+			peer_vdev_id, vdev_id);
+		return QDF_STATUS_E_INVAL;
+	}
+
+	if (objmgr_peer_delete)
+		goto host_peer_delete;
+
+	del_param.vdev_id = vdev_id;
+	qdf_status = wmi_unified_peer_delete_send(wma->wmi_handle,
+						  peer_addr->bytes,
+						  &del_param);
+	if (QDF_IS_STATUS_ERROR(qdf_status)) {
+		wma_err("Peer delete could not be sent to target %d",
+			qdf_status);
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	if (wmi_service_enabled(wma->wmi_handle,
+				wmi_service_sync_delete_cmds)) {
+		peer_del_resp = qdf_mem_malloc(sizeof(*peer_del_resp));
+		if (!peer_del_resp)
+			return QDF_STATUS_E_INVAL;
+
+		peer_del_resp->vdev_id = vdev_id;
+		peer_del_resp->status = QDF_STATUS_SUCCESS;
+
+		wma_debug("Wait for the peer delete. vdev_id %d", vdev_id);
+		del_req = wma_fill_hold_req(wma, vdev_id,
+					    WMA_DELETE_STA_REQ,
+					     type, peer_del_resp,
+					     WMA_DELETE_STA_TIMEOUT);
+		if (!del_req) {
+			wma_err("Failed to allocate request vdev_id %d",
+				vdev_id);
+			qdf_mem_free(peer_del_resp);
+			return QDF_STATUS_E_FAILURE;
+		}
+
+		return QDF_STATUS_SUCCESS;
+	}
+
+host_peer_delete:
+	wma_remove_objmgr_peer(wma, wma->interfaces[vdev_id].vdev,
+			       peer_addr->bytes);
+
+	return QDF_STATUS_SUCCESS;
+}
+
 QDF_STATUS
 wma_pasn_peer_create(struct wlan_objmgr_psoc *psoc,
-		     struct qdf_mac_addr *peer_addr,
-		     uint8_t vdev_id)
+		     struct qdf_mac_addr *peer_addr, uint8_t vdev_id,
+		     uint8_t pasn_peer_msg_type)
 {
 	tp_wma_handle wma = cds_get_context(QDF_MODULE_ID_WMA);
 	target_resource_config *wlan_res_cfg;
@@ -161,20 +243,27 @@ wma_pasn_peer_create(struct wlan_objmgr_psoc *psoc,
 	qdf_mem_copy(peer_create_rsp->peer_mac.bytes, peer_addr->bytes,
 		     QDF_MAC_ADDR_SIZE);
 	wma_req = wma_fill_hold_req(wma, vdev_id, WMA_PEER_CREATE_REQ,
-				    WMA_PASN_PEER_CREATE_RESPONSE,
-				    peer_create_rsp,
+				    pasn_peer_msg_type, peer_create_rsp,
 				    WMA_PEER_CREATE_RESPONSE_TIMEOUT);
 	if (!wma_req) {
 		wma_err("vdev:%d failed to fill peer create req", vdev_id);
-		wma_remove_peer_req(wma, vdev_id, WMA_PASN_PEER_CREATE_RESPONSE,
+		wma_remove_peer_req(wma, vdev_id, pasn_peer_msg_type,
 				    peer_addr);
-		wma_pasn_peer_remove(psoc, peer_addr, vdev_id, false);
+
+		if (pasn_peer_msg_type == WMA_PASN_PEER_CREATE_RESPONSE)
+			wma_pasn_peer_remove(psoc, peer_addr, vdev_id, false);
+		else if (pasn_peer_msg_type ==
+			   WMA_NAN_PASN_PEER_CREATE_RESPONSE)
+			wma_nan_pasn_peer_remove(psoc, vdev_id, peer_addr,
+					WMA_NAN_PASN_PEER_DELETE_RESPONSE,
+					false);
+
 		wma_release_wakelock(&wma->wmi_cmd_rsp_wake_lock);
 		qdf_mem_free(peer_create_rsp);
 		return QDF_STATUS_E_FAILURE;
 	}
 
-	wma_debug("Created ranging peer peer_addr " QDF_MAC_ADDR_FMT " vdev_id %d",
+	wma_debug("Created PASN peer peer_addr " QDF_MAC_ADDR_FMT " vdev_id %d",
 		  QDF_MAC_ADDR_REF(peer_addr->bytes), vdev_id);
 
 	return status;
@@ -183,7 +272,8 @@ wma_pasn_peer_create(struct wlan_objmgr_psoc *psoc,
 QDF_STATUS
 wma_pasn_handle_peer_create_conf(tp_wma_handle wma,
 				 struct qdf_mac_addr *peer_mac,
-				 QDF_STATUS status, uint8_t vdev_id)
+				 uint8_t req_msg_type, QDF_STATUS status,
+				 uint8_t vdev_id)
 {
 	struct wlan_lmac_if_wifi_pos_rx_ops *rx_ops;
 	struct wlan_objmgr_vdev *vdev;

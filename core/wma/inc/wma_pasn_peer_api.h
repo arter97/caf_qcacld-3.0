@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022,2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -25,7 +25,16 @@
 #include "wlan_objmgr_psoc_obj.h"
 #include "wma.h"
 
-#if defined(WIFI_POS_CONVERGED) && defined(WLAN_FEATURE_RTT_11AZ_SUPPORT)
+/**
+ * struct pasn_peer_del_rsp_params  - Peer delete response parameters
+ * @vdev_id: vdev id
+ * @status: response status code
+ */
+struct pasn_peer_del_rsp_params {
+	uint8_t vdev_id;
+	uint32_t status;
+};
+
 /**
  * wma_pasn_peer_remove  - Remove RTT pasn peer and send peer delete command to
  * firmware
@@ -39,25 +48,27 @@
 QDF_STATUS
 wma_pasn_peer_remove(struct wlan_objmgr_psoc *psoc,
 		     struct qdf_mac_addr *peer_addr,
-		     uint8_t vdev_id,  bool no_fw_peer_delete);
+		     uint8_t vdev_id, bool no_fw_peer_delete);
 
 /**
  * wma_pasn_peer_create() - Create RTT PASN peer
  * @psoc: PSOC pointer
  * @peer_addr: Peer address
  * @vdev_id: vdev id
+ * @type: type of PASN request (create/delete) for NAN/RTT
  *
  * Return: QDF_STATUS
  */
 QDF_STATUS
 wma_pasn_peer_create(struct wlan_objmgr_psoc *psoc,
-		     struct qdf_mac_addr *peer_addr,
-		     uint8_t vdev_id);
+		     struct qdf_mac_addr *peer_addr, uint8_t vdev_id,
+		     uint8_t type);
 
 /**
  * wma_pasn_handle_peer_create_conf() - Handle PASN peer create confirm event
  * @wma: WMA handle
  * @peer_mac: peer mac address
+ * @req_msg_type: Request message type
  * @status: status
  * @vdev_id: vdev id
  *
@@ -66,6 +77,7 @@ wma_pasn_peer_create(struct wlan_objmgr_psoc *psoc,
 QDF_STATUS
 wma_pasn_handle_peer_create_conf(tp_wma_handle wma,
 				 struct qdf_mac_addr *peer_mac,
+				 uint8_t req_msg_type,
 				 QDF_STATUS status, uint8_t vdev_id);
 
 /**
@@ -83,41 +95,23 @@ wma_resume_vdev_delete(tp_wma_handle wma, uint8_t vdev_id);
 
 QDF_STATUS
 wma_pasn_peer_delete_all_complete(struct wlan_objmgr_vdev *vdev);
-#else
-static inline QDF_STATUS
-wma_pasn_peer_create(struct wlan_objmgr_psoc *psoc,
-		     struct qdf_mac_addr *peer_addr,
-		     uint8_t vdev_id)
-{
-	return QDF_STATUS_SUCCESS;
-}
 
-static inline QDF_STATUS
-wma_pasn_peer_remove(struct wlan_objmgr_psoc *psoc,
-		     struct qdf_mac_addr *peer_addr,
-		     uint8_t vdev_id,  bool no_fw_peer_delete)
-{
-	return QDF_STATUS_SUCCESS;
-}
-
-static inline QDF_STATUS
-wma_pasn_handle_peer_create_conf(tp_wma_handle wma,
-				 struct qdf_mac_addr *peer_mac,
-				 QDF_STATUS status, uint8_t vdev_id)
-{
-	return QDF_STATUS_SUCCESS;
-}
-
-static inline QDF_STATUS
-wma_delete_all_pasn_peers(tp_wma_handle wma, struct wlan_objmgr_vdev *vdev)
-{
-	return QDF_STATUS_SUCCESS;
-}
-
-static inline QDF_STATUS
-wma_resume_vdev_delete(tp_wma_handle wma, uint8_t vdev_id)
-{
-	return QDF_STATUS_SUCCESS;
-}
-#endif
+/**
+ * wma_nan_pasn_peer_remove() - Based on peer delete flag, send peer delete
+ * request to target or remove NAN PASN peer from the object manager
+ * @psoc: PSOC pointer
+ * @vdev_id: vdev id
+ * @peer_addr: Peer address
+ * @type: type of PASN request (create/delete) for NAN/RTT
+ * @objmgr_peer_delete: true means don't send peer delete to target but delete
+ * object manager peer only and false means send peer delete to target but
+ * do not delete object manager peer.
+ *
+ * Return: QDF status
+ */
+QDF_STATUS wma_nan_pasn_peer_remove(struct wlan_objmgr_psoc *psoc,
+				    uint8_t vdev_id,
+				    struct qdf_mac_addr *peer_addr,
+				    uint8_t type,
+				    bool objmgr_peer_delete);
 #endif

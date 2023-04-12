@@ -117,6 +117,7 @@
 #include "wlan_vdev_mgr_utils_api.h"
 #include "target_if.h"
 #include <wlan_psoc_mlme_api.h>
+#include "wlan_objmgr_vdev_obj.h"
 
 /*
  * FW only supports 8 clients in SAP/GO mode for D3 WoW feature
@@ -1914,8 +1915,12 @@ static int wma_get_obj_mgr_peer_type(tp_wma_handle wma, uint8_t vdev_id,
 	if (wma_peer_type == WMI_PEER_TYPE_TDLS)
 		return WLAN_PEER_TDLS;
 
-	if (wma_peer_type == WMI_PEER_TYPE_PASN)
-		return WLAN_PEER_RTT_PASN;
+	if (wma_peer_type == WMI_PEER_TYPE_PASN) {
+		if (wlan_vdev_mlme_get_opmode(vdev) == QDF_NAN_DISC_MODE)
+			return WLAN_PEER_NAN_PASN;
+		else
+			return WLAN_PEER_RTT_PASN;
+	}
 
 	if (!qdf_mem_cmp(addr, peer_addr, QDF_MAC_ADDR_SIZE) ||
 	    !qdf_mem_cmp(mld_addr, peer_addr, QDF_MAC_ADDR_SIZE)) {
@@ -3663,8 +3668,9 @@ int wma_peer_create_confirm_handler(void *handle, uint8_t *evt_param_info,
 	qdf_mem_free(rsp_data);
 	qdf_mem_free(req_msg);
 
-	if (req_msg_type == WMA_PASN_PEER_CREATE_RESPONSE) {
-		wma_pasn_handle_peer_create_conf(wma, &peer_mac,
+	if (req_msg_type == WMA_PASN_PEER_CREATE_RESPONSE ||
+	    req_msg_type == WMA_NAN_PASN_PEER_CREATE_RESPONSE) {
+		wma_pasn_handle_peer_create_conf(wma, &peer_mac, req_msg_type,
 						 peer_create_rsp->status,
 						 peer_create_rsp->vdev_id);
 		wma_release_wakelock(&wma->wmi_cmd_rsp_wake_lock);
@@ -4042,9 +4048,9 @@ void wma_hold_req_timer(void *data)
 			(struct peer_create_rsp_params *)tgt_req->user_data;
 		peer_mac = &peer_create_rsp->peer_mac;
 
-		wma_pasn_handle_peer_create_conf(
-				wma, peer_mac, QDF_STATUS_E_TIMEOUT,
-				tgt_req->vdev_id);
+		wma_pasn_handle_peer_create_conf(wma, peer_mac, tgt_req->type,
+						 QDF_STATUS_E_TIMEOUT,
+						 tgt_req->vdev_id);
 		qdf_mem_free(tgt_req->user_data);
 	} else if (tgt_req->msg_type == WMA_PASN_PEER_DELETE_REQUEST &&
 		   tgt_req->type == WMA_PASN_PEER_DELETE_RESPONSE) {

@@ -3111,11 +3111,8 @@ endif
 ifeq ($(CONFIG_WLAN_MWS_INFO_DEBUGFS), y)
 WMA_OBJS +=	$(WMA_SRC_DIR)/wma_coex.o
 endif
-ifeq ($(CONFIG_WIFI_POS_CONVERGED), y)
-ifeq ($(CONFIG_WIFI_POS_PASN), y)
+
 WMA_OBJS +=	$(WMA_SRC_DIR)/wma_pasn_peer_api.o
-endif
-endif
 
 $(call add-wlan-objs,wma,$(WMA_OBJS))
 

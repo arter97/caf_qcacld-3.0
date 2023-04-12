@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -22,6 +22,9 @@
 #include "wma_pasn_peer_api.h"
 
 #if defined(WIFI_POS_CONVERGED) && defined(WLAN_FEATURE_RTT_11AZ_SUPPORT)
+#define WIFI_POS_PASN_PEER_CREATE 0x0a
+#define WIFI_POS_PASN_PEER_DELETE 0x0b
+
 /**
  * wlan_wifi_pos_pasn_peer_create() - Callback to create ranging peer
  * @psoc: Pointer to PSOC
@@ -34,7 +37,8 @@ static QDF_STATUS wlan_wifi_pos_pasn_peer_create(struct wlan_objmgr_psoc *psoc,
 						 struct qdf_mac_addr *peer_addr,
 						 uint8_t vdev_id)
 {
-	return wma_pasn_peer_create(psoc, peer_addr, vdev_id);
+	return wma_pasn_peer_create(psoc, peer_addr, vdev_id,
+				    WIFI_POS_PASN_PEER_CREATE);
 }
 
 /**
