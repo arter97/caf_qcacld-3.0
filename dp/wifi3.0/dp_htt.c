@@ -2418,6 +2418,7 @@ dp_h2t_ptqm_migration_msg_send(struct dp_soc *dp_soc, uint16_t vdev_id,
 	qdf_nbuf_t msg;
 	uint32_t *msg_word;
 	QDF_STATUS ret = QDF_STATUS_SUCCESS;
+	bool src_info_valid = false;
 
 	msg = qdf_nbuf_alloc(
 			soc->osdev,
@@ -2464,6 +2465,12 @@ dp_h2t_ptqm_migration_msg_send(struct dp_soc *dp_soc, uint16_t vdev_id,
 	/* word 1 */
 	msg_word++;
 	*msg_word = 0;
+
+	if (src_info != 0)
+		src_info_valid = true;
+
+	HTT_H2T_PRIMARY_LINK_PEER_MIGRATE_SRC_INFO_VALID_SET(*msg_word,
+							     src_info_valid);
 	HTT_H2T_PRIMARY_LINK_PEER_MIGRATE_SRC_INFO_SET(*msg_word,
 						       src_info);
 	HTT_H2T_PRIMARY_LINK_PEER_MIGRATE_STATUS_SET(*msg_word,
