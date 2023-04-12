@@ -9668,8 +9668,8 @@ static QDF_STATUS dp_vdev_getstats(struct cdp_vdev *vdev_handle,
 	vdev_stats = qdf_mem_malloc_atomic(sizeof(struct cdp_vdev_stats));
 
 	if (!vdev_stats) {
-		dp_cdp_err("%pK: DP alloc failure - unable to get alloc vdev stats",
-			   soc);
+		dp_err("%pK: DP alloc failure - unable to get alloc vdev stats",
+		       soc);
 		return QDF_STATUS_E_FAILURE;
 	}
 
@@ -9711,7 +9711,8 @@ static QDF_STATUS dp_vdev_getstats(struct cdp_vdev *vdev_handle,
 			    vdev_stats->rx.peer_unauth_rx_pkt_drop +
 			    vdev_stats->rx.policy_check_drop +
 			    vdev_stats->rx.nawds_mcast_drop +
-			    vdev_stats->rx.mcast_3addr_drop;
+			    vdev_stats->rx.mcast_3addr_drop +
+			    vdev_stats->rx.ppeds_drop.num;
 
 	qdf_mem_free(vdev_stats);
 
@@ -9772,6 +9773,7 @@ static void dp_pdev_getstats(struct cdp_pdev *pdev_handle,
 		pdev->stats.dropped.mon_rx_drop +
 		pdev->stats.dropped.mon_radiotap_update_err +
 		pdev->stats.rx.mec_drop.num +
+		pdev->stats.rx.ppeds_drop.num +
 		pdev->stats.rx.multipass_rx_pkt_drop +
 		pdev->stats.rx.peer_unauth_rx_pkt_drop +
 		pdev->stats.rx.policy_check_drop +
