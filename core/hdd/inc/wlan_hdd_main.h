@@ -60,7 +60,7 @@
 #include <wlan_hdd_cfg.h>
 #include <linux/spinlock.h>
 #include <ani_system_defs.h>
-#if defined(WLAN_OPEN_SOURCE) && defined(CONFIG_HAS_WAKELOCK)
+#if defined(CONFIG_HAS_WAKELOCK)
 #include <linux/wakelock.h>
 #endif
 #ifdef WLAN_FEATURE_TSF_PTP

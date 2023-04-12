@@ -28,7 +28,7 @@
 #include <qdf_event.h>
 #include <i_qdf_types.h>
 #include <linux/wait.h>
-#if defined(WLAN_OPEN_SOURCE) && defined(CONFIG_HAS_WAKELOCK)
+#if defined(CONFIG_HAS_WAKELOCK)
 #include <linux/wakelock.h>
 #endif
 #include <qdf_types.h>

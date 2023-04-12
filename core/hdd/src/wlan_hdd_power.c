@@ -31,7 +31,7 @@
 #include <linux/cpu.h>
 #include "osif_sync.h"
 #include <wlan_hdd_includes.h>
-#if defined(WLAN_OPEN_SOURCE) && defined(CONFIG_HAS_WAKELOCK)
+#if defined(CONFIG_HAS_WAKELOCK)
 #include <linux/wakelock.h>
 #endif
 #include "qdf_types.h"
