@@ -2012,6 +2012,17 @@ static QDF_STATUS hal_rx_reo_ent_get_src_link_id_kiwi(hal_rxdma_desc_t rx_desc,
 	return QDF_STATUS_SUCCESS;
 }
 
+/**
+ * hal_rx_en_mcast_fp_data_filter_kiwi() - Is mcast filter pass enabled
+ *
+ * Return: false for BE MCC
+ */
+static inline
+bool hal_rx_en_mcast_fp_data_filter_kiwi(void)
+{
+	return false;
+}
+
 #ifdef QCA_WIFI_KIWI_V2
 /**
  * hal_srng_dst_hw_init_misc_1_kiwi() - Function to initialize MISC_1 register
@@ -2343,6 +2354,8 @@ static void hal_hw_txrx_ops_attach_kiwi(struct hal_soc *hal_soc)
 #ifdef FEATURE_DIRECT_LINK
 	hal_soc->ops->hal_srng_set_msi_config = hal_srng_set_msi_config;
 #endif
+	hal_soc->ops->hal_rx_en_mcast_fp_data_filter =
+					hal_rx_en_mcast_fp_data_filter_kiwi;
 };
 
 struct hal_hw_srng_config hw_srng_table_kiwi[] = {

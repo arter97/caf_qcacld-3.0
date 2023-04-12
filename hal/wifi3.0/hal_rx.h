@@ -3126,4 +3126,18 @@ hal_get_tsf_time(hal_soc_handle_t hal_soc_hdl, uint32_t tsf_id,
 		hal_soc->ops->hal_get_tsf_time(hal_soc_hdl, tsf_id, mac_id,
 					       tsf, tsf_sync_soc_time);
 }
+
+/**
+ * hal_rx_en_mcast_fp_data_filter() - Is mcast filter pass enabled
+ * @hal_soc_hdl: HAL soc handle
+ *
+ * Return: false for BE MCC, true for WIN
+ */
+static inline
+bool hal_rx_en_mcast_fp_data_filter(hal_soc_handle_t hal_soc_hdl)
+{
+	struct hal_soc *hal_soc = (struct hal_soc *)hal_soc_hdl;
+
+	return hal_soc->ops->hal_rx_en_mcast_fp_data_filter();
+}
 #endif /* _HAL_RX_H */

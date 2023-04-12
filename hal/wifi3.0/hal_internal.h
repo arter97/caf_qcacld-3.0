@@ -1455,6 +1455,7 @@ struct hal_hw_txrx_ops {
 	uint32_t (*hal_tx_get_num_ppe_vp_search_idx_tbl_entries)(
 					hal_soc_handle_t hal_soc_hdl);
 	uint32_t (*hal_tx_ring_halt_get)(hal_soc_handle_t hal_soc_hdl);
+	bool (*hal_rx_en_mcast_fp_data_filter)(void);
 };
 
 /**
