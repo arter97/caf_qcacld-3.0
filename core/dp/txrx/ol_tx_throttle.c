@@ -109,7 +109,7 @@ static void ol_tx_pdev_throttle_phase_timer(void *context)
 	if (pdev->tx_throttle.current_throttle_phase == THROTTLE_PHASE_OFF) {
 		/* Traffic is stopped */
 		ol_txrx_dbg(
-				   "throttle phase --> OFF\n");
+				   "throttle phase --> OFF");
 		ol_txrx_throttle_pause(pdev);
 		ol_txrx_thermal_pause(pdev);
 		pdev->tx_throttle.prev_outstanding_num = 0;
@@ -119,14 +119,14 @@ static void ol_tx_pdev_throttle_phase_timer(void *context)
 		if (pdev->tx_throttle.current_throttle_level !=
 				THROTTLE_LEVEL_0) {
 			ol_txrx_dbg(
-					   "start timer %d ms\n", ms);
+					   "start timer %d ms", ms);
 			qdf_timer_start(&pdev->tx_throttle.
 							phase_timer, ms);
 		}
 	} else {
 		/* Traffic can go */
 		ol_txrx_dbg(
-					"throttle phase --> ON\n");
+					"throttle phase --> ON");
 		ol_txrx_throttle_unpause(pdev);
 		ol_txrx_thermal_unpause(pdev);
 		cur_level = pdev->tx_throttle.current_throttle_level;
@@ -134,7 +134,7 @@ static void ol_tx_pdev_throttle_phase_timer(void *context)
 		ms = pdev->tx_throttle.throttle_time_ms[cur_level][cur_phase];
 		if (pdev->tx_throttle.current_throttle_level !=
 		    THROTTLE_LEVEL_0) {
-			ol_txrx_dbg("start timer %d ms\n", ms);
+			ol_txrx_dbg("start timer %d ms", ms);
 			qdf_timer_start(&pdev->tx_throttle.phase_timer,	ms);
 		}
 	}
@@ -232,7 +232,7 @@ void ol_tx_throttle_set_level(struct cdp_soc_t *soc_hdl,
 		return;
 	}
 
-	ol_txrx_info("Setting throttle level %d\n", level);
+	ol_txrx_info("Setting throttle level %d", level);
 
 	/* Set the current throttle level */
 	pdev->tx_throttle.current_throttle_level = (enum throttle_level)level;
@@ -266,7 +266,7 @@ void ol_tx_throttle_init_period(struct cdp_soc_t *soc_hdl,
 	/* Set the current throttle level */
 	pdev->tx_throttle.throttle_period_ms = period;
 
-	ol_txrx_dbg("level  OFF  ON\n");
+	ol_txrx_dbg("level  OFF  ON");
 	for (i = 0; i < THROTTLE_LEVEL_MAX; i++) {
 		pdev->tx_throttle.throttle_time_ms[i][THROTTLE_PHASE_ON] =
 			pdev->tx_throttle.throttle_period_ms -
@@ -276,7 +276,7 @@ void ol_tx_throttle_init_period(struct cdp_soc_t *soc_hdl,
 			pdev->tx_throttle.throttle_period_ms -
 			pdev->tx_throttle.throttle_time_ms[
 				i][THROTTLE_PHASE_ON];
-		ol_txrx_dbg("%d      %d    %d\n", i,
+		ol_txrx_dbg("%d      %d    %d", i,
 			    pdev->tx_throttle.
 			    throttle_time_ms[i][THROTTLE_PHASE_OFF],
 			    pdev->tx_throttle.

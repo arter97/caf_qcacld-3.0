@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -155,7 +155,7 @@ static void dp_fisa_fse_cache_flush_timer(void *arg)
 					   DP_HTT_FST_CACHE_INVALIDATE_FULL,
 					   &rx_flow_tuple_info);
 	if (QDF_IS_STATUS_ERROR(status)) {
-		dp_err("Failed to send the cache invalidation\n");
+		dp_err("Failed to send the cache invalidation");
 		/*
 		 * Not big impact cache entry gets updated later
 		 */
@@ -210,7 +210,7 @@ static QDF_STATUS dp_rx_fst_cmem_init(struct dp_rx_fst *fst)
 	fst->fst_update_wq =
 		qdf_alloc_high_prior_ordered_workqueue("dp_rx_fst_update_wq");
 	if (!fst->fst_update_wq) {
-		dp_err("failed to allocate fst update wq\n");
+		dp_err("failed to allocate fst update wq");
 		return QDF_STATUS_E_FAILURE;
 	}
 
@@ -456,7 +456,7 @@ QDF_STATUS dp_rx_flow_send_fst_fw_setup(struct dp_soc *soc,
 		/* Higher order bits are mostly 0, Always use 0x10 */
 		fisa_hw_fst_setup_cmd.base_addr_hi =
 			(soc->fst_cmem_base >> 32) | 0x10;
-		dp_info("cmem base address 0x%llx\n", soc->fst_cmem_base);
+		dp_info("cmem base address 0x%llx", soc->fst_cmem_base);
 	} else {
 		fisa_hw_fst_setup_cmd.base_addr_lo =
 			fst->hal_rx_fst_base_paddr & 0xffffffff;

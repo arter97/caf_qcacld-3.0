@@ -83,7 +83,7 @@ ol_tx_ll_wrapper(ol_txrx_vdev_handle vdev, qdf_nbuf_t msdu_list)
 		       hif_is_fastpath_mode_enabled(hif_device))) {
 		msdu_list = ol_tx_ll_fast(vdev, msdu_list);
 	} else {
-		qdf_print("Fast path is disabled\n");
+		qdf_print("Fast path is disabled");
 		QDF_BUG(0);
 	}
 	return msdu_list;
@@ -334,7 +334,7 @@ ol_tx_ll_fast(ol_txrx_vdev_handle vdev, qdf_nbuf_t msdu_list)
 		msdu_info.peer = NULL;
 
 		if (qdf_unlikely(ol_tx_prepare_tso(vdev, msdu, &msdu_info))) {
-			ol_txrx_err("ol_tx_prepare_tso failed\n");
+			ol_txrx_err("ol_tx_prepare_tso failed");
 			TXRX_STATS_MSDU_LIST_INCR(vdev->pdev,
 						  tx.dropped.host_reject,
 						  msdu);

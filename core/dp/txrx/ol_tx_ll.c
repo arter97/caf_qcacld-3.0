@@ -209,7 +209,7 @@ void ol_txrx_dump_frag_desc(char *msg, struct ol_tx_desc_t *tx_desc)
 	uint32_t                *frag_ptr_i_p;
 	int                     i;
 
-	ol_txrx_err("OL TX Descriptor 0x%pK msdu_id %d\n",
+	ol_txrx_err("OL TX Descriptor 0x%pK msdu_id %d",
 		    tx_desc, tx_desc->id);
 	ol_txrx_err("HTT TX Descriptor vaddr: 0x%pK paddr: %pad",
 		    tx_desc->htt_tx_desc, &tx_desc->htt_tx_desc_paddr);
@@ -724,7 +724,7 @@ void ol_txrx_stats_display_tso(ol_txrx_pdev_handle pdev)
 	int seg_idx;
 
 	txrx_nofl_info("TSO Statistics:");
-	txrx_nofl_info("TSO pkts %lld, bytes %lld\n",
+	txrx_nofl_info("TSO pkts %lld, bytes %lld",
 		       pdev->stats.pub.tx.tso.tso_pkts.pkts,
 		       pdev->stats.pub.tx.tso.tso_pkts.bytes);
 
