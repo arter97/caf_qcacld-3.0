@@ -610,25 +610,25 @@ QDF_STATUS dp_tx_desc_pool_alloc_rh(struct dp_soc *soc, uint32_t num_elem,
 
 	status = dp_tx_tcl_desc_pool_alloc_rh(soc, num_elem, pool_id);
 	if (QDF_IS_STATUS_ERROR(status)) {
-		dp_err("failed to allocate tcl desc pool %d\n", pool_id);
+		dp_err("failed to allocate tcl desc pool %d", pool_id);
 		goto err_tcl_desc_pool;
 	}
 
 	status = dp_tx_ext_desc_pool_alloc_by_id(soc, num_elem, pool_id);
 	if (QDF_IS_STATUS_ERROR(status)) {
-		dp_err("failed to allocate tx ext desc pool %d\n", pool_id);
+		dp_err("failed to allocate tx ext desc pool %d", pool_id);
 		goto err_free_tcl_pool;
 	}
 
 	status = dp_tx_tso_desc_pool_alloc_by_id(soc, num_elem, pool_id);
 	if (QDF_IS_STATUS_ERROR(status)) {
-		dp_err("failed to allocate tso desc pool %d\n", pool_id);
+		dp_err("failed to allocate tso desc pool %d", pool_id);
 		goto err_free_tx_ext_pool;
 	}
 
 	status = dp_tx_tso_num_seg_pool_alloc_by_id(soc, num_elem, pool_id);
 	if (QDF_IS_STATUS_ERROR(status)) {
-		dp_err("failed to allocate tso num seg pool %d\n", pool_id);
+		dp_err("failed to allocate tso num seg pool %d", pool_id);
 		goto err_free_tso_pool;
 	}
 

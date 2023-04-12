@@ -109,7 +109,7 @@ static inline int hal_history_get_next_index(qdf_atomic_t *table_index,
 }
 #else
 #define HAL_REG_WRITE_FAIL_HIST_ADD(hal_soc, offset, wr_val, rd_val) \
-	hal_err("write failed at reg offset 0x%x, write 0x%x read 0x%x\n", \
+	hal_err("write failed at reg offset 0x%x, write 0x%x read 0x%x", \
 		offset,	\
 		wr_val,	\
 		rd_val)

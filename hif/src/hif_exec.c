@@ -1101,7 +1101,7 @@ qdf_export_symbol(hif_register_ext_group);
 struct hif_exec_context *hif_exec_create(enum hif_exec_type type,
 						uint32_t scale)
 {
-	hif_debug("%s: create exec_type %d budget %d\n",
+	hif_debug("%s: create exec_type %d budget %d",
 		  __func__, type, QCA_NAPI_BUDGET * scale);
 
 	switch (type) {
@@ -1154,7 +1154,7 @@ void hif_deregister_exec_group(struct hif_opaque_softc *hif_ctx,
 		if (!hif_ext_group)
 			continue;
 
-		hif_debug("%s: Deregistering grp id %d name %s\n",
+		hif_debug("%s: Deregistering grp id %d name %s",
 			  __func__,
 			  hif_ext_group->grp_id,
 			  hif_ext_group->context_name);
@@ -1216,7 +1216,7 @@ QDF_STATUS hif_get_umac_reset_irq(struct hif_opaque_softc *hif_scn,
 			   "umac_reset", 0, umac_reset_irq);
 
 	if (ret) {
-		hif_err("umac reset get irq failed ret %d\n", ret);
+		hif_err("umac reset get irq failed ret %d", ret);
 		return QDF_STATUS_E_FAILURE;
 	}
 	return QDF_STATUS_SUCCESS;

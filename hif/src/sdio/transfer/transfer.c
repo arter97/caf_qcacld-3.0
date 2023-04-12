@@ -216,7 +216,7 @@ QDF_STATUS hif_dev_alloc_and_prepare_rx_packets(struct hif_sdio_device *pdev,
 	for (i = 0; i < messages; i++) {
 		hdr = (HTC_FRAME_HDR *)&look_aheads[i];
 		if (hdr->EndpointID >= ENDPOINT_MAX) {
-			hif_err("%s: Invalid Endpoint:%d\n",
+			hif_err("%s: Invalid Endpoint:%d",
 				__func__, hdr->EndpointID);
 			status = QDF_STATUS_E_INVAL;
 			break;
@@ -303,7 +303,7 @@ QDF_STATUS hif_dev_alloc_and_prepare_rx_packets(struct hif_sdio_device *pdev,
 				hif_err("%s: header reports payload: %u(%u)",
 					__func__, hdr->PayloadLen,
 					full_length);
-				hif_err("%s: endpoint buffer size: %d\n",
+				hif_err("%s: endpoint buffer size: %d",
 					__func__, packet->BufferLength);
 				status = QDF_STATUS_E_INVAL;
 				break;

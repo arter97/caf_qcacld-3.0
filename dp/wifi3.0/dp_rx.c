@@ -1910,7 +1910,7 @@ qdf_nbuf_t dp_rx_sg_create(struct dp_soc *soc, qdf_nbuf_t nbuf)
 			nbuf->next = NULL;
 			break;
 		} else if (qdf_nbuf_is_rx_chfrag_end(nbuf)) {
-			dp_err("Invalid packet length\n");
+			dp_err("Invalid packet length");
 			qdf_assert_always(0);
 		}
 		nbuf = nbuf->next;
@@ -2885,7 +2885,7 @@ QDF_STATUS dp_rx_vdev_detach(struct dp_vdev *vdev)
 	if (vdev->osif_rx_flush) {
 		ret = vdev->osif_rx_flush(vdev->osif_vdev, vdev->vdev_id);
 		if (!QDF_IS_STATUS_SUCCESS(ret)) {
-			dp_err("Failed to flush rx pkts for vdev %d\n",
+			dp_err("Failed to flush rx pkts for vdev %d",
 			       vdev->vdev_id);
 			return ret;
 		}

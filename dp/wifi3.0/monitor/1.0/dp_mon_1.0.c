@@ -388,7 +388,7 @@ QDF_STATUS dp_vdev_set_monitor_mode_rings(struct dp_pdev *pdev,
 		/* Allocate sw rx descriptor pool for mon RxDMA buffer ring */
 		status = dp_rx_pdev_mon_buf_desc_pool_alloc(pdev, mac_for_pdev);
 		if (!QDF_IS_STATUS_SUCCESS(status)) {
-			dp_err("%s: dp_rx_pdev_mon_buf_desc_pool_alloc() failed\n",
+			dp_err("%s: dp_rx_pdev_mon_buf_desc_pool_alloc() failed",
 			       __func__);
 			goto fail0;
 		}

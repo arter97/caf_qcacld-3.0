@@ -1347,7 +1347,7 @@ dp_rx_pdev_mon_desc_pool_alloc(struct dp_pdev *pdev)
 	for (mac_id = 0; mac_id < NUM_RXDMA_RINGS_PER_PDEV; mac_id++) {
 		status = dp_rx_pdev_mon_cmn_desc_pool_alloc(pdev, mac_id);
 		if (!QDF_IS_STATUS_SUCCESS(status)) {
-			dp_rx_mon_dest_err("%pK: %d failed\n",
+			dp_rx_mon_dest_err("%pK: %d failed",
 					   pdev->soc, mac_id);
 
 			for (count = 0; count < mac_id; count++)
@@ -2218,7 +2218,7 @@ void dp_rx_mon_update_pf_tag_to_buf_headroom(struct dp_soc *soc,
 	qdf_nbuf_t ext_list;
 
 	if (qdf_unlikely(!soc)) {
-		dp_err("Soc[%pK] Null. Can't update pftag to nbuf headroom\n",
+		dp_err("Soc[%pK] Null. Can't update pftag to nbuf headroom",
 		       soc);
 		qdf_assert_always(0);
 	}

@@ -5115,13 +5115,13 @@ static int dp_get_sec_type(struct cdp_soc_t *soc, uint8_t vdev_id,
 						       DP_MOD_ID_CDP);
 
 	if (!peer) {
-		dp_cdp_err("%pK: Peer is NULL!\n", (struct dp_soc *)soc);
+		dp_cdp_err("%pK: Peer is NULL!", (struct dp_soc *)soc);
 		return sec_type;
 	}
 
 	if (!peer->txrx_peer) {
 		dp_peer_unref_delete(peer, DP_MOD_ID_CDP);
-		dp_peer_debug("%pK: txrx peer is NULL!\n", soc);
+		dp_peer_debug("%pK: txrx peer is NULL!", soc);
 		return sec_type;
 	}
 	sec_type = peer->txrx_peer->security[sec_idx].sec_type;
@@ -5151,7 +5151,7 @@ dp_peer_authorize(struct cdp_soc_t *soc_hdl, uint8_t vdev_id,
 							      DP_MOD_ID_CDP);
 
 	if (!peer) {
-		dp_cdp_debug("%pK: Peer is NULL!\n", soc);
+		dp_cdp_debug("%pK: Peer is NULL!", soc);
 		status = QDF_STATUS_E_FAILURE;
 	} else {
 		peer->authorize = authorize ? 1 : 0;
@@ -5187,7 +5187,7 @@ dp_peer_get_authorize(struct cdp_soc_t *soc_hdl, uint8_t vdev_id,
 						      DP_MOD_ID_CDP);
 
 	if (!peer) {
-		dp_cdp_debug("%pK: Peer is NULL!\n", soc);
+		dp_cdp_debug("%pK: Peer is NULL!", soc);
 		return authorize;
 	}
 
@@ -7356,17 +7356,17 @@ dp_set_vdev_param(struct cdp_soc_t *cdp_soc, uint8_t vdev_id,
 
 	switch (param) {
 	case CDP_ENABLE_WDS:
-		dp_cdp_err("%pK: wds_enable %d for vdev(%pK) id(%d)\n",
+		dp_cdp_err("%pK: wds_enable %d for vdev(%pK) id(%d)",
 			   dsoc, val.cdp_vdev_param_wds, vdev, vdev->vdev_id);
 		vdev->wds_enabled = val.cdp_vdev_param_wds;
 		break;
 	case CDP_ENABLE_MEC:
-		dp_cdp_err("%pK: mec_enable %d for vdev(%pK) id(%d)\n",
+		dp_cdp_err("%pK: mec_enable %d for vdev(%pK) id(%d)",
 			   dsoc, val.cdp_vdev_param_mec, vdev, vdev->vdev_id);
 		vdev->mec_enabled = val.cdp_vdev_param_mec;
 		break;
 	case CDP_ENABLE_DA_WAR:
-		dp_cdp_err("%pK: da_war_enable %d for vdev(%pK) id(%d)\n",
+		dp_cdp_err("%pK: da_war_enable %d for vdev(%pK) id(%d)",
 			   dsoc, val.cdp_vdev_param_da_war, vdev, vdev->vdev_id);
 		vdev->pdev->soc->da_war_enabled = val.cdp_vdev_param_da_war;
 		dp_wds_flush_ast_table_wifi3(((struct cdp_soc_t *)
@@ -9403,7 +9403,7 @@ dp_soc_handle_pdev_mode_change
 	pdev->lmac_id = lmac_id;
 	pdev->target_pdev_id =
 		dp_calculate_target_pdev_id_from_host_pdev_id(soc, pdev_id);
-	dp_info(" mode change %d %d\n", pdev->pdev_id, pdev->lmac_id);
+	dp_info("mode change %d %d", pdev->pdev_id, pdev->lmac_id);
 
 	/*Set host PDEV ID for lmac_id*/
 	wlan_cfg_set_pdev_idx(soc->wlan_cfg_ctx,
@@ -9597,7 +9597,7 @@ static QDF_STATUS dp_peer_map_attach_wifi3(struct cdp_soc_t  *soc_hdl,
 		return QDF_STATUS_E_FAILURE;
 	}
 
-	dp_info("max_peers %u, calculated max_peers %u max_ast_index: %u\n",
+	dp_info("max_peers %u, calculated max_peers %u max_ast_index: %u",
 		max_peers, soc->max_peer_id, max_ast_index);
 
 	status = dp_peer_find_attach(soc);
@@ -9751,7 +9751,7 @@ dp_get_peer_extd_rate_link_stats(struct cdp_soc_t *soc_hdl, uint8_t *mac_addr)
 	struct cdp_peer_info peer_info = { 0 };
 
 	if (!mac_addr) {
-		dp_err("NULL peer mac addr\n");
+		dp_err("NULL peer mac addr");
 		return QDF_STATUS_E_FAILURE;
 	}
 
@@ -9760,7 +9760,7 @@ dp_get_peer_extd_rate_link_stats(struct cdp_soc_t *soc_hdl, uint8_t *mac_addr)
 
 	peer = dp_peer_hash_find_wrapper(soc, &peer_info, DP_MOD_ID_CDP);
 	if (!peer) {
-		dp_err("Invalid peer\n");
+		dp_err("Invalid peer");
 		return QDF_STATUS_E_FAILURE;
 	}
 
@@ -9799,14 +9799,14 @@ dp_get_peer_extd_rate_link_stats(struct cdp_soc_t *soc_hdl, uint8_t *mac_addr)
 	struct dp_soc *soc = (struct dp_soc *)soc_hdl;
 
 	if (!mac_addr) {
-		dp_err("NULL peer mac addr\n");
+		dp_err("NULL peer mac addr");
 		return QDF_STATUS_E_FAILURE;
 	}
 
 	peer = dp_peer_find_hash_find(soc, mac_addr, 0,
 				      DP_VDEV_ALL, DP_MOD_ID_CDP);
 	if (!peer) {
-		dp_err("Invalid peer\n");
+		dp_err("Invalid peer");
 		return QDF_STATUS_E_FAILURE;
 	}
 
@@ -12016,7 +12016,7 @@ dp_soc_attach(struct cdp_ctrl_objmgr_psoc *ctrl_psoc,
 	wlan_set_srng_cfg(&soc->wlan_srng_cfg);
 	soc->wlan_cfg_ctx = wlan_cfg_soc_attach(soc->ctrl_psoc);
 	if (!soc->wlan_cfg_ctx) {
-		dp_err("wlan_cfg_ctx failed\n");
+		dp_err("wlan_cfg_ctx failed");
 		goto fail2;
 	}
 
@@ -12449,7 +12449,7 @@ uint16_t dp_get_peer_id(ol_txrx_soc_handle soc, uint8_t vdev_id, uint8_t *mac)
 	uint16_t peer_id = HTT_INVALID_PEER;
 
 	if (!peer) {
-		dp_cdp_debug("%pK: Peer is NULL!\n", (struct dp_soc *)soc);
+		dp_cdp_debug("%pK: Peer is NULL!", (struct dp_soc *)soc);
 		return peer_id;
 	}
 
@@ -12472,7 +12472,7 @@ QDF_STATUS dp_wds_ext_set_peer_rx(ol_txrx_soc_handle soc,
 	QDF_STATUS status = QDF_STATUS_E_INVAL;
 
 	if (!peer) {
-		dp_cdp_debug("%pK: Peer is NULL!\n", (struct dp_soc *)soc);
+		dp_cdp_debug("%pK: Peer is NULL!", (struct dp_soc *)soc);
 		return status;
 	}
 
@@ -12517,13 +12517,13 @@ QDF_STATUS dp_wds_ext_get_peer_osif_handle(
 						      DP_MOD_ID_CDP);
 
 	if (!peer) {
-		dp_cdp_debug("%pK: Peer is NULL!\n", dp_soc);
+		dp_cdp_debug("%pK: Peer is NULL!", dp_soc);
 		return QDF_STATUS_E_INVAL;
 	}
 
 	txrx_peer = dp_get_txrx_peer(peer);
 	if (!txrx_peer) {
-		dp_cdp_debug("%pK: TXRX Peer is NULL!\n", dp_soc);
+		dp_cdp_debug("%pK: TXRX Peer is NULL!", dp_soc);
 		dp_peer_unref_delete(peer, DP_MOD_ID_CDP);
 		return QDF_STATUS_E_INVAL;
 	}
@@ -12852,7 +12852,7 @@ static QDF_STATUS dp_pdev_init(struct cdp_soc_t *txrx_soc,
 	}
 
 	if (dp_monitor_pdev_init(pdev)) {
-		dp_init_err("%pK: dp_monitor_pdev_init failed\n", soc);
+		dp_init_err("%pK: dp_monitor_pdev_init failed", soc);
 		goto fail6;
 	}
 

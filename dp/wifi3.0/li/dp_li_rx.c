@@ -543,7 +543,7 @@ done:
 					       &head[mac_id], &tail[mac_id]);
 	}
 
-	dp_verbose_debug("replenished %u\n", rx_bufs_reaped[0]);
+	dp_verbose_debug("replenished %u", rx_bufs_reaped[0]);
 	/* Peer can be NULL is case of LFR */
 	if (qdf_likely(txrx_peer))
 		vdev = NULL;

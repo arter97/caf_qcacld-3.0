@@ -285,7 +285,7 @@ dp_rx_mon_add_msdu_to_list_failure_handler(void *rx_tlv_hdr,
 	qdf_frag_free(rx_tlv_hdr);
 	if (head_msdu)
 		qdf_nbuf_list_free(*head_msdu);
-	dp_err("[%s] failed to allocate subsequent parent buffer to hold all frag\n",
+	dp_err("[%s] failed to allocate subsequent parent buffer to hold all frag",
 	       func_name);
 	if (head_msdu)
 		*head_msdu = NULL;
@@ -555,7 +555,7 @@ QDF_STATUS dp_rx_mon_add_msdu_to_list(struct dp_soc *soc, qdf_nbuf_t *head_msdu,
 	/* Here head_msdu and *head_msdu must not be NULL */
 	/* Dont add frag to skb if frag length is zero. Drop frame */
 	if (qdf_unlikely(!frag_len || !head_msdu || !(*head_msdu))) {
-		dp_err("[%s] frag_len[%d] || head_msdu[%pK] || *head_msdu is Null while adding frag to skb\n",
+		dp_err("[%s] frag_len[%d] || head_msdu[%pK] || *head_msdu is Null while adding frag to skb",
 		       __func__, frag_len, head_msdu);
 		return QDF_STATUS_E_FAILURE;
 	}
@@ -568,7 +568,7 @@ QDF_STATUS dp_rx_mon_add_msdu_to_list(struct dp_soc *soc, qdf_nbuf_t *head_msdu,
 
 	/* Current msdu must not be NULL */
 	if (qdf_unlikely(!msdu_curr)) {
-		dp_err("[%s] Current msdu can't be Null while adding frag to skb\n",
+		dp_err("[%s] Current msdu can't be Null while adding frag to skb",
 		       __func__);
 		return QDF_STATUS_E_FAILURE;
 	}

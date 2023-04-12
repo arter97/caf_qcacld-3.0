@@ -1785,7 +1785,7 @@ void *hal_srng_setup_idx(void *hal_soc, int ring_type, int ring_num, int mac_id,
 		if (idx) {
 			hal->ops->hal_tx_ring_halt_set(hal_hdl);
 			do {
-				hal_info("Waiting for ring reset\n");
+				hal_info("Waiting for ring reset");
 			} while (!(hal->ops->hal_tx_ring_halt_poll(hal_hdl)));
 		}
 		hal_srng_hw_init(hal, srng, idle_check, idx);

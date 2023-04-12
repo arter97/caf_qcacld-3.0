@@ -1296,7 +1296,7 @@ uint32_t dp_service_srngs(void *dp_ctx, uint32_t dp_budget, int cpu)
 	rx_wbm_rel_mask = int_ctx->rx_wbm_rel_ring_mask;
 	reo_status_mask = int_ctx->reo_status_ring_mask;
 
-	dp_verbose_debug("tx %x rx %x rx_err %x rx_wbm_rel %x reo_status %x rx_mon_ring %x host2rxdma %x rxdma2host %x\n",
+	dp_verbose_debug("tx %x rx %x rx_err %x rx_wbm_rel %x reo_status %x rx_mon_ring %x host2rxdma %x rxdma2host %x",
 			 tx_mask, rx_mask, rx_err_mask, rx_wbm_rel_mask,
 			 reo_status_mask,
 			 int_ctx->rx_mon_ring_mask,
@@ -4005,7 +4005,7 @@ void dp_drain_txrx(struct cdp_soc_t *soc_handle)
 	 * pendings writes(HP/TP) are flushed before read returns.
 	 */
 	val = HAL_REG_READ((struct hal_soc *)soc->hal_soc, 0);
-	dp_debug("Register value at offset 0: %u\n", val);
+	dp_debug("Register value at offset 0: %u", val);
 }
 #endif
 

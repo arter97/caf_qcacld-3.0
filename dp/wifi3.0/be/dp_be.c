@@ -672,7 +672,7 @@ QDF_STATUS dp_peer_setup_ppeds_be(struct dp_soc *soc,
 		mld_soc = mld_peer->vdev->pdev->soc;
 		cdp_soc = &mld_soc->cdp_soc;
 		if (!cdp_soc->ol_ops->get_ppeds_profile_info_for_vap) {
-			dp_err("%pK: Register PPEDS profile info API before use\n", cdp_soc);
+			dp_err("%pK: Register PPEDS profile info API before use", cdp_soc);
 			return QDF_STATUS_E_NULL_VALUE;
 		}
 
@@ -680,7 +680,7 @@ QDF_STATUS dp_peer_setup_ppeds_be(struct dp_soc *soc,
 									     mld_peer->vdev->vdev_id,
 									     &vp_params);
 		if (qdf_status == QDF_STATUS_E_NULL_VALUE) {
-			dp_err("%pK: Failed to get ppeds profile for mld soc\n", mld_soc);
+			dp_err("%pK: Failed to get ppeds profile for mld soc", mld_soc);
 			return qdf_status;
 		}
 
@@ -1219,7 +1219,7 @@ static void dp_soc_txrx_peer_setup_be(struct dp_soc *soc, uint8_t vdev_id,
 	 * Extract the VP profile from the VAP
 	 */
 	if (!cdp_soc->ol_ops->get_ppeds_profile_info_for_vap) {
-		dp_err("%pK: Register get ppeds profile info first\n", cdp_soc);
+		dp_err("%pK: Register get ppeds profile info first", cdp_soc);
 		qdf_status = QDF_STATUS_E_NULL_VALUE;
 		goto fail;
 	}
@@ -1232,7 +1232,7 @@ static void dp_soc_txrx_peer_setup_be(struct dp_soc *soc, uint8_t vdev_id,
 							tgt_peer->vdev->vdev_id,
 							&vp_params);
 	if (qdf_status == QDF_STATUS_E_NULL_VALUE) {
-		dp_err("%pK: Could not find ppeds profile info vdev\n", be_vdev);
+		dp_err("%pK: Could not find ppeds profile info vdev", be_vdev);
 		qdf_status = QDF_STATUS_E_NULL_VALUE;
 		goto fail;
 	}
@@ -2164,7 +2164,7 @@ dp_mlo_peer_find_hash_find_be(struct dp_soc *soc,
 	if (vdev_id != DP_VDEV_ALL) {
 		vdev = dp_vdev_get_ref_by_id(soc, vdev_id, mod_id);
 		if (!vdev) {
-			dp_err("vdev is null\n");
+			dp_err("vdev is null");
 			return NULL;
 		}
 	} else {

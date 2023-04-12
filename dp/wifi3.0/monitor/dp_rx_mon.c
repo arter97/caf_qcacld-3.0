@@ -530,8 +530,7 @@ dp_rx_populate_cdp_indication_ppdu_user(struct dp_pdev *pdev,
 				 * HTT_UL_OFDMA_V0_RU_SIZE_RU_996x2
 				 */
 				if (qdf_unlikely(ru_size >= OFDMA_NUM_RU_SIZE)) {
-					dp_err("invalid ru_size %d\n",
-					       ru_size);
+					dp_err("invalid ru_size %d", ru_size);
 					return;
 				}
 				is_data = dp_rx_inc_rusize_cnt(pdev,

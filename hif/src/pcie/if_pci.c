@@ -3703,7 +3703,7 @@ static void hif_pci_get_soc_info_pld(struct hif_pci_softc *sc,
 	sc->device_version.major_version = info.device_version.major_version;
 	sc->device_version.minor_version = info.device_version.minor_version;
 
-	hif_info("%s: fam num %u dev ver %u maj ver %u min ver %u\n", __func__,
+	hif_info("%s: fam num %u dev ver %u maj ver %u min ver %u", __func__,
 		 sc->device_version.family_number,
 		 sc->device_version.device_number,
 		 sc->device_version.major_version,
