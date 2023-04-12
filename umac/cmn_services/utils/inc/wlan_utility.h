@@ -155,6 +155,38 @@ const uint8_t *wlan_get_ext_ie_ptr_from_ext_id(const uint8_t *oui,
 					       uint16_t ie_len);
 
 /**
+ * wlan_iecap_set() - Set the capability in the IE
+ * @iecap: pointer to capability IE
+ * @bit_pos: bit position of capability from start of capability field
+ * @tot_bits: total bits of capability
+ * @value: value to be set
+ *
+ * This function sets the value in capability IE at the bit position
+ * specified for specified number of bits in byte order.
+ *
+ * Return: void
+ */
+void wlan_iecap_set(uint8_t *iecap,
+		    uint8_t bit_pos,
+		    uint8_t tot_bits,
+		    uint32_t value);
+
+/**
+ * wlan_iecap_get() - Get the capability in the IE
+ * @iecap: pointer to capability IE
+ * @bit_pos: bit position of capability from start of capability field
+ * @tot_bits: total bits of capability
+ *
+ * This function gets the value at bit position for specified bits
+ * from start of capability field.
+ *
+ * Return: capability value
+ */
+uint32_t wlan_iecap_get(uint8_t *iecap,
+			uint8_t bit_pos,
+			uint32_t tot_bits);
+
+/**
  * wlan_get_elem_fragseq_requirements() - Get requirements related to generation
  * of element fragment sequence.
  *
