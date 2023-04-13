@@ -94,6 +94,7 @@
 #define QCN9224_DEVICE_ID (0x1109)
 #define QCN6122_DEVICE_ID (0xFFFB)
 #define QCN9160_DEVICE_ID (0xFFF8)
+#define QCN6432_DEVICE_ID (0xFFF7)
 #define QCA6390_EMULATION_DEVICE_ID (0x0108)
 #define QCA6390_DEVICE_ID (0x1101)
 /* TODO: change IDs for HastingsPrime */
