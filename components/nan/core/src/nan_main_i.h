@@ -136,6 +136,9 @@ struct nan_cfg_params {
  * disabled by driver or user-space
  * @ndp_request_ctx: NDP request context
  * @nan_disc_request_ctx: NAN discovery enable/disable request context
+ * @nan_pairing_create_ctx: NAN Pairing create context
+ * @nan_pairing_delete_ctx: NAN Pairing delete context
+ * @nan_delete_all_peer_ctx: Delete all peer context
  */
 struct nan_psoc_priv_obj {
 	qdf_spinlock_t lock;
@@ -151,6 +154,9 @@ struct nan_psoc_priv_obj {
 	bool is_explicit_disable;
 	void *ndp_request_ctx;
 	void *nan_disc_request_ctx;
+	void *nan_pairing_create_ctx;
+	void *nan_pairing_delete_ctx;
+	void *nan_delete_all_peer_ctx;
 };
 
 /**
@@ -168,6 +174,8 @@ struct nan_psoc_priv_obj {
  *		   connection.
  * @peer_mc_addr_list: Peer multicast address list
  * @num_pasn_peers: Number of NAN PASN peers
+ * @is_delete_all_pasn_peer_in_progress: flag to track the deletion of all
+ * pasn peers
  */
 struct nan_vdev_priv_obj {
 	qdf_spinlock_t lock;
@@ -182,6 +190,7 @@ struct nan_vdev_priv_obj {
 	bool ndp_init_done;
 	struct qdf_mac_addr peer_mc_addr_list[MAX_NDP_SESSIONS];
 	uint8_t num_pasn_peers;
+	bool is_delete_all_pasn_peer_in_progress;
 };
 
 /**
@@ -359,5 +368,22 @@ bool nan_is_peer_exist_for_opmode(struct wlan_objmgr_psoc *psoc,
  */
 void nan_update_pasn_peer_count(struct wlan_objmgr_vdev *vdev,
 				bool is_increment);
+
+/*
+ * nan_pasn_flush_callback: callback to flush the NAN PASN scheduler msg
+ * @msg: pointer to msg
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS nan_pasn_flush_callback(struct scheduler_msg *msg);
+
+/**
+ * nan_pasn_scheduled_handler: callback pointer to be called when scheduler
+ * starts executing enqueued NAN command for PASN
+ * @msg: pointer to msg
+ *
+ * Return: status of operation
+ */
+QDF_STATUS nan_pasn_scheduled_handler(struct scheduler_msg *msg);
 #endif /* _WLAN_NAN_MAIN_I_H_ */
 #endif /* WLAN_FEATURE_NAN */

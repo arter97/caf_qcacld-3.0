@@ -82,13 +82,12 @@ wma_pasn_handle_peer_create_conf(tp_wma_handle wma,
 
 /**
  * wma_delete_all_pasn_peers() - Delete all PASN peers
- * @wma: WMA handle
  * @vdev: Vdev object pointer
  *
  * Return: QDF_STATUS
  */
 QDF_STATUS
-wma_delete_all_pasn_peers(tp_wma_handle wma, struct wlan_objmgr_vdev *vdev);
+wma_delete_all_pasn_peers(struct wlan_objmgr_vdev *vdev);
 
 QDF_STATUS
 wma_resume_vdev_delete(tp_wma_handle wma, uint8_t vdev_id);

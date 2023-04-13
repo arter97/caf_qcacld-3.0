@@ -52,6 +52,9 @@ struct wlan_objmgr_vdev;
 
 #define NAN_SER_CMD_TIMEOUT 4000
 #define NDP_SERVICE_ID_LEN 6
+
+#define NAN_PASN_PEER_CREATE 0x0c
+#define NAN_PASN_PEER_DELETE 0x0d
 /**
  * enum nan_discovery_msg_type - NAN msg type
  * @NAN_GENERIC_REQ: Type for all the NAN requests other than enable/disable
@@ -62,6 +65,18 @@ enum nan_discovery_msg_type {
 	NAN_GENERIC_REQ = 0,
 	NAN_ENABLE_REQ  = 1,
 	NAN_DISABLE_REQ = 2,
+};
+
+/**
+ * enum nan_pasn_msg_type - NAN PASN msg type
+ * @NAN_PASN_PEER_CREATE_REQ: Request type for creating PASN peer
+ * @NAN_PASN_PEER_DELETE_REQ: Request type for deleting PASN peer
+ * @NAN_PASN_PEER_DELETE_ALL_REQ: Request type for deleting all PASN peer
+ */
+enum nan_pasn_msg_type {
+	NAN_PASN_PEER_CREATE_REQ     = 0,
+	NAN_PASN_PEER_DELETE_REQ     = 1,
+	NAN_PASN_PEER_DELETE_ALL_REQ = 2,
 };
 
 /**
@@ -678,6 +693,18 @@ struct nan_dump_msg {
 };
 
 /**
+ * struct nan_pasn_peer_req - A NAN PASN peer request for the Target
+ * @psoc: Pointer to the psoc object
+ * @peer_addr: peer mac address
+ * @vdev_id: vdev id
+ */
+struct nan_pasn_peer_req {
+	struct wlan_objmgr_psoc *psoc;
+	struct qdf_mac_addr peer_addr;
+	uint8_t vdev_id;
+};
+
+/**
  * struct nan_datapath_confirm_event - ndp confirmation event from FW
  * @vdev: pointer to vdev object
  * @ndp_instance_id: ndp instance id for which confirm is being generated
@@ -795,6 +822,30 @@ struct nan_datapath_host_event {
 };
 
 /**
+ * struct nan_pasn_peer_ops - structure of pasn peer for nan component
+ * @nan_pasn_peer_create_cb: callback to send pasn peer create request
+ * @nan_pasn_peer_delete_cb: callback to send pasn peer delete request
+ * @nan_pasn_peer_delete_all_cb: callback to send pasn peer delete all request
+ * @nan_pasn_peer_delete_all_complete_cb: callback to when pasn peer delete all
+ * response received.
+ */
+struct nan_pasn_peer_ops {
+	QDF_STATUS (*nan_pasn_peer_create_cb)(struct wlan_objmgr_psoc *psoc,
+					      struct qdf_mac_addr *peer_addr,
+					      uint8_t vdev_id,
+					      uint8_t pasn_peer_msg_type);
+	QDF_STATUS (*nan_pasn_peer_delete_cb)(struct wlan_objmgr_psoc *psoc,
+					      uint8_t vdev_id,
+					      struct qdf_mac_addr *peer_addr,
+					      uint8_t pasn_peer_msg_type,
+					      bool objmgr_peer_delete);
+	QDF_STATUS (*nan_pasn_peer_delete_all_cb)(
+						struct wlan_objmgr_vdev *vdev);
+	QDF_STATUS (*nan_pasn_peer_delete_all_complete_cb)(
+						struct wlan_objmgr_vdev *vdev);
+};
+
+/**
  * struct nan_callbacks - struct containing callback to non-converged driver
  * @os_if_nan_event_handler: OS IF Callback for handling NAN Discovery events
  * @os_if_ndp_event_handler: OS IF Callback for handling NAN Datapath events
@@ -816,6 +867,7 @@ struct nan_datapath_host_event {
  * @nan_concurrency_update: Callback to handle nan concurrency
  * @set_mc_list: HDD callback to set multicast peer list
  * @nan_sr_concurrency_update: Callback to handle nan SR(Spatial Reuse)
+ * @pasn_peer_ops: structure contains the callbacks for pasn peer
  * concurrency
  */
 struct nan_callbacks {
@@ -847,6 +899,7 @@ struct nan_callbacks {
 #ifdef WLAN_FEATURE_SR
 	void (*nan_sr_concurrency_update)(struct nan_event_params *nan_evt);
 #endif
+	struct nan_pasn_peer_ops pasn_peer_ops;
 };
 
 /**

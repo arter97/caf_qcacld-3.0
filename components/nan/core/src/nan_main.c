@@ -1659,3 +1659,101 @@ uint8_t nan_get_vdev_id_from_bssid(struct wlan_objmgr_pdev *pdev,
 
 	return vdev_id;
 }
+
+QDF_STATUS nan_pasn_flush_callback(struct scheduler_msg *msg)
+{
+	if (!msg || !msg->bodyptr) {
+		nan_err("Null pointer for NAN Discovery message");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	switch (msg->type) {
+	case NAN_PASN_PEER_CREATE_REQ:
+	case NAN_PASN_PEER_DELETE_REQ:
+	case NAN_PASN_PEER_DELETE_ALL_REQ:
+		break;
+	default:
+		nan_err("Unsupported request type: %d", msg->type);
+		qdf_mem_free(msg->bodyptr);
+		return QDF_STATUS_E_INVAL;
+	}
+
+	qdf_mem_free(msg->bodyptr);
+
+	return QDF_STATUS_SUCCESS;
+}
+
+QDF_STATUS nan_pasn_scheduled_handler(struct scheduler_msg *msg)
+{
+	QDF_STATUS status = QDF_STATUS_SUCCESS;
+	struct nan_psoc_priv_obj *psoc_nan_obj;
+	struct nan_pasn_peer_ops *peer_ops;
+	struct nan_pasn_peer_req *peer_params;
+	struct wlan_objmgr_vdev *vdev;
+
+	if (!msg || !msg->bodyptr) {
+		nan_err("msg or bodyptr is null");
+		return QDF_STATUS_E_NULL_VALUE;
+	}
+
+	peer_params = msg->bodyptr;
+	psoc_nan_obj = nan_get_psoc_priv_obj(peer_params->psoc);
+	if (!psoc_nan_obj) {
+		nan_err("psoc_nan_obj is null");
+		return QDF_STATUS_E_NULL_VALUE;
+	}
+
+	peer_ops = &psoc_nan_obj->cb_obj.pasn_peer_ops;
+
+	switch (msg->type) {
+	case NAN_PASN_PEER_CREATE_REQ:
+		if (!peer_ops->nan_pasn_peer_create_cb) {
+			nan_err("NAN PASN peer create ops is NULL");
+			return QDF_STATUS_E_NULL_VALUE;
+		}
+
+		status = peer_ops->nan_pasn_peer_create_cb(peer_params->psoc,
+							&peer_params->peer_addr,
+							peer_params->vdev_id,
+							NAN_PASN_PEER_CREATE);
+		break;
+	case NAN_PASN_PEER_DELETE_REQ:
+		if (!peer_ops->nan_pasn_peer_delete_cb) {
+			nan_err("NAN PASN peer delete ops is NULL");
+			return QDF_STATUS_E_NULL_VALUE;
+		}
+
+		status = peer_ops->nan_pasn_peer_delete_cb(peer_params->psoc,
+							peer_params->vdev_id,
+							&peer_params->peer_addr,
+							NAN_PASN_PEER_DELETE,
+							false);
+		break;
+	case NAN_PASN_PEER_DELETE_ALL_REQ:
+		peer_ops = &psoc_nan_obj->cb_obj.pasn_peer_ops;
+		if (!peer_ops->nan_pasn_peer_delete_all_cb) {
+			nan_err("NAN PASN peer delete all ops is NULL");
+			return QDF_STATUS_E_NULL_VALUE;
+		}
+
+		vdev = wlan_objmgr_get_vdev_by_id_from_psoc(peer_params->psoc,
+							    peer_params->vdev_id,
+							    WLAN_NAN_ID);
+		if (!vdev) {
+			nan_err("vdev is null");
+			return QDF_STATUS_E_NULL_VALUE;
+		}
+
+		status = peer_ops->nan_pasn_peer_delete_all_cb(vdev);
+		wlan_objmgr_vdev_release_ref(vdev, WLAN_NAN_ID);
+		break;
+
+	default:
+		nan_err("Unsupported request type: %d", msg->type);
+		qdf_mem_free(msg->bodyptr);
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	nan_pasn_flush_callback(msg);
+	return status;
+}

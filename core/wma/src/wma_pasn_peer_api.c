@@ -367,12 +367,18 @@ wma_pasn_peer_delete_all_complete(struct wlan_objmgr_vdev *vdev)
 }
 
 QDF_STATUS
-wma_delete_all_pasn_peers(tp_wma_handle wma, struct wlan_objmgr_vdev *vdev)
+wma_delete_all_pasn_peers(struct wlan_objmgr_vdev *vdev)
 {
+	tp_wma_handle wma = cds_get_context(QDF_MODULE_ID_WMA);
 	struct wlan_lmac_if_wifi_pos_rx_ops *rx_ops;
 	struct wma_target_req *msg;
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
 	uint8_t vdev_id = wlan_vdev_get_id(vdev);
+
+	if (!wma) {
+		wma_err("wma handle is NULL");
+		return QDF_STATUS_E_NULL_VALUE;
+	}
 
 	rx_ops = wifi_pos_get_rx_ops(wma->psoc);
 	if (!rx_ops || !rx_ops->wifi_pos_vdev_delete_all_ranging_peers_cb) {

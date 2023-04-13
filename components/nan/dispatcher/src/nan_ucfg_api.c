@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2017-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -699,6 +699,14 @@ int ucfg_nan_register_wma_callbacks(struct wlan_objmgr_psoc *psoc,
 	}
 
 	psoc_obj->cb_obj.update_ndi_conn = cb_obj->update_ndi_conn;
+	psoc_obj->cb_obj.pasn_peer_ops.nan_pasn_peer_create_cb =
+			cb_obj->pasn_peer_ops.nan_pasn_peer_create_cb;
+	psoc_obj->cb_obj.pasn_peer_ops.nan_pasn_peer_delete_cb =
+			cb_obj->pasn_peer_ops.nan_pasn_peer_delete_cb;
+	psoc_obj->cb_obj.pasn_peer_ops.nan_pasn_peer_delete_all_cb =
+			cb_obj->pasn_peer_ops.nan_pasn_peer_delete_all_cb;
+	psoc_obj->cb_obj.pasn_peer_ops.nan_pasn_peer_delete_all_complete_cb =
+		cb_obj->pasn_peer_ops.nan_pasn_peer_delete_all_complete_cb;
 
 	return 0;
 }

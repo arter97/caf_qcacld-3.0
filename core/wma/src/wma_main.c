@@ -124,6 +124,7 @@
 #include "wlan_mlo_mgr_sta.h"
 #include "wlan_dp_api.h"
 #include "wlan_dp_ucfg_api.h"
+#include "wma_pasn_peer_api.h"
 
 #define WMA_LOG_COMPLETION_TIMER 500 /* 500 msecs */
 #define WMI_TLV_HEADROOM 128
@@ -3340,12 +3341,24 @@ void wma_get_phy_mode_cb(qdf_freq_t freq, uint32_t chan_width,
 }
 
 #ifdef WLAN_FEATURE_NAN
+/**
+ * wma_register_nan_callbacks: wma API to register NAN callbacks
+ * @wma_handle: WMA handle
+ *
+ * Return: none
+ */
 static void
 wma_register_nan_callbacks(tp_wma_handle wma_handle)
 {
 	struct nan_callbacks cb_obj = {0};
 
 	cb_obj.update_ndi_conn = wma_ndi_update_connection_info;
+	cb_obj.pasn_peer_ops.nan_pasn_peer_create_cb = wma_pasn_peer_create;
+	cb_obj.pasn_peer_ops.nan_pasn_peer_delete_cb = wma_nan_pasn_peer_remove;
+	cb_obj.pasn_peer_ops.nan_pasn_peer_delete_all_cb =
+						wma_delete_all_pasn_peers;
+	cb_obj.pasn_peer_ops.nan_pasn_peer_delete_all_complete_cb =
+					wma_pasn_peer_delete_all_complete;
 
 	ucfg_nan_register_wma_callbacks(wma_handle->psoc, &cb_obj);
 }
