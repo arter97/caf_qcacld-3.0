@@ -603,7 +603,7 @@ static void cm_create_bss_peer(struct cnx_mgr *cm_ctx,
 
 	wlan_psoc_mlme_get_11be_capab(wlan_vdev_get_psoc(cm_ctx->vdev),
 				      &eht_capab);
-	if (eht_capab) {
+	if (eht_capab && wlan_vdev_mlme_is_mlo_vdev(cm_ctx->vdev)) {
 		cm_set_vdev_link_id(cm_ctx, req);
 		wlan_mlo_init_cu_bpcc(cm_ctx->vdev);
 		mld_mac = cm_get_bss_peer_mld_addr(req);
