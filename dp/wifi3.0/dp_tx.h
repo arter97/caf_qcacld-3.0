@@ -767,15 +767,6 @@ bool dp_tx_multipass_process(struct dp_soc *soc, struct dp_vdev *vdev,
 void dp_tx_vdev_multipass_deinit(struct dp_vdev *vdev);
 
 /**
- * dp_tx_remove_vlan_tag() - Remove 4 bytes of vlan tag
- * @vdev: DP vdev handle
- * @nbuf: network buffer
- *
- * Return: void
- */
-void dp_tx_remove_vlan_tag(struct dp_vdev *vdev, qdf_nbuf_t nbuf);
-
-/**
  * dp_tx_add_groupkey_metadata() - Add group key in metadata
  * @vdev: DP vdev handle
  * @msdu_info: MSDU info to be setup in MSDU descriptor

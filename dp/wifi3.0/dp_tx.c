@@ -6666,3 +6666,179 @@ void dp_pkt_get_timestamp(uint64_t *time)
 }
 #endif
 
+#ifdef QCA_MULTIPASS_SUPPORT
+void dp_tx_add_groupkey_metadata(struct dp_vdev *vdev,
+				 struct dp_tx_msdu_info_s *msdu_info,
+				 uint16_t group_key)
+{
+	struct htt_tx_msdu_desc_ext2_t *meta_data =
+		(struct htt_tx_msdu_desc_ext2_t *)&msdu_info->meta_data[0];
+
+	qdf_mem_zero(meta_data, sizeof(struct htt_tx_msdu_desc_ext2_t));
+
+	/*
+	 * When attempting to send a multicast packet with multi-passphrase,
+	 * host shall add HTT EXT meta data "struct htt_tx_msdu_desc_ext2_t"
+	 * ref htt.h indicating the group_id field in "key_flags" also having
+	 * "valid_key_flags" as 1. Assign “key_flags = group_key_ix”.
+	 */
+	HTT_TX_MSDU_EXT2_DESC_FLAG_VALID_KEY_FLAGS_SET(msdu_info->meta_data[0],
+						       1);
+	HTT_TX_MSDU_EXT2_DESC_KEY_FLAGS_SET(msdu_info->meta_data[2], group_key);
+}
+
+#if defined(WLAN_FEATURE_11BE_MLO) && defined(WLAN_MLO_MULTI_CHIP) && \
+	defined(WLAN_MCAST_MLO)
+/**
+ * dp_tx_need_mcast_reinject() - If frame needs to be processed in reinject path
+ * @vdev: DP vdev handle
+ *
+ * Return: true if reinject handling is required else false
+ */
+static inline bool
+dp_tx_need_mcast_reinject(struct dp_vdev *vdev)
+{
+	if (vdev->mlo_vdev && vdev->opmode == wlan_op_mode_ap)
+		return true;
+
+	return false;
+}
+#else
+static inline bool
+dp_tx_need_mcast_reinject(struct dp_vdev *vdev)
+{
+	return false;
+}
+#endif
+
+/**
+ * dp_tx_need_multipass_process() - If frame needs multipass phrase processing
+ * @soc: dp soc handle
+ * @vdev: DP vdev handle
+ * @buf: frame
+ * @vlan_id: vlan id of frame
+ *
+ * Return: whether peer is special or classic
+ */
+static
+uint8_t dp_tx_need_multipass_process(struct dp_soc *soc, struct dp_vdev *vdev,
+				     qdf_nbuf_t buf, uint16_t *vlan_id)
+{
+	struct dp_txrx_peer *txrx_peer = NULL;
+	struct dp_peer *peer = NULL;
+	qdf_ether_header_t *eh = (qdf_ether_header_t *)qdf_nbuf_data(buf);
+	struct vlan_ethhdr *veh = NULL;
+	bool not_vlan = ((vdev->tx_encap_type == htt_cmn_pkt_type_raw) ||
+			(htons(eh->ether_type) != ETH_P_8021Q));
+
+	if (qdf_unlikely(not_vlan))
+		return DP_VLAN_UNTAGGED;
+
+	veh = (struct vlan_ethhdr *)eh;
+	*vlan_id = (ntohs(veh->h_vlan_TCI) & VLAN_VID_MASK);
+
+	if (qdf_unlikely(DP_FRAME_IS_MULTICAST((eh)->ether_dhost))) {
+		/* look for handling of multicast packets in reinject path */
+		if (dp_tx_need_mcast_reinject(vdev))
+			return DP_VLAN_UNTAGGED;
+
+		qdf_spin_lock_bh(&vdev->mpass_peer_mutex);
+		TAILQ_FOREACH(txrx_peer, &vdev->mpass_peer_list,
+			      mpass_peer_list_elem) {
+			if (*vlan_id == txrx_peer->vlan_id) {
+				qdf_spin_unlock_bh(&vdev->mpass_peer_mutex);
+				return DP_VLAN_TAGGED_MULTICAST;
+			}
+		}
+		qdf_spin_unlock_bh(&vdev->mpass_peer_mutex);
+		return DP_VLAN_UNTAGGED;
+	}
+
+	peer = dp_peer_find_hash_find(soc, eh->ether_dhost, 0, DP_VDEV_ALL,
+				      DP_MOD_ID_TX_MULTIPASS);
+	if (qdf_unlikely(!peer))
+		return DP_VLAN_UNTAGGED;
+
+	/*
+	 * Do not drop the frame when vlan_id doesn't match.
+	 * Send the frame as it is.
+	 */
+	if (*vlan_id == peer->txrx_peer->vlan_id) {
+		dp_peer_unref_delete(peer, DP_MOD_ID_TX_MULTIPASS);
+		return DP_VLAN_TAGGED_UNICAST;
+	}
+
+	dp_peer_unref_delete(peer, DP_MOD_ID_TX_MULTIPASS);
+	return DP_VLAN_UNTAGGED;
+}
+
+bool dp_tx_multipass_process(struct dp_soc *soc, struct dp_vdev *vdev,
+			     qdf_nbuf_t nbuf,
+			     struct dp_tx_msdu_info_s *msdu_info)
+{
+	uint16_t vlan_id = 0;
+	uint16_t group_key = 0;
+	uint8_t is_spcl_peer = DP_VLAN_UNTAGGED;
+	qdf_nbuf_t nbuf_copy = NULL;
+
+	if (HTT_TX_MSDU_EXT2_DESC_FLAG_VALID_KEY_FLAGS_GET(msdu_info->meta_data[0]))
+		return true;
+
+	is_spcl_peer = dp_tx_need_multipass_process(soc, vdev, nbuf, &vlan_id);
+
+	if ((is_spcl_peer != DP_VLAN_TAGGED_MULTICAST) &&
+	    (is_spcl_peer != DP_VLAN_TAGGED_UNICAST))
+		return true;
+
+	if (is_spcl_peer == DP_VLAN_TAGGED_UNICAST) {
+		dp_tx_remove_vlan_tag(vdev, nbuf);
+		return true;
+	}
+
+	/* AP can have classic clients, special clients &
+	 * classic repeaters.
+	 * 1. Classic clients & special client:
+	 *	Remove vlan header, find corresponding group key
+	 *	index, fill in metaheader and enqueue multicast
+	 *	frame to TCL.
+	 * 2. Classic repeater:
+	 *	Pass through to classic repeater with vlan tag
+	 *	intact without any group key index. Hardware
+	 *	will know which key to use to send frame to
+	 *	repeater.
+	 */
+	nbuf_copy = qdf_nbuf_copy(nbuf);
+
+	/*
+	 * Send multicast frame to special peers even
+	 * if pass through to classic repeater fails.
+	 */
+	if (nbuf_copy) {
+		struct dp_tx_msdu_info_s msdu_info_copy;
+
+		qdf_mem_zero(&msdu_info_copy, sizeof(msdu_info_copy));
+		msdu_info_copy.tid = HTT_TX_EXT_TID_INVALID;
+		HTT_TX_MSDU_EXT2_DESC_FLAG_VALID_KEY_FLAGS_SET(msdu_info_copy.meta_data[0], 1);
+		nbuf_copy = dp_tx_send_msdu_single(vdev, nbuf_copy,
+						   &msdu_info_copy,
+						   HTT_INVALID_PEER, NULL);
+		if (nbuf_copy) {
+			qdf_nbuf_free(nbuf_copy);
+			qdf_err("nbuf_copy send failed");
+		}
+	}
+
+	group_key = vdev->iv_vlan_map[vlan_id];
+
+	/*
+	 * If group key is not installed, drop the frame.
+	 */
+	if (!group_key)
+		return false;
+
+	dp_tx_remove_vlan_tag(vdev, nbuf);
+	dp_tx_add_groupkey_metadata(vdev, msdu_info, group_key);
+	msdu_info->exception_fw = 1;
+	return true;
+}
+#endif /* QCA_MULTIPASS_SUPPORT */
