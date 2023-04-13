@@ -2368,8 +2368,6 @@ enum wlan_ml_bv_cinfo_emlcap_emlmrdelay {
  *                                             TUs
  * @WLAN_ML_BV_CINFO_EMLCAP_TRANSTIMEOUT_64TU: Transition Timeout value of 64
  *                                             TUs
- * @WLAN_ML_BV_CINFO_EMLCAP_TRANSTIMEOUT_128TU: Transition Timeout value of 128
- *                                              TUs
  * @WLAN_ML_BV_CINFO_EMLCAP_TRANSTIMEOUT_INVALIDSTART: Start of invalid value
  *                                                     range
  */
@@ -2385,7 +2383,6 @@ enum wlan_ml_bv_cinfo_emlcap_transtimeout {
 	WLAN_ML_BV_CINFO_EMLCAP_TRANSTIMEOUT_16TU = 8,
 	WLAN_ML_BV_CINFO_EMLCAP_TRANSTIMEOUT_32TU = 9,
 	WLAN_ML_BV_CINFO_EMLCAP_TRANSTIMEOUT_64TU = 10,
-	WLAN_ML_BV_CINFO_EMLCAP_TRANSTIMEOUT_128TU = 11,
 	WLAN_ML_BV_CINFO_EMLCAP_TRANSTIMEOUT_INVALIDSTART,
 };
 
