@@ -1078,6 +1078,15 @@ static void reg_propagate_6g_mas_channel_list(
 void reg_set_ap_pwr_type(struct wlan_regulatory_pdev_priv_obj *pdev_priv_obj)
 {
 	uint8_t  *num_rules = pdev_priv_obj->reg_rules.num_of_6g_ap_reg_rules;
+	bool is_6ghz_pdev;
+
+	is_6ghz_pdev = reg_is_range_overlap_6g(pdev_priv_obj->range_5g_low,
+					       pdev_priv_obj->range_5g_high);
+
+	if (!is_6ghz_pdev) {
+		reg_debug("Not setting 6g_pwr_type for a non 6 GHz pdev");
+		return;
+	}
 
 	if (pdev_priv_obj->reg_afc_dev_deployment_type ==
 	    AFC_DEPLOYMENT_OUTDOOR) {
