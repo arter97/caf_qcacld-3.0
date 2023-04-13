@@ -620,13 +620,13 @@ static inline uint64_t hal_tx_comp_get_desc_va(void *hal_desc)
 {
 	uint64_t va_from_desc;
 
-	va_from_desc = HAL_TX_DESC_GET(hal_desc,
+	va_from_desc = qdf_le64_to_cpu(HAL_TX_DESC_GET(hal_desc,
 				       WBM2SW_COMPLETION_RING_TX,
 				       BUFFER_VIRT_ADDR_31_0) |
-			(((uint64_t)HAL_TX_DESC_GET(
-					hal_desc,
-					WBM2SW_COMPLETION_RING_TX,
-					BUFFER_VIRT_ADDR_63_32)) << 32);
+				       (((uint64_t)HAL_TX_DESC_GET(
+				       hal_desc,
+				       WBM2SW_COMPLETION_RING_TX,
+				       BUFFER_VIRT_ADDR_63_32)) << 32));
 
 	return va_from_desc;
 }

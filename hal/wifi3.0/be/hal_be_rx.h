@@ -356,13 +356,12 @@ static inline uintptr_t hal_rx_wbm_get_desc_va(void *hal_desc)
 {
 	uint64_t va_from_desc;
 
-	va_from_desc = HAL_RX_GET(hal_desc,
-				  WBM2SW_COMPLETION_RING_RX,
-				  BUFFER_VIRT_ADDR_31_0) |
-			(((uint64_t)HAL_RX_GET(hal_desc,
-					       WBM2SW_COMPLETION_RING_RX,
-					       BUFFER_VIRT_ADDR_63_32)) << 32);
-
+	va_from_desc = qdf_le64_to_cpu(HAL_RX_GET(hal_desc,
+				       WBM2SW_COMPLETION_RING_RX,
+				       BUFFER_VIRT_ADDR_31_0) |
+				       (((uint64_t)HAL_RX_GET(hal_desc,
+				       WBM2SW_COMPLETION_RING_RX,
+				       BUFFER_VIRT_ADDR_63_32)) << 32));
 	return (uintptr_t)va_from_desc;
 }
 
@@ -495,13 +494,12 @@ static inline uintptr_t hal_rx_get_reo_desc_va(void *reo_desc)
 {
 	uint64_t va_from_desc;
 
-	va_from_desc = HAL_RX_GET(reo_desc,
-				  REO_DESTINATION_RING,
-				  BUFFER_VIRT_ADDR_31_0) |
-		(((uint64_t)HAL_RX_GET(reo_desc,
+	va_from_desc = qdf_le64_to_cpu(HAL_RX_GET(reo_desc,
 				       REO_DESTINATION_RING,
-				       BUFFER_VIRT_ADDR_63_32)) << 32);
-
+				       BUFFER_VIRT_ADDR_31_0) |
+				       (((uint64_t)HAL_RX_GET(reo_desc,
+				       REO_DESTINATION_RING,
+				       BUFFER_VIRT_ADDR_63_32)) << 32));
 	return (uintptr_t)va_from_desc;
 }
 
