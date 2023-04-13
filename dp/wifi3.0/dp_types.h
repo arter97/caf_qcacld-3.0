@@ -2194,6 +2194,7 @@ enum dp_context_type {
  * @mlo_peer_find_hash_remove:
  * @mlo_peer_find_hash_find:
  * @get_hw_link_id:
+ * @dp_rx_peer_set_link_id: set link id in nbuf cb
  * @get_reo_qdesc_addr:
  * @get_rx_hash_key:
  * @dp_set_rx_fst:
@@ -2390,6 +2391,7 @@ struct dp_arch_ops {
 						   uint8_t vdev_id);
 #endif
 	uint8_t (*get_hw_link_id)(struct dp_pdev *pdev);
+	void (*dp_rx_peer_set_link_id)(qdf_nbuf_t nbuf, uint32_t peer_mdata);
 	uint64_t (*get_reo_qdesc_addr)(hal_soc_handle_t hal_soc_hdl,
 				       uint8_t *dst_ring_desc,
 				       uint8_t *buf,

@@ -2514,6 +2514,8 @@ dp_rx_wbm_err_process(struct dp_intr *int_ctx, struct dp_soc *soc,
 			continue;
 		}
 
+		dp_rx_nbuf_set_link_id_from_tlv(soc, rx_tlv_hdr, nbuf);
+
 		pool_id = wbm_err.info_bit.pool_id;
 		dp_pdev = dp_get_pdev_for_lmac_id(soc, pool_id);
 

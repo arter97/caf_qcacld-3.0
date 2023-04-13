@@ -12738,6 +12738,26 @@ fail1:
 	return QDF_STATUS_E_NOMEM;
 }
 
+#if defined(WLAN_FEATURE_11BE_MLO) && defined(DP_MLO_LINK_STATS_SUPPORT)
+/**
+ * dp_init_link_peer_stats_enabled() - Init link_peer_stats as per config
+ * @pdev: DP pdev
+ *
+ * Return: None
+ */
+static inline void
+dp_init_link_peer_stats_enabled(struct dp_pdev *pdev)
+{
+	pdev->link_peer_stats = wlan_cfg_is_peer_link_stats_enabled(
+						pdev->soc->wlan_cfg_ctx);
+}
+#else
+static inline void
+dp_init_link_peer_stats_enabled(struct dp_pdev *pdev)
+{
+}
+#endif
+
 static QDF_STATUS dp_pdev_init(struct cdp_soc_t *txrx_soc,
 				      HTC_HANDLE htc_handle,
 				      qdf_device_t qdf_osdev,
@@ -12884,6 +12904,7 @@ static QDF_STATUS dp_pdev_init(struct cdp_soc_t *txrx_soc,
 	dp_rx_pdev_buffers_alloc(pdev);
 
 	dp_init_tso_stats(pdev);
+	dp_init_link_peer_stats_enabled(pdev);
 
 	pdev->rx_fast_flag = false;
 	dp_info("Mem stats: DMA = %u HEAP = %u SKB = %u",

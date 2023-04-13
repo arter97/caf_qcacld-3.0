@@ -4605,7 +4605,9 @@ dp_tx_update_peer_extd_stats(struct hal_tx_completion_status *ts,
 }
 #endif
 
-#if defined(WLAN_FEATURE_11BE_MLO) && defined(QCA_ENHANCED_STATS_SUPPORT)
+#if defined(WLAN_FEATURE_11BE_MLO) && \
+	(defined(QCA_ENHANCED_STATS_SUPPORT) || \
+		defined(DP_MLO_LINK_STATS_SUPPORT))
 static inline uint8_t
 dp_tx_get_link_id_from_ppdu_id(struct dp_soc *soc,
 			       struct hal_tx_completion_status *ts,

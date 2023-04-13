@@ -2419,6 +2419,33 @@ dp_rx_peer_metadata_peer_id_get(struct dp_soc *soc, uint32_t peer_metadata)
 							     peer_metadata);
 }
 
+#if defined(WLAN_FEATURE_11BE_MLO) && defined(DP_MLO_LINK_STATS_SUPPORT)
+/**
+ * dp_rx_nbuf_set_link_id_from_tlv() - Set link id in nbuf cb
+ * @soc: SOC handle
+ * @tlv_hdr: rx tlv header
+ * @nbuf: nbuf pointer
+ *
+ * Return: None
+ */
+static inline void
+dp_rx_nbuf_set_link_id_from_tlv(struct dp_soc *soc, uint8_t *tlv_hdr,
+				qdf_nbuf_t nbuf)
+{
+	uint32_t peer_metadata = hal_rx_tlv_peer_meta_data_get(soc->hal_soc,
+								tlv_hdr);
+
+	if (soc->arch_ops.dp_rx_peer_set_link_id)
+		soc->arch_ops.dp_rx_peer_set_link_id(nbuf, peer_metadata);
+}
+#else
+static inline void
+dp_rx_nbuf_set_link_id_from_tlv(struct dp_soc *soc, uint8_t *tlv_hdr,
+				qdf_nbuf_t nbuf)
+{
+}
+#endif
+
 /**
  * dp_rx_desc_pool_init_generic() - Generic Rx descriptors initialization
  * @soc: SOC handle
@@ -3500,7 +3527,7 @@ static inline uint8_t
 dp_rx_get_stats_arr_idx_from_link_id(qdf_nbuf_t nbuf,
 				     struct dp_txrx_peer *txrx_peer)
 {
-	return 0;
+	return QDF_NBUF_CB_RX_LOGICAL_LINK_ID(nbuf);
 }
 #else
 static inline uint8_t
