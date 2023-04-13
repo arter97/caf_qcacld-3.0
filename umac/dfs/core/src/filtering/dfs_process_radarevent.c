@@ -685,7 +685,7 @@ static inline int dfs_handle_bangradar(
 	struct dfs_channel *chan,
 	struct dfs_state **rs,
 	uint8_t *seg_id,
-	int *retval)
+	bool *retval)
 {
 
 	if (dfs->dfs_bangradar_type) {
@@ -715,7 +715,7 @@ static inline int dfs_handle_bangradar(
 		*seg_id = dfs->dfs_seg_id;
 		dfs_debug(dfs, WLAN_DEBUG_DFS, "bangradar %d",
 			  dfs->dfs_bangradar_type);
-		*retval = 1;
+		*retval = true;
 		return 1;
 	}
 	return 0;
@@ -889,7 +889,7 @@ static inline void dfs_check_if_nonbin5(
 	uint64_t this_ts,
 	uint32_t diff_ts,
 	int *found,
-	int *retval,
+	bool *retval,
 	int *false_radar_found)
 {
 
@@ -1300,7 +1300,7 @@ static inline int dfs_process_each_radarevent(
 	struct dfs_channel *chan,
 	struct dfs_state **rs,
 	uint8_t *seg_id,
-	int *retval,
+	bool *retval,
 	int *false_radar_found)
 {
 	struct dfs_event re, *event;
@@ -1493,15 +1493,26 @@ bool dfs_radar_pulse_event_basic_sanity(struct wlan_dfs *dfs,
 	return true;
 }
 
-void dfs_process_radarevent(
-	struct wlan_dfs *dfs,
-	struct dfs_channel *chan)
+/**
+ * dfs_find_radar() - Check if radar found or not.
+ * @dfs: Pointer to wlan_dfs structure.
+ * @chan: Current channel.
+ * @rs: Pointer to dfs_state structure.
+ * @seg_id: segment id.
+ * @is_bangradar: true if radar is due to bangradar command.
+ * @is_radar_found: pointer to radar found or not.
+ *
+ */
+static
+void dfs_find_radar(struct wlan_dfs *dfs,
+		    struct dfs_channel *chan,
+		    struct dfs_state *rs,
+		    uint8_t   *seg_id,
+		    bool *is_bangradar,
+		    bool *is_radar_found)
 {
-	struct dfs_state *rs = NULL;
-	uint8_t   seg_id = 0;
-	int retval = 0;
 	int false_radar_found = 0;
-	bool bangradar = false;
+	*is_radar_found = false;
 
 	if (!dfs_radar_pulse_event_basic_sanity(dfs, chan))
 		return;
@@ -1510,24 +1521,43 @@ void dfs_process_radarevent(
 	 * TEST : Simulate radar bang, make sure we add the channel to NOL
 	 * (bug 29968)
 	 */
-	if (dfs_handle_bangradar(dfs, chan, &rs, &seg_id, &retval)) {
-		if (retval)
-			bangradar = true;
+	if (dfs_handle_bangradar(dfs, chan, &rs, seg_id, is_radar_found)) {
+		if (*is_radar_found)
+			*is_bangradar = true;
 		goto dfsfound;
 	}
 
 	if (!dfs_handle_missing_pulses(dfs, chan))
 		return;
 
-	dfs_process_each_radarevent(dfs, chan, &rs, &seg_id, &retval,
-			&false_radar_found);
+	dfs_process_each_radarevent(dfs, chan, &rs, seg_id, is_radar_found,
+				    &false_radar_found);
 
 dfsfound:
-	if (retval) {
-		dfs_radarfound_reset_vars(dfs, rs, chan, seg_id);
-		dfs_radar_found_action(dfs, bangradar, seg_id);
-	}
-
 	if (false_radar_found)
 		dfs_false_radarfound_reset_vars(dfs);
+
+	if (*is_radar_found)
+		dfs_radarfound_reset_vars(dfs, rs, chan, *seg_id);
+}
+
+void dfs_process_radarevent(
+	struct wlan_dfs *dfs,
+	struct dfs_channel *chan)
+{
+	struct dfs_state *rs = NULL;
+	uint8_t   seg_id = 0;
+	bool is_radar_found = 0;
+	bool is_bangradar = false;
+
+	/* Need to take a lock here since dfs filtering data structures are
+	 * freed and re-allocated in dfs_init_radar_filters() during channel
+	 * change which may happen in the middle of dfs pulse processing.
+	 */
+	WLAN_DFS_DATA_STRUCT_LOCK(dfs);
+	dfs_find_radar(dfs, chan, rs, &seg_id, &is_bangradar, &is_radar_found);
+	WLAN_DFS_DATA_STRUCT_UNLOCK(dfs);
+
+	if (is_radar_found)
+		dfs_radar_found_action(dfs, is_bangradar, seg_id);
 }
