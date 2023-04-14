@@ -590,6 +590,111 @@ static void dp_ppeds_dealloc_ppe_vp_profile_be(struct dp_soc_be *be_soc,
 }
 
 /**
+ * dp_ppeds_tx_desc_free_nolock() - PPE DS tx desc free nolocks
+ * @be_soc: SoC
+ * @tx_desc: tx desc
+ *
+ * PPE DS tx desc free witout locks
+ *
+ * Return: void
+ */
+static
+void dp_ppeds_tx_desc_free_nolock(struct dp_soc *soc,
+				  struct dp_tx_desc_s *tx_desc)
+{
+	struct dp_soc_be *be_soc = dp_get_be_soc_from_dp_soc(soc);
+	struct dp_ppeds_tx_desc_pool_s *pool = NULL;
+
+	tx_desc->nbuf = NULL;
+	tx_desc->flags = 0;
+
+	pool = &be_soc->ppeds_tx_desc;
+	tx_desc->next = pool->freelist;
+	pool->freelist = tx_desc;
+	pool->num_allocated--;
+	pool->num_free++;
+}
+
+#ifdef DP_UMAC_HW_RESET_SUPPORT
+/**
+ * dp_ppeds_enable_txcomp_irq() - ppeds tx completion irq enable
+ * @be_soc: soc handle
+ *
+ */
+static void dp_ppeds_enable_txcomp_irq(struct dp_soc_be *be_soc)
+{
+	struct dp_soc *soc = DP_SOC_BE_GET_SOC(be_soc);
+
+	if (!dp_check_umac_reset_in_progress(soc)) {
+		dp_ppeds_enable_irq(&be_soc->soc,
+				    &be_soc->ppeds_wbm_release_ring);
+	}
+
+	if (soc->notify_fw_callback)
+		soc->notify_fw_callback(soc);
+}
+
+static void dp_ppeds_tx_desc_reset(void *ctxt, void *elem, void *elem_list)
+{
+	struct dp_soc *soc = (struct dp_soc *)ctxt;
+	struct dp_tx_desc_s *tx_desc = (struct dp_tx_desc_s *)elem;
+	qdf_nbuf_t *nbuf_list = (qdf_nbuf_t *)elem_list;
+	qdf_nbuf_t nbuf = NULL;
+
+	if (tx_desc->nbuf) {
+		nbuf = tx_desc->nbuf;
+		dp_ppeds_tx_desc_free_nolock(soc, tx_desc);
+
+		if (nbuf) {
+			if (!nbuf_list) {
+				dp_err("potential memory leak");
+				qdf_assert_always(0);
+			}
+
+			nbuf->next = *nbuf_list;
+			*nbuf_list = nbuf;
+		}
+	}
+}
+
+/**
+ * dp_ppeds_tx_desc_pool_reset() - PPE DS tx desc pool reset
+ * @soc: SoC
+ *
+ * PPE DS tx desc pool reset
+ *
+ * Return: void
+ */
+void
+dp_ppeds_tx_desc_pool_reset(struct dp_soc *soc,
+			    qdf_nbuf_t *nbuf_list)
+{
+	struct dp_soc_be *be_soc = dp_get_be_soc_from_dp_soc(soc);
+	struct dp_ppeds_tx_desc_pool_s *pool = &be_soc->ppeds_tx_desc;
+
+	if (pool) {
+		TX_DESC_LOCK_LOCK(&pool->lock);
+
+		qdf_tx_desc_pool_free_bufs(&be_soc->soc, &pool->desc_pages,
+					   pool->elem_size, pool->elem_count,
+					   true, &dp_ppeds_tx_desc_reset,
+					   nbuf_list);
+
+		TX_DESC_LOCK_UNLOCK(&pool->lock);
+		pool->hotlist = NULL;
+		pool->hot_list_len = 0;
+	}
+}
+
+#else
+static void dp_ppeds_enable_txcomp_irq(struct dp_soc_be *be_soc)
+{
+	dp_ppeds_enable_irq(&be_soc->soc,
+			    &be_soc->ppeds_wbm_release_ring);
+}
+#endif
+
+/**
  * dp_ppeds_tx_comp_poll() - ppeds tx completion napi poll
  * @napi: napi handle
  * @budget: Budget
@@ -605,14 +710,18 @@ static int dp_ppeds_tx_comp_poll(struct napi_struct *napi, int budget)
 	int norm_budget = DS_NAPI_BUDGET_TO_INTERNAL_BUDGET(budget, shift);
 	struct dp_soc_be *be_soc =
 		qdf_container_of(napi, struct dp_soc_be, ppeds_napi_ctxt.napi);
+	struct dp_soc *soc = DP_SOC_BE_GET_SOC(be_soc);
 
+	qdf_atomic_set_bit(DP_PPEDS_TX_COMP_NAPI_BIT,
+			   &soc->service_rings_running);
 	work_done = dp_ppeds_tx_comp_handler(be_soc, norm_budget);
 	work_done = DS_INTERNAL_BUDGET_TO_NAPI_BUDGET(work_done, shift);
+	qdf_atomic_clear_bit(DP_PPEDS_TX_COMP_NAPI_BIT,
+			     &soc->service_rings_running);
 
 	if (budget > work_done) {
 		napi_complete(napi);
-		dp_ppeds_enable_irq(&be_soc->soc,
-				    &be_soc->ppeds_wbm_release_ring);
+		dp_ppeds_enable_txcomp_irq(be_soc);
 	}
 
 	return (work_done > budget) ? budget : work_done;
@@ -813,32 +922,6 @@ static QDF_STATUS dp_ppeds_tx_desc_pool_init(struct dp_soc *soc)
 }
 
 /**
- * dp_ppeds_tx_desc_free_nolock() - PPE DS tx desc free nolocks
- * @be_soc: SoC
- * @tx_desc: tx desc
- *
- * PPE DS tx desc free witout locks
- *
- * Return: void
- */
-static
-void dp_ppeds_tx_desc_free_nolock(struct dp_soc *soc,
-				  struct dp_tx_desc_s *tx_desc)
-{
-	struct dp_soc_be *be_soc = dp_get_be_soc_from_dp_soc(soc);
-	struct dp_ppeds_tx_desc_pool_s *pool = NULL;
-
-	tx_desc->nbuf = NULL;
-	tx_desc->flags = 0;
-
-	pool = &be_soc->ppeds_tx_desc;
-	tx_desc->next = pool->freelist;
-	pool->freelist = tx_desc;
-	pool->num_allocated--;
-	pool->num_free++;
-}
-
-/**
  * dp_ppeds_tx_desc_clean_up() -  Clean up the ppeds tx dexcriptors
  * @ctxt: context passed
  * @elem: element to be cleaned up
@@ -905,8 +988,9 @@ dp_ppeds_tx_desc_pool_cleanup(struct dp_soc_be *be_soc,
  *
  * Return: void
  */
-static void dp_ppeds_tx_desc_pool_deinit(struct dp_soc_be *be_soc)
+static void dp_ppeds_tx_desc_pool_deinit(struct dp_soc *soc)
 {
+	struct dp_soc_be *be_soc = dp_get_be_soc_from_dp_soc(soc);
 	struct dp_ppeds_tx_desc_pool_s *tx_desc_pool;
 
 	tx_desc_pool = &be_soc->ppeds_tx_desc;
@@ -1258,6 +1342,26 @@ dp_ppeds_enable_srng_intr(ppe_ds_wlan_handle_t *ppeds_handle, bool enable)
 		dp_ppeds_disable_irq(&be_soc->soc, &be_soc->ppe2tcl_ring);
 }
 
+#ifdef DP_UMAC_HW_RESET_SUPPORT
+/**
+ * dp_ppeds_notify_napi_done() - Notify calback about NAPI complete.
+ * @ppeds_handle: PPE-DS WLAN handle
+ *
+ * Return: None
+ */
+static inline
+void dp_ppeds_notify_napi_done(ppe_ds_wlan_handle_t *ppeds_handle)
+{
+	struct dp_soc *soc =
+			*((struct dp_soc **)ppe_ds_wlan_priv(ppeds_handle));
+
+	qdf_atomic_clear_bit(DP_PPEDS_NAPI_DONE_BIT,
+			     &soc->service_rings_running);
+	if (soc && soc->notify_fw_callback)
+		soc->notify_fw_callback(soc);
+}
+#endif
+
 /**
  * ppeds_ops
  *	PPE-DS WLAN operations
@@ -1271,6 +1375,9 @@ static struct ppe_ds_wlan_ops ppeds_ops = {
 	.get_tcl_cons_idx = dp_ppeds_get_tcl_cons_idx,
 	.get_reo_prod_idx = dp_ppeds_get_reo_prod_idx,
 	.release_rx_desc = dp_ppeds_release_rx_desc,
+#ifdef DP_UMAC_HW_RESET_SUPPORT
+	.notify_napi_done = dp_ppeds_notify_napi_done,
+#endif
 };
 
 void dp_ppeds_stats_sync_be(struct cdp_soc_t *soc_hdl,
@@ -1772,6 +1879,96 @@ QDF_STATUS dp_ppeds_vdev_enable_pri2tid_be(struct cdp_soc_t *soc_hdl,
 	return QDF_STATUS_SUCCESS;
 }
 
+#ifdef DP_UMAC_HW_RESET_SUPPORT
+/**
+ * dp_ppeds_napi_disable_be() - Stop the PPE-DS instance
+ * @soc: DP SoC
+ *
+ * Return: void
+ */
+static inline void dp_ppeds_napi_disable_be(struct dp_soc *soc)
+{
+	struct dp_soc_be *be_soc = dp_get_be_soc_from_dp_soc(soc);
+	struct dp_ppeds_napi *napi_ctxt = &be_soc->ppeds_napi_ctxt;
+
+	if (!dp_check_umac_reset_in_progress(soc))
+		napi_disable(&napi_ctxt->napi);
+}
+
+/**
+ * dp_ppeds_napi_enable_be() - Stop the PPE-DS instance
+ * @soc: DP SoC
+ *
+ * Return: void
+ */
+static inline void dp_ppeds_napi_enable_be(struct dp_soc *soc)
+{
+	struct dp_soc_be *be_soc = dp_get_be_soc_from_dp_soc(soc);
+	struct dp_ppeds_napi *napi_ctxt = &be_soc->ppeds_napi_ctxt;
+
+	if (!dp_check_umac_reset_in_progress(soc))
+		napi_enable(&napi_ctxt->napi);
+}
+
+/**
+ * dp_ppeds_txdesc_pool_deinit_be() - Stop the PPE-DS instance
+ * @soc: DP SoC
+ *
+ * Return: void
+ */
+static inline void dp_ppeds_txdesc_pool_deinit_be(struct dp_soc *soc)
+{
+	/**
+	 * Tx desc pool deinit handled in umac post reset.
+	 */
+	if (!dp_check_umac_reset_in_progress(soc))
+		dp_ppeds_tx_desc_pool_deinit(soc);
+}
+
+/**
+ * dp_ppeds_get_umac_reset_progress() - Get the umac reset progress flag
+ * @soc: DP SoC
+ * @ppe_ds_wlan_ctx_info_handle: Information handle
+ *
+ * Return: void
+ */
+static inline void
+dp_ppeds_get_umac_reset_progress(struct dp_soc *soc,
+				 struct ppe_ds_wlan_ctx_info_handle *info_hdl)
+{
+	info_hdl->umac_reset_inprogress = dp_check_umac_reset_in_progress(soc);
+}
+
+#else
+static inline void dp_ppeds_napi_disable_be(struct dp_soc *soc)
+{
+	struct dp_soc_be *be_soc = dp_get_be_soc_from_dp_soc(soc);
+	struct dp_ppeds_napi *napi_ctxt = &be_soc->ppeds_napi_ctxt;
+
+	napi_disable(&napi_ctxt->napi);
+}
+
+static inline void dp_ppeds_napi_enable_be(struct dp_soc *soc)
+{
+	struct dp_soc_be *be_soc = dp_get_be_soc_from_dp_soc(soc);
+	struct dp_ppeds_napi *napi_ctxt = &be_soc->ppeds_napi_ctxt;
+
+	napi_enable(&napi_ctxt->napi);
+}
+
+static inline void dp_ppeds_txdesc_pool_deinit_be(struct dp_soc *soc)
+{
+	dp_ppeds_tx_desc_pool_deinit(soc);
+}
+
+static inline void
+dp_ppeds_get_umac_reset_progress(struct dp_soc *soc,
+				 struct ppe_ds_wlan_ctx_info_handle *info_hdl)
+{
+	info_hdl->umac_reset_inprogress = 0;
+}
+#endif
+
 /**
  * dp_ppeds_stop_soc_be() - Stop the PPE-DS instance
  * @soc: DP SoC
@@ -1781,7 +1978,7 @@ QDF_STATUS dp_ppeds_vdev_enable_pri2tid_be(struct cdp_soc_t *soc_hdl,
 void dp_ppeds_stop_soc_be(struct dp_soc *soc)
 {
 	struct dp_soc_be *be_soc = dp_get_be_soc_from_dp_soc(soc);
-	struct dp_ppeds_napi *napi_ctxt = &be_soc->ppeds_napi_ctxt;
+	struct ppe_ds_wlan_ctx_info_handle wlan_info_hdl;
 
 	if (!be_soc->ppeds_handle || be_soc->ppeds_stopped)
 		return;
@@ -1790,10 +1987,13 @@ void dp_ppeds_stop_soc_be(struct dp_soc *soc)
 
 	dp_info("stopping ppe ds for soc %pK ", soc);
 
-	napi_disable(&napi_ctxt->napi);
+	dp_ppeds_napi_disable_be(soc);
 
-	ppe_ds_wlan_inst_stop(be_soc->ppeds_handle);
-	dp_ppeds_tx_desc_pool_deinit(be_soc);
+	dp_ppeds_get_umac_reset_progress(soc, &wlan_info_hdl);
+	ppe_ds_wlan_instance_stop(be_soc->ppeds_handle,
+				  &wlan_info_hdl);
+
+	dp_ppeds_txdesc_pool_deinit_be(soc);
 }
 
 /**
@@ -1805,27 +2005,34 @@ void dp_ppeds_stop_soc_be(struct dp_soc *soc)
 QDF_STATUS dp_ppeds_start_soc_be(struct dp_soc *soc)
 {
 	struct dp_soc_be *be_soc = dp_get_be_soc_from_dp_soc(soc);
-	struct dp_ppeds_napi *napi_ctxt = &be_soc->ppeds_napi_ctxt;
+	struct ppe_ds_wlan_ctx_info_handle wlan_info_hdl;
 
 	if (!be_soc->ppeds_handle) {
 		dp_err("%p: ppeds not allocated", soc);
 		return QDF_STATUS_SUCCESS;
 	}
 
-	if (dp_ppeds_tx_desc_pool_init(soc) != QDF_STATUS_SUCCESS) {
-		dp_err("%p: ppeds tx desc pool init failed", soc);
-		return QDF_STATUS_SUCCESS;
+	dp_ppeds_get_umac_reset_progress(soc, &wlan_info_hdl);
+	if (!wlan_info_hdl.umac_reset_inprogress) {
+		if (dp_ppeds_tx_desc_pool_init(soc) != QDF_STATUS_SUCCESS) {
+			dp_err("%p: ppeds tx desc pool init failed", soc);
+			return QDF_STATUS_SUCCESS;
+		}
 	}
 
-	napi_enable(&napi_ctxt->napi);
+	dp_ppeds_napi_enable_be(soc);
 
 	be_soc->ppeds_stopped = 0;
 
 	dp_info("starting ppe ds for soc %pK ", soc);
 
-	if (ppe_ds_wlan_inst_start(be_soc->ppeds_handle) != 0) {
+	/* Complete the EDMA UMAC reset during instance start */
+	wlan_info_hdl.umac_reset_inprogress = 0;
+
+	if (ppe_ds_wlan_instance_start(be_soc->ppeds_handle,
+				       &wlan_info_hdl) != 0) {
 		dp_err("%p: ppeds start failed", soc);
-		dp_ppeds_tx_desc_pool_deinit(be_soc);
+		dp_ppeds_tx_desc_pool_deinit(soc);
 		return QDF_STATUS_SUCCESS;
 	}
 
@@ -1892,6 +2099,83 @@ void dp_ppeds_detach_soc_be(struct dp_soc_be *be_soc)
 	dp_ppeds_deinit_ppe_vp_profile_be(be_soc);
 	dp_ppeds_deinit_ppe_vp_tbl_be(be_soc);
 }
+
+#ifdef DP_UMAC_HW_RESET_SUPPORT
+/**
+ * dp_ppeds_interrupt_start_be() - Start all the PPEDS interrupts
+ * @be_soc: BE SoC
+ *
+ * Return: void
+ */
+void dp_ppeds_interrupt_start_be(struct dp_soc *soc)
+{
+	struct dp_soc_be *be_soc = dp_get_be_soc_from_dp_soc(soc);
+
+	if (!be_soc->ppeds_handle)
+		return;
+
+	dp_ppeds_enable_irq(&be_soc->soc,
+			    &be_soc->ppeds_wbm_release_ring);
+
+	dp_ppeds_enable_irq(&be_soc->soc, &be_soc->ppe2tcl_ring);
+	dp_ppeds_enable_irq(&be_soc->soc, &be_soc->reo2ppe_ring);
+}
+
+/**
+ * dp_ppeds_interrupt_stop_be() - Stop all the PPEDS interrupts
+ * @be_soc: BE SoC
+ * @enable: enable/disable bit
+ *
+ * Return: void
+ */
+void dp_ppeds_interrupt_stop_be(struct dp_soc *soc)
+{
+	struct dp_soc_be *be_soc = dp_get_be_soc_from_dp_soc(soc);
+
+	if (!be_soc->ppeds_handle)
+		return;
+
+	dp_ppeds_disable_irq(&be_soc->soc,
+			     &be_soc->ppeds_wbm_release_ring);
+
+	dp_ppeds_disable_irq(&be_soc->soc, &be_soc->ppe2tcl_ring);
+	dp_ppeds_disable_irq(&be_soc->soc, &be_soc->reo2ppe_ring);
+}
+
+/**
+ * dp_ppeds_service_status_update_be() - Update the PPEDS service status
+ * @be_soc: BE SoC
+ * @enable: enable/disable bit
+ *
+ * Return: void
+ */
+void dp_ppeds_service_status_update_be(struct dp_soc *soc, bool enable)
+{
+	struct dp_soc_be *be_soc = dp_get_be_soc_from_dp_soc(soc);
+
+	if (!be_soc->ppeds_handle)
+		return;
+
+	if (enable)
+		qdf_atomic_set_bit(DP_PPEDS_NAPI_DONE_BIT,
+				   &soc->service_rings_running);
+
+	ppe_ds_wlan_service_status_update(be_soc->ppeds_handle, enable);
+}
+
+/**
+ * dp_ppeds_is_enabled() - Check if PPEDS enabled on SoC.
+ * @be_soc: BE SoC
+ *
+ * Return: void
+ */
+bool dp_ppeds_is_enabled_on_soc(struct dp_soc *soc)
+{
+	struct dp_soc_be *be_soc = dp_get_be_soc_from_dp_soc(soc);
+
+	return !!be_soc->ppeds_handle;
+}
+#endif
 
 /**
  * dp_ppeds_handle_tx_comp() - PPE DS handle irq
