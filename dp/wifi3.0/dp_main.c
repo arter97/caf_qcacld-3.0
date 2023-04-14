@@ -1750,6 +1750,15 @@ static void dp_srng_msi_setup(struct dp_soc *soc, struct dp_srng *srng,
 		 (uint64_t)ring_params->msi_addr);
 
 	vector = msi_irq_start + (reg_msi_grp_num % msi_data_count);
+
+	/*
+	 * During umac reset ppeds interrupts free is not called.
+	 * Avoid registering interrupts again.
+	 *
+	 */
+	if (dp_check_umac_reset_in_progress(soc))
+		goto configure_msi2;
+
 	if (soc->arch_ops.dp_register_ppeds_interrupts)
 		if (soc->arch_ops.dp_register_ppeds_interrupts(soc, srng,
 							       vector,
@@ -2498,10 +2507,14 @@ void dp_srng_deinit(struct dp_soc *soc, struct dp_srng *srng,
 		return;
 	}
 
+	if (dp_check_umac_reset_in_progress(soc))
+		goto srng_cleanup;
+
 	if (soc->arch_ops.dp_free_ppeds_interrupts)
 		soc->arch_ops.dp_free_ppeds_interrupts(soc, srng, ring_type,
 						       ring_num);
 
+srng_cleanup:
 	hal_srng_cleanup(soc->hal_soc, srng->hal_srng);
 	srng->hal_srng = NULL;
 }
@@ -13926,6 +13939,101 @@ static QDF_STATUS dp_umac_reset_action_trigger_recovery(struct dp_soc *soc)
 	return dp_umac_reset_notify_action_completion(soc, action);
 }
 
+#ifdef WLAN_SUPPORT_PPEDS
+/**
+ * dp_umac_reset_service_handle_n_notify_done()
+ *	Handle Umac pre reset for direct switch
+ * @soc: dp soc handle
+ *
+ * Return: QDF_STATUS
+ */
+static QDF_STATUS dp_umac_reset_service_handle_n_notify_done(struct dp_soc *soc)
+{
+	if (!soc->arch_ops.txrx_soc_ppeds_enabled_check ||
+	    !soc->arch_ops.txrx_soc_ppeds_service_status_update ||
+	    !soc->arch_ops.txrx_soc_ppeds_interrupt_stop)
+		goto non_ppeds;
+
+	/*
+	 * Check if ppeds is enabled on SoC.
+	 */
+	if (!soc->arch_ops.txrx_soc_ppeds_enabled_check(soc))
+		goto non_ppeds;
+
+	/*
+	 * Start the UMAC pre reset done service.
+	 */
+	soc->arch_ops.txrx_soc_ppeds_service_status_update(soc, true);
+
+	dp_register_notify_umac_pre_reset_fw_callback(soc);
+
+	soc->arch_ops.txrx_soc_ppeds_interrupt_stop(soc);
+
+	dp_soc_ppeds_stop((struct cdp_soc_t *)soc);
+
+	/*
+	 * UMAC pre reset service complete
+	 */
+	soc->arch_ops.txrx_soc_ppeds_service_status_update(soc, false);
+
+	soc->umac_reset_ctx.nbuf_list = NULL;
+	return QDF_STATUS_SUCCESS;
+
+non_ppeds:
+	dp_register_notify_umac_pre_reset_fw_callback(soc);
+	dp_check_n_notify_umac_prereset_done(soc);
+	soc->umac_reset_ctx.nbuf_list = NULL;
+	return QDF_STATUS_SUCCESS;
+}
+
+static inline void dp_umac_reset_ppeds_txdesc_pool_reset(struct dp_soc *soc,
+							 qdf_nbuf_t *nbuf_list)
+{
+	if (!soc->arch_ops.txrx_soc_ppeds_enabled_check ||
+	    !soc->arch_ops.txrx_soc_ppeds_txdesc_pool_reset)
+		return;
+
+	/*
+	 * Deinit of PPEDS Tx desc rings.
+	 */
+	if (soc->arch_ops.txrx_soc_ppeds_enabled_check(soc))
+		soc->arch_ops.txrx_soc_ppeds_txdesc_pool_reset(soc, nbuf_list);
+}
+
+static inline void dp_umac_reset_ppeds_start(struct dp_soc *soc)
+{
+	if (!soc->arch_ops.txrx_soc_ppeds_enabled_check ||
+	    !soc->arch_ops.txrx_soc_ppeds_start ||
+	    !soc->arch_ops.txrx_soc_ppeds_interrupt_start)
+		return;
+
+	/*
+	 * Start PPEDS node and enable interrupt.
+	 */
+	if (soc->arch_ops.txrx_soc_ppeds_enabled_check(soc)) {
+		soc->arch_ops.txrx_soc_ppeds_start(soc);
+		soc->arch_ops.txrx_soc_ppeds_interrupt_start(soc);
+	}
+}
+#else
+static QDF_STATUS dp_umac_reset_service_handle_n_notify_done(struct dp_soc *soc)
+{
+	dp_register_notify_umac_pre_reset_fw_callback(soc);
+	dp_check_n_notify_umac_prereset_done(soc);
+	soc->umac_reset_ctx.nbuf_list = NULL;
+	return QDF_STATUS_SUCCESS;
+}
+
+static inline void dp_umac_reset_ppeds_txdesc_pool_reset(struct dp_soc *soc,
+							 qdf_nbuf_t *nbuf_list)
+{
+}
+
+static inline void dp_umac_reset_ppeds_start(struct dp_soc *soc)
+{
+}
+#endif
+
 /**
  * dp_umac_reset_handle_pre_reset() - Handle Umac prereset interrupt from FW
  * @soc: dp soc handle
@@ -13934,19 +14042,11 @@ static QDF_STATUS dp_umac_reset_action_trigger_recovery(struct dp_soc *soc)
  */
 static QDF_STATUS dp_umac_reset_handle_pre_reset(struct dp_soc *soc)
 {
-	if (wlan_cfg_get_dp_soc_is_ppeds_enabled(soc->wlan_cfg_ctx)) {
-		dp_err("Umac reset is currently not supported in DS config");
-		qdf_assert_always(0);
-	}
-
 	dp_reset_interrupt_ring_masks(soc);
 
 	dp_pause_tx_hardstart(soc);
 	dp_pause_reo_send_cmd(soc);
-
-	dp_check_n_notify_umac_prereset_done(soc);
-
-	soc->umac_reset_ctx.nbuf_list = NULL;
+	dp_umac_reset_service_handle_n_notify_done(soc);
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -13969,6 +14069,8 @@ static QDF_STATUS dp_umac_reset_handle_post_reset(struct dp_soc *soc)
 		dp_rx_desc_reuse(soc, nbuf_list);
 
 		dp_cleanup_reo_cmd_module(soc);
+
+		dp_umac_reset_ppeds_txdesc_pool_reset(soc, nbuf_list);
 
 		dp_tx_desc_pool_cleanup(soc, nbuf_list);
 
@@ -13994,6 +14096,8 @@ static QDF_STATUS dp_umac_reset_handle_post_reset_complete(struct dp_soc *soc)
 	soc->umac_reset_ctx.nbuf_list = NULL;
 
 	dp_resume_reo_send_cmd(soc);
+
+	dp_umac_reset_ppeds_start(soc);
 
 	dp_restore_interrupt_ring_masks(soc);
 
@@ -14909,7 +15013,6 @@ dp_txrx_ext_stats_request(struct cdp_soc_t *soc_hdl, uint8_t pdev_id,
 		req->rx_mpdu_delivered,
 		req->rx_mpdu_missed,
 		req->rx_mpdu_error);
-
 	return QDF_STATUS_SUCCESS;
 }
 
