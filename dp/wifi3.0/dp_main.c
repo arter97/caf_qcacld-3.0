@@ -2599,8 +2599,15 @@ static int dp_process_rxdma_dst_ring(struct dp_soc *soc,
 				     int mac_for_pdev,
 				     int total_budget)
 {
-	return dp_rxdma_err_process(int_ctx, soc, mac_for_pdev,
-				    total_budget);
+	uint32_t target_type;
+
+	target_type = hal_get_target_type(soc->hal_soc);
+	if (target_type == TARGET_TYPE_QCN9160)
+		return dp_monitor_process(soc, int_ctx,
+					  mac_for_pdev, total_budget);
+	else
+		return dp_rxdma_err_process(int_ctx, soc, mac_for_pdev,
+					    total_budget);
 }
 
 /**
@@ -17281,10 +17288,13 @@ static void dp_soc_cfg_attach(struct dp_soc *soc)
 	case TARGET_TYPE_QCA6018:
 	case TARGET_TYPE_QCA9574:
 	case TARGET_TYPE_QCN6122:
-	case TARGET_TYPE_QCN9160:
 	case TARGET_TYPE_QCA5018:
 		wlan_cfg_set_tso_desc_attach_defer(soc->wlan_cfg_ctx, 1);
 		wlan_cfg_set_rxdma1_enable(soc->wlan_cfg_ctx);
+		break;
+	case TARGET_TYPE_QCN9160:
+		wlan_cfg_set_tso_desc_attach_defer(soc->wlan_cfg_ctx, 1);
+		soc->wlan_cfg_ctx->rxdma1_enable = 0;
 		break;
 	case TARGET_TYPE_QCN9000:
 		wlan_cfg_set_tso_desc_attach_defer(soc->wlan_cfg_ctx, 1);
