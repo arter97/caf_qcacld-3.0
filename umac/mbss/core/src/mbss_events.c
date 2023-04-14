@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2021 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -169,3 +170,22 @@ QDF_STATUS if_mgr_validate_candidate(struct wlan_objmgr_vdev *vdev,
 	return QDF_STATUS_SUCCESS;
 }
 
+QDF_STATUS if_mgr_ap_csa_start(struct wlan_objmgr_vdev *vdev,
+			       struct if_mgr_event_data *event_data)
+{
+	return QDF_STATUS_SUCCESS;
+}
+
+QDF_STATUS
+if_mgr_ap_csa_complete(struct wlan_objmgr_vdev *vdev,
+		       struct if_mgr_event_data *event_data)
+{
+	return QDF_STATUS_SUCCESS;
+}
+
+QDF_STATUS
+if_mgr_sta_csa_complete(struct wlan_objmgr_vdev *vdev,
+			struct if_mgr_event_data *event_data)
+{
+	return QDF_STATUS_SUCCESS;
+}
