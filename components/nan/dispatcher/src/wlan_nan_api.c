@@ -76,3 +76,12 @@ wlan_nan_vdev_delete_all_pasn_peers(struct wlan_objmgr_vdev *vdev)
 
 	return status;
 }
+
+void wlan_nan_handle_pasn_peer_create_rsp(struct wlan_objmgr_psoc *psoc,
+					  uint8_t vdev_id,
+					  struct qdf_mac_addr *peer_mac,
+					  uint8_t peer_create_status)
+{
+	nan_handle_pasn_peer_create_rsp(psoc, vdev_id, peer_mac,
+					peer_create_status);
+}

@@ -293,25 +293,35 @@ wma_pasn_handle_peer_create_conf(tp_wma_handle wma,
 	mode = wlan_vdev_mlme_get_opmode(vdev);
 	wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_WMA_ID);
 
-	/*
-	 * Only in I-sta case update the wifi pos module to
-	 * track the peer to initiate PASN authentication.
-	 * For R-STA, return from here.
-	 */
-	if (mode != QDF_STA_MODE) {
-		wma_debug("PASN opmode:%d is not sta", mode);
-		return QDF_STATUS_SUCCESS;
-	}
+	if (req_msg_type == WMA_PASN_PEER_CREATE_RESPONSE) {
+		/*
+		 * Only in I-sta case update the wifi pos module to
+		 * track the peer to initiate PASN authentication.
+		 * For R-STA, return from here.
+		 */
+		if (mode != QDF_STA_MODE) {
+			wma_debug("PASN opmode:%d is not sta", mode);
+			return QDF_STATUS_SUCCESS;
+		}
 
-	rx_ops = wifi_pos_get_rx_ops(wma->psoc);
-	if (!rx_ops || !rx_ops->wifi_pos_ranging_peer_create_rsp_cb) {
-		wma_err("%s is null",
-			!rx_ops ? "rx_ops" : "rx_ops->ranging_peer_cb");
-		return QDF_STATUS_E_NULL_VALUE;
-	}
+		rx_ops = wifi_pos_get_rx_ops(wma->psoc);
+		if (!rx_ops || !rx_ops->wifi_pos_ranging_peer_create_rsp_cb) {
+			wma_err("%s is null",
+				!rx_ops ? "rx_ops" : "rx_ops->ranging_peer_cb");
+			return QDF_STATUS_E_NULL_VALUE;
+		}
 
-	rx_ops->wifi_pos_ranging_peer_create_rsp_cb(wma->psoc, vdev_id,
-						    peer_mac, status);
+		rx_ops->wifi_pos_ranging_peer_create_rsp_cb(wma->psoc, vdev_id,
+							    peer_mac, status);
+	} else if (req_msg_type == WMA_NAN_PASN_PEER_CREATE_RESPONSE) {
+		if (mode != QDF_NAN_DISC_MODE) {
+			wma_debug("PASN opmode:%d is not NAN", mode);
+			return QDF_STATUS_SUCCESS;
+		}
+
+		wlan_nan_handle_pasn_peer_create_rsp(wma->psoc, vdev_id,
+						     peer_mac, status);
+	}
 
 	return QDF_STATUS_SUCCESS;
 }

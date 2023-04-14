@@ -1757,3 +1757,32 @@ QDF_STATUS nan_pasn_scheduled_handler(struct scheduler_msg *msg)
 	nan_pasn_flush_callback(msg);
 	return status;
 }
+
+void nan_handle_pasn_peer_create_rsp(struct wlan_objmgr_psoc *psoc,
+				     uint8_t vdev_id,
+				     struct qdf_mac_addr *peer_mac,
+				     uint8_t peer_create_status)
+{
+	struct nan_psoc_priv_obj *psoc_nan_obj;
+	uint8_t *cookie;
+
+	nan_debug("Received peer create response for " QDF_MAC_ADDR_FMT " and vdev id %d with status:%d",
+		  QDF_MAC_ADDR_REF(peer_mac->bytes), vdev_id,
+		  peer_create_status);
+
+	if (!psoc) {
+		nan_err("psoc is NULL");
+		return;
+	}
+
+	psoc_nan_obj = nan_get_psoc_priv_obj(psoc);
+	if (!psoc_nan_obj) {
+		nan_err("psoc_nan_obj is NULL");
+		return;
+	}
+
+	if (psoc_nan_obj->cb_obj.ucfg_nan_request_process_cb) {
+		cookie = (uint8_t *)psoc_nan_obj->nan_pairing_create_ctx;
+		psoc_nan_obj->cb_obj.ucfg_nan_request_process_cb(cookie);
+	}
+}
