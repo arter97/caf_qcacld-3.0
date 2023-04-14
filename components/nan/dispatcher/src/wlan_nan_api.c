@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2023-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -24,6 +24,7 @@
 #include "wlan_objmgr_vdev_obj.h"
 #include "wlan_nan_api_i.h"
 #include "cfg_nan_api.h"
+#include "wlan_vdev_mgr_tgt_if_tx_api.h"
 
 inline enum nan_datapath_state wlan_nan_get_ndi_state(
 					struct wlan_objmgr_vdev *vdev)
@@ -58,4 +59,20 @@ bool wlan_nan_is_disc_active(struct wlan_objmgr_psoc *psoc)
 bool wlan_nan_is_eht_capable(struct wlan_objmgr_psoc *psoc)
 {
 	return cfg_nan_is_eht_cap_enable(psoc);
+}
+
+QDF_STATUS
+wlan_nan_vdev_delete_all_pasn_peers(struct wlan_objmgr_vdev *vdev)
+{
+	QDF_STATUS status;
+	struct peer_delete_all_params param;
+
+	param.vdev_id = wlan_vdev_get_id(vdev);
+	param.peer_type_bitmap = BIT(WLAN_PEER_NAN_PASN);
+
+	status = tgt_vdev_mgr_peer_delete_all_send(vdev, &param);
+	if (QDF_IS_STATUS_ERROR(status))
+		nan_err("Send vdev delete all peers failed");
+
+	return status;
 }

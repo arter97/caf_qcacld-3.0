@@ -9698,10 +9698,13 @@ static void hdd_stop_station_adapter(struct hdd_adapter *adapter)
 						wlan_vdev_get_pdev(vdev),
 						link_info->vdev_id);
 		hdd_objmgr_put_vdev_by_user(vdev, WLAN_INIT_DEINIT_ID);
+
+		if (mode == QDF_NAN_DISC_MODE)
+			hdd_disable_nan_active_disc(adapter);
+
 		hdd_vdev_destroy(link_info);
 	}
 
-	hdd_disable_nan_active_disc(adapter);
 	hdd_adapter_deregister_fc(adapter);
 	hdd_cancel_ip_notifier_work(adapter);
 }
