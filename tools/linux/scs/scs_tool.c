@@ -28,8 +28,9 @@
 #include <cfg80211_nlwrapper_api.h>
 #include <qca_vendor.h>
 
-#define SAWF_SPM_RULE_CLASSIFIER_TYPE        1
 #define SCS_SPM_RULE_CLASSIFIER_TYPE         2
+#define SAWF_SCS_SPM_RULE_CLASSIFIER_TYPE    4
+
 #define SCS_ATTR_FLOW_LABEL_LENGTH           3
 
 #define SCS_ATTR_CLASSIFIER_TYPE_TCLAS4      4
@@ -414,6 +415,8 @@ parse_tclas10:
 	if (tb) {
 		val32 = nla_get_u32(tb);
 		PRINT_IF_VERB("Netdev Interface Index: %u", val32);
+		rule->ifindex = (uint8_t)val32;
+		rule->flags |= SP_RULE_FLAG_MATCH_IFINDEX;
 		rule_precedence++;
 	}
 
@@ -427,7 +430,7 @@ done:
 		val16 = nla_get_u16(tb);
 		rule->service_class_id = (uint8_t)val16;
 		rule->flags |= SP_RULE_FLAG_MATCH_SERVICE_CLASS_ID;
-		rule->classifier_type = SAWF_SPM_RULE_CLASSIFIER_TYPE;
+		rule->classifier_type = SAWF_SCS_SPM_RULE_CLASSIFIER_TYPE;
 		PRINT_IF_VERB("Service Class ID: %u", rule->service_class_id);
 	} else {
 		rule->classifier_type = SCS_SPM_RULE_CLASSIFIER_TYPE;

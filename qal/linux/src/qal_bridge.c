@@ -57,6 +57,8 @@ qal_bridge_fdb_has_entry(qal_netdev_t dev, const char *addr, uint16_t vid)
 {
 	if (!dev)
 		return NULL;
+	if (!netif_is_bridge_port(dev))
+		return NULL;
 
 	return br_fdb_has_entry(dev, addr, vid);
 }

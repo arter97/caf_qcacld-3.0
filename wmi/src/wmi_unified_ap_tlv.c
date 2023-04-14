@@ -467,6 +467,148 @@ send_set_ctl_table_cmd_tlv(wmi_unified_t wmi_handle,
 }
 
 /**
+ * send_set_sta_max_pwr_table_cmd_tlv() - send each sta max pwr table cmd to fw
+ * @wmi_handle: wmi handle
+ * @param: pointer to hold sta max pwr table param
+ *
+ * @return QDF_STATUS_SUCCESS  on success and -ve on failure.
+ */
+static QDF_STATUS
+send_set_sta_max_pwr_table_cmd_tlv(wmi_unified_t wmi_handle,
+				   struct sta_max_pwr_table_params *param)
+{
+	wmi_peer_bulk_set_cmd_fixed_param *cmd;
+	wmi_peer_list *wmi_peer;
+	struct sta_peer_table_list *tmp_peer_list;
+	wmi_buf_t buf;
+	int32_t len, i, err;
+	uint8_t *buf_ptr;
+
+	len = sizeof(*cmd) + WMI_TLV_HDR_SIZE;
+	len += sizeof(wmi_peer_list) * param->num_peers;
+	buf = wmi_buf_alloc(wmi_handle, len);
+	if (!buf)
+		return QDF_STATUS_E_NOMEM;
+
+	buf_ptr = (uint8_t *)wmi_buf_data(buf);
+	qdf_mem_zero(buf_ptr, len);
+
+	cmd = (wmi_peer_bulk_set_cmd_fixed_param *)buf_ptr;
+
+	WMITLV_SET_HDR(&cmd->tlv_header,
+		       WMITLV_TAG_STRUC_wmi_peer_bulk_set_cmd_fixed_param,
+		       WMITLV_GET_STRUCT_TLVLEN
+				(wmi_peer_bulk_set_cmd_fixed_param));
+
+	/*
+	* Vdev id is not known set it to zero. The FW will find the vdev
+	* for the peer if needed.
+	*/
+	cmd->vdev_var = 0;
+	WMITLV_SET_HDR((buf_ptr +
+			       sizeof(wmi_peer_bulk_set_cmd_fixed_param)),
+			       WMITLV_TAG_ARRAY_STRUC,
+			       sizeof(wmi_peer_list) * param->num_peers);
+	wmi_peer = (wmi_peer_list *)(buf_ptr + sizeof(*cmd) + WMI_TLV_HDR_SIZE);
+
+	for (i = 0; i < param->num_peers; i++) {
+		WMITLV_SET_HDR(&wmi_peer->tlv_header,
+			       WMITLV_TAG_STRUC_wmi_peer_list,
+			       WMITLV_GET_STRUCT_TLVLEN(wmi_peer_list));
+		tmp_peer_list = param->peer_list + i;
+		if (!tmp_peer_list)
+			return QDF_STATUS_E_FAILURE;
+
+		WMI_CHAR_ARRAY_TO_MAC_ADDR(tmp_peer_list->peer_macaddr,
+					   &wmi_peer->peer_macaddr);
+		wmi_peer->param_id = WMI_PEER_USE_FIXED_PWR;
+		wmi_peer->param_value = tmp_peer_list->peer_pwr_limit;
+		wmi_peer++;
+	}
+
+	err = wmi_unified_cmd_send(wmi_handle, buf,
+				   len,
+				   WMI_PEER_BULK_SET_CMDID);
+	if (err) {
+		wmi_err("Failed to send set_param cmd");
+		wmi_buf_free(buf);
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	return 0;
+}
+
+/**
+ * send_set_power_table_cmd_tlv() - send rate2power table cmd to fw
+ * @wmi_handle: wmi handle
+ * @param: pointer to hold rate2pwer table param
+ *
+ *  @return QDF_STATUS_SUCCESS  on success and -ve on failure.
+ */
+static QDF_STATUS
+send_set_power_table_cmd_tlv(wmi_unified_t wmi_handle,
+			     struct rate2power_table_params *param)
+{
+	uint16_t len, pwr_tlv_len;
+	int8_t *buf_ptr;
+	wmi_buf_t buf;
+	wmi_pdev_set_tgtr2p_table_cmd_fixed_param *cmd;
+	int8_t *pwr_array;
+
+	if (!param->pwr_array) {
+		wmi_err("pwr_array is null");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	pwr_tlv_len = WMI_TLV_HDR_SIZE +
+		roundup(param->pwr_cmd_len, sizeof(uint32_t));
+	len = sizeof(*cmd) + pwr_tlv_len;
+
+	buf = wmi_buf_alloc(wmi_handle, len);
+	if (!buf) {
+		wmi_err("wmi_buf_alloc failed");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	buf_ptr = wmi_buf_data(buf);
+	qdf_mem_zero(buf_ptr, len);
+
+	cmd = (wmi_pdev_set_tgtr2p_table_cmd_fixed_param *)buf_ptr;
+
+	WMITLV_SET_HDR(&cmd->tlv_header,
+		       WMITLV_TAG_STRUC_wmi_pdev_set_tgtr2p_table_cmd_fixed_param,
+		       WMITLV_GET_STRUCT_TLVLEN(
+				wmi_pdev_set_tgtr2p_table_cmd_fixed_param));
+	cmd->r2p_array_len = param->pwr_cmd_len;
+	cmd->freq_band = param->freq_band;
+	cmd->sub_band = param->sub_band;
+	cmd->is_ext = param->is_ext;
+	cmd->end_of_r2ptable_update = param->end_of_update;
+	cmd->target_type = param->target_type;
+	cmd->r2p_array_len = param->pwr_cmd_len;
+	cmd->pdev_id = wmi_handle->ops->convert_pdev_id_host_to_target(
+								wmi_handle,
+								param->pdev_id);
+	buf_ptr += sizeof(*cmd);
+	WMITLV_SET_HDR(buf_ptr, WMITLV_TAG_ARRAY_BYTE, (cmd->r2p_array_len));
+	buf_ptr += WMI_TLV_HDR_SIZE;
+	pwr_array = buf_ptr;
+
+	WMI_HOST_IF_MSG_COPY_CHAR_ARRAY(&pwr_array[0], param->pwr_array,
+					param->pwr_cmd_len);
+
+	wmi_mtrace(WMI_PDEV_SET_TGTR2P_TABLE_CMDID, NO_SESSION, 0);
+	if (wmi_unified_cmd_send(wmi_handle, buf, len,
+				 WMI_PDEV_SET_TGTR2P_TABLE_CMDID)) {
+		wmi_err("Failed to send WMI_PDEV_SET_TGTR2P_TABLE_CMDID command");
+		wmi_buf_free(buf);
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	return QDF_STATUS_SUCCESS;
+}
+
+/**
  * send_set_mimogain_table_cmd_tlv() - send mimogain table cmd to fw
  * @wmi_handle: wmi handle
  * @param: pointer to hold mimogain table param
@@ -2665,6 +2807,141 @@ static QDF_STATUS extract_mgmt_tx_compl_param_tlv(wmi_unified_t wmi_handle,
 	return QDF_STATUS_SUCCESS;
 }
 
+#ifdef QCA_MANUAL_TRIGGERED_ULOFDMA
+/**
+ * extract_ulofdma_trigger_feedback_event_tlv() - extract trigger feedback info
+ * @wmi_handle: wmi handle
+ * @evt_buf: event buffer
+ * @feedback: Pointer to hold ULOFDMA trigger feedback info
+ *
+ * Return: QDF_STATUS_SUCCESS for success or error code
+ */
+static QDF_STATUS
+extract_ulofdma_trigger_feedback_event_tlv(
+			wmi_unified_t wmi_handle,
+			void *evt_buf,
+			wmi_host_manual_ul_ofdma_trig_feedback_evt *feedback)
+{
+	WMI_MANUAL_UL_OFDMA_TRIG_FEEDBACK_EVENTID_param_tlvs *param_buf;
+	wmi_manual_ul_ofdma_trig_feedback_evt_fixed_param *ev;
+	wmi_mac_addr *ev_macaddr;
+	int i = 0;
+
+	param_buf = (WMI_MANUAL_UL_OFDMA_TRIG_FEEDBACK_EVENTID_param_tlvs *)
+						evt_buf;
+
+	ev = (wmi_manual_ul_ofdma_trig_feedback_evt_fixed_param *)
+						param_buf->fixed_param;
+
+	ev_macaddr = (wmi_mac_addr *)param_buf->peer_macaddr;
+
+	if (!ev || !ev_macaddr) {
+		wmi_err("Failed to allocmemory");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	if (param_buf->num_peer_macaddr > MAX_ULOFDMA_MU_PEER) {
+		wmi_err("invalid number of peer mac");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	feedback->vdev_id = ev->vdev_id;
+	feedback->trigger_type = ev->feedback_trig_type;
+	feedback->manual_trig_status = ev->manual_trig_status;
+	feedback->num_peer = param_buf->num_peer_macaddr;
+
+	if (feedback->trigger_type == WMI_HOST_ULOFDMA_SU_TRIGGER) {
+		feedback->u.su.curr_su_manual_trig =
+					ev->curr_su_manual_trig_count;
+		feedback->u.su.remaining_su_manual_trig =
+					ev->remaining_su_manual_trig;
+	} else if (feedback->trigger_type == WMI_HOST_ULOFDMA_MU_TRIGGER) {
+		feedback->u.mu.remaining_mu_trig_peers =
+					ev->remaining_mu_trig_peers;
+	}
+
+	for (i = 0; i < feedback->num_peer; ++i) {
+		WMI_MAC_ADDR_TO_CHAR_ARRAY(ev_macaddr, feedback->macaddr[i]);
+		ev_macaddr++;
+	}
+
+	return QDF_STATUS_SUCCESS;
+}
+
+/**
+ * extract_ul_ofdma_trig_rx_peer_userinfo_tlv() - extract trigger response info
+ * @wmi_handle: wmi handle
+ * @evt_buf: event buffer
+ * @resp: Pointer to hold ULOFDMA trigger response info
+ *
+ * Return: QDF_STATUS_SUCCESS for success or error code
+ */
+QDF_STATUS
+extract_ul_ofdma_trig_rx_peer_userinfo_tlv(
+		wmi_unified_t wmi_handle, void *evt_buf,
+		struct wmi_host_rx_peer_userinfo_evt_data *resp)
+{
+	WMI_MANUAL_UL_OFDMA_TRIG_RX_PEER_USERINFO_EVENTID_param_tlvs *param_buf;
+	wmi_manual_ul_ofdma_trig_rx_peer_userinfo_evt_fixed_param *fixed_param;
+	wmi_manual_ul_ofdma_trig_rx_peer_userinfo *buf;
+	int i;
+
+	param_buf = (WMI_MANUAL_UL_OFDMA_TRIG_RX_PEER_USERINFO_EVENTID_param_tlvs *)evt_buf;
+	if (!param_buf) {
+		wmi_err("Invalid RX PEER USERINFO buffer");
+		return QDF_STATUS_E_INVAL;
+	}
+	fixed_param = param_buf->fixed_param;
+	if (param_buf->num_rx_peer_userinfo >
+			((WMI_SVC_MSG_MAX_SIZE - sizeof(*fixed_param)) /
+			 sizeof(wmi_manual_ul_ofdma_trig_rx_peer_userinfo))) {
+		wmi_err("Invalid TLV size");
+		return QDF_STATUS_E_INVAL;
+	}
+	if (!param_buf->num_rx_peer_userinfo ||
+	    param_buf->num_rx_peer_userinfo > MAX_ULOFDMA_MU_PEER) {
+		wmi_err("Invalid num TLV:%d", param_buf->num_rx_peer_userinfo);
+		return QDF_STATUS_E_INVAL;
+	}
+
+	resp->comm_info.vdev_id = fixed_param->vdev_id;
+	if (resp->comm_info.vdev_id >= WLAN_UMAC_PDEV_MAX_VDEVS) {
+		wmi_err("Invalid vdev id:%d", resp->comm_info.vdev_id);
+		return QDF_STATUS_E_INVAL;
+	}
+	resp->comm_info.rx_ppdu_resp_type = fixed_param->rx_ppdu_resp_type;
+	resp->comm_info.rx_resp_bw = fixed_param->rx_resp_bw;
+	resp->comm_info.combined_rssi = fixed_param->combined_rssi;
+
+	buf = param_buf->rx_peer_userinfo;
+	if (!buf) {
+		wmi_err("NULL peer param TLV");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	wmi_debug("num_rx_peer_userinfo:%d", param_buf->num_rx_peer_userinfo);
+	for (i = 0; i < param_buf->num_rx_peer_userinfo; i++) {
+		WMI_MAC_ADDR_TO_CHAR_ARRAY(&buf->peer_macaddr,
+					   resp->peer_info[i].peer_mac.bytes);
+		resp->peer_info[i].resp_type =
+			WMI_GET_RX_PEER_STATS_RESP_TYPE(buf->rx_peer_stats);
+		resp->peer_info[i].mcs =
+			WMI_GET_RX_PEER_STATS_MCS(buf->rx_peer_stats);
+		resp->peer_info[i].nss =
+			WMI_GET_RX_PEER_STATS_NSS(buf->rx_peer_stats);
+		resp->peer_info[i].gi_ltf_type =
+			WMI_GET_RX_PEER_STATS_GI_LTF_TYPE(buf->rx_peer_stats);
+		qdf_mem_copy(&resp->peer_info[i].per_chain_rssi,
+			     &buf->peer_per_chain_rssi,
+			     sizeof(resp->peer_info[i].per_chain_rssi));
+		resp->comm_info.num_peers++;
+		buf++;
+	}
+
+	return QDF_STATUS_SUCCESS;
+}
+#endif /* QCA_MANUAL_TRIGGERED_ULOFDMA */
+
 /**
  * extract_chan_info_event_tlv() - extract chan information from event
  * @wmi_handle: wmi handle
@@ -2709,6 +2986,37 @@ static QDF_STATUS extract_chan_info_event_tlv(wmi_unified_t wmi_handle,
 	qdf_mem_copy(chan_info->per_chain_noise_floor,
 		     ev->per_chain_noise_floor,
 		     sizeof(chan_info->per_chain_noise_floor));
+
+	return QDF_STATUS_SUCCESS;
+}
+
+/**
+ * extract_scan_blanking_params_tlv() - extract scan blanking params from event
+ * @wmi_handle: wmi handle
+ * @param evt_buf: pointer to event buffer
+ * @param chan_info: Pointer to hold scan blanking parameters
+ *
+ * Return: QDF_STATUS_SUCCESS for success or error code
+ */
+static QDF_STATUS extract_scan_blanking_params_tlv(wmi_unified_t wmi_handle,
+	void *evt_buf, wmi_host_scan_blanking_params *blanking_params)
+{
+	WMI_CHAN_INFO_EVENTID_param_tlvs *param_buf;
+	wmi_scan_blanking_params_info *ev;
+
+	param_buf = (WMI_CHAN_INFO_EVENTID_param_tlvs *) evt_buf;
+
+	blanking_params->valid = false;
+
+	ev = (wmi_scan_blanking_params_info *) param_buf->scan_blanking_params;
+	if (!ev) {
+		wmi_debug("Scan blanking parameters is null");
+		return QDF_STATUS_SUCCESS;
+	}
+
+	blanking_params->blanking_duration = ev->scan_radio_blanking_duration;
+	blanking_params->blanking_count = ev->scan_radio_blanking_count;
+	blanking_params->valid = true;
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -3069,7 +3377,7 @@ static QDF_STATUS send_lcr_cmd_tlv(wmi_unified_t wmi_handle,
 	civic_info = (uint8_t *)lcr_config->civic_info;
 	civic_info[0] = lcr_info->country_code[0];
 	civic_info[1] = lcr_info->country_code[1];
-	qdf_mem_copy(&civic_info[2], lcr_info->civic_info, lcr_info->civic_len);
+	qdf_mem_copy(&civic_info[2], lcr_info->civic_info, lcr_info_len);
 
 	if (wmi_handle->ops->send_start_oem_data_cmd)
 		ret = wmi_handle->ops->send_start_oem_data_cmd(wmi_handle,
@@ -3483,6 +3791,10 @@ config_peer_latency_info_cmd_tlv(wmi_unified_t wmi_handle,
 			param->latency_info[i].service_interval;
 		tid_latency_info->burst_size_diff =
 			param->latency_info[i].burst_size;
+		tid_latency_info->max_latency =
+			param->latency_info[i].max_latency;
+		tid_latency_info->min_tput =
+			param->latency_info[i].min_throughput;
 		WMI_CHAR_ARRAY_TO_MAC_ADDR(param->latency_info[i].peer_mac,
 				&tid_latency_info->dest_macaddr);
 		WMI_TID_LATENCY_SET_TIDNUM(tid_latency_info->latency_tid_info,
@@ -3495,6 +3807,8 @@ config_peer_latency_info_cmd_tlv(wmi_unified_t wmi_handle,
 				param->latency_info[i].ul_enable);
 		WMI_LATENCY_SET_BURST_SIZE_SUM(tid_latency_info->latency_tid_info,
 				param->latency_info[i].add_or_sub);
+		WMI_LATENCY_SET_SAWF_UL_PARAMS_BIT(tid_latency_info->latency_tid_info,
+				param->latency_info[i].sawf_ul_param);
 		tid_latency_info++;
 	}
 
@@ -3503,6 +3817,207 @@ config_peer_latency_info_cmd_tlv(wmi_unified_t wmi_handle,
 			WMI_PEER_TID_LATENCY_CONFIG_CMDID);
 	if (QDF_IS_STATUS_ERROR(retval)) {
 		wmi_err("WMI Failed");
+		wmi_buf_free(buf);
+	}
+
+	return retval;
+}
+#endif
+
+#ifdef QCA_STANDALONE_SOUNDING_TRIGGER
+/**
+ * config_txbf_sounding_trig_info_cmd_tlv() - This API to send the
+ * WMI_VDEV_STANDALONE_SOUND_CMDID to FW
+ * @wmi: wmi handle
+ * @sounding_params: txbf sounding config param
+ *
+ * Return: QDF_STATUS_SUCCESS for success or error code
+ */
+static QDF_STATUS
+config_txbf_sounding_trig_info_cmd_tlv(wmi_unified_t wmi,
+				       struct wmi_txbf_sounding_trig_param *sounding_params)
+{
+	wmi_standalone_sounding_cmd_fixed_param *param_cmd;
+	wmi_buf_t buf;
+	wmi_mac_addr *peer_mac_address;
+	QDF_STATUS retval;
+	u_int8_t *buf_ptr = 0, i = 0, num_sounding_peers = 0;
+	u_int32_t len = 0;
+
+	num_sounding_peers = sounding_params->num_sounding_peers;
+	len = sizeof(*param_cmd) + WMI_TLV_HDR_SIZE;
+
+	if (num_sounding_peers)
+	    len += num_sounding_peers * sizeof(wmi_mac_addr);
+
+	buf = wmi_buf_alloc(wmi, len);
+	if (!buf) {
+		wmi_err("wmi_buf_alloc failed");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	buf_ptr = (uint8_t *)wmi_buf_data(buf);
+	param_cmd = (wmi_standalone_sounding_cmd_fixed_param *)buf_ptr;
+
+	WMITLV_SET_HDR(&param_cmd->tlv_header,
+		       WMITLV_TAG_STRUC_wmi_standalone_sounding_cmd_fixed_param,
+		       WMITLV_GET_STRUCT_TLVLEN(wmi_standalone_sounding_cmd_fixed_param));
+
+	param_cmd->vdev_id = sounding_params->vdev_id;
+	WMI_SET_STANDALONE_SOUND_PARAMS_FB_TYPE(param_cmd->sounding_params, sounding_params->feedback_type);
+	WMI_SET_STANDALONE_SOUND_PARAMS_NG(param_cmd->sounding_params, sounding_params->ng);
+	WMI_SET_STANDALONE_SOUND_PARAMS_CB(param_cmd->sounding_params, sounding_params->codebook);
+	WMI_SET_STANDALONE_SOUND_PARAMS_BW(param_cmd->sounding_params, sounding_params->bw);
+	param_cmd->num_sounding_repeats = sounding_params->sounding_repeats;
+
+	buf_ptr += sizeof(*param_cmd);
+
+	WMITLV_SET_HDR(buf_ptr, WMITLV_TAG_ARRAY_FIXED_STRUC,
+		       (num_sounding_peers * sizeof(wmi_mac_addr)));
+
+	peer_mac_address = (wmi_mac_addr *)(buf_ptr + WMI_TLV_HDR_SIZE);
+
+	for (i = 0; i < num_sounding_peers; ++i) {
+	     WMI_CHAR_ARRAY_TO_MAC_ADDR(&sounding_params->macaddr[i][0],
+					peer_mac_address);
+	     peer_mac_address++;
+	}
+
+	buf_ptr += WMI_TLV_HDR_SIZE + (num_sounding_peers * sizeof(wmi_mac_addr));
+
+	wmi_mtrace(WMI_VDEV_STANDALONE_SOUND_CMDID, param_cmd->vdev_id, 0);
+
+	retval = wmi_unified_cmd_send(wmi, buf, len,
+				      WMI_VDEV_STANDALONE_SOUND_CMDID);
+
+	if (QDF_IS_STATUS_ERROR(retval)) {
+	    wmi_err("Failed to send WMI_VDEV_STANDALONE_SOUND_CMDID");
+	    wmi_buf_free(buf);
+	    return retval;
+	}
+
+	return retval;
+}
+#endif
+
+#ifdef QCA_MANUAL_TRIGGERED_ULOFDMA
+/**
+ * trigger_ulofdma_su_cmd_tlv() - trigger SU ulofdma config command
+ * @wmi_handle: wmi handle
+ * @param: trigger SU ulofdma config
+ *
+ * Return: QDF_STATUS_SUCCESS for success or error code
+ */
+static QDF_STATUS
+trigger_ulofdma_su_cmd_tlv(wmi_unified_t wmi_handle,
+			   struct wmi_trigger_ul_ofdma_su_params *param)
+{
+	wmi_vdev_set_manual_su_trig_cmd_fixed_param *cmd;
+	wmi_buf_t buf;
+	QDF_STATUS retval;
+	uint32_t len = 0;
+	uint8_t *buf_ptr = 0;
+
+	len = sizeof(*cmd);
+	buf = wmi_buf_alloc(wmi_handle, len);
+	if (!buf) {
+		wmi_err("wmi_buf_alloc failed");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	buf_ptr = (uint8_t *)wmi_buf_data(buf);
+	cmd = (wmi_vdev_set_manual_su_trig_cmd_fixed_param *)buf_ptr;
+	WMITLV_SET_HDR(
+		&cmd->tlv_header,
+		WMITLV_TAG_STRUC_wmi_vdev_set_manual_su_trig_cmd_fixed_param,
+		WMITLV_GET_STRUCT_TLVLEN(
+		wmi_vdev_set_manual_su_trig_cmd_fixed_param));
+
+	cmd->vdev_id = param->vdev_id;
+	WMI_CHAR_ARRAY_TO_MAC_ADDR(param->macaddr, &cmd->peer_macaddr);
+
+	cmd->manual_trig_preferred_ac = param->preferred_ac;
+	cmd->num_su_manual_trig = param->num_trigger;
+	cmd->manual_trig_length = param->length;
+	cmd->manual_trig_mcs = param->mcs;
+	cmd->manual_trig_nss = param->nss;
+	cmd->manual_trig_target_rssi = param->rssi;
+
+	buf_ptr += sizeof(*cmd);
+
+	wmi_mtrace(WMI_VDEV_SET_ULOFDMA_MANUAL_SU_TRIG_CMDID, cmd->vdev_id, 0);
+	retval = wmi_unified_cmd_send(
+				wmi_handle, buf, len,
+				WMI_VDEV_SET_ULOFDMA_MANUAL_SU_TRIG_CMDID);
+
+	if (QDF_IS_STATUS_ERROR(retval)) {
+		wmi_err("WMI WMI_VDEV_SET_ULOFDMA_MANUAL_SU_TRIG_CMDID Failed");
+		wmi_buf_free(buf);
+	}
+
+	return retval;
+}
+
+/**
+ * trigger_ulofdma_mu_cmd_tlv() - trigger MU ulofdma config command
+ * @wmi_handle: wmi handle
+ * @param: trigger MU ulofdma config
+ *
+ * Return: QDF_STATUS_SUCCESS for success or error code
+ */
+static QDF_STATUS
+trigger_ulofdma_mu_cmd_tlv(wmi_unified_t wmi_handle,
+			   struct wmi_trigger_ul_ofdma_mu_params *param)
+{
+	wmi_vdev_set_manual_mu_trig_cmd_fixed_param *cmd;
+	wmi_mac_addr *peer_mac;
+	wmi_buf_t buf;
+	QDF_STATUS retval;
+	uint32_t len = 0;
+	uint8_t *buf_ptr = 0;
+	uint8_t i = 0;
+
+	len = sizeof(*cmd) + WMI_TLV_HDR_SIZE;
+	if (param->num_peer)
+		len += param->num_peer * sizeof(wmi_mac_addr);
+
+	buf = wmi_buf_alloc(wmi_handle, len);
+	if (!buf) {
+		wmi_err("wmi_buf_alloc failed");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	buf_ptr = (uint8_t *)wmi_buf_data(buf);
+	cmd = (wmi_vdev_set_manual_mu_trig_cmd_fixed_param *)buf_ptr;
+	WMITLV_SET_HDR(
+		&cmd->tlv_header,
+		WMITLV_TAG_STRUC_wmi_vdev_set_manual_mu_trig_cmd_fixed_param,
+		WMITLV_GET_STRUCT_TLVLEN(
+		wmi_vdev_set_manual_mu_trig_cmd_fixed_param));
+
+	cmd->vdev_id = param->vdev_id;
+	cmd->manual_trig_preferred_ac = param->preferred_ac;
+
+	buf_ptr += sizeof(*cmd);
+
+	WMITLV_SET_HDR(buf_ptr, WMITLV_TAG_ARRAY_FIXED_STRUC,
+		       (param->num_peer * sizeof(wmi_mac_addr)));
+	peer_mac = (wmi_mac_addr *)(buf_ptr + WMI_TLV_HDR_SIZE);
+
+	if (param->num_peer) {
+		for (i = 0; i < param->num_peer; ++i) {
+			WMI_CHAR_ARRAY_TO_MAC_ADDR(param->macaddr[i], peer_mac);
+			peer_mac++;
+		}
+	}
+
+	wmi_mtrace(WMI_VDEV_SET_ULOFDMA_MANUAL_MU_TRIG_CMDID, cmd->vdev_id, 0);
+	retval = wmi_unified_cmd_send(
+				wmi_handle, buf, len,
+				WMI_VDEV_SET_ULOFDMA_MANUAL_MU_TRIG_CMDID);
+
+	if (QDF_IS_STATUS_ERROR(retval)) {
+		wmi_err("WMI WMI_VDEV_SET_ULOFDMA_MANUAL_MU_TRIG_CMDID Failed");
 		wmi_buf_free(buf);
 	}
 
@@ -3846,6 +4361,51 @@ QDF_STATUS send_sawf_disable_cmd_tlv(wmi_unified_t wmi_handle,
 }
 #endif
 
+#ifdef QCA_STANDALONE_SOUNDING_TRIGGER
+/**
+ * extract_standalone_sounding_evt_params_tlv() - extract standalone
+ * sounding trigger status
+ * @wmi_handle: wmi handle
+ * @param evt_buf: pointer to event buffer
+ * @param chan_info: Pointer to standalone sounding event params
+ *
+ * Return: QDF_STATUS_SUCCESS for success or error code
+ */
+static QDF_STATUS
+extract_standalone_sounding_evt_params_tlv(wmi_unified_t wmi_handle,
+					   void *evt_buf,
+	struct wmi_host_standalone_sounding_evt_params *ss_params)
+{
+	WMI_VDEV_STANDALONE_SOUND_COMPLETE_EVENTID_param_tlvs *param_buf;
+	wmi_standalone_sounding_evt_fixed_param *ev;
+
+	param_buf = (WMI_VDEV_STANDALONE_SOUND_COMPLETE_EVENTID_param_tlvs *)
+		evt_buf;
+
+	ev = (wmi_standalone_sounding_evt_fixed_param *)
+		param_buf->fixed_param;
+	if (!ev) {
+		wmi_err("WMI sounding TLV is NULL ");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	ss_params->vdev_id = ev->vdev_id;
+	ss_params->status = ev->status;
+	ss_params->buffer_uploaded = ev->buffer_uploaded;
+	ss_params->num_sounding_repeats = param_buf->num_snd_failed;
+
+	if (param_buf->num_snd_failed > sizeof(ss_params->snd_failed)) {
+		wmi_err("Invalid num_num_snd_failed:%u",
+			param_buf->num_snd_failed);
+		return QDF_STATUS_E_INVAL;
+	}
+	qdf_mem_copy(ss_params->snd_failed, param_buf->snd_failed,
+		     (param_buf->num_snd_failed * sizeof(uint32_t)));
+
+	return QDF_STATUS_SUCCESS;
+}
+#endif /* QCA_STANDALONE_SOUNDING_TRIGGER */
+
 void wmi_ap_attach_tlv(wmi_unified_t wmi_handle)
 {
 	struct wmi_ops *ops = wmi_handle->ops;
@@ -3859,6 +4419,9 @@ void wmi_ap_attach_tlv(wmi_unified_t wmi_handle)
 					send_peer_update_wds_entry_cmd_tlv;
 	ops->send_pdev_get_tpc_config_cmd = send_pdev_get_tpc_config_cmd_tlv;
 	ops->send_set_ctl_table_cmd = send_set_ctl_table_cmd_tlv;
+	ops->send_set_sta_max_pwr_table_cmd =
+					send_set_sta_max_pwr_table_cmd_tlv;
+	ops->send_set_power_table_cmd = send_set_power_table_cmd_tlv;
 	ops->send_set_mimogain_table_cmd = send_set_mimogain_table_cmd_tlv;
 	ops->send_packet_power_info_get_cmd =
 					send_packet_power_info_get_cmd_tlv;
@@ -3910,6 +4473,13 @@ void wmi_ap_attach_tlv(wmi_unified_t wmi_handle)
 	ops->send_wmm_update_cmd = send_wmm_update_cmd_tlv;
 	ops->extract_mgmt_tx_compl_param = extract_mgmt_tx_compl_param_tlv;
 	ops->extract_chan_info_event = extract_chan_info_event_tlv;
+	ops->extract_scan_blanking_params = extract_scan_blanking_params_tlv;
+#ifdef QCA_MANUAL_TRIGGERED_ULOFDMA
+	ops->extract_ulofdma_trigger_feedback_event =
+			extract_ulofdma_trigger_feedback_event_tlv;
+	ops->extract_ul_ofdma_trig_rx_peer_userinfo =
+			extract_ul_ofdma_trig_rx_peer_userinfo_tlv;
+#endif
 	ops->extract_channel_hopping_event = extract_channel_hopping_event_tlv;
 	ops->send_peer_chan_width_switch_cmd =
 					send_peer_chan_width_switch_cmd_tlv;
@@ -3931,6 +4501,13 @@ void wmi_ap_attach_tlv(wmi_unified_t wmi_handle)
 	ops->config_vdev_tid_latency_info_cmd = config_vdev_tid_latency_info_cmd_tlv;
 	ops->config_peer_latency_info_cmd = config_peer_latency_info_cmd_tlv;
 #endif
+#ifdef QCA_STANDALONE_SOUNDING_TRIGGER
+	ops->config_txbf_sounding_trig_info_cmd = config_txbf_sounding_trig_info_cmd_tlv;
+#endif
+#ifdef QCA_MANUAL_TRIGGERED_ULOFDMA
+	ops->trigger_ulofdma_su_cmd = trigger_ulofdma_su_cmd_tlv;
+	ops->trigger_ulofdma_mu_cmd = trigger_ulofdma_mu_cmd_tlv;
+#endif
 	ops->send_get_halphy_cal_status_cmd = send_get_halphy_cal_status_cmd_tlv;
 	ops->send_peer_set_intra_bss_cmd = send_peer_set_intra_bss_cmd_tlv;
 	ops->send_vdev_set_intra_bss_cmd = send_vdev_set_intra_bss_cmd_tlv;
@@ -3947,6 +4524,10 @@ void wmi_ap_attach_tlv(wmi_unified_t wmi_handle)
 #endif
 #ifdef QCA_RSSI_DB2DBM
 	ops->extract_pdev_rssi_dbm_conv_ev_param = extract_pdev_rssi_dbm_conv_ev_param_tlv;
+#endif
+#ifdef QCA_STANDALONE_SOUNDING_TRIGGER
+	ops->extract_standalone_sounding_evt_params =
+			extract_standalone_sounding_evt_params_tlv;
 #endif
 	ops->send_wmi_tdma_schedule_request_cmd =
 		send_wmi_tdma_schedule_request_cmd_tlv;

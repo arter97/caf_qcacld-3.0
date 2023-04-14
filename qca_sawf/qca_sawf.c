@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022, Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023, Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -34,6 +34,8 @@ struct psoc_sawf_ul_itr {
 	uint8_t *mac_addr;
 	uint32_t service_interval;
 	uint32_t burst_size;
+	uint32_t min_tput;
+	uint32_t max_latency;
 	uint8_t tid;
 	uint8_t add_or_sub;
 };
@@ -48,18 +50,22 @@ static void qca_sawf_psoc_ul_cb(struct wlan_objmgr_psoc *psoc, void *cbd,
 	cdp_sawf_peer_config_ul(soc_txrx_handle,
 				param->mac_addr, param->tid,
 				param->service_interval, param->burst_size,
+				param->min_tput, param->max_latency,
 				param->add_or_sub);
 }
 
 static inline
 void qca_sawf_peer_config_ul(uint8_t *mac_addr, uint8_t tid,
 			     uint32_t service_interval, uint32_t burst_size,
+			     uint32_t min_tput, uint32_t max_latency,
 			     uint8_t add_or_sub)
 {
 	struct psoc_sawf_ul_itr param = {
 		.mac_addr = mac_addr,
 		.service_interval = service_interval,
 		.burst_size = burst_size,
+		.min_tput = min_tput,
+		.max_latency = max_latency,
 		.tid = tid,
 		.add_or_sub = add_or_sub
 	};
@@ -73,20 +79,24 @@ void qca_sawf_config_ul(uint8_t *dst_mac, uint8_t *src_mac,
 			uint8_t add_or_sub)
 {
 	uint32_t svc_interval = 0, burst_size = 0;
+	uint32_t min_tput = 0, max_latency = 0;
 	uint8_t tid = 0;
 
-	qdf_info("src " QDF_MAC_ADDR_FMT " dst " QDF_MAC_ADDR_FMT
-		 " fw_service_id %u rv_service_id %u",
-		 QDF_MAC_ADDR_REF(src_mac), QDF_MAC_ADDR_REF(dst_mac),
-		 fw_service_id, rv_service_id);
+	qdf_nofl_debug("src " QDF_MAC_ADDR_FMT " dst " QDF_MAC_ADDR_FMT
+		       " fwd_service_id %u rvrs_service_id %u",
+		       QDF_MAC_ADDR_REF(src_mac), QDF_MAC_ADDR_REF(dst_mac),
+		       fw_service_id, rv_service_id);
 
 	if (QDF_IS_STATUS_SUCCESS(wlan_sawf_get_uplink_params(fw_service_id,
 							      &tid,
 							      &svc_interval,
-							      &burst_size))) {
+							      &burst_size,
+							      &min_tput,
+							      &max_latency))) {
 		if (svc_interval && burst_size)
 			qca_sawf_peer_config_ul(src_mac, tid,
 						svc_interval, burst_size,
+						min_tput, max_latency,
 						add_or_sub);
 	}
 
@@ -96,10 +106,13 @@ void qca_sawf_config_ul(uint8_t *dst_mac, uint8_t *src_mac,
 	if (QDF_IS_STATUS_SUCCESS(wlan_sawf_get_uplink_params(rv_service_id,
 							      &tid,
 							      &svc_interval,
-							      &burst_size))) {
+							      &burst_size,
+							      &min_tput,
+							      &max_latency))) {
 		if (svc_interval && burst_size)
 			qca_sawf_peer_config_ul(dst_mac, tid,
 						svc_interval, burst_size,
+						min_tput, max_latency,
 						add_or_sub);
 	}
 }

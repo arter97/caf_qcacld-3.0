@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2016-2018 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -73,12 +74,16 @@ struct smart_ant_tx_ant_params {
  * @rate_array: Rates array
  * @antenna_array: Antenna array
  * @numpkts: num packets for training
+ * @minpkts: minimum packets to train
+ * @per_threshold: PER threshold to stop training after minpkts is trained
  */
 struct smart_ant_training_info_params {
 	uint8_t vdev_id;
 	uint32_t *rate_array;
 	uint32_t *antenna_array;
 	uint32_t numpkts;
+	uint16_t minpkts;
+	uint16_t per_threshold;
 };
 
 /**

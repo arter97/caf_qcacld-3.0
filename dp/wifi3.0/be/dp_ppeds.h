@@ -96,12 +96,27 @@ void dp_ppeds_stop_soc_be(struct dp_soc *soc);
  * dp_ppeds_detach_vdev_be() - Deattach the VP port from vdev
  * @soc_hdl: CDP SoC Tx/Rx handle
  * @vdev_id: vdev id
+ * @vp_params: vp params
  *
  * Detach the VP port from BE VAP
  *
  * Return: void
  */
-void dp_ppeds_detach_vdev_be(struct cdp_soc_t *soc, uint8_t vdev_id);
+void dp_ppeds_detach_vdev_be(struct cdp_soc_t *soc, uint8_t vdev_id,
+			     struct cdp_ds_vp_params *vp_params);
+
+/**
+ * dp_ppeds_vp_setup_on_fw_recovery - Setup DS VP on FW recovery
+ * @soc: CDP SoC Tx/Rx handle
+ * @vdev_id: vdev_id
+ * @profile_idx: DS profile index
+ * Setup DS VP on FW recovery
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS dp_ppeds_vp_setup_on_fw_recovery(struct cdp_soc_t *soc,
+					    uint8_t vdev_id,
+					    uint16_t profile_idx);
 
 /**
  * dp_ppeds_attach_vdev_be - PPE DS table entry alloc
@@ -109,13 +124,15 @@ void dp_ppeds_detach_vdev_be(struct cdp_soc_t *soc, uint8_t vdev_id);
  * @vdev_id: vdev_id
  * @vp_arg: PPE VP opaque
  * @ppe_vp_num: PPE VP number
+ * @vp_params: vp params
  *
  * Allocate a DS VP port and attach to BE VAP
  *
  * Return: QDF_STATUS
  */
 QDF_STATUS dp_ppeds_attach_vdev_be(struct cdp_soc_t *soc, uint8_t vdev_id,
-				   void *vp_arg, int32_t *ppe_vp_num);
+				   void *vp_arg, int32_t *ppe_vp_num,
+				   struct cdp_ds_vp_params *vp_params);
 
 /*
  * dp_ppeds_set_int_pri2tid_be() - Set up INT_PRI to TID

@@ -842,6 +842,12 @@ enum {
 	IEEE80211_PARAM_GDSCP_TID_MAP = 792, /* Get dscp-tid map */
 #endif
 	IEEE80211_PARAM_PPEVP_TYPE = 793,
+#ifdef QCA_SUPPORT_WDS_EXTENDED
+	IEEE80211_PARAM_WDS_EXT_EN = 794,
+#endif
+#if QCA_AIRTIME_FAIRNESS
+	IEEE80211_PARAM_ATF_VIP_INFRA = 795,
+#endif
 };
 
 enum {
@@ -1431,6 +1437,7 @@ enum _ol_ath_param_t {
 	OL_ATH_PARAM_EXCLUDE_EML_IN_SLO = 523,
 	OL_ATH_PARAM_MBSS_GET_GROUP_SIZE = 524,
 	OL_ATH_PARAM_SCAN_BLANKING_MODE = 525,
+	OL_ATH_PARAM_I2R_LMR_FEEDBACK_POLICY = 526,
 };
 
 #ifdef CONFIG_SUPPORT_VENCMDTABLE
@@ -1976,6 +1983,8 @@ struct vendor_commands vap_vendor_cmds[] = {
 	{"g_atfmaxclient",      IEEE80211_PARAM_ATF_MAX_CLIENT, GET_PARAM, 0},
 	{"atfssidgroup",        IEEE80211_PARAM_ATF_SSID_GROUP, SET_PARAM, 1},
 	{"g_atfssidgroup",      IEEE80211_PARAM_ATF_SSID_GROUP, GET_PARAM, 0},
+	{"atf_vip_infra",       IEEE80211_PARAM_ATF_VIP_INFRA, SET_PARAM, 1},
+	{"g_atf_vip_infra",     IEEE80211_PARAM_ATF_VIP_INFRA, GET_PARAM, 0},
 #endif
 	{"bss_chan_info",       IEEE80211_PARAM_BSS_CHAN_INFO, SET_PARAM, 1},
 	{"enable_lcr",          IEEE80211_PARAM_LCR_ENABLE, SET_PARAM, 1},
@@ -2524,6 +2533,7 @@ struct vendor_commands vap_vendor_cmds[] = {
 #ifdef QCA_SUPPORT_WDS_EXTENDED
 	{"drop_tx_mcast",      IEEE80211_PARAM_DROP_TX_MCAST, SET_PARAM, 1},
 	{"get_drop_tx_mcast",  IEEE80211_PARAM_DROP_TX_MCAST, GET_PARAM, 0},
+	{"get_wds_ext",        IEEE80211_PARAM_WDS_EXT_EN, GET_PARAM, 0},
 #endif
 	{"get_ppevp_type",     IEEE80211_PARAM_PPEVP_TYPE, GET_PARAM, 0},
 };
@@ -3776,6 +3786,8 @@ struct vendor_commands radio_vendor_cmds[] = {
 		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_SCAN_BLANKING_MODE, SET_PARAM, 1},
 	{"get_scan_blanking_mode",
 		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_SCAN_BLANKING_MODE, GET_PARAM, 0},
+	{"set_i2r_lmr_feedback_policy",
+		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_I2R_LMR_FEEDBACK_POLICY, SET_PARAM, 1},
 };
 #endif
 

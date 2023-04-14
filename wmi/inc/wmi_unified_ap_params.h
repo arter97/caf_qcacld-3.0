@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2020-2021, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -252,6 +253,49 @@ struct wlan_tdma_sched_cmd_param {
 	uint16_t cwmin[WMI_MAX_NUM_AC];
 	uint16_t cwmax[WMI_MAX_NUM_AC];
 };
+
+/**
+ * struct rate2power_table_params - Rate2Power table params
+ * @pwr_array: pointer to pwr array
+ * @pwr_cmd_len: rate2power command length
+ * @freq_band: Frequency band
+ * @sub_band: Sub band for the frequency band
+ * @end_of_update: Flag to denote the end of update
+ * @is_ext: is extension flag
+ * @target_type: target type
+ * @pdev_id: pdev id
+ */
+struct rate2power_table_params {
+	int8_t   *pwr_array;
+	uint16_t pwr_cmd_len;
+	uint32_t freq_band;
+	uint32_t sub_band;
+	uint32_t end_of_update;
+	uint32_t is_ext;
+	uint32_t target_type;
+	uint32_t pdev_id;
+};
+
+/**
+ * struct sta_peer_table_list - peer list params
+ * @peer_macaddr: array of STA MAC addresses
+ * @peer_pwr_limit: Peer power limit
+ */
+struct sta_peer_table_list {
+	uint8_t peer_macaddr[QDF_MAC_ADDR_SIZE];
+	int32_t peer_pwr_limit;
+};
+
+/**
+ * struct sta_pwr_table_params - sta pwr table params
+ * @num_peers: No.of stations
+ * @peer_list: pointer to struct sta_peer_table_list
+ */
+struct sta_max_pwr_table_params {
+	uint32_t num_peers;
+	struct sta_peer_table_list *peer_list;
+};
+
 /**
  * struct mimogain_table_params - MIMO gain table params
  * @array_gain: pointer to array gain table
@@ -885,6 +929,110 @@ typedef struct {
 	uint64_t	tx_tsf;
 } wmi_host_mgmt_tx_compl_event;
 
+#ifdef QCA_MANUAL_TRIGGERED_ULOFDMA
+#define MAX_ULOFDMA_SU_TRIGGER 8
+#define MAX_ULOFDMA_MU_PEER 8
+#define WMI_HOST_ULOFDMA_SU_TRIGGER 0
+#define WMI_HOST_ULOFDMA_MU_TRIGGER 1
+#define MAX_ULOFDMA_CHAINS 8
+
+/**
+ * enum wmi_host_ulofdma_trig_status - manual ulofdma trig response status
+ * @wmi_host_ul_ofdma_manual_trig_txerr_none - none
+ * @wmi_host_ul_ofdma_manual_trig_txerr_resp - response timeout, mismatch
+ *                                             BW mismatch, mimo ctrl mismatch
+ *                                             CRC error..
+ * @wmi_host_ul_ofdma_manual_trig_txerr_filt - blocked by tx filtering
+ * @wmi_host_ul_ofdma_manual_trig_txerr_fifo - fifo, misc errors in HW
+ * @wmi_host_ul_ofdma_manual_trig_txerr_swabort - software initialted abort
+ *                                                (TX_ABORT)
+ * @wmi_host_ul_ofdma_manual_trig_txerr_max - max status
+ * @wmi_host_ul_ofdma_manual_trig_txerr_invalid - invalid status
+ */
+typedef enum {
+	wmi_host_ul_ofdma_manual_trig_txerr_none,
+	wmi_host_ul_ofdma_manual_trig_txerr_resp,
+	wmi_host_ul_ofdma_manual_trig_txerr_filt,
+	wmi_host_ul_ofdma_manual_trig_txerr_fifo,
+	wmi_host_ul_ofdma_manual_trig_txerr_swabort,
+	wmi_host_ul_ofdma_manual_trig_txerr_max     = 0xff,
+	wmi_host_ul_ofdma_manual_trig_txerr_invalid =
+					wmi_host_ul_ofdma_manual_trig_txerr_max,
+} wmi_host_ulofdma_trig_status;
+
+/**
+ * struct wmi_host_manual_ul_ofdma_trig_feedback_evt - Trigger feedback event
+ * @vdev_id: Associated vdev_id
+ * @trigger_type: SU-0, MU-1
+ * @curr_su_manual_trig: current_su_manual_trig
+ * @remaining_su_manual_trig: remaining_su_manual_trig
+ * @remaining_mu_trig_peers: remaining_mu_trig_peers
+ * @manual_trig_status: manual trigger status
+ * @macaddr: peer macaddr
+ * @num_peer: number of peers
+ */
+typedef struct {
+	uint32_t vdev_id;
+	uint32_t trigger_type;
+	wmi_host_ulofdma_trig_status manual_trig_status;
+	uint8_t  macaddr[MAX_ULOFDMA_MU_PEER][QDF_MAC_ADDR_SIZE];
+	uint8_t  num_peer;
+	union {
+		struct {
+			uint32_t curr_su_manual_trig;
+			uint32_t remaining_su_manual_trig;
+		} su;
+		struct {
+			uint32_t remaining_mu_trig_peers;
+		} mu;
+	} u;
+} wmi_host_manual_ul_ofdma_trig_feedback_evt;
+
+/**
+ * struct wmi_host_rx_peer_userinfo - Trigger response peer info
+ * @peer_mac: peer macaddr
+ * @resp_type: QOS DATA  or QOS NULL
+ * @mcs: Rx peer trig resp mcs
+ * @nss: Rx peer trig resp nss
+ * @gi_ltf_type: Rx peer trig resp gi ltf type
+ * @per_chain_rssi: Per chain rssi
+ */
+struct wmi_host_rx_peer_userinfo {
+	struct qdf_mac_addr peer_mac;
+	uint8_t resp_type;
+	uint8_t mcs;
+	uint8_t nss;
+	uint8_t gi_ltf_type;
+	uint32_t per_chain_rssi[MAX_ULOFDMA_CHAINS];
+};
+
+/**
+ * struct wmi_host_rx_peer_common_info - Trigger response common info
+ * @vdev_id: Associated vdev_id
+ * @rx_ppdu_resp_type: SU-0, MU-1
+ * @num_peer: Number of peers
+ * @rx_resp_bw: Rx trig response bandwidth
+ * @combined_rssi: Rx trig response combined rssi
+ */
+struct wmi_host_rx_peer_common_info {
+	uint8_t vdev_id;
+	uint8_t rx_ppdu_resp_type;
+	uint8_t num_peers;
+	uint8_t rx_resp_bw;
+	uint32_t combined_rssi;
+};
+
+/**
+ * struct wmi_host_rx_peer_userinfo_evt_data - Trigger response event
+ * @comm_info: Trigger response common info
+ * @peer_info: Trigger response peer info
+ */
+struct wmi_host_rx_peer_userinfo_evt_data {
+	struct wmi_host_rx_peer_common_info comm_info;
+	struct wmi_host_rx_peer_userinfo peer_info[MAX_ULOFDMA_MU_PEER];
+};
+#endif /* QCA_MANUAL_TRIGGERED_ULOFDMA */
+
 /**
  * struct wmi_host_chan_info_event - Channel info WMI event
  * @pdev_id: pdev_id
@@ -930,6 +1078,18 @@ typedef struct {
 	uint32_t rx_clear_ext80_count;
 	uint32_t per_chain_noise_floor[WMI_HOST_MAX_CHAINS];
 } wmi_host_chan_info_event;
+
+/**
+ * struct wmi_host_scan_blanking_params - Scan blanking parameters
+ * @valid: Indicates whether the structure is valid
+ * @blanking_count: blanking count
+ * @blanking_duration: blanking duration
+ */
+typedef struct {
+	bool valid;
+	uint32_t blanking_count;
+	uint32_t blanking_duration;
+} wmi_host_scan_blanking_params;
 
 /**
  * struct wmi_host_pdev_channel_hopping_event
@@ -1025,6 +1185,9 @@ struct wmi_vdev_tid_latency_config_params {
  * @dl_enable: Bit to indicate dl latency enable
  * @flow_id: Flow id associated with tid
  * @add_or_sub: Bit to indicate add/delete of latency params
+ * @sawf_ul_param: Bit to indicate if UL params are for SAWF/SCS
+ * @max_latency: Maximum latency in milliseconds
+ * @min_throughput: Minimum throughput in Kbps
  */
 struct wmi_peer_latency_info_params {
 	uint8_t peer_mac[QDF_MAC_ADDR_SIZE];
@@ -1036,7 +1199,10 @@ struct wmi_peer_latency_info_params {
 			dl_enable   :1,
 			flow_id     :4,
 			add_or_sub  :2,
-			reserved    :14;
+			sawf_ul_param :1,
+			reserved    :13;
+	uint32_t max_latency;
+	uint32_t min_throughput;
 };
 
 /**
@@ -1050,6 +1216,48 @@ struct wmi_peer_latency_config_params {
 	uint32_t num_peer;
 	uint32_t pdev_id;
 	struct wmi_peer_latency_info_params latency_info[2];
+};
+#endif
+
+#ifdef QCA_MANUAL_TRIGGERED_ULOFDMA
+/**
+ * struct wmi_trigger_ul_ofdma_su_params - SU manual trigger ul_ofdma info
+ * @vdev_id: Associated vdev id
+ * @length: trigger length
+ * @nss : trigger nss value
+ * @mcs : trigger mcs value
+ * @gi_ltf: trigger gi_ltf value
+ * @reserved: reserved bits
+ * @rssi : trigger rssi value
+ * @macaddr : Peer macaddr
+ * @preferred_ac: Preferred AC
+ * @num_trigger: Number of SU ULOFDMA triggers
+ */
+struct wmi_trigger_ul_ofdma_su_params {
+	uint32_t vdev_id;
+	uint32_t length:12,
+		 nss:4,
+		 mcs:4,
+		 gi_ltf:2,
+		 reserved:10;
+	int8_t rssi;
+	uint8_t macaddr[QDF_MAC_ADDR_SIZE];
+	uint8_t preferred_ac;
+	uint8_t num_trigger;
+};
+
+/**
+ * struct wmi_trigger_ul_ofdma_mu_params - MU manual trigger ul_ofdma info
+ * @vdev_id: Associated vdev id
+ * @num_peer: Number of MU ULOFDMA peers
+ * @preferred_ac: Preferred AC
+ * @macaddr : Peer macaddr
+ */
+struct wmi_trigger_ul_ofdma_mu_params {
+	uint32_t vdev_id;
+	uint8_t num_peer;
+	uint8_t preferred_ac;
+	uint8_t macaddr[MAX_ULOFDMA_MU_PEER][QDF_MAC_ADDR_SIZE];
 };
 #endif
 
@@ -1111,4 +1319,68 @@ struct wmi_sawf_params {
 	uint32_t disabled_modes;
 };
 #endif
+
+#ifdef QCA_STANDALONE_SOUNDING_TRIGGER
+
+/* TXBF souding max peer macro */
+#define MAX_MU_TXBF_SOUNDING_USER 3
+
+/**
+ * struct wmi_txbf_sounding_trig_param - TXBF souding parameters
+ * @pdev_id: pdev id
+ * @vde_id: vdev id
+ * @feedback_type: single user/multi user feedback type,[0]Range[0-SU, 1-MU]
+ * @ng: [2:1] Ng -Range[0-1]
+ * @codebook: [3] Codebook -Range[0-1]
+ * @bw: [6:4] Bandwidth -Range[0-4]
+ * @reserved: [31:7] reserved
+ * @sounding_repeats: sounding repetations,Range[[0-3]-MU, [0-5]-SU]
+ * @num_sounding_peers: number of peers, Range[1- SU, [1-3]-MU]
+ * @macaddr: mac address of peers
+ */
+struct wmi_txbf_sounding_trig_param {
+	u_int32_t  pdev_id;
+	u_int32_t  vdev_id;
+	u_int32_t  feedback_type :1,
+		   ng            :2,
+		   codebook      :1,
+		   bw            :3,
+		   reserved      :25;
+	u_int32_t  sounding_repeats;
+	u_int8_t   num_sounding_peers;
+	u_int8_t   macaddr[MAX_MU_TXBF_SOUNDING_USER][QDF_MAC_ADDR_SIZE];
+};
+
+enum wmi_host_standalone_sounding_status {
+	WMI_HOST_STANDALONE_SOUND_STATUS_OK,
+	WMI_HOST_STANDALONE_SOUND_STATUS_ERR_NUM_PEERS_EXCEEDED,
+	WMI_HOST_STANDALONE_SOUND_STATUS_ERR_NG_INVALID,
+	WMI_HOST_STANDALONE_SOUND_STATUS_ERR_NUM_REPEAT_EXCEEDED,
+	WMI_HOST_STANDALONE_SOUND_STATUS_ERR_PEER_DOESNOT_SUPPORT_BW,
+	WMI_HOST_STANDALONE_SOUND_STATUS_ERR_INVALID_PEER,
+	WMI_HOST_STANDALONE_SOUND_STATUS_ERR_INVALID_VDEV,
+	WMI_HOST_STANDALONE_SOUND_STATUS_ERR_PEER_DOES_NOT_SUPPORT_MU_FB,
+	WMI_HOST_STANDALONE_SOUND_STATUS_ERR_DMA_NOT_CONFIGURED,
+	WMI_HOST_STANDALONE_SOUND_STATUS_ERR_COMPLETE_FAILURE,
+};
+
+#define MAX_NUM_SOUNDING_REPEATS 5
+/**
+ * struct wmi_host_standalone_sounding_evt_params - Standalone sounding
+ * command complete event params
+ * @vdev_id: vdev id
+ * @status: Standalone sounding command status
+ * @buffer_uploaded: number of CV buffers uploaded
+ * @num_sounding_repeats: Number of sounding repeats
+ * @num_snd_failed: Number of sounding failures per repetition
+ */
+struct wmi_host_standalone_sounding_evt_params {
+	uint32_t vdev_id;
+	uint32_t status;
+	uint32_t buffer_uploaded;
+	uint32_t num_sounding_repeats;
+	uint32_t snd_failed[MAX_NUM_SOUNDING_REPEATS];
+};
+#endif /* QCA_STANDALONE_SOUNDING_TRIGGER */
+
 #endif

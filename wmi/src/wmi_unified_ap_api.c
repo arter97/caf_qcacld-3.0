@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2016-2018,2020-2021 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -83,6 +84,28 @@ QDF_STATUS wmi_unified_set_ctl_table_cmd_send(
 {
 	if (wmi_handle->ops->send_set_ctl_table_cmd)
 		return wmi_handle->ops->send_set_ctl_table_cmd(wmi_handle,
+				param);
+
+	return QDF_STATUS_E_FAILURE;
+}
+
+QDF_STATUS wmi_unified_set_sta_max_pwr_table_cmd_send(
+		wmi_unified_t wmi_handle,
+		struct sta_max_pwr_table_params *param)
+{
+	if (wmi_handle->ops->send_set_sta_max_pwr_table_cmd)
+		return wmi_handle->ops->send_set_sta_max_pwr_table_cmd(
+								wmi_handle,
+								param);
+	return QDF_STATUS_E_FAILURE;
+}
+
+QDF_STATUS wmi_unified_set_power_table_cmd_send(
+		wmi_unified_t wmi_handle,
+		struct rate2power_table_params *param)
+{
+	if (wmi_handle->ops->send_set_power_table_cmd)
+		return wmi_handle->ops->send_set_power_table_cmd(wmi_handle,
 				param);
 
 	return QDF_STATUS_E_FAILURE;
@@ -532,6 +555,47 @@ QDF_STATUS wmi_extract_mgmt_tx_compl_param(
 	return QDF_STATUS_E_FAILURE;
 }
 
+#ifdef QCA_MANUAL_TRIGGERED_ULOFDMA
+/**
+ * wmi_extract_ulofdma_trigger_feedback_event - extract ulofdma trig feedback
+ * @wmi_handle: wmi handle
+ * @evt_buf: event buffer
+ * @feedback: feedback to be extracted from event buffer
+ *
+ * Return: QDF_STATUS_SUCCESS on success and QDF_STATUS_E_FAILURE for failure
+ */
+QDF_STATUS wmi_extract_ulofdma_trigger_feedback_event(
+		wmi_unified_t wmi_handle, void *evt_buf,
+		wmi_host_manual_ul_ofdma_trig_feedback_evt *feedback)
+{
+	if (wmi_handle->ops->extract_ulofdma_trigger_feedback_event)
+		return wmi_handle->ops->extract_ulofdma_trigger_feedback_event(
+					wmi_handle, evt_buf, feedback);
+
+	return QDF_STATUS_E_FAILURE;
+}
+
+/**
+ * wmi_extract_ul_ofdma_trig_rx_peer_userinfo - extract ulofdma trig response
+ * @wmi_handle: wmi handle
+ * @evt_buf: event buffer
+ * @resp: Rx peer trigger response to be extracted from event buffer
+ *
+ * Return: QDF_STATUS_SUCCESS on success and QDF_STATUS_E_FAILURE for failure
+ */
+QDF_STATUS
+wmi_extract_ul_ofdma_trig_rx_peer_userinfo(
+		wmi_unified_t wmi_handle, void *evt_buf,
+		struct wmi_host_rx_peer_userinfo_evt_data *resp)
+{
+	if (wmi_handle->ops->extract_ul_ofdma_trig_rx_peer_userinfo)
+		return wmi_handle->ops->extract_ul_ofdma_trig_rx_peer_userinfo(
+				wmi_handle, evt_buf, resp);
+
+	return QDF_STATUS_E_FAILURE;
+}
+#endif
+
 QDF_STATUS wmi_extract_chan_info_event(
 		wmi_unified_t wmi_handle, void *evt_buf,
 		wmi_host_chan_info_event *chan_info)
@@ -539,6 +603,17 @@ QDF_STATUS wmi_extract_chan_info_event(
 	if (wmi_handle->ops->extract_chan_info_event)
 		return wmi_handle->ops->extract_chan_info_event(wmi_handle,
 			evt_buf, chan_info);
+
+	return QDF_STATUS_E_FAILURE;
+}
+
+QDF_STATUS wmi_extract_scan_blanking_params(
+		wmi_unified_t wmi_handle, void *evt_buf,
+		wmi_host_scan_blanking_params *blanking_params)
+{
+	if (wmi_handle->ops->extract_scan_blanking_params)
+		return wmi_handle->ops->extract_scan_blanking_params(wmi_handle,
+			evt_buf, blanking_params);
 
 	return QDF_STATUS_E_FAILURE;
 }
@@ -714,6 +789,46 @@ QDF_STATUS wmi_unified_config_peer_latency_info_cmd_send(
 	return QDF_STATUS_E_FAILURE;
 }
 
+#ifdef QCA_MANUAL_TRIGGERED_ULOFDMA
+/**
+ * wmi_unified_config_trigger_ulofdma_su_cmd_send() - WMI SU ULOFDMA trigger
+ * @wmi_hdl: wmi handle
+ * @param: pointer to hold peer config SU trigger info
+ *
+ * Return: QDF_STATUS_SUCCESS on success and QDF_STATUS_E_FAILURE for failure
+ */
+QDF_STATUS wmi_unified_config_trigger_ulofdma_su_cmd_send(
+		wmi_unified_t wmi_hdl,
+		struct wmi_trigger_ul_ofdma_su_params *param)
+{
+	wmi_unified_t wmi_handle = wmi_hdl;
+
+	if (wmi_handle->ops->trigger_ulofdma_su_cmd)
+		return wmi_handle->ops->trigger_ulofdma_su_cmd(
+				wmi_handle, param);
+	return QDF_STATUS_E_FAILURE;
+}
+
+/**
+ * wmi_unified_config_trigger_ulofdma_mu_cmd_send() - WMI MU ULOFDMA trigger
+ * @wmi_hdl: wmi handle
+ * @param: pointer to hold peer config MU trigger info
+ *
+ * Return: QDF_STATUS_SUCCESS on success and QDF_STATUS_E_FAILURE for failure
+ */
+QDF_STATUS wmi_unified_config_trigger_ulofdma_mu_cmd_send(
+		wmi_unified_t wmi_hdl,
+		struct wmi_trigger_ul_ofdma_mu_params *param)
+{
+	wmi_unified_t wmi_handle = wmi_hdl;
+
+	if (wmi_handle->ops->trigger_ulofdma_mu_cmd)
+		return wmi_handle->ops->trigger_ulofdma_mu_cmd(
+				wmi_handle, param);
+	return QDF_STATUS_E_FAILURE;
+}
+#endif
+
 /**
  * wmi_unified_vdev_set_intra_bss_cmd_send() - Set inta bss params
  * @wmi_handle: wmi handle
@@ -838,6 +953,20 @@ QDF_STATUS wmi_sawf_disable_send(struct wmi_unified *wmi_handle,
 }
 #endif
 
+#ifdef QCA_STANDALONE_SOUNDING_TRIGGER
+QDF_STATUS wmi_extract_standalone_sounding_evt_params(
+		wmi_unified_t wmi_handle, void *evt_buf,
+		struct wmi_host_standalone_sounding_evt_params *ss_params)
+{
+	if (wmi_handle->ops->extract_standalone_sounding_evt_params) {
+		return wmi_handle->ops->extract_standalone_sounding_evt_params(
+				wmi_handle, evt_buf, ss_params);
+	}
+
+	return QDF_STATUS_E_FAILURE;
+}
+#endif /* QCA_STANDALONE_SOUNDING_TRIGGER */
+
 QDF_STATUS wmi_unified_tdma_schedule_send(
 		struct wmi_unified *wmi_handle,
 		struct wlan_tdma_sched_cmd_param *param)
@@ -848,3 +977,15 @@ QDF_STATUS wmi_unified_tdma_schedule_send(
 	}
 	return QDF_STATUS_E_FAILURE;
 }
+
+#ifdef QCA_STANDALONE_SOUNDING_TRIGGER
+QDF_STATUS wmi_unified_txbf_sounding_trig_info_cmd_send(struct wmi_unified *wmi_handle,
+							struct wmi_txbf_sounding_trig_param *sounding_params)
+{
+	if (wmi_handle->ops->config_txbf_sounding_trig_info_cmd) {
+	    return wmi_handle->ops->config_txbf_sounding_trig_info_cmd(wmi_handle,
+								       sounding_params);
+	}
+	return QDF_STATUS_E_FAILURE;
+}
+#endif

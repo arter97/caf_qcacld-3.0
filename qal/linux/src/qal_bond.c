@@ -22,7 +22,7 @@
 #include <qdf_module.h>
 #include "qal_bond.h"
 
-#ifdef CONFIG_MLO_SINGLE_DEV
+#ifdef CONFIG_BOND_MOD_SUPPORT
 struct net_device *
 qal_bond_create(struct net *net, char *name,
 		void *mlo_info)
@@ -108,4 +108,4 @@ qal_bond_get_mlo_ctx(struct net_device *bond_dev)
 }
 
 qdf_export_symbol(qal_bond_get_mlo_ctx);
-#endif /* CONFIG_MLO_SINGLE_DEV */
+#endif /* CONFIG_BOND_MOD_SUPPORT */

@@ -126,26 +126,12 @@ static int ol_ath_set_rx_monitor_filter_mon_2_0(struct ieee80211com *ic,
 			mon_config->data.filter_config.mgmt_filter[LITE_MON_MODE_FILTER_FP] = filter_val->fp_mgmt;
 			mon_config->data.filter_config.data_filter[LITE_MON_MODE_FILTER_FP] = filter_val->fp_data;
 			mon_config->data.filter_config.ctrl_filter[LITE_MON_MODE_FILTER_FP] = filter_val->fp_ctrl;
-#ifdef FIRMWARE_SUPPORT_PENDING
-			if (ic->mon_filter_osif_mac) {
-				mon_config->data.filter_config.mgmt_filter[LITE_MON_MODE_FILTER_FPMO] = LITE_MON_FILTER_ALL;
-				mon_config->data.filter_config.data_filter[LITE_MON_MODE_FILTER_FPMO] = LITE_MON_FILTER_ALL;
-				mon_config->data.filter_config.ctrl_filter[LITE_MON_MODE_FILTER_FPMO] = LITE_MON_FILTER_ALL;
-			}
-#endif
 		}
 
 		if (filter_val->mode & RX_MON_FILTER_OTHER) {
 			mon_config->data.filter_config.mgmt_filter[LITE_MON_MODE_FILTER_MO] = filter_val->mo_mgmt;
 			mon_config->data.filter_config.data_filter[LITE_MON_MODE_FILTER_MO] = filter_val->mo_data;
 			mon_config->data.filter_config.ctrl_filter[LITE_MON_MODE_FILTER_MO] = filter_val->mo_ctrl;
-#ifdef FIRMWARE_SUPPORT_PENDING
-			if (ic->mon_filter_osif_mac) {
-				mon_config->data.filter_config.mgmt_filter[LITE_MON_MODE_FILTER_MD] = LITE_MON_FILTER_ALL;
-				mon_config->data.filter_config.data_filter[LITE_MON_MODE_FILTER_MD] = LITE_MON_FILTER_ALL;
-				mon_config->data.filter_config.ctrl_filter[LITE_MON_MODE_FILTER_MD] = LITE_MON_FILTER_ALL;
-			}
-#endif
 		}
 
 		mon_config->data.filter_config.len[LITE_MON_TYPE_DATA] = LITE_MON_LEN_ALL;
@@ -916,9 +902,6 @@ int ol_set_lite_mode_rx_2_0(struct ol_ath_softc_net80211 *scn, int val)
 		mon_config->data.filter_config.mgmt_filter[LITE_MON_MODE_FILTER_FP] = LITE_MON_FILTER_ALL;
 		mon_config->data.filter_config.data_filter[LITE_MON_MODE_FILTER_FP] = LITE_MON_FILTER_ALL;
 		mon_config->data.filter_config.ctrl_filter[LITE_MON_MODE_FILTER_FP] = LITE_MON_FILTER_ALL;
-		mon_config->data.filter_config.mgmt_filter[LITE_MON_MODE_FILTER_MO] = LITE_MON_FILTER_ALL;
-		mon_config->data.filter_config.data_filter[LITE_MON_MODE_FILTER_MO] = LITE_MON_FILTER_ALL;
-		mon_config->data.filter_config.ctrl_filter[LITE_MON_MODE_FILTER_MO] = LITE_MON_FILTER_ALL;
 		mon_config->data.filter_config.mgmt_filter[LITE_MON_MODE_FILTER_FPMO] = LITE_MON_FILTER_ALL;
 		mon_config->data.filter_config.data_filter[LITE_MON_MODE_FILTER_FPMO] = LITE_MON_FILTER_ALL;
 		mon_config->data.filter_config.ctrl_filter[LITE_MON_MODE_FILTER_FPMO] = LITE_MON_FILTER_ALL;
@@ -940,6 +923,11 @@ int ol_set_lite_mode_rx_2_0(struct ol_ath_softc_net80211 *scn, int val)
 		mon_config->cmdtype = LITE_MON_SET_FILTER;
 		mon_config->data.filter_config.disable = 1;
 		mon_config->direction = LITE_MON_DIRECTION_RX;
+	} else {
+		qdf_err("Invalid mode, please enter 1 or 2");
+		qdf_mem_free(mon_config);
+		mon_config = NULL;
+		return A_ERROR;
 	}
 
 	monitor_set_lite_monitor_config(scn, mon_config);

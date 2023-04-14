@@ -704,17 +704,23 @@ dp_dump_rx_flow_tag_stats(struct cdp_soc_t *soc, uint8_t pdev_id,
 	return status;
 }
 
-#if defined(WLAN_SUPPORT_PPEDS) || (QCA_PPE_VP)
-#ifdef CONFIG_MLO_SINGLE_DEV
+#if defined (WLAN_SUPPORT_PPEDS) || (QCA_PPE_VP)
+#if defined (CONFIG_MLO_SINGLE_DEV) || (QCA_SUPPORT_WDS_EXTENDED)
 static inline
 wlan_if_t dp_rx_get_vap_osif_dev(osif_dev *osdev)
 {
+#ifdef QCA_SUPPORT_WDS_EXTENDED
+	osif_peer_dev *osifp;
+#endif
+#ifdef CONFIG_MLO_SINGLE_DEV
 	osif_dev  *os_linkdev;
 	struct osif_mldev *mldev;
 	uint8_t primary_chip_id;
 	uint8_t primary_pdev_id;
-
-	if (osdev->dev_type == OSIF_NETDEV_TYPE_MLO) {
+#endif
+	switch (osdev->dev_type) {
+#ifdef CONFIG_MLO_SINGLE_DEV
+	case OSIF_NETDEV_TYPE_MLO:
 		mldev = (struct osif_mldev *)osdev;
 		primary_chip_id = mldev->primary_chip_id;
 		primary_pdev_id = mldev->primary_pdev_id;
@@ -722,8 +728,23 @@ wlan_if_t dp_rx_get_vap_osif_dev(osif_dev *osdev)
 		os_linkdev = mldev->link_dev[primary_chip_id][primary_pdev_id];
 		if (!os_linkdev)
 			return NULL;
+
 		return os_linkdev->os_if;
+#endif
+#ifdef QCA_SUPPORT_WDS_EXTENDED
+	case OSIF_NETDEV_TYPE_WDS_EXT:
+		osifp = (osif_peer_dev *)(osdev);
+		if (!osifp->parent_netdev)
+			return NULL;
+
+		osdev = ath_netdev_priv(osifp->parent_netdev);
+		if (!osdev)
+			return NULL;
+
+		return osdev->os_if;
+#endif
 	}
+
 	return osdev->os_if;
 }
 #else
@@ -733,11 +754,12 @@ wlan_if_t dp_rx_get_vap_osif_dev(osif_dev *osdev)
 	return osdev->os_if;
 }
 #endif
+
 bool
 dp_rx_ppe_add_flow_entry(struct ppe_drv_fse_rule_info *ppe_flow_info)
 {
 	struct cdp_rx_flow_info flow_info = { 0 };
-	osif_dev  *osdev;
+	osif_dev *osdev;
 	wlan_if_t vap;
 	struct wlan_objmgr_vdev *vdev;
 	struct wlan_cfg_dp_soc_ctxt *cfg;
@@ -776,29 +798,31 @@ dp_rx_ppe_add_flow_entry(struct ppe_drv_fse_rule_info *ppe_flow_info)
 	flow_info.flow_tuple_info.dest_port = ppe_flow_info->tuple.dest_port;
 	flow_info.flow_tuple_info.l4_protocol = ppe_flow_info->tuple.protocol;
 	flow_info.fse_metadata = ppe_flow_info->vp_num;
-	flow_info.flow_tuple_info.src_ip_31_0 =
-		ntohl(ppe_flow_info->tuple.src_ip[0]);
-	flow_info.flow_tuple_info.dest_ip_31_0 =
-		ntohl(ppe_flow_info->tuple.dest_ip[0]);
 
 	if (ppe_flow_info->flags & PPE_DRV_FSE_IPV4) {
 		flow_info.is_addr_ipv4 = 1;
-	} else if (ppe_flow_info->flags & PPE_DRV_FSE_IPV6)  {
-		flow_info.flow_tuple_info.src_ip_63_32 =
-			ntohl(ppe_flow_info->tuple.src_ip[1]);
-		flow_info.flow_tuple_info.src_ip_95_64 =
-			ntohl(ppe_flow_info->tuple.src_ip[2]);
-		flow_info.flow_tuple_info.src_ip_127_96 =
-			ntohl(ppe_flow_info->tuple.src_ip[3]);
-
+		flow_info.flow_tuple_info.src_ip_31_0 =
+			ntohl(ppe_flow_info->tuple.src_ip[0]);
 		flow_info.flow_tuple_info.dest_ip_31_0 =
 			ntohl(ppe_flow_info->tuple.dest_ip[0]);
+	} else if (ppe_flow_info->flags & PPE_DRV_FSE_IPV6) {
+		flow_info.flow_tuple_info.src_ip_31_0 =
+					ntohl(ppe_flow_info->tuple.src_ip[3]);
+		flow_info.flow_tuple_info.src_ip_63_32 =
+					ntohl(ppe_flow_info->tuple.src_ip[2]);
+		flow_info.flow_tuple_info.src_ip_95_64 =
+					ntohl(ppe_flow_info->tuple.src_ip[1]);
+		flow_info.flow_tuple_info.src_ip_127_96 =
+					ntohl(ppe_flow_info->tuple.src_ip[0]);
+
+		flow_info.flow_tuple_info.dest_ip_31_0 =
+					ntohl(ppe_flow_info->tuple.dest_ip[3]);
 		flow_info.flow_tuple_info.dest_ip_63_32 =
-			ntohl(ppe_flow_info->tuple.dest_ip[1]);
+					ntohl(ppe_flow_info->tuple.dest_ip[2]);
 		flow_info.flow_tuple_info.dest_ip_95_64 =
-			ntohl(ppe_flow_info->tuple.dest_ip[2]);
+					ntohl(ppe_flow_info->tuple.dest_ip[1]);
 		flow_info.flow_tuple_info.dest_ip_127_96 =
-			ntohl(ppe_flow_info->tuple.dest_ip[3]);
+					ntohl(ppe_flow_info->tuple.dest_ip[0]);
 	}
 
 	if (ppe_flow_info->flags & PPE_DRV_FSE_DS)
@@ -860,29 +884,31 @@ dp_rx_ppe_del_flow_entry(struct ppe_drv_fse_rule_info *ppe_flow_info)
 	flow_info.flow_tuple_info.dest_port = ppe_flow_info->tuple.dest_port;
 	flow_info.flow_tuple_info.l4_protocol = ppe_flow_info->tuple.protocol;
 	flow_info.fse_metadata = ppe_flow_info->vp_num;
-	flow_info.flow_tuple_info.src_ip_31_0 =
-		ntohl(ppe_flow_info->tuple.src_ip[0]);
-	flow_info.flow_tuple_info.dest_ip_31_0 =
-		ntohl(ppe_flow_info->tuple.dest_ip[0]);
 
 	if (ppe_flow_info->flags & PPE_DRV_FSE_IPV4) {
 		flow_info.is_addr_ipv4 = 1;
-	} else if (ppe_flow_info->flags & PPE_DRV_FSE_IPV6) {
-		flow_info.flow_tuple_info.src_ip_63_32 =
-			ntohl(ppe_flow_info->tuple.src_ip[1]);
-		flow_info.flow_tuple_info.src_ip_95_64 =
-			ntohl(ppe_flow_info->tuple.src_ip[2]);
-		flow_info.flow_tuple_info.src_ip_127_96 =
-			ntohl(ppe_flow_info->tuple.src_ip[3]);
-
+		flow_info.flow_tuple_info.src_ip_31_0 =
+			ntohl(ppe_flow_info->tuple.src_ip[0]);
 		flow_info.flow_tuple_info.dest_ip_31_0 =
 			ntohl(ppe_flow_info->tuple.dest_ip[0]);
+	} else if (ppe_flow_info->flags & PPE_DRV_FSE_IPV6) {
+		flow_info.flow_tuple_info.src_ip_31_0 =
+					ntohl(ppe_flow_info->tuple.src_ip[3]);
+		flow_info.flow_tuple_info.src_ip_63_32 =
+					ntohl(ppe_flow_info->tuple.src_ip[2]);
+		flow_info.flow_tuple_info.src_ip_95_64 =
+					ntohl(ppe_flow_info->tuple.src_ip[1]);
+		flow_info.flow_tuple_info.src_ip_127_96 =
+					ntohl(ppe_flow_info->tuple.src_ip[0]);
+
+		flow_info.flow_tuple_info.dest_ip_31_0 =
+					ntohl(ppe_flow_info->tuple.dest_ip[3]);
 		flow_info.flow_tuple_info.dest_ip_63_32 =
-			ntohl(ppe_flow_info->tuple.dest_ip[1]);
+					ntohl(ppe_flow_info->tuple.dest_ip[2]);
 		flow_info.flow_tuple_info.dest_ip_95_64 =
-			ntohl(ppe_flow_info->tuple.dest_ip[2]);
+					ntohl(ppe_flow_info->tuple.dest_ip[1]);
 		flow_info.flow_tuple_info.dest_ip_127_96 =
-			ntohl(ppe_flow_info->tuple.dest_ip[3]);
+					ntohl(ppe_flow_info->tuple.dest_ip[0]);
 	}
 
 	if (ppe_flow_info->flags & PPE_DRV_FSE_DS)
