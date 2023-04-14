@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2020-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -221,3 +221,12 @@ QDF_STATUS ucfg_dcs_get_ch_util(struct wlan_objmgr_psoc *psoc, uint8_t mac_id,
 
 	return QDF_STATUS_SUCCESS;
 }
+
+#ifdef DCS_INTERFERENCE_DETECTION
+QDF_STATUS
+ucfg_dcs_switch_chan(struct wlan_objmgr_vdev *vdev, qdf_freq_t tgt_freq,
+		     enum phy_ch_width tgt_width)
+{
+	return wlan_dcs_switch_chan(vdev, tgt_freq, tgt_width);
+}
+#endif

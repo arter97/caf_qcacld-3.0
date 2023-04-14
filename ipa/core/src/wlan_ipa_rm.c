@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2013-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -131,6 +131,13 @@ void wlan_ipa_init_metering(struct wlan_ipa_priv *ipa_ctx)
 {
 	qdf_event_create(&ipa_ctx->ipa_uc_sharing_stats_comp);
 	qdf_event_create(&ipa_ctx->ipa_uc_set_quota_comp);
+}
+#endif
+
+#ifdef IPA_OPT_WIFI_DP
+void wlan_ipa_add_rem_flt_cb_event(struct wlan_ipa_priv *ipa_ctx)
+{
+	qdf_event_create(&ipa_ctx->ipa_flt_evnt);
 }
 #endif
 

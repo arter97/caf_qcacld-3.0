@@ -143,7 +143,13 @@ struct wlan_psoc_host_hal_reg_cap_ext {
  * @phy_id: Starts with 0
  * @phy_idx: Index to mac phy caps structure for the given hw_mode_id and phy_id
  * @hw_mode_config_type: holds the enum wmi_hw_mode_config_type
- * @bitmap of supported modulations
+ * @supports_11b: is 802.11b supported
+ * @supports_11g: is 802.11g supported
+ * @supports_11a: is 802.11a supported
+ * @supports_11n: is 802.11n supported
+ * @supports_11ac: is 802.11ac supported
+ * @supports_11ax: is 802.11ax supported
+ * @supports_11be: is 802.11be supported
  * @supported_bands: supported bands, enum WLAN_BAND_CAPABILITY
  * @ampdu_density: ampdu density 0 for no restriction, 1 for 1/4 us,
  *        2 for 1/2 us, 3 for 1 us,4 for 2 us, 5 for 4 us,
@@ -158,7 +164,7 @@ struct wlan_psoc_host_hal_reg_cap_ext {
  *         - 1 indicates support for VHT-MCS 0-8 for n spatial streams
  *         - 2 indicates support for VHT-MCS 0-9 for n spatial streams
  *         - 3 indicates that n spatial streams is not supported
- * @he_cap_info_2G[]: HE capability info field of 802.11ax, WMI_HE_CAP defines
+ * @he_cap_info_2G: HE capability info field of 802.11ax, WMI_HE_CAP defines
  * @he_supp_mcs_2G: HE Supported MCS Set field Rx/Tx same
  * @tx_chain_mask_2G: Valid Transmit chain mask
  * @rx_chain_mask_2G: Valid Receive chain mask
@@ -172,7 +178,7 @@ struct wlan_psoc_host_hal_reg_cap_ext {
  *        - 1 indicates support for VHT-MCS 0-8 for n spatial streams
  *        - 2 indicates support for VHT-MCS 0-9 for n spatial streams
  *        - 3 indicates that n spatial streams is not supported
- * @he_cap_info_5G[]: HE capability info field of 802.11ax, WMI_HE_CAP defines
+ * @he_cap_info_5G: HE capability info field of 802.11ax, WMI_HE_CAP defines
  * @he_supp_mcs_5G: HE Supported MCS Set field Rx/Tx same
  * @tx_chain_mask_5G: Valid Transmit chain mask
  * @rx_chain_mask_5G: Valid Receive chain mask
@@ -187,7 +193,7 @@ struct wlan_psoc_host_hal_reg_cap_ext {
  * @tgt_pdev_id: target pdev id assigned and used by firmware
  * @nss_ratio_enabled: This flag is set if nss ratio is received from FW as part
  *                     of service ready ext event.
- * @nss_ratio: nss ratio is used to calculate the NSS value for 160MHz.
+ * @nss_ratio_info: nss ratio is used to calculate the NSS value for 160MHz.
  * @hw_link_id: Unique link id across SoCs used to identify link in Multi-SoC ML
  */
 struct wlan_psoc_host_mac_phy_caps {
@@ -253,15 +259,15 @@ struct wlan_psoc_host_hw_mode_caps {
 	uint32_t hw_mode_config_type;
 };
 
-/*
+/**
  * struct wlan_psoc_host_mac_phy_caps_ext2 - Phy caps received in EXT2 service
  * @hw_mode_id: HW mode id
  * @pdev_id: Pdev id
  * @phy_id: Phy id
  * @wireless_modes_ext: Extended wireless modes
- * @eht_cap_info_2G[]: EHT capability info field of 802.11ax, WMI_HE_CAP defines
+ * @eht_cap_info_2G: EHT capability info field of 802.11ax, WMI_HE_CAP defines
  * @eht_supp_mcs_2G: EHT Supported MCS Set field Rx/Tx same
- * @eht_cap_info_5G[]: EHT capability info field of 802.11ax, WMI_HE_CAP defines
+ * @eht_cap_info_5G: EHT capability info field of 802.11ax, WMI_HE_CAP defines
  * @eht_supp_mcs_5G: EHT Supported MCS Set field Rx/Tx same
  * @eht_cap_phy_info_2G: 2G EHT capability phy field
  * @eht_cap_phy_info_5G: 5G EHT capability phy field
@@ -302,11 +308,13 @@ struct wlan_psoc_host_mac_phy_caps_ext2 {
  * @phy_id: phy id
  * @scan_radio_supported: indicates scan radio support
  * @dfs_en: indicates DFS needs to be enabled/disabled for scan radio vap
+ * @blanking_en: Indicates whether scan blanking feature is enabled
  */
 struct wlan_psoc_host_scan_radio_caps {
 	uint32_t phy_id;
 	bool scan_radio_supported;
 	bool dfs_en;
+	bool blanking_en;
 };
 
 /**
@@ -402,7 +410,7 @@ struct wlan_psoc_host_chainmask_table {
  * struct wlan_psoc_host_service_ext_param - EXT service base params in event
  * @default_conc_scan_config_bits: Default concurrenct scan config
  * @default_fw_config_bits: Default HW config bits
- * @wlan_psoc_host_ppe_threshold ppet: Host PPE threshold struct
+ * @ppet: Host PPE threshold struct
  * @he_cap_info: HE capabality info
  * @mpdu_density: units are microseconds
  * @max_bssid_rx_filters: Maximum no of BSSID based RX filters host can program
@@ -440,10 +448,10 @@ struct wlan_psoc_host_service_ext_param {
 
 /**
  * struct wlan_psoc_host_service_ext2_param - EXT service base params in event
- * reg_db_version_major: REG DB version major number
- * reg_db_version_minor: REG DB version minor number
- * bdf_reg_db_version_major: BDF REG DB version major number
- * bdf_reg_db_version_minor: BDF REG DB version minor number
+ * @reg_db_version_major: REG DB version major number
+ * @reg_db_version_minor: REG DB version minor number
+ * @bdf_reg_db_version_major: BDF REG DB version major number
+ * @bdf_reg_db_version_minor: BDF REG DB version minor number
  * @num_dbr_ring_caps: Number of direct buf rx ring capabilities
  * @chwidth_num_peer_caps: Peer limit for peer_chan_width_switch WMI cmd
  * @max_ndp_sessions: Max number of ndp session fw supports
@@ -459,7 +467,7 @@ struct wlan_psoc_host_service_ext_param {
  * @target_cap_flags: Rx peer metadata version number used by target
  * @ul_mumimo_tx_2g: UL MUMIMO Tx support for 2GHz
  * @ul_mumimo_tx_5g: UL MUMIMO Tx support for 5GHz
- * @ul_mumimo_tx_5g: UL MUMIMO Tx support for 6GHz
+ * @ul_mumimo_tx_6g: UL MUMIMO Tx support for 6GHz
  * @ul_mumimo_rx_2g: UL MUMIMO Rx support for 2GHz
  * @ul_mumimo_rx_5g: UL MUMIMO Rx support for 5GHz
  * @ul_mumimo_rx_6g: UL MUMIMO Rx support for 6GHz

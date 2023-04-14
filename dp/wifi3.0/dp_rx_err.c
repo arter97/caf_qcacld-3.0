@@ -1050,6 +1050,7 @@ dp_rx_reo_err_entry_process(struct dp_soc *soc,
 	hal_ring_handle_t hal_ring_hdl = soc->reo_exception_ring.hal_srng;
 	bool first_msdu_in_mpdu_processed = false;
 	bool msdu_dropped = false;
+	uint8_t link_id = 0;
 
 	peer_id = dp_rx_peer_metadata_peer_id_get(soc,
 					mpdu_desc_info->peer_meta_data);
@@ -1217,7 +1218,8 @@ more_msdu_link_desc:
 							       rx_tlv_hdr_last,
 							       rx_desc_pool_id,
 							       txrx_peer,
-							       TRUE);
+							       TRUE,
+							       link_id);
 			if (txrx_peer)
 				dp_txrx_peer_unref_delete(txrx_ref_handle,
 							  DP_MOD_ID_RX_ERR);
@@ -1281,7 +1283,7 @@ process_next_msdu:
 void
 dp_rx_process_rxdma_err(struct dp_soc *soc, qdf_nbuf_t nbuf,
 			uint8_t *rx_tlv_hdr, struct dp_txrx_peer *txrx_peer,
-			uint8_t err_code, uint8_t mac_id)
+			uint8_t err_code, uint8_t mac_id, uint8_t link_id)
 {
 	uint32_t pkt_len, l2_hdr_offset;
 	uint16_t msdu_len;
@@ -1408,15 +1410,20 @@ process_rx:
 		is_broadcast = (QDF_IS_ADDR_BROADCAST
 				(eh->ether_dhost)) ? 1 : 0 ;
 		DP_PEER_PER_PKT_STATS_INC_PKT(txrx_peer, rx.multicast, 1,
-					      qdf_nbuf_len(nbuf));
+					      qdf_nbuf_len(nbuf), link_id);
 		if (is_broadcast) {
 			DP_PEER_PER_PKT_STATS_INC_PKT(txrx_peer, rx.bcast, 1,
-						      qdf_nbuf_len(nbuf));
+						      qdf_nbuf_len(nbuf),
+						      link_id);
 		}
+	} else {
+		DP_PEER_PER_PKT_STATS_INC_PKT(txrx_peer, rx.unicast, 1,
+					      qdf_nbuf_len(nbuf),
+					      link_id);
 	}
 
 	if (qdf_unlikely(vdev->rx_decap_type == htt_cmn_pkt_type_raw)) {
-		dp_rx_deliver_raw(vdev, nbuf, txrx_peer);
+		dp_rx_deliver_raw(vdev, nbuf, txrx_peer, link_id);
 	} else {
 		/* Update the protocol tag in SKB based on CCE metadata */
 		dp_rx_update_protocol_tag(soc, vdev, nbuf, rx_tlv_hdr,
@@ -1520,10 +1527,12 @@ fail:
 static bool dp_rx_igmp_handler(struct dp_soc *soc,
 			       struct dp_vdev *vdev,
 			       struct dp_txrx_peer *peer,
-			       qdf_nbuf_t nbuf)
+			       qdf_nbuf_t nbuf,
+			       uint8_t link_id)
 {
 	if (soc->arch_ops.dp_rx_mcast_handler) {
-		if (soc->arch_ops.dp_rx_mcast_handler(soc, vdev, peer, nbuf))
+		if (soc->arch_ops.dp_rx_mcast_handler(soc, vdev, peer,
+						      nbuf, link_id))
 			return true;
 	}
 	return false;
@@ -1532,7 +1541,8 @@ static bool dp_rx_igmp_handler(struct dp_soc *soc,
 static bool dp_rx_igmp_handler(struct dp_soc *soc,
 			       struct dp_vdev *vdev,
 			       struct dp_txrx_peer *peer,
-			       qdf_nbuf_t nbuf)
+			       qdf_nbuf_t nbuf,
+			       uint8_t link_id)
 {
 	return false;
 }
@@ -1548,6 +1558,7 @@ static bool dp_rx_igmp_handler(struct dp_soc *soc,
  * @txrx_peer: txrx peer handle
  * @rx_tlv_hdr: start of rx tlv header
  * @err_src: rxdma/reo
+ * @link_id: link id on which the packet is received
  *
  * This function indicates EAPOL frame received in wbm error ring to stack.
  * Any other frame should be dropped.
@@ -1557,7 +1568,8 @@ static bool dp_rx_igmp_handler(struct dp_soc *soc,
 static void
 dp_rx_err_route_hdl(struct dp_soc *soc, qdf_nbuf_t nbuf,
 		    struct dp_txrx_peer *txrx_peer, uint8_t *rx_tlv_hdr,
-		    enum hal_rx_wbm_error_source err_src)
+		    enum hal_rx_wbm_error_source err_src,
+		    uint8_t link_id)
 {
 	uint32_t pkt_len;
 	uint16_t msdu_len;
@@ -1610,7 +1622,7 @@ dp_rx_err_route_hdl(struct dp_soc *soc, qdf_nbuf_t nbuf,
 		qdf_nbuf_pull_head(nbuf, (msdu_metadata.l3_hdr_pad +
 				   soc->rx_pkt_tlv_size));
 
-	if (dp_rx_igmp_handler(soc, vdev, txrx_peer, nbuf))
+	if (dp_rx_igmp_handler(soc, vdev, txrx_peer, nbuf, link_id))
 		return;
 
 	dp_vdev_peer_stats_update_protocol_cnt(vdev, nbuf, NULL, 0, 1);
@@ -2331,6 +2343,7 @@ dp_rx_wbm_err_process(struct dp_intr *int_ctx, struct dp_soc *soc,
 	struct hal_wbm_err_desc_info wbm_err_info = { 0 };
 	uint8_t pool_id;
 	uint8_t tid = 0;
+	uint8_t link_id = 0;
 
 	/* Debug -- Remove later */
 	qdf_assert(soc && hal_ring_hdl);
@@ -2359,10 +2372,7 @@ dp_rx_wbm_err_process(struct dp_intr *int_ctx, struct dp_soc *soc,
 		 * retrieve the wbm desc info from nbuf TLV, so we can
 		 * handle error cases appropriately
 		 */
-		hal_rx_priv_info_get_from_tlv(soc->hal_soc, rx_tlv_hdr,
-					      (uint8_t *)&wbm_err_info,
-					      sizeof(wbm_err_info));
-
+		wbm_err_info = dp_rx_get_err_info(soc, nbuf);
 		peer_meta_data = hal_rx_tlv_peer_meta_data_get(soc->hal_soc,
 							       rx_tlv_hdr);
 		peer_id = dp_rx_peer_metadata_peer_id_get(soc, peer_meta_data);
@@ -2404,6 +2414,20 @@ dp_rx_wbm_err_process(struct dp_intr *int_ctx, struct dp_soc *soc,
 			continue;
 		}
 
+		pool_id = wbm_err_info.pool_id;
+		dp_pdev = dp_get_pdev_for_lmac_id(soc, pool_id);
+
+		if (dp_pdev && dp_pdev->link_peer_stats &&
+		    txrx_peer && txrx_peer->is_mld_peer) {
+			link_id = ((dp_rx_peer_mdata_link_id_get(
+							soc,
+							peer_meta_data)) + 1);
+			if (link_id < 1 || link_id > DP_MAX_MLO_LINKS)
+				link_id = 0;
+		} else {
+			link_id = 0;
+		}
+
 		if (wbm_err_info.wbm_err_src == HAL_RX_WBM_ERR_SRC_REO) {
 			if (wbm_err_info.reo_psh_rsn
 					== HAL_RX_WBM_REO_PSH_RSN_ERROR) {
@@ -2412,8 +2436,6 @@ dp_rx_wbm_err_process(struct dp_intr *int_ctx, struct dp_soc *soc,
 					rx.err.reo_error
 					[wbm_err_info.reo_err_code], 1);
 				/* increment @pdev level */
-				pool_id = wbm_err_info.pool_id;
-				dp_pdev = dp_get_pdev_for_lmac_id(soc, pool_id);
 				if (dp_pdev)
 					DP_STATS_INC(dp_pdev, err.reo_error,
 						     1);
@@ -2430,7 +2452,8 @@ dp_rx_wbm_err_process(struct dp_intr *int_ctx, struct dp_soc *soc,
 								rx_tlv_hdr,
 								pool_id,
 								txrx_peer,
-								FALSE);
+								FALSE,
+								link_id);
 					break;
 				/* TODO */
 				/* Add per error code accounting */
@@ -2438,7 +2461,8 @@ dp_rx_wbm_err_process(struct dp_intr *int_ctx, struct dp_soc *soc,
 					if (txrx_peer)
 						DP_PEER_PER_PKT_STATS_INC(txrx_peer,
 									  rx.err.jump_2k_err,
-									  1);
+									  1,
+									  link_id);
 
 					pool_id = wbm_err_info.pool_id;
 
@@ -2459,7 +2483,8 @@ dp_rx_wbm_err_process(struct dp_intr *int_ctx, struct dp_soc *soc,
 					if (txrx_peer)
 						DP_PEER_PER_PKT_STATS_INC(txrx_peer,
 									  rx.err.oor_err,
-									  1);
+									  1,
+									  link_id);
 					if (hal_rx_msdu_end_first_msdu_get(soc->hal_soc,
 									   rx_tlv_hdr)) {
 						tid =
@@ -2489,7 +2514,8 @@ dp_rx_wbm_err_process(struct dp_intr *int_ctx, struct dp_soc *soc,
 					if (txrx_peer)
 						DP_PEER_PER_PKT_STATS_INC(txrx_peer,
 									  rx.err.pn_err,
-									  1);
+									  1,
+									  link_id);
 					dp_rx_nbuf_free(nbuf);
 					break;
 
@@ -2502,7 +2528,8 @@ dp_rx_wbm_err_process(struct dp_intr *int_ctx, struct dp_soc *soc,
 					== HAL_RX_WBM_REO_PSH_RSN_ROUTE) {
 				dp_rx_err_route_hdl(soc, nbuf, txrx_peer,
 						    rx_tlv_hdr,
-						    HAL_RX_WBM_ERR_SRC_REO);
+						    HAL_RX_WBM_ERR_SRC_REO,
+						    link_id);
 			} else {
 				/* should not enter here */
 				dp_rx_err_alert("invalid reo push reason %u",
@@ -2518,8 +2545,6 @@ dp_rx_wbm_err_process(struct dp_intr *int_ctx, struct dp_soc *soc,
 					rx.err.rxdma_error
 					[wbm_err_info.rxdma_err_code], 1);
 				/* increment @pdev level */
-				pool_id = wbm_err_info.pool_id;
-				dp_pdev = dp_get_pdev_for_lmac_id(soc, pool_id);
 				if (dp_pdev)
 					DP_STATS_INC(dp_pdev,
 						     err.rxdma_error, 1);
@@ -2531,7 +2556,8 @@ dp_rx_wbm_err_process(struct dp_intr *int_ctx, struct dp_soc *soc,
 					if (txrx_peer)
 						DP_PEER_PER_PKT_STATS_INC(txrx_peer,
 									  rx.err.rxdma_wifi_parse_err,
-									  1);
+									  1,
+									  link_id);
 
 					pool_id = wbm_err_info.pool_id;
 					dp_rx_process_rxdma_err(soc, nbuf,
@@ -2539,7 +2565,8 @@ dp_rx_wbm_err_process(struct dp_intr *int_ctx, struct dp_soc *soc,
 								txrx_peer,
 								wbm_err_info.
 								rxdma_err_code,
-								pool_id);
+								pool_id,
+								link_id);
 					break;
 
 				case HAL_RXDMA_ERR_TKIP_MIC:
@@ -2549,7 +2576,8 @@ dp_rx_wbm_err_process(struct dp_intr *int_ctx, struct dp_soc *soc,
 					if (txrx_peer)
 						DP_PEER_PER_PKT_STATS_INC(txrx_peer,
 									  rx.err.mic_err,
-									  1);
+									  1,
+									  link_id);
 					break;
 
 				case HAL_RXDMA_ERR_DECRYPT:
@@ -2564,14 +2592,16 @@ dp_rx_wbm_err_process(struct dp_intr *int_ctx, struct dp_soc *soc,
 									txrx_peer);
 						DP_PEER_PER_PKT_STATS_INC(txrx_peer,
 									  rx.err.mic_err,
-									  1);
+									  1,
+									  link_id);
 						break;
 					}
 
 					if (txrx_peer) {
 						DP_PEER_PER_PKT_STATS_INC(txrx_peer,
 									  rx.err.decrypt_err,
-									  1);
+									  1,
+									  link_id);
 						dp_rx_nbuf_free(nbuf);
 						break;
 					}
@@ -2587,13 +2617,15 @@ dp_rx_wbm_err_process(struct dp_intr *int_ctx, struct dp_soc *soc,
 					dp_rx_process_rxdma_err(soc, nbuf,
 								tlv_hdr, NULL,
 								err_code,
-								pool_id);
+								pool_id,
+								link_id);
 					break;
 				case HAL_RXDMA_MULTICAST_ECHO:
 					if (txrx_peer)
 						DP_PEER_PER_PKT_STATS_INC_PKT(txrx_peer,
 									      rx.mec_drop, 1,
-									      qdf_nbuf_len(nbuf));
+									      qdf_nbuf_len(nbuf),
+									      link_id);
 					dp_rx_nbuf_free(nbuf);
 					break;
 				case HAL_RXDMA_UNAUTHORIZED_WDS:
@@ -2604,7 +2636,8 @@ dp_rx_wbm_err_process(struct dp_intr *int_ctx, struct dp_soc *soc,
 								tlv_hdr,
 								txrx_peer,
 								err_code,
-								pool_id);
+								pool_id,
+								link_id);
 					break;
 				default:
 					dp_rx_nbuf_free(nbuf);
@@ -2615,7 +2648,8 @@ dp_rx_wbm_err_process(struct dp_intr *int_ctx, struct dp_soc *soc,
 					== HAL_RX_WBM_RXDMA_PSH_RSN_ROUTE) {
 				dp_rx_err_route_hdl(soc, nbuf, txrx_peer,
 						    rx_tlv_hdr,
-						    HAL_RX_WBM_ERR_SRC_RXDMA);
+						    HAL_RX_WBM_ERR_SRC_RXDMA,
+						    link_id);
 			} else if (wbm_err_info.rxdma_psh_rsn
 					== HAL_RX_WBM_RXDMA_PSH_RSN_FLUSH) {
 				dp_rx_err_err("rxdma push reason %u",

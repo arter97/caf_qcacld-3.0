@@ -4901,7 +4901,7 @@ void dp_vdev_peer_stats_update_protocol_cnt(struct dp_vdev *vdev,
 		if (!txrx_peer)
 			goto dp_vdev_peer_stats_update_protocol_cnt_free_peer;
 	}
-	per_pkt_stats = &txrx_peer->stats.per_pkt_stats;
+	per_pkt_stats = &txrx_peer->stats[0].per_pkt_stats;
 
 	if (qdf_nbuf_is_icmp_pkt(nbuf) == true)
 		prot = CDP_TRACE_ICMP;
@@ -8254,18 +8254,54 @@ QDF_STATUS dp_txrx_get_peer_per_pkt_stats_param(struct dp_peer *peer,
 	struct dp_peer *tgt_peer;
 	struct dp_txrx_peer *txrx_peer;
 	struct dp_peer_per_pkt_stats *peer_stats;
+	uint8_t link_id = 0;
+	uint8_t idx = 0;
+	uint8_t stats_arr_size;
+	struct cdp_pkt_info pkt_info = {0};
+	struct dp_soc *soc = peer->vdev->pdev->soc;
+	struct dp_pdev *pdev = peer->vdev->pdev;
 
 	txrx_peer = dp_get_txrx_peer(peer);
 	if (!txrx_peer)
 		return QDF_STATUS_E_FAILURE;
 
-	peer_stats = &txrx_peer->stats.per_pkt_stats;
+	stats_arr_size = txrx_peer->stats_arr_size;
+
+	if (IS_MLO_DP_LINK_PEER(peer))
+		link_id = dp_get_peer_hw_link_id(soc, pdev);
+
 	switch (type) {
 	case cdp_peer_tx_ucast:
-		buf->tx_ucast = peer_stats->tx.ucast;
+		if (link_id > 0) {
+			peer_stats = &txrx_peer->stats[link_id].per_pkt_stats;
+			buf->tx_ucast = peer_stats->tx.ucast;
+		} else {
+			for (idx = 0; idx < stats_arr_size; idx++) {
+				peer_stats =
+					&txrx_peer->stats[idx].per_pkt_stats;
+				pkt_info.num += peer_stats->tx.ucast.num;
+				pkt_info.bytes += peer_stats->tx.ucast.bytes;
+			}
+
+			buf->tx_ucast = pkt_info;
+		}
+
 		break;
 	case cdp_peer_tx_mcast:
-		buf->tx_mcast = peer_stats->tx.mcast;
+		if (link_id > 0) {
+			peer_stats = &txrx_peer->stats[link_id].per_pkt_stats;
+			buf->tx_mcast = peer_stats->tx.mcast;
+		} else {
+			for (idx = 0; idx < stats_arr_size; idx++) {
+				peer_stats =
+					&txrx_peer->stats[idx].per_pkt_stats;
+				pkt_info.num += peer_stats->tx.mcast.num;
+				pkt_info.bytes += peer_stats->tx.mcast.bytes;
+			}
+
+			buf->tx_mcast = pkt_info;
+		}
+
 		break;
 	case cdp_peer_tx_inactive_time:
 		tgt_peer = dp_get_tgt_peer_from_peer(peer);
@@ -8276,7 +8312,20 @@ QDF_STATUS dp_txrx_get_peer_per_pkt_stats_param(struct dp_peer *peer,
 			ret = QDF_STATUS_E_FAILURE;
 		break;
 	case cdp_peer_rx_ucast:
-		buf->rx_ucast = peer_stats->rx.unicast;
+		if (link_id > 0) {
+			peer_stats = &txrx_peer->stats[link_id].per_pkt_stats;
+			buf->rx_ucast = peer_stats->rx.unicast;
+		} else {
+			for (idx = 0; idx < stats_arr_size; idx++) {
+				peer_stats =
+					&txrx_peer->stats[idx].per_pkt_stats;
+				pkt_info.num += peer_stats->rx.unicast.num;
+				pkt_info.bytes += peer_stats->rx.unicast.bytes;
+			}
+
+			buf->rx_ucast = pkt_info;
+		}
+
 		break;
 	default:
 		ret = QDF_STATUS_E_FAILURE;
@@ -8337,7 +8386,7 @@ QDF_STATUS dp_txrx_get_peer_extd_stats_param(struct dp_peer *peer,
 	if (!txrx_peer)
 		return QDF_STATUS_E_FAILURE;
 
-	peer_stats = &txrx_peer->stats.extd_stats;
+	peer_stats = &txrx_peer->stats[0].extd_stats;
 
 	switch (type) {
 	case cdp_peer_tx_rate:
@@ -8463,6 +8512,8 @@ void dp_update_vdev_stats(struct dp_soc *soc, struct dp_peer *srcobj,
 	struct dp_txrx_peer *txrx_peer;
 	struct cdp_vdev_stats *vdev_stats = (struct cdp_vdev_stats *)arg;
 	struct dp_peer_per_pkt_stats *per_pkt_stats;
+	uint8_t link_id = 0;
+	struct dp_pdev *pdev = srcobj->vdev->pdev;
 
 	txrx_peer = dp_get_txrx_peer(srcobj);
 	if (qdf_unlikely(!txrx_peer))
@@ -8471,13 +8522,20 @@ void dp_update_vdev_stats(struct dp_soc *soc, struct dp_peer *srcobj,
 	if (qdf_unlikely(dp_is_wds_extended(txrx_peer)))
 		return;
 
-	if (!dp_peer_is_primary_link_peer(srcobj))
-		goto link_stats;
+	if (dp_peer_is_primary_link_peer(srcobj)) {
+		dp_update_vdev_basic_stats(txrx_peer, vdev_stats);
+		per_pkt_stats = &txrx_peer->stats[0].per_pkt_stats;
+		DP_UPDATE_PER_PKT_STATS(vdev_stats, per_pkt_stats);
+	}
 
-	dp_update_vdev_basic_stats(txrx_peer, vdev_stats);
-
-	per_pkt_stats = &txrx_peer->stats.per_pkt_stats;
-	DP_UPDATE_PER_PKT_STATS(vdev_stats, per_pkt_stats);
+	if (IS_MLO_DP_LINK_PEER(srcobj)) {
+		link_id = dp_get_peer_hw_link_id(soc, pdev);
+		if (link_id > 0) {
+			per_pkt_stats = &txrx_peer->
+				stats[link_id].per_pkt_stats;
+			DP_UPDATE_PER_PKT_STATS(vdev_stats, per_pkt_stats);
+		}
+	}
 
 link_stats:
 	dp_monitor_peer_get_stats(soc, srcobj, vdev_stats, UPDATE_VDEV_STATS);
@@ -8490,21 +8548,33 @@ void dp_update_vdev_stats_on_peer_unmap(struct dp_vdev *vdev,
 	struct dp_txrx_peer *txrx_peer;
 	struct dp_peer_per_pkt_stats *per_pkt_stats;
 	struct cdp_vdev_stats *vdev_stats = &vdev->stats;
+	uint8_t link_id = 0;
+	struct dp_pdev *pdev = vdev->pdev;
 
-	txrx_peer = peer->txrx_peer;
+	txrx_peer = dp_get_txrx_peer(peer);
 	if (!txrx_peer)
 		goto link_stats;
 
-	dp_update_vdev_basic_stats(txrx_peer, vdev_stats);
 	dp_peer_aggregate_tid_stats(peer);
 
-	per_pkt_stats = &txrx_peer->stats.per_pkt_stats;
-	DP_UPDATE_PER_PKT_STATS(vdev_stats, per_pkt_stats);
+	if (!IS_MLO_DP_LINK_PEER(peer)) {
+		per_pkt_stats = &txrx_peer->stats[0].per_pkt_stats;
+		dp_update_vdev_basic_stats(txrx_peer, vdev_stats);
+		DP_UPDATE_PER_PKT_STATS(vdev_stats, per_pkt_stats);
+	}
+
+	if (IS_MLO_DP_LINK_PEER(peer)) {
+		link_id = dp_get_peer_hw_link_id(soc, pdev);
+		if (link_id > 0) {
+			per_pkt_stats =
+				&txrx_peer->stats[link_id].per_pkt_stats;
+			DP_UPDATE_PER_PKT_STATS(vdev_stats, per_pkt_stats);
+		}
+	}
 
 link_stats:
 	dp_monitor_peer_get_stats(soc, peer, vdev_stats, UPDATE_VDEV_STATS);
 }
-
 #else
 void dp_update_vdev_stats(struct dp_soc *soc, struct dp_peer *srcobj,
 			  void *arg)
@@ -8513,6 +8583,8 @@ void dp_update_vdev_stats(struct dp_soc *soc, struct dp_peer *srcobj,
 	struct cdp_vdev_stats *vdev_stats = (struct cdp_vdev_stats *)arg;
 	struct dp_peer_per_pkt_stats *per_pkt_stats;
 	struct dp_peer_extd_stats *extd_stats;
+	uint8_t inx = 0;
+	uint8_t stats_arr_size = 0;
 
 	txrx_peer = dp_get_txrx_peer(srcobj);
 	if (qdf_unlikely(!txrx_peer))
@@ -8524,13 +8596,15 @@ void dp_update_vdev_stats(struct dp_soc *soc, struct dp_peer *srcobj,
 	if (!dp_peer_is_primary_link_peer(srcobj))
 		return;
 
+	stats_arr_size = txrx_peer->stats_arr_size;
 	dp_update_vdev_basic_stats(txrx_peer, vdev_stats);
 
-	per_pkt_stats = &txrx_peer->stats.per_pkt_stats;
-	DP_UPDATE_PER_PKT_STATS(vdev_stats, per_pkt_stats);
-
-	extd_stats = &txrx_peer->stats.extd_stats;
-	DP_UPDATE_EXTD_STATS(vdev_stats, extd_stats);
+	for (inx = 0; inx < stats_arr_size; inx++) {
+		per_pkt_stats = &txrx_peer->stats[inx].per_pkt_stats;
+		extd_stats = &txrx_peer->stats[inx].extd_stats;
+		DP_UPDATE_EXTD_STATS(vdev_stats, extd_stats);
+		DP_UPDATE_PER_PKT_STATS(vdev_stats, per_pkt_stats);
+	}
 }
 
 void dp_update_vdev_stats_on_peer_unmap(struct dp_vdev *vdev,
@@ -8540,18 +8614,22 @@ void dp_update_vdev_stats_on_peer_unmap(struct dp_vdev *vdev,
 	struct dp_peer_per_pkt_stats *per_pkt_stats;
 	struct dp_peer_extd_stats *extd_stats;
 	struct cdp_vdev_stats *vdev_stats = &vdev->stats;
+	uint8_t inx = 0;
+	uint8_t stats_arr_size = 0;
 
-	txrx_peer = peer->txrx_peer;
+	txrx_peer = dp_get_txrx_peer(peer);
 	if (!txrx_peer)
 		return;
 
+	stats_arr_size = txrx_peer->stats_arr_size;
 	dp_update_vdev_basic_stats(txrx_peer, vdev_stats);
 
-	per_pkt_stats = &txrx_peer->stats.per_pkt_stats;
-	DP_UPDATE_PER_PKT_STATS(vdev_stats, per_pkt_stats);
-
-	extd_stats = &txrx_peer->stats.extd_stats;
-	DP_UPDATE_EXTD_STATS(vdev_stats, extd_stats);
+	for (inx = 0; inx < stats_arr_size; inx++) {
+		per_pkt_stats = &txrx_peer->stats[inx].per_pkt_stats;
+		extd_stats = &txrx_peer->stats[inx].extd_stats;
+		DP_UPDATE_EXTD_STATS(vdev_stats, extd_stats);
+		DP_UPDATE_PER_PKT_STATS(vdev_stats, per_pkt_stats);
+	}
 }
 #endif
 

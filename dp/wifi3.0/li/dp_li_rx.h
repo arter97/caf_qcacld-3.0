@@ -150,10 +150,18 @@ dp_rx_peer_metadata_peer_id_get_li(struct dp_soc *soc, uint32_t peer_metadata)
 	return metadata->peer_id;
 }
 
+static inline uint8_t
+dp_rx_peer_mdata_link_id_get_li(uint32_t peer_metadata)
+{
+	return 0;
+}
+
 bool
 dp_rx_intrabss_handle_nawds_li(struct dp_soc *soc, struct dp_txrx_peer *ta_peer,
 			       qdf_nbuf_t nbuf_copy,
-			       struct cdp_tid_rx_stats *tid_stats);
+			       struct cdp_tid_rx_stats *tid_stats,
+			       uint8_t link_id);
+
 #ifdef QCA_DP_RX_NBUF_AND_NBUF_DATA_PREFETCH
 static inline
 void dp_rx_prefetch_nbuf_data(qdf_nbuf_t nbuf, qdf_nbuf_t next)
@@ -316,6 +324,7 @@ dp_rx_wbm_err_reap_desc_li(struct dp_intr *int_ctx, struct dp_soc *soc,
  * @pool_id: mac id
  * @txrx_peer: txrx peer handle
  * @is_reo_exception: flag to check if the error is from REO or WBM
+ * @link_id: link Id on which packet is received
  *
  * This function handles NULL queue descriptor violations arising out
  * a missing REO queue for a given peer or a given TID. This typically
@@ -332,5 +341,6 @@ QDF_STATUS
 dp_rx_null_q_desc_handle_li(struct dp_soc *soc, qdf_nbuf_t nbuf,
 			    uint8_t *rx_tlv_hdr, uint8_t pool_id,
 			    struct dp_txrx_peer *txrx_peer,
-			    bool is_reo_exception);
+			    bool is_reo_exception,
+			    uint8_t link_id);
 #endif

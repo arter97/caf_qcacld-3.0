@@ -67,6 +67,27 @@ struct ast_del_ctxt {
 	int del_count;
 };
 
+#ifdef QCA_SUPPORT_WDS_EXTENDED
+/**
+ * dp_peer_is_wds_ext_peer() - peer is WDS_EXT peer
+ *
+ * @peer: DP peer context
+ *
+ * This API checks whether the peer is WDS_EXT peer or not
+ *
+ * Return: true in the wds_ext peer else flase
+ */
+static inline bool dp_peer_is_wds_ext_peer(struct dp_txrx_peer *peer)
+{
+	return qdf_atomic_test_bit(WDS_EXT_PEER_INIT_BIT, &peer->wds_ext.init);
+}
+#else
+static inline bool dp_peer_is_wds_ext_peer(struct dp_txrx_peer *peer)
+{
+	return false;
+}
+#endif
+
 typedef void dp_peer_iter_func(struct dp_soc *soc, struct dp_peer *peer,
 			       void *arg);
 /**
@@ -696,6 +717,22 @@ QDF_STATUS dp_peer_add_ast(struct dp_soc *soc, struct dp_peer *peer,
 			   uint32_t flags);
 
 /**
+ * dp_peer_add_ast_hmwds() - Allocate and add hmwds AST entry into peer list
+ * @soc: SoC handle
+ * @peer: peer to which ast node belongs
+ * @mac_addr: MAC address of ast node
+ * @type: AST entry type
+ * @flags: AST configuration flags
+ *
+ * This function adds new HMWDS AST entry into peer AST list
+ *
+ * Return: QDF_STATUS code
+ */
+QDF_STATUS dp_peer_add_ast_hmwds(struct dp_soc *soc, struct dp_peer *peer,
+				 uint8_t *mac_addr,
+				 enum cdp_txrx_ast_entry_type type,
+				 uint32_t flags);
+/**
  * dp_peer_del_ast() - Delete and free AST entry
  * @soc: SoC handle
  * @ast_entry: AST entry of the node
@@ -1237,6 +1274,22 @@ QDF_STATUS dp_peer_ast_hash_attach(struct dp_soc *soc);
  */
 QDF_STATUS dp_peer_mec_hash_attach(struct dp_soc *soc);
 
+/**
+ * dp_del_wds_entry_wrapper() - delete a WDS AST entry
+ * @soc: DP soc structure pointer
+ * @vdev_id: vdev_id
+ * @wds_macaddr: MAC address of ast node
+ * @type: type from enum cdp_txrx_ast_entry_type
+ * @delete_in_fw: Flag to indicate if entry needs to be deleted in fw
+ *
+ * This API is used to delete an AST entry from fw
+ *
+ * Return: None
+ */
+void dp_del_wds_entry_wrapper(struct dp_soc *soc, uint8_t vdev_id,
+			      uint8_t *wds_macaddr, uint8_t type,
+			      uint8_t delete_in_fw);
+
 void dp_soc_wds_attach(struct dp_soc *soc);
 
 /**
@@ -1622,7 +1675,6 @@ void dp_mld_peer_add_link_peer(struct dp_peer *mld_peer,
 {
 	int i;
 	struct dp_peer_link_info *link_peer_info;
-	bool action_done = false;
 	struct dp_soc *soc = mld_peer->vdev->pdev->soc;
 
 	qdf_spin_lock_bh(&mld_peer->link_peers_info_lock);
@@ -1637,27 +1689,22 @@ void dp_mld_peer_add_link_peer(struct dp_peer *mld_peer,
 			link_peer_info->chip_id =
 				dp_mlo_get_chip_id(link_peer->vdev->pdev->soc);
 			mld_peer->num_links++;
-			action_done = true;
 			break;
 		}
 	}
 	qdf_spin_unlock_bh(&mld_peer->link_peers_info_lock);
 
-	if (i == DP_MAX_MLO_LINKS)
-		dp_err("fail to add link peer" QDF_MAC_ADDR_FMT "to mld peer",
-		       QDF_MAC_ADDR_REF(link_peer->mac_addr.raw));
-	else
-		dp_peer_info("%s addition of link peer %pK (" QDF_MAC_ADDR_FMT ") "
-			     "to MLD peer %pK (" QDF_MAC_ADDR_FMT "), "
-			     "idx %u num_links %u",
-			     action_done ? "Successful" : "Failed",
-			     mld_peer, QDF_MAC_ADDR_REF(mld_peer->mac_addr.raw),
-			     link_peer, QDF_MAC_ADDR_REF(link_peer->mac_addr.raw),
-			     i, mld_peer->num_links);
+	dp_peer_info("%s addition of link peer %pK (" QDF_MAC_ADDR_FMT ") "
+		     "to MLD peer %pK (" QDF_MAC_ADDR_FMT "), "
+		     "idx %u num_links %u",
+		     (i != DP_MAX_MLO_LINKS) ? "Successful" : "Failed",
+		     link_peer, QDF_MAC_ADDR_REF(link_peer->mac_addr.raw),
+		     mld_peer, QDF_MAC_ADDR_REF(mld_peer->mac_addr.raw),
+		     i, mld_peer->num_links);
 
 	dp_cfg_event_record_mlo_link_delink_evt(soc, DP_CFG_EVENT_MLO_ADD_LINK,
 						mld_peer, link_peer, i,
-						action_done ? 1 : 0);
+						(i != DP_MAX_MLO_LINKS) ? 1 : 0);
 }
 
 /**
@@ -1674,7 +1721,6 @@ uint8_t dp_mld_peer_del_link_peer(struct dp_peer *mld_peer,
 	int i;
 	struct dp_peer_link_info *link_peer_info;
 	uint8_t num_links;
-	bool action_done = false;
 	struct dp_soc *soc = mld_peer->vdev->pdev->soc;
 
 	qdf_spin_lock_bh(&mld_peer->link_peers_info_lock);
@@ -1685,28 +1731,23 @@ uint8_t dp_mld_peer_del_link_peer(struct dp_peer *mld_peer,
 					&link_peer_info->mac_addr)) {
 			link_peer_info->is_valid = false;
 			mld_peer->num_links--;
-			action_done = true;
 			break;
 		}
 	}
 	num_links = mld_peer->num_links;
 	qdf_spin_unlock_bh(&mld_peer->link_peers_info_lock);
 
-	if (i == DP_MAX_MLO_LINKS)
-		dp_err("fail to del link peer" QDF_MAC_ADDR_FMT "to mld peer",
-		       QDF_MAC_ADDR_REF(link_peer->mac_addr.raw));
-	else
-		dp_peer_info("%s deletion of link peer %pK (" QDF_MAC_ADDR_FMT ") "
-			     "from MLD peer %pK (" QDF_MAC_ADDR_FMT "), "
-			     "idx %u num_links %u",
-			     action_done ? "Successful" : "Failed",
-			     mld_peer, QDF_MAC_ADDR_REF(mld_peer->mac_addr.raw),
-			     link_peer, QDF_MAC_ADDR_REF(link_peer->mac_addr.raw),
-			     i, mld_peer->num_links);
+	dp_peer_info("%s deletion of link peer %pK (" QDF_MAC_ADDR_FMT ") "
+		     "from MLD peer %pK (" QDF_MAC_ADDR_FMT "), "
+		     "idx %u num_links %u",
+		     (i != DP_MAX_MLO_LINKS) ? "Successful" : "Failed",
+		     link_peer, QDF_MAC_ADDR_REF(link_peer->mac_addr.raw),
+		     mld_peer, QDF_MAC_ADDR_REF(mld_peer->mac_addr.raw),
+		     i, mld_peer->num_links);
 
 	dp_cfg_event_record_mlo_link_delink_evt(soc, DP_CFG_EVENT_MLO_DEL_LINK,
 						mld_peer, link_peer, i,
-						action_done ? 1 : 0);
+						(i != DP_MAX_MLO_LINKS) ? 1 : 0);
 
 	return num_links;
 }
@@ -2437,4 +2478,14 @@ static inline void dp_peer_rx_reo_shared_qaddr_delete(struct dp_soc *soc,
  * Return: True for WDS ext peer, false otherwise
  */
 bool dp_peer_check_wds_ext_peer(struct dp_peer *peer);
+
+/**
+ * dp_gen_ml_peer_id() - Generate MLD peer id for DP
+ *
+ * @soc: DP soc context
+ * @peer_id: mld peer id
+ *
+ * Return: DP MLD peer id
+ */
+uint16_t dp_gen_ml_peer_id(struct dp_soc *soc, uint16_t peer_id);
 #endif /* _DP_PEER_H_ */

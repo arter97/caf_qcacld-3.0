@@ -117,6 +117,8 @@
 #define CDP_DATA_NON_QOS_TID 16
 
 #define CDP_NUM_SA_BW 4
+/* Smart Antenna 320MHz BW Phy MAX Rate Code Index */
+#define CDP_SA_BW320_INX 4
 #define CDP_PERCENT_MACRO 100
 #define CDP_NUM_KB_IN_MB 1000
 /*
@@ -619,6 +621,22 @@ struct cdp_mscs_params {
 	uint8_t classifier_mask;
 };
 #endif
+
+/**
+ * struct cdp_ds_vp_params - Direct Switch related params
+ * @dev: Net device
+ * @peer_id: peer id
+ * @ppe_vp_profile_idx: VP profile index in be soc
+ * @wds_ext_mode: flag to indicate wds ext.
+ * @ppe_vp_type: VP type flag.
+ */
+struct cdp_ds_vp_params {
+	struct net_device *dev;
+	uint32_t peer_id;
+	int8_t ppe_vp_profile_idx;
+	bool wds_ext_mode;
+	unsigned long ppe_vp_type;
+};
 
 /**
  * enum cdp_sec_type - security type information
@@ -2113,22 +2131,22 @@ struct cdp_tx_completion_ppdu_user {
 	uint8_t sa_is_training;
 	uint32_t rssi_chain[CDP_RSSI_CHAIN_LEN];
 	uint32_t sa_tx_antenna;
-	/*Max rates for BW: 20MHZ, 40MHZ and 80MHZ and 160MHZ
-	 * |---------------------------------------|
-	 * | 16 bits | 16 bits | 16 bits | 16 bits |
-	 * |   BW-1  |   BW-2  |   BW-3  |   BW-4  |
-	 * |      /\  \                            |
-	 * |     /  \  \                           |
-	 * |    /    \  \                          |
-	 * |   /      \  \                         |
-	 * |  /        \  \                        |
-	 * | /          \  \                       |
-	 * |/            \  \                      |
-	 * |[11|8]     [5|8] \                     |
-	 * | BW1      PADDED  \                    |
-	 * |---------------------------------------|
+	/*Max rates for BW: 20MHZ, 40MHZ and 80MHZ and 160MHZ and 320MHZ
+	 * |-------------------------------------------------|
+	 * | 16 bits | 16 bits | 16 bits | 16 bits | 16 bits |
+	 * |   BW-1  |   BW-2  |   BW-3  |   BW-4  |   BW-5  |
+	 * |      /\  \                                      |
+	 * |     /  \  \                                     |
+	 * |    /    \  \                                    |
+	 * |   /      \  \                                   |
+	 * |  /        \  \                                  |
+	 * | /          \  \                                 |
+	 * |/            \  \                                |
+	 * |[11|8]     [5|8] \                               |
+	 * | BW1      PADDED  \                              |
+	 * |-------------------------------------------------|
 	 */
-	uint16_t sa_max_rates[CDP_NUM_SA_BW];
+	uint16_t sa_max_rates[CDP_NUM_SA_BW + 1];
 	uint32_t sa_goodput;
 	/* below field is used to calculate goodput in non-training period
 	 * Note: As host is exposing goodput and hence current_rate_per is

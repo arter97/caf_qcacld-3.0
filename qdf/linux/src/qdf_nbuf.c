@@ -1276,6 +1276,7 @@ __qdf_nbuf_set_rx_cksum(struct sk_buff *skb, qdf_nbuf_rx_cksum_t *cksum)
 		break;
 	case QDF_NBUF_RX_CKSUM_TCP_UDP_UNNECESSARY:
 		skb->ip_summed = CHECKSUM_UNNECESSARY;
+		skb->csum_level = cksum->csum_level;
 		break;
 	case QDF_NBUF_RX_CKSUM_TCP_UDP_HW:
 		skb->ip_summed = CHECKSUM_PARTIAL;
@@ -2535,13 +2536,15 @@ qdf_export_symbol(__qdf_nbuf_is_bcast_pkt);
 
 bool __qdf_nbuf_is_mcast_replay(qdf_nbuf_t nbuf)
 {
-	struct ethhdr *eh = (struct ethhdr *)qdf_nbuf_data(nbuf);
+	struct sk_buff *skb = (struct sk_buff *)nbuf;
+	struct ethhdr *eth = eth_hdr(skb);
 
-	if (unlikely(nbuf->pkt_type == PACKET_MULTICAST)) {
-		if (unlikely(ether_addr_equal(eh->h_source,
-					      nbuf->dev->dev_addr)))
-			return true;
-	}
+	if (qdf_likely(skb->pkt_type != PACKET_MULTICAST))
+		return false;
+
+	if (qdf_unlikely(ether_addr_equal(eth->h_source, skb->dev->dev_addr)))
+		return true;
+
 	return false;
 }
 
@@ -3669,6 +3672,7 @@ qdf_export_symbol(qdf_nbuf_dev_kfree_list_debug);
 #endif /* NBUF_MEMORY_DEBUG */
 
 #if defined(QCA_DP_NBUF_FAST_PPEDS)
+#if defined(NBUF_MEMORY_DEBUG)
 struct sk_buff *__qdf_nbuf_alloc_ppe_ds(qdf_device_t osdev, size_t size,
 					const char *func, uint32_t line)
 {
@@ -3705,7 +3709,33 @@ struct sk_buff *__qdf_nbuf_alloc_ppe_ds(qdf_device_t osdev, size_t size,
 	}
 	return skb;
 }
+#else
+struct sk_buff *__qdf_nbuf_alloc_ppe_ds(qdf_device_t osdev, size_t size,
+					const char *func, uint32_t line)
+{
+	struct sk_buff *skb;
+	int flags = GFP_KERNEL;
 
+	if (in_interrupt() || irqs_disabled() || in_atomic()) {
+		flags = GFP_ATOMIC;
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 4, 0)
+		/*
+		 * Observed that kcompactd burns out CPU to make order-3
+		 * page.__netdev_alloc_skb has 4k page fallback option
+		 * just in case of
+		 * failing high order page allocation so we don't need
+		 * to be hard. Make kcompactd rest in piece.
+		 */
+		flags = flags & ~__GFP_KSWAPD_RECLAIM;
+#endif
+	}
+	skb = __netdev_alloc_skb_no_skb_reset(NULL, size, flags);
+	if (qdf_likely(skb))
+		qdf_nbuf_count_inc(skb);
+
+	return skb;
+}
+#endif
 qdf_export_symbol(__qdf_nbuf_alloc_ppe_ds);
 #endif
 
@@ -4833,63 +4863,31 @@ qdf_nbuf_update_radiotap_he_flags(struct mon_rx_status *rx_status,
 	 * IEEE80211_RADIOTAP_HE u16, u16, u16, u16, u16, u16
 	 * Enable all "known" HE radiotap flags for now
 	 */
-	struct mon_rx_user_status *rx_user_status = rx_status->rx_user_status;
 
 	rtap_len = qdf_align(rtap_len, 2);
 
-	if (!rx_user_status) {
-		put_unaligned_le16(rx_status->he_data1, &rtap_buf[rtap_len]);
-		rtap_len += 2;
+	put_unaligned_le16(rx_status->he_data1, &rtap_buf[rtap_len]);
+	rtap_len += 2;
 
-		put_unaligned_le16(rx_status->he_data2, &rtap_buf[rtap_len]);
-		rtap_len += 2;
+	put_unaligned_le16(rx_status->he_data2, &rtap_buf[rtap_len]);
+	rtap_len += 2;
 
-		put_unaligned_le16(rx_status->he_data3, &rtap_buf[rtap_len]);
-		rtap_len += 2;
+	put_unaligned_le16(rx_status->he_data3, &rtap_buf[rtap_len]);
+	rtap_len += 2;
 
-		put_unaligned_le16(rx_status->he_data4, &rtap_buf[rtap_len]);
-		rtap_len += 2;
+	put_unaligned_le16(rx_status->he_data4, &rtap_buf[rtap_len]);
+	rtap_len += 2;
 
-		put_unaligned_le16(rx_status->he_data5, &rtap_buf[rtap_len]);
-		rtap_len += 2;
+	put_unaligned_le16(rx_status->he_data5, &rtap_buf[rtap_len]);
+	rtap_len += 2;
 
-		put_unaligned_le16(rx_status->he_data6, &rtap_buf[rtap_len]);
-		rtap_len += 2;
-		qdf_rl_debug("he data %x %x %x %x %x %x",
-			     rx_status->he_data1,
-			     rx_status->he_data2, rx_status->he_data3,
-			     rx_status->he_data4, rx_status->he_data5,
-			     rx_status->he_data6);
-	} else {
-		put_unaligned_le16(rx_user_status->he_data1,
-				   &rtap_buf[rtap_len]);
-		rtap_len += 2;
-
-		put_unaligned_le16(rx_user_status->he_data2,
-				   &rtap_buf[rtap_len]);
-		rtap_len += 2;
-
-		put_unaligned_le16(rx_user_status->he_data3,
-				   &rtap_buf[rtap_len]);
-		rtap_len += 2;
-
-		put_unaligned_le16(rx_user_status->he_data4,
-				   &rtap_buf[rtap_len]);
-		rtap_len += 2;
-
-		put_unaligned_le16(rx_user_status->he_data5,
-				   &rtap_buf[rtap_len]);
-		rtap_len += 2;
-
-		put_unaligned_le16(rx_user_status->he_data6,
-				   &rtap_buf[rtap_len]);
-		rtap_len += 2;
-		qdf_rl_debug("he data %x %x %x %x %x %x",
-			     rx_user_status->he_data1,
-			     rx_user_status->he_data2, rx_user_status->he_data3,
-			     rx_user_status->he_data4, rx_user_status->he_data5,
-			     rx_user_status->he_data6);
-	}
+	put_unaligned_le16(rx_status->he_data6, &rtap_buf[rtap_len]);
+	rtap_len += 2;
+	qdf_rl_debug("he data %x %x %x %x %x %x",
+		     rx_status->he_data1,
+		     rx_status->he_data2, rx_status->he_data3,
+		     rx_status->he_data4, rx_status->he_data5,
+		     rx_status->he_data6);
 
 	return rtap_len;
 }
@@ -5267,7 +5265,7 @@ unsigned int qdf_nbuf_update_radiotap(struct mon_rx_status *rx_status,
 
 	/* IEEE80211_RADIOTAP_RATE  u8           500kb/s */
 	if (!rx_status->ht_flags && !rx_status->vht_flags &&
-	    !rx_status->he_flags) {
+	    !rx_status->he_flags && !rx_status->eht_flags) {
 		it_present_val |= (1 << IEEE80211_RADIOTAP_RATE);
 		rtap_buf[rtap_len] = rx_status->rate;
 	} else

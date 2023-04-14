@@ -38,6 +38,69 @@
 #define DP_MON_DECAP_FORMAT_INVALID 0xff
 #define DP_MON_MIN_FRAGS_FOR_RESTITCH 2
 
+#ifdef MONITOR_TLV_RECORDING_ENABLE
+#define MAX_TLV_LOGGING_SIZE 1024
+
+#define MAX_PPDU_START_TLV_NUM 38
+#define MAX_MPDU_TLV_NUM 160
+#define MAX_PPDU_END_TLV_NUM 57
+
+#define MAX_NUM_PPDU_RECORD 4
+#define MAX_TLVS_PER_PPDU 255
+
+/*
+ * struct dp_mon_tlv_info - recorded information of each TLV
+ * @tlv_tag: tlv tag
+ * @data: union of struct of fields to be recorded for each TLV
+ *
+ * Tag and its corresponding important fields are stored in this struct
+ */
+struct dp_mon_tlv_info {
+	uint32_t tlv_tag:10;
+	union {
+		struct hal_ppdu_start_tlv_record ppdu_start;
+		struct hal_ppdu_start_user_info_tlv_record  ppdu_start_user_info;
+		struct hal_mpdu_start_tlv_record mpdu_start;
+		struct hal_mpdu_end_tlv_record mpdu_end;
+		struct hal_header_tlv_record header;
+		struct hal_msdu_end_tlv_record msdu_end;
+		struct hal_mon_buffer_addr_tlv_record mon_buffer_addr;
+		struct hal_phy_location_tlv_record phy_location;
+		struct hal_ppdu_end_user_stats_tlv_record ppdu_end_user_stats;
+		struct hal_pcu_ppdu_end_info_tlv_record pcu_ppdu_end_info;
+		struct hal_phy_rx_ht_sig_tlv_record phy_rx_ht_sig;
+		uint32_t data:22;
+	} data;
+};
+
+/**
+ * struct dp_mon_tlv_logger - contains indexes and other data of the buffer
+ * @buff: buffer in which TLVs are stored
+ * @curr_ppdu_pos: position of the next ppdu to be written
+ * @ppdu_start_idx: starting index form which PPDU start level TLVs are stored for a ppdu
+ * @mpdu_idx: starting index form which MPDU TLVs are stored for a ppdu
+ * @ppdu_end_idx: starting index form which PPDU end level TLVs are stored for a ppdu
+ * @max_ppdu_start_idx: ending index for PPDU start level TLVs for a ppdu
+ * @max_mpdu_idx: ending index for MPDU level TLVs for a ppdu
+ * @max_ppdu_end_idx: ending index for PPDU end level TLVs for a ppdu
+ * @wrap_flag: flag toggle between consecutive PPDU
+ * @tlv_logging_enable: check is tlv logging is enabled
+ *
+ */
+struct dp_mon_tlv_logger {
+	void *buff;
+	uint16_t curr_ppdu_pos;
+	uint16_t ppdu_start_idx;
+	uint16_t mpdu_idx;
+	uint16_t ppdu_end_idx;
+	uint16_t max_ppdu_start_idx;
+	uint16_t max_ppdu_end_idx;
+	uint16_t max_mpdu_idx;
+	uint8_t wrap_flag;
+	bool tlv_logging_enable;
+};
+#endif
+
 /* monitor frame filter modes */
 enum dp_mon_frm_filter_mode {
 	/* mode filter pass */
@@ -155,6 +218,7 @@ struct dp_mon_desc_pool {
  * @prev_rxmon_cookie: prev rxmon cookie
  * @ppdu_info_cache: PPDU info cache
  * @total_free_elem: total free element in queue
+ * @rx_tlv_logger: Rx TLV logger struct
  */
 struct dp_mon_pdev_be {
 	struct dp_mon_pdev mon_pdev;
@@ -181,6 +245,9 @@ struct dp_mon_pdev_be {
 	uint32_t prev_rxmon_cookie;
 	qdf_kmem_cache_t ppdu_info_cache;
 	uint32_t total_free_elem;
+#ifdef MONITOR_TLV_RECORDING_ENABLE
+	struct dp_mon_tlv_logger *rx_tlv_log;
+#endif
 };
 
 /**
@@ -484,4 +551,27 @@ struct dp_mon_pdev_be *dp_get_be_mon_pdev_from_dp_mon_pdev(struct dp_mon_pdev *m
 	return (struct dp_mon_pdev_be *)mon_pdev;
 }
 #endif
+
+#ifdef QCA_ENHANCED_STATS_SUPPORT
+/*
+ * dp_enable_enhanced_stats_2_0() - BE Wrapper to enable stats
+ * @soc: Datapath soc handle
+ * @pdev_id: Pdev Id on which stats will get enable
+ *
+ * Return: status success/failure
+ */
+QDF_STATUS
+dp_enable_enhanced_stats_2_0(struct cdp_soc_t *soc, uint8_t pdev_id);
+
+/*
+ * dp_disable_enhanced_stats_2_0() - BE Wrapper to disable stats
+ * @soc: Datapath soc handle
+ * @pdev_id: Pdev Id on which stats will get disable
+ *
+ * Return: status success/failure
+ */
+QDF_STATUS
+dp_disable_enhanced_stats_2_0(struct cdp_soc_t *soc, uint8_t pdev_id);
+#endif /* QCA_ENHANCED_STATS_SUPPORT */
+
 #endif /* _DP_MON_2_0_H_ */

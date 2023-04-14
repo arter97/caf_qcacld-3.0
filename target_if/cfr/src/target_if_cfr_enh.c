@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2019-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -705,7 +705,8 @@ extract_peer_mac_from_freeze_tlv(void *freeze_tlv, uint8_t *peermac)
 
 /**
  * check_dma_length() - Sanity check DMA header and payload length
- * @dma_hdr: pointer to enhanced DMA header
+ * @lut: lookup table entry to check
+ * @target_type: target type
  *
  * Return: QDF_STATUS
  */
@@ -870,7 +871,7 @@ done:
 /**
  * target_if_cfr_rx_tlv_process() - Process PPDU status TLVs and store info in
  * lookup table
- * @pdev_obj: PDEV object
+ * @pdev: PDEV object
  * @nbuf: ppdu info
  *
  * Return: none
@@ -1557,6 +1558,7 @@ target_if_pdev_aoa_phasedaelta_event_handler(ol_scn_t sc,
  * enh_prepare_cfr_header_txstatus() - Prepare CFR metadata for TX failures
  * @tx_evt_param: ptr to WMI TX completion event
  * @header: pointer to metadata
+ * @target_type: target type
  *
  * Return: none
  */
@@ -1956,10 +1958,12 @@ target_if_unregister_tx_completion_enh_event_handler(struct wlan_objmgr_psoc
 	return status;
 }
 
-/**
+/*
  * lut_ageout_timer_task() - Timer to flush pending TXRX/DBR events
  *
  * Return: none
+ * NB: kernel-doc script doesn't parse os_timer_func
+
  */
 static os_timer_func(lut_ageout_timer_task)
 {

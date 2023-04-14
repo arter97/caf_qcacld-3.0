@@ -868,13 +868,21 @@ wlan_mlo_t2lm_timer_start(struct wlan_objmgr_vdev *vdev,
 	struct wlan_t2lm_timer *t2lm_timer;
 	struct wlan_t2lm_context *t2lm_ctx;
 	uint32_t target_out_time;
+	struct wlan_mlo_dev_context *mlo_dev_ctx;
 
 	if (!interval) {
 		t2lm_debug("Timer interval is 0");
 		return QDF_STATUS_E_NULL_VALUE;
 	}
 
-	t2lm_ctx = &vdev->mlo_dev_ctx->t2lm_ctx;
+	if (!vdev)
+		return QDF_STATUS_E_NULL_VALUE;
+
+	mlo_dev_ctx = wlan_vdev_get_mlo_dev_ctx(vdev);
+	if (!mlo_dev_ctx)
+		return QDF_STATUS_E_NULL_VALUE;
+
+	t2lm_ctx = &mlo_dev_ctx->t2lm_ctx;
 	t2lm_timer = &vdev->mlo_dev_ctx->t2lm_ctx.t2lm_timer;
 	if (!t2lm_timer) {
 		t2lm_err("t2lm timer ctx is null");
@@ -981,9 +989,17 @@ static QDF_STATUS wlan_update_mapping_switch_time_expected_dur(
 {
 	struct wlan_t2lm_context *t2lm_ctx;
 	uint16_t tsf_bit25_10, ms_time;
+	struct wlan_mlo_dev_context *mlo_dev_ctx;
+
+	if (!vdev)
+		return QDF_STATUS_E_NULL_VALUE;
+
+	mlo_dev_ctx = wlan_vdev_get_mlo_dev_ctx(vdev);
+	if (!mlo_dev_ctx)
+		return QDF_STATUS_E_NULL_VALUE;
 
 	tsf_bit25_10 = (tsf & WLAN_T2LM_MAPPING_SWITCH_TSF_BITS) >> 10;
-	t2lm_ctx = &vdev->mlo_dev_ctx->t2lm_ctx;
+	t2lm_ctx = &mlo_dev_ctx->t2lm_ctx;
 
 	t2lm_dev_lock_acquire(t2lm_ctx);
 
@@ -1046,12 +1062,20 @@ QDF_STATUS wlan_process_bcn_prbrsp_t2lm_ie(
 {
 	struct wlan_t2lm_context *t2lm_ctx;
 	QDF_STATUS status;
+	struct wlan_mlo_dev_context *mlo_dev_ctx;
 
 	/* Do not parse the T2LM IE if STA is not in connected state */
 	if (!wlan_cm_is_vdev_connected(vdev))
 		return QDF_STATUS_SUCCESS;
 
-	t2lm_ctx = &vdev->mlo_dev_ctx->t2lm_ctx;
+	if (!vdev)
+		return QDF_STATUS_E_NULL_VALUE;
+
+	mlo_dev_ctx = wlan_vdev_get_mlo_dev_ctx(vdev);
+	if (!mlo_dev_ctx)
+		return QDF_STATUS_E_NULL_VALUE;
+
+	t2lm_ctx = &mlo_dev_ctx->t2lm_ctx;
 
 	status = wlan_update_mapping_switch_time_expected_dur(
 			vdev, rx_t2lm_ie, tsf);

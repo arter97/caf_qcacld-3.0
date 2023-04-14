@@ -26,12 +26,6 @@ QDF_STATUS ucfg_twt_get_responder(struct wlan_objmgr_psoc *psoc, bool *val)
 	return wlan_twt_tgt_caps_get_responder(psoc, val);
 }
 
-QDF_STATUS ucfg_twt_get_legacy_bcast_twt_support(struct wlan_objmgr_psoc *psoc,
-						bool *val)
-{
-	return wlan_twt_tgt_caps_get_legacy_bcast_support(psoc, val);
-}
-
 QDF_STATUS ucfg_twt_get_twt_nudge_enabled(struct wlan_objmgr_psoc *psoc,
 					bool *val)
 {
@@ -104,4 +98,10 @@ ucfg_twt_get_peer_capabilities(struct wlan_objmgr_psoc *psoc,
 			       uint8_t *peer_cap)
 {
 	return wlan_twt_get_peer_capabilities(psoc, peer_mac, peer_cap);
+}
+
+QDF_STATUS ucfg_twt_get_restricted_twt_supported(struct wlan_objmgr_psoc *psoc,
+						 bool *val)
+{
+	return wlan_twt_tgt_caps_get_restricted_support(psoc, val);
 }

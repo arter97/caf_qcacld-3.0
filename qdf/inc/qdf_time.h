@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2014-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -36,7 +36,7 @@ typedef __qdf_work_struct_t qdf_work_struct_t;
 
 #ifdef ENHANCED_OS_ABSTRACTION
 /**
- * qdf_ns_to_ktime - Converts nanoseconds to a qdf_ktime_t object
+ * qdf_ns_to_ktime() - Converts nanoseconds to a qdf_ktime_t object
  * @ns: time in nanoseconds
  *
  * Return: nanoseconds as qdf_ktime_t object
@@ -44,7 +44,7 @@ typedef __qdf_work_struct_t qdf_work_struct_t;
 qdf_ktime_t qdf_ns_to_ktime(uint64_t ns);
 
 /**
- * qdf_ktime_add - Adds two qdf_ktime_t objects and returns
+ * qdf_ktime_add() - Adds two qdf_ktime_t objects and returns
  * a qdf_ktime_t object
  * @ktime1: time as qdf_ktime_t object
  * @ktime2: time as qdf_ktime_t object
@@ -54,21 +54,21 @@ qdf_ktime_t qdf_ns_to_ktime(uint64_t ns);
 qdf_ktime_t qdf_ktime_add(qdf_ktime_t ktime1, qdf_ktime_t ktime2);
 
 /**
- * qdf_ktime_get - Gets the current time as qdf_ktime_t object
+ * qdf_ktime_get() - Gets the current time as qdf_ktime_t object
  *
  * Return: current time as qdf_ktime_t object
  */
 qdf_ktime_t qdf_ktime_get(void);
 
 /**
- * qdf_ktime_real_get - Gets the current wall clock as qdf_ktime_t object
+ * qdf_ktime_real_get() - Gets the current wall clock as qdf_ktime_t object
  *
  * Return: current wall clock as qdf_ktime_t object
  */
 qdf_ktime_t qdf_ktime_real_get(void);
 
 /**
- * qdf_ktime_add_ns - Adds qdf_ktime_t object and nanoseconds value and
+ * qdf_ktime_add_ns() - Adds qdf_ktime_t object and nanoseconds value and
  * returns the qdf_ktime_t object
  * @ktime: time as qdf_ktime_t object
  * @ns: time in nanoseconds
@@ -78,7 +78,7 @@ qdf_ktime_t qdf_ktime_real_get(void);
 qdf_ktime_t qdf_ktime_add_ns(qdf_ktime_t ktime, int64_t ns);
 
 /**
- * qdf_ktime_to_ms - Convert the qdf_ktime_t object into milliseconds
+ * qdf_ktime_to_ms() - Convert the qdf_ktime_t object into milliseconds
  * @ktime: time as qdf_ktime_t object
  *
  * Return: qdf_ktime_t in milliseconds
@@ -86,7 +86,7 @@ qdf_ktime_t qdf_ktime_add_ns(qdf_ktime_t ktime, int64_t ns);
 int64_t qdf_ktime_to_ms(qdf_ktime_t ktime);
 
 /**
- * qdf_ktime_to_us - Convert the qdf_ktime_t object into microseconds
+ * qdf_ktime_to_us() - Convert the qdf_ktime_t object into microseconds
  * @ktime: time as qdf_ktime_t object
  *
  * Return: qdf_ktime_t in microseconds
@@ -94,7 +94,7 @@ int64_t qdf_ktime_to_ms(qdf_ktime_t ktime);
 int64_t qdf_ktime_to_us(qdf_ktime_t ktime);
 
 /**
- * qdf_ktime_to_ns - Convert the qdf_ktime_t object into nanoseconds
+ * qdf_ktime_to_ns() - Convert the qdf_ktime_t object into nanoseconds
  * @ktime: time as qdf_ktime_t object
  *
  * Return: qdf_ktime_t in nanoseconds
@@ -102,7 +102,7 @@ int64_t qdf_ktime_to_us(qdf_ktime_t ktime);
 int64_t qdf_ktime_to_ns(qdf_ktime_t ktime);
 
 /**
- * qdf_system_ticks - Count the number of ticks elapsed from the time when
+ * qdf_system_ticks() - Count the number of ticks elapsed from the time when
  * the system booted
  *
  * Return: ticks
@@ -112,7 +112,7 @@ qdf_time_t qdf_system_ticks(void);
 #define qdf_system_ticks_per_sec __qdf_system_ticks_per_sec
 
 /**
- * qdf_system_ticks_to_msecs - convert ticks to milliseconds
+ * qdf_system_ticks_to_msecs() - convert ticks to milliseconds
  * @clock_ticks: Number of ticks
  *
  * Return: unsigned int Time in milliseconds
@@ -120,15 +120,23 @@ qdf_time_t qdf_system_ticks(void);
 uint32_t qdf_system_ticks_to_msecs(unsigned long clock_ticks);
 
 /**
- * qdf_system_msecs_to_ticks - convert milliseconds to ticks
- * @msec: Time in milliseconds
+ * qdf_system_ticks_to_nsecs() - convert ticks to nanoseconds
+ * @clock_ticks: Number of ticks
+ *
+ * Return: unsigned int Time in nanoseconds
+ */
+uint32_t qdf_system_ticks_to_nsecs(unsigned long clock_ticks);
+
+/**
+ * qdf_system_msecs_to_ticks() - convert milliseconds to ticks
+ * @msecs: Time in milliseconds
  *
  * Return: unsigned long number of ticks
  */
 qdf_time_t qdf_system_msecs_to_ticks(uint32_t msecs);
 
 /**
- * qdf_get_system_uptime - Return a monotonically increasing time
+ * qdf_get_system_uptime() - Return a monotonically increasing time
  * This increments once per HZ ticks
  *
  * Return: qdf_time_t system up time in ticks
@@ -148,14 +156,14 @@ qdf_time_t qdf_get_system_uptime(void);
 uint64_t qdf_get_bootbased_boottime_ns(void);
 
 /**
- * qdf_get_system_timestamp - Return current timestamp
+ * qdf_get_system_timestamp() - Return current timestamp
  *
  * Return: unsigned long timestamp in ms.
  */
 unsigned long qdf_get_system_timestamp(void);
 
 /**
- * qdf_udelay - delay in microseconds
+ * qdf_udelay() - delay in microseconds
  * @usecs: Number of microseconds to delay
  *
  * Return: none
@@ -163,8 +171,8 @@ unsigned long qdf_get_system_timestamp(void);
 void qdf_udelay(int usecs);
 
 /**
- * qdf_mdelay - Delay in milliseconds.
- * @msec: Number of milliseconds to delay
+ * qdf_mdelay() - Delay in milliseconds.
+ * @msecs: Number of milliseconds to delay
  *
  * Return: none
  */
@@ -221,9 +229,12 @@ enum qdf_timestamp_unit {
 uint64_t qdf_log_timestamp_to_usecs(uint64_t time);
 
 /**
- * qdf_get_log_timestamp_to_secs() - get time stamp for logging in seconds
+ * qdf_log_timestamp_to_secs() - get time stamp for logging in seconds
+ * @time: logging timestamp
+ * @secs: pointer to write seconds
+ * @usecs: pointer to write microseconds
  *
- * Return: The current logging timestamp normalized to second precision
+ * Return: void. The normalized time is returned in @secs and @usecs
  */
 void qdf_log_timestamp_to_secs(uint64_t time, uint64_t *secs,
 			       uint64_t *usecs);
@@ -231,7 +242,7 @@ void qdf_log_timestamp_to_secs(uint64_t time, uint64_t *secs,
 uint64_t qdf_usecs_to_log_timestamp(uint64_t usecs);
 
 /**
- * qdf_get_log_timestamp - get time stamp for logging
+ * qdf_get_log_timestamp() - get time stamp for logging
  * For adrastea this API returns QTIMER tick which is needed to synchronize
  * host and fw log timestamps
  * For ROME and other discrete solution this API returns system boot time stamp
@@ -250,7 +261,7 @@ uint64_t qdf_get_log_timestamp(void);
 uint64_t qdf_get_log_timestamp_usecs(void);
 
 /**
- * qdf_get_monotonic_boottime - get monotonic kernel boot time
+ * qdf_get_monotonic_boottime() - get monotonic kernel boot time
  * This API is similar to qdf_get_system_boottime but it includes
  * time spent in suspend.
  *
@@ -267,116 +278,60 @@ uint64_t qdf_get_monotonic_boottime(void);
 void qdf_time_ktime_get_real_time(qdf_timespec_t *ts);
 
 /**
- * qdf_time_sched_clock - scheduler clock
+ * qdf_time_sched_clock() - scheduler clock
  *
  * Return: current time in nanosec units.
  */
 unsigned long long qdf_time_sched_clock(void);
 #else
-/**
- * qdf_ns_to_ktime - Converts nanoseconds to a qdf_ktime_t object
- * @ns: time in nanoseconds
- *
- * Return: nanoseconds as qdf_ktime_t object
- */
 
 static inline qdf_ktime_t qdf_ns_to_ktime(uint64_t ns)
 {
 	return __qdf_ns_to_ktime(ns);
 }
 
-/**
- * qdf_ktime_add - Adds two qdf_ktime_t objects and returns
- * a qdf_ktime_t object
- * @ktime1: time as qdf_ktime_t object
- * @ktime2: time as qdf_ktime_t object
- *
- * Return: sum of both qdf_ktime_t as qdf_ktime_t object
- */
 
 static inline qdf_ktime_t qdf_ktime_add(qdf_ktime_t ktime1, qdf_ktime_t ktime2)
 {
 	return __qdf_ktime_add(ktime1, ktime2);
 }
 
-/**
- * qdf_ktime_get - Gets the current time as qdf_ktime_t object
- *
- * Return: current time as qdf_ktime_t object
- */
 
 static inline qdf_ktime_t qdf_ktime_get(void)
 {
 	return __qdf_ktime_get();
 }
 
-/**
- * qdf_ktime_real_get - Gets the current wall clock as qdf_ktime_t object
- *
- * Return: current wall clock as qdf_ktime_t object
- */
 
 static inline qdf_ktime_t qdf_ktime_real_get(void)
 {
 	return __qdf_ktime_real_get();
 }
 
-/**
- * qdf_ktime_add_ns - Adds qdf_ktime_t object and nanoseconds value and
- * returns the qdf_ktime_t object
- * @ktime: time as qdf_ktime_t object
- * @ns: time in nanoseconds
- *
- * Return: qdf_ktime_t object
- */
 
 static inline qdf_ktime_t qdf_ktime_add_ns(qdf_ktime_t ktime, int64_t ns)
 {
 	return __qdf_ktime_add_ns(ktime, ns);
 }
 
-/**
- * qdf_ktime_to_ms - Convert the qdf_ktime_t object into milliseconds
- * @ktime: time as qdf_ktime_t object
- *
- * Return: qdf_ktime_t in milliseconds
- */
 
 static inline int64_t qdf_ktime_to_ms(qdf_ktime_t ktime)
 {
 	return __qdf_ktime_to_ms(ktime);
 }
 
-/**
- * qdf_ktime_to_us - Convert the qdf_ktime_t object into microseconds
- * @ktime: time as qdf_ktime_t object
- *
- * Return: qdf_ktime_t in microseconds
- */
 
 static inline int64_t qdf_ktime_to_us(qdf_ktime_t ktime)
 {
 	return __qdf_time_ktime_to_us(ktime);
 }
 
-/**
- * qdf_ktime_to_ns - Convert the qdf_ktime_t object into nanoseconds
- * @ktime: time as qdf_ktime_t object
- *
- * Return: qdf_ktime_t in nanoseconds
- */
 
 static inline int64_t qdf_ktime_to_ns(qdf_ktime_t ktime)
 {
 	return __qdf_ktime_to_ns(ktime);
 }
 
-/**
- * qdf_system_ticks - Count the number of ticks elapsed from the time when
- * the system booted
- *
- * Return: ticks
- */
 static inline qdf_time_t qdf_system_ticks(void)
 {
 	return __qdf_system_ticks();
@@ -384,122 +339,52 @@ static inline qdf_time_t qdf_system_ticks(void)
 
 #define qdf_system_ticks_per_sec __qdf_system_ticks_per_sec
 
-/**
- * qdf_system_ticks_to_msecs - convert ticks to milliseconds
- * @clock_ticks: Number of ticks
- *
- * Return: unsigned int Time in milliseconds
- */
 static inline uint32_t qdf_system_ticks_to_msecs(unsigned long clock_ticks)
 {
 	return __qdf_system_ticks_to_msecs(clock_ticks);
 }
 
-/**
- * qdf_system_msecs_to_ticks - convert milliseconds to ticks
- * @msec: Time in milliseconds
- *
- * Return: unsigned long number of ticks
- */
 static inline qdf_time_t qdf_system_msecs_to_ticks(uint32_t msecs)
 {
 	return __qdf_system_msecs_to_ticks(msecs);
 }
 
-/**
- * qdf_get_system_uptime - Return a monotonically increasing time
- * This increments once per HZ ticks
- *
- * Return: qdf_time_t system up time in ticks
- */
 static inline qdf_time_t qdf_get_system_uptime(void)
 {
 	return __qdf_get_system_uptime();
 }
 
-/**
- * qdf_get_bootbased_boottime_ns() - Get the bootbased time in nanoseconds
- *
- * qdf_get_bootbased_boottime_ns() function returns the number of nanoseconds
- * that have elapsed since the system was booted. It also includes the time when
- * system was suspended.
- *
- * Return:
- * The time since system booted in nanoseconds
- */
 
 static inline uint64_t qdf_get_bootbased_boottime_ns(void)
 {
 	return __qdf_get_bootbased_boottime_ns();
 }
 
-/**
- * qdf_get_system_timestamp - Return current timestamp
- *
- * Return: unsigned long timestamp in ms.
- */
 static inline unsigned long qdf_get_system_timestamp(void)
 {
 	return __qdf_get_system_timestamp();
 }
 
-/**
- * qdf_udelay - delay in microseconds
- * @usecs: Number of microseconds to delay
- *
- * Return: none
- */
 static inline void qdf_udelay(int usecs)
 {
 	__qdf_udelay(usecs);
 }
 
-/**
- * qdf_mdelay - Delay in milliseconds.
- * @msec: Number of milliseconds to delay
- *
- * Return: none
- */
 static inline void qdf_mdelay(int msecs)
 {
 	__qdf_mdelay(msecs);
 }
 
-/**
- * qdf_system_time_after() - Check if a is later than b
- * @a: Time stamp value a
- * @b: Time stamp value b
- *
- * Return:
- * true if a < b else false
- */
 static inline bool qdf_system_time_after(qdf_time_t a, qdf_time_t b)
 {
 	return __qdf_system_time_after(a, b);
 }
 
-/**
- * qdf_system_time_before() - Check if a is before b
- * @a: Time stamp value a
- * @b: Time stamp value b
- *
- * Return:
- * true if a is before b else false
- */
 static inline bool qdf_system_time_before(qdf_time_t a, qdf_time_t b)
 {
 	return __qdf_system_time_before(a, b);
 }
 
-/**
- * qdf_system_time_after_eq() - Check if a atleast as recent as b, if not
- * later
- * @a: Time stamp value a
- * @b: Time stamp value b
- *
- * Return:
- * true if a >= b else false
- */
 static inline bool qdf_system_time_after_eq(qdf_time_t a, qdf_time_t b)
 {
 	return __qdf_system_time_after_eq(a, b);
@@ -549,7 +434,7 @@ static inline uint64_t qdf_log_timestamp_to_usecs(uint64_t time)
 }
 
 /**
- * qdf_get_log_timestamp_lightweight - get time stamp for logging
+ * qdf_get_log_timestamp_lightweight() - get time stamp for logging
  * For adrastea this API returns QTIMER tick which is needed to synchronize
  * host and fw log timestamps
  * For ROME and other discrete solution this API returns system boot time stamp
@@ -601,38 +486,16 @@ static inline uint64_t qdf_usecs_to_log_timestamp(uint64_t usecs)
 	return (usecs * QDF_LOG_TIMESTAMP_CYCLES_PER_10_US) / 10;
 }
 
-/**
- * qdf_get_log_timestamp - get time stamp for logging
- * For adrastea this API returns QTIMER tick which is needed to synchronize
- * host and fw log timestamps
- * For ROME and other discrete solution this API returns system boot time stamp
- *
- * Return:
- * QTIMER ticks(19.2MHz) for adrastea
- * System tick for rome and other future discrete solutions
- */
 static inline uint64_t qdf_get_log_timestamp(void)
 {
 	return __qdf_get_log_timestamp();
 }
 
-/**
- * qdf_get_log_timestamp_usecs() - get time stamp for logging in microseconds
- *
- * Return: The current logging timestamp normalized to microsecond precision
- */
 static inline uint64_t qdf_get_log_timestamp_usecs(void)
 {
 	return qdf_log_timestamp_to_usecs(qdf_get_log_timestamp());
 }
 
-/**
- * qdf_get_monotonic_boottime - get monotonic kernel boot time
- * This API is similar to qdf_get_system_boottime but it includes
- * time spent in suspend.
- *
- * Return: Time in microseconds
- */
 static inline uint64_t qdf_get_monotonic_boottime(void)
 {
 	return __qdf_get_monotonic_boottime();

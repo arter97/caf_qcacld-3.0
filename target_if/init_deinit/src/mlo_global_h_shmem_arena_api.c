@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -53,8 +53,8 @@ static uint16_t mgmt_rx_reo_snapshot_get_mgmt_pkt_ctr(uint32_t snapshot_low,
 }
 
 /**
- * mgmt_rx_reo_snapshot_get_mgmt_pkt_ctr() - Get the redundant management packet
- * counter from MGMT Rx REO snapshot
+ * mgmt_rx_reo_snapshot_get_redundant_mgmt_pkt_ctr() - Get the
+ * redundant management packet counter from MGMT Rx REO snapshot
  * @snapshot_high: higher 32-bits of the snapshot
  *
  * Return: Redundant management packet counter of the snapshot
@@ -88,6 +88,7 @@ static bool mgmt_rx_reo_snapshot_is_consistent(uint32_t snapshot_low,
  * MGMT Rx REO snapshot
  * @snapshot_low: lower 32-bits of the snapshot
  * @snapshot_high: higher 32-bits of the snapshot
+ * @snapshot_version: snapshot version id
  *
  * Return: Global timestamp of the snapshot
  */

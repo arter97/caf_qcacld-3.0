@@ -1062,6 +1062,203 @@ static void dp_mon_register_intr_ops_1_0(struct dp_soc *soc)
 }
 #endif
 
+#if defined(ATH_SUPPORT_NAC_RSSI) || defined(ATH_SUPPORT_NAC)
+/*
+ * dp_update_filter_neighbour_peers() - set neighbour peers(nac clients)
+ * address for smart mesh filtering
+ * @txrx_soc: cdp soc handle
+ * @vdev_id: id of virtual device object
+ * @cmd: Add/Del command
+ * @macaddr: nac client mac address
+ *
+ * Return: success/failure
+ */
+static int dp_update_filter_neighbour_peers(struct cdp_soc_t *soc_hdl,
+					    uint8_t vdev_id,
+					    uint32_t cmd, uint8_t *macaddr)
+{
+	struct dp_soc *soc = (struct dp_soc *)soc_hdl;
+	struct dp_pdev *pdev;
+	struct dp_neighbour_peer *peer = NULL;
+	struct dp_vdev *vdev = dp_vdev_get_ref_by_id(soc, vdev_id,
+						     DP_MOD_ID_CDP);
+	struct dp_mon_pdev *mon_pdev;
+
+	if (!vdev || !macaddr)
+		goto fail0;
+
+	pdev = vdev->pdev;
+
+	if (!pdev)
+		goto fail0;
+
+	mon_pdev = pdev->monitor_pdev;
+
+	/* Store address of NAC (neighbour peer) which will be checked
+	 * against TA of received packets.
+	 */
+	if (cmd == DP_NAC_PARAM_ADD) {
+		peer = (struct dp_neighbour_peer *)qdf_mem_malloc(
+				sizeof(*peer));
+
+		if (!peer) {
+			dp_cdp_err("%pK: DP neighbour peer node memory allocation failed"
+				   , soc);
+			goto fail0;
+		}
+
+		qdf_mem_copy(&peer->neighbour_peers_macaddr.raw[0],
+			     macaddr, QDF_MAC_ADDR_SIZE);
+		peer->vdev = vdev;
+
+		qdf_spin_lock_bh(&mon_pdev->neighbour_peer_mutex);
+
+		/* add this neighbour peer into the list */
+		TAILQ_INSERT_TAIL(&mon_pdev->neighbour_peers_list, peer,
+				  neighbour_peer_list_elem);
+		qdf_spin_unlock_bh(&mon_pdev->neighbour_peer_mutex);
+
+		/* first neighbour */
+		if (!mon_pdev->neighbour_peers_added) {
+			QDF_STATUS status = QDF_STATUS_SUCCESS;
+
+			mon_pdev->neighbour_peers_added = true;
+			dp_mon_filter_setup_smart_monitor(pdev);
+			status = dp_mon_filter_update(pdev);
+			if (status != QDF_STATUS_SUCCESS) {
+				dp_cdp_err("%pK: smart mon filter setup failed",
+					   soc);
+				dp_mon_filter_reset_smart_monitor(pdev);
+				mon_pdev->neighbour_peers_added = false;
+			}
+		}
+
+	} else if (cmd == DP_NAC_PARAM_DEL) {
+		qdf_spin_lock_bh(&mon_pdev->neighbour_peer_mutex);
+		TAILQ_FOREACH(peer, &mon_pdev->neighbour_peers_list,
+			      neighbour_peer_list_elem) {
+			if (!qdf_mem_cmp(&peer->neighbour_peers_macaddr.raw[0],
+					 macaddr, QDF_MAC_ADDR_SIZE)) {
+				/* delete this peer from the list */
+				TAILQ_REMOVE(&mon_pdev->neighbour_peers_list,
+					     peer, neighbour_peer_list_elem);
+				qdf_mem_free(peer);
+				break;
+			}
+		}
+		/* last neighbour deleted */
+		if (TAILQ_EMPTY(&mon_pdev->neighbour_peers_list)) {
+			QDF_STATUS status = QDF_STATUS_SUCCESS;
+
+			dp_mon_filter_reset_smart_monitor(pdev);
+			status = dp_mon_filter_update(pdev);
+			if (status != QDF_STATUS_SUCCESS) {
+				dp_cdp_err("%pK: smart mon filter clear failed",
+					   soc);
+			}
+			mon_pdev->neighbour_peers_added = false;
+		}
+		qdf_spin_unlock_bh(&mon_pdev->neighbour_peer_mutex);
+	}
+	dp_vdev_unref_delete(soc, vdev, DP_MOD_ID_CDP);
+	return 1;
+
+fail0:
+	if (vdev)
+		dp_vdev_unref_delete(soc, vdev, DP_MOD_ID_CDP);
+	return 0;
+}
+#endif /* ATH_SUPPORT_NAC_RSSI || ATH_SUPPORT_NAC */
+
+#ifdef ATH_SUPPORT_NAC_RSSI
+/**
+ * dp_vdev_get_neighbour_rssi(): Store RSSI for configured NAC
+ * @soc_hdl: DP soc handle
+ * @vdev_id: id of DP vdev handle
+ * @mac_addr: neighbour mac
+ * @rssi: rssi value
+ *
+ * Return: 0 for success. nonzero for failure.
+ */
+static QDF_STATUS  dp_vdev_get_neighbour_rssi(struct cdp_soc_t *soc_hdl,
+					      uint8_t vdev_id,
+					      char *mac_addr,
+					      uint8_t *rssi)
+{
+	struct dp_soc *soc = cdp_soc_t_to_dp_soc(soc_hdl);
+	struct dp_vdev *vdev = dp_vdev_get_ref_by_id(soc, vdev_id,
+						     DP_MOD_ID_CDP);
+	struct dp_pdev *pdev;
+	struct dp_neighbour_peer *peer = NULL;
+	QDF_STATUS status = QDF_STATUS_E_FAILURE;
+	struct dp_mon_pdev *mon_pdev;
+
+	if (!vdev)
+		return status;
+
+	pdev = vdev->pdev;
+	mon_pdev = pdev->monitor_pdev;
+
+	*rssi = 0;
+	qdf_spin_lock_bh(&mon_pdev->neighbour_peer_mutex);
+	TAILQ_FOREACH(peer, &mon_pdev->neighbour_peers_list,
+		      neighbour_peer_list_elem) {
+		if (qdf_mem_cmp(&peer->neighbour_peers_macaddr.raw[0],
+				mac_addr, QDF_MAC_ADDR_SIZE) == 0) {
+			*rssi = peer->rssi;
+			status = QDF_STATUS_SUCCESS;
+			break;
+		}
+	}
+	qdf_spin_unlock_bh(&mon_pdev->neighbour_peer_mutex);
+	dp_vdev_unref_delete(soc, vdev, DP_MOD_ID_CDP);
+	return status;
+}
+
+static QDF_STATUS
+dp_config_for_nac_rssi(struct cdp_soc_t *cdp_soc,
+		       uint8_t vdev_id,
+		       enum cdp_nac_param_cmd cmd, char *bssid,
+		       char *client_macaddr,
+		       uint8_t chan_num)
+{
+	struct dp_soc *soc = (struct dp_soc *)cdp_soc;
+	struct dp_vdev *vdev = dp_vdev_get_ref_by_id(soc, vdev_id,
+						     DP_MOD_ID_CDP);
+	struct dp_pdev *pdev;
+	struct dp_mon_pdev *mon_pdev;
+
+	if (!vdev)
+		return QDF_STATUS_E_FAILURE;
+
+	pdev = (struct dp_pdev *)vdev->pdev;
+
+	mon_pdev = pdev->monitor_pdev;
+	mon_pdev->nac_rssi_filtering = 1;
+	/* Store address of NAC (neighbour peer) which will be checked
+	 * against TA of received packets.
+	 */
+
+	if (cmd == CDP_NAC_PARAM_ADD) {
+		dp_update_filter_neighbour_peers(cdp_soc, vdev->vdev_id,
+						 DP_NAC_PARAM_ADD,
+						 (uint8_t *)client_macaddr);
+	} else if (cmd == CDP_NAC_PARAM_DEL) {
+		dp_update_filter_neighbour_peers(cdp_soc, vdev->vdev_id,
+						 DP_NAC_PARAM_DEL,
+						 (uint8_t *)client_macaddr);
+	}
+
+	if (soc->cdp_soc.ol_ops->config_bssid_in_fw_for_nac_rssi)
+		soc->cdp_soc.ol_ops->config_bssid_in_fw_for_nac_rssi
+			(soc->ctrl_psoc, pdev->pdev_id,
+			 vdev->vdev_id, cmd, bssid, client_macaddr);
+
+	dp_vdev_unref_delete(soc, vdev, DP_MOD_ID_CDP);
+	return QDF_STATUS_SUCCESS;
+}
+#endif
+
 /**
  * dp_mon_register_feature_ops_1_0() - register feature ops
  *
@@ -1308,6 +1505,17 @@ struct cdp_mon_ops dp_ops_mon_1_0 = {
 	.soc_config_full_mon_mode = dp_soc_config_full_mon_mode,
 	.get_mon_pdev_rx_stats = dp_pdev_get_rx_mon_stats,
 	.txrx_enable_mon_reap_timer = dp_enable_mon_reap_timer,
+#ifdef QCA_ENHANCED_STATS_SUPPORT
+	.txrx_enable_enhanced_stats = dp_enable_enhanced_stats,
+	.txrx_disable_enhanced_stats = dp_disable_enhanced_stats,
+#endif /* QCA_ENHANCED_STATS_SUPPORT */
+#if defined(ATH_SUPPORT_NAC_RSSI) || defined(ATH_SUPPORT_NAC)
+	.txrx_update_filter_neighbour_peers = dp_update_filter_neighbour_peers,
+#endif
+#ifdef ATH_SUPPORT_NAC_RSSI
+	.txrx_vdev_config_for_nac_rssi = dp_config_for_nac_rssi,
+	.txrx_vdev_get_neighbour_rssi = dp_vdev_get_neighbour_rssi,
+#endif
 #ifdef QCA_SUPPORT_LITE_MONITOR
 	.txrx_set_lite_mon_config = NULL,
 	.txrx_get_lite_mon_config = NULL,

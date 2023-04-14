@@ -203,6 +203,21 @@ void mlo_mlme_peer_create(struct wlan_objmgr_vdev *vdev,
 						    addr, frm_buf);
 }
 
+void mlo_mlme_bridge_peer_create(struct wlan_objmgr_vdev *vdev,
+				 struct wlan_mlo_peer_context *ml_peer,
+				 struct qdf_mac_addr *addr,
+				 qdf_nbuf_t frm_buf)
+{
+	struct mlo_mgr_context *mlo_ctx = wlan_objmgr_get_mlo_ctx();
+
+	if (!mlo_ctx || !mlo_ctx->mlme_ops ||
+	    !mlo_ctx->mlme_ops->mlo_mlme_ext_bridge_peer_create)
+		return;
+
+	mlo_ctx->mlme_ops->mlo_mlme_ext_bridge_peer_create(vdev, ml_peer,
+							   addr, frm_buf);
+}
+
 void mlo_mlme_peer_assoc(struct wlan_objmgr_peer *peer)
 {
 	struct mlo_mgr_context *mlo_ctx = wlan_objmgr_get_mlo_ctx();
@@ -353,6 +368,25 @@ uint16_t wlan_mlo_get_valid_link_bitmap(uint8_t grp_id)
 
 	return mlo_ctx->setup_info[grp_id].valid_link_bitmap;
 }
+
+uint8_t wlan_mlo_get_psoc_mlo_chip_id(struct wlan_objmgr_psoc *psoc)
+{
+	struct wlan_lmac_if_tx_ops *tx_ops;
+	uint8_t mlo_chip_id = WLAN_MLO_CHIP_ID_INVALID;
+
+	if (!psoc) {
+		qdf_err("PSOC is NULL");
+		return mlo_chip_id;
+	}
+
+	tx_ops = wlan_psoc_get_lmac_if_txops(psoc);
+	if (tx_ops && tx_ops->mops.get_psoc_mlo_chip_id)
+		mlo_chip_id = tx_ops->mops.get_psoc_mlo_chip_id(psoc);
+
+	return mlo_chip_id;
+}
+
+qdf_export_symbol(wlan_mlo_get_psoc_mlo_chip_id);
 
 uint8_t wlan_mlo_get_psoc_group_id(struct wlan_objmgr_psoc *psoc)
 {

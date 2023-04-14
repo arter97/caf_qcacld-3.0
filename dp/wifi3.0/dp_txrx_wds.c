@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2016-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -296,12 +296,6 @@ static void dp_ast_aging_timer_fn(void *soc_hdl)
 #endif /* WLAN_FEATURE_MULTI_AST_DEL */
 
 #ifndef IPA_WDS_EASYMESH_FEATURE
-/*
- * dp_soc_wds_attach() - Setup WDS timer and AST table
- * @soc:		Datapath SOC handle
- *
- * Return: None
- */
 void dp_soc_wds_attach(struct dp_soc *soc)
 {
 	if (soc->ast_offload_support)
@@ -316,12 +310,6 @@ void dp_soc_wds_attach(struct dp_soc *soc)
 	qdf_timer_mod(&soc->ast_aging_timer, DP_AST_AGING_TIMER_DEFAULT_MS);
 }
 
-/*
- * dp_soc_wds_detach() - Detach WDS data structures and timers
- * @txrx_soc: DP SOC handle
- *
- * Return: None
- */
 void dp_soc_wds_detach(struct dp_soc *soc)
 {
 	qdf_timer_stop(&soc->ast_aging_timer);
@@ -337,15 +325,6 @@ void dp_soc_wds_detach(struct dp_soc *soc)
 }
 #endif
 
-/**
- * dp_tx_mec_handler() - Tx  MEC Notify Handler
- * @vdev: pointer to dp dev handler
- * @status : Tx completion status from HTT descriptor
- *
- * Handles MEC notify event sent from fw to Host
- *
- * Return: none
- */
 void dp_tx_mec_handler(struct dp_vdev *vdev, uint8_t *status)
 {
 	struct dp_soc *soc;
@@ -376,17 +355,6 @@ void dp_tx_mec_handler(struct dp_vdev *vdev, uint8_t *status)
 
 #ifndef QCA_HOST_MODE_WIFI_DISABLED
 
-/**
- * dp_rx_da_learn() - Add AST entry based on DA lookup
- *			This is a WAR for HK 1.0 and will
- *			be removed in HK 2.0
- *
- * @soc: core txrx main context
- * @rx_tlv_hdr	: start address of rx tlvs
- * @ta_txrx_peer: Transmitter peer entry
- * @nbuf	: nbuf to retrieve destination mac for which AST will be added
- *
- */
 void
 dp_rx_da_learn(struct dp_soc *soc,
 	       uint8_t *rx_tlv_hdr,
@@ -424,15 +392,6 @@ dp_rx_da_learn(struct dp_soc *soc,
 	}
 }
 
-/**
- * dp_txrx_set_wds_rx_policy() - API to store datapath
- *                            config parameters
- * @soc - datapath soc handle
- * @vdev_id - id of datapath vdev handle
- * @cfg: ini parameter handle
- *
- * Return: status
- */
 #ifdef WDS_VENDOR_EXTENSION
 QDF_STATUS
 dp_txrx_set_wds_rx_policy(struct cdp_soc_t *soc_hdl, uint8_t vdev_id,
@@ -463,17 +422,6 @@ dp_txrx_set_wds_rx_policy(struct cdp_soc_t *soc_hdl, uint8_t vdev_id,
 	return QDF_STATUS_SUCCESS;
 }
 
-/**
- * dp_txrx_peer_wds_tx_policy_update() - API to set tx wds policy
- *
- * @cdp_soc: DP soc handle
- * @vdev_id: id of vdev handle
- * @peer_mac: peer mac address
- * @wds_tx_ucast: policy for unicast transmission
- * @wds_tx_mcast: policy for multicast transmission
- *
- * Return: void
- */
 QDF_STATUS
 dp_txrx_peer_wds_tx_policy_update(struct cdp_soc_t *soc,  uint8_t vdev_id,
 				  uint8_t *peer_mac, int wds_tx_ucast,
@@ -601,14 +549,6 @@ int dp_wds_rx_policy_check(uint8_t *rx_tlv_hdr,
 }
 #endif
 
-/**
- * dp_tx_add_groupkey_metadata - Add group key in metadata
- * @vdev: DP vdev handle
- * @msdu_info: MSDU info to be setup in MSDU descriptor
- * @group_key: Group key index programmed in metadata
- *
- * Return: void
- */
 #ifdef QCA_MULTIPASS_SUPPORT
 void dp_tx_add_groupkey_metadata(struct dp_vdev *vdev,
 		struct dp_tx_msdu_info_s *msdu_info, uint16_t group_key)
@@ -628,13 +568,6 @@ void dp_tx_add_groupkey_metadata(struct dp_vdev *vdev,
 	HTT_TX_MSDU_EXT2_DESC_KEY_FLAGS_SET(msdu_info->meta_data[2], group_key);
 }
 
-/**
- * dp_tx_remove_vlan_tag - Remove 4 bytes of vlan tag
- * @vdev: DP vdev handle
- * @tx_desc: Tx Descriptor Handle
- *
- * Return: void
- */
 void dp_tx_remove_vlan_tag(struct dp_vdev *vdev, qdf_nbuf_t nbuf)
 {
 	struct vlan_ethhdr veth_hdr;
@@ -656,7 +589,7 @@ void dp_tx_remove_vlan_tag(struct dp_vdev *vdev, qdf_nbuf_t nbuf)
 #if defined(WLAN_FEATURE_11BE_MLO) && defined(WLAN_MLO_MULTI_CHIP) && \
 	defined(WLAN_MCAST_MLO)
 /**
- * dp_tx_need_mcast_reinject - If frame needs to be processed in reinject path
+ * dp_tx_need_mcast_reinject() - If frame needs to be processed in reinject path
  * @vdev: DP vdev handle
  *
  * Return: true if reinject handling is required else false
@@ -678,9 +611,10 @@ dp_tx_need_mcast_reinject(struct dp_vdev *vdev)
 
 #endif
 /**
- * dp_tx_need_multipass_process - If frame needs multipass phrase processing
+ * dp_tx_need_multipass_process() - If frame needs multipass phrase processing
+ * @soc: dp soc handle
  * @vdev: DP vdev handle
- * @tx_desc: Tx Descriptor Handle
+ * @buf: frame
  * @vlan_id: vlan id of frame
  *
  * Return: whether peer is special or classic
@@ -738,15 +672,6 @@ uint8_t dp_tx_need_multipass_process(struct dp_soc *soc, struct dp_vdev *vdev,
 	return DP_VLAN_UNTAGGED;
 }
 
-/**
- * dp_tx_multipass_process - Process vlan frames in tx path
- * @soc: dp soc handle
- * @vdev: DP vdev handle
- * @nbuf: skb
- * @msdu_info: msdu descriptor
- *
- * Return: status whether frame needs to be dropped or transmitted
- */
 bool dp_tx_multipass_process(struct dp_soc *soc, struct dp_vdev *vdev,
 			     qdf_nbuf_t nbuf,
 			     struct dp_tx_msdu_info_s *msdu_info)
@@ -815,20 +740,6 @@ bool dp_tx_multipass_process(struct dp_soc *soc, struct dp_vdev *vdev,
 	return true;
 }
 
-/**
- * dp_rx_multipass_process - insert vlan tag on frames for traffic separation
- * @txrx_peer: DP txrx peer handle
- * @nbuf: skb
- * @tid: traffic priority
- *
- * Return: bool: true in case of success else false
- * Success is considered if:
- *  i. If frame has vlan header
- *  ii. If the frame comes from different peer and dont need multipass processing
- * Failure is considered if:
- *  i. Frame comes from multipass peer but doesn't contain vlan header.
- *  In failure case, drop such frames.
- */
 bool dp_rx_multipass_process(struct dp_txrx_peer *txrx_peer, qdf_nbuf_t nbuf,
 			     uint8_t tid)
 {
@@ -863,12 +774,6 @@ bool dp_rx_multipass_process(struct dp_txrx_peer *txrx_peer, qdf_nbuf_t nbuf,
 
 #ifdef QCA_MULTIPASS_SUPPORT
 
-/**
- * dp_peer_multipass_list_remove: remove peer from list
- * @peer: pointer to peer
- *
- * return: void
- */
 void dp_peer_multipass_list_remove(struct dp_peer *peer)
 {
 	struct dp_vdev *vdev = peer->vdev;
@@ -892,8 +797,8 @@ void dp_peer_multipass_list_remove(struct dp_peer *peer)
 }
 
 /**
- * dp_peer_multipass_list_add: add to new multipass list
- * @dp_soc: soc handle
+ * dp_peer_multipass_list_add() - add to new multipass list
+ * @soc: soc handle
  * @peer_mac: mac address
  * @vdev_id: vdev id for peer
  * @vlan_id: vlan_id
@@ -945,18 +850,9 @@ fail:
 	return;
 }
 
-/**
- * dp_peer_set_vlan_id: set vlan_id for this peer
- * @cdp_soc: soc handle
- * @vdev_id: vdev id for peer
- * @peer_mac: mac address
- * @vlan_id: vlan id for peer
- *
- * return: void
- */
 void dp_peer_set_vlan_id(struct cdp_soc_t *cdp_soc,
-		uint8_t vdev_id, uint8_t *peer_mac,
-		uint16_t vlan_id)
+			 uint8_t vdev_id, uint8_t *peer_mac,
+			 uint16_t vlan_id)
 {
 	struct dp_soc *soc = (struct dp_soc *)cdp_soc;
 	struct dp_vdev *vdev =
@@ -969,15 +865,6 @@ void dp_peer_set_vlan_id(struct cdp_soc_t *cdp_soc,
 	}
 }
 
-/**
- * dp_set_vlan_groupkey: set vlan map for vdev
- * @soc: pointer to soc
- * @vdev_id : id of vdev
- * @vlan_id: vlan_id
- * @group_key: group key for vlan
- *
- * return: set success/failure
- */
 QDF_STATUS dp_set_vlan_groupkey(struct cdp_soc_t *soc_hdl, uint8_t vdev_id,
 				uint16_t vlan_id, uint16_t group_key)
 {
@@ -1021,12 +908,6 @@ fail:
 	return status;
 }
 
-/**
- * dp_tx_vdev_multipass_deinit: set vlan map for vdev
- * @vdev_handle: pointer to vdev
- *
- * return: void
- */
 void dp_tx_vdev_multipass_deinit(struct dp_vdev *vdev)
 {
 	struct dp_txrx_peer *txrx_peer = NULL;
@@ -1043,12 +924,6 @@ void dp_tx_vdev_multipass_deinit(struct dp_vdev *vdev)
 	qdf_spinlock_destroy(&vdev->mpass_peer_mutex);
 }
 
-/**
- * dp_peer_multipass_list_init: initialize peer mulitpass list
- * @vdev_handle: pointer to vdev
- *
- * return: set success/failure
- */
 void dp_peer_multipass_list_init(struct dp_vdev *vdev)
 {
 	/*
@@ -1062,12 +937,6 @@ void dp_peer_multipass_list_init(struct dp_vdev *vdev)
 
 #ifdef QCA_PEER_MULTIQ_SUPPORT
 
-/**
- * dp_peer_reset_flowq_map() - reset peer flowq map table
- * @peer - dp peer handle
- *
- * Return: none
- */
 void dp_peer_reset_flowq_map(struct dp_peer *peer)
 {
 	int i = 0;
@@ -1085,8 +954,8 @@ void dp_peer_reset_flowq_map(struct dp_peer *peer)
 
 /**
  * dp_peer_get_flowid_from_flowmask() - get flow id from flow mask
- * @peer - dp peer handle
- * @mask - flow mask
+ * @peer: dp peer handle
+ * @mask: flow mask
  *
  * Return: flow id
  */
@@ -1113,10 +982,10 @@ static int dp_peer_get_flowid_from_flowmask(struct dp_peer *peer,
 
 /**
  * dp_peer_get_ast_valid() - get ast index valid from mask
- * @mask - mask for ast valid bits
- * @index - index for an ast
+ * @mask: mask for ast valid bits
+ * @index: index for an ast
  *
- * Return - 1 if ast index is valid from mask else 0
+ * Return: 1 if ast index is valid from mask else 0
  */
 static inline bool dp_peer_get_ast_valid(uint8_t mask, uint16_t index)
 {
@@ -1125,16 +994,6 @@ static inline bool dp_peer_get_ast_valid(uint8_t mask, uint16_t index)
 	return ((mask) & (1 << ((index) - 1)));
 }
 
-/**
- * dp_peer_ast_index_flow_queue_map_create() - create ast index flow queue map
- * @soc - generic soc handle
- * @is_wds - flag to indicate if peer is wds
- * @peer_id - peer_id from htt peer map message
- * @peer_mac_addr - mac address of the peer
- * @ast_info - ast flow override information from peer map
- *
- * Return: none
- */
 void dp_peer_ast_index_flow_queue_map_create(void *soc_hdl,
 		bool is_wds, uint16_t peer_id, uint8_t *peer_mac_addr,
 		struct dp_ast_flow_override_info *ast_info)
@@ -1222,14 +1081,6 @@ end:
 	dp_peer_unref_delete(peer, DP_MOD_ID_AST);
 }
 
-/**
- * dp_peer_find_ast_index_by_flowq_id() - API to get ast idx for a given flowid
- * @soc - soc handle
- * @peer_mac_addr - mac address of the peer
- * @flow_id - flow id to find ast index
- *
- * Return: ast index for a given flow id, -1 for fail cases
- */
 int dp_peer_find_ast_index_by_flowq_id(struct cdp_soc_t *soc,
 		uint16_t vdev_id, uint8_t *peer_mac_addr,
 		uint8_t flow_id, uint8_t tid)
@@ -1375,17 +1226,6 @@ void dp_hmwds_ast_add_notify(struct dp_peer *peer,
 	defined(QCA_TX_CAPTURE_SUPPORT) || \
 	defined(QCA_MCOPY_SUPPORT)
 #ifdef FEATURE_PERPKT_INFO
-/**
- * dp_get_completion_indication_for_stack() - send completion to stack
- * @soc : dp_soc handle
- * @pdev: dp_pdev handle
- * @peer: dp peer handle
- * @ts: transmit completion status structure
- * @netbuf: Buffer pointer for free
- *
- * This function is used for indication whether buffer needs to be
- * sent to stack for freeing or not
-*/
 QDF_STATUS
 dp_get_completion_indication_for_stack(struct dp_soc *soc,
 				       struct dp_pdev *pdev,
@@ -1460,17 +1300,6 @@ dp_get_completion_indication_for_stack(struct dp_soc *soc,
 	return QDF_STATUS_SUCCESS;
 }
 
-/**
- * dp_send_completion_to_stack() - send completion to stack
- * @soc :  dp_soc handle
- * @pdev:  dp_pdev handle
- * @peer_id: peer_id of the peer for which completion came
- * @ppdu_id: ppdu_id
- * @netbuf: Buffer pointer for free
- *
- * This function is used to send completion to stack
- * to free buffer
-*/
 void dp_send_completion_to_stack(struct dp_soc *soc,  struct dp_pdev *pdev,
 				 uint16_t peer_id, uint32_t ppdu_id,
 				 qdf_nbuf_t netbuf)

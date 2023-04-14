@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -95,6 +95,13 @@ uint32_t qdf_system_ticks_to_msecs(unsigned long clock_ticks)
 }
 
 qdf_export_symbol(qdf_system_ticks_to_msecs);
+
+uint32_t qdf_system_ticks_to_nsecs(unsigned long clock_ticks)
+{
+	return __qdf_system_ticks_to_nsecs(clock_ticks);
+}
+
+qdf_export_symbol(qdf_system_ticks_to_nsecs);
 
 qdf_time_t qdf_system_msecs_to_ticks(uint32_t msecs)
 {

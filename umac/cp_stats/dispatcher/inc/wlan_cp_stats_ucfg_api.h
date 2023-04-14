@@ -58,7 +58,7 @@ ucfg_send_infra_cp_stats_request(struct wlan_objmgr_vdev *vdev,
 
 #ifdef WLAN_TELEMETRY_STATS_SUPPORT
 /**
- * @ucfg_send_telemetry_cp_stats_request() - send a telemetry cp stats command
+ * ucfg_send_telemetry_cp_stats_request() - send a telemetry cp stats command
  * @pdev: pointer to pdev object
  * @req: pointer to request parameter structure
  *

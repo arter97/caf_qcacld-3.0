@@ -176,7 +176,7 @@ dp_tx_mon_print_ring_stat_2_0(struct dp_pdev *pdev);
 #define MAX_MONITOR_HEADER (512)
 #define MAX_DUMMY_FRM_BODY (128)
 
-#define MAX_STATUS_BUFFER_IN_PPDU (64)
+#define MAX_STATUS_BUFFER_IN_PPDU (128)
 #define TXMON_NO_BUFFER_SZ (64)
 
 #define DP_BA_ACK_FRAME_SIZE (sizeof(struct ieee80211_ctlframe_addr2) + 36)

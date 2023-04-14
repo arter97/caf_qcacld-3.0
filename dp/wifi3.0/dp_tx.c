@@ -64,9 +64,6 @@
 /* disable TQM_BYPASS */
 #define TQM_BYPASS_WAR 0
 
-/* invalid peer id for reinject*/
-#define DP_INVALID_PEER 0XFFFE
-
 #define DP_RETRY_COUNT 7
 #ifdef WLAN_PEER_JITTER
 #define DP_AVG_JITTER_WEIGHT_DENOM 4
@@ -108,6 +105,9 @@
 #define DP_TCL_METADATA_TYPE_VDEV_BASED \
 	HTT_TCL_METADATA_TYPE_VDEV_BASED
 #endif
+
+#define DP_GET_HW_LINK_ID_FRM_PPDU_ID(PPDU_ID, LINK_ID_OFFSET, LINK_ID_BITS) \
+	(((PPDU_ID) >> (LINK_ID_OFFSET)) & ((1 << (LINK_ID_BITS)) - 1))
 
 /*mapping between hal encrypt type and cdp_sec_type*/
 uint8_t sec_type_map[MAX_CDP_SEC_TYPE] = {HAL_TX_ENCRYPT_TYPE_NO_CIPHER,
@@ -1999,6 +1999,9 @@ is_nbuf_frm_rmnet(qdf_nbuf_t nbuf, struct dp_tx_msdu_info_s *msdu_info)
 
 	ingress_dev = dev_get_by_index(dev_net(nbuf->dev), nbuf->skb_iif);
 
+	if (!ingress_dev)
+		return false;
+
 	if ((ingress_dev->priv_flags & IFF_PHONY_HEADROOM)) {
 		dev_put(ingress_dev);
 		frag = &(skb_shinfo(nbuf)->frags[0]);
@@ -3154,7 +3157,6 @@ dp_tx_per_pkt_vdev_id_check(qdf_nbuf_t nbuf, struct dp_vdev *vdev)
  * Return: none
  */
 
-static inline
 void dp_tx_nawds_handler(struct dp_soc *soc, struct dp_vdev *vdev,
 			 struct dp_tx_msdu_info_s *msdu_info,
 			 qdf_nbuf_t nbuf, uint16_t sa_peer_id)
@@ -3163,6 +3165,7 @@ void dp_tx_nawds_handler(struct dp_soc *soc, struct dp_vdev *vdev,
 	qdf_nbuf_t nbuf_clone = NULL;
 	uint16_t peer_id = DP_INVALID_PEER;
 	struct dp_txrx_peer *txrx_peer;
+	uint8_t link_id = 0;
 
 	/* This check avoids pkt forwarding which is entered
 	 * in the ast table but still doesn't have valid peerid.
@@ -3182,6 +3185,12 @@ void dp_tx_nawds_handler(struct dp_soc *soc, struct dp_vdev *vdev,
 			if (!dp_peer_is_primary_link_peer(peer))
 				continue;
 
+			/* In the case of wds ext peer mcast traffic will be
+			 * sent as part of VLAN interface
+			 */
+			if (dp_peer_is_wds_ext_peer(txrx_peer))
+				continue;
+
 			/* Multicast packets needs to be
 			 * dropped in case of intra bss forwarding
 			 */
@@ -3189,7 +3198,7 @@ void dp_tx_nawds_handler(struct dp_soc *soc, struct dp_vdev *vdev,
 				dp_tx_debug("multicast packet");
 				DP_PEER_PER_PKT_STATS_INC(txrx_peer,
 							  tx.nawds_mcast_drop,
-							  1);
+							  1, link_id);
 				continue;
 			}
 
@@ -3213,13 +3222,35 @@ void dp_tx_nawds_handler(struct dp_soc *soc, struct dp_vdev *vdev,
 				if (peer_id != DP_INVALID_PEER)
 					DP_PEER_PER_PKT_STATS_INC_PKT(txrx_peer,
 								      tx.nawds_mcast,
-								      1, qdf_nbuf_len(nbuf));
+								      1, qdf_nbuf_len(nbuf), link_id);
 			}
 		}
 	}
 
 	qdf_spin_unlock_bh(&vdev->peer_list_lock);
 }
+
+#ifdef WLAN_MCAST_MLO
+static inline bool
+dp_tx_check_mesh_vdev(struct dp_vdev *vdev,
+		      struct cdp_tx_exception_metadata *tx_exc_metadata)
+{
+	if (!tx_exc_metadata->is_mlo_mcast && qdf_unlikely(vdev->mesh_vdev))
+		return true;
+
+	return false;
+}
+#else
+static inline bool
+dp_tx_check_mesh_vdev(struct dp_vdev *vdev,
+		      struct cdp_tx_exception_metadata *tx_exc_metadata)
+{
+	if (qdf_unlikely(vdev->mesh_vdev))
+		return true;
+
+	return false;
+}
+#endif
 
 qdf_nbuf_t
 dp_tx_send_exception(struct cdp_soc_t *soc_hdl, uint8_t vdev_id,
@@ -3268,7 +3299,7 @@ dp_tx_send_exception(struct cdp_soc_t *soc_hdl, uint8_t vdev_id,
 	/* Basic sanity checks for unsupported packets */
 
 	/* MESH mode */
-	if (qdf_unlikely(vdev->mesh_vdev)) {
+	if (dp_tx_check_mesh_vdev(vdev, tx_exc_metadata)) {
 		dp_tx_err("Mesh mode is not supported in exception path");
 		goto fail;
 	}
@@ -4461,19 +4492,21 @@ void dp_tx_compute_delay(struct dp_vdev *vdev, struct dp_tx_desc_s *tx_desc,
 #ifdef DISABLE_DP_STATS
 static
 inline void dp_update_no_ack_stats(qdf_nbuf_t nbuf,
-				   struct dp_txrx_peer *txrx_peer)
+				   struct dp_txrx_peer *txrx_peer,
+				   uint8_t link_id)
 {
 }
 #else
 static inline void
-dp_update_no_ack_stats(qdf_nbuf_t nbuf, struct dp_txrx_peer *txrx_peer)
+dp_update_no_ack_stats(qdf_nbuf_t nbuf, struct dp_txrx_peer *txrx_peer,
+		       uint8_t link_id)
 {
 	enum qdf_proto_subtype subtype = QDF_PROTO_INVALID;
 
 	DPTRACE(qdf_dp_track_noack_check(nbuf, &subtype));
 	if (subtype != QDF_PROTO_INVALID)
 		DP_PEER_PER_PKT_STATS_INC(txrx_peer, tx.no_ack_count[subtype],
-					  1);
+					  1, link_id);
 }
 #endif
 
@@ -4497,12 +4530,13 @@ dp_tx_get_mpdu_retry_threshold(struct dp_txrx_peer *txrx_peer)
  *
  * @ts: Tx compltion status
  * @txrx_peer: datapath txrx_peer handle
+ * @link_id: Link id
  *
  * Return: void
  */
 static inline void
 dp_tx_update_peer_extd_stats(struct hal_tx_completion_status *ts,
-			     struct dp_txrx_peer *txrx_peer)
+			     struct dp_txrx_peer *txrx_peer, uint8_t link_id)
 {
 	uint8_t mcs, pkt_type, dst_mcs_idx;
 	uint8_t retry_threshold = dp_tx_get_mpdu_retry_threshold(txrx_peer);
@@ -4517,33 +4551,70 @@ dp_tx_update_peer_extd_stats(struct hal_tx_completion_status *ts,
 	if (MCS_INVALID_ARRAY_INDEX != dst_mcs_idx)
 		DP_PEER_EXTD_STATS_INC(txrx_peer,
 				       tx.pkt_type[pkt_type].mcs_count[dst_mcs_idx],
-				       1);
+				       1, link_id);
 
-	DP_PEER_EXTD_STATS_INC(txrx_peer, tx.sgi_count[ts->sgi], 1);
-	DP_PEER_EXTD_STATS_INC(txrx_peer, tx.bw[ts->bw], 1);
-	DP_PEER_EXTD_STATS_UPD(txrx_peer, tx.last_ack_rssi, ts->ack_frame_rssi);
+	DP_PEER_EXTD_STATS_INC(txrx_peer, tx.sgi_count[ts->sgi], 1, link_id);
+	DP_PEER_EXTD_STATS_INC(txrx_peer, tx.bw[ts->bw], 1, link_id);
+	DP_PEER_EXTD_STATS_UPD(txrx_peer, tx.last_ack_rssi, ts->ack_frame_rssi,
+			       link_id);
 	DP_PEER_EXTD_STATS_INC(txrx_peer,
-			       tx.wme_ac_type[TID_TO_WME_AC(ts->tid)], 1);
-	DP_PEER_EXTD_STATS_INCC(txrx_peer, tx.stbc, 1, ts->stbc);
-	DP_PEER_EXTD_STATS_INCC(txrx_peer, tx.ldpc, 1, ts->ldpc);
-	DP_PEER_EXTD_STATS_INCC(txrx_peer, tx.retries, 1, ts->transmit_cnt > 1);
+			       tx.wme_ac_type[TID_TO_WME_AC(ts->tid)], 1,
+			       link_id);
+	DP_PEER_EXTD_STATS_INCC(txrx_peer, tx.stbc, 1, ts->stbc, link_id);
+	DP_PEER_EXTD_STATS_INCC(txrx_peer, tx.ldpc, 1, ts->ldpc, link_id);
+	DP_PEER_EXTD_STATS_INCC(txrx_peer, tx.retries, 1, ts->transmit_cnt > 1,
+				link_id);
 	if (ts->first_msdu) {
 		DP_PEER_EXTD_STATS_INCC(txrx_peer, tx.retries_mpdu, 1,
-					ts->transmit_cnt > 1);
+					ts->transmit_cnt > 1, link_id);
 
 		if (!retry_threshold)
 			return;
 		DP_PEER_EXTD_STATS_INCC(txrx_peer, tx.mpdu_success_with_retries,
 					qdf_do_div(ts->transmit_cnt,
 						   retry_threshold),
-					ts->transmit_cnt > retry_threshold);
+					ts->transmit_cnt > retry_threshold,
+					link_id);
 	}
 }
 #else
 static inline void
 dp_tx_update_peer_extd_stats(struct hal_tx_completion_status *ts,
-			     struct dp_txrx_peer *txrx_peer)
+			     struct dp_txrx_peer *txrx_peer, uint8_t link_id)
 {
+}
+#endif
+
+#ifdef WLAN_FEATURE_11BE_MLO
+static inline int
+dp_tx_get_link_id_from_ppdu_id(struct dp_soc *soc,
+			       struct hal_tx_completion_status *ts,
+			       struct dp_txrx_peer *txrx_peer,
+			       struct dp_vdev *vdev)
+{
+	uint8_t hw_link_id = 0;
+	uint32_t ppdu_id;
+	uint8_t link_id_offset, link_id_bits;
+
+	if (!txrx_peer->is_mld_peer || !vdev->pdev->link_peer_stats)
+		return 0;
+
+	link_id_offset = soc->link_id_offset;
+	link_id_bits = soc->link_id_bits;
+	ppdu_id = ts->ppdu_id;
+	hw_link_id = DP_GET_HW_LINK_ID_FRM_PPDU_ID(ppdu_id, link_id_offset,
+						   link_id_bits);
+
+	return (hw_link_id + 1);
+}
+#else
+static inline int
+dp_tx_get_link_id_from_ppdu_id(struct dp_soc *soc,
+			       struct hal_tx_completion_status *ts,
+			       struct dp_txrx_peer *txrx_peer,
+			       struct dp_vdev *vdev)
+{
+	return 0;
 }
 #endif
 
@@ -4555,13 +4626,15 @@ dp_tx_update_peer_extd_stats(struct hal_tx_completion_status *ts,
  * @ts: Tx completion status
  * @txrx_peer: peer handle
  * @ring_id: ring number
+ * @link_id: Link id
  *
  * Return: None
  */
 static inline void
 dp_tx_update_peer_stats(struct dp_tx_desc_s *tx_desc,
 			struct hal_tx_completion_status *ts,
-			struct dp_txrx_peer *txrx_peer, uint8_t ring_id)
+			struct dp_txrx_peer *txrx_peer, uint8_t ring_id,
+			uint8_t link_id)
 {
 	struct dp_pdev *pdev = txrx_peer->vdev->pdev;
 	uint8_t tid = ts->tid;
@@ -4578,7 +4651,8 @@ dp_tx_update_peer_stats(struct dp_tx_desc_s *tx_desc,
 
 	if (ts->release_src != HAL_TX_COMP_RELEASE_SOURCE_TQM) {
 		dp_err_rl("Release source:%d is not from TQM", ts->release_src);
-		DP_PEER_PER_PKT_STATS_INC(txrx_peer, tx.release_src_not_tqm, 1);
+		DP_PEER_PER_PKT_STATS_INC(txrx_peer, tx.release_src_not_tqm, 1,
+					  link_id);
 		return;
 	}
 
@@ -4595,22 +4669,23 @@ dp_tx_update_peer_stats(struct dp_tx_desc_s *tx_desc,
 
 	if (qdf_likely(ts->status == HAL_TX_TQM_RR_FRAME_ACKED)) {
 		DP_PEER_PER_PKT_STATS_INCC(txrx_peer, tx.retry_count, 1,
-					   ts->transmit_cnt > 1);
+					   ts->transmit_cnt > 1, link_id);
 
 		DP_PEER_PER_PKT_STATS_INCC(txrx_peer, tx.multiple_retry_count,
-					   1, ts->transmit_cnt > 2);
+					   1, ts->transmit_cnt > 2, link_id);
 
-		DP_PEER_PER_PKT_STATS_INCC(txrx_peer, tx.ofdma, 1, ts->ofdma);
+		DP_PEER_PER_PKT_STATS_INCC(txrx_peer, tx.ofdma, 1, ts->ofdma,
+					   link_id);
 
 		DP_PEER_PER_PKT_STATS_INCC(txrx_peer, tx.amsdu_cnt, 1,
-					   ts->msdu_part_of_amsdu);
+					   ts->msdu_part_of_amsdu, link_id);
 		DP_PEER_PER_PKT_STATS_INCC(txrx_peer, tx.non_amsdu_cnt, 1,
-					   !ts->msdu_part_of_amsdu);
+					   !ts->msdu_part_of_amsdu, link_id);
 
-		txrx_peer->stats.per_pkt_stats.tx.last_tx_ts =
+		txrx_peer->stats[link_id].per_pkt_stats.tx.last_tx_ts =
 							qdf_system_ticks();
 
-		dp_tx_update_peer_extd_stats(ts, txrx_peer);
+		dp_tx_update_peer_extd_stats(ts, txrx_peer, link_id);
 
 		return;
 	}
@@ -4626,44 +4701,58 @@ dp_tx_update_peer_stats(struct dp_tx_desc_s *tx_desc,
 	DP_PEER_STATS_FLAT_INC(txrx_peer, tx_failed, 1);
 
 	DP_PEER_PER_PKT_STATS_INCC(txrx_peer, tx.failed_retry_count, 1,
-				   ts->transmit_cnt > DP_RETRY_COUNT);
-	dp_update_no_ack_stats(tx_desc->nbuf, txrx_peer);
+				   ts->transmit_cnt > DP_RETRY_COUNT,
+				   link_id);
+	dp_update_no_ack_stats(tx_desc->nbuf, txrx_peer, link_id);
 
 	if (ts->status == HAL_TX_TQM_RR_REM_CMD_AGED) {
-		DP_PEER_PER_PKT_STATS_INC(txrx_peer, tx.dropped.age_out, 1);
+		DP_PEER_PER_PKT_STATS_INC(txrx_peer, tx.dropped.age_out, 1,
+					  link_id);
 	} else if (ts->status == HAL_TX_TQM_RR_REM_CMD_REM) {
 		DP_PEER_PER_PKT_STATS_INC_PKT(txrx_peer, tx.dropped.fw_rem, 1,
-					      length);
+					      length, link_id);
 	} else if (ts->status == HAL_TX_TQM_RR_REM_CMD_NOTX) {
-		DP_PEER_PER_PKT_STATS_INC(txrx_peer, tx.dropped.fw_rem_notx, 1);
+		DP_PEER_PER_PKT_STATS_INC(txrx_peer, tx.dropped.fw_rem_notx, 1,
+					  link_id);
 	} else if (ts->status == HAL_TX_TQM_RR_REM_CMD_TX) {
-		DP_PEER_PER_PKT_STATS_INC(txrx_peer, tx.dropped.fw_rem_tx, 1);
+		DP_PEER_PER_PKT_STATS_INC(txrx_peer, tx.dropped.fw_rem_tx, 1,
+					  link_id);
 	} else if (ts->status == HAL_TX_TQM_RR_FW_REASON1) {
-		DP_PEER_PER_PKT_STATS_INC(txrx_peer, tx.dropped.fw_reason1, 1);
+		DP_PEER_PER_PKT_STATS_INC(txrx_peer, tx.dropped.fw_reason1, 1,
+					  link_id);
 	} else if (ts->status == HAL_TX_TQM_RR_FW_REASON2) {
-		DP_PEER_PER_PKT_STATS_INC(txrx_peer, tx.dropped.fw_reason2, 1);
+		DP_PEER_PER_PKT_STATS_INC(txrx_peer, tx.dropped.fw_reason2, 1,
+					  link_id);
 	} else if (ts->status == HAL_TX_TQM_RR_FW_REASON3) {
-		DP_PEER_PER_PKT_STATS_INC(txrx_peer, tx.dropped.fw_reason3, 1);
+		DP_PEER_PER_PKT_STATS_INC(txrx_peer, tx.dropped.fw_reason3, 1,
+					  link_id);
 	} else if (ts->status == HAL_TX_TQM_RR_REM_CMD_DISABLE_QUEUE) {
 		DP_PEER_PER_PKT_STATS_INC(txrx_peer,
-					  tx.dropped.fw_rem_queue_disable, 1);
+					  tx.dropped.fw_rem_queue_disable, 1,
+					  link_id);
 	} else if (ts->status == HAL_TX_TQM_RR_REM_CMD_TILL_NONMATCHING) {
 		DP_PEER_PER_PKT_STATS_INC(txrx_peer,
-					  tx.dropped.fw_rem_no_match, 1);
+					  tx.dropped.fw_rem_no_match, 1,
+					  link_id);
 	} else if (ts->status == HAL_TX_TQM_RR_DROP_THRESHOLD) {
 		DP_PEER_PER_PKT_STATS_INC(txrx_peer,
-					  tx.dropped.drop_threshold, 1);
+					  tx.dropped.drop_threshold, 1,
+					  link_id);
 	} else if (ts->status == HAL_TX_TQM_RR_LINK_DESC_UNAVAILABLE) {
 		DP_PEER_PER_PKT_STATS_INC(txrx_peer,
-					  tx.dropped.drop_link_desc_na, 1);
+					  tx.dropped.drop_link_desc_na, 1,
+					  link_id);
 	} else if (ts->status == HAL_TX_TQM_RR_DROP_OR_INVALID_MSDU) {
 		DP_PEER_PER_PKT_STATS_INC(txrx_peer,
-					  tx.dropped.invalid_drop, 1);
+					  tx.dropped.invalid_drop, 1,
+					  link_id);
 	} else if (ts->status == HAL_TX_TQM_RR_MULTICAST_DROP) {
 		DP_PEER_PER_PKT_STATS_INC(txrx_peer,
-					  tx.dropped.mcast_vdev_drop, 1);
+					  tx.dropped.mcast_vdev_drop, 1,
+					  link_id);
 	} else {
-		DP_PEER_PER_PKT_STATS_INC(txrx_peer, tx.dropped.invalid_rr, 1);
+		DP_PEER_PER_PKT_STATS_INC(txrx_peer, tx.dropped.invalid_rr, 1,
+					  link_id);
 	}
 }
 
@@ -4763,6 +4852,7 @@ static inline void dp_tx_notify_completion(struct dp_soc *soc,
  * @tid: tid value
  * @txdesc_ts: timestamp from txdesc
  * @ppdu_id: ppdu id
+ * @link_id: link id
  *
  * Return: none
  */
@@ -4771,7 +4861,8 @@ static inline void dp_tx_sojourn_stats_process(struct dp_pdev *pdev,
 					       struct dp_txrx_peer *txrx_peer,
 					       uint8_t tid,
 					       uint64_t txdesc_ts,
-					       uint32_t ppdu_id)
+					       uint32_t ppdu_id,
+					       uint8_t link_id)
 {
 	uint64_t delta_ms;
 	struct cdp_tx_sojourn_stats *sojourn_stats;
@@ -4805,12 +4896,13 @@ static inline void dp_tx_sojourn_stats_process(struct dp_pdev *pdev,
 
 	delta_ms = qdf_ktime_to_ms(qdf_ktime_real_get()) -
 				txdesc_ts;
-	qdf_ewma_tx_lag_add(&txrx_peer->stats.per_pkt_stats.tx.avg_sojourn_msdu[tid],
+	qdf_ewma_tx_lag_add(&txrx_peer->stats[link_id].per_pkt_stats.tx.avg_sojourn_msdu[tid],
 			    delta_ms);
 	sojourn_stats->sum_sojourn_msdu[tid] = delta_ms;
 	sojourn_stats->num_msdus[tid] = 1;
 	sojourn_stats->avg_sojourn_msdu[tid].internal =
-		txrx_peer->stats.per_pkt_stats.tx.avg_sojourn_msdu[tid].internal;
+		txrx_peer->stats[link_id].
+			per_pkt_stats.tx.avg_sojourn_msdu[tid].internal;
 	dp_wdi_event_handler(WDI_EVENT_TX_SOJOURN_STAT, pdev->soc,
 			     pdev->sojourn_buf, HTT_INVALID_PEER,
 			     WDI_NO_VAL, pdev->pdev_id);
@@ -5171,6 +5263,7 @@ void dp_tx_comp_process_tx_status(struct dp_soc *soc,
 	struct dp_vdev *vdev = NULL;
 	qdf_nbuf_t nbuf = tx_desc->nbuf;
 	enum qdf_dp_tx_rx_status dp_status;
+	uint8_t link_id = 0;
 
 	if (!nbuf) {
 		dp_info_rl("invalid tx descriptor. nbuf NULL");
@@ -5229,6 +5322,12 @@ void dp_tx_comp_process_tx_status(struct dp_soc *soc,
 	}
 	vdev = txrx_peer->vdev;
 
+#ifdef DP_MLO_LINK_STATS_SUPPORT
+	link_id = dp_tx_get_link_id_from_ppdu_id(soc, ts, txrx_peer, vdev);
+	if (link_id < 1 || link_id > DP_MAX_MLO_LINKS)
+		link_id = 0;
+#endif
+
 	dp_tx_update_connectivity_stats(soc, vdev, tx_desc, ts->status);
 	dp_tx_update_uplink_delay(soc, vdev, ts);
 
@@ -5247,30 +5346,32 @@ void dp_tx_comp_process_tx_status(struct dp_soc *soc,
 			 vdev->opmode == wlan_op_mode_ap)) {
 		if (ts->status != HAL_TX_TQM_RR_REM_CMD_REM) {
 			DP_PEER_PER_PKT_STATS_INC_PKT(txrx_peer, tx.mcast, 1,
-						      length);
+						      length, link_id);
 
 			if (txrx_peer->vdev->tx_encap_type ==
 				htt_cmn_pkt_type_ethernet &&
 				QDF_IS_ADDR_BROADCAST(eh->ether_dhost)) {
 				DP_PEER_PER_PKT_STATS_INC_PKT(txrx_peer,
 							      tx.bcast, 1,
-							      length);
+							      length, link_id);
 			}
 		}
 	} else {
-		DP_PEER_PER_PKT_STATS_INC_PKT(txrx_peer, tx.ucast, 1, length);
+		DP_PEER_PER_PKT_STATS_INC_PKT(txrx_peer, tx.ucast, 1, length,
+					      link_id);
 		if (ts->status == HAL_TX_TQM_RR_FRAME_ACKED) {
 			DP_PEER_PER_PKT_STATS_INC_PKT(txrx_peer, tx.tx_success,
-						      1, length);
+						      1, length, link_id);
 			if (qdf_unlikely(txrx_peer->in_twt)) {
 				DP_PEER_PER_PKT_STATS_INC_PKT(txrx_peer,
 							      tx.tx_success_twt,
-							      1, length);
+							      1, length,
+							      link_id);
 			}
 		}
 	}
 
-	dp_tx_update_peer_stats(tx_desc, ts, txrx_peer, ring_id);
+	dp_tx_update_peer_stats(tx_desc, ts, txrx_peer, ring_id, link_id);
 	dp_tx_update_peer_delay_stats(txrx_peer, tx_desc, ts, ring_id);
 	dp_tx_update_peer_jitter_stats(txrx_peer, tx_desc, ts, ring_id);
 	dp_tx_update_peer_sawf_stats(soc, vdev, txrx_peer, tx_desc,
@@ -5281,7 +5382,7 @@ void dp_tx_comp_process_tx_status(struct dp_soc *soc,
 	if (soc->peerstats_enabled)
 		dp_tx_sojourn_stats_process(vdev->pdev, txrx_peer, ts->tid,
 					    qdf_ktime_to_ms(tx_desc->timestamp),
-					    ts->ppdu_id);
+					    ts->ppdu_id, link_id);
 #endif
 
 out:
@@ -5421,6 +5522,19 @@ dp_tx_nbuf_dev_queue_free(qdf_nbuf_queue_head_t *nbuf_queue_head,
 }
 
 static inline void
+dp_tx_nbuf_dev_queue_free_no_flag(qdf_nbuf_queue_head_t *nbuf_queue_head,
+				  qdf_nbuf_t nbuf)
+{
+	if (!nbuf)
+		return;
+
+	if (nbuf->is_from_recycler)
+		qdf_nbuf_dev_queue_head(nbuf_queue_head, nbuf);
+	else
+		qdf_nbuf_free(nbuf);
+}
+
+static inline void
 dp_tx_nbuf_dev_kfree_list(qdf_nbuf_queue_head_t *nbuf_queue_head)
 {
 	qdf_nbuf_dev_kfree_list(nbuf_queue_head);
@@ -5439,7 +5553,59 @@ dp_tx_nbuf_dev_queue_free(qdf_nbuf_queue_head_t *nbuf_queue_head,
 }
 
 static inline void
+dp_tx_nbuf_dev_queue_free_no_flag(qdf_nbuf_queue_head_t *nbuf_queue_head,
+				  qdf_nbuf_t nbuf)
+{
+	qdf_nbuf_free(nbuf);
+}
+
+static inline void
 dp_tx_nbuf_dev_kfree_list(qdf_nbuf_queue_head_t *nbuf_queue_head)
+{
+}
+#endif
+
+#ifdef WLAN_SUPPORT_PPEDS
+static inline void
+dp_tx_update_ppeds_tx_comp_stats(struct dp_soc *soc,
+				 struct dp_txrx_peer *txrx_peer,
+				 struct hal_tx_completion_status *ts,
+				 struct dp_tx_desc_s *desc,
+				 uint8_t ring_id)
+{
+	uint8_t link_id = 0;
+	struct dp_vdev *vdev = NULL;
+
+	if (qdf_likely(txrx_peer)) {
+		dp_tx_update_peer_basic_stats(txrx_peer,
+					      desc->length,
+					      desc->tx_status,
+					      false);
+		if (!(desc->flags & DP_TX_DESC_FLAG_SIMPLE)) {
+			hal_tx_comp_get_status(&desc->comp,
+					       ts,
+					       soc->hal_soc);
+			vdev = txrx_peer->vdev;
+			link_id = dp_tx_get_link_id_from_ppdu_id(soc,
+								 ts,
+								 txrx_peer,
+								 vdev);
+			if (link_id < 1 || link_id > DP_MAX_MLO_LINKS)
+				link_id = 0;
+			dp_tx_update_peer_stats(desc, ts,
+						txrx_peer,
+						ring_id,
+						link_id);
+		}
+	}
+}
+#else
+static inline void
+dp_tx_update_ppeds_tx_comp_stats(struct dp_soc *soc,
+				 struct dp_txrx_peer *txrx_peer,
+				 struct hal_tx_completion_status *ts,
+				 struct dp_tx_desc_s *desc,
+				 uint8_t ring_id)
 {
 }
 #endif
@@ -5481,13 +5647,12 @@ dp_tx_comp_process_desc_list(struct dp_soc *soc,
 		}
 
 		if (desc->flags & DP_TX_DESC_FLAG_PPEDS) {
-			if (qdf_likely(txrx_peer))
-				dp_tx_update_peer_basic_stats(txrx_peer,
-							      desc->length,
-							      desc->tx_status,
-							      false);
-			dp_tx_nbuf_dev_queue_free(&h, desc);
-			dp_ppeds_tx_desc_free(soc, desc);
+			qdf_nbuf_t nbuf;
+			dp_tx_update_ppeds_tx_comp_stats(soc, txrx_peer, &ts,
+							 desc, ring_id);
+
+			nbuf = dp_ppeds_tx_desc_free(soc, desc);
+			dp_tx_nbuf_dev_queue_free_no_flag(&h, nbuf);
 			desc = next;
 			continue;
 		}

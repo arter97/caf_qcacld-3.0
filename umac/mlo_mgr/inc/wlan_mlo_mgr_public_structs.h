@@ -111,6 +111,19 @@ enum MLO_SOC_LIST {
 
 #define MAX_MLO_LINKS 6
 #define MAX_MLO_CHIPS 5
+#define MAX_ADJ_CHIPS 2
+
+/**
+ * struct mlo_chip_info: MLO chip info per link
+ * @info_valid: If the info here is valid or not
+ * @chip_id: Chip ID as assigned by platform
+ * @adj_chip_ids: Chip IDs of Adjacent chips
+ */
+struct mlo_chip_info {
+	uint8_t info_valid;
+	uint8_t chip_id[MAX_MLO_CHIPS];
+	uint8_t adj_chip_ids[MAX_MLO_CHIPS][MAX_ADJ_CHIPS];
+};
 
 /**
  * struct mlo_setup_info: MLO setup status per link
@@ -128,6 +141,7 @@ enum MLO_SOC_LIST {
  * @state_lock: lock to protect access to link state
  * @event: event for teardown completion
  * @dp_handle: pointer to DP ML context
+ * @chip_info: chip specific info of the soc
  */
 struct mlo_setup_info {
 	uint8_t ml_grp_id;
@@ -144,6 +158,7 @@ struct mlo_setup_info {
 	qdf_spinlock_t state_lock;
 	qdf_event_t event;
 	struct cdp_mlo_ctxt *dp_handle;
+	struct mlo_chip_info chip_info;
 };
 
 /**
@@ -325,6 +340,7 @@ struct wlan_mlo_sta {
  * @ml_aid_mgr: ML AID mgr
  * @mlo_ap_lock: lock to sync VDEV SM event
  * @mlo_vdev_quiet_bmap: Bitmap of vdevs for which quiet ie needs to enabled
+ * @mlo_vdev_up_bmap: Bitmap of vdevs for which sync complete can be dispatched
  *
  * NB: not using kernel-doc format since the kernel-doc script doesn't
  *     handle the qdf_bitmap() macro
@@ -338,6 +354,7 @@ struct wlan_mlo_ap {
 	qdf_mutex_t mlo_ap_lock;
 #endif
 	qdf_bitmap(mlo_vdev_quiet_bmap, WLAN_UMAC_MLO_MAX_VDEVS);
+	qdf_bitmap(mlo_vdev_up_bmap, WLAN_UMAC_MLO_MAX_VDEVS);
 };
 
 /**
@@ -586,6 +603,7 @@ struct wlan_mlo_peer_context {
  * struct mlo_link_info - ML link info
  * @link_addr: link mac address
  * @link_id: link index
+ * @is_bridge : Bridge peer or not
  * @chan_freq: Operating channel frequency
  * @nawds_config: peer's NAWDS configurarion
  * @vdev_id: VDEV ID
@@ -594,6 +612,7 @@ struct wlan_mlo_peer_context {
 struct mlo_link_info {
 	struct qdf_mac_addr link_addr;
 	uint8_t link_id;
+	bool is_bridge;
 	uint16_t chan_freq;
 #ifdef UMAC_SUPPORT_MLNAWDS
 	struct mlnawds_config nawds_config;
@@ -662,10 +681,34 @@ struct ml_rv_info {
  * struct mlo_tgt_link_info - ML target link info
  * @vdev_id: link peer vdev id
  * @hw_mld_link_id: HW link id
+ * @mlo_enabled: indicate is MLO enabled
+ * @mlo_assoc_link: indicate is the link used to initialize the association
+ *                  of mlo connection
+ * @mlo_primary_umac: indicate is the link on primary UMAC, WIN only flag
+ * @mlo_logical_link_index_valid: indicate if the logial link index in is valid
+ * @mlo_peer_id_valid: indicate if the mlo peer id is valid
+ * @mlo_force_link_inactive: force the peer inactive
+ * @emlsr_support: indicate if eMLSR supported
+ * @emlmr_support: indicate if eMLMR supported
+ * @msd_cap_support: indicate if MSD supported
+ * @unused: spare bits
+ * @logical_link_index: Unique index for links of the mlo. Starts with Zero
  */
 struct mlo_tgt_link_info {
 	uint8_t vdev_id;
 	uint8_t hw_mld_link_id;
+	uint32_t mlo_enabled:1,
+		 mlo_assoc_link:1,
+		 mlo_primary_umac:1,
+		 mlo_logical_link_index_valid:1,
+		 mlo_peer_id_valid:1,
+		 mlo_force_link_inactive:1,
+		 emlsr_support:1,
+		 emlmr_support:1,
+		 msd_cap_support:1,
+		 unused:23;
+	uint32_t logical_link_index;
+
 };
 
 /**
@@ -683,6 +726,7 @@ struct mlo_tgt_partner_info {
  * @mlo_mlme_ext_validate_conn_req: Callback to validate connect request
  * @mlo_mlme_ext_create_link_vdev: Callback to create link vdev for ML STA
  * @mlo_mlme_ext_peer_create: Callback to create link peer
+ * @mlo_mlme_ext_bridge_peer_create: Callback to create bridge peer
  * @mlo_mlme_ext_peer_assoc: Callback to initiate peer assoc
  * @mlo_mlme_ext_peer_assoc_fail: Callback to notify peer assoc failure
  * @mlo_mlme_ext_peer_delete: Callback to initiate link peer delete
@@ -700,6 +744,10 @@ struct mlo_mlme_ext_ops {
 	QDF_STATUS (*mlo_mlme_ext_create_link_vdev)(
 		    struct vdev_mlme_obj *vdev_mlme, void *ext_data);
 	QDF_STATUS (*mlo_mlme_ext_peer_create)(struct wlan_objmgr_vdev *vdev,
+					struct wlan_mlo_peer_context *ml_peer,
+					struct qdf_mac_addr *addr,
+					qdf_nbuf_t frm_buf);
+	QDF_STATUS (*mlo_mlme_ext_bridge_peer_create)(struct wlan_objmgr_vdev *vdev,
 					struct wlan_mlo_peer_context *ml_peer,
 					struct qdf_mac_addr *addr,
 					qdf_nbuf_t frm_buf);

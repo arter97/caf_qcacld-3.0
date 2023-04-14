@@ -30,11 +30,6 @@ wlan_twt_tgt_caps_get_responder(struct wlan_objmgr_psoc *psoc, bool *val)
 {
 	struct twt_psoc_priv_obj *twt_psoc;
 
-	if (!psoc) {
-		twt_err("null psoc");
-		return QDF_STATUS_E_FAILURE;
-	}
-
 	twt_psoc = wlan_objmgr_psoc_get_comp_private_obj(psoc,
 							 WLAN_UMAC_COMP_TWT);
 	if (!twt_psoc) {
@@ -47,37 +42,10 @@ wlan_twt_tgt_caps_get_responder(struct wlan_objmgr_psoc *psoc, bool *val)
 }
 
 QDF_STATUS
-wlan_twt_tgt_caps_get_legacy_bcast_support(struct wlan_objmgr_psoc *psoc,
-					   bool *val)
-{
-	struct twt_psoc_priv_obj *twt_psoc;
-
-	if (!psoc) {
-		twt_err("null psoc");
-		return QDF_STATUS_E_FAILURE;
-	}
-
-	twt_psoc = wlan_objmgr_psoc_get_comp_private_obj(psoc,
-							 WLAN_UMAC_COMP_TWT);
-	if (!twt_psoc) {
-		twt_err("null twt psoc priv obj");
-		return QDF_STATUS_E_FAILURE;
-	}
-
-	*val = twt_psoc->twt_caps.legacy_bcast_twt_support;
-	return QDF_STATUS_SUCCESS;
-}
-
-QDF_STATUS
 wlan_twt_tgt_caps_get_nudge_enabled(struct wlan_objmgr_psoc *psoc,
 				    bool *val)
 {
 	struct twt_psoc_priv_obj *twt_psoc;
-
-	if (!psoc) {
-		twt_err("null psoc");
-		return QDF_STATUS_E_FAILURE;
-	}
 
 	twt_psoc = wlan_objmgr_psoc_get_comp_private_obj(psoc,
 							 WLAN_UMAC_COMP_TWT);
@@ -96,11 +64,6 @@ wlan_twt_tgt_caps_get_all_twt_enabled(struct wlan_objmgr_psoc *psoc,
 {
 	struct twt_psoc_priv_obj *twt_psoc;
 
-	if (!psoc) {
-		twt_err("null psoc");
-		return QDF_STATUS_E_FAILURE;
-	}
-
 	twt_psoc = wlan_objmgr_psoc_get_comp_private_obj(psoc,
 							 WLAN_UMAC_COMP_TWT);
 	if (!twt_psoc) {
@@ -117,11 +80,6 @@ wlan_twt_tgt_caps_get_stats_enabled(struct wlan_objmgr_psoc *psoc,
 					bool *val)
 {
 	struct twt_psoc_priv_obj *twt_psoc;
-
-	if (!psoc) {
-		twt_err("null psoc");
-		return QDF_STATUS_E_FAILURE;
-	}
 
 	twt_psoc = wlan_objmgr_psoc_get_comp_private_obj(psoc,
 							 WLAN_UMAC_COMP_TWT);
@@ -161,12 +119,6 @@ wlan_twt_tgt_caps_get_ack_supported(struct wlan_objmgr_psoc *psoc,
 {
 	struct twt_psoc_priv_obj *twt_psoc;
 
-	if (!psoc) {
-		twt_err("null psoc");
-		*val = false;
-		return QDF_STATUS_E_FAILURE;
-	}
-
 	twt_psoc = wlan_objmgr_psoc_get_comp_private_obj(psoc,
 							 WLAN_UMAC_COMP_TWT);
 	if (!twt_psoc) {
@@ -180,9 +132,8 @@ wlan_twt_tgt_caps_get_ack_supported(struct wlan_objmgr_psoc *psoc,
 }
 
 QDF_STATUS
-wlan_twt_requestor_disable(struct wlan_objmgr_psoc *psoc,
-			   struct twt_disable_param *req,
-			   void *context)
+wlan_twt_tgt_caps_get_restricted_support(struct wlan_objmgr_psoc *psoc,
+					 bool *val)
 {
 	struct twt_psoc_priv_obj *twt_psoc;
 
@@ -190,6 +141,24 @@ wlan_twt_requestor_disable(struct wlan_objmgr_psoc *psoc,
 		twt_err("null psoc");
 		return QDF_STATUS_E_FAILURE;
 	}
+
+	twt_psoc = wlan_objmgr_psoc_get_comp_private_obj(psoc,
+							 WLAN_UMAC_COMP_TWT);
+	if (!twt_psoc) {
+		twt_err("null twt psoc priv obj");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	*val = twt_psoc->twt_caps.restricted_twt_support;
+	return QDF_STATUS_SUCCESS;
+}
+
+QDF_STATUS
+wlan_twt_requestor_disable(struct wlan_objmgr_psoc *psoc,
+			   struct twt_disable_param *req,
+			   void *context)
+{
+	struct twt_psoc_priv_obj *twt_psoc;
 
 	twt_psoc = wlan_objmgr_psoc_get_comp_private_obj(psoc,
 							 WLAN_UMAC_COMP_TWT);
@@ -217,11 +186,6 @@ wlan_twt_responder_disable(struct wlan_objmgr_psoc *psoc,
 {
 	struct twt_psoc_priv_obj *twt_psoc;
 
-	if (!psoc) {
-		twt_err("null psoc");
-		return QDF_STATUS_E_FAILURE;
-	}
-
 	twt_psoc = wlan_objmgr_psoc_get_comp_private_obj(psoc,
 							 WLAN_UMAC_COMP_TWT);
 	if (!twt_psoc) {
@@ -248,11 +212,6 @@ wlan_twt_requestor_enable(struct wlan_objmgr_psoc *psoc,
 {
 	struct twt_psoc_priv_obj *twt_psoc;
 	bool requestor_en = false, twt_bcast_requestor = false;
-
-	if (!psoc) {
-		twt_err("null psoc");
-		return QDF_STATUS_E_FAILURE;
-	}
 
 	twt_psoc = wlan_objmgr_psoc_get_comp_private_obj(psoc,
 							 WLAN_UMAC_COMP_TWT);
@@ -294,11 +253,6 @@ wlan_twt_responder_enable(struct wlan_objmgr_psoc *psoc,
 {
 	struct twt_psoc_priv_obj *twt_psoc;
 	bool responder_en = false, twt_bcast_responder = false;
-
-	if (!psoc) {
-		twt_err("null psoc");
-		return QDF_STATUS_E_FAILURE;
-	}
 
 	twt_psoc = wlan_objmgr_psoc_get_comp_private_obj(psoc,
 							 WLAN_UMAC_COMP_TWT);
@@ -407,11 +361,6 @@ wlan_twt_enable_event_handler(struct wlan_objmgr_psoc *psoc,
 	struct twt_psoc_priv_obj *twt_psoc;
 	struct twt_en_dis_context *twt_context;
 
-	if (!psoc) {
-		twt_err("null psoc");
-		return QDF_STATUS_E_FAILURE;
-	}
-
 	twt_psoc = wlan_objmgr_psoc_get_comp_private_obj(psoc,
 							 WLAN_UMAC_COMP_TWT);
 	if (!twt_psoc) {
@@ -450,11 +399,6 @@ wlan_twt_disable_event_handler(struct wlan_objmgr_psoc *psoc,
 {
 	struct twt_psoc_priv_obj *twt_psoc;
 	struct twt_en_dis_context *twt_context;
-
-	if (!psoc) {
-		twt_err("null psoc");
-		return QDF_STATUS_E_FAILURE;
-	}
 
 	twt_psoc = wlan_objmgr_psoc_get_comp_private_obj(psoc,
 							 WLAN_UMAC_COMP_TWT);

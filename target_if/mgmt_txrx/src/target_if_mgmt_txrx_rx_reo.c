@@ -29,12 +29,13 @@
 #include <wlan_lmac_if_api.h>
 #include <init_deinit_lmac.h>
 #include <wlan_mlo_mgr_setup.h>
+
 /**
  * target_if_mgmt_rx_reo_fw_consumed_event_handler() - WMI event handler to
  * process MGMT Rx FW consumed event handler
  * @scn: Pointer to scn object
- * @data_buf: Pointer to event buffer
- * @data_len: Length of event buffer
+ * @data: Pointer to event buffer
+ * @datalen: Length of event buffer
  *
  * Return: 0 for success, else failure
  */
@@ -96,6 +97,32 @@ target_if_mgmt_rx_reo_fw_consumed_event_handler(
 
 	wlan_objmgr_pdev_release_ref(pdev, WLAN_MGMT_SB_ID);
 	return 0;
+}
+
+void target_if_mgmt_rx_reo_release_frames(void *arg)
+{
+	ol_scn_t scn = arg;
+	struct wlan_objmgr_psoc *psoc;
+	struct wlan_lmac_if_mgmt_rx_reo_rx_ops *mgmt_rx_reo_rx_ops;
+	QDF_STATUS status;
+
+	psoc = target_if_get_psoc_from_scn_hdl(scn);
+	if (!psoc) {
+		mgmt_rx_reo_err("null psoc");
+		return;
+	}
+
+	mgmt_rx_reo_rx_ops = target_if_mgmt_rx_reo_get_rx_ops(psoc);
+	if (!mgmt_rx_reo_rx_ops) {
+		mgmt_rx_reo_err("rx_ops of MGMT Rx REO module is NULL");
+		return;
+	}
+
+	status = mgmt_rx_reo_rx_ops->release_frames(psoc);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		mgmt_rx_reo_err("Failed to release entries, ret = %d", status);
+		return;
+	}
 }
 
 QDF_STATUS
@@ -251,6 +278,7 @@ target_if_mgmt_rx_reo_get_valid_hw_link_bitmap(struct wlan_objmgr_psoc *psoc,
  * @mgmt_rx_reo_snapshot_low: Pointer to lower 32 bits of snapshot value
  * @mgmt_rx_reo_snapshot_high: Pointer to higher 32 bits of snapshot value
  * @snapshot_version: snapshot version
+ * @raw_snapshot: Raw snapshot data
  *
  * Read raw value of management rx-reorder snapshots.
  *
@@ -324,6 +352,7 @@ target_if_mgmt_rx_reo_read_snapshot_raw
  * @snapshot_info: Snapshot info
  * @id: Snapshot ID
  * @snapshot_value: Pointer to snapshot value
+ * @raw_snapshot: Raw snapshot data
  *
  * Read management rx-reorder snapshots from target.
  *
@@ -606,6 +635,82 @@ target_if_mgmt_rx_reo_extract_reo_params(
 					      params->reo_params);
 }
 
+/**
+ * target_if_mgmt_rx_reo_schedule_delivery() - Schedule the delivery of
+ * management frames of the given psoc
+ * @psoc: Pointer to psoc object
+ *
+ * Return: QDF_STATUS
+ */
+static QDF_STATUS
+target_if_mgmt_rx_reo_schedule_delivery(struct wlan_objmgr_psoc *psoc)
+{
+	struct wmi_unified *wmi_handle;
+	QDF_STATUS status;
+	HTC_ENDPOINT_ID wmi_endpoint_id;
+	HTC_HANDLE htc_handle;
+
+	wmi_handle = get_wmi_unified_hdl_from_psoc(psoc);
+	if (!wmi_handle) {
+		mgmt_rx_reo_err("wmi_handle is NULL");
+		return QDF_STATUS_E_NULL_VALUE;
+	}
+
+	htc_handle = lmac_get_htc_hdl(psoc);
+	if (!htc_handle) {
+		mgmt_rx_reo_err("HTC_handle is NULL");
+		return QDF_STATUS_E_NULL_VALUE;
+	}
+
+	wmi_endpoint_id = wmi_get_endpoint(wmi_handle);
+
+	status = htc_enable_custom_cb(htc_handle, wmi_endpoint_id);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		mgmt_rx_reo_err("Failed to schedule delivery");
+		return status;
+	}
+
+	return QDF_STATUS_SUCCESS;
+}
+
+/**
+ * target_if_mgmt_rx_reo_cancel_scheduled_delivery() - Cancel the scheduled
+ * delivery of management frames of the given psoc
+ * @psoc: Pointer to psoc object
+ *
+ * Return: QDF_STATUS
+ */
+static QDF_STATUS
+target_if_mgmt_rx_reo_cancel_scheduled_delivery(struct wlan_objmgr_psoc *psoc)
+{
+	struct wmi_unified *wmi_handle;
+	QDF_STATUS status;
+	HTC_ENDPOINT_ID wmi_endpoint_id;
+	HTC_HANDLE htc_handle;
+
+	wmi_handle = get_wmi_unified_hdl_from_psoc(psoc);
+	if (!wmi_handle) {
+		mgmt_rx_reo_err("wmi_handle is NULL");
+		return QDF_STATUS_E_NULL_VALUE;
+	}
+
+	htc_handle = lmac_get_htc_hdl(psoc);
+	if (!htc_handle) {
+		mgmt_rx_reo_err("HTC_handle is NULL");
+		return QDF_STATUS_E_NULL_VALUE;
+	}
+
+	wmi_endpoint_id = wmi_get_endpoint(wmi_handle);
+
+	status = htc_disable_custom_cb(htc_handle, wmi_endpoint_id);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		mgmt_rx_reo_err("Failed to cancel scheduled delivery");
+		return status;
+	}
+
+	return QDF_STATUS_SUCCESS;
+}
+
 QDF_STATUS
 target_if_mgmt_rx_reo_tx_ops_register(
 			struct wlan_lmac_if_mgmt_txrx_tx_ops *mgmt_txrx_tx_ops)
@@ -627,6 +732,10 @@ target_if_mgmt_rx_reo_tx_ops_register(
 				target_if_mgmt_rx_reo_get_snapshot_info;
 	mgmt_rx_reo_tx_ops->mgmt_rx_reo_filter_config =
 					target_if_mgmt_rx_reo_filter_config;
+	mgmt_rx_reo_tx_ops->schedule_delivery =
+				target_if_mgmt_rx_reo_schedule_delivery;
+	mgmt_rx_reo_tx_ops->cancel_scheduled_delivery =
+				target_if_mgmt_rx_reo_cancel_scheduled_delivery;
 
 	return QDF_STATUS_SUCCESS;
 }

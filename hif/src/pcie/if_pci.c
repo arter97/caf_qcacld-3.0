@@ -4228,3 +4228,15 @@ void hif_allow_link_low_power_states(struct hif_opaque_softc *hif)
 	pld_allow_l1(HIF_GET_SOFTC(hif)->qdf_dev->dev);
 }
 #endif
+
+#ifdef IPA_OPT_WIFI_DP
+int hif_prevent_l1(struct hif_opaque_softc *hif)
+{
+	return hif_force_wake_request(hif);
+}
+
+void hif_allow_l1(struct hif_opaque_softc *hif)
+{
+	hif_force_wake_release(hif);
+}
+#endif

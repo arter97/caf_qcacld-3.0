@@ -440,7 +440,7 @@ target_if_mlo_send_tid_to_link_mapping(struct wlan_objmgr_vdev *vdev,
 
 	params.num_dir++;
 
-	status = wmi_send_mlo_peer_tid_to_link_map_cmd(wmi_handle, &params);
+	status = wmi_send_mlo_peer_tid_to_link_map_cmd(wmi_handle, &params, true);
 	if (QDF_IS_STATUS_ERROR(status)) {
 		t2lm_err("Failed to send T2LM WMI command for pdev_id:%d peer_mac: " QDF_MAC_ADDR_FMT,
 			 params.pdev_id,

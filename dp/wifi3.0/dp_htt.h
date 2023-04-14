@@ -199,6 +199,10 @@ void htt_htc_pkt_pool_free(struct htt_soc *soc);
 #define dp_htt_tx_stats_debug(params...) QDF_TRACE_DEBUG(QDF_MODULE_ID_DP_HTT_TX_STATS, params)
 
 #define RXMON_GLOBAL_EN_SHIFT 28
+#ifdef IPA_OPT_WIFI_DP
+#define MAX_RESERVE_FAIL_ATTEMPT 5
+#endif
+
 /**
  * enum dp_full_mon_config - enum to enable/disable full monitor mode
  *
@@ -263,6 +267,8 @@ struct htt_soc {
 		int fail_count;
 		/* rtpm put skip count for ver req msg */
 		int htt_ver_req_put_skip;
+		int reserve_fail_cnt;
+		int abort_count;
 	} stats;
 
 	HTT_TX_MUTEX_TYPE htt_tx_mutex;
@@ -506,22 +512,28 @@ struct dp_tx_mon_upstream_tlv_config {
 
 /**
  * struct dp_tx_mon_wordmask_config - Tx monitor word mask
- * @tx_fes_setup: TX_FES_SETUP TLV word mask
+ * @pcu_ppdu_setup_init: PCU_PPDU_SETUP TLV word mask
  * @tx_peer_entry: TX_PEER_ENTRY TLV word mask
  * @tx_queue_ext: TX_QUEUE_EXTENSION TLV word mask
+ * @tx_fes_status_end: TX_FES_STATUS_END TLV word mask
+ * @response_end_status: RESPONSE_END_STATUS TLV word mask
+ * @tx_fes_status_prot: TX_FES_STATUS_PROT TLV word mask
+ * @tx_fes_setup: TX_FES_SETUP TLV word mask
  * @tx_msdu_start: TX_MSDU_START TLV word mask
  * @tx_mpdu_start: TX_MPDU_START TLV word mask
- * @pcu_ppdu_setup_init: PCU_PPDU_SETUP TLV word mask
  * @rxpcu_user_setup: RXPCU_USER_SETUP TLV word mask
  */
 struct dp_tx_mon_wordmask_config {
-	uint16_t tx_fes_setup;
+	uint32_t pcu_ppdu_setup_init;
 	uint16_t tx_peer_entry;
 	uint16_t tx_queue_ext;
-	uint16_t tx_msdu_start;
-	uint16_t tx_mpdu_start;
-	uint32_t pcu_ppdu_setup_init;
-	uint16_t rxpcu_user_setup;
+	uint16_t tx_fes_status_end;
+	uint16_t response_end_status;
+	uint16_t tx_fes_status_prot;
+	uint8_t tx_fes_setup;
+	uint8_t tx_msdu_start;
+	uint8_t tx_mpdu_start;
+	uint8_t rxpcu_user_setup;
 };
 
 /**
@@ -530,6 +542,7 @@ struct dp_tx_mon_wordmask_config {
  * @dtlvs: enable/disable downstream TLVs
  * @utlvs: enable/disable upstream TLVs
  * @wmask: enable/disable word mask subscription
+ * @compaction_enable: word mask compaction enable
  * @mgmt_filter: enable/disable mgmt packets
  * @data_filter: enable/disable data packets
  * @ctrl_filter: enable/disable ctrl packets
@@ -559,6 +572,7 @@ struct htt_tx_ring_tlv_filter {
 	struct dp_tx_mon_downstream_tlv_config dtlvs;
 	struct dp_tx_mon_upstream_tlv_config utlvs;
 	struct dp_tx_mon_wordmask_config wmask;
+	uint8_t compaction_enable;
 	uint16_t mgmt_filter;
 	uint16_t data_filter;
 	uint16_t ctrl_filter;
@@ -901,6 +915,39 @@ htt_soc_initialize(struct htt_soc *htt_soc,
 		   hal_soc_handle_t hal_soc_hdl, qdf_device_t osdev);
 
 /**
+ * dp_htt_h2t_full() - Send full handler (called from HTC)
+ * @context:	Opaque context (HTT SOC handle)
+ * @pkt:	HTC packet
+ *
+ * Return: enum htc_send_full_action
+ */
+enum htc_send_full_action
+dp_htt_h2t_full(void *context, HTC_PACKET *pkt);
+
+/**
+ * dp_htt_h2t_send_complete() - H2T completion handler
+ * @context:	Opaque context (HTT SOC handle)
+ * @htc_pkt:	HTC packet
+ */
+void
+dp_htt_h2t_send_complete(void *context, HTC_PACKET *htc_pkt);
+
+/**
+ * dp_htt_hif_t2h_hp_callback() - HIF callback for high priority T2H messages
+ * @context:	Opaque context (HTT SOC handle)
+ * @nbuf:	nbuf containing T2H message
+ * @pipe_id:	HIF pipe ID
+ *
+ * Return: QDF_STATUS
+ *
+ * TODO: Temporary change to bypass HTC connection for this new HIF pipe, which
+ * will be used for packet log and other high-priority HTT messages. Proper
+ * HTC connection to be added later once required FW changes are available
+ */
+QDF_STATUS
+dp_htt_hif_t2h_hp_callback(void *context, qdf_nbuf_t nbuf, uint8_t pipe_id);
+
+/**
  * htt_soc_attach() - attach DP and HTT SOC
  * @soc: DP SOC handle
  * @htc_hdl: HTC handle
@@ -988,6 +1035,13 @@ int htt_h2t_rx_ring_cfg(struct htt_soc *htt_soc, int pdev_id,
 			struct htt_rx_ring_tlv_filter *htt_tlv_filter);
 
 /**
+ * dp_htt_t2h_msg_handler() - Generic Target to host Msg/event handler
+ * @context:	Opaque context (HTT SOC handle)
+ * @pkt:	HTC packet
+ */
+void dp_htt_t2h_msg_handler(void *context, HTC_PACKET *pkt);
+
+/**
  * htt_t2h_stats_handler() - target to host stats work handler
  * @context:	context (dp soc context)
  *
@@ -1030,6 +1084,21 @@ struct dp_htt_umac_reset_setup_cmd_params {
 QDF_STATUS dp_htt_umac_reset_send_setup_cmd(
 		struct dp_soc *soc,
 		const struct dp_htt_umac_reset_setup_cmd_params *setup_params);
+
+/**
+ * dp_htt_umac_reset_send_start_pre_reset_cmd() - Send the HTT UMAC reset start
+ * pre reset command
+ * @soc: dp soc object
+ * @is_initiator: Indicates whether the target needs to execute the
+ * UMAC-recovery in context of the Initiator or Non-Initiator. The value zero
+ * indicates this target is Non-Initiator.
+ * @is_umac_hang: Indicates whether MLO UMAC recovery executed in context of
+ * UMAC hang or Target recovery.
+ *
+ * Return: Success when HTT message is sent, error on failure
+ */
+QDF_STATUS dp_htt_umac_reset_send_start_pre_reset_cmd(
+		struct dp_soc *soc, bool is_initiator, bool is_umac_hang);
 #endif
 
 /**
@@ -1117,4 +1186,64 @@ dp_htt_get_mon_htt_ring_id(struct dp_soc *soc,
 
 	return htt_srng_id;
 }
+
+#ifdef IPA_OPT_WIFI_DP
+/**
+ * htt_h2t_rx_cce_super_rule_setup() - htt message to set cce super rules
+ *
+ * @htt_soc: HTT Soc handle
+ * @flt_params: Filter tuple
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS htt_h2t_rx_cce_super_rule_setup(struct htt_soc *htt_soc,
+					   void *flt_params);
+#endif
+
+#ifdef QCA_SUPPORT_PRIMARY_LINK_MIGRATE
+/**
+ * struct dp_peer_info - Primary Peer information
+ * @primary_peer_id: Primary peer id
+ * @chip_id: Chip id of primary peer
+ */
+struct dp_peer_info {
+	uint16_t primary_peer_id;
+	uint8_t chip_id;
+};
+
+/**
+ * dp_h2t_ptqm_migration_msg_send() - Send H2T PTQM message to FW
+ * @dp_soc: DP SOC handle
+ * @vdev_id: Vdev id of primary peer
+ * @pdev_id: Pdev id of primary peer
+ * @chip_id: Chip id of primary peer
+ * @peer_id: Peer id of primary peer
+ * @ml_peer_id: Peer id of MLD peer
+ * @src_info: source info for DS
+ * @status: success or failure status of PTQM migration
+ *
+ * Return: Success when HTT message is sent, error on failure
+ */
+QDF_STATUS
+dp_h2t_ptqm_migration_msg_send(struct dp_soc *dp_soc, uint16_t vdev_id,
+			       uint8_t pdev_id,
+			       uint8_t chip_id, uint16_t peer_id,
+			       uint16_t ml_peer_id, uint16_t src_info,
+			       QDF_STATUS status);
+
+/**
+ * dp_htt_reo_migration() - Reo migration API
+ * @soc: DP SOC handle
+ * @peer_id: Peer id of primary peer
+ * @ml_peer_id: Peer id of MLD peer
+ * @vdev_id: Vdev id of primary peer
+ * @pdev_id: Pdev id of primary peer
+ * @chip_id: Chip id of primary peer
+ *
+ * Return: Success if migration completes, error on failure
+ */
+QDF_STATUS dp_htt_reo_migration(struct dp_soc *soc, uint16_t peer_id,
+				uint16_t ml_peer_id, uint16_t vdev_id,
+				uint8_t pdev_id, uint8_t chip_id);
+#endif
 #endif /* _DP_HTT_H_ */

@@ -41,6 +41,12 @@
 
 #define DP_TX_MAX_NUM_FRAGS 6
 
+/* invalid peer id for reinject*/
+#define DP_INVALID_PEER 0XFFFE
+
+void dp_tx_nawds_handler(struct dp_soc *soc, struct dp_vdev *vdev,
+			 struct dp_tx_msdu_info_s *msdu_info,
+			 qdf_nbuf_t nbuf, uint16_t sa_peer_id);
 /*
  * DP_TX_DESC_FLAG_FRAG flags should always be defined to 0x1
  * please do not change this flag's definition
@@ -410,11 +416,13 @@ qdf_nbuf_t dp_tx_exc_drop(struct cdp_soc_t *soc_hdl, uint8_t vdev_id,
 			  struct cdp_tx_exception_metadata *tx_exc_metadata);
 #endif
 #ifdef WLAN_SUPPORT_PPEDS
-void dp_ppeds_tx_desc_free(struct dp_soc *soc, struct dp_tx_desc_s *tx_desc);
+qdf_nbuf_t
+dp_ppeds_tx_desc_free(struct dp_soc *soc, struct dp_tx_desc_s *tx_desc);
 #else
-static inline
-void dp_ppeds_tx_desc_free(struct dp_soc *soc, struct dp_tx_desc_s *tx_desc)
+static inline qdf_nbuf_t
+dp_ppeds_tx_desc_free(struct dp_soc *soc, struct dp_tx_desc_s *tx_desc)
 {
+	return NULL;
 }
 #endif
 #ifndef QCA_HOST_MODE_WIFI_DISABLED

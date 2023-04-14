@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2016-2021 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -344,11 +345,10 @@ UNIFIED_RX_MSDU_DETAILS_2_RX_MSDU_DESC_INFO_RX_MSDU_DESC_INFO_DETAILS_OFFSET))
 		RX_MSDU_END_1_TCP_UDP_CHKSUM_MASK, \
 		RX_MSDU_END_1_TCP_UDP_CHKSUM_LSB))
 
-/*
- * hal_rx_msdu_start_nss_get_8074(): API to get the NSS
- * Interval from rx_msdu_start
- *
+/**
+ * hal_rx_msdu_start_nss_get_8074() - API to get the NSS from rx_msdu_start
  * @buf: pointer to the start of RX PKT TLV header
+ *
  * Return: uint32_t(nss)
  */
 static uint32_t
@@ -364,10 +364,9 @@ hal_rx_msdu_start_nss_get_8074(uint8_t *buf)
 }
 
 /**
- * hal_rx_mon_hw_desc_get_mpdu_status_8074(): Retrieve MPDU status
- *
- * @ hw_desc_addr: Start address of Rx HW TLVs
- * @ rs: Status for monitor mode
+ * hal_rx_mon_hw_desc_get_mpdu_status_8074() - Retrieve MPDU status
+ * @hw_desc_addr: Start address of Rx HW TLVs
+ * @rs: Status for monitor mode
  *
  * Return: void
  */
@@ -406,10 +405,10 @@ static uint32_t hal_get_link_desc_size_8074(void)
 	return LINK_DESC_SIZE;
 }
 
-/*
- * hal_rx_get_tlv_8074(): API to get the tlv
- *
+/**
+ * hal_rx_get_tlv_8074() - API to get the tlv
  * @rx_tlv: TLV data extracted from the rx packet
+ *
  * Return: uint8_t
  */
 static uint8_t hal_rx_get_tlv_8074(void *rx_tlv)
@@ -419,7 +418,7 @@ static uint8_t hal_rx_get_tlv_8074(void *rx_tlv)
 
 /**
  * hal_rx_proc_phyrx_other_receive_info_tlv_8074()
- *				      -process other receive info TLV
+ *				      - process other receive info TLV
  * @rx_tlv_hdr: pointer to TLV header
  * @ppdu_info: pointer to ppdu_info
  *
@@ -435,8 +434,8 @@ void hal_rx_proc_phyrx_other_receive_info_tlv_8074(void *rx_tlv_hdr,
 /**
  * hal_rx_dump_msdu_start_tlv_8074() : dump RX msdu_start TLV in structured
  *			     human readable format.
- * @ msdu_start: pointer the msdu_start TLV in pkt.
- * @ dbg_level: log level.
+ * @msdustart: pointer the msdu_start TLV in pkt.
+ * @dbg_level: log level.
  *
  * Return: void
  */
@@ -512,10 +511,10 @@ static void hal_rx_dump_msdu_start_tlv_8074(void *msdustart,
 }
 
 /**
- * hal_rx_dump_msdu_end_tlv_8074: dump RX msdu_end TLV in structured
- *			     human readable format.
- * @ msdu_end: pointer the msdu_end TLV in pkt.
- * @ dbg_level: log level.
+ * hal_rx_dump_msdu_end_tlv_8074() - dump RX msdu_end TLV in structured
+ *                                   human readable format.
+ * @msduend: pointer the msdu_end TLV in pkt.
+ * @dbg_level: log level.
  *
  * Return: void
  */
@@ -648,11 +647,11 @@ static uint32_t hal_rx_mpdu_start_tid_get_8074(uint8_t *buf)
 	RX_MSDU_START_5_RECEPTION_TYPE_MASK,		\
 	RX_MSDU_START_5_RECEPTION_TYPE_LSB))
 
-/*
- * hal_rx_msdu_start_reception_type_get(): API to get the reception type
- * Interval from rx_msdu_start
- *
+/**
+ * hal_rx_msdu_start_reception_type_get_8074() - API to get the reception type
+ *                                               Interval from rx_msdu_start
  * @buf: pointer to the start of RX PKT TLV header
+ *
  * Return: uint32_t(reception_type)
  */
 static uint32_t hal_rx_msdu_start_reception_type_get_8074(uint8_t *buf)
@@ -673,11 +672,10 @@ static uint32_t hal_rx_msdu_start_reception_type_get_8074(uint8_t *buf)
 		RX_MSDU_END_13_DA_IDX_MASK,		\
 		RX_MSDU_END_13_DA_IDX_LSB))
 
- /**
- * hal_rx_msdu_end_da_idx_get_8074: API to get da_idx
- * from rx_msdu_end TLV
+/**
+ * hal_rx_msdu_end_da_idx_get_8074() - API to get da_idx from rx_msdu_end TLV
+ * @buf: pointer to the start of RX PKT TLV headers
  *
- * @ buf: pointer to the start of RX PKT TLV headers
  * Return: da index
  */
 static uint16_t hal_rx_msdu_end_da_idx_get_8074(uint8_t *buf)

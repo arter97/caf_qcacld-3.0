@@ -288,9 +288,9 @@ static void dp_mlo_soc_teardown(struct cdp_soc_t *soc_hdl,
 		return;
 
 	/* During the teardown drain the Rx buffers if any exist in the ring */
-	dp_mcast_mlo_iter_ptnr_soc(be_soc,
-				   dp_mlo_soc_drain_rx_buf,
-				   NULL);
+	dp_mlo_iter_ptnr_soc(be_soc,
+			     dp_mlo_soc_drain_rx_buf,
+			     NULL);
 
 	dp_mlo_set_soc_by_chip_id(mlo_ctxt, NULL, be_soc->mlo_chip_id);
 	be_soc->ml_ctxt = NULL;
@@ -814,9 +814,9 @@ dp_soc_get_by_idle_bm_id(struct dp_soc *soc, uint8_t idle_bm_id)
 }
 
 #ifdef WLAN_MCAST_MLO
-void dp_mcast_mlo_iter_ptnr_soc(struct dp_soc_be *be_soc,
-				dp_ptnr_soc_iter_func func,
-				void *arg)
+void dp_mlo_iter_ptnr_soc(struct dp_soc_be *be_soc,
+			  dp_ptnr_soc_iter_func func,
+			  void *arg)
 {
 	int i = 0;
 	struct dp_mlo_ctxt *dp_mlo = be_soc->ml_ctxt;
@@ -831,7 +831,7 @@ void dp_mcast_mlo_iter_ptnr_soc(struct dp_soc_be *be_soc,
 	}
 }
 
-qdf_export_symbol(dp_mcast_mlo_iter_ptnr_soc);
+qdf_export_symbol(dp_mlo_iter_ptnr_soc);
 
 void dp_mcast_mlo_iter_ptnr_vdev(struct dp_soc_be *be_soc,
 				 struct dp_vdev_be *be_vdev,

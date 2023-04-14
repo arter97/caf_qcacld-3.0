@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2017-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  *
  * Permission to use, copy, modify, and/or distribute this software for
@@ -57,13 +57,13 @@ QDF_STATUS ucfg_reg_get_band(struct wlan_objmgr_pdev *pdev,
 
 /**
  * ucfg_reg_notify_sap_event() - Notify regulatory domain for sap event
- * @pdev: The physical dev to set the band for
+ * @pdev: The physical dev to notify
  * @sap_state: true for sap start else false
  *
  * Return: QDF_STATUS
  */
 QDF_STATUS ucfg_reg_notify_sap_event(struct wlan_objmgr_pdev *pdev,
-			bool sap_state);
+				     bool sap_state);
 
 /**
  * ucfg_reg_cache_channel_freq_state() - Cache the current state of the
@@ -118,6 +118,7 @@ void ucfg_reg_restore_cached_channels(struct wlan_objmgr_pdev *pdev)
 /**
  * ucfg_reg_set_fcc_constraint() - apply fcc constraints on channels 12/13
  * @pdev: The physical pdev to reduce tx power for
+ * @fcc_constraint: true to apply the constraint, false to remove it
  *
  * This function adjusts the transmit power on channels 12 and 13, to comply
  * with FCC regulations in the USA.
@@ -125,7 +126,7 @@ void ucfg_reg_restore_cached_channels(struct wlan_objmgr_pdev *pdev)
  * Return: QDF_STATUS
  */
 QDF_STATUS ucfg_reg_set_fcc_constraint(struct wlan_objmgr_pdev *pdev,
-		bool fcc_constraint);
+				       bool fcc_constraint);
 
 /**
  * ucfg_reg_get_default_country() - Get the default regulatory country
@@ -135,7 +136,7 @@ QDF_STATUS ucfg_reg_set_fcc_constraint(struct wlan_objmgr_pdev *pdev,
  * Return: QDF_STATUS
  */
 QDF_STATUS ucfg_reg_get_default_country(struct wlan_objmgr_psoc *psoc,
-					       uint8_t *country_code);
+					uint8_t *country_code);
 
 /**
  * ucfg_reg_get_current_country() - Get the current regulatory country
@@ -145,26 +146,27 @@ QDF_STATUS ucfg_reg_get_default_country(struct wlan_objmgr_psoc *psoc,
  * Return: QDF_STATUS
  */
 QDF_STATUS ucfg_reg_get_current_country(struct wlan_objmgr_psoc *psoc,
-					       uint8_t *country_code);
+					uint8_t *country_code);
+
 /**
  * ucfg_reg_set_default_country() - Set the default regulatory country
  * @psoc: The physical SoC to set default country for
- * @country_code: The country information to configure
+ * @country: The country information to configure
  *
  * Return: QDF_STATUS
  */
 QDF_STATUS ucfg_reg_set_default_country(struct wlan_objmgr_psoc *psoc,
-					       uint8_t *country_code);
+					       uint8_t *country);
 
 /**
  * ucfg_reg_set_country() - Set the current regulatory country
  * @pdev: The physical dev to set current country for
- * @country_code: The country information to configure
+ * @country: The country information to configure
  *
  * Return: QDF_STATUS
  */
-QDF_STATUS ucfg_reg_set_country(struct wlan_objmgr_pdev *dev,
-				uint8_t *country_code);
+QDF_STATUS ucfg_reg_set_country(struct wlan_objmgr_pdev *pdev,
+				uint8_t *country);
 
 /**
  * ucfg_reg_reset_country() - Reset the regulatory country to default
@@ -177,11 +179,12 @@ QDF_STATUS ucfg_reg_reset_country(struct wlan_objmgr_psoc *psoc);
 /**
  * ucfg_reg_enable_dfs_channels() - Enable the use of DFS channels
  * @pdev: The physical dev to enable DFS channels for
+ * @dfs_enable: true to enable DFS channels, false to disable them
  *
  * Return: QDF_STATUS
  */
 QDF_STATUS ucfg_reg_enable_dfs_channels(struct wlan_objmgr_pdev *pdev,
-		bool dfs_enable);
+					bool dfs_enable);
 
 QDF_STATUS ucfg_reg_register_event_handler(uint8_t vdev_id, reg_event_cb cb,
 		void *arg);
@@ -244,7 +247,7 @@ QDF_STATUS ucfg_reg_get_current_chan_list(struct wlan_objmgr_pdev *pdev,
 /**
  * ucfg_reg_modify_chan_144() - Enable/Disable channel 144
  * @pdev: pdev pointer
- * @enable_chan_144: flag to disable/enable channel 144
+ * @enable_ch_144: flag to disable/enable channel 144
  *
  * Return: Success or Failure
  */
@@ -626,7 +629,7 @@ ucfg_reg_get_unii_5g_bitmap(struct wlan_objmgr_pdev *pdev, uint8_t *bitmap)
  * ucfg_reg_get_cur_6g_ap_pwr_type() - Get the current 6G regulatory AP power
  * type.
  * @pdev: Pointer to PDEV object.
- * @reg_6g_ap_pwr_type: The current regulatory 6G AP type ie VLPI/LPI/SP.
+ * @reg_cur_6g_ap_pwr_type: The current regulatory 6G AP type ie VLPI/LPI/SP.
  *
  * Return: QDF_STATUS.
  */
@@ -638,13 +641,13 @@ ucfg_reg_get_cur_6g_ap_pwr_type(struct wlan_objmgr_pdev *pdev,
  * ucfg_reg_set_cur_6g_ap_pwr_type() - Set the current 6G regulatory AP power
  * type.
  * @pdev: Pointer to PDEV object.
- * @reg_6g_ap_pwr_type: Regulatory 6G AP type ie VLPI/LPI/SP.
+ * @reg_cur_6g_ap_pwr_type: Regulatory 6G AP type ie VLPI/LPI/SP.
  *
  * Return: QDF_STATUS_E_INVAL if unable to set and QDF_STATUS_SUCCESS is set.
  */
 QDF_STATUS
 ucfg_reg_set_cur_6g_ap_pwr_type(struct wlan_objmgr_pdev *pdev,
-				enum reg_6g_ap_type reg_cur_6g_ap_type);
+				enum reg_6g_ap_type reg_cur_6g_ap_pwr_type);
 #else
 static inline QDF_STATUS
 ucfg_reg_get_cur_6g_ap_pwr_type(struct wlan_objmgr_pdev *pdev,
@@ -686,4 +689,37 @@ ucfg_reg_send_afc_resp_rx_ind(struct wlan_objmgr_pdev *pdev,
  */
 QDF_STATUS ucfg_reg_afc_start(struct wlan_objmgr_pdev *pdev, uint64_t req_id);
 #endif
+
+#ifndef CONFIG_REG_CLIENT
+/**
+ * ucfg_reg_enable_disable_opclass_chans() - Disable or enable the input 20 MHz
+ * operating channels in the radio's current channel list.
+ * @pdev: Pointer to pdev
+ * @is_disable: Boolean to disable or enable the channels
+ * @opclass: Operating class. Only 20MHz opclasses are supported.
+ * @ieee_chan_list: Pointer to ieee_chan_list
+ * @chan_list_size: Size of ieee_chan_list
+ * @global_tbl_lookup: Whether to lookup global op class table
+ *
+ * Return - Return QDF_STATUS
+ */
+QDF_STATUS ucfg_reg_enable_disable_opclass_chans(struct wlan_objmgr_pdev *pdev,
+						 bool is_disable,
+						 uint8_t opclass,
+						 uint8_t *ieee_chan_list,
+						 uint8_t chan_list_size,
+						 bool global_tbl_lookup);
+#else
+static inline QDF_STATUS
+ucfg_reg_enable_disable_opclass_chans(struct wlan_objmgr_pdev *pdev,
+				      bool is_disable,
+				      uint8_t opclass,
+				      uint8_t *ieee_chan_list,
+				      uint8_t chan_list_size,
+				      bool global_tbl_lookup)
+{
+	return QDF_STATUS_E_NOSUPPORT;
+}
+#endif
+
 #endif

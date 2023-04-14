@@ -479,6 +479,16 @@ bool wlan_scan_cfg_skip_6g_and_indoor_freq(
 			struct wlan_objmgr_psoc *psoc);
 
 /**
+ * wlan_scan_register_mbssid_cb() - register api to inform bcn/probe rsp
+ * @psoc: psoc object
+ * @cb: callback to be registered
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS wlan_scan_register_mbssid_cb(struct wlan_objmgr_psoc *psoc,
+					update_mbssid_bcn_prb_rsp cb);
+
+/**
  * wlan_scan_get_entry_by_mac_addr() - Get bcn/probe rsp from scan db
  * @pdev: pdev info
  * @bssid: BSSID of the bcn/probe response to be fetched from scan db
@@ -496,6 +506,17 @@ wlan_scan_get_entry_by_mac_addr(struct wlan_objmgr_pdev *pdev,
 				struct qdf_mac_addr *bssid,
 				struct element_info *frame);
 
+/**
+ * wlan_scan_get_last_scan_ageout_time() - API to get last scan
+ * ageout time
+ * @psoc: psoc object
+ * @last_scan_ageout_time: last scan ageout time
+ *
+ * Return: void
+ */
+void
+wlan_scan_get_last_scan_ageout_time(struct wlan_objmgr_psoc *psoc,
+				    uint32_t *last_scan_ageout_time);
 /**
  * wlan_scan_get_entry_by_bssid() - function to get scan entry by bssid
  * @pdev: pdev object

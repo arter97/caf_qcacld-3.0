@@ -1170,6 +1170,10 @@ int htt_h2t_tx_ring_cfg(struct htt_soc *htt_soc, int pdev_id,
 	if (htt_tlv_filter->data_msdu_end)
 		HTT_TX_MONITOR_CFG_FILTER_IN_TX_MSDU_END_DATA_SET(*msg_word, 1);
 
+	if (htt_tlv_filter->compaction_enable)
+		HTT_TX_MONITOR_CFG_WORD_MASK_COMPACTION_ENABLE_SET(*msg_word,
+								   1);
+
 	/* word 3 */
 	msg_word++;
 	*msg_word = 0;
@@ -1250,6 +1254,38 @@ int htt_h2t_tx_ring_cfg(struct htt_soc *htt_soc, int pdev_id,
 					     htt_tlv_filter->ctrl_mpdu_log);
 	HTT_TX_MONITOR_CFG_DMA_MPDU_DATA_SET(*msg_word,
 					     htt_tlv_filter->data_mpdu_log);
+
+	/* word 10 */
+	msg_word++;
+	*msg_word = 0;
+
+	if (htt_tlv_filter->wmask.tx_queue_ext)
+		HTT_TX_MONITOR_CFG_TX_QUEUE_EXT_V2_WORD_MASK_SET(*msg_word,
+				htt_tlv_filter->wmask.tx_queue_ext);
+
+	if (htt_tlv_filter->wmask.tx_peer_entry)
+		HTT_TX_MONITOR_CFG_TX_PEER_ENTRY_V2_WORD_MASK_SET(*msg_word,
+				htt_tlv_filter->wmask.tx_peer_entry);
+
+	/* word 11 */
+	msg_word++;
+	*msg_word = 0;
+
+	if (htt_tlv_filter->wmask.tx_fes_status_end)
+		HTT_TX_MONITOR_CFG_FES_STATUS_END_WORD_MASK_SET(*msg_word,
+				htt_tlv_filter->wmask.tx_fes_status_end);
+
+	if (htt_tlv_filter->wmask.response_end_status)
+		HTT_TX_MONITOR_CFG_RESPONSE_END_STATUS_WORD_MASK_SET(*msg_word,
+				htt_tlv_filter->wmask.response_end_status);
+
+	/* word 12 */
+	msg_word++;
+	*msg_word = 0;
+
+	if (htt_tlv_filter->wmask.tx_fes_status_prot)
+		HTT_TX_MONITOR_CFG_FES_STATUS_PROT_WORD_MASK_SET(*msg_word,
+				htt_tlv_filter->wmask.tx_fes_status_prot);
 
 	pkt = htt_htc_pkt_alloc(soc);
 	if (!pkt)
@@ -1388,17 +1424,14 @@ void dp_tx_mon_filter_set_upstream_tlvs(struct htt_tx_ring_tlv_filter *filter)
 	filter->utlvs.mactx_phy_desc = 1;
 	filter->utlvs.mactx_user_desc_cmn = 1;
 	filter->utlvs.mactx_user_desc_per_usr = 1;
-}
 
-void dp_tx_mon_filter_set_word_mask(struct htt_tx_ring_tlv_filter *filter)
-{
-	filter->wmask.tx_fes_setup = 1;
-	filter->wmask.tx_peer_entry = 1;
-	filter->wmask.tx_queue_ext = 1;
-	filter->wmask.tx_msdu_start = 1;
-	filter->wmask.tx_mpdu_start = 1;
-	filter->wmask.pcu_ppdu_setup_init = 1;
-	filter->wmask.rxpcu_user_setup = 1;
+	/* enable u_sig and eht flag */
+	filter->utlvs.u_sig_eht_su_mu = 1;
+	filter->utlvs.u_sig_eht_su = 1;
+	filter->utlvs.u_sig_eht_tb = 1;
+	filter->utlvs.eht_sig_usr_su = 1;
+	filter->utlvs.eht_sig_usr_mu_mimo = 1;
+	filter->utlvs.eht_sig_usr_ofdma = 1;
 }
 
 void dp_tx_mon_filter_set_all(struct dp_mon_pdev_be *mon_pdev_be,
@@ -1413,7 +1446,6 @@ void dp_tx_mon_filter_set_all(struct dp_mon_pdev_be *mon_pdev_be,
 
 	dp_tx_mon_filter_set_downstream_tlvs(filter);
 	dp_tx_mon_filter_set_upstream_tlvs(filter);
-	dp_tx_mon_filter_set_word_mask(filter);
 
 	filter->mgmt_filter = 0x1;
 	filter->data_filter = 0x1;
@@ -1438,6 +1470,46 @@ void dp_tx_mon_filter_set_all(struct dp_mon_pdev_be *mon_pdev_be,
 	filter->mgmt_dma_length = mon_pdev_be->tx_mon_filter_length;
 	filter->ctrl_dma_length = mon_pdev_be->tx_mon_filter_length;
 	filter->data_dma_length = mon_pdev_be->tx_mon_filter_length;
+}
+
+void dp_tx_mon_filter_set_word_mask(struct dp_pdev *pdev,
+				    struct htt_tx_ring_tlv_filter *filter)
+{
+	hal_txmon_word_mask_config_t word_mask = {0};
+	bool status = false;
+
+	status = hal_txmon_get_word_mask(pdev->soc->hal_soc, &word_mask);
+
+	if (status) {
+		filter->wmask.pcu_ppdu_setup_init =
+			word_mask.pcu_ppdu_setup_init;
+		filter->wmask.tx_peer_entry = word_mask.tx_peer_entry;
+		filter->wmask.tx_queue_ext = word_mask.tx_queue_ext;
+		filter->wmask.tx_fes_status_end = word_mask.tx_fes_status_end;
+		filter->wmask.response_end_status =
+			word_mask.response_end_status;
+		filter->wmask.tx_fes_status_prot = word_mask.tx_fes_status_prot;
+		filter->wmask.tx_fes_setup = word_mask.tx_fes_setup;
+		filter->wmask.tx_msdu_start = word_mask.tx_msdu_start;
+		filter->wmask.tx_mpdu_start = word_mask.tx_mpdu_start;
+		filter->wmask.rxpcu_user_setup = word_mask.rxpcu_user_setup;
+
+		filter->compaction_enable = word_mask.compaction_enable;
+	} else {
+		filter->wmask.pcu_ppdu_setup_init = 0xFFFFFFFF;
+		filter->wmask.tx_peer_entry = 0xFFFF;
+		filter->wmask.tx_queue_ext = 0xFFFF;
+		filter->wmask.tx_fes_status_end = 0xFFFF;
+		filter->wmask.response_end_status = 0xFFFF;
+		filter->wmask.tx_fes_status_prot = 0xFFFF;
+		filter->wmask.tx_fes_setup = 0xFF;
+		filter->wmask.tx_msdu_start = 0xFF;
+		filter->wmask.tx_mpdu_start = 0xFF;
+		filter->wmask.rxpcu_user_setup = 0xFF;
+
+		/* compaction is disable */
+		filter->compaction_enable = 0;
+	}
 }
 
 void dp_mon_filter_setup_tx_mon_mode_2_0(struct dp_pdev *pdev)
@@ -1471,6 +1543,7 @@ void dp_mon_filter_setup_tx_mon_mode_2_0(struct dp_pdev *pdev)
 
 	filter.tx_valid = !!mon_pdev_be->tx_mon_mode;
 	dp_tx_mon_filter_set_all(mon_pdev_be, &filter.tx_tlv_filter);
+	dp_tx_mon_filter_set_word_mask(pdev, &filter.tx_tlv_filter);
 	dp_mon_filter_show_tx_filter_be(mode, &filter);
 	mon_pdev_be->filter_be[mode][srng_type] = filter;
 }
@@ -1983,8 +2056,8 @@ void dp_mon_filter_show_rx_filter_be(enum dp_mon_filter_mode mode,
 void dp_mon_filter_show_tx_filter_be(enum dp_mon_filter_mode mode,
 				     struct dp_mon_filter_be *filter)
 {
-	dp_mon_filter_err("TX MON RING TLV FILTER CONFIG:");
-	dp_mon_filter_err("[Mode %d]: Valid: %d", mode, filter->tx_valid);
+	DP_MON_FILTER_PRINT("TX MON RING TLV FILTER CONFIG:");
+	DP_MON_FILTER_PRINT("[Mode %d]: Valid: %d", mode, filter->tx_valid);
 
 	if (filter->tx_valid)
 		dp_tx_mon_filter_show_filter(filter);
@@ -2773,20 +2846,28 @@ static
 void dp_tx_mon_wordmask_config_set(struct htt_tx_ring_tlv_filter *dst_filter,
 				   struct htt_tx_ring_tlv_filter *src_filter)
 {
-	dst_filter->wmask.tx_fes_setup |=
-		src_filter->wmask.tx_fes_setup;
+	dst_filter->wmask.pcu_ppdu_setup_init |=
+		src_filter->wmask.pcu_ppdu_setup_init;
 	dst_filter->wmask.tx_peer_entry |=
 		src_filter->wmask.tx_peer_entry;
 	dst_filter->wmask.tx_queue_ext |=
 		src_filter->wmask.tx_queue_ext;
+	dst_filter->wmask.tx_fes_status_end |=
+		src_filter->wmask.tx_fes_status_end;
+	dst_filter->wmask.response_end_status |=
+		src_filter->wmask.response_end_status;
+	dst_filter->wmask.tx_fes_status_prot |=
+		src_filter->wmask.tx_fes_status_prot;
+	dst_filter->wmask.tx_fes_setup |=
+		src_filter->wmask.tx_fes_setup;
 	dst_filter->wmask.tx_msdu_start |=
 		src_filter->wmask.tx_msdu_start;
 	dst_filter->wmask.tx_mpdu_start |=
 		src_filter->wmask.tx_mpdu_start;
-	dst_filter->wmask.pcu_ppdu_setup_init |=
-		src_filter->wmask.pcu_ppdu_setup_init;
 	dst_filter->wmask.rxpcu_user_setup |=
 		src_filter->wmask.rxpcu_user_setup;
+	dst_filter->compaction_enable |=
+		src_filter->compaction_enable;
 }
 
 /**
@@ -3148,14 +3229,29 @@ dp_mon_filter_reset_tx_lite_mon(struct dp_mon_pdev_be *be_mon_pdev)
 }
 
 void
-dp_mon_filter_setup_tx_lite_mon(struct dp_mon_pdev_be *be_mon_pdev)
+dp_mon_filter_setup_tx_lite_mon(struct dp_pdev *pdev)
 {
+	struct dp_mon_pdev *mon_pdev = NULL;
+	struct dp_mon_pdev_be *be_mon_pdev = NULL;
 	struct dp_mon_filter_be filter = {0};
 	enum dp_mon_filter_mode mode = DP_MON_FILTER_LITE_MON_MODE;
 	enum dp_mon_filter_srng_type srng_type =
 				DP_MON_FILTER_SRNG_TYPE_TXMON_DEST;
 	struct htt_tx_ring_tlv_filter *tx_tlv_filter = &filter.tx_tlv_filter;
 	struct dp_lite_mon_tx_config *config = NULL;
+
+	if (!pdev) {
+		dp_mon_filter_err("Pdev context is null");
+		return;
+	}
+
+	mon_pdev = pdev->monitor_pdev;
+	if (!mon_pdev) {
+		dp_mon_filter_err("Monitor pdev context is null");
+		return;
+	}
+
+	be_mon_pdev = dp_get_be_mon_pdev_from_dp_mon_pdev(mon_pdev);
 
 	config = be_mon_pdev->lite_mon_tx_config;
 	if (!config)
@@ -3174,7 +3270,7 @@ dp_mon_filter_setup_tx_lite_mon(struct dp_mon_pdev_be *be_mon_pdev)
 
 	dp_tx_mon_filter_set_downstream_tlvs(tx_tlv_filter);
 	dp_tx_mon_filter_set_upstream_tlvs(tx_tlv_filter);
-	dp_tx_mon_filter_set_word_mask(tx_tlv_filter);
+	dp_tx_mon_filter_set_word_mask(pdev, tx_tlv_filter);
 
 	/* configure mgmt filters */
 	if (config->tx_config.mgmt_filter[DP_MON_FRM_FILTER_MODE_FP]) {
@@ -3308,6 +3404,6 @@ static void dp_cfr_filter_2_0(struct cdp_soc_t *soc_hdl,
 
 void dp_cfr_filter_register_2_0(struct cdp_ops *ops)
 {
-	ops->cfr_ops->txrx_cfr_filter = dp_cfr_filter_2_0;
+	ops->mon_ops->txrx_cfr_filter = dp_cfr_filter_2_0;
 }
 #endif

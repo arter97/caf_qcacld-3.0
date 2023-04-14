@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -95,6 +95,7 @@ static void wlan_get_rssi_data_each_psoc(struct wlan_objmgr_psoc *psoc,
 	tqm_params->max_ml_peers = MAX_MLO_PEER;
 
 	rssi_data->current_psoc_id = index;
+	rssi_data->num_psocs++;
 
 	wlan_objmgr_iterate_obj_list(psoc, WLAN_PEER_OP,
 				     wlan_mlo_peer_get_rssi, rssi_data, 0,
@@ -367,6 +368,78 @@ static void mlo_peer_calculate_avg_rssi(
 	ml_peer->avg_link_rssi = total_rssi / num_psocs;
 }
 
+#ifdef WLAN_MLO_MULTI_CHIP
+static QDF_STATUS mlo_set_3_link_primary_umac(
+		struct wlan_mlo_peer_context *ml_peer,
+		struct wlan_objmgr_vdev *link_vdevs[])
+{
+	uint8_t prim_psoc_id, psoc_ids[MAX_MLO_CHIPS];
+	uint8_t adjacent = 0;
+
+	if (ml_peer->max_links != 3)
+		return QDF_STATUS_E_FAILURE;
+
+	/* Some 3 link RDPs have restriction on the primary umac.
+	 * Only the link that is adjacent to both the links can be
+	 * a primary umac.
+	 * Note: it means umac migration is also restricted.
+	 */
+	psoc_ids[0] = wlan_vdev_get_psoc_id(link_vdevs[0]);
+	psoc_ids[1] = wlan_vdev_get_psoc_id(link_vdevs[1]);
+	psoc_ids[2] = wlan_vdev_get_psoc_id(link_vdevs[2]);
+
+	mlo_chip_adjacent(psoc_ids[0], psoc_ids[1], &adjacent);
+	if (!adjacent) {
+		prim_psoc_id = psoc_ids[2];
+	} else {
+		mlo_chip_adjacent(psoc_ids[0], psoc_ids[2], &adjacent);
+		if (!adjacent) {
+			prim_psoc_id = psoc_ids[1];
+		} else {
+			/* If all links are adjacent to each other,
+			 * no need to restrict the primary umac.
+			 * return failure the caller will handle.
+			 */
+			mlo_chip_adjacent(psoc_ids[1], psoc_ids[2],
+					  &adjacent);
+			if (!adjacent)
+				prim_psoc_id = psoc_ids[0];
+			else
+				return QDF_STATUS_E_FAILURE;
+		}
+	}
+
+	ml_peer->primary_umac_psoc_id = prim_psoc_id;
+	mlo_peer_assign_primary_umac(ml_peer,
+				     &ml_peer->peer_list[0]);
+
+	return QDF_STATUS_SUCCESS;
+}
+#else
+static QDF_STATUS mlo_set_3_link_primary_umac(
+		struct wlan_mlo_peer_context *ml_peer,
+		struct wlan_objmgr_vdev *link_vdevs[])
+{
+	return QDF_STATUS_E_FAILURE;
+}
+#endif
+
+#if defined(WLAN_FEATURE_11BE_MLO) && defined(WLAN_MLO_MULTI_CHIP)
+QDF_STATUS mlo_peer_overwrite_primary_umac(uint8_t psoc_id,
+					   struct wlan_mlo_peer_context *ml_peer)
+{
+	if (psoc_id >= WLAN_OBJMGR_MAX_DEVICES)
+		return QDF_STATUS_E_FAILURE;
+	if (!ml_peer)
+		return QDF_STATUS_E_FAILURE;
+
+	ml_peer->primary_umac_psoc_id = psoc_id;
+	mlo_peer_assign_primary_umac(ml_peer, &ml_peer->peer_list[0]);
+
+	return QDF_STATUS_SUCCESS;
+}
+#endif
+
 QDF_STATUS mlo_peer_allocate_primary_umac(
 		struct wlan_mlo_dev_context *ml_dev,
 		struct wlan_mlo_peer_context *ml_peer,
@@ -404,6 +477,20 @@ QDF_STATUS mlo_peer_allocate_primary_umac(
 	    (mlo_vdevs_check_single_soc(link_vdevs, ml_peer->max_links))) {
 		mlo_peer_assign_primary_umac(ml_peer, peer_entry);
 		mlo_info("MLD ID %d Assoc peer " QDF_MAC_ADDR_FMT " primary umac soc %d ",
+			 ml_dev->mld_id,
+			 QDF_MAC_ADDR_REF(ml_peer->peer_mld_addr.bytes),
+			 ml_peer->primary_umac_psoc_id);
+
+		return QDF_STATUS_SUCCESS;
+	}
+
+	if (mlo_set_3_link_primary_umac(ml_peer, link_vdevs) ==
+	    QDF_STATUS_SUCCESS) {
+		/* If success then the primary umac is restricted and assigned.
+		 * if not, there is no restriction, so just fallthrough
+		 */
+		mlo_info("MLD ID %d ML Peer " QDF_MAC_ADDR_FMT
+			 " center primary umac soc %d ",
 			 ml_dev->mld_id,
 			 QDF_MAC_ADDR_REF(ml_peer->peer_mld_addr.bytes),
 			 ml_peer->primary_umac_psoc_id);

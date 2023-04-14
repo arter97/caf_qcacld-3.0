@@ -881,8 +881,8 @@ QDF_STATUS dp_rx_mon_refill_buf_ring_2_0(struct dp_intr *int_ctx)
 	struct dp_srng *rx_mon_buf_ring;
 	struct dp_intr_stats *intr_stats = &int_ctx->intr_stats;
 	struct dp_mon_soc_be *mon_soc_be = dp_get_be_mon_soc_from_dp_mon_soc(mon_soc);
-	uint32_t num_entries_avail;
-	int sync_hw_ptr = 1, hp = 0, tp = 0, num_entries;
+	uint32_t num_entries_avail, num_entries, num_entries_in_ring;
+	int sync_hw_ptr = 1, hp = 0, tp = 0;
 	void *hal_srng;
 
 	rx_mon_buf_ring = &soc->rxdma_mon_buf_ring[0];
@@ -894,18 +894,22 @@ QDF_STATUS dp_rx_mon_refill_buf_ring_2_0(struct dp_intr *int_ctx)
 	num_entries_avail = hal_srng_src_num_avail(soc->hal_soc,
 						   hal_srng,
 						   sync_hw_ptr);
+	num_entries_in_ring = rx_mon_buf_ring->num_entries - num_entries_avail;
 	hal_get_sw_hptp(soc->hal_soc, (hal_ring_handle_t)hal_srng, &tp, &hp);
 	hal_srng_access_end(soc->hal_soc, hal_srng);
 
-	num_entries = num_entries_avail;
-	if (mon_soc_be->rx_mon_ring_fill_level < rx_mon_buf_ring->num_entries)
-		num_entries = num_entries_avail - mon_soc_be->rx_mon_ring_fill_level;
+	if (num_entries_avail) {
+		if (num_entries_in_ring < mon_soc_be->rx_mon_ring_fill_level)
+			num_entries = mon_soc_be->rx_mon_ring_fill_level
+				      - num_entries_in_ring;
+		else
+			return QDF_STATUS_SUCCESS;
 
-	if (num_entries)
 		dp_mon_buffers_replenish(soc, rx_mon_buf_ring,
 					 &mon_soc_be->rx_desc_mon,
 					 num_entries, &desc_list, &tail,
 					 NULL);
+	}
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -1309,6 +1313,113 @@ static void dp_mon_register_intr_ops_2_0(struct dp_soc *soc)
 	dp_mon_ppdu_stats_handler_register(mon_soc);
 }
 
+#ifdef MONITOR_TLV_RECORDING_ENABLE
+/*
+ * dp_mon_pdev_tlv_logger_init() - initializes struct dp_mon_tlv_logger
+ *
+ * @pdev: pointer to dp_pdev
+ *
+ * Return: QDF_STATUS
+ */
+static
+QDF_STATUS dp_mon_pdev_tlv_logger_init(struct dp_pdev *pdev)
+{
+	struct dp_mon_pdev *mon_pdev = NULL;
+	struct dp_mon_pdev_be *mon_pdev_be = NULL;
+	struct dp_mon_tlv_logger *tlv_log = NULL;
+
+	if (!pdev)
+		return QDF_STATUS_E_INVAL;
+
+	mon_pdev = pdev->monitor_pdev;
+	if (!mon_pdev)
+		return QDF_STATUS_E_INVAL;
+
+	mon_pdev_be = dp_get_be_mon_pdev_from_dp_mon_pdev(mon_pdev);
+
+	tlv_log = qdf_mem_malloc(sizeof(struct dp_mon_tlv_logger));
+	if (!tlv_log) {
+		qdf_err("Memory allocation failed");
+		return QDF_STATUS_E_NOMEM;
+	}
+
+	tlv_log->curr_ppdu_pos = 0;
+	tlv_log->wrap_flag = 0;
+	tlv_log->ppdu_start_idx = 0;
+	tlv_log->mpdu_idx = MAX_PPDU_START_TLV_NUM;
+	tlv_log->ppdu_end_idx = MAX_PPDU_START_TLV_NUM + MAX_MPDU_TLV_NUM;
+	tlv_log->max_ppdu_start_idx = MAX_PPDU_START_TLV_NUM - 1;
+	tlv_log->max_mpdu_idx = MAX_PPDU_START_TLV_NUM + MAX_MPDU_TLV_NUM - 1;
+	tlv_log->max_ppdu_end_idx = MAX_TLVS_PER_PPDU - 1;
+
+	tlv_log->buff = qdf_mem_malloc(MAX_TLV_LOGGING_SIZE *
+					sizeof(struct dp_mon_tlv_info));
+	if (!tlv_log->buff) {
+		qdf_err("Memory allocation failed");
+		qdf_mem_free(tlv_log);
+		tlv_log = NULL;
+		return QDF_STATUS_E_NOMEM;
+	}
+
+	tlv_log->tlv_logging_enable = 1;
+
+	mon_pdev_be->rx_tlv_log = tlv_log;
+
+	return QDF_STATUS_SUCCESS;
+}
+
+/*
+ * dp_mon_pdev_tlv_logger_deinit() - deinitializes struct dp_mon_tlv_logger
+ *
+ * @pdev: pointer to dp_pdev
+ *
+ * Return: QDF_STATUS
+ */
+static
+QDF_STATUS dp_mon_pdev_tlv_logger_deinit(struct dp_pdev *pdev)
+{
+	struct dp_mon_pdev *mon_pdev = NULL;
+	struct dp_mon_pdev_be *mon_pdev_be = NULL;
+	struct dp_mon_tlv_logger *tlv_log = NULL;
+
+	if (!pdev)
+		return QDF_STATUS_E_INVAL;
+
+	mon_pdev = pdev->monitor_pdev;
+	if (!mon_pdev)
+		return QDF_STATUS_E_INVAL;
+
+	mon_pdev_be = dp_get_be_mon_pdev_from_dp_mon_pdev(mon_pdev);
+
+	tlv_log = mon_pdev_be->rx_tlv_log;
+	if (!tlv_log || !(tlv_log->buff))
+		return QDF_STATUS_E_INVAL;
+
+	tlv_log->tlv_logging_enable = 0;
+	qdf_mem_free(tlv_log->buff);
+	tlv_log->buff = NULL;
+	qdf_mem_free(tlv_log);
+	tlv_log = NULL;
+
+	return QDF_STATUS_SUCCESS;
+}
+
+#else
+
+static inline
+QDF_STATUS dp_mon_pdev_tlv_logger_init(struct dp_pdev *pdev)
+{
+	return QDF_STATUS_SUCCESS;
+}
+
+static inline
+QDF_STATUS dp_mon_pdev_tlv_logger_deinit(struct dp_pdev *pdev)
+{
+	return QDF_STATUS_SUCCESS;
+}
+
+#endif
+
 /**
  * dp_mon_register_feature_ops_2_0() - register feature ops
  *
@@ -1544,6 +1655,8 @@ struct dp_mon_ops monitor_ops_2_0 = {
 	.mon_lite_mon_is_rx_adv_filter_enable = dp_lite_mon_is_rx_adv_filter_enable,
 	.mon_rx_ppdu_info_cache_create = dp_rx_mon_ppdu_info_cache_create,
 	.mon_rx_ppdu_info_cache_destroy = dp_rx_mon_ppdu_info_cache_destroy,
+	.mon_rx_pdev_tlv_logger_init = dp_mon_pdev_tlv_logger_init,
+	.mon_rx_pdev_tlv_logger_deinit = dp_mon_pdev_tlv_logger_deinit,
 };
 
 struct cdp_mon_ops dp_ops_mon_2_0 = {
@@ -1555,6 +1668,17 @@ struct cdp_mon_ops dp_ops_mon_2_0 = {
 	.soc_config_full_mon_mode = NULL,
 	.get_mon_pdev_rx_stats = dp_pdev_get_rx_mon_stats,
 	.txrx_enable_mon_reap_timer = NULL,
+#ifdef QCA_ENHANCED_STATS_SUPPORT
+	.txrx_enable_enhanced_stats = dp_enable_enhanced_stats,
+	.txrx_disable_enhanced_stats = dp_disable_enhanced_stats,
+#endif /* QCA_ENHANCED_STATS_SUPPORT */
+#if defined(ATH_SUPPORT_NAC_RSSI) || defined(ATH_SUPPORT_NAC)
+	.txrx_update_filter_neighbour_peers = dp_lite_mon_config_nac_peer,
+#endif
+#ifdef ATH_SUPPORT_NAC_RSSI
+	.txrx_vdev_config_for_nac_rssi = dp_lite_mon_config_nac_rssi_peer,
+	.txrx_vdev_get_neighbour_rssi = dp_lite_mon_get_nac_peer_rssi,
+#endif
 #ifdef QCA_SUPPORT_LITE_MONITOR
 	.txrx_set_lite_mon_config = dp_lite_mon_set_config,
 	.txrx_get_lite_mon_config = dp_lite_mon_get_config,
@@ -1622,8 +1746,8 @@ void dp_mon_cdp_ops_register_2_0(struct cdp_ops *ops)
 }
 #endif
 
-#if defined(WLAN_SUPPORT_RX_PROTOCOL_TYPE_TAG) ||\
-	defined(WLAN_SUPPORT_RX_FLOW_TAG)
+#if defined(WLAN_SUPPORT_RX_PROTOCOL_TYPE_TAG) &&\
+	defined(WLAN_SUPPORT_RX_TAG_STATISTICS)
 /** dp_mon_rx_update_rx_protocol_tag_stats() - Update mon protocols's
  *					      statistics
  * @pdev: pdev handle
@@ -1641,5 +1765,51 @@ void dp_mon_rx_update_rx_protocol_tag_stats(struct dp_pdev *pdev,
 void dp_mon_rx_update_rx_protocol_tag_stats(struct dp_pdev *pdev,
 					    uint16_t protocol_index)
 {
+}
+#endif
+
+#ifdef QCA_ENHANCED_STATS_SUPPORT
+static void
+dp_enable_enhanced_stats_for_each_pdev(struct dp_soc *soc, void *arg) {
+	uint8_t i = 0;
+
+	for (i = 0; i < MAX_PDEV_CNT; i++)
+		dp_enable_enhanced_stats(dp_soc_to_cdp_soc_t(soc), i);
+}
+
+QDF_STATUS
+dp_enable_enhanced_stats_2_0(struct cdp_soc_t *soc, uint8_t pdev_id)
+{
+	struct dp_soc *dp_soc = cdp_soc_t_to_dp_soc(soc);
+	struct dp_soc_be *be_soc = NULL;
+
+	be_soc = dp_get_be_soc_from_dp_soc(dp_soc);
+
+	dp_mlo_iter_ptnr_soc(be_soc,
+			     dp_enable_enhanced_stats_for_each_pdev,
+			     NULL);
+	return QDF_STATUS_SUCCESS;
+}
+
+static void
+dp_disable_enhanced_stats_for_each_pdev(struct dp_soc *soc, void *arg) {
+	uint8_t i = 0;
+
+	for (i = 0; i < MAX_PDEV_CNT; i++)
+		dp_disable_enhanced_stats(dp_soc_to_cdp_soc_t(soc), i);
+}
+
+QDF_STATUS
+dp_disable_enhanced_stats_2_0(struct cdp_soc_t *soc, uint8_t pdev_id)
+{
+	struct dp_soc *dp_soc = cdp_soc_t_to_dp_soc(soc);
+	struct dp_soc_be *be_soc = NULL;
+
+	be_soc = dp_get_be_soc_from_dp_soc(dp_soc);
+
+	dp_mlo_iter_ptnr_soc(be_soc,
+			     dp_disable_enhanced_stats_for_each_pdev,
+			     NULL);
+	return QDF_STATUS_SUCCESS;
 }
 #endif

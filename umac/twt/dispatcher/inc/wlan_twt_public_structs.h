@@ -152,6 +152,7 @@ enum TWT_OPERATION {
  * @b_twt_enable: Enable or disable broadcast TWT.
  * @b_twt_legacy_mbss_enable: Enable or disable legacy MBSSID TWT.
  * @b_twt_ax_mbss_enable: Enable or disable 11AX MBSSID TWT.
+ * @r_twt_enable: Restricted TWT enable or disable.
  */
 struct twt_enable_param {
 	uint32_t pdev_id;
@@ -177,6 +178,7 @@ struct twt_enable_param {
 	uint32_t b_twt_enable:1,
 		 b_twt_legacy_mbss_enable:1,
 		 b_twt_ax_mbss_enable:1;
+	bool r_twt_enable;
 };
 
 /**
@@ -457,6 +459,9 @@ enum HOST_TWT_COMMAND {
  * @b_twt_persistence: Countdown VAL frames to param update/teardown
  * @wake_time_tsf: Absolute TSF value to start first TWT service period
  * @announce_timeout_us: Timeout value before sending QoS NULL frame.
+ * @link_id_bitmap: MLD links to which R-TWT element applies
+ * @r_twt_dl_tid_bitmap: DL TIDs for R-TWT scheduling
+ * @r_twt_ul_tid_bitmap: UL TIDs for R-TWT scheduling
  */
 struct twt_add_dialog_param {
 	uint32_t vdev_id;
@@ -482,6 +487,9 @@ struct twt_add_dialog_param {
 		b_twt_recommendation:3;
 	uint64_t wake_time_tsf;
 	uint32_t announce_timeout_us;
+	uint32_t link_id_bitmap;
+	uint32_t r_twt_dl_tid_bitmap;
+	uint32_t r_twt_ul_tid_bitmap;
 };
 
 /**

@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2016-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -601,9 +601,9 @@ struct rx_mon_pkt_tlvs {
 	HAL_RX_MSDU_END(_rx_pkt_tlv).mcast_bcast
 
 #ifdef RECEIVE_OFFLOAD
-/**
-* LRO information needed from the TLVs
-*/
+/*
+ * LRO information needed from the TLVs
+ */
 #define HAL_RX_TLV_GET_LRO_ELIGIBLE(_rx_pkt_tlv) \
 	HAL_RX_MSDU_END(_rx_pkt_tlv).lro_eligible
 
@@ -811,11 +811,11 @@ static inline uint32_t hal_rx_tlv_msdu_done_get_be(uint8_t *buf)
 	return HAL_RX_TLV_MSDU_DONE_GET(buf);
 }
 
-/*
- * hal_rx_attn_first_mpdu_get(): get fist_mpdu bit from rx attention
+/**
+ * hal_rx_tlv_first_mpdu_get_be() - get first_mpdu bit from rx attention
  * @buf: pointer to rx_pkt_tlvs
  *
- * return: uint32_t(first_msdu)
+ * Return: uint32_t(first_msdu)
  */
 static inline uint32_t hal_rx_tlv_first_mpdu_get_be(uint8_t *buf)
 {
@@ -824,10 +824,10 @@ static inline uint32_t hal_rx_tlv_first_mpdu_get_be(uint8_t *buf)
 	return HAL_RX_TLV_FIRST_MPDU_GET(rx_pkt_tlvs);
 }
 
-/*
- * hal_rx_msdu_cce_match_get(): get CCE match bit
- * from rx attention
+/**
+ * hal_rx_msdu_cce_match_get_be() - get CCE match bit from rx attention
  * @buf: pointer to rx_pkt_tlvs
+ *
  * Return: CCE match value
  */
 static inline bool hal_rx_msdu_cce_match_get_be(uint8_t *buf)
@@ -850,11 +850,11 @@ static inline uint32_t hal_rx_msdu_peer_meta_data_get_be(uint8_t *buf)
 }
 #endif
 
-/*
- * hal_rx_mpdu_get_addr1_be(): API to check get address1 of the mpdu
- *
+/**
+ * hal_rx_mpdu_get_addr1_be() - API to check get address1 of the mpdu
  * @buf: pointer to the start of RX PKT TLV headera
  * @mac_addr: pointer to mac address
+ *
  * Return: success/failure
  */
 static inline QDF_STATUS hal_rx_mpdu_get_addr1_be(uint8_t *buf,
@@ -882,7 +882,7 @@ static inline QDF_STATUS hal_rx_mpdu_get_addr1_be(uint8_t *buf,
 
 #ifndef CONFIG_WORD_BASED_TLV
 /**
- * hal_rx_mpdu_info_ampdu_flag_get_be(): get ampdu flag bit
+ * hal_rx_mpdu_info_ampdu_flag_get_be() - get ampdu flag bit
  * from rx mpdu info
  * @buf: pointer to rx_pkt_tlvs
  *
@@ -896,7 +896,7 @@ static inline bool hal_rx_mpdu_info_ampdu_flag_get_be(uint8_t *buf)
 }
 
 /**
- * hal_rx_get_qdesc_addr_be(): API to get qdesc address of reo
+ * hal_rx_get_qdesc_addr_be() - API to get qdesc address of reo
  * entrance ring desc
  *
  * @dst_ring_desc: reo dest ring descriptor (used for Lithium DP)
@@ -911,11 +911,11 @@ static inline uint64_t hal_rx_get_qdesc_addr_be(uint8_t *dst_ring_desc,
 	return (uint64_t)HAL_RX_REO_QUEUE_DESC_ADDR_31_0_GET(rx_pkt_tlvs);
 }
 
-/*
- * @ hal_rx_print_pn_be: Prints the PN of rx packet.
+/**
+ * hal_rx_print_pn_be() - Prints the PN of rx packet.
+ * @buf: rx_tlv_hdr of the received packet
  *
- * @ buf: rx_tlv_hdr of the received packet
- * @ Return: void
+ * Return: void
  */
 static inline void hal_rx_print_pn_be(uint8_t *buf)
 {
@@ -941,12 +941,12 @@ static inline void hal_rx_tlv_get_pn_num_be(uint8_t *buf, uint64_t *pn_num)
 	pn_num[1] |= ((uint64_t)HAL_RX_TLV_MPDU_PN_127_96_GET(pkt_tlvs) << 32);
 }
 
-/*
- * hal_rx_mpdu_get_addr4_be(): API to get address4 of the mpdu
+/**
+ * hal_rx_mpdu_get_addr4_be() - API to get address4 of the mpdu
  * in the packet
- *
  * @buf: pointer to the start of RX PKT TLV header
  * @mac_addr: pointer to mac address
+ *
  * Return: success/failure
  */
 static inline QDF_STATUS hal_rx_mpdu_get_addr4_be(uint8_t *buf,
@@ -972,7 +972,7 @@ static inline QDF_STATUS hal_rx_mpdu_get_addr4_be(uint8_t *buf,
 }
 
 /**
- * hal_rx_priv_info_set_in_tlv_be(): Save the private info to
+ * hal_rx_priv_info_set_in_tlv_be() - Save the private info to
  *                             the reserved bytes of rx_tlv_hdr
  * @buf: start of rx_tlv_hdr
  * @priv_data: hal_wbm_err_desc_info structure
@@ -991,7 +991,7 @@ static inline void hal_rx_priv_info_set_in_tlv_be(uint8_t *buf,
 }
 
 /**
- * hal_rx_priv_info_get_from_tlv_be(): retrieve the private data from
+ * hal_rx_priv_info_get_from_tlv_be() - retrieve the private data from
  *                             the reserved bytes of rx_tlv_hdr.
  * @buf: start of rx_tlv_hdr
  * @priv_data: Handle to get the private data, output parameter.
@@ -1010,10 +1010,10 @@ static inline void hal_rx_priv_info_get_from_tlv_be(uint8_t *buf,
 }
 
 /**
- * hal_rx_tlv_l3_type_get_be(): API to get the l3 type
- * from rx_msdu_start TLV
- *
+ * hal_rx_tlv_l3_type_get_be() - API to get the l3 type from
+ *                               rx_msdu_start TLV
  * @buf: pointer to the start of RX PKT TLV headers
+ *
  * Return: uint32_t(l3 type)
  */
 static inline uint32_t hal_rx_tlv_l3_type_get_be(uint8_t *buf)
@@ -1024,7 +1024,7 @@ static inline uint32_t hal_rx_tlv_l3_type_get_be(uint8_t *buf)
 }
 
 /**
- * hal_rx_hw_desc_get_ppduid_get_be(): retrieve ppdu id
+ * hal_rx_hw_desc_get_ppduid_get_be() - retrieve ppdu id
  * @rx_tlv_hdr: start address of rx_pkt_tlvs
  * @rxdma_dst_ring_desc: Rx HW descriptor
  *
@@ -1039,8 +1039,8 @@ hal_rx_hw_desc_get_ppduid_get_be(void *rx_tlv_hdr, void *rxdma_dst_ring_desc)
 	return HAL_RX_TLV_PHY_PPDU_ID_GET(rx_pkt_tlvs);
 }
 
-/*
- * hal_rx_tlv_phy_ppdu_id_get(): get phy_ppdu_id value
+/**
+ * hal_rx_tlv_phy_ppdu_id_get_be() - get phy_ppdu_id value
  * from rx attention
  * @buf: pointer to rx_pkt_tlvs
  *
@@ -1053,8 +1053,8 @@ static inline uint16_t hal_rx_tlv_phy_ppdu_id_get_be(uint8_t *buf)
 	return HAL_RX_TLV_PHY_PPDU_ID_GET(rx_pkt_tlvs);
 }
 
-/*
- * hal_rx_attn_phy_ppdu_id_get(): get phy_ppdu_id value
+/**
+ * hal_rx_attn_phy_ppdu_id_get_be() - get phy_ppdu_id value
  * from rx attention
  * @buf: pointer to rx_pkt_tlvs
  *
@@ -1078,11 +1078,11 @@ hal_rx_get_ppdu_id_be(uint8_t *buf)
 	return HAL_RX_GET_PPDU_ID(rx_pkt_tlvs);
 }
 
-/*
- * hal_rx_mpdu_peer_meta_data_set: set peer meta data in RX mpdu start tlv
- *
+/**
+ * hal_rx_mpdu_peer_meta_data_set_be() - set peer meta data in RX mpdu start tlv
  * @buf: rx_tlv_hdr of the received packet
  * @peer_mdata: peer meta data to be set.
+ *
  * Return: void
  */
 static inline void
@@ -1112,9 +1112,9 @@ static inline uint8_t hal_rx_get_filter_category_be(uint8_t *buf)
 }
 
 /**
- * hal_rx_is_unicast_be: check packet is unicast frame or not.
+ * hal_rx_is_unicast_be() - check packet is unicast frame or not.
+ * @buf: pointer to rx pkt TLV.
  *
- * @ buf: pointer to rx pkt TLV.
  * Return: true on unicast.
  */
 static inline bool hal_rx_is_unicast_be(uint8_t *buf)
@@ -1129,12 +1129,6 @@ static inline bool hal_rx_is_unicast_be(uint8_t *buf)
 
 #else
 #define IS_ADDR_MULTICAST(_a)  (*(_a) & 0x01)
-/**
- * hal_rx_is_unicast_be: check packet is unicast frame or not.
- *
- * @ buf: pointer to rx pkt TLV.
- * Return: true on unicast.
- */
 static inline bool hal_rx_is_unicast_be(uint8_t *buf)
 {
 	uint8_t mac[QDF_MAC_ADDR_SIZE] = {0};
@@ -1145,11 +1139,12 @@ static inline bool hal_rx_is_unicast_be(uint8_t *buf)
 }
 
 /**
- * hal_rx_priv_info_set_in_tlv_be(): Save the private info to
+ * hal_rx_priv_info_set_in_tlv_be() - Save the private info to
  *                             the reserved bytes of rx_tlv_hdr
  * @buf: start of rx_tlv_hdr
  * @priv_data: hal_wbm_err_desc_info structure
  * @len: length of the private data
+ *
  * Return: void
  */
 static inline void hal_rx_priv_info_set_in_tlv_be(uint8_t *buf,
@@ -1165,11 +1160,12 @@ static inline void hal_rx_priv_info_set_in_tlv_be(uint8_t *buf,
 }
 
 /**
- * hal_rx_priv_info_get_from_tlv_be(): retrieve the private data from
+ * hal_rx_priv_info_get_from_tlv_be() - retrieve the private data from
  *                             the reserved bytes of rx_tlv_hdr.
  * @buf: start of rx_tlv_hdr
  * @priv_data: Handle to get the private data, output parameter.
  * @len: length of the private data
+ *
  * Return: void
  */
 static inline void hal_rx_priv_info_get_from_tlv_be(uint8_t *buf,
@@ -1185,11 +1181,11 @@ static inline void hal_rx_priv_info_get_from_tlv_be(uint8_t *buf,
 		     copy_len);
 }
 
-/*
- * @ hal_rx_print_pn_be: Prints the PN of rx packet.
+/**
+ * hal_rx_print_pn_be() - Prints the PN of rx packet.
+ * @buf: rx_tlv_hdr of the received packet
  *
- * @ buf: rx_tlv_hdr of the received packet
- * @ Return: void
+ * Return: void
  */
 static inline void hal_rx_print_pn_be(uint8_t *buf)
 {
@@ -1215,10 +1211,10 @@ static inline void hal_rx_tlv_get_pn_num_be(uint8_t *buf, uint64_t *pn_num)
 #endif
 
 /**
- * hal_rx_tlv_msdu_len_get(): API to get the MSDU length
- * from rx_msdu_start TLV
+ * hal_rx_tlv_msdu_len_get_be() - API to get the MSDU length from
+ *                                rx_msdu_start TLV
+ * @buf: pointer to the start of RX PKT TLV headers
  *
- * @ buf: pointer to the start of RX PKT TLV headers
  * Return: msdu length
  */
 static inline uint32_t hal_rx_tlv_msdu_len_get_be(uint8_t *buf)
@@ -1228,10 +1224,9 @@ static inline uint32_t hal_rx_tlv_msdu_len_get_be(uint8_t *buf)
 	return HAL_RX_TLV_MSDU_LEN_GET(rx_pkt_tlvs);
 }
 
- /**
- * hal_rx_tlv_msdu_len_set(): API to set the MSDU length
- * from rx_msdu_start TLV
- *
+/**
+ * hal_rx_tlv_msdu_len_set_be() - API to set the MSDU length from
+ *                                rx_msdu_start TLV
  * @buf: pointer to the start of RX PKT TLV headers
  * @len: msdu length
  *
@@ -1244,11 +1239,11 @@ static inline void hal_rx_tlv_msdu_len_set_be(uint8_t *buf, uint32_t len)
 	HAL_RX_TLV_MSDU_LEN_GET(rx_pkt_tlvs) = len;
 }
 
-/*
- * hal_rx_tlv_bw_get(): API to get the Bandwidth
- * Interval from rx_msdu_start
- *
+/**
+ * hal_rx_tlv_bw_get_be() - API to get the Bandwidth Interval from
+ *                          rx_msdu_start
  * @buf: pointer to the start of RX PKT TLV header
+ *
  * Return: uint32_t(bw)
  */
 static inline uint32_t hal_rx_tlv_bw_get_be(uint8_t *buf)
@@ -1258,11 +1253,11 @@ static inline uint32_t hal_rx_tlv_bw_get_be(uint8_t *buf)
 	return HAL_RX_TLV_BW_GET(rx_pkt_tlvs);
 }
 
- /**
- * hal_rx_tlv_toeplitz_get: API to get the toeplitz hash
- * from rx_msdu_start TLV
+/**
+ * hal_rx_tlv_toeplitz_get_be() - API to get the toeplitz hash from
+ *                                rx_msdu_start TLV
+ * @buf: pointer to the start of RX PKT TLV headers
  *
- * @ buf: pointer to the start of RX PKT TLV headers
  * Return: toeplitz hash
  */
 static inline uint32_t hal_rx_tlv_toeplitz_get_be(uint8_t *buf)
@@ -1273,10 +1268,10 @@ static inline uint32_t hal_rx_tlv_toeplitz_get_be(uint8_t *buf)
 }
 
 /**
- * hal_rx_tlv_msdu_sgi_get(): API to get the Short Guard
- * Interval from rx_msdu_start TLV
- *
+ * hal_rx_tlv_sgi_get_be() - API to get the Short Guard Interval from
+ *                           rx_msdu_start TLV
  * @buf: pointer to the start of RX PKT TLV headers
+ *
  * Return: uint32_t(sgi)
  */
 static inline uint32_t hal_rx_tlv_sgi_get_be(uint8_t *buf)
@@ -1287,10 +1282,10 @@ static inline uint32_t hal_rx_tlv_sgi_get_be(uint8_t *buf)
 }
 
 /**
- * hal_rx_tlv_msdu_rate_mcs_get(): API to get the MCS rate
- * from rx_msdu_start TLV
- *
+ * hal_rx_tlv_rate_mcs_get_be() - API to get the MCS rate from
+ *                                rx_msdu_start TLV
  * @buf: pointer to the start of RX PKT TLV headers
+ *
  * Return: uint32_t(rate_mcs)
  */
 static inline uint32_t hal_rx_tlv_rate_mcs_get_be(uint8_t *buf)
@@ -1303,14 +1298,11 @@ static inline uint32_t hal_rx_tlv_rate_mcs_get_be(uint8_t *buf)
 	return rate_mcs;
 }
 
-/*
- * Get key index from RX_MSDU_END
- */
-/*
- * hal_rx_msdu_get_keyid(): API to get the key id if the decrypted packet
- * from rx_msdu_end
- *
+/**
+ * hal_rx_msdu_get_keyid_be() - API to get the key id of the decrypted packet
+ *                              from rx_msdu_end
  * @buf: pointer to the start of RX PKT TLV header
+ *
  * Return: uint32_t(key id)
  */
 
@@ -1324,11 +1316,11 @@ static inline uint8_t hal_rx_msdu_get_keyid_be(uint8_t *buf)
 	return keyid_octet & 0x3;
 }
 
-/*
- * hal_rx_tlv_get_rssi(): API to get the rssi of received pkt
- * from rx_msdu_start
- *
+/**
+ * hal_rx_tlv_get_rssi_be() - API to get the rssi of received pkt from
+ *                            rx_msdu_start
  * @buf: pointer to the start of RX PKT TLV header
+ *
  * Return: uint32_t(rssi)
  */
 
@@ -1342,11 +1334,11 @@ static inline uint32_t hal_rx_tlv_get_rssi_be(uint8_t *buf)
 	return rssi;
 }
 
-/*
- * hal_rx_tlv_get_freq(): API to get the frequency of operating channel
- * from rx_msdu_start
- *
+/**
+ * hal_rx_tlv_get_freq_be() - API to get the frequency of operating
+ *                            channel from rx_msdu_start
  * @buf: pointer to the start of RX PKT TLV header
+ *
  * Return: uint32_t(frequency)
  */
 
@@ -1361,11 +1353,11 @@ static inline uint32_t hal_rx_tlv_get_freq_be(uint8_t *buf)
 }
 
 
-/*
- * hal_rx_tlv_get_pkt_type(): API to get the pkt type
- * from rx_msdu_start
- *
+/**
+ * hal_rx_tlv_get_pkt_type_be() - API to get the pkt type from
+ *                                rx_msdu_start
  * @buf: pointer to the start of RX PKT TLV header
+ *
  * Return: uint32_t(pkt type)
  */
 
@@ -1384,10 +1376,10 @@ static inline uint32_t hal_rx_tlv_get_pkt_type_be(uint8_t *buf)
  ******************************************************************************/
 
 /**
- * hal_rx_tlv_decrypt_err_get(): API to get the Decrypt ERR
- * from rx_mpdu_end TLV
- *
+ * hal_rx_tlv_decrypt_err_get_be() - API to get the Decrypt ERR from
+ *                                   rx_mpdu_end TLV
  * @buf: pointer to the start of RX PKT TLV headers
+ *
  * Return: uint32_t(decrypt_err)
  */
 static inline uint32_t hal_rx_tlv_decrypt_err_get_be(uint8_t *buf)
@@ -1401,10 +1393,9 @@ static inline uint32_t hal_rx_tlv_decrypt_err_get_be(uint8_t *buf)
 }
 
 /**
- * hal_rx_tlv_mic_err_get(): API to get the MIC ERR
- * from rx_tlv TLV
- *
+ * hal_rx_tlv_mic_err_get_be() - API to get the MIC ERR from rx_tlv TLV
  * @buf: pointer to the start of RX PKT TLV headers
+ *
  * Return: uint32_t(mic_err)
  */
 static inline uint32_t hal_rx_tlv_mic_err_get_be(uint8_t *buf)
@@ -1418,10 +1409,10 @@ static inline uint32_t hal_rx_tlv_mic_err_get_be(uint8_t *buf)
 }
 
 /**
- * hal_get_reo_ent_desc_qdesc_addr_be(): API to get qdesc address of reo
- * entrance ring desc
- *
+ * hal_get_reo_ent_desc_qdesc_addr_be() - API to get qdesc address of
+ *                                        reo entrance ring desc
  * @desc: reo entrance ring descriptor
+ *
  * Return: qdesc address
  */
 static inline uint8_t *hal_get_reo_ent_desc_qdesc_addr_be(uint8_t *desc)
@@ -1430,11 +1421,11 @@ static inline uint8_t *hal_get_reo_ent_desc_qdesc_addr_be(uint8_t *desc)
 }
 
 /**
- * hal_set_reo_ent_desc_reo_dest_ind_be(): API to set reo destination
- * indication of reo entrance ring desc
- *
+ * hal_set_reo_ent_desc_reo_dest_ind_be() - API to set reo destination
+ *                                          indication of reo entrance ring desc
  * @desc: reo ent ring descriptor
  * @dst_ind: reo destination indication value
+ *
  * Return: None
  */
 static inline void
@@ -1445,7 +1436,7 @@ hal_set_reo_ent_desc_reo_dest_ind_be(uint8_t *desc, uint32_t dst_ind)
 }
 
 /**
- * hal_rx_mpdu_sequence_number_get() - Get mpdu sequence number
+ * hal_rx_mpdu_sequence_number_get_be() - Get mpdu sequence number
  * @buf: pointer to packet buffer
  *
  * Return: mpdu sequence
@@ -1458,11 +1449,11 @@ static inline int hal_rx_mpdu_sequence_number_get_be(uint8_t *buf)
 }
 
 /**
- * hal_rx_msdu_packet_metadata_get(): API to get the
- * msdu information from rx_msdu_end TLV
- *
- * @ buf: pointer to the start of RX PKT TLV headers
- * @ hal_rx_msdu_metadata: pointer to the msdu info structure
+ * hal_rx_msdu_packet_metadata_get_generic_be() - API to get the msdu
+ *                                                information from
+ *                                                rx_msdu_end TLV
+ * @buf: pointer to the start of RX PKT TLV headers
+ * @pkt_msdu_metadata: pointer to the msdu info structure
  */
 static inline void
 hal_rx_msdu_packet_metadata_get_generic_be(uint8_t *buf,
@@ -1480,11 +1471,11 @@ hal_rx_msdu_packet_metadata_get_generic_be(uint8_t *buf,
 		HAL_RX_TLV_SA_SW_PEER_ID_GET(rx_pkt_tlvs);
 }
 
-/*
- * hal_rx_msdu_start_nss_get_kiwi(): API to get the NSS
- * Interval from rx_msdu_start
- *
+/**
+ * hal_rx_tlv_nss_get_be() - API to get the NSS Interval from
+ *                           rx_msdu_start
  * @buf: pointer to the start of RX PKT TLV header
+ *
  * Return: uint32_t(nss)
  */
 static inline uint32_t hal_rx_tlv_nss_get_be(uint8_t *buf)
@@ -1521,10 +1512,9 @@ static inline uint32_t hal_rx_tlv_nss_get_be(uint8_t *buf)
 #endif
 
 /**
- * hal_rx_mon_hw_desc_get_mpdu_status_be(): Retrieve MPDU status
- *
- * @ hw_desc_addr: Start address of Rx HW TLVs
- * @ rs: Status for monitor mode
+ * hal_rx_mon_hw_desc_get_mpdu_status_be() - Retrieve MPDU status
+ * @hw_desc_addr: Start address of Rx HW TLVs
+ * @rs: Status for monitor mode
  *
  * Return: void
  */
@@ -1565,11 +1555,11 @@ static inline uint32_t hal_rx_tlv_tid_get_be(uint8_t *buf)
 	return tid;
 }
 
-/*
- * hal_rx_tlv_reception_type_get(): API to get the reception type
- * Interval from rx_msdu_start
- *
+/**
+ * hal_rx_tlv_reception_type_get_be() - API to get the reception type
+ *                                      Interval from rx_msdu_start
  * @buf: pointer to the start of RX PKT TLV header
+ *
  * Return: uint32_t(reception_type)
  */
 static inline
@@ -1584,10 +1574,10 @@ uint32_t hal_rx_tlv_reception_type_get_be(uint8_t *buf)
 }
 
 /**
- * hal_rx_msdu_end_da_idx_get_be: API to get da_idx
- * from rx_msdu_end TLV
+ * hal_rx_msdu_end_da_idx_get_be() - API to get da_idx from
+ *                                   rx_msdu_end TLV
+ * @buf: pointer to the start of RX PKT TLV headers
  *
- * @ buf: pointer to the start of RX PKT TLV headers
  * Return: da index
  */
 static inline uint16_t hal_rx_msdu_end_da_idx_get_be(uint8_t *buf)
@@ -1601,10 +1591,10 @@ static inline uint16_t hal_rx_msdu_end_da_idx_get_be(uint8_t *buf)
 }
 
 /**
- * hal_rx_get_rx_fragment_number_be(): Function to retrieve rx fragment number
+ * hal_rx_get_rx_fragment_number_be() - Function to retrieve rx fragment number
+ * @buf: Network buffer
  *
- * @nbuf: Network buffer
- * Returns: rx fragment number
+ * Return: rx fragment number
  */
 static inline
 uint8_t hal_rx_get_rx_fragment_number_be(uint8_t *buf)
@@ -1617,10 +1607,10 @@ uint8_t hal_rx_get_rx_fragment_number_be(uint8_t *buf)
 }
 
 /**
- * hal_rx_msdu_end_da_is_mcbc_get_be(): API to check if pkt is MCBC
- * from rx_msdu_end TLV
+ * hal_rx_tlv_da_is_mcbc_get_be() - API to check if pkt is MCBC from
+ *                                  rx_msdu_end TLV
+ * @buf: pointer to the start of RX PKT TLV headers
  *
- * @ buf: pointer to the start of RX PKT TLV headers
  * Return: da_is_mcbc
  */
 static inline uint8_t
@@ -1632,10 +1622,10 @@ hal_rx_tlv_da_is_mcbc_get_be(uint8_t *buf)
 }
 
 /**
- * hal_rx_tlv_is_tkip_mic_err_get_be(): API to get tkip Mic error
- * from rx_msdu_end TLV
+ * hal_rx_tlv_is_tkip_mic_err_get_be() - API to get tkip Mic error
+ *                                       from rx_msdu_end TLV
+ * @buf: pointer to the start of RX PKT TLV headers
  *
- * @ buf: pointer to the start of RX PKT TLV headers
  * Return: tkip_mic_err
  */
 static inline uint8_t
@@ -1647,10 +1637,10 @@ hal_rx_tlv_is_tkip_mic_err_get_be(uint8_t *buf)
 }
 
 /**
- * hal_rx_tlvd_sa_is_valid_get_be(): API to get the sa_is_valid bit from
- *					rx_msdu_end TLV
+ * hal_rx_tlv_sa_is_valid_get_be() - API to get the sa_is_valid bit from
+ *                                   rx_msdu_end TLV
+ * @buf: pointer to the start of RX PKT TLV headers
  *
- * @ buf: pointer to the start of RX PKT TLV headers
  * Return: sa_is_valid bit
  */
 static inline uint8_t
@@ -1665,9 +1655,9 @@ hal_rx_tlv_sa_is_valid_get_be(uint8_t *buf)
 }
 
 /**
- * hal_rx_tlv_sa_idx_get_be(): API to get the sa_idx from rx_msdu_end TLV
+ * hal_rx_tlv_sa_idx_get_be() - API to get the sa_idx from rx_msdu_end TLV
+ * @buf: pointer to the start of RX PKT TLV headers
  *
- * @ buf: pointer to the start of RX PKT TLV headers
  * Return: sa_idx (SA AST index)
  */
 static inline
@@ -1683,8 +1673,6 @@ uint16_t hal_rx_tlv_sa_idx_get_be(uint8_t *buf)
 
 /**
  * hal_rx_desc_is_first_msdu_be() - Check if first msdu
- *
- * @hal_soc_hdl: hal_soc handle
  * @hw_desc_addr: hardware descriptor address
  *
  * Return: 0 - success/ non-zero failure
@@ -1698,10 +1686,10 @@ static inline uint32_t hal_rx_desc_is_first_msdu_be(void *hw_desc_addr)
 }
 
 /**
- * hal_rx_tlv_l3_hdr_padding_get_be(): API to get the l3_header padding
+ * hal_rx_tlv_l3_hdr_padding_get_be() - API to get the l3_header padding
  *					from rx_msdu_end TLV
+ * @buf: pointer to the start of RX PKT TLV headers
  *
- * @ buf: pointer to the start of RX PKT TLV headers
  * Return: number of l3 header padding bytes
  */
 static inline uint32_t hal_rx_tlv_l3_hdr_padding_get_be(uint8_t *buf)
@@ -1714,11 +1702,11 @@ static inline uint32_t hal_rx_tlv_l3_hdr_padding_get_be(uint8_t *buf)
 	return l3_header_padding;
 }
 
-/*
- * @ hal_rx_encryption_info_valid_be: Returns encryption type.
+/**
+ * hal_rx_encryption_info_valid_be() - Returns encryption type.
+ * @buf: rx_tlv_hdr of the received packet
  *
- * @ buf: rx_tlv_hdr of the received packet
- * @ Return: encryption type
+ * Return: encryption type
  */
 static inline uint32_t hal_rx_encryption_info_valid_be(uint8_t *buf)
 {
@@ -1730,10 +1718,10 @@ static inline uint32_t hal_rx_encryption_info_valid_be(uint8_t *buf)
 }
 
 /**
- * hal_rx_tlv_first_msdu_get_be: API to get first msdu status
- * from rx_msdu_end TLV
+ * hal_rx_tlv_first_msdu_get_be() - API to get first msdu status from
+ *                                  rx_msdu_end TLV
+ * @buf: pointer to the start of RX PKT TLV headers
  *
- * @ buf: pointer to the start of RX PKT TLV headers
  * Return: first_msdu
  */
 static inline uint8_t hal_rx_tlv_first_msdu_get_be(uint8_t *buf)
@@ -1747,10 +1735,10 @@ static inline uint8_t hal_rx_tlv_first_msdu_get_be(uint8_t *buf)
 }
 
 /**
- * hal_rx_tlv_da_is_valid_get_be: API to check if da is valid
- * from rx_msdu_end TLV
+ * hal_rx_tlv_da_is_valid_get_be() - API to check if da is valid from
+ *                                   rx_msdu_end TLV
+ * @buf: pointer to the start of RX PKT TLV headers
  *
- * @ buf: pointer to the start of RX PKT TLV headers
  * Return: da_is_valid
  */
 static inline uint8_t hal_rx_tlv_da_is_valid_get_be(uint8_t *buf)
@@ -1764,10 +1752,10 @@ static inline uint8_t hal_rx_tlv_da_is_valid_get_be(uint8_t *buf)
 }
 
 /**
- * hal_rx_tlv_last_msdu_get_be: API to get last msdu status
- * from rx_msdu_end TLV
+ * hal_rx_tlv_last_msdu_get_be() - API to get last msdu status from
+ *                                 rx_msdu_end TLV
+ * @buf: pointer to the start of RX PKT TLV headers
  *
- * @ buf: pointer to the start of RX PKT TLV headers
  * Return: last_msdu
  */
 static inline uint8_t hal_rx_tlv_last_msdu_get_be(uint8_t *buf)
@@ -1780,11 +1768,11 @@ static inline uint8_t hal_rx_tlv_last_msdu_get_be(uint8_t *buf)
 	return last_msdu;
 }
 
-/*
- * hal_rx_get_mpdu_mac_ad4_valid_be(): Retrieves if mpdu 4th addr is valid
+/**
+ * hal_rx_get_mpdu_mac_ad4_valid_be() - Retrieves if mpdu 4th addr is valid
+ * @buf: Network buffer
  *
- * @nbuf: Network buffer
- * Returns: value of mpdu 4th address valid field
+ * Return: value of mpdu 4th address valid field
  */
 static inline bool hal_rx_get_mpdu_mac_ad4_valid_be(uint8_t *buf)
 {
@@ -1797,7 +1785,7 @@ static inline bool hal_rx_get_mpdu_mac_ad4_valid_be(uint8_t *buf)
 }
 
 /**
- * hal_rx_mpdu_start_sw_peer_id_get_be: Retrieve sw peer_id
+ * hal_rx_mpdu_start_sw_peer_id_get_be() - Retrieve sw peer_id
  * @buf: network buffer
  *
  * Return: sw peer_id
@@ -1810,8 +1798,8 @@ static inline uint32_t hal_rx_mpdu_start_sw_peer_id_get_be(uint8_t *buf)
 }
 
 /**
- * hal_rx_mpdu_get_to_ds_be(): API to get the tods info
- * from rx_mpdu_start
+ * hal_rx_mpdu_get_to_ds_be() - API to get the tods info
+ *                              from rx_mpdu_start
  *
  * @buf: pointer to the start of RX PKT TLV header
  * Return: uint32_t(to_ds)
@@ -1823,11 +1811,11 @@ static inline uint32_t hal_rx_mpdu_get_to_ds_be(uint8_t *buf)
 	return HAL_RX_TLV_MPDU_GET_TODS(rx_pkt_tlvs);
 }
 
-/*
- * hal_rx_mpdu_get_fr_ds_be(): API to get the from ds info
- * from rx_mpdu_start
- *
+/**
+ * hal_rx_mpdu_get_fr_ds_be() - API to get the from ds info
+ *                              from rx_mpdu_start
  * @buf: pointer to the start of RX PKT TLV header
+ *
  * Return: uint32_t(fr_ds)
  */
 static inline uint32_t hal_rx_mpdu_get_fr_ds_be(uint8_t *buf)
@@ -1837,12 +1825,12 @@ static inline uint32_t hal_rx_mpdu_get_fr_ds_be(uint8_t *buf)
 	return HAL_RX_TLV_MPDU_GET_FROMDS(rx_pkt_tlvs);
 }
 
-/*
- * hal_rx_get_mpdu_frame_control_valid_be(): Retrieves mpdu
- * frame control valid
+/**
+ * hal_rx_get_mpdu_frame_control_valid_be() - Retrieves mpdu frame
+ *                                  control valid
+ * @buf: Network buffer
  *
- * @nbuf: Network buffer
- * Returns: value of frame control valid field
+ * Return: value of frame control valid field
  */
 static inline uint8_t hal_rx_get_mpdu_frame_control_valid_be(uint8_t *buf)
 {
@@ -1851,12 +1839,12 @@ static inline uint8_t hal_rx_get_mpdu_frame_control_valid_be(uint8_t *buf)
 	return HAL_RX_TLV_MPDU_GET_FRAME_CONTROL_VALID(rx_pkt_tlvs);
 }
 
-/*
- * hal_rx_mpdu_get_addr2_be(): API to check get address2 of the mpdu
- * in the packet
- *
+/**
+ * hal_rx_mpdu_get_addr2_be() - API to check get address2 of the mpdu
+ *                              in the packet
  * @buf: pointer to the start of RX PKT TLV header
  * @mac_addr: pointer to mac address
+ *
  * Return: success/failure
  */
 static inline QDF_STATUS hal_rx_mpdu_get_addr2_be(uint8_t *buf,
@@ -1881,12 +1869,12 @@ static inline QDF_STATUS hal_rx_mpdu_get_addr2_be(uint8_t *buf,
 	return QDF_STATUS_E_FAILURE;
 }
 
-/*
- * hal_rx_mpdu_get_addr3_be(): API to get address3 of the mpdu
- * in the packet
- *
+/**
+ * hal_rx_mpdu_get_addr3_be() - API to get address3 of the mpdu in the
+ *                              packet
  * @buf: pointer to the start of RX PKT TLV header
  * @mac_addr: pointer to mac address
+ *
  * Return: success/failure
  */
 static inline QDF_STATUS hal_rx_mpdu_get_addr3_be(uint8_t *buf,
@@ -1911,12 +1899,12 @@ static inline QDF_STATUS hal_rx_mpdu_get_addr3_be(uint8_t *buf,
 	return QDF_STATUS_E_FAILURE;
 }
 
-/*
- * hal_rx_get_mpdu_sequence_control_valid_be(): Get mpdu
- * sequence control valid
+/**
+ * hal_rx_get_mpdu_sequence_control_valid_be() - Get mpdu sequence
+ *                                               control valid
+ * @buf: Network buffer
  *
- * @nbuf: Network buffer
- * Returns: value of sequence control valid field
+ * Return: value of sequence control valid field
  */
 static inline uint8_t hal_rx_get_mpdu_sequence_control_valid_be(uint8_t *buf)
 {
@@ -1926,9 +1914,9 @@ static inline uint8_t hal_rx_get_mpdu_sequence_control_valid_be(uint8_t *buf)
 }
 
 /**
- * hal_rx_tid_get_be: get tid based on qos control valid.
+ * hal_rx_tid_get_be() - get tid based on qos control valid.
  * @hal_soc_hdl: hal_soc handle
- * @ buf: pointer to rx pkt TLV.
+ * @buf: pointer to rx pkt TLV.
  *
  * Return: tid
  */
@@ -1968,8 +1956,8 @@ static inline uint8_t hal_rx_get_mac_addr2_valid_be(uint8_t *buf)
 }
 
 /**
- * hal_rx_msdu_flow_idx_get_be: API to get flow index
- * from rx_msdu_end TLV
+ * hal_rx_msdu_flow_idx_get_be() - API to get flow index from
+ *                                 rx_msdu_end TLV
  * @buf: pointer to the start of RX PKT TLV headers
  *
  * Return: flow index value from MSDU END TLV
@@ -1982,8 +1970,10 @@ static inline uint32_t hal_rx_msdu_flow_idx_get_be(uint8_t *buf)
 }
 
 /**
- * hal_rx_msdu_get_reo_destination_indication_be: API to get
- * reo_destination_indication from rx_msdu_end TLV
+ * hal_rx_msdu_get_reo_destination_indication_be() - API to get
+ *                                                   reo_destination_indication
+ *                                                   from rx_msdu_end
+ *                                                   TLV
  * @buf: pointer to the start of RX PKT TLV headers
  * @reo_destination_indication: pointer to return value of
  *				reo_destination_indication
@@ -2000,8 +1990,8 @@ hal_rx_msdu_get_reo_destination_indication_be(uint8_t *buf,
 }
 
 /**
- * hal_rx_msdu_flow_idx_invalid_be: API to get flow index invalid
- * from rx_msdu_end TLV
+ * hal_rx_msdu_flow_idx_invalid_be() - API to get flow index invalid
+ *                                     from rx_msdu_end TLV
  * @buf: pointer to the start of RX PKT TLV headers
  *
  * Return: flow index invalid value from MSDU END TLV
@@ -2014,8 +2004,8 @@ static inline bool hal_rx_msdu_flow_idx_invalid_be(uint8_t *buf)
 }
 
 /**
- * hal_rx_msdu_flow_idx_timeout_be: API to get flow index timeout
- * from rx_msdu_end TLV
+ * hal_rx_msdu_flow_idx_timeout_be() - API to get flow index timeout
+ *                                     from rx_msdu_end TLV
  * @buf: pointer to the start of RX PKT TLV headers
  *
  * Return: flow index timeout value from MSDU END TLV
@@ -2028,8 +2018,8 @@ static inline bool hal_rx_msdu_flow_idx_timeout_be(uint8_t *buf)
 }
 
 /**
- * hal_rx_msdu_fse_metadata_get_be: API to get FSE metadata
- * from rx_msdu_end TLV
+ * hal_rx_msdu_fse_metadata_get_be() - API to get FSE metadata from
+ *                                     rx_msdu_end TLV
  * @buf: pointer to the start of RX PKT TLV headers
  *
  * Return: fse metadata value from MSDU END TLV
@@ -2042,8 +2032,8 @@ static inline uint32_t hal_rx_msdu_fse_metadata_get_be(uint8_t *buf)
 }
 
 /**
- * hal_rx_msdu_cce_metadata_get_be: API to get CCE metadata
- * from rx_msdu_end TLV
+ * hal_rx_msdu_cce_metadata_get_be() - API to get CCE metadata from
+ *                                     rx_msdu_end TLV
  * @buf: pointer to the start of RX PKT TLV headers
  *
  * Return: cce_metadata
@@ -2057,8 +2047,9 @@ hal_rx_msdu_cce_metadata_get_be(uint8_t *buf)
 }
 
 /**
- * hal_rx_msdu_get_flow_params_be: API to get flow index, flow index invalid
- * and flow index timeout from rx_msdu_end TLV
+ * hal_rx_msdu_get_flow_params_be() - API to get flow index, flow
+ *                                    index invalid and flow index
+ *                                    timeout from rx_msdu_end TLV
  * @buf: pointer to the start of RX PKT TLV headers
  * @flow_invalid: pointer to return value of flow_idx_valid
  * @flow_timeout: pointer to return value of flow_idx_timeout
@@ -2094,10 +2085,10 @@ hal_rx_tlv_get_tcp_chksum_be(uint8_t *buf)
 }
 
 /**
- * hal_rx_get_rx_sequence_be(): Function to retrieve rx sequence number
+ * hal_rx_get_rx_sequence_be() - Function to retrieve rx sequence number
+ * @buf: Network buffer
  *
- * @nbuf: Network buffer
- * Returns: rx sequence number
+ * Return: rx sequence number
  */
 static inline
 uint16_t hal_rx_get_rx_sequence_be(uint8_t *buf)
@@ -2227,7 +2218,7 @@ static inline uint8_t hal_rx_mpdu_start_tlv_tag_valid_be(void *rx_tlv_hdr)
 }
 
 /**
- * hal_rx_msdu_end_offset_get_generic(): API to get the
+ * hal_rx_msdu_end_offset_get_generic() - API to get the
  * msdu_end structure offset rx_pkt_tlv structure
  *
  * NOTE: API returns offset of msdu_end TLV from structure
@@ -2239,7 +2230,7 @@ static inline uint32_t hal_rx_msdu_end_offset_get_generic(void)
 }
 
 /**
- * hal_rx_mpdu_start_offset_get_generic(): API to get the
+ * hal_rx_mpdu_start_offset_get_generic() - API to get the
  * mpdu_start structure offset rx_pkt_tlv structure
  *
  * NOTE: API returns offset of attn TLV from structure
@@ -2262,7 +2253,7 @@ static inline  uint32_t hal_rx_pkt_tlv_offset_get_generic(void)
 #define MSDU_END_WMASK 0x13FC1
 
 /**
- * hal_rx_mpdu_start_wmask_get_be(): API to get the mpdu_start_tlv word mask
+ * hal_rx_mpdu_start_wmask_get_be() - API to get the mpdu_start_tlv word mask
  *
  * return: Word mask for MPDU start tlv
  */
@@ -2272,7 +2263,7 @@ static inline uint32_t hal_rx_mpdu_start_wmask_get_be(void)
 }
 
 /**
- * hal_rx_msdu_end_wmask_get_be(): API to get the msdu_end_tlv word mask
+ * hal_rx_msdu_end_wmask_get_be() - API to get the msdu_end_tlv word mask
  *
  * return: Word mask for MSDU end tlv
  */
@@ -2333,10 +2324,10 @@ static inline int hal_rx_get_l3_l4_offsets_be(uint8_t *buf,
 #endif
 
 /**
-* hal_rx_msdu_start_msdu_len_get(): API to get the MSDU length
-* from rx_msdu_start TLV
+* hal_rx_msdu_start_msdu_len_get_be() - API to get the MSDU length from
+*                                       rx_msdu_start TLV
+* @buf: pointer to the start of RX PKT TLV headers
 *
-* @ buf: pointer to the start of RX PKT TLV headers
 * Return: msdu length
 */
 static inline uint32_t hal_rx_msdu_start_msdu_len_get_be(uint8_t *buf)
@@ -2350,11 +2341,10 @@ static inline uint32_t hal_rx_msdu_start_msdu_len_get_be(uint8_t *buf)
 }
 
 /**
- * hal_rx_get_frame_ctrl_field(): Function to retrieve frame control field
+ * hal_rx_get_frame_ctrl_field_be() - Function to retrieve frame control field
+ * @buf: Network buffer
  *
- * @nbuf: Network buffer
- * Returns: rx more fragment bit
- *
+ * Return: frame control field
  */
 static inline uint16_t hal_rx_get_frame_ctrl_field_be(uint8_t *buf)
 {
@@ -2366,11 +2356,11 @@ static inline uint16_t hal_rx_get_frame_ctrl_field_be(uint8_t *buf)
 	return frame_ctrl;
 }
 
-/*
- * hal_rx_tlv_get_is_decrypted_be(): API to get the decrypt status of the
- *  packet from msdu_end
- *
+/**
+ * hal_rx_tlv_get_is_decrypted_be() - API to get the decrypt status of
+ *                                    the packet from msdu_end
  * @buf: pointer to the start of RX PKT TLV header
+ *
  * Return: uint32_t(decryt status)
  */
 static inline uint32_t hal_rx_tlv_get_is_decrypted_be(uint8_t *buf)
@@ -2389,7 +2379,7 @@ static inline uint32_t hal_rx_tlv_get_is_decrypted_be(uint8_t *buf)
 
 #ifdef NO_RX_PKT_HDR_TLV
 /**
- * hal_rx_pkt_hdr_get_be(): API to get 80211 header
+ * hal_rx_pkt_hdr_get_be() - API to get 80211 header
  * @buf: start of rx_pkt_tlv
  *
  * If NO_RX_PKT_HDR_TLV is enabled, then this API assume caller gives a raw
@@ -2416,7 +2406,7 @@ static inline uint8_t *hal_rx_pkt_hdr_get_be(uint8_t *buf)
  * hal_rx_tlv_csum_err_get_be() - Get IP and tcp-udp checksum fail flag
  * @rx_tlv_hdr: start address of rx_tlv_hdr
  * @ip_csum_err: buffer to return ip_csum_fail flag
- * @tcp_udp_csum_fail: placeholder to return tcp-udp checksum fail flag
+ * @tcp_udp_csum_err: placeholder to return tcp-udp checksum fail flag
  *
  * Return: None
  */
@@ -2450,10 +2440,10 @@ uint32_t hal_rx_tlv_mpdu_fcs_err_get_be(void *hw_desc_addr)
 }
 
 /**
- * hal_rx_get_rx_more_frag_bit(): Function to retrieve more fragment bit
+ * hal_rx_get_rx_more_frag_bit() - Function to retrieve more fragment bit
+ * @buf: Network buffer
  *
- * @nbuf: Network buffer
- * Returns: rx more fragment bit
+ * Return: rx more fragment bit
  */
 static inline
 uint8_t hal_rx_get_rx_more_frag_bit(uint8_t *buf)
@@ -2468,12 +2458,12 @@ uint8_t hal_rx_get_rx_more_frag_bit(uint8_t *buf)
 	return frame_ctrl;
 }
 
-/*
- * hal_rx_msdu_is_wlan_mcast_generic_be(): Check if the buffer is for multicast
- *					address
+/**
+ * hal_rx_msdu_is_wlan_mcast_generic_be() - Check if the buffer is for
+ *                                          multicast address
  * @nbuf: Network buffer
  *
- * Returns: flag to indicate whether the nbuf has MC/BC address
+ * Return: flag to indicate whether the nbuf has MC/BC address
  */
 static inline uint32_t hal_rx_msdu_is_wlan_mcast_generic_be(qdf_nbuf_t nbuf)
 {
@@ -2483,9 +2473,8 @@ static inline uint32_t hal_rx_msdu_is_wlan_mcast_generic_be(qdf_nbuf_t nbuf)
 }
 
 /**
- * hal_rx_msdu_start_msdu_len_set_be(): API to set the MSDU length
- * from rx_msdu_start TLV
- *
+ * hal_rx_msdu_start_msdu_len_set_be() - API to set the MSDU length
+ *                                       from rx_msdu_start TLV
  * @buf: pointer to the start of RX PKT TLV headers
  * @len: msdu length
  *
@@ -2498,8 +2487,8 @@ hal_rx_msdu_start_msdu_len_set_be(uint8_t *buf, uint32_t len)
 }
 
 /**
- * hal_rx_mpdu_start_mpdu_qos_control_valid_get_be():
- * Retrieve qos control valid bit from the tlv.
+ * hal_rx_mpdu_start_mpdu_qos_control_valid_get_be() -
+ *                                    Retrieve qos control valid bit from the tlv.
  * @buf: pointer to rx pkt TLV.
  *
  * Return: qos control value.
@@ -2513,7 +2502,7 @@ hal_rx_mpdu_start_mpdu_qos_control_valid_get_be(uint8_t *buf)
 }
 
 /**
- * hal_rx_msdu_end_sa_sw_peer_id_get_be(): API to get the
+ * hal_rx_msdu_end_sa_sw_peer_id_get_be() - API to get the
  * sa_sw_peer_id from rx_msdu_end TLV
  * @buf: pointer to the start of RX PKT TLV headers
  *

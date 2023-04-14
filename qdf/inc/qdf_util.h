@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2014-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -36,13 +36,13 @@
 typedef __qdf_wait_queue_head_t qdf_wait_queue_head_t;
 
 /**
- * qdf_unlikely - Compiler-dependent macro denoting code likely to execute
+ * qdf_unlikely - Compiler-dependent macro denoting code unlikely to execute
  * @_expr: expression to be checked
  */
 #define qdf_unlikely(_expr)     __qdf_unlikely(_expr)
 
 /**
- * qdf_likely - Compiler-dependent macro denoting code unlikely to execute
+ * qdf_likely - Compiler-dependent macro denoting code likely to execute
  * @_expr: expression to be checked
  */
 #define qdf_likely(_expr)       __qdf_likely(_expr)
@@ -67,6 +67,7 @@ typedef __qdf_wait_queue_head_t qdf_wait_queue_head_t;
  * @offset: register address
  */
 #define qdf_ioread32(offset)            __qdf_ioread32(offset)
+
 /**
  * qdf_iowrite32 - write a register
  * @offset: register address
@@ -76,6 +77,7 @@ typedef __qdf_wait_queue_head_t qdf_wait_queue_head_t;
 
 /**
  * qdf_assert - assert "expr" evaluates to false.
+ * @expr: expression to test
  */
 #ifdef QDF_DEBUG
 #define qdf_assert(expr)         __qdf_assert(expr)
@@ -85,11 +87,13 @@ typedef __qdf_wait_queue_head_t qdf_wait_queue_head_t;
 
 /**
  * qdf_assert_always - always assert "expr" evaluates to false.
+ * @expr: expression to test
  */
 #define qdf_assert_always(expr)  __qdf_assert(expr)
 
 /**
  * qdf_target_assert_always - always target assert "expr" evaluates to false.
+ * @expr: expression to test
  */
 #define qdf_target_assert_always(expr)  __qdf_target_assert(expr)
 
@@ -270,7 +274,7 @@ typedef __qdf_wait_queue_head_t qdf_wait_queue_head_t;
 
 /**
  * qdf_wake_up() - wakes up sleeping waitqueue
- * @wait_queue: wait queue, which needs wake up
+ * @_q: wait queue, which needs wake up
  *
  * Return: none
  */
@@ -279,7 +283,7 @@ typedef __qdf_wait_queue_head_t qdf_wait_queue_head_t;
 #define qdf_wake_up_completion(_q) __qdf_wake_up_completion(_q)
 
 /**
- * qdf_container_of - cast a member of a structure out to the containing
+ * qdf_container_of() - cast a member of a structure out to the containing
  * structure
  * @ptr: the pointer to the member.
  * @type: the type of the container struct this is embedded in.
@@ -289,7 +293,7 @@ typedef __qdf_wait_queue_head_t qdf_wait_queue_head_t;
 	 __qdf_container_of(ptr, type, member)
 
 /**
- * qdf_is_pwr2 - test input value is power of 2 integer
+ * QDF_IS_PWR2() - test input value is power of 2 integer
  * @value: input integer
  */
 #define QDF_IS_PWR2(value) (((value) ^ ((value)-1)) == ((value) << 1) - 1)
@@ -368,7 +372,7 @@ static inline void qdf_zero_macaddr(struct qdf_mac_addr *mac_addr)
 
 /**
  * qdf_is_macaddr_group() - check for a MacAddress is a 'group' address
- * @mac_addr1: pointer to the qdf MacAddress to check
+ * @mac_addr: pointer to the qdf MacAddress to check
  *
  * This function returns a bool that tells if a the input QDF MacAddress
  * is a "group" address. Group addresses have the 'group address bit' turned
@@ -501,32 +505,37 @@ static inline uint8_t *qdf_get_u32(uint8_t *ptr, uint32_t *value)
 }
 
 /**
- * qdf_abs - Get absolute value
+ * qdf_abs() - Get absolute value
+ * @x: value to be converted
  */
 #define qdf_abs(x)                           __qdf_abs(x)
 
 /**
- * qdf_ntohs - Convert a 16-bit value from network byte order to host byte order
+ * qdf_ntohs() - Convert a 16-bit value from network byte order to host byte order
+ * @x: value to be converted
  */
 #define qdf_ntohs(x)                         __qdf_ntohs(x)
 
 /**
- * qdf_ntohl - Convert a 32-bit value from network byte order to host byte order
+ * qdf_ntohl() - Convert a 32-bit value from network byte order to host byte order
+ * @x: value to be converted
  */
 #define qdf_ntohl(x)                         __qdf_ntohl(x)
 
 /**
- * qdf_htons - Convert a 16-bit value from host byte order to network byte order
+ * qdf_htons() - Convert a 16-bit value from host byte order to network byte order
+ * @x: value to be converted
  */
 #define qdf_htons(x)                         __qdf_htons(x)
 
 /**
- * qdf_htonl - Convert a 32-bit value from host byte order to network byte order
+ * qdf_htonl() - Convert a 32-bit value from host byte order to network byte order
+ * @x: value to be converted
  */
 #define qdf_htonl(x)                         __qdf_htonl(x)
 
 /**
- * qdf_cpu_to_le16 - Convert a 16-bit value from CPU byte order to
+ * qdf_cpu_to_le16() - Convert a 16-bit value from CPU byte order to
  * little-endian byte order
  *
  * @x: value to be converted
@@ -534,7 +543,7 @@ static inline uint8_t *qdf_get_u32(uint8_t *ptr, uint32_t *value)
 #define qdf_cpu_to_le16(x)                   __qdf_cpu_to_le16(x)
 
 /**
- * qdf_cpu_to_le32 - Convert a 32-bit value from CPU byte order to
+ * qdf_cpu_to_le32() - Convert a 32-bit value from CPU byte order to
  * little-endian byte order
  *
  * @x: value to be converted
@@ -542,7 +551,7 @@ static inline uint8_t *qdf_get_u32(uint8_t *ptr, uint32_t *value)
 #define qdf_cpu_to_le32(x)                   __qdf_cpu_to_le32(x)
 
 /**
- * qdf_cpu_to_le64 - Convert a 64-bit value from CPU byte order to
+ * qdf_cpu_to_le64() - Convert a 64-bit value from CPU byte order to
  * little-endian byte order
  *
  * @x: value to be converted
@@ -550,7 +559,7 @@ static inline uint8_t *qdf_get_u32(uint8_t *ptr, uint32_t *value)
 #define qdf_cpu_to_le64(x)                   __qdf_cpu_to_le64(x)
 
 /**
- * qdf_le16_to_cpu - Convert a 16-bit value from little-endian byte order
+ * qdf_le16_to_cpu() - Convert a 16-bit value from little-endian byte order
  * to CPU byte order
  *
  * @x: value to be converted
@@ -558,7 +567,7 @@ static inline uint8_t *qdf_get_u32(uint8_t *ptr, uint32_t *value)
 #define qdf_le16_to_cpu(x)                   __qdf_le16_to_cpu(x)
 
 /**
- * qdf_le32_to_cpu - Convert a 32-bit value from little-endian byte
+ * qdf_le32_to_cpu() - Convert a 32-bit value from little-endian byte
  * order to CPU byte order
  *
  * @x: value to be converted
@@ -566,7 +575,7 @@ static inline uint8_t *qdf_get_u32(uint8_t *ptr, uint32_t *value)
 #define qdf_le32_to_cpu(x)                   __qdf_le32_to_cpu(x)
 
 /**
- * qdf_le64_to_cpu - Convert a 64-bit value from little-endian byte
+ * qdf_le64_to_cpu() - Convert a 64-bit value from little-endian byte
  * order to CPU byte order
  *
  * @x: value to be converted
@@ -574,7 +583,7 @@ static inline uint8_t *qdf_get_u32(uint8_t *ptr, uint32_t *value)
 #define qdf_le64_to_cpu(x)                   __qdf_le64_to_cpu(x)
 
 /**
- * qdf_cpu_to_be16 - Convert a 16-bit value from CPU byte order to
+ * qdf_cpu_to_be16() - Convert a 16-bit value from CPU byte order to
  * big-endian byte order
  *
  * @x: value to be converted
@@ -582,7 +591,7 @@ static inline uint8_t *qdf_get_u32(uint8_t *ptr, uint32_t *value)
 #define qdf_cpu_to_be16(x)                   __qdf_cpu_to_be16(x)
 
 /**
- * qdf_cpu_to_be32 - Convert a 32-bit value from CPU byte order to
+ * qdf_cpu_to_be32() - Convert a 32-bit value from CPU byte order to
  * big-endian byte order
  *
  * @x: value to be converted
@@ -590,7 +599,7 @@ static inline uint8_t *qdf_get_u32(uint8_t *ptr, uint32_t *value)
 #define qdf_cpu_to_be32(x)                   __qdf_cpu_to_be32(x)
 
 /**
- * qdf_cpu_to_be64 - Convert a 64-bit value from CPU byte order to
+ * qdf_cpu_to_be64() - Convert a 64-bit value from CPU byte order to
  * big-endian byte order
  *
  * @x: value to be converted
@@ -599,7 +608,7 @@ static inline uint8_t *qdf_get_u32(uint8_t *ptr, uint32_t *value)
 
 
 /**
- * qdf_be16_to_cpu - Convert a 16-bit value from big-endian byte order
+ * qdf_be16_to_cpu() - Convert a 16-bit value from big-endian byte order
  * to CPU byte order
  *
  * @x: value to be converted
@@ -607,7 +616,7 @@ static inline uint8_t *qdf_get_u32(uint8_t *ptr, uint32_t *value)
 #define qdf_be16_to_cpu(x)                   __qdf_be16_to_cpu(x)
 
 /**
- * qdf_be32_to_cpu - Convert a 32-bit value from big-endian byte order
+ * qdf_be32_to_cpu() - Convert a 32-bit value from big-endian byte order
  * to CPU byte order
  *
  * @x: value to be converted
@@ -615,7 +624,7 @@ static inline uint8_t *qdf_get_u32(uint8_t *ptr, uint32_t *value)
 #define qdf_be32_to_cpu(x)                   __qdf_be32_to_cpu(x)
 
 /**
- * qdf_be64_to_cpu - Convert a 64-bit value from big-endian byte order
+ * qdf_be64_to_cpu() - Convert a 64-bit value from big-endian byte order
  * to CPU byte order
  *
  * @x: value to be converted
@@ -628,7 +637,9 @@ static inline uint8_t *qdf_get_u32(uint8_t *ptr, uint32_t *value)
 #define qdf_function             __qdf_function
 
 /**
- * qdf_min - minimum of two numbers
+ * qdf_min() - minimum of two numbers
+ * @a: first number
+ * @b: second number
  */
 #define qdf_min(a, b)   __qdf_min(a, b)
 
@@ -678,7 +689,7 @@ int qdf_get_cpu(void)
 
 /**
  * qdf_get_hweight8() - count num of 1's in 8-bit bitmap
- * @value: input bitmap
+ * @w: input bitmap
  *
  * Count num of 1's set in the 8-bit bitmap
  *
@@ -694,7 +705,7 @@ unsigned int qdf_get_hweight8(unsigned int w)
 
 /**
  * qdf_get_hweight16() - count num of 1's in 16-bit bitmap
- * @value: input bitmap
+ * @w: input bitmap
  *
  * Count num of 1's set in the 16-bit bitmap
  *
@@ -712,7 +723,7 @@ unsigned int qdf_get_hweight16(unsigned int w)
 
 /**
  * qdf_get_hweight32() - count num of 1's in 32-bit bitmap
- * @value: input bitmap
+ * @w: input bitmap
  *
  * Count num of 1's set in the 32-bit bitmap
  *
@@ -832,8 +843,9 @@ uint64_t qdf_do_div_rem(uint64_t dividend, uint32_t divisor)
 }
 
 /**
- * qdf_get_random_bytes() - returns nbytes bytes of random
- * data
+ * qdf_get_random_bytes() - returns nbytes bytes of random data
+ * @buf: buffer to fill
+ * @nbytes: number of bytes to fill
  *
  * Return: random bytes of data
  */
@@ -908,5 +920,16 @@ int qdf_fls(uint32_t x)
 static inline int qdf_get_smp_processor_id(void)
 {
 	return __qdf_get_smp_processor_id();
+}
+
+/**
+ * qdf_in_atomic: Check whether current thread running in atomic context
+ *
+ * Return: true if current thread is running in the atomic context
+ *	   else it will be return false.
+ */
+static inline bool qdf_in_atomic(void)
+{
+	return __qdf_in_atomic();
 }
 #endif /*_QDF_UTIL_H*/

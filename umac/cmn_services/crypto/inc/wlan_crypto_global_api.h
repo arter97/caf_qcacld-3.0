@@ -104,20 +104,6 @@ QDF_STATUS wlan_crypto_setkey(struct wlan_objmgr_vdev *vdev,
 					struct wlan_crypto_req_key *req_key);
 
 /**
- * store_def_keyix_peer() - called by wlan_crypto_setkey
- *                   to store default key index for each peer in the vdev.
- * @vdev: vdev
- * @object: Peer object
- * @arg: Argument passed by caller
- *
- * This function gets called from wlan_crypto_setkey
- *
- * Return: None
- */
-void store_def_keyix_peer(struct wlan_objmgr_vdev *vdev, void *object,
-			  void *arg);
-
-/**
  * wlan_crypto_getkey() - called by ucfg to get key
  * @vdev: vdev
  * @req_key: key value will be copied in this req_key
@@ -972,7 +958,7 @@ static inline void wlan_crypto_free_vdev_key(struct wlan_objmgr_vdev *vdev)
 {
 }
 
-static inline void wlan_crypto_reset_vdev_prarams(struct wlan_objmgr_vdev *vdev)
+static inline void wlan_crypto_reset_vdev_params(struct wlan_objmgr_vdev *vdev)
 {
 }
 #endif /* CRYPTO_SET_KEY_CONVERGED */

@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -42,6 +42,24 @@ static struct wlan_host_mlo_glb_h_shmem_arena_ctx
 	(qdf_offsetof(typeof(*(ptlv)), field_name) < (tlv_len) ? \
 		true : false)
 
+#ifdef BIG_ENDIAN_HOST
+static inline void
+convert_dwords_to_host_order(uint32_t *pwords, size_t num_words)
+{
+	size_t word = 0;
+
+	for (; word < num_words; word++) {
+		*pwords = qdf_le32_to_cpu(*pwords);
+		++pwords;
+	}
+}
+#else
+static inline void
+convert_dwords_to_host_order(uint32_t *pwords, size_t num_words)
+{
+}
+#endif
+
 /**
  * get_field_value_in_tlv() - Get the value of a given field in a given TLV
  * @ptlv: Pointer to start of the TLV
@@ -52,8 +70,15 @@ static struct wlan_host_mlo_glb_h_shmem_arena_ctx
  * structure is less than the TLV length, else 0.
  */
 #define get_field_value_in_tlv(ptlv, field_name, tlv_len) \
-	(qdf_offsetof(typeof(*(ptlv)), field_name) < (tlv_len) ? \
-		(ptlv)->field_name : 0)
+	(qdf_offsetof(typeof(*(ptlv)), field_name) >= (tlv_len) ? 0 : \
+	 ({ \
+	   typeof((ptlv)->field_name) _field_ = (ptlv)->field_name; \
+	   qdf_assert(!(sizeof(_field_) & 0x3)); \
+	   convert_dwords_to_host_order((uint32_t *)&_field_, \
+					sizeof(_field_) >> 2); \
+	   _field_; \
+	  }) \
+	)
 
 /**
  * get_field_pointer_in_tlv() - Get the address of a given field in a given TLV
@@ -84,13 +109,18 @@ process_tlv_header(const uint8_t *data, size_t remaining_len,
 		   uint32_t expected_tag, uint32_t *tlv_len,
 		   uint32_t *tlv_tag)
 {
+	uint32_t tlv_header;
+
 	if (remaining_len < MLO_SHMEM_TLV_HDR_SIZE) {
 		target_if_err("Not enough space(%zu) to read TLV header(%u)",
 			      remaining_len, (uint32_t)MLO_SHMEM_TLV_HDR_SIZE);
 		return qdf_status_to_os_return(QDF_STATUS_E_FAILURE);
 	}
 
-	*tlv_len = MLO_SHMEMTLV_GET_TLVLEN(MLO_SHMEMTLV_GET_HDR(data));
+	tlv_header = MLO_SHMEMTLV_GET_HDR(data);
+	tlv_header = qdf_le32_to_cpu(tlv_header);
+
+	*tlv_len = MLO_SHMEMTLV_GET_TLVLEN(tlv_header);
 	*tlv_len += MLO_SHMEM_TLV_HDR_SIZE;
 	if (remaining_len < *tlv_len) {
 		target_if_err("Not enough space(%zu) to read TLV payload(%u)",
@@ -98,7 +128,7 @@ process_tlv_header(const uint8_t *data, size_t remaining_len,
 		return qdf_status_to_os_return(QDF_STATUS_E_FAILURE);
 	}
 
-	*tlv_tag = MLO_SHMEMTLV_GET_TLVTAG(MLO_SHMEMTLV_GET_HDR(data));
+	*tlv_tag = MLO_SHMEMTLV_GET_TLVTAG(tlv_header);
 	if (*tlv_tag != expected_tag) {
 		target_if_err("Unexpected TLV tag: %u is seen. Expected: %u",
 			      *tlv_tag,
@@ -158,6 +188,7 @@ extract_mgmt_rx_reo_snapshot_tlv(uint8_t *data, size_t remaining_len,
  * RX_REO_PER_LINK_SNAPSHOT_INFO TLV
  * @data: Pointer to start of the TLV
  * @remaining_len: Length (in bytes) remaining in the arena from @data pointer
+ * @link_id: link ID of interest
  * @link_info: Pointer to MGMT Rx REO per link info. Extracted information
  * will be populated in this data structure.
  *
@@ -188,7 +219,7 @@ extract_mlo_glb_rx_reo_per_link_info_tlv(
 
 	link_info->link_id = link_id;
 
-	/**
+	/*
 	 * Get the pointer to the fw_consumed snapshot with in the TLV.
 	 * Note that snapshots are nested TLVs within link_sanpshot_info TLV.
 	 */
@@ -219,7 +250,7 @@ extract_mlo_glb_rx_reo_per_link_info_tlv(
 	validate_parsed_bytes_advance_data_pointer(len, data, remaining_len);
 	parsed_bytes += len;
 
-	/**
+	/*
 	 * Return the length of link_sanpshot_info TLV itself as the snapshots
 	 * are nested inside link_sanpshot_info TLV and hence no need to add
 	 * their lengths separately.

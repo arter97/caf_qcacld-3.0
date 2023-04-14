@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2016-2020 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -114,9 +114,9 @@ static void hal_tx_set_dscp_tid_map_5018(struct hal_soc *soc,
 
 /**
  * hal_tx_update_dscp_tid_5018() - Update the dscp tid map table as
-					updated by user
+ *                                 updated by user
  * @soc: HAL SoC context
- * @map: DSCP-TID mapping table
+ * @tid: TID
  * @id : MAP ID
  * @dscp: DSCP_TID map index
  *
@@ -193,7 +193,7 @@ static void hal_tx_update_dscp_tid_5018(struct hal_soc *soc, uint8_t tid,
 }
 
 /**
- * hal_tx_desc_set_lmac_id_5018 - Set the lmac_id value
+ * hal_tx_desc_set_lmac_id_5018() - Set the lmac_id value
  * @desc: Handle to Tx Descriptor
  * @lmac_id: mac Id to ast matching
  *		     b00 – mac 0
@@ -212,7 +212,7 @@ static void hal_tx_desc_set_lmac_id_5018(void *desc, uint8_t lmac_id)
 /**
  * hal_tx_init_cmd_credit_ring_5018() - Initialize TCL command/credit SRNG
  * @hal_soc_hdl: Handle to HAL SoC structure
- * @hal_srng: Handle to HAL SRNG structure
+ * @hal_ring_hdl: Handle to HAL SRNG structure
  *
  * Return: none
  */

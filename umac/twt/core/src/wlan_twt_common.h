@@ -32,17 +32,6 @@ QDF_STATUS
 wlan_twt_tgt_caps_get_responder(struct wlan_objmgr_psoc *psoc, bool *val);
 
 /**
- * wlan_twt_tgt_caps_get_legacy_bcast_support() - get legacy bcast support
- * @psoc: psoc handle
- * @val: pointer to the output variable
- *
- * return: QDF_STATUS
- */
-QDF_STATUS
-wlan_twt_tgt_caps_get_legacy_bcast_support(struct wlan_objmgr_psoc *psoc,
-					   bool *val);
-
-/**
  * wlan_twt_tgt_caps_get_bcast_req_support() - get bcast requestor support
  * @psoc: psoc handle
  * @val: pointer to the output variable
@@ -209,3 +198,15 @@ wlan_twt_enable_event_handler(struct wlan_objmgr_psoc *psoc,
 QDF_STATUS
 wlan_twt_disable_event_handler(struct wlan_objmgr_psoc *psoc,
 			       struct twt_disable_complete_event_param *event);
+
+/**
+ * wlan_twt_tgt_caps_get_restricted_support() - Get tgt restricted-twt
+ *                                              support caps
+ * @psoc: psoc handle
+ * @val: pointer to get caps enabled/disabled
+ *
+ * return: QDF_STATUS
+ */
+QDF_STATUS
+wlan_twt_tgt_caps_get_restricted_support(struct wlan_objmgr_psoc *psoc,
+					 bool *val);

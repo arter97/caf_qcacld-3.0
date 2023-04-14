@@ -276,20 +276,36 @@ wlan_mgmt_rx_reo_psoc_obj_destroy_notification(struct wlan_objmgr_psoc *psoc)
 }
 
 QDF_STATUS
-wlan_mgmt_rx_reo_attach(struct wlan_objmgr_pdev *pdev)
+wlan_mgmt_rx_reo_pdev_attach(struct wlan_objmgr_pdev *pdev)
 {
-	return mgmt_rx_reo_attach(pdev);
+	return mgmt_rx_reo_pdev_attach(pdev);
 }
 
-qdf_export_symbol(wlan_mgmt_rx_reo_attach);
+qdf_export_symbol(wlan_mgmt_rx_reo_pdev_attach);
 
 QDF_STATUS
-wlan_mgmt_rx_reo_detach(struct wlan_objmgr_pdev *pdev)
+wlan_mgmt_rx_reo_psoc_attach(struct wlan_objmgr_psoc *psoc)
 {
-	return mgmt_rx_reo_detach(pdev);
+	return mgmt_rx_reo_psoc_attach(psoc);
 }
 
-qdf_export_symbol(wlan_mgmt_rx_reo_detach);
+qdf_export_symbol(wlan_mgmt_rx_reo_psoc_attach);
+
+QDF_STATUS
+wlan_mgmt_rx_reo_pdev_detach(struct wlan_objmgr_pdev *pdev)
+{
+	return mgmt_rx_reo_pdev_detach(pdev);
+}
+
+qdf_export_symbol(wlan_mgmt_rx_reo_pdev_detach);
+
+QDF_STATUS
+wlan_mgmt_rx_reo_psoc_detach(struct wlan_objmgr_psoc *psoc)
+{
+	return mgmt_rx_reo_psoc_detach(psoc);
+}
+
+qdf_export_symbol(wlan_mgmt_rx_reo_psoc_detach);
 
 uint16_t
 wlan_mgmt_rx_reo_get_pkt_ctr_delta_thresh(struct wlan_objmgr_psoc *psoc)
@@ -317,6 +333,17 @@ wlan_mgmt_rx_reo_get_egress_frame_debug_list_size(struct wlan_objmgr_psoc *psoc)
 	}
 
 	return cfg_get(psoc, CFG_MGMT_RX_REO_EGRESS_FRAME_DEBUG_LIST_SIZE);
+}
+
+uint16_t
+wlan_mgmt_rx_reo_get_scheduler_debug_list_size(struct wlan_objmgr_psoc *psoc)
+{
+	if (!psoc) {
+		mgmt_rx_reo_err("psoc is NULL!");
+		return 0;
+	}
+
+	return cfg_get(psoc, CFG_MGMT_RX_REO_SCHEDULER_DEBUG_LIST_SIZE);
 }
 
 #ifndef WLAN_MGMT_RX_REO_SIM_SUPPORT
@@ -349,6 +376,35 @@ wlan_mgmt_rx_reo_is_feature_enabled_at_pdev(struct wlan_objmgr_pdev *pdev)
 }
 
 qdf_export_symbol(wlan_mgmt_rx_reo_is_feature_enabled_at_pdev);
+
+bool
+wlan_mgmt_rx_reo_is_scheduler_enabled_at_psoc(struct wlan_objmgr_psoc *psoc)
+{
+	if (!psoc) {
+		mgmt_rx_reo_err("psoc is NULL!");
+		return false;
+	}
+
+	return cfg_get(psoc, CFG_MGMT_RX_REO_SCHEDULER_ENABLE);
+}
+
+qdf_export_symbol(wlan_mgmt_rx_reo_is_scheduler_enabled_at_psoc);
+
+bool
+wlan_mgmt_rx_reo_is_scheduler_enabled_at_pdev(struct wlan_objmgr_pdev *pdev)
+{
+	struct wlan_objmgr_psoc *psoc;
+
+	if (!pdev) {
+		mgmt_rx_reo_err("pdev is NULL!");
+		return false;
+	}
+
+	psoc = wlan_pdev_get_psoc(pdev);
+	return wlan_mgmt_rx_reo_is_scheduler_enabled_at_psoc(psoc);
+}
+
+qdf_export_symbol(wlan_mgmt_rx_reo_is_scheduler_enabled_at_pdev);
 #else
 bool
 wlan_mgmt_rx_reo_is_feature_enabled_at_psoc(struct wlan_objmgr_psoc *psoc)
@@ -421,4 +477,10 @@ QDF_STATUS
 wlan_mgmt_rx_reo_print_egress_frame_info(uint8_t ml_grp_id, uint16_t num_frames)
 {
 	return mgmt_rx_reo_print_egress_frame_info(ml_grp_id, num_frames);
+}
+
+QDF_STATUS
+wlan_mgmt_rx_reo_release_frames(uint8_t mlo_grp_id, uint32_t link_bitmap)
+{
+	return mgmt_rx_reo_release_frames(mlo_grp_id, link_bitmap);
 }

@@ -225,6 +225,7 @@ struct wlan_objmgr_vdev *wlan_objmgr_vdev_obj_create(
 
 	/* peer count to 0 */
 	vdev->vdev_objmgr.wlan_peer_count = 0;
+	wlan_objmgr_vdev_set_ml_peer_count(vdev, 0);
 	qdf_atomic_init(&vdev->vdev_objmgr.ref_cnt);
 	vdev->vdev_objmgr.print_cnt = 0;
 	wlan_objmgr_vdev_get_ref(vdev, WLAN_OBJMGR_ID);

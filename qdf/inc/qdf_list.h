@@ -145,8 +145,8 @@ static inline void qdf_list_destroy(qdf_list_t *list)
 /**
  * qdf_list_size() - gives the size of the list
  * @list: object of list
- * @size: size of the list
- * Return: uint32_t
+ *
+ * Return: uint32_t size of the list
  */
 static inline uint32_t qdf_list_size(qdf_list_t *list)
 {

@@ -463,6 +463,22 @@ void mlo_peer_assign_primary_umac(
 		struct wlan_mlo_peer_context *ml_peer,
 		struct wlan_mlo_link_peer_entry *peer_entry);
 
+#if defined(WLAN_FEATURE_11BE_MLO) && defined(WLAN_MLO_MULTI_CHIP)
+/**
+ * mlo_peer_overwrite_primary_umac() - Overwrite Primary UMAC config
+ * @psoc_id: PSOC ID
+ * @ml_peer: MLO peer object
+ *
+ * This function overwrites previous primary UMAC configuration
+ * with given PSOC.
+ *
+ * Return: QDF_STATUS_SUCCESS if it overwrites successfully.
+ * QDF_STATUS_E_FAILURE otherwise.
+ */
+QDF_STATUS mlo_peer_overwrite_primary_umac(uint8_t psoc_id,
+					   struct wlan_mlo_peer_context *ml_peer);
+#endif
+
 /**
  * mlo_peer_allocate_primary_umac() - Allocate Primary UMAC
  * @ml_dev: MLO DEV context

@@ -824,6 +824,8 @@ struct dp_mon_ops {
 #endif
 	QDF_STATUS (*mon_pdev_ext_init)(struct dp_pdev *pdev);
 	QDF_STATUS (*mon_pdev_ext_deinit)(struct dp_pdev *pdev);
+	QDF_STATUS (*mon_rx_pdev_tlv_logger_init)(struct dp_pdev *pdev);
+	QDF_STATUS (*mon_rx_pdev_tlv_logger_deinit)(struct dp_pdev *pdev);
 	QDF_STATUS (*mon_lite_mon_alloc)(struct dp_pdev *pdev);
 	void (*mon_lite_mon_dealloc)(struct dp_pdev *pdev);
 	void (*mon_lite_mon_vdev_delete)(struct dp_pdev *pdev,
@@ -1062,7 +1064,7 @@ struct  dp_mon_pdev {
 	/* Neighnour peer list */
 	TAILQ_HEAD(, dp_neighbour_peer) neighbour_peers_list;
 	/* Enhanced Stats is enabled */
-	bool enhanced_stats_en;
+	uint8_t enhanced_stats_en;
 	qdf_nbuf_queue_t rx_status_q;
 
 	/* 128 bytes mpdu header queue per user for ppdu */
@@ -4291,7 +4293,29 @@ QDF_STATUS dp_pdev_get_rx_mon_stats(struct cdp_soc_t *soc_hdl, uint8_t pdev_id,
 bool dp_enable_mon_reap_timer(struct cdp_soc_t *soc_hdl,
 			      enum cdp_mon_reap_source source, bool enable);
 
+#ifdef QCA_ENHANCED_STATS_SUPPORT
 /**
+ * dp_enable_enhanced_stats() - enable enhanced and MLD Link Peer stats
+ * @soc: Datapath soc handle
+ * @pdev_id: Pdev Id on which stats will get enable
+ *
+ * Return: status success/failure
+ */
+QDF_STATUS
+dp_enable_enhanced_stats(struct cdp_soc_t *soc, uint8_t pdev_id);
+
+/**
+ * dp_disable_enhanced_stats() - disable enhanced and MLD Link Peer stats
+ * @soc: Datapath soc handle
+ * @pdev_id: Pdev Id on which stats will get disable
+ *
+ * Return: status success/failure
+ */
+QDF_STATUS
+dp_disable_enhanced_stats(struct cdp_soc_t *soc, uint8_t pdev_id);
+#endif /* QCA_ENHANCED_STATS_SUPPORT */
+
+/*
  * dp_monitor_lite_mon_disable_rx() - disables rx lite mon
  * @pdev: dp pdev
  *

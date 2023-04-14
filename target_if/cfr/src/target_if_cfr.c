@@ -315,6 +315,11 @@ static QDF_STATUS target_if_cfr_init_target(struct wlan_objmgr_psoc *psoc,
 		return QDF_STATUS_SUCCESS;
 	}
 
+	cfr_psoc->is_cfr_pdev_id_soc =
+		wmi_service_enabled(wmi_handle,
+				    wmi_service_cfr_capture_pdev_id_soc);
+	cfr_debug("is_cfr_pdev_id_soc %d", cfr_psoc->is_cfr_pdev_id_soc);
+
 	status = cfr_enh_init_pdev(psoc, pdev);
 	if (target == TARGET_TYPE_QCA6490)
 		cfr_pdev->chip_type = CFR_CAPTURE_RADIO_HSP;
@@ -482,7 +487,7 @@ target_if_cfr_deinit_pdev(struct wlan_objmgr_psoc *psoc,
 #endif
 
 #ifdef WLAN_ENH_CFR_ENABLE
-#if defined(QCA_WIFI_QCA6490)
+#if defined(QCA_WIFI_QCA6490) || defined(QCA_WIFI_KIWI)
 static uint8_t target_if_cfr_get_mac_id(struct wlan_objmgr_pdev *pdev)
 {
 	struct wlan_objmgr_vdev *vdev;
@@ -532,12 +537,7 @@ static uint8_t target_if_cfr_get_mac_id(struct wlan_objmgr_pdev *pdev)
 	return mac_id;
 }
 
-static uint8_t target_if_cfr_get_pdev_id(struct wlan_objmgr_pdev *pdev)
-{
-	return target_if_cfr_get_mac_id(pdev);
-}
-#elif defined(QCA_WIFI_KIWI)
-static uint8_t target_if_cfr_get_pdev_id(struct wlan_objmgr_pdev *pdev)
+static uint8_t target_if_cfr_get_pdev_id_soc(struct wlan_objmgr_pdev *pdev)
 {
 	/* Host and FW have agreement about using fixed pdev id for
 	 * CFR on HMT, FW will get correct mac id if host pass soc
@@ -546,6 +546,42 @@ static uint8_t target_if_cfr_get_pdev_id(struct wlan_objmgr_pdev *pdev)
 	 * band only case or 5/6GHz band only case.
 	 */
 	return WMI_HOST_PDEV_ID_SOC;
+}
+
+static uint8_t target_if_cfr_get_pdev_id(struct wlan_objmgr_pdev *pdev)
+{
+	struct wlan_objmgr_psoc *psoc;
+	struct psoc_cfr *cfr_psoc;
+	uint8_t pdev_id = 0;
+
+	if (!pdev) {
+		cfr_err("null pdev");
+		return pdev_id;
+	}
+
+	psoc = wlan_pdev_get_psoc(pdev);
+	if (!psoc) {
+		cfr_err("null psoc");
+		return pdev_id;
+	}
+
+	cfr_psoc = wlan_objmgr_psoc_get_comp_private_obj(psoc,
+							 WLAN_UMAC_COMP_CFR);
+
+	if (!cfr_psoc) {
+		cfr_err("null psoc cfr");
+		return pdev_id;
+	}
+
+	if (cfr_psoc->is_cfr_pdev_id_soc)
+		pdev_id = target_if_cfr_get_pdev_id_soc(pdev);
+	else
+		pdev_id = target_if_cfr_get_mac_id(pdev);
+
+	cfr_debug("is_cfr_pdev_id_soc %d, pdev_id %d",
+		  cfr_psoc->is_cfr_pdev_id_soc, pdev_id);
+
+	return pdev_id;
 }
 #else
 static uint8_t target_if_cfr_get_pdev_id(struct wlan_objmgr_pdev *pdev)

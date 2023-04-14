@@ -231,6 +231,7 @@ struct dp_ppe_vp_search_idx_tbl_entry {
 
 /**
  * struct dp_ppe_vp_profile - PPE direct switch profiler per vdev
+ * @is_configured: Boolean that the entry is configured.
  * @vp_num: Virtual port number
  * @ppe_vp_num_idx: Index to the PPE VP table entry
  * @search_idx_reg_num: Address search Index register number
@@ -239,6 +240,7 @@ struct dp_ppe_vp_search_idx_tbl_entry {
  * @use_ppe_int_pri: Use PPE INT_PRI to TID mapping table
  */
 struct dp_ppe_vp_profile {
+	bool is_configured;
 	uint8_t vp_num;
 	uint8_t ppe_vp_num_idx;
 	uint8_t search_idx_reg_num;
@@ -250,8 +252,10 @@ struct dp_ppe_vp_profile {
 /**
  * struct dp_ppeds_tx_desc_pool_s - PPEDS Tx Descriptor Pool
  * @elem_size: Size of each descriptor
+ * @hot_list_len: Length of hotlist chain
  * @num_allocated: Number of used descriptors
  * @freelist: Chain of free descriptors
+ * @hotlist: Chain of descriptors with attached nbufs
  * @desc_pages: multiple page allocation information for actual descriptors
  * @elem_count: Number of descriptors in the pool
  * @num_free: Number of free descriptors
@@ -260,7 +264,9 @@ struct dp_ppe_vp_profile {
 struct dp_ppeds_tx_desc_pool_s {
 	uint16_t elem_size;
 	uint32_t num_allocated;
+	uint32_t hot_list_len;
 	struct dp_tx_desc_s *freelist;
+	struct dp_tx_desc_s *hotlist;
 	struct qdf_mem_multi_page_t desc_pages;
 	uint16_t elem_count;
 	uint32_t num_free;
@@ -301,6 +307,7 @@ struct dp_ppeds_napi {
  * @ppeds_tx_desc: PPEDS tx desc pool
  * @ppeds_napi_ctxt:
  * @ppeds_handle: PPEDS soc instance handle
+ * @dp_ppeds_txdesc_hotlist_len: PPEDS tx desc hotlist length
  * @ppe_vp_tbl_lock: PPE VP table lock
  * @num_ppe_vp_entries: Number of PPE VP entries
  * @num_ppe_vp_search_idx_entries: PPEDS VP search idx entries
@@ -335,13 +342,16 @@ struct dp_soc_be {
 	struct dp_srng ppeds_wbm_release_ring;
 	struct dp_ppe_vp_tbl_entry *ppe_vp_tbl;
 	struct dp_ppe_vp_search_idx_tbl_entry *ppe_vp_search_idx_tbl;
+	struct dp_ppe_vp_profile *ppe_vp_profile;
 	struct dp_hw_cookie_conversion_t ppeds_tx_cc_ctx;
 	struct dp_ppeds_tx_desc_pool_s ppeds_tx_desc;
 	struct dp_ppeds_napi ppeds_napi_ctxt;
 	void *ppeds_handle;
+	int dp_ppeds_txdesc_hotlist_len;
 	qdf_mutex_t ppe_vp_tbl_lock;
 	uint8_t num_ppe_vp_entries;
 	uint8_t num_ppe_vp_search_idx_entries;
+	uint8_t num_ppe_vp_profiles;
 	char irq_name[DP_PPE_INTR_MAX][DP_PPE_INTR_STRNG_LEN];
 #endif
 #ifdef WLAN_FEATURE_11BE_MLO
@@ -393,8 +403,6 @@ struct dp_pdev_be {
  * @partner_vdev_list: partner list used for Intra-BSS
  * @seq_num: DP MLO seq number
  * @mcast_primary: MLO Mcast primary vdev
- * @ppe_vp_enabled: flag to check if PPE VP is enabled for vdev
- * @ppe_vp_profile: PPE VP profile
  */
 struct dp_vdev_be {
 	struct dp_vdev vdev;
@@ -408,10 +416,6 @@ struct dp_vdev_be {
 	bool mcast_primary;
 #endif
 #endif
-#endif
-	unsigned long ppe_vp_enabled;
-#ifdef WLAN_SUPPORT_PPEDS
-	struct dp_ppe_vp_profile ppe_vp_profile;
 #endif
 };
 
@@ -524,16 +528,16 @@ void dp_mcast_mlo_iter_ptnr_vdev(struct dp_soc_be *be_soc,
 				 void *arg,
 				 enum dp_mod_id mod_id);
 /**
- * dp_mcast_mlo_iter_ptnr_soc() - API to iterate through ptnr soc list
+ * dp_mlo_iter_ptnr_soc() - API to iterate through ptnr soc list
  * @be_soc: dp_soc_be pointer
  * @func: function to be called for each peer
  * @arg: argument need to be passed to func
  *
  * Return: None
  */
-void dp_mcast_mlo_iter_ptnr_soc(struct dp_soc_be *be_soc,
-				dp_ptnr_soc_iter_func func,
-				void *arg);
+void dp_mlo_iter_ptnr_soc(struct dp_soc_be *be_soc,
+			  dp_ptnr_soc_iter_func func,
+			  void *arg);
 /**
  * dp_mlo_get_mcast_primary_vdev() - get ref to mcast primary vdev
  * @be_soc: dp_soc_be pointer
@@ -621,6 +625,10 @@ struct dp_peer_be *dp_get_be_peer_from_dp_peer(struct dp_peer *peer)
 
 void dp_ppeds_disable_irq(struct dp_soc *soc, struct dp_srng *srng);
 void dp_ppeds_enable_irq(struct dp_soc *soc, struct dp_srng *srng);
+
+QDF_STATUS dp_peer_setup_ppeds_be(struct dp_soc *soc, struct dp_peer *peer,
+				  struct dp_vdev_be *be_vdev,
+				  void *args);
 
 QDF_STATUS
 dp_hw_cookie_conversion_attach(struct dp_soc_be *be_soc,

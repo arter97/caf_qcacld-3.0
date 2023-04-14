@@ -622,12 +622,12 @@ struct hal_rx_status_buffer_done {
 };
 
 /**
- * hal_mon_status_end_reason : ppdu status buffer end reason
+ * enum hal_mon_status_end_reason - ppdu status buffer end reason
  *
  * @HAL_MON_STATUS_BUFFER_FULL: status buffer full
  * @HAL_MON_FLUSH_DETECTED: flush detected
  * @HAL_MON_END_OF_PPDU: end of ppdu detected
- * HAL_MON_PPDU_truncated: truncated ppdu status
+ * @HAL_MON_PPDU_TRUNCATED: truncated ppdu status
  */
 enum hal_mon_status_end_reason {
 	HAL_MON_STATUS_BUFFER_FULL,
@@ -637,7 +637,7 @@ enum hal_mon_status_end_reason {
 };
 
 /**
- * struct hal_mon_desc () - HAL Monitor descriptor
+ * struct hal_mon_desc - HAL Monitor descriptor
  *
  * @buf_addr: virtual buffer address
  * @ppdu_id: ppdu id
@@ -645,7 +645,9 @@ enum hal_mon_status_end_reason {
  *	     - RxMON fills phy_ppdu_id
  * @end_offset: offset (units in 4 bytes) where status buffer ended
  *		i.e offset of TLV + last TLV size
- * @end_reason: 0 - status buffer is full
+ * @reserved_3a: reserved bits
+ * @end_reason: ppdu end reason
+ *		0 - status buffer is full
  *		1 - flush detected
  *		2 - TX_FES_STATUS_END or RX_PPDU_END
  *		3 - PPDU truncated due to system error
@@ -658,7 +660,6 @@ enum hal_mon_status_end_reason {
  * @looping_count: count to indicate number of times producer
  *			of entries has looped around the ring
  * @flush_detected: if flush detected
- * @end_reason: ppdu end reason
  * @end_of_ppdu_dropped: if end_of_ppdu is dropped
  * @ppdu_drop_count: PPDU drop count
  * @mpdu_drop_count: MPDU drop count
@@ -684,14 +685,16 @@ struct hal_mon_desc {
 typedef struct hal_mon_desc *hal_mon_desc_t;
 
 /**
- * struct hal_mon_buf_addr_status () - HAL buffer address tlv get status
+ * struct hal_mon_buf_addr_status - HAL buffer address tlv get status
  *
- * @buf_addr_31_0: Lower 32 bits of virtual address of status buffer
- * @buf_addr_63_32: Upper 32 bits of virtual address of status buffer
+ * @buffer_virt_addr_31_0: Lower 32 bits of virtual address of status buffer
+ * @buffer_virt_addr_63_32: Upper 32 bits of virtual address of status buffer
  * @dma_length: DMA length
+ * @reserved_2a: reserved bits
  * @msdu_continuation: is msdu size more than fragment size
  * @truncated: is msdu got truncated
- * @tlv_padding: tlv paddding
+ * @reserved_2b: reserved bits
+ * @tlv64_padding: tlv paddding
  */
 struct hal_mon_buf_addr_status {
 	uint32_t buffer_virt_addr_31_0;
@@ -706,9 +709,10 @@ struct hal_mon_buf_addr_status {
 
 #ifdef QCA_MONITOR_2_0_SUPPORT
 /**
- * hal_be_get_mon_dest_status() - Get monitor descriptor
- * @hal_soc_hdl: HAL Soc handle
- * @desc: HAL monitor descriptor
+ * hal_be_get_mon_dest_status() - Get monitor descriptor status
+ * @hal_soc: HAL Soc handle
+ * @hw_desc: HAL monitor descriptor
+ * @status: pointer to write descriptor status
  *
  * Return: none
  */
@@ -950,7 +954,8 @@ hal_update_frame_type_cnt(hal_rx_mon_mpdu_start_t *rx_mpdu_start,
  * hal_mon_buff_addr_info_set() - set desc address in cookie
  * @hal_soc_hdl: HAL Soc handle
  * @mon_entry: monitor srng
- * @desc: HAL monitor descriptor
+ * @mon_desc_addr: HAL monitor descriptor virtual address
+ * @phy_addr: HAL monitor descriptor physical address
  *
  * Return: none
  */
@@ -1069,6 +1074,166 @@ enum txmon_generated_response {
 	TXMON_GEN_RESP_SELFGEN_NDP_LMR
 };
 
+#ifdef MONITOR_TLV_RECORDING_ENABLE
+
+/*
+ * Please make sure that the maximum total size of fields in each TLV
+ * is 22 bits.
+ * 10 bits are reserved for tlv_tag
+ */
+struct hal_ppdu_start_tlv_record {
+	uint32_t ppdu_id:10;
+};
+
+struct hal_ppdu_start_user_info_tlv_record {
+	uint32_t user_id:6,
+		rate_mcs:4,
+		nss:3,
+		reception_type:3,
+		sgi:2;
+};
+
+struct hal_mpdu_start_tlv_record {
+	uint32_t user_id:6,
+		wrap_flag:1;
+};
+
+struct hal_mpdu_end_tlv_record {
+	uint32_t user_id:6,
+		fcs_err:1,
+		wrap_flag:1;
+};
+
+struct hal_header_tlv_record {
+	uint32_t wrap_flag:1;
+};
+
+struct hal_msdu_end_tlv_record {
+	uint32_t user_id:6,
+		msdu_num:8,
+		tid:4,
+		tcp_proto:1,
+		udp_proto:1,
+		wrap_flag:1;
+};
+
+struct hal_mon_buffer_addr_tlv_record {
+	uint32_t dma_length:12,
+		truncation:1,
+		continuation:1,
+		wrap_flag:1;
+};
+
+struct hal_phy_location_tlv_record {
+	uint32_t rtt_cfr_status:8,
+		rtt_num_streams:8,
+		rx_location_info_valid:1;
+};
+
+struct hal_ppdu_end_user_stats_tlv_record {
+	uint32_t ast_index:16,
+		 pkt_type:4;
+};
+
+struct hal_pcu_ppdu_end_info_tlv_record {
+	uint32_t dialog_topken:8,
+		 bb_captured_reason:3,
+		 bb_captured_channel:1,
+		 bb_captured_timeout:1,
+		 mpdu_delimiter_error_seen:1;
+};
+
+struct hal_phy_rx_ht_sig_tlv_record {
+	uint32_t crc:8,
+		 mcs:7,
+		 stbc:2,
+		 aggregation:1,
+		 short_gi:1,
+		 fes_coding:1,
+		 cbw:1;
+};
+/*
+ * enum hal_ppdu_tlv_category - Categories of TLV
+ * @PPDU_START: PPDU start level TLV
+ * @MPDU: MPDU level TLV
+ * @PPDU_END: PPDU end level TLV
+ *
+ */
+enum hal_ppdu_tlv_category {
+	CATEGORY_PPDU_START = 1,
+	CATEGORY_MPDU,
+	CATEGORY_PPDU_END
+};
+#endif
+
+/**
+ * struct hal_txmon_user_desc_per_user - user desc per user information
+ * @psdu_length: PSDU length of the user in octet
+ * @ru_start_index: RU number to which user is assigned
+ * @ru_size: Size of the RU for that user
+ * @ofdma_mu_mimo_enabled: mu mimo transmission within the RU
+ * @nss: Number of spatial stream occupied by the user
+ * @stream_offset: Stream Offset from which the User occupies the Streams
+ * @mcs: Modulation Coding Scheme for the User
+ * @dcm: Indicates whether dual sub-carrier modulation is applied
+ * @fec_type: Indicates whether it is BCC or LDPC
+ * @user_bf_type: user beamforming type
+ * @drop_user_cbf: frame dropped because of CBF FCS failure
+ * @ldpc_extra_symbol: LDPC encoding process
+ * @force_extra_symbol: force an extra OFDM symbol
+ * @reserved: reserved
+ * @sw_peer_id: user sw peer id
+ * @per_user_subband_mask: Per user sub band mask
+ */
+struct hal_txmon_user_desc_per_user {
+	uint32_t psdu_length;
+	uint32_t ru_start_index		:8,
+		 ru_size		:4,
+		 ofdma_mu_mimo_enabled	:1,
+		 nss			:3,
+		 stream_offset		:3,
+		 mcs			:4,
+		 dcm			:1,
+		 fec_type		:1,
+		 user_bf_type		:2,
+		 drop_user_cbf		:1,
+		 ldpc_extra_symbol	:1,
+		 force_extra_symbol	:1,
+		 reserved		:2;
+	uint32_t sw_peer_id		:16,
+		 per_user_subband_mask	:16;
+};
+
+/**
+ * struct hal_txmon_usr_desc_common - user desc common information
+ * @num_users: Number of users
+ * @ltf_size: LTF size
+ * @pkt_extn_pe: packet extension duration of the trigger-based PPDU
+ * @a_factor: packet extension duration of the trigger-based PPDU
+ * @center_ru_0: Center RU is occupied in the lower 80 MHz band
+ * @center_ru_1: Center RU is occupied in the upper 80 MHz band
+ * @num_ltf_symbols: number of LTF symbols
+ * @doppler_indication: doppler indication
+ * @reserved: reserved
+ * @spatial_reuse: spatial reuse
+ * @ru_channel_0: RU arrangement for band 0
+ * @ru_channel_1: RU arrangement for band 1
+ */
+struct hal_txmon_usr_desc_common {
+	uint32_t num_users		:6,
+		 ltf_size		:2,
+		 pkt_extn_pe		:1,
+		 a_factor		:2,
+		 center_ru_0		:1,
+		 center_ru_1		:1,
+		 num_ltf_symbols	:16,
+		 doppler_indication	:1,
+		 reserved		:2;
+	uint16_t spatial_reuse;
+	uint16_t ru_channel_0[8];
+	uint16_t ru_channel_1[8];
+};
+
 #define IS_MULTI_USERS(num_users)	(!!(0xFFFE & num_users))
 
 #define TXMON_HAL(hal_tx_ppdu_info, field)		\
@@ -1087,6 +1252,11 @@ enum txmon_generated_response {
  * @transmission_type: su or mu transmission type
  * @medium_prot_type: medium protection type
  * @generated_response: Generated frame in response window
+ * @band_center_freq1:
+ * @band_center_freq2:
+ * @freq:
+ * @phy_mode:
+ * @schedule_id:
  * @no_bitmap_avail: Bitmap available flag
  * @explicit_ack: Explicit Acknowledge flag
  * @explicit_ack_type: Explicit Acknowledge type
@@ -1094,8 +1264,13 @@ enum txmon_generated_response {
  * @response_type: Response type in response window
  * @ndp_frame: NDP frame
  * @num_users: number of users
+ * @reserved: reserved bits
+ * @mba_count: MBA count
+ * @mba_fake_bitmap_count: MBA fake bitmap count
  * @sw_frame_group_id: software frame group ID
  * @r2r_to_follow: Response to Response follow flag
+ * @phy_abort_reason: Reason for PHY abort
+ * @phy_abort_user_number: User number for PHY abort
  * @buffer: Packet buffer pointer address
  * @offset: Packet buffer offset
  * @length: Packet buffer length
@@ -1194,7 +1369,7 @@ hal_tx_status_get_next_tlv(uint8_t *tx_tlv) {
 
 /**
  * hal_txmon_status_parse_tlv() - process transmit info TLV
- * @hal_soc: HAL soc handle
+ * @hal_soc_hdl: HAL soc handle
  * @data_ppdu_info: pointer to hal data ppdu info
  * @prot_ppdu_info: pointer to hal prot ppdu info
  * @data_status_info: pointer to data status info
@@ -1226,7 +1401,7 @@ hal_txmon_status_parse_tlv(hal_soc_handle_t hal_soc_hdl,
 /**
  * hal_txmon_status_get_num_users() - api to get num users from start of fes
  * window
- * @hal_soc: HAL soc handle
+ * @hal_soc_hdl: HAL soc handle
  * @tx_tlv_hdr: pointer to TLV header
  * @num_users: reference to number of user
  *
@@ -1257,11 +1432,32 @@ hal_tx_status_get_tlv_tag(void *tx_tlv_hdr)
 
 	return tlv_tag;
 }
+
+/**
+ * hal_txmon_get_word_mask() - api to get word mask for tx monitor
+ * @hal_soc_hdl: HAL soc handle
+ * @wmask: pointer to hal_txmon_word_mask_config_t
+ *
+ * Return: bool
+ */
+static inline bool
+hal_txmon_get_word_mask(hal_soc_handle_t hal_soc_hdl,
+			hal_txmon_word_mask_config_t *wmask)
+{
+	struct hal_soc *hal_soc = (struct hal_soc *)hal_soc_hdl;
+
+	if (hal_soc->ops->hal_txmon_get_word_mask) {
+		hal_soc->ops->hal_txmon_get_word_mask(wmask);
+		return true;
+	}
+
+	return false;
+}
 #endif
 
 /**
  * hal_txmon_is_mon_buf_addr_tlv() - api to find packet buffer addr tlv
- * @hal_soc: HAL soc handle
+ * @hal_soc_hdl: HAL soc handle
  * @tx_tlv_hdr: pointer to TLV header
  *
  * Return: bool
@@ -1279,7 +1475,7 @@ hal_txmon_is_mon_buf_addr_tlv(hal_soc_handle_t hal_soc_hdl, void *tx_tlv_hdr)
 
 /**
  * hal_txmon_populate_packet_info() - api to populate packet info
- * @hal_soc: HAL soc handle
+ * @hal_soc_hdl: HAL soc handle
  * @tx_tlv_hdr: pointer to TLV header
  * @packet_info: pointer to placeholder for packet info
  *
@@ -2209,10 +2405,58 @@ hal_update_rx_ctrl_frame_stats(struct hal_rx_ppdu_info *ppdu_info,
 }
 #endif /* WLAN_SUPPORT_CTRL_FRAME_STATS */
 
+#ifdef MONITOR_TLV_RECORDING_ENABLE
 /**
- * hal_rx_status_get_tlv_info() - process receive info TLV
- * @rx_tlv_hdr: pointer to TLV header
+ * hal_rx_record_tlv_info() - Record received TLV info
  * @ppdu_info: pointer to ppdu_info
+ * @tlv_tag: TLV tag of the TLV to record
+ *
+ * Return
+ */
+static inline void
+hal_rx_record_tlv_info(struct hal_rx_ppdu_info *ppdu_info, uint32_t tlv_tag) {
+	ppdu_info->rx_tlv_info.tlv_tag = tlv_tag;
+	switch (tlv_tag) {
+	case WIFIRX_PPDU_START_E:
+	case WIFIRX_PPDU_START_USER_INFO_E:
+		ppdu_info->rx_tlv_info.tlv_category = CATEGORY_PPDU_START;
+		break;
+
+	case WIFIRX_HEADER_E:
+	case WIFIRX_MPDU_START_E:
+	case WIFIMON_BUFFER_ADDR_E:
+	case WIFIRX_MSDU_END_E:
+	case WIFIRX_MPDU_END_E:
+		ppdu_info->rx_tlv_info.tlv_category = CATEGORY_MPDU;
+		break;
+
+	case WIFIRX_USER_PPDU_END_E:
+	case WIFIRX_PPDU_END_E:
+	case WIFIPHYRX_RSSI_LEGACY_E:
+	case WIFIPHYRX_L_SIG_B_E:
+	case WIFIPHYRX_COMMON_USER_INFO_E:
+	case WIFIPHYRX_DATA_DONE_E:
+	case WIFIPHYRX_PKT_END_PART1_E:
+	case WIFIPHYRX_PKT_END_E:
+	case WIFIRXPCU_PPDU_END_INFO_E:
+	case WIFIRX_PPDU_END_USER_STATS_E:
+	case WIFIRX_PPDU_END_STATUS_DONE_E:
+		ppdu_info->rx_tlv_info.tlv_category = CATEGORY_PPDU_END;
+		break;
+	}
+}
+#else
+static inline void
+hal_rx_record_tlv_info(struct hal_rx_ppdu_info *ppdu_info, uint32_t tlv_tag) {
+}
+#endif
+
+/**
+ * hal_rx_status_get_tlv_info_generic_be() - process receive info TLV
+ * @rx_tlv_hdr: pointer to TLV header
+ * @ppduinfo: pointer to ppdu_info
+ * @hal_soc_hdl: HAL version of the SOC pointer
+ * @nbuf: Network buffer
  *
  * Return: HAL_TLV_STATUS_PPDU_NOT_DONE or HAL_TLV_STATUS_PPDU_DONE from tlv
  */
@@ -2448,12 +2692,14 @@ hal_rx_status_get_tlv_info_generic_be(void *rx_tlv_hdr, void *ppduinfo,
 		break;
 
 	case WIFIRX_PPDU_END_STATUS_DONE_E:
+		hal_rx_record_tlv_info(ppdu_info, tlv_tag);
 		return HAL_TLV_STATUS_PPDU_DONE;
 
 	case WIFIPHYRX_PKT_END_E:
 		break;
 
 	case WIFIDUMMY_E:
+		hal_rx_record_tlv_info(ppdu_info, tlv_tag);
 		return HAL_TLV_STATUS_BUF_DONE;
 
 	case WIFIPHYRX_HT_SIG_E:
@@ -3241,6 +3487,7 @@ hal_rx_status_get_tlv_info_generic_be(void *rx_tlv_hdr, void *ppduinfo,
 
 		/* for every RX_HEADER TLV increment mpdu_cnt */
 		com_info->mpdu_cnt++;
+		hal_rx_record_tlv_info(ppdu_info, tlv_tag);
 		return HAL_TLV_STATUS_HEADER;
 	}
 	case WIFIRX_MPDU_START_E:
@@ -3310,6 +3557,7 @@ hal_rx_status_get_tlv_info_generic_be(void *rx_tlv_hdr, void *ppduinfo,
 		ppdu_info->mpdu_info[user_id].decap_type =
 			rx_mpdu_start->rx_mpdu_info_details.decap_type;
 
+		hal_rx_record_tlv_info(ppdu_info, tlv_tag);
 		return HAL_TLV_STATUS_MPDU_START;
 	}
 	case WIFIRX_MPDU_END_E:
@@ -3317,6 +3565,8 @@ hal_rx_status_get_tlv_info_generic_be(void *rx_tlv_hdr, void *ppduinfo,
 		ppdu_info->fcs_err =
 			HAL_RX_GET_64(rx_tlv, RX_MPDU_END,
 				      FCS_ERR);
+
+		hal_rx_record_tlv_info(ppdu_info, tlv_tag);
 		return HAL_TLV_STATUS_MPDU_END;
 	case WIFIRX_MSDU_END_E: {
 		hal_rx_mon_msdu_end_t *rx_msdu_end = rx_tlv;
@@ -3343,26 +3593,31 @@ hal_rx_status_get_tlv_info_generic_be(void *rx_tlv_hdr, void *ppduinfo,
 			ppdu_info->msdu[user_id].reception_type =
 				rx_msdu_end->reception_type;
 		}
+		hal_rx_record_tlv_info(ppdu_info, tlv_tag);
 		return HAL_TLV_STATUS_MSDU_END;
 		}
 	case WIFIMON_BUFFER_ADDR_E:
 		hal_rx_status_get_mon_buf_addr(rx_tlv, ppdu_info);
-
+		hal_rx_record_tlv_info(ppdu_info, tlv_tag);
 		return HAL_TLV_STATUS_MON_BUF_ADDR;
 	case WIFIMON_DROP_E:
 		hal_rx_update_ppdu_drop_cnt(rx_tlv, ppdu_info);
+		hal_rx_record_tlv_info(ppdu_info, tlv_tag);
 		return HAL_TLV_STATUS_MON_DROP;
 	case 0:
+		hal_rx_record_tlv_info(ppdu_info, tlv_tag);
 		return HAL_TLV_STATUS_PPDU_DONE;
 	case WIFIRX_STATUS_BUFFER_DONE_E:
 	case WIFIPHYRX_DATA_DONE_E:
 	case WIFIPHYRX_PKT_END_PART1_E:
+		hal_rx_record_tlv_info(ppdu_info, tlv_tag);
 		return HAL_TLV_STATUS_PPDU_NOT_DONE;
 
 	default:
 		hal_debug("unhandled tlv tag %d", tlv_tag);
 	}
 
+	hal_rx_record_tlv_info(ppdu_info, tlv_tag);
 	qdf_trace_hex_dump(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_DEBUG,
 			   rx_tlv, tlv_len);
 

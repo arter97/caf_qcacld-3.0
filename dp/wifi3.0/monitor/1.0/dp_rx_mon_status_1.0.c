@@ -363,6 +363,7 @@ dp_rx_mon_status_ring_record_entry(struct dp_soc *soc,
 	record = &soc->mon_status_ring_history->entry[idx];
 
 	record->timestamp = qdf_get_log_timestamp();
+	record->event = event;
 	if (event == DP_MON_STATUS_BUF_REAP) {
 		hal_rx_buffer_addr_info_get_paddr(ring_desc, &hbi);
 

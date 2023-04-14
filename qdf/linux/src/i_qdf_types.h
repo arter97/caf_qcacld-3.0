@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2014-2020 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -210,9 +210,9 @@ typedef struct __qdf_shared_mem_info {
 #define qdf_get_dma_mem_context(var, field)   ((qdf_dma_context_t)(var->field))
 
 /**
- * typedef struct __qdf_resource - qdf resource type
+ * typedef __qdf_resource_t - qdf resource type
  * @paddr: Physical address
- * @paddr: Virtual address
+ * @vaddr: Virtual address
  * @len: Length
  */
 typedef struct __qdf_resource {

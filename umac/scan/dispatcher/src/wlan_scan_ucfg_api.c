@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2017-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -75,6 +75,11 @@ void ucfg_scan_filter_valid_channel(struct wlan_objmgr_pdev *pdev,
 	uint32_t *chan_freq_list, uint32_t num_chan)
 {
 	scm_filter_valid_channel(pdev, chan_freq_list, num_chan);
+}
+
+uint32_t ucfg_scan_get_entry_frame_len(struct scan_cache_entry *scan_entry)
+{
+	return util_scan_entry_frame_len(scan_entry);
 }
 
 QDF_STATUS ucfg_scan_init(void)
@@ -822,6 +827,8 @@ wlan_scan_global_init(struct wlan_objmgr_psoc *psoc,
 
 	scan_obj->scan_def.skip_6g_and_indoor_freq =
 		cfg_get(psoc, CFG_SKIP_6GHZ_AND_INDOOR_FREQ_SCAN);
+	scan_obj->scan_def.last_scan_ageout_time =
+		cfg_get(psoc, CFG_LAST_SCAN_AGEOUT_TIME);
 
 	/* init scan id seed */
 	qdf_atomic_init(&scan_obj->scan_ids);

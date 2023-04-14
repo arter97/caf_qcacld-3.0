@@ -79,7 +79,8 @@
  * @pdev_id: Index of the pdev for which response is received
  * @mod_id: Index of the module for which respone is received
  * @num_buf_release_entry: Number of buffers released through event
- * @num_meta_data_entry:
+ * @num_meta_data_entry: Number of meta data released
+ * @num_cv_meta_data_entry: Number of cv meta data released
  * @dbr_entries: Pointer to direct buffer rx entry struct
  */
 struct direct_buf_rx_rsp {
@@ -87,6 +88,7 @@ struct direct_buf_rx_rsp {
 	uint32_t mod_id;
 	uint32_t num_buf_release_entry;
 	uint32_t num_meta_data_entry;
+	uint32_t num_cv_meta_data_entry;
 	struct direct_buf_rx_entry *dbr_entries;
 };
 
@@ -136,6 +138,30 @@ struct direct_buf_rx_metadata {
 	uint32_t cfreq1;
 	uint32_t cfreq2;
 	uint32_t ch_width;
+};
+
+/**
+ * struct direct_buf_rx_cv_metadata: direct buffer metadata for TxBF CV upload
+ *
+ * @is_valid: Set cv metadata is valid,
+ *            false if sw_peer_id is invalid or FCS error
+ * @fb_type: Feedback type, 0 for SU 1 for MU
+ * @asnr_len: Average SNR length
+ * @asnr_offset: Average SNR offset
+ * @dsnr_len: Delta SNR length
+ * @dsnr_offset: Delta SNR offset
+ * @peer_mac: Peer macaddr
+ * @fb_params: Feedback params, [1:0] Nc [3:2] nss_num
+ */
+struct direct_buf_rx_cv_metadata {
+	uint32_t is_valid;
+	uint32_t fb_type;
+	uint16_t asnr_len;
+	uint16_t asnr_offset;
+	uint16_t dsnr_len;
+	uint16_t dsnr_offset;
+	struct qdf_mac_addr peer_mac;
+	uint32_t fb_params;
 };
 
 /**
