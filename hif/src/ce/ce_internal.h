@@ -202,6 +202,8 @@ struct CE_state {
 	/* CE tasklet sched time in nanoseconds */
 	unsigned long long ce_tasklet_sched_time;
 #endif
+	bool msi_supported;
+	bool batch_intr_supported;
 };
 
 /* Descriptor rings must be aligned to this boundary */

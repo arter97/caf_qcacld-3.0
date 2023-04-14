@@ -1185,7 +1185,7 @@ more_watermarks:
 	 * more copy completions happened while the misc interrupts were being
 	 * handled.
 	 */
-	if (!ce_srng_based(scn)) {
+	if (!ce_srng_based(scn) && !CE_state->msi_supported) {
 		if (TARGET_REGISTER_ACCESS_ALLOWED(scn)) {
 			CE_ENGINE_INT_STATUS_CLEAR(scn, ctrl_addr,
 					   CE_WATERMARK_MASK |
@@ -1212,7 +1212,8 @@ more_watermarks:
 		    more_comp_cnt++ < CE_TXRX_COMP_CHECK_THRESHOLD) {
 			goto more_completions;
 		} else {
-			if (!ce_srng_based(scn)) {
+			if (!ce_srng_based(scn) &&
+			    !CE_state->batch_intr_supported) {
 				hif_err_rl(
 					"Potential infinite loop detected during Rx processing id:%u nentries_mask:0x%x sw read_idx:0x%x hw read_idx:0x%x",
 					CE_state->id,
@@ -1231,7 +1232,8 @@ more_watermarks:
 		    more_snd_comp_cnt++ < CE_TXRX_COMP_CHECK_THRESHOLD) {
 			goto more_completions;
 		} else {
-			if (!ce_srng_based(scn)) {
+			if (!ce_srng_based(scn) &&
+			    !CE_state->batch_intr_supported) {
 				hif_err_rl(
 					"Potential infinite loop detected during send completion id:%u mask:0x%x sw read_idx:0x%x hw_index:0x%x write_index: 0x%x hw read_idx:0x%x",
 					CE_state->id,

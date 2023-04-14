@@ -1579,6 +1579,10 @@ static bool ce_mark_datapath(struct CE_state *ce_state)
 	}
 	return rc;
 }
+
+static void ce_update_msi_batch_intr_flags(struct CE_state *ce_state)
+{
+}
 #else
 static bool ce_mark_datapath(struct CE_state *ce_state)
 {
@@ -1606,6 +1610,12 @@ static bool ce_mark_datapath(struct CE_state *ce_state)
 	}
 
 	return (ce_state->htt_rx_data || ce_state->htt_tx_data);
+}
+
+static void ce_update_msi_batch_intr_flags(struct CE_state *ce_state)
+{
+	ce_state->msi_supported = true;
+	ce_state->batch_intr_supported = true;
 }
 #endif
 
@@ -2623,6 +2633,8 @@ struct CE_handle *ce_init(struct hif_softc *scn,
 	mem_status = alloc_mem_ce_debug_history(scn, CE_id, attr->src_nentries);
 	if (mem_status != QDF_STATUS_SUCCESS)
 		goto error_target_access;
+
+	ce_update_msi_batch_intr_flags(CE_state);
 
 	return (struct CE_handle *)CE_state;
 

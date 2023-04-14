@@ -321,6 +321,7 @@ uint32_t DEBUG_CE_DEST_RING_READ_IDX_GET(struct hif_softc *scn,
 	DRRI_FROM_DDR_ADDR(VADDR_FOR_CE(scn, CE_ctrl_addr))
 #endif
 
+#ifndef QCA_WIFI_WCN6450
 unsigned int hif_get_src_ring_read_index(struct hif_softc *scn,
 		uint32_t CE_ctrl_addr);
 unsigned int hif_get_dst_ring_read_index(struct hif_softc *scn,
@@ -330,6 +331,12 @@ unsigned int hif_get_dst_ring_read_index(struct hif_softc *scn,
 	hif_get_src_ring_read_index(scn, CE_ctrl_addr)
 #define CE_DEST_RING_READ_IDX_GET(scn, CE_ctrl_addr)\
 	hif_get_dst_ring_read_index(scn, CE_ctrl_addr)
+#else
+#define CE_SRC_RING_READ_IDX_GET(scn, CE_ctrl_addr)\
+	CE_SRC_RING_READ_IDX_GET_FROM_DDR(scn, CE_ctrl_addr)
+#define CE_DEST_RING_READ_IDX_GET(scn, CE_ctrl_addr)\
+	CE_DEST_RING_READ_IDX_GET_FROM_DDR(scn, CE_ctrl_addr)
+#endif
 #else
 #define CE_SRC_RING_READ_IDX_GET(scn, CE_ctrl_addr) \
 	CE_SRC_RING_READ_IDX_GET_FROM_REGISTER(scn, CE_ctrl_addr)

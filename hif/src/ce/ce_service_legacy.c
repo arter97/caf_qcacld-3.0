@@ -470,8 +470,9 @@ more_data:
 
 	qdf_atomic_set(&ce_state->rx_pending, 0);
 	if (TARGET_REGISTER_ACCESS_ALLOWED(scn)) {
-		CE_ENGINE_INT_STATUS_CLEAR(scn, ctrl_addr,
-					   HOST_IS_COPY_COMPLETE_MASK);
+		if (!ce_state->msi_supported)
+			CE_ENGINE_INT_STATUS_CLEAR(scn, ctrl_addr,
+						   HOST_IS_COPY_COMPLETE_MASK);
 	} else {
 		hif_err_rl("%s: target access is not allowed", __func__);
 		return;
@@ -1096,6 +1097,9 @@ ce_per_engine_handler_adjust_legacy(struct CE_state *CE_state,
 	struct hif_softc *scn = CE_state->scn;
 
 	CE_state->disable_copy_compl_intr = disable_copy_compl_intr;
+
+	if (CE_state->msi_supported)
+		return;
 
 	if (Q_TARGET_ACCESS_BEGIN(scn) < 0)
 		return;
