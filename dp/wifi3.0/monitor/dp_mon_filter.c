@@ -296,14 +296,16 @@ dp_mon_ht2_rx_ring_cfg(struct dp_soc *soc,
 
 		switch (srng_type) {
 		case DP_MON_FILTER_SRNG_TYPE_RXDMA_BUF:
-			if (target_type == TARGET_TYPE_QCN9160)
+			if (target_type == TARGET_TYPE_QCN9160) {
 				hal_ring_hdl =
 				soc->rx_refill_buf_ring[lmac_id].hal_srng;
-			else
+				ring_buf_size = RX_MONITOR_BUFFER_SIZE;
+			} else {
 				hal_ring_hdl =
 					pdev->rx_mac_buf_ring[lmac_id].hal_srng;
+				ring_buf_size = RX_DATA_BUFFER_SIZE;
+			}
 			hal_ring_type = RXDMA_BUF;
-			ring_buf_size = RX_DATA_BUFFER_SIZE;
 			break;
 
 		case DP_MON_FILTER_SRNG_TYPE_RXDMA_MONITOR_STATUS:
@@ -331,14 +333,14 @@ dp_mon_ht2_rx_ring_cfg(struct dp_soc *soc,
 			hal_ring_hdl =
 				soc->rxdma_mon_buf_ring[lmac_id].hal_srng;
 			hal_ring_type = RXDMA_MONITOR_BUF;
-			ring_buf_size = RX_DATA_BUFFER_SIZE;
+			ring_buf_size = RX_MONITOR_BUFFER_SIZE;
 			break;
 
 		case DP_MON_FILTER_SRNG_TYPE_RXMON_DEST:
 			hal_ring_hdl =
 				soc->rxdma_mon_dst_ring[lmac_id].hal_srng;
 			hal_ring_type = RXDMA_MONITOR_DST;
-			ring_buf_size = RX_DATA_BUFFER_SIZE;
+			ring_buf_size = RX_MONITOR_BUFFER_SIZE;
 			break;
 		default:
 			return QDF_STATUS_E_FAILURE;

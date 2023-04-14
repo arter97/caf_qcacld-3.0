@@ -192,7 +192,7 @@ static inline void dp_mon_adjust_frag_len(struct dp_soc *soc,
 					  uint32_t *frag_len,
 					  uint16_t l2_hdr_pad)
 {
-	uint32_t rx_pkt_tlv_len = soc->rx_pkt_tlv_size;
+	uint32_t rx_pkt_tlv_len = soc->rx_mon_pkt_tlv_size;
 
 	if (*total_len >= (RX_MONITOR_BUFFER_SIZE - rx_pkt_tlv_len)) {
 		*frag_len = RX_MONITOR_BUFFER_SIZE - rx_pkt_tlv_len -
@@ -414,7 +414,7 @@ dp_rx_mon_parse_desc_buffer(struct dp_soc *dp_soc,
 {
 	struct hal_rx_mon_dest_buf_info frame_info;
 	uint16_t tot_payload_len =
-			RX_MONITOR_BUFFER_SIZE - dp_soc->rx_pkt_tlv_size;
+			RX_MONITOR_BUFFER_SIZE - dp_soc->rx_mon_pkt_tlv_size;
 
 	if (msdu_info->msdu_flags & HAL_MSDU_F_MSDU_CONTINUATION) {
 		/* First buffer of MSDU */

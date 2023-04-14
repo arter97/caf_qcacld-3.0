@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2017-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -1933,7 +1933,7 @@ dp_rx_mon_frag_restitch_mpdu_from_msdus(struct dp_soc *soc,
 	 *  ------------------------------------------------------------
 	 */
 	pad_byte_pholder =
-		(RX_MONITOR_BUFFER_SIZE - soc->rx_pkt_tlv_size) - frag_size;
+		(RX_MONITOR_BUFFER_SIZE - soc->rx_mon_pkt_tlv_size) - frag_size;
 	/* Construct destination address
 	 *  --------------------------------------------------------------
 	 * | RX_PKT_TLV | L2_HDR_PAD   |   Decap HDR   |      Payload     |
@@ -2062,7 +2062,7 @@ dp_rx_mon_frag_restitch_mpdu_from_msdus(struct dp_soc *soc,
 			 * to accommodate amsdu pad byte
 			 */
 			pad_byte_pholder =
-				(RX_MONITOR_BUFFER_SIZE - soc->rx_pkt_tlv_size)
+				(RX_MONITOR_BUFFER_SIZE - soc->rx_mon_pkt_tlv_size)
 				- frag_size;
 			/*
 			 * We will come here only only three condition:
