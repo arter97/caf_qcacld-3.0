@@ -3770,7 +3770,9 @@ void dp_rx_tid_delete_cb(struct dp_soc *soc, void *cb_ctxt,
 	uint32_t list_size;
 	struct reo_desc_list_node *desc;
 	unsigned long curr_ts = qdf_get_system_timestamp();
+	uint32_t desc_size, tot_desc_size;
 	struct hal_reo_cmd_params params;
+	bool flush_failure = false;
 
 	DP_RX_REO_QDESC_UPDATE_EVT(freedesc);
 
@@ -3825,6 +3827,45 @@ void dp_rx_tid_delete_cb(struct dp_soc *soc, void *cb_ctxt,
 			else
 				continue;
 		}
+
+		/* Flush and invalidate REO descriptor from HW cache: Base and
+		 * extension descriptors should be flushed separately
+		 */
+		if (desc->pending_ext_desc_size)
+			tot_desc_size = desc->pending_ext_desc_size;
+		else
+			tot_desc_size = rx_tid->hw_qdesc_alloc_size;
+		/* Get base descriptor size by passing non-qos TID */
+		desc_size = hal_get_reo_qdesc_size(soc->hal_soc, 0,
+						   DP_NON_QOS_TID);
+
+		/* Flush reo extension descriptors */
+		while ((tot_desc_size -= desc_size) > 0) {
+			qdf_mem_zero(&params, sizeof(params));
+			params.std.addr_lo =
+				((uint64_t)(rx_tid->hw_qdesc_paddr) +
+				tot_desc_size) & 0xffffffff;
+			params.std.addr_hi =
+				(uint64_t)(rx_tid->hw_qdesc_paddr) >> 32;
+
+			if (QDF_STATUS_SUCCESS !=
+			    dp_reo_send_cmd(soc, CMD_FLUSH_CACHE, &params,
+					    NULL, NULL)) {
+				dp_info_rl("fail to send CMD_CACHE_FLUSH:"
+					   "tid %d desc %pK", rx_tid->tid,
+					   (void *)(rx_tid->hw_qdesc_paddr));
+				desc->pending_ext_desc_size = tot_desc_size +
+								desc_size;
+				dp_reo_desc_clean_up(soc, desc, reo_status);
+				flush_failure = true;
+				break;
+			}
+		}
+
+		if (flush_failure)
+			break;
+
+		desc->pending_ext_desc_size = desc_size;
 
 		/* Flush base descriptor */
 		qdf_mem_zero(&params, sizeof(params));
