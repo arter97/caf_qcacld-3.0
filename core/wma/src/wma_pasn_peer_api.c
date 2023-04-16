@@ -352,6 +352,7 @@ wma_pasn_peer_delete_all_complete(struct wlan_objmgr_vdev *vdev)
 	tp_wma_handle wma = cds_get_context(QDF_MODULE_ID_WMA);
 	struct wma_target_req *req_msg;
 	uint8_t vdev_id = wlan_vdev_get_id(vdev);
+	QDF_STATUS status = QDF_STATUS_SUCCESS;
 
 	if (!wma) {
 		wma_err("wma_handle is NULL");
@@ -373,7 +374,11 @@ wma_pasn_peer_delete_all_complete(struct wlan_objmgr_vdev *vdev)
 
 	wma_release_wakelock(&wma->wmi_cmd_rsp_wake_lock);
 
-	return wma_resume_vdev_delete(wma, vdev_id);
+	if (wlan_get_opmode_from_vdev_id(wma->pdev, vdev_id) !=
+	   QDF_NAN_DISC_MODE)
+		status = wma_resume_vdev_delete(wma, vdev_id);
+
+	return status;
 }
 
 QDF_STATUS

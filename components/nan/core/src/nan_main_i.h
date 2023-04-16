@@ -410,5 +410,24 @@ void nan_handle_pasn_peer_create_rsp(struct wlan_objmgr_psoc *psoc,
  */
 void nan_pasn_peer_handle_del_rsp(struct wlan_objmgr_psoc *psoc,
 				  uint8_t *peer_mac, uint8_t vdev_id);
+/**
+ * nan_handle_delete_all_pasn_peers: handle response for all PASN peers delete
+ * cmd for NAN
+ * @psoc: pointer to psoc object
+ * @vdev_id: vdev id
+ *
+ * Return: Success when handled response, otherwise error
+ */
+QDF_STATUS nan_handle_delete_all_pasn_peers(struct wlan_objmgr_psoc *psoc,
+					    uint8_t vdev_id);
+
+/**
+ * nan_cleanup_pasn_peers() - Delete all PASN peer objects for given vdev
+ * @psoc: Pointer to psoc object
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS nan_cleanup_pasn_peers(struct wlan_objmgr_psoc *psoc);
+
 #endif /* _WLAN_NAN_MAIN_I_H_ */
 #endif /* WLAN_FEATURE_NAN */

@@ -91,3 +91,9 @@ void wlan_nan_pasn_peer_handle_del_rsp(struct wlan_objmgr_psoc *psoc,
 {
 	nan_pasn_peer_handle_del_rsp(psoc, peer_mac, vdev_id);
 }
+
+QDF_STATUS wlan_nan_handle_delete_all_pasn_peers(struct wlan_objmgr_psoc *psoc,
+						 uint8_t vdev_id)
+{
+	return nan_handle_delete_all_pasn_peers(psoc, vdev_id);
+}

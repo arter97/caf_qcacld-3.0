@@ -53,6 +53,8 @@
 #include "wlan_ll_sap_api.h"
 #endif
 
+#include "wlan_nan_api_i.h"
+
 static struct vdev_mlme_ops sta_mlme_ops;
 static struct vdev_mlme_ops ap_mlme_ops;
 static struct vdev_mlme_ops mon_mlme_ops;
@@ -2079,6 +2081,10 @@ vdevmgr_vdev_peer_delete_all_rsp_handle(struct vdev_mlme_obj *vdev_mlme,
 
 		status = rx_ops->wifi_pos_vdev_delete_all_ranging_peers_rsp_cb(
 							psoc, rsp->vdev_id);
+		return status;
+	} else if (QDF_HAS_PARAM(rsp->peer_type_bitmap, WLAN_PEER_NAN_PASN)) {
+		status = wlan_nan_handle_delete_all_pasn_peers(psoc,
+							       rsp->vdev_id);
 		return status;
 	}
 

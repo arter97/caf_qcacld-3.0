@@ -1825,3 +1825,142 @@ void nan_pasn_peer_handle_del_rsp(struct wlan_objmgr_psoc *psoc,
 		psoc_nan_obj->cb_obj.ucfg_nan_request_process_cb(cookie);
 	}
 }
+
+/**
+ * nan_delete_objmgr_pasn_peer() - Delete PASN peer objects for given vdev
+ * @psoc: Pointer to psoc object
+ * @object: pointer to object
+ * @arg: pointer to arg
+ *
+ * Return: QDF_STATUS
+ */
+static void nan_delete_objmgr_pasn_peer(struct wlan_objmgr_psoc *psoc,
+					void *object, void *arg)
+{
+	struct wlan_objmgr_peer *peer = object;
+	struct wlan_objmgr_vdev *vdev = arg;
+	uint8_t vdev_id, peer_vdev_id;
+	enum wlan_peer_type peer_type;
+	QDF_STATUS status;
+
+	if (!peer) {
+		nan_err("Peer is NULL");
+		return;
+	}
+
+	peer_type = wlan_peer_get_peer_type(peer);
+	if (peer_type != WLAN_PEER_NAN_PASN)
+		return;
+
+	if (!vdev) {
+		nan_err("VDEV is NULL");
+		return;
+	}
+
+	vdev_id = wlan_vdev_get_id(vdev);
+	peer_vdev_id = wlan_vdev_get_id(wlan_peer_get_vdev(peer));
+	if (vdev_id != peer_vdev_id)
+		return;
+
+	status = wlan_objmgr_peer_obj_delete(peer);
+	if (QDF_IS_STATUS_ERROR(status))
+		nan_err("Failed to delete peer");
+
+	nan_update_pasn_peer_count(vdev, false);
+}
+
+QDF_STATUS nan_cleanup_pasn_peers(struct wlan_objmgr_psoc *psoc)
+{
+	QDF_STATUS status;
+	struct nan_vdev_priv_obj *nan_vdev_obj;
+	struct wlan_objmgr_vdev *vdev;
+
+	vdev = wlan_objmgr_get_vdev_by_opmode_from_psoc(psoc, QDF_NAN_DISC_MODE,
+							WLAN_NAN_ID);
+	if (!vdev) {
+		nan_err("vdev is null");
+		return QDF_STATUS_E_NULL_VALUE;
+	}
+
+	nan_debug("Iterate and delete PASN peers");
+	status = wlan_objmgr_iterate_obj_list(psoc, WLAN_PEER_OP,
+					      nan_delete_objmgr_pasn_peer,
+					      vdev, 0, WLAN_NAN_ID);
+	if (QDF_IS_STATUS_ERROR(status))
+		nan_err("Delete objmgr peers failed");
+
+	/*
+	 * PASN Peer count should be zero here
+	 */
+	nan_vdev_obj = nan_get_vdev_priv_obj(vdev);
+	if (nan_vdev_obj)
+		nan_vdev_obj->num_pasn_peers = 0;
+
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_NAN_ID);
+
+	return status;
+}
+
+QDF_STATUS nan_handle_delete_all_pasn_peers(struct wlan_objmgr_psoc *psoc,
+					    uint8_t vdev_id)
+{
+	struct nan_psoc_priv_obj *psoc_nan_obj;
+	QDF_STATUS status = QDF_STATUS_SUCCESS;
+	struct nan_vdev_priv_obj *nan_vdev_obj;
+	struct wlan_objmgr_vdev *vdev;
+	struct nan_pasn_peer_ops *peer_ops;
+	uint8_t *cookie;
+
+	nan_debug("Received all peer delete response for vdev id %d", vdev_id);
+
+	if (!psoc) {
+		nan_err("psoc is NULL");
+		return QDF_STATUS_E_NULL_VALUE;
+	}
+
+	psoc_nan_obj = nan_get_psoc_priv_obj(psoc);
+	if (!psoc_nan_obj) {
+		nan_err("psoc_nan_obj is NULL");
+		return QDF_STATUS_E_NULL_VALUE;
+	}
+
+	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, vdev_id, WLAN_NAN_ID);
+
+	peer_ops = &psoc_nan_obj->cb_obj.pasn_peer_ops;
+	if (!peer_ops->nan_pasn_peer_delete_all_complete_cb) {
+		nan_err("pasn_peer_delete_all_complete_cb is NULL");
+		status = QDF_STATUS_E_NULL_VALUE;
+		goto ref_rel;
+	}
+
+	status = peer_ops->nan_pasn_peer_delete_all_complete_cb(vdev);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		nan_err("delete all complete err");
+		goto ref_rel;
+	}
+
+	nan_vdev_obj = nan_get_vdev_priv_obj(vdev);
+	if (!nan_vdev_obj) {
+		nan_err("NAN vdev priv obj is null");
+		status = QDF_STATUS_E_FAILURE;
+		goto ref_rel;
+	}
+
+	status = nan_cleanup_pasn_peers(psoc);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		nan_err("nan clean up err");
+		goto ref_rel;
+	}
+
+	nan_vdev_obj->is_delete_all_pasn_peer_in_progress = false;
+	nan_vdev_obj->num_pasn_peers = 0;
+
+	if (psoc_nan_obj->cb_obj.ucfg_nan_request_process_cb) {
+		cookie = (uint8_t *)psoc_nan_obj->nan_pairing_create_ctx;
+		psoc_nan_obj->cb_obj.ucfg_nan_request_process_cb(cookie);
+	}
+
+ref_rel:
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_NAN_ID);
+	return status;
+}

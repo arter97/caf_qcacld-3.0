@@ -1455,10 +1455,16 @@ QDF_STATUS ucfg_disable_nan_discovery(struct wlan_objmgr_psoc *psoc,
 		qdf_mem_copy(nan_req->params.request_data, data, data_len);
 	}
 
-	status = ucfg_nan_pasn_peer_delete_all(psoc);
-	if (QDF_IS_STATUS_ERROR(status)) {
-		nan_err("Unable to delete all NAN Peer : %u", status);
-		return status;
+	if (cds_is_driver_recovering()) {
+		/* only delete the object manager peer */
+		nan_cleanup_pasn_peers(psoc);
+	} else {
+		/* send peer delete all command to target */
+		status = ucfg_nan_pasn_peer_delete_all(psoc);
+		if (QDF_IS_STATUS_ERROR(status)) {
+			nan_err("Unable to delete all NAN Peer : %u", status);
+			return status;
+		}
 	}
 
 	status = ucfg_nan_discovery_req(nan_req, NAN_DISABLE_REQ);

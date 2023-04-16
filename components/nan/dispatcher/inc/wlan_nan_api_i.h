@@ -98,6 +98,16 @@ void wlan_nan_handle_pasn_peer_create_rsp(struct wlan_objmgr_psoc *psoc,
  */
 void wlan_nan_pasn_peer_handle_del_rsp(struct wlan_objmgr_psoc *psoc,
 				       uint8_t *peer_mac, uint8_t vdev_id);
+/**
+ * wlan_nan_handle_delete_all_pasn_peers: This API is wrapper for function
+ * "nan_handle_delete_all_pasn_peers"
+ * @psoc: pointer to psoc object
+ * @vdev_id: vdev id
+ *
+ * Return: Success when handled response, otherwise error
+ */
+QDF_STATUS wlan_nan_handle_delete_all_pasn_peers(struct wlan_objmgr_psoc *psoc,
+						 uint8_t vdev_id);
 #else
 static inline
 enum nan_datapath_state wlan_nan_get_ndi_state(struct wlan_objmgr_vdev *vdev)
@@ -143,6 +153,13 @@ static inline void
 wlan_nan_pasn_peer_handle_del_rsp(struct wlan_objmgr_psoc *psoc,
 				  uint8_t *peer_mac, uint8_t vdev_id)
 {
+}
+
+static inline QDF_STATUS
+wlan_nan_handle_delete_all_pasn_peers(struct wlan_objmgr_psoc *psoc,
+				      uint8_t vdev_id)
+{
+	return QDF_STATUS_E_NOSUPPORT;
 }
 #endif /*WLAN_FEATURE_NAN */
 #endif /*_WLAN_NAN_API_I_H_ */
