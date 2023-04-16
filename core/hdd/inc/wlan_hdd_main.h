@@ -587,6 +587,40 @@ struct hdd_peer_stats {
 	uint32_t fcs_count;
 };
 
+#if defined(WLAN_FEATURE_11BE_MLO) && defined(CFG80211_11BE_BASIC)
+/**
+ * struct wlan_hdd_station_stats_info - Station stats info
+ * @signal: Signal strength of last received PPDU
+ * @signal_avg: Average signal strength
+ * @chain_signal_avg: Per-chain signal strength average
+ * @rxrate: Last unicast data frame rx rate
+ * @txrate: Current unicasr tx rate
+ * @rx_bytes: Total received bytes (MPDU length)
+ * @tx_bytes: Total transmitted bytes (MPDU length)
+ * @rx_packets: Total received packets (MSDUs and MMPDUs)
+ * @tx_packets: Total transmitted packets (MSDUs and MMPDUs)
+ * @tx_retries: Cumulative retry count (MPDU)
+ * @tx_failed: Number of failed transmissions (MPDUs)
+ * @rx_mpdu_count: Number of MPDUs received from this station
+ * @fcs_err_count: Number of MPDUs received from this station with an FCS error
+ */
+struct wlan_hdd_station_stats_info {
+	int8_t signal;
+	int8_t signal_avg;
+	int8_t chain_signal_avg[IEEE80211_MAX_CHAINS];
+	struct rate_info txrate;
+	struct rate_info rxrate;
+	uint64_t rx_bytes;
+	uint64_t tx_bytes;
+	uint32_t rx_packets;
+	uint32_t tx_packets;
+	uint32_t tx_retries;
+	uint32_t tx_failed;
+	uint32_t rx_mpdu_count;
+	uint32_t fcs_err_count;
+};
+#endif
+
 #define MAX_SUBTYPES_TRACKED	4
 
 struct hdd_stats {
