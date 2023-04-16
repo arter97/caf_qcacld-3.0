@@ -87,6 +87,17 @@ void wlan_nan_handle_pasn_peer_create_rsp(struct wlan_objmgr_psoc *psoc,
 					  uint8_t vdev_id,
 					  struct qdf_mac_addr *peer_mac,
 					  uint8_t peer_create_status);
+/**
+ * wlan_nan_pasn_peer_handle_del_rsp: wrapper API for
+ *                                    "nan_pasn_peer_handle_del_rsp"
+ * @psoc: pointer to psoc object
+ * @peer_mac: address of peer
+ * @vdev_id: vdev id
+ *
+ * Return: None
+ */
+void wlan_nan_pasn_peer_handle_del_rsp(struct wlan_objmgr_psoc *psoc,
+				       uint8_t *peer_mac, uint8_t vdev_id);
 #else
 static inline
 enum nan_datapath_state wlan_nan_get_ndi_state(struct wlan_objmgr_vdev *vdev)
@@ -125,6 +136,12 @@ void wlan_nan_handle_pasn_peer_create_rsp(struct wlan_objmgr_psoc *psoc,
 					  uint8_t vdev_id,
 					  struct qdf_mac_addr *peer_mac,
 					  uint8_t peer_create_status)
+{
+}
+
+static inline void
+wlan_nan_pasn_peer_handle_del_rsp(struct wlan_objmgr_psoc *psoc,
+				  uint8_t *peer_mac, uint8_t vdev_id)
 {
 }
 #endif /*WLAN_FEATURE_NAN */

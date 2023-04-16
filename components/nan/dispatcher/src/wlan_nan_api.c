@@ -85,3 +85,9 @@ void wlan_nan_handle_pasn_peer_create_rsp(struct wlan_objmgr_psoc *psoc,
 	nan_handle_pasn_peer_create_rsp(psoc, vdev_id, peer_mac,
 					peer_create_status);
 }
+
+void wlan_nan_pasn_peer_handle_del_rsp(struct wlan_objmgr_psoc *psoc,
+				       uint8_t *peer_mac, uint8_t vdev_id)
+{
+	nan_pasn_peer_handle_del_rsp(psoc, peer_mac, vdev_id);
+}

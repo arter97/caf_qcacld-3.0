@@ -387,7 +387,8 @@ QDF_STATUS nan_pasn_flush_callback(struct scheduler_msg *msg);
 QDF_STATUS nan_pasn_scheduled_handler(struct scheduler_msg *msg);
 
 /*
- * nan_handle_pasn_peer_create_rsp: handle pasn peer create response
+ * nan_handle_pasn_peer_create_rsp: This API handle pasn peer create response
+ * by clearing wait timer.
  * @psoc: PSOC object
  * @vdev_id: vdev id
  * @peer_mac: peer mac address
@@ -399,5 +400,15 @@ void nan_handle_pasn_peer_create_rsp(struct wlan_objmgr_psoc *psoc,
 				     uint8_t vdev_id,
 				     struct qdf_mac_addr *peer_mac,
 				     uint8_t peer_create_status);
+/**
+ * nan_pasn_peer_handle_del_rsp: handle psan peer delete response
+ * @psoc: pointer to psoc object
+ * @peer_mac: address of peer
+ * @vdev_id: vdev id
+ *
+ * Return: None
+ */
+void nan_pasn_peer_handle_del_rsp(struct wlan_objmgr_psoc *psoc,
+				  uint8_t *peer_mac, uint8_t vdev_id);
 #endif /* _WLAN_NAN_MAIN_I_H_ */
 #endif /* WLAN_FEATURE_NAN */

@@ -1786,3 +1786,42 @@ void nan_handle_pasn_peer_create_rsp(struct wlan_objmgr_psoc *psoc,
 		psoc_nan_obj->cb_obj.ucfg_nan_request_process_cb(cookie);
 	}
 }
+
+void nan_pasn_peer_handle_del_rsp(struct wlan_objmgr_psoc *psoc,
+				  uint8_t *peer_mac, uint8_t vdev_id)
+{
+	struct nan_psoc_priv_obj *psoc_nan_obj;
+	struct nan_pasn_peer_ops *peer_ops;
+	uint8_t *cookie;
+	struct qdf_mac_addr peer_mac_addr;
+
+	nan_debug("Received peer delete response for " QDF_MAC_ADDR_FMT " and vdev id %d",
+		  QDF_MAC_ADDR_REF(peer_mac), vdev_id);
+
+	if (!psoc) {
+		nan_err("psoc is NULL");
+		return;
+	}
+
+	psoc_nan_obj = nan_get_psoc_priv_obj(psoc);
+	if (!psoc_nan_obj) {
+		nan_err("psoc_nan_obj is NULL");
+		return;
+	}
+
+	peer_ops = &psoc_nan_obj->cb_obj.pasn_peer_ops;
+	if (!peer_ops->nan_pasn_peer_delete_cb) {
+		nan_err("NAN PASN peer delete ops is NULL");
+		return;
+	}
+
+	qdf_mem_copy(peer_mac_addr.bytes, peer_mac, QDF_MAC_ADDR_SIZE);
+
+	peer_ops->nan_pasn_peer_delete_cb(psoc, vdev_id, &peer_mac_addr,
+					  NAN_PASN_PEER_DELETE, true);
+
+	if (psoc_nan_obj->cb_obj.ucfg_nan_request_process_cb) {
+		cookie = (uint8_t *)psoc_nan_obj->nan_pairing_create_ctx;
+		psoc_nan_obj->cb_obj.ucfg_nan_request_process_cb(cookie);
+	}
+}

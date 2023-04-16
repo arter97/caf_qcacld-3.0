@@ -428,3 +428,35 @@ wma_delete_all_pasn_peers(struct wlan_objmgr_vdev *vdev)
 
 	return status;
 }
+
+void wma_pasn_peer_delete_handler(struct wlan_objmgr_psoc *psoc,
+				  uint8_t *peer_mac, uint8_t vdev_id,
+				  void *params)
+{
+	struct pasn_peer_del_rsp_params *peer_del_resp = params;
+
+	if (!peer_del_resp) {
+		wma_err("peer del rsp is null");
+		return;
+	}
+
+	if (peer_del_resp->status) {
+		wma_err("peer delete fail status %d", peer_del_resp->status);
+		goto free;
+	}
+
+	if (!psoc) {
+		wma_err("psoc is null");
+		goto free;
+	}
+
+	if (peer_del_resp->vdev_id != vdev_id) {
+		wma_err("peer del vdev id %d, expected vdev id %d", vdev_id,
+			peer_del_resp->vdev_id);
+		goto free;
+	}
+
+	wlan_nan_pasn_peer_handle_del_rsp(psoc, peer_mac, vdev_id);
+free:
+	qdf_mem_free(peer_del_resp);
+}

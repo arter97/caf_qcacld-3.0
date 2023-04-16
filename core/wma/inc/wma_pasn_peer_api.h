@@ -38,7 +38,7 @@ struct pasn_peer_del_rsp_params {
 /**
  * wma_pasn_peer_remove  - Remove RTT pasn peer and send peer delete command to
  * firmware
- * @wma: WMA handle
+ * @psoc: PSOC object
  * @peer_addr: Peer mac address
  * @vdev_id: vdev id
  * @no_fw_peer_delete: Don't send peer delete to firmware
@@ -113,4 +113,17 @@ QDF_STATUS wma_nan_pasn_peer_remove(struct wlan_objmgr_psoc *psoc,
 				    struct qdf_mac_addr *peer_addr,
 				    uint8_t type,
 				    bool objmgr_peer_delete);
+
+/*
+ * wma_pasn_peer_delete_handler() - handle peer delete
+ * @psoc: PSOC pointer
+ * @peer_mac: Peer address
+ * @vdev_id: vdev id
+ * @params: parameter to peer delete
+ *
+ * Return: QDF_STATUS
+ */
+void wma_pasn_peer_delete_handler(struct wlan_objmgr_psoc *psoc,
+				  uint8_t *peer_mac, uint8_t vdev_id,
+				  void *params);
 #endif

@@ -3762,6 +3762,7 @@ int wma_peer_delete_handler(void *handle, uint8_t *cmd_param_info,
 	uint8_t macaddr[QDF_MAC_ADDR_SIZE];
 	int status = 0;
 	struct mac_context *mac = cds_get_context(QDF_MODULE_ID_PE);
+	struct del_sta_self_rsp_params *data;
 
 	if (!mac) {
 		wma_err("mac context is null");
@@ -3797,7 +3798,8 @@ int wma_peer_delete_handler(void *handle, uint8_t *cmd_param_info,
 	qdf_mc_timer_stop(&req_msg->event_timeout);
 	qdf_mc_timer_destroy(&req_msg->event_timeout);
 
-	if (req_msg->type == WMA_DELETE_STA_RSP_START) {
+	switch (req_msg->type) {
+	case WMA_DELETE_STA_RSP_START:
 		del_sta = req_msg->user_data;
 		if (del_sta->respReqd) {
 			wma_debug("Sending peer del rsp to umac");
@@ -3806,24 +3808,32 @@ int wma_peer_delete_handler(void *handle, uint8_t *cmd_param_info,
 		} else {
 			qdf_mem_free(del_sta);
 		}
-	} else if (req_msg->type == WMA_DEL_P2P_SELF_STA_RSP_START) {
-		struct del_sta_self_rsp_params *data;
-
+		break;
+	case WMA_DEL_P2P_SELF_STA_RSP_START:
 		data = (struct del_sta_self_rsp_params *)req_msg->user_data;
 		wma_debug("Calling vdev detach handler");
 		wma_handle_vdev_detach(wma, data->self_sta_param);
 		mlme_vdev_self_peer_delete_resp(data->self_sta_param);
 		qdf_mem_free(data);
-	} else if (req_msg->type == WMA_SET_LINK_PEER_RSP ||
-		   req_msg->type == WMA_DELETE_PEER_RSP) {
+		break;
+	case WMA_SET_LINK_PEER_RSP:
+	case WMA_DELETE_PEER_RSP:
 		wma_send_vdev_down_req(wma, req_msg->user_data);
-	} else if (req_msg->type == WMA_DELETE_STA_CONNECT_RSP) {
+		break;
+	case WMA_DELETE_STA_CONNECT_RSP:
 		wma_debug("wma delete peer completed vdev %d",
 			  req_msg->vdev_id);
 		lim_cm_send_connect_rsp(mac, NULL, req_msg->user_data,
 					CM_GENERIC_FAILURE,
 					QDF_STATUS_E_FAILURE, 0, false);
 		cm_free_join_req(req_msg->user_data);
+		break;
+	case WMA_NAN_PASN_PEER_DELETE_RESPONSE:
+		wma_pasn_peer_delete_handler(wma->psoc, macaddr, event->vdev_id,
+					     req_msg->user_data);
+		break;
+	default:
+		break;
 	}
 
 	wma_cdp_cp_peer_del_response(wma->psoc, macaddr, event->vdev_id);
