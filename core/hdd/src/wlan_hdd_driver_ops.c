@@ -2180,6 +2180,10 @@ wlan_hdd_pld_uevent(struct device *dev, struct pld_uevent_data *event_data)
 		if (event_data->bus_data.etype == PLD_BUS_EVENT_PCIE_LINK_DOWN)
 			host_log_device_status(WLAN_STATUS_BUS_EXCEPTION);
 		break;
+	case PLD_SYS_REBOOT:
+		hdd_info("Received system reboot");
+		cds_set_sys_rebooting();
+		break;
 	default:
 		/* other events intentionally not handled */
 		hdd_debug("Received uevent %d", event_data->uevent);

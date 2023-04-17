@@ -3855,7 +3855,34 @@ static void hdd_check_for_leaks(struct hdd_context *hdd_ctx, bool is_ssr)
 	qdf_mem_check_for_leaks();
 }
 
-#define hdd_debug_domain_set(domain) qdf_debug_domain_set(domain)
+/**
+ * hdd_debug_domain_set() - Set qdf debug domain
+ * @domain: debug domain to be set
+ *
+ * In the scenario of system reboot, it may have thread accessing debug domain
+ * for memory allocation/free, other than the one trying to change it.
+ * If debug domain is changed after a memory allocation but before the free,
+ * it will hit debug domain mismatch assertion in memory free.
+ * To avoid such assertion, skip debug domain transition if system reboot is
+ * in progress.
+ *
+ * Return: 0 if the specified debug domain has been set, -EBUSY otherwise
+ */
+static int hdd_debug_domain_set(enum qdf_debug_domain domain)
+{
+	int ret = 0;
+
+	if (cds_sys_reboot_protect()) {
+		hdd_info("System is rebooting, skip debug domain transition");
+		ret = -EBUSY;
+	} else {
+		qdf_debug_domain_set(domain);
+	}
+
+	cds_sys_reboot_unprotect();
+
+	return ret;
+}
 #else
 static void hdd_check_for_objmgr_peer_leaks(struct wlan_objmgr_psoc *psoc)
 {
@@ -3922,7 +3949,8 @@ static void hdd_check_for_leaks(struct hdd_context *hdd_ctx, bool is_ssr)
 {
 	hdd_check_for_objmgr_leaks(hdd_ctx);
 }
-#define hdd_debug_domain_set(domain)
+
+#define hdd_debug_domain_set(domain) 0
 #endif /* CONFIG_LEAK_DETECTION */
 
 #ifdef FEATURE_WLAN_AP_AP_ACS_OPTIMIZE
@@ -4425,8 +4453,9 @@ int hdd_wlan_start_modules(struct hdd_context *hdd_ctx, bool reinit)
 		fallthrough;
 	case DRIVER_MODULES_CLOSED:
 		hdd_nofl_debug("Wlan transitioning (CLOSED -> ENABLED)");
-
-		hdd_debug_domain_set(QDF_DEBUG_DOMAIN_ACTIVE);
+		ret = hdd_debug_domain_set(QDF_DEBUG_DOMAIN_ACTIVE);
+		if (ret)
+			goto release_lock;
 
 		if (!reinit && !unint) {
 			ret = pld_power_on(qdf_dev->dev);
