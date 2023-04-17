@@ -262,7 +262,7 @@ static void dp_tx_me_mem_free(struct dp_pdev *pdev,
 	}
 }
 
-#if defined(QCA_SUPPORT_WDS_EXTENDED) || defined(CONFIG_MLO_SINGLE_DEV)
+#if defined(QCA_SUPPORT_WDS_EXTENDED) || defined(WLAN_FEATURE_11BE_MLO)
 /**
  * dp_tx_me_check_primary_peer_by_mac() - Check primary peer using mac address
  * @soc: Datapath soc handle
