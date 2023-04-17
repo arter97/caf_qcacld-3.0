@@ -6318,6 +6318,9 @@ typedef enum {
 #ifdef QCA_STANDALONE_SOUNDING_TRIGGER
 	wmi_service_standalone_sound,
 #endif
+#ifdef WLAN_FEATURE_11BE_MLO
+	wmi_service_mlo_tsf_sync,
+#endif
 	wmi_services_max,
 } wmi_conv_service_ids;
 #define WMI_SERVICE_UNAVAILABLE 0xFFFF

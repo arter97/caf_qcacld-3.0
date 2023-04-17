@@ -434,6 +434,7 @@ void mlo_setup_init(uint8_t total_grp)
 	mlo_ctx->setup_info = setup_info;
 	mlo_ctx->setup_info[0].ml_grp_id = 0;
 	for (id = 0; id < total_grp; id++) {
+		mlo_ctx->setup_info[id].tsf_sync_enabled = true;
 		if (qdf_event_create(&mlo_ctx->setup_info[id].event) !=
 							QDF_STATUS_SUCCESS)
 			mlo_err("Unable to create teardown event");
@@ -1004,4 +1005,23 @@ QDF_STATUS mlo_link_teardown_link(struct wlan_objmgr_psoc *psoc,
 }
 
 qdf_export_symbol(mlo_link_teardown_link);
+
+void mlo_update_tsf_sync_support(struct wlan_objmgr_psoc *psoc,
+				 bool tsf_sync_enab)
+{
+	uint8_t ml_grp_id;
+	struct mlo_mgr_context *mlo_ctx = wlan_objmgr_get_mlo_ctx();
+	struct mlo_setup_info *mlo_setup;
+
+	ml_grp_id = wlan_mlo_get_psoc_group_id(psoc);
+	if (ml_grp_id < 0) {
+		mlo_err("Invalid ML Grp ID %d", ml_grp_id);
+		return;
+	}
+
+	mlo_setup = &mlo_ctx->setup_info[ml_grp_id];
+	mlo_setup->tsf_sync_enabled &= tsf_sync_enab;
+}
+
+qdf_export_symbol(mlo_update_tsf_sync_support);
 #endif /*WLAN_MLO_MULTI_CHIP*/

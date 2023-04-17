@@ -22043,6 +22043,9 @@ static void populate_tlv_service(uint32_t *wmi_service)
 	wmi_service[wmi_service_standalone_sound] =
 			WMI_SERVICE_STANDALONE_SOUND;
 #endif
+#ifdef WLAN_FEATURE_11BE_MLO
+	wmi_service[wmi_service_mlo_tsf_sync] = WMI_SERVICE_MLO_TSF_SYNC;
+#endif
 }
 
 /**

@@ -220,6 +220,18 @@ bool mlo_vdevs_check_single_soc(struct wlan_objmgr_vdev **wlan_vdev_list,
 QDF_STATUS mlo_check_all_pdev_state(struct wlan_objmgr_psoc *psoc,
 				    uint8_t grp_id,
 				    enum MLO_LINK_STATE state);
+
+/**
+ * mlo_update_tsf_sync_support() - API to update TSF sync support per MLO
+ *				   group.
+ *
+ * @psoc: Pointer to psoc object
+ * @tsf_sync_enab: Indicates TSF sync is to be enabled or not
+ *
+ * Return: None
+ */
+void mlo_update_tsf_sync_support(struct wlan_objmgr_psoc *psoc,
+				 bool tsf_sync_enab);
 #else
 static inline void mlo_setup_init(uint8_t total_grp)
 {
@@ -247,6 +259,12 @@ static inline
 bool mlo_psoc_get_grp_id(struct wlan_objmgr_psoc *psoc, uint8_t *grp_id)
 {
 	return 0;
+}
+
+static inline
+void mlo_update_tsf_sync_support(struct wlan_objmgr_psoc *psoc,
+				 bool tsf_sync_enab)
+{
 }
 #endif /* WLAN_MLO_MULTI_CHIP */
 #endif /* _WLAN_MLO_MGR_SETUP_H_ */
