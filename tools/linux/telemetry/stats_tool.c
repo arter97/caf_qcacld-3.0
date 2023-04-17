@@ -585,7 +585,7 @@ static void display_help(void)
 		    "\n"
 		    "Feature Name specifies various specific feature for which Stats is to be displayed. By default ALL will\n"
 		    "be selected. List of feature flags are as follows:\n"
-		    "ALL,RX,TX,AST,CFR,FWD,HTT,RAW,EXT,TSO,TWT,VOW,WDI,WMI,IGMP,LINK,MESH,RATE,DELAY,JITTER,ME,NAWDS,TXCAP,MONITOR,SAWFDELAY and SAWFTX.\n"
+		    "ALL,RX,TX,AST,CFR,FWD,HTT,RAW,EXT,TSO,TWT,VOW,WDI,WMI,IGMP,LINK,MESH,RATE,DELAY,JITTER,ME,NAWDS,TXCAP,MONITOR,SAWFDELAY,SAWFTX and WMM.\n"
 		    "\n"
 		    "Levels:\n"
 		    "    -B or --basic:   Only Basic level stats are displyed. This is the default level\n"
@@ -886,6 +886,18 @@ void print_advance_data_tx_stats(struct advance_data_tx_stats *tx)
 	STATS_64(stdout, "Tx Multicast Bytes", tx->mcast.bytes);
 	STATS_64(stdout, "Tx Broadcast Packets", tx->bcast.num);
 	STATS_64(stdout, "Tx Broadcast Bytes", tx->bcast.bytes);
+	STATS_32(stdout, "MPDU Number successfully transmitted after retries",
+		 tx->retries_mpdu);
+	STATS_32(stdout, "Tx Failed Retry Count", tx->failed_retry_count);
+	STATS_32(stdout, "Tx Total Retry Count", tx->retry_count);
+	STATS_32(stdout, "Tx Multiple Retry Count", tx->multiple_retry_count);
+	STATS_32(stdout, "Tx Release Source Not TQM", tx->release_src_not_tqm);
+	STATS_32(stdout, "Tx Invalid Link ID Packet Count", tx->inval_link_id);
+	STATS_32(stdout, "Tx PPDUs", tx->tx_ppdus);
+	STATS_32(stdout, "Tx MPDUs Success", tx->tx_mpdus_success);
+	STATS_32(stdout, "Tx MPDUs Treid", tx->tx_mpdus_tried);
+	STATS_32(stdout, "Tx MPDUs Success With Retries",
+		 tx->mpdu_success_with_retries);
 	STATS_PRINT("\tTx SGI = 0.8us %u, 0.4us %u, 1.6us %u, 3.2us %u\n",
 		    tx->sgi_count[0], tx->sgi_count[1],
 		    tx->sgi_count[2], tx->sgi_count[3]);
@@ -941,6 +953,11 @@ void print_advance_data_rx_stats(struct advance_data_rx_stats *rx)
 	STATS_64(stdout, "Rx Broadcast Bytes", rx->bcast.bytes);
 	STATS_32(stdout, "Rx MPDU FCS Ok Count", rx->mpdu_cnt_fcs_ok);
 	STATS_32(stdout, "Rx MPDU FCS Error Count", rx->mpdu_cnt_fcs_err);
+	STATS_32(stdout, "Rx policy check drops", rx->policy_check_drop);
+	STATS_32(stdout, "Rx mcast 3 address drop", rx->mcast_3addr_drop);
+	STATS_32(stdout, "RX Unauth packet drops", rx->peer_unauth_rx_pkt_drop);
+	STATS_32(stdout, "RX MPDU Retries", rx->mpdu_retry_cnt);
+	STATS_32(stdout, "RX Invalid Link Pkt Count", rx->inval_link_id);
 	STATS_PRINT("\tRx PPDU Counts\n");
 	for (inx = 0; inx < STATS_IF_MAX_MCS; inx++) {
 		if (!rate_string[STATS_IF_DOT11_AX][inx].valid)
@@ -1384,6 +1401,9 @@ void print_advance_sta_data_rate(struct advance_peer_data_rate *rate)
 	print_basic_sta_data_rate(&rate->b_rate);
 	STATS_32(stdout, "Avg ppdu Rx rate(kbps)", rate->rnd_avg_rx_rate);
 	STATS_32(stdout, "Avg ppdu Tx rate(kbps)", rate->rnd_avg_tx_rate);
+	STATS_32(stdout, "Avg Rx rate(kbps)", rate->avg_rx_rate);
+	STATS_32(stdout, "Last Tx rate used(kbps)", rate->last_tx_rate_used);
+	STATS_64(stdout, "Avg Tx rate(kbps)", rate->avg_tx_rate);
 }
 
 void print_advance_sta_data_nawds(struct advance_peer_data_nawds *nawds)
@@ -1695,6 +1715,8 @@ void print_advance_vap_data_me(struct advance_vdev_data_me *me)
 
 void print_advance_vap_data_tx(struct advance_vdev_data_tx *tx)
 {
+	uint8_t i = 0;
+
 	print_basic_vap_data_tx(&tx->b_tx);
 	print_advance_data_tx_stats(&tx->adv_tx);
 
@@ -1704,6 +1726,11 @@ void print_advance_vap_data_tx(struct advance_vdev_data_tx *tx)
 		STATS_64(stdout, "Tx Inspect Packets", tx->inspect_pkts.num);
 		STATS_64(stdout, "Tx Inspect Bytes", tx->inspect_pkts.bytes);
 		STATS_32(stdout, "Tx CCE Classified", tx->cce_classified);
+		STATS_64(stdout, "Tx Recvd Fast Xmit flow",
+			 tx->rcvd_in_fast_xmit_flow);
+		for (i = 0; i < STATS_IF_MAX_TX_DATA_RINGS; i++)
+			STATS_PRINT("\tTx Pkts received for core[%u]: %u\n",
+				    i, tx->rcvd_per_core[i]);
 	}
 }
 
@@ -1730,6 +1757,13 @@ void print_advance_vap_data_tso(struct advance_vdev_data_tso *tso)
 	STATS_64(stdout, "Non-SG Bytess", tso->non_sg_pkts.bytes);
 	STATS_64(stdout, "TSO Packets", tso->num_tso_pkts.num);
 	STATS_64(stdout, "TSO Bytess", tso->num_tso_pkts.bytes);
+	STATS_32(stdout, "TSO complete", tso->tso_comp);
+	STATS_64(stdout, "TSO dropped host Packets", tso->dropped_host.num);
+	STATS_64(stdout, "TSO dropped host bytes", tso->dropped_host.bytes);
+	STATS_64(stdout, "TSO no mem dropped pck", tso->tso_no_mem_dropped.num);
+	STATS_64(stdout, "TSO no mem dropped bytes",
+		 tso->tso_no_mem_dropped.bytes);
+	STATS_32(stdout, "TSO dropped target", tso->dropped_target);
 }
 
 void print_advance_vap_data_igmp(struct advance_vdev_data_igmp *igmp)
@@ -1823,6 +1857,12 @@ void print_advance_radio_data_tx(struct advance_pdev_data_tx *tx)
 		STATS_64(stdout, "Tx Inspect Bytes", tx->inspect_pkts.bytes);
 		STATS_32(stdout, "Tx CCE Classified", tx->cce_classified);
 		STATS_PRINT("\tTx packets sent per interrupt\n");
+		STATS_64(stdout, "Received in fast xmit flow",
+			 tx->rcvd_in_fast_xmit_flow);
+		STATS_64(stdout, "Sniffer received packets",
+			 tx->sniffer_rcvd.num);
+		STATS_64(stdout, "Sniffer received bytes",
+			 tx->sniffer_rcvd.bytes);
 		print_histogram_stats(&tx->tx_hist);
 	}
 }
@@ -1864,6 +1904,11 @@ void print_advance_radio_data_tso(struct advance_pdev_data_tso *tso)
 	STATS_64(stdout, "11-15 segs", tso->segs_11_15);
 	STATS_64(stdout, "16-20 segs", tso->segs_16_20);
 	STATS_64(stdout, "  20+ segs", tso->segs_20_plus);
+	STATS_32(stdout, "TSO desc Count", tso->tso_desc_cnt);
+	STATS_64(stdout, "Dropped host packets", tso->dropped_host.num);
+	STATS_64(stdout, "Dropped host bytes", tso->dropped_host.bytes);
+	STATS_32(stdout, "Dropped target", tso->dropped_target);
+	STATS_32(stdout, "DMA map error", tso->dma_map_error);
 }
 
 void print_advance_radio_data_vow(struct advance_pdev_data_vow *vow)
@@ -2601,6 +2646,14 @@ void print_debug_data_tx_stats(struct debug_data_tx_stats *tx)
 		 tx->fw_reason2);
 	STATS_32(stdout, "Firmware discard untransmitted fw_reason3",
 		 tx->fw_reason3);
+	STATS_32(stdout, "Firmware dropped due to HW threshold",
+		 tx->drop_threshold);
+	STATS_32(stdout, "Firmware dropped due resource not available in HW",
+		 tx->drop_link_desc_na);
+	STATS_32(stdout, "Invalid msdu drop", tx->invalid_drop);
+	STATS_32(stdout, "MCAST drop configured for VDEV in HW",
+		 tx->mcast_vdev_drop);
+	STATS_32(stdout, "Invalid TQM release reason", tx->invalid_rr);
 	STATS_PRINT("\tLast Packet RU index [%u], Size [%u]\n",
 		    tx->ru_start, tx->ru_tones);
 	STATS_PRINT("\tTx Data Packets per AC\n");
@@ -2621,6 +2674,8 @@ void print_debug_data_tx_stats(struct debug_data_tx_stats *tx)
 		 tx->excess_retries_per_ac[STATS_IF_WME_AC_VI]);
 	STATS_32(stdout, "           Voice",
 		 tx->excess_retries_per_ac[STATS_IF_WME_AC_VO]);
+	STATS_64(stdout, "Last timestamp in jiffies when tx comp occurred ",
+		 tx->last_tx_ts);
 	STATS_PRINT("\tTransmit Type:\n");
 	STATS_PRINT("\tMSDU:SU %u, MU_MIMO %u, MU_OFDMA %u, MU_MIMO_OFDMA %u\n",
 		    tx->transmit_type[STATS_IF_SU].num_msdu,
@@ -2679,6 +2734,10 @@ void print_debug_data_tx_stats(struct debug_data_tx_stats *tx)
 				    proto_subtype_string[ptype],
 				    tx->no_ack_count[ptype]);
 	}
+
+	STATS_PRINT("\tTx RSSI chain per BW:\n");
+	for (i = 0; i < STATS_IF_RSSI_CHAIN_MAX; i++)
+		STATS_PRINT("\t\t %u\n", tx->rssi_chain[i]);
 }
 
 void print_debug_data_rx_stats(struct debug_data_rx_stats *rx)
@@ -2689,11 +2748,16 @@ void print_debug_data_rx_stats(struct debug_data_rx_stats *rx)
 	uint32_t index;
 
 	STATS_32(stdout, "Rx Dropped", rx->rx_discard);
+	STATS_32(stdout, "Rx MPDUs", rx->rx_mpdus);
+	STATS_32(stdout, "Rx PPDUs", rx->rx_ppdus);
 	STATS_32(stdout, "Rx MIC Error", rx->mic_err);
 	STATS_32(stdout, "Rx Decrypt Error", rx->decrypt_err);
 	STATS_32(stdout, "Rx FCS Error", rx->fcserr);
 	STATS_32(stdout, "Rx PN Error", rx->pn_err);
 	STATS_32(stdout, "Rx Out of Order Error", rx->oor_err);
+	STATS_32(stdout, "Rx Jump 2k Error", rx->jump_2k_err);
+	STATS_32(stdout, "Rx Rxdma wifi parse Error", rx->rxdma_wifi_parse_err);
+	STATS_64(stdout, "Rx last timestamp", rx->last_rx_ts);
 	STATS_64(stdout, "Rx MEC drop packets", rx->mec_drop.num);
 	STATS_64(stdout, "Rx MEC drop bytes", rx->mec_drop.bytes);
 	STATS_PRINT("\tRx MSDU Reception Type:\n");
@@ -3023,6 +3087,12 @@ void print_debug_vap_data_tx(struct debug_vdev_data_tx *tx)
 		 tx->headroom_insufficient);
 	STATS_32(stdout, "Packets dropped due to per Pkt vdev id check fail",
 		 tx->fail_per_pkt_vdev_id_check);
+	STATS_32(stdout, "Packets dropped during Umac reset",
+		 tx->drop_ingress);
+	STATS_32(stdout, "Invalid Peer Id in exc Path",
+		 tx->invalid_peer_id_in_exc_path);
+	STATS_32(stdout, "Tx mcast Drop", tx->tx_mcast_drop);
+	STATS_32(stdout, "Firmware to WBM Tx drop", tx->fw2wbm_tx_drop);
 }
 
 void print_debug_vap_data_rx(struct debug_vdev_data_rx *rx)
@@ -3178,6 +3248,42 @@ void print_debug_radio_data_tx(struct debug_pdev_data_tx *tx)
 {
 	print_basic_radio_data_tx(&tx->b_tx);
 	print_debug_data_tx_stats(&tx->dbg_tx);
+	STATS_PRINT("\tPackets dropped on the Tx ingress side:\n");
+	STATS_64(stdout, "Packets dropped Desc Not Available", tx->desc_na.num);
+	STATS_64(stdout, "Bytes dropped Desc Not Available", tx->desc_na.bytes);
+	STATS_64(stdout, "Packets dropped Descriptor alloc fail",
+		 tx->desc_na_exc_alloc_fail.num);
+	STATS_64(stdout, "Bytes dropped Descriptor alloc fail",
+		 tx->desc_na_exc_alloc_fail.bytes);
+	STATS_64(stdout, "Packets dropped Tx outstanding too many",
+		 tx->desc_na_exc_outstand.num);
+	STATS_64(stdout, "Bytes dropped Tx outstanding too many",
+		 tx->desc_na_exc_outstand.bytes);
+	STATS_64(stdout, "Packets dropped as Exception pkts more than limit",
+		 tx->exc_desc_na.num);
+	STATS_64(stdout, "Bytes dropped as Exception pkts more than limit",
+		 tx->exc_desc_na.bytes);
+	STATS_32(stdout, "Packets dropped due to Ring full", tx->ring_full);
+	STATS_32(stdout, "Packets dropped due to HW enqueue failed",
+		 tx->enqueue_fail);
+	STATS_32(stdout, "Packets dropped due to DMA error", tx->dma_error);
+	STATS_32(stdout, "Packets dropped due to Resource Full", tx->res_full);
+	STATS_32(stdout, "Packets dropped due to Insufficient Headroom",
+		 tx->headroom_insufficient);
+	STATS_32(stdout, "Packets dropped due to per Pkt vdev id check fail",
+		 tx->fail_per_pkt_vdev_id_check);
+	STATS_32(stdout, "Packets dropped during Umac reset",
+		 tx->drop_ingress);
+	STATS_32(stdout, "Invalid Peer Id in exc Path",
+		 tx->invalid_peer_id_in_exc_path);
+	STATS_32(stdout, "Tx mcast Drop", tx->tx_mcast_drop);
+	STATS_32(stdout, "Firmware to WBM Tx drop", tx->fw2wbm_tx_drop);
+	STATS_8(stdout, "Tx desc err", tx->tx_desc_err);
+	STATS_8(stdout, "Tx hal ring access err", tx->tx_hal_ring_access_err);
+	STATS_8(stdout, "Tx dma map err", tx->tx_dma_map_err);
+	STATS_8(stdout, "Tx HW enqueue drops", tx->tx_hw_enqueue_dropped);
+	STATS_8(stdout, "Tx SW enqueue drops", tx->tx_sw_enqueue_dropped);
+	STATS_32(stdout, "SG desc cout", tx->sg_desc_cnt);
 }
 
 void print_debug_radio_data_rx(struct debug_pdev_data_rx *rx)
@@ -3210,6 +3316,16 @@ void print_debug_radio_data_rx(struct debug_pdev_data_rx *rx)
 	STATS_PRINT("\tSent To Stack:\n");
 	STATS_32(stdout, "Vlan tagged stp packets in wifi parse error",
 		 rx->vlan_tag_stp_cnt);
+	STATS_32(stdout, "RX descriptiors moving back to free list",
+		 rx->free_list);
+	STATS_32(stdout, "FW reported rxdma error count",
+		 rx->fw_reported_rxdma_error);
+	STATS_32(stdout, "Desc Allocation fail", rx->desc_lt_alloc_fail);
+	STATS_64(stdout, "Total buffers consumed", rx->num_bufs_consumed);
+	STATS_64(stdout, "Number of pool buffer replenish",
+		 rx->num_pool_bufs_replenish);
+	STATS_64(stdout, "Number of buffer allocation successful",
+		 rx->num_bufs_alloc_success);
 }
 
 void print_debug_radio_data_raw(struct debug_pdev_data_raw *raw)
@@ -3442,6 +3558,24 @@ void print_debug_radio_data_monitor(struct debug_pdev_data_monitor *monitor)
 	}
 }
 
+void print_debug_radio_wmm(struct debug_pdev_data_wmm *wmm)
+{
+	uint8_t i;
+
+	STATS_PRINT("----MPDU Failed Tx: ----\n");
+	for (i = 0; i < STATS_IF_WME_AC_MAX; i++)
+		STATS_PRINT("Tx MPDU Failed [%u]: %u\n",
+			    i + 1, wmm->tx_mpdu_failed[i]);
+	STATS_PRINT("----Total MPDU Tx: ----\n");
+	for (i = 0; i < STATS_IF_WME_AC_MAX; i++)
+		STATS_PRINT("Total MPDU Transmitted [%u]: %u\n",
+			    i + 1, wmm->tx_mpdu_total[i]);
+	STATS_PRINT("----Link Airtime: ----\n");
+	for (i = 0; i < STATS_IF_WME_AC_MAX; i++)
+		STATS_PRINT("Link Airtime [%u]: %u\n", i + 1,
+			    wmm->link_airtime[i]);
+}
+
 void print_debug_radio_deter_stats(struct debug_pdev_data_deter *deter)
 {
 	uint8_t user;
@@ -3577,6 +3711,10 @@ void print_debug_radio_data(struct stats_obj *radio)
 	if (data->deter) {
 		STATS_PRINT("Deterministic Stats\n");
 		print_debug_radio_deter_stats(data->deter);
+	}
+	if (data->wmm) {
+		STATS_PRINT("WMM Stats\n");
+		print_debug_radio_wmm(data->wmm);
 	}
 }
 

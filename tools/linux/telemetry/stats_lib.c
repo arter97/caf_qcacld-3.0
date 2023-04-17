@@ -204,6 +204,7 @@ static struct feat_parser_t g_feat[] = {
 	{ "SAWFDELAY", STATS_FEAT_FLG_SAWFDELAY },
 	{ "SAWFTX", STATS_FEAT_FLG_SAWFTX },
 	{ "DETER", STATS_FEAT_FLG_DETER },
+	{ "WMM", STATS_FEAT_FLG_WMM },
 	{ NULL, 0 },
 };
 
@@ -233,6 +234,7 @@ struct nla_policy g_policy[QCA_WLAN_VENDOR_ATTR_FEAT_MAX] = {
 	[QCA_WLAN_VENDOR_ATTR_FEAT_SAWFDELAY] = { .type = NLA_UNSPEC },
 	[QCA_WLAN_VENDOR_ATTR_FEAT_SAWFTX] = { .type = NLA_UNSPEC },
 	[QCA_WLAN_VENDOR_ATTR_FEAT_DETER] = { .type = NLA_UNSPEC },
+	[QCA_WLAN_VENDOR_ATTR_FEAT_WMM] = { .type = NLA_UNSPEC },
 };
 
 int libstats_is_ifname_valid(const char *ifname, enum stats_object_e obj)
@@ -1842,6 +1844,10 @@ static void parse_debug_radio(struct nlattr *rattr, struct stats_obj *obj)
 		extract_nl_data(tb[QCA_WLAN_VENDOR_ATTR_FEAT_DETER],
 				(void **)&data->deter,
 				sizeof(struct debug_pdev_data_deter));
+
+		extract_nl_data(tb[QCA_WLAN_VENDOR_ATTR_FEAT_WMM],
+				(void **)&data->wmm,
+				sizeof(struct debug_pdev_data_wmm));
 
 		obj->stats = data;
 		break;
@@ -3801,7 +3807,6 @@ u_int64_t libstats_get_feature_flag(char *feat_flags)
 			STATS_WARN("%s not in supported list!\n", flag);
 		flag = strtok_r(NULL, ",", &feat_flags);
 	}
-
 	return feats;
 }
 

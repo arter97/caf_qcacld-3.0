@@ -50,6 +50,7 @@
 #define STATS_FEAT_FLG_SAWFDELAY       0x00400000
 #define STATS_FEAT_FLG_SAWFTX          0x00800000
 #define STATS_FEAT_FLG_DETER           0x01000000
+#define STATS_FEAT_FLG_WMM             0x02000000
 
 /* Add new feature flag above and update STATS_FEAT_FLG_ALL */
 #define STATS_FEAT_FLG_ALL             \
@@ -61,7 +62,7 @@
 	 STATS_FEAT_FLG_DELAY | STATS_FEAT_FLG_ME | STATS_FEAT_FLG_NAWDS | \
 	 STATS_FEAT_FLG_TXCAP | STATS_FEAT_FLG_MONITOR | \
 	 STATS_FEAT_FLG_JITTER | STATS_FEAT_FLG_SAWFDELAY | \
-	 STATS_FEAT_FLG_SAWFTX | STATS_FEAT_FLG_DETER)
+	 STATS_FEAT_FLG_SAWFTX | STATS_FEAT_FLG_DETER | STATS_FEAT_FLG_WMM)
 
 #define STATS_BASIC_AP_CTRL_MASK       0
 #define STATS_BASIC_AP_DATA_MASK       (STATS_FEAT_FLG_RX | STATS_FEAT_FLG_TX)
@@ -118,7 +119,7 @@
 	 STATS_FEAT_FLG_TSO | STATS_FEAT_FLG_CFR |     \
 	 STATS_FEAT_FLG_TXCAP | STATS_FEAT_FLG_WDI |   \
 	 STATS_FEAT_FLG_MONITOR | STATS_FEAT_FLG_MESH |\
-	 STATS_FEAT_FLG_DETER)
+	 STATS_FEAT_FLG_DETER | STATS_FEAT_FLG_WMM)
 #define STATS_DEBUG_VAP_CTRL_MASK                      \
 	(STATS_BASIC_VAP_CTRL_MASK | STATS_FEAT_FLG_WMI)
 #define STATS_DEBUG_VAP_DATA_MASK                      \
@@ -140,6 +141,8 @@
 #define STATS_IF_MAX_USERS           37
 #define STATS_IF_MAX_MIMO_USERS      8
 #define STATS_IF_DATA_TID_MAX        8
+#define STATS_IF_TSO_SEGMENTS_MAX    2
+#define STATS_IF_TSO_PACKETS_MAX     5
 
 /**
  * enum stats_level_e: Defines detailing levels
@@ -395,6 +398,7 @@ struct basic_psoc_data_rx {
 #define STATS_IF_MAX_VOW_TID         4
 #define STATS_IF_REO_ERR_MAX         15
 #define STATS_IF_RXDMA_ERR_MAX       14
+#define STATS_IF_MAX_TX_DATA_RINGS   5
 
 enum stats_if_hist_bucket_index {
 	STATS_IF_HIST_BUCKET_0,
@@ -596,12 +600,22 @@ struct advance_data_tx_stats {
 	u_int32_t bw[STATS_IF_MAX_BW];
 	u_int32_t punc_bw[STATS_IF_MAX_PUNCTURED_MODE];
 	u_int32_t retries;
+	uint32_t retries_mpdu;
 	u_int32_t non_amsdu_cnt;
 	u_int32_t amsdu_cnt;
 	u_int32_t ampdu_cnt;
 	u_int32_t non_ampdu_cnt;
 	u_int32_t per;
 	u_int32_t tx_rate;
+	uint32_t failed_retry_count;
+	uint32_t retry_count;
+	uint32_t multiple_retry_count;
+	uint32_t release_src_not_tqm;
+	uint32_t inval_link_id;
+	uint32_t tx_ppdus;
+	uint32_t tx_mpdus_success;
+	uint32_t tx_mpdus_tried;
+	uint32_t mpdu_success_with_retries;
 	u_int32_t wme_ac_type[STATS_IF_WME_AC_MAX];
 	u_int64_t wme_ac_type_bytes[STATS_IF_WME_AC_MAX];
 };
@@ -628,8 +642,13 @@ struct advance_data_rx_stats {
 	u_int32_t amsdu_cnt;
 	u_int32_t bar_recv_cnt;
 	u_int32_t rx_retries;
+	uint32_t mcast_3addr_drop;
 	u_int32_t multipass_rx_pkt_drop;
+	uint32_t policy_check_drop;
+	uint32_t inval_link_id;
+	uint32_t peer_unauth_rx_pkt_drop;
 	u_int64_t wme_ac_type_bytes[STATS_IF_WME_AC_MAX];
+	uint32_t mpdu_retry_cnt;
 };
 
 /* Advance Peer Data */
@@ -662,6 +681,9 @@ struct advance_peer_data_rate {
 	struct basic_peer_data_rate b_rate;
 	u_int32_t rnd_avg_rx_rate;
 	u_int32_t rnd_avg_tx_rate;
+	uint32_t avg_rx_rate;
+	uint32_t last_tx_rate_used;
+	uint64_t avg_tx_rate;
 };
 
 struct advance_peer_data_link {
@@ -733,6 +755,8 @@ struct advance_vdev_data_tx {
 	struct pkt_info reinject_pkts;
 	struct pkt_info inspect_pkts;
 	u_int32_t cce_classified;
+	uint64_t rcvd_in_fast_xmit_flow;
+	uint32_t rcvd_per_core[STATS_IF_MAX_TX_DATA_RINGS];
 };
 
 struct advance_vdev_data_rx {
@@ -755,6 +779,10 @@ struct advance_vdev_data_tso {
 	struct pkt_info sg_pkt;
 	struct pkt_info non_sg_pkts;
 	struct pkt_info num_tso_pkts;
+	struct pkt_info dropped_host;
+	struct pkt_info tso_no_mem_dropped;
+	uint32_t dropped_target;
+	uint32_t tso_comp;
 };
 
 struct advance_vdev_data_igmp {
@@ -823,7 +851,10 @@ struct advance_pdev_data_tx {
 	struct pkt_info reinject_pkts;
 	struct pkt_info inspect_pkts;
 	struct histogram_stats tx_hist;
+	struct pkt_info sniffer_rcvd;
 	u_int32_t cce_classified;
+	uint64_t rcvd_in_fast_xmit_flow;
+	uint32_t rcvd_per_core[STATS_IF_MAX_TX_DATA_RINGS];
 };
 
 struct advance_pdev_data_rx {
@@ -848,6 +879,9 @@ struct advance_pdev_data_tso {
 	struct pkt_info sg_pkt;
 	struct pkt_info non_sg_pkts;
 	struct pkt_info num_tso_pkts;
+	struct pkt_info  dropped_host;
+	uint32_t dropped_target;
+	uint32_t dma_map_error;
 	u_int64_t segs_1;
 	u_int64_t segs_2_5;
 	u_int64_t segs_6_10;
@@ -855,6 +889,7 @@ struct advance_pdev_data_tso {
 	u_int64_t segs_16_20;
 	u_int64_t segs_20_plus;
 	u_int32_t tso_comp;
+	uint32_t tso_desc_cnt;
 };
 
 struct advance_pdev_data_igmp {
@@ -945,6 +980,7 @@ struct advance_psoc_data_rx {
 #define STATS_IF_FC0_SUBTYPE_SHIFT           4
 #define STATS_IF_FC0_TYPE_DATA               0x08
 #define STATS_IF_FC0_SUBTYPE_MASK            0xf0
+#define STATS_IF_RSSI_CHAIN_MAX              8
 
 #define STATS_IF_TXCAP_MAX_TYPE \
 	((STATS_IF_FC0_TYPE_DATA >> STATS_IF_FC0_TYPE_SHIFT) + 1)
@@ -1154,29 +1190,42 @@ struct debug_data_tx_stats {
 	uint32_t fw_reason1;
 	uint32_t fw_reason2;
 	uint32_t fw_reason3;
+	uint32_t drop_threshold;
+	uint32_t drop_link_desc_na;
+	uint32_t invalid_drop;
+	uint32_t mcast_vdev_drop;
+	uint32_t invalid_rr;
 	uint32_t ru_start;
 	uint32_t ru_tones;
 	uint32_t wme_ac_type[STATS_IF_WME_AC_MAX];
 	uint32_t excess_retries_per_ac[STATS_IF_WME_AC_MAX];
 	uint32_t mu_group_id[STATS_IF_MAX_MU_GROUP_ID];
 	uint32_t no_ack_count[QDF_PROTO_SUBTYPE_MAX];
+	uint64_t last_tx_ts;
 	struct pkt_info fw_rem;
 	struct pkt_type pkt_type[STATS_IF_DOT11_MAX];
 	struct tx_pkt_info transmit_type[STATS_IF_MAX_TRANSMIT_TYPES];
 	struct tx_pkt_info ru_loc[STATS_IF_MAX_RU_LOCATIONS];
 	struct proto_trace_count protocol_trace_cnt[STATS_IF_TRACE_MAX];
+	int32_t rssi_chain[STATS_IF_RSSI_CHAIN_MAX];
 };
 
 struct debug_data_rx_stats {
 	uint32_t rx_discard;
+	uint32_t rx_mpdus;
+	uint32_t rx_ppdus;
 	uint32_t mic_err;
 	uint32_t decrypt_err;
 	uint32_t fcserr;
 	uint32_t pn_err;
 	uint32_t oor_err;
+	uint32_t jump_2k_err;
+	uint32_t rxdma_wifi_parse_err;
 	uint32_t ppdu_cnt[STATS_IF_MAX_RECEPTION_TYPES];
 	uint32_t reception_type[STATS_IF_MAX_RECEPTION_TYPES];
+	uint64_t last_rx_ts;
 	struct pkt_info mec_drop;
+	struct pkt_info ppeds_drop;
 	struct pkt_type pkt_type[STATS_IF_DOT11_MAX];
 	struct rx_mu_info rx_mu[STATS_IF_TXRX_TYPE_MU_MAX];
 	struct proto_trace_count protocol_trace_cnt[STATS_IF_TRACE_MAX];
@@ -1299,6 +1348,10 @@ struct debug_vdev_data_tx {
 	uint32_t res_full;
 	uint32_t headroom_insufficient;
 	uint32_t fail_per_pkt_vdev_id_check;
+	uint32_t drop_ingress;
+	uint32_t invalid_peer_id_in_exc_path;
+	uint32_t tx_mcast_drop;
+	uint32_t fw2wbm_tx_drop;
 };
 
 struct debug_vdev_data_rx {
@@ -1381,6 +1434,26 @@ struct debug_vdev_ctrl_link {
 struct debug_pdev_data_tx {
 	struct basic_pdev_data_tx b_tx;
 	struct debug_data_tx_stats dbg_tx;
+	struct pkt_info desc_na;
+	struct pkt_info desc_na_exc_alloc_fail;
+	struct pkt_info desc_na_exc_outstand;
+	struct pkt_info exc_desc_na;
+	uint32_t ring_full;
+	uint32_t enqueue_fail;
+	uint32_t dma_error;
+	uint32_t res_full;
+	uint32_t headroom_insufficient;
+	uint32_t fail_per_pkt_vdev_id_check;
+	uint32_t drop_ingress;
+	uint32_t invalid_peer_id_in_exc_path;
+	uint32_t tx_mcast_drop;
+	uint32_t fw2wbm_tx_drop;
+	uint32_t sg_desc_cnt;
+	uint8_t tx_desc_err;
+	uint8_t tx_hal_ring_access_err;
+	uint8_t tx_dma_map_err;
+	uint8_t tx_hw_enqueue_dropped;
+	uint8_t tx_sw_enqueue_dropped;
 };
 
 struct debug_pdev_data_rx {
@@ -1406,6 +1479,14 @@ struct debug_pdev_data_rx {
 	uint32_t tcp_udp_csum_err;
 	uint32_t rxdma_error;
 	uint32_t reo_error;
+	uint32_t desc_lt_alloc_fail;
+	uint32_t fw_reported_rxdma_error;
+	int32_t free_list;
+	uint64_t num_bufs_consumed;
+	uint64_t num_pool_bufs_replenish;
+	uint64_t num_bufs_alloc_success;
+	uint64_t num_bufs_refilled;
+	uint64_t num_bufs_allocated;
 };
 
 struct debug_pdev_data_me {
@@ -1513,6 +1594,12 @@ struct stats_if_chan_util {
 struct stats_if_ul_trigger_status {
 	uint64_t trigger_success;
 	uint64_t trigger_fail;
+};
+
+struct debug_pdev_data_wmm {
+	uint32_t tx_mpdu_failed[STATS_IF_WME_AC_MAX];
+	uint32_t tx_mpdu_total[STATS_IF_WME_AC_MAX];
+	uint32_t link_airtime[STATS_IF_WME_AC_MAX];
 };
 
 struct debug_pdev_data_deter {

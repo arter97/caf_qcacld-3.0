@@ -418,6 +418,7 @@ struct debug_pdev_data {
 	struct debug_pdev_data_txcap *txcap;
 	struct debug_pdev_data_monitor *monitor;
 	struct debug_pdev_data_deter *deter;
+	struct debug_pdev_data_wmm *wmm;
 };
 
 /* Debug pdev control stats holder */

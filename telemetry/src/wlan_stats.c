@@ -51,7 +51,12 @@ static void fill_basic_data_tx_stats(struct basic_data_tx_stats *tx,
 			    cdp_tx->dropped.age_out +
 			    cdp_tx->dropped.fw_reason1 +
 			    cdp_tx->dropped.fw_reason2 +
-			    cdp_tx->dropped.fw_reason3;
+			    cdp_tx->dropped.fw_reason3 +
+			    cdp_tx->dropped.drop_threshold +
+			    cdp_tx->dropped.drop_link_desc_na +
+			    cdp_tx->dropped.invalid_drop +
+			    cdp_tx->dropped.mcast_vdev_drop +
+			    cdp_tx->dropped.invalid_rr;
 }
 
 static void update_basic_peer_data_rx_stats(struct basic_data_rx_stats *rx,
@@ -235,7 +240,9 @@ static void fill_basic_pdev_data_rx(struct basic_pdev_data_rx *data,
 			  pdev_stats->err.ip_csum_err +
 			  pdev_stats->err.tcp_udp_csum_err +
 			  pdev_stats->err.rxdma_error +
-			  pdev_stats->err.reo_error;
+			  pdev_stats->err.reo_error +
+			  pdev_stats->err.desc_lt_alloc_fail +
+			  pdev_stats->err.fw_reported_rxdma_error;
 }
 
 static void fill_basic_pdev_ctrl_rx(struct basic_pdev_ctrl_rx *ctrl,
@@ -1644,12 +1651,22 @@ static void fill_advance_data_tx_stats(struct advance_data_tx_stats *tx,
 	}
 
 	tx->retries = cdp_tx->retries;
+	tx->retries_mpdu = cdp_tx->retries_mpdu;
 	tx->per = cdp_tx->per;
 	tx->tx_rate = cdp_tx->tx_byte_rate;
 	tx->non_amsdu_cnt = cdp_tx->non_amsdu_cnt;
 	tx->amsdu_cnt = cdp_tx->amsdu_cnt;
 	tx->ampdu_cnt = cdp_tx->ampdu_cnt;
 	tx->non_ampdu_cnt = cdp_tx->non_ampdu_cnt;
+	tx->failed_retry_count = cdp_tx->failed_retry_count;
+	tx->retry_count = cdp_tx->retry_count;
+	tx->multiple_retry_count = cdp_tx->multiple_retry_count;
+	tx->release_src_not_tqm = cdp_tx->release_src_not_tqm;
+	tx->inval_link_id = cdp_tx->inval_link_id_pkt_cnt;
+	tx->tx_ppdus = cdp_tx->tx_ppdus;
+	tx->tx_mpdus_success = cdp_tx->tx_mpdus_success;
+	tx->tx_mpdus_tried = cdp_tx->tx_mpdus_tried;
+	tx->mpdu_success_with_retries = cdp_tx->mpdu_success_with_retries;
 	update_ppdu_be_stats(tx, cdp_tx);
 }
 
@@ -1697,6 +1714,11 @@ static void fill_advance_data_rx_stats(struct advance_data_rx_stats *rx,
 	rx->bar_recv_cnt = cdp_rx->bar_recv_cnt;
 	rx->rx_retries = cdp_rx->rx_retries;
 	rx->multipass_rx_pkt_drop = cdp_rx->multipass_rx_pkt_drop;
+	rx->inval_link_id = cdp_rx->inval_link_id_pkt_cnt;
+	rx->mcast_3addr_drop = cdp_rx->mcast_3addr_drop;
+	rx->policy_check_drop = cdp_rx->policy_check_drop;
+	rx->peer_unauth_rx_pkt_drop = cdp_rx->peer_unauth_rx_pkt_drop;
+	rx->mpdu_retry_cnt = cdp_rx->mpdu_retry_cnt;
 	update_ppdu_be_stats(rx, cdp_rx);
 }
 
@@ -1948,6 +1970,9 @@ static QDF_STATUS get_advance_peer_data_rate(struct unified_stats *stats,
 
 	data->rnd_avg_rx_rate = rx->rnd_avg_rx_rate;
 	data->rnd_avg_tx_rate = tx->rnd_avg_tx_rate;
+	data->avg_rx_rate = rx->avg_rx_rate;
+	data->last_tx_rate_used = tx->last_tx_rate_used;
+	data->avg_tx_rate = tx->avg_tx_rate;
 
 	stats->feat[INX_FEAT_RATE] = data;
 	stats->size[INX_FEAT_RATE] = sizeof(struct advance_peer_data_rate);
@@ -2495,6 +2520,8 @@ static QDF_STATUS get_advance_vdev_data_tx(struct unified_stats *stats,
 {
 	struct advance_vdev_data_tx *data = NULL;
 	struct cdp_tx_ingress_stats *tx_i = NULL;
+	uint8_t inx;
+	uint8_t loop_cnt;
 
 	if (!stats || !vdev_stats) {
 		qdf_err("Invalid Input!");
@@ -2514,6 +2541,12 @@ static QDF_STATUS get_advance_vdev_data_tx(struct unified_stats *stats,
 	data->inspect_pkts.num = tx_i->inspect_pkts.num;
 	data->inspect_pkts.bytes = tx_i->inspect_pkts.bytes;
 	data->cce_classified = tx_i->cce_classified;
+	data->rcvd_in_fast_xmit_flow =  tx_i->rcvd_in_fast_xmit_flow;
+
+	loop_cnt = qdf_min((uint8_t)CDP_MAX_TX_DATA_RINGS,
+			   (uint8_t)STATS_IF_MAX_TX_DATA_RINGS);
+	for (inx = 0; inx < loop_cnt; inx++)
+		data->rcvd_per_core[inx] = tx_i->rcvd_per_core[inx];
 
 	stats->feat[INX_FEAT_TX] = data;
 	stats->size[INX_FEAT_TX] = sizeof(struct advance_vdev_data_tx);
@@ -2624,6 +2657,12 @@ static QDF_STATUS get_advance_vdev_data_tso(struct unified_stats *stats,
 	data->non_sg_pkts.bytes = tx_i->sg.non_sg_pkts.bytes;
 	data->num_tso_pkts.num = tso->num_tso_pkts.num;
 	data->num_tso_pkts.bytes = tso->num_tso_pkts.bytes;
+	data->tso_comp = tso->tso_comp;
+	data->dropped_host.num = tso->dropped_host.num;
+	data->dropped_host.bytes = tso->dropped_host.bytes;
+	data->tso_no_mem_dropped.num = tso->tso_no_mem_dropped.num;
+	data->tso_no_mem_dropped.bytes = tso->tso_no_mem_dropped.bytes;
+	data->dropped_target = tso->dropped_target;
 
 	stats->feat[INX_FEAT_TSO] = data;
 	stats->size[INX_FEAT_TSO] = sizeof(struct advance_vdev_data_tso);
@@ -2991,6 +3030,8 @@ get_failed:
 static QDF_STATUS get_advance_pdev_data_tx(struct unified_stats *stats,
 					   struct cdp_pdev_stats *pdev_stats)
 {
+	uint8_t inx;
+	uint8_t loop_cnt;
 	struct advance_pdev_data_tx *data = NULL;
 	struct cdp_tx_ingress_stats *tx_i = NULL;
 	struct cdp_hist_tx_comp *hist = NULL;
@@ -3014,6 +3055,9 @@ static QDF_STATUS get_advance_pdev_data_tx(struct unified_stats *stats,
 	data->inspect_pkts.num = tx_i->inspect_pkts.num;
 	data->inspect_pkts.bytes = tx_i->inspect_pkts.bytes;
 	data->cce_classified = tx_i->cce_classified;
+	data->rcvd_in_fast_xmit_flow = tx_i->rcvd_in_fast_xmit_flow;
+	data->sniffer_rcvd.num = tx_i->sniffer_rcvd.num;
+	data->sniffer_rcvd.bytes = tx_i->sniffer_rcvd.bytes;
 	data->tx_hist.pkts_1 = hist->pkts_1;
 	data->tx_hist.pkts_2_20 = hist->pkts_2_20;
 	data->tx_hist.pkts_21_40 = hist->pkts_21_40;
@@ -3022,6 +3066,11 @@ static QDF_STATUS get_advance_pdev_data_tx(struct unified_stats *stats,
 	data->tx_hist.pkts_81_100 = hist->pkts_81_100;
 	data->tx_hist.pkts_101_200 = hist->pkts_101_200;
 	data->tx_hist.pkts_201_plus = hist->pkts_201_plus;
+
+	loop_cnt = qdf_min((uint8_t)CDP_MAX_TX_DATA_RINGS,
+			   (uint8_t)STATS_IF_MAX_TX_DATA_RINGS);
+	for (inx = 0; inx < loop_cnt; inx++)
+		data->rcvd_per_core[inx] = tx_i->rcvd_per_core[inx];
 
 	stats->feat[INX_FEAT_TX] = data;
 	stats->size[INX_FEAT_TX] = sizeof(struct advance_pdev_data_tx);
@@ -3142,6 +3191,10 @@ static QDF_STATUS get_advance_pdev_data_tso(struct unified_stats *stats,
 	data->sg_pkt.bytes = tx_i->sg.sg_pkt.bytes;
 	data->non_sg_pkts.num = tx_i->sg.non_sg_pkts.num;
 	data->non_sg_pkts.bytes = tx_i->sg.non_sg_pkts.bytes;
+	data->dropped_host.num = tx_i->sg.dropped_host.num;
+	data->dropped_host.bytes = tx_i->sg.dropped_host.bytes;
+	data->dropped_target = tx_i->sg.dropped_target;
+	data->dma_map_error = tx_i->sg.dma_map_error;
 	data->num_tso_pkts.num = tso->num_tso_pkts.num;
 	data->num_tso_pkts.bytes = tso->num_tso_pkts.bytes;
 	data->tso_comp = tso->tso_comp;
@@ -3152,6 +3205,7 @@ static QDF_STATUS get_advance_pdev_data_tso(struct unified_stats *stats,
 	data->segs_11_15 = tso->seg_histogram.segs_11_15;
 	data->segs_16_20 = tso->seg_histogram.segs_16_20;
 	data->segs_20_plus = tso->seg_histogram.segs_20_plus;
+	data->tso_desc_cnt = pdev_stats->tso_desc_cnt;
 #endif /* FEATURE_TSO_STATS */
 
 	stats->feat[INX_FEAT_TSO] = data;
@@ -3862,10 +3916,16 @@ static void fill_debug_data_tx_stats(struct debug_data_tx_stats *tx,
 	tx->fw_reason1 = cdp_tx->dropped.fw_reason1;
 	tx->fw_reason2 = cdp_tx->dropped.fw_reason2;
 	tx->fw_reason3 = cdp_tx->dropped.fw_reason3;
+	tx->drop_threshold = cdp_tx->dropped.drop_threshold;
+	tx->drop_link_desc_na = cdp_tx->dropped.drop_link_desc_na;
+	tx->invalid_drop = cdp_tx->dropped.invalid_drop;
+	tx->mcast_vdev_drop = cdp_tx->dropped.mcast_vdev_drop;
+	tx->invalid_rr = cdp_tx->dropped.invalid_rr;
 	tx->fw_rem.num = cdp_tx->dropped.fw_rem.num;
 	tx->fw_rem.bytes = cdp_tx->dropped.fw_rem.bytes;
 	tx->ru_start = cdp_tx->ru_start;
 	tx->ru_tones = cdp_tx->ru_tones;
+	tx->last_tx_ts = cdp_tx->last_tx_ts;
 	loop_cnt = qdf_min((uint8_t)WME_AC_MAX, (uint8_t)STATS_IF_WME_AC_MAX);
 	for (inx = 0; inx < loop_cnt; inx++) {
 		tx->wme_ac_type[inx] = cdp_tx->wme_ac_type[inx];
@@ -3901,6 +3961,11 @@ static void fill_debug_data_tx_stats(struct debug_data_tx_stats *tx,
 		tx->ru_loc[inx].num_mpdu = cdp_tx->ru_loc[inx].num_mpdu;
 		tx->ru_loc[inx].mpdu_tried = cdp_tx->ru_loc[inx].mpdu_tried;
 	}
+	loop_cnt = qdf_min((uint8_t)CDP_RSSI_CHAIN_LEN,
+			   (uint8_t)STATS_IF_RSSI_CHAIN_MAX);
+	for (inx = 0; inx < loop_cnt; inx++)
+		tx->rssi_chain[inx] = cdp_tx->rssi_chain[inx];
+
 	fill_tx_protocol_trace(tx, cdp_tx);
 }
 
@@ -3916,8 +3981,15 @@ static void fill_debug_data_rx_stats(struct debug_data_rx_stats *rx,
 	rx->fcserr = cdp_rx->err.fcserr;
 	rx->pn_err = cdp_rx->err.pn_err;
 	rx->oor_err = cdp_rx->err.oor_err;
+	rx->jump_2k_err = cdp_rx->err.jump_2k_err;
+	rx->rxdma_wifi_parse_err = cdp_rx->err.rxdma_wifi_parse_err;
 	rx->mec_drop.num = cdp_rx->mec_drop.num;
 	rx->mec_drop.bytes = cdp_rx->mec_drop.bytes;
+	rx->ppeds_drop.num = cdp_rx->ppeds_drop.num;
+	rx->ppeds_drop.bytes = cdp_rx->ppeds_drop.bytes;
+	rx->last_rx_ts = cdp_rx->last_rx_ts;
+	rx->rx_mpdus = cdp_rx->rx_mpdus;
+	rx->rx_ppdus = cdp_rx->rx_ppdus;
 	loop_cnt = qdf_min((uint8_t)MAX_RECEPTION_TYPES,
 			   (uint8_t)STATS_IF_MAX_RECEPTION_TYPES);
 	for (inx = 0; inx < loop_cnt; inx++) {
@@ -4562,6 +4634,11 @@ static QDF_STATUS get_debug_vdev_data_tx(struct unified_stats *stats,
 	data->headroom_insufficient = tx_i->dropped.headroom_insufficient;
 	data->fail_per_pkt_vdev_id_check =
 				tx_i->dropped.fail_per_pkt_vdev_id_check;
+	data->drop_ingress = tx_i->dropped.drop_ingress;
+	data->invalid_peer_id_in_exc_path =
+				tx_i->dropped.invalid_peer_id_in_exc_path;
+	data->tx_mcast_drop = tx_i->dropped.tx_mcast_drop;
+	data->fw2wbm_tx_drop = tx_i->dropped.fw2wbm_tx_drop;
 
 	stats->feat[INX_FEAT_TX] = data;
 	stats->size[INX_FEAT_TX] = sizeof(struct debug_vdev_data_tx);
@@ -4977,11 +5054,13 @@ static QDF_STATUS get_debug_pdev_data_tx(struct unified_stats *stats,
 					 struct cdp_pdev_stats *pdev_stats)
 {
 	struct debug_pdev_data_tx *data = NULL;
+	struct cdp_tx_ingress_stats *tx_i = NULL;
 
 	if (!stats || !pdev_stats) {
 		qdf_err("Invalid Input!");
 		return QDF_STATUS_E_INVAL;
 	}
+	tx_i = &pdev_stats->tx_i;
 	data = qdf_mem_malloc(sizeof(struct debug_pdev_data_tx));
 	if (!data) {
 		qdf_err("Allocation Failed!");
@@ -4989,6 +5068,36 @@ static QDF_STATUS get_debug_pdev_data_tx(struct unified_stats *stats,
 	}
 	fill_basic_pdev_data_tx(&data->b_tx, pdev_stats);
 	fill_debug_data_tx_stats(&data->dbg_tx, &pdev_stats->tx);
+	data->desc_na.num = tx_i->dropped.desc_na.num;
+	data->desc_na.bytes = tx_i->dropped.desc_na.bytes;
+	data->desc_na_exc_alloc_fail.num =
+				tx_i->dropped.desc_na_exc_alloc_fail.num;
+	data->desc_na_exc_alloc_fail.bytes =
+				tx_i->dropped.desc_na_exc_alloc_fail.bytes;
+	data->desc_na_exc_outstand.num = tx_i->dropped.desc_na_exc_outstand.num;
+	data->desc_na_exc_outstand.bytes =
+				tx_i->dropped.desc_na_exc_outstand.bytes;
+	data->exc_desc_na.num = tx_i->dropped.exc_desc_na.num;
+	data->exc_desc_na.bytes = tx_i->dropped.exc_desc_na.bytes;
+	data->ring_full = tx_i->dropped.ring_full;
+	data->enqueue_fail = tx_i->dropped.enqueue_fail;
+	data->dma_error = tx_i->dropped.dma_error;
+	data->res_full = tx_i->dropped.res_full;
+	data->headroom_insufficient = tx_i->dropped.headroom_insufficient;
+	data->fail_per_pkt_vdev_id_check =
+				tx_i->dropped.fail_per_pkt_vdev_id_check;
+	data->drop_ingress = tx_i->dropped.drop_ingress;
+	data->invalid_peer_id_in_exc_path =
+				tx_i->dropped.invalid_peer_id_in_exc_path;
+	data->tx_mcast_drop = tx_i->dropped.tx_mcast_drop;
+	data->fw2wbm_tx_drop = tx_i->dropped.fw2wbm_tx_drop;
+	data->tx_desc_err = pdev_stats->eap_drop_stats.tx_desc_err;
+	data->tx_hal_ring_access_err =
+			pdev_stats->eap_drop_stats.tx_hal_ring_access_err;
+	data->tx_dma_map_err = pdev_stats->eap_drop_stats.tx_dma_map_err;
+	data->tx_hw_enqueue_dropped = pdev_stats->eap_drop_stats.tx_hw_enqueue;
+	data->tx_sw_enqueue_dropped = pdev_stats->eap_drop_stats.tx_sw_enqueue;
+	data->sg_desc_cnt = pdev_stats->sg_desc_cnt;
 
 	stats->feat[INX_FEAT_TX] = data;
 	stats->size[INX_FEAT_TX] = sizeof(struct debug_pdev_data_tx);
@@ -5021,6 +5130,7 @@ static QDF_STATUS get_debug_pdev_data_rx(struct unified_stats *stats,
 	data->map_err = pdev_stats->replenish.map_err;
 	data->x86_fail = pdev_stats->replenish.x86_fail;
 	data->low_thresh_intrs = pdev_stats->replenish.low_thresh_intrs;
+	data->free_list = pdev_stats->replenish.free_list;
 	data->buf_freelist = pdev_stats->buf_freelist;
 	data->vlan_tag_stp_cnt = pdev_stats->vlan_tag_stp_cnt;
 	data->msdu_not_done = pdev_stats->dropped.msdu_not_done;
@@ -5035,6 +5145,17 @@ static QDF_STATUS get_debug_pdev_data_rx(struct unified_stats *stats,
 	data->tcp_udp_csum_err = pdev_stats->err.tcp_udp_csum_err;
 	data->rxdma_error = pdev_stats->err.rxdma_error;
 	data->reo_error = pdev_stats->err.reo_error;
+	data->desc_lt_alloc_fail = pdev_stats->err.desc_lt_alloc_fail;
+	data->fw_reported_rxdma_error = pdev_stats->err.fw_reported_rxdma_error;
+	data->num_bufs_consumed = pdev_stats->rx_buffer_pool.num_bufs_consumed;
+	data->num_pool_bufs_replenish =
+			pdev_stats->rx_buffer_pool.num_pool_bufs_replenish;
+	data->num_bufs_alloc_success =
+			pdev_stats->rx_buffer_pool.num_bufs_alloc_success;
+	data->num_bufs_refilled =
+			pdev_stats->rx_refill_buff_pool.num_bufs_refilled;
+	data->num_bufs_allocated =
+			pdev_stats->rx_refill_buff_pool.num_bufs_allocated;
 
 	stats->feat[INX_FEAT_RX] = data;
 	stats->size[INX_FEAT_RX] = sizeof(struct debug_pdev_data_rx);
@@ -5096,6 +5217,7 @@ static QDF_STATUS get_debug_pdev_data_raw(struct unified_stats *stats,
 	return QDF_STATUS_SUCCESS;
 }
 
+#if FEATURE_TSO_STATS
 static QDF_STATUS get_debug_pdev_data_tso(struct unified_stats *stats,
 					  struct cdp_pdev_stats *pdev_stats)
 {
@@ -5117,12 +5239,26 @@ static QDF_STATUS get_debug_pdev_data_tso(struct unified_stats *stats,
 	data->tso_no_mem_dropped.num = tso->tso_no_mem_dropped.num;
 	data->tso_no_mem_dropped.bytes = tso->tso_no_mem_dropped.bytes;
 	data->dropped_target = tso->dropped_target;
-
+	for (inx = 0; inx < STATS_IF_TSO_PACKETS_MAX; inx++) {
+		data->tso_info.tso_packet_info[inx].num_seg
+			= tso->tso_info.tso_packet_info[inx].num_seg;
+		data->tso_info.tso_packet_info[inx].tso_packet_len
+			= tso->tso_info.tso_packet_info[inx].tso_packet_len;
+		data->tso_info.tso_packet_info[inx].tso_seg_idx
+			= tso->tso_info.tso_packet_info[inx].tso_seg_idx;
+	}
 	stats->feat[INX_FEAT_TSO] = data;
 	stats->size[INX_FEAT_TSO] = sizeof(struct debug_pdev_data_tso);
 
 	return QDF_STATUS_SUCCESS;
 }
+#else
+static QDF_STATUS get_debug_pdev_data_tso(struct unified_stats *stats,
+					  struct cdp_pdev_stats *pdev_stats)
+{
+	return QDF_STATUS_SUCCESS;
+}
+#endif
 
 #if defined(WLAN_CFR_ENABLE) && defined(WLAN_ENH_CFR_ENABLE)
 static QDF_STATUS get_debug_pdev_data_cfr(struct unified_stats *stats,
@@ -5460,6 +5596,41 @@ static QDF_STATUS get_debug_pdev_ctrl_link(struct unified_stats *stats,
 
 #ifdef WLAN_CONFIG_TELEMETRY_AGENT
 static QDF_STATUS
+get_debug_pdev_data_wmm(struct unified_stats *stats,
+			struct cdp_pdev_telemetry_stats *cdp_wmm)
+{
+	struct debug_pdev_data_wmm *data = NULL;
+
+	if (!stats || !cdp_wmm) {
+		qdf_err("Invalid Input!");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	data = qdf_mem_malloc(sizeof(struct debug_pdev_data_wmm));
+	if (!data) {
+		qdf_err("Allocation Failed!");
+		return QDF_STATUS_E_NOMEM;
+	}
+
+	qdf_mem_copy(data->tx_mpdu_failed,
+		     cdp_wmm->tx_mpdu_failed,
+		     sizeof(data->tx_mpdu_failed));
+	qdf_mem_copy(data->tx_mpdu_total,
+		     cdp_wmm->tx_mpdu_total,
+		     sizeof(data->tx_mpdu_total));
+	qdf_mem_copy(data->link_airtime,
+		     cdp_wmm->link_airtime,
+		     sizeof(data->link_airtime));
+
+	stats->feat[INX_FEAT_WMM] = data;
+	stats->size[INX_FEAT_WMM] = sizeof(struct debug_pdev_data_wmm);
+
+	return QDF_STATUS_SUCCESS;
+}
+#endif
+
+#ifdef WLAN_CONFIG_TELEMETRY_AGENT
+static QDF_STATUS
 get_debug_pdev_deter_stats(struct unified_stats *stats,
 			   struct cdp_pdev_deter_stats *deter)
 {
@@ -5598,6 +5769,7 @@ static QDF_STATUS get_debug_pdev_data(struct wlan_objmgr_psoc *psoc,
 	struct cdp_pdev_mon_stats *mon = NULL;
 	struct cdp_pdev_tx_capture_stats *cap = NULL;
 	struct cdp_pdev_deter_stats *deter = NULL;
+	struct cdp_pdev_telemetry_stats *wmm = NULL;
 	QDF_STATUS ret = QDF_STATUS_SUCCESS;
 	void *dp_soc = NULL;
 	uint8_t pdev_id;
@@ -5721,6 +5893,22 @@ static QDF_STATUS get_debug_pdev_data(struct wlan_objmgr_psoc *psoc,
 		else
 			stats_collected = true;
 	}
+	if (feat & STATS_FEAT_FLG_WMM) {
+		wmm =
+			qdf_mem_malloc(sizeof(struct cdp_pdev_telemetry_stats));
+		if (!wmm) {
+			ret = QDF_STATUS_E_NOMEM;
+			goto get_failed;
+		}
+		ret = cdp_get_pdev_telemetry_stats(dp_soc, pdev_id,
+						   wmm);
+		if (ret == QDF_STATUS_SUCCESS)
+			ret = get_debug_pdev_data_wmm(stats, wmm);
+		if (ret != QDF_STATUS_SUCCESS)
+			qdf_err("Unable to fetch pdev Debug TELEMETRY Stats!");
+		else
+			stats_collected = true;
+	}
 get_failed:
 	if (deter)
 		qdf_mem_free(deter);
@@ -5728,6 +5916,8 @@ get_failed:
 		qdf_mem_free(cap);
 	if (mon)
 		qdf_mem_free(mon);
+	if (wmm)
+		qdf_mem_free(wmm);
 	qdf_mem_free(pdev_stats);
 	if (stats_collected)
 		ret = QDF_STATUS_SUCCESS;
@@ -6036,7 +6226,7 @@ get_failed:
 
 	return ret;
 }
-#endif /* WLAM_DEBUG_TELEMETRY */
+#endif /* WLAN_DEBUG_TELEMETRY */
 
 /* Public APIs */
 QDF_STATUS wlan_stats_get_peer_stats(struct wlan_objmgr_vdev *vdev,

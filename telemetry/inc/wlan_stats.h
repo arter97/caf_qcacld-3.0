@@ -79,6 +79,7 @@ enum stats_feat_index_e {
 	DEF_INX(SAWFDELAY),
 	DEF_INX(SAWFTX),
 	DEF_INX(DETER),
+	DEF_INX(WMM),
 	DEF_INX(MAX),
 };
 
