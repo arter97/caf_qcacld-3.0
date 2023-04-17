@@ -1287,18 +1287,18 @@ dp_mon_status_srng_drop_for_mac(struct dp_pdev *pdev, uint32_t mac_id,
 }
 
 uint32_t dp_mon_drop_packets_for_mac(struct dp_pdev *pdev, uint32_t mac_id,
-				     uint32_t quota)
+				     uint32_t quota, bool force_flush)
 {
 	uint32_t work_done;
 
 	work_done = dp_mon_status_srng_drop_for_mac(pdev, mac_id, quota);
-	dp_mon_dest_srng_drop_for_mac(pdev, mac_id);
+	dp_mon_dest_srng_drop_for_mac(pdev, mac_id, force_flush);
 
 	return work_done;
 }
 #else
 uint32_t dp_mon_drop_packets_for_mac(struct dp_pdev *pdev, uint32_t mac_id,
-				     uint32_t quota)
+				     uint32_t quota, bool force_flush)
 {
 	return 0;
 }
