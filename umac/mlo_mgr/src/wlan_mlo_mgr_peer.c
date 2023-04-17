@@ -1433,6 +1433,9 @@ QDF_STATUS wlan_mlo_peer_create(struct wlan_objmgr_vdev *vdev,
 		ml_peer->mlpeer_state = ML_PEER_CREATED;
 		ml_peer->max_links = ml_info->num_partner_links;
 		ml_peer->primary_umac_psoc_id = ML_PRIMARY_UMAC_ID_INVAL;
+		ml_peer->migrate_primary_umac_psoc_id =
+						ML_PRIMARY_UMAC_ID_INVAL;
+		ml_peer->primary_umac_migration_in_progress = false;
 
 		ml_peer->mlo_peer_id = mlo_ap_ml_peerid_alloc();
 		if (ml_peer->mlo_peer_id == MLO_INVALID_PEER_ID) {

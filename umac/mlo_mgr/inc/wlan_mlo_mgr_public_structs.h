@@ -662,6 +662,10 @@ struct mlo_nstr_info {
  * @mesh_config: eack link peer's MESH configuration
  * @mlpeer_mldcap: MLD Capability information for ML peer
  * @mlpeer_nstrinfo: NSTR Capability info
+ * @migrate_primary_umac_psoc_id: primary umac psoc id selected for umac
+ * migration
+ * @primary_umac_migration_in_progress: flag to indicate primary umac migration
+ * in progress
  */
 struct wlan_mlo_peer_context {
 	qdf_list_node_t peer_node;
@@ -703,6 +707,8 @@ struct wlan_mlo_peer_context {
 #endif
 	struct wlan_mlo_mld_cap mlpeer_mldcap;
 	struct mlo_nstr_info mlpeer_nstrinfo[WLAN_UMAC_MLO_MAX_VDEVS];
+	uint8_t migrate_primary_umac_psoc_id;
+	bool primary_umac_migration_in_progress;
 };
 
 /**
