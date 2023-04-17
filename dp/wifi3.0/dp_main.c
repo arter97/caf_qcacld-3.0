@@ -4164,7 +4164,7 @@ static void dp_ipa_deinit_alt_tx_ring(struct dp_soc *soc)
 
 static int dp_ipa_alloc_alt_tx_ring(struct dp_soc *soc)
 {
-	return 0
+	return 0;
 }
 
 static void dp_ipa_free_alt_tx_ring(struct dp_soc *soc)
