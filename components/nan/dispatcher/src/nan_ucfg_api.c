@@ -1460,3 +1460,98 @@ bool ucfg_is_mlo_sta_nan_ndi_allowed(struct wlan_objmgr_psoc *psoc)
 {
 	return wlan_is_mlo_sta_nan_ndi_allowed(psoc);
 }
+
+#define NAN_PASN_PEER_CREATE_TIMEOUT_MS 4000
+QDF_STATUS ucfg_nan_send_pasn_peer_create_cmd(struct wlan_objmgr_psoc *psoc,
+					      struct wlan_objmgr_vdev *vdev,
+					      struct qdf_mac_addr peer_mac_addr)
+{
+	struct nan_psoc_priv_obj *psoc_priv;
+	struct osif_request *request = NULL;
+	uint8_t vdev_id;
+	QDF_STATUS status = QDF_STATUS_SUCCESS;
+	struct scheduler_msg msg = {0};
+	uint32_t len;
+	struct nan_pasn_peer_req params;
+	static const struct osif_request_params req_params = {
+		.priv_size = 0,
+		.timeout_ms = NAN_PASN_PEER_CREATE_TIMEOUT_MS,
+	};
+
+	vdev_id = wlan_vdev_get_id(vdev);
+
+	if (!nan_is_pairing_allowed(psoc)) {
+		nan_debug("NAN Pairing is not supported");
+		return QDF_STATUS_SUCCESS;
+	}
+
+	if (nan_is_peer_exist_for_opmode(psoc, &peer_mac_addr, QDF_NDI_MODE)) {
+		nan_debug("NDI peer exist with same mac address" QDF_MAC_ADDR_FMT,
+			  QDF_MAC_ADDR_REF(peer_mac_addr.bytes));
+		return QDF_STATUS_SUCCESS;
+	}
+
+	if (nan_is_peer_exist_for_opmode(psoc, &peer_mac_addr,
+					 QDF_NAN_DISC_MODE)) {
+		nan_debug("NAN peer exist with same mac address" QDF_MAC_ADDR_FMT,
+			  QDF_MAC_ADDR_REF(peer_mac_addr.bytes));
+		return QDF_STATUS_SUCCESS;
+	}
+
+	len = sizeof(params);
+	params.psoc = psoc;
+	params.peer_addr = peer_mac_addr;
+	params.vdev_id = vdev_id;
+	msg.bodyptr = qdf_mem_malloc(len);
+	if (!msg.bodyptr)
+		return QDF_STATUS_E_NOMEM;
+
+	qdf_mem_copy(msg.bodyptr, &params, len);
+
+	msg.type = NAN_PASN_PEER_CREATE_REQ;
+	msg.callback = nan_pasn_scheduled_handler;
+	msg.flush_callback = nan_pasn_flush_callback;
+
+	request = osif_request_alloc(&req_params);
+	if (!request) {
+		nan_err("Request allocation failure");
+		nan_pasn_flush_callback(&msg);
+		return QDF_STATUS_E_NOMEM;
+	}
+
+	psoc_priv = nan_get_psoc_priv_obj(psoc);
+	if (!psoc_priv) {
+		nan_err("psoc_nan_obj is null");
+		nan_pasn_flush_callback(&msg);
+		status = QDF_STATUS_E_NULL_VALUE;
+		goto end;
+	}
+
+	psoc_priv->nan_pairing_create_ctx = osif_request_cookie(request);
+
+	status = scheduler_post_message(QDF_MODULE_ID_NAN,
+					QDF_MODULE_ID_NAN,
+					QDF_MODULE_ID_OS_IF, &msg);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		nan_err("failed to post msg to NAN component, status: %d",
+			status);
+		nan_pasn_flush_callback(&msg);
+		goto end;
+	}
+
+	status = osif_request_wait_for_response(request);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		nan_err("NAN request timed out %d", status);
+		goto end;
+	}
+
+	nan_update_pasn_peer_count(vdev, true);
+
+	nan_debug("peer created successfully");
+
+end:
+	if (request)
+		osif_request_put(request);
+
+	return status;
+}

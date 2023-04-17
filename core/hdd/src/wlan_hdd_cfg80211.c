@@ -24715,9 +24715,16 @@ done:
 					     keyidx, cipher);
 
 		break;
+	case QDF_NAN_DISC_MODE:
+		status = ucfg_nan_send_pasn_peer_create_cmd(hdd_ctx->psoc, vdev,
+							    mac_address);
+		if (QDF_IS_STATUS_ERROR(status)) {
+			hdd_err("PASN peer creation fails %d", status);
+			return -EINVAL;
+		}
+		fallthrough;
 	case QDF_STA_MODE:
 	case QDF_P2P_CLIENT_MODE:
-	case QDF_NAN_DISC_MODE:
 		errno = wlan_hdd_add_key_sta(hdd_ctx->pdev, link_info, pairwise,
 					     key_index, &ft_mode);
 		if (ft_mode)

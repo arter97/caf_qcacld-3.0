@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2017-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -544,6 +544,20 @@ bool ucfg_get_disable_6g_nan(struct wlan_objmgr_psoc *psoc);
  */
 bool ucfg_is_mlo_sta_nan_ndi_allowed(struct wlan_objmgr_psoc *psoc);
 
+/**
+ * ucfg_nan_send_pasn_peer_create_cmd: This API post NAN peer create message to
+ * the scheduler and wait for NAN peer create response.
+ * @psoc: pointer to PSOC object
+ * @vdev: pointer to VDEV object
+ * @peer_mac_addr: mac address of the peer
+ *
+ * Return: Success on posting the message otherwise error
+ */
+QDF_STATUS
+ucfg_nan_send_pasn_peer_create_cmd(struct wlan_objmgr_psoc *psoc,
+				   struct wlan_objmgr_vdev *vdev,
+				   struct qdf_mac_addr peer_mac_addr);
+
 #else /* WLAN_FEATURE_NAN */
 
 static inline
@@ -685,6 +699,14 @@ static inline bool
 ucfg_is_mlo_sta_nan_ndi_allowed(struct wlan_objmgr_psoc *psoc)
 {
 	return false;
+}
+
+static inline QDF_STATUS
+ucfg_nan_send_pasn_peer_create_cmd(struct wlan_objmgr_psoc *psoc,
+				   struct wlan_objmgr_vdev *vdev,
+				   struct qdf_mac_addr peer_mac_addr)
+{
+	return QDF_STATUS_E_NOSUPPORT;
 }
 #endif /* WLAN_FEATURE_NAN */
 #endif /* _NAN_UCFG_API_H_ */
