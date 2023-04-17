@@ -419,6 +419,8 @@ enum roam_fail_params {
  * final BMISS
  * @ROAM_FAIL_REASON_NO_CAND_AP_FOUND_AND_FINAL_BMISS_SENT: No Candidate AP
  * found after final BMISS.
+ * @ROAM_FAIL_REASON_CURR_AP_STILL_OK: Background scan was abort, but
+ * current network condition is fine.
  * @ROAM_FAIL_REASON_UNKNOWN: Default reason
  */
 enum wlan_roam_failure_reason_code {
@@ -458,6 +460,7 @@ enum wlan_roam_failure_reason_code {
 	ROAM_FAIL_REASON_UNABLE_TO_START_ROAM_HO,
 	ROAM_FAIL_REASON_NO_AP_FOUND_AND_FINAL_BMISS_SENT,
 	ROAM_FAIL_REASON_NO_CAND_AP_FOUND_AND_FINAL_BMISS_SENT,
+	ROAM_FAIL_REASON_CURR_AP_STILL_OK,
 	ROAM_FAIL_REASON_UNKNOWN = 255,
 };
 

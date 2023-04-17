@@ -4820,6 +4820,8 @@ char *mlme_get_roam_fail_reason_str(enum wlan_roam_failure_reason_code result)
 		return "No AP found on final BMISS";
 	case ROAM_FAIL_REASON_NO_CAND_AP_FOUND_AND_FINAL_BMISS_SENT:
 		return "No Candidate AP found on final BMISS";
+	case ROAM_FAIL_REASON_CURR_AP_STILL_OK:
+		return "CURRENT AP STILL OK";
 	default:
 		return "UNKNOWN";
 	}
