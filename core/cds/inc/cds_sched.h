@@ -48,7 +48,7 @@
 #define RX_REFILL_SUSPEND_EVENT        0x002
 #define RX_REFILL_SHUTDOWN_EVENT       0x004
 
-#ifdef QCA_CONFIG_SMP
+#ifdef WLAN_DP_LEGACY_OL_RX_THREAD
 /*
 ** Maximum number of cds messages to be allocated for
 ** OL Rx thread.
@@ -90,7 +90,7 @@ struct cds_ol_rx_pkt {
 **
 */
 typedef struct _cds_sched_context {
-#ifdef QCA_CONFIG_SMP
+#ifdef WLAN_DP_LEGACY_OL_RX_THREAD
 	spinlock_t ol_rx_thread_lock;
 
 	/* OL Rx thread handle */
@@ -223,7 +223,7 @@ struct cds_context {
 /*---------------------------------------------------------------------------
    Function declarations and documentation
    ---------------------------------------------------------------------------*/
-#ifdef QCA_CONFIG_SMP
+#ifdef WLAN_DP_LEGACY_OL_RX_THREAD
 
 /**
  * cds_sched_handle_cpu_hot_plug() - cpu hotplug event handler

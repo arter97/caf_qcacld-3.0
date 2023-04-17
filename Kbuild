@@ -3454,6 +3454,11 @@ else
 ccflags-y += -DDISABLE_MON_CONFIG
 endif
 
+ifeq ($(CONFIG_SMP), y)
+ifneq (y,$(filter y,$(CONFIG_LITHIUM) $(CONFIG_BERYLLIUM) $(CONFIG_RHINE)))
+ccflags-y += -DWLAN_DP_LEGACY_OL_RX_THREAD
+endif
+endif
 
 #Enable NL80211 test mode
 ccflags-$(CONFIG_NL80211_TESTMODE) += -DWLAN_NL80211_TESTMODE
