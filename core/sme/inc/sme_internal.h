@@ -522,10 +522,6 @@ struct sme_context {
 #if defined(CLD_PM_QOS) && defined(WLAN_FEATURE_LL_MODE)
 	void (*beacon_latency_event_cb)(uint32_t latency_level);
 #endif
-#ifdef WLAN_FEATURE_ROAM_OFFLOAD
-	void (*roam_rt_stats_cb)(hdd_handle_t hdd_handle, uint8_t idx,
-				 struct roam_stats_event *roam_stats);
-#endif
 	QDF_STATUS (*sme_vdev_del_cb)(mac_handle_t mac_handle,
 				      struct wlan_objmgr_vdev *vdev);
 };

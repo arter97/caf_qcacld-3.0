@@ -202,7 +202,7 @@ void hdd_ipa_send_nbuf_to_network(qdf_nbuf_t nbuf, qdf_netdev_t dev)
 	qdf_dp_trace_set_track(nbuf, QDF_RX);
 
 	ucfg_dp_event_eapol_log(nbuf, QDF_RX);
-	qdf_dp_trace_log_pkt(adapter->vdev_id,
+	qdf_dp_trace_log_pkt(adapter->deflink->vdev_id,
 			     nbuf, QDF_RX, QDF_TRACE_DEFAULT_PDEV_ID);
 	DPTRACE(qdf_dp_trace(nbuf,
 			     QDF_DP_TRACE_RX_HDD_PACKET_PTR_RECORD,
@@ -264,7 +264,7 @@ void hdd_ipa_send_nbuf_to_network(qdf_nbuf_t nbuf, qdf_netdev_t dev)
 	 * Expectation here is vdev will be present during TX/RX processing
 	 * and also DP internally maintaining vdev ref count
 	 */
-	ucfg_dp_inc_rx_pkt_stats(adapter->vdev,
+	ucfg_dp_inc_rx_pkt_stats(adapter->deflink->vdev,
 				 len,
 				 delivered);
 	/*

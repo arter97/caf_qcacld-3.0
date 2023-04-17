@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2020-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021, 2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -110,7 +110,7 @@ static ssize_t __hdd_sysfs_unit_test_target_store(
 	if (QDF_GLOBAL_FTM_MODE == hdd_get_conparam())
 		vdev_id = 0;
 	else
-		vdev_id = adapter->vdev_id;
+		vdev_id = adapter->deflink->vdev_id;
 
 	status = sme_send_unit_test_cmd(vdev_id,
 					module_id,

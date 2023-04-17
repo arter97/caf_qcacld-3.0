@@ -194,7 +194,7 @@ static int hdd_medium_assess_cca(struct hdd_context *hdd_ctx,
 		return -EINVAL;
 
 	status = policy_mgr_get_mac_id_by_session_id(hdd_ctx->psoc,
-						     adapter->vdev_id,
+						     adapter->deflink->vdev_id,
 						     &mac_id);
 	if (QDF_IS_STATUS_ERROR(status)) {
 		hdd_err_rl("Failed to get mac_id");
@@ -209,7 +209,7 @@ static int hdd_medium_assess_cca(struct hdd_context *hdd_ctx,
 		goto out;
 	}
 
-	if (qdf_atomic_read(&adapter->session.ap.acs_in_progress)) {
+	if (qdf_atomic_read(&adapter->deflink->session.ap.acs_in_progress)) {
 		hdd_err_rl("ACS is in progress");
 		errno = -EBUSY;
 		goto out;
@@ -221,7 +221,8 @@ static int hdd_medium_assess_cca(struct hdd_context *hdd_ctx,
 		cca_period = DEFAULT_CCA_PERIOD;
 
 	ucfg_dcs_reset_user_stats(hdd_ctx->psoc, mac_id);
-	ucfg_dcs_register_user_cb(hdd_ctx->psoc, mac_id, adapter->vdev_id,
+	ucfg_dcs_register_user_cb(hdd_ctx->psoc, mac_id,
+				  adapter->deflink->vdev_id,
 				  hdd_cca_notification_cb);
 	/* dcs is already enabled and dcs event is reported every second
 	 * set the user request counter to collect user stats
@@ -435,7 +436,7 @@ static int hdd_medium_assess_congestion_report(struct hdd_context *hdd_ctx,
 	if (!vdev)
 		return -EINVAL;
 
-	vdev_id = adapter->vdev_id;
+	vdev_id = adapter->deflink->vdev_id;
 	status = policy_mgr_get_mac_id_by_session_id(hdd_ctx->psoc, vdev_id,
 						     &pdev_id);
 	if (QDF_IS_STATUS_ERROR(status)) {
@@ -779,11 +780,4 @@ void hdd_medium_assess_deinit(void)
 
 		qdf_mc_timer_destroy(&hdd_medium_assess_timer);
 	}
-}
-
-bool hdd_medium_access_state(void)
-{
-	if (!timer_enable)
-		return true;
-	return false;
 }

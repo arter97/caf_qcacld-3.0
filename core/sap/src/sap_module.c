@@ -621,7 +621,7 @@ enum phy_ch_width wlan_sap_get_concurrent_bw(struct wlan_objmgr_pdev *pdev,
 	bool is_hw_dbs_capable = false;
 
 	if (WLAN_REG_IS_24GHZ_CH_FREQ(con_ch_freq))
-		return CH_WIDTH_20MHZ;
+		return channel_width;
 
 	if (wlan_reg_is_6ghz_chan_freq(con_ch_freq))
 		return channel_width;
@@ -840,6 +840,7 @@ QDF_STATUS wlansap_start_bss(struct sap_context *sap_ctx,
 	sap_ctx->acs_cfg = &config->acs_cfg;
 	sap_ctx->sec_ch_freq = config->sec_ch_freq;
 	sap_ctx->dfs_cac_offload = config->dfs_cac_offload;
+	sap_ctx->isCacStartNotified = false;
 	sap_ctx->isCacEndNotified = false;
 	sap_ctx->is_chan_change_inprogress = false;
 	sap_ctx->disabled_mcs13 = false;
@@ -1749,8 +1750,6 @@ QDF_STATUS wlansap_set_channel_change_with_csa(struct sap_context *sap_ctx,
 			 * request was issued.
 			 */
 			sap_ctx->sap_radar_found_status = true;
-			mac->sap.SapDfsInfo.cac_state =
-					eSAP_DFS_DO_NOT_SKIP_CAC;
 			sap_cac_reset_notify(mac_handle);
 
 			/*
@@ -2159,7 +2158,8 @@ QDF_STATUS wlansap_set_dfs_ignore_cac(mac_handle_t mac_handle,
 }
 
 QDF_STATUS wlansap_get_dfs_cac_state(mac_handle_t mac_handle,
-				     eSapDfsCACState_t *cac_state)
+				     struct sap_context *sapcontext,
+				     bool *cac_state)
 {
 	struct mac_context *mac = NULL;
 
@@ -2169,8 +2169,13 @@ QDF_STATUS wlansap_get_dfs_cac_state(mac_handle_t mac_handle,
 		sap_err("Invalid mac_handle pointer");
 		return QDF_STATUS_E_FAULT;
 	}
+	if (!sapcontext) {
+		sap_err("Invalid sapcontext pointer");
+		return QDF_STATUS_E_FAULT;
+	}
 
-	*cac_state = mac->sap.SapDfsInfo.cac_state;
+	*cac_state = sap_is_dfs_cac_wait_state(sapcontext);
+
 	return QDF_STATUS_SUCCESS;
 }
 

@@ -456,10 +456,7 @@ lim_cleanup_rx_path(struct mac_context *mac, tpDphHashNode sta,
 		/* Deactivating probe after heart beat timer */
 		lim_deactivate_and_change_timer(mac, eLIM_JOIN_FAIL_TIMER);
 	}
-#ifdef WLAN_DEBUG
-	/* increment a debug count */
-	mac->lim.gLimNumRxCleanup++;
-#endif
+
 	/* Do DEL BSS or DEL STA only if ADD BSS was success */
 	if (!pe_session->add_bss_failed) {
 		if (pe_session->limSmeState == eLIM_SME_JOIN_FAILURE_STATE) {
@@ -3204,9 +3201,6 @@ lim_check_and_announce_join_success(struct mac_context *mac_ctx,
 		 * Ignore received Beacon frame
 		 */
 		pe_debug("SSID received in Beacon does not match");
-#ifdef WLAN_DEBUG
-		mac_ctx->lim.gLimBcnSSIDMismatchCnt++;
-#endif
 		return;
 	}
 
@@ -4724,16 +4718,4 @@ void lim_extract_ies_from_deauth_disassoc(struct pe_session *session,
 	ie.len = deauth_disassoc_frame_len - ie_offset;
 
 	mlme_set_peer_disconnect_ies(session->vdev, &ie);
-}
-
-uint8_t *lim_get_src_addr_from_frame(struct element_info *frame)
-{
-	struct wlan_frame_hdr *hdr;
-
-	if (!frame || !frame->len || frame->len < WLAN_MAC_HDR_LEN_3A)
-		return NULL;
-
-	hdr = (struct wlan_frame_hdr *)frame->ptr;
-
-	return hdr->i_addr2;
 }

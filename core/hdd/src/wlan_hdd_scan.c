@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -448,6 +448,7 @@ static int __wlan_hdd_cfg80211_scan(struct wiphy *wiphy,
 	int status;
 	struct hdd_scan_info *scan_info = NULL;
 	struct hdd_adapter *con_sap_adapter;
+	struct hdd_ap_ctx *ap_ctx;
 	qdf_freq_t con_dfs_ch_freq;
 	uint8_t curr_vdev_id;
 	enum scan_reject_states curr_reason;
@@ -469,7 +470,7 @@ static int __wlan_hdd_cfg80211_scan(struct wiphy *wiphy,
 		return -EINVAL;
 	}
 
-	if (wlan_hdd_validate_vdev_id(adapter->vdev_id))
+	if (wlan_hdd_validate_vdev_id(adapter->deflink->vdev_id))
 		return -EINVAL;
 
 	status = wlan_hdd_validate_context(hdd_ctx);
@@ -478,9 +479,10 @@ static int __wlan_hdd_cfg80211_scan(struct wiphy *wiphy,
 
 	qdf_mtrace(QDF_MODULE_ID_HDD, QDF_MODULE_ID_HDD,
 		   TRACE_CODE_HDD_CFG80211_SCAN,
-		   adapter->vdev_id, request->n_channels);
+		   adapter->deflink->vdev_id, request->n_channels);
 
-	if (!sme_is_session_id_valid(hdd_ctx->mac_handle, adapter->vdev_id))
+	if (!sme_is_session_id_valid(hdd_ctx->mac_handle,
+				     adapter->deflink->vdev_id))
 		return -EINVAL;
 
 	qdf_status = ucfg_mlme_get_self_recovery(hdd_ctx->psoc, &self_recovery);
@@ -516,13 +518,11 @@ static int __wlan_hdd_cfg80211_scan(struct wiphy *wiphy,
 
 	con_sap_adapter = hdd_get_con_sap_adapter(adapter, true);
 	if (con_sap_adapter) {
-		con_dfs_ch_freq =
-			con_sap_adapter->session.ap.sap_config.chan_freq;
-		con_dfs_ch_width =
-		      con_sap_adapter->session.ap.sap_config.ch_params.ch_width;
+		ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(con_sap_adapter);
+		con_dfs_ch_freq = ap_ctx->sap_config.chan_freq;
+		con_dfs_ch_width = ap_ctx->sap_config.ch_params.ch_width;
 		if (con_dfs_ch_freq == AUTO_CHANNEL_SELECT)
-			con_dfs_ch_freq =
-				con_sap_adapter->session.ap.operating_chan_freq;
+			con_dfs_ch_freq = ap_ctx->operating_chan_freq;
 
 		if (!policy_mgr_is_hw_dbs_capable(hdd_ctx->psoc) &&
 		    !policy_mgr_is_sta_sap_scc_allowed_on_dfs_chan(
@@ -820,12 +820,13 @@ static inline void wlan_hdd_copy_bssid(struct cfg80211_scan_request *request,
 
 static void hdd_process_vendor_acs_response(struct hdd_adapter *adapter)
 {
+	qdf_mc_timer_t *vendor_acs_timer;
+
+	vendor_acs_timer = &adapter->deflink->session.ap.vendor_acs_timer;
 	if (test_bit(VENDOR_ACS_RESPONSE_PENDING, &adapter->event_flags)) {
 		if (QDF_TIMER_STATE_RUNNING ==
-		    qdf_mc_timer_get_current_state(&adapter->session.
-					ap.vendor_acs_timer)) {
-			qdf_mc_timer_stop(&adapter->session.
-					ap.vendor_acs_timer);
+		    qdf_mc_timer_get_current_state(vendor_acs_timer)) {
+			qdf_mc_timer_stop(vendor_acs_timer);
 		}
 	}
 }
@@ -1252,18 +1253,12 @@ int wlan_hdd_vendor_abort_scan(struct wiphy *wiphy, struct wireless_dev *wdev,
 	return errno;
 }
 
-/**
- * wlan_hdd_scan_abort() - abort ongoing scan
- * @adapter: Pointer to interface adapter
- *
- * Return: 0 for success, non zero for failure
- */
 int wlan_hdd_scan_abort(struct hdd_adapter *adapter)
 {
 	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
 
 	wlan_abort_scan(hdd_ctx->pdev, INVAL_PDEV_ID,
-			adapter->vdev_id, INVALID_SCAN_ID, true);
+			adapter->deflink->vdev_id, INVALID_SCAN_ID, true);
 
 	return 0;
 }
@@ -1300,7 +1295,7 @@ static int __wlan_hdd_cfg80211_sched_scan_start(struct wiphy *wiphy,
 		return -EINVAL;
 	}
 
-	if (wlan_hdd_validate_vdev_id(adapter->vdev_id))
+	if (wlan_hdd_validate_vdev_id(adapter->deflink->vdev_id))
 		return -EINVAL;
 
 	if (adapter->device_mode != QDF_STA_MODE) {
@@ -1379,7 +1374,7 @@ int wlan_hdd_sched_scan_stop(struct net_device *dev)
 		return -EINVAL;
 	}
 
-	if (wlan_hdd_validate_vdev_id(adapter->vdev_id))
+	if (wlan_hdd_validate_vdev_id(adapter->deflink->vdev_id))
 		return -EINVAL;
 
 	hdd_ctx = WLAN_HDD_GET_CTX(adapter);
@@ -1550,7 +1545,7 @@ static void __wlan_hdd_cfg80211_abort_scan(struct wiphy *wiphy,
 		return;
 	}
 
-	if (wlan_hdd_validate_vdev_id(adapter->vdev_id))
+	if (wlan_hdd_validate_vdev_id(adapter->deflink->vdev_id))
 		return;
 
 	ret = wlan_hdd_validate_context(hdd_ctx);

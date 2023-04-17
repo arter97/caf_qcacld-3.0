@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -194,8 +194,6 @@ struct hdd_config {
 	bool enable_sar_safety;
 	bool config_sar_safety_sleep_index;
 #endif
-	bool get_roam_chan_from_fw;
-	bool enable_fisa_lru_deletion;
 	uint8_t nb_commands_interval;
 
 #ifdef FEATURE_CLUB_LL_STATS_AND_GET_STATION

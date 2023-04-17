@@ -119,7 +119,7 @@ ap_beacon_process_24_ghz(struct mac_context *mac_ctx, uint8_t *rx_pkt_info,
 		if (!tmp_exp)
 			return;
 #ifdef FEATURE_WLAN_ESE
-		if (session->isESEconnection)
+		if (wlan_cm_get_ese_assoc(mac_ctx->pdev, session->vdev_id))
 			pe_info("[INFOLOG]ESE 11g erpPresent=%d useProtection=%d nonErpPresent=%d",
 				bcn_struct->erpPresent,
 				bcn_struct->erpIEInfo.useProtection,
@@ -144,7 +144,7 @@ ap_beacon_process_24_ghz(struct mac_context *mac_ctx, uint8_t *rx_pkt_info,
 		     bcn_struct->erpIEInfo.nonErpPresent));
 	if (tmp_exp) {
 #ifdef FEATURE_WLAN_ESE
-		if (session->isESEconnection) {
+		if (wlan_cm_get_ese_assoc(mac_ctx->pdev, session->vdev_id)) {
 			pe_info("[INFOLOG]ESE 11g erpPresent=%d useProtection=%d nonErpPresent=%d",
 				bcn_struct->erpPresent,
 				bcn_struct->erpIEInfo.useProtection,
@@ -669,7 +669,7 @@ static void __sch_beacon_process_for_session(struct mac_context *mac_ctx,
 	bool ap_constraint_change = false, tpe_change = false;
 	int8_t regMax = 0, maxTxPower = 0;
 	QDF_STATUS status;
-	bool skip_tpe = false;
+	bool skip_tpe = false, is_sap_go_switched_ch;
 	uint8_t programmed_country[REG_ALPHA2_LEN + 1];
 	enum reg_6g_ap_type pwr_type_6g = REG_INDOOR_AP;
 	bool ctry_code_match = false;
@@ -691,6 +691,11 @@ static void __sch_beacon_process_for_session(struct mac_context *mac_ctx,
 	beaconParams.paramChangeBitmap = 0;
 
 	if (LIM_IS_STA_ROLE(session)) {
+		is_sap_go_switched_ch =
+			wlan_vdev_mlme_is_sap_go_move_before_sta(session->vdev);
+		if (is_sap_go_switched_ch)
+			policy_mgr_sta_sap_dfs_enforce_scc(mac_ctx->psoc,
+							   session->vdev_id);
 		if (false == sch_bcn_process_sta(mac_ctx, bcn, rx_pkt_info,
 						 session, &beaconParams,
 						 &sendProbeReq, pMh))

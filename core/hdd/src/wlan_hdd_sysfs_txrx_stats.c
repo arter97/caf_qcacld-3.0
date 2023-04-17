@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2011-2020 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -99,7 +100,7 @@ __hdd_sysfs_txrx_stats_store(struct net_device *net_dev,
 				(char *)&sta_ctx->conn_info.bssid;
 		}
 	}
-	ret = cdp_txrx_stats_request(soc, adapter->vdev_id, &req);
+	ret = cdp_txrx_stats_request(soc, adapter->deflink->vdev_id, &req);
 
 	if (ret) {
 		hdd_err_rl("failed to set txrx stats: %d", ret);

@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -68,7 +68,7 @@ void hdd_handle_disassociation_event(struct hdd_adapter *adapter,
 		/* send peer status indication to oem app */
 		hdd_send_peer_status_ind_to_app(peer_macaddr,
 						ePeerDisconnected, 0,
-						adapter->vdev_id, NULL,
+						adapter->deflink->vdev_id, NULL,
 						adapter->device_mode);
 
 	hdd_lpass_notify_disconnect(adapter);
@@ -135,7 +135,7 @@ void __hdd_cm_disconnect_handler_pre_user_update(struct hdd_adapter *adapter)
 				  &sta_ctx->conn_info.bssid)))
 		ucfg_ipa_wlan_evt(hdd_ctx->pdev, adapter->dev,
 				  adapter->device_mode,
-				  adapter->vdev_id,
+				  adapter->deflink->vdev_id,
 				  WLAN_IPA_STA_DISCONNECT,
 				  sta_ctx->conn_info.bssid.bytes,
 				  false);
@@ -149,7 +149,7 @@ void __hdd_cm_disconnect_handler_pre_user_update(struct hdd_adapter *adapter)
 	wlan_hdd_auto_shutdown_enable(hdd_ctx, true);
 
 	DPTRACE(qdf_dp_trace_mgmt_pkt(QDF_DP_TRACE_MGMT_PACKET_RECORD,
-		adapter->vdev_id,
+		adapter->deflink->vdev_id,
 		QDF_TRACE_DEFAULT_PDEV_ID,
 		QDF_PROTO_TYPE_MGMT, QDF_PROTO_MGMT_DISASSOC));
 
@@ -172,21 +172,22 @@ void __hdd_cm_disconnect_handler_post_user_update(struct hdd_adapter *adapter,
 
 	/* update P2P connection status */
 	ucfg_p2p_status_disconnect(vdev);
-	hdd_cfr_disconnect(adapter->vdev);
+	hdd_cfr_disconnect(adapter->deflink->vdev);
 
 	hdd_wmm_adapter_clear(adapter);
 	ucfg_cm_ft_reset(vdev);
-	ucfg_cm_reset_key(hdd_ctx->pdev, adapter->vdev_id);
+	ucfg_cm_reset_key(hdd_ctx->pdev, adapter->deflink->vdev_id);
 	hdd_clear_roam_profile_ie(adapter);
 
 	if (adapter->device_mode == QDF_STA_MODE)
 		wlan_crypto_reset_vdev_params(vdev);
 
 	hdd_remove_beacon_filter(adapter);
-	if (sme_is_beacon_report_started(mac_handle, adapter->vdev_id)) {
+	if (sme_is_beacon_report_started(mac_handle,
+					 adapter->deflink->vdev_id)) {
 		hdd_debug("Sending beacon pause indication to userspace");
 		hdd_beacon_recv_pause_indication((hdd_handle_t)hdd_ctx,
-						 adapter->vdev_id,
+						 adapter->deflink->vdev_id,
 						 SCAN_EVENT_TYPE_MAX, true);
 	}
 
@@ -206,7 +207,8 @@ void __hdd_cm_disconnect_handler_post_user_update(struct hdd_adapter *adapter,
 	ucfg_dp_remove_conn_info(vdev);
 
 	/* Setting the RTS profile to original value */
-	if (sme_cli_set_command(adapter->vdev_id, wmi_vdev_param_enable_rtscts,
+	if (sme_cli_set_command(adapter->deflink->vdev_id,
+				wmi_vdev_param_enable_rtscts,
 				cfg_get(hdd_ctx->psoc,
 					CFG_ENABLE_FW_RTS_PROFILE),
 				VDEV_CMD))
@@ -218,7 +220,7 @@ void __hdd_cm_disconnect_handler_post_user_update(struct hdd_adapter *adapter,
 	if ((QDF_STA_MODE == adapter->device_mode) ||
 	    (QDF_P2P_CLIENT_MODE == adapter->device_mode)) {
 		sme_ps_disable_auto_ps_timer(mac_handle,
-					     adapter->vdev_id);
+					     adapter->deflink->vdev_id);
 		adapter->send_mode_change = true;
 	}
 	wlan_hdd_clear_link_layer_stats(adapter);
@@ -234,7 +236,7 @@ void __hdd_cm_disconnect_handler_post_user_update(struct hdd_adapter *adapter,
 #ifdef WLAN_FEATURE_MSCS
 void reset_mscs_params(struct hdd_adapter *adapter)
 {
-	mlme_set_is_mscs_req_sent(adapter->vdev, false);
+	mlme_set_is_mscs_req_sent(adapter->deflink->vdev, false);
 	adapter->mscs_counter = 0;
 }
 #endif
@@ -259,7 +261,7 @@ QDF_STATUS wlan_hdd_cm_issue_disconnect(struct hdd_adapter *adapter,
 
 	qdf_rtpm_sync_resume();
 
-	wlan_rec_conn_info(adapter->vdev_id, DEBUG_CONN_DISCONNECT,
+	wlan_rec_conn_info(adapter->deflink->vdev_id, DEBUG_CONN_DISCONNECT,
 			   sta_ctx->conn_info.bssid.bytes, 0, reason);
 
 	if (sync)
@@ -289,7 +291,7 @@ int wlan_hdd_cm_disconnect(struct wiphy *wiphy,
 	if (ret)
 		return ret;
 
-	if (wlan_hdd_validate_vdev_id(adapter->vdev_id))
+	if (wlan_hdd_validate_vdev_id(adapter->deflink->vdev_id))
 		return -EINVAL;
 
 	if (hdd_ctx->is_wiphy_suspended) {
@@ -299,7 +301,7 @@ int wlan_hdd_cm_disconnect(struct wiphy *wiphy,
 
 	qdf_mtrace(QDF_MODULE_ID_HDD, QDF_MODULE_ID_HDD,
 		   TRACE_CODE_HDD_CFG80211_DISCONNECT,
-		   adapter->vdev_id, reason);
+		   adapter->deflink->vdev_id, reason);
 
 	hdd_print_netdev_txq_status(dev);
 
@@ -349,7 +351,8 @@ hdd_cm_disconnect_complete_pre_user_update(struct wlan_objmgr_vdev *vdev,
 
 	hdd_handle_disassociation_event(adapter, &rsp->req.req.bssid);
 
-	wlan_rec_conn_info(adapter->vdev_id, DEBUG_CONN_DISCONNECT_HANDLER,
+	wlan_rec_conn_info(adapter->deflink->vdev_id,
+			   DEBUG_CONN_DISCONNECT_HANDLER,
 			   rsp->req.req.bssid.bytes,
 			   rsp->req.cm_id,
 			   rsp->req.req.reason_code << 16 |
@@ -406,8 +409,8 @@ static void hdd_cm_set_default_wlm_mode(struct hdd_adapter *adapter)
 	} else {
 		status =
 			sme_set_wlm_latency_level(hdd_ctx->mac_handle,
-						  adapter->vdev_id, def_level,
-						  0, false);
+						  adapter->deflink->vdev_id,
+						  def_level, 0, false);
 		if (QDF_IS_STATUS_SUCCESS(status)) {
 			hdd_debug("reset wlm mode %x on disconnection",
 				  def_level);

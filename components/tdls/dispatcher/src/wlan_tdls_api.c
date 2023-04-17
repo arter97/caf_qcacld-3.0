@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2020, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -29,6 +29,7 @@
 #include <wlan_objmgr_global_obj.h>
 #include <wlan_objmgr_cmn.h>
 #include "wlan_tdls_cfg_api.h"
+#include "wlan_policy_mgr_api.h"
 
 static QDF_STATUS tdls_teardown_flush_cb(struct scheduler_msg *msg)
 {
@@ -110,6 +111,39 @@ void  wlan_tdls_teardown_links_sync(struct wlan_objmgr_psoc *psoc)
 release_ref:
 	wlan_objmgr_vdev_release_ref(vdev,
 				     WLAN_TDLS_NB_ID);
+}
+
+#ifdef WLAN_FEATURE_TDLS_CONCURRENCIES
+static void wlan_tdls_handle_sap_start(struct wlan_objmgr_psoc *psoc)
+{
+	QDF_STATUS status;
+	struct scheduler_msg msg = {0};
+
+	msg.callback = tdls_process_cmd;
+	msg.type = TDLS_CMD_START_BSS;
+	msg.bodyptr = psoc;
+	status = scheduler_post_message(QDF_MODULE_ID_TDLS,
+					QDF_MODULE_ID_TDLS,
+					QDF_MODULE_ID_TARGET_IF, &msg);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		tdls_err("post start bss msg fail");
+		return;
+	}
+}
+#else
+static inline void
+wlan_tdls_handle_sap_start(struct wlan_objmgr_psoc *psoc)
+{}
+#endif
+
+void wlan_tdls_notify_start_bss(struct wlan_objmgr_psoc *psoc)
+{
+	if (tdls_is_concurrency_allowed(psoc)) {
+		wlan_tdls_handle_sap_start(psoc);
+		return;
+	}
+
+	wlan_tdls_teardown_links_sync(psoc);
 }
 
 static QDF_STATUS tdls_notify_flush_cb(struct scheduler_msg *msg)

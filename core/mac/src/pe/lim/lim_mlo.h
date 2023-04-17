@@ -73,6 +73,15 @@ void lim_get_mlo_vdev_list(struct pe_session *session, uint16_t *vdev_count,
 			   struct wlan_objmgr_vdev **wlan_vdev_list);
 
 /**
+ * lim_mlo_roam_peer_disconn_del - trigger mlo to delete partner peer
+ *                                 This API is only for MLO STA roam.
+ * @vdev: vdev pointer
+ *
+ * Return: void
+ */
+void lim_mlo_roam_peer_disconn_del(struct wlan_objmgr_vdev *vdev);
+
+/**
  * lim_mlo_notify_peer_disconn - trigger mlo to delete partner peer
  * @pe_session: pe session
  * @sta_ds: Pointer to internal STA Datastructure
@@ -314,6 +323,16 @@ lim_send_probe_req_frame_mlo(struct mac_context *mac_ctx,
 			     struct pe_session *session);
 
 /**
+ * lim_send_tdls_mgmt_frame_mlo() - Prepare ML IE for tdls mgmt frame
+ * @mac_ctx: pointer to mac_context
+ * @session: pointer to pe_session
+ *
+ * Return: the actual ML IE length
+ */
+uint16_t lim_send_tdls_mgmt_frame_mlo(struct mac_context *mac_ctx,
+				      struct pe_session *session);
+
+/**
  * lim_get_frame_mlo_ie_len() - get ML IE length
  * @session: pointer to pe_session
  *
@@ -382,6 +401,9 @@ QDF_STATUS lim_get_bpcc_from_mlo_ie(tSchBeaconStruct *bcn,
 bool lim_check_cu_happens(struct wlan_objmgr_vdev *vdev, uint8_t new_bpcc);
 
 #else
+static inline void lim_mlo_roam_peer_disconn_del(struct wlan_objmgr_vdev *vdev)
+{
+}
 static inline void lim_mlo_notify_peer_disconn(struct pe_session *pe_session,
 					       tpDphHashNode sta_ds)
 {
@@ -490,6 +512,13 @@ lim_send_probe_req_frame_mlo(struct mac_context *mac_ctx,
 
 static inline uint16_t
 lim_send_bcn_frame_mlo(struct mac_context *mac_ctx, struct pe_session *session)
+{
+	return 0;
+}
+
+static inline uint16_t
+lim_send_tdls_mgmt_frame_mlo(struct mac_context *mac_ctx,
+			     struct pe_session *session)
 {
 	return 0;
 }

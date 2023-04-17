@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -343,20 +343,6 @@ void hdd_wext_send_event(struct net_device *dev, unsigned int cmd,
 {
 }
 #endif /* WLAN_WEXT_SUPPORT_ENABLE */
-
-#ifdef WLAN_DUMP_LOG_BUF_CNT
-/**
- * hdd_dump_log_buffer() - dump log buffer history
- *
- * Return: None
- */
-void hdd_dump_log_buffer(void);
-#else
-static inline
-void hdd_dump_log_buffer(void)
-{
-}
-#endif
 
 #if defined(WLAN_WEXT_SUPPORT_ENABLE) && defined(HASTINGS_BT_WAR)
 int hdd_hastings_bt_war_enable_fw(struct hdd_context *hdd_ctx);

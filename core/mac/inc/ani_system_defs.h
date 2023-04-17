@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2011-2019, 2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -89,6 +89,7 @@ enum ani_akm_type {
 	ANI_AKM_TYPE_WPA,
 	ANI_AKM_TYPE_WPA_PSK,
 	ANI_AKM_TYPE_SAE_EXT_KEY,
+	ANI_AKM_TYPE_FT_SAE_EXT_KEY,
 	ANI_NUM_OF_SUPPORT_AKM_TYPE,
 	ANI_AKM_TYPE_UNKNOWN = 0xff,
 };
@@ -153,13 +154,9 @@ typedef struct sSirAddie {
 typedef struct sSirKeys {
 	uint8_t keyId;
 	uint8_t unicast;        /* 0 for multicast */
-	tAniKeyDirection keyDirection;
-	uint8_t keyRsc[WLAN_CRYPTO_RSC_SIZE];   /* Usage is unknown */
-	uint8_t paeRole;        /* =1 for authenticator, */
-	/* =0 for supplicant */
 	uint16_t keyLength;
 	uint8_t key[SIR_MAC_MAX_KEY_LENGTH];
-} tSirKeys, *tpSirKeys;
+} tSirKeys;
 
 /* / Definition for Keying material */
 typedef struct sSirKeyMaterial {

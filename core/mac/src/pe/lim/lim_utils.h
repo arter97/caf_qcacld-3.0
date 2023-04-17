@@ -119,6 +119,11 @@
 /* SR is disabled if NON_SRG is disallowed and SRG INFO is not present */
 #define SR_DISABLE NON_SRG_PD_SR_DISALLOWED & (~SRG_INFO_PRESENT & 0x0F)
 
+/* Length of RSNXE element ID + length + one octet of capability */
+#define RSNXE_CAP_FOR_SAE_LEN     3
+/* Position of WPA3 capabilities in the RSNX element */
+#define RSNXE_CAP_POS_0           0
+
 typedef union uPmfSaQueryTimerId {
 	struct {
 		uint8_t sessionId;
@@ -131,18 +136,6 @@ typedef struct last_processed_frame {
 	tSirMacAddr sa;
 	uint16_t seq_num;
 } last_processed_msg;
-
-/**
- * struct lim_max_tx_pwr_attr - List of tx powers from various sources
- * @reg_max: power from regulatory database
- * @ap_tx_power: local power constraint adjusted value
- * @frequency: current operating frequency for which above powers are defined
- */
-struct lim_max_tx_pwr_attr {
-	int8_t reg_max;
-	int8_t ap_tx_power;
-	uint32_t frequency;
-};
 
 /* LIM utility functions */
 bool lim_is_valid_frame(last_processed_msg *last_processed_frm,
@@ -288,7 +281,7 @@ void lim_set_mlo_caps(struct mac_context *mac, struct pe_session *session,
 		      uint8_t *ie_start, uint32_t num_bytes);
 
 QDF_STATUS lim_send_mlo_caps_ie(struct mac_context *mac_ctx,
-				struct pe_session *session,
+				struct wlan_objmgr_vdev *vdev,
 				enum QDF_OPMODE device_mode,
 				uint8_t vdev_id);
 
@@ -337,7 +330,7 @@ void lim_strip_mlo_ie(struct mac_context *mac_ctx,
 
 static inline
 QDF_STATUS lim_send_mlo_caps_ie(struct mac_context *mac_ctx,
-				struct pe_session *session,
+				struct wlan_objmgr_vdev *vdev,
 				enum QDF_OPMODE device_mode,
 				uint8_t vdev_id)
 {

@@ -38,6 +38,8 @@
 #define JOIN_PROBE_REQ_TIMER_MS              200
 #define MAX_JOIN_PROBE_REQ                   5
 
+#define MAX_WAKELOCK_FOR_BSS_COLOR_CHANGE    2000
+
 /* If AP reported link delete timer less than such value,
  * host will do link removel directly without wait for the
  * timer timeout.
@@ -754,6 +756,9 @@ struct enhance_roam_info {
  * @country_ie_for_all_band: take all band channel info in country ie
  * @mlme_ap: SAP related vdev private configurations
  * @is_single_link_mlo_roam: Single link mlo roam flag
+ * @bss_color_change_wakelock: wakelock to complete bss color change
+ *				operation on bss color collision detection
+ * @bss_color_change_runtime_lock: runtime lock to complete bss color change
  */
 struct mlme_legacy_priv {
 	bool chan_switch_in_progress;
@@ -823,6 +828,8 @@ struct mlme_legacy_priv {
 #if defined(WLAN_FEATURE_11BE_MLO) && defined(WLAN_FEATURE_ROAM_OFFLOAD)
 	bool is_single_link_mlo_roam;
 #endif
+	qdf_wake_lock_t bss_color_change_wakelock;
+	qdf_runtime_lock_t bss_color_change_runtime_lock;
 };
 
 /**

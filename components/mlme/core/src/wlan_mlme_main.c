@@ -33,6 +33,7 @@
 #include "wlan_mlme_ucfg_api.h"
 #include "wifi_pos_ucfg_i.h"
 #include "wlan_mlo_mgr_sta.h"
+#include "twt/core/src/wlan_twt_cfg.h"
 
 #define NUM_OF_SOUNDING_DIMENSIONS     1 /*Nss - 1, (Nss = 2 for 2x2)*/
 
@@ -1258,6 +1259,7 @@ static void mlme_init_he_cap_in_cfg(struct wlan_objmgr_psoc *psoc,
 	uint32_t chan_width, mcs_12_13;
 	uint16_t value = 0;
 	struct wlan_mlme_he_caps *he_caps = &mlme_cfg->he_caps;
+	bool is_twt_enabled = false;
 
 	he_caps->dot11_he_cap.htc_he = cfg_default(CFG_HE_CONTROL);
 	he_caps->dot11_he_cap.twt_request =
@@ -1270,9 +1272,12 @@ static void mlme_init_he_cap_in_cfg(struct wlan_objmgr_psoc *psoc,
 	 * role and "twt_bcast_req_resp_config" ini
 	 */
 	he_caps->dot11_he_cap.broadcast_twt = 0;
-	if (mlme_is_twt_enabled(psoc))
+
+	is_twt_enabled = wlan_twt_cfg_is_twt_enabled(psoc);
+
+	if (is_twt_enabled)
 		he_caps->dot11_he_cap.flex_twt_sched =
-				cfg_default(CFG_HE_FLEX_TWT_SCHED);
+			cfg_default(CFG_HE_FLEX_TWT_SCHED);
 	he_caps->dot11_he_cap.fragmentation =
 			cfg_default(CFG_HE_FRAGMENTATION);
 	he_caps->dot11_he_cap.max_num_frag_msdu_amsdu_exp =
@@ -1612,6 +1617,8 @@ static void mlme_init_sap_cfg(struct wlan_objmgr_psoc *psoc,
 		cfg_get(psoc, CFG_6G_SAP_FILS_DISCOVERY_ENABLED);
 	sap_cfg->disable_bcn_prot =
 		cfg_get(psoc, CFG_DISABLE_SAP_BCN_PROT);
+	sap_cfg->sap_ps_with_twt_enable =
+		cfg_get(psoc, CFG_SAP_PS_WITH_TWT);
 }
 
 static void mlme_init_obss_ht40_cfg(struct wlan_objmgr_psoc *psoc,

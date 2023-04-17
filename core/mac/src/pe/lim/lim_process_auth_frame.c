@@ -48,6 +48,7 @@
 #include "lim_types.h"
 #include <wlan_mlo_mgr_main.h>
 #include "wlan_nan_api_i.h"
+#include <utils_mlo.h>
 /**
  * is_auth_valid
  *
@@ -313,6 +314,29 @@ static void lim_process_auth_open_system_algo(struct mac_context *mac_ctx,
 }
 
 #ifdef WLAN_FEATURE_SAE
+#ifdef WLAN_FEATURE_11BE_MLO
+/**
+ * lim_external_auth_update_pre_auth_node_mld() - Update preauth node mld addr
+ * for the peer performing external authentication
+ * @auth_node: Pointer to pre-auth node to be added to the list
+ * @peer_mld: Peer MLD address
+ *
+ * Return: None
+ */
+static void
+lim_external_auth_update_pre_auth_node_mld(struct tLimPreAuthNode *auth_node,
+					   struct qdf_mac_addr *peer_mld)
+{
+	qdf_mem_copy((uint8_t *)auth_node->peer_mld, peer_mld->bytes,
+		     QDF_MAC_ADDR_SIZE);
+}
+#else
+static void
+lim_external_auth_update_pre_auth_node_mld(struct tLimPreAuthNode *auth_node,
+					   struct qdf_mac_addr *peer_mld)
+{
+}
+#endif
 
 /**
  * lim_external_auth_add_pre_auth_node()- Add preauth node for the peer
@@ -344,10 +368,8 @@ static void lim_external_auth_add_pre_auth_node(struct mac_context *mac_ctx,
 		 QDF_MAC_ADDR_REF(mac_hdr->sa));
 	qdf_mem_copy((uint8_t *)auth_node->peerMacAddr,
 		     mac_hdr->sa, sizeof(tSirMacAddr));
-#ifdef WLAN_FEATURE_11BE_MLO
-	qdf_mem_copy((uint8_t *)auth_node->peer_mld, peer_mld->bytes,
-		     QDF_MAC_ADDR_SIZE);
-#endif
+	lim_external_auth_update_pre_auth_node_mld(auth_node, peer_mld);
+
 	auth_node->mlmState = mlm_state;
 	auth_node->authType = eSIR_AUTH_TYPE_SAE;
 	auth_node->timestamp = qdf_mc_timer_get_system_ticks();
@@ -528,11 +550,11 @@ static QDF_STATUS lim_update_link_to_mld_address(struct mac_context *mac_ctx,
 	struct qdf_mac_addr *self_mld_addr;
 	struct tLimPreAuthNode *pre_auth_node;
 	struct qdf_mac_addr peer_mld_addr;
+	struct qdf_mac_addr *peer_roaming_mld_addr;
 	enum QDF_OPMODE opmode;
 	QDF_STATUS status;
 
-	if (!wlan_vdev_mlme_is_mlo_vdev(vdev) ||
-	    !wlan_vdev_get_mlo_external_sae_auth_conversion(vdev))
+	if (!wlan_cm_is_sae_auth_addr_conversion_required(vdev))
 		return QDF_STATUS_SUCCESS;
 
 	opmode = wlan_vdev_mlme_get_opmode(vdev);
@@ -550,9 +572,19 @@ static QDF_STATUS lim_update_link_to_mld_address(struct mac_context *mac_ctx,
 			     QDF_MAC_ADDR_SIZE);
 		break;
 	case QDF_STA_MODE:
-		status = wlan_vdev_get_bss_peer_mld_mac(vdev, &peer_mld_addr);
-		if (QDF_IS_STATUS_ERROR(status))
-			return status;
+		if (!wlan_cm_is_vdev_roaming(vdev)) {
+			status = wlan_vdev_get_bss_peer_mld_mac(vdev,
+								&peer_mld_addr);
+			if (QDF_IS_STATUS_ERROR(status))
+				return status;
+		} else {
+			peer_roaming_mld_addr =
+				wlan_cm_roaming_get_peer_mld_addr(vdev);
+			if (!peer_roaming_mld_addr)
+				return QDF_STATUS_E_FAILURE;
+
+			peer_mld_addr = *peer_roaming_mld_addr;
+		}
 
 		qdf_mem_copy(mac_hdr->sa, peer_mld_addr.bytes,
 			     QDF_MAC_ADDR_SIZE);
@@ -2080,8 +2112,9 @@ bool lim_process_sae_preauth_frame(struct mac_context *mac, uint8_t *rx_pkt)
 	tpSirMacMgmtHdr dot11_hdr;
 	uint16_t auth_alg, frm_len;
 	uint16_t sae_auth_seq = 0, sae_status_code = 0;
-	uint8_t *frm_body, pdev_id, vdev_id = 0;
+	uint8_t *frm_body, pdev_id, vdev_id;
 	struct wlan_objmgr_vdev *vdev;
+	QDF_STATUS status = QDF_STATUS_SUCCESS;
 
 	dot11_hdr = WMA_GET_RX_MAC_HEADER(rx_pkt);
 	frm_body = WMA_GET_RX_MPDU_DATA(rx_pkt);
@@ -2109,12 +2142,32 @@ bool lim_process_sae_preauth_frame(struct mac_context *mac, uint8_t *rx_pkt)
 		  (dot11_hdr->seqControl.fragNum)), *(uint16_t *)(frm_body + 2));
 	pdev_id = wlan_objmgr_pdev_get_pdev_id(mac->pdev);
 	vdev = wlan_objmgr_get_vdev_by_macaddr_from_psoc(
-			mac->psoc, pdev_id, dot11_hdr->da, WLAN_LEGACY_SME_ID);
+			mac->psoc, pdev_id, dot11_hdr->da, WLAN_LEGACY_MAC_ID);
+
 	if (vdev) {
 		vdev_id = wlan_vdev_get_id(vdev);
-
 		lim_sae_auth_cleanup_retry(mac, vdev_id);
-		wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_SME_ID);
+		status = lim_update_link_to_mld_address(mac, vdev, dot11_hdr);
+
+		wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_MAC_ID);
+	} else {
+		vdev = wlan_objmgr_pdev_get_roam_vdev(mac->pdev,
+						      WLAN_LEGACY_MAC_ID);
+		if (!vdev) {
+			pe_err("not able to find roaming vdev");
+			return false;
+		}
+
+		vdev_id = wlan_vdev_get_id(vdev);
+		status = lim_update_link_to_mld_address(mac, vdev, dot11_hdr);
+
+		wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_MAC_ID);
+	}
+
+	if (QDF_IS_STATUS_ERROR(status)) {
+		pe_err("dropping the auth frame for vdev id: %d and BSSID " QDF_MAC_ADDR_FMT,
+		       vdev_id, QDF_MAC_ADDR_REF(dot11_hdr->bssId));
+		return false;
 	}
 
 	wlan_connectivity_mgmt_event(mac->psoc,

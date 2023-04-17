@@ -1275,6 +1275,16 @@ void lim_process_mlm_set_keys_cnf(struct mac_context *mac, uint32_t *msg_buf)
 				     pe_session, pe_session->smeSessionId);
 } /*** end lim_process_mlm_set_keys_cnf() ***/
 
+void lim_update_lost_link_rssi(struct mac_context *mac, uint32_t rssi)
+{
+	if (!mac) {
+		pe_debug("mac is null");
+		return;
+	}
+
+	mac->lim.bss_rssi = rssi;
+}
+
 void lim_join_result_callback(struct mac_context *mac,
 			      uint8_t vdev_id)
 {
@@ -1549,9 +1559,7 @@ void lim_process_sta_mlm_add_sta_rsp(struct mac_context *mac_ctx,
 			session_entry->limMlmState));
 		lim_process_add_sta_rsp_mlo(mac_ctx, &mlm_assoc_cnf,
 					    session_entry);
-#ifdef WLAN_DEBUG
-		mac_ctx->lim.gLimNumLinkEsts++;
-#endif
+
 #ifdef FEATURE_WLAN_TDLS
 		/* initialize TDLS peer related data */
 		lim_init_tdls_data(mac_ctx, session_entry);

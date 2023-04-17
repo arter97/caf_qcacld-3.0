@@ -603,13 +603,13 @@ int hdd_test_config_twt_setup_session(struct hdd_adapter *adapter,
 	hdd_sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter);
 	if (!hdd_cm_is_vdev_associated(adapter)) {
 		hdd_err_rl("Invalid state, vdev %d mode %d",
-			   adapter->vdev_id, adapter->device_mode);
+			   adapter->deflink->vdev_id, adapter->device_mode);
 		return -EINVAL;
 	}
 
 	qdf_mem_copy(params.peer_macaddr, hdd_sta_ctx->conn_info.bssid.bytes,
 		     QDF_MAC_ADDR_SIZE);
-	params.vdev_id = adapter->vdev_id;
+	params.vdev_id = adapter->deflink->vdev_id;
 
 	cmd_id = QCA_WLAN_VENDOR_ATTR_WIFI_TEST_CONFIG_TWT_SETUP;
 	nla_for_each_nested(twt_session, tb[cmd_id], tmp) {
@@ -670,14 +670,14 @@ int hdd_test_config_twt_terminate_session(struct hdd_adapter *adapter,
 	hdd_sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter);
 	if (!hdd_cm_is_vdev_associated(adapter)) {
 		hdd_err_rl("Invalid state, vdev %d mode %d",
-			   adapter->vdev_id, adapter->device_mode);
+			   adapter->deflink->vdev_id, adapter->device_mode);
 		return -EINVAL;
 	}
 
 	qdf_mem_copy(params.peer_macaddr,
 		     hdd_sta_ctx->conn_info.bssid.bytes,
 		     QDF_MAC_ADDR_SIZE);
-	params.vdev_id = adapter->vdev_id;
+	params.vdev_id = adapter->deflink->vdev_id;
 	params.dialog_id = 0;
 	hdd_debug("twt_terminate: vdev_id %d", params.vdev_id);
 
@@ -1019,7 +1019,7 @@ static int hdd_is_twt_command_allowed(struct hdd_adapter *adapter)
 
 	if (!hdd_cm_is_vdev_associated(adapter)) {
 		hdd_err_rl("Invalid state, vdev %d mode %d",
-			   adapter->vdev_id, adapter->device_mode);
+			   adapter->deflink->vdev_id, adapter->device_mode);
 		return -EAGAIN;
 	}
 
@@ -1118,7 +1118,7 @@ static int hdd_sap_twt_get_session_params(struct hdd_adapter *adapter,
 	if (!params)
 		return -ENOMEM;
 
-	params[0].vdev_id = adapter->vdev_id;
+	params[0].vdev_id = adapter->deflink->vdev_id;
 	id = QCA_WLAN_VENDOR_ATTR_TWT_SETUP_FLOW_ID;
 	id1 = QCA_WLAN_VENDOR_ATTR_TWT_SETUP_MAC_ADDR;
 
@@ -1188,7 +1188,7 @@ static int hdd_sta_twt_get_session_params(struct hdd_adapter *adapter,
 	if (ret)
 		return ret;
 
-	params[0].vdev_id = adapter->vdev_id;
+	params[0].vdev_id = adapter->deflink->vdev_id;
 	/*
 	 * Currently twt_get_params nl cmd is sending only dialog_id(STA), fill
 	 * mac_addr of STA in params and call hdd_twt_get_peer_session_params.
@@ -1218,7 +1218,7 @@ static int hdd_sta_twt_get_session_params(struct hdd_adapter *adapter,
 					 &hdd_sta_ctx->conn_info.bssid,
 					 params[0].dialog_id)) {
 		hdd_debug("vdev%d: TWT session %d setup incomplete",
-			  adapter->vdev_id, params[0].dialog_id);
+			  adapter->deflink->vdev_id, params[0].dialog_id);
 		qdf_status = hdd_send_inactive_session_reply(adapter, params);
 
 		return qdf_status_to_os_return(qdf_status);
@@ -2068,7 +2068,7 @@ static int hdd_twt_setup_session(struct hdd_adapter *adapter,
 	if (ret)
 		return ret;
 
-	if (hdd_twt_setup_conc_allowed(hdd_ctx, adapter->vdev_id)) {
+	if (hdd_twt_setup_conc_allowed(hdd_ctx, adapter->deflink->vdev_id)) {
 		hdd_err_rl("TWT setup reject: SCC or MCC concurrency exists");
 		return -EAGAIN;
 	}
@@ -2076,7 +2076,7 @@ static int hdd_twt_setup_session(struct hdd_adapter *adapter,
 	qdf_mem_copy(params.peer_macaddr,
 		     hdd_sta_ctx->conn_info.bssid.bytes,
 		     QDF_MAC_ADDR_SIZE);
-	params.vdev_id = adapter->vdev_id;
+	params.vdev_id = adapter->deflink->vdev_id;
 
 	ret = wlan_cfg80211_nla_parse_nested(tb2,
 					     QCA_WLAN_VENDOR_ATTR_TWT_SETUP_MAX,
@@ -2172,7 +2172,7 @@ static int hdd_twt_add_ac_config(struct hdd_adapter *adapter,
 	ucfg_mlme_get_twt_responder(hdd_ctx->psoc, &is_responder_en);
 
 	if (adapter->device_mode == QDF_SAP_MODE && is_responder_en) {
-		ret = sme_cli_set_command(adapter->vdev_id,
+		ret = sme_cli_set_command(adapter->deflink->vdev_id,
 					  wmi_pdev_param_twt_ac_config,
 					  twt_ac_param, PDEV_CMD);
 	} else {
@@ -2394,7 +2394,7 @@ hdd_send_twt_del_all_sessions_to_userspace(struct hdd_adapter *adapter)
 	hdd_sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter);
 	if (!hdd_cm_is_vdev_associated(adapter)) {
 		hdd_debug("Not associated, vdev %d mode %d",
-			   adapter->vdev_id, adapter->device_mode);
+			   adapter->deflink->vdev_id, adapter->device_mode);
 		return;
 	}
 
@@ -2402,12 +2402,13 @@ hdd_send_twt_del_all_sessions_to_userspace(struct hdd_adapter *adapter)
 					 &hdd_sta_ctx->conn_info.bssid,
 					 TWT_ALL_SESSIONS_DIALOG_ID)) {
 		hdd_debug("No active TWT sessions, vdev_id: %d dialog_id: %d",
-			  adapter->vdev_id, TWT_ALL_SESSIONS_DIALOG_ID);
+			  adapter->deflink->vdev_id,
+			  TWT_ALL_SESSIONS_DIALOG_ID);
 		return;
 	}
 
 	qdf_mem_zero(&params, sizeof(params));
-	params.vdev_id = adapter->vdev_id;
+	params.vdev_id = adapter->deflink->vdev_id;
 	params.dialog_id = TWT_ALL_SESSIONS_DIALOG_ID;
 	params.status = WMI_HOST_DEL_TWT_STATUS_UNKNOWN_ERROR;
 	qdf_mem_copy(params.peer_macaddr, hdd_sta_ctx->conn_info.bssid.bytes,
@@ -2544,7 +2545,7 @@ static int hdd_sap_twt_terminate_session(struct hdd_adapter *adapter,
 	bool is_associated;
 	struct qdf_mac_addr mac_addr;
 
-	params.vdev_id = adapter->vdev_id;
+	params.vdev_id = adapter->deflink->vdev_id;
 
 	ret = wlan_cfg80211_nla_parse_nested(tb,
 					     QCA_WLAN_VENDOR_ATTR_TWT_SETUP_MAX,
@@ -2624,7 +2625,7 @@ static int hdd_sta_twt_terminate_session(struct hdd_adapter *adapter,
 	hdd_sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter);
 	if (!hdd_cm_is_vdev_associated(adapter)) {
 		hdd_err_rl("Invalid state, vdev %d mode %d",
-			   adapter->vdev_id, adapter->device_mode);
+			   adapter->deflink->vdev_id, adapter->device_mode);
 
 		/*
 		 * Return success, since STA is not associated and there is
@@ -2644,7 +2645,7 @@ static int hdd_sta_twt_terminate_session(struct hdd_adapter *adapter,
 	qdf_mem_copy(params.peer_macaddr,
 		     hdd_sta_ctx->conn_info.bssid.bytes,
 		     QDF_MAC_ADDR_SIZE);
-	params.vdev_id = adapter->vdev_id;
+	params.vdev_id = adapter->deflink->vdev_id;
 
 	ret = wlan_cfg80211_nla_parse_nested(tb,
 					     QCA_WLAN_VENDOR_ATTR_TWT_SETUP_MAX,
@@ -3075,7 +3076,7 @@ static int hdd_twt_pause_session(struct hdd_adapter *adapter,
 
 	qdf_mem_copy(params.peer_macaddr, hdd_sta_ctx->conn_info.bssid.bytes,
 		     QDF_MAC_ADDR_SIZE);
-	params.vdev_id = adapter->vdev_id;
+	params.vdev_id = adapter->deflink->vdev_id;
 	params.dialog_id = 0;
 
 	if (twt_param_attr) {
@@ -3240,7 +3241,7 @@ static int hdd_twt_nudge_session(struct hdd_adapter *adapter,
 		return -EOPNOTSUPP;
 	}
 
-	params.vdev_id = adapter->vdev_id;
+	params.vdev_id = adapter->deflink->vdev_id;
 
 	ret = wlan_cfg80211_nla_parse_nested(tb,
 				      QCA_WLAN_VENDOR_ATTR_TWT_NUDGE_MAX,
@@ -3631,7 +3632,7 @@ static int hdd_twt_get_capabilities(struct hdd_adapter *adapter,
 
 	if (!hdd_cm_is_vdev_associated(adapter)) {
 		hdd_err_rl("vdev %d not in connected state, mode %d",
-			   adapter->vdev_id, adapter->device_mode);
+			   adapter->deflink->vdev_id, adapter->device_mode);
 		return -EAGAIN;
 	}
 
@@ -3672,7 +3673,7 @@ static int hdd_twt_resume_session(struct hdd_adapter *adapter,
 
 	qdf_mem_copy(params.peer_macaddr, hdd_sta_ctx->conn_info.bssid.bytes,
 		     QDF_MAC_ADDR_SIZE);
-	params.vdev_id = adapter->vdev_id;
+	params.vdev_id = adapter->deflink->vdev_id;
 
 	ret = wlan_cfg80211_nla_parse_nested(tb,
 					     QCA_WLAN_VENDOR_ATTR_TWT_RESUME_MAX,
@@ -3969,7 +3970,7 @@ static int hdd_twt_clear_session_traffic_stats(struct hdd_adapter *adapter,
 		return -EAGAIN;
 	}
 
-	ret = wlan_cfg80211_mc_twt_clear_infra_cp_stats(adapter->vdev,
+	ret = wlan_cfg80211_mc_twt_clear_infra_cp_stats(adapter->deflink->vdev,
 							dialog_id, peer_mac);
 
 	return ret;
@@ -3997,7 +3998,7 @@ hdd_twt_request_session_traffic_stats(struct hdd_adapter *adapter,
 	if (!adapter || !peer_mac)
 		return status;
 
-	event = wlan_cfg80211_mc_twt_get_infra_cp_stats(adapter->vdev,
+	event = wlan_cfg80211_mc_twt_get_infra_cp_stats(adapter->deflink->vdev,
 							dialog_id,
 							peer_mac,
 							&errno);

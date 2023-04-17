@@ -677,7 +677,7 @@ void lim_fill_ft_session(struct mac_context *mac,
 	}
 
 	sir_copy_mac_addr(ft_session->self_mac_addr,
-			  pe_session->self_mac_addr);
+			  wlan_vdev_mlme_get_macaddr(pe_session->vdev));
 	sir_copy_mac_addr(ft_session->limReAssocbssId,
 			  pbssDescription->bssId);
 	sir_copy_mac_addr(ft_session->prev_ap_bssid, pe_session->bssId);
@@ -728,15 +728,9 @@ void lim_fill_ft_session(struct mac_context *mac,
 
 	ft_session->is11Rconnection = pe_session->is11Rconnection;
 #ifdef FEATURE_WLAN_ESE
-	ft_session->isESEconnection = pe_session->isESEconnection;
 	ft_session->is_ese_version_ie_present =
 		pBeaconStruct->is_ese_ver_ie_present;
 #endif
-	ft_session->isFastTransitionEnabled =
-		pe_session->isFastTransitionEnabled;
-
-	ft_session->isFastRoamIniFeatureEnabled =
-		pe_session->isFastRoamIniFeatureEnabled;
 
 	mlme_obj->reg_tpc_obj.reg_max[0] = regMax;
 	mlme_obj->reg_tpc_obj.ap_constraint_power = localPowerConstraint;

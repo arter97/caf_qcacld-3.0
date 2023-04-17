@@ -121,6 +121,7 @@
 #include "wlan_tdls_api.h"
 #include "wlan_twt_cfg_ext_api.h"
 #include "wlan_mlo_mgr_sta.h"
+#include "wlan_dp_api.h"
 
 #define WMA_LOG_COMPLETION_TIMER 500 /* 500 msecs */
 #define WMI_TLV_HEADROOM 128
@@ -3702,12 +3703,6 @@ QDF_STATUS wma_open(struct wlan_objmgr_psoc *psoc,
 					   WMA_RX_SERIALIZER_CTX);
 #endif /* FEATURE_OEM_DATA_SUPPORT */
 
-	/* Register peer change event handler */
-	wmi_unified_register_event_handler(wma_handle->wmi_handle,
-					   wmi_peer_state_event_id,
-					   wma_peer_state_change_event_handler,
-					   WMA_RX_WORK_CTX);
-
 	/* Register beacon tx complete event id. The event is required
 	 * for sending channel switch announcement frames
 	 */
@@ -7213,6 +7208,8 @@ int wma_rx_service_ready_ext_event(void *handle, uint8_t *event,
 		return -EINVAL;
 
 	wmi_handle = get_wmi_unified_hdl_from_psoc(wma_handle->psoc);
+	if (wmi_validate_handle(wmi_handle))
+		return -EINVAL;
 
 	tgt_hdl = wlan_psoc_get_tgt_if_handle(wma_handle->psoc);
 	if (!tgt_hdl) {
@@ -7254,6 +7251,8 @@ int wma_rx_service_ready_ext_event(void *handle, uint8_t *event,
 	wma_update_hw_mode_config(wma_handle, tgt_hdl);
 
 	target_psoc_set_num_radios(tgt_hdl, 1);
+
+	wlan_dp_update_peer_map_unmap_version(&wlan_res_cfg->peer_map_unmap_version);
 
 	if (wmi_service_enabled(wmi_handle,
 				wmi_service_new_htt_msg_format)) {
@@ -7730,7 +7729,8 @@ static void wma_set_wifi_start_packet_stats(void *wma_handle,
 		ATH_PKTLOG_RX | ATH_PKTLOG_TX |
 		ATH_PKTLOG_TEXT | ATH_PKTLOG_SW_EVENT;
 #elif defined(QCA_WIFI_QCA6390) || defined(QCA_WIFI_QCA6490) || \
-      defined(QCA_WIFI_QCA6750) || defined(QCA_WIFI_KIWI)
+      defined(QCA_WIFI_QCA6750) || defined(QCA_WIFI_KIWI) || \
+      defines(QCA_WIFI_WCN6450)
 	log_state = ATH_PKTLOG_RCFIND | ATH_PKTLOG_RCUPDATE |
 		    ATH_PKTLOG_TX | ATH_PKTLOG_LITE_T2H |
 		    ATH_PKTLOG_SW_EVENT | ATH_PKTLOG_RX;
@@ -8584,7 +8584,7 @@ int wma_motion_det_host_event_handler(void *handle, uint8_t *event,
 				    QDF_MODULE_ID_PE);
 
 	if (!param_buf) {
-		wma_er("Invalid motion det host event buffer");
+		wma_err("Invalid motion det host event buffer");
 		return -EINVAL;
 	}
 
@@ -9342,11 +9342,6 @@ static QDF_STATUS wma_mc_process_msg(struct scheduler_msg *msg)
 			(struct sir_antenna_mode_param *)msg->bodyptr);
 		qdf_mem_free(msg->bodyptr);
 		break;
-	case WMA_LRO_CONFIG_CMD:
-		wma_lro_config_cmd(wma_handle,
-			(struct cdp_lro_hash_config *)msg->bodyptr);
-		qdf_mem_free(msg->bodyptr);
-		break;
 	case WMA_GW_PARAM_UPDATE_REQ:
 		wma_set_gateway_params(wma_handle, msg->bodyptr);
 		qdf_mem_free(msg->bodyptr);
@@ -9981,35 +9976,6 @@ QDF_STATUS wma_crash_inject(WMA_HANDLE wma_handle, uint32_t type,
 	param.delay_time_ms = delay_time_ms;
 	return wmi_crash_inject(wma->wmi_handle, &param);
 }
-
-#ifdef RECEIVE_OFFLOAD
-int wma_lro_init(struct cdp_lro_hash_config *lro_config)
-{
-	struct scheduler_msg msg = {0};
-	struct cdp_lro_hash_config *iwcmd;
-
-	iwcmd = qdf_mem_malloc(sizeof(*iwcmd));
-	if (!iwcmd)
-		return -ENOMEM;
-
-	*iwcmd = *lro_config;
-
-	msg.type = WMA_LRO_CONFIG_CMD;
-	msg.reserved = 0;
-	msg.bodyptr = iwcmd;
-
-	if (QDF_STATUS_SUCCESS !=
-		scheduler_post_message(QDF_MODULE_ID_WMA,
-				       QDF_MODULE_ID_WMA,
-				       QDF_MODULE_ID_WMA, &msg)) {
-		qdf_mem_free(iwcmd);
-		return -EAGAIN;
-	}
-
-	wma_debug("sending the LRO configuration to the fw");
-	return 0;
-}
-#endif
 
 QDF_STATUS wma_configure_smps_params(uint32_t vdev_id, uint32_t param_id,
 							uint32_t param_val)
