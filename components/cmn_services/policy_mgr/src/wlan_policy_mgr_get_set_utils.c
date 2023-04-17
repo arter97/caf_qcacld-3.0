@@ -5619,9 +5619,7 @@ policy_mgr_is_mlo_sap_concurrency_allowed(struct wlan_objmgr_psoc *psoc,
 {
 	struct policy_mgr_psoc_priv_obj *pm_ctx;
 	uint32_t conn_index;
-	bool ret = false;
-	uint32_t mlo_sap_count = 0;
-	uint32_t non_mlo_sap_count = 0;
+	bool ret = false, mlo_sap_present = false;
 	struct wlan_objmgr_vdev *vdev;
 	uint32_t vdev_id;
 
@@ -5634,31 +5632,35 @@ policy_mgr_is_mlo_sap_concurrency_allowed(struct wlan_objmgr_psoc *psoc,
 	qdf_mutex_acquire(&pm_ctx->qdf_conc_list_lock);
 	for (conn_index = 0; conn_index < MAX_NUMBER_OF_CONC_CONNECTIONS;
 		 conn_index++) {
-		if (pm_conc_connection_list[conn_index].in_use) {
-			vdev_id = pm_conc_connection_list[conn_index].vdev_id;
-			vdev = wlan_objmgr_get_vdev_by_id_from_psoc(
-					psoc, vdev_id, WLAN_POLICY_MGR_ID);
-			if (!vdev) {
-				policy_mgr_err("vdev for vdev_id:%d is NULL",
-					       vdev_id);
-				qdf_mutex_release(&pm_ctx->qdf_conc_list_lock);
-				return ret;
-			}
-			if (wlan_vdev_mlme_is_mlo_ap(vdev))
-				mlo_sap_count++;
-			else
-				non_mlo_sap_count++;
-			wlan_objmgr_vdev_release_ref(vdev, WLAN_POLICY_MGR_ID);
+		if (!pm_conc_connection_list[conn_index].in_use ||
+		    (pm_conc_connection_list[conn_index].mode != PM_SAP_MODE))
+			continue;
+
+		vdev_id = pm_conc_connection_list[conn_index].vdev_id;
+		vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, vdev_id,
+							    WLAN_POLICY_MGR_ID);
+		if (!vdev) {
+			policy_mgr_err("vdev for vdev_id:%d is NULL", vdev_id);
+			qdf_mutex_release(&pm_ctx->qdf_conc_list_lock);
+			return ret;
 		}
+
+		/* As only one ML SAP is allowed, break after one ML SAP
+		 * instance found in the policy manager list.
+		 */
+		if (wlan_vdev_mlme_is_mlo_vdev(vdev)) {
+			mlo_sap_present = true;
+			wlan_objmgr_vdev_release_ref(vdev, WLAN_POLICY_MGR_ID);
+			break;
+		}
+
+		wlan_objmgr_vdev_release_ref(vdev, WLAN_POLICY_MGR_ID);
 	}
 	qdf_mutex_release(&pm_ctx->qdf_conc_list_lock);
 
-	if (is_new_vdev_mlo)
-		mlo_sap_count++;
+	if (is_new_vdev_mlo && mlo_sap_present)
+		ret = false;
 	else
-		non_mlo_sap_count++;
-
-	if ((mlo_sap_count <= 1) || !non_mlo_sap_count)
 		ret = true;
 
 	return ret;
