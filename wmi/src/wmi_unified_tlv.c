@@ -14322,11 +14322,15 @@ extract_service_ready_ext2_tlv(wmi_unified_t wmi_handle, uint8_t *event,
 	param->num_msdu_idx_qtype_map =
 				param_buf->num_htt_msdu_idx_to_qtype_map;
 
-	if (param_buf->nan_cap)
+	if (param_buf->nan_cap) {
 		param->max_ndp_sessions =
 			param_buf->nan_cap->max_ndp_sessions;
-	else
+		param->max_nan_pairing_sessions =
+			param_buf->nan_cap->max_pairing_sessions;
+	} else {
 		param->max_ndp_sessions = 0;
+		param->max_nan_pairing_sessions = 0;
+	}
 
 	param->preamble_puncture_bw_cap = ev->preamble_puncture_bw;
 	param->num_scan_radio_caps = param_buf->num_wmi_scan_radio_caps;

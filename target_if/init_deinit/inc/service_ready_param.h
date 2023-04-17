@@ -455,6 +455,7 @@ struct wlan_psoc_host_service_ext_param {
  * @num_dbr_ring_caps: Number of direct buf rx ring capabilities
  * @chwidth_num_peer_caps: Peer limit for peer_chan_width_switch WMI cmd
  * @max_ndp_sessions: Max number of ndp session fw supports
+ * @max_nan_pairing_sessions: max number of PASN pairing session allowed on NAN
  * @preamble_puncture_bw_cap: Preamble Puncturing Tx support
  * @num_scan_radio_caps: Number of scan radio capabilities
  * @max_users_dl_ofdma: Max number of users per-PPDU for Downlink OFDMA
@@ -484,6 +485,7 @@ struct wlan_psoc_host_service_ext2_param {
 	uint32_t num_dbr_ring_caps;
 	uint32_t chwidth_num_peer_caps;
 	uint32_t max_ndp_sessions;
+	uint32_t max_nan_pairing_sessions;
 	uint32_t preamble_puncture_bw_cap;
 	uint8_t num_scan_radio_caps;
 	uint16_t max_users_dl_ofdma;
