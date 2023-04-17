@@ -734,6 +734,11 @@ static QDF_STATUS check_dma_length(struct look_up_table *lut,
 		    lut->payload_length <= WAIKIKI_MAX_DATA_LENGTH_BYTES) {
 			return QDF_STATUS_SUCCESS;
 		}
+	} else if (target_type == TARGET_TYPE_QCN6432) {
+		if (lut->header_length <= QCN6432_MAX_HEADER_LENGTH_WORDS &&
+		    lut->payload_length <= QCN6432_MAX_DATA_LENGTH_BYTES) {
+			return QDF_STATUS_SUCCESS;
+		}
 	} else {
 		if (lut->header_length <= CYP_MAX_HEADER_LENGTH_WORDS &&
 		    lut->payload_length <= CYP_MAX_DATA_LENGTH_BYTES) {
@@ -2241,6 +2246,11 @@ QDF_STATUS cfr_enh_init_pdev(struct wlan_objmgr_psoc *psoc,
 		pcfr->num_subbufs = STREAMFS_NUM_SUBBUF_WAIKIKI;
 		pcfr->chip_type = CFR_CAPTURE_RADIO_WAIKIKI;
 		pcfr->max_mu_users = WAIKIKI_CFR_MU_USERS;
+	} else if (target_type == TARGET_TYPE_QCN6432) {
+		pcfr->subbuf_size = STREAMFS_MAX_SUBBUF_QCN6432;
+		pcfr->num_subbufs = STREAMFS_NUM_SUBBUF_QCN6432;
+		pcfr->chip_type = CFR_CAPTURE_RADIO_PEBBLE;
+		pcfr->max_mu_users = QCN6432_CFR_MU_USERS;
 	} else {
 		pcfr->subbuf_size = STREAMFS_MAX_SUBBUF_CYP;
 		pcfr->num_subbufs = STREAMFS_NUM_SUBBUF_CYP;

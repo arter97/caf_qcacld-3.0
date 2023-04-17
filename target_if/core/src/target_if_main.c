@@ -479,6 +479,9 @@ static void target_if_target_tx_ops_register(
 	target_tx_ops->tgt_is_tgt_type_qcn9160 =
 		target_is_tgt_type_qcn9160;
 
+	target_tx_ops->tgt_is_tgt_type_qcn6432 =
+		target_is_tgt_type_qcn6432;
+
 	target_tx_ops->tgt_is_tgt_type_qcn7605 =
 		target_is_tgt_type_qcn7605;
 
@@ -839,6 +842,11 @@ bool target_is_tgt_type_qcn6122(uint32_t target_type)
 bool target_is_tgt_type_qcn9160(uint32_t target_type)
 {
 	return target_type == TARGET_TYPE_QCN9160;
+}
+
+bool target_is_tgt_type_qcn6432(uint32_t target_type)
+{
+	return target_type == TARGET_TYPE_QCN6432;
 }
 
 bool target_is_tgt_type_qcn7605(uint32_t target_type)

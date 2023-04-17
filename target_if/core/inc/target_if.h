@@ -584,6 +584,14 @@ bool target_is_tgt_type_qcn6122(uint32_t target_type);
 bool target_is_tgt_type_qcn9160(uint32_t target_type);
 
 /**
+ * target_is_tgt_type_qcn6432() - Check if the target type is QCN6432 (Pebble)
+ * @target_type: target type to be checked.
+ *
+ * Return: true if the target_type is QCN6432, else false.
+ */
+bool target_is_tgt_type_qcn6432(uint32_t target_type);
+
+/**
  * target_is_tgt_type_qcn7605() - Check if the target type is QCN7605
  * @target_type: target type to be checked.
  *
@@ -2903,7 +2911,8 @@ static inline void target_if_set_reo_shared_qref_feature(struct wlan_objmgr_psoc
 	}
 
 	if (target_psoc_get_target_type(tgt_hdl) == TARGET_TYPE_QCN9224 ||
-	    target_psoc_get_target_type(tgt_hdl) == TARGET_TYPE_QCA5332)
+	    target_psoc_get_target_type(tgt_hdl) == TARGET_TYPE_QCA5332 ||
+	    target_psoc_get_target_type(tgt_hdl) == TARGET_TYPE_QCN6432)
 		info->wlan_res_cfg.reo_qdesc_shared_addr_table_enabled = true;
 	else
 		info->wlan_res_cfg.reo_qdesc_shared_addr_table_enabled = false;

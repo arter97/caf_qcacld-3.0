@@ -1051,7 +1051,8 @@ QDF_STATUS init_deinit_validate_160_80p80_fw_caps(
 	    (tgt_hdl->info.target_type == TARGET_TYPE_QCA8074V2) ||
 	    (tgt_hdl->info.target_type == TARGET_TYPE_QCN6122) ||
 	    (tgt_hdl->info.target_type == TARGET_TYPE_QCN9160) ||
-	    (tgt_hdl->info.target_type == TARGET_TYPE_QCA6290)) {
+	    (tgt_hdl->info.target_type == TARGET_TYPE_QCA6290) ||
+	    (tgt_hdl->info.target_type == TARGET_TYPE_QCN6432)) {
 		/**
 		 * Return true for now. This is not available in
 		 * qca8074 fw yet
