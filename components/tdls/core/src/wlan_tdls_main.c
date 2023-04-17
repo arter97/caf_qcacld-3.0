@@ -56,56 +56,30 @@ static struct tdls_soc_priv_obj *tdls_soc_global;
 static char *tdls_get_cmd_type_str(enum tdls_command_type cmd_type)
 {
 	switch (cmd_type) {
-	case TDLS_CMD_TX_ACTION:
-		return "TDLS_CMD_TX_ACTION";
-	case TDLS_CMD_ADD_STA:
-		return "TDLS_CMD_ADD_STA";
-	case TDLS_CMD_CHANGE_STA:
-		return "TDLS_CMD_CHANGE_STA";
-	case TDLS_CMD_ENABLE_LINK:
-		return "TDLS_CMD_ENABLE_LINK";
-	case TDLS_CMD_DISABLE_LINK:
-		return "TDLS_CMD_DISABLE_LINK";
-	case TDLS_CMD_CONFIG_FORCE_PEER:
-		return "TDLS_CMD_CONFIG_FORCE_PEER";
-	case TDLS_CMD_REMOVE_FORCE_PEER:
-		return "TDLS_CMD_REMOVE_FORCE_PEER";
-	case TDLS_CMD_STATS_UPDATE:
-		return "TDLS_CMD_STATS_UPDATE";
-	case TDLS_CMD_CONFIG_UPDATE:
-		return "TDLS_CMD_CONFIG_UPDATE";
-	case TDLS_CMD_SET_RESPONDER:
-		return "TDLS_CMD_SET_RESPONDER";
-	case TDLS_CMD_SCAN_DONE:
-		return "TDLS_CMD_SCAN_DONE";
-	case TDLS_NOTIFY_STA_CONNECTION:
-		return "TDLS_NOTIFY_STA_CONNECTION";
-	case TDLS_NOTIFY_STA_DISCONNECTION:
-		return "TDLS_NOTIFY_STA_DISCONNECTION";
-	case TDLS_CMD_SET_TDLS_MODE:
-		return "TDLS_CMD_SET_TDLS_MODE";
-	case TDLS_CMD_SESSION_DECREMENT:
-		return "TDLS_CMD_SESSION_DECREMENT";
-	case TDLS_CMD_SESSION_INCREMENT:
-		return "TDLS_CMD_SESSION_INCREMENT";
-	case TDLS_CMD_TEARDOWN_LINKS:
-		return "TDLS_CMD_TEARDOWN_LINKS";
-	case TDLS_NOTIFY_RESET_ADAPTERS:
-		return "TDLS_NOTIFY_RESET_ADAPTERS";
-	case TDLS_CMD_GET_ALL_PEERS:
-		return "TDLS_CMD_GET_ALL_PEERS";
-	case TDLS_CMD_ANTENNA_SWITCH:
-		return "TDLS_CMD_ANTENNA_SWITCH";
-	case TDLS_CMD_START_BSS:
-		return "TDLS_CMD_START_BSS";
-	case TDLS_CMD_SET_OFFCHANMODE:
-		return "TDLS_CMD_SET_OFFCHANMODE";
-	case TDLS_CMD_SET_OFFCHANNEL:
-		return "TDLS_CMD_SET_OFFCHANNEL";
-	case TDLS_CMD_SET_SECOFFCHANOFFSET:
-		return "TDLS_CMD_SET_SECOFFCHANOFFSET";
-	case TDLS_DELETE_ALL_PEERS_INDICATION:
-		return "TDLS_DELETE_ALL_PEERS_INDICATION";
+	CASE_RETURN_STRING(TDLS_CMD_TX_ACTION);
+	CASE_RETURN_STRING(TDLS_CMD_ADD_STA);
+	CASE_RETURN_STRING(TDLS_CMD_CHANGE_STA);
+	CASE_RETURN_STRING(TDLS_CMD_ENABLE_LINK);
+	CASE_RETURN_STRING(TDLS_CMD_DISABLE_LINK);
+	CASE_RETURN_STRING(TDLS_CMD_CONFIG_FORCE_PEER);
+	CASE_RETURN_STRING(TDLS_CMD_REMOVE_FORCE_PEER);
+	CASE_RETURN_STRING(TDLS_CMD_STATS_UPDATE);
+	CASE_RETURN_STRING(TDLS_CMD_CONFIG_UPDATE);
+	CASE_RETURN_STRING(TDLS_CMD_SCAN_DONE);
+	CASE_RETURN_STRING(TDLS_CMD_SET_RESPONDER);
+	CASE_RETURN_STRING(TDLS_NOTIFY_STA_CONNECTION);
+	CASE_RETURN_STRING(TDLS_NOTIFY_STA_DISCONNECTION);
+	CASE_RETURN_STRING(TDLS_CMD_SET_TDLS_MODE);
+	CASE_RETURN_STRING(TDLS_CMD_SESSION_INCREMENT);
+	CASE_RETURN_STRING(TDLS_CMD_SESSION_DECREMENT);
+	CASE_RETURN_STRING(TDLS_CMD_TEARDOWN_LINKS);
+	CASE_RETURN_STRING(TDLS_NOTIFY_RESET_ADAPTERS);
+	CASE_RETURN_STRING(TDLS_CMD_ANTENNA_SWITCH);
+	CASE_RETURN_STRING(TDLS_CMD_SET_OFFCHANMODE);
+	CASE_RETURN_STRING(TDLS_CMD_SET_OFFCHANNEL);
+	CASE_RETURN_STRING(TDLS_CMD_SET_SECOFFCHANOFFSET);
+	CASE_RETURN_STRING(TDLS_DELETE_ALL_PEERS_INDICATION);
+	CASE_RETURN_STRING(TDLS_CMD_START_BSS);
 	default:
 		return "Invalid TDLS command";
 	}
@@ -841,44 +815,6 @@ QDF_STATUS tdls_get_vdev_objects(struct wlan_objmgr_vdev *vdev,
 	return QDF_STATUS_SUCCESS;
 }
 
-QDF_STATUS tdls_set_offchan_mode(struct wlan_objmgr_psoc *psoc,
-				     struct tdls_channel_switch_params *param)
-{
-	QDF_STATUS status;
-
-	/*  wmi_unified_set_tdls_offchan_mode_cmd() will be called directly */
-	status = tgt_tdls_set_offchan_mode(psoc, param);
-
-	if (!QDF_IS_STATUS_SUCCESS(status))
-		status = QDF_STATUS_E_FAILURE;
-
-	return status;
-}
-
-/**
- * tdls_update_fw_tdls_state() - update tdls status info
- * @tdls_soc_obj: TDLS soc object
- * @tdls_info_to_fw: TDLS state info to update in f/w.
- *
- * send message to WMA to set TDLS state in f/w
- *
- * Return: QDF_STATUS.
- */
-static
-QDF_STATUS tdls_update_fw_tdls_state(struct tdls_soc_priv_obj *tdls_soc_obj,
-				     struct tdls_info *tdls_info_to_fw)
-{
-	QDF_STATUS status;
-
-	/*  wmi_unified_update_fw_tdls_state_cmd() will be called directly */
-	status = tgt_tdls_set_fw_state(tdls_soc_obj->soc, tdls_info_to_fw);
-
-	if (!QDF_IS_STATUS_SUCCESS(status))
-		status = QDF_STATUS_E_FAILURE;
-
-	return status;
-}
-
 #ifdef WLAN_FEATURE_11AX
 uint32_t tdls_get_6g_pwr_for_power_type(struct wlan_objmgr_vdev *vdev,
 					qdf_freq_t freq,
@@ -1508,8 +1444,8 @@ void tdls_send_update_to_fw(struct tdls_vdev_priv_obj *tdls_vdev_obj,
 	if (!sta_connect_event)
 		tdls_soc_obj->set_state_info.set_state_cnt--;
 
-	status = tdls_update_fw_tdls_state(tdls_soc_obj, tdls_info_to_fw);
-	if (QDF_STATUS_SUCCESS != status)
+	status = tgt_tdls_set_fw_state(tdls_soc_obj->soc, tdls_info_to_fw);
+	if (QDF_IS_STATUS_ERROR(status))
 		goto done;
 
 	if (sta_connect_event) {

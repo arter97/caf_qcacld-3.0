@@ -826,19 +826,6 @@ void tdls_scan_done_callback(struct tdls_soc_priv_obj *tdls_soc);
 void tdls_scan_serialization_comp_info_cb(struct wlan_objmgr_vdev *vdev,
 		union wlan_serialization_rules_info *comp_info,
 		struct wlan_serialization_command *cmd);
-
-/**
- * tdls_set_offchan_mode() - update tdls status info
- * @psoc: soc object
- * @param: channel switch params
- *
- * send message to WMI to set TDLS off channel in f/w
- *
- * Return: QDF_STATUS.
- */
-QDF_STATUS tdls_set_offchan_mode(struct wlan_objmgr_psoc *psoc,
-				     struct tdls_channel_switch_params *param);
-
 /**
  * tdls_check_and_indicate_delete_all_peers() - Check if delete all peers is
  * allowed for the vdev based on current concurrency.

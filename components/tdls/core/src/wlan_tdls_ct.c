@@ -31,6 +31,7 @@
 #include "wlan_tdls_cmds_process.h"
 #include "wlan_reg_services_api.h"
 #include "wlan_policy_mgr_api.h"
+#include "wlan_tdls_tgt_api.h"
 
 bool tdls_is_vdev_authenticated(struct wlan_objmgr_vdev *vdev)
 {
@@ -1346,7 +1347,7 @@ int tdls_set_tdls_offchannelmode(struct wlan_objmgr_vdev *vdev,
 		    chan_switch_params->tdls_sw_mode,
 		    chan_switch_params->is_responder);
 
-	status = tdls_set_offchan_mode(tdls_soc->soc, chan_switch_params);
+	status = tgt_tdls_set_offchan_mode(tdls_soc->soc, chan_switch_params);
 	if (QDF_IS_STATUS_ERROR(status)) {
 		qdf_mem_free(chan_switch_params);
 		tdls_err("Failed to send channel switch request to wmi");
