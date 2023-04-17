@@ -285,7 +285,7 @@ QDF_STATUS osif_disconnect_handler(struct wlan_objmgr_vdev *vdev,
 {
 	enum ieee80211_reasoncode ieee80211_reason;
 	struct vdev_osif_priv *osif_priv = wlan_vdev_get_ospriv(vdev);
-	bool locally_generated = true;
+	bool locally_generated;
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
 	enum qca_disconnect_reason_codes qca_reason;
 	int link_id = -1;
@@ -297,11 +297,11 @@ QDF_STATUS osif_disconnect_handler(struct wlan_objmgr_vdev *vdev,
 
 	locally_generated = osif_is_disconnect_locally_generated(rsp);
 
-	osif_nofl_info("%s(vdevid-%d): " QDF_MAC_ADDR_FMT " %sdisconnect " QDF_MAC_ADDR_FMT " cm_id 0x%x source %d reason:%u %s vendor:%u %s",
+	osif_nofl_info("%s(vdevid-%d): " QDF_MAC_ADDR_FMT " %s disconnect " QDF_MAC_ADDR_FMT " cmid 0x%x src %d reason:%u %s vendor:%u %s",
 		       osif_priv->wdev->netdev->name,
 		       rsp->req.req.vdev_id,
 		       QDF_MAC_ADDR_REF(wlan_vdev_mlme_get_macaddr(vdev)),
-		       locally_generated ? "locally-generated " : "",
+		       locally_generated ? "locally-generated" : "",
 		       QDF_MAC_ADDR_REF(rsp->req.req.bssid.bytes),
 		       rsp->req.cm_id, rsp->req.req.source, ieee80211_reason,
 		       ucfg_cm_reason_code_to_str(rsp->req.req.reason_code),
