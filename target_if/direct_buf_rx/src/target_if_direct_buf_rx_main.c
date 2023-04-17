@@ -2318,7 +2318,7 @@ static QDF_STATUS target_if_dbr_deinit_ring(struct wlan_objmgr_pdev *pdev,
 	dbr_ring_cfg = mod_param->dbr_ring_cfg;
 	if (dbr_ring_cfg) {
 		target_if_dbr_empty_ring(pdev, dbr_psoc_obj, mod_param);
-		hal_srng_cleanup(dbr_psoc_obj->hal_soc, dbr_ring_cfg->srng);
+		hal_srng_cleanup(dbr_psoc_obj->hal_soc, dbr_ring_cfg->srng, 0);
 		qdf_mem_free_consistent(dbr_psoc_obj->osdev,
 					dbr_psoc_obj->osdev->dev,
 					dbr_ring_cfg->ring_alloc_size,

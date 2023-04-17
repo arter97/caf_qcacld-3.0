@@ -2515,7 +2515,8 @@ void dp_srng_deinit(struct dp_soc *soc, struct dp_srng *srng,
 						       ring_num);
 
 srng_cleanup:
-	hal_srng_cleanup(soc->hal_soc, srng->hal_srng);
+	hal_srng_cleanup(soc->hal_soc, srng->hal_srng,
+			 dp_check_umac_reset_in_progress(soc));
 	srng->hal_srng = NULL;
 }
 

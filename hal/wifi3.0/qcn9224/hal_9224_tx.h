@@ -33,6 +33,28 @@
 #define HAL_TX_NUM_DSCP_REGISTER_SIZE 32
 
 /**
+ * hal_tx_ppe2tcl_ring_halt_get_9224() - Get ring halt for the ppe2tcl ring
+ * @hal_soc: HAL SoC context
+ *
+ * Return: Ring halt status.
+ */
+static uint32_t hal_tx_ppe2tcl_ring_halt_get_9224(hal_soc_handle_t hal_soc)
+{
+	uint32_t cmn_reg_addr;
+	uint32_t regval;
+	struct hal_soc *soc = (struct hal_soc *)hal_soc;
+
+	cmn_reg_addr =
+		HWIO_TCL_R0_CONS_RING_CMN_CTRL_REG_ADDR(MAC_TCL_REG_REG_BASE);
+
+	/* Get RING_HALT status */
+	regval = HAL_REG_READ(soc, cmn_reg_addr);
+	return (regval &
+	    (1 <<
+	    HWIO_TCL_R0_CONS_RING_CMN_CTRL_REG_PPE2TCL1_RNG_HALT_SHFT));
+}
+
+/**
  * hal_tx_ppe2tcl_ring_halt_set_9224() - Enable ring halt for the ppe2tcl ring
  * @hal_soc: HAL SoC context
  *
