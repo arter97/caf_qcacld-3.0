@@ -751,4 +751,17 @@ QDF_STATUS wlan_mlo_validate_reassocreq(struct wlan_mlo_peer_context *ml_peer);
  */
 void wlan_objmgr_mlo_update_primary_info(struct wlan_objmgr_peer *peer);
 #endif
+
+/**
+ * wlan_mld_get_best_primary_umac_w_rssi() - API to get primary umac using rssi
+ * @ml_peer: ml peer object
+ * @link_vdevs: list of vdevs from which new primary link is to be selected
+ *
+ * API to get primary umac using rssi
+ *
+ * Return: primary umac psoc id
+ */
+uint8_t
+wlan_mld_get_best_primary_umac_w_rssi(struct wlan_mlo_peer_context *ml_peer,
+				      struct wlan_objmgr_vdev *link_vdevs[]);
 #endif
