@@ -425,6 +425,7 @@ static void lim_send_mlm_assoc_req(struct mac_context *mac_ctx,
 		session_entry, QDF_STATUS_SUCCESS, QDF_STATUS_SUCCESS);
 #endif
 	assoc_req->listenInterval = (uint16_t) val;
+	pe_debug("Listen Interval : %d", assoc_req->listenInterval);
 	/* Update PE session ID */
 	assoc_req->sessionId = session_entry->peSessionId;
 	session_entry->limPrevSmeState = session_entry->limSmeState;

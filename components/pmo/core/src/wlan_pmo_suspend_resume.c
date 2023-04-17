@@ -1671,6 +1671,7 @@ QDF_STATUS pmo_core_config_listen_interval(struct wlan_objmgr_vdev *vdev,
 
 	pmo_debug("Set Listen Interval %d for vdevId %d", listen_interval,
 			vdev_id);
+	ucfg_mlme_set_sap_listen_interval(psoc, listen_interval);
 	status = pmo_tgt_vdev_update_param_req(vdev,
 					       pmo_vdev_param_listen_interval,
 					       listen_interval);
