@@ -2481,6 +2481,16 @@ void policy_mgr_checkn_update_hw_mode_single_mac_mode(
 void policy_mgr_dump_connection_status_info(struct wlan_objmgr_psoc *psoc);
 
 /**
+ * policy_mgr_mode_get_macid_by_vdev_id() - get macid from vdev_id
+ * @psoc: PSOC object information
+ * @vdev_id: vdev id to get PCL
+ *
+ * Return: mac id
+ */
+uint32_t policy_mgr_mode_get_macid_by_vdev_id(struct wlan_objmgr_psoc *psoc,
+					      uint32_t vdev_id);
+
+/**
  * policy_mgr_mode_specific_vdev_id() - provides the
  * vdev id of the pecific mode
  * @psoc: PSOC object information
@@ -3495,11 +3505,23 @@ bool policy_mgr_sap_allowed_on_indoor_freq(struct wlan_objmgr_psoc *psoc,
  * @sap_ch_freq: sap channel frequency.
  *
  * This function returns an alternate channel for SAP to move to
+ *
  * Return: The new channel for SAP
  */
 uint32_t policy_mgr_get_alternate_channel_for_sap(
 	struct wlan_objmgr_psoc *psoc, uint8_t sap_vdev_id,
 	uint32_t sap_ch_freq);
+
+/**
+ * policy_mgr_con_mode_by_vdev_id() - Get policy mgr con mode from vdev id
+ * @psoc: psoc object
+ * @vdev_id: vdev id
+ *
+ * return: enum policy_mgr_con_mode for the vdev id
+ */
+enum policy_mgr_con_mode
+policy_mgr_con_mode_by_vdev_id(struct wlan_objmgr_psoc *psoc,
+			       uint8_t vdev_id);
 
 /**
  * policy_mgr_disallow_mcc() - Check for mcc
