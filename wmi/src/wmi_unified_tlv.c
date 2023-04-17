@@ -22289,6 +22289,9 @@ static void populate_tlv_service(uint32_t *wmi_service)
 			WMI_SERVICE_CCA_BUSY_INFO_FOREACH_20MHZ;
 	wmi_service[wmi_service_vdev_param_chwidth_with_notify_support] =
 			WMI_SERVICE_VDEV_PARAM_CHWIDTH_WITH_NOTIFY_SUPPORT;
+#ifdef WLAN_FEATURE_11BE_MLO
+	wmi_service[wmi_service_mlo_tsf_sync] = WMI_SERVICE_MLO_TSF_SYNC;
+#endif
 }
 
 /**
