@@ -9388,20 +9388,9 @@ void wmi_copy_resource_config(wmi_resource_config *resource_cfg,
 	/*
 	 * DP Peer Meta data FW version
 	 */
-	if (tgt_res_cfg->dp_peer_meta_data_ver) {
-#ifdef CONFIG_AP_PLATFORM
-		WMI_RSRC_CFG_FLAGS2_RX_PEER_METADATA_VERSION_SET(
-			resource_cfg->flags2, 3);
-#else
-		WMI_RSRC_CFG_FLAGS2_RX_PEER_METADATA_VERSION_SET(
-			resource_cfg->flags2, 2);
-#endif
-	} else {
-		WMI_RSRC_CFG_FLAGS2_RX_PEER_METADATA_VERSION_SET(
+	WMI_RSRC_CFG_FLAGS2_RX_PEER_METADATA_VERSION_SET(
 			resource_cfg->flags2,
-			WMI_TARGET_CAP_FLAGS_RX_PEER_METADATA_VERSION_GET(
-			tgt_res_cfg->target_cap_flags));
-	}
+			tgt_res_cfg->dp_peer_meta_data_ver);
 
 	if (tgt_res_cfg->notify_frame_support)
 		WMI_RSRC_CFG_FLAGS2_NOTIFY_FRAME_CONFIG_ENABLE_SET(
@@ -14316,6 +14305,10 @@ extract_service_ready_ext2_tlv(wmi_unified_t wmi_handle, uint8_t *event,
 	param->max_users_ul_mumimo = WMI_MAX_USER_PER_PPDU_UL_MUMIMO_GET(
 						ev->max_user_per_ppdu_mumimo);
 	param->target_cap_flags = ev->target_cap_flags;
+
+	param->dp_peer_meta_data_ver =
+			WMI_TARGET_CAP_FLAGS_RX_PEER_METADATA_VERSION_GET(
+						ev->target_cap_flags);
 	extract_ul_mumimo_support(param);
 	wmi_debug("htt peer data :%d", ev->target_cap_flags);
 

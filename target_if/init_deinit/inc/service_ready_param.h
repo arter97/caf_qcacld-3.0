@@ -465,6 +465,7 @@ struct wlan_psoc_host_service_ext_param {
  * @sap_coex_fixed_chan_support: Indicates if fw supports coex SAP in
  *                               fixed chan config
  * @target_cap_flags: Rx peer metadata version number used by target
+ * @dp_peer_meta_data_ver: DP peer metadata version reported by target
  * @ul_mumimo_tx_2g: UL MUMIMO Tx support for 2GHz
  * @ul_mumimo_tx_5g: UL MUMIMO Tx support for 5GHz
  * @ul_mumimo_tx_6g: UL MUMIMO Tx support for 6GHz
@@ -492,6 +493,7 @@ struct wlan_psoc_host_service_ext2_param {
 	uint32_t twt_ack_support_cap:1;
 	uint32_t sap_coex_fixed_chan_support:1;
 	uint32_t target_cap_flags;
+	uint8_t dp_peer_meta_data_ver;
 	uint8_t ul_mumimo_tx_2g:1,
 		ul_mumimo_tx_5g:1,
 		ul_mumimo_tx_6g:1,
