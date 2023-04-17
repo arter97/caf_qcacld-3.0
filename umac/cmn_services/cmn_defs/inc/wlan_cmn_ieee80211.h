@@ -1010,6 +1010,28 @@ enum wlan_reason_code {
  * listen interval is too large.
  * @STATUS_INVALID_FT_ACTION_FRAME_COUNT: Invalid FT Action frame count.
  * @STATUS_INVALID_PMKID: Invalid pairwise master key identifier (PMKID).
+ * @STATUS_DENIED_STA_AFFILIATED_WITH_MLD_WITH_EXISTING_MLD_ASSOC: Association
+ * denied because the requesting STA is affiliated with a non-AP MLD that is
+ * associated with the AP MLD.
+ * @STATUS_EPCS_DENIED_UNAUTHORIZED: EPCS priority access denied because the
+ * non-AP MLD is not authorized to use the service.
+ * @STATUS_EPCS_DENIED_OTHER_REASON: EPCS priority access denied due to a
+ * reason outside the scope of this standard.
+ * @STATUS_DENIED_TID_TO_LINK_MAPPING: Request denied because the requested
+ * TID-to-link mapping is unacceptable.
+ * @STATUS_PREFERRED_TID_TO_LINK_MAPPING_SUGGESTED: Preferred TID-to-link
+ * mapping suggested.
+ * @STATUS_DENIED_EHT_NOT_SUPPORTED: Association denied because the requesting
+ * STA does not support EHT features.
+ * @STATUS_DENIED_LINK_ON_WHICH_THE_ASSOC_FRAME_IS_TXED_NOT_ACCEPTED: Link not
+ * accepted because the link on which the (Re)Association Request frame is
+ * transmitted is not accepted.
+ * @STATUS_EPCS_DENIED_VERIFICATION_FAILURE: EPCS priority access is
+ * temporarily denied because the receiving AP MLD is unable to verify that the
+ * non-AP MLD is authorized for an unspecified reason.
+ * @STATUS_DENIED_OPERATION_PARAMETER_UPDATE: Operation parameter update denied
+ * because the requested operation parameters or capabilities are not
+ * acceptable.
  *
  * Internal status codes: Add any internal status code just after
  * STATUS_PROP_START and decrease the value of STATUS_PROP_START
@@ -1071,6 +1093,15 @@ enum wlan_status_code {
 	STATUS_ASSOC_DENIED_LISTEN_INT_TOO_LARGE = 51,
 	STATUS_INVALID_FT_ACTION_FRAME_COUNT = 52,
 	STATUS_INVALID_PMKID = 53,
+	STATUS_DENIED_STA_AFFILIATED_WITH_MLD_WITH_EXISTING_MLD_ASSOC = 130,
+	STATUS_EPCS_DENIED_UNAUTHORIZED = 131,
+	STATUS_EPCS_DENIED_OTHER_REASON = 132,
+	STATUS_DENIED_TID_TO_LINK_MAPPING = 133,
+	STATUS_PREFERRED_TID_TO_LINK_MAPPING_SUGGESTED = 134,
+	STATUS_DENIED_EHT_NOT_SUPPORTED = 135,
+	STATUS_DENIED_LINK_ON_WHICH_THE_ASSOC_FRAME_IS_TXED_NOT_ACCEPTED = 139,
+	STATUS_EPCS_DENIED_VERIFICATION_FAILURE = 140,
+	STATUS_DENIED_OPERATION_PARAMETER_UPDATE = 141,
 
 	/* Error STATUS code for intenal usage*/
 	STATUS_PROP_START = 65528,
