@@ -2494,6 +2494,16 @@ void policy_mgr_checkn_update_hw_mode_single_mac_mode(
 void policy_mgr_dump_connection_status_info(struct wlan_objmgr_psoc *psoc);
 
 /**
+ * policy_mgr_mode_get_macid_by_vdev_id() - get macid from vdev_id
+ * @psoc: PSOC object information
+ * @vdev_id: vdev id to get PCL
+ *
+ * Return: mac id
+ */
+uint32_t policy_mgr_mode_get_macid_by_vdev_id(struct wlan_objmgr_psoc *psoc,
+					      uint32_t vdev_id);
+
+/**
  * policy_mgr_mode_specific_vdev_id() - provides the
  * vdev id of the pecific mode
  * @psoc: PSOC object information
