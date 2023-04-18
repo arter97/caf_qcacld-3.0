@@ -1114,6 +1114,7 @@ wlan_rptr_conn_up_dbdc_process(struct wlan_objmgr_vdev *vdev,
 #if QCA_AIRTIME_FAIRNESS
 	struct ieee80211vap *vap = wlan_vdev_get_vap(vdev);
 #endif
+	osif_dev *osdev;
 
 	g_priv = wlan_rptr_get_global_ctx();
 	ext_cb = &g_priv->ext_cbacks;
@@ -1137,8 +1138,9 @@ wlan_rptr_conn_up_dbdc_process(struct wlan_objmgr_vdev *vdev,
 #endif
 	RPTR_GLOBAL_UNLOCK(&g_priv->rptr_global_lock);
 
+	osdev = ath_netdev_priv(dev);
 	if (wiphy && dev)
-		qca_multi_link_add_station_vap(wiphy, dev, wlan_vdev_mlme_get_mldaddr(vdev));
+		qca_multi_link_add_station_vap(wiphy, dev, osif_get_mld_netdev(osdev), wlan_vdev_mlme_get_mldaddr(vdev));
 
 	qca_multi_link_append_num_sta(true);
 
