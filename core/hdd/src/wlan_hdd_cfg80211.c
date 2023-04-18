@@ -21712,6 +21712,9 @@ static int wlan_hdd_add_key_mlo_vdev(mac_handle_t mac_handle,
 		return errno;
 	}
 
+	if (link_vdev)
+		ucfg_tdls_put_tdls_link_vdev(link_vdev, WLAN_OSIF_TDLS_ID);
+
 	if (wlan_vdev_get_link_id(adapter->deflink->vdev) == link_id) {
 		hdd_debug("add_key for same vdev: %d",
 			  adapter->deflink->vdev_id);
