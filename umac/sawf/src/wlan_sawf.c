@@ -55,7 +55,7 @@ QDF_STATUS wlan_sawf_init(void)
 
 	qdf_spinlock_create(&g_wlan_sawf_ctx->lock);
 
-	qdf_info("SAWF: SAWF ctx is initialized");
+	qdf_debug("SAWF: SAWF ctx is initialized");
 	return QDF_STATUS_SUCCESS;
 }
 

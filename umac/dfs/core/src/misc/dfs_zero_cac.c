@@ -1407,12 +1407,12 @@ void dfs_agile_soc_obj_init(struct wlan_dfs *dfs,
 
 	dfs_soc_obj = dfs->dfs_soc_obj;
 	dfs->dfs_psoc_idx = dfs_soc_obj->num_dfs_privs;
-	dfs_info(dfs, WLAN_DEBUG_DFS_ALWAYS,
+	dfs_debug(dfs, WLAN_DEBUG_DFS,
 		 "dfs->dfs_psoc_idx: %d ", dfs->dfs_psoc_idx);
 	dfs_soc_obj->dfs_priv[dfs_soc_obj->num_dfs_privs].dfs = dfs;
 	dfs_soc_obj->num_dfs_privs++;
 
-	dfs_info(dfs, WLAN_DEBUG_DFS_ALWAYS, "dfs_soc_obj->num_dfs_privs: %d ",
+	dfs_debug(dfs, WLAN_DEBUG_DFS, "dfs_soc_obj->num_dfs_privs: %d ",
 		 dfs_soc_obj->num_dfs_privs);
 }
 #endif
