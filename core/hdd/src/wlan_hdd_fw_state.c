@@ -63,6 +63,54 @@ static void hdd_get_fw_state_cb(void *context)
 	osif_request_put(request);
 }
 
+int wlan_hdd_get_fw_state(struct hdd_adapter *adapter)
+{
+	struct hdd_context *hdd_ctx = adapter->hdd_ctx;
+	QDF_STATUS status;
+	int ret;
+	void *cookie;
+	struct fw_state *priv;
+	static const struct osif_request_params params = {
+		.priv_size = sizeof(*priv),
+		.timeout_ms = WLAN_WAIT_TIME_LINK_STATUS,
+	};
+	struct osif_request *request;
+	bool fw_active;
+
+	if (wlan_hdd_validate_context(hdd_ctx) != 0)
+		return false;
+
+	request = osif_request_alloc(&params);
+	if (!request) {
+		hdd_err("Request allocation failure");
+		return false;
+	}
+
+	cookie = osif_request_cookie(request);
+
+	status = sme_get_fw_state(adapter->hdd_ctx->mac_handle,
+				   hdd_get_fw_state_cb,
+				   cookie);
+	if (QDF_STATUS_SUCCESS != status) {
+		hdd_err("Unable to retrieve firmware status");
+		fw_active = false;
+	} else {
+		/* request is sent -- wait for the response */
+		ret = osif_request_wait_for_response(request);
+		if (ret) {
+			hdd_err("SME timed out while retrieving firmware status");
+			fw_active = false;
+		} else {
+			priv = osif_request_priv(request);
+			fw_active = priv->fw_active;
+		}
+	}
+
+	osif_request_put(request);
+
+	return fw_active;
+}
+
 /**
  * hdd_post_get_fw_state_rsp - send rsp to user space
  * @hdd_ctx: pointer to hdd context
