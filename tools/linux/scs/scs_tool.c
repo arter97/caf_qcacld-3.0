@@ -27,6 +27,7 @@
 #include <libsalrule/sal_rule.h>
 #include <cfg80211_nlwrapper_api.h>
 #include <qca_vendor.h>
+#include <cfg80211_external.h>
 
 #define SCS_SPM_RULE_CLASSIFIER_TYPE         2
 #define SAWF_SCS_SPM_RULE_CLASSIFIER_TYPE    4
@@ -63,7 +64,7 @@ static int verbose;
 
 struct callback {
 	uint32_t cmd_id;
-	void (*cb)(void *cbd, uint8_t *buf, size_t buf_len);
+	void (*cb)(void *cbd, uint8_t *buf, size_t buf_len, char *ifname);
 	void *cbd;
 };
 
@@ -76,7 +77,8 @@ struct sal_ctxt {
 	struct sal_rule_socket *rs;
 };
 
-static void scs_tool_nl_sal_cb(void *cbd, uint8_t *buf, size_t buf_len);
+static void scs_tool_nl_sal_cb(void *cbd, uint8_t *buf, size_t buf_len,
+				char *ifname);
 
 static struct sal_ctxt g_sal_ctxt;
 
@@ -175,7 +177,8 @@ static void scs_tool_get_mac_addr(void *data, uint8_t *mac_addr)
 }
 
 static int
-scs_tool_fill_sal_rule(uint8_t *data, size_t len, struct sp_rule *rule)
+scs_tool_fill_sal_rule(uint8_t *data, size_t len, struct sp_rule *rule,
+			uint8_t *type)
 {
 	struct nlattr *tb_array[QCA_WLAN_VENDOR_ATTR_SCS_RULE_CONFIG_MAX + 1];
 	struct nlattr *tb;
@@ -220,7 +223,7 @@ scs_tool_fill_sal_rule(uint8_t *data, size_t len, struct sp_rule *rule)
 		}
 
 		rule->add_del_rule = spm_cmd;
-
+		*type = spm_cmd;
 		if (rule->add_del_rule == SCS_SPM_CMD_DELETE)
 			goto done;
 	} else {
@@ -442,10 +445,27 @@ done:
 	return 0;
 }
 
-static void scs_tool_nl_sal_cb(void *cbd, uint8_t *data, size_t len)
+static int32_t
+scs_tool_nl_prepare_response(struct nl_msg *nlmsg, uint32_t rule_id)
 {
-	struct sal_ctxt *ctxt = (struct sal_ctxt *)cbd;
+	if (nla_put_u32(nlmsg, QCA_WLAN_VENDOR_ATTR_SCS_CONFIG_RESP_RULE_ID,
+	    rule_id))
+		return -EIO;
+
+	return 0;
+}
+
+static void scs_tool_nl_sal_cb(void *cbd, uint8_t *data, size_t len,
+				char *ifname)
+{
 	int r;
+	uint32_t rul_ret = 0;
+	uint8_t type = 0;
+	int ret = 0;
+
+	struct nl_msg *nlmsg = NULL;
+	struct sal_ctxt *ctxt = (struct sal_ctxt *)cbd;
+	struct nlattr *nl_ven_data = NULL;
 
 	if (!ctxt->rs->sk)
 		return;
@@ -453,29 +473,55 @@ static void scs_tool_nl_sal_cb(void *cbd, uint8_t *data, size_t len)
 	PRINT_IF_VERB(".......... SCS EVENT RECEIVED .........\n");
 
 	memset(&ctxt->rs->rule, 0, sizeof(struct sp_rule));
-	r = scs_tool_fill_sal_rule(data, len, &ctxt->rs->rule);
+	r = scs_tool_fill_sal_rule(data, len, &ctxt->rs->rule, &type);
 	if (r < 0) {
 		PRINT_IF_VERB("Unable to set SPM rule");
 		return;
 	}
 
-	scs_tool_send_sal_rule(ctxt);
-}
+	rul_ret = scs_tool_send_sal_rule(ctxt);
 
-/*****************************************************************************/
+	/* Send NL msg if rule population failed and request type is ADD */
+	if (rul_ret && type == SCS_SPM_CMD_ADD) {
+		nlmsg = wifi_cfg80211_prepare_command(&g_nl_ctxt.cfg80211_ctxt,
+						      QCA_NL80211_VENDOR_SUBCMD_SCS_RULE_CONFIG_RESP,
+						      ifname);
+		if (nlmsg) {
+			nl_ven_data = (struct nlattr *)start_vendor_data(nlmsg);
+			if (!nl_ven_data) {
+				PRINT_IF_VERB("Failed to get vender data\n");
+				nlmsg_free(nlmsg);
+				return;
+			}
+
+			ret = scs_tool_nl_prepare_response(nlmsg, rul_ret);
+			if (ret) {
+				PRINT_IF_VERB("Failed to prepare message\n");
+				nlmsg_free(nlmsg);
+				return;
+			}
+			end_vendor_data(nlmsg, nl_ven_data);
+			ret = send_nlmsg(&g_nl_ctxt.cfg80211_ctxt, nlmsg, NULL);
+			if (ret < 0)
+				PRINT_IF_VERB("Couldn't send NL command, ret = %d\n", ret);
+		} else {
+			PRINT_IF_VERB("Unable to prepare NL command!\n");
+		}
+	}
+}
 
 static void
 scs_tool_dispatch_nl_event(struct nl_ctxt *ctxt, uint32_t cmdid,
-			   uint8_t *data, size_t len)
+			   uint8_t *data, size_t len, char *ifname)
 {
 	if (cmdid == QCA_NL80211_VENDOR_SUBCMD_SCS_RULE_CONFIG)
-		ctxt->scs_cb.cb(ctxt->scs_cb.cbd, data, len);
+		ctxt->scs_cb.cb(ctxt->scs_cb.cbd, data, len, ifname);
 }
 
 static void
 scs_tool_qca_nl_cb(char *ifname, uint32_t cmdid, uint8_t *data, size_t len)
 {
-	scs_tool_dispatch_nl_event(&g_nl_ctxt, cmdid, data, len);
+	scs_tool_dispatch_nl_event(&g_nl_ctxt, cmdid, data, len, ifname);
 }
 
 static struct nl_ctxt *scs_tool_nl_init(void)
