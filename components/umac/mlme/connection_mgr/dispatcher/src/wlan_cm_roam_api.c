@@ -444,7 +444,8 @@ wlan_cm_dual_sta_is_freq_allowed(struct wlan_objmgr_psoc *psoc,
 	if (!connected_sta_freq)
 		return true;
 
-	if (policy_mgr_are_2_freq_on_same_mac(psoc, freq, connected_sta_freq))
+	if (policy_mgr_2_freq_always_on_same_mac(psoc, freq,
+						 connected_sta_freq))
 		return false;
 
 	return true;
@@ -3902,4 +3903,18 @@ wlan_cm_get_assoc_btm_cap(struct wlan_objmgr_vdev *vdev)
 		return true;
 
 	return mlme_priv->connect_info.assoc_btm_cap;
+}
+
+bool wlan_cm_is_self_mld_roam_supported(struct wlan_objmgr_psoc *psoc)
+{
+	struct wmi_unified *wmi_handle;
+
+	wmi_handle = get_wmi_unified_hdl_from_psoc(psoc);
+	if (!wmi_handle) {
+		mlme_debug("Invalid WMI handle");
+		return false;
+	}
+
+	return wmi_service_enabled(wmi_handle,
+				   wmi_service_self_mld_roam_between_dbs_and_hbs);
 }

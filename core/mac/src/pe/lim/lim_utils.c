@@ -7395,6 +7395,8 @@ lim_revise_req_he_cap_per_band(struct mlme_legacy_priv *mlme_priv,
 			mac->he_cap_2g.tx_he_mcs_map_lt_80;
 		he_config->rx_he_mcs_map_lt_80 =
 			mac->he_cap_2g.rx_he_mcs_map_lt_80;
+		he_config->max_ampdu_len_exp_ext =
+			mac->he_cap_2g.max_ampdu_len_exp_ext;
 		he_config->ul_2x996_tone_ru_supp = 0;
 		he_config->num_sounding_gt_80 = 0;
 		he_config->bfee_sts_gt_80 = 0;
@@ -7412,6 +7414,8 @@ lim_revise_req_he_cap_per_band(struct mlme_legacy_priv *mlme_priv,
 
 		he_config->num_sounding_lt_80 =
 			mac->he_cap_5g.num_sounding_lt_80;
+		he_config->max_ampdu_len_exp_ext =
+			mac->he_cap_5g.max_ampdu_len_exp_ext;
 		if (he_config->chan_width_2 ||
 		    he_config->chan_width_3) {
 			he_config->bfee_sts_gt_80 =
@@ -10614,6 +10618,8 @@ QDF_STATUS lim_set_ch_phy_mode(struct wlan_objmgr_vdev *vdev, uint8_t dot11mode)
 			wlan_reg_chan_band_to_freq(mac_ctx->pdev,
 						   des_chan->ch_freq_seg1,
 						   band_mask);
+		} else if (bw_val >= 160) {
+			pe_debug("Skip center_freq check for bw %d", bw_val);
 		} else {
 			pe_err("Invalid cntr_freq for bw %d, drop to 20",
 			       bw_val);
