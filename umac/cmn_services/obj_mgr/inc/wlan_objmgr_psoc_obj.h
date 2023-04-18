@@ -356,8 +356,8 @@ struct wlan_objmgr_psoc_objmgr {
 	uint8_t psoc_id;
 	uint8_t wlan_pdev_count;
 	uint8_t wlan_pdev_id_map;
-	uint8_t wlan_vdev_count;
-	uint8_t max_vdev_count;
+	uint16_t wlan_vdev_count;
+	uint16_t max_vdev_count;
 	uint8_t print_cnt;
 	uint16_t wlan_peer_count;
 	uint16_t max_peer_count;
@@ -1720,7 +1720,7 @@ static inline void wlan_psoc_set_qdf_dev(
  * Return: void
  */
 static inline void wlan_psoc_set_max_vdev_count(struct wlan_objmgr_psoc *psoc,
-						uint8_t max_vdev_count)
+						uint16_t max_vdev_count)
 {
 	if (max_vdev_count > WLAN_UMAC_PSOC_MAX_VDEVS)
 		QDF_BUG(0);
@@ -1736,7 +1736,7 @@ static inline void wlan_psoc_set_max_vdev_count(struct wlan_objmgr_psoc *psoc,
  *
  * Return: @vdev count: Max vdev count
  */
-static inline uint8_t wlan_psoc_get_max_vdev_count(
+static inline uint16_t wlan_psoc_get_max_vdev_count(
 					struct wlan_objmgr_psoc *psoc)
 {
 	return psoc->soc_objmgr.max_vdev_count;
