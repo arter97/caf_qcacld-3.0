@@ -526,6 +526,19 @@ void wlan_cfg80211_mc_cp_stats_free_big_data_stats_event(
 #endif
 
 /**
+ * wlan_hdd_get_fw_state() - get firmware state
+ * @adapter:     pointer to the adapter
+ *
+ * This function sends a request to firmware and waits
+ * on a timer to invoke the callback. if the callback is invoked then
+ * true will be returned or otherwise fail status will be returned.
+ *
+ * Return: true, firmware is active.
+ *         false, firmware is in bad state.
+ */
+int wlan_hdd_get_fw_state(struct hdd_adapter *adapter);
+
+/**
  * wlan_hdd_get_temperature() - get current device temperature
  * @adapter: device upon which the request was made
  * @temperature: pointer to where the temperature is to be returned
