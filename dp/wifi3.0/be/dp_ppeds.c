@@ -2124,6 +2124,22 @@ void dp_ppeds_detach_soc_be(struct dp_soc_be *be_soc)
 
 #ifdef DP_UMAC_HW_RESET_SUPPORT
 /**
+ * dp_ppeds_handle_attached() - Check if ppeds handle attached
+ * @be_soc: BE SoC
+ *
+ * Return: true if ppeds handle attached else false.
+ */
+bool dp_ppeds_handle_attached(struct dp_soc *soc)
+{
+	struct dp_soc_be *be_soc = dp_get_be_soc_from_dp_soc(soc);
+
+	if (be_soc->ppeds_handle)
+		return true;
+
+	return false;
+}
+
+/**
  * dp_ppeds_interrupt_start_be() - Start all the PPEDS interrupts
  * @be_soc: BE SoC
  *
