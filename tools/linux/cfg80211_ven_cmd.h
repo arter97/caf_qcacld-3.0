@@ -1464,6 +1464,9 @@ enum _ol_ath_param_t {
 	OL_ATH_PARAM_MLD_SUPPORT = 527,
 	OL_ATH_PARAM_MAX_MLD_SUPPORTED = 528,
 	OL_ATH_PARAM_MAX_ML_LINK_SUPPORTED = 529,
+#ifdef QCA_R2P_UPDATE_ENABLED
+	OL_ATH_PARAM_R2P_HCHAN_RESTORE = 530,
+#endif
 };
 
 #ifdef CONFIG_SUPPORT_VENCMDTABLE
@@ -3848,6 +3851,10 @@ struct vendor_commands radio_vendor_cmds[] = {
 	{"g_max_ml_link_capability",
 		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_MAX_ML_LINK_SUPPORTED,
 		GET_PARAM, 0},
+#ifdef QCA_R2P_UPDATE_ENABLED
+	{"hchan_r2p_restore_en",
+		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_R2P_HCHAN_RESTORE, SET_PARAM, 1},
+#endif
 };
 #endif
 
