@@ -1810,6 +1810,7 @@ static bool mlme_vdev_subst_mlo_sync_wait_event(void *ctx, uint16_t event,
 
 	case WLAN_VDEV_SM_EV_RADAR_DETECTED:
 	case WLAN_VDEV_SM_EV_CSA_RESTART:
+	case WLAN_VDEV_SM_EV_FW_VDEV_RESTART:
 		mlme_vdev_sm_transition_to(vdev_mlme, WLAN_VDEV_S_START);
 		mlme_vdev_sm_deliver_event(vdev_mlme,
 					   WLAN_VDEV_SM_EV_RESTART_REQ,
