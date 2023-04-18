@@ -6950,6 +6950,10 @@ void dp_print_peer_stats(struct dp_peer *peer,
 		dp_peer_print_tx_delay_stats(pdev, peer);
 	}
 
+	if (IS_MLO_DP_MLD_PEER(peer))
+		DP_PRINT_STATS("TX Invalid Link ID Packet Count = %u",
+			       peer_stats->tx.inval_link_id_pkt_cnt);
+
 	DP_PRINT_STATS("Node Rx Stats:");
 	DP_PRINT_STATS("Packets Sent To Stack = %d",
 		       peer_stats->rx.to_stack.num);
@@ -7122,6 +7126,10 @@ void dp_print_peer_stats(struct dp_peer *peer,
 
 	if (!IS_MLO_DP_LINK_PEER(peer))
 		dp_peer_print_rx_delay_stats(pdev, peer);
+
+	if (IS_MLO_DP_MLD_PEER(peer))
+		DP_PRINT_STATS("RX Invalid Link ID Packet Count = %u",
+			       peer_stats->rx.inval_link_id_pkt_cnt);
 
 	dp_peer_print_reo_qref_table(peer);
 }
