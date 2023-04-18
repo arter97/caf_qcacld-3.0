@@ -837,8 +837,8 @@ wlan_mlo_peer_set_t2lm_enable_val(struct wlan_mlo_peer_context *ml_peer,
 
 #if defined(WLAN_FEATURE_11BE_MLO) && defined(WLAN_MLO_MULTI_CHIP)
 static struct wlan_objmgr_vdev*
-mlo_get_primary_umac_vdev(struct wlan_mlo_dev_context *ml_dev,
-			  uint8_t psoc_id)
+mlo_get_link_vdev_from_psoc_id(struct wlan_mlo_dev_context *ml_dev,
+			       uint8_t psoc_id)
 {
 	uint8_t i;
 	struct wlan_objmgr_vdev *link_vdev;
@@ -853,8 +853,14 @@ mlo_get_primary_umac_vdev(struct wlan_mlo_dev_context *ml_dev,
 		link_vdev = ml_dev->wlan_vdev_list[i];
 		if (!link_vdev)
 			continue;
-		if (psoc_id == wlan_vdev_get_psoc_id(link_vdev))
-			return link_vdev;
+		if (psoc_id != wlan_vdev_get_psoc_id(link_vdev))
+			continue;
+		if (wlan_objmgr_vdev_try_get_ref(link_vdev, WLAN_MLO_MGR_ID) !=
+							QDF_STATUS_SUCCESS) {
+			mlo_err("VDEV is not in created state");
+			return NULL;
+		}
+		return link_vdev;
 	}
 
 	return NULL;
@@ -869,18 +875,18 @@ QDF_STATUS mlo_bridge_peer_create_post(struct wlan_mlo_dev_context *ml_dev,
 	struct wlan_objmgr_vdev *vdev_link;
 	QDF_STATUS status;
 
-	vdev_link = mlo_get_primary_umac_vdev(ml_dev, psoc_id);
+	/* Bridge peer not required */
+	if (psoc_id >= WLAN_OBJMGR_MAX_DEVICES)
+		return QDF_STATUS_SUCCESS;
+
+	vdev_link = mlo_get_link_vdev_from_psoc_id(ml_dev, psoc_id);
 
 	if (!vdev_link) {
-		mlo_err("VDEV derivation in unsuccessful");
+		mlo_err("VDEV derivation in unsuccessful for %u psoc",
+			psoc_id);
 		return QDF_STATUS_E_FAILURE;
 	}
 
-	if (wlan_objmgr_vdev_try_get_ref(vdev_link, WLAN_MLO_MGR_ID) !=
-							QDF_STATUS_SUCCESS) {
-		mlo_err("VDEV is not in created state");
-		return QDF_STATUS_E_FAILURE;
-	}
 	peer_create.vdev_link = vdev_link;
 	wlan_mlo_peer_get_ref(ml_peer);
 	peer_create.ml_peer = ml_peer;
@@ -900,10 +906,11 @@ QDF_STATUS mlo_bridge_peer_create_post(struct wlan_mlo_dev_context *ml_dev,
 }
 
 static QDF_STATUS
-wlan_mlo_check_and_create_bridge_peer(struct wlan_objmgr_vdev *vdev,
-				      struct wlan_mlo_peer_context *ml_peer,
-				      struct wlan_objmgr_vdev *link_vdevs[],
-				      uint8_t num_partner_links)
+wlan_mlo_get_bridge_peer_psoc_id(struct wlan_objmgr_vdev *vdev,
+				 struct wlan_mlo_peer_context *ml_peer,
+				 struct wlan_objmgr_vdev *link_vdevs[],
+				 uint8_t num_partner_links,
+				 uint8_t *bridge_psoc_id)
 {
 	struct wlan_mlo_dev_context *ml_dev;
 	struct wlan_objmgr_vdev *ml_vdev;
@@ -974,22 +981,50 @@ wlan_mlo_check_and_create_bridge_peer(struct wlan_objmgr_vdev *vdev,
 		}
 	}
 
-	/* Assign bridge peer PSOC as primary UMAC */
-	mlo_peer_overwrite_primary_umac(bridge_peer_psoc_id, ml_peer);
-	mlo_debug("Creating bridge peer for " QDF_MAC_ADDR_FMT " on psoc %u, is_adjacent %u",
+	/* Add vdev corresponds to bridge link to link_vdevs so
+	 * that primary UMAC derivation follows 3-link assoc.
+	 */
+	for (i = 0; i < WLAN_UMAC_MLO_MAX_VDEVS; i++) {
+		if (link_vdevs[i])
+			continue;
+
+		link_vdevs[i] = mlo_get_link_vdev_from_psoc_id(ml_dev,
+							       bridge_peer_psoc_id);
+		if (!link_vdevs[i])
+			return QDF_STATUS_E_FAILURE;
+
+		ml_peer->max_links++;
+		*bridge_psoc_id = bridge_peer_psoc_id;
+		break;
+	}
+
+	if (i == WLAN_UMAC_MLO_MAX_VDEVS) {
+		mlo_err("Unable to append bridge peer vdev to link vdev list");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	mlo_debug("%u is adjecent psoc for " QDF_MAC_ADDR_FMT " is_adjacent %u",
+		  bridge_peer_psoc_id,
 		  QDF_MAC_ADDR_REF(ml_peer->peer_mld_addr.bytes),
-		  bridge_peer_psoc_id, is_adjacent);
-	/* Create bridge peer */
-	status = mlo_bridge_peer_create_post(ml_dev, ml_peer,
-					     bridge_peer_psoc_id);
+		  is_adjacent);
+
 	return status;
 }
 #else
+static
+QDF_STATUS mlo_bridge_peer_create_post(struct wlan_mlo_dev_context *ml_dev,
+				       struct wlan_mlo_peer_context *ml_peer,
+				       uint8_t psoc_id)
+{
+	return QDF_STATUS_SUCCESS;
+}
+
 static QDF_STATUS
-wlan_mlo_check_and_create_bridge_peer(struct wlan_objmgr_vdev *vdev,
-				      struct wlan_mlo_peer_context *ml_peer,
-				      struct wlan_objmgr_vdev *link_vdevs[],
-				      uint8_t num_partner_links)
+wlan_mlo_get_bridge_peer_psoc_id(struct wlan_objmgr_vdev *vdev,
+				 struct wlan_mlo_peer_context *ml_peer,
+				 struct wlan_objmgr_vdev *link_vdevs[],
+				 uint8_t num_partner_links,
+				 uint8_t *bridge_psoc_id)
 {
 	return QDF_STATUS_SUCCESS;
 }
@@ -1004,10 +1039,12 @@ QDF_STATUS wlan_mlo_peer_create(struct wlan_objmgr_vdev *vdev,
 	struct wlan_mlo_dev_context *ml_dev;
 	struct wlan_mlo_peer_context *ml_peer = NULL;
 	struct wlan_objmgr_vdev *link_vdevs[WLAN_UMAC_MLO_MAX_VDEVS] = { NULL };
+	struct wlan_objmgr_vdev *tmp_link_vdevs[WLAN_UMAC_MLO_MAX_VDEVS] = { NULL };
 	struct wlan_objmgr_vdev *vdev_link;
 	QDF_STATUS status;
-	uint16_t i;
+	uint16_t i, j;
 	struct wlan_objmgr_peer *assoc_peer;
+	uint8_t bridge_peer_psoc_id = WLAN_OBJMGR_MAX_DEVICES;
 	bool is_ml_peer_attached = false;
 
 	/* get ML VDEV from VDEV */
@@ -1165,8 +1202,55 @@ QDF_STATUS wlan_mlo_peer_create(struct wlan_objmgr_vdev *vdev,
 		return status;
 	}
 
+	if (wlan_vdev_mlme_get_opmode(vdev) == QDF_SAP_MODE) {
+		for (i = 0; i < WLAN_UMAC_MLO_MAX_VDEVS; i++) {
+			if (!link_vdevs[i]) {
+				mlo_debug("vdev_link is null");
+				continue;
+			}
+
+			if (wlan_objmgr_vdev_try_get_ref(link_vdevs[i], WLAN_MLO_MGR_ID) !=
+					QDF_STATUS_SUCCESS) {
+				mlo_err("VDEV is not in created state");
+				/* release ref which were taken before failure */
+				for (j = 0; j < i; j++) {
+					if (!link_vdevs[i])
+						continue;
+
+					wlan_objmgr_vdev_release_ref(link_vdevs[i],
+								     WLAN_MLO_MGR_ID);
+				}
+				mlo_reset_link_peer(ml_peer, link_peer);
+				mlo_peer_free(ml_peer);
+				mlo_dev_release_link_vdevs(link_vdevs);
+
+				return QDF_STATUS_E_FAILURE;
+			}
+			tmp_link_vdevs[i] = link_vdevs[i];
+		}
+
+		status = wlan_mlo_get_bridge_peer_psoc_id(vdev, ml_peer,
+							  tmp_link_vdevs,
+							  ml_info->num_partner_links,
+							  &bridge_peer_psoc_id);
+		if (QDF_STATUS_SUCCESS != status) {
+			mlo_err("MLD ID %d: Failed to derive bridge peer psoc id",
+				ml_dev->mld_id);
+			mlo_reset_link_peer(ml_peer, link_peer);
+			mlo_peer_free(ml_peer);
+			mlo_dev_release_link_vdevs(link_vdevs);
+			mlo_dev_release_link_vdevs(tmp_link_vdevs);
+			wlan_objmgr_peer_release_ref(link_peer,
+						     WLAN_MLO_MGR_ID);
+			return QDF_STATUS_E_FAILURE;
+		}
+	}
+
 	/* Allocate Primary UMAC */
-	mlo_peer_allocate_primary_umac(ml_dev, ml_peer, link_vdevs);
+	mlo_peer_allocate_primary_umac(ml_dev, ml_peer, tmp_link_vdevs);
+
+	if (wlan_vdev_mlme_get_opmode(vdev) == QDF_SAP_MODE)
+		mlo_dev_release_link_vdevs(tmp_link_vdevs);
 
 	/* Store AID, MLO Peer pointer in link peer, take link peer ref count */
 	mlo_peer_populate_link_peer(ml_peer, link_peer);
@@ -1226,9 +1310,9 @@ QDF_STATUS wlan_mlo_peer_create(struct wlan_objmgr_vdev *vdev,
 			mlo_partner_peer_create_post(ml_dev, vdev_link,
 						     ml_peer, frm_buf, ml_info);
 		}
-		status = wlan_mlo_check_and_create_bridge_peer(vdev, ml_peer,
-							       link_vdevs,
-							       ml_info->num_partner_links);
+		/* Create bridge peer */
+		status = mlo_bridge_peer_create_post(ml_dev, ml_peer,
+						     bridge_peer_psoc_id);
 		if (QDF_STATUS_SUCCESS != status) {
 			mlo_err("MLD ID %d: Bridge peer creation failed",
 				ml_dev->mld_id);
