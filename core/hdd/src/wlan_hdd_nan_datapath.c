@@ -306,6 +306,11 @@ static int hdd_ndi_start_bss(struct hdd_adapter *adapter)
 	hdd_enter();
 	hdd_ctx = WLAN_HDD_GET_CTX(adapter);
 
+	if (!mac) {
+		hdd_debug("mac ctx NULL");
+		return -EINVAL;
+	}
+
 	status = hdd_ndi_select_valid_freq(hdd_ctx, &valid_freq);
 	if (!QDF_IS_STATUS_SUCCESS(status)) {
 		hdd_err("Unable to retrieve channel list for NAN");
