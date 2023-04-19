@@ -3097,7 +3097,7 @@ void dp_rx_enable_mon_dest_frag(struct rx_desc_pool *rx_desc_pool,
 {
 	rx_desc_pool->rx_mon_dest_frag_enable = false;
 	if (is_mon_dest_desc)
-		dp_alert("Feature DP_RX_MON_MEM_FRAG for mon_dest is disabled");
+		dp_debug("Feature DP_RX_MON_MEM_FRAG for mon_dest is disabled");
 }
 #endif
 
