@@ -39,6 +39,7 @@
 #include "wlan_hdd_object_manager.h"
 #include "wlan_dp_ucfg_api.h"
 
+#ifdef IPA_OFFLOAD
 #if (defined(QCA_CONFIG_SMP) && defined(PF_WAKE_UP_IDLE)) ||\
 	IS_ENABLED(CONFIG_SCHED_WALT)
 /**
@@ -202,7 +203,7 @@ void hdd_ipa_send_nbuf_to_network(qdf_nbuf_t nbuf, qdf_netdev_t dev)
 	qdf_dp_trace_set_track(nbuf, QDF_RX);
 
 	ucfg_dp_event_eapol_log(nbuf, QDF_RX);
-	qdf_dp_trace_log_pkt(adapter->vdev_id,
+	qdf_dp_trace_log_pkt(adapter->deflink->vdev_id,
 			     nbuf, QDF_RX, QDF_TRACE_DEFAULT_PDEV_ID);
 	DPTRACE(qdf_dp_trace(nbuf,
 			     QDF_DP_TRACE_RX_HDD_PACKET_PTR_RECORD,
@@ -264,7 +265,7 @@ void hdd_ipa_send_nbuf_to_network(qdf_nbuf_t nbuf, qdf_netdev_t dev)
 	 * Expectation here is vdev will be present during TX/RX processing
 	 * and also DP internally maintaining vdev ref count
 	 */
-	ucfg_dp_inc_rx_pkt_stats(adapter->vdev,
+	ucfg_dp_inc_rx_pkt_stats(adapter->deflink->vdev,
 				 len,
 				 delivered);
 	/*
@@ -284,3 +285,4 @@ void hdd_ipa_set_mcc_mode(bool mcc_mode)
 
 	ucfg_ipa_set_mcc_mode(hdd_ctx->pdev, mcc_mode);
 }
+#endif

@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022, Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -43,6 +43,7 @@ static void wlan_hdd_pre_cac_failure(struct hdd_adapter *adapter)
 	if (wlan_hdd_validate_context(hdd_ctx))
 		return;
 
+	wlan_hdd_stop_sap(adapter);
 	hdd_stop_adapter(hdd_ctx, adapter);
 
 	hdd_exit();
@@ -89,17 +90,17 @@ static void wlan_hdd_pre_cac_success(struct hdd_adapter *adapter)
 	 * Setting of the pre cac complete status will ensure that on channel
 	 * switch to the pre CAC DFS channel, there is no CAC again.
 	 */
-	ucfg_pre_cac_complete_set(ap_adapter->vdev, true);
+	ucfg_pre_cac_complete_set(ap_adapter->deflink->vdev, true);
 
-	wlan_hdd_set_sap_csa_reason(hdd_ctx->psoc, ap_adapter->vdev_id,
+	wlan_hdd_set_sap_csa_reason(hdd_ctx->psoc, ap_adapter->deflink->vdev_id,
 				    CSA_REASON_PRE_CAC_SUCCESS);
-	chan_freq = ucfg_pre_cac_get_freq(ap_adapter->vdev);
+	chan_freq = ucfg_pre_cac_get_freq(ap_adapter->deflink->vdev);
 	i = hdd_softap_set_channel_change(ap_adapter->dev,
 					  chan_freq,
 					  pre_cac_ch_width, false);
 	if (i) {
 		hdd_err("failed to change channel");
-		ucfg_pre_cac_complete_set(ap_adapter->vdev, false);
+		ucfg_pre_cac_complete_set(ap_adapter->deflink->vdev, false);
 	}
 
 	hdd_exit();
@@ -340,18 +341,18 @@ static int __wlan_hdd_request_pre_cac(struct hdd_context *hdd_ctx,
 	 * other active SAP interface. In regular scenarios, these IEs would
 	 * come from the user space entity
 	 */
-	pre_cac_adapter->session.ap.beacon = qdf_mem_malloc(
-			sizeof(*ap_adapter->session.ap.beacon));
-	if (!pre_cac_adapter->session.ap.beacon)
+	pre_cac_adapter->deflink->session.ap.beacon = qdf_mem_malloc(
+			sizeof(*ap_adapter->deflink->session.ap.beacon));
+	if (!pre_cac_adapter->deflink->session.ap.beacon)
 		goto stop_close_pre_cac_adapter;
 
-	qdf_mem_copy(pre_cac_adapter->session.ap.beacon,
-		     ap_adapter->session.ap.beacon,
-		     sizeof(*pre_cac_adapter->session.ap.beacon));
-	pre_cac_adapter->session.ap.sap_config.ch_width_orig =
-			ap_adapter->session.ap.sap_config.ch_width_orig;
-	pre_cac_adapter->session.ap.sap_config.authType =
-			ap_adapter->session.ap.sap_config.authType;
+	qdf_mem_copy(pre_cac_adapter->deflink->session.ap.beacon,
+		     ap_adapter->deflink->session.ap.beacon,
+		     sizeof(*pre_cac_adapter->deflink->session.ap.beacon));
+	pre_cac_adapter->deflink->session.ap.sap_config.ch_width_orig =
+		ap_adapter->deflink->session.ap.sap_config.ch_width_orig;
+	pre_cac_adapter->deflink->session.ap.sap_config.authType =
+			ap_adapter->deflink->session.ap.sap_config.authType;
 
 	/* The original premise is that on moving from 2.4GHz to 5GHz, the SAP
 	 * will continue to operate on the same bandwidth as that of the 2.4GHz
@@ -372,11 +373,11 @@ static int __wlan_hdd_request_pre_cac(struct hdd_context *hdd_ctx,
 		hdd_err("error set pre_cac channel %d", pre_cac_chan_freq);
 		goto close_pre_cac_adapter;
 	}
-	pre_cac_adapter->session.ap.sap_config.ch_width_orig =
+	pre_cac_adapter->deflink->session.ap.sap_config.ch_width_orig =
 					hdd_map_nl_chan_width(chandef.width);
 
 	hdd_debug("existing ap phymode:%d pre cac ch_width:%d freq:%d",
-		  ap_adapter->session.ap.sap_config.SapHw_mode,
+		  ap_adapter->deflink->session.ap.sap_config.SapHw_mode,
 		  cac_ch_width, pre_cac_chan_freq);
 	/*
 	 * Doing update after opening and starting pre-cac adapter will make
@@ -386,8 +387,10 @@ static int __wlan_hdd_request_pre_cac(struct hdd_context *hdd_ctx,
 	 * connection update should result in DBS mode
 	 */
 	status = policy_mgr_update_and_wait_for_connection_update(
-			hdd_ctx->psoc, ap_adapter->vdev_id, pre_cac_chan_freq,
-			POLICY_MGR_UPDATE_REASON_PRE_CAC);
+					    hdd_ctx->psoc,
+					    ap_adapter->deflink->vdev_id,
+					    pre_cac_chan_freq,
+					    POLICY_MGR_UPDATE_REASON_PRE_CAC);
 	if (QDF_IS_STATUS_ERROR(status)) {
 		hdd_err("error in moving to DBS mode");
 		goto stop_close_pre_cac_adapter;
@@ -414,24 +417,24 @@ static int __wlan_hdd_request_pre_cac(struct hdd_context *hdd_ctx,
 	 * anywhere, since after the pre cac success/failure, the pre cac
 	 * adapter itself would be removed.
 	 */
-	ret = ucfg_pre_cac_set_status(pre_cac_adapter->vdev, true);
+	ret = ucfg_pre_cac_set_status(pre_cac_adapter->deflink->vdev, true);
 	if (ret != 0) {
 		hdd_err("failed to set pre cac status");
 		goto stop_close_pre_cac_adapter;
 	}
 
-	ucfg_pre_cac_set_freq_before_pre_cac(ap_adapter->vdev,
+	ucfg_pre_cac_set_freq_before_pre_cac(ap_adapter->deflink->vdev,
 					     hdd_ap_ctx->operating_chan_freq);
-	ucfg_pre_cac_set_freq(ap_adapter->vdev, pre_cac_chan_freq);
-	ucfg_pre_cac_adapter_set(pre_cac_adapter->vdev, true);
+	ucfg_pre_cac_set_freq(ap_adapter->deflink->vdev, pre_cac_chan_freq);
+	ucfg_pre_cac_adapter_set(pre_cac_adapter->deflink->vdev, true);
 	*out_adapter = pre_cac_adapter;
 
 	return 0;
 
 stop_close_pre_cac_adapter:
 	hdd_stop_adapter(hdd_ctx, pre_cac_adapter);
-	qdf_mem_free(pre_cac_adapter->session.ap.beacon);
-	pre_cac_adapter->session.ap.beacon = NULL;
+	qdf_mem_free(pre_cac_adapter->deflink->session.ap.beacon);
+	pre_cac_adapter->deflink->session.ap.beacon = NULL;
 close_pre_cac_adapter:
 	hdd_close_adapter(hdd_ctx, pre_cac_adapter, false);
 release_intf_addr_and_return_failure:

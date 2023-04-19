@@ -1985,6 +1985,14 @@ void lim_process_action_frame(struct mac_context *mac_ctx,
 			lim_process_ext_channel_switch_action_frame(mac_ctx,
 							rx_pkt_info, session);
 			break;
+		case TDLS_DISCOVERY_RESPONSE:
+			/* do not forward the tdls discovery response frame,
+			 * it is handled by
+			 * tgt_mgmt_txrx_rx_frame_handler ->
+			 * tgt_tdls_mgmt_frame_rx_cb ->
+			 * tdls_process_rx_frame
+			 */
+			break;
 		case SIR_MAC_ACTION_VENDOR_SPECIFIC:
 			pub_action =
 				(tpSirMacVendorSpecificPublicActionFrameHdr)

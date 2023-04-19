@@ -80,6 +80,7 @@
 #include "wlan_cmn_ieee80211.h"
 #include <wlan_cm_api.h>
 #include <wlan_vdev_mgr_utils_api.h>
+#include "parser_api.h"
 
 /** -------------------------------------------------------------
    \fn lim_delete_dialogue_token_list
@@ -7366,6 +7367,8 @@ lim_revise_req_he_cap_per_band(struct mlme_legacy_priv *mlme_priv,
 			mac->he_cap_2g.tx_he_mcs_map_lt_80;
 		he_config->rx_he_mcs_map_lt_80 =
 			mac->he_cap_2g.rx_he_mcs_map_lt_80;
+		he_config->max_ampdu_len_exp_ext =
+			mac->he_cap_2g.max_ampdu_len_exp_ext;
 		he_config->ul_2x996_tone_ru_supp = 0;
 		he_config->num_sounding_gt_80 = 0;
 		he_config->bfee_sts_gt_80 = 0;
@@ -7383,6 +7386,8 @@ lim_revise_req_he_cap_per_band(struct mlme_legacy_priv *mlme_priv,
 
 		he_config->num_sounding_lt_80 =
 			mac->he_cap_5g.num_sounding_lt_80;
+		he_config->max_ampdu_len_exp_ext =
+			mac->he_cap_5g.max_ampdu_len_exp_ext;
 		if (he_config->chan_width_2 ||
 		    he_config->chan_width_3) {
 			he_config->bfee_sts_gt_80 =
@@ -7400,6 +7405,12 @@ lim_revise_req_he_cap_per_band(struct mlme_legacy_priv *mlme_priv,
 			he_config->ul_2x996_tone_ru_supp =
 				 mac->he_cap_5g.ul_2x996_tone_ru_supp;
 		}
+		he_config->su_feedback_tone16 =
+					mac->he_cap_5g.su_feedback_tone16;
+		he_config->mu_feedback_tone16 =
+					mac->he_cap_5g.mu_feedback_tone16;
+		he_config->codebook_su = mac->he_cap_5g.codebook_su;
+		he_config->codebook_mu = mac->he_cap_5g.codebook_mu;
 	}
 }
 
@@ -8200,29 +8211,22 @@ void lim_set_mlo_caps(struct mac_context *mac, struct pe_session *session,
 }
 
 QDF_STATUS lim_send_mlo_caps_ie(struct mac_context *mac_ctx,
-				struct pe_session *session,
+				struct wlan_objmgr_vdev *vdev,
 				enum QDF_OPMODE device_mode,
 				uint8_t vdev_id)
 {
-	uint8_t mlo_cap_total_len = DOT11F_IE_MLO_IE_MIN_LEN +
-				    EHT_CAP_OUI_LEN + QDF_MAC_ADDR_SIZE;
+
 	QDF_STATUS status_2g, status_5g;
-	uint8_t mlo_caps[DOT11F_IE_MLO_IE_MIN_LEN +
-			 EHT_CAP_OUI_LEN + QDF_MAC_ADDR_SIZE] = {0};
+	struct wlan_mlo_ie mlo_ie;
 
-	mlo_caps[0] = DOT11F_EID_MLO_IE;
-	mlo_caps[1] = DOT11F_IE_MLO_IE_MIN_LEN + 1;
-
-	qdf_mem_copy(&mlo_caps[2], MLO_IE_OUI_TYPE, MLO_IE_OUI_SIZE);
-	lim_set_mlo_caps(mac_ctx, session, mlo_caps, mlo_cap_total_len);
-
+	populate_dot11f_mlo_ie(mac_ctx, vdev, &mlo_ie);
 	status_2g = lim_send_ie(mac_ctx, vdev_id, DOT11F_EID_MLO_IE,
-				CDS_BAND_2GHZ, &mlo_caps[2],
-				EHT_CAP_OUI_LEN + QDF_MAC_ADDR_SIZE);
+				CDS_BAND_2GHZ, &mlo_ie.data[2],
+				mlo_ie.num_data - 2);
 
 	status_5g = lim_send_ie(mac_ctx, vdev_id, DOT11F_EID_MLO_IE,
-				CDS_BAND_5GHZ, &mlo_caps[2],
-				EHT_CAP_OUI_LEN + QDF_MAC_ADDR_SIZE);
+				CDS_BAND_5GHZ, &mlo_ie.data[2],
+				mlo_ie.num_data - 2);
 
 	if (QDF_IS_STATUS_SUCCESS(status_2g) &&
 	    QDF_IS_STATUS_SUCCESS(status_5g)) {
@@ -8774,6 +8778,23 @@ void lim_update_stads_eht_capable(tpDphHashNode sta_ds, tpSirAssocReq assoc_req)
 {
 	sta_ds->mlmStaContext.eht_capable = assoc_req->eht_cap.present;
 }
+
+#ifdef FEATURE_WLAN_TDLS
+#ifdef WLAN_FEATURE_11BE
+void lim_update_tdls_sta_eht_capable(struct mac_context *mac,
+				     tpAddStaParams add_sta_params,
+				     tpDphHashNode sta_ds,
+				     struct pe_session *session_entry)
+{
+	if (sta_ds->staType == STA_ENTRY_TDLS_PEER) {
+		if (!sta_ds->eht_config.present)
+			add_sta_params->eht_capable = 0;
+	}
+
+	pe_debug("tdls eht_capable: %d", add_sta_params->eht_capable);
+}
+#endif
+#endif
 
 void lim_update_sta_eht_capable(struct mac_context *mac,
 				tpAddStaParams add_sta_params,
@@ -9465,8 +9486,7 @@ QDF_STATUS lim_util_get_type_subtype(void *pkt, uint8_t *type,
 		pe_err("NULL packet received");
 		return QDF_STATUS_E_FAILURE;
 	}
-	status =
-		wma_ds_peek_rx_packet_info(cds_pkt, (void *)&rxpktinfor, false);
+	status = wma_ds_peek_rx_packet_info(cds_pkt, (void *)&rxpktinfor);
 	if (!QDF_IS_STATUS_SUCCESS(status)) {
 		pe_err("Failed extract cds packet. status %d", status);
 		return QDF_STATUS_E_FAILURE;

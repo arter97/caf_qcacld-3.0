@@ -108,8 +108,6 @@ QDF_STATUS cm_abort_fw_roam(struct cnx_mgr *cm_ctx,
 	if (QDF_IS_STATUS_ERROR(status))
 		cm_remove_cmd(cm_ctx, &cm_id);
 
-	cm_disconnect_roam_abort_fail(cm_ctx->vdev, source, &bssid, cm_id);
-
 	return status;
 }
 
@@ -586,19 +584,11 @@ QDF_STATUS cm_roam_sync_event_handler_cb(struct wlan_objmgr_vdev *vdev,
 	 */
 	cm_update_phymode_on_roam(vdev_id,
 				  sync_ind);
-	cm_fw_roam_sync_propagation(psoc,
-				    vdev_id,
-				    sync_ind);
+	status = cm_fw_roam_sync_propagation(psoc,
+					     vdev_id,
+					     sync_ind);
 
 err:
-	if (QDF_IS_STATUS_ERROR(status)) {
-		wlan_mlo_roam_abort_on_link(psoc, event,
-					    sync_ind->roamed_vdev_id);
-		cm_fw_roam_abort_req(psoc, sync_ind->roamed_vdev_id);
-		cm_roam_stop_req(psoc, sync_ind->roamed_vdev_id,
-				 REASON_ROAM_SYNCH_FAILED,
-				 NULL, false);
-	}
 	return status;
 }
 
@@ -614,6 +604,8 @@ cm_roam_candidate_event_handler(struct wlan_objmgr_psoc *psoc,
 	uint8_t *extracted_ie = NULL;
 	uint8_t primary_channel, band;
 	qdf_freq_t op_freq;
+	struct wlan_frame_hdr *wh;
+	struct qdf_mac_addr bssid;
 
 	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, candidate->vdev_id,
 						    WLAN_MLME_CM_ID);
@@ -651,9 +643,14 @@ cm_roam_candidate_event_handler(struct wlan_objmgr_psoc *psoc,
 							   ie_ptr, ie_len);
 	if (extracted_ie && extracted_ie[0] == WLAN_ELEMID_SSID &&
 	    extracted_ie[1] > MIN_IE_LEN) {
+		wh = (struct wlan_frame_hdr *)candidate->frame;
+		WLAN_ADDR_COPY(&bssid.bytes[0], wh->i_addr2);
+
 		mlme_debug("SSID of the candidate is " QDF_SSID_FMT,
 			   QDF_SSID_REF(extracted_ie[1], &extracted_ie[2]));
-		wlan_cm_set_roam_offload_ssid(vdev, extracted_ie);
+		wlan_cm_set_roam_offload_ssid(vdev, &extracted_ie[2],
+					      extracted_ie[1]);
+		wlan_cm_set_roam_offload_bssid(vdev, &bssid);
 	}
 
 	/* For 2.4GHz,5GHz get channel from DS IE */
@@ -699,12 +696,11 @@ cm_roam_candidate_event_handler(struct wlan_objmgr_psoc *psoc,
 			goto update_beacon;
 	}
 
-	mlme_err("Primary channel was not found in the candidate scan entry");
+	mlme_err("Ignore beacon, Primary channel was not found in the candidate frame");
 	goto err;
 
 update_beacon:
 	op_freq = wlan_reg_chan_band_to_freq(pdev, primary_channel, band);
-	mlme_debug("Roaming candidate frequency : %d", op_freq);
 	cm_inform_bcn_probe(cm_ctx, candidate->frame, candidate->frame_length,
 			    op_freq,
 			    0, /* Real RSSI will be updated by Roam synch ind */

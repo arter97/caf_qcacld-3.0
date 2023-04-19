@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2020-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -729,7 +729,7 @@ static int __wlan_hdd_cfg80211_peer_cfr_capture_cfg(struct wiphy *wiphy,
 	}
 
 	adapter = WLAN_HDD_GET_PRIV_PTR(dev);
-	if (wlan_hdd_validate_vdev_id(adapter->vdev_id))
+	if (wlan_hdd_validate_vdev_id(adapter->deflink->vdev_id))
 		return -EINVAL;
 
 	wlan_cfg80211_peer_cfr_capture_cfg(wiphy, adapter,

@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2018-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -1227,25 +1227,27 @@ QDF_STATUS ucfg_fwol_configure_global_params(struct wlan_objmgr_psoc *psoc,
 }
 
 QDF_STATUS ucfg_fwol_configure_vdev_params(struct wlan_objmgr_psoc *psoc,
-					   struct wlan_objmgr_pdev *pdev,
-					   enum QDF_OPMODE device_mode,
-					   uint8_t vdev_id)
+					   struct wlan_objmgr_vdev *vdev)
 {
-	QDF_STATUS status = QDF_STATUS_SUCCESS;
 	uint32_t value;
+	QDF_STATUS status;
+	uint8_t vdev_id = wlan_vdev_get_id(vdev);
 
-	if (device_mode == QDF_SAP_MODE) {
+	switch (wlan_vdev_mlme_get_opmode(vdev)) {
+	case QDF_SAP_MODE:
 		status = ucfg_fwol_get_sap_sho(psoc, &value);
 		if (QDF_IS_STATUS_ERROR(status))
-			return status;
+			break;
 
 		status = fwol_set_sap_sho(psoc, vdev_id, value);
 		if (QDF_IS_STATUS_ERROR(status))
-			return status;
+			break;
 
 		status = fwol_set_sap_wds_config(psoc, vdev_id);
-		if (QDF_IS_STATUS_ERROR(status))
-			return status;
+		break;
+	default:
+		status = QDF_STATUS_SUCCESS;
+		break;
 	}
 
 	return status;

@@ -493,7 +493,6 @@ QDF_STATUS pmo_suspend_all_components(struct wlan_objmgr_psoc *psoc,
 	pmo_ctx = pmo_get_context();
 	if (!pmo_ctx) {
 		pmo_err("unable to get pmo ctx");
-		QDF_ASSERT(0);
 		status = QDF_STATUS_E_FAILURE;
 		goto exit_with_status;
 	}
@@ -512,7 +511,6 @@ QDF_STATUS pmo_suspend_all_components(struct wlan_objmgr_psoc *psoc,
 		if (QDF_IS_STATUS_ERROR(status)) {
 			pmo_err("component %d failed to suspend; status: %d",
 				i, status);
-			QDF_ASSERT(0);
 			goto suspend_recovery;
 		}
 	}

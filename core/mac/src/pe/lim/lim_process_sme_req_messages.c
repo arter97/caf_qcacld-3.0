@@ -524,7 +524,8 @@ static void lim_set_privacy(struct mac_context *mac_ctx,
 		mac_ctx->mlme_cfg->wep_params.auth_type = eSIR_SHARED_KEY;
 	else if (QDF_HAS_PARAM(akm, WLAN_CRYPTO_KEY_MGMT_FT_SAE) ||
 	    QDF_HAS_PARAM(akm, WLAN_CRYPTO_KEY_MGMT_SAE) ||
-	    QDF_HAS_PARAM(akm, WLAN_CRYPTO_KEY_MGMT_SAE_EXT_KEY))
+	    QDF_HAS_PARAM(akm, WLAN_CRYPTO_KEY_MGMT_SAE_EXT_KEY) ||
+	    QDF_HAS_PARAM(akm, WLAN_CRYPTO_KEY_MGMT_FT_SAE_EXT_KEY))
 		mac_ctx->mlme_cfg->wep_params.auth_type = eSIR_AUTH_TYPE_SAE;
 
 	if (QDF_HAS_PARAM(ucast_cipher, WLAN_CRYPTO_CIPHER_WEP) ||
@@ -3602,6 +3603,8 @@ lim_get_rsn_akm(uint32_t akm)
 		return ANI_AKM_TYPE_FILS_SHA384;
 	else if (QDF_HAS_PARAM(akm, WLAN_CRYPTO_KEY_MGMT_FILS_SHA256))
 		return ANI_AKM_TYPE_FILS_SHA256;
+	else if (QDF_HAS_PARAM(akm, WLAN_CRYPTO_KEY_MGMT_FT_SAE_EXT_KEY))
+		return ANI_AKM_TYPE_FT_SAE_EXT_KEY;
 	else if (QDF_HAS_PARAM(akm, WLAN_CRYPTO_KEY_MGMT_FT_SAE))
 		return ANI_AKM_TYPE_FT_SAE;
 	else if (QDF_HAS_PARAM(akm, WLAN_CRYPTO_KEY_MGMT_SAE))
@@ -4363,7 +4366,7 @@ lim_cm_handle_join_req(struct cm_vdev_join_req *req)
 	}
 
 	if (!wlan_vdev_mlme_is_mlo_link_vdev(pe_session->vdev))
-		lim_send_mlo_caps_ie(mac_ctx, pe_session,
+		lim_send_mlo_caps_ie(mac_ctx, pe_session->vdev,
 				     QDF_STA_MODE,
 				     pe_session->vdev_id);
 
@@ -4544,8 +4547,10 @@ struct pe_session *lim_get_disconnect_session(struct mac_context *mac_ctx,
 	uint8_t pe_session_id;
 
 	/* Try to find pe session with bssid */
-	session = pe_find_session_by_bssid(mac_ctx, req->req.bssid.bytes,
-					   &pe_session_id);
+	session = pe_find_session_by_bssid_and_vdev_id(mac_ctx,
+						       req->req.bssid.bytes,
+						       req->req.vdev_id,
+						       &pe_session_id);
 	/*
 	 * If bssid search fail try to find by vdev id, this can happen if
 	 * Roaming change the BSSID during disconnect was getting processed.
@@ -5885,8 +5890,9 @@ static void __lim_process_sme_disassoc_req(struct mac_context *mac,
 		return;
 	}
 
-	pe_session = pe_find_session_by_bssid(mac,
+	pe_session = pe_find_session_by_bssid_and_vdev_id(mac,
 				smeDisassocReq.bssid.bytes,
+				smeDisassocReq.sessionId,
 				&sessionId);
 	if (!pe_session) {
 		pe_err("session does not exist for bssid " QDF_MAC_ADDR_FMT,
@@ -6066,8 +6072,9 @@ void __lim_process_sme_disassoc_cnf(struct mac_context *mac, uint32_t *msg_buf)
 
 	qdf_mem_copy(&smeDisassocCnf, msg_buf, sizeof(smeDisassocCnf));
 
-	pe_session = pe_find_session_by_bssid(mac,
+	pe_session = pe_find_session_by_bssid_and_vdev_id(mac,
 				smeDisassocCnf.bssid.bytes,
+				smeDisassocCnf.vdev_id,
 				&sessionId);
 	if (!pe_session) {
 		pe_err("session does not exist for bssid " QDF_MAC_ADDR_FMT,
@@ -6235,8 +6242,9 @@ static void __lim_process_sme_deauth_req(struct mac_context *mac_ctx,
 	 * We need to get a session first but we don't even know
 	 * if the message is correct.
 	 */
-	session_entry = pe_find_session_by_bssid(mac_ctx,
+	session_entry = pe_find_session_by_bssid_and_vdev_id(mac_ctx,
 					sme_deauth_req.bssid.bytes,
+					sme_deauth_req.vdev_id,
 					&session_id);
 	if (!session_entry) {
 		pe_err("session does not exist for bssid " QDF_MAC_ADDR_FMT,

@@ -1508,9 +1508,9 @@ static int hdd_get_connected_station_info(struct hdd_context *hdd_ctx,
 	if (status != QDF_STATUS_SUCCESS)
 		hdd_err("Unable to fetch sap ger peer info");
 	if (value) {
-		stats = wlan_cfg80211_mc_cp_stats_get_peer_stats(adapter->vdev,
-								 mac_addr.bytes,
-								 &ret);
+		stats = wlan_cfg80211_mc_cp_stats_get_peer_stats(
+					adapter->deflink->vdev, mac_addr.bytes,
+					&ret);
 		if (ret || !stats) {
 			hdd_err("fail to get tx/rx rate");
 			wlan_cfg80211_mc_cp_stats_free_stats_event(stats);
@@ -1762,7 +1762,7 @@ static int hdd_get_peer_stats(struct hdd_adapter *adapter,
 	if (!peer_stats)
 		return -ENOMEM;
 
-	status = cdp_host_get_peer_stats(soc, adapter->vdev_id,
+	status = cdp_host_get_peer_stats(soc, adapter->deflink->vdev_id,
 					 stainfo->sta_mac.bytes, peer_stats);
 	if (status != QDF_STATUS_SUCCESS) {
 		hdd_err("cdp_host_get_peer_stats failed");
@@ -1781,7 +1781,7 @@ static int hdd_get_peer_stats(struct hdd_adapter *adapter,
 	qdf_mem_free(peer_stats);
 	peer_stats = NULL;
 
-	stats = wlan_cfg80211_mc_cp_stats_get_peer_stats(adapter->vdev,
+	stats = wlan_cfg80211_mc_cp_stats_get_peer_stats(adapter->deflink->vdev,
 							 stainfo->sta_mac.bytes,
 							 &ret);
 	if (ret || !stats) {
@@ -1790,7 +1790,7 @@ static int hdd_get_peer_stats(struct hdd_adapter *adapter,
 		return -EINVAL;
 	}
 
-	if (cds_dp_get_vdev_stats(adapter->vdev_id, &dp_stats))
+	if (cds_dp_get_vdev_stats(adapter->deflink->vdev_id, &dp_stats))
 		stainfo->tx_retry_succeed =
 					dp_stats.tx_mpdu_success_with_retries;
 	else
@@ -2070,13 +2070,15 @@ hdd_big_data_pack_resp_nlmsg(struct sk_buff *skb,
 	}
 	if (nla_put_u32(skb,
 			QCA_WLAN_VENDOR_ATTR_GET_STA_INFO_ROAM_TRIGGER_REASON,
-			wlan_cm_get_roam_states(hdd_ctx->psoc, adapter->vdev_id,
+			wlan_cm_get_roam_states(hdd_ctx->psoc,
+						adapter->deflink->vdev_id,
 						ROAM_TRIGGER_REASON))){
 		hdd_err("roam trigger reason put fail");
 		return -EINVAL;
 	}
 	if (nla_put_u32(skb, QCA_WLAN_VENDOR_ATTR_GET_STA_INFO_ROAM_FAIL_REASON,
-			wlan_cm_get_roam_states(hdd_ctx->psoc, adapter->vdev_id,
+			wlan_cm_get_roam_states(hdd_ctx->psoc,
+						adapter->deflink->vdev_id,
 						ROAM_FAIL_REASON))){
 		hdd_err("roam fail reason put fail");
 		return -EINVAL;
@@ -2084,7 +2086,8 @@ hdd_big_data_pack_resp_nlmsg(struct sk_buff *skb,
 	if (nla_put_u32(
 		      skb,
 		      QCA_WLAN_VENDOR_ATTR_GET_STA_INFO_ROAM_INVOKE_FAIL_REASON,
-		      wlan_cm_get_roam_states(hdd_ctx->psoc, adapter->vdev_id,
+		      wlan_cm_get_roam_states(hdd_ctx->psoc,
+					      adapter->deflink->vdev_id,
 					      ROAM_INVOKE_FAIL_REASON))){
 		hdd_err("roam invoke fail reason put fail");
 		return -EINVAL;
@@ -2493,7 +2496,7 @@ static int hdd_get_station_info_ex(struct hdd_context *hdd_ctx,
 	}
 
 	ret = wlan_cfg80211_vendor_cmd_reply(skb);
-	hdd_reset_roam_params(hdd_ctx->psoc, adapter->vdev_id);
+	hdd_reset_roam_params(hdd_ctx->psoc, adapter->deflink->vdev_id);
 	return ret;
 }
 

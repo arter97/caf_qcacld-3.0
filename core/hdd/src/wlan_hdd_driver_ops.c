@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2015-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -50,6 +50,7 @@
 #include "wlan_hdd_thermal.h"
 #include "wlan_dp_ucfg_api.h"
 #include "qdf_ssr_driver_dump.h"
+#include "wlan_hdd_ioctl.h"
 
 #ifdef MODULE
 #ifdef WLAN_WEAR_CHIPSET
@@ -1800,6 +1801,9 @@ static int wlan_hdd_pld_probe(struct device *dev,
 		hdd_err("Invalid bus type %d->%d", pld_bus_type, bus_type);
 		return -EINVAL;
 	}
+	qdf_ssr_driver_dump_register_region("hang_event_data",
+					    g_fw_host_hang_event,
+					    sizeof(g_fw_host_hang_event));
 
 	return hdd_soc_probe(dev, bdev, id, bus_type);
 }
@@ -1816,6 +1820,7 @@ static void wlan_hdd_pld_remove(struct device *dev, enum pld_bus_type bus_type)
 	hdd_enter();
 
 	hdd_soc_remove(dev);
+	qdf_ssr_driver_dump_unregister_region("hang_event_data");
 
 	hdd_exit();
 }
@@ -2115,7 +2120,7 @@ wlan_hdd_pld_uevent(struct device *dev, struct pld_uevent_data *event_data)
 		break;
 	case PLD_FW_DOWN:
 		hdd_debug("Received firmware down indication");
-		hdd_dump_log_buffer();
+		hdd_dump_log_buffer(NULL, NULL);
 		cds_set_target_ready(false);
 		cds_set_recovery_in_progress(true);
 		hdd_init_start_completion();

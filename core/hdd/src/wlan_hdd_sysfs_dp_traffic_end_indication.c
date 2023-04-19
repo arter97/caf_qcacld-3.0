@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -59,7 +59,7 @@ __hdd_sysfs_dp_traffic_end_indication_show(struct net_device *net_dev,
 		return -EINVAL;
 
 	hdd_debug("vdev_id:%u traffic end indication:%u defdscp:%u spldscp:%u",
-		  adapter->vdev_id, info.enabled,
+		  adapter->deflink->vdev_id, info.enabled,
 		  info.def_dscp, info.spl_dscp);
 
 	ret = scnprintf(buf, PAGE_SIZE, "%u %u %u\n",
@@ -159,7 +159,7 @@ __hdd_sysfs_dp_traffic_end_indication_store(struct net_device *net_dev,
 	}
 
 	hdd_debug("vdev_id:%u traffic end indication:%u defdscp:%u spldscp:%u",
-		  adapter->vdev_id, value, defdscp, spldscp);
+		  adapter->deflink->vdev_id, value, defdscp, spldscp);
 
 	ucfg_dp_traffic_end_indication_set(vdev, info);
 	wlan_objmgr_vdev_release_ref(vdev, WLAN_DP_ID);

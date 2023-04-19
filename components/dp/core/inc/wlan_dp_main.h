@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -669,10 +669,11 @@ QDF_STATUS dp_direct_link_init(struct wlan_dp_psoc_context *dp_ctx);
 /**
  * dp_direct_link_deinit() - De-initializes Direct Link datapath
  * @dp_ctx: DP private context
+ * @is_ssr: true if SSR is in progress else false
  *
  * Return: None
  */
-void dp_direct_link_deinit(struct wlan_dp_psoc_context *dp_ctx);
+void dp_direct_link_deinit(struct wlan_dp_psoc_context *dp_ctx, bool is_ssr);
 
 /**
  * dp_config_direct_link: Set direct link config of vdev
@@ -694,7 +695,7 @@ QDF_STATUS dp_direct_link_init(struct wlan_dp_psoc_context *dp_ctx)
 }
 
 static inline
-void dp_direct_link_deinit(struct wlan_dp_psoc_context *dp_ctx)
+void dp_direct_link_deinit(struct wlan_dp_psoc_context *dp_ctx, bool is_ssr)
 {
 }
 
@@ -704,6 +705,25 @@ QDF_STATUS dp_config_direct_link(struct wlan_dp_intf *dp_intf,
 				 bool enable_low_latency)
 {
 	return QDF_STATUS_SUCCESS;
+}
+#endif
+#ifdef WLAN_FEATURE_11BE
+/**
+ * __wlan_dp_update_peer_map_unmap_version() - update peer map unmap version
+ * @version: Peer map unmap version pointer to be updated
+ *
+ * Return: None
+ */
+static inline void
+__wlan_dp_update_peer_map_unmap_version(uint8_t *version)
+{
+	/* 0x32 -> host supports HTT peer map v3 format and peer unmap v2 format. */
+	*version = 0x32;
+}
+#else
+static inline void
+__wlan_dp_update_peer_map_unmap_version(uint8_t *version)
+{
 }
 #endif
 #endif

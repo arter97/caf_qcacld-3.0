@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -3130,7 +3130,7 @@ static QDF_STATUS sme_qos_process_ft_reassoc_req_ev(
 	 */
 	entry = csr_ll_peek_head(&sme_qos_cb.flow_list, false);
 	if (!entry) {
-		sme_warn("Flow List empty, nothing to update");
+		sme_debug("Flow List empty, nothing to update");
 		return QDF_STATUS_E_FAILURE;
 	}
 

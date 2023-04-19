@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022, Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -89,7 +89,7 @@ wlan_hdd_cfg80211_send_pasn_auth_status(struct wiphy *wiphy,
 		return -EPERM;
 	}
 
-	if (wlan_hdd_validate_vdev_id(adapter->vdev_id))
+	if (wlan_hdd_validate_vdev_id(adapter->deflink->vdev_id))
 		return -EINVAL;
 
 	ret = wlan_hdd_validate_context(hdd_ctx);
@@ -112,7 +112,7 @@ wlan_hdd_cfg80211_send_pasn_auth_status(struct wiphy *wiphy,
 	if (!pasn_data)
 		return -ENOMEM;
 
-	pasn_data->vdev_id = adapter->vdev_id;
+	pasn_data->vdev_id = adapter->deflink->vdev_id;
 	nla_for_each_nested(curr_attr, tb[QCA_WLAN_VENDOR_ATTR_PASN_PEERS],
 			    rem) {
 		if (wlan_cfg80211_nla_parse_nested(
@@ -299,7 +299,7 @@ static int wlan_cfg80211_set_pasn_key(struct hdd_adapter *adapter,
 	if (!pasn_status)
 		return -ENOMEM;
 
-	pasn_status->vdev_id = adapter->vdev_id;
+	pasn_status->vdev_id = adapter->deflink->vdev_id;
 	pasn_status->num_peers = 1;
 
 	qdf_mem_copy(pasn_status->auth_status[0].peer_mac.bytes,
@@ -442,7 +442,7 @@ wlan_hdd_cfg80211_send_set_ltf_keyseed(struct wiphy *wiphy,
 		return -EPERM;
 	}
 
-	if (wlan_hdd_validate_vdev_id(adapter->vdev_id))
+	if (wlan_hdd_validate_vdev_id(adapter->deflink->vdev_id))
 		return -EINVAL;
 
 	ret = wlan_hdd_validate_context(hdd_ctx);
@@ -453,7 +453,7 @@ wlan_hdd_cfg80211_send_set_ltf_keyseed(struct wiphy *wiphy,
 	if (!data)
 		return -ENOMEM;
 
-	data->vdev_id = adapter->vdev_id;
+	data->vdev_id = adapter->deflink->vdev_id;
 	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(hdd_ctx->psoc,
 						    data->vdev_id,
 						    WLAN_WIFI_POS_OSIF_ID);
@@ -560,7 +560,7 @@ wlan_hdd_cfg80211_send_set_ltf_keyseed(struct wiphy *wiphy,
 		goto err;
 	}
 
-	pasn_auth_status->vdev_id = adapter->vdev_id;
+	pasn_auth_status->vdev_id = adapter->deflink->vdev_id;
 	pasn_auth_status->num_peers = 1;
 	qdf_mem_copy(pasn_auth_status->auth_status[0].peer_mac.bytes,
 		     data->peer_mac_addr.bytes, QDF_MAC_ADDR_SIZE);

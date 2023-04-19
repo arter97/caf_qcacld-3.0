@@ -861,8 +861,7 @@ static QDF_STATUS lim_allocate_and_get_bcn(
 	if (!pkt_l)
 		return QDF_STATUS_E_FAILURE;
 
-	status = wma_ds_peek_rx_packet_info(
-		pkt_l, (void *)&rx_pkt_info_l, false);
+	status = wma_ds_peek_rx_packet_info(pkt_l, (void *)&rx_pkt_info_l);
 	if (!QDF_IS_STATUS_SUCCESS(status)) {
 		pe_err("Failed to get Rx Pkt meta");
 		goto free;
@@ -1498,6 +1497,46 @@ end:
 	return;
 } /*** end lim_handle80211_frames() ***/
 
+QDF_STATUS lim_handle_frame_genby_mbssid(uint8_t *frame, uint32_t frame_len,
+					 uint8_t frm_subtype, char *bssid)
+{
+	struct mac_context *mac_ctx;
+	struct pe_session *session;
+	uint8_t sessionid;
+	t_packetmeta meta_data;
+
+	mac_ctx = cds_get_context(QDF_MODULE_ID_PE);
+	if (!mac_ctx) {
+		pe_err("mac ctx is null");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	session = pe_find_session_by_bssid(mac_ctx, bssid, &sessionid);
+	if (!session)
+		return QDF_STATUS_E_INVAL;
+
+	meta_data.mpdu_hdr_ptr = frame;
+	meta_data.mpdu_data_ptr = frame + sizeof(struct wlan_frame_hdr);
+	meta_data.mpdu_data_len = frame_len - sizeof(struct wlan_frame_hdr);
+
+	if (frm_subtype == MGMT_SUBTYPE_BEACON) {
+		pe_debug("Gen beacon frame for critical update feature");
+		if (session->limSmeState == eLIM_SME_LINK_EST_STATE ||
+		    session->limSmeState == eLIM_SME_NORMAL_STATE)
+			sch_beacon_process(mac_ctx, (uint8_t *)&meta_data,
+					   session);
+		else
+			lim_process_beacon_frame(mac_ctx, (uint8_t *)&meta_data,
+						 session);
+	} else if (frm_subtype == MGMT_SUBTYPE_PROBE_RESP) {
+		pe_debug("Gen Probe rsp frame for critical update feature");
+		lim_process_probe_rsp_frame(mac_ctx, (uint8_t *)&meta_data,
+						      session);
+	}
+
+	return QDF_STATUS_SUCCESS;
+}
+
 void lim_process_abort_scan_ind(struct mac_context *mac_ctx,
 	uint8_t vdev_id, uint32_t scan_id, uint32_t scan_requestor_id)
 {
@@ -1638,8 +1677,9 @@ static void lim_process_messages(struct mac_context *mac_ctx,
 		body_ptr = (cds_pkt_t *) new_msg.bodyptr;
 		cds_pkt_get_packet_length(body_ptr, &pkt_len);
 
-		qdf_status = wma_ds_peek_rx_packet_info(body_ptr,
-			(void **) &new_msg.bodyptr, false);
+		qdf_status =
+			wma_ds_peek_rx_packet_info(body_ptr,
+						   (void **) &new_msg.bodyptr);
 
 		if (!QDF_IS_STATUS_SUCCESS(qdf_status)) {
 			lim_decrement_pending_mgmt_count(mac_ctx);

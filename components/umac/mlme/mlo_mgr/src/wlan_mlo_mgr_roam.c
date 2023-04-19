@@ -88,16 +88,16 @@ end:
 static void
 mlo_cleanup_link(struct wlan_objmgr_vdev *vdev, uint8_t num_setup_links)
 {
-	if (num_setup_links >= 2 &&
-	    wlan_vdev_mlme_is_mlo_link_vdev(vdev)) {
+	/*
+	 * Cleanup the non-assoc link link in below cases,
+	 * 1. Roamed to single link-MLO AP
+	 * 2. Roamed to an MLO AP but 4-way handshake is offloaded to
+	 *    userspace, i.e.auth_status = ROAM_AUTH_STATUS_CONNECTED
+	 * 3. Roamed to non-MLO AP(num_setup_links = 0)
+	 * This covers all supported combinations. So cleanup the link always.
+	 */
+	if (wlan_vdev_mlme_is_mlo_link_vdev(vdev))
 		cm_cleanup_mlo_link(vdev);
-	} else if (!num_setup_links || wlan_vdev_mlme_is_mlo_link_vdev(vdev)) {
-		wlan_vdev_mlme_clear_mlo_vdev(vdev);
-		if (wlan_vdev_mlme_is_mlo_link_vdev(vdev)) {
-			cm_cleanup_mlo_link(vdev);
-			wlan_vdev_mlme_clear_mlo_link_vdev(vdev);
-		}
-	}
 }
 
 static void
@@ -162,10 +162,7 @@ mlo_roam_abort_req(struct wlan_objmgr_psoc *psoc,
 		return QDF_STATUS_E_NULL_VALUE;
 	}
 
-	wlan_mlo_roam_abort_on_link(psoc, event, vdev_id);
-	cm_roam_stop_req(psoc, sync_ind->roamed_vdev_id,
-			 REASON_ROAM_SYNCH_FAILED,
-			 NULL, false);
+	wlan_mlo_roam_abort_on_link(psoc, event, sync_ind->roamed_vdev_id);
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -448,14 +445,34 @@ bool is_multi_link_roam(struct roam_offload_synch_ind *sync_ind)
 	return false;
 }
 
+uint8_t
+mlo_roam_get_num_of_setup_links(struct roam_offload_synch_ind *sync_ind)
+{
+	if (!sync_ind) {
+		mlo_err("Roam Sync ind is null");
+		return WLAN_INVALID_VDEV_ID;
+	}
+
+	return sync_ind->num_setup_links;
+}
+
 uint32_t
 mlo_roam_get_link_freq_from_mac_addr(struct roam_offload_synch_ind *sync_ind,
 				     uint8_t *link_mac_addr)
 {
 	uint8_t i;
 
-	if (!sync_ind || !sync_ind->num_setup_links || !link_mac_addr)
+	if (!sync_ind)
 		return 0;
+
+	/* Non-MLO roaming */
+	if (!sync_ind->num_setup_links)
+		return sync_ind->chan_freq;
+
+	if (!link_mac_addr) {
+		mlo_debug("link_mac_addr is NULL");
+		return 0;
+	}
 
 	for (i = 0; i < sync_ind->num_setup_links; i++)
 		if (!qdf_mem_cmp(sync_ind->ml_link[i].link_addr.bytes,
@@ -463,7 +480,30 @@ mlo_roam_get_link_freq_from_mac_addr(struct roam_offload_synch_ind *sync_ind,
 				 QDF_MAC_ADDR_SIZE))
 			return sync_ind->ml_link[i].channel.mhz;
 
+	mlo_debug("Mac address not found in ml_link info" QDF_MAC_ADDR_FMT,
+		  QDF_MAC_ADDR_REF(link_mac_addr));
+
 	return 0;
+}
+
+QDF_STATUS
+mlo_roam_get_link_id_from_mac_addr(struct roam_offload_synch_ind *sync_ind,
+				   uint8_t *link_mac_addr, uint32_t *link_id)
+{
+	uint8_t i;
+
+	if (!sync_ind || !sync_ind->num_setup_links || !link_mac_addr)
+		return QDF_STATUS_E_INVAL;
+
+	for (i = 0; i < sync_ind->num_setup_links; i++)
+		if (!qdf_mem_cmp(sync_ind->ml_link[i].link_addr.bytes,
+				 link_mac_addr,
+				 QDF_MAC_ADDR_SIZE)) {
+			*link_id = sync_ind->ml_link[i].link_id;
+			return QDF_STATUS_SUCCESS;
+		}
+
+	return QDF_STATUS_E_INVAL;
 }
 
 QDF_STATUS mlo_enable_rso(struct wlan_objmgr_pdev *pdev,
@@ -1273,3 +1313,47 @@ end:
 	wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_SB_ID);
 	return status;
 }
+
+bool
+mlo_is_roaming_in_progress(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id)
+{
+	struct wlan_objmgr_vdev *vdev;
+	struct wlan_mlo_dev_context *mlo_dev_ctx;
+	bool is_roaming_in_progress = false;
+	uint8_t link_vdev_id;
+	uint8_t i;
+
+	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, vdev_id,
+						    WLAN_MLME_OBJMGR_ID);
+	if (!vdev) {
+		mlme_err("vdev object is NULL for vdev %d", vdev_id);
+		return false;
+	}
+
+	mlo_dev_ctx = vdev->mlo_dev_ctx;
+	if (!mlo_dev_ctx) {
+		mlme_err("mlo_dev_ctx object is NULL for vdev %d", vdev_id);
+		goto end;
+	}
+
+	for (i = 0; i < WLAN_UMAC_MLO_MAX_VDEVS; i++) {
+		if (!mlo_dev_ctx->wlan_vdev_list[i])
+			continue;
+
+		link_vdev_id = wlan_vdev_get_id(mlo_dev_ctx->wlan_vdev_list[i]);
+		if (link_vdev_id == WLAN_INVALID_VDEV_ID) {
+			mlme_err("invalid vdev id");
+			goto end;
+		}
+
+		if (wlan_cm_is_roam_sync_in_progress(psoc, link_vdev_id)) {
+			is_roaming_in_progress = true;
+			goto end;
+		}
+	}
+
+end:
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_OBJMGR_ID);
+	return is_roaming_in_progress;
+}
+

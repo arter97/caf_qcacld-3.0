@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -239,7 +239,7 @@ static int hdd_set_reset_apf_offload(struct hdd_context *hdd_ctx,
 		goto fail;
 	}
 
-	apf_set_offload.session_id = adapter->vdev_id;
+	apf_set_offload.session_id = adapter->deflink->vdev_id;
 	apf_set_offload.total_length = nla_get_u32(tb[APF_PACKET_SIZE]);
 
 	if (!apf_set_offload.total_length) {
@@ -320,7 +320,8 @@ hdd_enable_disable_apf(struct hdd_adapter *adapter, bool apf_enable)
 	QDF_STATUS status;
 
 	status = sme_set_apf_enable_disable(hdd_adapter_get_mac_handle(adapter),
-					    adapter->vdev_id, apf_enable);
+					    adapter->deflink->vdev_id,
+					    apf_enable);
 	if (!QDF_IS_STATUS_SUCCESS(status)) {
 		hdd_err("Unable to post sme apf enable/disable message (status-%d)",
 				status);
@@ -350,7 +351,7 @@ hdd_apf_write_memory(struct hdd_adapter *adapter, struct nlattr **tb)
 	QDF_STATUS status;
 	int ret = 0;
 
-	write_mem_params.vdev_id = adapter->vdev_id;
+	write_mem_params.vdev_id = adapter->deflink->vdev_id;
 	if (adapter->apf_context.apf_enabled) {
 		hdd_err("Cannot get/set when APF interpreter is enabled");
 		return -EINVAL;
@@ -500,7 +501,7 @@ static int hdd_apf_read_memory(struct hdd_adapter *adapter, struct nlattr **tb)
 		return -EINVAL;
 	}
 
-	read_mem_params.vdev_id = adapter->vdev_id;
+	read_mem_params.vdev_id = adapter->deflink->vdev_id;
 
 	/* Read APF work memory offset */
 	if (!tb[APF_CURRENT_OFFSET]) {

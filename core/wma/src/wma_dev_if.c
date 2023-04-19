@@ -111,6 +111,8 @@
 #include "wlan_vdev_mgr_tgt_if_tx_defs.h"
 #include "wlan_mlo_mgr_roam.h"
 #include "target_if_vdev_mgr_tx_ops.h"
+#include "wlan_fwol_ucfg_api.h"
+
 /*
  * FW only supports 8 clients in SAP/GO mode for D3 WoW feature
  * and hence host needs to hold a wake lock after 9th client connects
@@ -1418,20 +1420,6 @@ wma_vdev_set_param(wmi_unified_t wmi_handle, uint32_t if_id,
 }
 
 /**
- * wma_set_peer_authorized_cb() - set peer authorized callback function
- * @wma_ctx: wma handle
- * @auth_cb: peer authorized callback
- *
- * Return: none
- */
-void wma_set_peer_authorized_cb(void *wma_ctx, wma_peer_authorized_fp auth_cb)
-{
-	tp_wma_handle wma_handle = (tp_wma_handle) wma_ctx;
-
-	wma_handle->peer_authorized_cb = auth_cb;
-}
-
-/**
  * wma_set_peer_param() - set peer parameter in fw
  * @wma_ctx: wma handle
  * @peer_addr: peer mac address
@@ -2643,8 +2631,8 @@ __wma_handle_vdev_stop_rsp(struct vdev_stop_response *resp_event)
 	if (mode == QDF_STA_MODE || mode == QDF_P2P_CLIENT_MODE) {
 		status = wlan_vdev_get_bss_peer_mac(iface->vdev, &bssid);
 		if (QDF_IS_STATUS_ERROR(status)) {
-			wma_err("Failed to get bssid");
-			return QDF_STATUS_E_INVAL;
+			wma_debug("Failed to get bssid, peer might have got deleted already");
+			return wlan_cm_bss_peer_delete_rsp(iface->vdev, status);
 		}
 		/* initiate CM to delete bss peer */
 		return wlan_cm_bss_peer_delete_ind(iface->vdev,  &bssid);
@@ -2979,6 +2967,7 @@ QDF_STATUS wma_post_vdev_create_setup(struct wlan_objmgr_vdev *vdev)
 	struct wlan_mlme_qos *qos_aggr;
 	struct vdev_mlme_obj *vdev_mlme;
 	tp_wma_handle wma_handle;
+	uint8_t enable_sifs_burst = 0;
 
 	if (!mac)
 		return QDF_STATUS_E_FAILURE;
@@ -3066,6 +3055,34 @@ QDF_STATUS wma_post_vdev_create_setup(struct wlan_objmgr_vdev *vdev)
 	if (vdev_mlme->mgmt.generic.type == WMI_VDEV_TYPE_STA &&
 	    vdev_mlme->mgmt.generic.subtype == 0)
 		wma_set_vdev_latency_level_param(wma_handle, mac, vdev_id);
+
+	switch (vdev_mlme->mgmt.generic.type) {
+	case WMI_VDEV_TYPE_AP:
+		if (vdev_mlme->mgmt.generic.subtype !=
+		    WLAN_VDEV_MLME_SUBTYPE_P2P_DEVICE)
+			break;
+
+		fallthrough;
+	case WMI_VDEV_TYPE_STA:
+	case WMI_VDEV_TYPE_NAN:
+	case WMI_VDEV_TYPE_OCB:
+	case WMI_VDEV_TYPE_MONITOR:
+		status = ucfg_get_enable_sifs_burst(wma_handle->psoc,
+						    &enable_sifs_burst);
+		if (QDF_IS_STATUS_ERROR(status))
+			wma_err("Failed to get sifs burst value, use default");
+
+		status = wma_vdev_set_param(wma_handle->wmi_handle, vdev_id,
+					    WMI_PDEV_PARAM_BURST_ENABLE,
+					    enable_sifs_burst);
+
+		if (QDF_IS_STATUS_ERROR(status))
+			wma_err("WMI_PDEV_PARAM_BURST_ENABLE set failed %d",
+				status);
+		break;
+	default:
+		break;
+	}
 
 	wma_vdev_set_data_tx_callback(vdev);
 
@@ -5597,7 +5614,8 @@ void wma_delete_sta(tp_wma_handle wma, tpDeleteStaParams del_sta)
 	switch (oper_mode) {
 	case BSS_OPERATIONAL_MODE_STA:
 		if (wlan_cm_is_roam_sync_in_progress(wma->psoc, vdev_id) ||
-		    MLME_IS_MLO_ROAM_SYNCH_IN_PROGRESS(wma->psoc, vdev_id)) {
+		    MLME_IS_MLO_ROAM_SYNCH_IN_PROGRESS(wma->psoc, vdev_id) ||
+		    mlo_is_roaming_in_progress(wma->psoc, vdev_id)) {
 			wma_debug("LFR3: Del STA on vdev_id %d", vdev_id);
 			qdf_mem_free(del_sta);
 			return;
@@ -5876,7 +5894,8 @@ void wma_delete_bss(tp_wma_handle wma, uint8_t vdev_id)
 	}
 
 	if (wlan_cm_is_roam_sync_in_progress(wma->psoc, vdev_id) ||
-	    MLME_IS_MLO_ROAM_SYNCH_IN_PROGRESS(wma->psoc, vdev_id)) {
+	    MLME_IS_MLO_ROAM_SYNCH_IN_PROGRESS(wma->psoc, vdev_id) ||
+	    mlo_is_roaming_in_progress(wma->psoc, vdev_id)) {
 		roam_synch_in_progress = true;
 		wma_debug("LFR3: Setting vdev_up to FALSE for vdev:%d",
 			  vdev_id);

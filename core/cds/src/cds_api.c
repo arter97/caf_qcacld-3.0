@@ -145,7 +145,9 @@ static struct ol_if_ops  dp_ol_if_ops = {
     /* TODO: Add any other control path calls required to OL_IF/WMA layer */
 };
 #else
-static struct ol_if_ops  dp_ol_if_ops;
+static struct ol_if_ops  dp_ol_if_ops = {
+	.dp_rx_get_pending = cds_get_rx_thread_pending,
+};
 #endif
 
 static void cds_trigger_recovery_work(void *param);
@@ -838,6 +840,25 @@ QDF_STATUS cds_open(struct wlan_objmgr_psoc *psoc)
 				goto err_soc_detach;
 			}
 		hdd_ctx->is_wifi3_0_target = true;
+	} else if (hdd_ctx->target_type == TARGET_TYPE_WCN6450) {
+		gp_cds_context->dp_soc =
+			cdp_soc_attach(RHINE_DP,
+				       gp_cds_context->hif_context,
+				       htcInfo.target_psoc,
+				       gp_cds_context->htc_ctx,
+				       gp_cds_context->qdf_ctx,
+				       &dp_ol_if_ops);
+		if (gp_cds_context->dp_soc)
+			if (!cdp_soc_init(gp_cds_context->dp_soc, RHINE_DP,
+					  gp_cds_context->hif_context,
+					  htcInfo.target_psoc,
+					  gp_cds_context->htc_ctx,
+					  gp_cds_context->qdf_ctx,
+					  &dp_ol_if_ops)) {
+				status = QDF_STATUS_E_FAILURE;
+				goto err_soc_detach;
+			}
+		hdd_ctx->is_wifi3_0_target = true;
 	} else {
 		gp_cds_context->dp_soc = cdp_soc_attach(MOB_DRV_LEGACY_DP,
 			gp_cds_context->hif_context, htcInfo.target_psoc,
@@ -968,7 +989,8 @@ QDF_STATUS cds_dp_open(struct wlan_objmgr_psoc *psoc)
 	    hdd_ctx->target_type == TARGET_TYPE_QCA6750 ||
 	    hdd_ctx->target_type == TARGET_TYPE_KIWI ||
 	    hdd_ctx->target_type == TARGET_TYPE_MANGO ||
-	    hdd_ctx->target_type == TARGET_TYPE_PEACH) {
+	    hdd_ctx->target_type == TARGET_TYPE_PEACH ||
+	    hdd_ctx->target_type == TARGET_TYPE_WCN6450) {
 		qdf_status = cdp_pdev_init(cds_get_context(QDF_MODULE_ID_SOC),
 					   gp_cds_context->htc_ctx,
 					   gp_cds_context->qdf_ctx, 0);
@@ -2013,6 +2035,9 @@ static void cds_trigger_recovery_handler(const char *func, const uint32_t line)
 	if (pld_force_collect_target_dump(qdf->dev))
 		cds_force_assert_target(qdf);
 	cds_set_assert_target_in_progress(false);
+
+	/* Do not wait for firmware down block wmi transactions */
+	wma_wmi_stop();
 
 	/*
 	 * if *wlan* recovery is disabled, once all the required registers are

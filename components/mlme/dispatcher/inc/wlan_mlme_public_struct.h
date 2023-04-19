@@ -1669,12 +1669,14 @@ struct wlan_mlme_nss_chains {
  * @MLME_STA_KEEPALIVE_MIN: ensure KEEPALIVE_NULL or ARP are not values of 0
  * @MLME_STA_KEEPALIVE_NULL_DATA: null data packet
  * @MLME_STA_KEEPALIVE_GRAT_ARP: gratuitous ARP packet
+ * @MLME_STA_KEEPALIVE_UNSOLICIT_ARP_RSP: unsolicited  ARP response packet
  * @MLME_STA_KEEPALIVE_COUNT: number of method options available
  */
 enum station_keepalive_method {
 	MLME_STA_KEEPALIVE_MIN,
 	MLME_STA_KEEPALIVE_NULL_DATA = 1,
 	MLME_STA_KEEPALIVE_GRAT_ARP = 2,
+	MLME_STA_KEEPALIVE_UNSOLICIT_ARP_RSP = 3,
 	/* keep at the end */
 	MLME_STA_KEEPALIVE_COUNT
 };
@@ -2906,5 +2908,17 @@ enum host_concurrent_ap_policy {
 	HOST_CONCURRENT_AP_POLICY_GAMING_AUDIO = 1,
 	HOST_CONCURRENT_AP_POLICY_LOSSLESS_AUDIO_STREAMING = 2,
 	HOST_CONCURRENT_AP_POLICY_XR = 3
+};
+
+/**
+ * enum ll_ap_type - low latency AP type
+ * @LL_AP_TYPE_HT: low latency AP type high throughput
+ * @LL_AP_TYPE_LT: low latency AP type low latency
+ * @LL_AP_TYPE_ANY: low latency AP type any
+ */
+enum ll_ap_type {
+	LL_AP_TYPE_HT = 0,
+	LL_AP_TYPE_LT = 1,
+	LL_AP_TYPE_ANY = 2,
 };
 #endif

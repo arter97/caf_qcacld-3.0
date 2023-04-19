@@ -1320,7 +1320,7 @@ void lim_send_mscs_req_action_frame(struct mac_context *mac,
 			   TXRX_FRM_802_11_MGMT, ANI_TXDIR_TODS, 7,
 			   lim_tx_complete, frame, lim_mscs_req_tx_complete_cnf,
 			   HAL_USE_PEER_STA_REQUESTED_MASK,
-			   pe_session->vdev_id, false, 0, RATEID_DEFAULT, 0);
+			   pe_session->vdev_id, false, 0, RATEID_DEFAULT, 0, 0);
 	if (QDF_IS_STATUS_SUCCESS(qdf_status)) {
 		mlme_set_is_mscs_req_sent(pe_session->vdev, true);
 	} else {
@@ -1968,7 +1968,7 @@ lim_send_assoc_rsp_mgmt_frame(struct mac_context *mac_ctx,
 				ANI_TXDIR_TODS,
 				7, lim_tx_complete, frame,
 				lim_assoc_rsp_tx_complete, tx_flag,
-				sme_session, false, 0, RATEID_DEFAULT, 0);
+				sme_session, false, 0, RATEID_DEFAULT, 0, 0);
 	else
 		qdf_status = wma_tx_frame(
 				mac_ctx, packet, (uint16_t)bytes,
@@ -3090,7 +3090,7 @@ lim_send_assoc_req_mgmt_frame(struct mac_context *mac_ctx,
 			   TXRX_FRM_802_11_MGMT, ANI_TXDIR_TODS, 7,
 			   lim_tx_complete, frame, lim_assoc_tx_complete_cnf,
 			   tx_flag, vdev_id, false, 0,
-			   min_rid, peer_rssi);
+			   min_rid, peer_rssi, 0);
 	MTRACE(qdf_trace
 		       (QDF_MODULE_ID_PE, TRACE_CODE_TX_COMPLETE,
 		       pe_session->peSessionId, qdf_status));
@@ -3706,7 +3706,7 @@ alloc_packet:
 				 7, lim_tx_complete, frame,
 				 lim_auth_tx_complete_cnf,
 				 tx_flag, vdev_id, false,
-				 ch_freq_tx_frame, min_rid, peer_rssi);
+				 ch_freq_tx_frame, min_rid, peer_rssi, 0);
 	MTRACE(qdf_trace(QDF_MODULE_ID_PE, TRACE_CODE_TX_COMPLETE,
 		session->peSessionId, qdf_status));
 	if (!QDF_IS_STATUS_SUCCESS(qdf_status)) {
@@ -4219,7 +4219,7 @@ lim_send_disassoc_mgmt_frame(struct mac_context *mac,
 					 ANI_TXDIR_TODS, 7, lim_tx_complete,
 					 pFrame, lim_disassoc_tx_complete_cnf_handler,
 					 txFlag, smeSessionId, false, 0,
-					 RATEID_DEFAULT, 0);
+					 RATEID_DEFAULT, 0, 0);
 		MTRACE(qdf_trace
 			       (QDF_MODULE_ID_PE, TRACE_CODE_TX_COMPLETE,
 			       pe_session->peSessionId, qdf_status));
@@ -4455,7 +4455,7 @@ lim_send_deauth_mgmt_frame(struct mac_context *mac,
 					 ANI_TXDIR_TODS, 7, lim_tx_complete,
 					 pFrame, lim_deauth_tx_complete_cnf_handler,
 					 txFlag, smeSessionId, false, 0,
-					 RATEID_DEFAULT, 0);
+					 RATEID_DEFAULT, 0, 0);
 		MTRACE(qdf_trace
 			       (QDF_MODULE_ID_PE, TRACE_CODE_TX_COMPLETE,
 			       pe_session->peSessionId, qdf_status));
@@ -5179,7 +5179,7 @@ lim_p2p_oper_chan_change_confirm_action_frame(struct mac_context *mac_ctx,
 			TXRX_FRM_802_11_MGMT, ANI_TXDIR_TODS,
 			7, lim_tx_complete, frame,
 			lim_oper_chan_change_confirm_tx_complete_cnf,
-			tx_flag, vdev_id, false, 0, RATEID_DEFAULT, 0);
+			tx_flag, vdev_id, false, 0, RATEID_DEFAULT, 0, 0);
 
 	MTRACE(qdf_trace(QDF_MODULE_ID_PE, TRACE_CODE_TX_COMPLETE,
 			session_entry->peSessionId, qdf_status));
@@ -6045,6 +6045,35 @@ bool lim_tdls_peer_support_he(tpDphHashNode sta_ds)
 }
 #endif
 
+#ifdef WLAN_FEATURE_11BE_MLO
+static
+void lim_prepare_tdls_with_mlo(struct pe_session *session,
+			       tSirMacAddr peer_mac, tSirMacAddr self_mac,
+			       uint16_t *action)
+{
+	uint8_t *mld_addr;
+
+	if (!sir_compare_mac_addr(session->bssId, peer_mac) &&
+	    wlan_mlo_get_tdls_link_vdev(session->vdev)) {
+		mld_addr = wlan_vdev_mlme_get_mldaddr(session->vdev);
+		sir_copy_mac_addr(self_mac, mld_addr);
+		*action = ACTION_CATEGORY_BACK << 8 | ADDBA_RESPONSE;
+	} else {
+		sir_copy_mac_addr(self_mac, session->self_mac_addr);
+		*action = 0;
+	}
+}
+#else
+static
+void lim_prepare_tdls_with_mlo(struct pe_session *session,
+			       tSirMacAddr peer_mac, tSirMacAddr self_mac,
+			       uint16_t *action)
+{
+	sir_copy_mac_addr(self_mac, session->self_mac_addr);
+	*action = 0;
+}
+#endif
+
 QDF_STATUS lim_send_addba_response_frame(struct mac_context *mac_ctx,
 		tSirMacAddr peer_mac, uint16_t tid,
 		struct pe_session *session, uint8_t addba_extn_present,
@@ -6069,6 +6098,8 @@ QDF_STATUS lim_send_addba_response_frame(struct mac_context *mac_ctx,
 	bool he_cap = false;
 	bool eht_cap = false;
 	struct wlan_mlme_qos *qos_aggr;
+	tSirMacAddr self_mac;
+	uint16_t action;
 
 	vdev_id = session->vdev_id;
 
@@ -6181,8 +6212,13 @@ QDF_STATUS lim_send_addba_response_frame(struct mac_context *mac_ctx,
 		}
 	}
 
+	/*
+	 * for TDLS MLO case, it needs to use MLD mac address for TA and
+	 * set action code to send out from specific vdev in fw.
+	 */
+	lim_prepare_tdls_with_mlo(session, peer_mac, self_mac, &action);
 	pe_debug("Sending a ADDBA Response from "QDF_MAC_ADDR_FMT" to "QDF_MAC_ADDR_FMT,
-		 QDF_MAC_ADDR_REF(session->self_mac_addr),
+		 QDF_MAC_ADDR_REF(self_mac),
 		 QDF_MAC_ADDR_REF(peer_mac));
 	pe_debug("tid %d dialog_token %d status %d buff_size %d amsdu_supp %d",
 		 tid, frm.DialogToken.token, frm.Status.status,
@@ -6216,7 +6252,7 @@ QDF_STATUS lim_send_addba_response_frame(struct mac_context *mac_ctx,
 	qdf_mem_zero(frame_ptr, num_bytes);
 
 	lim_populate_mac_header(mac_ctx, frame_ptr, SIR_MAC_MGMT_FRAME,
-		SIR_MAC_MGMT_ACTION, peer_mac, session->self_mac_addr);
+		SIR_MAC_MGMT_ACTION, peer_mac, self_mac);
 
 	/* Update A3 with the BSSID */
 	mgmt_hdr = (tpSirMacMgmtHdr) frame_ptr;
@@ -6261,7 +6297,8 @@ QDF_STATUS lim_send_addba_response_frame(struct mac_context *mac_ctx,
 						NULL, frame_ptr,
 						lim_addba_rsp_tx_complete_cnf,
 						tx_flag, vdev_id,
-						false, 0, RATEID_DEFAULT, 0);
+						false, 0, RATEID_DEFAULT, 0,
+						action);
 	MTRACE(qdf_trace(QDF_MODULE_ID_PE, TRACE_CODE_TX_COMPLETE,
 			 session->peSessionId, qdf_status));
 	if (QDF_STATUS_SUCCESS != qdf_status) {
@@ -6524,7 +6561,7 @@ QDF_STATUS lim_send_delba_action_frame(struct mac_context *mac_ctx,
 						NULL, frame_ptr,
 						lim_delba_tx_complete_cnf,
 						tx_flag, vdev_id,
-						false, 0, RATEID_DEFAULT, 0);
+						false, 0, RATEID_DEFAULT, 0, 0);
 	if (qdf_status != QDF_STATUS_SUCCESS) {
 		pe_err("delba wma_tx_frame FAILED! Status [%d]", qdf_status);
 		return qdf_status;
@@ -6608,7 +6645,7 @@ static void lim_tx_mgmt_frame(struct mac_context *mac_ctx, uint8_t vdev_id,
 					 7, lim_tx_complete, frame,
 					 lim_auth_tx_complete_cnf,
 					 0, vdev_id, false, channel_freq,
-					 min_rid, 0);
+					 min_rid, 0, 0);
 	MTRACE(qdf_trace(QDF_MODULE_ID_PE, TRACE_CODE_TX_COMPLETE,
 		session_id, qdf_status));
 	if (!QDF_IS_STATUS_SUCCESS(qdf_status)) {
@@ -6695,11 +6732,11 @@ static QDF_STATUS lim_update_mld_to_link_address(struct mac_context *mac_ctx,
 	struct qdf_mac_addr *self_link_addr;
 	struct tLimPreAuthNode *pre_auth_node;
 	struct qdf_mac_addr peer_link_addr;
+	struct qdf_mac_addr *peer_roaming_link_addr;
 	enum QDF_OPMODE opmode;
 	QDF_STATUS status;
 
-	if (!wlan_vdev_mlme_is_mlo_vdev(vdev) ||
-	    !wlan_vdev_get_mlo_external_sae_auth_conversion(vdev))
+	if (!wlan_cm_is_sae_auth_addr_conversion_required(vdev))
 		return QDF_STATUS_SUCCESS;
 
 	opmode = wlan_vdev_mlme_get_opmode(vdev);
@@ -6720,9 +6757,18 @@ static QDF_STATUS lim_update_mld_to_link_address(struct mac_context *mac_ctx,
 			     QDF_MAC_ADDR_SIZE);
 		break;
 	case QDF_STA_MODE:
-		status = wlan_vdev_get_bss_peer_mac(vdev, &peer_link_addr);
-		if (QDF_IS_STATUS_ERROR(status))
-			return status;
+		if (!wlan_cm_is_vdev_roaming(vdev)) {
+			status = wlan_vdev_get_bss_peer_mac(vdev,
+							    &peer_link_addr);
+			if (QDF_IS_STATUS_ERROR(status))
+				return status;
+		} else {
+			peer_roaming_link_addr =
+				wlan_cm_roaming_get_peer_link_addr(vdev);
+			if (!peer_roaming_link_addr)
+				return QDF_STATUS_E_FAILURE;
+			peer_link_addr = *peer_roaming_link_addr;
+		}
 
 		qdf_mem_copy(mac_hdr->da, peer_link_addr.bytes,
 			     QDF_MAC_ADDR_SIZE);

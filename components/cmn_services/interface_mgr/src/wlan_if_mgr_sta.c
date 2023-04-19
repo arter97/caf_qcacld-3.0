@@ -39,6 +39,7 @@
 #include <wlan_mlo_mgr_sta.h>
 #endif
 #include "wlan_vdev_mgr_utils_api.h"
+#include "wlan_tdls_api.h"
 
 QDF_STATUS if_mgr_connect_start(struct wlan_objmgr_vdev *vdev,
 				struct if_mgr_event_data *event_data)
@@ -90,6 +91,9 @@ QDF_STATUS if_mgr_connect_start(struct wlan_objmgr_vdev *vdev,
 		if (disable_nan)
 			ucfg_nan_disable_concurrency(psoc);
 	}
+
+	if (op_mode == QDF_P2P_CLIENT_MODE)
+		wlan_tdls_handle_p2p_client_connect(psoc, vdev);
 
 	/*
 	 * STA+NDI concurrency gets preference over NDI+NDI. Disable
@@ -229,6 +233,26 @@ QDF_STATUS if_mgr_disconnect_complete(struct wlan_objmgr_vdev *vdev,
 		ifmgr_err("Failed to enable roaming on connected sta");
 		return status;
 	}
+
+	return QDF_STATUS_SUCCESS;
+}
+
+QDF_STATUS
+if_mgr_sta_csa_complete(struct wlan_objmgr_vdev *vdev,
+			struct if_mgr_event_data *event_data)
+{
+	struct wlan_objmgr_psoc *psoc;
+	struct wlan_objmgr_pdev *pdev;
+
+	pdev = wlan_vdev_get_pdev(vdev);
+	if (!pdev)
+		return QDF_STATUS_E_FAILURE;
+
+	psoc = wlan_pdev_get_psoc(pdev);
+	if (!psoc)
+		return QDF_STATUS_E_FAILURE;
+
+	wlan_tdls_notify_channel_switch_complete(psoc, wlan_vdev_get_id(vdev));
 
 	return QDF_STATUS_SUCCESS;
 }

@@ -305,22 +305,6 @@ QDF_STATUS ucfg_dp_rx_ol_init(struct wlan_objmgr_psoc *psoc,
 			      bool is_wifi3_0_target);
 
 /**
- * ucfg_dp_init_txrx() - Initialize STA DP init TX/RX
- * @vdev: vdev mapped to STA DP interface
- *
- * Return: 0 on success and non zero on failure.
- */
-QDF_STATUS ucfg_dp_init_txrx(struct wlan_objmgr_vdev *vdev);
-
-/**
- * ucfg_dp_deinit_txrx() - Deinitialize STA DP init TX/RX
- * @vdev: vdev mapped to STA DP interface
- *
- * Return: 0 on success and non zero on failure.
- */
-QDF_STATUS ucfg_dp_deinit_txrx(struct wlan_objmgr_vdev *vdev);
-
-/**
  * ucfg_dp_start_xmit() - Transmit packet on STA interface
  * @nbuf: n/w buffer to transmitted
  * @vdev: vdev mapped to STA DP interface
@@ -1356,10 +1340,11 @@ QDF_STATUS ucfg_dp_direct_link_init(struct wlan_objmgr_psoc *psoc);
 /**
  * ucfg_dp_direct_link_deinit() - De-initializes Direct Link datapath
  * @psoc: psoc handle
+ * @is_ssr: true if SSR is in progress else false
  *
  * Return: None
  */
-void ucfg_dp_direct_link_deinit(struct wlan_objmgr_psoc *psoc);
+void ucfg_dp_direct_link_deinit(struct wlan_objmgr_psoc *psoc, bool is_ssr);
 
 /**
  * ucfg_dp_wfds_handle_request_mem_ind() - Process request memory indication
@@ -1416,7 +1401,7 @@ QDF_STATUS ucfg_dp_direct_link_init(struct wlan_objmgr_psoc *psoc)
 }
 
 static inline
-void ucfg_dp_direct_link_deinit(struct wlan_objmgr_psoc *psoc)
+void ucfg_dp_direct_link_deinit(struct wlan_objmgr_psoc *psoc, bool is_ssr)
 {
 }
 

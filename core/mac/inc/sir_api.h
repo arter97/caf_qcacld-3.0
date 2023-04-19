@@ -1307,17 +1307,6 @@ struct missed_beacon_ind {
 	int32_t rssi;
 };
 
-/* / Definition for Set Context request */
-/* / ---> MAC */
-struct set_context_req {
-	uint16_t messageType;   /* eWNI_SME_SET_CONTEXT_REQ */
-	uint16_t length;
-	uint8_t vdev_id;      /* vdev ID */
-	struct qdf_mac_addr peer_macaddr;
-	struct qdf_mac_addr bssid;      /* BSSID */
-	tSirKeyMaterial keyMaterial;
-};
-
 /* / Definition for Set Context response */
 /* / MAC ---> */
 struct set_context_rsp {
@@ -1522,16 +1511,6 @@ struct qos_map_set {
 	uint8_t dscp_exceptions[QOS_MAP_MAX_EX][2];
 	uint8_t dscp_range[QOS_MAP_RANGE_NUM][2];
 };
-
-typedef struct sSmeIbssPeerInd {
-	uint16_t mesgType;
-	uint16_t mesgLen;
-	uint8_t sessionId;
-
-	struct qdf_mac_addr peer_addr;
-
-	/* Beacon will be appended for new Peer indication. */
-} tSmeIbssPeerInd, *tpSmeIbssPeerInd;
 
 typedef struct sSmeMaxAssocInd {
 	uint16_t mesgType;      /* eWNI_SME_MAX_ASSOC_EXCEEDED */

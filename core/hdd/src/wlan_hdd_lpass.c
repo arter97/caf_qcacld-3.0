@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2020 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -108,7 +108,7 @@ static int wlan_hdd_gen_wlan_status_pack(struct wlan_status_data *data,
 		return -EINVAL;
 	}
 
-	if (wlan_hdd_validate_vdev_id(adapter->vdev_id))
+	if (wlan_hdd_validate_vdev_id(adapter->deflink->vdev_id))
 		return -EINVAL;
 
 	hdd_ctx = WLAN_HDD_GET_CTX(adapter);
@@ -156,11 +156,11 @@ static int wlan_hdd_gen_wlan_status_pack(struct wlan_status_data *data,
 
 	wlan_reg_get_cc_and_src(hdd_ctx->psoc, data->country_code);
 	data->is_on = is_on;
-	data->vdev_id = adapter->vdev_id;
+	data->vdev_id = adapter->deflink->vdev_id;
 	data->vdev_mode = adapter->device_mode;
 	if (sta_ctx) {
 		data->is_connected = is_connected;
-		data->rssi = adapter->rssi;
+		data->rssi = adapter->deflink->rssi;
 		data->freq = sta_ctx->conn_info.chan_freq;
 		if (WLAN_SVC_MAX_SSID_LEN >=
 		    sta_ctx->conn_info.ssid.SSID.length) {
@@ -366,14 +366,14 @@ void hdd_lpass_notify_connect(struct hdd_adapter *adapter)
 	struct hdd_station_ctx *sta_ctx;
 
 	/* only send once per connection */
-	if (adapter->rssi_send)
+	if (adapter->deflink->rssi_send)
 		return;
 
 	/* don't send if driver is unloading */
 	if (cds_is_driver_unloading())
 		return;
 
-	adapter->rssi_send = true;
+	adapter->deflink->rssi_send = true;
 	sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter);
 	wlan_hdd_send_status_pkg(adapter, sta_ctx, 1, 1);
 }
@@ -386,7 +386,7 @@ void hdd_lpass_notify_disconnect(struct hdd_adapter *adapter)
 {
 	struct hdd_station_ctx *sta_ctx;
 
-	adapter->rssi_send = false;
+	adapter->deflink->rssi_send = false;
 	sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter);
 	wlan_hdd_send_status_pkg(adapter, sta_ctx, 1, 0);
 }

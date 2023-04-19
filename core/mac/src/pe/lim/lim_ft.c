@@ -677,7 +677,7 @@ void lim_fill_ft_session(struct mac_context *mac,
 	}
 
 	sir_copy_mac_addr(ft_session->self_mac_addr,
-			  pe_session->self_mac_addr);
+			  wlan_vdev_mlme_get_macaddr(pe_session->vdev));
 	sir_copy_mac_addr(ft_session->limReAssocbssId,
 			  pbssDescription->bssId);
 	sir_copy_mac_addr(ft_session->prev_ap_bssid, pe_session->bssId);

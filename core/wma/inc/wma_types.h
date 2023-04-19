@@ -462,11 +462,12 @@ enum wmamsgtype {
 		      (false), \
 		      (channel_freq), \
 		      (rid), \
-		      (peer_rssi)))
+		      (peer_rssi), \
+		      (0)))
 
 #define wma_tx_frameWithTxComplete(hHal, pFrmBuf, frmLen, frmType, txDir, tid, \
 	 pCompFunc, pData, pCBackFnTxComp, txFlag, sessionid, \
-	 tdlsflag, channel_freq, rid, peer_rssi) \
+	 tdlsflag, channel_freq, rid, peer_rssi, action) \
 	(QDF_STATUS)( wma_tx_packet( \
 		      cds_get_context(QDF_MODULE_ID_WMA), \
 		      (pFrmBuf), \
@@ -482,7 +483,8 @@ enum wmamsgtype {
 		      (tdlsflag), \
 		      (channel_freq), \
 		      (rid), \
-		      (peer_rssi)))
+		      (peer_rssi), \
+		      (action)))
 
 /**
  * struct sUapsd_Params - Powersave Offload Changes
@@ -645,9 +647,16 @@ void wma_get_rx_retry_cnt(struct mac_context *mac, uint8_t vdev_id,
 QDF_STATUS wma_set_wlm_latency_level(void *wma_ptr,
 			struct wlm_latency_level_param *latency_params);
 
-QDF_STATUS
-wma_ds_peek_rx_packet_info
-	(cds_pkt_t *vosDataBuff, void **ppRxHeader, bool bSwap);
+/**
+ * wma_ds_peek_rx_packet_info() - peek rx packet info
+ * @pkt: packet
+ * @pkt_meta: packet meta
+ *
+ * Function fills the rx packet meta info from the the cds packet
+ *
+ * Return: QDF status
+ */
+QDF_STATUS wma_ds_peek_rx_packet_info(cds_pkt_t *pkt, void **pkt_meta);
 
 /**
  * wma_tx_abort() - abort tx
@@ -676,6 +685,7 @@ void wma_tx_abort(uint8_t vdev_id);
  * @channel_freq: channel frequency
  * @rid: rate id
  * @peer_rssi: peer RSSI value
+ * @action: action code
  *
  * This function sends the frame corresponding to the
  * given vdev id.
@@ -690,7 +700,7 @@ QDF_STATUS wma_tx_packet(void *wma_context, void *tx_frame, uint16_t frmLen,
 			 wma_tx_ota_comp_callback tx_frm_ota_comp_cb,
 			 uint8_t tx_flag, uint8_t vdev_id, bool tdls_flag,
 			 uint16_t channel_freq, enum rateid rid,
-			 int8_t peer_rssi);
+			 int8_t peer_rssi, uint16_t action);
 
 /**
  * wma_open() - Allocate wma context and initialize it.

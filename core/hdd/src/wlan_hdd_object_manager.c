@@ -284,15 +284,15 @@ __hdd_objmgr_get_vdev_by_user(struct hdd_adapter *adapter,
 		return NULL;
 	}
 
-	qdf_spin_lock_bh(&adapter->vdev_lock);
-	vdev = adapter->vdev;
+	qdf_spin_lock_bh(&adapter->deflink->vdev_lock);
+	vdev = adapter->deflink->vdev;
 	if (vdev) {
 		status = wlan_objmgr_vdev_try_get_ref_debug(vdev, id, func,
 							    line);
 		if (QDF_IS_STATUS_ERROR(status))
 			vdev = NULL;
 	}
-	qdf_spin_unlock_bh(&adapter->vdev_lock);
+	qdf_spin_unlock_bh(&adapter->deflink->vdev_lock);
 
 	if (!vdev)
 		hdd_debug("VDEV is NULL (via %s, id %d)", func, id);
@@ -313,14 +313,14 @@ __hdd_objmgr_get_vdev_by_user(struct hdd_adapter *adapter,
 		return NULL;
 	}
 
-	qdf_spin_lock_bh(&adapter->vdev_lock);
-	vdev = adapter->vdev;
+	qdf_spin_lock_bh(&adapter->deflink->vdev_lock);
+	vdev = adapter->deflink->vdev;
 	if (vdev) {
 		status = wlan_objmgr_vdev_try_get_ref(vdev, id);
 		if (QDF_IS_STATUS_ERROR(status))
 			vdev = NULL;
 	}
-	qdf_spin_unlock_bh(&adapter->vdev_lock);
+	qdf_spin_unlock_bh(&adapter->deflink->vdev_lock);
 
 	if (!vdev)
 		hdd_debug("VDEV is NULL (via %s, id %d)", func, id);

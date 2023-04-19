@@ -509,9 +509,10 @@ static bool sap_chan_sel_init(mac_handle_t mac_handle,
 			continue;
 
 		/* Skip indoor channels for non-scc indoor scenario*/
-		if (!policy_mgr_is_sap_allowed_on_indoor(mac->pdev,
-							 sap_ctx->sessionId,
-							 *pChans)) {
+		if (!policy_mgr_is_sap_go_interface_allowed_on_indoor(
+							mac->pdev,
+							sap_ctx->sessionId,
+							*pChans)) {
 			sap_debug("Do not allow SAP on indoor frequency %u",
 				  *pChans);
 			continue;
