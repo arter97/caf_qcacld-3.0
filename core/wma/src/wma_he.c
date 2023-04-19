@@ -990,6 +990,10 @@ void wma_update_target_ext_he_cap(struct target_psoc_info *tgt_hdl,
 
 	qdf_mem_copy(he_cap, &tmp_he_cap, sizeof(*he_cap));
 	wma_print_he_cap(he_cap);
+	wma_debug("5 GHz HE capabilities");
+	wma_print_he_cap(&tgt_cfg->he_cap_5g);
+	wma_debug("2.4 GHz HE capabilities");
+	wma_print_he_cap(&tgt_cfg->he_cap_2g);
 }
 
 void wma_he_update_tgt_services(struct wmi_unified *wmi_handle,
