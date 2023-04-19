@@ -10495,6 +10495,27 @@ void sme_set_eht_bw_cap(mac_handle_t mac_handle, uint8_t vdev_id,
 
 	csr_update_session_eht_cap(mac_ctx, session);
 }
+
+int sme_update_eht_om_ctrl_supp(mac_handle_t mac_handle, uint8_t session_id,
+				uint8_t cfg_val)
+{
+	struct mac_context *mac_ctx = MAC_CONTEXT(mac_handle);
+	struct csr_roam_session *session;
+
+	session = CSR_GET_SESSION(mac_ctx, session_id);
+
+	if (!session) {
+		sme_err("No session for id %d", session_id);
+		return -EINVAL;
+	}
+	mac_ctx->mlme_cfg->eht_caps.dot11_eht_cap.eht_om_ctl = cfg_val;
+	mac_ctx->eht_cap_2g.eht_om_ctl = cfg_val;
+	mac_ctx->eht_cap_5g.eht_om_ctl = cfg_val;
+
+	csr_update_session_eht_cap(mac_ctx, session);
+
+	return 0;
+}
 #endif
 
 #ifdef WLAN_FEATURE_11AX
@@ -10891,6 +10912,8 @@ int sme_update_he_om_ctrl_supp(mac_handle_t mac_handle, uint8_t session_id,
 		return -EINVAL;
 	}
 	mac_ctx->mlme_cfg->he_caps.dot11_he_cap.omi_a_ctrl = cfg_val;
+	mac_ctx->he_cap_2g.omi_a_ctrl = cfg_val;
+	mac_ctx->he_cap_5g.omi_a_ctrl = cfg_val;
 
 	csr_update_session_he_cap(mac_ctx, session);
 	return 0;
@@ -15190,6 +15213,73 @@ void sme_update_eht_cap_mcs(mac_handle_t mac_handle, uint8_t vdev_id,
 
 	qdf_mem_copy(&mac_ctx->eht_cap_5g, mlme_eht_cap,
 		     sizeof(tDot11fIEeht_cap));
+}
+
+void sme_activate_mlo_links(mac_handle_t mac_handle, uint8_t session_id,
+			    uint8_t num_links,
+			    struct qdf_mac_addr active_link_addr[2])
+{
+	struct mac_context *mac_ctx = MAC_CONTEXT(mac_handle);
+	struct csr_roam_session *session;
+
+	session = CSR_GET_SESSION(mac_ctx, session_id);
+
+	if (!session) {
+		sme_err("No session for id %d", session_id);
+		return;
+	}
+
+	policy_mgr_activate_mlo_links(mac_ctx->psoc, session_id, num_links,
+				      active_link_addr);
+}
+
+int sme_update_eht_caps(mac_handle_t mac_handle, uint8_t session_id,
+			uint8_t cfg_val, enum sme_eht_tx_bfee_cap_type cap_type,
+			enum QDF_OPMODE op_mode)
+{
+	struct mac_context *mac_ctx = MAC_CONTEXT(mac_handle);
+	struct csr_roam_session *session;
+	tDot11fIEeht_cap *cfg_eht_cap;
+
+	session = CSR_GET_SESSION(mac_ctx, session_id);
+
+	if (!session) {
+		sme_err("No session for id %d", session_id);
+		return -EINVAL;
+	}
+	cfg_eht_cap = &mac_ctx->mlme_cfg->eht_caps.dot11_eht_cap;
+
+	switch (cap_type) {
+	case EHT_TX_BFEE_ENABLE:
+		cfg_eht_cap->su_beamformee = cfg_val;
+		break;
+	case EHT_TX_BFEE_SS_80MHZ:
+		cfg_eht_cap->bfee_ss_le_80mhz = cfg_val;
+		break;
+	case EHT_TX_BFEE_SS_160MHZ:
+		cfg_eht_cap->bfee_ss_160mhz = cfg_val;
+		break;
+	case EHT_TX_BFEE_SS_320MHZ:
+		cfg_eht_cap->bfee_ss_320mhz = cfg_val;
+		break;
+	case EHT_TX_BFEE_SOUNDING_FEEDBACK_RATELIMIT:
+		cfg_eht_cap->tb_sounding_feedback_rl = cfg_val;
+		break;
+	default:
+		sme_debug("default: Unhandled cap type %d", cap_type);
+		return -EINVAL;
+	}
+
+	sme_debug("EHT cap: cap type %d, cfg val %d", cap_type, cfg_val);
+	csr_update_session_eht_cap(mac_ctx, session);
+
+	qdf_mem_copy(&mac_ctx->eht_cap_2g, cfg_eht_cap,
+		     sizeof(tDot11fIEeht_cap));
+	qdf_mem_copy(&mac_ctx->eht_cap_5g, cfg_eht_cap,
+		     sizeof(tDot11fIEeht_cap));
+	sme_set_vdev_ies_per_band(mac_handle, session_id, op_mode);
+
+	return 0;
 }
 #endif
 

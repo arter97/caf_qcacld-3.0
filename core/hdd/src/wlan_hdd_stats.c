@@ -2089,6 +2089,7 @@ static void cache_station_stats_cb(struct stats_event *ev, void *cookie)
 			continue;
 		}
 		copy_station_stats_to_adapter(adapter, ev);
+		wlan_hdd_get_peer_rx_rate_stats(adapter);
 		/* dev_put has to be done here */
 		hdd_adapter_dev_put_debug(adapter, dbgid);
 		if (next_adapter)
@@ -2104,6 +2105,8 @@ wlan_hdd_get_mlo_vdev_params(struct hdd_adapter *adapter,
 			     struct request_info *req_info,
 			     tSirLLStatsGetReq *req)
 {
+	struct wlan_objmgr_peer *peer;
+	struct wlan_objmgr_vdev *vdev;
 	struct wlan_objmgr_psoc *psoc = adapter->hdd_ctx->psoc;
 	struct mlo_stats_vdev_params *info = &req_info->ml_vdev_info;
 	int i;
@@ -2115,8 +2118,32 @@ wlan_hdd_get_mlo_vdev_params(struct hdd_adapter *adapter,
 	status = mlo_get_mlstats_vdev_params(psoc, info, adapter->vdev_id);
 	if (QDF_IS_STATUS_ERROR(status))
 		return status;
-	for (i = 0; i < info->ml_vdev_count; i++)
+	for (i = 0; i < info->ml_vdev_count; i++) {
 		bmap |= (1 << info->ml_vdev_id[i]);
+
+		vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc,
+							    info->ml_vdev_id[i],
+							    WLAN_OSIF_STATS_ID);
+		if (!vdev) {
+			hdd_err("vdev object is NULL for vdev %d",
+				info->ml_vdev_id[i]);
+			return QDF_STATUS_E_INVAL;
+		}
+
+		peer = wlan_objmgr_vdev_try_get_bsspeer(vdev,
+							WLAN_OSIF_STATS_ID);
+		if (!peer) {
+			hdd_err("peer is null");
+			hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_STATS_ID);
+			return QDF_STATUS_E_INVAL;
+		}
+
+		qdf_mem_copy(&(req_info->ml_peer_mac_addr[i][0]), peer->macaddr,
+			     QDF_MAC_ADDR_SIZE);
+
+		wlan_objmgr_peer_release_ref(peer, WLAN_OSIF_STATS_ID);
+		hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_STATS_ID);
+	}
 	req->mlo_vdev_id_bitmap = bmap;
 	return QDF_STATUS_SUCCESS;
 }
@@ -2156,6 +2183,7 @@ wlan_hdd_set_station_stats_request_pending(struct hdd_adapter *adapter,
 		status = wlan_hdd_get_mlo_vdev_params(adapter, &info, req);
 		if (QDF_IS_STATUS_ERROR(status)) {
 			hdd_err("unable to get vdev params for mlo stats");
+			hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_STATS_ID);
 			return status;
 		}
 	}
@@ -6118,11 +6146,17 @@ static inline void wlan_hdd_mlo_update_stats_info(struct hdd_adapter *adapter)
 	uint32_t *snr, *link_snr;
 	uint8_t iter;
 	struct hdd_mlo_adapter_info *mlo_adapter_info;
-	struct hdd_adapter *link_adapter;
+	struct hdd_adapter *link_adapter, *ml_adapter;
 	struct wlan_objmgr_vdev *vdev;
 
-	rssi = &adapter->hdd_stats.summary_stat.rssi;
-	snr = &adapter->hdd_stats.summary_stat.snr;
+	if (hdd_adapter_is_link_adapter(adapter))
+		ml_adapter = hdd_adapter_get_mlo_adapter_from_link(adapter);
+	else
+		ml_adapter = adapter;
+
+
+	rssi = &ml_adapter->hdd_stats.summary_stat.rssi;
+	snr = &ml_adapter->hdd_stats.summary_stat.snr;
 
 	vdev = hdd_objmgr_get_vdev_by_user(adapter, WLAN_OSIF_STATS_ID);
 	if (!vdev)
@@ -6138,11 +6172,12 @@ static inline void wlan_hdd_mlo_update_stats_info(struct hdd_adapter *adapter)
 	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_STATS_ID);
 
 	hdd_debug("Link0: RSSI: %d, SNR: %d", *rssi, *snr);
-	mlo_adapter_info = &adapter->mlo_adapter_info;
+
+	mlo_adapter_info = &ml_adapter->mlo_adapter_info;
 	for (iter = 0; iter < WLAN_MAX_MLD; iter++) {
 		link_adapter = mlo_adapter_info->link_adapter[iter];
 		if (!link_adapter ||
-		    link_adapter->mlo_adapter_info.associate_with_ml_adapter)
+		    hdd_adapter_is_associated_with_ml_adapter(link_adapter))
 			continue;
 
 		link_rssi = &link_adapter->hdd_stats.summary_stat.rssi;
@@ -7524,13 +7559,6 @@ void wlan_hdd_get_peer_rx_rate_stats(struct hdd_adapter *adapter)
 		return;
 
 	soc = cds_get_context(QDF_MODULE_ID_SOC);
-
-	/*
-	 *  If througput is high, do not get rx rate
-	 *  info to avoid the performance penalty
-	 */
-	if (cdp_get_bus_lvl_high(soc))
-		return;
 
 	peer_stats = qdf_mem_malloc(sizeof(*peer_stats));
 	if (!peer_stats)
