@@ -1984,6 +1984,7 @@ bool dp_ppeds_target_supported(int target_type)
 	 */
 	switch (target_type) {
 	case TARGET_TYPE_QCN9224:
+	case TARGET_TYPE_QCN6432:
 		return true;
 
 	default:
