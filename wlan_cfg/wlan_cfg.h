@@ -339,6 +339,7 @@ struct wlan_srng_cfg {
  * @pointer_timer_threshold_rx: RX REO2SW ring pointer update timer threshold
  * @pointer_num_threshold_rx: RX REO2SW ring pointer update entries threshold
  * @local_pkt_capture: flag indicating enable/disable of local packet capture
+ * @special_frame_msk: Special frame mask
  */
 struct wlan_cfg_dp_soc_ctxt {
 	int num_int_ctxts;
@@ -541,6 +542,7 @@ struct wlan_cfg_dp_soc_ctxt {
 #ifdef WLAN_FEATURE_LOCAL_PKT_CAPTURE
 	bool local_pkt_capture;
 #endif
+	uint32_t special_frame_msk;
 };
 
 /**
@@ -2524,4 +2526,13 @@ bool wlan_cfg_get_local_pkt_capture(struct wlan_cfg_dp_soc_ctxt *cfg)
 	return false;
 }
 #endif
+
+/**
+ * wlan_cfg_get_special_frame_cfg() - Get special frame mask
+ * @cfg: soc configuration context
+ *
+ * Return: frame mask
+ */
+uint32_t
+wlan_cfg_get_special_frame_cfg(struct wlan_cfg_dp_soc_ctxt *cfg);
 #endif /*__WLAN_CFG_H*/

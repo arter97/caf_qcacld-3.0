@@ -531,8 +531,8 @@ dp_rx_oor_handle(struct dp_soc *soc,
 		 uint16_t peer_id,
 		 uint8_t *rx_tlv_hdr)
 {
-	uint32_t frame_mask = FRAME_MASK_IPV4_ARP | FRAME_MASK_IPV4_DHCP |
-				FRAME_MASK_IPV4_EAPOL | FRAME_MASK_IPV6_DHCP;
+	uint32_t frame_mask = wlan_cfg_get_special_frame_cfg(soc->wlan_cfg_ctx);
+
 	struct dp_txrx_peer *txrx_peer = NULL;
 	dp_txrx_ref_handle txrx_ref_handle = NULL;
 

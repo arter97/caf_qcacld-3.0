@@ -1811,6 +1811,10 @@
 #define WLAN_CFG_NUM_PPEDS_TX_DESC_MAX 0
 #endif
 
+#define WLAN_CFG_SPECIAL_MSK_MIN 0
+#define WLAN_CFG_SPECIAL_MSK_MAX 0xFFFFFFFF
+#define WLAN_CFG_SPECIAL_MSK 0xF
+
 #if defined(WLAN_FEATURE_11BE_MLO) && defined(WLAN_MLO_MULTI_CHIP)
 /*
  * <ini>
@@ -1924,6 +1928,27 @@
 #else
 #define CFG_TX_PKT_INSPECT_FOR_ILP_CFG
 #endif
+
+/*
+ * <ini>
+ * special_frame_msk - frame mask to mark special frame type
+ * @Min: 0
+ * @Max: 0xFFFFFFFF
+ * @Default: 15
+ *
+ * This ini entry is used to set frame types to deliver to stack
+ * in error receive path
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
+#define CFG_SPECIAL_FRAME_MSK \
+		CFG_INI_UINT("special_frame_msk", \
+		WLAN_CFG_SPECIAL_MSK_MIN, \
+		WLAN_CFG_SPECIAL_MSK_MAX, \
+		WLAN_CFG_SPECIAL_MSK, \
+		CFG_VALUE_OR_DEFAULT, "special frame to deliver to stack")
 
 #define CFG_DP \
 		CFG(CFG_DP_HTT_PACKET_TYPE) \
@@ -2053,5 +2078,6 @@
 		CFG_TX_PKT_INSPECT_FOR_ILP_CFG \
 		CFG(CFG_DP_POINTER_TIMER_THRESHOLD_RX) \
 		CFG(CFG_DP_POINTER_NUM_THRESHOLD_RX) \
-		CFG_DP_LOCAL_PKT_CAPTURE_CONFIG
+		CFG_DP_LOCAL_PKT_CAPTURE_CONFIG \
+		CFG(CFG_SPECIAL_FRAME_MSK)
 #endif /* _CFG_DP_H_ */
