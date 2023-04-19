@@ -44,6 +44,33 @@ QDF_STATUS cdp_ppesds_vp_setup_fw_recovery(struct cdp_soc_t *soc,
 	return QDF_STATUS_E_INVAL;
 }
 
+/*
+ * cdp_ppesds_update_dev_stats() - Update dev stats for PPE-DS mode.
+ * @soc: data path soc handle
+ * @vp_params: VP params
+ * @vdev_id: vdev id
+ * @stats: stats pointer from ppe
+ *
+ * return: void
+ */
+static inline
+void cdp_ppesds_update_dev_stats(struct cdp_soc_t *soc,
+				 struct cdp_ds_vp_params *vp_params,
+				 uint16_t vdev_id, void *stats)
+{
+	if (!soc || !soc->ops || !soc->ops->ppeds_ops) {
+		QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_FATAL,
+			  "%s invalid instance", __func__);
+		return;
+	}
+
+	if (soc->ops->ppeds_ops->ppeds_stats_sync)
+		return soc->ops->ppeds_ops->ppeds_stats_sync(soc,
+							     vdev_id,
+							     vp_params,
+							     stats);
+}
+
 /**
  * cdp_ppesds_entry_attach() - attach the ppe vp interface.
  * @soc: data path soc handle

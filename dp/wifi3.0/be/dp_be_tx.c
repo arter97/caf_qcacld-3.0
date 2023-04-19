@@ -659,9 +659,9 @@ dp_tx_mlo_mcast_multipass_handler(struct dp_soc *soc,
 
 	dp_tx_mlo_mcast_multipass_lookup(be_vdev, vdev, &mpass_buf);
 	if (mpass_buf.vlan_id == INVALID_VLAN_ID) {
-		dp_mcast_mlo_iter_ptnr_vdev(be_soc, be_vdev,
-					    dp_tx_mlo_mcast_multipass_lookup,
-					    &mpass_buf, DP_MOD_ID_TX);
+		dp_mlo_iter_ptnr_vdev(be_soc, be_vdev,
+				      dp_tx_mlo_mcast_multipass_lookup,
+				      &mpass_buf, DP_MOD_ID_TX);
 		/*
 		 * Do not drop the frame when vlan_id doesn't match.
 		 * Send the frame as it is.
@@ -694,9 +694,9 @@ dp_tx_mlo_mcast_multipass_handler(struct dp_soc *soc,
 		mpass_buf_copy.vlan_id = MULTIPASS_WITH_VLAN_ID;
 		mpass_buf_copy.nbuf = nbuf_copy;
 		/* send frame on partner vdevs */
-		dp_mcast_mlo_iter_ptnr_vdev(be_soc, be_vdev,
-					    dp_tx_mlo_mcast_multipass_send,
-					    &mpass_buf_copy, DP_MOD_ID_TX);
+		dp_mlo_iter_ptnr_vdev(be_soc, be_vdev,
+				      dp_tx_mlo_mcast_multipass_send,
+				      &mpass_buf_copy, DP_MOD_ID_TX);
 
 		/* send frame on mcast primary vdev */
 		dp_tx_mlo_mcast_multipass_send(be_vdev, vdev, &mpass_buf_copy);
@@ -707,9 +707,9 @@ dp_tx_mlo_mcast_multipass_handler(struct dp_soc *soc,
 			be_vdev->seq_num++;
 	}
 
-	dp_mcast_mlo_iter_ptnr_vdev(be_soc, be_vdev,
-				    dp_tx_mlo_mcast_multipass_send,
-				    &mpass_buf, DP_MOD_ID_TX);
+	dp_mlo_iter_ptnr_vdev(be_soc, be_vdev,
+			      dp_tx_mlo_mcast_multipass_send,
+			      &mpass_buf, DP_MOD_ID_TX);
 	dp_tx_mlo_mcast_multipass_send(be_vdev, vdev, &mpass_buf);
 
 	if (qdf_unlikely(be_vdev->seq_num > MAX_GSN_NUM))
@@ -796,9 +796,9 @@ void dp_tx_mlo_mcast_handler_be(struct dp_soc *soc,
 	    dp_tx_mlo_mcast_multipass_handler(soc, vdev, nbuf))
 		return;
 	/* send frame on partner vdevs */
-	dp_mcast_mlo_iter_ptnr_vdev(be_soc, be_vdev,
-				    dp_tx_mlo_mcast_pkt_send,
-				    nbuf, DP_MOD_ID_REINJECT);
+	dp_mlo_iter_ptnr_vdev(be_soc, be_vdev,
+			      dp_tx_mlo_mcast_pkt_send,
+			      nbuf, DP_MOD_ID_REINJECT);
 
 	/* send frame on mcast primary vdev */
 	dp_tx_mlo_mcast_pkt_send(be_vdev, vdev, nbuf);
@@ -879,9 +879,9 @@ dp_tx_mlo_mcast_send_be(struct dp_soc *soc, struct dp_vdev *vdev,
 		 */
 		qdf_nbuf_ref(nbuf);
 		if (qdf_unlikely(!dp_tx_mcast_enhance(vdev, nbuf))) {
-			dp_mcast_mlo_iter_ptnr_vdev(be_soc, be_vdev,
-						    dp_tx_mlo_mcast_enhance_be,
-						    nbuf, DP_MOD_ID_TX);
+			dp_mlo_iter_ptnr_vdev(be_soc, be_vdev,
+					      dp_tx_mlo_mcast_enhance_be,
+					      nbuf, DP_MOD_ID_TX);
 			qdf_nbuf_free(nbuf);
 			return NULL;
 		}
@@ -1772,7 +1772,6 @@ qdf_nbuf_t dp_tx_fast_send_be(struct cdp_soc_t *soc_hdl, uint8_t vdev_id,
 	hal_ring_handle_t hal_ring_hdl = NULL;
 	uint32_t *hal_tx_desc_cached;
 	void *hal_tx_desc;
-	uint8_t desc_size = DP_TX_FAST_DESC_SIZE;
 
 	if (qdf_unlikely(vdev_id >= MAX_VDEV_CNT))
 		return nbuf;
@@ -1845,12 +1844,10 @@ qdf_nbuf_t dp_tx_fast_send_be(struct cdp_soc_t *soc_hdl, uint8_t vdev_id,
 	hal_tx_desc_cached[5] = vdev->lmac_id << TCL_DATA_CMD_PMAC_ID_LSB;
 	hal_tx_desc_cached[5] |= vdev->vdev_id << TCL_DATA_CMD_VDEV_ID_LSB;
 
-	if (vdev->opmode == wlan_op_mode_sta) {
+	if (vdev->opmode == wlan_op_mode_sta)
 		hal_tx_desc_cached[6] = vdev->bss_ast_idx |
 			((vdev->bss_ast_hash & 0xF) <<
 			 TCL_DATA_CMD_CACHE_SET_NUM_LSB);
-		desc_size = DP_TX_FAST_DESC_SIZE + 4;
-	}
 
 	hal_ring_hdl = dp_tx_get_hal_ring_hdl(soc, desc_pool_id);
 
@@ -1872,7 +1869,7 @@ qdf_nbuf_t dp_tx_fast_send_be(struct cdp_soc_t *soc_hdl, uint8_t vdev_id,
 	tx_desc->flags |= DP_TX_DESC_FLAG_QUEUED_TX;
 
 	/* Sync cached descriptor with HW */
-	qdf_mem_copy(hal_tx_desc, hal_tx_desc_cached, desc_size);
+	qdf_mem_copy(hal_tx_desc, hal_tx_desc_cached, DP_TX_FAST_DESC_SIZE);
 	qdf_dsb();
 
 	DP_STATS_INC_PKT(vdev, tx_i.processed, 1, tx_desc->length);

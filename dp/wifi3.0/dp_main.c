@@ -267,6 +267,7 @@ static uint8_t dp_soc_ring_if_nss_offloaded(struct dp_soc *soc,
 					    enum hal_ring_type ring_type,
 					    int ring_num);
 #ifdef DP_UMAC_HW_RESET_SUPPORT
+static QDF_STATUS dp_umac_reset_action_trigger_recovery(struct dp_soc *soc);
 static QDF_STATUS dp_umac_reset_handle_pre_reset(struct dp_soc *soc);
 static QDF_STATUS dp_umac_reset_handle_post_reset(struct dp_soc *soc);
 static QDF_STATUS dp_umac_reset_handle_post_reset_complete(struct dp_soc *soc);
@@ -803,15 +804,13 @@ dp_peer_reset_ast_entries(struct dp_soc *soc, struct dp_peer *peer, void *arg)
  * @wds_macaddr:	WDS entry MAC Address
  * @peer_mac_addr:	WDS entry MAC Address
  * @vdev_id:		id of vdev handle
- * @type:		Type of AST entry
  *
  * Return: QDF_STATUS
  */
 static QDF_STATUS dp_wds_reset_ast_wifi3(struct cdp_soc_t *soc_hdl,
 					 uint8_t *wds_macaddr,
 					 uint8_t *peer_mac_addr,
-					 uint8_t vdev_id,
-					 enum cdp_txrx_ast_entry_type type)
+					 uint8_t vdev_id)
 {
 	struct dp_soc *soc = (struct dp_soc *)soc_hdl;
 	struct dp_ast_entry *ast_entry = NULL;
@@ -819,7 +818,7 @@ static QDF_STATUS dp_wds_reset_ast_wifi3(struct cdp_soc_t *soc_hdl,
 	struct dp_pdev *pdev;
 	struct dp_vdev *vdev;
 
-	if (soc->ast_offload_support && type != CDP_TXRX_AST_TYPE_WDS_HM)
+	if (soc->ast_offload_support)
 		return QDF_STATUS_E_FAILURE;
 
 	vdev = dp_vdev_get_ref_by_id(soc, vdev_id, DP_MOD_ID_CDP);
@@ -863,17 +862,16 @@ static QDF_STATUS dp_wds_reset_ast_wifi3(struct cdp_soc_t *soc_hdl,
  * dp_wds_reset_ast_table_wifi3() - Reset the is_active param for all ast entry
  * @soc_hdl:		Datapath SOC handle
  * @vdev_id:		id of vdev object
- * @type:		Type of AST entry
  *
  * Return: QDF_STATUS
  */
 static QDF_STATUS
 dp_wds_reset_ast_table_wifi3(struct cdp_soc_t  *soc_hdl,
-			     uint8_t vdev_id, enum cdp_txrx_ast_entry_type type)
+			     uint8_t vdev_id)
 {
 	struct dp_soc *soc = (struct dp_soc *) soc_hdl;
 
-	if (soc->ast_offload_support && type != CDP_TXRX_AST_TYPE_WDS_HM)
+	if (soc->ast_offload_support)
 		return QDF_STATUS_SUCCESS;
 
 	qdf_spin_lock_bh(&soc->ast_lock);
@@ -1197,6 +1195,7 @@ static QDF_STATUS dp_peer_ast_entry_del_by_pdev(struct cdp_soc_t *soc_handle,
  * @vdev_id: vdev id
  * @wds_macaddr: AST entry mac address to delete
  * @type: cdp_txrx_ast_entry_type to send to FW
+ * @delete_in_fw: flag to indicate AST entry deletion in FW
  *
  * Return: QDF_STATUS_SUCCESS if ast entry found with ast_mac_addr and delete
  *         is sent
@@ -1205,13 +1204,14 @@ static QDF_STATUS dp_peer_ast_entry_del_by_pdev(struct cdp_soc_t *soc_handle,
 static QDF_STATUS dp_peer_HMWDS_ast_entry_del(struct cdp_soc_t *soc_handle,
 					      uint8_t vdev_id,
 					      uint8_t *wds_macaddr,
-					      uint8_t type)
+					      uint8_t type,
+					      uint8_t delete_in_fw)
 {
 	struct dp_soc *soc = (struct dp_soc *)soc_handle;
 
 	if (soc->ast_offload_support) {
-		dp_wds_reset_ast_wifi3(soc_handle, wds_macaddr, NULL, vdev_id,
-				       type);
+		dp_del_wds_entry_wrapper(soc, vdev_id, wds_macaddr, type,
+					 delete_in_fw);
 		return QDF_STATUS_SUCCESS;
 	}
 
@@ -1750,6 +1750,15 @@ static void dp_srng_msi_setup(struct dp_soc *soc, struct dp_srng *srng,
 		 (uint64_t)ring_params->msi_addr);
 
 	vector = msi_irq_start + (reg_msi_grp_num % msi_data_count);
+
+	/*
+	 * During umac reset ppeds interrupts free is not called.
+	 * Avoid registering interrupts again.
+	 *
+	 */
+	if (dp_check_umac_reset_in_progress(soc))
+		goto configure_msi2;
+
 	if (soc->arch_ops.dp_register_ppeds_interrupts)
 		if (soc->arch_ops.dp_register_ppeds_interrupts(soc, srng,
 							       vector,
@@ -2369,18 +2378,6 @@ static inline bool dp_skip_msi_cfg(struct dp_soc *soc, int ring_type)
 #endif /* DP_CON_MON_MSI_ENABLED */
 #endif /* DISABLE_MON_RING_MSI_CFG */
 
-#ifdef DP_UMAC_HW_RESET_SUPPORT
-static bool dp_check_umac_reset_in_progress(struct dp_soc *soc)
-{
-	return !!soc->umac_reset_ctx.intr_ctx_bkp;
-}
-#else
-static bool dp_check_umac_reset_in_progress(struct dp_soc *soc)
-{
-	return false;
-}
-#endif
-
 QDF_STATUS dp_srng_init_idx(struct dp_soc *soc, struct dp_srng *srng,
 			    int ring_type, int ring_num, int mac_id,
 			    uint32_t idx)
@@ -2510,10 +2507,14 @@ void dp_srng_deinit(struct dp_soc *soc, struct dp_srng *srng,
 		return;
 	}
 
+	if (dp_check_umac_reset_in_progress(soc))
+		goto srng_cleanup;
+
 	if (soc->arch_ops.dp_free_ppeds_interrupts)
 		soc->arch_ops.dp_free_ppeds_interrupts(soc, srng, ring_type,
 						       ring_num);
 
+srng_cleanup:
 	hal_srng_cleanup(soc->hal_soc, srng->hal_srng);
 	srng->hal_srng = NULL;
 }
@@ -2611,8 +2612,15 @@ static int dp_process_rxdma_dst_ring(struct dp_soc *soc,
 				     int mac_for_pdev,
 				     int total_budget)
 {
-	return dp_rxdma_err_process(int_ctx, soc, mac_for_pdev,
-				    total_budget);
+	uint32_t target_type;
+
+	target_type = hal_get_target_type(soc->hal_soc);
+	if (target_type == TARGET_TYPE_QCN9160)
+		return dp_monitor_process(soc, int_ctx,
+					  mac_for_pdev, total_budget);
+	else
+		return dp_rxdma_err_process(int_ctx, soc, mac_for_pdev,
+					    total_budget);
 }
 
 /**
@@ -6875,6 +6883,10 @@ void dp_soc_txrx_peer_setup(enum wlan_op_mode vdev_opmode, struct dp_soc *soc,
 static void dp_register_umac_reset_handlers(struct dp_soc *soc)
 {
 	dp_umac_reset_register_rx_action_callback(soc,
+					dp_umac_reset_action_trigger_recovery,
+					UMAC_RESET_ACTION_DO_TRIGGER_RECOVERY);
+
+	dp_umac_reset_register_rx_action_callback(soc,
 		dp_umac_reset_handle_pre_reset, UMAC_RESET_ACTION_DO_PRE_RESET);
 
 	dp_umac_reset_register_rx_action_callback(soc,
@@ -9594,7 +9606,6 @@ void dp_aggregate_vdev_stats(struct dp_vdev *vdev,
 	if (!vdev || !vdev->pdev)
 		return;
 
-
 	dp_update_vdev_ingress_stats(vdev);
 
 	qdf_mem_copy(vdev_stats, &vdev->stats, sizeof(vdev->stats));
@@ -9677,8 +9688,8 @@ static QDF_STATUS dp_vdev_getstats(struct cdp_vdev *vdev_handle,
 	vdev_stats = qdf_mem_malloc_atomic(sizeof(struct cdp_vdev_stats));
 
 	if (!vdev_stats) {
-		dp_cdp_err("%pK: DP alloc failure - unable to get alloc vdev stats",
-			   soc);
+		dp_err("%pK: DP alloc failure - unable to get alloc vdev stats",
+		       soc);
 		return QDF_STATUS_E_FAILURE;
 	}
 
@@ -9720,7 +9731,8 @@ static QDF_STATUS dp_vdev_getstats(struct cdp_vdev *vdev_handle,
 			    vdev_stats->rx.peer_unauth_rx_pkt_drop +
 			    vdev_stats->rx.policy_check_drop +
 			    vdev_stats->rx.nawds_mcast_drop +
-			    vdev_stats->rx.mcast_3addr_drop;
+			    vdev_stats->rx.mcast_3addr_drop +
+			    vdev_stats->rx.ppeds_drop.num;
 
 	qdf_mem_free(vdev_stats);
 
@@ -9781,6 +9793,7 @@ static void dp_pdev_getstats(struct cdp_pdev *pdev_handle,
 		pdev->stats.dropped.mon_rx_drop +
 		pdev->stats.dropped.mon_radiotap_update_err +
 		pdev->stats.rx.mec_drop.num +
+		pdev->stats.rx.ppeds_drop.num +
 		pdev->stats.rx.multipass_rx_pkt_drop +
 		pdev->stats.rx.peer_unauth_rx_pkt_drop +
 		pdev->stats.rx.policy_check_drop +
@@ -11320,6 +11333,9 @@ dp_set_psoc_param(struct cdp_soc_t *cdp_soc,
 	case CDP_UMAC_RST_SKEL_ENABLE:
 		dp_umac_rst_skel_enable_update(soc, val.cdp_umac_rst_skel);
 		break;
+	case CDP_UMAC_RESET_STATS:
+		dp_umac_reset_stats_print(soc);
+		break;
 	case CDP_SAWF_STATS:
 		wlan_cfg_set_sawf_stats_config(wlan_cfg_ctx,
 					       val.cdp_sawf_stats);
@@ -12134,6 +12150,24 @@ fail0:
 	if (vdev)
 		dp_vdev_unref_delete(soc, vdev, DP_MOD_ID_CDP);
 	return status;
+}
+
+/**
+ * dp_soc_notify_asserted_soc() - API to notify asserted soc info
+ * @psoc: CDP soc handle
+ *
+ * Return: QDF_STATUS
+ */
+static QDF_STATUS dp_soc_notify_asserted_soc(struct cdp_soc_t *psoc)
+{
+	struct dp_soc *soc = (struct dp_soc *)psoc;
+
+	if (!soc) {
+		dp_cdp_err("%pK: soc is NULL", soc);
+		return QDF_STATUS_E_INVAL;
+	}
+
+	return dp_umac_reset_notify_asserted_soc(soc);
 }
 
 /**
@@ -13679,7 +13713,8 @@ static void dp_restore_interrupt_ring_masks(struct dp_soc *soc)
 	int num_ctxt = wlan_cfg_get_num_contexts(soc->wlan_cfg_ctx);
 	int i;
 
-	qdf_assert_always(intr_bkp);
+	if (!intr_bkp)
+		return;
 
 	for (i = 0; i < num_ctxt; i++) {
 		intr_ctx = &soc->intr_ctx[i];
@@ -13892,6 +13927,114 @@ static void dp_reinit_rings(struct dp_soc *soc)
 }
 
 /**
+ * dp_umac_reset_action_trigger_recovery() - Handle FW Umac recovery trigger
+ * @soc: dp soc handle
+ *
+ * Return: QDF_STATUS
+ */
+static QDF_STATUS dp_umac_reset_action_trigger_recovery(struct dp_soc *soc)
+{
+	enum umac_reset_action action = UMAC_RESET_ACTION_DO_TRIGGER_RECOVERY;
+
+	return dp_umac_reset_notify_action_completion(soc, action);
+}
+
+#ifdef WLAN_SUPPORT_PPEDS
+/**
+ * dp_umac_reset_service_handle_n_notify_done()
+ *	Handle Umac pre reset for direct switch
+ * @soc: dp soc handle
+ *
+ * Return: QDF_STATUS
+ */
+static QDF_STATUS dp_umac_reset_service_handle_n_notify_done(struct dp_soc *soc)
+{
+	if (!soc->arch_ops.txrx_soc_ppeds_enabled_check ||
+	    !soc->arch_ops.txrx_soc_ppeds_service_status_update ||
+	    !soc->arch_ops.txrx_soc_ppeds_interrupt_stop)
+		goto non_ppeds;
+
+	/*
+	 * Check if ppeds is enabled on SoC.
+	 */
+	if (!soc->arch_ops.txrx_soc_ppeds_enabled_check(soc))
+		goto non_ppeds;
+
+	/*
+	 * Start the UMAC pre reset done service.
+	 */
+	soc->arch_ops.txrx_soc_ppeds_service_status_update(soc, true);
+
+	dp_register_notify_umac_pre_reset_fw_callback(soc);
+
+	soc->arch_ops.txrx_soc_ppeds_interrupt_stop(soc);
+
+	dp_soc_ppeds_stop((struct cdp_soc_t *)soc);
+
+	/*
+	 * UMAC pre reset service complete
+	 */
+	soc->arch_ops.txrx_soc_ppeds_service_status_update(soc, false);
+
+	soc->umac_reset_ctx.nbuf_list = NULL;
+	return QDF_STATUS_SUCCESS;
+
+non_ppeds:
+	dp_register_notify_umac_pre_reset_fw_callback(soc);
+	dp_check_n_notify_umac_prereset_done(soc);
+	soc->umac_reset_ctx.nbuf_list = NULL;
+	return QDF_STATUS_SUCCESS;
+}
+
+static inline void dp_umac_reset_ppeds_txdesc_pool_reset(struct dp_soc *soc,
+							 qdf_nbuf_t *nbuf_list)
+{
+	if (!soc->arch_ops.txrx_soc_ppeds_enabled_check ||
+	    !soc->arch_ops.txrx_soc_ppeds_txdesc_pool_reset)
+		return;
+
+	/*
+	 * Deinit of PPEDS Tx desc rings.
+	 */
+	if (soc->arch_ops.txrx_soc_ppeds_enabled_check(soc))
+		soc->arch_ops.txrx_soc_ppeds_txdesc_pool_reset(soc, nbuf_list);
+}
+
+static inline void dp_umac_reset_ppeds_start(struct dp_soc *soc)
+{
+	if (!soc->arch_ops.txrx_soc_ppeds_enabled_check ||
+	    !soc->arch_ops.txrx_soc_ppeds_start ||
+	    !soc->arch_ops.txrx_soc_ppeds_interrupt_start)
+		return;
+
+	/*
+	 * Start PPEDS node and enable interrupt.
+	 */
+	if (soc->arch_ops.txrx_soc_ppeds_enabled_check(soc)) {
+		soc->arch_ops.txrx_soc_ppeds_start(soc);
+		soc->arch_ops.txrx_soc_ppeds_interrupt_start(soc);
+	}
+}
+#else
+static QDF_STATUS dp_umac_reset_service_handle_n_notify_done(struct dp_soc *soc)
+{
+	dp_register_notify_umac_pre_reset_fw_callback(soc);
+	dp_check_n_notify_umac_prereset_done(soc);
+	soc->umac_reset_ctx.nbuf_list = NULL;
+	return QDF_STATUS_SUCCESS;
+}
+
+static inline void dp_umac_reset_ppeds_txdesc_pool_reset(struct dp_soc *soc,
+							 qdf_nbuf_t *nbuf_list)
+{
+}
+
+static inline void dp_umac_reset_ppeds_start(struct dp_soc *soc)
+{
+}
+#endif
+
+/**
  * dp_umac_reset_handle_pre_reset() - Handle Umac prereset interrupt from FW
  * @soc: dp soc handle
  *
@@ -13899,19 +14042,11 @@ static void dp_reinit_rings(struct dp_soc *soc)
  */
 static QDF_STATUS dp_umac_reset_handle_pre_reset(struct dp_soc *soc)
 {
-	if (wlan_cfg_get_dp_soc_is_ppeds_enabled(soc->wlan_cfg_ctx)) {
-		dp_err("Umac reset is currently not supported in DS config");
-		qdf_assert_always(0);
-	}
-
 	dp_reset_interrupt_ring_masks(soc);
 
 	dp_pause_tx_hardstart(soc);
 	dp_pause_reo_send_cmd(soc);
-
-	dp_check_n_notify_umac_prereset_done(soc);
-
-	soc->umac_reset_ctx.nbuf_list = NULL;
+	dp_umac_reset_service_handle_n_notify_done(soc);
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -13934,6 +14069,8 @@ static QDF_STATUS dp_umac_reset_handle_post_reset(struct dp_soc *soc)
 		dp_rx_desc_reuse(soc, nbuf_list);
 
 		dp_cleanup_reo_cmd_module(soc);
+
+		dp_umac_reset_ppeds_txdesc_pool_reset(soc, nbuf_list);
 
 		dp_tx_desc_pool_cleanup(soc, nbuf_list);
 
@@ -13960,6 +14097,8 @@ static QDF_STATUS dp_umac_reset_handle_post_reset_complete(struct dp_soc *soc)
 
 	dp_resume_reo_send_cmd(soc);
 
+	dp_umac_reset_ppeds_start(soc);
+
 	dp_restore_interrupt_ring_masks(soc);
 
 	dp_resume_tx_hardstart(soc);
@@ -13974,9 +14113,12 @@ static QDF_STATUS dp_umac_reset_handle_post_reset_complete(struct dp_soc *soc)
 		nbuf_list = nbuf;
 	}
 
-	dp_umac_reset_info("Umac reset done on soc %pK\n prereset : %u us\n"
+	dp_umac_reset_info("Umac reset done on soc %pK\n trigger start : %u us "
+			   "trigger done : %u us prereset : %u us\n"
 			   "postreset : %u us \n postreset complete: %u us \n",
 			   soc,
+			   soc->umac_reset_ctx.ts.trigger_done -
+			   soc->umac_reset_ctx.ts.trigger_start,
 			   soc->umac_reset_ctx.ts.pre_reset_done -
 			   soc->umac_reset_ctx.ts.pre_reset_start,
 			   soc->umac_reset_ctx.ts.post_reset_done -
@@ -14194,6 +14336,7 @@ static struct cdp_cmn_ops dp_ops_cmn = {
 	.txrx_stats_request = dp_txrx_stats_request,
 	.txrx_get_peer_mac_from_peer_id = dp_get_peer_mac_from_peer_id,
 	.display_stats = dp_txrx_dump_stats,
+	.notify_asserted_soc = dp_soc_notify_asserted_soc,
 	.txrx_intr_attach = dp_soc_interrupt_attach_wrapper,
 	.txrx_intr_detach = dp_soc_interrupt_detach,
 	.txrx_ppeds_stop = dp_soc_ppeds_stop,
@@ -14428,6 +14571,7 @@ static struct cdp_sawf_ops dp_ops_sawf = {
 	.sawf_def_queues_get_map_report =
 		dp_sawf_def_queues_get_map_report,
 #ifdef CONFIG_SAWF_STATS
+	.sawf_get_peer_msduq_info = dp_sawf_get_peer_msduq_info,
 	.txrx_get_peer_sawf_delay_stats = dp_sawf_get_peer_delay_stats,
 	.txrx_get_peer_sawf_tx_stats = dp_sawf_get_peer_tx_stats,
 	.sawf_mpdu_stats_req = dp_sawf_mpdu_stats_req,
@@ -14869,7 +15013,6 @@ dp_txrx_ext_stats_request(struct cdp_soc_t *soc_hdl, uint8_t pdev_id,
 		req->rx_mpdu_delivered,
 		req->rx_mpdu_missed,
 		req->rx_mpdu_error);
-
 	return QDF_STATUS_SUCCESS;
 }
 
@@ -17248,10 +17391,13 @@ static void dp_soc_cfg_attach(struct dp_soc *soc)
 	case TARGET_TYPE_QCA6018:
 	case TARGET_TYPE_QCA9574:
 	case TARGET_TYPE_QCN6122:
-	case TARGET_TYPE_QCN9160:
 	case TARGET_TYPE_QCA5018:
 		wlan_cfg_set_tso_desc_attach_defer(soc->wlan_cfg_ctx, 1);
 		wlan_cfg_set_rxdma1_enable(soc->wlan_cfg_ctx);
+		break;
+	case TARGET_TYPE_QCN9160:
+		wlan_cfg_set_tso_desc_attach_defer(soc->wlan_cfg_ctx, 1);
+		soc->wlan_cfg_ctx->rxdma1_enable = 0;
 		break;
 	case TARGET_TYPE_QCN9000:
 		wlan_cfg_set_tso_desc_attach_defer(soc->wlan_cfg_ctx, 1);

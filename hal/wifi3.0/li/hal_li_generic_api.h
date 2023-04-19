@@ -93,6 +93,7 @@ hal_rx_get_phyrx_abort(struct hal_soc *hal, void *rx_tlv,
 		       struct hal_rx_ppdu_info *ppdu_info){
 	switch (hal->target_type) {
 	case TARGET_TYPE_QCN9000:
+	case TARGET_TYPE_QCN9160:
 		ppdu_info->rx_status.phyrx_abort =
 			HAL_RX_GET(rx_tlv, RXPCU_PPDU_END_INFO_2,
 				   PHYRX_ABORT_REQUEST_INFO_VALID);

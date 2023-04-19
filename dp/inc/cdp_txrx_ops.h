@@ -156,6 +156,7 @@ enum cdp_peer_txq_flush_policy {
  * @mlo_update_mlo_ts_offset: update MLO timestamp offset for SOC
  * @mlo_ctxt_attach: Attach DP MLO context
  * @mlo_ctxt_detach: Detach DP MLO context
+ * @mlo_get_mld_vdev_stats: Get MLD vdev stats
  */
 struct cdp_mlo_ops {
 	void (*mlo_soc_setup)(struct cdp_soc_t *cdp_soc,
@@ -178,6 +179,8 @@ struct cdp_mlo_ops {
 				     uint64_t delta_tqm);
 	void (*mlo_update_mlo_ts_offset)(struct cdp_soc_t *soc_hdl,
 					 uint64_t offset);
+	QDF_STATUS (*mlo_get_mld_vdev_stats)(struct cdp_soc_t *soc,
+					     uint8_t vdev_id, void *buf);
 };
 #endif
 
@@ -278,7 +281,7 @@ struct cdp_cmn_ops {
 
 	QDF_STATUS (*txrx_peer_HMWDS_ast_delete)
 		(ol_txrx_soc_handle soc, uint8_t vdev_id, uint8_t *dest_mac,
-		 uint8_t type);
+		 uint8_t type, uint8_t delete_in_fw);
 
 	QDF_STATUS
 	(*txrx_peer_delete)(struct cdp_soc_t *soc, uint8_t vdev_id,
@@ -544,6 +547,14 @@ struct cdp_cmn_ops {
 	QDF_STATUS (*display_stats)(struct cdp_soc_t *psoc, uint16_t value,
 				    enum qdf_stats_verbosity_level level);
 
+	/**
+	 * notify_asserted_soc() - Notified asserted soc info to UMAC Reset
+	 * @cdp_soc: soc handle
+	 *
+	 * Return: QDF_STATUS
+	 */
+	QDF_STATUS (*notify_asserted_soc)(struct cdp_soc_t *psoc);
+
 	QDF_STATUS (*txrx_intr_attach)(struct cdp_soc_t *soc_handle);
 	void (*txrx_intr_detach)(struct cdp_soc_t *soc_handle);
 	void (*txrx_ppeds_stop)(struct cdp_soc_t *soc_handle);
@@ -585,12 +596,10 @@ struct cdp_cmn_ops {
 
 	QDF_STATUS (*txrx_peer_reset_ast)
 		(ol_txrx_soc_handle soc, uint8_t *ast_macaddr,
-		 uint8_t *peer_macaddr, uint8_t vdev_id,
-		 enum cdp_txrx_ast_entry_type type);
+		 uint8_t *peer_macaddr, uint8_t vdev_id);
 
-	QDF_STATUS (*txrx_peer_reset_ast_table)
-		(ol_txrx_soc_handle soc, uint8_t vdev_id,
-		 enum cdp_txrx_ast_entry_type type);
+	QDF_STATUS (*txrx_peer_reset_ast_table)(ol_txrx_soc_handle soc,
+						uint8_t vdev_id);
 
 	void (*txrx_peer_flush_ast_table)(ol_txrx_soc_handle soc);
 	void (*txrx_set_ba_aging_timeout)(struct cdp_soc_t *soc_handle,
@@ -2329,6 +2338,8 @@ struct cdp_sawf_ops {
 					  uint8_t *mac_addr);
 #ifdef CONFIG_SAWF
 	QDF_STATUS
+	(*sawf_get_peer_msduq_info)(struct cdp_soc_t *soc, uint8_t *mac_addr);
+	QDF_STATUS
 	(*txrx_get_peer_sawf_delay_stats)(struct cdp_soc_t *soc,
 					  uint32_t svc_id, uint8_t *mac,
 					  void *data);
@@ -2394,6 +2405,11 @@ struct cdp_ppeds_txrx_ops {
 	void (*ppeds_update_int_pri2tid)(struct cdp_soc_t *soc,
 					 uint8_t pri, uint8_t tid);
 	void (*ppeds_entry_dump)(struct cdp_soc_t *soc);
+	void
+	(*ppeds_stats_sync)(struct cdp_soc_t *soc,
+			    uint16_t vdev_id,
+			    struct cdp_ds_vp_params *vp_params,
+			    void *stats);
 };
 #endif /* WLAN_SUPPORT_PPEDS */
 

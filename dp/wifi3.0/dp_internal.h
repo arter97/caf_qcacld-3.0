@@ -1959,6 +1959,8 @@ void dp_update_vdev_stats_on_peer_unmap(struct dp_vdev *vdev,
 		_tgtobj->rx.mcast_3addr_drop += _srcobj->rx.mcast_3addr_drop; \
 		_tgtobj->rx.mec_drop.num += _srcobj->rx.mec_drop.num; \
 		_tgtobj->rx.mec_drop.bytes += _srcobj->rx.mec_drop.bytes; \
+		_tgtobj->rx.ppeds_drop.num += _srcobj->rx.ppeds_drop.num; \
+		_tgtobj->rx.ppeds_drop.bytes += _srcobj->rx.ppeds_drop.bytes; \
 		_tgtobj->rx.intra_bss.pkts.num += \
 					_srcobj->rx.intra_bss.pkts.num; \
 		_tgtobj->rx.intra_bss.pkts.bytes += \
@@ -2094,6 +2096,8 @@ void dp_update_vdev_stats_on_peer_unmap(struct dp_vdev *vdev,
 		_tgtobj->tx.tx_ucast_success.bytes += \
 				_srcobj->tx.tx_ucast_success.bytes; \
 		\
+		for (i = 0; i < CDP_RSSI_CHAIN_LEN; i++) \
+			_tgtobj->tx.rssi_chain[i] = _srcobj->tx.rssi_chain[i]; \
 		_tgtobj->rx.mpdu_cnt_fcs_ok += _srcobj->rx.mpdu_cnt_fcs_ok; \
 		_tgtobj->rx.mpdu_cnt_fcs_err += _srcobj->rx.mpdu_cnt_fcs_err; \
 		_tgtobj->rx.non_ampdu_cnt += _srcobj->rx.non_ampdu_cnt; \
@@ -2164,6 +2168,153 @@ void dp_update_vdev_stats_on_peer_unmap(struct dp_vdev *vdev,
 		DP_UPDATE_11BE_STATS(_tgtobj, _srcobj); \
 	} while (0)
 
+#define DP_UPDATE_INGRESS_STATS(_tgtobj, _srcobj) \
+	do { \
+		uint8_t i = 0; \
+		_tgtobj->tx_i.rcvd.num += _srcobj->tx_i.rcvd.num; \
+		_tgtobj->tx_i.rcvd.bytes += _srcobj->tx_i.rcvd.bytes; \
+		_tgtobj->tx_i.rcvd_in_fast_xmit_flow += \
+					_srcobj->tx_i.rcvd_in_fast_xmit_flow; \
+		for (i = 0; i < CDP_MAX_TX_DATA_RINGS; i++) { \
+			_tgtobj->tx_i.rcvd_per_core[i] += \
+					_srcobj->tx_i.rcvd_per_core[i]; \
+		} \
+		_tgtobj->tx_i.processed.num += _srcobj->tx_i.processed.num; \
+		_tgtobj->tx_i.processed.bytes += \
+						_srcobj->tx_i.processed.bytes; \
+		_tgtobj->tx_i.reinject_pkts.num += \
+					_srcobj->tx_i.reinject_pkts.num; \
+		_tgtobj->tx_i.reinject_pkts.bytes += \
+					_srcobj->tx_i.reinject_pkts.bytes; \
+		_tgtobj->tx_i.inspect_pkts.num += \
+					_srcobj->tx_i.inspect_pkts.num; \
+		_tgtobj->tx_i.inspect_pkts.bytes += \
+				_srcobj->tx_i.inspect_pkts.bytes; \
+		_tgtobj->tx_i.nawds_mcast.num += \
+					_srcobj->tx_i.nawds_mcast.num; \
+		_tgtobj->tx_i.nawds_mcast.bytes += \
+					_srcobj->tx_i.nawds_mcast.bytes; \
+		_tgtobj->tx_i.bcast.num += _srcobj->tx_i.bcast.num; \
+		_tgtobj->tx_i.bcast.bytes += _srcobj->tx_i.bcast.bytes; \
+		_tgtobj->tx_i.raw.raw_pkt.num += \
+					_srcobj->tx_i.raw.raw_pkt.num; \
+		_tgtobj->tx_i.raw.raw_pkt.bytes += \
+					_srcobj->tx_i.raw.raw_pkt.bytes; \
+		_tgtobj->tx_i.raw.dma_map_error += \
+					_srcobj->tx_i.raw.dma_map_error; \
+		_tgtobj->tx_i.raw.invalid_raw_pkt_datatype += \
+				_srcobj->tx_i.raw.invalid_raw_pkt_datatype; \
+		_tgtobj->tx_i.raw.num_frags_overflow_err += \
+				_srcobj->tx_i.raw.num_frags_overflow_err; \
+		_tgtobj->tx_i.sg.sg_pkt.num += _srcobj->tx_i.sg.sg_pkt.num; \
+		_tgtobj->tx_i.sg.sg_pkt.bytes += \
+					_srcobj->tx_i.sg.sg_pkt.bytes; \
+		_tgtobj->tx_i.sg.non_sg_pkts.num += \
+					_srcobj->tx_i.sg.non_sg_pkts.num; \
+		_tgtobj->tx_i.sg.non_sg_pkts.bytes += \
+					_srcobj->tx_i.sg.non_sg_pkts.bytes; \
+		_tgtobj->tx_i.sg.dropped_host.num += \
+					_srcobj->tx_i.sg.dropped_host.num; \
+		_tgtobj->tx_i.sg.dropped_host.bytes += \
+					_srcobj->tx_i.sg.dropped_host.bytes; \
+		_tgtobj->tx_i.sg.dropped_target += \
+					_srcobj->tx_i.sg.dropped_target; \
+		_tgtobj->tx_i.sg.dma_map_error += \
+					_srcobj->tx_i.sg.dma_map_error; \
+		_tgtobj->tx_i.mcast_en.mcast_pkt.num += \
+					_srcobj->tx_i.mcast_en.mcast_pkt.num; \
+		_tgtobj->tx_i.mcast_en.mcast_pkt.bytes += \
+				_srcobj->tx_i.mcast_en.mcast_pkt.bytes; \
+		_tgtobj->tx_i.mcast_en.dropped_map_error += \
+				_srcobj->tx_i.mcast_en.dropped_map_error; \
+		_tgtobj->tx_i.mcast_en.dropped_self_mac += \
+				_srcobj->tx_i.mcast_en.dropped_self_mac; \
+		_tgtobj->tx_i.mcast_en.dropped_send_fail += \
+				_srcobj->tx_i.mcast_en.dropped_send_fail; \
+		_tgtobj->tx_i.mcast_en.ucast += _srcobj->tx_i.mcast_en.ucast; \
+		_tgtobj->tx_i.mcast_en.fail_seg_alloc += \
+					_srcobj->tx_i.mcast_en.fail_seg_alloc; \
+		_tgtobj->tx_i.mcast_en.clone_fail += \
+					_srcobj->tx_i.mcast_en.clone_fail; \
+		_tgtobj->tx_i.igmp_mcast_en.igmp_rcvd += \
+				_srcobj->tx_i.igmp_mcast_en.igmp_rcvd; \
+		_tgtobj->tx_i.igmp_mcast_en.igmp_ucast_converted += \
+			_srcobj->tx_i.igmp_mcast_en.igmp_ucast_converted; \
+		_tgtobj->tx_i.dropped.desc_na.num += \
+				_srcobj->tx_i.dropped.desc_na.num; \
+		_tgtobj->tx_i.dropped.desc_na.bytes += \
+				_srcobj->tx_i.dropped.desc_na.bytes; \
+		_tgtobj->tx_i.dropped.desc_na_exc_alloc_fail.num += \
+			_srcobj->tx_i.dropped.desc_na_exc_alloc_fail.num; \
+		_tgtobj->tx_i.dropped.desc_na_exc_alloc_fail.bytes += \
+			_srcobj->tx_i.dropped.desc_na_exc_alloc_fail.bytes; \
+		_tgtobj->tx_i.dropped.desc_na_exc_outstand.num += \
+			_srcobj->tx_i.dropped.desc_na_exc_outstand.num; \
+		_tgtobj->tx_i.dropped.desc_na_exc_outstand.bytes += \
+			_srcobj->tx_i.dropped.desc_na_exc_outstand.bytes; \
+		_tgtobj->tx_i.dropped.exc_desc_na.num += \
+				_srcobj->tx_i.dropped.exc_desc_na.num; \
+		_tgtobj->tx_i.dropped.exc_desc_na.bytes += \
+				_srcobj->tx_i.dropped.exc_desc_na.bytes; \
+		_tgtobj->tx_i.dropped.ring_full += \
+					_srcobj->tx_i.dropped.ring_full; \
+		_tgtobj->tx_i.dropped.enqueue_fail += \
+					_srcobj->tx_i.dropped.enqueue_fail; \
+		_tgtobj->tx_i.dropped.dma_error += \
+					_srcobj->tx_i.dropped.dma_error; \
+		_tgtobj->tx_i.dropped.res_full += \
+					_srcobj->tx_i.dropped.res_full; \
+		_tgtobj->tx_i.dropped.headroom_insufficient += \
+				_srcobj->tx_i.dropped.headroom_insufficient; \
+		_tgtobj->tx_i.dropped.fail_per_pkt_vdev_id_check += \
+			_srcobj->tx_i.dropped.fail_per_pkt_vdev_id_check; \
+		_tgtobj->tx_i.dropped.drop_ingress += \
+				_srcobj->tx_i.dropped.drop_ingress; \
+		_tgtobj->tx_i.dropped.invalid_peer_id_in_exc_path += \
+			_srcobj->tx_i.dropped.invalid_peer_id_in_exc_path; \
+		_tgtobj->tx_i.dropped.tx_mcast_drop += \
+					_srcobj->tx_i.dropped.tx_mcast_drop; \
+		_tgtobj->tx_i.dropped.fw2wbm_tx_drop += \
+					_srcobj->tx_i.dropped.fw2wbm_tx_drop; \
+		_tgtobj->tx_i.dropped.dropped_pkt.num = \
+			_tgtobj->tx_i.dropped.dma_error + \
+			_tgtobj->tx_i.dropped.ring_full + \
+			_tgtobj->tx_i.dropped.enqueue_fail + \
+			_tgtobj->tx_i.dropped.fail_per_pkt_vdev_id_check + \
+			_tgtobj->tx_i.dropped.desc_na.num + \
+			_tgtobj->tx_i.dropped.res_full + \
+			_tgtobj->tx_i.dropped.drop_ingress + \
+			_tgtobj->tx_i.dropped.headroom_insufficient + \
+			_tgtobj->tx_i.dropped.invalid_peer_id_in_exc_path + \
+			_tgtobj->tx_i.dropped.tx_mcast_drop + \
+			_tgtobj->tx_i.dropped.fw2wbm_tx_drop; \
+		_tgtobj->tx_i.dropped.dropped_pkt.bytes += \
+				_srcobj->tx_i.dropped.dropped_pkt.bytes; \
+		_tgtobj->tx_i.mesh.exception_fw += \
+					_srcobj->tx_i.mesh.exception_fw; \
+		_tgtobj->tx_i.mesh.completion_fw += \
+					_srcobj->tx_i.mesh.completion_fw; \
+		_tgtobj->tx_i.cce_classified += \
+					_srcobj->tx_i.cce_classified; \
+		_tgtobj->tx_i.cce_classified_raw += \
+					_srcobj->tx_i.cce_classified_raw; \
+		_tgtobj->tx_i.sniffer_rcvd.num += \
+					_srcobj->tx_i.sniffer_rcvd.num; \
+		_tgtobj->tx_i.sniffer_rcvd.bytes += \
+					_srcobj->tx_i.sniffer_rcvd.bytes; \
+		_tgtobj->rx_i.reo_rcvd_pkt.num += \
+					_srcobj->rx_i.reo_rcvd_pkt.num; \
+		_tgtobj->rx_i.reo_rcvd_pkt.bytes += \
+					_srcobj->rx_i.reo_rcvd_pkt.bytes; \
+		_tgtobj->rx_i.null_q_desc_pkt.num += \
+					_srcobj->rx_i.null_q_desc_pkt.num; \
+		_tgtobj->rx_i.null_q_desc_pkt.bytes += \
+					_srcobj->rx_i.null_q_desc_pkt.bytes; \
+		_tgtobj->rx_i.routed_eapol_pkt.num += \
+					_srcobj->rx_i.routed_eapol_pkt.num; \
+		_tgtobj->rx_i.routed_eapol_pkt.bytes += \
+					_srcobj->rx_i.routed_eapol_pkt.bytes; \
+	} while (0)
 /**
  * dp_peer_find_attach() - Allocates memory for peer objects
  * @soc: SoC handle
@@ -2667,6 +2818,104 @@ void dp_reo_desc_freelist_destroy(struct dp_soc *soc);
  */
 void dp_reset_rx_reo_tid_queue(struct dp_soc *soc, void *hw_qdesc_vaddr,
 			       uint32_t size);
+
+#if defined(WLAN_FEATURE_11BE_MLO) && defined(WLAN_MLO_MULTI_CHIP)
+/**
+ * dp_umac_reset_complete_umac_recovery() - Complete Umac reset session
+ * @soc: dp soc handle
+ *
+ * Return: void
+ */
+void dp_umac_reset_complete_umac_recovery(struct dp_soc *soc);
+
+/**
+ * dp_umac_reset_initiate_umac_recovery() - Initiate Umac reset session
+ * @soc: dp soc handle
+ * @is_target_recovery: Flag to indicate if it is triggered for target recovery
+ *
+ * Return: void
+ */
+void dp_umac_reset_initiate_umac_recovery(struct dp_soc *soc,
+					  bool is_target_recovery);
+
+/**
+ * dp_umac_reset_handle_action_cb() - Function to call action callback
+ * @soc: dp soc handle
+ * @umac_reset_ctx: Umac reset context
+ * @action: Action to call the callback for
+ *
+ * Return: QDF_STATUS status
+ */
+QDF_STATUS dp_umac_reset_handle_action_cb(struct dp_soc *soc,
+				struct dp_soc_umac_reset_ctx *umac_reset_ctx,
+				enum umac_reset_action action);
+
+/**
+ * dp_umac_reset_post_tx_cmd() - Iterate partner socs and post Tx command
+ * @umac_reset_ctx: UMAC reset context
+ * @tx_cmd: Tx command to be posted
+ *
+ * Return: QDF status of operation
+ */
+QDF_STATUS
+dp_umac_reset_post_tx_cmd(struct dp_soc_umac_reset_ctx *umac_reset_ctx,
+			  enum umac_reset_tx_cmd tx_cmd);
+
+/**
+ * dp_umac_reset_initiator_check() - Check if soc is the Umac reset initiator
+ * @soc: dp soc handle
+ *
+ * Return: true if the soc is initiator or false otherwise
+ */
+bool dp_umac_reset_initiator_check(struct dp_soc *soc);
+
+/**
+ * dp_umac_reset_target_recovery_check() - Check if this is for target recovery
+ * @soc: dp soc handle
+ *
+ * Return: true if the session is for target recovery or false otherwise
+ */
+bool dp_umac_reset_target_recovery_check(struct dp_soc *soc);
+
+/**
+ * dp_umac_reset_is_soc_ignored() - Check if this soc is to be ignored
+ * @soc: dp soc handle
+ *
+ * Return: true if the soc is ignored or false otherwise
+ */
+bool dp_umac_reset_is_soc_ignored(struct dp_soc *soc);
+
+/**
+ * dp_mlo_umac_reset_stats_print() - API to print MLO umac reset stats
+ * @soc: dp soc handle
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS dp_mlo_umac_reset_stats_print(struct dp_soc *soc);
+#else
+static inline
+QDF_STATUS dp_mlo_umac_reset_stats_print(struct dp_soc *soc)
+{
+	return QDF_STATUS_SUCCESS;
+}
+#endif
+
+#endif
+
+#if defined(DP_UMAC_HW_RESET_SUPPORT) && defined(WLAN_FEATURE_11BE_MLO) && defined(WLAN_MLO_MULTI_CHIP)
+/**
+ * dp_umac_reset_notify_asserted_soc() - API to notify the asserted SOC
+ * @soc: dp soc
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS dp_umac_reset_notify_asserted_soc(struct dp_soc *soc);
+#else
+static inline
+QDF_STATUS dp_umac_reset_notify_asserted_soc(struct dp_soc *soc)
+{
+	return QDF_STATUS_SUCCESS;
+}
 #endif
 
 QDF_STATUS dp_reo_send_cmd(struct dp_soc *soc, enum hal_reo_cmd_type type,

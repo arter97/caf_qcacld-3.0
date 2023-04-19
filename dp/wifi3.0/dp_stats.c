@@ -8519,9 +8519,6 @@ void dp_update_vdev_stats(struct dp_soc *soc, struct dp_peer *srcobj,
 	if (qdf_unlikely(!txrx_peer))
 		goto link_stats;
 
-	if (qdf_unlikely(dp_is_wds_extended(txrx_peer)))
-		return;
-
 	if (dp_peer_is_primary_link_peer(srcobj)) {
 		dp_update_vdev_basic_stats(txrx_peer, vdev_stats);
 		per_pkt_stats = &txrx_peer->stats[0].per_pkt_stats;
@@ -8873,6 +8870,8 @@ void dp_update_pdev_stats(struct dp_pdev *tgtobj,
 		srcobj->tx.last_ack_rssi;
 	tgtobj->stats.rx.mec_drop.num += srcobj->rx.mec_drop.num;
 	tgtobj->stats.rx.mec_drop.bytes += srcobj->rx.mec_drop.bytes;
+	tgtobj->stats.rx.ppeds_drop.num += srcobj->rx.ppeds_drop.num;
+	tgtobj->stats.rx.ppeds_drop.bytes += srcobj->rx.ppeds_drop.bytes;
 	tgtobj->stats.rx.multipass_rx_pkt_drop +=
 		srcobj->rx.multipass_rx_pkt_drop;
 	tgtobj->stats.rx.peer_unauth_rx_pkt_drop +=

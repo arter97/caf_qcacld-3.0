@@ -24,6 +24,7 @@
 #ifndef _CDP_TXRX_HIST_STRUCT_H_
 #define _CDP_TXRX_HIST_STRUCT_H_
 
+#define CDP_RSSI_CHAIN_LEN 8
 /**
  * enum cdp_hist_bucket_index - Histogram Bucket
  * @CDP_HIST_BUCKET_0: Bucket Index 0

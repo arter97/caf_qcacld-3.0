@@ -688,6 +688,7 @@ static inline QDF_STATUS cdp_peer_ast_delete_by_pdev
  * @vdev_id: vdev id
  * @dest_mac: AST entry mac address to delete
  * @type: cdp_txrx_ast_entry_type to send to FW
+ * @delete_in_fw: flag to indicate AST entry deletion in FW
  *
  * Return: QDF_STATUS_SUCCESS if ast entry found with ast_mac_addr and delete
  *         is sent
@@ -695,7 +696,7 @@ static inline QDF_STATUS cdp_peer_ast_delete_by_pdev
  */
 static inline QDF_STATUS cdp_peer_HMWDS_ast_delete
 	(ol_txrx_soc_handle soc, uint8_t vdev_id, uint8_t *dest_mac,
-	 uint8_t type)
+	 uint8_t type, uint8_t delete_in_fw)
 {
 	if (!soc || !soc->ops) {
 		dp_cdp_debug("Invalid Instance:");
@@ -711,7 +712,8 @@ static inline QDF_STATUS cdp_peer_HMWDS_ast_delete
 					(soc,
 					 vdev_id,
 					 dest_mac,
-					 type);
+					 type,
+					 delete_in_fw);
 }
 
 static inline int cdp_peer_add_ast
@@ -739,7 +741,7 @@ static inline int cdp_peer_add_ast
 
 static inline QDF_STATUS cdp_peer_reset_ast
 	(ol_txrx_soc_handle soc, uint8_t *wds_macaddr, uint8_t *peer_macaddr,
-	 uint8_t vdev_id, enum cdp_txrx_ast_entry_type type)
+	 uint8_t vdev_id)
 {
 
 	if (!soc || !soc->ops) {
@@ -752,12 +754,11 @@ static inline QDF_STATUS cdp_peer_reset_ast
 		return QDF_STATUS_E_FAILURE;
 
 	return soc->ops->cmn_drv_ops->txrx_peer_reset_ast(soc, wds_macaddr,
-						   peer_macaddr, vdev_id, type);
+						   peer_macaddr, vdev_id);
 }
 
 static inline QDF_STATUS cdp_peer_reset_ast_table
-	(ol_txrx_soc_handle soc, uint8_t vdev_id,
-	enum cdp_txrx_ast_entry_type type)
+	(ol_txrx_soc_handle soc, uint8_t vdev_id)
 {
 	if (!soc || !soc->ops) {
 		dp_cdp_debug("Invalid Instance:");
@@ -769,8 +770,7 @@ static inline QDF_STATUS cdp_peer_reset_ast_table
 	    !soc->ops->cmn_drv_ops->txrx_peer_reset_ast_table)
 		return QDF_STATUS_E_FAILURE;
 
-	return soc->ops->cmn_drv_ops->txrx_peer_reset_ast_table(soc, vdev_id,
-						   type);
+	return soc->ops->cmn_drv_ops->txrx_peer_reset_ast_table(soc, vdev_id);
 }
 
 static inline void cdp_peer_flush_ast_table
@@ -1861,6 +1861,28 @@ static inline void cdp_txrx_umac_reset_deinit(ol_txrx_soc_handle soc)
 		return;
 
 	soc->ops->cmn_drv_ops->txrx_umac_reset_deinit(soc);
+}
+
+/**
+ * cdp_notify_asserted_soc(): function to notify asserted SoC
+ * @soc: soc handle
+ *
+ * Return: QDF_STATUS
+ */
+static inline QDF_STATUS
+cdp_notify_asserted_soc(ol_txrx_soc_handle soc)
+{
+	if (!soc || !soc->ops) {
+		dp_cdp_debug("Invalid Instance:");
+		QDF_BUG(0);
+		return QDF_STATUS_E_NULL_VALUE;
+	}
+
+	if (!soc->ops->cmn_drv_ops ||
+	    !soc->ops->cmn_drv_ops->notify_asserted_soc)
+		return QDF_STATUS_E_NULL_VALUE;
+
+	return soc->ops->cmn_drv_ops->notify_asserted_soc(soc);
 }
 
 /**

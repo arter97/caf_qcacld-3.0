@@ -1770,7 +1770,8 @@ void dp_mon_rx_update_rx_protocol_tag_stats(struct dp_pdev *pdev,
 
 #ifdef QCA_ENHANCED_STATS_SUPPORT
 static void
-dp_enable_enhanced_stats_for_each_pdev(struct dp_soc *soc, void *arg) {
+dp_enable_enhanced_stats_for_each_pdev(struct dp_soc *soc, void *arg,
+				       int chip_id) {
 	uint8_t i = 0;
 
 	for (i = 0; i < MAX_PDEV_CNT; i++)
@@ -1792,7 +1793,8 @@ dp_enable_enhanced_stats_2_0(struct cdp_soc_t *soc, uint8_t pdev_id)
 }
 
 static void
-dp_disable_enhanced_stats_for_each_pdev(struct dp_soc *soc, void *arg) {
+dp_disable_enhanced_stats_for_each_pdev(struct dp_soc *soc, void *arg,
+					int chip_id) {
 	uint8_t i = 0;
 
 	for (i = 0; i < MAX_PDEV_CNT; i++)

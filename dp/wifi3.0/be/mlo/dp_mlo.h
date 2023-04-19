@@ -46,6 +46,7 @@
  * @link_to_pdev_map: link to pdev mapping
  * @rx_fst: pointer to rx_fst handle
  * @rx_fst_ref_cnt: ref count of rx_fst
+ * @grp_umac_reset_ctx: UMAC reset context at mlo group level
  */
 struct dp_mlo_ctxt {
 	struct cdp_ctrl_mlo_mgr *ctrl_ctxt;
@@ -64,6 +65,9 @@ struct dp_mlo_ctxt {
 	uint32_t toeplitz_hash_ipv6[LRO_IPV6_SEED_ARR_SZ];
 	struct dp_pdev_be *link_to_pdev_map[WLAN_MAX_MLO_CHIPS *
 		WLAN_MAX_MLO_LINKS_PER_SOC];
+#ifdef DP_UMAC_HW_RESET_SUPPORT
+	struct dp_soc_mlo_umac_reset_ctx grp_umac_reset_ctx;
+#endif
 };
 
 /**

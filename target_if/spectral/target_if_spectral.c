@@ -5709,7 +5709,7 @@ target_if_spectral_populate_session_report_info(
 		spectral_err_rl("Spectral LMAC object is null");
 		return QDF_STATUS_E_NULL_VALUE;
 	}
-	if (smode > SPECTRAL_SCAN_MODE_MAX) {
+	if (smode >= SPECTRAL_SCAN_MODE_MAX) {
 		spectral_err_rl("Invalid Spectral scan mode");
 		return QDF_STATUS_E_FAILURE;
 	}
@@ -5761,7 +5761,7 @@ target_if_spectral_populate_session_det_host_info(
 		spectral_err_rl("Spectral LMAC object is null");
 		return QDF_STATUS_E_NULL_VALUE;
 	}
-	if (smode > SPECTRAL_SCAN_MODE_MAX) {
+	if (smode >= SPECTRAL_SCAN_MODE_MAX) {
 		spectral_err_rl("Invalid Spectral scan mode");
 		return QDF_STATUS_E_FAILURE;
 	}

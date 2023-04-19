@@ -176,6 +176,9 @@
 	(comb_peer_id_tid & DP_PEER_REO_STATS_PEER_ID_MASK)
 #endif
 
+typedef void dp_ptnr_soc_iter_func(struct dp_soc *ptnr_soc, void *arg,
+				   int chip_id);
+
 enum rx_pktlog_mode {
 	DP_RX_PKTLOG_DISABLED = 0,
 	DP_RX_PKTLOG_FULL,
@@ -2201,6 +2204,11 @@ enum dp_context_type {
  * @dp_free_ppeds_interrupts:
  * @dp_rx_wbm_err_reap_desc: Reap WBM Error Ring Descriptor
  * @dp_rx_null_q_desc_handle: Handle Null Queue Exception Error
+ * @txrx_soc_ppeds_interrupt_stop:
+ * @txrx_soc_ppeds_interrupt_start:
+ * @txrx_soc_ppeds_service_status_update:
+ * @txrx_soc_ppeds_enabled_check:
+ * @txrx_soc_ppeds_txdesc_pool_reset:
  */
 struct dp_arch_ops {
 	/* INIT/DEINIT Arch Ops */
@@ -2428,6 +2436,15 @@ struct dp_arch_ops {
 					       struct dp_txrx_peer *txrx_peer,
 					       bool is_reo_exception,
 					       uint8_t link_id);
+#ifdef WLAN_SUPPORT_PPEDS
+	void (*txrx_soc_ppeds_interrupt_stop)(struct dp_soc *soc);
+	void (*txrx_soc_ppeds_interrupt_start)(struct dp_soc *soc);
+	void (*txrx_soc_ppeds_service_status_update)(struct dp_soc *soc,
+						     bool enable);
+	bool (*txrx_soc_ppeds_enabled_check)(struct dp_soc *soc);
+	void (*txrx_soc_ppeds_txdesc_pool_reset)(struct dp_soc *soc,
+						 qdf_nbuf_t *nbuf_list);
+#endif
 };
 
 /**
@@ -4321,6 +4338,7 @@ struct dp_peer_per_pkt_tx_stats {
  * @rts_failure: RTS failure count
  * @bar_cnt: Block ACK Request frame count
  * @ndpa_cnt: NDP announcement frame count
+ * @rssi_chain: rssi chain
  * @wme_ac_type_bytes: Wireless Multimedia bytes Count
  */
 struct dp_peer_extd_tx_stats {
@@ -4378,6 +4396,7 @@ struct dp_peer_extd_tx_stats {
 	uint32_t rts_failure;
 	uint32_t bar_cnt;
 	uint32_t ndpa_cnt;
+	int32_t rssi_chain[CDP_RSSI_CHAIN_LEN];
 	uint64_t wme_ac_type_bytes[WME_AC_MAX];
 };
 
@@ -4391,6 +4410,7 @@ struct dp_peer_extd_tx_stats {
  * @raw: Raw Pakets received
  * @nawds_mcast_drop: Total NAWDS multicast packets dropped
  * @mec_drop: Total MEC packets dropped
+ * @ppeds_drop: Total DS packets dropped
  * @last_rx_ts: last timestamp in jiffies when RX happened
  * @intra_bss: Intra BSS statistics
  * @intra_bss.pkts: Intra BSS packets received
@@ -4424,6 +4444,7 @@ struct dp_peer_per_pkt_rx_stats {
 	struct cdp_pkt_info raw;
 	uint32_t nawds_mcast_drop;
 	struct cdp_pkt_info mec_drop;
+	struct cdp_pkt_info ppeds_drop;
 	unsigned long last_rx_ts;
 	struct {
 		struct cdp_pkt_info pkts;

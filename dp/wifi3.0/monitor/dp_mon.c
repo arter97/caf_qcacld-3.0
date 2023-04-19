@@ -3160,6 +3160,7 @@ dp_tx_stats_update(struct dp_pdev *pdev, struct dp_peer *peer,
 	struct dp_mon_peer *mon_peer = NULL;
 	uint32_t ratekbps = 0;
 	uint64_t tx_byte_count;
+	uint8_t idx = 0;
 
 	preamble = ppdu->preamble;
 	mcs = ppdu->mcs;
@@ -3300,6 +3301,9 @@ dp_tx_stats_update(struct dp_pdev *pdev, struct dp_peer *peer,
 	DP_STATS_INC(mon_peer, tx.tx_ppdus, 1);
 	DP_STATS_INC(mon_peer, tx.tx_mpdus_success, num_mpdu);
 	DP_STATS_INC(mon_peer, tx.tx_mpdus_tried, mpdu_tried);
+
+	for (idx = 0; idx < CDP_RSSI_CHAIN_LEN; idx++)
+		DP_STATS_UPD(mon_peer, tx.rssi_chain[idx], ppdu->rssi_chain[idx]);
 
 	mon_ops = dp_mon_ops_get(pdev->soc);
 	if (mon_ops && mon_ops->mon_tx_stats_update)
@@ -3938,7 +3942,7 @@ static void dp_process_ppdu_stats_user_cmpltn_common_tlv(
 	tag_buf++;
 	for (bw_iter = 0; bw_iter < CDP_RSSI_CHAIN_LEN; bw_iter++) {
 		ppdu_user_desc->rssi_chain[bw_iter] =
-		HTT_PPDU_STATS_USER_CMPLTN_COMMON_TLV_CHAIN_RSSI_GET(*tag_buf);
+			HTT_PPDU_STATS_USER_CMPLTN_COMMON_TLV_CHAIN_RSSI_GET(*tag_buf);
 		tag_buf++;
 	}
 
@@ -5089,6 +5093,18 @@ struct ppdu_info *dp_get_ppdu_desc(struct dp_pdev *pdev, uint32_t ppdu_id,
 	return ppdu_info;
 }
 
+#define DP_HTT_PPDU_ID_MASK 0x00FFFFFF
+/**
+ * dp_htt_mask_ppdu_id() - Function to mask ppdu_id
+ * @ppdu_id: PPDU ID
+ *
+ * Return: Masked ppdu_id
+ */
+static inline uint32_t dp_htt_mask_ppdu_id(uint32_t ppdu_id)
+{
+	return (ppdu_id & DP_HTT_PPDU_ID_MASK);
+}
+
 /**
  * dp_htt_process_tlv() - Function to process each PPDU TLVs
  * @pdev: DP pdev handle
@@ -5116,6 +5132,7 @@ static struct ppdu_info *dp_htt_process_tlv(struct dp_pdev *pdev,
 
 	msg_word = msg_word + 1;
 	ppdu_id = HTT_T2H_PPDU_STATS_PPDU_ID_GET(*msg_word);
+	ppdu_id = dp_htt_mask_ppdu_id(ppdu_id);
 
 	msg_word = msg_word + 1;
 	tsf_l32 = (uint32_t)(*msg_word);
@@ -6206,7 +6223,8 @@ void dp_mon_cdp_ops_register(struct dp_soc *soc)
 #if defined(WLAN_CFR_ENABLE) && defined(WLAN_ENH_CFR_ENABLE)
 		dp_cfr_filter_register_1_0(ops);
 #endif
-		if (target_type == TARGET_TYPE_QCN9000)
+		if (target_type == TARGET_TYPE_QCN9000 ||
+		    target_type == TARGET_TYPE_QCN9160)
 			ops->ctrl_ops->txrx_update_mon_mac_filter =
 					dp_update_mon_mac_filter;
 		break;

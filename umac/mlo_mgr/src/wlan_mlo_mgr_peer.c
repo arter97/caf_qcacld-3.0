@@ -938,7 +938,8 @@ wlan_mlo_check_and_create_bridge_peer(struct wlan_objmgr_vdev *vdev,
 		return QDF_STATUS_SUCCESS;
 	for (i = 0; i < WLAN_UMAC_MLO_MAX_VDEVS; i++) {
 		ml_vdev = ml_dev->wlan_vdev_list[i];
-		if (!ml_vdev || (wlan_vdev_is_up(vdev) != QDF_STATUS_SUCCESS))
+		if (!ml_vdev ||
+		    (wlan_vdev_is_up(ml_vdev) != QDF_STATUS_SUCCESS))
 			continue;
 		comp_psoc_id = wlan_vdev_get_psoc_id(ml_vdev);
 		if ((comp_psoc_id != psoc_ids[0]) &&
@@ -1259,7 +1260,8 @@ QDF_STATUS wlan_mlo_peer_create(struct wlan_objmgr_vdev *vdev,
 	 */
 	if ((wlan_vdev_mlme_get_opmode(vdev) == QDF_SAP_MODE) &&
 	    (!wlan_mlo_peer_is_nawds(ml_peer))) {
-		if (ml_peer->max_links == ml_peer->link_peer_cnt) {
+		if ((ml_peer->max_links == 1) &&
+		    (ml_peer->link_peer_cnt == 1)) {
 			assoc_peer = ml_peer->peer_list[0].link_peer;
 			if (assoc_peer)
 				mlo_mlme_peer_assoc_resp(assoc_peer);
@@ -1633,30 +1635,4 @@ bool wlan_mlo_partner_peer_delete_is_allowed(struct wlan_objmgr_peer *src_peer)
 
 	return true;
 }
-#endif
-
-#ifdef QCA_SUPPORT_PRIMARY_LINK_MIGRATE
-void wlan_objmgr_mlo_update_primary_info(struct wlan_objmgr_peer *peer)
-{
-	struct wlan_mlo_peer_context *ml_peer = NULL;
-	struct wlan_mlo_link_peer_entry *peer_ent_iter;
-	uint8_t i;
-
-	ml_peer = peer->mlo_peer_ctx;
-
-	for (i = 0; i < MAX_MLO_LINK_PEERS; i++) {
-		peer_ent_iter = &ml_peer->peer_list[i];
-
-		if (!peer_ent_iter->link_peer)
-			continue;
-
-		if (peer_ent_iter->is_primary)
-			peer_ent_iter->is_primary = false;
-
-		if (peer_ent_iter->link_peer == peer)
-			peer_ent_iter->is_primary = true;
-	}
-}
-
-qdf_export_symbol(wlan_objmgr_mlo_update_primary_info);
 #endif
