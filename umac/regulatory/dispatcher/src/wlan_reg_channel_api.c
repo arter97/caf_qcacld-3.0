@@ -343,3 +343,11 @@ wlan_reg_get_max_reg_eirp_from_list(struct wlan_objmgr_pdev *pdev,
 					      num_6g_chans);
 }
 #endif
+
+QDF_STATUS
+wlan_quick_reg_set_ap_pwr_and_update_chan_list(struct wlan_objmgr_pdev *pdev,
+					       enum reg_6g_ap_type ap_pwr_type)
+{
+	return reg_quick_set_ap_pwr_and_update_chan_list(pdev, ap_pwr_type);
+}
+
