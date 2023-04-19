@@ -721,6 +721,8 @@ struct dfs_filtertype {
  *                              in MHZ applicable only for 80+80MHZ mode of
  *                              operation.
  * @dfs_ch_punc_pattern:        Bitmap representing puncturing patterns.
+ * @dfs_internal_radar_pattern: Bitmap representing puncturing patterns caused
+ *                              by radar.
  */
 struct dfs_channel {
 	uint16_t       dfs_ch_freq;
@@ -740,6 +742,9 @@ struct dfs_channel {
 	 * indicates the leftmost sub20channel).
 	 */
 	uint16_t       dfs_ch_punc_pattern;
+#endif
+#if defined(QCA_DFS_BW_PUNCTURE) && !defined(CONFIG_REG_CLIENT)
+	uint16_t       dfs_internal_radar_pattern;
 #endif
 };
 
@@ -978,6 +983,86 @@ struct dfs_rcac_params {
 };
 #endif
 
+#ifdef WLAN_DISP_CHAN_INFO
+/**
+ * struct dfs_cacelem - CAC parameters of a DFS channel (20 MHz channel).
+ * @cac_start_us: Time in microseconds when cac started (monotonic boot time).
+ * @cac_completed_time: CAC completed time in ms (monotonic boot time).
+ */
+struct dfs_cacelem {
+	uint64_t cac_start_us;
+	uint64_t cac_completed_time;
+};
+#endif
+
+#define DFS_PUNC_SM_SPIN_LOCK(_dfs_obj) \
+	qdf_spin_lock_bh(&((_dfs_obj)->dfs_punc_sm_lock))
+#define DFS_PUNC_SM_SPIN_UNLOCK(_dfs_obj) \
+	qdf_spin_unlock_bh(&((_dfs_obj)->dfs_punc_sm_lock))
+
+#define N_MAX_PUNC_SM 2
+
+/**
+ * enum dfs_punc_sm_evt - DFS Puncturing SM events.
+ * @DFS_PUNC_SM_EV_RADAR: Radar event on DFS puncturing SM.
+ * @DFS_PUNC_SM_EV_NOL_EXPIRY: NOL expiry event on DFS puncturing SM.
+ * @DFS_PUNC_SM_EV_CAC_EXPIRY: CAC expiry event on DFS puncturing SM.
+ * @DFS_PUNC_SM_EV_STOP: STOP event on DFS puncturing SM.
+ */
+enum dfs_punc_sm_evt {
+	DFS_PUNC_SM_EV_RADAR      = 0,
+	DFS_PUNC_SM_EV_NOL_EXPIRY = 1,
+	DFS_PUNC_SM_EV_CAC_EXPIRY = 2,
+	DFS_PUNC_SM_EV_STOP       = 3,
+};
+
+/**
+ * enum dfs_punc_sm_state - DFS Puncturing SM states.
+ * @DFS_S_UNPUNCTURED:    Default state or the start state of the puncturing SM.
+ * @DFS_S_PUNCTURED:      DFS channel is punctured.
+ * @DFS_S_CAC_WAIT:       The channel completed the NOL time and is waiting for
+ *                        CAC completion.
+ * @DFS_PUNCTURING_S_MAX: Max (invalid) state.
+ */
+enum dfs_punc_sm_state {
+	DFS_S_UNPUNCTURED    = 0,
+	DFS_S_PUNCTURED      = 1,
+	DFS_S_CAC_WAIT       = 2,
+	DFS_PUNCTURING_S_MAX = 3,
+};
+
+/**
+ * struct dfs_punc_obj -   DFS puncture object type. Each object represents one
+ *                         set of continuous punctured-channels. These channels
+ *                         were punctured by DFS component (NOT by other
+ *                         components).
+ * @punc_low_freq:         Low frequency of the continuous puncture object.
+ * @punc_high_freq:        High frequency of the continuous puncture object.
+ * @dfs_punc_cac_timer:    CAC timer for DFS unpuncturing for the puncture
+ *                         object.
+ * @dfs:                   Pointer to main DFS structure.
+ * @dfs_punc_sm_hdl:       The handle for the state machine.
+ * @dfs_punc_sm_cur_state: Current state of the Puncturing State Machine.
+ * @dfs_punc_sm_lock:      Puncturing state machine lock.
+ */
+struct dfs_punc_obj {
+	qdf_freq_t punc_low_freq;
+	qdf_freq_t punc_high_freq;
+	qdf_hrtimer_data_t dfs_punc_cac_timer;
+	struct wlan_dfs *dfs;
+	struct wlan_sm *dfs_punc_sm_hdl;
+	enum dfs_punc_sm_state dfs_punc_sm_cur_state;
+	qdf_spinlock_t dfs_punc_sm_lock;
+};
+
+/**
+ * struct dfs_punc_unpunc - The type of the list of the DFS puncture objects.
+ * @dfs_punc_arr:  Array of puncture objects.
+ */
+struct dfs_punc_unpunc {
+	struct dfs_punc_obj dfs_punc_arr[N_MAX_PUNC_SM];
+};
+
 /*
  * NB: not using kernel-doc format since the kernel-doc script doesn't
  *     handle the TAILQ_HEAD() or STAILQ_HEAD() macros
@@ -1160,6 +1245,10 @@ struct dfs_rcac_params {
  *                                   CAC REQUIRED, CAC COMPLETED, NOL,
  *                                   PRECAC STARTED, PRECAC COMPLETED etc. of
  *                                   all the DFS channels.
+ * @dfs_cacelems:                    Stores the CAC related parameters of a
+ *                                   channel such as: CAC started time, CAC
+ *                                   completed time.
+ * @dfs_punc_lst:                    List of DFS puncture objects.
  */
 struct wlan_dfs {
 	uint32_t       dfs_debug_mask;
@@ -1336,6 +1425,9 @@ struct wlan_dfs {
 #if defined(WLAN_DISP_CHAN_INFO)
 	enum channel_dfs_state dfs_channel_state_array[NUM_DFS_CHANS];
 #endif /* WLAN_DISP_CHAN_INFO */
+#if defined(QCA_DFS_BW_PUNCTURE) && !defined(CONFIG_REG_CLIENT)
+	struct dfs_punc_unpunc dfs_punc_lst;
+#endif /* QCA_DFS_BW_PUNCTURE */
 #ifdef QCA_SUPPORT_AGILE_DFS
 #endif
 };
@@ -1419,6 +1511,7 @@ struct dfs_soc_priv_obj {
  *                              detection.
  * @WLAN_DEBUG_DFS_RANDOM_CHAN: Random channel selection.
  * @WLAN_DEBUG_DFS_AGILE:       Agile PreCAC/RCAC
+ * @WLAN_DEBUG_DFS_PUNCTURING:  DFS puncturing and unpuncturing.
  * @WLAN_DEBUG_DFS_MAX:         Max flag
  * @WLAN_DEBUG_DFS_ALWAYS:      Always debug
  */
@@ -1438,6 +1531,7 @@ enum dfs_debug {
 	WLAN_DEBUG_DFS_FALSE_DET2 = 0x00100000,
 	WLAN_DEBUG_DFS_RANDOM_CHAN = 0x00200000,
 	WLAN_DEBUG_DFS_AGILE       = 0x00400000,
+	WLAN_DEBUG_DFS_PUNCTURING  = 0x00800000,
 	WLAN_DEBUG_DFS_MAX        = 0x80000000,
 	WLAN_DEBUG_DFS_ALWAYS     = WLAN_DEBUG_DFS_MAX
 };

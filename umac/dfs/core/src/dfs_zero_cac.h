@@ -1332,4 +1332,262 @@ bool dfs_get_configured_bwexpand_dfs_chan(struct wlan_dfs *dfs,
 	return false;
 }
 #endif /* QCA_DFS_BW_EXPAND */
+
+#if defined(QCA_DFS_BW_PUNCTURE) && !defined(CONFIG_REG_CLIENT)
+/**
+ * dfs_create_punc_sm() - Wrapper API to Create DFS puncture state machine.
+ * @dfs: pointer to wlan_dfs.
+ *
+ * Return: Nothing.
+ */
+void dfs_create_punc_sm(struct wlan_dfs *dfs);
+
+/**
+ * dfs_destroy_punc_sm() - Wrapper API to Destroy DFS puncture state machine.
+ * @dfs: pointer to wlan_dfs.
+ *
+ * Return: Nothing.
+ */
+void dfs_destroy_punc_sm(struct wlan_dfs *dfs);
+
+/**
+ * dfs_punc_sm_start() - Start DFS puncture state machine.
+ * @dfs:           Pointer to wlan_dfs.
+ * @indx:          Index of DFS puncture state machine.
+ * @dfs_punc_arr:  Pointer to DFS puncture state machine object.
+ *
+ * Return: Nothing.
+ */
+void dfs_punc_sm_start(struct wlan_dfs *dfs,
+		       uint8_t indx,
+		       struct dfs_punc_obj *dfs_punc_arr);
+
+/**
+ * dfs_punc_sm_stop() - Stop DFS puncture state machine.
+ * @dfs:           Pointer to wlan_dfs.
+ * @indx:          Index of DFS puncture state machine.
+ * @dfs_punc_arr:  Pointer to DFS puncture state machine object.
+ *
+ * Return: Nothing.
+ */
+void dfs_punc_sm_stop(struct wlan_dfs *dfs,
+		      uint8_t indx,
+		      struct dfs_punc_obj *dfs_punc_arr);
+
+/**
+ * dfs_punc_sm_create() - Create DFS puncture state machine.
+ * @dfs_punc:             Pointer to DFS puncture state machine object.
+ *
+ * Return: Success if SM is created.
+ */
+QDF_STATUS dfs_punc_sm_create(struct dfs_punc_obj *dfs_punc);
+
+/**
+ * dfs_punc_sm_destroy() - Destroy DFS puncture state machine.
+ * @dfs_punc:              Pointer to DFS puncture state machine object.
+ *
+ * Return: Success if SM is destroyed.
+ */
+QDF_STATUS dfs_punc_sm_destroy(struct dfs_punc_obj *dfs_punc);
+
+/**
+ * dfs_punc_cac_timer_attach() - Attach puncture CAC timer to DFS puncture
+ *                               state machine.
+ * @dfs:                         Pointer to wlan_dfs.
+ * @dfs_punc_arr:                Pointer to DFS puncture state machine object.
+ *
+ * Return: Nothing.
+ */
+void dfs_punc_cac_timer_attach(struct wlan_dfs *dfs,
+			       struct dfs_punc_obj *dfs_punc_arr);
+
+/**
+ * dfs_handle_dfs_puncture_unpuncture() - Handles DFS puncture and unpuncturing.
+ * @dfs:                                  Pointer to wlan_dfs.
+ *
+ * Return: Nothing.
+ */
+void dfs_handle_dfs_puncture_unpuncture(struct wlan_dfs *dfs);
+
+/**
+ * dfs_punc_cac_timer_reset() - Reset puncture CAC timer.
+ * @dfs_punc_arr:               Pointer to DFS puncture state machine object.
+ *
+ * Return: Nothing.
+ */
+void dfs_punc_cac_timer_reset(struct dfs_punc_obj *dfs_punc_arr);
+
+/**
+ * dfs_punc_cac_timer_detach() - Detach puncture CAC timer from DFS puncture
+ *                               state machine.
+ * @dfs_punc_arr:                Pointer to DFS puncture state machine object.
+ *
+ * Return: Nothing.
+ */
+void dfs_punc_cac_timer_detach(struct dfs_punc_obj *dfs_punc_arr);
+
+/**
+ * dfs_start_punc_cac_timer() - Start puncture CAC timer.
+ * @dfs_punc_arr:               Pointer to DFS puncture state machine object.
+ * @is_weather_chan:            check if the channel is weather channel.
+ *
+ * Return: Nothing.
+ */
+void dfs_start_punc_cac_timer(struct dfs_punc_obj *dfs_punc_arr,
+			      bool is_weather_chan);
+
+/**
+ * dfs_cancel_punc_cac_timer() - Cancel puncture CAC timer.
+ * @dfs_punc_arr:                Pointer to DFS puncture state machine object.
+ *
+ * Return: Nothing.
+ */
+void dfs_cancel_punc_cac_timer(struct dfs_punc_obj *dfs_punc_arr);
+
+/**
+ * utils_dfs_puncturing_sm_deliver_evt() - Utility API to post events to DFS
+ *                                         puncture state machine.
+ * @pdev:                          Pointer to DFS pdev object.
+ * @sm_indx:                       Index of state machine.
+ * @event:                         Event to be posted to DFS Puncturing SM.
+ *
+ * Return: Nothing.
+ */
+void utils_dfs_puncturing_sm_deliver_evt(struct wlan_objmgr_pdev *pdev,
+					 uint8_t sm_indx,
+					 enum dfs_punc_sm_evt event);
+/**
+ * dfs_puncturing_sm_deliver_evt() - API to post events to DFS puncture
+ *                                   state machine.
+ * @dfs:                           Pointer to wlan_dfs.
+ * @event:                         Event to be posted to DFS Puncturing SM.
+ * @event_data_len:                Size of event data.
+ * @event_data:                    Event data.
+ *
+ * Return: Nothing.
+ */
+QDF_STATUS dfs_puncturing_sm_deliver_evt(struct wlan_dfs *dfs,
+					 enum dfs_punc_sm_evt event,
+					 uint16_t event_data_len,
+					 void *event_data);
+
+/**
+ * dfs_handle_nol_puncture() - Send SM event post NOL expiry.
+ * @dfs:           Pointer to wlan_dfs.
+ * @nolfreq:       NOL channel frequency.
+ *
+ * Return: Nothing.
+ */
+void dfs_handle_nol_puncture(struct wlan_dfs *dfs, qdf_freq_t nolfreq);
+
+/**
+ * dfs_is_ignore_radar_for_punctured_chans() - Store the radar bitmap and check
+ *                                             if radar is found in already
+ *                                             punctured channel and ignore the
+ *                                             radar.
+ * @dfs:                       Wlan_dfs structure
+ * @dfs_curr_radar_bitmap:     Variable to store radar bitmap.
+ *
+ * Return: If radar is found on punctured channel then return true.
+ * Else return false.
+ */
+bool dfs_is_ignore_radar_for_punctured_chans(struct wlan_dfs *dfs,
+					     uint16_t dfs_curr_radar_bitmap);
+#else
+static inline
+void dfs_create_punc_sm(struct wlan_dfs *dfs)
+{
+}
+
+static inline
+void dfs_destroy_punc_sm(struct wlan_dfs *dfs)
+{
+}
+
+static inline
+void dfs_punc_sm_start(struct wlan_dfs *dfs,
+		       uint8_t indx,
+		       struct dfs_punc_obj *dfs_punc_arr)
+{
+}
+
+static inline
+void dfs_punc_sm_stop(struct wlan_dfs *dfs,
+		      uint8_t indx,
+		      struct dfs_punc_obj *dfs_punc_arr)
+{
+}
+
+static inline
+QDF_STATUS dfs_punc_sm_create(struct dfs_punc_obj *dfs_punc)
+{
+	return QDF_STATUS_E_FAILURE;
+}
+
+static inline
+QDF_STATUS dfs_punc_sm_destroy(struct dfs_punc_obj *dfs_punc)
+{
+	return QDF_STATUS_E_FAILURE;
+}
+
+static inline
+void dfs_punc_cac_timer_attach(struct wlan_dfs *dfs,
+			       struct dfs_punc_obj *dfs_punc_arr)
+{
+}
+
+static inline
+void dfs_handle_dfs_puncture_unpuncture(struct wlan_dfs *dfs)
+{
+}
+
+static inline
+void dfs_punc_cac_timer_reset(struct dfs_punc_obj *dfs_punc_arr)
+{
+}
+
+static inline
+void dfs_punc_cac_timer_detach(struct dfs_punc_obj *dfs_punc_arr)
+{
+}
+
+static inline
+void dfs_start_punc_cac_timer(struct dfs_punc_obj *dfs_punc_arr,
+			      bool is_weather_chan)
+{
+}
+
+static inline
+void dfs_cancel_punc_cac_timer(struct dfs_punc_obj *dfs_punc_arr)
+{
+}
+
+static inline
+void utils_dfs_puncturing_sm_deliver_evt(struct wlan_objmgr_pdev *pdev,
+					 uint8_t sm_indx,
+					 enum dfs_punc_sm_evt event)
+{
+}
+
+static inline
+QDF_STATUS dfs_puncturing_sm_deliver_evt(struct wlan_dfs *dfs,
+					 enum dfs_punc_sm_evt event,
+					 uint16_t event_data_len,
+					 void *event_data)
+{
+	return QDF_STATUS_E_FAILURE;
+}
+
+static inline
+void dfs_handle_nol_puncture(struct wlan_dfs *dfs, qdf_freq_t nolfreq)
+{
+}
+
+static inline
+bool dfs_is_ignore_radar_for_punctured_chans(struct wlan_dfs *dfs,
+					     uint16_t dfs_curr_radar_bitmap)
+{
+	return false;
+}
+#endif /* DFS_BW_PUNCTURE */
 #endif /* _DFS_ZERO_CAC_H_ */

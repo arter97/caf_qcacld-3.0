@@ -204,6 +204,36 @@ uint16_t dfs_generate_radar_bitmap(struct wlan_dfs *dfs,
 {
 	return 0;
 }
+#endif
+
+/**
+ * dfs_handle_radar_puncturing() - Check if the puncture bitmap is valid
+ *                                 and initialize puncture SM for the
+ *                                 punctured channels.
+ * @dfs:                      Pointer to wlan_dfs structure.
+ * @dfs_radar_bitmap:         Puncture bitmap.
+ * @freq_list:                Channel list affected by radar.
+ * @num_channels:             Number of channels affected by radar.
+ * @is_ignore_radar_puncture: Bool to check if radar should be ignored.
+ *
+ * Return: Nothing.
+ */
+#if defined(QCA_DFS_BW_PUNCTURE) && !defined(CONFIG_REG_CLIENT)
+void
+dfs_handle_radar_puncturing(struct wlan_dfs *dfs,
+			    uint16_t *dfs_radar_bitmap,
+			    uint16_t *freq_list,
+			    uint8_t num_channels,
+			    bool *is_ignore_radar_puncture);
+#else
+static inline
+void dfs_handle_radar_puncturing(struct wlan_dfs *dfs,
+				 uint16_t *dfs_radar_bitmap,
+				 uint16_t *freq_list,
+				 uint8_t num_channels,
+				 bool *is_ignore_radar_puncture)
+{
+}
 #endif /* QCA_DFS_BW_PUNCTURE */
 
 /**
