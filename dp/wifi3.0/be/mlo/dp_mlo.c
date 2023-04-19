@@ -1139,24 +1139,24 @@ void dp_umac_reset_complete_umac_recovery(struct dp_soc *soc)
  * @soc: dp soc handle
  * @is_target_recovery: Flag to indicate if it is triggered for target recovery
  *
- * Return: void
+ * Return: status
  */
-void dp_umac_reset_initiate_umac_recovery(struct dp_soc *soc,
-					  bool is_target_recovery)
+QDF_STATUS dp_umac_reset_initiate_umac_recovery(struct dp_soc *soc,
+						bool is_target_recovery)
 {
 	struct dp_soc_be *be_soc = dp_get_be_soc_from_dp_soc(soc);
 	struct dp_mlo_ctxt *mlo_ctx = be_soc->ml_ctxt;
 	struct dp_soc_mlo_umac_reset_ctx *grp_umac_reset_ctx;
 
 	if (!mlo_ctx)
-		return;
+		return QDF_STATUS_SUCCESS;
 
 	grp_umac_reset_ctx = &mlo_ctx->grp_umac_reset_ctx;
 	qdf_spin_lock_bh(&grp_umac_reset_ctx->grp_ctx_lock);
 
 	if (grp_umac_reset_ctx->umac_reset_in_progress) {
 		qdf_spin_unlock_bh(&grp_umac_reset_ctx->grp_ctx_lock);
-		return;
+		return QDF_STATUS_E_INVAL;
 	}
 
 	grp_umac_reset_ctx->umac_reset_in_progress = true;
@@ -1169,6 +1169,8 @@ void dp_umac_reset_initiate_umac_recovery(struct dp_soc *soc,
 	grp_umac_reset_ctx->umac_reset_count++;
 
 	qdf_spin_unlock_bh(&grp_umac_reset_ctx->grp_ctx_lock);
+
+	return QDF_STATUS_SUCCESS;
 }
 
 /**
