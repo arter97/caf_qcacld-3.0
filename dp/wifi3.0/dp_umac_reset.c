@@ -327,11 +327,12 @@ bool dp_check_umac_reset_in_progress(struct dp_soc *soc)
  * @soc: dp soc handle
  * @is_target_recovery: Flag to indicate if it is triggered for target recovery
  *
- * Return: void
+ * Return: status
  */
-static void dp_umac_reset_initiate_umac_recovery(struct dp_soc *soc,
-						 bool is_target_recovery)
+static QDF_STATUS dp_umac_reset_initiate_umac_recovery(struct dp_soc *soc,
+						       bool is_target_recovery)
 {
+	return QDF_STATUS_SUCCESS;
 }
 
 /**
@@ -482,9 +483,13 @@ static int dp_umac_reset_rx_event_handler(void *dp_ctx)
 		umac_reset_ctx->ts.trigger_start =
 						qdf_get_log_timestamp_usecs();
 
-		action = UMAC_RESET_ACTION_DO_TRIGGER_RECOVERY;
-
+		status =
 		dp_umac_reset_initiate_umac_recovery(soc, target_recovery);
+
+		if (status != QDF_STATUS_SUCCESS)
+			break;
+
+		action = UMAC_RESET_ACTION_DO_TRIGGER_RECOVERY;
 
 		break;
 
