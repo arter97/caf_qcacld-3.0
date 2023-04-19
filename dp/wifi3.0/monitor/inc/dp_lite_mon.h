@@ -367,5 +367,17 @@ dp_lite_mon_get_filter_mcast_data(struct cdp_pdev *pdev_handle);
 bool
 dp_lite_mon_get_filter_non_data(struct cdp_pdev *pdev_handle);
 
+/**
+ * dp_lite_mon_free_peers - Free peers in litemon config
+ *
+ * @pdev: pdev context
+ * @config: Lite monitor config
+ *
+ * Return: void
+ **/
+void
+dp_lite_mon_free_peers(struct dp_pdev *pdev,
+		       struct dp_lite_mon_config *config);
+
 #endif
 #endif /* _DP_LITE_MON_H_ */

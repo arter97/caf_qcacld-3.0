@@ -17,6 +17,9 @@
 #ifndef _DP_PPEDS_H_
 #define _DP_PPEDS_H_
 
+#define DP_PPEDS_TX_COMP_NAPI_BIT 16
+#define DP_PPEDS_NAPI_DONE_BIT 17
+
 struct dp_ppe_ds_idxs {
 	uint32_t ppe2tcl_start_idx;
 	uint32_t reo2ppe_start_idx;
@@ -93,10 +96,22 @@ QDF_STATUS dp_ppeds_start_soc_be(struct dp_soc *soc);
 void dp_ppeds_stop_soc_be(struct dp_soc *soc);
 
 /**
- * dp_ppeds_detach_vdev_be() - Deattach the VP port from vdev
- * @soc_hdl: CDP SoC Tx/Rx handle
+ * dp_ppeds_stats_sync_be() - sync stats for DS mode.
+ * @soc: CDP SoC Tx/Rx handle
  * @vdev_id: vdev id
- * @vp_params: vp params
+ * @vp_params: PPE virtual port params
+ * @stats: pointer to stats structure
+ *
+ * Return: void
+ */
+void dp_ppeds_stats_sync_be(struct cdp_soc_t *soc, uint16_t vdev_id,
+			    struct cdp_ds_vp_params *vp_params, void *stats);
+
+/**
+ * dp_ppeds_detach_vdev_be() - Deattach the VP port from vdev
+ * @soc: CDP SoC Tx/Rx handle
+ * @vdev_id: vdev id
+ * @vp_params: PPE virtual port params
  *
  * Detach the VP port from BE VAP
  *
@@ -124,7 +139,7 @@ QDF_STATUS dp_ppeds_vp_setup_on_fw_recovery(struct cdp_soc_t *soc,
  * @vdev_id: vdev_id
  * @vp_arg: PPE VP opaque
  * @ppe_vp_num: PPE VP number
- * @vp_params: vp params
+ * @vp_params: PPE virtual port params
  *
  * Allocate a DS VP port and attach to BE VAP
  *
@@ -226,4 +241,52 @@ void *dp_get_ppe_ds_ctxt(struct dp_soc *soc);
  */
 void dp_tx_ppeds_cfg_astidx_cache_mapping(struct dp_soc *soc,
 					  struct dp_vdev *vdev, bool peer_map);
+
+#ifdef DP_UMAC_HW_RESET_SUPPORT
+/**
+ * dp_ppeds_interrupt_stop_be() - Stop all the PPEDS interrupts
+ * @be_soc: BE SoC
+ * @enable: enable/disable bit
+ *
+ * Return: void
+ */
+void dp_ppeds_interrupt_stop_be(struct dp_soc *soc);
+
+/**
+ * dp_ppeds_interrupt_start_be() - Start all the PPEDS interrupts
+ * @be_soc: BE SoC
+ *
+ * Return: void
+ */
+void dp_ppeds_interrupt_start_be(struct dp_soc *soc);
+
+/**
+ * dp_ppeds_service_status_update_be() - Update the PPEDS service status
+ * @be_soc: BE SoC
+ * @enable: enable/disable bit
+ *
+ * Return: void
+ */
+void dp_ppeds_service_status_update_be(struct dp_soc *soc, bool enable);
+
+/**
+ * dp_ppeds_is_enabled() - Check if PPEDS enabled on SoC.
+ * @be_soc: BE SoC
+ *
+ * Return: void
+ */
+bool dp_ppeds_is_enabled_on_soc(struct dp_soc *soc);
+
+/**
+ * dp_ppeds_tx_desc_pool_reset() - PPE DS tx desc pool reset
+ * @soc: SoC
+ *
+ * PPE DS tx desc pool reset
+ *
+ * Return: void
+ */
+void
+dp_ppeds_tx_desc_pool_reset(struct dp_soc *soc,
+			    qdf_nbuf_t *nbuf_list);
+#endif /* DP_UMAC_HW_RESET_SUPPORT */
 #endif /* _DP_PPEDS_H_ */
