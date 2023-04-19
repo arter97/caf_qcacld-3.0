@@ -96,7 +96,7 @@ static void  wlan_tdls_teardown_links_sync(struct wlan_objmgr_psoc *psoc,
 	struct wlan_objmgr_vdev *tdls_vdev;
 
 	tdls_vdev = tdls_get_vdev(psoc, WLAN_TDLS_NB_ID);
-	if (!vdev)
+	if (!tdls_vdev)
 		return;
 
 	vdev_priv_obj = wlan_vdev_get_tdls_vdev_obj(tdls_vdev);
