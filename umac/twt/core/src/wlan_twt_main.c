@@ -220,7 +220,7 @@ QDF_STATUS wlan_twt_send_enable_cmd(struct wlan_objmgr_pdev *pdev)
 	struct wlan_objmgr_psoc *psoc;
 	struct twt_psoc_priv_obj *twt_psoc;
 	psoc_twt_ext_cfg_params_t *twt_cfg;
-	struct twt_enable_param twt_param;
+	struct twt_enable_param twt_param = { 0 };
 
 	if (!pdev) {
 		twt_err("null pdev");
@@ -274,6 +274,12 @@ QDF_STATUS wlan_twt_send_enable_cmd(struct wlan_objmgr_pdev *pdev)
 		twt_cfg->remove_sta_slot_interval;
 	twt_param.b_twt_enable = twt_cfg->b_twt_enable;
 	twt_param.r_twt_enable = twt_cfg->r_twt_enable;
+	/* Set ext_conf_present flag so that new format
+	 * is used to send cmd to FW */
+	twt_param.ext_conf_present = true;
+	twt_param.b_twt_legacy_mbss_enable = 1;
+	if (twt_cfg->mbss_support)
+		twt_param.b_twt_ax_mbss_enable = 1;
 
 	return wlan_twt_responder_enable(psoc, &twt_param, NULL);
 }
