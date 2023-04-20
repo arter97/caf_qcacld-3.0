@@ -325,13 +325,6 @@ hdd_send_igmp_offload_params(struct hdd_adapter *adapter,
 	return QDF_STATUS_SUCCESS;
 }
 
-static inline QDF_STATUS
-wlan_hdd_send_igmp_offload_params(struct hdd_adapter *adapter, bool enable,
-				  uint32_t *mc_address, uint32_t count)
-{
-	return QDF_STATUS_SUCCESS;
-}
-
 static inline void
 hdd_disable_igmp_offload(struct hdd_adapter *adapter)
 {}
@@ -1870,6 +1863,32 @@ void hdd_svc_fw_shutdown_ind(struct device *dev)
 }
 
 /**
+ * wlan_hdd_set_twt_responder() - wrapper to configure twt responder
+ * in sap_config
+ * @hdd_ctx: Pointer to hdd context
+ * @adapter: Pointer to hostapd hdd adapter
+ *
+ * Return: none
+ */
+#if defined(WLAN_SUPPORT_TWT) && \
+	((LINUX_VERSION_CODE >= KERNEL_VERSION(5, 3, 0)) || \
+	  defined(CFG80211_TWT_RESPONDER_SUPPORT))
+static void wlan_hdd_set_twt_responder(struct hdd_context *hdd_ctx,
+				       struct hdd_adapter *adapter)
+{
+	bool twt_responder;
+
+	twt_responder = adapter->session.ap.sap_config.cfg80211_twt_responder;
+	wlan_hdd_configure_twt_responder(hdd_ctx, twt_responder);
+}
+#else
+static inline void wlan_hdd_set_twt_responder(struct hdd_context *hdd_ctx,
+					      struct hdd_adapter *adapter)
+{
+}
+#endif
+
+/**
  * hdd_ssr_restart_sap() - restart sap on SSR
  * @hdd_ctx:   hdd context
  *
@@ -1888,6 +1907,8 @@ static void hdd_ssr_restart_sap(struct hdd_context *hdd_ctx)
 				hdd_debug(
 				"Restart prev SAP session, event_flags 0x%lx(%s)",
 				adapter->event_flags, (adapter->dev)->name);
+				wlan_hdd_set_twt_responder(hdd_ctx,
+							   adapter);
 				wlan_hdd_start_sap(adapter, true);
 			}
 		}

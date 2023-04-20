@@ -86,7 +86,6 @@
 #include "wlan_mlo_mgr_sta.h"
 #include "wlan_mlo_mgr_peer.h"
 #include <wlan_twt_api.h>
-#include "spatial_reuse_api.h"
 
 struct pe_hang_event_fixed_param {
 	uint16_t tlv_header;
@@ -108,11 +107,6 @@ static void __lim_init_bss_vars(struct mac_context *mac)
 
 static void __lim_init_stats_vars(struct mac_context *mac)
 {
-	mac->lim.gLimNumBeaconsRcvd = 0;
-	mac->lim.gLimNumBeaconsIgnored = 0;
-
-	mac->lim.gLimNumDeferredMsgs = 0;
-
 	/* / Variable to keep track of number of currently associated STAs */
 	mac->lim.gLimNumOfAniSTAs = 0; /* count of ANI peers */
 
@@ -121,31 +115,6 @@ static void __lim_init_stats_vars(struct mac_context *mac)
 	qdf_mem_zero(mac->lim.gLimHeartBeatApMac[1],
 			sizeof(tSirMacAddr));
 	mac->lim.gLimHeartBeatApMacIndex = 0;
-
-	/* Statistics to keep track of no. beacons rcvd in heart beat interval */
-	qdf_mem_zero(mac->lim.gLimHeartBeatBeaconStats,
-		    sizeof(mac->lim.gLimHeartBeatBeaconStats));
-
-#ifdef WLAN_DEBUG
-	/* Debug counters */
-	mac->lim.numTot = 0;
-	mac->lim.numBbt = 0;
-	mac->lim.numProtErr = 0;
-	mac->lim.numLearn = 0;
-	mac->lim.numLearnIgnore = 0;
-	mac->lim.numSme = 0;
-	qdf_mem_zero(mac->lim.numMAC, sizeof(mac->lim.numMAC));
-	mac->lim.gLimNumAssocReqDropInvldState = 0;
-	mac->lim.gLimNumAssocReqDropACRejectTS = 0;
-	mac->lim.gLimNumAssocReqDropACRejectSta = 0;
-	mac->lim.gLimNumReassocReqDropInvldState = 0;
-	mac->lim.gLimNumHashMissIgnored = 0;
-	mac->lim.gLimUnexpBcnCnt = 0;
-	mac->lim.gLimBcnSSIDMismatchCnt = 0;
-	mac->lim.gLimNumLinkEsts = 0;
-	mac->lim.gLimNumRxCleanup = 0;
-	mac->lim.gLim11bStaAssocRejectCount = 0;
-#endif
 }
 
 static void __lim_init_states(struct mac_context *mac)
@@ -726,6 +695,53 @@ static QDF_STATUS lim_unregister_sap_bcn_callback(struct mac_context *mac_ctx)
 	return status;
 }
 
+/*
+ * lim_register_scan_mbssid_callback(): Register callback with scan module
+ * @mac_ctx: pointer to the global mac context
+ *
+ * Registers the function lim_register_scan_mbssid_callback as callback
+ * with the Scan module to handle generated frames by MBSSID IE
+ *
+ * Return: QDF Status
+ */
+static QDF_STATUS
+lim_register_scan_mbssid_callback(struct mac_context *mac_ctx)
+{
+	QDF_STATUS status;
+
+	status = wlan_scan_register_mbssid_cb(mac_ctx->psoc,
+					      lim_handle_frame_genby_mbssid);
+	if (!QDF_IS_STATUS_SUCCESS(status)) {
+		pe_err("failed with status code %08d [x%08x]",
+		       status, status);
+	}
+
+	return status;
+}
+
+/*
+ * lim_unregister_scan_mbssid_callback(): Unregister callback with scan module
+ * @mac_ctx: pointer to the global mac context
+ *
+ * Unregisters the callback registered with the Scan module to handle
+ * generated frames by MBSSID IE
+ *
+ * Return: QDF Status
+ */
+static QDF_STATUS
+lim_unregister_scan_mbssid_callback(struct mac_context *mac_ctx)
+{
+	QDF_STATUS status;
+
+	status = wlan_scan_register_mbssid_cb(mac_ctx->psoc, NULL);
+	if (!QDF_IS_STATUS_SUCCESS(status)) {
+		pe_err("failed with status code %08d [x%08x]",
+		       status, status);
+	}
+
+	return status;
+}
+
 static void lim_register_policy_mgr_callback(struct wlan_objmgr_psoc *psoc)
 {
 	struct policy_mgr_conc_cbacks conc_cbacks;
@@ -827,7 +843,7 @@ QDF_STATUS pe_open(struct mac_context *mac, struct cds_config_info *cds_cfg)
 	}
 
 	mac->lim.gpSession =
-		qdf_mem_malloc(sizeof(struct pe_session) * mac->lim.maxBssId);
+		qdf_mem_common_alloc(sizeof(struct pe_session) * mac->lim.maxBssId);
 	if (!mac->lim.gpSession) {
 		status = QDF_STATUS_E_NOMEM;
 		goto pe_open_psession_fail;
@@ -851,6 +867,7 @@ QDF_STATUS pe_open(struct mac_context *mac, struct cds_config_info *cds_cfg)
 	lim_register_debug_callback();
 	lim_nan_register_callbacks(mac);
 	p2p_register_callbacks(mac);
+	lim_register_scan_mbssid_callback(mac);
 	lim_register_sap_bcn_callback(mac);
 	wlan_reg_register_ctry_change_callback(
 					mac->psoc,
@@ -870,7 +887,7 @@ QDF_STATUS pe_open(struct mac_context *mac, struct cds_config_info *cds_cfg)
 	return status; /* status here will be QDF_STATUS_SUCCESS */
 
 pe_open_lock_fail:
-	qdf_mem_free(mac->lim.gpSession);
+	qdf_mem_common_free(mac->lim.gpSession);
 	mac->lim.gpSession = NULL;
 pe_open_psession_fail:
 	qdf_mem_free(mac->lim.lim_timers.gpLimCnfWaitTimer);
@@ -897,6 +914,7 @@ QDF_STATUS pe_close(struct mac_context *mac)
 
 	qdf_hang_event_unregister_notifier(&pe_hang_event_notifier);
 	lim_cleanup(mac);
+	lim_unregister_scan_mbssid_callback(mac);
 	lim_unregister_sap_bcn_callback(mac);
 	wlan_reg_unregister_ctry_change_callback(
 					mac->psoc,
@@ -915,7 +933,7 @@ QDF_STATUS pe_close(struct mac_context *mac)
 	qdf_mem_free(mac->lim.lim_timers.gpLimCnfWaitTimer);
 	mac->lim.lim_timers.gpLimCnfWaitTimer = NULL;
 
-	qdf_mem_free(mac->lim.gpSession);
+	qdf_mem_common_free(mac->lim.gpSession);
 	mac->lim.gpSession = NULL;
 
 	pe_free_dph_node_array_buffer();
@@ -1242,7 +1260,7 @@ static QDF_STATUS pe_handle_mgmt_frame(struct wlan_objmgr_psoc *psoc,
 	}
 
 	qdf_status =
-		wma_ds_peek_rx_packet_info(pVosPkt, (void *)&pRxPacketInfo, false);
+		wma_ds_peek_rx_packet_info(pVosPkt, (void *)&pRxPacketInfo);
 
 	if (!QDF_IS_STATUS_SUCCESS(qdf_status)) {
 		cds_pkt_return_packet(pVosPkt);
@@ -2653,22 +2671,8 @@ static void
 lim_mlo_roam_copy_partner_info_to_session(struct pe_session *session,
 					  struct roam_offload_synch_ind *sync_ind)
 {
-	uint8_t i;
-	struct mlo_partner_info partner_info;
-
-	if (!sync_ind)
-		return;
-
-	for (i = 0; i < sync_ind->num_setup_links; i++) {
-		partner_info.partner_link_info[i].link_id =
-			sync_ind->ml_link[i].link_id;
-		qdf_copy_macaddr(
-			&partner_info.partner_link_info[i].link_addr,
-			&sync_ind->ml_link[i].link_addr);
-	}
-
-	session->ml_partner_info = partner_info;
-	session->ml_partner_info.num_partner_links = sync_ind->num_setup_links;
+	mlo_roam_copy_partner_info(&session->ml_partner_info,
+				   sync_ind, sync_ind->roamed_vdev_id);
 }
 
 static QDF_STATUS
@@ -2755,17 +2759,8 @@ static inline void pe_roam_fill_obss_scan_param(struct pe_session *src_session,
 #endif
 
 #ifdef WLAN_FEATURE_SR
-/**
- * lim_handle_sr_cap() - To handle SR(Spatial Reuse) capability
- * of roamed AP
- * @vdev: objmgr vdev
- *
- * This function is to check and compare SR cap of previous and
- * roamed AP and takes decision to send event to userspace.
- *
- * Return: None
- */
-static void lim_handle_sr_cap(struct wlan_objmgr_vdev *vdev)
+void lim_handle_sr_cap(struct wlan_objmgr_vdev *vdev,
+		       enum sr_osif_reason_code reason)
 {
 	int32_t non_srg_pd_threshold = 0;
 	int32_t srg_pd_threshold = 0;
@@ -2776,6 +2771,7 @@ static void lim_handle_sr_cap(struct wlan_objmgr_vdev *vdev)
 	bool is_pd_threshold_present = false;
 	struct wlan_objmgr_pdev *pdev;
 	enum sr_status_of_roamed_ap sr_status;
+	enum sr_osif_operation sr_op;
 
 	pdev = wlan_vdev_get_pdev(vdev);
 	if (!pdev) {
@@ -2803,12 +2799,12 @@ static void lim_handle_sr_cap(struct wlan_objmgr_vdev *vdev)
 		     SR_PD_THRESHOLD_MIN) ||
 		      (srg_pd_threshold < srg_min_pd_offset +
 		       SR_PD_THRESHOLD_MIN))))
-			sr_status = SR_THRESHOLD_NOT_IN_RANGE_OF_ROAMED_AP;
+			sr_status = SR_THRESHOLD_NOT_IN_RANGE;
 		else
-			sr_status = SR_THRESHOLD_IN_RANGE_OF_ROAMED_AP;
+			sr_status = SR_THRESHOLD_IN_RANGE;
 	}
-	pe_debug("sr status of roamed AP %d existing thresholds srg: %d non-srg: %d roamed AP sr offset srg: max %d min %d non-srg: %d",
-		 sr_status, srg_pd_threshold, non_srg_pd_threshold,
+	pe_debug("sr status %d reason %d existing thresholds srg: %d non-srg: %d New: sr offset srg: max %d min %d non-srg: %d",
+		 sr_status, reason, srg_pd_threshold, non_srg_pd_threshold,
 		 srg_max_pd_offset, srg_min_pd_offset, non_srg_pd_offset);
 	switch (sr_status) {
 	case SR_DISALLOW:
@@ -2817,9 +2813,15 @@ static void lim_handle_sr_cap(struct wlan_objmgr_vdev *vdev)
 		wlan_vdev_mlme_set_current_srg_pd_threshold(vdev, 0);
 		wlan_spatial_reuse_osif_event(vdev,
 					      SR_OPERATION_SUSPEND,
-					      SR_REASON_CODE_ROAMING);
+					      reason);
+		/*
+		 * If SR is disabled due to beacon update,
+		 * notify the firmware to disable SR
+		 */
+		if (reason == SR_REASON_CODE_BCN_IE_CHANGE)
+			wlan_sr_setup_req(vdev, pdev, false, 0, 0);
 	break;
-	case SR_THRESHOLD_NOT_IN_RANGE_OF_ROAMED_AP:
+	case SR_THRESHOLD_NOT_IN_RANGE:
 		wlan_vdev_mlme_get_pd_threshold_present(
 						vdev, &is_pd_threshold_present);
 		/*
@@ -2835,27 +2837,25 @@ static void lim_handle_sr_cap(struct wlan_objmgr_vdev *vdev)
 			wlan_vdev_mlme_set_current_srg_pd_threshold(vdev, 0);
 			wlan_spatial_reuse_osif_event(vdev,
 						      SR_OPERATION_SUSPEND,
-						      SR_REASON_CODE_ROAMING);
+						      reason);
 		} else {
+			sr_op = (reason == SR_REASON_CODE_ROAMING) ?
+				SR_OPERATION_RESUME :
+				SR_OPERATION_UPDATE_PARAMS;
 			wlan_sr_setup_req(
 				vdev, pdev, true,
 				srg_max_pd_offset + SR_PD_THRESHOLD_MIN,
 				non_srg_pd_threshold + SR_PD_THRESHOLD_MIN);
-			wlan_spatial_reuse_osif_event(vdev,
-						      SR_OPERATION_RESUME,
-						      SR_REASON_CODE_ROAMING);
+			wlan_spatial_reuse_osif_event(vdev, sr_op, reason);
 		}
 	break;
-	case SR_THRESHOLD_IN_RANGE_OF_ROAMED_AP:
+	case SR_THRESHOLD_IN_RANGE:
 		/* Send enable command to fw, as fw disables SR on roaming */
 		wlan_sr_setup_req(vdev, pdev, true, srg_pd_threshold,
 				  non_srg_pd_threshold);
 	break;
 	}
 }
-#else
-static void lim_handle_sr_cap(struct wlan_objmgr_vdev *vdev)
-{}
 #endif
 
 QDF_STATUS
@@ -3073,7 +3073,7 @@ pe_roam_synch_callback(struct mac_context *mac_ctx,
 	lim_init_tdls_data(mac_ctx, ft_session_ptr);
 	ric_tspec_len = ft_session_ptr->RICDataLen;
 	pe_debug("LFR3: Session RicLength: %d", ft_session_ptr->RICDataLen);
-	lim_handle_sr_cap(ft_session_ptr->vdev);
+	lim_handle_sr_cap(ft_session_ptr->vdev, SR_REASON_CODE_ROAMING);
 #ifdef FEATURE_WLAN_ESE
 	ric_tspec_len += ft_session_ptr->tspecLen;
 	pe_debug("LFR3: tspecLen: %d", ft_session_ptr->tspecLen);
@@ -4275,7 +4275,8 @@ lim_gen_link_probe_rsp_roam(struct mac_context *mac_ctx,
 			pe_debug("MLO: link probe rsp size:%u orig probe rsp :%u",
 				 link_probe_rsp.len, frame_len);
 
-			src_addr = lim_get_src_addr_from_frame(&link_probe_rsp);
+			src_addr = wlan_mlme_get_src_addr_from_frame(
+							&link_probe_rsp);
 			if (!src_addr) {
 				pe_err("MLO: Failed to fetch src address");
 				status = QDF_STATUS_E_FAILURE;

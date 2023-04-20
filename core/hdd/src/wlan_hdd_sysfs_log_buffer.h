@@ -14,40 +14,44 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
-#ifndef _WLAN_HDD_SYSFS_RUNTIME_PM_H
-#define _WLAN_HDD_SYSFS_RUNTIME_PM_H
+#ifndef _WLAN_HDD_SYSFS_LOG_BUFFER_H
+#define _WLAN_HDD_SYSFS_LOG_BUFFER_H
 
-#if defined(WLAN_SYSFS) && defined(FEATURE_RUNTIME_PM)
+#if defined(WLAN_SYSFS) && defined(FEATURE_SYSFS_LOG_BUFFER)
 
 /**
- * hdd_sysfs_runtime_pm_create(): create runtime pm WoW stats sysfs node
- * @driver_kobject: pointer to driver kobject
+ * hdd_sysfs_log_buffer_create() - API to create log_buffer sysfs file
+ * @driver_kobject: sysfs driver kobject
  *
- * Return: 0 for success and non zero error code for failure
+ * file path: /sys/kernel/kiwi_v2/log_buffer
  *
+ * usage:
+ *      cat log_buffer
+ *
+ * Return: 0 on success and errno on failure
  */
-int hdd_sysfs_runtime_pm_create(struct kobject *driver_kobject);
+int hdd_sysfs_log_buffer_create(struct kobject *driver_kobject);
 
 /**
- * hdd_sysfs_runtime_pm_destroy(): destroy runtime pm WoW stats sysfs node
+ * hdd_sysfs_log_buffer_destroy(): destroy hdd log buffer sysfs node
  * @driver_kobject: pointer to driver kobject
  *
  * Return: void
  *
  */
 void
-hdd_sysfs_runtime_pm_destroy(struct kobject *driver_kobject);
+hdd_sysfs_log_buffer_destroy(struct kobject *driver_kobject);
 
 #else
 
 static inline int
-hdd_sysfs_runtime_pm_create(struct kobject *driver_kobject)
+hdd_sysfs_log_buffer_create(struct kobject *driver_kobject)
 {
 	return 0;
 }
 
 static inline void
-hdd_sysfs_runtime_pm_destroy(struct kobject *driver_kobject)
+hdd_sysfs_log_buffer_destroy(struct kobject *driver_kobject)
 {
 }
 #endif

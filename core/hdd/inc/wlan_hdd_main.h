@@ -124,7 +124,6 @@
  * Preprocessor definitions and constants
  */
 
-static qdf_atomic_t dp_protect_entry_count;
 /* Milli seconds to delay SSR thread when an packet is getting processed */
 #define SSR_WAIT_SLEEP_TIME 200
 /* MAX iteration count to wait for dp tx to complete */
@@ -463,18 +462,6 @@ enum hdd_nb_cmd_id {
 #define INTF_MACADDR_MASK       0x7
 
 /**
- * enum hdd_auth_key_mgmt - auth key mgmt protocols
- * @HDD_AUTH_KEY_MGMT_802_1X: 802.1x
- * @HDD_AUTH_KEY_MGMT_PSK: PSK
- * @HDD_AUTH_KEY_MGMT_CCKM: CCKM
- */
-enum hdd_auth_key_mgmt {
-	HDD_AUTH_KEY_MGMT_802_1X = BIT(0),
-	HDD_AUTH_KEY_MGMT_PSK = BIT(1),
-	HDD_AUTH_KEY_MGMT_CCKM = BIT(2)
-};
-
-/**
  * typedef wlan_net_dev_ref_dbgid - Debug IDs to detect net device reference
  *                                  leaks.
  * NOTE: New values added to the enum must also be reflected in function
@@ -620,16 +607,12 @@ struct hdd_stats {
  * @peer_mac: Peer MAC address for IBSS connection
  * @roam_id: Unique identifier for a roaming instance
  * @roam_status: Current roam command status
- * @defer_key_complete: Should key complete be deferred?
- *
  */
 struct hdd_roaming_info {
 	tSirMacAddr bssid;
 	tSirMacAddr peer_mac;
 	uint32_t roam_id;
 	eRoamCmdStatus roam_status;
-	bool defer_key_complete;
-
 };
 
 #ifdef FEATURE_WLAN_WAPI
@@ -1374,22 +1357,6 @@ struct hdd_adapter {
 				(&(adapter)->session.ap.hostapd_state)
 #define WLAN_HDD_GET_SAP_CTX_PTR(adapter) ((adapter)->session.ap.sap_context)
 
-/**
- * hdd_is_sta_authenticated() - check if given adapter's STA
- *				session authenticated
- * @adapter: adapter pointer
- *
- * Return: STA session is_authenticated flag value
- */
-static inline
-uint8_t hdd_is_sta_authenticated(struct hdd_adapter *adapter)
-{
-	struct hdd_station_ctx *sta_ctx =
-			WLAN_HDD_GET_STATION_CTX_PTR(adapter);
-
-	return sta_ctx->conn_info.is_authenticated;
-}
-
 #ifdef WLAN_FEATURE_NAN
 #define WLAN_HDD_IS_NDP_ENABLED(hdd_ctx) ((hdd_ctx)->nan_datapath_enabled)
 #else
@@ -1789,7 +1756,6 @@ enum wlan_state_ctrl_str_id {
  * @is_extwow_app_type2_param_set: is extwow app type2 param set
  * @ext_scan_start_since_boot: Time since boot up to extscan start (in micro
  *                             seconds)
- * @g_event_flags: a bitmap of hdd_driver_flags (unused??)
  * @miracast_value: value of driver miracast command
  * @ipv6_notifier: IPv6 notifier callback for handling NS offload on change
  *                 in IP
@@ -1885,8 +1851,6 @@ enum wlan_state_ctrl_str_id {
  * @pm_qos_req:
  * @qos_cpu_mask: voted cpu core mask
  * @pm_qos_req: pm_qos request for all cpu cores
- * @enable_pkt_capture_support: enable packet capture support
- * @val_pkt_capture_mode: value for packet capturte mode
  * @roam_ch_from_fw_supported:
  * @dutycycle_off_percent:
  * @pm_qos_request_flags:
@@ -1897,7 +1861,6 @@ enum wlan_state_ctrl_str_id {
  * @ll_stats_per_chan_rx_tx_time:
  * @is_get_station_clubbed_in_ll_stats_req:
  * @multi_client_thermal_mitigation: Multi client thermal mitigation by fw
- * @disconnect_for_sta_mon_conc: disconnect if sta monitor intf concurrency
  * @is_dual_mac_cfg_updated: indicate whether dual mac cfg has been updated
  * @is_regulatory_update_in_progress:
  * @regulatory_update_event:
@@ -2017,7 +1980,6 @@ struct hdd_context {
 #endif
 
 	uint64_t ext_scan_start_since_boot;
-	unsigned long g_event_flags;
 	uint8_t miracast_value;
 
 #ifdef WLAN_NS_OFFLOAD
@@ -2148,12 +2110,6 @@ struct hdd_context {
 #elif defined(CLD_PM_QOS)
 	struct pm_qos_request pm_qos_req;
 #endif
-#ifdef WLAN_FEATURE_PKT_CAPTURE
-	/* enable packet capture support */
-	bool enable_pkt_capture_support;
-	/* value for packet capturte mode */
-	uint8_t val_pkt_capture_mode;
-#endif
 	bool roam_ch_from_fw_supported;
 #ifdef FW_THERMAL_THROTTLE_SUPPORT
 	uint8_t dutycycle_off_percent;
@@ -2170,7 +2126,6 @@ struct hdd_context {
 #ifdef FEATURE_WPSS_THERMAL_MITIGATION
 	bool multi_client_thermal_mitigation;
 #endif
-	bool disconnect_for_sta_mon_conc;
 	bool is_dual_mac_cfg_updated;
 	bool is_regulatory_update_in_progress;
 	qdf_event_t regulatory_update_event;
@@ -2498,6 +2453,19 @@ void hdd_adapter_dev_put_debug(struct hdd_adapter *adapter,
 			       wlan_net_dev_ref_dbgid dbgid);
 
 /**
+ * hdd_validate_next_adapter - API to check for infinite loop
+ *                             in the adapter list traversal
+ * @curr: current adapter pointer
+ * @next: next adapter pointer
+ * @dbg_id: Debug ID corresponding to API that is requesting the dev_put
+ *
+ * Return: None
+ */
+void hdd_validate_next_adapter(struct hdd_adapter **curr,
+			       struct hdd_adapter **next,
+			       wlan_net_dev_ref_dbgid dbg_id);
+
+/**
  * __hdd_take_ref_and_fetch_front_adapter_safe - Helper macro to lock, fetch
  * front and next adapters, take ref and unlock.
  * @hdd_ctx: the global HDD context
@@ -2528,6 +2496,7 @@ void hdd_adapter_dev_put_debug(struct hdd_adapter *adapter,
 	qdf_spin_lock_bh(&hdd_ctx->hdd_adapter_lock), \
 	adapter = next_adapter, \
 	hdd_get_next_adapter_no_lock(hdd_ctx, adapter, &next_adapter), \
+	hdd_validate_next_adapter(&adapter, &next_adapter, dbgid), \
 	(next_adapter) ? hdd_adapter_dev_hold_debug(next_adapter, dbgid) : \
 			 (false), \
 	qdf_spin_unlock_bh(&hdd_ctx->hdd_adapter_lock)
@@ -3662,8 +3631,7 @@ static inline int wlan_hdd_nl_init(struct hdd_context *hdd_ctx)
 	return nl_srv_init(hdd_ctx->wiphy, proto);
 }
 #endif
-QDF_STATUS hdd_sme_open_session_callback(uint8_t vdev_id,
-					 QDF_STATUS qdf_status);
+
 QDF_STATUS hdd_sme_close_session_callback(uint8_t vdev_id);
 
 int hdd_register_cb(struct hdd_context *hdd_ctx);
@@ -4678,14 +4646,6 @@ void hdd_driver_unload(void);
  */
 void hdd_init_start_completion(void);
 
-/**
- * hdd_max_sta_vdev_count_reached() - check sta vdev count
- * @hdd_ctx: global hdd context
- *
- * Return: true if vdev limit reached
- */
-bool hdd_max_sta_vdev_count_reached(struct hdd_context *hdd_ctx);
-
 #if defined(CLD_PM_QOS) && defined(WLAN_FEATURE_LL_MODE)
 /**
  * hdd_beacon_latency_event_cb() - Callback function to get latency level
@@ -4827,25 +4787,6 @@ QDF_STATUS hdd_stop_adapter_ext(struct hdd_context *hdd_ctx,
  * released.
  */
 void hdd_check_for_net_dev_ref_leak(struct hdd_adapter *adapter);
-
-/**
- * hdd_wait_for_dp_tx: Wait for packet tx to complete
- *
- * This function waits for dp packet tx to complete
- *
- * Return: None
- */
-void hdd_wait_for_dp_tx(void);
-
-static inline void hdd_dp_ssr_protect(void)
-{
-	qdf_atomic_inc_return(&dp_protect_entry_count);
-}
-
-static inline void hdd_dp_ssr_unprotect(void)
-{
-	qdf_atomic_dec(&dp_protect_entry_count);
-}
 
 #ifdef WLAN_FEATURE_DYNAMIC_MAC_ADDR_UPDATE
 /**

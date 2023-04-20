@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2017-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -45,8 +45,11 @@
 #define WLAN_MAX_SUPP_OPER_CLASSES                   32
 #define WLAN_MAC_MAX_SUPP_RATES                      32
 #define WLAN_CHANNEL_14                              14
+
 #define ENABLE_CHANSWITCH                            1
 #define DISABLE_CHANSWITCH                           2
+#define DISABLE_ACTIVE_CHANSWITCH                    3
+
 #define WLAN_TDLS_PREFERRED_OFF_CHANNEL_NUM_MIN      1
 #define WLAN_TDLS_PREFERRED_OFF_CHANNEL_NUM_MAX      165
 #define WLAN_TDLS_PREFERRED_OFF_CHANNEL_NUM_DEF      36
@@ -1008,6 +1011,8 @@ struct tdls_peer_update_state {
  * @oper_class: Operating class for target channel
  * @is_responder: Responder or initiator
  * @tdls_off_chan_freq: Target Off Channel frequency
+ * @num_off_channels: Number of channels allowed for off channel operation
+ * @allowed_off_channels: Channel list allowed for off channels
  */
 struct tdls_channel_switch_params {
 	uint32_t    vdev_id;
@@ -1018,6 +1023,8 @@ struct tdls_channel_switch_params {
 	uint8_t     oper_class;
 	uint8_t     is_responder;
 	uint32_t    tdls_off_chan_freq;
+	uint16_t    num_off_channels;
+	struct tdls_ch_params allowed_off_channels[WLAN_MAC_WMI_MAX_SUPP_CHANNELS];
 };
 
 /**

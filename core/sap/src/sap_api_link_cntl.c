@@ -452,6 +452,8 @@ wlansap_roam_process_ch_change_success(struct mac_context *mac_ctx,
 	QDF_STATUS qdf_status;
 	bool is_ch_dfs = false;
 	uint32_t target_chan_freq;
+	eSapDfsCACState_t cac_state = eSAP_DFS_DO_NOT_SKIP_CAC;
+
 	/*
 	 * Channel change is successful. If the new channel is a DFS channel,
 	 * then we will to perform channel availability check for 60 seconds
@@ -513,9 +515,11 @@ wlansap_roam_process_ch_change_success(struct mac_context *mac_ctx,
 		sap_event.u1 = eCSR_ROAM_INFRA_IND;
 		sap_event.u2 = eCSR_ROAM_RESULT_INFRA_STARTED;
 	} else if (is_ch_dfs) {
-		if ((false == mac_ctx->sap.SapDfsInfo.ignore_cac)
-		    && (eSAP_DFS_DO_NOT_SKIP_CAC ==
-			mac_ctx->sap.SapDfsInfo.cac_state) &&
+		if (sap_plus_sap_cac_skip(mac_ctx, sap_ctx,
+					  sap_ctx->chan_freq))
+			cac_state = eSAP_DFS_SKIP_CAC;
+		if ((false == mac_ctx->sap.SapDfsInfo.ignore_cac) &&
+		    (cac_state == eSAP_DFS_DO_NOT_SKIP_CAC) &&
 		    policy_mgr_get_dfs_master_dynamic_enabled(
 					mac_ctx->psoc,
 					sap_ctx->sessionId)) {
@@ -866,8 +870,6 @@ static void wlansap_update_vendor_acs_chan(struct mac_context *mac_ctx,
 				sap_ctx->dfs_vendor_chan_bw;
 
 	if (mac_ctx->sap.SapDfsInfo.target_chan_freq != 0) {
-		mac_ctx->sap.SapDfsInfo.cac_state =
-			eSAP_DFS_DO_NOT_SKIP_CAC;
 		sap_cac_reset_notify(MAC_HANDLE(mac_ctx));
 		return;
 	}
@@ -1175,8 +1177,6 @@ QDF_STATUS wlansap_roam_callback(void *ctx,
 			goto EXIT;
 		}
 		if (mac_ctx->sap.SapDfsInfo.target_chan_freq != 0) {
-			mac_ctx->sap.SapDfsInfo.cac_state =
-				eSAP_DFS_DO_NOT_SKIP_CAC;
 			sap_cac_reset_notify(mac_handle);
 			break;
 		}
@@ -1644,6 +1644,7 @@ void wlansap_process_chan_info_event(struct sap_context *sap_ctx,
 	struct mac_context *mac;
 	struct scan_filter *filter;
 	qdf_list_t *list = NULL;
+	enum channel_state state;
 
 	mac = sap_get_mac_context();
 	if (!mac) {
@@ -1658,6 +1659,12 @@ void wlansap_process_chan_info_event(struct sap_context *sap_ctx,
 		return;
 
 	if (WLAN_REG_IS_24GHZ_CH_FREQ(roam_info->chan_info_freq))
+		return;
+
+	state = wlan_reg_get_channel_state_for_pwrmode(
+				mac->pdev, roam_info->chan_info_freq,
+				REG_CURRENT_PWR_MODE);
+	if (state != CHANNEL_STATE_ENABLE)
 		return;
 
 	if (sap_ctx->optimize_acs_chan_selected)

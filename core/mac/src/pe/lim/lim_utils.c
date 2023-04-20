@@ -7366,6 +7366,8 @@ lim_revise_req_he_cap_per_band(struct mlme_legacy_priv *mlme_priv,
 			mac->he_cap_2g.tx_he_mcs_map_lt_80;
 		he_config->rx_he_mcs_map_lt_80 =
 			mac->he_cap_2g.rx_he_mcs_map_lt_80;
+		he_config->max_ampdu_len_exp_ext =
+			mac->he_cap_2g.max_ampdu_len_exp_ext;
 		he_config->ul_2x996_tone_ru_supp = 0;
 		he_config->num_sounding_gt_80 = 0;
 		he_config->bfee_sts_gt_80 = 0;
@@ -7383,6 +7385,8 @@ lim_revise_req_he_cap_per_band(struct mlme_legacy_priv *mlme_priv,
 
 		he_config->num_sounding_lt_80 =
 			mac->he_cap_5g.num_sounding_lt_80;
+		he_config->max_ampdu_len_exp_ext =
+			mac->he_cap_5g.max_ampdu_len_exp_ext;
 		if (he_config->chan_width_2 ||
 		    he_config->chan_width_3) {
 			he_config->bfee_sts_gt_80 =
@@ -9465,8 +9469,7 @@ QDF_STATUS lim_util_get_type_subtype(void *pkt, uint8_t *type,
 		pe_err("NULL packet received");
 		return QDF_STATUS_E_FAILURE;
 	}
-	status =
-		wma_ds_peek_rx_packet_info(cds_pkt, (void *)&rxpktinfor, false);
+	status = wma_ds_peek_rx_packet_info(cds_pkt, (void *)&rxpktinfor);
 	if (!QDF_IS_STATUS_SUCCESS(status)) {
 		pe_err("Failed extract cds packet. status %d", status);
 		return QDF_STATUS_E_FAILURE;

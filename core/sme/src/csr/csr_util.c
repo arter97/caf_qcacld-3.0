@@ -618,11 +618,7 @@ uint16_t csr_check_concurrent_channel_overlap(struct mac_context *mac_ctx,
 			QDF_MCC_TO_SCC_SWITCH_DISABLE)
 		return 0;
 
-	op_mode = wlan_get_opmode_vdev_id(mac_ctx->pdev, vdev_id);
-	if (policy_mgr_is_vdev_ll_sap(
-			mac_ctx->psoc,
-			policy_mgr_convert_device_mode_to_qdf_type(op_mode),
-			vdev_id))
+	if (policy_mgr_is_vdev_ll_sap(mac_ctx->psoc, vdev_id))
 		return 0;
 
 	if (sap_ch_freq != 0) {

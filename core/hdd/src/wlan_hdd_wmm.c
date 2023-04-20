@@ -2056,8 +2056,8 @@ void hdd_wmm_classify_pkt(struct hdd_adapter *adapter,
 void hdd_wmm_classify_pkt_cb(void *adapter,
 			     struct sk_buff *skb)
 {
-	enum sme_qos_wmmuptype user_pri;
-	bool is_critical;
+	enum sme_qos_wmmuptype user_pri = SME_QOS_WMM_UP_BE;
+	bool is_critical = false;
 
 	hdd_wmm_classify_critical_pkt(skb, &user_pri, &is_critical);
 
@@ -2229,9 +2229,8 @@ uint16_t hdd_wmm_select_queue(struct net_device *dev,
 {
 	uint16_t q_index;
 
-	hdd_dp_ssr_protect();
 	q_index = __hdd_wmm_select_queue(dev, skb);
-	hdd_dp_ssr_unprotect();
+
 	return q_index;
 }
 

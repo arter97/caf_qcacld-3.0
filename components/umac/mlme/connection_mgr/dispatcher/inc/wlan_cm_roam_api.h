@@ -111,14 +111,6 @@ wlan_roam_update_cfg(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
  */
 void wlan_cm_send_beacon_miss(uint8_t vdev_id, int32_t rssi);
 
-/**
- * wlan_cm_is_sta_connected() - check if STA is connected
- * @vdev_id: vdev id
- *
- * Return: bool
- */
-bool wlan_cm_is_sta_connected(uint8_t vdev_id);
-
 #else
 static inline
 QDF_STATUS wlan_cm_roam_send_rso_cmd(struct wlan_objmgr_psoc *psoc,
@@ -970,10 +962,12 @@ cm_akm_roam_allowed(struct wlan_objmgr_psoc *psoc,
  * cm_invalid_roam_reason_handler() - Handler for invalid roam reason
  * @vdev_id: vdev id
  * @notif: roam notification of type enum cm_roam_notif
+ * @reason: Notif param value from the roam event that carries trigger reason
  *
  * Return: QDF_STATUS
  */
-void cm_invalid_roam_reason_handler(uint32_t vdev_id, enum cm_roam_notif notif);
+void cm_invalid_roam_reason_handler(uint32_t vdev_id, enum cm_roam_notif notif,
+				    uint32_t reason);
 
 /**
  * cm_handle_roam_reason_ho_failed() - Handler for roam due to ho failure
@@ -1090,6 +1084,7 @@ wlan_cm_get_roam_rt_stats(struct wlan_objmgr_psoc *psoc,
  * @roam_info: Roam stats from the roam stats event
  * @value:     Notif param value from the roam event
  * @idx:       TLV index in roam stats event
+ * @reason:    Notif param value from the roam event that carries trigger reason
  *
  * Gathers the roam stats from the roam event and the roam stats event and
  * sends them to hdd for filling the vendor attributes.
@@ -1100,7 +1095,7 @@ void cm_report_roam_rt_stats(struct wlan_objmgr_psoc *psoc,
 			     uint8_t vdev_id,
 			     enum roam_rt_stats_type events,
 			     struct roam_stats_event *roam_info,
-			     uint32_t value, uint8_t idx);
+			     uint32_t value, uint8_t idx, uint32_t reason);
 /**
  * cm_roam_candidate_event_handler() - CM callback to save roam
  * candidate entry in scan db
@@ -1419,7 +1414,7 @@ static inline void
 cm_report_roam_rt_stats(struct wlan_objmgr_psoc *psoc,
 			uint8_t vdev_id, enum roam_rt_stats_type events,
 			struct roam_stats_event *roam_info,
-			uint32_t value, uint8_t idx)
+			uint32_t value, uint8_t idx, uint32_t reason)
 {}
 
 static inline QDF_STATUS
@@ -1885,4 +1880,11 @@ wlan_cm_set_assoc_btm_cap(struct wlan_objmgr_vdev *vdev, bool val);
 bool
 wlan_cm_get_assoc_btm_cap(struct wlan_objmgr_vdev *vdev);
 
+/**
+ * wlan_cm_is_self_mld_roam_supported() - Is self mld roam supported
+ * @psoc: pointer to psoc object
+ *
+ * Return: bool, true: self mld roam supported
+ */
+bool wlan_cm_is_self_mld_roam_supported(struct wlan_objmgr_psoc *psoc);
 #endif  /* WLAN_CM_ROAM_API_H__ */

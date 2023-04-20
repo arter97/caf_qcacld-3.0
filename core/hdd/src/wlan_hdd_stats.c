@@ -794,6 +794,9 @@ static bool put_wifi_iface_stats(struct wifi_interface_stats *if_stat,
 	    nla_put_u32(vendor_event,
 			QCA_WLAN_VENDOR_ATTR_LL_STATS_IFACE_LEAKY_AP_GUARD_TIME,
 			link_stats->rx_leak_window) ||
+	    nla_put_s32(vendor_event,
+			QCA_WLAN_VENDOR_ATTR_LL_STATS_IFACE_NF_CAL_VAL,
+			link_stats->nf_cal_val) ||
 	    hdd_wlan_nla_put_u64(vendor_event,
 			QCA_WLAN_VENDOR_ATTR_LL_STATS_IFACE_AVERAGE_TSF_OFFSET,
 			average_tsf_offset) ||
@@ -2105,6 +2108,8 @@ wlan_hdd_get_mlo_vdev_params(struct hdd_adapter *adapter,
 			     struct request_info *req_info,
 			     tSirLLStatsGetReq *req)
 {
+	struct wlan_objmgr_peer *peer;
+	struct wlan_objmgr_vdev *vdev;
 	struct wlan_objmgr_psoc *psoc = adapter->hdd_ctx->psoc;
 	struct mlo_stats_vdev_params *info = &req_info->ml_vdev_info;
 	int i;
@@ -2116,8 +2121,32 @@ wlan_hdd_get_mlo_vdev_params(struct hdd_adapter *adapter,
 	status = mlo_get_mlstats_vdev_params(psoc, info, adapter->vdev_id);
 	if (QDF_IS_STATUS_ERROR(status))
 		return status;
-	for (i = 0; i < info->ml_vdev_count; i++)
+	for (i = 0; i < info->ml_vdev_count; i++) {
 		bmap |= (1 << info->ml_vdev_id[i]);
+
+		vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc,
+							    info->ml_vdev_id[i],
+							    WLAN_OSIF_STATS_ID);
+		if (!vdev) {
+			hdd_err("vdev object is NULL for vdev %d",
+				info->ml_vdev_id[i]);
+			return QDF_STATUS_E_INVAL;
+		}
+
+		peer = wlan_objmgr_vdev_try_get_bsspeer(vdev,
+							WLAN_OSIF_STATS_ID);
+		if (!peer) {
+			hdd_err("peer is null");
+			hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_STATS_ID);
+			return QDF_STATUS_E_INVAL;
+		}
+
+		qdf_mem_copy(&(req_info->ml_peer_mac_addr[i][0]), peer->macaddr,
+			     QDF_MAC_ADDR_SIZE);
+
+		wlan_objmgr_peer_release_ref(peer, WLAN_OSIF_STATS_ID);
+		hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_STATS_ID);
+	}
 	req->mlo_vdev_id_bitmap = bmap;
 	return QDF_STATUS_SUCCESS;
 }
@@ -2157,6 +2186,7 @@ wlan_hdd_set_station_stats_request_pending(struct hdd_adapter *adapter,
 		status = wlan_hdd_get_mlo_vdev_params(adapter, &info, req);
 		if (QDF_IS_STATUS_ERROR(status)) {
 			hdd_err("unable to get vdev params for mlo stats");
+			hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_STATS_ID);
 			return status;
 		}
 	}
@@ -4288,7 +4318,8 @@ roam_rt_stats_fill_cand_info(struct sk_buff *vendor_event, uint8_t idx,
 	uint8_t i, num_cand = 0;
 
 	if (roam_stats->result[idx].present &&
-	    roam_stats->result[idx].fail_reason) {
+	    roam_stats->result[idx].fail_reason &&
+	    roam_stats->result[idx].fail_reason != ROAM_FAIL_REASON_UNKNOWN) {
 		num_cand++;
 		for (i = 0; i < roam_stats->scan[idx].num_ap; i++) {
 			if (roam_stats->scan[idx].ap[i].type == 0 &&
@@ -4364,10 +4395,10 @@ roam_rt_stats_fill_cand_info(struct sk_buff *vendor_event, uint8_t idx,
 }
 
 void
-wlan_hdd_cfg80211_roam_events_callback(hdd_handle_t hdd_handle, uint8_t idx,
-				       struct roam_stats_event *roam_stats)
+wlan_hdd_cfg80211_roam_events_callback(struct roam_stats_event *roam_stats,
+				       uint8_t idx)
 {
-	struct hdd_context *hdd_ctx = hdd_handle_to_context(hdd_handle);
+	struct hdd_context *hdd_ctx = cds_get_context(QDF_MODULE_ID_HDD);
 	int status;
 	uint32_t data_size, roam_event_type = 0;
 	struct sk_buff *vendor_event;
@@ -4772,7 +4803,7 @@ static void hdd_get_max_rate_vht(struct hdd_station_info *stainfo,
  * @rate_flags: HDD rate flags
  * @mcsidx: mcs index
  * @nss: number of streams
- * @vht: vht mode or not
+ * @rate_info_flag: rate info flags
  *
  * This function will fill ch width and mcs flags
  *
@@ -4782,18 +4813,32 @@ static void hdd_fill_bw_mcs(struct rate_info *rate_info,
 			    enum tx_rate_info rate_flags,
 			    uint8_t mcsidx,
 			    uint8_t nss,
-			    bool vht)
+			    uint8_t rate_info_flag)
 {
-	if (vht) {
+	if (rate_info_flag == RATE_INFO_FLAGS_HE_MCS) {
+		rate_info->nss = nss;
+		rate_info->mcs = mcsidx;
+		rate_info->flags |= RATE_INFO_FLAGS_HE_MCS;
+		if (rate_flags & TX_RATE_HE160)
+			rate_info->bw = RATE_INFO_BW_160;
+		else if (rate_flags & TX_RATE_HE80)
+			rate_info->bw = RATE_INFO_BW_80;
+		else if (rate_flags & TX_RATE_HE40)
+			rate_info->bw = RATE_INFO_BW_40;
+		else if (rate_flags & TX_RATE_HE20)
+			rate_info->bw = RATE_INFO_BW_20;
+	} else if (rate_info_flag == RATE_INFO_FLAGS_VHT_MCS) {
 		rate_info->nss = nss;
 		rate_info->mcs = mcsidx;
 		rate_info->flags |= RATE_INFO_FLAGS_VHT_MCS;
-		if (rate_flags & TX_RATE_VHT80)
+		if (rate_flags & TX_RATE_VHT160)
+			rate_info->bw = RATE_INFO_BW_160;
+		else if (rate_flags & TX_RATE_VHT80)
 			rate_info->bw = RATE_INFO_BW_80;
 		else if (rate_flags & TX_RATE_VHT40)
 			rate_info->bw = RATE_INFO_BW_40;
 		else if (rate_flags & TX_RATE_VHT20)
-			rate_info->flags |= RATE_INFO_FLAGS_VHT_MCS;
+			rate_info->bw = RATE_INFO_BW_20;
 	} else {
 		rate_info->mcs = (nss - 1) << 3;
 		rate_info->mcs |= mcsidx;
@@ -4809,7 +4854,7 @@ static void hdd_fill_bw_mcs(struct rate_info *rate_info,
  * @rate_flags: HDD rate flags
  * @mcsidx: mcs index
  * @nss: number of streams
- * @vht: vht mode or not
+ * @rate_info_flag: rate info flags
  *
  * This function will fill ch width and mcs flags
  *
@@ -4819,9 +4864,9 @@ static void hdd_fill_bw_mcs(struct rate_info *rate_info,
 			    enum tx_rate_info rate_flags,
 			    uint8_t mcsidx,
 			    uint8_t nss,
-			    bool vht)
+			    uint8_t rate_info_flag)
 {
-	if (vht) {
+	if (rate_info_flag == RATE_INFO_FLAGS_VHT_MCS) {
 		rate_info->nss = nss;
 		rate_info->mcs = mcsidx;
 		rate_info->flags |= RATE_INFO_FLAGS_VHT_MCS;
@@ -4830,7 +4875,7 @@ static void hdd_fill_bw_mcs(struct rate_info *rate_info,
 		else if (rate_flags & TX_RATE_VHT40)
 			rate_info->flags |= RATE_INFO_FLAGS_40_MHZ_WIDTH;
 		else if (rate_flags & TX_RATE_VHT20)
-			rate_info->flags |= RATE_INFO_FLAGS_VHT_MCS;
+			rate_info->bw = RATE_INFO_BW_20;
 	} else {
 		rate_info->mcs = (nss - 1) << 3;
 		rate_info->mcs |= mcsidx;
@@ -4840,25 +4885,6 @@ static void hdd_fill_bw_mcs(struct rate_info *rate_info,
 	}
 }
 #endif
-
-/**
- * hdd_fill_bw_mcs_vht() - fill ch width and mcs flags for VHT mode
- * @rate_info: pointer to struct rate_info
- * @rate_flags: HDD rate flags
- * @mcsidx: mcs index
- * @nss: number of streams
- *
- * This function will fill ch width and mcs flags for VHT mode
- *
- * Return: None
- */
-static void hdd_fill_bw_mcs_vht(struct rate_info *rate_info,
-				enum tx_rate_info rate_flags,
-				uint8_t mcsidx,
-				uint8_t nss)
-{
-	hdd_fill_bw_mcs(rate_info, rate_flags, mcsidx, nss, true);
-}
 
 /**
  * hdd_fill_sinfo_rate_info() - fill rate info of sinfo struct
@@ -4893,15 +4919,25 @@ static void hdd_fill_sinfo_rate_info(struct station_info *sinfo,
 	} else {
 		/* must be MCS */
 		if (rate_flags &
-				(TX_RATE_VHT80 |
-				 TX_RATE_VHT40 |
-				 TX_RATE_VHT20))
-			hdd_fill_bw_mcs_vht(rate_info, rate_flags, mcsidx, nss);
-
-		if (rate_flags & (TX_RATE_HT20 | TX_RATE_HT40))
+				(TX_RATE_HE160 |
+				 TX_RATE_HE80 |
+				 TX_RATE_HE40 |
+				 TX_RATE_HE20)) {
 			hdd_fill_bw_mcs(rate_info, rate_flags, mcsidx, nss,
-					false);
-
+					RATE_INFO_FLAGS_HE_MCS);
+		}
+		if (rate_flags &
+				(TX_RATE_VHT160 |
+				 TX_RATE_VHT80 |
+				 TX_RATE_VHT40 |
+				 TX_RATE_VHT20)) {
+			hdd_fill_bw_mcs(rate_info, rate_flags, mcsidx, nss,
+					RATE_INFO_FLAGS_VHT_MCS);
+		}
+		if (rate_flags & (TX_RATE_HT20 | TX_RATE_HT40)) {
+			hdd_fill_bw_mcs(rate_info, rate_flags, mcsidx, nss,
+					RATE_INFO_FLAGS_MCS);
+		}
 		if (rate_flags & TX_RATE_SGI) {
 			if (!(rate_info->flags & RATE_INFO_FLAGS_VHT_MCS))
 				rate_info->flags |= RATE_INFO_FLAGS_MCS;

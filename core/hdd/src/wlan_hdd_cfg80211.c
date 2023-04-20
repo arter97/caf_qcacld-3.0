@@ -3557,7 +3557,6 @@ static bool wlan_hdd_check_is_acs_request_same(struct hdd_adapter *adapter,
  * @sap_config: Pointer to sap_config
  * @psoc: Pointer to psoc
  * @pdev: Pointer to pdev
- * @curr_mode: Current mode
  * @vdev_id: Vdev Id
  *
  * This function will remove passive/dfs acs channel for low latency SAP
@@ -3569,13 +3568,12 @@ static void hdd_remove_passive_dfs_acs_channel_for_ll_sap(
 					struct sap_config *sap_config,
 					struct wlan_objmgr_psoc *psoc,
 					struct wlan_objmgr_pdev *pdev,
-					enum policy_mgr_con_mode curr_mode,
 					uint8_t vdev_id)
 {
 	uint32_t i, ch_cnt = 0;
 	uint32_t freq = 0;
 
-	if (!policy_mgr_is_vdev_ll_sap(psoc, curr_mode, vdev_id))
+	if (!policy_mgr_is_vdev_ll_sap(psoc, vdev_id))
 		return;
 
 	for (i = 0; i < sap_config->acs_cfg.ch_list_count; i++) {
@@ -3859,7 +3857,6 @@ static int __wlan_hdd_cfg80211_do_acs(struct wiphy *wiphy,
 	hdd_remove_passive_dfs_acs_channel_for_ll_sap(sap_config,
 						      hdd_ctx->psoc,
 						      hdd_ctx->pdev,
-						      pm_mode,
 						      adapter->vdev_id);
 
 	/* consult policy manager to get PCL */
@@ -3868,10 +3865,10 @@ static int __wlan_hdd_cfg80211_do_acs(struct wiphy *wiphy,
 					&sap_config->acs_cfg.pcl_ch_count,
 					sap_config->acs_cfg.
 					pcl_channels_weight_list,
-					NUM_CHANNELS);
+					NUM_CHANNELS, adapter->vdev_id);
 
 	policy_mgr_get_pcl_channel_for_ll_sap_concurrency(
-				hdd_ctx->psoc, pm_mode, adapter->vdev_id,
+				hdd_ctx->psoc, adapter->vdev_id,
 				sap_config->acs_cfg.pcl_chan_freq,
 				sap_config->acs_cfg.pcl_channels_weight_list,
 				&sap_config->acs_cfg.pcl_ch_count);
@@ -3901,8 +3898,7 @@ static int __wlan_hdd_cfg80211_do_acs(struct wiphy *wiphy,
 		if (!sap_config->acs_cfg.ch_list_count &&
 		    sap_config->acs_cfg.master_ch_list_count &&
 		    !is_vendor_unsafe_ch_present &&
-		    !policy_mgr_is_vdev_ll_sap(hdd_ctx->psoc, pm_mode,
-					       adapter->vdev_id))
+		    !policy_mgr_is_vdev_ll_sap(hdd_ctx->psoc, adapter->vdev_id))
 			wlan_hdd_handle_zero_acs_list(
 				hdd_ctx,
 				sap_config->acs_cfg.freq_list,
@@ -6732,8 +6728,7 @@ wlan_hdd_cfg80211_set_ext_roam_params(struct wiphy *wiphy,
 #define RATEMASK_PARAMS_MAX QCA_WLAN_VENDOR_ATTR_RATEMASK_PARAMS_MAX
 const struct nla_policy wlan_hdd_set_ratemask_param_policy[
 			RATEMASK_PARAMS_MAX + 1] = {
-	[QCA_WLAN_VENDOR_ATTR_RATEMASK_PARAMS_LIST] =
-		VENDOR_NLA_POLICY_NESTED(wlan_hdd_set_ratemask_param_policy),
+	[QCA_WLAN_VENDOR_ATTR_RATEMASK_PARAMS_LIST] = {.type = NLA_NESTED},
 	[QCA_WLAN_VENDOR_ATTR_RATEMASK_PARAMS_TYPE] = {.type = NLA_U8},
 	[QCA_WLAN_VENDOR_ATTR_RATEMASK_PARAMS_BITMAP] = {.type = NLA_BINARY,
 					.len = RATEMASK_PARAMS_BITMAP_MAX},
@@ -9691,14 +9686,14 @@ hdd_latency_level_event_handler_cb(const struct latency_level_data *event_data,
 
 	hdd_enter();
 
+	if (wlan_hdd_validate_context(hdd_ctx))
+		return;
+
 	hdd_adapter = hdd_get_adapter_by_vdev(hdd_ctx, vdev_id);
 	if (!hdd_adapter) {
 		hdd_err("adapter is NULL vdev_id = %d", vdev_id);
 		return;
 	}
-
-	if (wlan_hdd_validate_context(hdd_ctx))
-		return;
 
 	if (!event_data) {
 		hdd_err("Invalid latency level event data");
@@ -13889,7 +13884,8 @@ static int __wlan_hdd_cfg80211_get_preferred_freq_list(struct wiphy *wiphy,
 	status = policy_mgr_get_pcl(
 			hdd_ctx->psoc, intf_mode, chan_weights->pcl_list,
 			&chan_weights->pcl_len, chan_weights->weight_list,
-			QDF_ARRAY_SIZE(chan_weights->weight_list));
+			QDF_ARRAY_SIZE(chan_weights->weight_list),
+			adapter->vdev_id);
 	if (status != QDF_STATUS_SUCCESS) {
 		hdd_err("Get pcl failed");
 		qdf_mem_free(chan_weights);
@@ -14093,7 +14089,7 @@ static int __wlan_hdd_cfg80211_set_probable_oper_channel(struct wiphy *wiphy,
 	/* check pcl table */
 	if (!policy_mgr_allow_concurrency(hdd_ctx->psoc, intf_mode,
 					  ch_freq, HW_MODE_20_MHZ,
-					  conc_ext_flags)) {
+					  conc_ext_flags, adapter->vdev_id)) {
 		hdd_err("Set channel hint failed due to concurrency check");
 		return -EINVAL;
 	}
@@ -17496,7 +17492,8 @@ static int __wlan_hdd_cfg80211_get_usable_channel(struct wiphy *wiphy,
 		  req_msg.filter_mask);
 
 	status = wlan_reg_get_usable_channel(hdd_ctx->pdev, req_msg,
-					     res_msg, &count);
+					     res_msg, &count,
+					     REG_CURRENT_PWR_MODE);
 	if (QDF_STATUS_SUCCESS != status) {
 		hdd_err("get usable channel failed %d", status);
 		ret = -EINVAL;
@@ -20065,12 +20062,17 @@ int wlan_hdd_cfg80211_register_frames(struct hdd_adapter *adapter)
 	mac_handle_t mac_handle = hdd_adapter_get_mac_handle(adapter);
 	/* Register for all P2P action, public action etc frames */
 	uint16_t type = (SIR_MAC_MGMT_FRAME << 2) | (SIR_MAC_MGMT_ACTION << 4);
-	QDF_STATUS status;
+	QDF_STATUS status = QDF_STATUS_E_INVAL;
 
 	hdd_enter();
 	if (adapter->device_mode == QDF_FTM_MODE) {
 		hdd_info("No need to register frames in FTM mode");
 		return 0;
+	}
+
+	if (!mac_handle) {
+		hdd_err("mac_handle is NULL, failed to register frames");
+		goto ret_status;
 	}
 
 	/* Register frame indication call back */
@@ -20173,6 +20175,11 @@ void wlan_hdd_cfg80211_deregister_frames(struct hdd_adapter *adapter)
 	uint16_t type = (SIR_MAC_MGMT_FRAME << 2) | (SIR_MAC_MGMT_ACTION << 4);
 
 	hdd_enter();
+
+	if (!mac_handle) {
+		hdd_err("mac_handle is NULL, failed to deregister frames");
+		return;
+	}
 
 	/* Right now we are registering these frame when driver is getting
 	 * initialized. Once we will move to 2.6.37 kernel, in which we have

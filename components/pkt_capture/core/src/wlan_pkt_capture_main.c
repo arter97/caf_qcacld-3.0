@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2020-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -1390,7 +1390,10 @@ QDF_STATUS pkt_capture_set_filter(struct pkt_capture_frame_filter frame_filter,
 					      WLAN_MLME_CFG_BEACON_INTERVAL,
 					      &bcn_interval);
 
-		if (bcn_interval) {
+		if (bcn_interval &&
+		    (vdev_priv->frame_filter.connected_beacon_interval >
+		    bcn_interval || vdev_priv->
+		    frame_filter.connected_beacon_interval == 0)) {
 			nth_beacon_value =
 				vdev_priv->
 				frame_filter.connected_beacon_interval /
@@ -1404,6 +1407,11 @@ QDF_STATUS pkt_capture_set_filter(struct pkt_capture_frame_filter frame_filter,
 				pkt_capture_err("send beacon interval fail");
 				return status;
 			}
+		} else {
+			pkt_capture_debug(
+			"Failed to set beacon interval %d, it should be >= %d",
+			vdev_priv->frame_filter.connected_beacon_interval,
+			bcn_interval);
 		}
 	}
 	return QDF_STATUS_SUCCESS;

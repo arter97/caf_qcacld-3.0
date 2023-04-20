@@ -61,32 +61,6 @@
 #define MS_TO_TU_MUS(x)   ((x) * 1024)
 #define MAX_MUS_VAL       (INT_MAX / 1024)
 
-#ifdef WLAN_FEATURE_P2P_DEBUG
-#define MAX_P2P_ACTION_FRAME_TYPE 9
-const char *p2p_action_frame_type[] = { "GO Negotiation Request",
-					"GO Negotiation Response",
-					"GO Negotiation Confirmation",
-					"P2P Invitation Request",
-					"P2P Invitation Response",
-					"Device Discoverability Request",
-					"Device Discoverability Response",
-					"Provision Discovery Request",
-					"Provision Discovery Response"};
-
-#endif
-#define MAX_TDLS_ACTION_FRAME_TYPE 11
-const char *tdls_action_frame_type[] = { "TDLS Setup Request",
-					 "TDLS Setup Response",
-					 "TDLS Setup Confirm",
-					 "TDLS Teardown",
-					 "TDLS Peer Traffic Indication",
-					 "TDLS Channel Switch Request",
-					 "TDLS Channel Switch Response",
-					 "TDLS Peer PSM Request",
-					 "TDLS Peer PSM Response",
-					 "TDLS Peer Traffic Response",
-					 "TDLS Discovery Request"};
-
 void wlan_hdd_cancel_existing_remain_on_channel(struct hdd_adapter *adapter)
 {
 	struct wlan_objmgr_vdev *vdev;

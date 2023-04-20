@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -154,7 +154,6 @@ enum wmamsgtype {
 	WMA_P2P_NOA_ATTR_IND = SIR_HAL_P2P_NOA_ATTR_IND,
 	WMA_PWR_SAVE_CFG = SIR_HAL_PWR_SAVE_CFG,
 
-	WMA_IBSS_STA_ADD = SIR_HAL_IBSS_STA_ADD,
 	WMA_TIMER_ADJUST_ADAPTIVE_THRESHOLD_IND =
 				SIR_HAL_TIMER_ADJUST_ADAPTIVE_THRESHOLD_IND,
 	WMA_SET_LINK_STATE = SIR_HAL_SET_LINK_STATE,
@@ -384,7 +383,6 @@ enum wmamsgtype {
 	WMA_DCC_UPDATE_NDL_CMD = SIR_HAL_DCC_UPDATE_NDL_CMD,
 	WMA_SET_IE_INFO = SIR_HAL_SET_IE_INFO,
 
-	WMA_LRO_CONFIG_CMD = SIR_HAL_LRO_CONFIG_CMD,
 	WMA_GW_PARAM_UPDATE_REQ = SIR_HAL_GATEWAY_PARAM_UPDATE_REQ,
 	WMA_ADD_BCN_FILTER_CMDID = SIR_HAL_ADD_BCN_FILTER_CMDID,
 	WMA_REMOVE_BCN_FILTER_CMDID = SIR_HAL_REMOVE_BCN_FILTER_CMDID,
@@ -647,9 +645,16 @@ void wma_get_rx_retry_cnt(struct mac_context *mac, uint8_t vdev_id,
 QDF_STATUS wma_set_wlm_latency_level(void *wma_ptr,
 			struct wlm_latency_level_param *latency_params);
 
-QDF_STATUS
-wma_ds_peek_rx_packet_info
-	(cds_pkt_t *vosDataBuff, void **ppRxHeader, bool bSwap);
+/**
+ * wma_ds_peek_rx_packet_info() - peek rx packet info
+ * @pkt: packet
+ * @pkt_meta: packet meta
+ *
+ * Function fills the rx packet meta info from the the cds packet
+ *
+ * Return: QDF status
+ */
+QDF_STATUS wma_ds_peek_rx_packet_info(cds_pkt_t *pkt, void **pkt_meta);
 
 /**
  * wma_tx_abort() - abort tx

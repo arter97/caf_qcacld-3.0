@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -224,11 +224,7 @@ static void __hdd_softap_hard_start_xmit(struct sk_buff *skb,
 netdev_tx_t hdd_softap_hard_start_xmit(struct sk_buff *skb,
 				       struct net_device *net_dev)
 {
-	hdd_dp_ssr_protect();
-
 	__hdd_softap_hard_start_xmit(skb, net_dev);
-
-	hdd_dp_ssr_unprotect();
 
 	return NETDEV_TX_OK;
 }

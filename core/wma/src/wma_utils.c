@@ -604,6 +604,7 @@ void wma_lost_link_info_handler(tp_wma_handle wma, uint32_t vdev_id,
 	if (wma_is_vdev_up(vdev_id) &&
 	    (WMI_VDEV_TYPE_STA == wma->interfaces[vdev_id].type) &&
 	    (0 == wma->interfaces[vdev_id].sub_type)) {
+		lim_update_lost_link_rssi(wma->mac_context, rssi);
 		lost_link_info = qdf_mem_malloc(sizeof(*lost_link_info));
 		if (!lost_link_info)
 			return;
@@ -2512,7 +2513,7 @@ static int wma_peer_ps_evt_handler(void *handle, u_int8_t *event,
 	link_stats_results->moreResultToFollow = 0;
 
 	peer_stat = (struct wifi_peer_stat *)link_stats_results->results;
-	peer_stat->numPeers = 1;
+	peer_stat->num_peers = 1;
 	peer_info = (struct wifi_peer_info *)peer_stat->peer_info;
 	qdf_mem_copy(&peer_info->peer_macaddr,
 		     &mac_address,
@@ -4431,6 +4432,8 @@ QDF_STATUS wma_remove_bss_peer_before_join(
 		return qdf_status;
 	}
 	mac_addr = bssid.bytes;
+
+	wma_delete_peer_mlo(wma->psoc, mac_addr);
 
 	qdf_status = wma_remove_peer(wma, mac_addr, vdev_id, false);
 

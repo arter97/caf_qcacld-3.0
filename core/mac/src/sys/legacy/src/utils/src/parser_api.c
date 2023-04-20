@@ -1752,14 +1752,9 @@ void populate_dot11f_qcn_ie(struct mac_context *mac,
 	}
 
 	populate_dot11f_qcn_ie_he_params(mac, pe_session, qcn_ie, attr_id);
-	if (policy_mgr_is_vdev_ll_sap(
-				mac->psoc,
-				policy_mgr_convert_device_mode_to_qdf_type(
-				pe_session->opmode), pe_session->vdev_id)) {
+	if (policy_mgr_is_vdev_ll_sap(mac->psoc, pe_session->vdev_id)) {
 		pe_debug("Populate edca/pifs param ie for ll sap");
-		populate_dot11f_edca_pifs_param_set(
-					mac,
-					qcn_ie);
+		populate_dot11f_edca_pifs_param_set(mac, qcn_ie);
 	}
 }
 
@@ -5067,6 +5062,22 @@ static inline void convert_bcon_bss_color_change_ie(tDot11fBeacon *bcn_frm,
 {}
 #endif
 
+#ifdef WLAN_FEATURE_SR
+static void sir_convert_beacon_frame2_sr_struct(tDot11fBeacon *bcn_frm,
+						tpSirProbeRespBeacon bcn_struct)
+{
+	if (bcn_frm->spatial_reuse.present)
+		qdf_mem_copy(&bcn_struct->srp_ie, &bcn_frm->spatial_reuse,
+			     sizeof(tDot11fIEspatial_reuse));
+}
+#else
+static inline void
+sir_convert_beacon_frame2_sr_struct(tDot11fBeacon *bcn_frm,
+				    tpSirProbeRespBeacon bcn_struct)
+{
+}
+#endif
+
 #ifdef WLAN_FEATURE_11BE_MLO
 static QDF_STATUS
 sir_convert_beacon_frame2_t2lm_struct(tDot11fBeacon *bcn_frm,
@@ -5581,6 +5592,7 @@ sir_convert_beacon_frame2_struct(struct mac_context *mac,
 	sir_convert_beacon_frame2_mlo_struct(pPayload, nPayload, pBeacon,
 					     pBeaconStruct);
 	sir_convert_beacon_frame2_t2lm_struct(pBeacon, pBeaconStruct);
+	sir_convert_beacon_frame2_sr_struct(pBeacon, pBeaconStruct);
 
 	qdf_mem_free(pBeacon);
 	return QDF_STATUS_SUCCESS;

@@ -217,6 +217,7 @@
 #ifdef WLAN_FEATURE_11BE_MLO
 #include <wlan_mlo_mgr_ap.h>
 #endif
+#include "wlan_osif_features.h"
 #include "wlan_vdev_mgr_ucfg_api.h"
 #include <wlan_objmgr_psoc_obj_i.h>
 #include <wlan_objmgr_vdev_obj_i.h>
@@ -3770,7 +3771,6 @@ static void hdd_check_for_objmgr_leaks(struct hdd_context *hdd_ctx)
 	if (!psoc)
 		return;
 
-	wlan_psoc_obj_lock(psoc);
 
 	hdd_check_for_objmgr_peer_leaks(psoc);
 
@@ -3794,7 +3794,6 @@ static void hdd_check_for_objmgr_leaks(struct hdd_context *hdd_ctx)
 		wlan_objmgr_for_each_refs(ref_id_dbg, ref_id, refs)
 			wlan_objmgr_pdev_release_ref(pdev, ref_id);
 	}
-	wlan_psoc_obj_unlock(psoc);
 }
 
 static void hdd_check_for_leaks(struct hdd_context *hdd_ctx, bool is_ssr)
@@ -6491,6 +6490,22 @@ hdd_populate_vdev_create_params(struct hdd_adapter *adapter,
 }
 #endif
 
+#if defined(WLAN_FEATURE_11BE_MLO) && defined(WLAN_EXTERNAL_AUTH_MLO_SUPPORT)
+static void
+hdd_set_vdev_mlo_external_sae_auth_conversion(struct wlan_objmgr_vdev *vdev,
+					      enum QDF_OPMODE mode)
+{
+	if (mode == QDF_STA_MODE || mode == QDF_SAP_MODE)
+		wlan_vdev_set_mlo_external_sae_auth_conversion(vdev, true);
+}
+#else
+static inline void
+hdd_set_vdev_mlo_external_sae_auth_conversion(struct wlan_objmgr_vdev *vdev,
+					      enum QDF_OPMODE mode)
+{
+}
+#endif
+
 int hdd_vdev_create(struct hdd_adapter *adapter)
 {
 	QDF_STATUS status;
@@ -6589,6 +6604,9 @@ int hdd_vdev_create(struct hdd_adapter *adapter)
 		VDEV_CMD);
 	}
 	hdd_store_nss_chains_cfg_in_vdev(adapter);
+
+	hdd_set_vdev_mlo_external_sae_auth_conversion(vdev,
+						      adapter->device_mode);
 
 	/* Configure vdev params */
 	ucfg_fwol_configure_vdev_params(hdd_ctx->psoc, hdd_ctx->pdev,
@@ -8235,13 +8253,7 @@ QDF_STATUS hdd_stop_adapter_ext(struct hdd_context *hdd_ctx,
 		ucfg_ipa_flush(hdd_ctx->pdev);
 
 		if (!ucfg_pre_cac_adapter_is_active(adapter->vdev)) {
-			/**
-			 * don't flush pre-cac destroy if we are destroying
-			 * pre-cac adapter
-			 */
-			if (!ucfg_pre_cac_is_active(hdd_ctx->psoc))
-				ucfg_pre_cac_stop(hdd_ctx->psoc);
-
+			ucfg_pre_cac_stop(hdd_ctx->psoc);
 			hdd_close_pre_cac_adapter(hdd_ctx);
 		} else {
 			if (ucfg_pre_cac_set_status(adapter->vdev, false))
@@ -9214,6 +9226,19 @@ QDF_STATUS hdd_add_adapter_front(struct hdd_context *hdd_ctx,
 	qdf_spin_unlock_bh(&hdd_ctx->hdd_adapter_lock);
 
 	return status;
+}
+
+void hdd_validate_next_adapter(struct hdd_adapter **curr,
+			       struct hdd_adapter **next,
+			       wlan_net_dev_ref_dbgid dbg_id)
+{
+	if (!*curr || !*next || *curr != *next)
+		return;
+
+	hdd_err("Validation failed");
+	hdd_adapter_dev_put_debug(*curr, dbg_id);
+	*curr = NULL;
+	*next = NULL;
 }
 
 QDF_STATUS hdd_adapter_iterate(hdd_adapter_iterate_cb cb, void *context)
@@ -12564,7 +12589,8 @@ static void hdd_psoc_idle_timeout_callback(void *priv)
 	}
 
 	/* Clear the recovery flag for PCIe discrete soc after idle shutdown*/
-	if (PLD_BUS_TYPE_PCIE == pld_get_bus_type(hdd_ctx->parent_dev))
+	if (PLD_BUS_TYPE_PCIE == pld_get_bus_type(hdd_ctx->parent_dev) &&
+	    -EBUSY != ret)
 		cds_set_recovery_in_progress(false);
 }
 
@@ -15978,9 +16004,6 @@ int hdd_register_cb(struct hdd_context *hdd_ctx)
 	sme_stats_ext2_register_callback(mac_handle,
 					wlan_hdd_cfg80211_stats_ext2_callback);
 
-	sme_roam_events_register_callback(mac_handle,
-					wlan_hdd_cfg80211_roam_events_callback);
-
 	sme_multi_client_ll_rsp_register_callback(mac_handle,
 					hdd_latency_level_event_handler_cb);
 
@@ -16103,7 +16126,6 @@ void hdd_deregister_cb(struct hdd_context *hdd_ctx)
 		hdd_err("Failed to de-register data stall detect event callback");
 	hdd_thermal_unregister_callbacks(hdd_ctx);
 	sme_deregister_oem_data_rsp_callback(mac_handle);
-	sme_roam_events_deregister_callback(mac_handle);
 	sme_multi_client_ll_rsp_deregister_callback(mac_handle);
 
 	hdd_exit();
@@ -16693,6 +16715,8 @@ void wlan_hdd_start_sap(struct hdd_adapter *ap_adapter, bool reinit)
 	}
 	hdd_info("SAP Start Success");
 
+	if (reinit)
+		hdd_medium_assess_init();
 	wlansap_reset_sap_config_add_ie(sap_config, eUPDATE_IE_ALL);
 	set_bit(SOFTAP_BSS_STARTED, &ap_adapter->event_flags);
 	if (hostapd_state->bss_state == BSS_START) {
@@ -19354,6 +19378,7 @@ void hdd_restart_sap(struct hdd_adapter *ap_adapter)
 		wlansap_reset_sap_config_add_ie(sap_config,
 						eUPDATE_IE_ALL);
 		hdd_err("SAP Start Success");
+		hdd_medium_assess_init();
 		set_bit(SOFTAP_BSS_STARTED, &ap_adapter->event_flags);
 		if (hostapd_state->bss_state == BSS_START) {
 			policy_mgr_incr_active_session(hdd_ctx->psoc,
@@ -19696,7 +19721,6 @@ wlan_hdd_add_monitor_check(struct hdd_context *hdd_ctx,
 						NULL);
 
 		if (num_open_session == 1) {
-			hdd_ctx->disconnect_for_sta_mon_conc = true;
 			/* Try disconnecting if already in connected state */
 			wlan_hdd_cm_issue_disconnect(sta_adapter,
 						     REASON_UNSPEC_FAILURE,
@@ -20073,32 +20097,6 @@ out:
 	osif_driver_sync_op_stop(driver_sync);
 
 	return ret;
-}
-
-void hdd_wait_for_dp_tx(void)
-{
-	int count = MAX_SSR_WAIT_ITERATIONS;
-	int r;
-
-	hdd_enter();
-
-	while (count) {
-		r = atomic_read(&dp_protect_entry_count);
-
-		if (!r)
-			break;
-
-		if (--count) {
-			hdd_err_rl("Waiting for Packet tx to complete: %d",
-				   count);
-			msleep(SSR_WAIT_SLEEP_TIME);
-		}
-	}
-
-	if (!count)
-		hdd_err("Timed-out waiting for packet tx");
-
-	hdd_exit();
 }
 
 static const struct kernel_param_ops pcie_gen_speed_ops = {

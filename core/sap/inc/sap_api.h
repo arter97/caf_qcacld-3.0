@@ -548,6 +548,9 @@ struct sap_config {
 	struct hdd_channel_info *channel_info;
 	uint32_t channel_info_count;
 	bool dfs_cac_offload;
+#ifdef WLAN_SUPPORT_TWT
+	bool cfg80211_twt_responder;
+#endif
 #ifdef WLAN_FEATURE_11BE_MLO
 	bool mlo_sap;
 	uint8_t link_id;
@@ -588,7 +591,6 @@ typedef struct sSapDfsInfo {
 	 */
 	uint32_t target_chan_freq;
 	uint8_t ignore_cac;
-	eSapDfsCACState_t cac_state;
 	uint32_t user_provided_target_chan_freq;
 
 	/*
@@ -695,6 +697,7 @@ typedef struct tagSapStruct {
 #endif /* FEATURE_AP_MCC_CH_AVOIDANCE */
 	bool acs_with_more_param;
 	bool enable_dfs_phy_error_logs;
+	uint8_t one_time_csa_count;
 #ifdef DCS_INTERFERENCE_DETECTION
 	struct sap_dcs_info dcs_info;
 #endif
@@ -1141,14 +1144,16 @@ QDF_STATUS wlansap_set_dfs_ignore_cac(mac_handle_t mac_handle,
 /**
  * wlansap_get_dfs_cac_state() - Get cac_state value
  * @mac_handle: Opaque handle to the global MAC context
+ * @sap_context: sap adapter context
  * @cac_state: Location to store cac_state value
  *
- * This API is used to Get the value of ignore_cac value
+ * This API is used to Get the value of current cac state
  *
  * Return: The QDF_STATUS code associated with performing the operation
  */
 QDF_STATUS wlansap_get_dfs_cac_state(mac_handle_t mac_handle,
-				     eSapDfsCACState_t *cac_state);
+				     struct sap_context *sap_context,
+				     bool *cac_state);
 
 /**
  * wlansap_get_csa_chanwidth_from_phymode() - function to populate
@@ -1862,7 +1867,6 @@ static inline void sap_acs_set_puncture_support(struct sap_context *sap_ctx,
 }
 #endif /* WLAN_FEATURE_11BE */
 
-#ifdef PRE_CAC_SUPPORT
 /**
  * sap_cac_end_notify() - Notify CAC end to HDD
  * @mac_handle: Opaque handle to the global MAC context
@@ -1874,14 +1878,6 @@ static inline void sap_acs_set_puncture_support(struct sap_context *sap_ctx,
  */
 QDF_STATUS sap_cac_end_notify(mac_handle_t mac_handle,
 			      struct csr_roam_info *roamInfo);
-#else
-static inline QDF_STATUS
-sap_cac_end_notify(mac_handle_t mac_handle,
-		   struct csr_roam_info *roamInfo)
-{
-	return QDF_STATUS_SUCCESS;
-}
-#endif /* PRE_CAC_SUPPORT */
 
 #ifdef WLAN_FEATURE_SAP_ACS_OPTIMIZE
 static inline bool sap_is_acs_scan_optimize_enable(void)

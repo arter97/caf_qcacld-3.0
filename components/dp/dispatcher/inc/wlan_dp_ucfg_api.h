@@ -1443,7 +1443,7 @@ static inline void ucfg_dp_wfds_del_server(void)
 
 static inline
 QDF_STATUS ucfg_dp_config_direct_link(struct wlan_objmgr_vdev *vdev,
-				      bool enable_direct_link,
+				      bool config_direct_link,
 				      bool enable_low_latency)
 {
 	return QDF_STATUS_SUCCESS;

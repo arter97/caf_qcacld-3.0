@@ -493,7 +493,8 @@ static struct hdd_adapter
 {
 	struct hdd_adapter *adapter, *next_adapter = NULL;
 	wlan_net_dev_ref_dbgid dbgid = NET_DEV_HOLD_GET_ADAPTER;
-	qdf_freq_t chan_freq = 0;
+	struct wlan_channel *chan;
+	struct ch_params ch_params = {0};
 
 	hdd_for_each_adapter_dev_held_safe(hdd_ctx, adapter, next_adapter,
 					   dbgid) {
@@ -508,11 +509,24 @@ static struct hdd_adapter
 		    (hdd_ctx->dev_dfs_cac_status != DFS_CAC_IN_PROGRESS))
 			goto loop_next;
 
-		chan_freq = wlan_get_operation_chan_freq_vdev_id(hdd_ctx->pdev,
-							adapter->vdev_id);
+		chan = wlan_vdev_get_active_channel(adapter->vdev);
+		if (!chan) {
+			hdd_debug("Can not get active channel");
+			goto loop_next;
+		}
 
-		if (chan_freq && wlan_reg_is_dfs_for_freq(hdd_ctx->pdev,
-							  chan_freq)) {
+		if (!wlan_reg_is_5ghz_ch_freq(chan->ch_freq))
+			goto loop_next;
+
+		ch_params.ch_width = chan->ch_width;
+		if (ch_params.ch_width == CH_WIDTH_160MHZ)
+			wlan_reg_set_create_punc_bitmap(&ch_params, true);
+
+		if (wlan_reg_get_5g_bonded_channel_state_for_pwrmode(hdd_ctx->pdev,
+								     chan->ch_freq,
+								     &ch_params,
+								     REG_CURRENT_PWR_MODE) ==
+		    CHANNEL_STATE_DFS) {
 			hdd_adapter_dev_put_debug(adapter, dbgid);
 			if (next_adapter)
 				hdd_adapter_dev_put_debug(next_adapter, dbgid);
@@ -633,33 +647,32 @@ def_chan:
 	 */
 	ch_bw = hdd_ap_ctx->sap_config.ch_width_orig;
 	if (!ch_freq || wlan_reg_is_dfs_for_freq(hdd_ctx->pdev, ch_freq) ||
-	    !policy_mgr_is_safe_channel(hdd_ctx->psoc, ch_freq)) {
+	    !policy_mgr_is_safe_channel(hdd_ctx->psoc, ch_freq))
 		ch_freq = policy_mgr_get_nondfs_preferred_channel(
-			hdd_ctx->psoc, PM_SAP_MODE, true);
-		if (WLAN_REG_IS_5GHZ_CH_FREQ(ch_freq) &&
-		    ch_bw > CH_WIDTH_20MHZ) {
-			struct ch_params ch_params;
+			hdd_ctx->psoc, PM_SAP_MODE, true, ap_adapter->vdev_id);
+	if (WLAN_REG_IS_5GHZ_CH_FREQ(ch_freq) &&
+	    ch_bw > CH_WIDTH_20MHZ) {
+		struct ch_params ch_params;
 
-			qdf_mem_zero(&ch_params, sizeof(ch_params));
+		qdf_mem_zero(&ch_params, sizeof(ch_params));
+		ch_params.ch_width = ch_bw;
+		ch_state =
+		wlan_reg_get_5g_bonded_channel_state_for_pwrmode(
+				hdd_ctx->pdev, ch_freq, &ch_params,
+				REG_CURRENT_PWR_MODE);
+		while (ch_bw > CH_WIDTH_20MHZ &&
+		       ch_state != CHANNEL_STATE_ENABLE) {
+			ch_bw =
+			wlan_reg_get_next_lower_bandwidth(ch_bw);
 			ch_params.ch_width = ch_bw;
 			ch_state =
-			wlan_reg_get_5g_bonded_channel_state_for_pwrmode(
-					hdd_ctx->pdev, ch_freq, &ch_params,
-					REG_CURRENT_PWR_MODE);
-			while (ch_bw > CH_WIDTH_20MHZ &&
-			       ch_state != CHANNEL_STATE_ENABLE) {
-				ch_bw =
-				wlan_reg_get_next_lower_bandwidth(ch_bw);
-				ch_params.ch_width = ch_bw;
-				ch_state =
-				wlan_reg_get_5g_bonded_channel_state_for_pwrmode
-					(hdd_ctx->pdev, ch_freq, &ch_params,
-					REG_CURRENT_PWR_MODE);
-			}
-			hdd_debug("bw change from %d to %d",
-				  hdd_ap_ctx->sap_config.ch_width_orig,
-				  ch_bw);
+			wlan_reg_get_5g_bonded_channel_state_for_pwrmode
+				(hdd_ctx->pdev, ch_freq, &ch_params,
+				REG_CURRENT_PWR_MODE);
 		}
+		hdd_debug("bw change from %d to %d",
+			  hdd_ap_ctx->sap_config.ch_width_orig,
+			  ch_bw);
 	}
 
 	hostapd_state = WLAN_HDD_GET_HOSTAP_STATE_PTR(ap_adapter);
@@ -936,6 +949,11 @@ static void hdd_cm_save_bss_info(struct hdd_adapter *adapter,
 	mac_handle_t mac_handle = hdd_adapter_get_mac_handle(adapter);
 	struct sDot11fAssocResponse *assoc_resp;
 
+	if (!mac_handle) {
+		hdd_err("mac handle is null");
+		return;
+	}
+
 	hdd_ctx = WLAN_HDD_GET_CTX(adapter);
 	hdd_sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter);
 
@@ -1052,6 +1070,11 @@ static void hdd_wmm_cm_connect(struct wlan_objmgr_vdev *vdev,
 	struct vdev_mlme_obj *vdev_mlme;
 	mac_handle_t mac_handle = hdd_adapter_get_mac_handle(adapter);
 	struct mac_context *mac_ctx = MAC_CONTEXT(mac_handle);
+
+	if (!mac_handle) {
+		hdd_err("mac handle is null");
+		return;
+	}
 
 	vdev_mlme = wlan_vdev_mlme_get_cmpt_obj(vdev);
 	if (!vdev_mlme) {

@@ -2072,7 +2072,6 @@ QDF_STATUS csr_get_channel_and_power_list(struct mac_context *mac)
 	} else {
 		if (num20MHzChannelsFound > CFG_VALID_CHANNEL_LIST_LEN)
 			num20MHzChannelsFound = CFG_VALID_CHANNEL_LIST_LEN;
-		mac->scan.numChannelsDefault = num20MHzChannelsFound;
 		/* Move the channel list to the global data */
 		/* structure -- this will be used as the scan list */
 		for (Index = 0; Index < num20MHzChannelsFound; Index++)
@@ -2796,11 +2795,9 @@ static void csr_roam_process_start_bss_success(struct mac_context *mac_ctx,
 	 */
 	if (opmode == QDF_SAP_MODE || opmode == QDF_P2P_GO_MODE) {
 		if (wlan_is_open_wep_cipher(mac_ctx->pdev, vdev_id)) {
-			/* NO keys. these key parameters don't matter */
 			csr_issue_set_context_req_helper(mac_ctx, vdev_id,
 							 &bcast_mac, false,
-							 false, eSIR_TX_RX,
-							 0, 0, NULL);
+							 false, 0);
 		}
 	}
 
@@ -3589,12 +3586,10 @@ static QDF_STATUS csr_roam_issue_set_context_req(struct mac_context *mac_ctx,
 
 QDF_STATUS
 csr_issue_set_context_req_helper(struct mac_context *mac_ctx,
-				 uint32_t session_id, tSirMacAddr *bssid,
-				 bool addkey, bool unicast,
-				 tAniKeyDirection key_direction, uint8_t key_id,
-				 uint16_t key_length, uint8_t *key)
+				 uint32_t vdev_id, tSirMacAddr *bssid,
+				 bool addkey, bool unicast, uint8_t key_id)
 {
-	return csr_roam_issue_set_context_req(mac_ctx, session_id, addkey,
+	return csr_roam_issue_set_context_req(mac_ctx, vdev_id, addkey,
 					      unicast, key_id,
 					      (struct qdf_mac_addr *)bssid);
 }
@@ -3986,10 +3981,9 @@ csr_roam_chk_lnk_assoc_ind(struct mac_context *mac_ctx, tSirSmeRsp *msg_ptr)
 
 	if (opmode == QDF_SAP_MODE || opmode == QDF_P2P_GO_MODE) {
 		if (wlan_is_open_wep_cipher(mac_ctx->pdev, sessionId)) {
-			/* NO keys... these key parameters don't matter. */
 			csr_issue_set_context_req_helper(mac_ctx, sessionId,
 					&roam_info->peerMac.bytes, false, true,
-					eSIR_TX_RX, 0, 0, NULL);
+					0);
 			roam_info->fAuthRequired = false;
 		} else {
 			roam_info->fAuthRequired = true;
@@ -7182,6 +7176,10 @@ QDF_STATUS csr_roam_send_chan_sw_ie_request(struct mac_context *mac_ctx,
 	msg->csaIeRequired = csa_ie_reqd;
 	msg->ch_switch_beacon_cnt =
 		 mac_ctx->sap.SapDfsInfo.sap_ch_switch_beacon_cnt;
+	if (mac_ctx->sap.one_time_csa_count) {
+		msg->ch_switch_beacon_cnt = mac_ctx->sap.one_time_csa_count;
+		mac_ctx->sap.one_time_csa_count = 0;
+	}
 	msg->ch_switch_mode = mac_ctx->sap.SapDfsInfo.sap_ch_switch_mode;
 	msg->dfs_ch_switch_disable =
 		mac_ctx->sap.SapDfsInfo.disable_dfs_ch_switch;

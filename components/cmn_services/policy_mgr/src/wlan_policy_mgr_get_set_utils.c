@@ -44,6 +44,7 @@
 #include "wlan_cm_ucfg_api.h"
 #include "wlan_cm_roam_api.h"
 #include "wlan_mlme_ucfg_api.h"
+#include "wlan_p2p_ucfg_api.h"
 
 /* invalid channel id. */
 #define INVALID_CHANNEL_ID 0
@@ -6246,6 +6247,16 @@ policy_mgr_handle_mcc_ml_sta(struct wlan_objmgr_psoc *psoc,
 					       ml_sta_vdev_lst, num_ml_sta))
 		return QDF_STATUS_E_FAILURE;
 
+	/*
+	 * eMLSR is allowed in MCC mode also. So, don't disable any links
+	 * if current connection happens in eMLSR mode.
+	 */
+	if (policy_mgr_is_mlo_in_mode_emlsr(psoc, ml_sta_vdev_lst,
+					    &num_ml_sta)) {
+		policy_mgr_debug("Don't disable eMLSR links");
+		return QDF_STATUS_E_FAILURE;
+	}
+
 	policy_mgr_mlo_sta_set_link(psoc, MLO_LINK_FORCE_REASON_CONNECT,
 				    MLO_LINK_FORCE_MODE_ACTIVE_NUM,
 				    num_ml_sta, ml_sta_vdev_lst);
@@ -7268,7 +7279,7 @@ bool policy_mgr_allow_concurrency(struct wlan_objmgr_psoc *psoc,
 				  enum policy_mgr_con_mode mode,
 				  uint32_t ch_freq,
 				  enum hw_mode_bandwidth bw,
-				  uint32_t ext_flags)
+				  uint32_t ext_flags, uint8_t vdev_id)
 {
 	QDF_STATUS status;
 	struct policy_mgr_pcl_list pcl;
@@ -7277,7 +7288,7 @@ bool policy_mgr_allow_concurrency(struct wlan_objmgr_psoc *psoc,
 	qdf_mem_zero(&pcl, sizeof(pcl));
 	status = policy_mgr_get_pcl(psoc, mode, pcl.pcl_list, &pcl.pcl_len,
 				    pcl.weight_list,
-				    QDF_ARRAY_SIZE(pcl.weight_list));
+				    QDF_ARRAY_SIZE(pcl.weight_list), vdev_id);
 	if (QDF_IS_STATUS_ERROR(status)) {
 		policy_mgr_err("disallow connection:%d", status);
 		return false;
@@ -7360,7 +7371,7 @@ policy_mgr_allow_concurrency_csa(struct wlan_objmgr_psoc *psoc,
 						    WLAN_POLICY_MGR_ID);
 	conc_ext_flags = policy_mgr_get_conc_ext_flags(vdev, false);
 	allow = policy_mgr_allow_concurrency(psoc, mode, ch_freq,
-					     bw, conc_ext_flags);
+					     bw, conc_ext_flags, vdev_id);
 	if (vdev)
 		wlan_objmgr_vdev_release_ref(vdev, WLAN_POLICY_MGR_ID);
 
@@ -7591,7 +7602,7 @@ bool policy_mgr_check_for_session_conc(struct wlan_objmgr_psoc *psoc,
 	/* Take care of 160MHz and 80+80Mhz later */
 	conc_ext_flags = policy_mgr_get_conc_ext_flags(vdev, false);
 	ret = policy_mgr_allow_concurrency(psoc, mode, ch_freq, HW_MODE_20_MHZ,
-					   conc_ext_flags);
+					   conc_ext_flags, session_id);
 	if (vdev)
 		wlan_objmgr_vdev_release_ref(vdev, WLAN_POLICY_MGR_ID);
 
@@ -8822,6 +8833,57 @@ bool policy_mgr_is_sap_allowed_on_dfs_freq(struct wlan_objmgr_pdev *pdev,
 	return true;
 }
 
+bool policy_mgr_is_sap_allowed_on_indoor(struct wlan_objmgr_pdev *pdev,
+					 uint8_t vdev_id, qdf_freq_t ch_freq)
+{
+	struct wlan_objmgr_psoc *psoc;
+	bool is_scc = false, indoor_support = false;
+	enum QDF_OPMODE mode;
+
+	psoc = wlan_pdev_get_psoc(pdev);
+	if (!psoc)
+		return true;
+
+	if (!wlan_reg_is_freq_indoor(pdev, ch_freq))
+		return true;
+
+	is_scc = policy_mgr_is_sta_sap_scc(psoc, ch_freq);
+	mode = wlan_get_opmode_from_vdev_id(pdev, vdev_id);
+	ucfg_mlme_get_indoor_channel_support(psoc, &indoor_support);
+
+	/*
+	 * Rules for indoor operation:
+	 * If gindoor_channel_support is enabled - Allow SAP/GO
+	 * If gindoor_channel_support is disabled
+	 *      a) Restrict 6 GHz SAP
+	 *      b) Restrict standalone 5 GHz SAP
+	 *
+	 * If p2p_go_on_indoor_chan is enabled - Allow GO
+	 * with or without concurrency
+	 *
+	 * If sta_sap_scc_on_indoor_chan is enabled - Allow
+	 * SAP/GO with concurrent STA in indoor SCC
+	 *
+	 * Restrict all other operations on indoor
+	 */
+	if (indoor_support) {
+		return true;
+	} else if (WLAN_REG_IS_6GHZ_CHAN_FREQ(ch_freq) ||
+		   (!is_scc && mode == QDF_SAP_MODE)) {
+		policy_mgr_rl_debug("SAP operation is not allowed on indoor channel");
+		return false;
+	} else if (mode == QDF_P2P_GO_MODE &&
+		   ucfg_p2p_get_indoor_ch_support(psoc)) {
+		return true;
+	} else if (is_scc &&
+		  policy_mgr_get_sta_sap_scc_allowed_on_indoor_chnl(psoc)) {
+		return true;
+	}
+
+	policy_mgr_rl_debug("SAP operation is not allowed on indoor channel");
+	return false;
+}
+
 bool policy_mgr_is_sta_sap_scc_allowed_on_dfs_chan(
 		struct wlan_objmgr_psoc *psoc)
 {
@@ -9584,10 +9646,9 @@ bool policy_mgr_is_restart_sap_required(struct wlan_objmgr_psoc *psoc,
 		if (connection[i].freq != freq &&
 		    WLAN_REG_IS_24GHZ_CH_FREQ(connection[i].freq) &&
 		    WLAN_REG_IS_5GHZ_CH_FREQ(freq) &&
-		    wlan_reg_is_freq_indoor(pm_ctx->pdev, freq) &&
-		    !policy_mgr_sap_allowed_on_indoor_freq(pm_ctx->psoc,
-							   pm_ctx->pdev,
-							   freq)) {
+		    !policy_mgr_is_sap_allowed_on_indoor(pm_ctx->pdev,
+							 vdev_id,
+							 freq)) {
 			policy_mgr_debug("SAP in indoor freq: sta:%d sap:%d",
 					 connection[i].freq, freq);
 			restart_required = true;

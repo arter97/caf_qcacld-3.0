@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2018-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -447,16 +447,6 @@ bool wlan_is_vdev_traffic_ll_ht(struct wlan_objmgr_vdev *vdev);
  * Return: associate type
  */
 enum vdev_assoc_type  mlme_get_assoc_type(struct wlan_objmgr_vdev *vdev);
-
-/**
- * mlme_vdev_create_send() - function to send the vdev create to firmware
- * @vdev: vdev pointer
- *
- * Return: QDF_STATUS_SUCCESS when the command has been successfully sent
- * to firmware or QDF_STATUS_E_** when there is a failure in sending the command
- * to firmware.
- */
-QDF_STATUS mlme_vdev_create_send(struct wlan_objmgr_vdev *vdev);
 
 /**
  * mlme_vdev_self_peer_create() - function to send the vdev create self peer

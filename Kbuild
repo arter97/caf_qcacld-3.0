@@ -62,6 +62,11 @@ ifeq ($(findstring yes, $(found)), yes)
 cppflags-y += -DCFG80211_RU_PUNCT_SUPPORT
 endif
 
+found = $(shell if grep -qF "unsigned int link_id, u16 punct_bitmap" $(srctree)/include/net/cfg80211.h; then echo "yes" ;else echo "no" ;fi;)
+ifeq ($(findstring yes, $(found)), yes)
+cppflags-y += -DCFG80211_RU_PUNCT_NOTIFY
+endif
+
 include $(WLAN_ROOT)/configs/$(CONFIG_QCA_CLD_WLAN_PROFILE)_defconfig
 
 # add configurations in WLAN_CFG_OVERRIDE
@@ -476,6 +481,14 @@ endif
 
 ifeq ($(CONFIG_BUS_AUTO_SUSPEND), y)
 HDD_OBJS += $(HDD_SRC_DIR)/wlan_hdd_sysfs_runtime_pm.o
+endif
+
+ifeq ($(CONFIG_WLAN_SYSFS_LOG_BUFFER), y)
+HDD_OBJS += $(HDD_SRC_DIR)/wlan_hdd_sysfs_log_buffer.o
+endif
+
+ifeq ($(CONFIG_WLAN_SYSFS_DFSNOL), y)
+HDD_OBJS += $(HDD_SRC_DIR)/wlan_hdd_sysfs_dfsnol.o
 endif
 
 endif # CONFIG_WLAN_SYSFS
@@ -2158,6 +2171,7 @@ DP_INC := -I$(WLAN_COMMON_INC)/dp/inc \
 
 DP_SRC := $(WLAN_COMMON_ROOT)/dp/wifi3.0
 DP_OBJS := $(DP_SRC)/dp_main.o \
+		$(DP_SRC)/dp_rings_main.o \
 		$(DP_SRC)/dp_tx.o \
 		$(DP_SRC)/dp_arch_ops.o \
 		$(DP_SRC)/dp_tx_desc.o \
@@ -3505,6 +3519,9 @@ cppflags-$(CONFIG_QCA_MONITOR_PKT_SUPPORT) += -DQCA_MONITOR_PKT_SUPPORT
 cppflags-$(CONFIG_MONITOR_MODULARIZED_ENABLE) += -DMONITOR_MODULARIZED_ENABLE
 cppflags-$(CONFIG_DP_PKT_ADD_TIMESTAMP) += -DCONFIG_DP_PKT_ADD_TIMESTAMP
 cppflags-$(CONFIG_WLAN_PDEV_VDEV_SEND_MULTI_PARAM) += -DWLAN_PDEV_VDEV_SEND_MULTI_PARAM
+cppflags-$(CONFIG_WLAN_SYSFS_LOG_BUFFER) += -DFEATURE_SYSFS_LOG_BUFFER
+cppflags-$(CONFIG_ENABLE_VALLOC_REPLACE_MALLOC) += -DENABLE_VALLOC_REPLACE_MALLOC
+cppflags-$(CONFIG_WLAN_SYSFS_DFSNOL) += -DCONFIG_WLAN_SYSFS_DFSNOL
 
 ifeq ($(CONFIG_LEAK_DETECTION), y)
 cppflags-y += \
@@ -4075,6 +4092,7 @@ cppflags-$(CONFIG_TX_ADDR_INDEX_SEARCH) += -DTX_ADDR_INDEX_SEARCH
 cppflags-$(CONFIG_QCA_SUPPORT_TX_MIN_RATES_FOR_SPECIAL_FRAMES) += -DQCA_SUPPORT_TX_MIN_RATES_FOR_SPECIAL_FRAMES
 cppflags-$(CONFIG_QCA_GET_TSF_VIA_REG) += -DQCA_GET_TSF_VIA_REG
 cppflags-$(CONFIG_DP_TX_COMP_RING_DESC_SANITY_CHECK) += -DDP_TX_COMP_RING_DESC_SANITY_CHECK
+cppflags-$(CONFIG_HAL_SRNG_REG_HIS_DEBUG) += -DHAL_SRNG_REG_HIS_DEBUG
 
 cppflags-$(CONFIG_RX_HASH_DEBUG) += -DRX_HASH_DEBUG
 cppflags-$(CONFIG_DP_PKT_STATS_PER_LMAC) += -DDP_PKT_STATS_PER_LMAC

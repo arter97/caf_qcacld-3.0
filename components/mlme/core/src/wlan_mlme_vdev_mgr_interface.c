@@ -315,6 +315,7 @@ QDF_STATUS sta_mlme_vdev_notify_roam_start(struct vdev_mlme_obj *vdev_mlme,
  * @vdev_mlme: vdev mlme object
  * @event_data_len: event data length
  * @event_data: event data
+ * @is_disconnect_legacy_only: flag to indicate legacy disconnect
  *
  * This function is called to disconnect BSS/send deauth to AP
  *
@@ -322,7 +323,8 @@ QDF_STATUS sta_mlme_vdev_notify_roam_start(struct vdev_mlme_obj *vdev_mlme,
  */
 static QDF_STATUS sta_mlme_vdev_disconnect_bss(struct vdev_mlme_obj *vdev_mlme,
 					       uint16_t event_data_len,
-					       void *event_data)
+					       void *event_data,
+					       bool is_disconnect_legacy_only)
 {
 	mlme_legacy_debug("vdev id = %d ",
 			  vdev_mlme->vdev->vdev_objmgr.vdev_id);
@@ -513,13 +515,15 @@ ap_mlme_vdev_notify_up_complete(struct vdev_mlme_obj *vdev_mlme,
  * @vdev_mlme: vdev mlme object
  * @data_len: event data length
  * @data: event data
+ * @is_disconnect_legacy_only: flag to indicate is disconnect legacy
  *
  * This function is called to disconnect all connected peers
  *
  * Return: QDF_STATUS
  */
 static QDF_STATUS ap_mlme_vdev_disconnect_peers(struct vdev_mlme_obj *vdev_mlme,
-						uint16_t data_len, void *data)
+						uint16_t data_len, void *data,
+						bool is_disconnect_legacy_only)
 {
 	mlme_legacy_debug("vdev id = %d ",
 			  vdev_mlme->vdev->vdev_objmgr.vdev_id);
@@ -1373,6 +1377,10 @@ static void mlme_ext_handler_destroy(struct vdev_mlme_obj *vdev_mlme)
 {
 	if (!vdev_mlme || !vdev_mlme->ext_vdev_ptr)
 		return;
+	qdf_runtime_lock_deinit(
+		&vdev_mlme->ext_vdev_ptr->bss_color_change_runtime_lock);
+	qdf_wake_lock_destroy(
+		&vdev_mlme->ext_vdev_ptr->bss_color_change_wakelock);
 	mlme_free_self_disconnect_ies(vdev_mlme->vdev);
 	mlme_free_peer_disconnect_ies(vdev_mlme->vdev);
 	mlme_free_sae_auth_retry(vdev_mlme->vdev);
@@ -1405,6 +1413,12 @@ QDF_STATUS vdevmgr_mlme_ext_hdl_create(struct vdev_mlme_obj *vdev_mlme)
 	vdev_mlme->ext_vdev_ptr->connect_info.fils_con_info = NULL;
 	mlme_init_wait_for_key_timer(vdev_mlme->vdev,
 				     &vdev_mlme->ext_vdev_ptr->wait_key_timer);
+
+	qdf_wake_lock_create(
+			&vdev_mlme->ext_vdev_ptr->bss_color_change_wakelock,
+			"bss_color_change_wakelock");
+	qdf_runtime_lock_init(
+		&vdev_mlme->ext_vdev_ptr->bss_color_change_runtime_lock);
 
 	sme_get_vdev_type_nss(wlan_vdev_mlme_get_opmode(vdev_mlme->vdev),
 			      &vdev_mlme->proto.generic.nss_2g,
@@ -1582,6 +1596,7 @@ static QDF_STATUS mon_mlme_vdev_up_send(struct vdev_mlme_obj *vdev_mlme,
  * @vdev_mlme: vdev mlme object
  * @data_len: event data length
  * @data: event data
+ * @is_disconnect_legacy_only: flag to indicate legacy disconnect
  *
  * montior mode no connected peers, only do VDEV state transition.
  *
@@ -1589,7 +1604,8 @@ static QDF_STATUS mon_mlme_vdev_up_send(struct vdev_mlme_obj *vdev_mlme,
  */
 static QDF_STATUS mon_mlme_vdev_disconnect_peers(
 		struct vdev_mlme_obj *vdev_mlme,
-		uint16_t data_len, void *data)
+		uint16_t data_len, void *data,
+		bool is_disconnect_legacy_only)
 {
 	mlme_legacy_debug("vdev id = %d",
 			  vdev_mlme->vdev->vdev_objmgr.vdev_id);

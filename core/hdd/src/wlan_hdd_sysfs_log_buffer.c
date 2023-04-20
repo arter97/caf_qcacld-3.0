@@ -17,22 +17,27 @@
 #include <wlan_hdd_includes.h>
 #include "osif_psoc_sync.h"
 #include <wlan_hdd_sysfs.h>
-#include <wlan_hdd_sysfs_runtime_pm.h>
-#include "hif.h"
-#include "hif_runtime_pm.h"
+#include <wlan_hdd_sysfs_log_buffer.h>
+#include <wlan_hdd_ioctl.h>
 
-static ssize_t hdd_sysfs_runtime_pm_show(struct kobject *kobj,
+static ssize_t hdd_sysfs_log_buffer_show(struct kobject *kobj,
 					 struct kobj_attribute *attr,
 					 char *buf)
 {
-	return hif_rtpm_log_debug_stats(buf, HIF_RTPM_FILL_TYPE_SYSFS);
+	struct hdd_sysfs_print_ctx ctx;
+
+	ctx.buf = buf;
+	ctx.idx = 0;
+	ctx.new_line = true;
+	hdd_dump_log_buffer(&ctx, &hdd_sysfs_print);
+	return ctx.idx;
 }
 
-static struct kobj_attribute runtime_pm_attribute =
-	__ATTR(runtime_pm, 0440, hdd_sysfs_runtime_pm_show,
+static struct kobj_attribute log_buffer_attribute =
+	__ATTR(log_buffer, 0440, hdd_sysfs_log_buffer_show,
 	       NULL);
 
-int hdd_sysfs_runtime_pm_create(struct kobject *driver_kobject)
+int hdd_sysfs_log_buffer_create(struct kobject *driver_kobject)
 {
 	int error;
 
@@ -42,19 +47,19 @@ int hdd_sysfs_runtime_pm_create(struct kobject *driver_kobject)
 	}
 
 	error = sysfs_create_file(driver_kobject,
-				  &runtime_pm_attribute.attr);
+				  &log_buffer_attribute.attr);
 	if (error)
-		hdd_err("could not create runtime_pm sysfs file");
+		hdd_err("could not create log_buffer sysfs file");
 
 	return error;
 }
 
 void
-hdd_sysfs_runtime_pm_destroy(struct kobject *driver_kobject)
+hdd_sysfs_log_buffer_destroy(struct kobject *driver_kobject)
 {
 	if (!driver_kobject) {
 		hdd_err("could not get driver kobject!");
 		return;
 	}
-	sysfs_remove_file(driver_kobject, &runtime_pm_attribute.attr);
+	sysfs_remove_file(driver_kobject, &log_buffer_attribute.attr);
 }

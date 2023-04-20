@@ -444,7 +444,8 @@ wlan_cm_dual_sta_is_freq_allowed(struct wlan_objmgr_psoc *psoc,
 	if (!connected_sta_freq)
 		return true;
 
-	if (policy_mgr_are_2_freq_on_same_mac(psoc, freq, connected_sta_freq))
+	if (policy_mgr_2_freq_always_on_same_mac(psoc, freq,
+						 connected_sta_freq))
 		return false;
 
 	return true;
@@ -2413,7 +2414,8 @@ cm_handle_roam_offload_events(struct roam_offload_roam_event *roam_event)
 	break;
 	case ROAM_REASON_INVALID:
 		cm_invalid_roam_reason_handler(roam_event->vdev_id,
-					       roam_event->notif);
+					       roam_event->notif,
+					       roam_event->notif_params);
 		break;
 	default:
 		break;
@@ -3247,7 +3249,7 @@ void cm_report_roam_rt_stats(struct wlan_objmgr_psoc *psoc,
 			     uint8_t vdev_id,
 			     enum roam_rt_stats_type events,
 			     struct roam_stats_event *roam_info,
-			     uint32_t value, uint8_t idx)
+			     uint32_t value, uint8_t idx, uint32_t reason)
 {
 	struct roam_stats_event *roam_event = NULL;
 
@@ -3262,18 +3264,23 @@ void cm_report_roam_rt_stats(struct wlan_objmgr_psoc *psoc,
 		if (!roam_event)
 			return;
 
-		if (value == WMI_ROAM_NOTIF_SCAN_START)
+		if (value == WMI_ROAM_NOTIF_SCAN_START) {
 			roam_event->roam_event_param.roam_scan_state =
 					QCA_WLAN_VENDOR_ROAM_SCAN_STATE_START;
-		else if (value == WMI_ROAM_NOTIF_SCAN_END)
+			if (reason) {
+				roam_event->trigger[idx].present = true;
+				roam_event->trigger[idx].trigger_reason =
+							 reason;
+			}
+		} else if (value == WMI_ROAM_NOTIF_SCAN_END) {
 			roam_event->roam_event_param.roam_scan_state =
 					QCA_WLAN_VENDOR_ROAM_SCAN_STATE_END;
+		}
 
-		//TO DO: Add a new CB in CM and register the hdd function to it
-		//And call the new CB from here.
 		mlme_debug("Invoke HDD roam events callback for roam "
 			   "scan notif");
 		roam_event->vdev_id = vdev_id;
+		mlme_cm_osif_roam_rt_stats(roam_event, idx);
 		qdf_mem_free(roam_event);
 		break;
 	case ROAM_RT_STATS_TYPE_INVOKE_FAIL_REASON:
@@ -3283,11 +3290,10 @@ void cm_report_roam_rt_stats(struct wlan_objmgr_psoc *psoc,
 
 		roam_event->roam_event_param.roam_invoke_fail_reason = value;
 
-		//TO DO: Add a new CB in CM and register the hdd function to it
-		//And call the new CB from here.
 		mlme_debug("Invoke HDD roam events callback for roam "
 			   "invoke fail");
 		roam_event->vdev_id = vdev_id;
+		mlme_cm_osif_roam_rt_stats(roam_event, idx);
 		qdf_mem_free(roam_event);
 		break;
 	case ROAM_RT_STATS_TYPE_ROAM_SCAN_INFO:
@@ -3298,8 +3304,7 @@ void cm_report_roam_rt_stats(struct wlan_objmgr_psoc *psoc,
 			mlme_debug("Invoke HDD roam events callback for roam "
 				   "stats event");
 			roam_info->vdev_id = vdev_id;
-		//TO DO: Add a new CB in CM and register the hdd function to it
-		//And call the new CB from here.
+			mlme_cm_osif_roam_rt_stats(roam_info, idx);
 		}
 		break;
 	default:
@@ -3402,7 +3407,7 @@ log_btm_frames_only:
 
 	cm_report_roam_rt_stats(psoc, stats_info->vdev_id,
 				ROAM_RT_STATS_TYPE_ROAM_SCAN_INFO,
-				stats_info, 0, i);
+				stats_info, 0, i, 0);
 }
 
 #ifdef WLAN_FEATURE_ROAM_INFO_STATS
@@ -4100,7 +4105,7 @@ cm_roam_stats_event_handler(struct wlan_objmgr_psoc *psoc,
 
 		cm_report_roam_rt_stats(psoc, stats_info->vdev_id,
 					ROAM_RT_STATS_TYPE_ROAM_SCAN_INFO,
-					stats_info, 0, i);
+					stats_info, 0, i, 0);
 	}
 
 	if (!stats_info->num_tlv) {
@@ -4515,4 +4520,18 @@ wlan_cm_get_assoc_btm_cap(struct wlan_objmgr_vdev *vdev)
 		return true;
 
 	return mlme_priv->connect_info.assoc_btm_cap;
+}
+
+bool wlan_cm_is_self_mld_roam_supported(struct wlan_objmgr_psoc *psoc)
+{
+	struct wmi_unified *wmi_handle;
+
+	wmi_handle = get_wmi_unified_hdl_from_psoc(psoc);
+	if (!wmi_handle) {
+		mlme_debug("Invalid WMI handle");
+		return false;
+	}
+
+	return wmi_service_enabled(wmi_handle,
+				   wmi_service_self_mld_roam_between_dbs_and_hbs);
 }

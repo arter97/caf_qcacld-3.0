@@ -461,6 +461,14 @@ cm_fill_bssid_freq_info(uint8_t vdev_id,
 
 	return QDF_STATUS_SUCCESS;
 }
+
+static void
+cm_mlo_roam_copy_partner_info(struct wlan_cm_connect_resp *connect_rsp,
+			      struct roam_offload_synch_ind *roam_synch_data)
+{
+	mlo_roam_copy_partner_info(&connect_rsp->ml_parnter_info,
+				   roam_synch_data, WLAN_INVALID_VDEV_ID);
+}
 #else
 static QDF_STATUS
 cm_fill_bssid_freq_info(uint8_t vdev_id,
@@ -471,6 +479,12 @@ cm_fill_bssid_freq_info(uint8_t vdev_id,
 	rsp->connect_rsp.freq = roam_synch_data->chan_freq;
 
 	return QDF_STATUS_SUCCESS;
+}
+
+static void
+cm_mlo_roam_copy_partner_info(struct wlan_cm_connect_resp *connect_rsp,
+			      struct roam_offload_synch_ind *roam_synch_data)
+{
 }
 #endif
 
@@ -582,7 +596,7 @@ cm_fill_roam_info(struct wlan_objmgr_vdev *vdev,
 	roaming_info->roam_reason =
 		roam_synch_data->roam_reason & ROAM_REASON_MASK;
 	roaming_info->subnet_change_status =
-			CM_GET_SUBNET_STATUS(roaming_info->roam_reason);
+			CM_GET_SUBNET_STATUS(roam_synch_data->roam_reason);
 	roaming_info->pmk_len = roam_synch_data->pmk_len;
 	if (roaming_info->pmk_len)
 		qdf_mem_copy(roaming_info->pmk, roam_synch_data->pmk,
@@ -860,37 +874,50 @@ cm_update_scan_db_on_roam_success(struct wlan_objmgr_vdev *vdev,
 				  wlan_cm_id cm_id)
 {
 	struct cnx_mgr *cm_ctx;
-	qdf_freq_t link_freq;
+	qdf_freq_t frame_freq;
 	struct wlan_connect_rsp_ies *ies = &resp->connect_ies;
 
 	cm_ctx = cm_get_cm_ctx(vdev);
 	if (!cm_ctx)
 		return;
 
-	link_freq = mlo_roam_get_chan_freq(wlan_vdev_get_id(vdev),
-					   roam_synch_ind);
 	if (roam_synch_ind->auth_status == ROAM_AUTH_STATUS_CONNECTED) {
-		if (ies->link_bcn_probe_rsp.len)
+		if (ies->link_bcn_probe_rsp.len) {
+			frame_freq = mlo_roam_get_link_freq_from_mac_addr(
+					roam_synch_ind,
+					wlan_mlme_get_src_addr_from_frame(
+					&ies->link_bcn_probe_rsp));
 			cm_inform_bcn_probe(cm_ctx,
 					    ies->link_bcn_probe_rsp.ptr,
 					    ies->link_bcn_probe_rsp.len,
-					    link_freq,
+					    frame_freq,
 					    roam_synch_ind->rssi,
 					    cm_id);
+		}
+
+		frame_freq = mlo_roam_get_link_freq_from_mac_addr(
+					roam_synch_ind,
+					wlan_mlme_get_src_addr_from_frame(
+					&ies->bcn_probe_rsp));
 		cm_inform_bcn_probe(cm_ctx,
 				    ies->bcn_probe_rsp.ptr,
 				    ies->bcn_probe_rsp.len,
-				    resp->freq,
+				    frame_freq,
 				    roam_synch_ind->rssi,
 				    cm_id);
 	} else if (wlan_vdev_mlme_is_mlo_link_vdev(vdev)) {
-		if (ies->link_bcn_probe_rsp.len)
+		if (ies->link_bcn_probe_rsp.len) {
+			frame_freq = mlo_roam_get_link_freq_from_mac_addr(
+					roam_synch_ind,
+					wlan_mlme_get_src_addr_from_frame(
+					&ies->link_bcn_probe_rsp));
 			cm_inform_bcn_probe(cm_ctx,
 					    ies->link_bcn_probe_rsp.ptr,
 					    ies->link_bcn_probe_rsp.len,
-					    link_freq,
+					    frame_freq,
 					    roam_synch_ind->rssi,
 					    cm_id);
+		}
 	} else {
 		cm_inform_bcn_probe(cm_ctx,
 				    ies->bcn_probe_rsp.ptr,
@@ -978,7 +1005,7 @@ cm_fw_roam_sync_propagation(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 	if (wlan_vdev_mlme_is_mlo_vdev(vdev))
 		policy_mgr_move_vdev_from_disabled_to_connection_tbl(psoc,
 								     vdev_id);
-	mlo_roam_copy_partner_info(connect_rsp, roam_synch_data);
+	cm_mlo_roam_copy_partner_info(connect_rsp, roam_synch_data);
 	mlo_roam_init_cu_bpcc(vdev, roam_synch_data);
 	mlo_roam_set_link_id(vdev, roam_synch_data);
 
@@ -1231,7 +1258,8 @@ cm_disconnect_roam_abort_fail(struct wlan_objmgr_vdev *vdev,
 
 	if (source == CM_ROAMING_HOST ||
 	    (source == CM_ROAMING_NUD_FAILURE && nud_disconnect) ||
-	     source == CM_ROAMING_LINK_REMOVAL)
+	     source == CM_ROAMING_LINK_REMOVAL ||
+	     qdf_is_macaddr_zero(bssid))
 		status = mlo_disconnect(vdev, CM_ROAM_DISCONNECT,
 					REASON_USER_TRIGGERED_ROAM_FAILURE,
 					NULL);

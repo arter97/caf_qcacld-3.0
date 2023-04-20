@@ -675,18 +675,18 @@ struct wlan_mlme_ht_caps {
 };
 
 #define MLME_CFG_WPS_UUID_MAX_LEN    16
-/*
+/**
  * struct wlan_mlme_wps_params - All wps based related cfg items
  *
- * @enable_wps - to enable wps
- * @wps_state - current wps state
- * @wps_version - wps version
- * @wps_cfg_method - wps config method
- * @wps_primary_device_category - wps primary device category
- * @wps_primary_device_oui - primary device OUI
- * @wps_device_sub_category - device sub category
- * @wps_device_password_id - password id of device
- * @wps_uuid - wps uuid to be sent in probe
+ * @enable_wps: to enable wps
+ * @wps_state: current wps state
+ * @wps_version: wps version
+ * @wps_cfg_method: wps config method
+ * @wps_primary_device_category: wps primary device category
+ * @wps_primary_device_oui: primary device OUI
+ * @wps_device_sub_category: device sub category
+ * @wps_device_password_id: password id of device
+ * @wps_uuid: wps uuid to be sent in probe
  */
 struct wlan_mlme_wps_params {
 	uint8_t enable_wps;
@@ -743,6 +743,7 @@ struct wlan_mlme_wps_params {
  * @is_sap_bcast_deauth_enabled: enable bcast deauth for sap
  * @is_6g_sap_fd_enabled: enable fils discovery on sap
  * @disable_bcn_prot: disable beacon protection for sap
+ * @sap_ps_with_twt_enable: SAP power save with TWT
  */
 struct wlan_mlme_cfg_sap {
 	uint16_t beacon_interval;
@@ -779,6 +780,7 @@ struct wlan_mlme_cfg_sap {
 	bool is_sap_bcast_deauth_enabled;
 	bool is_6g_sap_fd_enabled;
 	bool disable_bcn_prot;
+	bool sap_ps_with_twt_enable;
 };
 
 /**
@@ -1212,8 +1214,8 @@ struct wlan_mlme_feature_flag {
 	uint32_t channel_bonding_mode_5ghz;
 };
 
-/*
- * struct wlan_mlme_sap_protection_cfg - SAP erp protection config items
+/**
+ * struct wlan_mlme_sap_protection - SAP erp protection config items
  * @ignore_peer_ht_opmode:     Ignore the ht opmode of the peer. Dynamic via INI
  * @enable_ap_obss_protection: enable/disable AP OBSS protection
  * @protection_force_policy:   Protection force policy. Static via cfg
@@ -1230,7 +1232,7 @@ struct wlan_mlme_sap_protection {
 	uint32_t protection_enabled;
 };
 
-/*
+/**
  * struct wlan_mlme_chainmask - All chainmask related cfg items
  * @txchainmask1x1:     To set transmit chainmask
  * @rxchainmask1x1:     To set rx chainmask
@@ -1460,7 +1462,7 @@ struct wlan_mlme_generic {
 #endif
 };
 
-/*
+/**
  * struct wlan_mlme_product_details_cfg - product details config items
  * @manufacturer_name: manufacture name
  * @model_number: model number
@@ -1476,7 +1478,7 @@ struct wlan_mlme_product_details_cfg {
 	char manufacture_product_version[WLAN_CFG_MFR_PRODUCT_VERSION_LEN + 1];
 };
 
-/*
+/**
  * struct acs_weight - Normalize ACS weight for mentioned channels
  * @chan_freq: frequency of the channel
  * @normalize_weight: Normalization factor of the frequency
@@ -1486,7 +1488,7 @@ struct acs_weight {
 	uint8_t normalize_weight;
 };
 
-/*
+/**
  * struct acs_weight_range - Normalize ACS weight for mentioned channel range
  * @start_freq: frequency of the start channel
  * @end_freq: frequency of the end channel
@@ -1501,13 +1503,13 @@ struct acs_weight_range {
 #define MAX_ACS_WEIGHT_RANGE              10
 #define MLME_GET_DFS_CHAN_WEIGHT(np_chan_weight) (np_chan_weight & 0x000000FF)
 
-/*
+/**
  * struct wlan_mlme_acs - All acs related cfg items
- * @is_acs_with_more_param - to enable acs with more param
- * @auto_channel_select_weight - to set acs channel weight
- * @is_vendor_acs_support - enable application based channel selection
- * @is_acs_support_for_dfs_ltecoex - enable channel for dfs and lte coex
- * @is_external_acs_policy - control external policy
+ * @is_acs_with_more_param: to enable acs with more param
+ * @auto_channel_select_weight: to set acs channel weight
+ * @is_vendor_acs_support: enable application based channel selection
+ * @is_acs_support_for_dfs_ltecoex: enable channel for dfs and lte coex
+ * @is_external_acs_policy: control external policy
  * @normalize_weight_chan: Weight factor to be considered in ACS
  * @normalize_weight_num_chan: Number of freq items for normalization.
  * @normalize_weight_range: Frequency range for weight normalization
@@ -1532,7 +1534,7 @@ struct wlan_mlme_acs {
 	uint32_t np_chan_weightage;
 };
 
-/*
+/**
  * struct wlan_mlme_cfg_twt - All twt related cfg items
  * @is_twt_enabled: global twt configuration
  * @is_bcast_responder_enabled: bcast responder enable/disable
@@ -1667,12 +1669,14 @@ struct wlan_mlme_nss_chains {
  * @MLME_STA_KEEPALIVE_MIN: ensure KEEPALIVE_NULL or ARP are not values of 0
  * @MLME_STA_KEEPALIVE_NULL_DATA: null data packet
  * @MLME_STA_KEEPALIVE_GRAT_ARP: gratuitous ARP packet
+ * @MLME_STA_KEEPALIVE_UNSOLICIT_ARP_RSP: unsolicited  ARP response packet
  * @MLME_STA_KEEPALIVE_COUNT: number of method options available
  */
 enum station_keepalive_method {
 	MLME_STA_KEEPALIVE_MIN,
 	MLME_STA_KEEPALIVE_NULL_DATA = 1,
 	MLME_STA_KEEPALIVE_GRAT_ARP = 2,
+	MLME_STA_KEEPALIVE_UNSOLICIT_ARP_RSP = 3,
 	/* keep at the end */
 	MLME_STA_KEEPALIVE_COUNT
 };
@@ -2303,7 +2307,7 @@ struct wlan_mlme_rssi_cfg_score  {
 	uint32_t rssi_pref_5g_rssi_thresh;
 };
 
-/*
+/**
  * struct wlan_mlme_roam_scoring_cfg - MLME roam related scoring config
  * @enable_scoring_for_roam: Enable/disable BSS Scoring for Roaming
  * @roam_trigger_bitmap: bitmap for various roam triggers
@@ -2362,7 +2366,7 @@ struct mlme_power_usage {
 	char data[CFG_POWER_USAGE_MAX_LEN];
 };
 
-/*
+/**
  * struct wlan_mlme_power - power related config items
  * @max_tx_power_24: max power Tx for 2.4 ghz, this is based on frequencies
  * @max_tx_power_5: max power Tx for 5 ghz, this is based on frequencies
@@ -2398,7 +2402,7 @@ struct wlan_mlme_power {
 	bool skip_tpe;
 };
 
-/*
+/**
  * struct wlan_mlme_timeout - mlme timeout related config items
  * @join_failure_timeout: join failure timeout (can be changed in connect req)
  * @probe_req_retry_timeout: Probe req retry timeout during join time
@@ -2497,7 +2501,7 @@ struct wlan_mlme_wifi_pos_cfg {
 #define BTM_OFFLOAD_CONFIG_BIT_8    8
 #define BTM_OFFLOAD_CONFIG_BIT_7    7
 
-/*
+/**
  * struct wlan_mlme_btm - BTM related configs
  * @prefer_btm_query: flag to prefer btm query over 11k
  * @abridge_flag: set this flag to enable firmware to sort candidates based on
@@ -2562,7 +2566,7 @@ struct wlan_mlme_fe_rrm {
 };
 
 #ifdef MWS_COEX
-/*
+/**
  * struct wlan_mlme_mwc - MWC related configs
  * @mws_coex_4g_quick_tdm:  bitmap to set mws-coex 5g-nr power limit
  * @mws_coex_5g_nr_pwr_limit: bitmap to set mws-coex 5g-nr power limit
@@ -2781,11 +2785,6 @@ struct wlan_mlme_cfg {
 	struct wlan_mlme_eml_cap eml_cap;
 };
 
-enum pkt_origin {
-	FW,
-	HOST
-};
-
 /**
  * struct mlme_pmk_info - SAE Roaming using single pmk info
  * @pmk: pmk
@@ -2909,5 +2908,17 @@ enum host_concurrent_ap_policy {
 	HOST_CONCURRENT_AP_POLICY_GAMING_AUDIO = 1,
 	HOST_CONCURRENT_AP_POLICY_LOSSLESS_AUDIO_STREAMING = 2,
 	HOST_CONCURRENT_AP_POLICY_XR = 3
+};
+
+/**
+ * enum ll_ap_type - low latency AP type
+ * @LL_AP_TYPE_HT: low latency AP type high throughput
+ * @LL_AP_TYPE_LT: low latency AP type low latency
+ * @LL_AP_TYPE_ANY: low latency AP type any
+ */
+enum ll_ap_type {
+	LL_AP_TYPE_HT = 0,
+	LL_AP_TYPE_LT = 1,
+	LL_AP_TYPE_ANY = 2,
 };
 #endif

@@ -405,8 +405,6 @@ lim_process_beacon_frame(struct mac_context *mac_ctx, uint8_t *rx_pkt_info,
 	bool cu_flag = true;
 	QDF_STATUS status;
 
-	mac_ctx->lim.gLimNumBeaconsRcvd++;
-
 	/*
 	 * here is it required to increment session specific heartBeat
 	 * beacon counter
