@@ -1303,6 +1303,17 @@ void cm_set_candidate_custom_sort_cb(
  */
 bool cm_is_connect_req_reassoc(struct wlan_cm_connect_req *req);
 
+/**
+ * cm_get_rnr() - get rnr
+ * @vdev:vdev
+ * @cm_id: connect mgr id
+ * @rnr: pointer to copy rnr info
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS cm_get_rnr(struct wlan_objmgr_vdev *vdev, wlan_cm_id cm_id,
+		      struct reduced_neighbor_report *rnr);
+
 #ifdef CONN_MGR_ADV_FEATURE
 /**
  * cm_free_connect_rsp_ies() - Function to free all connection IEs.

@@ -1652,6 +1652,47 @@ wlan_cm_id cm_get_cm_id_by_scan_id(struct cnx_mgr *cm_ctx,
 	return CM_ID_INVALID;
 }
 
+QDF_STATUS cm_get_rnr(struct wlan_objmgr_vdev *vdev, wlan_cm_id cm_id,
+		      struct reduced_neighbor_report *rnr)
+{
+	qdf_list_node_t *cur_node = NULL, *next_node = NULL;
+	struct cm_req *cm_req;
+	uint32_t prefix = CM_ID_GET_PREFIX(cm_id);
+	struct cnx_mgr *cm_ctx;
+
+	if (prefix != CONNECT_REQ_PREFIX)
+		return QDF_STATUS_E_INVAL;
+
+	cm_ctx = cm_get_cm_ctx(vdev);
+	if (!cm_ctx)
+		return QDF_STATUS_E_INVAL;
+
+	cm_req_lock_acquire(cm_ctx);
+	qdf_list_peek_front(&cm_ctx->req_list, &cur_node);
+	while (cur_node) {
+		qdf_list_peek_next(&cm_ctx->req_list, cur_node, &next_node);
+		cm_req = qdf_container_of(cur_node, struct cm_req, node);
+
+		if (cm_req->cm_id == cm_id) {
+			if (!cm_req->connect_req.cur_candidate ||
+			    !cm_req->connect_req.cur_candidate->entry)
+				break;
+
+			qdf_mem_copy(rnr,
+				&cm_req->connect_req.cur_candidate->entry->rnr,
+				sizeof(*rnr));
+			cm_req_lock_release(cm_ctx);
+			return QDF_STATUS_SUCCESS;
+		}
+
+		cur_node = next_node;
+		next_node = NULL;
+	}
+	cm_req_lock_release(cm_ctx);
+
+	return QDF_STATUS_E_FAILURE;
+}
+
 #ifdef WLAN_POLICY_MGR_ENABLE
 static void
 cm_get_pcl_chan_weigtage_for_sta(struct wlan_objmgr_pdev *pdev,
