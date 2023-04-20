@@ -2363,14 +2363,17 @@ QDF_STATUS wlan_get_chan_by_bssid_from_rnr(struct wlan_objmgr_vdev *vdev,
 {
 	struct reduced_neighbor_report *rnr;
 	int i;
+	QDF_STATUS status;
 
 	*chan = 0;
+	rnr = qdf_mem_malloc(sizeof(*rnr));
+	if (!rnr)
+		return QDF_STATUS_E_NOMEM;
 
-	rnr = wlan_cm_get_rnr(vdev, cm_id);
-
-	if (!rnr) {
-		mlme_err("no rnr IE is gotten");
-		return QDF_STATUS_E_EMPTY;
+	status = wlan_cm_get_rnr(vdev, cm_id, rnr);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		qdf_mem_free(rnr);
+		return status;
 	}
 
 	for (i = 0; i < MAX_RNR_BSS; i++) {
@@ -2382,6 +2385,7 @@ QDF_STATUS wlan_get_chan_by_bssid_from_rnr(struct wlan_objmgr_vdev *vdev,
 			break;
 		}
 	}
+	qdf_mem_free(rnr);
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -2410,14 +2414,17 @@ QDF_STATUS wlan_get_chan_by_link_id_from_rnr(struct wlan_objmgr_vdev *vdev,
 {
 	struct reduced_neighbor_report *rnr;
 	int i;
+	QDF_STATUS status;
 
 	*chan = 0;
+	rnr = qdf_mem_malloc(sizeof(*rnr));
+	if (!rnr)
+		return QDF_STATUS_E_NOMEM;
 
-	rnr = wlan_cm_get_rnr(vdev, cm_id);
-
-	if (!rnr) {
-		mlme_err("no rnr IE is gotten");
-		return QDF_STATUS_E_EMPTY;
+	status = wlan_cm_get_rnr(vdev, cm_id, rnr);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		qdf_mem_free(rnr);
+		return status;
 	}
 
 	for (i = 0; i < MAX_RNR_BSS; i++) {
@@ -2429,6 +2436,7 @@ QDF_STATUS wlan_get_chan_by_link_id_from_rnr(struct wlan_objmgr_vdev *vdev,
 			break;
 		}
 	}
+	qdf_mem_free(rnr);
 
 	return QDF_STATUS_SUCCESS;
 }
