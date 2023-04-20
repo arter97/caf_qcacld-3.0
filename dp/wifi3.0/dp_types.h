@@ -4165,6 +4165,24 @@ struct dp_ast_flow_override_info {
 	uint8_t tid_valid_hi_pri_mask;
 };
 
+#if defined(WLAN_FEATURE_11BE_MLO) && defined(DP_MLO_LINK_STATS_SUPPORT)
+/**
+ * struct dp_peer_ext_evt_info - peer extended event info
+ * @peer_id: peer_id from firmware
+ * @vdev_id: vdev ID
+ * @link_id: Link ID
+ * @link_id_valid: link_id_valid
+ * @peer_mac_addr: mac address of the peer
+ */
+struct dp_peer_ext_evt_info {
+	uint16_t peer_id;
+	uint8_t vdev_id;
+	uint8_t link_id;
+	bool link_id_valid;
+	uint8_t *peer_mac_addr;
+};
+#endif
+
 /**
  * struct dp_peer_ast_params - ast parameters for a msdu flow-queue
  * @ast_idx: ast index populated by FW

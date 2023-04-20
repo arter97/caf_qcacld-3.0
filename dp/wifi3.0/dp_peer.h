@@ -713,6 +713,19 @@ void dp_rx_peer_unmap_handler(struct dp_soc *soc, uint16_t peer_id,
 			      uint8_t vdev_id, uint8_t *peer_mac_addr,
 			      uint8_t is_wds, uint32_t free_wds_count);
 
+#if defined(WLAN_FEATURE_11BE_MLO) && defined(DP_MLO_LINK_STATS_SUPPORT)
+/**
+ * dp_rx_peer_ext_evt() - handle peer extended event from firmware
+ * @soc: DP soc handle
+ * @info: extended evt info
+ *
+ *
+ * Return: QDF_STATUS
+ */
+
+QDF_STATUS
+dp_rx_peer_ext_evt(struct dp_soc *soc, struct dp_peer_ext_evt_info *info);
+#endif
 #ifdef DP_RX_UDP_OVER_PEER_ROAM
 /**
  * dp_rx_reset_roaming_peer() - Reset the roamed peer in vdev
