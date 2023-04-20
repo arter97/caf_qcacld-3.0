@@ -1990,6 +1990,9 @@ is_nbuf_frm_rmnet(qdf_nbuf_t nbuf, struct dp_tx_msdu_info_s *msdu_info)
 	uint16_t linear_data_len = 0;
 	uint8_t *payload_addr = NULL;
 
+	if (!nbuf->dev)
+		return false;
+
 	ingress_dev = dev_get_by_index(dev_net(nbuf->dev), nbuf->skb_iif);
 
 	if (!ingress_dev)
