@@ -4374,13 +4374,6 @@ QDF_STATUS wlan_ipa_cleanup(struct wlan_ipa_priv *ipa_ctx)
 
 	gp_ipa = NULL;
 
-	/* Acquire lock */
-	ipa_init_deinit_lock();
-	if (g_instances_added)
-		g_instances_added--;
-	/* Unlock */
-	ipa_init_deinit_unlock();
-
 	ipa_ctx->handle_initialized = false;
 
 	return QDF_STATUS_SUCCESS;
