@@ -7334,6 +7334,107 @@ dp_set_vdev_param(struct cdp_soc_t *cdp_soc, uint8_t vdev_id,
 	return QDF_STATUS_SUCCESS;
 }
 
+#if defined(FEATURE_WLAN_TDLS) && defined(WLAN_FEATURE_11BE_MLO)
+/**
+ * dp_update_mlo_vdev_for_tdls() - update mlo vdev configuration
+ *                                 for TDLS
+ * @cdp_soc: DP soc handle
+ * @vdev_id: id of DP vdev handle
+ * @param: parameter type for vdev
+ * @val: value
+ *
+ * If TDLS connection is from secondary vdev, then copy osif_vdev from
+ * primary vdev to support RX, update TX bank register info for primary
+ * vdev as well.
+ * If TDLS connection is from primary vdev, same as before.
+ *
+ * Return: None
+ */
+static void
+dp_update_mlo_vdev_for_tdls(struct cdp_soc_t *cdp_soc, uint8_t vdev_id,
+			    enum cdp_vdev_param_type param,
+			    cdp_config_param_type val)
+{
+	struct dp_soc *soc = (struct dp_soc *)cdp_soc;
+	struct dp_peer *peer;
+	struct dp_peer *tmp_peer;
+	struct dp_peer *mld_peer;
+	struct dp_vdev *vdev = NULL;
+	struct dp_vdev *pri_vdev = NULL;
+	uint8_t pri_vdev_id = CDP_INVALID_VDEV_ID;
+
+	if (param != CDP_UPDATE_TDLS_FLAGS)
+		return;
+
+	dp_info("update TDLS flag for vdev_id %d, val %d",
+		vdev_id, val.cdp_vdev_param_tdls_flags);
+	vdev = dp_vdev_get_ref_by_id(soc, vdev_id, DP_MOD_ID_MISC);
+	/* only check for STA mode vdev */
+	if (!vdev || vdev->opmode != wlan_op_mode_sta) {
+		dp_info("vdev is not as expected for TDLS");
+		goto comp_ret;
+	}
+
+	/* Find primary vdev_id */
+	qdf_spin_lock_bh(&vdev->peer_list_lock);
+	TAILQ_FOREACH_SAFE(peer, &vdev->peer_list,
+			   peer_list_elem,
+			   tmp_peer) {
+		if (dp_peer_get_ref(soc, peer, DP_MOD_ID_CONFIG) ==
+					QDF_STATUS_SUCCESS) {
+			/* do check only if MLO link peer exist */
+			if (IS_MLO_DP_LINK_PEER(peer)) {
+				mld_peer = DP_GET_MLD_PEER_FROM_PEER(peer);
+				pri_vdev_id = mld_peer->vdev->vdev_id;
+				dp_peer_unref_delete(peer, DP_MOD_ID_CONFIG);
+				break;
+			}
+			dp_peer_unref_delete(peer, DP_MOD_ID_CONFIG);
+		}
+	}
+	qdf_spin_unlock_bh(&vdev->peer_list_lock);
+
+	if (pri_vdev_id != CDP_INVALID_VDEV_ID)
+		pri_vdev = dp_vdev_get_ref_by_id(soc, pri_vdev_id,
+						 DP_MOD_ID_MISC);
+
+	/* If current vdev is not same as primary vdev */
+	if (pri_vdev && pri_vdev != vdev) {
+		dp_info("primary vdev [%d] %pK different with vdev [%d] %pK",
+			pri_vdev->vdev_id, pri_vdev,
+			vdev->vdev_id, vdev);
+		/* update osif_vdev to support RX for vdev */
+		vdev->osif_vdev = pri_vdev->osif_vdev;
+		dp_set_vdev_param(cdp_soc, pri_vdev->vdev_id,
+				  CDP_UPDATE_TDLS_FLAGS, val);
+	}
+
+comp_ret:
+	if (pri_vdev)
+		dp_vdev_unref_delete(soc, pri_vdev, DP_MOD_ID_MISC);
+	if (vdev)
+		dp_vdev_unref_delete(soc, vdev, DP_MOD_ID_MISC);
+}
+
+static QDF_STATUS
+dp_set_vdev_param_wrapper(struct cdp_soc_t *cdp_soc, uint8_t vdev_id,
+			  enum cdp_vdev_param_type param,
+			  cdp_config_param_type val)
+{
+	dp_update_mlo_vdev_for_tdls(cdp_soc, vdev_id, param, val);
+
+	return dp_set_vdev_param(cdp_soc, vdev_id, param, val);
+}
+#else
+static QDF_STATUS
+dp_set_vdev_param_wrapper(struct cdp_soc_t *cdp_soc, uint8_t vdev_id,
+			  enum cdp_vdev_param_type param,
+			  cdp_config_param_type val)
+{
+	return dp_set_vdev_param(cdp_soc, vdev_id, param, val);
+}
+#endif
+
 /**
  * dp_set_psoc_param: function to set parameters in psoc
  * @cdp_soc: DP soc handle
@@ -10398,7 +10499,7 @@ static struct cdp_ctrl_ops dp_ops_ctrl = {
 		dp_is_vdev_peer_protocol_count_enabled,
 	.txrx_get_peer_protocol_drop_mask = dp_get_vdev_peer_protocol_drop_mask,
 #endif
-	.txrx_set_vdev_param = dp_set_vdev_param,
+	.txrx_set_vdev_param = dp_set_vdev_param_wrapper,
 	.txrx_set_psoc_param = dp_set_psoc_param,
 	.txrx_get_psoc_param = dp_get_psoc_param,
 #ifndef WLAN_SOFTUMAC_SUPPORT
