@@ -618,7 +618,8 @@ target_if_send_vdev_spectral_enable_cmd(struct target_if_spectral *spectral,
 static inline bool is_spectral_arch_beryllium(uint32_t target_tpe)
 {
 	if ((target_tpe == TARGET_TYPE_QCN9224) ||
-	    (target_tpe == TARGET_TYPE_QCA5332))
+	    (target_tpe == TARGET_TYPE_QCA5332) ||
+	    (target_tpe == TARGET_TYPE_QCN6432))
 		return true;
 
 	return false;
@@ -3161,6 +3162,7 @@ target_if_spectral_len_adj_swar_init(struct spectral_fft_bin_len_adj_swar *swar,
 	    target_type == TARGET_TYPE_QCA6018 ||
 	    target_type == TARGET_TYPE_QCN6122 ||
 	    target_type == TARGET_TYPE_QCN9160 ||
+	    target_type == TARGET_TYPE_QCN6432 ||
 	    target_type == TARGET_TYPE_QCA5332 ||
 	    target_type == TARGET_TYPE_QCA5018 ||
 	    target_type == TARGET_TYPE_QCN9000 ||
@@ -3208,6 +3210,7 @@ target_if_spectral_report_params_init(
 	if (target_type == TARGET_TYPE_QCN9000 ||
 	    target_type == TARGET_TYPE_QCN6122 ||
 	    target_type == TARGET_TYPE_QCN9160 ||
+	    target_type == TARGET_TYPE_QCN6432 ||
 	    target_type == TARGET_TYPE_QCA5018 ||
 	    target_type == TARGET_TYPE_QCA6750 ||
 	    target_type == TARGET_TYPE_QCA6490 ||
@@ -3253,6 +3256,7 @@ target_if_spectral_report_params_init(
 	if (target_type == TARGET_TYPE_QCN9000 ||
 	    target_type == TARGET_TYPE_QCN6122 ||
 	    target_type == TARGET_TYPE_QCN9224 ||
+	    target_type == TARGET_TYPE_QCN6432 ||
 	    target_type == TARGET_TYPE_QCN9160 ||
 	    target_type == TARGET_TYPE_QCA6490 ||
 	    target_type == TARGET_TYPE_KIWI ||
@@ -3674,6 +3678,7 @@ target_if_pdev_spectral_init(struct wlan_objmgr_pdev *pdev)
 	    target_type == TARGET_TYPE_QCA6390 ||
 	    target_type == TARGET_TYPE_QCN6122 ||
 	    target_type == TARGET_TYPE_QCN9160 ||
+	    target_type == TARGET_TYPE_QCN6432 ||
 	    target_type == TARGET_TYPE_QCA6490 ||
 	    target_type == TARGET_TYPE_QCN9000 ||
 	    target_type == TARGET_TYPE_QCA6750 ||
@@ -3697,6 +3702,7 @@ target_if_pdev_spectral_init(struct wlan_objmgr_pdev *pdev)
 	    (target_type == TARGET_TYPE_QCA5332) ||
 	    (target_type == TARGET_TYPE_QCN6122) ||
 	    (target_type == TARGET_TYPE_QCN9160) ||
+	    (target_type == TARGET_TYPE_QCN6432) ||
 	    (target_type == TARGET_TYPE_QCN9000) ||
 	    (target_type == TARGET_TYPE_QCA6290) ||
 	    (target_type == TARGET_TYPE_QCA6390) ||
