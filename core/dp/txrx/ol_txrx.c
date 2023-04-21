@@ -3522,7 +3522,7 @@ static QDF_STATUS ol_txrx_peer_detach(struct cdp_soc_t *soc_hdl,
 	if (!peer)
 		return QDF_STATUS_E_FAILURE;
 
-	ol_txrx_info_high("%s peer %pK, peer->ref_cnt %d", __func__,
+	ol_txrx_info_high("peer %pK, peer->ref_cnt %d",
 			  peer, qdf_atomic_read(&peer->ref_cnt));
 
 	/* redirect peer's rx delivery function to point to a discard func */
@@ -4164,7 +4164,7 @@ ol_txrx_fw_stats_handler(ol_txrx_pdev_handle pdev,
 	}
 	req = ol_txrx_fw_stats_desc_get_req(pdev, (uint8_t)cookie);
 	if (!req) {
-		ol_txrx_err("%s: Request not retrieved for cookie %u", __func__,
+		ol_txrx_err("Request not retrieved for cookie %u",
 			    (uint8_t)cookie);
 		return;
 	}

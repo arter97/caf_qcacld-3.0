@@ -318,7 +318,7 @@ ol_rx_frag_indication_handler(ol_txrx_pdev_handle pdev,
 	void *rx_desc;
 
 	if (tid >= OL_TXRX_NUM_EXT_TIDS) {
-		ol_txrx_err("%s:  invalid tid, %u", __FUNCTION__, tid);
+		ol_txrx_err("Invalid tid: %u", tid);
 		return;
 	}
 
@@ -655,7 +655,7 @@ void ol_rx_defrag_waitlist_flush(struct ol_txrx_pdev_t *pdev)
 
 		tid = rx_reorder->tid;
 		if (tid >= OL_TXRX_NUM_EXT_TIDS) {
-			ol_txrx_err("%s:  invalid tid, %u", __FUNCTION__, tid);
+			ol_txrx_err("Invalid tid: %u", tid);
 			WARN_ON(1);
 			continue;
 		}

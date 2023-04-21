@@ -459,7 +459,7 @@ static void ol_rx_reorder_detect_hole(struct ol_txrx_peer_t *peer,
 	uint32_t win_sz_mask, next_rel_idx, hole_size;
 
 	if (tid >= OL_TXRX_NUM_EXT_TIDS) {
-		ol_txrx_err("%s:  invalid tid, %u", __FUNCTION__, tid);
+		ol_txrx_err("Invalid tid: %u", tid);
 		return;
 	}
 
@@ -632,7 +632,7 @@ ol_rx_flush_handler(ol_txrx_pdev_handle pdev,
 	htt_pdev_handle htt_pdev = pdev->htt_pdev;
 
 	if (tid >= OL_TXRX_NUM_EXT_TIDS) {
-		ol_txrx_err("%s:  invalid tid, %u", __FUNCTION__, tid);
+		ol_txrx_err("Invalid tid: %u", tid);
 		return;
 	}
 
@@ -693,7 +693,7 @@ ol_rx_pn_ind_handler(ol_txrx_pdev_handle pdev,
 	int i = 0;
 
 	if (tid >= OL_TXRX_NUM_EXT_TIDS) {
-		ol_txrx_err("%s:  invalid tid, %u", __FUNCTION__, tid);
+		ol_txrx_err("Invalid tid: %u", tid);
 		WARN_ON(1);
 		return;
 	}
