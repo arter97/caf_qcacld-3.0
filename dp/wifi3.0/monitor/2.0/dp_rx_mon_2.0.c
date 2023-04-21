@@ -999,14 +999,15 @@ dp_rx_mon_handle_full_mon(struct dp_pdev *pdev,
 
 	msdu_meta = (struct hal_rx_mon_msdu_info *)(((void *)qdf_nbuf_get_frag_addr(mpdu, 1)) - DP_RX_MON_PACKET_OFFSET);
 
+	frag_size = qdf_nbuf_get_frag_size_by_idx(head_msdu, 1);
+	pad_byte_pholder =
+		RX_MONITOR_BUFFER_SIZE - (frag_size + DP_RX_MON_PACKET_OFFSET);
+
 	/* Adjust page frag offset to appropriate after decap header */
 	frag_page_offset =
 		decap_hdr_pull_bytes + l2_hdr_offset;
 	qdf_nbuf_move_frag_page_offset(head_msdu, 1, frag_page_offset);
-
-	frag_size = qdf_nbuf_get_frag_size_by_idx(head_msdu, 1);
-	pad_byte_pholder =
-		RX_MONITOR_BUFFER_SIZE - (frag_size + DP_RX_MON_PACKET_OFFSET + DP_RX_MON_NONRAW_L2_HDR_PAD_BYTE);
+	frag_size = frag_size - frag_page_offset;
 
 	if (msdu_meta->first_buffer && msdu_meta->last_buffer) {
 		/* MSDU with single buffer */
@@ -1098,8 +1099,7 @@ dp_rx_mon_handle_full_mon(struct dp_pdev *pdev,
 			 * to accommodate amsdu pad byte
 			 */
 			pad_byte_pholder =
-				RX_MONITOR_BUFFER_SIZE - (frag_size + (DP_RX_MON_PACKET_OFFSET +
-							  DP_RX_MON_NONRAW_L2_HDR_PAD_BYTE));
+				RX_MONITOR_BUFFER_SIZE - (frag_size + DP_RX_MON_PACKET_OFFSET);
 			/*
 			 * We will come here only only three condition:
 			 * 1. Msdu with single Buffer
