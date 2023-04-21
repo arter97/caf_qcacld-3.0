@@ -2707,10 +2707,10 @@ void dp_umac_reset_complete_umac_recovery(struct dp_soc *soc);
  * @soc: dp soc handle
  * @is_target_recovery: Flag to indicate if it is triggered for target recovery
  *
- * Return: void
+ * Return: status
  */
-void dp_umac_reset_initiate_umac_recovery(struct dp_soc *soc,
-					  bool is_target_recovery);
+QDF_STATUS dp_umac_reset_initiate_umac_recovery(struct dp_soc *soc,
+						bool is_target_recovery);
 
 /**
  * dp_umac_reset_handle_action_cb() - Function to call action callback
