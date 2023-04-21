@@ -3868,7 +3868,7 @@ QDF_STATUS dp_ipa_tx_buf_smmu_mapping(
 		dp_get_pdev_from_soc_pdev_id_wifi3(soc, pdev_id);
 
 	if (!pdev) {
-		dp_err("%s invalid instance", __func__);
+		dp_err("Invalid instance");
 		return QDF_STATUS_E_FAILURE;
 	}
 
@@ -3895,7 +3895,7 @@ QDF_STATUS dp_ipa_tx_buf_smmu_unmapping(
 		dp_get_pdev_from_soc_pdev_id_wifi3(soc, pdev_id);
 
 	if (!pdev) {
-		dp_err("%s invalid instance", __func__);
+		dp_err("Invalid instance");
 		return QDF_STATUS_E_FAILURE;
 	}
 

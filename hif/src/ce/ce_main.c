@@ -3330,23 +3330,23 @@ static int hif_completion_thread_startup_by_ceid(struct HIF_CE_state *hif_state,
 	if (!hif_msg_callbacks ||
 	    !hif_msg_callbacks->rxCompletionHandler ||
 	    !hif_msg_callbacks->txCompletionHandler) {
-		hif_err("%s: no completion handler registered", __func__);
+		hif_err("no completion handler registered");
 		return -EFAULT;
 	}
 
 	attr = hif_state->host_ce_config[pipe_num];
 	if (attr.src_nentries) {
 		/* pipe used to send to target */
-		hif_debug("%s: pipe_num:%d pipe_info:0x%pK\n",
-			  __func__, pipe_num, pipe_info);
+		hif_debug("pipe_num:%d pipe_info:0x%pK\n",
+			  pipe_num, pipe_info);
 		ce_send_cb_register(pipe_info->ce_hdl,
 				    hif_pci_ce_send_done, pipe_info,
 				    attr.flags & CE_ATTR_DISABLE_INTR);
 		pipe_info->num_sends_allowed = attr.src_nentries - 1;
 	}
 	if (attr.dest_nentries) {
-		hif_debug("%s: pipe_num:%d pipe_info:0x%pK\n",
-			  __func__, pipe_num, pipe_info);
+		hif_debug("pipe_num:%d pipe_info:0x%pK\n",
+			  pipe_num, pipe_info);
 		/* pipe used to receive from target */
 		ce_recv_cb_register(pipe_info->ce_hdl,
 				    hif_pci_ce_recv_data, pipe_info,
@@ -4867,7 +4867,7 @@ int hif_config_ce(struct hif_softc *scn)
 	scn->athdiag_procfs_inited = true;
 
 	hif_debug("ce_init done");
-	hif_debug("%s: X, ret = %d", __func__, rv);
+	hif_debug("X, ret = %d", rv);
 
 #ifdef ADRASTEA_SHADOW_REGISTERS
 	hif_debug("Using Shadow Registers instead of CE Registers");
@@ -4930,7 +4930,7 @@ int hif_config_ce_pktlog(struct hif_opaque_softc *hif_hdl)
 
 	qdf_status = hif_completion_thread_startup_by_ceid(hif_state, pipe_num);
 	if (!QDF_IS_STATUS_SUCCESS(qdf_status)) {
-		hif_err("%s:failed to start hif thread", __func__);
+		hif_err("Failed to start hif thread");
 		goto err;
 	}
 
@@ -4938,14 +4938,14 @@ int hif_config_ce_pktlog(struct hif_opaque_softc *hif_hdl)
 	qdf_status = hif_post_recv_buffers_for_pipe(pipe_info);
 	if (!QDF_IS_STATUS_SUCCESS(qdf_status)) {
 		/* cleanup is done in hif_ce_disable */
-		hif_err("%s:failed to post buffers", __func__);
+		hif_err("Failed to post buffers");
 		return qdf_status;
 	}
 	scn->pktlog_init = true;
 	return qdf_status != QDF_STATUS_SUCCESS;
 
 err:
-	hif_debug("%s: X, ret = %d", __func__, qdf_status);
+	hif_debug("X, ret = %d", qdf_status);
 	return QDF_STATUS_SUCCESS != QDF_STATUS_E_FAILURE;
 }
 

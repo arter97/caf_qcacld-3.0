@@ -7246,7 +7246,7 @@ void dp_txrx_path_stats(struct dp_soc *soc)
 	uint8_t i;
 
 	if (!soc) {
-		dp_err("%s: Invalid access",  __func__);
+		dp_err("Invalid access");
 		return;
 	}
 
