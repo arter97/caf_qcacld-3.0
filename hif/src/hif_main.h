@@ -176,16 +176,44 @@ struct hif_ce_stats {
 };
 
 #ifdef HIF_DETECTION_LATENCY_ENABLE
+/**
+ * struct hif_tasklet_running_info - running info of tasklet
+ * @sched_cpuid: id of cpu on which the tasklet was scheduled
+ * @sched_time: time when the tasklet was scheduled
+ * @exec_time: time when the tasklet was executed
+ */
+struct hif_tasklet_running_info {
+	int sched_cpuid;
+	qdf_time_t sched_time;
+	qdf_time_t exec_time;
+};
+
+#define HIF_TASKLET_IN_MONITOR CE_COUNT_MAX
+
 struct hif_latency_detect {
-	qdf_timer_t detect_latency_timer;
-	uint32_t detect_latency_timer_timeout;
+	qdf_timer_t timer;
+	uint32_t timeout;
 	bool is_timer_started;
 	bool enable_detection;
 	/* threshold when stall happens */
-	uint32_t detect_latency_threshold;
-	int ce2_tasklet_sched_cpuid;
-	qdf_time_t ce2_tasklet_sched_time;
-	qdf_time_t ce2_tasklet_exec_time;
+	uint32_t threshold;
+
+	/*
+	 * Bitmap to indicate the enablement of latency detection for
+	 * the tasklets. bit-X represents for tasklet of WLAN_CE_X,
+	 * latency detection is enabled on the corresponding tasklet
+	 * when a bit is set.
+	 * At the same time, this bitmap also indicates the validity of
+	 * elements in array 'tasklet_info', bit-X represents for index-X,
+	 * the corresponding element is valid when a bit is set.
+	 */
+	qdf_bitmap(tasklet_bmap, HIF_TASKLET_IN_MONITOR);
+
+	/*
+	 * Array to record running info of tasklets, info of tasklet
+	 * for WLAN_CE_X is stored at index-X.
+	 */
+	struct hif_tasklet_running_info tasklet_info[HIF_TASKLET_IN_MONITOR];
 	qdf_time_t credit_request_time;
 	qdf_time_t credit_report_time;
 };

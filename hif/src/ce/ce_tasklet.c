@@ -368,11 +368,14 @@ void hif_latency_detect_tasklet_sched(
 	struct hif_softc *scn,
 	struct ce_tasklet_entry *tasklet_entry)
 {
-	if (tasklet_entry->ce_id != CE_ID_2)
+	int idx = tasklet_entry->ce_id;
+
+	if (idx >= HIF_TASKLET_IN_MONITOR ||
+	    !qdf_test_bit(idx, scn->latency_detect.tasklet_bmap))
 		return;
 
-	scn->latency_detect.ce2_tasklet_sched_cpuid = qdf_get_cpu();
-	scn->latency_detect.ce2_tasklet_sched_time = qdf_system_ticks();
+	scn->latency_detect.tasklet_info[idx].sched_cpuid = qdf_get_cpu();
+	scn->latency_detect.tasklet_info[idx].sched_time = qdf_system_ticks();
 }
 
 static inline
@@ -380,10 +383,13 @@ void hif_latency_detect_tasklet_exec(
 	struct hif_softc *scn,
 	struct ce_tasklet_entry *tasklet_entry)
 {
-	if (tasklet_entry->ce_id != CE_ID_2)
+	int idx = tasklet_entry->ce_id;
+
+	if (idx >= HIF_TASKLET_IN_MONITOR ||
+	    !qdf_test_bit(idx, scn->latency_detect.tasklet_bmap))
 		return;
 
-	scn->latency_detect.ce2_tasklet_exec_time = qdf_system_ticks();
+	scn->latency_detect.tasklet_info[idx].exec_time = qdf_system_ticks();
 	hif_check_detection_latency(scn, false, BIT(HIF_DETECT_TASKLET));
 }
 #else

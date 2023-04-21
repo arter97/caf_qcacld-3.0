@@ -850,17 +850,25 @@ static void hif_cpuhp_unregister(struct hif_softc *scn)
 #endif /* ifdef HIF_CPU_PERF_AFFINE_MASK */
 
 #ifdef HIF_DETECTION_LATENCY_ENABLE
+/*
+ * Bitmask to control enablement of latency detection for the tasklets,
+ * bit-X represents for tasklet of WLAN_CE_X.
+ */
+#ifndef DETECTION_LATENCY_TASKLET_MASK
+#define DETECTION_LATENCY_TASKLET_MASK (BIT(2) | BIT(7))
+#endif
 
-void hif_tasklet_latency(struct hif_softc *scn, bool from_timer)
+static inline int
+__hif_tasklet_latency(struct hif_softc *scn, bool from_timer, int idx)
 {
-	qdf_time_t ce2_tasklet_sched_time =
-		scn->latency_detect.ce2_tasklet_sched_time;
-	qdf_time_t ce2_tasklet_exec_time =
-		scn->latency_detect.ce2_tasklet_exec_time;
-	qdf_time_t curr_jiffies = qdf_system_ticks();
-	uint32_t detect_latency_threshold =
-		scn->latency_detect.detect_latency_threshold;
-	int cpu_id = qdf_get_cpu();
+	qdf_time_t sched_time =
+		scn->latency_detect.tasklet_info[idx].sched_time;
+	qdf_time_t exec_time =
+		scn->latency_detect.tasklet_info[idx].exec_time;
+	qdf_time_t curr_time = qdf_system_ticks();
+	uint32_t threshold = scn->latency_detect.threshold;
+	qdf_time_t expect_exec_time =
+		sched_time + qdf_system_msecs_to_ticks(threshold);
 
 	/* 2 kinds of check here.
 	 * from_timer==true:  check if tasklet stall
@@ -868,36 +876,45 @@ void hif_tasklet_latency(struct hif_softc *scn, bool from_timer)
 	 */
 
 	if ((from_timer ?
-	    qdf_system_time_after(ce2_tasklet_sched_time,
-				  ce2_tasklet_exec_time) :
-	    qdf_system_time_after(ce2_tasklet_exec_time,
-				  ce2_tasklet_sched_time)) &&
-	    qdf_system_time_after(
-		curr_jiffies,
-		ce2_tasklet_sched_time +
-		qdf_system_msecs_to_ticks(detect_latency_threshold))) {
-		hif_err("tasklet ce2 latency: from_timer %d, curr_jiffies %lu, ce2_tasklet_sched_time %lu,ce2_tasklet_exec_time %lu, detect_latency_threshold %ums detect_latency_timer_timeout %ums, cpu_id %d, called: %ps",
-			from_timer, curr_jiffies, ce2_tasklet_sched_time,
-			ce2_tasklet_exec_time, detect_latency_threshold,
-			scn->latency_detect.detect_latency_timer_timeout,
-			cpu_id, (void *)_RET_IP_);
-		goto latency;
+	     qdf_system_time_after(sched_time, exec_time) :
+	     qdf_system_time_after(exec_time, sched_time)) &&
+	    qdf_system_time_after(curr_time, expect_exec_time)) {
+		hif_err("tasklet[%d] latency detected: from_timer %d, curr_time %lu, sched_time %lu, exec_time %lu, threshold %ums, timeout %ums, cpu_id %d, called: %ps",
+			idx, from_timer, curr_time, sched_time,
+			exec_time, threshold,
+			scn->latency_detect.timeout,
+			qdf_get_cpu(), (void *)_RET_IP_);
+		return -ETIMEDOUT;
 	}
-	return;
 
-latency:
-	qdf_trigger_self_recovery(NULL, QDF_TASKLET_CREDIT_LATENCY_DETECT);
+	return 0;
 }
 
-void hif_credit_latency(struct hif_softc *scn, bool from_timer)
+static inline void hif_tasklet_latency(struct hif_softc *scn, bool from_timer)
+{
+	int i, ret;
+
+	for (i = 0; i < HIF_TASKLET_IN_MONITOR; i++) {
+		if (!qdf_test_bit(i, scn->latency_detect.tasklet_bmap))
+			continue;
+
+		ret = __hif_tasklet_latency(scn, from_timer, i);
+		if (!ret)
+			continue;
+
+		qdf_trigger_self_recovery(NULL,
+					  QDF_TASKLET_CREDIT_LATENCY_DETECT);
+		return;
+	}
+}
+
+static inline void hif_credit_latency(struct hif_softc *scn, bool from_timer)
 {
 	qdf_time_t credit_request_time =
 		scn->latency_detect.credit_request_time;
-	qdf_time_t credit_report_time =
-		scn->latency_detect.credit_report_time;
+	qdf_time_t credit_report_time = scn->latency_detect.credit_report_time;
 	qdf_time_t curr_jiffies = qdf_system_ticks();
-	uint32_t detect_latency_threshold =
-		scn->latency_detect.detect_latency_threshold;
+	uint32_t threshold = scn->latency_detect.threshold;
 	int cpu_id = qdf_get_cpu();
 
 	/* 2 kinds of check here.
@@ -906,18 +923,15 @@ void hif_credit_latency(struct hif_softc *scn, bool from_timer)
 	 */
 
 	if ((from_timer ?
-	    qdf_system_time_after(credit_request_time,
-				  credit_report_time) :
-	    qdf_system_time_after(credit_report_time,
-				  credit_request_time)) &&
-	    qdf_system_time_after(
-		curr_jiffies,
-		credit_request_time +
-		qdf_system_msecs_to_ticks(detect_latency_threshold))) {
-		hif_err("credit report latency: from timer %d, curr_jiffies %lu, credit_request_time %lu,credit_report_time %lu, detect_latency_threshold %ums, detect_latency_timer_timeout %ums, cpu_id %d, called: %ps",
+	     qdf_system_time_after(credit_request_time, credit_report_time) :
+	     qdf_system_time_after(credit_report_time, credit_request_time)) &&
+	    qdf_system_time_after(curr_jiffies,
+				  credit_request_time +
+				  qdf_system_msecs_to_ticks(threshold))) {
+		hif_err("credit report latency: from timer %d, curr_jiffies %lu, credit_request_time %lu, credit_report_time %lu, threshold %ums, timeout %ums, cpu_id %d, called: %ps",
 			from_timer, curr_jiffies, credit_request_time,
-			credit_report_time, detect_latency_threshold,
-			scn->latency_detect.detect_latency_timer_timeout,
+			credit_report_time, threshold,
+			scn->latency_detect.timeout,
 			cpu_id, (void *)_RET_IP_);
 		goto latency;
 	}
@@ -956,7 +970,9 @@ void hif_check_detection_latency(struct hif_softc *scn,
 static void hif_latency_detect_timeout_handler(void *arg)
 {
 	struct hif_softc *scn = (struct hif_softc *)arg;
-	int next_cpu;
+	int next_cpu, i;
+	qdf_cpu_mask cpu_mask = {0};
+	struct hif_latency_detect *detect = &scn->latency_detect;
 
 	hif_check_detection_latency(scn, true,
 				    BIT(HIF_DETECT_TASKLET) |
@@ -971,47 +987,40 @@ static void hif_latency_detect_timeout_handler(void *arg)
 	 * if tasklet stall, anyway other place will detect it, just
 	 * a little later.
 	 */
-	next_cpu = cpumask_any_but(
-			cpu_active_mask,
-			scn->latency_detect.ce2_tasklet_sched_cpuid);
+	qdf_cpumask_copy(&cpu_mask, (const qdf_cpu_mask *)cpu_active_mask);
+	for (i = 0; i < HIF_TASKLET_IN_MONITOR; i++) {
+		if (!qdf_test_bit(i, detect->tasklet_bmap))
+			continue;
 
+		qdf_cpumask_clear_cpu(detect->tasklet_info[i].sched_cpuid,
+				      &cpu_mask);
+	}
+
+	next_cpu = cpumask_first(&cpu_mask);
 	if (qdf_unlikely(next_cpu >= nr_cpu_ids)) {
 		hif_debug("start timer on local");
 		/* it doesn't found a available cpu, start on local cpu*/
-		qdf_timer_mod(
-			&scn->latency_detect.detect_latency_timer,
-			scn->latency_detect.detect_latency_timer_timeout);
+		qdf_timer_mod(&detect->timer, detect->timeout);
 	} else {
-		qdf_timer_start_on(
-			&scn->latency_detect.detect_latency_timer,
-			scn->latency_detect.detect_latency_timer_timeout,
-			next_cpu);
+		qdf_timer_start_on(&detect->timer, detect->timeout, next_cpu);
 	}
 }
 
 static void hif_latency_detect_timer_init(struct hif_softc *scn)
 {
-	if (!scn) {
-		hif_info_high("scn is null");
-		return;
-	}
-
-	if (QDF_GLOBAL_MISSION_MODE != hif_get_conparam(scn))
-		return;
-
-	scn->latency_detect.detect_latency_timer_timeout =
+	scn->latency_detect.timeout =
 		DETECTION_TIMER_TIMEOUT;
-	scn->latency_detect.detect_latency_threshold =
+	scn->latency_detect.threshold =
 		DETECTION_LATENCY_THRESHOLD;
 
 	hif_info("timer timeout %u, latency threshold %u",
-		 scn->latency_detect.detect_latency_timer_timeout,
-		 scn->latency_detect.detect_latency_threshold);
+		 scn->latency_detect.timeout,
+		 scn->latency_detect.threshold);
 
 	scn->latency_detect.is_timer_started = false;
 
 	qdf_timer_init(NULL,
-		       &scn->latency_detect.detect_latency_timer,
+		       &scn->latency_detect.timer,
 		       &hif_latency_detect_timeout_handler,
 		       scn,
 		       QDF_TIMER_TYPE_SW_SPIN);
@@ -1019,11 +1028,38 @@ static void hif_latency_detect_timer_init(struct hif_softc *scn)
 
 static void hif_latency_detect_timer_deinit(struct hif_softc *scn)
 {
+	hif_info("deinit timer");
+	qdf_timer_free(&scn->latency_detect.timer);
+}
+
+static void hif_latency_detect_init(struct hif_softc *scn)
+{
+	uint32_t tasklet_mask;
+	int i;
+
 	if (QDF_GLOBAL_MISSION_MODE != hif_get_conparam(scn))
 		return;
 
-	hif_info("deinit timer");
-	qdf_timer_free(&scn->latency_detect.detect_latency_timer);
+	tasklet_mask = DETECTION_LATENCY_TASKLET_MASK;
+	hif_info("tasklet mask is 0x%x", tasklet_mask);
+	for (i = 0; i < HIF_TASKLET_IN_MONITOR; i++) {
+		if (BIT(i) & tasklet_mask)
+			qdf_set_bit(i, scn->latency_detect.tasklet_bmap);
+	}
+
+	hif_latency_detect_timer_init(scn);
+}
+
+static void hif_latency_detect_deinit(struct hif_softc *scn)
+{
+	int i;
+
+	if (QDF_GLOBAL_MISSION_MODE != hif_get_conparam(scn))
+		return;
+
+	hif_latency_detect_timer_deinit(scn);
+	for (i = 0; i < HIF_TASKLET_IN_MONITOR; i++)
+		qdf_clear_bit(i, scn->latency_detect.tasklet_bmap);
 }
 
 void hif_latency_detect_timer_start(struct hif_opaque_softc *hif_ctx)
@@ -1039,8 +1075,8 @@ void hif_latency_detect_timer_start(struct hif_opaque_softc *hif_ctx)
 		return;
 	}
 
-	qdf_timer_start(&scn->latency_detect.detect_latency_timer,
-			scn->latency_detect.detect_latency_timer_timeout);
+	qdf_timer_start(&scn->latency_detect.timer,
+			scn->latency_detect.timeout);
 	scn->latency_detect.is_timer_started = true;
 }
 
@@ -1053,7 +1089,7 @@ void hif_latency_detect_timer_stop(struct hif_opaque_softc *hif_ctx)
 
 	hif_debug_rl("stop timer");
 
-	qdf_timer_sync_cancel(&scn->latency_detect.detect_latency_timer);
+	qdf_timer_sync_cancel(&scn->latency_detect.timer);
 	scn->latency_detect.is_timer_started = false;
 }
 
@@ -1094,10 +1130,10 @@ void hif_set_enable_detection(struct hif_opaque_softc *hif_ctx, bool value)
 	scn->latency_detect.enable_detection = value;
 }
 #else
-static void hif_latency_detect_timer_init(struct hif_softc *scn)
+static inline void hif_latency_detect_init(struct hif_softc *scn)
 {}
 
-static void hif_latency_detect_timer_deinit(struct hif_softc *scn)
+static inline void hif_latency_detect_deinit(struct hif_softc *scn)
 {}
 #endif
 struct hif_opaque_softc *hif_open(qdf_device_t qdf_ctx,
@@ -1147,7 +1183,7 @@ struct hif_opaque_softc *hif_open(qdf_device_t qdf_ctx,
 	hif_rtpm_lock_init(scn);
 
 	hif_cpuhp_register(scn);
-	hif_latency_detect_timer_init(scn);
+	hif_latency_detect_init(scn);
 
 out:
 	return GET_HIF_OPAQUE_HDL(scn);
@@ -1186,7 +1222,7 @@ void hif_close(struct hif_opaque_softc *hif_ctx)
 		return;
 	}
 
-	hif_latency_detect_timer_deinit(scn);
+	hif_latency_detect_deinit(scn);
 
 	if (scn->athdiag_procfs_inited) {
 		athdiag_procfs_remove();
