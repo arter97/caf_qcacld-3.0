@@ -2204,6 +2204,7 @@ enum dp_context_type {
  * @dp_free_ppeds_interrupts:
  * @dp_rx_wbm_err_reap_desc: Reap WBM Error Ring Descriptor
  * @dp_rx_null_q_desc_handle: Handle Null Queue Exception Error
+ * @ppeds_handle_attached:
  * @txrx_soc_ppeds_interrupt_stop:
  * @txrx_soc_ppeds_interrupt_start:
  * @txrx_soc_ppeds_service_status_update:
@@ -2416,6 +2417,7 @@ struct dp_arch_ops {
 						     struct dp_vdev *vdev,
 						     bool peer_map);
 #endif
+	bool (*ppeds_handle_attached)(struct dp_soc *soc);
 	QDF_STATUS (*txrx_soc_ppeds_start)(struct dp_soc *soc);
 	void (*txrx_soc_ppeds_stop)(struct dp_soc *soc);
 	int (*dp_register_ppeds_interrupts)(struct dp_soc *soc,

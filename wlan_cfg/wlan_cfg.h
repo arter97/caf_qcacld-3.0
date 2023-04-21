@@ -1866,12 +1866,13 @@ wlan_cfg_is_tx_per_pkt_vdev_id_check_enabled(struct wlan_cfg_dp_soc_ctxt *cfg);
  * @num_dp_msi: Number of DP interrupts available (0 for integrated)
  * @interrupt_mode: Type of interrupt
  * @is_monitor_mode: is monitor mode enabled
+ * @ppeds_attached: is ppeds attached
  *
  * Return: void
  */
 void wlan_cfg_fill_interrupt_mask(struct wlan_cfg_dp_soc_ctxt *wlan_cfg_ctx,
 				  int num_dp_msi, int interrupt_mode,
-				  bool is_monitor_mode);
+				  bool is_monitor_mode, bool ppeds_attached);
 
 /**
  * wlan_cfg_is_rx_fisa_enabled() - Get Rx FISA enabled flag
@@ -2132,13 +2133,13 @@ void wlan_cfg_dp_soc_ctx_dump(struct wlan_cfg_dp_soc_ctxt *cfg);
 
 #ifdef WLAN_SUPPORT_PPEDS
 /**
- * wlan_cfg_get_dp_soc_is_ppeds_enabled() - API to get ppe enable flag
+ * wlan_cfg_get_dp_soc_ppeds_enable() - API to get ppe enable flag
  * @cfg: Configuration Handle
  *
- * Return: true if ppe is enabled else return false
+ * Return: true if ppeds support is enabled else return false
  */
 bool
-wlan_cfg_get_dp_soc_is_ppeds_enabled(struct wlan_cfg_dp_soc_ctxt *cfg);
+wlan_cfg_get_dp_soc_ppeds_enable(struct wlan_cfg_dp_soc_ctxt *cfg);
 
 /**
  * wlan_cfg_get_dp_soc_reo2ppe_ring_size() - get ppe rx ring size
@@ -2185,7 +2186,7 @@ int
 wlan_cfg_get_dp_soc_ppeds_tx_comp_napi_budget(struct wlan_cfg_dp_soc_ctxt *cfg);
 #else
 static inline bool
-wlan_cfg_get_dp_soc_is_ppeds_enabled(struct wlan_cfg_dp_soc_ctxt *cfg)
+wlan_cfg_get_dp_soc_ppeds_enable(struct wlan_cfg_dp_soc_ctxt *cfg)
 {
 	return false;
 }

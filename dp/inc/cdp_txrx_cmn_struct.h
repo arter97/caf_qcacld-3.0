@@ -1434,7 +1434,6 @@ enum cdp_pdev_param_type {
  *
  * @cdp_psoc_param_en_rate_stats: set rate stats enable/disable
  * @cdp_psoc_param_en_nss_cfg: set nss cfg
- * @cdp_psoc_param_ppeds_enabled: PPE-DS feature enable
  * @cdp_ipa_enabled : set ipa mode
  * @cdp_psoc_param_vdev_stats_hw_offload: Configure HW vdev stats offload
  * @cdp_pdev_param_undecoded_metadata_enable: Undecoded metadata capture enable
@@ -1522,7 +1521,6 @@ typedef union cdp_config_param_t {
 	int cdp_psoc_param_en_nss_cfg;
 	int cdp_psoc_param_preferred_hw_mode;
 	bool cdp_psoc_param_pext_stats;
-	bool cdp_psoc_param_ppeds_enabled;
 
 	bool cdp_skip_bar_update;
 	bool cdp_ipa_enabled;
@@ -1688,7 +1686,6 @@ enum cdp_vdev_param_type {
  * @CDP_CFG_VDEV_STATS_HW_OFFLOAD: HW Vdev stats config
  * @CDP_SAWF_ENABLE:
  * @CDP_UMAC_RST_SKEL_ENABLE: Enable Umac reset skeleton code for debug
- * @CDP_PPEDS_ENABLE: PPEDS is enabled or not
  * @CDP_SAWF_STATS: set SAWF stats config
  * @CDP_UMAC_RESET_STATS: UMAC reset stats
  */
@@ -1701,7 +1698,6 @@ enum cdp_psoc_param_type {
 	CDP_CFG_VDEV_STATS_HW_OFFLOAD,
 	CDP_SAWF_ENABLE,
 	CDP_UMAC_RST_SKEL_ENABLE,
-	CDP_PPEDS_ENABLE,
 	CDP_SAWF_STATS,
 	CDP_UMAC_RESET_STATS,
 };
