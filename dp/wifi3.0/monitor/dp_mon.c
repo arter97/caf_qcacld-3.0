@@ -5498,6 +5498,7 @@ QDF_STATUS dp_mon_soc_cfg_init(struct dp_soc *soc)
 		break;
 	case TARGET_TYPE_QCN9224:
 	case TARGET_TYPE_QCA5332:
+	case TARGET_TYPE_QCN6432:
 		wlan_cfg_set_mon_delayed_replenish_entries(soc->wlan_cfg_ctx,
 							   MON_BUF_MIN_ENTRIES);
 		mon_soc->hw_nac_monitor_support = 1;
@@ -6183,6 +6184,7 @@ void dp_mon_ops_register(struct dp_soc *soc)
 		break;
 	case TARGET_TYPE_QCN9224:
 	case TARGET_TYPE_QCA5332:
+	case TARGET_TYPE_QCN6432:
 #ifdef QCA_MONITOR_2_0_SUPPORT
 		dp_mon_ops_register_2_0(mon_soc);
 #endif
@@ -6253,6 +6255,7 @@ void dp_mon_cdp_ops_register(struct dp_soc *soc)
 		break;
 	case TARGET_TYPE_QCN9224:
 	case TARGET_TYPE_QCA5332:
+	case TARGET_TYPE_QCN6432:
 #ifdef QCA_MONITOR_2_0_SUPPORT
 		dp_mon_cdp_ops_register_2_0(ops);
 #if defined(WLAN_CFR_ENABLE) && defined(WLAN_ENH_CFR_ENABLE)
