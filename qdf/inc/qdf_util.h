@@ -92,6 +92,23 @@ typedef __qdf_wait_queue_head_t qdf_wait_queue_head_t;
 #define qdf_assert_always(expr)  __qdf_assert(expr)
 
 /**
+ * qdf_assert_always_func - invoke function to dump needed info before assert
+ * @expr: expression to test
+ * @debug_fp: function pointer to be invoked for debugging
+ */
+#define qdf_assert_always_func(expr, debug_fp, ...)			\
+	do {								\
+		typeof(debug_fp) _debug_fp = debug_fp;			\
+		if (unlikely(!(expr))) {				\
+			pr_err("Assertion failed! %s:%s %s:%d\n",	\
+			       # expr, __func__, __FILE__, __LINE__);	\
+			if (_debug_fp)					\
+				_debug_fp(__VA_ARGS__);			\
+			QDF_BUG_ON_ASSERT(0);				\
+		}							\
+	} while (0)
+
+/**
  * qdf_target_assert_always - always target assert "expr" evaluates to false.
  * @expr: expression to test
  */
