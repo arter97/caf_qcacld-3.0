@@ -48,6 +48,7 @@
 void dp_tx_nawds_handler(struct dp_soc *soc, struct dp_vdev *vdev,
 			 struct dp_tx_msdu_info_s *msdu_info,
 			 qdf_nbuf_t nbuf, uint16_t sa_peer_id);
+int dp_tx_proxy_arp(struct dp_vdev *vdev, qdf_nbuf_t nbuf);
 /*
  * DP_TX_DESC_FLAG_FRAG flags should always be defined to 0x1
  * please do not change this flag's definition

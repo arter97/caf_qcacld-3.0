@@ -2263,9 +2263,7 @@ dp_tx_update_mcast_param(uint16_t peer_id,
 						    msdu_info->gsn);
 
 		msdu_info->vdev_id = vdev->vdev_id + DP_MLO_VDEV_ID_OFFSET;
-		if (qdf_unlikely(vdev->nawds_enabled ||
-				 dp_vdev_is_wds_ext_enabled(vdev)))
-			HTT_TX_TCL_METADATA_GLBL_SEQ_HOST_INSPECTED_SET(
+		HTT_TX_TCL_METADATA_GLBL_SEQ_HOST_INSPECTED_SET(
 							*htt_tcl_metadata, 1);
 	} else {
 		msdu_info->vdev_id = vdev->vdev_id;
@@ -3803,7 +3801,6 @@ qdf_nbuf_t dp_tx_send_vdev_id_check(struct cdp_soc_t *soc_hdl,
  *
  * Return: status
  */
-static inline
 int dp_tx_proxy_arp(struct dp_vdev *vdev, qdf_nbuf_t nbuf)
 {
 	if (vdev->osif_proxy_arp)
@@ -3819,7 +3816,6 @@ int dp_tx_proxy_arp(struct dp_vdev *vdev, qdf_nbuf_t nbuf)
 	return QDF_STATUS_NOT_INITIALIZED;
 }
 #else
-static inline
 int dp_tx_proxy_arp(struct dp_vdev *vdev, qdf_nbuf_t nbuf)
 {
 	return QDF_STATUS_SUCCESS;
