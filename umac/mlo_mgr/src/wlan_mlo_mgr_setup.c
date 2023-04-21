@@ -434,6 +434,7 @@ void mlo_setup_init(uint8_t total_grp)
 	mlo_ctx->setup_info = setup_info;
 	mlo_ctx->setup_info[0].ml_grp_id = 0;
 	for (id = 0; id < total_grp; id++) {
+		mlo_ctx->setup_info[id].tsf_sync_enabled = true;
 		if (qdf_event_create(&mlo_ctx->setup_info[id].event) !=
 							QDF_STATUS_SUCCESS)
 			mlo_err("Unable to create teardown event");
