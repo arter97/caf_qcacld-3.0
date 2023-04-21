@@ -36,12 +36,15 @@
 int dp_mscs_peer_lookup_n_get_priority(struct cdp_soc_t *soc_hdl,
 		uint8_t *src_mac_addr, uint8_t *dst_mac_addr, qdf_nbuf_t nbuf)
 {
-	struct dp_peer *src_peer;
-	struct dp_peer *dst_peer;
+	struct dp_peer *src_peer = NULL;
+	struct dp_peer *dst_peer = NULL;
+	struct dp_peer *tgt_peer = NULL;
 	uint8_t user_prio_bitmap;
 	uint8_t user_prio_limit;
 	uint8_t user_prio;
+	uint16_t peer_id;
 	int status = 0;
+	struct dp_ast_entry *ast_entry = NULL;
 	struct dp_soc *dpsoc = cdp_soc_t_to_dp_soc(soc_hdl);
 
 	if (!dpsoc) {
@@ -50,11 +53,21 @@ int dp_mscs_peer_lookup_n_get_priority(struct cdp_soc_t *soc_hdl,
 		return DP_MSCS_PEER_LOOKUP_STATUS_PEER_NOT_FOUND;
 	}
 
+	/* Fetch ast_entry corresponding to src_mac_addr */
+	qdf_spin_lock_bh(&dpsoc->ast_lock);
+	ast_entry = dp_peer_ast_hash_find_soc(dpsoc, src_mac_addr);
+	if (!ast_entry) {
+		qdf_spin_unlock_bh(&dpsoc->ast_lock);
+		return DP_MSCS_PEER_LOOKUP_STATUS_PEER_NOT_FOUND;
+	}
+
+	peer_id = ast_entry->peer_id;
+	qdf_spin_unlock_bh(&dpsoc->ast_lock);
+
 	/*
 	 * Find the MSCS peer from global soc
 	 */
-	src_peer = dp_peer_find_hash_find(dpsoc, src_mac_addr, 0,
-			DP_VDEV_ALL, DP_MOD_ID_MSCS);
+	src_peer = dp_peer_get_ref_by_id(dpsoc, peer_id, DP_MOD_ID_MSCS);
 
 	if (!src_peer) {
 		dst_peer = dp_peer_find_hash_find(dpsoc, dst_mac_addr, 0,
@@ -82,10 +95,16 @@ int dp_mscs_peer_lookup_n_get_priority(struct cdp_soc_t *soc_hdl,
 		}
 	}
 
+	tgt_peer = dp_get_tgt_peer_from_peer(src_peer);
+	if (!tgt_peer) {
+		status = DP_MSCS_PEER_LOOKUP_STATUS_ALLOW_INVALID_QOS_TAG_UPDATE;
+		goto fail;
+	}
+
 	/*
 	 * check if there is any active MSCS session for this peer
 	 */
-	if (!src_peer->mscs_active) {
+	if (!tgt_peer->mscs_active) {
 		QDF_TRACE(QDF_MODULE_ID_MSCS, QDF_TRACE_LEVEL_DEBUG,
 		"%s: MSCS session not active on peer or peer delete in progress\n", __func__);
 		status = DP_MSCS_PEER_LOOKUP_STATUS_ALLOW_INVALID_QOS_TAG_UPDATE;
@@ -95,8 +114,8 @@ int dp_mscs_peer_lookup_n_get_priority(struct cdp_soc_t *soc_hdl,
 	/*
 	 * Get user priority bitmap for this peer MSCS active session
 	 */
-	user_prio_bitmap = src_peer->mscs_ipv4_parameter.user_priority_bitmap;
-	user_prio_limit = src_peer->mscs_ipv4_parameter.user_priority_limit;
+	user_prio_bitmap = tgt_peer->mscs_ipv4_parameter.user_priority_bitmap;
+	user_prio_limit = tgt_peer->mscs_ipv4_parameter.user_priority_limit;
 	user_prio = qdf_nbuf_get_priority(nbuf) & DP_MSCS_VALID_TID_MASK;
 
 	/*
