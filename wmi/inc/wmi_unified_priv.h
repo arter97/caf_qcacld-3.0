@@ -371,13 +371,13 @@ enum WMI_RECORD_TYPE {
 
 #endif /*WMI_INTERFACE_EVENT_LOGGING */
 
-#ifdef WLAN_OPEN_SOURCE
+#ifdef WLAN_DBGLOG_DEBUGFS
 struct fwdebug {
 	struct sk_buff_head fwlog_queue;
 	struct completion fwlog_completion;
 	A_BOOL fwlog_open;
 };
-#endif /* WLAN_OPEN_SOURCE */
+#endif /* WLAN_DBGLOG_DEBUGFS */
 
 /**
  * struct wmi_wq_dbg_info - WMI WQ debug info
@@ -3362,10 +3362,10 @@ struct wmi_unified {
 	struct wmi_host_abi_version final_abi_vers;
 	uint32_t num_of_diag_events_logs;
 	uint32_t *events_logs_list;
-#ifdef WLAN_OPEN_SOURCE
+#ifdef WLAN_DBGLOG_DEBUGFS
 	struct fwdebug dbglog;
 	struct dentry *debugfs_phy;
-#endif /* WLAN_OPEN_SOURCE */
+#endif /* WLAN_DBGLOG_DEBUGFS */
 
 #ifdef WMI_INTERFACE_EVENT_LOGGING
 	struct wmi_debug_log_info log_info;
