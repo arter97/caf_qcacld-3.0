@@ -3240,9 +3240,22 @@ static inline void dp_update_mlo_ts_offset(struct dp_soc *soc,
 	soc->cdp_soc.ops->mlo_ops->mlo_update_mlo_ts_offset
 		((struct cdp_soc_t *)soc, mlo_offset);
 }
+
+static inline
+void dp_update_mlo_delta_tsf2(struct dp_soc *soc, struct dp_pdev *pdev)
+{
+	uint64_t delta_tsf2 = 0;
+
+	hal_get_tsf2_offset(soc->hal_soc, pdev->lmac_id, &delta_tsf2);
+	soc->cdp_soc.ops->mlo_ops->mlo_update_delta_tsf2
+		((struct cdp_soc_t *)soc, pdev->pdev_id, delta_tsf2);
+}
 #else
 static inline void dp_update_mlo_ts_offset(struct dp_soc *soc,
 					   uint32_t ts_lo, uint32_t ts_hi)
+{}
+static inline
+void dp_update_mlo_delta_tsf2(struct dp_soc *soc, struct dp_pdev *pdev)
 {}
 #endif
 static void dp_htt_mlo_peer_map_handler(struct htt_soc *soc,
@@ -3437,6 +3450,8 @@ dp_rx_mlo_timestamp_ind_handler(struct dp_soc *soc,
 	dp_update_mlo_ts_offset(soc,
 				pdev->timestamp.mlo_offset_lo_us,
 				pdev->timestamp.mlo_offset_hi_us);
+
+	dp_update_mlo_delta_tsf2(soc, pdev);
 }
 #else
 static void dp_htt_mlo_peer_map_handler(struct htt_soc *soc,
