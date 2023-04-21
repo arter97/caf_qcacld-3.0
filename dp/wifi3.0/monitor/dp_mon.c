@@ -472,8 +472,10 @@ static QDF_STATUS dp_vdev_set_monitor_mode(struct cdp_soc_t *dp_soc,
 
 	pdev = vdev->pdev;
 
-	if (!pdev || !pdev->monitor_pdev)
+	if (!pdev || !pdev->monitor_pdev) {
+		dp_vdev_unref_delete(soc, vdev, DP_MOD_ID_CDP);
 		return QDF_STATUS_E_FAILURE;
+	}
 
 	mon_pdev = pdev->monitor_pdev;
 
