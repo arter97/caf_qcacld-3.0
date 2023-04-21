@@ -1443,6 +1443,7 @@ enum cdp_pdev_param_type {
  * @cdp_skel_enable : Enable/Disable skeleton code for Umac reset debug
  * @cdp_drop_tx_mcast: Enable/Disable tx mcast drop
  * @cdp_vdev_tx_to_fw: Set to_fw bit for all tx packets for the vdev
+ * @cdp_peer_metadata_ver: DP rx peer metadata version configuration
  */
 typedef union cdp_config_param_t {
 	/* peer params */
@@ -1533,6 +1534,7 @@ typedef union cdp_config_param_t {
 	bool cdp_umac_rst_skel;
 	bool cdp_drop_tx_mcast;
 	bool cdp_vdev_tx_to_fw;
+	uint8_t cdp_peer_metadata_ver;
 } cdp_config_param_type;
 
 /**
@@ -1688,6 +1690,7 @@ enum cdp_vdev_param_type {
  * @CDP_UMAC_RST_SKEL_ENABLE: Enable Umac reset skeleton code for debug
  * @CDP_SAWF_STATS: set SAWF stats config
  * @CDP_UMAC_RESET_STATS: UMAC reset stats
+ * @CDP_CFG_RX_PEER_METADATA_VER: RX peer metadata configuration
  */
 enum cdp_psoc_param_type {
 	CDP_ENABLE_RATE_STATS,
@@ -1700,7 +1703,15 @@ enum cdp_psoc_param_type {
 	CDP_UMAC_RST_SKEL_ENABLE,
 	CDP_SAWF_STATS,
 	CDP_UMAC_RESET_STATS,
+	CDP_CFG_RX_PEER_METADATA_VER,
 };
+
+#ifdef CONFIG_AP_PLATFORM
+/* RX peer metadata version if v1a_v1b is supported */
+#define CDP_RX_PEER_METADATA_V1_A_B 3
+#else
+#define CDP_RX_PEER_METADATA_V1_A_B 2
+#endif
 
 #define TXRX_FW_STATS_TXSTATS                     1
 #define TXRX_FW_STATS_RXSTATS                     2

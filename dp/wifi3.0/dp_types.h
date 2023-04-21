@@ -2794,6 +2794,16 @@ struct dp_soc {
 	uint32_t peer_id_mask;
 #endif
 
+	/* rx peer metadata field shift and mask configuration */
+	uint8_t htt_peer_id_s;
+	uint32_t htt_peer_id_m;
+	uint8_t htt_vdev_id_s;
+	uint32_t htt_vdev_id_m;
+	uint8_t htt_mld_peer_valid_s;
+	uint32_t htt_mld_peer_valid_m;
+	/* rx peer metadata version */
+	uint8_t rx_peer_metadata_ver;
+
 	/* SoC level data path statistics */
 	struct dp_soc_stats stats;
 #ifdef WLAN_SYSFS_DP_STATS

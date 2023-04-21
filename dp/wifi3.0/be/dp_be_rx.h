@@ -190,18 +190,25 @@ dp_rx_desc_sw_cc_check(struct dp_soc *soc,
 
 #define DP_PEER_METADATA_OFFLOAD_GET_BE(_peer_metadata)		(0)
 
+#define HTT_RX_PEER_META_DATA_FIELD_GET(_var, _field_s, _field_m) \
+	(((_var) & (_field_m)) >> (_field_s))
+
 #ifdef DP_USE_REDUCED_PEER_ID_FIELD_WIDTH
 static inline uint16_t
 dp_rx_peer_metadata_peer_id_get_be(struct dp_soc *soc, uint32_t peer_metadata)
 {
-	struct htt_rx_peer_metadata_v1 *metadata =
-			(struct htt_rx_peer_metadata_v1 *)&peer_metadata;
+	uint8_t ml_peer_valid;
 	uint16_t peer_id;
 
-	peer_id = metadata->peer_id |
-		  (metadata->ml_peer_valid << soc->peer_id_shift);
+	peer_id = HTT_RX_PEER_META_DATA_FIELD_GET(peer_metadata,
+						  soc->htt_peer_id_s,
+						  soc->htt_peer_id_m);
+	ml_peer_valid = HTT_RX_PEER_META_DATA_FIELD_GET(
+						peer_metadata,
+						soc->htt_mld_peer_valid_s,
+						soc->htt_mld_peer_valid_m);
 
-	return peer_id;
+	return (peer_id | (ml_peer_valid << soc->peer_id_shift));
 }
 #else
 /* Combine ml_peer_valid and peer_id field */
@@ -219,10 +226,10 @@ dp_rx_peer_metadata_peer_id_get_be(struct dp_soc *soc, uint32_t peer_metadata)
 static inline uint16_t
 dp_rx_peer_metadata_vdev_id_get_be(struct dp_soc *soc, uint32_t peer_metadata)
 {
-	struct htt_rx_peer_metadata_v1 *metadata =
-			(struct htt_rx_peer_metadata_v1 *)&peer_metadata;
 
-	return metadata->vdev_id;
+	return HTT_RX_PEER_META_DATA_FIELD_GET(peer_metadata,
+					       soc->htt_vdev_id_s,
+					       soc->htt_vdev_id_m);
 }
 
 static inline uint8_t

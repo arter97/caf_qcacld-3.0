@@ -7436,6 +7436,64 @@ dp_set_vdev_param_wrapper(struct cdp_soc_t *cdp_soc, uint8_t vdev_id,
 #endif
 
 /**
+ * dp_rx_peer_metadata_ver_update() - update rx peer metadata version and
+ *                                    corresponding filed shift and mask
+ * @soc: Handle to DP Soc structure
+ * @peer_md_ver: RX peer metadata version value
+ *
+ * Return: None
+ */
+static void
+dp_rx_peer_metadata_ver_update(struct dp_soc *soc, uint8_t peer_md_ver)
+{
+	dp_info("rx_peer_metadata version %d", peer_md_ver);
+
+	switch (peer_md_ver) {
+	case 0: /* htt_rx_peer_metadata_v0 */
+		soc->htt_peer_id_s = HTT_RX_PEER_META_DATA_V0_PEER_ID_S;
+		soc->htt_peer_id_m = HTT_RX_PEER_META_DATA_V0_PEER_ID_M;
+		soc->htt_vdev_id_s = HTT_RX_PEER_META_DATA_V0_VDEV_ID_S;
+		soc->htt_vdev_id_m = HTT_RX_PEER_META_DATA_V0_VDEV_ID_M;
+		break;
+	case 1: /* htt_rx_peer_metadata_v1 */
+		soc->htt_peer_id_s = HTT_RX_PEER_META_DATA_V1_PEER_ID_S;
+		soc->htt_peer_id_m = HTT_RX_PEER_META_DATA_V1_PEER_ID_M;
+		soc->htt_vdev_id_s = HTT_RX_PEER_META_DATA_V1_VDEV_ID_S;
+		soc->htt_vdev_id_m = HTT_RX_PEER_META_DATA_V1_VDEV_ID_M;
+		soc->htt_mld_peer_valid_s =
+				HTT_RX_PEER_META_DATA_V1_ML_PEER_VALID_S;
+		soc->htt_mld_peer_valid_m =
+				HTT_RX_PEER_META_DATA_V1_ML_PEER_VALID_M;
+		break;
+	case 2: /* htt_rx_peer_metadata_v1a */
+		soc->htt_peer_id_s = HTT_RX_PEER_META_DATA_V1A_PEER_ID_S;
+		soc->htt_peer_id_m = HTT_RX_PEER_META_DATA_V1A_PEER_ID_M;
+		soc->htt_vdev_id_s = HTT_RX_PEER_META_DATA_V1A_VDEV_ID_S;
+		soc->htt_vdev_id_m = HTT_RX_PEER_META_DATA_V1A_VDEV_ID_M;
+		soc->htt_mld_peer_valid_s =
+				HTT_RX_PEER_META_DATA_V1A_ML_PEER_VALID_S;
+		soc->htt_mld_peer_valid_m =
+				HTT_RX_PEER_META_DATA_V1A_ML_PEER_VALID_M;
+		break;
+	case 3: /* htt_rx_peer_metadata_v1b */
+		soc->htt_peer_id_s = HTT_RX_PEER_META_DATA_V1B_PEER_ID_S;
+		soc->htt_peer_id_m = HTT_RX_PEER_META_DATA_V1B_PEER_ID_M;
+		soc->htt_vdev_id_s = HTT_RX_PEER_META_DATA_V1B_VDEV_ID_S;
+		soc->htt_vdev_id_m = HTT_RX_PEER_META_DATA_V1B_VDEV_ID_M;
+		soc->htt_mld_peer_valid_s =
+				HTT_RX_PEER_META_DATA_V1B_ML_PEER_VALID_S;
+		soc->htt_mld_peer_valid_m =
+				HTT_RX_PEER_META_DATA_V1B_ML_PEER_VALID_M;
+		break;
+	default:
+		dp_err("invliad rx_peer_metadata version %d", peer_md_ver);
+		break;
+	}
+
+	soc->rx_peer_metadata_ver = peer_md_ver;
+}
+
+/**
  * dp_set_psoc_param: function to set parameters in psoc
  * @cdp_soc: DP soc handle
  * @param: parameter type to be set
@@ -7505,6 +7563,10 @@ dp_set_psoc_param(struct cdp_soc_t *cdp_soc,
 	case CDP_SAWF_STATS:
 		wlan_cfg_set_sawf_stats_config(wlan_cfg_ctx,
 					       val.cdp_sawf_stats);
+		break;
+	case CDP_CFG_RX_PEER_METADATA_VER:
+		dp_rx_peer_metadata_ver_update(
+				soc, val.cdp_peer_metadata_ver);
 		break;
 	default:
 		break;
