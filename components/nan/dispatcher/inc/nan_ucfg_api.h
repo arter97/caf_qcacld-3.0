@@ -558,6 +558,18 @@ ucfg_nan_send_pasn_peer_create_cmd(struct wlan_objmgr_psoc *psoc,
 				   struct wlan_objmgr_vdev *vdev,
 				   struct qdf_mac_addr peer_mac_addr);
 
+/**
+ * ucfg_nan_send_delete_pasn_peer() - This API post NAN peer delete message to
+ * the scheduler and wait for NAN peer delete response.
+ * @psoc: pointer to PSOC object
+ * @vdev_id: VDEV id
+ * @peer_mac_addr: pointer to peer mac address
+ *
+ * Return: status of operation
+ */
+QDF_STATUS ucfg_nan_send_delete_pasn_peer(struct wlan_objmgr_psoc *psoc,
+					  uint8_t vdev_id,
+					  struct qdf_mac_addr *peer_mac_addr);
 #else /* WLAN_FEATURE_NAN */
 
 static inline
@@ -705,6 +717,13 @@ static inline QDF_STATUS
 ucfg_nan_send_pasn_peer_create_cmd(struct wlan_objmgr_psoc *psoc,
 				   struct wlan_objmgr_vdev *vdev,
 				   struct qdf_mac_addr peer_mac_addr)
+{
+	return QDF_STATUS_E_NOSUPPORT;
+}
+
+static inline QDF_STATUS
+ucfg_nan_send_delete_pasn_peer(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
+			       struct qdf_mac_addr *peer_mac_addr)
 {
 	return QDF_STATUS_E_NOSUPPORT;
 }

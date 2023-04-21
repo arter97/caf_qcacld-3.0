@@ -25442,6 +25442,38 @@ static int wlan_hdd_cfg80211_get_key(struct wiphy *wiphy,
 #endif
 
 /**
+ * wlan_hdd_is_key_associated_with_peer() - check if provided key is associated
+ * associated with provided peer address.
+ * @vdev: pointer to vdev object
+ * @key_index: Key index used in 802.11 frames
+ * @peer_mac: Peer address
+ *
+ * Return: true if keys is associated with peer, otherwise false
+ */
+static bool
+wlan_hdd_is_key_associated_with_peer(struct wlan_objmgr_vdev *vdev,
+				     uint8_t key_index,
+				     struct qdf_mac_addr *peer_mac)
+{
+	struct wlan_crypto_key *crypto_key;
+
+	crypto_key = wlan_crypto_get_key(vdev, key_index);
+	if (!crypto_key) {
+		hdd_err("Crypto KEY is NULL");
+		return false;
+	}
+
+	if (!qdf_mem_cmp(peer_mac->bytes, crypto_key->macaddr,
+			 QDF_MAC_ADDR_SIZE))
+		return true;
+
+	hdd_debug("key is not associated, peer addr" QDF_MAC_ADDR_FMT,
+		  QDF_MAC_ADDR_REF(peer_mac->bytes));
+
+	return false;
+}
+
+/**
  * __wlan_hdd_cfg80211_del_key() - Delete the encryption key for station
  * @wiphy: wiphy interface context
  * @ndev: pointer to net device
@@ -25474,6 +25506,9 @@ static int __wlan_hdd_cfg80211_del_key(struct wiphy *wiphy,
 	enum wlan_peer_type peer_type;
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
 	int ret;
+	uint8_t vdev_id;
+	struct wlan_objmgr_vdev *vdev;
+	bool is_key_associated;
 
 	hdd_enter();
 
@@ -25504,10 +25539,44 @@ static int __wlan_hdd_cfg80211_del_key(struct wiphy *wiphy,
 								&peer_mac);
 			if (QDF_IS_STATUS_ERROR(status))
 				hdd_err("send_pasn_peer_deauth failed");
+		} else if (peer_type == WLAN_PEER_NAN_PASN) {
+			vdev = wlan_peer_get_vdev(peer);
+			status = wlan_objmgr_vdev_try_get_ref(vdev,
+							      WLAN_OSIF_ID);
+			if (QDF_IS_STATUS_ERROR(status)) {
+				hdd_err("get vdev ref fails");
+				goto peer_rel;
+			}
 
-			ret = qdf_status_to_os_return(status);
+			vdev_id = wlan_vdev_get_id(vdev);
+			is_key_associated =
+				wlan_hdd_is_key_associated_with_peer(vdev,
+								     key_index,
+								     &peer_mac);
+			wlan_objmgr_vdev_release_ref(vdev, WLAN_OSIF_ID);
+			/*
+			 * release peer reference before sending peer delete
+			 * cmd to avoid the peer ref leak.
+			 */
+			wlan_objmgr_peer_release_ref(peer, WLAN_OSIF_ID);
+
+			if (!is_key_associated) {
+				status = QDF_STATUS_E_FAILURE;
+				goto ret;
+			}
+
+			status = ucfg_nan_send_delete_pasn_peer(hdd_ctx->psoc,
+								vdev_id,
+								&peer_mac);
+			if (QDF_IS_STATUS_ERROR(status))
+				hdd_err("NAN pasn peer delete failed");
+
+			goto ret;
 		}
+peer_rel:
 		wlan_objmgr_peer_release_ref(peer, WLAN_OSIF_ID);
+ret:
+		ret = qdf_status_to_os_return(status);
 	}
 err:
 	hdd_exit();
