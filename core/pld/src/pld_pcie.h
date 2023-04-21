@@ -616,7 +616,7 @@ static inline void pld_pcie_unlock_reg_window(struct device *dev,
 	cnss_pci_unlock_reg_window(dev, flags);
 }
 
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 10, 0))
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 4, 0))
 static inline int pld_pcie_get_pci_slot(struct device *dev)
 {
 	return cnss_get_pci_slot(dev);
