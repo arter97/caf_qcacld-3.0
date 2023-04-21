@@ -759,6 +759,12 @@ dp_tx_mlo_mcast_pkt_send(struct dp_vdev_be *be_vdev,
 				    &msdu_info, nbuf_clone, DP_INVALID_PEER);
 	}
 
+	if (qdf_unlikely(dp_tx_proxy_arp(ptnr_vdev, nbuf_clone) !=
+			 QDF_STATUS_SUCCESS)) {
+		qdf_nbuf_free(nbuf_clone);
+		return;
+	}
+
 	qdf_mem_zero(&msdu_info, sizeof(msdu_info));
 	dp_tx_get_queue(ptnr_vdev, nbuf_clone, &msdu_info.tx_queue);
 	msdu_info.gsn = be_vdev->seq_num;
