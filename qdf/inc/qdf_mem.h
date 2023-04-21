@@ -1487,4 +1487,45 @@ int
 qdf_iommu_domain_get_attr(qdf_iommu_domain_t *domain,
 			  enum qdf_iommu_attr attr, void *data);
 #endif
+
+#define DEFAULT_DEBUG_DOMAIN_INIT 0
+#ifdef QCA_DMA_PADDR_CHECK
+/**
+ * qdf_dma_invalid_buf_list_init() - Initialize dma invalid buffer list
+ *
+ * Return: none
+ */
+void qdf_dma_invalid_buf_list_init(void);
+
+/**
+ * qdf_dma_invalid_buf_list_deinit() - Deinitialize dma invalid buffer list
+ *
+ * Return: none
+ */
+void qdf_dma_invalid_buf_list_deinit(void);
+
+/**
+ * qdf_dma_invalid_buf_free() - Free dma invalid buffer
+ * @dev: Pointer to device handle
+ * @domain: Debug domain
+ *
+ * Return: none
+ */
+void qdf_dma_invalid_buf_free(void *dev, uint8_t domain);
+#else
+static inline void
+qdf_dma_invalid_buf_list_init(void)
+{
+}
+
+static inline void
+qdf_dma_invalid_buf_list_deinit(void)
+{
+}
+
+static inline void
+qdf_dma_invalid_buf_free(void *dev, uint8_t domain)
+{
+}
+#endif /* QCA_DMA_PADDR_CHECK */
 #endif /* __QDF_MEMORY_H */
