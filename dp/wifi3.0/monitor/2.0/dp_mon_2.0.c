@@ -1694,6 +1694,7 @@ struct cdp_mon_ops dp_ops_mon_2_0 = {
 	.txrx_update_pdev_mon_telemetry_airtime_stats =
 			dp_pdev_update_telemetry_airtime_stats,
 #endif
+	.txrx_update_mon_mac_filter = NULL,
 };
 
 #ifdef QCA_MONITOR_OPS_PER_SOC_SUPPORT
