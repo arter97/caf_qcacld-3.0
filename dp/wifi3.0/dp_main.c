@@ -12120,8 +12120,10 @@ uint16_t dp_get_peer_mac_list(ol_txrx_soc_handle soc, uint8_t vdev_id,
 	if (!vdev)
 		return new_mac_cnt;
 
-	if (limit && (vdev->num_peers > mac_cnt))
+	if (limit && (vdev->num_peers > mac_cnt)) {
+		dp_vdev_unref_delete(dp_soc, vdev, DP_MOD_ID_CDP);
 		return 0;
+	}
 
 	qdf_spin_lock_bh(&vdev->peer_list_lock);
 	TAILQ_FOREACH(peer, &vdev->peer_list, peer_list_elem) {
