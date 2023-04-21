@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -41,7 +41,7 @@
  * This mask defines how many transmit frames account for 1 NAPI work unit
  * 0 means each tx completion is 1 unit
  */
-#define DP_TX_NAPI_BUDGET_DIV_MASK 0
+#define DP_TX_NAPI_BUDGET_DIV_MASK 0xffff
 
 /* PPDU Stats Configuration - Configure bitmask for enabling tx ppdu tlv's */
 #define DP_PPDU_TXLITE_STATS_BITMASK_CFG 0x3FFF
