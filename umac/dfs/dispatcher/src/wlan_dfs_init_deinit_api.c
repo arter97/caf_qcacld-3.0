@@ -265,9 +265,6 @@ static QDF_STATUS dfs_psoc_obj_create_notification(struct wlan_objmgr_psoc *psoc
 	/* DFS Agile SM initialization */
 	dfs_agile_sm_create(dfs_soc_obj);
 
-	dfs_debug(NULL, WLAN_DEBUG_DFS1,
-		"DFS obj attach to psoc successfully");
-
 	return status;
 }
 
