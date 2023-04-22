@@ -4826,6 +4826,10 @@ BUILD_TAG = "cld:$(CLD_IDS); cmn:$(CMN_IDS); dev:$(DEVNAME)"
 ccflags-y += -DBUILD_TAG=\"$(BUILD_TAG)\"
 endif
 
+ifeq ($(CONFIG_ARCH_PINEAPPLE), y)
+ccflags-y += -gdwarf-4
+endif
+
 # Module information used by KBuild framework
 obj-$(CONFIG_QCA_CLD_WLAN) += $(MODNAME).o
 ifeq ($(CONFIG_WLAN_RESIDENT_DRIVER), y)
