@@ -88,6 +88,16 @@ QDF_STATUS
 wlan_twt_cfg_get_bcast_responder(struct wlan_objmgr_psoc *psoc, bool *val);
 
 /**
+ * wlan_twt_cfg_get_rtwt_requestor() - get rTWT requestor
+ * @psoc: Pointer to global psoc
+ * @val: pointer to output variable
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+wlan_twt_cfg_get_rtwt_requestor(struct wlan_objmgr_psoc *psoc, bool *val);
+
+/**
  * wlan_twt_cfg_set_requestor_flag() - set requestor flag
  * @psoc: Pointer to global psoc
  * @val: value to be set
