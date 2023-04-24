@@ -1224,7 +1224,7 @@ void dp_rx_process_invalid_peer_wrapper(struct dp_soc *soc,
 		qdf_nbuf_set_next((ptail), NULL);                     \
 	} while (0)
 
-#if defined(QCA_PADDR_CHECK_ON_3RD_PARTY_PLATFORM)
+#if defined(QCA_PADDR_CHECK_ON_3TH_PLATFORM)
 /*
  * on some third-party platform, the memory below 0x2000
  * is reserved for target use, so any memory allocated in this
@@ -1242,7 +1242,7 @@ void dp_rx_process_invalid_peer_wrapper(struct dp_soc *soc,
 #define DP_PHY_ADDR_RESERVED	0x50000000
 #endif
 
-#if defined(QCA_PADDR_CHECK_ON_3RD_PARTY_PLATFORM) || defined(BUILD_X86)
+#if defined(QCA_PADDR_CHECK_ON_3TH_PLATFORM) || defined(BUILD_X86)
 /**
  * dp_check_paddr() - check if current phy address is valid or not
  * @dp_soc: core txrx main context
