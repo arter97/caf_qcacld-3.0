@@ -23,10 +23,6 @@
 #include <target_if_vdev_mgr_tx_ops.h>
 #include <init_deinit_lmac.h>
 #include <wlan_vdev_mlme_api.h>
-#ifdef WLAN_POLICY_MGR_ENABLE
-#include <wlan_policy_mgr_api.h>
-#endif
-#include "spatial_reuse_api.h"
 
 static QDF_STATUS spatial_reuse_send_cfg(struct wlan_objmgr_vdev *vdev,
 					 uint8_t sr_ctrl,
@@ -177,24 +173,6 @@ spatial_reuse_send_pd_threshold(struct wlan_objmgr_pdev *pdev,
 }
 
 /**
- * spatial_reuse_is_enable: Check whether SR is enabled or not
- * @vdev: object manager vdev
- *
- * Return: True/False
- */
-static int
-spatial_reuse_is_enable(struct wlan_objmgr_vdev *vdev)
-{
-	uint8_t sr_ctrl;
-
-	sr_ctrl = wlan_vdev_mlme_get_sr_ctrl(vdev);
-	mlme_debug("SR Control: %x", sr_ctrl);
-	return ((!(sr_ctrl & NON_SRG_PD_SR_DISALLOWED) &&
-		 (sr_ctrl & NON_SRG_OFFSET_PRESENT)) ||
-		(sr_ctrl & SRG_INFO_PRESENT));
-}
-
-/**
  * spatial_reuse_set_sr_enable_disable: To send wmi command to enable/disable SR
  * @vdev: object manager vdev
  * @pdev: object manager pdev
@@ -211,6 +189,7 @@ spatial_reuse_set_sr_enable_disable(struct wlan_objmgr_vdev *vdev,
 				    int32_t non_srg_pd_threshold)
 {
 	uint32_t val = 0;
+	uint8_t sr_ctrl;
 	struct wlan_objmgr_psoc *psoc;
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
 
@@ -218,7 +197,10 @@ spatial_reuse_set_sr_enable_disable(struct wlan_objmgr_vdev *vdev,
 	if (!psoc)
 		return QDF_STATUS_E_NOENT;
 
-	if (spatial_reuse_is_enable(vdev)) {
+	sr_ctrl = wlan_vdev_mlme_get_sr_ctrl(vdev);
+	if ((!(sr_ctrl & NON_SRG_PD_SR_DISALLOWED) &&
+	     (sr_ctrl & NON_SRG_OFFSET_PRESENT)) ||
+	    (sr_ctrl & SRG_INFO_PRESENT)) {
 		if (is_sr_enable) {
 			wlan_mlme_update_sr_data(vdev, &val, srg_pd_threshold,
 						 non_srg_pd_threshold,
@@ -256,147 +238,6 @@ spatial_reuse_set_sr_enable_disable(struct wlan_objmgr_vdev *vdev,
 	return status;
 }
 
-/**
- * spatial_reuse_handle_conc: Handle concurrency scenario i.e Single MAC
- *                            concurrency is not supoprted for SR, Disable SR
- *                            if it is enable on other VDEV and enable it back
- *                            once the once the concurrent vdev is down.
- *
- * @vdev: object manager vdev
- * @conc_vdev: cuncurrent vdev object
- * @en_sr_curr_vdev: indicates spatial reuse enable/disable
- *
- */
-static void
-spatial_reuse_handle_conc(struct wlan_objmgr_vdev *vdev,
-			  struct wlan_objmgr_vdev *conc_vdev,
-			  bool en_sr_curr_vdev)
-{
-	uint32_t val = 0;
-	struct wlan_objmgr_pdev *pdev;
-	uint8_t conc_vdev_id = wlan_vdev_get_id(conc_vdev);
-
-	pdev = wlan_vdev_get_pdev(vdev);
-	if (!pdev) {
-		mlme_err("pdev is NULL");
-		return;
-	}
-
-	if (en_sr_curr_vdev) {
-		wlan_vdev_mlme_set_sr_disable_due_conc(vdev, true);
-		wlan_vdev_mlme_set_sr_disable_due_conc(conc_vdev, true);
-
-		if (!wlan_vdev_mlme_get_he_spr_enabled(conc_vdev))
-			return;
-
-		spatial_reuse_send_pd_threshold(pdev, conc_vdev_id, val);
-		wlan_spatial_reuse_osif_event(conc_vdev, SR_OPERATION_SUSPEND,
-					      SR_REASON_CODE_CONCURRENCY);
-	} else if (wlan_vdev_mlme_is_sr_disable_due_conc(conc_vdev)) {
-		wlan_vdev_mlme_set_sr_disable_due_conc(conc_vdev, false);
-
-		if (!wlan_vdev_mlme_get_he_spr_enabled(conc_vdev))
-			return;
-
-		if (spatial_reuse_is_enable(vdev)) {
-			wlan_mlme_update_sr_data(conc_vdev, &val, 0, 0, true);
-			spatial_reuse_send_pd_threshold(pdev, conc_vdev_id,
-							val);
-			wlan_spatial_reuse_osif_event(conc_vdev,
-						      SR_OPERATION_RESUME,
-						      SR_REASON_CODE_CONCURRENCY);
-		} else {
-			mlme_debug("SR Disabled in SR Control");
-		}
-	}
-}
-
-/**
- * spatial_reuse_pd_threshold_update() - update the SR threshold
- * @vdev: vdev
- * @enable: indicates spatial reuse enable/disable
- *
- * Return: QDF_STATUS_SUCCESS for success or error code
- */
-static QDF_STATUS
-spatial_reuse_pd_threshold_update(struct wlan_objmgr_vdev *vdev,
-				  bool enable)
-{
-	QDF_STATUS status = QDF_STATUS_SUCCESS;
-	struct wlan_objmgr_vdev *conc_vdev;
-	struct wlan_objmgr_psoc *psoc;
-	struct wlan_objmgr_pdev *pdev;
-	uint32_t conc_vdev_id;
-	uint32_t val = 0;
-	uint8_t vdev_id;
-	uint8_t mac_id;
-
-	if (!vdev) {
-		mlme_err("vdev is NULL");
-		return QDF_STATUS_E_INVAL;
-	}
-	vdev_id = wlan_vdev_get_id(vdev);
-
-	pdev = wlan_vdev_get_pdev(vdev);
-	if (!pdev) {
-		mlme_err("pdev is NULL");
-		return QDF_STATUS_E_INVAL;
-	}
-
-	psoc = wlan_vdev_get_psoc(vdev);
-	if (!psoc) {
-		mlme_err("psoc is NULL");
-		return QDF_STATUS_E_INVAL;
-	}
-
-	policy_mgr_get_mac_id_by_session_id(psoc, vdev_id, &mac_id);
-	conc_vdev_id = policy_mgr_get_conc_vdev_on_same_mac(psoc, vdev_id,
-							    mac_id);
-	if (conc_vdev_id != WLAN_INVALID_VDEV_ID &&
-	    !policy_mgr_sr_same_mac_conc_enabled(psoc)) {
-		/*
-		 * Single MAC concurrency is not supoprted for SR,
-		 * Disable SR if it is enable on other VDEV and enable
-		 * it back once the once the concurrent vdev is down.
-		 */
-		mlme_debug("SR with concurrency is not allowed");
-		conc_vdev =
-		wlan_objmgr_get_vdev_by_id_from_psoc(psoc, conc_vdev_id,
-						     WLAN_MLME_SB_ID);
-		if (!conc_vdev) {
-			mlme_err("Can't get vdev by vdev_id:%d", conc_vdev_id);
-		} else {
-			spatial_reuse_handle_conc(vdev, conc_vdev, enable);
-			wlan_objmgr_vdev_release_ref(conc_vdev,
-						     WLAN_MLME_SB_ID);
-			goto err;
-		}
-	}
-
-	if (!wlan_vdev_mlme_get_he_spr_enabled(vdev)) {
-		mlme_err("Spatial Reuse disabled for vdev_id: %d", vdev_id);
-		status = QDF_STATUS_E_NOSUPPORT;
-		goto err;
-	}
-
-	if (spatial_reuse_is_enable(vdev)) {
-		if (enable) {
-			wlan_mlme_update_sr_data(vdev, &val, 0, 0, true);
-		} else {
-			/* VDEV down, disable SR */
-			wlan_vdev_mlme_set_sr_ctrl(vdev, 0);
-			wlan_vdev_mlme_set_non_srg_pd_offset(vdev, 0);
-		}
-
-		mlme_debug("SR param val: %x, Enable: %x", val, enable);
-		spatial_reuse_send_pd_threshold(pdev, vdev_id, val);
-	} else {
-		mlme_debug("Spatial reuse is disabled in SR control");
-	}
-err:
-	return status;
-}
-
 void target_if_spatial_reuse_register_tx_ops(struct wlan_lmac_if_tx_ops *tx_ops)
 {
 	tx_ops->spatial_reuse_tx_ops.send_cfg = spatial_reuse_send_cfg;
@@ -404,6 +245,4 @@ void target_if_spatial_reuse_register_tx_ops(struct wlan_lmac_if_tx_ops *tx_ops)
 					spatial_reuse_send_sr_prohibit_cfg;
 	tx_ops->spatial_reuse_tx_ops.target_if_set_sr_enable_disable =
 					spatial_reuse_set_sr_enable_disable;
-	tx_ops->spatial_reuse_tx_ops.target_if_sr_update =
-					spatial_reuse_pd_threshold_update;
 }

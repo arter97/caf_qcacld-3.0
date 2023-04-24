@@ -1621,7 +1621,7 @@ struct wlan_lmac_if_twt_rx_ops {
 };
 #endif
 
-#ifdef WLAN_FEATURE_SR
+#if defined WLAN_FEATURE_SR
 struct wlan_lmac_if_spatial_reuse_tx_ops {
 	QDF_STATUS (*send_cfg)(struct wlan_objmgr_vdev *vdev, uint8_t sr_ctrl,
 			       uint8_t non_srg_max_pd_offset);
@@ -1632,8 +1632,6 @@ struct wlan_lmac_if_spatial_reuse_tx_ops {
 				struct wlan_objmgr_pdev *pdev,
 				bool is_sr_enable, int32_t srg_pd_threshold,
 				int32_t non_srg_pd_threshold);
-	QDF_STATUS (*target_if_sr_update)(struct wlan_objmgr_vdev *vdev,
-					  bool val);
 };
 #endif
 
