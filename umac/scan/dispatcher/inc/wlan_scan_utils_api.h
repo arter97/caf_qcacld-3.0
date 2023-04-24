@@ -741,6 +741,8 @@ util_scan_copy_beacon_data(struct scan_cache_entry *new_entry,
 	/* This macro will be removed once 11be is enabled */
 	ie_lst->ehtcap = conv_ptr(ie_lst->ehtcap, old_ptr, new_ptr);
 	ie_lst->ehtop = conv_ptr(ie_lst->ehtop, old_ptr, new_ptr);
+	ie_lst->bw_ind =
+		conv_ptr(ie_lst->bw_ind, old_ptr, new_ptr);
 #endif
 #ifdef WLAN_FEATURE_11BE_MLO
 	ie_lst->multi_link_bv =
@@ -1590,10 +1592,22 @@ util_scan_entry_ehtop(struct scan_cache_entry *scan_entry)
 {
 	return scan_entry->ie_list.ehtop;
 }
+
+static inline uint8_t*
+util_scan_entry_bw_ind(struct scan_cache_entry *scan_entry)
+{
+	return scan_entry->ie_list.bw_ind;
+}
 #else
 
 static inline uint8_t*
 util_scan_entry_ehtcap(struct scan_cache_entry *scan_entry)
+{
+	return NULL;
+}
+
+static inline uint8_t*
+util_scan_entry_bw_ind(struct scan_cache_entry *scan_entry)
 {
 	return NULL;
 }

@@ -311,6 +311,11 @@ enum qcn_attribute_id {
  */
 #define WLAN_TPE_IE_MAX_LEN                      9
 
+#ifdef WLAN_FEATURE_11BE
+/* Bandwidth indication element IE minimum length */
+#define WLAN_BW_IND_IE_MIN_LEN              3
+#endif
+
 /* Max channel switch time IE length */
 #define WLAN_MAX_CHAN_SWITCH_TIME_IE_LEN         4
 
@@ -655,6 +660,7 @@ enum element_ie {
  * @WLAN_EXTN_ELEMID_EHTCAP: EHT Capabilities IE
  * @WLAN_EXTN_ELEMID_T2LM: TID-to-link mapping IE
  * @WLAN_EXTN_ELEMID_MULTI_LINK_TRAFFIC_IND: Multi-link Traffic Indication IE
+ * @WLAN_EXTN_ELEMID_BW_IND: Bandwidth Indication Element Sub IE
  */
 enum extn_element_ie {
 	WLAN_EXTN_ELEMID_ESP         = 11,
@@ -678,6 +684,9 @@ enum extn_element_ie {
 #endif
 	WLAN_EXTN_ELEMID_T2LM        = 109,
 	WLAN_EXTN_ELEMID_MULTI_LINK_TRAFFIC_IND = 110,
+#ifdef WLAN_FEATURE_11BE
+	WLAN_EXTN_ELEMID_BW_IND = 135,
+#endif
 };
 
 /**
@@ -1922,6 +1931,29 @@ struct wlan_ie_ehtops {
 	uint8_t elem_id_extn;
 	uint8_t ehtop_param;
 	struct eht_basic_mcs_nss_set basic_mcs_nss_set;
+	uint8_t control;
+	uint8_t ccfs0;
+	uint8_t ccfs1;
+	uint8_t disabled_sub_chan_bitmap[2];
+} qdf_packed;
+
+/**
+ * struct wlan_ie_bw_ind - Bandwidth Indication Element
+ * @elem_id: Element ID
+ * @elem_len: Element length
+ * @elem_id_extn: Element ID extension
+ * @bw_ind_param: bw indication element parameters
+ * @control: Control field in bw_ind Operation Information
+ * @ccfs0: EHT Channel Centre Frequency Segment0 information
+ * @ccfs1: EHT Channel Centre Frequency Segment1 information
+ * @disabled_sub_chan_bitmap: Bitmap to indicate 20MHz subchannel
+ *                            is punctured or not
+ */
+struct wlan_ie_bw_ind {
+	uint8_t elem_id;
+	uint8_t elem_len;
+	uint8_t elem_id_extn;
+	uint8_t bw_ind_param;
 	uint8_t control;
 	uint8_t ccfs0;
 	uint8_t ccfs1;
