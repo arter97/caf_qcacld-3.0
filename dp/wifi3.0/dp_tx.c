@@ -6770,28 +6770,13 @@ uint8_t dp_tx_need_multipass_process(struct dp_soc *soc, struct dp_vdev *vdev,
 	return DP_VLAN_UNTAGGED;
 }
 
-bool dp_tx_multipass_process(struct dp_soc *soc, struct dp_vdev *vdev,
-			     qdf_nbuf_t nbuf,
-			     struct dp_tx_msdu_info_s *msdu_info)
+#ifndef WLAN_REPEATER_NOT_SUPPORTED
+static inline void
+dp_tx_multipass_send_pkt_to_repeater(struct dp_soc *soc, struct dp_vdev *vdev,
+				     qdf_nbuf_t nbuf,
+				     struct dp_tx_msdu_info_s *msdu_info)
 {
-	uint16_t vlan_id = 0;
-	uint16_t group_key = 0;
-	uint8_t is_spcl_peer = DP_VLAN_UNTAGGED;
 	qdf_nbuf_t nbuf_copy = NULL;
-
-	if (HTT_TX_MSDU_EXT2_DESC_FLAG_VALID_KEY_FLAGS_GET(msdu_info->meta_data[0]))
-		return true;
-
-	is_spcl_peer = dp_tx_need_multipass_process(soc, vdev, nbuf, &vlan_id);
-
-	if ((is_spcl_peer != DP_VLAN_TAGGED_MULTICAST) &&
-	    (is_spcl_peer != DP_VLAN_TAGGED_UNICAST))
-		return true;
-
-	if (is_spcl_peer == DP_VLAN_TAGGED_UNICAST) {
-		dp_tx_remove_vlan_tag(vdev, nbuf);
-		return true;
-	}
 
 	/* AP can have classic clients, special clients &
 	 * classic repeaters.
@@ -6822,10 +6807,35 @@ bool dp_tx_multipass_process(struct dp_soc *soc, struct dp_vdev *vdev,
 						   HTT_INVALID_PEER, NULL);
 		if (nbuf_copy) {
 			qdf_nbuf_free(nbuf_copy);
-			qdf_err("nbuf_copy send failed");
+			dp_info_rl("nbuf_copy send failed");
 		}
 	}
+}
+#endif
 
+bool dp_tx_multipass_process(struct dp_soc *soc, struct dp_vdev *vdev,
+			     qdf_nbuf_t nbuf,
+			     struct dp_tx_msdu_info_s *msdu_info)
+{
+	uint16_t vlan_id = 0;
+	uint16_t group_key = 0;
+	uint8_t is_spcl_peer = DP_VLAN_UNTAGGED;
+
+	if (HTT_TX_MSDU_EXT2_DESC_FLAG_VALID_KEY_FLAGS_GET(msdu_info->meta_data[0]))
+		return true;
+
+	is_spcl_peer = dp_tx_need_multipass_process(soc, vdev, nbuf, &vlan_id);
+
+	if ((is_spcl_peer != DP_VLAN_TAGGED_MULTICAST) &&
+	    (is_spcl_peer != DP_VLAN_TAGGED_UNICAST))
+		return true;
+
+	if (is_spcl_peer == DP_VLAN_TAGGED_UNICAST) {
+		dp_tx_remove_vlan_tag(vdev, nbuf);
+		return true;
+	}
+
+	dp_tx_multipass_send_pkt_to_repeater(soc, vdev, nbuf, msdu_info);
 	group_key = vdev->iv_vlan_map[vlan_id];
 
 	/*
