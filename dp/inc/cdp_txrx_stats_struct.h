@@ -3089,12 +3089,6 @@ struct cdp_pdev_deter_stats {
 	struct cdp_pdev_chan_util_stats ch_util;
 	struct cdp_pdev_ul_trigger_status ts[TX_MODE_UL_MAX];
 };
-#else
-struct cdp_peer_deter_stats {
-};
-
-struct cdp_pdev_deter_stats {
-};
 #endif
 
 /**
