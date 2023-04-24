@@ -84,6 +84,9 @@
 #define SAWF_LATENCY_STATS_ENABLED(x) \
 	(((x) & (0x1 << SAWF_STATS_LATENCY)) ? true : false)
 
+#define SAWF_FLOW_START 1
+#define SAWF_FLOW_STOP  2
+
 uint16_t dp_sawf_msduq_peer_id_set(uint16_t peer_id, uint8_t msduq)
 {
 	uint16_t peer_msduq = 0;
@@ -565,6 +568,97 @@ static struct dp_peer *dp_sawf_get_peer_from_wds_ext_dev(
 #endif
 
 QDF_STATUS
+dp_sawf_peer_flow_count(struct cdp_soc_t *soc_hdl, uint8_t *mac_addr,
+			uint8_t svc_id, uint8_t direction,
+			uint8_t start_or_stop, uint8_t *peer_mac)
+{
+	struct dp_soc *dpsoc = cdp_soc_t_to_dp_soc(soc_hdl);
+	struct dp_peer *peer, *mld_peer, *primary_link_peer;
+	struct dp_ast_entry *ast_entry;
+	struct dp_peer_sawf *sawf_ctx;
+	struct dp_sawf_msduq *msduq;
+	uint16_t peer_id;
+	bool match_found = false;
+	int q_idx;
+
+	dp_sawf_info("mac_addr: ", QDF_MAC_ADDR_FMT,
+		     " svc_id %u direction %u start_or_stop %u",
+		     QDF_MAC_ADDR_REF(mac_addr), svc_id, direction,
+		     start_or_stop);
+
+	qdf_spin_lock_bh(&dpsoc->ast_lock);
+	ast_entry = dp_peer_ast_hash_find_soc(dpsoc, mac_addr);
+	if (!ast_entry) {
+		qdf_spin_unlock_bh(&dpsoc->ast_lock);
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	peer_id = ast_entry->peer_id;
+	qdf_spin_unlock_bh(&dpsoc->ast_lock);
+
+	peer = dp_peer_get_ref_by_id(dpsoc, peer_id, DP_MOD_ID_SAWF);
+	if (!peer)
+		return QDF_STATUS_E_FAILURE;
+
+	if (IS_MLO_DP_LINK_PEER(peer))
+		mld_peer = DP_GET_MLD_PEER_FROM_PEER(peer);
+	else if (IS_MLO_DP_MLD_PEER(peer))
+		mld_peer = peer;
+	else
+		mld_peer = NULL;
+
+	if (mld_peer) {
+		primary_link_peer = dp_get_primary_link_peer_by_id
+			(dpsoc, mld_peer->peer_id, DP_MOD_ID_SAWF);
+		if (!primary_link_peer) {
+			dp_peer_unref_delete(peer, DP_MOD_ID_SAWF);
+			dp_sawf_err("Invalid primary peer");
+			return QDF_STATUS_E_FAILURE;
+		}
+
+		/*
+		 * Release the MLD-peer reference.
+		 * Hold only primary link ref now.
+		 */
+		dp_peer_unref_delete(peer, DP_MOD_ID_SAWF);
+		peer = primary_link_peer;
+	}
+
+	sawf_ctx = dp_peer_sawf_ctx_get(peer);
+	if (!sawf_ctx) {
+		dp_sawf_err("sawf_ctx doesn't exist");
+		goto fail;
+	}
+
+	for (q_idx = 0; q_idx < DP_SAWF_Q_MAX; q_idx++) {
+		msduq = &sawf_ctx->msduq[q_idx];
+		if (msduq->is_used && msduq->svc_id == svc_id) {
+			match_found = true;
+			break;
+		}
+	}
+
+	if (match_found) {
+		if (start_or_stop == SAWF_FLOW_START) {
+			msduq->ref_count++;
+		} else if (start_or_stop == SAWF_FLOW_STOP) {
+			if (msduq->ref_count)
+				msduq->ref_count--;
+		}
+	}
+
+	if (peer_mac)
+		qdf_mem_copy(peer_mac, peer->mac_addr.raw, QDF_MAC_ADDR_SIZE);
+
+	dp_peer_unref_delete(peer, DP_MOD_ID_SAWF);
+	return QDF_STATUS_SUCCESS;
+fail:
+	if (peer)
+		dp_peer_unref_delete(peer, DP_MOD_ID_SAWF);
+	return QDF_STATUS_E_FAILURE;
+}
+
+QDF_STATUS
 dp_sawf_peer_config_ul(struct cdp_soc_t *soc_hdl, uint8_t *mac_addr,
 		       uint8_t tid, uint32_t service_interval,
 		       uint32_t burst_size, uint32_t min_tput,
@@ -703,7 +797,6 @@ process_peer:
 			 */
 			if ((dp_sawf(peer, q_id, is_used) == 1) &&
 					dp_sawf(peer, q_id, svc_id) == service_id) {
-				dp_sawf(peer, q_id, ref_count)++;
 				dp_peer_unref_delete(peer, DP_MOD_ID_SAWF);
 				q_id = q_id + DP_SAWF_DEFAULT_Q_MAX;
 				return dp_sawf_msduq_peer_id_set(peer_id, q_id);
@@ -715,7 +808,6 @@ process_peer:
 			if (dp_sawf(peer, q_id, is_used) == 0) {
 				dp_sawf(peer, q_id, is_used) = 1;
 				dp_sawf(peer, q_id, svc_id) = service_id;
-				dp_sawf(peer, q_id, ref_count)++;
 				peer->sawf->sla_mask |=
 					wlan_service_id_get_enabled_param_mask(
 							service_id);
@@ -756,7 +848,6 @@ process_peer:
 			 */
 			if ((dp_sawf(peer, q_id, is_used) == 1) &&
 					dp_sawf(peer, q_id, svc_id) == service_id) {
-				dp_sawf(peer, q_id, ref_count)++;
 				dp_peer_unref_delete(peer, DP_MOD_ID_SAWF);
 				q_id = q_id + DP_SAWF_DEFAULT_Q_MAX;
 				return dp_sawf_msduq_peer_id_set(peer_id, q_id);
@@ -768,7 +859,6 @@ process_peer:
 			if (dp_sawf(peer, q_id, is_used) == 0) {
 				dp_sawf(peer, q_id, is_used) = 1;
 				dp_sawf(peer, q_id, svc_id) = service_id;
-				dp_sawf(peer, q_id, ref_count)++;
 				if (!peer->sawf->telemetry_ctx) {
 					tmetry_ctx = telemetry_sawf_peer_ctx_alloc(
 							soc, txrx_peer->sawf_stats,
