@@ -224,33 +224,6 @@ static inline void init_deinit_update_tdls_caps(struct wmi_unified *wmi_handle,
 {}
 #endif
 
-#ifdef WLAN_MLO_MULTI_CHIP
-static void init_deinit_mlo_tsf_sync_support(struct wmi_unified *wmi_handle,
-					     struct wlan_objmgr_psoc *psoc)
-{
-	uint8_t ml_grp_id;
-	struct mlo_mgr_context *mlo_ctx = wlan_objmgr_get_mlo_ctx();
-	struct mlo_setup_info *mlo_setup;
-	bool mlo_tsf_sync_enab = false;
-
-	ml_grp_id = wlan_mlo_get_psoc_group_id(psoc);
-	if (ml_grp_id < 0) {
-		target_if_err("Invalid ML Grp ID");
-		return;
-	}
-
-	mlo_setup = &mlo_ctx->setup_info[ml_grp_id];
-	if (wmi_service_enabled(wmi_handle, wmi_service_mlo_tsf_sync))
-		mlo_tsf_sync_enab = true;
-
-	mlo_setup->tsf_sync_enabled &= mlo_tsf_sync_enab;
-}
-#else
-static void init_deinit_mlo_tsf_sync_support(struct wmi_unified *wmi_handle,
-					     struct wlan_objmgr_psoc *psoc)
-{}
-#endif
-
 static int init_deinit_service_ready_event_handler(ol_scn_t scn_handle,
 							uint8_t *event,
 							uint32_t data_len)
@@ -406,8 +379,6 @@ static int init_deinit_service_ready_event_handler(ol_scn_t scn_handle,
 
 	init_deinit_update_wifi_pos_caps(wmi_handle, psoc);
 	init_deinit_update_tdls_caps(wmi_handle, psoc);
-
-	init_deinit_mlo_tsf_sync_support(wmi_handle, psoc);
 
 	/* override derived value, if it exceeds max peer count */
 	if ((wlan_psoc_get_max_peer_count(psoc) >
