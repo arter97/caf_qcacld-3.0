@@ -296,6 +296,9 @@ uint8_t *peer_assoc_add_mlo_params(uint8_t *buf_ptr,
 	mlo_params->msd_max_num_txops =
 			req->mlo_params.medium_sync_max_txop_num;
 
+	mlo_params->max_num_simultaneous_links =
+			req->mlo_params.max_num_simultaneous_links;
+
 	return buf_ptr + sizeof(wmi_peer_assoc_mlo_params);
 }
 
