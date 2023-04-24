@@ -79,28 +79,6 @@ struct dp_ipa_reo_remap_record {
 
 #define REO_REMAP_HISTORY_SIZE 32
 
-#if defined(IPA_WDI3_TX_TWO_PIPES) && defined(QCA_IPA_LL_TX_FLOW_CONTROL)
-static bool dp_ipa_is_alt_tx_required(struct dp_soc *soc)
-{
-	uint8_t num_radio = soc->pdev_count;
-
-	if (num_radio > 1)
-		return true;
-	else
-		return false;
-}
-#elif defined(IPA_WDI3_TX_TWO_PIPES)
-static bool dp_ipa_is_alt_tx_required(struct dp_soc *soc)
-{
-	return true;
-}
-#else
-static bool dp_ipa_is_alt_tx_required(struct dp_soc *soc)
-{
-	return false;
-}
-#endif
-
 struct dp_ipa_reo_remap_record dp_ipa_reo_remap_history[REO_REMAP_HISTORY_SIZE];
 
 static qdf_atomic_t dp_ipa_reo_remap_history_index;
@@ -831,25 +809,23 @@ static void dp_ipa_map_ring_doorbell_paddr(struct dp_pdev *pdev)
 	}
 
 	/* Setup for alternative TX pipe */
-	if (dp_ipa_is_alt_tx_required(soc)) {
-		if (!ipa_res->tx_alt_comp_doorbell_paddr)
-			return;
+	if (!ipa_res->tx_alt_comp_doorbell_paddr)
+		return;
 
-		if (ipa_res->is_db_ddr_mapped)
-			ipa_res->tx_alt_comp_doorbell_vaddr =
-				phys_to_virt(ipa_res->tx_alt_comp_doorbell_paddr);
-		else
-			ipa_res->tx_alt_comp_doorbell_vaddr =
-				ioremap(ipa_res->tx_alt_comp_doorbell_paddr, 4);
+	if (ipa_res->is_db_ddr_mapped)
+		ipa_res->tx_alt_comp_doorbell_vaddr =
+			phys_to_virt(ipa_res->tx_alt_comp_doorbell_paddr);
+	else
+		ipa_res->tx_alt_comp_doorbell_vaddr =
+			ioremap(ipa_res->tx_alt_comp_doorbell_paddr, 4);
 
-		if (qdf_mem_smmu_s1_enabled(soc->osdev)) {
-			ret = pld_smmu_map(soc->osdev->dev,
-					   ipa_res->tx_alt_comp_doorbell_paddr,
-					   &tx_comp_doorbell_dmaaddr,
-					   sizeof(uint32_t));
-			ipa_res->tx_alt_comp_doorbell_paddr = tx_comp_doorbell_dmaaddr;
-			qdf_assert_always(!ret);
-		}
+	if (qdf_mem_smmu_s1_enabled(soc->osdev)) {
+		ret = pld_smmu_map(soc->osdev->dev,
+				   ipa_res->tx_alt_comp_doorbell_paddr,
+				   &tx_comp_doorbell_dmaaddr,
+				   sizeof(uint32_t));
+		ipa_res->tx_alt_comp_doorbell_paddr = tx_comp_doorbell_dmaaddr;
+		qdf_assert_always(!ret);
 	}
 }
 
@@ -863,13 +839,11 @@ static void dp_ipa_unmap_ring_doorbell_paddr(struct dp_pdev *pdev)
 		return;
 
 	/* Unmap must be in reverse order of map */
-	if (dp_ipa_is_alt_tx_required(soc)) {
-		if (ipa_res->tx_alt_comp_doorbell_paddr) {
-			ret = pld_smmu_unmap(soc->osdev->dev,
-					     ipa_res->tx_alt_comp_doorbell_paddr,
-					     sizeof(uint32_t));
-			qdf_assert_always(!ret);
-		}
+	if (ipa_res->tx_alt_comp_doorbell_paddr) {
+		ret = pld_smmu_unmap(soc->osdev->dev,
+				     ipa_res->tx_alt_comp_doorbell_paddr,
+				     sizeof(uint32_t));
+		qdf_assert_always(!ret);
 	}
 
 	ret = pld_smmu_unmap(soc->osdev->dev,
@@ -1061,16 +1035,14 @@ static void dp_ipa_tx_comp_ring_init_hp(struct dp_soc *soc,
 			     res->tx_comp_doorbell_vaddr);
 
 	/* Init the alternate TX comp ring */
-	if (dp_ipa_is_alt_tx_required(soc)) {
-		if (!res->tx_alt_comp_doorbell_paddr)
-			return;
+	if (!res->tx_alt_comp_doorbell_paddr)
+		return;
 
-		wbm_srng = (struct hal_srng *)
-			soc->tx_comp_ring[IPA_TX_ALT_COMP_RING_IDX].hal_srng;
+	wbm_srng = (struct hal_srng *)
+		soc->tx_comp_ring[IPA_TX_ALT_COMP_RING_IDX].hal_srng;
 
-		hal_srng_dst_init_hp(soc->hal_soc, wbm_srng,
-				     res->tx_alt_comp_doorbell_vaddr);
-	}
+	hal_srng_dst_init_hp(soc->hal_soc, wbm_srng,
+			     res->tx_alt_comp_doorbell_vaddr);
 }
 
 static void dp_ipa_set_tx_doorbell_paddr(struct dp_soc *soc,
@@ -1089,20 +1061,18 @@ static void dp_ipa_set_tx_doorbell_paddr(struct dp_soc *soc,
 		(void *)ipa_res->tx_comp_doorbell_vaddr);
 
 	/* Setup for alternative TX comp ring */
-	if (dp_ipa_is_alt_tx_required(soc)) {
-		if (!ipa_res->tx_alt_comp_doorbell_paddr)
-			return;
+	if (!ipa_res->tx_alt_comp_doorbell_paddr)
+		return;
 
-		wbm_srng = (struct hal_srng *)
-				soc->tx_comp_ring[IPA_TX_ALT_COMP_RING_IDX].hal_srng;
+	wbm_srng = (struct hal_srng *)
+			soc->tx_comp_ring[IPA_TX_ALT_COMP_RING_IDX].hal_srng;
 
-		hal_srng_dst_set_hp_paddr_confirm(wbm_srng,
-						  ipa_res->tx_alt_comp_doorbell_paddr);
+	hal_srng_dst_set_hp_paddr_confirm(wbm_srng,
+					  ipa_res->tx_alt_comp_doorbell_paddr);
 
-		dp_info("paddr %pK vaddr %pK",
-			(void *)ipa_res->tx_alt_comp_doorbell_paddr,
-			(void *)ipa_res->tx_alt_comp_doorbell_vaddr);
-	}
+	dp_info("paddr %pK vaddr %pK",
+		(void *)ipa_res->tx_alt_comp_doorbell_paddr,
+		(void *)ipa_res->tx_alt_comp_doorbell_vaddr);
 }
 
 #ifdef IPA_SET_RESET_TX_DB_PA
@@ -1121,9 +1091,6 @@ static QDF_STATUS dp_ipa_reset_tx_doorbell_pa(struct dp_soc *soc,
 	hal_srng_dst_set_hp_paddr_confirm((struct hal_srng *)wbm_srng, hp_addr);
 
 	dp_info("Reset WBM HP addr paddr: %pK", (void *)hp_addr);
-
-	if (!dp_ipa_is_alt_tx_required(soc))
-		return QDF_STATUS_SUCCESS;
 
 	/* Reset alternative TX comp ring */
 	wbm_srng = soc->tx_comp_ring[IPA_TX_ALT_COMP_RING_IDX].hal_srng;
@@ -1429,8 +1396,7 @@ int dp_ipa_uc_detach(struct dp_soc *soc, struct dp_pdev *pdev)
 	dp_tx_ipa_uc_detach(soc, pdev);
 
 	/* Cleanup 2nd TX pipe resources */
-	if (dp_ipa_is_alt_tx_required(soc))
-		dp_ipa_tx_alt_pool_detach(soc, pdev);
+	dp_ipa_tx_alt_pool_detach(soc, pdev);
 
 	/* RX resource detach */
 	dp_rx_ipa_uc_detach(soc, pdev);
@@ -1594,15 +1560,13 @@ int dp_ipa_uc_attach(struct dp_soc *soc, struct dp_pdev *pdev)
 	}
 
 	/* Setup 2nd TX pipe */
-	if (dp_ipa_is_alt_tx_required(soc)) {
-		error = dp_ipa_tx_alt_pool_attach(soc);
-		if (error) {
-			QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_ERROR,
-				  "%s: DP IPA TX pool2 attach fail code %d",
-				  __func__, error);
-			dp_tx_ipa_uc_detach(soc, pdev);
-			return error;
-		}
+	error = dp_ipa_tx_alt_pool_attach(soc);
+	if (error) {
+		QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_ERROR,
+			  "%s: DP IPA TX pool2 attach fail code %d",
+			  __func__, error);
+		dp_tx_ipa_uc_detach(soc, pdev);
+		return error;
 	}
 
 	/* RX resource attach */
@@ -1611,8 +1575,7 @@ int dp_ipa_uc_attach(struct dp_soc *soc, struct dp_pdev *pdev)
 		QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_ERROR,
 			  "%s: DP IPA UC RX attach fail code %d",
 			  __func__, error);
-		if (dp_ipa_is_alt_tx_required(soc))
-			dp_ipa_tx_alt_pool_detach(soc, pdev);
+		dp_ipa_tx_alt_pool_detach(soc, pdev);
 		dp_tx_ipa_uc_detach(soc, pdev);
 		return error;
 	}
@@ -1941,10 +1904,8 @@ QDF_STATUS dp_ipa_get_resource(struct cdp_soc_t *soc_hdl, uint8_t pdev_id)
 				  &ipa_res->rx_refill_ring.mem_info))
 		return QDF_STATUS_E_FAILURE;
 
-	if (dp_ipa_is_alt_tx_required(soc)) {
-		if (dp_ipa_tx_alt_ring_get_resource(pdev))
-			return QDF_STATUS_E_FAILURE;
-	}
+	if (dp_ipa_tx_alt_ring_get_resource(pdev))
+		return QDF_STATUS_E_FAILURE;
 
 	if (dp_ipa_rx_alt_ring_get_resource(pdev))
 		return QDF_STATUS_E_FAILURE;
@@ -2858,8 +2819,7 @@ QDF_STATUS dp_ipa_setup(struct cdp_soc_t *soc_hdl, uint8_t pdev_id,
 	else
 		dp_ipa_wdi_tx_params(soc, ipa_res, tx, over_gsi);
 
-	if (dp_ipa_is_alt_tx_required(soc))
-		dp_ipa_setup_tx_alt_pipe(soc, ipa_res, pipe_in);
+	dp_ipa_setup_tx_alt_pipe(soc, ipa_res, pipe_in);
 
 	/* RX PIPE */
 	if (QDF_IPA_WDI_CONN_IN_PARAMS_SMMU_ENABLED(pipe_in)) {
@@ -3920,13 +3880,9 @@ QDF_STATUS dp_ipa_tx_buf_smmu_mapping(
 	if (ret)
 		return ret;
 
-	if (dp_ipa_is_alt_tx_required(soc)) {
-		ret = dp_ipa_tx_alt_buf_smmu_mapping(soc, pdev, true, func,
-						     line);
-		if (ret)
-			__dp_ipa_tx_buf_smmu_mapping(soc, pdev, false, func,
-						     line);
-	}
+	ret = dp_ipa_tx_alt_buf_smmu_mapping(soc, pdev, true, func, line);
+	if (ret)
+		__dp_ipa_tx_buf_smmu_mapping(soc, pdev, false, func, line);
 	return ret;
 }
 
@@ -3948,14 +3904,9 @@ QDF_STATUS dp_ipa_tx_buf_smmu_unmapping(
 		return QDF_STATUS_SUCCESS;
 	}
 
-	if (__dp_ipa_tx_buf_smmu_mapping(soc, pdev, false, func, line))
+	if (__dp_ipa_tx_buf_smmu_mapping(soc, pdev, false, func, line) ||
+	    dp_ipa_tx_alt_buf_smmu_mapping(soc, pdev, false, func, line))
 		return QDF_STATUS_E_FAILURE;
-
-	if (dp_ipa_is_alt_tx_required(soc)) {
-		if (dp_ipa_tx_alt_buf_smmu_mapping(soc, pdev, false, func,
-						   line))
-			return QDF_STATUS_E_FAILURE;
-	}
 
 	return QDF_STATUS_SUCCESS;
 }
