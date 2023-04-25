@@ -2267,9 +2267,6 @@ static void mlo_process_link_remove(struct wlan_objmgr_vdev *vdev,
 	if (!vdev_mlme)
 		return;
 
-	if (vdev_mlme->ml_reconfig_started == true)
-		return;
-
 	bss_peer = wlan_vdev_get_bsspeer(vdev);
 	if (!bss_peer)
 		return;
