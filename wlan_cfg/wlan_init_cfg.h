@@ -41,7 +41,7 @@
  * This mask defines how many transmit frames account for 1 NAPI work unit
  * 0 means each tx completion is 1 unit
  */
-#define DP_TX_NAPI_BUDGET_DIV_MASK 0xffff
+#define DP_TX_NAPI_BUDGET_DIV_MASK 0
 
 /* PPDU Stats Configuration - Configure bitmask for enabling tx ppdu tlv's */
 #define DP_PPDU_TXLITE_STATS_BITMASK_CFG 0x3FFF
