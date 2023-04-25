@@ -60,6 +60,7 @@
 #include "wlan_crypto_global_api.h"
 #include "wlan_connectivity_logging.h"
 #include "lim_mlo.h"
+#include "wlan_mlo_mgr_sta.h"
 
 /**
  *
