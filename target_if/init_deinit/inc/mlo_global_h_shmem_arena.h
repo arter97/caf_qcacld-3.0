@@ -125,21 +125,24 @@ struct wlan_host_mlo_glb_h_shmem_arena_ctx {
  * @arena_vaddr: Virtual address of the MLO Global shared memory arena
  * @arena_len: Length (in bytes) of the MLO Global shared memory arena
  * @grp_id: Id of the required MLO Group
+ * @recovery: MLO recovery is in progress
  *
  * Return: QDF_STATUS of operation
  */
 QDF_STATUS mlo_glb_h_shmem_arena_ctx_init(void *arena_vaddr,
 					  size_t arena_len,
-					  uint8_t grp_id);
+					  uint8_t grp_id,
+					  uint8_t recovery);
 
 /**
  * mlo_glb_h_shmem_arena_ctx_deinit() - De-initialize MLO Global shared memory
  * arena context on Host
  * @grp_id: Id of the required MLO Group
+ * @recovery: MLO recovery is in progress
  *
  * Return: QDF_STATUS of operation
  */
-QDF_STATUS mlo_glb_h_shmem_arena_ctx_deinit(uint8_t grp_id);
+QDF_STATUS mlo_glb_h_shmem_arena_ctx_deinit(uint8_t grp_id, uint8_t recovery);
 #endif
 
 #ifdef WLAN_MLO_GLOBAL_SHMEM_SUPPORT
