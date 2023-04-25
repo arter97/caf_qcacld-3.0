@@ -2457,7 +2457,8 @@ static inline void
 dp_rx_rates_stats_update(struct dp_soc *soc, qdf_nbuf_t nbuf,
 			 uint8_t *rx_tlv_hdr, struct dp_txrx_peer *txrx_peer,
 			 uint32_t sgi, uint32_t mcs,
-			 uint32_t nss, uint32_t bw, uint32_t pkt_type)
+			 uint32_t nss, uint32_t bw, uint32_t pkt_type,
+			 uint8_t link_id)
 {
 }
 #endif /* FEATURE_RX_LINKSPEED_ROAM_TRIGGER */
