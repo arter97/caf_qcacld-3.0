@@ -197,6 +197,8 @@ dfs_radar_add_channel_list_to_nol_for_freq(struct wlan_dfs *dfs,
 	}
 	*num_channels = num_ch;
 
+	dfs_update_cac_elements(dfs, nol_freq_list, num_ch, NULL, WLAN_EV_NOL_STARTED);
+
 	if (!dfs_get_disable_radar_marking(dfs)) {
 		utils_dfs_reg_update_nol_chan_for_freq(dfs->dfs_pdev_obj,
 						       nol_freq_list, num_ch,

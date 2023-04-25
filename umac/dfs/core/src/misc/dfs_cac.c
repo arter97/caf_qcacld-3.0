@@ -36,6 +36,9 @@
 #include "wlan_dfs_mlme_api.h"
 #include "../dfs_internal.h"
 #include "../dfs_process_radar_found_ind.h"
+#ifdef CONFIG_HOST_FIND_CHAN
+#include <wlan_reg_channel_api.h>
+#endif
 
 #define IS_CHANNEL_WEATHER_RADAR(freq) ((freq >= 5600) && (freq <= 5650))
 #define ADJACENT_WEATHER_RADAR_CHANNEL   5580
@@ -146,6 +149,8 @@ void dfs_process_cac_completion(struct wlan_dfs *dfs)
 						      ch_width);
 	}
 
+	dfs_update_cac_elements(dfs, NULL, 0, dfs->dfs_curchan, WLAN_EV_CAC_COMPLETED);
+
 	dfs_clear_cac_started_chan(dfs);
 
 	/* Clear NOL history for current channel on successful CAC completion */
@@ -207,6 +212,7 @@ void dfs_cac_timer_reset(struct wlan_dfs *dfs)
 	qdf_hrtimer_cancel(&dfs->dfs_cac_timer);
 	dfs_get_override_cac_timeout(dfs,
 			&(dfs->dfs_cac_timeout_override));
+	dfs_update_cac_elements(dfs, NULL, 0, dfs->dfs_curchan, WLAN_EV_CAC_RESET);
 	dfs_clear_cac_started_chan(dfs);
 }
 
@@ -253,6 +259,7 @@ void dfs_start_cac_timer(struct wlan_dfs *dfs)
 void dfs_cancel_cac_timer(struct wlan_dfs *dfs)
 {
 	qdf_hrtimer_cancel(&dfs->dfs_cac_timer);
+	dfs_update_cac_elements(dfs, NULL, 0, dfs->dfs_curchan, WLAN_EV_CAC_RESET);
 	dfs_clear_cac_started_chan(dfs);
 }
 
@@ -266,10 +273,20 @@ void dfs_send_dfs_events_for_chan(struct wlan_dfs *dfs,
 	nchannels =
 		dfs_get_bonding_channel_without_seg_info_for_freq(chan,
 								  freq_list);
-	for (i = 0; i < nchannels; i++)
+
+	/* If radar is found during CAC period, CAC cancel is invoked and hence
+	 * dfs_cac_stop posts WLAN_EV_CAC_RESET. However, since the channel is
+	 * radar infected and is added to the NOL, the most appropriate state of
+	 * the channel should be WLAN_EV_NOL_STARTED.
+	 * After NOL timeout, WLAN_EV_CAC_RESET should be posted.
+	 */
+	for (i = 0; i < nchannels; i++) {
+		if (wlan_reg_is_nol_for_freq(dfs->dfs_pdev_obj, freq_list[i]))
+			event = WLAN_EV_NOL_STARTED;
 		utils_dfs_deliver_event(dfs->dfs_pdev_obj,
 					freq_list[i],
 					event);
+	}
 }
 
 void dfs_cac_stop(struct wlan_dfs *dfs)
@@ -285,6 +302,7 @@ void dfs_cac_stop(struct wlan_dfs *dfs)
 	qdf_hrtimer_cancel(&dfs->dfs_cac_timer);
 
 	dfs_send_dfs_events_for_chan(dfs, chan, WLAN_EV_CAC_RESET);
+	dfs_update_cac_elements(dfs, NULL, 0, chan, WLAN_EV_CAC_RESET);
 
 	if (dfs->dfs_cac_timer_running)
 		dfs->dfs_cac_aborted = 1;

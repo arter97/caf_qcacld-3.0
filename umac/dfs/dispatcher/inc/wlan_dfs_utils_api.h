@@ -81,7 +81,7 @@
 /* WLAN 5GHz channel number 170 freq */
 #define DFS_CHAN_170_FREQ        (5852)
 
-
+#define IS_CHAN_DFS(_flags) ((_flags) & REGULATORY_CHAN_RADAR)
 
 extern struct dfs_to_mlme global_dfs_to_mlme;
 
@@ -977,4 +977,16 @@ QDF_STATUS dfs_init_chan_state_array(struct wlan_objmgr_pdev *pdev)
  * Return: QDF_STATUS.
  */
 QDF_STATUS utils_dfs_radar_enable(struct wlan_objmgr_pdev *pdev);
+
+/**
+ * utils_dfs_convert_freq_to_index() - Converts a channel frequency
+ * to the DFS channel state array index. The input frequency should be a 5 GHz
+ * channel frequency and this check should be done in the caller.
+ *
+ * @freq: Input DFS channel frequency.
+ * @index: Output DFS channel state array index.
+ *
+ * Return: None.
+ */
+void utils_dfs_convert_freq_to_index(qdf_freq_t freq, int8_t *index);
 #endif /* _WLAN_DFS_UTILS_API_H_ */

@@ -186,6 +186,7 @@ struct dfs_agile_cac_params {
  *                           DFS channel.
  * @CH_DFS_S_PRECAC_COMPLETED: Indicates that the PreCAC has been completed for
  *                             the DFS channel.
+ * @CH_DFS_S_NON_DFS: Indicates that it is a non-DFS channel.
  */
 enum channel_dfs_state {
 	CH_DFS_S_INVALID,
@@ -195,5 +196,6 @@ enum channel_dfs_state {
 	CH_DFS_S_NOL,
 	CH_DFS_S_PRECAC_STARTED,
 	CH_DFS_S_PRECAC_COMPLETED,
+	CH_DFS_S_NON_DFS,
 };
 #endif
