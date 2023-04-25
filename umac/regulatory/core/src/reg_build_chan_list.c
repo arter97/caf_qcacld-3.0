@@ -3339,7 +3339,7 @@ reg_copy_from_super_chan_info_to_reg_channel(struct regulatory_channel *chan,
 	chan->psd_eirp = sc_entry.reg_chan_pwr[in_6g_pwr_mode].psd_eirp;
 }
 
-static QDF_STATUS
+QDF_STATUS
 reg_get_6g_pwrmode_chan_list(struct wlan_regulatory_pdev_priv_obj
 			     *pdev_priv_obj,
 			     struct regulatory_channel *chan_list,
@@ -3372,15 +3372,6 @@ reg_populate_6g_band_channels(struct cur_reg_rule *reg_rule_5g,
 			      uint16_t min_bw_5g,
 			      struct regulatory_channel *mas_chan_list)
 {
-}
-
-static inline QDF_STATUS
-reg_get_6g_pwrmode_chan_list(struct wlan_regulatory_pdev_priv_obj
-			     *pdev_priv_obj,
-			     struct regulatory_channel *chan_list,
-			     enum supported_6g_pwr_types in_6g_pwr_mode)
-{
-	return QDF_STATUS_E_INVAL;
 }
 #endif /* CONFIG_BAND_6GHZ */
 
