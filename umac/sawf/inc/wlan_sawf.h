@@ -137,6 +137,7 @@
  * @type: type of service class
  * @ref_count: Number of sawf/scs procedures using the service class
  * @peer_count: Number of peers having initialized a flow in this service class
+ * @enabled_param_mask: Bitmask of enabled sawf parameters
  */
 
 struct wlan_sawf_svc_class_params {
@@ -160,6 +161,7 @@ struct wlan_sawf_svc_class_params {
 	uint32_t ref_count;
 	uint32_t peer_count;
 	uint32_t disabled_modes;
+	uint16_t enabled_param_mask;
 };
 
 /**
@@ -473,4 +475,12 @@ void wlan_service_id_inc_peer_count(uint8_t svc_id);
  * Return: void
  */
 void wlan_disable_service_class(uint8_t svc_id);
+
+/* wlan_service_id_get_enabled_param_mask() - Get enabled_param_mask
+ *
+ * @svc_id : service-class id
+ *
+ * Return: enabled_param_mask
+ */
+uint16_t wlan_service_id_get_enabled_param_mask(uint8_t svc_id);
 #endif
