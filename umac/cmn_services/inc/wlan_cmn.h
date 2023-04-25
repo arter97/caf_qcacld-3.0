@@ -74,7 +74,7 @@
 #define WLAN_UMAC_VDEV_ID_MAX 0xFF
 
 /* MAX AID */
-#define WLAN_UMAC_MAX_AID 1991
+#define WLAN_UMAC_MAX_AID 2008
 
 /* Invalid pdev_id */
 #define WLAN_INVALID_PDEV_ID 0xFFFFFFFF
