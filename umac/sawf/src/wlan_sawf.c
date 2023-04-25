@@ -92,7 +92,7 @@ void wlan_print_service_class(struct wlan_sawf_svc_class_params *params)
 		      "UL Burst Size: %d\nUL Service Interval: %d\n"
 		      "UL Min throughput: %d\nUL Max Latency: %d\n"
 		      "Service class type: %d\nRef Count: %d\nPeer Count: %d\n"
-		      "Disabled_Modes: %u",
+		      "Disabled_Modes: %u\nEnabled Params Mask: 0x%02X",
 		      SAWF_LINE_FORMAT,
 		      params->svc_id, params->app_name,
 		      params->min_thruput_rate, params->max_thruput_rate,
@@ -102,7 +102,7 @@ void wlan_print_service_class(struct wlan_sawf_svc_class_params *params)
 		      params->ul_burst_size, params->ul_service_interval,
 		      params->ul_min_tput, params->ul_max_latency,
 		      params->type, params->ref_count, params->peer_count,
-		      params->disabled_modes);
+		      params->disabled_modes, params->enabled_param_mask);
 
 	if (nb > 0 && nb >= sizeof(buf))
 		qdf_err("Small buffer (buffer size %zu required size %d)",
@@ -935,3 +935,23 @@ bool wlan_service_id_scs_valid(bool scs_based_rule, uint8_t service_id)
 #endif
 
 qdf_export_symbol(wlan_service_id_scs_valid);
+
+uint16_t wlan_service_id_get_enabled_param_mask(uint8_t svc_id)
+{
+	struct sawf_ctx *sawf;
+	uint16_t enabled_param_mask;
+
+	sawf = wlan_get_sawf_ctx();
+	if (!sawf) {
+		qdf_err("SAWF ctx is invalid");
+		return 0;
+	}
+
+	qdf_spin_lock_bh(&sawf->lock);
+	enabled_param_mask = sawf->svc_classes[svc_id - 1].enabled_param_mask;
+	qdf_spin_unlock_bh(&sawf->lock);
+
+	return enabled_param_mask;
+}
+
+qdf_export_symbol(wlan_service_id_get_enabled_param_mask);
