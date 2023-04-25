@@ -1277,14 +1277,14 @@ QDF_STATUS wlan_mlo_peer_create(struct wlan_objmgr_vdev *vdev,
 		if ((wlan_vdev_mlme_get_opmode(vdev) == QDF_SAP_MODE) &&
 		    mlo_mgr_ml_peer_exist_on_diff_ml_ctx(&link_peer->mldaddr[0],
 							 NULL)) {
+			mlo_err("MLD ID %d ML Peer " QDF_MAC_ADDR_FMT " is exists, creation failed",
+				ml_dev->mld_id,
+				QDF_MAC_ADDR_REF(ml_peer->peer_mld_addr.bytes));
 			mlo_reset_link_peer(ml_peer, link_peer);
 			mlo_peer_free(ml_peer);
 			mlo_dev_release_link_vdevs(link_vdevs);
 			wlan_objmgr_peer_release_ref(link_peer,
 						     WLAN_MLO_MGR_ID);
-			mlo_err("MLD ID %d ML Peer " QDF_MAC_ADDR_FMT " is exists, creation failed",
-				ml_dev->mld_id,
-				QDF_MAC_ADDR_REF(ml_peer->peer_mld_addr.bytes));
 			return QDF_STATUS_E_EXISTS;
 		}
 
