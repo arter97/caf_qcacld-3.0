@@ -845,10 +845,12 @@ struct dp_mon_ops {
  * struct dp_mon_soc_stats - monitor stats
  * @frag_alloc: Number of frags allocated
  * @frag_free: Number of frags freed
+ * @empty_queue: Number of frags freed due to empty queue
  */
 struct dp_mon_soc_stats {
 	uint32_t frag_alloc;
 	uint32_t frag_free;
+	uint32_t empty_queue;
 };
 
 struct dp_mon_soc {

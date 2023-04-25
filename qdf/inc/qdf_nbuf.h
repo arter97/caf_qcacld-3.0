@@ -4889,6 +4889,31 @@ qdf_nbuf_get_priv_ptr(qdf_nbuf_t buf)
 }
 
 /**
+ * qdf_nbuf_has_fraglist() - check if nbuf has attached frag list
+ * @nbuf: Pointer to nbuf
+ *
+ * Return: bool
+ */
+static inline bool
+qdf_nbuf_has_fraglist(qdf_nbuf_t nbuf)
+{
+	return __qdf_nbuf_has_fraglist(nbuf);
+}
+
+/**
+ * qdf_nbuf_get_last_frag_list_nbuf() - Fetch pointer to last nbuf in frag list
+ * @nbuf: Pointer to nbuf
+ *
+ * Return: Pointer to last nbuf in frag list if parent nbuf has extended frag
+ *         list or else return NULL
+ */
+static inline qdf_nbuf_t
+qdf_nbuf_get_last_frag_list_nbuf(qdf_nbuf_t nbuf)
+{
+	return __qdf_nbuf_get_last_frag_list_nbuf(nbuf);
+}
+
+/**
  * qdf_nbuf_update_radiotap() - update radiotap at head of nbuf.
  * @rx_status: rx_status containing required info to update radiotap
  * @nbuf: Pointer to nbuf

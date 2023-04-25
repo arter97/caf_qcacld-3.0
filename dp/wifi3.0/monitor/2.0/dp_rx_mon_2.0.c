@@ -1372,6 +1372,31 @@ dp_rx_mon_handle_flush_n_trucated_ppdu(struct dp_soc *soc,
 						  rx_mon_desc_pool);
 }
 
+/**
+ * dp_rx_mon_append_nbuf() - Append nbuf to parent nbuf
+ * @nbuf: Parent nbuf
+ * @tmp_nbuf: nbuf to be attached to parent
+ *
+ * Return: void
+ */
+static void dp_rx_mon_append_nbuf(qdf_nbuf_t nbuf, qdf_nbuf_t tmp_nbuf)
+{
+	qdf_nbuf_t last_nbuf;
+
+	/*
+	 * If nbuf does not have fraglist, then append tmp_nbuf as fraglist,
+	 * else append tmp_nbuf as next of last_nbuf present in nbuf fraglist.
+	 */
+	if (!qdf_nbuf_has_fraglist(nbuf))
+		qdf_nbuf_append_ext_list(nbuf, tmp_nbuf,
+					 qdf_nbuf_len(tmp_nbuf));
+	else {
+		last_nbuf = qdf_nbuf_get_last_frag_list_nbuf(nbuf);
+
+		if (qdf_likely(last_nbuf))
+			qdf_nbuf_set_next(last_nbuf, tmp_nbuf);
+	}
+}
 uint8_t dp_rx_mon_process_tlv_status(struct dp_pdev *pdev,
 				     struct hal_rx_ppdu_info *ppdu_info,
 				     void *status_frag,
@@ -1468,9 +1493,7 @@ uint8_t dp_rx_mon_process_tlv_status(struct dp_pdev *pdev,
 					qdf_assert_always(0);
 				}
 				mon_pdev->rx_mon_stats.parent_buf_alloc++;
-				/* add new skb to frag list */
-				qdf_nbuf_append_ext_list(nbuf, tmp_nbuf,
-							 qdf_nbuf_len(tmp_nbuf));
+				dp_rx_mon_append_nbuf(nbuf, tmp_nbuf);
 			}
 			dp_rx_mon_nbuf_add_rx_frag(tmp_nbuf, status_frag,
 						   ppdu_info->hdr_len - DP_RX_MON_RX_HDR_OFFSET,
@@ -1522,6 +1545,9 @@ uint8_t dp_rx_mon_process_tlv_status(struct dp_pdev *pdev,
 		nbuf = qdf_nbuf_queue_last(&ppdu_info->mpdu_q[user_id]);
 		if (qdf_unlikely(!nbuf)) {
 			dp_mon_debug("nbuf is NULL");
+			DP_STATS_INC(mon_soc, frag_free, 1);
+			DP_STATS_INC(mon_soc, empty_queue, 1);
+			qdf_frag_free(addr);
 			return num_buf_reaped;
 		}
 
@@ -1559,9 +1585,7 @@ uint8_t dp_rx_mon_process_tlv_status(struct dp_pdev *pdev,
 				return num_buf_reaped;
 			}
 			mon_pdev->rx_mon_stats.parent_buf_alloc++;
-			/* add new skb to frag list */
-			qdf_nbuf_append_ext_list(nbuf, tmp_nbuf,
-						 qdf_nbuf_len(tmp_nbuf));
+			dp_rx_mon_append_nbuf(nbuf, tmp_nbuf);
 		}
 		mpdu_info->full_pkt = true;
 
@@ -2153,7 +2177,7 @@ dp_rx_mon_srng_process_2_0(struct dp_soc *soc, struct dp_intr *int_ctx,
 		status = dp_rx_mon_add_ppdu_info_to_wq(pdev, ppdu_info);
 		if (status != QDF_STATUS_SUCCESS) {
 			if (ppdu_info)
-				__dp_rx_mon_free_ppdu_info(mon_pdev, ppdu_info);
+				dp_rx_mon_free_ppdu_info(pdev, ppdu_info);
 		}
 
 		work_done++;
@@ -2399,8 +2423,10 @@ void dp_mon_rx_print_advanced_stats_2_0(struct dp_soc *soc,
 		       rx_mon_stats->mpdus_buf_to_stack);
 	DP_PRINT_STATS("frag_alloc = %d",
 		       mon_soc->stats.frag_alloc);
-	DP_PRINT_STATS("frag_free = %d",
+	DP_PRINT_STATS("total frag_free = %d",
 		       mon_soc->stats.frag_free);
+	DP_PRINT_STATS("frag_free due to empty queue= %d",
+		       mon_soc->stats.empty_queue);
 	DP_PRINT_STATS("status_buf_count = %d",
 		       rx_mon_stats->status_buf_count);
 	DP_PRINT_STATS("pkt_buf_count = %d",
