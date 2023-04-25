@@ -1922,6 +1922,63 @@ hdd_hostapd_sap_fill_peer_ml_info(struct hdd_adapter *adapter,
 }
 #endif
 
+static void
+hdd_hostapd_check_channel_post_csa(struct hdd_context *hdd_ctx,
+				   struct hdd_adapter *adapter)
+{
+	struct hdd_ap_ctx *ap_ctx;
+	uint8_t sta_cnt, sap_cnt;
+	QDF_STATUS qdf_status = QDF_STATUS_SUCCESS;
+
+	ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(adapter);
+	if (ap_ctx->sap_context->csa_reason ==
+	    CSA_REASON_UNSAFE_CHANNEL)
+		qdf_status = hdd_unsafe_channel_restart_sap(hdd_ctx);
+	else if (ap_ctx->sap_context->csa_reason == CSA_REASON_DCS)
+		qdf_status = hdd_dcs_hostapd_set_chan(
+			hdd_ctx, adapter->deflink->vdev_id,
+			ap_ctx->operating_chan_freq);
+	if (qdf_status == QDF_STATUS_E_PENDING) {
+		hdd_debug("csa is pending with reason %d",
+			  ap_ctx->sap_context->csa_reason);
+		return;
+	}
+
+	/* Added the sta cnt check as we don't support sta+sap+nan
+	 * today. But this needs to be re-visited when we start
+	 * supporting this combo.
+	 */
+	sta_cnt = policy_mgr_mode_specific_connection_count(hdd_ctx->psoc,
+							    PM_STA_MODE,
+							    NULL);
+	if (!sta_cnt)
+		qdf_status =
+		policy_mgr_nan_sap_post_enable_conc_check(hdd_ctx->psoc);
+	if (qdf_status == QDF_STATUS_E_PENDING) {
+		hdd_debug("csa is pending by nan sap conc");
+		return;
+	}
+
+	qdf_status = policy_mgr_check_sap_go_force_scc(
+			hdd_ctx->psoc, adapter->deflink->vdev,
+			ap_ctx->sap_context->csa_reason);
+	if (qdf_status == QDF_STATUS_E_PENDING) {
+		hdd_debug("csa is pending by sap go force scc");
+		return;
+	}
+
+	sap_cnt = policy_mgr_mode_specific_connection_count(hdd_ctx->psoc,
+							    PM_SAP_MODE,
+							    NULL);
+	sap_cnt += policy_mgr_mode_specific_connection_count(hdd_ctx->psoc,
+							     PM_P2P_GO_MODE,
+							     NULL);
+	if (sap_cnt > 1)
+		policy_mgr_check_concurrent_intf_and_restart_sap(
+				hdd_ctx->psoc,
+				ap_ctx->sap_config.acs_cfg.acs_mode);
+}
+
 QDF_STATUS hdd_hostapd_sap_event_cb(struct sap_event *sap_event,
 				    void *context)
 {
@@ -1961,7 +2018,6 @@ QDF_STATUS hdd_hostapd_sap_event_cb(struct sap_event *sap_event,
 	struct wlan_objmgr_vdev *vdev;
 	struct qdf_mac_addr sta_addr = {0};
 	qdf_freq_t dfs_freq;
-	uint8_t sta_cnt;
 
 	dev = context;
 	if (!dev) {
@@ -2941,26 +2997,8 @@ QDF_STATUS hdd_hostapd_sap_event_cb(struct sap_event *sap_event,
 		}
 
 		/* Check any other sap need restart */
-		if (ap_ctx->sap_context->csa_reason ==
-		    CSA_REASON_UNSAFE_CHANNEL)
-			hdd_unsafe_channel_restart_sap(hdd_ctx);
-		else if (ap_ctx->sap_context->csa_reason == CSA_REASON_DCS)
-			hdd_dcs_hostapd_set_chan(
-				hdd_ctx, adapter->deflink->vdev_id,
-				ap_ctx->operating_chan_freq);
+		hdd_hostapd_check_channel_post_csa(hdd_ctx, adapter);
 
-		/* Added the sta cnt check as we don't support sta+sap+nan
-		 * today. But this needs to be re-visited when we start
-		 * supporting this combo.
-		 */
-		sta_cnt = policy_mgr_mode_specific_connection_count(hdd_ctx->psoc,
-								    PM_STA_MODE,
-								    NULL);
-		if (!sta_cnt)
-			policy_mgr_nan_sap_post_enable_conc_check(hdd_ctx->psoc);
-		policy_mgr_check_sap_go_force_scc(
-				hdd_ctx->psoc, adapter->deflink->vdev,
-				ap_ctx->sap_context->csa_reason);
 		qdf_status = qdf_event_set(&hostapd_state->qdf_event);
 		if (!QDF_IS_STATUS_SUCCESS(qdf_status))
 			hdd_err("qdf_event_set failed! status: %d",

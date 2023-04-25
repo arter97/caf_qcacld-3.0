@@ -1043,11 +1043,12 @@ void policy_mgr_process_force_scc_for_nan(struct wlan_objmgr_psoc *psoc);
  * scheduled. The workqueue will handle the new channel selection and change
  * the channel of second interface to avoid MCC.
  *
- * Return: void
+ * Return: QDF_STATUS
  */
-void policy_mgr_check_sap_go_force_scc(struct wlan_objmgr_psoc *psoc,
-				       struct wlan_objmgr_vdev *vdev,
-				       enum sap_csa_reason_code reason_code);
+QDF_STATUS
+policy_mgr_check_sap_go_force_scc(struct wlan_objmgr_psoc *psoc,
+				  struct wlan_objmgr_vdev *vdev,
+				  enum sap_csa_reason_code reason_code);
 
 /**
  * policy_mgr_set_pcl_for_existing_combo() - SET PCL for existing combo
@@ -4265,9 +4266,10 @@ qdf_freq_t policy_mgr_get_user_config_sap_freq(struct wlan_objmgr_psoc *psoc,
  *                                               post nan/sap enable
  * @psoc: pointer to psoc
  *
- * Return: void
+ * Return: QDF_STATUS
  **/
-void policy_mgr_nan_sap_post_enable_conc_check(struct wlan_objmgr_psoc *psoc);
+QDF_STATUS
+policy_mgr_nan_sap_post_enable_conc_check(struct wlan_objmgr_psoc *psoc);
 
 /**
  * policy_mgr_nan_sap_post_disable_conc_check() - Do concurrency related

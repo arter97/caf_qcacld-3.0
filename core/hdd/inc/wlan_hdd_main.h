@@ -3197,10 +3197,10 @@ int hdd_update_acs_timer_reason(struct hdd_adapter *adapter, uint8_t reason);
  * Moves the SAP interface by invoking the function which
  * executes the callback to perform channel switch using (E)CSA.
  *
- * Return: None
+ * Return: QDF_STATUS
  */
-void hdd_switch_sap_channel(struct hdd_adapter *adapter, uint8_t channel,
-			    bool forced);
+QDF_STATUS hdd_switch_sap_channel(struct hdd_adapter *adapter, uint8_t channel,
+				  bool forced);
 
 /**
  * hdd_switch_sap_chan_freq() - Move SAP to the given channel
@@ -3220,15 +3220,16 @@ QDF_STATUS hdd_switch_sap_chan_freq(struct hdd_adapter *adapter,
 				    bool forced);
 
 #if defined(FEATURE_WLAN_CH_AVOID)
-void hdd_unsafe_channel_restart_sap(struct hdd_context *hdd_ctx);
+QDF_STATUS hdd_unsafe_channel_restart_sap(struct hdd_context *hdd_ctx);
 
 void hdd_ch_avoid_ind(struct hdd_context *hdd_ctxt,
 		      struct unsafe_ch_list *unsafe_chan_list,
 		      struct ch_avoid_ind_type *avoid_freq_list);
 #else
 static inline
-void hdd_unsafe_channel_restart_sap(struct hdd_context *hdd_ctx)
+QDF_STATUS hdd_unsafe_channel_restart_sap(struct hdd_context *hdd_ctx)
 {
+	return QDF_STATUS_SUCCESS;
 }
 
 static inline
@@ -3768,7 +3769,7 @@ static inline void hdd_enable_fastpath(struct hdd_context *hdd_ctx,
 void hdd_wlan_update_target_info(struct hdd_context *hdd_ctx, void *context);
 
 enum  sap_acs_dfs_mode wlan_hdd_get_dfs_mode(enum dfs_mode mode);
-void hdd_unsafe_channel_restart_sap(struct hdd_context *hdd_ctx);
+
 /**
  * hdd_clone_local_unsafe_chan() - clone hdd ctx unsafe chan list
  * @hdd_ctx: hdd context pointer

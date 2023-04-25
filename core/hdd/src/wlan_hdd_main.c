@@ -11823,8 +11823,8 @@ static void hdd_set_thermal_level_cb(hdd_handle_t hdd_handle, u_int8_t level)
  *
  * Return: None
  */
-void hdd_switch_sap_channel(struct hdd_adapter *adapter, uint8_t channel,
-			    bool forced)
+QDF_STATUS hdd_switch_sap_channel(struct hdd_adapter *adapter, uint8_t channel,
+				  bool forced)
 {
 	struct hdd_ap_ctx *hdd_ap_ctx;
 	struct hdd_context *hdd_ctx;
@@ -11832,7 +11832,7 @@ void hdd_switch_sap_channel(struct hdd_adapter *adapter, uint8_t channel,
 
 	if (!adapter) {
 		hdd_err("invalid adapter");
-		return;
+		return QDF_STATUS_E_INVAL;
 	}
 
 	hdd_ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(adapter);
@@ -11840,7 +11840,7 @@ void hdd_switch_sap_channel(struct hdd_adapter *adapter, uint8_t channel,
 	mac_handle = hdd_adapter_get_mac_handle(adapter);
 	if (!mac_handle) {
 		hdd_err("invalid MAC handle");
-		return;
+		return QDF_STATUS_E_INVAL;
 	}
 
 	hdd_ctx = WLAN_HDD_GET_CTX(adapter);
@@ -11848,7 +11848,7 @@ void hdd_switch_sap_channel(struct hdd_adapter *adapter, uint8_t channel,
 	hdd_debug("chan:%d width:%d",
 		channel, hdd_ap_ctx->sap_config.ch_width_orig);
 
-	policy_mgr_change_sap_channel_with_csa(
+	return policy_mgr_change_sap_channel_with_csa(
 		hdd_ctx->psoc, adapter->deflink->vdev_id,
 		wlan_reg_legacy_chan_to_freq(hdd_ctx->pdev, channel),
 		hdd_ap_ctx->sap_config.ch_width_orig, forced);
@@ -12017,7 +12017,7 @@ hdd_check_chn_bw_boundary_unsafe(struct hdd_context *hdd_ctxt,
  *
  * Return - none
  */
-void hdd_unsafe_channel_restart_sap(struct hdd_context *hdd_ctxt)
+QDF_STATUS hdd_unsafe_channel_restart_sap(struct hdd_context *hdd_ctxt)
 {
 	struct hdd_adapter *adapter, *next_adapter = NULL;
 	struct hdd_ap_ctx *ap_ctx;
@@ -12147,7 +12147,7 @@ void hdd_unsafe_channel_restart_sap(struct hdd_context *hdd_ctxt)
 				if (next_adapter)
 					hdd_adapter_dev_put_debug(next_adapter,
 								  dbgid);
-				return;
+				return QDF_STATUS_E_PENDING;
 			} else {
 				hdd_debug("CSA failed, check next SAP");
 			}
@@ -12160,11 +12160,13 @@ void hdd_unsafe_channel_restart_sap(struct hdd_context *hdd_ctxt)
 			if (next_adapter)
 				hdd_adapter_dev_put_debug(next_adapter,
 							  dbgid);
-			return;
+			return QDF_STATUS_SUCCESS;
 		}
 		/* dev_put has to be done here */
 		hdd_adapter_dev_put_debug(adapter, dbgid);
 	}
+
+	return QDF_STATUS_SUCCESS;
 }
 
 /**
