@@ -212,6 +212,18 @@ static inline bool __qdf_is_macaddr_equal(const struct qdf_mac_addr *mac_addr1,
 		} \
 } while (0)
 
+#define __qdf_assert_with_debug(expr, debug_fp, ...)			\
+	do {								\
+		typeof(debug_fp) _debug_fp = debug_fp;			\
+		if (unlikely(!(expr))) {				\
+			pr_err("Assertion failed! %s:%s %s:%d\n",	\
+			       # expr, __func__, __FILE__, __LINE__);	\
+			if (_debug_fp)					\
+				_debug_fp(__VA_ARGS__);			\
+			QDF_BUG_ON_ASSERT(0);				\
+		}							\
+	} while (0)
+
 #define __qdf_target_assert(expr)  do {    \
 	if (unlikely(!(expr))) {                                 \
 		qdf_err("Assertion failed! %s:%s %s:%d",   \

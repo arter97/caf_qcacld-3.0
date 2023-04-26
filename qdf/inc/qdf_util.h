@@ -92,6 +92,14 @@ typedef __qdf_wait_queue_head_t qdf_wait_queue_head_t;
 #define qdf_assert_always(expr)  __qdf_assert(expr)
 
 /**
+ * qdf_assert_with_debug - invoke function to dump needed info before assert
+ * @expr: expression to test
+ * @debug_fp: function pointer to be invoked for debugging
+ */
+#define qdf_assert_with_debug(expr, debug_fp, ...) \
+	__qdf_assert_with_debug(expr, debug_fp, ...)
+
+/**
  * qdf_target_assert_always - always target assert "expr" evaluates to false.
  * @expr: expression to test
  */
