@@ -697,6 +697,40 @@ static uint8_t reg_dmn_get_num_6g_opclasses(struct wlan_objmgr_pdev *pdev)
 }
 
 /**
+ * reg_dmn_fill_cfis() - Fill the cfis for the given
+ * opclass and frequency range.
+ * @op_class_tbl: Pointer to struct reg_dmn_op_class_map_t
+ * @p_lst: Pointer to struct c_freq_lst
+ * @p_frange_lst: Pointer to struct wlan_afc_frange_list
+ * @dst: Pointer to dst buffer
+ *
+ * Return: Number of valid cfis
+ */
+static uint8_t
+reg_dmn_fill_cfis(const struct reg_dmn_op_class_map_t *op_class_tbl,
+		  const struct c_freq_lst *p_lst,
+		  struct wlan_afc_frange_list *p_frange_lst,
+		  uint8_t *dst)
+{
+	uint8_t j;
+	uint8_t cfi_idx = 0;
+
+	for (j = 0; j < p_lst->num_cfis; j++) {
+		uint8_t cfi;
+		qdf_freq_t cfi_freq;
+		qdf_freq_t start_freq = op_class_tbl->start_freq;
+		uint16_t bw = op_class_tbl->chan_spacing;
+
+		cfi = p_lst->p_cfis_arr[j];
+		cfi_freq = start_freq + FREQ_TO_CHAN_SCALE * cfi;
+
+		if (reg_is_cfi_freq_in_ranges(cfi_freq, bw, p_frange_lst))
+			dst[cfi_idx++] = cfi;
+	}
+	return cfi_idx;
+}
+
+/**
  * reg_dmn_fill_6g_opcls_chan_lists() - Copy the channel lists for 6g opclasses
  * to the output argument list ('channel_lists')
  * @pdev: Pointer to pdev.
@@ -723,28 +757,19 @@ static void reg_dmn_fill_6g_opcls_chan_lists(struct wlan_objmgr_pdev *pdev,
 		p_lst = op_class_tbl->p_cfi_lst_obj;
 		if (p_lst &&
 		    reg_is_6ghz_op_class(pdev, op_class_tbl->op_class)) {
-			uint8_t j;
-			uint8_t cfi_idx = 0;
 			uint8_t *dst;
+			uint8_t num_valid_cfi = 0;
 
 			dst = channel_lists[i];
-			for (j = 0; j < p_lst->num_cfis; j++) {
-				uint8_t cfi;
-				qdf_freq_t cfi_freq;
-				qdf_freq_t start_freq = op_class_tbl->start_freq;
-				uint16_t bw = op_class_tbl->chan_spacing;
-
-				cfi = p_lst->p_cfis_arr[j];
-				cfi_freq = start_freq +
-					FREQ_TO_CHAN_SCALE * cfi;
-
-				if (reg_is_cfi_freq_in_ranges(cfi_freq,
-							      bw,
-							      p_frange_lst)) {
-					dst[cfi_idx++] = cfi;
-				}
+			if (!dst) {
+				reg_debug("dest list empty\n");
+				return;
 			}
-			i++;
+			num_valid_cfi = reg_dmn_fill_cfis(op_class_tbl, p_lst,
+							  p_frange_lst, dst);
+			if (num_valid_cfi)
+				i++;
+
 		}
 		op_class_tbl++;
 	}
@@ -770,17 +795,18 @@ QDF_STATUS reg_dmn_get_6g_opclasses_and_channels(struct wlan_objmgr_pdev *pdev,
 	uint8_t *p_total_alloc1;
 	uint8_t *p_total_alloc2;
 	uint8_t *p_temp_alloc;
+	uint8_t n_tot_opclss;
 
 	*opclass_lst = NULL;
 	*chansize_lst =  NULL;
 	*channel_lists = NULL;
+	*num_opclasses = 0;
 
 	op_class_tbl = global_op_class;
-
-	*num_opclasses = reg_dmn_get_num_6g_opclasses(pdev);
-	opcls_lst_size = *num_opclasses * sizeof(uint8_t);
-	chansize_lst_size = *num_opclasses * sizeof(uint8_t);
-	arr_chan_lists_size = *num_opclasses * sizeof(uint8_t *);
+	n_tot_opclss = reg_dmn_get_num_6g_opclasses(pdev);
+	opcls_lst_size = n_tot_opclss * sizeof(uint8_t);
+	chansize_lst_size = n_tot_opclss * sizeof(uint8_t);
+	arr_chan_lists_size = n_tot_opclss * sizeof(uint8_t *);
 
 	total_alloc_size = 0;
 	total_alloc_size += opcls_lst_size
@@ -819,7 +845,6 @@ QDF_STATUS reg_dmn_get_6g_opclasses_and_channels(struct wlan_objmgr_pdev *pdev,
 			uint8_t n_supp_cfis = 0;
 			uint8_t j;
 
-			l_opcls_lst[count] = op_class_tbl->op_class;
 			for (j = 0; j < p_lst->num_cfis; j++) {
 				uint8_t cfi;
 				qdf_freq_t cfi_freq;
@@ -835,8 +860,16 @@ QDF_STATUS reg_dmn_get_6g_opclasses_and_channels(struct wlan_objmgr_pdev *pdev,
 					n_supp_cfis++;
 				}
 			}
-			l_chansize_lst[count] = n_supp_cfis;
-			count++;
+			/* Fill opclass number, num cfis and increment
+			 * num_opclasses only if the cfi of the opclass
+			 * is within the frequency range of interest.
+			 */
+			if (n_supp_cfis) {
+				l_chansize_lst[count] = n_supp_cfis;
+				l_opcls_lst[count] = op_class_tbl->op_class;
+				(*num_opclasses)++;
+				count++;
+			}
 		}
 		op_class_tbl++;
 	}
