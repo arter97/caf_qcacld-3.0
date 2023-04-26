@@ -435,6 +435,7 @@ wlan_cfg80211_tdls_extract_he_params(struct tdls_update_peer_params *req_info,
 #endif
 
 #ifdef WLAN_FEATURE_11BE
+#ifdef CFG80211_LINK_STA_PARAMS_PRESENT
 static void
 wlan_cfg80211_tdls_extract_eht_params(struct tdls_update_peer_params *req_info,
 				      struct station_parameters *params)
@@ -450,6 +451,22 @@ wlan_cfg80211_tdls_extract_eht_params(struct tdls_update_peer_params *req_info,
 		req_info->ehtcap_present = 0;
 	}
 }
+#else
+static void
+wlan_cfg80211_tdls_extract_eht_params(struct tdls_update_peer_params *req_info,
+				      struct station_parameters *params)
+{
+	if (params->eht_capa) {
+		osif_debug("eht capa is present");
+		req_info->ehtcap_present = 1;
+		req_info->eht_cap_len = params->eht_capa_len;
+		qdf_mem_copy(&req_info->eht_cap, params->eht_capa,
+			     sizeof(struct ehtcap));
+	} else {
+		req_info->ehtcap_present = 0;
+	}
+}
+#endif
 #else
 static void
 wlan_cfg80211_tdls_extract_eht_params(struct tdls_update_peer_params *req_info,
