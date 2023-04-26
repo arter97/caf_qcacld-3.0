@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2014-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -323,3 +323,45 @@ qdf_thread_cpumap_print_to_pagebuf(bool list, char *new_mask_str,
 
 qdf_export_symbol(qdf_thread_cpumap_print_to_pagebuf);
 
+bool
+qdf_cpumask_and(qdf_cpu_mask *dstp, const qdf_cpu_mask *src1p,
+		const qdf_cpu_mask *src2p)
+{
+	return cpumask_and(dstp, src1p, src2p);
+}
+
+qdf_export_symbol(qdf_cpumask_and);
+
+bool
+qdf_cpumask_andnot(qdf_cpu_mask *dstp, const qdf_cpu_mask *src1p,
+		   const qdf_cpu_mask *src2p)
+{
+	return cpumask_andnot(dstp, src1p, src2p);
+}
+
+qdf_export_symbol(qdf_cpumask_andnot);
+
+bool
+qdf_cpumask_equal(const qdf_cpu_mask *src1p, const qdf_cpu_mask *src2p)
+{
+	return cpumask_equal(src1p, src2p);
+}
+
+qdf_export_symbol(qdf_cpumask_equal);
+
+void
+qdf_cpumask_complement(qdf_cpu_mask *dstp, const qdf_cpu_mask *srcp)
+{
+	cpumask_complement(dstp, srcp);
+}
+
+qdf_export_symbol(qdf_cpumask_complement);
+
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 1, 0))
+qdf_cpu_mask qdf_walt_get_cpus_taken(void)
+{
+	return walt_get_cpus_taken();
+}
+
+qdf_export_symbol(qdf_walt_get_cpus_taken);
+#endif
