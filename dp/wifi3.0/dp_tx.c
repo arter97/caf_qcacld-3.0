@@ -5656,8 +5656,14 @@ dp_tx_comp_process_desc_list(struct dp_soc *soc,
 			dp_tx_update_ppeds_tx_comp_stats(soc, txrx_peer, &ts,
 							 desc, ring_id);
 
-			nbuf = dp_ppeds_tx_desc_free(soc, desc);
-			dp_tx_nbuf_dev_queue_free_no_flag(&h, nbuf);
+			if (desc->pool_id != DP_TX_PPEDS_POOL_ID) {
+				nbuf = desc->nbuf;
+				dp_tx_nbuf_dev_queue_free_no_flag(&h, nbuf);
+				dp_tx_desc_free(soc, desc, desc->pool_id);
+			} else {
+				nbuf = dp_ppeds_tx_desc_free(soc, desc);
+				dp_tx_nbuf_dev_queue_free_no_flag(&h, nbuf);
+			}
 			desc = next;
 			continue;
 		}

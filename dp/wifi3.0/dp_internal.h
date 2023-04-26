@@ -30,6 +30,8 @@
 #define DP_BLOCKMEM_SIZE 4096
 #define WBM2_SW_PPE_REL_RING_ID 6
 #define WBM2_SW_PPE_REL_MAP_ID 11
+#define DP_TX_PPEDS_POOL_ID 0xF
+
 /* Alignment for consistent memory for DP rings*/
 #define DP_RING_BASE_ALIGN 32
 

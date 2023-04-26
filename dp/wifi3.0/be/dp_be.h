@@ -107,8 +107,6 @@ enum CMEM_MEM_CLIENTS {
 /* The MAX PPE PRI2TID */
 #define DP_TX_INT_PRI2TID_MAX 15
 
-#define DP_TX_PPEDS_POOL_ID 0
-
 /* size of CMEM needed for a ppeds tx desc pool */
 #define DP_TX_PPEDS_DESC_POOL_CMEM_SIZE \
 	((WLAN_CFG_NUM_PPEDS_TX_DESC_MAX / DP_CC_SPT_PAGE_MAX_ENTRIES) * \
