@@ -2388,9 +2388,9 @@ struct cdp_sawf_ops {
 			  uint32_t service_interval, uint32_t burst_size,
 			  uint32_t min_tput, uint32_t max_latency,
 			  uint8_t add_or_sub);
-	bool
-	(*swaf_peer_is_sla_configured)(struct cdp_soc_t *soc,
-				       uint8_t *mac_addr);
+	QDF_STATUS
+	(*swaf_peer_sla_configuration)(struct cdp_soc_t *soc,
+				       uint8_t *mac_addr, uint16_t *sla_mask);
 
 #endif
 };

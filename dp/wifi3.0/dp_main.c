@@ -10727,7 +10727,7 @@ static struct cdp_sawf_ops dp_ops_sawf = {
 	.telemetry_get_mpdu_stats = dp_sawf_get_mpdu_sched_stats,
 	.telemetry_get_drop_stats = dp_sawf_get_drop_stats,
 	.peer_config_ul = dp_sawf_peer_config_ul,
-	.swaf_peer_is_sla_configured = dp_swaf_peer_is_sla_configured,
+	.swaf_peer_sla_configuration = dp_swaf_peer_sla_configuration,
 #endif
 };
 #endif
