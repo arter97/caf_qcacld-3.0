@@ -1128,11 +1128,18 @@ static QDF_STATUS dp_peer_setup_be(struct dp_soc *soc, struct dp_peer *peer)
 {
 	struct dp_vdev_be *be_vdev;
 	QDF_STATUS qdf_status = QDF_STATUS_SUCCESS;
-	struct dp_soc_be *be_soc = dp_get_be_soc_from_dp_soc(soc);
+	struct dp_soc_be *be_soc;
 	struct cdp_ds_vp_params vp_params = {0};
-	struct cdp_soc_t *cdp_soc = &soc->cdp_soc;
+	struct cdp_soc_t *cdp_soc;
+	struct dp_peer *tgt_peer = NULL;
+	struct dp_soc *tgt_soc = NULL;
 
-	be_vdev = dp_get_be_vdev_from_dp_vdev(peer->vdev);
+	tgt_peer = dp_get_tgt_peer_from_peer(peer);
+	tgt_soc = tgt_peer->vdev->pdev->soc;
+	be_soc = dp_get_be_soc_from_dp_soc(tgt_soc);
+	cdp_soc = &tgt_soc->cdp_soc;
+
+	be_vdev = dp_get_be_vdev_from_dp_vdev(tgt_peer->vdev);
 	if (!be_vdev) {
 		qdf_err("BE vap is null");
 		return QDF_STATUS_E_NULL_VALUE;
@@ -1149,8 +1156,8 @@ static QDF_STATUS dp_peer_setup_be(struct dp_soc *soc, struct dp_peer *peer)
 	/*
 	 * Check if PPE DS routing is enabled on the associated vap.
 	 */
-	qdf_status = cdp_soc->ol_ops->get_ppeds_profile_info_for_vap(soc->ctrl_psoc,
-								     peer->vdev->vdev_id,
+	qdf_status = cdp_soc->ol_ops->get_ppeds_profile_info_for_vap(tgt_soc->ctrl_psoc,
+								     tgt_peer->vdev->vdev_id,
 								     &vp_params);
 	if (qdf_status == QDF_STATUS_E_NULL_VALUE) {
 		dp_err("%pK: Could not find ppeds profile info vdev\n", be_vdev);
@@ -1158,7 +1165,7 @@ static QDF_STATUS dp_peer_setup_be(struct dp_soc *soc, struct dp_peer *peer)
 	}
 
 	if (vp_params.ppe_vp_type == PPE_VP_USER_TYPE_DS) {
-		qdf_status = dp_peer_setup_ppeds_be(soc, peer, be_vdev,
+		qdf_status = dp_peer_setup_ppeds_be(tgt_soc, tgt_peer, be_vdev,
 						    (void *)&be_soc->ppe_vp_profile[vp_params.ppe_vp_profile_idx]);
 	}
 
