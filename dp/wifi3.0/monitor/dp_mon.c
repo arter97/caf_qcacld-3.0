@@ -2140,7 +2140,6 @@ void dp_peer_update_telemetry_stats(struct dp_soc *soc,
 			mon_peer->stats.airtime_stats.rx_airtime_consumption[ac].avg_consumption_per_sec =
 				(uint8_t)qdf_do_div((uint64_t)(mon_peer->stats.airtime_stats.rx_airtime_consumption[ac].consumption * 100),
 						    (uint32_t)(current_time - mon_peer->stats.airtime_stats.last_update_time));
-			mon_peer->stats.airtime_stats.last_update_time = current_time;
 			/* Store each peer airtime consumption in pdev
 			 * link_airtime to calculate pdev's total airtime
 			 * consumption
@@ -2156,6 +2155,7 @@ void dp_peer_update_telemetry_stats(struct dp_soc *soc,
 			mon_peer->stats.airtime_stats.tx_airtime_consumption[ac].consumption = 0;
 			mon_peer->stats.airtime_stats.rx_airtime_consumption[ac].consumption = 0;
 		}
+		mon_peer->stats.airtime_stats.last_update_time = current_time;
 	}
 }
 
