@@ -1217,6 +1217,9 @@ struct wmi_host_link_state_params {
  * @emlsr_support: indicate if eMLSR supported
  * @emlmr_support: indicate if eMLMR supported
  * @msd_cap_support: indicate if MSD supported
+ * @nstr_bitmap_present: indicate if NSTR bitmap is present
+ * @nstr_bitmap_size: Indicates size of NSTR bitmap,
+ *                    as per the 802.11be specification
  * @unused: spare bits
  * @mld_mac: MLD mac address
  * @logical_link_index: Unique index for links of the mlo. Starts with Zero
@@ -1231,6 +1234,7 @@ struct wmi_host_link_state_params {
  * @medium_sync_max_txop_num: Max number of TXOPs
  * @max_num_simultaneous_links: Max number of simultaneous links as per
  *                              MLD Capability for ML peer
+ * @nstr_indication_bitmap: NSTR indication bitmap
  */
 struct peer_assoc_mlo_params {
 	uint32_t mlo_enabled:1,
@@ -1242,7 +1246,9 @@ struct peer_assoc_mlo_params {
 		 emlsr_support:1,
 		 emlmr_support:1,
 		 msd_cap_support:1,
-		 unused:23;
+		 nstr_bitmap_present:1,
+		 nstr_bitmap_size:1,
+		 unused:21;
 	uint8_t mld_mac[QDF_MAC_ADDR_SIZE];
 	uint32_t logical_link_index;
 	uint32_t ml_peer_id;
@@ -1255,6 +1261,7 @@ struct peer_assoc_mlo_params {
 	uint16_t medium_sync_ofdm_ed_thresh;
 	uint16_t medium_sync_max_txop_num;
 	uint16_t max_num_simultaneous_links;
+	uint32_t nstr_indication_bitmap;
 };
 
 /**
