@@ -1664,6 +1664,35 @@ struct wlan_lmac_if_coap_tx_ops {
 };
 #endif
 
+#ifdef CONFIG_SAWF
+/**
+ * struct wlan_lmac_if_sawf_tx_ops - Target function pointers for SAWF
+ *
+ * @sawf_svc_create_send: function pointer to send SAWF SVC create
+ * @sawf_svc_disable_send: function pointer to send SAWF SVC disable
+ * @sawf_ul_svc_update_send: function pointer to update
+ *                           peer uplink QoS parameters
+ * @sawf_update_ul_params: function pointer to update flow uplink QoS parameters
+ */
+struct wlan_lmac_if_sawf_tx_ops {
+	QDF_STATUS
+	(*sawf_svc_create_send)(struct wlan_objmgr_pdev *pdev, void *params);
+	QDF_STATUS
+	(*sawf_svc_disable_send)(struct wlan_objmgr_pdev *pdev, void *params);
+	QDF_STATUS
+	(*sawf_ul_svc_update_send)(struct wlan_objmgr_pdev *pdev,
+				   uint8_t vdev_id, uint8_t *peer_mac,
+				   uint8_t ac, uint8_t add_or_sub,
+				   void *svc_params);
+	QDF_STATUS
+	(*sawf_update_ul_params)(struct wlan_objmgr_pdev *pdev, uint8_t vdev_id,
+				 uint8_t *peer_mac, uint8_t tid, uint8_t ac,
+				 uint32_t service_interval, uint32_t burst_size,
+				 uint32_t min_tput, uint32_t max_latency,
+				 uint8_t add_or_sub);
+};
+#endif
+
 /**
  * struct wlan_lmac_if_tx_ops - south bound tx function pointers
  * @mgmt_txrx_tx_ops: mgmt txrx tx ops
@@ -1697,6 +1726,7 @@ struct wlan_lmac_if_coap_tx_ops {
  * @twt_tx_ops: TWT tx ops
  * @spatial_reuse_tx_ops: Spatial Reuse tx ops
  * @coap_ops: COAP tx ops
+ * @sawf_tx_ops: SAWF tx ops
  *
  * Callback function tabled to be registered with umac.
  * umac will use the functional table to send events/frames to wmi
@@ -1802,6 +1832,9 @@ struct wlan_lmac_if_tx_ops {
 
 #ifdef WLAN_FEATURE_COAP
 	struct wlan_lmac_if_coap_tx_ops coap_ops;
+#endif
+#ifdef CONFIG_SAWF
+	struct wlan_lmac_if_sawf_tx_ops sawf_tx_ops;
 #endif
 };
 
