@@ -163,8 +163,7 @@ dp_tx_mon_enqueue_mpdu_nbuf(struct dp_pdev *pdev,
 	/* enqueue mpdu_nbuf to the per user mpdu_q */
 	qdf_nbuf_queue_t *usr_mpdu_q = NULL;
 
-	if (!TXMON_PPDU_HAL(tx_ppdu_info, rx_user_status) ||
-	    !TXMON_PPDU_HAL(tx_ppdu_info, num_users))
+	if (!TXMON_PPDU_HAL(tx_ppdu_info, num_users))
 		QDF_BUG(0);
 
 	usr_mpdu_q = &TXMON_PPDU_USR(tx_ppdu_info, user_id, mpdu_q);

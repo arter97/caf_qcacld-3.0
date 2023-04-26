@@ -9093,6 +9093,23 @@ void wmi_copy_afc_deployment_config(wmi_resource_config *resource_cfg,
 }
 #endif
 
+#ifdef DP_TX_PACKET_INSPECT_FOR_ILP
+static inline
+void wmi_copy_latency_flowq_support(wmi_resource_config *resource_cfg,
+				    target_resource_config *tgt_res_cfg)
+{
+	if (tgt_res_cfg->tx_ilp_enable)
+		WMI_RSRC_CFG_FLAGS2_LATENCY_FLOWQ_SUPPORT_SET(
+						resource_cfg->flags2, 1);
+}
+#else
+static inline
+void wmi_copy_latency_flowq_support(wmi_resource_config *resource_cfg,
+				    target_resource_config *tgt_res_cfg)
+{
+}
+#endif
+
 static
 void wmi_copy_resource_config(wmi_resource_config *resource_cfg,
 				target_resource_config *tgt_res_cfg)
@@ -9390,6 +9407,7 @@ void wmi_copy_resource_config(wmi_resource_config *resource_cfg,
 		WMI_RSRC_CFG_FLAGS2_NOTIFY_FRAME_CONFIG_ENABLE_SET(
 			resource_cfg->flags2, 1);
 
+	wmi_copy_latency_flowq_support(resource_cfg, tgt_res_cfg);
 }
 
 #ifdef FEATURE_SET
@@ -18976,6 +18994,8 @@ extract_roam_trigger_stats_tlv(wmi_unified_t wmi_handle, void *evt_buf,
 		trig_reason = cmn_data->trigger_reason;
 		trig->trigger_reason =
 			wmi_convert_fw_to_cm_trig_reason(trig_reason);
+		trig->trigger_sub_reason =
+			wmi_convert_roam_sub_reason(cmn_data->trigger_sub_reason);
 		trig->timestamp = cmn_data->timestamp;
 		trig->common_roam = true;
 	} else if (src_data) {

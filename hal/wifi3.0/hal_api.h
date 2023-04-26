@@ -1254,8 +1254,10 @@ void hal_srng_dst_init_hp(struct hal_soc_handle *hal_soc,
  * hal_srng_cleanup() - Deinitialize HW SRNG ring.
  * @hal_soc: Opaque HAL SOC handle
  * @hal_ring_hdl: Opaque HAL SRNG pointer
+ * @umac_reset_inprogress: UMAC reset enabled/disabled.
  */
-void hal_srng_cleanup(void *hal_soc, hal_ring_handle_t hal_ring_hdl);
+void hal_srng_cleanup(void *hal_soc, hal_ring_handle_t hal_ring_hdl,
+		      bool umac_reset_inprogress);
 
 static inline bool hal_srng_initialized(hal_ring_handle_t hal_ring_hdl)
 {

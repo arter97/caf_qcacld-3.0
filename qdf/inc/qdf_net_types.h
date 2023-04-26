@@ -70,8 +70,11 @@ typedef __in6_addr_t in6_addr_t;
 #define QDF_IEEE80211_FC1_FROMDS        0x02
 #define QDF_IEEE80211_FC1_PM            0x10
 
+#define QDF_IEEE80211_FC0_VERSION_0     0x00
 #define QDF_IEEE80211_FC0_TYPE_MASK     0x0c
 #define QDF_IEEE80211_FC0_SUBTYPE_MASK  0xf0
+
+#define QDF_IEEE80211_FC0_TYPE_MGT      0x00
 
 #define QDF_IEEE80211_FC0_TYPE_DATA     0x08
 #define QDF_IEEE80211_FC0_SUBTYPE_DATA  0x00
@@ -89,6 +92,7 @@ typedef __in6_addr_t in6_addr_t;
 #define QDF_IEEE80211_FC0_SUBTYPE_BA    0x90
 #define QDF_IEEE80211_FC0_SUBTYPE_PSPOLL  0xA0
 #define QDF_IEEE80211_FC0_SUBTYPE_RTS   0xB0
+#define QDF_IEEE80211_FC0_SUBTYPE_CTS   0xC0
 #define QDF_IEEE80211_FC0_SUBTYPE_ACK   0xD0
 #define QDF_IEEE80211_FC0_SUBTYPE_CF_END 0xE0
 #define QDF_IEEE80211_FC0_SUBTYPE_CF_END_CF_ACK 0xF0
@@ -658,4 +662,5 @@ typedef struct {
 		} __packed type_raw;
 	} llc_un /* XXX __packed ??? */;
 } qdf_llc_t;
+
 #endif /*_QDF_NET_TYPES_H*/

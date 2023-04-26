@@ -239,6 +239,467 @@ dp_rx_intrabss_fwd_rh(struct dp_soc *soc,
 	return false;
 }
 
+#ifdef RX_DESC_DEBUG_CHECK
+static
+QDF_STATUS dp_rx_desc_nbuf_sanity_check_rh(struct dp_soc *soc,
+					   uint32_t *msg_word,
+					   struct dp_rx_desc *rx_desc)
+{
+	uint64_t paddr;
+
+	paddr = (HTT_RX_DATA_MSDU_INFO_BUFFER_ADDR_LOW_GET(*msg_word) |
+		 ((uint64_t)(HTT_RX_DATA_MSDU_INFO_BUFFER_ADDR_HIGH_GET(*(msg_word + 1))) << 32));
+
+	/* Sanity check for possible buffer paddr corruption */
+	if (dp_rx_desc_paddr_sanity_check(rx_desc, paddr))
+		return QDF_STATUS_SUCCESS;
+
+	return QDF_STATUS_E_FAILURE;
+}
+
+#else
+static inline
+QDF_STATUS dp_rx_desc_nbuf_sanity_check_rh(struct dp_soc *soc,
+					   uint32_t *msg_word,
+					   struct dp_rx_desc *rx_desc)
+#endif
+
+#ifdef DUP_RX_DESC_WAR
+static
+void dp_rx_dump_info_and_assert_rh(struct dp_soc *soc,
+				   uint32_t *msg_word,
+				   struct dp_rx_desc *rx_desc)
+{
+	QDF_TRACE_HEX_DUMP(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_INFO_HIGH,
+			   msg_word, HTT_RX_DATA_MSDU_INFO_SIZE);
+	dp_rx_desc_dump(rx_desc);
+}
+#else
+static
+void dp_rx_dump_info_and_assert_rh(struct dp_soc *soc,
+				   uint32_t *msg_word,
+				   struct dp_rx_desc *rx_desc)
+{
+	dp_rx_desc_dump(rx_desc);
+	QDF_TRACE_HEX_DUMP(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_INFO_HIGH,
+			   msg_word, HTT_RX_DATA_MSDU_INFO_SIZE);
+	qdf_assert_always(0);
+}
+#endif
+
+#ifdef WLAN_FEATURE_DP_RX_RING_HISTORY
+static void
+dp_rx_ring_record_entry_rh(struct dp_soc *soc, uint8_t ring_num,
+			   uint32_t *msg_word)
+{
+	struct dp_buf_info_record *record;
+	uint32_t idx;
+
+	if (qdf_unlikely(!soc->rx_ring_history[ring_num]))
+		return;
+
+	idx = dp_history_get_next_index(&soc->rx_ring_history[ring_num]->index,
+					DP_RX_HIST_MAX);
+
+	/* No NULL check needed for record since its an array */
+	record = &soc->rx_ring_history[ring_num]->entry[idx];
+
+	record->timestamp = qdf_get_log_timestamp();
+	record->hbi.paddr =
+		(HTT_RX_DATA_MSDU_INFO_BUFFER_ADDR_LOW_GET(*msg_word) |
+		((uint64_t)(HTT_RX_DATA_MSDU_INFO_BUFFER_ADDR_HIGH_GET(*(msg_word + 1))) << 32));
+	record->hbi.sw_cookie =
+		HTT_RX_DATA_MSDU_INFO_SW_BUFFER_COOKIE_GET(*(msg_word + 1));
+}
+#else
+static inline void
+dp_rx_ring_record_entry_rh(struct dp_soc *soc, uint8_t rx_ring_num,
+			   uint32_t *msg_word) {}
+#endif
+
+#ifdef WLAN_FEATURE_MARK_FIRST_WAKEUP_PACKET
+static inline void
+dp_rx_mark_first_packet_after_wow_wakeup_rh(struct dp_soc *soc,
+					    uint32_t *msg_word,
+					    qdf_nbuf_t nbuf)
+{
+	struct dp_pdev *pdev = soc->pdev_list[0];
+
+	if (!pdev->is_first_wakeup_packet)
+		return;
+
+	if (HTT_RX_DATA_MSDU_INFO_IS_FIRST_PKT_AFTER_WKP_GET(*(msg_word + 2))) {
+		qdf_nbuf_mark_wakeup_frame(nbuf);
+		dp_info("First packet after WOW Wakeup rcvd");
+	}
+}
+#else
+static inline void
+dp_rx_mark_first_packet_after_wow_wakeup_rh(struct dp_soc *soc,
+					    uint32_t *msg_word,
+					    qdf_nbuf_t nbuf) {}
+#endif
+
+#ifdef QCA_SUPPORT_EAPOL_OVER_CONTROL_PORT
+static void
+dp_rx_deliver_to_osif_stack_rh(struct dp_soc *soc,
+			       struct dp_vdev *vdev,
+			       struct dp_txrx_peer *txrx_peer,
+			       qdf_nbuf_t nbuf,
+			       qdf_nbuf_t tail,
+			       bool is_eapol)
+{
+	if (is_eapol && soc->eapol_over_control_port)
+		dp_rx_eapol_deliver_to_stack(soc, vdev, txrx_peer, nbuf, NULL);
+	else
+		dp_rx_deliver_to_stack(soc, vdev, txrx_peer, nbuf, NULL);
+}
+#else
+static void
+dp_rx_deliver_to_osif_stack_rh(struct dp_soc *soc,
+			       struct dp_vdev *vdev,
+			       struct dp_txrx_peer *txrx_peer,
+			       qdf_nbuf_t nbuf,
+			       qdf_nbuf_t tail,
+			       bool is_eapol)
+{
+	dp_rx_deliver_to_stack(soc, vdev, txrx_peer, nbuf, NULL);
+}
+#endif
+
+static void
+dp_rx_decrypt_unecrypt_err_handler_rh(struct dp_soc *soc, qdf_nbuf_t nbuf,
+				      uint8_t error_code, uint8_t mac_id)
+{
+	uint32_t pkt_len, l2_hdr_offset;
+	uint16_t msdu_len;
+	struct dp_vdev *vdev;
+	struct dp_txrx_peer *txrx_peer = NULL;
+	dp_txrx_ref_handle txrx_ref_handle = NULL;
+	qdf_ether_header_t *eh;
+	bool is_broadcast;
+	uint8_t *rx_tlv_hdr;
+	uint16_t peer_id;
+
+	rx_tlv_hdr = qdf_nbuf_data(nbuf);
+
+	/*
+	 * Check if DMA completed -- msdu_done is the last bit
+	 * to be written
+	 */
+	if (!hal_rx_attn_msdu_done_get(soc->hal_soc, rx_tlv_hdr)) {
+		dp_err_rl("MSDU DONE failure");
+
+		hal_rx_dump_pkt_tlvs(soc->hal_soc, rx_tlv_hdr,
+				     QDF_TRACE_LEVEL_INFO);
+		qdf_assert(0);
+	}
+
+	if (qdf_unlikely(qdf_nbuf_is_rx_chfrag_cont(nbuf))) {
+		dp_err("Unsupported MSDU format rcvd for error:%u", error_code);
+		qdf_assert_always(0);
+		goto free_nbuf;
+	}
+
+	peer_id =  QDF_NBUF_CB_RX_PEER_ID(nbuf);
+	txrx_peer = dp_tgt_txrx_peer_get_ref_by_id(soc, peer_id,
+						   &txrx_ref_handle,
+						   DP_MOD_ID_RX);
+	if (!txrx_peer) {
+		QDF_TRACE_ERROR_RL(QDF_MODULE_ID_DP, "txrx_peer is NULL");
+		DP_STATS_INC_PKT(soc, rx.err.rx_invalid_peer, 1,
+				 qdf_nbuf_len(nbuf));
+		/* Trigger invalid peer handler wrapper */
+		dp_rx_process_invalid_peer_wrapper(soc, nbuf, true, mac_id);
+		return;
+	}
+
+	l2_hdr_offset = hal_rx_msdu_end_l3_hdr_padding_get(soc->hal_soc,
+							   rx_tlv_hdr);
+	msdu_len = hal_rx_msdu_start_msdu_len_get(soc->hal_soc, rx_tlv_hdr);
+	pkt_len = msdu_len + l2_hdr_offset + soc->rx_pkt_tlv_size;
+
+	if (qdf_unlikely(pkt_len > RX_DATA_BUFFER_SIZE)) {
+		DP_STATS_INC_PKT(soc, rx.err.rx_invalid_pkt_len,
+				 1, pkt_len);
+		goto free_nbuf;
+	}
+
+	/* Set length in nbuf */
+	qdf_nbuf_set_pktlen(nbuf, pkt_len);
+
+	qdf_nbuf_set_next(nbuf, NULL);
+
+	qdf_nbuf_set_rx_chfrag_start(nbuf, 1);
+	qdf_nbuf_set_rx_chfrag_end(nbuf, 1);
+
+	vdev = txrx_peer->vdev;
+	if (!vdev) {
+		dp_rx_info_rl("%pK: INVALID vdev %pK OR osif_rx", soc,
+			      vdev);
+		DP_STATS_INC(soc, rx.err.invalid_vdev, 1);
+		goto free_nbuf;
+	}
+
+	/*
+	 * Advance the packet start pointer by total size of
+	 * pre-header TLV's
+	 */
+	dp_rx_skip_tlvs(soc, nbuf, l2_hdr_offset);
+
+	/*
+	 * WAPI cert AP sends rekey frames as unencrypted.
+	 * Thus RXDMA will report unencrypted frame error.
+	 * To pass WAPI cert case, SW needs to pass unencrypted
+	 * rekey frame to stack.
+	 *
+	 * In dynamic WEP case rekey frames are not encrypted
+	 * similar to WAPI. Allow EAPOL when 8021+wep is enabled and
+	 * key install is already done
+	 */
+	if ((qdf_nbuf_is_ipv4_wapi_pkt(nbuf)) ||
+	    ((vdev->sec_type == cdp_sec_type_wep104) &&
+	     (qdf_nbuf_is_ipv4_eapol_pkt(nbuf)))) {
+		if (qdf_unlikely(hal_rx_msdu_end_da_is_mcbc_get(soc->hal_soc,
+								rx_tlv_hdr) &&
+				 (vdev->rx_decap_type ==
+				  htt_cmn_pkt_type_ethernet))) {
+			eh = (qdf_ether_header_t *)qdf_nbuf_data(nbuf);
+			is_broadcast = (QDF_IS_ADDR_BROADCAST
+					(eh->ether_dhost)) ? 1 : 0;
+			DP_PEER_PER_PKT_STATS_INC_PKT(txrx_peer, rx.multicast,
+						      1, qdf_nbuf_len(nbuf), 0);
+			if (is_broadcast) {
+				DP_PEER_PER_PKT_STATS_INC_PKT(txrx_peer, rx.bcast,
+							      1, qdf_nbuf_len(nbuf), 0);
+			}
+		} else {
+			DP_PEER_PER_PKT_STATS_INC_PKT(txrx_peer, rx.unicast, 1,
+						      qdf_nbuf_len(nbuf),
+						      0);
+		}
+
+		if (qdf_unlikely(vdev->rx_decap_type == htt_cmn_pkt_type_raw)) {
+			dp_rx_deliver_raw(vdev, nbuf, txrx_peer, 0);
+		} else {
+			/* Update the protocol tag in SKB based on CCE metadata */
+			dp_rx_update_protocol_tag(soc, vdev, nbuf, rx_tlv_hdr,
+						  EXCEPTION_DEST_RING_ID, true, true);
+			/* Update the flow tag in SKB based on FSE metadata */
+			dp_rx_update_flow_tag(soc, vdev, nbuf, rx_tlv_hdr, true);
+			DP_PEER_STATS_FLAT_INC(txrx_peer, to_stack.num, 1);
+			qdf_nbuf_set_exc_frame(nbuf, 1);
+			dp_rx_deliver_to_osif_stack_rh(soc, vdev, txrx_peer, nbuf, NULL,
+						       qdf_nbuf_is_ipv4_eapol_pkt(nbuf));
+		}
+	}
+
+	if (txrx_peer)
+		dp_txrx_peer_unref_delete(txrx_ref_handle, DP_MOD_ID_RX);
+	return;
+
+free_nbuf:
+	if (txrx_peer)
+		dp_txrx_peer_unref_delete(txrx_ref_handle, DP_MOD_ID_RX);
+	dp_rx_nbuf_free(nbuf);
+}
+
+static void
+dp_rx_2k_jump_oor_err_handler_rh(struct dp_soc *soc, qdf_nbuf_t nbuf,
+				 uint32_t error_code)
+{
+	uint32_t frame_mask;
+	struct dp_txrx_peer *txrx_peer = NULL;
+	dp_txrx_ref_handle txrx_ref_handle = NULL;
+	uint8_t *rx_tlv_hdr;
+	uint16_t peer_id;
+
+	rx_tlv_hdr = qdf_nbuf_data(nbuf);
+	if (qdf_unlikely(qdf_nbuf_is_rx_chfrag_cont(nbuf))) {
+		dp_err("Unsupported MSDU format rcvd for error:%u", error_code);
+		qdf_assert_always(0);
+		goto free_nbuf;
+	}
+
+	peer_id =  QDF_NBUF_CB_RX_PEER_ID(nbuf);
+	txrx_peer = dp_tgt_txrx_peer_get_ref_by_id(soc, peer_id,
+						   &txrx_ref_handle,
+						   DP_MOD_ID_RX);
+	if (!txrx_peer) {
+		dp_info_rl("peer not found");
+		goto free_nbuf;
+	}
+
+	if (error_code == HTT_RXDATA_ERR_OOR) {
+		frame_mask = FRAME_MASK_IPV4_ARP | FRAME_MASK_IPV4_DHCP |
+			FRAME_MASK_IPV4_EAPOL | FRAME_MASK_IPV6_DHCP;
+	} else {
+		frame_mask = FRAME_MASK_IPV4_ARP;
+	}
+
+	if (dp_rx_deliver_special_frame(soc, txrx_peer, nbuf, frame_mask,
+					rx_tlv_hdr)) {
+		if (error_code == HTT_RXDATA_ERR_OOR) {
+			DP_STATS_INC(soc, rx.err.reo_err_oor_to_stack, 1);
+		} else {
+			DP_STATS_INC(soc, rx.err.rx_2k_jump_to_stack, 1);
+		}
+
+		dp_txrx_peer_unref_delete(txrx_ref_handle, DP_MOD_ID_RX);
+		return;
+	}
+
+free_nbuf:
+	if (txrx_peer)
+		dp_txrx_peer_unref_delete(txrx_ref_handle, DP_MOD_ID_RX);
+
+	if (error_code == HTT_RXDATA_ERR_OOR) {
+		DP_STATS_INC(soc, rx.err.reo_err_oor_drop, 1);
+	} else {
+		DP_STATS_INC(soc, rx.err.rx_2k_jump_drop, 1);
+	}
+
+	dp_rx_nbuf_free(nbuf);
+}
+
+static void dp_rx_mic_err_handler_rh(struct dp_soc *soc, qdf_nbuf_t nbuf)
+{
+	struct dp_vdev *vdev;
+	struct dp_pdev *pdev;
+	struct dp_txrx_peer *txrx_peer = NULL;
+	dp_txrx_ref_handle txrx_ref_handle = NULL;
+	struct ol_if_ops *tops;
+	uint16_t rx_seq, fragno;
+	uint8_t is_raw;
+	uint16_t peer_id;
+	unsigned int tid;
+	QDF_STATUS status;
+	struct cdp_rx_mic_err_info mic_failure_info;
+
+	/*
+	 * only first msdu, mpdu start description tlv valid?
+	 * and use it for following msdu.
+	 */
+	if (!hal_rx_msdu_end_first_msdu_get(soc->hal_soc,
+					    qdf_nbuf_data(nbuf)))
+		return;
+
+	peer_id =  QDF_NBUF_CB_RX_PEER_ID(nbuf);
+	txrx_peer = dp_tgt_txrx_peer_get_ref_by_id(soc, peer_id,
+						   &txrx_ref_handle,
+						   DP_MOD_ID_RX);
+	if (!txrx_peer) {
+		dp_info_rl("txrx_peer not found");
+		goto fail;
+	}
+
+	vdev = txrx_peer->vdev;
+	if (!vdev) {
+		dp_info_rl("VDEV not found");
+		goto fail;
+	}
+
+	pdev = vdev->pdev;
+	if (!pdev) {
+		dp_info_rl("PDEV not found");
+		goto fail;
+	}
+
+	/*TODO is raw support required for evros check*/
+	is_raw = HAL_IS_DECAP_FORMAT_RAW(soc->hal_soc, qdf_nbuf_data(nbuf));
+	if (is_raw) {
+		fragno = dp_rx_frag_get_mpdu_frag_number(soc,
+							 qdf_nbuf_data(nbuf));
+		/* Can get only last fragment */
+		if (fragno) {
+			tid = hal_rx_mpdu_start_tid_get(soc->hal_soc,
+							qdf_nbuf_data(nbuf));
+			rx_seq = hal_rx_get_rx_sequence(soc->hal_soc,
+							qdf_nbuf_data(nbuf));
+
+			status = dp_rx_defrag_add_last_frag(soc, txrx_peer,
+							    tid, rx_seq, nbuf);
+			dp_info_rl("Frag pkt seq# %d frag# %d consumed " "status %d !",
+				   rx_seq, fragno, status);
+			if (txrx_peer)
+				dp_txrx_peer_unref_delete(txrx_ref_handle,
+							  DP_MOD_ID_RX);
+			return;
+		}
+	}
+
+	if (qdf_unlikely(qdf_nbuf_is_rx_chfrag_cont(nbuf))) {
+		dp_err("Unsupported MSDU format rcvd in MIC error handler");
+		qdf_assert_always(0);
+		goto fail;
+	}
+
+	if (hal_rx_mpdu_get_addr1(soc->hal_soc, qdf_nbuf_data(nbuf),
+				  &mic_failure_info.da_mac_addr.bytes[0])) {
+		dp_err_rl("Failed to get da_mac_addr");
+		goto fail;
+	}
+
+	if (hal_rx_mpdu_get_addr2(soc->hal_soc, qdf_nbuf_data(nbuf),
+				  &mic_failure_info.ta_mac_addr.bytes[0])) {
+		dp_err_rl("Failed to get ta_mac_addr");
+		goto fail;
+	}
+
+	mic_failure_info.key_id = 0;
+	mic_failure_info.multicast =
+		IEEE80211_IS_MULTICAST(mic_failure_info.da_mac_addr.bytes);
+	qdf_mem_zero(mic_failure_info.tsc, MIC_SEQ_CTR_SIZE);
+	mic_failure_info.frame_type = cdp_rx_frame_type_802_11;
+	mic_failure_info.data = NULL;
+	mic_failure_info.vdev_id = vdev->vdev_id;
+
+	tops = pdev->soc->cdp_soc.ol_ops;
+	if (tops->rx_mic_error)
+		tops->rx_mic_error(soc->ctrl_psoc, pdev->pdev_id,
+				   &mic_failure_info);
+
+fail:
+	dp_rx_nbuf_free(nbuf);
+	if (txrx_peer)
+		dp_txrx_peer_unref_delete(txrx_ref_handle, DP_MOD_ID_RX);
+}
+
+static QDF_STATUS dp_rx_err_handler_rh(struct dp_soc *soc,
+				       struct dp_rx_desc *rx_desc,
+				       uint32_t error_code)
+{
+	switch (error_code) {
+	case HTT_RXDATA_ERR_MSDU_LIMIT:
+	case HTT_RXDATA_ERR_FLUSH_REQUEST:
+	case HTT_RXDATA_ERR_ZERO_LEN_MSDU:
+		dp_rx_nbuf_free(rx_desc->nbuf);
+		dp_err_rl("MSDU rcvd with error code: %u", error_code);
+		break;
+	case HTT_RXDATA_ERR_TKIP_MIC:
+		dp_rx_mic_err_handler_rh(soc, rx_desc->nbuf);
+		break;
+	case HTT_RXDATA_ERR_OOR:
+	case HTT_RXDATA_ERR_2K_JUMP:
+		dp_rx_2k_jump_oor_err_handler_rh(soc, rx_desc->nbuf,
+						 error_code);
+		break;
+	case HTT_RXDATA_ERR_DECRYPT:
+	case HTT_RXDATA_ERR_UNENCRYPTED:
+		dp_rx_decrypt_unecrypt_err_handler_rh(soc, rx_desc->nbuf,
+						      error_code,
+						      rx_desc->pool_id);
+	default:
+		dp_err("Invalid error packet rcvd");
+		dp_rx_desc_dump(rx_desc);
+		qdf_assert_always(0);
+		dp_rx_nbuf_free(rx_desc->nbuf);
+		return QDF_STATUS_E_INVAL;
+	}
+
+	return QDF_STATUS_SUCCESS;
+}
+
 void
 dp_rx_data_indication_handler(struct dp_soc *soc, qdf_nbuf_t data_ind,
 			      uint16_t vdev_id, uint16_t peer_id,
@@ -285,10 +746,10 @@ dp_rx_data_indication_handler(struct dp_soc *soc, qdf_nbuf_t data_ind,
 	uint32_t max_ast;
 	uint64_t current_time = 0;
 	uint32_t error;
+	uint32_t error_code;
+	QDF_STATUS status;
 
 	DP_HIST_INIT();
-
-	/* TODO implement dp_rx_dump_info_and_assert equivalent in RHINE */
 
 	qdf_assert_always(soc && msdu_count);
 	hal_soc = soc->hal_soc;
@@ -330,27 +791,32 @@ dp_rx_data_indication_handler(struct dp_soc *soc, qdf_nbuf_t data_ind,
 		dp_rx_get_ctx_id_frm_napiid(QDF_NBUF_CB_RX_CTX_ID(data_ind));
 
 	while (qdf_likely(num_pending)) {
-		error = HTT_RX_DATA_MSDU_INFO_ERROR_VALID_GET(*(msg_word + 3));
-		if (qdf_unlikely(error)) {
-			dp_rx_err("MSDU RX error encountered error:%u", error);
-			/* TODO handle error MSDU gracefully */
-			qdf_assert_always(0);
-		}
-
+		dp_rx_ring_record_entry_rh(soc, rx_ctx_id, msg_word);
 		rx_buf_cookie =
 			HTT_RX_DATA_MSDU_INFO_SW_BUFFER_COOKIE_GET(*(msg_word + 1));
 		rx_desc = dp_rx_cookie_2_va_rxdma_buf(soc, rx_buf_cookie);
 		if (qdf_unlikely(!rx_desc && !rx_desc->nbuf &&
 				 !rx_desc->in_use)) {
-			dp_rx_err("Invalid RX descriptor");
+			dp_err("Invalid RX descriptor");
 			qdf_assert_always(0);
 			/* TODO handle this if its valid case */
+		}
+
+		status = dp_rx_desc_nbuf_sanity_check_rh(soc, msg_word,
+							 rx_desc);
+		if (qdf_unlikely(QDF_IS_STATUS_ERROR(status))) {
+			DP_STATS_INC(soc, rx.err.nbuf_sanity_fail, 1);
+			dp_info_rl("Nbuf sanity check failure!");
+			dp_rx_dump_info_and_assert_rh(soc, msg_word, rx_desc);
+			rx_desc->in_err_state = 1;
+			continue;
 		}
 
 		if (qdf_unlikely(!dp_rx_desc_check_magic(rx_desc))) {
 			dp_err("Invalid rx_desc cookie=%d", rx_buf_cookie);
 			DP_STATS_INC(soc, rx.err.rx_desc_invalid_magic, 1);
-			qdf_assert(0);
+			dp_rx_dump_info_and_assert_rh(soc, msg_word, rx_desc);
+			continue;
 		}
 
 		msdu_len =
@@ -391,13 +857,19 @@ dp_rx_data_indication_handler(struct dp_soc *soc, qdf_nbuf_t data_ind,
 		if (HTT_RX_DATA_MSDU_INFO_RAW_MPDU_FRAME_GET(*(msg_word + 2)))
 			qdf_nbuf_set_raw_frame(rx_desc->nbuf, 1);
 
+		/*
+		 * end MSDU has continuation bit set to zero using this to detect
+		 * full MSDU
+		 */
 		if (!is_prev_msdu_last &&
-		    HTT_RX_DATA_MSDU_INFO_LAST_MSDU_IN_MPDU_GET(*(msg_word + 2)))
+		    !HTT_RX_DATA_MSDU_INFO_MSDU_CONTINUATION_GET(*(msg_word + 2)))
 			is_prev_msdu_last = true;
 
 		rx_bufs_reaped[rx_desc->pool_id]++;
 		QDF_NBUF_CB_RX_PEER_ID(rx_desc->nbuf) = peer_id;
 		QDF_NBUF_CB_RX_VDEV_ID(rx_desc->nbuf) = vdev_id;
+		dp_rx_mark_first_packet_after_wow_wakeup_rh(soc, msg_word,
+							    rx_desc->nbuf);
 
 		/*
 		 * save msdu flags first, last and continuation msdu in
@@ -446,8 +918,18 @@ dp_rx_data_indication_handler(struct dp_soc *soc, qdf_nbuf_t data_ind,
 		 */
 		dp_rx_nbuf_unmap(soc, rx_desc, rx_ctx_id);
 		rx_desc->unmapped = 1;
-		DP_RX_PROCESS_NBUF(soc, nbuf_head, nbuf_tail, ebuf_head,
-				   ebuf_tail, rx_desc);
+
+		error = HTT_RX_DATA_MSDU_INFO_ERROR_VALID_GET(*(msg_word + 3));
+		if (qdf_unlikely(error)) {
+			dp_rx_err("MSDU RX error encountered error:%u", error);
+			error_code =
+			HTT_RX_DATA_MSDU_INFO_ERROR_INFO_GET(*(msg_word + 3));
+			dp_rx_err_handler_rh(soc, rx_desc, error_code);
+
+		} else {
+			DP_RX_PROCESS_NBUF(soc, nbuf_head, nbuf_tail, ebuf_head,
+					   ebuf_tail, rx_desc);
+		}
 
 		num_pending -= 1;
 
@@ -762,12 +1244,6 @@ dp_rx_data_indication_handler(struct dp_soc *soc, qdf_nbuf_t data_ind,
 		}
 
 		dp_rx_fill_gro_info(soc, rx_tlv_hdr, nbuf, &rx_ol_pkt_cnt);
-
-		/*
-		 * TODO mark first packet after wow get this from HTT desc
-		 * dp_rx_mark_first_packet_after_wow_wakeup(vdev->pdev,
-		 * rx_tlv_hdr, nbuf);
-		 */
 
 		dp_rx_update_stats(soc, nbuf);
 

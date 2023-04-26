@@ -303,11 +303,13 @@ struct wlan_ipa_rx_hdr {
  * @exception: Exception packet
  * @iface_context: Interface context
  * @ipa_tx_desc: IPA TX descriptor
+ * @send_to_nw: RX exception packet that needs to be passed up to stack
  */
 struct wlan_ipa_pm_tx_cb {
 	bool exception;
 	struct wlan_ipa_iface_context *iface_context;
 	qdf_ipa_rx_data_t *ipa_tx_desc;
+	bool send_to_nw;
 };
 
 /**

@@ -153,6 +153,93 @@ static inline void dp_tx_fill_nbuf_data_attr_rh(qdf_nbuf_t nbuf)
 	qdf_nbuf_data_attr_set(nbuf, data_attr);
 }
 
+#ifdef DP_TX_HW_DESC_HISTORY
+static inline void
+dp_tx_record_hw_desc_rh(uint8_t *hal_tx_desc_cached, struct dp_soc *soc)
+{
+	struct dp_tx_hw_desc_history *tx_hw_desc_history =
+						&soc->tx_hw_desc_history;
+	struct dp_tx_hw_desc_evt *evt;
+	uint32_t idx = 0;
+	uint16_t slot = 0;
+
+	if (!tx_hw_desc_history->allocated)
+		return;
+
+	dp_get_frag_hist_next_atomic_idx(&tx_hw_desc_history->index, &idx,
+					 &slot,
+					 DP_TX_HW_DESC_HIST_SLOT_SHIFT,
+					 DP_TX_HW_DESC_HIST_PER_SLOT_MAX,
+					 DP_TX_HW_DESC_HIST_MAX);
+
+	evt = &tx_hw_desc_history->entry[slot][idx];
+	qdf_mem_copy(evt->tcl_desc, hal_tx_desc_cached, HAL_TX_DESC_LEN_BYTES);
+	evt->posted = qdf_get_log_timestamp();
+	evt->tcl_ring_id = 0;
+}
+#else
+static inline void
+dp_tx_record_hw_desc_rh(uint8_t *hal_tx_desc_cached, struct dp_soc *soc)
+{
+}
+#endif
+
+#if defined(FEATURE_RUNTIME_PM)
+static void dp_tx_update_write_index(struct dp_soc *soc,
+				     struct dp_tx_ep_info_rh *tx_ep_info)
+{
+	int ret;
+
+	/* Avoid runtime get and put APIs under high throughput scenarios */
+	if (dp_get_rtpm_tput_policy_requirement(soc)) {
+		ce_tx_ring_write_idx_update_wrapper(tx_ep_info->ce_tx_hdl,
+						    true);
+		return;
+	}
+
+	ret = hif_rtpm_get(HIF_RTPM_GET_ASYNC, HIF_RTPM_ID_DP);
+	if (QDF_IS_STATUS_SUCCESS(ret)) {
+		if (hif_system_pm_state_check(soc->hif_handle)) {
+			ce_tx_ring_write_idx_update_wrapper(tx_ep_info->ce_tx_hdl, false);
+			ce_ring_set_event(((struct CE_state *)(tx_ep_info->ce_tx_hdl))->src_ring,
+					  CE_RING_FLUSH_EVENT);
+		} else {
+			ce_tx_ring_write_idx_update_wrapper(tx_ep_info->ce_tx_hdl,
+							    true);
+		}
+	} else {
+		dp_runtime_get(soc);
+		ce_tx_ring_write_idx_update_wrapper(tx_ep_info->ce_tx_hdl,
+						    false);
+		ce_ring_set_event(((struct CE_state *)(tx_ep_info->ce_tx_hdl))->src_ring,
+				  CE_RING_FLUSH_EVENT);
+		qdf_atomic_inc(&soc->tx_pending_rtpm);
+		dp_runtime_put(soc);
+	}
+}
+#elif defined(DP_POWER_SAVE)
+static void dp_tx_update_write_index(struct dp_soc *soc,
+				     struct dp_tx_ep_info_rh *tx_ep_info)
+{
+	if (hif_system_pm_state_check(soc->hif_handle)) {
+		ce_tx_ring_write_idx_update_wrapper(tx_ep_info->ce_tx_hdl,
+						    false);
+		ce_ring_set_event(((struct CE_state *)(tx_ep_info->ce_tx_hdl))->src_ring,
+				  CE_RING_FLUSH_EVENT);
+	} else {
+		ce_tx_ring_write_idx_update_wrapper(tx_ep_info->ce_tx_hdl,
+						    true);
+	}
+}
+#else
+static void dp_tx_update_write_index(struct dp_soc *soc,
+				     struct dp_tx_ep_info_rh *tx_ep_info)
+{
+	ce_tx_ring_write_idx_update_wrapper(tx_ep_info->ce_tx_hdl,
+					    true);
+}
+#endif
+
 QDF_STATUS
 dp_tx_hw_enqueue_rh(struct dp_soc *soc, struct dp_vdev *vdev,
 		    struct dp_tx_desc_s *tx_desc, uint16_t fw_metadata,
@@ -250,9 +337,11 @@ dp_tx_hw_enqueue_rh(struct dp_soc *soc, struct dp_vdev *vdev,
 
 	dp_tx_fill_nbuf_data_attr_rh(nbuf);
 
-	ret = ce_send_fast(tx_ep_info->ce_tx_hdl, nbuf,
-			   tx_ep_info->tx_endpoint, download_len);
-	if (!ret) {
+	ce_ring_aquire_lock(tx_ep_info->ce_tx_hdl);
+	ret = ce_enqueue_desc(tx_ep_info->ce_tx_hdl, nbuf,
+			      tx_ep_info->tx_endpoint, download_len);
+	if (ret) {
+		ce_ring_release_lock(tx_ep_info->ce_tx_hdl);
 		dp_verbose_debug("CE tx ring full");
 		/* TODO: Should this be a separate ce_ring_full stat? */
 		DP_STATS_INC(soc, tx.tcl_ring_full[0], 1);
@@ -260,10 +349,15 @@ dp_tx_hw_enqueue_rh(struct dp_soc *soc, struct dp_vdev *vdev,
 		goto enqueue_fail;
 	}
 
+	dp_tx_update_write_index(soc, tx_ep_info);
+	ce_ring_release_lock(tx_ep_info->ce_tx_hdl);
+
 	tx_desc->flags |= DP_TX_DESC_FLAG_QUEUED_TX;
 	dp_vdev_peer_stats_update_protocol_cnt_tx(vdev, nbuf);
 	DP_STATS_INC_PKT(vdev, tx_i.processed, 1, tx_desc->length);
 	status = QDF_STATUS_SUCCESS;
+
+	dp_tx_record_hw_desc_rh((uint8_t *)hal_tx_desc_cached, soc);
 
 enqueue_fail:
 	dp_pkt_add_timestamp(vdev, QDF_PKT_TX_DRIVER_EXIT,

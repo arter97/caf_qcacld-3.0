@@ -48,7 +48,9 @@
  * @WLAN_IF_MGR_EV_AP_STOP_HT40: Event to handle HT40 scan stop
  * @WLAN_IF_MGR_EV_AP_DONE_HT40: Event to handle HT40 scan completion
  * @WLAN_IF_MGR_EV_AP_CANCEL_HT40: Event to handle HT40 scan cancel
- * @WLAN_IF_MGR_EV_CSA_COMPLETE: Event to handle csa complete
+ * @WLAN_IF_MGR_EV_AP_CSA_START: Event to handle CSA start
+ * @WLAN_IF_MGR_EV_AP_CSA_COMPLETE: Event to handle csa complete
+ * @WLAN_IF_MGR_EV_STA_CSA_COMPLETE: Event to handle STA/P2P_CLI CSA completion
  * @WLAN_IF_MGR_EV_MAX: Max event
  */
 enum wlan_if_mgr_evt {
@@ -69,8 +71,10 @@ enum wlan_if_mgr_evt {
 	WLAN_IF_MGR_EV_AP_STOP_HT40 = 14,
 	WLAN_IF_MGR_EV_AP_DONE_HT40 = 15,
 	WLAN_IF_MGR_EV_AP_CANCEL_HT40 = 16,
-	WLAN_IF_MGR_EV_CSA_COMPLETE = 17,
-	WLAN_IF_MGR_EV_MAX = 18,
+	WLAN_IF_MGR_EV_AP_CSA_START = 17,
+	WLAN_IF_MGR_EV_AP_CSA_COMPLETE = 18,
+	WLAN_IF_MGR_EV_STA_CSA_COMPLETE = 19,
+	WLAN_IF_MGR_EV_MAX = 20,
 };
 
 /**

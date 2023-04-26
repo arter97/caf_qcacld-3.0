@@ -693,6 +693,8 @@ void dp_initialize_arch_ops_li(struct dp_arch_ops *arch_ops)
 	arch_ops->dp_rxdma_ring_sel_cfg = dp_rxdma_ring_sel_cfg_li;
 	arch_ops->dp_rx_peer_metadata_peer_id_get =
 					dp_rx_peer_metadata_peer_id_get_li;
+	arch_ops->dp_rx_peer_mdata_link_id_get =
+					dp_rx_peer_mdata_link_id_get_li;
 	arch_ops->soc_cfg_attach = dp_soc_cfg_attach_li;
 	arch_ops->tx_implicit_rbm_set = dp_tx_implicit_rbm_set_li;
 	arch_ops->txrx_set_vdev_param = dp_txrx_set_vdev_param_li;
@@ -708,6 +710,9 @@ void dp_initialize_arch_ops_li(struct dp_arch_ops *arch_ops)
 	arch_ops->txrx_get_vdev_mcast_param = dp_txrx_get_vdev_mcast_param_li;
 	arch_ops->get_hw_link_id = dp_get_hw_link_id_li;
 	arch_ops->txrx_srng_init = dp_srng_init_li;
+#if defined(DP_POWER_SAVE) || defined(FEATURE_RUNTIME_PM)
+	arch_ops->dp_update_ring_hptp = dp_update_ring_hptp;
+#endif
 }
 
 #ifdef QCA_DP_TX_HW_SW_NBUF_DESC_PREFETCH

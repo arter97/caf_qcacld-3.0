@@ -57,9 +57,8 @@ dp_rx_mon_handle_cfr_mu_info(struct dp_pdev *pdev,
 
 	num_users = ppdu_info->com_info.num_users;
 	for (user_id = 0; user_id < num_users; user_id++) {
-		if (user_id > OFDMA_NUM_USERS) {
+		if (user_id >= OFDMA_NUM_USERS)
 			return;
-		}
 
 		rx_user_status =  &ppdu_info->rx_user_status[user_id];
 		rx_stats_peruser = &cdp_rx_ppdu->user[user_id];
@@ -131,6 +130,8 @@ dp_rx_mon_populate_cfr_ppdu_info(struct dp_pdev *pdev,
 	cdp_rx_ppdu->peer_id = peer->peer_id;
 	cdp_rx_ppdu->vdev_id = peer->vdev->vdev_id;
 	cdp_rx_ppdu->num_users = num_users;
+
+	dp_peer_unref_delete(peer, DP_MOD_ID_RX_PPDU_STATS);
 }
 
 bool

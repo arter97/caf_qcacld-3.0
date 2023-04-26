@@ -53,6 +53,8 @@
  *                                     Channel Switch Announcement.
  * @mlme_postnol_chan_switch:          Channel change post NOL using Channel
  *                                     Switch Announcement.
+ * @mlme_unpunc_chan_switch:           After DFS unpuncture occurs send VDEV
+ *                                     restart.
  * @mlme_nol_timeout_notification:     NOL timeout notification.
  * @mlme_clist_update:                 Updates the channel list.
  * @mlme_is_opmode_sta:                Check if pdev opmode is STA.
@@ -163,6 +165,11 @@ struct dfs_to_mlme {
 				    qdf_freq_t des_chan_freq,
 				    qdf_freq_t des_cfreq2,
 				    enum wlan_phymode des_mode);
+#endif
+#if defined(QCA_DFS_BW_PUNCTURE) && !defined(CONFIG_REG_CLIENT)
+	QDF_STATUS
+	    (*mlme_unpunc_chan_switch)(struct wlan_objmgr_pdev *pdev,
+				       uint16_t new_punc_pattern);
 #endif
 	QDF_STATUS (*mlme_nol_timeout_notification)(
 			struct wlan_objmgr_pdev *pdev);

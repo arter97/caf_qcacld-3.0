@@ -103,6 +103,17 @@ enum reg_afc_dev_deploy_type {
 };
 
 /**
+ * enum reg_afc_resp_format_type - Response type supported by AP
+ *
+ * @AFC_RESP_TYPE_JSON_RESP: JSON format
+ * @AFC_RESP_TYPE_BIN_RESP: Binary format
+ */
+enum reg_afc_resp_format_type {
+	AFC_RESP_TYPE_JSON_RESP = 0,
+	AFC_RESP_TYPE_BIN_RESP = 1,
+};
+
+/**
  * enum afc_object_type - AFC Request object types
  * @AFC_OBJ_LOCATION: Location object
  */
@@ -191,7 +202,7 @@ struct wlan_afc_resp_opclass_info {
  */
 struct wlan_afc_resp_eirp_info {
 	uint32_t channel_cfi;
-	uint32_t max_eirp_pwr;
+	int32_t  max_eirp_pwr;
 } qdf_packed;
 
 /**

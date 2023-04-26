@@ -2181,6 +2181,7 @@ enum dp_context_type {
  * @dp_service_near_full_srngs: Handler for servicing the near full IRQ
  * @tx_implicit_rbm_set:
  * @dp_rx_peer_metadata_peer_id_get:
+ * @dp_rx_peer_mdata_link_id_get: Handle to get link id
  * @dp_rx_chain_msdus:
  * @txrx_set_vdev_param: target specific ops while setting vdev params
  * @txrx_get_vdev_mcast_param: target specific ops for getting vdev
@@ -2231,11 +2232,13 @@ enum dp_context_type {
  * @dp_tx_desc_pool_alloc: Allocate arch specific TX descriptor pool
  * @dp_tx_desc_pool_free: Free arch specific TX descriptor pool
  * @txrx_srng_init: Init txrx srng
+ * @ppeds_handle_attached:
  * @txrx_soc_ppeds_interrupt_stop:
  * @txrx_soc_ppeds_interrupt_start:
  * @txrx_soc_ppeds_service_status_update:
  * @txrx_soc_ppeds_enabled_check:
  * @txrx_soc_ppeds_txdesc_pool_reset:
+ * @dp_update_ring_hptp: Update rings hptp during suspend/resume
  */
 struct dp_arch_ops {
 	/* INIT/DEINIT Arch Ops */
@@ -2342,6 +2345,7 @@ struct dp_arch_ops {
 				    uint8_t bm_id);
 	uint16_t (*dp_rx_peer_metadata_peer_id_get)(struct dp_soc *soc,
 						    uint32_t peer_metadata);
+	uint8_t (*dp_rx_peer_mdata_link_id_get)(uint32_t peer_metadata);
 	bool (*dp_rx_chain_msdus)(struct dp_soc *soc, qdf_nbuf_t nbuf,
 				  uint8_t *rx_tlv_hdr, uint8_t mac_id);
 	/* Control Arch Ops */
@@ -2445,6 +2449,7 @@ struct dp_arch_ops {
 						     struct dp_vdev *vdev,
 						     bool peer_map);
 #endif
+	bool (*ppeds_handle_attached)(struct dp_soc *soc);
 	QDF_STATUS (*txrx_soc_ppeds_start)(struct dp_soc *soc);
 	void (*txrx_soc_ppeds_stop)(struct dp_soc *soc);
 	int (*dp_register_ppeds_interrupts)(struct dp_soc *soc,
@@ -2482,6 +2487,7 @@ struct dp_arch_ops {
 	void (*txrx_soc_ppeds_txdesc_pool_reset)(struct dp_soc *soc,
 						 qdf_nbuf_t *nbuf_list);
 #endif
+	void (*dp_update_ring_hptp)(struct dp_soc *soc, bool force_flush_tx);
 };
 
 /**

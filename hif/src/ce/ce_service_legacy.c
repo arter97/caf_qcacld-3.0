@@ -1119,6 +1119,148 @@ ce_per_engine_handler_adjust_legacy(struct CE_state *CE_state,
 }
 
 #ifdef QCA_WIFI_WCN6450
+int ce_enqueue_desc(struct CE_handle *copyeng, qdf_nbuf_t msdu,
+		    unsigned int transfer_id, uint32_t download_len)
+{
+	struct CE_state *ce_state = (struct CE_state *)copyeng;
+	struct hif_softc *scn = ce_state->scn;
+	struct CE_ring_state *src_ring = ce_state->src_ring;
+	u_int32_t ctrl_addr = ce_state->ctrl_addr;
+	unsigned int nentries_mask = src_ring->nentries_mask;
+	unsigned int write_index;
+	unsigned int sw_index;
+	unsigned int frag_len;
+	uint64_t dma_addr;
+	uint32_t user_flags;
+	enum hif_ce_event_type type = FAST_TX_SOFTWARE_INDEX_UPDATE;
+
+	/*
+	 * Create a log assuming the call will go through, and if not, we would
+	 * add an error trace as well.
+	 * Please add the same failure log for any additional error paths.
+	 */
+	DPTRACE(qdf_dp_trace(msdu,
+			     QDF_DP_TRACE_CE_FAST_PACKET_PTR_RECORD,
+			     QDF_TRACE_DEFAULT_PDEV_ID,
+			     qdf_nbuf_data_addr(msdu),
+			     sizeof(qdf_nbuf_data(msdu)), QDF_TX));
+
+	DATA_CE_UPDATE_SWINDEX(src_ring->sw_index, scn, ctrl_addr);
+
+	write_index = src_ring->write_index;
+	sw_index = src_ring->sw_index;
+	hif_record_ce_desc_event(scn, ce_state->id,
+				 FAST_TX_SOFTWARE_INDEX_UPDATE,
+				 NULL, NULL, sw_index, 0);
+
+	if (qdf_unlikely(CE_RING_DELTA(nentries_mask, write_index, sw_index - 1)
+			 < SLOTS_PER_DATAPATH_TX)) {
+		hif_err_rl("Source ring full, required %d, available %d",
+			   SLOTS_PER_DATAPATH_TX,
+			   CE_RING_DELTA(nentries_mask, write_index,
+					 sw_index - 1));
+		OL_ATH_CE_PKT_ERROR_COUNT_INCR(scn, CE_RING_DELTA_FAIL);
+
+		DPTRACE(qdf_dp_trace(NULL,
+				     QDF_DP_TRACE_CE_FAST_PACKET_ERR_RECORD,
+				     QDF_TRACE_DEFAULT_PDEV_ID,
+				     NULL, 0, QDF_TX));
+
+		return -ENOSPC;
+	}
+
+	{
+		struct CE_src_desc *src_ring_base =
+			(struct CE_src_desc *)src_ring->base_addr_owner_space;
+		struct CE_src_desc *shadow_base =
+			(struct CE_src_desc *)src_ring->shadow_base;
+		struct CE_src_desc *src_desc =
+			CE_SRC_RING_TO_DESC(src_ring_base, write_index);
+		struct CE_src_desc *shadow_src_desc =
+			CE_SRC_RING_TO_DESC(shadow_base, write_index);
+
+		/*
+		 * First fill out the ring descriptor for the HTC HTT frame
+		 * header. These are uncached writes. Should we use a local
+		 * structure instead?
+		 */
+		/* HTT/HTC header can be passed as a argument */
+		dma_addr = qdf_nbuf_get_frag_paddr(msdu, 0);
+		shadow_src_desc->buffer_addr = (uint32_t)(dma_addr &
+							  0xFFFFFFFF);
+		user_flags = qdf_nbuf_data_attr_get(msdu) & DESC_DATA_FLAG_MASK;
+		ce_buffer_addr_hi_set(shadow_src_desc, dma_addr, user_flags);
+			shadow_src_desc->meta_data = transfer_id;
+		shadow_src_desc->nbytes = qdf_nbuf_get_frag_len(msdu, 0);
+		ce_validate_nbytes(shadow_src_desc->nbytes, ce_state);
+		download_len -= shadow_src_desc->nbytes;
+		/*
+		 * HTC HTT header is a word stream, so byte swap if CE byte
+		 * swap enabled
+		 */
+		shadow_src_desc->byte_swap = ((ce_state->attr_flags &
+					CE_ATTR_BYTE_SWAP_DATA) != 0);
+		/* For the first one, it still does not need to write */
+		shadow_src_desc->gather = 1;
+		*src_desc = *shadow_src_desc;
+		/* By default we could initialize the transfer context to this
+		 * value
+		 */
+		src_ring->per_transfer_context[write_index] =
+			CE_SENDLIST_ITEM_CTXT;
+		write_index = CE_RING_IDX_INCR(nentries_mask, write_index);
+
+		src_desc = CE_SRC_RING_TO_DESC(src_ring_base, write_index);
+		shadow_src_desc = CE_SRC_RING_TO_DESC(shadow_base, write_index);
+		/*
+		 * Now fill out the ring descriptor for the actual data
+		 * packet
+		 */
+		dma_addr = qdf_nbuf_get_frag_paddr(msdu, 1);
+		shadow_src_desc->buffer_addr = (uint32_t)(dma_addr &
+							  0xFFFFFFFF);
+		/*
+		 * Clear packet offset for all but the first CE desc.
+		 */
+		user_flags &= ~CE_DESC_PKT_OFFSET_BIT_M;
+		ce_buffer_addr_hi_set(shadow_src_desc, dma_addr, user_flags);
+		shadow_src_desc->meta_data = transfer_id;
+
+		/* get actual packet length */
+		frag_len = qdf_nbuf_get_frag_len(msdu, 1);
+
+		/* download remaining bytes of payload */
+		shadow_src_desc->nbytes =  download_len;
+		ce_validate_nbytes(shadow_src_desc->nbytes, ce_state);
+		if (shadow_src_desc->nbytes > frag_len)
+			shadow_src_desc->nbytes = frag_len;
+
+		/*  Data packet is a byte stream, so disable byte swap */
+		shadow_src_desc->byte_swap = 0;
+		/* For the last one, gather is not set */
+		shadow_src_desc->gather    = 0;
+		*src_desc = *shadow_src_desc;
+		src_ring->per_transfer_context[write_index] = msdu;
+
+		hif_record_ce_desc_event(scn, ce_state->id, type,
+					 (union ce_desc *)src_desc,
+				src_ring->per_transfer_context[write_index],
+				write_index, shadow_src_desc->nbytes);
+
+		write_index = CE_RING_IDX_INCR(nentries_mask, write_index);
+
+		DPTRACE(qdf_dp_trace(msdu,
+				     QDF_DP_TRACE_CE_FAST_PACKET_PTR_RECORD,
+				     QDF_TRACE_DEFAULT_PDEV_ID,
+				     qdf_nbuf_data_addr(msdu),
+				     sizeof(qdf_nbuf_data(msdu)), QDF_TX));
+	}
+
+	src_ring->write_index = write_index;
+
+	return 0;
+}
+
 static void ce_legacy_msi_param_setup(struct hif_softc *scn, uint32_t ctrl_addr,
 				      uint32_t ce_id, struct CE_attr *attr)
 {

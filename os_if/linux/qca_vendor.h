@@ -663,6 +663,14 @@
  *	The attributes used with this subcommand are defined in
  *	enum qca_wlan_vendor_attr_dozed_ap.
  *
+ * @QCA_NL80211_VENDOR_SUBCMD_GET_MONITOR_MODE: This vendor subcommand is used
+ *	to get the status of local packet capture of monitor mode. The monitor
+ *	mode can be started using QCA_NL80211_VENDOR_SUBCMD_SET_MONITOR_MODE
+ *	subcommand.
+ *
+ *	The attributes used with this command are defined in enum
+ *	qca_wlan_vendor_attr_get_monitor_mode.
+ *
  * @QCA_NL80211_VENDOR_SUBCMD_ROAM_STATS: This vendor command is used to
  *	get roam information from the driver to user space. It provides the
  *	latest several instances of roam information cached in the driver.
@@ -927,6 +935,7 @@ enum qca_nl80211_vendor_subcmds {
 	QCA_NL80211_VENDOR_SUBCMD_AFC_EVENT = 222,
 	QCA_NL80211_VENDOR_SUBCMD_AFC_RESPONSE = 223,
 	QCA_NL80211_VENDOR_SUBCMD_DOZED_AP = 224,
+	QCA_NL80211_VENDOR_SUBCMD_GET_MONITOR_MODE = 225,
 	QCA_NL80211_VENDOR_SUBCMD_ROAM_STATS = 226,
 	QCA_NL80211_VENDOR_SUBCMD_MLO_LINK_STATE = 227,
 };
@@ -15775,6 +15784,41 @@ enum qca_wlan_vendor_attr_dozed_ap {
 };
 
 /**
+ * enum qca_wlan_vendor_monitor_mode_status - Represents the status codes
+ * used with QCA_NL80211_VENDOR_SUBCMD_GET_MONITOR_MODE.
+ * @QCA_WLAN_VENDOR_MONITOR_MODE_NO_CAPTURE_RUNNING: Used to indicate no
+ * capture running status.
+ * @QCA_WLAN_VENDOR_MONITOR_MODE_CAPTURE_RUNNING: Used to indicate
+ * capture running status.
+ **/
+
+enum qca_wlan_vendor_monitor_mode_status {
+	QCA_WLAN_VENDOR_MONITOR_MODE_NO_CAPTURE_RUNNING = 0,
+	QCA_WLAN_VENDOR_MONITOR_MODE_CAPTURE_RUNNING = 1,
+};
+
+/**
+ * enum qca_wlan_vendor_attr_get_monitor_mode - Used by the
+ * vendor command QCA_NL80211_VENDOR_SUBCMD_GET_MONITOR_MODE to report
+ * information regarding the local packet capture over the monitor mode.
+ *
+ * @QCA_WLAN_VENDOR_ATTR_GET_MONITOR_MODE_STATUS: u32 attribute. This attribute
+ * represents the status of the start capture commands. The values used with
+ * this attribute are defined in enum qca_wlan_vendor_monitor_mode_status. This
+ * is returned by the driver in the response to the command.
+ */
+
+enum qca_wlan_vendor_attr_get_monitor_mode {
+	QCA_WLAN_VENDOR_ATTR_GET_MONITOR_MODE_INVALID = 0,
+	QCA_WLAN_VENDOR_ATTR_GET_MONITOR_MODE_STATUS = 1,
+
+	/* Keep last */
+	QCA_WLAN_VENDOR_ATTR_GET_MONITOR_MODE_AFTER_LAST,
+	QCA_WLAN_VENDOR_ATTR_GET_MONITOR_MODE_MAX =
+	QCA_WLAN_VENDOR_ATTR_GET_MONITOR_MODE_AFTER_LAST - 1,
+};
+
+/**
  * enum qca_wlan_vendor_link_state_op_types - Defines different types of
  * operations for which %QCA_NL80211_VENDOR_SUBCMD_MLO_LINK_STATE can be used.
  * Will be used with %QCA_WLAN_VENDOR_ATTR_LINK_STATE_OP_TYPE attribute.
@@ -15927,5 +15971,4 @@ enum qca_wlan_vendor_attr_mlo_link_state {
 	QCA_WLAN_VENDOR_ATTR_LINK_STATE_MAX =
 	QCA_WLAN_VENDOR_ATTR_LINK_STATE_AFTER_LAST - 1,
 };
-
 #endif

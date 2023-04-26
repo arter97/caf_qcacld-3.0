@@ -878,7 +878,7 @@ static struct service_to_pipe target_service_to_ce_map_qcn9000[] = {
 };
 #endif
 
-#if (defined(QCA_WIFI_QCA5332))
+#if (defined(QCA_WIFI_QCA5332) || defined(QCA_WIFI_QCN6432))
 static struct service_to_pipe target_service_to_ce_map_qca5332[] = {
 	{ WMI_DATA_VO_SVC, PIPEDIR_OUT, 3, },
 	{ WMI_DATA_VO_SVC, PIPEDIR_IN, 2, },
@@ -1518,6 +1518,7 @@ static void hif_select_service_to_pipe_map(struct hif_softc *scn,
 						  sz_tgt_svc_map_to_use);
 			break;
 		case TARGET_TYPE_QCA5332:
+		case TARGET_TYPE_QCN6432:
 			*tgt_svc_map_to_use = target_service_to_ce_map_qca5332;
 			*sz_tgt_svc_map_to_use =
 				sizeof(target_service_to_ce_map_qca5332);
@@ -1831,6 +1832,7 @@ bool ce_srng_based(struct hif_softc *scn)
 	case TARGET_TYPE_QCN9224:
 	case TARGET_TYPE_QCA9574:
 	case TARGET_TYPE_QCA5332:
+	case TARGET_TYPE_QCN6432:
 		return true;
 	default:
 		return false;
@@ -2510,6 +2512,16 @@ struct CE_handle *ce_init(struct hif_softc *scn,
 				goto error_target_access;
 			ce_ring_test_initial_indexes(CE_id, src_ring,
 						     "src_ring");
+			if (CE_state->attr_flags & CE_ATTR_ENABLE_POLL) {
+				qdf_timer_init(scn->qdf_dev,
+					       &CE_state->poll_timer,
+					       ce_poll_timeout,
+					       CE_state,
+					       QDF_TIMER_TYPE_WAKE_APPS);
+				ce_enable_polling(CE_state);
+				qdf_timer_mod(&CE_state->poll_timer,
+					      CE_POLL_TIMEOUT);
+			}
 		}
 	}
 
@@ -4407,6 +4419,14 @@ void hif_ce_prepare_config(struct hif_softc *scn)
 		hif_state->target_ce_config_sz =
 					sizeof(target_ce_config_wlan_qcn9160);
 		scn->ce_count = QCN_9160_CE_COUNT;
+		scn->ini_cfg.disable_wake_irq = 1;
+		break;
+	case TARGET_TYPE_QCN6432:
+		hif_state->host_ce_config = host_ce_config_wlan_qcn6432;
+		hif_state->target_ce_config = target_ce_config_wlan_qcn6432;
+		hif_state->target_ce_config_sz =
+					sizeof(target_ce_config_wlan_qcn6432);
+		scn->ce_count = QCN_6432_CE_COUNT;
 		scn->ini_cfg.disable_wake_irq = 1;
 		break;
 	case TARGET_TYPE_QCA5018:

@@ -222,6 +222,7 @@ static void ipa_register_ready_cb(void *user_data)
 	}
 	if (ucfg_ipa_uc_ol_init(pdev, qdf_dev)) {
 		ipa_err("IPA ucfg_ipa_uc_ol_init failed");
+		ipa_obj_cleanup(ipa_obj);
 		goto out;
 	}
 

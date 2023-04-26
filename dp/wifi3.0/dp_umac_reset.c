@@ -82,8 +82,9 @@ dp_umac_reset_send_setup_cmd(struct dp_soc *soc)
 	return dp_htt_umac_reset_send_setup_cmd(soc, &params);
 }
 
-QDF_STATUS dp_soc_umac_reset_init(struct dp_soc *soc)
+QDF_STATUS dp_soc_umac_reset_init(struct cdp_soc_t *txrx_soc)
 {
+	struct dp_soc *soc = (struct dp_soc *)txrx_soc;
 	struct dp_soc_umac_reset_ctx *umac_reset_ctx;
 	size_t alloc_size;
 	QDF_STATUS status;
@@ -680,19 +681,21 @@ dp_umac_reset_post_tx_cmd_via_shmem(struct dp_soc *soc, void *ctxt, int chip_id)
 	case UMAC_RESET_TX_CMD_TRIGGER_DONE:
 		/* Send htt message to the partner soc */
 		initiator = dp_umac_reset_initiator_check(soc);
+		if (!initiator)
+			umac_reset_ctx->current_state =
+					UMAC_RESET_STATE_WAIT_FOR_DO_PRE_RESET;
+
 		status = dp_htt_umac_reset_send_start_pre_reset_cmd(soc,
 								    initiator,
 				!dp_umac_reset_target_recovery_check(soc));
 
-		if (status != QDF_STATUS_SUCCESS)
+		if (status != QDF_STATUS_SUCCESS) {
 			dp_umac_reset_err("Unable to send Umac trigger");
-		else
+			qdf_assert_always(0);
+		} else {
 			dp_umac_reset_debug("Sent trigger for soc (chip_id %d)",
 					    chip_id);
-
-		if (!initiator)
-			umac_reset_ctx->current_state =
-					UMAC_RESET_STATE_WAIT_FOR_DO_PRE_RESET;
+		}
 
 		umac_reset_ctx->ts.trigger_done = qdf_get_log_timestamp_usecs();
 		break;
@@ -774,15 +777,19 @@ dp_umac_reset_notify_target(struct dp_soc_umac_reset_ctx *umac_reset_ctx)
 		return QDF_STATUS_E_FAILURE;
 	}
 
+	/*
+	 * Update the state machine before sending the command to firmware
+	 * as we might get the response from firmware even before the state
+	 * is updated.
+	 */
+	umac_reset_ctx->current_state = next_state;
+
 	status = dp_umac_reset_post_tx_cmd(umac_reset_ctx, tx_cmd);
 	if (QDF_IS_STATUS_ERROR(status)) {
 		dp_umac_reset_err("Couldn't post Tx cmd");
 		qdf_assert_always(0);
 		return status;
 	}
-
-	/* Update the state machine */
-	umac_reset_ctx->current_state = next_state;
 
 	return status;
 }
@@ -968,6 +975,8 @@ static inline const char *dp_umac_reset_pending_action_to_str(
 		return "UMAC_RESET_RX_EVENT_NONE";
 	case UMAC_RESET_RX_EVENT_DO_TRIGGER_RECOVERY:
 		return "UMAC_RESET_RX_EVENT_DO_TRIGGER_RECOVERY";
+	case UMAC_RESET_RX_EVENT_DO_TRIGGER_TR_SYNC:
+		return "UMAC_RESET_RX_EVENT_DO_TRIGGER_TR_SYNC";
 	case UMAC_RESET_RX_EVENT_DO_PRE_RESET:
 		return "UMAC_RESET_RX_EVENT_DO_PRE_RESET";
 	case UMAC_RESET_RX_EVENT_DO_POST_RESET_START:

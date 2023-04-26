@@ -1052,6 +1052,7 @@ void hif_allow_link_low_power_states(struct hif_opaque_softc *hif)
 }
 #endif
 
+#ifndef QCA_WIFI_WCN6450
 int hif_ipci_enable_grp_irqs(struct hif_softc *scn)
 {
 	struct hif_ipci_softc *ipci_scn = HIF_GET_IPCI_SOFTC(scn);
@@ -1085,3 +1086,4 @@ int hif_ipci_disable_grp_irqs(struct hif_softc *scn)
 
 	return status;
 }
+#endif

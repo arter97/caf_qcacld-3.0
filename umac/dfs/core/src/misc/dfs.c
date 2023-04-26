@@ -821,6 +821,8 @@ void dfs_set_current_channel_for_freq(struct wlan_dfs *dfs,
 
 	if (is_channel_updated)
 		*is_channel_updated = true;
+	if (dfs->dfs_use_puncture)
+		dfs_handle_dfs_puncture_unpuncture(dfs);
 }
 #endif
 

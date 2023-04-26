@@ -981,7 +981,7 @@ static void ce_ring_cleanup_srng(struct hif_softc *scn,
 	}
 
 	if (hal_srng)
-		hal_srng_cleanup(scn->hal_soc, hal_srng);
+		hal_srng_cleanup(scn->hal_soc, hal_srng, 0);
 }
 
 static void ce_construct_shadow_config_srng(struct hif_softc *scn)

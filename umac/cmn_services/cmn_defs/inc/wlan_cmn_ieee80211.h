@@ -1010,6 +1010,28 @@ enum wlan_reason_code {
  * listen interval is too large.
  * @STATUS_INVALID_FT_ACTION_FRAME_COUNT: Invalid FT Action frame count.
  * @STATUS_INVALID_PMKID: Invalid pairwise master key identifier (PMKID).
+ * @STATUS_DENIED_STA_AFFILIATED_WITH_MLD_WITH_EXISTING_MLD_ASSOC: Association
+ * denied because the requesting STA is affiliated with a non-AP MLD that is
+ * associated with the AP MLD.
+ * @STATUS_EPCS_DENIED_UNAUTHORIZED: EPCS priority access denied because the
+ * non-AP MLD is not authorized to use the service.
+ * @STATUS_EPCS_DENIED_OTHER_REASON: EPCS priority access denied due to a
+ * reason outside the scope of this standard.
+ * @STATUS_DENIED_TID_TO_LINK_MAPPING: Request denied because the requested
+ * TID-to-link mapping is unacceptable.
+ * @STATUS_PREFERRED_TID_TO_LINK_MAPPING_SUGGESTED: Preferred TID-to-link
+ * mapping suggested.
+ * @STATUS_DENIED_EHT_NOT_SUPPORTED: Association denied because the requesting
+ * STA does not support EHT features.
+ * @STATUS_DENIED_LINK_ON_WHICH_THE_ASSOC_FRAME_IS_TXED_NOT_ACCEPTED: Link not
+ * accepted because the link on which the (Re)Association Request frame is
+ * transmitted is not accepted.
+ * @STATUS_EPCS_DENIED_VERIFICATION_FAILURE: EPCS priority access is
+ * temporarily denied because the receiving AP MLD is unable to verify that the
+ * non-AP MLD is authorized for an unspecified reason.
+ * @STATUS_DENIED_OPERATION_PARAMETER_UPDATE: Operation parameter update denied
+ * because the requested operation parameters or capabilities are not
+ * acceptable.
  *
  * Internal status codes: Add any internal status code just after
  * STATUS_PROP_START and decrease the value of STATUS_PROP_START
@@ -1071,6 +1093,15 @@ enum wlan_status_code {
 	STATUS_ASSOC_DENIED_LISTEN_INT_TOO_LARGE = 51,
 	STATUS_INVALID_FT_ACTION_FRAME_COUNT = 52,
 	STATUS_INVALID_PMKID = 53,
+	STATUS_DENIED_STA_AFFILIATED_WITH_MLD_WITH_EXISTING_MLD_ASSOC = 130,
+	STATUS_EPCS_DENIED_UNAUTHORIZED = 131,
+	STATUS_EPCS_DENIED_OTHER_REASON = 132,
+	STATUS_DENIED_TID_TO_LINK_MAPPING = 133,
+	STATUS_PREFERRED_TID_TO_LINK_MAPPING_SUGGESTED = 134,
+	STATUS_DENIED_EHT_NOT_SUPPORTED = 135,
+	STATUS_DENIED_LINK_ON_WHICH_THE_ASSOC_FRAME_IS_TXED_NOT_ACCEPTED = 139,
+	STATUS_EPCS_DENIED_VERIFICATION_FAILURE = 140,
+	STATUS_DENIED_OPERATION_PARAMETER_UPDATE = 141,
 
 	/* Error STATUS code for intenal usage*/
 	STATUS_PROP_START = 65528,
@@ -1746,6 +1777,10 @@ struct subelem_header {
 #define EHTCAP_MAC_TRS_SUPPORT_BITS                     1
 #define EHTCAP_MAC_TXOP_RET_SUPPP_IN_SHARING_MODE2_IDX  10
 #define EHTCAP_MAC_TXOP_RET_SUPPP_IN_SHARING_MODE2_BITS 1
+#define EHTCAP_MAC_TWO_BQRS_SUPP_IDX                    11
+#define EHTCAP_MAC_TWO_BQRS_SUPP_BITS                   1
+#define EHTCAP_MAC_EHT_LINK_ADAPTATION_SUPP_IDX         12
+#define EHTCAP_MAC_EHT_LINK_ADAPTATION_SUPP_BITS        2
 
 #define EHTCAP_PHY_320MHZIN6GHZ_IDX                     1
 #define EHTCAP_PHY_320MHZIN6GHZ_BITS                    1
@@ -1832,6 +1867,12 @@ struct subelem_header {
 #define EHTCAP_PHY_RX_1K_QAM_IN_WIDER_BW_DL_OFDMA_BITS  1
 #define EHTCAP_PHY_RX_4K_QAM_IN_WIDER_BW_DL_OFDMA_IDX   65
 #define EHTCAP_PHY_RX_4K_QAM_IN_WIDER_BW_DL_OFDMA_BITS  1
+#define EHTCAP_PHY_20MHZ_ONLY_CAPS_IDX                  66
+#define EHTCAP_PHY_20MHZ_ONLY_CAPS_BITS                 1
+#define EHTCAP_PHY_20MHZ_ONLY_TRIGGER_MUBF_FL_BW_FB_DLMUMIMO_IDX  67
+#define EHTCAP_PHY_20MHZ_ONLY_TRIGGER_MUBF_FL_BW_FB_DLMUMIMO_BITS 1
+#define EHTCAP_PHY_20MHZ_ONLY_MRU_SUPP_IDX              68
+#define EHTCAP_PHY_20MHZ_ONLY_MRU_SUPP_BITS             1
 
 #define EHTCAP_RX_MCS_NSS_MAP_IDX                       0
 #define EHTCAP_RX_MCS_NSS_MAP_BITS                      4
@@ -3026,6 +3067,8 @@ struct wlan_ext_cap_ie {
  * @max_a_mpdu_len_exponent_ext: Maximum A-MPDU Length Exponent Extension
  * @eht_trs_support: EHT TRS SUPPORT
  * @txop_return_support_txop_share_m2: TXOP Return Support in TXOP Share Mode 2
+ * @two_bqrs_support: Two BQRs Support
+ * @eht_link_adaptation_support: EHT Link Adaptation Support
  * @reserved: reserved bits
  * @reserved2: reserved bits
  * @support_320mhz_6ghz: support 320mhz in 6gz
@@ -3076,6 +3119,10 @@ struct wlan_ext_cap_ie {
  *                                 OFDMA support
  * @rx_4k_qam_in_wider_bw_dl_ofdma: Rx 4096-QAM in wider bandwidth DL
  *                                 OFDMA support
+ * @limited_cap_support_20mhz: 20 MHz-Only Limited Capabilities Support
+ * @triggered_mu_bf_full_bw_fb_and_dl_mumimo: 20 MHz-Only Triggered MU Beam-
+ *                                   forming Full BW Feedback And DL MU-MIMO
+ * @mru_support_20mhz: 20 MHz-Only M-RU Support
  * @reserved3: reserved bits
  * @bw_20_rx_max_nss_for_mcs_0_to_7: Max Rx NSS for MCS 0 to 7 (BW = 20MHz)
  * @bw_20_tx_max_nss_for_mcs_0_to_7: Max Tx NSS for MCS 0 to 7 (BW = 20MHz)
@@ -3122,7 +3169,9 @@ struct wlan_ext_cap_ie {
  */
 struct wlan_eht_cap_info {
 #ifndef ANI_LITTLE_BIT_ENDIAN
-	uint16_t reserved:5;
+	uint16_t reserved:2;
+	uint16_t eht_link_adaptation_support:2;
+	uint16_t two_bqrs_support:1;
 	uint16_t txop_return_support_txop_share_m2:1;
 	uint16_t eht_trs_support:1;
 	uint16_t max_a_mpdu_len_exponent_ext:1;
@@ -3177,7 +3226,10 @@ struct wlan_eht_cap_info {
 	uint32_t psr_based_sr:1;
 	uint32_t partial_bw_dl_mu_mimo:1;
 
-	uint8_t reserved3:6;
+	uint8_t reserved3:3;
+	uint8_t mru_support_20mhz:1;
+	uint8_t triggered_mu_bf_full_bw_fb_and_dl_mumimo:1;
+	uint8_t limited_cap_support_20mhz:1;
 	uint8_t rx_4k_qam_in_wider_bw_dl_ofdma:1;
 	uint8_t rx_1k_qam_in_wider_bw_dl_ofdma:1;
 
@@ -3222,7 +3274,9 @@ struct wlan_eht_cap_info {
 	uint16_t max_a_mpdu_len_exponent_ext:1;
 	uint16_t eht_trs_support:1;
 	uint16_t txop_return_support_txop_share_m2:1;
-	uint16_t reserved:5;
+	uint16_t two_bqrs_support:1;
+	uint16_t eht_link_adaptation_support:2;
+	uint16_t reserved:2;
 
 	uint32_t reserved2:1;
 	uint32_t support_320mhz_6ghz:1;
@@ -3267,9 +3321,12 @@ struct wlan_eht_cap_info {
 	uint32_t mu_bformer_320mhz:1;
 	uint32_t tb_sounding_feedback_rl:1;
 
+	uint8_t limited_cap_support_20mhz:1;
+	uint8_t triggered_mu_bf_full_bw_fb_and_dl_mumimo:1;
+	uint8_t mru_support_20mhz:1;
 	uint8_t rx_1k_qam_in_wider_bw_dl_ofdma:1;
 	uint8_t rx_4k_qam_in_wider_bw_dl_ofdma:1;
-	uint8_t reserved3:6;
+	uint8_t reserved3:3;
 
 	uint32_t bw_20_rx_max_nss_for_mcs_0_to_7:4;
 	uint32_t bw_20_tx_max_nss_for_mcs_0_to_7:4;
@@ -3316,6 +3373,8 @@ struct wlan_eht_cap_info {
  * @max_a_mpdu_len_exponent_ext: Maximum A-MPDU Length Exponent Extension
  * @eht_trs_support: EHT TRS SUPPORT
  * @txop_return_support_txop_share_m2: TXOP Return Support in TXOP Share Mode 2
+ * @two_bqrs_support: Two BQRs Support
+ * @eht_link_adaptation_support: EHT Link Adaptation Support
  * @reserved: reserved bits
  * @reserved2: reserved bits
  * @support_320mhz_6ghz: support 320mhz in 6gz
@@ -3366,6 +3425,10 @@ struct wlan_eht_cap_info {
  *                                 OFDMA support
  * @rx_4k_qam_in_wider_bw_dl_ofdma: Rx 4096-QAM in wider bandwidth DL
  *                                 OFDMA support
+ * @limited_cap_support_20mhz: 20 MHz-Only Limited Capabilities Support
+ * @triggered_mu_bf_full_bw_fb_and_dl_mumimo: 20 MHz-Only Triggered MU Beam-
+ *                                   forming Full BW Feedback And DL MU-MIMO
+ * @mru_support_20mhz: 20 MHz-Only M-RU Support
  * @reserved3: reserved bits
  * @bw_20_rx_max_nss_for_mcs_0_to_7: Max Rx NSS for MCS 0 to 7 (BW = 20MHz)
  * @bw_20_tx_max_nss_for_mcs_0_to_7: Max Tx NSS for MCS 0 to 7 (BW = 20MHz)
@@ -3421,7 +3484,9 @@ struct wlan_eht_cap_info_network_endian {
 	uint16_t max_a_mpdu_len_exponent_ext:1;
 	uint16_t eht_trs_support:1;
 	uint16_t txop_return_support_txop_share_m2:1;
-	uint16_t reserved:5;
+	uint16_t two_bqrs_support:1;
+	uint16_t eht_link_adaptation_support:2;
+	uint16_t reserved:2;
 
 	uint32_t reserved2:1;
 	uint32_t support_320mhz_6ghz:1;
@@ -3468,7 +3533,10 @@ struct wlan_eht_cap_info_network_endian {
 
 	uint8_t rx_1k_qam_in_wider_bw_dl_ofdma:1;
 	uint8_t rx_4k_qam_in_wider_bw_dl_ofdma:1;
-	uint8_t reserved3:6;
+	uint8_t mru_support_20mhz:1;
+	uint8_t triggered_mu_bf_full_bw_fb_and_dl_mumimo:1;
+	uint8_t limited_cap_support_20mhz:1;
+	uint8_t reserved3:3;
 
 	uint32_t bw_20_rx_max_nss_for_mcs_0_to_7:4;
 	uint32_t bw_20_tx_max_nss_for_mcs_0_to_7:4;
@@ -4130,12 +4198,14 @@ wlan_parse_oce_ap_tx_pwr_ie(uint8_t *mbo_oce_ie, int8_t *ap_tx_pwr_dbm)
  * @MLME_XCSA_IE_PRESENT: extend CSA IE is present
  * @MLME_WBW_IE_PRESENT: wide bandwidth channel switch IE is present
  * @MLME_CSWRAP_IE_EXTENDED_PRESENT: channel switch wrapper IE is present
+ * @MLME_CSWRAP_IE_EXT_V2_PRESENT: channel switch wrapper IE V2 is present
  */
 enum mlme_csa_event_ies_present_flag {
 	MLME_CSA_IE_PRESENT    = 0x00000001,
 	MLME_XCSA_IE_PRESENT   = 0x00000002,
 	MLME_WBW_IE_PRESENT    = 0x00000004,
 	MLME_CSWRAP_IE_EXTENDED_PRESENT = 0x00000008,
+	MLME_CSWRAP_IE_EXT_V2_PRESENT    = 0x00000010,
 };
 
 /**

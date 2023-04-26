@@ -863,7 +863,8 @@ hal_txmon_get_user_desc_per_user(void *tx_tlv,
 	usr->ofdma_mu_mimo_enabled =
 		HAL_TX_DESC_GET_64(tx_tlv, MACTX_USER_DESC_PER_USER,
 				   OFDMA_MU_MIMO_ENABLED);
-	usr->nss = HAL_TX_DESC_GET_64(tx_tlv, MACTX_USER_DESC_PER_USER, NSS);
+	usr->nss = HAL_TX_DESC_GET_64(tx_tlv, MACTX_USER_DESC_PER_USER,
+				      NSS) + 1;
 	usr->stream_offset = HAL_TX_DESC_GET_64(tx_tlv,
 						MACTX_USER_DESC_PER_USER,
 						STREAM_OFFSET);
