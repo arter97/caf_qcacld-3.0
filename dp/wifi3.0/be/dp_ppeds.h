@@ -26,6 +26,16 @@ struct dp_ppe_ds_idxs {
 };
 
 /**
+ * dp_ppeds_target_supported - Check target supports ppeds
+ * @target_type: Device ID
+ *
+ * Check target supports ppeds
+ *
+ * Return: true if supported , false if not supported
+ */
+bool dp_ppeds_target_supported(int target_type);
+
+/**
  * dp_ppeds_init_ppe_vp_tbl_be - Attach ppeds soc instance
  * @be_soc: BE SoC
  *
@@ -243,6 +253,14 @@ void dp_tx_ppeds_cfg_astidx_cache_mapping(struct dp_soc *soc,
 					  struct dp_vdev *vdev, bool peer_map);
 
 #ifdef DP_UMAC_HW_RESET_SUPPORT
+/**
+ * dp_ppeds_handle_attached() - Check if ppeds handle attached
+ * @be_soc: BE SoC
+ *
+ * Return: true if ppeds handle attached else false.
+ */
+bool dp_ppeds_handle_attached(struct dp_soc *soc);
+
 /**
  * dp_ppeds_interrupt_stop_be() - Stop all the PPEDS interrupts
  * @be_soc: BE SoC
