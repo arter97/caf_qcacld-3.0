@@ -91,6 +91,7 @@
 #include "wlan_cm_roam_ucfg_api.h"
 #include "wlan_hdd_son.h"
 #include "wlan_dp_ucfg_api.h"
+#include "wlan_cm_ucfg_api.h"
 
 /* These are needed to recognize WPA and RSN suite types */
 #define HDD_WPA_OUI_SIZE 4
@@ -2169,13 +2170,20 @@ static void hdd_roam_channel_switch_handler(struct hdd_adapter *adapter,
 	chan_change.chan_params.mhz_freq_seg1 =
 		roam_info->chan_info.band_center_freq2;
 
+	vdev = hdd_objmgr_get_vdev_by_user(adapter, WLAN_OSIF_ID);
+	if (!vdev) {
+		hdd_err("Invalid vdev");
+		return;
+	}
+
 	if ((adapter->device_mode == QDF_STA_MODE ||
 	     adapter->device_mode == QDF_P2P_CLIENT_MODE)) {
 		if (!wlan_get_connected_vdev_by_bssid(
 				hdd_ctx->pdev, sta_ctx->conn_info.bssid.bytes,
 				&connected_vdev))
 			notify = false;
-		else if (adapter->deflink->vdev_id != connected_vdev)
+		else if (adapter->deflink->vdev_id != connected_vdev ||
+			 !ucfg_cm_is_vdev_connected(vdev))
 			notify = false;
 	}
 	if (notify) {
@@ -2195,12 +2203,9 @@ static void hdd_roam_channel_switch_handler(struct hdd_adapter *adapter,
 	if (QDF_IS_STATUS_ERROR(status))
 		hdd_debug("set hw mode change not done");
 
-	vdev = hdd_objmgr_get_vdev_by_user(adapter, WLAN_DP_ID);
-	if (vdev) {
-		is_sap_go_moved_before_sta =
+	is_sap_go_moved_before_sta =
 			wlan_vdev_mlme_is_sap_go_move_before_sta(vdev);
-		hdd_objmgr_put_vdev_by_user(vdev, WLAN_DP_ID);
-	}
+	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
 
 	if (!is_sap_go_moved_before_sta)
 		policy_mgr_check_concurrent_intf_and_restart_sap(
