@@ -143,6 +143,7 @@ struct mlo_chip_info {
  * @soc_id_list: list of soc ids part of this mlo group
  * @state: MLO link state
  * @valid_link_bitmap: valid MLO link bitmap
+ * @trigger_umac_reset: teardown require umac reset, for mode1 SSR
  * @state_lock: lock to protect access to link state
  * @event: event for teardown completion
  * @dp_handle: pointer to DP ML context
@@ -160,6 +161,7 @@ struct mlo_setup_info {
 	uint8_t soc_id_list[MAX_MLO_CHIPS];
 	enum MLO_LINK_STATE state[MAX_MLO_LINKS];
 	uint16_t valid_link_bitmap;
+	bool trigger_umac_reset;
 	qdf_spinlock_t state_lock;
 	qdf_event_t event;
 	struct cdp_mlo_ctxt *dp_handle;

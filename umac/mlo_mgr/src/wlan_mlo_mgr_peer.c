@@ -612,6 +612,8 @@ void wlan_mlo_partner_peer_disconnect_notify(struct wlan_objmgr_peer *src_peer)
 	}
 }
 
+qdf_export_symbol(wlan_mlo_partner_peer_disconnect_notify);
+
 static void mlo_peer_populate_link_peer(
 			struct wlan_mlo_peer_context *ml_peer,
 			struct wlan_objmgr_peer *link_peer)
@@ -1988,6 +1990,8 @@ bool wlan_mlo_partner_peer_delete_is_allowed(struct wlan_objmgr_peer *src_peer)
 
 	return true;
 }
+
+qdf_export_symbol(wlan_mlo_partner_peer_delete_is_allowed);
 #endif
 
 QDF_STATUS wlan_mlo_validate_reassocreq(struct wlan_mlo_peer_context *ml_peer)

@@ -1645,6 +1645,7 @@ QDF_STATUS mlo_teardown_cmd_send_tlv(struct wmi_unified *wmi_handle,
 								param->pdev_id);
 	switch (param->reason) {
 	case WMI_MLO_TEARDOWN_REASON_SSR:
+	case WMI_MLO_TEARDOWN_REASON_MODE1_SSR:
 		cmd->reason_code = WMI_MLO_TEARDOWN_SSR_REASON;
 		break;
 	case WMI_MLO_TEARDOWN_REASON_DOWN:
@@ -1652,6 +1653,8 @@ QDF_STATUS mlo_teardown_cmd_send_tlv(struct wmi_unified *wmi_handle,
 		cmd->reason_code = WMI_MLO_TEARDOWN_SSR_REASON + 1;
 		break;
 	}
+
+	cmd->trigger_umac_reset = param->umac_reset;
 
 	wmi_mtrace(WMI_MLO_TEARDOWN_CMDID, NO_SESSION, 0);
 	ret = wmi_unified_cmd_send(wmi_handle, buf, len,
