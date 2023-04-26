@@ -1392,6 +1392,22 @@ void dp_rx_fill_mesh_stats(struct dp_vdev *vdev, qdf_nbuf_t nbuf,
 	rate_mcs = hal_rx_tlv_rate_mcs_get(soc->hal_soc, rx_tlv_hdr);
 	bw = hal_rx_tlv_bw_get(soc->hal_soc, rx_tlv_hdr);
 	nss = hal_rx_msdu_start_nss_get(soc->hal_soc, rx_tlv_hdr);
+
+	/*
+	 * The MCS index does not start with 0 when NSS>1 in HT mode.
+	 * MCS params for optional 20/40MHz, NSS=1~3, EQM(NSS>1):
+	 * ------------------------------------------------------
+	 *         NSS     |   1   |   2    |    3    |    4
+	 * ------------------------------------------------------
+	 * MCS index: HT20 | 0 ~ 7 | 8 ~ 15 | 16 ~ 23 | 24 ~ 31
+	 * ------------------------------------------------------
+	 * MCS index: HT40 | 0 ~ 7 | 8 ~ 15 | 16 ~ 23 | 24 ~ 31
+	 * ------------------------------------------------------
+	 * Currently, the MAX_NSS=2. If NSS>2, MCS index = 8 * (NSS-1)
+	 */
+	if ((pkt_type == DOT11_N) && (nss == 2))
+		rate_mcs += 8;
+
 	rx_info->rs_ratephy1 = rate_mcs | (nss << 0x8) | (pkt_type << 16) |
 				(bw << 24);
 
@@ -2506,6 +2522,21 @@ void dp_rx_msdu_extd_stats_update(struct dp_soc *soc, qdf_nbuf_t nbuf,
 	/* do HW to SW pkt type conversion */
 	pkt_type = (pkt_type >= HAL_DOT11_MAX ? DOT11_MAX :
 		    hal_2_dp_pkt_type_map[pkt_type]);
+
+	/*
+	 * The MCS index does not start with 0 when NSS>1 in HT mode.
+	 * MCS params for optional 20/40MHz, NSS=1~3, EQM(NSS>1):
+	 * ------------------------------------------------------
+	 *         NSS     |   1   |   2    |    3    |    4
+	 * ------------------------------------------------------
+	 * MCS index: HT20 | 0 ~ 7 | 8 ~ 15 | 16 ~ 23 | 24 ~ 31
+	 * ------------------------------------------------------
+	 * MCS index: HT40 | 0 ~ 7 | 8 ~ 15 | 16 ~ 23 | 24 ~ 31
+	 * ------------------------------------------------------
+	 * Currently, the MAX_NSS=2. If NSS>2, MCS index = 8 * (NSS-1)
+	 */
+	if ((pkt_type == DOT11_N) && (nss == 2))
+		mcs += 8;
 
 	DP_PEER_EXTD_STATS_INCC(txrx_peer, rx.rx_mpdu_cnt[mcs], 1,
 		      ((mcs < MAX_MCS) && QDF_NBUF_CB_RX_CHFRAG_START(nbuf)),
