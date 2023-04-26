@@ -875,7 +875,7 @@ struct hal_srng {
 	uint8_t pointer_num_threshold;
 #ifdef HAL_SRNG_REG_HIS_DEBUG
 	/* pointer register writing history for this srng */
-	struct hal_srng_reg_his_ctx reg_his_ctx;
+	struct hal_srng_reg_his_ctx *reg_his_ctx;
 #endif
 };
 
@@ -890,7 +890,7 @@ struct hal_srng {
 static inline
 void hal_srng_reg_his_init(struct hal_srng *srng)
 {
-	qdf_atomic_set(&srng->reg_his_ctx.current_idx, -1);
+	qdf_atomic_set(&srng->reg_his_ctx->current_idx, -1);
 }
 
 /**
@@ -907,10 +907,10 @@ void hal_srng_reg_his_add(struct hal_srng *srng, uint32_t reg_val)
 	uint32_t write_idx;
 	struct hal_srng_reg_his_entry *reg_his_entry;
 
-	write_idx = qdf_atomic_inc_return(&srng->reg_his_ctx.current_idx);
+	write_idx = qdf_atomic_inc_return(&srng->reg_his_ctx->current_idx);
 	write_idx = write_idx & (HAL_SRNG_REG_MAX_ENTRIES - 1);
 
-	reg_his_entry = &srng->reg_his_ctx.reg_his_arr[write_idx];
+	reg_his_entry = &srng->reg_his_ctx->reg_his_arr[write_idx];
 
 	reg_his_entry->write_time = qdf_get_log_timestamp();
 	reg_his_entry->write_value = reg_val;

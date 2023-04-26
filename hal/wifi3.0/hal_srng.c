@@ -1117,6 +1117,42 @@ void hal_delayed_reg_write(struct hal_soc *hal_soc,
 #endif
 #endif
 
+#ifdef HAL_SRNG_REG_HIS_DEBUG
+inline void hal_free_srng_history(struct hal_soc *hal)
+{
+	int i;
+
+	for (i = 0; i < HAL_SRNG_ID_MAX; i++)
+		qdf_mem_free(hal->srng_list[i].reg_his_ctx);
+}
+
+inline bool hal_alloc_srng_history(struct hal_soc *hal)
+{
+	int i;
+
+	for (i = 0; i < HAL_SRNG_ID_MAX; i++) {
+		hal->srng_list[i].reg_his_ctx =
+			qdf_mem_malloc(sizeof(struct hal_srng_reg_his_ctx));
+		if (!hal->srng_list[i].reg_his_ctx) {
+			hal_err("srng_hist alloc failed");
+			hal_free_srng_history(hal);
+			return false;
+		}
+	}
+
+	return true;
+}
+#else
+inline void hal_free_srng_history(struct hal_soc *hal)
+{
+}
+
+inline bool hal_alloc_srng_history(struct hal_soc *hal)
+{
+	return true;
+}
+#endif
+
 void *hal_attach(struct hif_opaque_softc *hif_handle, qdf_device_t qdf_dev)
 {
 	struct hal_soc *hal;
@@ -1159,6 +1195,9 @@ void *hal_attach(struct hif_opaque_softc *hif_handle, qdf_device_t qdf_dev)
 	}
 	qdf_mem_zero(hal->shadow_wrptr_mem_vaddr,
 		sizeof(*(hal->shadow_wrptr_mem_vaddr)) * HAL_MAX_LMAC_RINGS);
+
+	if (!hal_alloc_srng_history(hal))
+		goto fail2;
 
 	for (i = 0; i < HAL_SRNG_ID_MAX; i++) {
 		hal->srng_list[i].initialized = 0;
@@ -1240,6 +1279,7 @@ void hal_detach(void *hal_soc)
 	qdf_minidump_remove(hal, sizeof(*hal), "hal_soc");
 	qdf_mem_free(hal->ops);
 
+	hal_free_srng_history(hal);
 	qdf_mem_free_consistent(hal->qdf_dev, hal->qdf_dev->dev,
 		sizeof(*(hal->shadow_rdptr_mem_vaddr)) * HAL_SRNG_ID_MAX,
 		hal->shadow_rdptr_mem_vaddr, hal->shadow_rdptr_mem_paddr, 0);
