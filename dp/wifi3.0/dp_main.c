@@ -6153,6 +6153,8 @@ static inline void dp_srng_clear_ring_usage_wm_stats(struct dp_soc *soc)
 static inline QDF_STATUS
 dp_txrx_host_stats_clr(struct dp_vdev *vdev, struct dp_soc *soc)
 {
+	struct dp_vdev *var_vdev = NULL;
+
 	if (!vdev || !vdev->pdev)
 		return QDF_STATUS_E_FAILURE;
 
@@ -6172,12 +6174,14 @@ dp_txrx_host_stats_clr(struct dp_vdev *vdev, struct dp_soc *soc)
 
 	DP_STATS_CLR(vdev->pdev);
 	DP_STATS_CLR(vdev->pdev->soc);
-	DP_STATS_CLR(vdev);
 
 	hif_clear_napi_stats(vdev->pdev->soc->hif_handle);
 
-	dp_vdev_iterate_peer(vdev, dp_txrx_host_peer_stats_clr, NULL,
-			     DP_MOD_ID_GENERIC_STATS);
+	TAILQ_FOREACH(var_vdev, &vdev->pdev->vdev_list, vdev_list_elem) {
+		DP_STATS_CLR(var_vdev);
+		dp_vdev_iterate_peer(var_vdev, dp_txrx_host_peer_stats_clr,
+				     NULL, DP_MOD_ID_GENERIC_STATS);
+	}
 
 	dp_srng_clear_ring_usage_wm_stats(soc);
 
