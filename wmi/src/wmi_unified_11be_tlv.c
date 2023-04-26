@@ -298,6 +298,12 @@ uint8_t *peer_assoc_add_mlo_params(uint8_t *buf_ptr,
 
 	mlo_params->max_num_simultaneous_links =
 			req->mlo_params.max_num_simultaneous_links;
+	mlo_params->mlo_flags.nstr_bitmap_present =
+			req->mlo_params.nstr_bitmap_present;
+	mlo_params->mlo_flags.nstr_bitmap_size =
+			req->mlo_params.nstr_bitmap_size;
+	mlo_params->nstr_indication_bitmap =
+		req->mlo_params.nstr_indication_bitmap;
 
 	return buf_ptr + sizeof(wmi_peer_assoc_mlo_params);
 }
