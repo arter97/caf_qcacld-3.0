@@ -18,6 +18,7 @@
 #include <dp_sawf.h>
 #include <wlan_sawf.h>
 #include <cdp_txrx_sawf.h>
+#include <qca_sawf_if.h>
 #ifdef WLAN_SUPPORT_SCS
 #include <qca_scs_if.h>
 #endif
@@ -222,9 +223,9 @@ void qca_sawf_config_ul(uint8_t *dst_mac, uint8_t *src_mac,
 	uint8_t tid = 0;
 
 	qdf_nofl_debug("src " QDF_MAC_ADDR_FMT " dst " QDF_MAC_ADDR_FMT
-		       " fwd_service_id %u rvrs_service_id %u",
+		       " fwd_service_id %u rvrs_service_id %u add_or_sub %u",
 		       QDF_MAC_ADDR_REF(src_mac), QDF_MAC_ADDR_REF(dst_mac),
-		       fw_service_id, rv_service_id);
+		       fw_service_id, rv_service_id, add_or_sub);
 
 	if (QDF_IS_STATUS_SUCCESS(wlan_sawf_get_uplink_params(fw_service_id,
 							      &tid,
@@ -262,13 +263,11 @@ void qca_sawf_config_ul(uint8_t *dst_mac, uint8_t *src_mac,
 		qca_sawf_peer_dl_flow_count(src_mac, rv_service_id, add_or_sub);
 }
 
-void qca_sawf_config_ul_v2(struct net_device *dst_dev, uint8_t *dst_mac,
-			   struct net_device *src_dev, uint8_t *src_mac,
-			   uint8_t fw_service_id, uint8_t rv_service_id,
-			   uint8_t add_or_sub)
+void qca_sawf_connection_sync(struct qca_sawf_connection_sync_param *params)
 {
-	qca_sawf_config_ul(dst_mac, src_mac, fw_service_id, rv_service_id,
-			   add_or_sub);
+	qca_sawf_config_ul(params->dst_mac, params->src_mac,
+			   params->fw_service_id, params->rv_service_id,
+			   params->start_or_stop);
 }
 #else
 
@@ -292,10 +291,10 @@ void qca_sawf_config_ul(uint8_t *dst_mac, uint8_t *src_mac,
 			uint8_t add_or_sub)
 {}
 
-void qca_sawf_config_ul_v2(struct net_device *dst_dev, uint8_t *dst_mac,
-			   struct net_device *src_dev, uint8_t *src_mac,
-			   uint8_t fw_service_id, uint8_t rv_service_id,
-			   uint8_t add_or_sub)
+/* Forward declaration */
+struct qca_sawf_connection_sync_param;
+
+void qca_sawf_connection_sync(struct qca_sawf_connection_sync_param *params)
 {}
 #endif
 
@@ -310,4 +309,4 @@ qdf_export_symbol(qca_sawf_get_msduq);
 qdf_export_symbol(qca_sawf_get_msduq_v2);
 qdf_export_symbol(qca_sawf_get_msdu_queue);
 qdf_export_symbol(qca_sawf_config_ul);
-qdf_export_symbol(qca_sawf_config_ul_v2);
+qdf_export_symbol(qca_sawf_connection_sync);
