@@ -411,9 +411,12 @@ util_get_bvmlie_mldcap(uint8_t *mlieseq, qdf_size_t mlieseqlen,
  * profile is found, or if none of the per-STA profiles includes a MAC address
  * in the STA Info field (assuming no errors are encountered).
  *
- * Get partner link information in the per-STA profiles present in a Basic
- * variant Multi-Link element. The partner link information is returned only for
- * those per-STA profiles which have a MAC address in the STA Info field.
+ * Get partner link information and NSTR capability information in the
+ * per-STA profiles present in a Basic variant Multi-Link element.
+ * The partner link information is returned only for those per-STA profiles
+ * which have a MAC address in the STA Info field.
+ * The NSTR capability information is returned only for those per-STA profiles
+ * which are Complete per-STA profiles.
  *
  * Return: QDF_STATUS_SUCCESS in the case of success, QDF_STATUS value giving
  * the reason for error in the case of failure
