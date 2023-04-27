@@ -346,26 +346,6 @@ wlan_mgmt_rx_reo_get_scheduler_debug_list_size(struct wlan_objmgr_psoc *psoc)
 
 	return cfg_get(psoc, CFG_MGMT_RX_REO_SCHEDULER_DEBUG_LIST_SIZE);
 }
-
-#else
-uint16_t
-wlan_mgmt_rx_reo_get_ingress_frame_debug_list_size(struct wlan_objmgr_psoc *psoc)
-{
-	return 0;
-}
-
-uint16_t
-wlan_mgmt_rx_reo_get_egress_frame_debug_list_size(struct wlan_objmgr_psoc *psoc)
-{
-	return 0;
-}
-
-uint16_t
-wlan_mgmt_rx_reo_get_scheduler_debug_list_size(struct wlan_objmgr_psoc *psoc)
-{
-	return 0;
-}
-
 #endif /* WLAN_MGMT_RX_REO_DEBUG_SUPPORT */
 
 #ifndef WLAN_MGMT_RX_REO_SIM_SUPPORT
