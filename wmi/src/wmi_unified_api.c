@@ -75,6 +75,19 @@ QDF_STATUS wmi_unified_soc_set_hw_mode_cmd(wmi_unified_t wmi_handle,
 	return QDF_STATUS_E_FAILURE;
 }
 
+QDF_STATUS wmi_unified_soc_set_rf_path_cmd(wmi_unified_t wmi_handle,
+					   uint32_t rf_path_index,
+					   uint8_t pdev_id)
+{
+	if (wmi_handle->ops->send_pdev_set_rf_path_cmd)
+		return wmi_handle->ops->send_pdev_set_rf_path_cmd(
+								wmi_handle,
+								rf_path_index,
+								pdev_id);
+
+	return QDF_STATUS_E_FAILURE;
+}
+
 QDF_STATUS wmi_unified_vdev_create_send(wmi_unified_t wmi_handle,
 					uint8_t macaddr[QDF_MAC_ADDR_SIZE],
 					struct vdev_create_params *param)
@@ -3565,6 +3578,18 @@ QDF_STATUS wmi_unified_extract_hw_mode_resp(wmi_unified_t wmi,
 		return wmi->ops->extract_hw_mode_resp_event(wmi,
 							    evt_buf,
 							    cmd_status);
+
+	return QDF_STATUS_E_FAILURE;
+}
+
+QDF_STATUS wmi_unified_extract_rf_path_resp(wmi_unified_t wmi,
+					    void *evt_buf,
+					    uint32_t *cmd_status)
+{
+	if (wmi->ops->extract_rf_path_resp)
+		return wmi->ops->extract_rf_path_resp(wmi,
+						      evt_buf,
+						      cmd_status);
 
 	return QDF_STATUS_E_FAILURE;
 }

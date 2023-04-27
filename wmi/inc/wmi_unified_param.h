@@ -5295,6 +5295,7 @@ typedef enum {
 #ifdef WLAN_RCC_ENHANCED_AOA_SUPPORT
 	wmi_pdev_enhanced_aoa_phasedelta_eventid,
 #endif
+	wmi_pdev_set_rf_path_resp_eventid,
 	wmi_events_max,
 } wmi_conv_event_id;
 
