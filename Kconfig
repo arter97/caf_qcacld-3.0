@@ -96,6 +96,10 @@ config WLAN_FEATURE_FIPS
 	bool "Enable FIPS certification feature"
 	default n
 
+config WLAN_FEATURE_LL_LT_SAP
+	bool "Enable Low latency low throughput SAP feature"
+	default n
+
 config WLAN_FEATURE_LPSS
 	bool "Enable the WLAN LPSS feature"
 	default n

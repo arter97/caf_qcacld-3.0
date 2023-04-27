@@ -1607,6 +1607,18 @@ MLME_INC += $(WFA_INC)
 MLME_OBJS += $(WFA_TGT_IF_DIR)/src/target_if_wfa_testcmd.o \
 		$(WFA_DIR)/dispatcher/src/wlan_wfa_tgt_if_tx_api.o
 
+####### LL_SAP #######
+LL_SAP_DIR := components/umac/mlme/sap/ll_sap
+
+LL_SAP_INC := -I$(WLAN_ROOT)/$(LL_SAP_DIR)/dispatcher/inc \
+
+MLME_INC += $(LL_SAP_INC)
+
+ifeq ($(CONFIG_WLAN_FEATURE_LL_LT_SAP), y)
+MLME_OBJS += $(LL_SAP_DIR)/dispatcher/src/wlan_ll_sap_ucfg_api.o \
+		$(LL_SAP_DIR)/core/src/wlan_ll_sap_main.o
+endif
+
 $(call add-wlan-objs,mlme,$(MLME_OBJS))
 
 ####### DENYLIST_MGR ########
@@ -4384,6 +4396,7 @@ ccflags-$(CONFIG_SAR_SAFETY_FEATURE) += -DSAR_SAFETY_FEATURE
 
 ccflags-$(CONFIG_CONNECTION_ROAMING_CFG) += -DCONNECTION_ROAMING_CFG
 ccflags-$(CONFIG_FEATURE_SET) += -DFEATURE_SET
+ccflags-$(CONFIG_WLAN_FEATURE_LL_LT_SAP) += -DWLAN_FEATURE_LL_LT_SAP
 
 ccflags-$(CONFIG_WLAN_FEATURE_NEAR_FULL_IRQ) += -DWLAN_FEATURE_NEAR_FULL_IRQ
 ccflags-$(CONFIG_WLAN_FEATURE_DP_EVENT_HISTORY) += -DWLAN_FEATURE_DP_EVENT_HISTORY

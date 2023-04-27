@@ -242,6 +242,7 @@
 #include "wlan_qmi_ucfg_api.h"
 #include "ce_api.h"
 #include "wlan_psoc_mlme_ucfg_api.h"
+#include "wlan_ll_sap_ucfg_api.h"
 
 #include "os_if_dp_local_pkt_capture.h"
 #include "cdp_txrx_mon.h"
@@ -462,6 +463,7 @@ static const struct category_info cinfo[MAX_SUPPORTED_CATEGORY] = {
 	[QDF_MODULE_ID_WLAN_PRE_CAC] = {QDF_TRACE_LEVEL_ALL},
 	[QDF_MODULE_ID_COAP] = {QDF_TRACE_LEVEL_ALL},
 	[QDF_MODULE_ID_MON_FILTER] = {QDF_DATA_PATH_TRACE_LEVEL},
+	[QDF_MODULE_ID_LL_SAP] = {QDF_TRACE_LEVEL_ALL},
 };
 
 struct notifier_block hdd_netdev_notifier;
@@ -18102,8 +18104,14 @@ static QDF_STATUS hdd_component_init(void)
 	if (QDF_IS_STATUS_ERROR(status))
 		goto dp_deinit;
 
+	status = ucfg_ll_sap_init();
+	if (QDF_IS_STATUS_ERROR(status))
+		goto qmi_deinit;
+
 	return QDF_STATUS_SUCCESS;
 
+qmi_deinit:
+	ucfg_qmi_deinit();
 dp_deinit:
 	ucfg_dp_deinit();
 pre_cac_deinit:
@@ -18154,6 +18162,7 @@ mlme_global_deinit:
 static void hdd_component_deinit(void)
 {
 	/* deinitialize non-converged components */
+	ucfg_ll_sap_deinit();
 	ucfg_qmi_deinit();
 	ucfg_dp_deinit();
 	ucfg_pre_cac_deinit();
