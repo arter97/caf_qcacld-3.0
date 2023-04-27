@@ -107,12 +107,18 @@ enum wlan_link_band_caps {
  *  list.
  *  Bit 0-15: Each bit maps to the corresponding Link ID
  *  Bit 16-31: Reserved
+ * @qualifier_flags: u32 flags to check that link order is
+ * for TLT or link preference. Bit definition for the flags.
+ * Bit 0: TLT bit
+ * Bit 1: Preferred Link bit
+ * Bit 2-31: Reserved
  */
 struct wlan_link_preference {
 	uint8_t num_pref_links;
 	uint8_t pref_order[MAX_PREFERRED_LINKS];
 	uint32_t timeout[WIFI_AC_MAX];
 	uint32_t tlt_characterization_params;
+	uint32_t qualifier_flags;
 };
 
 /**
