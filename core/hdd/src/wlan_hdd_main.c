@@ -344,6 +344,9 @@ static qdf_wake_lock_t wlan_wake_lock;
 #define HDD_INVALID_MIN_PCIE_GEN_SPEED (0)
 #define HDD_INVALID_MAX_PCIE_GEN_SPEED (4)
 
+#define MAX_PDEV_PRE_ENABLE_PARAMS 8
+#define FTM_MAX_PDEV_PARAMS 1
+
 #define WOW_MAX_FILTER_LISTS 1
 #define WOW_MAX_FILTERS_PER_LIST 4
 #define WOW_MIN_PATTERN_SIZE 6
@@ -4523,6 +4526,44 @@ static inline void hdd_qmi_register_callbacks(struct hdd_context *hdd_ctx)
 	os_if_qmi_register_callbacks(hdd_ctx->psoc, &cb_obj);
 }
 
+/**
+ * hdd_set_pcie_params() - Set pcie params
+ * @hdd_ctx: HDD context
+ * @index: index value
+ * @param: pointer to vdev/pdev set param info
+ *
+ * Checks for pcie_config value and sets
+ * corresponding params
+ *
+ * Return: 0 on success and errno on failure.
+ */
+static int hdd_set_pcie_params(struct hdd_context *hdd_ctx,
+			       uint8_t index, struct dev_set_param *param)
+{
+	int ret = 0;
+	bool check_value = false;
+
+	ret = ucfg_fwol_get_pcie_config(hdd_ctx->psoc, &check_value);
+	if (QDF_IS_STATUS_SUCCESS(ret)) {
+		if (QDF_GLOBAL_FTM_MODE == hdd_get_conparam()) {
+			ret = mlme_check_index_setparam(param,
+					wmi_pdev_param_pcie_config,
+					(int)check_value, index++,
+					FTM_MAX_PDEV_PARAMS);
+		} else {
+			ret = mlme_check_index_setparam(param,
+					wmi_pdev_param_pcie_config,
+					(int)check_value, index++,
+					MAX_PDEV_PRE_ENABLE_PARAMS);
+		}
+		if (QDF_IS_STATUS_ERROR(ret)) {
+			hdd_err("failed to set wmi_pdev_param_pcie_config");
+			return ret;
+		}
+	}
+	return ret;
+}
+
 int hdd_wlan_start_modules(struct hdd_context *hdd_ctx, bool reinit)
 {
 	int ret = 0;
@@ -4533,6 +4574,8 @@ int hdd_wlan_start_modules(struct hdd_context *hdd_ctx, bool reinit)
 	struct target_psoc_info *tgt_hdl;
 	unsigned long thermal_state = 0;
 	bool is_sched_disabled = false;
+	uint8_t index = 0;
+	struct dev_set_param setparam[MAX_PDEV_PRE_ENABLE_PARAMS] = {};
 
 	hdd_enter();
 	qdf_dev = cds_get_context(QDF_MODULE_ID_QDF_DEVICE);
@@ -4737,6 +4780,18 @@ int hdd_wlan_start_modules(struct hdd_context *hdd_ctx, bool reinit)
 			 * in FW use vdev_id = 0.
 			 */
 			hdd_set_fw_log_params(hdd_ctx, 0);
+			ret = hdd_set_pcie_params(hdd_ctx, index, setparam);
+			if (QDF_IS_STATUS_ERROR(ret))
+				break;
+			index++;
+			ret = sme_send_multi_pdev_vdev_set_params(
+					MLME_PDEV_SETPARAM,
+					WMI_PDEV_ID_SOC, setparam, index);
+			if (QDF_IS_STATUS_ERROR(ret)) {
+				hdd_err("failed to send pdev set params");
+				return ret;
+			}
+
 			ret = -EINVAL;
 			break;
 		}
@@ -14425,7 +14480,6 @@ static int hdd_initialize_mac_address(struct hdd_context *hdd_ctx)
 	return ret;
 }
 
-#define MAX_PDEV_PRE_ENABLE_PARAMS 7
 /* params being sent:
  * wmi_pdev_param_tx_chain_mask_1ss
  * wmi_pdev_param_mgmt_retry_limit
@@ -14434,8 +14488,8 @@ static int hdd_initialize_mac_address(struct hdd_context *hdd_ctx)
  * wmi_pdev_param_smart_chainmask_scheme
  * wmi_pdev_param_alternative_chainmask_scheme
  * wmi_pdev_param_ani_enable
+ * wmi_pdev_param_pcie_config
  */
-
 /**
  * hdd_pre_enable_configure() - Configurations prior to cds_enable
  * @hdd_ctx:	HDD context
@@ -14576,6 +14630,11 @@ static int hdd_pre_enable_configure(struct hdd_context *hdd_ctx)
 		}
 	}
 
+	ret = hdd_set_pcie_params(hdd_ctx, index, setparam);
+	if (QDF_IS_STATUS_ERROR(ret))
+		goto out;
+	else
+		index++;
 	ret = sme_send_multi_pdev_vdev_set_params(MLME_PDEV_SETPARAM,
 						  WMI_PDEV_ID_SOC, setparam,
 						  index);
@@ -14583,6 +14642,7 @@ static int hdd_pre_enable_configure(struct hdd_context *hdd_ctx)
 		hdd_err("failed to send pdev set params");
 		goto out;
 	}
+
 	/* Configure global firmware params */
 	ret = ucfg_fwol_configure_global_params(hdd_ctx->psoc, hdd_ctx->pdev);
 	if (ret)
