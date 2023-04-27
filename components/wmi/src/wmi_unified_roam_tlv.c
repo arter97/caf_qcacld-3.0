@@ -26,6 +26,7 @@
 #include "wlan_roam_debug.h"
 #include "ol_defines.h"
 #include "wlan_cm_roam_api.h"
+#include "wlan_mlme_api.h"
 
 #define WMI_MAC_TO_PDEV_MAP(x) ((x) + (1))
 #define WMI_PDEV_TO_MAC_MAP(x) ((x) - (1))
@@ -4643,6 +4644,34 @@ static void wmi_roam_mlo_attach_tlv(struct wmi_unified *wmi_handle)
 }
 #endif
 
+#ifdef WLAN_FEATURE_11BE_MLO
+/**
+ * update_mlo_prefer_percentage() - Update mlo preference with configured value
+ * @psoc: psoc object
+ * @mlo_prefer_percentage: pointer to hold mlo preference percentage
+ *
+ * Return: None
+ */
+static void update_mlo_prefer_percentage(struct wlan_objmgr_psoc *psoc,
+					  int8_t *mlo_prefer_percentage)
+{
+	wlan_mlme_get_mlo_prefer_percentage(psoc, mlo_prefer_percentage);
+	/* host will deliver actual weighted number based on 100.
+	 * For example:
+	 * If percentage value in INI is 20, then host will give 120 (100 + 20)
+	 * i.e (100 * 1.2) as mlo_etp_weightage_pcnt.
+	 * If percentage value in INI is -20, then host will give 80 (100 - 20)
+	 * i.e (100 * 0.8) as mlo_etp_weightage_pcnt.
+	 */
+	*mlo_prefer_percentage += 100;
+}
+#else
+static inline
+void update_mlo_prefer_percentage(struct wlan_objmgr_psoc *psoc,
+				int8_t *mlo_preference_pctn)
+{}
+#endif
+
 /**
  * send_roam_scan_offload_ap_profile_cmd_tlv() - set roam ap profile in fw
  * @wmi_handle: wmi handle
@@ -4668,6 +4697,7 @@ send_roam_scan_offload_ap_profile_cmd_tlv(wmi_unified_t wmi_handle,
 	wmi_owe_ap_profile *owe_ap_profile;
 	enum roam_trigger_reason trig_reason;
 	uint32_t *authmode_list;
+	int8_t mlo_prefer_percentage = 0;
 	wmi_ssid *ssid;
 	int i;
 
@@ -4773,8 +4803,11 @@ send_roam_scan_offload_ap_profile_cmd_tlv(wmi_unified_t wmi_handle,
 			ap_profile->param.vendor_roam_score_algorithm;
 	score_param->sae_pk_ap_weightage_pcnt =
 				ap_profile->param.sae_pk_ap_weightage;
+	update_mlo_prefer_percentage(wmi_handle->soc->wmi_psoc,
+				     &mlo_prefer_percentage);
+	score_param->mlo_etp_weightage_pcnt = mlo_prefer_percentage;
 	send_update_mlo_roam_params(score_param, ap_profile);
-	wmi_debug("Score params weightage: disable_bitmap %x rssi %d ht %d vht %d he %d BW %d band %d NSS %d ESP %d BF %d PCL %d OCE WAN %d APTX %d roam score algo %d subnet id %d sae-pk %d security %d",
+	wmi_debug("Score params weightage: disable_bitmap %x rssi %d ht %d vht %d he %d BW %d band %d NSS %d ESP %d BF %d PCL %d OCE WAN %d APTX %d roam score algo %d subnet id %d sae-pk %d security %d mlo_etp_weight_pct %d",
 		  score_param->disable_bitmap, score_param->rssi_weightage_pcnt,
 		  score_param->ht_weightage_pcnt,
 		  score_param->vht_weightage_pcnt,
@@ -4790,7 +4823,8 @@ send_roam_scan_offload_ap_profile_cmd_tlv(wmi_unified_t wmi_handle,
 		  score_param->vendor_roam_score_algorithm_id,
 		  score_param->oce_ap_subnet_id_weightage_pcnt,
 		  score_param->sae_pk_ap_weightage_pcnt,
-		  score_param->security_weightage_pcnt);
+		  score_param->security_weightage_pcnt,
+		  score_param->mlo_etp_weightage_pcnt);
 
 	score_param->bw_scoring.score_pcnt = ap_profile->param.bw_index_score;
 	score_param->band_scoring.score_pcnt =
