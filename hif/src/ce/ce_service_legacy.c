@@ -1307,17 +1307,15 @@ static void ce_legacy_src_intr_thres_setup(struct hif_softc *scn,
 	tmp = CE_CHANNEL_SRC_BATCH_TIMER_INT_SETUP_GET(scn, ctrl_addr);
 
 	if (count_thrs) {
-		tmp &= ~(CE_SRC_BATCH_COUNTER_THRESH_MASK <<
-			 CE_SRC_BATCH_COUNTER_THRESH_LSB);
-		tmp |= ((count_thrs & CE_SRC_BATCH_COUNTER_THRESH_MASK) <<
-			CE_SRC_BATCH_COUNTER_THRESH_LSB);
+		tmp &= ~CE_SRC_BATCH_COUNTER_THRESH_MASK;
+		tmp |= ((count_thrs << CE_SRC_BATCH_COUNTER_THRESH_LSB) &
+			 CE_SRC_BATCH_COUNTER_THRESH_MASK);
 	}
 
 	if (timer_thrs) {
-		tmp &= ~(CE_SRC_BATCH_TIMER_THRESH_MASK <<
-			 CE_SRC_BATCH_TIMER_THRESH_LSB);
-		tmp |= ((timer_thrs & CE_SRC_BATCH_TIMER_THRESH_MASK) <<
-			CE_SRC_BATCH_TIMER_THRESH_LSB);
+		tmp &= ~CE_SRC_BATCH_TIMER_THRESH_MASK;
+		tmp |= ((timer_thrs  << CE_SRC_BATCH_TIMER_THRESH_LSB) &
+			CE_SRC_BATCH_TIMER_THRESH_MASK);
 	}
 
 	CE_CHANNEL_SRC_BATCH_TIMER_INT_SETUP(scn, ctrl_addr, tmp);
@@ -1335,17 +1333,15 @@ static void ce_legacy_dest_intr_thres_setup(struct hif_softc *scn,
 	tmp = CE_CHANNEL_DST_BATCH_TIMER_INT_SETUP_GET(scn, ctrl_addr);
 
 	if (count_thrs) {
-		tmp &= ~(CE_DST_BATCH_COUNTER_THRESH_MASK <<
-			 CE_DST_BATCH_COUNTER_THRESH_LSB);
-		tmp |= ((count_thrs & CE_DST_BATCH_COUNTER_THRESH_MASK) <<
-			CE_DST_BATCH_COUNTER_THRESH_LSB);
+		tmp &= ~CE_DST_BATCH_COUNTER_THRESH_MASK;
+		tmp |= ((count_thrs << CE_DST_BATCH_COUNTER_THRESH_LSB) &
+			 CE_DST_BATCH_COUNTER_THRESH_MASK);
 	}
 
 	if (timer_thrs) {
-		tmp &= ~(CE_DST_BATCH_TIMER_THRESH_MASK <<
-			 CE_DST_BATCH_TIMER_THRESH_LSB);
-		tmp |= ((timer_thrs & CE_DST_BATCH_TIMER_THRESH_MASK) <<
-			CE_DST_BATCH_TIMER_THRESH_LSB);
+		tmp &= ~CE_DST_BATCH_TIMER_THRESH_MASK;
+		tmp |= ((timer_thrs  << CE_DST_BATCH_TIMER_THRESH_LSB) &
+			 CE_DST_BATCH_TIMER_THRESH_MASK);
 	}
 
 	CE_CHANNEL_DST_BATCH_TIMER_INT_SETUP(scn, ctrl_addr, tmp);
