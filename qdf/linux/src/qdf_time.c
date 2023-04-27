@@ -217,7 +217,8 @@ uint64_t qdf_usecs_to_log_timestamp(uint64_t usecs)
 
 	ts = (usecs * QDF_LOG_TIMESTAMP_CYCLES_PER_10_US);
 
-	return do_div(ts, 10ul);
+	do_div(ts, 10ul);
+	return ts;
 }
 
 qdf_export_symbol(qdf_usecs_to_log_timestamp);
