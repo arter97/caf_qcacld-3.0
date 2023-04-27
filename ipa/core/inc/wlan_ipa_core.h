@@ -884,9 +884,9 @@ int wlan_ipa_wdi_opt_dpath_flt_rsrv_cb(
  * response to IPA
  * @is_success: result of filter reservation
  *
- * Return 0 on success, negative on failure
+ * Return: None
  */
-int wlan_ipa_wdi_opt_dpath_notify_flt_rsvd(bool is_success);
+void wlan_ipa_wdi_opt_dpath_notify_flt_rsvd(bool is_success);
 
 /**
  * wlan_ipa_wdi_opt_dpath_flt_add_cb - Add rx filter tuple to cce filter
@@ -935,9 +935,9 @@ int wlan_ipa_wdi_opt_dpath_flt_rsrv_rel_cb(void *ipa_ctx);
  * @result0: result of filter0 release
  * @result1: result of filter1 release
  *
- * Return: 0 on success, negative on failure
+ * Return: void
  */
-int wlan_ipa_wdi_opt_dpath_notify_flt_rlsd(int result0, int result1);
+void wlan_ipa_wdi_opt_dpath_notify_flt_rlsd(int result0, int result1);
 
 #endif /* IPA_OPT_WIFI_DP */
 #endif /* IPA_OFFLOAD */
