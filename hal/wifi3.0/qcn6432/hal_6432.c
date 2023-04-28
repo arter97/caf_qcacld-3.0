@@ -1697,6 +1697,13 @@ static void hal_hw_txrx_ops_attach_qcn6432(struct hal_soc *hal_soc)
 		hal_txmon_status_parse_tlv_generic_be;
 	hal_soc->ops->hal_txmon_status_get_num_users =
 		hal_txmon_status_get_num_users_generic_be;
+#if defined(TX_MONITOR_WORD_MASK)
+	hal_soc->ops->hal_txmon_get_word_mask =
+				hal_txmon_get_word_mask_qcn6432;
+#else
+	hal_soc->ops->hal_txmon_get_word_mask =
+				hal_txmon_get_word_mask_generic_be;
+#endif /* TX_MONITOR_WORD_MASK */
 #endif /* QCA_MONITOR_2_0_SUPPORT */
 	hal_soc->ops->hal_compute_reo_remap_ix0 = NULL;
 	hal_soc->ops->hal_tx_vdev_mismatch_routing_set =
