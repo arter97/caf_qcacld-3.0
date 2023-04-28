@@ -5751,8 +5751,8 @@ void dp_aggregate_vdev_stats(struct dp_vdev *vdev,
 
 #if defined(FEATURE_PERPKT_INFO) && WDI_EVENT_ENABLE
 	dp_wdi_event_handler(WDI_EVENT_UPDATE_DP_STATS, vdev->pdev->soc,
-			    vdev_stats, vdev->vdev_id,
-			    UPDATE_VDEV_STATS, vdev->pdev->pdev_id);
+			     vdev_stats, vdev->vdev_id,
+			     UPDATE_VDEV_STATS, vdev->pdev->pdev_id);
 #endif
 }
 
@@ -8191,7 +8191,7 @@ dp_txrx_reset_peer_stats(struct cdp_soc_t *soc, uint8_t vdev_id,
  *
  * Return: QDF_STATUS
  */
-static QDF_STATUS
+QDF_STATUS
 dp_txrx_get_vdev_stats(struct cdp_soc_t *soc_hdl, uint8_t vdev_id,
 		       void *buf, bool is_aggregate)
 {
@@ -8944,6 +8944,22 @@ QDF_STATUS dp_txrx_clear_dump_stats(struct cdp_soc_t *soc_hdl, uint8_t pdev_id,
 	}
 
 	return status;
+}
+
+static QDF_STATUS
+dp_txrx_get_interface_stats(struct cdp_soc_t *soc_hdl,
+			    uint8_t vdev_id,
+			    void *buf,
+			    bool is_aggregate)
+{
+	struct dp_soc *soc = cdp_soc_t_to_dp_soc(soc_hdl);
+
+	if (soc && soc->arch_ops.dp_get_interface_stats)
+		return soc->arch_ops.dp_get_interface_stats(soc_hdl,
+							    vdev_id,
+							    buf,
+							    is_aggregate);
+	return QDF_STATUS_E_FAILURE;
 }
 
 #ifdef QCA_LL_TX_FLOW_CONTROL_V2
@@ -10908,11 +10924,7 @@ static struct cdp_host_stats_ops dp_ops_host_stats = {
 					dp_get_peer_extd_rate_link_stats,
 	.get_pdev_obss_stats = dp_get_obss_stats,
 	.clear_pdev_obss_pd_stats = dp_clear_pdev_obss_pd_stats,
-#ifdef CONFIG_MLO_SINGLE_DEV
 	.txrx_get_interface_stats  = dp_txrx_get_interface_stats,
-#else
-	.txrx_get_interface_stats  = dp_txrx_get_vdev_stats,
-#endif
 	/* TODO */
 };
 

@@ -2922,6 +2922,9 @@ void dp_initialize_arch_ops_be(struct dp_arch_ops *arch_ops)
 	arch_ops->txrx_srng_init = dp_srng_init_be;
 	arch_ops->dp_get_vdev_stats_for_unmap_peer =
 					dp_get_vdev_stats_for_unmap_peer_be;
+#ifdef WLAN_MLO_MULTI_CHIP
+	arch_ops->dp_get_interface_stats = dp_get_interface_stats_be;
+#endif
 #if defined(DP_POWER_SAVE) || defined(FEATURE_RUNTIME_PM)
 	arch_ops->dp_update_ring_hptp = dp_update_ring_hptp;
 #endif

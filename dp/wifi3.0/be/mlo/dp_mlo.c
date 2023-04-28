@@ -665,12 +665,6 @@ void dp_aggregate_interface_stats(struct dp_vdev *vdev,
 			     DP_MOD_ID_GENERIC_STATS);
 
 	dp_update_vdev_rate_stats(vdev_stats, &vdev->stats);
-
-#if defined(FEATURE_PERPKT_INFO) && WDI_EVENT_ENABLE
-	dp_wdi_event_handler(WDI_EVENT_UPDATE_DP_STATS, vdev->pdev->soc,
-			     vdev_stats, vdev->vdev_id,
-			     UPDATE_VDEV_STATS, vdev->pdev->pdev_id);
-#endif
 }
 
 /**
@@ -766,10 +760,10 @@ complete:
 }
 
 QDF_STATUS
-dp_txrx_get_interface_stats(struct cdp_soc_t *soc_hdl,
-			    uint8_t vdev_id,
-			    void *buf,
-			    bool is_aggregate)
+dp_get_interface_stats_be(struct cdp_soc_t *soc_hdl,
+			  uint8_t vdev_id,
+			  void *buf,
+			  bool is_aggregate)
 {
 	struct dp_soc *soc = cdp_soc_t_to_dp_soc(soc_hdl);
 	struct dp_vdev *vdev = dp_vdev_get_ref_by_id(soc, vdev_id,

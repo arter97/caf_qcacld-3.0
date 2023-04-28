@@ -2849,20 +2849,17 @@ void dp_aggregate_vdev_stats(struct dp_vdev *vdev,
 			     struct cdp_vdev_stats *vdev_stats);
 
 /**
- * dp_txrx_get_interface_stats() - get vdev stats for ath interface
+ * dp_txrx_get_vdev_stats() - Update buffer with cdp_vdev_stats
  * @soc_hdl: CDP SoC handle
  * @vdev_id: vdev Id
  * @buf: buffer for vdev stats
- * @is_aggregate: for aggregation
+ * @is_aggregate: are aggregate stats being collected
  *
  * Return: QDF_STATUS
  */
-
 QDF_STATUS
-dp_txrx_get_interface_stats(struct cdp_soc_t *soc_hdl,
-			    uint8_t vdev_id,
-			    void *buf,
-			    bool is_aggregate);
+dp_txrx_get_vdev_stats(struct cdp_soc_t *soc_hdl, uint8_t vdev_id,
+		       void *buf, bool is_aggregate);
 
 /**
  * dp_rx_bar_stats_cb() - BAR received stats callback

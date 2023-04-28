@@ -2260,6 +2260,7 @@ enum dp_context_type {
  * @dp_tx_desc_pool_free: Free arch specific TX descriptor pool
  * @txrx_srng_init: Init txrx srng
  * @dp_get_vdev_stats_for_unmap_peer: Get vdev stats pointer for unmap peer
+ * @dp_get_interface_stats: Get interface stats
  * @ppeds_handle_attached:
  * @txrx_soc_ppeds_interrupt_stop:
  * @txrx_soc_ppeds_interrupt_start:
@@ -2511,6 +2512,10 @@ struct dp_arch_ops {
 					struct dp_vdev *vdev,
 					struct dp_peer *peer,
 					struct cdp_vdev_stats **vdev_stats);
+	QDF_STATUS (*dp_get_interface_stats)(struct cdp_soc_t *soc_hdl,
+					     uint8_t vdev_id,
+					     void *buf,
+					     bool is_aggregate);
 #ifdef WLAN_SUPPORT_PPEDS
 	void (*txrx_soc_ppeds_interrupt_stop)(struct dp_soc *soc);
 	void (*txrx_soc_ppeds_interrupt_start)(struct dp_soc *soc);

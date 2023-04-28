@@ -8661,7 +8661,7 @@ void dp_update_vdev_stats_on_peer_unmap(struct dp_vdev *vdev,
 	uint8_t link_id = 0;
 	struct dp_pdev *pdev = vdev->pdev;
 
-	if (soc && soc->arch_ops.dp_get_vdev_stats_for_unmap_peer)
+	if (soc->arch_ops.dp_get_vdev_stats_for_unmap_peer)
 		soc->arch_ops.dp_get_vdev_stats_for_unmap_peer(vdev,
 							       peer,
 							       &vdev_stats);
