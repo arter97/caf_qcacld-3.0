@@ -93,8 +93,7 @@ lim_is_auth_algo_supported(struct mac_context *mac, tAniAuthType authType,
 	} else {
 
 		if (LIM_IS_AP_ROLE(pe_session)) {
-			if ((pe_session->authType == eSIR_SHARED_KEY)
-			    || (pe_session->authType == eSIR_AUTO_SWITCH))
+			if (pe_session->authType == eSIR_AUTO_SWITCH)
 				algoEnable = true;
 			else
 				algoEnable = false;
