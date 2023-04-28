@@ -18,6 +18,7 @@
  */
 
 #include "wlan_ipa_ucfg_api.h"
+#include "wlan_ipa_main.h"
 #if defined(CONFIG_HL_SUPPORT)
 #include "wlan_tgt_def_config_hl.h"
 #else
@@ -3534,8 +3535,8 @@ wlan_soc_ipa_cfg_attach(struct cdp_ctrl_objmgr_psoc *psoc,
 {
 	if (ucfg_ipa_get_pld_enable()) {
 		wlan_cfg_ctx->ipa_enabled =
-			(cfg_get(psoc, CFG_DP_IPA_OFFLOAD_CONFIG) &
-			WLAN_CFG_IPA_ENABLE_MASK);
+			(get_ipa_config((struct wlan_objmgr_psoc *)psoc) &
+			 WLAN_CFG_IPA_ENABLE_MASK);
 		dp_info("is IPA enabled from ini: %d",
 			wlan_cfg_ctx->ipa_enabled);
 	} else {
@@ -3566,8 +3567,8 @@ wlan_soc_ipa_cfg_attach(struct cdp_ctrl_objmgr_psoc *psoc,
 {
 	if (ucfg_ipa_get_pld_enable()) {
 		wlan_cfg_ctx->ipa_enabled =
-			(cfg_get(psoc, CFG_DP_IPA_OFFLOAD_CONFIG) &
-			WLAN_CFG_IPA_ENABLE_MASK);
+			(get_ipa_config((struct wlan_objmgr_psoc *)psoc) &
+			 WLAN_CFG_IPA_ENABLE_MASK);
 		dp_info("is IPA enabled from ini: %d",
 			wlan_cfg_ctx->ipa_enabled);
 	} else {

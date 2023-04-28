@@ -29,7 +29,6 @@
 #include "qdf_platform.h"
 #include "qdf_module.h"
 
-#ifdef IPA_OFFLOAD
 /* This is as per IPA capbility */
 #define MAX_INSTANCES_SUPPORTED 2
 
@@ -373,4 +372,3 @@ bool wlan_ipa_is_vlan_enabled(void)
 }
 
 qdf_export_symbol(wlan_ipa_is_vlan_enabled);
-#endif

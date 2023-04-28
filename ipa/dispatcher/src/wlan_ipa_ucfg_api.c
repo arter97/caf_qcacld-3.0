@@ -25,7 +25,6 @@
 #include "cfg_ucfg_api.h"
 #include "qdf_module.h"
 
-#ifdef IPA_OFFLOAD
 void ucfg_ipa_set_pld_enable(bool flag)
 {
 	ipa_set_pld_enable(flag);
@@ -362,4 +361,3 @@ bool ucfg_ipa_is_wds_enabled(void)
 }
 
 qdf_export_symbol(ucfg_ipa_is_wds_enabled);
-#endif

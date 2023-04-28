@@ -23,7 +23,6 @@
 #include "cdp_txrx_ipa.h"
 #include "qdf_platform.h"
 
-#ifdef IPA_OFFLOAD
 /**
  * wlan_ipa_uc_rt_debug_host_fill - fill rt debug buffer
  * @ctext: pointer to ipa context.
@@ -1033,4 +1032,3 @@ void wlan_ipa_wdi_meter_notifier_cb(qdf_ipa_wdi_meter_evt_type_t evt,
 	qdf_op_unprotect(op_sync);
 }
 #endif /* FEATURE_METERING */
-#endif /* IPA_OFFLOAD */

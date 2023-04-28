@@ -30,7 +30,6 @@
 #include <wmi_unified_param.h>
 #include <wlan_osif_priv.h>
 #include <net/cfg80211.h>
-#ifdef IPA_OFFLOAD
 #ifdef IPA_OPT_WIFI_DP
 #include "init_deinit_lmac.h"
 #endif
@@ -5344,4 +5343,3 @@ void wlan_ipa_wdi_opt_dpath_notify_flt_add_rem_cb(int flt0_rslt, int flt1_rslt)
 	qdf_event_set(&ipa_obj->ipa_flt_evnt);
 }
 #endif /* IPA_OPT_WIFI_DP */
-#endif /* IPA_OFFLOAD */
