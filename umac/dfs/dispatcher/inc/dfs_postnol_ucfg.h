@@ -22,6 +22,9 @@
  * component.
  */
 
+#ifndef _DFS_POSTNOL_H_
+#define _DFS_POSTNOL_H_
+
 #ifdef QCA_SUPPORT_DFS_CHAN_POSTNOL
 /**
  * ucfg_dfs_set_postnol_freq() - Set PostNOL freq.
@@ -217,3 +220,33 @@ QDF_STATUS
 ucfg_dfs_get_dfs_puncture(struct wlan_objmgr_pdev *pdev,
 			  bool *is_dfs_punc_en);
 #endif /* QCA_DFS_BW_PUNCTURE */
+
+#ifdef WLAN_DISP_CHAN_INFO
+/**
+ * ucfg_dfs_get_cac_nol_time() - Get CAC and NOL time related values.
+ * @pdev: Pointer to wlan_objmgr_pdev
+ * @freq: Frequency in MHz
+ * @index: Channel index
+ * @remaining_cac_time: Pointer to remaining cac time field
+ * @cac_completion_time: Pointer to cac completion time field
+ * @remaining_nol_time: Pointer to remaining nol time field
+ *
+ * Return: None
+ */
+void
+ucfg_dfs_get_cac_nol_time(struct wlan_objmgr_pdev *pdev, qdf_freq_t freq,
+			  int8_t index,
+			  uint32_t *remaining_cac_time,
+			  uint64_t *cac_completion_time,
+			  uint32_t *remaining_nol_time);
+#else
+static inline void
+ucfg_dfs_get_cac_nol_time(struct wlan_objmgr_pdev *pdev, qdf_freq_t freq,
+			  int8_t index,
+			  uint32_t *remaining_cac_time,
+			  uint64_t *cac_completion_time,
+			  uint32_t *remaining_nol_time)
+{
+}
+#endif
+#endif /* _DFS_POSTNOL_H_ */

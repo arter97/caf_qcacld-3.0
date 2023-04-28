@@ -504,3 +504,20 @@ void utils_dfs_puncturing_sm_deliver_evt(struct wlan_objmgr_pdev *pdev,
 
 qdf_export_symbol(utils_dfs_puncturing_sm_deliver_evt);
 #endif /* QCA_DFS_BW_PUNCTURE */
+
+#ifdef WLAN_DISP_CHAN_INFO
+void
+ucfg_dfs_get_cac_nol_time(struct wlan_objmgr_pdev *pdev, qdf_freq_t freq,
+			  int8_t index, uint32_t *rem_cac_time,
+			  uint64_t *cac_comp_time, uint32_t *rem_nol_time)
+{
+	struct wlan_dfs *dfs;
+
+	dfs = wlan_pdev_get_dfs_obj(pdev);
+	if (!dfs)
+		return;
+
+	dfs_get_cac_nol_time(dfs, index, rem_cac_time, cac_comp_time,
+			     rem_nol_time, freq);
+}
+#endif
