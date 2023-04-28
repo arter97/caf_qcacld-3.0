@@ -31,7 +31,9 @@
 #ifdef WLAN_FEATURE_11BE_MLO
 #include "wlan_mlo_mgr_public_structs.h"
 #endif
-
+#ifdef CONFIG_AFC_SUPPORT
+#include "wlan_reg_afc.h"
+#endif
 
 /**
  * struct wlan_psoc_hal_reg_capability - hal reg table in psoc
