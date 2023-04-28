@@ -690,6 +690,7 @@ void dp_initialize_arch_ops_li(struct dp_arch_ops *arch_ops)
 	arch_ops->get_hw_link_id = dp_get_hw_link_id_li;
 	arch_ops->dp_get_vdev_stats_for_unmap_peer =
 					dp_get_vdev_stats_for_unmap_peer_li;
+	arch_ops->dp_get_interface_stats = dp_txrx_get_vdev_stats;
 }
 
 #ifdef QCA_DP_TX_HW_SW_NBUF_DESC_PREFETCH

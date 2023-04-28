@@ -204,4 +204,17 @@ int32_t dp_mlo_get_delta_tsf2_wrt_mlo_offset(struct dp_soc *soc,
  * Return: int32_t
  */
 int32_t dp_mlo_get_delta_tqm_wrt_mlo_offset(struct dp_soc *soc);
+
+/**
+ * dp_get_interface_stats_be() - get vdev stats for ath interface
+ * @soc_hdl: CDP SoC handle
+ * @vdev_id: vdev Id
+ * @buf: buffer for vdev stats
+ * @is_aggregate: for aggregation
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+dp_get_interface_stats_be(struct cdp_soc_t *soc_hdl, uint8_t vdev_id,
+			  void *buf, bool is_aggregate);
 #endif /* __DP_MLO_H */
