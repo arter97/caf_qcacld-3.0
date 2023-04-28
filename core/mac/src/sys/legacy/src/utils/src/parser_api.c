@@ -1891,8 +1891,11 @@ populate_dot11f_power_caps(struct mac_context *mac,
 
 	/* Use firmware updated max tx power if non zero */
 	mlme_obj = wlan_vdev_mlme_get_cmpt_obj(pe_session->vdev);
-	if (mlme_obj && mlme_obj->mgmt.generic.tx_pwrlimit)
+	if (mlme_obj && mlme_obj->mgmt.generic.tx_pwrlimit) {
 		pCaps->maxTxPower = mlme_obj->mgmt.generic.tx_pwrlimit;
+		pCaps->minTxPower = QDF_MIN(pCaps->minTxPower,
+					    mlme_obj->mgmt.generic.minpower);
+	}
 
 	pCaps->present = 1;
 } /* End populate_dot11f_power_caps. */

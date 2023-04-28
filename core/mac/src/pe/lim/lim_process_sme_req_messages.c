@@ -3602,6 +3602,7 @@ lim_fill_pe_session(struct mac_context *mac_ctx, struct pe_session *session,
 		session->max_11h_pwr = session->maxTxPower;
 
 	session->min_11h_pwr = MIN_TX_PWR_CAP;
+	pe_debug("Min session tx power: %d", session->min_11h_pwr);
 
 	if (!session->enable_session_twt_support) {
 		status = wlan_mlme_get_wmm_mode(mac_ctx->psoc, &wmm_mode);
@@ -5334,8 +5335,10 @@ static void lim_handle_reassoc_req(struct cm_vdev_join_req *req)
 	if (session_entry->max_11h_pwr > session_entry->maxTxPower)
 		session_entry->max_11h_pwr = session_entry->maxTxPower;
 
-	pe_info("Reg max = %d, local pwr constraint = %d, max tx = %d",
-		reg_max, local_pwr_constraint, session_entry->maxTxPower);
+	pe_info("TX power: reg max: %d, local constraint: %d, max: %d min: %d",
+		reg_max, local_pwr_constraint, session_entry->maxTxPower,
+		session_entry->min_11h_pwr);
+
 	/* Copy the SSID from session entry to local variable */
 	session_entry->limReassocSSID.length = req->entry->ssid.length;
 	qdf_mem_copy(session_entry->limReassocSSID.ssId,
