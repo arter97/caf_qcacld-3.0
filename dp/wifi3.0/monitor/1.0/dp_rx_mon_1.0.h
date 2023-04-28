@@ -892,21 +892,21 @@ uint8_t *dp_rx_mon_get_buffer_data(struct dp_rx_desc *rx_desc)
 /**
  * dp_rx_cookie_2_mon_link_desc() - Retrieve Link descriptor based on target
  * @pdev: core physical device context
- * @buf_info: structure holding the buffer info
+ * @buf_info: ptr to structure holding the buffer info
  * @mac_id: mac number
  *
  * Return: link descriptor address
  */
 static inline
 void *dp_rx_cookie_2_mon_link_desc(struct dp_pdev *pdev,
-				   struct hal_buf_info buf_info,
+				   struct hal_buf_info *buf_info,
 				   uint8_t mac_id)
 {
 	if (pdev->soc->wlan_cfg_ctx->rxdma1_enable)
-		return dp_rx_cookie_2_mon_link_desc_va(pdev, &buf_info,
+		return dp_rx_cookie_2_mon_link_desc_va(pdev, buf_info,
 						       mac_id);
 
-	return dp_rx_cookie_2_link_desc_va(pdev->soc, &buf_info);
+	return dp_rx_cookie_2_link_desc_va(pdev->soc, buf_info);
 }
 
 /**
