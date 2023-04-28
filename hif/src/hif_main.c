@@ -1317,6 +1317,7 @@ static inline int hif_get_num_active_grp_tasklets(struct hif_softc *scn)
 	defined(QCA_WIFI_QCN9000) || defined(QCA_WIFI_QCA6490) || \
 	defined(QCA_WIFI_QCA6750) || defined(QCA_WIFI_QCA5018) || \
 	defined(QCA_WIFI_KIWI) || defined(QCA_WIFI_QCN9224) || \
+	defined(QCA_WIFI_QCN6432) || \
 	defined(QCA_WIFI_QCA9574)) || defined(QCA_WIFI_QCA5332)
 /**
  * hif_get_num_pending_work() - get the number of entries in

@@ -252,6 +252,236 @@ hal_tx_init_cmd_credit_ring_6432(hal_soc_handle_t hal_soc_hdl,
 {
 }
 
+/* TX MONITOR */
+#if defined(QCA_MONITOR_2_0_SUPPORT) && defined(TX_MONITOR_WORD_MASK)
+
+#define TX_FES_SETUP_MASK 0x3
+typedef struct tx_fes_setup_compact_6432 hal_tx_fes_setup_t;
+struct tx_fes_setup_compact_6432 {
+	/* DWORD - 0 */
+	uint32_t schedule_id;
+	/* DWORD - 1 */
+	uint32_t reserved_1a                    : 7,  // [0: 6]
+		transmit_start_reason           : 3,  // [7: 9]
+		reserved_1b                     : 13, // [10: 22]
+		number_of_users                 : 6,  // [28: 23]
+		mu_type                         : 1,  // [29]
+		reserved_1c                     : 2;  // [30]
+	/* DWORD - 2 */
+	uint32_t reserved_2a                    : 4,  // [0: 3]
+		ndp_frame                       : 2,  // [4: 5]
+		txbf                            : 1,  // [6]
+		reserved_2b                     : 3,  // [7: 9]
+		static_bandwidth                : 3,  // [12: 10]
+		reserved_2c                     : 1,  // [13]
+		transmission_contains_mu_rts    : 1,  // [14]
+		reserved_2d                     : 17; // [15: 31]
+	/* DWORD - 3 */
+	uint32_t reserved_3a                    : 15, // [0: 14]
+		mu_ndp                          : 1,  // [15]
+		reserved_3b                     : 11, // [16: 26]
+		ndpa                            : 1,  // [27]
+		reserved_3c                     : 4;  // [28: 31]
+};
+
+#define TX_PEER_ENTRY_MASK 0x103
+typedef struct tx_peer_entry_compact_6432 hal_tx_peer_entry_t;
+struct tx_peer_entry_compact_6432 {
+	/* DWORD - 0 */
+	uint32_t mac_addr_a_31_0                : 32;
+	/* DWORD - 1 */
+	uint32_t mac_addr_a_47_32               : 16,
+		 mac_addr_b_15_0                : 16;
+	/* DWORD - 2 */
+	uint32_t mac_addr_b_47_16               : 32;
+	/* DWORD - 3 */
+	uint32_t reserved_3                     : 32;
+	/* DWORD - 16 */
+	uint32_t reserved_16                    : 32;
+	/* DWORD - 17 */
+	uint32_t multi_link_addr_crypto_enable  : 1,
+		 reserved_17_a                  : 15,
+		 sw_peer_id                     : 16;
+};
+
+#define TX_QUEUE_EXT_MASK 0x1
+typedef struct tx_queue_ext_compact_6432 hal_tx_queue_ext_t;
+struct tx_queue_ext_compact_6432 {
+	/* DWORD - 0 */
+	uint32_t frame_ctl                      : 16,
+		 qos_ctl                        : 16;
+	/* DWORD - 1 */
+	uint32_t ampdu_flag                     : 1,
+		 reserved_1                     : 31;
+};
+
+#define TX_MSDU_START_MASK 0x1
+typedef struct tx_msdu_start_compact_6432 hal_tx_msdu_start_t;
+struct tx_msdu_start_compact_6432 {
+	/* DWORD - 0 */
+	uint32_t reserved_0                     : 32;
+	/* DWORD - 1 */
+	uint32_t reserved_1                     : 32;
+};
+
+#define TX_MPDU_START_MASK 0x3
+typedef struct tx_mpdu_start_compact_6432 hal_tx_mpdu_start_t;
+struct tx_mpdu_start_compact_6432 {
+	/* DWORD - 0 */
+	uint32_t mpdu_length                    : 14,
+		 frame_not_from_tqm             : 1,
+		 vht_control_present            : 1,
+		 mpdu_header_length             : 8,
+		 retry_count                    : 7,
+		 wds                            : 1;
+	/* DWORD - 1 */
+	uint32_t pn_31_0                        : 32;
+	/* DWORD - 2 */
+	uint32_t pn_47_32                       : 16,
+		 mpdu_sequence_number           : 12,
+		 raw_already_encrypted          : 1,
+		 frame_type                     : 2,
+		 txdma_dropped_mpdu_warning     : 1;
+	/* DWORD - 3 */
+	uint32_t reserved_3                     : 32;
+};
+
+typedef struct rxpcu_user_setup_compact_6432  hal_rxpcu_user_setup_t;
+struct rxpcu_user_setup_compact_6432 {
+};
+
+#define TX_FES_STATUS_END_MASK 0x7
+typedef struct tx_fes_status_end_compact_6432 hal_tx_fes_status_end_t;
+struct tx_fes_status_end_compact_6432 {
+	/* DWORD - 0 */
+	uint32_t reserved_0                     : 32;
+	/* DWORD - 1 */
+	struct {
+	uint16_t phytx_abort_reason             : 8,
+		 user_number                    : 6,
+		 reserved_1a                    : 2;
+	} phytx_abort_request_info_details;
+	uint16_t reserved_1b                    : 12,
+		 phytx_abort_request_info_valid : 1,
+		 reserved_1c                    : 3;
+	/* DWORD - 2 */
+	uint32_t start_of_frame_timestamp_15_0  : 16,
+		 start_of_frame_timestamp_31_16 : 16;
+	/* DWORD - 3 */
+	uint32_t end_of_frame_timestamp_15_0    : 16,
+		 end_of_frame_timestamp_31_16   : 16;
+	/* DWORD - 4 */
+	uint32_t terminate_ranging_sequence     : 1,
+		 reserved_4a                    : 7,
+		 timing_status                  : 2,
+		 response_type                  : 5,
+		 r2r_end_status_to_follow       : 1,
+		 transmit_delay                 : 16;
+	/* DWORD - 5 */
+	uint32_t reserved_5                     : 32;
+};
+
+#define RESPONSE_END_STATUS_MASK 0xD
+typedef struct response_end_status_compact_6432 hal_response_end_status_t;
+struct response_end_status_compact_6432 {
+	/* DWORD - 0 */
+	uint32_t coex_bt_tx_while_wlan_tx       : 1,
+		 coex_wan_tx_while_wlan_tx      : 1,
+		 coex_wlan_tx_while_wlan_tx     : 1,
+		 global_data_underflow_warning  : 1,
+		 response_transmit_status       : 4,
+		 phytx_pkt_end_info_valid       : 1,
+		 phytx_abort_request_info_valid : 1,
+		 generated_response             : 3,
+		 mba_user_count	                : 7,
+		 mba_fake_bitmap_count          : 7,
+		 coex_based_tx_bw               : 3,
+		 trig_response_related          : 1,
+		 dpdtrain_done                  : 1;
+	/* DWORD - 1 */
+	uint32_t reserved_1                     : 32;
+	/* DWORD - 4 */
+	uint32_t reserved_4                     : 32;
+	/* DWORD - 5 */
+	uint32_t start_of_frame_timestamp_15_0  : 16,
+		 start_of_frame_timestamp_31_16 : 16;
+	/* DWORD - 6 */
+	uint32_t end_of_frame_timestamp_15_0    : 16,
+		 end_of_frame_timestamp_31_16   : 16;
+	/* DWORD - 7 */
+	uint32_t reserved_7                     : 32;
+};
+
+#define TX_FES_STATUS_PROT_MASK	0x2
+typedef struct tx_fes_status_prot_compact_6432 hal_tx_fes_status_prot_t;
+struct tx_fes_status_prot_compact_6432 {
+	/* DWORD - 2 */
+	uint32_t start_of_frame_timestamp_15_0  : 16,
+		 start_of_frame_timestamp_31_16 : 16;
+	/* DWROD - 3 */
+	uint32_t end_of_frame_timestamp_15_0    : 16,
+		 end_of_frame_timestamp_31_16   : 16;
+};
+
+#define PCU_PPDU_SETUP_INIT_MASK 0x1E800000
+typedef struct pcu_ppdu_setup_init_compact_6432 hal_pcu_ppdu_setup_t;
+struct pcu_ppdu_setup_init_compact_6432 {
+	/* DWORD - 46 */
+	uint32_t reserved_46                            : 32;
+	/* DWORD - 47 */
+	uint32_t r2r_group_id                           : 6,
+		 r2r_response_frame_type                : 4,
+		 r2r_sta_partial_aid                    : 11,
+		 use_address_fields_for_protection      : 1,
+		 r2r_set_required_response_time         : 1,
+		 reserved_47                            : 9;
+	/* DWORD - 50 */
+	uint32_t reserved_50                            : 32;
+	/* DWORD - 51 */
+	uint32_t protection_frame_ad1_31_0              : 32;
+	/* DWORD - 52 */
+	uint32_t protection_frame_ad1_47_32             : 16,
+		 protection_frame_ad2_15_0              : 16;
+	/* DWORD - 53 */
+	uint32_t protection_frame_ad2_47_16             : 32;
+	/* DWORD - 54 */
+	uint32_t reserved_54                            : 32;
+	/* DWORD - 55 */
+	uint32_t protection_frame_ad3_31_0              : 32;
+	/* DWORD - 56 */
+	uint32_t protection_frame_ad3_47_32             : 16,
+		 protection_frame_ad4_15_0              : 16;
+	/* DWORD - 57 */
+	uint32_t protection_frame_ad4_47_16             : 32;
+};
+
+/**
+ * hal_txmon_get_word_mask_qcn6432() - api to get word mask for tx monitor
+ * @wmask: pointer to hal_txmon_word_mask_config_t
+ *
+ * Return: void
+ */
+static inline
+void hal_txmon_get_word_mask_qcn6432(void *wmask)
+{
+	hal_txmon_word_mask_config_t *word_mask = NULL;
+
+	word_mask = (hal_txmon_word_mask_config_t *)wmask;
+
+	word_mask->compaction_enable = 1;
+	word_mask->tx_fes_setup = TX_FES_SETUP_MASK;
+	word_mask->tx_peer_entry = TX_PEER_ENTRY_MASK;
+	word_mask->tx_queue_ext = TX_QUEUE_EXT_MASK;
+	word_mask->tx_msdu_start = TX_MSDU_START_MASK;
+	word_mask->pcu_ppdu_setup_init = PCU_PPDU_SETUP_INIT_MASK;
+	word_mask->tx_mpdu_start = TX_MPDU_START_MASK;
+	word_mask->rxpcu_user_setup = 0xFF;
+	word_mask->tx_fes_status_end = TX_FES_STATUS_END_MASK;
+	word_mask->response_end_status = RESPONSE_END_STATUS_MASK;
+	word_mask->tx_fes_status_prot = TX_FES_STATUS_PROT_MASK;
+}
+#endif
+
 /**
  * hal_tx_set_ppe_cmn_config_6432() - Set the PPE common config register
  * @hal_soc_hdl: HAL SoC handle
@@ -559,37 +789,4 @@ static bool hal_tx_ppe2tcl_ring_halt_done_6432(hal_soc_handle_t hal_soc)
 	return(!!regval);
 }
 
-/* TX MONITOR */
-#ifdef QCA_MONITOR_2_0_SUPPORT
-
-#if defined(TX_MONITOR_WORD_MASK)
-typedef struct tx_fes_setup_compact_6432 hal_tx_fes_setup_t;
-struct tx_fes_setup_compact_6432 {
-	/* DWORD - 0 */
-	uint32_t schedule_id;
-	/* DWORD - 1 */
-	uint32_t reserved_1a			: 7,  // [0: 6]
-		 transmit_start_reason		: 3,  // [7: 9]
-		 reserved_1b			: 13, // [10: 22]
-		 number_of_users			: 6,  // [28: 23]
-		 MU_type				: 1,  // [29]
-		 reserved_1c			: 2;  // [30]
-	/* DWORD - 2 */
-	uint32_t reserved_2a			: 4,  // [0: 3]
-		 ndp_frame			: 2,  // [4: 5]
-		 txbf				: 1,  // [6]
-		 reserved_2b			: 3,  // [7: 9]
-		 static_bandwidth		: 3,  // [12: 10]
-		 reserved_2c			: 1,  // [13]
-		 transmission_contains_MU_RTS	: 1,  // [14]
-		 reserved_2d			: 17; // [15: 31]
-	/* DWORD - 3 */
-	uint32_t reserved_3a			: 15, // [0: 14]
-		 mu_ndp				: 1,  // [15]
-		 reserved_3b			: 11, // [16: 26]
-		 ndpa				: 1,  // [27]
-		 reserved_3c			: 4;  // [28: 31]
-};
-#endif
-#endif /* QCA_MONITOR_2_0_SUPPORT */
 #endif /* _HAL_6432_TX_H_ */

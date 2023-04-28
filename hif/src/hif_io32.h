@@ -33,6 +33,7 @@
 #define MAX_UNWINDOWED_ADDRESS 0x80000
 #if defined(QCA_WIFI_QCA6390) || defined(QCA_WIFI_QCA6490) || \
 	defined(QCA_WIFI_QCN9000) || defined(QCA_WIFI_QCA6750) || \
+	defined(QCA_WIFI_QCN6432) || \
 	defined(QCA_WIFI_QCN9224) || defined(QCA_WIFI_KIWI)
 #define WINDOW_ENABLE_BIT 0x40000000
 #else
