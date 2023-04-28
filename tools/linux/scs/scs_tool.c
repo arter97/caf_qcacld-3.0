@@ -44,7 +44,16 @@
 enum scs_rule_config_request {
 	SCS_RULE_CONFIG_REQUEST_TYPE_ADD,
 	SCS_RULE_CONFIG_REQUEST_TYPE_REMOVE,
+
+	WLAN_CFG80211_SAWF_RULE_ADD = 16,
+	WLAN_CFG80211_SAWF_RULE_DELETE,
 };
+
+/*
+ * Reuse TCLAS10 filter value attribute for src mac
+ */
+#define QCA_WLAN_VENDOR_ATTR_SAWF_RULE_SRC_MAC_ADDR \
+	QCA_WLAN_VENDOR_ATTR_SCS_RULE_CONFIG_TCLAS10_FILTER_VALUE
 
 enum scs_spm_cmd {
 	SCS_SPM_CMD_DELETE = 0,
@@ -177,8 +186,93 @@ static void scs_tool_get_mac_addr(void *data, uint8_t *mac_addr)
 }
 
 static int
+sawf_handle_rule_config_req(uint8_t *data, size_t len, struct sp_rule *rule)
+{
+	struct nlattr *tb_array[QCA_WLAN_VENDOR_ATTR_SCS_RULE_CONFIG_MAX + 1];
+	struct nlattr *tb;
+	uint32_t val32;
+	uint16_t val16;
+	uint8_t val8;
+
+	nla_parse(tb_array,
+		  QCA_WLAN_VENDOR_ATTR_SCS_RULE_CONFIG_MAX,
+		  (struct nlattr *)data, len, NULL);
+
+	tb = tb_array[QCA_WLAN_VENDOR_ATTR_SCS_RULE_CONFIG_RULE_ID];
+	if (tb) {
+		val32 = nla_get_u32(tb);
+		PRINT_IF_VERB("Rule ID                 %u", val32);
+		rule->attr_id = val32;
+	} else {
+		PRINT_IF_VERB("No Rule ID");
+		return -EINVAL;
+	}
+
+	tb = tb_array[QCA_WLAN_VENDOR_ATTR_SCS_RULE_CONFIG_REQUEST_TYPE];
+	if (tb) {
+		uint8_t spm_cmd;
+
+		val8 = nla_get_u8(tb);
+		PRINT_IF_VERB("Request Type            %u", val8);
+
+		switch (val8) {
+		case WLAN_CFG80211_SAWF_RULE_ADD:
+			spm_cmd = SCS_SPM_CMD_ADD;
+			break;
+		case WLAN_CFG80211_SAWF_RULE_DELETE:
+			spm_cmd = SCS_SPM_CMD_DELETE;
+			break;
+		default:
+			PRINT_IF_VERB("Invalid Request type %u", val8);
+			return -EINVAL;
+		}
+
+		rule->add_del_rule = spm_cmd;
+	} else {
+		PRINT_IF_VERB("No Request Type");
+		return -EINVAL;
+	}
+
+	if (rule->add_del_rule == SCS_SPM_CMD_DELETE)
+		return 0;
+
+	tb = tb_array[QCA_WLAN_VENDOR_ATTR_SCS_RULE_CONFIG_SERVICE_CLASS_ID];
+	if (tb) {
+		val16 = nla_get_u16(tb);
+		rule->service_class_id = (uint8_t)val16;
+		rule->flags |= SP_RULE_FLAG_MATCH_SERVICE_CLASS_ID;
+		PRINT_IF_VERB("Service Class ID: %u", rule->service_class_id);
+	} else {
+		PRINT_IF_VERB("No service class");
+		return -EINVAL;
+	}
+
+	tb = tb_array[QCA_WLAN_VENDOR_ATTR_SAWF_RULE_SRC_MAC_ADDR];
+	if (tb) {
+		scs_tool_get_mac_addr(nla_data(tb), rule->src_mac);
+		rule->flags |= SP_RULE_FLAG_MATCH_SRC_MAC;
+		PRINT_IF_VERB("Source MAC_ADDR: %02x:%02x:%02x:%02x:%02x:%02x",
+				      rule->src_mac[0], rule->src_mac[1],
+				      rule->src_mac[2], rule->src_mac[3],
+				      rule->src_mac[4], rule->src_mac[5]);
+	}
+
+	tb = tb_array[QCA_WLAN_VENDOR_ATTR_SCS_RULE_CONFIG_DST_MAC_ADDR];
+	if (tb) {
+		scs_tool_get_mac_addr(nla_data(tb), rule->dst_mac);
+		rule->flags |= SP_RULE_FLAG_MATCH_DST_MAC;
+		PRINT_IF_VERB("Destination MAC_ADDR: %02x:%02x:%02x:%02x:%02x:%02x",
+			      rule->dst_mac[0], rule->dst_mac[1],
+			      rule->dst_mac[2], rule->dst_mac[3],
+			      rule->dst_mac[4], rule->dst_mac[5]);
+	}
+
+	return 0;
+}
+
+static int
 scs_tool_fill_sal_rule(uint8_t *data, size_t len, struct sp_rule *rule,
-			uint8_t *type)
+		       uint8_t *req_type)
 {
 	struct nlattr *tb_array[QCA_WLAN_VENDOR_ATTR_SCS_RULE_CONFIG_MAX + 1];
 	struct nlattr *tb;
@@ -206,6 +300,7 @@ scs_tool_fill_sal_rule(uint8_t *data, size_t len, struct sp_rule *rule,
 	tb = tb_array[QCA_WLAN_VENDOR_ATTR_SCS_RULE_CONFIG_REQUEST_TYPE];
 	if (tb) {
 		uint8_t spm_cmd;
+		int sawf_req = 0;
 
 		val8 = nla_get_u8(tb);
 		PRINT_IF_VERB("Request Type            %u", val8);
@@ -217,13 +312,22 @@ scs_tool_fill_sal_rule(uint8_t *data, size_t len, struct sp_rule *rule,
 		case SCS_RULE_CONFIG_REQUEST_TYPE_REMOVE:
 			spm_cmd = SCS_SPM_CMD_DELETE;
 			break;
+		case WLAN_CFG80211_SAWF_RULE_ADD:
+		case WLAN_CFG80211_SAWF_RULE_DELETE:
+			sawf_req = 1;
+			break;
 		default:
 			PRINT_IF_VERB("Invalid Request type %u", val8);
 			return -EINVAL;
 		}
 
+		*req_type = val8;
+
+		if (sawf_req)
+			return sawf_handle_rule_config_req(data, len, rule);
+
 		rule->add_del_rule = spm_cmd;
-		*type = spm_cmd;
+
 		if (rule->add_del_rule == SCS_SPM_CMD_DELETE)
 			goto done;
 	} else {
@@ -460,7 +564,7 @@ static void scs_tool_nl_sal_cb(void *cbd, uint8_t *data, size_t len,
 {
 	int r;
 	uint32_t rul_ret = 0;
-	uint8_t type = 0;
+	uint8_t req_type = 0;
 	int ret = 0;
 
 	struct nl_msg *nlmsg = NULL;
@@ -473,7 +577,7 @@ static void scs_tool_nl_sal_cb(void *cbd, uint8_t *data, size_t len,
 	PRINT_IF_VERB(".......... SCS EVENT RECEIVED .........\n");
 
 	memset(&ctxt->rs->rule, 0, sizeof(struct sp_rule));
-	r = scs_tool_fill_sal_rule(data, len, &ctxt->rs->rule, &type);
+	r = scs_tool_fill_sal_rule(data, len, &ctxt->rs->rule, &req_type);
 	if (r < 0) {
 		PRINT_IF_VERB("Unable to set SPM rule");
 		return;
@@ -482,7 +586,7 @@ static void scs_tool_nl_sal_cb(void *cbd, uint8_t *data, size_t len,
 	rul_ret = scs_tool_send_sal_rule(ctxt);
 
 	/* Send NL msg if rule population failed and request type is ADD */
-	if (rul_ret && type == SCS_SPM_CMD_ADD) {
+	if (rul_ret && (req_type == SCS_RULE_CONFIG_REQUEST_TYPE_ADD)) {
 		nlmsg = wifi_cfg80211_prepare_command(&g_nl_ctxt.cfg80211_ctxt,
 						      QCA_NL80211_VENDOR_SUBCMD_SCS_RULE_CONFIG_RESP,
 						      ifname);
