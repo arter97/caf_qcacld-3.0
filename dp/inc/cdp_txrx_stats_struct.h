@@ -3168,6 +3168,7 @@ struct cdp_pdev_deter_stats {
  * @peer_unauth_rx_pkt_drop: stats counter for drops due to unauthorized peer
  * @telemetry_stats: pdev telemetry stats
  * @deter_stats:
+ * @invalid_msdu_cnt: Invalid MSDU count received counter
  */
 struct cdp_pdev_stats {
 	struct {
@@ -3265,6 +3266,7 @@ struct cdp_pdev_stats {
 	struct cdp_pdev_telemetry_stats telemetry_stats;
 	struct cdp_pdev_deter_stats deter_stats;
 #endif
+	uint32_t invalid_msdu_cnt;
 };
 
 /**

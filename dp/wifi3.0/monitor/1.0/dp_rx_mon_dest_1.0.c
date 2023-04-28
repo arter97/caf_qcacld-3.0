@@ -230,6 +230,11 @@ dp_rx_mon_mpdu_pop(struct dp_soc *soc, uint32_t mac_id,
 	is_first_msdu = true;
 
 	do {
+		if (!msdu_cnt) {
+			drop_mpdu = true;
+			DP_STATS_INC(dp_pdev, invalid_msdu_cnt, 1);
+		}
+
 		/* WAR for duplicate link descriptors received from HW */
 		if (qdf_unlikely(mon_pdev->mon_last_linkdesc_paddr ==
 		    buf_info.paddr)) {
@@ -239,7 +244,7 @@ dp_rx_mon_mpdu_pop(struct dp_soc *soc, uint32_t mac_id,
 
 		rx_msdu_link_desc =
 			dp_rx_cookie_2_mon_link_desc(dp_pdev,
-						     buf_info, mac_id);
+						     &buf_info, mac_id);
 
 		qdf_assert_always(rx_msdu_link_desc);
 
@@ -384,7 +389,7 @@ dp_rx_mon_mpdu_pop(struct dp_soc *soc, uint32_t mac_id,
 						    rx_desc_tlv,
 						    &first_rx_desc_tlv,
 						    &is_frag_non_raw, data);
-			if (!is_frag)
+			if (!is_frag && msdu_cnt)
 				msdu_cnt--;
 
 			dp_rx_mon_dest_debug("total_len %u frag_len %u flags %u",
@@ -457,7 +462,7 @@ next_msdu:
 						   bm_action)
 						   != QDF_STATUS_SUCCESS)
 			dp_err_rl("monitor link desc return failed");
-	} while (buf_info.paddr && msdu_cnt);
+	} while (buf_info.paddr);
 
 	dp_rx_mon_init_tail_msdu(head_msdu, msdu, last, tail_msdu);
 	dp_rx_mon_remove_raw_frame_fcs_len(soc, head_msdu, tail_msdu);
@@ -506,7 +511,7 @@ static int dp_rx_mon_drop_one_mpdu(struct dp_pdev *pdev,
 
 	do {
 		rx_msdu_link_desc = dp_rx_cookie_2_mon_link_desc(pdev,
-								 buf_info,
+								 &buf_info,
 								 mac_id);
 		if (qdf_unlikely(!rx_msdu_link_desc)) {
 			mon_pdev->rx_mon_stats.mon_link_desc_invalid++;

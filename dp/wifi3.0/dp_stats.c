@@ -7818,6 +7818,7 @@ dp_print_pdev_rx_stats(struct dp_pdev *pdev)
 
 	dp_pdev_iterate_peer_lock_safe(pdev, dp_peer_ctrl_frames_stats_get,
 				       NULL, DP_MOD_ID_GENERIC_STATS);
+
 	/* Get bar_recv_cnt */
 	DP_PRINT_STATS("BAR Received Count: = %u",
 		       pdev->stats.rx.bar_recv_cnt);
@@ -7829,6 +7830,9 @@ dp_print_pdev_rx_stats(struct dp_pdev *pdev)
 		       pdev->stats.rx_buffer_pool.num_bufs_alloc_success);
 	DP_PRINT_STATS("\tAllocations from the pool during replenish = %llu",
 		       pdev->stats.rx_buffer_pool.num_pool_bufs_replenish);
+
+	DP_PRINT_STATS("Invalid MSDU count = %u",
+		       pdev->stats.invalid_msdu_cnt);
 
 	dp_rx_basic_fst_stats(pdev);
 }
