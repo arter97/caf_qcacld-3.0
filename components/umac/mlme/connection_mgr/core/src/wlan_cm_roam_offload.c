@@ -4628,7 +4628,7 @@ cm_roam_state_change(struct wlan_objmgr_pdev *pdev,
 		return status;
 
 	if (wlan_vdev_mlme_is_mlo_vdev(vdev))
-		is_up = mlo_check_if_all_links_up(vdev);
+		is_up = mlo_check_if_all_vdev_up(vdev);
 	else
 		is_up = QDF_IS_STATUS_SUCCESS(wlan_vdev_is_up(vdev));
 	wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_NB_ID);
