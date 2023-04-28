@@ -4843,7 +4843,7 @@ QDF_STATUS dp_peer_mlo_setup(
 			 * during mld peer creation.
 			 */
 			prev_vdev = mld_peer->vdev;
-			dp_info("Primary link is not the first link. vdev: %pK,"
+			dp_info("Primary link is not the first link. vdev: %pK "
 				"vdev_id %d vdev_ref_cnt %d",
 				mld_peer->vdev, vdev_id,
 				qdf_atomic_read(&mld_peer->vdev->ref_cnt));

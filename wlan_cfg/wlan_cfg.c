@@ -5370,13 +5370,13 @@ qdf_export_symbol(wlan_cfg_is_delay_mon_replenish);
 #ifdef WLAN_SOFTUMAC_SUPPORT
 void wlan_cfg_dp_soc_ctx_dump(struct wlan_cfg_dp_soc_ctxt *cfg)
 {
-	dp_info("DP CFG SoC ctx: delay_mon_replenish = %d,",
+	dp_info("DP CFG SoC ctx: delay_mon_replenish = %d",
 		cfg->delay_mon_replenish);
 }
 #else
 void wlan_cfg_dp_soc_ctx_dump(struct wlan_cfg_dp_soc_ctxt *cfg)
 {
-	dp_info("DP CFG SoC ctx: delay_mon_replenish = %d,",
+	dp_info("DP CFG SoC ctx: delay_mon_replenish = %d",
 		cfg->delay_mon_replenish);
 	dp_info("reo_dst_ring_size = %d, delayed_replenish_entries = %d",
 		cfg->reo_dst_ring_size, cfg->delayed_replenish_entries);

@@ -3643,7 +3643,7 @@ static void dp_ipa_rx_cce_super_rule_setup_done_handler(struct htt_soc *soc,
 		dp_info("opt_dp:: Wrong Super rule setup response");
 	};
 
-	dp_info("opt_dp:: cce super rule resp type: %d, is_rules_enough: %d,",
+	dp_info("opt_dp:: cce super rule resp type: %d, is_rules_enough: %d",
 		resp_type, is_rules_enough);
 	dp_info("num_rules_avail: %d, rslt0: %d, rslt1: %d",
 		num_rules_avail, filter0_result, filter1_result);

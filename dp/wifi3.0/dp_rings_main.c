@@ -4236,7 +4236,7 @@ qdf_export_symbol(dp_soc_set_txrx_ring_map);
 static void dp_soc_cfg_dump(struct dp_soc *soc, uint32_t target_type)
 {
 	dp_init_info("DP soc Dump for Target = %d", target_type);
-	dp_init_info("ast_override_support = %d, da_war_enabled = %d,",
+	dp_init_info("ast_override_support = %d da_war_enabled = %d",
 		     soc->ast_override_support, soc->da_war_enabled);
 
 	wlan_cfg_dp_soc_ctx_dump(soc->wlan_cfg_ctx);

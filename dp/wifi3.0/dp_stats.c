@@ -7048,7 +7048,7 @@ void dp_print_peer_stats(struct dp_peer *peer,
 			       peer_stats->rx.rcvd_reo[i].bytes);
 	}
 	for (i = 0; i < CDP_MAX_LMACS; i++)
-		DP_PRINT_STATS("Packets Received on lmac[%d] = %d ( %llu ),",
+		DP_PRINT_STATS("Packets Received on lmac[%d] = %d ( %llu )",
 			       i, peer_stats->rx.rx_lmac[i].num,
 			       peer_stats->rx.rx_lmac[i].bytes);
 
@@ -7275,7 +7275,7 @@ void dp_txrx_path_stats(struct dp_soc *soc)
 		DP_PRINT_STATS("Invalid TX desc from completion ring: %u",
 			       soc->stats.tx.invalid_tx_comp_desc);
 		DP_PRINT_STATS("Dropped in host:");
-		DP_PRINT_STATS("Total packets dropped: %u,",
+		DP_PRINT_STATS("Total packets dropped: %u",
 			       pdev->stats.tx_i.dropped.dropped_pkt.num);
 		DP_PRINT_STATS("Descriptor not available: %u",
 			       pdev->stats.tx_i.dropped.desc_na.num);
@@ -7329,25 +7329,25 @@ void dp_txrx_path_stats(struct dp_soc *soc)
 
 		DP_PRINT_STATS("Rx path statistics");
 
-		DP_PRINT_STATS("delivered %u msdus ( %llu bytes),",
+		DP_PRINT_STATS("delivered %u msdus ( %llu bytes)",
 			       pdev->stats.rx.to_stack.num,
 			       pdev->stats.rx.to_stack.bytes);
 		for (i = 0; i < CDP_MAX_RX_RINGS; i++) {
 			if (!pdev->stats.rx.rcvd_reo[i].num)
 				continue;
 			DP_PRINT_STATS(
-				       "received on reo[%d] %u msdus( %llu bytes),",
+				       "received on reo[%d] %u msdus( %llu bytes)",
 				       i, pdev->stats.rx.rcvd_reo[i].num,
 				       pdev->stats.rx.rcvd_reo[i].bytes);
 		}
 		for (i = 0; i < CDP_MAX_LMACS; i++)
-			DP_PRINT_STATS("received on lmac[%d] %u msdus (%llu bytes),",
+			DP_PRINT_STATS("received on lmac[%d] %u msdus (%llu bytes)",
 				       i, pdev->stats.rx.rx_lmac[i].num,
 				       pdev->stats.rx.rx_lmac[i].bytes);
-		DP_PRINT_STATS("intra-bss packets %u msdus ( %llu bytes),",
+		DP_PRINT_STATS("intra-bss packets %u msdus ( %llu bytes)",
 			       pdev->stats.rx.intra_bss.pkts.num,
 			       pdev->stats.rx.intra_bss.pkts.bytes);
-		DP_PRINT_STATS("intra-bss fails %u msdus ( %llu bytes),",
+		DP_PRINT_STATS("intra-bss fails %u msdus ( %llu bytes)",
 			       pdev->stats.rx.intra_bss.fail.num,
 			       pdev->stats.rx.intra_bss.fail.bytes);
 		DP_PRINT_STATS("intra-bss no mdns fwds %u msdus",
@@ -7355,7 +7355,7 @@ void dp_txrx_path_stats(struct dp_soc *soc)
 		DP_PRINT_STATS("intra-bss EAPOL drops: %u",
 			       soc->stats.rx.err.intrabss_eapol_drop);
 
-		DP_PRINT_STATS("raw packets %u msdus ( %llu bytes),",
+		DP_PRINT_STATS("raw packets %u msdus ( %llu bytes)",
 			       pdev->stats.rx.raw.num,
 			       pdev->stats.rx.raw.bytes);
 		DP_PRINT_STATS("mic errors %u",
