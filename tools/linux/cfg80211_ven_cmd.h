@@ -1441,6 +1441,9 @@ enum _ol_ath_param_t {
 	OL_ATH_PARAM_MBSS_GET_GROUP_SIZE = 524,
 	OL_ATH_PARAM_SCAN_BLANKING_MODE = 525,
 	OL_ATH_PARAM_I2R_LMR_FEEDBACK_POLICY = 526,
+#ifdef QCA_R2P_UPDATE_ENABLED
+	OL_ATH_PARAM_R2P_HCHAN_RESTORE = 527,
+#endif
 };
 
 #ifdef CONFIG_SUPPORT_VENCMDTABLE
@@ -3792,6 +3795,10 @@ struct vendor_commands radio_vendor_cmds[] = {
 	{"list_5ghz_chan_info",
 		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_LIST_5GHZ_CHAN_INFO,
 		GET_PARAM, 0},
+#endif
+#ifdef QCA_R2P_UPDATE_ENABLED
+	{"hchan_r2p_restore_en",
+		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_R2P_HCHAN_RESTORE, SET_PARAM, 1},
 #endif
 };
 #endif
