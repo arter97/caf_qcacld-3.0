@@ -470,7 +470,7 @@ endif
 CONFIG_WLAN_DEBUG_VERSION := y
 
 #Enable this flag to build driver in diag version
-CONFIG_WLAN_DEBUG_VERSION := y
+CONFIG_WLAN_DIAG_VERSION := y
 
 ifeq ($(CONFIG_SLUB_DEBUG), y)
 	PANIC_ON_BUG := y
