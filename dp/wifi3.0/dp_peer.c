@@ -5225,8 +5225,13 @@ dp_clear_peer(struct cdp_soc_t *soc_hdl, uint8_t pdev_id,
 
 	peer = dp_peer_find_hash_find(soc, peer_addr.bytes,
 				      0, DP_VDEV_ALL, DP_MOD_ID_CDP);
-	if (!peer || !peer->valid)
+
+	if (!peer)
 		return QDF_STATUS_E_FAULT;
+	if (!peer->valid) {
+		dp_peer_unref_delete(peer, DP_MOD_ID_CDP);
+		return QDF_STATUS_E_FAULT;
+	}
 
 	dp_clear_peer_internal(soc, peer);
 	dp_peer_unref_delete(peer, DP_MOD_ID_CDP);
