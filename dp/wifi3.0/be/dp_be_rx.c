@@ -1133,15 +1133,29 @@ static inline bool dp_rx_mlo_igmp_wds_ext_handler(struct dp_txrx_peer *peer)
 }
 #endif
 
+#ifdef EXT_HYBRID_MLO_MODE
+static inline
+bool dp_rx_check_ext_hybrid_mode(struct dp_soc *soc, struct dp_vdev *vdev)
+{
+	return ((DP_MLD_MODE_HYBRID_NONBOND == soc->mld_mode_ap) &&
+		(wlan_op_mode_ap == vdev->opmode));
+}
+#else
+static inline
+bool dp_rx_check_ext_hybrid_mode(struct dp_soc *soc, struct dp_vdev *vdev)
+{
+	return false;
+}
+#endif
+
 bool dp_rx_mlo_igmp_handler(struct dp_soc *soc,
 			    struct dp_vdev *vdev,
 			    struct dp_txrx_peer *peer,
 			    qdf_nbuf_t nbuf,
 			    uint8_t link_id)
 {
-	struct dp_vdev *mcast_primary_vdev = NULL;
+	qdf_nbuf_t nbuf_copy;
 	struct dp_vdev_be *be_vdev = dp_get_be_vdev_from_dp_vdev(vdev);
-	struct dp_soc_be *be_soc = dp_get_be_soc_from_dp_soc(soc);
 	uint8_t tid = qdf_nbuf_get_tid_val(nbuf);
 	struct cdp_tid_rx_stats *tid_stats = &peer->vdev->pdev->stats.
 					tid_stats.tid_rx_wbm_stats[0][tid];
@@ -1165,51 +1179,57 @@ bool dp_rx_mlo_igmp_handler(struct dp_soc *soc,
 			dp_rx_err("forwarding failed");
 	}
 
-	/*
-	 * In the case of ME6, Backhaul WDS, NAWDS
-	 * send the igmp pkt on the same link where it received,
-	 * as these features will use peer based tcl metadata
-	 */
-
 	qdf_nbuf_set_next(nbuf, NULL);
 
-	if (vdev->mcast_enhancement_en || be_vdev->mcast_primary ||
-	    peer->nawds_enabled)
-		goto send_pkt;
+	/* REO sends IGMP to driver only if AP is operating in hybrid
+	 *  mld mode.
+	 */
 
-	if (qdf_unlikely(dp_rx_mlo_igmp_wds_ext_handler(peer)))
-		goto send_pkt;
-
-	mcast_primary_vdev = dp_mlo_get_mcast_primary_vdev(be_soc, be_vdev,
-							   DP_MOD_ID_RX);
-	if (!mcast_primary_vdev) {
-		dp_rx_debug("Non mlo vdev");
-		goto send_pkt;
-	}
-
-	if (qdf_unlikely(vdev->wrap_vdev)) {
-		/* In the case of qwrap repeater send the original
-		 * packet on the interface where it received,
-		 * packet with dummy src on the mcast primary interface.
+	if (qdf_unlikely(dp_rx_mlo_igmp_wds_ext_handler(peer))) {
+		/* send the IGMP to the netdev corresponding to the interface
+		 * its received on
 		 */
-		qdf_nbuf_t nbuf_copy;
-
-		nbuf_copy = qdf_nbuf_copy(nbuf);
-		if (qdf_likely(nbuf_copy))
-			dp_rx_deliver_to_stack(soc, vdev, peer, nbuf_copy,
-					       NULL);
+		goto send_pkt;
 	}
+
+	if (dp_rx_check_ext_hybrid_mode(soc, vdev)) {
+		/* send the IGMP to the netdev corresponding to the interface
+		 * its received on
+		 */
+		goto send_pkt;
+	}
+
+	/*
+	 * In the case of ME5/ME6, Backhaul WDS for a mld peer, NAWDS,
+	 * legacy non-mlo AP vdev & non-AP vdev(which is very unlikely),
+	 * send the igmp pkt on the same link where it received, as these
+	 *  features will use peer based tcl metadata.
+	 */
+	if (vdev->mcast_enhancement_en ||
+	    peer->is_mld_peer ||
+	    peer->nawds_enabled ||
+	    !vdev->mlo_vdev ||
+	    qdf_unlikely(wlan_op_mode_ap != vdev->opmode)) {
+		/* send the IGMP to the netdev corresponding to the interface
+		 * its received on
+		 */
+		goto send_pkt;
+	}
+
+	/* We are here, it means a legacy non-wds sta is connected
+	 * to a hybrid mld ap, So send a clone of the IGPMP packet
+	 * on the interface where it was received.
+	 */
+	nbuf_copy = qdf_nbuf_copy(nbuf);
+	if (qdf_likely(nbuf_copy))
+		dp_rx_deliver_to_stack(soc, vdev, peer, nbuf_copy, NULL);
 
 	dp_rx_dummy_src_mac(vdev, nbuf);
-	dp_rx_deliver_to_stack(mcast_primary_vdev->pdev->soc,
-			       mcast_primary_vdev,
-			       peer,
-			       nbuf,
-			       NULL);
-	dp_vdev_unref_delete(mcast_primary_vdev->pdev->soc,
-			     mcast_primary_vdev,
-			     DP_MOD_ID_RX);
-	return true;
+	/* Set the ml peer valid bit in skb peer metadata, so that osif
+	 * can deliver the SA mangled IGMP packet to mld netdev.
+	 */
+	QDF_NBUF_CB_RX_SET_ML_PEER_VALID(nbuf);
+	/* Deliver the original IGMP with dummy src on the mld netdev */
 send_pkt:
 	dp_rx_deliver_to_stack(be_vdev->vdev.pdev->soc,
 			       &be_vdev->vdev,
