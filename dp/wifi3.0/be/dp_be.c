@@ -2790,6 +2790,9 @@ void dp_initialize_arch_ops_be(struct dp_arch_ops *arch_ops)
 	arch_ops->txrx_get_vdev_mcast_param = dp_txrx_get_vdev_mcast_param_be;
 	arch_ops->dp_get_vdev_stats_for_unmap_peer =
 					dp_get_vdev_stats_for_unmap_peer_be;
+#ifdef WLAN_MLO_MULTI_CHIP
+	arch_ops->dp_get_interface_stats = dp_get_interface_stats_be;
+#endif
 	dp_initialize_arch_ops_be_ipa(arch_ops);
 	dp_initialize_arch_ops_be_single_dev(arch_ops);
 }

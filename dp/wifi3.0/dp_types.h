@@ -2224,6 +2224,7 @@ enum dp_context_type {
  * @dp_rx_wbm_err_reap_desc: Reap WBM Error Ring Descriptor
  * @dp_rx_null_q_desc_handle: Handle Null Queue Exception Error
  * @dp_get_vdev_stats_for_unmap_peer: Get vdev stats pointer for unmap peer
+ * @dp_get_interface_stats: Get interface stats
  * @ppeds_handle_attached:
  * @txrx_soc_ppeds_interrupt_stop:
  * @txrx_soc_ppeds_interrupt_start:
@@ -2462,6 +2463,10 @@ struct dp_arch_ops {
 					struct dp_vdev *vdev,
 					struct dp_peer *peer,
 					struct cdp_vdev_stats **vdev_stats);
+	QDF_STATUS (*dp_get_interface_stats)(struct cdp_soc_t *soc_hdl,
+					     uint8_t vdev_id,
+					     void *buf,
+					     bool is_aggregate);
 #ifdef WLAN_SUPPORT_PPEDS
 	void (*txrx_soc_ppeds_interrupt_stop)(struct dp_soc *soc);
 	void (*txrx_soc_ppeds_interrupt_start)(struct dp_soc *soc);
