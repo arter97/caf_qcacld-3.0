@@ -1275,6 +1275,9 @@ QDF_STATUS __scm_handle_bcn_probe(struct scan_bcn_probe_event *bcn)
 				continue;
 			}
 		}
+
+		scan_entry->non_intersected_phymode = scan_entry->phy_mode;
+
 		if (scan_obj->cb.update_beacon)
 			scan_obj->cb.update_beacon(pdev, scan_entry);
 

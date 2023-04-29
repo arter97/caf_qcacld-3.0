@@ -595,6 +595,7 @@ struct ml_info {
  * @raw_frame: contain raw frame and the length of the raw frame
  * @pdev_id: pdev id
  * @ml_info: Multi link information
+ * @non_intersected_phymode: Non intersected phy mode of the AP
  */
 struct scan_cache_entry {
 	uint8_t frm_subtype;
@@ -648,6 +649,7 @@ struct scan_cache_entry {
 #ifdef WLAN_FEATURE_11BE_MLO
 	struct ml_info ml_info;
 #endif
+	enum wlan_phymode non_intersected_phymode;
 };
 
 #define MAX_FAVORED_BSSID 16
