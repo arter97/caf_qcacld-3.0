@@ -177,6 +177,43 @@ void qca_sawf_peer_config_ul(uint8_t *mac_addr, uint8_t tid,
 				      WLAN_SAWF_ID);
 }
 
+struct psoc_sawf_dl_itr {
+	uint8_t *mac_addr;
+	uint8_t svc_id;
+	uint8_t direction;
+	uint8_t start_or_stop;
+	uint8_t peer_mac_addr[QDF_MAC_ADDR_SIZE];
+};
+
+static void
+qca_sawf_psoc_flow_count_cb(struct wlan_objmgr_psoc *psoc, void *cbd,
+			    uint8_t index)
+{
+	ol_txrx_soc_handle soc_txrx_handle;
+	struct psoc_sawf_dl_itr *param = (struct psoc_sawf_dl_itr *)cbd;
+
+	soc_txrx_handle = wlan_psoc_get_dp_handle(psoc);
+	cdp_sawf_peer_flow_count(soc_txrx_handle, param->mac_addr,
+				 param->svc_id, param->direction,
+				 param->start_or_stop,
+				 param->peer_mac_addr);
+}
+
+static inline
+void qca_sawf_peer_dl_flow_count(uint8_t *mac_addr, uint8_t svc_id,
+				 uint8_t start_or_stop)
+{
+	struct psoc_sawf_dl_itr param = {
+		.mac_addr = mac_addr,
+		.svc_id = svc_id,
+		.direction = 1, /* DL */
+		.start_or_stop = start_or_stop,
+	};
+
+	wlan_objmgr_iterate_psoc_list(qca_sawf_psoc_flow_count_cb, &param,
+				      WLAN_SAWF_ID);
+}
+
 void qca_sawf_config_ul(uint8_t *dst_mac, uint8_t *src_mac,
 			uint8_t fw_service_id, uint8_t rv_service_id,
 			uint8_t add_or_sub)
@@ -218,6 +255,12 @@ void qca_sawf_config_ul(uint8_t *dst_mac, uint8_t *src_mac,
 						min_tput, max_latency,
 						add_or_sub);
 	}
+
+	if (wlan_service_id_valid(fw_service_id))
+		qca_sawf_peer_dl_flow_count(dst_mac, fw_service_id, add_or_sub);
+
+	if (wlan_service_id_valid(rv_service_id))
+		qca_sawf_peer_dl_flow_count(src_mac, rv_service_id, add_or_sub);
 }
 
 void qca_sawf_connection_sync(struct qca_sawf_connection_sync_param *params)
