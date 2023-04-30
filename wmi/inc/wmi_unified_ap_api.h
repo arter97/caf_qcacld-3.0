@@ -1020,6 +1020,20 @@ QDF_STATUS
 wmi_unified_soc_tqm_reset_enable_disable_cmd(wmi_unified_t wmi_handle,
 					     uint32_t enable);
 
+/**
+ * wmi_unified_set_peer_disable_mode() - set peer disabled modes
+ * @wmi_handle: wmi handle
+ * @peer_mac: peer mac address
+ * @pdev_id: pdev id
+ * @disabled_modes: disabled modes
+ *
+ * Return: QDF_STATUS_SUCCESS for success or error code
+ */
+QDF_STATUS
+wmi_unified_set_peer_disable_mode(wmi_unified_t wmi_handle,
+				  uint8_t *peer_mac,
+				  uint8_t pdev_id,
+				  uint32_t disabled_modes);
 #ifdef CONFIG_SAWF_DEF_QUEUES
 /**
  * wmi_unified_set_rate_upper_cap_cmd_send() - set rate upper cap cmd
