@@ -1000,6 +1000,25 @@ static void dp_ppeds_tx_desc_pool_deinit(struct dp_soc *soc)
 }
 
 /**
+ * dp_tx_borrow_tx_desc() - API to borrow tx descs from regular pool
+ * @be_soc: SoC
+ *
+ * Borrow Tx descs from regular pool when DS Tx desc pool is empty
+ *
+ * Return: tx descriptor
+ */
+static inline
+struct dp_tx_desc_s *dp_tx_borrow_tx_desc(struct dp_soc *soc)
+{
+	struct dp_tx_desc_s *tx_desc = dp_tx_desc_alloc(soc, qdf_get_cpu());
+
+	if (tx_desc)
+		tx_desc->flags = 0;
+
+	return tx_desc;
+}
+
+/**
  * dp_ppeds_tx_desc_alloc() - PPE DS tx desc alloc
  * @be_soc: SoC
  *
@@ -1017,6 +1036,7 @@ struct dp_tx_desc_s *dp_ppeds_tx_desc_alloc(struct dp_soc_be *be_soc)
 
 	if (pool->hotlist) {
 		tx_desc = pool->hotlist;
+		tx_desc->flags = 0;
 		pool->hotlist = pool->hotlist->next;
 		pool->hot_list_len--;
 		if (pool->hot_list_len)
@@ -1028,17 +1048,23 @@ struct dp_tx_desc_s *dp_ppeds_tx_desc_alloc(struct dp_soc_be *be_soc)
 
 		/* Pool is exhausted */
 		if (!tx_desc) {
-			TX_DESC_LOCK_UNLOCK(&pool->lock);
-			return NULL;
-		}
 
-		pool->freelist = pool->freelist->next;
-		dp_tx_prefetch_desc(pool->freelist);
-		pool->num_allocated++;
-		pool->num_free--;
+			/* Try to borrow from regular tx desc pools */
+			tx_desc = dp_tx_borrow_tx_desc(&be_soc->soc);
+			if (!tx_desc) {
+				TX_DESC_LOCK_UNLOCK(&pool->lock);
+				return NULL;
+			}
+		} else {
+			tx_desc->flags = 0;
+			pool->freelist = pool->freelist->next;
+			dp_tx_prefetch_desc(pool->freelist);
+			pool->num_allocated++;
+			pool->num_free--;
+		}
 	}
 
-	tx_desc->flags = DP_TX_DESC_FLAG_ALLOCATED;
+	tx_desc->flags |= DP_TX_DESC_FLAG_ALLOCATED;
 	tx_desc->flags |= DP_TX_DESC_FLAG_PPEDS;
 
 	TX_DESC_LOCK_UNLOCK(&pool->lock);
@@ -1107,16 +1133,7 @@ uint32_t dp_ppeds_get_batched_tx_desc(ppe_ds_wlan_handle_t *ppeds_handle,
 	struct dp_tx_desc_s *tx_desc;
 	struct dp_soc *soc = *((struct dp_soc **)ppe_ds_wlan_priv(ppeds_handle));
 	struct dp_soc_be *be_soc = dp_get_be_soc_from_dp_soc(soc);
-	struct dp_ppeds_tx_desc_pool_s *pool = &be_soc->ppeds_tx_desc;
 	qdf_dma_addr_t paddr;
-
-	/*
-	 * If the tx desc pool is empty, we need to return.
-	 */
-	if (!pool->freelist && !pool->hotlist) {
-		dp_err("ran out of txdesc");
-		return 0;
-	}
 
 	for (i = 0; i < num_buff_req; i++) {
 		qdf_nbuf_t nbuf = NULL;
