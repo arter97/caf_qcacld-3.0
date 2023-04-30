@@ -6928,6 +6928,7 @@ static QDF_STATUS send_unified_ll_stats_get_sta_cmd_tlv(
 					 WMI_REQUEST_PEER_STAT |
 					 WMI_REQUEST_VDEV_STAT |
 					 WMI_REQUEST_PDEV_STAT |
+					 WMI_REQUEST_VDEV_EXTD_STAT |
 					 WMI_REQUEST_PEER_EXTD2_STAT |
 					 WMI_REQUEST_RSSI_PER_CHAIN_STAT);
 	unified_cmd->pdev_id = wmi_handle->ops->convert_pdev_id_host_to_target(
@@ -13692,6 +13693,45 @@ static QDF_STATUS extract_bcn_stats_tlv(wmi_unified_t wmi_handle,
 	return QDF_STATUS_SUCCESS;
 }
 
+#ifdef WLAN_FEATURE_11BE_MLO
+/**
+ * wmi_is_mlo_vdev_active() - get if mlo vdev is active or not
+ * @flag: vdev link status info
+ *
+ * Return: True if active, else False
+ */
+static bool wmi_is_mlo_vdev_active(uint32_t flag)
+{
+	if ((flag & WMI_VDEV_STATS_FLAGS_LINK_ACTIVE_FLAG_IS_VALID_MASK) &&
+	    (flag & WMI_VDEV_STATS_FLAGS_IS_LINK_ACTIVE_MASK))
+		return true;
+
+	return false;
+}
+
+static QDF_STATUS
+extract_mlo_vdev_status_info(WMI_UPDATE_STATS_EVENTID_param_tlvs *param_buf,
+			     wmi_vdev_extd_stats *ev,
+			     struct wmi_host_vdev_prb_fils_stats *vdev_stats)
+{
+	if (!param_buf->num_vdev_extd_stats) {
+		wmi_err("No vdev_extd_stats in the event buffer");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	vdev_stats->is_mlo_vdev_active = wmi_is_mlo_vdev_active(ev->flags);
+	return QDF_STATUS_SUCCESS;
+}
+#else
+static QDF_STATUS
+extract_mlo_vdev_status_info(WMI_UPDATE_STATS_EVENTID_param_tlvs *param_buf,
+			     wmi_vdev_extd_stats *ev,
+			     struct wmi_host_vdev_prb_fils_stats *vdev_stats)
+{
+	return QDF_STATUS_SUCCESS;
+}
+#endif
+
 /**
  * extract_vdev_prb_fils_stats_tlv() - extract vdev probe and fils
  * stats from event
@@ -13709,6 +13749,7 @@ extract_vdev_prb_fils_stats_tlv(wmi_unified_t wmi_handle,
 {
 	WMI_UPDATE_STATS_EVENTID_param_tlvs *param_buf;
 	wmi_vdev_extd_stats *ev;
+	QDF_STATUS status = QDF_STATUS_SUCCESS;
 
 	param_buf = (WMI_UPDATE_STATS_EVENTID_param_tlvs *)evt_buf;
 
@@ -13722,13 +13763,15 @@ extract_vdev_prb_fils_stats_tlv(wmi_unified_t wmi_handle,
 			ev->unsolicited_prb_succ_cnt;
 		vdev_stats->unsolicited_prb_fail_cnt =
 			ev->unsolicited_prb_fail_cnt;
+		status = extract_mlo_vdev_status_info(param_buf, ev,
+						      vdev_stats);
 		wmi_debug("vdev: %d, fd_s: %d, fd_f: %d, prb_s: %d, prb_f: %d",
 			 ev->vdev_id, ev->fd_succ_cnt, ev->fd_fail_cnt,
 			 ev->unsolicited_prb_succ_cnt,
 			 ev->unsolicited_prb_fail_cnt);
 	}
 
-	return QDF_STATUS_SUCCESS;
+	return status;
 }
 
 /**
