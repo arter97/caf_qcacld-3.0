@@ -6366,6 +6366,7 @@ typedef enum {
 #ifdef WLAN_FEATURE_11BE_MLO
 	wmi_service_mlo_tsf_sync,
 	wmi_service_n_link_mlo_support,
+	wmi_service_per_link_stats_support,
 #endif
 	wmi_services_max,
 } wmi_conv_service_ids;

@@ -22335,6 +22335,8 @@ static void populate_tlv_service(uint32_t *wmi_service)
 	wmi_service[wmi_service_mlo_tsf_sync] = WMI_SERVICE_MLO_TSF_SYNC;
 	wmi_service[wmi_service_n_link_mlo_support] =
 			WMI_SERVICE_N_LINK_MLO_SUPPORT;
+	wmi_service[wmi_service_per_link_stats_support] =
+					WMI_SERVICE_PER_LINK_STATS_SUPPORT;
 #endif
 }
 
