@@ -883,44 +883,103 @@ scm_find_duplicate(struct wlan_objmgr_pdev *pdev,
 }
 
 /*
- * Buffer len size to conside the 8 char for MLD print, 17 char MLD address
- * 3 char for space and 3 char for number of link.
+ * Buffer len size to add the dynamic scan frame debug info
+ * 7 (pdev id) + 21 (security info) + 8 (hidden info) + 15 (chan mismatch) +
+ * 8 (CSA IE info) + 31 (ML info) + 5 extra
  */
-#define ML_MAX_CHAR_LENGTH 32
+#define SCAN_DUMP_MAX_LEN 95
 
 #ifdef WLAN_FEATURE_11BE_MLO
 /**
  * scm_dump_ml_scan_info(): Dump ml scan info
  * @scan_params: new received entry
- * @int_ctx_str: Buffer pointer
+ * @log_str: Buffer pointer
+ * @str_len: max string length
+ * @len: already filled length in buffer
  *
- * Return: void
+ * Return: length filled in buffer
  */
-static void scm_dump_ml_scan_info(struct scan_cache_entry *scan_params,
-				  char *int_ctx_str)
+static uint32_t scm_dump_ml_scan_info(struct scan_cache_entry *scan_params,
+				      char *log_str, uint32_t str_len,
+				      uint32_t len)
 {
-	char *buf;
-	int buf_len;
-
-	buf = int_ctx_str;
-	buf_len = ML_MAX_CHAR_LENGTH;
-
 	/* Scenario: When both STA and AP support ML then
 	 * Driver will fill ml_info structure and print the MLD address and no.
 	 * of links.
 	 */
-	if (!qdf_is_macaddr_zero(&scan_params->ml_info.mld_mac_addr))
-		qdf_scnprintf(buf, buf_len,
-			      "MLD " QDF_MAC_ADDR_FMT " links %d",
-			      QDF_MAC_ADDR_REF(scan_params->ml_info.mld_mac_addr.bytes),
-			      scan_params->ml_info.num_links);
+	if (qdf_is_macaddr_zero(&scan_params->ml_info.mld_mac_addr))
+		return 0;
+
+	return qdf_scnprintf(log_str + len, str_len - len,
+		", MLD " QDF_MAC_ADDR_FMT " links %d",
+		QDF_MAC_ADDR_REF(scan_params->ml_info.mld_mac_addr.bytes),
+		scan_params->ml_info.num_links);
 }
 #else
-static void scm_dump_ml_scan_info(struct scan_cache_entry *scan_params,
-				  char *int_ctx_str)
+static uint32_t scm_dump_ml_scan_info(struct scan_cache_entry *scan_params,
+				      char *log_str, uint32_t str_len,
+				      uint32_t len)
 {
+	return 0;
 }
 #endif
+
+static void scm_dump_scan_entry(struct wlan_objmgr_pdev *pdev,
+				struct scan_cache_entry *scan_params)
+{
+	uint8_t security_type;
+	char log_str[SCAN_DUMP_MAX_LEN] = {0};
+	uint32_t str_len = SCAN_DUMP_MAX_LEN;
+	uint8_t pdev_id = wlan_objmgr_pdev_get_pdev_id(pdev);
+	uint32_t len = 0;
+
+	/* Add pdev_id if its non zero */
+	if (pdev_id)
+		len += qdf_scnprintf(log_str + len, str_len - len,
+				     "pdev %d ", pdev_id);
+
+	/* Add WPA/RSN/WAPI/WEP info if its non zero */
+	security_type = scan_params->security_type;
+	if (security_type)
+		len += qdf_scnprintf(log_str + len, str_len - len,
+				     "%s%s%s%s",
+				     security_type & SCAN_SECURITY_TYPE_WPA ?
+				     "[WPA]" : "",
+				     security_type & SCAN_SECURITY_TYPE_RSN ?
+				     "[RSN]" : "",
+				     security_type & SCAN_SECURITY_TYPE_WAPI ?
+				     "[WAPI]" : "",
+				     security_type & SCAN_SECURITY_TYPE_WEP ?
+				     "[WEP]" : "");
+
+	/* Add hidden info if present */
+	if (scan_params->is_hidden_ssid)
+		len += qdf_scnprintf(log_str + len, str_len - len, "[hidden]");
+
+	/* Add channel mismatch info if present */
+	if (scan_params->channel_mismatch)
+		len += qdf_scnprintf(log_str + len, str_len - len,
+				     "[Chan mismatch]");
+
+	/* Add CSA IE info if present */
+	if (scan_params->ie_list.csa ||
+	    scan_params->ie_list.xcsa ||
+	    scan_params->ie_list.cswrp)
+		len += qdf_scnprintf(log_str + len, str_len - len, "[CSA IE]");
+
+	/* Add ML info */
+	len += scm_dump_ml_scan_info(scan_params, log_str, str_len, len);
+
+	scm_nofl_debug("Rcvd %s(%d): " QDF_MAC_ADDR_FMT " \"" QDF_SSID_FMT "\" freq %d rssi %d tsf %u seq %d snr %d phy %d %s",
+		       (scan_params->frm_subtype == MGMT_SUBTYPE_PROBE_RESP) ?
+		       "prb rsp" : "bcn", scan_params->raw_frame.len,
+		       QDF_MAC_ADDR_REF(scan_params->bssid.bytes),
+		       QDF_SSID_REF(scan_params->ssid.length,
+				    scan_params->ssid.ssid),
+		       scan_params->channel.chan_freq, scan_params->rssi_raw,
+		       scan_params->tsf_delta, scan_params->seq_num,
+		       scan_params->snr, scan_params->phy_mode, log_str);
+}
 
 /**
  * scm_add_update_entry() - add or update scan entry
@@ -939,8 +998,6 @@ static QDF_STATUS scm_add_update_entry(struct wlan_objmgr_psoc *psoc,
 	QDF_STATUS status;
 	struct scan_dbs *scan_db;
 	struct wlan_scan_obj *scan_obj;
-	uint8_t security_type;
-	char *int_ctx_str = NULL;
 
 	scan_db = wlan_pdev_get_scan_db(psoc, pdev);
 	if (!scan_db) {
@@ -959,42 +1016,10 @@ static QDF_STATUS scm_add_update_entry(struct wlan_objmgr_psoc *psoc,
 	   !scan_params->ie_list.ssid)
 		scm_debug("Probe resp doesn't contain SSID");
 
-
-	if (scan_params->ie_list.csa ||
-	   scan_params->ie_list.xcsa ||
-	   scan_params->ie_list.cswrp)
-		scm_debug("CSA IE present for BSSID: "QDF_MAC_ADDR_FMT,
-			  QDF_MAC_ADDR_REF(scan_params->bssid.bytes));
-
 	is_dup_found = scm_find_duplicate(pdev, scan_obj, scan_db, scan_params,
 					  &dup_node);
 
-	security_type = scan_params->security_type;
-	int_ctx_str = qdf_mem_malloc(ML_MAX_CHAR_LENGTH);
-	if (!int_ctx_str)
-		return QDF_STATUS_E_INVAL;
-
-	scm_dump_ml_scan_info(scan_params, int_ctx_str);
-
-	scm_nofl_debug("Received %s: " QDF_MAC_ADDR_FMT " \"" QDF_SSID_FMT "\" freq %d rssi %d tsf_delta %u seq %d snr %d phy %d hidden %d mismatch %d %s%s%s%s pdev %d boot_time %llu ns %s",
-		       (scan_params->frm_subtype == MGMT_SUBTYPE_PROBE_RESP) ?
-		       "prb rsp" : "bcn",
-		       QDF_MAC_ADDR_REF(scan_params->bssid.bytes),
-		       QDF_SSID_REF(scan_params->ssid.length,
-				    scan_params->ssid.ssid),
-		       scan_params->channel.chan_freq, scan_params->rssi_raw,
-		       scan_params->tsf_delta, scan_params->seq_num,
-		       scan_params->snr, scan_params->phy_mode,
-		       scan_params->is_hidden_ssid,
-		       scan_params->channel_mismatch,
-		       security_type & SCAN_SECURITY_TYPE_WPA ? "[WPA]" : "",
-		       security_type & SCAN_SECURITY_TYPE_RSN ? "[RSN]" : "",
-		       security_type & SCAN_SECURITY_TYPE_WAPI ? "[WAPI]" : "",
-		       security_type & SCAN_SECURITY_TYPE_WEP ? "[WEP]" : "",
-		       wlan_objmgr_pdev_get_pdev_id(pdev),
-		       scan_params->boottime_ns, int_ctx_str);
-
-	qdf_mem_free(int_ctx_str);
+	scm_dump_scan_entry(pdev, scan_params);
 
 	if (scan_obj->cb.inform_beacon)
 		scan_obj->cb.inform_beacon(pdev, scan_params);
