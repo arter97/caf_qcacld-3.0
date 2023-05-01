@@ -232,7 +232,7 @@ enum diag_tx_status wlan_get_diag_tx_status(enum qdf_dp_tx_rx_status tx_status);
 #define MAX_QDF_DP_TRACE_RECORDS       2000
 #endif
 
-#define QDF_DP_TRACE_RECORD_SIZE       50 /* bytes */
+#define QDF_DP_TRACE_RECORD_SIZE       66 /* bytes */
 #define INVALID_QDF_DP_TRACE_ADDR      0xffffffff
 #define QDF_DP_TRACE_VERBOSITY_HIGH		4
 #define QDF_DP_TRACE_VERBOSITY_MEDIUM		3
