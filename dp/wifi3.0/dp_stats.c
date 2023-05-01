@@ -7289,6 +7289,16 @@ void dp_txrx_path_stats(struct dp_soc *soc)
 			       pdev->stats.tx_i.dropped.dma_error);
 		DP_PRINT_STATS("Drop Ingress: %u",
 			       pdev->stats.tx_i.dropped.drop_ingress);
+		DP_PRINT_STATS("Resources full: %u",
+			       pdev->stats.tx_i.dropped.res_full);
+		DP_PRINT_STATS("Headroom insufficient: %u",
+			       pdev->stats.tx_i.dropped.headroom_insufficient);
+		DP_PRINT_STATS("Invalid peer id in exception path: %u",
+			       pdev->stats.tx_i.dropped.invalid_peer_id_in_exc_path);
+		DP_PRINT_STATS("Tx Mcast Drop: %u",
+			       pdev->stats.tx_i.dropped.tx_mcast_drop);
+		DP_PRINT_STATS("FW2WBM Tx Drop: %u",
+			       pdev->stats.tx_i.dropped.fw2wbm_tx_drop);
 
 		DP_PRINT_STATS("Dropped in hardware:");
 		DP_PRINT_STATS("total packets dropped: %u",
