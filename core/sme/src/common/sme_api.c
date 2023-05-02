@@ -16339,12 +16339,10 @@ bool sme_is_11be_capable(void)
 
 QDF_STATUS sme_send_set_mac_addr(struct qdf_mac_addr mac_addr,
 				 struct qdf_mac_addr mld_addr,
-				 struct wlan_objmgr_vdev *vdev,
-				 bool update_mld_addr)
+				 struct wlan_objmgr_vdev *vdev)
 {
 	enum QDF_OPMODE vdev_opmode;
-	struct qdf_mac_addr vdev_mac_addr = mac_addr;
-	QDF_STATUS qdf_ret_status;
+	QDF_STATUS status;
 	struct vdev_mlme_obj *vdev_mlme;
 
 	if (!vdev) {
@@ -16355,26 +16353,14 @@ QDF_STATUS sme_send_set_mac_addr(struct qdf_mac_addr mac_addr,
 	vdev_opmode = wlan_vdev_mlme_get_opmode(vdev);
 
 	if (vdev_opmode == QDF_P2P_DEVICE_MODE) {
-		qdf_ret_status = wma_p2p_self_peer_remove(vdev);
-		if (QDF_IS_STATUS_ERROR(qdf_ret_status))
-			return qdf_ret_status;
+		status = wma_p2p_self_peer_remove(vdev);
+		if (QDF_IS_STATUS_ERROR(status))
+			return status;
 	}
 
-	if (sme_is_11be_capable() && update_mld_addr) {
-		/* Set new MAC addr as MLD address incase of MLO */
-		mld_addr = mac_addr;
-		if (vdev_opmode == QDF_STA_MODE) {
-			qdf_mem_copy(&vdev_mac_addr,
-				     wlan_vdev_mlme_get_linkaddr(vdev),
-				     sizeof(struct qdf_mac_addr));
-		}
-	}
-
-	qdf_ret_status = wlan_vdev_mlme_send_set_mac_addr(vdev_mac_addr,
-							  mld_addr, vdev);
-
-	if (QDF_IS_STATUS_SUCCESS(qdf_ret_status))
-		return qdf_ret_status;
+	status = wlan_vdev_mlme_send_set_mac_addr(mac_addr, mld_addr, vdev);
+	if (QDF_IS_STATUS_SUCCESS(status))
+		return status;
 
 	/**
 	 * Failed to send set MAC address command to FW. Create P2P self peer
@@ -16387,10 +16373,10 @@ QDF_STATUS sme_send_set_mac_addr(struct qdf_mac_addr mac_addr,
 			return QDF_STATUS_E_INVAL;
 		}
 
-		qdf_ret_status = wma_vdev_self_peer_create(vdev_mlme);
-		if (QDF_IS_STATUS_ERROR(qdf_ret_status)) {
+		status = wma_vdev_self_peer_create(vdev_mlme);
+		if (QDF_IS_STATUS_ERROR(status)) {
 			sme_nofl_err("Failed to create self peer for P2P device mode. Status:%d",
-				     qdf_ret_status);
+				     status);
 			return QDF_STATUS_E_INVAL;
 		}
 	}
@@ -16398,22 +16384,20 @@ QDF_STATUS sme_send_set_mac_addr(struct qdf_mac_addr mac_addr,
 	return QDF_STATUS_E_INVAL;
 }
 
-QDF_STATUS sme_update_vdev_mac_addr(struct wlan_objmgr_psoc *psoc,
+QDF_STATUS sme_update_vdev_mac_addr(struct wlan_objmgr_vdev *vdev,
 				    struct qdf_mac_addr mac_addr,
-				    struct wlan_objmgr_vdev *vdev,
+				    struct qdf_mac_addr mld_addr,
 				    bool update_sta_self_peer,
 				    bool update_mld_addr, int req_status)
 {
 	enum QDF_OPMODE vdev_opmode;
-	uint8_t *old_mac_addr_bytes;
+	uint8_t *old_macaddr, *new_macaddr;
 	QDF_STATUS qdf_ret_status;
 	struct wlan_objmgr_peer *peer;
 	struct vdev_mlme_obj *vdev_mlme;
+	struct wlan_objmgr_psoc *psoc;
 
-	if (!vdev) {
-		sme_err("Invalid VDEV");
-		return QDF_STATUS_E_INVAL;
-	}
+	psoc = wlan_vdev_get_psoc(vdev);
 
 	vdev_opmode = wlan_vdev_mlme_get_opmode(vdev);
 
@@ -16421,17 +16405,20 @@ QDF_STATUS sme_update_vdev_mac_addr(struct wlan_objmgr_psoc *psoc,
 		goto p2p_self_peer_create;
 
 	if (vdev_opmode == QDF_STA_MODE && update_sta_self_peer) {
-		if (sme_is_11be_capable() && update_mld_addr)
-			old_mac_addr_bytes = wlan_vdev_mlme_get_mldaddr(vdev);
-		else
-			old_mac_addr_bytes = wlan_vdev_mlme_get_macaddr(vdev);
+		if (sme_is_11be_capable() && update_mld_addr) {
+			old_macaddr = wlan_vdev_mlme_get_mldaddr(vdev);
+			new_macaddr = mld_addr.bytes;
+		} else {
+			old_macaddr = wlan_vdev_mlme_get_macaddr(vdev);
+			new_macaddr = mac_addr.bytes;
+		}
 
 		/* Update self peer MAC address */
-		peer = wlan_objmgr_get_peer_by_mac(psoc, old_mac_addr_bytes,
+		peer = wlan_objmgr_get_peer_by_mac(psoc, old_macaddr,
 						   WLAN_MLME_NB_ID);
 		if (peer) {
-			qdf_ret_status = wlan_peer_update_macaddr(
-							peer, mac_addr.bytes);
+			qdf_ret_status = wlan_peer_update_macaddr(peer,
+								  new_macaddr);
 			wlan_objmgr_peer_release_ref(peer, WLAN_MLME_NB_ID);
 			if (QDF_IS_STATUS_ERROR(qdf_ret_status)) {
 				sme_nofl_err("Failed to update self peer MAC address. Status:%d",
@@ -16441,7 +16428,7 @@ QDF_STATUS sme_update_vdev_mac_addr(struct wlan_objmgr_psoc *psoc,
 		} else {
 			sme_err("Self peer not found with MAC addr:"
 				QDF_MAC_ADDR_FMT,
-				QDF_MAC_ADDR_REF(old_mac_addr_bytes));
+				QDF_MAC_ADDR_REF(old_macaddr));
 				return QDF_STATUS_E_INVAL;
 		}
 	}
@@ -16452,22 +16439,14 @@ QDF_STATUS sme_update_vdev_mac_addr(struct wlan_objmgr_psoc *psoc,
 			qdf_ret_status = wlan_mlo_mgr_update_mld_addr(
 					    (struct qdf_mac_addr *)
 					       wlan_vdev_mlme_get_mldaddr(vdev),
-					    &mac_addr);
+					    &mld_addr);
 			if (QDF_IS_STATUS_ERROR(qdf_ret_status))
 				return qdf_ret_status;
 		}
-		wlan_vdev_mlme_set_mldaddr(vdev, mac_addr.bytes);
-		/* Currently the design is to use same MAC for
-		 * MLD and Link for SAP so update link and MAC addr.
-		 */
-		if (vdev_opmode == QDF_SAP_MODE) {
-			wlan_vdev_mlme_set_macaddr(vdev, mac_addr.bytes);
-			wlan_vdev_mlme_set_linkaddr(vdev, mac_addr.bytes);
-		}
-	} else {
-		wlan_vdev_mlme_set_macaddr(vdev, mac_addr.bytes);
-		wlan_vdev_mlme_set_linkaddr(vdev, mac_addr.bytes);
+		wlan_vdev_mlme_set_mldaddr(vdev, mld_addr.bytes);
 	}
+	wlan_vdev_mlme_set_macaddr(vdev, mac_addr.bytes);
+	wlan_vdev_mlme_set_linkaddr(vdev, mac_addr.bytes);
 
 p2p_self_peer_create:
 	if (vdev_opmode == QDF_P2P_DEVICE_MODE) {

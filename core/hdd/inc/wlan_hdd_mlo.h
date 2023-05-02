@@ -151,6 +151,15 @@ void hdd_adapter_set_ml_adapter(struct hdd_adapter *adapter);
 void hdd_adapter_set_sl_ml_adapter(struct hdd_adapter *adapter);
 
 /**
+ * hdd_adapter_clear_sl_ml_adapter() - Set adapter as sl ml adapter
+ * @adapter: HDD adapter
+ *
+ * This function clears adapter single link ML adapter flag
+ * Return: None
+ */
+void hdd_adapter_clear_sl_ml_adapter(struct hdd_adapter *adapter);
+
+/**
  * hdd_get_ml_adapter() - get an ml adapter
  * @hdd_ctx: HDD context
  *
@@ -263,6 +272,11 @@ hdd_adapter_set_ml_adapter(struct hdd_adapter *adapter)
 
 static inline void
 hdd_adapter_set_sl_ml_adapter(struct hdd_adapter *adapter)
+{
+}
+
+static inline void
+hdd_adapter_clear_sl_ml_adapter(struct hdd_adapter *adapter)
 {
 }
 

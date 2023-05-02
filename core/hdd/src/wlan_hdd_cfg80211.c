@@ -202,6 +202,7 @@
 #include <utils_mlo.h>
 #include "wlan_mlo_mgr_roam.h"
 #include "wlan_hdd_mlo.h"
+#include <wlan_psoc_mlme_ucfg_api.h>
 
 /*
  * A value of 100 (milliseconds) can be sent to FW.
@@ -20729,79 +20730,43 @@ static bool hdd_is_ap_mode(enum QDF_OPMODE mode)
 	}
 }
 
-/**
- * hdd_adapter_update_mac_on_mode_change() - Update mac address on mode change
- * @adapter: HDD adapter
- * @get_new_addr: Get new address or release existing address
- *
- * If @get_new_addr is false, the function will release the MAC address
- * in the adapter's mac_addr member and copy the MLD address into it.
- *
- * If @get_new_addr is true, the function will override MAC address
- * in the adapter's mac_addr member and copy the new MAc address
- * fetched from the MAC address pool.
- *
- * The MLD address is not changed in this function.
- *
- * Return: void
- */
+#if defined(WLAN_FEATURE_11BE_MLO) && defined(CFG80211_11BE_BASIC)
 static QDF_STATUS
-hdd_adapter_update_mac_on_mode_change(struct hdd_adapter *adapter,
-				      bool get_new_addr)
+hdd_adapter_update_mac_on_mode_change(struct hdd_adapter *adapter)
 {
-	uint8_t *new_mac;
-	bool is_mac_equal;
-	struct hdd_adapter *assoc_adapter;
-	struct qdf_mac_addr *assoc_mac;
+	int i;
 	QDF_STATUS status;
+	struct hdd_adapter *link_adapter;
+	struct hdd_mlo_adapter_info *mlo_adapter_info;
+	struct hdd_context *hdd_ctx = adapter->hdd_ctx;
+	struct qdf_mac_addr link_addr[WLAN_MAX_MLD] = {0};
 
-	if (!adapter || !hdd_adapter_is_ml_adapter(adapter))
-		return QDF_STATUS_SUCCESS;
+	status = hdd_derive_link_address_from_mld(&adapter->mld_addr,
+						  &link_addr[0],
+						  WLAN_MAX_MLD);
+	if (QDF_IS_STATUS_ERROR(status))
+		return status;
 
-	assoc_adapter = hdd_get_assoc_link_adapter(adapter);
-	if (!assoc_adapter || qdf_is_macaddr_zero(&assoc_adapter->mld_addr))
-		return QDF_STATUS_E_INVAL;
+	mlo_adapter_info = &adapter->mlo_adapter_info;
+	for (i = 0; i < WLAN_MAX_MLD; i++) {
+		link_adapter = mlo_adapter_info->link_adapter[i];
+		if (!link_adapter)
+			continue;
 
-	assoc_mac = &assoc_adapter->mac_addr;
-
-	is_mac_equal = qdf_is_macaddr_equal(&assoc_adapter->mld_addr,
-					    assoc_mac);
-
-	if (get_new_addr) {
-		/* If both address are already different
-		 * don't get new address
-		 */
-		if (!is_mac_equal)
-			goto out;
-
-		new_mac = wlan_hdd_get_intf_addr(adapter->hdd_ctx,
-						 QDF_STA_MODE);
-		if (new_mac) {
-			memcpy(assoc_mac->bytes, new_mac, QDF_MAC_ADDR_SIZE);
-			status = ucfg_dp_create_intf(
-					assoc_adapter->hdd_ctx->psoc,
-					assoc_mac,
-					(qdf_netdev_t)assoc_adapter->dev);
-			if (QDF_IS_STATUS_ERROR(status))
-				return status;
-		}
-	} else {
-		/* If both address are already equal
-		 * don't release the address
-		 */
-		if (is_mac_equal)
-			goto out;
-
-		wlan_hdd_release_intf_addr(adapter->hdd_ctx, assoc_mac->bytes);
-		ucfg_dp_destroy_intf(adapter->hdd_ctx->psoc, assoc_mac);
-		qdf_copy_macaddr(assoc_mac, &adapter->mld_addr);
+		ucfg_dp_update_inf_mac(hdd_ctx->psoc, &link_adapter->mac_addr,
+				       &link_addr[i]);
+		qdf_copy_macaddr(&link_adapter->mac_addr, &link_addr[i]);
 	}
-out:
-	qdf_net_update_net_device_dev_addr(adapter->dev,
-					   adapter->mld_addr.bytes,
-					   QDF_MAC_ADDR_SIZE);
+
 	return QDF_STATUS_SUCCESS;
 }
+#else
+static inline QDF_STATUS
+hdd_adapter_update_mac_on_mode_change(struct hdd_adapter *adapter)
+{
+	return QDF_STATUS_SUCCESS;
+}
+#endif
 
 /**
  * __wlan_hdd_cfg80211_change_iface() - change interface cfg80211 op
@@ -20827,6 +20792,7 @@ static int __wlan_hdd_cfg80211_change_iface(struct wiphy *wiphy,
 	QDF_STATUS status;
 	int errno;
 	uint8_t mac_addr[QDF_MAC_ADDR_SIZE];
+	bool eht_capab;
 
 	hdd_enter();
 
@@ -20928,10 +20894,6 @@ static int __wlan_hdd_cfg80211_change_iface(struct wiphy *wiphy,
 					QDF_MAC_ADDR_FMT "\n",
 					QDF_MAC_ADDR_REF(ndev->dev_addr));
 			}
-			status = hdd_adapter_update_mac_on_mode_change(adapter,
-								       false);
-			if (QDF_IS_STATUS_ERROR(status))
-				goto err;
 			hdd_set_ap_ops(adapter->dev);
 		} else {
 			hdd_err("Changing to device mode '%s' is not supported",
@@ -20946,10 +20908,6 @@ static int __wlan_hdd_cfg80211_change_iface(struct wiphy *wiphy,
 				hdd_err("change mode fail %d", errno);
 				goto err;
 			}
-			status = hdd_adapter_update_mac_on_mode_change(adapter,
-								       true);
-			if (QDF_IS_STATUS_ERROR(status))
-				goto err;
 		} else if (hdd_is_ap_mode(new_mode)) {
 			adapter->device_mode = new_mode;
 
@@ -20966,6 +20924,26 @@ static int __wlan_hdd_cfg80211_change_iface(struct wiphy *wiphy,
 			qdf_opmode_str(adapter->device_mode));
 		errno = -EOPNOTSUPP;
 		goto err;
+	}
+
+	ucfg_psoc_mlme_get_11be_capab(hdd_ctx->psoc, &eht_capab);
+	if (eht_capab && hdd_adapter_is_ml_adapter(adapter)) {
+		switch (adapter->device_mode) {
+		case QDF_SAP_MODE:
+			hdd_adapter_set_sl_ml_adapter(adapter);
+			break;
+		case QDF_STA_MODE:
+			hdd_adapter_clear_sl_ml_adapter(adapter);
+
+			status = hdd_adapter_update_mac_on_mode_change(adapter);
+			if (QDF_IS_STATUS_ERROR(status))
+				goto err;
+
+			break;
+		default:
+			hdd_adapter_clear_sl_ml_adapter(adapter);
+			break;
+		}
 	}
 
 	/* restart the adapter if it was up before the change iface request */

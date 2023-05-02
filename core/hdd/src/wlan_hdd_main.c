@@ -5408,26 +5408,33 @@ bool hdd_is_dynamic_set_mac_addr_allowed(struct hdd_adapter *adapter)
 	}
 }
 
-int hdd_dynamic_mac_address_set(struct hdd_context *hdd_ctx,
-				struct hdd_adapter *adapter,
-				struct qdf_mac_addr mac_addr)
+int hdd_dynamic_mac_address_set(struct hdd_adapter *adapter,
+				struct qdf_mac_addr mac_addr,
+				struct qdf_mac_addr mld_addr,
+				bool update_self_peer)
 {
-	uint32_t *fw_resp_status;
+	int ret;
 	void *cookie;
+	bool update_mld_addr;
+	uint32_t *fw_resp_status;
+	QDF_STATUS status;
 	struct osif_request *request;
+	struct wlan_objmgr_vdev *vdev;
+	struct hdd_context *hdd_ctx = adapter->hdd_ctx;
 	static const struct osif_request_params params = {
 		.priv_size = sizeof(*fw_resp_status),
 		.timeout_ms = WLAN_SET_MAC_ADDR_TIMEOUT
 	};
-	int ret;
-	QDF_STATUS qdf_ret_status;
-	struct qdf_mac_addr mld_addr;
-	bool update_self_peer, update_mld_addr;
 
-	qdf_ret_status = ucfg_vdev_mgr_cdp_vdev_detach(adapter->deflink->vdev);
-	if (QDF_IS_STATUS_ERROR(qdf_ret_status)) {
-		hdd_err("Failed to detach CDP vdev. Status:%d", qdf_ret_status);
-		return qdf_status_to_os_return(qdf_ret_status);
+	vdev = hdd_objmgr_get_vdev_by_user(adapter, WLAN_OSIF_ID);
+	if (!vdev)
+		return -EINVAL;
+
+	status = ucfg_vdev_mgr_cdp_vdev_detach(vdev);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		hdd_err("Failed to detach CDP vdev. Status:%d", status);
+		ret = qdf_status_to_os_return(status);
+		goto vdev_ref;
 	}
 
 	request = osif_request_alloc(&params);
@@ -5436,20 +5443,6 @@ int hdd_dynamic_mac_address_set(struct hdd_context *hdd_ctx,
 		goto status_ret;
 	}
 
-	if (hdd_adapter_is_link_adapter(adapter)) {
-		update_self_peer =
-			hdd_adapter_is_associated_with_ml_adapter(adapter);
-		update_mld_addr = true;
-	} else if (hdd_adapter_is_sl_ml_adapter(adapter)) {
-		update_mld_addr = true;
-		if (adapter->device_mode == QDF_SAP_MODE)
-			update_self_peer = false;
-		else
-			update_self_peer = true;
-	} else {
-		update_self_peer = true;
-		update_mld_addr = false;
-	}
 	/* Host should hold a wake lock until the FW event response is received
 	 * the WMI event would not be a wake up event.
 	 */
@@ -5460,14 +5453,11 @@ int hdd_dynamic_mac_address_set(struct hdd_context *hdd_ctx,
 	cookie = osif_request_cookie(request);
 	hdd_update_set_mac_addr_req_ctx(adapter, cookie);
 
-	qdf_mem_copy(&mld_addr, adapter->mld_addr.bytes, sizeof(mld_addr));
-	qdf_ret_status = sme_send_set_mac_addr(mac_addr, mld_addr,
-					       adapter->deflink->vdev,
-					       update_mld_addr);
-	ret = qdf_status_to_os_return(qdf_ret_status);
-	if (QDF_STATUS_SUCCESS != qdf_ret_status) {
+	status = sme_send_set_mac_addr(mac_addr, mld_addr, vdev);
+	ret = qdf_status_to_os_return(status);
+	if (QDF_IS_STATUS_ERROR(status)) {
 		hdd_nofl_err("Failed to send set MAC address command. Status:%d",
-			     qdf_ret_status);
+			     status);
 		osif_request_put(request);
 		goto status_ret;
 	} else {
@@ -5486,33 +5476,41 @@ int hdd_dynamic_mac_address_set(struct hdd_context *hdd_ctx,
 
 	osif_request_put(request);
 
-	qdf_ret_status = sme_update_vdev_mac_addr(
-			   hdd_ctx->psoc, mac_addr, adapter->deflink->vdev,
-			   update_self_peer, update_mld_addr,
-			   ret);
+	if (qdf_is_macaddr_zero(&mld_addr))
+		update_mld_addr = false;
+	else
+		update_mld_addr = true;
 
-	if (QDF_IS_STATUS_ERROR(qdf_ret_status))
-		ret = qdf_status_to_os_return(qdf_ret_status);
+	status = sme_update_vdev_mac_addr(vdev, mac_addr, mld_addr,
+					  update_self_peer, update_mld_addr,
+					  ret);
+
+	if (QDF_IS_STATUS_ERROR(status))
+		ret = qdf_status_to_os_return(status);
 
 status_ret:
-	qdf_ret_status = ucfg_vdev_mgr_cdp_vdev_attach(adapter->deflink->vdev);
-	if (QDF_IS_STATUS_ERROR(qdf_ret_status)) {
+	status = ucfg_vdev_mgr_cdp_vdev_attach(vdev);
+	if (QDF_IS_STATUS_ERROR(status)) {
 		hdd_allow_suspend(
 			WIFI_POWER_EVENT_WAKELOCK_DYN_MAC_ADDR_UPDATE);
 		qdf_runtime_pm_allow_suspend(
 				&hdd_ctx->runtime_context.dyn_mac_addr_update);
-		hdd_err("Failed to attach CDP vdev. status:%d", qdf_ret_status);
-		return qdf_status_to_os_return(qdf_ret_status);
+		hdd_err("Failed to attach CDP vdev. status:%d", status);
+		ret = qdf_status_to_os_return(status);
+		goto vdev_ref;
 	}
-	sme_vdev_set_data_tx_callback(adapter->deflink->vdev);
+	sme_vdev_set_data_tx_callback(vdev);
 
 	/* Update FW WoW pattern with new MAC address */
-	ucfg_pmo_del_wow_pattern(adapter->deflink->vdev);
-	ucfg_pmo_register_wow_default_patterns(adapter->deflink->vdev);
+	ucfg_pmo_del_wow_pattern(vdev);
+	ucfg_pmo_register_wow_default_patterns(vdev);
 
 	hdd_allow_suspend(WIFI_POWER_EVENT_WAKELOCK_DYN_MAC_ADDR_UPDATE);
 	qdf_runtime_pm_allow_suspend(
 			&hdd_ctx->runtime_context.dyn_mac_addr_update);
+
+vdev_ref:
+	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
 
 	return ret;
 }
@@ -5608,7 +5606,7 @@ static int __hdd_set_mac_address(struct net_device *dev, void *addr)
 		       QDF_MAC_ADDR_REF(mac_addr.bytes), dev->name);
 
 	if (net_if_running && adapter->deflink->vdev) {
-		ret = hdd_update_vdev_mac_address(hdd_ctx, adapter, mac_addr);
+		ret = hdd_update_vdev_mac_address(adapter, mac_addr);
 		if (ret)
 			return ret;
 	}

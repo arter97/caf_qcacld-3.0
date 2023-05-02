@@ -118,6 +118,7 @@
 #include "wlan_twt_ucfg_ext_api.h"
 #include "wlan_twt_ucfg_api.h"
 #include "wlan_vdev_mgr_ucfg_api.h"
+#include <wlan_psoc_mlme_ucfg_api.h>
 
 #define ACS_SCAN_EXPIRY_TIMEOUT_S 4
 
@@ -747,7 +748,8 @@ static int __hdd_hostapd_set_mac_address(struct net_device *dev, void *addr)
 	struct hdd_adapter *adapter, *adapter_temp;
 	struct hdd_context *hdd_ctx;
 	int ret = 0;
-	struct qdf_mac_addr mac_addr;
+	bool eht_capab;
+	struct qdf_mac_addr mac_addr, mld_addr;
 
 	hdd_enter_dev(dev);
 
@@ -791,7 +793,14 @@ static int __hdd_hostapd_set_mac_address(struct net_device *dev, void *addr)
 		if (!hdd_is_dynamic_set_mac_addr_allowed(adapter))
 			return -ENOTSUPP;
 
-		ret = hdd_dynamic_mac_address_set(hdd_ctx, adapter, mac_addr);
+		ucfg_psoc_mlme_get_11be_capab(hdd_ctx->psoc, &eht_capab);
+		if (eht_capab && hdd_adapter_is_ml_adapter(adapter))
+			qdf_copy_macaddr(&mld_addr, &mac_addr);
+		else
+			qdf_zero_macaddr(&mld_addr);
+
+		ret = hdd_dynamic_mac_address_set(adapter, mac_addr, mld_addr,
+						  false);
 		if (ret)
 			return ret;
 	}

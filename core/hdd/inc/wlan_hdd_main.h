@@ -4850,17 +4850,19 @@ void hdd_check_for_net_dev_ref_leak(struct hdd_adapter *adapter);
 /**
  * hdd_dynamic_mac_address_set(): API to set MAC address, when interface
  *                                is up.
- * @hdd_ctx: Pointer to HDD context
  * @adapter: Pointer to hdd_adapter
  * @mac_addr: MAC address to set
+ * @mld_addr: MLD address to set
+ * @update_self_peer: Set to true to update self peer's address
  *
  * This API is used to update the current VDEV MAC address.
  *
  * Return: 0 for success. non zero valure for failure.
  */
-int hdd_dynamic_mac_address_set(struct hdd_context *hdd_ctx,
-				struct hdd_adapter *adapter,
-				struct qdf_mac_addr mac_addr);
+int hdd_dynamic_mac_address_set(struct hdd_adapter *adapter,
+				struct qdf_mac_addr mac_addr,
+				struct qdf_mac_addr mld_addr,
+				bool update_self_peer);
 
 /**
  * hdd_is_dynamic_set_mac_addr_allowed() - API to check dynamic MAC address
@@ -4874,7 +4876,6 @@ bool hdd_is_dynamic_set_mac_addr_allowed(struct hdd_adapter *adapter);
 #if defined(WLAN_FEATURE_11BE_MLO) && defined(CFG80211_11BE_BASIC)
 /**
  * hdd_update_vdev_mac_address() - Update VDEV MAC address dynamically
- * @hdd_ctx: Pointer to HDD context
  * @adapter: Pointer to HDD adapter
  * @mac_addr: MAC address to be updated
  *
@@ -4882,28 +4883,28 @@ bool hdd_is_dynamic_set_mac_addr_allowed(struct hdd_adapter *adapter);
  *
  * Return: 0 for Success. Error code for failure
  */
-int hdd_update_vdev_mac_address(struct hdd_context *hdd_ctx,
-				struct hdd_adapter *adapter,
+int hdd_update_vdev_mac_address(struct hdd_adapter *adapter,
 				struct qdf_mac_addr mac_addr);
 #else
-static inline int hdd_update_vdev_mac_address(struct hdd_context *hdd_ctx,
-					      struct hdd_adapter *adapter,
+static inline int hdd_update_vdev_mac_address(struct hdd_adapter *adapter,
 					      struct qdf_mac_addr mac_addr)
 {
-	return hdd_dynamic_mac_address_set(hdd_ctx, adapter, mac_addr);
+	struct qdf_mac_addr mld_addr = QDF_MAC_ADDR_ZERO_INIT;
+
+	return hdd_dynamic_mac_address_set(adapter, mac_addr, mld_addr, true);
 }
 #endif /* WLAN_FEATURE_11BE_MLO */
 #else
-static inline int hdd_update_vdev_mac_address(struct hdd_context *hdd_ctx,
-					      struct hdd_adapter *adapter,
+static inline int hdd_update_vdev_mac_address(struct hdd_adapter *adapter,
 					      struct qdf_mac_addr mac_addr)
 {
 	return 0;
 }
 
-static inline int hdd_dynamic_mac_address_set(struct hdd_context *hdd_ctx,
-					      struct hdd_adapter *adapter,
-					      struct qdf_mac_addr mac_addr)
+static inline int hdd_dynamic_mac_address_set(struct hdd_adapter *adapter,
+					      struct qdf_mac_addr mac_addr,
+					      struct qdf_mac_addr mld_addr,
+					      bool update_self_peer)
 {
 	return 0;
 }
