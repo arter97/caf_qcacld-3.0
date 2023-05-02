@@ -30,6 +30,19 @@
 #define NUM_WORDS_PER_DSCP_TID_TABLE (DSCP_TID_TABLE_SIZE / 4)
 #define HAL_TX_NUM_DSCP_REGISTER_SIZE 32
 #define HAL_PPE_VP_ENTRIES_MAX 32
+#define HAL_PPE_VP_SEARCH_IDX_REG_MAX 8
+
+/**
+ * hal_tx_get_num_ppe_vp_search_idx_reg_entries_6432() - get number of PPE VP
+ *                                                       search index registers
+ * @hal_soc_hdl: HAL SoC handle
+ *
+ * Return: Number of PPE VP search index registers
+ */
+static uint32_t hal_tx_get_num_ppe_vp_search_idx_reg_entries_6432(hal_soc_handle_t hal_soc_hdl)
+{
+	return HAL_PPE_VP_SEARCH_IDX_REG_MAX;
+}
 
 /**
  * hal_tx_set_dscp_tid_map_6432() - Configure default DSCP to TID map table
