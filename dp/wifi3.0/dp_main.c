@@ -2782,14 +2782,20 @@ static uint32_t dp_service_srngs(void *dp_ctx, uint32_t dp_budget, int cpu)
 	int index;
 	uint32_t work_done  = 0;
 	int budget = dp_budget;
-	uint8_t tx_mask = int_ctx->tx_ring_mask;
-	uint8_t rx_mask = int_ctx->rx_ring_mask;
-	uint8_t rx_err_mask = int_ctx->rx_err_ring_mask;
-	uint8_t rx_wbm_rel_mask = int_ctx->rx_wbm_rel_ring_mask;
-	uint8_t reo_status_mask = int_ctx->reo_status_ring_mask;
 	uint32_t remaining_quota = dp_budget;
+	uint8_t tx_mask = 0;
+	uint8_t rx_mask = 0;
+	uint8_t rx_err_mask = 0;
+	uint8_t rx_wbm_rel_mask = 0;
+	uint8_t reo_status_mask = 0;
 
 	qdf_atomic_set_bit(cpu, &soc->service_rings_running);
+
+	tx_mask = int_ctx->tx_ring_mask;
+	rx_mask = int_ctx->rx_ring_mask;
+	rx_err_mask = int_ctx->rx_err_ring_mask;
+	rx_wbm_rel_mask = int_ctx->rx_wbm_rel_ring_mask;
+	reo_status_mask = int_ctx->reo_status_ring_mask;
 
 	dp_verbose_debug("tx %x rx %x rx_err %x rx_wbm_rel %x reo_status %x rx_mon_ring %x host2rxdma %x rxdma2host %x\n",
 			 tx_mask, rx_mask, rx_err_mask, rx_wbm_rel_mask,
