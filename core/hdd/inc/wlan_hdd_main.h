@@ -1017,6 +1017,7 @@ enum udp_qos_upgrade {
  * @snr: SNR measured from @rssi
  * @rssi_on_disconnect: Rssi at disconnection time in STA mode
  * @rssi_send: Notify RSSI over lpass
+ * @is_mlo_vdev_active: is the mlo vdev currently active
  */
 struct wlan_hdd_link_info {
 	uint8_t vdev_id;
@@ -1035,6 +1036,7 @@ struct wlan_hdd_link_info {
 #ifdef WLAN_FEATURE_LPSS
 	bool rssi_send;
 #endif
+	bool is_mlo_vdev_active;
 };
 
 /**

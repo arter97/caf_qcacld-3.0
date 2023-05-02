@@ -273,6 +273,10 @@ static int copy_station_stats_to_adapter(struct hdd_adapter *adapter,
 	adapter->tx_power.tx_pwr = stats->pdev_stats->max_pwr;
 	adapter->tx_power.tx_pwr_cached_timestamp =
 			qdf_system_ticks_to_msecs(qdf_system_ticks());
+	/* Copy vdev status info sent by FW */
+	if (stats->vdev_extd_stats)
+		adapter->deflink->is_mlo_vdev_active =
+			stats->vdev_extd_stats[0].is_mlo_vdev_active;
 
 	dynamic_cfg = mlme_get_dynamic_vdev_config(vdev);
 	if (!dynamic_cfg) {
