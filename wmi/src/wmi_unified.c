@@ -3394,6 +3394,7 @@ void wmi_unified_detach(struct wmi_unified *wmi_handle)
 
 			wmi_interface_sequence_deinit(soc->wmi_pdev[i]);
 			wmi_ext_dbgfs_deinit(soc->wmi_pdev[i]);
+			wmi_clear_wow_enable_ack_failed(soc->wmi_pdev[i]);
 
 			qdf_mem_free(soc->wmi_pdev[i]);
 		}
@@ -3414,8 +3415,6 @@ void wmi_unified_detach(struct wmi_unified *wmi_handle)
 		qdf_mem_free(soc->wmi_ext2_service_bitmap);
 		soc->wmi_ext2_service_bitmap = NULL;
 	}
-
-	wmi_clear_wow_enable_ack_failed(wmi_handle);
 
 	/* Decrease the ref count once refcount infra is present */
 	soc->wmi_psoc = NULL;
