@@ -57,7 +57,7 @@ static inline uint8_t dp_rx_get_ctx_id_frm_napiid(uint8_t napi_id)
 	case 12:
 		return 2;
 	default:
-		dp_err("Invalid napi id, this should not happen");
+		dp_err("Invalid napi id: %u, this should not happen", napi_id);
 		qdf_assert_always(0);
 		break;
 	}
@@ -690,7 +690,7 @@ static QDF_STATUS dp_rx_err_handler_rh(struct dp_soc *soc,
 						      error_code,
 						      rx_desc->pool_id);
 	default:
-		dp_err("Invalid error packet rcvd");
+		dp_err("Invalid error packet rcvd, code: %u", error_code);
 		dp_rx_desc_dump(rx_desc);
 		qdf_assert_always(0);
 		dp_rx_nbuf_free(rx_desc->nbuf);

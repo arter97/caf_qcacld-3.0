@@ -6074,7 +6074,7 @@ char *dp_srng_get_str_from_hal_ring_type(enum hal_ring_type ring_type)
 	case TX_MONITOR_BUF:
 		return "tx_monitor_buf";
 	default:
-		dp_err("Invalid ring type");
+		dp_err("Invalid ring type: %u", ring_type);
 		break;
 	}
 	return "Invalid";
@@ -7779,7 +7779,7 @@ static QDF_STATUS dp_get_psoc_param(struct cdp_soc_t *cdp_soc,
 		val->cdp_umac_rst_skel = dp_umac_rst_skel_enable_get(soc);
 		break;
 	default:
-		dp_warn("Invalid param");
+		dp_warn("Invalid param: %u", param);
 		break;
 	}
 
@@ -8607,7 +8607,7 @@ QDF_STATUS dp_txrx_stats_request(struct cdp_soc_t *soc_handle,
 	}
 
 	if (req->mac_id >= WLAN_CFG_MAC_PER_TARGET) {
-		dp_err("Invalid mac id request");
+		dp_err("Invalid mac_id: %u request", req->mac_id);
 		status = QDF_STATUS_E_INVAL;
 		goto fail0;
 	}
@@ -9760,7 +9760,7 @@ dp_get_peer_extd_rate_link_stats(struct cdp_soc_t *soc_hdl, uint8_t *mac_addr)
 
 	peer = dp_peer_hash_find_wrapper(soc, &peer_info, DP_MOD_ID_CDP);
 	if (!peer) {
-		dp_err("Invalid peer");
+		dp_err("Peer is NULL");
 		return QDF_STATUS_E_FAILURE;
 	}
 
@@ -9806,7 +9806,7 @@ dp_get_peer_extd_rate_link_stats(struct cdp_soc_t *soc_hdl, uint8_t *mac_addr)
 	peer = dp_peer_find_hash_find(soc, mac_addr, 0,
 				      DP_VDEV_ALL, DP_MOD_ID_CDP);
 	if (!peer) {
-		dp_err("Invalid peer");
+		dp_err("Peer is NULL");
 		return QDF_STATUS_E_FAILURE;
 	}
 
@@ -12200,7 +12200,7 @@ dp_get_cfr_dbg_stats(struct cdp_soc_t *soc_hdl, uint8_t pdev_id,
 	struct dp_pdev *pdev = dp_get_pdev_from_soc_pdev_id_wifi3(soc, pdev_id);
 
 	if (!pdev) {
-		dp_err("Invalid pdev");
+		dp_err("pdev is NULL");
 		return;
 	}
 

@@ -2959,7 +2959,7 @@ dp_primary_link_migration(struct dp_soc *soc, void *cb_ctxt,
 
 	mld_peer = DP_GET_MLD_PEER_FROM_PEER(new_primary_peer);
 	if (!mld_peer) {
-		dp_htt_err("Invalid peer");
+		dp_htt_err("MLD peer is NULL");
 		qdf_mem_free(pr_peer_info);
 		return;
 	}

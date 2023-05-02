@@ -1502,6 +1502,7 @@ uint8_t dp_rx_process_invalid_peer(struct dp_soc *soc, qdf_nbuf_t mpdu,
 	uint8_t *rx_tlv_hdr = qdf_nbuf_data(mpdu);
 	uint8_t *rx_pkt_hdr = NULL;
 	int i = 0;
+	uint32_t nbuf_len;
 
 	if (!HAL_IS_DECAP_FORMAT_RAW(soc->hal_soc, rx_tlv_hdr)) {
 		dp_rx_debug("%pK: Drop decapped frames", soc);
@@ -1517,8 +1518,9 @@ uint8_t dp_rx_process_invalid_peer(struct dp_soc *soc, qdf_nbuf_t mpdu,
 		goto free;
 	}
 
-	if (qdf_nbuf_len(mpdu) < sizeof(struct ieee80211_frame)) {
-		dp_rx_err("%pK: Invalid nbuf length", soc);
+	nbuf_len = qdf_nbuf_len(mpdu);
+	if (nbuf_len < sizeof(struct ieee80211_frame)) {
+		dp_rx_err("%pK: Invalid nbuf length: %u", soc, nbuf_len);
 		goto free;
 	}
 
@@ -1624,6 +1626,7 @@ uint8_t dp_rx_process_invalid_peer(struct dp_soc *soc, qdf_nbuf_t mpdu,
 	struct dp_peer *peer = NULL;
 	uint8_t *rx_tlv_hdr = qdf_nbuf_data(mpdu);
 	uint8_t *rx_pkt_hdr = hal_rx_pkt_hdr_get(soc->hal_soc, rx_tlv_hdr);
+	uint32_t nbuf_len;
 
 	wh = (struct ieee80211_frame *)rx_pkt_hdr;
 
@@ -1633,8 +1636,9 @@ uint8_t dp_rx_process_invalid_peer(struct dp_soc *soc, qdf_nbuf_t mpdu,
 		goto free;
 	}
 
-	if (qdf_nbuf_len(mpdu) < sizeof(struct ieee80211_frame)) {
-		dp_rx_info_rl("%pK: Invalid nbuf length", soc);
+	nbuf_len = qdf_nbuf_len(mpdu);
+	if (nbuf_len < sizeof(struct ieee80211_frame)) {
+		dp_rx_info_rl("%pK: Invalid nbuf length: %u", soc, nbuf_len);
 		goto free;
 	}
 

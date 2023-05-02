@@ -4729,7 +4729,7 @@ dp_peer_update_inactive_time(struct dp_pdev *pdev, uint32_t tag_type,
 	}
 	break;
 	default:
-		qdf_err("Invalid tag_type");
+		qdf_err("Invalid tag_type: %u", tag_type);
 	}
 }
 

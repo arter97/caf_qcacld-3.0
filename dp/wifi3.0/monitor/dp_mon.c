@@ -630,7 +630,7 @@ dp_config_debug_sniffer(struct dp_pdev *pdev, int val)
 
 	default:
 		QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_ERROR,
-			  "Invalid value, mode not supported");
+			  "Invalid value, mode: %d not supported", val);
 		status = QDF_STATUS_E_INVAL;
 		break;
 	}
@@ -1863,7 +1863,7 @@ QDF_STATUS dp_peer_qos_stats_notify(struct dp_pdev *dp_pdev,
 	struct cdp_interface_peer_qos_stats qos_stats_intf = {0};
 
 	if (qdf_unlikely(ppdu_user->peer_id == HTT_INVALID_PEER)) {
-		dp_mon_warn("Invalid peer id");
+		dp_mon_warn("Invalid peer id: %u", ppdu_user->peer_id);
 		return QDF_STATUS_E_FAILURE;
 	}
 
@@ -1922,7 +1922,7 @@ dp_enable_peer_based_pktlog(struct cdp_soc_t *soc, uint8_t pdev_id,
 				      0, DP_VDEV_ALL, DP_MOD_ID_CDP);
 
 	if (!peer) {
-		dp_mon_err("Invalid Peer");
+		dp_mon_err("Peer is NULL");
 		return QDF_STATUS_E_FAILURE;
 	}
 
@@ -2293,7 +2293,7 @@ int dp_set_filter_neigh_peers(struct dp_pdev *pdev,
 void dp_set_atf_stats_enable(struct dp_pdev *pdev, bool value)
 {
 	if (!pdev) {
-		dp_cdp_err("Invalid pdev");
+		dp_cdp_err("pdev is NULL");
 		return;
 	}
 
@@ -4182,7 +4182,7 @@ static void dp_process_ppdu_stats_user_common_array_tlv(
 
 	if (!dp_peer_find_by_id_valid(pdev->soc, peer_id)) {
 		QDF_TRACE(QDF_MODULE_ID_TXRX, QDF_TRACE_LEVEL_ERROR,
-			  "Invalid peer");
+			  "Peer with peer_id: %u not found", peer_id);
 		return;
 	}
 
@@ -6336,7 +6336,7 @@ void dp_mon_peer_get_stats(struct dp_peer *peer, void *arg,
 		break;
 	}
 	default:
-		dp_mon_err("Invalid stats_update_type");
+		dp_mon_err("Invalid stats_update_type: %u", type);
 	}
 }
 
@@ -6395,7 +6395,7 @@ dp_mon_peer_get_stats_param(struct dp_peer *peer, enum cdp_peer_stats_type type,
 		buf->rx_snr = mon_peer->stats.rx.snr;
 		break;
 	default:
-		dp_err("Invalid stats type requested");
+		dp_err("Invalid stats type: %u requested", type);
 		ret = QDF_STATUS_E_FAILURE;
 	}
 

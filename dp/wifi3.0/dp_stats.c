@@ -5119,7 +5119,7 @@ dp_accumulate_tid_stats(struct dp_pdev *pdev, uint8_t tid,
 		break;
 	}
 	default:
-		qdf_err("Invalid stats type");
+		qdf_err("Invalid stats type: %d", type);
 		break;
 	}
 }

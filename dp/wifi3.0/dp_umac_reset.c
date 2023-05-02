@@ -587,7 +587,8 @@ QDF_STATUS dp_umac_reset_interrupt_attach(struct dp_soc *soc)
 	} else {
 		if (umac_reset_ctx->intr_offset < 0 ||
 		    umac_reset_ctx->intr_offset >= WLAN_CFG_INT_NUM_CONTEXTS) {
-			dp_umac_reset_err("Invalid interrupt offset");
+			dp_umac_reset_err("Invalid interrupt offset: %d",
+					  umac_reset_ctx->intr_offset);
 			return QDF_STATUS_E_FAILURE;
 		}
 
@@ -880,7 +881,7 @@ QDF_STATUS dp_umac_reset_notify_action_completion(
 		break;
 
 	default:
-		dp_umac_reset_err("Invalid action");
+		dp_umac_reset_err("Invalid action: %u", action);
 		return QDF_STATUS_E_FAILURE;
 	}
 

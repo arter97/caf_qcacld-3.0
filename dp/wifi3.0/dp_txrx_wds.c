@@ -861,7 +861,7 @@ dp_get_completion_indication_for_stack(struct dp_soc *soc,
 
 	if (!txrx_peer) {
 		QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_ERROR,
-			  FL("Peer Invalid"));
+			  FL("txrx_peer is NULL"));
 		return QDF_STATUS_E_INVAL;
 	}
 
