@@ -1998,6 +1998,33 @@ done:
 	return nbuf_head;
 }
 
+#ifdef WLAN_FEATURE_11BE_MLO
+/**
+ * check_extap_multicast_loopback() - Check if rx packet is a loopback packet.
+ *
+ * @vdev: vdev on which rx packet is received
+ * @addr: src address of the received packet
+ *
+ */
+static bool check_extap_multicast_loopback(struct dp_vdev *vdev, uint8_t *addr)
+{
+	 /* if src mac addr matches with vdev mac address then drop the pkt */
+	if (!(qdf_mem_cmp(addr, vdev->mac_addr.raw, QDF_MAC_ADDR_SIZE)))
+		return true;
+
+	 /* if src mac addr matches with mld mac address then drop the pkt */
+	if (!(qdf_mem_cmp(addr, vdev->mld_mac_addr.raw, QDF_MAC_ADDR_SIZE)))
+		return true;
+
+	return false;
+}
+#else
+static bool check_extap_multicast_loopback(struct dp_vdev *vdev, uint8_t *addr)
+{
+	return false;
+}
+#endif
+
 QDF_STATUS
 dp_rx_null_q_desc_handle_be(struct dp_soc *soc, qdf_nbuf_t nbuf,
 			    uint8_t *rx_tlv_hdr, uint8_t pool_id,
@@ -2226,6 +2253,18 @@ dp_rx_null_q_desc_handle_be(struct dp_soc *soc, qdf_nbuf_t nbuf,
 	 */
 	if (qdf_unlikely(dp_rx_err_cce_drop(soc, vdev, nbuf, rx_tlv_hdr)))
 		goto drop_nbuf;
+
+	/*
+	 * In extap mode if the received packet matches with mld mac address
+	 * drop it. For non IP packets conversion might not be possible
+	 * due to that MEC entry will not be updated, resulting loopback.
+	 */
+	if (qdf_unlikely(check_extap_multicast_loopback(vdev,
+							eh->ether_shost))) {
+		DP_PEER_PER_PKT_STATS_INC_PKT(txrx_peer, rx.mec_drop, 1,
+					      qdf_nbuf_len(nbuf), link_id);
+		goto drop_nbuf;
+	}
 
 	if (qdf_unlikely(vdev->rx_decap_type == htt_cmn_pkt_type_raw)) {
 		qdf_nbuf_set_next(nbuf, NULL);
