@@ -208,7 +208,8 @@ dp_tx_prepare_send_me(struct dp_vdev *vdev, qdf_nbuf_t nbuf)
 	uint32_t flag = 0;
 #ifdef WLAN_FEATURE_11BE_MLO
 	if ((DP_MLD_MODE_HYBRID_NONBOND == vdev->pdev->soc->mld_mode_ap) &&
-		(wlan_op_mode_ap == vdev->opmode))
+	    (wlan_op_mode_ap == vdev->opmode) &&
+	    (CB_FTYPE_MLO_MCAST == qdf_nbuf_get_tx_ftype(nbuf)))
 		flag = DP_ME_MCTBL_MLD_VDEV;
 #endif
 
