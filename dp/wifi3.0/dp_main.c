@@ -97,6 +97,9 @@ cdp_dump_flow_pool_info(struct cdp_soc_t *soc)
 #ifdef WLAN_DP_FEATURE_SW_LATENCY_MGR
 #include <wlan_dp_swlm.h>
 #endif
+#ifdef WLAN_DP_PROFILE_SUPPORT
+#include <wlan_dp_main.h>
+#endif
 #ifdef CONFIG_SAWF_DEF_QUEUES
 #include "dp_sawf.h"
 #endif
@@ -2563,19 +2566,22 @@ QDF_STATUS dp_pdev_attach_wifi3(struct cdp_soc_t *txrx_soc,
 		goto fail1;
 	}
 
-	/*
-	 * set nss pdev config based on soc config
-	 */
-	nss_cfg = wlan_cfg_get_dp_soc_nss_cfg(soc_cfg_ctx);
-	wlan_cfg_set_dp_pdev_nss_enabled(pdev->wlan_cfg_ctx,
-					 (nss_cfg & (1 << pdev_id)));
-
 	pdev->soc = soc;
 	pdev->pdev_id = pdev_id;
 	soc->pdev_list[pdev_id] = pdev;
 
 	pdev->lmac_id = wlan_cfg_get_hw_mac_idx(soc->wlan_cfg_ctx, pdev_id);
 	soc->pdev_count++;
+
+	/*sync DP pdev cfg items with profile support after cfg_pdev_attach*/
+	wlan_dp_pdev_cfg_sync_profile((struct cdp_soc_t *)soc, pdev_id);
+
+	/*
+	 * set nss pdev config based on soc config
+	 */
+	nss_cfg = wlan_cfg_get_dp_soc_nss_cfg(soc_cfg_ctx);
+	wlan_cfg_set_dp_pdev_nss_enabled(pdev->wlan_cfg_ctx,
+					 (nss_cfg & (1 << pdev_id)));
 
 	/* Allocate memory for pdev srng rings */
 	if (dp_pdev_srng_alloc(pdev)) {
@@ -7908,8 +7914,8 @@ static QDF_STATUS dp_get_psoc_param(struct cdp_soc_t *cdp_soc,
 	case CDP_CFG_RX_REFILL_POOL_NUM:
 		val->cdp_rx_refill_buf_pool_size =
 			wlan_cfg_get_rx_refill_buf_pool_size(wlan_cfg_ctx);
-#endif
 		break;
+#endif
 	default:
 		dp_warn("Invalid param: %u", param);
 		break;
@@ -12162,6 +12168,9 @@ dp_soc_attach(struct cdp_ctrl_objmgr_psoc *ctrl_psoc,
 		dp_err("wlan_cfg_ctx failed");
 		goto fail2;
 	}
+
+	/*sync DP soc cfg items with profile support after cfg_soc_attach*/
+	wlan_dp_soc_cfg_sync_profile((struct cdp_soc_t *)soc);
 
 	soc->arch_ops.soc_cfg_attach(soc);
 

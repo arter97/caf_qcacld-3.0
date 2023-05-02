@@ -584,6 +584,7 @@ struct wlan_cfg_dp_pdev_ctxt {
  * @num_reo_exception_ring_entries: num of rx exception ring entries
  * @num_tx_desc: num of tx descriptors
  * @num_tx_ext_desc: num of tx ext descriptors
+ * @num_rx_sw_desc: number of rx sw descriptors
  * @num_reo_dst_ring_entries: Number of entries in REO destination ring
  * @num_rxdma_buf_ring_entries: Number of entries in rxdma buf ring
  * @num_rxdma_refill_ring_entries: Number of entries in rxdma refill ring
@@ -601,6 +602,7 @@ struct wlan_dp_prealloc_cfg {
 	int num_reo_exception_ring_entries;
 	int num_tx_desc;
 	int num_tx_ext_desc;
+	int num_rx_sw_desc;
 	int num_reo_dst_ring_entries;
 	int num_rxdma_buf_ring_entries;
 	int num_rxdma_refill_ring_entries;
