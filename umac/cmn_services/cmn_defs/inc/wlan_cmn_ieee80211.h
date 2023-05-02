@@ -1494,6 +1494,27 @@ struct htcap_ie {
 	struct htcap_cmn_ie ie;
 } qdf_packed;
 
+/*
+ * Definitions for Neighbor AP Information field of Reduced
+ * Neighbor Report element.
+ */
+
+/* HDR FIELD TYPE */
+#define WLAN_RNR_NBR_AP_INFO_HDR_INFO_FIELD_TYPE_IDX                   0
+#define WLAN_RNR_NBR_AP_INFO_HDR_INFO_FIELD_TYPE_BITS                  2
+/* HDR FILTERED NEIGHBOR CNT */
+#define WLAN_RNR_NBR_AP_INFO_HDR_INFO_FILTERED_NBR_AP_IDX              2
+#define WLAN_RNR_NBR_AP_INFO_HDR_INFO_FILTERED_NBR_AP_BITS             1
+/* HDR RESERVED */
+#define WLAN_RNR_NBR_AP_INFO_HDR_INFO_RESERVED_IDX                     3
+#define WLAN_RNR_NBR_AP_INFO_HDR_INFO_RESERVED_BITS                    1
+/* HDR INFO CNT */
+#define WLAN_RNR_NBR_AP_INFO_HDR_INFO_CNT_IDX                          4
+#define WLAN_RNR_NBR_AP_INFO_HDR_INFO_CNT_BITS                         4
+/* HDR INFO LEN */
+#define WLAN_RNR_NBR_AP_INFO_HDR_INFO_LEN_IDX                          8
+#define WLAN_RNR_NBR_AP_INFO_HDR_INFO_LEN_BITS                         8
+
 /**
  * struct tbtt_information_header - TBTT information header
  * @tbbt_info_fieldtype: TBTT information field type
