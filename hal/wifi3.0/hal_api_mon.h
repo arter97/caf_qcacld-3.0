@@ -191,7 +191,11 @@
 #define HAL_RX_MAX_MPDU_H_PER_STATUS_BUFFER 16
 
 /* Max pilot count */
+#ifdef QCA_MONITOR_2_0_SUPPORT
+#define HAL_RX_MAX_SU_EVM_COUNT 256
+#else
 #define HAL_RX_MAX_SU_EVM_COUNT 32
+#endif
 
 #define HAL_RX_FRAMECTRL_TYPE_MASK 0x0C
 #define HAL_RX_GET_FRAME_CTRL_TYPE(fc)\

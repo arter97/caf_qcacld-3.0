@@ -348,9 +348,9 @@ void
 dp_rx_populate_su_evm_details(struct hal_rx_ppdu_info *ppdu_info,
 			      struct cdp_rx_indication_ppdu *cdp_rx_ppdu)
 {
-	uint8_t pilot_evm;
-	uint8_t nss_count;
-	uint8_t pilot_count;
+	uint16_t pilot_evm;
+	uint16_t nss_count;
+	uint16_t pilot_count;
 
 	nss_count = ppdu_info->evm_info.nss_count;
 	pilot_count = ppdu_info->evm_info.pilot_count;
