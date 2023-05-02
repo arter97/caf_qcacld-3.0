@@ -189,7 +189,11 @@
 #define CDP_SNR_UPDATE_AVG(x, y) x = CDP_SNR_AVG((x), CDP_SNR_IN((y)))
 
 /*Max SU EVM count */
+#ifdef QCA_MONITOR_2_0_SUPPORT
+#define DP_RX_MAX_SU_EVM_COUNT 256
+#else
 #define DP_RX_MAX_SU_EVM_COUNT 32
+#endif
 
 #define WDI_EVENT_BASE 0x100
 
