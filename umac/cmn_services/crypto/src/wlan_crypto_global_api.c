@@ -1099,8 +1099,12 @@ QDF_STATUS wlan_crypto_setkey(struct wlan_objmgr_vdev *vdev,
 		key->private = req_key;
 	} else {
 		if (WLAN_CRYPTO_TX_OPS_SETKEY(tx_ops)) {
-			WLAN_CRYPTO_TX_OPS_SETKEY(tx_ops)(vdev, key, macaddr,
-							  req_key->type);
+			if (WLAN_CRYPTO_TX_OPS_SETKEY(tx_ops)(vdev, key,
+							      macaddr,
+							      req_key->type)) {
+				status = QDF_STATUS_E_INVAL;
+				goto err;
+			}
 		}
 	}
 	if (cipher)
