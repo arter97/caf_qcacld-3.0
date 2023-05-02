@@ -849,7 +849,8 @@ dp_peer_obj_create_notification(struct wlan_objmgr_peer *peer, void *arg)
 						       sta_info,
 						       QDF_STATUS_SUCCESS);
 	if (QDF_IS_STATUS_ERROR(status)) {
-		dp_err("DP peer attach failed");
+		dp_err("DP peer ("QDF_MAC_ADDR_FMT") attach failed",
+			QDF_MAC_ADDR_REF(peer->macaddr));
 		qdf_mem_free(sta_info);
 		return status;
 	}
@@ -881,7 +882,8 @@ dp_peer_obj_destroy_notification(struct wlan_objmgr_peer *peer, void *arg)
 	status = wlan_objmgr_peer_component_obj_detach(peer, WLAN_COMP_DP,
 						       sta_info);
 	if (QDF_IS_STATUS_ERROR(status))
-		dp_err("DP peer detach failed");
+		dp_err("DP peer ("QDF_MAC_ADDR_FMT") detach failed",
+			QDF_MAC_ADDR_REF(peer->macaddr));
 
 	qdf_mem_free(sta_info);
 
