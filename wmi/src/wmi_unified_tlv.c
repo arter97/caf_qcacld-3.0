@@ -443,6 +443,7 @@ static const uint32_t pdev_param_tlv[] = {
 		  PDEV_PARAM_SET_CONC_LOW_LATENCY_MODE),
 	PARAM_MAP(pdev_param_rtt_11az_rsid_range,
 		  PDEV_PARAM_RTT_11AZ_RSID_RANGE),
+	PARAM_MAP(pdev_param_pcie_config, PDEV_PARAM_PCIE_CONFIG),
 };
 
 /* Populate vdev_param array whose index is host param, value is target param */
