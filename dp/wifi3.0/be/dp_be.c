@@ -2829,6 +2829,7 @@ dp_primary_link_migration(struct dp_soc *soc, void *cb_ctxt,
 	struct dp_peer *mld_peer = NULL;
 	uint8_t primary_vdev_id;
 	struct cdp_txrx_peer_params_update params = {0};
+	uint8_t tid;
 
 	pr_soc = dp_mlo_get_soc_ref_by_chip_id(dp_mlo, pr_peer_info->chip_id);
 	if (!pr_soc) {
@@ -2848,6 +2849,21 @@ dp_primary_link_migration(struct dp_soc *soc, void *cb_ctxt,
 	}
 
 	new_primary_peer->primary_link = 1;
+
+	/*
+	 * Check if reo_qref_table_en is set and if
+	 * rx_tid qdesc for tid 0 is already setup and perform
+	 * qref write to LUT for Tid 0 and 16.
+	 *
+	 */
+	if (hal_reo_shared_qaddr_is_enable(pr_soc->hal_soc) &&
+	    mld_peer->rx_tid[0].hw_qdesc_vaddr_unaligned) {
+		for (tid = 0; tid < DP_MAX_TIDS; tid++)
+			hal_reo_shared_qaddr_write(pr_soc->hal_soc,
+						   mld_peer->peer_id,
+						   tid,
+						   mld_peer->rx_tid[tid].hw_qdesc_paddr);
+	}
 
 	if (pr_soc && pr_soc->cdp_soc.ol_ops->update_primary_link)
 		pr_soc->cdp_soc.ol_ops->update_primary_link(pr_soc->ctrl_psoc,
