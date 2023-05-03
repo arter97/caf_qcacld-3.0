@@ -364,6 +364,20 @@ static int dp_get_num_rx_contexts(struct cdp_soc_t *soc_hdl)
 	return num_rx_contexts;
 }
 #else
+#ifdef WLAN_SOFTUMAC_SUPPORT
+static int dp_get_num_rx_contexts(struct cdp_soc_t *soc_hdl)
+{
+	uint32_t rx_rings_config;
+	struct dp_soc *soc = (struct dp_soc *)soc_hdl;
+
+	rx_rings_config = wlan_cfg_get_rx_rings_mapping(soc->wlan_cfg_ctx);
+	/*
+	 * qdf_get_hweight32 prefer over qdf_get_hweight8 in case map is scaled
+	 * in future
+	 */
+	return qdf_get_hweight32(rx_rings_config);
+}
+#else
 static int dp_get_num_rx_contexts(struct cdp_soc_t *soc_hdl)
 {
 	int num_rx_contexts;
@@ -379,6 +393,7 @@ static int dp_get_num_rx_contexts(struct cdp_soc_t *soc_hdl)
 
 	return num_rx_contexts;
 }
+#endif /* WLAN_SOFTUMAC_SUPPORT */
 #endif
 
 #endif
