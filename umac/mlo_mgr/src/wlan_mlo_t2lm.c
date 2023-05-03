@@ -22,10 +22,10 @@
 #include <wlan_objmgr_vdev_obj.h>
 #include <wlan_objmgr_peer_obj.h>
 #include <wlan_mlo_mgr_public_structs.h>
-#include <wlan_mlo_t2lm.h>
 #include <wlan_mlo_mgr_cmn.h>
 #include <qdf_util.h>
 #include <wlan_cm_api.h>
+#include "wlan_utility.h"
 #if defined(WLAN_FEATURE_11BE_MLO) && defined(WLAN_FEATURE_11BE_MLO_ADV_FEATURE)
 #include <wlan_t2lm_api.h>
 #endif
@@ -300,7 +300,8 @@ uint8_t *wlan_mlo_add_t2lm_info_ie(uint8_t *frm, struct wlan_t2lm_info *t2lm,
 		frm += sizeof(*t2lm_ie) + sizeof(uint8_t);
 	} else {
 		for (tid_num = 0; tid_num < T2LM_MAX_NUM_TIDS; tid_num++)
-			if (t2lm->hw_link_map_tid[tid_num])
+			if (t2lm->hw_link_map_tid[tid_num] ||
+			    t2lm->ieee_link_map_tid[tid_num])
 				link_mapping_presence_indicator |= BIT(tid_num);
 
 		QDF_SET_BITS(t2lm_control,
@@ -1397,3 +1398,60 @@ wlan_mlo_t2lm_timer_deinit(struct wlan_objmgr_vdev *vdev)
 	t2lm_dev_lock_destroy(&vdev->mlo_dev_ctx->t2lm_ctx);
 	return QDF_STATUS_SUCCESS;
 }
+
+#if defined(WLAN_FEATURE_11BE_MLO_ADV_FEATURE) && defined(WLAN_FEATURE_11BE)
+QDF_STATUS
+wlan_mlo_link_disable_request_handler(struct wlan_objmgr_psoc *psoc,
+				      void *evt_params)
+{
+	struct wlan_objmgr_vdev *vdev;
+	QDF_STATUS status = QDF_STATUS_SUCCESS;
+	uint8_t vdev_id;
+	bool is_connected = false;
+	struct mlo_link_disable_request_evt_params *params;
+
+	if (!psoc)
+		return QDF_STATUS_E_NULL_VALUE;
+
+	if (!evt_params) {
+		t2lm_err("event params is null");
+		return QDF_STATUS_E_NULL_VALUE;
+	}
+
+	params = (struct mlo_link_disable_request_evt_params *)evt_params;
+	if (qdf_is_macaddr_zero(&params->mld_addr)) {
+		t2lm_err("mld mac addr in event params is null");
+		return QDF_STATUS_E_NULL_VALUE;
+	}
+
+	if (!params->link_id_bitmap) {
+		t2lm_debug("Link id bitmap is 0, no action frame to be sent");
+		return QDF_STATUS_SUCCESS;
+	}
+
+	is_connected = wlan_get_connected_vdev_by_mld_addr(psoc,
+							   params->mld_addr.bytes,
+							   &vdev_id);
+	if (!is_connected) {
+		t2lm_err("Not connected to peer MLD " QDF_MAC_ADDR_FMT,
+			 params->mld_addr.bytes);
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, vdev_id,
+						    WLAN_MLO_MGR_ID);
+	if (!vdev) {
+		t2lm_err("vdev is null");
+		return QDF_STATUS_E_NULL_VALUE;
+	}
+
+	status = wlan_populate_link_disable_t2lm_frame(vdev, params);
+
+	if (QDF_IS_STATUS_ERROR(status))
+		t2lm_err("Failed to handle link disable");
+
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_MLO_MGR_ID);
+	return status;
+}
+#endif
+

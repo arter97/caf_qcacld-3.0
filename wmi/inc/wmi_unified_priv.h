@@ -3127,6 +3127,11 @@ QDF_STATUS (*extract_mgmt_rx_mlo_link_removal_info)(
 		void *buf,
 		struct mgmt_rx_mlo_link_removal_info *link_removal_info,
 		int num_link_removal_info);
+
+QDF_STATUS (*extract_mlo_link_disable_request_evt_param)(
+		struct wmi_unified *wmi_handle,
+		void *buf,
+		struct mlo_link_disable_request_evt_params *params);
 #endif
 
 #ifdef WLAN_FEATURE_SON

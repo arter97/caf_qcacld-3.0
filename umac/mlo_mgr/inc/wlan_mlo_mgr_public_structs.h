@@ -1068,4 +1068,14 @@ struct mgmt_rx_mlo_link_removal_info {
 	uint16_t tbtt_count;
 };
 
+/**
+ * struct mlo_link_disable_request_evt_params - MLO link disable
+ * request params
+ * @mld_addr: disable mld address
+ * @link_id_bitmap: Disable Link id bitmap
+ */
+struct mlo_link_disable_request_evt_params {
+	struct qdf_mac_addr mld_addr;
+	uint32_t link_id_bitmap;
+};
 #endif

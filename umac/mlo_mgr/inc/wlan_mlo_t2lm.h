@@ -714,6 +714,7 @@ QDF_STATUS wlan_process_bcn_prbrsp_t2lm_ie(struct wlan_objmgr_vdev *vdev,
  */
 QDF_STATUS wlan_send_tid_to_link_mapping(struct wlan_objmgr_vdev *vdev,
 					 struct wlan_t2lm_info *t2lm);
+
 /**
  * wlan_get_t2lm_mapping_status() - API to get T2LM info
  * @vdev: Pointer to vdev
@@ -736,7 +737,6 @@ QDF_STATUS wlan_get_t2lm_mapping_status(struct wlan_objmgr_vdev *vdev,
 QDF_STATUS
 wlan_send_peer_level_tid_to_link_mapping(struct wlan_objmgr_vdev *vdev,
 					 struct wlan_objmgr_peer *peer);
-
 #else
 static inline QDF_STATUS wlan_mlo_parse_t2lm_ie(
 	struct wlan_t2lm_onging_negotiation_info *t2lm, uint8_t *ie)
@@ -880,10 +880,30 @@ wlan_send_peer_level_tid_to_link_mapping(struct wlan_objmgr_vdev *vdev,
  */
 void
 wlan_clear_peer_level_tid_to_link_mapping(struct wlan_objmgr_vdev *vdev);
+
+/**
+ * wlan_mlo_link_disable_request_handler() - API to handle mlo link disable
+ * request handler.
+ *
+ * @psoc: Pointer to psoc
+ * @evt_params: MLO Link disable request params
+ *
+ * Return QDF_STATUS
+ */
+QDF_STATUS
+wlan_mlo_link_disable_request_handler(struct wlan_objmgr_psoc *psoc,
+				      void *evt_params);
 #else
 static inline void
 wlan_clear_peer_level_tid_to_link_mapping(struct wlan_objmgr_vdev *vdev)
 {
+}
+
+static inline QDF_STATUS
+wlan_mlo_link_disable_request_handler(struct wlan_objmgr_psoc *psoc,
+				      void *evt_params)
+{
+	return QDF_STATUS_E_NOSUPPORT;
 }
 #endif
 #endif /* _WLAN_MLO_T2LM_H_ */
