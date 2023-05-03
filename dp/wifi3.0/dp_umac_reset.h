@@ -310,6 +310,23 @@ bool dp_check_umac_reset_in_progress(struct dp_soc *soc);
  * Return: QDF_STATUS
  */
 QDF_STATUS dp_umac_reset_stats_print(struct dp_soc *soc);
+
+/**
+ * dp_umac_reset_validate_n_update_state_machine_on_rx() - Validate the state
+ * machine for a given rx event and update the state machine
+ * @umac_reset_ctx: UMAC reset context
+ * @rx_event: Rx event
+ * @current_exp_state: Expected state
+ * @next_state: The state to which the state machine needs to be updated
+ *
+ * Return: QDF_STATUS of operation
+ */
+QDF_STATUS
+dp_umac_reset_validate_n_update_state_machine_on_rx(
+				struct dp_soc_umac_reset_ctx *umac_reset_ctx,
+				enum umac_reset_rx_event rx_event,
+				enum umac_reset_state current_exp_state,
+				enum umac_reset_state next_state);
 #else
 static inline bool dp_check_umac_reset_in_progress(struct dp_soc *soc)
 {
