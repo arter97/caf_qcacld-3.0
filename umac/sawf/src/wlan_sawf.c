@@ -919,16 +919,17 @@ void wlan_disable_service_class(uint8_t svc_id)
 qdf_export_symbol(wlan_disable_service_class);
 
 #ifdef WLAN_SUPPORT_SCS
-bool wlan_service_id_scs_valid(bool scs_based_rule, uint8_t service_id)
+bool wlan_service_id_scs_valid(uint8_t sawf_rule_type, uint8_t service_id)
 {
-	if (scs_based_rule && (service_id >= SAWF_SCS_SVC_CLASS_MIN) &&
+	if ((sawf_rule_type == SAWF_RULE_TYPE_SCS) &&
+	    (service_id >= SAWF_SCS_SVC_CLASS_MIN) &&
 	    (service_id <= SAWF_SCS_SVC_CLASS_MAX))
 		return true;
 	else
 		return false;
 }
 #else
-bool wlan_service_id_scs_valid(bool scs_based_rule, uint8_t service_id)
+bool wlan_service_id_scs_valid(uint8_t sawf_rule_type, uint8_t service_id)
 {
 	return false;
 }

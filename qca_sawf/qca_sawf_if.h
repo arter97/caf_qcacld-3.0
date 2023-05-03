@@ -42,7 +42,7 @@ uint16_t qca_sawf_get_msduq(struct net_device *netdev,
 			    uint8_t *peer_mac, uint32_t service_id);
 uint16_t qca_sawf_get_msduq_v2(struct net_device *netdev, uint8_t *peer_mac,
 			       uint32_t service_id, uint32_t dscp,
-			       uint32_t rule_id, bool scs_based_rule);
+			       uint32_t rule_id, uint8_t sawf_rule_type);
 uint16_t qca_sawf_get_msdu_queue(struct net_device *netdev,
 				 uint8_t *peer_mac, uint32_t service_id,
 				 uint32_t dscp, uint32_t rule_id);

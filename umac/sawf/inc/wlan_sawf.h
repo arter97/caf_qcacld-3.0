@@ -42,6 +42,18 @@
 #define SAWF_SCS_SVC_CLASS_MAX (SAWF_SVC_CLASS_MAX + SAWF_SCS_TID_MAX)
 #endif
 
+/**
+ * enum sawf_rule_type - Enum for SAWF rule type
+ * @SAWF_RULE_TYPE_DEFAULT: Admin configured global SAWF rule
+ * @SAWF_RULE_TYPE_SCS: Client specific SAWF rule configured via SCS procedure
+ * @SAWF_RULE_TYPE_MAX: Max SAWF rule type
+ */
+enum sawf_rule_type {
+	SAWF_RULE_TYPE_DEFAULT,
+	SAWF_RULE_TYPE_SCS,
+	SAWF_RULE_TYPE_MAX,
+};
+
 #define SAWF_LINE_FORMAT "================================================"
 
 #define SAWF_DEF_PARAM_VAL 0xFFFFFFFF
@@ -488,12 +500,12 @@ void wlan_disable_service_class(uint8_t svc_id);
 
 /* wlan_service_id_scs_valid() - Check if valid SCS service class
  *
- * @scs_based_rule : flag to indicate SCS based rule
+ * @sawf_rule_type: sawf rule type
  * @svc_id : service-class id
  *
  * Return: bool
  */
-bool wlan_service_id_scs_valid(bool scs_based_rule, uint8_t svc_id);
+bool wlan_service_id_scs_valid(uint8_t sawf_rule_type, uint8_t svc_id);
 
 /* wlan_service_id_get_enabled_param_mask() - Get enabled_param_mask
  *
