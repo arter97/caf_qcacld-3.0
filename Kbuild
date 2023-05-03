@@ -3124,7 +3124,6 @@ INCS +=		$(WMA_INC) \
 		$(SCHEDULER_INC) \
 		$(REGULATORY_INC) \
 		$(HTC_INC) \
-		$(DFS_INC) \
 		$(WCFG_INC)
 
 INCS +=		$(HIF_INC) \
