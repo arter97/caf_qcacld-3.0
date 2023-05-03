@@ -1350,9 +1350,6 @@ wlan_hdd_connectivity_fail_event(struct wlan_objmgr_vdev *vdev,
 
 	WLAN_HOST_DIAG_EVENT_DEF(wlan_diag_event, struct wlan_diag_connect);
 
-	if (!rsp->reason)
-		return;
-
 	qdf_mem_zero(&wlan_diag_event, sizeof(struct wlan_diag_connect));
 
 	wlan_diag_event.diag_cmn.vdev_id = wlan_vdev_get_id(vdev);
