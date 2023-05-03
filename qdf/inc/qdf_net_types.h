@@ -70,6 +70,8 @@ typedef __in6_addr_t in6_addr_t;
 #define QDF_IEEE80211_FC1_FROMDS        0x02
 #define QDF_IEEE80211_FC1_PM            0x10
 
+#define QDF_IEEE80211_FC0_VERSION_0     0x00
+#define QDF_IEEE80211_FC0_VERSION_MASK  0x03
 #define QDF_IEEE80211_FC0_TYPE_MASK     0x0c
 #define QDF_IEEE80211_FC0_SUBTYPE_MASK  0xf0
 
