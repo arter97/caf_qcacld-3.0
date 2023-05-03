@@ -1326,19 +1326,27 @@ void dp_umac_reset_complete_umac_recovery(struct dp_soc *soc)
 /**
  * dp_umac_reset_initiate_umac_recovery() - Initiate Umac reset session
  * @soc: dp soc handle
+ * @umac_reset_ctx: Umac reset context
+ * @rx_event: Rx event received
  * @is_target_recovery: Flag to indicate if it is triggered for target recovery
  *
  * Return: status
  */
 QDF_STATUS dp_umac_reset_initiate_umac_recovery(struct dp_soc *soc,
-						bool is_target_recovery)
+				struct dp_soc_umac_reset_ctx *umac_reset_ctx,
+				enum umac_reset_rx_event rx_event,
+				bool is_target_recovery)
 {
 	struct dp_soc_be *be_soc = dp_get_be_soc_from_dp_soc(soc);
 	struct dp_mlo_ctxt *mlo_ctx = be_soc->ml_ctxt;
 	struct dp_soc_mlo_umac_reset_ctx *grp_umac_reset_ctx;
+	QDF_STATUS status = QDF_STATUS_SUCCESS;
 
 	if (!mlo_ctx)
-		return QDF_STATUS_SUCCESS;
+		return dp_umac_reset_validate_n_update_state_machine_on_rx(
+					umac_reset_ctx, rx_event,
+					UMAC_RESET_STATE_WAIT_FOR_TRIGGER,
+					UMAC_RESET_STATE_DO_TRIGGER_RECEIVED);
 
 	grp_umac_reset_ctx = &mlo_ctx->grp_umac_reset_ctx;
 	qdf_spin_lock_bh(&grp_umac_reset_ctx->grp_ctx_lock);
@@ -1346,6 +1354,16 @@ QDF_STATUS dp_umac_reset_initiate_umac_recovery(struct dp_soc *soc,
 	if (grp_umac_reset_ctx->umac_reset_in_progress) {
 		qdf_spin_unlock_bh(&grp_umac_reset_ctx->grp_ctx_lock);
 		return QDF_STATUS_E_INVAL;
+	}
+
+	status = dp_umac_reset_validate_n_update_state_machine_on_rx(
+					umac_reset_ctx, rx_event,
+					UMAC_RESET_STATE_WAIT_FOR_TRIGGER,
+					UMAC_RESET_STATE_DO_TRIGGER_RECEIVED);
+
+	if (status != QDF_STATUS_SUCCESS) {
+		qdf_spin_unlock_bh(&grp_umac_reset_ctx->grp_ctx_lock);
+		return status;
 	}
 
 	grp_umac_reset_ctx->umac_reset_in_progress = true;

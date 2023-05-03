@@ -2849,12 +2849,16 @@ void dp_umac_reset_complete_umac_recovery(struct dp_soc *soc);
 /**
  * dp_umac_reset_initiate_umac_recovery() - Initiate Umac reset session
  * @soc: dp soc handle
+ * @umac_reset_ctx: Umac reset context
+ * @rx_event: Rx event received
  * @is_target_recovery: Flag to indicate if it is triggered for target recovery
  *
  * Return: status
  */
 QDF_STATUS dp_umac_reset_initiate_umac_recovery(struct dp_soc *soc,
-						bool is_target_recovery);
+				struct dp_soc_umac_reset_ctx *umac_reset_ctx,
+				enum umac_reset_rx_event rx_event,
+				bool is_target_recovery);
 
 /**
  * dp_umac_reset_handle_action_cb() - Function to call action callback
