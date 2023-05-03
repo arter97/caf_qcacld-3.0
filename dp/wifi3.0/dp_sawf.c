@@ -716,8 +716,9 @@ process_peer:
 				dp_sawf(peer, q_id, is_used) = 1;
 				dp_sawf(peer, q_id, svc_id) = service_id;
 				dp_sawf(peer, q_id, ref_count)++;
-				if (!peer->sawf->is_sla)
-					peer->sawf->is_sla = true;
+				peer->sawf->sla_mask |=
+					wlan_service_id_get_enabled_param_mask(
+							service_id);
 				if (!peer->sawf->telemetry_ctx) {
 					tmetry_ctx = telemetry_sawf_peer_ctx_alloc(
 							soc, txrx_peer->sawf_stats,
@@ -797,14 +798,14 @@ process_peer:
 
 qdf_export_symbol(dp_sawf_get_msduq);
 
-bool
-dp_swaf_peer_is_sla_configured(struct cdp_soc_t *soc_hdl, uint8_t *mac_addr)
+QDF_STATUS
+dp_swaf_peer_sla_configuration(struct cdp_soc_t *soc_hdl, uint8_t *mac_addr,
+			       uint16_t *sla_mask)
 {
 	struct dp_soc *dp_soc;
 	struct dp_peer *peer = NULL, *primary_link_peer = NULL;
 	struct dp_txrx_peer *txrx_peer;
 	struct dp_peer_sawf *sawf_ctx;
-	bool is_sla = false;
 
 	dp_soc = cdp_soc_t_to_dp_soc(soc_hdl);
 	if (!dp_soc) {
@@ -839,17 +840,18 @@ dp_swaf_peer_is_sla_configured(struct cdp_soc_t *soc_hdl, uint8_t *mac_addr)
 		goto fail;
 	}
 
-	is_sla = sawf_ctx->is_sla;
+	*sla_mask = sawf_ctx->sla_mask;
 	dp_peer_unref_delete(primary_link_peer, DP_MOD_ID_SAWF);
 	dp_peer_unref_delete(peer, DP_MOD_ID_SAWF);
 
-	return is_sla;
+	return QDF_STATUS_SUCCESS;
 fail:
 	if (primary_link_peer)
 		dp_peer_unref_delete(primary_link_peer, DP_MOD_ID_SAWF);
 	if (peer)
 		dp_peer_unref_delete(peer, DP_MOD_ID_SAWF);
-	return is_sla;
+	*sla_mask = 0x00;
+	return QDF_STATUS_E_INVAL;
 }
 
 #ifdef CONFIG_SAWF_STATS

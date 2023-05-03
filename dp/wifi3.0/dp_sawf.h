@@ -408,7 +408,7 @@ struct dp_peer_sawf {
 	struct dp_sawf_msduq_tid_map
 	       msduq_map[DP_SAWF_TID_MAX][DP_SAWF_DEFINED_Q_PTID_MAX];
 	struct sawf_def_queue_report tid_reports[DP_SAWF_TID_MAX];
-	bool is_sla;
+	uint16_t sla_mask;
 	void *telemetry_ctx;
 };
 
@@ -510,14 +510,16 @@ dp_sawf_peer_config_ul(struct cdp_soc_t *soc_hdl, uint8_t *mac_addr,
 		       uint32_t max_latency, uint8_t add_or_sub);
 
 /*
- * dp_swaf_peer_is_sla_configured() - Check if sla is configured for a peer
+ * dp_swaf_peer_sla_configuration() - Get sla configuration for a peer
  * @soc_hdl: SOC handle
  * @mac_addr: peer mac address
+ * @sla_mask: SLA Mask
  *
- * Return: true is peer is sla configured
+ * Return: QDF_STATUS
  */
-bool
-dp_swaf_peer_is_sla_configured(struct cdp_soc_t *soc_hdl, uint8_t *mac_addr);
+QDF_STATUS
+dp_swaf_peer_sla_configuration(struct cdp_soc_t *soc_hdl, uint8_t *mac_addr,
+			       uint16_t *sla_mask);
 
 /**
  * dp_sawf_get_peer_msduq_info - get peer MSDU Queue information
