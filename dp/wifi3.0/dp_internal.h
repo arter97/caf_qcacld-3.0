@@ -2814,6 +2814,22 @@ QDF_STATUS dp_umac_reset_notify_asserted_soc(struct dp_soc *soc)
 }
 #endif
 
+#ifdef DP_UMAC_HW_RESET_SUPPORT
+/**
+ * dp_umac_reset_is_inprogress() - Check if umac reset is in progress
+ * @psoc: dp soc handle
+ *
+ * Return: true if umac reset is in progress, else false.
+ */
+bool dp_umac_reset_is_inprogress(struct cdp_soc_t *psoc);
+#else
+static inline
+bool dp_umac_reset_is_inprogress(struct cdp_soc_t *psoc)
+{
+	return false;
+}
+#endif
+
 #ifndef WLAN_SOFTUMAC_SUPPORT
 QDF_STATUS dp_reo_send_cmd(struct dp_soc *soc, enum hal_reo_cmd_type type,
 			   struct hal_reo_cmd_params *params,

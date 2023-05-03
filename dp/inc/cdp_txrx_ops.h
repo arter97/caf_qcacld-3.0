@@ -953,6 +953,7 @@ struct cdp_ctrl_ops {
 						     uint32_t *mask,
 						     uint32_t *mask_cont);
 #endif
+	bool (*umac_reset_is_inprogress)(struct cdp_soc_t *psoc);
 };
 
 struct cdp_me_ops {

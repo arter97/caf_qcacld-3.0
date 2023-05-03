@@ -1589,4 +1589,32 @@ QDF_STATUS dp_mlo_umac_reset_stats_print(struct dp_soc *soc)
 
 	return QDF_STATUS_SUCCESS;
 }
+
+bool dp_umac_reset_is_inprogress(struct cdp_soc_t *psoc)
+{
+	struct dp_soc_umac_reset_ctx *umac_reset_ctx;
+	struct dp_soc *soc = (struct dp_soc *)psoc;
+	struct dp_soc_mlo_umac_reset_ctx *grp_umac_reset_ctx;
+	struct dp_soc_be *be_soc = NULL;
+	struct dp_mlo_ctxt *mlo_ctx = NULL;
+
+	if (!soc) {
+		dp_umac_reset_err("DP SOC is null");
+		return false;
+	}
+
+	umac_reset_ctx = &soc->umac_reset_ctx;
+
+	be_soc = dp_get_be_soc_from_dp_soc(soc);
+	if (be_soc)
+		mlo_ctx = be_soc->ml_ctxt;
+
+	if (mlo_ctx) {
+		grp_umac_reset_ctx = &mlo_ctx->grp_umac_reset_ctx;
+		return grp_umac_reset_ctx->umac_reset_in_progress;
+	} else {
+		return (umac_reset_ctx->current_state !=
+				UMAC_RESET_STATE_WAIT_FOR_TRIGGER);
+	}
+}
 #endif
