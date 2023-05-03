@@ -378,7 +378,7 @@ struct wlan_cm_vdev_discon_req {
  * @CM_VALID_CANDIDATE_CHECK_FAIL: Valid Candidate Check fail
  */
 enum wlan_cm_connect_fail_reason {
-	CM_NO_CANDIDATE_FOUND,
+	CM_NO_CANDIDATE_FOUND = 1,
 	CM_ABORT_DUE_TO_NEW_REQ_RECVD,
 	CM_BSS_SELECT_IND_FAILED,
 	CM_PEER_CREATE_FAILED,
