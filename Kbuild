@@ -3298,6 +3298,12 @@ ifeq ($(findstring yes, $(found)), yes)
 ccflags-y += -DCFG80211_EXTERNAL_AUTH_MLO_SUPPORT
 endif
 
+
+found = $(shell if grep -qF "NL80211_EXT_FEATURE_SECURE_NAN" $(srctree)/include/uapi/linux/nl80211.h; then echo "yes"; else echo "no"; fi;)
+ifeq ($(findstring yes, $(found)), yes)
+ccflags-y += -DCFG80211_EXT_FEATURE_SECURE_NAN
+endif
+
 ifeq (qca_cld3, $(WLAN_WEAR_CHIPSET))
 	ccflags-y += -DWLAN_WEAR_CHIPSET
 endif
