@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2016-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -420,6 +420,7 @@ QDF_STATUS wlan_mgmt_txrx_mgmt_frame_tx(struct wlan_objmgr_peer *peer,
 	struct wlan_objmgr_vdev *vdev;
 	QDF_STATUS status;
 	struct wlan_lmac_if_tx_ops *tx_ops;
+	struct ieee80211_frame *wh;
 
 	if (!peer) {
 		mgmt_txrx_err("peer passed is NULL");
@@ -451,6 +452,14 @@ QDF_STATUS wlan_mgmt_txrx_mgmt_frame_tx(struct wlan_objmgr_peer *peer,
 	if (!pdev) {
 		mgmt_txrx_err("pdev unavailable for peer %pK vdev %pK",
 				peer, vdev);
+		wlan_objmgr_peer_release_ref(peer, WLAN_MGMT_NB_ID);
+		return QDF_STATUS_E_NULL_VALUE;
+	}
+
+	wh = (struct ieee80211_frame *)qdf_nbuf_data(buf);
+	if ((wh->i_fc[0] & QDF_IEEE80211_FC0_VERSION_MASK) !=
+	    QDF_IEEE80211_FC0_VERSION_0) {
+		mgmt_txrx_err("Incorrect frame control version");
 		wlan_objmgr_peer_release_ref(peer, WLAN_MGMT_NB_ID);
 		return QDF_STATUS_E_NULL_VALUE;
 	}
