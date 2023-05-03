@@ -86,26 +86,62 @@ enum {
 /**
  * struct hal_wbm_err_desc_info - structure to hold wbm error codes and reasons
  *
- * @reo_psh_rsn:	REO push reason
- * @reo_err_code:	REO Error code
- * @rxdma_psh_rsn:	RXDMA push reason
- * @rxdma_err_code:	RXDMA Error code
- * @reserved_1:		Reserved bits
- * @wbm_err_src:	WBM error source
- * @pool_id:		pool ID, indicates which rxdma pool
- * @msdu_continued:     Is the MSDU continued
- * @reserved_2:		Reserved bits
+ * The fields of this structure is aligned to HAL Rx WBM2SW Ring desc,
+ * inorder to efficiently copy the data from desc to struct.
+ * Do not change the sequence of the fields.
+ *
+ * @wbm_err_src: Module which initiated the buffer release
+ * @bm_action: BM action
+ * @buffer_or_desc_type: Type of Buffer or Desc released
+ * @return_buffer_manager: Buffer address Info for debug
+ * @pool_id: pool ID, indicates which rxdma pool
+ * @cache_id: cache Id
+ * @cookie_conversion_status: cookie conversion status
+ * @rxdma_psh_rsn: RXDMA push reason
+ * @rxdma_err_code: RXDMA Error code
+ * @reo_psh_rsn: REO push reason
+ * @reo_err_code: REO Error code
+ * @wbm_internal_error: WBM Internal error
  */
 struct hal_wbm_err_desc_info {
-	uint16_t reo_psh_rsn:2,
-		 reo_err_code:5,
-		 rxdma_psh_rsn:2,
-		 rxdma_err_code:5,
-		 reserved_1:2;
-	uint8_t wbm_err_src:3,
-		pool_id:2,
-		msdu_continued:1,
-		reserved_2:2;
+#ifndef WIFI_BIT_ORDER_BIG_ENDIAN
+	uint32_t wbm_err_src                                             :  3,
+		 bm_action                                               :  3,
+		 buffer_or_desc_type                                     :  3,
+		 return_buffer_manager                                   :  4,
+		 pool_id                                                 :  2,
+		 cache_id                                                :  1,
+		 cookie_conversion_status                                :  1,
+		 rxdma_psh_rsn                                           :  2,
+		 rxdma_err_code                                          :  5,
+		 reo_psh_rsn                                             :  2,
+		 reo_err_code                                            :  5,
+		 wbm_internal_error                                      :  1;
+#else
+	uint32_t wbm_internal_error                                      :  1,
+		 reo_err_code                                            :  5,
+		 reo_psh_rsn                                             :  2,
+		 rxdma_err_code                                          :  5,
+		 rxdma_psh_rsn                                           :  2,
+		 cookie_conversion_status                                :  1,
+		 cache_id                                                :  1,
+		 pool_id                                                 :  2,
+		 return_buffer_manager                                   :  4,
+		 buffer_or_desc_type                                     :  3,
+		 bm_action                                               :  3,
+		 wbm_err_src                                             :  3;
+#endif
+};
+
+/**
+ * union hal_wbm_err_info_u - Union to hold wbm error information
+ * @info_bit: hal_wbm_err_desc_info: structure to hold wbm error info bit fields
+ * @info: variable to hold wbm error info
+ *
+ */
+union hal_wbm_err_info_u {
+	struct hal_wbm_err_desc_info info_bit;
+	uint32_t info;
 };
 
 /**

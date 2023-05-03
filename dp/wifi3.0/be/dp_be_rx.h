@@ -659,13 +659,6 @@ dp_rx_set_msdu_hw_link_id(qdf_nbuf_t nbuf, uint32_t peer_mdata)
 	QDF_NBUF_CB_RX_LOGICAL_LINK_ID(nbuf) = logical_link_id;
 }
 
-static inline uint8_t
-dp_rx_get_stats_arr_idx_from_link_id(qdf_nbuf_t nbuf,
-				     struct dp_txrx_peer *txrx_peer)
-{
-	return QDF_NBUF_CB_RX_LOGICAL_LINK_ID(nbuf);
-}
-
 static inline uint16_t
 dp_rx_get_peer_id_be(qdf_nbuf_t nbuf)
 {
@@ -768,40 +761,19 @@ static inline uint8_t hal_rx_get_l3_pad_bytes_be(qdf_nbuf_t nbuf,
 {
 	return HAL_RX_TLV_L3_HEADER_PADDING_GET(rx_tlv_hdr);
 }
-#else
+
 static inline uint8_t
-dp_rx_peer_mdata_link_id_get_be(uint32_t peer_metadata)
+dp_rx_wbm_err_msdu_continuation_get(struct dp_soc *soc,
+				    hal_ring_desc_t ring_desc,
+				    qdf_nbuf_t nbuf)
 {
-	uint8_t link_id = 0;
-
-	link_id = (HTT_RX_PEER_META_DATA_V1A_LOGICAL_LINK_ID_GET(peer_metadata)
-		   + 1);
-	if (link_id > DP_MAX_MLO_LINKS)
-		link_id = 0;
-
-	return link_id;
+	return hal_rx_wbm_err_msdu_continuation_get(soc->hal_soc,
+						    ring_desc);
 }
-
+#else
 static inline void
 dp_rx_set_msdu_hw_link_id(qdf_nbuf_t nbuf, uint32_t peer_mdata)
 {
-}
-
-static inline uint8_t
-dp_rx_get_stats_arr_idx_from_link_id(qdf_nbuf_t nbuf,
-				     struct dp_txrx_peer *txrx_peer)
-{
-	uint8_t link_id = 0;
-
-	link_id = (QDF_NBUF_CB_RX_HW_LINK_ID(nbuf) + 1);
-	if (link_id > DP_MAX_MLO_LINKS) {
-		link_id = 0;
-		DP_PEER_PER_PKT_STATS_INC(txrx_peer,
-					  rx.inval_link_id_pkt_cnt,
-					  1, link_id);
-	}
-
-	return link_id;
 }
 
 static inline uint16_t
@@ -852,5 +824,51 @@ static inline uint8_t hal_rx_get_l3_pad_bytes_be(qdf_nbuf_t nbuf,
 {
 	return QDF_NBUF_CB_RX_L3_PAD_MSB(nbuf) ? 2 : 0;
 }
-#endif
+
+static inline uint8_t
+dp_rx_wbm_err_msdu_continuation_get(struct dp_soc *soc,
+				    hal_ring_desc_t ring_desc,
+				    qdf_nbuf_t nbuf)
+{
+	return qdf_nbuf_is_rx_chfrag_cont(nbuf);
+}
+#endif /* CONFIG_NBUF_AP_PLATFORM */
+
+/**
+ * dp_rx_wbm_err_copy_desc_info_in_nbuf(): API to copy WBM dest ring
+ * descriptor information in nbuf CB/TLV
+ *
+ * @soc: pointer to Soc structure
+ * @ring_desc: wbm dest ring descriptor
+ * @nbuf: nbuf to save descriptor information
+ * @pool_id: pool id part of wbm error info
+ *
+ * Return: wbm error information details
+ */
+static inline uint32_t
+dp_rx_wbm_err_copy_desc_info_in_nbuf(struct dp_soc *soc,
+				     hal_ring_desc_t ring_desc,
+				     qdf_nbuf_t nbuf,
+				     uint8_t pool_id)
+{
+	uint32_t mpdu_desc_info = 0;
+	uint32_t msdu_desc_info = 0;
+	uint32_t peer_mdata = 0;
+	union hal_wbm_err_info_u wbm_err = { 0 };
+
+	/* get WBM mpdu & msdu desc info */
+	hal_rx_wbm_err_mpdu_msdu_info_get_be(ring_desc,
+					     &wbm_err.info,
+					     &mpdu_desc_info,
+					     &msdu_desc_info,
+					     &peer_mdata);
+
+	wbm_err.info_bit.pool_id = pool_id;
+	dp_rx_set_mpdu_msdu_desc_info_in_nbuf(nbuf,
+					      mpdu_desc_info,
+					      peer_mdata,
+					      msdu_desc_info);
+	dp_rx_set_wbm_err_info_in_nbuf(soc, nbuf, wbm_err);
+	return wbm_err.info;
+}
 #endif

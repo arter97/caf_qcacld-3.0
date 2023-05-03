@@ -150,12 +150,6 @@ dp_rx_peer_metadata_peer_id_get_li(struct dp_soc *soc, uint32_t peer_metadata)
 	return metadata->peer_id;
 }
 
-static inline uint8_t
-dp_rx_peer_mdata_link_id_get_li(uint32_t peer_metadata)
-{
-	return 0;
-}
-
 bool
 dp_rx_intrabss_handle_nawds_li(struct dp_soc *soc, struct dp_txrx_peer *ta_peer,
 			       qdf_nbuf_t nbuf_copy,

@@ -2212,7 +2212,6 @@ enum dp_context_type {
  * @dp_service_near_full_srngs: Handler for servicing the near full IRQ
  * @tx_implicit_rbm_set:
  * @dp_rx_peer_metadata_peer_id_get:
- * @dp_rx_peer_mdata_link_id_get: Handle to get link id
  * @dp_rx_chain_msdus:
  * @txrx_set_vdev_param: target specific ops while setting vdev params
  * @txrx_get_vdev_mcast_param: target specific ops for getting vdev
@@ -2378,7 +2377,6 @@ struct dp_arch_ops {
 				    uint8_t bm_id);
 	uint16_t (*dp_rx_peer_metadata_peer_id_get)(struct dp_soc *soc,
 						    uint32_t peer_metadata);
-	uint8_t (*dp_rx_peer_mdata_link_id_get)(uint32_t peer_metadata);
 	bool (*dp_rx_chain_msdus)(struct dp_soc *soc, qdf_nbuf_t nbuf,
 				  uint8_t *rx_tlv_hdr, uint8_t mac_id);
 	/* Control Arch Ops */

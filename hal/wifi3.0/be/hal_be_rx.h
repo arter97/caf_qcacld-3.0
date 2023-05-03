@@ -570,4 +570,34 @@ hal_rx_get_mpdu_msdu_desc_info_be(void *desc_addr,
 	*msdu_info = *(uint32_t *)(&reo_dst_ring->rx_msdu_desc_info_details);
 }
 
+/**
+ * hal_rx_wbm_err_mpdu_msdu_info_get_be() - Copies wbm, msdu, mpdu info
+ *                                          from HAL desc
+ * @desc_addr: WBM2SW Rx Error ring descriptor addr
+ * @wbm_err_info: Holds WBM Error info from HAL Rx descriptor
+ * @mpdu_info: Holds MPDU descriptor info from HAL Rx descriptor
+ * @msdu_info: Holds MSDU descriptor info from HAL Rx descriptor
+ * @peer_meta_data: Holds Peer Meta data from HAL Rx descriptor
+ *
+ * This function copies the WBM error information, MSDU desc info,
+ * MPDU Desc info and peer meta data from HAL RX Desc.
+ *
+ * Return: void
+ */
+static inline void
+hal_rx_wbm_err_mpdu_msdu_info_get_be(void *desc_addr,
+				     uint32_t *wbm_err_info,
+				     uint32_t *mpdu_info,
+				     uint32_t *msdu_info,
+				     uint32_t *peer_meta_data)
+{
+	struct wbm2sw_completion_ring_rx *wbm_rx_err_ring;
+
+	wbm_rx_err_ring = (struct wbm2sw_completion_ring_rx *)desc_addr;
+	*msdu_info = *(uint32_t *)&wbm_rx_err_ring->rx_msdu_desc_info_details;
+	*mpdu_info = *(uint32_t *)&wbm_rx_err_ring->rx_mpdu_desc_info_details;
+	*peer_meta_data =
+		*((uint32_t *)&wbm_rx_err_ring->rx_mpdu_desc_info_details + 1);
+	*wbm_err_info = *((uint32_t *)wbm_rx_err_ring + 2);
+}
 #endif /* _HAL_BE_RX_H_ */

@@ -1091,11 +1091,9 @@ dp_rx_wbm_err_reap_desc_li(struct dp_intr *int_ctx, struct dp_soc *soc,
 	hal_ring_desc_t ring_desc;
 	hal_soc_handle_t hal_soc;
 	struct dp_rx_desc *rx_desc;
-	union dp_rx_desc_list_elem_t
-		*head[WLAN_MAX_MLO_CHIPS][MAX_PDEV_CNT] = { { NULL } };
-	union dp_rx_desc_list_elem_t
-		*tail[WLAN_MAX_MLO_CHIPS][MAX_PDEV_CNT] = { { NULL } };
-	uint32_t rx_bufs_reaped[WLAN_MAX_MLO_CHIPS][MAX_PDEV_CNT] = { { 0 } };
+	union dp_rx_desc_list_elem_t *head[MAX_PDEV_CNT] = { NULL };
+	union dp_rx_desc_list_elem_t *tail[MAX_PDEV_CNT] = { NULL };
+	uint32_t rx_bufs_reaped[MAX_PDEV_CNT] = { 0 };
 	uint8_t buf_type;
 	uint8_t mac_id;
 	struct dp_srng *dp_rxdma_srng;
@@ -1103,14 +1101,16 @@ dp_rx_wbm_err_reap_desc_li(struct dp_intr *int_ctx, struct dp_soc *soc,
 	qdf_nbuf_t nbuf_head = NULL;
 	qdf_nbuf_t nbuf_tail = NULL;
 	qdf_nbuf_t nbuf;
-	struct hal_wbm_err_desc_info wbm_err_info = { 0 };
+	union hal_wbm_err_info_u wbm_err_info = { 0 };
 	uint8_t msdu_continuation = 0;
 	bool process_sg_buf = false;
 	uint32_t wbm_err_src;
 	QDF_STATUS status;
 	struct dp_soc *replenish_soc;
-	uint8_t chip_id;
+	uint8_t chip_id = 0;
 	struct hal_rx_mpdu_desc_info mpdu_desc_info = { 0 };
+	uint8_t *rx_tlv_hdr;
+	uint32_t peer_mdata;
 
 	qdf_assert(soc && hal_ring_hdl);
 	hal_soc = soc->hal_soc;
@@ -1173,7 +1173,8 @@ dp_rx_wbm_err_reap_desc_li(struct dp_intr *int_ctx, struct dp_soc *soc,
 			continue;
 		}
 
-		hal_rx_wbm_err_info_get(ring_desc, &wbm_err_info, hal_soc);
+		hal_rx_wbm_err_info_get(ring_desc, &wbm_err_info.info_bit,
+					hal_soc);
 		nbuf = rx_desc->nbuf;
 
 		status = dp_rx_wbm_desc_nbuf_sanity_check(soc, hal_ring_hdl,
@@ -1184,14 +1185,21 @@ dp_rx_wbm_err_reap_desc_li(struct dp_intr *int_ctx, struct dp_soc *soc,
 				   nbuf);
 			rx_desc->in_err_state = 1;
 			rx_desc->unmapped = 1;
-			rx_bufs_reaped[rx_desc->chip_id][rx_desc->pool_id]++;
+			rx_bufs_reaped[rx_desc->pool_id]++;
 
 			dp_rx_add_to_free_desc_list(
-				&head[rx_desc->chip_id][rx_desc->pool_id],
-				&tail[rx_desc->chip_id][rx_desc->pool_id],
+				&head[rx_desc->pool_id],
+				&tail[rx_desc->pool_id],
 				rx_desc);
 			continue;
 		}
+
+		/* Update peer_id in nbuf cb */
+		rx_tlv_hdr = qdf_nbuf_data(nbuf);
+		peer_mdata = hal_rx_tlv_peer_meta_data_get(soc->hal_soc,
+							   rx_tlv_hdr);
+		QDF_NBUF_CB_RX_PEER_ID(rx_desc->nbuf) =
+			dp_rx_peer_metadata_peer_id_get(soc, peer_mdata);
 
 		/* Get MPDU DESC info */
 		hal_rx_mpdu_desc_info_get(hal_soc, ring_desc, &mpdu_desc_info);
@@ -1207,8 +1215,8 @@ dp_rx_wbm_err_reap_desc_li(struct dp_intr *int_ctx, struct dp_soc *soc,
 		dp_ipa_rx_buf_smmu_mapping_unlock(soc);
 
 		if (qdf_unlikely(
-			soc->wbm_release_desc_rx_sg_support &&
-			dp_rx_is_sg_formation_required(&wbm_err_info))) {
+		    soc->wbm_release_desc_rx_sg_support &&
+		    dp_rx_is_sg_formation_required(&wbm_err_info.info_bit))) {
 			/* SG is detected from continuation bit */
 			msdu_continuation =
 				hal_rx_wbm_err_msdu_continuation_get(hal_soc,
@@ -1240,13 +1248,13 @@ dp_rx_wbm_err_reap_desc_li(struct dp_intr *int_ctx, struct dp_soc *soc,
 		}
 
 		/*
-		 * save the wbm desc info in nbuf TLV. We will need this
+		 * save the wbm desc info in nbuf CB/TLV. We will need this
 		 * info when we do the actual nbuf processing
 		 */
-		wbm_err_info.pool_id = rx_desc->pool_id;
-		dp_rx_set_err_info(soc, nbuf, wbm_err_info);
+		wbm_err_info.info_bit.pool_id = rx_desc->pool_id;
+		dp_rx_set_wbm_err_info_in_nbuf(soc, nbuf, wbm_err_info);
 
-		rx_bufs_reaped[rx_desc->chip_id][rx_desc->pool_id]++;
+		rx_bufs_reaped[rx_desc->pool_id]++;
 
 		if (qdf_nbuf_is_rx_chfrag_cont(nbuf) || process_sg_buf) {
 			DP_RX_LIST_APPEND(soc->wbm_sg_param.wbm_sg_nbuf_head,
@@ -1271,8 +1279,8 @@ dp_rx_wbm_err_reap_desc_li(struct dp_intr *int_ctx, struct dp_soc *soc,
 		}
 
 		dp_rx_add_to_free_desc_list
-			(&head[rx_desc->chip_id][rx_desc->pool_id],
-			 &tail[rx_desc->chip_id][rx_desc->pool_id], rx_desc);
+			(&head[rx_desc->pool_id],
+			 &tail[rx_desc->pool_id], rx_desc);
 
 		/*
 		 * if continuation bit is set then we have MSDU spread
@@ -1285,32 +1293,30 @@ dp_rx_wbm_err_reap_desc_li(struct dp_intr *int_ctx, struct dp_soc *soc,
 done:
 	dp_srng_access_end(int_ctx, soc, hal_ring_hdl);
 
-	for (chip_id = 0; chip_id < WLAN_MAX_MLO_CHIPS; chip_id++) {
-		for (mac_id = 0; mac_id < MAX_PDEV_CNT; mac_id++) {
-			/*
-			 * continue with next mac_id if no pkts were reaped
-			 * from that pool
-			 */
-			if (!rx_bufs_reaped[chip_id][mac_id])
-				continue;
+	for (mac_id = 0; mac_id < MAX_PDEV_CNT; mac_id++) {
+		/*
+		 * continue with next mac_id if no pkts were reaped
+		 * from that pool
+		 */
+		if (!rx_bufs_reaped[mac_id])
+			continue;
 
-			replenish_soc =
-			soc->arch_ops.dp_rx_replenish_soc_get(soc, chip_id);
+		replenish_soc =
+		soc->arch_ops.dp_rx_replenish_soc_get(soc, chip_id);
 
-			dp_rxdma_srng =
-				&replenish_soc->rx_refill_buf_ring[mac_id];
+		dp_rxdma_srng =
+			&replenish_soc->rx_refill_buf_ring[mac_id];
 
-			rx_desc_pool = &replenish_soc->rx_desc_buf[mac_id];
+		rx_desc_pool = &replenish_soc->rx_desc_buf[mac_id];
 
-			dp_rx_buffers_replenish_simple(
-						replenish_soc, mac_id,
-						dp_rxdma_srng,
-						rx_desc_pool,
-						rx_bufs_reaped[chip_id][mac_id],
-						&head[chip_id][mac_id],
-						&tail[chip_id][mac_id]);
-			*rx_bufs_used += rx_bufs_reaped[chip_id][mac_id];
-		}
+		dp_rx_buffers_replenish_simple(
+					replenish_soc, mac_id,
+					dp_rxdma_srng,
+					rx_desc_pool,
+					rx_bufs_reaped[mac_id],
+					&head[mac_id],
+					&tail[mac_id]);
+		*rx_bufs_used += rx_bufs_reaped[mac_id];
 	}
 	return nbuf_head;
 }
