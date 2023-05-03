@@ -198,8 +198,6 @@ CONFIG_FEATURE_MSCS := y
 CONFIG_WLAN_FEATURE_FILS := y
 ifneq ($(CONFIG_QCA_CLD_WLAN),)
 	ifeq (y,$(findstring y,$(CONFIG_ICNSS2) $(CONFIG_ICNSS2_MODULE)))
-	#Flag to enable Protected Management Frames (11w) feature
-	CONFIG_WLAN_FEATURE_11W := y
 	#Flag to enable LTE CoEx feature
 	CONFIG_QCOM_LTE_COEX := y
 	ifneq ($(CONFIG_MOBILE_ROUTER), y)
