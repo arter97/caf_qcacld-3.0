@@ -123,10 +123,6 @@ config WLAN_FEATURE_FILS
 	bool "Enable FILS feature"
 	default n
 
-config NAN_CONVERGENCE
-	bool "Enable NAN_CONVERGENCE feature"
-	default n
-
 config WLAN_OBJMGR_DEBUG
 	bool "Enable WLAN Obj Mgr Debug services"
 	default n
