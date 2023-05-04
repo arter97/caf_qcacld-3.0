@@ -130,6 +130,14 @@ enum verbose_debug_module {
 		(_peer_info)->peer_type = (_peer_type);			\
 	} while (0); })
 
+#ifdef WLAN_FEATURE_11BE_MLO
+#define CDP_RX_ML_PEER_VALID_MASK  (0x00002000)
+#define CDP_RX_ML_PEER_VALID_SHIFT (13)
+#define CDP_RX_GET_ML_PEER_VALID(skb) \
+	((QDF_NBUF_CB_RX_PEER_ID(skb) & \
+	  CDP_RX_ML_PEER_VALID_MASK) >> CDP_RX_ML_PEER_VALID_SHIFT)
+#endif
+
 /**
  * enum vdev_host_stats_id -
  * host stats update from CDP have to set one of the following stats ID

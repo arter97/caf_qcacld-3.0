@@ -1239,7 +1239,7 @@ bool dp_rx_mlo_igmp_handler(struct dp_soc *soc,
 	/* Set the ml peer valid bit in skb peer metadata, so that osif
 	 * can deliver the SA mangled IGMP packet to mld netdev.
 	 */
-	QDF_NBUF_CB_RX_SET_ML_PEER_VALID(nbuf);
+	QDF_NBUF_CB_RX_PEER_ID(nbuf) |= CDP_RX_ML_PEER_VALID_MASK;
 	/* Deliver the original IGMP with dummy src on the mld netdev */
 send_pkt:
 	dp_rx_deliver_to_stack(be_vdev->vdev.pdev->soc,

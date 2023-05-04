@@ -430,18 +430,6 @@ QDF_COMPILE_TIME_ASSERT(qdf_nbuf_cb_size,
 	(((struct qdf_nbuf_cb *) \
 	  ((skb)->cb))->u.rx.hw_info.desc_tlv_members.peer_id)
 
-#define QDF_NBUF_CB_RX_ML_PEER_VALID_MASK  (0x00002000)
-#define QDF_NBUF_CB_RX_ML_PEER_VALID_SHIFT (13)
-
-#define QDF_NBUF_CB_RX_GET_ML_PEER_VALID(skb) \
-	((QDF_NBUF_CB_RX_PEER_ID(skb) & \
-		QDF_NBUF_CB_RX_ML_PEER_VALID_MASK) >> \
-			QDF_NBUF_CB_RX_ML_PEER_VALID_SHIFT)
-
-#define QDF_NBUF_CB_RX_SET_ML_PEER_VALID(skb) \
-	(QDF_NBUF_CB_RX_PEER_ID(nbuf) |= \
-		QDF_NBUF_CB_RX_ML_PEER_VALID_MASK)
-
 #define QDF_NBUF_CB_RX_VDEV_ID(skb) \
 	(((struct qdf_nbuf_cb *) \
 	  ((skb)->cb))->u.rx.hw_info.desc_tlv_members.vdev_id)
