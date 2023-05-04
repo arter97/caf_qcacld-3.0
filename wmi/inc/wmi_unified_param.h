@@ -1358,6 +1358,8 @@ struct peer_assoc_ml_partner_links {
  * @akm: AKM info
  * @mlo_params: MLO assoc params
  * @ml_links: MLO partner links
+ * @qcn_node_flag: if node is QCN node
+ * @mesh_node_flag: if node is 4 addr node
  * @peer_dms_capable: is peer DMS capable
  * @reserved: spare bits
  * @t2lm_params: TID-to-link mapping params
@@ -1444,6 +1446,8 @@ struct peer_assoc_params {
 #ifdef WLAN_FEATURE_11BE_MLO
 	struct peer_assoc_mlo_params mlo_params;
 	struct peer_assoc_ml_partner_links ml_links;
+	bool qcn_node_flag;
+	bool mesh_node_flag;
 #endif
 	uint8_t peer_dms_capable:1,
 		reserved:7;
