@@ -94,9 +94,15 @@ QDF_STATUS wlan_ipa_update_perf_level(struct wlan_ipa_priv *ipa_ctx, int client)
 static inline
 QDF_STATUS wlan_ipa_update_perf_level(struct wlan_ipa_priv *ipa_ctx, int client)
 {
-	return cdp_ipa_set_perf_level(ipa_ctx->dp_soc,
-				      client,
-				      WLAN_IPA_MAX_BANDWIDTH, ipa_ctx->hdl);
+	uint32_t bw;
+
+	if (ipa_ctx->opt_wifi_datapath)
+		bw = WLAN_IPA_MAX_BANDWIDTH;
+	else
+		bw = WLAN_IPA_MAX_BW_NOMINAL;
+
+	return cdp_ipa_set_perf_level(ipa_ctx->dp_soc, client, bw,
+				      ipa_ctx->hdl);
 }
 #endif
 
