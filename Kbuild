@@ -3288,6 +3288,11 @@ ifeq ($(findstring yes, $(found)), yes)
 ccflags-y += -DCFG80211_RU_PUNCT_NOTIFY
 endif
 
+found = $(shell if grep -qF "NL80211_EXT_FEATURE_AUTH_AND_DEAUTH_RANDOM_TA" $(srctree)/include/uapi/linux/nl80211.h; then echo "yes"; else echo "no"; fi;)
+ifeq ($(findstring yes, $(found)), yes)
+ccflags-y += -DCFG80211_EXT_FEATURE_AUTH_AND_DEAUTH_RANDOM_TA
+endif
+
 # CFG80211_EXTERNAL_AUTH_MLO_SUPPORT
 # Used to indicate Linux kernel contains support for ML external auth support.
 #
