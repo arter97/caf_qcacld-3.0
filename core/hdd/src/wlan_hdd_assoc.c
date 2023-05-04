@@ -2705,6 +2705,9 @@ struct osif_cm_ops osif_ops = {
 #endif
 	.send_vdev_keys_cb = hdd_cm_send_vdev_keys,
 	.get_scan_ie_params_cb = hdd_cm_get_scan_ie_params,
+#ifdef WLAN_BOOST_CPU_FREQ_IN_ROAM
+	.perfd_set_cpufreq_cb = hdd_cm_perfd_set_cpufreq,
+#endif
 };
 
 QDF_STATUS hdd_cm_register_cb(void)

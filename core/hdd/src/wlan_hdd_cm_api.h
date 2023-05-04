@@ -136,6 +136,26 @@ QDF_STATUS hdd_cm_get_handoff_param(struct wlan_objmgr_psoc *psoc,
  */
 QDF_STATUS hdd_cm_napi_serialize_control(bool action);
 
+#ifdef WLAN_BOOST_CPU_FREQ_IN_ROAM
+/**
+ * hdd_cm_perfd_set_cpufreq() - API to set CPU min freq
+ * @action: set or reset the CPU freq
+ *
+ * This function sets/resets the CPU min frequency
+ * by sending netlink msg to cnss-daemon, which will
+ * communicate to perf daemon to set/reset CPU freq.
+ *
+ * Return: qdf status
+ */
+QDF_STATUS hdd_cm_perfd_set_cpufreq(bool action);
+#else
+static inline
+QDF_STATUS hdd_cm_perfd_set_cpufreq(bool action)
+{
+	return QDF_STATUS_SUCCESS;
+}
+#endif
+
 #ifdef WLAN_FEATURE_FILS_SK
 /**
  * hdd_cm_save_gtk() - save gtk api
