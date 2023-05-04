@@ -867,6 +867,11 @@ int hdd_reg_set_country(struct hdd_context *hdd_ctx, char *country_code)
 		return -EINVAL;
 	}
 
+	if (!ucfg_reg_is_user_country_set_allowed(hdd_ctx->psoc)) {
+		hdd_err("user_country is not allowed");
+		return -EINVAL;
+	}
+
 	qdf_mem_copy(cc, country_code, REG_ALPHA2_LEN);
 	cc[REG_ALPHA2_LEN] = '\0';
 

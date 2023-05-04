@@ -3952,7 +3952,8 @@ static void hdd_skip_acs_scan_timer_deinit(struct hdd_context *hdd_ctx) {}
  */
 int hdd_update_country_code(struct hdd_context *hdd_ctx)
 {
-	if (!country_code)
+	if (!country_code ||
+	    !ucfg_reg_is_user_country_set_allowed(hdd_ctx->psoc))
 		return 0;
 
 	return hdd_reg_set_country(hdd_ctx, country_code);
