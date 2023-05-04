@@ -374,6 +374,7 @@ osif_cm_disconnect_start_cb(struct wlan_objmgr_vdev *vdev)
 static QDF_STATUS
 osif_cm_roam_start_cb(struct wlan_objmgr_vdev *vdev)
 {
+	osif_cm_perfd_set_cpufreq(true);
 	return osif_cm_netif_queue_ind(vdev,
 				       WLAN_STOP_ALL_NETIF_QUEUE,
 				       WLAN_CONTROL_PATH);
@@ -391,6 +392,7 @@ osif_cm_roam_start_cb(struct wlan_objmgr_vdev *vdev)
 static QDF_STATUS
 osif_cm_roam_abort_cb(struct wlan_objmgr_vdev *vdev)
 {
+	osif_cm_perfd_set_cpufreq(false);
 	osif_cm_napi_serialize(false);
 	return osif_cm_netif_queue_ind(vdev,
 				       WLAN_WAKE_ALL_NETIF_QUEUE,
@@ -410,6 +412,7 @@ osif_cm_roam_abort_cb(struct wlan_objmgr_vdev *vdev)
 static QDF_STATUS
 osif_cm_roam_cmpl_cb(struct wlan_objmgr_vdev *vdev)
 {
+	osif_cm_perfd_set_cpufreq(false);
 	return osif_cm_napi_serialize(false);
 }
 
@@ -749,3 +752,18 @@ void osif_cm_reset_legacy_cb(void)
 {
 	osif_cm_legacy_ops = NULL;
 }
+
+#ifdef WLAN_BOOST_CPU_FREQ_IN_ROAM
+QDF_STATUS osif_cm_perfd_set_cpufreq(bool action)
+{
+	os_if_cm_perfd_set_cpufreq_ctrl_cb cb = NULL;
+	QDF_STATUS ret = QDF_STATUS_SUCCESS;
+
+	if (osif_cm_legacy_ops)
+		cb = osif_cm_legacy_ops->perfd_set_cpufreq_cb;
+	if (cb)
+		ret = cb(action);
+
+	return ret;
+}
+#endif

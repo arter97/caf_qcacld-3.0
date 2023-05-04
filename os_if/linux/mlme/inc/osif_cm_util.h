@@ -346,6 +346,22 @@ typedef QDF_STATUS
 #endif
 #endif
 
+#ifdef WLAN_BOOST_CPU_FREQ_IN_ROAM
+/**
+ * typedef os_if_cm_perfd_set_cpufreq_ctrl_cb: Callback to update
+ * CPU min freq
+ * @action: bool action to set or reset the CPU freq
+ *
+ * This callback indicates legacy modules to take the actions
+ * related to set/reset CPU freq
+ *
+ * Context: Any context.
+ * Return: QDF_STATUS
+ */
+typedef QDF_STATUS
+	(*os_if_cm_perfd_set_cpufreq_ctrl_cb)(bool action);
+#endif
+
 /**
  * struct osif_cm_ops - connection manager legacy callbacks
  * @connect_complete_cb: callback for connect complete to legacy
@@ -367,6 +383,7 @@ typedef QDF_STATUS
  * preauth indication to the supplicant via wireless custom event.
  * @vendor_handoff_params_cb: callback to legacy module to send vendor handoff
  * parameters to upper layer
+ * @perfd_set_cpufreq_cb: callback to update CPU min freq
  */
 struct osif_cm_ops {
 	osif_cm_connect_comp_cb connect_complete_cb;
@@ -392,6 +409,9 @@ struct osif_cm_ops {
 #endif
 #ifdef WLAN_VENDOR_HANDOFF_CONTROL
 	osif_cm_get_vendor_handoff_params_cb vendor_handoff_params_cb;
+#endif
+#ifdef WLAN_BOOST_CPU_FREQ_IN_ROAM
+	os_if_cm_perfd_set_cpufreq_ctrl_cb perfd_set_cpufreq_cb;
 #endif
 };
 
@@ -551,4 +571,25 @@ void osif_cm_set_legacy_cb(struct osif_cm_ops *osif_legacy_ops);
  * Return: void
  */
 void osif_cm_reset_legacy_cb(void);
+
+#ifdef WLAN_BOOST_CPU_FREQ_IN_ROAM
+/**
+ * osif_cm_perfd_set_cpufreq() - Function to CPU min freq
+ * action to legacy module
+ * @action: Action to set or reset the CPU freq
+ *
+ * This function indicates to take the actions related to set/reset the CPU freq
+ *
+ * Context: Any context.
+ * Return: QDF_STATUS
+ */
+QDF_STATUS osif_cm_perfd_set_cpufreq(bool action);
+#else
+static inline
+QDF_STATUS osif_cm_perfd_set_cpufreq(bool action)
+{
+	return QDF_STATUS_SUCCESS;
+}
+#endif
+
 #endif /* __OSIF_CM_UTIL_H */
