@@ -1413,14 +1413,7 @@ dp_rx_mon_handle_flush_n_trucated_ppdu(struct dp_soc *soc,
 						  rx_mon_desc_pool);
 }
 
-/**
- * dp_rx_mon_append_nbuf() - Append nbuf to parent nbuf
- * @nbuf: Parent nbuf
- * @tmp_nbuf: nbuf to be attached to parent
- *
- * Return: void
- */
-static void dp_rx_mon_append_nbuf(qdf_nbuf_t nbuf, qdf_nbuf_t tmp_nbuf)
+void dp_rx_mon_append_nbuf(qdf_nbuf_t nbuf, qdf_nbuf_t tmp_nbuf)
 {
 	qdf_nbuf_t last_nbuf;
 

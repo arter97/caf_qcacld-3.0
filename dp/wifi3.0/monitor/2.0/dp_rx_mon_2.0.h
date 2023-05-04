@@ -401,4 +401,12 @@ void dp_mon_rx_print_advanced_stats_2_0(struct dp_soc *soc,
 }
 #endif
 
+/**
+ * dp_rx_mon_append_nbuf() - Append nbuf to parent nbuf
+ * @nbuf: Parent nbuf
+ * @tmp_nbuf: nbuf to be attached to parent
+ *
+ * Return: void
+ */
+void dp_rx_mon_append_nbuf(qdf_nbuf_t nbuf, qdf_nbuf_t tmp_nbuf);
 #endif /* _DP_RX_MON_2_0_H_ */
