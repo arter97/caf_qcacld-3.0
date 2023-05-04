@@ -890,12 +890,15 @@ qdf_export_symbol(dp_sawf_get_msduq);
 
 QDF_STATUS
 dp_swaf_peer_sla_configuration(struct cdp_soc_t *soc_hdl, uint8_t *mac_addr,
-			       uint16_t *sla_mask)
+			       uint16_t *arg_sla_mask)
 {
 	struct dp_soc *dp_soc;
 	struct dp_peer *peer = NULL, *primary_link_peer = NULL;
 	struct dp_txrx_peer *txrx_peer;
 	struct dp_peer_sawf *sawf_ctx;
+	struct dp_sawf_msduq *msduq;
+	uint8_t q_idx;
+	uint16_t sla_mask = 0;
 
 	dp_soc = cdp_soc_t_to_dp_soc(soc_hdl);
 	if (!dp_soc) {
@@ -930,7 +933,17 @@ dp_swaf_peer_sla_configuration(struct cdp_soc_t *soc_hdl, uint8_t *mac_addr,
 		goto fail;
 	}
 
-	*sla_mask = sawf_ctx->sla_mask;
+	for (q_idx = 0; q_idx < DP_SAWF_Q_MAX; q_idx++) {
+		msduq = &sawf_ctx->msduq[q_idx];
+		if (msduq->is_used && msduq->ref_count) {
+			sla_mask |= wlan_service_id_get_enabled_param_mask
+				(msduq->svc_id);
+		}
+	}
+
+	if (arg_sla_mask)
+		*arg_sla_mask = sla_mask;
+
 	dp_peer_unref_delete(primary_link_peer, DP_MOD_ID_SAWF);
 	dp_peer_unref_delete(peer, DP_MOD_ID_SAWF);
 
@@ -940,7 +953,8 @@ fail:
 		dp_peer_unref_delete(primary_link_peer, DP_MOD_ID_SAWF);
 	if (peer)
 		dp_peer_unref_delete(peer, DP_MOD_ID_SAWF);
-	*sla_mask = 0x00;
+	if (arg_sla_mask)
+		*arg_sla_mask = 0;
 	return QDF_STATUS_E_INVAL;
 }
 
