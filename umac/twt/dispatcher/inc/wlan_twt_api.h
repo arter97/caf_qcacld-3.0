@@ -143,5 +143,13 @@ QDF_STATUS wlan_twt_deinit(void)
 {
 	return QDF_STATUS_SUCCESS;
 }
+
+static inline
+QDF_STATUS wlan_set_peer_twt_capabilities(struct wlan_objmgr_psoc *psoc,
+					  struct qdf_mac_addr *peer_mac,
+					  uint8_t peer_cap)
+{
+	return QDF_STATUS_SUCCESS;
+}
 #endif
 #endif /* _WLAN_TWT_API_H_ */
