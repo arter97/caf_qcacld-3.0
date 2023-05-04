@@ -2994,7 +2994,7 @@ dp_rx_peer_map_handler(struct dp_soc *soc, uint16_t peer_id,
 	 * If AST offload and host AST DB is enabled, populate AST entries on
 	 * host based on peer map event from FW
 	 */
-	if (peer && soc->ast_offload_support && soc->host_ast_db_enable) {
+	if (soc->ast_offload_support && soc->host_ast_db_enable) {
 		dp_peer_host_add_map_ast(soc, peer_id, peer_mac_addr,
 					 hw_peer_id, vdev_id,
 					 ast_hash, is_wds);
