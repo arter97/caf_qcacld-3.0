@@ -120,13 +120,13 @@ static uint16_t qca_sawf_get_default_msduq(struct net_device *netdev,
 
 uint16_t qca_sawf_get_msduq_v2(struct net_device *netdev, uint8_t *peer_mac,
 			       uint32_t service_id, uint32_t dscp,
-			       uint32_t rule_id, bool scs_based_rule)
+			       uint32_t rule_id, uint8_t sawf_rule_type)
 {
 	if (!netdev->ieee80211_ptr)
 		return DP_SAWF_PEER_Q_INVALID;
 
 	/* Return default queue_id in case of valid SAWF_SCS */
-	if (wlan_service_id_scs_valid(scs_based_rule, service_id))
+	if (wlan_service_id_scs_valid(sawf_rule_type, service_id))
 		return qca_sawf_get_default_msduq(netdev, peer_mac,
 						  service_id, rule_id);
 
@@ -238,7 +238,7 @@ uint16_t qca_sawf_get_msduq(struct net_device *netdev, uint8_t *peer_mac,
 
 uint16_t qca_sawf_get_msduq_v2(struct net_device *netdev, uint8_t *peer_mac,
 			       uint32_t service_id, uint32_t dscp,
-			       uint32_t rule_id, bool scs_based_rule)
+			       uint32_t rule_id, uint8_t sawf_rule_type)
 {
 	return DP_SAWF_PEER_Q_INVALID;
 }
