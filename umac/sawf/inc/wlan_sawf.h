@@ -165,6 +165,28 @@ struct wlan_sawf_svc_class_params {
 };
 
 /**
+ * telemetry_sawf_param - Enum indicating SAWF param type
+ * @SAWF_PARAM_MIN_THROUGHPUT: minimum throughput
+ * @SAWF_PARAM_MAX_THROUGHPUT: maximum throughput
+ * @SAWF_PARAM_BURST_SIZE: burst-size num-pkts
+ * @SAWF_PARAM_SERVICE_INTERVAL: service-interval
+ * @SAWF_PARAM_DELAY_BOUND: delay-bound
+ * @SAWF_PARAM_MSDU_TTL: TTL for msdu-drop
+ * @SAWF_PARAM_MSDU_LOSS:  msdu-loss rate
+ */
+enum telemetry_sawf_param {
+	SAWF_PARAM_INVALID,
+	SAWF_PARAM_MIN_THROUGHPUT,
+	SAWF_PARAM_MAX_THROUGHPUT,
+	SAWF_PARAM_BURST_SIZE,
+	SAWF_PARAM_SERVICE_INTERVAL,
+	SAWF_PARAM_DELAY_BOUND,
+	SAWF_PARAM_MSDU_TTL,
+	SAWF_PARAM_MSDU_LOSS,
+	SAWF_PARAM_MAX,
+};
+
+/**
  * struct sawf_ctx- SAWF context
  * @lock: Lock to add or delete entry from sawf params structure
  * @svc_classes: List of all service classes
