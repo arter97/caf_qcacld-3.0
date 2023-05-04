@@ -92,7 +92,7 @@ void wlan_print_service_class(struct wlan_sawf_svc_class_params *params)
 		      "UL Burst Size: %d\nUL Service Interval: %d\n"
 		      "UL Min throughput: %d\nUL Max Latency: %d\n"
 		      "Service class type: %d\nRef Count: %d\nPeer Count: %d\n"
-		      "Disabled_Modes: %u\nEnabled Params Mask: 0x%02X",
+		      "Disabled_Modes: %u\nEnabled Params Mask: 0x%04X",
 		      SAWF_LINE_FORMAT,
 		      params->svc_id, params->app_name,
 		      params->min_thruput_rate, params->max_thruput_rate,
@@ -236,6 +236,7 @@ void wlan_update_sawf_params_nolock(struct wlan_sawf_svc_class_params *params)
 	new_param->ul_service_interval = params->ul_service_interval;
 	new_param->ul_min_tput = params->ul_min_tput;
 	new_param->ul_max_latency = params->ul_max_latency;
+	new_param->enabled_param_mask = params->enabled_param_mask;
 }
 
 qdf_export_symbol(wlan_update_sawf_params_nolock);
