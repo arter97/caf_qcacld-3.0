@@ -341,6 +341,7 @@ dp_rx_wds_add_or_update_ast(struct dp_soc *soc,
 				 * radio
 				 */
 				dp_peer_del_ast(soc, ast);
+				qdf_spin_unlock_bh(&soc->ast_lock);
 				return;
 			} else {
 				/* this case is when a STA roams from one
@@ -354,6 +355,7 @@ dp_rx_wds_add_or_update_ast(struct dp_soc *soc,
 				if (soc->ast_override_support &&
 				    (ta_peer->vdev->opmode == wlan_op_mode_sta)) {
 					dp_peer_del_ast(soc, ast);
+					qdf_spin_unlock_bh(&soc->ast_lock);
 					return;
 				} else {
 					ta_base_peer =
