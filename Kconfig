@@ -115,8 +115,8 @@ config ICMP_DISABLE_PS
 	bool "Enable ICMP packet disable powersave feature"
 	default n
 
-config BUILD_TIMESTAMP
-	bool "Embed timestamp in wlan version"
+config BUILD_TAG
+	bool "Embed tags and timestamp in wlan version"
 	default n
 
 config WLAN_FEATURE_FILS
