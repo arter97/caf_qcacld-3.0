@@ -1334,10 +1334,23 @@ static void wma_set_mlo_capability(tp_wma_handle wma,
 	}
 	wlan_objmgr_peer_release_ref(peer, WLAN_LEGACY_WMA_ID);
 }
+
+static void wma_set_mlo_assoc_vdev(struct wlan_objmgr_vdev *vdev,
+				   struct peer_assoc_params *req)
+{
+	if (wlan_vdev_mlme_is_mlo_vdev(vdev) &&
+	    !wlan_vdev_mlme_is_mlo_link_vdev(vdev))
+		req->is_assoc_vdev = true;
+}
 #else
 static inline void wma_set_mlo_capability(tp_wma_handle wma,
 					  struct wlan_objmgr_vdev *vdev,
 					  tpAddStaParams params,
+					  struct peer_assoc_params *req)
+{
+}
+
+static inline void wma_set_mlo_assoc_vdev(struct wlan_objmgr_vdev *vdev,
 					  struct peer_assoc_params *req)
 {
 }
@@ -1682,6 +1695,8 @@ QDF_STATUS wma_send_peer_assoc(tp_wma_handle wma,
 	}
 
 	wma_set_mlo_capability(wma, intr->vdev, params, cmd);
+
+	wma_set_mlo_assoc_vdev(intr->vdev, cmd);
 
 	wma_debug("rx_max_rate %d, rx_mcs %x, tx_max_rate %d, tx_mcs: %x num rates %d need 4 way %d",
 		  cmd->rx_max_rate, cmd->rx_mcs_set, cmd->tx_max_rate,

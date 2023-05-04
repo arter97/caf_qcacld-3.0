@@ -81,6 +81,7 @@
 #include <wlan_cm_api.h>
 #include <wlan_vdev_mgr_utils_api.h>
 #include "parser_api.h"
+#include "wlan_mlo_mgr_link_switch.h"
 
 /** -------------------------------------------------------------
    \fn lim_delete_dialogue_token_list
@@ -9292,6 +9293,30 @@ void lim_extract_per_link_id(struct pe_session *session,
 				wlan_vdev_get_link_id(session->vdev);
 
 	pe_debug("vdev: %d, link id: %d", vdev_id, add_bss->staContext.link_id);
+}
+
+void lim_extract_ml_partner_info(struct pe_session *session,
+				 struct bss_params *add_bss,
+				 tpSirAssocRsp assoc_rsp)
+{
+	uint8_t num_partner_link, i, link_id;
+	struct mlo_partner_info ml_partner_info;
+	struct mlo_link_info *link_info;
+
+	if (wlan_vdev_mlme_is_mlo_link_vdev(session->vdev) ||
+	    !assoc_rsp->mlo_ie.mlo_ie_present)
+		return;
+
+	ml_partner_info = session->ml_partner_info;
+	num_partner_link = ml_partner_info.num_partner_links;
+
+	for (i = 0; i < num_partner_link; i++) {
+		link_id = ml_partner_info.partner_link_info[i].link_id;
+		link_info =
+			mlo_mgr_get_ap_link_by_link_id(session->vdev, link_id);
+		if (!link_info)
+			return;
+	}
 }
 
 void lim_intersect_ap_emlsr_caps(struct mac_context *mac_ctx,

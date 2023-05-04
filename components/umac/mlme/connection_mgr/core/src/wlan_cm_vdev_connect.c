@@ -43,6 +43,7 @@
 #include "wlan_t2lm_api.h"
 #include "wlan_mlo_t2lm.h"
 #include "wlan_mlo_link_force.h"
+#include "wlan_mlo_mgr_link_switch.h"
 
 #ifdef WLAN_FEATURE_FILS_SK
 void cm_update_hlp_info(struct wlan_objmgr_vdev *vdev,
@@ -1177,10 +1178,39 @@ cm_get_ml_partner_info(struct scan_cache_entry *scan_entry,
 
 	partner_info->num_partner_links = j;
 	mlme_debug("sta and ap integrate link num: %d", j);
-
 	wlan_objmgr_psoc_release_ref(psoc, WLAN_MLME_CM_ID);
 
 	return QDF_STATUS_SUCCESS;
+}
+
+static void cm_update_mlo_mgr_info(struct wlan_objmgr_vdev *vdev,
+				   struct cm_vdev_join_req *join_req)
+{
+	struct qdf_mac_addr link_addr;
+	uint8_t link_id, i;
+	struct wlan_channel channel = {0};
+	struct mlo_partner_info *partner_info;
+
+	if (wlan_vdev_mlme_is_mlo_link_vdev(vdev))
+		return;
+
+	link_id = join_req->entry->ml_info.self_link_id;
+	qdf_mem_copy(link_addr.bytes, join_req->entry->bssid.bytes,
+		     QDF_MAC_ADDR_SIZE);
+
+	/* Update the AP self link info */
+	mlo_mgr_update_ap_link_info(vdev, link_id, link_addr.bytes, channel);
+
+	partner_info = &join_req->partner_info;
+	for (i = 0; i < partner_info->num_partner_links; i++) {
+		link_id = partner_info->partner_link_info[i].link_id;
+		qdf_mem_copy(link_addr.bytes,
+			     partner_info->partner_link_info[i].link_addr.bytes,
+			     QDF_MAC_ADDR_SIZE);
+		/* Updating AP partner link info */
+		mlo_mgr_update_ap_link_info(vdev, link_id, link_addr.bytes,
+					    channel);
+	}
 }
 
 static void
@@ -1200,6 +1230,8 @@ cm_copy_join_req_info_from_cm_connect_req(struct wlan_objmgr_vdev *vdev,
 	mlme_debug("Num of partner links %d assoc_link_id:%d",
 		   join_req->partner_info.num_partner_links,
 		   join_req->assoc_link_id);
+
+	cm_update_mlo_mgr_info(vdev, join_req);
 }
 #else
 static inline void

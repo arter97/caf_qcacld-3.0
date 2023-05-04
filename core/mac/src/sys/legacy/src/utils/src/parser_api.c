@@ -59,6 +59,7 @@
 #include "wlan_epcs_api.h"
 #include <wlan_mlo_t2lm.h>
 #endif
+#include "wlan_mlo_mgr_link_switch.h"
 
 #define RSN_OUI_SIZE 4
 /* ////////////////////////////////////////////////////////////////////// */
@@ -3835,7 +3836,7 @@ sir_convert_assoc_resp_frame2_mlo_struct(struct mac_context *mac,
 			}
 
 			ml_ie_info->num_sta_profile =
-			       session_entry->ml_partner_info.num_partner_links;
+			      session_entry->ml_partner_info.num_partner_links;
 			ml_ie_info->link_id_info_present = link_id_found;
 			ml_ie_info->link_id = link_id;
 			pe_debug("Partner link count: %d, Link id: %d, MLD mac addr: " QDF_MAC_ADDR_FMT,
@@ -11656,7 +11657,6 @@ QDF_STATUS populate_dot11f_assoc_req_mlo_ie(struct mac_context *mac_ctx,
 	struct mlo_partner_info *partner_info;
 	struct qdf_mac_addr *mld_addr;
 	struct wlan_mlo_dev_context *mlo_dev_ctx;
-	struct wlan_objmgr_vdev *vdev = NULL;
 	tSirMacRateSet b_rates;
 	tSirMacRateSet e_rates;
 	uint8_t non_inher_len;
@@ -11843,19 +11843,20 @@ QDF_STATUS populate_dot11f_assoc_req_mlo_ie(struct mac_context *mac_ctx,
 	for (link = 0;
 	     link < total_sta_prof && total_sta_prof != num_sta_prof;
 	     link++) {
+		struct mlo_link_info *ml_link_info;
+
 		if (!partner_info->num_partner_links)
 			continue;
-
-		vdev = mlo_dev_ctx->wlan_vdev_list[1];
-		if (!vdev) {
-			pe_err("vdev is null");
-			return QDF_STATUS_E_NULL_VALUE;
-		}
 
 		sta_prof = &mlo_ie->sta_profile[num_sta_prof];
 		link_info = &partner_info->partner_link_info[link];
 		p_sta_prof = sta_prof->data;
 		len_remaining = sizeof(sta_prof->data);
+		ml_link_info =
+			mlo_mgr_get_ap_link_by_link_id(pe_session->vdev,
+						       link_info->link_id);
+		if (!ml_link_info)
+			continue;
 
 		/* subelement ID 0, length(sta_prof->num_data - 2) */
 		*p_sta_prof++ = WLAN_ML_LINFO_SUBELEMID_PERSTAPROFILE;
@@ -11895,13 +11896,13 @@ QDF_STATUS populate_dot11f_assoc_req_mlo_ie(struct mac_context *mac_ctx,
 			WLAN_ML_BV_LINFO_PERSTAPROF_STAINFO_LENGTH_SIZE;
 
 		/* Copying sta mac address in sta info field */
-		qdf_mem_copy(p_sta_prof, vdev->vdev_mlme.macaddr,
+		qdf_mem_copy(p_sta_prof, ml_link_info->link_addr.bytes,
 			     QDF_MAC_ADDR_SIZE);
 		p_sta_prof += QDF_MAC_ADDR_SIZE;
 		len_remaining -= QDF_MAC_ADDR_SIZE;
 
 		pe_debug("Sta profile mac: " QDF_MAC_ADDR_FMT,
-			 vdev->vdev_mlme.macaddr);
+			QDF_MAC_ADDR_REF(ml_link_info->link_addr.bytes));
 
 		/* TBD : populate beacon_interval, dtim_info
 		 * nstr_link_pair_present, nstr_bitmap_size

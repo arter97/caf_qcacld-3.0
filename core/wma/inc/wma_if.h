@@ -136,6 +136,20 @@ struct med_sync_delay {
 };
 
 /**
+ * struct ml_partner_link_info: partner link info
+ * @link_id: partner link ID
+ * @link_addr: partner link address
+ * @ch_freq:Channel in Mhz
+ * @ch_phymode: Channel phymode
+ */
+struct ml_partner_link_info {
+	uint8_t link_id;
+	struct qdf_mac_addr link_addr;
+	uint8_t ch_freq;
+	enum wlan_phymode ch_phymode;
+};
+
+/**
  * struct tAddStaParams - add sta related parameters
  * @bssId: bssid of sta
  * @assocId: associd
@@ -286,6 +300,7 @@ typedef struct {
 	bool msd_caps_present;
 	uint8_t link_id;
 	uint16_t emlsr_trans_timeout;
+	struct ml_partner_link_info ml_partner_info[MLD_MAX_LINKS - 1];
 #endif
 } tAddStaParams, *tpAddStaParams;
 
