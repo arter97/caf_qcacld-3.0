@@ -3349,6 +3349,27 @@ static inline void copy_peer_flags_tlv_11be(
 {
 }
 #endif
+#ifdef WLAN_FEATURE_11BE_MLO
+static inline void copy_peer_flags_tlv_vendor(
+			wmi_peer_assoc_complete_cmd_fixed_param * cmd,
+			struct peer_assoc_params *param)
+{
+	if (!(param->mlo_params.mlo_enabled))
+		return;
+	if (param->qcn_node_flag)
+		cmd->peer_flags_ext |= WMI_PEER_EXT_IS_QUALCOMM_NODE;
+	if (param->mesh_node_flag)
+		cmd->peer_flags_ext |= WMI_PEER_EXT_IS_MESH_NODE;
+
+	wmi_debug("peer_flags_ext 0x%x", cmd->peer_flags_ext);
+}
+#else
+static inline void copy_peer_flags_tlv_vendor(
+			wmi_peer_assoc_complete_cmd_fixed_param * cmd,
+			struct peer_assoc_params *param)
+{
+}
+#endif
 
 static inline void copy_peer_flags_tlv(
 			wmi_peer_assoc_complete_cmd_fixed_param * cmd,
@@ -3380,6 +3401,7 @@ static inline void copy_peer_flags_tlv(
 			cmd->peer_flags |= WMI_PEER_160MHZ;
 
 		copy_peer_flags_tlv_11be(cmd, param);
+		copy_peer_flags_tlv_vendor(cmd, param);
 
 		/* Typically if STBC is enabled for VHT it should be enabled
 		 * for HT as well
