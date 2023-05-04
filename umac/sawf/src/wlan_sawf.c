@@ -43,26 +43,26 @@ static struct sawf_ctx *g_wlan_sawf_ctx;
 QDF_STATUS wlan_sawf_init(void)
 {
 	if (g_wlan_sawf_ctx) {
-		qdf_err("SAWF global context is already allocated");
+		sawf_err("SAWF global context is already allocated");
 		return QDF_STATUS_E_FAILURE;
 	}
 
 	g_wlan_sawf_ctx = qdf_mem_malloc(sizeof(struct sawf_ctx));
 	if (!g_wlan_sawf_ctx) {
-		qdf_err("Mem alloc failed for SAWF context");
+		sawf_err("Mem alloc failed for SAWF context");
 		return QDF_STATUS_E_FAILURE;
 	}
 
 	qdf_spinlock_create(&g_wlan_sawf_ctx->lock);
 
-	qdf_info("SAWF: SAWF ctx is initialized");
+	sawf_info("SAWF: SAWF ctx is initialized");
 	return QDF_STATUS_SUCCESS;
 }
 
 QDF_STATUS wlan_sawf_deinit(void)
 {
 	if (!g_wlan_sawf_ctx) {
-		qdf_err("SAWF gloabl context is already freed");
+		sawf_err("SAWF gloabl context is already freed");
 		return QDF_STATUS_E_FAILURE;
 	}
 
@@ -105,8 +105,8 @@ void wlan_print_service_class(struct wlan_sawf_svc_class_params *params)
 		      params->disabled_modes, params->enabled_param_mask);
 
 	if (nb > 0 && nb >= sizeof(buf))
-		qdf_err("Small buffer (buffer size %zu required size %d)",
-			sizeof(buf), nb);
+		sawf_err("Small buffer (buffer size %zu required size %d)",
+			 sizeof(buf), nb);
 
 	qdf_nofl_info(buf);
 }
@@ -129,7 +129,7 @@ bool wlan_service_id_configured_nolock(uint8_t svc_id)
 
 	sawf = wlan_get_sawf_ctx();
 	if (!sawf) {
-		qdf_err("SAWF ctx is invalid");
+		sawf_err("SAWF ctx is invalid");
 		return false;
 	}
 
@@ -147,7 +147,7 @@ uint8_t wlan_service_id_tid_nolock(uint8_t svc_id)
 
 	sawf = wlan_get_sawf_ctx();
 	if (!sawf) {
-		qdf_err("SAWF ctx is invalid");
+		sawf_err("SAWF ctx is invalid");
 		goto err;
 	}
 
@@ -166,12 +166,12 @@ bool wlan_delay_bound_configured_nolock(uint8_t svc_id)
 
 	sawf = wlan_get_sawf_ctx();
 	if (!sawf) {
-		qdf_err("SAWF ctx is invalid");
+		sawf_err("SAWF ctx is invalid");
 		return false;
 	}
 	if (svc_id <  SAWF_SVC_CLASS_MIN ||
 	    svc_id > SAWF_SVC_CLASS_MAX) {
-		qdf_err("Invalid svc-class id");
+		sawf_err("Invalid svc-class id");
 		return false;
 	}
 
@@ -193,12 +193,12 @@ wlan_get_svc_class_params(uint8_t svc_id)
 
 	sawf = wlan_get_sawf_ctx();
 	if (!sawf) {
-		qdf_err("SAWF ctx is invalid");
+		sawf_err("SAWF ctx is invalid");
 		return NULL;
 	}
 	if (svc_id <  SAWF_SVC_CLASS_MIN ||
 	    svc_id > SAWF_SVC_CLASS_MAX) {
-		qdf_err("Invalid svc-class id");
+		sawf_err("Invalid svc-class id");
 		return NULL;
 	}
 
@@ -217,7 +217,7 @@ void wlan_update_sawf_params_nolock(struct wlan_sawf_svc_class_params *params)
 
 	sawf = wlan_get_sawf_ctx();
 	if (!sawf) {
-		qdf_err("SAWF ctx is invalid");
+		sawf_err("SAWF ctx is invalid");
 		return;
 	}
 
@@ -247,63 +247,63 @@ QDF_STATUS wlan_validate_sawf_params(struct wlan_sawf_svc_class_params *params)
 	value = params->min_thruput_rate;
 	if (value != SAWF_DEF_PARAM_VAL && (value < SAWF_MIN_MIN_THROUGHPUT ||
 	    value > SAWF_MAX_MIN_THROUGHPUT)) {
-		qdf_err("Invalid Min throughput: %d", value);
+		sawf_err("Invalid Min throughput: %d", value);
 		return QDF_STATUS_E_FAILURE;
 	}
 
 	value = params->max_thruput_rate;
 	if (value != SAWF_DEF_PARAM_VAL && (value < SAWF_MIN_MAX_THROUGHPUT ||
 	    value > SAWF_MAX_MAX_THROUGHPUT)) {
-		qdf_err("Invalid Max througput: %d", value);
+		sawf_err("Invalid Max througput: %d", value);
 		return QDF_STATUS_E_FAILURE;
 	}
 
 	value = params->burst_size;
 	if (value != SAWF_DEF_PARAM_VAL && (value < SAWF_MIN_BURST_SIZE ||
 	    value > SAWF_MAX_BURST_SIZE)) {
-		qdf_err("Invalid Burst Size: %d", value);
+		sawf_err("Invalid Burst Size: %d", value);
 		return QDF_STATUS_E_FAILURE;
 	}
 
 	value = params->delay_bound;
 	if (value != SAWF_DEF_PARAM_VAL && (value < SAWF_MIN_DELAY_BOUND
 	    || value > SAWF_MAX_DELAY_BOUND)) {
-		qdf_err("Invalid Delay Bound: %d", value);
+		sawf_err("Invalid Delay Bound: %d", value);
 		return QDF_STATUS_E_FAILURE;
 	}
 
 	value = params->service_interval;
 	if (value != SAWF_DEF_PARAM_VAL && (value < SAWF_MIN_SVC_INTERVAL ||
 	    value > SAWF_MAX_SVC_INTERVAL)) {
-		qdf_err("Invalid Service Interval: %d", value);
+		sawf_err("Invalid Service Interval: %d", value);
 		return QDF_STATUS_E_FAILURE;
 	}
 
 	value = params->msdu_ttl;
 	if (value != SAWF_DEF_PARAM_VAL && (value < SAWF_MIN_MSDU_TTL ||
 	    value > SAWF_MAX_MSDU_TTL)) {
-		qdf_err("Invalid MSDU TTL: %d", value);
+		sawf_err("Invalid MSDU TTL: %d", value);
 		return QDF_STATUS_E_FAILURE;
 	}
 
 	value = params->priority;
 	if (value != SAWF_DEF_PARAM_VAL && (value < SAWF_MIN_PRIORITY ||
 	    value > SAWF_MAX_PRIORITY)) {
-		qdf_err("Invalid Priority: %d", value);
+		sawf_err("Invalid Priority: %d", value);
 		return QDF_STATUS_E_FAILURE;
 	}
 
 	value = params->tid;
 	if (value != SAWF_DEF_PARAM_VAL && (value < SAWF_MIN_TID ||
 	    value > SAWF_MAX_TID)) {
-		qdf_err("Invalid TID %d", value);
+		sawf_err("Invalid TID %d", value);
 		return QDF_STATUS_E_FAILURE;
 	}
 
 	value = params->msdu_rate_loss;
 	if (value != SAWF_DEF_PARAM_VAL && (value < SAWF_MIN_MSDU_LOSS_RATE ||
 	    value > SAWF_MAX_MSDU_LOSS_RATE)) {
-		qdf_err("Invalid MSDU Loss rate: %d", value);
+		sawf_err("Invalid MSDU Loss rate: %d", value);
 		return QDF_STATUS_E_FAILURE;
 	}
 
@@ -326,7 +326,7 @@ wlan_sawf_get_uplink_params(uint8_t svc_id, uint8_t *tid,
 
 	sawf = wlan_get_sawf_ctx();
 	if (!sawf) {
-		qdf_err("SAWF ctx is invalid");
+		sawf_err("SAWF ctx is invalid");
 		return QDF_STATUS_E_INVAL;
 	}
 
@@ -391,7 +391,7 @@ static inline QDF_STATUS wlan_sawf_fill_mld_mac(struct wlan_objmgr_peer *peer,
 		if (nla_put(vendor_event, QCA_WLAN_VENDOR_ATTR_SLA_PEER_MLD_MAC,
 			    QDF_MAC_ADDR_SIZE,
 			    (void *)(wlan_peer_mlme_get_mldaddr(peer)))) {
-			qdf_err("nla put fail");
+			sawf_err("nla put fail");
 			return QDF_STATUS_E_FAILURE;
 		}
 	}
@@ -423,19 +423,19 @@ static void wlan_sawf_send_breach_nl(struct wlan_objmgr_peer *peer,
 
 	vdev = wlan_peer_get_vdev(peer);
 	if (!vdev) {
-		qdf_info("Unable to find vdev");
+		sawf_info("Unable to find vdev");
 		return;
 	}
 
 	pdev = wlan_vdev_get_pdev(vdev);
 	if (!pdev) {
-		qdf_info("Unable to find pdev");
+		sawf_info("Unable to find pdev");
 		return;
 	}
 
 	osif_vdev  = wlan_vdev_get_ospriv(vdev);
 	if (!osif_vdev) {
-		qdf_info("Unable to find osif_vdev");
+		sawf_info("Unable to find osif_vdev");
 		return;
 	}
 
@@ -447,44 +447,44 @@ static void wlan_sawf_send_breach_nl(struct wlan_objmgr_peer *peer,
 				GFP_ATOMIC);
 
 	if (!vendor_event) {
-		qdf_info("Failed to allocate vendor event");
+		sawf_info("Failed to allocate vendor event");
 		return;
 	}
 
 	if (nla_put(vendor_event, QCA_WLAN_VENDOR_ATTR_SLA_PEER_MAC,
 		    QDF_MAC_ADDR_SIZE,
 		    (void *)(wlan_peer_get_macaddr(peer)))) {
-		qdf_err("nla put fail");
+		sawf_err("nla put fail");
 		goto error_cleanup;
 	}
 
 	if (wlan_sawf_fill_mld_mac(peer, vendor_event)) {
-			qdf_err("nla put fail");
+			sawf_err("nla put fail");
 		goto error_cleanup;
 	}
 
 	if (nla_put_u8(vendor_event, QCA_WLAN_VENDOR_ATTR_SLA_SVC_ID,
 		       itr->svc_id)) {
-		qdf_err("nla put fail");
+		sawf_err("nla put fail");
 		goto error_cleanup;
 	}
 
 	if (nla_put_u8(vendor_event, QCA_WLAN_VENDOR_ATTR_SLA_PARAM,
 		       itr->param)) {
-		qdf_err("nla put fail");
+		sawf_err("nla put fail");
 		goto error_cleanup;
 	}
 
 	if (nla_put_u8(vendor_event, QCA_WLAN_VENDOR_ATTR_SLA_SET_CLEAR,
 		       itr->set_clear)) {
-		qdf_err("nla put fail");
+		sawf_err("nla put fail");
 		goto error_cleanup;
 	}
 
 	ac = TID_TO_WME_AC(itr->tid);
 	if (nla_put_u8(vendor_event, QCA_WLAN_VENDOR_ATTR_SLA_AC,
 		       ac)) {
-		qdf_err("nla put fail");
+		sawf_err("nla put fail");
 		goto error_cleanup;
 	}
 
@@ -541,7 +541,7 @@ bool wlan_service_id_configured(uint8_t svc_id)
 
 	sawf = wlan_get_sawf_ctx();
 	if (!sawf) {
-		qdf_err("SAWF ctx is invalid");
+		sawf_err("SAWF ctx is invalid");
 		return false;
 	}
 
@@ -560,7 +560,7 @@ uint8_t wlan_service_id_tid(uint8_t svc_id)
 
 	sawf = wlan_get_sawf_ctx();
 	if (!sawf) {
-		qdf_err("SAWF ctx is invalid");
+		sawf_err("SAWF ctx is invalid");
 		goto err;
 	}
 
@@ -581,12 +581,12 @@ bool wlan_delay_bound_configured(uint8_t svc_id)
 
 	sawf = wlan_get_sawf_ctx();
 	if (!sawf) {
-		qdf_err("SAWF ctx is invalid");
+		sawf_err("SAWF ctx is invalid");
 		return false;
 	}
 	if (svc_id <  SAWF_SVC_CLASS_MIN ||
 	    svc_id > SAWF_SVC_CLASS_MAX) {
-		qdf_err("Invalid svc-class id");
+		sawf_err("Invalid svc-class id");
 		return false;
 	}
 
@@ -604,7 +604,7 @@ void wlan_update_sawf_params(struct wlan_sawf_svc_class_params *params)
 
 	sawf = wlan_get_sawf_ctx();
 	if (!sawf) {
-		qdf_err("SAWF ctx is invalid");
+		sawf_err("SAWF ctx is invalid");
 		return;
 	}
 
@@ -621,7 +621,7 @@ uint8_t wlan_service_id_get_type_nolock(uint8_t svc_id)
 
 	sawf = wlan_get_sawf_ctx();
 	if (!sawf) {
-		qdf_err("SAWF ctx is invalid");
+		sawf_err("SAWF ctx is invalid");
 		goto err;
 	}
 
@@ -640,7 +640,7 @@ uint8_t wlan_service_id_get_type(uint8_t svc_id)
 
 	sawf = wlan_get_sawf_ctx();
 	if (!sawf) {
-		qdf_err("SAWF ctx is invalid");
+		sawf_err("SAWF ctx is invalid");
 		goto err;
 	}
 
@@ -660,7 +660,7 @@ void wlan_service_id_set_type_nolock(uint8_t svc_id, uint8_t type)
 
 	sawf = wlan_get_sawf_ctx();
 	if (!sawf) {
-		qdf_err("SAWF ctx is invalid");
+		sawf_err("SAWF ctx is invalid");
 		return;
 	}
 
@@ -675,7 +675,7 @@ void wlan_service_id_set_type(uint8_t svc_id, uint8_t type)
 
 	sawf = wlan_get_sawf_ctx();
 	if (!sawf) {
-		qdf_err("SAWF ctx is invalid");
+		sawf_err("SAWF ctx is invalid");
 		return;
 	}
 
@@ -692,7 +692,7 @@ void wlan_service_id_inc_ref_count_nolock(uint8_t svc_id)
 
 	sawf = wlan_get_sawf_ctx();
 	if (!sawf) {
-		qdf_err("SAWF ctx is invalid");
+		sawf_err("SAWF ctx is invalid");
 		return;
 	}
 
@@ -708,7 +708,7 @@ void wlan_service_id_dec_ref_count_nolock(uint8_t svc_id)
 
 	sawf = wlan_get_sawf_ctx();
 	if (!sawf) {
-		qdf_err("SAWF ctx is invalid");
+		sawf_err("SAWF ctx is invalid");
 		return;
 	}
 
@@ -725,7 +725,7 @@ void wlan_service_id_inc_peer_count_nolock(uint8_t svc_id)
 
 	sawf = wlan_get_sawf_ctx();
 	if (!sawf) {
-		qdf_err("SAWF ctx is invalid");
+		sawf_err("SAWF ctx is invalid");
 		return;
 	}
 
@@ -741,7 +741,7 @@ void wlan_service_id_dec_peer_count_nolock(uint8_t svc_id)
 
 	sawf = wlan_get_sawf_ctx();
 	if (!sawf) {
-		qdf_err("SAWF ctx is invalid");
+		sawf_err("SAWF ctx is invalid");
 		return;
 	}
 
@@ -758,7 +758,7 @@ void wlan_service_id_inc_ref_count(uint8_t svc_id)
 
 	sawf = wlan_get_sawf_ctx();
 	if (!sawf) {
-		qdf_err("SAWF ctx is invalid");
+		sawf_err("SAWF ctx is invalid");
 		return;
 	}
 
@@ -775,7 +775,7 @@ void wlan_service_id_dec_ref_count(uint8_t svc_id)
 
 	sawf = wlan_get_sawf_ctx();
 	if (!sawf) {
-		qdf_err("SAWF ctx is invalid");
+		sawf_err("SAWF ctx is invalid");
 		return;
 	}
 
@@ -792,7 +792,7 @@ void wlan_service_id_inc_peer_count(uint8_t svc_id)
 
 	sawf = wlan_get_sawf_ctx();
 	if (!sawf) {
-		qdf_err("SAWF ctx is invalid");
+		sawf_err("SAWF ctx is invalid");
 		return;
 	}
 
@@ -809,7 +809,7 @@ void wlan_service_id_dec_peer_count(uint8_t svc_id)
 
 	sawf = wlan_get_sawf_ctx();
 	if (!sawf) {
-		qdf_err("SAWF ctx is invalid");
+		sawf_err("SAWF ctx is invalid");
 		return;
 	}
 
@@ -826,7 +826,7 @@ uint32_t wlan_service_id_get_ref_count_nolock(uint8_t svc_id)
 
 	sawf = wlan_get_sawf_ctx();
 	if (!sawf) {
-		qdf_err("SAWF ctx is invalid");
+		sawf_err("SAWF ctx is invalid");
 		goto err;
 	}
 
@@ -845,7 +845,7 @@ uint32_t wlan_service_id_get_ref_count(uint8_t svc_id)
 
 	sawf = wlan_get_sawf_ctx();
 	if (!sawf) {
-		qdf_err("SAWF ctx is invalid");
+		sawf_err("SAWF ctx is invalid");
 		goto err;
 	}
 
@@ -865,7 +865,7 @@ uint32_t wlan_service_id_get_peer_count_nolock(uint8_t svc_id)
 
 	sawf = wlan_get_sawf_ctx();
 	if (!sawf) {
-		qdf_err("SAWF ctx is invalid");
+		sawf_err("SAWF ctx is invalid");
 		goto err;
 	}
 
@@ -884,7 +884,7 @@ uint32_t wlan_service_id_get_peer_count(uint8_t svc_id)
 
 	sawf = wlan_get_sawf_ctx();
 	if (!sawf) {
-		qdf_err("SAWF ctx is invalid");
+		sawf_err("SAWF ctx is invalid");
 		goto err;
 	}
 
@@ -905,7 +905,7 @@ void wlan_disable_service_class(uint8_t svc_id)
 
 	sawf = wlan_get_sawf_ctx();
 	if (!sawf) {
-		qdf_err("SAWF ctx is invalid");
+		sawf_err("SAWF ctx is invalid");
 		return;
 	}
 
