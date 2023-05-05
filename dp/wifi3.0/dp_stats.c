@@ -7322,12 +7322,28 @@ static void dp_pdev_print_tx_rx_rates(struct dp_pdev *pdev)
 	qdf_mem_free(vdev_array);
 }
 
+/*
+ * Format is:
+ * [0 18 1728, 1 15 1222, 2 24 1969,...]
+ * 2 character space for [ and ]
+ * 8 reo * 3 white space = 24
+ * 8 char space for reo rings
+ * 8 * 10 (uint32_t max value is 4294967295) = 80
+ * 8 * 20 (uint64_t max value is 18446744073709551615) = 160
+ * 8 commas
+ * 1 for \0
+ * Total of 283
+ */
+#define DP_STATS_STR_LEN 283
 void dp_txrx_path_stats(struct dp_soc *soc)
 {
 	uint8_t error_code;
 	uint8_t loop_pdev;
 	struct dp_pdev *pdev;
 	uint8_t i;
+	uint8_t *buf;
+	size_t pos, buf_len;
+	uint8_t dp_stats_str[DP_STATS_STR_LEN] = {'\0'};
 
 	if (!soc) {
 		dp_err("Invalid access");
@@ -7403,37 +7419,50 @@ void dp_txrx_path_stats(struct dp_soc *soc)
 		DP_PRINT_STATS("Tx desc force freed: %u",
 			       pdev->soc->stats.tx.tx_comp_force_freed);
 
-		DP_PRINT_STATS("Tx packets sent per interrupt:");
-		DP_PRINT_STATS("Single Packet: %u",
-			       pdev->stats.tx_comp_histogram.pkts_1);
-		DP_PRINT_STATS("2-20 Packets:  %u",
-			       pdev->stats.tx_comp_histogram.pkts_2_20);
-		DP_PRINT_STATS("21-40 Packets: %u",
-			       pdev->stats.tx_comp_histogram.pkts_21_40);
-		DP_PRINT_STATS("41-60 Packets: %u",
-			       pdev->stats.tx_comp_histogram.pkts_41_60);
-		DP_PRINT_STATS("61-80 Packets: %u",
-			       pdev->stats.tx_comp_histogram.pkts_61_80);
-		DP_PRINT_STATS("81-100 Packets: %u",
-			       pdev->stats.tx_comp_histogram.pkts_81_100);
-		DP_PRINT_STATS("101-200 Packets: %u",
-			       pdev->stats.tx_comp_histogram.pkts_101_200);
-		DP_PRINT_STATS("    201+ Packets: %u",
-			       pdev->stats.tx_comp_histogram.pkts_201_plus);
+		buf = dp_stats_str;
+		buf_len = DP_STATS_STR_LEN;
+		pos = 0;
+		pos += qdf_scnprintf(buf + pos, buf_len - pos, "%s", "Tx/IRQ [Range:Pkts] [");
 
-		DP_PRINT_STATS("Rx path statistics");
+		pos += qdf_scnprintf(buf + pos, buf_len - pos, "1: %u, ",
+				     pdev->stats.tx_comp_histogram.pkts_1);
+		pos += qdf_scnprintf(buf + pos, buf_len - pos, "2-20: %u, ",
+				     pdev->stats.tx_comp_histogram.pkts_2_20);
+		pos += qdf_scnprintf(buf + pos, buf_len - pos, "21-40: %u, ",
+				     pdev->stats.tx_comp_histogram.pkts_21_40);
+		pos += qdf_scnprintf(buf + pos, buf_len - pos, "41-60: %u, ",
+				     pdev->stats.tx_comp_histogram.pkts_41_60);
+		pos += qdf_scnprintf(buf + pos, buf_len - pos, "61-80: %u, ",
+				     pdev->stats.tx_comp_histogram.pkts_61_80);
+		pos += qdf_scnprintf(buf + pos, buf_len - pos, "81-100: %u, ",
+				     pdev->stats.tx_comp_histogram.pkts_81_100);
+		pos += qdf_scnprintf(buf + pos, buf_len - pos, "101-200: %u, ",
+				    pdev->stats.tx_comp_histogram.pkts_101_200);
+		pos += qdf_scnprintf(buf + pos, buf_len - pos, "201+: %u",
+				   pdev->stats.tx_comp_histogram.pkts_201_plus);
+		pos += qdf_scnprintf(buf + pos, buf_len - pos, "%s", "]");
+		DP_PRINT_STATS("%s", dp_stats_str);
+
+		DP_PRINT_STATS("Rx path statistics:");
 
 		DP_PRINT_STATS("delivered %u msdus ( %llu bytes)",
 			       pdev->stats.rx.to_stack.num,
 			       pdev->stats.rx.to_stack.bytes);
+
+		pos = 0;
+		pos += qdf_scnprintf(buf + pos, buf_len - pos, "%s", "REO/msdus/bytes [");
 		for (i = 0; i < CDP_MAX_RX_RINGS; i++) {
 			if (!pdev->stats.rx.rcvd_reo[i].num)
 				continue;
-			DP_PRINT_STATS(
-				       "received on reo[%d] %u msdus( %llu bytes)",
-				       i, pdev->stats.rx.rcvd_reo[i].num,
-				       pdev->stats.rx.rcvd_reo[i].bytes);
+
+			pos += qdf_scnprintf(buf + pos, buf_len - pos,
+					"%d %u %llu, ",
+					i, pdev->stats.rx.rcvd_reo[i].num,
+					pdev->stats.rx.rcvd_reo[i].bytes);
 		}
+		pos += qdf_scnprintf(buf + pos, buf_len - pos, "%s", "]");
+		DP_PRINT_STATS("%s", dp_stats_str);
+
 		for (i = 0; i < CDP_MAX_LMACS; i++)
 			DP_PRINT_STATS("received on lmac[%d] %u msdus (%llu bytes)",
 				       i, pdev->stats.rx.rx_lmac[i].num,
@@ -7531,23 +7560,27 @@ void dp_txrx_path_stats(struct dp_soc *soc)
 				       .rxdma_error[error_code]);
 		}
 
-		DP_PRINT_STATS("Rx packets reaped per interrupt:");
-		DP_PRINT_STATS("Single Packet: %u",
-			       pdev->stats.rx_ind_histogram.pkts_1);
-		DP_PRINT_STATS("2-20 Packets:  %u",
-			       pdev->stats.rx_ind_histogram.pkts_2_20);
-		DP_PRINT_STATS("21-40 Packets: %u",
-			       pdev->stats.rx_ind_histogram.pkts_21_40);
-		DP_PRINT_STATS("41-60 Packets: %u",
-			       pdev->stats.rx_ind_histogram.pkts_41_60);
-		DP_PRINT_STATS("61-80 Packets: %u",
-			       pdev->stats.rx_ind_histogram.pkts_61_80);
-		DP_PRINT_STATS("81-100 Packets: %u",
-			       pdev->stats.rx_ind_histogram.pkts_81_100);
-		DP_PRINT_STATS("101-200 Packets: %u",
-			       pdev->stats.rx_ind_histogram.pkts_101_200);
-		DP_PRINT_STATS("   201+ Packets: %u",
-			       pdev->stats.rx_ind_histogram.pkts_201_plus);
+		pos = 0;
+		pos += qdf_scnprintf(buf + pos, buf_len - pos, "%s", "Rx/IRQ [Range:Pkts] [");
+
+		pos += qdf_scnprintf(buf + pos, buf_len - pos, "1: %u, ",
+				     pdev->stats.rx_ind_histogram.pkts_1);
+		pos += qdf_scnprintf(buf + pos, buf_len - pos, "2-20: %u, ",
+				     pdev->stats.rx_ind_histogram.pkts_2_20);
+		pos += qdf_scnprintf(buf + pos, buf_len - pos, "21-40: %u, ",
+				     pdev->stats.rx_ind_histogram.pkts_21_40);
+		pos += qdf_scnprintf(buf + pos, buf_len - pos, "41-60: %u, ",
+				     pdev->stats.rx_ind_histogram.pkts_41_60);
+		pos += qdf_scnprintf(buf + pos, buf_len - pos, "61-80: %u, ",
+				     pdev->stats.rx_ind_histogram.pkts_61_80);
+		pos += qdf_scnprintf(buf + pos, buf_len - pos, "81-100: %u, ",
+				     pdev->stats.rx_ind_histogram.pkts_81_100);
+		pos += qdf_scnprintf(buf + pos, buf_len - pos, "101-200: %u, ",
+				    pdev->stats.rx_ind_histogram.pkts_101_200);
+		pos += qdf_scnprintf(buf + pos, buf_len - pos, "201+: %u",
+				   pdev->stats.rx_ind_histogram.pkts_201_plus);
+		pos += qdf_scnprintf(buf + pos, buf_len - pos, "%s", "]");
+		DP_PRINT_STATS("%s", dp_stats_str);
 
 		DP_PRINT_STATS("%s: tso_enable: %u lro_enable: %u rx_hash: %u napi_enable: %u",
 			       __func__,
