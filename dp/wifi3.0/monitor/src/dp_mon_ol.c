@@ -733,7 +733,7 @@ int ol_ath_set_phyrx_error_mask(void *vscn, uint32_t mask, uint32_t mask_cont)
 		dp_mon_err("Phyrx error mask configuration failed");
 		return -EINVAL;
 	}
-	dp_mon_info("mask(0 to 31):0x%x mask(32 to 64):0x%x", mask, mask_cont);
+	dp_mon_info("mask(0 to 31):0x%x mask(32 to 63):0x%x", mask, mask_cont);
 
 	return 0;
 }
@@ -1317,7 +1317,7 @@ ol_set_undeocded_metadata_capture(struct ol_ath_softc_net80211 *scn,
 						       ic->ic_phyrx_error_mask_cont)) {
 			dp_mon_err("Phyrx error mask configuration failed");
 		}
-		dp_mon_info("mask(0 to 31):0x%x mask(32 to 64):0x%x",
+		dp_mon_info("mask(0 to 31):0x%x mask(32 to 63):0x%x",
 			    ic->ic_phyrx_error_mask,
 			    ic->ic_phyrx_error_mask_cont);
 	} else {
