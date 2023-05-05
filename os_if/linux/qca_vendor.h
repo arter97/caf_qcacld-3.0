@@ -2226,91 +2226,67 @@ enum qca_vendor_attr_interop_issues_ap {
 
 #ifdef WLAN_FEATURE_LINK_LAYER_STATS
 
-/**
- * enum qca_wlan_vendor_attr_ll_stats_set - vendor attribute set stats
- *
- * @QCA_WLAN_VENDOR_ATTR_LL_STATS_SET_INVALID: Invalid initial value
- * @QCA_WLAN_VENDOR_ATTR_LL_STATS_SET_CONFIG_MPDU_SIZE_THRESHOLD: Size threshold
- * @QCA_WLAN_VENDOR_ATTR_LL_STATS_SET_CONFIG_AGGRESSIVE_STATS_GATHERING:
- *	Aggressive stats gathering
- * @QCA_WLAN_VENDOR_ATTR_LL_STATS_SET_AFTER_LAST: After last
- * @QCA_WLAN_VENDOR_ATTR_LL_STATS_SET_MAX: Max value
- */
 enum qca_wlan_vendor_attr_ll_stats_set {
 	QCA_WLAN_VENDOR_ATTR_LL_STATS_SET_INVALID = 0,
+	/* Unsigned 32-bit value */
 	QCA_WLAN_VENDOR_ATTR_LL_STATS_SET_CONFIG_MPDU_SIZE_THRESHOLD = 1,
-	QCA_WLAN_VENDOR_ATTR_LL_STATS_SET_CONFIG_AGGRESSIVE_STATS_GATHERING,
+	QCA_WLAN_VENDOR_ATTR_LL_STATS_SET_CONFIG_AGGRESSIVE_STATS_GATHERING = 2,
 	/* keep last */
 	QCA_WLAN_VENDOR_ATTR_LL_STATS_SET_AFTER_LAST,
 	QCA_WLAN_VENDOR_ATTR_LL_STATS_SET_MAX =
-		QCA_WLAN_VENDOR_ATTR_LL_STATS_SET_AFTER_LAST - 1
+	QCA_WLAN_VENDOR_ATTR_LL_STATS_SET_AFTER_LAST - 1,
 };
 
-/**
- * enum qca_wlan_vendor_attr_ll_stats_get - vendor attribute get stats
- *
- * @QCA_WLAN_VENDOR_ATTR_LL_STATS_GET_INVALID: Invalid initial value
- * @QCA_WLAN_VENDOR_ATTR_LL_STATS_GET_CONFIG_REQ_ID: Unsigned 32bit value
- *	provided by the caller issuing the GET stats command. When reporting
- *	the stats results, the driver uses the same value to indicate which
- *	GET request the results correspond to.
- * @QCA_WLAN_VENDOR_ATTR_LL_STATS_GET_CONFIG_REQ_MASK: Get config request mask
- * @QCA_WLAN_VENDOR_ATTR_LL_STATS_CLR_CONFIG_RSP_MASK: Config response mask
- * @QCA_WLAN_VENDOR_ATTR_LL_STATS_CLR_CONFIG_STOP_RSP: Config stop response
- * @QCA_WLAN_VENDOR_ATTR_LL_STATS_GET_AFTER_LAST: After last
- * @QCA_WLAN_VENDOR_ATTR_LL_STATS_GET_MAX: Max value
- */
-enum qca_wlan_vendor_attr_ll_stats_get {
-	QCA_WLAN_VENDOR_ATTR_LL_STATS_GET_INVALID = 0,
-	QCA_WLAN_VENDOR_ATTR_LL_STATS_GET_CONFIG_REQ_ID,
-	QCA_WLAN_VENDOR_ATTR_LL_STATS_GET_CONFIG_REQ_MASK,
-	QCA_WLAN_VENDOR_ATTR_LL_STATS_GET_AFTER_LAST,
-	QCA_WLAN_VENDOR_ATTR_LL_STATS_GET_MAX =
-		QCA_WLAN_VENDOR_ATTR_LL_STATS_GET_AFTER_LAST - 1
-};
-
-/**
- * enum qca_wlan_vendor_attr_ll_stats_clr - vendor attribute clear stats
- *
- * @QCA_WLAN_VENDOR_ATTR_LL_STATS_CLR_INVALID: Invalid initial value
- * @QCA_WLAN_VENDOR_ATTR_LL_STATS_CLR_CONFIG_REQ_MASK: Config request mask
- * @QCA_WLAN_VENDOR_ATTR_LL_STATS_CLR_CONFIG_STOP_REQ: Config stop mask
- * @QCA_WLAN_VENDOR_ATTR_LL_STATS_CLR_CONFIG_RSP_MASK: Config response mask
- * @QCA_WLAN_VENDOR_ATTR_LL_STATS_CLR_CONFIG_STOP_RSP: Config stop response
- * @QCA_WLAN_VENDOR_ATTR_LL_STATS_CLR_AFTER_LAST: After last
- * @QCA_WLAN_VENDOR_ATTR_LL_STATS_CLR_MAX: Max value
- */
 enum qca_wlan_vendor_attr_ll_stats_clr {
 	QCA_WLAN_VENDOR_ATTR_LL_STATS_CLR_INVALID = 0,
-	QCA_WLAN_VENDOR_ATTR_LL_STATS_CLR_CONFIG_REQ_MASK,
-	QCA_WLAN_VENDOR_ATTR_LL_STATS_CLR_CONFIG_STOP_REQ,
-	QCA_WLAN_VENDOR_ATTR_LL_STATS_CLR_CONFIG_RSP_MASK,
-	QCA_WLAN_VENDOR_ATTR_LL_STATS_CLR_CONFIG_STOP_RSP,
+	/* Unsigned 32bit bitmap for clearing statistics
+	 * All radio statistics                     0x00000001
+	 * cca_busy_time (within radio statistics)  0x00000002
+	 * All channel stats (within radio statistics) 0x00000004
+	 * All scan statistics (within radio statistics) 0x00000008
+	 * All interface statistics                     0x00000010
+	 * All tx rate statistics (within interface statistics) 0x00000020
+	 * All ac statistics (with in interface statistics) 0x00000040
+	 * All contention (min, max, avg) statistics (within ac statisctics)
+	 * 0x00000080.
+	 */
+	QCA_WLAN_VENDOR_ATTR_LL_STATS_CLR_CONFIG_REQ_MASK = 1,
+	/* Unsigned 8 bit value: Request to stop statistics collection */
+	QCA_WLAN_VENDOR_ATTR_LL_STATS_CLR_CONFIG_STOP_REQ = 2,
+
+	/* Unsigned 32 bit bitmap: Response from the driver
+	 * for the cleared statistics
+	 */
+	QCA_WLAN_VENDOR_ATTR_LL_STATS_CLR_CONFIG_RSP_MASK = 3,
+	/* Unsigned 8 bit value: Response from driver/firmware
+	 * for the stop request
+	 */
+	QCA_WLAN_VENDOR_ATTR_LL_STATS_CLR_CONFIG_STOP_RSP = 4,
+	/* keep last */
 	QCA_WLAN_VENDOR_ATTR_LL_STATS_CLR_AFTER_LAST,
 	QCA_WLAN_VENDOR_ATTR_LL_STATS_CLR_MAX =
-		QCA_WLAN_VENDOR_ATTR_LL_STATS_CLR_AFTER_LAST - 1
+	QCA_WLAN_VENDOR_ATTR_LL_STATS_CLR_AFTER_LAST - 1,
 };
 
-/**
- * enum qca_wlan_vendor_attr_ll_stats_results_type - ll stats result type
- *
- * @QCA_WLAN_VENDOR_ATTR_LL_STATS_TYPE_INVALID: Initial invalid value
- * @QCA_WLAN_VENDOR_ATTR_LL_STATS_TYPE_RADIO: Link layer stats type radio
- * @QCA_WLAN_VENDOR_ATTR_LL_STATS_TYPE_IFACE: Link layer stats type interface
- * @QCA_WLAN_VENDOR_ATTR_LL_STATS_TYPE_PEER: Link layer stats type peer
- * @QCA_WLAN_VENDOR_ATTR_LL_STATS_TYPE_AFTER_LAST: Last value
- * @QCA_WLAN_VENDOR_ATTR_LL_STATS_TYPE_MAX: Max value
- */
-enum qca_wlan_vendor_attr_ll_stats_results_type {
-	QCA_WLAN_VENDOR_ATTR_LL_STATS_TYPE_INVALID = 0,
-
-	QCA_WLAN_VENDOR_ATTR_LL_STATS_TYPE_RADIO = 1,
-	QCA_WLAN_VENDOR_ATTR_LL_STATS_TYPE_IFACE,
-	QCA_WLAN_VENDOR_ATTR_LL_STATS_TYPE_PEER,
-
-	QCA_WLAN_VENDOR_ATTR_LL_STATS_TYPE_AFTER_LAST,
-	QCA_WLAN_VENDOR_ATTR_LL_STATS_TYPE_MAX =
-		QCA_WLAN_VENDOR_ATTR_LL_STATS_TYPE_AFTER_LAST - 1
+enum qca_wlan_vendor_attr_ll_stats_get {
+	QCA_WLAN_VENDOR_ATTR_LL_STATS_GET_INVALID = 0,
+	/* Unsigned 32 bit value provided by the caller issuing the GET stats
+	 * command. When reporting the stats results, the driver uses the same
+	 * value to indicate which GET request the results correspond to.
+	 */
+	QCA_WLAN_VENDOR_ATTR_LL_STATS_GET_CONFIG_REQ_ID = 1,
+	/* Unsigned 32 bit value - bit mask to identify what statistics are
+	 * requested for retrieval.
+	 * Radio Statistics 0x00000001
+	 * Interface Statistics 0x00000020
+	 * All Peer Statistics 0x00000040
+	 * Peer Statistics     0x00000080
+	 */
+	QCA_WLAN_VENDOR_ATTR_LL_STATS_GET_CONFIG_REQ_MASK = 2,
+	/* keep last */
+	QCA_WLAN_VENDOR_ATTR_LL_STATS_GET_AFTER_LAST,
+	QCA_WLAN_VENDOR_ATTR_LL_STATS_GET_MAX =
+	QCA_WLAN_VENDOR_ATTR_LL_STATS_GET_AFTER_LAST - 1,
 };
 
 enum qca_wlan_vendor_attr_ll_stats_results {
@@ -2643,6 +2619,9 @@ enum qca_wlan_vendor_attr_ll_stats_results {
 	 * Possible values are -120~-50 dBm.
 	 */
 	QCA_WLAN_VENDOR_ATTR_LL_STATS_IFACE_NF_CAL_VAL = 90,
+
+	/* Attribute used for padding for 64-bit alignment */
+	QCA_WLAN_VENDOR_ATTR_LL_STATS_PAD = 91,
 
 	/* keep last */
 	QCA_WLAN_VENDOR_ATTR_LL_STATS_AFTER_LAST,
