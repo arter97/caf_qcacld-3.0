@@ -4223,6 +4223,7 @@ send_set_nss_probe_intvl_cmd_tlv(struct wmi_unified *wmi_handle,
 }
 
 #define SAWF_CONFIG_PARAM_MAX 0xFFFFFFFF
+#define SAWF_MAX_MIN_THROUGHPUT (10 * 1024 * 1024)
 
 static uint32_t sawf_tid_infer(wmi_sawf_svc_class_cfg_cmd_fixed_param *p_cmd)
 {
@@ -4369,6 +4370,23 @@ QDF_STATUS send_sawf_create_cmd_tlv(wmi_unified_t wmi_handle,
 		tid = sawf_tid_infer(cmd);
 		cmd->tid = tid;
 		param->tid = tid;
+	}
+
+	if (param->min_thruput_rate !=
+	    WMI_SAWF_SVC_CLASS_PARAM_DEFAULT_MIN_THRUPUT) {
+		uint32_t min_tput;
+
+		/*
+		 * Do 1.5 * min_tput to get FW value. First multiply by 3 and
+		 * then divide by 2 to get the desired multiplication
+		 */
+		min_tput = 3 * param->min_thruput_rate;
+		min_tput = qdf_do_div(min_tput, 2);
+
+		if (min_tput > SAWF_MAX_MIN_THROUGHPUT)
+			min_tput = SAWF_MAX_MIN_THROUGHPUT;
+
+		cmd->min_thruput_kbps = min_tput;
 	}
 
 	wmi_debug("Service class params - ID:%u, min_thruput_rate:%u, "
