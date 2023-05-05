@@ -763,7 +763,7 @@ static bool put_wifi_iface_stats(struct wifi_interface_stats *if_stat,
 
 	if (nla_put_u32(vendor_event,
 			QCA_WLAN_VENDOR_ATTR_LL_STATS_TYPE,
-			QCA_WLAN_VENDOR_ATTR_LL_STATS_TYPE_IFACE) ||
+			QCA_NL80211_VENDOR_SUBCMD_LL_STATS_TYPE_IFACE) ||
 	    nla_put_u32(vendor_event,
 			QCA_WLAN_VENDOR_ATTR_LL_STATS_IFACE_NUM_PEERS,
 			num_peers) ||
@@ -979,7 +979,7 @@ static void hdd_link_layer_process_peer_stats(struct hdd_adapter *adapter,
 
 	if (nla_put_u32(skb,
 			QCA_WLAN_VENDOR_ATTR_LL_STATS_TYPE,
-			QCA_WLAN_VENDOR_ATTR_LL_STATS_TYPE_PEER) ||
+			QCA_NL80211_VENDOR_SUBCMD_LL_STATS_TYPE_PEERS) ||
 	    nla_put_u32(skb,
 			QCA_WLAN_VENDOR_ATTR_LL_STATS_RESULTS_MORE_DATA,
 			more_data) ||
@@ -1313,7 +1313,7 @@ static void hdd_llstats_post_radio_stats(struct hdd_adapter *adapter,
 
 	if (nla_put_u32(vendor_event,
 			QCA_WLAN_VENDOR_ATTR_LL_STATS_TYPE,
-			QCA_WLAN_VENDOR_ATTR_LL_STATS_TYPE_RADIO) ||
+			QCA_NL80211_VENDOR_SUBCMD_LL_STATS_TYPE_RADIO) ||
 	    nla_put_u32(vendor_event,
 			QCA_WLAN_VENDOR_ATTR_LL_STATS_RESULTS_MORE_DATA,
 			more_data) ||
