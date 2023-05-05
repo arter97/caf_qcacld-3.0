@@ -88,6 +88,13 @@ static int is_bigtk(uint16_t keyix)
 		return 1;
 }
 
+static int is_gtk(uint16_t keyix)
+{
+	if (keyix == 1 || keyix == 2)
+		return 1;
+	else
+		return 0;
+}
 /**
  * wlan_crypto_vdev_get_comp_params() - called by mlme to get crypto params
  * @vdev: vdev
@@ -957,6 +964,7 @@ QDF_STATUS wlan_crypto_setkey(struct wlan_objmgr_vdev *vdev,
 
 			igtk_idx = req_key->keyix - WLAN_CRYPTO_MAXKEYIDX;
 			bigtk_idx = igtk_idx - WLAN_CRYPTO_MAXIGTKKEYIDX;
+
 			if (!is_igtk(req_key->keyix) &&
 			    !(is_bigtk(req_key->keyix))) {
 				crypto_err("igtk/bigtk key invalid keyid %d",
@@ -1225,6 +1233,8 @@ QDF_STATUS wlan_crypto_getkey(struct wlan_objmgr_vdev *vdev,
 	struct wlan_objmgr_peer *peer = NULL;
 	uint8_t pdev_id;
 	uint16_t get_pn_enable;
+	bool is_bcast;
+	uint8_t *pn_mac_addr;
 
 	if (!req_key) {
 		crypto_err("req_key NULL");
@@ -1255,8 +1265,9 @@ QDF_STATUS wlan_crypto_getkey(struct wlan_objmgr_vdev *vdev,
 		crypto_err("rx_ops is NULL");
 		return QDF_STATUS_E_INVAL;
 	}
+	is_bcast = qdf_is_macaddr_broadcast((struct qdf_mac_addr *)mac_addr);
 
-	if (qdf_is_macaddr_broadcast((struct qdf_mac_addr *)mac_addr)) {
+	if (is_bcast) {
 		key = wlan_crypto_vdev_getkey(vdev, req_key->keyix);
 		if (!key)
 			return QDF_STATUS_E_INVAL;
@@ -1286,12 +1297,6 @@ QDF_STATUS wlan_crypto_getkey(struct wlan_objmgr_vdev *vdev,
 	if (key->valid) {
 		qdf_mem_copy(req_key->keydata,
 				key->keyval, key->keylen);
-		qdf_mem_copy((uint8_t *)(&req_key->keytsc),
-				(uint8_t *)(&key->keytsc),
-				sizeof(req_key->keytsc));
-		qdf_mem_copy((uint8_t *)(&req_key->keyrsc),
-				(uint8_t *)(&key->keyrsc[0]),
-				sizeof(req_key->keyrsc));
 		req_key->keylen = key->keylen;
 		req_key->keyix = key->keyix;
 		req_key->flags = key->flags;
@@ -1319,14 +1324,27 @@ QDF_STATUS wlan_crypto_getkey(struct wlan_objmgr_vdev *vdev,
 		}
 
 		if (get_pn_enable) {
+			pn_mac_addr = ((is_gtk(req_key->keyix) ||
+					is_bigtk(req_key->keyix)) && is_bcast) ?
+					macaddr : mac_addr;
+
 			if (WLAN_CRYPTO_TX_OPS_GETPN(tx_ops))
-				WLAN_CRYPTO_TX_OPS_GETPN(tx_ops)(vdev, mac_addr,
+				WLAN_CRYPTO_TX_OPS_GETPN(tx_ops)(vdev,
+								 pn_mac_addr,
 								 req_key->keyix,
 								 req_key->type);
 			if (WLAN_CRYPTO_RX_OPS_GET_RXPN(&rx_ops->crypto_rx_ops))
 				WLAN_CRYPTO_RX_OPS_GET_RXPN(&rx_ops->crypto_rx_ops)(
 						vdev, mac_addr, req_key->keyix);
+
+			qdf_mem_copy((uint8_t *)(&req_key->keytsc),
+				     (uint8_t *)(&key->keytsc),
+				     sizeof(req_key->keytsc));
+			qdf_mem_copy((uint8_t *)(&req_key->keyrsc),
+				     (uint8_t *)(&key->keyrsc[0]),
+				     sizeof(req_key->keyrsc));
 		}
+
 	}
 	status = QDF_STATUS_SUCCESS;
 
