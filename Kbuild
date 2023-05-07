@@ -1296,8 +1296,7 @@ UMAC_OBJMGR_DIR := $(WLAN_COMMON_ROOT)/umac/cmn_services/obj_mgr
 
 UMAC_OBJMGR_INC := -I$(WLAN_COMMON_INC)/umac/cmn_services/obj_mgr/inc \
 		-I$(WLAN_COMMON_INC)/umac/cmn_services/obj_mgr/src \
-		-I$(WLAN_COMMON_INC)/umac/cmn_services/inc \
-		-I$(WLAN_COMMON_INC)/umac/global_umac_dispatcher/lmac_if/inc
+		-I$(WLAN_COMMON_INC)/umac/cmn_services/inc
 
 UMAC_OBJMGR_OBJS := $(UMAC_OBJMGR_DIR)/src/wlan_objmgr_global_obj.o \
 		$(UMAC_OBJMGR_DIR)/src/wlan_objmgr_pdev_obj.o \
