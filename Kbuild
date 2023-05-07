@@ -1696,7 +1696,6 @@ $(call add-wlan-objs,ftm_time_sync,$(FTM_TIME_SYNC_OBJS))
 ########## WLAN PRE_CAC ##########
 
 WLAN_PRE_CAC_DIR := components/pre_cac
-WLAN_PRE_CAC_INC := -I$(WLAN_ROOT)/$(WLAN_PRE_CAC_DIR)/dispatcher/inc
 PRE_CAC_OSIF_DIR := os_if/pre_cac
 WLAN_PRE_CAC_INC := -I$(WLAN_ROOT)/$(WLAN_PRE_CAC_DIR)/dispatcher/inc \
 		  -I$(WLAN_ROOT)/$(PRE_CAC_OSIF_DIR)/inc
