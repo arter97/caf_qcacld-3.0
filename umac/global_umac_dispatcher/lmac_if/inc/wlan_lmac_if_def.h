@@ -686,6 +686,10 @@ struct wlan_lmac_if_p2p_tx_ops {
  * @atf_register_event_handler:   ATF register wmi event handlers
  * @atf_unregister_event_handler: ATF unregister wmi event handlers
  * @atf_set_ppdu_stats:           ATF set ppdu stats to get ATF stats
+ * @atf_send_peer_list_v2:        Send atf list of peers with increased
+ *                                maximum peer support
+ * @atf_set_grouping_v2:          Set atf grouping with increased maximum
+ *                                peer support
  */
 struct wlan_lmac_if_atf_tx_ops {
 	int32_t (*atf_enable_disable)(struct wlan_objmgr_vdev *vdev,
@@ -712,6 +716,12 @@ struct wlan_lmac_if_atf_tx_ops {
 	void (*atf_unregister_event_handler)(struct wlan_objmgr_psoc *psoc);
 	void (*atf_set_ppdu_stats)(struct wlan_objmgr_pdev *pdev,
 				   uint8_t value);
+#ifdef WLAN_ATF_INCREASED_STA
+	int32_t (*atf_send_peer_list_v2)(struct wlan_objmgr_pdev *pdev,
+					 struct pdev_atf_req_v2 *atf_req);
+	int32_t (*atf_set_grouping_v2)(struct wlan_objmgr_pdev *pdev,
+				       struct pdev_atf_ssid_group_req_v2 *req);
+#endif
 };
 #endif
 
