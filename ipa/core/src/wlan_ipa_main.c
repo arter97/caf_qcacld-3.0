@@ -382,7 +382,7 @@ void ipa_reg_send_to_nw_cb(struct wlan_objmgr_pdev *pdev,
 	return wlan_ipa_reg_send_to_nw_cb(ipa_obj, cb);
 }
 
-#ifdef QCA_CONFIG_RPS
+#if defined(QCA_CONFIG_RPS) && !defined(MDM_PLATFORM)
 void ipa_reg_rps_enable_cb(struct wlan_objmgr_pdev *pdev,
 			   wlan_ipa_rps_enable cb)
 {

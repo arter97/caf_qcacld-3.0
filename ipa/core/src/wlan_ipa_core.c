@@ -2328,9 +2328,17 @@ end:
     defined(QCA_WIFI_KIWI) || defined(QCA_WIFI_KIWI_V2)    || \
     defined(QCA_WIFI_QCN9224)
 
-#ifdef QCA_CONFIG_RPS
-void ipa_set_rps(struct wlan_ipa_priv *ipa_ctx, enum QDF_OPMODE mode,
-		 bool enable)
+#if defined(QCA_CONFIG_RPS) && !defined(MDM_PLATFORM)
+/**
+ * ipa_set_rps(): Enable/disable RPS for all interfaces of specific mode
+ * @ipa_ctx: IPA context
+ * @mode: mode of interface for which RPS needs to be enabled
+ * @enable: Set true to enable RPS
+ *
+ * Return: None
+ */
+static void ipa_set_rps(struct wlan_ipa_priv *ipa_ctx, enum QDF_OPMODE mode,
+			bool enable)
 {
 	struct wlan_ipa_iface_context *iface_ctx;
 	wlan_ipa_rps_enable cb = ipa_ctx->rps_enable;
@@ -2345,9 +2353,7 @@ void ipa_set_rps(struct wlan_ipa_priv *ipa_ctx, enum QDF_OPMODE mode,
 			cb(iface_ctx->session_id, enable);
 	}
 }
-#endif
 
-#ifdef QCA_CONFIG_RPS
 /**
  * wlan_ipa_uc_handle_first_con() - Handle first uC IPA connection
  * @ipa_ctx: IPA context
@@ -2375,21 +2381,6 @@ static QDF_STATUS wlan_ipa_uc_handle_first_con(struct wlan_ipa_priv *ipa_ctx)
 
 	return QDF_STATUS_SUCCESS;
 }
-#else
-static QDF_STATUS wlan_ipa_uc_handle_first_con(struct wlan_ipa_priv *ipa_ctx)
-{
-	ipa_debug("enter");
-
-	if (wlan_ipa_uc_enable_pipes(ipa_ctx) != QDF_STATUS_SUCCESS) {
-		ipa_err("IPA WDI Pipe activation failed");
-		return QDF_STATUS_E_BUSY;
-	}
-
-	ipa_debug("exit");
-
-	return QDF_STATUS_SUCCESS;
-}
-#endif
 
 static
 void wlan_ipa_uc_handle_last_discon(struct wlan_ipa_priv *ipa_ctx,
@@ -2404,6 +2395,32 @@ void wlan_ipa_uc_handle_last_discon(struct wlan_ipa_priv *ipa_ctx,
 
 	ipa_debug("exit: IPA WDI Pipes deactivated");
 }
+#else
+static QDF_STATUS wlan_ipa_uc_handle_first_con(struct wlan_ipa_priv *ipa_ctx)
+{
+	ipa_debug("enter");
+
+	if (wlan_ipa_uc_enable_pipes(ipa_ctx) != QDF_STATUS_SUCCESS) {
+		ipa_err("IPA WDI Pipe activation failed");
+		return QDF_STATUS_E_BUSY;
+	}
+
+	ipa_debug("exit");
+
+	return QDF_STATUS_SUCCESS;
+}
+
+static
+void wlan_ipa_uc_handle_last_discon(struct wlan_ipa_priv *ipa_ctx,
+				    bool force_disable)
+{
+	ipa_debug("enter");
+
+	wlan_ipa_uc_disable_pipes(ipa_ctx, force_disable);
+
+	ipa_debug("exit: IPA WDI Pipes deactivated");
+}
+#endif
 
 bool wlan_ipa_is_fw_wdi_activated(struct wlan_ipa_priv *ipa_ctx)
 {
@@ -2738,7 +2755,7 @@ static QDF_STATUS wlan_ipa_send_msg(qdf_netdev_t net_dev,
 	return QDF_STATUS_SUCCESS;
 }
 
-#ifdef QCA_CONFIG_RPS
+#if defined(QCA_CONFIG_RPS) && !defined(MDM_PLATFORM)
 void wlan_ipa_handle_multiple_sap_evt(struct wlan_ipa_priv *ipa_ctx,
 				      qdf_ipa_wlan_event type)
 {

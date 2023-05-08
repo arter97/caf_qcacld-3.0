@@ -326,7 +326,7 @@ void ipa_reg_sap_xmit_cb(struct wlan_objmgr_pdev *pdev,
 void ipa_reg_send_to_nw_cb(struct wlan_objmgr_pdev *pdev,
 			   wlan_ipa_send_to_nw cb);
 
-#ifdef QCA_CONFIG_RPS
+#if defined(QCA_CONFIG_RPS) && !defined(MDM_PLATFORM)
 /**
  * ipa_reg_rps_enable_cb() - Register cb to enable RPS
  * @pdev: pdev obj

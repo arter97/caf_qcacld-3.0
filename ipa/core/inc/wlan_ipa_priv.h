@@ -760,7 +760,7 @@ struct wlan_ipa_priv {
 	wlan_ipa_softap_xmit softap_xmit;
 	wlan_ipa_send_to_nw send_to_nw;
 
-#ifdef QCA_CONFIG_RPS
+#if defined(QCA_CONFIG_RPS) && !defined(MDM_PLATFORM)
 	/*Callback to enable RPS for STA in STA+SAP scenario*/
 	wlan_ipa_rps_enable rps_enable;
 #endif
