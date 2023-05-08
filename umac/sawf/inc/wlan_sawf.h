@@ -40,21 +40,21 @@
  * Granularity: 1Kbps
  */
 #define SAWF_MIN_MIN_THROUGHPUT 0
-#define SAWF_MAX_MIN_THROUGHPUT (10 * 1204 * 1024)
+#define SAWF_MAX_MIN_THROUGHPUT (10 * 1024 * 1024)
 
 /*
  * Max throughput limit 0 - 10gbps.
  * Granularity: 1Kbps
  */
 #define SAWF_MIN_MAX_THROUGHPUT 0
-#define SAWF_MAX_MAX_THROUGHPUT (10 * 1204 * 1024)
+#define SAWF_MAX_MAX_THROUGHPUT (10 * 1024 * 1024)
 
 /*
  * Service interval limit 0 - 10secs.
- * Granularity: 100µs
+ * Granularity: 1ms
  */
 #define SAWF_MIN_SVC_INTERVAL 0
-#define SAWF_MAX_SVC_INTERVAL (10 * 100 * 100)
+#define SAWF_MAX_SVC_INTERVAL (10 * 1000)
 
 /*
  * Burst size 0 - 16Mbytes.
@@ -65,17 +65,17 @@
 
 /*
  * Delay bound limit 0 - 10secs
- * Granularity: 100µs
+ * Granularity: 1ms
  */
 #define SAWF_MIN_DELAY_BOUND 0
-#define SAWF_MAX_DELAY_BOUND (10 * 100 * 100)
+#define SAWF_MAX_DELAY_BOUND (10 * 1000)
 
 /*
  * Msdu TTL limit 0 - 10secs.
- * Granularity: 100µs
+ * Granularity: 1ms
  */
 #define SAWF_MIN_MSDU_TTL 0
-#define SAWF_MAX_MSDU_TTL (10 * 100 * 100)
+#define SAWF_MAX_MSDU_TTL (10 * 1000)
 
 /*
  * Priority limit 0 - 127.
