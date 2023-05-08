@@ -515,6 +515,7 @@ struct dp_direct_link_context {
  * @rtpm_tput_policy_ctx: Runtime Tput policy context
  * @txrx_hist: TxRx histogram
  * @bbm_ctx: bus bandwidth manager context
+ * @dp_direct_link_lock: Direct link mutex lock
  * @dp_direct_link_ctx: DP Direct Link context
  * @arp_connectivity_map: ARP connectivity map
  * @rx_wake_lock: rx wake lock
@@ -591,6 +592,7 @@ struct wlan_dp_psoc_context {
 
 	enum RX_OFFLOAD ol_enable;
 #ifdef FEATURE_DIRECT_LINK
+	qdf_mutex_t dp_direct_link_lock;
 	struct dp_direct_link_context *dp_direct_link_ctx;
 #endif
 };
