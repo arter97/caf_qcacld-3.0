@@ -1253,8 +1253,16 @@ QDF_STATUS hdd_update_nss(struct hdd_adapter *adapter, uint8_t tx_nss,
 
 		if (hdd_is_vdev_in_conn_state(adapter))
 			return hdd_set_nss_params(adapter, tx_nss, rx_nss);
+
+		if (tx_nss != rx_nss) {
+			hdd_err("TX NSS = %d, RX NSS  = %d value mismatch, doesn't support asymmetric config in disconnected state",
+				tx_nss, rx_nss);
+			return QDF_STATUS_E_FAILURE;
+		}
+
 		hdd_debug("Vdev %d in disconnect state, changing ini nss params",
 			  adapter->deflink->vdev_id);
+
 		if (!bval) {
 			hdd_err("Nss in 1x1, no change required, 2x2 mode disabled");
 			return QDF_STATUS_SUCCESS;
