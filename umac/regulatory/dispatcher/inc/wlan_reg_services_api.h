@@ -1715,6 +1715,7 @@ static inline
 QDF_STATUS wlan_reg_extract_puncture_by_bw(enum phy_ch_width ori_bw,
 					   uint16_t ori_puncture_bitmap,
 					   qdf_freq_t freq,
+					   qdf_freq_t cen320_freq,
 					   enum phy_ch_width new_bw,
 					   uint16_t *new_puncture_bitmap)
 {
