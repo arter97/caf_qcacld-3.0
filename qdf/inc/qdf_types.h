@@ -455,6 +455,7 @@ typedef bool (*qdf_irqlocked_func_t)(void *);
  * @QDF_MODULE_ID_ANY: anything
  * @QDF_MODULE_ID_SOUNDING: txbf SOUNDING
  * @QDF_MODULE_ID_SAWF: SAWF module ID
+ * @QDF_MODULE_ID_EPCS: EPCS module ID
  * @QDF_MODULE_ID_MAX: Max place holder module ID
  *
  * New module ID needs to be added in qdf trace along with this enum.
@@ -621,6 +622,7 @@ typedef enum {
 	QDF_MODULE_ID_QMI,
 	QDF_MODULE_ID_SOUNDING,
 	QDF_MODULE_ID_SAWF,
+	QDF_MODULE_ID_EPCS,
 	QDF_MODULE_ID_ANY,
 	QDF_MODULE_ID_MAX,
 } QDF_MODULE_ID;
