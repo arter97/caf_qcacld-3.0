@@ -1075,7 +1075,7 @@ static struct CE_attr host_ce_config_wlan_qcn9160[] = {
 	/* host->target WMI */
 	{/*CE3*/ (CE_ATTR_FLAGS), 0, 32, WMI_CE_BUF_SIZE, 0, NULL,},
 	/* host->target HTT */
-	{/*CE4*/ (CE_ATTR_FLAGS), 0,
+	{/*CE4*/ CE4_COMP_HTT_HTC, 0,
 		CE_HTT_H2T_MSG_SRC_NENTRIES, 256, 0, NULL,},
 	/* target -> host PKTLOG */
 	{/*CE5*/ (CE_ATTR_FLAGS), 0, 0, 2048,
@@ -1099,8 +1099,7 @@ static struct CE_pipe_config target_ce_config_wlan_qcn9160[] = {
 	/* host->target WMI */
 	{ /* CE3 */ 3, PIPEDIR_OUT, 32, WMI_CE_BUF_SIZE, CE_ATTR_FLAGS, 0,},
 	/* host->target HTT */
-	{ /* CE4 */ 4, PIPEDIR_OUT, 256, 256,
-		(CE_ATTR_FLAGS | CE_ATTR_DISABLE_INTR), 0,},
+	{ /* CE4 */ 4, PIPEDIR_OUT, 256, 256, CE4_COMP_HTT_HTC, 0,},
 	/* Target -> host PKTLOG */
 	{ /* CE5 */ 5, PIPEDIR_IN,  32, 2048, CE_ATTR_FLAGS, 0,},
 	/* Reserved for target autonomous HIF_memcpy */
