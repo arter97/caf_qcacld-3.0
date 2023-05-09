@@ -64,7 +64,7 @@
 #define WLAN_IPA_CLIENT_MAX_IFACE           MAX_IPA_IFACE
 #define WLAN_IPA_MAX_SYSBAM_PIPE            4
 
-#ifdef IPA_WDS_EASYMESH_FEATURE
+#if defined(IPA_WDS_EASYMESH_FEATURE) || defined(QCA_WIFI_QCN9224)
 #define WLAN_IPA_MAX_SESSION                MAX_IPA_IFACE //7
 #else
 #define WLAN_IPA_MAX_SESSION                5
