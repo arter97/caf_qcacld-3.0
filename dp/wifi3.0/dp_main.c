@@ -1346,7 +1346,7 @@ void dp_pdev_update_fast_rx_flag(struct dp_soc *soc, struct dp_pdev *pdev)
 	uint8_t rx_fast_flag = true;
 
 	/* Check if protocol tagging enable */
-	if (pdev->is_rx_protocol_tagging_enabled && !pdev->enhanced_stats_en) {
+	if (pdev->is_rx_protocol_tagging_enabled) {
 		rx_fast_flag = false;
 		goto update_flag;
 	}
