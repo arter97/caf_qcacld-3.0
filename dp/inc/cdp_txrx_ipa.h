@@ -897,6 +897,12 @@ cdp_ipa_opt_dp_enable_disable_low_power_mode(struct wlan_objmgr_pdev *pdev,
 
 	psoc = wlan_pdev_get_psoc(pdev);
 	wmi_handle = get_wmi_unified_hdl_from_psoc(psoc);
+	if (!wmi_handle) {
+		QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_FATAL,
+			  "Unable to get wmi handle");
+		return QDF_STATUS_E_NULL_VALUE;
+	}
+
 	pdev_wmi_handle = pdev->tgt_if_handle->wmi_handle;
 	qdf_mem_set(&pparam, sizeof(pparam), 0);
 	pparam.is_host_pdev_id = false;
