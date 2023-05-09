@@ -3993,8 +3993,48 @@ void dp_mlo_peer_delete(struct dp_soc *soc, struct dp_peer *peer, void *arg)
 				     peer->mac_addr.raw, 0,
 				     CDP_LINK_PEER_TYPE);
 }
+
+/**
+ * dp_mlo_link_peer_flush() - flush all the link peers
+ * @soc: Datapath soc handle
+ * @peer: DP peer handle to be checked
+ *
+ * Return: None
+ */
+static void dp_mlo_link_peer_flush(struct dp_soc *soc, struct dp_peer *peer)
+{
+	int cnt = 0;
+	struct dp_peer *link_peer = NULL;
+	struct dp_mld_link_peers link_peers_info = {NULL};
+
+	if (!IS_MLO_DP_MLD_PEER(peer))
+		return;
+
+	/* get link peers with reference */
+	dp_get_link_peers_ref_from_mld_peer(soc, peer, &link_peers_info,
+					    DP_MOD_ID_CDP);
+	for (cnt = 0; cnt < link_peers_info.num_links; cnt++) {
+		link_peer = link_peers_info.link_peers[cnt];
+		if (!link_peer)
+			continue;
+
+		/* delete all the link peers */
+		dp_mlo_peer_delete(link_peer->vdev->pdev->soc, link_peer, NULL);
+		/* unmap all the link peers */
+		dp_rx_peer_unmap_handler(link_peer->vdev->pdev->soc,
+					 link_peer->peer_id,
+					 link_peer->vdev->vdev_id,
+					 link_peer->mac_addr.raw, 0,
+					 DP_PEER_WDS_COUNT_INVALID);
+	}
+	dp_release_link_peers_ref(&link_peers_info, DP_MOD_ID_CDP);
+}
 #else
 void dp_mlo_peer_delete(struct dp_soc *soc, struct dp_peer *peer, void *arg)
+{
+}
+
+static void dp_mlo_link_peer_flush(struct dp_soc *soc, struct dp_peer *peer)
 {
 }
 #endif
@@ -4053,6 +4093,8 @@ static void dp_vdev_flush_peers(struct cdp_vdev *vdev_handle,
 			   IS_MLO_DP_MLD_PEER(peer)) {
 			dp_info("peer: " QDF_MAC_ADDR_FMT " is getting unmap",
 				QDF_MAC_ADDR_REF(peer->mac_addr.raw));
+
+			dp_mlo_link_peer_flush(soc, peer);
 			dp_rx_peer_unmap_handler(soc, i,
 						 vdev->vdev_id,
 						 peer->mac_addr.raw, 0,
