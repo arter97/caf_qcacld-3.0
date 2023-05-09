@@ -1290,6 +1290,7 @@ wlan_rptr_vdev_s_ssid_check_cb(struct wlan_objmgr_psoc *psoc,
 {
 	struct wlan_objmgr_vdev *vdev = NULL;
 	struct s_ssid_info *s_ssid_msg = NULL;
+	enum QDF_OPMODE vdev_mode, ssid_msg_vdev_mode;
 
 	vdev = (struct wlan_objmgr_vdev *)obj;
 	if (!vdev) {
@@ -1297,15 +1298,23 @@ wlan_rptr_vdev_s_ssid_check_cb(struct wlan_objmgr_psoc *psoc,
 		return;
 	}
 
+	/*No same ssid checks for Proxy STAs*/
+	if (wlan_rptr_is_psta_vdev(vdev))
+		return;
+
 	s_ssid_msg = ((struct s_ssid_info *)arg);
 
-	if (wlan_vdev_mlme_get_opmode(vdev) != wlan_vdev_mlme_get_opmode(
-							s_ssid_msg->vdev)) {
+	vdev_mode = wlan_vdev_mlme_get_opmode(vdev);
+	ssid_msg_vdev_mode = wlan_vdev_mlme_get_opmode(s_ssid_msg->vdev);
+
+	/* Do same ssid check only if vdev_mode and ssid_msg_vdev_mode
+	 * are not the same and they're SAP or STA, not any other mode */
+	if (((vdev_mode == QDF_STA_MODE) &&
+			(ssid_msg_vdev_mode == QDF_SAP_MODE)) ||
+			((vdev_mode == QDF_SAP_MODE) &&
+			 (ssid_msg_vdev_mode == QDF_STA_MODE))) {
 		struct wlan_rptr_global_priv *g_priv = wlan_rptr_get_global_ctx();
 		struct rptr_ext_cbacks *ext_cb = &g_priv->ext_cbacks;
-
-		if (wlan_rptr_is_psta_vdev(vdev))
-			return;
 
 		if (ext_cb->dessired_ssid_found(vdev, s_ssid_msg->ssid, s_ssid_msg->ssid_len)) {
 			s_ssid_msg->ssid_match = 1;
