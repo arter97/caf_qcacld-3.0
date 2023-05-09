@@ -2585,6 +2585,7 @@ policy_mgr_change_sap_channel_with_csa(struct wlan_objmgr_psoc *psoc,
 {
 	struct policy_mgr_psoc_priv_obj *pm_ctx;
 	struct ch_params ch_params = {0};
+	qdf_freq_t center_freq;
 	QDF_STATUS status;
 
 	pm_ctx = policy_mgr_get_context(psoc);
@@ -2601,8 +2602,13 @@ policy_mgr_change_sap_channel_with_csa(struct wlan_objmgr_psoc *psoc,
 			ch_width = ch_params.ch_width;
 	}
 
+	if (ch_params.mhz_freq_seg1)
+		center_freq = ch_params.mhz_freq_seg1;
+	else
+		center_freq = ch_params.mhz_freq_seg0;
+
 	if (!policy_mgr_check_bw_with_unsafe_chan_freq(psoc,
-						       ch_params.mhz_freq_seg0,
+						       center_freq,
 						       ch_width)) {
 		policy_mgr_info("SAP bw shrink to 20M for unsafe");
 		ch_width = CH_WIDTH_20MHZ;
