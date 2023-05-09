@@ -1073,6 +1073,57 @@ add_freq:
 	return QDF_STATUS_SUCCESS;
 }
 
+/**
+ * policy_mgr_modify_sap_go_4th_conc_disallow() - filter out channel that
+ * is not allowed for 4th sap/go connection
+ * @psoc: pointer to soc
+ * @mode: interface mode
+ * @pcl_list_org: channel list to filter out
+ * @weight_list_org: weight of channel list
+ * @pcl_len_org: length of channel list
+ *
+ * Return: QDF_STATUS
+ */
+static QDF_STATUS policy_mgr_modify_sap_go_4th_conc_disallow(
+		struct wlan_objmgr_psoc *psoc,
+		enum policy_mgr_con_mode mode,
+		uint32_t *pcl_list_org,
+		uint8_t *weight_list_org,
+		uint32_t *pcl_len_org)
+{
+	size_t i, pcl_len = 0;
+	struct policy_mgr_psoc_priv_obj *pm_ctx;
+	uint32_t num_connections;
+
+	pm_ctx = policy_mgr_get_context(psoc);
+	if (!pm_ctx) {
+		policy_mgr_err("Invalid Context");
+		return QDF_STATUS_E_FAILURE;
+	}
+	if (*pcl_len_org > NUM_CHANNELS) {
+		policy_mgr_err("Invalid PCL List Length %d", *pcl_len_org);
+		return QDF_STATUS_E_FAILURE;
+	}
+	qdf_mutex_acquire(&pm_ctx->qdf_conc_list_lock);
+	num_connections = policy_mgr_get_connection_count(psoc);
+	if (num_connections < 3)
+		goto end;
+
+	for (i = 0; i < *pcl_len_org; i++) {
+		if (policy_mgr_allow_4th_new_freq(psoc, pcl_list_org[i],
+						  mode, 0)) {
+			pcl_list_org[pcl_len] = pcl_list_org[i];
+			weight_list_org[pcl_len++] = weight_list_org[i];
+		}
+	}
+
+	*pcl_len_org = pcl_len;
+end:
+	qdf_mutex_release(&pm_ctx->qdf_conc_list_lock);
+
+	return QDF_STATUS_SUCCESS;
+}
+
 static QDF_STATUS policy_mgr_pcl_modification_for_sap(
 			struct wlan_objmgr_psoc *psoc,
 			uint32_t *pcl_channels, uint8_t *pcl_weight,
@@ -1085,6 +1136,7 @@ static QDF_STATUS policy_mgr_pcl_modification_for_sap(
 	bool dfs_modified_pcl = false;
 	bool indoor_modified_pcl = false;
 	bool passive_modified_pcl = false;
+	bool band_6ghz_modified_pcl = false;
 	bool modified_final_pcl = false;
 	bool srd_chan_enabled;
 
@@ -1157,15 +1209,26 @@ static QDF_STATUS policy_mgr_pcl_modification_for_sap(
 		policy_mgr_err("failed to modify pcl for 6G channels");
 		return status;
 	}
+	band_6ghz_modified_pcl = true;
+
+	status = policy_mgr_modify_sap_go_4th_conc_disallow(psoc,
+							    PM_SAP_MODE,
+							    pcl_channels,
+							    pcl_weight, len);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		policy_mgr_err("failed to modify pcl for 4th sap channels");
+		return status;
+	}
 
 	modified_final_pcl = true;
-	policy_mgr_debug("%d %d %d %d %d %d",
+	policy_mgr_debug("%d %d %d %d %d %d %d",
 			 mandatory_modified_pcl,
 			 nol_modified_pcl,
 			 dfs_modified_pcl,
 			 indoor_modified_pcl,
 			 passive_modified_pcl,
-			 modified_final_pcl);
+			 modified_final_pcl,
+			 band_6ghz_modified_pcl);
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -1206,6 +1269,14 @@ static QDF_STATUS policy_mgr_pcl_modification_for_p2p_go(
 			policy_mgr_err("Failed to modify SRD in pcl for GO");
 			return status;
 		}
+	}
+	status = policy_mgr_modify_sap_go_4th_conc_disallow(psoc,
+							    PM_P2P_GO_MODE,
+							    pcl_channels,
+							    pcl_weight, len);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		policy_mgr_err("failed to modify pcl for 4th go channels");
+		return status;
 	}
 
 	return QDF_STATUS_SUCCESS;
@@ -1259,10 +1330,10 @@ static enum policy_mgr_pcl_type policy_mgr_get_pcl_4_port(
 	}
 
 	/* SAP and P2P Go have same result in 4th port pcl table */
-	if (mode == PM_SAP_MODE || mode == PM_P2P_GO_MODE ||
-	    mode == PM_P2P_CLIENT_MODE) {
+	if (mode == PM_SAP_MODE || mode == PM_P2P_GO_MODE)
 		mode = PM_SAP_MODE;
-	}
+	else if (mode == PM_P2P_CLIENT_MODE)
+		mode = PM_STA_MODE;
 
 	if (mode != PM_STA_MODE && mode != PM_SAP_MODE &&
 	    mode != PM_NDI_MODE) {

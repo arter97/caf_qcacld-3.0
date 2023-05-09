@@ -2276,9 +2276,10 @@ policy_mgr_allow_4th_new_freq(struct wlan_objmgr_psoc *psoc,
 		 * in this hw mode.
 		 */
 		if (i == MAX_MAC) {
-			policy_mgr_debug("new freq %d mode %s is allowed in hw mode %s",
-					 ch_freq, device_mode_to_string(mode),
-					 policy_mgr_hw_mode_to_str(j));
+			policy_mgr_rl_debug("new freq %d mode %s is allowed in hw mode %s",
+					    ch_freq,
+					    device_mode_to_string(mode),
+					    policy_mgr_hw_mode_to_str(j));
 			return true;
 		}
 	}
