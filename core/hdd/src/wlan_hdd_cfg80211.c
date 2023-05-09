@@ -1397,8 +1397,6 @@ int wlan_hdd_send_hang_reason_event(struct hdd_context *hdd_ctx,
 {
 	struct sk_buff *vendor_event;
 	enum qca_wlan_vendor_hang_reason hang_reason;
-	struct hdd_adapter *sta_adapter;
-	struct wireless_dev *wdev = NULL;
 
 	hdd_enter();
 
@@ -1407,12 +1405,8 @@ int wlan_hdd_send_hang_reason_event(struct hdd_context *hdd_ctx,
 		return -EINVAL;
 	}
 
-	sta_adapter = hdd_get_adapter(hdd_ctx, QDF_STA_MODE);
-	if (sta_adapter)
-		wdev = &(sta_adapter->wdev);
-
 	vendor_event = wlan_cfg80211_vendor_event_alloc(hdd_ctx->wiphy,
-							wdev,
+							NULL,
 							sizeof(uint32_t) +
 							data_len,
 							HANG_REASON_INDEX,
