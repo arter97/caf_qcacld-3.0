@@ -141,6 +141,47 @@ int dp_wrap_dev_add(struct wlan_objmgr_vdev *vdev)
 }
 
 /**
+ * @brief Add wrap vdev object to the vma table, also
+ * registers bridge hooks if this the first object.
+ *
+ * @param vdev objmgr Pointer to wrap_vdev to add vma.
+ *
+ * @return 0 on success
+ * @return -ve on failure
+ */
+int dp_wrap_dev_add_vma(struct wlan_objmgr_vdev *vdev)
+{
+	int hash_vma;
+	struct dp_wrap_pdev *wrap_pdev;
+	struct dp_wrap_vdev *wrap_vdev;
+	struct dp_wrap_devt *wdt;
+	rwlock_state_t lock_state;
+
+	wrap_pdev = dp_wrap_get_pdev_handle(wlan_vdev_get_pdev(vdev));
+	if (!wrap_pdev) {
+		qwrap_err(" wrap_pdev is NULL");
+		return -EINVAL;
+	}
+	wrap_vdev = dp_wrap_get_vdev_handle(vdev);
+	if (!wrap_vdev) {
+		qwrap_err(" wrap_vdev is NULL");
+		return -EINVAL;
+	}
+	wdt = &wrap_pdev->wp_devt;
+	hash_vma = WRAP_DEV_HASH(wrap_vdev->wrap_dev_vma);
+	OS_RWLOCK_WRITE_LOCK_BH(&wdt->wdt_lock, &lock_state);
+	LIST_INSERT_HEAD(&wdt->wdt_hash_vma[hash_vma], wrap_vdev,
+			 wrap_dev_hash_vma);
+	TAILQ_INSERT_TAIL(&wdt->wdt_dev_vma, wrap_vdev, wrap_dev_list_vma);
+	OS_RWLOCK_WRITE_UNLOCK_BH(&wdt->wdt_lock, &lock_state);
+	qwrap_info("Added vdev:%d to the vma list mat. pdev_id:%d",
+		   vdev->vdev_objmgr.vdev_id,
+		   wlan_objmgr_pdev_get_pdev_id(
+		   wlan_vdev_get_pdev(vdev)));
+	return 0;
+}
+
+/**
  * @brief Delete wrap dev object from the device table,
  * based on OMA address.
  *
@@ -551,6 +592,7 @@ void dp_wrap_mat_params_update(struct wlan_objmgr_vdev *vdev)
 		}
 
 		if (wvdev->is_psta) {
+			dp_wrap_dev_remove_vma(vdev);
 			if (wlan_vdev_mlme_is_mlo_vdev(vdev)) {
 				WLAN_ADDR_COPY(wvdev->wrap_dev_vma,
 						vdev->vdev_mlme.mldaddr);
@@ -562,7 +604,6 @@ void dp_wrap_mat_params_update(struct wlan_objmgr_vdev *vdev)
 
 		if (wvdev->is_mpsta) {
 			dp_wrap_dev_remove(vdev);
-			dp_wrap_dev_remove_vma(vdev);
 			if (wlan_vdev_mlme_is_mlo_vdev(vdev)) {
 				WLAN_ADDR_COPY(wvdev->wrap_dev_oma,
 						vdev->vdev_mlme.mldaddr);
@@ -570,8 +611,12 @@ void dp_wrap_mat_params_update(struct wlan_objmgr_vdev *vdev)
 				WLAN_ADDR_COPY(wvdev->wrap_dev_oma,
 						vdev->vdev_mlme.macaddr);
 			}
-			dp_wrap_dev_add(vdev);
 		}
+
+		if (wvdev->is_psta && !wvdev->is_mpsta)
+			dp_wrap_dev_add_vma(vdev);
+		else if (wvdev->is_mpsta)
+			dp_wrap_dev_add(vdev);
 	}
 }
 
