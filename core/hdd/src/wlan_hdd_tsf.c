@@ -3020,8 +3020,9 @@ static int hdd_handle_tsf_auto_report(struct hdd_adapter *adapter,
 		return -EINVAL;
 	}
 
-	/* uplink delay feature is only required for STA mode */
-	if (adapter->device_mode != QDF_STA_MODE) {
+	/* uplink delay feature is required for STA and P2P-GC mode */
+	if (adapter->device_mode != QDF_STA_MODE &&
+	    adapter->device_mode != QDF_P2P_CLIENT_MODE) {
 		hdd_debug_rl("tsf_cmd %d not allowed for device mode %d",
 			     tsf_cmd, adapter->device_mode);
 		return -EPERM;
@@ -3085,7 +3086,8 @@ QDF_STATUS hdd_add_uplink_delay(struct hdd_adapter *adapter,
 	QDF_STATUS status;
 	uint32_t ul_delay;
 
-	if (adapter->device_mode != QDF_STA_MODE)
+	if (adapter->device_mode != QDF_STA_MODE &&
+	    adapter->device_mode != QDF_P2P_CLIENT_MODE)
 		return QDF_STATUS_SUCCESS;
 
 	if (qdf_atomic_read(&adapter->tsf.tsf_auto_report)) {
