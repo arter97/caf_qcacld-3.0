@@ -94,17 +94,32 @@ struct pwr_channel_info {
 };
 
 /**
+ * struct peer_disconnect_stats_param -Peer disconnect stats params
+ * @vdev_id: vdev_id of the SAP vdev on which disconnect stats request is sent
+ * @is_disconn_stats_completed: Indicates if disconnect stats request is
+ * completed or not
+ * @disconn_stats_timer: Disconnect stats timer
+ */
+struct peer_disconnect_stats_param {
+	uint8_t vdev_id;
+	qdf_atomic_t is_disconn_stats_completed;
+	qdf_mc_timer_t disconn_stats_timer;
+};
+
+/**
  * struct wlan_mlme_psoc_ext_obj -MLME ext psoc priv object
  * @cfg:     cfg items
  * @rso_tx_ops: Roam Tx ops to send roam offload commands to firmware
  * @rso_rx_ops: Roam Rx ops to receive roam offload events from firmware
  * @wfa_testcmd: WFA config tx ops to send to FW
+ * @disconnect_stats_param: Peer disconnect stats related params for SAP case
  */
 struct wlan_mlme_psoc_ext_obj {
 	struct wlan_mlme_cfg cfg;
 	struct wlan_cm_roam_tx_ops rso_tx_ops;
 	struct wlan_cm_roam_rx_ops rso_rx_ops;
 	struct wlan_mlme_wfa_cmd wfa_testcmd;
+	struct peer_disconnect_stats_param disconnect_stats_param;
 };
 
 /**
@@ -407,6 +422,7 @@ struct wait_for_key_timer {
  *			  requests from some IOT APs
  * @ba_2k_jump_iot_ap: This is set to true if connected to the ba 2k jump IOT AP
  * @is_usr_ps_enabled: Is Power save enabled
+ * @notify_co_located_ap_upt_rnr: Notify co located AP to update RNR or not
  */
 struct mlme_legacy_priv {
 	bool chan_switch_in_progress;
@@ -447,6 +463,7 @@ struct mlme_legacy_priv {
 	qdf_time_t last_delba_sent_time;
 	bool ba_2k_jump_iot_ap;
 	bool is_usr_ps_enabled;
+	bool notify_co_located_ap_upt_rnr;
 };
 
 /**
