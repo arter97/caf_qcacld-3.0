@@ -319,7 +319,7 @@ dp_mon_ht2_rx_ring_cfg(struct dp_soc *soc,
 			if (target_type == TARGET_TYPE_QCN9160) {
 				hal_ring_hdl =
 				soc->rx_refill_buf_ring[lmac_id].hal_srng;
-				ring_buf_size = RX_MONITOR_BUFFER_SIZE;
+				ring_buf_size = RX_DATA_BUFFER_SIZE;
 			} else {
 				hal_ring_hdl =
 					pdev->rx_mac_buf_ring[lmac_id].hal_srng;
