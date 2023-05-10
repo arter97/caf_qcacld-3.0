@@ -3601,6 +3601,7 @@ static bool wlan_hdd_check_is_acs_request_same(struct hdd_adapter *adapter,
 	return true;
 }
 
+#ifndef WLAN_FEATURE_LL_LT_SAP
 /**
  * hdd_remove_passive_dfs_acs_channel_for_ll_sap(): Remove passive/dfs channel
  * for LL SAP
@@ -3643,6 +3644,15 @@ static void hdd_remove_passive_dfs_acs_channel_for_ll_sap(
 		sap_dump_acs_channel(&sap_config->acs_cfg);
 	}
 }
+#else
+static inline void
+hdd_remove_passive_dfs_acs_channel_for_ll_sap(struct sap_config *sap_config,
+					      struct wlan_objmgr_psoc *psoc,
+					      struct wlan_objmgr_pdev *pdev,
+					      uint8_t vdev_id)
+{
+}
+#endif
 
 /* Stored ACS Frequency timeout in msec */
 #define STORED_ACS_FREQ_TIMEOUT 500
@@ -3697,7 +3707,7 @@ wlan_hdd_ll_lt_sap_get_valid_last_acs_freq(struct hdd_adapter *adapter)
 	if (!sap_config->last_acs_freq || !sap_config->last_acs_complete_time)
 		return prev_acs_freq_valid;
 
-	if (!policy_mgr_is_vdev_lt_ll_sap(
+	if (!policy_mgr_is_vdev_ll_lt_sap(
 				hdd_ctx->psoc,
 				adapter->deflink->vdev_id))
 		return prev_acs_freq_valid;
@@ -3766,6 +3776,7 @@ static int __wlan_hdd_cfg80211_do_acs(struct wiphy *wiphy,
 	uint8_t vht_ch_width;
 	uint32_t channel_bonding_mode_2g;
 	uint32_t last_scan_ageout_time;
+	bool ll_lt_sap = false;
 
 	/* ***Note*** Donot set SME config related to ACS operation here because
 	 * ACS operation is not synchronouse and ACS for Second AP may come when
@@ -4021,9 +4032,11 @@ static int __wlan_hdd_cfg80211_do_acs(struct wiphy *wiphy,
 
 	sap_config->acs_cfg.acs_mode = true;
 
-	if (is_external_acs_policy &&
+	ll_lt_sap = policy_mgr_is_vdev_ll_lt_sap(hdd_ctx->psoc,
+						 adapter->deflink->vdev_id);
+	if ((is_external_acs_policy &&
 	    policy_mgr_is_force_scc(hdd_ctx->psoc) &&
-	    policy_mgr_get_connection_count(hdd_ctx->psoc)) {
+	    policy_mgr_get_connection_count(hdd_ctx->psoc)) || ll_lt_sap) {
 		if (adapter->device_mode == QDF_SAP_MODE)
 			is_vendor_unsafe_ch_present =
 				wlansap_filter_vendor_unsafe_ch_freq(sap_ctx,
@@ -4036,8 +4049,7 @@ static int __wlan_hdd_cfg80211_do_acs(struct wiphy *wiphy,
 		if (!sap_config->acs_cfg.ch_list_count &&
 		    sap_config->acs_cfg.master_ch_list_count &&
 		    !is_vendor_unsafe_ch_present &&
-		    !policy_mgr_is_vdev_ll_sap(hdd_ctx->psoc,
-					       adapter->deflink->vdev_id))
+		    !ll_lt_sap)
 			wlan_hdd_handle_zero_acs_list(
 				hdd_ctx,
 				sap_config->acs_cfg.freq_list,
@@ -4340,7 +4352,7 @@ void wlan_hdd_cfg80211_acs_ch_select_evt(struct hdd_adapter *adapter,
 	len = hdd_get_acs_evt_data_len(sap_cfg);
 
 	if (store_acs_freq &&
-	    policy_mgr_is_vdev_lt_ll_sap(hdd_ctx->psoc,
+	    policy_mgr_is_vdev_ll_lt_sap(hdd_ctx->psoc,
 					 adapter->deflink->vdev_id)) {
 		sap_cfg->last_acs_freq = sap_cfg->acs_cfg.pri_ch_freq;
 		sap_cfg->last_acs_complete_time = qdf_get_time_of_the_day_ms();

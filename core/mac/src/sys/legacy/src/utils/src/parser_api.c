@@ -1751,7 +1751,7 @@ void populate_dot11f_qcn_ie(struct mac_context *mac,
 	}
 
 	populate_dot11f_qcn_ie_he_params(mac, pe_session, qcn_ie, attr_id);
-	if (policy_mgr_is_vdev_ll_sap(mac->psoc, pe_session->vdev_id)) {
+	if (policy_mgr_is_vdev_ll_lt_sap(mac->psoc, pe_session->vdev_id)) {
 		pe_debug("Populate edca/pifs param ie for ll sap");
 		populate_dot11f_edca_pifs_param_set(mac, qcn_ie);
 	}

@@ -536,7 +536,7 @@ void sch_edca_profile_update(struct mac_context *mac, struct pe_session *pe_sess
 		sch_qos_update_broadcast(mac, pe_session);
 		sch_qos_concurrency_update();
 
-		if (policy_mgr_is_vdev_ll_sap(
+		if (policy_mgr_is_vdev_ll_lt_sap(
 				mac->psoc, pe_session->vdev_id))
 			sch_qos_update_edca_pifs_param_for_ll_sap(
 							mac,

@@ -618,7 +618,7 @@ uint16_t csr_check_concurrent_channel_overlap(struct mac_context *mac_ctx,
 			QDF_MCC_TO_SCC_SWITCH_DISABLE)
 		return 0;
 
-	if (policy_mgr_is_vdev_ll_sap(mac_ctx->psoc, vdev_id))
+	if (policy_mgr_is_vdev_ll_lt_sap(mac_ctx->psoc, vdev_id))
 		return 0;
 
 	if (sap_ch_freq != 0) {

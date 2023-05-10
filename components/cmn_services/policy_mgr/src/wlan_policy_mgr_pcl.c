@@ -1282,6 +1282,65 @@ static QDF_STATUS policy_mgr_pcl_modification_for_p2p_go(
 	return QDF_STATUS_SUCCESS;
 }
 
+#ifdef WLAN_FEATURE_LL_LT_SAP
+static QDF_STATUS policy_mgr_pcl_modification_for_ll_lt_sap(
+			struct wlan_objmgr_psoc *psoc,
+			uint32_t *pcl_channels, uint8_t *pcl_weight,
+			uint32_t *len, uint32_t weight_len)
+{
+	struct policy_mgr_psoc_priv_obj *pm_ctx;
+	uint32_t pcl_list[NUM_CHANNELS], orig_len = *len;
+	uint8_t weight_list[NUM_CHANNELS];
+	uint32_t i, pcl_len = 0;
+
+	pm_ctx = policy_mgr_get_context(psoc);
+	if (!pm_ctx) {
+		policy_mgr_err("pm_ctx is NULL");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	policy_mgr_pcl_modification_for_sap(
+		psoc, pcl_channels, pcl_weight, len, weight_len);
+
+	for (i = 0; i < *len; i++) {
+		/* Remove passive/dfs channel for LL_LT_SAP */
+		if (wlan_reg_is_passive_for_freq(
+					pm_ctx->pdev,
+					pcl_channels[i]) ||
+		    wlan_reg_is_dfs_for_freq(
+					pm_ctx->pdev,
+					pcl_channels[i]))
+			continue;
+
+		pcl_list[pcl_len] = pcl_channels[i];
+		weight_list[pcl_len++] = pcl_weight[i];
+	}
+
+	if (orig_len == pcl_len)
+		return QDF_STATUS_SUCCESS;
+
+	qdf_mem_zero(pcl_channels, *len * sizeof(*pcl_channels));
+	qdf_mem_zero(pcl_weight, *len);
+	qdf_mem_copy(pcl_channels, pcl_list, pcl_len * sizeof(*pcl_channels));
+	qdf_mem_copy(pcl_weight, weight_list, pcl_len);
+	*len = pcl_len;
+
+	policy_mgr_debug("PCL after ll sap modification");
+	policy_mgr_dump_channel_list(*len, pcl_channels, pcl_weight);
+
+	return QDF_STATUS_SUCCESS;
+}
+#else
+static inline QDF_STATUS
+policy_mgr_pcl_modification_for_ll_lt_sap(struct wlan_objmgr_psoc *psoc,
+					  uint32_t *pcl_channels,
+					  uint8_t *pcl_weight,
+					  uint32_t *len, uint32_t weight_len)
+{
+	return QDF_STATUS_SUCCESS;
+}
+#endif
+
 static QDF_STATUS policy_mgr_mode_specific_modification_on_pcl(
 			struct wlan_objmgr_psoc *psoc,
 			uint32_t *pcl_channels, uint8_t *pcl_weight,
@@ -1303,6 +1362,10 @@ static QDF_STATUS policy_mgr_mode_specific_modification_on_pcl(
 	case PM_P2P_CLIENT_MODE:
 	case PM_NAN_DISC_MODE:
 		status = QDF_STATUS_SUCCESS;
+		break;
+	case PM_LL_LT_SAP_MODE:
+		status = policy_mgr_pcl_modification_for_ll_lt_sap(
+			psoc, pcl_channels, pcl_weight, len, weight_len);
 		break;
 	default:
 		policy_mgr_err("unexpected mode %d", mode);
@@ -4227,12 +4290,13 @@ policy_mgr_is_vdev_ht_ll_sap(struct wlan_objmgr_psoc *psoc,
 }
 
 bool
-policy_mgr_is_vdev_lt_ll_sap(struct wlan_objmgr_psoc *psoc,
+policy_mgr_is_vdev_ll_lt_sap(struct wlan_objmgr_psoc *psoc,
 			     uint32_t vdev_id)
 {
 	return _policy_mgr_is_vdev_ll_sap(psoc, vdev_id, LL_AP_TYPE_LT);
 }
 
+#ifndef WLAN_FEATURE_LL_LT_SAP
 QDF_STATUS
 policy_mgr_get_pcl_chlist_for_ll_sap(struct wlan_objmgr_psoc *psoc,
 				     uint32_t *len, uint32_t *pcl_channels,
@@ -4390,3 +4454,4 @@ policy_mgr_get_pcl_channel_for_ll_sap_concurrency(
 
 	return QDF_STATUS_SUCCESS;
 }
+#endif
