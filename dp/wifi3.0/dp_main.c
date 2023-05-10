@@ -55,6 +55,9 @@
 #include "qdf_mem.h"   /* qdf_mem_malloc,free */
 #include "cfg_ucfg_api.h"
 #include <wlan_module_ids.h>
+#ifdef QCA_MULTIPASS_SUPPORT
+#include <enet.h>
+#endif
 
 #ifdef QCA_LL_TX_FLOW_CONTROL_V2
 #include "cdp_txrx_flow_ctrl_v2.h"
