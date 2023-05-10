@@ -1319,13 +1319,16 @@ static struct dp_tx_desc_s *dp_tx_prepare_desc(struct dp_vdev *vdev,
 		goto failure;
 	}
 
-#if TQM_BYPASS_WAR
-	/* Temporary WAR due to TQM VP issues */
-	tx_desc->flags |= DP_TX_DESC_FLAG_TO_FW;
-	qdf_atomic_inc(&soc->num_tx_exception);
+#if !TQM_BYPASS_WAR
+	if (qdf_unlikely(msdu_info->exception_fw) ||
+	    dp_tx_is_nbuf_marked_exception(soc, nbuf))
 #endif
-	if (qdf_unlikely(msdu_info->exception_fw))
+	{
+		/* Temporary WAR due to TQM VP issues */
 		tx_desc->flags |= DP_TX_DESC_FLAG_TO_FW;
+		qdf_atomic_inc(&soc->num_tx_exception);
+	}
+
 
 	tx_desc->msdu_ext_desc = msdu_ext_desc;
 	tx_desc->flags |= DP_TX_DESC_FLAG_FRAG;
