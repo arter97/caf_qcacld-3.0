@@ -187,7 +187,8 @@ int dfs_create_object(struct wlan_dfs **dfs)
 	return 0;
 }
 
-#if defined(QCA_DFS_BW_PUNCTURE) && defined(CONFIG_REG_CLIENT)
+#if defined(QCA_DFS_BW_PUNCTURE)
+#if defined(CONFIG_REG_CLIENT)
 static void dfs_puncture_init(struct wlan_dfs *dfs)
 {
 	/*
@@ -198,6 +199,18 @@ static void dfs_puncture_init(struct wlan_dfs *dfs)
 	dfs_set_nol_subchannel_marking(dfs, true);
 	dfs->dfs_use_puncture = true;
 }
+#else
+static void dfs_puncture_init(struct wlan_dfs *dfs)
+{
+	uint8_t i;
+	struct dfs_punc_obj *dfs_punc_obj;
+
+	for (i = 0 ; i < N_MAX_PUNC_SM; i++) {
+		dfs_punc_obj = &dfs->dfs_punc_lst.dfs_punc_arr[i];
+		dfs_punc_cac_timer_attach(dfs, dfs_punc_obj);
+	}
+}
+#endif
 #else
 static inline void dfs_puncture_init(struct wlan_dfs *dfs)
 {
@@ -281,6 +294,7 @@ void dfs_reset(struct wlan_dfs *dfs)
 void dfs_timer_detach(struct wlan_dfs *dfs)
 {
 	dfs_cac_timer_detach(dfs);
+	dfs_puncture_cac_timer_detach(dfs);
 	dfs_zero_cac_timer_detach(dfs->dfs_soc_obj);
 
 	if (!dfs->dfs_is_offload_enabled) {
