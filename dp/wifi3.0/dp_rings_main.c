@@ -2312,7 +2312,6 @@ void dp_link_desc_ring_replenish(struct dp_soc *soc, uint32_t mac_id)
 		page_idx = 0;
 		count = 0;
 		offset = 0;
-		pages = &soc->link_desc_pages;
 		while ((desc = hal_srng_src_get_next(soc->hal_soc,
 						     desc_srng)) &&
 			(count < total_link_descs)) {
@@ -2344,7 +2343,6 @@ void dp_link_desc_ring_replenish(struct dp_soc *soc, uint32_t mac_id)
 		scatter_buf_ptr = (uint8_t *)(
 			soc->wbm_idle_scatter_buf_base_vaddr[scatter_buf_num]);
 		rem_entries = num_entries_per_buf;
-		pages = &soc->link_desc_pages;
 		page_idx = 0; count = 0;
 		offset = 0;
 		num_descs_per_page = pages->num_element_per_page;
