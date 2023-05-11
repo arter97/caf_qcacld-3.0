@@ -5656,6 +5656,8 @@ dp_tx_comp_process_desc_list(struct dp_soc *soc,
 				nbuf = desc->nbuf;
 				dp_tx_nbuf_dev_queue_free_no_flag(&h, nbuf);
 				dp_tx_desc_free(soc, desc, desc->pool_id);
+
+				__dp_tx_outstanding_dec(soc);
 			} else {
 				nbuf = dp_ppeds_tx_desc_free(soc, desc);
 				dp_tx_nbuf_dev_queue_free_no_flag(&h, nbuf);
