@@ -4570,3 +4570,122 @@ QDF_STATUS util_get_rvmlie_persta_link_info(uint8_t *mlieseq,
 }
 
 #endif
+
+#ifdef WLAN_FEATURE_11BE
+
+QDF_STATUS util_add_bw_ind(struct wlan_ie_bw_ind *bw_ind, uint8_t ccfs0,
+			   uint8_t ccfs1, enum phy_ch_width ch_width,
+			   uint16_t puncture_bitmap, int *bw_ind_len)
+{
+	uint8_t bw_ind_width;
+
+	if (!bw_ind) {
+		mlo_err("Pointer to bandwidth indiaction element is NULL");
+		return QDF_STATUS_E_NULL_VALUE;
+	}
+
+	if (!bw_ind_len) {
+		mlo_err("Length of bandwidth indaication element is Zero");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	switch (ch_width) {
+	case CH_WIDTH_20MHZ:
+		bw_ind_width = IEEE80211_11BEOP_CHWIDTH_20;
+		break;
+	case CH_WIDTH_40MHZ:
+		bw_ind_width = IEEE80211_11BEOP_CHWIDTH_40;
+		break;
+	case CH_WIDTH_80MHZ:
+		bw_ind_width = IEEE80211_11BEOP_CHWIDTH_80;
+		break;
+	case CH_WIDTH_160MHZ:
+		bw_ind_width = IEEE80211_11BEOP_CHWIDTH_160;
+		break;
+	case CH_WIDTH_320MHZ:
+		bw_ind_width = IEEE80211_11BEOP_CHWIDTH_320;
+		break;
+	default:
+		bw_ind_width = IEEE80211_11BEOP_CHWIDTH_20;
+	}
+
+	bw_ind->elem_id = WLAN_ELEMID_EXTN_ELEM;
+	*bw_ind_len = WLAN_BW_IND_IE_MAX_LEN;
+	bw_ind->elem_len = WLAN_BW_IND_IE_MAX_LEN - WLAN_IE_HDR_LEN;
+	bw_ind->elem_id_extn = WLAN_EXTN_ELEMID_BW_IND;
+	bw_ind->ccfs0 = ccfs0;
+	bw_ind->ccfs1 = ccfs1;
+	QDF_SET_BITS(bw_ind->control, BW_IND_CHAN_WIDTH_IDX,
+		     BW_IND_CHAN_WIDTH_BITS, bw_ind_width);
+
+	if (puncture_bitmap) {
+		bw_ind->disabled_sub_chan_bitmap[0] =
+			QDF_GET_BITS(puncture_bitmap, 0, 8);
+		bw_ind->disabled_sub_chan_bitmap[1] =
+			QDF_GET_BITS(puncture_bitmap, 8, 8);
+		QDF_SET_BITS(bw_ind->bw_ind_param,
+			     BW_IND_PARAM_DISABLED_SC_BITMAP_PRESENT_IDX,
+			     BW_IND_PARAM_DISABLED_SC_BITMAP_PRESENT_BITS, 1);
+	} else {
+		QDF_SET_BITS(bw_ind->bw_ind_param,
+			     BW_IND_PARAM_DISABLED_SC_BITMAP_PRESENT_IDX,
+			     BW_IND_PARAM_DISABLED_SC_BITMAP_PRESENT_BITS, 0);
+		bw_ind->elem_len -=
+			QDF_ARRAY_SIZE(bw_ind->disabled_sub_chan_bitmap);
+		*bw_ind_len -=
+			QDF_ARRAY_SIZE(bw_ind->disabled_sub_chan_bitmap);
+	}
+
+	return QDF_STATUS_SUCCESS;
+}
+
+QDF_STATUS util_parse_bw_ind(struct wlan_ie_bw_ind *bw_ind, uint8_t *ccfs0,
+			     uint8_t *ccfs1, enum phy_ch_width *ch_width,
+			     uint16_t *puncture_bitmap)
+{
+	uint8_t bw_ind_width;
+
+	if (!bw_ind) {
+		mlo_err("Pointer to bandwidth indiaction element is NULL");
+		return QDF_STATUS_E_NULL_VALUE;
+	}
+
+	*ccfs0 = bw_ind->ccfs0;
+	*ccfs1 = bw_ind->ccfs1;
+	bw_ind_width = QDF_GET_BITS(bw_ind->control, BW_IND_CHAN_WIDTH_IDX,
+				    BW_IND_CHAN_WIDTH_BITS);
+
+	switch (bw_ind_width) {
+	case IEEE80211_11BEOP_CHWIDTH_20:
+		*ch_width = CH_WIDTH_20MHZ;
+		break;
+	case IEEE80211_11BEOP_CHWIDTH_40:
+		*ch_width = CH_WIDTH_40MHZ;
+		break;
+	case IEEE80211_11BEOP_CHWIDTH_80:
+		*ch_width = CH_WIDTH_80MHZ;
+		break;
+	case IEEE80211_11BEOP_CHWIDTH_160:
+		*ch_width = CH_WIDTH_160MHZ;
+		break;
+	case IEEE80211_11BEOP_CHWIDTH_320:
+		*ch_width = CH_WIDTH_320MHZ;
+		break;
+	default:
+		*ch_width = CH_WIDTH_20MHZ;
+	}
+
+	if (QDF_GET_BITS(bw_ind->bw_ind_param,
+			 BW_IND_PARAM_DISABLED_SC_BITMAP_PRESENT_IDX,
+			 BW_IND_PARAM_DISABLED_SC_BITMAP_PRESENT_BITS)) {
+		QDF_SET_BITS(*puncture_bitmap, 0, 8,
+			     bw_ind->disabled_sub_chan_bitmap[0]);
+		QDF_SET_BITS(*puncture_bitmap, 8, 8,
+			     bw_ind->disabled_sub_chan_bitmap[1]);
+	} else {
+		*puncture_bitmap = 0;
+	}
+
+	return QDF_STATUS_SUCCESS;
+}
+#endif
