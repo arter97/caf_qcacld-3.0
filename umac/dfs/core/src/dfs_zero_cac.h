@@ -1351,18 +1351,6 @@ void dfs_create_punc_sm(struct wlan_dfs *dfs);
 void dfs_destroy_punc_sm(struct wlan_dfs *dfs);
 
 /**
- * dfs_punc_sm_start() - Start DFS puncture state machine.
- * @dfs:           Pointer to wlan_dfs.
- * @indx:          Index of DFS puncture state machine.
- * @dfs_punc_arr:  Pointer to DFS puncture state machine object.
- *
- * Return: Nothing.
- */
-void dfs_punc_sm_start(struct wlan_dfs *dfs,
-		       uint8_t indx,
-		       struct dfs_punc_obj *dfs_punc_arr);
-
-/**
  * dfs_punc_sm_stop() - Stop DFS puncture state machine.
  * @dfs:           Pointer to wlan_dfs.
  * @indx:          Index of DFS puncture state machine.
@@ -1501,13 +1489,6 @@ void dfs_create_punc_sm(struct wlan_dfs *dfs)
 
 static inline
 void dfs_destroy_punc_sm(struct wlan_dfs *dfs)
-{
-}
-
-static inline
-void dfs_punc_sm_start(struct wlan_dfs *dfs,
-		       uint8_t indx,
-		       struct dfs_punc_obj *dfs_punc_arr)
 {
 }
 

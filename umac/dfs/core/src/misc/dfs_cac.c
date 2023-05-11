@@ -223,6 +223,19 @@ void dfs_cac_timer_detach(struct wlan_dfs *dfs)
 	dfs->dfs_cac_valid = 0;
 }
 
+#if defined(QCA_DFS_BW_PUNCTURE) && !defined(CONFIG_REG_CLIENT)
+void dfs_puncture_cac_timer_detach(struct wlan_dfs *dfs)
+{
+	uint8_t i;
+	struct dfs_punc_obj *dfs_punc_obj;
+
+	for (i = 0 ; i < N_MAX_PUNC_SM; i++) {
+		dfs_punc_obj = &dfs->dfs_punc_lst.dfs_punc_arr[i];
+		dfs_punc_cac_timer_detach(dfs_punc_obj);
+	}
+}
+#endif
+
 int dfs_is_ap_cac_timer_running(struct wlan_dfs *dfs)
 {
 	return dfs->dfs_cac_timer_running;

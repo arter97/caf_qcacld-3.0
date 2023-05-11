@@ -2390,6 +2390,19 @@ void dfs_cac_timer_reset(struct wlan_dfs *dfs);
 void dfs_cac_timer_detach(struct wlan_dfs *dfs);
 
 /**
+ * dfs_puncture_cac_timer_detach() - Free puncture cac timers.
+ * @dfs: Pointer to wlan_dfs structure.
+ */
+#if defined(QCA_DFS_BW_PUNCTURE) && !defined(CONFIG_REG_CLIENT)
+void dfs_puncture_cac_timer_detach(struct wlan_dfs *dfs);
+#else
+static inline
+void dfs_puncture_cac_timer_detach(struct wlan_dfs *dfs)
+{
+}
+#endif
+
+/**
  * dfs_deliver_cac_state_events() - Deliver the DFS CAC events namely
  * WLAN_EV_CAC_STARTED on cac started channel(current channel) and
  * WLAN_EV_CAC_RESET on previous dfs channel.
@@ -2498,6 +2511,12 @@ static inline
 void dfs_deliver_cac_state_events(struct wlan_dfs *dfs)
 {
 }
+
+static inline
+void dfs_puncture_cac_timer_detach(struct wlan_dfs *dfs)
+{
+}
+
 #endif
 /**
  * dfs_set_update_nol_flag() - Sets update_nol flag.
