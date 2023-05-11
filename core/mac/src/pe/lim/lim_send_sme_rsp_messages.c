@@ -1741,10 +1741,12 @@ prnt_log:
 static bool lim_is_csa_channel_allowed(struct mac_context *mac_ctx,
 				       struct pe_session *session_entry,
 				       qdf_freq_t ch_freq1,
-				       uint32_t ch_freq2)
+				       uint32_t ch_freq2,
+				       enum phy_ch_width new_ch_width)
 {
 	bool is_allowed = true;
 	u32 cnx_count = 0;
+	enum QDF_OPMODE mode;
 
 	if (!session_entry->vdev ||
 	    wlan_cm_is_vdev_disconnecting(session_entry->vdev) ||
@@ -1754,10 +1756,19 @@ static bool lim_is_csa_channel_allowed(struct mac_context *mac_ctx,
 		return false;
 	}
 
+	mode = wlan_vdev_mlme_get_opmode(session_entry->vdev);
 	cnx_count = policy_mgr_get_connection_count(mac_ctx->psoc);
 	if ((cnx_count > 1) && !policy_mgr_is_hw_dbs_capable(mac_ctx->psoc) &&
 	    !policy_mgr_is_interband_mcc_supported(mac_ctx->psoc)) {
 		is_allowed = wlan_reg_is_same_band_freqs(ch_freq1, ch_freq2);
+	} else if (cnx_count > 2) {
+		is_allowed =
+		policy_mgr_allow_concurrency_csa(
+			mac_ctx->psoc, ch_freq2,
+			policy_mgr_convert_device_mode_to_qdf_type(mode),
+			session_entry->vdev_id,
+			policy_mgr_get_bw(new_ch_width), false,
+			CSA_REASON_UNKNOWN);
 	}
 
 	return is_allowed;
@@ -1861,7 +1872,8 @@ void lim_handle_sta_csa_param(struct mac_context *mac_ctx,
 
 	if (!lim_is_csa_channel_allowed(mac_ctx, session_entry,
 					session_entry->curr_op_freq,
-					csa_params->csa_chan_freq)) {
+					csa_params->csa_chan_freq,
+					csa_params->new_ch_width)) {
 		pe_debug("Channel switch is not allowed");
 		goto err;
 	}
