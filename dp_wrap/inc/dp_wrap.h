@@ -297,6 +297,7 @@ int dp_wrap_detach(struct wlan_objmgr_pdev *pdev);
 void dp_wrap_vdev_attach(struct wlan_objmgr_vdev *vdev);
 void dp_wrap_vdev_detach(struct wlan_objmgr_vdev *vdev);
 int dp_wrap_dev_add(struct wlan_objmgr_vdev *vdev);
+int dp_wrap_dev_add_vma(struct wlan_objmgr_vdev *vdev);
 void dp_wrap_vdev_set_psta(struct wlan_objmgr_vdev *vdev);
 void dp_wrap_vdev_set_mpsta(struct wlan_objmgr_vdev *vdev);
 void dp_wrap_vdev_clear_psta(struct wlan_objmgr_vdev *vdev);
