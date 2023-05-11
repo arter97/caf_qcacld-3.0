@@ -680,7 +680,7 @@ QDF_STATUS dp_softap_start_xmit(qdf_nbuf_t nbuf, struct wlan_dp_intf *dp_intf)
 		goto drop_pkt_and_release_skb;
 	}
 
-	if (dp_intf->tx_fn(soc, dp_intf->intf_id, nbuf)) {
+	if (dp_intf->txrx_ops.tx.tx(soc, dp_intf->intf_id, nbuf)) {
 		dp_debug("Failed to send packet to txrx for sta: "
 			 QDF_MAC_ADDR_FMT,
 			 QDF_MAC_ADDR_REF(dest_mac_addr->bytes));

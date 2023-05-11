@@ -993,7 +993,7 @@ dp_vdev_obj_destroy_notification(struct wlan_objmgr_vdev *vdev, void *arg)
 			dp_err("eap frm done event destroy failed!!");
 			return status;
 		}
-		dp_intf->tx_fn = NULL;
+		dp_intf->txrx_ops.tx.tx = NULL;
 		dp_intf->sap_tx_block_mask |= DP_TX_FN_CLR;
 	}
 	qdf_mem_zero(&dp_intf->conn_info, sizeof(struct wlan_dp_conn_info));

@@ -991,7 +991,6 @@ QDF_STATUS ucfg_dp_sta_register_txrx_ops(struct wlan_objmgr_vdev *vdev)
 		txrx_ops.rx.rx_stack = dp_rx_packet_cbk;
 		txrx_ops.rx.rx_flush = dp_rx_flush_packet_cbk;
 		txrx_ops.rx.rx_gro_flush = dp_rx_thread_gro_flush_ind_cbk;
-		dp_intf->rx_stack = dp_rx_packet_cbk;
 	} else {
 		txrx_ops.rx.rx = dp_rx_packet_cbk;
 		txrx_ops.rx.rx_stack = NULL;
@@ -1016,7 +1015,7 @@ QDF_STATUS ucfg_dp_sta_register_txrx_ops(struct wlan_objmgr_vdev *vdev)
 		return QDF_STATUS_E_FAILURE;
 	}
 
-	dp_intf->tx_fn = txrx_ops.tx.tx;
+	dp_intf->txrx_ops = txrx_ops;
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -1041,7 +1040,6 @@ QDF_STATUS ucfg_dp_tdlsta_register_txrx_ops(struct wlan_objmgr_vdev *vdev)
 		txrx_ops.rx.rx_stack = dp_rx_packet_cbk;
 		txrx_ops.rx.rx_flush = dp_rx_flush_packet_cbk;
 		txrx_ops.rx.rx_gro_flush = dp_rx_thread_gro_flush_ind_cbk;
-		dp_intf->rx_stack = dp_rx_packet_cbk;
 	} else {
 		txrx_ops.rx.rx = dp_rx_packet_cbk;
 		txrx_ops.rx.rx_stack = NULL;
@@ -1066,7 +1064,7 @@ QDF_STATUS ucfg_dp_tdlsta_register_txrx_ops(struct wlan_objmgr_vdev *vdev)
 		return QDF_STATUS_E_FAILURE;
 	}
 
-	dp_intf->tx_fn = txrx_ops.tx.tx;
+	dp_intf->txrx_ops = txrx_ops;
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -1096,7 +1094,7 @@ QDF_STATUS ucfg_dp_ocb_register_txrx_ops(struct wlan_objmgr_vdev *vdev)
 		return QDF_STATUS_E_FAILURE;
 	}
 
-	dp_intf->tx_fn = txrx_ops.tx.tx;
+	dp_intf->txrx_ops = txrx_ops;
 
 	qdf_copy_macaddr(&dp_intf->conn_info.peer_macaddr,
 			 &dp_intf->mac_addr);
@@ -1124,6 +1122,8 @@ QDF_STATUS ucfg_dp_mon_register_txrx_ops(struct wlan_objmgr_vdev *vdev)
 			  (ol_osif_vdev_handle)dp_intf,
 			  &txrx_ops);
 
+	dp_intf->txrx_ops = txrx_ops;
+
 	return QDF_STATUS_SUCCESS;
 }
 #endif
@@ -1148,7 +1148,6 @@ QDF_STATUS ucfg_dp_softap_register_txrx_ops(struct wlan_objmgr_vdev *vdev,
 		txrx_ops->rx.rx_stack = dp_softap_rx_packet_cbk;
 		txrx_ops->rx.rx_flush = dp_rx_flush_packet_cbk;
 		txrx_ops->rx.rx_gro_flush = dp_rx_thread_gro_flush_ind_cbk;
-		dp_intf->rx_stack = dp_softap_rx_packet_cbk;
 	} else {
 		txrx_ops->rx.rx = dp_softap_rx_packet_cbk;
 		txrx_ops->rx.rx_stack = NULL;
@@ -1165,7 +1164,7 @@ QDF_STATUS ucfg_dp_softap_register_txrx_ops(struct wlan_objmgr_vdev *vdev,
 		return QDF_STATUS_E_FAILURE;
 	}
 
-	dp_intf->tx_fn = txrx_ops->tx.tx;
+	dp_intf->txrx_ops = *txrx_ops;
 	dp_intf->sap_tx_block_mask &= ~DP_TX_FN_CLR;
 
 	return QDF_STATUS_SUCCESS;
