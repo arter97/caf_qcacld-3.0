@@ -5307,14 +5307,15 @@ void dp_tx_comp_process_tx_status(struct dp_soc *soc,
 			 "transmit_cnt = %d \n"
 			 "tid = %d \n"
 			 "peer_id = %d\n"
-			 "tx_status = %d\n",
+			 "tx_status = %d\n"
+			 "tx_release_source = %d\n",
 			 ts->ack_frame_rssi, ts->first_msdu,
 			 ts->last_msdu, ts->msdu_part_of_amsdu,
 			 ts->valid, ts->bw, ts->pkt_type, ts->stbc,
 			 ts->ldpc, ts->sgi, ts->mcs, ts->ofdma,
 			 ts->tones_in_ru, ts->tsf, ts->ppdu_id,
 			 ts->transmit_cnt, ts->tid, ts->peer_id,
-			 ts->status);
+			 ts->status, ts->release_src);
 
 	/* Update SoC level stats */
 	DP_STATS_INCC(soc, tx.dropped_fw_removed, 1,
@@ -5578,10 +5579,6 @@ dp_tx_update_ppeds_tx_comp_stats(struct dp_soc *soc,
 	struct dp_vdev *vdev = NULL;
 
 	if (qdf_likely(txrx_peer)) {
-		dp_tx_update_peer_basic_stats(txrx_peer,
-					      desc->length,
-					      desc->tx_status,
-					      false);
 		if (!(desc->flags & DP_TX_DESC_FLAG_SIMPLE)) {
 			hal_tx_comp_get_status(&desc->comp,
 					       ts,
@@ -5597,6 +5594,9 @@ dp_tx_update_ppeds_tx_comp_stats(struct dp_soc *soc,
 						txrx_peer,
 						ring_id,
 						link_id);
+		} else {
+			dp_tx_update_peer_basic_stats(txrx_peer, desc->length,
+						      desc->tx_status, false);
 		}
 	}
 }
