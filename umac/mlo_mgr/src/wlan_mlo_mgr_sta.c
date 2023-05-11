@@ -1372,6 +1372,13 @@ QDF_STATUS mlo_sync_disconnect(struct wlan_objmgr_vdev *vdev,
 			sta_ctx->connect_req = NULL;
 		}
 
+		status = mlo_validate_disconn_req(vdev, source,
+						  reason_code, bssid);
+		if (QDF_IS_STATUS_ERROR(status)) {
+			mlo_err("Connect in progress, deferring disconnect");
+			return status;
+		}
+
 		status = mlo_send_link_disconnect_sync(mlo_dev_ctx, source,
 						       reason_code, bssid);
 		if (QDF_IS_STATUS_SUCCESS(status))
