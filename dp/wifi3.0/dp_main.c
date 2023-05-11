@@ -1770,13 +1770,13 @@ static QDF_STATUS dp_lro_hash_setup(struct dp_soc *soc, struct dp_pdev *pdev)
 		lro_hash.tcp_flag_mask);
 
 	dp_info("toeplitz_hash_ipv4:");
-	qdf_trace_hex_dump(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_INFO,
+	qdf_trace_hex_dump(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_DEBUG,
 			   lro_hash.toeplitz_hash_ipv4,
 			   (sizeof(lro_hash.toeplitz_hash_ipv4[0]) *
 			   LRO_IPV4_SEED_ARR_SZ));
 
 	dp_info("toeplitz_hash_ipv6:");
-	qdf_trace_hex_dump(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_INFO,
+	qdf_trace_hex_dump(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_DEBUG,
 			   lro_hash.toeplitz_hash_ipv6,
 			   (sizeof(lro_hash.toeplitz_hash_ipv6[0]) *
 			   LRO_IPV6_SEED_ARR_SZ));
@@ -3089,7 +3089,7 @@ static QDF_STATUS dp_rxdma_ring_config(struct dp_soc *soc)
 
 			dp_update_num_mac_rings_for_dbs(soc, &max_mac_rings);
 			dp_lpc_tx_config(pdev);
-			dp_err("pdev_id %d max_mac_rings %d",
+			dp_info("pdev_id %d max_mac_rings %d",
 			       pdev->pdev_id, max_mac_rings);
 
 			for (mac_id = 0; mac_id < max_mac_rings; mac_id++) {

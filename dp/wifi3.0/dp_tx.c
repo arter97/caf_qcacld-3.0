@@ -6512,9 +6512,7 @@ QDF_STATUS dp_soc_tx_desc_sw_pools_alloc(struct dp_soc *soc)
 	num_desc = wlan_cfg_get_num_tx_desc(soc->wlan_cfg_ctx);
 	num_ext_desc = wlan_cfg_get_num_tx_ext_desc(soc->wlan_cfg_ctx);
 
-	QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_INFO,
-		  "%s Tx Desc Alloc num_pool = %d, descs = %d",
-		  __func__, num_pool, num_desc);
+	dp_info("Tx Desc Alloc num_pool: %d descs: %d", num_pool, num_desc);
 
 	if ((num_pool > MAX_TXDESC_POOLS) ||
 	    (num_desc > WLAN_CFG_NUM_TX_DESC_MAX))
