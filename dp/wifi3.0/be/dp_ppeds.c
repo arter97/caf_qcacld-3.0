@@ -1044,6 +1044,11 @@ struct dp_tx_desc_s *dp_ppeds_tx_desc_alloc(struct dp_soc_be *be_soc)
 		else
 			dp_tx_prefetch_desc(pool->freelist);
 	} else {
+		if (__dp_tx_limit_check(&be_soc->soc)) {
+			TX_DESC_LOCK_UNLOCK(&pool->lock);
+			return NULL;
+		}
+
 		tx_desc = pool->freelist;
 
 		/* Pool is exhausted */
@@ -1062,6 +1067,7 @@ struct dp_tx_desc_s *dp_ppeds_tx_desc_alloc(struct dp_soc_be *be_soc)
 			pool->num_allocated++;
 			pool->num_free--;
 		}
+		__dp_tx_outstanding_inc(&be_soc->soc);
 	}
 
 	tx_desc->flags |= DP_TX_DESC_FLAG_ALLOCATED;
@@ -1096,6 +1102,8 @@ qdf_nbuf_t dp_ppeds_tx_desc_free(struct dp_soc *soc, struct dp_tx_desc_s *tx_des
 		pool->hotlist = tx_desc;
 		pool->hot_list_len++;
 	} else {
+		__dp_tx_outstanding_dec(soc);
+
 		nbuf = tx_desc->nbuf;
 		tx_desc->nbuf = NULL;
 		tx_desc->flags = 0;
