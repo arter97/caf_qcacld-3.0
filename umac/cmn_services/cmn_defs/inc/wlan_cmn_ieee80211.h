@@ -2342,6 +2342,7 @@ enum wlan_ml_bv_cinfo_emlcap_emlmrdelay {
 	WLAN_ML_BV_CINFO_EMLCAP_EMLMRDELAY_INVALIDSTART,
 };
 
+#ifdef WLAN_SUPPORT_11BE_D3_0
 /**
  * enum wlan_ml_bv_cinfo_emlcap_transtimeout - Encoding for Transition Timeout
  * sub-sub field in EML Capabilities subfield in Basic variant Multi-Link
@@ -2385,6 +2386,55 @@ enum wlan_ml_bv_cinfo_emlcap_transtimeout {
 	WLAN_ML_BV_CINFO_EMLCAP_TRANSTIMEOUT_64TU = 10,
 	WLAN_ML_BV_CINFO_EMLCAP_TRANSTIMEOUT_INVALIDSTART,
 };
+
+#else
+/**
+ * enum wlan_ml_bv_cinfo_emlcap_transtimeout - Encoding for Transition Timeout
+ * sub-sub field in EML Capabilities subfield in Basic variant Multi-Link
+ * element Common Info field.
+ * Note: a) In case of holes in the enumeration, scheme for invalid value
+ * determination should be changed. b) A mathematical formula could have been
+ * used instead of an enumeration. However, the standard explicitly lists out
+ * values instead of using a formula, and we reflect this accordingly using an
+ * enumeration.
+ * @WLAN_ML_BV_CINFO_EMLCAP_TRANSTIMEOUT_0TU: Transition Timeout value of 0 TUs
+ * @WLAN_ML_BV_CINFO_EMLCAP_TRANSTIMEOUT_128MU: Transition Timeout value of
+ *                                              128μs
+ * @WLAN_ML_BV_CINFO_EMLCAP_TRANSTIMEOUT_256MU: Transition Timeout value of
+ *                                              256μs
+ * @WLAN_ML_BV_CINFO_EMLCAP_TRANSTIMEOUT_512MU: Transition Timeout value of
+ *                                              512μs
+ * @WLAN_ML_BV_CINFO_EMLCAP_TRANSTIMEOUT_1TU: Transition Timeout value of 1 TU
+ * @WLAN_ML_BV_CINFO_EMLCAP_TRANSTIMEOUT_2TU: Transition Timeout value of 2 TUs
+ * @WLAN_ML_BV_CINFO_EMLCAP_TRANSTIMEOUT_4TU: Transition Timeout value of 4 TUs
+ * @WLAN_ML_BV_CINFO_EMLCAP_TRANSTIMEOUT_8TU: Transition Timeout value of 8 TUs
+ * @WLAN_ML_BV_CINFO_EMLCAP_TRANSTIMEOUT_16TU: Transition Timeout value of 16
+ *                                             TUs
+ * @WLAN_ML_BV_CINFO_EMLCAP_TRANSTIMEOUT_32TU: Transition Timeout value of 32
+ *                                             TUs
+ * @WLAN_ML_BV_CINFO_EMLCAP_TRANSTIMEOUT_64TU: Transition Timeout value of 64
+ *                                             TUs
+ * @WLAN_ML_BV_CINFO_EMLCAP_TRANSTIMEOUT_128TU: Transition Timeout value of 128
+ *                                             TUs
+ * @WLAN_ML_BV_CINFO_EMLCAP_TRANSTIMEOUT_INVALIDSTART: Start of invalid value
+ *                                                     range
+ */
+enum wlan_ml_bv_cinfo_emlcap_transtimeout {
+	WLAN_ML_BV_CINFO_EMLCAP_TRANSTIMEOUT_0TU = 0,
+	WLAN_ML_BV_CINFO_EMLCAP_TRANSTIMEOUT_128MU = 1,
+	WLAN_ML_BV_CINFO_EMLCAP_TRANSTIMEOUT_256MU = 2,
+	WLAN_ML_BV_CINFO_EMLCAP_TRANSTIMEOUT_512MU = 3,
+	WLAN_ML_BV_CINFO_EMLCAP_TRANSTIMEOUT_1TU = 4,
+	WLAN_ML_BV_CINFO_EMLCAP_TRANSTIMEOUT_2TU = 5,
+	WLAN_ML_BV_CINFO_EMLCAP_TRANSTIMEOUT_4TU = 6,
+	WLAN_ML_BV_CINFO_EMLCAP_TRANSTIMEOUT_8TU = 7,
+	WLAN_ML_BV_CINFO_EMLCAP_TRANSTIMEOUT_16TU = 8,
+	WLAN_ML_BV_CINFO_EMLCAP_TRANSTIMEOUT_32TU = 9,
+	WLAN_ML_BV_CINFO_EMLCAP_TRANSTIMEOUT_64TU = 10,
+	WLAN_ML_BV_CINFO_EMLCAP_TRANSTIMEOUT_128TU = 11,
+	WLAN_ML_BV_CINFO_EMLCAP_TRANSTIMEOUT_INVALIDSTART,
+};
+#endif /* WLAN_SUPPORT_11BE_D3_0 */
 
 /* Size in octets of MLD Capabilities and operation subfield in Basic variant
  * Multi-Link element Common Info field as per IEEE P802.11be/D1.5.
