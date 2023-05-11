@@ -1983,6 +1983,11 @@ fourth_connection_pcl_dbs_sbs_table
 	[PM_NDI_MODE] = { PM_5G, PM_5G, PM_5G } },
 	[PM_NAN_DISC_24_STA_24_STA_5_DBS] = {
 	[PM_NDI_MODE] = { PM_5G, PM_5G, PM_5G } },
+#else
+	[PM_SAP_SAP_SCC_24_SAP_5_DBS] = {
+	[PM_SAP_MODE] = { PM_5G, PM_5G, PM_5G } },
+	[PM_SAP_SAP_SCC_5_SAP_24_DBS] = {
+	[PM_SAP_MODE] = { PM_24G, PM_24G, PM_24G } },
 #endif
 	[PM_24_SCC_MCC_PLUS_5_DBS] = {
 	[PM_STA_MODE] = { PM_SCC_ON_5_CH_5G, PM_SCC_ON_5_CH_5G,
