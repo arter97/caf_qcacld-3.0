@@ -322,8 +322,8 @@ QDF_STATUS dp_rx_fst_attach(struct dp_soc *soc, struct dp_pdev *pdev)
 
 	fst->hash_mask = fst->max_entries - 1;
 	fst->num_entries = 0;
-	dp_err("FST setup params FT size %d, hash_mask 0x%x, skid_length %d",
-	       fst->max_entries, fst->hash_mask, fst->max_skid_length);
+	dp_info("FST setup params FT size %d, hash_mask 0x%x, skid_length %d",
+		fst->max_entries, fst->hash_mask, fst->max_skid_length);
 
 	/* Allocate the software flowtable */
 	fst->base = (uint8_t *)dp_context_alloc_mem(soc, DP_FISA_RX_FT_TYPE,
