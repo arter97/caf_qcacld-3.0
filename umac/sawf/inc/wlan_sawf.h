@@ -574,4 +574,102 @@ bool wlan_service_id_scs_valid(uint8_t sawf_rule_type, uint8_t svc_id);
  * Return: enabled_param_mask
  */
 uint16_t wlan_service_id_get_enabled_param_mask(uint8_t svc_id);
-#endif
+
+#ifdef CONFIG_SAWF
+/* wlan_sawf_get_tput_stats() - Get sawf throughput stats
+ *
+ * @soc : soc handle
+ * @arg : opaque pointer
+ * @in_bytes: pointer to hold no of ingress_bytes
+ * @in_cnt: pointer to hold count of ingress pkts
+ * @tx_bytes: pointer to hold no of egress_bytes
+ * @tx_cnt: pointer to hold count of egress pkts
+ * @tid: tid no for the sawf flow
+ * @msduq: msdu queue-id used for the sawf flow
+ *
+ * Return: 0 on success
+ */
+int wlan_sawf_get_tput_stats(void *soc, void *arg, uint64_t *in_bytes,
+			     uint64_t *in_cnt, uint64_t *tx_bytes,
+			     uint64_t *tx_cnt, uint8_t tid, uint8_t msduq);
+/* wlan_sawf_get_mpdu_stats() - Get sawf MPDU stats
+ *
+ * @soc : soc handle
+ * @arg : opaque pointer
+ * @svc_int_pass: pointer to hold no of mpdu's that met svc_intval sla
+ * @svc_int_fail: pointer to hold no of mpdu's that didnt meet svc_intval sla
+ * @burst_pass: pointer to hold no of mpdu's that met burst-size sla
+ * @burst_fail: pointer to hold no of mpdu's that didn't meet burst-size sla
+ * @tid: tid no for the sawf flow
+ * @msduq: msdu queue-id used for the sawf flow
+ *
+ * Return: 0 on success
+ */
+int wlan_sawf_get_mpdu_stats(void *soc, void *arg, uint64_t *svc_int_pass,
+			     uint64_t *svc_int_fail, uint64_t *burst_pass,
+			     uint64_t *burst_fail, uint8_t tid, uint8_t msduq);
+/* wlan_sawf_get_drop_stats() - Get sawf drop stats
+ *
+ * @soc : soc handle
+ * @arg : opaque pointer
+ * @pass: pointer to hold no of msdu's that got transmitted successfully
+ * @drop: pointer to hold no of msdu's that got dropped
+ * @tid: tid no for the sawf flow
+ * @msduq: msdu queue-id used for the sawf flow
+ *
+ * Return: 0 on success
+ */
+int wlan_sawf_get_drop_stats(void *soc, void *arg, uint64_t *pass,
+			     uint64_t *drop, uint64_t *drop_ttl,
+			     uint8_t tid, uint8_t msduq);
+/* wlan_sawf_notify_breach() - Notify sla breach
+ *
+ * @mac_adddr : pointer to hold peer mac address
+ * @svc-id : service-class id
+ * @param: parameter for which notification is being sent
+ * @set_clear: flag tro indicate breach detection or clear
+ * @tid: tid no for the sawf flow
+ *
+ * Return: void
+ */
+void wlan_sawf_notify_breach(uint8_t *mac_addr,
+			     uint8_t svc_id,
+			     uint8_t param,
+			     bool set_clear,
+			     uint8_t tid);
+#else
+static inline
+int wlan_sawf_get_tput_stats(void *soc, void *arg, uint64_t *in_bytes,
+			     uint64_t *in_cnt, uint64_t *tx_bytes,
+			     uint64_t *tx_cnt, uint8_t tid, uint8_t msduq)
+{
+	return 0;
+}
+
+static inline
+int wlan_sawf_get_mpdu_stats(void *soc, void *arg, uint64_t *svc_int_pass,
+			     uint64_t *svc_int_fail,
+			     uint64_t *burst_pass, uint64_t *burst_fail,
+			     uint8_t tid, uint8_t msduq)
+{
+	return 0;
+}
+
+static inline
+int wlan_sawf_get_drop_stats(void *soc, void *arg, uint64_t *pass,
+			     uint64_t *drop, uint64_t *drop_ttl,
+			     uint8_t tid, uint8_t msduq)
+{
+	return 0;
+}
+
+static inline
+void wlan_sawf_notify_breach(uint8_t *mac_addr,
+			     uint8_t svc_id,
+			     uint8_t param,
+			     bool set_clear,
+			     uint8_t tid)
+{
+}
+#endif /* CONFIG_SAWF */
+#endif /* _WLAN_SAWF_H_ */
