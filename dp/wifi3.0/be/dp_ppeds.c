@@ -2181,7 +2181,6 @@ void dp_ppeds_interrupt_start_be(struct dp_soc *soc)
 	dp_ppeds_enable_irq(&be_soc->soc,
 			    &be_soc->ppeds_wbm_release_ring);
 
-	dp_ppeds_enable_irq(&be_soc->soc, &be_soc->ppe2tcl_ring);
 	dp_ppeds_enable_irq(&be_soc->soc, &be_soc->reo2ppe_ring);
 }
 
@@ -2202,7 +2201,6 @@ void dp_ppeds_interrupt_stop_be(struct dp_soc *soc)
 	dp_ppeds_disable_irq(&be_soc->soc,
 			     &be_soc->ppeds_wbm_release_ring);
 
-	dp_ppeds_disable_irq(&be_soc->soc, &be_soc->ppe2tcl_ring);
 	dp_ppeds_disable_irq(&be_soc->soc, &be_soc->reo2ppe_ring);
 }
 
