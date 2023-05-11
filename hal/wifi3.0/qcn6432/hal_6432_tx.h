@@ -228,7 +228,9 @@ hal_tx_config_rbm_mapping_be_6432(hal_soc_handle_t hal_soc_hdl,
 
 	reg_addr = HWIO_TCL_R0_RBM_MAPPING0_ADDR(MAC_TCL_REG_REG_BASE);
 
-	if (ring_type == TCL_CMD_CREDIT)
+	if (ring_type == PPE2TCL)
+		ring_num = ring_num + RBM_PPE2TCL_OFFSET;
+	else if (ring_type == TCL_CMD_CREDIT)
 		ring_num = ring_num + RBM_TCL_CMD_CREDIT_OFFSET;
 
 	/* get current value stored in register address */
