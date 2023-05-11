@@ -24,8 +24,11 @@
 #include <wlan_objmgr_global_obj.h>
 #include "wlan_telemetry_agent.h"
 #include <cfg80211_ven_cmd.h>
+#include <wlan_mlme_if.h>
+#include <wlan_sawf.h>
 
 struct telemetry_agent_ops *g_agent_ops;
+qdf_export_symbol(g_agent_ops);
 
 void wlan_telemetry_agent_application_init_notify(
 		enum agent_notification_event event)
@@ -450,6 +453,19 @@ qdf_export_symbol(telemetry_sawf_reset_peer_stats);
 int register_telemetry_agent_ops(struct telemetry_agent_ops *agent_ops)
 {
 	g_agent_ops = agent_ops;
+	g_agent_ops->agent_get_psoc_info = wifi_driver_get_psoc_info;
+	g_agent_ops->agent_get_pdev_info = wifi_driver_get_pdev_info;
+	g_agent_ops->agent_get_peer_info = wifi_driver_get_peer_info;
+	g_agent_ops->agent_get_pdev_stats = wifi_driver_get_pdev_stats;
+	g_agent_ops->agent_get_peer_stats = wifi_driver_get_peer_stats;
+	g_agent_ops->agent_get_emesh_pdev_stats = wifi_driver_get_emesh_pdev_stats;
+	g_agent_ops->agent_get_emesh_peer_stats = wifi_driver_get_emesh_peer_stats;
+	/* SAWF ops */
+	g_agent_ops->sawf_get_tput_stats = wlan_sawf_get_tput_stats;
+	g_agent_ops->sawf_get_mpdu_stats = wlan_sawf_get_mpdu_stats;
+	g_agent_ops->sawf_get_drop_stats = wlan_sawf_get_drop_stats;
+	g_agent_ops->sawf_notify_breach = wlan_sawf_notify_breach;
+
 	qdf_info("Registered Telemetry Agent ops: %p", g_agent_ops);
 	return QDF_STATUS_SUCCESS;
 }
