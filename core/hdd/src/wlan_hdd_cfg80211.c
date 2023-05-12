@@ -12890,14 +12890,38 @@ __wlan_hdd_cfg80211_set_wifi_test_config(struct wiphy *wiphy,
 
 	cmd_id = QCA_WLAN_VENDOR_ATTR_WIFI_TEST_CONFIG_HE_TX_SUPPDU;
 	if (tb[cmd_id]) {
+		int i;
+		enum wlan_eht_mode eht_mode;
+		uint8_t op_mode;
 		cfg_val = nla_get_u8(tb[cmd_id]);
-		hdd_debug("Configure Tx SU PPDU enable %d", cfg_val);
-		if (cfg_val)
-			sme_config_su_ppdu_queue(adapter->deflink->vdev_id,
-						 true);
-		else
-			sme_config_su_ppdu_queue(adapter->deflink->vdev_id,
-						 false);
+		ucfg_mlme_get_eht_mode(hdd_ctx->psoc, &eht_mode);
+		if (eht_mode == WLAN_EHT_MODE_MLMR ||
+		    eht_mode == WLAN_EHT_MODE_MLSR ||
+		    eht_mode == WLAN_EHT_MODE_EMLSR) {
+			for (i = 0; i < WLAN_MAX_VDEVS; i++) {
+				op_mode = wlan_get_opmode_from_vdev_id(
+						hdd_ctx->pdev, i);
+				if (op_mode != QDF_STA_MODE) {
+					hdd_debug("vdev_id %d is not STA", i);
+					continue;
+				}
+				hdd_debug("Tx SU PPDU enable %d, vdev_id %d",
+					  cfg_val, i);
+				if (cfg_val)
+					sme_config_su_ppdu_queue(i, true);
+				else
+					sme_config_su_ppdu_queue(i, false);
+			}
+		} else {
+			if (cfg_val)
+				sme_config_su_ppdu_queue(
+						adapter->deflink->vdev_id,
+						true);
+			else
+				sme_config_su_ppdu_queue(
+						adapter->deflink->vdev_id,
+						false);
+		}
 	}
 
 	cmd_id = QCA_WLAN_VENDOR_ATTR_WIFI_TEST_CONFIG_ENABLE_2G_VHT;
