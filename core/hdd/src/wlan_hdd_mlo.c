@@ -665,4 +665,176 @@ wlan_handle_mlo_link_state_operation(struct wiphy *wiphy,
 	return ret;
 }
 
+static uint32_t
+hdd_get_t2lm_setup_event_len(void)
+{
+	uint32_t len = 0;
+	uint32_t info_len = 0;
+
+	len = NLMSG_HDRLEN;
+
+	/* QCA_WLAN_VENDOR_ATTR_TID_TO_LINK_MAP_AP_MLD_ADDR */
+	len += nla_total_size(QDF_MAC_ADDR_SIZE);
+
+	/* nest */
+	info_len = NLA_HDRLEN;
+	/* QCA_WLAN_VENDOR_ATTR_LINK_TID_MAP_STATUS_UPLINK */
+	info_len += NLA_HDRLEN + sizeof(u16);
+	/* QCA_WLAN_VENDOR_ATTR_LINK_TID_MAP_STATUS_DOWNLINK */
+	info_len += NLA_HDRLEN + sizeof(u16);
+
+	/* QCA_WLAN_VENDOR_ATTR_TID_TO_LINK_MAP_STATUS */
+	len += NLA_HDRLEN + (info_len * T2LM_MAX_NUM_TIDS);
+
+	return len;
+}
+
+static QDF_STATUS
+hdd_t2lm_pack_nl_response(struct sk_buff *skb,
+			  struct wlan_objmgr_vdev *vdev,
+			  struct wlan_t2lm_info *t2lm,
+			  struct qdf_mac_addr mld_addr)
+{
+	struct nlattr *config_attr, *config_params;
+	uint32_t i = 0, attr, attr1;
+	int errno;
+	uint32_t value;
+	uint8_t tid_num;
+
+	attr = QCA_WLAN_VENDOR_ATTR_TID_TO_LINK_MAP_AP_MLD_ADDR;
+	if (nla_put(skb, attr, QDF_MAC_ADDR_SIZE, mld_addr.bytes)) {
+		hdd_err("Failed to put mac_addr");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	if (t2lm->default_link_mapping) {
+		hdd_debug("update mld addr for default mapping");
+		return QDF_STATUS_SUCCESS;
+	}
+
+	attr = QCA_WLAN_VENDOR_ATTR_TID_TO_LINK_MAP_STATUS;
+	config_attr = nla_nest_start(skb, attr);
+	if (!config_attr) {
+		hdd_err("nla_nest_start error");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	switch (t2lm->direction) {
+	case WLAN_T2LM_UL_DIRECTION:
+		for (tid_num = 0; tid_num < T2LM_MAX_NUM_TIDS; tid_num++) {
+			config_params = nla_nest_start(skb, tid_num + 1);
+			if (!config_params)
+				return -EINVAL;
+
+			attr1 = QCA_WLAN_VENDOR_ATTR_LINK_TID_MAP_STATUS_UPLINK;
+			value = t2lm->ieee_link_map_tid[i];
+			errno = nla_put_u16(skb, attr1, value);
+			if (errno)
+				return errno;
+
+			attr1 = QCA_WLAN_VENDOR_ATTR_LINK_TID_MAP_STATUS_DOWNLINK;
+			value = 0;
+			errno = nla_put_u16(skb, attr1, value);
+			if (errno)
+				return errno;
+			nla_nest_end(skb, config_params);
+		}
+		break;
+	case WLAN_T2LM_DL_DIRECTION:
+		for (tid_num = 0; tid_num < T2LM_MAX_NUM_TIDS; tid_num++) {
+			config_params = nla_nest_start(skb, tid_num + 1);
+			if (!config_params)
+				return -EINVAL;
+			attr1 = QCA_WLAN_VENDOR_ATTR_LINK_TID_MAP_STATUS_DOWNLINK;
+			value = t2lm->ieee_link_map_tid[i];
+			errno = nla_put_u16(skb, attr1, value);
+			if (errno)
+				return errno;
+
+			attr1 = QCA_WLAN_VENDOR_ATTR_LINK_TID_MAP_STATUS_UPLINK;
+			value = 0;
+			errno = nla_put_u16(skb, attr1, value);
+			if (errno)
+				return errno;
+			nla_nest_end(skb, config_params);
+		}
+		break;
+	case WLAN_T2LM_BIDI_DIRECTION:
+		for (tid_num = 0; tid_num < T2LM_MAX_NUM_TIDS; tid_num++) {
+			config_params = nla_nest_start(skb, tid_num + 1);
+			if (!config_params)
+				return -EINVAL;
+
+			attr1 = QCA_WLAN_VENDOR_ATTR_LINK_TID_MAP_STATUS_UPLINK;
+			value = t2lm->ieee_link_map_tid[i];
+			errno = nla_put_u16(skb, attr1, value);
+			if (errno)
+				return errno;
+
+			attr1 = QCA_WLAN_VENDOR_ATTR_LINK_TID_MAP_STATUS_DOWNLINK;
+			value = t2lm->ieee_link_map_tid[i];
+			errno = nla_put_u16(skb, attr1, value);
+			if (errno)
+				return errno;
+			nla_nest_end(skb, config_params);
+		}
+		break;
+	default:
+		return -EINVAL;
+	}
+	nla_nest_end(skb, config_attr);
+	return QDF_STATUS_SUCCESS;
+}
+
+QDF_STATUS wlan_hdd_send_t2lm_event(struct wlan_objmgr_vdev *vdev,
+				    struct wlan_t2lm_info *t2lm)
+{
+	struct sk_buff *skb;
+	size_t data_len;
+	QDF_STATUS status;
+	struct qdf_mac_addr mld_addr;
+	struct hdd_adapter *adapter;
+	struct wlan_hdd_link_info *link_info;
+
+	enum qca_nl80211_vendor_subcmds_index index =
+		QCA_NL80211_VENDOR_SUBCMD_TID_TO_LINK_MAP_INDEX;
+
+	link_info = wlan_hdd_get_link_info_from_objmgr(vdev);
+	if (!link_info) {
+		hdd_err("Invalid VDEV");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	adapter = link_info->adapter;
+	data_len = hdd_get_t2lm_setup_event_len();
+	skb = wlan_cfg80211_vendor_event_alloc(adapter->hdd_ctx->wiphy,
+					       NULL,
+					       data_len,
+					       index, GFP_KERNEL);
+	if (!skb) {
+		hdd_err("wlan_cfg80211_vendor_event_alloc failed");
+		return -EINVAL;
+	}
+
+	/* get mld addr */
+	status = wlan_vdev_get_bss_peer_mld_mac(vdev, &mld_addr);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		hdd_err("Failed to get mld address");
+		goto free_skb;
+	}
+
+	status = hdd_t2lm_pack_nl_response(skb, vdev, t2lm, mld_addr);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		hdd_err("Failed to pack nl response");
+		goto free_skb;
+	}
+
+	wlan_cfg80211_vendor_event(skb, GFP_KERNEL);
+
+	return status;
+free_skb:
+	wlan_cfg80211_vendor_free_skb(skb);
+
+	return status;
+}
 #endif

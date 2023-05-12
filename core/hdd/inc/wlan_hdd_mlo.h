@@ -220,6 +220,17 @@ extern const struct nla_policy
 ml_link_state_request_policy[QCA_WLAN_VENDOR_ATTR_LINK_STATE_MAX + 1];
 
 /**
+ * wlan_hdd_send_t2lm_event() - Send t2lm info to userspace
+ * @vdev: vdev handler
+ * @t2lm: tid to link mapping info
+ *
+ * This function is called when driver needs to send vendor specific
+ * t2lm info to userspace
+ */
+QDF_STATUS wlan_hdd_send_t2lm_event(struct wlan_objmgr_vdev *vdev,
+				    struct wlan_t2lm_info *t2lm);
+
+/**
  * wlan_hdd_cfg80211_process_ml_link_state() - process ml link state
  * @wiphy: wiphy pointer
  * @wdev: pointer to struct wireless_dev

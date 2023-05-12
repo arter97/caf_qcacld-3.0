@@ -1074,7 +1074,17 @@ struct wlan_objmgr_vdev *wlan_key_get_link_vdev(struct hdd_adapter *adapter,
 void wlan_key_put_link_vdev(struct wlan_objmgr_vdev *link_vdev,
 			    wlan_objmgr_ref_dbgid id);
 
-#if defined(WLAN_FEATURE_11BE_MLO) && defined(WLAN_TID_LINK_MAP_SUPPORT)
+#if defined(WLAN_FEATURE_11BE_MLO)
+/**
+ * hdd_tid_to_link_map() - to get t2lm info
+ * @vdev: Pointer to vdev
+ * @t2lm: T2LM info
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS hdd_tid_to_link_map(struct wlan_objmgr_vdev *vdev,
+			       struct wlan_t2lm_info *t2lm);
+
 /**
  * hdd_mlo_dev_t2lm_notify_link_update() - Send update T2LM info event
  * @vdev: Pointer to vdev

@@ -1955,6 +1955,10 @@ static const struct nl80211_vendor_cmd_info wlan_hdd_cfg80211_vendor_events[] = 
 	FEATURE_GREEN_AP_LOW_LATENCY_PWR_SAVE_EVENT
 	FEATURE_ROAM_STATS_EVENTS
 #ifdef WLAN_FEATURE_11BE_MLO
+	[QCA_NL80211_VENDOR_SUBCMD_TID_TO_LINK_MAP_INDEX] = {
+		.vendor_id = QCA_NL80211_VENDOR_ID,
+		.subcmd = QCA_NL80211_VENDOR_SUBCMD_TID_TO_LINK_MAP,
+	},
 	[QCA_NL80211_VENDOR_SUBCMD_LINK_RECONFIG_INDEX] = {
 		.vendor_id = QCA_NL80211_VENDOR_ID,
 		.subcmd = QCA_NL80211_VENDOR_SUBCMD_LINK_RECONFIG,
@@ -27165,7 +27169,8 @@ wlan_hdd_cfg80211_del_intf_link(struct wiphy *wiphy, struct wireless_dev *wdev,
 }
 #endif
 
-#if defined(WLAN_FEATURE_11BE_MLO) && defined(WLAN_TID_LINK_MAP_SUPPORT)
+#if defined(WLAN_FEATURE_11BE_MLO)
+#if defined(WLAN_TID_LINK_MAP_SUPPORT)
 #define MAX_T2LM_INFO 2
 
 static void wlan_hdd_print_t2lm_info(struct cfg80211_mlo_tid_map *map)
@@ -27331,13 +27336,82 @@ wlan_hdd_cfg80211_get_t2lm_mapping_status(struct wiphy *wiphy,
 	return errno;
 }
 
+QDF_STATUS hdd_tid_to_link_map(struct wlan_objmgr_vdev *vdev,
+			       struct wlan_t2lm_info *t2lm)
+{
+	struct cfg80211_mlo_tid_map map;
+	bool found = false;
+
+	qdf_mem_zero(&map, sizeof(map));
+	wlan_hdd_fill_map(t2lm, &map, &found);
+	if (!found) {
+		hdd_debug("Failed to get t2lm info");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	wlan_hdd_print_t2lm_info(&map);
+	cfg80211_tid_to_link_map_change(dev, &map);
+	return QDF_STATUS_SUCCESS;
+}
+
+#else
+static void wlan_hdd_print_vendor_t2lm_info(struct wlan_t2lm_info *t2lm)
+{
+	int tid, value = 0;
+
+	hdd_debug("default mapping: %d", t2lm->default_link_mapping);
+
+	if (t2lm->direction == WLAN_T2LM_INVALID_DIRECTION)
+		return;
+
+	switch (t2lm->direction) {
+	case WLAN_T2LM_BIDI_DIRECTION:
+		for (tid = 0; tid < T2LM_MAX_NUM_TIDS; tid++) {
+			hdd_debug("TID[%d]: Downlink: %d Uplink: %d",
+				  tid, t2lm->ieee_link_map_tid[tid],
+				  t2lm->ieee_link_map_tid[tid]);
+		}
+		break;
+	case WLAN_T2LM_DL_DIRECTION:
+		for (tid = 0; tid < T2LM_MAX_NUM_TIDS; tid++) {
+			/* Keep uplink info as 0 for downlink direction */
+			hdd_debug("TID[%d]: Downlink: %d Uplink: %d",
+				  tid, t2lm->ieee_link_map_tid[tid], value);
+		}
+		break;
+	case WLAN_T2LM_UL_DIRECTION:
+		for (tid = 0; tid < T2LM_MAX_NUM_TIDS; tid++) {
+			/* Keep downlinklink info as 0 for downlink direction */
+			hdd_debug("TID[%d]: Downlink: %d Uplink: %d",
+				  tid, value, t2lm->ieee_link_map_tid[tid]);
+		}
+		break;
+	default:
+		return;
+	}
+}
+
+QDF_STATUS hdd_tid_to_link_map(struct wlan_objmgr_vdev *vdev,
+			       struct wlan_t2lm_info *t2lm)
+{
+	uint8_t ret;
+
+	wlan_hdd_print_vendor_t2lm_info(t2lm);
+	ret = wlan_hdd_send_t2lm_event(vdev, t2lm);
+	if (QDF_IS_STATUS_ERROR(ret)) {
+		hdd_debug("failed to send t2lm info to userspace");
+		return QDF_STATUS_E_FAILURE;
+	}
+	return QDF_STATUS_SUCCESS;
+}
+#endif
+
 QDF_STATUS hdd_mlo_dev_t2lm_notify_link_update(struct wlan_objmgr_vdev *vdev,
 					       struct wlan_t2lm_info *t2lm)
 {
-	struct cfg80211_mlo_tid_map map;
 	struct wlan_hdd_link_info *link_info;
 	struct net_device *dev;
-	bool found = false;
+	uint8_t ret;
 
 	link_info = wlan_hdd_get_link_info_from_objmgr(vdev);
 	if (!link_info) {
@@ -27348,16 +27422,11 @@ QDF_STATUS hdd_mlo_dev_t2lm_notify_link_update(struct wlan_objmgr_vdev *vdev,
 	dev = link_info->adapter->dev;
 	hdd_enter_dev(dev);
 
-	qdf_mem_zero(&map, sizeof(map));
-
-	wlan_hdd_fill_map(t2lm, &map, &found);
-	if (!found) {
-		hdd_debug("Failed to get t2lm info");
+	ret = hdd_tid_to_link_map(vdev, t2lm);
+	if (QDF_IS_STATUS_ERROR(ret)) {
+		hdd_debug("tid to link map change failed ");
 		return QDF_STATUS_E_FAILURE;
 	}
-
-	wlan_hdd_print_t2lm_info(&map);
-	cfg80211_tid_to_link_map_change(dev, &map);
 
 	hdd_exit();
 
