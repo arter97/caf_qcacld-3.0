@@ -1138,7 +1138,11 @@ set_prim_dev:
 			/*
 			 * Find the AP vap corresponding to the station vap.
 			 */
-			ap_dev = qca_multi_link_tbl_find_sta_or_ap(sta_dev, 0);
+			if (mld_ndev)
+				ap_dev = qca_multi_link_tbl_find_sta_or_ap(mld_ndev, 0);
+			else
+				ap_dev = qca_multi_link_tbl_find_sta_or_ap(sta_dev, 0);
+
 			if (!ap_dev) {
 				QDF_TRACE(QDF_MODULE_ID_RPTR, QDF_TRACE_LEVEL_DEBUG,
 				FL("Null AP device found %pM - Drop\n"), eh->ether_shost);
