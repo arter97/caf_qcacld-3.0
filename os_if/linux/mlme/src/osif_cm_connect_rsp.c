@@ -902,8 +902,10 @@ static void osif_indcate_connect_results(struct wlan_objmgr_vdev *vdev,
 		qdf_mem_copy(&resp, rsp, sizeof(struct wlan_cm_connect_resp));
 		tmp_osif_priv  = wlan_vdev_get_ospriv(assoc_vdev);
 		freq = vdev->vdev_mlme.bss_chan->ch_freq;
-		wlan_vdev_get_bss_peer_mac(assoc_vdev, &macaddr);
+		qdf_mem_copy(macaddr.bytes, rsp->bssid.bytes,
+			     QDF_MAC_ADDR_SIZE);
 		if (QDF_IS_STATUS_SUCCESS(rsp->connect_status)) {
+			wlan_vdev_get_bss_peer_mac(assoc_vdev, &macaddr);
 			chan = ieee80211_get_channel(tmp_osif_priv->wdev->wiphy,
 						     freq);
 			bss = wlan_cfg80211_get_bss(tmp_osif_priv->wdev->wiphy,
