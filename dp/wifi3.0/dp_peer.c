@@ -1248,7 +1248,33 @@ void dp_peer_map_ipa_evt(struct dp_soc *soc, struct dp_peer *peer,
 		dp_peer_info("%pK: AST entry not found", soc);
 	}
 }
+
+/**
+ * dp_peer_unmap_ipa_evt() - Send peer unmap event to IPA
+ * @soc: SoC handle
+ * @peer_id: Peerid
+ * @vdev_id: Vdev id
+ * @mac_addr: Peer mac address
+ *
+ * Return: None
+ */
+static inline
+void dp_peer_unmap_ipa_evt(struct dp_soc *soc, uint16_t peer_id,
+			   uint8_t vdev_id, uint8_t *mac_addr)
+{
+	if (soc->cdp_soc.ol_ops->peer_unmap_event) {
+		soc->cdp_soc.ol_ops->peer_unmap_event(soc->ctrl_psoc,
+						      peer_id, vdev_id,
+						      mac_addr);
+	}
+}
 #else
+static inline
+void dp_peer_unmap_ipa_evt(struct dp_soc *soc, uint16_t peer_id,
+			   uint8_t vdev_id, uint8_t *mac_addr)
+{
+}
+
 static inline
 void dp_peer_map_ipa_evt(struct dp_soc *soc, struct dp_peer *peer,
 			 struct dp_ast_entry *ast_entry, uint8_t *mac_addr)
@@ -2144,6 +2170,12 @@ void dp_peer_ast_send_wds_del(struct dp_soc *soc,
 			      struct dp_peer *peer)
 {
 }
+
+static inline
+void dp_peer_unmap_ipa_evt(struct dp_soc *soc, uint16_t peer_id,
+			   uint8_t vdev_id, uint8_t *mac_addr)
+{
+}
 #endif
 
 #ifdef WLAN_FEATURE_MULTI_AST_DEL
@@ -2882,6 +2914,7 @@ dp_rx_peer_unmap_handler(struct dp_soc *soc, uint16_t peer_id,
 	if (is_wds) {
 		if (!dp_peer_ast_free_entry_by_mac(soc, peer, vdev_id,
 						   mac_addr)) {
+			dp_peer_unmap_ipa_evt(soc, peer_id, vdev_id, mac_addr);
 			dp_peer_unref_delete(peer, DP_MOD_ID_HTT);
 			return;
 		}
