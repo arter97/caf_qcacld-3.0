@@ -2043,6 +2043,7 @@ target_if_init_spectral_param_min_max_be(struct target_if_spectral *spectral)
 
 	param_min_max = &spectral->param_min_max;
 	param_min_max->fft_size_min = SPECTRAL_PARAM_FFT_SIZE_MIN_GEN3_BE;
+	param_min_max->scan_count_max = SPECTRAL_PARAM_SCAN_COUNT_MAX_GEN3_BE;
 
 	for (op_bw = CH_WIDTH_20MHZ; op_bw < CH_WIDTH_MAX; op_bw++) {
 		bool is_supported;
@@ -2113,6 +2114,8 @@ target_if_init_spectral_param_min_max(
 		param_min_max->fft_size_min = SPECTRAL_PARAM_FFT_SIZE_MIN_GEN3;
 		param_min_max->fft_size_max[CH_WIDTH_20MHZ] =
 				SPECTRAL_PARAM_FFT_SIZE_MAX_GEN3_DEFAULT;
+		param_min_max->scan_count_max =
+				SPECTRAL_PARAM_SCAN_COUNT_MAX_GEN3;
 		if (target_type == TARGET_TYPE_QCN9000 ||
 		    target_type == TARGET_TYPE_QCN6122 ||
 		    target_type == TARGET_TYPE_QCN9160 ||
@@ -4483,6 +4486,10 @@ _target_if_set_spectral_config(struct target_if_spectral *spectral,
 		}
 		break;
 	case SPECTRAL_PARAM_SCAN_COUNT:
+		if (param->value > param_min_max->scan_count_max) {
+			*err = SPECTRAL_SCAN_ERR_PARAM_INVALID_VALUE;
+			return QDF_STATUS_E_FAILURE;
+		}
 		sparams->ss_count = param->value;
 		break;
 	case SPECTRAL_PARAM_SHORT_REPORT:

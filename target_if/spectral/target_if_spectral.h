@@ -98,6 +98,8 @@
 #define INVALID_FFT_SIZE                          (0xFFFF)
 #define SPECTRAL_PARAM_RPT_MODE_MIN               (0)
 #define SPECTRAL_PARAM_RPT_MODE_MAX               (3)
+#define SPECTRAL_PARAM_SCAN_COUNT_MAX_GEN3        (4095)
+#define SPECTRAL_PARAM_SCAN_COUNT_MAX_GEN3_BE     (4095)
 #define SPECTRAL_DWORD_SIZE                       (4)
 
 #define MAX_FFTBIN_VALUE_LINEAR_MODE              (U8_MAX)
@@ -652,10 +654,12 @@ struct spectral_report_params {
  * struct spectral_param_min_max - Spectral parameter minimum and maximum values
  * @fft_size_min: Minimum value of fft_size
  * @fft_size_max: Maximum value of fft_size for each BW
+ * @scan_count_max: Maximum value of scan count
  */
 struct spectral_param_min_max {
 	uint16_t fft_size_min;
 	uint16_t fft_size_max[CH_WIDTH_MAX];
+	uint16_t scan_count_max;
 };
 
 /**
