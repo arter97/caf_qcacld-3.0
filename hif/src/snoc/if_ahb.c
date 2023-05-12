@@ -501,7 +501,8 @@ QDF_STATUS hif_ahb_enable_bus(struct hif_softc *ol_sc,
 	}
 
 	/* 11BE SoC chipsets Need to call this function to get cmem addr */
-	if (target_type == TARGET_TYPE_QCA5332)
+	if (target_type == TARGET_TYPE_QCA5332 ||
+	    target_type == TARGET_TYPE_QCN6432)
 		hif_ahb_get_soc_cmem_info_pld(sc, dev);
 
 	if (target_type == TARGET_TYPE_QCN6122 ||
