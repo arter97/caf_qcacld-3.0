@@ -1066,11 +1066,7 @@ OS_IF_OBJ += $(OS_IF_DIR)/linux/wlan_osif_request_manager.o \
 	     $(OS_IF_DIR)/linux/mlme/src/osif_cm_roam_rsp.o \
 	     $(OS_IF_DIR)/linux/mlme/src/osif_vdev_mgr_util.o
 
-CONFIG_CRYPTO_COMPONENT := y
-
-ifeq ($(CONFIG_CRYPTO_COMPONENT), y)
 OS_IF_OBJ += $(OS_IF_DIR)/linux/crypto/src/wlan_cfg80211_crypto.o
-endif
 
 $(call add-wlan-objs,os_if,$(OS_IF_OBJ))
 
@@ -1219,13 +1215,12 @@ UMAC_CRYPTO_DIR := umac/cmn_services/crypto
 UMAC_CRYPTO_CORE_DIR := $(WLAN_COMMON_ROOT)/$(UMAC_CRYPTO_DIR)/src
 UMAC_CRYPTO_INC := -I$(WLAN_COMMON_INC)/$(UMAC_CRYPTO_DIR)/inc \
 		-I$(WLAN_COMMON_INC)/$(UMAC_CRYPTO_DIR)/src
-ifeq ($(CONFIG_CRYPTO_COMPONENT), y)
+
 UMAC_CRYPTO_OBJS := $(UMAC_CRYPTO_CORE_DIR)/wlan_crypto_global_api.o \
 		$(UMAC_CRYPTO_CORE_DIR)/wlan_crypto_ucfg_api.o \
 		$(UMAC_CRYPTO_CORE_DIR)/wlan_crypto_main.o \
 		$(UMAC_CRYPTO_CORE_DIR)/wlan_crypto_obj_mgr.o \
 		$(UMAC_CRYPTO_CORE_DIR)/wlan_crypto_param_handling.o
-endif
 
 $(call add-wlan-objs,umac_crypto,$(UMAC_CRYPTO_OBJS))
 
@@ -1879,9 +1874,7 @@ ifeq ($(CONFIG_FEATURE_VDEV_OPS_WAKELOCK), y)
 TARGET_IF_OBJ += $(TARGET_IF_DIR)/mlme/psoc/src/target_if_psoc_wake_lock.o
 endif
 
-ifeq ($(CONFIG_CRYPTO_COMPONENT), y)
 TARGET_IF_OBJ += $(TARGET_IF_DIR)/crypto/src/target_if_crypto.o
-endif
 
 ifeq ($(CONFIG_IPA_OFFLOAD), y)
 TARGET_IF_OBJ += $(TARGET_IF_DIR)/ipa/src/target_if_ipa.o
