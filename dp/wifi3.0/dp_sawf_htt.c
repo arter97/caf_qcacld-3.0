@@ -345,6 +345,66 @@ dp_htt_sawf_def_queues_map_report_conf(struct htt_soc *soc,
 }
 
 QDF_STATUS
+dp_htt_sawf_dynamic_ast_update(struct htt_soc *soc, uint32_t *msg_word,
+			       qdf_nbuf_t htt_t2h_msg)
+{
+	uint16_t peer_id;
+	struct dp_peer *peer;
+	struct dp_peer_sawf *sawf_ctx;
+	struct dp_peer *primary_link_peer = NULL;
+	uint16_t *dynamic_ast_idx;
+
+	peer_id = HTT_PEER_AST_OVERRIDE_SW_PEER_ID_GET(*msg_word);
+
+	peer = dp_peer_get_ref_by_id(soc->dp_soc, peer_id,
+				     DP_MOD_ID_SAWF);
+	if (!peer) {
+		dp_sawf_err("Invalid peer");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	if (IS_MLO_DP_MLD_PEER(peer)) {
+		primary_link_peer =
+		dp_get_primary_link_peer_by_id(soc->dp_soc,
+					       peer->peer_id, DP_MOD_ID_SAWF);
+
+		if (!primary_link_peer) {
+			dp_peer_unref_delete(peer, DP_MOD_ID_SAWF);
+			dp_sawf_err("Invalid peer");
+			return QDF_STATUS_E_FAILURE;
+		}
+
+		/*
+		 * Release the MLD-peer reference.
+		 * Hold only primary link ref now.
+		 */
+		dp_peer_unref_delete(peer, DP_MOD_ID_SAWF);
+		peer = primary_link_peer;
+	}
+
+	sawf_ctx = dp_peer_sawf_ctx_get(peer);
+	if (!sawf_ctx) {
+		dp_peer_unref_delete(peer, DP_MOD_ID_SAWF);
+		dp_sawf_err("Invalid SAWF ctx");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	dynamic_ast_idx = sawf_ctx->dynamic_ast_idx;
+
+	/* The dynamic AST index*/
+	msg_word += 2;
+	*dynamic_ast_idx = HTT_PEER_AST_OVERRIDE_AST_INDEX1_GET(*msg_word);
+	dynamic_ast_idx++;
+
+	msg_word++;
+	*dynamic_ast_idx = HTT_PEER_AST_OVERRIDE_AST_INDEX2_GET(*msg_word);
+
+	dp_peer_unref_delete(peer, DP_MOD_ID_SAWF);
+
+	return QDF_STATUS_SUCCESS;
+}
+
+QDF_STATUS
 dp_htt_sawf_msduq_map(struct htt_soc *soc, uint32_t *msg_word,
 		      qdf_nbuf_t htt_t2h_msg)
 {
