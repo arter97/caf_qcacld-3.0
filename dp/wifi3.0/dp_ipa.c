@@ -2527,6 +2527,9 @@ dp_ipa_wdi_rx_alt_pipe_smmu_params(struct dp_soc *soc,
 		else if (hdl == DP_IPA_HDL_SECOND)
 			QDF_IPA_WDI_SETUP_INFO_SMMU_CLIENT(rx_smmu) =
 				IPA_CLIENT_WLAN3_PROD1;
+		else if (hdl == DP_IPA_HDL_THIRD)
+			QDF_IPA_WDI_SETUP_INFO_CLIENT(rx_smmu) =
+				IPA_CLIENT_WLAN1_PROD1;
 	} else {
 		QDF_IPA_WDI_SETUP_INFO_SMMU_CLIENT(rx_smmu) =
 					IPA_CLIENT_WLAN1_PROD;
