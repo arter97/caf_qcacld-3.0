@@ -176,6 +176,38 @@ ucfg_dp_destroy_intf(struct wlan_objmgr_psoc *psoc,
 	return QDF_STATUS_SUCCESS;
 }
 
+void ucfg_dp_set_cmn_dp_handle(struct wlan_objmgr_psoc *psoc,
+			       ol_txrx_soc_handle soc)
+{
+	struct wlan_dp_psoc_context *dp_ctx;
+	cdp_config_param_type soc_param;
+	QDF_STATUS status;
+
+	dp_ctx = dp_psoc_get_priv(psoc);
+
+	dp_ctx->cdp_soc = soc;
+
+	soc_param.hal_soc_hdl = NULL;
+	status = cdp_txrx_get_psoc_param(dp_ctx->cdp_soc, CDP_TXRX_HAL_SOC_HDL,
+					 &soc_param);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		dp_err("Unable to fetch hal soc handle");
+		return;
+	}
+
+	dp_ctx->hal_soc = soc_param.hal_soc_hdl;
+}
+
+void ucfg_dp_set_hif_handle(struct wlan_objmgr_psoc *psoc,
+			    struct hif_opaque_softc *hif_handle)
+{
+	struct wlan_dp_psoc_context *dp_ctx;
+
+	dp_ctx = dp_psoc_get_priv(psoc);
+
+	dp_ctx->hif_handle = hif_handle;
+}
+
 QDF_STATUS ucfg_dp_init(void)
 {
 	QDF_STATUS status;

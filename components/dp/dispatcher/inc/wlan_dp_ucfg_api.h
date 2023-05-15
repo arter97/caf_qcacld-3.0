@@ -92,6 +92,10 @@ QDF_STATUS ucfg_dp_create_intf(struct wlan_objmgr_psoc *psoc,
 			       struct qdf_mac_addr *intf_addr,
 			       qdf_netdev_t ndev);
 
+void ucfg_dp_set_hif_handle(struct wlan_objmgr_psoc *psoc,
+			    struct hif_opaque_softc *hif_handle);
+void ucfg_dp_set_cmn_dp_handle(struct wlan_objmgr_psoc *psoc,
+			       ol_txrx_soc_handle soc);
 /**
  * ucfg_dp_init() - DP module initialization API
  *

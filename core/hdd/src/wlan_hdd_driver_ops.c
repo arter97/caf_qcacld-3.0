@@ -474,6 +474,7 @@ int hdd_hif_open(struct device *dev, void *bdev, const struct hif_bus_id *bid,
 				cfg_get(hdd_ctx->psoc,
 					CFG_DP_CE_SERVICE_MAX_YIELD_TIME));
 	ucfg_pmo_psoc_set_hif_handle(hdd_ctx->psoc, hif_ctx);
+	ucfg_dp_set_hif_handle(hdd_ctx->psoc, hif_ctx);
 	hif_set_ce_service_max_rx_ind_flush(hif_ctx,
 				cfg_get(hdd_ctx->psoc,
 					CFG_DP_CE_SERVICE_MAX_RX_IND_FLUSH));

@@ -472,6 +472,9 @@ struct dp_direct_link_context {
  * @pdev: object manager pdev context
  * @qdf_dev: qdf device
  * @dp_cfg: place holder for DP configuration
+ * @cdp_soc: CDP SoC handle
+ * @hif_handle: HIF handle
+ * @hal_soc: HAL SoC handle
  * @intf_list_lock: DP interfaces list lock
  * @intf_list: DP interfaces list
  * @rps: rps
@@ -526,6 +529,9 @@ struct wlan_dp_psoc_context {
 	struct wlan_objmgr_pdev *pdev;
 	qdf_device_t qdf_dev;
 	struct wlan_dp_psoc_cfg dp_cfg;
+	ol_txrx_soc_handle cdp_soc;
+	struct hif_opaque_softc *hif_handle;
+	void *hal_soc;
 
 	qdf_spinlock_t intf_list_lock;
 	qdf_list_t intf_list;
