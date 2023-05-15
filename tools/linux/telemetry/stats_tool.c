@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -485,7 +485,7 @@ const char *mu_reception_mode[STATS_IF_TXRX_TYPE_MU_MAX] = {
 };
 #endif /* WLAN_DEBUG_TELEMETRY */
 
-static const char *opt_string = "BADarvsdcf:i:m:t:RIh?";
+static const char *opt_string = "BADarvsdcf:i:m:t:RIMh?";
 
 static const struct option long_opts[] = {
 	{ "basic", no_argument, NULL, 'B' },
@@ -503,6 +503,7 @@ static const struct option long_opts[] = {
 	{ "serviceid", required_argument, NULL, 't' },
 	{ "recursive", no_argument, NULL, 'R' },
 	{ "ipa", no_argument, NULL, 'I' },
+	{ "mldlink", no_argument, NULL, 'M' },
 	{ "help", no_argument, NULL, 'h' },
 	{ NULL, no_argument, NULL, 0 },
 };
@@ -567,7 +568,7 @@ static void display_help(void)
 {
 	STATS_PRINT("\nwifitelemetry : Displays Statistics of Access Point\n");
 	STATS_PRINT("\nUsage:\n"
-		    "Process Mode: wifitelemetry [Level] [Object] [StatsType] [FeatureName] [[-i interface_name] | [-m StationMACAddress]] [-R] [-I] [-h | ?]\n"
+		    "Process Mode: wifitelemetry [Level] [Object] [StatsType] [FeatureName] [[-i interface_name] | [-m StationMACAddress]] [-R] [-I] [-M] [-h | ?]\n"
 		    "Daemon Mode: wifitelemetry async\n"
 		    "    Note: User must run wifitelemetry in background. Excecute another instance in process mode to trigger stats request.\n"
 		    "\n"
@@ -619,6 +620,7 @@ static void display_help(void)
 		    "OTHER OPTIONS:\n"
 		    "    -R or --recursive:  Recursive display\n"
 		    "    -I or --ipa is required to get Tx and Rx stats in IPA architecture\n"
+		    "    -M or --mldlink indicates to get link stats for MLD\n"
 		    "    -h or --help:       Usage display\n");
 }
 
@@ -3859,6 +3861,7 @@ int main(int argc, char *argv[])
 	u_int8_t is_serviceid_set = 0;
 	u_int8_t is_option_selected = 0;
 	u_int8_t is_ipa_stats_set = 0;
+	bool is_mld_link = false;
 	bool recursion_temp = false;
 	char feat_flags[128] = {'\0'};
 	char ifname_temp[IFNAME_LEN] = {'\0'};
@@ -4030,6 +4033,9 @@ int main(int argc, char *argv[])
 			is_type_set = 1;
 			is_option_selected = 1;
 			break;
+		case 'M':
+			is_mld_link = true;
+			break;
 		case 'h':
 		case '?':
 			display_help();
@@ -4063,6 +4069,7 @@ int main(int argc, char *argv[])
 	cmd.feat_flag = feat_temp;
 	cmd.recursive = recursion_temp;
 	cmd.serviceid = servid_temp;
+	cmd.mld_link = is_mld_link;
 
 	strlcpy(cmd.if_name, ifname_temp, IFNAME_LEN);
 
