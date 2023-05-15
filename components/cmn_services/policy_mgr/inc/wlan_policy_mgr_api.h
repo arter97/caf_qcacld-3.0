@@ -859,7 +859,7 @@ policy_mgr_change_sap_channel_with_csa(struct wlan_objmgr_psoc *psoc,
 				       uint8_t vdev_id, uint32_t ch_freq,
 				       uint32_t ch_width, bool forced)
 {
-
+	return QDF_STATUS_SUCCESS;
 }
 #endif
 
