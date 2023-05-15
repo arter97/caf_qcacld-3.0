@@ -2116,6 +2116,7 @@ struct cdp_throttle_ops {
  * buffers to IPA
  * @ipa_rx_super_rule_setup: Setup cce super rules based on filter tuple
  * @ipa_ast_create: Create/Update ast entry
+ * @ipa_get_wdi_version: Get WDI version
  */
 struct cdp_ipa_ops {
 	QDF_STATUS (*ipa_get_resource)(struct cdp_soc_t *soc_hdl,
@@ -2216,6 +2217,8 @@ struct cdp_ipa_ops {
 	QDF_STATUS (*ipa_ast_create)(struct cdp_soc_t *soc_hdl,
 				     qdf_ipa_ast_info_type_t *data);
 #endif
+	void (*ipa_get_wdi_version)(struct cdp_soc_t *soc_hdl,
+				    uint8_t *wdi_ver);
 };
 #endif
 
