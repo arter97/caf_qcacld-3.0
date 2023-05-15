@@ -271,16 +271,13 @@ static QDF_STATUS dp_soc_detach_rh(struct dp_soc *soc)
 static QDF_STATUS dp_soc_deinit_rh(struct dp_soc *soc)
 {
 	struct htt_soc *htt_soc = soc->htt_handle;
-	struct dp_mon_ops *mon_ops;
 
 	qdf_atomic_set(&soc->cmn_init_done, 0);
 
 	/*Degister RX offload flush handlers*/
 	hif_offld_flush_cb_deregister(soc->hif_handle);
 
-	mon_ops = dp_mon_ops_get(soc);
-	if (mon_ops && mon_ops->mon_soc_deinit)
-		mon_ops->mon_soc_deinit(soc);
+	dp_monitor_soc_deinit(soc);
 
 	/* free peer tables & AST tables allocated during peer_map_attach */
 	if (soc->peer_map_attach_success) {
@@ -332,7 +329,6 @@ static void *dp_soc_init_rh(struct dp_soc *soc, HTC_HANDLE htc_handle,
 	struct htt_soc *htt_soc = (struct htt_soc *)soc->htt_handle;
 	bool is_monitor_mode = false;
 	uint8_t i;
-	struct dp_mon_ops *mon_ops;
 
 	wlan_minidump_log(soc, sizeof(*soc), soc->ctrl_psoc,
 			  WLAN_MD_DP_SOC, "dp_soc");
@@ -424,9 +420,7 @@ static void *dp_soc_init_rh(struct dp_soc *soc, HTC_HANDLE htc_handle,
 		wlan_cfg_get_defrag_timeout_check(soc->wlan_cfg_ctx);
 	qdf_spinlock_create(&soc->rx.defrag.defrag_lock);
 
-	mon_ops = dp_mon_ops_get(soc);
-	if (mon_ops && mon_ops->mon_soc_init)
-		mon_ops->mon_soc_init(soc);
+	dp_monitor_soc_init(soc);
 
 	qdf_atomic_set(&soc->cmn_init_done, 1);
 
