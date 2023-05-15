@@ -877,8 +877,8 @@ QDF_STATUS mlo_glb_h_shmem_arena_ctx_deinit(uint8_t grp_id, uint8_t recovery)
 	}
 
        /* We need to de-initialize only for the last invocation */
-	if ((recovery != MLO_RECOVERY_MODE_1) &&
-	    qdf_atomic_dec_and_test(&shmem_arena_ctx->init_count))
+	if (qdf_atomic_dec_and_test(&shmem_arena_ctx->init_count) &&
+	    recovery != MLO_RECOVERY_MODE_1)
 		goto success;
 
 	free_mlo_glb_rx_reo_per_link_info(
