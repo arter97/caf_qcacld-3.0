@@ -5613,4 +5613,14 @@ void qdf_nbuf_stop_replenish_timer(void);
  */
 qdf_nbuf_t qdf_get_nbuf_valid_frag(qdf_nbuf_t nbuf);
 
+/**
+ * qdf_nbuf_fast_xmit() - Check if packet has fast_xmit support
+ * @nbuf: qdf_nbuf_t master nbuf
+ *
+ * This function checks if skb has fast_xmit or not.
+ *
+ * Return: True if skb support fast_xmit otherwise false
+ */
+bool qdf_nbuf_fast_xmit(qdf_nbuf_t nbuf);
+
 #endif /* _QDF_NBUF_H */
