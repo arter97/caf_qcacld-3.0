@@ -1307,6 +1307,39 @@ struct dp_ast_entry *dp_peer_ast_hash_find_soc(struct dp_soc *soc,
 }
 
 /**
+ * dp_peer_map_ipa_evt() - Send peer map event to IPA
+ * @soc: SoC handle
+ * @peer: peer to which ast node belongs
+ * @ast_entry: AST entry
+ * @mac_addr: MAC address of ast node
+ *
+ * Return: None
+ */
+#if defined(IPA_OFFLOAD) && defined(QCA_IPA_LL_TX_FLOW_CONTROL)
+static inline
+void dp_peer_map_ipa_evt(struct dp_soc *soc, struct dp_peer *peer,
+			 struct dp_ast_entry *ast_entry, uint8_t *mac_addr)
+{
+	if (ast_entry || (peer->vdev && peer->vdev->proxysta_vdev)) {
+		if (soc->cdp_soc.ol_ops->peer_map_event) {
+			soc->cdp_soc.ol_ops->peer_map_event(
+			soc->ctrl_psoc, ast_entry->peer_id,
+			ast_entry->ast_idx, ast_entry->vdev_id,
+			mac_addr, ast_entry->type, ast_entry->ast_hash_value);
+		}
+	} else {
+		dp_peer_info("%pK: AST entry not found", soc);
+	}
+}
+#else
+static inline
+void dp_peer_map_ipa_evt(struct dp_soc *soc, struct dp_peer *peer,
+			 struct dp_ast_entry *ast_entry, uint8_t *mac_addr)
+{
+}
+#endif
+
+/**
  * dp_peer_host_add_map_ast() - Add ast entry with HW AST Index
  * @soc: SoC handle
  * @peer_id: peer id from firmware
@@ -1439,6 +1472,8 @@ QDF_STATUS dp_peer_host_add_map_ast(struct dp_soc *soc, uint16_t peer_id,
 	ast_entry->peer_id = peer_id;
 	TAILQ_INSERT_TAIL(&peer->ast_entry_list, ast_entry,
 			  ase_list_elem);
+
+	dp_peer_map_ipa_evt(soc, peer, ast_entry, mac_addr);
 
 	qdf_spin_unlock_bh(&soc->ast_lock);
 fail:
