@@ -741,8 +741,14 @@ uint16_t dp_sawf_get_msduq(struct net_device *netdev, uint8_t *dest_mac,
 #ifdef QCA_SUPPORT_WDS_EXTENDED
 	if (osdev->dev_type == OSIF_NETDEV_TYPE_WDS_EXT) {
 		peer = dp_sawf_get_peer_from_wds_ext_dev(netdev, dest_mac, &soc);
-		if (peer)
+		if (peer) {
+			if (!wlan_cfg_get_sawf_config(soc->wlan_cfg_ctx)) {
+				dp_sawf_err("SAWF is disabled");
+				dp_peer_unref_delete(peer, DP_MOD_ID_SAWF);
+				return DP_SAWF_PEER_Q_INVALID;
+			}
 			goto process_peer;
+		}
 
 		qdf_info("Peer not found from WDS EXT dev");
 		return DP_SAWF_PEER_Q_INVALID;
@@ -754,6 +760,11 @@ uint16_t dp_sawf_get_msduq(struct net_device *netdev, uint8_t *dest_mac,
 	      (wlan_pdev_get_psoc(wlan_vdev_get_pdev(vdev)));
 	if (!soc) {
 		qdf_info("Soc cannot be NULL");
+		return DP_SAWF_PEER_Q_INVALID;
+	}
+
+	if (!wlan_cfg_get_sawf_config(soc->wlan_cfg_ctx)) {
+		dp_sawf_err("SAWF is disabled");
 		return DP_SAWF_PEER_Q_INVALID;
 	}
 
