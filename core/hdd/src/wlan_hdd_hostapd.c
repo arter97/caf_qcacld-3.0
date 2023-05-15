@@ -2972,7 +2972,7 @@ QDF_STATUS hdd_hostapd_sap_event_cb(struct sap_event *sap_event,
 		    test_bit(SOFTAP_BSS_STARTED, &adapter->event_flags)) {
 			hdd_dcs_chan_select_complete(adapter);
 		} else {
-			wlan_hdd_cfg80211_acs_ch_select_evt(adapter);
+			wlan_hdd_cfg80211_acs_ch_select_evt(adapter, true);
 			wlansap_dcs_set_wlan_interference_mitigation_on_band(
 					WLAN_HDD_GET_SAP_CTX_PTR(adapter->deflink),
 					&ap_ctx->sap_config);

@@ -519,7 +519,18 @@ int wlan_hdd_send_avoid_freq_for_dnbs(struct hdd_context *hdd_ctx,
 void wlan_hdd_rso_cmd_status_cb(hdd_handle_t hdd_handle,
 				struct rso_cmd_status *rso_status);
 
-void wlan_hdd_cfg80211_acs_ch_select_evt(struct hdd_adapter *adapter);
+/**
+ * wlan_hdd_cfg80211_acs_ch_select_evt: Callback function for ACS evt
+ * @adapter: Pointer to SAP adapter struct
+ * @store_acs_freq: Store current ACS frequecy flag
+ *
+ * This is a callback function on ACS procedure is completed.
+ * This function send the ACS selected channel information to hostapd
+ *
+ * Return: None
+ */
+void wlan_hdd_cfg80211_acs_ch_select_evt(struct hdd_adapter *adapter,
+					 bool store_acs_freq);
 
 #ifdef WLAN_CFR_ENABLE
 /*

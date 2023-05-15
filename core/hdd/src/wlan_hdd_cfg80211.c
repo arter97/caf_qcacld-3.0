@@ -2261,7 +2261,6 @@ static void hdd_update_acs_channel_list(struct sap_config *sap_config,
 	sap_config->acs_cfg.ch_list_count = temp_count;
 }
 
-
 /**
  * wlan_hdd_cfg80211_start_acs : Start ACS Procedure for SAP
  * @adapter: pointer to SAP adapter struct
@@ -2319,7 +2318,7 @@ int wlan_hdd_cfg80211_start_acs(struct hdd_adapter *adapter)
 
 		if (status > 0) {
 			/*notify hostapd about channel override */
-			wlan_hdd_cfg80211_acs_ch_select_evt(adapter);
+			wlan_hdd_cfg80211_acs_ch_select_evt(adapter, true);
 			wlansap_dcs_set_wlan_interference_mitigation_on_band(sap_ctx,
 									     sap_config);
 			return 0;
@@ -3357,7 +3356,7 @@ wlan_hdd_handle_single_ch_in_acs_list(struct hdd_context *hdd_ctx,
 	sap_config->ch_params.mhz_freq_seg1 =
 		sap_config->acs_cfg.vht_seg1_center_ch_freq;
 	/*notify hostapd about channel override */
-	wlan_hdd_cfg80211_acs_ch_select_evt(adapter);
+	wlan_hdd_cfg80211_acs_ch_select_evt(adapter, true);
 	wlansap_dcs_set_wlan_interference_mitigation_on_band(
 		WLAN_HDD_GET_SAP_CTX_PTR(adapter->deflink),
 		sap_config);
@@ -3637,6 +3636,88 @@ static void hdd_remove_passive_dfs_acs_channel_for_ll_sap(
 		sap_config->acs_cfg.ch_list_count = ch_cnt;
 		sap_dump_acs_channel(&sap_config->acs_cfg);
 	}
+}
+
+/* Stored ACS Frequency timeout in msec */
+#define STORED_ACS_FREQ_TIMEOUT 500
+static bool
+wlan_hdd_is_prev_acs_freq_present_in_acs_config(struct sap_config *sap_cfg)
+{
+	uint32_t i = 0;
+	bool prev_acs_freq_found = false;
+
+	if (!qdf_system_time_before(
+		qdf_get_time_of_the_day_ms(),
+		sap_cfg->last_acs_complete_time + STORED_ACS_FREQ_TIMEOUT))
+		return prev_acs_freq_found;
+
+	for (i = 0; i < sap_cfg->acs_cfg.ch_list_count; i++) {
+		if (sap_cfg->acs_cfg.freq_list[i] == sap_cfg->last_acs_freq) {
+			prev_acs_freq_found = true;
+			break;
+		}
+	}
+
+	return prev_acs_freq_found;
+}
+
+static bool
+wlan_hdd_ll_lt_sap_get_valid_last_acs_freq(struct hdd_adapter *adapter)
+{
+	struct hdd_context *hdd_ctx;
+	struct sap_config *sap_config;
+	int status;
+	bool prev_acs_freq_valid = false;
+	struct sap_context *sap_ctx;
+
+	if (!adapter) {
+		hdd_err("adapter is NULL");
+		return prev_acs_freq_valid;
+	}
+
+	hdd_ctx = WLAN_HDD_GET_CTX(adapter);
+	status = wlan_hdd_validate_context(hdd_ctx);
+	if (0 != status) {
+		hdd_err("Invalid HDD context");
+		return prev_acs_freq_valid;
+	}
+
+	sap_config = &adapter->deflink->session.ap.sap_config;
+	if (!sap_config) {
+		hdd_err("SAP config is NULL");
+		return prev_acs_freq_valid;
+	}
+
+	if (!sap_config->last_acs_freq || !sap_config->last_acs_complete_time)
+		return prev_acs_freq_valid;
+
+	if (!policy_mgr_is_vdev_lt_ll_sap(
+				hdd_ctx->psoc,
+				adapter->deflink->vdev_id))
+		return prev_acs_freq_valid;
+
+	sap_ctx = WLAN_HDD_GET_SAP_CTX_PTR(adapter->deflink);
+	if (wlan_hdd_is_prev_acs_freq_present_in_acs_config(sap_config)) {
+		wlansap_update_ll_lt_sap_acs_result(sap_ctx,
+						    sap_config->last_acs_freq);
+
+		hdd_debug("vdev %d, return prev ACS freq %d stored at %lu, current time %lu",
+			  adapter->deflink->vdev_id, sap_config->last_acs_freq,
+			  sap_config->last_acs_complete_time,
+			  qdf_get_time_of_the_day_ms());
+
+		/* Notify to hostapd without storing the last acs frequency.
+		 * Reason for not storing the last acs frequency is to avoid
+		 * storing the same freq again and again
+		 */
+		wlan_hdd_cfg80211_acs_ch_select_evt(adapter, false);
+		wlansap_dcs_set_wlan_interference_mitigation_on_band(sap_ctx,
+								    sap_config);
+
+		prev_acs_freq_valid = true;
+	}
+
+	return prev_acs_freq_valid;
 }
 
 /**
@@ -4046,6 +4127,11 @@ static int __wlan_hdd_cfg80211_do_acs(struct wiphy *wiphy,
 
 	sap_dump_acs_channel(&sap_config->acs_cfg);
 
+	if (wlan_hdd_ll_lt_sap_get_valid_last_acs_freq(adapter)) {
+		ret = 0;
+		goto out;
+	}
+
 	qdf_status = ucfg_mlme_get_vendor_acs_support(hdd_ctx->psoc,
 						      &is_vendor_acs_support);
 	if (QDF_IS_STATUS_ERROR(qdf_status))
@@ -4226,16 +4312,8 @@ static uint16_t wlan_hdd_acs_get_puncture_bitmap(struct sap_acs_cfg *acs_cfg)
 }
 #endif /* WLAN_FEATURE_11BE */
 
-/**
- * wlan_hdd_cfg80211_acs_ch_select_evt: Callback function for ACS evt
- * @adapter: Pointer to SAP adapter struct
- *
- * This is a callback function on ACS procedure is completed.
- * This function send the ACS selected channel information to hostapd
- *
- * Return: None
- */
-void wlan_hdd_cfg80211_acs_ch_select_evt(struct hdd_adapter *adapter)
+void wlan_hdd_cfg80211_acs_ch_select_evt(struct hdd_adapter *adapter,
+					 bool store_acs_freq)
 {
 	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
 	struct sap_config *sap_cfg;
@@ -4254,6 +4332,13 @@ void wlan_hdd_cfg80211_acs_ch_select_evt(struct hdd_adapter *adapter)
 
 	sap_cfg = &(WLAN_HDD_GET_AP_CTX_PTR(adapter->deflink))->sap_config;
 	len = hdd_get_acs_evt_data_len(sap_cfg);
+
+	if (store_acs_freq &&
+	    policy_mgr_is_vdev_lt_ll_sap(hdd_ctx->psoc,
+					 adapter->deflink->vdev_id)) {
+		sap_cfg->last_acs_freq = sap_cfg->acs_cfg.pri_ch_freq;
+		sap_cfg->last_acs_complete_time = qdf_get_time_of_the_day_ms();
+	}
 
 	vendor_event = wlan_cfg80211_vendor_event_alloc(hdd_ctx->wiphy,
 							&adapter->wdev, len, id,
@@ -15866,7 +15951,7 @@ static int hdd_update_acs_channel(struct hdd_adapter *adapter, uint8_t reason,
 	case QCA_WLAN_VENDOR_ACS_SELECT_REASON_INIT:
 		hdd_update_acs_sap_config(hdd_ctx, sap_config, channel_list);
 		/* Update Hostapd */
-		wlan_hdd_cfg80211_acs_ch_select_evt(adapter);
+		wlan_hdd_cfg80211_acs_ch_select_evt(adapter, true);
 		break;
 
 	/* DFS detected on current channel */

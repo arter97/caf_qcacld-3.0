@@ -4134,3 +4134,24 @@ void sap_acs_set_puncture_support(struct sap_context *sap_ctx,
 		ch_params->is_create_punc_bitmap = true;
 }
 #endif
+
+void wlansap_update_ll_lt_sap_acs_result(struct sap_context *sap_ctx,
+					 qdf_freq_t last_acs_freq)
+{
+	struct mac_context *mac;
+
+	mac = sap_get_mac_context();
+	if (!mac) {
+		sap_err("Invalid MAC context");
+		return;
+	}
+
+	if (!sap_ctx) {
+		sap_err("Invalid sap context");
+		return;
+	}
+
+	wlansap_set_acs_ch_freq(sap_ctx, last_acs_freq);
+	sap_ctx->acs_cfg->pri_ch_freq = last_acs_freq;
+	sap_ctx->acs_cfg->ht_sec_ch_freq = 0;
+}
