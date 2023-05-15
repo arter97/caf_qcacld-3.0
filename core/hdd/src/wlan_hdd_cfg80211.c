@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -6492,6 +6492,7 @@ wlan_hdd_cfg80211_set_ext_roam_params(struct wiphy *wiphy,
 }
 
 #define RATEMASK_PARAMS_TYPE_MAX 4
+#define RATEMASK_PARAMS_BITMAP_MAX 16
 #define RATEMASK_PARAMS_MAX QCA_WLAN_VENDOR_ATTR_RATEMASK_PARAMS_MAX
 const struct nla_policy wlan_hdd_set_ratemask_param_policy[
 			RATEMASK_PARAMS_MAX + 1] = {
@@ -6499,7 +6500,7 @@ const struct nla_policy wlan_hdd_set_ratemask_param_policy[
 		VENDOR_NLA_POLICY_NESTED(wlan_hdd_set_ratemask_param_policy),
 	[QCA_WLAN_VENDOR_ATTR_RATEMASK_PARAMS_TYPE] = {.type = NLA_U8},
 	[QCA_WLAN_VENDOR_ATTR_RATEMASK_PARAMS_BITMAP] = {.type = NLA_BINARY,
-							 .len = 128},
+					.len = RATEMASK_PARAMS_BITMAP_MAX},
 };
 
 /**
@@ -6520,7 +6521,7 @@ static int hdd_set_ratemask_params(struct hdd_context *hdd_ctx,
 	int ret, rem;
 	struct config_ratemask_params rate_params[RATEMASK_PARAMS_TYPE_MAX];
 	uint8_t ratemask_type, num_ratemask = 0, len;
-	uint32_t bitmap[RATEMASK_PARAMS_TYPE_MAX] = {0};
+	uint32_t bitmap[RATEMASK_PARAMS_BITMAP_MAX / 4];
 
 	ret = wlan_cfg80211_nla_parse(tb,
 				      RATEMASK_PARAMS_MAX,
@@ -6573,7 +6574,8 @@ static int hdd_set_ratemask_params(struct hdd_context *hdd_ctx,
 		}
 
 		len = nla_len(tb2[QCA_WLAN_VENDOR_ATTR_RATEMASK_PARAMS_BITMAP]);
-		nla_memcpy((void *)bitmap,
+		qdf_mem_zero(bitmap, sizeof(bitmap));
+		nla_memcpy(bitmap,
 			   tb2[QCA_WLAN_VENDOR_ATTR_RATEMASK_PARAMS_BITMAP],
 			   len);
 
@@ -18609,7 +18611,8 @@ static QDF_STATUS
 wlan_hdd_iftype_data_alloc_6ghz(struct hdd_context *hdd_ctx)
 {
 	hdd_ctx->iftype_data_6g =
-			qdf_mem_malloc(sizeof(*hdd_ctx->iftype_data_6g));
+			qdf_mem_malloc(sizeof(*hdd_ctx->iftype_data_6g) *
+				       EHT_OPMODE_SUPPORTED);
 
 	if (!hdd_ctx->iftype_data_6g)
 		return QDF_STATUS_E_NOMEM;
@@ -18640,13 +18643,15 @@ static QDF_STATUS
 wlan_hdd_iftype_data_alloc(struct hdd_context *hdd_ctx)
 {
 	hdd_ctx->iftype_data_2g =
-			qdf_mem_malloc(sizeof(*hdd_ctx->iftype_data_2g));
+			qdf_mem_malloc(sizeof(*hdd_ctx->iftype_data_2g) *
+				       EHT_OPMODE_SUPPORTED);
 
 	if (!hdd_ctx->iftype_data_2g)
 		return QDF_STATUS_E_NOMEM;
 
 	hdd_ctx->iftype_data_5g =
-			qdf_mem_malloc(sizeof(*hdd_ctx->iftype_data_5g));
+			qdf_mem_malloc(sizeof(*hdd_ctx->iftype_data_5g) *
+				       EHT_OPMODE_SUPPORTED);
 	if (!hdd_ctx->iftype_data_5g) {
 		qdf_mem_free(hdd_ctx->iftype_data_2g);
 		hdd_ctx->iftype_data_2g = NULL;
@@ -19168,7 +19173,7 @@ static void wlan_hdd_update_ap_sme_cap_wiphy(struct hdd_context *hdd_ctx)
  */
 void wlan_hdd_update_wiphy(struct hdd_context *hdd_ctx)
 {
-	int value;
+	int value = 0;
 	bool fils_enabled, mac_spoofing_enabled;
 	bool dfs_master_capable = true, is_oce_sta_enabled = false;
 	QDF_STATUS status;

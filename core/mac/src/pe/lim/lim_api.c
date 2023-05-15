@@ -826,7 +826,7 @@ QDF_STATUS pe_open(struct mac_context *mac, struct cds_config_info *cds_cfg)
 	}
 
 	mac->lim.gpSession =
-		qdf_mem_malloc(sizeof(struct pe_session) * mac->lim.maxBssId);
+		qdf_mem_common_alloc(sizeof(struct pe_session) * mac->lim.maxBssId);
 	if (!mac->lim.gpSession) {
 		status = QDF_STATUS_E_NOMEM;
 		goto pe_open_psession_fail;
@@ -869,7 +869,7 @@ QDF_STATUS pe_open(struct mac_context *mac, struct cds_config_info *cds_cfg)
 	return status; /* status here will be QDF_STATUS_SUCCESS */
 
 pe_open_lock_fail:
-	qdf_mem_free(mac->lim.gpSession);
+	qdf_mem_common_free(mac->lim.gpSession);
 	mac->lim.gpSession = NULL;
 pe_open_psession_fail:
 	qdf_mem_free(mac->lim.lim_timers.gpLimCnfWaitTimer);
@@ -914,7 +914,7 @@ QDF_STATUS pe_close(struct mac_context *mac)
 	qdf_mem_free(mac->lim.lim_timers.gpLimCnfWaitTimer);
 	mac->lim.lim_timers.gpLimCnfWaitTimer = NULL;
 
-	qdf_mem_free(mac->lim.gpSession);
+	qdf_mem_common_free(mac->lim.gpSession);
 	mac->lim.gpSession = NULL;
 
 	pe_free_dph_node_array_buffer();
