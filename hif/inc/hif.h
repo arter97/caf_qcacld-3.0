@@ -626,6 +626,29 @@ struct hif_event_misc {
 	uint64_t last_irq_ts;
 };
 
+#ifdef WLAN_FEATURE_AFFINITY_MGR
+/**
+ * struct hif_cpu_affinity - CPU affinity mask info for IRQ
+ *
+ * @current_irq_mask: Current CPU mask set for IRQ
+ * @wlan_requested_mask: CPU mask requested by WLAN
+ * @walt_taken_mask: Current CPU taken by Audio
+ * @last_updated: Last time IRQ CPU affinity was updated
+ * @last_affined_away: Last time when IRQ was affined away
+ * @update_requested: IRQ affinity hint set requested by WLAN
+ * @irq: IRQ number
+ */
+struct hif_cpu_affinity {
+	qdf_cpu_mask current_irq_mask;
+	qdf_cpu_mask wlan_requested_mask;
+	qdf_cpu_mask walt_taken_mask;
+	uint64_t last_updated;
+	uint64_t last_affined_away;
+	bool update_requested;
+	int irq;
+};
+#endif
+
 /**
  * struct hif_event_history - history for one interrupt group
  * @index: index to store new event
@@ -2761,4 +2784,118 @@ hif_get_direct_link_ce_srng_info(struct hif_opaque_softc *scn,
 	return QDF_STATUS_SUCCESS;
 }
 #endif
+
+static inline QDF_STATUS
+hif_irq_set_affinity_hint(int irq_num, qdf_cpu_mask *cpu_mask)
+{
+	QDF_STATUS status;
+
+	qdf_dev_modify_irq_status(irq_num, IRQ_NO_BALANCING, 0);
+	status = qdf_dev_set_irq_affinity(irq_num,
+					  (struct qdf_cpu_mask *)cpu_mask);
+	qdf_dev_modify_irq_status(irq_num, 0, IRQ_NO_BALANCING);
+
+	return status;
+}
+
+#ifdef WLAN_FEATURE_AFFINITY_MGR
+/**
+ * hif_affinity_mgr_init_ce_irq() - Init for CE IRQ
+ * @scn: hif opaque handle
+ * @id: CE ID
+ * @irq: IRQ assigned
+ *
+ * Return: None
+ */
+void
+hif_affinity_mgr_init_ce_irq(struct hif_softc *scn, int id, int irq);
+
+/**
+ * hif_affinity_mgr_init_grp_irq() - Init for group IRQ
+ * @scn: hif opaque handle
+ * @grp_id: GRP ID
+ * @irq_num: IRQ number of hif ext group
+ * @irq: IRQ number assigned
+ *
+ * Return: None
+ */
+void
+hif_affinity_mgr_init_grp_irq(struct hif_softc *scn, int grp_id,
+			      int irq_num, int irq);
+
+/**
+ * hif_affinity_mgr_set_qrg_irq_affinity() - Set affinity for group IRQ
+ * @scn: hif opaque handle
+ * @irq: IRQ assigned
+ * @grp_id: GRP ID
+ * @irq_index: IRQ number of hif ext group
+ * @cpu_mask: reuquested cpu_mask for IRQ
+ *
+ * Return: status
+ */
+QDF_STATUS
+hif_affinity_mgr_set_qrg_irq_affinity(struct hif_softc *scn, uint32_t irq,
+				      uint32_t grp_id, uint32_t irq_index,
+				      qdf_cpu_mask *cpu_mask);
+
+/**
+ * hif_affinity_mgr_set_ce_irq_affinity() - Set affinity for CE IRQ
+ * @scn: hif opaque handle
+ * @irq: IRQ assigned
+ * @ce_id: CE ID
+ * @cpu_mask: reuquested cpu_mask for IRQ
+ *
+ * Return: status
+ */
+QDF_STATUS
+hif_affinity_mgr_set_ce_irq_affinity(struct hif_softc *scn, uint32_t irq,
+				     uint32_t ce_id, qdf_cpu_mask *cpu_mask);
+
+/**
+ * hif_affinity_mgr_affine_irq() - Affine CE and GRP IRQs
+ * @scn: hif opaque handle
+ *
+ * Return: None
+ */
+void hif_affinity_mgr_affine_irq(struct hif_softc *scn);
+#else
+static inline void
+hif_affinity_mgr_init_ce_irq(struct hif_softc *scn, int id, int irq)
+{
+}
+
+static inline void
+hif_affinity_mgr_init_grp_irq(struct hif_softc *scn, int grp_id, int irq_num,
+			      int irq)
+{
+}
+
+static inline QDF_STATUS
+hif_affinity_mgr_set_qrg_irq_affinity(struct hif_softc *scn, uint32_t irq,
+				      uint32_t grp_id, uint32_t irq_index,
+				      qdf_cpu_mask *cpu_mask)
+{
+	return hif_irq_set_affinity_hint(irq, cpu_mask);
+}
+
+static inline QDF_STATUS
+hif_affinity_mgr_set_ce_irq_affinity(struct hif_softc *scn, uint32_t irq,
+				     uint32_t ce_id, qdf_cpu_mask *cpu_mask)
+{
+	return hif_irq_set_affinity_hint(irq, cpu_mask);
+}
+
+static inline
+void hif_affinity_mgr_affine_irq(struct hif_softc *scn)
+{
+}
+#endif
+
+/**
+ * hif_affinity_mgr_set_affinity() - Affine CE and GRP IRQs
+ * @scn: hif opaque handle
+ *
+ * Return: None
+ */
+void hif_affinity_mgr_set_affinity(struct hif_opaque_softc *scn);
 #endif /* _HIF_H_ */

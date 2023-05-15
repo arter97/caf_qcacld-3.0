@@ -421,6 +421,14 @@ struct hif_softc {
 	struct pld_shadow_reg_v3_cfg shadow_regs[MAX_SHADOW_REGS];
 	int num_shadow_registers_configured;
 #endif
+#ifdef WLAN_FEATURE_AFFINITY_MGR
+	/* CPU Affinity info of IRQs */
+	bool affinity_mgr_supported;
+	uint64_t time_threshold;
+	struct hif_cpu_affinity ce_irq_cpu_mask[CE_COUNT_MAX];
+	struct hif_cpu_affinity irq_cpu_mask[HIF_MAX_GROUP][HIF_MAX_GRP_IRQ];
+	qdf_cpu_mask allowed_mask;
+#endif
 };
 
 #if defined(NUM_SOC_PERF_CLUSTER) && (NUM_SOC_PERF_CLUSTER > 1)
