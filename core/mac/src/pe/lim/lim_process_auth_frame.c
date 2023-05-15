@@ -2044,10 +2044,14 @@ lim_process_auth_frame(struct mac_context *mac_ctx, uint8_t *rx_pkt_info,
 	if (LIM_IS_STA_ROLE(pe_session) &&
 	    wlan_vdev_mlme_is_mlo_vdev(pe_session->vdev)) {
 		if (!rx_auth_frm_body->is_mlo_ie_present) {
-			pe_debug("MLO IE not present in auth frame from peer");
+			pe_err("MLO IE not present in auth frame from peer, abort connection");
 			lim_send_deauth_mgmt_frame(
 				mac_ctx, REASON_UNSPEC_FAILURE,
 				pe_session->bssId, pe_session, false);
+			lim_restore_from_auth_state(mac_ctx,
+						    eSIR_SME_INVALID_PARAMETERS,
+						    REASON_UNSPEC_FAILURE,
+						    pe_session);
 			goto free;
 		}
 	}
