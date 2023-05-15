@@ -486,8 +486,8 @@ struct mlme_ht_param_info {
 	uint8_t max_rx_ampdu_factor:2;
 	uint8_t mpdu_density:3;
 	uint8_t reserved:3;
-#endif
 } qdf_packed;
+#endif
 
 #ifndef ANI_LITTLE_BIT_ENDIAN
 /**
