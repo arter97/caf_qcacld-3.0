@@ -125,6 +125,8 @@ struct mlo_chip_info {
 	uint8_t adj_chip_ids[MAX_MLO_CHIPS][MAX_ADJ_CHIPS];
 };
 
+#define START_STOP_INPROGRESS_BIT 0
+
 /**
  * struct mlo_setup_info: MLO setup status per link
  * @ml_grp_id: Unique id for ML grouping of Pdevs/links
@@ -141,6 +143,7 @@ struct mlo_chip_info {
  * @trigger_umac_reset: teardown require umac reset, for mode1 SSR
  * @state_lock: lock to protect access to link state
  * @event: event for teardown completion
+ * @start_stop_inprogress: MLO group start/stop in progress
  * @dp_handle: pointer to DP ML context
  * @chip_info: chip specific info of the soc
  * @tsf_sync_enabled: MLO TSF sync is enabled at FW or not
@@ -160,6 +163,7 @@ struct mlo_setup_info {
 	bool trigger_umac_reset;
 	qdf_spinlock_t state_lock;
 	qdf_event_t event;
+	unsigned long start_stop_inprogress;
 	struct cdp_mlo_ctxt *dp_handle;
 	struct mlo_chip_info chip_info;
 	bool tsf_sync_enabled;

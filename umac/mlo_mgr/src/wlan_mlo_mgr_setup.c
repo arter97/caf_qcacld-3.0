@@ -334,6 +334,46 @@ static QDF_STATUS mlo_find_pdev_idx(struct wlan_objmgr_pdev *pdev,
 	return QDF_STATUS_E_FAILURE;
 }
 
+bool mlo_check_start_stop_inprogress(uint8_t grp_id)
+{
+	struct mlo_mgr_context *mlo_ctx = wlan_objmgr_get_mlo_ctx();
+
+	if (!mlo_ctx)
+		return true;
+
+	if (grp_id >= mlo_ctx->total_grp) {
+		mlo_err("Invalid grp id %d, total no of groups %d",
+			grp_id, mlo_ctx->total_grp);
+		return true;
+	}
+
+	return qdf_atomic_test_and_set_bit(
+			START_STOP_INPROGRESS_BIT,
+			&mlo_ctx->setup_info[grp_id].start_stop_inprogress);
+}
+
+qdf_export_symbol(mlo_check_start_stop_inprogress);
+
+void mlo_clear_start_stop_inprogress(uint8_t grp_id)
+{
+	struct mlo_mgr_context *mlo_ctx = wlan_objmgr_get_mlo_ctx();
+
+	if (!mlo_ctx)
+		return;
+
+	if (grp_id >= mlo_ctx->total_grp) {
+		mlo_err("Invalid grp id %d, total no of groups %d",
+			grp_id, mlo_ctx->total_grp);
+		return;
+	}
+
+	qdf_atomic_clear_bit(
+			START_STOP_INPROGRESS_BIT,
+			&mlo_ctx->setup_info[grp_id].start_stop_inprogress);
+}
+
+qdf_export_symbol(mlo_clear_start_stop_inprogress);
+
 #define WLAN_SOC_ID_NOT_INITIALIZED -1
 bool mlo_vdevs_check_single_soc(struct wlan_objmgr_vdev **wlan_vdev_list,
 				uint8_t vdev_count)
