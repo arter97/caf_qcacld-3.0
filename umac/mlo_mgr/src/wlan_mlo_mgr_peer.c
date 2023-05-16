@@ -453,6 +453,8 @@ wlan_mlo_peer_deauth_init(struct wlan_mlo_peer_context *ml_peer,
 	}
 }
 
+qdf_export_symbol(wlan_mlo_peer_deauth_init);
+
 void wlan_mlo_peer_delete(struct wlan_mlo_peer_context *ml_peer)
 {
 	struct wlan_mlo_dev_context *ml_dev;
