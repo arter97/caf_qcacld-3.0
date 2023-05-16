@@ -6688,6 +6688,7 @@ struct target_feature_set {
  * support
  * @notify_frame_support: capability to mark notify frames from host
  * @dp_peer_meta_data_ver: datapath peer meta data version flag
+ * @rf_path: Indicates RF path 0 primary, 1 secondary
  */
 typedef struct {
 	uint32_t num_vdevs;
@@ -6816,6 +6817,7 @@ typedef struct {
 	uint32_t num_max_active_vdevs;
 	uint8_t notify_frame_support;
 	uint8_t dp_peer_meta_data_ver;
+	bool rf_path;
 } target_resource_config;
 
 /**
