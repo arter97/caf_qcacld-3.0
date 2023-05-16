@@ -41,6 +41,7 @@
 #ifndef ENABLE_HOST_TO_TARGET_CONVERSION
 #include <wmi_unified.h>
 #endif
+#include <wlan_objmgr_vdev_obj.h>
 
 #define MAC_MAX_KEY_LENGTH 32
 #define MAC_PN_LENGTH 8
@@ -1235,6 +1236,10 @@ struct wmi_host_link_state_params {
  * @max_num_simultaneous_links: Max number of simultaneous links as per
  *                              MLD Capability for ML peer
  * @nstr_indication_bitmap: NSTR indication bitmap
+ * @vdev_id: ID of the vdev object
+ * @bssid: AP link address
+ * @chan: Wlan channel information
+ * @mac_addr: Self mac addresses
  */
 struct peer_assoc_mlo_params {
 	uint32_t mlo_enabled:1,
@@ -1262,6 +1267,10 @@ struct peer_assoc_mlo_params {
 	uint16_t medium_sync_max_txop_num;
 	uint16_t max_num_simultaneous_links;
 	uint32_t nstr_indication_bitmap;
+	uint32_t vdev_id;
+	struct qdf_mac_addr bssid;
+	struct wlan_channel chan;
+	struct qdf_mac_addr mac_addr;
 };
 
 /**
@@ -1280,6 +1289,10 @@ struct peer_assoc_mlo_params {
  * @msd_cap_support: indicate if MSD supported
  * @unused: spare bits
  * @logical_link_index: Unique index for links of the mlo. Starts with Zero
+ * @link_id: AP Link Id
+ * @bssid: AP link address
+ * @chan: Wlan channel information
+ * @mac_addr: Self mac addresses
  */
 struct ml_partner_info {
 	uint32_t vdev_id;
@@ -1295,6 +1308,10 @@ struct ml_partner_info {
 		 msd_cap_support:1,
 		 unused:23;
 	uint32_t logical_link_index;
+	uint32_t link_id;
+	struct qdf_mac_addr bssid;
+	struct wlan_channel chan;
+	struct qdf_mac_addr mac_addr;
 };
 
 /**
@@ -1382,6 +1399,7 @@ struct peer_assoc_ml_partner_links {
  * @ml_links: MLO partner links
  * @qcn_node_flag: if node is QCN node
  * @mesh_node_flag: if node is 4 addr node
+ * @is_assoc_vdev: true if assoc vdev
  * @peer_dms_capable: is peer DMS capable
  * @reserved: spare bits
  * @t2lm_params: TID-to-link mapping params
@@ -1470,6 +1488,7 @@ struct peer_assoc_params {
 	struct peer_assoc_ml_partner_links ml_links;
 	bool qcn_node_flag;
 	bool mesh_node_flag;
+	bool is_assoc_vdev;
 #endif
 	uint8_t peer_dms_capable:1,
 		reserved:7;

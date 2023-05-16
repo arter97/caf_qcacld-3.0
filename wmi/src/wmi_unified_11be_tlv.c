@@ -242,9 +242,13 @@ size_t peer_assoc_mlo_params_size(struct peer_assoc_params *req)
 {
 	size_t peer_assoc_mlo_size = sizeof(wmi_peer_assoc_mlo_params) +
 			WMI_TLV_HDR_SIZE +
-			(req->ml_links.num_links *
+			((req->ml_links.num_links) *
 			sizeof(wmi_peer_assoc_mlo_partner_link_params)) +
 			WMI_TLV_HDR_SIZE;
+
+	if (req->is_assoc_vdev)
+		peer_assoc_mlo_size = peer_assoc_mlo_size +
+			sizeof(wmi_peer_assoc_mlo_partner_link_params);
 
 	return peer_assoc_mlo_size;
 }
@@ -308,6 +312,46 @@ uint8_t *peer_assoc_add_mlo_params(uint8_t *buf_ptr,
 	return buf_ptr + sizeof(wmi_peer_assoc_mlo_params);
 }
 
+static inline void wmi_copy_chan_info(wmi_channel *dst_chan,
+				      struct wlan_channel *src_chan)
+{
+	dst_chan->mhz = src_chan->ch_freq;
+	dst_chan->band_center_freq1 = src_chan->ch_cfreq1;
+	dst_chan->band_center_freq2 = src_chan->ch_cfreq2;
+}
+
+static inline void
+peer_assoc_update_assoc_link_info(uint8_t **buf_ptr,
+				  struct peer_assoc_params *req)
+{
+	wmi_peer_assoc_mlo_partner_link_params *ml_partner_link;
+
+	if (!req->is_assoc_vdev)
+		return;
+
+	ml_partner_link = (wmi_peer_assoc_mlo_partner_link_params *)(*buf_ptr);
+
+	/* Fill Assoc link info */
+	WMITLV_SET_HDR(&ml_partner_link->tlv_header,
+		       WMITLV_TAG_STRUC_wmi_peer_assoc_mlo_partner_link_params,
+		       WMITLV_GET_STRUCT_TLVLEN(wmi_peer_assoc_mlo_partner_link_params));
+	ml_partner_link->vdev_id = req->mlo_params.vdev_id;
+	ml_partner_link->ieee_link_id = req->mlo_params.ieee_link_id;
+	WMI_CHAR_ARRAY_TO_MAC_ADDR(req->mlo_params.bssid.bytes,
+				   &ml_partner_link->bss_id);
+	WMI_CHAR_ARRAY_TO_MAC_ADDR(req->mlo_params.mac_addr.bytes,
+				   &ml_partner_link->self_mac);
+	wmi_copy_chan_info(&ml_partner_link->wmi_chan, &req->mlo_params.chan);
+
+	wmi_debug("Send Link info with link_id: %d vdev_id: %d AP link addr: "QDF_MAC_ADDR_FMT ", STA addr: "QDF_MAC_ADDR_FMT,
+		  ml_partner_link->ieee_link_id, ml_partner_link->vdev_id,
+		  QDF_MAC_ADDR_REF(req->mlo_params.bssid.bytes),
+		  QDF_MAC_ADDR_REF(req->mlo_params.mac_addr.bytes));
+
+	ml_partner_link++;
+	*buf_ptr = (uint8_t *)ml_partner_link;
+}
+
 uint8_t *peer_assoc_add_ml_partner_links(uint8_t *buf_ptr,
 					 struct peer_assoc_params *req)
 {
@@ -316,11 +360,12 @@ uint8_t *peer_assoc_add_ml_partner_links(uint8_t *buf_ptr,
 	uint8_t i;
 
 	WMITLV_SET_HDR(buf_ptr, WMITLV_TAG_ARRAY_STRUC,
-		       (req->ml_links.num_links *
+		       ((req->ml_links.num_links + req->is_assoc_vdev) *
 		       sizeof(wmi_peer_assoc_mlo_partner_link_params)));
 	buf_ptr += sizeof(uint32_t);
 
 	ml_partner_link = (wmi_peer_assoc_mlo_partner_link_params *)buf_ptr;
+	peer_assoc_update_assoc_link_info((uint8_t **)&ml_partner_link, req);
 	partner_info = req->ml_links.partner_info;
 	for (i = 0; i < req->ml_links.num_links; i++) {
 		WMITLV_SET_HDR(&ml_partner_link->tlv_header,
@@ -338,12 +383,25 @@ uint8_t *peer_assoc_add_ml_partner_links(uint8_t *buf_ptr,
 						   partner_info[i].mlo_logical_link_index_valid);
 		ml_partner_link->mlo_flags.emlsr_support = partner_info[i].emlsr_support;
 		ml_partner_link->logical_link_index = partner_info[i].logical_link_index;
+		ml_partner_link->ieee_link_id = partner_info[i].link_id;
+		WMI_CHAR_ARRAY_TO_MAC_ADDR(partner_info[i].bssid.bytes,
+					   &ml_partner_link->bss_id);
+		WMI_CHAR_ARRAY_TO_MAC_ADDR(partner_info[i].mac_addr.bytes,
+					   &ml_partner_link->self_mac);
+
+		wmi_debug("Send Link info with link_id: %d vdev_id: %d AP link addr: "QDF_MAC_ADDR_FMT ", STA addr: "QDF_MAC_ADDR_FMT,
+			  ml_partner_link->ieee_link_id,
+			  ml_partner_link->vdev_id,
+			  QDF_MAC_ADDR_REF(partner_info[i].bssid.bytes),
+			  QDF_MAC_ADDR_REF(partner_info[i].mac_addr.bytes));
+		wmi_copy_chan_info(&ml_partner_link->wmi_chan,
+				   &partner_info[i].chan);
 
 		ml_partner_link++;
 	}
 
 	return buf_ptr +
-	       (req->ml_links.num_links *
+	       ((req->ml_links.num_links + req->is_assoc_vdev) *
 		sizeof(wmi_peer_assoc_mlo_partner_link_params));
 }
 

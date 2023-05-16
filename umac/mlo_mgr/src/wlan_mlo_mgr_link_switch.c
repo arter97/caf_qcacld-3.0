@@ -41,8 +41,8 @@ void mlo_mgr_update_link_info_mac_addr(struct wlan_objmgr_vdev *vdev,
 			     QDF_MAC_ADDR_SIZE);
 
 		link_info->vdev_id = link_mac_info->vdev_id;
-		mlo_debug("link_info_iter:%d vdev_id %d "QDF_MAC_ADDR_FMT,
-			  link_info_iter, link_info->vdev_id,
+		mlo_debug("Update STA Link info for vdev_id %d, link_addr:" QDF_MAC_ADDR_FMT,
+			  link_info->vdev_id,
 			  QDF_MAC_ADDR_REF(link_info->link_addr.bytes));
 		link_mac_info++;
 		link_info++;
@@ -74,6 +74,36 @@ void mlo_mgr_update_ap_link_info(struct wlan_objmgr_vdev *vdev, uint8_t link_id,
 	qdf_mem_copy(&link_info->ap_link_addr, ap_link_addr, QDF_MAC_ADDR_SIZE);
 	qdf_mem_copy(link_info->link_chan_info, &channel, sizeof(channel));
 	link_info->link_id = link_id;
+
+	mlo_debug("Update AP Link info for link_id: %d, vdev_id:%d, link_addr:" QDF_MAC_ADDR_FMT,
+		  link_info->link_id, link_info->vdev_id,
+		  QDF_MAC_ADDR_REF(link_info->ap_link_addr.bytes));
+}
+
+void mlo_mgr_update_ap_channel_info(struct wlan_objmgr_vdev *vdev, uint8_t link_id,
+				    uint8_t *ap_link_addr,
+				    struct wlan_channel channel)
+{
+	struct mlo_link_info *link_info;
+
+	if (!vdev || !vdev->mlo_dev_ctx || !ap_link_addr)
+		return;
+
+	link_info = mlo_mgr_get_ap_link_by_link_id(vdev, link_id);
+	if (!link_info)
+		return;
+
+	qdf_mem_copy(link_info->link_chan_info, &channel,
+		     sizeof(*link_info->link_chan_info));
+
+	mlo_debug("Update AP Channel info link_id: %d, vdev_id:%d, link_addr:" QDF_MAC_ADDR_FMT,
+		  link_info->link_id, link_info->vdev_id,
+		  QDF_MAC_ADDR_REF(link_info->ap_link_addr.bytes));
+	mlo_debug("Ch_freq: %d, freq1: %d, freq2: %d phy_mode: %d",
+		  link_info->link_chan_info->ch_freq,
+		  link_info->link_chan_info->ch_cfreq1,
+		  link_info->link_chan_info->ch_cfreq2,
+		  link_info->link_chan_info->ch_phymode);
 }
 
 void mlo_mgr_update_link_info_reset(struct wlan_mlo_dev_context *ml_dev)
