@@ -903,6 +903,14 @@ void lim_mlo_delete_link_peer(struct pe_session *pe_session,
 	wlan_objmgr_peer_release_ref(peer, WLAN_LEGACY_MAC_ID);
 }
 
+#if defined(SAP_MULTI_LINK_EMULATION)
+QDF_STATUS lim_mlo_assoc_ind_upper_layer(struct mac_context *mac,
+					 struct pe_session *pe_session,
+					 struct mlo_partner_info *mlo_info)
+{
+	return QDF_STATUS_SUCCESS;
+}
+#else
 QDF_STATUS lim_mlo_assoc_ind_upper_layer(struct mac_context *mac,
 					 struct pe_session *pe_session,
 					 struct mlo_partner_info *mlo_info)
@@ -1007,6 +1015,7 @@ QDF_STATUS lim_mlo_assoc_ind_upper_layer(struct mac_context *mac,
 
 	return status;
 }
+#endif
 
 void lim_mlo_save_mlo_info(tpDphHashNode sta_ds,
 			   struct mlo_partner_info *mlo_info)
