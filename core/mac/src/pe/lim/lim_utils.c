@@ -9295,28 +9295,60 @@ void lim_extract_per_link_id(struct pe_session *session,
 	pe_debug("vdev: %d, link id: %d", vdev_id, add_bss->staContext.link_id);
 }
 
-void lim_extract_ml_partner_info(struct pe_session *session,
-				 struct bss_params *add_bss,
-				 tpSirAssocRsp assoc_rsp)
+void lim_extract_ml_info(struct pe_session *session,
+			 struct bss_params *add_bss,
+			 tpSirAssocRsp assoc_rsp)
 {
-	uint8_t num_partner_link, i, link_id;
-	struct mlo_partner_info ml_partner_info;
+	uint8_t i, link_id, partner_idx = 0;
+	struct mlo_partner_info *ml_partner_info;
 	struct mlo_link_info *link_info;
+	struct peer_ml_info *ml_link;
 
-	if (wlan_vdev_mlme_is_mlo_link_vdev(session->vdev) ||
-	    !assoc_rsp->mlo_ie.mlo_ie_present)
+	if (!wlan_vdev_mlme_is_mlo_vdev(session->vdev))
 		return;
 
-	ml_partner_info = session->ml_partner_info;
-	num_partner_link = ml_partner_info.num_partner_links;
+	ml_link = &add_bss->staContext.ml_info;
+	ml_partner_info = &session->ml_partner_info;
 
-	for (i = 0; i < num_partner_link; i++) {
-		link_id = ml_partner_info.partner_link_info[i].link_id;
-		link_info =
-			mlo_mgr_get_ap_link_by_link_id(session->vdev, link_id);
+	ml_link->vdev_id = wlan_vdev_get_id(session->vdev);
+	ml_link->link_id = wlan_vdev_get_link_id(session->vdev);
+	link_info = mlo_mgr_get_ap_link_by_link_id(session->vdev,
+						   ml_link->link_id);
+	if (!link_info)
+		return;
+
+	qdf_mem_copy(&ml_link->channel_info, link_info->link_chan_info,
+		     sizeof(ml_link->channel_info));
+	qdf_mem_copy(&ml_link->link_addr, &link_info->ap_link_addr,
+		     QDF_MAC_ADDR_SIZE);
+	qdf_mem_copy(&ml_link->self_mac_addr, &link_info->link_addr,
+		     QDF_MAC_ADDR_SIZE);
+
+	if (wlan_vdev_mlme_is_mlo_link_vdev(session->vdev))
+		return;
+
+	for (i = 0; i < ml_partner_info->num_partner_links; i++) {
+		link_id = ml_partner_info->partner_link_info[i].link_id;
+		link_info = mlo_mgr_get_ap_link_by_link_id(session->vdev,
+							   link_id);
 		if (!link_info)
-			return;
+			continue;
+
+		ml_link->partner_info[partner_idx].vdev_id = link_info->vdev_id;
+		ml_link->partner_info[partner_idx].link_id = link_info->link_id;
+		qdf_mem_copy(&ml_link->partner_info[partner_idx].channel_info,
+			     link_info->link_chan_info,
+			     sizeof(ml_link->partner_info[partner_idx].channel_info));
+		qdf_mem_copy(&ml_link->partner_info[partner_idx].link_addr,
+			     &link_info->ap_link_addr, QDF_MAC_ADDR_SIZE);
+		qdf_mem_copy(&ml_link->partner_info[partner_idx].self_mac_addr,
+			     &link_info->link_addr, QDF_MAC_ADDR_SIZE);
+
+		partner_idx++;
 	}
+
+	ml_link->num_links = partner_idx;
+	pe_debug("Num of partner links: %d", ml_link->num_links);
 }
 
 void lim_intersect_ap_emlsr_caps(struct mac_context *mac_ctx,

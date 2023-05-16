@@ -1135,9 +1135,55 @@ static void wma_populate_peer_puncture(struct peer_assoc_params *peer,
 	peer->puncture_bitmap = des_chan->puncture_bitmap;
 	wma_debug("Peer EHT puncture bitmap %d", peer->puncture_bitmap);
 }
+
+static void wma_populate_peer_mlo_cap(struct peer_assoc_params *peer,
+				      tpAddStaParams params)
+{
+	struct peer_assoc_ml_partner_links *ml_links;
+	struct peer_assoc_mlo_params *mlo_params;
+	struct peer_ml_info *ml_info;
+	uint8_t i;
+
+	ml_info = &params->ml_info;
+	mlo_params = &peer->mlo_params;
+	ml_links = &peer->ml_links;
+
+	/* Assoc link info */
+	mlo_params->vdev_id = ml_info->vdev_id;
+	mlo_params->ieee_link_id = ml_info->link_id;
+	qdf_mem_copy(&mlo_params->chan, &ml_info->channel_info,
+		     sizeof(struct wlan_channel));
+	qdf_mem_copy(&mlo_params->bssid, &ml_info->link_addr,
+		     QDF_MAC_ADDR_SIZE);
+	qdf_mem_copy(&mlo_params->mac_addr, &ml_info->self_mac_addr,
+		     QDF_MAC_ADDR_SIZE);
+
+	/* Fill partner link info */
+	ml_links->num_links = ml_info->num_links;
+	for (i = 0; i < ml_links->num_links; i++) {
+		ml_links->partner_info[i].vdev_id =
+					ml_info->partner_info[i].vdev_id;
+		ml_links->partner_info[i].link_id =
+					ml_info->partner_info[i].link_id;
+		qdf_mem_copy(&ml_links->partner_info[i].chan,
+			     &ml_info->partner_info[i].channel_info,
+			     sizeof(struct wlan_channel));
+		qdf_mem_copy(&ml_links->partner_info[i].bssid,
+			     &ml_info->partner_info[i].link_addr,
+			     QDF_MAC_ADDR_SIZE);
+		qdf_mem_copy(&ml_links->partner_info[i].mac_addr,
+			     &ml_info->partner_info[i].self_mac_addr,
+			     QDF_MAC_ADDR_SIZE);
+	}
+}
 #else
 static void wma_populate_peer_puncture(struct peer_assoc_params *peer,
 				       struct wlan_channel *des_chan)
+{
+}
+
+static void wma_populate_peer_mlo_cap(struct peer_assoc_params *peer,
+				      tpAddStaParams params)
 {
 }
 #endif
@@ -1715,6 +1761,7 @@ QDF_STATUS wma_send_peer_assoc(tp_wma_handle wma,
 	wma_populate_peer_he_cap(cmd, params);
 	wma_populate_peer_eht_cap(cmd, params);
 	wma_populate_peer_puncture(cmd, des_chan);
+	wma_populate_peer_mlo_cap(cmd, params);
 	if (!wma_is_vdev_in_ap_mode(wma, params->smesessionId))
 		intr->nss = cmd->peer_nss;
 	wma_objmgr_set_peer_mlme_nss(wma, cmd->peer_mac, cmd->peer_nss);

@@ -87,6 +87,7 @@
 #include "wlan_mlo_mgr_peer.h"
 #include <wlan_twt_api.h>
 #include "wlan_tdls_api.h"
+#include "wlan_mlo_mgr_link_switch.h"
 
 struct pe_hang_event_fixed_param {
 	uint16_t tlv_header;
@@ -3985,6 +3986,48 @@ free_cache_entry:
 	qdf_mem_free(cache_entry);
 	return status;
 }
+
+QDF_STATUS lim_update_mlo_mgr_info(struct mac_context *mac_ctx,
+				   struct wlan_objmgr_vdev *vdev,
+				   struct qdf_mac_addr *link_addr,
+				   uint8_t link_id, uint16_t freq)
+{
+	struct wlan_objmgr_pdev *pdev;
+	struct scan_cache_entry *cache_entry;
+	QDF_STATUS status = QDF_STATUS_E_FAILURE;
+	struct wlan_channel channel;
+
+	pdev = mac_ctx->pdev;
+	if (!pdev) {
+		pe_err("pdev is NULL");
+		return QDF_STATUS_E_NULL_VALUE;
+	}
+
+	cache_entry = qdf_mem_malloc(sizeof(struct scan_cache_entry));
+	if (!cache_entry)
+		return QDF_STATUS_E_FAILURE;
+
+	status = wlan_scan_get_scan_entry_by_mac_freq(pdev, link_addr, freq,
+						      cache_entry);
+
+	if (!QDF_IS_STATUS_SUCCESS(status)) {
+		status = QDF_STATUS_E_FAILURE;
+		goto free_cache_entry;
+	}
+
+	channel.ch_freq = cache_entry->channel.chan_freq;
+	channel.ch_ieee = wlan_reg_freq_to_chan(pdev, channel.ch_freq);
+	channel.ch_phymode = cache_entry->phy_mode;
+	channel.ch_cfreq1 = cache_entry->channel.cfreq0;
+	channel.ch_cfreq2 = cache_entry->channel.cfreq1;
+
+	mlo_mgr_update_ap_channel_info(vdev, link_id, (uint8_t *)link_addr,
+				       channel);
+
+free_cache_entry:
+	qdf_mem_free(cache_entry);
+	return status;
+}
 #else
 static inline void
 lim_clear_ml_partner_info(struct pe_session *session_entry)
@@ -4156,6 +4199,22 @@ lim_gen_link_specific_probe_rsp(struct mac_context *mac_ctx,
 					session_entry, mac_ctx);
 				if (QDF_IS_STATUS_ERROR(status))
 				       lim_clear_ml_partner_info(session_entry);
+
+				goto end;
+			}
+
+			status = lim_update_mlo_mgr_info(mac_ctx,
+							 session_entry->vdev,
+							 &link_info->link_addr,
+							 link_info->link_id,
+							 link_info->chan_freq);
+			if (QDF_IS_STATUS_ERROR(status)) {
+				pe_err("failed to update mlo_mgr %d", status);
+				status =
+				   lim_check_scan_db_for_join_req_partner_info(
+					session_entry, mac_ctx);
+				if (QDF_IS_STATUS_ERROR(status))
+					lim_clear_ml_partner_info(session_entry);
 
 				goto end;
 			}

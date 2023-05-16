@@ -2301,16 +2301,16 @@ void lim_extract_per_link_id(struct pe_session *session,
 			     tpSirAssocRsp assoc_rsp);
 
 /**
- * lim_extract_ml_partner_info() - Extract ML partner info and share with FW
+ * lim_extract_ml_info() - Extract ML info and send with FW
  * @session: pointer to PE session
  * @add_bss: pointer to ADD BSS params
  * @assoc_rsp: pointer to assoc response
  *
  * Return: None
  */
-void lim_extract_ml_partner_info(struct pe_session *session,
-				 struct bss_params *add_bss,
-				 tpSirAssocRsp assoc_rsp);
+void lim_extract_ml_info(struct pe_session *session,
+			 struct bss_params *add_bss,
+			 tpSirAssocRsp assoc_rsp);
 
 /**
  * lim_intersect_ap_emlsr_caps() - Intersect AP and self STA EML capabilities
@@ -2349,9 +2349,9 @@ lim_extract_per_link_id(struct pe_session *session,
 }
 
 static inline void
-lim_extract_ml_partner_info(struct pe_session *session,
-			    struct bss_params *add_bss,
-			    tpSirAssocRsp assoc_rsp)
+lim_extract_ml_info(struct pe_session *session,
+		    struct bss_params *add_bss,
+		    tpSirAssocRsp assoc_rsp)
 {
 }
 
