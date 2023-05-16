@@ -193,6 +193,9 @@ void dp_flush_monitor_rings(struct dp_soc *soc)
 		dp_info("failed to reset monitor filters");
 	qdf_spin_unlock_bh(&mon_pdev->mon_lock);
 
+	if (qdf_unlikely(mon_pdev->mon_chan_band >= REG_BAND_UNKNOWN))
+		return;
+
 	lmac_id = pdev->ch_band_lmac_id_mapping[mon_pdev->mon_chan_band];
 	if (qdf_unlikely(lmac_id == DP_MON_INVALID_LMAC_ID))
 		return;
