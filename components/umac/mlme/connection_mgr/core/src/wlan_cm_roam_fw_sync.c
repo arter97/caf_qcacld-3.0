@@ -997,6 +997,14 @@ cm_fw_roam_sync_propagation(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 	mlo_roam_init_cu_bpcc(vdev, roam_synch_data);
 	mlo_roam_set_link_id(vdev, roam_synch_data);
 
+	if (!wlan_vdev_mlme_is_mlo_link_vdev(vdev)) {
+		mlo_roam_update_connected_links(vdev, connect_rsp);
+		mlo_set_single_link_ml_roaming(psoc, vdev_id,
+					       false);
+	}
+
+	mlme_cm_osif_connect_complete(vdev, connect_rsp);
+
 	/**
 	 * Don't send roam_sync complete for MLO link vdevs.
 	 * Send only for legacy STA/MLO STA vdev.
@@ -1016,9 +1024,6 @@ cm_fw_roam_sync_propagation(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 			cm_roam_start_init_on_connect(pdev, vdev_id);
 		}
 		wlan_cm_tgt_send_roam_sync_complete_cmd(psoc, vdev_id);
-		mlo_roam_update_connected_links(vdev, connect_rsp);
-		mlo_set_single_link_ml_roaming(psoc, vdev_id,
-					       false);
 	}
 	cm_connect_info(vdev, true, &connect_rsp->bssid, &connect_rsp->ssid,
 			connect_rsp->freq);
@@ -1033,7 +1038,7 @@ cm_fw_roam_sync_propagation(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 			 CM_PREFIX_REF(vdev_id, cm_id));
 		goto error;
 	}
-	mlme_cm_osif_connect_complete(vdev, connect_rsp);
+
 	mlme_cm_osif_roam_complete(vdev);
 
 	if (wlan_vdev_mlme_is_mlo_vdev(vdev) &&
