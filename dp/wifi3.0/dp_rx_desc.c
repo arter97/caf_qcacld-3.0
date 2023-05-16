@@ -452,18 +452,21 @@ void dp_rx_desc_pool_deinit(struct dp_soc *soc,
 			    struct rx_desc_pool *rx_desc_pool,
 			    uint32_t pool_id)
 {
-	qdf_spin_lock_bh(&rx_desc_pool->lock);
+	if (rx_desc_pool->pool_size) {
+		qdf_spin_lock_bh(&rx_desc_pool->lock);
 
-	rx_desc_pool->freelist = NULL;
-	rx_desc_pool->pool_size = 0;
+		rx_desc_pool->freelist = NULL;
+		rx_desc_pool->pool_size = 0;
 
-	/* Deinitialize rx mon dest frag flag */
-	rx_desc_pool->rx_mon_dest_frag_enable = false;
+		/* Deinitialize rx mon dest frag flag */
+		rx_desc_pool->rx_mon_dest_frag_enable = false;
 
-	soc->arch_ops.dp_rx_desc_pool_deinit(soc, rx_desc_pool, pool_id);
+		soc->arch_ops.dp_rx_desc_pool_deinit(soc, rx_desc_pool,
+						     pool_id);
 
-	qdf_spin_unlock_bh(&rx_desc_pool->lock);
-	qdf_spinlock_destroy(&rx_desc_pool->lock);
+		qdf_spin_unlock_bh(&rx_desc_pool->lock);
+		qdf_spinlock_destroy(&rx_desc_pool->lock);
+	}
 }
 
 qdf_export_symbol(dp_rx_desc_pool_deinit);

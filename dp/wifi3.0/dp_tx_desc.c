@@ -530,13 +530,14 @@ void dp_tx_tso_desc_pool_deinit_by_id(struct dp_soc *soc, uint8_t pool_id)
 
 	tso_desc_pool = &soc->tx_tso_desc[pool_id];
 
-	qdf_spin_lock_bh(&tso_desc_pool->lock);
-	tso_desc_pool->freelist = NULL;
-	tso_desc_pool->num_free = 0;
-	tso_desc_pool->pool_size = 0;
-	qdf_spin_unlock_bh(&tso_desc_pool->lock);
-
-	qdf_spinlock_destroy(&tso_desc_pool->lock);
+	if (tso_desc_pool->pool_size) {
+		qdf_spin_lock_bh(&tso_desc_pool->lock);
+		tso_desc_pool->freelist = NULL;
+		tso_desc_pool->num_free = 0;
+		tso_desc_pool->pool_size = 0;
+		qdf_spin_unlock_bh(&tso_desc_pool->lock);
+		qdf_spinlock_destroy(&tso_desc_pool->lock);
+	}
 }
 
 void dp_tx_tso_desc_pool_deinit(struct dp_soc *soc, uint8_t num_pool)
@@ -666,13 +667,14 @@ void dp_tx_tso_num_seg_pool_deinit_by_id(struct dp_soc *soc, uint8_t pool_id)
 
 	tso_num_seg_pool = &soc->tx_tso_num_seg[pool_id];
 
-	qdf_spin_lock_bh(&tso_num_seg_pool->lock);
-	tso_num_seg_pool->freelist = NULL;
-	tso_num_seg_pool->num_free = 0;
-	tso_num_seg_pool->num_seg_pool_size = 0;
-	qdf_spin_unlock_bh(&tso_num_seg_pool->lock);
-
-	qdf_spinlock_destroy(&tso_num_seg_pool->lock);
+	if (tso_num_seg_pool->num_seg_pool_size) {
+		qdf_spin_lock_bh(&tso_num_seg_pool->lock);
+		tso_num_seg_pool->freelist = NULL;
+		tso_num_seg_pool->num_free = 0;
+		tso_num_seg_pool->num_seg_pool_size = 0;
+		qdf_spin_unlock_bh(&tso_num_seg_pool->lock);
+		qdf_spinlock_destroy(&tso_num_seg_pool->lock);
+	}
 }
 
 void dp_tx_tso_num_seg_pool_deinit(struct dp_soc *soc, uint8_t num_pool)
