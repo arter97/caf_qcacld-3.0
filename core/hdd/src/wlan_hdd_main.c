@@ -5691,7 +5691,7 @@ static QDF_STATUS hdd_register_interface(struct hdd_adapter *adapter, bool rtnl_
 			}
 		}
 
-		ret = register_netdevice(dev);
+		ret = wlan_cfg80211_register_netdevice(dev);
 		if (ret) {
 			hdd_err("register_netdevice(%s) failed, err = 0x%x",
 				dev->name, ret);
@@ -6398,7 +6398,7 @@ static void hdd_cleanup_adapter(struct hdd_context *hdd_ctx,
 
 	if (test_bit(NET_DEVICE_REGISTERED, &adapter->event_flags)) {
 		if (rtnl_held)
-			unregister_netdevice(dev);
+			wlan_cfg80211_unregister_netdevice(dev);
 		else
 			unregister_netdev(dev);
 		/*
