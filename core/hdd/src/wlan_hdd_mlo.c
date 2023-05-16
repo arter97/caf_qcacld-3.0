@@ -292,6 +292,7 @@ QDF_STATUS hdd_derive_link_address_from_mld(struct qdf_mac_addr *mld_addr,
 		temp_byte = ((last_byte >> 4 & INTF_MACADDR_MASK) + idx) &
 			     INTF_MACADDR_MASK;
 		new_addr.bytes[5] = last_byte + temp_byte;
+		new_addr.bytes[5] ^= (1 << 7);
 
 		qdf_copy_macaddr(link_addr, &new_addr);
 		link_addr++;
