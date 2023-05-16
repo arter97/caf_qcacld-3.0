@@ -36,6 +36,7 @@
 #include "init_deinit_lmac.h"
 #include <hif.h>
 #include <htc_api.h>
+#include <cdp_txrx_cmn_reg.h>
 #ifdef FEATURE_DIRECT_LINK
 #include "dp_internal.h"
 #include "cdp_txrx_ctrl.h"
@@ -1552,6 +1553,125 @@ bool dp_is_data_stall_event_enabled(uint32_t evt)
 		return true;
 
 	return false;
+}
+
+void *wlan_dp_txrx_soc_attach(struct dp_txrx_soc_attach_params *params,
+			      bool *is_wifi3_0_target)
+{
+	void *dp_soc = NULL;
+	struct hif_opaque_softc *hif_context;
+	HTC_HANDLE htc_ctx = cds_get_context(QDF_MODULE_ID_HTC);
+	qdf_device_t qdf_ctx = cds_get_context(QDF_MODULE_ID_QDF_DEVICE);
+
+	hif_context = cds_get_context(QDF_MODULE_ID_HIF);
+
+	if (TARGET_TYPE_QCA6290 == params->target_type ||
+	    TARGET_TYPE_QCA6390 == params->target_type ||
+	    TARGET_TYPE_QCA6490 == params->target_type ||
+	    TARGET_TYPE_QCA6750 == params->target_type) {
+		dp_soc = cdp_soc_attach(LITHIUM_DP, hif_context,
+					params->target_psoc, htc_ctx,
+					qdf_ctx, params->dp_ol_if_ops);
+
+		if (dp_soc)
+			if (!cdp_soc_init(dp_soc, LITHIUM_DP,
+					  hif_context, params->target_psoc,
+					  htc_ctx, qdf_ctx,
+					  params->dp_ol_if_ops))
+				goto err_soc_detach;
+		*is_wifi3_0_target = true;
+	} else if (params->target_type == TARGET_TYPE_KIWI ||
+		   params->target_type == TARGET_TYPE_MANGO ||
+		   params->target_type == TARGET_TYPE_PEACH) {
+		dp_soc = cdp_soc_attach(BERYLLIUM_DP, hif_context,
+					params->target_psoc,
+					htc_ctx, qdf_ctx,
+					params->dp_ol_if_ops);
+		if (dp_soc)
+			if (!cdp_soc_init(dp_soc, BERYLLIUM_DP, hif_context,
+					  params->target_psoc, htc_ctx,
+					  qdf_ctx, params->dp_ol_if_ops))
+				goto err_soc_detach;
+		*is_wifi3_0_target = true;
+	} else if (params->target_type == TARGET_TYPE_WCN6450) {
+		dp_soc =
+			cdp_soc_attach(RHINE_DP, hif_context,
+				       params->target_psoc, htc_ctx,
+				       qdf_ctx, params->dp_ol_if_ops);
+		if (dp_soc)
+			if (!cdp_soc_init(dp_soc, RHINE_DP, hif_context,
+					  params->target_psoc, htc_ctx,
+					  qdf_ctx, params->dp_ol_if_ops))
+				goto err_soc_detach;
+		*is_wifi3_0_target = true;
+	} else {
+		dp_soc = cdp_soc_attach(MOB_DRV_LEGACY_DP, hif_context,
+					params->target_psoc, htc_ctx, qdf_ctx,
+					params->dp_ol_if_ops);
+	}
+
+	return dp_soc;
+
+err_soc_detach:
+	cdp_soc_detach(dp_soc);
+	dp_soc = NULL;
+
+	return dp_soc;
+}
+
+void wlan_dp_txrx_soc_detach(ol_txrx_soc_handle soc)
+{
+	cdp_soc_deinit(soc);
+	cdp_soc_detach(soc);
+}
+
+QDF_STATUS wlan_dp_txrx_attach_target(ol_txrx_soc_handle soc, uint8_t pdev_id)
+{
+	QDF_STATUS qdf_status;
+	int errno;
+
+	qdf_status = cdp_soc_attach_target(soc);
+	if (QDF_IS_STATUS_ERROR(qdf_status)) {
+		dp_err("Failed to attach soc target; status:%d", qdf_status);
+		return qdf_status;
+	}
+
+	errno = cdp_pdev_attach_target(soc, pdev_id);
+	if (errno) {
+		dp_err("Failed to attach pdev target; errno:%d", errno);
+		qdf_status = QDF_STATUS_E_FAILURE;
+		goto err_soc_detach_target;
+	}
+
+	return qdf_status;
+
+err_soc_detach_target:
+	/* NOP */
+	return qdf_status;
+}
+
+QDF_STATUS wlan_dp_txrx_pdev_attach(ol_txrx_soc_handle soc)
+{
+	struct wlan_dp_psoc_context *dp_ctx;
+	struct cdp_pdev_attach_params pdev_params = { 0 };
+
+	dp_ctx =  dp_get_context();
+
+	pdev_params.htc_handle = cds_get_context(QDF_MODULE_ID_HTC);
+	pdev_params.qdf_osdev = cds_get_context(QDF_MODULE_ID_QDF_DEVICE);
+	pdev_params.pdev_id = 0;
+
+	return cdp_pdev_attach(cds_get_context(QDF_MODULE_ID_SOC),
+			       &pdev_params);
+}
+
+QDF_STATUS wlan_dp_txrx_pdev_detach(ol_txrx_soc_handle soc, uint8_t pdev_id,
+				    int force)
+{
+	struct wlan_dp_psoc_context *dp_ctx;
+
+	dp_ctx =  dp_get_context();
+	return cdp_pdev_detach(soc, pdev_id, force);
 }
 
 #ifdef FEATURE_DIRECT_LINK

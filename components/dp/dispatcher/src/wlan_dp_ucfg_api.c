@@ -2395,6 +2395,33 @@ QDF_STATUS ucfg_dp_config_direct_link(struct wlan_objmgr_vdev *vdev,
 }
 #endif
 
+void *ucfg_dp_txrx_soc_attach(struct dp_txrx_soc_attach_params *params,
+			      bool *is_wifi3_0_target)
+{
+	return wlan_dp_txrx_soc_attach(params, is_wifi3_0_target);
+}
+
+void ucfg_dp_txrx_soc_detach(ol_txrx_soc_handle soc)
+{
+	return wlan_dp_txrx_soc_detach(soc);
+}
+
+QDF_STATUS ucfg_dp_txrx_attach_target(ol_txrx_soc_handle soc, uint8_t pdev_id)
+{
+	return wlan_dp_txrx_attach_target(soc, pdev_id);
+}
+
+QDF_STATUS ucfg_dp_txrx_pdev_attach(ol_txrx_soc_handle soc)
+{
+	return wlan_dp_txrx_pdev_attach(soc);
+}
+
+QDF_STATUS ucfg_dp_txrx_pdev_detach(ol_txrx_soc_handle soc, uint8_t pdev_id,
+				    int force)
+{
+	return wlan_dp_txrx_pdev_detach(soc, pdev_id, force);
+}
+
 QDF_STATUS ucfg_dp_txrx_init(ol_txrx_soc_handle soc, uint8_t pdev_id,
 			     struct dp_txrx_config *config)
 {

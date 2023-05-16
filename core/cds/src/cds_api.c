@@ -710,6 +710,7 @@ QDF_STATUS cds_open(struct wlan_objmgr_psoc *psoc)
 	struct cds_config_info *cds_cfg;
 	qdf_device_t qdf_ctx;
 	struct htc_init_info htcInfo = { 0 };
+	struct dp_txrx_soc_attach_params soc_attach_params = {0};
 	struct ol_context *ol_ctx;
 	struct hif_opaque_softc *scn;
 	void *HTCHandle;
@@ -850,73 +851,12 @@ QDF_STATUS cds_open(struct wlan_objmgr_psoc *psoc)
 	/* Set default value to false */
 	hdd_ctx->is_wifi3_0_target = false;
 
-	if (TARGET_TYPE_QCA6290 == hdd_ctx->target_type ||
-	    TARGET_TYPE_QCA6390 == hdd_ctx->target_type ||
-	    TARGET_TYPE_QCA6490 == hdd_ctx->target_type ||
-	    TARGET_TYPE_QCA6750 == hdd_ctx->target_type) {
-		gp_cds_context->dp_soc = cdp_soc_attach(LITHIUM_DP,
-			gp_cds_context->hif_context, htcInfo.target_psoc,
-			gp_cds_context->htc_ctx, gp_cds_context->qdf_ctx,
-			&dp_ol_if_ops);
-
-		if (gp_cds_context->dp_soc)
-			if (!cdp_soc_init(gp_cds_context->dp_soc, LITHIUM_DP,
-					  gp_cds_context->hif_context,
-					  htcInfo.target_psoc,
-					  gp_cds_context->htc_ctx,
-					  gp_cds_context->qdf_ctx,
-					  &dp_ol_if_ops)) {
-				status = QDF_STATUS_E_FAILURE;
-				goto err_soc_detach;
-			}
-		hdd_ctx->is_wifi3_0_target = true;
-	} else if (hdd_ctx->target_type == TARGET_TYPE_KIWI ||
-		   hdd_ctx->target_type == TARGET_TYPE_MANGO ||
-		   hdd_ctx->target_type == TARGET_TYPE_PEACH) {
-		gp_cds_context->dp_soc =
-			cdp_soc_attach(BERYLLIUM_DP,
-				       gp_cds_context->hif_context,
-				       htcInfo.target_psoc,
-				       gp_cds_context->htc_ctx,
-				       gp_cds_context->qdf_ctx,
-				       &dp_ol_if_ops);
-		if (gp_cds_context->dp_soc)
-			if (!cdp_soc_init(gp_cds_context->dp_soc, BERYLLIUM_DP,
-					  gp_cds_context->hif_context,
-					  htcInfo.target_psoc,
-					  gp_cds_context->htc_ctx,
-					  gp_cds_context->qdf_ctx,
-					  &dp_ol_if_ops)) {
-				status = QDF_STATUS_E_FAILURE;
-				goto err_soc_detach;
-			}
-		hdd_ctx->is_wifi3_0_target = true;
-	} else if (hdd_ctx->target_type == TARGET_TYPE_WCN6450) {
-		gp_cds_context->dp_soc =
-			cdp_soc_attach(RHINE_DP,
-				       gp_cds_context->hif_context,
-				       htcInfo.target_psoc,
-				       gp_cds_context->htc_ctx,
-				       gp_cds_context->qdf_ctx,
-				       &dp_ol_if_ops);
-		if (gp_cds_context->dp_soc)
-			if (!cdp_soc_init(gp_cds_context->dp_soc, RHINE_DP,
-					  gp_cds_context->hif_context,
-					  htcInfo.target_psoc,
-					  gp_cds_context->htc_ctx,
-					  gp_cds_context->qdf_ctx,
-					  &dp_ol_if_ops)) {
-				status = QDF_STATUS_E_FAILURE;
-				goto err_soc_detach;
-			}
-		hdd_ctx->is_wifi3_0_target = true;
-	} else {
-		gp_cds_context->dp_soc = cdp_soc_attach(MOB_DRV_LEGACY_DP,
-			gp_cds_context->hif_context, htcInfo.target_psoc,
-			gp_cds_context->htc_ctx, gp_cds_context->qdf_ctx,
-			&dp_ol_if_ops);
-	}
-
+	soc_attach_params.target_type = hdd_ctx->target_type;
+	soc_attach_params.target_psoc = htcInfo.target_psoc;
+	soc_attach_params.dp_ol_if_ops = &dp_ol_if_ops;
+	gp_cds_context->dp_soc =
+		ucfg_dp_txrx_soc_attach(&soc_attach_params,
+					&hdd_ctx->is_wifi3_0_target);
 	if (!gp_cds_context->dp_soc) {
 		status = QDF_STATUS_E_FAILURE;
 		goto err_wma_close;
@@ -939,7 +879,7 @@ QDF_STATUS cds_open(struct wlan_objmgr_psoc *psoc)
 
 	if (QDF_STATUS_SUCCESS != status) {
 		cds_alert("Failed to open MAC");
-		goto err_soc_deinit;
+		goto err_soc_detach;
 	}
 	gp_cds_context->mac_context = mac_handle;
 
@@ -971,11 +911,8 @@ err_mac_close:
 	mac_close(mac_handle);
 	gp_cds_context->mac_context = NULL;
 
-err_soc_deinit:
-	cdp_soc_deinit(gp_cds_context->dp_soc);
-
 err_soc_detach:
-	cdp_soc_detach(gp_cds_context->dp_soc);
+	ucfg_dp_txrx_soc_detach(gp_cds_context->dp_soc);
 	gp_cds_context->dp_soc = NULL;
 
 	ucfg_ocb_update_dp_handle(psoc, NULL);
@@ -1013,8 +950,6 @@ QDF_STATUS cds_dp_open(struct wlan_objmgr_psoc *psoc)
 	QDF_STATUS qdf_status;
 	struct dp_txrx_config dp_config;
 	struct hdd_context *hdd_ctx;
-	struct cdp_pdev_attach_params pdev_params = { 0 };
-
 
 	hdd_ctx = gp_cds_context->hdd_context;
 	if (!hdd_ctx) {
@@ -1022,11 +957,8 @@ QDF_STATUS cds_dp_open(struct wlan_objmgr_psoc *psoc)
 		return QDF_STATUS_E_FAILURE;
 	}
 
-	pdev_params.htc_handle = gp_cds_context->htc_ctx;
-	pdev_params.qdf_osdev = gp_cds_context->qdf_ctx;
-	pdev_params.pdev_id = 0;
-	qdf_status = cdp_pdev_attach(cds_get_context(QDF_MODULE_ID_SOC),
-				     &pdev_params);
+	qdf_status =
+		ucfg_dp_txrx_pdev_attach(cds_get_context(QDF_MODULE_ID_SOC));
 	if (!QDF_IS_STATUS_SUCCESS(qdf_status)) {
 		/* Critical Error ...  Cannot proceed further */
 		cds_alert("Failed to open TXRX");
@@ -1096,8 +1028,8 @@ pdev_deinit:
 			OL_TXRX_PDEV_ID, false);
 
 pdev_detach:
-	cdp_pdev_detach(gp_cds_context->dp_soc,
-			OL_TXRX_PDEV_ID, false);
+	ucfg_dp_txrx_pdev_detach(gp_cds_context->dp_soc, OL_TXRX_PDEV_ID,
+				 false);
 
 close:
 	return QDF_STATUS_E_FAILURE;
@@ -1267,7 +1199,6 @@ QDF_STATUS cds_enable(struct wlan_objmgr_psoc *psoc)
 {
 	QDF_STATUS qdf_status;
 	struct mac_start_params mac_params;
-	int errno;
 
 	/* We support only one instance for now ... */
 	if (!gp_cds_context) {
@@ -1309,17 +1240,12 @@ QDF_STATUS cds_enable(struct wlan_objmgr_psoc *psoc)
 		goto err_mac_stop;
 	}
 
-	qdf_status = cdp_soc_attach_target(cds_get_context(QDF_MODULE_ID_SOC));
+	qdf_status =
+		ucfg_dp_txrx_attach_target(cds_get_context(QDF_MODULE_ID_SOC),
+					   OL_TXRX_PDEV_ID);
 	if (!QDF_IS_STATUS_SUCCESS(qdf_status)) {
-		cds_err("Failed to attach soc target; status:%d", qdf_status);
+		cds_err("Failed to attach DP target; status:%d", qdf_status);
 		goto err_sme_stop;
-	}
-
-	errno = cdp_pdev_attach_target(cds_get_context(QDF_MODULE_ID_SOC),
-				       OL_TXRX_PDEV_ID);
-	if (errno) {
-		cds_err("Failed to attach pdev target; errno:%d", errno);
-		goto err_soc_target_detach;
 	}
 
 	qdf_status = dispatcher_psoc_enable(psoc);
@@ -1503,8 +1429,7 @@ QDF_STATUS cds_close(struct wlan_objmgr_psoc *psoc)
 
 	gp_cds_context->mac_context = NULL;
 
-	cdp_soc_deinit(gp_cds_context->dp_soc);
-	cdp_soc_detach(gp_cds_context->dp_soc);
+	ucfg_dp_txrx_soc_detach(gp_cds_context->dp_soc);
 	gp_cds_context->dp_soc = NULL;
 
 	ucfg_pmo_psoc_update_dp_handle(psoc, NULL);
@@ -1541,7 +1466,8 @@ QDF_STATUS cds_dp_close(struct wlan_objmgr_psoc *psoc)
 
 	cdp_pdev_deinit(cds_get_context(QDF_MODULE_ID_SOC), OL_TXRX_PDEV_ID, 1);
 
-	cdp_pdev_detach(cds_get_context(QDF_MODULE_ID_SOC), OL_TXRX_PDEV_ID, 1);
+	ucfg_dp_txrx_pdev_detach(cds_get_context(QDF_MODULE_ID_SOC),
+				 OL_TXRX_PDEV_ID, 1);
 
 	ucfg_pmo_psoc_set_txrx_pdev_id(psoc, OL_TXRX_INVALID_PDEV_ID);
 

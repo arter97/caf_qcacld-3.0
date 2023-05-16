@@ -1436,6 +1436,52 @@ QDF_STATUS ucfg_dp_config_direct_link(struct wlan_objmgr_vdev *vdev,
 #endif
 
 /**
+ * ucfg_dp_txrx_soc_attach() - Datapath soc attach
+ * @params: SoC attach params
+ * @is_wifi3_0_target: [OUT] Pointer to update if the target is wifi3.0
+ *
+ * Return: SoC handle
+ */
+void *ucfg_dp_txrx_soc_attach(struct dp_txrx_soc_attach_params *params,
+			      bool *is_wifi3_0_target);
+
+/**
+ * ucfg_dp_txrx_soc_detach() - Datapath SoC detach
+ * @soc: DP SoC handle
+ *
+ * Return: None
+ */
+void ucfg_dp_txrx_soc_detach(ol_txrx_soc_handle soc);
+
+/**
+ * ucfg_dp_txrx_attach_target() - DP target attach
+ * @soc: DP SoC handle
+ * @pdev_id: DP pdev id
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS ucfg_dp_txrx_attach_target(ol_txrx_soc_handle soc, uint8_t pdev_id);
+
+/**
+ * ucfg_dp_txrx_pdev_attach() - DP pdev attach
+ * @soc: DP SoC handle
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS ucfg_dp_txrx_pdev_attach(ol_txrx_soc_handle soc);
+
+/**
+ * ucfg_dp_txrx_pdev_detach() - DP pdev detach
+ * @soc: DP SoC handle
+ * @pdev_id: DP pdev id
+ * @force: indicates if force detach is to be done or not
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS ucfg_dp_txrx_pdev_detach(ol_txrx_soc_handle soc, uint8_t pdev_id,
+				    int force);
+
+/**
  * ucfg_dp_txrx_init() - initialize DP TXRX module
  * @soc: ol_txrx_soc_handle
  * @pdev_id: id of dp pdev handle
