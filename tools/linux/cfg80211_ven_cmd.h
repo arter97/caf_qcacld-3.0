@@ -1471,6 +1471,9 @@ enum _ol_ath_param_t {
 	OL_ATH_PARAM_ATF_VO_TIMESLOT = 534,
 	OL_ATH_PARAM_ATF_VI_TIMESLOT = 535,
 #endif
+#ifdef CONFIG_AFC_SUPPORT
+	OL_ATH_PARAM_AFC_SEND_CMD = 536,
+#endif /* CONFIG_AFC_SUPPORT */
 };
 
 #ifdef CONFIG_SUPPORT_VENCMDTABLE
@@ -3670,6 +3673,8 @@ struct vendor_commands radio_vendor_cmds[] = {
 	{"g_dcs_afc_chan_sel_config",
 		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_DCS_AFC_CHAN_SEL_CONFIG,
 		GET_PARAM, 0},
+	{"afc_send_cmd",
+		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_AFC_SEND_CMD, SET_PARAM, 1},
 #endif
 	{"enable_rtt",
 		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_RTT_ENABLE, SET_PARAM, 1},
