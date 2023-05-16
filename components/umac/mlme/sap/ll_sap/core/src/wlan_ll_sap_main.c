@@ -21,7 +21,7 @@ static QDF_STATUS ll_sap_psoc_obj_created_notification(struct wlan_objmgr_psoc *
 {
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
 
-	QDF_TRACE_DEBUG(QDF_MODULE_ID_LL_SAP, "ll sap psoc object created");
+	ll_sap_debug("ll sap psoc object created");
 
 	/* attach ll_sap_psoc object which will contain cfg items,
 	 * tx and rx ops
@@ -33,8 +33,7 @@ static QDF_STATUS ll_sap_psoc_obj_destroyed_notification(struct wlan_objmgr_psoc
 {
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
 
-	QDF_TRACE_DEBUG(QDF_MODULE_ID_LL_SAP,
-			"ll sap psoc object destroyed");
+	ll_sap_debug("ll sap psoc object destroyed");
 
 	/* detach ll_sap_psoc object which will contain cfg items,
 	 * tx and rx ops
@@ -52,8 +51,7 @@ QDF_STATUS ll_sap_init(void)
 							  ll_sap_psoc_obj_created_notification,
 							  NULL);
 	if (QDF_IS_STATUS_ERROR(status)) {
-		QDF_TRACE_ERROR(QDF_MODULE_ID_LL_SAP,
-				"objmgr_register_psoc_create_handler failed");
+		ll_sap_err("objmgr_register_psoc_create_handler failed");
 		return status;
 	}
 
@@ -62,8 +60,7 @@ QDF_STATUS ll_sap_init(void)
 							   ll_sap_psoc_obj_destroyed_notification,
 							   NULL);
 	if (QDF_IS_STATUS_ERROR(status)) {
-		QDF_TRACE_ERROR(QDF_MODULE_ID_LL_SAP,
-				"objmgr_register_psoc_destroy_handler failed");
+		ll_sap_err("objmgr_register_psoc_destroy_handler failed");
 		wlan_objmgr_unregister_psoc_create_handler(WLAN_UMAC_COMP_LL_SAP,
 							   ll_sap_psoc_obj_created_notification,
 							   NULL);
@@ -80,8 +77,7 @@ QDF_STATUS ll_sap_deinit(void)
 							     ll_sap_psoc_obj_destroyed_notification,
 							     NULL);
 	if (QDF_IS_STATUS_ERROR(status)) {
-		QDF_TRACE_ERROR(QDF_MODULE_ID_LL_SAP,
-				"objmgr_deregister_psoc_destroy_handler failed");
+		ll_sap_err("objmgr_deregister_psoc_destroy_handler failed");
 		ret = status;
 	}
 
@@ -90,8 +86,7 @@ QDF_STATUS ll_sap_deinit(void)
 							    ll_sap_psoc_obj_created_notification,
 							    NULL);
 	if (QDF_IS_STATUS_ERROR(status)) {
-		QDF_TRACE_ERROR(QDF_MODULE_ID_LL_SAP,
-				"objmgr_unregister_psoc_create_handler failed");
+		ll_sap_err("objmgr_unregister_psoc_create_handler failed");
 		ret = status;
 	}
 

@@ -25,6 +25,17 @@
 
 #include "wlan_objmgr_psoc_obj.h"
 
+#define ll_sap_err(params...) QDF_TRACE_ERROR(QDF_MODULE_ID_LL_SAP, params)
+#define ll_sap_info(params...) QDF_TRACE_INFO(QDF_MODULE_ID_LL_SAP, params)
+#define ll_sap_debug(params...) QDF_TRACE_DEBUG(QDF_MODULE_ID_LL_SAP, params)
+
+#define ll_sap_nofl_err(params...) \
+	QDF_TRACE_ERROR_NO_FL(QDF_MODULE_ID_LL_SAP, params)
+#define ll_sap_nofl_info(params...) \
+	QDF_TRACE_INFO_NO_FL(QDF_MODULE_ID_LL_SAP, params)
+#define ll_sap_nofl_debug(params...) \
+	QDF_TRACE_DEBUG_NO_FL(QDF_MODULE_ID_LL_SAP, params)
+
 /**
  * ll_sap_init() - initializes ll_sap component
  *
