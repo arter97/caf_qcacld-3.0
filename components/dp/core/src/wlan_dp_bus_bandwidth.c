@@ -1718,6 +1718,8 @@ static void dp_pld_request_bus_bandwidth(struct wlan_dp_psoc_context *dp_ctx,
 					  true : false);
 		dp_periodic_sta_stats_display(dp_ctx);
 	}
+
+	hif_affinity_mgr_set_affinity(hif_ctx);
 }
 
 #ifdef WLAN_FEATURE_DYNAMIC_RX_AGGREGATION
