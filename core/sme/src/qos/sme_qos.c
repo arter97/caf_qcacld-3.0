@@ -1914,6 +1914,7 @@ static enum sme_qos_statustype sme_qos_internal_release_req(struct mac_context *
 			if (QDF_IS_STATUS_SUCCESS(hstatus)) {
 				sme_debug("Buffered release request for flow = %d",
 					  QosFlowID);
+				return SME_QOS_STATUS_RELEASE_REQ_PENDING_RSP;
 			}
 		}
 		return SME_QOS_STATUS_RELEASE_INVALID_PARAMS_RSP;
