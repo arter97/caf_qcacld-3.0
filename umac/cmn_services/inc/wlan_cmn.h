@@ -306,6 +306,7 @@
  * @WLAN_UMAC_COMP_QMI:           QMI component
  * @WLAN_UMAC_COMP_AFC:           AFC component
  * @WLAN_UMAC_COMP_SAWF:          SAWF component
+ * @WLAN_UMAC_COMP_LL_SAP:        LL SAP component
  * @WLAN_UMAC_COMP_ID_MAX:        Maximum components in UMAC
  *
  * This id is static.
@@ -364,6 +365,7 @@ enum wlan_umac_comp_id {
 	WLAN_UMAC_COMP_QMI                = 49,
 	WLAN_UMAC_COMP_AFC                = 50,
 	WLAN_UMAC_COMP_SAWF               = 51,
+	WLAN_UMAC_COMP_LL_SAP             = 52,
 	WLAN_UMAC_COMP_ID_MAX,
 };
 
