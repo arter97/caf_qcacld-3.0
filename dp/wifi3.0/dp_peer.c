@@ -3941,6 +3941,9 @@ void dp_peer_set_vlan_id(struct cdp_soc_t *cdp_soc,
 		dp_vdev_get_ref_by_id((struct dp_soc *)soc, vdev_id,
 				      DP_MOD_ID_TX_MULTIPASS);
 
+	dp_info("vdev_id %d, vdev %pK, multipass_en %d, peer_mac " QDF_MAC_ADDR_FMT " vlan %d",
+		vdev_id, vdev, vdev ? vdev->multipass_en : 0,
+		QDF_MAC_ADDR_REF(peer_mac), vlan_id);
 	if (vdev && vdev->multipass_en) {
 		dp_peer_multipass_list_add(soc, peer_mac, vdev_id, vlan_id);
 		dp_vdev_unref_delete(soc, vdev, DP_MOD_ID_TX_MULTIPASS);
