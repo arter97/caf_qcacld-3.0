@@ -4556,7 +4556,7 @@ int hdd_wlan_start_modules(struct hdd_context *hdd_ctx, bool reinit)
 		hdd_nofl_debug("Wlan transitioning (CLOSED -> ENABLED)");
 		ret = hdd_debug_domain_set(QDF_DEBUG_DOMAIN_ACTIVE);
 		if (ret)
-			goto release_lock;
+			goto abort;
 
 		if (!reinit && !unint) {
 			ret = pld_power_on(qdf_dev->dev);
@@ -4859,6 +4859,8 @@ release_lock:
 	cds_shutdown_notifier_purge();
 	hdd_check_for_leaks(hdd_ctx, reinit);
 	hdd_debug_domain_set(QDF_DEBUG_DOMAIN_INIT);
+
+abort:
 	cds_set_driver_state_module_stop(true);
 
 	hdd_exit();
