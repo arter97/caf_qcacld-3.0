@@ -518,6 +518,7 @@
 #define WLAN_CFG_SAWF_STATS_MIN 0x0
 #define WLAN_CFG_SAWF_STATS_MAX 0x7
 #endif
+
 /*
  * <ini>
  * "dp_tx_capt_max_mem_mb"- maximum memory used by Tx capture
@@ -788,7 +789,7 @@
 #define CFG_DP_LOCAL_PKT_CAPTURE \
 		CFG_INI_BOOL( \
 		"local_packet_capture", \
-		false, \
+		true, \
 		"Local packet capture")
 
 #define CFG_DP_LOCAL_PKT_CAPTURE_CONFIG CFG(CFG_DP_LOCAL_PKT_CAPTURE)
