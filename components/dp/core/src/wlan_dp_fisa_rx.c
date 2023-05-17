@@ -2208,8 +2208,9 @@ void dp_set_fisa_disallowed_for_vdev(struct cdp_soc_t *cdp_soc, uint8_t vdev_id,
 	dp_vdev_unref_delete(soc, vdev, DP_MOD_ID_RX);
 }
 
-void dp_suspend_fse_cache_flush(struct dp_soc *soc)
+void dp_suspend_fse_cache_flush(struct wlan_dp_psoc_context *dp_ctx)
 {
+	struct dp_soc *soc = (struct dp_soc *)dp_ctx->cdp_soc;
 	struct dp_rx_fst *dp_fst;
 
 	dp_fst = soc->rx_fst;
@@ -2222,8 +2223,9 @@ void dp_suspend_fse_cache_flush(struct dp_soc *soc)
 	dp_info("fse cache flush suspended");
 }
 
-void dp_resume_fse_cache_flush(struct dp_soc *soc)
+void dp_resume_fse_cache_flush(struct wlan_dp_psoc_context *dp_ctx)
 {
+	struct dp_soc *soc = (struct dp_soc *)dp_ctx->cdp_soc;
 	struct dp_rx_fst *dp_fst;
 
 	dp_fst = soc->rx_fst;

@@ -145,11 +145,11 @@ void dp_fisa_rx_fst_update_work(void *arg);
 
 /**
  * dp_suspend_fse_cache_flush() - Suspend FSE cache flush
- * @soc: core txrx main context
+ * @dp_ctx: DP component context
  *
  * Return: None
  */
-void dp_suspend_fse_cache_flush(struct dp_soc *soc);
+void dp_suspend_fse_cache_flush(struct wlan_dp_psoc_context *dp_ctx);
 
 /**
  * dp_rx_fst_attach() - Initialize Rx FST and setup necessary parameters
@@ -185,11 +185,11 @@ void dp_rx_fst_detach(struct wlan_dp_psoc_context *dp_ctx);
 
 /**
  * dp_resume_fse_cache_flush() - Resume FSE cache flush
- * @soc: core txrx main context
+ * @dp_ctx: DP component context
  *
  * Return: None
  */
-void dp_resume_fse_cache_flush(struct dp_soc *soc);
+void dp_resume_fse_cache_flush(struct wlan_dp_psoc_context *dp_ctx);
 
 /**
  * dp_rx_flow_send_fst_fw_setup() - Program FST parameters in FW/HW post-attach
@@ -200,7 +200,31 @@ void dp_resume_fse_cache_flush(struct dp_soc *soc);
  */
 QDF_STATUS dp_rx_flow_send_fst_fw_setup(struct dp_soc *soc,
 					struct dp_pdev *pdev);
+
+/**
+ * dp_rx_fst_update_pm_suspend_status() - Update Suspend status in FISA
+ * @dp_ctx: DP component context
+ * @suspended: Flag to indicate suspend or not
+ *
+ * Return: None
+ */
+void dp_rx_fst_update_pm_suspend_status(struct wlan_dp_psoc_context *dp_ctx,
+					bool suspended);
+
+/**
+ * dp_rx_fst_requeue_wq() - Re-queue pending work queue tasks
+ * @dp_ctx: DP component context
+ *
+ * Return: None
+ */
+void dp_rx_fst_requeue_wq(struct wlan_dp_psoc_context *dp_ctx);
 #else
+static inline void
+dp_rx_fst_update_pm_suspend_status(struct wlan_dp_psoc_context *dp_ctx,
+				   bool suspended)
+{
+}
+
 static QDF_STATUS dp_rx_dump_fisa_stats(struct dp_soc *soc)
 {
 	return QDF_STATUS_SUCCESS;

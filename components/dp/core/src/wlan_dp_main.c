@@ -1618,6 +1618,25 @@ wlan_dp_rx_fisa_cmem_attach(struct wlan_dp_psoc_context *dp_ctx)
 	dp_ctx->fst_cmem_base = cdp_get_fst_cem_base(dp_ctx->cdp_soc,
 						     DP_CMEM_FST_SIZE);
 }
+
+static inline QDF_STATUS
+wlan_dp_fisa_suspend(struct wlan_dp_psoc_context *dp_ctx)
+{
+	dp_suspend_fse_cache_flush(dp_ctx);
+	dp_rx_fst_update_pm_suspend_status(dp_ctx, true);
+
+	return QDF_STATUS_SUCCESS;
+}
+
+static inline QDF_STATUS
+wlan_dp_fisa_resume(struct wlan_dp_psoc_context *dp_ctx)
+{
+	dp_resume_fse_cache_flush(dp_ctx);
+	dp_rx_fst_update_pm_suspend_status(dp_ctx, false);
+	dp_rx_fst_requeue_wq(dp_ctx);
+
+	return QDF_STATUS_SUCCESS;
+}
 #else
 static inline QDF_STATUS
 wlan_dp_rx_fisa_attach(struct wlan_dp_psoc_context *dp_ctx)
@@ -1635,26 +1654,84 @@ static inline void
 wlan_dp_rx_fisa_cmem_attach(struct wlan_dp_psoc_context *dp_ctx)
 {
 }
+
+static inline QDF_STATUS
+wlan_dp_fisa_suspend(struct wlan_dp_psoc_context *dp_ctx)
+{
+	return QDF_STATUS_SUCCESS;
+}
+
+static inline QDF_STATUS
+wlan_dp_fisa_resume(struct wlan_dp_psoc_context *dp_ctx)
+{
+	return QDF_STATUS_SUCCESS;
+}
 #endif
 
 QDF_STATUS __wlan_dp_runtime_suspend(ol_txrx_soc_handle soc, uint8_t pdev_id)
 {
-	return cdp_runtime_suspend(soc, pdev_id);
+	struct wlan_dp_psoc_context *dp_ctx;
+	QDF_STATUS status;
+
+	dp_ctx = dp_get_context();
+	status = cdp_runtime_suspend(soc, pdev_id);
+	if (QDF_IS_STATUS_ERROR(status))
+		return status;
+
+	dp_rx_fst_update_pm_suspend_status(dp_ctx, true);
+
+	return status;
 }
 
 QDF_STATUS __wlan_dp_runtime_resume(ol_txrx_soc_handle soc, uint8_t pdev_id)
 {
-	return cdp_runtime_resume(soc, pdev_id);
+	struct wlan_dp_psoc_context *dp_ctx;
+	QDF_STATUS status;
+
+	dp_ctx = dp_get_context();
+	status = cdp_runtime_resume(soc, pdev_id);
+	if (QDF_IS_STATUS_ERROR(status))
+		return status;
+
+	dp_rx_fst_update_pm_suspend_status(dp_ctx, false);
+
+	return status;
 }
 
 QDF_STATUS __wlan_dp_bus_suspend(ol_txrx_soc_handle soc, uint8_t pdev_id)
 {
-	return cdp_bus_suspend(soc, pdev_id);
+	struct wlan_dp_psoc_context *dp_ctx;
+	QDF_STATUS status;
+
+	dp_ctx = dp_get_context();
+
+	status = cdp_bus_suspend(soc, pdev_id);
+	if (QDF_IS_STATUS_ERROR(status))
+		return status;
+
+	status = wlan_dp_fisa_suspend(dp_ctx);
+	if (QDF_IS_STATUS_ERROR(status))
+		return status;
+
+	return status;
 }
 
 QDF_STATUS __wlan_dp_bus_resume(ol_txrx_soc_handle soc, uint8_t pdev_id)
 {
-	return cdp_bus_resume(soc, pdev_id);
+	struct wlan_dp_psoc_context *dp_ctx;
+	QDF_STATUS status;
+
+	dp_ctx = dp_get_context();
+
+	status = cdp_bus_resume(soc, pdev_id);
+	if (QDF_IS_STATUS_ERROR(status))
+		return status;
+
+	status = wlan_dp_fisa_resume(dp_ctx);
+	if (QDF_IS_STATUS_ERROR(status))
+		return status;
+
+	return status;
 }
 
 void *wlan_dp_txrx_soc_attach(struct dp_txrx_soc_attach_params *params,

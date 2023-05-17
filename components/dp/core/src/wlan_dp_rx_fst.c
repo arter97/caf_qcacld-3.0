@@ -524,8 +524,10 @@ void dp_rx_fst_update_cmem_params(struct dp_soc *soc, uint16_t num_entries,
 		qdf_event_set(&fst->cmem_resp_event);
 }
 
-void dp_rx_fst_update_pm_suspend_status(struct dp_soc *soc, bool suspended)
+void dp_rx_fst_update_pm_suspend_status(struct wlan_dp_psoc_context *dp_ctx,
+					bool suspended)
 {
+	struct dp_soc *soc = (struct dp_soc *)dp_ctx->cdp_soc;
 	struct dp_rx_fst *fst = soc->rx_fst;
 
 	if (!fst)
@@ -537,8 +539,9 @@ void dp_rx_fst_update_pm_suspend_status(struct dp_soc *soc, bool suspended)
 		qdf_atomic_set(&fst->pm_suspended, 0);
 }
 
-void dp_rx_fst_requeue_wq(struct dp_soc *soc)
+void dp_rx_fst_requeue_wq(struct wlan_dp_psoc_context *dp_ctx)
 {
+	struct dp_soc *soc = (struct dp_soc *)dp_ctx->cdp_soc;
 	struct dp_rx_fst *fst = soc->rx_fst;
 
 	if (!fst || !fst->fst_wq_defer)
