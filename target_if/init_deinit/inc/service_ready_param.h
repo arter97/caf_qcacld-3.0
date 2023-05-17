@@ -280,6 +280,7 @@ struct wlan_psoc_host_hw_mode_caps {
  * @eht_ppet5G: 5G EHT PPET info
  * @emlcap: EML Capabilities info
  * @mldcap: MLD Capabilities info
+ * @msdcap: Medium Synchronization Delay capabilities info
  */
 struct wlan_psoc_host_mac_phy_caps_ext2 {
 	uint32_t hw_mode_id;
@@ -302,6 +303,7 @@ struct wlan_psoc_host_mac_phy_caps_ext2 {
 #ifdef WLAN_FEATURE_11BE_MLO
 	struct wlan_mlo_eml_cap emlcap;
 	struct wlan_mlo_mld_cap mldcap;
+	struct wlan_mlo_msd_cap msdcap;
 #endif
 };
 
