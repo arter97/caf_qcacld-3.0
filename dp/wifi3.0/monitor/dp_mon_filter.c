@@ -278,8 +278,6 @@ void dp_mon_filter_h2t_setup(struct dp_soc *soc, struct dp_pdev *pdev,
 				mon_filter->tlv_filter.enable_mon_mac_filter;
 		DP_RX_MON_FILTER_SET_RX_HDR_LEN(tlv_filter,
 						mon_filter->tlv_filter);
-		DP_RX_MON_FILTER_SET_RX_HDR_LEN(tlv_filter,
-						mon_filter->tlv_filter);
 	}
 
 	dp_mon_filter_show_filter(mon_pdev, 0, filter);
@@ -933,19 +931,7 @@ dp_mon_set_local_pkt_capture_rx_filter(struct dp_pdev *pdev,
 	enum dp_mon_filter_mode mode = DP_MON_FILTER_MONITOR_MODE;
 	enum dp_mon_filter_srng_type srng_type;
 	struct dp_mon_filter dst_filter = {0};
-	struct dp_soc *soc = pdev->soc;
 
-	srng_type = ((soc->wlan_cfg_ctx->rxdma1_enable) ?
-			DP_MON_FILTER_SRNG_TYPE_RXDMA_MON_BUF :
-			DP_MON_FILTER_SRNG_TYPE_RXDMA_BUF);
-
-	dst_filter.valid = true;
-	dp_mon_filter_set_mon_cmn(pdev, &dst_filter);
-
-	dp_mon_filter_show_filter(mon_pdev, mode, &dst_filter);
-	mon_pdev->filter[mode][srng_type] = dst_filter;
-
-	qdf_mem_zero(&dst_filter, sizeof(struct dp_mon_filter));
 	dst_filter.valid = true;
 	dp_mon_filter_set_status_cmn(mon_pdev, &dst_filter);
 
