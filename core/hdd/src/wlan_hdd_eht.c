@@ -112,7 +112,8 @@ hdd_update_wiphy_eht_caps_6ghz(struct hdd_context *hdd_ctx,
 		   hdd_ctx->wiphy->bands[HDD_NL80211_BAND_6GHZ];
 	uint8_t *phy_info =
 		    hdd_ctx->iftype_data_6g->eht_cap.eht_cap_elem.phy_cap_info;
-	uint8_t max_fw_bw = sme_get_vht_ch_width();
+	struct ieee80211_sband_iftype_data *iftype_sta;
+	struct ieee80211_sband_iftype_data *iftype_ap;
 
 	if (!band_6g || !phy_info) {
 		hdd_debug("6ghz not supported in wiphy");
@@ -121,24 +122,35 @@ hdd_update_wiphy_eht_caps_6ghz(struct hdd_context *hdd_ctx,
 
 	hdd_ctx->iftype_data_6g->types_mask =
 		(BIT(NL80211_IFTYPE_STATION) | BIT(NL80211_IFTYPE_AP));
-	band_6g->n_iftype_data = 1;
+	band_6g->n_iftype_data = EHT_OPMODE_SUPPORTED;
 	band_6g->iftype_data = hdd_ctx->iftype_data_6g;
+	iftype_sta = hdd_ctx->iftype_data_6g;
+	iftype_ap = hdd_ctx->iftype_data_6g + 1;
+
 
 	hdd_ctx->iftype_data_6g->eht_cap.has_eht = eht_cap.present;
-	if (!hdd_ctx->iftype_data_6g->eht_cap.has_eht)
+	if (hdd_ctx->iftype_data_6g->eht_cap.has_eht &&
+	    !hdd_ctx->iftype_data_6g->he_cap.has_he) {
+		hdd_debug("6 GHz HE caps not present");
+		hdd_ctx->iftype_data_6g->eht_cap.has_eht = false;
+		band_6g->n_iftype_data = 1;
 		return;
-
-	hdd_ctx->iftype_data_6g->he_cap.has_he = true;
-
-	if (max_fw_bw >= WNI_CFG_VHT_CHANNEL_WIDTH_80MHZ)
-		phy_info[0] |= CHAN_WIDTH_SET_40MHZ_80MHZ_IN_5G;
-	if (max_fw_bw >= WNI_CFG_VHT_CHANNEL_WIDTH_160MHZ)
-		phy_info[0] |= CHAN_WIDTH_SET_160MHZ_IN_5G;
-	if (max_fw_bw >= WNI_CFG_VHT_CHANNEL_WIDTH_80_PLUS_80MHZ)
-		phy_info[0] |= CHAN_WIDTH_SET_80PLUS80_MHZ_IN_5G;
+	}
 
 	if (eht_cap.support_320mhz_6ghz)
 		phy_info[0] |= IEEE80211_EHT_PHY_CAP0_320MHZ_IN_6GHZ;
+
+	if (eht_cap.su_beamformer)
+		phy_info[0] |= IEEE80211_EHT_PHY_CAP0_SU_BEAMFORMER;
+
+	if (eht_cap.su_beamformee)
+		phy_info[0] |= IEEE80211_EHT_PHY_CAP0_SU_BEAMFORMEE;
+
+	qdf_mem_copy(iftype_ap, hdd_ctx->iftype_data_6g,
+		     sizeof(struct ieee80211_supported_band));
+
+	iftype_sta->types_mask = BIT(NL80211_IFTYPE_STATION);
+	iftype_ap->types_mask = BIT(NL80211_IFTYPE_AP);
 }
 
 #ifdef CFG80211_RU_PUNCT_SUPPORT
@@ -168,11 +180,11 @@ void hdd_update_wiphy_eht_cap(struct hdd_context *hdd_ctx)
 	QDF_STATUS status;
 	uint8_t *phy_info_5g =
 		    hdd_ctx->iftype_data_5g->eht_cap.eht_cap_elem.phy_cap_info;
-	uint8_t max_fw_bw = sme_get_eht_ch_width();
-	uint32_t channel_bonding_mode_2g;
 	uint8_t *phy_info_2g =
 		    hdd_ctx->iftype_data_2g->eht_cap.eht_cap_elem.phy_cap_info;
 	bool eht_capab;
+	struct ieee80211_sband_iftype_data *iftype_sta;
+	struct ieee80211_sband_iftype_data *iftype_ap;
 
 	hdd_enter();
 
@@ -188,41 +200,67 @@ void hdd_update_wiphy_eht_cap(struct hdd_context *hdd_ctx)
 		hdd_update_wiphy_punct_support(hdd_ctx);
 
 	if (band_2g) {
+		iftype_sta = hdd_ctx->iftype_data_2g;
+		iftype_ap = hdd_ctx->iftype_data_2g + 1;
 		hdd_ctx->iftype_data_2g->types_mask =
 			(BIT(NL80211_IFTYPE_STATION) | BIT(NL80211_IFTYPE_AP));
-		band_2g->n_iftype_data = 1;
+		band_2g->n_iftype_data = EHT_OPMODE_SUPPORTED;
 		band_2g->iftype_data = hdd_ctx->iftype_data_2g;
 
 		hdd_ctx->iftype_data_2g->eht_cap.has_eht = eht_cap_cfg.present;
-		if (hdd_ctx->iftype_data_2g->eht_cap.has_eht) {
-			hdd_ctx->iftype_data_2g->he_cap.has_he = true;
-
-			ucfg_mlme_get_channel_bonding_24ghz(
-					hdd_ctx->psoc,
-					&channel_bonding_mode_2g);
-			if (channel_bonding_mode_2g)
-				phy_info_2g[0] |= CHAN_WIDTH_SET_40MHZ_IN_2G;
+		if (hdd_ctx->iftype_data_2g->eht_cap.has_eht &&
+		    !hdd_ctx->iftype_data_2g->he_cap.has_he) {
+			hdd_debug("2.4 GHz HE caps not present");
+			hdd_ctx->iftype_data_2g->eht_cap.has_eht = false;
+			band_2g->n_iftype_data = 1;
+			goto band_5ghz;
 		}
+
+		if (eht_cap_cfg.su_beamformer)
+			phy_info_2g[0] |= IEEE80211_EHT_PHY_CAP0_SU_BEAMFORMER;
+
+		if (eht_cap_cfg.su_beamformee)
+			phy_info_2g[0] |= IEEE80211_EHT_PHY_CAP0_SU_BEAMFORMEE;
+
+		qdf_mem_copy(iftype_ap, hdd_ctx->iftype_data_2g,
+			     sizeof(struct ieee80211_supported_band));
+
+		iftype_sta->types_mask = BIT(NL80211_IFTYPE_STATION);
+		iftype_ap->types_mask = BIT(NL80211_IFTYPE_AP);
 	}
 
+band_5ghz:
 	if (band_5g) {
+		iftype_sta = hdd_ctx->iftype_data_5g;
+		iftype_ap = hdd_ctx->iftype_data_5g + 1;
 		hdd_ctx->iftype_data_5g->types_mask =
 			(BIT(NL80211_IFTYPE_STATION) | BIT(NL80211_IFTYPE_AP));
-		band_5g->n_iftype_data = 1;
+		band_5g->n_iftype_data = EHT_OPMODE_SUPPORTED;
 		band_5g->iftype_data = hdd_ctx->iftype_data_5g;
 
 		hdd_ctx->iftype_data_5g->eht_cap.has_eht = eht_cap_cfg.present;
-		if (hdd_ctx->iftype_data_5g->eht_cap.has_eht) {
-			hdd_ctx->iftype_data_5g->he_cap.has_he = true;
-			if (max_fw_bw >= WNI_CFG_VHT_CHANNEL_WIDTH_80MHZ)
-				phy_info_5g[0] |=
-					CHAN_WIDTH_SET_40MHZ_80MHZ_IN_5G;
-			if (max_fw_bw >= WNI_CFG_VHT_CHANNEL_WIDTH_160MHZ)
-				phy_info_5g[0] |=
-					CHAN_WIDTH_SET_160MHZ_IN_5G;
+		if (hdd_ctx->iftype_data_5g->eht_cap.has_eht &&
+		    !hdd_ctx->iftype_data_5g->he_cap.has_he) {
+			hdd_debug("5 GHz HE caps not present");
+			hdd_ctx->iftype_data_5g->eht_cap.has_eht = false;
+			band_5g->n_iftype_data = 1;
+			goto band_6ghz;
 		}
+
+		if (eht_cap_cfg.su_beamformer)
+			phy_info_5g[0] |= IEEE80211_EHT_PHY_CAP0_SU_BEAMFORMER;
+
+		if (eht_cap_cfg.su_beamformee)
+			phy_info_5g[0] |= IEEE80211_EHT_PHY_CAP0_SU_BEAMFORMEE;
+
+		qdf_mem_copy(iftype_ap, hdd_ctx->iftype_data_5g,
+			     sizeof(struct ieee80211_supported_band));
+
+		iftype_sta->types_mask = BIT(NL80211_IFTYPE_STATION);
+		iftype_ap->types_mask = BIT(NL80211_IFTYPE_AP);
 	}
 
+band_6ghz:
 	hdd_update_wiphy_eht_caps_6ghz(hdd_ctx, eht_cap_cfg);
 
 	hdd_exit();
