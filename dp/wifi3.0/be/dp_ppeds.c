@@ -643,6 +643,7 @@ static void dp_ppeds_tx_desc_reset(void *ctxt, void *elem, void *elem_list)
 
 	if (tx_desc->nbuf) {
 		nbuf = tx_desc->nbuf;
+		__dp_tx_outstanding_dec(soc);
 		dp_ppeds_tx_desc_free_nolock(soc, tx_desc);
 
 		if (nbuf) {
@@ -936,6 +937,7 @@ void dp_ppeds_tx_desc_clean_up(void *ctxt, void *elem, void *elem_list)
 
 	if (tx_desc->nbuf) {
 		qdf_nbuf_free(tx_desc->nbuf);
+		__dp_tx_outstanding_dec(soc);
 		dp_ppeds_tx_desc_free_nolock(soc, tx_desc);
 	}
 }
