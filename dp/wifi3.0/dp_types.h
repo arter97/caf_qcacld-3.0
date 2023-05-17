@@ -2237,6 +2237,7 @@ enum dp_context_type {
  * @txrx_soc_ppeds_enabled_check:
  * @txrx_soc_ppeds_txdesc_pool_reset:
  * @dp_update_ring_hptp: Update rings hptp during suspend/resume
+ * @dp_get_fst_cmem_base: Get CMEM base address for FISA
  */
 struct dp_arch_ops {
 	/* INIT/DEINIT Arch Ops */
@@ -2496,6 +2497,7 @@ struct dp_arch_ops {
 						 qdf_nbuf_t *nbuf_list);
 #endif
 	void (*dp_update_ring_hptp)(struct dp_soc *soc, bool force_flush_tx);
+	uint64_t (*dp_get_fst_cmem_base)(struct dp_soc *soc, uint64_t size);
 };
 
 /**

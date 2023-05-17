@@ -727,6 +727,7 @@ struct cdp_cmn_ops {
 	void (*txrx_get_tsf2_offset)(struct cdp_soc_t *soc_hdl, uint8_t mac_id,
 				     uint64_t *value);
 	void (*txrx_get_tqm_offset)(struct cdp_soc_t *soc_hdl, uint64_t *value);
+	uint64_t (*get_fst_cmem_base)(struct cdp_soc_t *soc_hdl, uint64_t size);
 };
 
 struct cdp_ctrl_ops {

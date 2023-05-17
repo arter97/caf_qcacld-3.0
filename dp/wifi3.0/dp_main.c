@@ -2633,18 +2633,6 @@ dp_rx_fst_detach_wrapper(struct dp_soc *soc, struct dp_pdev *pdev)
 	}
 	pdev->rx_fst = NULL;
 }
-#elif defined(WLAN_SUPPORT_RX_FISA)
-QDF_STATUS
-dp_rx_fst_attach_wrapper(struct dp_soc *soc, struct dp_pdev *pdev)
-{
-	return dp_rx_fst_attach(soc, pdev);
-}
-
-void
-dp_rx_fst_detach_wrapper(struct dp_soc *soc, struct dp_pdev *pdev)
-{
-	dp_rx_fst_detach(soc, pdev);
-}
 #else
 QDF_STATUS
 dp_rx_fst_attach_wrapper(struct dp_soc *soc, struct dp_pdev *pdev)
@@ -3346,65 +3334,14 @@ dp_rx_target_fst_config(struct dp_soc *soc)
 	}
 	return status;
 }
-#elif defined(WLAN_SUPPORT_RX_FISA)
-/**
- * dp_rx_target_fst_config() - Configure RX OLE FSE engine in HW
- * @soc: SoC handle
- *
- * Return: Success
- */
-static inline QDF_STATUS dp_rx_target_fst_config(struct dp_soc *soc)
-{
-	QDF_STATUS status;
-	struct dp_rx_fst *fst = soc->rx_fst;
-
-	/* Check if it is enabled in the INI */
-	if (!soc->fisa_enable) {
-		dp_err("RX FISA feature is disabled");
-		return QDF_STATUS_E_NOSUPPORT;
-	}
-
-	status = dp_rx_flow_send_fst_fw_setup(soc, soc->pdev_list[0]);
-	if (QDF_IS_STATUS_ERROR(status)) {
-		dp_err("dp_rx_flow_send_fst_fw_setup failed %d",
-		       status);
-		return status;
-	}
-
-	if (soc->fst_cmem_base) {
-		soc->fst_in_cmem = true;
-		dp_rx_fst_update_cmem_params(soc, fst->max_entries,
-					     soc->fst_cmem_base & 0xffffffff,
-					     soc->fst_cmem_base >> 32);
-	}
-	return status;
-}
-
-#define FISA_MAX_TIMEOUT 0xffffffff
-#define FISA_DISABLE_TIMEOUT 0
-static QDF_STATUS dp_rx_fisa_config(struct dp_soc *soc)
-{
-	struct dp_htt_rx_fisa_cfg fisa_config;
-
-	fisa_config.pdev_id = 0;
-	fisa_config.fisa_timeout = FISA_MAX_TIMEOUT;
-
-	return dp_htt_rx_fisa_config(soc->pdev_list[0], &fisa_config);
-}
-
 #else /* !WLAN_SUPPORT_RX_FISA */
 static inline QDF_STATUS dp_rx_target_fst_config(struct dp_soc *soc)
 {
 	return QDF_STATUS_SUCCESS;
 }
-#endif /* !WLAN_SUPPORT_RX_FISA */
+#endif
 
 #ifndef WLAN_SUPPORT_RX_FISA
-static QDF_STATUS dp_rx_fisa_config(struct dp_soc *soc)
-{
-	return QDF_STATUS_SUCCESS;
-}
-
 static QDF_STATUS dp_rx_dump_fisa_stats(struct dp_soc *soc)
 {
 	return QDF_STATUS_SUCCESS;
@@ -3550,14 +3487,6 @@ dp_soc_attach_target_wifi3(struct cdp_soc_t *cdp_soc)
 	    status != QDF_STATUS_E_NOSUPPORT) {
 		dp_err("Failed to send htt fst setup config message to target");
 		return status;
-	}
-
-	if (status == QDF_STATUS_SUCCESS) {
-		status = dp_rx_fisa_config(soc);
-		if (status != QDF_STATUS_SUCCESS) {
-			dp_err("Failed to send htt FISA config message to target");
-			return status;
-		}
 	}
 
 	DP_STATS_INIT(soc);
@@ -11054,6 +10983,17 @@ void dp_set_tx_pause(struct cdp_soc_t *soc_hdl, bool flag)
 	soc->is_tx_pause = flag;
 }
 
+static inline uint64_t dp_rx_fisa_get_cmem_base(struct cdp_soc_t *soc_hdl,
+						uint64_t size)
+{
+	struct dp_soc *soc = cdp_soc_t_to_dp_soc(soc_hdl);
+
+	if (soc->arch_ops.dp_get_fst_cmem_base)
+		return soc->arch_ops.dp_get_fst_cmem_base(soc, size);
+
+	return 0;
+}
+
 #ifdef DP_TX_PACKET_INSPECT_FOR_ILP
 /**
  * dp_evaluate_update_tx_ilp_config() - Evaluate and update DP TX
@@ -11242,6 +11182,9 @@ static struct cdp_cmn_ops dp_ops_cmn = {
 	.txrx_get_tsf_time = dp_get_tsf_time,
 	.txrx_get_tsf2_offset = dp_get_tsf2_scratch_reg,
 	.txrx_get_tqm_offset = dp_get_tqm_scratch_reg,
+#ifdef WLAN_SUPPORT_RX_FISA
+	.get_fst_cmem_base = dp_rx_fisa_get_cmem_base,
+#endif
 };
 
 static struct cdp_ctrl_ops dp_ops_ctrl = {

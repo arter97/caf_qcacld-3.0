@@ -55,12 +55,9 @@ enum CMEM_MEM_CLIENTS {
 #define DP_CC_PPT_MEM_SIZE 8192
 #endif
 
-/* FST required CMEM offset from CMEM pool */
+/* FST required CMEM offset M pool */
 #define DP_FST_MEM_OFFSET_IN_CMEM \
 	(DP_CC_MEM_OFFSET_IN_CMEM + DP_CC_PPT_MEM_SIZE)
-
-/* CMEM size for FISA FST 16K */
-#define DP_CMEM_FST_SIZE 16384
 
 /* lower 9 bits in Desc ID for offset in page of SPT */
 #define DP_CC_DESC_ID_SPT_VA_OS_SHIFT 0

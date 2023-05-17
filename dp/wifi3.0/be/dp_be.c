@@ -168,19 +168,19 @@ static uint64_t dp_get_cmem_chunk(struct dp_soc *soc, uint64_t size,
 }
 #endif
 
-#if defined(WLAN_SUPPORT_RX_FISA)
-static inline QDF_STATUS dp_fisa_fst_cmem_addr_init(struct dp_soc *soc)
+#ifdef WLAN_SUPPORT_RX_FISA
+static uint64_t dp_get_fst_cmem_base_be(struct dp_soc *soc, uint64_t size)
 {
-	soc->fst_cmem_size = DP_CMEM_FST_SIZE;
-	soc->fst_cmem_base = dp_get_cmem_chunk(soc, soc->fst_cmem_size,
-					       FISA_FST);
-
-	return QDF_STATUS_SUCCESS;
+	return dp_get_cmem_chunk(soc, size, FISA_FST);
 }
-#else /* !WLAN_SUPPORT_RX_FISA */
-static inline QDF_STATUS dp_fisa_fst_cmem_addr_init(struct dp_soc *soc)
+
+static void dp_initialize_arch_ops_be_fisa(struct dp_arch_ops *arch_ops)
 {
-	return QDF_STATUS_SUCCESS;
+	arch_ops->dp_get_fst_cmem_base = dp_get_fst_cmem_base_be;
+}
+#else
+static void dp_initialize_arch_ops_be_fisa(struct dp_arch_ops *arch_ops)
+{
 }
 #endif
 
@@ -334,9 +334,6 @@ static QDF_STATUS dp_get_cmem_allocation(struct dp_soc *soc,
 	switch (for_feature) {
 	case COOKIE_CONVERSION:
 		status = dp_hw_cc_cmem_addr_init(soc);
-		break;
-	case FISA_FST:
-		status = dp_fisa_fst_cmem_addr_init(soc);
 		break;
 	default:
 		dp_err("Invalid CMEM request");
@@ -987,10 +984,6 @@ static QDF_STATUS dp_soc_attach_be(struct dp_soc *soc,
 		if (!QDF_IS_STATUS_SUCCESS(qdf_status))
 			goto fail;
 	}
-
-	qdf_status = dp_get_cmem_allocation(soc, FISA_FST);
-	if (!QDF_IS_STATUS_SUCCESS(qdf_status))
-		goto fail;
 
 	for (i = 0; i < MAX_RXDESC_POOLS; i++) {
 		num_entries =
@@ -2953,6 +2946,7 @@ void dp_initialize_arch_ops_be(struct dp_arch_ops *arch_ops)
 #endif
 	dp_initialize_arch_ops_be_ipa(arch_ops);
 	dp_initialize_arch_ops_be_single_dev(arch_ops);
+	dp_initialize_arch_ops_be_fisa(arch_ops);
 }
 
 #ifdef QCA_SUPPORT_PRIMARY_LINK_MIGRATE

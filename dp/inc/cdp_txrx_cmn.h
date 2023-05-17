@@ -3190,4 +3190,19 @@ cdp_get_tqm_offset(ol_txrx_soc_handle soc, uint64_t *value)
 
 	soc->ops->cmn_drv_ops->txrx_get_tqm_offset(soc, value);
 }
+
+static inline uint64_t cdp_get_fst_cem_base(ol_txrx_soc_handle soc,
+					    uint64_t size)
+{
+	if (!soc) {
+		dp_cdp_debug("Invalid Instance");
+		return 0;
+	}
+
+	if (!soc->ops->cmn_drv_ops ||
+	    !soc->ops->cmn_drv_ops->get_fst_cmem_base)
+		return 0;
+
+	return soc->ops->cmn_drv_ops->get_fst_cmem_base(soc, size);
+}
 #endif /* _CDP_TXRX_CMN_H_ */

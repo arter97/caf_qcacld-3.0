@@ -3926,7 +3926,7 @@ struct cdp_soc_t *dp_soc_to_cdp_soc_t(struct dp_soc *psoc)
 	return (struct cdp_soc_t *)psoc;
 }
 
-#if defined(WLAN_SUPPORT_RX_FLOW_TAG) || defined(WLAN_SUPPORT_RX_FISA)
+#if defined(WLAN_SUPPORT_RX_FLOW_TAG)
 /**
  * dp_rx_flow_get_fse_stats() - Retrieve a flow's statistics
  * @pdev: pdev handle
@@ -3978,16 +3978,6 @@ QDF_STATUS dp_rx_fst_attach(struct dp_soc *soc, struct dp_pdev *pdev);
 void dp_rx_fst_detach(struct dp_soc *soc, struct dp_pdev *pdev);
 
 /**
- * dp_rx_flow_send_fst_fw_setup() - Program FST parameters in FW/HW post-attach
- * @soc: SoC handle
- * @pdev: Pdev handle
- *
- * Return: Success when fst parameters are programmed in FW, error otherwise
- */
-QDF_STATUS dp_rx_flow_send_fst_fw_setup(struct dp_soc *soc,
-					struct dp_pdev *pdev);
-
-/**
  * dp_mon_rx_update_rx_flow_tag_stats() - Update a mon flow's statistics
  * @pdev: pdev handle
  * @flow_id: flow index (truncated hash) in the Rx FST
@@ -3996,33 +3986,18 @@ QDF_STATUS dp_rx_flow_send_fst_fw_setup(struct dp_soc *soc,
  */
 QDF_STATUS
 dp_mon_rx_update_rx_flow_tag_stats(struct dp_pdev *pdev, uint32_t flow_id);
+#endif
 
-#else /* !((WLAN_SUPPORT_RX_FLOW_TAG) || defined(WLAN_SUPPORT_RX_FISA)) */
-
+#ifdef WLAN_SUPPORT_RX_FLOW_TAG
 /**
- * dp_rx_fst_attach() - Initialize Rx FST and setup necessary parameters
+ * dp_rx_flow_send_fst_fw_setup() - Program FST parameters in FW/HW post-attach
  * @soc: SoC handle
  * @pdev: Pdev handle
  *
- * Return: Handle to flow search table entry
+ * Return: Success when fst parameters are programmed in FW, error otherwise
  */
-static inline
-QDF_STATUS dp_rx_fst_attach(struct dp_soc *soc, struct dp_pdev *pdev)
-{
-	return QDF_STATUS_SUCCESS;
-}
-
-/**
- * dp_rx_fst_detach() - De-initialize Rx FST
- * @soc: SoC handle
- * @pdev: Pdev handle
- *
- * Return: None
- */
-static inline
-void dp_rx_fst_detach(struct dp_soc *soc, struct dp_pdev *pdev)
-{
-}
+QDF_STATUS dp_rx_flow_send_fst_fw_setup(struct dp_soc *soc,
+					struct dp_pdev *pdev);
 #endif
 
 /**
