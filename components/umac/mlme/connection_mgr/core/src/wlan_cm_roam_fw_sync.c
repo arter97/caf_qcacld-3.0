@@ -79,7 +79,6 @@ QDF_STATUS cm_fw_roam_sync_req(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 
 	if (QDF_IS_STATUS_ERROR(status)) {
 		mlme_err("Roam sync was not handled");
-		cm_fw_roam_abort_req(psoc, vdev_id);
 		cm_roam_stop_req(psoc, vdev_id, REASON_ROAM_SYNCH_FAILED,
 				 NULL, false);
 	}
@@ -121,14 +120,7 @@ cm_fw_send_vdev_roam_event(struct cnx_mgr *cm_ctx, uint16_t data_len,
 					       data_len,
 					       data);
 
-	if (QDF_IS_STATUS_ERROR(status))
-		cm_roam_stop_req(psoc, roam_req->req.vdev_id,
-				 REASON_ROAM_SYNCH_FAILED,
-				 NULL, false);
-
 error:
-	if (QDF_IS_STATUS_ERROR(status))
-		cm_abort_fw_roam(cm_ctx, cm_id);
 
 	return status;
 }
@@ -1038,12 +1030,8 @@ error:
 	if (rsp)
 		wlan_cm_free_connect_rsp(rsp);
 
-	if (QDF_IS_STATUS_ERROR(status)) {
-		cm_roam_stop_req(psoc, vdev_id, REASON_ROAM_SYNCH_FAILED,
-				 NULL, false);
-		cm_abort_fw_roam(cm_ctx, cm_id);
+	if (QDF_IS_STATUS_ERROR(status))
 		mlo_update_connected_links(vdev, 0);
-	}
 rel_ref:
 	wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_SB_ID);
 
@@ -1199,17 +1187,16 @@ end:
 	return status;
 }
 
-QDF_STATUS
-cm_disconnect_roam_abort_fail(struct wlan_objmgr_vdev *vdev,
-			      enum wlan_cm_source source,
-			      struct qdf_mac_addr *bssid,
-			      wlan_cm_id cm_id)
+static QDF_STATUS
+cm_disconnect_roam_invoke_fail(struct wlan_objmgr_vdev *vdev,
+			       wlan_cm_id cm_id)
 {
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
 	struct wlan_mlme_psoc_ext_obj *mlme_obj;
 	bool nud_disconnect;
 	struct wlan_objmgr_psoc *psoc;
 	uint8_t vdev_id = wlan_vdev_get_id(vdev);
+	struct rso_config *rso_cfg;
 
 	psoc = wlan_vdev_get_psoc(vdev);
 	if (!psoc) {
@@ -1222,10 +1209,18 @@ cm_disconnect_roam_abort_fail(struct wlan_objmgr_vdev *vdev,
 	if (!mlme_obj)
 		return QDF_STATUS_E_NULL_VALUE;
 
+	rso_cfg = wlan_cm_get_rso_config(vdev);
+	if (!rso_cfg) {
+		mlme_err(CM_PREFIX_FMT "rso cfg not found",
+			 CM_PREFIX_REF(vdev_id, cm_id));
+		return QDF_STATUS_E_NULL_VALUE;
+	}
+
 	nud_disconnect = mlme_obj->cfg.lfr.disconnect_on_nud_roam_invoke_fail;
-	mlme_debug(CM_PREFIX_FMT "disconnect on NUD %d, source %d bssid " QDF_MAC_ADDR_FMT,
+	mlme_debug(CM_PREFIX_FMT "disconnect on NUD %d, source %d forced roaming %d",
 		   CM_PREFIX_REF(vdev_id, cm_id),
-		   nud_disconnect, source, QDF_MAC_ADDR_REF(bssid));
+		   nud_disconnect, rso_cfg->roam_invoke_source,
+		   rso_cfg->is_forced_roaming);
 
 	/*
 	 * If reassoc MAC from user space is broadcast MAC as:
@@ -1235,14 +1230,22 @@ cm_disconnect_roam_abort_fail(struct wlan_objmgr_vdev *vdev,
 	 * highest score. It is requirement from customer which can avoid
 	 * ping-pong roaming.
 	 */
-	if (qdf_is_macaddr_broadcast(bssid))
+	if (qdf_is_macaddr_broadcast(&rso_cfg->roam_invoke_bssid)) {
+		qdf_zero_macaddr(&rso_cfg->roam_invoke_bssid);
 		return status;
+	}
 
-	if (source == CM_ROAMING_HOST || source == CM_ROAMING_LINK_REMOVAL ||
-	    (source == CM_ROAMING_NUD_FAILURE && nud_disconnect))
+	if (rso_cfg->roam_invoke_source == CM_ROAMING_HOST ||
+	    (rso_cfg->roam_invoke_source == CM_ROAMING_NUD_FAILURE &&
+	    (nud_disconnect || rso_cfg->is_forced_roaming)) ||
+	     rso_cfg->roam_invoke_source == CM_ROAMING_LINK_REMOVAL) {
+		rso_cfg->roam_invoke_source = CM_SOURCE_INVALID;
+		if (rso_cfg->is_forced_roaming)
+			rso_cfg->is_forced_roaming = false;
 		status = mlo_disconnect(vdev, CM_ROAM_DISCONNECT,
 					REASON_USER_TRIGGERED_ROAM_FAILURE,
 					NULL);
+	}
 
 	return status;
 }
@@ -1252,11 +1255,8 @@ QDF_STATUS cm_fw_roam_invoke_fail(struct wlan_objmgr_psoc *psoc,
 {
 	QDF_STATUS status;
 	struct wlan_objmgr_vdev *vdev;
-	wlan_cm_id cm_id;
-	enum wlan_cm_source source;
+	wlan_cm_id cm_id = CM_ID_INVALID;
 	struct cnx_mgr *cm_ctx;
-	struct cm_roam_req *roam_req = NULL;
-	struct qdf_mac_addr bssid;
 
 	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc,
 						    vdev_id,
@@ -1272,23 +1272,12 @@ QDF_STATUS cm_fw_roam_invoke_fail(struct wlan_objmgr_psoc *psoc,
 		goto error;
 	}
 
-	roam_req = cm_get_first_roam_command(vdev);
-	if (!roam_req) {
-		mlme_err("Failed to find roam req from list");
-		status = QDF_STATUS_E_FAILURE;
-		goto error;
-	}
-
-	cm_id = roam_req->cm_id;
-	source = roam_req->req.source;
-	bssid = roam_req->req.bssid;
-
 	status = cm_sm_deliver_event(vdev, WLAN_CM_SM_EV_ROAM_INVOKE_FAIL,
 				     sizeof(wlan_cm_id), &cm_id);
 	if (QDF_IS_STATUS_ERROR(status))
 		cm_remove_cmd(cm_ctx, &cm_id);
 
-	cm_disconnect_roam_abort_fail(vdev, source, &bssid, cm_id);
+	cm_disconnect_roam_invoke_fail(vdev, cm_id);
 error:
 	wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_SB_ID);
 	return status;

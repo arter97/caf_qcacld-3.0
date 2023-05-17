@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2018-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -127,6 +127,8 @@ static QDF_STATUS policy_mgr_init_cfg(struct wlan_objmgr_psoc *psoc)
 	policy_mgr_init_same_mac_conc_sr_status(psoc);
 	cfg->use_sap_original_bw =
 		cfg_get(psoc, CFG_SAP_DEFAULT_BW_FOR_RESTART);
+	cfg->move_sap_go_1st_on_dfs_sta_csa =
+		cfg_get(psoc, CFG_MOVE_SAP_GO_1ST_ON_DFS_STA_CSA);
 
 	return QDF_STATUS_SUCCESS;
 }
