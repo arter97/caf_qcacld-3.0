@@ -81,7 +81,7 @@ static void dp_tx_desc_clean_up(void *ctxt, void *elem, void *elem_list)
 
 	if (tx_desc->nbuf) {
 		nbuf = dp_tx_comp_free_buf(soc, tx_desc, true);
-		dp_tx_desc_release(tx_desc, tx_desc->pool_id);
+		dp_tx_desc_release(soc, tx_desc, tx_desc->pool_id);
 
 		if (nbuf) {
 			if (!nbuf_list) {
