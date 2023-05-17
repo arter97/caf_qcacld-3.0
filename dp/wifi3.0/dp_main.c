@@ -3334,31 +3334,12 @@ dp_rx_target_fst_config(struct dp_soc *soc)
 	}
 	return status;
 }
-#else /* !WLAN_SUPPORT_RX_FISA */
+#else
 static inline QDF_STATUS dp_rx_target_fst_config(struct dp_soc *soc)
 {
 	return QDF_STATUS_SUCCESS;
 }
 #endif
-
-#ifndef WLAN_SUPPORT_RX_FISA
-static QDF_STATUS dp_rx_dump_fisa_stats(struct dp_soc *soc)
-{
-	return QDF_STATUS_SUCCESS;
-}
-
-static void dp_rx_dump_fisa_table(struct dp_soc *soc)
-{
-}
-
-static void dp_suspend_fse_cache_flush(struct dp_soc *soc)
-{
-}
-
-static void dp_resume_fse_cache_flush(struct dp_soc *soc)
-{
-}
-#endif /* !WLAN_SUPPORT_RX_FISA */
 
 #ifndef WLAN_DP_FEATURE_SW_LATENCY_MGR
 static inline QDF_STATUS dp_print_swlm_stats(struct dp_soc *soc)
@@ -11536,8 +11517,6 @@ static QDF_STATUS dp_runtime_suspend(struct cdp_soc_t *soc_hdl, uint8_t pdev_id)
 	if (soc->intr_mode == DP_INTR_POLL)
 		qdf_timer_stop(&soc->int_timer);
 
-	dp_rx_fst_update_pm_suspend_status(soc, true);
-
 	return QDF_STATUS_SUCCESS;
 }
 
@@ -11572,8 +11551,6 @@ static QDF_STATUS dp_runtime_resume(struct cdp_soc_t *soc_hdl, uint8_t pdev_id)
 
 	soc->arch_ops.dp_update_ring_hptp(soc, false);
 	qdf_atomic_set(&soc->tx_pending_rtpm, 0);
-
-	dp_rx_fst_update_pm_suspend_status(soc, false);
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -12064,9 +12041,6 @@ static QDF_STATUS dp_bus_suspend(struct cdp_soc_t *soc_hdl, uint8_t pdev_id)
 	/* Stop monitor reap timer and reap any pending frames in ring */
 	dp_monitor_reap_timer_suspend(soc);
 
-	dp_suspend_fse_cache_flush(soc);
-	dp_rx_fst_update_pm_suspend_status(soc, true);
-
 	return QDF_STATUS_SUCCESS;
 }
 
@@ -12086,13 +12060,7 @@ static QDF_STATUS dp_bus_resume(struct cdp_soc_t *soc_hdl, uint8_t pdev_id)
 	/* Start monitor reap timer */
 	dp_monitor_reap_timer_start(soc, CDP_MON_REAP_SOURCE_ANY);
 
-	dp_resume_fse_cache_flush(soc);
-
 	soc->arch_ops.dp_update_ring_hptp(soc, false);
-
-	dp_rx_fst_update_pm_suspend_status(soc, false);
-
-	dp_rx_fst_requeue_wq(soc);
 
 	return QDF_STATUS_SUCCESS;
 }
