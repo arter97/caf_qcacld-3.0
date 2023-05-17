@@ -3186,10 +3186,13 @@ QDF_STATUS dp_rx_pdev_desc_pool_init(struct dp_pdev *pdev)
 	rx_desc_pool->buf_size = RX_DATA_BUFFER_SIZE;
 	rx_desc_pool->buf_alignment = RX_DATA_BUFFER_ALIGNMENT;
 	/* Disable monitor dest processing via frag */
-	if (target_type == TARGET_TYPE_QCN9160)
+	if (target_type == TARGET_TYPE_QCN9160) {
+		rx_desc_pool->buf_size = RX_MONITOR_BUFFER_SIZE;
+		rx_desc_pool->buf_alignment = RX_MONITOR_BUFFER_ALIGNMENT;
 		dp_rx_enable_mon_dest_frag(rx_desc_pool, true);
-	else
+	} else {
 		dp_rx_enable_mon_dest_frag(rx_desc_pool, false);
+	}
 
 	dp_rx_desc_pool_init(soc, mac_for_pdev,
 			     rx_sw_desc_num, rx_desc_pool);
