@@ -1284,7 +1284,8 @@ static int __wlan_hdd_bus_suspend(struct wow_enable_params wow_params,
 	}
 
 	dp_soc = cds_get_context(QDF_MODULE_ID_SOC);
-	err = qdf_status_to_os_return(cdp_bus_suspend(dp_soc, OL_TXRX_PDEV_ID));
+	err = qdf_status_to_os_return(ucfg_dp_bus_suspend(dp_soc,
+							  OL_TXRX_PDEV_ID));
 	if (err) {
 		hdd_err("Failed cdp bus suspend: %d", err);
 		return err;
@@ -1293,13 +1294,13 @@ static int __wlan_hdd_bus_suspend(struct wow_enable_params wow_params,
 	if (ucfg_ipa_is_tx_pending(hdd_ctx->pdev)) {
 		hdd_err("failed due to pending IPA TX comps");
 		err = -EBUSY;
-		goto resume_cdp;
+		goto resume_dp;
 	}
 
 	err = hif_bus_early_suspend(hif_ctx);
 	if (err) {
 		hdd_err("Failed hif bus early suspend");
-		goto resume_cdp;
+		goto resume_dp;
 	}
 
 	status = ucfg_pmo_psoc_bus_suspend_req(hdd_ctx->psoc,
@@ -1367,8 +1368,8 @@ late_hif_resume:
 	status = hif_bus_late_resume(hif_ctx);
 	QDF_BUG(QDF_IS_STATUS_SUCCESS(status));
 
-resume_cdp:
-	status = cdp_bus_resume(dp_soc, OL_TXRX_PDEV_ID);
+resume_dp:
+	status = ucfg_dp_bus_resume(dp_soc, OL_TXRX_PDEV_ID);
 	QDF_BUG(QDF_IS_STATUS_SUCCESS(status));
 	hif_system_pm_set_state_on(hif_ctx);
 
@@ -1546,7 +1547,7 @@ int wlan_hdd_bus_resume(enum qdf_suspend_type type)
 	}
 
 	dp_soc = cds_get_context(QDF_MODULE_ID_SOC);
-	qdf_status = cdp_bus_resume(dp_soc, OL_TXRX_PDEV_ID);
+	qdf_status = ucfg_dp_bus_resume(dp_soc, OL_TXRX_PDEV_ID);
 	status = qdf_status_to_os_return(qdf_status);
 	if (status) {
 		hdd_err("Failed cdp bus resume");

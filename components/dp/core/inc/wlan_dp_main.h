@@ -170,6 +170,42 @@ void dp_wait_complete_tasks(struct wlan_dp_psoc_context *dp_ctx);
 #define dp_exit() QDF_TRACE_EXIT(QDF_MODULE_ID_DP, "exit")
 
 /**
+ * __wlan_dp_runtime_suspend() - Runtime suspend DP handler
+ * @soc: CDP SoC handle
+ * @pdev_id: DP PDEV ID
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS __wlan_dp_runtime_suspend(ol_txrx_soc_handle soc, uint8_t pdev_id);
+
+/**
+ * __wlan_dp_runtime_resume() - Runtime suspend DP handler
+ * @soc: CDP SoC handle
+ * @pdev_id: DP PDEV ID
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS __wlan_dp_runtime_resume(ol_txrx_soc_handle soc, uint8_t pdev_id);
+
+/**
+ * __wlan_dp_bus_suspend() - BUS suspend DP handler
+ * @soc: CDP SoC handle
+ * @pdev_id: DP PDEV ID
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS __wlan_dp_bus_suspend(ol_txrx_soc_handle soc, uint8_t pdev_id);
+
+/**
+ * __wlan_dp_bus_resume() - BUS resume DP handler
+ * @soc: CDP SoC handle
+ * @pdev_id: DP PDEV ID
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS __wlan_dp_bus_resume(ol_txrx_soc_handle soc, uint8_t pdev_id);
+
+/**
  * wlan_dp_txrx_soc_attach() - Datapath soc attach
  * @params: SoC attach params
  * @is_wifi3_0_target: [OUT] Pointer to update if the target is wifi3.0

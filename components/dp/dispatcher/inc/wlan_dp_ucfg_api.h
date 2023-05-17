@@ -1436,6 +1436,24 @@ QDF_STATUS ucfg_dp_config_direct_link(struct wlan_objmgr_vdev *vdev,
 #endif
 
 /**
+ * ucfg_dp_bus_suspend() - BUS suspend DP handler
+ * @soc: CDP SoC handle
+ * @pdev_id: DP PDEV ID
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS ucfg_dp_bus_suspend(ol_txrx_soc_handle soc, uint8_t pdev_id);
+
+/**
+ * ucfg_dp_bus_resume() - BUS resume DP handler
+ * @soc: CDP SoC handle
+ * @pdev_id: DP PDEV ID
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS ucfg_dp_bus_resume(ol_txrx_soc_handle soc, uint8_t pdev_id);
+
+/**
  * ucfg_dp_txrx_soc_attach() - Datapath soc attach
  * @params: SoC attach params
  * @is_wifi3_0_target: [OUT] Pointer to update if the target is wifi3.0

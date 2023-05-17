@@ -35,6 +35,7 @@
 #include "htc_api.h"
 #include "wlan_pmo_obj_mgmt_api.h"
 #include <wlan_scan_ucfg_api.h>
+#include <wlan_dp_api.h>
 #include "cds_api.h"
 #include "wlan_pmo_static_config.h"
 #include "wlan_mlme_ucfg_api.h"
@@ -1108,14 +1109,14 @@ QDF_STATUS pmo_core_psoc_bus_runtime_suspend(struct wlan_objmgr_psoc *psoc,
 		goto runtime_failure;
 	}
 
-	status = cdp_runtime_suspend(dp_soc, pdev_id);
+	status = wlan_dp_runtime_suspend(dp_soc, pdev_id);
 	if (status != QDF_STATUS_SUCCESS)
 		goto runtime_failure;
 
 	ret = htc_runtime_suspend(htc_ctx);
 	if (ret) {
 		status = qdf_status_from_os_return(ret);
-		goto cdp_runtime_resume;
+		goto dp_runtime_resume;
 	}
 
 	status = pmo_tgt_psoc_set_runtime_pm_inprogress(psoc, true);
@@ -1208,9 +1209,9 @@ resume_htc:
 	PMO_CORE_PSOC_RUNTIME_PM_QDF_BUG(QDF_STATUS_SUCCESS !=
 		pmo_tgt_psoc_set_runtime_pm_inprogress(psoc, false));
 
-cdp_runtime_resume:
+dp_runtime_resume:
 	PMO_CORE_PSOC_RUNTIME_PM_QDF_BUG(QDF_STATUS_SUCCESS !=
-		cdp_runtime_resume(dp_soc, pdev_id));
+		wlan_dp_runtime_resume(dp_soc, pdev_id));
 
 runtime_failure:
 	hif_process_runtime_suspend_failure();
@@ -1310,7 +1311,7 @@ QDF_STATUS pmo_core_psoc_bus_runtime_resume(struct wlan_objmgr_psoc *psoc,
 		goto fail;
 	}
 
-	status = cdp_runtime_resume(dp_soc, pdev_id);
+	status = wlan_dp_runtime_resume(dp_soc, pdev_id);
 	if (status != QDF_STATUS_SUCCESS)
 		goto fail;
 

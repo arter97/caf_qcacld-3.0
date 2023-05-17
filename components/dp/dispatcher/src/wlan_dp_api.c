@@ -25,3 +25,13 @@ void wlan_dp_update_peer_map_unmap_version(uint8_t *version)
 {
 	__wlan_dp_update_peer_map_unmap_version(version);
 }
+
+QDF_STATUS wlan_dp_runtime_suspend(ol_txrx_soc_handle soc, uint8_t pdev_id)
+{
+	return __wlan_dp_runtime_suspend(soc, pdev_id);
+}
+
+QDF_STATUS wlan_dp_runtime_resume(ol_txrx_soc_handle soc, uint8_t pdev_id)
+{
+	return __wlan_dp_runtime_resume(soc, pdev_id);
+}

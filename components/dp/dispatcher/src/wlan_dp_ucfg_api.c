@@ -2395,6 +2395,16 @@ QDF_STATUS ucfg_dp_config_direct_link(struct wlan_objmgr_vdev *vdev,
 }
 #endif
 
+QDF_STATUS ucfg_dp_bus_suspend(ol_txrx_soc_handle soc, uint8_t pdev_id)
+{
+	return __wlan_dp_bus_suspend(soc, pdev_id);
+}
+
+QDF_STATUS ucfg_dp_bus_resume(ol_txrx_soc_handle soc, uint8_t pdev_id)
+{
+	return __wlan_dp_bus_resume(soc, pdev_id);
+}
+
 void *ucfg_dp_txrx_soc_attach(struct dp_txrx_soc_attach_params *params,
 			      bool *is_wifi3_0_target)
 {

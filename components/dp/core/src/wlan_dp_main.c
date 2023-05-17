@@ -37,6 +37,7 @@
 #include <hif.h>
 #include <htc_api.h>
 #include <cdp_txrx_cmn_reg.h>
+#include <cdp_txrx_bus.h>
 #ifdef FEATURE_DIRECT_LINK
 #include "dp_internal.h"
 #include "cdp_txrx_ctrl.h"
@@ -1553,6 +1554,26 @@ bool dp_is_data_stall_event_enabled(uint32_t evt)
 		return true;
 
 	return false;
+}
+
+QDF_STATUS __wlan_dp_runtime_suspend(ol_txrx_soc_handle soc, uint8_t pdev_id)
+{
+	return cdp_runtime_suspend(soc, pdev_id);
+}
+
+QDF_STATUS __wlan_dp_runtime_resume(ol_txrx_soc_handle soc, uint8_t pdev_id)
+{
+	return cdp_runtime_resume(soc, pdev_id);
+}
+
+QDF_STATUS __wlan_dp_bus_suspend(ol_txrx_soc_handle soc, uint8_t pdev_id)
+{
+	return cdp_bus_suspend(soc, pdev_id);
+}
+
+QDF_STATUS __wlan_dp_bus_resume(ol_txrx_soc_handle soc, uint8_t pdev_id)
+{
+	return cdp_bus_resume(soc, pdev_id);
 }
 
 void *wlan_dp_txrx_soc_attach(struct dp_txrx_soc_attach_params *params,
