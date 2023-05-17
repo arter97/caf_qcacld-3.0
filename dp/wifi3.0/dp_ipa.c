@@ -2455,6 +2455,9 @@ dp_ipa_wdi_tx_smmu_params(struct dp_soc *soc,
 		else if (hdl == DP_IPA_HDL_SECOND)
 			QDF_IPA_WDI_SETUP_INFO_SMMU_CLIENT(tx_smmu) =
 				IPA_CLIENT_WLAN4_CONS;
+		else if (hdl == DP_IPA_HDL_THIRD)
+			QDF_IPA_WDI_SETUP_INFO_SMMU_CLIENT(tx_smmu) =
+				IPA_CLIENT_WLAN1_CONS;
 	} else {
 		QDF_IPA_WDI_SETUP_INFO_SMMU_CLIENT(tx_smmu) =
 			IPA_CLIENT_WLAN1_CONS;
@@ -2506,6 +2509,9 @@ dp_ipa_wdi_rx_smmu_params(struct dp_soc *soc,
 		else if (hdl == DP_IPA_HDL_SECOND)
 			QDF_IPA_WDI_SETUP_INFO_SMMU_CLIENT(rx_smmu) =
 				IPA_CLIENT_WLAN3_PROD;
+		else if (hdl == DP_IPA_HDL_THIRD)
+			QDF_IPA_WDI_SETUP_INFO_SMMU_CLIENT(rx_smmu) =
+				IPA_CLIENT_WLAN1_PROD;
 	} else {
 		QDF_IPA_WDI_SETUP_INFO_SMMU_CLIENT(rx_smmu) =
 					IPA_CLIENT_WLAN1_PROD;
@@ -2627,6 +2633,9 @@ static void dp_ipa_wdi_rx_alt_pipe_params(struct dp_soc *soc,
 		else if (hdl == DP_IPA_HDL_SECOND)
 			QDF_IPA_WDI_SETUP_INFO_CLIENT(rx) =
 				IPA_CLIENT_WLAN3_PROD1;
+		else if (hdl == DP_IPA_HDL_THIRD)
+			QDF_IPA_WDI_SETUP_INFO_CLIENT(rx) =
+				IPA_CLIENT_WLAN1_PROD1;
 	} else {
 		QDF_IPA_WDI_SETUP_INFO_CLIENT(rx) =
 					IPA_CLIENT_WLAN1_PROD;
