@@ -9847,6 +9847,9 @@ bool policy_mgr_is_restart_sap_required(struct wlan_objmgr_psoc *psoc,
 	struct policy_mgr_conc_connection_info *connection;
 	bool sta_sap_scc_on_dfs_chan, sta_sap_scc_allowed_on_indoor_ch;
 	qdf_freq_t user_config_freq;
+	bool sap_found = false;
+	uint8_t num_mcc_conn = 0;
+	uint8_t num_scc_conn = 0;
 
 	pm_ctx = policy_mgr_get_context(psoc);
 	if (!pm_ctx) {
@@ -9861,19 +9864,39 @@ bool policy_mgr_is_restart_sap_required(struct wlan_objmgr_psoc *psoc,
 	qdf_mutex_acquire(&pm_ctx->qdf_conc_list_lock);
 	connection = pm_conc_connection_list;
 	for (i = 0; i < MAX_NUMBER_OF_CONC_CONNECTIONS; i++) {
-		if (connection[i].vdev_id == vdev_id &&
-		    connection[i].in_use) {
+		if (!connection[i].in_use)
+			continue;
+		if (connection[i].vdev_id == vdev_id) {
 			if (WLAN_REG_IS_5GHZ_CH_FREQ(connection[i].freq) &&
 			    (connection[i].ch_flagext & (IEEE80211_CHAN_DFS |
 					      IEEE80211_CHAN_DFS_CFREQ2)))
 				sap_on_dfs = true;
-			break;
+			sap_found = true;
+		} else if (connection[i].freq == freq) {
+			num_scc_conn++;
+		} else {
+			num_mcc_conn++;
 		}
 	}
-	if (i == MAX_NUMBER_OF_CONC_CONNECTIONS) {
+	if (!sap_found) {
 		policy_mgr_err("Invalid vdev id: %d", vdev_id);
 		qdf_mutex_release(&pm_ctx->qdf_conc_list_lock);
 		return false;
+	}
+	/* Current hw mode is SBS low share. STA 5180, SAP 1 2412,
+	 * SAP 2 5745, but SAP 1 is 2G only, can't move to STA 5180,
+	 * SAP 2 is SBS with STA, policy_mgr_are_2_freq_on_same_mac
+	 * return false for 5745 and 5180 and finally this function
+	 * return false, no force SCC on SAP2.
+	 * Add mcc conntion count check for SAP2, if SAP 2 channel
+	 * is different from all of exsting 2 or more connections, then
+	 * try to force SCC on SAP 2.
+	 */
+	if (num_mcc_conn > 1 && !num_scc_conn) {
+		policy_mgr_debug("sap vdev %d has chan %d diff with %d exsting conn",
+				 vdev_id, freq, num_mcc_conn);
+		qdf_mutex_release(&pm_ctx->qdf_conc_list_lock);
+		return true;
 	}
 	sta_sap_scc_on_dfs_chan =
 		policy_mgr_is_sta_sap_scc_allowed_on_dfs_chan(psoc);
