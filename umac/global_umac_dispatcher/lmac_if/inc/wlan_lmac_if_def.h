@@ -1110,6 +1110,7 @@ struct wlan_lmac_if_ftm_rx_ops {
  * @register_afc_event_handler: pointer to register afc event handler
  * @unregister_afc_event_handler: pointer to unregister afc event handler
  * @trigger_acs_for_afc: pointer to trigger acs for afc
+ * @trigger_update_channel_list: pointer to trigger_update_channel_list
  * @reg_get_min_psd:
  * @is_chip_11be:
  * @register_rate2power_table_update_event_handler: pointer to register
@@ -1169,7 +1170,8 @@ struct wlan_lmac_if_reg_tx_ops {
 	QDF_STATUS (*unregister_afc_event_handler)
 				(struct wlan_objmgr_psoc *psoc, void *arg);
 	QDF_STATUS (*trigger_acs_for_afc)(struct wlan_objmgr_pdev *pdev);
-
+	QDF_STATUS (*trigger_update_channel_list)
+				(struct wlan_objmgr_pdev *pdev);
 	QDF_STATUS (*reg_get_min_psd) (struct wlan_objmgr_pdev *pdev,
 				       qdf_freq_t primary_freq,
 				       qdf_freq_t cen320,
