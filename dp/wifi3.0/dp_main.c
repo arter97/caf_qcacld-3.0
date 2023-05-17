@@ -14792,7 +14792,8 @@ static void dp_find_missing_tx_comp(struct dp_soc *soc)
 						dp_tx_comp_free_buf(soc,
 								    tx_desc,
 								    false);
-						dp_tx_desc_release(tx_desc, i);
+						dp_tx_desc_release(soc, tx_desc,
+								   i);
 						DP_STATS_INC(soc,
 							     tx.tx_comp_force_freed, 1);
 					}

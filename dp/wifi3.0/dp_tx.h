@@ -287,6 +287,7 @@ qdf_nbuf_t dp_tx_comp_free_buf(struct dp_soc *soc, struct dp_tx_desc_s *desc,
 
 /**
  * dp_tx_desc_release() - Release Tx Descriptor
+ * @soc: Soc handle
  * @tx_desc: Tx Descriptor
  * @desc_pool_id: Descriptor Pool ID
  *
@@ -295,7 +296,8 @@ qdf_nbuf_t dp_tx_comp_free_buf(struct dp_soc *soc, struct dp_tx_desc_s *desc,
  *
  * Return:
  */
-void dp_tx_desc_release(struct dp_tx_desc_s *tx_desc, uint8_t desc_pool_id);
+void dp_tx_desc_release(struct dp_soc *soc, struct dp_tx_desc_s *tx_desc,
+			uint8_t desc_pool_id);
 
 /**
  * dp_tx_compute_delay() - Compute and fill in all timestamps
