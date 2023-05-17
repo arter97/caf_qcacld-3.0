@@ -1688,7 +1688,8 @@ util_scan_populate_bcn_ie_list(struct wlan_objmgr_pdev *pdev,
 err:
 	status = QDF_STATUS_E_INVAL;
 err_status:
-	scm_debug("failed to parse IE - id: %d, len: %d",
+	scm_debug(QDF_MAC_ADDR_FMT ": failed to parse IE - id: %d, len: %d",
+		  QDF_MAC_ADDR_REF(scan_params->bssid.bytes),
 		  ie->ie_id, ie->ie_len);
 
 	return status;
@@ -2443,8 +2444,6 @@ util_scan_gen_scan_entry(struct wlan_objmgr_pdev *pdev,
 	status = util_scan_populate_bcn_ie_list(pdev, scan_entry, &chan_freq,
 						band_mask);
 	if (QDF_IS_STATUS_ERROR(status)) {
-		scm_debug(QDF_MAC_ADDR_FMT": failed to parse beacon IE",
-			  QDF_MAC_ADDR_REF(scan_entry->bssid.bytes));
 		qdf_mem_free(scan_entry->raw_frame.ptr);
 		qdf_mem_free(scan_entry);
 		return QDF_STATUS_E_FAILURE;
