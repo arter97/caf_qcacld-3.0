@@ -805,7 +805,10 @@ pmo_core_enable_wow_in_fw(struct wlan_objmgr_psoc *psoc,
 			htc_log_link_user_votes();
 		}
 	}
-
+	if (wow_params->is_unit_test) {
+		pmo_info("Unit test WoW, force DRV mode");
+		param.flags |= WMI_WOW_FLAG_ENABLE_DRV_PCIE_L1SS_SLEEP;
+	}
 	if (type == QDF_SYSTEM_SUSPEND) {
 		pmo_info("system suspend wow");
 		param.flags |= WMI_WOW_FLAG_SYSTEM_SUSPEND_WOW;
