@@ -1441,6 +1441,9 @@ bool dp_peer_tx_cap_search(struct dp_pdev *pdev,
 	bool found = false;
 	struct dp_mon_pdev *mon_pdev = pdev->monitor_pdev;
 
+	if (qdf_unlikely(!mon_pdev))
+		return found;
+
 	tx_capture = &mon_pdev->tx_capture;
 
 	if (!tx_capture || !(tx_capture->ptr_peer_mgmt_list)) {
@@ -7488,7 +7491,7 @@ dp_peer_set_tx_capture_enabled_1_0(struct dp_pdev *pdev,
 void dp_peer_tx_capture_filter_check_1_0(struct dp_pdev *pdev,
 					 struct dp_peer *peer)
 {
-	if (!peer || !peer->monitor_peer)
+	if (!peer || !peer->monitor_peer || !pdev->monitor_pdev)
 		return;
 
 	if (dp_peer_tx_cap_search(pdev, peer->peer_id,
