@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2020-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -15,8 +15,11 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
+#ifdef WLAN_SUPPORT_RX_FISA
 #include <dp_types.h>
+#endif
 #include <qdf_status.h>
+#include <wlan_dp_priv.h>
 
 //#define FISA_DEBUG_ENABLE
 
@@ -43,6 +46,9 @@
 /* minimal length without L2/L3 header required for FISA */
 #define FISA_MIN_L4_AND_DATA_LEN \
 	(FISA_UDP_HDR_LEN + FISA_MIN_UDP_DATA_LEN)
+
+/* CMEM size for FISA FST 16K */
+#define DP_CMEM_FST_SIZE 16384
 
 #define IPSEC_PORT 500
 #define IPSEC_NAT_PORT 4500
@@ -146,12 +152,54 @@ void dp_fisa_rx_fst_update_work(void *arg);
 void dp_suspend_fse_cache_flush(struct dp_soc *soc);
 
 /**
+ * dp_rx_fst_attach() - Initialize Rx FST and setup necessary parameters
+ * @dp_ctx: DP component context
+ *
+ * Return: Handle to flow search table entry
+ */
+QDF_STATUS dp_rx_fst_attach(struct wlan_dp_psoc_context *dp_ctx);
+
+/**
+ * dp_rx_fst_target_config() - Configure RX OLE FSE engine in HW
+ * @dp_ctx: DP component context
+ *
+ * Return: Success
+ */
+QDF_STATUS dp_rx_fst_target_config(struct wlan_dp_psoc_context *dp_ctx);
+
+/**
+ * dp_rx_fisa_config() - Configure FISA related settings
+ * @dp_ctx: DP component context
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS dp_rx_fisa_config(struct wlan_dp_psoc_context *dp_ctx);
+
+/**
+ * dp_rx_fst_detach() - De-initialize Rx FST
+ * @dp_ctx: DP component context
+ *
+ * Return: None
+ */
+void dp_rx_fst_detach(struct wlan_dp_psoc_context *dp_ctx);
+
+/**
  * dp_resume_fse_cache_flush() - Resume FSE cache flush
  * @soc: core txrx main context
  *
  * Return: None
  */
 void dp_resume_fse_cache_flush(struct dp_soc *soc);
+
+/**
+ * dp_rx_flow_send_fst_fw_setup() - Program FST parameters in FW/HW post-attach
+ * @soc: SoC handle
+ * @pdev: Pdev handle
+ *
+ * Return: Success when fst parameters are programmed in FW, error otherwise
+ */
+QDF_STATUS dp_rx_flow_send_fst_fw_setup(struct dp_soc *soc,
+					struct dp_pdev *pdev);
 #else
 static QDF_STATUS dp_rx_dump_fisa_stats(struct dp_soc *soc)
 {

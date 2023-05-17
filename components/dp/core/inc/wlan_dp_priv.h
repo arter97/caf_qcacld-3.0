@@ -523,6 +523,8 @@ struct dp_direct_link_context {
  * @arp_connectivity_map: ARP connectivity map
  * @rx_wake_lock: rx wake lock
  * @ol_enable: Enable/Disable offload
+ * @fst_cmem_base: FST base in CMEM
+ * @fst_in_cmem: Flag indicating if FST is in CMEM or not
  */
 struct wlan_dp_psoc_context {
 	struct wlan_objmgr_psoc *psoc;
@@ -600,6 +602,10 @@ struct wlan_dp_psoc_context {
 #ifdef FEATURE_DIRECT_LINK
 	qdf_mutex_t dp_direct_link_lock;
 	struct dp_direct_link_context *dp_direct_link_ctx;
+#endif
+#ifdef WLAN_SUPPORT_RX_FISA
+	uint64_t fst_cmem_base;
+	bool fst_in_cmem;
 #endif
 };
 

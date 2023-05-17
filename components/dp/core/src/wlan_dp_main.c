@@ -62,6 +62,7 @@ static struct wlan_dp_memory_profile_ctx wlan_dp_1x1_he80_1kqam[] = {
 /* Global data structure to save profile info */
 static struct wlan_dp_memory_profile_info g_dp_profile_info;
 #endif
+#include <wlan_dp_fisa_rx.h>
 
 /* Global DP context */
 static struct wlan_dp_psoc_context *gp_dp_ctx;
@@ -1576,6 +1577,66 @@ bool dp_is_data_stall_event_enabled(uint32_t evt)
 	return false;
 }
 
+#ifdef WLAN_SUPPORT_RX_FISA
+static inline QDF_STATUS
+wlan_dp_rx_fisa_attach_target(struct wlan_dp_psoc_context *dp_ctx)
+{
+	QDF_STATUS status;
+
+	status = dp_rx_fst_target_config(dp_ctx);
+	if (status != QDF_STATUS_SUCCESS &&
+	    status != QDF_STATUS_E_NOSUPPORT) {
+		dp_err("Failed to send htt fst setup config message to target");
+		return status;
+	}
+
+	if (status == QDF_STATUS_SUCCESS) {
+		status = dp_rx_fisa_config(dp_ctx);
+		if (QDF_IS_STATUS_ERROR(status)) {
+			dp_err("Failed to send htt FISA config message to target");
+			return status;
+		}
+	}
+
+	return status;
+}
+
+static inline QDF_STATUS
+wlan_dp_rx_fisa_attach(struct wlan_dp_psoc_context *dp_ctx)
+{
+	return dp_rx_fst_attach(dp_ctx);
+}
+
+static inline void wlan_dp_rx_fisa_detach(struct wlan_dp_psoc_context *dp_ctx)
+{
+	return dp_rx_fst_detach(dp_ctx);
+}
+
+static inline void
+wlan_dp_rx_fisa_cmem_attach(struct wlan_dp_psoc_context *dp_ctx)
+{
+	dp_ctx->fst_cmem_base = cdp_get_fst_cem_base(dp_ctx->cdp_soc,
+						     DP_CMEM_FST_SIZE);
+}
+#else
+static inline QDF_STATUS
+wlan_dp_rx_fisa_attach(struct wlan_dp_psoc_context *dp_ctx)
+{
+	return QDF_STATUS_SUCCESS;
+}
+
+static inline QDF_STATUS
+wlan_dp_rx_fisa_detach(struct wlan_dp_psoc_context *dp_ctx)
+{
+	return QDF_STATUS_SUCCESS;
+}
+
+static inline void
+wlan_dp_rx_fisa_cmem_attach(struct wlan_dp_psoc_context *dp_ctx)
+{
+}
+#endif
+
 QDF_STATUS __wlan_dp_runtime_suspend(ol_txrx_soc_handle soc, uint8_t pdev_id)
 {
 	return cdp_runtime_suspend(soc, pdev_id);
@@ -1599,11 +1660,13 @@ QDF_STATUS __wlan_dp_bus_resume(ol_txrx_soc_handle soc, uint8_t pdev_id)
 void *wlan_dp_txrx_soc_attach(struct dp_txrx_soc_attach_params *params,
 			      bool *is_wifi3_0_target)
 {
+	struct wlan_dp_psoc_context *dp_ctx;
 	void *dp_soc = NULL;
 	struct hif_opaque_softc *hif_context;
 	HTC_HANDLE htc_ctx = cds_get_context(QDF_MODULE_ID_HTC);
 	qdf_device_t qdf_ctx = cds_get_context(QDF_MODULE_ID_QDF_DEVICE);
 
+	dp_ctx = dp_get_context();
 	hif_context = cds_get_context(QDF_MODULE_ID_HIF);
 
 	if (TARGET_TYPE_QCA6290 == params->target_type ||
@@ -1651,6 +1714,12 @@ void *wlan_dp_txrx_soc_attach(struct dp_txrx_soc_attach_params *params,
 					params->dp_ol_if_ops);
 	}
 
+	if (!dp_soc)
+		return NULL;
+
+	dp_ctx->cdp_soc = dp_soc;
+	wlan_dp_rx_fisa_cmem_attach(dp_ctx);
+
 	return dp_soc;
 
 err_soc_detach:
@@ -1668,14 +1737,21 @@ void wlan_dp_txrx_soc_detach(ol_txrx_soc_handle soc)
 
 QDF_STATUS wlan_dp_txrx_attach_target(ol_txrx_soc_handle soc, uint8_t pdev_id)
 {
+	struct wlan_dp_psoc_context *dp_ctx;
 	QDF_STATUS qdf_status;
 	int errno;
+
+	dp_ctx = dp_get_context();
 
 	qdf_status = cdp_soc_attach_target(soc);
 	if (QDF_IS_STATUS_ERROR(qdf_status)) {
 		dp_err("Failed to attach soc target; status:%d", qdf_status);
 		return qdf_status;
 	}
+
+	qdf_status = wlan_dp_rx_fisa_attach_target(dp_ctx);
+	if (QDF_IS_STATUS_ERROR(qdf_status))
+		return qdf_status;
 
 	errno = cdp_pdev_attach_target(soc, pdev_id);
 	if (errno) {
@@ -1695,6 +1771,7 @@ QDF_STATUS wlan_dp_txrx_pdev_attach(ol_txrx_soc_handle soc)
 {
 	struct wlan_dp_psoc_context *dp_ctx;
 	struct cdp_pdev_attach_params pdev_params = { 0 };
+	QDF_STATUS qdf_status;
 
 	dp_ctx =  dp_get_context();
 
@@ -1702,8 +1779,20 @@ QDF_STATUS wlan_dp_txrx_pdev_attach(ol_txrx_soc_handle soc)
 	pdev_params.qdf_osdev = cds_get_context(QDF_MODULE_ID_QDF_DEVICE);
 	pdev_params.pdev_id = 0;
 
-	return cdp_pdev_attach(cds_get_context(QDF_MODULE_ID_SOC),
-			       &pdev_params);
+	qdf_status = cdp_pdev_attach(cds_get_context(QDF_MODULE_ID_SOC),
+				     &pdev_params);
+	if (QDF_IS_STATUS_ERROR(qdf_status))
+		return qdf_status;
+
+	/* FISA Attach */
+	qdf_status = wlan_dp_rx_fisa_attach(dp_ctx);
+	if (QDF_IS_STATUS_ERROR(qdf_status)) {
+		wlan_dp_txrx_pdev_detach(cds_get_context(QDF_MODULE_ID_SOC),
+					 OL_TXRX_PDEV_ID, false);
+		return qdf_status;
+	}
+
+	return qdf_status;
 }
 
 QDF_STATUS wlan_dp_txrx_pdev_detach(ol_txrx_soc_handle soc, uint8_t pdev_id,
@@ -1712,6 +1801,7 @@ QDF_STATUS wlan_dp_txrx_pdev_detach(ol_txrx_soc_handle soc, uint8_t pdev_id,
 	struct wlan_dp_psoc_context *dp_ctx;
 
 	dp_ctx =  dp_get_context();
+	wlan_dp_rx_fisa_detach(dp_ctx);
 	return cdp_pdev_detach(soc, pdev_id, force);
 }
 

@@ -26,6 +26,7 @@
 #include "dp_internal.h"
 #include "hif.h"
 #include "wlan_dp_rx_thread.h"
+#include <wlan_dp_fisa_rx.h>
 
 /* Timeout in milliseconds to wait for CMEM FST HTT response */
 #define DP_RX_FST_CMEM_RESP_TIMEOUT 2000
@@ -274,19 +275,13 @@ static void dp_rx_sw_ft_hist_deinit(struct dp_fisa_rx_sw_ft *sw_ft,
 }
 #endif
 
-/**
- * dp_rx_fst_attach() - Initialize Rx FST and setup necessary parameters
- * @soc: SoC handle
- * @pdev: Pdev handle
- *
- * Return: Handle to flow search table entry
- */
-QDF_STATUS dp_rx_fst_attach(struct dp_soc *soc, struct dp_pdev *pdev)
+QDF_STATUS dp_rx_fst_attach(struct wlan_dp_psoc_context *dp_ctx)
 {
+	struct dp_soc *soc = (struct dp_soc *)dp_ctx->cdp_soc;
+	struct wlan_cfg_dp_soc_ctxt *cfg = soc->wlan_cfg_ctx;
 	struct dp_rx_fst *fst;
 	struct dp_fisa_rx_sw_ft *ft_entry;
 	uint8_t *hash_key;
-	struct wlan_cfg_dp_soc_ctxt *cfg = soc->wlan_cfg_ctx;
 	int i = 0;
 	QDF_STATUS status;
 
@@ -429,13 +424,6 @@ static void dp_rx_fst_check_cmem_support(struct dp_soc *soc)
 	fst->fst_in_cmem = true;
 }
 
-/**
- * dp_rx_flow_send_fst_fw_setup() - Program FST parameters in FW/HW post-attach
- * @soc: SoC handle
- * @pdev: Pdev handle
- *
- * Return: Success when fst parameters are programmed in FW, error otherwise
- */
 QDF_STATUS dp_rx_flow_send_fst_fw_setup(struct dp_soc *soc,
 					struct dp_pdev *pdev)
 {
@@ -488,15 +476,9 @@ QDF_STATUS dp_rx_flow_send_fst_fw_setup(struct dp_soc *soc,
 	return status;
 }
 
-/**
- * dp_rx_fst_detach() - De-initialize Rx FST
- * @soc: SoC handle
- * @pdev: Pdev handle
- *
- * Return: None
- */
-void dp_rx_fst_detach(struct dp_soc *soc, struct dp_pdev *pdev)
+void dp_rx_fst_detach(struct wlan_dp_psoc_context *dp_ctx)
 {
+	struct dp_soc *soc = (struct dp_soc *)dp_ctx->cdp_soc;
 	struct dp_rx_fst *dp_fst;
 
 	dp_fst = soc->rx_fst;
@@ -568,6 +550,47 @@ void dp_rx_fst_requeue_wq(struct dp_soc *soc)
 		       &fst->fst_update_work);
 
 	dp_info("requeued defer fst update task");
+}
+
+QDF_STATUS dp_rx_fst_target_config(struct wlan_dp_psoc_context *dp_ctx)
+{
+	struct dp_soc *soc = (struct dp_soc *)dp_ctx->cdp_soc;
+	QDF_STATUS status;
+	struct dp_rx_fst *fst = soc->rx_fst;
+
+	/* Check if it is enabled in the INI */
+	if (!soc->fisa_enable) {
+		dp_err("RX FISA feature is disabled");
+		return QDF_STATUS_E_NOSUPPORT;
+	}
+
+	status = dp_rx_flow_send_fst_fw_setup(soc, soc->pdev_list[0]);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		dp_err("dp_rx_flow_send_fst_fw_setup failed %d",
+		       status);
+		return status;
+	}
+
+	if (dp_ctx->fst_cmem_base) {
+		dp_ctx->fst_in_cmem = true;
+		dp_rx_fst_update_cmem_params(soc, fst->max_entries,
+					     dp_ctx->fst_cmem_base & 0xffffffff,
+					     dp_ctx->fst_cmem_base >> 32);
+	}
+	return status;
+}
+
+#define FISA_MAX_TIMEOUT 0xffffffff
+#define FISA_DISABLE_TIMEOUT 0
+QDF_STATUS dp_rx_fisa_config(struct wlan_dp_psoc_context *dp_ctx)
+{
+	struct dp_soc *soc = (struct dp_soc *)dp_ctx->cdp_soc;
+	struct dp_htt_rx_fisa_cfg fisa_config;
+
+	fisa_config.pdev_id = 0;
+	fisa_config.fisa_timeout = FISA_MAX_TIMEOUT;
+
+	return dp_htt_rx_fisa_config(soc->pdev_list[0], &fisa_config);
 }
 
 #else /* WLAN_SUPPORT_RX_FISA */
