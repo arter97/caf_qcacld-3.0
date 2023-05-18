@@ -143,6 +143,7 @@ struct mlo_chip_info {
  * @event: event for teardown completion
  * @dp_handle: pointer to DP ML context
  * @chip_info: chip specific info of the soc
+ * @tsf_sync_enabled: MLO TSF sync is enabled at FW or not
  */
 struct mlo_setup_info {
 	uint8_t ml_grp_id;
@@ -161,6 +162,7 @@ struct mlo_setup_info {
 	qdf_event_t event;
 	struct cdp_mlo_ctxt *dp_handle;
 	struct mlo_chip_info chip_info;
+	bool tsf_sync_enabled;
 };
 
 /**
