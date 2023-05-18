@@ -593,6 +593,50 @@ void *mlo_glb_h_shmem_arena_get_crash_reason_address(uint8_t grp_id,
 }
 
 /**
+ * mlo_glb_h_shmem_arena_get_recovery_mode_address() - get the address of
+ * recovery mode associated with chip_id
+ * @grp_id: Id of the required MLO Group
+ * @chip_id: MLO Chip Id
+ *
+ * Return: Address of recovery mode field from global shmem arena in case of
+ * success, else returns NULL
+ */
+void *mlo_glb_h_shmem_arena_get_recovery_mode_address(uint8_t grp_id,
+						      uint8_t chip_id)
+{
+	struct wlan_host_mlo_glb_h_shmem_arena_ctx *shmem_arena_ctx;
+	struct wlan_host_mlo_glb_chip_crash_info *crash_info;
+	struct wlan_host_mlo_glb_per_chip_crash_info *per_chip_crash_info;
+	uint8_t chip;
+
+	if (grp_id > WLAN_MAX_MLO_GROUPS)
+		return NULL;
+
+	shmem_arena_ctx = get_shmem_arena_ctx(grp_id);
+	if (!shmem_arena_ctx) {
+		target_if_err("mlo_glb_h_shmem_arena context is NULL");
+		return NULL;
+	}
+
+	crash_info = &shmem_arena_ctx->chip_crash_info;
+
+	for (chip = 0; chip < crash_info->no_of_chips; chip++) {
+		per_chip_crash_info = &crash_info->per_chip_crash_info[chip];
+
+		if (chip_id == per_chip_crash_info->chip_id)
+			break;
+	}
+
+	if (chip == crash_info->no_of_chips) {
+		target_if_err("No crash info corresponding to chip %u",
+			      chip_id);
+		return NULL;
+	}
+
+	return per_chip_crash_info->recovery_mode;
+}
+
+/**
  * free_mlo_glb_per_chip_crash_info() - free per chip crash info
  * @crash_info: Pointer to crash info
  *
@@ -622,6 +666,7 @@ static int extract_mlo_glb_per_chip_crash_info_tlv(
 	mlo_glb_per_chip_crash_info *ptlv;
 	uint32_t tlv_len, tlv_tag;
 	uint8_t *crash_reason;
+	uint8_t *recovery_mode;
 
 	qdf_assert_always(data);
 	qdf_assert_always(chip_crash_info);
@@ -638,7 +683,10 @@ static int extract_mlo_glb_per_chip_crash_info_tlv(
 	chip_crash_info->chip_id = chip_id;
 	crash_reason = (uint8_t *)get_field_pointer_in_tlv(
 			ptlv, crash_reason, tlv_len);
+	recovery_mode = (uint8_t *)get_field_pointer_in_tlv(
+			ptlv, recovery_mode, tlv_len);
 	chip_crash_info->crash_reason = (void *)crash_reason;
+	chip_crash_info->recovery_mode = (void *)recovery_mode;
 	return tlv_len;
 }
 

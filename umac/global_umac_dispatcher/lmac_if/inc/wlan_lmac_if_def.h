@@ -253,6 +253,8 @@ struct wlan_target_if_dcs_rx_ops {
  * @deinit_shmem_arena_ctx: De-initialize shmem arena context
  * @get_crash_reason_address: Get the address of the crash reason associated
  * with chip_id
+ * @get_recovery_mode_address: Get the address of the recovery mode associated
+ * with chip_id
  * @get_no_of_chips_from_crash_info: Get the number of chips participated in the
  * mlo from global shmem crash info
  */
@@ -267,6 +269,8 @@ struct wlan_lmac_if_global_shmem_local_ops {
 					     uint8_t recovery);
 	void *(*get_crash_reason_address)(uint8_t grp_id,
 					  uint8_t chip_id);
+	void *(*get_recovery_mode_address)(uint8_t grp_id,
+					   uint8_t chip_id);
 	uint8_t (*get_no_of_chips_from_crash_info)(uint8_t grp_id);
 };
 #endif
