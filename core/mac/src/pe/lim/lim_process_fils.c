@@ -646,7 +646,6 @@ static void lim_get_keys(struct mac_context *mac_ctx,
 	qdf_mem_copy(buf, pe_session->bssId, QDF_MAC_ADDR_SIZE);
 	buf += QDF_MAC_ADDR_SIZE;
 
-
 	if (LIM_IS_AP_ROLE(pe_session)) {
 		qdf_mem_copy(buf, fils_info->auth_info.fils_nonce,
 			     SIR_FILS_NONCE_LENGTH);
@@ -693,6 +692,177 @@ static void lim_get_keys(struct mac_context *mac_ctx,
 	qdf_mem_zero(data, data_len);
 	qdf_mem_free(data);
 }
+
+#ifdef WLAN_FEATURE_FILS_SK_SAP
+QDF_STATUS lim_cache_fils_key(struct pe_session *pe_session, bool unicast,
+			      uint8_t key_id, uint16_t key_length,
+			      uint8_t *key, struct qdf_mac_addr *mac_addr)
+{
+	struct wlan_crypto_key *crypto_key;
+	QDF_STATUS status;
+	uint8_t i;
+	int32_t cipher;
+	enum wlan_crypto_cipher_type cipher_type = WLAN_CRYPTO_CIPHER_NONE;
+
+	if (unicast)
+		cipher = wlan_crypto_get_param(pe_session->vdev,
+					       WLAN_CRYPTO_PARAM_UCAST_CIPHER);
+	else
+		cipher = wlan_crypto_get_param(pe_session->vdev,
+					       WLAN_CRYPTO_PARAM_MCAST_CIPHER);
+
+	for (i = 0; i <= WLAN_CRYPTO_CIPHER_MAX; i++) {
+		if (QDF_HAS_PARAM(cipher, i)) {
+			cipher_type = i;
+			break;
+		}
+	}
+	crypto_key = wlan_crypto_get_key(pe_session->vdev, key_id);
+	if (!crypto_key) {
+		crypto_key = qdf_mem_malloc(sizeof(*crypto_key));
+		if (!crypto_key) {
+			pe_err("Failed to allocated memory for Crypto Key");
+			return QDF_STATUS_E_FAILURE;
+		}
+		status = wlan_crypto_save_key(pe_session->vdev, key_id,
+					      crypto_key);
+		if (QDF_IS_STATUS_ERROR(status)) {
+			pe_err("Failed to save crypto key");
+			qdf_mem_free(crypto_key);
+			return QDF_STATUS_E_FAILURE;
+		}
+	}
+	qdf_mem_zero(crypto_key, sizeof(*crypto_key));
+	crypto_key->cipher_type = cipher_type;
+	crypto_key->keylen = key_length;
+	crypto_key->keyix = key_id;
+	qdf_mem_copy(&crypto_key->keyval[0], key, key_length);
+	qdf_mem_copy(crypto_key->macaddr, mac_addr, QDF_MAC_ADDR_SIZE);
+
+	pe_debug("cipher_type %d key_len %d, key_id %d mac:" QDF_MAC_ADDR_FMT,
+		 crypto_key->cipher_type, crypto_key->keylen,
+		 crypto_key->keyix, QDF_MAC_ADDR_REF(crypto_key->macaddr));
+
+	return QDF_STATUS_SUCCESS;
+}
+
+QDF_STATUS lim_set_fils_key(struct pe_session *pe_session, bool unicast,
+			    uint8_t key_idx)
+{
+	struct wlan_crypto_key *crypto_key;
+
+	crypto_key = wlan_crypto_get_key(pe_session->vdev, key_idx);
+
+	return wlan_crypto_set_key_req(pe_session->vdev, crypto_key, (unicast ?
+				       WLAN_CRYPTO_KEY_TYPE_UNICAST :
+				       WLAN_CRYPTO_KEY_TYPE_GROUP));
+}
+
+/**
+ * lim_generate_gtk()- This API generates GTK
+ *
+ * @pe_session: pe session pointer
+ *
+ * Return: Status 0 for Success, else Failure
+ */
+static QDF_STATUS lim_generate_gtk(struct pe_session *pe_session)
+{
+	struct pe_fils_session *fils_info = pe_session->fils_info;
+	uint8_t gmk[FILS_GMK_LEN];
+	uint8_t gnonce[FILS_GNONCE_LEN];
+	uint8_t rkey[FILS_GTK_LEN];
+	uint8_t key_data[FILS_MAX_KEY_DATA_LEN] = {0};
+	uint8_t key_data_len = FILS_GNONCE_LEN;
+	uint8_t *data;
+	uint8_t data_len;
+	uint8_t *buf;
+	uint64_t timestamp = 0;
+	QDF_STATUS status;
+
+	if (!fils_info) {
+		pe_err("Failed to get Fils info");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	/*
+	 * Counter = PRF-256(Random number, "Init Counter",
+	 *                   Local MAC Address || Time)
+	 */
+
+	/* Get Gnonce */
+
+	data_len = QDF_MAC_ADDR_SIZE + sizeof(timestamp);
+	data = qdf_mem_malloc(data_len);
+	if (!data) {
+		pe_err("Failed to allocate memory for Gnonce");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	fils_info->gtk_len = FILS_GTK_LEN;
+	/* Get GMK */
+	qdf_get_random_bytes(gmk, FILS_GMK_LEN);
+
+	/* data is  Local MAC Address || Time */
+	buf = data;
+	qdf_mem_copy(buf, pe_session->self_mac_addr, QDF_MAC_ADDR_SIZE);
+	buf += QDF_MAC_ADDR_SIZE;
+	timestamp = qdf_get_time_of_the_day_ms();
+	qdf_mem_copy(buf, &timestamp, sizeof(timestamp));
+
+	qdf_get_random_bytes(rkey, FILS_GNONCE_LEN);
+
+	status = lim_get_key_from_prf(HMAC_SHA256_CRYPTO_TYPE,
+				      rkey,
+				      FILS_GNONCE_LEN, "Init Counter", data,
+				      data_len, key_data, key_data_len);
+	if (status != QDF_STATUS_SUCCESS) {
+		pe_err("failed to derive Gnonce");
+		qdf_mem_free(data);
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	qdf_mem_free(data);
+	qdf_mem_copy(gnonce, key_data, key_data_len);
+
+	/* GTK = PRF-X(GMK, "Group key expansion",
+	 *       AA || GNonce || Time || random data)
+	 * The example described in the IEEE 802.11 standard uses only AA and
+	 * GNonce as inputs here. Add some more entropy since this derivation
+	 * is done only at the Authenticator and as such, does not need to be
+	 * exactly same.
+	 */
+
+	data_len = QDF_MAC_ADDR_SIZE + FILS_GNONCE_LEN + sizeof(timestamp);
+	data = qdf_mem_malloc(data_len);
+	if (!data) {
+		pe_err("Failed to allocate memory for GTK");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	/* data is  AA || GNonce || Time */
+	buf = data;
+	qdf_mem_copy(buf, pe_session->self_mac_addr, QDF_MAC_ADDR_SIZE);
+	buf += QDF_MAC_ADDR_SIZE;
+	qdf_mem_copy(buf, gnonce, FILS_GNONCE_LEN);
+	buf += FILS_GNONCE_LEN;
+	timestamp = qdf_get_time_of_the_day_ms();
+	qdf_mem_copy(buf, &timestamp, sizeof(timestamp));
+
+	status = lim_get_key_from_prf(lim_get_hmac_crypto_type(fils_info->akm),
+				      gmk, FILS_GMK_LEN, "Group key expansion",
+				      data, data_len, fils_info->gtk,
+				      fils_info->gtk_len);
+
+	if (status != QDF_STATUS_SUCCESS) {
+		pe_err("failed to derive GTK");
+		qdf_mem_free(data);
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	qdf_mem_free(data);
+	return QDF_STATUS_SUCCESS;
+}
+#endif
 
 /**
  * lim_generate_pmkid()- This API generates PMKID using hash of erp auth packet
@@ -1639,6 +1809,7 @@ bool lim_process_fils_auth_frame1(struct mac_context *mac_ctx,
 	tDot11fIERSN dot11f_ie_rsn = {0};
 	struct pe_fils_session *fils_info = NULL;
 	struct qdf_mac_addr *sta_addr = (struct qdf_mac_addr *)peer_mac_addr;
+	QDF_STATUS status;
 
 	if (rx_auth_frm_body->authAlgoNumber != SIR_FILS_SK_WITHOUT_PFS) {
 		pe_debug("Auth type is not FILS_SK");
@@ -1725,6 +1896,20 @@ bool lim_process_fils_auth_frame1(struct mac_context *mac_ctx,
 
 	lim_generate_key_auth(pe_session, peer_mac_addr);
 	lim_generate_ap_key_auth(pe_session, peer_mac_addr);
+
+	/* GTK Calculation */
+	if (!fils_info->gtk_len) {
+		status = lim_generate_gtk(pe_session);
+		if (status != QDF_STATUS_SUCCESS) {
+			pe_err("failed to generate GTK");
+			qdf_mem_free(fils_info->fils_pmk);
+			fils_info->fils_pmk = NULL;
+			return false;
+		}
+	}
+
+	qdf_mem_free(fils_info->fils_pmk);
+	fils_info->fils_pmk = NULL;
 
 	return true;
 }

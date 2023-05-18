@@ -379,5 +379,49 @@ static inline bool lim_verify_fils_params_assoc_rsp(struct mac_context *mac_ctx,
 {
 	return true;
 }
-#endif
+#endif /* WLAN_FEATURE_FILS_SK */
+
+#ifdef WLAN_FEATURE_FILS_SK_SAP
+/**
+ * lim_cache_fils_key() - Cache FILS temporal key for FILS connection.
+ * @pe_session: PE Session
+ * @unicast: 1 for unicast, 0 for broadcast.
+ * @key_id: Index on which key needs to cached.
+ * @key_length: Length of temporal key to be cached.
+ * @key: Key to be cached.
+ * @mac_addr: MAC Address for peer.
+ *
+ * Return: QDF_STATUS
+ */
+
+QDF_STATUS lim_cache_fils_key(struct pe_session *pe_session, bool unicast,
+			      uint8_t key_id, uint16_t key_length,
+			      uint8_t *key, struct qdf_mac_addr *mac_addr);
+
+/**
+ * lim_set_fils_key() - Set FILS temporal key for FILS connection.
+ * @pe_session: PE Session
+ * @unicast: 1 for unicast, 0 for broadcast.
+ * @key_idx: Index on which key needs to cached.
+ * @mac_addr: MAC Address for peer.
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS lim_set_fils_key(struct pe_session *pe_session, bool unicast,
+			    uint8_t key_idx);
+#else
+static inline QDF_STATUS lim_cache_fils_key(struct pe_session *pe_session,
+					    bool unicast, uint8_t key_id,
+					    uint16_t key_length, uint8_t *key,
+					    struct qdf_mac_addr *mac_addr)
+{
+	return QDF_STATUS_SUCCESS;
+}
+
+static inline QDF_STATUS lim_set_fils_key(struct pe_session *pe_session,
+					  bool unicast, uint8_t key_idx)
+{
+	return QDF_STATUS_SUCCESS;
+}
+#endif /* WLAN_FEATURE_FILS_SK_SAP */
 #endif
