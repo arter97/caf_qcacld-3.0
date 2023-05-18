@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2017-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -24,6 +24,7 @@
 #include <lim_global.h>
 #include <ani_global.h>
 #include <lim_ser_des_utils.h>
+#include <lim_security_utils.h>
 
 #ifdef WLAN_FEATURE_FILS_SK
 
@@ -103,13 +104,16 @@ void lim_update_fils_config(struct mac_context *mac_ctx,
  * @mac_ctx: mac context
  * @auth_frame: pointer to auth frame
  * @session: PE session
+ * @frame_len: Length of FILS frame
+ * @peer_mac_addr: Mac Address of Peer Station
  *
  * Return: length of fils data
  */
 QDF_STATUS lim_create_fils_auth_data(struct mac_context *mac_ctx,
 				     tpSirMacAuthFrameBody auth_frame,
 				     struct pe_session *session,
-				     uint32_t *frame_len);
+				     uint32_t *frame_len,
+				     tSirMacAddr peer_mac_addr);
 
 /**
  * lim_increase_fils_sequence_number: this API increases fils sequence number in
@@ -206,6 +210,31 @@ static inline bool lim_is_fils_connection(struct pe_session *pe_session)
 	return false;
 }
 
+static inline struct pe_fils_session *
+lim_get_fils_info(struct pe_session *pe_session,
+		  tSirMacAddr peer_mac_addr)
+{
+	struct tLimPreAuthNode *sta_pre_auth_ctx;
+
+	if (LIM_IS_AP_ROLE(pe_session) && peer_mac_addr) {
+		/*
+		 * Extract pre-auth context for the STA
+		 */
+		sta_pre_auth_ctx = lim_search_pre_auth_list(pe_session->mac_ctx,
+							    peer_mac_addr);
+
+		if (!sta_pre_auth_ctx) {
+			pe_debug("No preauth node created for "
+				 QDF_MAC_ADDR_FMT,
+				 QDF_MAC_ADDR_REF(peer_mac_addr));
+			return NULL;
+		}
+		return sta_pre_auth_ctx->fils_info;
+	} else {
+		return pe_session->fils_info;
+	}
+}
+
 /**
  * lim_verify_fils_params_assoc_rsp() - Verify FILS params in assoc rsp
  * @mac_ctx: Mac context
@@ -253,7 +282,8 @@ static inline
 QDF_STATUS lim_create_fils_auth_data(struct mac_context *mac_ctx,
 				     tpSirMacAuthFrameBody auth_frame,
 				     struct pe_session *session,
-				     uint32_t *frame_len);
+				     uint32_t *frame_len,
+				     tSirMacAddr peer_mac_addr);
 {
 	return QDF_STATUS_SUCCESS;
 }

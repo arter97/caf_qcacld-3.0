@@ -3471,7 +3471,8 @@ lim_send_auth_mgmt_frame(struct mac_context *mac_ctx,
 		frame_len = sizeof(tSirMacMgmtHdr) + body_len;
 
 		status = lim_create_fils_auth_data(mac_ctx, auth_frame,
-						   session, &frame_len);
+						   session, &frame_len,
+						   NULL);
 		if (QDF_IS_STATUS_ERROR(status))
 			return;
 
@@ -3511,6 +3512,22 @@ lim_send_auth_mgmt_frame(struct mac_context *mac_ctx,
 
 			body_len = SIR_MAC_AUTH_FRAME_INFO_LEN;
 			frame_len = sizeof(tSirMacMgmtHdr) + body_len;
+		} else if (auth_frame->authAlgoNumber ==
+						SIR_FILS_SK_WITHOUT_PFS) {
+			body_len = SIR_MAC_AUTH_FRAME_INFO_LEN;
+			frame_len = sizeof(tSirMacMgmtHdr) + body_len;
+			if (auth_frame->authStatusCode == STATUS_SUCCESS) {
+				status =
+					lim_create_fils_auth_data(mac_ctx,
+								  auth_frame,
+								  session,
+								  &frame_len,
+								  peer_addr);
+				if (QDF_IS_STATUS_ERROR(status)) {
+					pe_err("Failed to create FILS Data");
+					return;
+				}
+			}
 		} else {
 			/*
 			 * Shared Key algorithm with challenge text

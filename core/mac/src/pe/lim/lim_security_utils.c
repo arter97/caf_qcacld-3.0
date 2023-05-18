@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2013-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -94,8 +94,9 @@ lim_is_auth_algo_supported(struct mac_context *mac, tAniAuthType authType,
 	} else {
 
 		if (LIM_IS_AP_ROLE(pe_session)) {
-			if ((pe_session->authType == eSIR_SHARED_KEY)
-			    || (pe_session->authType == eSIR_AUTO_SWITCH))
+			if (pe_session->authType == eSIR_SHARED_KEY ||
+			    pe_session->authType == SIR_FILS_SK_WITHOUT_PFS ||
+			    pe_session->authType == eSIR_AUTO_SWITCH)
 				algoEnable = true;
 			else
 				algoEnable = false;
