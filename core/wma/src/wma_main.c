@@ -6230,6 +6230,10 @@ static void wma_update_nan_target_caps(tp_wma_handle wma_handle,
 		tgt_cfg->nan_caps.ndi_txbf_supported = 1;
 
 	wma_update_mlo_sta_nan_ndi_target_caps(wma_handle, tgt_cfg);
+
+	if (wmi_service_enabled(wma_handle->wmi_handle,
+				wmi_service_nan_pairing_peer_create))
+		tgt_cfg->nan_caps.nan_pairing_peer_create_cap = 1;
 }
 #else
 static void wma_update_nan_target_caps(tp_wma_handle wma_handle,

@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2017-2018, 2020 The Linux Foundation. All rights reserved.
- * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2023-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -109,4 +109,5 @@ int target_if_nan_rsp_handler(ol_scn_t scn, uint8_t *data, uint32_t len);
  */
 void target_if_nan_set_vdev_feature_config(struct wlan_objmgr_psoc *psoc,
 					   uint8_t vdev_id);
-#endif /* _WIFI_POS_TGT_IF_H_ */
+
+#endif /* _WLAN_NAN_TGT_IF_H_ */

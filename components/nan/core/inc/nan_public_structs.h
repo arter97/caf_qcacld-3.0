@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2017-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -883,6 +883,7 @@ struct wlan_nan_rx_ops {
  * @ndi_txbf_supported: Target supports NAN Datapath with TX beamforming
  * by Fw or not.
  * @mlo_sta_nan_ndi_allowed: MLO STA + NAN + NDI concurrency is supported
+ * @nan_pairing_peer_create_cap: create NAN pairing peer in host when it is true
  */
 struct nan_tgt_caps {
 	uint32_t nan_conc_control:1;
@@ -896,6 +897,7 @@ struct nan_tgt_caps {
 #ifdef WLAN_FEATURE_11BE_MLO
 	uint32_t mlo_sta_nan_ndi_allowed:1;
 #endif
+	uint32_t nan_pairing_peer_create_cap:1;
 };
 
 #endif

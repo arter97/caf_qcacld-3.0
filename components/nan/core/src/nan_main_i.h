@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -326,5 +326,13 @@ uint8_t nan_get_vdev_id_from_bssid(struct wlan_objmgr_pdev *pdev,
  * Return: True if concurrency is present, False otherwise
  */
 bool nan_is_sta_sta_concurrency_present(struct wlan_objmgr_psoc *psoc);
+
+/**
+ * nan_is_pairing_allowed() - check NAN pairing capability
+ * @psoc: pointer to psoc object
+ *
+ * Return: Boolean flag indicating whether the NAN pairing allowed or not
+ */
+bool nan_is_pairing_allowed(struct wlan_objmgr_psoc *psoc);
 #endif /* _WLAN_NAN_MAIN_I_H_ */
 #endif /* WLAN_FEATURE_NAN */
