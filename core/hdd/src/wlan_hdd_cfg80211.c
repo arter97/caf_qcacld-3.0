@@ -21863,6 +21863,8 @@ static int wlan_hdd_add_key_all_mlo_vdev(mac_handle_t mac_handle,
 			if (QDF_IS_STATUS_ERROR(status))
 				peer = wlan_objmgr_vdev_try_get_bsspeer(link_vdev,
 									WLAN_OSIF_ID);
+			else
+				goto add_key;
 			break;
 		}
 
@@ -21886,6 +21888,8 @@ static int wlan_hdd_add_key_all_mlo_vdev(mac_handle_t mac_handle,
 			mlo_release_vdev_ref(link_vdev);
 			continue;
 		}
+
+add_key:
 		errno = wlan_hdd_add_key_vdev(mac_handle, link_vdev, key_index,
 					      pairwise, peer_mac.bytes,
 					      params, link_id, link_adapter);
