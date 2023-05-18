@@ -2862,14 +2862,14 @@ QDF_STATUS target_if_mlo_ready(struct wlan_objmgr_pdev **pdev,
 
 /**
  * target_if_mlo_teardown_req - API to trigger MLO teardown sequence
- * @pdev: Array of pointers to pdev object that are part of ML group
- * @num_pdevs: Number of pdevs in above array
+ * @pdev: Pointer to pdev object
  * @reason: Reason for triggering teardown
+ * @reset: UMAC reset for mode1 SSR
  *
  * Return: QDF_STATUS codes
  */
-QDF_STATUS target_if_mlo_teardown_req(struct wlan_objmgr_pdev **pdev,
-				      uint8_t num_pdevs, uint32_t reason);
+QDF_STATUS target_if_mlo_teardown_req(struct wlan_objmgr_pdev *pdev,
+				      uint32_t reason, bool reset);
 #endif /*WLAN_FEATURE_11BE_MLO && WLAN_MLO_MULTI_CHIP*/
 
 /**
