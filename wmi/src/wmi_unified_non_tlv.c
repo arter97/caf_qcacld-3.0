@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2016-2020 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -4273,15 +4273,15 @@ send_set_bwf_cmd_non_tlv(wmi_unified_t wmi_handle,
 
 #ifdef WLAN_ATF_ENABLE
 /**
- * send_set_atf_cmd_non_tlv() - send set atf command to fw
+ * send_atf_peer_list_cmd_non_tlv() - send set atf command to fw
  * @wmi_handle: wmi handle
  * @param: pointer to set atf param
  *
  * Return: 0 for success or error code
  */
 static QDF_STATUS
-send_set_atf_cmd_non_tlv(wmi_unified_t wmi_handle,
-			 struct set_atf_params *param)
+send_atf_peer_list_cmd_non_tlv(wmi_unified_t wmi_handle,
+			       struct set_atf_params *param)
 {
 	struct wmi_atf_peer_info   *peer_info;
 	wmi_peer_atf_request *cmd;
@@ -10215,7 +10215,7 @@ struct wmi_ops non_tlv_ops =  {
 	.send_scan_chan_list_cmd = send_scan_chan_list_cmd_non_tlv,
 	.send_pdev_get_tpc_config_cmd = send_pdev_get_tpc_config_cmd_non_tlv,
 #ifdef WLAN_ATF_ENABLE
-	.send_set_atf_cmd = send_set_atf_cmd_non_tlv,
+	.send_atf_peer_list_cmd = send_atf_peer_list_cmd_non_tlv,
 	.send_atf_peer_request_cmd = send_atf_peer_request_cmd_non_tlv,
 	.send_set_atf_grouping_cmd = send_set_atf_grouping_cmd_non_tlv,
 	.send_set_atf_group_ac_cmd = send_set_atf_group_ac_cmd_non_tlv,
