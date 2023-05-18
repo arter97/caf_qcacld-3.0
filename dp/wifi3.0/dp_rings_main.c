@@ -2016,7 +2016,7 @@ void dp_hw_link_desc_pool_banks_free(struct dp_soc *soc, uint32_t mac_id)
 				     soc->ctrl_psoc,
 				     WLAN_MD_DP_SRNG_WBM_IDLE_LINK,
 				     "hw_link_desc_bank");
-		dp_desc_multi_pages_mem_free(soc, DP_HW_LINK_DESC_TYPE,
+		dp_desc_multi_pages_mem_free(soc, QDF_DP_HW_LINK_DESC_TYPE,
 					     pages, 0, false);
 	}
 }
@@ -2105,7 +2105,7 @@ QDF_STATUS dp_hw_link_desc_pool_banks_alloc(struct dp_soc *soc, uint32_t mac_id)
 		     soc, total_mem_size);
 
 	dp_set_max_page_size(pages, max_alloc_size);
-	dp_desc_multi_pages_mem_alloc(soc, DP_HW_LINK_DESC_TYPE,
+	dp_desc_multi_pages_mem_alloc(soc, QDF_DP_HW_LINK_DESC_TYPE,
 				      pages,
 				      link_desc_size,
 				      *total_link_descs,

@@ -392,7 +392,7 @@ dp_tx_tcl_desc_pool_alloc_rh(struct dp_soc *soc, uint32_t num_elem,
 	/* Allocate tcl descriptors in coherent memory */
 	tcl_desc_pool = &rh_soc->tcl_desc_pool[pool_id];
 	memctx = qdf_get_dma_mem_context(tcl_desc_pool, memctx);
-	dp_desc_multi_pages_mem_alloc(soc, DP_TX_TCL_DESC_TYPE,
+	dp_desc_multi_pages_mem_alloc(soc, QDF_DP_TX_TCL_DESC_TYPE,
 				      &tcl_desc_pool->desc_pages,
 				      elem_size, num_elem, memctx, false);
 
@@ -405,7 +405,7 @@ dp_tx_tcl_desc_pool_alloc_rh(struct dp_soc *soc, uint32_t num_elem,
 	return status;
 
 err_alloc_fail:
-	dp_desc_multi_pages_mem_free(soc, DP_TX_TCL_DESC_TYPE,
+	dp_desc_multi_pages_mem_free(soc, QDF_DP_TX_TCL_DESC_TYPE,
 				     &tcl_desc_pool->desc_pages,
 				     memctx, false);
 	return status;
@@ -429,7 +429,7 @@ static void dp_tx_tcl_desc_pool_free_rh(struct dp_soc *soc, uint8_t pool_id)
 	tcl_desc_pool = &rh_soc->tcl_desc_pool[pool_id];
 	memctx = qdf_get_dma_mem_context(tcl_desc_pool, memctx);
 
-	dp_desc_multi_pages_mem_free(soc, DP_TX_TCL_DESC_TYPE,
+	dp_desc_multi_pages_mem_free(soc, QDF_DP_TX_TCL_DESC_TYPE,
 				     &tcl_desc_pool->desc_pages,
 				     memctx, false);
 }

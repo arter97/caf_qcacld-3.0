@@ -125,7 +125,7 @@ QDF_STATUS dp_tx_desc_pool_alloc(struct dp_soc *soc, uint8_t pool_id,
 	desc_size = DP_TX_DESC_SIZE(sizeof(struct dp_tx_desc_s));
 	tx_desc_pool = &((soc)->tx_desc[(pool_id)]);
 	tx_desc_pool->desc_pages.page_size = DP_BLOCKMEM_SIZE;
-	dp_desc_multi_pages_mem_alloc(soc, DP_TX_DESC_TYPE,
+	dp_desc_multi_pages_mem_alloc(soc, QDF_DP_TX_DESC_TYPE,
 				      &tx_desc_pool->desc_pages,
 				      desc_size, num_elem,
 				      0, true);
@@ -152,7 +152,7 @@ void dp_tx_desc_pool_free(struct dp_soc *soc, uint8_t pool_id)
 	tx_desc_pool = &((soc)->tx_desc[pool_id]);
 
 	if (tx_desc_pool->desc_pages.num_pages)
-		dp_desc_multi_pages_mem_free(soc, DP_TX_DESC_TYPE,
+		dp_desc_multi_pages_mem_free(soc, QDF_DP_TX_DESC_TYPE,
 					     &tx_desc_pool->desc_pages, 0,
 					     true);
 
@@ -217,7 +217,7 @@ dp_tx_ext_desc_pool_alloc_by_id(struct dp_soc *soc, uint32_t num_elem,
 	memctx = qdf_get_dma_mem_context(dp_tx_ext_desc_pool, memctx);
 
 	/* Coherent tx extension descriptor alloc */
-	dp_desc_multi_pages_mem_alloc(soc, DP_TX_EXT_DESC_TYPE,
+	dp_desc_multi_pages_mem_alloc(soc, QDF_DP_TX_EXT_DESC_TYPE,
 				      &dp_tx_ext_desc_pool->desc_pages,
 				      elem_size, num_elem, memctx, false);
 
@@ -233,7 +233,7 @@ dp_tx_ext_desc_pool_alloc_by_id(struct dp_soc *soc, uint32_t num_elem,
 	 * single element is 24bytes, 2K elements are 48Kbytes
 	 * Have to alloc multi page cacheable memory
 	 */
-	dp_desc_multi_pages_mem_alloc(soc, DP_TX_EXT_DESC_LINK_TYPE,
+	dp_desc_multi_pages_mem_alloc(soc, QDF_DP_TX_EXT_DESC_LINK_TYPE,
 				      &dp_tx_ext_desc_pool->desc_link_pages,
 				      link_elem_size, num_elem, 0, true);
 
@@ -247,7 +247,7 @@ dp_tx_ext_desc_pool_alloc_by_id(struct dp_soc *soc, uint32_t num_elem,
 	return QDF_STATUS_SUCCESS;
 
 free_ext_desc:
-	dp_desc_multi_pages_mem_free(soc, DP_TX_EXT_DESC_TYPE,
+	dp_desc_multi_pages_mem_free(soc, QDF_DP_TX_EXT_DESC_TYPE,
 				     &dp_tx_ext_desc_pool->desc_pages,
 				     memctx, false);
 	return status;
@@ -378,11 +378,11 @@ void dp_tx_ext_desc_pool_free_by_id(struct dp_soc *soc, uint8_t pool_id)
 	dp_tx_ext_desc_pool = &((soc)->tx_ext_desc[pool_id]);
 	memctx = qdf_get_dma_mem_context(dp_tx_ext_desc_pool, memctx);
 
-	dp_desc_multi_pages_mem_free(soc, DP_TX_EXT_DESC_LINK_TYPE,
+	dp_desc_multi_pages_mem_free(soc, QDF_DP_TX_EXT_DESC_LINK_TYPE,
 				     &dp_tx_ext_desc_pool->desc_link_pages,
 				     0, true);
 
-	dp_desc_multi_pages_mem_free(soc, DP_TX_EXT_DESC_TYPE,
+	dp_desc_multi_pages_mem_free(soc, QDF_DP_TX_EXT_DESC_TYPE,
 				     &dp_tx_ext_desc_pool->desc_pages,
 				     memctx, false);
 }
@@ -422,7 +422,7 @@ QDF_STATUS dp_tx_tso_desc_pool_alloc_by_id(struct dp_soc *soc, uint32_t num_elem
 
 	tso_desc_pool = &soc->tx_tso_desc[pool_id];
 	tso_desc_pool->num_free = 0;
-	dp_desc_multi_pages_mem_alloc(soc, DP_TX_TSO_DESC_TYPE,
+	dp_desc_multi_pages_mem_alloc(soc, QDF_DP_TX_TSO_DESC_TYPE,
 				      &tso_desc_pool->desc_pages,
 				      desc_size, num_elem, 0, true);
 	if (!tso_desc_pool->desc_pages.num_pages) {
@@ -462,7 +462,7 @@ void dp_tx_tso_desc_pool_free_by_id(struct dp_soc *soc, uint8_t pool_id)
 	struct dp_tx_tso_seg_pool_s *tso_desc_pool;
 
 	tso_desc_pool = &soc->tx_tso_desc[pool_id];
-	dp_desc_multi_pages_mem_free(soc, DP_TX_TSO_DESC_TYPE,
+	dp_desc_multi_pages_mem_free(soc, QDF_DP_TX_TSO_DESC_TYPE,
 				     &tso_desc_pool->desc_pages,
 				     0, true);
 }
@@ -558,7 +558,7 @@ QDF_STATUS dp_tx_tso_num_seg_pool_alloc_by_id(struct dp_soc *soc,
 
 	tso_num_seg_pool = &soc->tx_tso_num_seg[pool_id];
 	tso_num_seg_pool->num_free = 0;
-	dp_desc_multi_pages_mem_alloc(soc, DP_TX_TSO_NUM_SEG_TYPE,
+	dp_desc_multi_pages_mem_alloc(soc, QDF_DP_TX_TSO_NUM_SEG_TYPE,
 				      &tso_num_seg_pool->desc_pages,
 				      desc_size,
 				      num_elem, 0, true);
@@ -600,7 +600,7 @@ void dp_tx_tso_num_seg_pool_free_by_id(struct dp_soc *soc, uint8_t pool_id)
 	struct dp_tx_tso_num_seg_pool_s *tso_num_seg_pool;
 
 	tso_num_seg_pool = &soc->tx_tso_num_seg[pool_id];
-	dp_desc_multi_pages_mem_free(soc, DP_TX_TSO_NUM_SEG_TYPE,
+	dp_desc_multi_pages_mem_free(soc, QDF_DP_TX_TSO_NUM_SEG_TYPE,
 				     &tso_num_seg_pool->desc_pages,
 				     0, true);
 }
