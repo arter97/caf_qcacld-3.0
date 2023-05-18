@@ -5133,6 +5133,8 @@ struct dp_rx_fst {
 	bool fst_in_cmem;
 	qdf_atomic_t pm_suspended;
 	bool fst_wq_defer;
+	/* Hash based routing supported */
+	bool rx_hash_enabled;
 };
 
 #endif /* WLAN_SUPPORT_RX_FISA */
