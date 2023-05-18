@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2016-2019 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -24,15 +25,15 @@
 
 #ifdef WLAN_ATF_ENABLE
 /**
- * send_set_atf_cmd_tlv() - send set atf command to fw
+ * send_atf_peer_list_cmd_tlv() - send set atf command to fw
  * @wmi_handle: wmi handle
  * @param: pointer to set atf param
  *
  *  @return QDF_STATUS_SUCCESS  on success and -ve on failure.
  */
 static QDF_STATUS
-send_set_atf_cmd_tlv(wmi_unified_t wmi_handle,
-		     struct set_atf_params *param)
+send_atf_peer_list_cmd_tlv(wmi_unified_t wmi_handle,
+			   struct set_atf_params *param)
 {
 	wmi_atf_peer_info *peer_info;
 	wmi_peer_atf_request_fixed_param *cmd;
@@ -310,7 +311,216 @@ send_atf_peer_request_cmd_tlv(wmi_unified_t wmi_handle,
 
 	return retval;
 }
-#endif
+
+#ifdef WLAN_ATF_INCREASED_STA
+/**
+ * wmi_get_peer_entries_per_page() - Compute entry fits per WMI
+ * @wmi_handle: wmi handle
+ * @cmd_size: TLV header size + fixed param size
+ * @per_entry_size: Array element size
+ *
+ * Return: number of entries
+ */
+static inline size_t wmi_get_peer_entries_per_page(wmi_unified_t wmi_handle,
+						   size_t cmd_size,
+						   size_t per_entry_size)
+{
+	uint32_t avail_space = 0;
+	int num_entries = 0;
+	uint16_t max_msg_len = wmi_get_max_msg_len(wmi_handle);
+
+	avail_space = max_msg_len - cmd_size;
+	num_entries = avail_space / per_entry_size;
+
+	return num_entries;
+}
+
+/**
+ * send_atf_peer_list_cmd_tlv_v2() - send set atf command to fw
+ * @wmi_handle: wmi handle
+ * @param: pointer to set atf param
+ *
+ *  @return QDF_STATUS_SUCCESS  on success and -ve on failure.
+ */
+static QDF_STATUS
+send_atf_peer_list_cmd_tlv_v2(wmi_unified_t wmi_handle,
+			      struct atf_peer_params_v2 *param)
+{
+	wmi_atf_peer_info_v2 *peer_info;
+	wmi_peer_atf_request_fixed_param *cmd;
+	wmi_buf_t buf;
+	struct atf_peer_info_v2 *param_peer_info;
+	uint8_t *buf_ptr;
+	int i;
+	size_t len;
+	size_t cmd_len;
+	uint16_t num_entry;
+	uint16_t num_peers;
+	QDF_STATUS retval = QDF_STATUS_SUCCESS;
+
+	if (!wmi_handle || !param) {
+		wmi_err("Invalid input");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	if (param->num_peers && !param->peer_info) {
+		wmi_err("Invalid peer info input");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	len = sizeof(*cmd) + (2 * WMI_TLV_HDR_SIZE);
+	num_entry = wmi_get_peer_entries_per_page(wmi_handle, len,
+						  sizeof(*peer_info));
+	num_peers = param->num_peers;
+	param_peer_info = param->peer_info;
+	do {
+		cmd_len = len + (QDF_MIN(num_entry, num_peers) * sizeof(wmi_atf_peer_info_v2));
+		buf = wmi_buf_alloc(wmi_handle, cmd_len);
+		if (!buf) {
+			wmi_err("wmi_buf_alloc failed");
+			return QDF_STATUS_E_FAILURE;
+		}
+		buf_ptr = wmi_buf_data(buf);
+		cmd = (wmi_peer_atf_request_fixed_param *)buf_ptr;
+		WMITLV_SET_HDR(&cmd->tlv_header,
+			       WMITLV_TAG_STRUC_wmi_peer_atf_request_fixed_param,
+			       WMITLV_GET_STRUCT_TLVLEN(
+			       wmi_peer_atf_request_fixed_param));
+		cmd->num_peers = QDF_MIN(num_entry, num_peers);
+		cmd->pdev_id = wmi_handle->ops->convert_pdev_id_host_to_target(wmi_handle,
+									       param->pdev_id);
+		buf_ptr += sizeof(*cmd);
+		WMI_ATF_SET_PEER_FULL_UPDATE(cmd->atf_flags,
+					     param->full_update_flag);
+		WMI_ATF_SET_PEER_PDEV_ID_VALID(cmd->atf_flags, 1);
+
+		/* Set v1 param TLV length to 0 */
+		WMITLV_SET_HDR(buf_ptr, WMITLV_TAG_ARRAY_STRUC, 0);
+		buf_ptr += WMI_TLV_HDR_SIZE;
+
+		WMITLV_SET_HDR(buf_ptr, WMITLV_TAG_ARRAY_STRUC,
+			       sizeof(wmi_atf_peer_info_v2) * cmd->num_peers);
+		buf_ptr += WMI_TLV_HDR_SIZE;
+
+		peer_info = (wmi_atf_peer_info_v2 *)buf_ptr;
+
+		for (i = 0; i < cmd->num_peers; i++) {
+			if (!param_peer_info) {
+				wmi_err("Invalid param");
+				wmi_buf_free(buf);
+				return retval;
+			}
+			WMITLV_SET_HDR(&peer_info->tlv_header,
+				       WMITLV_TAG_STRUC_wmi_atf_peer_info_v2,
+				       WMITLV_GET_STRUCT_TLVLEN(wmi_atf_peer_info_v2));
+			qdf_mem_copy(&peer_info->peer_macaddr,
+				     &param_peer_info->peer_macaddr,
+				     sizeof(wmi_mac_addr));
+			WMI_ATF_SET_PEER_UNITS(peer_info->atf_peer_info,
+					       param_peer_info->percentage_peer);
+			WMI_ATF_SET_GROUP_ID(peer_info->atf_peer_info,
+					     param_peer_info->group_index);
+			WMI_ATF_SET_EXPLICIT_PEER_FLAG(peer_info->atf_peer_info,
+						       param_peer_info->explicit_peer_flag);
+			param_peer_info++;
+			peer_info++;
+		}
+		num_peers -= cmd->num_peers;
+		if (!num_peers)
+			WMI_ATF_SET_PEER_PENDING_WMI_CMDS(cmd->atf_flags, 0);
+		else
+			WMI_ATF_SET_PEER_PENDING_WMI_CMDS(cmd->atf_flags, 1);
+
+		wmi_mtrace(WMI_PEER_ATF_REQUEST_CMDID, NO_SESSION, 0);
+		retval = wmi_unified_cmd_send(wmi_handle, buf, cmd_len,
+					      WMI_PEER_ATF_REQUEST_CMDID);
+
+		if (QDF_IS_STATUS_ERROR(retval)) {
+			wmi_err("WMI_PEER_ATF_REQUEST_CMDID Failed");
+			wmi_buf_free(buf);
+			return retval;
+		}
+	} while (num_peers && (num_peers <= param->num_peers));
+
+	return retval;
+}
+
+/**
+ * send_set_atf_grouping_cmd_tlv_v2() - send set atf grouping command to fw
+ * @wmi_handle: wmi handle
+ * @param: pointer to set atf grouping param
+ *
+ * Return: 0 for success or error code
+ */
+static QDF_STATUS
+send_set_atf_grouping_cmd_tlv_v2(wmi_unified_t wmi_handle,
+				 struct atf_grouping_params_v2 *param)
+{
+	wmi_atf_group_info_v2 *group_info;
+	wmi_atf_ssid_grp_request_fixed_param *cmd;
+	wmi_buf_t buf;
+	uint8_t i;
+	QDF_STATUS retval;
+	uint32_t len = 0;
+	uint8_t *buf_ptr = 0;
+
+	len = sizeof(*cmd) + (2 * WMI_TLV_HDR_SIZE);
+	len += param->num_groups * sizeof(wmi_atf_group_info_v2);
+	buf = wmi_buf_alloc(wmi_handle, len);
+	if (!buf) {
+		wmi_err("wmi_buf_alloc failed");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	buf_ptr = wmi_buf_data(buf);
+	cmd = (wmi_atf_ssid_grp_request_fixed_param *)buf_ptr;
+	WMITLV_SET_HDR(&cmd->tlv_header,
+		       WMITLV_TAG_STRUC_wmi_atf_ssid_grp_request_fixed_param,
+		       WMITLV_GET_STRUCT_TLVLEN(wmi_atf_ssid_grp_request_fixed_param));
+	cmd->pdev_id = wmi_handle->ops->convert_pdev_id_host_to_target(wmi_handle,
+								       param->pdev_id);
+
+	buf_ptr += sizeof(*cmd);
+
+	/* Set v1 param TLV length to 0 */
+	WMITLV_SET_HDR(buf_ptr, WMITLV_TAG_ARRAY_STRUC, 0);
+	buf_ptr += WMI_TLV_HDR_SIZE;
+
+	WMITLV_SET_HDR(buf_ptr, WMITLV_TAG_ARRAY_STRUC,
+		       sizeof(wmi_atf_group_info_v2) *
+		       param->num_groups);
+	buf_ptr += WMI_TLV_HDR_SIZE;
+
+	group_info = (wmi_atf_group_info_v2 *)buf_ptr;
+
+	for (i = 0; i < param->num_groups; i++)	{
+		WMITLV_SET_HDR(&group_info->tlv_header,
+			       WMITLV_TAG_STRUC_wmi_atf_group_info_v2,
+			       WMITLV_GET_STRUCT_TLVLEN(wmi_atf_group_info_v2));
+		group_info->atf_group_id = i;
+		group_info->atf_group_units = param->group_info[i].percentage_group;
+		WMI_ATF_GROUP_SET_GROUP_SCHED_POLICY(group_info->atf_group_flags,
+						     param->group_info[i].group_units_reserved);
+		WMI_ATF_GROUP_SET_NUM_IMPLICIT_PEERS(group_info->atf_total_num_peers,
+						     param->group_info[i].implicit_peers);
+		WMI_ATF_GROUP_SET_NUM_EXPLICIT_PEERS(group_info->atf_total_num_peers,
+						     param->group_info[i].explicit_peers);
+		group_info->atf_total_implicit_peer_units = param->group_info[i].implicit_peer_units;
+		group_info++;
+	}
+
+	wmi_mtrace(WMI_ATF_SSID_GROUPING_REQUEST_CMDID, NO_SESSION, 0);
+	retval = wmi_unified_cmd_send(wmi_handle, buf, len,
+				      WMI_ATF_SSID_GROUPING_REQUEST_CMDID);
+	if (QDF_IS_STATUS_ERROR(retval)) {
+		wmi_err("WMI_ATF_SSID_GROUPING_REQUEST_CMDID Failed");
+		wmi_buf_free(buf);
+	}
+
+	return retval;
+}
+#endif /* WLAN_ATF_INCREASED_STA */
+#endif /* WLAN_ATF_ENABLE */
 
 /**
  * send_set_bwf_cmd_tlv() - send set bwf command to fw
@@ -387,16 +597,28 @@ send_set_bwf_cmd_tlv(wmi_unified_t wmi_handle,
 	return retval;
 }
 
+#ifdef WLAN_ATF_INCREASED_STA
+static inline void wmi_atf_attach_v2_tlv(struct wmi_ops *ops)
+{
+	ops->send_atf_peer_list_cmd_v2 = send_atf_peer_list_cmd_tlv_v2;
+	ops->send_set_atf_grouping_cmd_v2 = send_set_atf_grouping_cmd_tlv_v2;
+}
+#else
+static inline void wmi_atf_attach_v2_tlv(struct wmi_ops *ops)
+{
+}
+#endif
+
 void wmi_atf_attach_tlv(wmi_unified_t wmi_handle)
 {
 	struct wmi_ops *ops = wmi_handle->ops;
 
 #ifdef WLAN_ATF_ENABLE
-	ops->send_set_atf_cmd = send_set_atf_cmd_tlv;
+	ops->send_atf_peer_list_cmd = send_atf_peer_list_cmd_tlv;
 	ops->send_set_atf_grouping_cmd = send_set_atf_grouping_cmd_tlv;
 	ops->send_set_atf_group_ac_cmd = send_set_atf_group_ac_cmd_tlv;
 	ops->send_atf_peer_request_cmd = send_atf_peer_request_cmd_tlv;
+	wmi_atf_attach_v2_tlv(ops);
 #endif
 	ops->send_set_bwf_cmd = send_set_bwf_cmd_tlv;
 }
-

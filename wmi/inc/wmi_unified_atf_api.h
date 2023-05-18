@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2013-2019 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -36,16 +37,40 @@ QDF_STATUS wmi_unified_set_bwf_cmd_send(wmi_unified_t wmi_handle,
 					struct set_bwf_params *param);
 
 #ifdef WLAN_ATF_ENABLE
+#ifdef WLAN_ATF_INCREASED_STA
 /**
- *  wmi_unified_set_atf_cmd_send() - WMI set atf function
+ *  wmi_unified_set_atf_peer_list_cmd_send_v2() - send ATF peer list to fw
+ *                                                as per version 2
+ *  @wmi_handle: handle to WMI.
+ *  @param: pointer to set atf param for version 2
+ *
+ *  Return: QDF_STATUS_SUCCESS on success and QDF_STATUS_E_FAILURE for failure
+ */
+QDF_STATUS
+wmi_unified_set_atf_peer_list_cmd_send_v2(wmi_unified_t wmi_handle,
+					  struct atf_peer_params_v2 *param);
+/**
+ * wmi_unified_set_atf_groupping_cmd_send_v2() - send atf grouping command to
+ *                                               fw as per version 2
+ * @wmi_handle: wmi handle
+ * @param: pointer to set atf grouping param for version 2
+ *
+ * Return: QDF_STATUS_SUCCESS on success and QDF_STATUS_E_FAILURE for failure
+ */
+QDF_STATUS
+wmi_unified_set_atf_groupping_cmd_send_v2(wmi_unified_t wmi_handle,
+					  struct atf_grouping_params_v2 *param);
+#endif
+/**
+ *  wmi_unified_set_atf_peer_list_cmd_send() - send ATF peer list to fw
  *  @wmi_handle: handle to WMI.
  *  @param: pointer to set atf param
  *
  *  Return: QDF_STATUS_SUCCESS on success and QDF_STATUS_E_FAILURE for failure
  */
 QDF_STATUS
-wmi_unified_set_atf_cmd_send(wmi_unified_t wmi_handle,
-			     struct set_atf_params *param);
+wmi_unified_set_atf_peer_list_cmd_send(wmi_unified_t wmi_handle,
+				       struct set_atf_params *param);
 
 /**
  * wmi_send_atf_peer_request_cmd() - send atf peer request command to fw
