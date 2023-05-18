@@ -208,6 +208,8 @@ QDF_STATUS wlan_mlo_peer_is_assoc_done(struct wlan_mlo_peer_context *ml_peer)
 	return status;
 }
 
+qdf_export_symbol(wlan_mlo_peer_is_assoc_done);
+
 struct wlan_objmgr_peer *wlan_mlo_peer_get_assoc_peer(
 					struct wlan_mlo_peer_context *ml_peer)
 {
@@ -316,6 +318,68 @@ void wlan_mlo_partner_peer_assoc_post(struct wlan_objmgr_peer *assoc_peer)
 		mlo_link_peer_assoc_notify(ml_dev, link_peers[i]);
 	}
 }
+
+void wlan_mlo_link_peer_assoc_set(struct wlan_objmgr_peer *peer, bool is_sent)
+{
+	struct wlan_mlo_peer_context *ml_peer;
+	struct wlan_mlo_link_peer_entry *peer_entry;
+	uint16_t i;
+
+	ml_peer = peer->mlo_peer_ctx;
+	if (!ml_peer)
+		return;
+
+	mlo_peer_lock_acquire(ml_peer);
+
+	for (i = 0; i < MAX_MLO_LINK_PEERS; i++) {
+		peer_entry = &ml_peer->peer_list[i];
+
+		if (!peer_entry->link_peer)
+			continue;
+
+		if (peer_entry->link_peer == peer) {
+			peer_entry->peer_assoc_sent = is_sent;
+			break;
+		}
+	}
+	mlo_peer_lock_release(ml_peer);
+}
+
+qdf_export_symbol(wlan_mlo_link_peer_assoc_set);
+
+void wlan_mlo_peer_get_del_hw_bitmap(struct wlan_objmgr_peer *peer,
+				     uint32_t *hw_link_id_bitmap)
+{
+	struct wlan_mlo_peer_context *ml_peer;
+	struct wlan_mlo_link_peer_entry *peer_entry;
+	uint16_t i;
+
+	ml_peer = peer->mlo_peer_ctx;
+	if (!ml_peer)
+		return;
+
+	mlo_peer_lock_acquire(ml_peer);
+
+	for (i = 0; i < MAX_MLO_LINK_PEERS; i++) {
+		peer_entry = &ml_peer->peer_list[i];
+
+		if (!peer_entry->link_peer)
+			continue;
+
+		if (peer_entry->link_peer == peer) {
+			/* Peer assoc is not sent, no need to send bitmap */
+			if (!peer_entry->peer_assoc_sent)
+				break;
+
+			continue;
+		}
+		if (!peer_entry->peer_assoc_sent)
+			*hw_link_id_bitmap |= 1 << peer_entry->hw_link_id;
+	}
+	mlo_peer_lock_release(ml_peer);
+}
+
+qdf_export_symbol(wlan_mlo_peer_get_del_hw_bitmap);
 
 void
 wlan_mlo_peer_deauth_init(struct wlan_mlo_peer_context *ml_peer,

@@ -422,6 +422,7 @@ struct wlan_mlo_dev_context {
  * @is_primary: sets true if the peer is primary UMAC’s peer
  * @hw_link_id: HW Link id of peer
  * @assoc_rsp_buf: Assoc resp buffer
+ * @peer_assoc_sent: flag to indicate peer assoc sent to FW
  */
 struct wlan_mlo_link_peer_entry {
 	struct wlan_objmgr_peer *link_peer;
@@ -430,6 +431,7 @@ struct wlan_mlo_link_peer_entry {
 	bool is_primary;
 	uint8_t hw_link_id;
 	qdf_nbuf_t assoc_rsp_buf;
+	bool peer_assoc_sent;
 };
 
 /**

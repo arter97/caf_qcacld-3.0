@@ -194,6 +194,30 @@ bool wlan_mlo_peer_is_assoc_peer(struct wlan_mlo_peer_context *ml_peer,
 void wlan_mlo_partner_peer_assoc_post(struct wlan_objmgr_peer *assoc_peer);
 
 /**
+ * wlan_mlo_link_peer_assoc_set() - Set Peer assoc sent flag
+ * @peer: Link peer
+ * @is_sent: indicates whether peer assoc is queued to FW
+ *
+ * This function updates that the Peer assoc commandis sent for the link peer
+ *
+ * Return: void
+ */
+void wlan_mlo_link_peer_assoc_set(struct wlan_objmgr_peer *peer, bool is_sent);
+
+/**
+ * wlan_mlo_peer_get_del_hw_bitmap() - Gets peer del hw bitmap for link peer
+ * @peer: Link peer
+ * @hw_link_id_bitmap: WMI peer delete HW link bitmap
+ *
+ * This function gets hw bitmap for peer delete command, which includes
+ * hw link id of partner links for which peer assoc was not sent to FW
+ *
+ * Return: void
+ */
+void wlan_mlo_peer_get_del_hw_bitmap(struct wlan_objmgr_peer *peer,
+				     uint32_t *hw_link_id_bitmap);
+
+/**
  * wlan_mlo_peer_deauth_init() - Initiate Deauth of MLO peer
  * @ml_peer: MLO peer
  * @src_peer: Source peer, if this pointer is valid, send deauth on other link
