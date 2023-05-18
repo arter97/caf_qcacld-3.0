@@ -1789,8 +1789,8 @@ QDF_STATUS (*send_periodic_chan_stats_config_cmd)(wmi_unified_t wmi_handle,
 			struct periodic_chan_stats_params *param);
 
 #ifdef WLAN_ATF_ENABLE
-QDF_STATUS (*send_set_atf_cmd)(wmi_unified_t wmi_handle,
-			       struct set_atf_params *param);
+QDF_STATUS (*send_atf_peer_list_cmd)(wmi_unified_t wmi_handle,
+				     struct set_atf_params *param);
 
 QDF_STATUS
 (*send_atf_peer_request_cmd)(wmi_unified_t wmi_handle,
@@ -1811,6 +1811,14 @@ QDF_STATUS (*extract_atf_peer_stats_ev)(wmi_unified_t wmi_handle,
 QDF_STATUS (*extract_atf_token_info_ev)(wmi_unified_t wmi_handle,
 					void *evt_buf, uint8_t idx,
 					wmi_host_atf_peer_stats_info *atf_info);
+
+#ifdef WLAN_ATF_INCREASED_STA
+QDF_STATUS (*send_atf_peer_list_cmd_v2)(wmi_unified_t wmi_handle,
+					struct atf_peer_params_v2 *param);
+QDF_STATUS
+(*send_set_atf_grouping_cmd_v2)(wmi_unified_t wmi_handle,
+				struct atf_grouping_params_v2 *param);
+#endif
 #endif
 
 QDF_STATUS (*send_get_user_position_cmd)(wmi_unified_t wmi_handle,
