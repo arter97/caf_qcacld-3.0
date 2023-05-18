@@ -429,6 +429,10 @@ struct hif_softc {
 	struct hif_cpu_affinity irq_cpu_mask[HIF_MAX_GROUP][HIF_MAX_GRP_IRQ];
 	qdf_cpu_mask allowed_mask;
 #endif
+#ifdef FEATURE_DIRECT_LINK
+	struct qdf_mem_multi_page_t dl_recv_pages;
+	int dl_recv_pipe_num;
+#endif
 };
 
 #if defined(NUM_SOC_PERF_CLUSTER) && (NUM_SOC_PERF_CLUSTER > 1)
@@ -610,6 +614,35 @@ void hif_mem_free_consistent_unaligned(struct hif_softc *scn,
 				       qdf_dma_addr_t paddr,
 				       qdf_dma_context_t memctx,
 				       uint8_t is_mem_prealloc);
+
+/**
+ * hif_prealloc_get_multi_pages() - gets pre-alloc DP multi-pages memory
+ * @scn: HIF context
+ * @desc_type: descriptor type
+ * @elem_size: single element size
+ * @elem_num: total number of elements should be allocated
+ * @pages: multi page information storage
+ * @cacheable: coherent memory or cacheable memory
+ *
+ * Return: None
+ */
+void hif_prealloc_get_multi_pages(struct hif_softc *scn, uint32_t desc_type,
+				  qdf_size_t elem_size, uint16_t elem_num,
+				  struct qdf_mem_multi_page_t *pages,
+				  bool cacheable);
+
+/**
+ * hif_prealloc_put_multi_pages() - puts back pre-alloc DP multi-pages memory
+ * @scn: HIF context
+ * @desc_type: descriptor type
+ * @pages: multi page information storage
+ * @cacheable: coherent memory or cacheable memory
+ *
+ * Return: None
+ */
+void hif_prealloc_put_multi_pages(struct hif_softc *scn, uint32_t desc_type,
+				  struct qdf_mem_multi_page_t *pages,
+				  bool cacheable);
 #else
 static inline
 void *hif_mem_alloc_consistent_unaligned(struct hif_softc *scn,
@@ -634,6 +667,25 @@ void hif_mem_free_consistent_unaligned(struct hif_softc *scn,
 {
 	return qdf_mem_free_consistent(scn->qdf_dev, scn->qdf_dev->dev,
 				       size, vaddr, paddr, memctx);
+}
+
+static inline
+void hif_prealloc_get_multi_pages(struct hif_softc *scn, uint32_t desc_type,
+				  qdf_size_t elem_size, uint16_t elem_num,
+				  struct qdf_mem_multi_page_t *pages,
+				  bool cacheable)
+{
+	qdf_mem_multi_pages_alloc(scn->qdf_dev, pages,
+				  elem_size, elem_num, 0, cacheable);
+}
+
+static inline
+void hif_prealloc_put_multi_pages(struct hif_softc *scn, uint32_t desc_type,
+				  struct qdf_mem_multi_page_t *pages,
+				  bool cacheable)
+{
+	qdf_mem_multi_pages_free(scn->qdf_dev, pages, 0,
+				 cacheable);
 }
 #endif
 

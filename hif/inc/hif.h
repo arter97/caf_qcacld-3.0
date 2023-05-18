@@ -878,6 +878,8 @@ struct htc_callbacks {
  * @get_bandwidth_level: Query current bandwidth level for the driver
  * @prealloc_get_consistent_mem_unaligned: get prealloc unaligned consistent mem
  * @prealloc_put_consistent_mem_unaligned: put unaligned consistent mem to pool
+ * @prealloc_get_multi_pages: get prealloc multi pages memory
+ * @prealloc_put_multi_pages: put prealloc multi pages memory back to pool
  * This Structure provides callback pointer for HIF to query hdd for driver
  * states.
  */
@@ -893,6 +895,13 @@ struct hif_driver_state_callbacks {
 						       qdf_dma_addr_t *paddr,
 						       uint32_t ring_type);
 	void (*prealloc_put_consistent_mem_unaligned)(void *vaddr);
+	void (*prealloc_get_multi_pages)(uint32_t desc_type,
+					 qdf_size_t elem_size,
+					 uint16_t elem_num,
+					 struct qdf_mem_multi_page_t *pages,
+					 bool cacheable);
+	void (*prealloc_put_multi_pages)(uint32_t desc_type,
+					 struct qdf_mem_multi_page_t *pages);
 };
 
 /* This API detaches the HTC layer from the HIF device */

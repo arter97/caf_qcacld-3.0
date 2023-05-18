@@ -1168,6 +1168,26 @@ hif_affinity_mgr_init(struct hif_softc *scn, struct wlan_objmgr_psoc *psoc)
 }
 #endif
 
+#ifdef FEATURE_DIRECT_LINK
+/**
+ * hif_init_direct_link_rcv_pipe_num(): Initialize the direct link receive
+ *  pipe number
+ * @scn: hif context
+ *
+ * Return: None
+ */
+static inline
+void hif_init_direct_link_rcv_pipe_num(struct hif_softc *scn)
+{
+	scn->dl_recv_pipe_num = INVALID_PIPE_NO;
+}
+#else
+static inline
+void hif_init_direct_link_rcv_pipe_num(struct hif_softc *scn)
+{
+}
+#endif
+
 struct hif_opaque_softc *hif_open(qdf_device_t qdf_ctx,
 				  uint32_t mode,
 				  enum qdf_bus_type bus_type,
@@ -1217,6 +1237,7 @@ struct hif_opaque_softc *hif_open(qdf_device_t qdf_ctx,
 	hif_cpuhp_register(scn);
 	hif_latency_detect_init(scn);
 	hif_affinity_mgr_init(scn, psoc);
+	hif_init_direct_link_rcv_pipe_num(scn);
 
 out:
 	return GET_HIF_OPAQUE_HDL(scn);
@@ -2308,6 +2329,39 @@ void hif_mem_free_consistent_unaligned(struct hif_softc *scn,
 		qdf_mem_free_consistent(scn->qdf_dev, scn->qdf_dev->dev,
 					size, vaddr, paddr, memctx);
 	}
+}
+
+void hif_prealloc_get_multi_pages(struct hif_softc *scn, uint32_t desc_type,
+				  qdf_size_t elem_size, uint16_t elem_num,
+				  struct qdf_mem_multi_page_t *pages,
+				  bool cacheable)
+{
+	struct hif_driver_state_callbacks *cbk =
+			hif_get_callbacks_handle(scn);
+
+	if (cbk && cbk->prealloc_get_multi_pages)
+		cbk->prealloc_get_multi_pages(desc_type, elem_size, elem_num,
+					      pages, cacheable);
+
+	if (!pages->num_pages)
+		qdf_mem_multi_pages_alloc(scn->qdf_dev, pages,
+					  elem_size, elem_num, 0, cacheable);
+}
+
+void hif_prealloc_put_multi_pages(struct hif_softc *scn, uint32_t desc_type,
+				  struct qdf_mem_multi_page_t *pages,
+				  bool cacheable)
+{
+	struct hif_driver_state_callbacks *cbk =
+			hif_get_callbacks_handle(scn);
+
+	if (cbk && cbk->prealloc_put_multi_pages &&
+	    pages->is_mem_prealloc)
+		cbk->prealloc_put_multi_pages(desc_type, pages);
+
+	if (!pages->is_mem_prealloc)
+		qdf_mem_multi_pages_free(scn->qdf_dev, pages, 0,
+					 cacheable);
 }
 #endif
 
