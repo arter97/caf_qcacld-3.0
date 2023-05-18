@@ -132,6 +132,48 @@ qdf_size_t dp_get_context_size_be(enum dp_context_type context_type)
 	}
 }
 
+#if defined(DP_FEATURE_HW_COOKIE_CONVERSION) || defined(WLAN_SUPPORT_RX_FISA)
+static uint64_t dp_get_cmem_chunk(struct dp_soc *soc, uint64_t size,
+				  enum CMEM_MEM_CLIENTS client)
+{
+	uint64_t cmem_chunk;
+
+	dp_info("cmem base 0x%llx, total size 0x%llx avail_size 0x%llx",
+		soc->cmem_base, soc->cmem_total_size, soc->cmem_avail_size);
+
+	/* Check if requested cmem space is available */
+	if (soc->cmem_avail_size < size) {
+		dp_err("cmem_size 0x%llx bytes < requested size 0x%llx bytes",
+		       soc->cmem_avail_size, size);
+		return 0;
+	}
+
+	cmem_chunk = soc->cmem_base +
+		     (soc->cmem_total_size - soc->cmem_avail_size);
+	soc->cmem_avail_size -= size;
+	dp_info("Reserved cmem space 0x%llx, size 0x%llx for client %d",
+		cmem_chunk, size, client);
+
+	return cmem_chunk;
+}
+#endif
+
+#if defined(WLAN_SUPPORT_RX_FISA)
+static inline QDF_STATUS dp_fisa_fst_cmem_addr_init(struct dp_soc *soc)
+{
+	soc->fst_cmem_size = DP_CMEM_FST_SIZE;
+	soc->fst_cmem_base = dp_get_cmem_chunk(soc, soc->fst_cmem_size,
+					       FISA_FST);
+
+	return QDF_STATUS_SUCCESS;
+}
+#else /* !WLAN_SUPPORT_RX_FISA */
+static inline QDF_STATUS dp_fisa_fst_cmem_addr_init(struct dp_soc *soc)
+{
+	return QDF_STATUS_SUCCESS;
+}
+#endif
+
 #ifdef DP_FEATURE_HW_COOKIE_CONVERSION
 #if defined(WLAN_MAX_PDEVS) && (WLAN_MAX_PDEVS == 1)
 /**
@@ -183,35 +225,6 @@ void dp_cc_wbm_sw_en_cfg(struct hal_hw_cc_config *cc_cfg)
 	cc_cfg->wbm2sw1_cc_en = 1;
 	cc_cfg->wbm2sw0_cc_en = 1;
 	cc_cfg->wbm2fw_cc_en = 0;
-}
-#endif
-
-#if defined(WLAN_SUPPORT_RX_FISA)
-static QDF_STATUS dp_fisa_fst_cmem_addr_init(struct dp_soc *soc)
-{
-	dp_info("cmem base 0x%llx, total size 0x%llx avail_size 0x%llx",
-		soc->cmem_base, soc->cmem_total_size, soc->cmem_avail_size);
-	/* get CMEM for cookie conversion */
-	if (soc->cmem_avail_size < DP_CMEM_FST_SIZE) {
-		dp_err("cmem_size 0x%llx bytes < 16K", soc->cmem_avail_size);
-		return QDF_STATUS_E_NOMEM;
-	}
-
-	soc->fst_cmem_size = DP_CMEM_FST_SIZE;
-
-	soc->fst_cmem_base = soc->cmem_base +
-			     (soc->cmem_total_size - soc->cmem_avail_size);
-	soc->cmem_avail_size -= soc->fst_cmem_size;
-
-	dp_info("fst_cmem_base 0x%llx, fst_cmem_size 0x%llx",
-		soc->fst_cmem_base, soc->fst_cmem_size);
-
-	return QDF_STATUS_SUCCESS;
-}
-#else /* !WLAN_SUPPORT_RX_FISA */
-static QDF_STATUS dp_fisa_fst_cmem_addr_init(struct dp_soc *soc)
-{
-	return QDF_STATUS_SUCCESS;
 }
 #endif
 
@@ -281,23 +294,28 @@ static inline QDF_STATUS dp_hw_cc_cmem_addr_init(struct dp_soc *soc)
 {
 	struct dp_soc_be *be_soc = dp_get_be_soc_from_dp_soc(soc);
 
-	dp_info("cmem base 0x%llx, total size 0x%llx avail_size 0x%llx",
-		soc->cmem_base, soc->cmem_total_size, soc->cmem_avail_size);
-	/* get CMEM for cookie conversion */
-	if (soc->cmem_avail_size < DP_CC_PPT_MEM_SIZE) {
-		dp_err("cmem_size 0x%llx bytes < 4K", soc->cmem_avail_size);
-		return QDF_STATUS_E_RESOURCES;
-	}
-	be_soc->cc_cmem_base = (uint32_t)(soc->cmem_base +
-					  DP_CC_MEM_OFFSET_IN_CMEM);
-
-	soc->cmem_avail_size -= DP_CC_PPT_MEM_SIZE;
-
-	dp_info("cc_cmem_base 0x%x, cmem_avail_size 0x%llx",
-		be_soc->cc_cmem_base, soc->cmem_avail_size);
+	be_soc->cc_cmem_base = dp_get_cmem_chunk(soc, DP_CC_PPT_MEM_SIZE,
+					      COOKIE_CONVERSION);
 	return QDF_STATUS_SUCCESS;
 }
 
+#else
+
+static inline void dp_cc_reg_cfg_init(struct dp_soc *soc,
+				      bool is_4k_align) {}
+
+static inline void dp_hw_cc_cmem_write(hal_soc_handle_t hal_soc_hdl,
+				       uint32_t offset,
+				       uint32_t value)
+{ }
+
+static inline QDF_STATUS dp_hw_cc_cmem_addr_init(struct dp_soc *soc)
+{
+	return QDF_STATUS_SUCCESS;
+}
+#endif
+
+#if defined(DP_FEATURE_HW_COOKIE_CONVERSION) || defined(WLAN_SUPPORT_RX_FISA)
 static QDF_STATUS dp_get_cmem_allocation(struct dp_soc *soc,
 					 uint8_t for_feature)
 {
@@ -316,28 +334,12 @@ static QDF_STATUS dp_get_cmem_allocation(struct dp_soc *soc,
 
 	return status;
 }
-
 #else
-
-static inline void dp_cc_reg_cfg_init(struct dp_soc *soc,
-				      bool is_4k_align) {}
-
-static inline void dp_hw_cc_cmem_write(hal_soc_handle_t hal_soc_hdl,
-				       uint32_t offset,
-				       uint32_t value)
-{ }
-
-static inline QDF_STATUS dp_hw_cc_cmem_addr_init(struct dp_soc *soc)
-{
-	return QDF_STATUS_SUCCESS;
-}
-
 static QDF_STATUS dp_get_cmem_allocation(struct dp_soc *soc,
 					 uint8_t for_feature)
 {
 	return QDF_STATUS_SUCCESS;
 }
-
 #endif
 
 QDF_STATUS
