@@ -84,7 +84,9 @@ QDF_STATUS cm_disconnect_start_ind(struct wlan_objmgr_vdev *vdev,
 		cm_csr_set_ss_none(req->vdev_id);
 	}
 
-	user_disconnect = req->source == CM_OSIF_DISCONNECT ? true : false;
+	user_disconnect =
+		(req->source == CM_OSIF_DISCONNECT ||
+		 req->source == CM_MLO_LINK_SWITCH_DISCONNECT) ? true : false;
 	if (user_disconnect) {
 		wlan_p2p_cleanup_roc_by_vdev(vdev, false);
 		wlan_tdls_notify_sta_disconnect(req->vdev_id, false,
@@ -92,7 +94,8 @@ QDF_STATUS cm_disconnect_start_ind(struct wlan_objmgr_vdev *vdev,
 	}
 	cm_abort_connect_request_timers(vdev);
 
-	if (req->source != CM_MLO_ROAM_INTERNAL_DISCONNECT) {
+	if (req->source != CM_MLO_ROAM_INTERNAL_DISCONNECT &&
+	    req->source != CM_MLO_LINK_SWITCH_DISCONNECT) {
 		mlme_debug("Free copied reassoc rsp");
 		mlo_roam_free_copied_reassoc_rsp(vdev);
 	}

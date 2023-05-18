@@ -4750,6 +4750,8 @@ static void lim_prepare_and_send_disassoc(struct mac_context *mac_ctx,
 		disassoc_req.doNotSendOverTheAir = 1;
 		disassoc_req.reasonCode =
 					REASON_AUTHORIZED_ACCESS_LIMIT_REACHED;
+	} else if (req->req.reason_code == CM_MLO_LINK_SWITCH_DISCONNECT) {
+		disassoc_req.doNotSendOverTheAir = 1;
 	}
 
 	msg.bodyptr = &disassoc_req;
@@ -4897,7 +4899,8 @@ lim_cm_handle_disconnect_req(struct wlan_cm_vdev_discon_req *req)
 	}
 
 	if (req->req.source == CM_PEER_DISCONNECT ||
-	    req->req.source == CM_SB_DISCONNECT)
+	    req->req.source == CM_SB_DISCONNECT ||
+	    req->req.source == CM_MLO_LINK_SWITCH_DISCONNECT)
 		lim_process_sb_disconnect_req(mac_ctx, pe_session, req);
 	else
 		lim_process_nb_disconnect_req(mac_ctx, pe_session, req);

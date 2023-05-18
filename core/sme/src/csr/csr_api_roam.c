@@ -5850,6 +5850,8 @@ QDF_STATUS cm_csr_handle_diconnect_req(struct wlan_objmgr_vdev *vdev,
 			/* Unknown reason code */
 			break;
 		}
+	} else if (req->req.source == CM_MLO_LINK_SWITCH_DISCONNECT) {
+		/* Do not update any stats as session is going to be deleted*/
 	} else {
 		session->disconnect_stats.disconnection_by_app++;
 	}

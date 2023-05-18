@@ -15845,8 +15845,30 @@ static void hdd_v2_flow_pool_map(int vdev_id)
  */
 static void hdd_v2_flow_pool_unmap(int vdev_id)
 {
+	struct hdd_context *hdd_ctx = cds_get_context(QDF_MODULE_ID_HDD);
+	struct wlan_objmgr_vdev *vdev;
+
+	if (!hdd_ctx) {
+		hdd_err("HDD context null");
+		return;
+	}
+
+	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(hdd_ctx->psoc, vdev_id,
+						    WLAN_OSIF_ID);
+	if (!vdev) {
+		hdd_err("Invalid VDEV %d", vdev_id);
+		return;
+	}
+
+	if (wlan_vdev_mlme_is_mlo_link_switch_in_progress(vdev)) {
+		hdd_info("Link switch ongoing do not invoke flow pool unmap");
+		goto release_ref;
+	}
+
 	cdp_flow_pool_unmap(cds_get_context(QDF_MODULE_ID_SOC),
 			    OL_TXRX_PDEV_ID, vdev_id);
+release_ref:
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_OSIF_ID);
 }
 
 static void hdd_hastings_bt_war_initialize(struct hdd_context *hdd_ctx)
