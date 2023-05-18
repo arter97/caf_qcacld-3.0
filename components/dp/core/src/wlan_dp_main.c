@@ -623,6 +623,28 @@ static void dp_set_rx_mode_value(struct wlan_dp_psoc_context *dp_ctx)
 		dp_ctx->rps, dp_ctx->dynamic_rps);
 }
 
+#ifdef WLAN_SUPPORT_RX_FISA
+bool wlan_dp_cfg_is_rx_fisa_enabled(struct wlan_dp_psoc_cfg *dp_cfg)
+{
+	return dp_cfg->is_rx_fisa_enabled;
+}
+
+bool wlan_dp_cfg_is_rx_fisa_lru_del_enabled(struct wlan_dp_psoc_cfg *dp_cfg)
+{
+	return dp_cfg->is_rx_fisa_lru_del_enabled;
+}
+#else
+bool wlan_dp_cfg_is_rx_fisa_enabled(struct wlan_dp_psoc_cfg *dp_cfg)
+{
+	return false;
+}
+
+bool wlan_dp_cfg_is_rx_fisa_lru_del_enabled(struct wlan_dp_psoc_cfg *dp_cfg)
+{
+	return false;
+}
+#endif
+
 /**
  * dp_cfg_init() - initialize target specific configuration
  * @ctx: dp context handle
@@ -646,7 +668,6 @@ static void dp_cfg_init(struct wlan_dp_psoc_context *ctx)
 		cfg_get(psoc, CFG_DP_RX_THREAD_UL_CPU_MASK);
 	config->rx_thread_affinity_mask =
 		cfg_get(psoc, CFG_DP_RX_THREAD_CPU_MASK);
-	config->fisa_enable = cfg_get(psoc, CFG_DP_RX_FISA_ENABLE);
 	if (cfg_len < CFG_DP_RPS_RX_QUEUE_CPU_MAP_LIST_LEN) {
 		qdf_str_lcopy(config->cpu_map_list,
 			      cfg_get(psoc, CFG_DP_RPS_RX_QUEUE_CPU_MAP_LIST),
@@ -677,6 +698,7 @@ static void dp_cfg_init(struct wlan_dp_psoc_context *ctx)
 	dp_trace_cfg_update(config, psoc);
 	dp_nud_tracking_cfg_update(config, psoc);
 	dp_trace_cfg_update(config, psoc);
+	dp_fisa_cfg_init(config, psoc);
 }
 
 /**
@@ -1638,6 +1660,12 @@ wlan_dp_fisa_resume(struct wlan_dp_psoc_context *dp_ctx)
 	return QDF_STATUS_SUCCESS;
 }
 #else
+static inline QDF_STATUS
+wlan_dp_rx_fisa_attach_target(struct wlan_dp_psoc_context *dp_ctx)
+{
+	return QDF_STATUS_SUCCESS;
+}
+
 static inline QDF_STATUS
 wlan_dp_rx_fisa_attach(struct wlan_dp_psoc_context *dp_ctx)
 {

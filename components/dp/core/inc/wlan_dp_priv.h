@@ -134,6 +134,8 @@ struct dp_rtpm_tput_policy_context {
  * be sent to FW.
  * @lro_enable: Enable/Disable lro
  * @gro_enable: Enable/Disable gro
+ * @is_rx_fisa_enabled: flag to enable/disable FISA Rx
+ * @is_rx_fisa_lru_del_enabled: flag to enable/disable FST entry delete
  */
 struct wlan_dp_psoc_cfg {
 	bool tx_orphan_enable;
@@ -201,6 +203,10 @@ struct wlan_dp_psoc_cfg {
 
 	bool lro_enable;
 	bool gro_enable;
+#ifdef WLAN_SUPPORT_RX_FISA
+	bool is_rx_fisa_enabled;
+	bool is_rx_fisa_lru_del_enabled;
+#endif
 };
 
 /**

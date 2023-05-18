@@ -15,6 +15,9 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
+#ifndef __WLAN_DP_FISA_RX_H__
+#define __WLAN_DP_FISA_RX_H__
+
 #ifdef WLAN_SUPPORT_RX_FISA
 #include <dp_types.h>
 #endif
@@ -218,6 +221,16 @@ void dp_rx_fst_update_pm_suspend_status(struct wlan_dp_psoc_context *dp_ctx,
  * Return: None
  */
 void dp_rx_fst_requeue_wq(struct wlan_dp_psoc_context *dp_ctx);
+
+/**
+ * dp_fisa_cfg_init() - FISA INI items init
+ * @config: SoC CFG config
+ * @psoc: Objmgr PSoC handle
+ *
+ * Return: None
+ */
+void dp_fisa_cfg_init(struct wlan_dp_psoc_cfg *config,
+		      struct wlan_objmgr_psoc *psoc);
 #else
 static inline void
 dp_rx_fst_update_pm_suspend_status(struct wlan_dp_psoc_context *dp_ctx,
@@ -233,4 +246,10 @@ static QDF_STATUS dp_rx_dump_fisa_stats(struct dp_soc *soc)
 void dp_rx_dump_fisa_table(struct dp_soc *soc)
 {
 }
+
+static inline void dp_fisa_cfg_init(struct wlan_dp_psoc_cfg *config,
+				    struct wlan_objmgr_psoc *psoc)
+{
+}
+#endif
 #endif

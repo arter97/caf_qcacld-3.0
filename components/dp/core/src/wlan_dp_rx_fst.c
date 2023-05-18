@@ -26,6 +26,7 @@
 #include "dp_internal.h"
 #include "hif.h"
 #include "wlan_dp_rx_thread.h"
+#include <wlan_dp_main.h>
 #include <wlan_dp_fisa_rx.h>
 
 /* Timeout in milliseconds to wait for CMEM FST HTT response */
@@ -38,14 +39,16 @@ void dp_fisa_rx_fst_update_work(void *arg);
 
 void dp_rx_dump_fisa_table(struct dp_soc *soc)
 {
-	struct wlan_cfg_dp_soc_ctxt *cfg = soc->wlan_cfg_ctx;
 	hal_soc_handle_t hal_soc_hdl = soc->hal_soc;
+	/* TODO - Make this better */
+	struct wlan_dp_psoc_context *dp_ctx = dp_get_context();
+	struct wlan_dp_psoc_cfg *dp_cfg = &dp_ctx->dp_cfg;
 	struct dp_rx_fst *fst = soc->rx_fst;
 	struct dp_fisa_rx_sw_ft *sw_ft_entry;
 	int i;
 
 	/* Check if it is enabled in the INI */
-	if (!wlan_cfg_is_rx_fisa_enabled(cfg)) {
+	if (!wlan_dp_cfg_is_rx_fisa_enabled(dp_cfg)) {
 		dp_err("RX FISA feature is disabled");
 		return;
 	}
@@ -74,11 +77,13 @@ void dp_rx_dump_fisa_table(struct dp_soc *soc)
 
 void dp_print_fisa_stats(struct dp_soc *soc)
 {
-	struct wlan_cfg_dp_soc_ctxt *cfg = soc->wlan_cfg_ctx;
 	struct dp_rx_fst *fst = soc->rx_fst;
+	/* TODO - Make this better */
+	struct wlan_dp_psoc_context *dp_ctx = dp_get_context();
+	struct wlan_dp_psoc_cfg *dp_cfg = &dp_ctx->dp_cfg;
 
 	/* Check if it is enabled in the INI */
-	if (!wlan_cfg_is_rx_fisa_enabled(cfg))
+	if (!wlan_dp_cfg_is_rx_fisa_enabled(dp_cfg))
 		return;
 
 	dp_info("invalid flow index: %u", fst->stats.invalid_flow_index);
@@ -278,15 +283,15 @@ static void dp_rx_sw_ft_hist_deinit(struct dp_fisa_rx_sw_ft *sw_ft,
 QDF_STATUS dp_rx_fst_attach(struct wlan_dp_psoc_context *dp_ctx)
 {
 	struct dp_soc *soc = (struct dp_soc *)dp_ctx->cdp_soc;
-	struct wlan_cfg_dp_soc_ctxt *cfg = soc->wlan_cfg_ctx;
+	struct wlan_dp_psoc_cfg *dp_cfg = &dp_ctx->dp_cfg;
 	struct dp_rx_fst *fst;
 	struct dp_fisa_rx_sw_ft *ft_entry;
-	uint8_t *hash_key;
+	cdp_config_param_type soc_param;
 	int i = 0;
 	QDF_STATUS status;
 
 	/* Check if it is enabled in the INI */
-	if (!wlan_cfg_is_rx_fisa_enabled(cfg)) {
+	if (!wlan_dp_cfg_is_rx_fisa_enabled(dp_cfg)) {
 		dp_err("RX FISA feature is disabled");
 		return QDF_STATUS_E_NOSUPPORT;
 	}
@@ -311,9 +316,18 @@ QDF_STATUS dp_rx_fst_attach(struct wlan_dp_psoc_context *dp_ctx)
 	if (!fst)
 		return QDF_STATUS_E_NOMEM;
 
-	fst->max_skid_length = wlan_cfg_rx_fst_get_max_search(cfg);
-	fst->max_entries = wlan_cfg_get_rx_flow_search_table_size(cfg);
-	hash_key = wlan_cfg_rx_fst_get_hash_key(cfg);
+	/* This will clear entire FISA params */
+	soc_param.fisa_params.rx_toeplitz_hash_key = NULL;
+	status = cdp_txrx_get_psoc_param(dp_ctx->cdp_soc, CDP_CFG_FISA_PARAMS,
+					 &soc_param);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		dp_err("Unable to fetch fisa params");
+		return status;
+	}
+
+	fst->max_skid_length = soc_param.fisa_params.rx_flow_max_search;
+	fst->max_entries = soc_param.fisa_params.fisa_fst_size;
+	fst->rx_toeplitz_hash_key = soc_param.fisa_params.rx_toeplitz_hash_key;
 
 	fst->hash_mask = fst->max_entries - 1;
 	fst->num_entries = 0;
@@ -341,7 +355,8 @@ QDF_STATUS dp_rx_fst_attach(struct wlan_dp_psoc_context *dp_ctx)
 					    soc->osdev,
 					    &fst->hal_rx_fst_base_paddr,
 					    fst->max_entries,
-					    fst->max_skid_length, hash_key,
+					    fst->max_skid_length,
+					    fst->rx_toeplitz_hash_key,
 					    soc->fst_cmem_base);
 
 	if (qdf_unlikely(!fst->hal_rx_fst)) {
@@ -369,7 +384,8 @@ QDF_STATUS dp_rx_fst_attach(struct wlan_dp_psoc_context *dp_ctx)
 	fst->soc_hdl = soc;
 	soc->rx_fst = fst;
 	soc->fisa_enable = true;
-	soc->fisa_lru_del_enable = wlan_cfg_is_rx_fisa_lru_del_enabled(cfg);
+	soc->fisa_lru_del_enable =
+				wlan_dp_cfg_is_rx_fisa_lru_del_enabled(dp_cfg);
 
 	qdf_atomic_init(&soc->skip_fisa_param.skip_fisa);
 	qdf_atomic_init(&fst->pm_suspended);
@@ -429,7 +445,8 @@ QDF_STATUS dp_rx_flow_send_fst_fw_setup(struct dp_soc *soc,
 {
 	struct dp_htt_rx_flow_fst_setup fisa_hw_fst_setup_cmd = {0};
 	struct dp_rx_fst *fst = soc->rx_fst;
-	struct wlan_cfg_dp_soc_ctxt *cfg = soc->wlan_cfg_ctx;
+	/* TODO - Make this better */
+	struct wlan_dp_psoc_context *dp_ctx = dp_get_context();
 	QDF_STATUS status;
 
 	/* check if FW has support to place FST in CMEM */
@@ -455,7 +472,7 @@ QDF_STATUS dp_rx_flow_send_fst_fw_setup(struct dp_soc *soc,
 
 	fisa_hw_fst_setup_cmd.ip_da_sa_prefix =	HTT_RX_IPV4_COMPATIBLE_IPV6;
 	fisa_hw_fst_setup_cmd.hash_key_len = HAL_FST_HASH_KEY_SIZE_BYTES;
-	fisa_hw_fst_setup_cmd.hash_key = wlan_cfg_rx_fst_get_hash_key(cfg);
+	fisa_hw_fst_setup_cmd.hash_key = fst->rx_toeplitz_hash_key;
 
 	status = dp_htt_rx_flow_fst_setup(pdev, &fisa_hw_fst_setup_cmd);
 
@@ -596,6 +613,14 @@ QDF_STATUS dp_rx_fisa_config(struct wlan_dp_psoc_context *dp_ctx)
 	return dp_htt_rx_fisa_config(soc->pdev_list[0], &fisa_config);
 }
 
+void dp_fisa_cfg_init(struct wlan_dp_psoc_cfg *config,
+		      struct wlan_objmgr_psoc *psoc)
+{
+	config->fisa_enable = cfg_get(psoc, CFG_DP_RX_FISA_ENABLE);
+	config->is_rx_fisa_enabled = cfg_get(psoc, CFG_DP_RX_FISA_ENABLE);
+	config->is_rx_fisa_lru_del_enabled =
+				cfg_get(psoc, CFG_DP_RX_FISA_LRU_DEL_ENABLE);
+}
 #else /* WLAN_SUPPORT_RX_FISA */
 
 #endif /* !WLAN_SUPPORT_RX_FISA */

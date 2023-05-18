@@ -1581,7 +1581,7 @@ QDF_STATUS dp_rx_flush_packet_cbk(void *dp_intf_context, uint8_t intf_id)
 	qdf_atomic_inc(&dp_intf->num_active_task);
 
 	/* do fisa flush for this vdev */
-	if (dp_ctx->dp_cfg.fisa_enable)
+	if (wlan_dp_cfg_is_rx_fisa_enabled(&dp_ctx->dp_cfg))
 		wlan_dp_rx_fisa_flush_by_vdev_id((struct dp_soc *)soc, intf_id);
 
 	if (dp_ctx->enable_dp_rx_threads)

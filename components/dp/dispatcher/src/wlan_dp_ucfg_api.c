@@ -1029,8 +1029,8 @@ QDF_STATUS ucfg_dp_sta_register_txrx_ops(struct wlan_objmgr_vdev *vdev)
 		txrx_ops.rx.rx_flush = NULL;
 	}
 
-	if (dp_intf->dp_ctx->dp_cfg.fisa_enable &&
-		(dp_intf->device_mode != QDF_MONITOR_MODE)) {
+	if (wlan_dp_cfg_is_rx_fisa_enabled(&dp_intf->dp_ctx->dp_cfg) &&
+	    dp_intf->device_mode != QDF_MONITOR_MODE) {
 		dp_debug("FISA feature enabled");
 		dp_rx_register_fisa_ops(&txrx_ops);
 	}
@@ -1077,7 +1077,8 @@ QDF_STATUS ucfg_dp_tdlsta_register_txrx_ops(struct wlan_objmgr_vdev *vdev)
 		txrx_ops.rx.rx_stack = NULL;
 		txrx_ops.rx.rx_flush = NULL;
 	}
-	if (dp_intf->dp_ctx->dp_cfg.fisa_enable &&
+
+	if (wlan_dp_cfg_is_rx_fisa_enabled(&dp_intf->dp_ctx->dp_cfg) &&
 	    dp_intf->device_mode != QDF_MONITOR_MODE) {
 		dp_debug("FISA feature enabled");
 		dp_rx_register_fisa_ops(&txrx_ops);
