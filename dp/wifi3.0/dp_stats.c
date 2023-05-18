@@ -388,7 +388,7 @@ void DP_PRINT_STATS(const char *fmt, ...)
 			curr_len = soc->sysfs_config->curr_buffer_length;
 			max_len = soc->sysfs_config->max_buffer_length;
 			if ((max_len - curr_len) <= 1)
-				return;
+				goto fail;
 
 			qdf_spinlock_acquire(&soc->sysfs_config->sysfs_write_user_buffer);
 			if (soc->sysfs_config->buf) {
@@ -396,7 +396,7 @@ void DP_PRINT_STATS(const char *fmt, ...)
 							 max_len - curr_len, fmt, val);
 				curr_len += buf_written;
 				if ((max_len - curr_len) <= 1)
-					return;
+					goto rel_lock;
 
 				buf_written += scnprintf(soc->sysfs_config->buf + curr_len,
 							 max_len - curr_len, "\n");
@@ -405,6 +405,12 @@ void DP_PRINT_STATS(const char *fmt, ...)
 			qdf_spinlock_release(&soc->sysfs_config->sysfs_write_user_buffer);
 		}
 	}
+	va_end(val);
+	return;
+
+rel_lock:
+	qdf_spinlock_release(&soc->sysfs_config->sysfs_write_user_buffer);
+fail:
 	va_end(val);
 }
 #endif /* WLAN_SYSFS_DP_STATS */
