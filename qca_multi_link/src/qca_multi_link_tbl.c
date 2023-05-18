@@ -67,7 +67,12 @@ int qca_multi_link_tbl_get_eth_entries(struct net_device *net_dev,
 				       search_fdb->key.addr.addr, 6);
 #endif
 				qfdb->qal_fdb_dev = ndev;
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 1, 0)
+				qfdb->qal_fdb_is_local =
+				    test_bit(BR_FDB_LOCAL, &search_fdb->flags);
+#else
 				qfdb->qal_fdb_is_local =  search_fdb->is_local;
+#endif
 				num_of_entries++;
 				qfdb += 1;
 				buff_size -= fdb_entry_size;
@@ -111,7 +116,11 @@ struct net_device *qca_multi_link_tbl_find_sta_or_ap(struct net_device *net_dev,
 		hlist_for_each_entry_rcu(search_fdb, &p->br->fdb_list,
 					 fdb_node) {
 #endif
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 1, 0)
+			if (!test_bit(BR_FDB_LOCAL, &search_fdb->flags))
+#else
 			if (!search_fdb->is_local)
+#endif
 				continue;
 
 			if ((!search_fdb->dst) || (!search_fdb->dst->dev)) {
@@ -168,7 +177,11 @@ QDF_STATUS qca_multi_link_tbl_delete_entry(struct net_device *net_dev, uint8_t *
 		return QDF_STATUS_E_FAILURE;
 	}
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 1, 0)
+	if (test_bit(BR_FDB_LOCAL, &fdb_entry->flags)) {
+#else
 	if (fdb_entry->is_local) {
+#endif
 		return QDF_STATUS_SUCCESS;
 	}
 
@@ -215,7 +228,12 @@ QDF_STATUS qca_multi_link_tbl_has_entry(struct net_device *net_dev,
 
 	qca_ml_entry->qal_fdb_ieee80211_ptr = fdb_dev->ieee80211_ptr;
 	qca_ml_entry->qal_fdb_dev = fdb_dev;
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 1, 0)
+	qca_ml_entry->qal_fdb_is_local =
+		test_bit(BR_FDB_LOCAL, &fdb_entry->flags);
+#else
 	qca_ml_entry->qal_fdb_is_local = fdb_entry->is_local;
+#endif
 	return QDF_STATUS_SUCCESS;
 }
 
