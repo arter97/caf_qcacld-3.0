@@ -383,6 +383,7 @@ struct mlo_sta_quiet_status {
  * @ml_link_state: ml link state command info param
  * NB: not using kernel-doc format since the kernel-doc script doesn't
  *     handle the qdf_bitmap() macro
+ * @copied_t2lm_ie_assoc_rsp: copy of t2lm ie received in assoc response
  */
 struct wlan_mlo_sta {
 	qdf_bitmap(wlan_connect_req_links, WLAN_UMAC_MLO_MAX_VDEVS);
@@ -405,6 +406,7 @@ struct wlan_mlo_sta {
 #endif
 #ifdef WLAN_FEATURE_11BE_MLO
 	struct ml_link_state_cmd_info ml_link_state;
+	struct wlan_t2lm_context copied_t2lm_ie_assoc_rsp;
 #endif
 };
 

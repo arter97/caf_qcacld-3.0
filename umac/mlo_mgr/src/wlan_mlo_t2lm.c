@@ -1219,7 +1219,7 @@ static QDF_STATUS wlan_update_mapping_switch_time_expected_dur(
 	} else if (rx_t2lm->established_t2lm.t2lm.expected_duration_present &&
 		   !rx_t2lm->established_t2lm.t2lm.mapping_switch_time_present) {
 		if (!qdf_mem_cmp(t2lm_ctx->established_t2lm.t2lm.ieee_link_map_tid,
-				 rx_t2lm->upcoming_t2lm.t2lm.ieee_link_map_tid,
+				 rx_t2lm->established_t2lm.t2lm.ieee_link_map_tid,
 				 sizeof(uint16_t) * T2LM_MAX_NUM_TIDS)) {
 			t2lm_debug("T2LM mapping is already configured");
 			t2lm_dev_lock_release(t2lm_ctx);
