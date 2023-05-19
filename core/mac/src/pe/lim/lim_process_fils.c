@@ -2365,6 +2365,73 @@ verify_fils_params_fails:
 	return false;
 }
 
+#ifdef WLAN_FEATURE_FILS_SK_SAP
+bool lim_verify_fils_params_assoc_req(struct mac_context *mac_ctx,
+				      struct pe_session *session_entry,
+				      tpSirAssocReq assoc_req,
+				      tSirMacAddr peer_mac_addr)
+{
+	struct pe_fils_session *fils_info;
+	tDot11fIEfils_session fils_session = assoc_req->fils_session;
+	tDot11fIEfils_key_confirmation *fils_key_auth;
+
+	fils_info = lim_get_fils_info(session_entry, peer_mac_addr);
+
+	if (!fils_info) {
+		pe_debug("Failed to get fils_info");
+		return true;
+	}
+
+	if (!assoc_req->fils_session.present) {
+		pe_debug("FILS IE not present");
+		goto verify_fils_params_fails;
+	}
+
+	/* Compare FILS session */
+	if (qdf_mem_cmp(fils_info->fils_session,
+			fils_session.session, DOT11F_IE_FILS_SESSION_MAX_LEN)) {
+		pe_debug("FILS session mismatch");
+		goto verify_fils_params_fails;
+	}
+
+	fils_key_auth = qdf_mem_malloc(sizeof(*fils_key_auth));
+	if (!fils_key_auth) {
+		pe_debug("malloc failed for fils_key_auth");
+		goto verify_fils_params_fails;
+	}
+
+	*fils_key_auth = assoc_req->fils_key_auth;
+
+	/* Compare FILS key auth */
+	if (fils_key_auth->num_key_auth != fils_info->key_auth_len ||
+	    qdf_mem_cmp(fils_info->key_auth,
+			fils_key_auth->key_auth,
+			fils_info->key_auth_len)) {
+		pe_debug("Mismatch in key_auth data");
+		lim_fils_data_dump("session keyauth",
+				   fils_info->key_auth,
+				   fils_info->key_auth_len);
+		lim_fils_data_dump("Pkt keyauth",
+				   fils_key_auth->key_auth,
+				   fils_key_auth->num_key_auth);
+		qdf_mem_free(fils_key_auth);
+		goto verify_fils_params_fails;
+	}
+
+	qdf_mem_free(fils_key_auth);
+
+	lim_update_fils_hlp_data(&assoc_req->dst_mac,
+				 &assoc_req->src_mac,
+				 assoc_req->hlp_data_len,
+				 assoc_req->hlp_data,
+				 session_entry);
+	return true;
+
+verify_fils_params_fails:
+	return false;
+}
+#endif
+
 /**
  * find_ie_data_after_fils_session_ie() - Find IE pointer after FILS Session IE
  * @mac_ctx: MAC context
@@ -2559,6 +2626,72 @@ QDF_STATUS aead_encrypt_assoc_req(struct mac_context *mac_ctx,
 	return QDF_STATUS_SUCCESS;
 }
 
+#ifdef WLAN_FEATURE_FILS_SK_SAP
+QDF_STATUS aead_encrypt_assoc_rsp(struct mac_context *mac_ctx,
+				  struct pe_session *pe_session,
+				  uint8_t *frm, uint32_t *frm_len,
+				  tSirMacAddr peer_mac_addr)
+{
+	uint8_t *plain_text = NULL, *data;
+	uint32_t plain_text_len = 0, data_len;
+	QDF_STATUS status;
+	struct pe_fils_session *fils_info;
+
+	fils_info = lim_get_fils_info(pe_session, peer_mac_addr);
+
+	if (!fils_info) {
+		pe_debug("Failed to get fils_info");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	/*
+	 * data is the packet data after MAC header till
+	 * FILS session IE(inclusive)
+	 */
+	data = frm + sizeof(tSirMacMgmtHdr);
+
+	/*
+	 * plain_text is the packet data after FILS session IE
+	 * which needs to be encrypted. Get plain_text ptr and
+	 * plain_text_len values using find_ptr_aft_fils_session_ie()
+	 */
+	status =
+		find_ie_data_after_fils_session_ie(mac_ctx, data +
+						FIXED_PARAM_OFFSET_ASSOC_RSP,
+						(*frm_len -
+						FIXED_PARAM_OFFSET_ASSOC_RSP),
+						&plain_text,
+						&plain_text_len);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		pe_debug("Could not find FILS session IE");
+		return QDF_STATUS_E_FAILURE;
+	}
+	data_len = ((*frm_len) - plain_text_len);
+
+	lim_fils_data_dump("Plain text: ", plain_text, plain_text_len);
+
+	/* Overwrite the AEAD encrypted output @ plain_text */
+	if (fils_aead_encrypt(fils_info->kek, fils_info->kek_len,
+			      pe_session->bssId, peer_mac_addr,
+			      fils_info->fils_nonce,
+			      fils_info->auth_info.fils_nonce,
+			      data, data_len, plain_text, plain_text_len,
+			      plain_text)) {
+		pe_err("AEAD Encryption fails!");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	/*
+	 * AEAD encrypted output(cipher_text) will have length equals to
+	 * plain_text_len + AES_BLOCK_SIZE(AEAD encryption header info).
+	 * Add this to frm_len
+	 */
+	(*frm_len) += (AES_BLOCK_SIZE);
+
+	return QDF_STATUS_SUCCESS;
+}
+#endif
+
 /**
  * fils_aead_decrypt() - API to do AEAD decryption
  *
@@ -2707,4 +2840,58 @@ QDF_STATUS aead_decrypt_assoc_rsp(struct mac_context *mac_ctx,
 	(*n_frame) -= AES_BLOCK_SIZE;
 	return status;
 }
+
+#ifdef WLAN_FEATURE_FILS_SK_SAP
+QDF_STATUS aead_decrypt_assoc_req(struct mac_context *mac_ctx,
+				  struct pe_session *session,
+				  tDot11fAssocRequest *ar,
+				  uint8_t *p_frame, uint32_t *n_frame,
+				  tSirMacAddr peer_mac_addr)
+{
+	QDF_STATUS status;
+	uint32_t data_len, fils_ies_len;
+	uint8_t *fils_ies;
+	struct pe_fils_session *fils_info;
+
+	fils_info = lim_get_fils_info(session, peer_mac_addr);
+
+	if (!fils_info) {
+		pe_debug("Failed to get fils_info");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	if (*n_frame < FIXED_PARAM_OFFSET_ASSOC_REQ) {
+		pe_debug("payload len is less than ASSOC Request Fixed param");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	status = find_ie_data_after_fils_session_ie(mac_ctx, p_frame +
+					      FIXED_PARAM_OFFSET_ASSOC_REQ,
+					      ((*n_frame) -
+					      FIXED_PARAM_OFFSET_ASSOC_REQ),
+					      &fils_ies, &fils_ies_len);
+	if (!QDF_IS_STATUS_SUCCESS(status)) {
+		pe_debug("FILS session IE not present");
+		return status;
+	}
+
+	data_len = (*n_frame) - fils_ies_len;
+
+	if (fils_aead_decrypt(fils_info->kek, fils_info->kek_len,
+			      session->bssId, peer_mac_addr,
+			      fils_info->fils_nonce,
+			      fils_info->auth_info.fils_nonce,
+			      p_frame, data_len,
+			      fils_ies, fils_ies_len, fils_ies)){
+		pe_err("AEAD decryption fails");
+		return QDF_STATUS_E_FAILURE;
+	}
+	/* Dump the output of AEAD decrypt */
+	lim_fils_data_dump("Plain text: ", fils_ies,
+			   fils_ies_len - AES_BLOCK_SIZE);
+
+	(*n_frame) -= AES_BLOCK_SIZE;
+	return status;
+}
+#endif /* WLAN_FEATURE_FILS_SK_SAP */
 #endif

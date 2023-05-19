@@ -392,6 +392,15 @@ typedef struct sSirAssocReq {
 	bool is_sae_authenticated;
 	struct mlo_partner_info mlo_info;
 	uint8_t mld_mac[QDF_MAC_ADDR_SIZE];
+#ifdef WLAN_FEATURE_FILS_SK_SAP
+	tDot11fIEfils_session fils_session;
+	tDot11fIEfils_key_confirmation fils_key_auth;
+	tDot11fIEfils_kde fils_kde;
+	struct qdf_mac_addr dst_mac;
+	struct qdf_mac_addr src_mac;
+	uint16_t hlp_data_len;
+	uint8_t hlp_data[FILS_MAX_HLP_DATA_LEN];
+#endif
 } tSirAssocReq, *tpSirAssocReq;
 
 #define FTIE_SUBELEM_R1KH_ID 1
