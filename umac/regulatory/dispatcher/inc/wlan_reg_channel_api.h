@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2020, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  *
  * Permission to use, copy, modify, and/or distribute this software for any
@@ -445,14 +445,16 @@ wlan_reg_get_reg_chan_list_based_on_freq(struct wlan_objmgr_pdev *pdev,
 					 in_6g_pwr_mode);
 
 /**
- * wlan_reg_get_first_valid_freq_on_cur_chan() - Get the first valid freq based
- * on cur chan list.
+ * wlan_reg_get_first_valid_freq() - Get the first valid freq
+ * between the given channel indexes based on cur chan list.
  * @pdev: Pointer to pdev.
  * @in_6g_pwr_mode: Input 6g power mode based on which the 6g channel list
  * is determined.
  * @first_valid_freq: channel center frequency.
  * @bw: Bandwidth.
  * @sec_40_offset: 40 MHz channel's secondary offset
+ * @start_chan: Input channel start index
+ * @end_chan: Input channel end index
  *
  * Return: QDF_STATUS.
  */
@@ -461,7 +463,9 @@ wlan_reg_get_first_valid_freq(struct wlan_objmgr_pdev *pdev,
 			      enum supported_6g_pwr_types
 			      in_6g_pwr_mode,
 			      qdf_freq_t *first_valid_freq,
-			      int bw, int sec_40_offset);
+			      int bw, int sec_40_offset,
+			      enum channel_enum start_chan,
+			      enum channel_enum end_chan);
 
 /**
  * wlan_reg_get_first_valid_freq_on_power_mode() - Get the first valid freq

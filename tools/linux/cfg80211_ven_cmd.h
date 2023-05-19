@@ -848,6 +848,9 @@ enum {
 #if QCA_AIRTIME_FAIRNESS
 	IEEE80211_PARAM_ATF_VIP_INFRA = 795,
 #endif
+#ifdef WLAN_FEATURE_11BE
+	IEEE80211_PARAM_EHT_NUM_SD = 796, /* EHT Beamformer num sounding dimentions */
+#endif
 #ifdef CONFIG_MLO_SINGLE_DEV
 	IEEE80211_PARAM_GET_MLD_PEER = 797,
 #endif
@@ -1430,6 +1433,9 @@ enum _ol_ath_param_t {
 #ifdef WLAN_MGMT_RX_REO_SUPPORT
 	OL_ATH_PARAM_MGMT_RX_REO_STATUS = 518,
 #endif
+#ifdef WLAN_DISP_CHAN_INFO
+	OL_ATH_PARAM_LIST_5GHZ_CHAN_INFO = 519,
+#endif
 	OL_ATH_PARAM_MON_MAC_FILTER = 520,
 	OL_ATH_PARAM_PUNC_EIRP_THRES = 521,
 	/* Display the current 6G client type */
@@ -1438,7 +1444,9 @@ enum _ol_ath_param_t {
 	OL_ATH_PARAM_MBSS_GET_GROUP_SIZE = 524,
 	OL_ATH_PARAM_SCAN_BLANKING_MODE = 525,
 	OL_ATH_PARAM_I2R_LMR_FEEDBACK_POLICY = 526,
-	/* Param number 519 is unused. Please use this for the new param addition */
+#ifdef QCA_R2P_UPDATE_ENABLED
+	OL_ATH_PARAM_R2P_HCHAN_RESTORE = 527,
+#endif
 };
 
 #ifdef CONFIG_SUPPORT_VENCMDTABLE
@@ -2180,8 +2188,8 @@ struct vendor_commands vap_vendor_cmds[] = {
 	{"get_m_copy",          IEEE80211_PARAM_CONFIG_M_COPY, GET_PARAM, 0},
 	{"ba_bufsize",          IEEE80211_PARAM_BA_BUFFER_SIZE, SET_PARAM, 1},
 	{"get_ba_bufsize",      IEEE80211_PARAM_BA_BUFFER_SIZE, GET_PARAM, 0},
-	{"he_ar_gi_ltf",        IEEE80211_PARAM_HE_AR_GI_LTF, SET_PARAM, 1},
-	{"get_he_ar_gi_ltf",    IEEE80211_PARAM_HE_AR_GI_LTF, GET_PARAM, 0},
+	{"ar_gi_ltf",        IEEE80211_PARAM_HE_AR_GI_LTF, SET_PARAM, 1},
+	{"get_ar_gi_ltf",    IEEE80211_PARAM_HE_AR_GI_LTF, GET_PARAM, 0},
 	{"nss_rdprehdr",        IEEE80211_PARAM_NSSOL_VAP_READ_RXPREHDR, SET_PARAM, 1},
 	{"g_nss_rdprehdr",      IEEE80211_PARAM_NSSOL_VAP_READ_RXPREHDR, GET_PARAM, 0},
 	{"he_sounding_mode",    IEEE80211_PARAM_HE_SOUNDING_MODE, SET_PARAM, 1},
@@ -2476,6 +2484,8 @@ struct vendor_commands vap_vendor_cmds[] = {
 	{"get_eht_su_bfme", IEEE80211_PARAM_EHT_SU_BFME, GET_PARAM, 0},
 	{"set_eht_bfme_ss", IEEE80211_PARAM_EHT_BFME_SS, SET_PARAM, 3},
 	{"get_eht_bfme_ss", IEEE80211_PARAM_EHT_BFME_SS, GET_PARAM, 0},
+	{"set_eht_num_sd", IEEE80211_PARAM_EHT_NUM_SD, SET_PARAM, 3},
+	{"get_eht_num_sd", IEEE80211_PARAM_EHT_NUM_SD, GET_PARAM, 0},
 	{"set_eht_4x_eht_ltf_and_800ns_gi", IEEE80211_PARAM_EHT_4X_EHT_LTF_AND_800NS_GI, SET_PARAM, 1},
 	{"get_eht_4x_eht_ltf_and_800ns_gi", IEEE80211_PARAM_EHT_4X_EHT_LTF_AND_800NS_GI, GET_PARAM, 0},
 	{"set_eht_max_nc", IEEE80211_PARAM_EHT_MAX_NC, SET_PARAM, 1},
@@ -3786,6 +3796,15 @@ struct vendor_commands radio_vendor_cmds[] = {
 		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_SCAN_BLANKING_MODE, GET_PARAM, 0},
 	{"set_i2r_lmr_feedback_policy",
 		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_I2R_LMR_FEEDBACK_POLICY, SET_PARAM, 1},
+#ifdef WLAN_DISP_CHAN_INFO
+	{"list_5ghz_chan_info",
+		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_LIST_5GHZ_CHAN_INFO,
+		GET_PARAM, 0},
+#endif
+#ifdef QCA_R2P_UPDATE_ENABLED
+	{"hchan_r2p_restore_en",
+		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_R2P_HCHAN_RESTORE, SET_PARAM, 1},
+#endif
 };
 #endif
 

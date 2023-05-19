@@ -40,21 +40,21 @@
  * Granularity: 1Kbps
  */
 #define SAWF_MIN_MIN_THROUGHPUT 0
-#define SAWF_MAX_MIN_THROUGHPUT (10 * 1204 * 1024)
+#define SAWF_MAX_MIN_THROUGHPUT (10 * 1024 * 1024)
 
 /*
  * Max throughput limit 0 - 10gbps.
  * Granularity: 1Kbps
  */
 #define SAWF_MIN_MAX_THROUGHPUT 0
-#define SAWF_MAX_MAX_THROUGHPUT (10 * 1204 * 1024)
+#define SAWF_MAX_MAX_THROUGHPUT (10 * 1024 * 1024)
 
 /*
  * Service interval limit 0 - 10secs.
- * Granularity: 100µs
+ * Granularity: 1ms
  */
 #define SAWF_MIN_SVC_INTERVAL 0
-#define SAWF_MAX_SVC_INTERVAL (10 * 100 * 100)
+#define SAWF_MAX_SVC_INTERVAL (10 * 1000)
 
 /*
  * Burst size 0 - 16Mbytes.
@@ -65,17 +65,17 @@
 
 /*
  * Delay bound limit 0 - 10secs
- * Granularity: 100µs
+ * Granularity: 1ms
  */
 #define SAWF_MIN_DELAY_BOUND 0
-#define SAWF_MAX_DELAY_BOUND (10 * 100 * 100)
+#define SAWF_MAX_DELAY_BOUND (10 * 1000)
 
 /*
  * Msdu TTL limit 0 - 10secs.
- * Granularity: 100µs
+ * Granularity: 1ms
  */
 #define SAWF_MIN_MSDU_TTL 0
-#define SAWF_MAX_MSDU_TTL (10 * 100 * 100)
+#define SAWF_MAX_MSDU_TTL (10 * 1000)
 
 /*
  * Priority limit 0 - 127.
@@ -137,6 +137,7 @@
  * @type: type of service class
  * @ref_count: Number of sawf/scs procedures using the service class
  * @peer_count: Number of peers having initialized a flow in this service class
+ * @enabled_param_mask: Bitmask of enabled sawf parameters
  */
 
 struct wlan_sawf_svc_class_params {
@@ -160,6 +161,29 @@ struct wlan_sawf_svc_class_params {
 	uint32_t ref_count;
 	uint32_t peer_count;
 	uint32_t disabled_modes;
+	uint16_t enabled_param_mask;
+};
+
+/**
+ * telemetry_sawf_param - Enum indicating SAWF param type
+ * @SAWF_PARAM_MIN_THROUGHPUT: minimum throughput
+ * @SAWF_PARAM_MAX_THROUGHPUT: maximum throughput
+ * @SAWF_PARAM_BURST_SIZE: burst-size num-pkts
+ * @SAWF_PARAM_SERVICE_INTERVAL: service-interval
+ * @SAWF_PARAM_DELAY_BOUND: delay-bound
+ * @SAWF_PARAM_MSDU_TTL: TTL for msdu-drop
+ * @SAWF_PARAM_MSDU_LOSS:  msdu-loss rate
+ */
+enum telemetry_sawf_param {
+	SAWF_PARAM_INVALID,
+	SAWF_PARAM_MIN_THROUGHPUT,
+	SAWF_PARAM_MAX_THROUGHPUT,
+	SAWF_PARAM_BURST_SIZE,
+	SAWF_PARAM_SERVICE_INTERVAL,
+	SAWF_PARAM_DELAY_BOUND,
+	SAWF_PARAM_MSDU_TTL,
+	SAWF_PARAM_MSDU_LOSS,
+	SAWF_PARAM_MAX,
 };
 
 /**
@@ -473,4 +497,12 @@ void wlan_service_id_inc_peer_count(uint8_t svc_id);
  * Return: void
  */
 void wlan_disable_service_class(uint8_t svc_id);
+
+/* wlan_service_id_get_enabled_param_mask() - Get enabled_param_mask
+ *
+ * @svc_id : service-class id
+ *
+ * Return: enabled_param_mask
+ */
+uint16_t wlan_service_id_get_enabled_param_mask(uint8_t svc_id);
 #endif

@@ -7062,7 +7062,7 @@ QDF_STATUS dp_send_ack_frame_to_stack(struct dp_soc *soc,
 		return QDF_STATUS_SUCCESS;
 
 	for (i = 0; i < ppdu_info->com_info.num_users; i++) {
-		if (i > OFDMA_NUM_USERS)
+		if (i >= OFDMA_NUM_USERS)
 			return QDF_STATUS_E_FAULT;
 
 		rx_user_status =  &ppdu_info->rx_user_status[i];

@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2016-2020 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021,2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  *
  * Permission to use, copy, modify, and/or distribute this software for
@@ -477,4 +477,47 @@ QDF_STATUS ucfg_dfs_get_dfs_puncture(struct wlan_objmgr_pdev *pdev,
 }
 
 qdf_export_symbol(ucfg_dfs_get_dfs_puncture);
+
+void utils_dfs_puncturing_sm_deliver_evt(struct wlan_objmgr_pdev *pdev,
+					 uint8_t sm_indx,
+					 enum dfs_punc_sm_evt event)
+{
+	struct wlan_dfs *dfs;
+	void *event_data;
+	struct dfs_punc_obj *dfs_punc;
+
+	if (!tgt_dfs_is_5ghz_supported_in_pdev(pdev))
+		return;
+
+	dfs = wlan_pdev_get_dfs_obj(pdev);
+
+	if (!dfs) {
+		dfs_err(dfs, WLAN_DEBUG_DFS_ALWAYS,  "dfs is null");
+		return;
+	}
+
+	dfs_punc = &dfs->dfs_punc_lst.dfs_punc_arr[sm_indx];
+	event_data = (struct dfs_punc_obj  *)dfs_punc;
+
+	dfs_puncturing_sm_deliver_evt(dfs, event, 0, event_data);
+}
+
+qdf_export_symbol(utils_dfs_puncturing_sm_deliver_evt);
 #endif /* QCA_DFS_BW_PUNCTURE */
+
+#ifdef WLAN_DISP_CHAN_INFO
+void
+ucfg_dfs_get_cac_nol_time(struct wlan_objmgr_pdev *pdev, qdf_freq_t freq,
+			  int8_t index, uint32_t *rem_cac_time,
+			  uint64_t *cac_comp_time, uint32_t *rem_nol_time)
+{
+	struct wlan_dfs *dfs;
+
+	dfs = wlan_pdev_get_dfs_obj(pdev);
+	if (!dfs)
+		return;
+
+	dfs_get_cac_nol_time(dfs, index, rem_cac_time, cac_comp_time,
+			     rem_nol_time, freq);
+}
+#endif

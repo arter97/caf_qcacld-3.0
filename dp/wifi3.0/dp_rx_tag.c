@@ -705,21 +705,21 @@ dp_dump_rx_flow_tag_stats(struct cdp_soc_t *soc, uint8_t pdev_id,
 }
 
 #if defined (WLAN_SUPPORT_PPEDS) || (QCA_PPE_VP)
-#if defined (CONFIG_MLO_SINGLE_DEV) || (QCA_SUPPORT_WDS_EXTENDED)
+#if defined (WLAN_FEATURE_11BE_MLO) || (QCA_SUPPORT_WDS_EXTENDED)
 static inline
 wlan_if_t dp_rx_get_vap_osif_dev(osif_dev *osdev)
 {
 #ifdef QCA_SUPPORT_WDS_EXTENDED
 	osif_peer_dev *osifp;
 #endif
-#ifdef CONFIG_MLO_SINGLE_DEV
+#ifdef WLAN_FEATURE_11BE_MLO
 	osif_dev  *os_linkdev;
 	struct osif_mldev *mldev;
 	uint8_t primary_chip_id;
 	uint8_t primary_pdev_id;
 #endif
 	switch (osdev->dev_type) {
-#ifdef CONFIG_MLO_SINGLE_DEV
+#ifdef WLAN_FEATURE_11BE_MLO
 	case OSIF_NETDEV_TYPE_MLO:
 		mldev = (struct osif_mldev *)osdev;
 		primary_chip_id = mldev->primary_chip_id;

@@ -643,6 +643,7 @@ static void dp_ppeds_tx_desc_reset(void *ctxt, void *elem, void *elem_list)
 
 	if (tx_desc->nbuf) {
 		nbuf = tx_desc->nbuf;
+		__dp_tx_outstanding_dec(soc);
 		dp_ppeds_tx_desc_free_nolock(soc, tx_desc);
 
 		if (nbuf) {
@@ -936,6 +937,7 @@ void dp_ppeds_tx_desc_clean_up(void *ctxt, void *elem, void *elem_list)
 
 	if (tx_desc->nbuf) {
 		qdf_nbuf_free(tx_desc->nbuf);
+		__dp_tx_outstanding_dec(soc);
 		dp_ppeds_tx_desc_free_nolock(soc, tx_desc);
 	}
 }
@@ -1000,6 +1002,25 @@ static void dp_ppeds_tx_desc_pool_deinit(struct dp_soc *soc)
 }
 
 /**
+ * dp_tx_borrow_tx_desc() - API to borrow tx descs from regular pool
+ * @be_soc: SoC
+ *
+ * Borrow Tx descs from regular pool when DS Tx desc pool is empty
+ *
+ * Return: tx descriptor
+ */
+static inline
+struct dp_tx_desc_s *dp_tx_borrow_tx_desc(struct dp_soc *soc)
+{
+	struct dp_tx_desc_s *tx_desc = dp_tx_desc_alloc(soc, qdf_get_cpu());
+
+	if (tx_desc)
+		tx_desc->flags = 0;
+
+	return tx_desc;
+}
+
+/**
  * dp_ppeds_tx_desc_alloc() - PPE DS tx desc alloc
  * @be_soc: SoC
  *
@@ -1017,6 +1038,7 @@ struct dp_tx_desc_s *dp_ppeds_tx_desc_alloc(struct dp_soc_be *be_soc)
 
 	if (pool->hotlist) {
 		tx_desc = pool->hotlist;
+		tx_desc->flags = 0;
 		pool->hotlist = pool->hotlist->next;
 		pool->hot_list_len--;
 		if (pool->hot_list_len)
@@ -1024,21 +1046,33 @@ struct dp_tx_desc_s *dp_ppeds_tx_desc_alloc(struct dp_soc_be *be_soc)
 		else
 			dp_tx_prefetch_desc(pool->freelist);
 	} else {
-		tx_desc = pool->freelist;
-
-		/* Pool is exhausted */
-		if (!tx_desc) {
+		if (__dp_tx_limit_check(&be_soc->soc)) {
 			TX_DESC_LOCK_UNLOCK(&pool->lock);
 			return NULL;
 		}
 
-		pool->freelist = pool->freelist->next;
-		dp_tx_prefetch_desc(pool->freelist);
-		pool->num_allocated++;
-		pool->num_free--;
+		tx_desc = pool->freelist;
+
+		/* Pool is exhausted */
+		if (!tx_desc) {
+
+			/* Try to borrow from regular tx desc pools */
+			tx_desc = dp_tx_borrow_tx_desc(&be_soc->soc);
+			if (!tx_desc) {
+				TX_DESC_LOCK_UNLOCK(&pool->lock);
+				return NULL;
+			}
+		} else {
+			tx_desc->flags = 0;
+			pool->freelist = pool->freelist->next;
+			dp_tx_prefetch_desc(pool->freelist);
+			pool->num_allocated++;
+			pool->num_free--;
+		}
+		__dp_tx_outstanding_inc(&be_soc->soc);
 	}
 
-	tx_desc->flags = DP_TX_DESC_FLAG_ALLOCATED;
+	tx_desc->flags |= DP_TX_DESC_FLAG_ALLOCATED;
 	tx_desc->flags |= DP_TX_DESC_FLAG_PPEDS;
 
 	TX_DESC_LOCK_UNLOCK(&pool->lock);
@@ -1070,6 +1104,8 @@ qdf_nbuf_t dp_ppeds_tx_desc_free(struct dp_soc *soc, struct dp_tx_desc_s *tx_des
 		pool->hotlist = tx_desc;
 		pool->hot_list_len++;
 	} else {
+		__dp_tx_outstanding_dec(soc);
+
 		nbuf = tx_desc->nbuf;
 		tx_desc->nbuf = NULL;
 		tx_desc->flags = 0;
@@ -1107,16 +1143,7 @@ uint32_t dp_ppeds_get_batched_tx_desc(ppe_ds_wlan_handle_t *ppeds_handle,
 	struct dp_tx_desc_s *tx_desc;
 	struct dp_soc *soc = *((struct dp_soc **)ppe_ds_wlan_priv(ppeds_handle));
 	struct dp_soc_be *be_soc = dp_get_be_soc_from_dp_soc(soc);
-	struct dp_ppeds_tx_desc_pool_s *pool = &be_soc->ppeds_tx_desc;
 	qdf_dma_addr_t paddr;
-
-	/*
-	 * If the tx desc pool is empty, we need to return.
-	 */
-	if (!pool->freelist && !pool->hotlist) {
-		dp_err("ran out of txdesc");
-		return 0;
-	}
 
 	for (i = 0; i < num_buff_req; i++) {
 		qdf_nbuf_t nbuf = NULL;
@@ -1970,6 +1997,28 @@ dp_ppeds_get_umac_reset_progress(struct dp_soc *soc,
 #endif
 
 /**
+ * dp_ppeds_target_supported - Check target supports ppeds
+ * @target_type: Device ID
+ *
+ * Check target supports ppeds
+ *
+ * Return: true if supported , false if not supported
+ */
+bool dp_ppeds_target_supported(int target_type)
+{
+	/*
+	 * Add ppeds capable wlan target type here.
+	 */
+	switch (target_type) {
+	case TARGET_TYPE_QCN9224:
+		return true;
+
+	default:
+		return false;
+	}
+}
+
+/**
  * dp_ppeds_stop_soc_be() - Stop the PPE-DS instance
  * @soc: DP SoC
  *
@@ -2102,6 +2151,22 @@ void dp_ppeds_detach_soc_be(struct dp_soc_be *be_soc)
 
 #ifdef DP_UMAC_HW_RESET_SUPPORT
 /**
+ * dp_ppeds_handle_attached() - Check if ppeds handle attached
+ * @be_soc: BE SoC
+ *
+ * Return: true if ppeds handle attached else false.
+ */
+bool dp_ppeds_handle_attached(struct dp_soc *soc)
+{
+	struct dp_soc_be *be_soc = dp_get_be_soc_from_dp_soc(soc);
+
+	if (be_soc->ppeds_handle)
+		return true;
+
+	return false;
+}
+
+/**
  * dp_ppeds_interrupt_start_be() - Start all the PPEDS interrupts
  * @be_soc: BE SoC
  *
@@ -2117,7 +2182,6 @@ void dp_ppeds_interrupt_start_be(struct dp_soc *soc)
 	dp_ppeds_enable_irq(&be_soc->soc,
 			    &be_soc->ppeds_wbm_release_ring);
 
-	dp_ppeds_enable_irq(&be_soc->soc, &be_soc->ppe2tcl_ring);
 	dp_ppeds_enable_irq(&be_soc->soc, &be_soc->reo2ppe_ring);
 }
 
@@ -2138,7 +2202,6 @@ void dp_ppeds_interrupt_stop_be(struct dp_soc *soc)
 	dp_ppeds_disable_irq(&be_soc->soc,
 			     &be_soc->ppeds_wbm_release_ring);
 
-	dp_ppeds_disable_irq(&be_soc->soc, &be_soc->ppe2tcl_ring);
 	dp_ppeds_disable_irq(&be_soc->soc, &be_soc->reo2ppe_ring);
 }
 
@@ -2203,7 +2266,7 @@ QDF_STATUS dp_ppeds_init_soc_be(struct dp_soc *soc)
 {
 	struct dp_soc_be *be_soc = dp_get_be_soc_from_dp_soc(soc);
 
-	if (!wlan_cfg_get_dp_soc_is_ppeds_enabled(soc->wlan_cfg_ctx))
+	if (!be_soc->ppeds_handle)
 		return QDF_STATUS_SUCCESS;
 
 	be_soc->dp_ppeds_txdesc_hotlist_len =
@@ -2216,7 +2279,7 @@ QDF_STATUS dp_ppeds_deinit_soc_be(struct dp_soc *soc)
 {
 	struct dp_soc_be *be_soc = dp_get_be_soc_from_dp_soc(soc);
 
-	if (!wlan_cfg_get_dp_soc_is_ppeds_enabled(soc->wlan_cfg_ctx))
+	if (!be_soc->ppeds_handle)
 		return QDF_STATUS_SUCCESS;
 
 	return dp_hw_cookie_conversion_deinit(be_soc, &be_soc->ppeds_tx_cc_ctx);

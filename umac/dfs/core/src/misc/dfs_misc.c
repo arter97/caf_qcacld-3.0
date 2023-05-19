@@ -447,6 +447,8 @@ void dfs_deliver_cac_state_events(struct wlan_dfs *dfs)
 
 	chan = dfs->dfs_curchan;
 	dfs_send_dfs_events_for_chan(dfs, chan, WLAN_EV_CAC_STARTED);
+	dfs_update_cac_elements(dfs, NULL, 0, chan, WLAN_EV_CAC_STARTED);
+
 	/* The current channel has started CAC, so the CAC_DONE state of the
 	 * previous channel has to reset. So deliver the CAC_RESET event on
 	 * all the sub-channels of previous dfs channel. If the previous
@@ -467,6 +469,7 @@ void dfs_deliver_cac_state_events(struct wlan_dfs *dfs)
 	if (WLAN_IS_CHAN_RADAR(dfs, chan))
 		return;
 
+	dfs_update_cac_elements(dfs, NULL, 0, dfs->dfs_prevchan, WLAN_EV_CAC_RESET);
 	dfs_send_dfs_events_for_chan(dfs, chan, WLAN_EV_CAC_RESET);
 }
 #endif
@@ -510,3 +513,234 @@ void dfs_get_dfs_puncture(struct wlan_dfs *dfs,
 	*is_dfs_punc_en = dfs->dfs_use_puncture;
 }
 #endif /* QCA_DFS_BW_PUNCTURE */
+
+#if defined(WLAN_DISP_CHAN_INFO)
+/**
+ * dfs_clear_cac_elems() - Clear the dfs_cacelem data structure.
+ * @dfs_cac_cur_elem: Pointer to struct dfs_cacelem
+ *
+ * Return: None
+ */
+static void
+dfs_clear_cac_elems(struct dfs_cacelem *dfs_cac_cur_elem)
+{
+	qdf_mem_zero(dfs_cac_cur_elem, sizeof(struct dfs_cacelem));
+}
+
+/**
+ * dfs_fill_cac_comp_params() - Store the timestamp of CAC completion.
+ * This is called immediately after CAC is completed for the element.
+ * @dfs_cac_cur_elem: Pointer to struct dfs_cacelem
+ *
+ * Return: None
+ */
+static void
+dfs_fill_cac_comp_params(struct dfs_cacelem *dfs_cac_cur_elem)
+{
+	dfs_cac_cur_elem->cac_completed_time =  qdf_get_monotonic_boottime();
+}
+
+/**
+ * dfs_fill_cac_start_params() - Fill CAC start params in struct dfs_cacelem.
+ * This is called when CAC is just started.
+ * @dfs_cac_elem: Pointer to struct dfs_cacelem
+ *
+ * Return: None
+ */
+static void
+dfs_fill_cac_start_params(struct dfs_cacelem *dfs_cac_elem)
+{
+	dfs_cac_elem->cac_start_us = qdf_get_monotonic_boottime();
+	dfs_cac_elem->cac_completed_time = 0;
+}
+
+/**
+ * dfs_update_cac_elem() - Fill dfs_cacelem data structure based on the
+ * input CAC events.
+ * @dfs: Pointer to struct wlan_dfs
+ * @dfs_cac_cur_elem: Pointer to struct dfs_cacelem
+ * @dfs_ev: DFS event
+ *
+ * Return: None
+ */
+static void
+dfs_update_cac_elem(struct wlan_dfs *dfs, struct dfs_cacelem *dfs_cac_cur_elem,
+		    enum WLAN_DFS_EVENTS dfs_ev)
+{
+	switch (dfs_ev) {
+	case WLAN_EV_CAC_STARTED:
+		dfs_fill_cac_start_params(dfs_cac_cur_elem);
+		break;
+	case WLAN_EV_CAC_COMPLETED:
+		dfs_fill_cac_comp_params(dfs_cac_cur_elem);
+		break;
+	case WLAN_EV_NOL_STARTED:
+	case WLAN_EV_CAC_RESET:
+		dfs_clear_cac_elems(dfs_cac_cur_elem);
+		break;
+	default:
+		dfs_debug(dfs, WLAN_DEBUG_DFS, "unknown event %u received", dfs_ev);
+		break;
+	}
+
+	dfs_debug(dfs, WLAN_DEBUG_DFS, "event: %u", dfs_ev);
+}
+
+QDF_STATUS
+dfs_update_cac_elements(struct wlan_dfs *dfs, uint16_t *freq_list,
+			uint8_t num_chan, struct dfs_channel *dfs_chan,
+			enum WLAN_DFS_EVENTS dfs_ev)
+{
+	qdf_freq_t cac_subchan_freq[MAX_20MHZ_SUBCHANS];
+	qdf_freq_t *sub_chan_freq;
+	uint8_t num_cac_subchan = 0;
+	QDF_STATUS status = QDF_STATUS_SUCCESS;
+	struct dfs_cacelem *dfs_cac_cur_elem;
+	uint8_t i;
+	int8_t index;
+
+	if (dfs_chan) {
+		num_cac_subchan = dfs_find_dfs_sub_channels_for_freq(dfs,
+								     dfs_chan,
+								     cac_subchan_freq);
+		sub_chan_freq = cac_subchan_freq;
+	} else if (freq_list) {
+		sub_chan_freq = freq_list;
+		num_cac_subchan = num_chan;
+	}
+
+	if (!num_cac_subchan) {
+		dfs_debug(dfs, WLAN_DEBUG_DFS, "number of cac subchans is 0");
+		return QDF_STATUS_E_INVAL;
+	}
+	for (i = 0; i < num_cac_subchan; i++) {
+		if (!wlan_reg_is_dfs_for_freq(dfs->dfs_pdev_obj,
+					      sub_chan_freq[i])) {
+			dfs_debug(dfs, WLAN_DEBUG_DFS, "sub chan freq: %u is non_dfs",
+				  sub_chan_freq[i]);
+			continue;
+		}
+		utils_dfs_convert_freq_to_index(sub_chan_freq[i], &index);
+		if (index == INVALID_INDEX) {
+			dfs_debug(dfs, WLAN_DEBUG_DFS, "Index for freq: %u is invalid",
+				  sub_chan_freq[i]);
+			return QDF_STATUS_E_INVAL;
+		}
+		dfs_cac_cur_elem = &dfs->dfs_cacelems[index];
+		dfs_update_cac_elem(dfs, dfs_cac_cur_elem, dfs_ev);
+	}
+	return status;
+}
+
+/**
+ * dfs_compute_rem_time() - Given the start time (in us) and timeout (in ms),
+ * compute the remaining time.
+ * @start_time_us: Start time in us
+ * @timeout_ms: Timeout in ms
+ *
+ * Return: Remaining time in seconds
+ */
+static uint32_t
+dfs_compute_rem_time(uint64_t start_time_us, uint32_t timeout_ms)
+{
+	uint32_t diff_ms;
+
+	diff_ms = qdf_do_div(qdf_get_monotonic_boottime() - start_time_us, 1000);
+	if (timeout_ms > diff_ms)
+		diff_ms = timeout_ms - diff_ms;
+	else
+		diff_ms = 0;
+	/* Convert to seconds */
+	return qdf_do_div(diff_ms, 1000);
+}
+
+/**
+ * dfs_get_rem_nol_time() - If the input freq is an NOL freq, find out
+ * the remaining NOL time. If the input freq is not in NOL, set remaining
+ * NOL timeout as 0.
+ *
+ * @dfs: Pointer to struct wlan_dfs
+ * @freq: Frequency in MHz
+ *
+ * Return: Remaining NOL time in seconds.
+ */
+static uint32_t
+dfs_get_rem_nol_time(struct wlan_dfs *dfs, qdf_freq_t freq)
+{
+	struct dfs_nolelem *nol = dfs->dfs_nol;
+
+	while (nol) {
+		if (nol->nol_freq == freq)
+			break;
+		nol = nol->nol_next;
+	}
+
+	if (nol)
+		return dfs_compute_rem_time(nol->nol_start_us,
+					    nol->nol_timeout_ms);
+	return 0;
+}
+
+/**
+ * dfs_get_rem_cac_and_nol_time() - Get remaining CAC and NOL time.
+ * @dfs: Pointer to struct wlan_dfs
+ * @dfs_elem: Pointer to struct dfs_cacelem
+ * @dfs_state: DFS state
+ * @rem_cac_time: Pointer to remaining cac time
+ * @rem_nol_time: Pointer to remaining NOL time
+ * @freq: Frequency in MHz
+ *
+ * Return: None
+ */
+#define TIME_IN_MS 1000
+static void
+dfs_get_rem_cac_and_nol_time(struct wlan_dfs *dfs,
+			     struct dfs_cacelem *dfs_elem,
+			     enum channel_dfs_state dfs_state,
+			     uint32_t *rem_cac_time,
+			     uint32_t *rem_nol_time,
+			     qdf_freq_t freq)
+{
+	struct dfs_channel *chan = dfs->dfs_curchan;
+	uint16_t cac_timeout;
+
+	*rem_nol_time = 0;
+	*rem_cac_time = 0;
+
+	switch (dfs_state) {
+	case CH_DFS_S_CAC_STARTED:
+		cac_timeout = dfs_mlme_get_cac_timeout_for_freq(dfs->dfs_pdev_obj,
+							  chan->dfs_ch_freq,
+							  chan->dfs_ch_mhz_freq_seg2,
+							  chan->dfs_ch_flags);
+		*rem_cac_time = dfs_compute_rem_time(dfs_elem->cac_start_us,
+						     cac_timeout * TIME_IN_MS);
+		break;
+	case CH_DFS_S_CAC_COMPLETED:
+		/* rem_cac_time was already set to 0 before entering switch */
+		break;
+	case CH_DFS_S_NOL:
+		*rem_nol_time = dfs_get_rem_nol_time(dfs, freq);
+		break;
+	default:
+		dfs_debug(dfs, WLAN_DEBUG_DFS, "remaining cac/nol time is NA for state: %u",
+			  dfs_state);
+		break;
+	}
+}
+
+void dfs_get_cac_nol_time(struct wlan_dfs *dfs, int8_t index,
+			  uint32_t *rem_cac_time,
+			  uint64_t *cac_comp_time, uint32_t *rem_nol_time,
+			  qdf_freq_t freq)
+{
+	struct dfs_cacelem *dfs_cacelems = &dfs->dfs_cacelems[index];
+	enum channel_dfs_state dfs_state = dfs->dfs_channel_state_array[index];
+
+	dfs_get_rem_cac_and_nol_time(dfs, dfs_cacelems, dfs_state,
+				     rem_cac_time, rem_nol_time, freq);
+
+	*cac_comp_time = dfs_cacelems->cac_completed_time;
+}
+
+#endif

@@ -940,6 +940,8 @@ static void dfs_fill_max_bw_for_chan(struct wlan_dfs *dfs,
 	}
 
 	for (i = MIN_5GHZ_CHANNEL; i < MAX_5GHZ_CHANNEL; i++) {
+		uint16_t this_bandwidth;
+
 		if (!WLAN_REG_IS_5GHZ_CH_FREQ(cur_chan_list[i].center_freq))
 			continue;
 
@@ -955,16 +957,26 @@ static void dfs_fill_max_bw_for_chan(struct wlan_dfs *dfs,
 		if (!dfs_is_freq_needed_in_precac_list(dfs, cur_chan_list[i]))
 			continue;
 
+		this_bandwidth = cur_chan_list[i].max_bw;
+		/*
+		 * When the regulatory gives a maximum bandwidth of 320 MHz for
+		 * a 5 GHz channel, change it to 240 MHz because the 5 GHz
+		 * channel as per ADFS/precac only spans for 240 MHz and will
+		 * create only 240 MHz node.
+		 */
+		if (this_bandwidth == DFS_CHWIDTH_320_VAL)
+			this_bandwidth = DFS_CHWIDTH_240_VAL;
+
 		right_edge_freq =
 			cur_chan_list[i].center_freq -
 			HALF_20MHZ_BW +
-			cur_chan_list[i].max_bw;
+			this_bandwidth;
 
 		if (dfs_is_restricted_80p80mhz_supported(dfs) &&
 		    IS_WITHIN_RANGE(cur_chan_list[i].center_freq,
 				    RESTRICTED_80P80_CHAN_CENTER_FREQ,
 				    DFS_CHWIDTH_165_VAL/2) &&
-			cur_chan_list[i].max_bw == DFS_CHWIDTH_80_VAL) {
+			this_bandwidth == DFS_CHWIDTH_80_VAL) {
 
 		    /* If channel 132 through 144 is already found as a 80MHz
 		     * channel, then one 80Mhz entry was added. Now since
@@ -979,7 +991,7 @@ static void dfs_fill_max_bw_for_chan(struct wlan_dfs *dfs,
 				right_edge_freq =
 					cur_chan_list[i].center_freq -
 					HALF_20MHZ_BW +
-					cur_chan_list[i].max_bw;
+					this_bandwidth;
 				continue;
 			} else {
 				restricted_80p80_found = true;
@@ -988,12 +1000,12 @@ static void dfs_fill_max_bw_for_chan(struct wlan_dfs *dfs,
 
 		dfs_max_bw_info[j].dfs_pri_ch_freq =
 			cur_chan_list[i].center_freq;
-		if (cur_chan_list[i].max_bw == DFS_CHWIDTH_240_VAL)
+		if (this_bandwidth == DFS_CHWIDTH_240_VAL)
 			dfs_max_bw_info[j].dfs_max_bw =
 				DFS_CHWIDTH_320_VAL;
 		else
 			dfs_max_bw_info[j].dfs_max_bw =
-				cur_chan_list[i].max_bw;
+				this_bandwidth;
 		dfs_max_bw_info[j].dfs_center_ch_freq =
 			cur_chan_list[i].center_freq -
 			HALF_20MHZ_BW +

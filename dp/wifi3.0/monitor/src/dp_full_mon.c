@@ -531,10 +531,15 @@ dp_rx_mon_mpdu_reap(struct dp_soc *soc, struct dp_pdev *pdev, uint32_t mac_id,
 	 * reaps msdu_count number of msdus for one SW_MONITOR_RING descriptor
 	 * and forms nbuf queue.
 	 */
-	while (desc_info->msdu_count && desc_info->link_desc.paddr) {
+	while (desc_info->link_desc.paddr) {
+		if (!desc_info->msdu_count) {
+			drop_mpdu = true;
+			DP_STATS_INC(pdev, invalid_msdu_cnt, 1);
+		}
+
 		link_desc_va =
 			dp_rx_cookie_2_mon_link_desc(pdev,
-						     desc_info->link_desc,
+						     &desc_info->link_desc,
 						     mac_id);
 
 		qdf_assert_always(link_desc_va);
@@ -583,7 +588,8 @@ dp_rx_mon_mpdu_reap(struct dp_soc *soc, struct dp_pdev *pdev, uint32_t mac_id,
 					dp_rx_mon_dest_debug("%pK: failed to allocate parent buffer to hold all frag",
 							     soc);
 					drop_mpdu = true;
-					desc_info->msdu_count--;
+					if (desc_info->msdu_count)
+						desc_info->msdu_count--;
 					goto next_msdu;
 				}
 				is_first_msdu = false;
@@ -609,7 +615,7 @@ dp_rx_mon_mpdu_reap(struct dp_soc *soc, struct dp_pdev *pdev, uint32_t mac_id,
 					rx_tlv_hdr,
 					&first_rx_desc_tlv,
 					&is_frag_non_raw, rx_tlv_hdr);
-			if (!msdu_frag)
+			if (!msdu_frag && desc_info->msdu_count)
 				desc_info->msdu_count--;
 
 			rx_hdr_tlv_len = SIZE_OF_MONITOR_TLV;
@@ -675,6 +681,7 @@ next_msdu:
 					   soc);
 		}
 	}
+
 	mon_pdev->rx_mon_stats.dest_mpdu_done++;
 
 	dp_rx_mon_init_tail_msdu(head_msdu, msdu, last_msdu, tail_msdu);

@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -91,7 +91,8 @@ enum stats_feat_index_e {
  * @type:  Requested stats category
  * @aggregate: Aggregate in driver
  * @serviceid: service id for checking the level of sawf stats
- * @mld_req: Flag to indicate if request is rcvd for MLD interface
+ * @mld_req: Flag to indicate if request is received for MLD interface
+ * @mld_link: Flag to indicate if request is received for link stats on MLD
  * @intf_name: Interface name for which stats are requested
  */
 struct stats_config {
@@ -103,6 +104,7 @@ struct stats_config {
 	bool                   aggregate;
 	u_int8_t               serviceid;
 	bool                   mld_req;
+	bool                   mld_link;
 	char                   intf_name[IFNAMSIZ];
 };
 

@@ -453,7 +453,7 @@ wlan_rptr_vdev_create_complete(struct wlan_objmgr_vdev *vdev,
 	u8 *oma_addr = NULL;
 	u8 *vma_addr = NULL;
 	struct net_device *wrap_dev;
-#ifdef CONFIG_MLO_SINGLE_DEV
+#ifdef WLAN_FEATURE_11BE_MLO
 	osif_dev  *osdev;
 	struct osif_mldev *mldev;
 #endif
@@ -474,7 +474,7 @@ wlan_rptr_vdev_create_complete(struct wlan_objmgr_vdev *vdev,
 			wrap_dev = dp_wrap_vdev_get_netdev(
 					dp_wrap_get_vdev(pdev));
 			if (wrap_dev) {
-#ifdef CONFIG_MLO_SINGLE_DEV
+#ifdef WLAN_FEATURE_11BE_MLO
 				osdev = ath_netdev_priv(wrap_dev);
 				mldev = osdev->mldev;
 				if (mldev)
@@ -522,7 +522,7 @@ wlan_rptr_vdev_delete_start(struct wlan_objmgr_vdev *vdev)
 	u8 *oma_addr = NULL;
 	u8 *vma_addr = NULL;
 	struct net_device *wrap_dev;
-#ifdef CONFIG_MLO_SINGLE_DEV
+#ifdef WLAN_FEATURE_11BE_MLO
 	osif_dev  *osdev;
 	struct osif_mldev *mldev;
 #endif
@@ -539,7 +539,7 @@ wlan_rptr_vdev_delete_start(struct wlan_objmgr_vdev *vdev)
 			wrap_dev = dp_wrap_vdev_get_netdev(
 						dp_wrap_get_vdev(pdev));
 			if (wrap_dev) {
-#ifdef CONFIG_MLO_SINGLE_DEV
+#ifdef WLAN_FEATURE_11BE_MLO
 				osdev = ath_netdev_priv(wrap_dev);
 				mldev = osdev->mldev;
 				if (mldev)
@@ -1114,6 +1114,7 @@ wlan_rptr_conn_up_dbdc_process(struct wlan_objmgr_vdev *vdev,
 #if QCA_AIRTIME_FAIRNESS
 	struct ieee80211vap *vap = wlan_vdev_get_vap(vdev);
 #endif
+	osif_dev *osdev;
 
 	g_priv = wlan_rptr_get_global_ctx();
 	ext_cb = &g_priv->ext_cbacks;
@@ -1137,8 +1138,9 @@ wlan_rptr_conn_up_dbdc_process(struct wlan_objmgr_vdev *vdev,
 #endif
 	RPTR_GLOBAL_UNLOCK(&g_priv->rptr_global_lock);
 
+	osdev = ath_netdev_priv(dev);
 	if (wiphy && dev)
-		qca_multi_link_add_station_vap(wiphy, dev, wlan_vdev_mlme_get_mldaddr(vdev));
+		qca_multi_link_add_station_vap(wiphy, dev, osif_get_mld_netdev(osdev), wlan_vdev_mlme_get_mldaddr(vdev));
 
 	qca_multi_link_append_num_sta(true);
 
@@ -1159,10 +1161,6 @@ wlan_rptr_conn_up_dbdc_process(struct wlan_objmgr_vdev *vdev,
 		if (flags.dbdc_process_enable) {
 			qca_multi_link_set_dbdc_enable(true);
 
-			/*Disable legacy DBDC model when multi link dbdb is enabled.*/
-			if (ext_cb->target_lithium(pdev))
-				dp_lag_soc_enable(pdev, 0);
-
 		}
 	}
 
@@ -1175,7 +1173,6 @@ wlan_rptr_conn_up_dbdc_process(struct wlan_objmgr_vdev *vdev,
 		RPTR_GLOBAL_UNLOCK(&g_priv->rptr_global_lock);
 		if (flags.delay_stavap_connection) {
 			RPTR_LOGI("Setting drop_secondary_mcast and starting timer");
-			dp_lag_soc_set_drop_secondary_mcast(pdev, 1);
 			ext_cb->delay_stavap_conn_process_up(vdev);
 		}
 		if (flags.dbdc_process_enable) {
@@ -1269,7 +1266,6 @@ wlan_rptr_conn_down_dbdc_process(struct wlan_objmgr_vdev *vdev,
 	RPTR_GLOBAL_LOCK(&g_priv->rptr_global_lock);
 	if (g_priv->num_stavaps_up == 1) {
 		RPTR_GLOBAL_UNLOCK(&g_priv->rptr_global_lock);
-		dp_lag_soc_enable(pdev, 0);
 		qca_multi_link_set_dbdc_enable(false);
 #ifdef QCA_NSS_WIFI_OFFLOAD_SUPPORT
 		ext_cb->nss_dbdc_process_mac_db_down(vdev);
@@ -1277,7 +1273,6 @@ wlan_rptr_conn_down_dbdc_process(struct wlan_objmgr_vdev *vdev,
 		if (flags.delay_stavap_connection) {
 			RPTR_LOGI("clearing drop_secondary_mcast and starting timer");
 			qca_multi_link_set_drop_sec_mcast(false);
-			dp_lag_soc_set_drop_secondary_mcast(pdev, 0);
 			ext_cb->delay_stavap_conn_process_down(vdev);
 		}
 	} else {
@@ -1295,6 +1290,7 @@ wlan_rptr_vdev_s_ssid_check_cb(struct wlan_objmgr_psoc *psoc,
 {
 	struct wlan_objmgr_vdev *vdev = NULL;
 	struct s_ssid_info *s_ssid_msg = NULL;
+	enum QDF_OPMODE vdev_mode, ssid_msg_vdev_mode;
 
 	vdev = (struct wlan_objmgr_vdev *)obj;
 	if (!vdev) {
@@ -1302,15 +1298,23 @@ wlan_rptr_vdev_s_ssid_check_cb(struct wlan_objmgr_psoc *psoc,
 		return;
 	}
 
+	/*No same ssid checks for Proxy STAs*/
+	if (wlan_rptr_is_psta_vdev(vdev))
+		return;
+
 	s_ssid_msg = ((struct s_ssid_info *)arg);
 
-	if (wlan_vdev_mlme_get_opmode(vdev) != wlan_vdev_mlme_get_opmode(
-							s_ssid_msg->vdev)) {
+	vdev_mode = wlan_vdev_mlme_get_opmode(vdev);
+	ssid_msg_vdev_mode = wlan_vdev_mlme_get_opmode(s_ssid_msg->vdev);
+
+	/* Do same ssid check only if vdev_mode and ssid_msg_vdev_mode
+	 * are not the same and they're SAP or STA, not any other mode */
+	if (((vdev_mode == QDF_STA_MODE) &&
+			(ssid_msg_vdev_mode == QDF_SAP_MODE)) ||
+			((vdev_mode == QDF_SAP_MODE) &&
+			 (ssid_msg_vdev_mode == QDF_STA_MODE))) {
 		struct wlan_rptr_global_priv *g_priv = wlan_rptr_get_global_ctx();
 		struct rptr_ext_cbacks *ext_cb = &g_priv->ext_cbacks;
-
-		if (wlan_rptr_is_psta_vdev(vdev))
-			return;
 
 		if (ext_cb->dessired_ssid_found(vdev, s_ssid_msg->ssid, s_ssid_msg->ssid_len)) {
 			s_ssid_msg->ssid_match = 1;
