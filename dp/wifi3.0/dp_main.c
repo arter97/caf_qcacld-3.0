@@ -6830,7 +6830,9 @@ dp_print_host_stats(struct dp_vdev *vdev,
 		dp_print_soc_interrupt_stats(pdev->soc);
 		break;
 	case TXRX_SOC_FSE_STATS:
-		dp_rx_dump_fisa_table(pdev->soc);
+		if (soc->cdp_soc.ol_ops->dp_print_fisa_stats)
+			soc->cdp_soc.ol_ops->dp_print_fisa_stats(
+						CDP_FISA_STATS_ID_DUMP_HW_FST);
 		break;
 	case TXRX_HAL_REG_WRITE_STATS:
 		hal_dump_reg_write_stats(pdev->soc->hal_soc);
@@ -9005,7 +9007,9 @@ static QDF_STATUS dp_txrx_dump_stats(struct cdp_soc_t *psoc, uint16_t value,
 		dp_pdev_print_tx_delay_stats(soc);
 		/* Dump usage watermark stats for core TX/RX SRNGs */
 		dp_dump_srng_high_wm_stats(soc, (1 << REO_DST));
-		dp_print_fisa_stats(soc);
+		if (soc->cdp_soc.ol_ops->dp_print_fisa_stats)
+			soc->cdp_soc.ol_ops->dp_print_fisa_stats(
+						CDP_FISA_STATS_ID_ERR_STATS);
 		break;
 
 	case CDP_RX_RING_STATS:
@@ -9032,7 +9036,9 @@ static QDF_STATUS dp_txrx_dump_stats(struct cdp_soc_t *psoc, uint16_t value,
 		break;
 
 	case CDP_DP_RX_FISA_STATS:
-		dp_rx_dump_fisa_stats(soc);
+		if (soc->cdp_soc.ol_ops->dp_print_fisa_stats)
+			soc->cdp_soc.ol_ops->dp_print_fisa_stats(
+						CDP_FISA_STATS_ID_DUMP_SW_FST);
 		break;
 
 	case CDP_DP_SWLM_STATS:

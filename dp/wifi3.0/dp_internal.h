@@ -4114,16 +4114,6 @@ void dp_update_num_mac_rings_for_dbs(struct dp_soc *soc,
 
 
 #if defined(WLAN_SUPPORT_RX_FISA)
-void dp_rx_dump_fisa_table(struct dp_soc *soc);
-
-/**
- * dp_print_fisa_stats() - Print FISA stats
- * @soc: DP soc handle
- *
- * Return: None
- */
-void dp_print_fisa_stats(struct dp_soc *soc);
-
 /**
  * dp_rx_fst_update_cmem_params() - Update CMEM FST params
  * @soc:		DP SoC context
@@ -4139,19 +4129,6 @@ void dp_rx_fst_update_cmem_params(struct dp_soc *soc, uint16_t num_entries,
 static inline void
 dp_rx_fst_update_cmem_params(struct dp_soc *soc, uint16_t num_entries,
 			     uint32_t cmem_ba_lo, uint32_t cmem_ba_hi)
-{
-}
-
-static inline void dp_print_fisa_stats(struct dp_soc *soc)
-{
-}
-
-static QDF_STATUS dp_rx_dump_fisa_stats(struct dp_soc *soc)
-{
-	return QDF_STATUS_SUCCESS;
-}
-
-static void dp_rx_dump_fisa_table(struct dp_soc *soc)
 {
 }
 #endif /* WLAN_SUPPORT_RX_FISA */

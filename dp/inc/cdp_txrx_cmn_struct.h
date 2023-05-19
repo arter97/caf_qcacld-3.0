@@ -3009,6 +3009,18 @@ struct cdp_peer_cookie {
 	uint8_t cookie;
 };
 
+/**
+ * enum cdp_fisa_stats_id - ID to query FISA stats
+ * @CDP_FISA_STATS_ID_ERR_STATS: FISA error stats
+ * @CDP_FISA_STATS_ID_DUMP_HW_FST: HW FST dump
+ * @CDP_FISA_STATS_ID_DUMP_SW_FST: SW FST dump
+ */
+enum cdp_fisa_stats_id {
+	CDP_FISA_STATS_ID_ERR_STATS,
+	CDP_FISA_STATS_ID_DUMP_HW_FST,
+	CDP_FISA_STATS_ID_DUMP_SW_FST,
+};
+
 #ifdef WLAN_SUPPORT_RX_FISA
 struct cdp_flow_stats {
 	uint32_t aggr_count;

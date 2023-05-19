@@ -1700,6 +1700,7 @@ void (*peer_send_wds_disconnect)(struct cdp_ctrl_objmgr_psoc *psoc,
 #ifdef CONFIG_SAWF_DEF_QUEUES
 	int (*disable_sawf_svc)(uint8_t svc_id);
 #endif
+	void (*dp_print_fisa_stats)(enum cdp_fisa_stats_id stats_id);
 };
 
 #ifdef DP_PEER_EXTENDED_API

@@ -162,10 +162,6 @@
 #define DP_TX_MESH_ENABLED 0x4
 #define DP_TX_INVALID_QOS_TAG 0xf
 
-#ifdef WLAN_SUPPORT_RX_FISA
-#define FISA_FLOW_MAX_AGGR_COUNT        16 /* max flow aggregate count */
-#endif
-
 #ifdef WLAN_FEATURE_RX_PREALLOC_BUFFER_POOL
 #define DP_RX_REFILL_BUFF_POOL_SIZE  2048
 #define DP_RX_REFILL_BUFF_POOL_BURST 64
@@ -2975,32 +2971,14 @@ struct dp_soc {
 	 * invalidation bug is enabled or not
 	 */
 	bool is_rx_fse_full_cache_invalidate_war_enabled;
-#if defined(WLAN_SUPPORT_RX_FLOW_TAG) || defined(WLAN_SUPPORT_RX_FISA)
+#if defined(WLAN_SUPPORT_RX_FLOW_TAG)
 	/**
 	 * Pointer to DP RX Flow FST at SOC level if
 	 * is_rx_flow_search_table_per_pdev is false
 	 * TBD: rx_fst[num_macs] if we decide to have per mac FST
 	 */
 	struct dp_rx_fst *rx_fst;
-#ifdef WLAN_SUPPORT_RX_FISA
-	uint8_t fisa_enable;
-	uint8_t fisa_lru_del_enable;
-	/**
-	 * Params used for controlling the fisa aggregation dynamically
-	 */
-	struct {
-		qdf_atomic_t skip_fisa;
-		uint8_t fisa_force_flush[MAX_REO_DEST_RINGS];
-	} skip_fisa_param;
-
-	/**
-	 * CMEM address and size for FST in CMEM, This is the address
-	 * shared during init time.
-	 */
-	uint64_t fst_cmem_base;
-	uint64_t fst_cmem_size;
-#endif
-#endif /* WLAN_SUPPORT_RX_FLOW_TAG || WLAN_SUPPORT_RX_FISA */
+#endif /* WLAN_SUPPORT_RX_FLOW_TAG */
 	/* SG supported for msdu continued packets from wbm release ring */
 	bool wbm_release_desc_rx_sg_support;
 	bool peer_map_attach_success;
@@ -4957,6 +4935,7 @@ struct dp_tx_me_buf_t {
 
 #if defined(WLAN_SUPPORT_RX_FLOW_TAG) || defined(WLAN_SUPPORT_RX_FISA)
 struct hal_rx_fst;
+#endif /* WLAN_SUPPORT_RX_FLOW_TAG || WLAN_SUPPORT_RX_FISA */
 
 #ifdef WLAN_SUPPORT_RX_FLOW_TAG
 struct dp_rx_fse {
@@ -5003,161 +4982,8 @@ struct dp_rx_fst {
 };
 
 #define DP_RX_GET_SW_FT_ENTRY_SIZE sizeof(struct dp_rx_fse)
-#elif WLAN_SUPPORT_RX_FISA
 
-/**
- * struct dp_fisa_reo_mismatch_stats - reo mismatch sub-case stats for FISA
- * @allow_cce_match: packet allowed due to cce mismatch
- * @allow_fse_metdata_mismatch: packet allowed since it belongs to same flow,
- *			only fse_metadata is not same.
- * @allow_non_aggr: packet allowed due to any other reason.
- */
-struct dp_fisa_reo_mismatch_stats {
-	uint32_t allow_cce_match;
-	uint32_t allow_fse_metdata_mismatch;
-	uint32_t allow_non_aggr;
-};
-
-struct dp_fisa_stats {
-	/* flow index invalid from RX HW TLV */
-	uint32_t invalid_flow_index;
-	/* workqueue deferred due to suspend */
-	uint32_t update_deferred;
-	struct dp_fisa_reo_mismatch_stats reo_mismatch;
-	uint32_t incorrect_rdi;
-};
-
-enum fisa_aggr_ret {
-	FISA_AGGR_DONE,
-	FISA_AGGR_NOT_ELIGIBLE,
-	FISA_FLUSH_FLOW
-};
-
-/**
- * struct fisa_pkt_hist - FISA Packet history structure
- * @tlv_hist: array of TLV history
- * @ts_hist: array of timestamps of fisa packets
- * @idx: index indicating the next location to be used in the array.
- */
-struct fisa_pkt_hist {
-	uint8_t *tlv_hist;
-	qdf_time_t ts_hist[FISA_FLOW_MAX_AGGR_COUNT];
-	uint32_t idx;
-};
-
-struct dp_fisa_rx_sw_ft {
-	/* HAL Rx Flow Search Entry which matches HW definition */
-	void *hw_fse;
-	/* hash value */
-	uint32_t flow_hash;
-	/* toeplitz hash value*/
-	uint32_t flow_id_toeplitz;
-	/* Flow index, equivalent to hash value truncated to FST size */
-	uint32_t flow_id;
-	/* Stats tracking for this flow */
-	struct cdp_flow_stats stats;
-	/* Flag indicating whether flow is IPv4 address tuple */
-	uint8_t is_ipv4_addr_entry;
-	/* Flag indicating whether flow is valid */
-	uint8_t is_valid;
-	uint8_t is_populated;
-	uint8_t is_flow_udp;
-	uint8_t is_flow_tcp;
-	qdf_nbuf_t head_skb;
-	uint16_t cumulative_l4_checksum;
-	uint16_t adjusted_cumulative_ip_length;
-	uint16_t cur_aggr;
-	uint16_t napi_flush_cumulative_l4_checksum;
-	uint16_t napi_flush_cumulative_ip_length;
-	qdf_nbuf_t last_skb;
-	uint32_t head_skb_ip_hdr_offset;
-	uint32_t head_skb_l4_hdr_offset;
-	struct cdp_rx_flow_tuple_info rx_flow_tuple_info;
-	uint8_t napi_id;
-	struct dp_vdev *vdev;
-	uint64_t bytes_aggregated;
-	uint32_t flush_count;
-	uint32_t aggr_count;
-	uint8_t do_not_aggregate;
-	uint16_t hal_cumultive_ip_len;
-	struct dp_soc *soc_hdl;
-	/* last aggregate count fetched from RX PKT TLV */
-	uint32_t last_hal_aggr_count;
-	uint32_t cur_aggr_gso_size;
-	qdf_net_udphdr_t *head_skb_udp_hdr;
-	uint16_t frags_cumulative_len;
-	/* CMEM parameters */
-	uint32_t cmem_offset;
-	uint32_t metadata;
-	uint32_t reo_dest_indication;
-	qdf_time_t flow_init_ts;
-	qdf_time_t last_accessed_ts;
-#ifdef WLAN_SUPPORT_RX_FISA_HIST
-	struct fisa_pkt_hist pkt_hist;
-#endif
-};
-
-#define DP_RX_GET_SW_FT_ENTRY_SIZE sizeof(struct dp_fisa_rx_sw_ft)
-#define MAX_FSE_CACHE_FL_HST 10
-/**
- * struct fse_cache_flush_history - Debug history cache flush
- * @timestamp: Entry update timestamp
- * @flows_added: Number of flows added for this flush
- * @flows_deleted: Number of flows deleted for this flush
- */
-struct fse_cache_flush_history {
-	uint64_t timestamp;
-	uint32_t flows_added;
-	uint32_t flows_deleted;
-};
-
-struct dp_rx_fst {
-	/* Software (DP) FST */
-	uint8_t *base;
-	/* Pointer to HAL FST */
-	struct hal_rx_fst *hal_rx_fst;
-	/* Base physical address of HAL RX HW FST */
-	uint64_t hal_rx_fst_base_paddr;
-	/* Maximum number of flows FSE supports */
-	uint16_t max_entries;
-	/* Num entries in flow table */
-	uint16_t num_entries;
-	/* SKID Length */
-	uint16_t max_skid_length;
-	/* Hash mask to obtain legitimate hash entry */
-	uint32_t hash_mask;
-	/* Lock for adding/deleting entries of FST */
-	qdf_spinlock_t dp_rx_fst_lock;
-	uint32_t add_flow_count;
-	uint32_t del_flow_count;
-	uint32_t hash_collision_cnt;
-	struct dp_soc *soc_hdl;
-	qdf_atomic_t fse_cache_flush_posted;
-	qdf_timer_t fse_cache_flush_timer;
-	/* Allow FSE cache flush cmd to FW */
-	bool fse_cache_flush_allow;
-	struct fse_cache_flush_history cache_fl_rec[MAX_FSE_CACHE_FL_HST];
-	/* FISA DP stats */
-	struct dp_fisa_stats stats;
-
-	/* CMEM params */
-	qdf_work_t fst_update_work;
-	qdf_workqueue_t *fst_update_wq;
-	qdf_list_t fst_update_list;
-	uint32_t meta_counter;
-	uint32_t cmem_ba;
-	qdf_spinlock_t dp_rx_sw_ft_lock[MAX_REO_DEST_RINGS];
-	qdf_event_t cmem_resp_event;
-	bool flow_deletion_supported;
-	bool fst_in_cmem;
-	qdf_atomic_t pm_suspended;
-	bool fst_wq_defer;
-	/* Hash based routing supported */
-	bool rx_hash_enabled;
-};
-
-#endif /* WLAN_SUPPORT_RX_FISA */
-#endif /* WLAN_SUPPORT_RX_FLOW_TAG || WLAN_SUPPORT_RX_FISA */
+#endif /* WLAN_SUPPORT_RX_FLOW_TAG */
 
 #ifdef WLAN_FEATURE_STATS_EXT
 /**
