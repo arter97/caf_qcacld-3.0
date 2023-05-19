@@ -37,6 +37,10 @@
 #include <target_if_cm_roam_offload.h>
 #endif
 
+#ifdef DP_UMAC_HW_RESET_SUPPORT
+#include <cdp_txrx_ctrl.h>
+#endif
+
 static inline
 void target_if_vdev_mgr_handle_recovery(struct wlan_objmgr_psoc *psoc,
 					uint8_t vdev_id,
@@ -68,6 +72,43 @@ target_if_send_rso_stop_failure_rsp(struct wlan_objmgr_psoc *psoc,
 }
 #endif
 
+#ifdef DP_UMAC_HW_RESET_SUPPORT
+/**
+ * target_if_check_and_restart_vdev_mgr_rsp_timer - Check and restart the vdev
+ * manager response timer if UMAC reset is in progress
+ * @vdev_rsp: Pointer to vdev response timer structure
+ *
+ * Return: QDF_STATUS
+ */
+static inline QDF_STATUS
+target_if_check_and_restart_vdev_mgr_rsp_timer(
+		struct vdev_response_timer *vdev_rsp)
+{
+	ol_txrx_soc_handle soc_txrx_handle;
+
+	soc_txrx_handle = wlan_psoc_get_dp_handle(vdev_rsp->psoc);
+
+	if (!soc_txrx_handle)
+		return QDF_STATUS_E_INVAL;
+
+	/* Restart the timer if UMAC reset is inprogress */
+	if (cdp_umac_reset_is_inprogress(soc_txrx_handle)) {
+		mlme_debug("Umac reset is in progress, restart the vdev manager response timer");
+		qdf_timer_mod(&vdev_rsp->rsp_timer, vdev_rsp->expire_time);
+		return QDF_STATUS_SUCCESS;
+	}
+
+	return QDF_STATUS_E_FAILURE;
+}
+#else
+static inline QDF_STATUS
+target_if_check_and_restart_vdev_mgr_rsp_timer(
+		struct vdev_response_timer *vdev_rsp)
+{
+	return QDF_STATUS_E_FAILURE;
+}
+#endif
+
 void target_if_vdev_mgr_rsp_timer_cb(void *arg)
 {
 	struct wlan_objmgr_psoc *psoc;
@@ -80,6 +121,7 @@ void target_if_vdev_mgr_rsp_timer_cb(void *arg)
 	enum qdf_hang_reason recovery_reason;
 	uint8_t vdev_id;
 	uint16_t rsp_pos = RESPONSE_BIT_MAX;
+	QDF_STATUS status;
 
 	if (!vdev_rsp) {
 		mlme_err("Vdev response timer is NULL");
@@ -154,6 +196,11 @@ void target_if_vdev_mgr_rsp_timer_cb(void *arg)
 		rx_ops->vdev_mgr_stop_response(psoc, &stop_rsp);
 	} else if (qdf_atomic_test_bit(DELETE_RESPONSE_BIT,
 				       &vdev_rsp->rsp_status)) {
+		status = target_if_check_and_restart_vdev_mgr_rsp_timer(
+				vdev_rsp);
+		if (QDF_IS_STATUS_SUCCESS(status))
+			return;
+
 		del_rsp.vdev_id = vdev_id;
 		rsp_pos = DELETE_RESPONSE_BIT;
 		recovery_reason = QDF_VDEV_DELETE_RESPONSE_TIMED_OUT;
@@ -163,6 +210,11 @@ void target_if_vdev_mgr_rsp_timer_cb(void *arg)
 		rx_ops->vdev_mgr_delete_response(psoc, &del_rsp);
 	} else if (qdf_atomic_test_bit(PEER_DELETE_ALL_RESPONSE_BIT,
 				&vdev_rsp->rsp_status)) {
+		status = target_if_check_and_restart_vdev_mgr_rsp_timer(
+				vdev_rsp);
+		if (QDF_IS_STATUS_SUCCESS(status))
+			return;
+
 		peer_del_all_rsp.vdev_id = vdev_id;
 		peer_del_all_rsp.peer_type_bitmap = vdev_rsp->peer_type_bitmap;
 		rsp_pos = PEER_DELETE_ALL_RESPONSE_BIT;
