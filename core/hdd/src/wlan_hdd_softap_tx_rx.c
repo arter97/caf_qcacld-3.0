@@ -480,10 +480,15 @@ QDF_STATUS hdd_softap_deregister_sta(struct hdd_adapter *adapter,
 	 * If the address is a broadcast address then the CDP layers expects
 	 * the self mac address of the adapter.
 	 */
-	if (QDF_IS_ADDR_BROADCAST(sta->sta_mac.bytes))
+	if (QDF_IS_ADDR_BROADCAST(sta->sta_mac.bytes)) {
 		mac_addr = &adapter->mac_addr;
-	else
-		mac_addr = &sta->sta_mac;
+	} else {
+		if (wlan_vdev_mlme_is_mlo_vdev(adapter->deflink->vdev) &&
+		    !qdf_is_macaddr_zero(&sta->mld_addr))
+			mac_addr = &sta->mld_addr;
+		else
+			mac_addr = &sta->sta_mac;
+	}
 
 	if (ucfg_ipa_is_enabled()) {
 		if (ucfg_ipa_wlan_evt(hdd_ctx->pdev, adapter->dev,

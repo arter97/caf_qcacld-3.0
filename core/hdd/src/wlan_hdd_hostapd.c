@@ -2560,12 +2560,21 @@ QDF_STATUS hdd_hostapd_sap_event_cb(struct sap_event *sap_event,
 		sta_id = event->staId;
 
 		if (ucfg_ipa_is_enabled()) {
+			vdev = adapter->deflink->vdev;
+
+			if (wlan_vdev_mlme_is_mlo_vdev(vdev) &&
+			    !qdf_is_macaddr_zero(&event->sta_mld))
+				qdf_copy_macaddr(&sta_addr, &event->sta_mld);
+			else
+				qdf_copy_macaddr(&sta_addr, &event->staMac);
+
 			status = ucfg_ipa_wlan_evt(hdd_ctx->pdev,
 						   adapter->dev,
 						   adapter->device_mode,
 						   adapter->deflink->vdev_id,
 						   WLAN_IPA_CLIENT_CONNECT_EX,
-						   event->staMac.bytes,
+						   (const uint8_t *)
+						   &sta_addr.bytes[0],
 						   false);
 			if (status)
 				hdd_err("WLAN_CLIENT_CONNECT_EX event failed");
