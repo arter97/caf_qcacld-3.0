@@ -554,6 +554,21 @@ static void dp_mlo_update_mlo_ts_offset(struct cdp_soc_t *soc_hdl,
 
 #ifdef CONFIG_MLO_SINGLE_DEV
 /**
+ * dp_aggregate_vdev_basic_stats() - aggregate vdev basic stats
+ * @tgt_vdev_stats: target vdev buffer
+ * @src_vdev_stats: source vdev buffer
+ *
+ * return: void
+ */
+static inline
+void dp_aggregate_vdev_basic_stats(
+			struct cdp_vdev_stats *tgt_vdev_stats,
+			struct cdp_vdev_stats *src_vdev_stats)
+{
+	DP_UPDATE_BASIC_STATS(tgt_vdev_stats, src_vdev_stats);
+}
+
+/**
  * dp_aggregate_vdev_ingress_stats() - aggregate vdev ingress stats
  * @tgt_vdev_stats: target vdev buffer
  * @src_vdev_stats: source vdev buffer
@@ -716,16 +731,67 @@ void dp_mlo_aggr_ptnr_iface_stats_mlo_links(
 							DP_PEER_TYPE_MLO_LINK);
 }
 
+/**
+ * dp_aggregate_sta_interface_stats() - for sta mode aggregate vdev stats from
+ * all link peers
+ * @soc: soc handle
+ * @vdev: vdev handle
+ * @buf: target buffer for aggregation
+ *
+ * return: QDF_STATUS
+ */
+static QDF_STATUS
+dp_aggregate_sta_interface_stats(struct dp_soc *soc,
+				 struct dp_vdev *vdev,
+				 void *buf)
+{
+	struct dp_peer *vap_bss_peer = NULL;
+	struct dp_peer *mld_peer = NULL;
+	struct dp_peer *link_peer = NULL;
+	struct dp_mld_link_peers link_peers_info;
+	uint8_t i = 0;
+	QDF_STATUS ret = QDF_STATUS_SUCCESS;
+
+	vap_bss_peer = dp_vdev_bss_peer_ref_n_get(soc, vdev,
+						  DP_MOD_ID_GENERIC_STATS);
+	if (!vap_bss_peer)
+		return QDF_STATUS_E_FAILURE;
+
+	mld_peer = DP_GET_MLD_PEER_FROM_PEER(vap_bss_peer);
+
+	if (!mld_peer) {
+		dp_peer_unref_delete(vap_bss_peer, DP_MOD_ID_GENERIC_STATS);
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	dp_get_link_peers_ref_from_mld_peer(soc, mld_peer, &link_peers_info,
+					    DP_MOD_ID_GENERIC_STATS);
+
+	for (i = 0; i < link_peers_info.num_links; i++) {
+		link_peer = link_peers_info.link_peers[i];
+		dp_update_vdev_stats(soc, link_peer, buf);
+		dp_aggregate_vdev_ingress_stats((struct cdp_vdev_stats *)buf,
+						&link_peer->vdev->stats);
+		dp_aggregate_vdev_basic_stats(
+					(struct cdp_vdev_stats *)buf,
+					&link_peer->vdev->stats);
+	}
+
+	dp_release_link_peers_ref(&link_peers_info, DP_MOD_ID_GENERIC_STATS);
+	dp_peer_unref_delete(vap_bss_peer, DP_MOD_ID_GENERIC_STATS);
+	return ret;
+}
+
 static QDF_STATUS dp_mlo_get_mld_vdev_stats(struct cdp_soc_t *soc_hdl,
 					    uint8_t vdev_id, void *buf,
 					    bool link_vdev_only)
 {
 	struct dp_soc *soc = cdp_soc_t_to_dp_soc(soc_hdl);
 	struct dp_soc_be *be_soc = dp_get_be_soc_from_dp_soc(soc);
-	struct cdp_vdev_stats *vdev_stats;
 	struct dp_vdev *vdev = dp_vdev_get_ref_by_id(soc, vdev_id,
 						     DP_MOD_ID_GENERIC_STATS);
 	struct dp_vdev_be *vdev_be = NULL;
+	QDF_STATUS ret = QDF_STATUS_SUCCESS;
 
 	if (!vdev)
 		return QDF_STATUS_E_FAILURE;
@@ -736,7 +802,10 @@ static QDF_STATUS dp_mlo_get_mld_vdev_stats(struct cdp_soc_t *soc_hdl,
 		return QDF_STATUS_E_FAILURE;
 	}
 
-	vdev_stats = (struct cdp_vdev_stats *)buf;
+	if (vdev->opmode == wlan_op_mode_sta) {
+		ret = dp_aggregate_sta_interface_stats(soc, vdev, buf);
+		goto complete;
+	}
 
 	if (DP_MLD_MODE_HYBRID_NONBOND == soc->mld_mode_ap &&
 	    vdev->opmode == wlan_op_mode_ap) {
@@ -765,7 +834,7 @@ static QDF_STATUS dp_mlo_get_mld_vdev_stats(struct cdp_soc_t *soc_hdl,
 
 complete:
 	dp_vdev_unref_delete(soc, vdev, DP_MOD_ID_GENERIC_STATS);
-	return QDF_STATUS_SUCCESS;
+	return ret;
 }
 
 QDF_STATUS
