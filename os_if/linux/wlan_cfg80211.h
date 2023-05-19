@@ -603,7 +603,7 @@ static inline void wlan_cfg80211_unregister_netdevice(struct net_device *dev)
 #endif
 
 #ifdef CFG80211_SINGLE_NETDEV_MULTI_LINK_SUPPORT
-#ifdef CFG80211_RU_PUNCT_NOTIFY
+#if defined(CFG80211_RU_PUNCT_NOTIFY) || defined(CFG80211_MLO_SINGLE_NETDEV_API)
 static inline
 void wlan_cfg80211_ch_switch_notify(struct net_device *dev,
 				    struct cfg80211_chan_def *chandef,
