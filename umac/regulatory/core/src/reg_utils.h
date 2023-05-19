@@ -139,6 +139,27 @@ QDF_STATUS reg_cache_channel_freq_state(struct wlan_objmgr_pdev *pdev,
 
 #ifdef CONFIG_REG_CLIENT
 /**
+ * reg_get_keep_6ghz_sta_cli_connection() - Get keep 6ghz sta cli
+ *                                               connection flag
+ * @pdev: The physical pdev to get keep_6ghz_sta_cli_connection
+ *
+ * Return: Return true if keep_6ghz_sta_cli_connection set else return false
+ */
+bool reg_get_keep_6ghz_sta_cli_connection(struct wlan_objmgr_pdev *pdev);
+
+/**
+ * reg_set_keep_6ghz_sta_cli_connection() - Set keep 6ghz sta cli connection
+ *                                          flag
+ * @pdev: The physical pdev to get keep_6ghz_sta_cli_connection
+ * @keep_6ghz_sta_cli_connection: Parameter to set
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS reg_set_keep_6ghz_sta_cli_connection(
+					struct wlan_objmgr_pdev *pdev,
+					bool keep_6ghz_sta_cli_connection);
+
+/**
  * reg_set_band() - Sets the band information for the PDEV
  * @pdev: The physical dev to set the band for
  * @band_bitmap: The set band parameters to configure for the physical device
@@ -179,6 +200,13 @@ QDF_STATUS reg_set_fcc_constraint(struct wlan_objmgr_pdev *pdev,
  */
 bool reg_get_fcc_constraint(struct wlan_objmgr_pdev *pdev, uint32_t freq);
 
+/**
+ * reg_is_6ghz_band_set - Check if 6 GHz band set
+ * @pdev: Pointer to pdev
+ *
+ * Return: True if 6 GHz band set else return flase
+ */
+bool reg_is_6ghz_band_set(struct wlan_objmgr_pdev *pdev);
 /**
  * reg_read_current_country() - Get the current regulatory country
  * @psoc: The physical SoC to get current country from
@@ -469,10 +497,29 @@ bool reg_get_fcc_constraint(struct wlan_objmgr_pdev *pdev, uint32_t freq)
 	return false;
 }
 
+static inline
+bool reg_is_6ghz_band_set(struct wlan_objmgr_pdev *pdev)
+{
+	return true;
+}
+
 static inline enum reg_6g_ap_type
 reg_decide_6g_ap_pwr_type(struct wlan_objmgr_pdev *pdev)
 {
 	return REG_CURRENT_MAX_AP_TYPE;
+}
+
+static inline
+bool reg_get_keep_6ghz_sta_cli_connection(struct wlan_objmgr_pdev *pdev)
+{
+	return false;
+}
+
+static inline
+QDF_STATUS reg_set_keep_6ghz_sta_cli_connection(struct wlan_objmgr_pdev *pdev,
+					bool keep_6ghz_sta_cli_connection)
+{
+	return QDF_STATUS_SUCCESS;
 }
 #endif /* CONFIG_REG_CLIENT */
 

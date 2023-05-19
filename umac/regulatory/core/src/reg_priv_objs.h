@@ -100,6 +100,25 @@ struct ctry_change_cbk_entry {
 	reg_ctry_change_callback cbk;
 };
 
+/**
+ * typedef reg_is_chan_connected_callback() - Regulatory callback to check if
+ *                                            channel is connected
+ * @psoc: Pointer to psoc object
+ * @opmode: vdev operating mode
+ * @freq: Frequency
+ */
+typedef bool (*reg_is_chan_connected_callback)(
+		struct wlan_objmgr_psoc *psoc,
+		enum QDF_OPMODE opmode,
+		uint32_t      freq);
+
+/* struct is_chan_connected_cbk_entry - Is channel connected callback entry
+ * @cbk: Callback
+ */
+struct is_chan_connected_cbk_entry {
+	reg_is_chan_connected_callback cbk;
+};
+
 #ifdef CONFIG_REG_CLIENT
 #define MAX_INDOOR_LIST_SIZE 3
 
@@ -160,6 +179,7 @@ struct indoor_concurrency_list {
  * @cbk_list:
  * @num_chan_change_cbks:
  * @cc_cbk:
+ * @conn_chan_cb:
  * @ch_avoid_ind:
  * @unsafe_chan_list:
  * @avoid_freq_list:
@@ -238,6 +258,7 @@ struct wlan_regulatory_psoc_priv_obj {
 	bool user_ctry_priority;
 	bool user_ctry_set;
 	struct chan_change_cbk_entry cbk_list[REG_MAX_CHAN_CHANGE_CBKS];
+	struct is_chan_connected_cbk_entry conn_chan_cb;
 	uint8_t num_chan_change_cbks;
 	struct ctry_change_cbk_entry cc_cbk;
 	uint8_t ch_avoid_ind;
@@ -366,6 +387,7 @@ struct wlan_regulatory_psoc_priv_obj {
  * @fcc_rules_ptr : Value of fcc channel frequency and tx_power list received
  * from firmware
  * @indoor_list: List of current indoor station interfaces
+ * @keep_6ghz_sta_cli_connection: Keep current STA/P2P client connection
  */
 struct wlan_regulatory_pdev_priv_obj {
 	struct regulatory_channel cur_chan_list[NUM_CHANNELS];
@@ -449,6 +471,7 @@ struct wlan_regulatory_pdev_priv_obj {
 	struct cur_fcc_rule fcc_rules_ptr[MAX_NUM_FCC_RULES];
 	struct indoor_concurrency_list indoor_list[MAX_INDOOR_LIST_SIZE];
 #endif
+	bool keep_6ghz_sta_cli_connection;
 };
 
 /**

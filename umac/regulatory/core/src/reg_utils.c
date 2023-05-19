@@ -586,9 +586,28 @@ QDF_STATUS reg_set_band(struct wlan_objmgr_pdev *pdev, uint32_t band_bitmap)
 		return QDF_STATUS_E_INVAL;
 	}
 
-	if (pdev_priv_obj->band_capability == band_bitmap) {
+	/*
+	 * If SET_FCC_CHANNEL 0 command is received first then 6 GHz band would
+	 * be disabled and band_capability would be set to 3 but existing 6 GHz
+	 * STA and P2P client connections won't be disconnected.
+	 * If set band comes again for 6 GHz band disabled and band_bitmap is
+	 * equal to band_capability, proceed to disable 6 GHz band completely.
+	 */
+	if (pdev_priv_obj->band_capability == band_bitmap &&
+	    !reg_get_keep_6ghz_sta_cli_connection(pdev)) {
 		reg_info("same band %d", band_bitmap);
 		return QDF_STATUS_SUCCESS;
+	}
+
+	/*
+	 * If in current band_capability 6 GHz bit is not set, in current
+	 * request 6 GHz band might be enabled/disabled. Hence reset
+	 * reg_set_keep_6ghz_sta_cli_connection flag.
+	 */
+	if (!wlan_reg_is_6ghz_band_set(pdev)) {
+		status = reg_set_keep_6ghz_sta_cli_connection(pdev, false);
+		if (QDF_IS_STATUS_ERROR(status))
+			return status;
 	}
 
 	psoc = wlan_pdev_get_psoc(pdev);
@@ -739,6 +758,37 @@ QDF_STATUS reg_cache_channel_freq_state(struct wlan_objmgr_pdev *pdev,
 #endif
 
 #ifdef CONFIG_REG_CLIENT
+bool reg_get_keep_6ghz_sta_cli_connection(struct wlan_objmgr_pdev *pdev)
+{
+	struct wlan_regulatory_pdev_priv_obj *pdev_priv_obj;
+
+	pdev_priv_obj = reg_get_pdev_obj(pdev);
+	if (!IS_VALID_PDEV_REG_OBJ(pdev_priv_obj)) {
+		reg_err("pdev reg component is NULL");
+		return false;
+	}
+
+	return pdev_priv_obj->keep_6ghz_sta_cli_connection;
+}
+
+QDF_STATUS reg_set_keep_6ghz_sta_cli_connection(struct wlan_objmgr_pdev *pdev,
+					bool keep_6ghz_sta_cli_connection)
+{
+	struct wlan_regulatory_pdev_priv_obj *pdev_priv_obj;
+
+	pdev_priv_obj = reg_get_pdev_obj(pdev);
+	if (!IS_VALID_PDEV_REG_OBJ(pdev_priv_obj)) {
+		reg_err("pdev reg component is NULL");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	pdev_priv_obj->keep_6ghz_sta_cli_connection =
+			keep_6ghz_sta_cli_connection;
+
+	reg_debug("set keep_6ghz_sta_cli_connection = %d",
+		  keep_6ghz_sta_cli_connection);
+	return QDF_STATUS_SUCCESS;
+}
 
 QDF_STATUS reg_set_fcc_constraint(struct wlan_objmgr_pdev *pdev,
 				  bool fcc_constraint)
@@ -781,6 +831,22 @@ QDF_STATUS reg_set_fcc_constraint(struct wlan_objmgr_pdev *pdev,
 	status = reg_send_scheduler_msg_sb(psoc, pdev);
 
 	return status;
+}
+
+bool reg_is_6ghz_band_set(struct wlan_objmgr_pdev *pdev)
+{
+	struct wlan_regulatory_pdev_priv_obj *pdev_priv_obj;
+
+	pdev_priv_obj = reg_get_pdev_obj(pdev);
+	if (!IS_VALID_PDEV_REG_OBJ(pdev_priv_obj)) {
+		reg_err("pdev reg component is NULL");
+		return false;
+	}
+
+	if (!(pdev_priv_obj->band_capability & BIT(REG_BAND_6G)))
+		return false;
+
+	return true;
 }
 
 bool reg_get_fcc_constraint(struct wlan_objmgr_pdev *pdev, uint32_t freq)

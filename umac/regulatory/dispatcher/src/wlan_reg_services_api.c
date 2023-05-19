@@ -730,6 +730,15 @@ bool wlan_reg_is_etsi13_srd_chan_allowed_master_mode(struct wlan_objmgr_pdev
 	return reg_is_etsi13_srd_chan_allowed_master_mode(pdev);
 }
 
+bool wlan_reg_is_6ghz_band_set(struct wlan_objmgr_pdev *pdev)
+{
+	return reg_is_6ghz_band_set(pdev);
+}
+
+bool wlan_reg_get_keep_6ghz_sta_cli_connection(struct wlan_objmgr_pdev *pdev)
+{
+	return reg_get_keep_6ghz_sta_cli_connection(pdev);
+}
 bool wlan_reg_get_fcc_constraint(struct wlan_objmgr_pdev *pdev, uint32_t freq)
 {
 	return reg_get_fcc_constraint(pdev, freq);
@@ -1942,3 +1951,19 @@ wlan_reg_modify_indoor_concurrency(struct wlan_objmgr_pdev *pdev,
 		return reg_remove_indoor_concurrency(pdev, vdev_id, freq);
 }
 #endif
+
+void
+wlan_reg_register_is_chan_connected_callback(struct wlan_objmgr_psoc *psoc,
+					     void *cbk)
+{
+	reg_register_is_chan_connected_callback(psoc,
+					(reg_is_chan_connected_callback)cbk);
+}
+
+void
+wlan_reg_unregister_is_chan_connected_callback(struct wlan_objmgr_psoc *psoc,
+					       void *cbk)
+{
+	reg_unregister_is_chan_connected_callback(psoc,
+					(reg_is_chan_connected_callback)cbk);
+}

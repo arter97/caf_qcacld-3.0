@@ -116,6 +116,28 @@ void ucfg_reg_restore_cached_channels(struct wlan_objmgr_pdev *pdev)
 #endif
 
 /**
+ * ucfg_reg_get_keep_6ghz_sta_cli_connection() - Get keep 6ghz sta cli
+ *                                               connection flag
+ * @pdev: The physical pdev to get keep_6ghz_sta_cli_connection
+ *
+ * Return: Return true if keep 6ghz sta cli connection set else return flase
+ */
+bool ucfg_reg_get_keep_6ghz_sta_cli_connection(
+					struct wlan_objmgr_pdev *pdev);
+
+/**
+ * ucfg_reg_set_keep_6ghz_sta_cli_connection() - Set keep 6ghz sta cli
+ *                                               connection flag
+ * @pdev: The physical pdev to get keep_6ghz_sta_cli_connection
+ * @keep_6ghz_sta_cli_connection: Parameter to set
+ *
+ * Return: QDF_STATUS
+ */
+
+QDF_STATUS ucfg_reg_set_keep_6ghz_sta_cli_connection(
+					struct wlan_objmgr_pdev *pdev,
+					bool keep_6ghz_sta_cli_connection);
+/**
  * ucfg_reg_set_fcc_constraint() - apply fcc constraints on channels 12/13
  * @pdev: The physical pdev to reduce tx power for
  * @fcc_constraint: true to apply the constraint, false to remove it
