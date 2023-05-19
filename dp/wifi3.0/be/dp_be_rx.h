@@ -436,11 +436,10 @@ void dp_rx_prefetch_nbuf_data_be(qdf_nbuf_t nbuf, qdf_nbuf_t next)
 		qdf_prefetch(next);
 		/* skb->cb spread across 2 cache lines hence below prefetch */
 		qdf_prefetch(&next->_skb_refdst);
-		qdf_prefetch(&next->len);
 		qdf_prefetch(&next->protocol);
+		qdf_prefetch(&next->data);
 		qdf_prefetch(next->data);
 		qdf_prefetch(next->data + 64);
-		qdf_prefetch(next->data + 128);
 	}
 }
 #else
