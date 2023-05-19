@@ -795,38 +795,6 @@ struct wmi_rx_pkt_protocol_routing_info {
 #endif /* WLAN_SUPPORT_RX_PROTOCOL_TYPE_TAG */
 
 /**
- * struct peer_vlan_config_param - peer vlan config command
- * @tx_cmd: Tx command
- * @rx_cmd: Rx command
- * @tx_strip_insert: Strip or Insert vlan in Tx[0:Strip, 1: Insert]
- * @tx_strip_insert_inner: Enable tx_strip_insert operation for inner vlan tag.
- * @tx_strip_insert_outer: Enable tx_strip_insert operation for outer vlan tag.
- * @rx_strip_c_tag: Strip c_tag
- * @rx_strip_s_tag: Strip s_tag
- * @rx_insert_c_tag: Insert c_tag
- * @rx_insert_s_tag: Insert s_tag
- *
- * @insert_vlan_inner_tci: Vlan inner tci
- * @insert_vlan_inner_tci: Vlan outer tci
- *
- * @vdev_id: vdev id corresponding to peer.
- */
-struct peer_vlan_config_param {
-	uint16_t tx_cmd:1,
-		rx_cmd:1,
-		tx_strip_insert:1,
-		tx_strip_insert_inner:1,
-		tx_strip_insert_outer:1,
-		rx_strip_c_tag:1,
-		rx_strip_s_tag:1,
-		rx_insert_c_tag:1,
-		rx_insert_s_tag:1;
-	uint16_t insert_vlan_inner_tci;
-	uint16_t insert_vlan_outer_tci;
-	uint8_t vdev_id;
-};
-
-/**
  * struct fd_params - FD cmd parameter
  * @vdev_id: vdev id
  * @frame_ctrl: frame control field
