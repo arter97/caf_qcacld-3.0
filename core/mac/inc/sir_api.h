@@ -1104,6 +1104,7 @@ struct assoc_ind {
 	uint16_t ft_status;
 	bool need_assoc_rsp_tx_cb;
 	tSirMacAddr peer_mld_addr;
+	bool is_fils_connection;
 };
 
 /**

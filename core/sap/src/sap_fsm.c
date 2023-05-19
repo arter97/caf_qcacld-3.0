@@ -2673,7 +2673,8 @@ QDF_STATUS sap_signal_hdd_event(struct sap_context *sap_ctx,
 						csr_roaminfo->eht_caps_present;
 		reassoc_complete->capability_info =
 						csr_roaminfo->capability_info;
-
+		reassoc_complete->is_fils_connection =
+					csr_roaminfo->is_fils_connection;
 		break;
 
 	case eSAP_STA_DISASSOC_EVENT:

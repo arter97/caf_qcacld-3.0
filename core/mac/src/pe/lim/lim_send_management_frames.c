@@ -1450,6 +1450,8 @@ static QDF_STATUS lim_assoc_rsp_tx_complete(
 
 	qdf_mem_free(lim_assoc_ind);
 
+	lim_install_fils_key(session_entry, mac_hdr->da);
+
 free_buffers:
 	lim_free_assoc_req_frm_buf(assoc_req);
 	qdf_mem_free(session_entry->parsedAssocReq[sta_ds->assocId]);
@@ -1529,6 +1531,8 @@ lim_send_assoc_rsp_mgmt_frame(struct mac_context *mac_ctx,
 	uint16_t ie_buf_size;
 	uint16_t mlo_ie_len = 0;
 	struct element_info ie;
+	uint32_t aes_block_size_len = 0;
+	struct pe_fils_session *fils_info;
 
 	if (!pe_session) {
 		pe_err("pe_session is NULL");
@@ -1800,6 +1804,15 @@ lim_send_assoc_rsp_mgmt_frame(struct mac_context *mac_ctx,
 							       sta, &frm);
 	}
 
+	fils_info = lim_get_fils_info(pe_session, peer_addr);
+
+	if (fils_info && fils_info->is_fils_connection &&
+	    status_code == QDF_STATUS_SUCCESS) {
+		populate_dot11f_fils_params_assoc_rsp(mac_ctx, &frm, pe_session,
+						      peer_addr);
+		aes_block_size_len = AES_BLOCK_SIZE;
+	}
+
 	/* Allocate a buffer for this frame: */
 	status = dot11f_get_packed_assoc_response_size(mac_ctx, &frm, &payload);
 	if (DOT11F_FAILED(status)) {
@@ -1811,7 +1824,8 @@ lim_send_assoc_rsp_mgmt_frame(struct mac_context *mac_ctx,
 			status);
 	}
 
-	bytes += sizeof(tSirMacMgmtHdr) + payload + mlo_ie_len;
+	bytes += sizeof(tSirMacMgmtHdr) + payload + mlo_ie_len +
+		 aes_block_size_len;
 
 	if (sta) {
 		bytes += sta->mlmStaContext.owe_ie_len;
@@ -1951,6 +1965,17 @@ lim_send_assoc_rsp_mgmt_frame(struct mac_context *mac_ctx,
 			mlo_ie_len = 0;
 		}
 		payload += mlo_ie_len;
+	}
+
+	if (fils_info && fils_info->is_fils_connection) {
+		qdf_status = aead_encrypt_assoc_rsp(mac_ctx, pe_session,
+						    frame, &payload,
+						    mac_hdr->da);
+		if (!QDF_IS_STATUS_SUCCESS(qdf_status)) {
+			pe_err("Failed to encrypt Assoc Req");
+			cds_packet_free((void *)packet);
+			goto error;
+		}
 	}
 
 	pe_nofl_debug("Assoc rsp TX: vdev %d subtype %d to "QDF_MAC_ADDR_FMT" seq num %d status %d aid %d addn_ie_len %d ht %d vht %d vendor vht %d he %d eht %d",

@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -621,7 +621,7 @@ QDF_STATUS hdd_softap_register_sta(struct wlan_hdd_link_info *link_info,
 	sta_info->is_qos_enabled = wmm_enabled;
 
 	if (!auth_required) {
-		hdd_debug("open/shared auth STA MAC= " QDF_MAC_ADDR_FMT
+		hdd_debug("open/shared/FILS auth STA MAC= " QDF_MAC_ADDR_FMT
 			  ".  Changing TL state to AUTHENTICATED at Join time",
 			 QDF_MAC_ADDR_REF(sta_info->sta_mac.bytes));
 

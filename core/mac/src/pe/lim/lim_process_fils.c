@@ -757,6 +757,38 @@ QDF_STATUS lim_set_fils_key(struct pe_session *pe_session, bool unicast,
 				       WLAN_CRYPTO_KEY_TYPE_UNICAST :
 				       WLAN_CRYPTO_KEY_TYPE_GROUP));
 }
+QDF_STATUS lim_install_fils_key(struct pe_session *pe_session,
+				const void *mac_addr)
+{
+	struct pe_fils_session *fils_info;
+
+	fils_info = lim_get_fils_info(pe_session, mac_addr);
+
+	if (fils_info && fils_info->is_fils_connection) {
+		pe_debug("Installing FILS key for connection");
+		lim_cache_fils_key(pe_session, true, FILS_TK_INDEX,
+				   fils_info->tk_len, fils_info->tk, mac_addr);
+		lim_cache_fils_key(pe_session, false, FILS_GTK_INDEX,
+				   fils_info->gtk_len,
+				   fils_info->gtk,
+				   pe_session->bssId);
+		lim_set_fils_key(pe_session, true, FILS_TK_INDEX, mac_addr);
+		lim_set_fils_key(pe_session, false, FILS_GTK_INDEX,
+				 pe_session->bssId);
+	}
+
+	/* Delete Pre auth node here as it is skipped while receiving
+	 * Assoc Req if auth type is FILS_SK
+	 */
+	if (sme_assoc_ind->authType == SIR_FILS_SK_WITHOUT_PFS) {
+		qdf_mem_free(fils_info);
+		lim_delete_pre_auth_node(pe_session->mac_ctx,
+					 mac_addr);
+	}
+
+	return QDF_STATUS_SUCCESS;
+}
+
 
 /**
  * lim_generate_gtk()- This API generates GTK

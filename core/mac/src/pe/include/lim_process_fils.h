@@ -411,6 +411,17 @@ QDF_STATUS lim_cache_fils_key(struct pe_session *pe_session, bool unicast,
  */
 QDF_STATUS lim_set_fils_key(struct pe_session *pe_session, bool unicast,
 			    uint8_t key_idx);
+
+/**
+ * lim_install_fils_key() - Install FILS temporal key for FILS connection.
+ * @pe_session: PE Session
+ * @mac_addr: MAC Address for peer.
+ *
+ * Return: QDF_STATUS
+ */
+
+QDF_STATUS lim_install_fils_key(struct pe_session *pe_session,
+				const void *mac_addr);
 /**
  * aead_encrypt_assoc_rsp() - Encrypt FILS IE's in Assoc Response
  * @mac_ctx: mac context
@@ -448,7 +459,6 @@ QDF_STATUS aead_decrypt_assoc_req(struct mac_context *mac_ctx,
 				  tDot11fAssocRequest *assoc_req,
 				  uint8_t *p_frame, uint32_t *n_frame,
 				  tSirMacAddr peer_mac_addr);
-
 /**
  * lim_verify_fils_params_assoc_req() - Verify FILS params in assoc request
  * @mac_ctx: Mac context
@@ -465,6 +475,7 @@ bool lim_verify_fils_params_assoc_req(struct mac_context *mac_ctx,
 				      struct pe_session *session_entry,
 				      tpSirAssocReq assoc_req,
 				      tSirMacAddr peer_mac_addr);
+
 #else
 static inline QDF_STATUS lim_cache_fils_key(struct pe_session *pe_session,
 					    bool unicast, uint8_t key_id,
@@ -476,6 +487,12 @@ static inline QDF_STATUS lim_cache_fils_key(struct pe_session *pe_session,
 
 static inline QDF_STATUS lim_set_fils_key(struct pe_session *pe_session,
 					  bool unicast, uint8_t key_idx)
+{
+	return QDF_STATUS_SUCCESS;
+}
+
+static inline QDF_STATUS lim_install_fils_key(struct pe_session *pe_session,
+					       const void *mac_addr)
 {
 	return QDF_STATUS_SUCCESS;
 }
@@ -502,7 +519,7 @@ static inline QDF_STATUS aead_decrypt_assoc_req(struct mac_context *mac_ctx,
 static inline bool
 lim_verify_fils_params_assoc_req(struct mac_context *mac_ctx,
 				 struct pe_session *session_entry,
-				 tpSirAssocRsp assoc_rsp,
+				 tpSirAssocReq assoc_req,
 				 tSirMacAddr peer_mac_addr)
 
 {

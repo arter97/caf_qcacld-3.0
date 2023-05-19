@@ -301,6 +301,7 @@ typedef struct sap_StationAssocReassocCompleteEvent_s {
 	tSirMacCapabilityInfo capability_info;
 	bool he_caps_present;
 	struct qdf_mac_addr sta_mld;
+	bool is_fils_connection;
 } tSap_StationAssocReassocCompleteEvent;
 
 typedef struct sap_StationDisassocCompleteEvent_s {

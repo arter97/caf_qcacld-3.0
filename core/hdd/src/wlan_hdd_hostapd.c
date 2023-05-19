@@ -2797,6 +2797,11 @@ QDF_STATUS hdd_hostapd_sap_event_cb(struct sap_event *sap_event,
 			bAuthRequired = false;
 		}
 
+		if (event->is_fils_connection &&
+		    QDF_IS_STATUS_SUCCESS(event->status)) {
+			bAuthRequired = false;
+		}
+
 		qdf_status = hdd_softap_register_sta(link_info,
 						     bAuthRequired,
 						     ap_ctx->privacy,

@@ -603,6 +603,7 @@ struct csr_roam_info {
 	uint32_t chan_info_freq;
 #endif
 	struct switch_channel_ind *pSirSmeSwitchChInd;
+	bool is_fils_connection;
 };
 
 typedef struct sSirSmeAssocIndToUpperLayerCnf {
@@ -646,6 +647,7 @@ typedef struct sSirSmeAssocIndToUpperLayerCnf {
 	tSirMacCapabilityInfo capability_info;
 	bool he_caps_present;
 	bool eht_caps_present;
+	bool is_fils_connection;
 #ifdef WLAN_FEATURE_11BE_MLO
 	tSirMacAddr peer_mld_addr;
 #endif

@@ -32,6 +32,7 @@
 #include "ani_global.h"
 #include "parser_api.h"
 #include "lim_utils.h"
+#include "lim_security_utils.h"
 #include "utils_parser.h"
 #include "lim_ser_des_utils.h"
 #include "sch_api.h"
@@ -68,6 +69,15 @@
 
 #define RSN_OUI_SIZE 4
 /* ////////////////////////////////////////////////////////////////////// */
+#ifdef WLAN_FEATURE_FILS_SK_SAP
+static void fils_convert_assoc_req_frame2_struct(tDot11fAssocRequest *ar,
+						 tpSirAssocReq pAssocReq);
+#else
+static inline void fils_convert_assoc_req_frame2_struct(tDot11fAssocRequest
+							*ar, tpSirAssocReq
+							pAssocReq)
+{ }
+#endif
 void swap_bit_field16(uint16_t in, uint16_t *out)
 {
 #ifdef ANI_LITTLE_BIT_ENDIAN
@@ -2803,6 +2813,69 @@ void populate_dot11f_fils_params(struct mac_context *mac_ctx,
 	}
 }
 
+#ifdef WLAN_FEATURE_FILS_SK_SAP
+void populate_dot11f_fils_params_assoc_rsp(struct mac_context *mac_ctx,
+					   tDot11fAssocResponse *frm,
+					   struct pe_session *pe_session,
+					   tSirMacAddr peer_mac_addr)
+{
+	struct pe_fils_session *fils_info;
+	uint8_t *kde_data;
+	uint8_t kde_data_len = 0;
+
+	fils_info = lim_get_fils_info(pe_session, peer_mac_addr);
+
+	if (!fils_info) {
+		pe_err("Failed to get fils_info");
+		return;
+	}
+
+	/* Populate FILS session IE */
+	frm->fils_session.present = true;
+	qdf_mem_copy(frm->fils_session.session,
+		     fils_info->fils_session, FILS_SESSION_LENGTH);
+
+	/* Populate FILS Key confirmation IE */
+	if (fils_info->key_auth_len) {
+		frm->fils_key_confirmation.present = true;
+		frm->fils_key_confirmation.num_key_auth =
+			fils_info->ap_key_auth_len;
+
+		qdf_mem_copy(frm->fils_key_confirmation.key_auth,
+			     fils_info->ap_key_auth_data,
+			     fils_info->ap_key_auth_len);
+	}
+	/* Populate FILS KDE Element */
+	if (pe_session->fils_info->gtk_len) {
+		pe_debug("Populate FILS KDE");
+		frm->fils_kde.present = true;
+		frm->fils_kde.key_rsc[0] = KDE_LEN_SIZE;
+
+		kde_data_len = KDE_OUI_TYPE_SIZE + KDE_DATA_TYPE_OFFSET +
+			       pe_session->fils_info->gtk_len;
+		kde_data = &frm->fils_kde.kde_list[2];
+
+		/* Populate KDE List with GTK */
+		/* KDE Type */
+		frm->fils_kde.kde_list[0] = KDE_TYPE;
+		/* Length of KDE Data */
+		frm->fils_kde.kde_list[1] = kde_data_len;
+		/* OUI Type for KDE */
+		qdf_mem_copy(kde_data, KDE_OUI_TYPE, KDE_OUI_TYPE_SIZE);
+		/* Data Type */
+		kde_data[3] = DATA_TYPE_GTK;
+		/* GTK */
+		qdf_mem_copy(kde_data + KDE_OUI_TYPE_SIZE +
+			     KDE_DATA_TYPE_OFFSET,
+			     pe_session->fils_info->gtk,
+			     pe_session->fils_info->gtk_len);
+
+		frm->fils_kde.num_kde_list = kde_data_len + KDE_TYPE_SIZE +
+						KDE_LEN_SIZE;
+	}
+}
+#endif
+
 /**
  * update_fils_data: update fils params from beacon/probe response
  * @fils_ind: pointer to sir_fils_indication
@@ -3353,15 +3426,34 @@ sir_convert_assoc_req_frame2_mlo_struct(uint8_t *pFrame,
 
 enum wlan_status_code
 sir_convert_assoc_req_frame2_struct(struct mac_context *mac,
+				    struct pe_session *session,
 				    uint8_t *pFrame,
-				    uint32_t nFrame, tpSirAssocReq pAssocReq)
+				    uint32_t nFrame, tpSirAssocReq pAssocReq,
+				    tSirMacAddr peer_mac_addr)
 {
 	tDot11fAssocRequest *ar;
 	uint32_t status;
+	struct pe_fils_session *fils_info;
 
 	ar = qdf_mem_malloc(sizeof(tDot11fAssocRequest));
 	if (!ar)
 		return STATUS_UNSPECIFIED_FAILURE;
+
+	/*
+	 * Decrypt the cipher text of Assoc Request
+	 * using AEAD decryption
+	 */
+	fils_info = lim_get_fils_info(session, peer_mac_addr);
+	if (fils_info && fils_info->is_fils_connection) {
+		status = aead_decrypt_assoc_req(mac, session,
+						ar, pFrame, &nFrame,
+						peer_mac_addr);
+		if (!QDF_IS_STATUS_SUCCESS(status)) {
+			pe_err("FILS Assoc Rsp AEAD decrypt fails");
+			qdf_mem_free(ar);
+			return STATUS_UNSPECIFIED_FAILURE;
+		}
+	}
 
 	/* delegate to the framesc-generated code, */
 	status = dot11f_unpack_assoc_request(mac, pFrame, nFrame, ar, false);
@@ -3560,6 +3652,7 @@ sir_convert_assoc_req_frame2_struct(struct mac_context *mac,
 			     sizeof(tDot11fIEhe_6ghz_band_cap));
 
 	sir_convert_assoc_req_frame2_eht_struct(ar, pAssocReq);
+	fils_convert_assoc_req_frame2_struct(ar, pAssocReq);
 	sir_convert_assoc_req_frame2_mlo_struct(pFrame, nFrame, ar, pAssocReq);
 
 	pe_debug("ht %d vht %d opmode %d vendor vht %d he %d he 6ghband %d eht %d",
@@ -3657,7 +3750,58 @@ static void fils_convert_assoc_rsp_frame2_struct(tDot11fAssocResponse *ar,
 static inline void fils_convert_assoc_rsp_frame2_struct(tDot11fAssocResponse
 							*ar, tpSirAssocRsp
 							pAssocRsp)
-{ }
+{}
+#endif
+
+#ifdef WLAN_FEATURE_FILS_SK_SAP
+/**
+ * fils_convert_assoc_req_frame2_struct() - Copy FILS IE's to Assoc req struct
+ * @ar: frame parser Assoc request struct
+ * @pAssocRsp: LIM Assoc request
+ *
+ * Return: None
+ */
+static void fils_convert_assoc_req_frame2_struct(tDot11fAssocRequest *ar,
+						 tpSirAssocReq pAssocReq)
+{
+	if (ar->fils_session.present) {
+		pe_debug("fils session IE present");
+		pAssocReq->fils_session.present = true;
+		qdf_mem_copy(pAssocReq->fils_session.session,
+			     ar->fils_session.session,
+			     DOT11F_IE_FILS_SESSION_MAX_LEN);
+	}
+
+	if (ar->fils_key_confirmation.present) {
+		pe_debug("fils key conf IE present");
+		pAssocReq->fils_key_auth.num_key_auth =
+			ar->fils_key_confirmation.num_key_auth;
+		qdf_mem_copy(pAssocReq->fils_key_auth.key_auth,
+			     ar->fils_key_confirmation.key_auth,
+			     pAssocReq->fils_key_auth.num_key_auth);
+	}
+
+	if (ar->fils_hlp_container.present) {
+		pe_debug("FILS HLP container IE present");
+		sir_copy_mac_addr(pAssocReq->dst_mac.bytes,
+				  ar->fils_hlp_container.dest_mac);
+		sir_copy_mac_addr(pAssocReq->src_mac.bytes,
+				  ar->fils_hlp_container.src_mac);
+		pAssocReq->hlp_data_len = ar->fils_hlp_container.num_hlp_packet;
+		qdf_mem_copy(pAssocReq->hlp_data,
+			     ar->fils_hlp_container.hlp_packet,
+			     pAssocReq->hlp_data_len);
+
+		if (ar->fragment_ie.present) {
+			pe_debug("FILS fragment ie present");
+			qdf_mem_copy(pAssocReq->hlp_data +
+				     pAssocReq->hlp_data_len,
+				     ar->fragment_ie.data,
+				     ar->fragment_ie.num_data);
+			pAssocReq->hlp_data_len += ar->fragment_ie.num_data;
+		}
+	}
+}
 #endif
 
 QDF_STATUS wlan_parse_ftie_sha384(uint8_t *frame, uint32_t frame_len,

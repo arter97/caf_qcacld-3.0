@@ -45,6 +45,7 @@
 #include "wlan_utility.h"
 #include "wlan_crypto_global_api.h"
 #include "lim_mlo.h"
+#include "lim_process_fils.h"
 #include <son_api.h>
 
 /**
@@ -258,9 +259,12 @@ static bool lim_chk_assoc_req_parse_error(struct mac_context *mac_ctx,
 	enum wlan_status_code wlan_status;
 
 	if (sub_type == LIM_ASSOC)
-		wlan_status = sir_convert_assoc_req_frame2_struct(mac_ctx, frm_body,
-							     frame_len,
-							     assoc_req);
+		wlan_status = sir_convert_assoc_req_frame2_struct(mac_ctx,
+								  session,
+								  frm_body,
+								  frame_len,
+								  assoc_req,
+								  sa);
 	else
 		wlan_status = sir_convert_reassoc_req_frame2_struct(mac_ctx,
 						frm_body, frame_len, assoc_req);
@@ -1282,7 +1286,13 @@ static bool lim_process_assoc_req_no_sta_ctx(struct mac_context *mac_ctx,
 		*auth_type = sta_pre_auth_ctx->authType;
 		if (sta_pre_auth_ctx->authType == eSIR_AUTH_TYPE_SAE)
 			assoc_req->is_sae_authenticated = true;
-		lim_delete_pre_auth_node(mac_ctx, sa);
+
+		/* For FILS Connection we need pre auth node for anonce snonce
+		 * and key installation so keeping it here and freeing
+		 * it once connection is complete
+		 */
+		if (sta_pre_auth_ctx->authType != SIR_FILS_SK_WITHOUT_PFS)
+			lim_delete_pre_auth_node(mac_ctx, sa);
 	}
 	/* All is well. Assign AID (after else part) */
 	return true;
@@ -2640,6 +2650,15 @@ QDF_STATUS lim_proc_assoc_req_frm_cmn(struct mac_context *mac_ctx,
 					  &akm_type))
 		goto error;
 
+	/* If it is FILS connection, check is FILS params are matching
+	 * with Authentication stage.
+	 */
+	if (!lim_verify_fils_params_assoc_req(mac_ctx, session,
+					      assoc_req, sa)) {
+		pe_err("FILS params does not match for sta:" QDF_MAC_ADDR_FMT,
+		       QDF_MAC_ADDR_REF(sa));
+		goto error;
+	}
 	/* Update ap ext cap */
 	lim_update_ap_ext_cap(session, assoc_req);
 

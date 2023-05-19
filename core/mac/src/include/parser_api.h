@@ -653,8 +653,10 @@ sir_convert_probe_frame2_struct(struct mac_context *mac, uint8_t *frame,
 
 enum wlan_status_code
 sir_convert_assoc_req_frame2_struct(struct mac_context *mac,
+				    struct pe_session *session,
 				    uint8_t *frame, uint32_t len,
-				    tpSirAssocReq assoc);
+				    tpSirAssocReq assoc,
+				    tSirMacAddr peer_mac_addr);
 /**
  * wlan_parse_ftie_sha384() - Parse the FT IE if akm uses sha384 KDF
  * @frame: Pointer to the association response frame
@@ -1245,6 +1247,31 @@ void populate_dot11f_fils_params(struct mac_context *mac_ctx,
 static inline void populate_dot11f_fils_params(struct mac_context *mac_ctx,
 				 tDot11fAssocRequest *frm,
 				 struct pe_session *pe_session)
+{ }
+#endif
+
+#ifdef WLAN_FEATURE_FILS_SK_SAP
+/**
+ * populate_dot11f_fils_params_assoc_rsp() - Populate FILS IE to frame
+ * @mac_ctx: global mac context
+ * @frm: Assoc request frame
+ * @pe_session: PE session
+ * @peer_mac_addr: Mac address for Peer
+ *
+ * This API is used to populate FILS IE to Association response
+ *
+ * Return: None
+ */
+void populate_dot11f_fils_params_assoc_rsp(struct mac_context *mac_ctx,
+					   tDot11fAssocResponse * frm,
+					   struct pe_session *pe_session,
+					   tSirMacAddr peer_mac_addr);
+#else
+static inline void
+populate_dot11f_fils_params_assoc_rsp(struct mac_context *mac_ctx,
+				      tDot11fAssocResponse *frm,
+				      struct pe_session *pe_session,
+				      tSirMacAddr peer_mac_addr)
 { }
 #endif
 

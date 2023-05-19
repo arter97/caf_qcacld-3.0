@@ -33,6 +33,7 @@
 #include "lim_ft.h"
 #include "lim_ft_defs.h"
 #include "lim_session.h"
+#include "lim_process_fils.h"
 #include "lim_session_utils.h"
 #include "rrm_api.h"
 #include "wma_types.h"
@@ -767,6 +768,7 @@ lim_fill_sme_assoc_ind_params(
 	tpLimMlmAssocInd assoc_ind, struct assoc_ind *sme_assoc_ind,
 	struct pe_session *session_entry, bool assoc_req_alloc)
 {
+	struct tLimPreAuthNode *sta_pre_auth_ctx;
 	sme_assoc_ind->length = sizeof(struct assoc_ind);
 	sme_assoc_ind->sessionId = session_entry->smeSessionId;
 
@@ -856,6 +858,14 @@ lim_fill_sme_assoc_ind_params(
 	sme_assoc_ind->he_caps_present = assoc_ind->he_caps_present;
 	sme_assoc_ind->eht_caps_present = assoc_ind->eht_caps_present;
 	sme_assoc_ind->is_sae_authenticated = assoc_ind->is_sae_authenticated;
+
+	sta_pre_auth_ctx = lim_search_pre_auth_list(mac_ctx,
+						    assoc_ind->peerMacAddr);
+	if (sta_pre_auth_ctx)
+		sme_assoc_ind->is_fils_connection =
+			sta_pre_auth_ctx->fils_info->is_fils_connection;
+	else
+		sme_assoc_ind->is_fils_connection = false;
 }
 
 /**

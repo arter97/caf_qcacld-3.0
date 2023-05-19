@@ -126,6 +126,9 @@
 
 #define KDE_OUI_TYPE   "\x00\x0F\xAC"
 #define KDE_OUI_TYPE_SIZE  3
+#define KDE_TYPE 0xdd
+#define KDE_TYPE_SIZE 1
+#define KDE_LEN_SIZE 1
 
 #define SINGLE_ELEMENT_HASH_CNT 1
 
@@ -258,6 +261,8 @@ struct mac_ft_ie {
 #define FILS_GTK_LEN 16
 #define FILS_GMK_LEN 32
 #define FILS_GNONCE_LEN 32
+#define FILS_TK_INDEX 0
+#define FILS_GTK_INDEX 2
 #endif
 #define FILS_PMK_LEN 48
 #define FILS_PMK_NAME_LEN 16
