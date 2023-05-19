@@ -57,11 +57,9 @@ uint32_t wlan_dp_intf_get_pkt_type_bitmap_value(void *intf_ctx)
 }
 
 #if defined(WLAN_SUPPORT_RX_FISA)
-void dp_rx_skip_fisa(struct cdp_soc_t *cdp_soc, uint32_t value)
+void dp_rx_skip_fisa(struct wlan_dp_psoc_context *dp_ctx, uint32_t value)
 {
-	struct dp_soc *soc = (struct dp_soc *)cdp_soc;
-
-	qdf_atomic_set(&soc->skip_fisa_param.skip_fisa, !value);
+	qdf_atomic_set(&dp_ctx->skip_fisa_param.skip_fisa, !value);
 }
 #endif
 
@@ -1596,8 +1594,9 @@ QDF_STATUS dp_rx_flush_packet_cbk(void *dp_intf_context, uint8_t intf_id)
 QDF_STATUS wlan_dp_rx_fisa_cbk(void *dp_soc,
 			       void *dp_vdev, qdf_nbuf_t nbuf_list)
 {
-	return dp_fisa_rx((struct dp_soc *)dp_soc, (struct dp_vdev *)dp_vdev,
-			  nbuf_list);
+	struct wlan_dp_psoc_context *dp_ctx = dp_get_context();
+
+	return dp_fisa_rx(dp_ctx, dp_vdev, nbuf_list);
 }
 
 QDF_STATUS wlan_dp_rx_fisa_flush_by_ctx_id(void *dp_soc, int ring_num)

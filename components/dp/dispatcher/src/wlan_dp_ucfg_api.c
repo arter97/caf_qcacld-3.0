@@ -2371,12 +2371,12 @@ void ucfg_dp_prealloc_put_multi_pages(uint32_t desc_type,
 #if defined(WLAN_SUPPORT_RX_FISA)
 void ucfg_dp_rx_skip_fisa(uint32_t value)
 {
-	void *dp_soc;
+	struct wlan_dp_psoc_context *dp_ctx;
 
-	dp_soc = cds_get_context(QDF_MODULE_ID_SOC);
+	dp_ctx = dp_get_context();
 
-	if (dp_soc)
-		dp_rx_skip_fisa(dp_soc, value);
+	if (dp_ctx)
+		dp_rx_skip_fisa(dp_ctx, value);
 }
 #endif
 

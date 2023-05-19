@@ -18,6 +18,7 @@
 
 #include <wlan_objmgr_pdev_obj.h>
 #include <wlan_dp_main.h>
+#include <wlan_dp_priv.h>
 #include <wlan_dp_prealloc.h>
 #include <dp_types.h>
 #include <dp_internal.h>

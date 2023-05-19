@@ -37,13 +37,11 @@
 #ifdef WLAN_SUPPORT_RX_FISA
 void dp_fisa_rx_fst_update_work(void *arg);
 
-void dp_rx_dump_fisa_table(struct dp_soc *soc)
+static void dp_rx_dump_fisa_table(struct wlan_dp_psoc_context *dp_ctx)
 {
-	hal_soc_handle_t hal_soc_hdl = soc->hal_soc;
-	/* TODO - Make this better */
-	struct wlan_dp_psoc_context *dp_ctx = dp_get_context();
+	hal_soc_handle_t hal_soc_hdl = dp_ctx->hal_soc;
 	struct wlan_dp_psoc_cfg *dp_cfg = &dp_ctx->dp_cfg;
-	struct dp_rx_fst *fst = soc->rx_fst;
+	struct dp_rx_fst *fst = dp_ctx->rx_fst;
 	struct dp_fisa_rx_sw_ft *sw_ft_entry;
 	int i;
 
@@ -54,7 +52,7 @@ void dp_rx_dump_fisa_table(struct dp_soc *soc)
 	}
 
 	if (!fst->fst_in_cmem)
-		return hal_rx_dump_fse_table(soc->rx_fst->hal_rx_fst);
+		return hal_rx_dump_fse_table(fst->hal_rx_fst);
 
 	sw_ft_entry = (struct dp_fisa_rx_sw_ft *)fst->base;
 
@@ -75,12 +73,10 @@ void dp_rx_dump_fisa_table(struct dp_soc *soc)
 	}
 }
 
-void dp_print_fisa_stats(struct dp_soc *soc)
+static void dp_print_fisa_stats(struct wlan_dp_psoc_context *dp_ctx)
 {
-	struct dp_rx_fst *fst = soc->rx_fst;
-	/* TODO - Make this better */
-	struct wlan_dp_psoc_context *dp_ctx = dp_get_context();
 	struct wlan_dp_psoc_cfg *dp_cfg = &dp_ctx->dp_cfg;
+	struct dp_rx_fst *fst = dp_ctx->rx_fst;
 
 	/* Check if it is enabled in the INI */
 	if (!wlan_dp_cfg_is_rx_fisa_enabled(dp_cfg))
@@ -94,6 +90,98 @@ void dp_print_fisa_stats(struct dp_soc *soc)
 		fst->stats.reo_mismatch.allow_fse_metdata_mismatch);
 	dp_info("reo_mismatch: allow_non_aggr: %u",
 		fst->stats.reo_mismatch.allow_non_aggr);
+}
+
+/* Length of string to store tuple information for printing */
+#define DP_TUPLE_STR_LEN 512
+
+/**
+ * print_flow_tuple() - Debug function to dump flow tuple
+ * @flow_tuple: flow tuple containing tuple info
+ * @str: destination buffer
+ * @size: size of @str
+ *
+ * Return: NONE
+ */
+static
+void print_flow_tuple(struct cdp_rx_flow_tuple_info *flow_tuple, char *str,
+		      uint32_t size)
+{
+	qdf_scnprintf(str, size,
+		      "dest 0x%x%x%x%x(0x%x) src 0x%x%x%x%x(0x%x) proto 0x%x",
+		      flow_tuple->dest_ip_127_96,
+		      flow_tuple->dest_ip_95_64,
+		      flow_tuple->dest_ip_63_32,
+		      flow_tuple->dest_ip_31_0,
+		      flow_tuple->dest_port,
+		      flow_tuple->src_ip_127_96,
+		      flow_tuple->src_ip_95_64,
+		      flow_tuple->src_ip_63_32,
+		      flow_tuple->src_ip_31_0,
+		      flow_tuple->src_port,
+		      flow_tuple->l4_protocol);
+}
+
+static QDF_STATUS dp_rx_dump_fisa_stats(struct wlan_dp_psoc_context *dp_ctx)
+{
+	char tuple_str[DP_TUPLE_STR_LEN] = {'\0'};
+	struct dp_rx_fst *rx_fst = dp_ctx->rx_fst;
+	struct dp_fisa_rx_sw_ft *sw_ft_entry =
+		&((struct dp_fisa_rx_sw_ft *)rx_fst->base)[0];
+	int ft_size = rx_fst->max_entries;
+	int i;
+
+	dp_info("#flows added %d evicted %d hash collision %d",
+		rx_fst->add_flow_count,
+		rx_fst->del_flow_count,
+		rx_fst->hash_collision_cnt);
+
+	for (i = 0; i < ft_size; i++, sw_ft_entry++) {
+		if (!sw_ft_entry->is_populated)
+			continue;
+
+		print_flow_tuple(&sw_ft_entry->rx_flow_tuple_info,
+				 tuple_str,
+				 sizeof(tuple_str));
+
+		dp_info("Flow[%d][%s][%s] ring %d msdu-aggr %d flushes %d bytes-agg %llu avg-bytes-aggr %llu",
+			sw_ft_entry->flow_id,
+			sw_ft_entry->is_flow_udp ? "udp" : "tcp",
+			tuple_str,
+			sw_ft_entry->napi_id,
+			sw_ft_entry->aggr_count,
+			sw_ft_entry->flush_count,
+			sw_ft_entry->bytes_aggregated,
+			qdf_do_div(sw_ft_entry->bytes_aggregated,
+				   sw_ft_entry->flush_count));
+	}
+	return QDF_STATUS_SUCCESS;
+}
+
+void dp_set_fst_in_cmem(bool fst_in_cmem)
+{
+	struct wlan_dp_psoc_context *dp_ctx = dp_get_context();
+
+	dp_ctx->fst_in_cmem = fst_in_cmem;
+}
+
+void dp_print_fisa_rx_stats(enum cdp_fisa_stats_id stats_id)
+{
+	struct wlan_dp_psoc_context *dp_ctx = dp_get_context();
+
+	switch (stats_id) {
+	case CDP_FISA_STATS_ID_ERR_STATS:
+		dp_print_fisa_stats(dp_ctx);
+		break;
+	case CDP_FISA_STATS_ID_DUMP_HW_FST:
+		dp_rx_dump_fisa_table(dp_ctx);
+		break;
+	case CDP_FISA_STATS_ID_DUMP_SW_FST:
+		dp_rx_dump_fisa_stats(dp_ctx);
+		break;
+	default:
+		break;
+	}
 }
 
 /**
@@ -132,8 +220,10 @@ dp_rx_flow_send_htt_operation_cmd(struct dp_pdev *pdev,
  */
 static void dp_fisa_fse_cache_flush_timer(void *arg)
 {
-	struct dp_soc *soc = (struct dp_soc *)arg;
-	struct dp_rx_fst *fisa_hdl = soc->rx_fst;
+	struct wlan_dp_psoc_context *dp_ctx =
+					(struct wlan_dp_psoc_context *)arg;
+	struct dp_soc *soc = cdp_soc_t_to_dp_soc(dp_ctx->cdp_soc);
+	struct dp_rx_fst *fisa_hdl = dp_ctx->rx_fst;
 	struct cdp_rx_flow_tuple_info rx_flow_tuple_info = { 0 };
 	static uint32_t fse_cache_flush_rec_idx;
 	struct fse_cache_flush_history *fse_cache_flush_rec;
@@ -306,7 +396,7 @@ QDF_STATUS dp_rx_fst_attach(struct wlan_dp_psoc_context *dp_ctx)
 		return QDF_STATUS_E_NOSUPPORT;
 	}
 #endif
-	if (soc->rx_fst) {
+	if (dp_ctx->rx_fst) {
 		QDF_TRACE(QDF_MODULE_ID_ANY, QDF_TRACE_LEVEL_ERROR,
 			  "RX FST already allocated\n");
 		return QDF_STATUS_SUCCESS;
@@ -351,13 +441,13 @@ QDF_STATUS dp_rx_fst_attach(struct wlan_dp_psoc_context *dp_ctx)
 	if (QDF_IS_STATUS_ERROR(status))
 		goto free_hist;
 
-	fst->hal_rx_fst = hal_rx_fst_attach(soc->hal_soc,
-					    soc->osdev,
+	fst->hal_rx_fst = hal_rx_fst_attach(dp_ctx->hal_soc,
+					    dp_ctx->qdf_dev,
 					    &fst->hal_rx_fst_base_paddr,
 					    fst->max_entries,
 					    fst->max_skid_length,
 					    fst->rx_toeplitz_hash_key,
-					    soc->fst_cmem_base);
+					    dp_ctx->fst_cmem_base);
 
 	if (qdf_unlikely(!fst->hal_rx_fst)) {
 		QDF_TRACE(QDF_MODULE_ID_ANY, QDF_TRACE_LEVEL_ERROR,
@@ -368,8 +458,8 @@ QDF_STATUS dp_rx_fst_attach(struct wlan_dp_psoc_context *dp_ctx)
 
 	qdf_spinlock_create(&fst->dp_rx_fst_lock);
 
-	status = qdf_timer_init(soc->osdev, &fst->fse_cache_flush_timer,
-				dp_fisa_fse_cache_flush_timer, (void *)soc,
+	status = qdf_timer_init(dp_ctx->qdf_dev, &fst->fse_cache_flush_timer,
+				dp_fisa_fse_cache_flush_timer, (void *)dp_ctx,
 				QDF_TIMER_TYPE_WAKE_APPS);
 	if (QDF_IS_STATUS_ERROR(status)) {
 		QDF_TRACE(QDF_MODULE_ID_ANY, QDF_TRACE_LEVEL_ERROR,
@@ -382,12 +472,13 @@ QDF_STATUS dp_rx_fst_attach(struct wlan_dp_psoc_context *dp_ctx)
 	fst->fse_cache_flush_allow = true;
 	fst->rx_hash_enabled = wlan_cfg_is_rx_hash_enabled(soc->wlan_cfg_ctx);
 	fst->soc_hdl = soc;
-	soc->rx_fst = fst;
-	soc->fisa_enable = true;
-	soc->fisa_lru_del_enable =
+	fst->dp_ctx = dp_ctx;
+	dp_ctx->rx_fst = fst;
+	dp_ctx->fisa_enable = true;
+	dp_ctx->fisa_lru_del_enable =
 				wlan_dp_cfg_is_rx_fisa_lru_del_enabled(dp_cfg);
 
-	qdf_atomic_init(&soc->skip_fisa_param.skip_fisa);
+	qdf_atomic_init(&dp_ctx->skip_fisa_param.skip_fisa);
 	qdf_atomic_init(&fst->pm_suspended);
 
 	QDF_TRACE(QDF_MODULE_ID_ANY, QDF_TRACE_LEVEL_ERROR,
@@ -398,8 +489,8 @@ QDF_STATUS dp_rx_fst_attach(struct wlan_dp_psoc_context *dp_ctx)
 
 timer_init_fail:
 	qdf_spinlock_destroy(&fst->dp_rx_fst_lock);
-	hal_rx_fst_detach(soc->hal_soc, fst->hal_rx_fst, soc->osdev,
-			  soc->fst_cmem_base);
+	hal_rx_fst_detach(dp_ctx->hal_soc, fst->hal_rx_fst, dp_ctx->qdf_dev,
+			  dp_ctx->fst_cmem_base);
 free_hist:
 	dp_rx_sw_ft_hist_deinit((struct dp_fisa_rx_sw_ft *)fst->base,
 				fst->max_entries);
@@ -412,28 +503,29 @@ free_rx_fst:
 /**
  * dp_rx_fst_check_cmem_support() - Check if FW can allocate FSE in CMEM,
  * allocate FSE in DDR if FW doesn't support CMEM allocation
- * @soc: DP SoC handle
+ * @dp_ctx: DP component context
  *
  * Return: None
  */
-static void dp_rx_fst_check_cmem_support(struct dp_soc *soc)
+static void dp_rx_fst_check_cmem_support(struct wlan_dp_psoc_context *dp_ctx)
 {
-	struct dp_rx_fst *fst = soc->rx_fst;
+	struct dp_rx_fst *fst = dp_ctx->rx_fst;
 	QDF_STATUS status;
 
 	/**
 	 * FW doesn't support CMEM FSE, keep it in DDR
-	 * soc->fst_cmem_base is non-NULL then CMEM support is already present
+	 * dp_ctx->fst_cmem_base is non-NULL then CMEM support is
+	 * already present
 	 */
-	if (!soc->fst_in_cmem && (soc->fst_cmem_base == 0))
+	if (!dp_ctx->fst_in_cmem && dp_ctx->fst_cmem_base == 0)
 		return;
 
 	status = dp_rx_fst_cmem_init(fst);
 	if (status != QDF_STATUS_SUCCESS)
 		return;
 
-	hal_rx_fst_detach(soc->hal_soc, fst->hal_rx_fst, soc->osdev,
-			  soc->fst_cmem_base);
+	hal_rx_fst_detach(dp_ctx->hal_soc, fst->hal_rx_fst, dp_ctx->qdf_dev,
+			  dp_ctx->fst_cmem_base);
 	fst->hal_rx_fst = NULL;
 	fst->hal_rx_fst_base_paddr = 0;
 	fst->flow_deletion_supported = true;
@@ -444,25 +536,25 @@ QDF_STATUS dp_rx_flow_send_fst_fw_setup(struct dp_soc *soc,
 					struct dp_pdev *pdev)
 {
 	struct dp_htt_rx_flow_fst_setup fisa_hw_fst_setup_cmd = {0};
-	struct dp_rx_fst *fst = soc->rx_fst;
 	/* TODO - Make this better */
 	struct wlan_dp_psoc_context *dp_ctx = dp_get_context();
+	struct dp_rx_fst *fst = dp_ctx->rx_fst;
 	QDF_STATUS status;
 
 	/* check if FW has support to place FST in CMEM */
-	dp_rx_fst_check_cmem_support(soc);
+	dp_rx_fst_check_cmem_support(dp_ctx);
 
 	/* mac_id = 0 is used to configure both macs with same FT */
 	fisa_hw_fst_setup_cmd.pdev_id = 0;
 	fisa_hw_fst_setup_cmd.max_entries = fst->max_entries;
 	fisa_hw_fst_setup_cmd.max_search = fst->max_skid_length;
-	if (soc->fst_cmem_base) {
+	if (dp_ctx->fst_cmem_base) {
 		fisa_hw_fst_setup_cmd.base_addr_lo =
-			soc->fst_cmem_base & 0xffffffff;
+			dp_ctx->fst_cmem_base & 0xffffffff;
 		/* Higher order bits are mostly 0, Always use 0x10 */
 		fisa_hw_fst_setup_cmd.base_addr_hi =
-			(soc->fst_cmem_base >> 32) | 0x10;
-		dp_info("cmem base address 0x%llx", soc->fst_cmem_base);
+			(dp_ctx->fst_cmem_base >> 32) | 0x10;
+		dp_info("cmem base address 0x%llx", dp_ctx->fst_cmem_base);
 	} else {
 		fisa_hw_fst_setup_cmd.base_addr_lo =
 			fst->hal_rx_fst_base_paddr & 0xffffffff;
@@ -476,7 +568,7 @@ QDF_STATUS dp_rx_flow_send_fst_fw_setup(struct dp_soc *soc,
 
 	status = dp_htt_rx_flow_fst_setup(pdev, &fisa_hw_fst_setup_cmd);
 
-	if (!fst->fst_in_cmem || soc->fst_cmem_base) {
+	if (!fst->fst_in_cmem || dp_ctx->fst_cmem_base) {
 		/**
 		 * Return from here if fst_cmem is not enabled or cmem address
 		 * is known at init time
@@ -498,14 +590,14 @@ void dp_rx_fst_detach(struct wlan_dp_psoc_context *dp_ctx)
 	struct dp_soc *soc = (struct dp_soc *)dp_ctx->cdp_soc;
 	struct dp_rx_fst *dp_fst;
 
-	dp_fst = soc->rx_fst;
+	dp_fst = dp_ctx->rx_fst;
 	if (qdf_likely(dp_fst)) {
 		qdf_timer_sync_cancel(&dp_fst->fse_cache_flush_timer);
 		if (dp_fst->fst_in_cmem)
 			dp_rx_fst_cmem_deinit(dp_fst);
 		else
 			hal_rx_fst_detach(soc->hal_soc, dp_fst->hal_rx_fst,
-					  soc->osdev, soc->fst_cmem_base);
+					  soc->osdev, dp_ctx->fst_cmem_base);
 
 		dp_rx_sw_ft_hist_deinit((struct dp_fisa_rx_sw_ft *)dp_fst->base,
 					dp_fst->max_entries);
@@ -513,7 +605,8 @@ void dp_rx_fst_detach(struct wlan_dp_psoc_context *dp_ctx)
 		qdf_spinlock_destroy(&dp_fst->dp_rx_fst_lock);
 		qdf_mem_free(dp_fst);
 	}
-	soc->rx_fst = NULL;
+
+	dp_ctx->rx_fst = NULL;
 	QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_DEBUG,
 		  "Rx FST detached\n");
 }
@@ -530,22 +623,22 @@ void dp_rx_fst_detach(struct wlan_dp_psoc_context *dp_ctx)
 void dp_rx_fst_update_cmem_params(struct dp_soc *soc, uint16_t num_entries,
 				  uint32_t cmem_ba_lo, uint32_t cmem_ba_hi)
 {
-	struct dp_rx_fst *fst = soc->rx_fst;
+	struct wlan_dp_psoc_context *dp_ctx = dp_get_context();
+	struct dp_rx_fst *fst = dp_ctx->rx_fst;
 
 	fst->max_entries = num_entries;
 	fst->hash_mask = fst->max_entries - 1;
 	fst->cmem_ba = cmem_ba_lo;
 
 	/* Address is not NULL then address is already known during init */
-	if (soc->fst_cmem_base == 0)
+	if (dp_ctx->fst_cmem_base == 0)
 		qdf_event_set(&fst->cmem_resp_event);
 }
 
 void dp_rx_fst_update_pm_suspend_status(struct wlan_dp_psoc_context *dp_ctx,
 					bool suspended)
 {
-	struct dp_soc *soc = (struct dp_soc *)dp_ctx->cdp_soc;
-	struct dp_rx_fst *fst = soc->rx_fst;
+	struct dp_rx_fst *fst = dp_ctx->rx_fst;
 
 	if (!fst)
 		return;
@@ -558,8 +651,7 @@ void dp_rx_fst_update_pm_suspend_status(struct wlan_dp_psoc_context *dp_ctx,
 
 void dp_rx_fst_requeue_wq(struct wlan_dp_psoc_context *dp_ctx)
 {
-	struct dp_soc *soc = (struct dp_soc *)dp_ctx->cdp_soc;
-	struct dp_rx_fst *fst = soc->rx_fst;
+	struct dp_rx_fst *fst = dp_ctx->rx_fst;
 
 	if (!fst || !fst->fst_wq_defer)
 		return;
@@ -574,12 +666,12 @@ void dp_rx_fst_requeue_wq(struct wlan_dp_psoc_context *dp_ctx)
 
 QDF_STATUS dp_rx_fst_target_config(struct wlan_dp_psoc_context *dp_ctx)
 {
-	struct dp_soc *soc = (struct dp_soc *)dp_ctx->cdp_soc;
+	struct dp_soc *soc = cdp_soc_t_to_dp_soc(dp_ctx->cdp_soc);
 	QDF_STATUS status;
-	struct dp_rx_fst *fst = soc->rx_fst;
+	struct dp_rx_fst *fst = dp_ctx->rx_fst;
 
 	/* Check if it is enabled in the INI */
-	if (!soc->fisa_enable) {
+	if (!dp_ctx->fisa_enable) {
 		dp_err("RX FISA feature is disabled");
 		return QDF_STATUS_E_NOSUPPORT;
 	}

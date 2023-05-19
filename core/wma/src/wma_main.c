@@ -6620,6 +6620,9 @@ int wma_rx_service_ready_event(void *handle, uint8_t *cmd_param_info,
 		wmi_service_enabled(wmi_handle, wmi_service_lpass);
 #endif /* WLAN_FEATURE_LPSS */
 
+	if (wmi_service_enabled(wmi_handle, wmi_service_fse_cmem_alloc_support))
+		wlan_dp_set_fst_in_cmem(true);
+
 	/*
 	 * This Service bit is added to check for ARP/NS Offload
 	 * support for LL/HL targets

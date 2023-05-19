@@ -89,22 +89,15 @@ struct dp_ft_lock_history {
 };
 
 /**
- * dp_rx_dump_fisa_stats() - Dump fisa stats
- * @soc: core txrx main context
- *
- * Return: QDF_STATUS
- */
-QDF_STATUS dp_rx_dump_fisa_stats(struct dp_soc *soc);
-
-/**
  * dp_fisa_rx() - FISA Rx packet delivery entry function
- * @soc: core txrx main context
+ * @dp_ctx: DP component handle
  * @vdev: core txrx vdev
  * @nbuf_list: Delivery list of nbufs
  *
- * Return: QDF_STATUS
+ * Return: Success on aggregation
  */
-QDF_STATUS dp_fisa_rx(struct dp_soc *soc, struct dp_vdev *vdev,
+QDF_STATUS dp_fisa_rx(struct wlan_dp_psoc_context *dp_ctx,
+		      struct dp_vdev *vdev,
 		      qdf_nbuf_t nbuf_list);
 
 /**
@@ -222,6 +215,8 @@ void dp_rx_fst_update_pm_suspend_status(struct wlan_dp_psoc_context *dp_ctx,
  */
 void dp_rx_fst_requeue_wq(struct wlan_dp_psoc_context *dp_ctx);
 
+void dp_print_fisa_rx_stats(enum cdp_fisa_stats_id stats_id);
+
 /**
  * dp_fisa_cfg_init() - FISA INI items init
  * @config: SoC CFG config
@@ -231,6 +226,14 @@ void dp_rx_fst_requeue_wq(struct wlan_dp_psoc_context *dp_ctx);
  */
 void dp_fisa_cfg_init(struct wlan_dp_psoc_cfg *config,
 		      struct wlan_objmgr_psoc *psoc);
+
+/**
+ * dp_set_fst_in_cmem() - Set flag to indicate FST is in CMEM
+ * @fst_in_cmem: Flag to indicate FST is in CMEM
+ *
+ * Return: None
+ */
+void dp_set_fst_in_cmem(bool fst_in_cmem);
 #else
 static inline void
 dp_rx_fst_update_pm_suspend_status(struct wlan_dp_psoc_context *dp_ctx,
@@ -238,17 +241,16 @@ dp_rx_fst_update_pm_suspend_status(struct wlan_dp_psoc_context *dp_ctx,
 {
 }
 
-static QDF_STATUS dp_rx_dump_fisa_stats(struct dp_soc *soc)
-{
-	return QDF_STATUS_SUCCESS;
-}
-
-void dp_rx_dump_fisa_table(struct dp_soc *soc)
+static inline void dp_print_fisa_rx_stats(enum cdp_fisa_stats_id stats_id)
 {
 }
 
 static inline void dp_fisa_cfg_init(struct wlan_dp_psoc_cfg *config,
 				    struct wlan_objmgr_psoc *psoc)
+{
+}
+
+static inline void dp_set_fst_in_cmem(bool fst_in_cmem)
 {
 }
 #endif

@@ -153,33 +153,6 @@ static void nbuf_skip_rx_pkt_tlv(struct dp_soc *soc, qdf_nbuf_t nbuf)
 	qdf_nbuf_pull_head(nbuf, soc->rx_pkt_tlv_size + l2_hdr_offset);
 }
 
-/**
- * print_flow_tuple() - Debug function to dump flow tuple
- * @flow_tuple: flow tuple containing tuple info
- * @str: destination buffer
- * @size: size of @str
- *
- * Return: NONE
- */
-static
-void print_flow_tuple(struct cdp_rx_flow_tuple_info *flow_tuple, char *str,
-		      uint32_t size)
-{
-	qdf_scnprintf(str, size,
-		      "dest 0x%x%x%x%x(0x%x) src 0x%x%x%x%x(0x%x) proto 0x%x",
-		      flow_tuple->dest_ip_127_96,
-		      flow_tuple->dest_ip_95_64,
-		      flow_tuple->dest_ip_63_32,
-		      flow_tuple->dest_ip_31_0,
-		      flow_tuple->dest_port,
-		      flow_tuple->src_ip_127_96,
-		      flow_tuple->src_ip_95_64,
-		      flow_tuple->src_ip_63_32,
-		      flow_tuple->src_ip_31_0,
-		      flow_tuple->src_port,
-		      flow_tuple->l4_protocol);
-}
-
 static bool
 dp_rx_fisa_should_bypass(struct cdp_rx_flow_tuple_info *flow_tuple_info)
 {
@@ -1924,7 +1897,8 @@ QDF_STATUS dp_rx_fisa_flush_by_vdev_ctx_id(struct dp_soc *soc,
 					   struct dp_vdev *vdev,
 					   uint8_t rx_ctx_id)
 {
-	struct dp_rx_fst *fisa_hdl = soc->rx_fst;
+	struct wlan_dp_psoc_context *dp_ctx = dp_get_context();
+	struct dp_rx_fst *fisa_hdl = dp_ctx->rx_fst;
 	struct dp_fisa_rx_sw_ft *sw_ft_entry =
 		(struct dp_fisa_rx_sw_ft *)fisa_hdl->base;
 	int ft_size = fisa_hdl->max_entries;
@@ -1971,18 +1945,12 @@ static bool dp_fisa_disallowed_for_vdev(struct dp_soc *soc,
 	return true;
 }
 
-/**
- * dp_fisa_rx() - Entry function to FISA to handle aggregation
- * @soc: core txrx main context
- * @vdev: Handle DP vdev
- * @nbuf_list: List nbufs to be aggregated
- *
- * Return: Success on aggregation
- */
-QDF_STATUS dp_fisa_rx(struct dp_soc *soc, struct dp_vdev *vdev,
+QDF_STATUS dp_fisa_rx(struct wlan_dp_psoc_context *dp_ctx,
+		      struct dp_vdev *vdev,
 		      qdf_nbuf_t nbuf_list)
 {
-	struct dp_rx_fst *dp_fisa_rx_hdl = soc->rx_fst;
+	struct dp_soc *soc = cdp_soc_t_to_dp_soc(dp_ctx->cdp_soc);
+	struct dp_rx_fst *dp_fisa_rx_hdl = dp_ctx->rx_fst;
 	qdf_nbuf_t head_nbuf;
 	qdf_nbuf_t next_nbuf;
 	struct dp_fisa_rx_sw_ft *fisa_flow;
@@ -2003,21 +1971,21 @@ QDF_STATUS dp_fisa_rx(struct dp_soc *soc, struct dp_vdev *vdev,
 		if (dp_fisa_disallowed_for_vdev(soc, vdev, rx_ctx_id))
 			goto deliver_nbuf;
 
-		if (qdf_atomic_read(&soc->skip_fisa_param.skip_fisa)) {
-			if (!soc->skip_fisa_param.fisa_force_flush[rx_ctx_id]) {
+		if (qdf_atomic_read(&dp_ctx->skip_fisa_param.skip_fisa)) {
+			if (!dp_ctx->skip_fisa_param.fisa_force_flush[rx_ctx_id]) {
 				dp_rx_fisa_flush_by_ctx_id(soc, rx_ctx_id);
-				soc->skip_fisa_param.
+				dp_ctx->skip_fisa_param.
 						fisa_force_flush[rx_ctx_id] = 1;
 			}
 			goto deliver_nbuf;
-		} else if (soc->skip_fisa_param.fisa_force_flush[rx_ctx_id]) {
-			soc->skip_fisa_param.fisa_force_flush[rx_ctx_id] = 0;
+		} else if (dp_ctx->skip_fisa_param.fisa_force_flush[rx_ctx_id]) {
+			dp_ctx->skip_fisa_param.fisa_force_flush[rx_ctx_id] = 0;
 		}
 
 		qdf_nbuf_push_head(head_nbuf, soc->rx_pkt_tlv_size +
 				   QDF_NBUF_CB_RX_PACKET_L3_HDR_PAD(head_nbuf));
 
-		hal_rx_msdu_get_reo_destination_indication(soc->hal_soc,
+		hal_rx_msdu_get_reo_destination_indication(dp_ctx->hal_soc,
 							   (uint8_t *)qdf_nbuf_data(head_nbuf),
 							   &tlv_reo_dest_ind);
 
@@ -2078,45 +2046,6 @@ next_msdu:
 	return QDF_STATUS_SUCCESS;
 }
 
-/* Length of string to store tuple information for printing */
-#define DP_TUPLE_STR_LEN 512
-
-QDF_STATUS dp_rx_dump_fisa_stats(struct dp_soc *soc)
-{
-	int i;
-	char tuple_str[DP_TUPLE_STR_LEN] = {'\0'};
-	struct dp_rx_fst *rx_fst = soc->rx_fst;
-	struct dp_fisa_rx_sw_ft *sw_ft_entry =
-		&((struct dp_fisa_rx_sw_ft *)rx_fst->base)[0];
-	int ft_size = rx_fst->max_entries;
-
-	dp_info("#flows added %d evicted %d hash collision %d",
-		rx_fst->add_flow_count,
-		rx_fst->del_flow_count,
-		rx_fst->hash_collision_cnt);
-
-	for (i = 0; i < ft_size; i++, sw_ft_entry++) {
-		if (!sw_ft_entry->is_populated)
-			continue;
-
-		print_flow_tuple(&sw_ft_entry->rx_flow_tuple_info,
-				 tuple_str,
-				 sizeof(tuple_str));
-
-		dp_info("Flow[%d][%s][%s] ring %d msdu-aggr %d flushes %d bytes-agg %llu avg-bytes-aggr %llu",
-			sw_ft_entry->flow_id,
-			sw_ft_entry->is_flow_udp ? "udp" : "tcp",
-			tuple_str,
-			sw_ft_entry->napi_id,
-			sw_ft_entry->aggr_count,
-			sw_ft_entry->flush_count,
-			sw_ft_entry->bytes_aggregated,
-			qdf_do_div(sw_ft_entry->bytes_aggregated,
-				   sw_ft_entry->flush_count));
-	}
-	return QDF_STATUS_SUCCESS;
-}
-
 /**
  * dp_rx_fisa_flush_flow_wrap() - flush fisa flow by invoking
  *				  dp_rx_fisa_flush_flow()
@@ -2143,7 +2072,8 @@ static void dp_rx_fisa_flush_flow_wrap(struct dp_fisa_rx_sw_ft *sw_ft)
 
 QDF_STATUS dp_rx_fisa_flush_by_ctx_id(struct dp_soc *soc, int napi_id)
 {
-	struct dp_rx_fst *fisa_hdl = soc->rx_fst;
+	struct wlan_dp_psoc_context *dp_ctx = dp_get_context();
+	struct dp_rx_fst *fisa_hdl = dp_ctx->rx_fst;
 	struct dp_fisa_rx_sw_ft *sw_ft_entry =
 		(struct dp_fisa_rx_sw_ft *)fisa_hdl->base;
 	int ft_size = fisa_hdl->max_entries;
@@ -2165,7 +2095,8 @@ QDF_STATUS dp_rx_fisa_flush_by_ctx_id(struct dp_soc *soc, int napi_id)
 
 QDF_STATUS dp_rx_fisa_flush_by_vdev_id(struct dp_soc *soc, uint8_t vdev_id)
 {
-	struct dp_rx_fst *fisa_hdl = soc->rx_fst;
+	struct wlan_dp_psoc_context *dp_ctx = dp_get_context();
+	struct dp_rx_fst *fisa_hdl = dp_ctx->rx_fst;
 	struct dp_fisa_rx_sw_ft *sw_ft_entry =
 		(struct dp_fisa_rx_sw_ft *)fisa_hdl->base;
 	int ft_size = fisa_hdl->max_entries;
@@ -2213,10 +2144,9 @@ void dp_set_fisa_disallowed_for_vdev(struct cdp_soc_t *cdp_soc, uint8_t vdev_id,
 
 void dp_suspend_fse_cache_flush(struct wlan_dp_psoc_context *dp_ctx)
 {
-	struct dp_soc *soc = (struct dp_soc *)dp_ctx->cdp_soc;
 	struct dp_rx_fst *dp_fst;
 
-	dp_fst = soc->rx_fst;
+	dp_fst = dp_ctx->rx_fst;
 	if (dp_fst) {
 		if (qdf_atomic_read(&dp_fst->fse_cache_flush_posted))
 			qdf_timer_sync_cancel(&dp_fst->fse_cache_flush_timer);
@@ -2228,10 +2158,9 @@ void dp_suspend_fse_cache_flush(struct wlan_dp_psoc_context *dp_ctx)
 
 void dp_resume_fse_cache_flush(struct wlan_dp_psoc_context *dp_ctx)
 {
-	struct dp_soc *soc = (struct dp_soc *)dp_ctx->cdp_soc;
 	struct dp_rx_fst *dp_fst;
 
-	dp_fst = soc->rx_fst;
+	dp_fst = dp_ctx->rx_fst;
 	if (dp_fst) {
 		qdf_atomic_set(&dp_fst->fse_cache_flush_posted, 0);
 		dp_fst->fse_cache_flush_allow = true;
