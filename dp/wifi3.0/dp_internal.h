@@ -1449,6 +1449,7 @@ bool dp_vdev_is_wds_ext_enabled(struct dp_vdev *vdev);
 #ifdef QCA_SUPPORT_WDS_EXTENDED
 static inline void dp_wds_ext_peer_init(struct dp_txrx_peer *txrx_peer)
 {
+	txrx_peer->wds_ext.osif_peer = NULL;
 	txrx_peer->wds_ext.init = 0;
 }
 #else
