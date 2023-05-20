@@ -956,6 +956,7 @@ struct cdp_ctrl_ops {
 	QDF_STATUS (*txrx_update_mon_mac_filter)(struct cdp_soc_t *soc,
 						 uint8_t vdev_id,
 						 uint32_t cmd);
+	bool (*umac_reset_is_inprogress)(struct cdp_soc_t *psoc);
 };
 
 struct cdp_me_ops {
