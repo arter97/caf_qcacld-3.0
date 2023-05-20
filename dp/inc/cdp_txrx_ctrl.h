@@ -1408,4 +1408,25 @@ QDF_STATUS cdp_txrx_get_pdev_phyrx_error_mask(ol_txrx_soc_handle soc,
 }
 #endif
 
+/**
+ * cdp_umac_reset_is_inprogress() - API to check if umac reset is in progress
+ * @soc: opaque soc handle
+ *
+ * Return: true if umac reset is in progress, else false.
+ */
+static inline bool
+cdp_umac_reset_is_inprogress(ol_txrx_soc_handle soc)
+{
+	if (!soc || !soc->ops) {
+		dp_cdp_debug("Invalid Instance:");
+		QDF_BUG(0);
+		return false;
+	}
+
+	if (!soc->ops->ctrl_ops ||
+	    !soc->ops->ctrl_ops->umac_reset_is_inprogress)
+		return false;
+
+	return soc->ops->ctrl_ops->umac_reset_is_inprogress(soc);
+}
 #endif /* _CDP_TXRX_CTRL_H_ */
