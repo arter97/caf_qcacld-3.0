@@ -420,6 +420,7 @@ struct fisa_pkt_hist {
  * @aggr_count: Aggregation count
  * @do_not_aggregate: Flag to indicate not to aggregate this flow
  * @hal_cumultive_ip_len: HAL cumulative IP length
+ * @dp_ctx: DP component handle
  * @soc_hdl: DP SoC handle
  * @last_hal_aggr_count: last aggregate count fetched from RX PKT TLV
  * @cur_aggr_gso_size: Current aggreagtesd GSO size
@@ -460,6 +461,10 @@ struct dp_fisa_rx_sw_ft {
 	uint32_t aggr_count;
 	uint8_t do_not_aggregate;
 	uint16_t hal_cumultive_ip_len;
+	struct wlan_dp_psoc_context *dp_ctx;
+	/* TODO - Only reference needed to this is to get vdev.
+	 * Once that ref is removed, this field can be deleted
+	 */
 	struct dp_soc *soc_hdl;
 	uint32_t last_hal_aggr_count;
 	uint32_t cur_aggr_gso_size;

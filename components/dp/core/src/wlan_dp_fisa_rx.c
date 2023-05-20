@@ -276,7 +276,7 @@ dp_rx_fisa_setup_hw_fse(struct dp_rx_fst *fisa_hdl,
 	flow.tuple_info.src_port = rx_flow_info->src_port;
 	flow.tuple_info.l4_protocol = rx_flow_info->l4_protocol;
 	flow.reo_destination_handler = HAL_RX_FSE_REO_DEST_FT;
-	hw_fse = hal_rx_flow_setup_fse(fisa_hdl->soc_hdl->hal_soc,
+	hw_fse = hal_rx_flow_setup_fse(fisa_hdl->dp_ctx->hal_soc,
 				       fisa_hdl->hal_rx_fst, hashed_flow_idx,
 				       &flow);
 
@@ -426,7 +426,7 @@ dp_rx_fisa_setup_cmem_fse(struct dp_rx_fst *fisa_hdl, uint32_t hashed_flow_idx,
 	flow.tuple_info.l4_protocol = rx_flow_info->l4_protocol;
 	flow.reo_destination_handler = HAL_RX_FSE_REO_DEST_FT;
 
-	return hal_rx_flow_setup_cmem_fse(fisa_hdl->soc_hdl->hal_soc,
+	return hal_rx_flow_setup_cmem_fse(fisa_hdl->dp_ctx->hal_soc,
 					  fisa_hdl->cmem_ba, hashed_flow_idx,
 					  &flow);
 }
@@ -436,7 +436,7 @@ dp_rx_fisa_setup_cmem_fse(struct dp_rx_fst *fisa_hdl, uint32_t hashed_flow_idx,
  * @sw_ft_entry: Pointer to softerware flow table entry
  * @flow_hash: flow_hash for the flow
  * @vdev: Saving dp_vdev in FT later used in the flushing the flow
- * @soc_hdl: HAL soc handle
+ * @dp_ctx: DP component handle
  * @flow_id: Flow ID of the flow
  *
  * Return: NONE
@@ -444,13 +444,13 @@ dp_rx_fisa_setup_cmem_fse(struct dp_rx_fst *fisa_hdl, uint32_t hashed_flow_idx,
 static void dp_rx_fisa_update_sw_ft_entry(struct dp_fisa_rx_sw_ft *sw_ft_entry,
 					  uint32_t flow_hash,
 					  struct dp_vdev *vdev,
-					  struct dp_soc *soc_hdl,
+					  struct wlan_dp_psoc_context *dp_ctx,
 					  uint32_t flow_id)
 {
 	sw_ft_entry->flow_hash = flow_hash;
 	sw_ft_entry->flow_id = flow_id;
 	sw_ft_entry->vdev = vdev;
-	sw_ft_entry->soc_hdl = soc_hdl;
+	sw_ft_entry->dp_ctx = dp_ctx;
 }
 
 /**
@@ -508,7 +508,7 @@ dp_rx_fisa_add_ft_entry(struct dp_vdev *vdev,
 	uint32_t reo_id = QDF_NBUF_CB_RX_CTX_ID(nbuf);
 	struct hal_proto_params proto_params;
 
-	if (hal_rx_get_proto_params(fisa_hdl->soc_hdl->hal_soc, rx_tlv_hdr,
+	if (hal_rx_get_proto_params(fisa_hdl->dp_ctx->hal_soc, rx_tlv_hdr,
 				    &proto_params))
 		return NULL;
 
@@ -546,7 +546,7 @@ dp_rx_fisa_add_ft_entry(struct dp_vdev *vdev,
 			/* Add SW FT entry */
 			dp_rx_fisa_update_sw_ft_entry(sw_ft_entry,
 						      flow_hash, vdev,
-						      fisa_hdl->soc_hdl,
+						      fisa_hdl->dp_ctx,
 						      hashed_flow_idx);
 
 			/* Add HW FT entry */
@@ -726,7 +726,7 @@ dp_fisa_rx_delete_flow(struct dp_rx_fst *fisa_hdl,
 	dp_rx_fisa_restore_pkt_hist(sw_ft_entry, &pkt_hist);
 
 	dp_rx_fisa_update_sw_ft_entry(sw_ft_entry, elem->flow_idx, elem->vdev,
-				      fisa_hdl->soc_hdl, hashed_flow_idx);
+				      fisa_hdl->dp_ctx, hashed_flow_idx);
 
 	/* Add HW FT entry */
 	sw_ft_entry->cmem_offset = dp_rx_fisa_setup_cmem_fse(
@@ -760,7 +760,7 @@ static uint32_t
 dp_fisa_rx_get_hw_ft_timestamp(struct dp_rx_fst *fisa_hdl,
 			       uint32_t hashed_flow_idx)
 {
-	hal_soc_handle_t hal_soc_hdl = fisa_hdl->soc_hdl->hal_soc;
+	hal_soc_handle_t hal_soc_hdl = fisa_hdl->dp_ctx->hal_soc;
 	struct dp_fisa_rx_sw_ft *sw_ft_entry;
 
 	sw_ft_entry = &(((struct dp_fisa_rx_sw_ft *)
@@ -821,7 +821,7 @@ static void dp_fisa_rx_fst_update(struct dp_rx_fst *fisa_hdl,
 			/* Add SW FT entry */
 			dp_rx_fisa_update_sw_ft_entry(sw_ft_entry,
 						      flow_hash, elem->vdev,
-						      fisa_hdl->soc_hdl,
+						      fisa_hdl->dp_ctx,
 						      hashed_flow_idx);
 
 			/* Add HW FT entry */
@@ -900,7 +900,7 @@ void dp_fisa_rx_fst_update_work(void *arg)
 	struct dp_fisa_rx_fst_update_elem *elem;
 	struct dp_rx_fst *fisa_hdl = arg;
 	qdf_list_node_t *node;
-	hal_soc_handle_t hal_soc_hdl = fisa_hdl->soc_hdl->hal_soc;
+	hal_soc_handle_t hal_soc_hdl = fisa_hdl->dp_ctx->hal_soc;
 
 	if (qdf_atomic_read(&fisa_hdl->pm_suspended)) {
 		dp_err_rl("WQ triggered during suspend stage, deferred update");
@@ -976,7 +976,7 @@ static void *
 dp_fisa_rx_queue_fst_update_work(struct dp_rx_fst *fisa_hdl, uint32_t flow_idx,
 				 qdf_nbuf_t nbuf, struct dp_vdev *vdev)
 {
-	hal_soc_handle_t hal_soc_hdl = fisa_hdl->soc_hdl->hal_soc;
+	hal_soc_handle_t hal_soc_hdl = fisa_hdl->dp_ctx->hal_soc;
 	struct cdp_rx_flow_tuple_info flow_tuple_info;
 	uint8_t *rx_tlv_hdr = qdf_nbuf_data(nbuf);
 	struct dp_fisa_rx_fst_update_elem *elem;
@@ -986,7 +986,7 @@ dp_fisa_rx_queue_fst_update_work(struct dp_rx_fst *fisa_hdl, uint32_t flow_idx,
 	bool found;
 	struct hal_proto_params proto_params;
 
-	if (hal_rx_get_proto_params(fisa_hdl->soc_hdl->hal_soc, rx_tlv_hdr,
+	if (hal_rx_get_proto_params(fisa_hdl->dp_ctx->hal_soc, rx_tlv_hdr,
 				    &proto_params))
 		return NULL;
 
@@ -1040,7 +1040,7 @@ dp_fisa_rx_queue_fst_update_work(struct dp_rx_fst *fisa_hdl, uint32_t flow_idx,
 		fisa_hdl->fst_wq_defer = true;
 		dp_info("defer fst update task in WoW");
 	} else {
-		qdf_queue_work(fisa_hdl->soc_hdl->osdev,
+		qdf_queue_work(fisa_hdl->dp_ctx->qdf_dev,
 			       fisa_hdl->fst_update_wq,
 			       &fisa_hdl->fst_update_work);
 	}
@@ -1061,7 +1061,7 @@ static inline struct dp_fisa_rx_sw_ft *
 dp_fisa_rx_get_sw_ft_entry(struct dp_rx_fst *fisa_hdl, qdf_nbuf_t nbuf,
 			   uint32_t flow_idx, struct dp_vdev *vdev)
 {
-	hal_soc_handle_t hal_soc_hdl = fisa_hdl->soc_hdl->hal_soc;
+	hal_soc_handle_t hal_soc_hdl = fisa_hdl->dp_ctx->hal_soc;
 	struct dp_fisa_rx_sw_ft *sw_ft_entry = NULL;
 	struct dp_fisa_rx_sw_ft *sw_ft_base;
 	uint32_t fse_metadata;
@@ -1170,7 +1170,7 @@ dp_rx_get_fisa_flow(struct dp_rx_fst *fisa_hdl, struct dp_vdev *vdev,
 	uint32_t tlv_reo_dest_ind;
 	bool flow_invalid, flow_timeout, flow_idx_valid;
 	struct dp_fisa_rx_sw_ft *sw_ft_entry = NULL;
-	hal_soc_handle_t hal_soc_hdl = fisa_hdl->soc_hdl->hal_soc;
+	hal_soc_handle_t hal_soc_hdl = fisa_hdl->dp_ctx->hal_soc;
 	QDF_STATUS status;
 
 	if (QDF_NBUF_CB_RX_TCP_PROTO(nbuf))
@@ -1315,7 +1315,7 @@ dp_rx_fisa_aggr_udp(struct dp_rx_fst *fisa_hdl,
 	qdf_nbuf_t head_skb = fisa_flow->head_skb;
 	uint8_t *rx_tlv_hdr = qdf_nbuf_data(nbuf);
 	uint32_t l2_hdr_offset =
-		hal_rx_msdu_end_l3_hdr_padding_get(fisa_hdl->soc_hdl->hal_soc,
+		hal_rx_msdu_end_l3_hdr_padding_get(fisa_hdl->dp_ctx->hal_soc,
 						   rx_tlv_hdr);
 	qdf_net_udphdr_t *udp_hdr;
 	uint32_t udp_len;
@@ -1324,7 +1324,7 @@ dp_rx_fisa_aggr_udp(struct dp_rx_fst *fisa_hdl,
 
 	qdf_nbuf_pull_head(nbuf, fisa_hdl->rx_pkt_tlv_size + l2_hdr_offset);
 
-	hal_rx_get_l3_l4_offsets(fisa_hdl->soc_hdl->hal_soc, rx_tlv_hdr,
+	hal_rx_get_l3_l4_offsets(fisa_hdl->dp_ctx->hal_soc, rx_tlv_hdr,
 				 &l3_hdr_offset, &l4_hdr_offset);
 	udp_hdr = (qdf_net_udphdr_t *)(qdf_nbuf_data(nbuf) +
 			get_transport_header_offset(fisa_flow, l3_hdr_offset,
@@ -1443,6 +1443,7 @@ dp_rx_fisa_flush_udp_flow(struct dp_vdev *vdev,
 	qdf_nbuf_shared_info_t shinfo;
 	qdf_nbuf_t linear_skb;
 	struct dp_vdev *fisa_flow_vdev;
+	ol_txrx_soc_handle cdp_soc = fisa_flow->dp_ctx->cdp_soc;
 
 	dp_fisa_debug("head_skb %pK", head_skb);
 	dp_fisa_debug("cumulative ip length %d",
@@ -1520,7 +1521,7 @@ dp_rx_fisa_flush_udp_flow(struct dp_vdev *vdev,
 	hex_dump_skb_data(fisa_flow->head_skb, false);
 
 	fisa_flow_vdev = dp_vdev_get_ref_by_id(
-				fisa_flow->soc_hdl,
+				cdp_soc_t_to_dp_soc(cdp_soc),
 				QDF_NBUF_CB_RX_VDEV_ID(fisa_flow->head_skb),
 				DP_MOD_ID_RX);
 	if (qdf_unlikely(!fisa_flow_vdev ||
@@ -1556,7 +1557,7 @@ dp_rx_fisa_flush_udp_flow(struct dp_vdev *vdev,
 
 out:
 	if (fisa_flow_vdev)
-		dp_vdev_unref_delete(fisa_flow->soc_hdl,
+		dp_vdev_unref_delete(cdp_soc_t_to_dp_soc(cdp_soc),
 				     fisa_flow_vdev,
 				     DP_MOD_ID_RX);
 	fisa_flow->head_skb = NULL;
@@ -1644,13 +1645,13 @@ static bool dp_fisa_aggregation_should_stop(
 				uint8_t *rx_tlv_hdr)
 {
 	uint32_t msdu_len =
-		hal_rx_msdu_start_msdu_len_get(fisa_flow->soc_hdl->hal_soc,
+		hal_rx_msdu_start_msdu_len_get(fisa_flow->dp_ctx->hal_soc,
 					       rx_tlv_hdr);
 	uint32_t l3_hdr_offset, l4_hdr_offset, l2_l3_hdr_len;
 	uint32_t cumulative_ip_len_delta = hal_cumulative_ip_len -
 					   fisa_flow->hal_cumultive_ip_len;
 
-	hal_rx_get_l3_l4_offsets(fisa_flow->soc_hdl->hal_soc, rx_tlv_hdr,
+	hal_rx_get_l3_l4_offsets(fisa_flow->dp_ctx->hal_soc, rx_tlv_hdr,
 				 &l3_hdr_offset, &l4_hdr_offset);
 
 	l2_l3_hdr_len = l3_hdr_offset + l4_hdr_offset;
@@ -1694,7 +1695,7 @@ static int dp_add_nbuf_to_fisa_flow(struct dp_rx_fst *fisa_hdl,
 	bool flow_aggr_cont;
 	uint8_t *rx_tlv_hdr = qdf_nbuf_data(nbuf);
 	uint16_t hal_cumulative_ip_len;
-	hal_soc_handle_t hal_soc_hdl = fisa_hdl->soc_hdl->hal_soc;
+	hal_soc_handle_t hal_soc_hdl = fisa_hdl->dp_ctx->hal_soc;
 	uint32_t hal_aggr_count;
 	uint8_t napi_id = QDF_NBUF_CB_RX_CTX_ID(nbuf);
 	uint32_t fse_metadata;
