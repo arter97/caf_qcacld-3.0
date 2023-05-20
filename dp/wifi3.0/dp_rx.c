@@ -2826,6 +2826,37 @@ void dp_rx_deliver_to_stack_no_peer(struct dp_soc *soc, qdf_nbuf_t nbuf)
 #endif /* QCA_HOST_MODE_WIFI_DISABLED */
 
 #ifdef WLAN_SUPPORT_RX_FISA
+QDF_STATUS dp_fisa_config(ol_txrx_soc_handle cdp_soc, uint8_t pdev_id,
+			  enum cdp_fisa_config_id config_id,
+			  union cdp_fisa_config *cfg)
+{
+	struct dp_soc *soc = (struct dp_soc *)cdp_soc;
+	struct dp_pdev *pdev;
+	QDF_STATUS status;
+
+	pdev = dp_get_pdev_from_soc_pdev_id_wifi3(soc, pdev_id);
+	if (!pdev) {
+		dp_err("pdev is NULL for pdev_id %u", pdev_id);
+		return QDF_STATUS_E_INVAL;
+	}
+
+	switch (config_id) {
+	case CDP_FISA_HTT_RX_FISA_CFG:
+		status = dp_htt_rx_fisa_config(pdev, cfg->fisa_config);
+		break;
+	case CDP_FISA_HTT_RX_FSE_OP_CFG:
+		status = dp_htt_rx_flow_fse_operation(pdev, cfg->fse_op_cmd);
+		break;
+	case CDP_FISA_HTT_RX_FSE_SETUP_CFG:
+		status = dp_htt_rx_flow_fst_setup(pdev, cfg->fse_setup_info);
+		break;
+	default:
+		status = QDF_STATUS_E_INVAL;
+	}
+
+	return status;
+}
+
 void dp_rx_skip_tlvs(struct dp_soc *soc, qdf_nbuf_t nbuf, uint32_t l3_padding)
 {
 	QDF_NBUF_CB_RX_PACKET_L3_HDR_PAD(nbuf) = l3_padding;

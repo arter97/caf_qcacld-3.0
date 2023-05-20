@@ -3022,6 +3022,30 @@ enum cdp_fisa_stats_id {
 };
 
 #ifdef WLAN_SUPPORT_RX_FISA
+/**
+ * enum cdp_fisa_config_id - FISA config ID
+ * @CDP_FISA_HTT_RX_FISA_CFG: FISA config HTT message
+ * @CDP_FISA_HTT_RX_FSE_OP_CFG: FSE operation HTT message
+ * @CDP_FISA_HTT_RX_FSE_SETUP_CFG: FSE setup HTT message
+ */
+enum cdp_fisa_config_id {
+	CDP_FISA_HTT_RX_FISA_CFG,
+	CDP_FISA_HTT_RX_FSE_OP_CFG,
+	CDP_FISA_HTT_RX_FSE_SETUP_CFG,
+};
+
+/**
+ * union cdp_fisa_config - FISA HTT message data
+ * @fisa_config: FISA config HTT msg data
+ * @fse_op_cmd: FSE operation HTT msg data
+ * @fse_setup_info: FSE setup HTT msg data
+ */
+union cdp_fisa_config {
+	struct dp_htt_rx_fisa_cfg *fisa_config;
+	struct dp_htt_rx_flow_fst_operation *fse_op_cmd;
+	struct dp_htt_rx_flow_fst_setup *fse_setup_info;
+};
+
 struct cdp_flow_stats {
 	uint32_t aggr_count;
 	uint32_t curr_aggr_count;

@@ -11239,6 +11239,9 @@ static struct cdp_ctrl_ops dp_ops_ctrl = {
 #endif
 	.txrx_peer_flush_frags = dp_peer_flush_frags,
 	.umac_reset_is_inprogress = dp_umac_reset_is_inprogress,
+#ifdef WLAN_SUPPORT_RX_FISA
+	.txrx_fisa_config = dp_fisa_config,
+#endif
 };
 
 static struct cdp_me_ops dp_ops_me = {

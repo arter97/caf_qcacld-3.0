@@ -1429,4 +1429,24 @@ cdp_umac_reset_is_inprogress(ol_txrx_soc_handle soc)
 
 	return soc->ops->ctrl_ops->umac_reset_is_inprogress(soc);
 }
+
+#ifdef WLAN_SUPPORT_RX_FISA
+static inline
+QDF_STATUS cdp_txrx_fisa_config(struct cdp_soc_t *soc, uint8_t pdev_id,
+				enum cdp_fisa_config_id config_id,
+				union cdp_fisa_config *cfg)
+{
+	if (!soc || !soc->ops) {
+		dp_cdp_debug("Invalid Instance:");
+		QDF_BUG(0);
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	if (!soc->ops->ctrl_ops || !soc->ops->ctrl_ops->txrx_fisa_config)
+		return QDF_STATUS_E_FAILURE;
+
+	return soc->ops->ctrl_ops->txrx_fisa_config(soc, pdev_id, config_id,
+						    cfg);
+}
+#endif
 #endif /* _CDP_TXRX_CTRL_H_ */

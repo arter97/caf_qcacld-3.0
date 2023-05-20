@@ -4125,6 +4125,17 @@ void dp_update_num_mac_rings_for_dbs(struct dp_soc *soc,
  */
 void dp_rx_fst_update_cmem_params(struct dp_soc *soc, uint16_t num_entries,
 				  uint32_t cmem_ba_lo, uint32_t cmem_ba_hi);
+
+/**
+ * dp_fisa_config() - FISA config handler
+ * @cdp_soc: CDP SoC handle
+ * @pdev_id: PDEV ID
+ * @config_id: FISA config ID
+ * @cfg: FISA config msg data
+ */
+QDF_STATUS dp_fisa_config(ol_txrx_soc_handle cdp_soc, uint8_t pdev_id,
+			  enum cdp_fisa_config_id config_id,
+			  union cdp_fisa_config *cfg);
 #else
 static inline void
 dp_rx_fst_update_cmem_params(struct dp_soc *soc, uint16_t num_entries,
