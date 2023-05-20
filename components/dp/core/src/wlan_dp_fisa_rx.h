@@ -188,16 +188,6 @@ void dp_rx_fst_detach(struct wlan_dp_psoc_context *dp_ctx);
 void dp_resume_fse_cache_flush(struct wlan_dp_psoc_context *dp_ctx);
 
 /**
- * dp_rx_flow_send_fst_fw_setup() - Program FST parameters in FW/HW post-attach
- * @soc: SoC handle
- * @pdev: Pdev handle
- *
- * Return: Success when fst parameters are programmed in FW, error otherwise
- */
-QDF_STATUS dp_rx_flow_send_fst_fw_setup(struct dp_soc *soc,
-					struct dp_pdev *pdev);
-
-/**
  * dp_rx_fst_update_pm_suspend_status() - Update Suspend status in FISA
  * @dp_ctx: DP component context
  * @suspended: Flag to indicate suspend or not
