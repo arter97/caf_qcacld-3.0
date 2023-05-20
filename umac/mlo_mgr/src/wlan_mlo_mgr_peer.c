@@ -639,7 +639,7 @@ static QDF_STATUS mlo_peer_attach_link_peer(
 			break;
 		}
 		peer_entry->link_peer = link_peer;
-		vdev->vdev_objmgr.wlan_ml_peer_count++;
+		qdf_atomic_inc(&vdev->vdev_objmgr.wlan_ml_peer_count);
 		qdf_copy_macaddr(&peer_entry->link_addr,
 				 (struct qdf_mac_addr *)&link_peer->macaddr[0]);
 
@@ -752,7 +752,7 @@ static QDF_STATUS mlo_peer_detach_link_peer(
 		}
 		vdev =  wlan_peer_get_vdev(link_peer);
 		if (vdev)
-			vdev->vdev_objmgr.wlan_ml_peer_count--;
+			qdf_atomic_dec(&vdev->vdev_objmgr.wlan_ml_peer_count);
 
 		wlan_objmgr_peer_release_ref(link_peer, WLAN_MLO_MGR_ID);
 		peer_entry->link_peer = NULL;
