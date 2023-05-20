@@ -409,7 +409,7 @@ struct wlan_objmgr_vdev_objmgr {
 	struct wlan_objmgr_pdev *wlan_pdev;
 	uint16_t wlan_peer_count;
 #ifdef WLAN_FEATURE_11BE_MLO
-	uint16_t wlan_ml_peer_count;
+	qdf_atomic_t wlan_ml_peer_count;
 #endif
 	uint16_t max_peer_count;
 	uint32_t c_flags;
@@ -1609,7 +1609,7 @@ static inline uint16_t wlan_vdev_get_legacy_peer_count(
 					struct wlan_objmgr_vdev *vdev)
 {
 	return vdev->vdev_objmgr.wlan_peer_count -
-	       vdev->vdev_objmgr.wlan_ml_peer_count;
+	       qdf_atomic_read(&vdev->vdev_objmgr.wlan_ml_peer_count);
 }
 #else
 static inline uint16_t wlan_vdev_get_legacy_peer_count(
@@ -2193,18 +2193,17 @@ static inline struct wlan_mlo_dev_context *wlan_vdev_get_mlo_dev_ctx(
 }
 
 /**
- * wlan_objmgr_vdev_set_ml_peer_count() - set ml_peer_count value
+ * wlan_objmgr_vdev_init_ml_peer_count() - initialize ml_peer_count
  * @vdev: vdev object pointer
- * @ml_peer_count: ml peer count to be set
  *
  * Return: void
  */
 static inline void
-wlan_objmgr_vdev_set_ml_peer_count(struct wlan_objmgr_vdev *vdev,
-				   uint16_t ml_peer_count)
+wlan_objmgr_vdev_init_ml_peer_count(struct wlan_objmgr_vdev *vdev)
 {
-	vdev->vdev_objmgr.wlan_ml_peer_count = ml_peer_count;
+	qdf_atomic_init(&vdev->vdev_objmgr.wlan_ml_peer_count);
 }
+
 #else
 static inline
 QDF_STATUS wlan_vdev_get_bss_peer_mld_mac(struct wlan_objmgr_vdev *vdev,
@@ -2214,10 +2213,10 @@ QDF_STATUS wlan_vdev_get_bss_peer_mld_mac(struct wlan_objmgr_vdev *vdev,
 }
 
 static inline void
-wlan_objmgr_vdev_set_ml_peer_count(struct wlan_objmgr_vdev *vdev,
-				   uint16_t ml_peer_count)
+wlan_objmgr_vdev_init_ml_peer_count(struct wlan_objmgr_vdev *vdev)
 {
 }
+
 #endif
 
 /**
