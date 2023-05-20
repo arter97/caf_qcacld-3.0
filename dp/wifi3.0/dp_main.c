@@ -8086,6 +8086,16 @@ static QDF_STATUS dp_get_psoc_param(struct cdp_soc_t *cdp_soc,
 			wlan_cfg_get_rx_refill_buf_pool_size(wlan_cfg_ctx);
 		break;
 #endif
+	case CDP_CFG_FISA_PARAMS:
+		val->fisa_params.fisa_fst_size = wlan_cfg_get_rx_flow_search_table_size(soc->wlan_cfg_ctx);
+		val->fisa_params.rx_flow_max_search =
+			wlan_cfg_rx_fst_get_max_search(soc->wlan_cfg_ctx);
+		val->fisa_params.rx_toeplitz_hash_key =
+			wlan_cfg_rx_fst_get_hash_key(soc->wlan_cfg_ctx);
+		break;
+	case CDP_RX_PKT_TLV_SIZE:
+		val->rx_pkt_tlv_size = soc->rx_pkt_tlv_size;
+		break;
 	default:
 		dp_warn("Invalid param: %u", param);
 		break;

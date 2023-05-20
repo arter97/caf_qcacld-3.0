@@ -1466,6 +1466,10 @@ enum cdp_pdev_param_type {
  * @cdp_rxdma_buf_ring_size: RXDMA buf ring size config
  * @mac_addr: vdev mac address
  * @new_vdev_id: New vdev id to which MLD peer is to be moved
+ * @fisa_params.fisa_fst_size: FISA table size
+ * @fisa_params.rx_flow_max_search: max FST entries
+ * @fisa_params.rx_toeplitz_hash_key: RX hash key
+ * @rx_pkt_tlv_size: RX packet TLV size
  */
 typedef union cdp_config_param_t {
 	/* peer params */
@@ -1571,6 +1575,12 @@ typedef union cdp_config_param_t {
 
 	uint8_t mac_addr[QDF_MAC_ADDR_SIZE];
 	uint8_t new_vdev_id;
+	struct {
+		uint32_t fisa_fst_size;
+		uint16_t rx_flow_max_search;
+		uint8_t *rx_toeplitz_hash_key;
+	} fisa_params;
+	uint16_t rx_pkt_tlv_size;
 } cdp_config_param_type;
 
 /**
@@ -1738,6 +1748,8 @@ enum cdp_vdev_param_type {
  * @CDP_CFG_REO_DST_RING_SIZE: REO destination ring size config
  * @CDP_CFG_RXDMA_REFILL_RING_SIZE: RXDMA refill ring size config
  * @CDP_CFG_RX_REFILL_POOL_NUM: RX refill pool size config param
+ * @CDP_CFG_FISA_PARAMS: FISA params
+ * @CDP_RX_PKT_TLV_SIZE: RX pkt tlv size
  */
 enum cdp_psoc_param_type {
 	CDP_ENABLE_RATE_STATS,
@@ -1762,6 +1774,8 @@ enum cdp_psoc_param_type {
 #ifdef WLAN_FEATURE_RX_PREALLOC_BUFFER_POOL
 	CDP_CFG_RX_REFILL_POOL_NUM,
 #endif
+	CDP_CFG_FISA_PARAMS,
+	CDP_RX_PKT_TLV_SIZE,
 };
 
 #ifdef CONFIG_AP_PLATFORM
