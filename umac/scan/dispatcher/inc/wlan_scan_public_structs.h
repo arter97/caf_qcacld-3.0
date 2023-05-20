@@ -548,6 +548,20 @@ struct ml_info {
 	struct partner_link_info link_info[MLD_MAX_LINKS - 1];
 	uint16_t ml_bss_score;
 };
+
+/**
+ * enum number_of_partner_link: Enumeration for number of partner links
+ * @NO_LINK:    Default value
+ * @ONE_LINK:   Single Link
+ * @TWO_LINK:   2 Links
+ * @THREE_LINK: 3 Links
+ */
+enum number_of_partner_link {
+	NO_LINK,
+	ONE_LINK,
+	TWO_LINK,
+	THREE_LINK,
+};
 #endif
 
 /**
