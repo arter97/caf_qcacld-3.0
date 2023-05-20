@@ -376,10 +376,22 @@ wlan_mlo_roam_abort_on_link(struct wlan_objmgr_psoc *psoc,
  * This api will check if all the requested links are  in CM connected
  * state.
  *
- * Return: QDF_STATUS
+ * Return: bool, true: all links of mld connected
  */
 bool
 mlo_check_if_all_links_up(struct wlan_objmgr_vdev *vdev);
+
+/**
+ * mlo_check_if_all_vdev_up - Check if all vdev are up
+ * @vdev: vdev pointer
+ *
+ * This api will check if all the requested vdev are  in up
+ * state.
+ *
+ * Return: bool, true: all assoc/link vdevs of mld in UP state
+ */
+bool
+mlo_check_if_all_vdev_up(struct wlan_objmgr_vdev *vdev);
 
 /**
  * mlo_roam_set_link_id - set link id post roaming
@@ -408,6 +420,21 @@ mlo_roam_set_link_id(struct wlan_objmgr_vdev *vdev,
 bool
 mlo_is_roaming_in_progress(struct wlan_objmgr_psoc *psoc,
 			   uint8_t vdev_id);
+
+/**
+ * mlo_add_all_link_probe_rsp_to_scan_db - Extract and add all ML link probe
+ * rsps to scan db
+ * @psoc: psoc pointer
+ * @rcvd_frame: Received frame from firmware
+ *
+ * This api will be called to generate ML probe responses corresponds to each
+ * link from the received probe response and add them to scan db
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+mlo_add_all_link_probe_rsp_to_scan_db(struct wlan_objmgr_psoc *psoc,
+			      struct roam_scan_candidate_frame *rcvd_frame);
 #else /* WLAN_FEATURE_11BE_MLO */
 #ifdef WLAN_FEATURE_ROAM_OFFLOAD
 static inline
@@ -519,6 +546,12 @@ mlo_roam_get_bssid_chan_for_link(uint8_t vdev_id,
 
 static inline bool
 mlo_check_if_all_links_up(struct wlan_objmgr_vdev *vdev)
+{
+	return false;
+}
+
+static inline bool
+mlo_check_if_all_vdev_up(struct wlan_objmgr_vdev *vdev)
 {
 	return false;
 }

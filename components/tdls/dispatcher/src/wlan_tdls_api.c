@@ -96,7 +96,7 @@ static void  wlan_tdls_teardown_links_sync(struct wlan_objmgr_psoc *psoc,
 	struct wlan_objmgr_vdev *tdls_vdev;
 
 	tdls_vdev = tdls_get_vdev(psoc, WLAN_TDLS_NB_ID);
-	if (!vdev)
+	if (!tdls_vdev)
 		return;
 
 	vdev_priv_obj = wlan_vdev_get_tdls_vdev_obj(tdls_vdev);
@@ -193,6 +193,7 @@ void wlan_tdls_notify_channel_switch_complete(struct wlan_objmgr_psoc *psoc,
 		goto exit;
 	}
 
+	tdls_debug("CSA complete");
 	/*
 	 * Channel Switch can cause SCC -> MCC switch on
 	 * STA vdev. Disable TDLS if CSA causes STA vdev to be in MCC with
@@ -261,13 +262,14 @@ wlan_tdls_post_set_off_channel_mode(struct wlan_objmgr_psoc *psoc,
 void wlan_tdls_notify_channel_switch_start(struct wlan_objmgr_psoc *psoc,
 					   struct wlan_objmgr_vdev *vdev)
 {
+	tdls_debug("Send Channel Switch start to TDLS module");
 	wlan_tdls_post_set_off_channel_mode(psoc, DISABLE_ACTIVE_CHANSWITCH);
 }
 
 void wlan_tdls_handle_p2p_client_connect(struct wlan_objmgr_psoc *psoc,
 					 struct wlan_objmgr_vdev *vdev)
 {
-	if (policy_mgr_get_connection_count(psoc) < 2)
+	if (!policy_mgr_get_connection_count(psoc))
 		return;
 
 	/*
@@ -292,6 +294,11 @@ void wlan_tdls_notify_start_bss(struct wlan_objmgr_psoc *psoc,
 	}
 
 	wlan_tdls_check_and_teardown_links_sync(psoc, vdev);
+}
+
+void wlan_tdls_notify_start_bss_failure(struct wlan_objmgr_psoc *psoc)
+{
+	tdls_notify_decrement_session(psoc);
 }
 
 static QDF_STATUS tdls_notify_flush_cb(struct scheduler_msg *msg)

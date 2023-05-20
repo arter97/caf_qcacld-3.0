@@ -334,6 +334,21 @@ int wlan_hdd_cfg80211_stats_ext_request(struct wiphy *wiphy,
 #endif /* End of WLAN_FEATURE_STATS_EXT */
 
 /**
+ * wlan_hdd_cfg80211_connected_chan_stats_req() - get currently connected
+ * channel statistics from driver/firmware
+ * @wiphy: Pointer to wiphy
+ * @wdev: Pointer to wdev
+ * @data: Pointer to data
+ * @data_len: Data length
+ *
+ * Return: int
+ */
+int wlan_hdd_cfg80211_connected_chan_stats_req(struct wiphy *wiphy,
+					       struct wireless_dev *wdev,
+					       const void *data,
+					       int data_len);
+
+/**
  * wlan_hdd_cfg80211_get_station() - get station statistics
  * @wiphy: Pointer to wiphy
  * @dev: Pointer to network device

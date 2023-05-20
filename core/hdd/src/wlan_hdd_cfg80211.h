@@ -1062,6 +1062,27 @@ struct wlan_objmgr_vdev *wlan_key_get_link_vdev(struct hdd_adapter *adapter,
 void wlan_key_put_link_vdev(struct wlan_objmgr_vdev *link_vdev,
 			    wlan_objmgr_ref_dbgid id);
 
+#if defined(WLAN_FEATURE_11BE_MLO) && defined(WLAN_TID_LINK_MAP_SUPPORT)
+/**
+ * hdd_mlo_dev_t2lm_notify_link_update() - Send update T2LM info event
+ * @vdev: Pointer to vdev
+ * @t2lm: T2LM info
+ *
+ * Send update T2LM info event to userspace
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS hdd_mlo_dev_t2lm_notify_link_update(struct wlan_objmgr_vdev *vdev,
+					       struct wlan_t2lm_info *t2lm);
+#else
+static inline
+QDF_STATUS hdd_mlo_dev_t2lm_notify_link_update(struct wlan_objmgr_vdev *vdev,
+					       struct wlan_t2lm_info *t2lm)
+{
+	return QDF_STATUS_SUCCESS;
+}
+#endif
+
 #if defined(WLAN_FEATURE_11BE_MLO) && \
 	defined(CFG80211_SINGLE_NETDEV_MULTI_LINK_SUPPORT)
 /**

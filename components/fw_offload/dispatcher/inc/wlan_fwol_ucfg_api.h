@@ -762,6 +762,20 @@ QDF_STATUS ucfg_fwol_configure_global_params(struct wlan_objmgr_psoc *psoc,
 					     struct wlan_objmgr_pdev *pdev);
 
 /**
+ * ucfg_fwol_set_ilp_config - API to configure Interface Low Power (ILP)
+ * @psoc: pointer to psoc object
+ * @pdev: pointer to pdev object
+ * @enable: enable
+ *
+ * This API is used to enable/disable Interface Low Power (IPL) feature.
+ *
+ * Return: QDF Status
+ */
+QDF_STATUS ucfg_fwol_set_ilp_config(struct wlan_objmgr_psoc *psoc,
+				    struct wlan_objmgr_pdev *pdev,
+				    uint32_t enable);
+
+/**
  * ucfg_fwol_configure_vdev_params - API to configure vdev specific params
  * @psoc: pointer to psoc object
  * @vdev: pointer to vdev object

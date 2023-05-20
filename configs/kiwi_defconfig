@@ -5,14 +5,6 @@ include $(WLAN_ROOT)/configs/default_defconfig
 #Enable 11BE EHT
 CONFIG_WLAN_FEATURE_11BE := y
 
-#Enable IPA Optional wifi datapath feature
-ifeq (y,$(findstring y,$(CONFIG_ARCH_PINEAPPLE) $(CONFIG_ARCH_KALAMA)))
-CONFIG_IPA_OPT_WIFI_DP := n
-CONFIG_IPA_OFFLOAD := n
-CONFIG_ENABLE_SMMU_S1_TRANSLATION := n
-CONFIG_SMMU_S1_UNMAP := n
-endif
-
 # Enable EHT rate sysfs entry
 ifeq ($(CONFIG_WLAN_SYSFS), y)
 CONFIG_WLAN_SYSFS_EHT_RATE := y

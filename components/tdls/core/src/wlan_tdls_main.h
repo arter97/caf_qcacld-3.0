@@ -167,7 +167,6 @@ struct tdls_set_state_info {
  * @tdls_external_peer_count: external tdls peer count
  * @tdls_nss_switch_in_progress: tdls antenna switch in progress
  * @tdls_nss_teardown_complete: tdls tear down complete
- * @tdls_disable_in_progress: tdls is disable in progress
  * @tdls_nss_transition_mode: tdls nss transition mode
  * @tdls_teardown_peers_cnt: tdls tear down peer count
  * @set_state_info: set tdls state info
@@ -223,7 +222,6 @@ struct tdls_soc_priv_obj {
 	uint8_t tdls_external_peer_count;
 	bool tdls_nss_switch_in_progress;
 	bool tdls_nss_teardown_complete;
-	bool tdls_disable_in_progress;
 	enum tdls_nss_transition_state tdls_nss_transition_mode;
 	int32_t tdls_teardown_peers_cnt;
 	struct tdls_set_state_info set_state_info;
@@ -828,31 +826,20 @@ void tdls_scan_done_callback(struct tdls_soc_priv_obj *tdls_soc);
 void tdls_scan_serialization_comp_info_cb(struct wlan_objmgr_vdev *vdev,
 		union wlan_serialization_rules_info *comp_info,
 		struct wlan_serialization_command *cmd);
-
 /**
- * tdls_set_offchan_mode() - update tdls status info
- * @psoc: soc object
- * @param: channel switch params
- *
- * send message to WMI to set TDLS off channel in f/w
- *
- * Return: QDF_STATUS.
- */
-QDF_STATUS tdls_set_offchan_mode(struct wlan_objmgr_psoc *psoc,
-				     struct tdls_channel_switch_params *param);
-
-/**
- * tdls_delete_all_peers_indication() - update tdls status info
+ * tdls_check_and_indicate_delete_all_peers() - Check if delete all peers is
+ * allowed for the vdev based on current concurrency.
  * @psoc: soc object
  * @vdev_id: vdev id
  *
- * Notify tdls component to cleanup all peers
+ * Notify tdls component to cleanup all peers based on current concurrency
+ * combination.
  *
- * Return: QDF_STATUS.
+ * Return: QDF_STATUS
  */
-
-QDF_STATUS tdls_delete_all_peers_indication(struct wlan_objmgr_psoc *psoc,
-					    uint8_t vdev_id);
+QDF_STATUS
+tdls_check_and_indicate_delete_all_peers(struct wlan_objmgr_psoc *psoc,
+					 uint8_t vdev_id);
 
 /**
  * tdls_get_opclass_from_bandwidth() - Return opclass for corresponding BW and

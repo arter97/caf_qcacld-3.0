@@ -688,6 +688,7 @@ struct wireless_dev *__wlan_hdd_add_virtual_intf(struct wiphy *wiphy,
 	struct wlan_objmgr_vdev *vdev;
 	int ret;
 	struct hdd_adapter_create_param create_params = {0};
+	uint8_t *device_address = NULL;
 
 	hdd_enter();
 
@@ -751,7 +752,8 @@ struct wireless_dev *__wlan_hdd_add_virtual_intf(struct wiphy *wiphy,
 
 	adapter = NULL;
 	if (type == NL80211_IFTYPE_MONITOR) {
-		if (ucfg_mlme_is_sta_mon_conc_supported(hdd_ctx->psoc) ||
+		if (ucfg_dp_is_local_pkt_capture_enabled(hdd_ctx->psoc) ||
+		    ucfg_mlme_is_sta_mon_conc_supported(hdd_ctx->psoc) ||
 		    ucfg_pkt_capture_get_mode(hdd_ctx->psoc) !=
 						PACKET_CAPTURE_MODE_DISABLE) {
 			ret = wlan_hdd_add_monitor_check(hdd_ctx,
@@ -786,7 +788,6 @@ struct wireless_dev *__wlan_hdd_add_virtual_intf(struct wiphy *wiphy,
 					   name_assign_type, true,
 					   &create_params);
 	} else {
-		uint8_t *device_address;
 		if (strnstr(name, "p2p", 3) && mode == QDF_STA_MODE) {
 			hdd_debug("change mode to p2p device");
 			mode = QDF_P2P_DEVICE_MODE;
@@ -829,6 +830,8 @@ struct wireless_dev *__wlan_hdd_add_virtual_intf(struct wiphy *wiphy,
 	return adapter->dev->ieee80211_ptr;
 
 close_adapter:
+	if (device_address)
+		wlan_hdd_release_intf_addr(hdd_ctx, device_address);
 	hdd_close_adapter(hdd_ctx, adapter, true);
 
 	return ERR_PTR(-EINVAL);

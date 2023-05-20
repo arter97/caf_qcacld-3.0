@@ -1009,6 +1009,55 @@ static void tgt_mc_cp_stats_extract_vdev_chain_rssi_stats(
 	}
 }
 
+static void
+tgt_mc_cp_stats_extract_vdev_extd_stats(struct wlan_objmgr_psoc *psoc,
+					struct stats_event *ev)
+{
+	uint8_t i, vdev_id;
+	QDF_STATUS status;
+	struct request_info last_req = {0};
+	struct wlan_objmgr_vdev *vdev;
+	struct vdev_mc_cp_stats *vdev_mc_stats;
+	struct vdev_cp_stats *vdev_cp_stats_priv;
+
+	if (!ev->vdev_extd_stats)
+		return;
+
+	status = ucfg_mc_cp_stats_get_pending_req(psoc, TYPE_STATION_STATS,
+						  &last_req);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		cp_stats_err("ucfg_mc_cp_stats_get_pending_req failed");
+		return;
+	}
+
+	for (i = 0; i < ev->num_vdev_extd_stats; i++) {
+		vdev_id = ev->vdev_extd_stats[i].vdev_id;
+
+		vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, vdev_id,
+							    WLAN_CP_STATS_ID);
+		if (!vdev) {
+			cp_stats_err("vdev is null");
+			return;
+		}
+
+		vdev_cp_stats_priv = wlan_cp_stats_get_vdev_stats_obj(vdev);
+		if (!vdev_cp_stats_priv) {
+			cp_stats_err("vdev cp stats object is null");
+			wlan_objmgr_vdev_release_ref(vdev, WLAN_CP_STATS_ID);
+			return;
+		}
+
+		wlan_cp_stats_vdev_obj_lock(vdev_cp_stats_priv);
+		vdev_mc_stats = vdev_cp_stats_priv->vdev_stats;
+		qdf_mem_copy(&vdev_mc_stats->vdev_extd_stats,
+			     &ev->vdev_extd_stats[i],
+			     sizeof(vdev_mc_stats->vdev_extd_stats));
+
+		wlan_cp_stats_vdev_obj_unlock(vdev_cp_stats_priv);
+		wlan_objmgr_vdev_release_ref(vdev, WLAN_CP_STATS_ID);
+	}
+}
+
 static QDF_STATUS
 tgt_send_vdev_mc_cp_stats(struct wlan_objmgr_psoc *psoc,
 			  struct stats_event *ev,
@@ -1046,6 +1095,11 @@ tgt_send_vdev_mc_cp_stats(struct wlan_objmgr_psoc *psoc,
 	ev->tx_rate_flags = vdev_mc_stats->tx_rate_flags;
 
 	ev->bcn_protect_stats = vdev_mc_stats->pmf_bcn_stats;
+
+	qdf_mem_copy(&ev->vdev_extd_stats[0],
+		     &vdev_mc_stats->vdev_extd_stats,
+		     sizeof(vdev_mc_stats->vdev_extd_stats));
+
 	wlan_cp_stats_vdev_obj_unlock(vdev_cp_stats_priv);
 	wlan_objmgr_vdev_release_ref(vdev, WLAN_CP_STATS_ID);
 
@@ -1171,10 +1225,15 @@ tgt_mc_cp_stats_send_raw_station_stats(struct wlan_objmgr_psoc *psoc,
 
 	info.num_summary_stats = 1;
 	info.num_chain_rssi_stats = 1;
+	info.num_vdev_extd_stats = 1;
 	info.vdev_summary_stats = qdf_mem_malloc(
 					sizeof(*info.vdev_summary_stats));
 	info.vdev_chain_rssi = qdf_mem_malloc(sizeof(*info.vdev_chain_rssi));
-	if (!info.vdev_summary_stats || !info.vdev_chain_rssi)
+
+	info.vdev_extd_stats = qdf_mem_malloc(sizeof(*info.vdev_extd_stats));
+
+	if (!info.vdev_summary_stats || !info.vdev_chain_rssi ||
+	    !info.vdev_extd_stats)
 		goto end;
 
 	status = tgt_send_vdev_mc_cp_stats(psoc, &info, last_req);
@@ -1263,6 +1322,7 @@ static void tgt_mc_cp_stats_extract_station_stats(
 	tgt_mc_cp_stats_extract_vdev_summary_stats(psoc, ev);
 	tgt_mc_cp_stats_extract_vdev_chain_rssi_stats(psoc, ev);
 	tgt_mc_cp_stats_extract_pmf_bcn_stats(psoc, ev);
+	tgt_mc_cp_stats_extract_vdev_extd_stats(psoc, ev);
 
 	/*
 	 * PEER stats are the last stats sent for get_station statistics.

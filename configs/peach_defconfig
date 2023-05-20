@@ -276,9 +276,6 @@ CONFIG_WLAN_SYSFS := y
 
 CONFIG_THERMAL_STATS_SUPPORT := y
 
-#Flag to enable pre cac feature
-CONFIG_FEATURE_WLAN_PRE_CAC := y
-
 ifeq ($(CONFIG_WLAN_SYSFS), y)
 	CONFIG_WLAN_SYSFS_STA_INFO := y
 	CONFIG_WLAN_SYSFS_CHANNEL := y
@@ -331,6 +328,9 @@ CONFIG_WLAN_FEATURE_MEDIUM_ASSESS := y
 
 CONFIG_QCACLD_FEATURE_GREEN_AP := y
 
+#Flag to enable pre cac feature
+CONFIG_FEATURE_WLAN_PRE_CAC := y
+
 #Flag to enable Android Packet Filtering
 CONFIG_QCACLD_FEATURE_APF := y
 
@@ -370,8 +370,6 @@ ifneq ($(CONFIG_QCA_CLD_WLAN),)
 	ifeq (y,$(findstring y,$(CONFIG_CNSS) $(CONFIG_CNSS_MODULE) $(CONFIG_CNSS2) \
 			$(CONFIG_CNSS2_MODULE) $(CONFIG_ICNSS) $(CONFIG_ICNSS_MODULE) \
 			$(CONFIG_ICNSS2) $(CONFIG_ICNSS2_MODULE)))
-	#Flag to enable Protected Management Frames (11w) feature
-	CONFIG_WLAN_FEATURE_11W := y
 	#Flag to enable LTE CoEx feature
 	CONFIG_QCOM_LTE_COEX := y
 	ifneq ($(CONFIG_MOBILE_ROUTER), y)
@@ -466,13 +464,11 @@ ifeq ($(CONFIG_WLAN_DEBUGFS), y)
        CONFIG_WLAN_FEATURE_MIB_STATS := y
 endif
 
-# Feature flags which are not (currently) configurable via Kconfig
-
 #Whether to build debug version
-BUILD_DEBUG_VERSION := y
+CONFIG_WLAN_DEBUG_VERSION := y
 
 #Enable this flag to build driver in diag version
-BUILD_DIAG_VERSION := y
+CONFIG_WLAN_DIAG_VERSION := y
 
 ifeq ($(CONFIG_SLUB_DEBUG), y)
 	PANIC_ON_BUG := y

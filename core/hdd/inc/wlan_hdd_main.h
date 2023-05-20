@@ -60,7 +60,7 @@
 #include <wlan_hdd_cfg.h>
 #include <linux/spinlock.h>
 #include <ani_system_defs.h>
-#if defined(WLAN_OPEN_SOURCE) && defined(CONFIG_HAS_WAKELOCK)
+#if defined(CONFIG_HAS_WAKELOCK)
 #include <linux/wakelock.h>
 #endif
 #ifdef WLAN_FEATURE_TSF_PTP
@@ -909,6 +909,7 @@ struct hdd_chan_change_params {
  * @wow_unit_test: wow unit test mode context to prevent/allow runtime pm
  * @system_suspend: system suspend context to prevent/allow runtime pm
  * @dyn_mac_addr_update: update mac addr context to prevent/allow runtime pm
+ * @vdev_destroy: vdev destroy context to prevent/allow runtime pm
  *
  * Runtime PM control for underlying activities
  */
@@ -921,6 +922,7 @@ struct hdd_runtime_pm_context {
 	qdf_runtime_lock_t wow_unit_test;
 	qdf_runtime_lock_t system_suspend;
 	qdf_runtime_lock_t dyn_mac_addr_update;
+	qdf_runtime_lock_t vdev_destroy;
 };
 
 /*
@@ -1015,6 +1017,7 @@ enum udp_qos_upgrade {
  * @snr: SNR measured from @rssi
  * @rssi_on_disconnect: Rssi at disconnection time in STA mode
  * @rssi_send: Notify RSSI over lpass
+ * @is_mlo_vdev_active: is the mlo vdev currently active
  */
 struct wlan_hdd_link_info {
 	uint8_t vdev_id;
@@ -1033,6 +1036,17 @@ struct wlan_hdd_link_info {
 #ifdef WLAN_FEATURE_LPSS
 	bool rssi_send;
 #endif
+	bool is_mlo_vdev_active;
+};
+
+/**
+ * struct wlan_hdd_tx_power - Structure to store connection tx power info
+ * @tx_pwr: connection tx power sent by firmware
+ * @tx_pwr_cached_timestamp: timestamp when tx_pwr is cached into adapter
+ */
+struct wlan_hdd_tx_power {
+	int tx_pwr;
+	uint32_t tx_pwr_cached_timestamp;
 };
 
 /**
@@ -1159,7 +1173,7 @@ struct wlan_hdd_link_info {
  * @is_dbam_configured:
  * @deflink: Default link pointing to the 0th index of the linkinfo array
  * @link_info: Data structure to hold link specific information
- * @tx_pwr: connection tx power sent by firmware
+ * @tx_power: Structure to hold connection tx Power info
  */
 struct hdd_adapter {
 	uint32_t magic;
@@ -1353,7 +1367,7 @@ struct hdd_adapter {
 #endif
 	struct wlan_hdd_link_info *deflink;
 	struct wlan_hdd_link_info link_info[WLAN_MAX_MLD];
-	int tx_pwr;
+	struct wlan_hdd_tx_power tx_power;
 };
 
 #define WLAN_HDD_GET_STATION_CTX_PTR(adapter) \
@@ -1888,6 +1902,7 @@ enum wlan_state_ctrl_str_id {
  * @dbam_mode:
  * @last_pagefault_ssr_time: Time when last recovery was triggered because of
  * @host wakeup from fw with reason as pagefault
+ * @bridgeaddr: Bridge MAC address
  */
 struct hdd_context {
 	struct wlan_objmgr_psoc *psoc;
@@ -1919,7 +1934,7 @@ struct hdd_context {
 	struct completion mc_sus_event_var;
 	bool is_scheduler_suspended;
 
-#ifdef QCA_CONFIG_SMP
+#ifdef WLAN_DP_LEGACY_OL_RX_THREAD
 	bool is_ol_rx_thread_suspended;
 #endif
 
@@ -2163,6 +2178,7 @@ struct hdd_context {
 	enum coex_dbam_config_mode dbam_mode;
 #endif
 	qdf_time_t last_pagefault_ssr_time;
+	uint8_t bridgeaddr[QDF_MAC_ADDR_SIZE];
 };
 
 /**
@@ -2703,6 +2719,7 @@ int hdd_vdev_destroy(struct hdd_adapter *adapter);
 /**
  * hdd_vdev_ready() - Configure FW post VDEV create
  * @vdev: VDEV object.
+ * @bridgeaddr: Bridge MAC address
  *
  * The function is used send configuration to the FW
  * post VDEV creation.
@@ -2710,7 +2727,8 @@ int hdd_vdev_destroy(struct hdd_adapter *adapter);
  *
  * Return: 0 on success, negative value on failure.
  */
-int hdd_vdev_ready(struct wlan_objmgr_vdev *vdev);
+int hdd_vdev_ready(struct wlan_objmgr_vdev *vdev,
+		   struct qdf_mac_addr *bridgeaddr);
 
 QDF_STATUS hdd_init_station_mode(struct hdd_adapter *adapter);
 struct hdd_adapter *hdd_get_adapter(struct hdd_context *hdd_ctx,
@@ -3083,6 +3101,25 @@ static inline bool hdd_dynamic_mac_addr_supported(struct hdd_context *hdd_ctx)
 #endif
 
 /**
+ * hdd_adapter_get_link_info_ptr() - To get the pointer of link_info
+ * in adapter.
+ * @adapter: HDD adapter
+ * @link_idx: Index of link_info in @adapter.
+ *
+ * The API returns link_info in @adapter pointed at @link_idx in the array.
+ *
+ * Return: Pointer to wlan_hdd_link_info or NULL.
+ */
+static inline struct wlan_hdd_link_info *
+hdd_adapter_get_link_info_ptr(struct hdd_adapter *adapter, uint8_t link_idx)
+{
+	if (!adapter || (link_idx >= WLAN_MAX_MLD))
+		return NULL;
+
+	return &adapter->link_info[link_idx];
+}
+
+/**
  * hdd_start_vendor_acs(): Start vendor ACS procedure
  * @adapter: pointer to SAP adapter struct
  *
@@ -3181,10 +3218,10 @@ int hdd_update_acs_timer_reason(struct hdd_adapter *adapter, uint8_t reason);
  * Moves the SAP interface by invoking the function which
  * executes the callback to perform channel switch using (E)CSA.
  *
- * Return: None
+ * Return: QDF_STATUS
  */
-void hdd_switch_sap_channel(struct hdd_adapter *adapter, uint8_t channel,
-			    bool forced);
+QDF_STATUS hdd_switch_sap_channel(struct hdd_adapter *adapter, uint8_t channel,
+				  bool forced);
 
 /**
  * hdd_switch_sap_chan_freq() - Move SAP to the given channel
@@ -3204,15 +3241,16 @@ QDF_STATUS hdd_switch_sap_chan_freq(struct hdd_adapter *adapter,
 				    bool forced);
 
 #if defined(FEATURE_WLAN_CH_AVOID)
-void hdd_unsafe_channel_restart_sap(struct hdd_context *hdd_ctx);
+QDF_STATUS hdd_unsafe_channel_restart_sap(struct hdd_context *hdd_ctx);
 
 void hdd_ch_avoid_ind(struct hdd_context *hdd_ctxt,
 		      struct unsafe_ch_list *unsafe_chan_list,
 		      struct ch_avoid_ind_type *avoid_freq_list);
 #else
 static inline
-void hdd_unsafe_channel_restart_sap(struct hdd_context *hdd_ctx)
+QDF_STATUS hdd_unsafe_channel_restart_sap(struct hdd_context *hdd_ctx)
 {
+	return QDF_STATUS_SUCCESS;
 }
 
 static inline
@@ -3752,7 +3790,7 @@ static inline void hdd_enable_fastpath(struct hdd_context *hdd_ctx,
 void hdd_wlan_update_target_info(struct hdd_context *hdd_ctx, void *context);
 
 enum  sap_acs_dfs_mode wlan_hdd_get_dfs_mode(enum dfs_mode mode);
-void hdd_unsafe_channel_restart_sap(struct hdd_context *hdd_ctx);
+
 /**
  * hdd_clone_local_unsafe_chan() - clone hdd ctx unsafe chan list
  * @hdd_ctx: hdd context pointer

@@ -374,9 +374,9 @@ void hdd_dcs_register_cb(struct hdd_context *hdd_ctx)
 					  hdd_ctx);
 }
 
-void hdd_dcs_hostapd_set_chan(struct hdd_context *hdd_ctx,
-			      uint8_t vdev_id,
-			      qdf_freq_t dcs_ch_freq)
+QDF_STATUS hdd_dcs_hostapd_set_chan(struct hdd_context *hdd_ctx,
+				    uint8_t vdev_id,
+				    qdf_freq_t dcs_ch_freq)
 {
 	struct hdd_ap_ctx *ap_ctx;
 	QDF_STATUS status;
@@ -391,7 +391,7 @@ void hdd_dcs_hostapd_set_chan(struct hdd_context *hdd_ctx,
 
 	if (QDF_IS_STATUS_ERROR(status)) {
 		hdd_err("get mac id failed");
-		return;
+		return QDF_STATUS_E_INVAL;
 	}
 	count = policy_mgr_get_sap_go_count_on_mac(hdd_ctx->psoc, list, mac_id);
 
@@ -405,7 +405,7 @@ void hdd_dcs_hostapd_set_chan(struct hdd_context *hdd_ctx,
 		if (!adapter) {
 			hdd_err("vdev_id %u does not exist with host",
 				list[conn_index]);
-			return;
+			return QDF_STATUS_E_INVAL;
 		}
 
 		if (adapter->deflink->session.ap.operating_chan_freq !=
@@ -421,7 +421,7 @@ void hdd_dcs_hostapd_set_chan(struct hdd_context *hdd_ctx,
 		if (!adapter) {
 			hdd_err("vdev_id %u does not exist with host",
 				list[conn_index]);
-			return;
+			return QDF_STATUS_E_INVAL;
 		}
 
 		ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(adapter);
@@ -434,11 +434,14 @@ void hdd_dcs_hostapd_set_chan(struct hdd_context *hdd_ctx,
 			wlan_hdd_set_sap_csa_reason(hdd_ctx->psoc,
 						    adapter->deflink->vdev_id,
 						    CSA_REASON_DCS);
-			hdd_switch_sap_channel(adapter, dcs_ch, true);
-
-			return;
+			status = hdd_switch_sap_channel(adapter, dcs_ch, true);
+			if (status == QDF_STATUS_SUCCESS)
+				status = QDF_STATUS_E_PENDING;
+			return status;
 		}
 	}
+
+	return QDF_STATUS_SUCCESS;
 }
 
 /**

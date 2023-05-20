@@ -198,8 +198,6 @@ CONFIG_FEATURE_MSCS := y
 CONFIG_WLAN_FEATURE_FILS := y
 ifneq ($(CONFIG_QCA_CLD_WLAN),)
 	ifeq (y,$(findstring y,$(CONFIG_ICNSS2) $(CONFIG_ICNSS2_MODULE)))
-	#Flag to enable Protected Management Frames (11w) feature
-	CONFIG_WLAN_FEATURE_11W := y
 	#Flag to enable LTE CoEx feature
 	CONFIG_QCOM_LTE_COEX := y
 	ifneq ($(CONFIG_MOBILE_ROUTER), y)
@@ -365,13 +363,11 @@ ifeq ($(CONFIG_WLAN_DEBUGFS), y)
        CONFIG_WLAN_FEATURE_MIB_STATS := y
 endif
 
-# Feature flags which are not (currently) configurable via Kconfig
-
 #Whether to build debug version
-BUILD_DEBUG_VERSION := y
+CONFIG_WLAN_DEBUG_VERSION := y
 
 #Enable this flag to build driver in diag version
-BUILD_DIAG_VERSION := y
+CONFIG_WLAN_DIAG_VERSION := y
 
 ifeq ($(CONFIG_SLUB_DEBUG), y)
 	PANIC_ON_BUG := y
@@ -678,6 +674,8 @@ endif
 	CONFIG_QDF_NBUF_HISTORY_SIZE := 8192
 	CONFIG_DP_RX_REFILL_CPU_PERF_AFFINE_MASK := y
 	CONFIG_FEATURE_HIF_LATENCY_PROFILE_ENABLE := y
+	CONFIG_DP_TX_HW_DESC_HISTORY := y
+	CONFIG_WLAN_FEATURE_DP_TX_DESC_HISTORY := y
 
 ifneq ($(CONFIG_CNSS_EMULATION), y)
 	CONFIG_HIF_DETECTION_LATENCY_ENABLE := y

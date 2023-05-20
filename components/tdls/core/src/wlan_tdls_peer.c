@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2017-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -29,6 +29,7 @@
 #include <wlan_policy_mgr_api.h>
 #include "wlan_reg_ucfg_api.h"
 #include <host_diag_core_event.h>
+#include "wlan_policy_mgr_api.h"
 
 static uint8_t calculate_hash_key(const uint8_t *macaddr)
 {
@@ -574,6 +575,46 @@ static void tdls_get_wifi_hal_state(struct tdls_peer *peer, uint32_t *state,
 	}
 }
 
+#ifdef WLAN_FEATURE_TDLS_CONCURRENCIES
+/**
+ * tdls_get_allowed_off_channel_for_concurrency() - Get allowed off-channel
+ * frequency based on current concurrency. Return 0 if all frequencies are
+ * allowed
+ * @pdev: Pointer to PDEV object
+ * @vdev: Pointer to vdev object
+ *
+ * Return: Frequency
+ */
+static inline qdf_freq_t
+tdls_get_allowed_off_channel_for_concurrency(struct wlan_objmgr_pdev *pdev,
+					     struct wlan_objmgr_vdev *vdev)
+{
+	struct wlan_objmgr_psoc *psoc = wlan_pdev_get_psoc(pdev);
+	qdf_freq_t freq = 0;
+
+	if (!psoc)
+		return 0;
+
+	if (!wlan_psoc_nif_fw_ext2_cap_get(psoc,
+					   WLAN_TDLS_CONCURRENCIES_SUPPORT))
+		return 0;
+
+	if (!policy_mgr_get_allowed_tdls_offchannel_freq(psoc, vdev, &freq)) {
+		tdls_debug("off channel not allowed for current concurrency");
+		return 0;
+	}
+
+	return freq;
+}
+#else
+static inline qdf_freq_t
+tdls_get_allowed_off_channel_for_concurrency(struct wlan_objmgr_pdev *pdev,
+					     struct wlan_objmgr_vdev *vdev)
+{
+	return 0;
+}
+#endif
+
 /**
  * tdls_extract_peer_state_param() - extract peer update params from TDLS peer
  * @peer_param: output peer update params
@@ -592,7 +633,7 @@ void tdls_extract_peer_state_param(struct tdls_peer_update_state *peer_param,
 	enum channel_state ch_state;
 	struct wlan_objmgr_pdev *pdev;
 	uint32_t cur_band;
-	qdf_freq_t ch_freq;
+	qdf_freq_t ch_freq, allowed_freq;
 	uint32_t tx_power = 0;
 
 	vdev_obj = peer->vdev_priv;
@@ -654,8 +695,16 @@ void tdls_extract_peer_state_param(struct tdls_peer_update_state *peer_param,
 	}
 
 	num = 0;
+	allowed_freq =
+		tdls_get_allowed_off_channel_for_concurrency(pdev,
+							     vdev_obj->vdev);
+	tdls_debug("allowed freq:%u", allowed_freq);
+
 	for (i = 0; i < peer->supported_channels_len; i++) {
 		ch_freq = peer->supported_chan_freq[i];
+		if (allowed_freq && allowed_freq != ch_freq)
+			continue;
+
 		ch_state = wlan_reg_get_channel_state_for_pwrmode(
 							pdev, ch_freq,
 							REG_CURRENT_PWR_MODE);

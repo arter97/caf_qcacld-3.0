@@ -30,6 +30,7 @@
 #include "wlan_mlme_vdev_mgr_interface.h"
 #include <include/wlan_mlme_cmn.h>
 #include <wlan_cm_api.h>
+#include <utils_mlo.h>
 
 #ifdef WLAN_FEATURE_11BE_MLO
 static bool
@@ -98,6 +99,13 @@ mlo_cleanup_link(struct wlan_objmgr_vdev *vdev, uint8_t num_setup_links)
 	 */
 	if (wlan_vdev_mlme_is_mlo_link_vdev(vdev))
 		cm_cleanup_mlo_link(vdev);
+	/*
+	 * Clear the MLO vdev flag when roam to a non-MLO AP to prepare the
+	 * roam done indication to userspace in non-MLO format
+	 * i.e. without MLD/link info
+	 */
+	else if (wlan_vdev_mlme_is_mlo_vdev(vdev) && !num_setup_links)
+		wlan_vdev_mlme_clear_mlo_vdev(vdev);
 }
 
 static void
@@ -736,6 +744,40 @@ mlo_check_if_all_links_up(struct wlan_objmgr_vdev *vdev)
 	return false;
 }
 
+bool
+mlo_check_if_all_vdev_up(struct wlan_objmgr_vdev *vdev)
+{
+	struct wlan_mlo_dev_context *mlo_dev_ctx;
+	struct wlan_mlo_sta *sta_ctx;
+	uint8_t i;
+
+	if (!vdev || !vdev->mlo_dev_ctx) {
+		mlo_err("Vdev is null");
+		return false;
+	}
+
+	mlo_dev_ctx = vdev->mlo_dev_ctx;
+	sta_ctx = mlo_dev_ctx->sta_ctx;
+	for (i = 0; i < WLAN_UMAC_MLO_MAX_VDEVS; i++) {
+		if (!mlo_dev_ctx->wlan_vdev_list[i])
+			continue;
+
+		if (qdf_test_bit(i, sta_ctx->wlan_connected_links) &&
+		    !QDF_IS_STATUS_SUCCESS(wlan_vdev_is_up(mlo_dev_ctx->wlan_vdev_list[i]))) {
+			mlo_debug("Vdev id %d is not in connected state",
+				  wlan_vdev_get_id(mlo_dev_ctx->wlan_vdev_list[i]));
+			return false;
+		}
+	}
+
+	if (i == WLAN_UMAC_MLO_MAX_VDEVS) {
+		mlo_debug("all links are up");
+		return true;
+	}
+
+	return false;
+}
+
 void
 mlo_roam_set_link_id(struct wlan_objmgr_vdev *vdev,
 		     struct roam_offload_synch_ind *sync_ind)
@@ -1357,3 +1399,91 @@ end:
 	return is_roaming_in_progress;
 }
 
+QDF_STATUS
+mlo_add_all_link_probe_rsp_to_scan_db(struct wlan_objmgr_psoc *psoc,
+			struct roam_scan_candidate_frame *rcvd_frame)
+{
+	uint8_t *ml_ie, link_id, idx, ies_offset;
+	qdf_size_t ml_ie_total_len, gen_frame_len;
+	QDF_STATUS status;
+	struct mlo_partner_info ml_partner_info = {0};
+	struct element_info rcvd_probe_rsp, gen_probe_rsp = {0, NULL};
+	struct roam_scan_candidate_frame entry = {0};
+	struct qdf_mac_addr self_link_addr;
+	struct wlan_objmgr_vdev *vdev;
+
+	/* Add the received scan entry as it is */
+	wlan_cm_add_frame_to_scan_db(psoc, rcvd_frame);
+
+	ies_offset = WLAN_MAC_HDR_LEN_3A + WLAN_PROBE_RESP_IES_OFFSET;
+	if (rcvd_frame->frame_length < ies_offset) {
+		mlme_err("No IEs in probe rsp");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	status = util_find_mlie(rcvd_frame->frame + ies_offset,
+				rcvd_frame->frame_length - ies_offset,
+				&ml_ie, &ml_ie_total_len);
+	if (QDF_IS_STATUS_ERROR(status))
+		return QDF_STATUS_SUCCESS;
+
+	status = util_get_bvmlie_persta_partner_info(ml_ie,
+						     ml_ie_total_len,
+						     &ml_partner_info);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		mlme_err("Per STA profile parsing failed");
+		return status;
+	}
+
+	gen_frame_len = MAX_MGMT_MPDU_LEN;
+
+	gen_probe_rsp.ptr = qdf_mem_malloc(gen_frame_len);
+	if (!gen_probe_rsp.ptr)
+		return QDF_STATUS_E_NOMEM;
+
+	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, rcvd_frame->vdev_id,
+						    WLAN_MLME_CM_ID);
+	if (!vdev) {
+		mlme_err("vdev object is NULL");
+		status = QDF_STATUS_E_NULL_VALUE;
+		goto done;
+	}
+	qdf_mem_copy(self_link_addr.bytes,
+		     wlan_vdev_mlme_get_macaddr(vdev),
+		     QDF_MAC_ADDR_SIZE);
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_CM_ID);
+
+	rcvd_probe_rsp.ptr = rcvd_frame->frame + WLAN_MAC_HDR_LEN_3A;
+	rcvd_probe_rsp.len = rcvd_frame->frame_length - WLAN_MAC_HDR_LEN_3A;
+
+	for (idx = 0; idx < ml_partner_info.num_partner_links; idx++) {
+		link_id = ml_partner_info.partner_link_info[idx].link_id;
+		status = util_gen_link_probe_rsp(rcvd_probe_rsp.ptr,
+				rcvd_probe_rsp.len,
+				link_id,
+				self_link_addr,
+				gen_probe_rsp.ptr,
+				gen_frame_len,
+				(qdf_size_t *)&gen_probe_rsp.len);
+		if (QDF_IS_STATUS_ERROR(status)) {
+			mlme_err("MLO: Link %d probe resp gen failed %d",
+				 link_id, status);
+			status = QDF_STATUS_E_FAILURE;
+			goto done;
+		}
+
+		mlme_debug("MLO: link probe rsp size:%u orig probe rsp :%u",
+			   gen_probe_rsp.len, rcvd_probe_rsp.len);
+
+		entry.vdev_id = rcvd_frame->vdev_id;
+		entry.frame = gen_probe_rsp.ptr;
+		entry.frame_length = gen_probe_rsp.len;
+		entry.rssi = rcvd_frame->rssi;
+
+		wlan_cm_add_frame_to_scan_db(psoc, &entry);
+	}
+done:
+	qdf_mem_free(gen_probe_rsp.ptr);
+
+	return status;
+}

@@ -270,7 +270,13 @@ static int copy_station_stats_to_adapter(struct hdd_adapter *adapter,
 			stats->peer_adv_stats->rx_bytes;
 	adapter->hdd_stats.peer_stats.fcs_count =
 			stats->peer_adv_stats->fcs_count;
-	adapter->tx_pwr = stats->pdev_stats->max_pwr;
+	adapter->tx_power.tx_pwr = stats->pdev_stats->max_pwr;
+	adapter->tx_power.tx_pwr_cached_timestamp =
+			qdf_system_ticks_to_msecs(qdf_system_ticks());
+	/* Copy vdev status info sent by FW */
+	if (stats->vdev_extd_stats)
+		adapter->deflink->is_mlo_vdev_active =
+			stats->vdev_extd_stats[0].is_mlo_vdev_active;
 
 	dynamic_cfg = mlme_get_dynamic_vdev_config(vdev);
 	if (!dynamic_cfg) {
@@ -761,7 +767,7 @@ static bool put_wifi_iface_stats(struct wifi_interface_stats *if_stat,
 
 	if (nla_put_u32(vendor_event,
 			QCA_WLAN_VENDOR_ATTR_LL_STATS_TYPE,
-			QCA_WLAN_VENDOR_ATTR_LL_STATS_TYPE_IFACE) ||
+			QCA_NL80211_VENDOR_SUBCMD_LL_STATS_TYPE_IFACE) ||
 	    nla_put_u32(vendor_event,
 			QCA_WLAN_VENDOR_ATTR_LL_STATS_IFACE_NUM_PEERS,
 			num_peers) ||
@@ -977,7 +983,7 @@ static void hdd_link_layer_process_peer_stats(struct hdd_adapter *adapter,
 
 	if (nla_put_u32(skb,
 			QCA_WLAN_VENDOR_ATTR_LL_STATS_TYPE,
-			QCA_WLAN_VENDOR_ATTR_LL_STATS_TYPE_PEER) ||
+			QCA_NL80211_VENDOR_SUBCMD_LL_STATS_TYPE_PEERS) ||
 	    nla_put_u32(skb,
 			QCA_WLAN_VENDOR_ATTR_LL_STATS_RESULTS_MORE_DATA,
 			more_data) ||
@@ -1311,7 +1317,7 @@ static void hdd_llstats_post_radio_stats(struct hdd_adapter *adapter,
 
 	if (nla_put_u32(vendor_event,
 			QCA_WLAN_VENDOR_ATTR_LL_STATS_TYPE,
-			QCA_WLAN_VENDOR_ATTR_LL_STATS_TYPE_RADIO) ||
+			QCA_NL80211_VENDOR_SUBCMD_LL_STATS_TYPE_RADIO) ||
 	    nla_put_u32(vendor_event,
 			QCA_WLAN_VENDOR_ATTR_LL_STATS_RESULTS_MORE_DATA,
 			more_data) ||
@@ -3940,6 +3946,64 @@ static QDF_STATUS wlan_hdd_stats_request_needed(struct hdd_adapter *adapter)
 }
 #endif /* WLAN_FEATURE_LINK_LAYER_STATS */
 
+/**
+ * __wlan_hdd_cfg80211_connected_chan_stats_request() - stats request for
+ * currently connected channel
+ * @wiphy: Pointer to wiphy
+ * @wdev: Pointer to wdev
+ * @data: Pointer to data
+ * @data_len: Data length
+ *
+ * Return: int
+ */
+static int
+__wlan_hdd_cfg80211_connected_chan_stats_request(struct wiphy *wiphy,
+						 struct wireless_dev *wdev,
+						 const void *data,
+						 int data_len)
+{
+	struct net_device *dev = wdev->netdev;
+	struct hdd_adapter *adapter = WLAN_HDD_GET_PRIV_PTR(dev);
+	struct hdd_context *hdd_ctx = wiphy_priv(wiphy);
+	bool is_vdev_connected;
+	enum QDF_OPMODE mode;
+	QDF_STATUS status;
+
+	is_vdev_connected = hdd_cm_is_vdev_connected(adapter);
+	mode = adapter->device_mode;
+
+	if (mode != QDF_STA_MODE || !is_vdev_connected) {
+		hdd_debug("vdev %d: reject chan stats req, mode:%d, conn:%d",
+			  adapter->deflink->vdev_id, mode, is_vdev_connected);
+		return -EPERM;
+	}
+
+	status = ucfg_mlme_connected_chan_stats_request(hdd_ctx->psoc,
+					adapter->deflink->vdev_id);
+	return qdf_status_to_os_return(status);
+}
+
+int wlan_hdd_cfg80211_connected_chan_stats_req(struct wiphy *wiphy,
+					       struct wireless_dev *wdev,
+					       const void *data,
+					       int data_len)
+{
+	int errno;
+	struct osif_vdev_sync *vdev_sync;
+
+	errno = osif_vdev_sync_op_start(wdev->netdev, &vdev_sync);
+	if (errno)
+		return errno;
+
+	errno = __wlan_hdd_cfg80211_connected_chan_stats_request(wiphy, wdev,
+								 data,
+								 data_len);
+
+	osif_vdev_sync_op_stop(vdev_sync);
+
+	return errno;
+}
+
 #ifdef WLAN_FEATURE_STATS_EXT
 /**
  * __wlan_hdd_cfg80211_stats_ext_request() - ext stats request
@@ -6212,77 +6276,12 @@ static inline void wlan_hdd_mlo_update_stats_info(struct hdd_adapter *adapter)
 }
 #endif
 
-/**
- * wlan_hdd_get_sta_stats() - get aggregate STA stats
- * @wiphy: wireless phy
- * @adapter: STA adapter to get stats for
- * @mac: mac address of sta
- * @sinfo: kernel station_info struct to populate
- *
- * Fetch the vdev-level aggregate stats for the given STA adapter. This is to
- * support "station dump" and "station get" for STA vdevs
- *
- * Return: errno
- */
-static int wlan_hdd_get_sta_stats(struct wiphy *wiphy,
-				  struct hdd_adapter *adapter,
-				  const uint8_t *mac,
-				  struct station_info *sinfo)
+static void wlan_hdd_update_rssi(struct hdd_adapter *adapter,
+				 struct station_info *sinfo)
 {
 	struct hdd_station_ctx *sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter);
-	enum tx_rate_info rate_flags, tx_rate_flags, rx_rate_flags;
-	uint8_t tx_mcs_index, rx_mcs_index;
-	struct hdd_context *hdd_ctx = (struct hdd_context *) wiphy_priv(wiphy);
-	mac_handle_t mac_handle;
 	int8_t snr;
-	uint16_t my_tx_rate, my_rx_rate;
-	uint8_t tx_nss = 1, rx_nss = 1, tx_dcm, rx_dcm;
-	enum txrate_gi tx_gi, rx_gi;
-	int32_t rcpi_value;
-	int link_speed_rssi_high = 0;
-	int link_speed_rssi_mid = 0;
-	int link_speed_rssi_low = 0;
-	uint32_t link_speed_rssi_report = 0;
-	struct wlan_objmgr_vdev *vdev;
-	qdf_net_dev_stats stats = {0};
 
-	qdf_mtrace(QDF_MODULE_ID_HDD, QDF_MODULE_ID_HDD,
-		   TRACE_CODE_HDD_CFG80211_GET_STA,
-		   adapter->deflink->vdev_id, 0);
-
-	if (!hdd_cm_is_vdev_associated(adapter)) {
-		hdd_debug("Not associated");
-		/*To keep GUI happy */
-		return 0;
-	}
-
-	if (hdd_cm_is_vdev_roaming(adapter)) {
-		hdd_debug("Roaming is in progress, cannot continue with this request");
-		/*
-		 * supplicant reports very low rssi to upper layer
-		 * and handover happens to cellular.
-		 * send the cached rssi when get_station
-		 */
-		sinfo->signal = adapter->deflink->rssi;
-		sinfo->filled |= HDD_INFO_SIGNAL;
-		return 0;
-	}
-
-	ucfg_mlme_stats_get_cfg_values(hdd_ctx->psoc,
-				       &link_speed_rssi_high,
-				       &link_speed_rssi_mid,
-				       &link_speed_rssi_low,
-				       &link_speed_rssi_report);
-
-	if (hdd_ctx->rcpi_enabled)
-		wlan_hdd_get_rcpi(adapter, (uint8_t *)mac, &rcpi_value,
-				  RCPI_MEASUREMENT_TYPE_AVG_MGMT);
-
-	wlan_hdd_get_station_stats(adapter);
-
-	wlan_hdd_get_peer_rx_rate_stats(adapter);
-
-	wlan_hdd_mlo_update_stats_info(adapter);
 	snr = adapter->deflink->snr;
 
 	/* for new connection there might be no valid previous RSSI */
@@ -6309,14 +6308,31 @@ static int wlan_hdd_get_sta_stats(struct wiphy *wiphy,
 	sta_ctx->cache_conn_info.signal = sinfo->signal;
 	sta_ctx->cache_conn_info.noise = sta_ctx->conn_info.noise;
 	sinfo->filled |= HDD_INFO_SIGNAL;
+}
 
-	/*
-	 * we notify connect to lpass here instead of during actual
-	 * connect processing because rssi info is not accurate during
-	 * actual connection.  lpass will ensure the notification is
-	 * only processed once per association.
-	 */
-	hdd_lpass_notify_connect(adapter);
+static int wlan_hdd_update_rate_info(struct hdd_adapter *adapter,
+				     struct station_info *sinfo)
+{
+	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
+	struct hdd_station_ctx *sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter);
+	mac_handle_t mac_handle;
+	struct wlan_objmgr_vdev *vdev;
+	enum tx_rate_info rate_flags, tx_rate_flags, rx_rate_flags;
+	enum txrate_gi tx_gi, rx_gi;
+	uint32_t link_speed_rssi_report = 0;
+	int link_speed_rssi_high = 0;
+	int link_speed_rssi_mid = 0;
+	int link_speed_rssi_low = 0;
+	uint16_t my_tx_rate, my_rx_rate;
+	uint8_t tx_mcs_index, rx_mcs_index;
+	uint8_t tx_nss = 1, rx_nss = 1, tx_dcm, rx_dcm;
+	qdf_net_dev_stats stats = {0};
+
+	ucfg_mlme_stats_get_cfg_values(hdd_ctx->psoc,
+				       &link_speed_rssi_high,
+				       &link_speed_rssi_mid,
+				       &link_speed_rssi_low,
+				       &link_speed_rssi_report);
 
 	rate_flags = adapter->hdd_stats.class_a_stat.tx_rx_rate_flags;
 	tx_rate_flags = rx_rate_flags = rate_flags;
@@ -6376,9 +6392,11 @@ static int wlan_hdd_get_sta_stats(struct wiphy *wiphy,
 
 	vdev = hdd_objmgr_get_vdev_by_user(adapter,
 					   WLAN_OSIF_STATS_ID);
-	if (!vdev)
-		/* Keep GUI happy */
-		return 0;
+
+	if (!vdev) {
+		hdd_nofl_debug("vdev object NULL");
+		return -EINVAL;
+	}
 
 	if (!ucfg_mlme_stats_is_link_speed_report_actual(hdd_ctx->psoc)) {
 		bool tx_rate_calc, rx_rate_calc;
@@ -6449,8 +6467,7 @@ static int wlan_hdd_get_sta_stats(struct wiphy *wiphy,
 	}
 
 	wlan_hdd_fill_summary_stats(&adapter->hdd_stats.summary_stat,
-				    sinfo,
-				    adapter->deflink->vdev_id);
+				    sinfo, adapter->deflink->vdev_id);
 
 	ucfg_dp_get_net_dev_stats(vdev, &stats);
 	sinfo->tx_bytes = stats.tx_bytes;
@@ -6458,8 +6475,6 @@ static int wlan_hdd_get_sta_stats(struct wiphy *wiphy,
 	sinfo->rx_packets = stats.rx_packets;
 
 	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_STATS_ID);
-
-	hdd_fill_fcs_and_mpdu_count(adapter, sinfo);
 
 	qdf_mem_copy(&sta_ctx->conn_info.txrate,
 		     &sinfo->txrate, sizeof(sinfo->txrate));
@@ -6489,6 +6504,75 @@ static int wlan_hdd_get_sta_stats(struct wiphy *wiphy,
 			  sinfo->rxrate.flags, sinfo->rx_packets,
 			  sinfo->rxrate.nss, sinfo->rxrate.bw);
 	}
+
+	return 0;
+}
+
+/**
+ * wlan_hdd_get_sta_stats() - get aggregate STA stats
+ * @adapter: STA adapter to get stats for
+ * @mac: mac address of sta
+ * @sinfo: kernel station_info struct to populate
+ *
+ * Fetch the vdev-level aggregate stats for the given STA adapter. This is to
+ * support "station dump" and "station get" for STA vdevs
+ *
+ * Return: errno
+ */
+static int wlan_hdd_get_sta_stats(struct hdd_adapter *adapter,
+				  const uint8_t *mac,
+				  struct station_info *sinfo)
+{
+	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
+	int32_t rcpi_value;
+
+	qdf_mtrace(QDF_MODULE_ID_HDD, QDF_MODULE_ID_HDD,
+		   TRACE_CODE_HDD_CFG80211_GET_STA,
+		   adapter->deflink->vdev_id, 0);
+
+	if (!hdd_cm_is_vdev_associated(adapter)) {
+		hdd_debug("Not associated");
+		/*To keep GUI happy */
+		return 0;
+	}
+
+	if (hdd_cm_is_vdev_roaming(adapter)) {
+		hdd_debug("Roaming is in progress, cannot continue with this request");
+		/*
+		 * supplicant reports very low rssi to upper layer
+		 * and handover happens to cellular.
+		 * send the cached rssi when get_station
+		 */
+		sinfo->signal = adapter->deflink->rssi;
+		sinfo->filled |= HDD_INFO_SIGNAL;
+		return 0;
+	}
+
+	if (hdd_ctx->rcpi_enabled)
+		wlan_hdd_get_rcpi(adapter, (uint8_t *)mac, &rcpi_value,
+				  RCPI_MEASUREMENT_TYPE_AVG_MGMT);
+
+	wlan_hdd_get_station_stats(adapter);
+
+	wlan_hdd_get_peer_rx_rate_stats(adapter);
+
+	wlan_hdd_mlo_update_stats_info(adapter);
+
+	wlan_hdd_update_rssi(adapter, sinfo);
+
+	/*
+	 * we notify connect to lpass here instead of during actual
+	 * connect processing because rssi info is not accurate during
+	 * actual connection.  lpass will ensure the notification is
+	 * only processed once per association.
+	 */
+	hdd_lpass_notify_connect(adapter);
+
+	if (wlan_hdd_update_rate_info(adapter, sinfo))
+		/* Keep GUI happy */
+		return 0;
+
+	hdd_fill_fcs_and_mpdu_count(adapter, sinfo);
 
 	hdd_wlan_fill_per_chain_rssi_stats(sinfo, adapter);
 
@@ -6593,7 +6677,7 @@ static int __wlan_hdd_cfg80211_get_station(struct wiphy *wiphy,
 			adapter = WLAN_HDD_GET_PRIV_PTR(dev);
 			hdd_err_rl("the bssid is invalid");
 		}
-		return wlan_hdd_get_sta_stats(wiphy, adapter, mac, sinfo);
+		return wlan_hdd_get_sta_stats(adapter, mac, sinfo);
 	}
 }
 
@@ -6744,7 +6828,7 @@ static int __wlan_hdd_cfg80211_dump_station(struct wiphy *wiphy,
 			return -ENOENT;
 
 		qdf_mem_copy(mac, dev->dev_addr, QDF_MAC_ADDR_SIZE);
-		errno = wlan_hdd_get_sta_stats(wiphy, adapter, mac, sinfo);
+		errno = wlan_hdd_get_sta_stats(adapter, mac, sinfo);
 	}
 
 	return errno;
@@ -7654,7 +7738,6 @@ int wlan_hdd_get_station_stats(struct hdd_adapter *adapter)
 	/* update get stats cached time stamp */
 	hdd_update_station_stats_cached_timestamp(adapter);
 	copy_station_stats_to_adapter(adapter, stats);
-
 out:
 	wlan_cfg80211_mc_cp_stats_free_stats_event(stats);
 	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_STATS_ID);
@@ -8232,6 +8315,8 @@ hdd_convert_roam_failures_reason(enum wlan_roam_failure_reason_code fail)
 		return QCA_ROAM_FAIL_REASON_SAE_PREAUTH_TIMEOUT;
 	case ROAM_FAIL_REASON_SAE_PREAUTH_FAIL:
 		return QCA_ROAM_FAIL_REASON_SAE_PREAUTH_FAIL;
+	case ROAM_FAIL_REASON_CURR_AP_STILL_OK:
+		return QCA_ROAM_FAIL_REASON_CURR_AP_STILL_OK;
 	case ROAM_FAIL_REASON_MLME:
 	case ROAM_FAIL_REASON_INTERNAL_ABORT:
 	case ROAM_FAIL_REASON_UNABLE_TO_START_ROAM_HO:

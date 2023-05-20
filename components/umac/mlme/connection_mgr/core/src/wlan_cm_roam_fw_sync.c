@@ -166,9 +166,6 @@ cm_fw_roam_sync_start_ind(struct wlan_objmgr_vdev *vdev,
 					     connected_bssid,
 					     DLM_AP_DISCONNECTED);
 
-	/* Notify TDLS STA about disconnection due to roaming */
-	wlan_tdls_notify_sta_disconnect(vdev_id, true, false, vdev);
-
 	if (IS_ROAM_REASON_STA_KICKOUT(sync_ind->roam_reason)) {
 		struct reject_ap_info ap_info;
 
@@ -437,6 +434,17 @@ cm_fill_bssid_freq_info(uint8_t vdev_id,
 	uint8_t i;
 	struct ml_setup_link_param *ml_link;
 
+	/* The @bssid field in roam synch indication will
+	 * contain MLD address in case of roaming to ML
+	 * candidate or else legacy MAC address for non-ML
+	 * roaming.
+	 */
+	if (is_multi_link_roam(roam_synch_data))
+		qdf_copy_macaddr(&rsp->connect_rsp.mld_addr,
+				 &roam_synch_data->bssid);
+	else
+		qdf_zero_macaddr(&rsp->connect_rsp.mld_addr);
+
 	for (i = 0; i < roam_synch_data->num_setup_links; i++) {
 		ml_link = &roam_synch_data->ml_link[i];
 		if (vdev_id == ml_link->vdev_id) {
@@ -695,7 +703,7 @@ static QDF_STATUS cm_process_roam_keys(struct wlan_objmgr_vdev *vdev,
 				 CM_PREFIX_REF(vdev_id, cm_id));
 			goto end;
 		}
-		wlan_vdev_get_bss_peer_mac(vdev, &pmkid_cache->bssid);
+		wlan_vdev_get_bss_peer_mac_for_pmksa(vdev, &pmkid_cache->bssid);
 		mlme_debug(CM_PREFIX_FMT "Trying to find PMKID for "
 			   QDF_MAC_ADDR_FMT " AKM Type:%d",
 			   CM_PREFIX_REF(vdev_id, cm_id),
@@ -767,7 +775,8 @@ static QDF_STATUS cm_process_roam_keys(struct wlan_objmgr_vdev *vdev,
 				 * This pmksa buffer is to update the
 				 * crypto table
 				 */
-				wlan_vdev_get_bss_peer_mac(vdev, &pmksa->bssid);
+				wlan_vdev_get_bss_peer_mac_for_pmksa(vdev,
+								     &pmksa->bssid);
 				qdf_mem_copy(pmksa->pmkid,
 					     roaming_info->pmkid, PMKID_LEN);
 				qdf_mem_copy(pmksa->pmk, roaming_info->pmk,
@@ -830,8 +839,8 @@ static QDF_STATUS cm_process_roam_keys(struct wlan_objmgr_vdev *vdev,
 				wlan_cm_set_psk_pmk(pdev, vdev_id,
 						    roaming_info->pmk,
 						    roaming_info->pmk_len);
-				wlan_vdev_get_bss_peer_mac(vdev,
-							   &pmksa->bssid);
+				wlan_vdev_get_bss_peer_mac_for_pmksa(vdev,
+								     &pmksa->bssid);
 				qdf_mem_copy(pmksa->pmkid,
 					     roaming_info->pmkid, PMKID_LEN);
 				qdf_mem_copy(pmksa->pmk,
@@ -890,12 +899,21 @@ cm_update_scan_db_on_roam_success(struct wlan_objmgr_vdev *vdev,
 				roam_synch_ind,
 				wlan_mlme_get_src_addr_from_frame(
 				&ies->bcn_probe_rsp));
-	cm_inform_bcn_probe(cm_ctx,
-			    ies->bcn_probe_rsp.ptr,
-			    ies->bcn_probe_rsp.len,
-			    frame_freq,
-			    roam_synch_ind->rssi,
-			    cm_id);
+	/*
+	 * Firmware might have roamed to a link but got ML probe
+	 * response from the other link. Then the link freq is not
+	 * present in roam link info and it returns 0. No need to add
+	 * the original probe rsp in such cases as roam sync indication
+	 * handling would add it to scan db. Add the entry to scan
+	 * db only if valid link freq is found.
+	 */
+	if (frame_freq)
+		cm_inform_bcn_probe(cm_ctx,
+				    ies->bcn_probe_rsp.ptr,
+				    ies->bcn_probe_rsp.len,
+				    frame_freq,
+				    roam_synch_ind->rssi,
+				    cm_id);
 
 	cm_update_scan_mlme_on_roam(vdev, &resp->bssid,
 				    SCAN_ENTRY_CON_STATE_ASSOC);
@@ -1004,6 +1022,8 @@ cm_fw_roam_sync_propagation(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 	}
 	cm_connect_info(vdev, true, &connect_rsp->bssid, &connect_rsp->ssid,
 			connect_rsp->freq);
+
+	cm_update_associated_ch_width(vdev, true);
 
 	status = cm_sm_deliver_event_sync(cm_ctx, WLAN_CM_SM_EV_ROAM_DONE,
 					  sizeof(*roam_synch_data),

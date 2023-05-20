@@ -122,6 +122,7 @@
 #include "wlan_twt_cfg_ext_api.h"
 #include "wlan_mlo_mgr_sta.h"
 #include "wlan_dp_api.h"
+#include "wlan_dp_ucfg_api.h"
 
 #define WMA_LOG_COMPLETION_TIMER 500 /* 500 msecs */
 #define WMI_TLV_HEADROOM 128
@@ -356,9 +357,9 @@ static void wma_set_feature_set_info(tp_wma_handle wma_handle,
 	struct cds_context *cds_ctx =
 		(struct cds_context *)(wma_handle->cds_context);
 	struct wlan_objmgr_psoc *psoc;
-	struct wlan_scan_features scan_feature_set;
-	struct wlan_twt_features twt_feature_set;
-	struct wlan_mlme_features mlme_feature_set;
+	struct wlan_scan_features scan_feature_set = {0};
+	struct wlan_twt_features twt_feature_set = {0};
+	struct wlan_mlme_features mlme_feature_set = {0};
 	struct wlan_tdls_features tdls_feature_set = {0};
 
 	psoc = wma_handle->psoc;
@@ -456,9 +457,10 @@ static void wma_set_feature_set_info(tp_wma_handle wma_handle,
 	feature_set->supported_dot11mode = feature_set->wifi_standard;
 	feature_set->sap_wpa3_support = true;
 	feature_set->assurance_disconnect_reason_api = true;
-	feature_set->frame_pcap_log_mgmt = false;
-	feature_set->frame_pcap_log_ctrl = false;
-	feature_set->frame_pcap_log_data = false;
+	feature_set->frame_pcap_log_mgmt =
+				    ucfg_dp_is_local_pkt_capture_enabled(psoc);
+	feature_set->frame_pcap_log_ctrl = feature_set->frame_pcap_log_mgmt;
+	feature_set->frame_pcap_log_data = feature_set->frame_pcap_log_mgmt;
 
 	/*
 	 * This information is hardcoded based on hdd_sta_akm_suites,
@@ -5180,6 +5182,38 @@ static inline void wma_get_dynamic_vdev_macaddr_support(
 }
 #endif
 
+#ifdef WLAN_FEATURE_NAN
+/**
+ * wma_nan_set_pairing_feature() - set feature bit for Secure NAN if max
+ * pairing session has non-zero value.
+ *
+ * Return: none
+ */
+static void wma_nan_set_pairing_feature(void)
+{
+	tp_wma_handle wma_handle = cds_get_context(QDF_MODULE_ID_WMA);
+	struct target_psoc_info *tgt_hdl;
+	struct wlan_objmgr_psoc *psoc;
+
+	if (!wma_handle) {
+		wma_err("wma handle is null");
+		return;
+	}
+
+	psoc = wma_handle->psoc;
+	tgt_hdl = wlan_psoc_get_tgt_if_handle(psoc);
+	if (!tgt_hdl) {
+		wma_err("tgt_hdl is null");
+		return;
+	}
+
+	if (tgt_hdl->info.service_ext2_param.max_nan_pairing_sessions) {
+		wma_set_fw_wlan_feat_caps(SECURE_NAN);
+		wma_debug("Secure NAN is enabled");
+	}
+}
+#endif /* WLAN_FEATURE_NAN */
+
 /**
  * wma_update_target_services() - update target services from wma handle
  * @wmi_handle: Unified wmi handle
@@ -5272,6 +5306,7 @@ static inline void wma_update_target_services(struct wmi_unified *wmi_handle,
 #ifdef WLAN_FEATURE_NAN
 	if (wmi_service_enabled(wmi_handle, wmi_service_nan))
 		g_fw_wlan_feat_caps |= (1 << NAN);
+	wma_nan_set_pairing_feature();
 #endif /* WLAN_FEATURE_NAN */
 
 	if (wmi_service_enabled(wmi_handle, wmi_service_rtt))

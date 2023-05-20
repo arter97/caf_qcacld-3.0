@@ -31,7 +31,7 @@
 #include <linux/cpu.h>
 #include "osif_sync.h"
 #include <wlan_hdd_includes.h>
-#if defined(WLAN_OPEN_SOURCE) && defined(CONFIG_HAS_WAKELOCK)
+#if defined(CONFIG_HAS_WAKELOCK)
 #include <linux/wakelock.h>
 #endif
 #include "qdf_types.h"
@@ -133,7 +133,7 @@ void hdd_wlan_offload_event(uint8_t type, uint8_t state)
 }
 #endif
 
-#ifdef QCA_CONFIG_SMP
+#ifdef WLAN_DP_LEGACY_OL_RX_THREAD
 
 /* timeout in msec to wait for RX_THREAD to suspend */
 #define HDD_RXTHREAD_SUSPEND_TIMEOUT 200
@@ -172,7 +172,7 @@ int wlan_hdd_rx_thread_suspend(struct hdd_context *hdd_ctx)
 
 	return 0;
 }
-#endif /* QCA_CONFIG_SMP */
+#endif /* WLAN_DP_LEGACY_OL_RX_THREAD */
 
 /**
  * hdd_enable_gtk_offload() - enable GTK offload
@@ -3201,22 +3201,23 @@ int wlan_hdd_cfg80211_set_txpower(struct wiphy *wiphy,
 	return errno;
 }
 
-#ifdef FEATURE_CLUB_LL_STATS_AND_GET_STATION
-static int wlan_hdd_get_tx_power(struct hdd_adapter *adapter, int *dbm)
-{
-	if (hdd_validate_adapter(adapter)) {
-		hdd_err("Invalid adapter");
-		return -EINVAL;
-	}
-	/* TX_POWER is sent by STATION_STATS by firmware and
-	 * is copied into the adapter. So, return the cached value.
-	 */
-	*dbm = adapter->tx_pwr;
-	hdd_nofl_debug("cached tx_power: %d", *dbm);
+#define WLAN_HDD_TX_POWER_CACHE_EXPIRY_TIME 350
 
-	return 0;
+static QDF_STATUS
+wlan_hdd_tx_power_request_needed(struct hdd_adapter *adapter)
+{
+	uint32_t tx_pwr_cached_duration;
+
+	tx_pwr_cached_duration =
+			qdf_system_ticks_to_msecs(qdf_system_ticks()) -
+			adapter->tx_power.tx_pwr_cached_timestamp;
+
+	if (tx_pwr_cached_duration <= WLAN_HDD_TX_POWER_CACHE_EXPIRY_TIME)
+		return QDF_STATUS_E_ALREADY;
+
+	return QDF_STATUS_SUCCESS;
 }
-#else
+
 static int wlan_hdd_get_tx_power(struct hdd_adapter *adapter, int *dbm)
 {
 	struct wlan_objmgr_vdev *vdev;
@@ -3233,7 +3234,6 @@ static int wlan_hdd_get_tx_power(struct hdd_adapter *adapter, int *dbm)
 	hdd_debug("power: %d", *dbm);
 	return ret;
 }
-#endif
 
 #ifdef FEATURE_ANI_LEVEL_REQUEST
 static void hdd_get_ani_level_cb(struct wmi_host_ani_level_event *ani,
@@ -3358,7 +3358,8 @@ static int __wlan_hdd_cfg80211_get_txpower(struct wiphy *wiphy,
 	struct hdd_context *hdd_ctx = (struct hdd_context *) wiphy_priv(wiphy);
 	struct net_device *ndev = wdev->netdev;
 	struct hdd_adapter *adapter = WLAN_HDD_GET_PRIV_PTR(ndev);
-	int status;
+	QDF_STATUS status;
+	int ret;
 	static bool is_rate_limited;
 	struct wlan_objmgr_vdev *vdev;
 
@@ -3371,14 +3372,14 @@ static int __wlan_hdd_cfg80211_get_txpower(struct wiphy *wiphy,
 
 	*dbm = 0;
 
-	status = wlan_hdd_validate_context(hdd_ctx);
-	if (status)
-		return status;
+	ret = wlan_hdd_validate_context(hdd_ctx);
+	if (ret)
+		return ret;
 
 	/* Validate adapter sessionId */
-	status = wlan_hdd_validate_vdev_id(adapter->deflink->vdev_id);
-	if (status)
-		return status;
+	ret = wlan_hdd_validate_vdev_id(adapter->deflink->vdev_id);
+	if (ret)
+		return ret;
 	switch (adapter->device_mode) {
 	case QDF_STA_MODE:
 	case QDF_P2P_CLIENT_MODE:
@@ -3417,6 +3418,16 @@ static int __wlan_hdd_cfg80211_get_txpower(struct wiphy *wiphy,
 		hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_POWER_ID);
 		hdd_debug("Modules not enabled/rate limited, cached tx power = %d",
 			  *dbm);
+		return 0;
+	}
+
+	status = wlan_hdd_tx_power_request_needed(adapter);
+	if (status == QDF_STATUS_E_ALREADY) {
+		/* TX_POWER is sent by STATION_STATS by firmware and
+		 * is copied into the adapter. So, return cached value.
+		 */
+		*dbm = adapter->tx_power.tx_pwr;
+		hdd_nofl_debug("cached tx_power: %d", *dbm);
 		return 0;
 	}
 

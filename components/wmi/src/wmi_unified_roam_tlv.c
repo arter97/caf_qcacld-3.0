@@ -3036,6 +3036,7 @@ extract_roam_stats_event_tlv(wmi_unified_t wmi_handle, uint8_t *evt_buf,
 	struct roam_msg_info *roam_msg_info = NULL;
 	uint8_t vdev_id, i, num_btm = 0, num_frames = 0;
 	uint8_t num_tlv = 0, num_chan = 0, num_ap = 0, num_rpt = 0;
+	uint8_t num_trigger_reason = 0;
 	uint32_t rem_len;
 	QDF_STATUS status;
 
@@ -3064,13 +3065,18 @@ extract_roam_stats_event_tlv(wmi_unified_t wmi_handle, uint8_t *evt_buf,
 		num_tlv = MAX_ROAM_SCAN_STATS_TLV;
 	}
 
+	if (param_buf->roam_trigger_reason)
+		num_trigger_reason = num_tlv;
+	else
+		num_trigger_reason = 0;
+
 	rem_len = len - sizeof(*fixed_param);
-	if (rem_len < num_tlv * sizeof(wmi_roam_trigger_reason)) {
+	if (rem_len < num_trigger_reason * sizeof(wmi_roam_trigger_reason)) {
 		wmi_err_rl("Invalid roam trigger data");
 		return QDF_STATUS_E_INVAL;
 	}
 
-	rem_len -= num_tlv * sizeof(wmi_roam_trigger_reason);
+	rem_len -= num_trigger_reason * sizeof(wmi_roam_trigger_reason);
 	if (rem_len < num_tlv * sizeof(wmi_roam_scan_info)) {
 		wmi_err_rl("Invalid roam scan data");
 		return QDF_STATUS_E_INVAL;
@@ -3457,6 +3463,8 @@ extract_roam_candidate_frame_tlv(wmi_unified_t wmi_handle, uint8_t *event,
 	data->vdev_id = frame_params->vdev_id;
 	data->frame_length = frame_params->frame_length;
 	data->frame = (uint8_t *)param_buf->frame;
+	QDF_TRACE_HEX_DUMP(QDF_MODULE_ID_WMI, QDF_TRACE_LEVEL_DEBUG,
+			   data->frame, data->frame_length);
 
 	return QDF_STATUS_SUCCESS;
 }
