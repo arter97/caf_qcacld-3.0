@@ -522,6 +522,7 @@ struct fse_cache_flush_history {
  * @fst_wq_defer:
  * @rx_hash_enabled: Flag to indicate if Hash based routing supported
  * @rx_toeplitz_hash_key: hash key
+ * @rx_pkt_tlv_size: RX packet TLV size
  */
 struct dp_rx_fst {
 	uint8_t *base;
@@ -557,6 +558,7 @@ struct dp_rx_fst {
 	bool fst_wq_defer;
 	bool rx_hash_enabled;
 	uint8_t *rx_toeplitz_hash_key;
+	uint16_t rx_pkt_tlv_size;
 };
 
 /**

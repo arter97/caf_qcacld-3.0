@@ -136,21 +136,25 @@ void dp_fisa_record_pkt(struct dp_fisa_rx_sw_ft *fisa_flow, qdf_nbuf_t nbuf,
 #endif
 
 /**
- * nbuf_skip_rx_pkt_tlv() - Function to skip the TLVs and mac header from msdu
- * @soc: DP soc handle
+ * wlan_dp_nbuf_skip_rx_pkt_tlv() - Function to skip the TLVs and
+ *				    mac header from msdu
+ * @dp_ctx: DP component handle
+ * @rx_fst: FST handle
  * @nbuf: msdu for which TLVs has to be skipped
  *
  * Return: None
  */
-static void nbuf_skip_rx_pkt_tlv(struct dp_soc *soc, qdf_nbuf_t nbuf)
+static inline void
+wlan_dp_nbuf_skip_rx_pkt_tlv(struct wlan_dp_psoc_context *dp_ctx,
+			     struct dp_rx_fst *rx_fst, qdf_nbuf_t nbuf)
 {
 	uint8_t *rx_tlv_hdr;
 	uint32_t l2_hdr_offset;
 
 	rx_tlv_hdr = qdf_nbuf_data(nbuf);
-	l2_hdr_offset = hal_rx_msdu_end_l3_hdr_padding_get(soc->hal_soc,
+	l2_hdr_offset = hal_rx_msdu_end_l3_hdr_padding_get(dp_ctx->hal_soc,
 							   rx_tlv_hdr);
-	qdf_nbuf_pull_head(nbuf, soc->rx_pkt_tlv_size + l2_hdr_offset);
+	qdf_nbuf_pull_head(nbuf, rx_fst->rx_pkt_tlv_size + l2_hdr_offset);
 }
 
 static bool
@@ -176,8 +180,8 @@ dp_fisa_is_ipsec_connection(struct cdp_rx_flow_tuple_info *flow_tuple_info)
 }
 
 /**
- * get_flow_tuple_from_nbuf() - Get the flow tuple from msdu
- * @soc: DP soc handle
+ * wlan_dp_get_flow_tuple_from_nbuf() - Get the flow tuple from msdu
+ * @dp_ctx: DP component handle
  * @flow_tuple_info: return argument where the flow is populated
  * @nbuf: msdu from which flow tuple is extracted.
  * @rx_tlv_hdr: Pointer to msdu TLVs
@@ -185,23 +189,24 @@ dp_fisa_is_ipsec_connection(struct cdp_rx_flow_tuple_info *flow_tuple_info)
  * Return: None
  */
 static void
-get_flow_tuple_from_nbuf(struct dp_soc *soc,
-			 struct cdp_rx_flow_tuple_info *flow_tuple_info,
-			 qdf_nbuf_t nbuf, uint8_t *rx_tlv_hdr)
+wlan_dp_get_flow_tuple_from_nbuf(struct wlan_dp_psoc_context *dp_ctx,
+				 struct cdp_rx_flow_tuple_info *flow_tuple_info,
+				 qdf_nbuf_t nbuf, uint8_t *rx_tlv_hdr)
 {
+	struct dp_rx_fst *rx_fst = dp_ctx->rx_fst;
 	qdf_net_iphdr_t *iph;
 	qdf_net_tcphdr_t *tcph;
 	uint32_t ip_hdr_offset;
 	uint32_t tcp_hdr_offset;
 	uint32_t l2_hdr_offset =
-			hal_rx_msdu_end_l3_hdr_padding_get(soc->hal_soc,
+			hal_rx_msdu_end_l3_hdr_padding_get(dp_ctx->hal_soc,
 							   rx_tlv_hdr);
 
-	hal_rx_get_l3_l4_offsets(soc->hal_soc, rx_tlv_hdr,
+	hal_rx_get_l3_l4_offsets(dp_ctx->hal_soc, rx_tlv_hdr,
 				 &ip_hdr_offset, &tcp_hdr_offset);
 	flow_tuple_info->tuple_populated = true;
 
-	qdf_nbuf_pull_head(nbuf, soc->rx_pkt_tlv_size + l2_hdr_offset);
+	qdf_nbuf_pull_head(nbuf, rx_fst->rx_pkt_tlv_size + l2_hdr_offset);
 
 	iph = (qdf_net_iphdr_t *)(qdf_nbuf_data(nbuf) + ip_hdr_offset);
 	tcph = (qdf_net_tcphdr_t *)(qdf_nbuf_data(nbuf) + ip_hdr_offset +
@@ -232,7 +237,7 @@ get_flow_tuple_from_nbuf(struct dp_soc *soc,
 	flow_tuple_info->l4_protocol = iph->ip_proto;
 	dp_fisa_debug("l4_protocol %d", flow_tuple_info->l4_protocol);
 
-	qdf_nbuf_push_head(nbuf, soc->rx_pkt_tlv_size + l2_hdr_offset);
+	qdf_nbuf_push_head(nbuf, rx_fst->rx_pkt_tlv_size + l2_hdr_offset);
 
 	dp_fisa_debug("head_skb: %pK head_skb->next:%pK head_skb->data:%pK len %d data_len %d",
 		      nbuf, qdf_nbuf_next(nbuf), qdf_nbuf_data(nbuf),
@@ -525,9 +530,9 @@ dp_rx_fisa_add_ft_entry(struct dp_vdev *vdev,
 	qdf_spin_lock_bh(&fisa_hdl->dp_rx_fst_lock);
 
 	if (!rx_flow_tuple_info.tuple_populated) {
-		get_flow_tuple_from_nbuf(fisa_hdl->soc_hdl,
-					 &rx_flow_tuple_info,
-					 nbuf, rx_tlv_hdr);
+		wlan_dp_get_flow_tuple_from_nbuf(fisa_hdl->dp_ctx,
+						 &rx_flow_tuple_info,
+						 nbuf, rx_tlv_hdr);
 		if (rx_flow_tuple_info.bypass_fisa) {
 			qdf_spin_unlock_bh(&fisa_hdl->dp_rx_fst_lock);
 			return NULL;
@@ -1003,8 +1008,8 @@ dp_fisa_rx_queue_fst_update_work(struct dp_rx_fst *fisa_hdl, uint32_t flow_idx,
 	sw_ft_entry = &(((struct dp_fisa_rx_sw_ft *)
 				fisa_hdl->base)[hashed_flow_idx]);
 
-	get_flow_tuple_from_nbuf(fisa_hdl->soc_hdl, &flow_tuple_info,
-				 nbuf, rx_tlv_hdr);
+	wlan_dp_get_flow_tuple_from_nbuf(fisa_hdl->dp_ctx, &flow_tuple_info,
+					 nbuf, rx_tlv_hdr);
 	if (flow_tuple_info.bypass_fisa)
 		return NULL;
 
@@ -1317,8 +1322,7 @@ dp_rx_fisa_aggr_udp(struct dp_rx_fst *fisa_hdl,
 	uint32_t transport_payload_offset;
 	uint32_t l3_hdr_offset, l4_hdr_offset;
 
-	qdf_nbuf_pull_head(nbuf,
-			   fisa_hdl->soc_hdl->rx_pkt_tlv_size + l2_hdr_offset);
+	qdf_nbuf_pull_head(nbuf, fisa_hdl->rx_pkt_tlv_size + l2_hdr_offset);
 
 	hal_rx_get_l3_l4_offsets(fisa_hdl->soc_hdl->hal_soc, rx_tlv_hdr,
 				 &l3_hdr_offset, &l4_hdr_offset);
@@ -1845,7 +1849,7 @@ static int dp_add_nbuf_to_fisa_flow(struct dp_rx_fst *fisa_hdl,
 	}
 
 	dp_fisa_record_pkt(fisa_flow, nbuf, rx_tlv_hdr,
-			   fisa_hdl->soc_hdl->rx_pkt_tlv_size);
+			   fisa_hdl->rx_pkt_tlv_size);
 
 	if (fisa_flow->is_flow_udp) {
 		dp_rx_fisa_aggr_udp(fisa_hdl, fisa_flow, nbuf);
@@ -1982,7 +1986,7 @@ QDF_STATUS dp_fisa_rx(struct wlan_dp_psoc_context *dp_ctx,
 			dp_ctx->skip_fisa_param.fisa_force_flush[rx_ctx_id] = 0;
 		}
 
-		qdf_nbuf_push_head(head_nbuf, soc->rx_pkt_tlv_size +
+		qdf_nbuf_push_head(head_nbuf, dp_fisa_rx_hdl->rx_pkt_tlv_size +
 				   QDF_NBUF_CB_RX_PACKET_L3_HDR_PAD(head_nbuf));
 
 		hal_rx_msdu_get_reo_destination_indication(dp_ctx->hal_soc,
@@ -2030,7 +2034,7 @@ QDF_STATUS dp_fisa_rx(struct wlan_dp_psoc_context *dp_ctx,
 			goto next_msdu;
 
 pull_nbuf:
-		nbuf_skip_rx_pkt_tlv(soc, head_nbuf);
+		wlan_dp_nbuf_skip_rx_pkt_tlv(dp_ctx, dp_fisa_rx_hdl, head_nbuf);
 
 deliver_nbuf: /* Deliver without FISA */
 		QDF_NBUF_CB_RX_NUM_ELEMENTS_IN_LIST(head_nbuf) = 1;

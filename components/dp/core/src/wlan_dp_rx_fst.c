@@ -410,6 +410,16 @@ QDF_STATUS dp_rx_fst_attach(struct wlan_dp_psoc_context *dp_ctx)
 	if (!fst)
 		return QDF_STATUS_E_NOMEM;
 
+	fst->rx_pkt_tlv_size = 0;
+	status = cdp_txrx_get_psoc_param(dp_ctx->cdp_soc, CDP_RX_PKT_TLV_SIZE,
+					 &soc_param);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		dp_err("Unable to fetch RX pkt tlv size");
+		return status;
+	}
+
+	fst->rx_pkt_tlv_size = soc_param.rx_pkt_tlv_size;
+
 	/* This will clear entire FISA params */
 	soc_param.fisa_params.rx_toeplitz_hash_key = NULL;
 	status = cdp_txrx_get_psoc_param(dp_ctx->cdp_soc, CDP_CFG_FISA_PARAMS,
@@ -441,7 +451,7 @@ QDF_STATUS dp_rx_fst_attach(struct wlan_dp_psoc_context *dp_ctx)
 		ft_entry[i].napi_id = INVALID_NAPI;
 
 	status = dp_rx_sw_ft_hist_init(ft_entry, fst->max_entries,
-				       soc->rx_pkt_tlv_size);
+				       fst->rx_pkt_tlv_size);
 	if (QDF_IS_STATUS_ERROR(status))
 		goto free_hist;
 
