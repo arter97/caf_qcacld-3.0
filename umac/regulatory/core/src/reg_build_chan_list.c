@@ -1067,6 +1067,7 @@ static void reg_propagate_6g_mas_channel_list(
 				mas_chan_params->unspecified_ap_usable;
 	pdev_priv_obj->is_6g_channel_list_populated =
 		mas_chan_params->is_6g_channel_list_populated;
+	reg_set_afc_power_event_received(pdev_priv_obj->pdev_ptr, false);
 	pdev_priv_obj->reg_6g_superid =
 		mas_chan_params->reg_6g_superid;
 	pdev_priv_obj->reg_6g_thresh_priority_freq =
