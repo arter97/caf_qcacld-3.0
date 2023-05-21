@@ -391,6 +391,20 @@ QDF_STATUS dp_rx_flow_add_entry(struct dp_pdev *pdev,
 		flow.reo_destination_indication = pdev->reo_dest;
 	}
 
+	/**
+	 * If Round Robin flow to core distribution is enabled,
+	 * select reo_destination_indication in a round robin
+	 * fashion for all the incoming flows.
+	 */
+	if (wlan_cfg_is_rx_rr_enabled(soc->wlan_cfg_ctx)) {
+		flow.reo_destination_indication = fst->ring_id;
+		fst->ring_id += 1;
+		fst->ring_id = fst->ring_id % 4;
+
+		if (!fst->ring_id)
+			fst->ring_id = 1;
+	}
+
 	flow.reo_destination_handler = HAL_RX_FSE_REO_DEST_FT;
 	flow.fse_metadata = rx_flow_info->fse_metadata;
 	dp_rx_update_ppe_fse_fields(&flow, rx_flow_info);
@@ -688,6 +702,8 @@ QDF_STATUS dp_rx_fst_attach(struct dp_soc *soc, struct dp_pdev *pdev)
 	}
 
 	qdf_mem_set(fst, 0, sizeof(struct dp_rx_fst));
+
+	fst->ring_id = 1;
 
 	fst->max_skid_length = wlan_cfg_rx_fst_get_max_search(cfg);
 	fst->max_entries = wlan_cfg_get_rx_flow_search_table_size(cfg);
