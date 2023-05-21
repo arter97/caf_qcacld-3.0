@@ -7750,6 +7750,9 @@ dp_set_psoc_param(struct cdp_soc_t *cdp_soc,
 		dp_rx_peer_metadata_ver_update(
 				soc, val.cdp_peer_metadata_ver);
 		break;
+	case CDP_TXRX_HAL_SOC_HDL:
+		val.hal_soc_hdl = soc->hal_soc;
+		break;
 	default:
 		break;
 	}

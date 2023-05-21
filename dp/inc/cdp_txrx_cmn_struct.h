@@ -1448,6 +1448,7 @@ enum cdp_pdev_param_type {
  * @cdp_drop_tx_mcast: Enable/Disable tx mcast drop
  * @cdp_vdev_tx_to_fw: Set to_fw bit for all tx packets for the vdev
  * @cdp_peer_metadata_ver: DP rx peer metadata version configuration
+ * @hal_soc_hdl: DP HAL soc handle
  */
 typedef union cdp_config_param_t {
 	/* peer params */
@@ -1539,6 +1540,7 @@ typedef union cdp_config_param_t {
 	bool cdp_drop_tx_mcast;
 	bool cdp_vdev_tx_to_fw;
 	uint8_t cdp_peer_metadata_ver;
+	void *hal_soc_hdl;
 } cdp_config_param_type;
 
 /**
@@ -1695,6 +1697,7 @@ enum cdp_vdev_param_type {
  * @CDP_SAWF_STATS: set SAWF stats config
  * @CDP_UMAC_RESET_STATS: UMAC reset stats
  * @CDP_CFG_RX_PEER_METADATA_VER: RX peer metadata configuration
+ * @CDP_TXRX_HAL_SOC_HDL: HAL soc handle
  */
 enum cdp_psoc_param_type {
 	CDP_ENABLE_RATE_STATS,
@@ -1708,6 +1711,7 @@ enum cdp_psoc_param_type {
 	CDP_SAWF_STATS,
 	CDP_UMAC_RESET_STATS,
 	CDP_CFG_RX_PEER_METADATA_VER,
+	CDP_TXRX_HAL_SOC_HDL,
 };
 
 #ifdef CONFIG_AP_PLATFORM
