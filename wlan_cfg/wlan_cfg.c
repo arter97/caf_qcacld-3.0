@@ -1435,8 +1435,7 @@ static struct dp_int_mask_assignment dp_mask_assignment[NUM_INTERRUPT_COMBINATIO
 		/* tx ring masks */
 		{ WLAN_CFG_TX_RING_MASK_0,
 		  WLAN_CFG_TX_RING_MASK_1,
-		  WLAN_CFG_TX_RING_MASK_2,
-		  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+		  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
 		/* rx ring masks */
 		{ 0, 0, 0, 0,
 		  WLAN_CFG_RX_RING_MASK_0,
