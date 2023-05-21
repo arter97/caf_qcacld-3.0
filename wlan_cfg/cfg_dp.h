@@ -850,6 +850,10 @@
 	CFG_INI_BOOL("dp_rx_hash", true, \
 	"DP Rx Hash")
 
+#define CFG_DP_RX_RR \
+	CFG_INI_BOOL("dp_rx_rr", true, \
+	"DP Rx Round Robin")
+
 #define CFG_DP_TSO \
 	CFG_INI_BOOL("TSOEnable", false, \
 	"DP TSO Enabled")
@@ -1983,6 +1987,7 @@
 		CFG(CFG_DP_TIME_CONTROL_BP) \
 		CFG(CFG_DP_BASE_HW_MAC_ID) \
 		CFG(CFG_DP_RX_HASH) \
+		CFG(CFG_DP_RX_RR) \
 		CFG(CFG_DP_TSO) \
 		CFG(CFG_DP_LRO) \
 		CFG(CFG_DP_SG) \

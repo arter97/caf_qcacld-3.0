@@ -340,6 +340,7 @@ struct wlan_srng_cfg {
  * @pointer_num_threshold_rx: RX REO2SW ring pointer update entries threshold
  * @local_pkt_capture: flag indicating enable/disable of local packet capture
  * @special_frame_msk: Special frame mask
+ * @rx_rr: rx round robin enable / disable
  */
 struct wlan_cfg_dp_soc_ctxt {
 	int num_int_ctxts;
@@ -543,6 +544,9 @@ struct wlan_cfg_dp_soc_ctxt {
 	bool local_pkt_capture;
 #endif
 	uint32_t special_frame_msk;
+#ifdef WLAN_SUPPORT_RX_FLOW_TAG
+	bool rx_rr;
+#endif
 };
 
 /**
@@ -1389,6 +1393,21 @@ bool wlan_cfg_is_ipa_enabled(struct wlan_cfg_dp_soc_ctxt *cfg);
  * @rx_hash: true - enabled false - disabled
  */
 void wlan_cfg_set_rx_hash(struct wlan_cfg_dp_soc_ctxt *cfg, bool rx_hash);
+
+/**
+ * wlan_cfg_is_rx_rr_enabled - Return RX round robin enabled/disabled
+ * @cfg: soc configuration context
+ *
+ * Return: true - enabled false - disabled
+ */
+bool wlan_cfg_is_rx_rr_enabled(struct wlan_cfg_dp_soc_ctxt *cfg);
+
+/**
+ * wlan_cfg_set_rx_rr - set rx round robin enabled/disabled
+ * @cfg: soc configuration context
+ * @rx_rr: true - enabled false - disabled
+ */
+void wlan_cfg_set_rx_rr(struct wlan_cfg_dp_soc_ctxt *cfg, bool rx_rr);
 
 /**
  * wlan_cfg_get_dp_pdev_nss_enabled - Return pdev nss enabled/disabled

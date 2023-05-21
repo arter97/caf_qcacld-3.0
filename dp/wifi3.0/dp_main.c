@@ -11019,8 +11019,8 @@ static struct cdp_scs_ops dp_ops_scs = {
 
 #ifdef WLAN_SUPPORT_RX_FLOW_TAG
 static struct cdp_fse_ops dp_ops_fse = {
-	.fse_rule_add = NULL,
-	.fse_rule_delete = NULL,
+	.fse_rule_add = dp_rx_sfe_add_flow_entry,
+	.fse_rule_delete = dp_rx_sfe_delete_flow_entry,
 };
 #endif
 
