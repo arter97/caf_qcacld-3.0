@@ -1669,6 +1669,12 @@ void wlansap_process_chan_info_event(struct sap_context *sap_ctx,
 
 	if (sap_ctx->optimize_acs_chan_selected)
 		return;
+
+	if (!sap_ctx->acs_cfg) {
+		sap_debug("acs_cfg is null");
+		return;
+	}
+
 	/* If chan_info_freq is not preferred band's freq
 	 * do not select it as ACS result.
 	 */
