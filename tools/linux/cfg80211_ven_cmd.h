@@ -1471,6 +1471,9 @@ enum _ol_ath_param_t {
 	OL_ATH_PARAM_PROBE_RESP_RETRY_LIMIT = 531,
 	OL_ATH_PARAM_CTS_TIMEOUT = 532,
 	OL_ATH_PARAM_SLOT_TIME = 533,
+#ifdef WLAN_FEATURE_11BE_MLO
+	OL_ATH_PARAM_FORCE_NON_ASSOC_PRIMARY_UMAC = 534,
+#endif
 };
 
 #ifdef CONFIG_SUPPORT_VENCMDTABLE
@@ -3726,6 +3729,12 @@ struct vendor_commands radio_vendor_cmds[] = {
 		GET_PARAM, 0},
 	{"mlo_forced_umac_soc",
 		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_FORCE_PRIMARY_UMAC_SOC_ID,
+		SET_PARAM, 1},
+	{"g_non_assoc_prim_umac_mode",
+		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_FORCE_NON_ASSOC_PRIMARY_UMAC,
+		GET_PARAM, 0},
+	{"non_assoc_prim_umac_mode",
+		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_FORCE_NON_ASSOC_PRIMARY_UMAC,
 		SET_PARAM, 1},
 #endif
 	{"ipaucstats",
