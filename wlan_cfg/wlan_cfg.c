@@ -4592,6 +4592,27 @@ bool wlan_cfg_is_rx_hash_enabled(struct wlan_cfg_dp_soc_ctxt *cfg)
 	return  cfg->rx_hash;
 }
 
+#ifdef WLAN_SUPPORT_RX_FLOW_TAG
+void wlan_cfg_set_rx_rr(struct wlan_cfg_dp_soc_ctxt *cfg, bool val)
+{
+	cfg->rx_rr = val;
+}
+
+bool wlan_cfg_is_rx_rr_enabled(struct wlan_cfg_dp_soc_ctxt *cfg)
+{
+	return  cfg->rx_rr;
+}
+#else
+void wlan_cfg_set_rx_rr(struct wlan_cfg_dp_soc_ctxt *cfg, bool val)
+{
+}
+
+bool wlan_cfg_is_rx_rr_enabled(struct wlan_cfg_dp_soc_ctxt *cfg)
+{
+	return  false;
+}
+#endif
+
 int wlan_cfg_get_dp_pdev_nss_enabled(struct wlan_cfg_dp_pdev_ctxt *cfg)
 {
 	return  cfg->nss_enabled;

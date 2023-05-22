@@ -14647,8 +14647,8 @@ static struct cdp_scs_ops dp_ops_scs = {
 
 #ifdef WLAN_SUPPORT_RX_FLOW_TAG
 static struct cdp_fse_ops dp_ops_fse = {
-	.fse_rule_add = NULL,
-	.fse_rule_delete = NULL,
+	.fse_rule_add = dp_rx_sfe_add_flow_entry,
+	.fse_rule_delete = dp_rx_sfe_add_flow_entry,
 };
 #endif
 
@@ -16079,6 +16079,10 @@ static void *dp_soc_init(struct dp_soc *soc, HTC_HANDLE htc_handle,
 
 	wlan_cfg_set_rx_hash(soc->wlan_cfg_ctx,
 			     cfg_get(soc->ctrl_psoc, CFG_DP_RX_HASH));
+#ifdef WLAN_SUPPORT_RX_FLOW_TAG
+	wlan_cfg_set_rx_rr(soc->wlan_cfg_ctx,
+			   cfg_get(soc->ctrl_psoc, CFG_DP_RX_RR));
+#endif
 	soc->cce_disable = false;
 	soc->max_ast_ageout_count = MAX_AST_AGEOUT_COUNT;
 
