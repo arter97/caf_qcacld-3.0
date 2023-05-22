@@ -1229,6 +1229,11 @@ bool is_found_in_cur_chan_punc_list(struct wlan_dfs *dfs,
 		qdf_freq_t punc_low_freq = dfs_punc_arr->punc_low_freq;
 		qdf_freq_t punc_high_freq = dfs_punc_arr->punc_high_freq;
 
+		if (!punc_low_freq || !punc_high_freq) {
+		    dfs_info(dfs, WLAN_DEBUG_DFS_PUNCTURING, "low: %d, high: %d punc freqs", punc_low_freq, punc_high_freq);
+		    return false;
+		}
+
 		/* If the puncture channel is non-dfs , Skip the channel. */
 		if (!wlan_reg_is_dfs_for_freq(dfs->dfs_pdev_obj, dfs_curchan_punc_freq)) {
 			dfs_info(dfs, WLAN_DEBUG_DFS, "ch=%d is not dfs, skip",
@@ -1822,6 +1827,7 @@ static const char *dfs_punc_sm_evt_names[] = {
 	"EV_PUNC_RADAR",
 	"EV_PUNC_NOL_EXPIRY",
 	"EV_PUNC_CAC_EXPIRY",
+	"EV_PUNC_SM_STOP",
 };
 
 /**
@@ -1859,6 +1865,11 @@ static void dfs_puncturing_sm_print_state_event(struct dfs_punc_obj *dfs_punc,
 	state = dfs_puncturing_get_curr_state(dfs_punc);
 	if (!(state < DFS_PUNCTURING_S_MAX))
 		return;
+
+	if (event >= QDF_ARRAY_SIZE(dfs_punc_sm_evt_names)) {
+		dfs_debug(NULL, WLAN_DEBUG_DFS_PUNCTURING, "invalid event %u", event);
+		return;
+	}
 
 	dfs_debug(NULL, WLAN_DEBUG_DFS_PUNCTURING, "[%s]%s, %s",
 		  dfs_punc->dfs_punc_sm_hdl->name,
