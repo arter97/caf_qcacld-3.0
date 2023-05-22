@@ -6880,7 +6880,6 @@ static inline
 void hdd_vdev_deinit_components(struct wlan_objmgr_vdev *vdev)
 {
 	ucfg_pmo_del_wow_pattern(vdev);
-	ucfg_reg_11d_vdev_delete_update(vdev);
 	ucfg_son_disable_cbs(vdev);
 }
 
@@ -6898,6 +6897,8 @@ int hdd_vdev_destroy(struct wlan_hdd_link_info *link_info)
 	uint8_t vdev_id;
 	struct hdd_context *hdd_ctx;
 	struct wlan_objmgr_vdev *vdev;
+	struct wlan_objmgr_psoc *psoc;
+	enum QDF_OPMODE op_mode;
 
 	vdev_id = link_info->vdev_id;
 	hdd_nofl_debug("destroying vdev %d", vdev_id);
@@ -6912,6 +6913,13 @@ int hdd_vdev_destroy(struct wlan_hdd_link_info *link_info)
 	vdev = hdd_objmgr_get_vdev_by_user(link_info, WLAN_OSIF_ID);
 	if (!vdev)
 		return -EINVAL;
+
+	psoc = wlan_vdev_get_psoc(vdev);
+	if (!psoc) {
+		hdd_err("invalid psoc");
+		return -EINVAL;
+	}
+	op_mode = wlan_vdev_mlme_get_opmode(vdev);
 
 	hdd_stop_last_active_connection(hdd_ctx, vdev);
 	hdd_check_wait_for_hw_mode_completion(hdd_ctx);
@@ -6931,6 +6939,8 @@ int hdd_vdev_destroy(struct wlan_hdd_link_info *link_info)
 	qdf_runtime_pm_prevent_suspend(&hdd_ctx->runtime_context.vdev_destroy);
 
 	ret = hdd_vdev_destroy_event_wait(hdd_ctx, vdev);
+
+	ucfg_reg_11d_vdev_delete_update(psoc, op_mode, vdev_id);
 
 	qdf_runtime_pm_allow_suspend(&hdd_ctx->runtime_context.vdev_destroy);
 	return ret;
