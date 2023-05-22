@@ -31,12 +31,14 @@
 #include "wlan_mlme_vdev_mgr_interface.h"
 #include "wlan_p2p_ucfg_api.h"
 #include "wlan_vdev_mgr_utils_api.h"
+#include "wlan_tdls_tgt_api.h"
 
 QDF_STATUS if_mgr_ap_start_bss(struct wlan_objmgr_vdev *vdev,
 			       struct if_mgr_event_data *event_data)
 {
 	struct wlan_objmgr_psoc *psoc;
 	struct wlan_objmgr_pdev *pdev;
+	QDF_STATUS status;
 
 	pdev = wlan_vdev_get_pdev(vdev);
 	if (!pdev)
@@ -46,16 +48,23 @@ QDF_STATUS if_mgr_ap_start_bss(struct wlan_objmgr_vdev *vdev,
 	if (!psoc)
 		return QDF_STATUS_E_FAILURE;
 
-	wlan_tdls_teardown_links_sync(psoc);
+	wlan_tdls_notify_start_bss(psoc, vdev);
 
 	if (wlan_vdev_mlme_get_opmode(vdev) == QDF_SAP_MODE ||
 	    wlan_vdev_mlme_get_opmode(vdev) == QDF_P2P_GO_MODE)
-		wlan_handle_emlsr_sta_concurrency(vdev, true, false, false);
+		wlan_handle_emlsr_sta_concurrency(psoc, true, false);
 
 	if (policy_mgr_is_hw_mode_change_in_progress(psoc)) {
 		if (!QDF_IS_STATUS_SUCCESS(
 		    policy_mgr_wait_for_connection_update(psoc))) {
 			ifmgr_err("qdf wait for event failed!!");
+			return QDF_STATUS_E_FAILURE;
+		}
+	}
+	if (policy_mgr_is_chan_switch_in_progress(psoc)) {
+		status = policy_mgr_wait_chan_switch_complete_evt(psoc);
+		if (!QDF_IS_STATUS_SUCCESS(status)) {
+			ifmgr_err("qdf wait for csa event failed!!");
 			return QDF_STATUS_E_FAILURE;
 		}
 	}
@@ -105,6 +114,11 @@ if_mgr_ap_start_bss_complete(struct wlan_objmgr_vdev *vdev,
 	ifmgr_debug("check for SAP restart");
 	policy_mgr_check_concurrent_intf_and_restart_sap(psoc,
 				wlan_util_vdev_mgr_get_acs_mode_for_vdev(vdev));
+	/*
+	 * Enable TDLS again on concurrent STA
+	 */
+	if (event_data && QDF_IS_STATUS_ERROR(event_data->status))
+		wlan_tdls_notify_start_bss_failure(psoc);
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -132,7 +146,7 @@ if_mgr_ap_stop_bss_complete(struct wlan_objmgr_vdev *vdev,
 
 	if (wlan_vdev_mlme_get_opmode(vdev) == QDF_SAP_MODE ||
 	    wlan_vdev_mlme_get_opmode(vdev) == QDF_P2P_GO_MODE)
-		wlan_handle_emlsr_sta_concurrency(vdev, false, false, true);
+		wlan_handle_emlsr_sta_concurrency(psoc, false, true);
 	/*
 	 * Due to audio share glitch with P2P GO caused by
 	 * roam scan on concurrent interface, disable
@@ -149,10 +163,9 @@ if_mgr_ap_stop_bss_complete(struct wlan_objmgr_vdev *vdev,
 	return QDF_STATUS_SUCCESS;
 }
 
-#ifdef WLAN_FEATURE_P2P_P2P_STA
 QDF_STATUS
-if_mgr_csa_complete(struct wlan_objmgr_vdev *vdev,
-		    struct if_mgr_event_data *event_data)
+if_mgr_ap_csa_complete(struct wlan_objmgr_vdev *vdev,
+		       struct if_mgr_event_data *event_data)
 {
 	struct wlan_objmgr_psoc *psoc;
 	struct wlan_objmgr_pdev *pdev;
@@ -161,6 +174,7 @@ if_mgr_csa_complete(struct wlan_objmgr_vdev *vdev,
 	pdev = wlan_vdev_get_pdev(vdev);
 	if (!pdev)
 		return QDF_STATUS_E_FAILURE;
+
 	psoc = wlan_pdev_get_psoc(pdev);
 	if (!psoc)
 		return QDF_STATUS_E_FAILURE;
@@ -168,6 +182,36 @@ if_mgr_csa_complete(struct wlan_objmgr_vdev *vdev,
 	status = wlan_p2p_check_and_force_scc_go_plus_go(psoc, vdev);
 	if (QDF_IS_STATUS_ERROR(status))
 		ifmgr_err("force scc failure with status: %d", status);
+
+	wlan_tdls_notify_channel_switch_complete(psoc, wlan_vdev_get_id(vdev));
+
 	return status;
 }
-#endif
+
+QDF_STATUS
+if_mgr_ap_csa_start(struct wlan_objmgr_vdev *vdev,
+		    struct if_mgr_event_data *event_data)
+{
+	struct wlan_objmgr_psoc *psoc;
+	struct wlan_objmgr_pdev *pdev;
+	enum QDF_OPMODE op_mode;
+
+	op_mode = wlan_vdev_mlme_get_opmode(vdev);
+	if (op_mode != QDF_SAP_MODE && op_mode != QDF_P2P_GO_MODE)
+		return QDF_STATUS_SUCCESS;
+
+	pdev = wlan_vdev_get_pdev(vdev);
+	if (!pdev)
+		return QDF_STATUS_E_FAILURE;
+
+	psoc = wlan_pdev_get_psoc(pdev);
+	if (!psoc)
+		return QDF_STATUS_E_FAILURE;
+
+	/*
+	 * Disable TDLS off-channel before VDEV restart
+	 */
+	wlan_tdls_notify_channel_switch_start(psoc, vdev);
+
+	return QDF_STATUS_SUCCESS;
+}

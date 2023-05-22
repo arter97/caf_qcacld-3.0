@@ -494,12 +494,13 @@
  * <ini>
  * gStaKeepAliveMethod - Which keepalive method to use
  * @Min: 1
- * @Max: 2
+ * @Max: 3
  * @Default: 1
  *
  * This ini determines which keepalive method to use for station interfaces
  *	 1) Use null data packets
  *	 2) Use gratuitous ARP packets
+ *	 3) Use unsolicited ARP response packets
  *
  * Related: gStaKeepAlivePeriod, gApKeepAlivePeriod, gGoKeepAlivePeriod
  *
@@ -512,7 +513,7 @@
 #define CFG_STA_KEEPALIVE_METHOD CFG_INI_INT( \
 			"gStaKeepAliveMethod", \
 			MLME_STA_KEEPALIVE_NULL_DATA, \
-			MLME_STA_KEEPALIVE_GRAT_ARP, \
+			MLME_STA_KEEPALIVE_UNSOLICIT_ARP_RSP, \
 			MLME_STA_KEEPALIVE_NULL_DATA, \
 			CFG_VALUE_OR_DEFAULT, \
 			"Which keepalive method to use")

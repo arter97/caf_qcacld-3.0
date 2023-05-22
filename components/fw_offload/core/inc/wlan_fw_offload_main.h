@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012 - 2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -113,7 +113,7 @@ struct wlan_fwol_coex_config {
 #endif
 };
 
-#define FWOL_THERMAL_LEVEL_MAX 4
+#define FWOL_THERMAL_LEVEL_MAX 6
 #define FWOL_THERMAL_THROTTLE_LEVEL_MAX 6
 /**
  * struct wlan_fwol_thermal_temp - Thermal temperature config items

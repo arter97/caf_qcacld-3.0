@@ -53,6 +53,18 @@
 
 #define SAE_AUTH_SEQ_NUM_OFFSET       2
 #define SAE_AUTH_STATUS_CODE_OFFSET   4
+#define SAE_AUTH_GROUP_ID_OFFSET      6
+
+#define SAE_GROUP_ID_19                    19
+#define SAE_GROUP_ID_20                    20
+#define SAE_GROUP_ID_21                    21
+
+#define SAE_GROUP_19_FIXED_FIELDS_LEN      96
+#define SAE_GROUP_20_FIXED_FIELDS_LEN      144
+#define SAE_GROUP_21_FIXED_FIELDS_LEN      198
+
+#define WLAN_SAE_STATUS_HASH_TO_ELEMENT    126
+#define WLAN_SAE_STATUS_PK                 127
 
 /* MLM message types */
 enum mlmmsgtype {
@@ -488,6 +500,22 @@ void lim_process_bcn_prb_rsp_t2lm(struct mac_context *mac_ctx,
 void lim_process_beacon_mlo(struct mac_context *mac_ctx,
 			    struct pe_session *session,
 			    tSchBeaconStruct *bcn_ptr);
+
+/**
+ * lim_process_ml_reconfig() - to process beacon frames with reconfig IE
+ * @mac_ctx: Pointer to Global MAC structure
+ * @session: A pointer to session
+ * @rx_pkt_info: A pointer to RX packet info structure
+ *
+ * This function will process ml reconfig beacon frames. If reconfig ie
+ * is present for link removal, link reconfig timer will start.
+ *
+ * Return: none
+ */
+void
+lim_process_ml_reconfig(struct mac_context *mac_ctx,
+			struct pe_session *session,
+			uint8_t *rx_pkt_info);
 #else
 static inline
 void lim_process_beacon_mlo(struct mac_context *mac_ctx,
@@ -500,6 +528,13 @@ static inline
 void lim_process_bcn_prb_rsp_t2lm(struct mac_context *mac_ctx,
 				  struct pe_session *session,
 				  tpSirProbeRespBeacon bcn_ptr)
+{
+}
+
+static inline void
+lim_process_ml_reconfig(struct mac_context *mac_ctx,
+			struct pe_session *session,
+			uint8_t *rx_pkt_info)
 {
 }
 #endif
@@ -1151,6 +1186,15 @@ QDF_STATUS lim_sta_handle_connect_fail(join_params *param);
 void lim_join_result_callback(struct mac_context *mac,
 			      uint8_t vdev_id);
 
+/**
+ * lim_update_lost_link_rssi() - API to update lost link rssi in lim session
+ * @mac: Pointer to Global MAC structure
+ * @rssi: rssi at disconnect time
+ *
+ * Return: None
+ */
+void lim_update_lost_link_rssi(struct mac_context *mac, uint32_t rssi);
+
 #ifdef WLAN_FEATURE_HOST_ROAM
 QDF_STATUS lim_sta_reassoc_error_handler(struct reassoc_params *param);
 #else
@@ -1372,16 +1416,6 @@ QDF_STATUS lim_process_sme_del_all_tdls_peers(struct mac_context *p_mac,
  */
 void lim_send_bcn_rsp(struct mac_context *mac_ctx, tpSendbeaconParams rsp);
 
-/**
- * lim_process_rx_channel_status_event() - processes
- * event WDA_RX_CHN_STATUS_EVENT
- * @mac_ctx Pointer to Global MAC structure
- * @buf: Received message info
- *
- * Return: None
- */
-void lim_process_rx_channel_status_event(struct mac_context *mac_ctx, void *buf);
-
 /* / Bit value data structure */
 typedef enum sHalBitVal         /* For Bit operations */
 {
@@ -1429,6 +1463,23 @@ QDF_STATUS lim_send_delba_action_frame(struct mac_context *mac_ctx,
 
 #ifdef WLAN_FEATURE_11BE_MLO
 /**
+ * lim_send_t2lm_action_req_frame() - Send T2LM negotiation request to peer
+ * @vdev: vdev pointer
+ * @peer_mac: Peer mac addr
+ * @args: Pointer to action frame args
+ * @ongoing_t2lm_neg: T2LM negotiation request
+ * @token: Dialog token
+ *
+ * Return: 0 for success, non-zero for failure
+ */
+QDF_STATUS
+lim_send_t2lm_action_req_frame(struct wlan_objmgr_vdev *vdev,
+			       uint8_t *peer_mac,
+			       struct wlan_action_frame_args *args,
+			       struct wlan_t2lm_onging_negotiation_info *t2lm_neg,
+			       uint8_t token);
+
+/**
  * lim_send_t2lm_action_rsp_frame() - Send T2LM negotiation response to peer
  * @mac_ctx: mac context
  * @peer_mac: Peer mac addr
@@ -1450,6 +1501,16 @@ lim_send_t2lm_action_rsp_frame(struct mac_context *mac_ctx,
 			       tSirMacAddr peer_mac,
 			       struct pe_session *session, uint8_t token,
 			       enum wlan_t2lm_resp_frm_type status_code)
+{
+	return QDF_STATUS_SUCCESS;
+}
+
+static inline QDF_STATUS
+lim_send_t2lm_action_req_frame(struct wlan_objmgr_vdev *vdev,
+			       uint8_t *peer_mac,
+			       struct wlan_action_frame_args *args,
+			       struct wlan_t2lm_onging_negotiation_info *t2lm_neg,
+			       uint8_t token)
 {
 	return QDF_STATUS_SUCCESS;
 }

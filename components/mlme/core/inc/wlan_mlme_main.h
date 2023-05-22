@@ -38,6 +38,14 @@
 #define JOIN_PROBE_REQ_TIMER_MS              200
 #define MAX_JOIN_PROBE_REQ                   5
 
+#define MAX_WAKELOCK_FOR_BSS_COLOR_CHANGE    2000
+
+/* If AP reported link delete timer less than such value,
+ * host will do link removel directly without wait for the
+ * timer timeout.
+ */
+#define LINK_REMOVAL_MIN_TIMEOUT_MS 1000
+
 /*
  * Following time is used to program WOW_TIMER_PATTERN to FW so that FW will
  * wake host up to do graceful disconnect in case PEER remains un-authorized
@@ -118,6 +126,7 @@ struct peer_disconnect_stats_param {
  * @rso_rx_ops: Roam Rx ops to receive roam offload events from firmware
  * @wfa_testcmd: WFA config tx ops to send to FW
  * @disconnect_stats_param: Peer disconnect stats related params for SAP case
+ * @scan_requester_id: mlme scan requester id
  */
 struct wlan_mlme_psoc_ext_obj {
 	struct wlan_mlme_cfg cfg;
@@ -125,6 +134,7 @@ struct wlan_mlme_psoc_ext_obj {
 	struct wlan_cm_roam_rx_ops rso_rx_ops;
 	struct wlan_mlme_wfa_cmd wfa_testcmd;
 	struct peer_disconnect_stats_param disconnect_stats_param;
+	wlan_scan_requester scan_requester_id;
 };
 
 /**
@@ -378,6 +388,7 @@ struct ft_context {
  * @ese_tspec_info: ese tspec info
  * @ext_cap_ie: Ext CAP IE
  * @assoc_btm_cap: BSS transition management cap used in (re)assoc req
+ * @ch_width_orig: channel width at the time of initial connection
  */
 struct mlme_connect_info {
 	uint8_t timing_meas_cap;
@@ -403,6 +414,7 @@ struct mlme_connect_info {
 #endif
 	uint8_t ext_cap_ie[DOT11F_IE_EXTCAP_MAX_LEN + 2];
 	bool assoc_btm_cap;
+	enum phy_ch_width ch_width_orig;
 };
 
 /** struct wait_for_key_timer - wait for key timer object
@@ -640,7 +652,7 @@ struct eroam_trigger_info {
 	struct roam_trigger_abort_reason abort;
 	enum roam_stats_scan_type roam_scan_type;
 	uint8_t roam_status;
-	uint32_t roam_fail_reason;
+	enum wlan_roam_failure_reason_code roam_fail_reason;
 };
 
 /**
@@ -663,7 +675,7 @@ struct roam_scan_chn {
  */
 struct eroam_scan_info {
 	uint8_t num_channels;
-	struct roam_scan_chn *roam_chn;
+	struct roam_scan_chn roam_chn[MAX_ROAM_SCAN_CHAN];
 	uint32_t total_scan_time;
 };
 
@@ -681,6 +693,7 @@ struct eroam_frame_info {
 	uint64_t timestamp;
 };
 
+/* Key frame num during roaming: PREAUTH/PREASSOC/EAPOL M1-M4 */
 #define ROAM_FRAME_NUM 6
 
 /**
@@ -747,6 +760,9 @@ struct enhance_roam_info {
  * @country_ie_for_all_band: take all band channel info in country ie
  * @mlme_ap: SAP related vdev private configurations
  * @is_single_link_mlo_roam: Single link mlo roam flag
+ * @bss_color_change_wakelock: wakelock to complete bss color change
+ *				operation on bss color collision detection
+ * @bss_color_change_runtime_lock: runtime lock to complete bss color change
  */
 struct mlme_legacy_priv {
 	bool chan_switch_in_progress;
@@ -816,6 +832,8 @@ struct mlme_legacy_priv {
 #if defined(WLAN_FEATURE_11BE_MLO) && defined(WLAN_FEATURE_ROAM_OFFLOAD)
 	bool is_single_link_mlo_roam;
 #endif
+	qdf_wake_lock_t bss_color_change_wakelock;
+	qdf_runtime_lock_t bss_color_change_runtime_lock;
 };
 
 /**
@@ -904,6 +922,17 @@ struct wlan_mlme_nss_chains *mlme_get_dynamic_vdev_config(
  * Return: HE ops IE
  */
 uint32_t mlme_get_vdev_he_ops(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id);
+
+/**
+ * mlme_connected_chan_stats_request() - process connected channel stats
+ * request
+ * @psoc: pointer to psoc object
+ * @vdev_id: Vdev id
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS mlme_connected_chan_stats_request(struct wlan_objmgr_psoc *psoc,
+					     uint8_t vdev_id);
 
 /**
  * mlme_get_ini_vdev_config() - get the vdev ini config params

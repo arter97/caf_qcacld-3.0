@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2020-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -1098,6 +1098,11 @@ dp_fisa_rx_get_sw_ft_entry(struct dp_rx_fst *fisa_hdl, qdf_nbuf_t nbuf,
 	}
 
 	sw_ft_entry = &sw_ft_base[flow_idx];
+	if (!sw_ft_entry->is_populated) {
+		dp_info("Pkt rx for non configured flow idx 0x%x", flow_idx);
+		DP_STATS_INC(fisa_hdl, invalid_flow_index, 1);
+		return NULL;
+	}
 
 	if (!fisa_hdl->flow_deletion_supported) {
 		sw_ft_entry->vdev = vdev;
@@ -1971,6 +1976,7 @@ QDF_STATUS dp_fisa_rx(struct dp_soc *soc, struct dp_vdev *vdev,
 	struct dp_fisa_rx_sw_ft *fisa_flow;
 	int fisa_ret;
 	uint8_t rx_ctx_id = QDF_NBUF_CB_RX_CTX_ID(nbuf_list);
+	uint32_t tlv_reo_dest_ind;
 
 	head_nbuf = nbuf_list;
 
@@ -1998,6 +2004,18 @@ QDF_STATUS dp_fisa_rx(struct dp_soc *soc, struct dp_vdev *vdev,
 
 		qdf_nbuf_push_head(head_nbuf, soc->rx_pkt_tlv_size +
 				   QDF_NBUF_CB_RX_PACKET_L3_HDR_PAD(head_nbuf));
+
+		hal_rx_msdu_get_reo_destination_indication(soc->hal_soc,
+							   (uint8_t *)qdf_nbuf_data(head_nbuf),
+							   &tlv_reo_dest_ind);
+
+		/* Skip FISA aggregation and drop the frame if RDI is REO2TCL. */
+		if (qdf_unlikely(tlv_reo_dest_ind == REO_REMAP_TCL)) {
+			qdf_nbuf_free(head_nbuf);
+			head_nbuf = next_nbuf;
+			DP_STATS_INC(dp_fisa_rx_hdl, incorrect_rdi, 1);
+			continue;
+		}
 
 		/* Add new flow if the there is no ongoing flow */
 		fisa_flow = dp_rx_get_fisa_flow(dp_fisa_rx_hdl, vdev,

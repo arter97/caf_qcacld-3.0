@@ -1059,6 +1059,34 @@ QDF_STATUS mlme_update_tgt_he_caps_in_cfg(struct wlan_objmgr_psoc *psoc,
 enum phy_ch_width wlan_mlme_convert_vht_op_bw_to_phy_ch_width(
 						uint8_t channel_width);
 
+/**
+ * wlan_mlme_chan_stats_scan_event_cb() - process connected channel stats
+ * scan event
+ * @vdev: pointer to vdev object
+ * @event: scan event definition
+ * @arg: scan argument
+ *
+ * Return: none
+ */
+void wlan_mlme_chan_stats_scan_event_cb(struct wlan_objmgr_vdev *vdev,
+					struct scan_event *event, void *arg);
+
+/**
+ * wlan_mlme_send_ch_width_update_with_notify() - update connected VDEV
+ * channel bandwidth
+ * @psoc: pointer to psoc object
+ * @vdev: pointer to vdev object
+ * @vdev_id: vdev id
+ * @ch_width: channel width to update
+ *
+ * Return: none
+ */
+QDF_STATUS
+wlan_mlme_send_ch_width_update_with_notify(struct wlan_objmgr_psoc *psoc,
+					   struct wlan_objmgr_vdev *vdev,
+					   uint8_t vdev_id,
+					   enum phy_ch_width ch_width);
+
 #ifdef WLAN_FEATURE_11BE
 /**
  * mlme_update_tgt_eht_caps_in_cfg() - Update tgt eht cap in mlme component
@@ -2450,6 +2478,19 @@ wlan_mlme_set_rf_test_mode_enabled(struct wlan_objmgr_psoc *psoc, bool value);
 
 #ifdef CONFIG_BAND_6GHZ
 /**
+ * wlan_mlme_is_disable_vlp_sta_conn_to_sp_ap_enabled() - Get the disable vlp
+ *                                                       STA conn to SP AP flag
+ * @psoc: psoc context
+ * @value: Enable/Disable value ptr.
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+wlan_mlme_is_disable_vlp_sta_conn_to_sp_ap_enabled(
+						struct wlan_objmgr_psoc *psoc,
+						bool *value);
+
+/**
  * wlan_mlme_is_standard_6ghz_conn_policy_enabled() - Get the 6 GHz standard
  *                                                    connection policy flag
  * @psoc: psoc context
@@ -2461,50 +2502,21 @@ QDF_STATUS
 wlan_mlme_is_standard_6ghz_conn_policy_enabled(struct wlan_objmgr_psoc *psoc,
 					       bool *value);
 
-/**
- * wlan_mlme_is_relaxed_6ghz_conn_policy_enabled() - Get the 6 GHz relaxed
- *                                                   connection policy flag
- * @psoc: psoc context
- * @value: Enable/Disable value ptr.
- *
- * Return: QDF_STATUS
- */
-QDF_STATUS
-wlan_mlme_is_relaxed_6ghz_conn_policy_enabled(struct wlan_objmgr_psoc *psoc,
-					      bool *value);
-
-/**
- * wlan_mlme_set_relaxed_6ghz_conn_policy() - Set the 6 GHz relaxed
- *                                            connection policy flag
- * @psoc: psoc context
- * @value: True/False
- *
- * Return: QDF_STATUS
- */
-QDF_STATUS
-wlan_mlme_set_relaxed_6ghz_conn_policy(struct wlan_objmgr_psoc *psoc,
-				       bool value);
 #else
+static inline QDF_STATUS
+wlan_mlme_is_disable_vlp_sta_conn_to_sp_ap_enabled(
+						struct wlan_objmgr_psoc *psoc,
+						bool *value)
+{
+	*value = false;
+	return QDF_STATUS_SUCCESS;
+}
+
 static inline QDF_STATUS
 wlan_mlme_is_standard_6ghz_conn_policy_enabled(struct wlan_objmgr_psoc *psoc,
 					       bool *value)
 {
 	*value = false;
-	return QDF_STATUS_SUCCESS;
-}
-
-static inline QDF_STATUS
-wlan_mlme_is_relaxed_6ghz_conn_policy_enabled(struct wlan_objmgr_psoc *psoc,
-					      bool *value)
-{
-	*value = false;
-	return QDF_STATUS_SUCCESS;
-}
-
-static inline QDF_STATUS
-wlan_mlme_set_relaxed_6ghz_conn_policy(struct wlan_objmgr_psoc *psoc,
-				       bool value)
-{
 	return QDF_STATUS_SUCCESS;
 }
 #endif
@@ -4245,4 +4257,27 @@ wlan_mlme_stats_get_periodic_display_time(struct wlan_objmgr_psoc *psoc,
  */
 bool
 wlan_mlme_is_bcn_prot_disabled_for_sap(struct wlan_objmgr_psoc *psoc);
+
+/**
+ * wlan_mlme_get_src_addr_from_frame() - Get source address of the frame
+ * @frame: frame ptr
+ *
+ * Extract source mac address of the frame
+ *
+ * Return: Ptr for extracted src mac address
+ *
+ */
+uint8_t *
+wlan_mlme_get_src_addr_from_frame(struct element_info *frame);
+
+/*
+ * wlan_mlme_get_sap_ps_with_twt() - power save with twt config enabled/disabled
+ * for SAP interface
+ *
+ * @psoc: pointer to psoc object
+ *
+ * Return: power save enabled/disabled
+ */
+bool
+wlan_mlme_get_sap_ps_with_twt(struct wlan_objmgr_psoc *psoc);
 #endif /* _WLAN_MLME_API_H_ */

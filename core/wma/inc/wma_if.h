@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2011-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -698,16 +698,6 @@ typedef struct sMaxTxPowerPerBandParams {
 } tMaxTxPowerPerBandParams, *tpMaxTxPowerPerBandParams;
 
 /**
- * struct vdev_create_req_param - vdev create request params
- * @vdev_id: vdev_id
- * @status: response status code
- */
-struct vdev_create_req_param {
-	uint32_t vdev_id;
-	QDF_STATUS status;
-};
-
-/**
  * struct set_ie_param - set IE params structure
  * @pdev_id: pdev id
  * @ie_type: IE type
@@ -743,14 +733,12 @@ struct set_dtim_params {
  * @session_id: SME Session ID
  * @status: response status code
  * @vdev: Object to vdev
- * @sme_ctx: pointer to context provided by SME
  */
 struct del_vdev_params {
 	tSirMacAddr self_mac_addr;
 	uint8_t vdev_id;
 	uint32_t status;
 	struct wlan_objmgr_vdev *vdev;
-	void *sme_ctx;
 };
 
 /**

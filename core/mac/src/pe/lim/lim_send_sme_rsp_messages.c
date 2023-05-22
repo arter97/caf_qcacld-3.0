@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -55,6 +55,7 @@
 #include "wlan_tdls_tgt_api.h"
 #include "lim_process_fils.h"
 #include "wma.h"
+#include "wma_he.h"
 #include <../../core/src/wlan_cm_vdev_api.h>
 #include <wlan_mlo_mgr_sta.h>
 #include <spatial_reuse_api.h>
@@ -136,6 +137,38 @@ lim_send_stop_bss_response(struct mac_context *mac_ctx, uint8_t vdev_id,
 #endif /* FEATURE_WLAN_DIAG_SUPPORT */
 	lim_sys_process_mmh_msg_api(mac_ctx, &msg);
 }
+
+#ifdef WLAN_FEATURE_11AX
+/**
+ * lim_get_he_rate_info_flag() - Get he tx rate info flag
+ * @sta_ds: Pointer to station ds structure
+ *
+ * This function is called to get the he tx rate info.
+ *
+ * Return: Returns he tx rate flag
+ */
+static enum tx_rate_info
+lim_get_he_rate_info_flag(tpDphHashNode sta_ds)
+{
+	tDot11fIEhe_cap *peer_he = &sta_ds->he_config;
+
+	if (peer_he->chan_width_3 || peer_he->chan_width_2)
+		return TX_RATE_HE160;
+	else if (peer_he->chan_width_1)
+		return TX_RATE_HE80;
+	else if (peer_he->chan_width_0)
+		return TX_RATE_HE40;
+	else
+		return TX_RATE_HE20;
+}
+#else
+static enum tx_rate_info
+lim_get_he_rate_info_flag(tpDphHashNode sta_ds)
+{
+	return TX_RATE_LEGACY;
+}
+#endif
+
 /**
  * lim_get_max_rate_flags() - Get rate flags
  * @mac_ctx: Pointer to global MAC structure
@@ -157,11 +190,19 @@ uint32_t lim_get_max_rate_flags(struct mac_context *mac_ctx, tpDphHashNode sta_d
 	}
 
 	if (!sta_ds->mlmStaContext.htCapability &&
-	    !sta_ds->mlmStaContext.vhtCapability) {
+	    !sta_ds->mlmStaContext.vhtCapability &&
+	    !lim_is_sta_he_capable(sta_ds)) {
 		rate_flags |= TX_RATE_LEGACY;
 	} else {
-		if (sta_ds->mlmStaContext.vhtCapability) {
-			if (WNI_CFG_VHT_CHANNEL_WIDTH_80MHZ ==
+		if (lim_is_sta_he_capable(sta_ds)) {
+			rate_flags |= lim_get_he_rate_info_flag(sta_ds);
+		} else if (sta_ds->mlmStaContext.vhtCapability) {
+			if (WNI_CFG_VHT_CHANNEL_WIDTH_160MHZ ==
+			   sta_ds->vhtSupportedChannelWidthSet ||
+			   WNI_CFG_VHT_CHANNEL_WIDTH_80_PLUS_80MHZ ==
+			   sta_ds->vhtSupportedChannelWidthSet) {
+				rate_flags |= TX_RATE_VHT160;
+			} else if (WNI_CFG_VHT_CHANNEL_WIDTH_80MHZ ==
 				sta_ds->vhtSupportedChannelWidthSet) {
 				rate_flags |= TX_RATE_VHT80;
 			} else if (WNI_CFG_VHT_CHANNEL_WIDTH_20_40MHZ ==
@@ -296,9 +337,10 @@ lim_cm_prepare_join_rsp_from_pe_session(struct mac_context *mac_ctx,
 
 	connect_rsp->cm_id = pe_session->cm_id;
 	connect_rsp->vdev_id = pe_session->vdev_id;
-	qdf_mem_copy(connect_rsp->bssid.bytes, pe_session->bssId,
-		     QDF_MAC_ADDR_SIZE);
-
+	qdf_ether_addr_copy(connect_rsp->bssid.bytes, pe_session->bssId);
+	wlan_cm_connect_resp_fill_mld_addr_from_cm_id(pe_session->vdev,
+						      pe_session->cm_id,
+						      connect_rsp);
 	connect_rsp->freq = pe_session->curr_op_freq;
 	connect_rsp->connect_status = connect_status;
 	connect_rsp->reason = reason;
@@ -389,6 +431,9 @@ lim_cm_fill_join_rsp_from_connect_req(struct cm_vdev_join_req *req,
 	connect_rsp->ssid = req->entry->ssid;
 	connect_rsp->is_wps_connection = req->is_wps_connection;
 	connect_rsp->is_osen_connection = req->is_osen_connection;
+	wlan_cm_connect_resp_fill_mld_addr_from_vdev_id(rsp->psoc, req->vdev_id,
+							req->entry,
+							connect_rsp);
 }
 
 static QDF_STATUS lim_cm_flush_connect_rsp(struct scheduler_msg *msg)
@@ -1863,8 +1908,8 @@ void lim_handle_sta_csa_param(struct mac_context *mac_ctx,
 
 	session_entry->htSupportedChannelWidthSet = false;
 	wlan_reg_read_current_country(mac_ctx->psoc, country_code);
-	if (!csa_params->ies_present_flag) {
-		/* no ies, means triggered by host */
+	if (!csa_params->ies_present_flag ||
+	    (csa_params->ies_present_flag & MLME_CSWRAP_IE_EXT_V2_PRESENT)) {
 		pe_debug("new freq: %u, width: %d", csa_params->csa_chan_freq,
 			 csa_params->new_ch_width);
 		ch_params.ch_width = csa_params->new_ch_width;
@@ -2477,6 +2522,8 @@ lim_handle_bss_color_change_ie(struct mac_context *mac_ctx,
 			lim_send_obss_color_collision_cfg(
 				mac_ctx, session,
 				OBSS_COLOR_COLLISION_DETECTION);
+			wma_allow_suspend_after_obss_color_change(
+								session->vdev);
 		}
 		lim_send_bss_color_change_ie_update(mac_ctx, session);
 	}
@@ -2495,7 +2542,8 @@ lim_process_beacon_tx_success_ind(struct mac_context *mac_ctx, uint16_t msgType,
 				  void *event)
 {
 	struct pe_session *session;
-	bool csa_tx_offload;
+	struct wlan_objmgr_vdev *vdev;
+	bool csa_tx_offload, is_sap_go_moved_before_sta = false;
 	tpSirFirstBeaconTxCompleteInd bcn_ind =
 		(tSirFirstBeaconTxCompleteInd *) event;
 
@@ -2505,11 +2553,21 @@ lim_process_beacon_tx_success_ind(struct mac_context *mac_ctx, uint16_t msgType,
 		return;
 	}
 
-	pe_debug("role: %d swIe: %d opIe: %d switch cnt:%d",
+	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(mac_ctx->psoc,
+						    session->vdev_id,
+						    WLAN_LEGACY_MAC_ID);
+	if (vdev) {
+		is_sap_go_moved_before_sta =
+			wlan_vdev_mlme_is_sap_go_move_before_sta(vdev);
+		wlan_vdev_mlme_set_sap_go_move_before_sta(vdev, false);
+		wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_MAC_ID);
+	}
+	pe_debug("role: %d swIe: %d opIe: %d switch cnt:%d Is SAP / GO Moved before STA: %d",
 		 GET_LIM_SYSTEM_ROLE(session),
 		 session->dfsIncludeChanSwIe,
 		 session->gLimOperatingMode.present,
-		 session->gLimChannelSwitch.switchCount);
+		 session->gLimChannelSwitch.switchCount,
+		 is_sap_go_moved_before_sta);
 
 	if (!LIM_IS_AP_ROLE(session))
 		return;
@@ -2518,7 +2576,8 @@ lim_process_beacon_tx_success_ind(struct mac_context *mac_ctx, uint16_t msgType,
 	if (session->dfsIncludeChanSwIe && !csa_tx_offload &&
 	    ((session->gLimChannelSwitch.switchCount ==
 	      mac_ctx->sap.SapDfsInfo.sap_ch_switch_beacon_cnt) ||
-	     (session->gLimChannelSwitch.switchCount == 1)))
+	     (session->gLimChannelSwitch.switchCount == 1) ||
+	     is_sap_go_moved_before_sta))
 		lim_process_ap_ecsa_timeout(session);
 
 

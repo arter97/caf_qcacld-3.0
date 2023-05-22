@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2011-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -144,7 +144,8 @@ static void hdd_sysfs_get_stats(struct hdd_adapter *adapter, ssize_t *length,
 		stats->txflow_unpause_cnt);
 
 	len += cdp_stats(cds_get_context(QDF_MODULE_ID_SOC),
-			 adapter->vdev_id, &buffer[len], (buf_len - len));
+			 adapter->deflink->vdev_id, &buffer[len],
+			 (buf_len - len));
 	*length = len + 1;
 	qdf_mem_free(dp_stats);
 }

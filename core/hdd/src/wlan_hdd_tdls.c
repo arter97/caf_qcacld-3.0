@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2020 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -80,6 +80,7 @@ int wlan_hdd_tdls_get_all_peers(struct hdd_adapter *adapter,
 	int len;
 	struct hdd_context *hdd_ctx;
 	struct wlan_objmgr_vdev *vdev;
+	struct wlan_objmgr_vdev *link_vdev;
 	int ret;
 
 	hdd_enter();
@@ -103,7 +104,15 @@ int wlan_hdd_tdls_get_all_peers(struct hdd_adapter *adapter,
 		len = scnprintf(buf, buflen, "\nVDEV is NULL\n");
 		return len;
 	}
-	ret = wlan_cfg80211_tdls_get_all_peers(vdev, buf, buflen);
+
+	link_vdev = ucfg_tdls_get_tdls_link_vdev(vdev, WLAN_OSIF_TDLS_ID);
+	if (link_vdev) {
+		ret = wlan_cfg80211_tdls_get_all_peers(link_vdev, buf, buflen);
+		ucfg_tdls_put_tdls_link_vdev(link_vdev, WLAN_OSIF_TDLS_ID);
+	} else {
+		ret = wlan_cfg80211_tdls_get_all_peers(vdev, buf, buflen);
+	}
+
 	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_TDLS_ID);
 
 	return ret;
@@ -414,7 +423,7 @@ int wlan_hdd_cfg80211_exttdls_disable(struct wiphy *wiphy,
 	return errno;
 }
 
-#if TDLS_MGMT_VERSION2
+#ifdef TDLS_MGMT_VERSION5
 /**
  * __wlan_hdd_cfg80211_tdls_mgmt() - handle management actions on a given peer
  * @wiphy: wiphy
@@ -424,18 +433,20 @@ int wlan_hdd_cfg80211_exttdls_disable(struct wiphy *wiphy,
  * @dialog_token: dialog token
  * @status_code: status code
  * @peer_capability: peer capability
+ * @initiator: tdls initiator flag
  * @buf: additional IE to include
  * @len: length of buf in bytes
+ * @link_id: link id for mld device
  *
  * Return: 0 if success; negative errno otherwise
  */
 static int __wlan_hdd_cfg80211_tdls_mgmt(struct wiphy *wiphy,
-				struct net_device *dev, u8 *peer,
-				u8 action_code, u8 dialog_token,
-				u16 status_code, u32 peer_capability,
-				const u8 *buf, size_t len)
-#else
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 17, 0))
+				struct net_device *dev, const uint8_t *peer,
+				uint8_t action_code, uint8_t dialog_token,
+				uint16_t status_code, uint32_t peer_capability,
+				bool initiator, const uint8_t *buf,
+				size_t len, int link_id)
+#elif (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 17, 0))
 static int __wlan_hdd_cfg80211_tdls_mgmt(struct wiphy *wiphy,
 				struct net_device *dev, const uint8_t *peer,
 				uint8_t action_code, uint8_t dialog_token,
@@ -448,7 +459,7 @@ static int __wlan_hdd_cfg80211_tdls_mgmt(struct wiphy *wiphy,
 				uint8_t action_code, uint8_t dialog_token,
 				uint16_t status_code, uint32_t peer_capability,
 				const uint8_t *buf, size_t len)
-#elif (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 15, 0))
+#elif (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 15, 0)) || defined(TDLS_MGMT_VERSION2)
 static int __wlan_hdd_cfg80211_tdls_mgmt(struct wiphy *wiphy,
 				struct net_device *dev, uint8_t *peer,
 				uint8_t action_code, uint8_t dialog_token,
@@ -461,11 +472,13 @@ static int __wlan_hdd_cfg80211_tdls_mgmt(struct wiphy *wiphy,
 				uint16_t status_code, const uint8_t *buf,
 				size_t len)
 #endif
-#endif
 {
 	struct hdd_adapter *adapter = WLAN_HDD_GET_PRIV_PTR(dev);
 	struct hdd_context *hdd_ctx = wiphy_priv(wiphy);
 	bool tdls_support;
+#ifndef TDLS_MGMT_VERSION5
+	int link_id = -1;
+#endif
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(3, 15, 0))
 #if !(TDLS_MGMT_VERSION2)
 	u32 peer_capability;
@@ -479,12 +492,12 @@ static int __wlan_hdd_cfg80211_tdls_mgmt(struct wiphy *wiphy,
 		return -EINVAL;
 	}
 
-	if (wlan_hdd_validate_vdev_id(adapter->vdev_id))
+	if (wlan_hdd_validate_vdev_id(adapter->deflink->vdev_id))
 		return -EINVAL;
 
 	qdf_mtrace(QDF_MODULE_ID_HDD, QDF_MODULE_ID_HDD,
 		   TRACE_CODE_HDD_CFG80211_TDLS_MGMT,
-		   adapter->vdev_id, action_code);
+		   adapter->deflink->vdev_id, action_code);
 
 	if (wlan_hdd_validate_context(hdd_ctx))
 		return -EINVAL;
@@ -497,23 +510,19 @@ static int __wlan_hdd_cfg80211_tdls_mgmt(struct wiphy *wiphy,
 	}
 
 	if (hdd_ctx->tdls_umac_comp_active) {
-		struct wlan_objmgr_vdev *vdev;
 		int ret;
 
-		vdev = hdd_objmgr_get_vdev_by_user(adapter, WLAN_OSIF_TDLS_ID);
-		if (!vdev)
-			return -EINVAL;
-		ret = wlan_cfg80211_tdls_mgmt(vdev, peer,
-					      action_code, dialog_token,
-					      status_code, peer_capability,
-					      buf, len);
-		hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_TDLS_ID);
+		ret = wlan_cfg80211_tdls_mgmt_mlo(adapter, peer,
+						  action_code, dialog_token,
+						  status_code, peer_capability,
+						  buf, len, link_id);
 		return ret;
 	}
 
 	return -EINVAL;
 }
 
+#ifdef TDLS_MGMT_VERSION5
 /**
  * wlan_hdd_cfg80211_tdls_mgmt() - cfg80211 tdls mgmt handler function
  * @wiphy: Pointer to wiphy structure.
@@ -523,8 +532,10 @@ static int __wlan_hdd_cfg80211_tdls_mgmt(struct wiphy *wiphy,
  * @dialog_token: dialog token
  * @status_code: status code
  * @peer_capability: peer capability
+ * @initiator: tdls initiator flag
  * @buf: buffer
  * @len: Length of @buf
+ * @link_id: link id for mld device
  *
  * This is the cfg80211 tdls mgmt handler function which invokes
  * the internal function @__wlan_hdd_cfg80211_tdls_mgmt with
@@ -532,15 +543,13 @@ static int __wlan_hdd_cfg80211_tdls_mgmt(struct wiphy *wiphy,
  *
  * Return: 0 for success, error number on failure.
  */
-#if TDLS_MGMT_VERSION2
 int wlan_hdd_cfg80211_tdls_mgmt(struct wiphy *wiphy,
 					struct net_device *dev,
-					u8 *peer, u8 action_code,
-					u8 dialog_token,
-					u16 status_code, u32 peer_capability,
-					const u8 *buf, size_t len)
-#else /* TDLS_MGMT_VERSION2 */
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 17, 0)) || defined(WITH_BACKPORTS)
+					const u8 *peer, u8 action_code,
+					u8 dialog_token, u16 status_code,
+					u32 peer_capability, bool initiator,
+					const u8 *buf, size_t len, int link_id)
+#elif (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 17, 0)) || defined(WITH_BACKPORTS)
 int wlan_hdd_cfg80211_tdls_mgmt(struct wiphy *wiphy,
 					struct net_device *dev,
 					const u8 *peer, u8 action_code,
@@ -554,7 +563,7 @@ int wlan_hdd_cfg80211_tdls_mgmt(struct wiphy *wiphy,
 					u8 dialog_token, u16 status_code,
 					u32 peer_capability, const u8 *buf,
 					size_t len)
-#elif (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 15, 0))
+#elif (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 15, 0)) || defined(TDLS_MGMT_VERSION2)
 int wlan_hdd_cfg80211_tdls_mgmt(struct wiphy *wiphy,
 					struct net_device *dev,
 					u8 *peer, u8 action_code,
@@ -569,7 +578,6 @@ int wlan_hdd_cfg80211_tdls_mgmt(struct wiphy *wiphy,
 					u16 status_code, const u8 *buf,
 					size_t len)
 #endif
-#endif
 {
 	int errno;
 	struct osif_vdev_sync *vdev_sync;
@@ -578,12 +586,12 @@ int wlan_hdd_cfg80211_tdls_mgmt(struct wiphy *wiphy,
 	if (errno)
 		return errno;
 
-#if TDLS_MGMT_VERSION2
+#ifdef TDLS_MGMT_VERSION5
 	errno = __wlan_hdd_cfg80211_tdls_mgmt(wiphy, dev, peer, action_code,
 					      dialog_token, status_code,
-					      peer_capability, buf, len);
-#else /* TDLS_MGMT_VERSION2 */
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 17, 0)) || defined(WITH_BACKPORTS)
+					      peer_capability, initiator,
+					      buf, len, link_id);
+#elif (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 17, 0)) || defined(WITH_BACKPORTS)
 	errno = __wlan_hdd_cfg80211_tdls_mgmt(wiphy, dev, peer, action_code,
 					      dialog_token, status_code,
 					      peer_capability, initiator,
@@ -592,7 +600,7 @@ int wlan_hdd_cfg80211_tdls_mgmt(struct wiphy *wiphy,
 	errno = __wlan_hdd_cfg80211_tdls_mgmt(wiphy, dev, peer, action_code,
 					      dialog_token, status_code,
 					      peer_capability, buf, len);
-#elif (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 15, 0))
+#elif (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 15, 0)) || defined(TDLS_MGMT_VERSION2)
 	errno = __wlan_hdd_cfg80211_tdls_mgmt(wiphy, dev, peer, action_code,
 					      dialog_token, status_code,
 					      peer_capability, buf, len);
@@ -600,7 +608,6 @@ int wlan_hdd_cfg80211_tdls_mgmt(struct wiphy *wiphy,
 	errno = __wlan_hdd_cfg80211_tdls_mgmt(wiphy, dev, peer, action_code,
 					      dialog_token, status_code,
 					      buf, len);
-#endif
 #endif
 
 	osif_vdev_sync_op_stop(vdev_sync);
@@ -613,7 +620,7 @@ hdd_is_sta_legacy(struct hdd_adapter *adapter)
 {
 	struct hdd_station_ctx *sta_ctx;
 
-	sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter);
+	sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter->deflink);
 	if (!sta_ctx)
 		return false;
 
@@ -742,7 +749,7 @@ static int __wlan_hdd_cfg80211_tdls_oper(struct wiphy *wiphy,
 		return -EINVAL;
 	}
 
-	if (wlan_hdd_validate_vdev_id(adapter->vdev_id))
+	if (wlan_hdd_validate_vdev_id(adapter->deflink->vdev_id))
 		return -EINVAL;
 
 	cfg_tdls_get_support_enable(hdd_ctx->psoc, &tdls_support);
@@ -754,7 +761,7 @@ static int __wlan_hdd_cfg80211_tdls_oper(struct wiphy *wiphy,
 
 	qdf_mtrace(QDF_MODULE_ID_HDD, QDF_MODULE_ID_HDD,
 		   TRACE_CODE_HDD_CFG80211_TDLS_OPER,
-		   adapter->vdev_id, oper);
+		   adapter->deflink->vdev_id, oper);
 
 	if (!peer) {
 		hdd_err("Invalid arguments");

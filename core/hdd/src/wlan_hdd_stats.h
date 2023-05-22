@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -334,6 +334,21 @@ int wlan_hdd_cfg80211_stats_ext_request(struct wiphy *wiphy,
 #endif /* End of WLAN_FEATURE_STATS_EXT */
 
 /**
+ * wlan_hdd_cfg80211_connected_chan_stats_req() - get currently connected
+ * channel statistics from driver/firmware
+ * @wiphy: Pointer to wiphy
+ * @wdev: Pointer to wdev
+ * @data: Pointer to data
+ * @data_len: Data length
+ *
+ * Return: int
+ */
+int wlan_hdd_cfg80211_connected_chan_stats_req(struct wiphy *wiphy,
+					       struct wireless_dev *wdev,
+					       const void *data,
+					       int data_len);
+
+/**
  * wlan_hdd_cfg80211_get_station() - get station statistics
  * @wiphy: Pointer to wiphy
  * @dev: Pointer to network device
@@ -400,21 +415,14 @@ wlan_hdd_cfg80211_stats_ext2_callback(hdd_handle_t hdd_handle,
 #ifdef WLAN_FEATURE_ROAM_OFFLOAD
 /**
  * wlan_hdd_cfg80211_roam_events_callback() - roam_events_callback
- * @hdd_handle: opaque handle to the hdd context
- * @idx: TLV index in roam stats event
  * @roam_stats: roam events stats
+ * @idx: TLV index in roam stats event
  *
  * Return: void
  */
 void
-wlan_hdd_cfg80211_roam_events_callback(hdd_handle_t hdd_handle, uint8_t idx,
-				       struct roam_stats_event *roam_stats);
-#else
-static inline void
-wlan_hdd_cfg80211_roam_events_callback(hdd_handle_t hdd_handle, uint8_t idx,
-				       struct roam_stats_event *roam_stats)
-{
-}
+wlan_hdd_cfg80211_roam_events_callback(struct roam_stats_event *roam_stats,
+				       uint8_t idx);
 #endif /* End of WLAN_FEATURE_ROAM_OFFLOAD */
 
 /**
@@ -584,16 +592,6 @@ void wlan_cfg80211_mc_cp_stats_free_big_data_stats_event(
 int wlan_hdd_get_temperature(struct hdd_adapter *adapter, int *temperature);
 
 /**
- * wlan_hdd_display_txrx_stats() - display HDD txrx stats summary
- * @hdd_ctx: hdd context
- *
- * Display TXRX Stats for all adapters
- *
- * Return: none
- */
-void wlan_hdd_display_txrx_stats(struct hdd_context *hdd_ctx);
-
-/**
  * hdd_get_max_tx_bitrate() - Get the max tx bitrate of the AP
  * @hdd_ctx: hdd context
  * @adapter: hostapd interface
@@ -670,5 +668,41 @@ void hdd_check_and_update_nss(struct hdd_context *hdd_ctx,
 void wlan_hdd_register_cp_stats_cb(struct hdd_context *hdd_ctx);
 #else
 static inline void wlan_hdd_register_cp_stats_cb(struct hdd_context *hdd_ctx) {}
+#endif
+
+#if defined(WLAN_FEATURE_ROAM_OFFLOAD) && defined(WLAN_FEATURE_ROAM_INFO_STATS)
+#define FEATURE_ROAM_STATS_COMMANDS	\
+	{	\
+	.info.vendor_id = QCA_NL80211_VENDOR_ID,	\
+	.info.subcmd = QCA_NL80211_VENDOR_SUBCMD_ROAM_STATS,	\
+	.flags = WIPHY_VENDOR_CMD_NEED_WDEV |	\
+		 WIPHY_VENDOR_CMD_NEED_NETDEV |	\
+		 WIPHY_VENDOR_CMD_NEED_RUNNING,	\
+	.doit = wlan_hdd_cfg80211_get_roam_stats,	\
+	vendor_command_policy(VENDOR_CMD_RAW_DATA, 0)	\
+	},	\
+
+#define FEATURE_ROAM_STATS_EVENTS	\
+	[QCA_NL80211_VENDOR_SUBCMD_ROAM_STATS_INDEX] = {	\
+		.vendor_id = QCA_NL80211_VENDOR_ID,	\
+		.subcmd = QCA_NL80211_VENDOR_SUBCMD_ROAM_STATS,	\
+	},	\
+
+/**
+ * wlan_hdd_cfg80211_get_roam_stats() - get roam statstics information
+ * @wiphy: wiphy pointer
+ * @wdev: pointer to struct wireless_dev
+ * @data: pointer to incoming NL vendor data
+ * @data_len: length of @data
+ *
+ * Return: 0 on success; error number otherwise.
+ */
+int wlan_hdd_cfg80211_get_roam_stats(struct wiphy *wiphy,
+				     struct wireless_dev *wdev,
+				     const void *data,
+				     int data_len);
+#else
+#define FEATURE_ROAM_STATS_COMMANDS
+#define FEATURE_ROAM_STATS_EVENTS
 #endif
 #endif /* end #if !defined(WLAN_HDD_STATS_H) */

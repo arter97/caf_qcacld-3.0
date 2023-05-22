@@ -867,7 +867,6 @@ struct wma_wlm_stats_data {
  * @log_completion_timer: log completion timer
  * @old_hw_mode_index: Previous configured HW mode index
  * @new_hw_mode_index: Current configured HW mode index
- * @peer_authorized_cb: peer authorized hdd callback
  * @ocb_config_req: OCB request context
  * @self_gen_frm_pwr: Self-generated frame power
  * @tx_chain_mask_cck: Is the CCK tx chain mask enabled
@@ -995,8 +994,6 @@ typedef struct {
 	qdf_mc_timer_t log_completion_timer;
 	uint32_t old_hw_mode_index;
 	uint32_t new_hw_mode_index;
-	wma_peer_authorized_fp peer_authorized_cb;
-	struct sir_ocb_config *ocb_config_req;
 	uint16_t self_gen_frm_pwr;
 	bool tx_chain_mask_cck;
 	qdf_mc_timer_t service_ready_ext_timer;
@@ -1144,32 +1141,6 @@ struct wma_target_req {
 	uint32_t msg_type;
 	uint8_t vdev_id;
 	uint8_t type;
-};
-
-/**
- * struct wma_set_key_params - set key parameters
- * @vdev_id: vdev id
- * @def_key_idx: used to see if we have to read the key from cfg
- * @key_len: key length
- * @peer_mac: peer mac address
- * @singl_tid_rc: 1=Single TID based Replay Count, 0=Per TID based RC
- * @key_type: key type
- * @key_idx: key index
- * @unicast: unicast flag
- * @key_data: key data
- */
-struct wma_set_key_params {
-	uint8_t vdev_id;
-	/* def_key_idx can be used to see if we have to read the key from cfg */
-	uint32_t def_key_idx;
-	uint16_t key_len;
-	uint8_t peer_mac[QDF_MAC_ADDR_SIZE];
-	uint8_t singl_tid_rc;
-	enum eAniEdType key_type;
-	uint32_t key_idx;
-	bool unicast;
-	uint8_t key_data[SIR_MAC_MAX_KEY_LENGTH];
-	uint8_t key_rsc[WLAN_CRYPTO_RSC_SIZE];
 };
 
 /**
@@ -1540,9 +1511,6 @@ QDF_STATUS wma_set_gateway_params(tp_wma_handle wma,
 	return QDF_STATUS_SUCCESS;
 }
 #endif /* FEATURE_LFR_SUBNET_DETECTION */
-
-QDF_STATUS wma_lro_config_cmd(void *handle,
-	 struct cdp_lro_hash_config *wma_lro_cmd);
 
 QDF_STATUS wma_ht40_stop_obss_scan(tp_wma_handle wma_handle,
 				int32_t vdev_id);
@@ -2545,6 +2513,25 @@ QDF_STATUS wma_post_chan_switch_setup(uint8_t vdev_id);
  * Return: QDF_STATUS
  */
 QDF_STATUS wma_vdev_pre_start(uint8_t vdev_id, bool restart);
+
+#ifdef WLAN_FEATURE_11BE_MLO
+/**
+ * wma_delete_peer_mlo() - Remove the MLO peer and detach link peer
+ * @psoc: PSOC objmgr pointer
+ * @macaddr: MAC address of objmgr peer
+ *
+ * The API will remove the ML peer with objmgr peer fetched from
+ * psoc peer list using the @macaddr.
+ *
+ * Return: void
+ */
+void wma_delete_peer_mlo(struct wlan_objmgr_psoc *psoc, uint8_t *macaddr);
+#else
+static inline
+void wma_delete_peer_mlo(struct wlan_objmgr_psoc *psoc, uint8_t *macaddr)
+{
+}
+#endif
 
 /**
  * wma_remove_bss_peer_on_failure() - remove the bss peers in case of

@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -234,25 +234,6 @@ bool mlme_is_flexible_twt_enabled(struct wlan_objmgr_psoc *psoc)
 	return false;
 }
 #endif /* WLAN_FEATURE_11AX */
-
-/**
- * mlme_sap_set_twt_command_in_progress() - Set TWT command is in progress.
- * @psoc: Pointer to psoc object
- * @vdev_id: vdev id
- * @peer_mac: Pointer to peer mac address
- * @dialog_id: Dialog id
- * @cmd: TWT command
- *
- * if the broadcast MAC address is passed, then
- * set TWT command is in progress for all the peers
- *
- * Return: QDF_STATUS
- */
-QDF_STATUS mlme_sap_set_twt_command_in_progress(struct wlan_objmgr_psoc *psoc,
-						uint8_t vdev_id,
-						struct qdf_mac_addr *peer_mac,
-						uint8_t dialog_id,
-						enum wlan_twt_commands cmd);
 
 /**
  * mlme_set_twt_command_in_progress() - Set TWT command is in progress.

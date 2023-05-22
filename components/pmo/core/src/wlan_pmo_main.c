@@ -258,7 +258,8 @@ static void wlan_pmo_init_cfg(struct wlan_objmgr_psoc *psoc,
 		cfg_get(psoc, CFG_ENABLE_BUS_SUSPEND_IN_SAP_MODE);
 	psoc_cfg->is_bus_suspend_enabled_in_go_mode =
 		cfg_get(psoc, CFG_ENABLE_BUS_SUSPEND_IN_GO_MODE);
-	if (wlan_ipa_config_is_enabled()) {
+	if (wlan_ipa_config_is_enabled() &&
+	    !ipa_config_is_opt_wifi_dp_enabled()) {
 		pmo_info("ipa is enabled and hence disable sap/go d3 wow");
 		psoc_cfg->is_bus_suspend_enabled_in_sap_mode = 0;
 		psoc_cfg->is_bus_suspend_enabled_in_go_mode = 0;
@@ -539,4 +540,37 @@ uint32_t pmo_get_ssr_frequency_on_pagefault(struct wlan_objmgr_psoc *psoc)
 		return 0;
 
 	return pmo_psoc_ctx->psoc_cfg.ssr_frequency_on_pagefault;
+}
+
+QDF_STATUS pmo_get_vdev_bridge_addr(struct wlan_objmgr_vdev *vdev,
+				    struct qdf_mac_addr *bridgeaddr)
+{
+	struct pmo_vdev_priv_obj *vdev_ctx;
+
+	if (!vdev) {
+		pmo_err("vdev is null");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	vdev_ctx = pmo_vdev_get_priv(vdev);
+	qdf_mem_copy(bridgeaddr->bytes, vdev_ctx->bridgeaddr,
+		     QDF_MAC_ADDR_SIZE);
+
+	return QDF_STATUS_SUCCESS;
+}
+
+QDF_STATUS pmo_set_vdev_bridge_addr(struct wlan_objmgr_vdev *vdev,
+				    struct qdf_mac_addr *bridgeaddr)
+{
+	struct pmo_vdev_priv_obj *vdev_ctx;
+
+	if (!vdev) {
+		pmo_err("vdev is null");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	vdev_ctx = pmo_vdev_get_priv(vdev);
+	qdf_mem_copy(vdev_ctx->bridgeaddr, bridgeaddr->bytes, QDF_MAC_ADDR_SIZE);
+
+	return QDF_STATUS_SUCCESS;
 }

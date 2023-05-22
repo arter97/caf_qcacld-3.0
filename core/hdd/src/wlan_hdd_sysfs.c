@@ -89,6 +89,9 @@
 #include <wlan_hdd_sysfs_dp_traffic_end_indication.h>
 #include <wlan_hdd_sysfs_eht_rate.h>
 #include <wlan_hdd_sysfs_direct_link_ut_cmd.h>
+#include <wlan_hdd_sysfs_runtime_pm.h>
+#include <wlan_hdd_sysfs_log_buffer.h>
+#include <wlan_hdd_sysfs_dfsnol.h>
 
 #define MAX_PSOC_ID_SIZE 10
 
@@ -433,7 +436,7 @@ static ssize_t __show_beacon_reception_stats(struct net_device *net_dev,
 	cookie = osif_request_cookie(request);
 
 	status = sme_beacon_debug_stats_req(hdd_ctx->mac_handle,
-					    adapter->vdev_id,
+					    adapter->deflink->vdev_id,
 					   hdd_beacon_debugstats_cb,
 					   cookie);
 	if (QDF_IS_STATUS_ERROR(status)) {
@@ -734,6 +737,30 @@ void hdd_destroy_wifi_feature_interface_sysfs_file(void)
 	hdd_sysfs_destroy_wifi_feature_interface(wifi_kobject);
 }
 
+int hdd_sysfs_print(void *ctx, const char *fmt, ...)
+{
+	va_list args;
+	int ret = -1;
+	struct hdd_sysfs_print_ctx *p_ctx = ctx;
+
+	va_start(args, fmt);
+
+	if (ctx) {
+		ret = vscnprintf(p_ctx->buf + p_ctx->idx,
+				 PAGE_SIZE - p_ctx->idx, fmt, args);
+		p_ctx->idx += ret;
+		if (p_ctx->new_line) {
+			ret += scnprintf(p_ctx->buf + p_ctx->idx,
+					  PAGE_SIZE - p_ctx->idx,
+					  "\n");
+			p_ctx->idx += ret;
+		}
+	}
+
+	va_end(args);
+	return ret;
+}
+
 #ifdef WLAN_FEATURE_BEACON_RECEPTION_STATS
 static int hdd_sysfs_create_bcn_reception_interface(struct hdd_adapter
 						     *adapter)
@@ -844,11 +871,13 @@ hdd_sysfs_create_sap_adapter_root_obj(struct hdd_adapter *adapter)
 	hdd_sysfs_dp_tx_delay_stats_create(adapter);
 	hdd_sysfs_dp_traffic_end_indication_create(adapter);
 	hdd_sysfs_direct_link_ut_cmd_create(adapter);
+	hdd_sysfs_dfsnol_create(adapter);
 }
 
 static void
 hdd_sysfs_destroy_sap_adapter_root_obj(struct hdd_adapter *adapter)
 {
+	hdd_sysfs_dfsnol_destroy(adapter);
 	hdd_sysfs_direct_link_ut_destroy(adapter);
 	hdd_sysfs_dp_traffic_end_indication_destroy(adapter);
 	hdd_sysfs_dp_tx_delay_stats_destroy(adapter);
@@ -913,12 +942,16 @@ void hdd_create_sysfs_files(struct hdd_context *hdd_ctx)
 		hdd_sysfs_dp_txrx_stats_sysfs_create(driver_kobject);
 		hdd_sysfs_get_valid_freq_for_power_create(driver_kobject);
 		hdd_sysfs_dp_pkt_add_ts_create(driver_kobject);
+		hdd_sysfs_runtime_pm_create(driver_kobject);
+		hdd_sysfs_log_buffer_create(driver_kobject);
 	}
 }
 
 void hdd_destroy_sysfs_files(void)
 {
 	if  (QDF_GLOBAL_MISSION_MODE == hdd_get_conparam()) {
+		hdd_sysfs_log_buffer_destroy(driver_kobject);
+		hdd_sysfs_runtime_pm_destroy(driver_kobject);
 		hdd_sysfs_dp_pkt_add_ts_destroy(driver_kobject);
 		hdd_sysfs_get_valid_freq_for_power_destroy(driver_kobject);
 		hdd_sysfs_dp_txrx_stats_sysfs_destroy(driver_kobject);

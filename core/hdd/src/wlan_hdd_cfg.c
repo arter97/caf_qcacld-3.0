@@ -51,6 +51,8 @@
 #include "hdd_dp_cfg.h"
 #include <wma_api.h>
 #include "wlan_hdd_object_manager.h"
+#include "wlan_dp_ucfg_api.h"
+#include "wlan_cmn.h"
 
 #ifndef WLAN_MAC_ADDR_UPDATE_DISABLE
 /**
@@ -927,6 +929,7 @@ QDF_STATUS hdd_set_sme_config(struct hdd_context *hdd_ctx)
 	mac_handle_t mac_handle = hdd_ctx->mac_handle;
 	bool roam_scan_enabled;
 	bool enable_dfs_scan = true;
+	bool disconnect_nud;
 	uint32_t channel_bonding_mode;
 
 #ifdef FEATURE_WLAN_ESE
@@ -1007,6 +1010,9 @@ QDF_STATUS hdd_set_sme_config(struct hdd_context *hdd_ctx)
 	mlme_obj->cfg.lfr.rso_user_config.policy_params.dfs_mode =
 		STA_ROAM_POLICY_DFS_ENABLED;
 	mlme_obj->cfg.lfr.rso_user_config.policy_params.skip_unsafe_channels = 0;
+
+	disconnect_nud = ucfg_dp_is_disconect_after_roam_fail(hdd_ctx->psoc);
+	mlme_obj->cfg.lfr.disconnect_on_nud_roam_invoke_fail = disconnect_nud;
 
 	status = hdd_set_sme_cfgs_related_to_mlme(hdd_ctx, sme_config);
 	if (!QDF_IS_STATUS_SUCCESS(status))
@@ -1113,7 +1119,7 @@ hdd_set_nss_params(struct hdd_adapter *adapter,
 	if (QDF_IS_STATUS_ERROR(
 		sme_nss_chains_update(mac_handle,
 				      &user_cfg,
-				      adapter->vdev_id)))
+				      adapter->deflink->vdev_id)))
 		return QDF_STATUS_E_FAILURE;
 
 	/* Check TDLS status and update antenna mode */
@@ -1130,6 +1136,7 @@ hdd_update_nss_in_vdev(struct hdd_adapter *adapter, mac_handle_t mac_handle,
 		       uint8_t tx_nss, uint8_t rx_nss)
 {
 	uint8_t band, max_supp_nss = MAX_VDEV_NSS;
+	struct wlan_objmgr_vdev *vdev;
 
 	for (band = NSS_CHAINS_BAND_2GHZ; band < NSS_CHAINS_BAND_MAX;
 	     band++) {
@@ -1147,7 +1154,12 @@ hdd_update_nss_in_vdev(struct hdd_adapter *adapter, mac_handle_t mac_handle,
 	 * This API will change the ini and dynamic nss params in
 	 * mlme vdev priv obj.
 	 */
-	hdd_store_nss_chains_cfg_in_vdev(adapter);
+	vdev = hdd_objmgr_get_vdev_by_user(adapter, WLAN_OSIF_ID);
+	if (!vdev)
+		return;
+
+	hdd_store_nss_chains_cfg_in_vdev(adapter->hdd_ctx, vdev);
+	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
 }
 
 static void hdd_set_sap_nss_params(struct hdd_context *hdd_ctx,
@@ -1224,15 +1236,15 @@ QDF_STATUS hdd_update_nss(struct hdd_adapter *adapter, uint8_t tx_nss,
 		if (hdd_is_vdev_in_conn_state(adapter))
 			return hdd_set_nss_params(adapter, tx_nss, rx_nss);
 		hdd_debug("Vdev %d in disconnect state, changing ini nss params",
-			  adapter->vdev_id);
+			  adapter->deflink->vdev_id);
 		if (!bval) {
 			hdd_err("Nss in 1x1, no change required, 2x2 mode disabled");
 			return QDF_STATUS_SUCCESS;
 		}
 
 		hdd_update_nss_in_vdev(adapter, mac_handle, tx_nss, rx_nss);
-		sme_set_nss_capability(mac_handle, adapter->vdev_id, rx_nss,
-				       adapter->device_mode);
+		sme_set_nss_capability(mac_handle, adapter->deflink->vdev_id,
+				       rx_nss, adapter->device_mode);
 
 		return QDF_STATUS_SUCCESS;
 	}
@@ -1341,8 +1353,8 @@ skip_ht_cap_update:
 		status = false;
 		hdd_err("Could not get MCS SET from CFG");
 	}
-	sme_set_nss_capability(mac_handle, adapter->vdev_id, rx_nss,
-			       adapter->device_mode);
+	sme_set_nss_capability(mac_handle, adapter->deflink->vdev_id,
+			       rx_nss, adapter->device_mode);
 #undef WLAN_HDD_RX_MCS_ALL_NSTREAM_RATES
 
 	if (QDF_STATUS_SUCCESS != sme_update_nss(mac_handle, rx_nss))
@@ -1838,7 +1850,7 @@ hdd_set_ht2040_mode(struct hdd_adapter *adapter,
 		else
 			csr_config->obssEnabled = false;
 		status = sme_set_ht2040_mode(hdd_ctx->mac_handle,
-					     adapter->vdev_id,
+					     adapter->deflink->vdev_id,
 					     eHT_CHAN_HT20,
 					     csr_config->obssEnabled);
 	}
@@ -1963,7 +1975,7 @@ int hdd_get_ldpc(struct hdd_adapter *adapter, int *value)
 	int ret;
 
 	hdd_enter();
-	ret = sme_get_ht_config(mac_handle, adapter->vdev_id,
+	ret = sme_get_ht_config(mac_handle, adapter->deflink->vdev_id,
 				WNI_CFG_HT_CAP_INFO_ADVANCE_CODING);
 	if (ret < 0) {
 		hdd_err("Failed to get LDPC value");
@@ -2006,15 +2018,16 @@ int hdd_set_ldpc(struct hdd_adapter *adapter, int value)
 		hdd_err("Failed to set VHT LDPC capability info");
 		return -EIO;
 	}
-	ret = sme_update_ht_config(mac_handle, adapter->vdev_id,
+	ret = sme_update_ht_config(mac_handle, adapter->deflink->vdev_id,
 				   WNI_CFG_HT_CAP_INFO_ADVANCE_CODING,
 				   value);
 	if (ret)
 		hdd_err("Failed to set LDPC value");
-	ret = sme_update_he_ldpc_supp(mac_handle, adapter->vdev_id, value);
+	ret = sme_update_he_ldpc_supp(mac_handle,
+				      adapter->deflink->vdev_id, value);
 	if (ret)
 		hdd_err("Failed to set HE LDPC value");
-	ret = sme_set_auto_rate_ldpc(mac_handle, adapter->vdev_id,
+	ret = sme_set_auto_rate_ldpc(mac_handle, adapter->deflink->vdev_id,
 				     (value ? 0 : 1));
 
 	return ret;
@@ -2026,7 +2039,7 @@ int hdd_get_tx_stbc(struct hdd_adapter *adapter, int *value)
 	int ret;
 
 	hdd_enter();
-	ret = sme_get_ht_config(mac_handle, adapter->vdev_id,
+	ret = sme_get_ht_config(mac_handle, adapter->deflink->vdev_id,
 				WNI_CFG_HT_CAP_INFO_TX_STBC);
 	if (ret < 0) {
 		hdd_err("Failed to get TX STBC value");
@@ -2066,12 +2079,13 @@ int hdd_set_tx_stbc(struct hdd_adapter *adapter, int value)
 			return -EINVAL;
 		}
 	}
-	ret = sme_update_ht_config(mac_handle, adapter->vdev_id,
+	ret = sme_update_ht_config(mac_handle, adapter->deflink->vdev_id,
 				   WNI_CFG_HT_CAP_INFO_TX_STBC,
 				   value);
 	if (ret)
 		hdd_err("Failed to set TX STBC value");
-	ret = sme_update_he_tx_stbc_cap(mac_handle, adapter->vdev_id, value);
+	ret = sme_update_he_tx_stbc_cap(mac_handle,
+					adapter->deflink->vdev_id, value);
 	if (ret)
 		hdd_err("Failed to set HE TX STBC value");
 
@@ -2084,7 +2098,7 @@ int hdd_get_rx_stbc(struct hdd_adapter *adapter, int *value)
 	int ret;
 
 	hdd_enter();
-	ret = sme_get_ht_config(mac_handle, adapter->vdev_id,
+	ret = sme_get_ht_config(mac_handle, adapter->deflink->vdev_id,
 				WNI_CFG_HT_CAP_INFO_RX_STBC);
 	if (ret < 0) {
 		hdd_err("Failed to get RX STBC value");
@@ -2124,17 +2138,57 @@ int hdd_set_rx_stbc(struct hdd_adapter *adapter, int value)
 			return -EINVAL;
 		}
 	}
-	ret = sme_update_ht_config(mac_handle, adapter->vdev_id,
+	ret = sme_update_ht_config(mac_handle, adapter->deflink->vdev_id,
 				   WNI_CFG_HT_CAP_INFO_RX_STBC,
 				   value);
 	if (ret)
 		hdd_err("Failed to set RX STBC value");
 
-	ret = sme_update_he_rx_stbc_cap(mac_handle, adapter->vdev_id, value);
+	ret = sme_update_he_rx_stbc_cap(mac_handle,
+					adapter->deflink->vdev_id, value);
 	if (ret)
 		hdd_err("Failed to set HE RX STBC value");
 
 	return ret;
+}
+
+/**
+ * hdd_convert_chwidth_to_phy_chwidth() - convert channel width of type enum
+ * eSirMacHTChannelWidth to enum phy_ch_width
+ * @chwidth: channel width of type enum eSirMacHTChannelWidth
+ *
+ * Return: channel width of type enum phy_ch_width
+ */
+static enum phy_ch_width
+hdd_convert_chwidth_to_phy_chwidth(enum eSirMacHTChannelWidth chwidth)
+{
+	enum phy_ch_width ch_width = CH_WIDTH_INVALID;
+
+	switch (chwidth) {
+	case eHT_CHANNEL_WIDTH_20MHZ:
+		ch_width = CH_WIDTH_20MHZ;
+		break;
+	case eHT_CHANNEL_WIDTH_40MHZ:
+		ch_width = CH_WIDTH_40MHZ;
+		break;
+	case eHT_CHANNEL_WIDTH_80MHZ:
+		ch_width = CH_WIDTH_80MHZ;
+		break;
+	case eHT_CHANNEL_WIDTH_160MHZ:
+		ch_width = CH_WIDTH_160MHZ;
+		break;
+	case eHT_CHANNEL_WIDTH_80P80MHZ:
+		ch_width = CH_WIDTH_80P80MHZ;
+		break;
+	case eHT_CHANNEL_WIDTH_320MHZ:
+		ch_width = CH_WIDTH_320MHZ;
+		break;
+	default:
+		hdd_debug("Invalid channel width %d", chwidth);
+		break;
+	}
+
+	return ch_width;
 }
 
 int hdd_update_channel_width(struct hdd_adapter *adapter,
@@ -2144,6 +2198,8 @@ int hdd_update_channel_width(struct hdd_adapter *adapter,
 	struct hdd_context *hdd_ctx;
 	struct sme_config_params *sme_config;
 	int ret;
+	enum phy_ch_width ch_width;
+	QDF_STATUS status;
 
 	hdd_ctx = WLAN_HDD_GET_CTX(adapter);
 	if (!hdd_ctx) {
@@ -2151,12 +2207,23 @@ int hdd_update_channel_width(struct hdd_adapter *adapter,
 		return -EINVAL;
 	}
 
+	if (ucfg_mlme_is_chwidth_with_notify_supported(hdd_ctx->psoc)) {
+		ch_width = hdd_convert_chwidth_to_phy_chwidth(chwidth);
+		hdd_debug("vdev %d : process update ch width request to %d",
+			  adapter->deflink->vdev_id, ch_width);
+		status =
+		    ucfg_mlme_send_ch_width_update_with_notify(hdd_ctx->psoc,
+					adapter->deflink->vdev_id, ch_width);
+		if (QDF_IS_STATUS_ERROR(status))
+			return -EIO;
+	}
+
 	sme_config = qdf_mem_malloc(sizeof(*sme_config));
 	if (!sme_config)
 		return -ENOMEM;
 
-	ret = wma_cli_set_command(adapter->vdev_id, wmi_vdev_param_chwidth,
-				  chwidth, VDEV_CMD);
+	ret = wma_cli_set_command(adapter->deflink->vdev_id,
+				  wmi_vdev_param_chwidth, chwidth, VDEV_CMD);
 	if (ret)
 		goto free_config;
 
@@ -2164,9 +2231,12 @@ int hdd_update_channel_width(struct hdd_adapter *adapter,
 	sme_config->csr_config.channelBondingMode5GHz = bonding_mode;
 	sme_config->csr_config.channelBondingMode24GHz = bonding_mode;
 	sme_update_config(hdd_ctx->mac_handle, sme_config);
-	sme_set_he_bw_cap(hdd_ctx->mac_handle, adapter->vdev_id, chwidth);
-	sme_set_eht_bw_cap(hdd_ctx->mac_handle, adapter->vdev_id, chwidth);
-	sme_set_vdev_ies_per_band(hdd_ctx->mac_handle, adapter->vdev_id,
+	sme_set_he_bw_cap(hdd_ctx->mac_handle,
+			  adapter->deflink->vdev_id, chwidth);
+	sme_set_eht_bw_cap(hdd_ctx->mac_handle,
+			   adapter->deflink->vdev_id, chwidth);
+	sme_set_vdev_ies_per_band(hdd_ctx->mac_handle,
+				  adapter->deflink->vdev_id,
 				  adapter->device_mode);
 
 free_config:

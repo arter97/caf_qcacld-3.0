@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -594,13 +594,15 @@ void lim_fill_ft_session(struct mac_context *mac,
 		 && pBeaconStruct->HTCaps.present);
 
 	if (IS_DOT11_MODE_HE(ft_session->dot11mode) &&
-	    pBeaconStruct->he_cap.present)
+	    pBeaconStruct->he_cap.present) {
 		lim_update_session_he_capable(mac, ft_session);
-
+		lim_copy_join_req_he_cap(ft_session);
+	}
 	if (IS_DOT11_MODE_EHT(ft_session->dot11mode) &&
-	    pBeaconStruct->eht_cap.present)
+	    pBeaconStruct->eht_cap.present) {
 		lim_update_session_eht_capable(mac, ft_session);
-
+		lim_copy_join_req_eht_cap(ft_session);
+	}
 	/* Assign default configured nss value in the new session */
 	if (!wlan_reg_is_24ghz_ch_freq(ft_session->curr_op_freq))
 		ft_session->vdev_nss = mac->vdev_type_nss_5g.sta;
@@ -675,7 +677,7 @@ void lim_fill_ft_session(struct mac_context *mac,
 	}
 
 	sir_copy_mac_addr(ft_session->self_mac_addr,
-			  pe_session->self_mac_addr);
+			  wlan_vdev_mlme_get_macaddr(pe_session->vdev));
 	sir_copy_mac_addr(ft_session->limReAssocbssId,
 			  pbssDescription->bssId);
 	sir_copy_mac_addr(ft_session->prev_ap_bssid, pe_session->bssId);
@@ -726,15 +728,9 @@ void lim_fill_ft_session(struct mac_context *mac,
 
 	ft_session->is11Rconnection = pe_session->is11Rconnection;
 #ifdef FEATURE_WLAN_ESE
-	ft_session->isESEconnection = pe_session->isESEconnection;
 	ft_session->is_ese_version_ie_present =
 		pBeaconStruct->is_ese_ver_ie_present;
 #endif
-	ft_session->isFastTransitionEnabled =
-		pe_session->isFastTransitionEnabled;
-
-	ft_session->isFastRoamIniFeatureEnabled =
-		pe_session->isFastRoamIniFeatureEnabled;
 
 	mlme_obj->reg_tpc_obj.reg_max[0] = regMax;
 	mlme_obj->reg_tpc_obj.ap_constraint_power = localPowerConstraint;
@@ -761,8 +757,6 @@ void lim_fill_ft_session(struct mac_context *mac,
 	/* Load default OBSS parameters to session entry */
 	lim_init_obss_params(mac, ft_session);
 
-	ft_session->enableHtSmps = pe_session->enableHtSmps;
-	ft_session->htSmpsvalue = pe_session->htSmpsvalue;
 	/*
 	 * By default supported NSS 1x1 is set to true
 	 * and later on updated while determining session
@@ -771,8 +765,8 @@ void lim_fill_ft_session(struct mac_context *mac,
 	 */
 	ft_session->supported_nss_1x1 = true;
 	pe_debug("FT enable smps: %d mode: %d supported nss 1x1: %d",
-		ft_session->enableHtSmps,
-		ft_session->htSmpsvalue,
+		mac->mlme_cfg->ht_caps.enable_smps,
+		mac->mlme_cfg->ht_caps.smps,
 		ft_session->supported_nss_1x1);
 
 	qdf_mem_free(pBeaconStruct);

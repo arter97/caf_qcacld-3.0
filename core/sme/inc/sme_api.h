@@ -208,14 +208,6 @@ struct sme_5g_band_pref_params {
 	uint8_t     max_rssi_penalize_5g;
 };
 
-/**
- * struct sme_session_params: Session creation params passed by HDD layer
- * @vdev: pointer to vdev object
- */
-struct sme_session_params {
-	struct wlan_objmgr_vdev *vdev;
-};
-
 #define MAX_CANDIDATE_INFO 10
 
 /**
@@ -661,30 +653,6 @@ QDF_STATUS sme_roam_set_psk_pmk(mac_handle_t mac_handle,
  */
 QDF_STATUS sme_set_pmk_cache_ft(mac_handle_t mac_handle, uint8_t vdev_id,
 				struct wlan_crypto_pmksa *pmk_cache);
-
-/**
- * sme_roam_events_register_callback() - Register roam events callback
- * @mac_handle: Opaque handle to the MAC context
- * @roam_rt_stats_cb: Function to be invoked for roam events stats
- *
- * This function will register a callback for roams events stats.
- *
- * Return: void
- */
-void sme_roam_events_register_callback(mac_handle_t mac_handle,
-				       void (*roam_rt_stats_cb)(
-				hdd_handle_t hdd_handle, uint8_t idx,
-				struct roam_stats_event *roam_stats));
-
-/**
- * sme_roam_events_deregister_callback() - DeRegister roam events callback
- * @mac_handle: Opaque handle to the MAC context
- *
- * This function will deregister the callback of roams events stats.
- *
- * Return: void
- */
-void sme_roam_events_deregister_callback(mac_handle_t mac_handle);
 #else
 static inline
 void sme_get_pmk_info(mac_handle_t mac_handle, uint8_t session_id,
@@ -720,16 +688,6 @@ QDF_STATUS sme_set_pmk_cache_ft(mac_handle_t mac_handle, uint8_t vdev_id,
 	return QDF_STATUS_SUCCESS;
 }
 
-static inline void
-sme_roam_events_register_callback(mac_handle_t mac_handle,
-				  void (*roam_rt_stats_cb)(
-				hdd_handle_t hdd_handle, uint8_t idx,
-				struct roam_stats_event *roam_stats))
-{}
-
-static inline
-void sme_roam_events_deregister_callback(mac_handle_t mac_handle)
-{}
 #endif
 
 QDF_STATUS sme_get_config_param(mac_handle_t mac_handle,
@@ -906,6 +864,16 @@ QDF_STATUS sme_deregister_mgmt_frame(mac_handle_t mac_handle,
 				     uint8_t sessionId,
 				     uint16_t frameType, uint8_t *matchData,
 				     uint16_t matchLen);
+/**
+ * sme_change_sap_csa_count() - Set CSA count
+ * @count: CSA count to be set
+ *
+ * Routine sets CSA count in CSA IE when channel switch
+ * is triggered
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS sme_change_sap_csa_count(uint8_t count);
 #ifdef WLAN_FEATURE_EXTWOW_SUPPORT
 QDF_STATUS sme_configure_ext_wow(mac_handle_t mac_handle,
 		tpSirExtWoWParams wlanExtParams,
@@ -1846,9 +1814,7 @@ QDF_STATUS sme_nss_update_request(uint32_t vdev_id,
 				  uint32_t original_vdev_id,
 				  uint32_t request_id);
 
-typedef void (*sme_peer_authorized_fp) (uint32_t vdev_id);
 QDF_STATUS sme_set_peer_authorized(uint8_t *peer_addr,
-				   sme_peer_authorized_fp auth_fp,
 				   uint32_t vdev_id);
 QDF_STATUS sme_soc_set_dual_mac_config(struct policy_mgr_dual_mac_config msg);
 QDF_STATUS sme_soc_set_antenna_mode(mac_handle_t mac_handle,
@@ -3261,12 +3227,6 @@ struct omi_ctrl_tx {
 	uint32_t reserved:14;
 };
 
-int sme_send_he_om_ctrl_bw_update(mac_handle_t mac_handle, uint8_t session_id,
-				  uint8_t cfg_val);
-
-int sme_send_he_om_ctrl_nss_update(mac_handle_t mac_handle, uint8_t session_id,
-				   uint8_t cfg_val);
-
 void sme_reset_he_om_ctrl(mac_handle_t mac_handle);
 
 /**
@@ -4659,7 +4619,6 @@ QDF_STATUS sme_switch_channel(mac_handle_t mac_handle,
  * @mac_addr: VDEV MAC address
  * @mld_addr: VDEV MLD address
  * @vdev: Pointer to object manager VDEV
- * @update_mld_addr: Flag to check whether to update MLD addr or not
  *
  * API to send set MAC address request command to FW
  *
@@ -4667,14 +4626,13 @@ QDF_STATUS sme_switch_channel(mac_handle_t mac_handle,
  */
 QDF_STATUS sme_send_set_mac_addr(struct qdf_mac_addr mac_addr,
 				 struct qdf_mac_addr mld_addr,
-				 struct wlan_objmgr_vdev *vdev,
-				 bool update_mld_addr);
+				 struct wlan_objmgr_vdev *vdev);
 
 /**
  * sme_update_vdev_mac_addr() - Update VDEV MAC address
- * @psoc: Pointer to PSOC structure
+ * @vdev: Objmgr VDEV pointer
  * @mac_addr: VDEV MAC address
- * @vdev: Pointer to object manager VDEV
+ * @mld_addr: VDEV MLD address
  * @update_sta_self_peer: Flag to check self peer MAC address or not.
  * @update_mld_addr: Flag to check if MLD address update needed or not.
  * @req_status: Status of the set MAC address request to the FW
@@ -4685,9 +4643,9 @@ QDF_STATUS sme_send_set_mac_addr(struct qdf_mac_addr mac_addr,
  *
  * Return: QDF_STATUS
  */
-QDF_STATUS sme_update_vdev_mac_addr(struct wlan_objmgr_psoc *psoc,
+QDF_STATUS sme_update_vdev_mac_addr(struct wlan_objmgr_vdev *vdev,
 				    struct qdf_mac_addr mac_addr,
-				    struct wlan_objmgr_vdev *vdev,
+				    struct qdf_mac_addr mld_addr,
 				    bool update_sta_self_peer,
 				    bool update_mld_addr, int req_status);
 #endif

@@ -207,6 +207,26 @@ struct tLimPreAuthNode *lim_search_pre_auth_list(struct mac_context *mac,
 	return pTempNode;
 } /*** end lim_search_pre_auth_list() ***/
 
+#ifdef WLAN_FEATURE_11BE_MLO
+struct tLimPreAuthNode *
+lim_search_pre_auth_list_by_mld_addr(struct mac_context *mac,
+				     tSirMacAddr mldaddr)
+{
+	struct tLimPreAuthNode *pTempNode = mac->lim.pLimPreAuthList;
+
+	while (pTempNode) {
+		if (!qdf_mem_cmp((uint8_t *)mldaddr,
+				 (uint8_t *)&pTempNode->peer_mld,
+				 sizeof(tSirMacAddr)))
+			break;
+
+		pTempNode = pTempNode->next;
+	}
+
+	return pTempNode;
+}
+#endif
+
 /**
  * lim_delete_open_auth_pre_auth_node() - delete any stale preauth nodes
  * @mac_ctx: Pointer to Global MAC structure

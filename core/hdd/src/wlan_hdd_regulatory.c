@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2014-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -38,6 +38,7 @@
 #include "wlan_hdd_hostapd.h"
 #include "osif_psoc_sync.h"
 #include "wlan_osif_features.h"
+#include "wlan_p2p_ucfg_api.h"
 
 #define REG_RULE_2412_2462    REG_RULE(2412-10, 2462+10, 40, 0, 20, 0)
 
@@ -357,6 +358,8 @@ static void reg_program_config_vars(struct hdd_context *hdd_ctx,
 	hdd_update_afc_config(hdd_ctx, config_vars);
 	config_vars->sta_sap_scc_on_indoor_channel =
 		ucfg_policy_mgr_get_sta_sap_scc_on_indoor_chnl(hdd_ctx->psoc);
+	config_vars->p2p_indoor_ch_support =
+		ucfg_p2p_get_indoor_ch_support(hdd_ctx->psoc);
 }
 
 /**
@@ -949,7 +952,8 @@ int hdd_reg_set_band(struct net_device *dev, uint32_t band_bitmap)
 		return -EINVAL;
 	}
 
-	status = ucfg_cm_set_roam_band_update(hdd_ctx->psoc, adapter->vdev_id);
+	status = ucfg_cm_set_roam_band_update(hdd_ctx->psoc,
+					      adapter->deflink->vdev_id);
 	if (QDF_IS_STATUS_ERROR(status))
 		hdd_err("Failed to send RSO update to fw on set band");
 
@@ -1652,7 +1656,8 @@ static void hdd_country_change_update_sta(struct hdd_context *hdd_ctx)
 			 * continue to next statement
 			 */
 		case QDF_STA_MODE:
-			sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter);
+			sta_ctx =
+				WLAN_HDD_GET_STATION_CTX_PTR(adapter->deflink);
 			new_phy_mode = wlan_reg_get_max_phymode(pdev,
 								REG_PHYMODE_MAX,
 								oper_freq);
@@ -1678,8 +1683,8 @@ static void hdd_country_change_update_sta(struct hdd_context *hdd_ctx)
 				} else {
 					hdd_debug("Remain on current channel but update tx power");
 					wlan_reg_update_tx_power_on_ctry_change(
-							pdev,
-							adapter->vdev_id);
+						    pdev,
+						    adapter->deflink->vdev_id);
 				}
 			}
 			break;
@@ -1736,7 +1741,7 @@ static void hdd_restart_sap_with_new_phymode(struct hdd_context *hdd_ctx,
 	}
 
 	sap_config->chan_freq =
-		wlansap_get_safe_channel_from_pcl_and_acs_range(sap_ctx);
+		wlansap_get_safe_channel_from_pcl_and_acs_range(sap_ctx, NULL);
 
 	sap_config->sap_orig_hw_mode = sap_config->SapHw_mode;
 	sap_config->SapHw_mode = csr_phy_mode;
@@ -1789,7 +1794,7 @@ static void hdd_country_change_update_sap(struct hdd_context *hdd_ctx)
 		switch (adapter->device_mode) {
 		case QDF_P2P_GO_MODE:
 			policy_mgr_check_sap_restart(hdd_ctx->psoc,
-						     adapter->vdev_id);
+						     adapter->deflink->vdev_id);
 			break;
 		case QDF_SAP_MODE:
 			if (!test_bit(SOFTAP_INIT_DONE,
@@ -1797,7 +1802,7 @@ static void hdd_country_change_update_sap(struct hdd_context *hdd_ctx)
 				hdd_info("AP is not started yet");
 				break;
 			}
-			sap_config = &adapter->session.ap.sap_config;
+			sap_config = &adapter->deflink->session.ap.sap_config;
 			reg_phy_mode = csr_convert_to_reg_phy_mode(
 						sap_config->sap_orig_hw_mode,
 						oper_freq);
@@ -1814,12 +1819,12 @@ static void hdd_country_change_update_sap(struct hdd_context *hdd_ctx)
 								 sap_config,
 								 csr_phy_mode);
 			else
-				policy_mgr_check_sap_restart(hdd_ctx->psoc,
-							     adapter->vdev_id);
+				policy_mgr_check_sap_restart(
+						hdd_ctx->psoc,
+						adapter->deflink->vdev_id);
 				hdd_debug("Update tx power due to ctry change");
 				wlan_reg_update_tx_power_on_ctry_change(
-							pdev,
-							adapter->vdev_id);
+					    pdev, adapter->deflink->vdev_id);
 			break;
 		default:
 			break;

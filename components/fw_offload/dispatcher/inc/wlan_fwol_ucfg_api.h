@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2018-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -762,11 +762,23 @@ QDF_STATUS ucfg_fwol_configure_global_params(struct wlan_objmgr_psoc *psoc,
 					     struct wlan_objmgr_pdev *pdev);
 
 /**
- * ucfg_fwol_configure_vdev_params - API to configure vdev specific params
+ * ucfg_fwol_set_ilp_config - API to configure Interface Low Power (ILP)
  * @psoc: pointer to psoc object
  * @pdev: pointer to pdev object
- * @device_mode: device mode
- * @vdev_id: vdev ID
+ * @enable: enable
+ *
+ * This API is used to enable/disable Interface Low Power (IPL) feature.
+ *
+ * Return: QDF Status
+ */
+QDF_STATUS ucfg_fwol_set_ilp_config(struct wlan_objmgr_psoc *psoc,
+				    struct wlan_objmgr_pdev *pdev,
+				    uint32_t enable);
+
+/**
+ * ucfg_fwol_configure_vdev_params - API to configure vdev specific params
+ * @psoc: pointer to psoc object
+ * @vdev: pointer to vdev object
  *
  * Used to configure per vdev firmware params based on device mode. This is
  * invoked from hdd during vdev creation.
@@ -774,9 +786,7 @@ QDF_STATUS ucfg_fwol_configure_global_params(struct wlan_objmgr_psoc *psoc,
  * Return: QDF Status
  */
 QDF_STATUS ucfg_fwol_configure_vdev_params(struct wlan_objmgr_psoc *psoc,
-					   struct wlan_objmgr_pdev *pdev,
-					   enum QDF_OPMODE device_mode,
-					   uint8_t vdev_id);
+					   struct wlan_objmgr_vdev *vdev);
 #else
 static inline QDF_STATUS ucfg_fwol_psoc_open(struct wlan_objmgr_psoc *psoc)
 {
@@ -1088,8 +1098,7 @@ ucfg_fwol_configure_global_params(struct wlan_objmgr_psoc *psoc,
 
 static inline QDF_STATUS
 ucfg_fwol_configure_vdev_params(struct wlan_objmgr_psoc *psoc,
-				struct wlan_objmgr_pdev *pdev,
-				enum QDF_OPMODE device_mode, uint8_t vdev_id)
+				struct wlan_objmgr_vdev *vdev)
 {
 	return QDF_STATUS_E_FAILURE;
 }

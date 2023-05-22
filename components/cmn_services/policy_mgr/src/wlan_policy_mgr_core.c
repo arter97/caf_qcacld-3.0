@@ -1600,8 +1600,19 @@ void policy_mgr_dump_current_concurrency(struct wlan_objmgr_psoc *psoc)
 			psoc, cc_mode, len);
 		qdf_mutex_acquire(&pm_ctx->qdf_conc_list_lock);
 		if (pm_conc_connection_list[0].freq ==
-			pm_conc_connection_list[1].freq) {
+		    pm_conc_connection_list[1].freq) {
 			strlcat(cc_mode, " SCC", len);
+			/* In some platform 2.4 Ghz can lead to DBS,
+			 * so check for DBS for SCC/MCC case
+			 */
+			if (policy_mgr_is_current_hwmode_dbs(psoc))
+				strlcat(cc_mode, " (DBS)", len);
+		} else if (policy_mgr_2_freq_always_on_same_mac(psoc,
+			   pm_conc_connection_list[0].freq,
+			   pm_conc_connection_list[1].freq)) {
+			strlcat(cc_mode, " MCC", len);
+			if (policy_mgr_is_current_hwmode_dbs(psoc))
+				strlcat(cc_mode, " (DBS)", len);
 		} else if (policy_mgr_is_current_hwmode_dbs(psoc)) {
 			strlcat(cc_mode, " DBS", len);
 		} else if (policy_mgr_is_current_hwmode_sbs(psoc)) {
@@ -3088,6 +3099,8 @@ QDF_STATUS policy_mgr_get_channel_list(struct wlan_objmgr_psoc *psoc,
 		goto end;
 	}
 
+	num_channels = QDF_MIN(num_channels, NUM_CHANNELS);
+
 	/* Let's divide the list in 2.4 & 5 Ghz lists */
 	for (i = 0; i < num_channels; i++) {
 		if (wlan_reg_is_24ghz_ch_freq(channel_list[i])) {
@@ -3826,7 +3839,8 @@ bool policy_mgr_allow_same_mac_same_freq(struct wlan_objmgr_psoc *psoc,
 
 bool policy_mgr_allow_new_home_channel(
 	struct wlan_objmgr_psoc *psoc, enum policy_mgr_con_mode mode,
-	qdf_freq_t ch_freq, uint32_t num_connections, bool is_dfs_ch)
+	qdf_freq_t ch_freq, uint32_t num_connections, bool is_dfs_ch,
+	uint32_t ext_flags)
 {
 	bool status = true;
 	struct policy_mgr_psoc_priv_obj *pm_ctx;
@@ -3845,10 +3859,8 @@ bool policy_mgr_allow_new_home_channel(
 	qdf_mutex_acquire(&pm_ctx->qdf_conc_list_lock);
 	if (num_connections == 3) {
 		status = policy_mgr_allow_4th_new_freq(psoc,
-						pm_conc_connection_list[0].freq,
-						pm_conc_connection_list[1].freq,
-						pm_conc_connection_list[2].freq,
-						ch_freq);
+						       ch_freq, mode,
+						       ext_flags);
 	} else if (num_connections == 2) {
 	/* No SCC or MCC combination is allowed with / on DFS channel */
 		on_same_mac = policy_mgr_2_freq_always_on_same_mac(psoc,
@@ -3981,7 +3993,8 @@ policy_mgr_get_pref_force_scc_freq(struct wlan_objmgr_psoc *psoc,
 	qdf_mem_zero(&pcl, sizeof(pcl));
 	status = policy_mgr_get_pcl(psoc, mode, pcl.pcl_list, &pcl.pcl_len,
 				    pcl.weight_list,
-				    QDF_ARRAY_SIZE(pcl.weight_list));
+				    QDF_ARRAY_SIZE(pcl.weight_list),
+				    vdev_id);
 	if (QDF_IS_STATUS_ERROR(status) || !pcl.pcl_len) {
 		policy_mgr_err("get pcl failed for mode: %d, pcl len %d", mode,
 			       pcl.pcl_len);

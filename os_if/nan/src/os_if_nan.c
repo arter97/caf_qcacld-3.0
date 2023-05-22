@@ -2531,7 +2531,7 @@ void os_if_nan_ndi_session_end(struct wlan_objmgr_vdev *vdev)
 	 * call and NDI state remains to created "NAN_DATA_NDI_CREATED_STATE".
 	 */
 	if (state == NAN_DATA_NDI_CREATED_STATE) {
-		osif_err("NDI interface is just created: %u", state);
+		osif_debug("NDI interface is just created: %u", state);
 		return;
 	} else if (state != NAN_DATA_NDI_DELETING_STATE &&
 		   state != NAN_DATA_DISCONNECTED_STATE) {
@@ -2729,7 +2729,7 @@ static int os_if_process_nan_disable_req(struct wlan_objmgr_psoc *psoc,
 }
 
 static int os_if_process_nan_enable_req(struct wlan_objmgr_pdev *pdev,
-					struct nlattr **tb)
+					struct nlattr **tb, uint8_t vdev_id)
 {
 	uint32_t chan_freq_2g, chan_freq_5g = 0;
 	uint32_t buf_len;
@@ -2750,7 +2750,7 @@ static int os_if_process_nan_enable_req(struct wlan_objmgr_pdev *pdev,
 			nla_get_u32(tb[
 				QCA_WLAN_VENDOR_ATTR_NAN_DISC_5GHZ_BAND_FREQ]);
 
-	if (!ucfg_is_nan_enable_allowed(psoc, chan_freq_2g)) {
+	if (!ucfg_is_nan_enable_allowed(psoc, chan_freq_2g, vdev_id)) {
 		osif_err("NAN Enable not allowed at this moment for channel %d",
 			 chan_freq_2g);
 		return -EINVAL;
@@ -2829,7 +2829,7 @@ int os_if_process_nan_req(struct wlan_objmgr_pdev *pdev, uint8_t vdev_id,
 
 	switch (nan_subcmd) {
 	case QCA_WLAN_NAN_EXT_SUBCMD_TYPE_ENABLE_REQ:
-		return os_if_process_nan_enable_req(pdev, tb);
+		return os_if_process_nan_enable_req(pdev, tb, vdev_id);
 	case QCA_WLAN_NAN_EXT_SUBCMD_TYPE_DISABLE_REQ:
 		return os_if_process_nan_disable_req(psoc, tb);
 	default:

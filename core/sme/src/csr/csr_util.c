@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2011-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -618,11 +618,7 @@ uint16_t csr_check_concurrent_channel_overlap(struct mac_context *mac_ctx,
 			QDF_MCC_TO_SCC_SWITCH_DISABLE)
 		return 0;
 
-	op_mode = wlan_get_opmode_vdev_id(mac_ctx->pdev, vdev_id);
-	if (policy_mgr_is_ll_sap_present(
-			mac_ctx->psoc,
-			policy_mgr_convert_device_mode_to_qdf_type(op_mode),
-			vdev_id))
+	if (policy_mgr_is_vdev_ll_sap(mac_ctx->psoc, vdev_id))
 		return 0;
 
 	if (sap_ch_freq != 0) {

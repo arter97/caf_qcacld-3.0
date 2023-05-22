@@ -861,8 +861,7 @@ static QDF_STATUS lim_allocate_and_get_bcn(
 	if (!pkt_l)
 		return QDF_STATUS_E_FAILURE;
 
-	status = wma_ds_peek_rx_packet_info(
-		pkt_l, (void *)&rx_pkt_info_l, false);
+	status = wma_ds_peek_rx_packet_info(pkt_l, (void *)&rx_pkt_info_l);
 	if (!QDF_IS_STATUS_SUCCESS(status)) {
 		pe_err("Failed to get Rx Pkt meta");
 		goto free;
@@ -1359,17 +1358,8 @@ lim_handle80211_frames(struct mac_context *mac, struct scheduler_msg *limMsg,
 			fc.protVer);
 		lim_pkt_free(mac, TXRX_FRM_802_11_MGMT, pRxPacketInfo,
 			     (void *)limMsg->bodyptr);
-#ifdef WLAN_DEBUG
-		mac->lim.numProtErr++;
-#endif
 		goto end;
 	}
-
-/* Chance of crashing : to be done BT-AMP ........happens when broadcast probe req is received */
-
-#ifdef WLAN_DEBUG
-	mac->lim.numMAC[fc.type][fc.subType]++;
-#endif
 
 	switch (fc.type) {
 	case SIR_MAC_MGMT_FRAME:
@@ -1507,6 +1497,47 @@ end:
 	return;
 } /*** end lim_handle80211_frames() ***/
 
+QDF_STATUS lim_handle_frame_genby_mbssid(uint8_t *frame, uint32_t frame_len,
+					 uint8_t frm_subtype, char *bssid)
+{
+	struct mac_context *mac_ctx;
+	struct pe_session *session;
+	uint8_t sessionid;
+	t_packetmeta meta_data = {0};
+
+	mac_ctx = cds_get_context(QDF_MODULE_ID_PE);
+	if (!mac_ctx) {
+		pe_err("mac ctx is null");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	session = pe_find_session_by_bssid(mac_ctx, bssid, &sessionid);
+	if (!session)
+		return QDF_STATUS_E_INVAL;
+
+	meta_data.mpdu_hdr_ptr = frame;
+	meta_data.mpdu_len = frame_len;
+	meta_data.mpdu_data_ptr = frame + sizeof(struct wlan_frame_hdr);
+	meta_data.mpdu_data_len = frame_len - sizeof(struct wlan_frame_hdr);
+
+	if (frm_subtype == MGMT_SUBTYPE_BEACON) {
+		pe_debug("Gen beacon frame for critical update feature");
+		if (session->limSmeState == eLIM_SME_LINK_EST_STATE ||
+		    session->limSmeState == eLIM_SME_NORMAL_STATE)
+			sch_beacon_process(mac_ctx, (uint8_t *)&meta_data,
+					   session);
+		else
+			lim_process_beacon_frame(mac_ctx, (uint8_t *)&meta_data,
+						 session);
+	} else if (frm_subtype == MGMT_SUBTYPE_PROBE_RESP) {
+		pe_debug("Gen Probe rsp frame for critical update feature");
+		lim_process_probe_rsp_frame(mac_ctx, (uint8_t *)&meta_data,
+						      session);
+	}
+
+	return QDF_STATUS_SUCCESS;
+}
+
 void lim_process_abort_scan_ind(struct mac_context *mac_ctx,
 	uint8_t vdev_id, uint32_t scan_id, uint32_t scan_requestor_id)
 {
@@ -1600,9 +1631,6 @@ static void lim_process_messages(struct mac_context *mac_ctx,
 		return;
 	}
 
-#ifdef WLAN_DEBUG
-	mac_ctx->lim.numTot++;
-#endif
 	/*
 	 * MTRACE logs not captured for events received from SME
 	 * SME enums (eWNI_SME_START_REQ) starts with 0x16xx.
@@ -1631,17 +1659,9 @@ static void lim_process_messages(struct mac_context *mac_ctx,
 	case SIR_LIM_UPDATE_BEACON:
 		lim_update_beacon(mac_ctx);
 		break;
-#ifdef ANI_SIR_IBSS_PEER_CACHING
-	case WMA_IBSS_STA_ADD:
-		lim_ibss_sta_add(mac_ctx, msg->bodyptr);
-		break;
-#endif
 	case SIR_BB_XPORT_MGMT_MSG:
-		/* These messages are from Peer MAC entity. */
-#ifdef WLAN_DEBUG
-		mac_ctx->lim.numBbt++;
-#endif
-		/* The original msg which we were deferring have the
+		/* These messages are from Peer MAC entity.
+		 * The original msg which we were deferring have the
 		 * bodyPointer point to 'BD' instead of 'cds pkt'. If we
 		 * don't make a copy of msg, then overwrite the
 		 * msg->bodyPointer and next time when we try to
@@ -1658,8 +1678,9 @@ static void lim_process_messages(struct mac_context *mac_ctx,
 		body_ptr = (cds_pkt_t *) new_msg.bodyptr;
 		cds_pkt_get_packet_length(body_ptr, &pkt_len);
 
-		qdf_status = wma_ds_peek_rx_packet_info(body_ptr,
-			(void **) &new_msg.bodyptr, false);
+		qdf_status =
+			wma_ds_peek_rx_packet_info(body_ptr,
+						   (void **) &new_msg.bodyptr);
 
 		if (!QDF_IS_STATUS_SUCCESS(qdf_status)) {
 			lim_decrement_pending_mgmt_count(mac_ctx);
@@ -2206,9 +2227,6 @@ static void lim_process_normal_hdd_msg(struct mac_context *mac_ctx,
 		 * if radar is detected, Defer processing this message
 		 */
 		if (lim_defer_msg(mac_ctx, msg) != TX_SUCCESS) {
-#ifdef WLAN_DEBUG
-			mac_ctx->lim.numSme++;
-#endif
 			lim_log_session_states(mac_ctx);
 			/* Release body */
 			qdf_mem_free(msg->bodyptr);
@@ -2222,9 +2240,6 @@ static void lim_process_normal_hdd_msg(struct mac_context *mac_ctx,
 		 */
 		if (rsp_reqd)
 			mac_ctx->lim.gLimRspReqd = true;
-#ifdef WLAN_DEBUG
-		mac_ctx->lim.numSme++;
-#endif
 		if (lim_process_sme_req_messages(mac_ctx, msg)) {
 			/*
 			 * Release body. limProcessSmeReqMessage consumed the

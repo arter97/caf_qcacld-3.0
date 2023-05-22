@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2020 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -104,11 +104,11 @@ static int populate_oem_data_cap(struct hdd_adapter *adapter,
 	data_cap->allowed_dwell_time_min = neighbor_scan_min_chan_time;
 	data_cap->allowed_dwell_time_max = neighbor_scan_max_chan_time;
 	data_cap->curr_dwell_time_min =
-		ucfg_cm_get_neighbor_scan_min_chan_time(hdd_ctx->psoc,
-							adapter->vdev_id);
+		ucfg_cm_get_neighbor_scan_min_chan_time(
+				hdd_ctx->psoc, adapter->deflink->vdev_id);
 	data_cap->curr_dwell_time_max =
-		ucfg_cm_get_neighbor_scan_max_chan_time(hdd_ctx->psoc,
-							adapter->vdev_id);
+		ucfg_cm_get_neighbor_scan_max_chan_time(
+				hdd_ctx->psoc, adapter->deflink->vdev_id);
 	data_cap->supported_bands = band_capability;
 
 	/* request for max num of channels */
@@ -230,7 +230,7 @@ static void send_oem_reg_rsp_nlink_msg(void)
 		device_mode = buf++;
 		vdev_id = buf++;
 		*device_mode = adapter->device_mode;
-		*vdev_id = adapter->vdev_id;
+		*vdev_id = adapter->deflink->vdev_id;
 		(*num_interfaces)++;
 		hdd_debug("num_interfaces: %d, device_mode: %d, vdev_id: %d",
 			  *num_interfaces, *device_mode,
@@ -1259,7 +1259,7 @@ void hdd_oem_event_handler_cb(const struct oem_data *oem_event_data,
 
 		qdf_mem_copy(oem_data->data, oem_event_data->data,
 			     oem_data->data_len);
-		oem_data->vdev_id = hdd_adapter->vdev_id;
+		oem_data->vdev_id = hdd_adapter->deflink->vdev_id;
 		osif_request_complete(request);
 		osif_request_put(request);
 	} else {
@@ -1377,9 +1377,10 @@ __wlan_hdd_cfg80211_oem_data_handler(struct wiphy *wiphy,
 			nla_get_u8(tb[QCA_WLAN_VENDOR_ATTR_OEM_DEVICE_INFO]);
 
 	if (oem_data.pdev_vdev_flag) {
-		status = policy_mgr_get_mac_id_by_session_id(hdd_ctx->psoc,
-							     adapter->vdev_id,
-							     &mac_id);
+		status = policy_mgr_get_mac_id_by_session_id(
+						    hdd_ctx->psoc,
+						    adapter->deflink->vdev_id,
+						    &mac_id);
 		if (QDF_IS_STATUS_ERROR(status)) {
 			hdd_err("get mac id failed");
 			return -EINVAL;
@@ -1393,7 +1394,7 @@ __wlan_hdd_cfg80211_oem_data_handler(struct wiphy *wiphy,
 		hdd_err("oem data len is 0!");
 		return -EINVAL;
 	}
-	oem_data.vdev_id = adapter->vdev_id;
+	oem_data.vdev_id = adapter->deflink->vdev_id;
 	oem_data.data = nla_data(tb[QCA_WLAN_VENDOR_ATTR_OEM_DATA_CMD_DATA]);
 
 	if (tb[QCA_WLAN_VENDOR_ATTR_OEM_DATA_RESPONSE_EXPECTED])
@@ -1416,7 +1417,7 @@ __wlan_hdd_cfg80211_oem_data_handler(struct wiphy *wiphy,
 
 		status = sme_oem_data_cmd(hdd_ctx->mac_handle,
 					  hdd_oem_event_handler_cb,
-					  &oem_data, adapter->vdev_id);
+					  &oem_data, adapter->deflink->vdev_id);
 		if (QDF_IS_STATUS_ERROR(status)) {
 			hdd_err("Failure while sending command to fw");
 			ret = -EAGAIN;
@@ -1456,7 +1457,7 @@ __wlan_hdd_cfg80211_oem_data_handler(struct wiphy *wiphy,
 	} else {
 		status = sme_oem_data_cmd(hdd_ctx->mac_handle,
 					  hdd_oem_event_handler_cb,
-					  &oem_data, adapter->vdev_id);
+					  &oem_data, adapter->deflink->vdev_id);
 		return qdf_status_to_os_return(status);
 	}
 

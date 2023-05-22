@@ -80,6 +80,7 @@
 #include "wlan_cmn_ieee80211.h"
 #include <wlan_cm_api.h>
 #include <wlan_vdev_mgr_utils_api.h>
+#include "parser_api.h"
 
 /** -------------------------------------------------------------
    \fn lim_delete_dialogue_token_list
@@ -665,30 +666,6 @@ void lim_cleanup_mlm(struct mac_context *mac_ctx)
 	}
 } /*** end lim_cleanup_mlm() ***/
 
-/**
- * lim_print_mac_addr()
- *
- ***FUNCTION:
- * This function is called to print passed MAC address
- * in : format.
- *
- ***LOGIC:
- *
- ***ASSUMPTIONS:
- * NA
- *
- ***NOTE:
- * @param  macAddr  - MacAddr to be printed
- * @param  logLevel - Loglevel to be used
- *
- * @return None.
- */
-
-void lim_print_mac_addr(struct mac_context *mac, tSirMacAddr macAddr, uint8_t logLevel)
-{
-	pe_debug(QDF_MAC_ADDR_FMT, QDF_MAC_ADDR_REF(macAddr));
-} /****** end lim_print_mac_addr() ******/
-
 /*
  * lim_reset_deferred_msg_q()
  *
@@ -1057,15 +1034,13 @@ lim_update_prot_sta_params(struct mac_context *mac,
 {
 	uint32_t i;
 
-	pe_debug("Associated STA addr is:");
-	lim_print_mac_addr(mac, peerMacAddr, LOGD);
+	pe_debug("Associated STA addr is: "QDF_MAC_ADDR_FMT,
+		 QDF_MAC_ADDR_REF(peerMacAddr));
 
 	for (i = 0; i < LIM_PROT_STA_CACHE_SIZE; i++) {
 		if (pe_session->protStaCache[i].active) {
-			pe_debug("Addr:");
-				lim_print_mac_addr
-				(mac, pe_session->protStaCache[i].addr,
-				LOGD);
+			pe_debug("Addr:" QDF_MAC_ADDR_FMT,
+				 QDF_MAC_ADDR_REF(pe_session->protStaCache[i].addr));
 
 			if (!qdf_mem_cmp
 				    (pe_session->protStaCache[i].addr,
@@ -1290,9 +1265,8 @@ lim_update_short_preamble(struct mac_context *mac_ctx, tSirMacAddr peer_mac_addr
 	if (sta_ds->shortPreambleEnabled != eHAL_CLEAR)
 		return;
 
-	pe_debug("Short Preamble is not enabled in Assoc Req from");
-
-	lim_print_mac_addr(mac_ctx, peer_mac_addr, LOGD);
+	pe_debug("Short Preamble is not enabled in Assoc Req from "QDF_MAC_ADDR_FMT,
+		 QDF_MAC_ADDR_REF(peer_mac_addr));
 
 	for (i = 0; i < LIM_PROT_STA_CACHE_SIZE; i++) {
 		if (LIM_IS_AP_ROLE(psession_entry) &&
@@ -1327,14 +1301,14 @@ lim_update_short_preamble(struct mac_context *mac_ctx, tSirMacAddr peer_mac_addr
 		tLimNoShortParams *lim_params =
 				&psession_entry->gLimNoShortParams;
 		if (LIM_IS_AP_ROLE(psession_entry)) {
-			pe_err("No space in Short cache active: %d sta: %d for sta",
-				i, lim_params->numNonShortPreambleSta);
-			lim_print_mac_addr(mac_ctx, peer_mac_addr, LOGE);
+			pe_err("No space in Short cache active: %d sta: %d for sta "QDF_MAC_ADDR_FMT,
+			       i, lim_params->numNonShortPreambleSta,
+			       QDF_MAC_ADDR_REF(peer_mac_addr));
 			return;
 		} else {
-			pe_err("No space in Short cache active: %d sta: %d for sta",
-				i, lim_params->numNonShortPreambleSta);
-			lim_print_mac_addr(mac_ctx, peer_mac_addr, LOGE);
+			pe_err("No space in Short cache active: %d sta: %d for sta "QDF_MAC_ADDR_FMT,
+			       i, lim_params->numNonShortPreambleSta,
+			       QDF_MAC_ADDR_REF(peer_mac_addr));
 			return;
 		}
 
@@ -1405,8 +1379,8 @@ lim_update_short_slot_time(struct mac_context *mac_ctx, tSirMacAddr peer_mac_add
 	if (sta_ds->shortSlotTimeEnabled != eHAL_CLEAR)
 		return;
 
-	pe_debug("Short Slot Time is not enabled in Assoc Req from");
-	lim_print_mac_addr(mac_ctx, peer_mac_addr, LOGD);
+	pe_debug("Short Slot Time is not enabled in Assoc Req from "QDF_MAC_ADDR_FMT,
+		 QDF_MAC_ADDR_REF(peer_mac_addr));
 	for (i = 0; i < LIM_PROT_STA_CACHE_SIZE; i++) {
 		if (LIM_IS_AP_ROLE(session_entry) &&
 		    session_entry->gLimNoShortSlotParams.
@@ -1439,16 +1413,14 @@ lim_update_short_slot_time(struct mac_context *mac_ctx, tSirMacAddr peer_mac_add
 
 	if (i >= LIM_PROT_STA_CACHE_SIZE) {
 		if (LIM_IS_AP_ROLE(session_entry)) {
-			pe_err("No space in ShortSlot cache active: %d sta: %d for sta",
-				i, session_entry->gLimNoShortSlotParams.
-				numNonShortSlotSta);
-			lim_print_mac_addr(mac_ctx, peer_mac_addr, LOGE);
+			pe_err("No space in ShortSlot cache active: %d sta: %d for sta "QDF_MAC_ADDR_FMT,
+			       i, session_entry->gLimNoShortSlotParams.numNonShortSlotSta,
+			       QDF_MAC_ADDR_REF(peer_mac_addr));
 			return;
 		} else {
-			pe_err("No space in ShortSlot cache active: %d sta: %d for sta",
-				i, mac_ctx->lim.gLimNoShortSlotParams.
-				numNonShortSlotSta);
-			lim_print_mac_addr(mac_ctx, peer_mac_addr, LOGE);
+			pe_err("No space in ShortSlot cache active: %d sta: %d for sta "QDF_MAC_ADDR_FMT,
+			       i, mac_ctx->lim.gLimNoShortSlotParams.numNonShortSlotSta,
+			       QDF_MAC_ADDR_REF(peer_mac_addr));
 			return;
 		}
 	}
@@ -4840,8 +4812,8 @@ void lim_pmf_sa_query_timer_handler(void *pMacGlobal, uint32_t param)
 	maxretries = mac->mlme_cfg->gen.pmf_sa_query_max_retries;
 	pSta->pmfSaQueryRetryCount++;
 	if (pSta->pmfSaQueryRetryCount >= maxretries) {
-		pe_err("SA Query timed out,Deleting STA");
-		lim_print_mac_addr(mac, pSta->staAddr, LOGE);
+		pe_err("SA Query timed out,Deleting STA: "QDF_MAC_ADDR_FMT,
+		       QDF_MAC_ADDR_REF(pSta->staAddr));
 		lim_send_disassoc_mgmt_frame(mac,
 			REASON_DISASSOC_DUE_TO_INACTIVITY,
 			pSta->staAddr, pe_session, false);
@@ -6461,7 +6433,7 @@ QDF_STATUS lim_send_action_frm_tb_ppdu_cfg(struct mac_context *mac_ctx,
 
 	frm = (tDot11fvendor_action_frame *)(data_buf + sizeof(*cfg_msg));
 
-	frm->Category.category = SIR_MAC_ACTION_VENDOR_SPECIFIC_CATEGORY;
+	frm->Category.category = ACTION_CATEGORY_VENDOR_SPECIFIC;
 
 	frm->vendor_oui.oui_data[0] = 0x00;
 	frm->vendor_oui.oui_data[1] = 0xA0;
@@ -7395,6 +7367,8 @@ lim_revise_req_he_cap_per_band(struct mlme_legacy_priv *mlme_priv,
 			mac->he_cap_2g.tx_he_mcs_map_lt_80;
 		he_config->rx_he_mcs_map_lt_80 =
 			mac->he_cap_2g.rx_he_mcs_map_lt_80;
+		he_config->max_ampdu_len_exp_ext =
+			mac->he_cap_2g.max_ampdu_len_exp_ext;
 		he_config->ul_2x996_tone_ru_supp = 0;
 		he_config->num_sounding_gt_80 = 0;
 		he_config->bfee_sts_gt_80 = 0;
@@ -7412,6 +7386,8 @@ lim_revise_req_he_cap_per_band(struct mlme_legacy_priv *mlme_priv,
 
 		he_config->num_sounding_lt_80 =
 			mac->he_cap_5g.num_sounding_lt_80;
+		he_config->max_ampdu_len_exp_ext =
+			mac->he_cap_5g.max_ampdu_len_exp_ext;
 		if (he_config->chan_width_2 ||
 		    he_config->chan_width_3) {
 			he_config->bfee_sts_gt_80 =
@@ -7429,6 +7405,12 @@ lim_revise_req_he_cap_per_band(struct mlme_legacy_priv *mlme_priv,
 			he_config->ul_2x996_tone_ru_supp =
 				 mac->he_cap_5g.ul_2x996_tone_ru_supp;
 		}
+		he_config->su_feedback_tone16 =
+					mac->he_cap_5g.su_feedback_tone16;
+		he_config->mu_feedback_tone16 =
+					mac->he_cap_5g.mu_feedback_tone16;
+		he_config->codebook_su = mac->he_cap_5g.codebook_su;
+		he_config->codebook_mu = mac->he_cap_5g.codebook_mu;
 	}
 }
 
@@ -8219,6 +8201,8 @@ void lim_set_mlo_caps(struct mac_context *mac, struct pe_session *session,
 		mlo_ie_info->eml_capab_present = dot11_cap.eml_capab_present;
 		mlo_ie_info->mld_capab_and_op_present = dot11_cap.mld_capab_and_op_present;
 		mlo_ie_info->mld_id_present = dot11_cap.mld_id_present;
+		mlo_ie_info->ext_mld_capab_and_op_present =
+				dot11_cap.ext_mld_capab_and_op_present;
 		mlo_ie_info->reserved_1 = dot11_cap.reserved_1;
 		mlo_ie_info->common_info_length = dot11_cap.common_info_length;
 		qdf_mem_copy(&mlo_ie_info->mld_mac_addr,
@@ -8229,29 +8213,22 @@ void lim_set_mlo_caps(struct mac_context *mac, struct pe_session *session,
 }
 
 QDF_STATUS lim_send_mlo_caps_ie(struct mac_context *mac_ctx,
-				struct pe_session *session,
+				struct wlan_objmgr_vdev *vdev,
 				enum QDF_OPMODE device_mode,
 				uint8_t vdev_id)
 {
-	uint8_t mlo_cap_total_len = DOT11F_IE_MLO_IE_MIN_LEN +
-				    EHT_CAP_OUI_LEN + QDF_MAC_ADDR_SIZE;
+
 	QDF_STATUS status_2g, status_5g;
-	uint8_t mlo_caps[DOT11F_IE_MLO_IE_MIN_LEN +
-			 EHT_CAP_OUI_LEN + QDF_MAC_ADDR_SIZE] = {0};
+	struct wlan_mlo_ie mlo_ie;
 
-	mlo_caps[0] = DOT11F_EID_MLO_IE;
-	mlo_caps[1] = DOT11F_IE_MLO_IE_MIN_LEN + 1;
-
-	qdf_mem_copy(&mlo_caps[2], MLO_IE_OUI_TYPE, MLO_IE_OUI_SIZE);
-	lim_set_mlo_caps(mac_ctx, session, mlo_caps, mlo_cap_total_len);
-
+	populate_dot11f_mlo_ie(mac_ctx, vdev, &mlo_ie);
 	status_2g = lim_send_ie(mac_ctx, vdev_id, DOT11F_EID_MLO_IE,
-				CDS_BAND_2GHZ, &mlo_caps[2],
-				EHT_CAP_OUI_LEN + QDF_MAC_ADDR_SIZE);
+				CDS_BAND_2GHZ, &mlo_ie.data[2],
+				mlo_ie.num_data - 2);
 
 	status_5g = lim_send_ie(mac_ctx, vdev_id, DOT11F_EID_MLO_IE,
-				CDS_BAND_5GHZ, &mlo_caps[2],
-				EHT_CAP_OUI_LEN + QDF_MAC_ADDR_SIZE);
+				CDS_BAND_5GHZ, &mlo_ie.data[2],
+				mlo_ie.num_data - 2);
 
 	if (QDF_IS_STATUS_SUCCESS(status_2g) &&
 	    QDF_IS_STATUS_SUCCESS(status_5g)) {
@@ -8804,6 +8781,23 @@ void lim_update_stads_eht_capable(tpDphHashNode sta_ds, tpSirAssocReq assoc_req)
 	sta_ds->mlmStaContext.eht_capable = assoc_req->eht_cap.present;
 }
 
+#ifdef FEATURE_WLAN_TDLS
+#ifdef WLAN_FEATURE_11BE
+void lim_update_tdls_sta_eht_capable(struct mac_context *mac,
+				     tpAddStaParams add_sta_params,
+				     tpDphHashNode sta_ds,
+				     struct pe_session *session_entry)
+{
+	if (sta_ds->staType == STA_ENTRY_TDLS_PEER) {
+		if (!sta_ds->eht_config.present)
+			add_sta_params->eht_capable = 0;
+	}
+
+	pe_debug("tdls eht_capable: %d", add_sta_params->eht_capable);
+}
+#endif
+#endif
+
 void lim_update_sta_eht_capable(struct mac_context *mac,
 				tpAddStaParams add_sta_params,
 				tpDphHashNode sta_ds,
@@ -8938,6 +8932,10 @@ void lim_set_eht_caps(struct mac_context *mac, struct pe_session *session,
 		eht_cap->eht_trs_support = dot11_cap.eht_trs_support;
 		eht_cap->txop_return_support_txop_share_m2 =
 			dot11_cap.txop_return_support_txop_share_m2;
+		eht_cap->two_bqrs_support =
+			dot11_cap.two_bqrs_support;
+		eht_cap->eht_link_adaptation_support =
+			dot11_cap.eht_link_adaptation_support;
 		eht_cap->support_320mhz_6ghz = dot11_cap.support_320mhz_6ghz;
 		eht_cap->ru_242tone_wt_20mhz = dot11_cap.ru_242tone_wt_20mhz;
 		eht_cap->ndp_4x_eht_ltf_3dot2_us_gi =
@@ -9003,6 +9001,12 @@ void lim_set_eht_caps(struct mac_context *mac, struct pe_session *session,
 			dot11_cap.rx_1k_qam_in_wider_bw_dl_ofdma;
 		eht_cap->rx_4k_qam_in_wider_bw_dl_ofdma =
 			dot11_cap.rx_4k_qam_in_wider_bw_dl_ofdma;
+		eht_cap->limited_cap_support_20mhz =
+			dot11_cap.limited_cap_support_20mhz;
+		eht_cap->triggered_mu_bf_full_bw_fb_and_dl_mumimo =
+			dot11_cap.triggered_mu_bf_full_bw_fb_and_dl_mumimo;
+		eht_cap->mru_support_20mhz =
+			dot11_cap.mru_support_20mhz;
 
 		if ((is_band_2g && !dot11_he_cap.chan_width_0) ||
 			(!is_band_2g && !dot11_he_cap.chan_width_1 &&
@@ -9276,6 +9280,8 @@ void lim_intersect_ap_emlsr_caps(struct mac_context *mac_ctx,
 		 add_bss->staContext.emlsr_trans_timeout);
 }
 
+#define MAX_MSD_OFDM_ED_THRESHOLD 10
+
 void lim_extract_msd_caps(struct mac_context *mac_ctx,
 			  struct pe_session *session,
 			  struct bss_params *add_bss,
@@ -9315,11 +9321,20 @@ void lim_extract_msd_caps(struct mac_context *mac_ctx,
 				assoc_rsp->mlo_ie.mlo_ie.medium_sync_delay_info.medium_sync_duration;
 			add_bss->staContext.msd_caps.med_sync_ofdm_ed_thresh =
 				assoc_rsp->mlo_ie.mlo_ie.medium_sync_delay_info.medium_sync_ofdm_ed_thresh;
+			if (add_bss->staContext.msd_caps.med_sync_ofdm_ed_thresh >
+			    MAX_MSD_OFDM_ED_THRESHOLD)
+				add_bss->staContext.msd_caps.med_sync_ofdm_ed_thresh = 0;
 			add_bss->staContext.msd_caps.med_sync_max_txop_num =
 				assoc_rsp->mlo_ie.mlo_ie.medium_sync_delay_info.medium_sync_max_txop_num;
 		} else {
-			/* Fill MSD params with zeroes if MSD caps are absent */
-			add_bss->staContext.msd_caps.med_sync_duration = 0;
+			/**
+			 * Fill MSD params with default values if MSD caps are
+			 * absent.
+			 * MSD duration = 5484usec / 32 = 171.
+			 * OFDM ED threshold = 0. FW adds -72 to Host value.
+			 * Maximum number of TXOPs = AP value (default = 0).
+			 */
+			add_bss->staContext.msd_caps.med_sync_duration = 171;
 			add_bss->staContext.msd_caps.med_sync_ofdm_ed_thresh = 0;
 			add_bss->staContext.msd_caps.med_sync_max_txop_num = 0;
 		}
@@ -9494,8 +9509,7 @@ QDF_STATUS lim_util_get_type_subtype(void *pkt, uint8_t *type,
 		pe_err("NULL packet received");
 		return QDF_STATUS_E_FAILURE;
 	}
-	status =
-		wma_ds_peek_rx_packet_info(cds_pkt, (void *)&rxpktinfor, false);
+	status = wma_ds_peek_rx_packet_info(cds_pkt, (void *)&rxpktinfor);
 	if (!QDF_IS_STATUS_SUCCESS(status)) {
 		pe_err("Failed extract cds packet. status %d", status);
 		return QDF_STATUS_E_FAILURE;
@@ -9578,6 +9592,9 @@ enum rateid lim_get_min_session_txrate(struct pe_session *session,
 		return rid;
 
 	lim_get_min_rate(&min_rate, rateset);
+
+	if (session->is_oui_auth_assoc_6mbps_2ghz_enable)
+		min_rate = SIR_MAC_RATE_6;
 
 	switch (min_rate) {
 	case SIR_MAC_RATE_1:
@@ -11143,7 +11160,7 @@ lim_set_tpc_power(struct mac_context *mac_ctx, struct pe_session *session)
 	    session->opmode == QDF_P2P_GO_MODE)
 		mlme_obj->reg_tpc_obj.num_pwr_levels = 0;
 
-	lim_calculate_tpc(mac_ctx, session, false, 0, false);
+	lim_calculate_tpc(mac_ctx, session, false);
 
 	tx_ops->set_tpc_power(mac_ctx->psoc, session->vdev_id,
 			      &mlme_obj->reg_tpc_obj);
@@ -11286,7 +11303,7 @@ lim_is_power_change_required_for_sta(struct mac_context *mac_ctx,
 
 	wlan_reg_get_cur_6g_ap_pwr_type(mac_ctx->pdev, &ap_power_type_6g);
 
-	if (sta_session->ap_power_type_6g == REG_INDOOR_AP &&
+	if (sta_session->best_6g_power_type == REG_INDOOR_AP &&
 	    channel_state & CHANNEL_STATE_ENABLE &&
 	    ap_power_type_6g == REG_VERY_LOW_POWER_AP) {
 		pe_debug("Change the power type of STA from LPI to VLP");

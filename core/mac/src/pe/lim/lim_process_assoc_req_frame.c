@@ -803,9 +803,6 @@ static bool lim_chk_is_11b_sta_supported(struct mac_context *mac_ctx,
 			pe_warn("Rejecting Re/Assoc req from 11b STA: "QDF_MAC_ADDR_FMT,
 				QDF_MAC_ADDR_REF(sa));
 
-#ifdef WLAN_DEBUG
-			mac_ctx->lim.gLim11bStaAssocRejectCount++;
-#endif
 			return false;
 		}
 	}
@@ -1280,20 +1277,6 @@ static bool lim_process_assoc_req_no_sta_ctx(struct mac_context *mac_ctx,
 	return true;
 }
 
-#ifdef WLAN_DEBUG
-static inline void
-lim_update_assoc_drop_count(struct mac_context *mac_ctx, uint8_t sub_type)
-{
-	if (sub_type == LIM_ASSOC)
-		mac_ctx->lim.gLimNumAssocReqDropInvldState++;
-	else
-		mac_ctx->lim.gLimNumReassocReqDropInvldState++;
-}
-#else
-static inline void
-lim_update_assoc_drop_count(struct mac_context *mac_ctx, uint8_t sub_type) {}
-#endif
-
 static inline void
 lim_delete_pmf_query_timer(tpDphHashNode sta_ds)
 {
@@ -1339,7 +1322,6 @@ static bool lim_process_assoc_req_sta_ctx(struct mac_context *mac_ctx,
 			 sta_ds->mlmStaContext.mlmState,
 			 lim_mlm_state_str(sta_ds->mlmStaContext.mlmState),
 			 sta_ds->sta_deletion_in_progress);
-		lim_update_assoc_drop_count(mac_ctx, sub_type);
 		return false;
 	}
 
@@ -1477,9 +1459,6 @@ static bool lim_chk_wmm(struct mac_context *mac_ctx, tSirMacAddr sa,
 					mac_ctx, REASON_NO_BANDWIDTH,
 					1, sa, sub_type, 0, session,
 					false);
-#ifdef WLAN_DEBUG
-				mac_ctx->lim.gLimNumAssocReqDropACRejectTS++;
-#endif
 				return false;
 			}
 		} else if (lim_admit_control_add_sta(mac_ctx, sa, false)
@@ -1488,9 +1467,6 @@ static bool lim_chk_wmm(struct mac_context *mac_ctx, tSirMacAddr sa,
 			lim_send_assoc_rsp_mgmt_frame(
 				mac_ctx, REASON_NO_BANDWIDTH, 1,
 				sa, sub_type, 0, session, false);
-#ifdef WLAN_DEBUG
-			mac_ctx->lim.gLimNumAssocReqDropACRejectSta++;
-#endif
 			return false;
 		}
 		/* else all ok */
@@ -2661,14 +2637,20 @@ void lim_process_assoc_req_frame(struct mac_context *mac_ctx,
 	 */
 	sta_ds = dph_lookup_hash_entry(mac_ctx, hdr->sa, &assoc_id,
 				&session->dph.dphHashTable);
-	if (sta_ds) {
+	if (sta_ds && !sta_ds->rmfEnabled) {
+		/*
+		 * Drop only retries for non-PMF assoc requests.
+		 * For PMF case:
+		 * a) Before key installation - Drop assoc request
+		 * b) After key installation - Send SA query
+		 */
 		if (hdr->fc.retry > 0) {
 			pe_err("STA is initiating Assoc Req after ACK lost. Do not process sessionid: %d sys sub_type=%d for role=%d from: "
 				QDF_MAC_ADDR_FMT, session->peSessionId,
 			sub_type, GET_LIM_SYSTEM_ROLE(session),
 			QDF_MAC_ADDR_REF(hdr->sa));
 			return;
-		} else if (!sta_ds->rmfEnabled && (sub_type == LIM_REASSOC)) {
+		} else if (sub_type == LIM_REASSOC) {
 			/*
 			 * SAP should send reassoc response with reject code
 			 * to avoid IOT issues. as per the specification SAP
@@ -2682,7 +2664,7 @@ void lim_process_assoc_req_frame(struct mac_context *mac_ctx,
 				sub_type, sta_ds, session, false);
 			pe_err("Rejecting reassoc req from STA");
 			return;
-		} else if (!sta_ds->rmfEnabled) {
+		} else {
 			/*
 			 * Do this only for non PMF case.
 			 * STA might have missed the assoc response, so it is
@@ -2699,16 +2681,16 @@ void lim_process_assoc_req_frame(struct mac_context *mac_ctx,
 				session->limSystemRole,
 				QDF_MAC_ADDR_REF(hdr->sa));
 			return;
-		} else if (sta_ds->rmfEnabled && !sta_ds->is_key_installed) {
-			/* When PMF enabled, SA Query will be triggered
-			 * unexpectedly if duplicated assoc_req received -
-			 * 1) after pre_auth node deleted and
-			 * 2) before key installed.
-			 * Here drop such duplicated assoc_req frame.
-			 */
-			pe_err("Drop duplicate assoc_req before 4-way HS");
-			return;
 		}
+	} else if (sta_ds && sta_ds->rmfEnabled && !sta_ds->is_key_installed) {
+		/* When PMF enabled, SA Query will be triggered
+		 * unexpectedly if duplicated assoc_req received -
+		 * 1) after pre_auth node deleted and
+		 * 2) before key installed.
+		 * Here drop such duplicated assoc_req frame.
+		 */
+		pe_err("Drop duplicate assoc_req before 4-way HS");
+		return;
 	}
 
 	/* Get pointer to Re/Association Request frame body */
@@ -3008,7 +2990,28 @@ lim_convert_channel_width_enum(enum phy_ch_width ch_width)
 static uint32_t lim_convert_rate_flags_enum(uint32_t rate_flags,
 					    enum phy_ch_width ch_width)
 {
-	if (rate_flags & (TX_RATE_VHT160 |
+	if (rate_flags & (TX_RATE_HE160 |
+			  TX_RATE_HE80 |
+			  TX_RATE_HE40 |
+			  TX_RATE_HE20)) {
+		switch (ch_width) {
+		case CH_WIDTH_20MHZ:
+			rate_flags |= TX_RATE_HE20;
+			break;
+		case CH_WIDTH_40MHZ:
+			rate_flags |= TX_RATE_HE40;
+			break;
+		case CH_WIDTH_80MHZ:
+			rate_flags |= TX_RATE_HE80;
+			break;
+		case CH_WIDTH_160MHZ:
+		case CH_WIDTH_80P80MHZ:
+			rate_flags |= TX_RATE_HE160;
+			break;
+		default:
+			break;
+		}
+	} else if (rate_flags & (TX_RATE_VHT160 |
 			  TX_RATE_VHT80 |
 			  TX_RATE_VHT40 |
 			  TX_RATE_VHT20)) {

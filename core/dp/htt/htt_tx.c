@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2011, 2014-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -44,6 +44,8 @@
 #include <htt_internal.h>
 
 #include <cds_utils.h>
+#include <ce_api.h>
+#include <ce_internal.h>
 
 /* IPA Micro controller TX data packet HTT Header Preset
  * 31 | 30  29 | 28 | 27 | 26  22  | 21   16 | 15  13   | 12  8      | 7 0
@@ -1850,9 +1852,9 @@ htt_tx_desc_init(htt_pdev_handle pdev,
 		(msdu_info->info.l2_hdr_type != htt_pkt_type_mgmt))) {
 		uint32_t pkt_offset = qdf_nbuf_get_frag_len(msdu, 0);
 
-		data_attr = hw_classify << QDF_CE_TX_CLASSIFY_BIT_S;
-		data_attr |= ce_pkt_type << QDF_CE_TX_PKT_TYPE_BIT_S;
-		data_attr |= pkt_offset  << QDF_CE_TX_PKT_OFFSET_BIT_S;
+		data_attr = hw_classify << CE_DESC_TX_CLASSIFY_BIT_S;
+		data_attr |= ce_pkt_type << CE_DESC_PKT_TYPE_BIT_S;
+		data_attr |= pkt_offset  << CE_DESC_PKT_OFFSET_BIT_S;
 	}
 
 	qdf_nbuf_data_attr_set(msdu, data_attr);

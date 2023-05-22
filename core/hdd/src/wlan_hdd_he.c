@@ -858,12 +858,13 @@ static int __wlan_hdd_cfg80211_sr_operations(struct wiphy *wiphy,
 			ret = -EINVAL;
 			goto exit;
 		}
-		status = policy_mgr_get_mac_id_by_session_id(hdd_ctx->psoc,
-							     adapter->vdev_id,
-							     &mac_id);
+		status = policy_mgr_get_mac_id_by_session_id(
+						hdd_ctx->psoc,
+						adapter->deflink->vdev_id,
+						&mac_id);
 		if (QDF_IS_STATUS_ERROR(status)) {
 			hdd_err("Failed to get mac_id for vdev_id: %u",
-				adapter->vdev_id); {
+				adapter->deflink->vdev_id); {
 				ret = -EAGAIN;
 				goto exit;
 			}
@@ -893,12 +894,13 @@ static int __wlan_hdd_cfg80211_sr_operations(struct wiphy *wiphy,
 			ret = -EINVAL;
 			goto exit;
 		}
-		status = policy_mgr_get_mac_id_by_session_id(hdd_ctx->psoc,
-							     adapter->vdev_id,
-							     &mac_id);
+		status = policy_mgr_get_mac_id_by_session_id(
+						hdd_ctx->psoc,
+						adapter->deflink->vdev_id,
+						&mac_id);
 		if (QDF_IS_STATUS_ERROR(status)) {
 			hdd_err("Failed to get mac_id for vdev_id: %u",
-				adapter->vdev_id);
+				adapter->deflink->vdev_id);
 			ret = -EAGAIN;
 			goto exit;
 		}

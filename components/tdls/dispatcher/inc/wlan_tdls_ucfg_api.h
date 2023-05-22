@@ -163,6 +163,53 @@ return false;
 }
 #endif
 
+#ifdef WLAN_FEATURE_11BE
+/**
+ * ucfg_tdls_update_fw_mlo_capability() - update fw mlo capability
+ * @psoc: psoc object
+ * @is_fw_tdls_mlo_capable: bool value
+ *
+ * Return: none
+ */
+void ucfg_tdls_update_fw_mlo_capability(struct wlan_objmgr_psoc *psoc,
+					bool is_fw_tdls_mlo_capable);
+#else
+static inline
+void ucfg_tdls_update_fw_mlo_capability(struct wlan_objmgr_psoc *psoc,
+					bool is_fw_tdls_mlo_capable)
+{
+}
+#endif
+
+/**
+ * ucfg_tdls_link_vdev_is_matching() - check whether vdev is matching link vdev
+ * @vdev: vdev object
+ *
+ * Return: bool
+ */
+bool ucfg_tdls_link_vdev_is_matching(struct wlan_objmgr_vdev *vdev);
+
+/**
+ * ucfg_tdls_get_tdls_link_vdev() - get tdls link vdev
+ * @vdev: vdev object
+ * @dbg_id: debug id
+ *
+ * Return: vdev pointer
+ */
+struct wlan_objmgr_vdev *
+ucfg_tdls_get_tdls_link_vdev(struct wlan_objmgr_vdev *vdev,
+			     wlan_objmgr_ref_dbgid dbg_id);
+
+/**
+ * ucfg_tdls_put_tdls_link_vdev() - put tdls link vdev
+ * @vdev: vdev odject
+ * @dbg_id: debug id
+ *
+ * Return: void
+ */
+void ucfg_tdls_put_tdls_link_vdev(struct wlan_objmgr_vdev *vdev,
+				  wlan_objmgr_ref_dbgid dbg_id);
+
 /**
  * ucfg_tdls_psoc_enable() - TDLS module enable API
  * @psoc: psoc object
@@ -251,10 +298,12 @@ QDF_STATUS ucfg_tdls_teardown_links(struct wlan_objmgr_psoc *psoc);
 /**
  * ucfg_tdls_teardown_links_sync() - teardown all TDLS links.
  * @psoc: psoc object
+ * @vdev: Vdev object pointer
  *
  * Return: None
  */
-void ucfg_tdls_teardown_links_sync(struct wlan_objmgr_psoc *psoc);
+void ucfg_tdls_teardown_links_sync(struct wlan_objmgr_psoc *psoc,
+				   struct wlan_objmgr_vdev *vdev);
 
 /**
  * ucfg_tdls_notify_reset_adapter() - notify reset adapter
@@ -336,6 +385,35 @@ QDF_STATUS ucfg_set_tdls_secoffchanneloffset(struct wlan_objmgr_vdev *vdev,
 					     int offchanoffset);
 
 /**
+ * ucfg_tdls_discovery_on_going() - check discovery is on going
+ * @vdev: vdev object
+ *
+ * Return: true if tdls discovery on going else false
+ */
+bool ucfg_tdls_discovery_on_going(struct wlan_objmgr_vdev *vdev);
+
+/**
+ * ucfg_tdls_get_mlo_vdev() - get mlo vdev for tdls
+ * @vdev: vdev object
+ * @index: index of vdev in mlo list
+ * @dbg_id: debug id
+ *
+ * Return: vdev pointer
+ */
+struct wlan_objmgr_vdev *ucfg_tdls_get_mlo_vdev(struct wlan_objmgr_vdev *vdev,
+						uint8_t index,
+						wlan_objmgr_ref_dbgid dbg_id);
+
+/**
+ * ucfg_tdls_release_mlo_vdev() - release mlo vdev for tdls
+ * @vdev: vdev object
+ * @dbg_id: debug id
+ *
+ * Return: void
+ */
+void ucfg_tdls_release_mlo_vdev(struct wlan_objmgr_vdev *vdev,
+				wlan_objmgr_ref_dbgid dbg_id);
+/**
  * ucfg_tdls_set_rssi() - API to set TDLS RSSI on peer given by mac
  * @vdev: vdev object
  * @mac: MAC address of Peer
@@ -382,6 +460,25 @@ struct wlan_objmgr_vdev *ucfg_get_tdls_vdev(struct wlan_objmgr_psoc *psoc,
 					    wlan_objmgr_ref_dbgid dbg_id);
 
 #else
+static inline
+bool ucfg_tdls_link_vdev_is_matching(struct wlan_objmgr_vdev *vdev)
+{
+	return false;
+}
+
+static inline
+struct wlan_objmgr_vdev *
+ucfg_tdls_get_tdls_link_vdev(struct wlan_objmgr_vdev *vdev,
+			     wlan_objmgr_ref_dbgid dbg_id)
+{
+	return NULL;
+}
+
+static inline
+void ucfg_tdls_put_tdls_link_vdev(struct wlan_objmgr_vdev *vdev,
+				  wlan_objmgr_ref_dbgid dbg_id)
+{
+}
 
 static inline
 QDF_STATUS ucfg_tdls_init(void)
@@ -439,7 +536,8 @@ QDF_STATUS ucfg_tdls_teardown_links(struct wlan_objmgr_psoc *psoc)
 }
 
 static inline
-void ucfg_tdls_teardown_links_sync(struct wlan_objmgr_psoc *psoc)
+void ucfg_tdls_teardown_links_sync(struct wlan_objmgr_psoc *psoc,
+				   struct wlan_objmgr_vdev *vdev)
 {
 }
 

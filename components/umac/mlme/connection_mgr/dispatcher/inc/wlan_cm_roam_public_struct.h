@@ -415,6 +415,12 @@ enum roam_fail_params {
  * timedout
  * @ROAM_FAIL_REASON_SAE_PREAUTH_FAIL: SAE preauthentication failure
  * @ROAM_FAIL_REASON_UNABLE_TO_START_ROAM_HO: Start handoff failed
+ * @ROAM_FAIL_REASON_NO_AP_FOUND_AND_FINAL_BMISS_SENT: No AP found after
+ * final BMISS
+ * @ROAM_FAIL_REASON_NO_CAND_AP_FOUND_AND_FINAL_BMISS_SENT: No Candidate AP
+ * found after final BMISS.
+ * @ROAM_FAIL_REASON_CURR_AP_STILL_OK: Background scan was abort, but
+ * current network condition is fine.
  * @ROAM_FAIL_REASON_UNKNOWN: Default reason
  */
 enum wlan_roam_failure_reason_code {
@@ -452,6 +458,9 @@ enum wlan_roam_failure_reason_code {
 	ROAM_FAIL_REASON_SAE_PREAUTH_TIMEOUT,
 	ROAM_FAIL_REASON_SAE_PREAUTH_FAIL,
 	ROAM_FAIL_REASON_UNABLE_TO_START_ROAM_HO,
+	ROAM_FAIL_REASON_NO_AP_FOUND_AND_FINAL_BMISS_SENT,
+	ROAM_FAIL_REASON_NO_CAND_AP_FOUND_AND_FINAL_BMISS_SENT,
+	ROAM_FAIL_REASON_CURR_AP_STILL_OK,
 	ROAM_FAIL_REASON_UNKNOWN = 255,
 };
 
@@ -492,6 +501,18 @@ struct roam_synch_frame_ind {
 struct owe_transition_mode_info {
 	bool is_owe_transition_conn;
 	struct wlan_ssid  ssid;
+};
+
+/**
+ * struct sae_roam_auth_map - map the peer address for the sae raom
+ * @is_mlo_ap: to check ap (to which roam) is mlo capable.
+ * @peer_mldaddr: peer MLD address
+ * @peer_linkaddr: peer link address
+ */
+struct sae_roam_auth_map {
+	bool is_mlo_ap;
+	struct qdf_mac_addr peer_mldaddr;
+	struct qdf_mac_addr peer_linkaddr;
 };
 
 /**
@@ -547,6 +568,11 @@ struct owe_transition_mode_info {
  * @lost_link_rssi: lost link RSSI
  * @roam_sync_frame_ind: roam sync frame ind
  * @roam_band_bitmask: This allows the driver to roam within this band
+ * @sae_roam_auth: structure containing roam peer mld and link address.
+ * @roam_invoke_source: roam invoke source
+ * @roam_invoke_bssid: mac address used for roam invoke
+ * @is_forced_roaming: bool value indicating if its forced roaming
+ * @tried_candidate_freq_list: freq list on which connection tried
  */
 struct rso_config {
 #ifdef WLAN_FEATURE_HOST_ROAM
@@ -593,6 +619,13 @@ struct rso_config {
 	int32_t lost_link_rssi;
 	struct roam_synch_frame_ind roam_sync_frame_ind;
 	uint32_t roam_band_bitmask;
+#if defined(WLAN_FEATURE_11BE_MLO) && defined(WLAN_FEATURE_ROAM_OFFLOAD)
+	struct sae_roam_auth_map sae_roam_auth;
+#endif
+	enum wlan_cm_source roam_invoke_source;
+	struct qdf_mac_addr roam_invoke_bssid;
+	bool is_forced_roaming;
+	struct wlan_chan_list tried_candidate_freq_list;
 };
 
 /**
@@ -2625,19 +2658,29 @@ struct wlan_cm_vendor_handoff_param {
 #endif
 
 /**
+ * struct sae_offload_params - SAE roam auth offload related params
+ * @ssid: SSID of the roam candidate
+ * @bssid: BSSID of the roam candidate
+ */
+struct sae_offload_params {
+	struct wlan_ssid ssid;
+	struct qdf_mac_addr bssid;
+};
+
+/**
  * struct wlan_cm_roam  - Connection manager roam configs, state and roam
  * data related structure
  * @pcl_vdev_cmd_active:  Flag to check if vdev level pcl command needs to be
  * sent or PDEV level PCL command needs to be sent
  * @vendor_handoff_param: vendor handoff params
- * @sae_offload_ssid: SSID of the roam auth offload bssid
+ * @sae_offload: SAE roam offload related params
  */
 struct wlan_cm_roam {
 	bool pcl_vdev_cmd_active;
 #ifdef WLAN_VENDOR_HANDOFF_CONTROL
 	struct wlan_cm_vendor_handoff_param vendor_handoff_param;
 #endif
-	struct wlan_ssid sae_offload_ssid;
+	struct sae_offload_params sae_offload;
 };
 
 /**
@@ -2770,7 +2813,6 @@ struct roam_offload_synch_ind {
 	uint8_t roamed_vdev_id;
 	struct qdf_mac_addr bssid;
 	struct wlan_ssid ssid;
-	struct qdf_mac_addr self_mac;
 	int8_t tx_mgmt_power;
 	uint32_t auth_status;
 	uint8_t rssi;
@@ -2822,11 +2864,13 @@ struct roam_offload_synch_ind {
  * @vdev_id : vdev id
  * @frame_length : Length of the beacon/probe rsp frame
  * @frame : Pointer to the frame
+ * @rssi: RSSI of the received frame, 0 if not available
  */
 struct roam_scan_candidate_frame {
 	uint8_t vdev_id;
 	uint32_t frame_length;
 	uint8_t *frame;
+	int32_t rssi;
 };
 
 /**

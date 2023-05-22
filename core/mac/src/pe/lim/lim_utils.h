@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -115,6 +115,15 @@
 #else
 #define MAX_NUM_PWR_LEVELS 8
 #endif
+
+/* SR is disabled if NON_SRG is disallowed and SRG INFO is not present */
+#define SR_DISABLE NON_SRG_PD_SR_DISALLOWED & (~SRG_INFO_PRESENT & 0x0F)
+
+/* Length of RSNXE element ID + length + one octet of capability */
+#define RSNXE_CAP_FOR_SAE_LEN     3
+/* Position of WPA3 capabilities in the RSNX element */
+#define RSNXE_CAP_POS_0           0
+
 typedef union uPmfSaQueryTimerId {
 	struct {
 		uint8_t sessionId;
@@ -127,18 +136,6 @@ typedef struct last_processed_frame {
 	tSirMacAddr sa;
 	uint16_t seq_num;
 } last_processed_msg;
-
-/**
- * struct lim_max_tx_pwr_attr - List of tx powers from various sources
- * @reg_max: power from regulatory database
- * @ap_tx_power: local power constraint adjusted value
- * @frequency: current operating frequency for which above powers are defined
- */
-struct lim_max_tx_pwr_attr {
-	int8_t reg_max;
-	int8_t ap_tx_power;
-	uint32_t frequency;
-};
 
 /* LIM utility functions */
 bool lim_is_valid_frame(last_processed_msg *last_processed_frm,
@@ -192,8 +189,6 @@ uint8_t lim_get_max_tx_power(struct mac_context *mac,
  * @session: PE Session Entry
  * @is_pwr_constraint_absolute: If local power constraint is an absolute
  * value or an offset value.
- * @ap_pwr_type: Ap power type for 6G
- * @ctry_code_match: check for country IE and sta programmed ctry match
  *
  * This function is used to get the maximum possible tx power from the list
  * of tx powers mentioned in @attr.
@@ -202,9 +197,7 @@ uint8_t lim_get_max_tx_power(struct mac_context *mac,
  */
 void lim_calculate_tpc(struct mac_context *mac,
 		       struct pe_session *session,
-		       bool is_pwr_constraint_absolute,
-		       uint8_t ap_pwr_type,
-		       bool ctry_code_match);
+		       bool is_pwr_constraint_absolute);
 
 /* AID pool management functions */
 
@@ -284,7 +277,7 @@ void lim_set_mlo_caps(struct mac_context *mac, struct pe_session *session,
 		      uint8_t *ie_start, uint32_t num_bytes);
 
 QDF_STATUS lim_send_mlo_caps_ie(struct mac_context *mac_ctx,
-				struct pe_session *session,
+				struct wlan_objmgr_vdev *vdev,
 				enum QDF_OPMODE device_mode,
 				uint8_t vdev_id);
 
@@ -333,7 +326,7 @@ void lim_strip_mlo_ie(struct mac_context *mac_ctx,
 
 static inline
 QDF_STATUS lim_send_mlo_caps_ie(struct mac_context *mac_ctx,
-				struct pe_session *session,
+				struct wlan_objmgr_vdev *vdev,
 				enum QDF_OPMODE device_mode,
 				uint8_t vdev_id)
 {
@@ -473,8 +466,6 @@ void lim_decide_sta_protection_on_assoc(struct mac_context *mac,
 void lim_update_sta_run_time_ht_switch_chnl_params(struct mac_context *mac,
 						 tDot11fIEHTInfo *pHTInfo,
 						 struct pe_session *pe_session);
-/* Print MAC address utility function */
-void lim_print_mac_addr(struct mac_context *, tSirMacAddr, uint8_t);
 
 /* Deferred Message Queue read/write */
 uint8_t lim_write_deferred_msg_q(struct mac_context *mac,
@@ -1968,6 +1959,30 @@ void lim_update_sta_eht_capable(struct mac_context *mac,
 				tpDphHashNode sta_ds,
 				struct pe_session *session_entry);
 
+#ifdef FEATURE_WLAN_TDLS
+/**
+ * lim_update_tdls_sta_eht_capable(): Update eht_capable in add tdls sta params
+ * @mac: pointer to MAC context
+ * @add_sta_params: pointer to add sta params
+ * @sta_ds: pointer to dph hash table entry
+ * @session_entry: pointer to PE session
+ *
+ * Return: None
+ */
+void lim_update_tdls_sta_eht_capable(struct mac_context *mac,
+				     tpAddStaParams add_sta_params,
+				     tpDphHashNode sta_ds,
+				     struct pe_session *session_entry);
+#else
+static inline
+void lim_update_tdls_sta_eht_capable(struct mac_context *mac,
+				     tpAddStaParams add_sta_params,
+				     tpDphHashNode sta_ds,
+				     struct pe_session *session_entry)
+{
+}
+#endif
+
 /**
  * lim_update_session_eht_capable_chan_switch(): Update eht_capable in PE
  *                                               session
@@ -2086,6 +2101,14 @@ void lim_update_stads_eht_bw_320mhz(struct pe_session *session,
  */
 bool lim_is_session_chwidth_320mhz(struct pe_session *session);
 #else
+static inline
+void lim_update_tdls_sta_eht_capable(struct mac_context *mac,
+				     tpAddStaParams add_sta_params,
+				     tpDphHashNode sta_ds,
+				     struct pe_session *session_entry)
+{
+}
+
 static inline bool lim_is_session_eht_capable(struct pe_session *session)
 {
 	return false;

@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2013-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -172,17 +172,6 @@ QDF_STATUS wma_set_ppsconfig(uint8_t vdev_id, uint16_t pps_param,
  */
 
 #ifdef WLAN_FEATURE_ROAM_OFFLOAD
-int wma_roam_synch_event_handler(void *handle, uint8_t *event,
-					uint32_t len);
-
-/**
- * wma_register_roam_vdev_disc_event_handler() - API to register handler for
- * roam vdev disconnect event id
- * @wma_handle: wma handle
- *
- * Return: void
- */
-void wma_register_roam_vdev_disc_event_handler(tp_wma_handle wma_handle);
 
 #ifdef WLAN_FEATURE_FIPS
 /**
@@ -346,9 +335,6 @@ int wma_passpoint_match_event_handler(void *handle,
 
 #endif
 
-int wma_handle_btm_denylist_event(void *handle, uint8_t *cmd_param_info,
-				  uint32_t len);
-
 #ifdef FEATURE_WLAN_EXTSCAN
 int wma_extscan_wow_event_callback(void *handle, void *event, uint32_t len);
 
@@ -508,9 +494,6 @@ QDF_STATUS wma_scan_probe_setoui(tp_wma_handle wma,
 				 struct scan_mac_oui *set_oui);
 
 void wma_roam_better_ap_handler(tp_wma_handle wma, uint32_t vdev_id);
-
-int wma_roam_event_callback(WMA_HANDLE handle, uint8_t *event_buf,
-			    uint32_t len);
 
 /*
  * wma_dev_if.c functions declarations
@@ -951,10 +934,6 @@ int32_t wmi_unified_send_txbf(tp_wma_handle wma, tpAddStaParams params);
  */
 QDF_STATUS wma_check_txrx_chainmask(int num_rf_chains, int cmd_value);
 
-int wma_peer_state_change_event_handler(void *handle,
-					       uint8_t *event_buff,
-					       uint32_t len);
-
 QDF_STATUS wma_set_enable_disable_mcc_adaptive_scheduler(uint32_t
 						mcc_adaptive_scheduler);
 
@@ -1104,15 +1083,10 @@ int wma_link_status_event_handler(void *handle, uint8_t *cmd_param_info,
  */
 int wma_rso_cmd_status_event_handler(uint8_t vdev_id, uint32_t notif);
 
-int wma_stats_event_handler(void *handle, uint8_t *cmd_param_info,
-			    uint32_t len);
-
 QDF_STATUS wma_send_link_speed(uint32_t link_speed);
 
 int wma_link_speed_event_handler(void *handle, uint8_t *cmd_param_info,
 				 uint32_t len);
-
-QDF_STATUS wma_wni_cfg_dnld(tp_wma_handle wma_handle);
 
 int wma_unified_debug_print_event_handler(void *handle, uint8_t *datap,
 					  uint32_t len);

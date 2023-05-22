@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2017-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -432,6 +432,27 @@ static void tdls_pe_update_peer_he_capa(struct tdls_add_sta_req *addstareq,
 {
 }
 #endif
+
+#ifdef WLAN_FEATURE_11BE
+static inline void
+tdls_pe_update_peer_eht_capa(struct tdls_add_sta_req *addstareq,
+			     struct tdls_update_peer_params *update_peer)
+{
+	if (update_peer->ehtcap_present) {
+		addstareq->ehtcap_present = update_peer->ehtcap_present;
+		addstareq->eht_cap_len = update_peer->eht_cap_len;
+		qdf_mem_copy(&addstareq->eht_cap,
+			     &update_peer->eht_cap,
+			     sizeof(update_peer->eht_cap));
+	}
+}
+#else
+static inline void
+tdls_pe_update_peer_eht_capa(struct tdls_add_sta_req *addstareq,
+			     struct tdls_update_peer_params *update_peer)
+{
+}
+#endif
 /**
  * tdls_pe_update_peer() - send TDLS update peer request to PE
  * @req: TDLS update peer request
@@ -493,6 +514,7 @@ static QDF_STATUS tdls_pe_update_peer(struct tdls_update_peer_request *req)
 		     &update_peer->vht_cap,
 		     sizeof(update_peer->vht_cap));
 	tdls_pe_update_peer_he_capa(addstareq, update_peer);
+	tdls_pe_update_peer_eht_capa(addstareq, update_peer);
 	addstareq->supported_rates_length = update_peer->supported_rates_len;
 	addstareq->is_pmf = update_peer->is_pmf;
 	qdf_mem_copy(&addstareq->supported_rates,
@@ -869,11 +891,6 @@ int tdls_validate_mgmt_request(struct tdls_action_frame_request *tdls_mgmt_req)
 
 	/* other than teardown frame, mgmt frames are not sent if disabled */
 	if (TDLS_TEARDOWN != tdls_validate->action_code) {
-		if (ucfg_is_nan_disc_active(tdls_soc->soc)) {
-			tdls_err("NAN active. NAN+TDLS not supported");
-			return -EPERM;
-		}
-
 		if (!tdls_check_is_tdls_allowed(vdev)) {
 			tdls_err("TDLS not allowed, reject MGMT, action = %d",
 				tdls_validate->action_code);
@@ -1014,15 +1031,13 @@ QDF_STATUS tdls_process_add_peer(struct tdls_add_peer_request *req)
 			 wlan_vdev_get_id(vdev));
 		goto error;
 	}
+
 	psoc = wlan_vdev_get_psoc(vdev);
 	if (!psoc) {
 		tdls_err("can't get psoc");
 		goto error;
 	}
-	if (ucfg_is_nan_disc_active(psoc)) {
-		tdls_err("NAN active. NAN+TDLS not supported");
-		goto error;
-	}
+
 	status = QDF_STATUS_SUCCESS;
 
 	cmd.cmd_type = WLAN_SER_CMD_TDLS_ADD_PEER;
@@ -1973,10 +1988,7 @@ static QDF_STATUS tdls_config_force_peer(
 			       req->op_class, req->min_bandwidth);
 
 	tdls_set_callback(peer, req->callback);
-
-	tdls_set_ct_mode(soc_obj->soc);
-	if (soc_obj->enable_tdls_connection_tracker)
-		tdls_implicit_enable(vdev_obj);
+	tdls_set_ct_mode(soc_obj->soc, vdev);
 
 	return status;
 error:
@@ -2153,9 +2165,7 @@ QDF_STATUS tdls_process_remove_force_peer(struct tdls_oper_request *req)
 		qdf_mem_free(peer_update_param);
 		goto error;
 	}
-	tdls_set_ct_mode(soc_obj->soc);
-	if (!soc_obj->enable_tdls_connection_tracker)
-		tdls_implicit_disable(vdev_obj);
+	tdls_set_ct_mode(soc_obj->soc, vdev);
 
 error:
 	wlan_objmgr_vdev_release_ref(vdev, WLAN_TDLS_NB_ID);

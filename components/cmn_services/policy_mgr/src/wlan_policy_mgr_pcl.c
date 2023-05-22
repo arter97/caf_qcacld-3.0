@@ -80,7 +80,8 @@ QDF_STATUS policy_mgr_get_pcl_for_existing_conn(
 		enum policy_mgr_con_mode mode,
 		uint32_t *pcl_ch, uint32_t *len,
 		uint8_t *pcl_weight, uint32_t weight_len,
-		bool all_matching_cxn_to_del)
+		bool all_matching_cxn_to_del,
+		uint8_t vdev_id)
 {
 	struct policy_mgr_conc_connection_info
 			info[MAX_NUMBER_OF_CONC_CONNECTIONS] = { {0} };
@@ -95,6 +96,7 @@ QDF_STATUS policy_mgr_get_pcl_for_existing_conn(
 		policy_mgr_err("Invalid Context");
 		return QDF_STATUS_E_FAILURE;
 	}
+
 	*len = 0;
 	qdf_mutex_acquire(&pm_ctx->qdf_conc_list_lock);
 	if (policy_mgr_mode_specific_connection_count(psoc, mode, NULL) > 0) {
@@ -103,7 +105,7 @@ QDF_STATUS policy_mgr_get_pcl_for_existing_conn(
 				all_matching_cxn_to_del, info, &num_cxn_del);
 		/* Get the PCL */
 		status = policy_mgr_get_pcl(psoc, mode, pcl_ch, len,
-					    pcl_weight, weight_len);
+					    pcl_weight, weight_len, vdev_id);
 		policy_mgr_debug("Get PCL to FW for mode:%d", mode);
 		/* Restore the connection info */
 		policy_mgr_restore_deleted_conn_info(psoc, info, num_cxn_del);
@@ -238,7 +240,9 @@ policy_mgr_get_pcl_concurrent_connetions(struct wlan_objmgr_psoc *psoc,
 	if (!has_same_band && vdev_id_with_diff_band != WLAN_INVALID_VDEV_ID) {
 		policy_mgr_debug("vdev_ids[%d]: %d",
 				 num_related, vdev_id_with_diff_band);
-		vdev_ids[num_related++] = vdev_id_with_diff_band;
+
+		if (num_related < vdev_ids_size)
+			vdev_ids[num_related++] = vdev_id_with_diff_band;
 	}
 
 out:
@@ -289,7 +293,7 @@ QDF_STATUS policy_mgr_get_pcl_for_vdev_id(struct wlan_objmgr_psoc *psoc,
 	id_num = policy_mgr_get_pcl_concurrent_connetions(psoc, mode,
 							  vdev_id, ids,
 							  QDF_ARRAY_SIZE(ids));
-	if (!id_num) {
+	if (!id_num || id_num > MAX_NUMBER_OF_CONC_CONNECTIONS) {
 		status = QDF_STATUS_E_FAILURE;
 		goto out;
 	}
@@ -307,7 +311,7 @@ QDF_STATUS policy_mgr_get_pcl_for_vdev_id(struct wlan_objmgr_psoc *psoc,
 
 	/* Get the PCL */
 	status = policy_mgr_get_pcl(psoc, mode, pcl_ch, len,
-				    pcl_weight, weight_len);
+				    pcl_weight, weight_len, vdev_id);
 	policy_mgr_debug("Get PCL to FW for mode:%d", mode);
 	/* Restore the connection info */
 	policy_mgr_restore_deleted_conn_info(psoc, info, total_del);
@@ -625,9 +629,8 @@ static QDF_STATUS policy_mgr_modify_pcl_based_on_enabled_channels(
 		return status;
 	}
 
-	if (dfs_master_capable &&
-	    (sta_sap_scc_on_dfs_chnl == PM_STA_SAP_ON_DFS_MASTER_MODE_FLEX &&
-	     pm_ctx->cfg.go_force_scc == GO_FORCE_SCC_STRICT)) {
+	if (dfs_master_capable && sta_sap_scc_on_dfs_chnl &&
+	    pm_ctx->cfg.go_force_scc == GO_FORCE_SCC_STRICT) {
 		allow_go_scc_on_dfs_chn = true;
 	}
 
@@ -1290,7 +1293,8 @@ static inline enum policy_mgr_pcl_type policy_mgr_get_pcl_4_port(
 QDF_STATUS policy_mgr_get_pcl(struct wlan_objmgr_psoc *psoc,
 			      enum policy_mgr_con_mode mode,
 			      uint32_t *pcl_channels, uint32_t *len,
-			      uint8_t *pcl_weight, uint32_t weight_len)
+			      uint8_t *pcl_weight, uint32_t weight_len,
+			      uint8_t vdev_id)
 {
 	QDF_STATUS status = QDF_STATUS_E_FAILURE;
 	uint32_t num_connections = 0;
@@ -1314,8 +1318,9 @@ QDF_STATUS policy_mgr_get_pcl(struct wlan_objmgr_psoc *psoc,
 
 	/* find the current connection state from pm_conc_connection_list*/
 	num_connections = policy_mgr_get_connection_count(psoc);
-	policy_mgr_debug("connections:%d pref:%d requested mode:%d",
-		num_connections, pm_ctx->cur_conc_system_pref, mode);
+	policy_mgr_debug("connections:%d pref:%d requested mode:%d vdev_id:%d",
+			 num_connections, pm_ctx->cur_conc_system_pref, mode,
+			 vdev_id);
 
 	switch (pm_ctx->cur_conc_system_pref) {
 	case 0:
@@ -3146,7 +3151,8 @@ enum policy_mgr_three_connection_mode
 uint32_t
 policy_mgr_get_nondfs_preferred_channel(struct wlan_objmgr_psoc *psoc,
 					enum policy_mgr_con_mode mode,
-					bool for_existing_conn)
+					bool for_existing_conn,
+					uint8_t vdev_id)
 {
 	uint32_t pcl_channels[NUM_CHANNELS];
 	uint8_t pcl_weight[NUM_CHANNELS];
@@ -3181,12 +3187,12 @@ policy_mgr_get_nondfs_preferred_channel(struct wlan_objmgr_psoc *psoc,
 					psoc, mode,
 					pcl_channels, &pcl_len,
 					pcl_weight, QDF_ARRAY_SIZE(pcl_weight),
-					false))
+					false, vdev_id))
 			return freq;
 	} else {
 		if (QDF_STATUS_SUCCESS != policy_mgr_get_pcl(
 		    psoc, mode, pcl_channels, &pcl_len, pcl_weight,
-		    QDF_ARRAY_SIZE(pcl_weight)))
+		    QDF_ARRAY_SIZE(pcl_weight), vdev_id))
 			return freq;
 	}
 
@@ -3522,7 +3528,7 @@ policy_mgr_get_sap_mandatory_channel(struct wlan_objmgr_psoc *psoc,
 	status = policy_mgr_get_pcl_for_existing_conn(
 			psoc, PM_SAP_MODE, pcl.pcl_list, &pcl.pcl_len,
 			pcl.weight_list, QDF_ARRAY_SIZE(pcl.weight_list),
-			false);
+			false, vdev_id);
 	if (QDF_IS_STATUS_ERROR(status)) {
 		policy_mgr_err("Unable to get PCL for SAP");
 		return status;
@@ -3540,7 +3546,7 @@ policy_mgr_get_sap_mandatory_channel(struct wlan_objmgr_psoc *psoc,
 				psoc, PM_SAP_MODE,
 				pcl.pcl_list, &pcl.pcl_len,
 				pcl.weight_list,
-				QDF_ARRAY_SIZE(pcl.weight_list));
+				QDF_ARRAY_SIZE(pcl.weight_list), vdev_id);
 		if (QDF_IS_STATUS_ERROR(status)) {
 			policy_mgr_err("Unable to get PCL for SAP: policy_mgr_get_pcl");
 			return status;
@@ -3821,7 +3827,7 @@ uint32_t policy_mgr_get_alternate_channel_for_sap(
 						      &info, &num_cxn_del);
 	if (QDF_STATUS_SUCCESS == policy_mgr_get_pcl(
 	    psoc, con_mode, pcl_channels, &pcl_len,
-	    pcl_weight, QDF_ARRAY_SIZE(pcl_weight))) {
+	    pcl_weight, QDF_ARRAY_SIZE(pcl_weight), sap_vdev_id)) {
 		for (i = 0; i < pcl_len; i++) {
 			/*
 			 * The API is expected to select the channel on the
@@ -4084,16 +4090,35 @@ bool policy_mgr_is_sta_chan_valid_for_connect_and_roam(
 	return true;
 }
 
-bool
-policy_mgr_is_ll_sap_present(struct wlan_objmgr_psoc *psoc,
-			     enum policy_mgr_con_mode curr_mode,
-			     uint32_t vdev_id)
+/**
+ * _policy_mgr_is_vdev_ll_sap() - Check whether any LL SAP is present or not
+ * for provided ap policy
+ * @psoc: psoc object
+ * @vdev_id: vdev id
+ * @ap_type: LL SAP type
+ *
+ * Return: true if it's present otherwise false
+ */
+static bool
+_policy_mgr_is_vdev_ll_sap(struct wlan_objmgr_psoc *psoc,
+			   uint32_t vdev_id, enum ll_ap_type ap_type)
 {
 	struct wlan_objmgr_vdev *vdev;
 	bool is_ll_sap = false;
+	enum QDF_OPMODE mode;
+	struct policy_mgr_psoc_priv_obj *pm_ctx;
 	enum host_concurrent_ap_policy profile =
 					HOST_CONCURRENT_AP_POLICY_UNSPECIFIED;
-	if (curr_mode != PM_SAP_MODE)
+
+	pm_ctx = policy_mgr_get_context(psoc);
+	if (!pm_ctx) {
+		policy_mgr_err("Invalid pm_ctx");
+		return is_ll_sap;
+	}
+
+	mode = wlan_get_opmode_from_vdev_id(pm_ctx->pdev, vdev_id);
+
+	if (mode != QDF_SAP_MODE)
 		return is_ll_sap;
 
 	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, vdev_id,
@@ -4104,12 +4129,50 @@ policy_mgr_is_ll_sap_present(struct wlan_objmgr_psoc *psoc,
 	}
 
 	profile = wlan_mlme_get_ap_policy(vdev);
-	if (profile == HOST_CONCURRENT_AP_POLICY_GAMING_AUDIO ||
-	    profile == HOST_CONCURRENT_AP_POLICY_LOSSLESS_AUDIO_STREAMING)
-		is_ll_sap = true;
-
 	wlan_objmgr_vdev_release_ref(vdev, WLAN_POLICY_MGR_ID);
+	switch (ap_type) {
+	case LL_AP_TYPE_HT:
+		if (profile == HOST_CONCURRENT_AP_POLICY_XR)
+			is_ll_sap = true;
+	break;
+	case LL_AP_TYPE_LT:
+		if (profile == HOST_CONCURRENT_AP_POLICY_GAMING_AUDIO ||
+		    profile ==
+		    HOST_CONCURRENT_AP_POLICY_LOSSLESS_AUDIO_STREAMING)
+			is_ll_sap = true;
+	break;
+	case LL_AP_TYPE_ANY:
+		if (profile == HOST_CONCURRENT_AP_POLICY_GAMING_AUDIO ||
+		    profile ==
+		    HOST_CONCURRENT_AP_POLICY_LOSSLESS_AUDIO_STREAMING ||
+		    profile == HOST_CONCURRENT_AP_POLICY_XR)
+			is_ll_sap = true;
+	break;
+	default:
+		policy_mgr_err("invalid ap type %d", ap_type);
+	}
 	return is_ll_sap;
+}
+
+bool
+policy_mgr_is_vdev_ll_sap(struct wlan_objmgr_psoc *psoc,
+			  uint32_t vdev_id)
+{
+	return _policy_mgr_is_vdev_ll_sap(psoc, vdev_id, LL_AP_TYPE_ANY);
+}
+
+bool
+policy_mgr_is_vdev_ht_ll_sap(struct wlan_objmgr_psoc *psoc,
+			     uint32_t vdev_id)
+{
+	return _policy_mgr_is_vdev_ll_sap(psoc, vdev_id, LL_AP_TYPE_HT);
+}
+
+bool
+policy_mgr_is_vdev_lt_ll_sap(struct wlan_objmgr_psoc *psoc,
+			     uint32_t vdev_id)
+{
+	return _policy_mgr_is_vdev_ll_sap(psoc, vdev_id, LL_AP_TYPE_LT);
 }
 
 QDF_STATUS
@@ -4188,7 +4251,6 @@ policy_mgr_get_pcl_ch_for_sap_go_with_ll_sap_present(
 	uint8_t weight_list[NUM_CHANNELS];
 	qdf_freq_t freq;
 	uint32_t vdev_id;
-	enum policy_mgr_con_mode mode;
 	bool is_ll_sap = 0;
 
 	pm_ctx = policy_mgr_get_context(psoc);
@@ -4205,8 +4267,7 @@ policy_mgr_get_pcl_ch_for_sap_go_with_ll_sap_present(
 
 		freq = pm_conc_connection_list[conn_idx].freq;
 		vdev_id = pm_conc_connection_list[conn_idx].vdev_id;
-		mode = pm_conc_connection_list[conn_idx].mode;
-		if (!policy_mgr_is_ll_sap_present(psoc, mode, vdev_id))
+		if (!policy_mgr_is_vdev_ll_sap(psoc, vdev_id))
 			continue;
 
 		is_ll_sap = 1;
@@ -4240,14 +4301,13 @@ policy_mgr_get_pcl_ch_for_sap_go_with_ll_sap_present(
 QDF_STATUS
 policy_mgr_get_pcl_channel_for_ll_sap_concurrency(
 					struct wlan_objmgr_psoc *psoc,
-					enum policy_mgr_con_mode curr_mode,
 					uint32_t vdev_id,
 					uint32_t *pcl_channels,
 					uint8_t *pcl_weight, uint32_t *len)
 {
 	uint32_t orig_len = *len;
 
-	if (policy_mgr_is_ll_sap_present(psoc, curr_mode, vdev_id)) {
+	if (policy_mgr_is_vdev_ll_sap(psoc, vdev_id)) {
 		/* Scenario: If there is some existing interface present and
 		 * LL SAP is coming up.
 		 * Filter pcl channel for LL SAP

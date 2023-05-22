@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2013-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -323,14 +323,6 @@ static inline void netif_trans_update(struct net_device *dev)
 	"%s: Transmission timeout occurred jiffies %lu", \
 	__func__, jiffies)
 #endif
-
-/**
- * hdd_txrx_get_tx_ack_count() - get tx acked count
- * @adapter: Pointer to adapter
- *
- * Return: tx acked count
- */
-uint32_t hdd_txrx_get_tx_ack_count(struct hdd_adapter *adapter);
 
 /**
  * hdd_dp_cfg_update() - update hdd config for HDD DP INIs

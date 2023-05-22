@@ -39,6 +39,7 @@
 #include <qdf_net_stats.h>
 #include "wlan_dp_prealloc.h"
 #include "wlan_dp_rx_thread.h"
+#include <cdp_txrx_host_stats.h>
 
 #ifdef FEATURE_DIRECT_LINK
 /**
@@ -1185,33 +1186,6 @@ QDF_STATUS ucfg_dp_register_pkt_capture_callbacks(struct wlan_objmgr_vdev *vdev)
 						   dp_intf);
 }
 
-QDF_STATUS ucfg_dp_init_txrx(struct wlan_objmgr_vdev *vdev)
-{
-	struct wlan_dp_intf *dp_intf;
-
-	dp_intf = dp_get_vdev_priv_obj(vdev);
-	if (unlikely(!dp_intf)) {
-		dp_err("DP interface not found");
-		return QDF_STATUS_E_INVAL;
-	}
-
-	return QDF_STATUS_SUCCESS;
-}
-
-QDF_STATUS ucfg_dp_deinit_txrx(struct wlan_objmgr_vdev *vdev)
-{
-	struct wlan_dp_intf *dp_intf;
-
-	dp_intf = dp_get_vdev_priv_obj(vdev);
-	if (unlikely(!dp_intf)) {
-		dp_err("DP interface not found");
-		return QDF_STATUS_E_INVAL;
-	}
-
-	dp_intf->tx_fn = NULL;
-	return QDF_STATUS_SUCCESS;
-}
-
 QDF_STATUS ucfg_dp_start_xmit(qdf_nbuf_t nbuf, struct wlan_objmgr_vdev *vdev)
 {
 	struct wlan_dp_intf *dp_intf;
@@ -1347,6 +1321,18 @@ ucfg_dp_is_roam_after_nud_enabled(struct wlan_objmgr_psoc *psoc)
 
 	if (dp_cfg->enable_nud_tracking == DP_ROAM_AFTER_NUD_FAIL ||
 	    dp_cfg->enable_nud_tracking == DP_DISCONNECT_AFTER_ROAM_FAIL)
+		return true;
+
+	return false;
+}
+
+bool
+ucfg_dp_is_disconect_after_roam_fail(struct wlan_objmgr_psoc *psoc)
+{
+	struct wlan_dp_psoc_context *dp_ctx = dp_psoc_get_priv(psoc);
+	struct wlan_dp_psoc_cfg *dp_cfg = &dp_ctx->dp_cfg;
+
+	if (dp_cfg->enable_nud_tracking == DP_DISCONNECT_AFTER_ROAM_FAIL)
 		return true;
 
 	return false;
@@ -2359,7 +2345,7 @@ QDF_STATUS ucfg_dp_direct_link_init(struct wlan_objmgr_psoc *psoc)
 	return dp_direct_link_init(dp_ctx);
 }
 
-void ucfg_dp_direct_link_deinit(struct wlan_objmgr_psoc *psoc)
+void ucfg_dp_direct_link_deinit(struct wlan_objmgr_psoc *psoc, bool is_ssr)
 {
 	struct wlan_dp_psoc_context *dp_ctx = dp_psoc_get_priv(psoc);
 
@@ -2368,7 +2354,7 @@ void ucfg_dp_direct_link_deinit(struct wlan_objmgr_psoc *psoc)
 		return;
 	}
 
-	dp_direct_link_deinit(dp_ctx);
+	dp_direct_link_deinit(dp_ctx, is_ssr);
 }
 
 void
@@ -2431,3 +2417,24 @@ QDF_STATUS ucfg_dp_txrx_set_cpu_mask(ol_txrx_soc_handle soc,
 {
 	return dp_txrx_set_cpu_mask(soc, new_mask);
 }
+
+QDF_STATUS
+ucfg_dp_get_per_link_peer_stats(ol_txrx_soc_handle soc, uint8_t vdev_id,
+				uint8_t *peer_mac,
+				struct cdp_peer_stats *peer_stats,
+				enum cdp_peer_type peer_type,
+				uint8_t num_link)
+{
+	return cdp_host_get_per_link_peer_stats(soc, vdev_id, peer_mac,
+						peer_stats, peer_type,
+						num_link);
+}
+
+#ifdef WLAN_FEATURE_LOCAL_PKT_CAPTURE
+bool ucfg_dp_is_local_pkt_capture_enabled(struct wlan_objmgr_psoc *psoc)
+{
+	void *soc = cds_get_context(QDF_MODULE_ID_SOC);
+
+	return cdp_cfg_get(soc, cfg_dp_local_pkt_capture);
+}
+#endif

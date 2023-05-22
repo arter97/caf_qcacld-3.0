@@ -233,7 +233,8 @@ static void hdd_wmm_enable_tl_uapsd(struct hdd_wmm_qos_context *qos_context)
 		sme_enable_uapsd_for_ac(ac_type, ac->tspec.ts_info.tid,
 					ac->tspec.ts_info.up,
 					service_interval, suspension_interval,
-					direction, psb, adapter->vdev_id,
+					direction, psb,
+					adapter->deflink->vdev_id,
 					delayed_trgr_frm_int);
 
 	if (!QDF_IS_STATUS_SUCCESS(status)) {
@@ -269,7 +270,8 @@ static void hdd_wmm_disable_tl_uapsd(struct hdd_wmm_qos_context *qos_context)
 
 	/* have we previously enabled UAPSD? */
 	if (ac->is_uapsd_info_valid == true) {
-		status = sme_disable_uapsd_for_ac(ac_type, adapter->vdev_id);
+		status = sme_disable_uapsd_for_ac(ac_type,
+						  adapter->deflink->vdev_id);
 
 		if (!QDF_IS_STATUS_SUCCESS(status)) {
 			hdd_err("Failed to disable U-APSD for AC=%d", ac_type);
@@ -1434,8 +1436,9 @@ static void __hdd_wmm_do_implicit_qos(struct hdd_wmm_qos_context *qos_context)
 
 	if (tspec.ts_info.ack_policy ==
 	    SME_QOS_WMM_TS_ACK_POLICY_HT_IMMEDIATE_BLOCK_ACK) {
-		if (!sme_qos_is_ts_info_ack_policy_valid(mac_handle, &tspec,
-							 adapter->vdev_id)) {
+		if (!sme_qos_is_ts_info_ack_policy_valid(
+					mac_handle, &tspec,
+					adapter->deflink->vdev_id)) {
 			tspec.ts_info.ack_policy =
 				SME_QOS_WMM_TS_ACK_POLICY_NORMAL_ACK;
 		}
@@ -1447,7 +1450,7 @@ static void __hdd_wmm_do_implicit_qos(struct hdd_wmm_qos_context *qos_context)
 
 #ifndef WLAN_MDM_CODE_REDUCTION_OPT
 	sme_status = sme_qos_setup_req(mac_handle,
-				       adapter->vdev_id,
+				       adapter->deflink->vdev_id,
 				       &tspec,
 				       hdd_wmm_sme_callback,
 				       qos_context,
@@ -2014,9 +2017,8 @@ void hdd_wmm_get_user_priority_from_ip_tos(struct hdd_adapter *adapter,
 	dscp = (tos >> 2) & 0x3f;
 	if (hdd_wmm_traffic_end_indication_is_enable(adapter)) {
 		psoc = adapter->hdd_ctx->psoc;
-		ucfg_dp_traffic_end_indication_update_dscp(psoc,
-							   adapter->vdev_id,
-							   &dscp);
+		ucfg_dp_traffic_end_indication_update_dscp(
+				psoc, adapter->deflink->vdev_id, &dscp);
 	}
 	*user_pri = adapter->dscp_to_up_map[dscp];
 
@@ -2056,8 +2058,8 @@ void hdd_wmm_classify_pkt(struct hdd_adapter *adapter,
 void hdd_wmm_classify_pkt_cb(void *adapter,
 			     struct sk_buff *skb)
 {
-	enum sme_qos_wmmuptype user_pri;
-	bool is_critical;
+	enum sme_qos_wmmuptype user_pri = SME_QOS_WMM_UP_BE;
+	bool is_critical = false;
 
 	hdd_wmm_classify_critical_pkt(skb, &user_pri, &is_critical);
 
@@ -2229,9 +2231,8 @@ uint16_t hdd_wmm_select_queue(struct net_device *dev,
 {
 	uint16_t q_index;
 
-	hdd_dp_ssr_protect();
 	q_index = __hdd_wmm_select_queue(dev, skb);
-	hdd_dp_ssr_unprotect();
+
 	return q_index;
 }
 
@@ -2479,7 +2480,7 @@ QDF_STATUS hdd_wmm_assoc(struct hdd_adapter *adapter,
 		status = sme_enable_uapsd_for_ac(
 				SME_AC_VO, 7, 7, srv_value, sus_value,
 				SME_QOS_WMM_TS_DIR_BOTH, 1,
-				adapter->vdev_id,
+				adapter->deflink->vdev_id,
 				delayed_trgr_frm_int);
 
 		QDF_ASSERT(QDF_IS_STATUS_SUCCESS(status));
@@ -2502,7 +2503,7 @@ QDF_STATUS hdd_wmm_assoc(struct hdd_adapter *adapter,
 		status = sme_enable_uapsd_for_ac(
 				SME_AC_VI, 5, 5, srv_value, sus_value,
 				SME_QOS_WMM_TS_DIR_BOTH, 1,
-				adapter->vdev_id,
+				adapter->deflink->vdev_id,
 				delayed_trgr_frm_int);
 
 		QDF_ASSERT(QDF_IS_STATUS_SUCCESS(status));
@@ -2525,7 +2526,7 @@ QDF_STATUS hdd_wmm_assoc(struct hdd_adapter *adapter,
 		status = sme_enable_uapsd_for_ac(
 				SME_AC_BK, 2, 2, srv_value, sus_value,
 				SME_QOS_WMM_TS_DIR_BOTH, 1,
-				adapter->vdev_id,
+				adapter->deflink->vdev_id,
 				delayed_trgr_frm_int);
 
 		QDF_ASSERT(QDF_IS_STATUS_SUCCESS(status));
@@ -2548,7 +2549,7 @@ QDF_STATUS hdd_wmm_assoc(struct hdd_adapter *adapter,
 		status = sme_enable_uapsd_for_ac(
 				SME_AC_BE, 3, 3, srv_value, sus_value,
 				SME_QOS_WMM_TS_DIR_BOTH, 1,
-				adapter->vdev_id,
+				adapter->deflink->vdev_id,
 				delayed_trgr_frm_int);
 
 		QDF_ASSERT(QDF_IS_STATUS_SUCCESS(status));
@@ -2556,7 +2557,7 @@ QDF_STATUS hdd_wmm_assoc(struct hdd_adapter *adapter,
 
 	status = sme_update_dsc_pto_up_mapping(hdd_ctx->mac_handle,
 					       adapter->dscp_to_up_map,
-					       adapter->vdev_id);
+					       adapter->deflink->vdev_id);
 
 	if (!QDF_IS_STATUS_SUCCESS(status))
 		hdd_wmm_dscp_initial_state(adapter);
@@ -2755,7 +2756,7 @@ hdd_wlan_wmm_status_e hdd_wmm_addts(struct hdd_adapter *adapter,
 
 #ifndef WLAN_MDM_CODE_REDUCTION_OPT
 	sme_status = sme_qos_setup_req(mac_handle,
-				       adapter->vdev_id,
+				       adapter->deflink->vdev_id,
 				       tspec,
 				       hdd_wmm_sme_callback,
 				       qos_context,
@@ -2869,7 +2870,7 @@ hdd_wlan_wmm_status_e hdd_wmm_delts(struct hdd_adapter *adapter,
 		 handle, flow_id, ac_type);
 
 #ifndef WLAN_MDM_CODE_REDUCTION_OPT
-	sme_status = sme_qos_release_req(mac_handle, adapter->vdev_id,
+	sme_status = sme_qos_release_req(mac_handle, adapter->deflink->vdev_id,
 					 flow_id);
 
 	hdd_debug("SME flow %d released, SME status %d", flow_id, sme_status);
