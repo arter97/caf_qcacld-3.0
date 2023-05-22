@@ -2335,6 +2335,7 @@ QDF_STATUS cfr_enh_init_pdev(struct wlan_objmgr_psoc *psoc,
 	}
 
 	qdf_spinlock_create(&pcfr->lut_lock);
+	pcfr->lut_lock_initialised = true;
 
 	return status;
 }
@@ -2397,7 +2398,10 @@ QDF_STATUS cfr_enh_deinit_pdev(struct wlan_objmgr_psoc *psoc,
 	if (status != QDF_STATUS_SUCCESS)
 		cfr_err("Failed to unregister phase delta handler");
 
-	qdf_spinlock_destroy(&pcfr->lut_lock);
+	if (pcfr->lut_lock_initialised) {
+		qdf_spinlock_destroy(&pcfr->lut_lock);
+		pcfr->lut_lock_initialised = false;
+	}
 
 	return status;
 }
