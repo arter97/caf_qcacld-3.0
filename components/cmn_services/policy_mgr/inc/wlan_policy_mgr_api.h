@@ -346,6 +346,22 @@ QDF_STATUS
 policy_mgr_get_original_bw_for_sap_restart(struct wlan_objmgr_psoc *psoc,
 					   bool *use_sap_original_bw);
 
+/**
+ * policy_mgr_get_dfs_sta_sap_go_scc_movement() - returns SAP / GO's movement
+ * in STA+SAP DFS SCC concurrency to whether SAP / GO should be moved first
+ * or not.
+ * @psoc: pointer to psoc
+ * @move_sap_go_first: value to be filled
+ *
+ * In STA+SAP DFS SCC concurrency, this API returns config on whether to move
+ * SAP / GO first on getting CSA STA side or not.
+ *
+ * Return: QDF_STATUS_SUCCESS up on success and any other status for failure.
+ */
+QDF_STATUS
+policy_mgr_get_dfs_sta_sap_go_scc_movement(struct wlan_objmgr_psoc *psoc,
+					   bool *move_sap_go_first);
+
 /*
  * policy_mgr_get_connected_vdev_band_mask() - to get the connected vdev band
  * mask
@@ -833,6 +849,42 @@ policy_mgr_change_sap_channel_with_csa(struct wlan_objmgr_psoc *psoc,
 
 }
 #endif
+
+/**
+ * policy_mgr_sta_sap_dfs_scc_conc_check() - validate and Move SAP channel
+ * using (E)CSA
+ *
+ * @psoc: PSOC object information
+ * @vdev_id: Vdev id
+ * @csa_event: Pointer to CSA IE Received event data
+ *
+ * Invoke the function to change SAP channel using (E)CSA for STA+GO / SAP
+ * SCC scenario only. This function will move P2P-GO / SAP first and then STA
+ * will follow.
+ *
+ * Return: QDF_STATUS_SUCCESS on success
+ */
+QDF_STATUS
+policy_mgr_sta_sap_dfs_scc_conc_check(struct wlan_objmgr_psoc *psoc,
+				      uint8_t vdev_id,
+				      struct csa_offload_params *csa_event);
+
+/**
+ * policy_mgr_sta_sap_dfs_enforce_scc() - validate and enforce SCC
+ * using (E)CSA upon receiving 1st beacon
+ *
+ * @psoc: PSOC object information
+ * @vdev_id: Vdev id
+ *
+ * Invoke the function to enforce SCC upon receiving 1st beacon. SAP / GO
+ * movement will be triggered using (E)CSA for STA+GO / SAP DFS scenario only.
+ * The pre-requisite for this function is SAP / GO shall already moved to new
+ * channel by policy_mgr_sta_sap_dfs_scc_conc_check() function.
+ *
+ * Return: void
+ */
+void policy_mgr_sta_sap_dfs_enforce_scc(struct wlan_objmgr_psoc *psoc,
+					uint8_t vdev_id);
 
 #ifdef WLAN_FEATURE_P2P_P2P_STA
 /**
@@ -1851,6 +1903,8 @@ typedef void (*policy_mgr_nss_update_cback)(struct wlan_objmgr_psoc *psoc,
  * @sme_change_mcc_beacon_interval: Set MCC beacon interval to FW
  * @sme_rso_start_cb: Enable roaming offload callback
  * @sme_rso_stop_cb: Disable roaming offload callback
+ * @sme_change_sap_csa_count: Change CSA count for SAP/GO, only one
+ *			      time, needs to set again if used once.
  */
 struct policy_mgr_sme_cbacks {
 	void (*sme_get_nss_for_vdev)(enum QDF_OPMODE,
@@ -1871,6 +1925,7 @@ struct policy_mgr_sme_cbacks {
 	QDF_STATUS (*sme_rso_stop_cb)(
 		mac_handle_t mac_handle, uint8_t vdev_id,
 		uint8_t reason, enum wlan_cm_rso_control_requestor requestor);
+	QDF_STATUS (*sme_change_sap_csa_count)(uint8_t count);
 };
 
 /**

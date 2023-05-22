@@ -627,9 +627,8 @@ static QDF_STATUS policy_mgr_modify_pcl_based_on_enabled_channels(
 		return status;
 	}
 
-	if (dfs_master_capable &&
-	    (sta_sap_scc_on_dfs_chnl == PM_STA_SAP_ON_DFS_MASTER_MODE_FLEX &&
-	     pm_ctx->cfg.go_force_scc == GO_FORCE_SCC_STRICT)) {
+	if (dfs_master_capable && sta_sap_scc_on_dfs_chnl &&
+	    pm_ctx->cfg.go_force_scc == GO_FORCE_SCC_STRICT) {
 		allow_go_scc_on_dfs_chn = true;
 	}
 

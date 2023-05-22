@@ -691,6 +691,7 @@ typedef struct tagSapStruct {
 #endif /* FEATURE_AP_MCC_CH_AVOIDANCE */
 	bool acs_with_more_param;
 	bool enable_dfs_phy_error_logs;
+	uint8_t one_time_csa_count;
 #ifdef DCS_INTERFERENCE_DETECTION
 	struct sap_dcs_info dcs_info;
 #endif

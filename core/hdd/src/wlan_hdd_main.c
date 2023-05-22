@@ -6357,6 +6357,7 @@ int hdd_vdev_destroy(struct hdd_adapter *adapter)
 	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
 
 	qdf_spin_lock_bh(&adapter->vdev_lock);
+	hdd_mlo_t2lm_unregister_callback(adapter->vdev);
 	adapter->vdev = NULL;
 	qdf_spin_unlock_bh(&adapter->vdev_lock);
 	osif_cm_osif_priv_deinit(vdev);
@@ -6548,6 +6549,9 @@ int hdd_vdev_create(struct hdd_adapter *adapter)
 
 	hdd_store_vdev_info(adapter, vdev);
 	osif_cm_osif_priv_init(vdev);
+
+	if (hdd_adapter_is_ml_adapter(adapter))
+		hdd_mlo_t2lm_register_callback(vdev);
 
 	set_bit(SME_SESSION_OPENED, &adapter->event_flags);
 	status = sme_vdev_post_vdev_create_setup(hdd_ctx->mac_handle, vdev);
@@ -8006,14 +8010,55 @@ void hdd_ipa_ap_disconnect_evt(struct hdd_context *hdd_ctx,
 	}
 }
 
+#ifdef WLAN_FEATURE_NAN
+/**
+ * hdd_ndp_state_cleanup() - API to set NDP state to Disconnected
+ * @psoc: pointer to psoc object
+ * @ndi_vdev_id: vdev_id of the NDI
+ *
+ * Return: None
+ */
 static void
-hdd_peer_cleanup(struct hdd_context *hdd_ctx, struct hdd_adapter *adapter)
+hdd_ndp_state_cleanup(struct wlan_objmgr_psoc *psoc, uint8_t ndi_vdev_id)
+{
+	struct wlan_objmgr_vdev *ndi_vdev;
+
+	ndi_vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, ndi_vdev_id,
+							WLAN_NAN_ID);
+	if (!ndi_vdev) {
+		hdd_err("Cannot obtain NDI vdev object!");
+		return;
+	}
+
+	ucfg_nan_set_ndi_state(ndi_vdev, NAN_DATA_DISCONNECTED_STATE);
+
+	wlan_objmgr_vdev_release_ref(ndi_vdev, WLAN_NAN_ID);
+}
+
+/**
+ * hdd_ndp_peer_cleanup() - This API will delete NDP peer if exist and modifies
+ * the NDP state.
+ * @hdd_ctx: hdd context
+ * @adapter: hdd adapter
+ *
+ * Return: None
+ */
+static void
+hdd_ndp_peer_cleanup(struct hdd_context *hdd_ctx, struct hdd_adapter *adapter)
 {
 	QDF_STATUS qdf_status = QDF_STATUS_E_FAILURE;
 
 	/* Check if there is any peer present on the adapter */
-	if (!hdd_any_valid_peer_present(adapter))
+	if (!hdd_any_valid_peer_present(adapter)) {
+		/*
+		 * No peers are connected to the NDI. So, set the NDI state to
+		 * DISCONNECTED. If there are any peers, ucfg_nan_disable_ndi()
+		 * would take care of cleanup all the peers and setting the
+		 * state to DISCONNECTED.
+		 */
+		hdd_ndp_state_cleanup(hdd_ctx->psoc, adapter->vdev_id);
 		return;
+	}
 
 	if (adapter->device_mode == QDF_NDI_MODE)
 		qdf_status = ucfg_nan_disable_ndi(hdd_ctx->psoc,
@@ -8027,6 +8072,17 @@ hdd_peer_cleanup(struct hdd_context *hdd_ctx, struct hdd_adapter *adapter)
 	if (QDF_IS_STATUS_ERROR(qdf_status))
 		hdd_debug("peer_cleanup_done wait fail");
 }
+#else
+static inline void
+hdd_ndp_state_cleanup(struct wlan_objmgr_psoc *psoc, uint8_t ndi_vdev_id)
+{
+}
+
+static inline void
+hdd_ndp_peer_cleanup(struct hdd_context *hdd_ctx, struct hdd_adapter *adapter)
+{
+}
+#endif /* WLAN_FEATURE_NAN */
 
 #ifdef FUNC_CALL_MAP
 
@@ -8114,7 +8170,7 @@ QDF_STATUS hdd_stop_adapter_ext(struct hdd_context *hdd_ctx,
 
 			/* For NDI do not use roam_profile */
 			if (adapter->device_mode == QDF_NDI_MODE) {
-				hdd_peer_cleanup(hdd_ctx, adapter);
+				hdd_ndp_peer_cleanup(hdd_ctx, adapter);
 				status = sme_roam_ndi_stop(mac_handle,
 							   adapter->vdev_id);
 				if (QDF_IS_STATUS_SUCCESS(status)) {

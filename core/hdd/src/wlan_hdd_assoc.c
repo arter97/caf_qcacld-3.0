@@ -284,19 +284,44 @@ wlan_hdd_sae_update_mld_addr(struct cfg80211_external_auth_params *params,
 			     struct hdd_adapter *adapter)
 {
 	struct qdf_mac_addr mld_addr;
-	QDF_STATUS status;
+	struct qdf_mac_addr *mld_roaming_addr;
+	QDF_STATUS status = QDF_STATUS_SUCCESS;
+	struct wlan_objmgr_vdev *vdev;
 
-	if (!wlan_vdev_mlme_is_mlo_vdev(adapter->vdev))
-		return QDF_STATUS_SUCCESS;
-
-	status = wlan_vdev_get_bss_peer_mld_mac(adapter->vdev, &mld_addr);
-	if (QDF_IS_STATUS_ERROR(status))
+	if (!adapter->deflink->vdev)
 		return QDF_STATUS_E_INVAL;
 
-	qdf_mem_copy(params->mld_addr, mld_addr.bytes,
-		     QDF_MAC_ADDR_SIZE);
+	vdev = adapter->deflink->vdev;
+	wlan_objmgr_vdev_get_ref(vdev, WLAN_HDD_ID_OBJ_MGR);
 
-	return QDF_STATUS_SUCCESS;
+	if (!ucfg_cm_is_sae_auth_addr_conversion_required(vdev))
+		goto end;
+
+	if (ucfg_cm_is_vdev_roaming(vdev)) {
+		/*
+		 * while roaming, peer is not created yet till authentication
+		 * So retrieving the MLD address which is cached from the
+		 * scan entry.
+		 */
+		mld_roaming_addr = ucfg_cm_roaming_get_peer_mld_addr(vdev);
+		if (!mld_roaming_addr) {
+			status = QDF_STATUS_E_INVAL;
+			goto end;
+		}
+		mld_addr = *mld_roaming_addr;
+	} else {
+		status = wlan_vdev_get_bss_peer_mld_mac(vdev, &mld_addr);
+		if (QDF_IS_STATUS_ERROR(status)) {
+			status = QDF_STATUS_E_INVAL;
+			goto end;
+		}
+	}
+
+	qdf_mem_copy(params->mld_addr, mld_addr.bytes, QDF_MAC_ADDR_SIZE);
+
+end:
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_HDD_ID_OBJ_MGR);
+	return status;
 }
 #else
 static inline QDF_STATUS
@@ -2150,7 +2175,8 @@ static void hdd_roam_channel_switch_handler(struct hdd_adapter *adapter,
 	mac_handle_t mac_handle = hdd_adapter_get_mac_handle(adapter);
 	struct hdd_station_ctx *sta_ctx;
 	uint8_t connected_vdev;
-	bool notify = true;
+	bool notify = true, is_sap_go_moved_before_sta = false;
+	struct wlan_objmgr_vdev *vdev;
 
 	/* Enable Roaming on STA interface which was disabled before CSA */
 	if (adapter->device_mode == QDF_STA_MODE)
@@ -2200,8 +2226,16 @@ static void hdd_roam_channel_switch_handler(struct hdd_adapter *adapter,
 	if (QDF_IS_STATUS_ERROR(status))
 		hdd_debug("set hw mode change not done");
 
-	policy_mgr_check_concurrent_intf_and_restart_sap(hdd_ctx->psoc,
-			!!adapter->session.ap.sap_config.acs_cfg.acs_mode);
+	vdev = hdd_objmgr_get_vdev_by_user(adapter, WLAN_DP_ID);
+	if (vdev) {
+		is_sap_go_moved_before_sta =
+			wlan_vdev_mlme_is_sap_go_move_before_sta(vdev);
+		hdd_objmgr_put_vdev_by_user(vdev, WLAN_DP_ID);
+	}
+
+	if (!is_sap_go_moved_before_sta)
+		policy_mgr_check_concurrent_intf_and_restart_sap(hdd_ctx->psoc,
+			    !!adapter->session.ap.sap_config.acs_cfg.acs_mode);
 	wlan_twt_concurrency_update(hdd_ctx);
 }
 

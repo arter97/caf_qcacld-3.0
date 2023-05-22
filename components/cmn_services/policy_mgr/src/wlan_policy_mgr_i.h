@@ -278,6 +278,8 @@ extern enum policy_mgr_conc_next_action
  * @sr_in_same_mac_conc: Enable/Disable SR in same MAC concurrency
  * @use_sap_original_bw: Enable/Disable sap original BW as default
  *                       BW when do restart
+ * @move_sap_go_1st_on_dfs_sta_csa: Enable/Disable SAP / GO's movement
+ *				    to non-DFS channel before STA
  */
 struct policy_mgr_cfg {
 	uint8_t mcc_to_scc_switch;
@@ -307,6 +309,7 @@ struct policy_mgr_cfg {
 	bool sr_in_same_mac_conc;
 #endif
 	bool use_sap_original_bw;
+	bool move_sap_go_1st_on_dfs_sta_csa;
 };
 
 /**

@@ -500,6 +500,18 @@ struct owe_transition_mode_info {
 };
 
 /**
+ * struct sae_roam_auth_map - map the peer address for the sae raom
+ * @is_mlo_ap: to check ap (to which roam) is mlo capable.
+ * @peer_mldaddr: peer MLD address
+ * @peer_linkaddr: peer link address
+ */
+struct sae_roam_auth_map {
+	bool is_mlo_ap;
+	struct qdf_mac_addr peer_mldaddr;
+	struct qdf_mac_addr peer_linkaddr;
+};
+
+/**
  * struct rso_config - connect config to be used to send info in
  * RSO. This is the info we dont have in VDEV or CM ctx
  * @reassoc_timer: reassoc timer
@@ -552,6 +564,10 @@ struct owe_transition_mode_info {
  * @lost_link_rssi: lost link RSSI
  * @roam_sync_frame_ind: roam sync frame ind
  * @roam_band_bitmask: This allows the driver to roam within this band
+ * @sae_roam_auth: structure containing roam peer mld and link address.
+ * @roam_invoke_source: roam invoke source
+ * @roam_invoke_bssid: mac address used for roam invoke
+ * @is_forced_roaming: bool value indicating if its forced roaming
  */
 struct rso_config {
 #ifdef WLAN_FEATURE_HOST_ROAM
@@ -598,6 +614,12 @@ struct rso_config {
 	int32_t lost_link_rssi;
 	struct roam_synch_frame_ind roam_sync_frame_ind;
 	uint32_t roam_band_bitmask;
+#if defined(WLAN_FEATURE_11BE_MLO) && defined(WLAN_FEATURE_ROAM_OFFLOAD)
+	struct sae_roam_auth_map sae_roam_auth;
+#endif
+	enum wlan_cm_source roam_invoke_source;
+	struct qdf_mac_addr roam_invoke_bssid;
+	bool is_forced_roaming;
 };
 
 /**

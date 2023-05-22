@@ -60,6 +60,16 @@ ifeq ($(findstring yes, $(found)), yes)
 cppflags-y += -DCFG80211_RU_PUNCT_NOTIFY
 endif
 
+# CFG80211_EXTERNAL_AUTH_MLO_SUPPORT
+# Used to indicate Linux kernel contains support for ML external auth support.
+#
+# This feature was backported to Android Common Kernel 5.15 via:
+# https://android-review.googlesource.com/c/kernel/common/+/2450264
+found = $(shell if grep -qF "MLD address of the peer. Used by the authentication request event" $(srctree)/include/net/cfg80211.h; then echo "yes" ;else echo "no" ;fi;)
+ifeq ($(findstring yes, $(found)), yes)
+cppflags-y += -DCFG80211_EXTERNAL_AUTH_MLO_SUPPORT
+endif
+
 include $(WLAN_ROOT)/configs/$(CONFIG_QCA_CLD_WLAN_PROFILE)_defconfig
 
 # add configurations in WLAN_CFG_OVERRIDE
@@ -3795,6 +3805,9 @@ cppflags-$(CONFIG_CHECKSUM_OFFLOAD) += -DCHECKSUM_OFFLOAD
 
 #Enable IPA Offload support
 cppflags-$(CONFIG_IPA_OFFLOAD) += -DIPA_OFFLOAD
+
+#Enable IPA optional Wifi datapath
+cppflags-$(CONFIG_IPA_OPT_WIFI_DP) += -DIPA_OPT_WIFI_DP
 
 cppflags-$(CONFIG_WDI3_IPA_OVER_GSI) += -DIPA_WDI3_GSI
 cppflags-$(CONFIG_WDI2_IPA_OVER_GSI) += -DIPA_WDI2_GSI
