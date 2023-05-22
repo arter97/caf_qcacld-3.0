@@ -585,11 +585,33 @@ QDF_STATUS mlo_peer_allocate_primary_umac(
 	 * 1) for single link MLO connection
 	 * 2) if MLD is single chip MLO
 	 */
+	if ((mlo_ctx->force_non_assoc_prim_umac) &&
+	    (ml_peer->max_links >= 1)) {
+		for (i = 0; i < WLAN_UMAC_MLO_MAX_VDEVS; i++) {
+			if (!link_vdevs[i])
+				continue;
+
+			if (wlan_peer_get_vdev(assoc_peer) == link_vdevs[i])
+				continue;
+			psoc_id = wlan_vdev_get_psoc_id(link_vdevs[i]);
+			ml_peer->primary_umac_psoc_id = psoc_id;
+			break;
+		}
+
+		mlo_peer_assign_primary_umac(ml_peer, peer_entry);
+		mlo_info("MLD ID %d ML Peer " QDF_MAC_ADDR_FMT
+			 " primary umac soc %d ", ml_dev->mld_id,
+			 QDF_MAC_ADDR_REF(ml_peer->peer_mld_addr.bytes),
+			 ml_peer->primary_umac_psoc_id);
+
+		return QDF_STATUS_SUCCESS;
+	}
+
 	if ((ml_peer->max_links == 1) ||
 	    (mlo_vdevs_check_single_soc(link_vdevs, ml_peer->max_links))) {
 		mlo_peer_assign_primary_umac(ml_peer, peer_entry);
-		mlo_info("MLD ID %d Assoc peer " QDF_MAC_ADDR_FMT " primary umac soc %d ",
-			 ml_dev->mld_id,
+		mlo_info("MLD ID %d Assoc peer " QDF_MAC_ADDR_FMT
+			 " primary umac soc %d ", ml_dev->mld_id,
 			 QDF_MAC_ADDR_REF(ml_peer->peer_mld_addr.bytes),
 			 ml_peer->primary_umac_psoc_id);
 

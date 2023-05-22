@@ -77,6 +77,7 @@ static void mlo_global_ctx_init(void)
 	ml_link_lock_create(mlo_mgr_ctx);
 	ml_aid_lock_create(mlo_mgr_ctx);
 	mlo_mgr_ctx->mlo_is_force_primary_umac = 0;
+	mlo_mgr_ctx->force_non_assoc_prim_umac = 0;
 	mlo_msgq_init();
 }
 
