@@ -194,12 +194,16 @@ QDF_STATUS qca_multi_link_tbl_has_entry(struct net_device *net_dev,
 	struct net_bridge_port *fdb_port = NULL;
 	struct net_device *fdb_dev = NULL;
 
-	if (!qca_ml_entry)
+	if (!qca_ml_entry) {
+		qdf_err("qca_ml_entry is null for ifname:%s with mac:%pM\n", net_dev->name, addr);
 		return QDF_STATUS_E_FAILURE;
+	}
 
 	fdb_entry = qal_bridge_fdb_has_entry(net_dev, addr, vlan_id);
-	if (!fdb_entry)
+	if (!fdb_entry) {
+		qdf_err("fdb_entry is null for ifname:%s with mac:%pM\n", net_dev->name, addr);
 		return QDF_STATUS_E_FAILURE;
+	}
 
 	fdb_port = fdb_entry->dst;
 	if (!fdb_port) {
