@@ -2578,6 +2578,25 @@ struct sysfs_stats_config {
 };
 #endif
 
+struct test_mem_free {
+	unsigned long ts_qdesc_mem_hdl;
+	qdf_dma_addr_t hw_qdesc_paddr;
+	void *hw_qdesc_vaddr_align;
+	void *hw_qdesc_vaddr_unalign;
+	uint32_t peer_id;
+	uint32_t tid;
+	uint8_t chip_id;
+	unsigned long ts_hw_flush_back;
+};
+
+struct test_qaddr_del {
+	unsigned long ts_qaddr_del;
+	uint32_t peer_id;
+	uint32_t paddr;
+	uint32_t tid;
+	uint8_t chip_id;
+};
+
 /* SOC level structure for data path */
 struct dp_soc {
 	/**
@@ -3123,6 +3142,14 @@ struct dp_soc {
 #if defined(WLAN_FEATURE_11BE_MLO) && defined(WLAN_MLO_MULTI_CHIP)
 	uint8_t mld_mode_ap;
 #endif
+	struct test_qaddr_del *list_shared_qaddr_del;
+	struct test_qaddr_del *reo_write_list;
+	struct test_mem_free *list_qdesc_addr_free;
+	struct test_mem_free *list_qdesc_addr_alloc;
+	uint64_t free_addr_list_idx;
+	uint64_t alloc_addr_list_idx;
+	uint64_t shared_qaddr_del_idx;
+	uint64_t write_paddr_list_idx;
 };
 
 #ifdef IPA_OFFLOAD
