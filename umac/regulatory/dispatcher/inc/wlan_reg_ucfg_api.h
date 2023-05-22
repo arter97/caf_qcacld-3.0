@@ -608,13 +608,18 @@ void ucfg_reg_set_afc_no_action(struct wlan_objmgr_psoc *psoc, bool value)
 }
 #endif
 
+#ifdef TARGET_11D_SCAN
 /**
  * ucfg_reg_11d_vdev_delete_update() - update vdev delete to regulatory
- * @vdev: vdev ptr
+ * @psoc: psoc pointer
+ * @op_mode: Operating mode of the deleted vdev
+ * @vdev_id: Vdev id of the deleted vdev
  *
  * Return: QDF_STATUS
  */
-QDF_STATUS ucfg_reg_11d_vdev_delete_update(struct wlan_objmgr_vdev *vdev);
+QDF_STATUS ucfg_reg_11d_vdev_delete_update(struct wlan_objmgr_psoc *psoc,
+					   enum QDF_OPMODE op_mode,
+					   uint32_t vdev_id);
 
 /**
  * ucfg_reg_11d_vdev_created_update() - update vdev create to regulatory
@@ -623,6 +628,21 @@ QDF_STATUS ucfg_reg_11d_vdev_delete_update(struct wlan_objmgr_vdev *vdev);
  * Return: QDF_STATUS
  */
 QDF_STATUS ucfg_reg_11d_vdev_created_update(struct wlan_objmgr_vdev *vdev);
+#else
+static inline
+QDF_STATUS ucfg_reg_11d_vdev_delete_update(struct wlan_objmgr_psoc *psoc,
+					   enum QDF_OPMODE op_mode,
+					   uint32_t vdev_id)
+{
+	return QDF_STATUS_SUCCESS;
+}
+
+static inline
+QDF_STATUS ucfg_reg_11d_vdev_created_update(struct wlan_objmgr_vdev *vdev)
+{
+	return QDF_STATUS_SUCCESS;
+}
+#endif
 
 /**
  * ucfg_reg_get_hal_reg_cap() - return hal reg cap
@@ -775,8 +795,8 @@ bool ucfg_reg_is_user_country_set_allowed(struct wlan_objmgr_psoc *psoc)
 	return true;
 }
 
-static inline bool
-ucfg_reg_is_fcc_constraint_set(struct wlan_objmgr_pdev *pdev)
+static inline
+bool ucfg_reg_is_fcc_constraint_set(struct wlan_objmgr_pdev *pdev)
 {
 	return false;
 }

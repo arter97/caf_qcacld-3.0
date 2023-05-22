@@ -318,15 +318,19 @@ void ucfg_reg_ch_avoid_ext(struct wlan_objmgr_psoc *psoc,
 }
 #endif
 
-QDF_STATUS ucfg_reg_11d_vdev_delete_update(struct wlan_objmgr_vdev *vdev)
+#ifdef TARGET_11D_SCAN
+QDF_STATUS ucfg_reg_11d_vdev_delete_update(struct wlan_objmgr_psoc *psoc,
+					   enum QDF_OPMODE op_mode,
+					   uint32_t vdev_id)
 {
-	return reg_11d_vdev_delete_update(vdev);
+	return reg_11d_vdev_delete_update(psoc, op_mode, vdev_id);
 }
 
 QDF_STATUS ucfg_reg_11d_vdev_created_update(struct wlan_objmgr_vdev *vdev)
 {
 	return reg_11d_vdev_created_update(vdev);
 }
+#endif
 
 struct wlan_psoc_host_hal_reg_capabilities_ext *ucfg_reg_get_hal_reg_cap(
 				struct wlan_objmgr_psoc *psoc)
