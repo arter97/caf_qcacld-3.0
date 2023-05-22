@@ -48,6 +48,84 @@
 	__QDF_TRACE_FL(QDF_TRACE_LEVEL_INFO_HIGH, QDF_MODULE_ID_DP_PEER, ## params)
 #define dp_peer_debug(params...) QDF_TRACE_DEBUG(QDF_MODULE_ID_DP_PEER, params)
 
+void check_free_list_for_invalid_flush(struct dp_soc *soc);
+
+static inline
+void add_entry_alloc_list(struct dp_soc *soc, struct dp_rx_tid *rx_tid,
+			  struct dp_peer *peer, void *hw_qdesc_vaddr)
+{
+	uint32_t max_list_size;
+	unsigned long curr_ts = qdf_get_system_timestamp();
+	uint32_t qref_index = soc->free_addr_list_idx;
+
+	max_list_size = soc->wlan_cfg_ctx->qref_control_size;
+
+	if (max_list_size == 0)
+		return;
+
+	soc->list_qdesc_addr_alloc[qref_index].hw_qdesc_paddr =
+							 rx_tid->hw_qdesc_paddr;
+	soc->list_qdesc_addr_alloc[qref_index].ts_qdesc_mem_hdl = curr_ts;
+	soc->list_qdesc_addr_alloc[qref_index].hw_qdesc_vaddr_align =
+								 hw_qdesc_vaddr;
+	soc->list_qdesc_addr_alloc[qref_index].hw_qdesc_vaddr_unalign =
+					       rx_tid->hw_qdesc_vaddr_unaligned;
+	soc->list_qdesc_addr_alloc[qref_index].peer_id = peer->peer_id;
+	soc->list_qdesc_addr_alloc[qref_index].tid = rx_tid->tid;
+	soc->alloc_addr_list_idx++;
+
+	if (soc->alloc_addr_list_idx == max_list_size)
+		soc->alloc_addr_list_idx = 0;
+}
+
+static inline
+void add_entry_free_list(struct dp_soc *soc, struct dp_rx_tid *rx_tid)
+{
+	uint32_t max_list_size;
+	unsigned long curr_ts = qdf_get_system_timestamp();
+	uint32_t qref_index = soc->free_addr_list_idx;
+
+	max_list_size = soc->wlan_cfg_ctx->qref_control_size;
+
+	if (max_list_size == 0)
+		return;
+
+	soc->list_qdesc_addr_free[qref_index].ts_qdesc_mem_hdl = curr_ts;
+	soc->list_qdesc_addr_free[qref_index].hw_qdesc_paddr =
+							 rx_tid->hw_qdesc_paddr;
+	soc->list_qdesc_addr_free[qref_index].hw_qdesc_vaddr_align =
+						 rx_tid->hw_qdesc_vaddr_aligned;
+	soc->list_qdesc_addr_free[qref_index].hw_qdesc_vaddr_unalign =
+					       rx_tid->hw_qdesc_vaddr_unaligned;
+	soc->free_addr_list_idx++;
+
+	if (soc->free_addr_list_idx == max_list_size)
+		soc->free_addr_list_idx = 0;
+}
+
+static inline
+void add_entry_write_list(struct dp_soc *soc, struct dp_peer *peer,
+			  uint32_t tid)
+{
+	uint32_t max_list_size;
+	unsigned long curr_ts = qdf_get_system_timestamp();
+
+	max_list_size = soc->wlan_cfg_ctx->qref_control_size;
+
+	if (max_list_size == 0)
+		return;
+
+	soc->reo_write_list[soc->write_paddr_list_idx].ts_qaddr_del = curr_ts;
+	soc->reo_write_list[soc->write_paddr_list_idx].peer_id = peer->peer_id;
+	soc->reo_write_list[soc->write_paddr_list_idx].paddr =
+					       peer->rx_tid[tid].hw_qdesc_paddr;
+	soc->reo_write_list[soc->write_paddr_list_idx].tid = tid;
+	soc->write_paddr_list_idx++;
+
+	if (soc->write_paddr_list_idx == max_list_size)
+		soc->write_paddr_list_idx = 0;
+}
+
 #ifdef REO_QDESC_HISTORY
 enum reo_qdesc_event_type {
 	REO_QDESC_UPDATE_CB = 0,

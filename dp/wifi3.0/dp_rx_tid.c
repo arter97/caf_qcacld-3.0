@@ -484,6 +484,33 @@ static void dp_reo_desc_defer_free(struct dp_soc *soc)
 }
 #endif /* !WLAN_DP_FEATURE_DEFERRED_REO_QDESC_DESTROY */
 
+void check_free_list_for_invalid_flush(struct dp_soc *soc)
+{
+	uint32_t i;
+	uint32_t *addr_deref_val;
+	unsigned long curr_ts = qdf_get_system_timestamp();
+	uint32_t max_list_size;
+
+	max_list_size = soc->wlan_cfg_ctx->qref_control_size;
+
+	if (max_list_size == 0)
+		return;
+
+	for (i = 0; i < soc->free_addr_list_idx; i++) {
+		addr_deref_val = (uint32_t *)
+			    soc->list_qdesc_addr_free[i].hw_qdesc_vaddr_unalign;
+
+		if (*addr_deref_val == 0xDDBEEF84 ||
+		    *addr_deref_val == 0xADBEEF84 ||
+		    *addr_deref_val == 0xBDBEEF84 ||
+		    *addr_deref_val == 0xCDBEEF84) {
+			if (soc->list_qdesc_addr_free[i].ts_hw_flush_back == 0)
+				soc->list_qdesc_addr_free[i].ts_hw_flush_back =
+									curr_ts;
+		}
+	}
+}
+
 /**
  * dp_reo_desc_free() - Callback free reo descriptor memory after
  * HW cache flush
@@ -519,12 +546,16 @@ static void dp_reo_desc_free(struct dp_soc *soc, void *cb_ctxt,
 		goto out;
 
 	DP_RX_REO_QDESC_FREE_EVT(freedesc);
+	add_entry_free_list(soc, rx_tid);
 
 	hal_reo_shared_qaddr_cache_clear(soc->hal_soc);
 	qdf_mem_unmap_nbytes_single(soc->osdev,
 				    rx_tid->hw_qdesc_paddr,
 				    QDF_DMA_BIDIRECTIONAL,
 				    rx_tid->hw_qdesc_alloc_size);
+	check_free_list_for_invalid_flush(soc);
+
+	*(uint32_t *)rx_tid->hw_qdesc_vaddr_unaligned = 0;
 	qdf_mem_free(rx_tid->hw_qdesc_vaddr_unaligned);
 out:
 	qdf_mem_free(freedesc);
@@ -672,6 +703,8 @@ try_desc_alloc:
 	qdf_mem_map_nbytes_single(soc->osdev, hw_qdesc_vaddr,
 		QDF_DMA_BIDIRECTIONAL, rx_tid->hw_qdesc_alloc_size,
 		&(rx_tid->hw_qdesc_paddr));
+
+	add_entry_alloc_list(soc, rx_tid, peer, hw_qdesc_vaddr);
 
 	if (dp_reo_desc_addr_chk(rx_tid->hw_qdesc_paddr) !=
 			QDF_STATUS_SUCCESS) {

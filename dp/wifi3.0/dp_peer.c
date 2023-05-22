@@ -2488,6 +2488,9 @@ void dp_peer_rx_reo_shared_qaddr_delete(struct dp_soc *soc,
 {
 	uint8_t tid;
 	uint16_t peer_id;
+	uint32_t max_list_size;
+
+	max_list_size = soc->wlan_cfg_ctx->qref_control_size;
 
 	peer_id = peer->peer_id;
 
@@ -2495,10 +2498,30 @@ void dp_peer_rx_reo_shared_qaddr_delete(struct dp_soc *soc,
 		return;
 	if (IS_MLO_DP_LINK_PEER(peer))
 		return;
+
+	if (max_list_size) {
+		unsigned long curr_ts = qdf_get_system_timestamp();
+		struct dp_peer *primary_peer = peer;
+		uint16_t chip_id = 0xFFFF;
+		uint32_t qref_index;
+
+		qref_index = soc->shared_qaddr_del_idx;
+
+		soc->list_shared_qaddr_del[qref_index].peer_id =
+							  primary_peer->peer_id;
+		soc->list_shared_qaddr_del[qref_index].ts_qaddr_del = curr_ts;
+		soc->list_shared_qaddr_del[qref_index].chip_id = chip_id;
+		soc->shared_qaddr_del_idx++;
+
+		if (soc->shared_qaddr_del_idx == max_list_size)
+			soc->shared_qaddr_del_idx = 0;
+	}
+
 	if (hal_reo_shared_qaddr_is_enable(soc->hal_soc)) {
-		for (tid = 0; tid < DP_MAX_TIDS; tid++)
+		for (tid = 0; tid < DP_MAX_TIDS; tid++) {
 			hal_reo_shared_qaddr_write(soc->hal_soc,
 						   peer_id, tid, 0);
+		}
 	}
 }
 #endif
@@ -2838,10 +2861,12 @@ dp_rx_peer_map_handler(struct dp_soc *soc, uint16_t peer_id,
 			if (hal_reo_shared_qaddr_is_enable(soc->hal_soc) &&
 			    peer->rx_tid[0].hw_qdesc_vaddr_unaligned &&
 			    !IS_MLO_DP_LINK_PEER(peer)) {
+				add_entry_write_list(soc, peer, 0);
 				hal_reo_shared_qaddr_write(soc->hal_soc,
 							   peer_id,
 							   0,
 							   peer->rx_tid[0].hw_qdesc_paddr);
+				add_entry_write_list(soc, peer, DP_NON_QOS_TID);
 				hal_reo_shared_qaddr_write(soc->hal_soc,
 							   peer_id,
 							   DP_NON_QOS_TID,
