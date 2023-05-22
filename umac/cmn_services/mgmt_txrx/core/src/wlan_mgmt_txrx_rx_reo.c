@@ -2906,9 +2906,9 @@ mgmt_rx_reo_handle_egress_overflow(struct mgmt_rx_reo_list *reo_egress_list)
 
 	reo_egress_list->overflow_count++;
 	reo_egress_list->last_overflow_ts = qdf_get_log_timestamp();
-	mgmt_rx_reo_err_rl("Egress overflow, cnt:%llu size:%u",
-			   reo_egress_list->overflow_count,
-			   qdf_list_size(&reo_egress_list->list));
+	mgmt_rx_reo_debug_rl("Egress overflow, cnt:%llu size:%u",
+			     reo_egress_list->overflow_count,
+			     qdf_list_size(&reo_egress_list->list));
 
 	egress_list_cur_size = qdf_list_size(&reo_egress_list->list);
 	egress_list_max_size = reo_egress_list->max_list_size;
@@ -3440,9 +3440,9 @@ mgmt_rx_reo_update_ingress_list(struct mgmt_rx_reo_ingress_list *ingress_list,
 			reo_ingress_list->overflow_count++;
 			reo_ingress_list->last_overflow_ts =
 							qdf_get_log_timestamp();
-			mgmt_rx_reo_err_rl("Ingress overflow, cnt:%llu size:%u",
-					   reo_ingress_list->overflow_count,
-					   qdf_list_size(ingress_list_ptr));
+			mgmt_rx_reo_debug_rl("Ingress ovrflw, cnt:%llu size:%u",
+					     reo_ingress_list->overflow_count,
+					     qdf_list_size(ingress_list_ptr));
 		}
 
 		if (new->wait_count.total_count == 0)
