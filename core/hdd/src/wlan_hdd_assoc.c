@@ -2189,7 +2189,7 @@ static void hdd_roam_channel_switch_handler(struct hdd_adapter *adapter,
 				&connected_vdev))
 			notify = false;
 		else if (adapter->deflink->vdev_id != connected_vdev ||
-			 !ucfg_cm_is_vdev_connected(vdev))
+			 !ucfg_cm_is_vdev_active(vdev))
 			notify = false;
 	}
 	if (notify) {
