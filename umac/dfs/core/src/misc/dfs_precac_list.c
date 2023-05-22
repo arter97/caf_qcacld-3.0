@@ -1253,6 +1253,24 @@ end:
 #endif
 #endif
 
+static
+enum wlan_phymode dfs_get_phymode_from_chwidth(enum phy_ch_width ch_width)
+{
+	switch (ch_width) {
+	case CH_WIDTH_20MHZ:
+		return WLAN_PHYMODE_11AC_VHT20;
+	case CH_WIDTH_40MHZ:
+		return WLAN_PHYMODE_11AC_VHT40;
+	case CH_WIDTH_80MHZ:
+		return WLAN_PHYMODE_11AC_VHT80;
+	case CH_WIDTH_160MHZ:
+	case CH_WIDTH_320MHZ:
+		return WLAN_PHYMODE_11AC_VHT160;
+	default:
+		return WLAN_PHYMODE_MAX;
+	}
+}
+
 /*
  * dfs_init_precac_list() - Initialize preCAC lists.
  * @dfs: Pointer to wlan_dfs.
@@ -1328,20 +1346,25 @@ void dfs_init_precac_list(struct wlan_dfs *dfs)
 				    dfs_max_bw_info[i].dfs_pri_ch_freq,
 				    WLAN_PHYMODE_11AC_VHT80_80);
 			} else {
+				enum phy_ch_width chwidth;
+				enum wlan_phymode max_phymode;
+
 			    status =
 				dfs_precac_create_precac_entry(dfs,
 							       precac_entry,
 							       dfs_max_bw_info,
 							       i);
-			if (status) /* should we return? */
+			    if (status) /* should we return? */
 				continue;
-			/* Some channels like 36HT160 might have a non DFS
-			 * part. Mark the non DFS portion as precac done.
-			 */
-			dfs_mark_non_dfs_as_precac_done(
-				dfs,
-				dfs_max_bw_info[i].dfs_pri_ch_freq,
-				WLAN_PHYMODE_11AC_VHT160);
+			    /* Some channels like 36HT160 might have a non DFS
+			     * part. Mark the non DFS portion as precac done.
+			     */
+			    chwidth = wlan_reg_find_chwidth_from_bw(dfs_max_bw_info[i].dfs_max_bw);
+			    max_phymode = dfs_get_phymode_from_chwidth(chwidth);
+
+			    dfs_mark_non_dfs_as_precac_done(dfs,
+							    dfs_max_bw_info[i].dfs_pri_ch_freq,
+							    max_phymode);
 			}
 		}
 	}
