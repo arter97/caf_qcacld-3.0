@@ -193,6 +193,8 @@ int htt_wbm_event_record(struct htt_logger *h, uint8_t tx_status,
 	struct htt_wbm_event_debug *buf = NULL;
 	uint8_t tdata[HTT_WBM_EVENT_DEBUG_ENTRY_MAX_LENGTH];
 	struct htt_log_buf_t *wbm_event_log_buf;
+	uint8_t log_length = qdf_min(HTT_WBM_EVENT_DEBUG_ENTRY_MAX_LENGTH,
+				     HAL_TX_COMP_HTT_STATUS_LEN);
 
 	/* return 0 if:
 	 * 1. Initialization failed.
@@ -221,8 +223,7 @@ int htt_wbm_event_record(struct htt_logger *h, uint8_t tx_status,
 
 	buf = h->log_info.htt_wbm_event_log_buf_info.buf;
 	buf[*p_buf_tail_idx].tx_status = tx_status;
-	qdf_mem_copy(buf[*p_buf_tail_idx].data, msg_data,
-		     HTT_WBM_EVENT_DEBUG_ENTRY_MAX_LENGTH);
+	qdf_mem_copy(buf[*p_buf_tail_idx].data, msg_data, log_length);
 	buf[*p_buf_tail_idx].time = qdf_get_log_timestamp();
 	buf[*p_buf_tail_idx].cpu_id = smp_processor_id();
 
