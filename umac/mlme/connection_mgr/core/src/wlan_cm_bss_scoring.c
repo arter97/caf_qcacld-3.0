@@ -1271,7 +1271,8 @@ cm_calculate_etp(struct wlan_objmgr_psoc *psoc,
 static uint32_t
 cm_calculate_etp_score(struct wlan_objmgr_psoc *psoc,
 		       struct scan_cache_entry *entry,
-		       struct psoc_phy_config *phy_config)
+		       struct psoc_phy_config *phy_config,
+		       enum MLO_TYPE bss_mlo_type)
 {
 	enum phy_ch_width ch_width;
 	uint32_t nss;
@@ -1281,6 +1282,8 @@ cm_calculate_etp_score(struct wlan_objmgr_psoc *psoc,
 	struct wlan_esp_info *esp;
 	struct wlan_esp_ie *esp_ie;
 	struct etp_params etp_param;
+	int8_t mlo_prefer_percentage = 0;
+	uint32_t score;
 
 	if (phy_config->he_cap && entry->ie_list.hecap)
 		is_he_intersect = true;
@@ -1326,15 +1329,21 @@ cm_calculate_etp_score(struct wlan_objmgr_psoc *psoc,
 	 * becomes useless. ETP should be [1Mbps, 20000Mbps],matches score
 	 * range: [1, 20000]
 	 */
-	return cm_calculate_etp(psoc, entry,
-				  &etp_param,
-				  nss,
-				  ch_width,
-				  is_ht_intersect,
-				  is_vht_intersect,
-				  is_he_intersect,
-				  entry->rssi_raw,
-				  phy_config);
+	score = cm_calculate_etp(psoc, entry,
+				 &etp_param,
+				 nss,
+				 ch_width,
+				 is_ht_intersect,
+				 is_vht_intersect,
+				 is_he_intersect,
+				 entry->rssi_raw,
+				 phy_config);
+	if (bss_mlo_type == SLO)
+		return score;
+	wlan_mlme_get_mlo_prefer_percentage(psoc, &mlo_prefer_percentage);
+	if (mlo_prefer_percentage)
+		score = score + (score * mlo_prefer_percentage) / 100;
+	return score;
 }
 #else
 static bool
@@ -1391,7 +1400,8 @@ static inline bool cm_is_assoc_allowed(struct psoc_mlme_obj *mlme_psoc_obj,
 static uint32_t
 cm_calculate_etp_score(struct wlan_objmgr_psoc *psoc,
 		       struct scan_cache_entry *entry,
-		       struct psoc_phy_config *phy_config)
+		       struct psoc_phy_config *phy_config,
+		       enum MLO_TYPE bss_mlo_type)
 {
 	return 0;
 }
@@ -2048,13 +2058,14 @@ static int cm_calculate_bss_score(struct wlan_objmgr_psoc *psoc,
 				CM_BEST_CANDIDATE_MAX_BSS_SCORE);
 		return CM_BEST_CANDIDATE_MAX_BSS_SCORE;
 	}
+	bss_mlo_type = cm_bss_mlo_type(psoc, entry, scan_list);
 	if (score_config->vendor_roam_score_algorithm) {
-		score = cm_calculate_etp_score(psoc, entry, phy_config);
+		score = cm_calculate_etp_score(psoc, entry, phy_config,
+					       bss_mlo_type);
 		entry->bss_score = score;
 		return score;
 	}
 
-	bss_mlo_type = cm_bss_mlo_type(psoc, entry, scan_list);
 	if (bss_mlo_type == SLO || bss_mlo_type == MLSR) {
 		rssi_score =
 			cm_calculate_rssi_score(&score_config->rssi_score,
