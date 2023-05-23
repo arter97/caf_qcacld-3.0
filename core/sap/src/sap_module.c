@@ -3321,7 +3321,7 @@ wlansap_select_chan_with_best_bandwidth(struct sap_context *sap_ctx,
 					enum phy_ch_width *selected_ch_width)
 {
 	struct mac_context *mac;
-	struct ch_params ch_params;
+	struct ch_params ch_params = {0};
 	enum phy_ch_width ch_width;
 	uint32_t center_freq, bw_val, bw_start, bw_end;
 	uint16_t i, j;

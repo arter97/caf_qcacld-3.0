@@ -1715,7 +1715,7 @@ sap_sort_chl_weight_80_mhz(struct mac_context *mac_ctx,
 	uint8_t i, j;
 	tSapSpectChInfo *pSpectInfo;
 	uint8_t minIdx;
-	struct ch_params acs_ch_params;
+	struct ch_params acs_ch_params = {0};
 	int8_t center_freq_diff;
 	uint32_t combined_weight;
 	uint32_t min_ch_weight;
@@ -2026,7 +2026,7 @@ sap_sort_chl_weight_320_mhz(struct mac_context *mac_ctx,
 	uint8_t i, j;
 	tSapSpectChInfo *pSpectInfo;
 	uint8_t minIdx;
-	struct ch_params acs_ch_params;
+	struct ch_params acs_ch_params = {0};
 	int32_t center_freq_diff;
 	uint32_t combined_weight;
 	uint32_t min_ch_weight;
@@ -2465,7 +2465,7 @@ sap_sort_chl_weight_40_mhz(struct mac_context *mac_ctx,
 	uint8_t i, j;
 	tSapSpectChInfo *pSpectInfo;
 	uint8_t minIdx;
-	struct ch_params acs_ch_params;
+	struct ch_params acs_ch_params = {0};
 	int8_t center_freq_diff;
 	uint32_t combined_weight;
 	uint32_t min_ch_weight;

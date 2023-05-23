@@ -5573,7 +5573,7 @@ void lim_calculate_tpc(struct mac_context *mac,
 	uint16_t local_constraint, bw_val = 0;
 	uint32_t num_pwr_levels, ap_power_type_6g = 0;
 	qdf_freq_t oper_freq, start_freq = 0;
-	struct ch_params ch_params;
+	struct ch_params ch_params = {0};
 	struct vdev_mlme_obj *mlme_obj;
 	int8_t tpe_power;
 	bool skip_tpe = false;

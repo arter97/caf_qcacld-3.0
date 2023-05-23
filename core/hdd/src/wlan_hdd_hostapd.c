@@ -1756,7 +1756,7 @@ hdd_fill_channel_change_puncture(struct hdd_chan_change_params *chan_change,
 static QDF_STATUS hdd_hostapd_chan_change(struct hdd_adapter *adapter,
 					  struct sap_event *sap_event)
 {
-	struct hdd_chan_change_params chan_change;
+	struct hdd_chan_change_params chan_change = {0};
 	struct ch_params sap_ch_param = {0};
 	eCsrPhyMode phy_mode;
 	bool legacy_phymode;
@@ -7326,7 +7326,7 @@ wlan_hdd_is_ap_ap_force_scc_override(struct hdd_adapter *adapter,
 	uint32_t cc_count, i;
 	uint32_t op_freq[MAX_NUMBER_OF_CONC_CONNECTIONS];
 	uint8_t vdev_id[MAX_NUMBER_OF_CONC_CONNECTIONS];
-	struct ch_params ch_params;
+	struct ch_params ch_params = {0};
 	enum nl80211_channel_type channel_type;
 	uint8_t con_vdev_id;
 	uint32_t con_freq;

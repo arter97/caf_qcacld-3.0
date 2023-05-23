@@ -2141,7 +2141,7 @@ hdd_indicate_ese_bcn_report_ind(const struct hdd_adapter *adapter,
 static void hdd_roam_channel_switch_handler(struct hdd_adapter *adapter,
 					    struct csr_roam_info *roam_info)
 {
-	struct hdd_chan_change_params chan_change;
+	struct hdd_chan_change_params chan_change = {0};
 	QDF_STATUS status;
 	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
 	mac_handle_t mac_handle;
