@@ -2859,8 +2859,130 @@ bool wlansap_is_6ghz_included_in_acs_range(struct sap_context *sap_ctx)
 
 #if defined(FEATURE_WLAN_CH_AVOID)
 /**
+ * wlansap_select_chan_with_best_bandwidth() - Select channel with
+ * max possible band width
+ * @sap_ctx: sap context
+ * @ch_freq_list: candidate channel frequency list
+ * @ch_cnt: count of channel frequency in list
+ * @selected_freq: selected channel frequency
+ * @selected_ch_width: selected channel width
+ *
+ * Return: QDF_STATUS_SUCCESS if better channel selected
+ */
+static QDF_STATUS
+wlansap_select_chan_with_best_bandwidth(struct sap_context *sap_ctx,
+					uint32_t *ch_freq_list,
+					uint32_t ch_cnt,
+					uint32_t *selected_freq,
+					enum phy_ch_width *selected_ch_width)
+{
+	struct mac_context *mac;
+	struct ch_params ch_params;
+	enum phy_ch_width ch_width;
+	uint32_t center_freq, bw_val, bw_start, bw_end;
+	uint16_t i, j;
+	uint16_t  unsafe_chan[NUM_CHANNELS];
+	uint16_t  unsafe_chan_cnt = 0;
+	qdf_device_t qdf_ctx = cds_get_context(QDF_MODULE_ID_QDF_DEVICE);
+
+	if (!selected_ch_width || !selected_freq)
+		return QDF_STATUS_E_INVAL;
+
+	if (!qdf_ctx) {
+		sap_err("invalid qdf_ctx");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	if (!sap_ctx) {
+		sap_err("invalid sap_ctx");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	mac = sap_get_mac_context();
+	if (!mac) {
+		sap_err("Invalid MAC context");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	if (policy_mgr_get_connection_count(mac->psoc) != 1)
+		return QDF_STATUS_E_INVAL;
+
+	pld_get_wlan_unsafe_channel(qdf_ctx->dev, unsafe_chan,
+				    &unsafe_chan_cnt,
+				    sizeof(uint16_t) * NUM_CHANNELS);
+	unsafe_chan_cnt = QDF_MIN(unsafe_chan_cnt, NUM_CHANNELS);
+	if (!unsafe_chan_cnt)
+		return QDF_STATUS_E_INVAL;
+
+	ch_width = sap_ctx->ch_width_orig;
+next_lower_bw:
+	for (i = 0; i < ch_cnt; i++) {
+		if (!WLAN_REG_IS_SAME_BAND_FREQS(sap_ctx->chan_freq,
+						 ch_freq_list[i]))
+			continue;
+		if (WLAN_REG_IS_6GHZ_CHAN_FREQ(ch_freq_list[i]) &&
+		    !WLAN_REG_IS_6GHZ_PSC_CHAN_FREQ(ch_freq_list[i]))
+			continue;
+		qdf_mem_zero(&ch_params, sizeof(ch_params));
+		ch_params.ch_width = ch_width;
+		wlan_reg_set_channel_params_for_freq(mac->pdev,
+						     ch_freq_list[i],
+						     0, &ch_params);
+		if (!WLAN_REG_IS_24GHZ_CH_FREQ(ch_freq_list[i]) &&
+		    wlan_reg_get_5g_bonded_channel_state_for_freq(mac->pdev,
+								  ch_freq_list[i],
+								  ch_params.ch_width) !=
+				CHANNEL_STATE_ENABLE)
+			continue;
+
+		bw_val = wlan_reg_get_bw_value(ch_params.ch_width);
+		if (!ch_params.mhz_freq_seg0)
+			continue;
+		if (bw_val < wlan_reg_get_bw_value(ch_width))
+			continue;
+		if (ch_params.mhz_freq_seg1)
+			center_freq = ch_params.mhz_freq_seg1;
+		else
+			center_freq = ch_params.mhz_freq_seg0;
+
+		bw_start = center_freq - bw_val / 2 + 10;
+		bw_end = center_freq + bw_val / 2 - 10;
+		for (j = 0; j < unsafe_chan_cnt; j++)
+			if (unsafe_chan[j] >= bw_start &&
+			    unsafe_chan[j] <= bw_end)
+				break;
+
+		if (j < unsafe_chan_cnt) {
+			sap_debug("ch_freq %d bw %d bw start %d, bw end %d unsafe %d",
+				  ch_freq_list[i], bw_val, bw_start, bw_end,
+				  unsafe_chan[j]);
+			continue;
+		}
+		sap_debug("ch_freq %d bw %d bw start %d, bw end %d",
+			  ch_freq_list[i], bw_val, bw_start, bw_end);
+		/* found freq/bw pair which is safe for used as sap channel
+		 * avoidance csa target channel/bandwidth.
+		 */
+		*selected_freq = ch_freq_list[i];
+		*selected_ch_width = ch_params.ch_width;
+		sap_debug("selected freq %d bw %d", *selected_freq,
+			  *selected_ch_width);
+
+		return QDF_STATUS_SUCCESS;
+	}
+
+	ch_width = wlan_reg_get_next_lower_bandwidth(ch_width);
+	if (!(wlan_reg_get_bw_value(ch_width) < 20 ||
+	      ch_width == CH_WIDTH_INVALID))
+		goto next_lower_bw;
+
+	return QDF_STATUS_E_INVAL;
+}
+
+/**
  * wlansap_get_safe_channel() - Get safe channel from current regulatory
  * @sap_ctx: Pointer to SAP context
+ * @ch_width: selected channel bandwdith
  *
  * This function is used to get safe channel from current regulatory valid
  * channels to restart SAP if failed to get safe channel from PCL.
@@ -2869,13 +2991,15 @@ bool wlansap_is_6ghz_included_in_acs_range(struct sap_context *sap_ctx)
  * failure, the channel number returned is zero.
  */
 static uint32_t
-wlansap_get_safe_channel(struct sap_context *sap_ctx)
+wlansap_get_safe_channel(struct sap_context *sap_ctx,
+			 enum phy_ch_width *ch_width)
 {
 	struct mac_context *mac;
 	uint32_t pcl_freqs[NUM_CHANNELS];
 	QDF_STATUS status;
 	mac_handle_t mac_handle;
 	uint32_t pcl_len = 0, i;
+	uint32_t selected_freq;
 
 	if (!sap_ctx) {
 		sap_err("NULL parameter");
@@ -2914,6 +3038,15 @@ wlansap_get_safe_channel(struct sap_context *sap_ctx)
 			return INVALID_CHANNEL_ID;
 		}
 
+		status =
+		wlansap_select_chan_with_best_bandwidth(sap_ctx,
+							pcl_freqs,
+							pcl_len,
+							&selected_freq,
+							ch_width);
+		if (QDF_IS_STATUS_SUCCESS(status))
+			return selected_freq;
+
 		for (i = 0; i < pcl_len; i++) {
 			if (WLAN_REG_IS_SAME_BAND_FREQS(sap_ctx->chan_freq,
 							pcl_freqs[i])) {
@@ -2933,6 +3066,7 @@ wlansap_get_safe_channel(struct sap_context *sap_ctx)
 /**
  * wlansap_get_safe_channel() - Get safe channel from current regulatory
  * @sap_ctx: Pointer to SAP context
+ * @ch_width: selected channel width
  *
  * This function is used to get safe channel from current regulatory valid
  * channels to restart SAP if failed to get safe channel from PCL.
@@ -2941,14 +3075,16 @@ wlansap_get_safe_channel(struct sap_context *sap_ctx)
  * failure, the channel number returned is zero.
  */
 static uint8_t
-wlansap_get_safe_channel(struct sap_context *sap_ctx)
+wlansap_get_safe_channel(struct sap_context *sap_ctx,
+			 enum phy_ch_width *ch_width)
 {
 	return 0;
 }
 #endif
 
 uint32_t
-wlansap_get_safe_channel_from_pcl_and_acs_range(struct sap_context *sap_ctx)
+wlansap_get_safe_channel_from_pcl_and_acs_range(struct sap_context *sap_ctx,
+						enum phy_ch_width *ch_width)
 {
 	struct mac_context *mac;
 	struct sir_pcl_list pcl = {0};
@@ -2971,7 +3107,7 @@ wlansap_get_safe_channel_from_pcl_and_acs_range(struct sap_context *sap_ctx)
 
 	if (policy_mgr_get_connection_count(mac->psoc) == 1) {
 		sap_debug("only SAP present return best channel from ACS list");
-		return wlansap_get_safe_channel(sap_ctx);
+		return wlansap_get_safe_channel(sap_ctx, ch_width);
 	}
 
 	status =
@@ -3009,7 +3145,7 @@ wlansap_get_safe_channel_from_pcl_and_acs_range(struct sap_context *sap_ctx)
 	 * channel is unsafe channel, the pcl may be empty, instead of return,
 	 * try to choose a safe channel from acs range.
 	 */
-	return wlansap_get_safe_channel(sap_ctx);
+	return wlansap_get_safe_channel(sap_ctx, ch_width);
 }
 
 static uint32_t wlansap_get_2g_first_safe_chan_freq(struct sap_context *sap_ctx)
@@ -3184,7 +3320,8 @@ qdf_freq_t wlansap_get_chan_band_restrict(struct sap_context *sap_ctx,
 		   !utils_dfs_is_freq_in_nol(mac->pdev, sap_ctx->chan_freq)) {
 		sap_debug("channel is disabled");
 		*csa_reason = CSA_REASON_CHAN_DISABLED;
-		return wlansap_get_safe_channel_from_pcl_and_acs_range(sap_ctx);
+		return wlansap_get_safe_channel_from_pcl_and_acs_range(sap_ctx,
+								       NULL);
 	} else if (wlan_reg_is_passive_for_freq(mac->pdev,
 						sap_ctx->chan_freq)) {
 		sap_debug("channel is passive");
@@ -3193,7 +3330,8 @@ qdf_freq_t wlansap_get_chan_band_restrict(struct sap_context *sap_ctx,
 	} else if (!policy_mgr_is_safe_channel(mac->psoc, sap_ctx->chan_freq)) {
 		sap_debug("channel is unsafe");
 		*csa_reason = CSA_REASON_UNSAFE_CHANNEL;
-		return wlansap_get_safe_channel_from_pcl_and_acs_range(sap_ctx);
+		return wlansap_get_safe_channel_from_pcl_and_acs_range(sap_ctx,
+								       NULL);
 	} else {
 		sap_debug("No need switch SAP/Go channel");
 		return 0;
