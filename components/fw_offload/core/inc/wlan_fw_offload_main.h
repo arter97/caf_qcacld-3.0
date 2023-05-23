@@ -72,6 +72,7 @@ enum wlan_fwol_southbound_event {
  * @max_tx_power_for_btc: Max wlan tx power in co-ex scenario
  * @wlan_low_rssi_threshold: Wlan low rssi threshold for BTC mode switching
  * @bt_low_rssi_threshold: BT low rssi threshold for BTC mode switching
+ * @bt_rx_per_threshold: BT rx per threshold
  * @bt_interference_low_ll: Lower limit of low level BT interference
  * @bt_interference_low_ul: Upper limit of low level BT interference
  * @bt_interference_medium_ll: Lower limit of medium level BT interference
@@ -94,6 +95,7 @@ struct wlan_fwol_coex_config {
 	uint8_t max_tx_power_for_btc;
 	int16_t wlan_low_rssi_threshold;
 	int16_t bt_low_rssi_threshold;
+	uint16_t bt_rx_per_threshold;
 	int16_t bt_interference_low_ll;
 	int16_t bt_interference_low_ul;
 	int16_t bt_interference_medium_ll;

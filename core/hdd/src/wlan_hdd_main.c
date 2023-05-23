@@ -7783,6 +7783,15 @@ static int hdd_send_coex_config_params(struct hdd_context *hdd_ctx,
 		goto err;
 	}
 
+	coex_cfg_params.config_type = WMI_COEX_CONFIG_BT_RX_PER_THRESHOLD;
+	coex_cfg_params.config_arg1 = config.bt_rx_per_threshold;
+
+	status = sme_send_coex_config_cmd(&coex_cfg_params);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		hdd_err("Failed to send coex BT Rx Per threshold");
+		goto err;
+	}
+
 	coex_cfg_params.config_type = WMI_COEX_CONFIG_BT_INTERFERENCE_LEVEL;
 	coex_cfg_params.config_arg1 = config.bt_interference_low_ll;
 	coex_cfg_params.config_arg2 = config.bt_interference_low_ul;
