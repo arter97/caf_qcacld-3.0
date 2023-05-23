@@ -4128,9 +4128,23 @@ policy_mgr_get_link_in_progress(struct policy_mgr_psoc_priv_obj *pm_ctx)
 	qdf_mutex_acquire(&pm_ctx->qdf_conc_list_lock);
 	value = pm_ctx->set_link_in_progress;
 	qdf_mutex_release(&pm_ctx->qdf_conc_list_lock);
+	if (value)
+		policy_mgr_debug("set_link_in_progress %d", value);
 
-	policy_mgr_debug("set_link_in_progress %d", value);
 	return value;
+}
+
+bool policy_mgr_is_set_link_in_progress(struct wlan_objmgr_psoc *psoc)
+{
+	struct policy_mgr_psoc_priv_obj *pm_ctx;
+
+	pm_ctx = policy_mgr_get_context(psoc);
+	if (!pm_ctx) {
+		policy_mgr_err("Invalid Context");
+		return false;
+	}
+
+	return policy_mgr_get_link_in_progress(pm_ctx);
 }
 
 /*
@@ -4363,6 +4377,10 @@ policy_mgr_handle_link_enable_disable_resp(struct wlan_objmgr_vdev *vdev,
 complete_evnt:
 	policy_mgr_set_link_in_progress(pm_ctx, false);
 	qdf_mutex_release(&pm_ctx->qdf_conc_list_lock);
+
+	/* reschedule force scc workqueue after link state changes */
+	if (req && resp && !resp->status)
+		policy_mgr_check_concurrent_intf_and_restart_sap(psoc, false);
 }
 
 #else

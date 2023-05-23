@@ -2451,6 +2451,13 @@ static void __policy_mgr_check_sta_ap_concurrent_ch_intf(
 				       SAP_CONC_CHECK_DEFER_TIMEOUT_MS);
 		goto end;
 	}
+	if (policy_mgr_is_set_link_in_progress(pm_ctx->psoc)) {
+		policy_mgr_debug("defer sap conc check to a later time due to ml sta set link in progress");
+		qdf_delayed_work_start(&pm_ctx->sta_ap_intf_check_work,
+				       SAP_CONC_CHECK_DEFER_TIMEOUT_MS);
+		goto end;
+	}
+
 	if (pm_ctx->hdd_cbacks.hdd_is_chan_switch_in_progress &&
 	    pm_ctx->hdd_cbacks.hdd_is_chan_switch_in_progress()) {
 		policy_mgr_debug("wait as channel switch is already in progress");

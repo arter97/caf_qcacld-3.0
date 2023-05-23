@@ -1215,6 +1215,14 @@ policy_mgr_ml_link_vdev_need_to_be_disabled(struct wlan_objmgr_psoc *psoc,
 					    struct wlan_objmgr_vdev *vdev);
 
 /**
+ * policy_mgr_is_set_link_in_progress() - Check set link in progress or not
+ * @psoc: psoc pointer
+ *
+ * Return: true if set link in progress
+ */
+bool policy_mgr_is_set_link_in_progress(struct wlan_objmgr_psoc *psoc);
+
+/**
  * policy_mgr_wait_for_set_link_update() - Wait for set/clear link response
  * @psoc: psoc pointer
  *
@@ -1250,6 +1258,12 @@ static inline void
 policy_mgr_move_vdev_from_connection_to_disabled_tbl(
 						struct wlan_objmgr_psoc *psoc,
 						uint8_t vdev_id) {}
+
+static inline bool
+policy_mgr_is_set_link_in_progress(struct wlan_objmgr_psoc *psoc)
+{
+	return false;
+}
 
 static inline QDF_STATUS
 policy_mgr_wait_for_set_link_update(struct wlan_objmgr_psoc *psoc)
