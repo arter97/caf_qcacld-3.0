@@ -414,7 +414,7 @@ QDF_STATUS wlan_cm_sta_set_chan_param(struct wlan_objmgr_vdev *vdev,
 	qdf_freq_t center_freq_320 = 0;
 	qdf_freq_t center_freq_40 = 0;
 	uint8_t band_mask;
-	uint16_t new_punc;
+	uint16_t new_punc = 0;
 
 	if (!vdev || !chan_param) {
 		mlme_err("invalid input parameters");
