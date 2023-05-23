@@ -3178,7 +3178,7 @@ dp_tx_stats_update(struct dp_pdev *pdev, struct dp_peer *peer,
 		   struct cdp_tx_completion_ppdu_user *ppdu,
 		   struct cdp_tx_completion_ppdu *ppdu_desc)
 {
-	uint8_t preamble, mcs;
+	uint8_t preamble, mcs, res_mcs = 0;
 	uint16_t num_msdu;
 	uint16_t num_mpdu;
 	uint16_t mpdu_tried;
@@ -3189,6 +3189,7 @@ dp_tx_stats_update(struct dp_pdev *pdev, struct dp_peer *peer,
 	uint32_t ratekbps = 0;
 	uint64_t tx_byte_count;
 	uint8_t idx = 0;
+	bool is_preamble_valid = true;
 
 	preamble = ppdu->preamble;
 	mcs = ppdu->mcs;
@@ -3293,36 +3294,29 @@ dp_tx_stats_update(struct dp_pdev *pdev, struct dp_peer *peer,
 			     tx_byte_count);
 	}
 
+	switch (preamble) {
+	case DOT11_A:
+		res_mcs = (mcs < MAX_MCS_11A) ? mcs : (MAX_MCS - 1);
+	break;
+	case DOT11_B:
+		res_mcs = (mcs < MAX_MCS_11B) ? mcs : (MAX_MCS - 1);
+	break;
+	case DOT11_N:
+		res_mcs = (mcs < MAX_MCS_11N) ? mcs : (MAX_MCS - 1);
+	break;
+	case DOT11_AC:
+		res_mcs = (mcs < MAX_MCS_11AC) ? mcs : (MAX_MCS - 1);
+	break;
+	case DOT11_AX:
+		res_mcs = (mcs < MAX_MCS_11AX) ? mcs : (MAX_MCS - 1);
+	break;
+	default:
+		is_preamble_valid = false;
+	}
+
 	DP_STATS_INCC(mon_peer,
-		      tx.pkt_type[preamble].mcs_count[MAX_MCS - 1], num_msdu,
-		      ((mcs >= MAX_MCS_11A) && (preamble == DOT11_A)));
-	DP_STATS_INCC(mon_peer,
-		      tx.pkt_type[preamble].mcs_count[mcs], num_msdu,
-		      ((mcs < MAX_MCS_11A) && (preamble == DOT11_A)));
-	DP_STATS_INCC(mon_peer,
-		      tx.pkt_type[preamble].mcs_count[MAX_MCS - 1], num_msdu,
-		      ((mcs >= MAX_MCS_11B) && (preamble == DOT11_B)));
-	DP_STATS_INCC(mon_peer,
-		      tx.pkt_type[preamble].mcs_count[mcs], num_msdu,
-		      ((mcs < (MAX_MCS_11B)) && (preamble == DOT11_B)));
-	DP_STATS_INCC(mon_peer,
-		      tx.pkt_type[preamble].mcs_count[MAX_MCS - 1], num_msdu,
-		      ((mcs >= MAX_MCS_11A) && (preamble == DOT11_N)));
-	DP_STATS_INCC(mon_peer,
-		      tx.pkt_type[preamble].mcs_count[mcs], num_msdu,
-		      ((mcs < MAX_MCS_11A) && (preamble == DOT11_N)));
-	DP_STATS_INCC(mon_peer,
-		      tx.pkt_type[preamble].mcs_count[MAX_MCS - 1], num_msdu,
-		      ((mcs >= MAX_MCS_11AC) && (preamble == DOT11_AC)));
-	DP_STATS_INCC(mon_peer,
-		      tx.pkt_type[preamble].mcs_count[mcs], num_msdu,
-		      ((mcs < MAX_MCS_11AC) && (preamble == DOT11_AC)));
-	DP_STATS_INCC(mon_peer,
-		      tx.pkt_type[preamble].mcs_count[MAX_MCS - 1], num_msdu,
-		      ((mcs >= MAX_MCS_11AX) && (preamble == DOT11_AX)));
-	DP_STATS_INCC(mon_peer,
-		      tx.pkt_type[preamble].mcs_count[mcs], num_msdu,
-		      ((mcs < MAX_MCS_11AX) && (preamble == DOT11_AX)));
+		      tx.pkt_type[preamble].mcs_count[res_mcs], num_msdu,
+		      is_preamble_valid);
 	DP_STATS_INCC(mon_peer, tx.ampdu_cnt, num_mpdu, ppdu->is_ampdu);
 	DP_STATS_INCC(mon_peer, tx.non_ampdu_cnt, num_mpdu, !(ppdu->is_ampdu));
 	DP_STATS_INCC(mon_peer, tx.pream_punct_cnt, 1, ppdu->pream_punct);

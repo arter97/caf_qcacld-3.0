@@ -275,7 +275,7 @@ void
 dp_mon_tx_stats_update_2_0(struct dp_mon_peer *mon_peer,
 			   struct cdp_tx_completion_ppdu_user *ppdu)
 {
-	uint8_t preamble, mcs, punc_mode;
+	uint8_t preamble, mcs, punc_mode, res_mcs;
 
 	preamble = ppdu->preamble;
 	mcs = ppdu->mcs;
@@ -285,42 +285,23 @@ dp_mon_tx_stats_update_2_0(struct dp_mon_peer *mon_peer,
 	ppdu->punc_mode = punc_mode;
 
 	DP_STATS_INC(mon_peer, tx.punc_bw[punc_mode], ppdu->num_msdu);
-	DP_STATS_INCC(mon_peer,
-		      tx.pkt_type[preamble].mcs_count[MAX_MCS - 1],
-		      ppdu->num_msdu,
-		      ((mcs >= MAX_MCS_11BE) && (preamble == DOT11_BE)));
-	DP_STATS_INCC(mon_peer,
-		      tx.pkt_type[preamble].mcs_count[mcs],
-		      ppdu->num_msdu,
-		      ((mcs < MAX_MCS_11BE) && (preamble == DOT11_BE)));
-	DP_STATS_INCC(mon_peer,
-		      tx.su_be_ppdu_cnt.mcs_count[MAX_MCS - 1], 1,
-		      ((mcs >= MAX_MCS_11BE) && (preamble == DOT11_BE) &&
-		      (ppdu->ppdu_type == HTT_PPDU_STATS_PPDU_TYPE_SU)));
-	DP_STATS_INCC(mon_peer,
-		      tx.su_be_ppdu_cnt.mcs_count[mcs], 1,
-		      ((mcs < MAX_MCS_11BE) && (preamble == DOT11_BE) &&
-		      (ppdu->ppdu_type == HTT_PPDU_STATS_PPDU_TYPE_SU)));
-	DP_STATS_INCC(mon_peer,
-		      tx.mu_be_ppdu_cnt[TXRX_TYPE_MU_OFDMA].mcs_count[MAX_MCS - 1],
-		      1, ((mcs >= MAX_MCS_11BE) &&
-		      (preamble == DOT11_BE) &&
-		      (ppdu->ppdu_type == HTT_PPDU_STATS_PPDU_TYPE_MU_OFDMA)));
-	DP_STATS_INCC(mon_peer,
-		      tx.mu_be_ppdu_cnt[TXRX_TYPE_MU_OFDMA].mcs_count[mcs],
-		      1, ((mcs < MAX_MCS_11BE) &&
-		      (preamble == DOT11_BE) &&
-		      (ppdu->ppdu_type == HTT_PPDU_STATS_PPDU_TYPE_MU_OFDMA)));
-	DP_STATS_INCC(mon_peer,
-		      tx.mu_be_ppdu_cnt[TXRX_TYPE_MU_MIMO].mcs_count[MAX_MCS - 1],
-		      1, ((mcs >= MAX_MCS_11BE) &&
-		      (preamble == DOT11_BE) &&
-		      (ppdu->ppdu_type == HTT_PPDU_STATS_PPDU_TYPE_MU_MIMO)));
-	DP_STATS_INCC(mon_peer,
-		      tx.mu_be_ppdu_cnt[TXRX_TYPE_MU_MIMO].mcs_count[mcs],
-		      1, ((mcs < MAX_MCS_11BE) &&
-		      (preamble == DOT11_BE) &&
-		      (ppdu->ppdu_type == HTT_PPDU_STATS_PPDU_TYPE_MU_MIMO)));
+
+	if (preamble == DOT11_BE) {
+		res_mcs = (mcs < MAX_MCS_11BE) ? mcs : (MAX_MCS - 1);
+
+		DP_STATS_INC(mon_peer,
+			     tx.pkt_type[preamble].mcs_count[res_mcs],
+			     ppdu->num_msdu);
+		DP_STATS_INCC(mon_peer,
+			      tx.su_be_ppdu_cnt.mcs_count[res_mcs], 1,
+			      (ppdu->ppdu_type == HTT_PPDU_STATS_PPDU_TYPE_SU));
+		DP_STATS_INCC(mon_peer,
+			      tx.mu_be_ppdu_cnt[TXRX_TYPE_MU_OFDMA].mcs_count[res_mcs],
+			      1, (ppdu->ppdu_type == HTT_PPDU_STATS_PPDU_TYPE_MU_OFDMA));
+		DP_STATS_INCC(mon_peer,
+			      tx.mu_be_ppdu_cnt[TXRX_TYPE_MU_MIMO].mcs_count[res_mcs],
+			      1, (ppdu->ppdu_type == HTT_PPDU_STATS_PPDU_TYPE_MU_MIMO));
+	}
 }
 
 enum cdp_punctured_modes

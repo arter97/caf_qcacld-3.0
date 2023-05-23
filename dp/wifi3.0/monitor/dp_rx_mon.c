@@ -930,7 +930,7 @@ static void dp_rx_stats_update(struct dp_pdev *pdev,
 			       struct cdp_rx_indication_ppdu *ppdu)
 {
 	struct dp_soc *soc = NULL;
-	uint8_t mcs, preamble, ac = 0, nss, ppdu_type;
+	uint8_t mcs, preamble, ac = 0, nss, ppdu_type, res_mcs = 0;
 	uint32_t num_msdu;
 	uint8_t pkt_bw_offset;
 	struct dp_peer *peer;
@@ -941,6 +941,7 @@ static void dp_rx_stats_update(struct dp_pdev *pdev,
 	struct dp_mon_ops *mon_ops;
 	struct dp_mon_pdev *mon_pdev = NULL;
 	uint64_t byte_count;
+	bool is_preamble_valid = true;
 
 	if (qdf_likely(pdev))
 		soc = pdev->soc;
@@ -1043,64 +1044,42 @@ static void dp_rx_stats_update(struct dp_pdev *pdev,
 		DP_STATS_INCC(mon_peer, rx.non_ampdu_cnt, num_msdu,
 			      !(ppdu_user->is_ampdu));
 		DP_STATS_UPD(mon_peer, rx.rx_rate, mcs);
+
+		switch (preamble) {
+		case DOT11_A:
+			res_mcs = (mcs < MAX_MCS_11A) ? mcs : (MAX_MCS - 1);
+		break;
+		case DOT11_B:
+			res_mcs = (mcs < MAX_MCS_11B) ? mcs : (MAX_MCS - 1);
+		break;
+		case DOT11_N:
+			res_mcs = (mcs < MAX_MCS_11N) ? mcs : (MAX_MCS - 1);
+		break;
+		case DOT11_AC:
+			res_mcs = (mcs < MAX_MCS_11AC) ? mcs : (MAX_MCS - 1);
+		break;
+		case DOT11_AX:
+			res_mcs = (mcs < MAX_MCS_11AX) ? mcs : (MAX_MCS - 1);
+		break;
+		default:
+			is_preamble_valid = false;
+		}
+
 		DP_STATS_INCC(mon_peer,
-			rx.pkt_type[preamble].mcs_count[MAX_MCS - 1], num_msdu,
-			((mcs >= MAX_MCS_11A) && (preamble == DOT11_A)));
-		DP_STATS_INCC(mon_peer,
-			rx.pkt_type[preamble].mcs_count[mcs], num_msdu,
-			((mcs < MAX_MCS_11A) && (preamble == DOT11_A)));
-		DP_STATS_INCC(mon_peer,
-			rx.pkt_type[preamble].mcs_count[MAX_MCS - 1], num_msdu,
-			((mcs >= MAX_MCS_11B) && (preamble == DOT11_B)));
-		DP_STATS_INCC(mon_peer,
-			rx.pkt_type[preamble].mcs_count[mcs], num_msdu,
-			((mcs < MAX_MCS_11B) && (preamble == DOT11_B)));
-		DP_STATS_INCC(mon_peer,
-			rx.pkt_type[preamble].mcs_count[MAX_MCS - 1], num_msdu,
-			((mcs >= MAX_MCS_11A) && (preamble == DOT11_N)));
-		DP_STATS_INCC(mon_peer,
-			rx.pkt_type[preamble].mcs_count[mcs], num_msdu,
-			((mcs < MAX_MCS_11A) && (preamble == DOT11_N)));
-		DP_STATS_INCC(mon_peer,
-			rx.pkt_type[preamble].mcs_count[MAX_MCS - 1], num_msdu,
-			((mcs >= MAX_MCS_11AC) && (preamble == DOT11_AC)));
-		DP_STATS_INCC(mon_peer,
-			rx.pkt_type[preamble].mcs_count[mcs], num_msdu,
-			((mcs < MAX_MCS_11AC) && (preamble == DOT11_AC)));
-		DP_STATS_INCC(mon_peer,
-			rx.pkt_type[preamble].mcs_count[MAX_MCS - 1], num_msdu,
-			((mcs >= (MAX_MCS_11AX)) && (preamble == DOT11_AX)));
-		DP_STATS_INCC(mon_peer,
-			rx.pkt_type[preamble].mcs_count[mcs], num_msdu,
-			((mcs < (MAX_MCS_11AX)) && (preamble == DOT11_AX)));
-		DP_STATS_INCC(mon_peer,
-			rx.su_ax_ppdu_cnt.mcs_count[MAX_MCS - 1], 1,
-			((mcs >= (MAX_MCS_11AX)) && (preamble == DOT11_AX) &&
-			(ppdu_type == HAL_RX_TYPE_SU)));
-		DP_STATS_INCC(mon_peer,
-			rx.su_ax_ppdu_cnt.mcs_count[mcs], 1,
-			((mcs < (MAX_MCS_11AX)) && (preamble == DOT11_AX) &&
-			(ppdu_type == HAL_RX_TYPE_SU)));
-		DP_STATS_INCC(mon_peer,
-			rx.rx_mu[TXRX_TYPE_MU_OFDMA].ppdu.mcs_count[MAX_MCS - 1],
-			1, ((mcs >= (MAX_MCS_11AX)) &&
-			(preamble == DOT11_AX) &&
-			(ppdu_type == HAL_RX_TYPE_MU_OFDMA)));
-		DP_STATS_INCC(mon_peer,
-			rx.rx_mu[TXRX_TYPE_MU_OFDMA].ppdu.mcs_count[mcs],
-			1, ((mcs < (MAX_MCS_11AX)) &&
-			(preamble == DOT11_AX) &&
-			(ppdu_type == HAL_RX_TYPE_MU_OFDMA)));
-		DP_STATS_INCC(mon_peer,
-			rx.rx_mu[TXRX_TYPE_MU_MIMO].ppdu.mcs_count[MAX_MCS - 1],
-			1, ((mcs >= (MAX_MCS_11AX)) &&
-			(preamble == DOT11_AX) &&
-			(ppdu_type == HAL_RX_TYPE_MU_MIMO)));
-		DP_STATS_INCC(mon_peer,
-			rx.rx_mu[TXRX_TYPE_MU_MIMO].ppdu.mcs_count[mcs],
-			1, ((mcs < (MAX_MCS_11AX)) &&
-			(preamble == DOT11_AX) &&
-			(ppdu_type == HAL_RX_TYPE_MU_MIMO)));
+			      rx.pkt_type[preamble].mcs_count[res_mcs], num_msdu,
+			      is_preamble_valid);
+
+		if (preamble == DOT11_AX) {
+			DP_STATS_INCC(mon_peer,
+				      rx.su_ax_ppdu_cnt.mcs_count[res_mcs], 1,
+				      (ppdu_type == HAL_RX_TYPE_SU));
+			DP_STATS_INCC(mon_peer,
+				      rx.rx_mu[TXRX_TYPE_MU_OFDMA].ppdu.mcs_count[res_mcs],
+				      1, (ppdu_type == HAL_RX_TYPE_MU_OFDMA));
+			DP_STATS_INCC(mon_peer,
+				      rx.rx_mu[TXRX_TYPE_MU_MIMO].ppdu.mcs_count[res_mcs],
+				      1, (ppdu_type == HAL_RX_TYPE_MU_MIMO));
+		}
 
 		/*
 		 * If invalid TID, it could be a non-qos frame, hence do not
