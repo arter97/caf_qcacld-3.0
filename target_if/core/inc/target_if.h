@@ -2513,6 +2513,38 @@ static inline int32_t target_psoc_get_num_hw_modes
 	return tgt_hdl->info.service_ext_param.num_hw_modes;
 }
 
+#ifdef WLAN_FEATURE_11BE_MLO
+static inline
+uint32_t target_psoc_get_num_max_mlo_link(struct target_psoc_info *tgt_hdl)
+{
+	if (!tgt_hdl)
+		return 0;
+
+	return tgt_hdl->info.service_ext2_param.num_max_mlo_link_per_ml_bss_supp;
+}
+
+static inline
+uint16_t target_if_res_cfg_get_num_max_mlo_link(struct target_psoc_info *tgt_hdl)
+{
+	if (!tgt_hdl)
+		return 0;
+
+	return tgt_hdl->info.wlan_res_cfg.num_max_mlo_link_per_ml_bss;
+}
+#else
+static inline
+uint32_t target_psoc_get_num_max_mlo_link(struct target_psoc_info *tgt_hdl)
+{
+	return 0;
+}
+
+static inline
+uint16_t target_if_res_cfg_get_num_max_mlo_link(struct target_psoc_info *tgt_hdl)
+{
+	return 0;
+}
+#endif
+
 #ifdef WLAN_SUPPORT_TWT
 #ifdef WLAN_TWT_AP_PDEV_COUNT_NUM_PHY
 static inline void target_if_set_twt_ap_pdev_count

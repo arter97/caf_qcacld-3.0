@@ -14349,6 +14349,25 @@ extract_multipass_sap_cap(struct wlan_psoc_host_service_ext2_param *param,
 }
 #endif
 
+#if defined(WLAN_FEATURE_11BE_MLO_ADV_FEATURE)
+static inline void
+extract_num_max_mlo_link(wmi_service_ready_ext2_event_fixed_param *ev,
+			 struct wlan_psoc_host_service_ext2_param *param)
+{
+	param->num_max_mlo_link_per_ml_bss_supp =
+				ev->num_max_mlo_link_per_ml_bss_supp;
+
+	wmi_debug("Firmware Max MLO link support: %d",
+		  param->num_max_mlo_link_per_ml_bss_supp);
+}
+#else
+static inline void
+extract_num_max_mlo_link(wmi_service_ready_ext2_event_fixed_param *ev,
+			 struct wlan_psoc_host_service_ext2_param *param)
+{
+}
+#endif
+
 /**
  * extract_service_ready_ext2_tlv() - extract service ready ext2 params from
  * event
@@ -14426,6 +14445,8 @@ extract_service_ready_ext2_tlv(wmi_unified_t wmi_handle, uint8_t *event,
 	extract_svc_rdy_ext2_afc_tlv(ev, param);
 
 	extract_hw_bdf_status(ev);
+
+	extract_num_max_mlo_link(ev, param);
 
 	return QDF_STATUS_SUCCESS;
 }

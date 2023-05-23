@@ -481,6 +481,7 @@ struct wlan_psoc_host_service_ext_param {
  * @num_msdu_idx_qtype_map: Number of HTT_MSDUQ_INDEX to HTT_MSDU_QTYPE
  *                          mapping
  * @is_multipass_sap: Multipass sap flag
+ * @num_max_mlo_link_per_ml_bss_supp: max link number per MLD FW supports.
  */
 struct wlan_psoc_host_service_ext2_param {
 	uint8_t reg_db_version_major;
@@ -514,6 +515,7 @@ struct wlan_psoc_host_service_ext2_param {
 #ifdef QCA_MULTIPASS_SUPPORT
 	bool is_multipass_sap;
 #endif
+	uint32_t num_max_mlo_link_per_ml_bss_supp;
 };
 
 #endif /* _SERVICE_READY_PARAM_H_*/
