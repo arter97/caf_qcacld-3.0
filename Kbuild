@@ -4601,6 +4601,13 @@ CONFIG_WLAN_MAX_MLD ?= 1
 endif
 ccflags-y += -DWLAN_MAX_MLD=$(CONFIG_WLAN_MAX_MLD)
 
+ifdef CONFIG_WLAN_FEATURE_11BE_MLO
+CONFIG_WLAN_MAX_ML_DEFAULT_LINK ?= 2
+else
+CONFIG_WLAN_MAX_ML_DEFAULT_LINK  ?= 1
+endif
+ccflags-y += -DWLAN_MAX_ML_DEFAULT_LINK=$(CONFIG_WLAN_MAX_ML_DEFAULT_LINK)
+
 #Maximum pending commands for a vdev is calculated in vdev create handler
 #by WLAN_SER_MAX_PENDING_CMDS/WLAN_SER_MAX_VDEVS. For SAP case, we will need
 #to accommodate 32 Pending commands to handle multiple STA sending

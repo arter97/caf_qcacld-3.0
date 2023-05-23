@@ -5115,10 +5115,25 @@ wma_get_tdls_mlo_support(struct wmi_unified *wmi_handle,
 		wmi_service_enabled(wmi_handle,
 				    wmi_service_tdls_mlo_support);
 }
+
+static inline void
+wma_get_n_link_mlo_support(struct wmi_unified *wmi_handle,
+			   struct wma_tgt_services *cfg)
+{
+	cfg->en_n_link_mlo_support =
+		wmi_service_enabled(wmi_handle,
+				    wmi_service_n_link_mlo_support);
+}
 #else
 static inline void
 wma_get_tdls_mlo_support(struct wmi_unified *wmi_handle,
 			 struct wma_tgt_services *cfg)
+{
+}
+
+static inline void
+wma_get_n_link_mlo_support(struct wmi_unified *wmi_handle,
+			   struct wma_tgt_services *cfg)
 {
 }
 #endif /* WLAN_FEATURE_11BE */
@@ -5167,6 +5182,11 @@ wma_get_tdls_mlo_support(struct wmi_unified *wmi_handle,
 			 struct wma_tgt_services *cfg)
 {
 }
+
+static inline void
+wma_get_n_link_mlo_support(struct wmi_unified *wmi_handle,
+			   struct wma_tgt_services *cfg)
+{}
 
 static inline void
 wma_get_tdls_ax_support(struct wmi_unified *wmi_handle,
@@ -5381,6 +5401,7 @@ static inline void wma_update_target_services(struct wmi_unified *wmi_handle,
 	wma_get_tdls_wideband_support(wmi_handle, cfg);
 	wma_get_dynamic_vdev_macaddr_support(wmi_handle, cfg);
 	wma_get_service_cap_per_link_mlo_stats(wmi_handle, cfg);
+	wma_get_n_link_mlo_support(wmi_handle, cfg);
 }
 
 /**

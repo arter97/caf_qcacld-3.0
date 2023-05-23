@@ -1175,6 +1175,25 @@ QDF_STATUS mlme_update_tgt_eht_caps_in_cfg(struct wlan_objmgr_psoc *psoc,
 	return QDF_STATUS_SUCCESS;
 }
 
+QDF_STATUS mlme_update_tgt_mlo_caps_in_cfg(struct wlan_objmgr_psoc *psoc)
+{
+	struct target_psoc_info *tgt_hdl;
+	QDF_STATUS status;
+	uint16_t value;
+
+	tgt_hdl = wlan_psoc_get_tgt_if_handle(psoc);
+	if (!tgt_hdl) {
+		mlme_debug("target psoc info is NULL");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	value = target_if_res_cfg_get_num_max_mlo_link(tgt_hdl);
+	status = wlan_mlme_set_sta_mlo_conn_max_num(psoc, value);
+	mlme_debug("Max ML link supported: %d", value);
+
+	return status;
+}
+
 enum phy_ch_width wlan_mlme_convert_eht_op_bw_to_phy_ch_width(
 						uint8_t channel_width)
 {

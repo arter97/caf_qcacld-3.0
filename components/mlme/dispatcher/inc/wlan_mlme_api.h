@@ -1141,6 +1141,16 @@ QDF_STATUS mlme_update_tgt_eht_caps_in_cfg(struct wlan_objmgr_psoc *psoc,
 					  struct wma_tgt_cfg *cfg);
 
 /**
+ * mlme_update_tgt_mlo_caps_in_cfg() - Update tgt MLO cap in mlme component
+ * @psoc: pointer to psoc object
+ *
+ * This api to be used by callers to update MLO caps in mlme.
+ *
+ * Return: QDF_STATUS_SUCCESS or QDF_STATUS_FAILURE
+ */
+QDF_STATUS mlme_update_tgt_mlo_caps_in_cfg(struct wlan_objmgr_psoc *psoc);
+
+/**
  * wlan_mlme_convert_eht_op_bw_to_phy_ch_width() - convert channel width in eht
  *                                                 operation IE to phy_ch_width
  * @channel_width: channel width in eht operation IE
