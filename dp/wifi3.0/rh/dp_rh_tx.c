@@ -699,7 +699,7 @@ void dp_tx_compl_handler_rh(struct dp_soc *soc, qdf_nbuf_t htt_msg)
 					   tx_desc->id);
 			tx_desc->flags |= DP_TX_DESC_FLAG_TX_COMP_ERR;
 			dp_tx_comp_free_buf(soc, tx_desc, false);
-			dp_tx_desc_release(tx_desc, tx_desc->pool_id);
+			dp_tx_desc_release(soc, tx_desc, tx_desc->pool_id);
 			goto next_msdu;
 		}
 
