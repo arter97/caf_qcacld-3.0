@@ -4772,8 +4772,10 @@ dp_ppdu_desc_user_stats_update(struct dp_pdev *pdev,
 	}
 	qdf_assert_always(ppdu_desc->num_users <= ppdu_desc->max_users);
 
-	dp_ppdu_desc_get_txmode(ppdu_desc);
-	dp_pdev_update_deter_stats(pdev, ppdu_desc);
+	if (wlan_cfg_get_sawf_stats_config(pdev->soc->wlan_cfg_ctx)) {
+		dp_ppdu_desc_get_txmode(ppdu_desc);
+		dp_pdev_update_deter_stats(pdev, ppdu_desc);
+	}
 
 	for (i = 0; i < num_users; i++) {
 		ppdu_desc->num_mpdu += ppdu_desc->user[i].num_mpdu;
@@ -4796,8 +4798,12 @@ dp_ppdu_desc_user_stats_update(struct dp_pdev *pdev,
 
 		dp_tx_ctrl_stats_update(pdev, peer, &ppdu_desc->user[i]);
 
-		dp_ppdu_desc_user_deter_stats_update(pdev, peer, ppdu_desc,
-						     &ppdu_desc->user[i]);
+		if (wlan_cfg_get_sawf_stats_config(pdev->soc->wlan_cfg_ctx)) {
+			dp_ppdu_desc_user_deter_stats_update(pdev,
+							     peer,
+							     ppdu_desc,
+							     &ppdu_desc->user[i]);
+		}
 
 		/*
 		 * different frame like DATA, BAR or CTRL has different

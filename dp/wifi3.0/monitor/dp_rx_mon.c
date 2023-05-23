@@ -1137,7 +1137,11 @@ static void dp_rx_stats_update(struct dp_pdev *pdev,
 		dp_send_stats_event(pdev, peer, ppdu_user->peer_id);
 
 		dp_ppdu_desc_user_rx_time_update(pdev, peer, ppdu, ppdu_user);
-		dp_rx_mon_update_user_deter_stats(pdev, peer, ppdu, ppdu_user);
+
+		if (wlan_cfg_get_sawf_stats_config(pdev->soc->wlan_cfg_ctx))
+			dp_rx_mon_update_user_deter_stats(pdev, peer,
+							  ppdu, ppdu_user);
+
 		dp_peer_unref_delete(peer, DP_MOD_ID_RX_PPDU_STATS);
 	}
 }
@@ -1224,8 +1228,12 @@ dp_rx_handle_ppdu_stats(struct dp_soc *soc, struct dp_pdev *pdev,
 		if (!qdf_unlikely(qdf_nbuf_put_tail(ppdu_nbuf,
 				       sizeof(struct cdp_rx_indication_ppdu))))
 			return;
-		if (cdp_rx_ppdu->u.ppdu_type == HAL_RX_TYPE_SU)
-			dp_rx_mon_update_pdev_deter_stats(pdev, cdp_rx_ppdu);
+
+		if (wlan_cfg_get_sawf_stats_config(pdev->soc->wlan_cfg_ctx)) {
+			if (cdp_rx_ppdu->u.ppdu_type == HAL_RX_TYPE_SU)
+				dp_rx_mon_update_pdev_deter_stats(pdev,
+								  cdp_rx_ppdu);
+		}
 
 		dp_rx_stats_update(pdev, cdp_rx_ppdu);
 

@@ -3813,6 +3813,8 @@ uint8_t wlan_cfg_get_sawf_stats_config(struct wlan_cfg_dp_soc_ctxt *cfg)
 	return cfg->sawf_stats;
 }
 
+qdf_export_symbol(wlan_cfg_get_sawf_stats_config);
+
 void wlan_cfg_set_sawf_stats_config(struct wlan_cfg_dp_soc_ctxt *cfg,
 				    uint8_t val)
 {
@@ -3829,6 +3831,8 @@ uint8_t wlan_cfg_get_sawf_stats_config(struct wlan_cfg_dp_soc_ctxt *cfg)
 {
 	return 0;
 }
+
+qdf_export_symbol(wlan_cfg_get_sawf_stats_config);
 
 void wlan_cfg_set_sawf_stats_config(struct wlan_cfg_dp_soc_ctxt *cfg,
 				    uint8_t val)
