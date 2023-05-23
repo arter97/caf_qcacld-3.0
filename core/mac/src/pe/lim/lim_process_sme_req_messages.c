@@ -1702,6 +1702,80 @@ lim_update_he_caps_htc(struct pe_session *session,  bool val)
 static void
 lim_update_eht_caps_mcs(struct mac_context *mac, struct pe_session *session)
 {
+	uint8_t tx_nss = 0;
+	uint8_t rx_nss = 0;
+	struct wlan_objmgr_vdev *vdev = session->vdev;
+	struct mlme_legacy_priv *mlme_priv;
+	struct wlan_mlme_cfg *mlme_cfg = mac->mlme_cfg;
+	tDot11fIEeht_cap *dot11_eht_cap;
+	tDot11fIEeht_cap *eht_config;
+
+	mlme_priv = wlan_vdev_mlme_get_ext_hdl(vdev);
+	if (!mlme_priv)
+		return;
+
+	eht_config = &mlme_priv->eht_config;
+	dot11_eht_cap = &mlme_cfg->eht_caps.dot11_eht_cap;
+
+	if (session->nss == 1) {
+		tx_nss = 1;
+		rx_nss = 1;
+	} else {
+		tx_nss = dot11_eht_cap->bw_20_tx_max_nss_for_mcs_0_to_7;
+		rx_nss = dot11_eht_cap->bw_20_rx_max_nss_for_mcs_0_to_7;
+	}
+
+	if (!tx_nss || tx_nss > 2 || !rx_nss || rx_nss > 2) {
+		pe_err("invalid Nss values tx_nss: %u rx_nss: %u",
+		       tx_nss, rx_nss);
+		return;
+	}
+
+	pe_debug("tx_nss: %u rx_nss: %u", tx_nss, rx_nss);
+
+	eht_config->bw_20_rx_max_nss_for_mcs_0_to_7 = rx_nss;
+	eht_config->bw_20_tx_max_nss_for_mcs_0_to_7 = tx_nss;
+	eht_config->bw_20_rx_max_nss_for_mcs_8_and_9 = rx_nss;
+	eht_config->bw_20_tx_max_nss_for_mcs_8_and_9 = tx_nss;
+	if (dot11_eht_cap->bw_20_rx_max_nss_for_mcs_10_and_11) {
+		eht_config->bw_20_rx_max_nss_for_mcs_10_and_11 = rx_nss;
+		eht_config->bw_20_tx_max_nss_for_mcs_10_and_11 = tx_nss;
+	}
+	if (dot11_eht_cap->bw_20_rx_max_nss_for_mcs_12_and_13) {
+		eht_config->bw_20_rx_max_nss_for_mcs_12_and_13 = rx_nss;
+		eht_config->bw_20_tx_max_nss_for_mcs_12_and_13 = tx_nss;
+	}
+	eht_config->bw_le_80_rx_max_nss_for_mcs_0_to_9 = rx_nss;
+	eht_config->bw_le_80_tx_max_nss_for_mcs_0_to_9 = tx_nss;
+	if (dot11_eht_cap->bw_le_80_rx_max_nss_for_mcs_10_and_11) {
+		eht_config->bw_le_80_rx_max_nss_for_mcs_10_and_11 = rx_nss;
+		eht_config->bw_le_80_tx_max_nss_for_mcs_10_and_11 = tx_nss;
+	}
+	if (dot11_eht_cap->bw_le_80_rx_max_nss_for_mcs_12_and_13) {
+		eht_config->bw_le_80_rx_max_nss_for_mcs_12_and_13 = rx_nss;
+		eht_config->bw_le_80_tx_max_nss_for_mcs_12_and_13 = tx_nss;
+	}
+	eht_config->bw_160_rx_max_nss_for_mcs_0_to_9 = rx_nss;
+	eht_config->bw_160_tx_max_nss_for_mcs_0_to_9 = tx_nss;
+	if (dot11_eht_cap->bw_160_rx_max_nss_for_mcs_10_and_11) {
+		eht_config->bw_160_rx_max_nss_for_mcs_10_and_11 = rx_nss;
+		eht_config->bw_160_tx_max_nss_for_mcs_10_and_11 = tx_nss;
+	}
+	if (dot11_eht_cap->bw_160_rx_max_nss_for_mcs_12_and_13) {
+		eht_config->bw_160_rx_max_nss_for_mcs_12_and_13 = rx_nss;
+		eht_config->bw_160_tx_max_nss_for_mcs_12_and_13 = tx_nss;
+	}
+	eht_config->bw_320_rx_max_nss_for_mcs_0_to_9 = rx_nss;
+	eht_config->bw_320_tx_max_nss_for_mcs_0_to_9 = tx_nss;
+
+	if (dot11_eht_cap->bw_320_rx_max_nss_for_mcs_10_and_11) {
+		eht_config->bw_320_rx_max_nss_for_mcs_10_and_11 = rx_nss;
+		eht_config->bw_320_tx_max_nss_for_mcs_10_and_11 = tx_nss;
+	}
+	if (dot11_eht_cap->bw_320_rx_max_nss_for_mcs_12_and_13) {
+		eht_config->bw_320_rx_max_nss_for_mcs_12_and_13 = rx_nss;
+		eht_config->bw_320_tx_max_nss_for_mcs_12_and_13 = tx_nss;
+	}
 }
 #else
 static void
