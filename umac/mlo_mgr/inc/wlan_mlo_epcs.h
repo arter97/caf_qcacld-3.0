@@ -53,7 +53,7 @@ enum wlan_epcs_category {
 struct wlan_epcs_info {
 	enum wlan_epcs_category cat;
 	uint8_t dialog_token;
-	uint8_t status;
+	uint16_t status;
 };
 
 /**
@@ -93,7 +93,7 @@ struct epcs_frm {
 			uint8_t bytes[0];
 		} req;
 		struct {
-			uint8_t status_code;
+			uint8_t status_code[2];
 			uint8_t bytes[0];
 		} resp;
 	};
