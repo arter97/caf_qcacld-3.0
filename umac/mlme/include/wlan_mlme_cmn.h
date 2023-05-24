@@ -101,6 +101,8 @@
  * @psoc: psoc pointer
  * @rsp: vendor handoff response pointer
  * @vendor_handoff_context: vendor handoff context
+ *
+ * @mlme_cm_perfd_reset_cpufreq_ctrl_cb: callback to reset CPU min freq
  */
 struct mlme_cm_ops {
 	QDF_STATUS (*mlme_cm_connect_complete_cb)(
@@ -154,6 +156,9 @@ struct mlme_cm_ops {
 	QDF_STATUS (*mlme_cm_get_vendor_handoff_params_cb)(
 				struct wlan_objmgr_psoc *psoc,
 				void *vendor_handoff_context);
+#endif
+#ifdef WLAN_BOOST_CPU_FREQ_IN_ROAM
+	void (*mlme_cm_perfd_reset_cpufreq_ctrl_cb)(void);
 #endif
 };
 
@@ -1361,4 +1366,21 @@ void mlme_vdev_reconfig_timer_cb(void *arg);
  * Return: True if reassoc on mlo reconfig link add ie enable
  */
 bool mlme_mlo_is_reconfig_reassoc_enable(struct wlan_objmgr_psoc *psoc);
+
+#ifdef WLAN_BOOST_CPU_FREQ_IN_ROAM
+/**
+ * mlme_cm_osif_perfd_reset_cpufreq() - Function to reset CPU freq
+ *
+ * This function is to reset the CPU freq
+ *
+ * Return: None
+ */
+void mlme_cm_osif_perfd_reset_cpufreq(void);
+#else
+static inline
+void mlme_cm_osif_perfd_reset_cpufreq(void)
+{
+}
+#endif
+
 #endif

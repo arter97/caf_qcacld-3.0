@@ -930,3 +930,11 @@ bool mlme_mlo_is_reconfig_reassoc_enable(struct wlan_objmgr_psoc *psoc)
 
 	return mlo_config->reconfig_reassoc_en;
 }
+
+#ifdef WLAN_BOOST_CPU_FREQ_IN_ROAM
+void mlme_cm_osif_perfd_reset_cpufreq(void)
+{
+	if (glbl_cm_ops && glbl_cm_ops->mlme_cm_perfd_reset_cpufreq_ctrl_cb)
+		glbl_cm_ops->mlme_cm_perfd_reset_cpufreq_ctrl_cb();
+}
+#endif
