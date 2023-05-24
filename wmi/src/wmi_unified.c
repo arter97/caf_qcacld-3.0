@@ -42,6 +42,10 @@
 #include "wmi_filtered_logging.h"
 #include <wmi_hang_event.h>
 
+#ifdef DP_UMAC_HW_RESET_SUPPORT
+#include <cdp_txrx_ctrl.h>
+#endif
+
 /* This check for CONFIG_WIN temporary added due to redeclaration compilation
 error in MCL. Error is caused due to inclusion of wmi.h in wmi_unified_api.h
 which gets included here through ol_if_athvar.h. Eventually it is expected that
@@ -2071,6 +2075,42 @@ static inline void wmi_set_system_pm_pkt_tag(uint16_t *htc_tag, wmi_buf_t buf,
 }
 #endif
 
+#ifdef DP_UMAC_HW_RESET_SUPPORT
+/**
+ * wmi_unified_is_max_pending_commands_reached() - API to check if WMI max
+ * pending commands are reached.
+ * @wmi_handle: Pointer to WMI handle
+ *
+ * Return: If umac reset is in progress and max wmi pending commands are reached
+ * then return false. The reason is FW will not reap the WMI commands from CE
+ * ring when umac reset is in progress. Hence, all the pending WMI command to
+ * host SW ring.
+ */
+static inline bool
+wmi_unified_is_max_pending_commands_reached(wmi_unified_t wmi_handle)
+{
+	ol_txrx_soc_handle soc_txrx_handle;
+
+	soc_txrx_handle = (ol_txrx_soc_handle)wlan_psoc_get_dp_handle(
+			wmi_handle->soc->wmi_psoc);
+	if (!soc_txrx_handle) {
+		wmi_err("psoc handle is NULL");
+		return false;
+	}
+
+	return ((qdf_atomic_read(&wmi_handle->pending_cmds) >=
+			wmi_handle->wmi_max_cmds) &&
+		!cdp_umac_reset_is_inprogress(soc_txrx_handle));
+}
+#else
+static inline bool
+wmi_unified_is_max_pending_commands_reached(wmi_unified_t wmi_handle)
+{
+	return (qdf_atomic_read(&wmi_handle->pending_cmds) >=
+			wmi_handle->wmi_max_cmds);
+}
+#endif
+
 QDF_STATUS wmi_unified_cmd_send_fl(wmi_unified_t wmi_handle, wmi_buf_t buf,
 				   uint32_t len, uint32_t cmd_id,
 				   const char *func, uint32_t line)
@@ -2123,8 +2163,7 @@ QDF_STATUS wmi_unified_cmd_send_fl(wmi_unified_t wmi_handle, wmi_buf_t buf,
 	WMI_SET_FIELD(qdf_nbuf_data(buf), WMI_CMD_HDR, COMMANDID, cmd_id);
 
 	qdf_atomic_inc(&wmi_handle->pending_cmds);
-	if (qdf_atomic_read(&wmi_handle->pending_cmds) >=
-			wmi_handle->wmi_max_cmds) {
+	if (wmi_unified_is_max_pending_commands_reached(wmi_handle)) {
 		wmi_dump_last_cmd_rec_info(wmi_handle);
 		wmi_nofl_err("hostcredits = %d",
 			     wmi_get_host_credits(wmi_handle));
