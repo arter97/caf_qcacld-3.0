@@ -22353,6 +22353,7 @@ static void populate_tlv_service(uint32_t *wmi_service)
 	wmi_service[wmi_service_per_link_stats_support] =
 					WMI_SERVICE_PER_LINK_STATS_SUPPORT;
 #endif
+	wmi_service[wmi_service_aux_mac_support] = WMI_SERVICE_AUX_MAC_SUPPORT;
 }
 
 /**
