@@ -987,9 +987,7 @@ mlo_update_connected_links_bmap(struct wlan_mlo_dev_context *mlo_dev_ctx,
 
 		for (j = 0; j < ml_parnter_info.num_partner_links; j++) {
 			if (wlan_vdev_get_link_id(mlo_dev_ctx->wlan_vdev_list[i]) ==
-			    ml_parnter_info.partner_link_info[j].link_id &&
-			    wlan_vdev_get_id(mlo_dev_ctx->wlan_vdev_list[i]) ==
-			    ml_parnter_info.partner_link_info[j].vdev_id)
+			    ml_parnter_info.partner_link_info[j].link_id)
 				mlo_update_connected_links(
 					mlo_dev_ctx->wlan_vdev_list[i], 1);
 		}
