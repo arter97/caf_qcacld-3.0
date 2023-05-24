@@ -24097,7 +24097,7 @@ int wlan_hdd_cfg80211_del_station(struct wiphy *wiphy, struct net_device *dev,
 }
 #endif
 
-#ifdef TDLS_MGMT_VERSION5
+#ifdef CFG80211_LINK_STA_PARAMS_PRESENT
 static inline
 uint8_t wlan_hdd_get_link_id(struct station_parameters *params)
 {
