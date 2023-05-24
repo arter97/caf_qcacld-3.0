@@ -4010,6 +4010,12 @@ wlan_mlme_set_sta_mlo_conn_max_num(struct wlan_objmgr_psoc *psoc,
 	return QDF_STATUS_SUCCESS;
 }
 
+static inline uint8_t
+wlan_mlme_get_sta_mlo_conn_max_num(struct wlan_objmgr_psoc *psoc)
+{
+	return 0;
+}
+
 static inline QDF_STATUS
 wlan_mlme_set_sta_mlo_simultaneous_links(struct wlan_objmgr_psoc *psoc,
 					 uint8_t value)
