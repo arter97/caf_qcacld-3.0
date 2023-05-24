@@ -1122,8 +1122,13 @@ cm_get_ml_partner_info(struct scan_cache_entry *scan_entry,
 	uint8_t mlo_support_link_num;
 	struct wlan_objmgr_psoc *psoc;
 
-	if (!scan_entry->ml_info.num_links)
+	/* If ML IE is not present then return failure*/
+	if (!scan_entry->ie_list.multi_link_bv)
 		return QDF_STATUS_E_FAILURE;
+
+	/* In case of single link ML return success*/
+	if (!scan_entry->ml_info.num_links)
+		return QDF_STATUS_SUCCESS;
 
 	psoc = wlan_objmgr_get_psoc_by_id(0, WLAN_MLME_CM_ID);
 	if (!psoc) {
