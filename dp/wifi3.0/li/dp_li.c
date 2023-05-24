@@ -612,12 +612,6 @@ static bool dp_reo_remap_config_li(struct dp_soc *soc,
 	return dp_reo_remap_config(soc, remap0, remap1, remap2);
 }
 
-static struct dp_soc *dp_rx_replensih_soc_get_li(struct dp_soc *soc,
-						 uint8_t chip_id)
-{
-	return soc;
-}
-
 static uint8_t dp_soc_get_num_soc_li(struct dp_soc *soc)
 {
 	return 1;
@@ -640,6 +634,13 @@ static void dp_get_vdev_stats_for_unmap_peer_li(
 					struct dp_peer *peer,
 					struct cdp_vdev_stats **vdev_stats)
 {
+}
+
+static struct
+dp_soc *dp_get_soc_by_chip_id_li(struct dp_soc *soc,
+				 uint8_t chip_id)
+{
+	return soc;
 }
 
 void dp_initialize_arch_ops_li(struct dp_arch_ops *arch_ops)
@@ -709,7 +710,7 @@ void dp_initialize_arch_ops_li(struct dp_arch_ops *arch_ops)
 	arch_ops->dp_find_peer_by_destmac = dp_find_peer_by_destmac_li;
 	arch_ops->peer_get_reo_hash = dp_peer_get_reo_hash_li;
 	arch_ops->reo_remap_config = dp_reo_remap_config_li;
-	arch_ops->dp_rx_replenish_soc_get = dp_rx_replensih_soc_get_li;
+	arch_ops->dp_get_soc_by_chip_id = dp_get_soc_by_chip_id_li;
 	arch_ops->dp_soc_get_num_soc = dp_soc_get_num_soc_li;
 	arch_ops->get_reo_qdesc_addr = dp_rx_get_reo_qdesc_addr_li;
 	arch_ops->txrx_get_vdev_mcast_param = dp_txrx_get_vdev_mcast_param_li;

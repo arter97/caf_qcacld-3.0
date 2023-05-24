@@ -2879,7 +2879,9 @@ void dp_initialize_arch_ops_be(struct dp_arch_ops *arch_ops)
 	arch_ops->tx_implicit_rbm_set = dp_tx_implicit_rbm_set_be;
 	arch_ops->txrx_set_vdev_param = dp_txrx_set_vdev_param_be;
 	dp_initialize_arch_ops_be_mlo(arch_ops);
-	arch_ops->dp_rx_replenish_soc_get = dp_rx_replensih_soc_get;
+#ifdef WLAN_MLO_MULTI_CHIP
+	arch_ops->dp_get_soc_by_chip_id = dp_get_soc_by_chip_id_be;
+#endif
 	arch_ops->dp_soc_get_num_soc = dp_soc_get_num_soc_be;
 	arch_ops->dp_peer_rx_reorder_queue_setup =
 					dp_peer_rx_reorder_queue_setup_be;

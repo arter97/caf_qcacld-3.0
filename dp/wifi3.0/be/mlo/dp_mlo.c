@@ -1080,7 +1080,7 @@ void dp_mlo_get_rx_hash_key(struct dp_soc *soc,
 }
 
 struct dp_soc *
-dp_rx_replensih_soc_get(struct dp_soc *soc, uint8_t chip_id)
+dp_rx_replenish_soc_get(struct dp_soc *soc, uint8_t chip_id)
 {
 	struct dp_soc_be *be_soc = dp_get_be_soc_from_dp_soc(soc);
 	struct dp_mlo_ctxt *mlo_ctxt = be_soc->ml_ctxt;
@@ -1687,3 +1687,20 @@ bool dp_umac_reset_is_inprogress(struct cdp_soc_t *psoc)
 	}
 }
 #endif
+
+struct dp_soc *
+dp_get_soc_by_chip_id_be(struct dp_soc *soc, uint8_t chip_id)
+{
+	struct dp_soc_be *be_soc = dp_get_be_soc_from_dp_soc(soc);
+	struct dp_mlo_ctxt *mlo_ctxt = be_soc->ml_ctxt;
+	struct dp_soc *partner_soc;
+
+	if (!be_soc->mlo_enabled || !mlo_ctxt)
+		return soc;
+
+	if (be_soc->mlo_chip_id == chip_id)
+		return soc;
+
+	partner_soc = dp_mlo_get_soc_ref_by_chip_id(mlo_ctxt, chip_id);
+	return partner_soc;
+}

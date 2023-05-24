@@ -476,7 +476,7 @@ done:
 			if (!rx_bufs_reaped[chip_id][mac_id])
 				continue;
 
-			replenish_soc = dp_rx_replensih_soc_get(soc, chip_id);
+			replenish_soc = dp_rx_replenish_soc_get(soc, chip_id);
 
 			dp_rxdma_srng =
 				&replenish_soc->rx_refill_buf_ring[mac_id];
@@ -1984,8 +1984,7 @@ done:
 			if (!rx_bufs_reaped[chip_id][mac_id])
 				continue;
 
-			replenish_soc =
-			soc->arch_ops.dp_rx_replenish_soc_get(soc, chip_id);
+			replenish_soc = dp_rx_replenish_soc_get(soc, chip_id);
 
 			dp_rxdma_srng =
 				&replenish_soc->rx_refill_buf_ring[mac_id];
