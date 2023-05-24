@@ -2500,7 +2500,7 @@ hal_rx_status_get_tlv_info_generic_be(void *rx_tlv_hdr, void *ppduinfo,
 	user_id = HAL_RX_GET_USER_TLV64_USERID(rx_tlv_hdr);
 	tlv_len = HAL_RX_GET_USER_TLV64_LEN(rx_tlv_hdr);
 
-	rx_tlv = (uint8_t *)rx_tlv_hdr + HAL_RX_TLV64_HDR_SIZE;
+	rx_tlv = (uint8_t *)rx_tlv_hdr + HAL_RX_TLV_HDR_SIZE;
 
 	qdf_trace_hex_dump(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_DEBUG,
 			   rx_tlv, tlv_len);
@@ -3690,7 +3690,7 @@ hal_rx_status_aggr_tlv(struct hal_soc *hal_soc, void *rx_tlv_hdr,
 	user_id = HAL_RX_GET_USER_TLV64_USERID(rx_tlv_hdr);
 	tlv_len = HAL_RX_GET_USER_TLV64_LEN(rx_tlv_hdr);
 
-	rx_tlv = (uint8_t *)rx_tlv_hdr + HAL_RX_TLV64_HDR_SIZE;
+	rx_tlv = (uint8_t *)rx_tlv_hdr + HAL_RX_TLV_HDR_SIZE;
 
 	if (tlv_len <= HAL_RX_MON_MAX_AGGR_SIZE - ppdu_info->tlv_aggr.cur_len) {
 		qdf_mem_copy(ppdu_info->tlv_aggr.buf +

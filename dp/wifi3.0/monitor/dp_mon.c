@@ -5597,10 +5597,10 @@ static void dp_mon_pdev_per_target_config(struct dp_pdev *pdev)
 	case TARGET_TYPE_KIWI:
 	case TARGET_TYPE_QCN9224:
 	case TARGET_TYPE_MANGO:
-	case TARGET_TYPE_PEACH:
 		mon_pdev->is_tlv_hdr_64_bit = true;
 		mon_pdev->tlv_hdr_size = HAL_RX_TLV64_HDR_SIZE;
 		break;
+	case TARGET_TYPE_PEACH:
 	default:
 		mon_pdev->is_tlv_hdr_64_bit = false;
 		mon_pdev->tlv_hdr_size = HAL_RX_TLV32_HDR_SIZE;

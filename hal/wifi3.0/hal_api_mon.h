@@ -54,6 +54,12 @@
 
 #define HAL_RX_TLV64_HDR_SIZE			8
 
+#ifdef CONFIG_4_BYTES_TLV_TAG
+#define HAL_RX_TLV_HDR_SIZE HAL_RX_TLV32_HDR_SIZE
+#else
+#define HAL_RX_TLV_HDR_SIZE HAL_RX_TLV64_HDR_SIZE
+#endif
+
 #define HAL_RX_GET_USER_TLV64_TYPE(rx_status_tlv_ptr) \
 		((qdf_le64_to_cpu(*((uint64_t *)(rx_status_tlv_ptr))) & \
 		HAL_RX_USER_TLV64_TYPE_MASK) >> \
