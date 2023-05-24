@@ -236,13 +236,18 @@ mld_get_best_primary_umac_w_rssi(struct wlan_mlo_peer_context *ml_peer,
 				chwidth = mld_ch_width[i];
 				continue;
 			}
-
+			/* if bw is 320MHZ mark that link as primary link */
+			if (mld_ch_width[i] == CH_WIDTH_320MHZ) {
+				prim_link = i;
+				chwidth = mld_ch_width[i];
+				break;
+			}
 			/* If bw is less than or equal to 160 MHZ
-			 * and chwidth is less than other link
+			 * and chwidth is greater than than other link
 			 * Mark this link as primary link
 			 */
 			if ((mld_ch_width[i] <= CH_WIDTH_160MHZ) &&
-			    (chwidth > mld_ch_width[i])) {
+			    (chwidth < mld_ch_width[i])) {
 				prim_link = i;
 				chwidth = mld_ch_width[i];
 			}
