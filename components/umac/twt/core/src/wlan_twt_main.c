@@ -786,12 +786,10 @@ wlan_twt_sap_init_context(struct wlan_objmgr_psoc *psoc,
 			  struct qdf_mac_addr *peer_mac,
 			  uint8_t dialog_id)
 {
-	if (qdf_is_macaddr_broadcast(peer_mac)) {
-		return wlan_twt_init_all_peers_context(psoc, vdev_id,
-						       dialog_id);
-	} else {
+	if (!qdf_is_macaddr_broadcast(peer_mac))
 		return wlan_twt_init_context(psoc, peer_mac, dialog_id);
-	}
+
+	return wlan_twt_init_all_peers_context(psoc, vdev_id, dialog_id);
 }
 
 /**
