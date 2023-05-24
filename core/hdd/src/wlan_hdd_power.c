@@ -2452,7 +2452,6 @@ static int __wlan_hdd_cfg80211_suspend_wlan(struct wiphy *wiphy,
 	int rc;
 	wlan_net_dev_ref_dbgid dbgid = NET_DEV_HOLD_CFG80211_SUSPEND_WLAN;
 	struct hdd_hostapd_state *hapd_state;
-	enum pmo_suspend_mode suspend_mode;
 	struct csr_del_sta_params params = {
 		.peerMacAddr = QDF_MAC_ADDR_BCAST_INIT,
 		.reason_code = REASON_DEAUTH_NETWORK_LEAVING,
