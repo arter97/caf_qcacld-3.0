@@ -478,7 +478,7 @@ QDF_STATUS wlan_dfs_pdev_obj_create_notification(struct wlan_objmgr_pdev *pdev,
 
 	if (!is_5ghz) {
 		pdev_id = wlan_objmgr_pdev_get_pdev_id(pdev);
-		dfs_info(dfs, WLAN_DEBUG_DFS_ALWAYS,
+		dfs_info(dfs, WLAN_DEBUG_DFS,
 				"Do not allocate DFS object for 2G, pdev_id = %d",
 				pdev_id);
 		return QDF_STATUS_SUCCESS;
