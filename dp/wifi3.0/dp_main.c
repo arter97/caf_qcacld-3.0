@@ -3985,9 +3985,37 @@ void dp_peer_delete(struct dp_soc *soc,
 #endif
 
 #if defined(WLAN_FEATURE_11BE_MLO) && defined(WLAN_MLO_MULTI_CHIP)
+static uint8_t
+dp_mlo_get_num_link_peer(struct dp_soc *soc, struct dp_peer *peer)
+{
+	struct dp_peer *mld_peer = NULL;
+	struct dp_mld_link_peers link_peers_info = {0};
+	uint8_t num_link = 0;
+
+	if (IS_MLO_DP_LINK_PEER(peer))
+		mld_peer = DP_GET_MLD_PEER_FROM_PEER(peer);
+
+	if (IS_MLO_DP_MLD_PEER(peer))
+		mld_peer = peer;
+
+	if (!mld_peer)
+		return 0;
+
+	/* get link peers with reference */
+	dp_get_link_peers_ref_from_mld_peer(soc, mld_peer, &link_peers_info,
+					    DP_MOD_ID_CDP);
+	num_link = link_peers_info.num_links;
+	dp_release_link_peers_ref(&link_peers_info, DP_MOD_ID_CDP);
+	return num_link;
+}
+
 void dp_mlo_peer_delete(struct dp_soc *soc, struct dp_peer *peer, void *arg)
 {
 	if (!peer->valid)
+		return;
+
+	/* skip deleting the SLO peers */
+	if (dp_mlo_get_num_link_peer(soc, peer) == 1)
 		return;
 
 	if (IS_MLO_DP_LINK_PEER(peer))
@@ -4033,6 +4061,12 @@ static void dp_mlo_link_peer_flush(struct dp_soc *soc, struct dp_peer *peer)
 	dp_release_link_peers_ref(&link_peers_info, DP_MOD_ID_CDP);
 }
 #else
+static uint8_t
+dp_mlo_get_num_link_peer(struct dp_soc *soc, struct dp_peer *peer)
+{
+	return 0;
+}
+
 void dp_mlo_peer_delete(struct dp_soc *soc, struct dp_peer *peer, void *arg)
 {
 }
@@ -4096,6 +4130,12 @@ static void dp_vdev_flush_peers(struct cdp_vdev *vdev_handle,
 			   IS_MLO_DP_MLD_PEER(peer)) {
 			dp_info("peer: " QDF_MAC_ADDR_FMT " is getting unmap",
 				QDF_MAC_ADDR_REF(peer->mac_addr.raw));
+
+			/* skip deleting the SLO peers */
+			if (dp_mlo_get_num_link_peer(soc, peer) ==  1) {
+				dp_peer_unref_delete(peer, DP_MOD_ID_CDP);
+				continue;
+			}
 
 			dp_mlo_link_peer_flush(soc, peer);
 			dp_rx_peer_unmap_handler(soc, i,

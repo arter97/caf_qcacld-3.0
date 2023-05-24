@@ -694,6 +694,7 @@ void dp_peer_find_id_to_obj_remove(struct dp_soc *soc,
 	qdf_spin_lock_bh(&soc->peer_map_lock);
 	peer = soc->peer_id_to_obj_map[peer_id];
 	if (!peer) {
+		dp_err("unable to get peer during peer id obj map remove");
 		qdf_spin_unlock_bh(&soc->peer_map_lock);
 		return;
 	}
