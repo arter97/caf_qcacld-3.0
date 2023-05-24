@@ -717,8 +717,9 @@ static void cm_print_mlo_info(struct wlan_objmgr_vdev *vdev)
 	if (!peer)
 		return;
 
-	mlme_nofl_debug("self_mld_addr:" QDF_MAC_ADDR_FMT,
-			QDF_MAC_ADDR_REF(mld_addr->bytes));
+	mlme_nofl_debug("self_mld_addr:" QDF_MAC_ADDR_FMT " link_id:%d",
+			QDF_MAC_ADDR_REF(mld_addr->bytes),
+			wlan_vdev_get_link_id(vdev));
 	mlme_nofl_debug("peer_mld_mac:" QDF_MAC_ADDR_FMT,
 			QDF_MAC_ADDR_REF(peer->mldaddr));
 }
