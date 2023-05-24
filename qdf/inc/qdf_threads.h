@@ -280,5 +280,32 @@ qdf_cpumask_complement(qdf_cpu_mask *dstp, const qdf_cpu_mask *srcp);
  * Return: Taken CPUs
  */
 qdf_cpu_mask qdf_walt_get_cpus_taken(void);
+
+/*
+ * qdf_walt_get_cpus_taken_supported: walt_get_cpus_taken supported
+ *
+ * Return: true if walt_get_cpus_taken API is supported
+ */
+static inline bool
+qdf_walt_get_cpus_taken_supported(void)
+{
+	return true;
+}
+#else
+static inline
+qdf_cpu_mask qdf_walt_get_cpus_taken(void)
+{
+	qdf_cpu_mask mask;
+
+	qdf_cpumask_clear(&mask);
+
+	return mask;
+}
+
+static inline bool
+qdf_walt_get_cpus_taken_supported(void)
+{
+	return false;
+}
 #endif
 #endif /* __QDF_THREADS_H */
