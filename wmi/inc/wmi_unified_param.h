@@ -6757,6 +6757,7 @@ struct target_feature_set {
  * @reo_qdesc_shared_addr_table_enabled: Reo shared qref enhancement enabled
  * @num_max_active_vdevs: max number of active virtual devices (VAPs) to
  * support
+ * @num_max_mlo_link_per_ml_bss: number of max partner links of a ML BSS
  * @notify_frame_support: capability to mark notify frames from host
  * @dp_peer_meta_data_ver: datapath peer meta data version flag
  * @tx_ilp_enable: capability to support TX ILP from host
@@ -6887,6 +6888,7 @@ typedef struct {
 	bool sawf;
 	bool reo_qdesc_shared_addr_table_enabled;
 	uint32_t num_max_active_vdevs;
+	uint32_t num_max_mlo_link_per_ml_bss;
 	uint8_t notify_frame_support;
 	uint8_t dp_peer_meta_data_ver;
 #ifdef DP_TX_PACKET_INSPECT_FOR_ILP

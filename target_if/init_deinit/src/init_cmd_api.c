@@ -592,6 +592,8 @@ void init_deinit_prepare_send_init_cmd(
 
 	target_if_set_reo_shared_qref_feature(psoc, info);
 
+	target_if_set_num_max_mlo_link(psoc, info);
+
 	wmi_unified_init_cmd_send(wmi_handle, &init_param);
 
 	/* Set Max scans allowed */

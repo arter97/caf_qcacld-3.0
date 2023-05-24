@@ -3003,4 +3003,30 @@ static inline void target_if_set_reo_shared_qref_feature(struct wlan_objmgr_psoc
  */
 enum phy_ch_width
 target_if_wmi_chan_width_to_phy_ch_width(wmi_host_channel_width ch_width);
+
+#ifdef WLAN_FEATURE_11BE_MLO_ADV_FEATURE
+static inline void target_if_set_num_max_mlo_link(struct wlan_objmgr_psoc *psoc,
+						  struct tgt_info *info)
+{
+	struct target_psoc_info *tgt_hdl;
+	uint16_t value;
+
+	tgt_hdl = wlan_psoc_get_tgt_if_handle(psoc);
+	if (!tgt_hdl)
+		return;
+
+	if (!target_psoc_get_num_max_mlo_link(tgt_hdl))
+		value = WLAN_MAX_ML_DEFAULT_LINK;
+	else
+		value = QDF_MIN(target_psoc_get_num_max_mlo_link(tgt_hdl),
+				info->wlan_res_cfg.num_max_mlo_link_per_ml_bss);
+
+	info->wlan_res_cfg.num_max_mlo_link_per_ml_bss = value;
+}
+#else
+static inline void target_if_set_num_max_mlo_link(struct wlan_objmgr_psoc *psoc,
+						  struct tgt_info *info)
+{
+}
+#endif
 #endif
