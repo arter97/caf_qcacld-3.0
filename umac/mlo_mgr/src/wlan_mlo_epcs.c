@@ -100,12 +100,14 @@ wlan_mlo_parse_epcs_response_action_frame(struct wlan_epcs_info *epcs,
 
 	epcs->cat = epcs_action_frm->protected_eht_action;
 	epcs->dialog_token = epcs_action_frm->dialog_token;
-	epcs->status = epcs_action_frm->resp.status_code;
-	epcs_info("EPCS frame rcv : category:%d action:%d dialog_token:%d status %d frmlen %d",
+	QDF_SET_BITS(epcs->status, 0, 8, epcs_action_frm->resp.status_code[0]);
+	QDF_SET_BITS(epcs->status, 8, 8, epcs_action_frm->resp.status_code[1]);
+	epcs_info("EPCS frame rcv : category:%d action:%d dialog_token:%d status %x %x frmlen %d",
 		  epcs_action_frm->category,
 		  epcs_action_frm->protected_eht_action,
 		  epcs_action_frm->dialog_token,
-		  epcs_action_frm->resp.status_code, frm_len);
+		  epcs_action_frm->resp.status_code[0],
+		  epcs_action_frm->resp.status_code[1], frm_len);
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -199,8 +201,9 @@ wlan_mlo_add_epcs_response_action_frame(uint8_t *frm,
 	*frm++ = args->action;
 	/* Dialog token*/
 	*frm++ = args->arg1;
-	/* Status code */
-	*frm++ = args->arg2;
+	/* Status code (2 bytes) */
+	*frm++ = QDF_GET_BITS(args->arg2, 0, 8);
+	*frm++ = QDF_GET_BITS(args->arg2, 8, 8);
 
 	epcs_info("EPCS response frame: category:%d action:%d dialog_token:%d status_code:%d",
 		  args->category, args->action, args->arg1, args->arg2);
@@ -214,9 +217,6 @@ wlan_mlo_add_epcs_action_frame(uint8_t *frm,
 			       struct wlan_action_frame_args *args,
 			       uint8_t *buf)
 {
-	qdf_err("EPCS frame: category:%d action:%d ",
-		args->category, args->action);
-
 	switch (args->action) {
 	case WLAN_EPCS_CATEGORY_REQUEST:
 		return wlan_mlo_add_epcs_request_action_frame(frm, args,
