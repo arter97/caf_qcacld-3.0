@@ -17960,8 +17960,8 @@ int hdd_driver_load(void)
 	int errno;
 	bool soft_load;
 
-	pr_err("%s: Loading driver v%s\n", WLAN_MODULE_NAME,
-	       g_wlan_driver_version);
+	pr_info("%s: Loading driver v%s\n", WLAN_MODULE_NAME,
+		g_wlan_driver_version);
 	hdd_place_marker(NULL, "START LOADING", NULL);
 
 	status = hdd_qdf_init();
