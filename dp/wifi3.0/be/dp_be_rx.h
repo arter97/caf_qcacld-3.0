@@ -259,7 +259,7 @@ uint32_t dp_rx_nf_process(struct dp_intr *int_ctx,
 
 #if defined(WLAN_FEATURE_11BE_MLO) && defined(WLAN_MLO_MULTI_CHIP)
 struct dp_soc *
-dp_rx_replensih_soc_get(struct dp_soc *soc, uint8_t chip_id);
+dp_rx_replenish_soc_get(struct dp_soc *soc, uint8_t chip_id);
 
 struct dp_soc *
 dp_soc_get_by_idle_bm_id(struct dp_soc *soc, uint8_t idle_bm_id);
@@ -267,7 +267,7 @@ dp_soc_get_by_idle_bm_id(struct dp_soc *soc, uint8_t idle_bm_id);
 uint8_t dp_soc_get_num_soc_be(struct dp_soc *soc);
 #else
 static inline struct dp_soc *
-dp_rx_replensih_soc_get(struct dp_soc *soc, uint8_t chip_id)
+dp_rx_replenish_soc_get(struct dp_soc *soc, uint8_t chip_id)
 {
 	return soc;
 }
@@ -843,6 +843,17 @@ static inline uint8_t hal_rx_get_l3_pad_bytes_be(qdf_nbuf_t nbuf,
 						 uint8_t *rx_tlv_hdr)
 {
 	return QDF_NBUF_CB_RX_L3_PAD_MSB(nbuf) ? 2 : 0;
+}
+#endif
+
+#if defined(WLAN_FEATURE_11BE_MLO) && defined(WLAN_MLO_MULTI_CHIP)
+struct dp_soc *
+dp_get_soc_by_chip_id_be(struct dp_soc *soc, uint8_t chip_id);
+#else
+struct dp_soc *
+dp_get_soc_by_chip_id_be(struct dp_soc *soc, uint8_t chip_id)
+{
+	return soc;
 }
 #endif
 #endif

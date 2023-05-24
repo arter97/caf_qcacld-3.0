@@ -1083,6 +1083,12 @@ bool dp_rx_chain_msdus_li(struct dp_soc *soc, qdf_nbuf_t nbuf,
 	return mpdu_done;
 }
 
+static struct dp_soc *dp_rx_replensih_soc_get_li(struct dp_soc *soc,
+						 uint8_t chip_id)
+{
+	return soc;
+}
+
 qdf_nbuf_t
 dp_rx_wbm_err_reap_desc_li(struct dp_intr *int_ctx, struct dp_soc *soc,
 			   hal_ring_handle_t hal_ring_hdl, uint32_t quota,
@@ -1295,10 +1301,9 @@ done:
 				continue;
 
 			replenish_soc =
-			soc->arch_ops.dp_rx_replenish_soc_get(soc, chip_id);
-
+			dp_rx_replensih_soc_get_li(soc, chip_id);
 			dp_rxdma_srng =
-				&replenish_soc->rx_refill_buf_ring[mac_id];
+			&replenish_soc->rx_refill_buf_ring[mac_id];
 
 			rx_desc_pool = &replenish_soc->rx_desc_buf[mac_id];
 
