@@ -2280,11 +2280,14 @@ enum HOST_REGDMN_MODE {
 /**
  * enum reg_afc_cmd_type - Type of AFC command sent to FW
  * @REG_AFC_CMD_SERV_RESP_READY: Server response is ready
- * @REG_AFC_CMD_RESET_AFC: Indicate the target to reset AFC
+ * @REG_AFC_CMD_RESET_AFC: Ask the target to send an AFC expiry event
+ * @REG_AFC_CMD_CLEAR_AFC_PAYLOAD: Ask the target to clear AFC Payload.
+ * The target in response sends REG_AFC_EXPIRY_EVENT_STOP_TX to host.
  */
 enum reg_afc_cmd_type {
 	REG_AFC_CMD_SERV_RESP_READY = 1,
 	REG_AFC_CMD_RESET_AFC = 2,
+	REG_AFC_CMD_CLEAR_AFC_PAYLOAD = 3,
 };
 
 /**
