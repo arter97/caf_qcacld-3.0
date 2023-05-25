@@ -234,3 +234,133 @@ wlan_mlo_add_epcs_action_frame(uint8_t *frm,
 
 	return frm;
 }
+
+QDF_STATUS
+wlan_mlo_peer_rcv_cmd(struct wlan_mlo_peer_context *ml_peer,
+		      struct wlan_epcs_info *epcs,
+		      bool *updparam)
+{
+	uint32_t cur_state;
+	uint32_t new_state;
+	QDF_STATUS status = QDF_STATUS_E_INVAL;
+
+	if (!ml_peer) {
+		epcs_err("Null MLO peer");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	*updparam = false;
+
+	cur_state = ml_peer->epcs_info.state;
+	switch (ml_peer->epcs_info.state) {
+	case EPCS_DOWN:
+		if (epcs->cat == WLAN_EPCS_CATEGORY_REQUEST) {
+		/* check authorization */
+			if (1) {
+				status = QDF_STATUS_SUCCESS;
+				epcs->dialog_token =
+				  ++ml_peer->epcs_info.self_gen_dialog_token;
+			} else {
+				epcs_info("peer not authorized to enable EPCS");
+			}
+		} else if (epcs->cat == WLAN_EPCS_CATEGORY_TEARDOWN) {
+			epcs_info("peer already in EPCS down state");
+		} else if (epcs->cat == WLAN_EPCS_CATEGORY_RESPONSE) {
+			epcs_err("Invalid command");
+		}
+		break;
+	case EPCS_ENABLE:
+		if (epcs->cat == WLAN_EPCS_CATEGORY_TEARDOWN) {
+			ml_peer->epcs_info.state = EPCS_DOWN;
+			status = QDF_STATUS_SUCCESS;
+			*updparam = true;
+		} else if (epcs->cat == WLAN_EPCS_CATEGORY_REQUEST) {
+			epcs_info("peer already in EPCS enable state");
+		} else if (epcs->cat == WLAN_EPCS_CATEGORY_RESPONSE) {
+			epcs_err("Invalid command");
+		}
+		break;
+	default:
+		epcs_err("Invalid peer state %d",
+			 ml_peer->epcs_info.state);
+	}
+
+	new_state = ml_peer->epcs_info.state;
+	epcs_debug("cmd:old state %d new state %d ev cat %d dialog token %d status %d",
+		   cur_state, new_state, epcs->cat,
+		   epcs->dialog_token, epcs->status);
+
+	return status;
+}
+
+QDF_STATUS
+wlan_mlo_peer_rcv_action_frame(struct wlan_mlo_peer_context *ml_peer,
+			       struct wlan_epcs_info *epcs,
+			       bool *respond,
+			       bool *updparam)
+{
+	uint32_t cur_state;
+	uint32_t new_state;
+	QDF_STATUS status = QDF_STATUS_E_INVAL;
+
+	if (!ml_peer) {
+		epcs_err("Null MLO peer");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	*respond = false;
+	*updparam = false;
+
+	cur_state = ml_peer->epcs_info.state;
+	switch (ml_peer->epcs_info.state) {
+	case EPCS_DOWN:
+		if (epcs->cat == WLAN_EPCS_CATEGORY_RESPONSE) {
+			if (epcs->status == STATUS_SUCCESS) {
+				if (epcs->dialog_token ==
+				    ml_peer->epcs_info.self_gen_dialog_token) {
+					ml_peer->epcs_info.state = EPCS_ENABLE;
+					status = QDF_STATUS_SUCCESS;
+					*updparam = true;
+				} else {
+					epcs_err("Response dialog token mismatch self_gen_dialog_token %d response token %d", ml_peer->epcs_info.self_gen_dialog_token, epcs->dialog_token);
+				}
+			} else {
+				epcs_info("epcs rejected with status code %d",
+					  epcs->status);
+			}
+		} else if (epcs->cat == WLAN_EPCS_CATEGORY_REQUEST) {
+			/* check authorization */
+			if (1) {
+				ml_peer->epcs_info.state = EPCS_ENABLE;
+				status = QDF_STATUS_SUCCESS;
+				*respond = true;
+				*updparam = true;
+			} else {
+				epcs_info("peer not authorized to enable EPCS");
+			}
+		} else if (epcs->cat == WLAN_EPCS_CATEGORY_TEARDOWN) {
+			epcs_info("peer not in EPCS enable state");
+		}
+		break;
+	case EPCS_ENABLE:
+		if (epcs->cat == WLAN_EPCS_CATEGORY_TEARDOWN) {
+			ml_peer->epcs_info.state = EPCS_DOWN;
+			status = QDF_STATUS_SUCCESS;
+			*updparam = true;
+		} else if (epcs->cat == WLAN_EPCS_CATEGORY_REQUEST) {
+			epcs_info("peer already in EPCS enable state");
+		} else if (epcs->cat == WLAN_EPCS_CATEGORY_RESPONSE) {
+			epcs_info("peer already in EPCS enable state");
+		}
+		break;
+	default:
+		epcs_err("Invalid peer state %d", ml_peer->epcs_info.state);
+	}
+
+	new_state = ml_peer->epcs_info.state;
+	epcs_debug("action:old state %d new state %d ev cat %d dialog token %d status %d",
+		   cur_state, new_state, epcs->cat,
+		   epcs->dialog_token, epcs->status);
+
+	return status;
+}

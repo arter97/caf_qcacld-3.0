@@ -27,6 +27,8 @@
 #include <wlan_cmn.h>
 #endif
 
+struct wlan_mlo_peer_context;
+
 /**
  * enum wlan_epcs_category - epcs category
  *
@@ -57,15 +59,23 @@ struct wlan_epcs_info {
 };
 
 /**
- * struct wlan_mlo_peer_epcs_policy - Peer EPCS information
- * @enable: EPCS enable status
- * @self_gen_dialog_token: selfgenerated dialog token
- * @status: status
+ * enum peer_epcs_state - epcs stat of peer
+ * @EPCS_DOWN: EPCS state down
+ * @EPCS_ENABLE: EPCS state enabled
  */
-struct wlan_mlo_peer_epcs_policy {
-	uint8_t enable;
+enum peer_epcs_state {
+	EPCS_DOWN,
+	EPCS_ENABLE
+};
+
+/**
+ * struct wlan_mlo_peer_epcs_info - Peer EPCS information
+ * @state: EPCS state of peer
+ * @self_gen_dialog_token: selfgenerated dialog token
+ */
+struct wlan_mlo_peer_epcs_info {
+	enum peer_epcs_state state;
 	uint8_t self_gen_dialog_token;
-	uint8_t status;
 };
 
 /**
@@ -141,5 +151,33 @@ QDF_STATUS
 wlan_mlo_parse_epcs_action_frame(struct wlan_epcs_info *epcs,
 				 struct wlan_action_frame *action_frm,
 				 uint32_t frm_len);
+
+/**
+ * wlan_mlo_peer_rcv_cmd() - API to process EPCS command
+ * @ml_peer: Pointer to ML peer received
+ * @epcs: Pointer to EPCS information
+ * @updparam: pointer to fill update parameters
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+wlan_mlo_peer_rcv_cmd(struct wlan_mlo_peer_context *ml_peer,
+		      struct wlan_epcs_info *epcs,
+		      bool *updparam);
+
+/**
+ * wlan_mlo_peer_rcv_action_frame() - API to process EPCS frame receive event
+ * @ml_peer: Pointer to ML peer received
+ * @epcs: Pointer to EPCS information
+ * @respond: pointer to fill response required or not
+ * @updparam: pointer to fill update parameters
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+wlan_mlo_peer_rcv_action_frame(struct wlan_mlo_peer_context *ml_peer,
+			       struct wlan_epcs_info *epcs,
+			       bool *respond,
+			       bool *updparam);
 
 #endif /* _WLAN_MLO_EPCS_H_ */
