@@ -2203,22 +2203,6 @@ static void get_sta_info(struct cfg80211_data *buffer)
 	buffer->length = LIST_STATION_CFG_ALLOC_SIZE;
 }
 
-static uint32_t get_interface_opmode(char *ifname)
-{
-	struct cfg80211_data buffer = {0};
-	uint32_t opmode = 0;
-
-	buffer.data = &opmode;
-	buffer.length = sizeof(uint32_t);
-	wifi_cfg80211_send_getparam_command(&g_sock_ctx.cfg80211_ctxt,
-					    QCA_NL80211_VENDOR_SUBCMD_WIFI_PARAMS,
-					    IEEE80211_PARAM_GET_OPMODE,
-					    ifname, (char *)&buffer,
-					    sizeof(uint32_t));
-
-	return opmode;
-}
-
 static int32_t build_child_sta_list(char *ifname,
 				    struct object_list *parent_obj)
 {
@@ -2742,11 +2726,6 @@ static int32_t send_request_per_object(struct stats_command *user_cmd,
 	if (!root_obj) {
 		STATS_ERR("No object found for %d obj type\n", user_cmd->obj);
 		return -EPERM;
-	}
-
-	if (is_mld_req && get_interface_opmode(root_obj->ifname) != IEEE80211_M_HOSTAP) {
-		STATS_ERR("MLD Interface stats not supported in Non-AP mode\n");
-		return -EINVAL;
 	}
 
 	temp_obj = root_obj;

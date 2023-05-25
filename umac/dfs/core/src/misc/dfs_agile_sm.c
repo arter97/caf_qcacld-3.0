@@ -1057,13 +1057,6 @@ void dfs_destroy_punc_sm(struct wlan_dfs *dfs)
 	}
 }
 
-void dfs_punc_sm_start(struct wlan_dfs *dfs,
-		       uint8_t indx,
-		       struct dfs_punc_obj *dfs_punc_arr)
-{
-	dfs_punc_cac_timer_attach(dfs, dfs_punc_arr);
-}
-
 void dfs_punc_sm_stop(struct wlan_dfs *dfs,
 		      uint8_t indx,
 		      struct dfs_punc_obj *dfs_punc_arr)
@@ -1296,7 +1289,6 @@ void dfs_handle_dfs_puncture_unpuncture(struct wlan_dfs *dfs)
 							  dfs_curchan_punc_list[i]);
 
 		if (is_found) {
-			dfs_punc_sm_start(dfs, i, dfs_punc_obj);
 			utils_dfs_puncturing_sm_deliver_evt(dfs->dfs_pdev_obj,
 							    i,
 							    DFS_PUNC_SM_EV_RADAR);

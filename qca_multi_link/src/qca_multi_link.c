@@ -361,7 +361,7 @@ void qca_multi_link_init_module(struct qca_multi_link_ops *ml_ops)
 
 	memset(&qca_multi_link_cfg.qca_ml_stats, 0x0, sizeof(qca_multi_link_radio_node_t));
 	qca_multi_link_cfg.qca_ml_ops = ml_ops;
-	QDF_TRACE(QDF_MODULE_ID_RPTR, QDF_TRACE_LEVEL_INFO,
+	QDF_TRACE(QDF_MODULE_ID_RPTR, QDF_TRACE_LEVEL_DEBUG,
 		FL("\n******QCA Repeater Initialization Done***********\n"));
 }
 
@@ -957,9 +957,9 @@ static qca_multi_link_status_t qca_multi_link_secondary_sta_rx(struct net_device
 	sta_wiphy = sta_dev->ieee80211_ptr->wiphy;
 	is_mcast = IEEE80211_IS_MULTICAST(eh->ether_dhost);
 
-	QDF_TRACE(QDF_MODULE_ID_RPTR, QDF_TRACE_LEVEL_DEBUG, FL("Secondary STA Rx:always_primary=%d, loop_detected=%d,\
+	QDF_TRACE(QDF_MODULE_ID_RPTR, QDF_TRACE_LEVEL_DEBUG, FL("Secondary STA Rx:ifname= %s always_primary=%d, loop_detected=%d,\
 			drop_secondary_mcast=%d, shost %pM dhost %pM is_mcast=%d\n"),
-			qca_multi_link_cfg.always_primary, qca_multi_link_cfg.loop_detected,
+			sta_dev->name, qca_multi_link_cfg.always_primary, qca_multi_link_cfg.loop_detected,
 			qca_multi_link_cfg.drop_secondary_mcast, eh->ether_shost, eh->ether_dhost, is_mcast);
 
 	/*
@@ -1116,7 +1116,7 @@ static qca_multi_link_status_t qca_multi_link_secondary_sta_rx(struct net_device
 						}
 					}
 
-					QDF_TRACE(QDF_MODULE_ID_RPTR, QDF_TRACE_LEVEL_WARN,
+					QDF_TRACE(QDF_MODULE_ID_RPTR, QDF_TRACE_LEVEL_DEBUG,
 							FL("Null STA device found %pM - Give to bridge\n"), eh->ether_shost);
 					return QCA_MULTI_LINK_PKT_DROP;
 				}
@@ -1189,9 +1189,9 @@ static qca_multi_link_status_t qca_multi_link_primary_sta_rx(struct net_device *
 	sta_wiphy = sta_dev->ieee80211_ptr->wiphy;
 	is_mcast = IEEE80211_IS_MULTICAST(eh->ether_dhost);
 
-	QDF_TRACE(QDF_MODULE_ID_RPTR, QDF_TRACE_LEVEL_DEBUG, FL("Primary STA Rx: always_primary=%d, loop_detected=%d,\
+	QDF_TRACE(QDF_MODULE_ID_RPTR, QDF_TRACE_LEVEL_DEBUG, FL("Primary STA Rx: ifname=%s, always_primary=%d, loop_detected=%d,\
 			drop_secondary_mcast=%d, shost %pM dhost %pM is_mcast=%d\n"),
-			qca_multi_link_cfg.always_primary, qca_multi_link_cfg.loop_detected,
+			sta_dev->name, qca_multi_link_cfg.always_primary, qca_multi_link_cfg.loop_detected,
 			qca_multi_link_cfg.drop_secondary_mcast, eh->ether_shost, eh->ether_dhost, is_mcast);
 
 	/*
@@ -1391,9 +1391,9 @@ static qca_multi_link_status_t qca_multi_link_secondary_sta_tx(struct net_device
 
 	sta_wiphy = sta_dev->ieee80211_ptr->wiphy;
 
-	QDF_TRACE(QDF_MODULE_ID_RPTR, QDF_TRACE_LEVEL_DEBUG, FL("STA Secondary Tx: always_primary=%d, loop_detected=%d,\
+	QDF_TRACE(QDF_MODULE_ID_RPTR, QDF_TRACE_LEVEL_DEBUG, FL("STA Secondary Tx: ifname=%s, always_primary=%d, loop_detected=%d,\
 		drop_secondary_mcast=%d, shost %pM dhost %pM \n"),
-		qca_multi_link_cfg.always_primary, qca_multi_link_cfg.loop_detected, qca_multi_link_cfg.drop_secondary_mcast,
+		sta_dev->name, qca_multi_link_cfg.always_primary, qca_multi_link_cfg.loop_detected, qca_multi_link_cfg.drop_secondary_mcast,
 		eh->ether_shost, eh->ether_dhost);
 
 	/*
@@ -1489,9 +1489,9 @@ static qca_multi_link_status_t qca_multi_link_primary_sta_tx(struct net_device *
 
 	sta_wiphy = sta_dev->ieee80211_ptr->wiphy;
 
-	QDF_TRACE(QDF_MODULE_ID_RPTR, QDF_TRACE_LEVEL_DEBUG, FL("Primary STA Tx: always_primary=%d, loop_detected=%d,\
+	QDF_TRACE(QDF_MODULE_ID_RPTR, QDF_TRACE_LEVEL_DEBUG, FL("Primary STA Tx: ifname=%s, always_primary=%d, loop_detected=%d,\
 				drop_secondary_mcast=%d, shost %pM dhost %pM \n"),
-				qca_multi_link_cfg.always_primary, qca_multi_link_cfg.loop_detected,
+				sta_dev->name, qca_multi_link_cfg.always_primary, qca_multi_link_cfg.loop_detected,
 				qca_multi_link_cfg.drop_secondary_mcast, eh->ether_shost, eh->ether_dhost);
 
 	/*
@@ -1564,7 +1564,7 @@ static qca_multi_link_status_t qca_multi_link_primary_sta_tx(struct net_device *
 		 */
 		sec_sta_dev = qca_multi_link_get_station_vap(qca_ml_entry.qal_fdb_ieee80211_ptr->wiphy);
 		if (!sec_sta_dev) {
-			QDF_TRACE(QDF_MODULE_ID_RPTR, QDF_TRACE_LEVEL_WARN,
+			QDF_TRACE(QDF_MODULE_ID_RPTR, QDF_TRACE_LEVEL_DEBUG,
 				FL("Null STA device found %pM - Give to bridge\n"), eh->ether_shost);
 			return QCA_MULTI_LINK_PKT_DROP;
 		}
