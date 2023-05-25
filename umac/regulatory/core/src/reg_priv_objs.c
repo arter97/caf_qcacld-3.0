@@ -469,6 +469,7 @@ reg_free_afc_pwr_info(struct wlan_regulatory_pdev_priv_obj *pdev_priv_obj)
 		qdf_mem_free(power_info->afc_chan_info);
 
 	qdf_mem_free(power_info);
+	pdev_priv_obj->power_info = NULL;
 }
 #endif
 
