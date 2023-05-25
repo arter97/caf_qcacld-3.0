@@ -2449,9 +2449,7 @@ void ucfg_dp_register_hdd_callbacks(struct wlan_objmgr_psoc *psoc,
 		cb_obj->dp_get_tx_flow_low_watermark;
 	dp_ctx->dp_ops.dp_get_tsf_time = cb_obj->dp_get_tsf_time;
 	dp_ctx->dp_ops.dp_tsf_timestamp_rx = cb_obj->dp_tsf_timestamp_rx;
-#ifdef WLAN_FEATURE_FILS_SK_SAP
 	dp_ctx->dp_ops.dp_fils_hlp_rx = cb_obj->dp_fils_hlp_rx;
-#endif
 	dp_ctx->dp_ops.dp_gro_rx_legacy_get_napi =
 		cb_obj->dp_gro_rx_legacy_get_napi;
 	dp_ctx->dp_ops.dp_get_netdev_by_vdev_mac =

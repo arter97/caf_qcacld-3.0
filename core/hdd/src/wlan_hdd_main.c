@@ -244,6 +244,7 @@
 #include "wlan_qmi_ucfg_api.h"
 #include "wlan_psoc_mlme_ucfg_api.h"
 #include "wlan_ll_sap_ucfg_api.h"
+#include "wlan_hdd_tx_rx.h"
 
 #include "os_if_dp_local_pkt_capture.h"
 #include <wlan_mlo_mgr_link_switch.h>
@@ -9218,6 +9219,9 @@ struct hdd_adapter *hdd_open_adapter(struct hdd_context *hdd_ctx,
 #endif
 		if (!params->is_pre_cac_adapter)
 			wlan_hdd_set_ml_cap_for_sap_intf(params, session_type);
+
+		hdd_fils_hlp_workqueue_init(hdd_ctx);
+
 		break;
 	case QDF_FTM_MODE:
 		adapter = hdd_alloc_station_adapter(hdd_ctx, mac_addr,
@@ -9271,6 +9275,7 @@ struct hdd_adapter *hdd_open_adapter(struct hdd_context *hdd_ctx,
 	adapter->upgrade_udp_qos_threshold = QCA_WLAN_AC_BK;
 
 	hdd_init_completion(adapter);
+
 	INIT_WORK(&adapter->scan_block_work, wlan_hdd_cfg80211_scan_block_cb);
 	qdf_list_create(&adapter->blocked_scan_request_q, WLAN_MAX_SCAN_COUNT);
 	qdf_mutex_create(&adapter->blocked_scan_request_q_lock);
@@ -11735,6 +11740,7 @@ static int hdd_context_deinit(struct hdd_context *hdd_ctx)
 
 	qdf_list_destroy(&hdd_ctx->hdd_adapters);
 
+	hdd_fils_hlp_deinit(hdd_ctx);
 	return 0;
 }
 
@@ -11854,6 +11860,7 @@ void hdd_wlan_exit(struct hdd_context *hdd_ctx)
 	}
 
 	qdf_spinlock_destroy(&hdd_ctx->hdd_adapter_lock);
+
 	qdf_spinlock_destroy(&hdd_ctx->connection_status_lock);
 	wlan_hdd_cache_chann_mutex_destroy(hdd_ctx);
 
@@ -12936,9 +12943,8 @@ static void hdd_dp_register_callbacks(struct hdd_context *hdd_ctx)
 	cb_obj.dp_tsf_timestamp_rx = hdd_tsf_timestamp_rx;
 	cb_obj.dp_gro_rx_legacy_get_napi = hdd_legacy_gro_get_napi;
 	cb_obj.link_monitoring_cb = wlan_hdd_link_speed_update;
-
+	cb_obj.dp_fils_hlp_rx = hdd_fils_hlp_rx;
 	hdd_dp_register_ipa_wds_callbacks(&cb_obj);
-
 	os_if_dp_register_hdd_callbacks(hdd_ctx->psoc, &cb_obj);
 }
 
@@ -14376,6 +14382,8 @@ static int hdd_context_init(struct hdd_context *hdd_ctx)
 
 	qdf_list_create(&hdd_ctx->hdd_adapters, 0);
 
+	hdd_fils_hlp_init(hdd_ctx);
+
 	ret = hdd_scan_context_init(hdd_ctx);
 	if (ret)
 		goto list_destroy;
@@ -14413,7 +14421,7 @@ scan_destroy:
 	hdd_scan_context_destroy(hdd_ctx);
 list_destroy:
 	qdf_list_destroy(&hdd_ctx->hdd_adapters);
-
+	hdd_fils_hlp_deinit(hdd_ctx);
 	return ret;
 }
 

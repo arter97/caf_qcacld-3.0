@@ -14965,6 +14965,16 @@ error:
 }
 #endif
 
+#ifdef WLAN_FEATURE_FILS_SK_SAP
+QDF_STATUS sme_handle_fils_hlp_msg(mac_handle_t mac_handle,
+				   uint8_t session_id,
+				   uint8_t *hlp_rsp,
+				   uint16_t hlp_rsp_len)
+{
+	return QDF_STATUS_SUCCESS;
+}
+#endif
+
 bool sme_is_sta_key_exchange_in_progress(mac_handle_t mac_handle,
 					 uint8_t session_id)
 {

@@ -814,10 +814,10 @@ struct wlan_dp_psoc_callbacks {
 	void (*dp_get_tsf_time)(qdf_netdev_t netdev, uint64_t input_time,
 				uint64_t *tsf_time);
 	void (*dp_tsf_timestamp_rx)(hdd_cb_handle ctx, qdf_nbuf_t nbuf);
-#ifdef WLAN_FEATURE_FILS_SK_SAP
+
 	void (*dp_fils_hlp_rx)(uint8_t intf_id, hdd_cb_handle ctx,
 			       qdf_nbuf_t nbuf);
-#endif
+
 	QDF_STATUS (*dp_nbuf_push_pkt)(qdf_nbuf_t nbuf,
 				       enum dp_nbuf_push_type type);
 

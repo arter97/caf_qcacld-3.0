@@ -672,4 +672,41 @@ hdd_cp_stats_cstats_log_sap_go_dfs_event(struct wlan_hdd_link_info *li,
 {
 }
 #endif /* WLAN_CHIPSET_STATS */
+
+#ifdef WLAN_FEATURE_FILS_SK_SAP
+void hdd_hlp_work_queue(struct work_struct *work);
+void hdd_fils_hlp_rx(uint8_t vdev_id, hdd_cb_handle ctx, qdf_nbuf_t netbuf);
+static inline void hdd_fils_hlp_init(struct hdd_context *hdd_ctx)
+{
+	qdf_spinlock_create(&hdd_ctx->hdd_hlp_data_lock);
+	qdf_list_create(&hdd_ctx->hdd_hlp_data_list, 0);
+}
+
+static inline void hdd_fils_hlp_deinit(struct hdd_context *hdd_ctx)
+{
+	qdf_list_destroy(&hdd_ctx->hdd_hlp_data_list);
+	qdf_spinlock_destroy(&hdd_ctx->hdd_hlp_data_lock);
+}
+
+static inline void hdd_fils_hlp_workqueue_init(struct hdd_context *hdd_ctx)
+{
+	hdd_debug("HLP Processing WorkQueue Initialised");
+	INIT_WORK(&hdd_ctx->hlp_processing_work,
+		  hdd_hlp_work_queue);
+}
+#else
+static inline void hdd_fils_hlp_init(struct hdd_context *hdd_ctx)
+{}
+
+static inline void hdd_fils_hlp_deinit(struct hdd_context *hdd_ctx)
+{}
+
+static inline void hdd_fils_hlp_rx(uint8_t vdev_id, hdd_cb_handle ctx,
+				   qdf_nbuf_t netbuf)
+{}
+
+static inline void hdd_fils_hlp_workqueue_init(struct hdd_context *hdd_ctx)
+{}
+#endif
+
 #endif /* end #if !defined(WLAN_HDD_HOSTAPD_H) */

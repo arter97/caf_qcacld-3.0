@@ -9372,3 +9372,70 @@ void hdd_cp_stats_cstats_log_sap_go_dfs_event(struct wlan_hdd_link_info *li,
 	wlan_cstats_host_stats(sizeof(struct cstats_sap_go_dfs_evt), &stat);
 }
 #endif /* WLAN_CHIPSET_STATS */
+
+#ifdef WLAN_FEATURE_FILS_SK_SAP
+void hdd_hlp_work_queue(struct work_struct *work)
+{
+	qdf_list_node_t *node;
+	QDF_STATUS status;
+	struct hdd_hlp_data_node *hlp_data_node = NULL;
+	struct hdd_context *hdd_ctx = container_of(work, struct hdd_context,
+						   hlp_processing_work);
+	mac_handle_t mac_handle = hdd_ctx->mac_handle;
+
+	if (!mac_handle) {
+		hdd_err("Failed to get mac handle for fils hlp workqueue");
+		return;
+	}
+
+	status = qdf_list_peek_front(&hdd_ctx->hdd_hlp_data_list, &node);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		hdd_err("Failed to get HLP Data Node from HDD");
+		return;
+	}
+
+	hlp_data_node = qdf_container_of(node, struct hdd_hlp_data_node, node);
+
+	sme_handle_fils_hlp_msg(mac_handle, hlp_data_node->vdev_id,
+				hlp_data_node->data,
+				hlp_data_node->data_len);
+
+	qdf_mem_free(hlp_data_node->data);
+
+	qdf_spin_lock_bh(&hdd_ctx->hdd_hlp_data_lock);
+	qdf_list_remove_node(&hdd_ctx->hdd_hlp_data_list,
+			     &hlp_data_node->node);
+	qdf_spin_unlock_bh(&hdd_ctx->hdd_hlp_data_lock);
+	qdf_mem_free(hlp_data_node);
+}
+
+void hdd_fils_hlp_rx(uint8_t vdev_id, hdd_cb_handle ctx, qdf_nbuf_t nbuf)
+{
+	struct hdd_context *hdd_ctx = hdd_cb_handle_to_context(ctx);
+	struct hdd_hlp_data_node *hlp_data_node =
+		qdf_mem_malloc(sizeof(struct hdd_hlp_data_node));
+
+	if (!hlp_data_node) {
+		hdd_err("Failed to allocate memory for HLP Data Node");
+		return;
+	}
+
+	hlp_data_node->data_len = qdf_nbuf_len(nbuf);
+	hlp_data_node->vdev_id = vdev_id;
+
+	hlp_data_node->data = qdf_mem_malloc(hlp_data_node->data_len);
+	if (!hlp_data_node->data) {
+		qdf_mem_free(hlp_data_node);
+		hdd_err("Failed to allocate memory for HLP Data");
+		return;
+	}
+	qdf_mem_copy(hlp_data_node->data, nbuf->data, qdf_nbuf_len(nbuf));
+	qdf_nbuf_kfree(nbuf);
+
+	qdf_spin_lock_bh(&hdd_ctx->hdd_hlp_data_lock);
+	qdf_list_insert_back(&hdd_ctx->hdd_hlp_data_list,
+			     &hlp_data_node->node);
+	qdf_spin_unlock_bh(&hdd_ctx->hdd_hlp_data_lock);
+	schedule_work(&hdd_ctx->hlp_processing_work);
+}
+#endif

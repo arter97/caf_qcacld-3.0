@@ -1826,6 +1826,22 @@ struct hdd_adapter_ops_history {
 	struct hdd_adapter_ops_record entry[WLAN_HDD_ADAPTER_OPS_HISTORY_MAX];
 };
 
+#ifdef WLAN_FEATURE_FILS_SK_SAP
+/**
+ * struct hdd_hlp_data_node - node for HLP response data
+ * @data: Pointer to HLP response data
+ * @data_len: Length of HLP Response
+ * @vdev_id: VDEV Id on which HLP response is received.
+ * @node: Pointer to node to traverse the HLP node
+ */
+struct hdd_hlp_data_node {
+	uint8_t *data;
+	uint16_t data_len;
+	uint8_t vdev_id;
+	qdf_list_node_t node;
+};
+#endif
+
 /**
  * struct hdd_dual_sta_policy - Concurrent STA policy configuration
  * @dual_sta_policy: Possible values are defined in enum
@@ -2083,6 +2099,9 @@ enum wlan_state_ctrl_str_id {
  * @wlan_hdd_akm_suites: Supported AKM suites for various interfaces
  * @sta_akms: Station mode supported AKMs
  * @ap_akms: AP mode supported AKMs
+ * @hdd_hlp_data_lock: lock to avoid race condition in handling hlp data
+ * @hdd_hlp_data_list: list to maintain hlp data packets
+ * @hlp_processing_work: work to process hlp data pkt for association
  */
 struct hdd_context {
 	struct wlan_objmgr_psoc *psoc;
@@ -2376,6 +2395,9 @@ struct hdd_context {
 	uint32_t *sta_akms;
 	uint32_t *ap_akms;
 #endif
+	qdf_spinlock_t hdd_hlp_data_lock;
+	qdf_list_t hdd_hlp_data_list;
+	struct work_struct hlp_processing_work;
 };
 
 /**

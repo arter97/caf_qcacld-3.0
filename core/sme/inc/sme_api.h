@@ -3070,6 +3070,31 @@ QDF_STATUS sme_handle_sae_msg(mac_handle_t mac_handle,
 }
 #endif
 
+#ifdef WLAN_FEATURE_FILS_SK_SAP
+/**
+ * sme_handle_fils_hlp_msg() - Sends HLP message received from data path
+ * @mac_handle: The handle returned by mac_open
+ * @session_id: session id
+ * @hlp_rsp: HLP response packet received
+ * @hlp_rsp_len: HLP response length
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS sme_handle_fils_hlp_msg(mac_handle_t mac_handle,
+				   uint8_t session_id,
+				   uint8_t *hlp_rsp,
+				   uint16_t hlp_rsp_len);
+#else
+static inline
+QDF_STATUS sme_handle_fils_hlp_msg(mac_handle_t mac_handle,
+				   uint8_t session_id,
+				   uint8_t *hlp_rsp,
+				   uint16_t hlp_rsp_len)
+{
+	return QDF_STATUS_SUCCESS;
+}
+#endif
+
 /**
  * sme_set_ba_buff_size() - sets BA buffer size
  * @mac_handle: Opaque handle to the global MAC context
