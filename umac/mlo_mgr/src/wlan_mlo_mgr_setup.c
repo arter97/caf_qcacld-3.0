@@ -603,7 +603,7 @@ void mlo_setup_update_soc_ready(struct wlan_objmgr_psoc *psoc, uint8_t grp_id)
 	struct mlo_mgr_context *mlo_ctx = wlan_objmgr_get_mlo_ctx();
 	struct mlo_setup_info *setup_info;
 	uint8_t chip_idx, tot_socs;
-	struct cdp_mlo_ctxt *dp_mlo_ctxt;
+	struct cdp_mlo_ctxt *dp_mlo_ctxt = NULL;
 
 	if (!mlo_ctx)
 		return;
@@ -645,9 +645,14 @@ void mlo_setup_update_soc_ready(struct wlan_objmgr_psoc *psoc, uint8_t grp_id)
 	if (setup_info->num_soc != tot_socs)
 		return;
 
-	dp_mlo_ctxt = cdp_mlo_ctxt_attach(wlan_psoc_get_dp_handle(psoc),
-			(struct cdp_ctrl_mlo_mgr *)mlo_ctx);
-	wlan_objmgr_set_dp_mlo_ctx(dp_mlo_ctxt, grp_id);
+	dp_mlo_ctxt = wlan_objmgr_get_dp_mlo_ctx(grp_id);
+
+	if (!dp_mlo_ctxt) {
+		dp_mlo_ctxt = cdp_mlo_ctxt_attach(
+				wlan_psoc_get_dp_handle(psoc),
+				(struct cdp_ctrl_mlo_mgr *)mlo_ctx);
+		wlan_objmgr_set_dp_mlo_ctx(dp_mlo_ctxt, grp_id);
+	}
 
 	for (chip_idx = 0; chip_idx < tot_socs; chip_idx++) {
 		struct wlan_objmgr_psoc *tmp_soc =
