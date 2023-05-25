@@ -76,6 +76,36 @@ dp_get_next_intf_no_lock(struct wlan_dp_psoc_context *dp_ctx,
 			 struct wlan_dp_intf *cur_intf,
 			 struct wlan_dp_intf **out_intf);
 
+#ifdef WLAN_FEATURE_FILS_SK_SAP
+/**
+ * dp_get_front_hlp_no_lock() - Get the first HLP node from the HLP list
+ * This API does not use any lock in it's implementation. It is the caller's
+ * directive to ensure concurrency safety.
+ * @dp_intf: pointer to the DP Interface
+ * @out_hlp: double pointer to pass the next hlp node
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+dp_get_front_hlp_no_lock(struct wlan_dp_intf *dp_intf,
+			 struct fils_peer_hlp_node **out_hlp);
+
+/**
+ * dp_get_next_hlp_no_lock() - Get the next HLP node from the HLP list
+ * This API does not use any lock in it's implementation. It is the caller's
+ * directive to ensure concurrency safety.
+ * @dp_intf: pointer to the DP interface
+ * @cur_hlp: pointer to the current hlp node
+ * @out_hlp: double pointer to pass the next HLP node
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+dp_get_next_hlp_no_lock(struct wlan_dp_intf *dp_intf,
+			struct fils_peer_hlp_node *cur_hlp,
+			struct fils_peer_hlp_node **out_hlp);
+
+#endif
 /**
  * __dp_take_ref_and_fetch_front_intf_safe - Helper macro to lock, fetch
  * front and next intf, take ref and unlock.
@@ -137,6 +167,84 @@ dp_get_next_intf_no_lock(struct wlan_dp_psoc_context *dp_ctx,
 struct wlan_dp_intf*
 dp_get_intf_by_macaddr(struct wlan_dp_psoc_context *dp_ctx,
 		       struct qdf_mac_addr *addr);
+
+#ifdef WLAN_FEATURE_FILS_SK_SAP
+/**
+ * dp_get_hlp_by_peeraddr() - API to Get HLP node from MAC address
+ * @dp_intf: DP interface
+ * @addr: MAC address
+ *
+ * Return: Pointer to Peer HLP Node
+ */
+struct fils_peer_hlp_node*
+dp_get_hlp_by_peeraddr(struct wlan_dp_intf *dp_intf,
+		       struct qdf_mac_addr *addr);
+
+/**
+ * dp_get_hlp_peer_state() - API to Get HLP Peer state from MAC address
+ * @dp_intf: DP interface
+ * @addr: MAC address of Peer
+ *
+ * Return: QDF_STATUS status in case of success else return error
+ */
+
+QDF_STATUS dp_get_hlp_peer_state(struct wlan_dp_intf *dp_intf,
+				 struct qdf_mac_addr *addr);
+
+/**
+ * dp_softap_handle_hlp() - API to handle HLP msg received from upper layer
+ * @dp_intf: DP interface
+ * @addr: MAC address of Peer
+ *
+ * Return: QDF_STATUS status in case of success else return error
+ */
+
+QDF_STATUS dp_softap_handle_hlp(struct wlan_dp_intf *dp_intf,
+				struct qdf_mac_addr *addr);
+
+/**
+ * dp_softap_hlp_init() - API to initialise context for hlp
+ * @dp_intf: DP interface
+ *
+ */
+void dp_softap_hlp_init(struct wlan_dp_intf *dp_intf);
+
+/**
+ * dp_softap_hlp_deinit() - API to initialise context for hlp
+ * @dp_intf: DP interface
+ *
+ */
+void dp_softap_hlp_deinit(struct wlan_dp_intf *dp_intf);
+
+#else
+static inline struct fils_peer_hlp_node*
+dp_get_hlp_by_peeraddr(struct wlan_dp_intf *dp_intf,
+		       struct qdf_mac_addr *addr)
+{
+	return NULL;
+}
+
+static inline QDF_STATUS
+dp_get_hlp_peer_state(struct wlan_dp_intf *dp_intf, struct qdf_mac_addr *addr)
+{
+	return QDF_STATUS_E_FAILURE;
+}
+
+static inline QDF_STATUS
+dp_softap_handle_hlp(struct wlan_dp_intf *dp_intf, struct qdf_mac_addr *addr)
+{
+	return QDF_STATUS_E_FAILURE;
+}
+
+static inline void dp_softap_hlp_init(struct wlan_dp_intf *dp_intf)
+{
+}
+
+static inline void dp_softap_hlp_deinit(struct wlan_dp_intf *dp_intf)
+{
+}
+
+#endif
 
 /**
  * dp_get_intf_by_netdev() - Api to Get interface from netdev

@@ -36,6 +36,7 @@
 #include "wlan_nlink_common.h"
 #include "wlan_pkt_capture_api.h"
 #include <cdp_txrx_ctrl.h>
+#include <cdp_txrx_peer_ops.h>
 #include <qdf_net_stats.h>
 #include "wlan_dp_prealloc.h"
 #include "wlan_dp_rx_thread.h"
@@ -243,7 +244,7 @@ ucfg_dp_create_intf(struct wlan_objmgr_psoc *psoc,
 	dp_mic_init_work(dp_intf);
 	qdf_atomic_init(&dp_ctx->num_latency_critical_clients);
 	qdf_atomic_init(&dp_intf->gro_disallowed);
-
+	dp_softap_hlp_init(dp_intf);
 	return QDF_STATUS_SUCCESS;
 }
 
@@ -279,7 +280,7 @@ ucfg_dp_destroy_intf(struct wlan_objmgr_psoc *psoc,
 	qdf_spin_lock_bh(&dp_ctx->intf_list_lock);
 	qdf_list_remove_node(&dp_ctx->intf_list, &dp_intf->node);
 	qdf_spin_unlock_bh(&dp_ctx->intf_list_lock);
-
+	dp_softap_hlp_deinit(dp_intf);
 	__qdf_mem_free(dp_intf);
 
 	return QDF_STATUS_SUCCESS;
@@ -1424,6 +1425,36 @@ QDF_STATUS ucfg_dp_rx_packet_cbk(struct wlan_objmgr_vdev *vdev, qdf_nbuf_t nbuf)
 	return dp_rx_packet_cbk(dp_link, nbuf);
 }
 
+#ifdef WLAN_FEATURE_FILS_SK_SAP
+QDF_STATUS ucfg_dp_hlp_state_update(struct wlan_objmgr_vdev *vdev,
+				    struct qdf_mac_addr *peer_mac)
+{
+	struct wlan_dp_intf *dp_intf;
+	struct fils_peer_hlp_node *hlp_node = NULL;
+
+	dp_intf = dp_get_vdev_priv_obj(vdev);
+	if (unlikely(!dp_intf)) {
+		dp_err_rl("DP interface not found");
+		return QDF_STATUS_E_INVAL;
+	}
+	hlp_node = qdf_mem_malloc(sizeof(struct fils_peer_hlp_node));
+	if (unlikely(!hlp_node)) {
+		dp_err_rl("Fail to allocate mem for hlp node" QDF_MAC_ADDR_FMT,
+			  QDF_MAC_ADDR_REF(peer_mac->bytes));
+		return QDF_STATUS_E_INVAL;
+	}
+	if (hlp_node) {
+		qdf_copy_macaddr(&hlp_node->peer_mac, peer_mac);
+		hlp_node->is_processing = true;
+	}
+
+	qdf_spin_lock_bh(&dp_intf->hlp_list_lock);
+	qdf_list_insert_front(&dp_intf->hlp_list, &hlp_node->node);
+	qdf_spin_unlock_bh(&dp_intf->hlp_list_lock);
+
+	return QDF_STATUS_SUCCESS;
+}
+#endif
 void ucfg_dp_tx_timeout(struct wlan_objmgr_vdev *vdev)
 {
 	struct wlan_dp_intf *dp_intf;
@@ -2238,6 +2269,9 @@ void ucfg_dp_register_hdd_callbacks(struct wlan_objmgr_psoc *psoc,
 		cb_obj->dp_get_tx_flow_low_watermark;
 	dp_ctx->dp_ops.dp_get_tsf_time = cb_obj->dp_get_tsf_time;
 	dp_ctx->dp_ops.dp_tsf_timestamp_rx = cb_obj->dp_tsf_timestamp_rx;
+#ifdef WLAN_FEATURE_FILS_SK_SAP
+	dp_ctx->dp_ops.dp_fils_hlp_rx = cb_obj->dp_fils_hlp_rx;
+#endif
 	dp_ctx->dp_ops.dp_gro_rx_legacy_get_napi =
 		cb_obj->dp_gro_rx_legacy_get_napi;
 	dp_ctx->dp_ops.dp_get_netdev_by_vdev_mac =

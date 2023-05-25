@@ -342,6 +342,12 @@ struct direct_link_info {
 	bool low_latency;
 };
 
+struct fils_peer_hlp_node {
+	qdf_list_node_t node;
+	bool is_processing;
+	struct qdf_mac_addr peer_mac;
+};
+
 /**
  * struct dp_fisa_reo_mismatch_stats - reo mismatch sub-case stats for FISA
  * @allow_cce_match: packet allowed due to cce mismatch
@@ -630,6 +636,8 @@ struct dp_rx_fst {
  * @dp_link_list: List of dp_links for this DP interface
  * @fpm_ctx: Flow policy manager context
  * @fim_ctx: Flow identification manager context
+ * @hlp_list_lock: Lock to protect hlp link_list operation
+ * @hlp_list: List of HLP peers for HLP response handling
  */
 struct wlan_dp_intf {
 	struct wlan_dp_psoc_context *dp_ctx;
@@ -701,6 +709,10 @@ struct wlan_dp_intf {
 #ifdef WLAN_SUPPORT_FLOW_PRIORTIZATION
 	struct fpm_table *fpm_ctx;
 	struct fim_vdev_ctx *fim_ctx;
+#endif
+#ifdef WLAN_FEATURE_FILS_SK_SAP
+	qdf_spinlock_t hlp_list_lock;
+	qdf_list_t hlp_list;
 #endif
 };
 

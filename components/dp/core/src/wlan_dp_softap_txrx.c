@@ -495,10 +495,11 @@ dp_softap_validate_peer_state(struct wlan_dp_link *dp_link,
 	*link_id = peer_info.vdev_id;
 	peer_state = peer_info.state;
 
-	if (peer_state == OL_TXRX_PEER_STATE_INVALID) {
-		dp_debug_rl("Failed to find right station");
-		return QDF_STATUS_E_FAILURE;
-	}
+	if (peer_state == OL_TXRX_PEER_STATE_AUTH)
+		return QDF_STATUS_SUCCESS;
+
+	if (peer_state == OL_TXRX_PEER_STATE_INVALID)
+		return dp_get_hlp_peer_state(dp_link->dp_intf, &mac_addr);
 
 	if (peer_state != OL_TXRX_PEER_STATE_CONN &&
 	    peer_state != OL_TXRX_PEER_STATE_AUTH) {
@@ -641,6 +642,24 @@ static inline void
 dp_softap_inspect_traffic_end_indication_pkt(struct wlan_dp_intf *dp_intf,
 					     qdf_nbuf_t nbuf)
 {}
+#endif
+#ifdef WLAN_FEATURE_FILS_SK_SAP
+static inline
+void dp_softap_fils_hlp_rx(struct wlan_dp_intf *dp_intf,
+			   qdf_nbuf_t netbuf)
+{
+	struct wlan_dp_psoc_context *dp_ctx = dp_intf->dp_ctx;
+
+	dp_ctx->dp_ops.dp_fils_hlp_rx(dp_intf->intf_id,
+				      dp_ctx->dp_ops.callback_ctx,
+				      netbuf);
+}
+#else
+static inline
+void dp_softap_fils_hlp_rx(struct wlan_dp_intf *dp_intf,
+			   qdf_nbuf_t netbuf)
+{ }
+
 #endif
 
 #if defined(WLAN_FEATURE_11BE_MLO) && defined(WLAN_FEATURE_MULTI_LINK_SAP) && \
@@ -794,8 +813,12 @@ QDF_STATUS dp_softap_start_xmit(qdf_nbuf_t nbuf, struct wlan_dp_link *dp_link)
 	QDF_NBUF_CB_TX_EXTRA_FRAG_FLAGS_NOTIFY_COMP(nbuf) = 0;
 
 	if (qdf_unlikely(QDF_NBUF_CB_GET_PACKET_TYPE(nbuf) ==
-			 QDF_NBUF_CB_PACKET_TYPE_DHCP))
+			 QDF_NBUF_CB_PACKET_TYPE_DHCP)) {
 		dp_softap_inspect_dhcp_packet(dp_link, nbuf, QDF_TX);
+		if (QDF_IS_STATUS_SUCCESS(dp_softap_handle_hlp(dp_intf,
+							       dest_mac_addr)))
+			return QDF_STATUS_SUCCESS;
+	}
 
 	if (qdf_unlikely(QDF_NBUF_CB_GET_PACKET_TYPE(nbuf) ==
 			 QDF_NBUF_CB_PACKET_TYPE_EAPOL)) {

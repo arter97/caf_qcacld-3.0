@@ -1929,4 +1929,8 @@ QDF_STATUS ucfg_dp_lapb_handle_app_ind(qdf_nbuf_t nbuf)
  * Return: Return true if ML mon mode supported
  */
 bool ucfg_dp_ml_mon_supported(void);
+#ifdef WLAN_FEATURE_FILS_SK_SAP
+QDF_STATUS ucfg_dp_hlp_state_update(struct wlan_objmgr_vdev *vdev,
+				    struct qdf_mac_addr *peer_addr);
+#endif
 #endif /* _WLAN_DP_UCFG_API_H_ */

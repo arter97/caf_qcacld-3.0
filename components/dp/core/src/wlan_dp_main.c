@@ -143,6 +143,46 @@ QDF_STATUS dp_get_next_intf_no_lock(struct wlan_dp_psoc_context *dp_ctx,
 	return status;
 }
 
+#ifdef WLAN_FEATURE_FILS_SK_SAP
+QDF_STATUS dp_get_front_hlp_no_lock(struct wlan_dp_intf *dp_intf,
+				    struct fils_peer_hlp_node **out_hlp)
+{
+	QDF_STATUS status;
+	qdf_list_node_t *node;
+	*out_hlp = NULL;
+	status = qdf_list_peek_front(&dp_intf->hlp_list, &node);
+	if (QDF_IS_STATUS_ERROR(status))
+		return status;
+
+	*out_hlp = qdf_container_of(node, struct fils_peer_hlp_node, node);
+
+	return QDF_STATUS_SUCCESS;
+}
+
+QDF_STATUS dp_get_next_hlp_no_lock(struct wlan_dp_intf *dp_intf,
+				   struct fils_peer_hlp_node *cur_hlp,
+				   struct fils_peer_hlp_node **out_hlp)
+{
+	QDF_STATUS status;
+	qdf_list_node_t *node;
+
+	if (!cur_hlp)
+		return QDF_STATUS_E_INVAL;
+
+	*out_hlp = NULL;
+
+	status = qdf_list_peek_next(&dp_intf->hlp_list,
+				    &cur_hlp->node,
+				    &node);
+	if (QDF_IS_STATUS_ERROR(status))
+		return status;
+
+	*out_hlp = qdf_container_of(node, struct fils_peer_hlp_node, node);
+
+	return status;
+}
+#endif
+
 struct wlan_dp_intf*
 dp_get_intf_by_macaddr(struct wlan_dp_psoc_context *dp_ctx,
 		       struct qdf_mac_addr *addr)
@@ -161,6 +201,72 @@ dp_get_intf_by_macaddr(struct wlan_dp_psoc_context *dp_ctx,
 
 	return NULL;
 }
+
+#ifdef WLAN_FEATURE_FILS_SK_SAP
+struct fils_peer_hlp_node*
+dp_get_hlp_by_peeraddr(struct wlan_dp_intf *dp_intf,
+		       struct qdf_mac_addr *addr)
+{
+	struct fils_peer_hlp_node *hlp_node;
+
+	qdf_spin_lock_bh(&dp_intf->hlp_list_lock);
+	for (dp_get_front_hlp_no_lock(dp_intf, &hlp_node); hlp_node;
+			dp_get_next_hlp_no_lock(dp_intf, hlp_node, &hlp_node)) {
+		if (qdf_is_macaddr_equal(&hlp_node->peer_mac, addr)) {
+			qdf_spin_unlock_bh(&dp_intf->hlp_list_lock);
+			return hlp_node;
+		}
+	}
+	qdf_spin_unlock_bh(&dp_intf->hlp_list_lock);
+
+	return NULL;
+}
+
+QDF_STATUS dp_get_hlp_peer_state(struct wlan_dp_intf *dp_intf,
+				 struct qdf_mac_addr *addr)
+{
+	struct fils_peer_hlp_node *hlp_node = NULL;
+
+	hlp_node = dp_get_hlp_by_peeraddr(dp_intf, addr);
+	if (hlp_node && hlp_node->is_processing)
+		return QDF_STATUS_SUCCESS;
+
+	dp_debug_rl("Failed to get peer state");
+	return QDF_STATUS_E_FAILURE;
+}
+
+QDF_STATUS dp_softap_handle_hlp(struct wlan_dp_intf *dp_intf,
+				struct qdf_mac_addr *addr)
+{
+	struct fils_peer_hlp_node *hlp_node = NULL;
+
+	hlp_node = dp_get_hlp_by_peeraddr(dp_intf, addr);
+	if (hlp_node && hlp_node->is_processing) {
+		dp_softap_fils_hlp_rx(dp_intf, nbuf);
+		qdf_spin_lock_bh(&dp_intf->hlp_list_lock);
+		qdf_list_remove_node(&dp_intf->hlp_list,
+				     &hlp_node->node);
+		qdf_spin_unlock_bh(&dp_intf->hlp_list_lock);
+		qdf_mem_free(hlp_node);
+		return QDF_STATUS_SUCCESS;
+	}
+	dp_debug_rl("Failed to handle HLP response");
+
+	return QDF_STATUS_E_FAILURE;
+}
+
+void dp_softap_hlp_init(struct wlan_dp_intf *dp_intf)
+{
+	qdf_spinlock_create(&dp_intf->hlp_list_lock);
+	qdf_list_create(&dp_intf->hlp_list, 0);
+}
+
+void dp_softap_hlp_deinit(struct wlan_dp_intf *dp_intf)
+{
+	qdf_spinlock_destroy(&dp_intf->hlp_list_lock);
+	qdf_list_destroy(&dp_intf->hlp_list);
+}
+#endif
 
 struct wlan_dp_intf*
 dp_get_intf_by_netdev(struct wlan_dp_psoc_context *dp_ctx, qdf_netdev_t dev)
