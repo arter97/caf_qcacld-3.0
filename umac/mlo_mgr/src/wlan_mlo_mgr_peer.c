@@ -1257,6 +1257,12 @@ QDF_STATUS wlan_mlo_peer_asreq(struct wlan_objmgr_vdev *vdev,
 		if (!iter_peer)
 			continue;
 
+		if (wlan_peer_get_peer_type(iter_peer) ==
+						WLAN_PEER_MLO_BRIDGE) {
+			link_count++;
+			continue;
+		}
+
 		for (i = 0; i < WLAN_UMAC_MLO_MAX_VDEVS; i++) {
 			vdev_link = link_vdevs[i];
 			if (!vdev_link)
