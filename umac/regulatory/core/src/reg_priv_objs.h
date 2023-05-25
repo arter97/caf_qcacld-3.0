@@ -357,7 +357,9 @@ struct wlan_regulatory_psoc_priv_obj {
  * @power_info: pointer to AFC power information received from the AFC event
  * sent by the target
  * @is_reg_noaction_on_afc_pwr_evt: indicates whether regulatory needs to
- * take action when AFC Power event is received
+ * take action when AFC Power event is received. This variable is supposed to
+ * be set in the enterprise mode where ACS is not called upon receiving AFC
+ * event.
  * @reg_afc_dev_deployment_type: AFC device deployment type from BDF
  * @sta_sap_scc_on_indoor_channel: Value of sap+sta scc on indoor support
  * @p2p_indoor_ch_support: Allow P2P GO in indoor channels

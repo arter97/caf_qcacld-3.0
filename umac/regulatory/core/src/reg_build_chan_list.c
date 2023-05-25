@@ -4391,8 +4391,11 @@ reg_process_afc_expiry_event(struct afc_regulatory_info *afc_info)
 		reg_reset_chan_list_and_power_event(pdev_priv_obj);
 		reg_client_afc_populate_channels(psoc, pdev);
 		reg_send_afc_payload_reset_event(pdev);
-		if (wlan_reg_is_noaction_on_afc_pwr_evt(pdev))
+		if (wlan_reg_is_noaction_on_afc_pwr_evt(pdev)) {
+			if (tx_ops->trigger_update_channel_list)
+				tx_ops->trigger_update_channel_list(pdev);
 			break;
+		}
 
 		if (tx_ops->trigger_acs_for_afc)
 			tx_ops->trigger_acs_for_afc(pdev);
