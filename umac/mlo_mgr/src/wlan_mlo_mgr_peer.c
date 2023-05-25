@@ -26,6 +26,7 @@
 #include "wlan_crypto_global_api.h"
 #include "wlan_mlo_mgr_setup.h"
 #include "wlan_utility.h"
+#include "wlan_mlo_epcs.h"
 
 static void mlo_partner_peer_create_post(struct wlan_mlo_dev_context *ml_dev,
 					 struct wlan_objmgr_vdev *vdev_link,
@@ -972,10 +973,22 @@ wlan_mlo_peer_set_t2lm_enable_val(struct wlan_mlo_peer_context *ml_peer,
 {
 	ml_peer->t2lm_policy.t2lm_enable_val = ml_info->t2lm_enable_val;
 }
+
+static void
+wlan_mlo_peer_initialize_epcs_info(struct wlan_mlo_peer_context *ml_peer)
+{
+	ml_peer->epcs_info.state = EPCS_DOWN;
+	ml_peer->epcs_info.self_gen_dialog_token = 0;
+}
+
 #else
 static void
 wlan_mlo_peer_set_t2lm_enable_val(struct wlan_mlo_peer_context *ml_peer,
 				  struct mlo_partner_info *ml_info)
+{}
+
+static void
+wlan_mlo_peer_initialize_epcs_info(struct wlan_mlo_peer_context *ml_peer)
 {}
 #endif /* WLAN_FEATURE_11BE */
 
@@ -1435,6 +1448,7 @@ QDF_STATUS wlan_mlo_peer_create(struct wlan_objmgr_vdev *vdev,
 		qdf_copy_macaddr((struct qdf_mac_addr *)&ml_peer->peer_mld_addr,
 				 (struct qdf_mac_addr *)&link_peer->mldaddr[0]);
 		wlan_mlo_peer_set_t2lm_enable_val(ml_peer, ml_info);
+		wlan_mlo_peer_initialize_epcs_info(ml_peer);
 
 		/* Allocate AID */
 		if (wlan_vdev_mlme_get_opmode(vdev) == QDF_SAP_MODE) {
