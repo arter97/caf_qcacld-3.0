@@ -779,11 +779,21 @@ scm_copy_info_from_dup_entry(struct wlan_objmgr_pdev *pdev,
 	 *   -- RSSI is less than -80, this indicate that the signal has leaked
 	 *       in adjacent channel.
 	 */
-	if ((scan_params->frm_subtype == MGMT_SUBTYPE_BEACON) &&
+	time_gap =
+		scan_params->scan_entry_time -
+		scan_entry->rssi_timestamp;
+
+	if ((scan_params->frm_subtype == MGMT_SUBTYPE_BEACON ||
+	     scan_params->frm_subtype == MGMT_SUBTYPE_PROBE_RESP) &&
 	    !util_scan_entry_htinfo(scan_params) &&
 	    !util_scan_entry_ds_param(scan_params) &&
+	    !util_scan_entry_vhtop(scan_params) &&
+	    !util_scan_entry_heop(scan_params) &&
 	    (scan_params->channel.chan_freq != scan_entry->channel.chan_freq) &&
-	    (scan_params->rssi_raw  < ADJACENT_CHANNEL_RSSI_THRESHOLD)) {
+	    (scan_params->rssi_raw  < ADJACENT_CHANNEL_RSSI_THRESHOLD ||
+	     (time_gap < WLAN_RSSI_AVERAGING_TIME &&
+	      (scan_params->rssi_raw + ADJACENT_CHANNEL_RSSI_DIFF_THRESHOLD) <
+	      scan_entry->rssi_raw))) {
 		scan_params->channel.chan_freq = scan_entry->channel.chan_freq;
 		scan_params->channel_mismatch = true;
 	}
@@ -803,9 +813,6 @@ scm_copy_info_from_dup_entry(struct wlan_objmgr_pdev *pdev,
 		 * Otherwise new frames RSSI and SNR are more representative
 		 * of the signal strength.
 		 */
-		time_gap =
-			scan_params->scan_entry_time -
-			scan_entry->rssi_timestamp;
 		if (time_gap > WLAN_RSSI_AVERAGING_TIME) {
 			scan_params->avg_rssi =
 				WLAN_RSSI_IN(scan_params->rssi_raw);
