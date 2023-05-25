@@ -38,6 +38,8 @@
 #define WLAN_UMAC_MLO_MAX_VDEVS 2
 #endif
 
+#include <wlan_mlo_epcs.h>
+
 /* MAX instances of ML devices */
 #ifndef WLAN_UMAC_MLO_MAX_DEV
 #define WLAN_UMAC_MLO_MAX_DEV 2
@@ -557,6 +559,7 @@ struct wlan_mlo_mld_cap {
  * @nawds_config: eack link peer's NAWDS configuration
  * @pending_auth: Holds pending auth request
  * @t2lm_policy: TID-to-link mapping information
+ * @epcs_info: EPCS information
  * @msd_cap_present: Medium Sync Capability present bit
  * @mlpeer_emlcap: EML capability information for ML peer
  * @mlpeer_msdcap: Medium Sync Delay capability information for ML peer
@@ -591,6 +594,7 @@ struct wlan_mlo_peer_context {
 #endif
 #ifdef WLAN_FEATURE_11BE
 	struct wlan_mlo_peer_t2lm_policy t2lm_policy;
+	struct wlan_mlo_peer_epcs_info epcs_info;
 #endif
 	bool msd_cap_present;
 	struct wlan_mlo_eml_cap mlpeer_emlcap;
