@@ -1111,9 +1111,6 @@ wlan_rptr_conn_up_dbdc_process(struct wlan_objmgr_vdev *vdev,
 	u8 disconnect_rptr_clients = 0;
 	struct iterate_info iterate_msg;
 #endif
-#if QCA_AIRTIME_FAIRNESS
-	struct ieee80211vap *vap = wlan_vdev_get_vap(vdev);
-#endif
 	osif_dev *osdev;
 
 	g_priv = wlan_rptr_get_global_ctx();
@@ -1131,11 +1128,6 @@ wlan_rptr_conn_up_dbdc_process(struct wlan_objmgr_vdev *vdev,
 	RPTR_GLOBAL_LOCK(&g_priv->rptr_global_lock);
 	g_priv->num_stavaps_up++;
 	RPTR_LOGI("Number of STA VAPs connected:%d", g_priv->num_stavaps_up);
-#if QCA_AIRTIME_FAIRNESS
-	/* Trigger peer join leave for atf peer nodes */
-	if (vap && vap->iv_bss)
-		wlan_atf_peer_join_leave(vap->iv_bss->peer_obj, 1);
-#endif
 	RPTR_GLOBAL_UNLOCK(&g_priv->rptr_global_lock);
 
 	osdev = ath_netdev_priv(dev);
