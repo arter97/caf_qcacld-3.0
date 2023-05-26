@@ -6863,6 +6863,13 @@ dp_tx_multipass_send_pkt_to_repeater(struct dp_soc *soc, struct dp_vdev *vdev,
 		}
 	}
 }
+#else
+static inline void
+dp_tx_multipass_send_pkt_to_repeater(struct dp_soc *soc, struct dp_vdev *vdev,
+				     qdf_nbuf_t nbuf,
+				     struct dp_tx_msdu_info_s *msdu_info)
+{
+}
 #endif
 
 bool dp_tx_multipass_process(struct dp_soc *soc, struct dp_vdev *vdev,
