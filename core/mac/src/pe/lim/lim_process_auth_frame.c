@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2011-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -312,6 +312,90 @@ static void lim_process_auth_open_system_algo(struct mac_context *mac_ctx,
 					LIM_NO_WEP_IN_FC,
 					pe_session);
 }
+
+#ifdef WLAN_FEATURE_FILS_SK_SAP
+static void
+lim_process_fils_auth_req_frame(struct mac_context *mac_ctx,
+				tpSirMacMgmtHdr mac_hdr,
+				tSirMacAuthFrameBody *rx_auth_frm_body,
+				tSirMacAuthFrameBody *auth_frame,
+				struct pe_session *pe_session)
+{
+	struct tLimPreAuthNode *auth_node;
+	struct pe_fils_session *fils_info;
+	tpLimPreAuthTable pPreAuthTimerTable;
+
+	pe_debug("FILS Auth Req frame from sta: " QDF_MAC_ADDR_FMT,
+		 QDF_MAC_ADDR_REF(mac_hdr->sa));
+
+	pPreAuthTimerTable = &mac_ctx->lim.gLimPreAuthTimerTable;
+	/* Create entry for this STA in pre-auth list */
+	auth_node = lim_acquire_free_pre_auth_node(mac_ctx,
+						   pPreAuthTimerTable);
+	if (!auth_node) {
+		pe_warn("Max pre-auth nodes reached SA: " QDF_MAC_ADDR_FMT,
+			QDF_MAC_ADDR_REF(mac_hdr->sa));
+		return;
+	}
+	qdf_mem_copy((uint8_t *)auth_node->peerMacAddr,
+		     mac_hdr->sa, sizeof(tSirMacAddr));
+	auth_node->mlmState = eLIM_MLM_AUTHENTICATED_STATE;
+	auth_node->authType = (tAniAuthType) rx_auth_frm_body->authAlgoNumber;
+	auth_node->fSeen = 0;
+	auth_node->fTimerStarted = 0;
+	auth_node->seq_num = ((mac_hdr->seqControl.seqNumHi << 4) |
+			      (mac_hdr->seqControl.seqNumLo));
+	auth_node->timestamp = qdf_mc_timer_get_system_ticks();
+
+	auth_node->fils_info = qdf_mem_malloc(sizeof(struct pe_fils_session));
+	fils_info = auth_node->fils_info;
+	if (!fils_info) {
+		pe_err("Failed to allocate memory for Fils Info Structure");
+		lim_release_pre_auth_node(mac_ctx, auth_node);
+		return;
+	}
+
+	lim_add_pre_auth_node(mac_ctx, auth_node);
+
+	if (!lim_process_fils_auth_frame1(mac_ctx, pe_session,
+					  rx_auth_frm_body, mac_hdr->sa)) {
+		pe_debug("Failed to process fils auth frame");
+		qdf_mem_free(fils_info);
+		auth_node->fils_info = NULL;
+		lim_delete_pre_auth_node(mac_ctx, mac_hdr->sa);
+
+		/*
+		 * Send Authenticaton frame with Failure status code
+		 */
+		auth_frame->authAlgoNumber = rx_auth_frm_body->authAlgoNumber;
+		auth_frame->authTransactionSeqNumber =
+			rx_auth_frm_body->authTransactionSeqNumber + 1;
+		auth_frame->authStatusCode = STATUS_UNSPECIFIED_FAILURE;
+		lim_send_auth_mgmt_frame(mac_ctx, auth_frame, mac_hdr->sa,
+					 LIM_NO_WEP_IN_FC, pe_session);
+		return;
+	}
+
+	/*
+	 * Send Authenticaton frame with Success status code.
+	 */
+	auth_frame->authAlgoNumber = rx_auth_frm_body->authAlgoNumber;
+	auth_frame->authTransactionSeqNumber =
+		rx_auth_frm_body->authTransactionSeqNumber + 1;
+	auth_frame->authStatusCode = STATUS_SUCCESS;
+	lim_send_auth_mgmt_frame(mac_ctx, auth_frame, mac_hdr->sa,
+				 LIM_NO_WEP_IN_FC,
+				 pe_session);
+}
+#else
+static inline void
+lim_process_fils_auth_req_frame(struct mac_context *mac_ctx,
+				tpSirMacMgmtHdr mac_hdr,
+				tSirMacAuthFrameBody *rx_auth_frm_body,
+				tSirMacAuthFrameBody *auth_frame,
+				struct pe_session *pe_session)
+{}
+#endif
 
 static QDF_STATUS
 lim_validate_mac_address_in_auth_frame(struct mac_context *mac_ctx,
@@ -1132,6 +1216,11 @@ static void lim_process_auth_frame_type1(struct mac_context *mac_ctx,
 		case eSIR_SHARED_KEY:
 			lim_process_auth_shared_system_algo(mac_ctx, mac_hdr,
 				rx_auth_frm_body, auth_frame, pe_session);
+			break;
+		case SIR_FILS_SK_WITHOUT_PFS:
+			lim_process_fils_auth_req_frame(mac_ctx, mac_hdr,
+							rx_auth_frm_body,
+							auth_frame, pe_session);
 			break;
 		default:
 			pe_err("rx Auth frm for unsupported auth algo %d "

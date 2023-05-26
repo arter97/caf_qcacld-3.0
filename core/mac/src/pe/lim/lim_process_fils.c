@@ -1177,6 +1177,75 @@ void lim_add_fils_data_to_auth_frame(struct pe_session *session,
 	body = body + fils_info->fils_erp_reauth_pkt_len;
 }
 
+#ifdef WLAN_FEATURE_FILS_SK_SAP
+/**
+ * lim_add_fils_data_to_auth_rsp_frame()- This API adds FILS data to auth frame.
+ * Following will be added in this.
+ * RSNIE
+ * SNonce
+ * Session
+ * Wrapped data
+ *
+ * @session: PE session
+ * @body: pointer to auth frame where data needs to be added
+ * @peer_mac_addr: Peer Mac Address for Sta
+ *
+ * Return: None
+ */
+void lim_add_fils_data_to_auth_rsp_frame(struct pe_session *session,
+					 uint8_t *body,
+					 tSirMacAddr peer_mac_addr)
+{
+	struct pe_fils_session *fils_info = NULL;
+
+	fils_info = lim_get_fils_info(session, peer_mac_addr);
+
+	if (!fils_info) {
+		pe_err("Failed to get fils_info");
+		return;
+	}
+
+	/* RSN IE */
+	qdf_mem_copy(body, fils_info->rsn_ie, fils_info->rsn_ie_len);
+	body += fils_info->rsn_ie_len;
+	lim_fils_data_dump("FILS RSN", fils_info->rsn_ie,
+			   fils_info->rsn_ie_len);
+
+	/* ***Nonce*** */
+	/* Add element id */
+	*body = SIR_MAX_ELEMENT_ID;
+	body++;
+	/* Add nonce length + 1 for ext element id */
+	*body = SIR_FILS_NONCE_LENGTH + 1;
+	body++;
+	/* Add ext element */
+	*body = SIR_FILS_NONCE_EXT_EID;
+	body++;
+	/* Add data */
+	qdf_mem_copy(body, fils_info->fils_nonce, SIR_FILS_NONCE_LENGTH);
+	body = body + SIR_FILS_NONCE_LENGTH;
+	/* Dump data */
+	lim_fils_data_dump("fils anonce", fils_info->fils_nonce,
+			   SIR_FILS_NONCE_LENGTH);
+
+	/*   *** Session ***  */
+	/* Add element id */
+	*body = SIR_MAX_ELEMENT_ID;
+	body++;
+	/* Add nonce length + 1 for ext element id */
+	*body = SIR_FILS_SESSION_LENGTH + 1;
+	body++;
+	/* Add ext element */
+	*body = SIR_FILS_SESSION_EXT_EID;
+	body++;
+	/* Add data */
+	qdf_mem_copy(body, fils_info->fils_session, SIR_FILS_SESSION_LENGTH);
+	body = body + SIR_FILS_SESSION_LENGTH;
+	/* dump data */
+	lim_fils_data_dump("Fils Session",
+			   fils_info->fils_session, SIR_FILS_SESSION_LENGTH);
+}
+#endif
 /**
  * lim_generate_fils_pmkr0() - Derive PMKR0 and PMKR0-Name from FT-FILS
  * key data
@@ -1547,6 +1616,119 @@ static uint8_t lim_get_akm_type(struct wlan_objmgr_vdev *vdev)
 	else
 		return eCSR_AUTH_TYPE_FILS_SHA256;
 }
+
+#ifdef WLAN_FEATURE_FILS_SK_SAP
+/**
+ * lim_process_fils_auth_frame1()- This API process FILS data from auth request
+ *
+ * @mac_ctx: mac context
+ * @session: PE session
+ * @rx_auth_frm_body: pointer to auth frame
+ * @peer_mac_addr: Peer Mac Address
+ *
+ * Return: true if FILS data needs to be processed else false
+ */
+bool lim_process_fils_auth_frame1(struct mac_context *mac_ctx,
+				  struct pe_session *pe_session,
+				  tSirMacAuthFrameBody *rx_auth_frm_body,
+				  tSirMacAddr peer_mac_addr)
+{
+	uint32_t ret, i;
+	bool pmkid_found = false;
+	struct wlan_crypto_pmksa *pmksa = NULL;
+	tDot11fIERSN dot11f_ie_rsn = {0};
+	struct pe_fils_session *fils_info = NULL;
+	struct qdf_mac_addr *sta_addr = (struct qdf_mac_addr *)peer_mac_addr;
+
+	if (rx_auth_frm_body->authAlgoNumber != SIR_FILS_SK_WITHOUT_PFS) {
+		pe_debug("Auth type is not FILS_SK");
+		return false;
+	}
+
+	fils_info = lim_get_fils_info(pe_session, peer_mac_addr);
+
+	if (!fils_info) {
+		pe_debug("Failed to get fils_info");
+		return false;
+	}
+
+	fils_info->is_fils_connection = true;
+
+	ret = dot11f_unpack_ie_rsn(mac_ctx, &rx_auth_frm_body->rsn_ie.info[0],
+				   rx_auth_frm_body->rsn_ie.length,
+				   &dot11f_ie_rsn, 0);
+	if (!DOT11F_SUCCEEDED(ret)) {
+		pe_debug("unpack failed, ret: %d", ret);
+		return false;
+	}
+
+	for (i = 0; i < dot11f_ie_rsn.pmkid_count; i++) {
+		pmksa = wlan_crypto_get_pmksa(pe_session->vdev,
+					      sta_addr);
+		if (pmksa) {
+			if (qdf_mem_cmp(pmksa->pmkid, dot11f_ie_rsn.pmkid[i],
+					PMKID_LEN))
+				continue;
+			pmkid_found = true;
+			pe_debug("pmkid match in rsn ie total_count %d",
+				 dot11f_ie_rsn.pmkid_count);
+			break;
+		}
+	}
+	if (!pmkid_found) {
+		pe_debug("pmkid not found for sta ");
+		return false;
+	}
+	/*
+	 * Update the fils_info structure based on auth request
+	 */
+
+	fils_info->akm = lim_get_akm_type(pe_session->vdev);
+	fils_info->auth = SIR_FILS_SK_WITHOUT_PFS;
+
+	fils_info->fils_pmk_len = pmksa->pmk_len;
+	if (fils_info->fils_pmk)
+		qdf_mem_free(fils_info->fils_pmk);
+
+	fils_info->fils_pmk = qdf_mem_malloc(fils_info->fils_pmk_len);
+	if (!fils_info->fils_pmk) {
+		pe_err("Failed to allocate the memory for fils_pmk");
+		return false;
+	}
+
+	/* RSN_IE */
+	wlan_crypto_build_rsnie_with_pmksa(pe_session->vdev,
+					   fils_info->rsn_ie, pmksa);
+
+	fils_info->rsn_ie_len = fils_info->rsn_ie[1] + 2;
+
+	/* PMK ID */
+	qdf_mem_copy(fils_info->fils_pmkid, pmksa->pmkid,
+		     PMKID_LEN);
+
+	/* PMK */
+	qdf_mem_copy(fils_info->fils_pmk, pmksa->pmk,
+		     fils_info->fils_pmk_len);
+
+	/* Snonce */
+	qdf_mem_copy(fils_info->auth_info.fils_nonce,
+		     rx_auth_frm_body->nonce, SIR_FILS_NONCE_LENGTH);
+
+	/* Anonce */
+	qdf_get_random_bytes(fils_info->fils_nonce, SIR_FILS_NONCE_LENGTH);
+
+	/* fils_session */
+	qdf_mem_copy(fils_info->fils_session,
+		     rx_auth_frm_body->session, SIR_FILS_SESSION_LENGTH);
+
+	lim_get_keys(mac_ctx, pe_session, peer_mac_addr);
+
+	lim_generate_key_auth(pe_session, peer_mac_addr);
+	lim_generate_ap_key_auth(pe_session, peer_mac_addr);
+
+	return true;
+}
+#endif
 
 void lim_update_fils_config(struct mac_context *mac_ctx,
 			    struct pe_session *session,

@@ -3706,7 +3706,18 @@ alloc_packet:
 						SIR_MAC_AUTH_FRAME_1)) {
 			pe_debug("FILS: appending fils Auth data");
 			lim_add_fils_data_to_auth_frame(session, body);
+		} else if ((auth_frame->authAlgoNumber ==
+					SIR_FILS_SK_WITHOUT_PFS) &&
+			   (auth_frame->authTransactionSeqNumber ==
+						SIR_MAC_AUTH_FRAME_2)) {
+			if (auth_frame->authStatusCode == STATUS_SUCCESS) {
+				pe_debug("FILS: appending fils Auth data for Frame 2");
+				lim_add_fils_data_to_auth_rsp_frame(session,
+								    body,
+								    peer_addr);
+			}
 		}
+
 	}
 
 	if (mlo_ie_len && mlo_ie_buf) {

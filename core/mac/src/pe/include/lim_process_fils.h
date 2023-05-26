@@ -54,6 +54,55 @@ bool lim_process_fils_auth_frame2(struct mac_context *mac_ctx,
  */
 void lim_add_fils_data_to_auth_frame(struct pe_session *session, uint8_t *body);
 
+#ifdef WLAN_FEATURE_FILS_SK_SAP
+/**
+ * lim_process_fils_auth_frame1()- This API processes fils data from auth req
+ * @mac_ctx: mac context
+ * @session: PE session
+ * @rx_auth_frm_body: pointer to auth frame
+ * @peer_mac_addr: mac address for peer
+ *
+ * Return: true if FILS data needs to be processed else false
+ */
+bool lim_process_fils_auth_frame1(struct mac_context *mac_ctx,
+				  struct pe_session *pe_session,
+				  tSirMacAuthFrameBody *rx_auth_frm_body,
+				  tSirMacAddr peer_mac_addr);
+
+/**
+ * lim_add_fils_data_to_auth_rsp_frame()- This API adds FILS data to auth frame.
+ * Following will be added in this.
+ *     1. RSNIE
+ *     2. SNonce
+ *     3. Session
+ *     4. Wrapped data
+ *
+ * @session: PE session
+ * @body: pointer to auth frame where data needs to be added
+ * @peer_mac_addr: mac address for peer
+ *
+ * Return: None
+ */
+void lim_add_fils_data_to_auth_rsp_frame(struct pe_session *session,
+					 uint8_t *body,
+					 tSirMacAddr peer_mac_addr);
+
+#else
+static inline bool
+lim_process_fils_auth_frame1(struct mac_context *mac_ctx,
+			     struct pe_session *pe_session,
+			     tSirMacAuthFrameBody *rx_auth_frm_body,
+			     tSirMacAddr peer_mac_addr)
+{
+	return true;
+}
+
+static inline void
+lim_add_fils_data_to_auth_rsp_frame(struct pe_session *session,
+				    uint8_t *body,
+				    tSirMacAddr peer_mac_addr)
+{ }
+#endif
 /**
  * lim_is_valid_fils_auth_frame()- This API checks whether auth frame is a
  * valid frame.
