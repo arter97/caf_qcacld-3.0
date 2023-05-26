@@ -445,6 +445,7 @@ static void __hdd_softap_hard_start_xmit(struct sk_buff *skb,
 	sme_ac_enum_type ac = SME_AC_BE;
 	struct hdd_adapter *adapter = (struct hdd_adapter *) netdev_priv(dev);
 	struct hdd_ap_ctx *ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(adapter);
+	struct hdd_context *hdd_ctx = adapter->hdd_ctx;
 	struct qdf_mac_addr *dest_mac_addr;
 	uint8_t sta_id;
 	uint32_t num_seg;
