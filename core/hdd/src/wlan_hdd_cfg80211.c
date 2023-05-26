@@ -19806,6 +19806,24 @@ wlan_hdd_update_max_connect_akm(struct wiphy *wiphy)
 }
 #endif
 
+#ifdef NL80211_EXT_FEATURE_PUNCT_SUPPORT
+/**
+ * NL80211_EXT_FEATURE_PUNCT() - set feature flag for puncture
+ * @wiphy: wiphy
+ *
+ * Return: void
+ */
+static void wlan_hdd_set_ext_feature_punct(struct wiphy *wiphy)
+{
+	wiphy_ext_feature_set(wiphy,
+			      NL80211_EXT_FEATURE_PUNCT);
+}
+#else
+static inline void wlan_hdd_set_ext_feature_punct(struct wiphy *wiphy)
+{
+}
+#endif
+
 /*
  * FUNCTION: wlan_hdd_cfg80211_init
  * This function is called by hdd_wlan_startup()
@@ -19949,6 +19967,7 @@ int wlan_hdd_cfg80211_init(struct device *dev,
 	wlan_hdd_update_eapol_over_nl80211_flags(wiphy);
 
 	wlan_hdd_set_auth_deauth_random_ta_feature_flag(wiphy);
+	wlan_hdd_set_ext_feature_punct(wiphy);
 
 	hdd_exit();
 	return 0;
