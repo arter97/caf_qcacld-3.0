@@ -473,8 +473,7 @@ QDF_STATUS ucfg_disable_nan_discovery(struct wlan_objmgr_psoc *psoc,
  * @ndi_vdev_id: vdev_id of the NDI to be disabled
  *
  * Disable all the NDPs present on the given NDI by sending NDP_END_ALL
- * to firmware. Firmwere sends an immediate response(NDP_HOST_UPDATE) with
- * ndp_disable param as 1 followed by NDP_END indication for all the NDPs.
+ * to firmware.
  *
  * Return: status of operation
  */
