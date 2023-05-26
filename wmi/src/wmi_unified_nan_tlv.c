@@ -655,31 +655,6 @@ static QDF_STATUS nan_ndp_end_req_tlv(wmi_unified_t wmi_handle,
 	return status;
 }
 
-static QDF_STATUS
-extract_ndp_host_event_tlv(wmi_unified_t wmi_handle, uint8_t *data,
-			   struct nan_datapath_host_event *evt)
-{
-	WMI_NDP_EVENTID_param_tlvs *event;
-	wmi_ndp_event_param *fixed_params;
-
-	event = (WMI_NDP_EVENTID_param_tlvs *)data;
-	fixed_params = event->fixed_param;
-
-	evt->vdev =
-		wlan_objmgr_get_vdev_by_id_from_psoc(wmi_handle->soc->wmi_psoc,
-						     fixed_params->vdev_id,
-						     WLAN_NAN_ID);
-	if (!evt->vdev) {
-		wmi_err("vdev is null");
-		return QDF_STATUS_E_INVAL;
-	}
-
-	evt->ndp_termination_in_progress =
-		       fixed_params->ndp_termination_in_progress ? true : false;
-
-	return QDF_STATUS_SUCCESS;
-}
-
 static QDF_STATUS extract_ndp_initiator_rsp_tlv(wmi_unified_t wmi_handle,
 			uint8_t *data, struct nan_datapath_initiator_rsp *rsp)
 {
@@ -1251,5 +1226,4 @@ void wmi_nan_attach_tlv(wmi_unified_t wmi_handle)
 	ops->extract_ndp_end_rsp = extract_ndp_end_rsp_tlv;
 	ops->extract_ndp_end_ind = extract_ndp_end_ind_tlv;
 	ops->extract_ndp_sch_update = extract_ndp_sch_update_tlv;
-	ops->extract_ndp_host_event = extract_ndp_host_event_tlv;
 }
