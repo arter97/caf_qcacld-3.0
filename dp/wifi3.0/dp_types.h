@@ -2205,7 +2205,7 @@ enum dp_context_type {
  * @dp_peer_rx_reorder_queue_setup: Dp peer reorder queue setup
  * @dp_find_peer_by_destmac:
  * @dp_bank_reconfig:
- * @dp_rx_replenish_soc_get:
+ * @dp_get_soc_by_chip_id: Get soc by chip id
  * @dp_soc_get_num_soc:
  * @dp_reconfig_tx_vdev_mcast_ctrl:
  * @dp_cc_reg_cfg_init:
@@ -2408,8 +2408,8 @@ struct dp_arch_ops {
 						   uint8_t vdev_id);
 	void (*dp_bank_reconfig)(struct dp_soc *soc, struct dp_vdev *vdev);
 
-	struct dp_soc * (*dp_rx_replenish_soc_get)(struct dp_soc *soc,
-						   uint8_t chip_id);
+	struct dp_soc * (*dp_get_soc_by_chip_id)(struct dp_soc *soc,
+						 uint8_t chip_id);
 
 	uint8_t (*dp_soc_get_num_soc)(struct dp_soc *soc);
 	void (*dp_reconfig_tx_vdev_mcast_ctrl)(struct dp_soc *soc,
