@@ -118,7 +118,7 @@ struct vdev_adfs_complete_status {
 	uint32_t chan_width;
 	uint32_t center_freq1;
 	uint32_t center_freq2;
-	uint32_t ocac_status;
+	enum ocac_status_type ocac_status;
 };
 
 extern struct dfs_to_mlme global_dfs_to_mlme;
