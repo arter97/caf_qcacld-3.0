@@ -198,4 +198,16 @@ enum channel_dfs_state {
 	CH_DFS_S_PRECAC_COMPLETED,
 	CH_DFS_S_NON_DFS,
 };
+
+/**
+ * enum ocac_status_type - Enum for OCAC status for Agile DFS.
+ * @OCAC_SUCCESS:       OCAC completed successfully.
+ * @OCAC_RESET:         OCAC status was reset.
+ * @OCAC_CANCEL:        OCAC canceled.
+ */
+enum ocac_status_type {
+	OCAC_SUCCESS = 0,
+	OCAC_RESET,
+	OCAC_CANCEL,
+};
 #endif
