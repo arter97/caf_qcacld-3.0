@@ -1431,6 +1431,65 @@ struct erp_ie {
 } qdf_packed;
 
 /**
+ * struct ac_param_record: AC Parameter Record
+ * @aci_aifsn: ACI/AIFSN field
+ * @ecw_min_max: ECWmin/ECWmax field
+ * @txop_limit: TXOP Limit
+ */
+struct ac_param_record {
+	uint8_t aci_aifsn;
+	uint8_t ecw_min_max;
+	uint16_t txop_limit;
+} qdf_packed;
+
+/* Max number of access catogeries */
+#define MAX_NUM_AC 4
+
+/**
+ * struct edca_ie: EDCA Parameter Set element
+ * @ie: EDCA Element id
+ * @len: EDCA IE length
+ * @qos_info: QOS information
+ * @update_edca_info: Update EDCA Info
+ * @ac_record: AC Parameter Record
+ */
+struct edca_ie {
+	uint8_t ie;
+	uint8_t len;
+	uint8_t qos_info;
+	uint8_t update_edca_info;
+	struct ac_param_record ac_record[MAX_NUM_AC];
+} qdf_packed;
+
+/**
+ * struct muac_param_record: MU AC Parameter Record
+ * @aci_aifsn: ACI/AIFSN field
+ * @ecw_min_max: ECWmin/ECWmax field
+ * @mu_edca_timer: MU EDCA Timer
+ */
+struct muac_param_record {
+	uint8_t aci_aifsn;
+	uint8_t ecw_min_max;
+	uint8_t mu_edca_timer;
+} qdf_packed;
+
+/**
+ * struct muedca_ie: MU EDCA Parameter Set element
+ * @elem_id: MU EDCA Element id
+ * @elem_len: MU EDCA IE length
+ * @elem_id_extn: MU EDCA extension element id
+ * @qos_info: QoS Info
+ * @mu_record: MU AC Parameter Record
+ */
+struct muedca_ie {
+	uint8_t elem_id;
+	uint8_t elem_len;
+	uint8_t elem_id_extn;
+	uint8_t qos_info;
+	struct muac_param_record mu_record[MAX_NUM_AC];
+} qdf_packed;
+
+/**
  * struct htcap_cmn_ie: HT common IE info
  * @hc_cap: HT capabilities
  * @ampdu_param: ampdu params
@@ -2735,6 +2794,67 @@ struct wlan_ml_rv_linfo_perstaprof_stainfo_opparams {
  * End of definitions related to MLO specific aspects of Reduced Neighbor Report
  * element.
  */
+
+/* Definitions related to Priority access variant Multi-Link element
+ * Common Info field
+ */
+
+/* Size in octets of Common Info Length subfield of Common Info field in
+ * Priority access variant Multi-Link element.
+ */
+/* Common Info Length  */
+#define WLAN_ML_PAV_CINFO_LENGTH_SIZE                               1
+
+/* Max value in octets of Common Info Length subfield of Common Info field in
+ * Priority access variant Multi-Link element
+ */
+#define WLAN_ML_PAV_CINFO_LENGTH_MAX \
+	(WLAN_ML_PAV_CINFO_LENGTH_SIZE + \
+	 QDF_MAC_ADDR_SIZE)
+
+/**
+ * struct wlan_ml_pav_linfo_perstaprof - Fixed fields of Per-STA Profile
+ * subelement in Priority access variant Multi-Link element Link Info field
+ * @subelem_id: Subelement ID
+ * @subelem_len: Subelement length
+ * @stacontrol: STA Control
+ */
+struct wlan_ml_pav_linfo_perstaprof {
+	uint8_t subelem_id;
+	uint8_t subelem_len;
+	uint16_t stacontrol;
+} qdf_packed;
+
+/* The above fixed fields may be followed by:
+ * STA profile (variable size)
+ */
+
+/* Size in octets of STA Control field of Per-STA Profile subelement in
+ * Priority access variant Multi-Link element Link Info field.
+ */
+#define WLAN_ML_PAV_LINFO_PERSTAPROF_STACTRL_SIZE                   2
+
+/* Definitions for subfields in STA Control field of Per-STA Profile subelement
+ * in Priority access variant Multi-Link element Link Info field. Any unused
+ * bits are reserved.
+ */
+
+/* Link ID */
+#define WLAN_ML_PAV_LINFO_PERSTAPROF_STACTRL_LINKID_IDX              0
+#define WLAN_ML_PAV_LINFO_PERSTAPROF_STACTRL_LINKID_BITS             4
+
+/* End of definitions related to priority access variant Multi-Link element Link
+ * Info field.
+ */
+
+/* Maximum size of IEs present in sta profile for a link
+ * EDCA IE and MU EDCA IE are part of this.
+ */
+#define WLAN_ML_PAV_LINFO_STAPROF_MAXSIZE \
+	(sizeof(struct edca_ie) + sizeof(struct muedca_ie))
+
+/* End of definitions related to priority access variant Multi-Link element. */
+
 #endif /* WLAN_FEATURE_11BE_MLO */
 #endif /* WLAN_FEATURE_11BE */
 

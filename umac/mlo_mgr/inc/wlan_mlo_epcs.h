@@ -45,15 +45,41 @@ enum wlan_epcs_category {
 };
 
 /**
+ * struct ml_pa_partner_link_info - Priority Access ML partner information
+ * @link_id: Link ID
+ * @edca: EDCA IE
+ * @muedca: MU EDCA IE
+ */
+struct ml_pa_partner_link_info {
+	uint8_t link_id;
+	struct edca_ie edca;
+	struct muedca_ie muedca;
+};
+
+/**
+ * struct ml_pa_info - priority access ML info
+ * @mld_mac_addr: MLD mac address
+ * @num_links: Number of Links
+ * @link_info: Partner link information
+ */
+struct ml_pa_info {
+	struct qdf_mac_addr mld_mac_addr;
+	uint8_t num_links;
+	struct ml_pa_partner_link_info link_info[WLAN_UMAC_MLO_MAX_VDEVS];
+};
+
+/**
  * struct wlan_epcs_info - EPCS information of frame
  * @cat: frame category
  * @dialog_token: dialog token
  * @status: status
+ * @pa_info: Priority access ML info
  */
 struct wlan_epcs_info {
 	enum wlan_epcs_category cat;
 	uint8_t dialog_token;
 	uint16_t status;
+	struct ml_pa_info pa_info;
 };
 
 /**
@@ -98,6 +124,12 @@ struct epcs_frm {
 		} resp;
 	};
 };
+
+/* MIN EPCS request frame length */
+#define EPCS_REQ_MIN_LENGTH 3
+
+/* MIN EPCS response frame length */
+#define EPCS_RESP_MIN_LENGTH 5
 
 #define epcs_alert(format, args...) \
 		QDF_TRACE_FATAL(QDF_MODULE_ID_EPCS, format, ## args)
