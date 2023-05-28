@@ -25,6 +25,7 @@
 #include "wlan_mlo_mgr_public_structs.h"
 #include <wlan_cm_ucfg_api.h>
 #include <wlan_objmgr_vdev_obj.h>
+#include <wlan_mlo_epcs.h>
 
 #ifdef WLAN_FEATURE_11BE_MLO
 
@@ -517,6 +518,24 @@ util_get_rvmlie_persta_link_info(uint8_t *mlieseq,
 				 qdf_size_t mlieseqlen,
 				 struct ml_rv_info *reconfig_info);
 
+/**
+ * util_get_pav_mlie_link_info() - Get priority access link information
+ *
+ * @mlieseq: Starting address of the Multi-Link element or Multi-Link element
+ * fragment sequence
+ * @mlieseqlen: Total length of the Multi-Link element or Multi-Link element
+ * fragment sequence
+ * @pa_info: Pointer to the location where the priority access multi link
+ * information is stored.
+ *
+ * Get EPCS priority access information from Priority Access Multi-Link element.
+ *
+ * Return: QDF_STATUS_SUCCESS in the case of success, QDF_STATUS value giving
+ * the reason for error in the case of failure.
+ */
+QDF_STATUS util_get_pav_mlie_link_info(uint8_t *mlieseq,
+				       qdf_size_t mlieseqlen,
+				       struct ml_pa_info *pa_info);
 #else
 static inline QDF_STATUS
 util_gen_link_assoc_req(uint8_t *frame, qdf_size_t frame_len, bool isreassoc,
@@ -644,5 +663,14 @@ util_get_rvmlie_persta_link_info(uint8_t *mlieseq,
 {
 	return QDF_STATUS_E_NOSUPPORT;
 }
+
+static inline
+QDF_STATUS util_get_pav_mlie_link_info(uint8_t *mlieseq,
+				       qdf_size_t mlieseqlen,
+				       struct ml_pa_info *pa_info)
+{
+	return QDF_STATUS_E_NOSUPPORT;
+}
+
 #endif /* WLAN_FEATURE_11BE_MLO */
 #endif /* _WLAN_UTILS_MLO_H_ */
