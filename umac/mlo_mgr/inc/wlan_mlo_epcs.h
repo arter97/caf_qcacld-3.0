@@ -114,10 +114,24 @@ struct wlan_mlo_peer_epcs_info {
 	uint8_t self_gen_dialog_token;
 };
 
+#define EPCS_MAX_AUTHORIZE_MAC_ADDR 32
+/**
+ * struct epcs_peer_authorize_info - EPCS authorized mac addresses
+ * @valid: valid index if set t0 true
+ * @peer_mld_mac: mld mac address
+ */
+struct epcs_peer_authorize_info {
+	bool valid;
+	uint8_t peer_mld_mac[QDF_MAC_ADDR_SIZE];
+};
+
 /**
  * struct wlan_epcs_context - EPCS context if MLD
+ * @authorize_info: Array of Authorization info containing peer mac address
  */
 struct wlan_epcs_context {
+	struct epcs_peer_authorize_info
+			authorize_info[EPCS_MAX_AUTHORIZE_MAC_ADDR];
 };
 
 /**
@@ -222,4 +236,25 @@ wlan_mlo_peer_rcv_action_frame(struct wlan_mlo_peer_context *ml_peer,
 			       bool *respond,
 			       bool *updparam);
 
+/**
+ * wlan_mlo_update_authorize_epcs_mac_addr() - API to authorize mac addr
+ * @vdev: pointer to vdev
+ * @peer_mld_mac: mld mac address
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+wlan_mlo_update_authorize_epcs_mac_addr(struct wlan_objmgr_vdev *vdev,
+					uint8_t *peer_mld_mac);
+
+/**
+ * wlan_mlo_update_deauthorize_epcs_mac_addr() - API to deauthorize mac addr
+ * @vdev: pointer to vdev
+ * @peer_mld_mac: mld mac address
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+wlan_mlo_update_deauthorize_epcs_mac_addr(struct wlan_objmgr_vdev *vdev,
+					  uint8_t *peer_mld_mac);
 #endif /* _WLAN_MLO_EPCS_H_ */
