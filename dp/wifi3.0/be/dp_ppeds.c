@@ -782,7 +782,7 @@ dp_ppeds_tx_desc_pool_alloc(struct dp_soc *soc, uint16_t num_elem)
 
 	desc_size =  qdf_get_pwr2(sizeof(struct dp_tx_desc_s));
 	tx_desc_pool = &be_soc->ppeds_tx_desc;
-	dp_desc_multi_pages_mem_alloc(soc, DP_TX_PPEDS_DESC_TYPE,
+	dp_desc_multi_pages_mem_alloc(soc, QDF_DP_TX_PPEDS_DESC_TYPE,
 				      &tx_desc_pool->desc_pages,
 				      desc_size, num_elem,
 				      0, true);
@@ -810,7 +810,7 @@ static void dp_ppeds_tx_desc_pool_free(struct dp_soc *soc)
 	tx_desc_pool = &be_soc->ppeds_tx_desc;
 
 	if (tx_desc_pool->desc_pages.num_pages)
-		dp_desc_multi_pages_mem_free(soc, DP_TX_PPEDS_DESC_TYPE,
+		dp_desc_multi_pages_mem_free(soc, QDF_DP_TX_PPEDS_DESC_TYPE,
 					     &tx_desc_pool->desc_pages, 0,
 					     true);
 }
@@ -2306,7 +2306,7 @@ QDF_STATUS dp_ppeds_attach_soc_be(struct dp_soc_be *be_soc)
 
 	qdf_status =
 		dp_hw_cookie_conversion_attach(be_soc, &be_soc->ppeds_tx_cc_ctx,
-					       num_elem, DP_TX_PPEDS_DESC_TYPE,
+					       num_elem, QDF_DP_TX_PPEDS_DESC_TYPE,
 					       DP_TX_PPEDS_POOL_ID);
 	if (!QDF_IS_STATUS_SUCCESS(qdf_status))
 		goto fail1;
