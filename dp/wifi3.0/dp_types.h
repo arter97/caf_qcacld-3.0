@@ -4064,6 +4064,8 @@ struct dp_vdev {
 	/* Flag to indicate if to_fw should be set for tx pkts on this vdev */
 	bool to_fw;
 #endif
+	/* QDF VDEV operating mode  */
+	enum QDF_OPMODE qdf_opmode;
 };
 
 enum {

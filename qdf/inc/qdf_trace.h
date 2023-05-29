@@ -933,11 +933,13 @@ void qdf_dp_set_no_of_record(uint32_t val);
  * @skb: skb pointer
  * @dir: direction
  * @pdev_id: pdev_id
+ * @op_mode: Vdev Operation mode
  *
  * Return: true: some protocol was logged, false: no protocol was logged.
  */
 bool qdf_dp_trace_log_pkt(uint8_t vdev_id, struct sk_buff *skb,
-			  enum qdf_proto_dir dir, uint8_t pdev_id);
+			  enum qdf_proto_dir dir, uint8_t pdev_id,
+			  enum QDF_OPMODE op_mode);
 
 /**
  * qdf_dp_trace_init() - enables the DP trace
@@ -1134,13 +1136,15 @@ enum qdf_dp_tx_rx_status qdf_dp_get_status_from_a_status(uint8_t status);
  * @msdu_id: msdu_id
  * @buf_arg_status: return status
  * @qdf_tx_status: qdf tx rx status
+ * @op_mode: Vdev Operation mode
  *
  * Return: none
  */
 void qdf_dp_trace_ptr(qdf_nbuf_t nbuf, enum QDF_DP_TRACE_ID code,
 		      uint8_t pdev_id, uint8_t *data, uint8_t size,
 		      uint16_t msdu_id, uint16_t buf_arg_status,
-		      enum qdf_dp_tx_rx_status qdf_tx_status);
+		      enum qdf_dp_tx_rx_status qdf_tx_status,
+		      enum QDF_OPMODE op_mode);
 
 /**
  * qdf_dp_trace_throttle_live_mode() - Throttle DP Trace live mode
@@ -1358,7 +1362,8 @@ void qdf_dp_track_noack_check(qdf_nbuf_t nbuf, enum qdf_proto_subtype *subtype);
 #else
 static inline
 bool qdf_dp_trace_log_pkt(uint8_t vdev_id, struct sk_buff *skb,
-			  enum qdf_proto_dir dir, uint8_t pdev_id)
+			  enum qdf_proto_dir dir, uint8_t pdev_id,
+			  enum QDF_OPMODE op_mode)
 {
 	return false;
 }

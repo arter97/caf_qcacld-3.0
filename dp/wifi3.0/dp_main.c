@@ -3697,6 +3697,7 @@ static QDF_STATUS dp_vdev_attach_wifi3(struct cdp_soc_t *cdp_soc,
 	uint8_t vdev_id = vdev_info->vdev_id;
 	enum wlan_op_mode op_mode = vdev_info->op_mode;
 	enum wlan_op_subtype subtype = vdev_info->subtype;
+	enum QDF_OPMODE qdf_opmode = vdev_info->qdf_opmode;
 	uint8_t vdev_stats_id = vdev_info->vdev_stats_id;
 
 	vdev_context_size =
@@ -3724,6 +3725,7 @@ static QDF_STATUS dp_vdev_attach_wifi3(struct cdp_soc_t *cdp_soc,
 	vdev->vdev_stats_id = vdev_stats_id;
 	vdev->opmode = op_mode;
 	vdev->subtype = subtype;
+	vdev->qdf_opmode = qdf_opmode;
 	vdev->osdev = soc->osdev;
 
 	vdev->osif_rx = NULL;
