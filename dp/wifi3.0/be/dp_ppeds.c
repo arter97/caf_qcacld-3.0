@@ -625,10 +625,8 @@ static void dp_ppeds_enable_txcomp_irq(struct dp_soc_be *be_soc)
 {
 	struct dp_soc *soc = DP_SOC_BE_GET_SOC(be_soc);
 
-	if (!dp_check_umac_reset_in_progress(soc)) {
-		dp_ppeds_enable_irq(&be_soc->soc,
-				    &be_soc->ppeds_wbm_release_ring);
-	}
+	dp_ppeds_enable_irq(&be_soc->soc,
+			    &be_soc->ppeds_wbm_release_ring);
 
 	if (soc->notify_fw_callback)
 		soc->notify_fw_callback(soc);
