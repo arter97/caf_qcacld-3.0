@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2011-2021 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -6355,7 +6356,7 @@ static int __iw_set_encodeext(struct net_device *dev,
 		/*Convert from 1-based to 0-based keying */
 		key_index--;
 	}
-	if (!ext->key_len) {
+	if (!ext->key_len || ext->key_len > CSR_MAX_KEY_LEN) {
 
 		/*Set the encrytion type to NONE */
 		pRoamProfile->EncryptionType.encryptionType[0] =
@@ -6422,6 +6423,9 @@ static int __iw_set_encodeext(struct net_device *dev,
 	case IW_ENCODE_ALG_TKIP:
 	{
 		uint8_t *pKey = &setKey.Key[0];
+
+		if (ext->key_len != CSR_MAX_KEY_LEN)
+			return -EINVAL;
 
 		setKey.encType = eCSR_ENCRYPT_TYPE_TKIP;
 
