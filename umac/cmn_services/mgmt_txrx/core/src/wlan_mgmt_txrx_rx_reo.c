@@ -4810,8 +4810,7 @@ wlan_mgmt_rx_reo_algo_entry(struct wlan_objmgr_pdev *pdev,
 	qdf_assert_always(desc->rx_params->reo_params->valid);
 	qdf_assert_always(desc->frame_type == IEEE80211_FC0_TYPE_MGT);
 
-	if (desc->type == MGMT_RX_REO_FRAME_DESC_HOST_CONSUMED_FRAME ||
-	    desc->type == MGMT_RX_REO_FRAME_DESC_FW_CONSUMED_FRAME)
+	if (desc->type == MGMT_RX_REO_FRAME_DESC_HOST_CONSUMED_FRAME)
 		qdf_assert_always(desc->rx_params->reo_params->duration_us);
 
 	ret = log_ingress_frame_before_list_update(reo_ctx, desc);
