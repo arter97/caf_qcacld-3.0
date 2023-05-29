@@ -1034,8 +1034,7 @@ void tdls_set_ct_mode(struct wlan_objmgr_psoc *psoc,
 	status = tdls_get_vdev_objects(vdev, &tdls_vdev_obj, &tdls_soc_obj);
 	if (QDF_IS_STATUS_ERROR(status)) {
 		tdls_err("Failed to get TDLS objects");
-		state = false;
-		goto set_state;
+		return;
 	}
 
 	qdf_atomic_set(&tdls_soc_obj->timer_cnt, 0);
