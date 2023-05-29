@@ -187,16 +187,19 @@ ol_tx_non_std_ll(struct ol_txrx_vdev_t *vdev,
 	return NULL;            /* all MSDUs were accepted */
 }
 
-void ol_tx_trace_pkt(qdf_nbuf_t skb, uint16_t msdu_id, uint8_t vdev_id)
+void ol_tx_trace_pkt(qdf_nbuf_t skb, uint16_t msdu_id, uint8_t vdev_id,
+		     enum QDF_OPMODE op_mode)
 {
 	DPTRACE(qdf_dp_trace_ptr(skb,
 				 QDF_DP_TRACE_TXRX_FAST_PACKET_PTR_RECORD,
 				 QDF_TRACE_DEFAULT_PDEV_ID,
 				 qdf_nbuf_data_addr(skb),
 				 sizeof(qdf_nbuf_data(skb)),
-				 msdu_id, vdev_id, 0));
+				 msdu_id, vdev_id, 0,
+				 op_mode));
 
-	qdf_dp_trace_log_pkt(vdev_id, skb, QDF_TX, QDF_TRACE_DEFAULT_PDEV_ID);
+	qdf_dp_trace_log_pkt(vdev_id, skb, QDF_TX, QDF_TRACE_DEFAULT_PDEV_ID,
+			     op_mode);
 
 	DPTRACE(qdf_dp_trace_data_pkt(skb, QDF_TRACE_DEFAULT_PDEV_ID,
 				      QDF_DP_TRACE_TX_PACKET_RECORD,

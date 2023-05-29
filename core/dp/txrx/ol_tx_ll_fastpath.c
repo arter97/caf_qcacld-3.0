@@ -418,7 +418,8 @@ ol_tx_ll_fast(ol_txrx_vdev_handle vdev, qdf_nbuf_t msdu_list)
 					qdf_nbuf_inc_users(msdu);
 
 				ol_tx_trace_pkt(msdu, tx_desc->id,
-						vdev->vdev_id);
+						vdev->vdev_id,
+						vdev->qdf_opmode);
 				/*
 				 * If debug display is enabled, show the meta
 				 * data being downloaded to the target via the
@@ -568,9 +569,10 @@ ol_tx_ll_fast(ol_txrx_vdev_handle vdev, qdf_nbuf_t msdu_list)
 				QDF_TRACE_DEFAULT_PDEV_ID,
 				qdf_nbuf_data_addr(msdu),
 				sizeof(qdf_nbuf_data(msdu)), tx_desc->id,
-				vdev->vdev_id, 0));
+				vdev->vdev_id, 0, vdev->qdf_opmode));
 
-			ol_tx_trace_pkt(msdu, tx_desc->id, vdev->vdev_id);
+			ol_tx_trace_pkt(msdu, tx_desc->id, vdev->vdev_id,
+					vdev->qdf_opmode);
 			/*
 			 * If debug display is enabled, show the meta-data being
 			 * downloaded to the target via the HTT tx descriptor.
