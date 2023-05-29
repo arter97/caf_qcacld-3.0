@@ -2075,7 +2075,7 @@ QDF_STATUS dp_sawf_update_mpdu_basic_stats(struct dp_soc *soc,
 					   uint64_t burst_size_success_cnt,
 					   uint64_t burst_size_failue_cnt)
 {
-	struct dp_peer *peer;
+	struct dp_peer *peer, *mld_peer, *primary_link_peer;
 	struct dp_txrx_peer *txrx_peer;
 	struct dp_peer_sawf *sawf_ctx;
 	struct dp_peer_sawf_stats *sawf_stats_ctx;
@@ -2094,6 +2094,30 @@ QDF_STATUS dp_sawf_update_mpdu_basic_stats(struct dp_soc *soc,
 	if (!peer) {
 		dp_sawf_err("Invalid peer");
 		return QDF_STATUS_E_FAILURE;
+	}
+
+	if (IS_MLO_DP_LINK_PEER(peer))
+		mld_peer = DP_GET_MLD_PEER_FROM_PEER(peer);
+	else if (IS_MLO_DP_MLD_PEER(peer))
+		mld_peer = peer;
+	else
+		mld_peer = NULL;
+
+	if (mld_peer) {
+		primary_link_peer = dp_get_primary_link_peer_by_id
+			(soc, mld_peer->peer_id, DP_MOD_ID_SAWF);
+		if (!primary_link_peer) {
+			dp_peer_unref_delete(peer, DP_MOD_ID_SAWF);
+			dp_sawf_err("Invalid primary peer");
+			return QDF_STATUS_E_FAILURE;
+		}
+
+		/*
+		 * Release the MLD-peer reference.
+		 * Hold only primary link ref now.
+		 */
+		dp_peer_unref_delete(peer, DP_MOD_ID_SAWF);
+		peer = primary_link_peer;
 	}
 
 	sawf_ctx = dp_peer_sawf_ctx_get(peer);
