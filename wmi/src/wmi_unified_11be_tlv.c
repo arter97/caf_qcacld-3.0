@@ -450,6 +450,186 @@ force_reason_host_to_fw(enum mlo_link_force_reason host_reason,
 }
 
 /**
+ * send_mlo_link_set_active_id_cmd_tlv() - send mlo link set active command
+ * by link id bitmap
+ * @wmi_handle: wmi handle
+ * @param: Pointer to mlo link set active param
+ *
+ * This API will populate link bitmap for corresponding force mode and
+ * send command to target.
+ * Previous API send_mlo_link_set_active_cmd_tlv can only handle vdev
+ * bitmap, if some associated links have no vdev attached, we have to use
+ * this API to do link force active/inactive.
+ * Note: no vdev associated links can be "non forced" state, so that target
+ * can repurpose vdev to such link.
+ * If link with no vdev attached is forced inactive for such concurrency
+ * reason, target will not switch to such link.
+ *
+ * Return: QDF_STATUS_SUCCESS for success or QDF_STATUS_E_* for error
+ */
+static QDF_STATUS
+send_mlo_link_set_active_id_cmd_tlv(wmi_unified_t wmi_handle,
+				    struct mlo_link_set_active_param *param)
+{
+	QDF_STATUS status;
+	wmi_mlo_link_set_active_cmd_fixed_param *cmd;
+	wmi_mlo_set_active_link_number_param *link_num_param;
+	uint32_t *link_bitmap;
+	uint32_t num_link_num_param = 0, num_link_bitmap = 0, tlv_len;
+	uint32_t num_inactive_link_bitmap = 0;
+	wmi_buf_t buf;
+	uint8_t *buf_ptr;
+	uint32_t len;
+	WMITLV_TAG_ID tag_id;
+	WMI_MLO_LINK_FORCE_MODE force_mode;
+	WMI_MLO_LINK_FORCE_REASON force_reason;
+
+	status = force_mode_host_to_fw(param->force_mode, &force_mode);
+	if (QDF_IS_STATUS_ERROR(status))
+		return QDF_STATUS_E_INVAL;
+
+	status = force_reason_host_to_fw(param->reason, &force_reason);
+	if (QDF_IS_STATUS_ERROR(status))
+		return QDF_STATUS_E_INVAL;
+
+	switch (force_mode) {
+	case WMI_MLO_LINK_FORCE_ACTIVE_LINK_NUM:
+	case WMI_MLO_LINK_FORCE_INACTIVE_LINK_NUM:
+		num_link_num_param = 1;
+		fallthrough;
+	case WMI_MLO_LINK_FORCE_ACTIVE:
+	case WMI_MLO_LINK_FORCE_INACTIVE:
+	case WMI_MLO_LINK_NO_FORCE:
+		num_link_bitmap = 1;
+		break;
+	case WMI_MLO_LINK_FORCE_ACTIVE_INACTIVE:
+		num_link_bitmap = 1;
+		num_inactive_link_bitmap = 1;
+		break;
+	default:
+		wmi_err("Invalid force reason: %d", force_mode);
+		return QDF_STATUS_E_INVAL;
+	}
+
+	len = sizeof(*cmd) +
+	      WMI_TLV_HDR_SIZE + WMI_TLV_HDR_SIZE +
+	      WMI_TLV_HDR_SIZE + sizeof(*link_num_param) * num_link_num_param +
+	      WMI_TLV_HDR_SIZE + sizeof(*link_bitmap) * num_link_bitmap;
+	if (force_mode == WMI_MLO_LINK_FORCE_ACTIVE_INACTIVE)
+		len += WMI_TLV_HDR_SIZE +
+		sizeof(*link_bitmap) * num_inactive_link_bitmap;
+
+	buf = wmi_buf_alloc(wmi_handle, len);
+	if (!buf)
+		return QDF_STATUS_E_NOMEM;
+
+	buf_ptr = (uint8_t *)wmi_buf_data(buf);
+	cmd = (wmi_mlo_link_set_active_cmd_fixed_param *)buf_ptr;
+	tlv_len = WMITLV_GET_STRUCT_TLVLEN
+			(wmi_mlo_link_set_active_cmd_fixed_param);
+
+	tag_id = WMITLV_TAG_STRUC_wmi_mlo_link_set_active_cmd_fixed_param;
+	WMITLV_SET_HDR(&cmd->tlv_header, tag_id, tlv_len);
+	cmd->force_mode = force_mode;
+	cmd->reason = force_reason;
+	cmd->use_ieee_link_id_bitmap = 1;
+	WMI_CHAR_ARRAY_TO_MAC_ADDR(param->force_cmd.ap_mld_mac_addr.bytes,
+				   &cmd->ap_mld_mac_addr);
+	if (force_mode == WMI_MLO_LINK_FORCE_ACTIVE) {
+		cmd->ctrl_flags.overwrite_force_active_bitmap =
+			param->control_flags.overwrite_force_active_bitmap;
+	} else if (force_mode == WMI_MLO_LINK_FORCE_INACTIVE) {
+		cmd->ctrl_flags.overwrite_force_inactive_bitmap =
+			param->control_flags.overwrite_force_inactive_bitmap;
+	} else if (force_mode == WMI_MLO_LINK_FORCE_ACTIVE_INACTIVE) {
+		cmd->ctrl_flags.overwrite_force_active_bitmap =
+			param->control_flags.overwrite_force_active_bitmap;
+		cmd->ctrl_flags.overwrite_force_inactive_bitmap =
+			param->control_flags.overwrite_force_inactive_bitmap;
+	} else {
+		cmd->ctrl_flags.dynamic_force_link_num =
+			param->control_flags.dynamic_force_link_num;
+	}
+
+	wmi_debug("mode %d reason %d num_link_num_param %d num_link_bitmap %d num_inactive %d overwrite %d %d %d",
+		  cmd->force_mode, cmd->reason, num_link_num_param,
+		  num_link_bitmap, num_inactive_link_bitmap,
+		  cmd->ctrl_flags.overwrite_force_active_bitmap,
+		  cmd->ctrl_flags.overwrite_force_inactive_bitmap,
+		  cmd->ctrl_flags.dynamic_force_link_num);
+	wmi_debug("ap mld mac addr: "QDF_MAC_ADDR_FMT,
+		  QDF_MAC_ADDR_REF(param->force_cmd.ap_mld_mac_addr.bytes));
+
+	buf_ptr += sizeof(*cmd);
+
+	/* set num of link tlv */
+	WMITLV_SET_HDR(buf_ptr, WMITLV_TAG_ARRAY_STRUC,
+		       sizeof(*link_num_param) * num_link_num_param);
+	buf_ptr += WMI_TLV_HDR_SIZE;
+
+	if (num_link_num_param) {
+		link_num_param =
+			(wmi_mlo_set_active_link_number_param *)buf_ptr;
+		tlv_len = WMITLV_GET_STRUCT_TLVLEN
+				(wmi_mlo_set_active_link_number_param);
+
+		WMITLV_SET_HDR(&link_num_param->tlv_header, 0, tlv_len);
+		link_num_param->num_of_link = param->force_cmd.link_num;
+		wmi_debug("entry[0]: num_of_link %d",
+			  link_num_param->num_of_link);
+
+		buf_ptr += sizeof(*link_num_param) * 1;
+	}
+	/* add empty vdev bitmap tlv */
+	WMITLV_SET_HDR(buf_ptr, WMITLV_TAG_ARRAY_UINT32, 0);
+	buf_ptr += WMI_TLV_HDR_SIZE;
+	/* add empty vdev bitmap2 tlv */
+	WMITLV_SET_HDR(buf_ptr, WMITLV_TAG_ARRAY_UINT32, 0);
+	buf_ptr += WMI_TLV_HDR_SIZE;
+
+	/* add link bitmap tlv */
+	WMITLV_SET_HDR(buf_ptr, WMITLV_TAG_ARRAY_UINT32,
+		       sizeof(*link_bitmap) * num_link_bitmap);
+	buf_ptr += WMI_TLV_HDR_SIZE;
+
+	if (num_link_bitmap) {
+		link_bitmap = (A_UINT32 *)(buf_ptr);
+
+		link_bitmap[0] = param->force_cmd.ieee_link_id_bitmap;
+		wmi_debug("entry[0]: link_bitmap 0x%x ", link_bitmap[0]);
+
+		buf_ptr += sizeof(*link_bitmap) * 1;
+	}
+	/* add link bitmap2 tlv */
+	if (force_mode == WMI_MLO_LINK_FORCE_ACTIVE_INACTIVE) {
+		WMITLV_SET_HDR(buf_ptr, WMITLV_TAG_ARRAY_UINT32,
+			       sizeof(*link_bitmap) *
+			       num_inactive_link_bitmap);
+		buf_ptr += WMI_TLV_HDR_SIZE;
+
+		if (num_inactive_link_bitmap) {
+			link_bitmap = (A_UINT32 *)(buf_ptr);
+			link_bitmap[0] = param->force_cmd.ieee_link_id_bitmap2;
+			wmi_debug("entry[0]: link_bitmap2 0x%x ",
+				  link_bitmap[0]);
+
+			buf_ptr += sizeof(*link_bitmap) * 1;
+		}
+	}
+
+	wmi_mtrace(WMI_MLO_LINK_SET_ACTIVE_CMDID, 0, cmd->force_mode);
+	status = wmi_unified_cmd_send(wmi_handle, buf, len,
+				      WMI_MLO_LINK_SET_ACTIVE_CMDID);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		wmi_err("Failed to send MLO link set active command to FW: %d",
+			status);
+		wmi_buf_free(buf);
+	}
+
+	return status;
+}
+
+/**
  * send_mlo_link_set_active_cmd_tlv() - send mlo link set active command
  * @wmi_handle: wmi handle
  * @param: Pointer to mlo link set active param
@@ -473,6 +653,16 @@ send_mlo_link_set_active_cmd_tlv(wmi_unified_t wmi_handle,
 	WMITLV_TAG_ID tag_id;
 	WMI_MLO_LINK_FORCE_MODE force_mode;
 	WMI_MLO_LINK_FORCE_REASON force_reason;
+
+	/* If use_ieee_link_id = true, use new API
+	 * send_mlo_link_set_active_id_cmd_tlv to fill link bitamp
+	 * to wmi buffer.
+	 * And target will indicate event with same flag set to true
+	 * to indicate link bitmap included in the event.
+	 */
+	if (param->use_ieee_link_id)
+		return send_mlo_link_set_active_id_cmd_tlv(wmi_handle,
+							   param);
 
 	if (!param->num_vdev_bitmap && !param->num_link_entry) {
 		wmi_err("No entry is provided vdev bit map %d link entry %d",
@@ -638,7 +828,30 @@ extract_mlo_link_set_active_resp_tlv(wmi_unified_t wmi_handle, void *evt_buf,
 
 	evt = param_buf->fixed_param;
 	resp->status = evt->status;
-	wmi_debug("status: %u", resp->status);
+	WMI_MAC_ADDR_TO_CHAR_ARRAY(&evt->ap_mld_mac_addr,
+				   resp->ap_mld_mac_addr.bytes);
+	wmi_debug("status: %u use linkid %d ap mld:"QDF_MAC_ADDR_FMT,
+		  resp->status,
+		  evt->use_ieee_link_id_bitmap,
+		  QDF_MAC_ADDR_REF(resp->ap_mld_mac_addr.bytes));
+	if (evt->use_ieee_link_id_bitmap) {
+		bitmap = param_buf->force_active_ieee_link_id_bitmap;
+		if (bitmap &&
+		    param_buf->num_force_active_ieee_link_id_bitmap > 0)
+			resp->active_linkid_bitmap = bitmap[0];
+
+		bitmap = param_buf->force_inactive_ieee_link_id_bitmap;
+		if (bitmap &&
+		    param_buf->num_force_inactive_ieee_link_id_bitmap > 0)
+			resp->inactive_linkid_bitmap = bitmap[0];
+		resp->use_ieee_link_id = true;
+		wmi_debug("active links: 0x%x inactive links: 0x%x num: %x %x",
+			  resp->active_linkid_bitmap,
+			  resp->inactive_linkid_bitmap,
+			  param_buf->num_force_active_ieee_link_id_bitmap,
+			  param_buf->num_force_inactive_ieee_link_id_bitmap);
+		return QDF_STATUS_SUCCESS;
+	}
 
 	bitmap = param_buf->force_active_vdev_bitmap;
 	entry_num = qdf_min(param_buf->num_force_active_vdev_bitmap,

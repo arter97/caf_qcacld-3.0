@@ -76,6 +76,9 @@ struct wlan_t2lm_context;
 #define STA_PROFILE_SUB_ELEM_ID 0
 #define PER_STA_PROF_MAC_ADDR_START 4
 
+/* MLO link id max value */
+#define MAX_MLO_LINK_ID 15
+
 #ifdef WLAN_MLO_MULTI_CHIP
 
 #ifndef WLAN_MAX_MLO_GROUPS
@@ -368,6 +371,33 @@ struct mlo_sta_quiet_status {
 	bool valid_status;
 };
 
+/**
+ * struct ml_link_force_state - link force state.
+ * @force_active_bitmap: force active link bitmap
+ * @force_inactive_bitmap: force inactive link bitmap
+ * @force_active_num: force active link num
+ * @force_active_num_bitmap: force active num link bitmap
+ * @force_inactive_num: force inactive link num
+ * @force_inactive_num_bitmap: force inactive num link bitmap
+ */
+struct ml_link_force_state {
+	uint16_t force_active_bitmap;
+	uint16_t force_inactive_bitmap;
+	uint8_t force_active_num;
+	uint16_t force_active_num_bitmap;
+	uint8_t force_inactive_num;
+	uint16_t force_inactive_num_bitmap;
+};
+
+/**
+ * struct wlan_link_force_context - link force ctx.
+ * @force_state: current force active/inactive states which
+ * have been sent to target
+ */
+struct wlan_link_force_context {
+	struct ml_link_force_state force_state;
+};
+
 /*
  * struct wlan_mlo_sta - MLO sta additional info
  * @wlan_connect_req_links: list of vdevs selected for connection with the MLAP
@@ -388,6 +418,7 @@ struct mlo_sta_quiet_status {
  * NB: not using kernel-doc format since the kernel-doc script doesn't
  *     handle the qdf_bitmap() macro
  * @copied_t2lm_ie_assoc_rsp: copy of t2lm ie received in assoc response
+ * @link_force_ctx: set link force mode context
  */
 struct wlan_mlo_sta {
 	qdf_bitmap(wlan_connect_req_links, WLAN_UMAC_MLO_MAX_VDEVS);
@@ -411,6 +442,9 @@ struct wlan_mlo_sta {
 #ifdef WLAN_FEATURE_11BE_MLO
 	struct ml_link_state_cmd_info ml_link_state;
 	struct wlan_t2lm_context copied_t2lm_ie_assoc_rsp;
+#endif
+#ifdef WLAN_FEATURE_11BE_MLO_ADV_FEATURE
+	struct wlan_link_force_context link_force_ctx;
 #endif
 };
 
@@ -961,6 +995,11 @@ enum mlo_link_force_reason {
  * @active: current active vdev bitmap array
  * @inactive_sz: size of current inactive vdev bitmap array
  * @inactive: current inactive vdev bitmap array
+ * @use_ieee_link_id: link id is valid in active_linkid_bitmap or
+ *	inactive_linkid_bitmap
+ * @ap_mld_mac_addr: AP MLD mac address
+ * @active_linkid_bitmap: current active link id bitmap
+ * @inactive_linkid_bitmap: current inactive link id bitmap
  */
 struct mlo_link_set_active_resp {
 	uint32_t status;
@@ -968,6 +1007,10 @@ struct mlo_link_set_active_resp {
 	uint32_t active[MLO_VDEV_BITMAP_SZ];
 	uint32_t inactive_sz;
 	uint32_t inactive[MLO_VDEV_BITMAP_SZ];
+	bool use_ieee_link_id;
+	struct qdf_mac_addr  ap_mld_mac_addr;
+	uint32_t active_linkid_bitmap;
+	uint32_t inactive_linkid_bitmap;
 };
 
 /**
@@ -1000,6 +1043,25 @@ struct mlo_control_flags {
 	bool dynamic_force_link_num;
 };
 
+/* struct ml_link_force_cmd - force command for links
+ * @ap_mld_mac_addr: AP mld mac address
+ * @ieee_link_id_bitmap: link id bitmap
+ * valid for WMI_MLO_LINK_FORCE_ACTIVE, WMI_MLO_LINK_FORCE_INACTIVE,
+ * WMI_MLO_LINK_NO_FORCE, WMI_MLO_LINK_FORCE_ACTIVE_LINK_NUM,
+ * WMI_MLO_LINK_FORCE_INACTIVE_LINK_NUM.
+ * @ieee_link_id_bitmap2: link id bitmap, only valid for
+ * WMI_MLO_LINK_FORCE_ACTIVE_INACTIVE carry the inactive linkid bitmap
+ * @link_num: link num
+ * only valid on WMI_MLO_LINK_FORCE_ACTIVE_LINK_NUM or
+ * WMI_MLO_LINK_FORCE_INACTIVE_LINK_NUM
+ */
+struct ml_link_force_cmd {
+	struct qdf_mac_addr ap_mld_mac_addr;
+	uint16_t ieee_link_id_bitmap;
+	uint16_t ieee_link_id_bitmap2;
+	uint8_t link_num;
+};
+
 /**
  * struct mlo_link_set_active_param: MLO link set active params
  * @force_mode: operation to take (enum mlo_link_force_mode)
@@ -1022,6 +1084,10 @@ struct mlo_control_flags {
  *  It will be present when force_mode is MLO_LINK_FORCE_MODE_ACTIVE_INACTIVE,
  *  it includes the inactive vdev bitmaps
  * @control_flags: This structure is used for setting wmi_mlo_control_flags.
+ * @use_ieee_link_id: send link id bitmap to target.
+ *  If this value is true, the "force_cmd" field should be provided and
+ *  that will be sent to target
+ * @force_cmd: force command which includes link id bitmap
  */
 struct mlo_link_set_active_param {
 	uint32_t force_mode;
@@ -1033,6 +1099,8 @@ struct mlo_link_set_active_param {
 	uint32_t vdev_bitmap[MLO_VDEV_BITMAP_SZ];
 	uint32_t inactive_vdev_bitmap[MLO_VDEV_BITMAP_SZ];
 	struct mlo_control_flags control_flags;
+	bool use_ieee_link_id;
+	struct ml_link_force_cmd force_cmd;
 };
 
 /**
