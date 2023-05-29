@@ -916,6 +916,7 @@ static void __hdd_hard_start_xmit(struct sk_buff *skb,
 	bool granted;
 	uint8_t STAId;
 	struct hdd_station_ctx *sta_ctx = &adapter->session.station;
+	struct hdd_context *hdd_ctx = adapter->hdd_ctx;
 	struct qdf_mac_addr *mac_addr;
 	uint8_t pkt_type = 0;
 	bool is_arp = false;
