@@ -117,6 +117,25 @@ enum sap_csa_reason_code {
 	CSA_REASON_SAP_FIX_CH_CONC_WITH_GO
 };
 
+/*
+ * enum link_control_flags: This enum is used for setting
+ * mlo_control_flags by api policy_mgr_mlo_sta_set_nlink.
+ * @link_ctrl_f_overwrite_active_bitmap: indicate overwrite all earlier
+ * force_active bitmaps. Used with MLO_LINK_FORCE_MODE_ACTIVE or
+ * MLO_LINK_FORCE_MODE_ACTIVE_INACTIVE
+ * @link_ctrl_f_overwrite_inactive_bitmap: indicate overwrite all earlier
+ * force_inactive bitmaps. Used with MLO_LINK_FORCE_MODE_INACTIVE or
+ * MLO_LINK_FORCE_MODE_ACTIVE_INACTIVE.
+ * @link_ctrl_f_dynamic_force_link_num: indicate fw to use force link number
+ * instead of force link bitmaps. Used with MLO_LINK_FORCE_MODE_ACTIVE_NUM.
+ * MLO_LINK_FORCE_MODE_INACTIVE_NUM, MLO_LINK_FORCE_MODE_NO_FORCE.
+ */
+enum link_control_flags {
+	link_ctrl_f_overwrite_active_bitmap =   1 << 0,
+	link_ctrl_f_overwrite_inactive_bitmap = 1 << 1,
+	link_ctrl_f_dynamic_force_link_num =    1 << 2,
+};
+
 /**
  * enum hw_mode_ss_config - Possible spatial stream configuration
  * @HW_MODE_SS_0x0: Unused Tx and Rx of MAC

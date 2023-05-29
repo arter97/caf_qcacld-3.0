@@ -45,6 +45,7 @@
 #include "wlan_cm_roam_api.h"
 #include "wlan_mlme_ucfg_api.h"
 #include "wlan_p2p_ucfg_api.h"
+#include "wlan_mlo_link_force.h"
 
 /* invalid channel id. */
 #define INVALID_CHANNEL_ID 0
@@ -4286,12 +4287,320 @@ policy_mgr_trigger_roam_on_link_removal(struct wlan_objmgr_vdev *vdev)
 }
 
 static void
+policy_mgr_handle_vdev_active_inactive_resp(
+					struct wlan_objmgr_psoc *psoc,
+					struct wlan_objmgr_vdev *vdev,
+					struct mlo_link_set_active_req *req,
+					struct mlo_link_set_active_resp *resp)
+{
+	uint8_t i;
+	uint8_t vdev_id_num = 0;
+	uint8_t vdev_ids[WLAN_MLO_MAX_VDEVS] = {0};
+	uint32_t assoc_bitmap = 0;
+
+	/* convert link id to vdev id and update vdev status based
+	 * on both inactive and active bitmap.
+	 * In link bitmap based WMI event (use_ieee_link_id = true),
+	 * target will always indicate current force inactive and
+	 * active bitmaps to host. For links in inactive_linkid_bitmap,
+	 * they will be moved to policy mgr disable connection table.
+	 * for other links, they will be in active tables.
+	 */
+	ml_nlink_convert_linkid_bitmap_to_vdev_bitmap(
+		psoc, vdev, resp->inactive_linkid_bitmap,
+		&assoc_bitmap,
+		&resp->inactive_sz, resp->inactive,
+		&vdev_id_num, vdev_ids);
+	ml_nlink_convert_linkid_bitmap_to_vdev_bitmap(
+		psoc, vdev,
+		(~resp->inactive_linkid_bitmap) & assoc_bitmap,
+		NULL,
+		&resp->active_sz, resp->active,
+		&vdev_id_num, vdev_ids);
+	for (i = 0; i < resp->inactive_sz; i++)
+		policy_mgr_enable_disable_link_from_vdev_bitmask(
+				psoc, 0, resp->inactive[i], i * 32);
+	for (i = 0; i < resp->active_sz; i++)
+		policy_mgr_enable_disable_link_from_vdev_bitmask(
+				psoc, resp->active[i], 0, i * 32);
+}
+
+static void
+policy_mgr_handle_force_active_resp(struct wlan_objmgr_psoc *psoc,
+				    struct wlan_objmgr_vdev *vdev,
+				    struct mlo_link_set_active_req *req,
+				    struct mlo_link_set_active_resp *resp)
+{
+	uint8_t i;
+	uint32_t assoc_bitmap = 0;
+
+	if (resp->use_ieee_link_id) {
+		/* save link force active bitmap */
+		ml_nlink_set_curr_force_active_state(
+			psoc, vdev, req->param.force_cmd.ieee_link_id_bitmap,
+			req->param.control_flags.overwrite_force_active_bitmap ?
+			LINK_OVERWRITE : LINK_ADD);
+
+		/* update vdev active inactive status */
+		policy_mgr_handle_vdev_active_inactive_resp(psoc, vdev, req,
+							    resp);
+		return;
+	}
+	ml_nlink_convert_vdev_bitmap_to_linkid_bitmap(
+		psoc, vdev, req->param.num_vdev_bitmap,
+		req->param.vdev_bitmap, &resp->active_linkid_bitmap,
+		&assoc_bitmap);
+	ml_nlink_set_curr_force_active_state(
+		psoc, vdev, resp->active_linkid_bitmap, LINK_ADD);
+
+	for (i = 0; i < resp->active_sz; i++)
+		policy_mgr_enable_disable_link_from_vdev_bitmask(
+				psoc, resp->active[i], 0, i * 32);
+}
+
+static void
+policy_mgr_handle_force_inactive_resp(struct wlan_objmgr_psoc *psoc,
+				      struct wlan_objmgr_vdev *vdev,
+				      struct mlo_link_set_active_req *req,
+				      struct mlo_link_set_active_resp *resp)
+{
+	uint8_t i;
+	uint32_t assoc_bitmap = 0;
+
+	if (resp->use_ieee_link_id) {
+		/* save link force inactive bitmap */
+		ml_nlink_set_curr_force_inactive_state(
+			psoc, vdev, req->param.force_cmd.ieee_link_id_bitmap,
+			req->param.control_flags.overwrite_force_inactive_bitmap ?
+			LINK_OVERWRITE : LINK_ADD);
+
+		/* update vdev active inactive status */
+		policy_mgr_handle_vdev_active_inactive_resp(psoc, vdev, req,
+							    resp);
+		return;
+	}
+	ml_nlink_convert_vdev_bitmap_to_linkid_bitmap(
+		psoc, vdev, req->param.num_vdev_bitmap,
+		req->param.vdev_bitmap, &resp->inactive_linkid_bitmap,
+		&assoc_bitmap);
+	ml_nlink_set_curr_force_inactive_state(
+		psoc, vdev, resp->inactive_linkid_bitmap, LINK_ADD);
+
+	for (i = 0; i < resp->inactive_sz; i++)
+		policy_mgr_enable_disable_link_from_vdev_bitmask(
+				psoc, 0, resp->inactive[i], i * 32);
+}
+
+static void
+policy_mgr_handle_force_active_num_resp(struct wlan_objmgr_psoc *psoc,
+					struct wlan_objmgr_vdev *vdev,
+					struct mlo_link_set_active_req *req,
+					struct mlo_link_set_active_resp *resp)
+{
+	uint8_t i;
+	uint32_t assoc_bitmap = 0;
+	uint32_t link_bitmap = 0;
+
+	if (resp->use_ieee_link_id) {
+		/* save force num and force num bitmap */
+		ml_nlink_set_curr_force_active_num_state(
+			psoc, vdev, req->param.force_cmd.link_num,
+			req->param.force_cmd.ieee_link_id_bitmap);
+
+		/* update vdev active inactive status */
+		policy_mgr_handle_vdev_active_inactive_resp(psoc, vdev, req,
+							    resp);
+		return;
+	}
+	ml_nlink_convert_vdev_bitmap_to_linkid_bitmap(
+		psoc, vdev, req->param.num_vdev_bitmap,
+		req->param.vdev_bitmap,
+		&link_bitmap,
+		&assoc_bitmap);
+	ml_nlink_set_curr_force_active_num_state(
+		psoc, vdev, req->param.link_num[0].num_of_link,
+		link_bitmap);
+	/*
+	 * When the host sends a set link command with force link num
+	 * and dynamic flag set, FW may not process it immediately.
+	 * In this case FW buffer the request and sends a response as
+	 * success to the host with VDEV bitmap as zero.
+	 * FW ensures that the number of active links will be equal to
+	 * the link num sent via WMI_MLO_LINK_SET_ACTIVE_CMDID command.
+	 * So the host should also fill the mlo policy_mgr table as per
+	 * request.
+	 */
+	if (req->param.control_flags.dynamic_force_link_num) {
+		policy_mgr_debug("Enable ML vdev(s) as sent in req");
+		for (i = 0; i < req->param.num_vdev_bitmap; i++)
+			policy_mgr_enable_disable_link_from_vdev_bitmask(
+				psoc,
+				req->param.vdev_bitmap[i], 0, i * 32);
+		return;
+	}
+
+	/*
+	 * MLO_LINK_FORCE_MODE_ACTIVE_NUM return which vdev is active
+	 * So XOR of the requested ML vdev and active vdev bit will give
+	 * the vdev bits to disable
+	 */
+	for (i = 0; i < resp->active_sz; i++)
+		policy_mgr_enable_disable_link_from_vdev_bitmask(
+			psoc, resp->active[i],
+			resp->active[i] ^ req->param.vdev_bitmap[i],
+			i * 32);
+}
+
+static void
+policy_mgr_handle_force_inactive_num_resp(
+				struct wlan_objmgr_psoc *psoc,
+				struct wlan_objmgr_vdev *vdev,
+				struct mlo_link_set_active_req *req,
+				struct mlo_link_set_active_resp *resp)
+{
+	uint8_t i;
+	uint32_t assoc_bitmap = 0;
+	uint32_t link_bitmap = 0;
+
+	if (resp->use_ieee_link_id) {
+		/* save force num and force num bitmap */
+		ml_nlink_set_curr_force_inactive_num_state(
+			psoc, vdev, req->param.force_cmd.link_num,
+			req->param.force_cmd.ieee_link_id_bitmap);
+
+		/* update vdev active inactive status */
+		policy_mgr_handle_vdev_active_inactive_resp(psoc, vdev, req,
+							    resp);
+		return;
+	}
+	ml_nlink_convert_vdev_bitmap_to_linkid_bitmap(
+		psoc, vdev, req->param.num_vdev_bitmap,
+		req->param.vdev_bitmap,
+		&link_bitmap,
+		&assoc_bitmap);
+	ml_nlink_set_curr_force_inactive_num_state(
+		psoc, vdev, req->param.link_num[0].num_of_link,
+		link_bitmap);
+
+	/*
+	 * MLO_LINK_FORCE_MODE_INACTIVE_NUM return which vdev is
+	 * inactive So XOR of the requested ML vdev and inactive vdev
+	 * bit will give the vdev bits to be enable.
+	 */
+	for (i = 0; i < resp->inactive_sz; i++)
+		policy_mgr_enable_disable_link_from_vdev_bitmask(
+			psoc,
+			resp->inactive[i] ^ req->param.vdev_bitmap[i],
+			resp->inactive[i], i * 32);
+}
+
+static void
+policy_mgr_handle_force_active_inactive_resp(
+				struct wlan_objmgr_psoc *psoc,
+				struct wlan_objmgr_vdev *vdev,
+				struct mlo_link_set_active_req *req,
+				struct mlo_link_set_active_resp *resp)
+{
+	uint8_t i;
+	uint32_t assoc_bitmap = 0;
+
+	if (resp->use_ieee_link_id) {
+		/* save link active/inactive bitmap */
+		ml_nlink_set_curr_force_active_state(
+			psoc, vdev, req->param.force_cmd.ieee_link_id_bitmap,
+			req->param.control_flags.overwrite_force_active_bitmap ?
+			LINK_OVERWRITE : LINK_ADD);
+		ml_nlink_set_curr_force_inactive_state(
+			psoc, vdev, req->param.force_cmd.ieee_link_id_bitmap2,
+			req->param.control_flags.overwrite_force_inactive_bitmap ?
+			LINK_OVERWRITE : LINK_ADD);
+
+		/* update vdev active inactive status */
+		policy_mgr_handle_vdev_active_inactive_resp(psoc, vdev, req,
+							    resp);
+		return;
+	}
+	ml_nlink_convert_vdev_bitmap_to_linkid_bitmap(
+		psoc, vdev, req->param.num_inactive_vdev_bitmap,
+		req->param.inactive_vdev_bitmap,
+		&resp->inactive_linkid_bitmap,
+		&assoc_bitmap);
+	ml_nlink_set_curr_force_inactive_state(
+		psoc, vdev, resp->inactive_linkid_bitmap, LINK_ADD);
+	ml_nlink_convert_vdev_bitmap_to_linkid_bitmap(
+		psoc, vdev, req->param.num_vdev_bitmap,
+		req->param.vdev_bitmap,
+		&resp->active_linkid_bitmap,
+		&assoc_bitmap);
+	ml_nlink_set_curr_force_active_state(
+		psoc, vdev, resp->active_linkid_bitmap, LINK_ADD);
+
+	for (i = 0; i < resp->inactive_sz; i++)
+		policy_mgr_enable_disable_link_from_vdev_bitmask(
+				psoc, 0, resp->inactive[i], i * 32);
+	for (i = 0; i < resp->active_sz; i++)
+		policy_mgr_enable_disable_link_from_vdev_bitmask(
+				psoc, resp->active[i], 0, i * 32);
+}
+
+static void
+policy_mgr_handle_no_force_resp(struct wlan_objmgr_psoc *psoc,
+				struct wlan_objmgr_vdev *vdev,
+				struct mlo_link_set_active_req *req,
+				struct mlo_link_set_active_resp *resp)
+{
+	uint8_t i;
+	uint32_t assoc_bitmap = 0;
+	uint32_t link_bitmap = 0;
+
+	if (resp->use_ieee_link_id) {
+		/* update link inactive/active bitmap */
+		if (req->param.force_cmd.ieee_link_id_bitmap) {
+			ml_nlink_set_curr_force_inactive_state(
+				psoc, vdev,
+				req->param.force_cmd.ieee_link_id_bitmap,
+				LINK_CLR);
+			ml_nlink_set_curr_force_active_state(
+				psoc, vdev,
+				req->param.force_cmd.ieee_link_id_bitmap,
+				LINK_CLR);
+		} else {
+			/* special handling for no force to clear all */
+			ml_nlink_clr_force_state(psoc, vdev);
+		}
+
+		/* update vdev active inactive status */
+		policy_mgr_handle_vdev_active_inactive_resp(psoc, vdev, req,
+							    resp);
+		return;
+	}
+
+	ml_nlink_convert_vdev_bitmap_to_linkid_bitmap(
+		psoc, vdev, req->param.num_vdev_bitmap,
+		req->param.vdev_bitmap,
+		&link_bitmap, &assoc_bitmap);
+
+	ml_nlink_set_curr_force_inactive_state(
+		psoc, vdev, link_bitmap, LINK_CLR);
+	ml_nlink_set_curr_force_active_state(
+		psoc, vdev, link_bitmap, LINK_CLR);
+	ml_nlink_set_curr_force_active_num_state(
+		psoc, vdev, 0, 0);
+	ml_nlink_set_curr_force_inactive_num_state(
+		psoc, vdev, 0, 0);
+
+	/* Enable all the ML vdev id sent in request */
+	for (i = 0; i < req->param.num_vdev_bitmap; i++)
+		policy_mgr_enable_disable_link_from_vdev_bitmask(
+			psoc, req->param.vdev_bitmap[i], 0, i * 32);
+}
+
+static void
 policy_mgr_handle_link_enable_disable_resp(struct wlan_objmgr_vdev *vdev,
 					  void *arg,
 					  struct mlo_link_set_active_resp *resp)
 {
 	struct mlo_link_set_active_req *req = arg;
-	uint8_t i;
 	struct wlan_objmgr_psoc *psoc;
 	struct policy_mgr_psoc_priv_obj *pm_ctx;
 
@@ -4327,70 +4636,24 @@ policy_mgr_handle_link_enable_disable_resp(struct wlan_objmgr_vdev *vdev,
 			 resp->active[0], resp->inactive[0]);
 	switch (req->param.force_mode) {
 	case MLO_LINK_FORCE_MODE_ACTIVE:
-		for (i = 0; i < resp->active_sz; i++)
-			policy_mgr_enable_disable_link_from_vdev_bitmask(psoc,
-					resp->active[i], 0, i * 32);
+		policy_mgr_handle_force_active_resp(psoc, vdev, req, resp);
 		break;
 	case MLO_LINK_FORCE_MODE_INACTIVE:
-		for (i = 0; i < resp->inactive_sz; i++)
-			policy_mgr_enable_disable_link_from_vdev_bitmask(psoc,
-				0, resp->inactive[i], i * 32);
+		policy_mgr_handle_force_inactive_resp(psoc, vdev, req, resp);
 		break;
 	case MLO_LINK_FORCE_MODE_ACTIVE_NUM:
-		/*
-		 * When the host sends a set link command with force link num
-		 * and dynamic flag set, FW may not process it immediately.
-		 * In this case FW buffer the request and sends a response as
-		 * success to the host with VDEV bitmap as zero.
-		 * FW ensures that the number of active links will be equal to
-		 * the link num sent via WMI_MLO_LINK_SET_ACTIVE_CMDID command.
-		 * So the host should also fill the mlo policy_mgr table as per
-		 * request.
-		 */
-		if (req->param.control_flags.dynamic_force_link_num) {
-			policy_mgr_debug("Enable ML vdev(s) as sent in req");
-			for (i = 0; i < req->param.num_vdev_bitmap; i++)
-			       policy_mgr_enable_disable_link_from_vdev_bitmask(
-					psoc,
-					req->param.vdev_bitmap[i], 0, i * 32);
-			break;
-		}
-
-		/*
-		 * MLO_LINK_FORCE_MODE_ACTIVE_NUM return which vdev is active
-		 * So XOR of the requested ML vdev and active vdev bit will give
-		 * the vdev bits to disable
-		 */
-		for (i = 0; i < resp->active_sz; i++)
-			policy_mgr_enable_disable_link_from_vdev_bitmask(psoc,
-				resp->active[i],
-				resp->active[i] ^ req->param.vdev_bitmap[i],
-				i * 32);
+		policy_mgr_handle_force_active_num_resp(psoc, vdev, req, resp);
 		break;
 	case MLO_LINK_FORCE_MODE_INACTIVE_NUM:
-		/*
-		 * MLO_LINK_FORCE_MODE_INACTIVE_NUM return which vdev is
-		 * inactive So XOR of the requested ML vdev and inactive vdev
-		 * bit will give the vdev bits to be enable.
-		 */
-		for (i = 0; i < resp->inactive_sz; i++)
-			policy_mgr_enable_disable_link_from_vdev_bitmask(psoc,
-				resp->inactive[i] ^ req->param.vdev_bitmap[i],
-				resp->inactive[i], i * 32);
+		policy_mgr_handle_force_inactive_num_resp(psoc, vdev, req,
+							  resp);
 		break;
 	case MLO_LINK_FORCE_MODE_NO_FORCE:
-		/* Enable all the ML vdev id sent in request */
-		for (i = 0; i < req->param.num_vdev_bitmap; i++)
-			policy_mgr_enable_disable_link_from_vdev_bitmask(psoc,
-					req->param.vdev_bitmap[i], 0, i * 32);
+		policy_mgr_handle_no_force_resp(psoc, vdev, req, resp);
 		break;
 	case MLO_LINK_FORCE_MODE_ACTIVE_INACTIVE:
-		for (i = 0; i < resp->active_sz; i++)
-			policy_mgr_enable_disable_link_from_vdev_bitmask(
-					psoc, resp->active[i], 0, i * 32);
-		for (i = 0; i < resp->inactive_sz; i++)
-			policy_mgr_enable_disable_link_from_vdev_bitmask(
-					psoc, 0, resp->inactive[i], i * 32);
+		policy_mgr_handle_force_active_inactive_resp(psoc, vdev, req,
+							     resp);
 		break;
 	default:
 		policy_mgr_err("Invalid request req mode %d",
@@ -4408,7 +4671,6 @@ complete_evnt:
 	if (req && resp && !resp->status)
 		policy_mgr_check_concurrent_intf_and_restart_sap(psoc, false);
 }
-
 #else
 static inline QDF_STATUS
 policy_mgr_delete_from_disabled_links(struct policy_mgr_psoc_priv_obj *pm_ctx,
@@ -5573,6 +5835,91 @@ policy_mgr_mlo_sta_set_link(struct wlan_objmgr_psoc *psoc,
 {
 	return policy_mgr_mlo_sta_set_link_ext(psoc, reason, mode, num_mlo_vdev,
 					       mlo_vdev_lst, 0, NULL);
+}
+
+QDF_STATUS
+policy_mgr_mlo_sta_set_nlink(struct wlan_objmgr_psoc *psoc,
+			     struct wlan_objmgr_vdev *vdev,
+			     enum mlo_link_force_reason reason,
+			     enum mlo_link_force_mode mode,
+			     uint8_t link_num,
+			     uint16_t link_bitmap,
+			     uint16_t link_bitmap2,
+			     uint32_t link_control_flags)
+{
+	struct mlo_link_set_active_req *req;
+	QDF_STATUS status;
+	struct policy_mgr_psoc_priv_obj *pm_ctx;
+
+	pm_ctx = policy_mgr_get_context(psoc);
+	if (!pm_ctx) {
+		policy_mgr_err("Invalid Context");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	req = qdf_mem_malloc(sizeof(*req));
+	if (!req)
+		return QDF_STATUS_E_NOMEM;
+
+	status = wlan_objmgr_vdev_try_get_ref(vdev, WLAN_POLICY_MGR_ID);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		qdf_mem_free(req);
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	policy_mgr_set_link_in_progress(pm_ctx, true);
+
+	policy_mgr_debug("vdev %d: mode %d %s reason %d",
+			 wlan_vdev_get_id(vdev), mode,
+			 force_mode_to_string(mode), reason);
+
+	req->ctx.vdev = vdev;
+	req->param.reason = reason;
+	req->param.force_mode = mode;
+	req->param.use_ieee_link_id = true;
+	req->param.force_cmd.ieee_link_id_bitmap = link_bitmap;
+	req->param.force_cmd.ieee_link_id_bitmap2 = link_bitmap2;
+	req->param.force_cmd.link_num = link_num;
+	if (link_control_flags & link_ctrl_f_overwrite_active_bitmap)
+		req->param.control_flags.overwrite_force_active_bitmap = true;
+	if (link_control_flags & link_ctrl_f_overwrite_inactive_bitmap)
+		req->param.control_flags.overwrite_force_inactive_bitmap =
+									true;
+	if (link_control_flags & link_ctrl_f_dynamic_force_link_num)
+		req->param.control_flags.dynamic_force_link_num = true;
+
+	status =
+	wlan_vdev_get_bss_peer_mld_mac(vdev,
+				       &req->param.force_cmd.ap_mld_mac_addr);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		policy_mgr_err("fail to get ap mld addr for vdev %d",
+			       wlan_vdev_get_id(vdev));
+		goto end;
+	}
+	if (qdf_is_macaddr_zero(&req->param.force_cmd.ap_mld_mac_addr)) {
+		policy_mgr_err("get ap zero mld addr for vdev %d",
+			       wlan_vdev_get_id(vdev));
+		goto end;
+	}
+
+	req->ctx.set_mlo_link_cb = policy_mgr_handle_link_enable_disable_resp;
+	req->ctx.validate_set_mlo_link_cb =
+		policy_mgr_validate_set_mlo_link_cb;
+	req->ctx.cb_arg = req;
+	status = mlo_ser_set_link_req(req);
+end:
+	if (QDF_IS_STATUS_ERROR(status)) {
+		policy_mgr_err("vdev %d: Failed to set link mode %d num_mlo_vdev %d reason %d",
+			       wlan_vdev_get_id(vdev), mode, link_num,
+			       reason);
+		qdf_mem_free(req);
+		policy_mgr_set_link_in_progress(pm_ctx, false);
+	} else {
+		status = QDF_STATUS_E_PENDING;
+	}
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_POLICY_MGR_ID);
+
+	return status;
 }
 
 uint32_t

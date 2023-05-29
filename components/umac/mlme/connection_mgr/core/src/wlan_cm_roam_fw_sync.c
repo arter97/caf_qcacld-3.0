@@ -47,6 +47,7 @@
 #include <wlan_mlo_mgr_sta.h>
 #include "wlan_mlo_mgr_roam.h"
 #include "wlan_vdev_mgr_utils_api.h"
+#include "wlan_mlo_link_force.h"
 
 QDF_STATUS cm_fw_roam_sync_req(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 			       void *event, uint32_t event_data_len)
@@ -1061,6 +1062,7 @@ cm_get_and_disable_link_from_roam_ind(struct wlan_objmgr_psoc *psoc,
 				      struct roam_offload_synch_ind *synch_data)
 {
 	uint8_t i;
+	struct wlan_objmgr_vdev *vdev;
 
 	for (i = 0; i < synch_data->num_setup_links; i++) {
 		if (synch_data->ml_link[i].vdev_id == vdev_id &&
@@ -1069,6 +1071,18 @@ cm_get_and_disable_link_from_roam_ind(struct wlan_objmgr_psoc *psoc,
 				  vdev_id, synch_data->ml_link[i].flags);
 			policy_mgr_move_vdev_from_connection_to_disabled_tbl(
 								psoc, vdev_id);
+
+			vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc,
+								    vdev_id,
+								    WLAN_MLME_SB_ID);
+			if (!vdev) {
+				mlme_debug("no vdev for id %d", vdev_id);
+				break;
+			}
+			ml_nlink_set_curr_force_inactive_state(
+				psoc, vdev, synch_data->ml_link[i].link_id,
+				LINK_ADD);
+			wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_SB_ID);
 			break;
 		}
 	}

@@ -30,6 +30,7 @@
 #include "qdf_types.h"
 #include "qdf_status.h"
 #include "wlan_objmgr_psoc_obj.h"
+#include "wlan_mlo_mgr_public_structs.h"
 #include "wlan_policy_mgr_public_struct.h"
 #include "wlan_cm_roam_public_struct.h"
 #include "wlan_utility.h"
@@ -1156,6 +1157,37 @@ polic_mgr_send_pcl_to_fw(struct wlan_objmgr_psoc *psoc,
 			 enum QDF_OPMODE mode);
 
 #ifdef WLAN_FEATURE_11BE_MLO
+/**
+ * policy_mgr_mlo_sta_set_nlink() - Set link mode for MLO STA
+ * by link id bitmap
+ * @psoc: psoc object
+ * @vdev: vdev object
+ * @reason: reason to set
+ * @mode: mode to set
+ * @link_num: number of link, valid for mode:
+ * MLO_LINK_FORCE_MODE_ACTIVE_NUM, MLO_LINK_FORCE_MODE_INACTIVE_NUM
+ * @link_bitmap: link bitmap, valid for mode:
+ * MLO_LINK_FORCE_MODE_ACTIVE, MLO_LINK_FORCE_MODE_INACTIVE,
+ * MLO_LINK_FORCE_MODE_ACTIVE_NUM, MLO_LINK_FORCE_MODE_INACTIVE_NUM
+ * MLO_LINK_FORCE_MODE_NO_FORCE.
+ * @link_bitmap2: inactive link bitmap, only valid for mode
+ * MLO_LINK_FORCE_MODE_ACTIVE_INACTIVE
+ * @link_control_flags: bitmap of enum link_control_flags.
+ *
+ * Interface to set link mode for MLO STA
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+policy_mgr_mlo_sta_set_nlink(struct wlan_objmgr_psoc *psoc,
+			     struct wlan_objmgr_vdev *vdev,
+			     enum mlo_link_force_reason reason,
+			     enum mlo_link_force_mode mode,
+			     uint8_t link_num,
+			     uint16_t link_bitmap,
+			     uint16_t link_bitmap2,
+			     uint32_t link_control_flags);
+
 /**
  * policy_mgr_mlo_sta_set_link() - Set link mode for MLO STA
  * @psoc: psoc object
