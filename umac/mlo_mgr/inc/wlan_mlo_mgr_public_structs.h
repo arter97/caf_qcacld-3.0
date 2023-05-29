@@ -391,6 +391,7 @@ struct wlan_mlo_peer_list {
  * @sta_ctx: MLO STA related information
  * @ap_ctx: AP related information
  * @t2lm_ctx: T2LM related information
+ * @epcs_ctx: EPCS related information
  */
 struct wlan_mlo_dev_context {
 	qdf_list_node_t node;
@@ -412,6 +413,7 @@ struct wlan_mlo_dev_context {
 	struct wlan_mlo_sta *sta_ctx;
 	struct wlan_mlo_ap *ap_ctx;
 	struct wlan_t2lm_context t2lm_ctx;
+	struct wlan_epcs_context epcs_ctx;
 };
 
 /**
