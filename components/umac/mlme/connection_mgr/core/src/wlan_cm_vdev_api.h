@@ -750,4 +750,18 @@ cm_send_rso_stop(struct wlan_objmgr_vdev *vdev)
 	return QDF_STATUS_E_NOSUPPORT;
 }
 #endif
+
+#ifdef WLAN_FEATURE_11BE_MLO
+/**
+ * cm_get_ml_partner_info() - Fill dst ML partner info
+ * @scan_entry: Scan entry
+ * @src_partner_info: Source partner info
+ * @dst_partner_info: Destination partner info
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+cm_get_ml_partner_info(struct scan_cache_entry *scan_entry,
+		       struct mlo_partner_info *partner_info);
+#endif
 #endif /* __WLAN_CM_VDEV_API_H__ */
