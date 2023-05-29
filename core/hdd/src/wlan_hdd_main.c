@@ -6378,8 +6378,6 @@ hdd_alloc_station_adapter(struct hdd_context *hdd_ctx, tSirMacAddr mac_addr,
 		goto free_net_dev;
 	}
 
-	init_completion(&adapter->deflink->vdev_destroy_event);
-
 	hdd_update_dynamic_tsf_sync(adapter);
 	adapter->is_link_up_service_needed = false;
 	adapter->send_mode_change = true;
@@ -7390,6 +7388,8 @@ static void hdd_cleanup_adapter(struct hdd_context *hdd_ctx,
 				bool rtnl_held)
 {
 	struct net_device *dev = NULL;
+	struct wlan_hdd_link_info *link_info;
+	uint8_t link_idx;
 
 	if (adapter)
 		dev = adapter->dev;
@@ -7399,7 +7399,14 @@ static void hdd_cleanup_adapter(struct hdd_context *hdd_ctx,
 	}
 
 	hdd_apf_context_destroy(adapter);
-	qdf_spinlock_destroy(&adapter->deflink->vdev_lock);
+	hdd_adapter_for_each_link_entry(adapter, link_idx) {
+		link_info = hdd_adapter_get_link_info_ptr(adapter, link_idx);
+		if (!link_info)
+			continue;
+
+		qdf_spinlock_destroy(&link_info->vdev_lock);
+	}
+
 	hdd_sta_info_deinit(&adapter->sta_info_list);
 	hdd_sta_info_deinit(&adapter->cache_sta_info_list);
 
@@ -7946,10 +7953,13 @@ static void hdd_adapter_init_link_info(struct hdd_adapter *adapter)
 	uint8_t link_idx;
 	struct wlan_hdd_link_info *link_info;
 
-	/* Assign the adapter back pointer in all link_info structs */
+	/* Initialize each member in link info array to default values */
 	hdd_adapter_for_each_link_entry(adapter, link_idx) {
 		link_info = &adapter->link_info[link_idx];
 		link_info->adapter = adapter;
+		link_info->vdev_id = WLAN_UMAC_VDEV_ID_MAX;
+		qdf_spinlock_create(&link_info->vdev_lock);
+		init_completion(&link_info->vdev_destroy_event);
 	}
 }
 
@@ -8193,7 +8203,6 @@ struct hdd_adapter *hdd_open_adapter(struct hdd_context *hdd_ctx,
 		goto err_cleanup_adapter;
 
 	adapter->upgrade_udp_qos_threshold = QCA_WLAN_AC_BK;
-	qdf_spinlock_create(&adapter->deflink->vdev_lock);
 
 	hdd_init_completion(adapter);
 	INIT_WORK(&adapter->scan_block_work, wlan_hdd_cfg80211_scan_block_cb);

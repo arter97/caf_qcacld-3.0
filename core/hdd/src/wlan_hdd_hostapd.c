@@ -4482,8 +4482,6 @@ struct hdd_adapter *hdd_wlan_create_ap_dev(struct hdd_context *hdd_ctx,
 	adapter->wdev.wiphy = hdd_ctx->wiphy;
 	adapter->wdev.netdev = dev;
 
-	init_completion(&adapter->deflink->vdev_destroy_event);
-
 	SET_NETDEV_DEV(dev, hdd_ctx->parent_dev);
 	spin_lock_init(&adapter->pause_map_lock);
 	adapter->start_time = adapter->last_time = qdf_system_ticks();
