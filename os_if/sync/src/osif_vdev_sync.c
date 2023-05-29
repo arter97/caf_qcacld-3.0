@@ -245,6 +245,9 @@ int __osif_vdev_sync_trans_start(struct net_device *net_dev,
 						dsc_vdev_trans_start);
 	osif_vdev_sync_unlock();
 
+	if (!errno)
+		osif_vdev_sync_wait_for_ops(*out_vdev_sync);
+
 	return errno;
 }
 
@@ -258,6 +261,9 @@ int __osif_vdev_sync_trans_start_wait(struct net_device *net_dev,
 	errno = __osif_vdev_sync_start_wait_callback(net_dev,
 						     out_vdev_sync, desc,
 						     dsc_vdev_trans_start_wait);
+
+	if (!errno)
+		osif_vdev_sync_wait_for_ops(*out_vdev_sync);
 
 	return errno;
 }
