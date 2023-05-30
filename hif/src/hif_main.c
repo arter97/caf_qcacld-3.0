@@ -90,6 +90,7 @@ void *hif_get_targetdef(struct hif_opaque_softc *hif_ctx)
 }
 
 #ifdef FORCE_WAKE
+#ifndef QCA_WIFI_WCN6450
 void hif_srng_init_phase(struct hif_opaque_softc *hif_ctx,
 			 bool init_phase)
 {
@@ -98,6 +99,15 @@ void hif_srng_init_phase(struct hif_opaque_softc *hif_ctx,
 	if (ce_srng_based(scn))
 		hal_set_init_phase(scn->hal_soc, init_phase);
 }
+#else
+void hif_srng_init_phase(struct hif_opaque_softc *hif_ctx,
+			 bool init_phase)
+{
+	struct hif_softc *scn = HIF_GET_SOFTC(hif_ctx);
+
+	hal_set_init_phase(scn->hal_soc, init_phase);
+}
+#endif
 #endif /* FORCE_WAKE */
 
 #ifdef HIF_IPCI
