@@ -337,6 +337,7 @@ struct wlan_srng_cfg {
  *			    based ILP feature is enabled
  * @pointer_timer_threshold_rx: RX REO2SW ring pointer update timer threshold
  * @pointer_num_threshold_rx: RX REO2SW ring pointer update entries threshold
+ * @rx_rr: rx round robin enable / disable
  */
 struct wlan_cfg_dp_soc_ctxt {
 	int num_int_ctxts;
@@ -535,6 +536,9 @@ struct wlan_cfg_dp_soc_ctxt {
 #endif
 	uint16_t pointer_timer_threshold_rx;
 	uint8_t pointer_num_threshold_rx;
+#ifdef WLAN_SUPPORT_RX_FLOW_TAG
+	bool rx_rr;
+#endif
 };
 
 /**
@@ -1376,6 +1380,21 @@ bool wlan_cfg_is_ipa_enabled(struct wlan_cfg_dp_soc_ctxt *cfg);
  * @rx_hash: true - enabled false - disabled
  */
 void wlan_cfg_set_rx_hash(struct wlan_cfg_dp_soc_ctxt *cfg, bool rx_hash);
+
+/**
+ * wlan_cfg_is_rx_rr_enabled - Return RX round robin enabled/disabled
+ * @cfg: soc configuration context
+ *
+ * Return: true - enabled false - disabled
+ */
+bool wlan_cfg_is_rx_rr_enabled(struct wlan_cfg_dp_soc_ctxt *cfg);
+
+/**
+ * wlan_cfg_set_rx_rr - set rx round robin enabled/disabled
+ * @cfg: soc configuration context
+ * @rx_rr: true - enabled false - disabled
+ */
+void wlan_cfg_set_rx_rr(struct wlan_cfg_dp_soc_ctxt *cfg, bool rx_rr);
 
 /**
  * wlan_cfg_get_dp_pdev_nss_enabled - Return pdev nss enabled/disabled
