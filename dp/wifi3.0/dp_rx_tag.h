@@ -161,6 +161,17 @@ void dp_rx_mon_update_protocol_flow_tag(struct dp_soc *soc,
 					qdf_nbuf_t msdu, void *rx_desc);
 #endif /* WLAN_SUPPORT_RX_PROTOCOL_TYPE_TAG || WLAN_SUPPORT_RX_FLOW_TAG */
 
+#ifdef WLAN_SUPPORT_RX_FLOW_TAG
+QDF_STATUS dp_rx_sfe_add_flow_entry(struct cdp_soc_t *soc,
+				    uint32_t *src_ip, uint32_t src_port,
+				    uint32_t *dest_ip, uint32_t dest_port,
+				    uint8_t protocol, uint8_t version);
+QDF_STATUS dp_rx_sfe_delete_flow_entry(struct cdp_soc_t *soc,
+				       uint32_t *src_ip, uint32_t src_port,
+				       uint32_t *dest_ip, uint32_t dest_port,
+				       uint8_t protocol, uint8_t version);
+#endif
+
 #if defined(WLAN_SUPPORT_PPEDS) || (QCA_PPE_VP)
 bool dp_rx_ppe_add_flow_entry(struct ppe_drv_fse_rule_info *ppe_flow_info);
 bool dp_rx_ppe_del_flow_entry(struct ppe_drv_fse_rule_info *ppe_flow_info);

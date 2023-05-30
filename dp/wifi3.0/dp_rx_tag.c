@@ -705,7 +705,7 @@ dp_dump_rx_flow_tag_stats(struct cdp_soc_t *soc, uint8_t pdev_id,
 }
 
 #if defined (WLAN_SUPPORT_PPEDS) || (QCA_PPE_VP)
-#if defined (WLAN_FEATURE_11BE_MLO) || (QCA_SUPPORT_WDS_EXTENDED)
+#if defined (CONFIG_MLO_SINGLE_DEV) || (QCA_SUPPORT_WDS_EXTENDED)
 static inline
 wlan_if_t dp_rx_get_vap_osif_dev(osif_dev *osdev)
 {
@@ -754,7 +754,123 @@ wlan_if_t dp_rx_get_vap_osif_dev(osif_dev *osdev)
 	return osdev->os_if;
 }
 #endif
+#endif
 
+QDF_STATUS dp_rx_sfe_add_flow_entry(struct cdp_soc_t *soc_hdl,
+				    uint32_t *src_ip, uint32_t src_port,
+				    uint32_t *dest_ip, uint32_t dest_port,
+				    uint8_t protocol, uint8_t version)
+{
+	struct cdp_rx_flow_info flow_info = { 0 };
+	struct wlan_cfg_dp_soc_ctxt *cfg;
+	struct dp_soc *soc = cdp_soc_t_to_dp_soc(soc_hdl);
+	QDF_STATUS status;
+
+	if (qdf_unlikely(!soc))
+		return QDF_STATUS_E_FAILURE;
+
+	cfg = soc->wlan_cfg_ctx;
+
+	if (qdf_unlikely(!wlan_cfg_is_rx_flow_tag_enabled(cfg))) {
+		dp_err("RX Flow tag feature disabled");
+		return QDF_STATUS_E_NOSUPPORT;
+	}
+
+	flow_info.flow_tuple_info.src_port = src_port;
+	flow_info.flow_tuple_info.dest_port = dest_port;
+	flow_info.flow_tuple_info.l4_protocol = protocol;
+
+	/*
+	 * Set FSE metadata to indicate that the SFE flow rule
+	 * is matched in FSE.
+	 */
+	flow_info.fse_metadata = DP_RX_FSE_FLOW_MATCH_SFE;
+
+	if (version == 4) {
+		flow_info.is_addr_ipv4 = 1;
+		flow_info.flow_tuple_info.src_ip_31_0 = src_ip[0];
+		flow_info.flow_tuple_info.dest_ip_31_0 = dest_ip[0];
+	} else if (version == 6) {
+		flow_info.flow_tuple_info.src_ip_31_0 = src_ip[3];
+		flow_info.flow_tuple_info.src_ip_63_32 = src_ip[2];
+		flow_info.flow_tuple_info.src_ip_95_64 = src_ip[1];
+		flow_info.flow_tuple_info.src_ip_127_96 = src_ip[0];
+
+		flow_info.flow_tuple_info.dest_ip_31_0 = dest_ip[3];
+		flow_info.flow_tuple_info.dest_ip_63_32 = dest_ip[2];
+		flow_info.flow_tuple_info.dest_ip_95_64 = dest_ip[1];
+		flow_info.flow_tuple_info.dest_ip_127_96 = dest_ip[0];
+	}
+
+	flow_info.op_code = CDP_FLOW_FST_ENTRY_ADD;
+	status = dp_rx_flow_add_entry(soc->pdev_list[0], &flow_info);
+
+	if (status == QDF_STATUS_SUCCESS) {
+		if (version == 4)
+			qdf_atomic_inc(&soc->ipv4_fse_cnt);
+		else if (version == 6)
+			qdf_atomic_inc(&soc->ipv6_fse_cnt);
+	}
+
+	return status;
+}
+qdf_export_symbol(dp_rx_sfe_add_flow_entry);
+
+QDF_STATUS dp_rx_sfe_delete_flow_entry(struct cdp_soc_t *soc_hdl,
+				       uint32_t *src_ip, uint32_t src_port,
+				       uint32_t *dest_ip, uint32_t dest_port,
+				       uint8_t protocol, uint8_t version)
+{
+	struct cdp_rx_flow_info flow_info = { 0 };
+	struct wlan_cfg_dp_soc_ctxt *cfg;
+	struct dp_soc *soc = cdp_soc_t_to_dp_soc(soc_hdl);
+	QDF_STATUS status;
+
+	if (qdf_unlikely(!soc))
+		return QDF_STATUS_E_FAILURE;
+
+	cfg = soc->wlan_cfg_ctx;
+
+	if (qdf_unlikely(!wlan_cfg_is_rx_flow_tag_enabled(cfg))) {
+		dp_err("RX Flow tag feature disabled");
+		return QDF_STATUS_E_NOSUPPORT;
+	}
+
+	flow_info.flow_tuple_info.src_port = src_port;
+	flow_info.flow_tuple_info.dest_port = dest_port;
+	flow_info.flow_tuple_info.l4_protocol = protocol;
+
+	if (version == 4) {
+		flow_info.is_addr_ipv4 = 1;
+		flow_info.flow_tuple_info.src_ip_31_0 = src_ip[0];
+		flow_info.flow_tuple_info.dest_ip_31_0 = dest_ip[0];
+	} else if (version == 6) {
+		flow_info.flow_tuple_info.src_ip_31_0 = src_ip[3];
+		flow_info.flow_tuple_info.src_ip_63_32 = src_ip[2];
+		flow_info.flow_tuple_info.src_ip_95_64 = src_ip[1];
+		flow_info.flow_tuple_info.src_ip_127_96 = src_ip[0];
+
+		flow_info.flow_tuple_info.dest_ip_31_0 = dest_ip[3];
+		flow_info.flow_tuple_info.dest_ip_63_32 = dest_ip[2];
+		flow_info.flow_tuple_info.dest_ip_95_64 = dest_ip[1];
+		flow_info.flow_tuple_info.dest_ip_127_96 = dest_ip[0];
+	}
+
+	flow_info.op_code = CDP_FLOW_FST_ENTRY_DEL;
+	status = dp_rx_flow_delete_entry(soc->pdev_list[0], &flow_info);
+
+	if (status == QDF_STATUS_SUCCESS) {
+		if (version == 4)
+			qdf_atomic_dec(&soc->ipv4_fse_cnt);
+		else if (version == 6)
+			qdf_atomic_dec(&soc->ipv6_fse_cnt);
+	}
+
+	return status;
+}
+qdf_export_symbol(dp_rx_sfe_delete_flow_entry);
+
+#if defined (WLAN_SUPPORT_PPEDS) || (QCA_PPE_VP)
 bool
 dp_rx_ppe_add_flow_entry(struct ppe_drv_fse_rule_info *ppe_flow_info)
 {
