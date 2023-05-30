@@ -809,6 +809,11 @@ process_peer:
 	}
 
 	txrx_peer = dp_get_txrx_peer(peer);
+	if (!txrx_peer) {
+		dp_peer_unref_delete(peer, DP_MOD_ID_SAWF);
+		qdf_warn("Invalid txrx peer");
+		return DP_SAWF_PEER_Q_INVALID;
+	}
 
 	/*
 	 * Check available MSDUQ for associated TID of Service class,
