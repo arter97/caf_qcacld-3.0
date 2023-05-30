@@ -259,6 +259,24 @@ reg_copy_from_super_chan_info_to_reg_channel(struct regulatory_channel *chan,
  */
 void reg_set_ap_pwr_type(struct wlan_regulatory_pdev_priv_obj *pdev_priv_obj);
 
+/**
+ * reg_get_6g_pwrmode_chan_list() - Get the modified channel list. The modified
+ * current channel list consists of 2G and 5G portions of the current channel
+ * list and the 6G portion of the current channel list is derived from the input
+ * 6g power type.
+ * @pdev_priv_obj: Pointer to pdev private object.
+ * @chan_list: channel list pointer
+ * @in_6g_pwr_mode: Input 6GHz power mode.
+ *
+ * Return:
+ * QDF_STATUS_SUCCESS: Success
+ * QDF_STATUS_E_INVAL: Failed to get channel list
+ */
+QDF_STATUS
+reg_get_6g_pwrmode_chan_list(struct wlan_regulatory_pdev_priv_obj
+			     *pdev_priv_obj,
+			     struct regulatory_channel *chan_list,
+			     enum supported_6g_pwr_types in_6g_pwr_mode);
 #else /* CONFIG_BAND_6GHZ */
 static inline QDF_STATUS
 reg_get_6g_ap_master_chan_list(struct wlan_objmgr_pdev *pdev,
@@ -318,6 +336,15 @@ reg_copy_from_super_chan_info_to_reg_channel(struct regulatory_channel *chan,
 static inline void
 reg_set_ap_pwr_type(struct wlan_regulatory_pdev_priv_obj *pdev_priv_obj)
 {
+}
+
+static inline QDF_STATUS
+reg_get_6g_pwrmode_chan_list(struct wlan_regulatory_pdev_priv_obj
+			     *pdev_priv_obj,
+			     struct regulatory_channel *chan_list,
+			     enum supported_6g_pwr_types in_6g_pwr_mode)
+{
+	return QDF_STATUS_E_INVAL;
 }
 #endif /* CONFIG_BAND_6GHZ */
 /**
