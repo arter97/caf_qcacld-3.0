@@ -869,6 +869,58 @@ done:
 }
 
 /**
+ * target_if_cfr_get_11be_support_flag(): check if target supports 11be
+ * @pdev_id: pdev id of the pdev
+ * @tgt_hdl: psoc info of pdev associated with pdev_id. Caller of this API to
+ *           ensure that tgt_hdl is not NULL
+ *
+ * Return: true if 11be supported, false otherwise
+ */
+#ifdef WLAN_FEATURE_11BE
+static inline
+bool target_if_cfr_get_11be_support_flag(uint8_t pdev_id,
+					 struct target_psoc_info *tgt_hdl)
+{
+	struct wlan_psoc_host_mac_phy_caps *mac_phy_cap_arr, *mac_phy_cap;
+
+	mac_phy_cap_arr = target_psoc_get_mac_phy_cap(tgt_hdl);
+
+	if (!mac_phy_cap_arr)
+		return false;
+
+	mac_phy_cap = &mac_phy_cap_arr[pdev_id];
+	if (mac_phy_cap && mac_phy_cap->supports_11be)
+		return true;
+
+	return false;
+}
+#else
+static inline
+bool target_if_cfr_get_11be_support_flag(uint8_t pdev_id,
+					 struct target_psoc_info *tgt_hdl)
+{
+	return false;
+}
+#endif
+
+/**
+ * target_if_get_max_agc_gain(): Function to get the max agc gain supported
+ * based on the target_type
+ *
+ * @target_type: target type to which max agc gain needed
+ *
+ * Return: max agc gain value supported on target_type
+ */
+static inline
+uint32_t target_if_get_max_agc_gain(uint32_t target_type)
+{
+	if (target_type == TARGET_TYPE_QCN9224)
+		return MAX_AGC_GAIN_VALUE_WAIKIKI;
+	else
+		return MAX_AGC_GAIN;
+}
+
+/**
  * target_if_cfr_rx_tlv_process() - Process PPDU status TLVs and store info in
  * lookup table
  * @pdev: PDEV object
@@ -903,6 +955,11 @@ void target_if_cfr_rx_tlv_process(struct wlan_objmgr_pdev *pdev, void *nbuf)
 	uint16_t pdelta, gain;
 	uint16_t gain_info[HOST_MAX_CHAINS];
 	bool invalid_gain_table_idx = false;
+	uint32_t target_max_agc_gain = 0;
+	bool supports_11be;
+	uint8_t pdev_id;
+	struct target_psoc_info *tgt_hdl;
+
 
 	if (qdf_unlikely(!pdev)) {
 		cfr_err("pdev is null\n");
@@ -941,6 +998,17 @@ void target_if_cfr_rx_tlv_process(struct wlan_objmgr_pdev *pdev, void *nbuf)
 		cfr_err("rx_ops is NULL");
 		goto relref;
 	}
+
+	tgt_hdl = wlan_psoc_get_tgt_if_handle(psoc);
+	if (qdf_unlikely(!tgt_hdl)) {
+		cfr_err("tgt_hdl is NULL");
+		goto relref;
+	}
+
+	pdev_id = wlan_objmgr_pdev_get_pdev_id(pdev);
+
+	supports_11be = target_if_cfr_get_11be_support_flag(pdev_id, tgt_hdl);
+
 	target_type = target_if_cfr_get_target_type(psoc);
 	cfr_rx_ops = &rx_ops->cfr_rx_ops;
 	buf_addr_extn = cfr_info->rtt_che_buffer_pointer_high8 & 0xF;
@@ -1029,6 +1097,8 @@ void target_if_cfr_rx_tlv_process(struct wlan_objmgr_pdev *pdev, void *nbuf)
 	gain_info[6] = get_u16_lsb(cfr_info->agc_gain_info3);
 	gain_info[7] = get_u16_msb(cfr_info->agc_gain_info3);
 
+	target_max_agc_gain = target_if_get_max_agc_gain(target_type);
+
 	for (i = 0; i < HOST_MAX_CHAINS; i++) {
 		meta->agc_gain[i] = get_gain_db(gain_info[i]);
 		meta->agc_gain_tbl_index[i] = get_gain_table_idx(gain_info[i]);
@@ -1040,8 +1110,8 @@ void target_if_cfr_rx_tlv_process(struct wlan_objmgr_pdev *pdev, void *nbuf)
 			invalid_gain_table_idx = true;
 		}
 
-		if (meta->agc_gain[i] > MAX_AGC_GAIN)
-			meta->agc_gain[i] = MAX_AGC_GAIN;
+		if (meta->agc_gain[i] > target_max_agc_gain)
+			meta->agc_gain[i] = target_max_agc_gain;
 	}
 
 	/**
@@ -1064,7 +1134,15 @@ void target_if_cfr_rx_tlv_process(struct wlan_objmgr_pdev *pdev, void *nbuf)
 				pdelta = pcfr->phase_delta[i][MAX_AGC_GAIN -
 							      1 -
 							      gain];
+			} else if (supports_11be &&
+				   gain < target_max_agc_gain) {
+				/**
+				 * 11be supports gain 62, 63 & gain 61's phase
+				 * delta need to be copied to 62 & 63
+				 */
+				pdelta = pcfr->phase_delta[i][0];
 			} else {
+				/* populate 0 for last gain index */
 				pdelta = 0;
 			}
 			/**
