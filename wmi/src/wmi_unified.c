@@ -3217,7 +3217,6 @@ void *wmi_unified_get_pdev_handle(struct wmi_soc *soc, uint32_t pdev_idx)
 		wmi_handle->cmd_phy_id_map = soc->cmd_phy_id_map;
 		wmi_handle->evt_phy_id_map = soc->evt_phy_id_map;
 		wmi_interface_logging_init(wmi_handle, pdev_idx);
-		qdf_atomic_init(&wmi_handle->pending_cmds);
 		qdf_atomic_init(&wmi_handle->is_target_suspended);
 		qdf_atomic_init(&wmi_handle->is_wow_enable_ack_failed);
 		wmi_handle->target_type = soc->target_type;
@@ -3232,6 +3231,7 @@ void *wmi_unified_get_pdev_handle(struct wmi_soc *soc, uint32_t pdev_idx)
 	} else
 		wmi_handle = soc->wmi_pdev[pdev_idx];
 
+	qdf_atomic_init(&wmi_handle->pending_cmds);
 	wmi_handle->wmi_stopinprogress = 0;
 	wmi_handle->wmi_endpoint_id = soc->wmi_endpoint_id[pdev_idx];
 	wmi_handle->htc_handle = soc->htc_handle;
