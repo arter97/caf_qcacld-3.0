@@ -53,6 +53,7 @@ first_connection_pcl_table[PM_MAX_NUM_OF_MODE]
 	[PM_P2P_CLIENT_MODE] = {PM_5G,   PM_5G,   PM_5G  },
 	[PM_P2P_GO_MODE] = {PM_5G,   PM_5G,   PM_5G  },
 	[PM_NAN_DISC_MODE] = {PM_5G, PM_5G, PM_5G},
+	[PM_LL_LT_SAP_MODE] = {PM_5G, PM_5G, PM_5G},
 };
 
 pm_dbs_pcl_second_connection_table_type
