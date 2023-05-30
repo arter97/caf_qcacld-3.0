@@ -4926,6 +4926,27 @@ FRAME mscs_request_action_frame
     MANDIE descriptor_element;
 }
 
+FRAME epcs_neg_req
+{
+    FF    Category;
+    FF    Action;
+    FF    DialogToken;
+}
+
+FRAME epcs_neg_rsp
+{
+    FF    Category;
+    FF    Action;
+    FF    DialogToken;
+    FF    Status;
+}
+
+FRAME epcs_teardown
+{
+    FF    Category;
+    FF    Action;
+}
+
 // Local Variables:
 // mode: c++
 // fill-column: 77
