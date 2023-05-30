@@ -1716,3 +1716,49 @@ QDF_STATUS reg_get_max_reg_eirp_from_list(struct wlan_objmgr_pdev *pdev,
 	return QDF_STATUS_SUCCESS;
 }
 #endif
+
+/**
+ * reg_quick_compute_pdev_current_chan_list - Compute regulatory current
+ * channel list but only the 6GHz portion based on the input power mode.
+ * @pdev: Pointer to pdev.
+ * @in_6g_pwr_mode: Input 6GHz power mode.
+ *
+ * Return: Void.
+ */
+static void
+reg_quick_compute_pdev_current_chan_list(struct wlan_objmgr_pdev *pdev,
+					 enum supported_6g_pwr_types in_6g_pwr_mode)
+{
+	struct wlan_regulatory_pdev_priv_obj *pdev_priv_obj;
+
+	pdev_priv_obj = reg_get_pdev_obj(pdev);
+	if (!IS_VALID_PDEV_REG_OBJ(pdev_priv_obj)) {
+		reg_err("pdev reg component is NULL");
+		return;
+	}
+
+	reg_get_6g_pwrmode_chan_list(pdev_priv_obj,
+				     pdev_priv_obj->cur_chan_list,
+				     in_6g_pwr_mode);
+	reg_modify_chan_list_for_max_chwidth_for_pwrmode(
+						pdev_priv_obj->pdev_ptr,
+						pdev_priv_obj->cur_chan_list,
+						in_6g_pwr_mode);
+}
+
+QDF_STATUS
+reg_quick_set_ap_pwr_and_update_chan_list(struct wlan_objmgr_pdev *pdev,
+					  enum reg_6g_ap_type ap_pwr_type)
+{
+	enum supported_6g_pwr_types supp_pwr_type;
+
+	if (!reg_get_num_rules_of_ap_pwr_type(pdev, ap_pwr_type))
+		return QDF_STATUS_E_FAILURE;
+
+	reg_set_cur_6g_ap_pwr_type(pdev, ap_pwr_type);
+	supp_pwr_type =
+		reg_conv_6g_ap_type_to_supported_6g_pwr_types(ap_pwr_type);
+	reg_quick_compute_pdev_current_chan_list(pdev, supp_pwr_type);
+
+	return QDF_STATUS_SUCCESS;
+}
