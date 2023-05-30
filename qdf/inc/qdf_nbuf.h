@@ -5626,4 +5626,15 @@ qdf_nbuf_t qdf_get_nbuf_valid_frag(qdf_nbuf_t nbuf);
  */
 bool qdf_nbuf_fast_xmit(qdf_nbuf_t nbuf);
 
+/**
+ * qdf_nbuf_set_fast_xmit() - Set fast_xmit in SKB
+ * @nbuf: qdf_nbuf_t master nbuf
+ * @value: value to set in fast_xmit
+ *
+ * This function set fast_xmit in SKB if it exist.
+ *
+ * Return: void
+ */
+void qdf_nbuf_set_fast_xmit(qdf_nbuf_t nbuf, int value);
+
 #endif /* _QDF_NBUF_H */

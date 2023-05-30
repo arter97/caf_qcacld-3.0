@@ -2670,13 +2670,29 @@ bool qdf_nbuf_fast_xmit(qdf_nbuf_t nbuf)
 {
 	return nbuf->fast_xmit;
 }
+
+qdf_export_symbol(qdf_nbuf_fast_xmit);
+
+void qdf_nbuf_set_fast_xmit(qdf_nbuf_t nbuf, int value)
+{
+	nbuf->fast_xmit = value;
+}
+
+qdf_export_symbol(qdf_nbuf_set_fast_xmit);
 #else
 bool qdf_nbuf_fast_xmit(qdf_nbuf_t nbuf)
 {
 	return false;
 }
-#endif
+
 qdf_export_symbol(qdf_nbuf_fast_xmit);
+
+void qdf_nbuf_set_fast_xmit(qdf_nbuf_t nbuf, int value)
+{
+}
+
+qdf_export_symbol(qdf_nbuf_set_fast_xmit);
+#endif
 
 #ifdef NBUF_MEMORY_DEBUG
 
