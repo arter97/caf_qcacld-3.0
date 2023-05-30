@@ -362,50 +362,6 @@ hif_reset_ce_full_count(struct hif_softc *scn, uint8_t ce_id)
 }
 #endif
 
-#ifdef HIF_DETECTION_LATENCY_ENABLE
-static inline
-void hif_latency_detect_tasklet_sched(
-	struct hif_softc *scn,
-	struct ce_tasklet_entry *tasklet_entry)
-{
-	int idx = tasklet_entry->ce_id;
-
-	if (idx >= HIF_TASKLET_IN_MONITOR ||
-	    !qdf_test_bit(idx, scn->latency_detect.tasklet_bmap))
-		return;
-
-	scn->latency_detect.tasklet_info[idx].sched_cpuid = qdf_get_cpu();
-	scn->latency_detect.tasklet_info[idx].sched_time = qdf_system_ticks();
-}
-
-static inline
-void hif_latency_detect_tasklet_exec(
-	struct hif_softc *scn,
-	struct ce_tasklet_entry *tasklet_entry)
-{
-	int idx = tasklet_entry->ce_id;
-
-	if (idx >= HIF_TASKLET_IN_MONITOR ||
-	    !qdf_test_bit(idx, scn->latency_detect.tasklet_bmap))
-		return;
-
-	scn->latency_detect.tasklet_info[idx].exec_time = qdf_system_ticks();
-	hif_check_detection_latency(scn, false, BIT(HIF_DETECT_TASKLET));
-}
-#else
-static inline
-void hif_latency_detect_tasklet_sched(
-	struct hif_softc *scn,
-	struct ce_tasklet_entry *tasklet_entry)
-{}
-
-static inline
-void hif_latency_detect_tasklet_exec(
-	struct hif_softc *scn,
-	struct ce_tasklet_entry *tasklet_entry)
-{}
-#endif
-
 #ifdef CUSTOM_CB_SCHEDULER_SUPPORT
 /**
  * ce_get_custom_cb_pending() - Helper API to check whether the custom
@@ -466,7 +422,7 @@ static void ce_tasklet(unsigned long data)
 	if (scn->ce_latency_stats)
 		hif_record_tasklet_exec_entry_ts(scn, tasklet_entry->ce_id);
 
-	hif_latency_detect_tasklet_exec(scn, tasklet_entry);
+	hif_tasklet_latency_record_exec(scn, tasklet_entry->ce_id);
 
 	if (qdf_atomic_read(&scn->link_suspended)) {
 		hif_err("ce %d tasklet fired after link suspend",
@@ -497,7 +453,7 @@ static void ce_tasklet(unsigned long data)
 					 NULL, NULL, -1, 0);
 
 		ce_tasklet_schedule(tasklet_entry);
-		hif_latency_detect_tasklet_sched(scn, tasklet_entry);
+		hif_tasklet_latency_record_sched(scn, tasklet_entry->ce_id);
 
 		hif_reset_ce_full_count(scn, tasklet_entry->ce_id);
 		if (scn->ce_latency_stats) {
@@ -792,7 +748,7 @@ static inline bool hif_tasklet_schedule(struct hif_opaque_softc *hif_ctx,
 	/* keep it before tasklet_schedule, this is to happy whunt.
 	 * in whunt, tasklet may run before finished hif_tasklet_schedule.
 	 */
-	hif_latency_detect_tasklet_sched(scn, tasklet_entry);
+	hif_tasklet_latency_record_sched(scn, tasklet_entry->ce_id);
 	ce_tasklet_schedule(tasklet_entry);
 
 	hif_reset_ce_full_count(scn, tasklet_entry->ce_id);

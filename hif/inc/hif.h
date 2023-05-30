@@ -2507,6 +2507,25 @@ void hif_check_detection_latency(struct hif_softc *scn,
 				 bool from_timer,
 				 uint32_t bitmap_type);
 void hif_set_enable_detection(struct hif_opaque_softc *hif_ctx, bool value);
+
+/**
+ * hif_tasklet_latency_record_exec() - record execute time and
+ * check the latency
+ * @scn: HIF opaque context
+ * @idx: CE id
+ *
+ * Return: None
+ */
+void hif_tasklet_latency_record_exec(struct hif_softc *scn, int idx);
+
+/**
+ * hif_tasklet_latency_record_sched() - record schedule time of a tasklet
+ * @scn: HIF opaque context
+ * @idx: CE id
+ *
+ * Return: None
+ */
+void hif_tasklet_latency_record_sched(struct hif_softc *scn, int idx);
 #else
 static inline
 void hif_latency_detect_timer_start(struct hif_opaque_softc *hif_ctx)
@@ -2529,6 +2548,14 @@ void hif_check_detection_latency(struct hif_softc *scn,
 
 static inline
 void hif_set_enable_detection(struct hif_opaque_softc *hif_ctx, bool value)
+{}
+
+static inline
+void hif_tasklet_latency_record_exec(struct hif_softc *scn, int idx)
+{}
+
+static inline
+void hif_tasklet_latency_record_sched(struct hif_softc *scn, int idx)
 {}
 #endif
 

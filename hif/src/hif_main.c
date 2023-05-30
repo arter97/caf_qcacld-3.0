@@ -884,38 +884,76 @@ __hif_tasklet_latency(struct hif_softc *scn, bool from_timer, int idx)
 	 * from_timer==true:  check if tasklet stall
 	 * from_timer==false: check tasklet execute comes late
 	 */
-
-	if ((from_timer ?
-	     qdf_system_time_after(sched_time, exec_time) :
-	     qdf_system_time_after(exec_time, sched_time)) &&
-	    qdf_system_time_after(curr_time, expect_exec_time)) {
+	if (from_timer ?
+	    (qdf_system_time_after(sched_time, exec_time) &&
+	     qdf_system_time_after(curr_time, expect_exec_time)) :
+	    qdf_system_time_after(exec_time, expect_exec_time)) {
 		hif_err("tasklet[%d] latency detected: from_timer %d, curr_time %lu, sched_time %lu, exec_time %lu, threshold %ums, timeout %ums, cpu_id %d, called: %ps",
 			idx, from_timer, curr_time, sched_time,
 			exec_time, threshold,
 			scn->latency_detect.timeout,
 			qdf_get_cpu(), (void *)_RET_IP_);
+		qdf_trigger_self_recovery(NULL,
+					  QDF_TASKLET_CREDIT_LATENCY_DETECT);
 		return -ETIMEDOUT;
 	}
 
 	return 0;
 }
 
-static inline void hif_tasklet_latency(struct hif_softc *scn, bool from_timer)
+/**
+ * hif_tasklet_latency_detect_enabled() - check whether latency detect
+ * is enabled for the tasklet which is specified by idx
+ * @scn: HIF opaque context
+ * @idx: CE id
+ *
+ * Return: true if latency detect is enabled for the specified tasklet,
+ * false otherwise.
+ */
+static inline bool
+hif_tasklet_latency_detect_enabled(struct hif_softc *scn, int idx)
 {
-	int i, ret;
+	if (QDF_GLOBAL_MISSION_MODE != hif_get_conparam(scn))
+		return false;
 
-	for (i = 0; i < HIF_TASKLET_IN_MONITOR; i++) {
-		if (!qdf_test_bit(i, scn->latency_detect.tasklet_bmap))
-			continue;
+	if (!scn->latency_detect.enable_detection)
+		return false;
 
-		ret = __hif_tasklet_latency(scn, from_timer, i);
-		if (!ret)
-			continue;
+	if (idx < 0 || idx >= HIF_TASKLET_IN_MONITOR ||
+	    !qdf_test_bit(idx, scn->latency_detect.tasklet_bmap))
+		return false;
 
-		qdf_trigger_self_recovery(NULL,
-					  QDF_TASKLET_CREDIT_LATENCY_DETECT);
+	return true;
+}
+
+void hif_tasklet_latency_record_exec(struct hif_softc *scn, int idx)
+{
+	if (!hif_tasklet_latency_detect_enabled(scn, idx))
 		return;
-	}
+
+	/*
+	 * hif_set_enable_detection(true) might come between
+	 * hif_tasklet_latency_record_sched() and
+	 * hif_tasklet_latency_record_exec() during wlan startup, then the
+	 * sched_time is 0 but exec_time is not, and hit the timeout case in
+	 * __hif_tasklet_latency().
+	 * To avoid such issue, skip exec_time recording if sched_time has not
+	 * been recorded.
+	 */
+	if (!scn->latency_detect.tasklet_info[idx].sched_time)
+		return;
+
+	scn->latency_detect.tasklet_info[idx].exec_time = qdf_system_ticks();
+	__hif_tasklet_latency(scn, false, idx);
+}
+
+void hif_tasklet_latency_record_sched(struct hif_softc *scn, int idx)
+{
+	if (!hif_tasklet_latency_detect_enabled(scn, idx))
+		return;
+
+	scn->latency_detect.tasklet_info[idx].sched_cpuid = qdf_get_cpu();
+	scn->latency_detect.tasklet_info[idx].sched_time = qdf_system_ticks();
 }
 
 static inline void hif_credit_latency(struct hif_softc *scn, bool from_timer)
@@ -949,6 +987,20 @@ static inline void hif_credit_latency(struct hif_softc *scn, bool from_timer)
 
 latency:
 	qdf_trigger_self_recovery(NULL, QDF_TASKLET_CREDIT_LATENCY_DETECT);
+}
+
+static inline void hif_tasklet_latency(struct hif_softc *scn, bool from_timer)
+{
+	int i, ret;
+
+	for (i = 0; i < HIF_TASKLET_IN_MONITOR; i++) {
+		if (!qdf_test_bit(i, scn->latency_detect.tasklet_bmap))
+			continue;
+
+		ret = __hif_tasklet_latency(scn, from_timer, i);
+		if (ret)
+			return;
+	}
 }
 
 /**
