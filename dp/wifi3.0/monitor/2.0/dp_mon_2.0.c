@@ -1618,6 +1618,12 @@ dp_enable_enhanced_stats_2_0(struct cdp_soc_t *soc, uint8_t pdev_id)
 
 	be_soc = dp_get_be_soc_from_dp_soc(dp_soc);
 
+	/* enable only on one soc if MLD is disabled */
+	if (!be_soc->mlo_enabled || !be_soc->ml_ctxt) {
+		dp_enable_enhanced_stats(soc, pdev_id);
+		return QDF_STATUS_SUCCESS;
+	}
+
 	dp_mlo_iter_ptnr_soc(be_soc,
 			     dp_enable_enhanced_stats_for_each_pdev,
 			     NULL);
@@ -1640,6 +1646,12 @@ dp_disable_enhanced_stats_2_0(struct cdp_soc_t *soc, uint8_t pdev_id)
 	struct dp_soc_be *be_soc = NULL;
 
 	be_soc = dp_get_be_soc_from_dp_soc(dp_soc);
+
+	/* enable only on one soc if MLD is disabled */
+	if (!be_soc->mlo_enabled || !be_soc->ml_ctxt) {
+		dp_disable_enhanced_stats(soc, pdev_id);
+		return QDF_STATUS_SUCCESS;
+	}
 
 	dp_mlo_iter_ptnr_soc(be_soc,
 			     dp_disable_enhanced_stats_for_each_pdev,
