@@ -63,6 +63,35 @@ u_int32_t snr_to_signal_strength(uint8_t snr)
 #endif
 
 /**
+ * tagret_if_snr_to_signal_strength() - wrapper API to snr_to_signal_strength to
+ *                                      consider target_type.
+ * @target_type: target type of the pdev
+ * @meta: pointer to CFR metadata
+ * @ppdu: rx ppdu having per chain rssi to be converted to dBm
+ *
+ * Return: none
+ */
+static inline
+void target_if_snr_to_signal_strength(uint32_t target_type,
+				      struct enh_cfr_metadata *meta,
+				      struct cdp_rx_indication_ppdu *ppdu)
+{
+	uint8_t i;
+
+	/* No need to add CMN_NOISE_FLOOR for york */
+	if (target_type == TARGET_TYPE_QCN9160) {
+		for (i = 0; i < MAX_CHAIN; i++) {
+			meta->chain_rssi[i] = (int8_t)ppdu->per_chain_rssi[i];
+		}
+	} else {
+		for (i = 0; i < MAX_CHAIN; i++) {
+			meta->chain_rssi[i] =
+				snr_to_signal_strength(ppdu->per_chain_rssi[i]);
+		}
+	}
+}
+
+/**
  * get_lut_entry() - Retrieve LUT entry using cookie number
  * @pcfr: PDEV CFR object
  * @offset: cookie number
@@ -1201,9 +1230,7 @@ void target_if_cfr_rx_tlv_process(struct wlan_objmgr_pdev *pdev, void *nbuf)
 	if (meta->num_mu_users > pcfr->max_mu_users)
 		meta->num_mu_users = pcfr->max_mu_users;
 
-	for (i = 0; i < MAX_CHAIN; i++)
-		meta->chain_rssi[i] =
-			snr_to_signal_strength(cdp_rx_ppdu->per_chain_rssi[i]);
+	target_if_snr_to_signal_strength(target_type, meta, cdp_rx_ppdu);
 
 	if (cdp_rx_ppdu->u.ppdu_type != CDP_RX_TYPE_SU) {
 		for (i = 0 ; i < meta->num_mu_users; i++) {
@@ -2312,7 +2339,8 @@ QDF_STATUS cfr_enh_init_pdev(struct wlan_objmgr_psoc *psoc,
 		   target_type == TARGET_TYPE_QCN9160) {
 		pcfr->subbuf_size = STREAMFS_MAX_SUBBUF_SPRUCE;
 		pcfr->num_subbufs = STREAMFS_NUM_SUBBUF_SPRUCE;
-		pcfr->chip_type = CFR_CAPTURE_RADIO_SPRUCE;
+		pcfr->chip_type = (target_type == TARGET_TYPE_QCN6122) ?
+			CFR_CAPTURE_RADIO_SPRUCE : CFR_CAPTURE_RADIO_YORK;
 		pcfr->max_mu_users = SPRUCE_CFR_MU_USERS;
 	} else if (target_type == TARGET_TYPE_QCN9224) {
 		pcfr->subbuf_size = STREAMFS_MAX_SUBBUF_WAIKIKI;
