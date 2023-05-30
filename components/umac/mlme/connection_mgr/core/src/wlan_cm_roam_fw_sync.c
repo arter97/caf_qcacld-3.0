@@ -1157,6 +1157,9 @@ QDF_STATUS cm_fw_roam_complete(struct cnx_mgr *cm_ctx, void *data)
 		roam_synch_data->hw_mode_trans_ind.num_vdev_mac_entries,
 		roam_synch_data->hw_mode_trans_ind.vdev_mac_map,
 		0, NULL, psoc);
+	ml_nlink_conn_change_notify(
+			psoc, vdev_id,
+			ml_nlink_roam_sync_completion_evt, NULL);
 
 	if (roam_synch_data->pmk_len) {
 		mlme_debug("Received pmk in roam sync. Length: %d",

@@ -42,6 +42,7 @@
 #include "wlan_psoc_mlme_api.h"
 #include "wlan_t2lm_api.h"
 #include "wlan_mlo_t2lm.h"
+#include "wlan_mlo_link_force.h"
 
 #ifdef WLAN_FEATURE_FILS_SK
 void cm_update_hlp_info(struct wlan_objmgr_vdev *vdev,
@@ -1081,6 +1082,9 @@ QDF_STATUS cm_connect_start_ind(struct wlan_objmgr_vdev *vdev,
 					   wlan_vdev_get_id(vdev),
 					   HS_20_AP, &src_cfg);
 	}
+	ml_nlink_conn_change_notify(
+		psoc, wlan_vdev_get_id(vdev),
+		ml_nlink_connect_start_evt, NULL);
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -1669,7 +1673,9 @@ cm_connect_complete_ind(struct wlan_objmgr_vdev *vdev,
 								psoc, vdev_id);
 		else
 			policy_mgr_incr_active_session(psoc, op_mode, vdev_id);
-
+		ml_nlink_conn_change_notify(
+			psoc, vdev_id,
+			ml_nlink_connect_completion_evt, NULL);
 		cm_process_connect_complete(psoc, pdev, vdev, rsp);
 		cm_install_link_vdev_keys(vdev);
 		wlan_tdls_notify_sta_connect(vdev_id,

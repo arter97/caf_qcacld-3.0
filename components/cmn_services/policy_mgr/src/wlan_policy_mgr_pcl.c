@@ -41,6 +41,7 @@
 #include "wlan_cm_roam_api.h"
 #include "wlan_scan_api.h"
 #include "wlan_nan_api.h"
+#include "wlan_mlo_link_force.h"
 
 /*
  * first_connection_pcl_table - table which provides PCL for the
@@ -467,7 +468,9 @@ void policy_mgr_decr_session_set_pcl(struct wlan_objmgr_psoc *psoc,
 		return;
 
 	policy_mgr_check_n_start_opportunistic_timer(psoc);
-	policy_mgr_handle_ml_sta_links_on_vdev_down(psoc, mode, session_id);
+	if (mode == QDF_SAP_MODE || mode == QDF_P2P_GO_MODE)
+		ml_nlink_conn_change_notify(
+			psoc, session_id, ml_nlink_ap_stopped_evt, NULL);
 }
 
 /**

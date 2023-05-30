@@ -23,6 +23,7 @@
 #include "wlan_cm_roam_public_struct.h"
 #include "wlan_cm_roam_api.h"
 #include "wlan_mlo_mgr_roam.h"
+#include "wlan_mlme_main.h"
 
 void
 ml_nlink_convert_linkid_bitmap_to_vdev_bitmap(
@@ -1535,6 +1536,7 @@ ml_nlink_conn_change_notify(struct wlan_objmgr_psoc *psoc,
 			    struct ml_nlink_change_event *data)
 {
 	struct wlan_objmgr_vdev *vdev;
+	enum QDF_OPMODE mode;
 
 	mlo_debug("vdev %d %s", vdev_id, link_evt_to_string(evt));
 	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, vdev_id,
@@ -1543,6 +1545,7 @@ ml_nlink_conn_change_notify(struct wlan_objmgr_psoc *psoc,
 		mlo_err("invalid vdev id %d ", vdev_id);
 		return QDF_STATUS_E_INVAL;
 	}
+	mode = wlan_vdev_mlme_get_opmode(vdev);
 
 	switch (evt) {
 	case ml_nlink_link_switch_start_evt:
@@ -1582,6 +1585,12 @@ ml_nlink_conn_change_notify(struct wlan_objmgr_psoc *psoc,
 			psoc, vdev, MLO_LINK_FORCE_REASON_DISCONNECT);
 		break;
 	case ml_nlink_connection_updated_evt:
+		if (mode == QDF_STA_MODE &&
+		    (MLME_IS_ROAM_SYNCH_IN_PROGRESS(psoc, vdev_id) ||
+		     MLME_IS_MLO_ROAM_SYNCH_IN_PROGRESS(psoc, vdev_id))) {
+			mlo_debug("vdev id %d in roam sync", vdev_id);
+			break;
+		}
 		ml_nlink_state_change_handler(
 			psoc, vdev, MLO_LINK_FORCE_REASON_CONNECT);
 		break;

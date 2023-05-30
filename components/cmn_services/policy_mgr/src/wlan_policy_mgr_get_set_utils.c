@@ -4795,7 +4795,9 @@ void policy_mgr_incr_active_session(struct wlan_objmgr_psoc *psoc,
 		wlan_reg_recompute_current_chan_list(psoc, pm_ctx->pdev);
 
 	qdf_mutex_release(&pm_ctx->qdf_conc_list_lock);
-	policy_mgr_handle_ml_sta_links_on_vdev_up_csa(psoc, mode, session_id);
+	if (mode == QDF_SAP_MODE || mode == QDF_P2P_GO_MODE)
+		ml_nlink_conn_change_notify(
+			psoc, session_id, ml_nlink_ap_started_evt, NULL);
 }
 
 /**
@@ -7428,7 +7430,9 @@ void policy_mgr_handle_ml_sta_link_on_traffic_type_change(
 	/* Check if any set link is already progress and thus wait */
 	policy_mgr_wait_for_set_link_update(psoc);
 
-	policy_mgr_handle_sap_cli_go_ml_sta_up_csa(psoc, vdev);
+	ml_nlink_conn_change_notify(
+		psoc, wlan_vdev_get_id(vdev),
+		ml_nlink_connection_updated_evt, NULL);
 
 	/*
 	 * Check if traffic type change lead to set link is progress and

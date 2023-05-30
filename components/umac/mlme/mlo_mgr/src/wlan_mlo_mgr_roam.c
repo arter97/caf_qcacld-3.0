@@ -32,6 +32,7 @@
 #include <wlan_cm_api.h>
 #include <utils_mlo.h>
 #include <wlan_mlo_mgr_peer.h>
+#include "wlan_mlo_link_force.h"
 
 #ifdef WLAN_FEATURE_11BE_MLO
 static bool
@@ -269,6 +270,9 @@ QDF_STATUS mlo_fw_roam_sync_req(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 	}
 
 	mlo_roam_update_vdev_macaddr(psoc, vdev_id, is_non_mlo_ap);
+	ml_nlink_conn_change_notify(
+		psoc, vdev_id, ml_nlink_roam_sync_start_evt, NULL);
+
 	status = cm_fw_roam_sync_req(psoc, vdev_id, event, event_data_len);
 
 	if (QDF_IS_STATUS_ERROR(status))
