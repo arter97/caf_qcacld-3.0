@@ -3015,6 +3015,11 @@ static int reg_get_num_reg_rules(
 	struct reg_rule_info *pdev_reg_rules;
 
 	cur_6g_ap_pwr_type = pdev_priv_obj->reg_cur_6g_ap_pwr_type;
+	if (cur_6g_ap_pwr_type > REG_MAX_SUPP_AP_TYPE) {
+		reg_err("Unsupported 6G AP power type");
+		return 0;
+	}
+
 	pdev_reg_rules = &pdev_priv_obj->reg_rules;
 
 	return (pdev_reg_rules->num_of_reg_rules +
@@ -3067,6 +3072,11 @@ static void reg_append_6g_reg_rules_in_pdev(
 	uint8_t num_reg_rules;
 
 	cur_pwr_type = pdev_priv_obj->reg_cur_6g_ap_pwr_type;
+	if (cur_pwr_type > REG_MAX_SUPP_AP_TYPE) {
+		reg_err("Unsupported 6G AP power type");
+		return;
+	}
+
 	pdev_reg_rules = &pdev_priv_obj->reg_rules;
 
 	num_reg_rules = pdev_reg_rules->num_of_reg_rules;
