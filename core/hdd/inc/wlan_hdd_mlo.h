@@ -209,9 +209,10 @@ void hdd_mlo_t2lm_unregister_callback(struct wlan_objmgr_vdev *vdev);
  * @data_len: length of @data
  *
  * Based on the data get or set the mlo link state
- * Return: QDF_STATUS
+ *
+ * Return: 0 on success and error number otherwise.
  */
-QDF_STATUS
+int
 wlan_handle_mlo_link_state_operation(struct wiphy *wiphy,
 				     struct wlan_objmgr_vdev *vdev,
 				     const void *data, int data_len);
@@ -318,12 +319,12 @@ void hdd_mlo_t2lm_unregister_callback(struct wlan_objmgr_vdev *vdev)
 {
 }
 
-static inline QDF_STATUS
+static inline int
 wlan_handle_mlo_link_state_operation(struct wiphy *wiphy,
 				     struct wlan_objmgr_vdev *vdev,
 				     const void *data, int data_len)
 {
-	return QDF_STATUS_SUCCESS;
+	return 0;
 }
 
 static inline
