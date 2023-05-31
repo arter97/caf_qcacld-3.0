@@ -7466,7 +7466,6 @@ static void hdd_cleanup_adapter(struct hdd_context *hdd_ctx,
 {
 	struct net_device *dev = NULL;
 	struct wlan_hdd_link_info *link_info;
-	uint8_t link_idx;
 
 	if (adapter)
 		dev = adapter->dev;
@@ -7477,13 +7476,8 @@ static void hdd_cleanup_adapter(struct hdd_context *hdd_ctx,
 
 	hdd_apf_context_destroy(adapter);
 	qdf_spinlock_destroy(&adapter->mc_list_lock);
-	hdd_adapter_for_each_link_entry(adapter, link_idx) {
-		link_info = hdd_adapter_get_link_info_ptr(adapter, link_idx);
-		if (!link_info)
-			continue;
-
+	hdd_adapter_for_each_link_info(adapter, link_info)
 		qdf_spinlock_destroy(&link_info->vdev_lock);
-	}
 
 	hdd_sta_info_deinit(&adapter->sta_info_list);
 	hdd_sta_info_deinit(&adapter->cache_sta_info_list);
@@ -8028,12 +8022,10 @@ wlan_hdd_set_ml_cap_for_sap_intf(struct hdd_adapter_create_param *create_params,
 
 static void hdd_adapter_init_link_info(struct hdd_adapter *adapter)
 {
-	uint8_t link_idx;
 	struct wlan_hdd_link_info *link_info;
 
 	/* Initialize each member in link info array to default values */
-	hdd_adapter_for_each_link_entry(adapter, link_idx) {
-		link_info = &adapter->link_info[link_idx];
+	hdd_adapter_for_each_link_info(adapter, link_info) {
 		link_info->adapter = adapter;
 		link_info->vdev_id = WLAN_UMAC_VDEV_ID_MAX;
 		qdf_spinlock_create(&link_info->vdev_lock);
@@ -9871,7 +9863,6 @@ hdd_get_link_info_by_vdev(struct hdd_context *hdd_ctx, uint32_t vdev_id)
 {
 	struct hdd_adapter *adapter, *next_adapter = NULL;
 	wlan_net_dev_ref_dbgid dbgid = NET_DEV_HOLD_GET_ADAPTER_BY_VDEV;
-	uint8_t link_idx;
 	struct wlan_hdd_link_info *link_info;
 
 	if (vdev_id == WLAN_INVALID_VDEV_ID)
@@ -9879,9 +9870,7 @@ hdd_get_link_info_by_vdev(struct hdd_context *hdd_ctx, uint32_t vdev_id)
 
 	hdd_for_each_adapter_dev_held_safe(hdd_ctx, adapter, next_adapter,
 					   dbgid) {
-		hdd_adapter_for_each_link_entry(adapter, link_idx) {
-			link_info = hdd_adapter_get_link_info_ptr(adapter,
-								  link_idx);
+		hdd_adapter_for_each_active_link_info(adapter, link_info) {
 			if (link_info->vdev_id == vdev_id) {
 				hdd_adapter_dev_put_debug(adapter, dbgid);
 				if (next_adapter)

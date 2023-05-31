@@ -2591,32 +2591,100 @@ void hdd_validate_next_adapter(struct hdd_adapter **curr,
 	     __hdd_take_ref_and_fetch_next_adapter_safe(hdd_ctx, adapter, \
 							next_adapter, dbgid))
 
-#define __hdd_adapter_deflink_idx(link_idx) (link_idx = WLAN_HDD_DEFLINK_IDX)
-#define __hdd_is_link_idx_valid(link_idx) ((link_idx) < WLAN_MAX_MLD)
-#define __hdd_adapter_next_link_idx(link_idx) ((link_idx)++)
-
-/**
- * hdd_adapter_for_each_link_entry() - Link info iterator for all
- * link_info fields.
- * @adapter: HDD adapter to iterate each link_info
- * @link_idx: Variable to save each iterating index
- *
- * The function iterates from the start index of link_info array
- * in @adapter till the end of the link_info array.
+/* Helper MACROS and APIs definition to iterate
+ * link info array in HDD adapter.
  */
+#define __hdd_adapter_is_active_link(adapter, link_idx) \
+			qdf_atomic_test_bit(link_idx, &(adapter)->active_links)
 
-#define hdd_adapter_for_each_link_entry(adapter, link_idx) \
-	for (__hdd_adapter_deflink_idx(link_idx); \
-		__hdd_is_link_idx_valid(link_idx); \
-		__hdd_adapter_next_link_idx(link_idx))
+#define hdd_adapter_get_link_info_if_active(adapter, link_idx) \
+		__hdd_adapter_is_active_link((adapter), (link_idx)) ? \
+			&((adapter)->link_info[(link_idx)]) : NULL
+
+#define __hdd_is_link_info_valid(_link_info) !!_link_info
+
+#define __hdd_adapter_get_first_active_link_info(adapter, link_info) \
+	link_info = NULL, \
+	hdd_adapter_get_next_active_link_info(adapter, &link_info)
+
 
 static inline uint8_t
 hdd_adapter_get_index_of_link_info(struct wlan_hdd_link_info *link_info)
 {
-	unsigned long offset = link_info - link_info->adapter->deflink;
-
-	return (offset / sizeof(struct wlan_hdd_link_info));
+	return (link_info - &link_info->adapter->link_info[0]);
 }
+
+static inline void
+hdd_adapter_get_next_active_link_info(struct hdd_adapter *adapter,
+				      struct wlan_hdd_link_info **link_info)
+{
+	uint8_t link_idx = WLAN_HDD_DEFLINK_IDX;
+
+	if (!link_info || !adapter)
+		return;
+
+	/* If @link_info already points to valid link info address, get the
+	 * index of that link info and get the next valid link info which is
+	 * set to active.
+	 * If @link_info points to invalid address, then start the search
+	 * for active link info from WLAN_HDD_DEFLINK_IDX index.
+	 */
+	if (*link_info)
+		link_idx = hdd_adapter_get_index_of_link_info(*link_info) + 1;
+
+	*link_info = NULL;
+	while (link_idx < WLAN_MAX_MLD && !(*link_info)) {
+		*link_info = hdd_adapter_get_link_info_if_active(adapter,
+								 link_idx);
+		link_idx++;
+	}
+}
+
+/**
+ * hdd_adapter_for_each_active_link_info() - Link info iterator which loops
+ * through the link info array elements which are set to active.
+ * @adapter: HDD adapter to iterate for each active link info pointer.
+ * @link_info: Pointer of active link info.
+ *
+ * The "active_links" bitmap in @adapter says which indices are active
+ * in the link info array.
+ * The MACRO iterates through all the active link info elements in link info
+ * array and ends loop when no more active link info entries are present.
+ * The @link_info points next active link info pointer on each iteration or
+ * NULL value at the end of the loop.
+ *
+ * Callers to take reference of adapter if needed.
+ */
+#define hdd_adapter_for_each_active_link_info(adapter, link_info) \
+	for (__hdd_adapter_get_first_active_link_info(adapter, link_info); \
+	     __hdd_is_link_info_valid(link_info); \
+	     hdd_adapter_get_next_active_link_info(adapter, &link_info))
+
+#define __hdd_adapter_get_firstlink(adapter, __link_info)	\
+		(__link_info = adapter ? &((adapter)->link_info[0]) : NULL)
+
+#define __hdd_is_link_info_idx_valid(adapter, __link_info) \
+		((__link_info - &(adapter)->link_info[0]) < WLAN_MAX_MLD)
+
+#define __hdd_adapter_next_link_info(link_info)	((link_info)++)
+
+/**
+ * hdd_adapter_for_each_link_info() - Link info iterator for all
+ * link_info fields.
+ * @adapter: HDD adapter to iterate each link_info.
+ * @link_info: Pointer to each link info element in the array.
+ *
+ * The function iterates from the start index of link_info array
+ * in @adapter till the end of the link_info array.
+ *
+ * Callers to take reference of adapter if needed.
+ */
+
+#define hdd_adapter_for_each_link_info(adapter, link_info) \
+	for (__hdd_adapter_get_firstlink(adapter, link_info); \
+	     __hdd_is_link_info_valid(link_info) && \
+	     __hdd_is_link_info_idx_valid(adapter, link_info); \
+	     __hdd_adapter_next_link_info(link_info))
 
 /**
  * wlan_hdd_get_link_info_from_objmgr() - Fetch adapter from objmgr
