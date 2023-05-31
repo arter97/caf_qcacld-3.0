@@ -1289,7 +1289,7 @@ static void hal_reo_setup_6432(struct hal_soc *soc, void *reoparams,
 	 * 7: NOT_USED.
 	 */
 	if (reo_params->rx_hash_enabled) {
-		//	hal_compute_reo_remap_ix0_6432(soc);
+		hal_compute_reo_remap_ix0_6432(soc);
 		HAL_REG_WRITE(soc,
 				HWIO_REO_R0_DESTINATION_RING_CTRL_IX_1_ADDR
 				(REO_REG_REG_BASE), reo_params->remap0);
@@ -1751,6 +1751,8 @@ static void hal_hw_txrx_ops_attach_qcn6432(struct hal_soc *hal_soc)
 		hal_tx_ppe2tcl_ring_halt_reset_6432;
 	hal_soc->ops->hal_tx_ring_halt_poll =
 		hal_tx_ppe2tcl_ring_halt_done_6432;
+	hal_soc->ops->hal_tx_get_num_ppe_vp_search_idx_tbl_entries =
+		hal_tx_get_num_ppe_vp_search_idx_reg_entries_6432;
 };
 
 struct hal_hw_srng_config hw_srng_table_6432[] = {
@@ -2184,7 +2186,6 @@ struct hal_hw_srng_config hw_srng_table_6432[] = {
 	},
 #endif
 	{ /* REO2PPE */
-#if 0
 		.start_ring_id = HAL_SRNG_REO2PPE,
 		.max_rings = 1,
 		.entry_size = sizeof(struct reo_destination_ring) >> 2,
@@ -2203,10 +2204,8 @@ struct hal_hw_srng_config hw_srng_table_6432[] = {
 		.max_size =
 			HWIO_REO_R0_REO2PPE_RING_BASE_LSB_RING_BASE_ADDR_LSB_BMSK >>
 			HWIO_REO_R0_REO2PPE_RING_BASE_LSB_RING_BASE_ADDR_LSB_SHFT,
-#endif
 	},
 	{ /* PPE2TCL */
-#if 0
 		.start_ring_id = HAL_SRNG_PPE2TCL1,
 		.max_rings = 1,
 		.entry_size = sizeof(struct tcl_entrance_from_ppe_ring) >> 2,
@@ -2222,24 +2221,13 @@ struct hal_hw_srng_config hw_srng_table_6432[] = {
 		.max_size =
 			HWIO_TCL_R0_SW2TCL1_RING_BASE_MSB_RING_SIZE_BMSK >>
 			HWIO_TCL_R0_SW2TCL1_RING_BASE_MSB_RING_SIZE_SHFT,
-#endif
 	},
 	{ /* PPE_RELEASE */
-#if 0
 		.start_ring_id = HAL_SRNG_WBM_PPE_RELEASE,
 		.max_rings = 1,
 		.entry_size = sizeof(struct wbm_release_ring) >> 2,
 		.lmac_ring = FALSE,
 		.ring_dir = HAL_SRNG_SRC_RING,
-		.reg_start = {
-			HWIO_WBM_R0_PPE_RELEASE_RING_BASE_LSB_ADDR(WBM_REG_REG_BASE),
-			HWIO_WBM_R2_PPE_RELEASE_RING_HP_ADDR(WBM_REG_REG_BASE),
-		},
-		.reg_size = {},
-		.max_size =
-			HWIO_WBM_R0_PPE_RELEASE_RING_BASE_MSB_RING_SIZE_BMSK >>
-			HWIO_WBM_R0_PPE_RELEASE_RING_BASE_MSB_RING_SIZE_SHFT,
-#endif
 	},
 #ifdef QCA_MONITOR_2_0_SUPPORT
 	{ /* TX_MONITOR_BUF */
@@ -2350,4 +2338,5 @@ void hal_qcn6432_attach(struct hal_soc *hal_soc)
 	hal_soc->dmac_cmn_src_rxbuf_ring = true;
 	if (hal_soc->static_window_map)
 		hal_write_window_register(hal_soc);
+	hal_hw_txrx_ops_override_qcn6432(hal_soc);
 }
