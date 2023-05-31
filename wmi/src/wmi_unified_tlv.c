@@ -14323,6 +14323,22 @@ extract_hw_bdf_status(wmi_service_ready_ext2_event_fixed_param *ev)
 	}
 }
 
+#ifdef QCA_MULTIPASS_SUPPORT
+static void
+extract_multipass_sap_cap(struct wlan_psoc_host_service_ext2_param *param,
+			  uint32_t target_cap_flag)
+{
+	param->is_multipass_sap =
+	WMI_TARGET_CAP_MULTIPASS_SAP_SUPPORT_GET(target_cap_flag);
+}
+#else
+static void
+extract_multipass_sap_cap(struct wlan_psoc_host_service_ext2_param *param,
+			  uint32_t target_cap_flag)
+{
+}
+#endif
+
 /**
  * extract_service_ready_ext2_tlv() - extract service ready ext2 params from
  * event
@@ -14391,6 +14407,9 @@ extract_service_ready_ext2_tlv(wmi_unified_t wmi_handle, uint8_t *event,
 	param->dp_peer_meta_data_ver =
 			WMI_TARGET_CAP_FLAGS_RX_PEER_METADATA_VERSION_GET(
 						ev->target_cap_flags);
+
+	extract_multipass_sap_cap(param, ev->target_cap_flags);
+
 	extract_ul_mumimo_support(param);
 	wmi_debug("htt peer data :%d", ev->target_cap_flags);
 
