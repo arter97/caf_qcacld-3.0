@@ -1460,6 +1460,7 @@ enum cdp_pdev_param_type {
  * @cdp_rxdma_refill_ring_size: RXDMA refill ring size config
  * @cdp_rx_refill_buf_pool_size: RX refill ring size config
  * @cdp_rxdma_buf_ring_size: RXDMA buf ring size config
+ * @mac_addr: vdev mac address
  */
 typedef union cdp_config_param_t {
 	/* peer params */
@@ -1562,6 +1563,8 @@ typedef union cdp_config_param_t {
 	int cdp_rxdma_refill_ring_size;
 	int cdp_rx_refill_buf_pool_size;
 	int cdp_rxdma_buf_ring_size;
+
+	uint8_t mac_addr[QDF_MAC_ADDR_SIZE];
 } cdp_config_param_type;
 
 /**
@@ -1652,6 +1655,7 @@ enum cdp_pdev_bpr_param {
  * @CDP_ENABLE_WRAP: qwrap ap
  * @CDP_ENABLE_TRAFFIC_END_INDICATION: enable/disable traffic end indication
  * @CDP_VDEV_TX_TO_FW: Set to_fw bit for tx packets for the vdev
+ * @CDP_VDEV_SET_MAC_ADDR: Set mac address for vdev
  */
 enum cdp_vdev_param_type {
 	CDP_ENABLE_NAWDS,
@@ -1702,6 +1706,7 @@ enum cdp_vdev_param_type {
 #ifdef FEATURE_DIRECT_LINK
 	CDP_VDEV_TX_TO_FW,
 #endif
+	CDP_VDEV_SET_MAC_ADDR,
 };
 
 /**

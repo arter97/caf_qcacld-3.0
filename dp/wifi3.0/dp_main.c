@@ -7561,6 +7561,14 @@ dp_set_vdev_param(struct cdp_soc_t *cdp_soc, uint8_t vdev_id,
 		vdev->to_fw = val.cdp_vdev_tx_to_fw;
 		break;
 #endif
+	case CDP_VDEV_SET_MAC_ADDR:
+		dp_info("set mac addr, old mac addr" QDF_MAC_ADDR_FMT
+			" new mac addr: " QDF_MAC_ADDR_FMT " for vdev %d",
+			QDF_MAC_ADDR_REF(vdev->mac_addr.raw),
+			QDF_MAC_ADDR_REF(val.mac_addr), vdev->vdev_id);
+		qdf_mem_copy(&vdev->mac_addr.raw[0], val.mac_addr,
+			     QDF_MAC_ADDR_SIZE);
+		break;
 	default:
 		break;
 	}
