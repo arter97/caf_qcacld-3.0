@@ -1203,9 +1203,12 @@ scm_scan_req_update_params(struct wlan_objmgr_vdev *vdev,
 	 */
 	pdev = wlan_vdev_get_pdev(vdev);
 	pdev_id = wlan_objmgr_pdev_get_pdev_id(pdev);
-	/* Trigger wide band scan also if pause_home_channel scan flag is set */
+	/*
+	 * Trigger wide band scan also if
+	 * scan_f_report_cca_busy_for_each_20mhz flag is set
+	 */
 	if (ucfg_scan_get_wide_band_scan(pdev) ||
-	    req->scan_req.scan_f_pause_home_channel)
+	    req->scan_req.scan_f_report_cca_busy_for_each_20mhz)
 		req->scan_req.scan_f_wide_band = true;
 	else
 		req->scan_req.scan_f_wide_band = false;
