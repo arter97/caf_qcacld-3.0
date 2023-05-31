@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2017-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -844,6 +844,9 @@ void dp_peer_tid_queue_init(struct dp_peer *peer)
 	}
 
 	mon_peer->tx_capture.is_tid_initialized = 1;
+
+	dp_tx_capture_warn("peer id:%d TX capture data initialized",
+			   peer->peer_id);
 }
 
 /*
@@ -1094,6 +1097,8 @@ void dp_peer_tid_queue_cleanup(struct dp_peer *peer)
 	}
 
 	mon_peer->tx_capture.is_tid_initialized = 0;
+
+	dp_tx_capture_warn("peer id:%d TX capture data freed", peer->peer_id);
 }
 
 /*
@@ -2417,8 +2422,10 @@ dp_enh_tx_capture_disable(struct dp_pdev *pdev)
 	dp_peer_tx_cap_del_all_filter(pdev);
 	mon_pdev->tx_capture_enabled = CDP_TX_ENH_CAPTURE_DISABLED;
 
-	if (!dp_soc_is_tx_capture_set_in_pdev(pdev->soc))
+	if (!dp_soc_is_tx_capture_set_in_pdev(pdev->soc)) {
 		dp_soc_set_txrx_ring_map(pdev->soc);
+		dp_tx_capture_warn("stop single ring");
+	}
 
 	dp_h2t_cfg_stats_msg_send(pdev,
 				  DP_PPDU_STATS_CFG_ENH_STATS,
@@ -2478,8 +2485,10 @@ dp_enh_tx_capture_enable(struct dp_pdev *pdev, uint8_t user_mode)
 	dp_pdev_iterate_peer(pdev, dp_peer_init_msdu_q, NULL,
 			     DP_MOD_ID_TX_CAPTURE);
 
-	if (!dp_soc_is_tx_capture_set_in_pdev(pdev->soc))
+	if (!dp_soc_is_tx_capture_set_in_pdev(pdev->soc)) {
 		dp_soc_set_txrx_ring_map_single(pdev->soc);
+		dp_tx_capture_warn("Single ring mode started");
+	}
 
 	if (!mon_pdev->pktlog_ppdu_stats)
 		dp_h2t_cfg_stats_msg_send(pdev,

@@ -322,7 +322,7 @@ dp_sawf_def_queues_get_map_report(struct cdp_soc_t *soc_hdl,
 		return QDF_STATUS_E_FAILURE;
 	}
 
-	dp_sawf_info("Peer ", QDF_MAC_ADDR_FMT,
+	dp_sawf_info("Peer " QDF_MAC_ADDR_FMT,
 		     QDF_MAC_ADDR_REF(mac_addr));
 	dp_sawf_nofl_err("TID    Active    Service Class ID");
 	for (tid = 0; tid < DP_SAWF_TID_MAX; ++tid) {
@@ -490,7 +490,8 @@ uint16_t dp_sawf_get_peerid(struct dp_soc *soc, uint8_t *dest_mac,
 
 	if (!ast_entry) {
 		qdf_spin_unlock_bh(&soc->ast_lock);
-		qdf_warn("%s NULL ast entry");
+		qdf_warn("NULL ast entry for dest mac addr: " QDF_MAC_ADDR_FMT,
+			 QDF_MAC_ADDR_REF(dest_mac));
 		return HTT_INVALID_PEER;
 	}
 
@@ -1547,15 +1548,15 @@ static void dp_sawf_dump_delay_stats(struct sawf_delay_stats *stats)
 
 static void dp_sawf_dump_tx_stats(struct sawf_tx_stats *tx_stats)
 {
-	dp_sawf_print_stats("tx_success: num = %u bytes = %lu",
-		       tx_stats->tx_success.num,
-		       tx_stats->tx_success.bytes);
+	dp_sawf_print_stats("tx_success: num = %u bytes = %llu",
+			    tx_stats->tx_success.num,
+			    tx_stats->tx_success.bytes);
 	dp_sawf_print_stats("tx_ingress: num = %u bytes = %lu",
 			    tx_stats->tx_ingress.num,
 			    tx_stats->tx_ingress.bytes);
-	dp_sawf_print_stats("dropped: fw_rem num = %u bytes = %lu",
-		       tx_stats->dropped.fw_rem.num,
-		       tx_stats->dropped.fw_rem.bytes);
+	dp_sawf_print_stats("dropped: fw_rem num = %u bytes = %llu",
+			    tx_stats->dropped.fw_rem.num,
+			    tx_stats->dropped.fw_rem.bytes);
 	dp_sawf_print_stats("dropped: fw_rem_notx = %u",
 		       tx_stats->dropped.fw_rem_notx);
 	dp_sawf_print_stats("dropped: fw_rem_tx = %u",
