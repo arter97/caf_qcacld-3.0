@@ -1315,6 +1315,7 @@ void dp_free_ppeds_interrupts(struct dp_soc *soc, struct dp_srng *srng,
 			      int ring_type, int ring_num)
 {
 	if (srng->irq >= 0) {
+		qdf_dev_clear_irq_status_flags(srng->irq, IRQ_DISABLE_UNLAZY);
 		if (ring_type == WBM2SW_RELEASE &&
 		    ring_num == WBM2_SW_PPE_REL_RING_ID)
 			pld_pfrm_free_irq(soc->osdev->dev, srng->irq, soc);
@@ -1334,6 +1335,7 @@ int dp_register_ppeds_interrupts(struct dp_soc *soc, struct dp_srng *srng,
 
 	srng->irq = -1;
 	irq = pld_get_msi_irq(soc->osdev->dev, vector);
+	qdf_dev_set_irq_status_flags(irq, IRQ_DISABLE_UNLAZY);
 
 	if (ring_type == WBM2SW_RELEASE &&
 	    ring_num == WBM2_SW_PPE_REL_RING_ID) {
@@ -1383,6 +1385,7 @@ int dp_register_ppeds_interrupts(struct dp_soc *soc, struct dp_srng *srng,
 fail:
 	dp_err("Unable to config irq : ring type %d irq %d vector %d",
 	       ring_type, irq, vector);
+	qdf_dev_clear_irq_status_flags(irq, IRQ_DISABLE_UNLAZY);
 
 	return ret;
 }
