@@ -3674,6 +3674,23 @@ dp_tx_vdev_traffic_end_indication_detach(struct dp_vdev *vdev)
 {}
 #endif
 
+#ifdef WLAN_DP_VDEV_NO_SELF_PEER
+static inline bool dp_vdev_self_peer_required(struct dp_soc *soc,
+					      struct dp_vdev *vdev)
+{
+	return false;
+}
+#else
+static inline bool dp_vdev_self_peer_required(struct dp_soc *soc,
+					      struct dp_vdev *vdev)
+{
+	if (wlan_op_mode_sta == vdev->opmode)
+		return true;
+
+	return false;
+}
+#endif
+
 /**
  * dp_vdev_attach_wifi3() - attach txrx vdev
  * @cdp_soc: CDP SoC context
@@ -3828,7 +3845,7 @@ static QDF_STATUS dp_vdev_attach_wifi3(struct cdp_soc_t *cdp_soc,
 	if (QDF_IS_STATUS_ERROR(soc->arch_ops.txrx_vdev_attach(soc, vdev)))
 		goto fail0;
 
-	if (wlan_op_mode_sta == vdev->opmode)
+	if (dp_vdev_self_peer_required(soc, vdev))
 		dp_peer_create_wifi3((struct cdp_soc_t *)soc, vdev_id,
 				     vdev->mac_addr.raw, CDP_LINK_PEER_TYPE);
 
