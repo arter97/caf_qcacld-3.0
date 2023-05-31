@@ -3820,6 +3820,14 @@ QDF_STATUS wlan_mlme_get_phy_max_freq_range(struct wlan_objmgr_psoc *psoc,
 					    uint32_t *low_5ghz_chan,
 					    uint32_t *high_5ghz_chan);
 
+/**
+ * wlan_mlme_is_multipass_sap() -Get multipass sap support
+ * @psoc: psoc pointer
+ *
+ * Return: True, if FW support multipass support.
+ */
+bool wlan_mlme_is_multipass_sap(struct wlan_objmgr_psoc *psoc);
+
 #ifdef FEATURE_WDS
 /**
  * wlan_mlme_get_wds_mode() - Check wds mode supported
