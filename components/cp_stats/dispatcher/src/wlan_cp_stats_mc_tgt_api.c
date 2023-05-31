@@ -116,7 +116,7 @@ static void tgt_mc_cp_stats_extract_tx_power(struct wlan_objmgr_psoc *psoc,
 					struct stats_event *ev,
 					bool is_station_stats)
 {
-	int32_t max_pwr;
+	int32_t max_pwr = 0;
 	uint8_t pdev_id;
 	QDF_STATUS status;
 	struct wlan_objmgr_pdev *pdev;
@@ -172,7 +172,11 @@ static void tgt_mc_cp_stats_extract_tx_power(struct wlan_objmgr_psoc *psoc,
 	    pdev_mc_stats->max_pwr != ev->pdev_stats[pdev_id].max_pwr)
 		wlan_son_deliver_tx_power(vdev,
 					  ev->pdev_stats[pdev_id].max_pwr);
-	max_pwr = pdev_mc_stats->max_pwr = ev->pdev_stats[pdev_id].max_pwr;
+	if (policy_mgr_mode_get_macid_by_vdev_id(psoc, last_req.vdev_id) ==
+	    ev->mac_seq_num)
+		max_pwr = pdev_mc_stats->max_pwr =
+			ev->pdev_stats[pdev_id].max_pwr;
+
 	wlan_cp_stats_pdev_obj_unlock(pdev_cp_stats_priv);
 	if (is_station_stats)
 		goto end;
