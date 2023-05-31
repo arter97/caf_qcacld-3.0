@@ -7674,6 +7674,7 @@ static void dp_vdev_flush_peers(struct cdp_vdev *vdev_handle,
 		if (!mlo_peers_only) {
 			dp_info("peer: " QDF_MAC_ADDR_FMT " is getting unmap",
 				QDF_MAC_ADDR_REF(peer->mac_addr.raw));
+			dp_mlo_link_peer_flush(soc, peer);
 			dp_rx_peer_unmap_handler(soc, i,
 						 vdev->vdev_id,
 						 peer->mac_addr.raw, 0,
