@@ -374,8 +374,6 @@ send_roam_scan_offload_scan_period_cmd_tlv(
 			param->roam_scan_inactivity_time;
 	scan_period_fp->roam_inactive_count =
 			param->roam_inactive_data_packet_count;
-	scan_period_fp->roam_scan_period_after_inactivity =
-			param->roam_scan_period_after_inactivity;
 	/* Firmware expects the full scan period in msec whereas host
 	 * provides the same in seconds.
 	 * Convert it to msec and send to firmware
@@ -387,10 +385,9 @@ send_roam_scan_offload_scan_period_cmd_tlv(
 		  scan_period_fp->roam_scan_age,
 		  scan_period_fp->roam_full_scan_period);
 
-	wmi_debug("inactiviy time:%d inactive cnt:%d time after inactivity:%d",
+	wmi_debug("inactiviy time:%d inactive cnt:%d",
 		  scan_period_fp->inactivity_time_period,
-		  scan_period_fp->roam_inactive_count,
-		  scan_period_fp->roam_scan_period_after_inactivity);
+		  scan_period_fp->roam_inactive_count);
 
 	wmi_mtrace(WMI_ROAM_SCAN_PERIOD, NO_SESSION, 0);
 	status = wmi_unified_cmd_send(wmi_handle, buf, len,

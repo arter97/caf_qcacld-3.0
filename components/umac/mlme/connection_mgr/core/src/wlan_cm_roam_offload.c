@@ -1272,8 +1272,6 @@ cm_roam_scan_offload_scan_period(uint8_t vdev_id,
 				cfg_params->roam_scan_inactivity_time;
 	params->roam_inactive_data_packet_count =
 			cfg_params->roam_inactive_data_packet_count;
-	params->roam_scan_period_after_inactivity =
-			cfg_params->roam_scan_period_after_inactivity;
 	params->full_scan_period =
 			cfg_params->full_roam_scan_period;
 	mlme_debug("full_scan_period:%d, empty_scan_refresh_period:%d",
@@ -5133,8 +5131,6 @@ cm_restore_default_roaming_params(struct wlan_mlme_psoc_ext_obj *mlme_obj,
 			mlme_obj->cfg.lfr.roam_scan_inactivity_time;
 	cfg_params->roam_inactive_data_packet_count =
 			mlme_obj->cfg.lfr.roam_inactive_data_packet_count;
-	cfg_params->roam_scan_period_after_inactivity =
-			mlme_obj->cfg.lfr.roam_scan_period_after_inactivity;
 	ucfg_reg_get_band(wlan_vdev_get_pdev(vdev), &current_band);
 	rso_cfg->roam_band_bitmask = current_band;
 }

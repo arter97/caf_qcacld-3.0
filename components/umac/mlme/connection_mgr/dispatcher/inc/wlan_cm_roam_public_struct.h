@@ -315,7 +315,6 @@ struct rso_chan_info {
  * @roam_scan_n_probes:
  * @roam_scan_inactivity_time:
  * @roam_inactive_data_packet_count:
- * @roam_scan_period_after_inactivity:
  */
 struct rso_cfg_params {
 	uint32_t neighbor_scan_period;
@@ -346,7 +345,6 @@ struct rso_cfg_params {
 	uint8_t roam_scan_n_probes;
 	uint32_t roam_scan_inactivity_time;
 	uint32_t roam_inactive_data_packet_count;
-	uint32_t roam_scan_period_after_inactivity;
 };
 
 /**
@@ -1866,8 +1864,6 @@ struct wlan_roam_reason_vsie_enable {
  * device is considered to be inactive
  * @roam_inactive_data_packet_count: Maximum allowed data packets count during
  * roam_scan_inactivity_time.
- * @roam_scan_period_after_inactivity: Roam scan period in ms after device is
- * in inactive state.
  * @full_scan_period: Full scan period is the idle period in seconds
  * between two successive full channel roam scans.
  */
@@ -1878,7 +1874,6 @@ struct wlan_roam_scan_period_params {
 	uint32_t scan_age;
 	uint32_t roam_scan_inactivity_time;
 	uint32_t roam_inactive_data_packet_count;
-	uint32_t roam_scan_period_after_inactivity;
 	uint32_t full_scan_period;
 };
 

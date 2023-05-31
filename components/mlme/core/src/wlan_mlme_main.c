@@ -2997,14 +2997,6 @@ static void mlme_init_lfr_cfg(struct wlan_objmgr_psoc *psoc,
 	lfr->roam_inactive_data_packet_count =
 		cfg_get(psoc, CFG_ROAM_INACTIVE_COUNT);
 
-	if (val)
-		lfr->roam_scan_period_after_inactivity =
-			cfg_get(psoc, CFG_ROAM_SCAN_SECOND_TIMER) * 1000;
-
-	else
-		lfr->roam_scan_period_after_inactivity =
-			cfg_get(psoc, CFG_POST_INACTIVITY_ROAM_SCAN_PERIOD);
-
 	lfr->fw_akm_bitmap = 0;
 	lfr->enable_ft_im_roaming = cfg_get(psoc, CFG_FT_IM_ROAMING);
 	lfr->enable_ft_over_ds = !ENABLE_FT_OVER_DS;

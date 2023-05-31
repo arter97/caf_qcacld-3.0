@@ -3125,12 +3125,8 @@
  * firmware gets empty roam scan results during periodic roam scans.
  * 1. roam_scan_inactivity_time
  * 2. roam_inactive_data_count
- * 3. roam_scan_period_after_inactivity
  * The first two ini "roam_scan_inactivity_time" and "roam_inactive_data_count"
- * is frames the criteria to detect if the DUT is inactive. If the device is
- * identified to be inactive based on the above two ini, then the value,
- * "roam_scan_period_after_inactivity" will be used as periodic roam scan
- * duration.
+ * is frames the criteria to detect if the DUT is inactive.
  *
  * Related: roam_inactive_data_count
  *
@@ -3213,37 +3209,6 @@
 	RoamScan_InactiveCount_default, \
 	CFG_VALUE_OR_DEFAULT, \
 	"Roam scan inactivity period data pkt count")
-
-/*
- * <ini>
- * roam_scan_period_after_inactivity - Roam scan duration in ms after device is
- * out of inactivity state.
- *
- * @Min: 0
- * @Max: 0xFFFFFFFF
- * @Default: 120000
- *
- * If there is empty scan results during roam scan, firmware will move to
- * roam scan inactive state if roam_scan_inactivity and
- * roam_inactive_data_count criteria are met.
- * This ini is used to configure the roam scan duration in ms once the
- * inactivity is finished and roam scan can be started.
- *
- * Related: roam_scan_inactivity_time, roam_inactive_data_count
- *
- * Supported Feature: Roaming
- *
- * Usage: External
- *
- * </ini>
- */
-#define CFG_POST_INACTIVITY_ROAM_SCAN_PERIOD CFG_INI_UINT( \
-	"roam_scan_period_after_inactivity", \
-	0, \
-	0xFFFFFFFF, \
-	120000, \
-	CFG_VALUE_OR_DEFAULT, \
-	"Roam scan period post inactivity")
 
 /*
  * <ini>
@@ -3420,7 +3385,6 @@
 	CFG(CFG_FT_IM_ROAMING) \
 	CFG(CFG_ROAM_INACTIVE_COUNT) \
 	CFG(CFG_ROAM_PASSIVE_MAX_CHANNEL_TIME) \
-	CFG(CFG_POST_INACTIVITY_ROAM_SCAN_PERIOD) \
 	CFG(CFG_ROAM_SCAN_INACTIVE_TIMER) \
 	CFG(CFG_BSS_LOAD_TRIG_6G_RSSI_THRES) \
 	CFG(CFG_BSS_LOAD_TRIG_5G_RSSI_THRES) \

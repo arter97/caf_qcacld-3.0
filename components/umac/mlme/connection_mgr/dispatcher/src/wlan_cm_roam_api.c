@@ -1303,7 +1303,6 @@ wlan_cm_roam_cfg_set_value(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 		rso_cfg->roam_control_enable = src_config->bool_value;
 		if (!rso_cfg->roam_control_enable)
 			break;
-		dst_cfg->roam_scan_period_after_inactivity = 0;
 		dst_cfg->roam_inactive_data_packet_count = 0;
 		dst_cfg->roam_scan_inactivity_time = 0;
 		if (mlme_obj->cfg.lfr.roam_scan_offload_enabled)
@@ -1547,8 +1546,6 @@ QDF_STATUS wlan_cm_rso_config_init(struct wlan_objmgr_vdev *vdev,
 		mlme_obj->cfg.lfr.roam_scan_inactivity_time;
 	cfg_params->roam_inactive_data_packet_count =
 		mlme_obj->cfg.lfr.roam_inactive_data_packet_count;
-	cfg_params->roam_scan_period_after_inactivity =
-		mlme_obj->cfg.lfr.roam_scan_period_after_inactivity;
 
 	chan_info = &cfg_params->specific_chan_info;
 	chan_info->num_chan =

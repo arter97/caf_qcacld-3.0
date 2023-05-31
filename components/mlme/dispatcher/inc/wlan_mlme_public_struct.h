@@ -1956,8 +1956,6 @@ struct fw_scan_channels {
  * milliseconds for which the device is considered to be inactive.
  * @roam_inactive_data_packet_count: Maximum allowed data packets count
  * during roam_scan_inactivity_time.
- * @roam_scan_period_after_inactivity: Roam scan period after device was in
- * inactive state
  * @fw_akm_bitmap: Supported Akm suites of firmware
  * @roam_full_scan_period: Idle period in seconds between two successive
  * full channel roam scans
@@ -2090,7 +2088,6 @@ struct wlan_mlme_lfr_cfg {
 	bool roaming_scan_policy;
 	uint32_t roam_scan_inactivity_time;
 	uint32_t roam_inactive_data_packet_count;
-	uint32_t roam_scan_period_after_inactivity;
 	uint32_t fw_akm_bitmap;
 	uint32_t roam_full_scan_period;
 	struct fw_scan_channels saved_freq_list;
