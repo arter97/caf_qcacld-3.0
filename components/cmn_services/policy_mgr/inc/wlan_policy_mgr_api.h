@@ -4745,6 +4745,14 @@ uint32_t
 policy_mgr_get_conc_ext_flags(struct wlan_objmgr_vdev *vdev, bool force_mlo);
 
 /**
+ * policy_mgr_is_non_ml_sta_present() - Check whether Non-ML STA is present
+ * @psoc: PSOC object information
+ *
+ * Return: True if non-ML STA is present, otherwise false.
+ */
+bool policy_mgr_is_non_ml_sta_present(struct wlan_objmgr_psoc *psoc);
+
+/**
  * policy_mgr_is_mlo_sta_present() - Check whether MLO STA is present
  * @psoc: PSOC object information
  *
@@ -4886,6 +4894,12 @@ static inline uint32_t
 policy_mgr_get_conc_ext_flags(struct wlan_objmgr_vdev *vdev, bool force_mlo)
 {
 	return 0;
+}
+
+static inline bool
+policy_mgr_is_non_ml_sta_present(struct wlan_objmgr_psoc *psoc)
+{
+	return true;
 }
 
 static inline bool policy_mgr_is_mlo_sta_present(struct wlan_objmgr_psoc *psoc)

@@ -1167,21 +1167,9 @@ bool ucfg_nan_is_sta_ndp_concurrency_allowed(struct wlan_objmgr_psoc *psoc,
 {
 	uint8_t vdev_id_list[MAX_NUMBER_OF_CONC_CONNECTIONS];
 	uint32_t freq_list[MAX_NUMBER_OF_CONC_CONNECTIONS];
-	uint32_t ndi_cnt, sta_cnt, id, conc_ext_flags;
+	uint32_t ndi_cnt, id, conc_ext_flags;
 
-	sta_cnt = policy_mgr_mode_specific_connection_count(psoc,
-							    PM_STA_MODE, NULL);
-	/* Allow if STA is not in connected state */
-	if (!sta_cnt)
-		return true;
-
-	/* Reject STA+STA in below case
-	 * Non-ML STA: STA+STA+NDP concurrency is not supported
-	 * ML STA: As both links would be treated as separate STAs from
-	 * policy mgr perspective, don't reject here and continue with further
-	 * checks
-	 */
-	if (sta_cnt > 1 && !policy_mgr_is_mlo_sta_present(psoc)) {
+	if (nan_is_sta_sta_concurrency_present(psoc)) {
 		nan_err("STA+STA+NDP concurrency is not allowed");
 		return false;
 	}
