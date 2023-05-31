@@ -46,24 +46,6 @@ void mlo_setup_deinit(void);
 bool mlo_is_ml_soc(struct wlan_objmgr_psoc *psoc, uint8_t grp_id);
 
 /**
- * mlo_check_start_stop_inprogress() - API to set  ML group
- * start or stop in progress bit and return last value
- * @grp_id: ID of the required mlo group to be checked
- *
- * Return: true if mlo group is in start/stop, or else return false
- */
-bool mlo_check_start_stop_inprogress(uint8_t grp_id);
-
-/**
- * mlo_clear_start_stop_inprogress() - API to clear the value of ML group
- *                                   start or stop in progress bit
- * @grp_id: ID of the required mlo group to be set
- *
- * Return: none
- */
-void mlo_clear_start_stop_inprogress(uint8_t grp_id);
-
-/**
  * mlo_get_soc_list() - API to get the list of SOCs participating in MLO
  * @soc_list: list where ML participating SOCs need to be populated
  * @grp_id: ID of the required mlo group
