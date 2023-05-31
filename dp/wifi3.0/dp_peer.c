@@ -776,6 +776,10 @@ void dp_peer_find_id_to_obj_remove(struct dp_soc *soc,
 
 	qdf_spin_lock_bh(&soc->peer_map_lock);
 	peer = soc->peer_id_to_obj_map[peer_id];
+	if (!peer) {
+		qdf_spin_unlock_bh(&soc->peer_map_lock);
+		return;
+	}
 	peer->peer_id = HTT_INVALID_PEER;
 	if (peer->txrx_peer)
 		peer->txrx_peer->peer_id = HTT_INVALID_PEER;
@@ -2487,7 +2491,15 @@ void dp_peer_ast_table_detach(struct dp_soc *soc)
 
 void dp_peer_find_map_detach(struct dp_soc *soc)
 {
+	struct dp_peer *peer = NULL;
+	uint32_t i = 0;
+
 	if (soc->peer_id_to_obj_map) {
+		for (i = 0; i < soc->max_peer_id; i++) {
+			peer = soc->peer_id_to_obj_map[i];
+			if (peer)
+				dp_peer_unref_delete(peer, DP_MOD_ID_CONFIG);
+		}
 		qdf_mem_free(soc->peer_id_to_obj_map);
 		soc->peer_id_to_obj_map = NULL;
 		qdf_spinlock_destroy(&soc->peer_map_lock);
