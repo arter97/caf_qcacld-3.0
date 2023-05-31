@@ -58,6 +58,9 @@ QDF_STATUS utils_dfs_reset(struct wlan_objmgr_pdev *pdev)
 	dfs_reset_precaclists(dfs);
 	dfs_init_chan_state_array(pdev);
 
+	if (dfs->dfs_use_puncture && !dfs->dfs_is_stadfs_enabled)
+		dfs_punc_sm_stop_all(dfs);
+
 	return QDF_STATUS_SUCCESS;
 }
 
