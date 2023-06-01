@@ -768,11 +768,18 @@ void dp_2k_jump_handle(struct dp_soc *soc, qdf_nbuf_t nbuf, uint8_t *rx_tlv_hdr,
 {
 	struct dp_peer *peer = NULL;
 	struct dp_rx_tid *rx_tid = NULL;
+	struct dp_txrx_peer *txrx_peer;
 	uint32_t frame_mask = FRAME_MASK_IPV4_ARP;
 
 	peer = dp_peer_get_ref_by_id(soc, peer_id, DP_MOD_ID_RX_ERR);
 	if (!peer) {
 		dp_rx_err_info_rl("%pK: peer not found", soc);
+		goto free_nbuf;
+	}
+
+	txrx_peer = dp_get_txrx_peer(peer);
+	if (!txrx_peer) {
+		dp_rx_err_info_rl("%pK: txrx_peer not found", soc);
 		goto free_nbuf;
 	}
 
@@ -812,7 +819,7 @@ void dp_2k_jump_handle(struct dp_soc *soc, qdf_nbuf_t nbuf, uint8_t *rx_tlv_hdr,
 	}
 
 nbuf_deliver:
-	if (dp_rx_deliver_special_frame(soc, peer->txrx_peer, nbuf, frame_mask,
+	if (dp_rx_deliver_special_frame(soc, txrx_peer, nbuf, frame_mask,
 					rx_tlv_hdr)) {
 		DP_STATS_INC(soc, rx.err.rx_2k_jump_to_stack, 1);
 		dp_peer_unref_delete(peer, DP_MOD_ID_RX_ERR);
