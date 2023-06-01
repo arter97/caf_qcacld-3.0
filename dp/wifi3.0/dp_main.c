@@ -7817,9 +7817,6 @@ dp_set_psoc_param(struct cdp_soc_t *cdp_soc,
 		dp_rx_peer_metadata_ver_update(
 				soc, val.cdp_peer_metadata_ver);
 		break;
-	case CDP_TXRX_HAL_SOC_HDL:
-		val.hal_soc_hdl = soc->hal_soc;
-		break;
 	case CDP_CFG_TX_DESC_NUM:
 		wlan_cfg_set_num_tx_desc(wlan_cfg_ctx,
 					 val.cdp_tx_desc_num);
@@ -7892,6 +7889,9 @@ static QDF_STATUS dp_get_psoc_param(struct cdp_soc_t *cdp_soc,
 		break;
 	case CDP_UMAC_RST_SKEL_ENABLE:
 		val->cdp_umac_rst_skel = dp_umac_rst_skel_enable_get(soc);
+		break;
+	case CDP_TXRX_HAL_SOC_HDL:
+		val->hal_soc_hdl = soc->hal_soc;
 		break;
 	case CDP_CFG_TX_DESC_NUM:
 		val->cdp_tx_desc_num = wlan_cfg_get_num_tx_desc(wlan_cfg_ctx);
