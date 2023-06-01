@@ -37,8 +37,10 @@ _fixed_ipaths = [
     "cmn/dp/cmn_dp_api",
     "cmn/dp/inc",
     "cmn/dp/wifi3.0",
+    "cmn/dp/wifi3.0/be",
     "cmn/dp/wifi3.0/monitor",
     "cmn/dp/wifi3.0/monitor/1.0",
+    "cmn/dp/wifi3.0/monitor/2.0",
     "cmn/ftm/core/src",
     "cmn/ftm/dispatcher/inc",
     "cmn/global_lmac_if/inc",
@@ -56,9 +58,11 @@ _fixed_ipaths = [
     "cmn/ipa/core/inc",
     "cmn/ipa/dispatcher/inc",
     "cmn/os_if/linux",
+    "cmn/os_if/linux/afc/inc",
     "cmn/os_if/linux/cp_stats/inc",
     "cmn/os_if/linux/crypto/inc",
     "cmn/os_if/linux/ftm/inc",
+    "cmn/os_if/linux/ftm/src",
     "cmn/os_if/linux/gpio/inc",
     "cmn/os_if/linux/mlme/inc",
     "cmn/os_if/linux/scan/inc",
@@ -81,6 +85,7 @@ _fixed_ipaths = [
     "cmn/target_if/dcs/inc",
     "cmn/target_if/dfs/inc",
     "cmn/target_if/direct_buf_rx/inc",
+    "cmn/target_if/direct_buf_rx/src",
     "cmn/target_if/dispatcher/inc",
     "cmn/target_if/dp/inc",
     "cmn/target_if/ftm/inc",
@@ -99,6 +104,8 @@ _fixed_ipaths = [
     "cmn/target_if/twt/inc",
     "cmn/target_if/wifi_pos/inc",
     "cmn/umac",
+    "cmn/umac/afc/core/inc",
+    "cmn/umac/afc/dispatcher/inc",
     "cmn/umac/cfr/core/inc",
     "cmn/umac/cfr/dispatcher/inc",
     "cmn/umac/cmn_services/cmn_defs/inc",
@@ -129,10 +136,14 @@ _fixed_ipaths = [
     "cmn/umac/mlme/vdev_mgr/dispatcher/inc",
     "cmn/umac/mlo_mgr/inc",
     "cmn/umac/regulatory/dispatcher/inc",
+    "cmn/umac/regulatory/core/inc",
+    "cmn/umac/regulatory/core/src",
     "cmn/umac/scan/dispatcher/inc",
     "cmn/umac/thermal/dispatcher/inc",
     "cmn/umac/twt/dispatcher/inc",
     "cmn/umac/wifi_pos/inc",
+    "cmn/umac/wifi_radar/core/inc",
+    "cmn/umac/wifi_radar/dispatcher/inc",
     "cmn/utils/epping/inc",
     "cmn/utils/fwlog",
     "cmn/utils/host_diag_log/inc",
@@ -143,8 +154,10 @@ _fixed_ipaths = [
     "cmn/utils/ptt/inc",
     "cmn/utils/sys",
     "cmn/wbuff/inc",
+    "cmn/wbuff/src",
     "cmn/wlan_cfg",
     "cmn/wmi/inc",
+    "cmn/wmi/src",
     "components/action_oui/core/inc",
     "components/action_oui/dispatcher/inc",
     "components/cfg",
@@ -174,12 +187,15 @@ _fixed_ipaths = [
     "components/interop_issues_ap/core/inc",
     "components/interop_issues_ap/dispatcher/inc",
     "components/mlme/core/inc",
+    "components/mlme/core/src",
     "components/mlme/dispatcher/inc",
     "components/nan/core/inc",
+    "components/nan/core/src",
     "components/nan/dispatcher/inc",
     "components/ocb/core/inc",
     "components/ocb/dispatcher/inc",
     "components/p2p/dispatcher/inc",
+    "components/p2p/core/src",
     "components/pkt_capture/core/inc",
     "components/pkt_capture/dispatcher/inc",
     "components/pmo/core/inc",
@@ -187,6 +203,7 @@ _fixed_ipaths = [
     "components/pmo/dispatcher/inc",
     "components/pmo/dispatcher/src",
     "components/pre_cac/dispatcher/inc",
+    "components/pre_cac/core/src",
     "components/qmi/core/inc",
     "components/qmi/core/src",
     "components/qmi/dispatcher/inc",
@@ -209,11 +226,15 @@ _fixed_ipaths = [
     "components/target_if/tdls/inc",
     "components/target_if/wfa_config/inc",
     "components/tdls/dispatcher/inc",
+    "components/tdls/core/inc",
+    "components/tdls/core/src",
     "components/umac",
     "components/umac/mlme/connection_mgr/dispatcher/inc",
     "components/umac/mlme/connection_mgr/utf/inc",
     "components/umac/mlme/mlo_mgr/inc",
+    "components/umac/mlme/mlo_mgr/dispatcher/inc",
     "components/umac/mlme/wfa_config/dispatcher/inc",
+    "components/umac/mlme/sap/ll_sap/dispatcher/inc",
     "components/umac/twt/dispatcher/inc",
     "components/wifi_pos/core/inc",
     "components/wifi_pos/dispatcher/inc",
@@ -427,13 +448,12 @@ _fixed_srcs = [
     "cmn/umac/scan/dispatcher/src/wlan_scan_tgt_api.c",
     "cmn/umac/scan/dispatcher/src/wlan_scan_ucfg_api.c",
     "cmn/umac/scan/dispatcher/src/wlan_scan_utils_api.c",
-    "cmn/umac/wifi_radar/core/src/wifi_radar_common.c",
-    "cmn/umac/wifi_radar/dispatcher/src/wlan_wifi_radar_utils_api.c",
     "cmn/utils/logging/src/wlan_logging_sock_svc.c",
     "cmn/utils/logging/src/wlan_roam_debug.c",
     "cmn/utils/nlink/src/wlan_nlink_srv.c",
     "cmn/utils/ptt/src/wlan_ptt_sock_svc.c",
     "cmn/wmi/src/wmi_tlv_helper.c",
+    "cmn/wmi/src/wmi_tlv_platform.c",
     "cmn/wmi/src/wmi_unified_api.c",
     "cmn/wmi/src/wmi_unified.c",
     "cmn/wmi/src/wmi_unified_crypto_api.c",
@@ -464,6 +484,7 @@ _fixed_srcs = [
     "components/dsc/src/wlan_dsc_vdev.c",
     "components/mlme/core/src/wlan_mlme_main.c",
     "components/mlme/core/src/wlan_mlme_vdev_mgr_interface.c",
+    "components/mlme/core/src/wlan_mlme_twt_api.c",
     "components/mlme/dispatcher/src/wlan_mlme_api.c",
     "components/mlme/dispatcher/src/wlan_mlme_ucfg_api.c",
     "components/p2p/core/src/wlan_p2p_main.c",
@@ -517,7 +538,7 @@ _fixed_srcs = [
     "core/hdd/src/wlan_hdd_wowl.c",
     "core/mac/src/dph/dph_hash_table.c",
     "core/mac/src/pe/lim/lim_admit_control.c",
-    "core/mac/src/pe/lim/lim_aid_mgmt.c",
+    #"core/mac/src/pe/lim/lim_aid_mgmt.c",
     "core/mac/src/pe/lim/lim_api.c",
     "core/mac/src/pe/lim/lim_assoc_utils.c",
     "core/mac/src/pe/lim/lim_ft.c",
@@ -548,6 +569,7 @@ _fixed_srcs = [
     "core/mac/src/pe/lim/lim_timer_utils.c",
     "core/mac/src/pe/lim/lim_trace.c",
     "core/mac/src/pe/lim/lim_utils.c",
+    "core/mac/src/pe/lim/lim_aid_mgmt.c",
     "core/mac/src/pe/rrm/rrm_api.c",
     "core/mac/src/pe/sch/sch_api.c",
     "core/mac/src/pe/sch/sch_beacon_gen.c",
@@ -638,12 +660,6 @@ _conditional_srcs = {
     "CONFIG_CNSS2_SSR_DRIVER_DUMP": {
         True: [
             "cmn/qdf/linux/src/qdf_ssr_driver_dump.c",
-        ],
-    },
-    "CONFIG_CNSS_KIWI": {
-        True: [
-            "cmn/hal/wifi3.0/kiwi/hal_kiwi.c",
-            "cmn/hif/src/kiwidef.c",
         ],
     },
     "CONFIG_CNSS_KIWI_V2": {
@@ -950,7 +966,7 @@ _conditional_srcs = {
             "core/pld/src/pld_usb.c",
         ],
     },
-    "CONFIG_HL_DP_SUPPORT": {
+    "LEGACY_CONFIG_HL_DP_SUPPORT": {
         True: [
             "core/dp/txrx/ol_tx_classify.c",
             "core/dp/txrx/ol_tx_hl.c",
@@ -1023,7 +1039,7 @@ _conditional_srcs = {
             "components/dp/core/src/wlan_dp_prealloc.c",
         ],
     },
-    "CONFIG_LL_DP_SUPPORT": {
+    "LEGACY_CONFIG_LL_DP_SUPPORT": {
         True: [
             "core/dp/txrx/ol_tx_ll.c",
         ],
@@ -1042,8 +1058,9 @@ _conditional_srcs = {
         True: [
             "cmn/utils/pktlog/pktlog_wifi2.c",
         ],
-        False: [
-            #TODO: This won't work, need a separate flag
+    },
+    "CONFIG_FEATURE_PKTLOG_EN_NON_LEGACY": {
+        True: [
             "cmn/utils/pktlog/pktlog_wifi3.c",
         ],
     },
@@ -1202,7 +1219,7 @@ _conditional_srcs = {
             "components/umac/mlme/connection_mgr/core/src/wlan_cm_roam_offload_event.c",
         ],
     },
-    "CONFIG_QCA_SUPPORT_TX_THROTTLE": {
+    "LEGACY_CONFIG_QCA_SUPPORT_TX_THROTTLE": {
         True: [
             "core/dp/txrx/ol_tx_throttle.c",
         ],
@@ -1329,6 +1346,19 @@ _conditional_srcs = {
             "cmn/dp/wifi3.0/monitor/dp_mon.c",
             "cmn/dp/wifi3.0/monitor/dp_mon_filter.c",
             "cmn/dp/wifi3.0/monitor/dp_rx_mon.c",
+        ],
+    },
+    "CONFIG_WIFI_MONITOR_SUPPORT_Y_WLAN_TX_MON_2_0": {
+        True: [
+            "cmn/dp/wifi3.0/monitor/2.0/dp_mon_2.0.c",
+            "cmn/dp/wifi3.0/monitor/2.0/dp_mon_filter_2.0.c",
+            "cmn/dp/wifi3.0/monitor/2.0/dp_tx_mon_2.0.c",
+            "cmn/dp/wifi3.0/monitor/2.0/dp_tx_mon_status_2.0.c",
+        ],
+    },
+    "CONFIG_WLAN_TX_MON_2_0_Y_WLAN_DP_LOCAL_PKT_CAPTURE": {
+        True: [
+            "os_if/dp/src/os_if_dp_local_pkt_capture.c",
         ],
     },
     "CONFIG_WIFI_POS_CONVERGED": {
@@ -1465,14 +1495,15 @@ _conditional_srcs = {
             "cmn/target_if/cfr/src/target_if_cfr_enh.c",
         ],
     },
-    "CONFIG_WLAN_FASTPATH": {
-        True: [
-            "core/dp/txrx/ol_tx_ll_fastpath.c",
-        ],
-        False: [
-            "core/dp/txrx/ol_tx_ll_legacy.c",
-        ],
-    },
+    #"LEGACY_CONFIG_WLAN_FASTPATH": {
+        #True: [
+        #    "core/dp/txrx/ol_tx_ll_fastpath.c",
+        #],
+	#TODO: Will need to create a separate flag to handle false case
+        #False: [
+        #    "core/dp/txrx/ol_tx_ll_legacy.c",
+        #],
+    #},
     "CONFIG_WLAN_FEATURE_11AX": {
         True: [
             "core/hdd/src/wlan_hdd_he.c",
@@ -1502,6 +1533,9 @@ _conditional_srcs = {
             "cmn/umac/mlo_mgr/src/wlan_mlo_mgr_primary_umac.c",
             "cmn/umac/mlo_mgr/src/wlan_mlo_mgr_sta.c",
             "cmn/umac/mlo_mgr/src/wlan_mlo_t2lm.c",
+            "components/umac/mlme/mlo_mgr/src/wlan_epcs_api.c",
+            "cmn/umac/mlo_mgr/src/wlan_mlo_epcs.c",
+            "components/umac/mlme/mlo_mgr/dispatcher/src/wlan_mlo_epcs_ucfg_api.c",
             "cmn/wmi/src/wmi_unified_11be_api.c",
             "cmn/wmi/src/wmi_unified_11be_tlv.c",
             "components/umac/mlme/mlo_mgr/src/wlan_mlo_mgr_roam.c",
@@ -1711,8 +1745,9 @@ _conditional_srcs = {
             "os_if/twt/src/osif_twt_ext_util.c",
             # TODO: rest being removed by David's TWT change
             #            "components/mlme/core/src/wlan_mlme_twt_api.c",
-            #            "components/mlme/dispatcher/src/wlan_mlme_twt_ucfg_api.c",
-            #            "core/wma/src/wma_twt.c",
+	    # TODO: to be removed by David's TWT change
+            "components/mlme/dispatcher/src/wlan_mlme_twt_ucfg_api.c",
+            "core/wma/src/wma_twt.c",
         ],
     },
     "CONFIG_WLAN_FREQ_LIST": {
@@ -1946,7 +1981,7 @@ _conditional_srcs = {
             "core/hdd/src/wlan_hdd_sysfs_txrx_stats.c",
         ],
     },
-    "CONFIG_WLAN_TX_FLOW_CONTROL_LEGACY": {
+    "LEGACY_CONFIG_WLAN_TX_FLOW_CONTROL_LEGACY": {
         True: [
             "core/dp/txrx/ol_txrx_legacy_flow_control.c",
         ],
@@ -2006,6 +2041,18 @@ _conditional_srcs = {
             "cmn/wmi/src/wmi_unified_sta_tlv.c",
         ],
     },
+    "CONFIG_AFC_SUPPORT": {
+        True: [
+           "core/hdd/src/wlan_hdd_afc.c",
+        ],
+    },
+    "CONFIG_WLAN_FEATURE_LL_LT_SAP": {
+        True: [
+           "components/umac/mlme/sap/ll_sap/dispatcher/src/wlan_ll_sap_ucfg_api.c",
+           "components/umac/mlme/sap/ll_sap/core/src/wlan_ll_sap_main.c",
+        ],
+    },
+
 }
 
 def _define_module_for_target_variant_chipset(target, variant, chipset):
@@ -2032,11 +2079,29 @@ def _define_module_for_target_variant_chipset(target, variant, chipset):
         copts.append("-include")
         copts.append(i)
 
+    native.genrule(
+        name = "configs/{}_defconfig_generate_consolidate".format(tvc),
+        outs = ["configs/{}_defconfig.generated_consolidate".format(tvc)],
+	srcs = [
+		"configs/{}_gki_{}_defconfig".format(target,chipset),
+		"configs/{}_consolidate_{}_defconfig".format(target,chipset),
+	],
+	cmd = "cat $(SRCS) > $@",
+    )
+    native.genrule(
+        name = "configs/{}_defconfig_generate_gki".format(tvc),
+        outs = ["configs/{}_defconfig.generated_gki".format(tvc)],
+	srcs = [
+		"configs/{}_gki_{}_defconfig".format(target,chipset),
+	],
+	cmd = "cat $(SRCS) > $@",
+    )
+
     srcs = native.glob(iglobs) + _fixed_srcs
 
-    out = "qca_cld_{}.ko".format(chipset.replace("-", "_"))
+    out = "qca_cld3_{}.ko".format(chipset.replace("-", "_"))
     kconfig = "Kconfig"
-    defconfig = "configs/{}_defconfig".format(tvc)
+    defconfig = ":configs/{}_defconfig_generate_{}".format(tvc,variant)
 
     print("name=", name)
     print("hw=", hw)
@@ -2051,7 +2116,7 @@ def _define_module_for_target_variant_chipset(target, variant, chipset):
     ddk_module(
         name = name,
         srcs = srcs,
-        includes = ipaths,
+        includes = ipaths + ["."],
         kconfig = kconfig,
         defconfig = defconfig,
         conditional_srcs = _conditional_srcs,
@@ -2060,8 +2125,13 @@ def _define_module_for_target_variant_chipset(target, variant, chipset):
         kernel_build = "//msm-kernel:{}".format(tv),
         deps = [
             "//vendor/qcom/opensource/wlan/platform:{}_cnss2".format(tv),
+            "//vendor/qcom/opensource/wlan/platform:{}_cnss_prealloc".format(tv),
+            "//vendor/qcom/opensource/wlan/platform:{}_cnss_utils".format(tv),
+            "//vendor/qcom/opensource/wlan/platform:{}_cnss_nl".format(tv),
             "//msm-kernel:all_headers",
             "//vendor/qcom/opensource/wlan/platform:wlan-platform-headers",
+	    "//vendor/qcom/opensource/dataipa:include_headers",
+	    "//vendor/qcom/opensource/dataipa:{}_{}_ipam".format(target, variant),
         ],
     )
 

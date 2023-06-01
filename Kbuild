@@ -1713,6 +1713,7 @@ $(call add-wlan-objs,ftm_time_sync,$(FTM_TIME_SYNC_OBJS))
 WLAN_PRE_CAC_DIR := components/pre_cac
 PRE_CAC_OSIF_DIR := os_if/pre_cac
 WLAN_PRE_CAC_INC := -I$(WLAN_ROOT)/$(WLAN_PRE_CAC_DIR)/dispatcher/inc \
+		  -I$(WLAN_ROOT)/$(WLAN_PRE_CAC_DIR)/core/src \
 		  -I$(WLAN_ROOT)/$(PRE_CAC_OSIF_DIR)/inc
 
 ifeq ($(CONFIG_FEATURE_WLAN_PRE_CAC), y)
@@ -1831,6 +1832,7 @@ TDLS_OS_IF_SRC := os_if/tdls/src
 TDLS_TARGET_IF_INC := components/target_if/tdls/inc
 TDLS_TARGET_IF_SRC := components/target_if/tdls/src
 TDLS_INC := -I$(WLAN_ROOT)/$(TDLS_DIR)/dispatcher/inc \
+	    -I$(WLAN_ROOT)/$(TDLS_DIR)/core/src \
 	    -I$(WLAN_ROOT)/$(TDLS_OS_IF_INC) \
 	    -I$(WLAN_ROOT)/$(TDLS_TARGET_IF_INC)
 
