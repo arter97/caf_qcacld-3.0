@@ -964,7 +964,8 @@ void hif_print_ipci_stats(struct hif_ipci_softc *ipci_handle)
 }
 #endif /* FORCE_WAKE */
 
-#ifdef FEATURE_HAL_DELAYED_REG_WRITE
+#if defined(FEATURE_HAL_DELAYED_REG_WRITE) || \
+	defined(FEATURE_HIF_DELAYED_REG_WRITE)
 int hif_prevent_link_low_power_states(struct hif_opaque_softc *hif)
 {
 	struct hif_softc *scn = HIF_GET_SOFTC(hif);
@@ -975,10 +976,7 @@ int hif_prevent_link_low_power_states(struct hif_opaque_softc *hif)
 	if (pld_is_pci_ep_awake(scn->qdf_dev->dev) == -ENOTSUPP)
 		return 0;
 
-	if ((qdf_atomic_read(&scn->dp_ep_vote_access) ==
-	     HIF_EP_VOTE_ACCESS_DISABLE) &&
-	    (qdf_atomic_read(&scn->ep_vote_access) ==
-	    HIF_EP_VOTE_ACCESS_DISABLE)) {
+	if (hif_is_ep_vote_access_disabled(scn)) {
 		hif_info_high("EP access disabled in flight skip vote");
 		return 0;
 	}

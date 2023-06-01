@@ -324,6 +324,11 @@ void hif_target_write_checked(struct hif_softc *scn, uint32_t offset,
 	hif_write32_mb(scn, (scn->mem) + (offset), value)
 #endif
 
+#ifdef FEATURE_HIF_DELAYED_REG_WRITE
+#define A_TARGET_DELAYED_REG_WRITE(scn, ctrl_addr, val) \
+	hif_delayed_reg_write(scn, ctrl_addr, val)
+#endif
+
 void hif_irq_enable(struct hif_softc *scn, int irq_id);
 void hif_irq_disable(struct hif_softc *scn, int irq_id);
 

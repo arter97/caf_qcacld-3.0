@@ -290,6 +290,72 @@ struct hif_umac_reset_ctx {
 
 #define MAX_SHADOW_REGS 40
 
+#ifdef FEATURE_HIF_DELAYED_REG_WRITE
+/**
+ * enum hif_reg_sched_delay - ENUM for write sched delay histogram
+ * @HIF_REG_WRITE_SCHED_DELAY_SUB_100us: index for delay < 100us
+ * @HIF_REG_WRITE_SCHED_DELAY_SUB_1000us: index for delay < 1000us
+ * @HIF_REG_WRITE_SCHED_DELAY_SUB_5000us: index for delay < 5000us
+ * @HIF_REG_WRITE_SCHED_DELAY_GT_5000us: index for delay >= 5000us
+ * @HIF_REG_WRITE_SCHED_DELAY_HIST_MAX: Max value (nnsize of histogram array)
+ */
+enum hif_reg_sched_delay {
+	HIF_REG_WRITE_SCHED_DELAY_SUB_100us,
+	HIF_REG_WRITE_SCHED_DELAY_SUB_1000us,
+	HIF_REG_WRITE_SCHED_DELAY_SUB_5000us,
+	HIF_REG_WRITE_SCHED_DELAY_GT_5000us,
+	HIF_REG_WRITE_SCHED_DELAY_HIST_MAX,
+};
+
+/**
+ * struct hif_reg_write_soc_stats - soc stats to keep track of register writes
+ * @enqueues: writes enqueued to delayed work
+ * @dequeues: writes dequeued from delayed work (not written yet)
+ * @coalesces: writes not enqueued since srng is already queued up
+ * @direct: writes not enqueud and writted to register directly
+ * @prevent_l1_fails: prevent l1 API failed
+ * @q_depth: current queue depth in delayed register write queue
+ * @max_q_depth: maximum queue for delayed register write queue
+ * @sched_delay: = kernel work sched delay + bus wakeup delay, histogram
+ * @dequeue_delay: dequeue operation be delayed
+ */
+struct hif_reg_write_soc_stats {
+	qdf_atomic_t enqueues;
+	uint32_t dequeues;
+	qdf_atomic_t coalesces;
+	qdf_atomic_t direct;
+	uint32_t prevent_l1_fails;
+	qdf_atomic_t q_depth;
+	uint32_t max_q_depth;
+	uint32_t sched_delay[HIF_REG_WRITE_SCHED_DELAY_HIST_MAX];
+	uint32_t dequeue_delay;
+};
+
+/**
+ * struct hif_reg_write_q_elem - delayed register write queue element
+ * @ce_state: CE state queued for a delayed write
+ * @offset: offset of the CE register
+ * @enqueue_val: register value at the time of delayed write enqueue
+ * @dequeue_val: register value at the time of delayed write dequeue
+ * @valid: whether this entry is valid or not
+ * @enqueue_time: enqueue time (qdf_log_timestamp)
+ * @work_scheduled_time: work scheduled time (qdf_log_timestamp)
+ * @dequeue_time: dequeue time (qdf_log_timestamp)
+ * @cpu_id: record cpuid when schedule work
+ */
+struct hif_reg_write_q_elem {
+	struct CE_state *ce_state;
+	uint32_t offset;
+	uint32_t enqueue_val;
+	uint32_t dequeue_val;
+	uint8_t valid;
+	qdf_time_t enqueue_time;
+	qdf_time_t work_scheduled_time;
+	qdf_time_t dequeue_time;
+	int cpu_id;
+};
+#endif
+
 struct hif_softc {
 	struct hif_opaque_softc osc;
 	struct hif_config_info hif_config;
@@ -433,6 +499,20 @@ struct hif_softc {
 	struct qdf_mem_multi_page_t dl_recv_pages;
 	int dl_recv_pipe_num;
 #endif
+#ifdef FEATURE_HIF_DELAYED_REG_WRITE
+	/* queue(array) to hold register writes */
+	struct hif_reg_write_q_elem *reg_write_queue;
+	/* delayed work to be queued into workqueue */
+	qdf_work_t reg_write_work;
+	/* workqueue for delayed register writes */
+	qdf_workqueue_t *reg_write_wq;
+	/* write index used by caller to enqueue delayed work */
+	qdf_atomic_t write_idx;
+	/* read index used by worker thread to dequeue/write registers */
+	uint32_t read_idx;
+	struct hif_reg_write_soc_stats wstats;
+	qdf_atomic_t active_work_cnt;
+#endif /* FEATURE_HIF_DELAYED_REG_WRITE */
 };
 
 #if defined(NUM_SOC_PERF_CLUSTER) && (NUM_SOC_PERF_CLUSTER > 1)
@@ -761,4 +841,26 @@ void hif_reg_window_write(struct hif_softc *scn,
 uint32_t hif_reg_window_read(struct hif_softc *scn, uint32_t offset);
 #endif
 
+#ifdef FEATURE_HIF_DELAYED_REG_WRITE
+void hif_delayed_reg_write(struct hif_softc *scn, uint32_t ctrl_addr,
+			   uint32_t val);
+#endif
+
+#if defined(HIF_IPCI) && defined(FEATURE_HAL_DELAYED_REG_WRITE)
+static inline bool hif_is_ep_vote_access_disabled(struct hif_softc *scn)
+{
+	if ((qdf_atomic_read(&scn->dp_ep_vote_access) ==
+	     HIF_EP_VOTE_ACCESS_DISABLE) &&
+	    (qdf_atomic_read(&scn->ep_vote_access) ==
+	     HIF_EP_VOTE_ACCESS_DISABLE))
+		return true;
+
+	return false;
+}
+#else
+static inline bool hif_is_ep_vote_access_disabled(struct hif_softc *scn)
+{
+	return false;
+}
+#endif
 #endif /* __HIF_MAIN_H__ */

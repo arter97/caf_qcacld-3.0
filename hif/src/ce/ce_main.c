@@ -1591,6 +1591,12 @@ static bool ce_mark_datapath(struct CE_state *ce_state)
 static void ce_update_msi_batch_intr_flags(struct CE_state *ce_state)
 {
 }
+
+static inline void ce_update_wrt_idx_offset(struct hif_softc *scn,
+					    struct CE_state *ce_state,
+					    uint8_t ring_type)
+{
+}
 #else
 static bool ce_mark_datapath(struct CE_state *ce_state)
 {
@@ -1624,6 +1630,20 @@ static void ce_update_msi_batch_intr_flags(struct CE_state *ce_state)
 {
 	ce_state->msi_supported = true;
 	ce_state->batch_intr_supported = true;
+}
+
+static inline void ce_update_wrt_idx_offset(struct hif_softc *scn,
+					    struct CE_state *ce_state,
+					    uint8_t ring_type)
+{
+	if (ring_type == CE_RING_SRC)
+		ce_state->ce_wrt_idx_offset =
+			CE_SRC_WR_IDX_OFFSET_GET(scn, ce_state->ctrl_addr);
+	else if (ring_type == CE_RING_DEST)
+		ce_state->ce_wrt_idx_offset =
+			CE_DST_WR_IDX_OFFSET_GET(scn, ce_state->ctrl_addr);
+	else
+		QDF_BUG(0);
 }
 #endif
 
@@ -2643,6 +2663,9 @@ struct CE_handle *ce_init(struct hif_softc *scn,
 		goto error_target_access;
 
 	ce_update_msi_batch_intr_flags(CE_state);
+	ce_update_wrt_idx_offset(scn, CE_state,
+				 attr->src_nentries ?
+				 CE_RING_SRC : CE_RING_DEST);
 
 	return (struct CE_handle *)CE_state;
 

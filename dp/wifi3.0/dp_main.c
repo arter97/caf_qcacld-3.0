@@ -6812,6 +6812,19 @@ static bool dp_umac_rst_skel_enable_get(struct dp_soc *soc)
 }
 #endif
 
+#ifndef WLAN_SOFTUMAC_SUPPORT
+static void dp_print_reg_write_stats(struct dp_soc *soc)
+{
+	hal_dump_reg_write_stats(soc->hal_soc);
+	hal_dump_reg_write_srng_stats(soc->hal_soc);
+}
+#else
+static void dp_print_reg_write_stats(struct dp_soc *soc)
+{
+	hif_print_reg_write_stats(soc->hif_handle);
+}
+#endif
+
 /**
  * dp_print_host_stats()- Function to print the stats aggregated at host
  * @vdev: DP_VDEV handle
@@ -6883,8 +6896,7 @@ dp_print_host_stats(struct dp_vdev *vdev,
 						CDP_FISA_STATS_ID_DUMP_HW_FST);
 		break;
 	case TXRX_HAL_REG_WRITE_STATS:
-		hal_dump_reg_write_stats(pdev->soc->hal_soc);
-		hal_dump_reg_write_srng_stats(pdev->soc->hal_soc);
+		dp_print_reg_write_stats(pdev->soc);
 		break;
 	case TXRX_SOC_REO_HW_DESC_DUMP:
 		dp_get_rx_reo_queue_info((struct cdp_soc_t *)pdev->soc,
@@ -9061,7 +9073,7 @@ static QDF_STATUS dp_txrx_dump_stats(struct cdp_soc_t *psoc, uint16_t value,
 	case CDP_TXRX_PATH_STATS:
 		dp_txrx_path_stats(soc);
 		dp_print_soc_interrupt_stats(soc);
-		hal_dump_reg_write_stats(soc->hal_soc);
+		dp_print_reg_write_stats(soc);
 		dp_pdev_print_tx_delay_stats(soc);
 		/* Dump usage watermark stats for core TX/RX SRNGs */
 		dp_dump_srng_high_wm_stats(soc, (1 << REO_DST));

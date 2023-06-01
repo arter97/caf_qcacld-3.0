@@ -2163,7 +2163,8 @@ int hif_force_wake_release(struct hif_opaque_softc *handle)
 }
 #endif /* FORCE_WAKE */
 
-#ifdef FEATURE_HAL_DELAYED_REG_WRITE
+#if defined(FEATURE_HAL_DELAYED_REG_WRITE) || \
+	defined(FEATURE_HIF_DELAYED_REG_WRITE)
 /**
  * hif_prevent_link_low_power_states() - Prevent from going to low power states
  * @hif: HIF opaque context
@@ -2934,4 +2935,18 @@ void hif_affinity_mgr_affine_irq(struct hif_softc *scn)
  * Return: None
  */
 void hif_affinity_mgr_set_affinity(struct hif_opaque_softc *scn);
+
+#ifdef FEATURE_HIF_DELAYED_REG_WRITE
+/**
+ * hif_print_reg_write_stats() - Print hif delayed reg write stats
+ * @hif_ctx: hif opaque handle
+ *
+ * Return: None
+ */
+void hif_print_reg_write_stats(struct hif_opaque_softc *hif_ctx);
+#else
+static inline void hif_print_reg_write_stats(struct hif_opaque_softc *hif_ctx)
+{
+}
+#endif
 #endif /* _HIF_H_ */

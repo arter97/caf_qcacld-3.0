@@ -55,6 +55,8 @@
 #include <linux/cpumask.h>
 
 #include <pld_common.h>
+#include "ce_internal.h"
+#include <qdf_tracepoint.h>
 
 void hif_dump(struct hif_opaque_softc *hif_ctx, uint8_t cmd_id, bool start)
 {
@@ -1392,6 +1394,11 @@ static inline int hif_get_num_pending_work(struct hif_softc *scn)
 {
 	return hal_get_reg_write_pending_work(scn->hal_soc);
 }
+#elif defined(FEATURE_HIF_DELAYED_REG_WRITE)
+static inline int hif_get_num_pending_work(struct hif_softc *scn)
+{
+	return qdf_atomic_read(&scn->active_work_cnt);
+}
 #else
 
 static inline int hif_get_num_pending_work(struct hif_softc *scn)
@@ -1527,6 +1534,354 @@ uint8_t hif_get_ep_vote_access(struct hif_opaque_softc *hif_ctx,
 }
 #endif
 
+#ifdef FEATURE_HIF_DELAYED_REG_WRITE
+#ifdef MEMORY_DEBUG
+#define HIF_REG_WRITE_QUEUE_LEN 128
+#else
+#define HIF_REG_WRITE_QUEUE_LEN 32
+#endif
+
+/**
+ * hif_print_reg_write_stats() - Print hif delayed reg write stats
+ * @hif_ctx: hif opaque handle
+ *
+ * Return: None
+ */
+void hif_print_reg_write_stats(struct hif_opaque_softc *hif_ctx)
+{
+	struct hif_softc *scn = HIF_GET_SOFTC(hif_ctx);
+	struct CE_state *ce_state;
+	uint32_t *hist;
+	int i;
+
+	hist = scn->wstats.sched_delay;
+	hif_debug("wstats: enq %u deq %u coal %u direct %u q_depth %u max_q %u sched-delay hist %u %u %u %u",
+		  qdf_atomic_read(&scn->wstats.enqueues),
+		  scn->wstats.dequeues,
+		  qdf_atomic_read(&scn->wstats.coalesces),
+		  qdf_atomic_read(&scn->wstats.direct),
+		  qdf_atomic_read(&scn->wstats.q_depth),
+		  scn->wstats.max_q_depth,
+		  hist[HIF_REG_WRITE_SCHED_DELAY_SUB_100us],
+		  hist[HIF_REG_WRITE_SCHED_DELAY_SUB_1000us],
+		  hist[HIF_REG_WRITE_SCHED_DELAY_SUB_5000us],
+		  hist[HIF_REG_WRITE_SCHED_DELAY_GT_5000us]);
+
+	for (i = 0; i < scn->ce_count; i++) {
+		ce_state = scn->ce_id_to_state[i];
+		if (!ce_state)
+			continue;
+
+		hif_debug("ce%d: enq %u deq %u coal %u direct %u",
+			  i, ce_state->wstats.enqueues,
+			  ce_state->wstats.dequeues,
+			  ce_state->wstats.coalesces,
+			  ce_state->wstats.direct);
+	}
+}
+
+/**
+ * hif_is_reg_write_tput_level_high() - throughput level for delayed reg writes
+ * @scn: hif_softc pointer
+ *
+ * Return: true if throughput is high, else false.
+ */
+static inline bool hif_is_reg_write_tput_level_high(struct hif_softc *scn)
+{
+	int bw_level = hif_get_bandwidth_level(GET_HIF_OPAQUE_HDL(scn));
+
+	return (bw_level >= PLD_BUS_WIDTH_MEDIUM) ? true : false;
+}
+
+/**
+ * hif_reg_write_fill_sched_delay_hist() - fill reg write delay histogram
+ * @scn: hif_softc pointer
+ * @delay_us: delay in us
+ *
+ * Return: None
+ */
+static inline void hif_reg_write_fill_sched_delay_hist(struct hif_softc *scn,
+						       uint64_t delay_us)
+{
+	uint32_t *hist;
+
+	hist = scn->wstats.sched_delay;
+
+	if (delay_us < 100)
+		hist[HIF_REG_WRITE_SCHED_DELAY_SUB_100us]++;
+	else if (delay_us < 1000)
+		hist[HIF_REG_WRITE_SCHED_DELAY_SUB_1000us]++;
+	else if (delay_us < 5000)
+		hist[HIF_REG_WRITE_SCHED_DELAY_SUB_5000us]++;
+	else
+		hist[HIF_REG_WRITE_SCHED_DELAY_GT_5000us]++;
+}
+
+/**
+ * hif_process_reg_write_q_elem() - process a register write queue element
+ * @scn: hif_softc pointer
+ * @q_elem: pointer to hal register write queue element
+ *
+ * Return: The value which was written to the address
+ */
+static int32_t
+hif_process_reg_write_q_elem(struct hif_softc *scn,
+			     struct hif_reg_write_q_elem *q_elem)
+{
+	struct CE_state *ce_state = q_elem->ce_state;
+	uint32_t write_val = -1;
+
+	qdf_spin_lock_bh(&ce_state->ce_index_lock);
+
+	ce_state->reg_write_in_progress = false;
+	ce_state->wstats.dequeues++;
+
+	if (ce_state->src_ring) {
+		q_elem->dequeue_val = ce_state->src_ring->write_index;
+		hal_write32_mb(scn->hal_soc, ce_state->ce_wrt_idx_offset,
+			       ce_state->src_ring->write_index);
+		write_val = ce_state->src_ring->write_index;
+	} else if (ce_state->dest_ring) {
+		q_elem->dequeue_val = ce_state->dest_ring->write_index;
+		hal_write32_mb(scn->hal_soc, ce_state->ce_wrt_idx_offset,
+			       ce_state->dest_ring->write_index);
+		write_val = ce_state->dest_ring->write_index;
+	} else {
+		hif_debug("invalid reg write received");
+		qdf_assert(0);
+	}
+
+	q_elem->valid = 0;
+	ce_state->last_dequeue_time = q_elem->dequeue_time;
+
+	qdf_spin_unlock_bh(&ce_state->ce_index_lock);
+
+	return write_val;
+}
+
+/**
+ * hif_reg_write_work() - Worker to process delayed writes
+ * @arg: hif_softc pointer
+ *
+ * Return: None
+ */
+static void hif_reg_write_work(void *arg)
+{
+	struct hif_softc *scn = arg;
+	struct hif_reg_write_q_elem *q_elem;
+	uint32_t offset;
+	uint64_t delta_us;
+	int32_t q_depth, write_val;
+	uint32_t num_processed = 0;
+	int32_t ring_id;
+
+	q_elem = &scn->reg_write_queue[scn->read_idx];
+	q_elem->work_scheduled_time = qdf_get_log_timestamp();
+	q_elem->cpu_id = qdf_get_cpu();
+
+	/* Make sure q_elem consistent in the memory for multi-cores */
+	qdf_rmb();
+	if (!q_elem->valid)
+		return;
+
+	q_depth = qdf_atomic_read(&scn->wstats.q_depth);
+	if (q_depth > scn->wstats.max_q_depth)
+		scn->wstats.max_q_depth =  q_depth;
+
+	if (hif_prevent_link_low_power_states(GET_HIF_OPAQUE_HDL(scn))) {
+		scn->wstats.prevent_l1_fails++;
+		return;
+	}
+
+	while (true) {
+		qdf_rmb();
+		if (!q_elem->valid)
+			break;
+
+		q_elem->dequeue_time = qdf_get_log_timestamp();
+		ring_id = q_elem->ce_state->id;
+		offset = q_elem->offset;
+		delta_us = qdf_log_timestamp_to_usecs(q_elem->dequeue_time -
+						      q_elem->enqueue_time);
+		hif_reg_write_fill_sched_delay_hist(scn, delta_us);
+
+		scn->wstats.dequeues++;
+		qdf_atomic_dec(&scn->wstats.q_depth);
+
+		write_val = hif_process_reg_write_q_elem(scn, q_elem);
+		hif_debug("read_idx %u ce_id %d offset 0x%x dequeue_val %d",
+			  scn->read_idx, ring_id, offset, write_val);
+
+		qdf_trace_dp_del_reg_write(ring_id, q_elem->enqueue_val,
+					   q_elem->dequeue_val,
+					   q_elem->enqueue_time,
+					   q_elem->dequeue_time);
+		num_processed++;
+		scn->read_idx = (scn->read_idx + 1) &
+					(HIF_REG_WRITE_QUEUE_LEN - 1);
+		q_elem = &scn->reg_write_queue[scn->read_idx];
+	}
+
+	hif_allow_link_low_power_states(GET_HIF_OPAQUE_HDL(scn));
+
+	/*
+	 * Decrement active_work_cnt by the number of elements dequeued after
+	 * hif_allow_link_low_power_states.
+	 * This makes sure that hif_try_complete_tasks will wait till we make
+	 * the bus access in hif_allow_link_low_power_states. This will avoid
+	 * race condition between delayed register worker and bus suspend
+	 * (system suspend or runtime suspend).
+	 *
+	 * The following decrement should be done at the end!
+	 */
+	qdf_atomic_sub(num_processed, &scn->active_work_cnt);
+}
+
+/**
+ * hif_delayed_reg_write_deinit() - De-Initialize delayed reg write processing
+ * @scn: hif_softc pointer
+ *
+ * De-initialize main data structures to process register writes in a delayed
+ * workqueue.
+ *
+ * Return: None
+ */
+static void hif_delayed_reg_write_deinit(struct hif_softc *scn)
+{
+	qdf_flush_work(&scn->reg_write_work);
+	qdf_disable_work(&scn->reg_write_work);
+	qdf_flush_workqueue(0, scn->reg_write_wq);
+	qdf_destroy_workqueue(0, scn->reg_write_wq);
+	qdf_mem_free(scn->reg_write_queue);
+}
+
+/**
+ * hif_delayed_reg_write_init() - Initialization function for delayed reg writes
+ * @scn: hif_softc pointer
+ *
+ * Initialize main data structures to process register writes in a delayed
+ * workqueue.
+ */
+
+static QDF_STATUS hif_delayed_reg_write_init(struct hif_softc *scn)
+{
+	qdf_atomic_init(&scn->active_work_cnt);
+	scn->reg_write_wq =
+		qdf_alloc_high_prior_ordered_workqueue("hif_register_write_wq");
+	qdf_create_work(0, &scn->reg_write_work, hif_reg_write_work, scn);
+	scn->reg_write_queue = qdf_mem_malloc(HIF_REG_WRITE_QUEUE_LEN *
+					      sizeof(*scn->reg_write_queue));
+	if (!scn->reg_write_queue) {
+		hif_err("unable to allocate memory for delayed reg write");
+		QDF_BUG(0);
+		return QDF_STATUS_E_NOMEM;
+	}
+
+	/* Initial value of indices */
+	scn->read_idx = 0;
+	qdf_atomic_set(&scn->write_idx, -1);
+
+	return QDF_STATUS_SUCCESS;
+}
+
+static void hif_reg_write_enqueue(struct hif_softc *scn,
+				  struct CE_state *ce_state,
+				  uint32_t value)
+{
+	struct hif_reg_write_q_elem *q_elem;
+	uint32_t write_idx;
+
+	if (ce_state->reg_write_in_progress) {
+		hif_debug("Already in progress ce_id %d offset 0x%x value %u",
+			  ce_state->id, ce_state->ce_wrt_idx_offset, value);
+		qdf_atomic_inc(&scn->wstats.coalesces);
+		ce_state->wstats.coalesces++;
+		return;
+	}
+
+	write_idx = qdf_atomic_inc_return(&scn->write_idx);
+	write_idx = write_idx & (HIF_REG_WRITE_QUEUE_LEN - 1);
+
+	q_elem = &scn->reg_write_queue[write_idx];
+	if (q_elem->valid) {
+		hif_err("queue full");
+		QDF_BUG(0);
+		return;
+	}
+
+	qdf_atomic_inc(&scn->wstats.enqueues);
+	ce_state->wstats.enqueues++;
+
+	qdf_atomic_inc(&scn->wstats.q_depth);
+
+	q_elem->ce_state = ce_state;
+	q_elem->offset = ce_state->ce_wrt_idx_offset;
+	q_elem->enqueue_val = value;
+	q_elem->enqueue_time = qdf_get_log_timestamp();
+
+	/*
+	 * Before the valid flag is set to true, all the other
+	 * fields in the q_elem needs to be updated in memory.
+	 * Else there is a chance that the dequeuing worker thread
+	 * might read stale entries and process incorrect srng.
+	 */
+	qdf_wmb();
+	q_elem->valid = true;
+
+	/*
+	 * After all other fields in the q_elem has been updated
+	 * in memory successfully, the valid flag needs to be updated
+	 * in memory in time too.
+	 * Else there is a chance that the dequeuing worker thread
+	 * might read stale valid flag and the work will be bypassed
+	 * for this round. And if there is no other work scheduled
+	 * later, this hal register writing won't be updated any more.
+	 */
+	qdf_wmb();
+
+	ce_state->reg_write_in_progress  = true;
+	qdf_atomic_inc(&scn->active_work_cnt);
+
+	hif_debug("write_idx %u ce_id %d offset 0x%x value %u",
+		  write_idx, ce_state->id, ce_state->ce_wrt_idx_offset, value);
+
+	qdf_queue_work(scn->qdf_dev, scn->reg_write_wq,
+		       &scn->reg_write_work);
+}
+
+void hif_delayed_reg_write(struct hif_softc *scn, uint32_t ctrl_addr,
+			   uint32_t val)
+{
+	struct CE_state *ce_state;
+	int ce_id = COPY_ENGINE_ID(ctrl_addr);
+
+	ce_state = scn->ce_id_to_state[ce_id];
+
+	if (!ce_state->htt_tx_data && !ce_state->htt_rx_data) {
+		hif_reg_write_enqueue(scn, ce_state, val);
+		return;
+	}
+
+	if (hif_is_reg_write_tput_level_high(scn) ||
+	    (PLD_MHI_STATE_L0 == pld_get_mhi_state(scn->qdf_dev->dev))) {
+		hal_write32_mb(scn->hal_soc, ce_state->ce_wrt_idx_offset, val);
+		qdf_atomic_inc(&scn->wstats.direct);
+		ce_state->wstats.direct++;
+	} else {
+		hif_reg_write_enqueue(scn, ce_state, val);
+	}
+}
+#else
+static inline QDF_STATUS hif_delayed_reg_write_init(struct hif_softc *scn)
+{
+	return QDF_STATUS_SUCCESS;
+}
+
+static inline void  hif_delayed_reg_write_deinit(struct hif_softc *scn)
+{
+}
+#endif
+
 #if defined(QCA_WIFI_WCN6450)
 static QDF_STATUS hif_hal_attach(struct hif_softc *scn)
 {
@@ -1644,6 +1999,11 @@ QDF_STATUS hif_enable(struct hif_opaque_softc *hif_ctx, struct device *dev,
 		goto disable_bus;
 	}
 
+	if (hif_delayed_reg_write_init(scn) != QDF_STATUS_SUCCESS) {
+		hif_err("unable to initialize delayed reg write");
+		goto hal_detach;
+	}
+
 	if (hif_bus_configure(scn)) {
 		hif_err("Target probe failed");
 		status = QDF_STATUS_E_FAILURE;
@@ -1682,6 +2042,7 @@ void hif_disable(struct hif_opaque_softc *hif_ctx, enum hif_disable_type type)
 	if (!scn)
 		return;
 
+	hif_delayed_reg_write_deinit(scn);
 	hif_set_enable_detection(hif_ctx, false);
 	hif_latency_detect_timer_stop(hif_ctx);
 

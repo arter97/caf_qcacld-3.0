@@ -136,6 +136,24 @@ struct CE_ring_state {
 	uint64_t last_flush_ts;
 };
 
+#ifdef FEATURE_HIF_DELAYED_REG_WRITE
+/**
+ * struct ce_reg_write_stats - stats to keep track of register writes
+ * @enqueues: writes enqueued to delayed work
+ * @dequeues: writes dequeued from delayed work (not written yet)
+ * @coalesces: writes not enqueued since srng is already queued up
+ * @direct: writes not enqueued and written to register directly
+ * @dequeue_delay: dequeue operation be delayed
+ */
+struct ce_reg_write_stats {
+	uint32_t enqueues;
+	uint32_t dequeues;
+	uint32_t coalesces;
+	uint32_t direct;
+	uint32_t dequeue_delay;
+};
+#endif
+
 /* Copy Engine internal state */
 struct CE_state {
 	struct hif_softc *scn;
@@ -206,6 +224,12 @@ struct CE_state {
 #endif
 	bool msi_supported;
 	bool batch_intr_supported;
+#ifdef FEATURE_HIF_DELAYED_REG_WRITE
+	struct ce_reg_write_stats wstats;
+	uint8_t reg_write_in_progress;
+	qdf_time_t last_dequeue_time;
+#endif
+	uint32_t ce_wrt_idx_offset;
 };
 
 /* Descriptor rings must be aligned to this boundary */
