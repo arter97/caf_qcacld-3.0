@@ -965,10 +965,20 @@ dp_rx_ppe_del_flow_entry(struct ppe_drv_fse_rule_info *ppe_flow_info)
 	wlan_if_t vap;
 	struct wlan_objmgr_vdev *vdev;
 	struct wlan_cfg_dp_soc_ctxt *cfg;
+	struct wlan_objmgr_pdev *pdev = NULL;
 	struct dp_soc *soc = NULL;
 	QDF_STATUS status;
 
 	if (!ppe_flow_info->dev)
+		return QDF_STATUS_E_FAILURE;
+
+	/*
+	 * In case of fw recovery, VAPs will go down but VP's will
+	 * still be there. Hence this callback might get triggered even if VAP object
+	 * is down in recovery mode. So we check the recovery mode using the netdev
+	 * queue and return if netdev queue is stopped.
+	 */
+	if (netif_queue_stopped(ppe_flow_info->dev))
 		return QDF_STATUS_E_FAILURE;
 
 	osdev = ath_netdev_priv(ppe_flow_info->dev);
@@ -983,8 +993,12 @@ dp_rx_ppe_del_flow_entry(struct ppe_drv_fse_rule_info *ppe_flow_info)
 	if (!vdev)
 		return QDF_STATUS_E_FAILURE;
 
+	pdev = wlan_vdev_get_pdev(vdev);
+	if (!pdev)
+		return QDF_STATUS_E_FAILURE;
+
 	soc = (struct dp_soc *)wlan_psoc_get_dp_handle
-		(wlan_pdev_get_psoc(wlan_vdev_get_pdev(vdev)));
+		(wlan_pdev_get_psoc(pdev));
 
 	if (qdf_unlikely(!soc))
 		return QDF_STATUS_E_FAILURE;
