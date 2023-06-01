@@ -652,7 +652,7 @@ mbss_stop_standalone_ap_vdevs(struct wlan_objmgr_vdev *vdev, void *arg)
 	}
 
 	ext_ops = wlan_mbss_get_ext_ops();
-	if (ext_ops && ext_ops->mbss_start_standalone_ap_vdevs_cb)
+	if (ext_ops && ext_ops->mbss_stop_standalone_ap_vdevs_cb)
 		handler = ext_ops->mbss_stop_standalone_ap_vdevs_cb;
 	else
 		goto err;
