@@ -44,6 +44,61 @@ enum wlan_epcs_category {
 	WLAN_EPCS_CATEGORY_INVALID,
 };
 
+/**
+ * struct wlan_epcs_info - EPCS information of frame
+ * @cat: frame category
+ * @dialog_token: dialog token
+ * @status: status
+ */
+struct wlan_epcs_info {
+	enum wlan_epcs_category cat;
+	uint8_t dialog_token;
+	uint8_t status;
+};
+
+/**
+ * struct wlan_mlo_peer_epcs_policy - Peer EPCS information
+ * @enable: EPCS enable status
+ * @self_gen_dialog_token: selfgenerated dialog token
+ * @status: status
+ */
+struct wlan_mlo_peer_epcs_policy {
+	uint8_t enable;
+	uint8_t self_gen_dialog_token;
+	uint8_t status;
+};
+
+/**
+ * struct wlan_epcs_context - EPCS context if MLD
+ */
+struct wlan_epcs_context {
+};
+
+/**
+ * struct epcs_frm - EPCS action frame format
+ * @category: category
+ * @protected_eht_action: Protected EHT Action
+ * @dialog_token: Dialog Token
+ * @status_code: Status Code
+ * @req: Request frame
+ * @resp: Response frame
+ * @bytes: Priority Access Multi-Link element bytes
+ */
+struct epcs_frm {
+	uint8_t category;
+	uint8_t protected_eht_action;
+	uint8_t dialog_token;
+	union {
+		struct {
+			uint8_t bytes[0];
+		} req;
+		struct {
+			uint8_t status_code;
+			uint8_t bytes[0];
+		} resp;
+	};
+};
+
 #define epcs_alert(format, args...) \
 		QDF_TRACE_FATAL(QDF_MODULE_ID_EPCS, format, ## args)
 
@@ -61,5 +116,30 @@ enum wlan_epcs_category {
 
 #define epcs_rl_debug(format, args...) \
 		QDF_TRACE_DEBUG_RL(QDF_MODULE_ID_EPCS, format, ## args)
+
+/**
+ * wlan_mlo_add_epcs_action_frame() - API to add EPCS action frame
+ * @frm: Pointer to a frame to add EPCS information
+ * @args: EPCS action frame related info
+ * @buf: Pointer to EPCS IE values
+ *
+ * Return: Pointer to the updated frame buffer
+ */
+uint8_t *wlan_mlo_add_epcs_action_frame(uint8_t *frm,
+					struct wlan_action_frame_args *args,
+					uint8_t *buf);
+
+/**
+ * wlan_mlo_parse_epcs_action_frame() - API to parse EPCS action frame
+ * @epcs: Pointer to EPCS information
+ * @action_frm: EPCS action frame
+ * @frm_len: frame length
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+wlan_mlo_parse_epcs_action_frame(struct wlan_epcs_info *epcs,
+				 struct wlan_action_frame *action_frm,
+				 uint32_t frm_len);
 
 #endif /* _WLAN_MLO_EPCS_H_ */
