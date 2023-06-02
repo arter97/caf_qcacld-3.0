@@ -1973,7 +1973,7 @@ hdd_add_pmf_bcn_protect_stats(struct sk_buff *skb,
 /**
  * hdd_get_big_data_stats_len - get data length used in
  * hdd_big_data_pack_resp_nlmsg()
- * @adapter: hdd adapter
+ * @link_info: Link info pointer in HDD adapter.
  *
  * This function calculates the data length used in
  * hdd_big_data_pack_resp_nlmsg()
@@ -1981,18 +1981,19 @@ hdd_add_pmf_bcn_protect_stats(struct sk_buff *skb,
  * Return: total data length used in hdd_big_data_pack_resp_nlmsg()
  */
 static uint32_t
-hdd_get_big_data_stats_len(struct hdd_adapter *adapter)
+hdd_get_big_data_stats_len(struct wlan_hdd_link_info *link_info)
 {
 	uint32_t len;
+	struct big_data_stats_event *big_data_stats =
+					&link_info->big_data_stats;
 
-	len =
-	nla_total_size(sizeof(adapter->big_data_stats.last_tx_data_rate_kbps)) +
-	nla_total_size(sizeof(adapter->big_data_stats.target_power_ofdm)) +
-	nla_total_size(sizeof(adapter->big_data_stats.target_power_dsss)) +
-	nla_total_size(sizeof(adapter->big_data_stats.last_tx_data_rix)) +
-	nla_total_size(sizeof(adapter->big_data_stats.tsf_out_of_sync)) +
-	nla_total_size(sizeof(adapter->big_data_stats.ani_level)) +
-	nla_total_size(sizeof(adapter->big_data_stats.last_data_tx_pwr));
+	len = nla_total_size(sizeof(big_data_stats->last_tx_data_rate_kbps)) +
+	      nla_total_size(sizeof(big_data_stats->target_power_ofdm)) +
+	      nla_total_size(sizeof(big_data_stats->target_power_dsss)) +
+	      nla_total_size(sizeof(big_data_stats->last_tx_data_rix)) +
+	      nla_total_size(sizeof(big_data_stats->tsf_out_of_sync)) +
+	      nla_total_size(sizeof(big_data_stats->ani_level)) +
+	      nla_total_size(sizeof(big_data_stats->last_data_tx_pwr));
 
 	/** Add len of roam params **/
 	len += nla_total_size(sizeof(uint32_t)) * 3;
@@ -2003,27 +2004,27 @@ hdd_get_big_data_stats_len(struct hdd_adapter *adapter)
 /**
  * hdd_big_data_pack_resp_nlmsg() - pack big data nl resp msg
  * @skb: pointer to response skb buffer
- * @adapter: adapter holding big data stats
- * @hdd_ctx: hdd context
+ * @link_info: Link info pointer in HDD adapter
  *
  * This function adds big data stats in response.
  *
  * Return: 0 on success
  */
-static int
-hdd_big_data_pack_resp_nlmsg(struct sk_buff *skb,
-			     struct hdd_adapter *adapter,
-			     struct hdd_context *hdd_ctx)
+static int hdd_big_data_pack_resp_nlmsg(struct sk_buff *skb,
+					struct wlan_hdd_link_info *link_info)
 {
 	struct hdd_station_ctx *hdd_sta_ctx;
+	struct hdd_context *hdd_ctx = link_info->adapter->hdd_ctx;
+	struct big_data_stats_event *big_data_stats =
+					&link_info->big_data_stats;
 
-	hdd_sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter->deflink);
+	hdd_sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(link_info);
 	if (!hdd_sta_ctx) {
 		hdd_err("Invalid station context");
 		return -EINVAL;
 	}
 	if (nla_put_u32(skb, QCA_WLAN_VENDOR_ATTR_GET_STA_INFO_LATEST_TX_RATE,
-			adapter->big_data_stats.last_tx_data_rate_kbps)){
+			big_data_stats->last_tx_data_rate_kbps)){
 		hdd_err("latest tx rate put fail");
 		return -EINVAL;
 	}
@@ -2032,7 +2033,7 @@ hdd_big_data_pack_resp_nlmsg(struct sk_buff *skb,
 		if (nla_put_u32(
 			skb,
 			QCA_WLAN_VENDOR_ATTR_GET_STA_INFO_TARGET_POWER_5G_6MBPS,
-			adapter->big_data_stats.target_power_ofdm)){
+			big_data_stats->target_power_ofdm)){
 			hdd_err("5G ofdm power put fail");
 			return -EINVAL;
 		}
@@ -2041,51 +2042,51 @@ hdd_big_data_pack_resp_nlmsg(struct sk_buff *skb,
 		if (nla_put_u32(
 		       skb,
 		       QCA_WLAN_VENDOR_ATTR_GET_STA_INFO_TARGET_POWER_24G_6MBPS,
-		       adapter->big_data_stats.target_power_ofdm)){
+		       big_data_stats->target_power_ofdm)){
 			hdd_err("2.4G ofdm power put fail");
 			return -EINVAL;
 		}
 		if (nla_put_u32(
 		       skb,
 		       QCA_WLAN_VENDOR_ATTR_GET_STA_INFO_TARGET_POWER_24G_1MBPS,
-		       adapter->big_data_stats.target_power_dsss)){
+		       big_data_stats->target_power_dsss)){
 			hdd_err("target power dsss put fail");
 			return -EINVAL;
 		}
 	}
 
 	if (nla_put_u32(skb, QCA_WLAN_VENDOR_ATTR_GET_STA_INFO_LATEST_RIX,
-			adapter->big_data_stats.last_tx_data_rix)){
+			big_data_stats->last_tx_data_rix)){
 		hdd_err("last rix rate put fail");
 		return -EINVAL;
 	}
 	if (nla_put_u32(skb,
 			QCA_WLAN_VENDOR_ATTR_GET_STA_INFO_TSF_OUT_OF_SYNC_COUNT,
-			adapter->big_data_stats.tsf_out_of_sync)){
+			big_data_stats->tsf_out_of_sync)){
 		hdd_err("tsf out of sync put fail");
 		return -EINVAL;
 	}
 	if (nla_put_u32(skb, QCA_WLAN_VENDOR_ATTR_GET_STA_INFO_ANI_LEVEL,
-			adapter->big_data_stats.ani_level)){
+			big_data_stats->ani_level)){
 		hdd_err("ani level put fail");
 		return -EINVAL;
 	}
 	if (nla_put_u32(skb, QCA_WLAN_VENDOR_ATTR_GET_STA_INFO_LATEST_TX_POWER,
-			adapter->big_data_stats.last_data_tx_pwr)){
+			big_data_stats->last_data_tx_pwr)){
 		hdd_err("last data tx power put fail");
 		return -EINVAL;
 	}
 	if (nla_put_u32(skb,
 			QCA_WLAN_VENDOR_ATTR_GET_STA_INFO_ROAM_TRIGGER_REASON,
 			wlan_cm_get_roam_states(hdd_ctx->psoc,
-						adapter->deflink->vdev_id,
+						link_info->vdev_id,
 						ROAM_TRIGGER_REASON))){
 		hdd_err("roam trigger reason put fail");
 		return -EINVAL;
 	}
 	if (nla_put_u32(skb, QCA_WLAN_VENDOR_ATTR_GET_STA_INFO_ROAM_FAIL_REASON,
 			wlan_cm_get_roam_states(hdd_ctx->psoc,
-						adapter->deflink->vdev_id,
+						link_info->vdev_id,
 						ROAM_FAIL_REASON))){
 		hdd_err("roam fail reason put fail");
 		return -EINVAL;
@@ -2094,7 +2095,7 @@ hdd_big_data_pack_resp_nlmsg(struct sk_buff *skb,
 		      skb,
 		      QCA_WLAN_VENDOR_ATTR_GET_STA_INFO_ROAM_INVOKE_FAIL_REASON,
 		      wlan_cm_get_roam_states(hdd_ctx->psoc,
-					      adapter->deflink->vdev_id,
+					      link_info->vdev_id,
 					      ROAM_INVOKE_FAIL_REASON))){
 		hdd_err("roam invoke fail reason put fail");
 		return -EINVAL;
@@ -2123,16 +2124,15 @@ hdd_reset_roam_params(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id)
 				   0, ROAM_INVOKE_FAIL_REASON);
 }
 #else
-static int
+static inline int
 hdd_big_data_pack_resp_nlmsg(struct sk_buff *skb,
-			     struct hdd_adapter *adapter,
-			     struct hdd_context *hdd_ctx)
+			     struct wlan_hdd_link_info *link_info)
 {
 	return 0;
 }
 
 static uint32_t
-hdd_get_big_data_stats_len(struct hdd_adapter *adapter)
+hdd_get_big_data_stats_len(struct wlan_hdd_link_info *link_info)
 {
 	return 0;
 }
@@ -2429,7 +2429,8 @@ static int hdd_get_station_remote_ex(struct hdd_context *hdd_ctx,
  */
 static int hdd_get_station_info_ex(struct wlan_hdd_link_info *link_info)
 {
-	struct hdd_context *hdd_ctx = link_info->adapter->hdd_ctx;
+	struct hdd_adapter *adapter = link_info->adapter;
+	struct hdd_context *hdd_ctx = adapter->hdd_ctx;
 	struct sk_buff *skb;
 	uint32_t nl_buf_len = 0, connect_fail_rsn_len;
 	struct hdd_station_ctx *hdd_sta_ctx;
@@ -2449,11 +2450,11 @@ static int hdd_get_station_info_ex(struct wlan_hdd_link_info *link_info)
 	wlan_hdd_get_peer_rx_rate_stats(adapter);
 
 	if (big_data_stats_req) {
-		if (wlan_hdd_get_big_data_station_stats(adapter)) {
+		if (wlan_hdd_get_big_data_station_stats(link_info)) {
 			hdd_err_rl("wlan_hdd_get_big_data_station_stats fail");
 			return -EINVAL;
 		}
-		nl_buf_len = hdd_get_big_data_stats_len(adapter);
+		nl_buf_len = hdd_get_big_data_stats_len(link_info);
 	}
 
 	nl_buf_len += hdd_get_pmf_bcn_protect_stats_len(link_info);
@@ -2488,7 +2489,7 @@ static int hdd_get_station_info_ex(struct wlan_hdd_link_info *link_info)
 	}
 
 	if (big_data_stats_req) {
-		if (hdd_big_data_pack_resp_nlmsg(skb, adapter, hdd_ctx)) {
+		if (hdd_big_data_pack_resp_nlmsg(skb, link_info)) {
 			wlan_cfg80211_vendor_free_skb(skb);
 			return -EINVAL;
 		}

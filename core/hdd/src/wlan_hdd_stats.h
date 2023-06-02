@@ -532,11 +532,11 @@ int wlan_hdd_qmi_put_suspend(void);
 #ifdef WLAN_FEATURE_BIG_DATA_STATS
 /**
  * wlan_hdd_get_big_data_station_stats() - Get big data station statistics
- * @adapter: adapter for which statistics are desired
+ * @link_info: Link info pointer in HDD adapter
  *
  * Return: status of operation
  */
-int wlan_hdd_get_big_data_station_stats(struct hdd_adapter *adapter);
+int wlan_hdd_get_big_data_station_stats(struct wlan_hdd_link_info *link_info);
 
 /**
  * wlan_cfg80211_mc_cp_get_big_data_stats() - API to get big data
@@ -560,8 +560,8 @@ wlan_cfg80211_mc_cp_get_big_data_stats(struct wlan_objmgr_vdev *vdev,
 void wlan_cfg80211_mc_cp_stats_free_big_data_stats_event(
 					struct big_data_stats_event *info);
 #else
-static inline int wlan_hdd_get_big_data_station_stats(
-						struct hdd_adapter *adapter)
+static inline int
+wlan_hdd_get_big_data_station_stats(struct wlan_hdd_link_info *link_info)
 {
 	return 0;
 }

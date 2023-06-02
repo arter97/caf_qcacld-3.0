@@ -341,27 +341,26 @@ out:
 #ifdef WLAN_FEATURE_BIG_DATA_STATS
 /*
  * copy_station_big_data_stats_to_adapter() - Copy big data stats to adapter
- * @adapter: Pointer to the adapter
+ * @link_info: Link info pointer in HDD adapter.
  * @stats: Pointer to the big data stats event
  *
  * Return: 0 if success, non-zero for failure
  */
-static void copy_station_big_data_stats_to_adapter(
-					struct hdd_adapter *adapter,
-					struct big_data_stats_event *stats)
+static void
+copy_station_big_data_stats_to_adapter(struct wlan_hdd_link_info *link_info,
+				       struct big_data_stats_event *stats)
 {
-	adapter->big_data_stats.vdev_id = stats->vdev_id;
-	adapter->big_data_stats.tsf_out_of_sync = stats->tsf_out_of_sync;
-	adapter->big_data_stats.ani_level = stats->ani_level;
-	adapter->big_data_stats.last_data_tx_pwr =
-					stats->last_data_tx_pwr;
-	adapter->big_data_stats.target_power_dsss =
-					stats->target_power_dsss;
-	adapter->big_data_stats.target_power_ofdm =
-					stats->target_power_ofdm;
-	adapter->big_data_stats.last_tx_data_rix = stats->last_tx_data_rix;
-	adapter->big_data_stats.last_tx_data_rate_kbps =
-					stats->last_tx_data_rate_kbps;
+	struct big_data_stats_event *big_data_stats =
+						&link_info->big_data_stats;
+
+	big_data_stats->vdev_id = stats->vdev_id;
+	big_data_stats->tsf_out_of_sync = stats->tsf_out_of_sync;
+	big_data_stats->ani_level = stats->ani_level;
+	big_data_stats->last_data_tx_pwr = stats->last_data_tx_pwr;
+	big_data_stats->target_power_dsss = stats->target_power_dsss;
+	big_data_stats->target_power_ofdm = stats->target_power_ofdm;
+	big_data_stats->last_tx_data_rix = stats->last_tx_data_rix;
+	big_data_stats->last_tx_data_rate_kbps = stats->last_tx_data_rate_kbps;
 }
 #endif
 
@@ -7762,23 +7761,21 @@ out:
 }
 
 #ifdef WLAN_FEATURE_BIG_DATA_STATS
-int wlan_hdd_get_big_data_station_stats(struct hdd_adapter *adapter)
+int wlan_hdd_get_big_data_station_stats(struct wlan_hdd_link_info *link_info)
 {
 	int ret = 0;
 	struct big_data_stats_event *big_data_stats;
 	struct wlan_objmgr_vdev *vdev;
 
-	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink,
-					   WLAN_OSIF_STATS_ID);
+	vdev = hdd_objmgr_get_vdev_by_user(link_info, WLAN_OSIF_STATS_ID);
 	if (!vdev)
 		return -EINVAL;
 
-	big_data_stats = wlan_cfg80211_mc_cp_get_big_data_stats(vdev,
-								&ret);
+	big_data_stats = wlan_cfg80211_mc_cp_get_big_data_stats(vdev, &ret);
 	if (ret || !big_data_stats)
 		goto out;
 
-	copy_station_big_data_stats_to_adapter(adapter, big_data_stats);
+	copy_station_big_data_stats_to_adapter(link_info, big_data_stats);
 out:
 	if (big_data_stats)
 		wlan_cfg80211_mc_cp_stats_free_big_data_stats_event(

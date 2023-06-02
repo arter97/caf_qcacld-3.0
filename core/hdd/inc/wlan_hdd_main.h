@@ -1027,6 +1027,7 @@ enum udp_qos_upgrade {
  * @is_mlo_vdev_active: is the mlo vdev currently active
  * @estimated_linkspeed: estimated link speed
  * @hdd_stats: HDD statistics
+ * @big_data_stats: Big data stats
  * @ll_iface_stats: Link Layer interface stats
  * @mscs_prev_tx_vo_pkts: count of prev VO AC packets transmitted
  * @mscs_counter: Counter on MSCS action frames sent
@@ -1055,6 +1056,9 @@ struct wlan_hdd_link_info {
 	bool is_mlo_vdev_active;
 	uint32_t estimated_linkspeed;
 	struct hdd_stats hdd_stats;
+#ifdef WLAN_FEATURE_BIG_DATA_STATS
+	struct big_data_stats_event big_data_stats;
+#endif
 #if defined(WLAN_FEATURE_11BE_MLO) && defined(CFG80211_11BE_BASIC)
 	struct wifi_interface_stats ll_iface_stats;
 #endif
@@ -1189,7 +1193,6 @@ struct wlan_hdd_tx_power {
  * progress, and any operation using rtnl lock inside
  * the driver can be avoided/skipped.
  * @is_virtual_iface: Indicates that netdev is called from virtual interface
- * @big_data_stats:
  * @mon_adapter: hdd_adapter of monitor mode.
  * @mlo_adapter_info:
  * @set_mac_addr_req_ctx: Set MAC address command request context
@@ -1365,9 +1368,6 @@ struct hdd_adapter {
 	qdf_atomic_t net_dev_hold_ref_count[NET_DEV_HOLD_ID_MAX];
 	bool delete_in_progress;
 	bool is_virtual_iface;
-#ifdef WLAN_FEATURE_BIG_DATA_STATS
-	struct big_data_stats_event big_data_stats;
-#endif
 #ifdef WLAN_FEATURE_PKT_CAPTURE
 	struct hdd_adapter *mon_adapter;
 #endif
