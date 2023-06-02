@@ -204,6 +204,7 @@
 #include "wlan_mlo_mgr_roam.h"
 #include "wlan_hdd_mlo.h"
 #include <wlan_psoc_mlme_ucfg_api.h>
+#include <wlan_ll_sap_ucfg_api.h>
 
 /*
  * A value of 100 (milliseconds) can be sent to FW.
@@ -4825,6 +4826,16 @@ static inline void wlan_hdd_set_ndi_feature(uint8_t *feature_flags)
 }
 #endif
 
+static inline void wlan_hdd_set_ll_lt_sap_feature(uint8_t *feature_flags)
+{
+	/* To Do: Once FW feature capability changes for ll_lt_sap feature are
+	 * merged, then this feature will be set based on that feature set
+	 * capability
+	 */
+	wlan_hdd_cfg80211_set_feature(feature_flags,
+				      QCA_WLAN_VENDOR_FEATURE_ENHANCED_AUDIO_EXPERIENCE_OVER_WLAN);
+}
+
 #define MAX_CONCURRENT_CHAN_ON_24G    2
 #define MAX_CONCURRENT_CHAN_ON_5G     2
 
@@ -4945,6 +4956,7 @@ __wlan_hdd_cfg80211_get_features(struct wiphy *wiphy,
 				feature_flags,
 				QCA_WLAN_VENDOR_FEATURE_AP_ALLOWED_FREQ_LIST);
 	wlan_wifi_pos_cfg80211_set_features(hdd_ctx->psoc, feature_flags);
+	wlan_hdd_set_ll_lt_sap_feature(feature_flags);
 
 	skb = wlan_cfg80211_vendor_cmd_alloc_reply_skb(wiphy,
 						       sizeof(feature_flags) +

@@ -32,3 +32,8 @@ QDF_STATUS ucfg_ll_sap_deinit(void)
 	return ll_sap_deinit();
 }
 
+bool ucfg_is_ll_lt_sap_supported(void)
+{
+	return ll_lt_sap_is_supported();
+}
+

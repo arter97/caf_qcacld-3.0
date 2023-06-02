@@ -50,4 +50,11 @@ QDF_STATUS ll_sap_init(void);
  */
 QDF_STATUS ll_sap_deinit(void);
 
+/**
+ * ll_lt_sap_is_supported() - Check if ll_lt_sap is supported or not
+ *
+ * Return: True/False
+ */
+bool ll_lt_sap_is_supported(void);
+
 #endif /* _WLAN_LL_SAP_MAIN_H_ */
