@@ -2661,7 +2661,6 @@ end:
 abort_roam:
 	if (QDF_IS_STATUS_ERROR(status)) {
 		wmi_err("%d Failed to extract roam sync ind", status);
-		wlan_cm_fw_roam_abort_req(psoc, synch_event->vdev_id);
 		wlan_cm_roam_stop_req(psoc, synch_event->vdev_id,
 				      REASON_ROAM_SYNCH_FAILED);
 	}
@@ -3458,6 +3457,8 @@ extract_roam_candidate_frame_tlv(wmi_unified_t wmi_handle, uint8_t *event,
 	data->vdev_id = frame_params->vdev_id;
 	data->frame_length = frame_params->frame_length;
 	data->frame = (uint8_t *)param_buf->frame;
+	QDF_TRACE_HEX_DUMP(QDF_MODULE_ID_WMI, QDF_TRACE_LEVEL_DEBUG,
+			   data->frame, data->frame_length);
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -3810,6 +3811,7 @@ static bool wmi_is_ft_akm(int akm,
 	case WMI_AUTH_FT_RSNA_SUITE_B_8021X_SHA384:
 	case WMI_AUTH_FT_RSNA_FILS_SHA256:
 	case WMI_AUTH_FT_RSNA_FILS_SHA384:
+	case WMI_AUTH_FT_RSNA_SAE_SHA384:
 		return true;
 	case WMI_AUTH_OPEN:
 		if (roam_req->rso_11r_info.mdid.mdie_present &&

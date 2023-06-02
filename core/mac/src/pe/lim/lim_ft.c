@@ -677,7 +677,7 @@ void lim_fill_ft_session(struct mac_context *mac,
 	}
 
 	sir_copy_mac_addr(ft_session->self_mac_addr,
-			  pe_session->self_mac_addr);
+			  wlan_vdev_mlme_get_macaddr(pe_session->vdev));
 	sir_copy_mac_addr(ft_session->limReAssocbssId,
 			  pbssDescription->bssId);
 	sir_copy_mac_addr(ft_session->prev_ap_bssid, pe_session->bssId);
@@ -757,8 +757,6 @@ void lim_fill_ft_session(struct mac_context *mac,
 	/* Load default OBSS parameters to session entry */
 	lim_init_obss_params(mac, ft_session);
 
-	ft_session->enableHtSmps = pe_session->enableHtSmps;
-	ft_session->htSmpsvalue = pe_session->htSmpsvalue;
 	/*
 	 * By default supported NSS 1x1 is set to true
 	 * and later on updated while determining session
@@ -767,8 +765,8 @@ void lim_fill_ft_session(struct mac_context *mac,
 	 */
 	ft_session->supported_nss_1x1 = true;
 	pe_debug("FT enable smps: %d mode: %d supported nss 1x1: %d",
-		ft_session->enableHtSmps,
-		ft_session->htSmpsvalue,
+		mac->mlme_cfg->ht_caps.enable_smps,
+		mac->mlme_cfg->ht_caps.smps,
 		ft_session->supported_nss_1x1);
 
 	qdf_mem_free(pBeaconStruct);

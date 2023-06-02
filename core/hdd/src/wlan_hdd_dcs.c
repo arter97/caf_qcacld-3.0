@@ -98,7 +98,7 @@ static QDF_STATUS hdd_dcs_switch_chan_cb(struct wlan_objmgr_vdev *vdev,
 		if (!hdd_cm_is_vdev_associated(adapter))
 			return QDF_STATUS_E_INVAL;
 
-		bssid = &adapter->session.station.conn_info.bssid;
+		bssid = &adapter->deflink->session.station.conn_info.bssid;
 
 		/* disconnect if got invalid freq or width */
 		if (tgt_freq == 0 || tgt_width == CH_WIDTH_INVALID) {
@@ -134,7 +134,7 @@ static QDF_STATUS hdd_dcs_switch_chan_cb(struct wlan_objmgr_vdev *vdev,
 		if (!psoc)
 			return QDF_STATUS_E_INVAL;
 
-		wlan_hdd_set_sap_csa_reason(psoc, adapter->vdev_id,
+		wlan_hdd_set_sap_csa_reason(psoc, adapter->deflink->vdev_id,
 					    CSA_REASON_DCS);
 		ret = hdd_softap_set_channel_change(adapter->dev, tgt_freq,
 						    tgt_width, true);
@@ -301,10 +301,11 @@ static void hdd_dcs_cb(struct wlan_objmgr_psoc *psoc, uint8_t mac_id,
 			 * selecting freq of other MAC may cause MCC with
 			 * other modes if present.
 			 */
-			if (wlan_mlme_get_ap_policy(adapter->vdev) !=
+			if (wlan_mlme_get_ap_policy(adapter->deflink->vdev) !=
 			    HOST_CONCURRENT_AP_POLICY_UNSPECIFIED) {
 				status = hdd_dcs_select_random_chan(
-						hdd_ctx->pdev, adapter->vdev);
+						hdd_ctx->pdev,
+						adapter->deflink->vdev);
 				if (QDF_IS_STATUS_SUCCESS(status))
 					return;
 			}
@@ -373,10 +374,11 @@ void hdd_dcs_register_cb(struct hdd_context *hdd_ctx)
 					  hdd_ctx);
 }
 
-void hdd_dcs_hostapd_set_chan(struct hdd_context *hdd_ctx,
-			      uint8_t vdev_id,
-			      qdf_freq_t dcs_ch_freq)
+QDF_STATUS hdd_dcs_hostapd_set_chan(struct hdd_context *hdd_ctx,
+				    uint8_t vdev_id,
+				    qdf_freq_t dcs_ch_freq)
 {
+	struct hdd_ap_ctx *ap_ctx;
 	QDF_STATUS status;
 	uint8_t mac_id;
 	uint32_t list[MAX_NUMBER_OF_CONC_CONNECTIONS];
@@ -389,7 +391,7 @@ void hdd_dcs_hostapd_set_chan(struct hdd_context *hdd_ctx,
 
 	if (QDF_IS_STATUS_ERROR(status)) {
 		hdd_err("get mac id failed");
-		return;
+		return QDF_STATUS_E_INVAL;
 	}
 	count = policy_mgr_get_sap_go_count_on_mac(hdd_ctx->psoc, list, mac_id);
 
@@ -403,10 +405,11 @@ void hdd_dcs_hostapd_set_chan(struct hdd_context *hdd_ctx,
 		if (!adapter) {
 			hdd_err("vdev_id %u does not exist with host",
 				list[conn_index]);
-			return;
+			return QDF_STATUS_E_INVAL;
 		}
 
-		if (adapter->session.ap.operating_chan_freq != dcs_ch_freq)
+		if (adapter->deflink->session.ap.operating_chan_freq !=
+		    dcs_ch_freq)
 			wlansap_dcs_set_vdev_starting(
 				WLAN_HDD_GET_SAP_CTX_PTR(adapter), true);
 		else
@@ -418,22 +421,27 @@ void hdd_dcs_hostapd_set_chan(struct hdd_context *hdd_ctx,
 		if (!adapter) {
 			hdd_err("vdev_id %u does not exist with host",
 				list[conn_index]);
-			return;
+			return QDF_STATUS_E_INVAL;
 		}
 
-		if (adapter->session.ap.operating_chan_freq != dcs_ch_freq) {
+		ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(adapter);
+
+		if (ap_ctx->operating_chan_freq != dcs_ch_freq) {
 			hdd_ctx->acs_policy.acs_chan_freq = AUTO_CHANNEL_SELECT;
 			hdd_debug("dcs triggers old ch:%d new ch:%d",
-				  adapter->session.ap.operating_chan_freq,
+				  ap_ctx->operating_chan_freq,
 				  dcs_ch_freq);
 			wlan_hdd_set_sap_csa_reason(hdd_ctx->psoc,
-						    adapter->vdev_id,
+						    adapter->deflink->vdev_id,
 						    CSA_REASON_DCS);
-			hdd_switch_sap_channel(adapter, dcs_ch, true);
-
-			return;
+			status = hdd_switch_sap_channel(adapter, dcs_ch, true);
+			if (status == QDF_STATUS_SUCCESS)
+				status = QDF_STATUS_E_PENDING;
+			return status;
 		}
 	}
+
+	return QDF_STATUS_SUCCESS;
 }
 
 /**
@@ -469,7 +477,8 @@ static void hdd_dcs_hostapd_enable_wlan_interference_mitigation(
 
 	if (wlansap_dcs_is_wlan_interference_mitigation_enabled(
 			WLAN_HDD_GET_SAP_CTX_PTR(adapter)) &&
-	    !WLAN_REG_IS_24GHZ_CH_FREQ(adapter->session.ap.operating_chan_freq))
+	    !WLAN_REG_IS_24GHZ_CH_FREQ(
+		    adapter->deflink->session.ap.operating_chan_freq))
 		ucfg_config_dcs_event_data(hdd_ctx->psoc, mac_id, true);
 }
 
@@ -477,6 +486,7 @@ void hdd_dcs_chan_select_complete(struct hdd_adapter *adapter)
 {
 	qdf_freq_t dcs_freq;
 	struct hdd_context *hdd_ctx;
+	uint32_t chan_freq;
 
 	hdd_ctx = WLAN_HDD_GET_CTX(adapter);
 	if (!hdd_ctx) {
@@ -485,14 +495,15 @@ void hdd_dcs_chan_select_complete(struct hdd_adapter *adapter)
 	}
 
 	dcs_freq = wlansap_dcs_get_freq(WLAN_HDD_GET_SAP_CTX_PTR(adapter));
-	if (dcs_freq && dcs_freq != adapter->session.ap.operating_chan_freq)
-		hdd_dcs_hostapd_set_chan(hdd_ctx, adapter->vdev_id, dcs_freq);
+	chan_freq = adapter->deflink->session.ap.operating_chan_freq;
+	if (dcs_freq && dcs_freq != chan_freq)
+		hdd_dcs_hostapd_set_chan(hdd_ctx, adapter->deflink->vdev_id,
+					 dcs_freq);
 	else
 		hdd_dcs_hostapd_enable_wlan_interference_mitigation(
-							hdd_ctx,
-							adapter->vdev_id);
+					hdd_ctx, adapter->deflink->vdev_id);
 
-	qdf_atomic_set(&adapter->session.ap.acs_in_progress, 0);
+	qdf_atomic_set(&adapter->deflink->session.ap.acs_in_progress, 0);
 }
 
 void hdd_dcs_clear(struct hdd_adapter *adapter)
@@ -511,7 +522,8 @@ void hdd_dcs_clear(struct hdd_adapter *adapter)
 
 	psoc = hdd_ctx->psoc;
 
-	status = policy_mgr_get_mac_id_by_session_id(psoc, adapter->vdev_id,
+	status = policy_mgr_get_mac_id_by_session_id(psoc,
+						     adapter->deflink->vdev_id,
 						     &mac_id);
 	if (QDF_IS_STATUS_ERROR(status)) {
 		hdd_err("get mac id failed");

@@ -60,7 +60,7 @@
 #include <wlan_hdd_cfg.h>
 #include <linux/spinlock.h>
 #include <ani_system_defs.h>
-#if defined(WLAN_OPEN_SOURCE) && defined(CONFIG_HAS_WAKELOCK)
+#if defined(CONFIG_HAS_WAKELOCK)
 #include <linux/wakelock.h>
 #endif
 #ifdef WLAN_FEATURE_TSF_PTP
@@ -258,7 +258,6 @@ static inline bool in_compat_syscall(void) { return is_compat_task(); }
  * enum hdd_adapter_flags - event bitmap flags registered net device
  * @NET_DEVICE_REGISTERED: Adapter is registered with the kernel
  * @SME_SESSION_OPENED: Firmware vdev has been created
- * @INIT_TX_RX_SUCCESS: Adapter datapath is initialized
  * @WMM_INIT_DONE: Adapter is initialized
  * @SOFTAP_BSS_STARTED: Software Access Point (SAP) is running
  * @DEVICE_IFACE_OPENED: Adapter has been "opened" via the kernel
@@ -269,7 +268,6 @@ static inline bool in_compat_syscall(void) { return is_compat_task(); }
 enum hdd_adapter_flags {
 	NET_DEVICE_REGISTERED,
 	SME_SESSION_OPENED,
-	INIT_TX_RX_SUCCESS,
 	WMM_INIT_DONE,
 	SOFTAP_BSS_STARTED,
 	DEVICE_IFACE_OPENED,
@@ -911,6 +909,7 @@ struct hdd_chan_change_params {
  * @wow_unit_test: wow unit test mode context to prevent/allow runtime pm
  * @system_suspend: system suspend context to prevent/allow runtime pm
  * @dyn_mac_addr_update: update mac addr context to prevent/allow runtime pm
+ * @vdev_destroy: vdev destroy context to prevent/allow runtime pm
  *
  * Runtime PM control for underlying activities
  */
@@ -923,6 +922,7 @@ struct hdd_runtime_pm_context {
 	qdf_runtime_lock_t wow_unit_test;
 	qdf_runtime_lock_t system_suspend;
 	qdf_runtime_lock_t dyn_mac_addr_update;
+	qdf_runtime_lock_t vdev_destroy;
 };
 
 /*
@@ -993,6 +993,61 @@ enum udp_qos_upgrade {
 };
 
 /**
+ * struct wlan_hdd_link_info - Data structure to store the link specific info
+ * @vdev_id: Unique value to identify VDEV. Equal to WLAN_UMAC_VDEV_ID_MAX
+ *           for invalid VDEVs.
+ * @vdev_lock: Lock to protect VDEV pointer access.
+ * @vdev: Pointer to VDEV objmgr.
+ * @vdev_destroy_event: vdev_destroy_event is moved from the qdf_event
+ *                      to linux event consciously, Lets take example
+ *                      when sap interface is waiting on the
+ *                      session_close event and then there is a SSR
+ *                      the wait event is completed the interface down
+ *                      is returned and the next command to the driver
+ *                      will be hdd_hostapd_uinit-->
+ *                      hdd_deinit_ap_mode-->
+ *                      hdd_hostapd_deinit_sap_session where in the
+ *                      sap_ctx would be freed.  During the SSR if the
+ *                      same sap context is used it would result in
+ *                      null pointer de-reference.
+ * @session: union of @ap and @station specific structs
+ * @session.station: station mode information
+ * @session.ap: ap mode specific information
+ * @rssi: The signal strength (dBm)
+ * @snr: SNR measured from @rssi
+ * @rssi_on_disconnect: Rssi at disconnection time in STA mode
+ * @rssi_send: Notify RSSI over lpass
+ */
+struct wlan_hdd_link_info {
+	uint8_t vdev_id;
+	qdf_spinlock_t vdev_lock;
+	struct wlan_objmgr_vdev *vdev;
+	struct completion vdev_destroy_event;
+
+	union {
+		struct hdd_station_ctx station;
+		struct hdd_ap_ctx ap;
+	} session;
+
+	int8_t rssi;
+	uint8_t snr;
+	int32_t rssi_on_disconnect;
+#ifdef WLAN_FEATURE_LPSS
+	bool rssi_send;
+#endif
+};
+
+/**
+ * struct wlan_hdd_tx_power - Structure to store connection tx power info
+ * @tx_pwr: connection tx power sent by firmware
+ * @tx_pwr_cached_timestamp: timestamp when tx_pwr is cached into adapter
+ */
+struct wlan_hdd_tx_power {
+	int tx_pwr;
+	uint32_t tx_pwr_cached_timestamp;
+};
+
+/**
  * struct hdd_adapter - hdd vdev/net_device context
  * @magic: Magic cookie for adapter sanity verification.  Note that this
  *         needs to be at the beginning of the private data structure so
@@ -1000,9 +1055,6 @@ enum udp_qos_upgrade {
  *         will always be in mapped memory
  * @node: list node for membership in the adapter list
  * @hdd_ctx:
- * @vdev: object manager vdev context
- * @vdev_lock: lock to protect vdev context access
- * @vdev_id: Unique identifier assigned to the vdev
  * @dev: Handle to the network device
  * @device_mode:
  * @ipv4_notifier_work: IPv4 notifier callback for handling ARP offload on
@@ -1019,22 +1071,9 @@ enum udp_qos_upgrade {
  * @event_flags: a bitmap of hdd_adapter_flags
  * @hdd_stats: HDD statistics
  * @estimated_linkspeed: estimated link speed
- * @vdev_destroy_event: vdev_destroy_event is moved from the qdf_event
- *                      to linux event consciously, Lets take example
- *                      when sap interface is waiting on the
- *                      session_close event and then there is a SSR
- *                      the wait event is completed the interface down
- *                      is returned and the next command to the driver
- *                      will be hdd_hostapd_uinit-->
- *                      hdd_deinit_ap_mode-->
- *                      hdd_hostapd_deinit_sap_session where in the
- *                      sap_ctx would be freed.  During the SSR if the
- *                      same sap context is used it would result in
- *                      null pointer de-reference.
  * @qdf_monitor_mode_vdev_up_event: QDF event for monitor mode vdev up
  * @disconnect_comp_var: completion variable for disconnect callback
  * @linkup_event_var: completion variable for Linkup Event
- * @sta_authorized_event:
  * @is_link_up_service_needed: Track whether the linkup handling is needed
  * @hdd_wmm_status: WMM Status
  * @sta_info:
@@ -1043,14 +1082,7 @@ enum udp_qos_upgrade {
  * @cache_sta_info_list:
  * @cache_sta_count: number of currently cached stations
  * @wapi_info:
- * @rssi:
- * @rssi_on_disconnect:
- * @rssi_send:
- * @snr:
  * @sap_stop_bss_work:
- * @session: union of @ap and @station specific structs
- * @session.station: station mode information
- * @session.ap: ap mode specific information
  * @ch_switch_in_progress:
  * @acs_complete_event: acs complete event
  * @tsf: structure containing tsf related information
@@ -1137,15 +1169,15 @@ enum udp_qos_upgrade {
  * @delta_qtime: delta between host qtime and monotonic time
  * @traffic_end_ind_en: traffic end indication feature enable/disable
  * @is_dbam_configured:
+ * @deflink: Default link pointing to the 0th index of the linkinfo array
+ * @link_info: Data structure to hold link specific information
+ * @tx_power: Structure to hold connection tx Power info
  */
 struct hdd_adapter {
 	uint32_t magic;
 	qdf_list_node_t node;
 
 	struct hdd_context *hdd_ctx;
-	struct wlan_objmgr_vdev *vdev;
-	qdf_spinlock_t vdev_lock;
-	uint8_t vdev_id;
 
 	struct net_device *dev;
 
@@ -1171,8 +1203,6 @@ struct hdd_adapter {
 
 	uint32_t estimated_linkspeed;
 
-	struct completion vdev_destroy_event;
-
 #ifdef FEATURE_MONITOR_MODE_SUPPORT
 	qdf_event_t qdf_monitor_mode_vdev_up_event;
 #endif
@@ -1180,8 +1210,6 @@ struct hdd_adapter {
 	/* TODO: move these to sta ctx. These may not be used in AP */
 	struct completion disconnect_comp_var;
 	struct completion linkup_event_var;
-
-	struct completion sta_authorized_event;
 
 	bool is_link_up_service_needed;
 
@@ -1200,20 +1228,7 @@ struct hdd_adapter {
 	struct hdd_wapi_info wapi_info;
 #endif
 
-	int8_t rssi;
-	int32_t rssi_on_disconnect;
-#ifdef WLAN_FEATURE_LPSS
-	bool rssi_send;
-#endif
-
-	uint8_t snr;
-
 	struct work_struct  sap_stop_bss_work;
-
-	union {
-		struct hdd_station_ctx station;
-		struct hdd_ap_ctx ap;
-	} session;
 
 	qdf_atomic_t ch_switch_in_progress;
 	qdf_event_t acs_complete_event;
@@ -1348,14 +1363,19 @@ struct hdd_adapter {
 #ifdef WLAN_FEATURE_DBAM_CONFIG
 	bool is_dbam_configured;
 #endif
+	struct wlan_hdd_link_info *deflink;
+	struct wlan_hdd_link_info link_info[WLAN_MAX_MLD];
+	struct wlan_hdd_tx_power tx_power;
 };
 
-#define WLAN_HDD_GET_STATION_CTX_PTR(adapter) (&(adapter)->session.station)
-#define WLAN_HDD_GET_AP_CTX_PTR(adapter) (&(adapter)->session.ap)
+#define WLAN_HDD_GET_STATION_CTX_PTR(adapter) \
+		(&(adapter)->deflink->session.station)
+#define WLAN_HDD_GET_AP_CTX_PTR(adapter) (&(adapter)->deflink->session.ap)
 #define WLAN_HDD_GET_CTX(adapter) ((adapter)->hdd_ctx)
 #define WLAN_HDD_GET_HOSTAP_STATE_PTR(adapter) \
-				(&(adapter)->session.ap.hostapd_state)
-#define WLAN_HDD_GET_SAP_CTX_PTR(adapter) ((adapter)->session.ap.sap_context)
+				(&(adapter)->deflink->session.ap.hostapd_state)
+#define WLAN_HDD_GET_SAP_CTX_PTR(adapter) \
+			((adapter)->deflink->session.ap.sap_context)
 
 #ifdef WLAN_FEATURE_NAN
 #define WLAN_HDD_IS_NDP_ENABLED(hdd_ctx) ((hdd_ctx)->nan_datapath_enabled)
@@ -1880,6 +1900,7 @@ enum wlan_state_ctrl_str_id {
  * @dbam_mode:
  * @last_pagefault_ssr_time: Time when last recovery was triggered because of
  * @host wakeup from fw with reason as pagefault
+ * @bridgeaddr: Bridge MAC address
  */
 struct hdd_context {
 	struct wlan_objmgr_psoc *psoc;
@@ -1911,7 +1932,7 @@ struct hdd_context {
 	struct completion mc_sus_event_var;
 	bool is_scheduler_suspended;
 
-#ifdef QCA_CONFIG_SMP
+#ifdef WLAN_DP_LEGACY_OL_RX_THREAD
 	bool is_ol_rx_thread_suspended;
 #endif
 
@@ -2155,6 +2176,7 @@ struct hdd_context {
 	enum coex_dbam_config_mode dbam_mode;
 #endif
 	qdf_time_t last_pagefault_ssr_time;
+	uint8_t bridgeaddr[QDF_MAC_ADDR_SIZE];
 };
 
 /**
@@ -2695,6 +2717,7 @@ int hdd_vdev_destroy(struct hdd_adapter *adapter);
 /**
  * hdd_vdev_ready() - Configure FW post VDEV create
  * @vdev: VDEV object.
+ * @bridgeaddr: Bridge MAC address
  *
  * The function is used send configuration to the FW
  * post VDEV creation.
@@ -2702,7 +2725,8 @@ int hdd_vdev_destroy(struct hdd_adapter *adapter);
  *
  * Return: 0 on success, negative value on failure.
  */
-int hdd_vdev_ready(struct wlan_objmgr_vdev *vdev);
+int hdd_vdev_ready(struct wlan_objmgr_vdev *vdev,
+		   struct qdf_mac_addr *bridgeaddr);
 
 QDF_STATUS hdd_init_station_mode(struct hdd_adapter *adapter);
 struct hdd_adapter *hdd_get_adapter(struct hdd_context *hdd_ctx,
@@ -2972,6 +2996,12 @@ bool hdd_is_5g_supported(struct hdd_context *hdd_ctx);
  */
 bool hdd_is_2g_supported(struct hdd_context *hdd_ctx);
 
+/**
+ * wlan_hdd_scan_abort() - abort ongoing scan
+ * @adapter: Pointer to interface adapter
+ *
+ * Return: 0 for success, non zero for failure
+ */
 int wlan_hdd_scan_abort(struct hdd_adapter *adapter);
 
 /**
@@ -3167,15 +3197,16 @@ int hdd_update_acs_timer_reason(struct hdd_adapter *adapter, uint8_t reason);
  * Moves the SAP interface by invoking the function which
  * executes the callback to perform channel switch using (E)CSA.
  *
- * Return: None
+ * Return: QDF_STATUS
  */
-void hdd_switch_sap_channel(struct hdd_adapter *adapter, uint8_t channel,
-			    bool forced);
+QDF_STATUS hdd_switch_sap_channel(struct hdd_adapter *adapter, uint8_t channel,
+				  bool forced);
 
 /**
  * hdd_switch_sap_chan_freq() - Move SAP to the given channel
  * @adapter: AP adapter
  * @chan_freq: Channel frequency
+ * @ch_width: channel bandwidth
  * @forced: Force to switch channel, ignore SCC/MCC check
  *
  * Moves the SAP interface by invoking the function which
@@ -3184,18 +3215,21 @@ void hdd_switch_sap_channel(struct hdd_adapter *adapter, uint8_t channel,
  * Return: QDF_STATUS_SUCCESS if successfully
  */
 QDF_STATUS hdd_switch_sap_chan_freq(struct hdd_adapter *adapter,
-				    qdf_freq_t chan_freq, bool forced);
+				    qdf_freq_t chan_freq,
+				    enum phy_ch_width ch_width,
+				    bool forced);
 
 #if defined(FEATURE_WLAN_CH_AVOID)
-void hdd_unsafe_channel_restart_sap(struct hdd_context *hdd_ctx);
+QDF_STATUS hdd_unsafe_channel_restart_sap(struct hdd_context *hdd_ctx);
 
 void hdd_ch_avoid_ind(struct hdd_context *hdd_ctxt,
 		      struct unsafe_ch_list *unsafe_chan_list,
 		      struct ch_avoid_ind_type *avoid_freq_list);
 #else
 static inline
-void hdd_unsafe_channel_restart_sap(struct hdd_context *hdd_ctx)
+QDF_STATUS hdd_unsafe_channel_restart_sap(struct hdd_context *hdd_ctx)
 {
+	return QDF_STATUS_SUCCESS;
 }
 
 static inline
@@ -3240,15 +3274,18 @@ void hdd_update_macaddr(struct hdd_context *hdd_ctx,
 
 /**
  * hdd_store_nss_chains_cfg_in_vdev() - Store the per vdev ini cfg in vdev_obj
- * @adapter: Current HDD adapter passed from caller
+ * @hdd_ctx: HDD context passed from caller
+ * @vdev: VDEV passed with caller holding reference.
  *
  * This function will store the per vdev nss params to the particular mlme
  * vdev obj.
+ * Caller shall acquire the reference for vdev objmgr and release on return.
  *
  * Return: None
  */
 void
-hdd_store_nss_chains_cfg_in_vdev(struct hdd_adapter *adapter);
+hdd_store_nss_chains_cfg_in_vdev(struct hdd_context *hdd_ctx,
+				 struct wlan_objmgr_vdev *vdev);
 
 /**
  * wlan_hdd_disable_roaming() - disable roaming on all STAs except the input one
@@ -3732,7 +3769,7 @@ static inline void hdd_enable_fastpath(struct hdd_context *hdd_ctx,
 void hdd_wlan_update_target_info(struct hdd_context *hdd_ctx, void *context);
 
 enum  sap_acs_dfs_mode wlan_hdd_get_dfs_mode(enum dfs_mode mode);
-void hdd_unsafe_channel_restart_sap(struct hdd_context *hdd_ctx);
+
 /**
  * hdd_clone_local_unsafe_chan() - clone hdd ctx unsafe chan list
  * @hdd_ctx: hdd context pointer

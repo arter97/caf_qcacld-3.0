@@ -44,7 +44,6 @@
 #include "wlan_ipa_ucfg_api.h"
 #include "wlan_dp_ucfg_api.h"
 #include "wlan_policy_mgr_ucfg.h"
-#include "wlan_mlme_twt_ucfg_api.h"
 #include <wma_types.h>
 #include "wlan_hdd_sta_info.h"
 #include "ol_defines.h"
@@ -56,6 +55,8 @@
 #include <net/llc_pdu.h>
 #endif
 #include <os_if_dp.h>
+#include <cfg_ucfg_api.h>
+#include <wlan_twt_ucfg_ext_api.h>
 
 /* Preprocessor definitions and constants */
 #undef QCA_HDD_SAP_DUMP_SK_BUFF
@@ -212,7 +213,8 @@ static void __hdd_softap_hard_start_xmit(struct sk_buff *skb,
 	ac = hdd_qdisc_ac_to_tl_ac[skb->queue_mapping];
 	++stats->per_cpu[cpu].tx_classified_ac[ac];
 
-	status = ucfg_dp_softap_start_xmit((qdf_nbuf_t)skb, adapter->vdev);
+	status = ucfg_dp_softap_start_xmit((qdf_nbuf_t)skb,
+					   adapter->deflink->vdev);
 	if (QDF_IS_STATUS_ERROR(status))
 		++stats->per_cpu[cpu].tx_dropped_ac[ac];
 
@@ -486,7 +488,7 @@ QDF_STATUS hdd_softap_deregister_sta(struct hdd_adapter *adapter,
 	if (ucfg_ipa_is_enabled()) {
 		if (ucfg_ipa_wlan_evt(hdd_ctx->pdev, adapter->dev,
 				      adapter->device_mode,
-				      adapter->vdev_id,
+				      adapter->deflink->vdev_id,
 				      WLAN_IPA_CLIENT_DISCONNECT,
 				      mac_addr->bytes,
 				      false) != QDF_STATUS_SUCCESS)
@@ -645,8 +647,8 @@ QDF_STATUS hdd_softap_register_sta(struct hdd_adapter *adapter,
 					     WLAN_CONTROL_PATH);
 	}
 	ucfg_mlme_update_oce_flags(hdd_ctx->pdev);
-	ucfg_mlme_init_twt_context(hdd_ctx->psoc, sta_mac,
-				   TWT_ALL_SESSIONS_DIALOG_ID);
+	ucfg_twt_init_context(hdd_ctx->psoc, sta_mac,
+			      TWT_ALL_SESSIONS_DIALOG_ID);
 	return qdf_status;
 }
 
@@ -718,7 +720,7 @@ QDF_STATUS hdd_softap_stop_bss(struct hdd_adapter *adapter)
 		if (ucfg_ipa_wlan_evt(hdd_ctx->pdev,
 				      adapter->dev,
 				      adapter->device_mode,
-				      adapter->vdev_id,
+				      adapter->deflink->vdev_id,
 				      WLAN_IPA_AP_DISCONNECT,
 				      adapter->dev->dev_addr,
 				      false) != QDF_STATUS_SUCCESS)
@@ -726,7 +728,8 @@ QDF_STATUS hdd_softap_stop_bss(struct hdd_adapter *adapter)
 	}
 
 	/* Setting the RTS profile to original value */
-	if (sme_cli_set_command(adapter->vdev_id, wmi_vdev_param_enable_rtscts,
+	if (sme_cli_set_command(adapter->deflink->vdev_id,
+				wmi_vdev_param_enable_rtscts,
 				cfg_get(hdd_ctx->psoc,
 					CFG_ENABLE_FW_RTS_PROFILE),
 				VDEV_CMD))

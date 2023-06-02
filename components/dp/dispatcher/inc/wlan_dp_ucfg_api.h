@@ -305,22 +305,6 @@ QDF_STATUS ucfg_dp_rx_ol_init(struct wlan_objmgr_psoc *psoc,
 			      bool is_wifi3_0_target);
 
 /**
- * ucfg_dp_init_txrx() - Initialize STA DP init TX/RX
- * @vdev: vdev mapped to STA DP interface
- *
- * Return: 0 on success and non zero on failure.
- */
-QDF_STATUS ucfg_dp_init_txrx(struct wlan_objmgr_vdev *vdev);
-
-/**
- * ucfg_dp_deinit_txrx() - Deinitialize STA DP init TX/RX
- * @vdev: vdev mapped to STA DP interface
- *
- * Return: 0 on success and non zero on failure.
- */
-QDF_STATUS ucfg_dp_deinit_txrx(struct wlan_objmgr_vdev *vdev);
-
-/**
  * ucfg_dp_start_xmit() - Transmit packet on STA interface
  * @nbuf: n/w buffer to transmitted
  * @vdev: vdev mapped to STA DP interface
@@ -1356,10 +1340,11 @@ QDF_STATUS ucfg_dp_direct_link_init(struct wlan_objmgr_psoc *psoc);
 /**
  * ucfg_dp_direct_link_deinit() - De-initializes Direct Link datapath
  * @psoc: psoc handle
+ * @is_ssr: true if SSR is in progress else false
  *
  * Return: None
  */
-void ucfg_dp_direct_link_deinit(struct wlan_objmgr_psoc *psoc);
+void ucfg_dp_direct_link_deinit(struct wlan_objmgr_psoc *psoc, bool is_ssr);
 
 /**
  * ucfg_dp_wfds_handle_request_mem_ind() - Process request memory indication
@@ -1416,7 +1401,7 @@ QDF_STATUS ucfg_dp_direct_link_init(struct wlan_objmgr_psoc *psoc)
 }
 
 static inline
-void ucfg_dp_direct_link_deinit(struct wlan_objmgr_psoc *psoc)
+void ucfg_dp_direct_link_deinit(struct wlan_objmgr_psoc *psoc, bool is_ssr)
 {
 }
 
@@ -1488,4 +1473,24 @@ QDF_STATUS ucfg_dp_txrx_ext_dump_stats(ol_txrx_soc_handle soc,
 QDF_STATUS ucfg_dp_txrx_set_cpu_mask(ol_txrx_soc_handle soc,
 				     qdf_cpu_mask *new_mask);
 
+/**
+ * ucfg_dp_get_per_link_peer_stats() - Call to get per link peer stats
+ * @soc: soc handle
+ * @vdev_id: vdev_id of vdev object
+ * @peer_mac: mac address of the peer
+ * @peer_stats: destination buffer
+ * @peer_type: Peer type
+ * @num_link: Number of ML links
+ *
+ * NOTE: For peer_type = CDP_MLD_PEER_TYPE peer_stats should point to
+ *			 buffer of size = (sizeof(*peer_stats) * num_link)
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+ucfg_dp_get_per_link_peer_stats(ol_txrx_soc_handle soc, uint8_t vdev_id,
+				uint8_t *peer_mac,
+				struct cdp_peer_stats *peer_stats,
+				enum cdp_peer_type peer_type,
+				uint8_t num_link);
 #endif /* _WLAN_DP_UCFGi_API_H_ */

@@ -88,11 +88,12 @@ static uint32_t hdd_son_is_acs_in_progress(struct wlan_objmgr_vdev *vdev)
 	}
 
 	if (!hdd_adapter_is_ap(adapter)) {
-		hdd_err("vdev id %d is not AP", adapter->vdev_id);
+		hdd_err("vdev id %d is not AP", adapter->deflink->vdev_id);
 		return in_progress;
 	}
 
-	in_progress = qdf_atomic_read(&adapter->session.ap.acs_in_progress);
+	in_progress =
+		qdf_atomic_read(&adapter->deflink->session.ap.acs_in_progress);
 
 	return in_progress;
 }
@@ -290,7 +291,7 @@ static int hdd_son_set_chan_ext_offset(
 		return retval;
 	}
 	if (!hdd_adapter_is_ap(adapter)) {
-		hdd_err("vdev id %d is not AP", adapter->vdev_id);
+		hdd_err("vdev id %d is not AP", adapter->deflink->vdev_id);
 		return retval;
 	}
 
@@ -355,7 +356,7 @@ static enum sec20_chan_offset hdd_son_get_chan_ext_offset(
 		return 0;
 	}
 	if (!hdd_adapter_is_ap(adapter)) {
-		hdd_err("vdev id %d is not AP", adapter->vdev_id);
+		hdd_err("vdev id %d is not AP", adapter->deflink->vdev_id);
 		return 0;
 	}
 
@@ -565,7 +566,8 @@ static uint32_t hdd_son_get_bandwidth(struct wlan_objmgr_vdev *vdev)
 		return NONHT;
 	}
 
-	chwidth = wma_cli_get_command(adapter->vdev_id, wmi_vdev_param_chwidth,
+	chwidth = wma_cli_get_command(adapter->deflink->vdev_id,
+				      wmi_vdev_param_chwidth,
 				      VDEV_CMD);
 
 	if (chwidth < 0) {
@@ -637,7 +639,7 @@ static int hdd_son_set_chan(struct wlan_objmgr_vdev *vdev, int chan,
 		return -EINVAL;
 	}
 	if (!hdd_adapter_is_ap(adapter)) {
-		hdd_err("vdev id %d is not AP", adapter->vdev_id);
+		hdd_err("vdev id %d is not AP", adapter->deflink->vdev_id);
 		return -ENOTSUPP;
 	}
 
@@ -654,13 +656,13 @@ static int hdd_son_set_chan(struct wlan_objmgr_vdev *vdev, int chan,
 	}
 
 	freq = wlan_reg_chan_band_to_freq(pdev, chan, BIT(band));
-	status = policy_mgr_is_sap_allowed_on_dfs_freq(pdev, adapter->vdev_id,
-						       freq);
+	status = policy_mgr_is_sap_allowed_on_dfs_freq(
+					pdev, adapter->deflink->vdev_id, freq);
 	if (!status) {
 		hdd_err("sap_allowed_on_dfs_freq check fails");
 		return -EINVAL;
 	}
-	wlan_hdd_set_sap_csa_reason(psoc, adapter->vdev_id,
+	wlan_hdd_set_sap_csa_reason(psoc, adapter->deflink->vdev_id,
 				    CSA_REASON_USER_INITIATED);
 
 	return hdd_softap_set_channel_change(adapter->dev, freq, CH_WIDTH_MAX,
@@ -722,7 +724,7 @@ static int hdd_son_set_candidate_freq(struct wlan_objmgr_vdev *vdev,
 		return -EINVAL;
 	}
 	if (!hdd_adapter_is_ap(adapter)) {
-		hdd_err("vdev id %d is not AP", adapter->vdev_id);
+		hdd_err("vdev id %d is not AP", adapter->deflink->vdev_id);
 		return -EINVAL;
 	}
 
@@ -759,7 +761,7 @@ static qdf_freq_t hdd_son_get_candidate_freq(struct wlan_objmgr_vdev *vdev)
 		return freq;
 	}
 	if (!hdd_adapter_is_ap(adapter)) {
-		hdd_err("vdev id %d is not AP", adapter->vdev_id);
+		hdd_err("vdev id %d is not AP", adapter->deflink->vdev_id);
 		return freq;
 	}
 
@@ -904,7 +906,7 @@ static int hdd_son_set_phymode(struct wlan_objmgr_vdev *vdev,
 	}
 
 	if (!hdd_adapter_is_ap(adapter)) {
-		hdd_err("vdev id %d is not AP", adapter->vdev_id);
+		hdd_err("vdev id %d is not AP", adapter->deflink->vdev_id);
 		return -EINVAL;
 	}
 
@@ -1877,7 +1879,7 @@ static QDF_STATUS hdd_son_init_acs_channels(struct hdd_adapter *adapter,
 				   acs_cfg->pcl_chan_freq,
 				   &acs_cfg->pcl_ch_count,
 				   acs_cfg->pcl_channels_weight_list,
-				   NUM_CHANNELS);
+				   NUM_CHANNELS, adapter->deflink->vdev_id);
 		wlan_hdd_trim_acs_channel_list(acs_cfg->pcl_chan_freq,
 					       acs_cfg->pcl_ch_count,
 					       acs_cfg->freq_list,
@@ -1929,12 +1931,12 @@ static int hdd_son_start_acs(struct wlan_objmgr_vdev *vdev, uint8_t enable)
 		hdd_err("null hdd_ctx");
 		return -EINVAL;
 	}
-	if (qdf_atomic_read(&adapter->session.ap.acs_in_progress)) {
+	if (qdf_atomic_read(&adapter->deflink->session.ap.acs_in_progress)) {
 		hdd_err("ACS is in-progress");
 		return -EAGAIN;
 	}
 	wlan_hdd_undo_acs(adapter);
-	sap_config = &adapter->session.ap.sap_config;
+	sap_config = &adapter->deflink->session.ap.sap_config;
 	hdd_debug("ACS Config country %s hw_mode %d ACS_BW: %d START_CH: %d END_CH: %d band %d",
 		  hdd_ctx->reg.alpha2, sap_config->acs_cfg.hw_mode,
 		  sap_config->acs_cfg.ch_width,
@@ -1999,7 +2001,7 @@ static int hdd_son_set_acs_channels(struct wlan_objmgr_vdev *vdev,
 		hdd_err("null hdd_ctx");
 		return -EINVAL;
 	}
-	sap_config = &adapter->session.ap.sap_config;
+	sap_config = &adapter->deflink->session.ap.sap_config;
 	/* initialize with default channels */
 	if (hdd_son_init_acs_channels(adapter, hdd_ctx, &sap_config->acs_cfg)
 						       != QDF_STATUS_SUCCESS) {
@@ -2216,7 +2218,7 @@ static int hdd_son_get_acs_report(struct wlan_objmgr_vdev *vdev,
 		goto end;
 	}
 	sap_ctx = WLAN_HDD_GET_SAP_CTX_PTR(adapter);
-	acs_cfg = &adapter->session.ap.sap_config.acs_cfg;
+	acs_cfg = &adapter->deflink->session.ap.sap_config.acs_cfg;
 	if (!acs_cfg->freq_list &&
 	    (hdd_son_init_acs_channels(adapter, hdd_ctx,
 				       acs_cfg) != QDF_STATUS_SUCCESS)) {

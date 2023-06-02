@@ -111,7 +111,9 @@ static const struct index_vht_data_rate_type vht_mcs_nss1[] = {
 	{6,  {585,  650}, {1215, 1350}, {2633, 2925}, {5265, 5850} },
 	{7,  {650,  722}, {1350, 1500}, {2925, 3250}, {5850, 6500} },
 	{8,  {780,  867}, {1620, 1800}, {3510, 3900}, {7020, 7800} },
-	{9,  {865,  960}, {1800, 2000}, {3900, 4333}, {7800, 8667} }
+	{9,  {865,  960}, {1800, 2000}, {3900, 4333}, {7800, 8667} },
+	{10, {975, 1083}, {2025, 2250}, {4388, 4875}, {8775, 9750} },
+	{11, {1083, 1204}, {2250, 2500}, {4875, 5417}, {9750, 1083} }
 };
 
 /*MCS parameters with Nss = 2*/
@@ -126,7 +128,9 @@ static const struct index_vht_data_rate_type vht_mcs_nss2[] = {
 	{6,  {1170, 1300}, {2430, 2700}, {5265, 5850}, {10530, 11700} },
 	{7,  {1300, 1444}, {2700, 3000}, {5850, 6500}, {11700, 13000} },
 	{8,  {1560, 1733}, {3240, 3600}, {7020, 7800}, {14040, 15600} },
-	{9,  {1730, 1920}, {3600, 4000}, {7800, 8667}, {15600, 17333} }
+	{9,  {1730, 1920}, {3600, 4000}, {7800, 8667}, {15600, 17333} },
+	{10, {1950, 2167}, {4050, 4500}, {8775, 9750}, {17550, 19500} },
+	{11, {2167, 2407}, {4500, 5000}, {9750, 10833}, {19500, 21667} }
 };
 
 #ifdef WLAN_FEATURE_11AX
@@ -1656,6 +1660,30 @@ static int wma_ll_stats_evt_handler(void *handle, u_int8_t *event,
 }
 
 /**
+ * wma_get_dp_peer_stats() - get host dp peer stats
+ * @dp_stats: buffer to store stats
+ * @peer_mac: peer mac address
+ *
+ * Return: 0 on success or error code
+ */
+static QDF_STATUS wma_get_dp_peer_stats(struct cdp_peer_stats *dp_stats,
+					uint8_t *peer_mac)
+{
+	void *dp_soc = cds_get_context(QDF_MODULE_ID_SOC);
+	uint8_t vdev_id;
+	QDF_STATUS status;
+
+	status = cdp_peer_get_vdevid(dp_soc, peer_mac, &vdev_id);
+	if (!QDF_IS_STATUS_SUCCESS(status)) {
+		wma_err("Unable to find peer ["QDF_MAC_ADDR_FMT"]",
+			QDF_MAC_ADDR_REF(peer_mac));
+		return status;
+	}
+
+	return cdp_host_get_peer_stats(dp_soc, vdev_id, peer_mac, dp_stats);
+}
+
+/**
  * wma_unified_link_peer_stats_event_handler() - peer stats event handler
  * @handle:          wma handle
  * @cmd_param_info:  data received with event from fw
@@ -1672,7 +1700,7 @@ static int wma_unified_link_peer_stats_event_handler(void *handle,
 	wmi_peer_link_stats *peer_stats, *temp_peer_stats;
 	wmi_rate_stats *rate_stats;
 	tSirLLStatsResults *link_stats_results;
-	uint8_t *results, *t_peer_stats, *t_rate_stats;
+	uint8_t *results, *t_peer_stats, *t_rate_stats, *peer_mac;
 	uint32_t count, rate_cnt;
 	uint32_t total_num_rates = 0;
 	uint32_t next_res_offset, next_peer_offset, next_rate_offset;
@@ -1681,7 +1709,6 @@ static int wma_unified_link_peer_stats_event_handler(void *handle,
 	bool excess_data = false;
 	uint32_t buf_len = 0;
 	struct cdp_peer_stats *dp_stats;
-	void *dp_soc = cds_get_context(QDF_MODULE_ID_SOC);
 	QDF_STATUS status;
 	uint8_t mcs_index;
 
@@ -1798,10 +1825,8 @@ static int wma_unified_link_peer_stats_event_handler(void *handle,
 			     t_peer_stats + next_peer_offset, peer_info_size);
 		next_res_offset += peer_info_size;
 
-		status = cdp_host_get_peer_stats(dp_soc,
-				       link_stats_results->ifaceId,
-				       (uint8_t *)&peer_stats->peer_mac_address,
-				       dp_stats);
+		peer_mac = (uint8_t *)&peer_stats->peer_mac_address;
+		status = wma_get_dp_peer_stats(dp_stats, peer_mac);
 
 		/* Copy rate stats associated with this peer */
 		for (count = 0; count < peer_stats->num_rates; count++) {

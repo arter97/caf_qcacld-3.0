@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2016-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -92,16 +92,12 @@ static int hdd_close_ndi(struct hdd_adapter *adapter)
 				     WLAN_STOP_ALL_NETIF_QUEUE_N_CARRIER,
 				     WLAN_CONTROL_PATH);
 
-#ifdef WLAN_OPEN_SOURCE
 	cancel_work_sync(&adapter->ipv4_notifier_work);
-#endif
 	hdd_deregister_hl_netdev_fc_timer(adapter);
 	hdd_deregister_tx_flow_control(adapter);
 
 #ifdef WLAN_NS_OFFLOAD
-#ifdef WLAN_OPEN_SOURCE
 	cancel_work_sync(&adapter->ipv6_notifier_work);
-#endif
 #endif
 	errno = hdd_vdev_destroy(adapter);
 	if (errno)
@@ -306,20 +302,25 @@ static int hdd_ndi_start_bss(struct hdd_adapter *adapter)
 	hdd_enter();
 	hdd_ctx = WLAN_HDD_GET_CTX(adapter);
 
+	if (!mac) {
+		hdd_debug("mac ctx NULL");
+		return -EINVAL;
+	}
+
 	status = hdd_ndi_select_valid_freq(hdd_ctx, &valid_freq);
 	if (!QDF_IS_STATUS_SUCCESS(status)) {
 		hdd_err("Unable to retrieve channel list for NAN");
 		return -EINVAL;
 	}
 
-	dot11_cfg.vdev_id = adapter->vdev_id;
+	dot11_cfg.vdev_id = adapter->deflink->vdev_id;
 	dot11_cfg.bss_op_ch_freq = valid_freq;
 	dot11_cfg.phy_mode = eCSR_DOT11_MODE_AUTO;
-	if (!wlan_vdev_id_is_open_cipher(mac->pdev, adapter->vdev_id))
+	if (!wlan_vdev_id_is_open_cipher(mac->pdev, adapter->deflink->vdev_id))
 		dot11_cfg.privacy = 1;
 
 	sme_get_network_params(mac, &dot11_cfg);
-	ndi_bss_cfg.vdev_id = adapter->vdev_id;
+	ndi_bss_cfg.vdev_id = adapter->deflink->vdev_id;
 	ndi_bss_cfg.oper_ch_freq = dot11_cfg.bss_op_ch_freq;
 	ndi_bss_cfg.nwType = dot11_cfg.nw_type;
 	ndi_bss_cfg.dot11mode = dot11_cfg.dot11_mode;
@@ -340,12 +341,12 @@ static int hdd_ndi_start_bss(struct hdd_adapter *adapter)
 				dot11_cfg.ext_rates.numRates;
 	}
 
-	status = sme_start_bss(mac_handle, adapter->vdev_id,
+	status = sme_start_bss(mac_handle, adapter->deflink->vdev_id,
 			       &ndi_bss_cfg);
 
 	if (QDF_IS_STATUS_ERROR(status)) {
 		hdd_err("NDI sme_RoamConnect session %d failed with status %d -> NotConnected",
-			adapter->vdev_id, status);
+			adapter->deflink->vdev_id, status);
 		/* change back to NotConnected */
 		hdd_conn_set_connection_state(adapter,
 					      eConnectionState_NotConnected);
@@ -459,16 +460,18 @@ void hdd_ndp_event_handler(struct hdd_adapter *adapter,
 					NAN_DATAPATH_RSP_STATUS_SUCCESS);
 			hdd_debug("posting ndi create status: %d (%s) to umac",
 				  success, success ? "Success" : "Failure");
-			os_if_nan_post_ndi_create_rsp(psoc, adapter->vdev_id,
-							success);
+			os_if_nan_post_ndi_create_rsp(
+					psoc, adapter->deflink->vdev_id,
+					success);
 			return;
 		case eCSR_ROAM_RESULT_NDI_DELETE_RSP:
 			success = (roam_info->ndp.ndi_create_params.status ==
 					NAN_DATAPATH_RSP_STATUS_SUCCESS);
 			hdd_debug("posting ndi delete status: %d (%s) to umac",
 				  success, success ? "Success" : "Failure");
-			os_if_nan_post_ndi_delete_rsp(psoc, adapter->vdev_id,
-							success);
+			os_if_nan_post_ndi_delete_rsp(
+					psoc, adapter->deflink->vdev_id,
+					success);
 			return;
 		default:
 			hdd_err("in correct roam_result: %d", roam_result);
@@ -586,7 +589,7 @@ int hdd_init_nan_data_mode(struct hdd_adapter *adapter)
 		hdd_err("unable to get vht_enable2x2");
 
 	sme_set_pdev_ht_vht_ies(mac_handle, bval);
-	sme_set_vdev_ies_per_band(mac_handle, adapter->vdev_id,
+	sme_set_vdev_ies_per_band(mac_handle, adapter->deflink->vdev_id,
 				  adapter->device_mode);
 
 	hdd_roam_profile_init(adapter);
@@ -595,18 +598,8 @@ int hdd_init_nan_data_mode(struct hdd_adapter *adapter)
 	vdev = hdd_objmgr_get_vdev_by_user(adapter, WLAN_DP_ID);
 	if (!vdev) {
 		ret_val = -EAGAIN;
-		goto error_init_txrx;
+		goto wext_unregister;
 	}
-
-	status = ucfg_dp_init_txrx(vdev);
-	if (QDF_STATUS_SUCCESS != status) {
-		hdd_objmgr_put_vdev_by_user(vdev, WLAN_DP_ID);
-		hdd_err("ucfg_dp_init_tx_rx() init failed, status %d", status);
-		ret_val = -EAGAIN;
-		goto error_init_txrx;
-	}
-
-	set_bit(INIT_TX_RX_SUCCESS, &adapter->event_flags);
 
 	status = hdd_wmm_adapter_init(adapter);
 	if (QDF_STATUS_SUCCESS != status) {
@@ -622,7 +615,7 @@ int hdd_init_nan_data_mode(struct hdd_adapter *adapter)
 	if (!QDF_IS_STATUS_SUCCESS(status))
 		hdd_err("Failed to get sifs burst value, use default");
 
-	ret_val = wma_cli_set_command((int)adapter->vdev_id,
+	ret_val = wma_cli_set_command((int)adapter->deflink->vdev_id,
 				      (int)wmi_pdev_param_burst_enable,
 				      enable_sifs_burst,
 				      PDEV_CMD);
@@ -634,7 +627,7 @@ int hdd_init_nan_data_mode(struct hdd_adapter *adapter)
 	if (QDF_IS_STATUS_ERROR(status))
 		hdd_err("FAILED TO GET RTSCTS Profile status:%d", status);
 
-	ret_val = sme_cli_set_command(adapter->vdev_id,
+	ret_val = sme_cli_set_command(adapter->deflink->vdev_id,
 				      wmi_vdev_param_enable_rtscts, rts_profile,
 				      VDEV_CMD);
 	if (ret_val)
@@ -647,13 +640,10 @@ int hdd_init_nan_data_mode(struct hdd_adapter *adapter)
 	return ret_val;
 
 error_wmm_init:
-	clear_bit(INIT_TX_RX_SUCCESS, &adapter->event_flags);
-	ucfg_dp_deinit_txrx(vdev);
 	hdd_objmgr_put_vdev_by_user(vdev, WLAN_DP_ID);
 
-error_init_txrx:
+wext_unregister:
 	hdd_wext_unregister(wlan_dev, true);
-
 	QDF_BUG(!hdd_vdev_destroy(adapter));
 
 	return ret_val;
@@ -1001,10 +991,10 @@ void hdd_ndi_drv_ndi_create_rsp_handler(uint8_t vdev_id,
 				goto error;
 			}
 		}
-		status = sme_send_multi_pdev_vdev_set_params(MLME_VDEV_SETPARAM,
-							     adapter->vdev_id,
-							     setparam,
-							     index);
+		status = sme_send_multi_pdev_vdev_set_params(
+						    MLME_VDEV_SETPARAM,
+						    adapter->deflink->vdev_id,
+						    setparam, index);
 		if (QDF_IS_STATUS_ERROR(status))
 			hdd_err("failed to send vdev set params");
 	} else {
@@ -1185,8 +1175,6 @@ int hdd_ndp_new_peer_handler(uint8_t vdev_id, uint16_t sta_id,
 		if (!NDI_CONCURRENCY_SUPPORTED(hdd_ctx->psoc))
 			hdd_indicate_active_ndp_cnt(hdd_ctx->psoc, vdev_id, 1);
 		hdd_send_obss_scan_req(hdd_ctx, true);
-
-		wlan_twt_concurrency_update(hdd_ctx);
 	}
 	qdf_mem_free(roam_info);
 	return 0;
@@ -1255,7 +1243,8 @@ void hdd_ndp_peer_departed_handler(uint8_t vdev_id, uint16_t sta_id,
 
 	if (last_peer) {
 		hdd_debug("No more ndp peers.");
-		ucfg_nan_clear_peer_mc_list(hdd_ctx->psoc, adapter->vdev,
+		ucfg_nan_clear_peer_mc_list(hdd_ctx->psoc,
+					    adapter->deflink->vdev,
 					    peer_mac_addr);
 		hdd_cleanup_ndi(hdd_ctx, adapter);
 		qdf_event_set(&adapter->peer_cleanup_done);
@@ -1266,7 +1255,5 @@ void hdd_ndp_peer_departed_handler(uint8_t vdev_id, uint16_t sta_id,
 		if (!NDI_CONCURRENCY_SUPPORTED(hdd_ctx->psoc))
 			hdd_indicate_active_ndp_cnt(hdd_ctx->psoc, vdev_id, 0);
 		hdd_send_obss_scan_req(hdd_ctx, false);
-
-		wlan_twt_concurrency_update(hdd_ctx);
 	}
 }

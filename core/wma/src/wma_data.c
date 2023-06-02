@@ -1060,57 +1060,6 @@ QDF_STATUS wma_check_txrx_chainmask(int num_rf_chains, int cmd_value)
 }
 
 /**
- * wma_peer_state_change_event_handler() - peer state change event handler
- * @handle: wma handle
- * @event_buff: event buffer
- * @len: length of buffer
- *
- * This event handler unpauses vdev if peer state change to AUTHORIZED STATE
- *
- * Return: 0 for success or error code
- */
-int wma_peer_state_change_event_handler(void *handle,
-					uint8_t *event_buff,
-					uint32_t len)
-{
-	WMI_PEER_STATE_EVENTID_param_tlvs *param_buf;
-	wmi_peer_state_event_fixed_param *event;
-#ifdef QCA_LL_LEGACY_TX_FLOW_CONTROL
-	tp_wma_handle wma_handle = (tp_wma_handle) handle;
-#endif
-
-	if (!event_buff) {
-		wma_err("Received NULL event ptr from FW");
-		return -EINVAL;
-	}
-	param_buf = (WMI_PEER_STATE_EVENTID_param_tlvs *) event_buff;
-	if (!param_buf) {
-		wma_err("Received NULL buf ptr from FW");
-		return -ENOMEM;
-	}
-
-	event = param_buf->fixed_param;
-
-	if ((cdp_get_opmode(cds_get_context(QDF_MODULE_ID_SOC),
-			    event->vdev_id) == wlan_op_mode_sta) &&
-	    event->state == WMI_PEER_STATE_AUTHORIZED) {
-		/*
-		 * set event so that hdd
-		 * can procced and unpause tx queue
-		 */
-#ifdef QCA_LL_LEGACY_TX_FLOW_CONTROL
-		if (!wma_handle->peer_authorized_cb) {
-			wma_err("peer authorized cb not registered");
-			return -EINVAL;
-		}
-		wma_handle->peer_authorized_cb(event->vdev_id);
-#endif
-	}
-
-	return 0;
-}
-
-/**
  * wma_set_enable_disable_mcc_adaptive_scheduler() -enable/disable mcc scheduler
  * @mcc_adaptive_scheduler: enable/disable
  *
@@ -2330,7 +2279,7 @@ QDF_STATUS wma_tx_packet(void *wma_context, void *tx_frame, uint16_t frmLen,
 			 wma_tx_ota_comp_callback tx_frm_ota_comp_cb,
 			 uint8_t tx_flag, uint8_t vdev_id, bool tdls_flag,
 			 uint16_t channel_freq, enum rateid rid,
-			 int8_t peer_rssi)
+			 int8_t peer_rssi, uint16_t action)
 {
 	tp_wma_handle wma_handle = (tp_wma_handle) (wma_context);
 	int32_t status;
@@ -2748,7 +2697,9 @@ QDF_STATUS wma_tx_packet(void *wma_context, void *tx_frame, uint16_t frmLen,
 	    frmType == TXRX_FRM_802_11_MGMT &&
 	    pFc->subType != SIR_MAC_MGMT_PROBE_REQ &&
 	    pFc->subType != SIR_MAC_MGMT_AUTH &&
-	    pFc->subType != SIR_MAC_MGMT_ASSOC_REQ)
+	    pFc->subType != SIR_MAC_MGMT_ASSOC_REQ &&
+	    action != (ACTION_CATEGORY_PUBLIC << 8 | TDLS_DISCOVERY_RESPONSE) &&
+	    action != (ACTION_CATEGORY_BACK << 8 | ADDBA_RESPONSE))
 		mgmt_param.mlo_link_agnostic = true;
 
 	if (tx_flag & HAL_USE_INCORRECT_KEY_PMF)

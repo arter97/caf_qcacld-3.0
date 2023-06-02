@@ -2802,7 +2802,7 @@ void hdd_wlan_get_stats(struct hdd_adapter *adapter, uint16_t *length,
 		return;
 	}
 
-	if (ucfg_dp_get_txrx_stats(adapter->vdev, dp_stats)) {
+	if (ucfg_dp_get_txrx_stats(adapter->deflink->vdev, dp_stats)) {
 		hdd_objmgr_put_vdev_by_user(vdev, WLAN_DP_ID);
 		hdd_err("Unable to get stats from DP component");
 		qdf_mem_free(dp_stats);
@@ -2883,7 +2883,8 @@ void hdd_wlan_get_stats(struct hdd_adapter *adapter, uint16_t *length,
 		stats->txflow_unpause_cnt);
 
 	len += cdp_stats(cds_get_context(QDF_MODULE_ID_SOC),
-			 adapter->vdev_id, &buffer[len], (buf_len - len));
+			 adapter->deflink->vdev_id, &buffer[len],
+			 (buf_len - len));
 	*length = len + 1;
 	qdf_mem_free(dp_stats);
 }
@@ -3092,7 +3093,7 @@ static int wlan_get_wlm_stats(struct hdd_adapter *adapter, uint32_t bitmask,
 		return -ENOMEM;
 	}
 	cookie = osif_request_cookie(request);
-	errno = wma_wlm_stats_req(adapter->vdev_id, bitmask,
+	errno = wma_wlm_stats_req(adapter->deflink->vdev_id, bitmask,
 				  params.priv_size,
 				  wlan_get_wlm_stats_cb, cookie);
 	if (errno) {
@@ -3364,7 +3365,7 @@ static int hdd_handle_pdev_reset(struct hdd_adapter *adapter, int value)
 	if (ret)
 		return ret;
 
-	ret = wma_cli_set_command(adapter->vdev_id,
+	ret = wma_cli_set_command(adapter->deflink->vdev_id,
 				  wmi_pdev_param_pdev_reset,
 				  value, PDEV_CMD);
 
@@ -3412,21 +3413,23 @@ static int hdd_we_set_power(struct hdd_adapter *adapter, int value)
 	switch (value) {
 	case 1:
 		/* Enable PowerSave */
-		sme_ps_set_powersave(hdd_ctx->mac_handle, adapter->vdev_id,
+		sme_ps_set_powersave(hdd_ctx->mac_handle,
+				     adapter->deflink->vdev_id,
 				     true, 0, true);
 		return 0;
 	case 2:
 		/* Disable PowerSave */
-		sme_ps_set_powersave(hdd_ctx->mac_handle, adapter->vdev_id,
+		sme_ps_set_powersave(hdd_ctx->mac_handle,
+				     adapter->deflink->vdev_id,
 				     false, 0, true);
 		return 0;
 	case 3:
 		/* Enable UASPD */
-		sme_ps_uapsd_enable(mac_handle, adapter->vdev_id);
+		sme_ps_uapsd_enable(mac_handle, adapter->deflink->vdev_id);
 		return 0;
 	case 4:
 		/* Disable UASPD */
-		sme_ps_uapsd_disable(mac_handle, adapter->vdev_id);
+		sme_ps_uapsd_disable(mac_handle, adapter->deflink->vdev_id);
 		return 0;
 	default:
 		hdd_err("Invalid value %d", value);
@@ -3483,7 +3486,7 @@ static int hdd_we_set_tx_power(struct hdd_adapter *adapter, int value)
 	if (!mac_handle)
 		return -EINVAL;
 
-	status = sme_set_tx_power(mac_handle, adapter->vdev_id,
+	status = sme_set_tx_power(mac_handle, adapter->deflink->vdev_id,
 				  sta_ctx->conn_info.bssid,
 				  adapter->device_mode, value);
 
@@ -3709,11 +3712,11 @@ int hdd_we_set_short_gi(struct hdd_adapter *adapter, int sgi)
 
 	if (sgi & HDD_AUTO_RATE_SGI)
 		errno = sme_set_auto_rate_he_sgi(mac_handle,
-						 adapter->vdev_id,
+						 adapter->deflink->vdev_id,
 						 sgi);
 	else
 		errno = sme_update_ht_config(mac_handle,
-					     adapter->vdev_id,
+					     adapter->deflink->vdev_id,
 					     WNI_CFG_HT_CAP_INFO_SHORT_GI_20MHZ,
 					     sgi);
 	if (errno)
@@ -3755,7 +3758,7 @@ static int hdd_we_set_rtscts(struct hdd_adapter *adapter, int rtscts)
 		return -EINVAL;
 	}
 
-	errno = wma_cli_set_command(adapter->vdev_id,
+	errno = wma_cli_set_command(adapter->deflink->vdev_id,
 				    wmi_vdev_param_enable_rtscts,
 				    rtscts, VDEV_CMD);
 	if (errno) {
@@ -3779,7 +3782,8 @@ static int hdd_we_set_11n_rate(struct hdd_adapter *adapter, int rate_code)
 	QDF_STATUS status;
 	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
 	enum wlan_phymode peer_phymode;
-	uint8_t *peer_mac = adapter->session.station.conn_info.bssid.bytes;
+	uint8_t *peer_mac =
+		adapter->deflink->session.station.conn_info.bssid.bytes;
 
 	hdd_debug("Rate code %d", rate_code);
 
@@ -3820,7 +3824,7 @@ static int hdd_we_set_11n_rate(struct hdd_adapter *adapter, int rate_code)
 	hdd_debug("wmi_vdev_param_fixed_rate val %d rix %d preamble %x nss %d",
 		  rate_code, rix, preamble, nss);
 
-	errno = wma_cli_set_command(adapter->vdev_id,
+	errno = wma_cli_set_command(adapter->deflink->vdev_id,
 				    wmi_vdev_param_fixed_rate,
 				    rate_code, VDEV_CMD);
 	if (errno)
@@ -3846,7 +3850,7 @@ static int hdd_we_set_vht_rate(struct hdd_adapter *adapter, int rate_code)
 	hdd_debug("wmi_vdev_param_fixed_rate val %d rix %d preamble %x nss %d",
 		  rate_code, rix, preamble, nss);
 
-	errno = wma_cli_set_command(adapter->vdev_id,
+	errno = wma_cli_set_command(adapter->deflink->vdev_id,
 				    wmi_vdev_param_fixed_rate,
 				    rate_code, VDEV_CMD);
 	if (errno)
@@ -3859,7 +3863,7 @@ static int hdd_we_set_ampdu(struct hdd_adapter *adapter, int ampdu)
 {
 	hdd_debug("AMPDU %d", ampdu);
 
-	return wma_cli_set_command(adapter->vdev_id,
+	return wma_cli_set_command(adapter->deflink->vdev_id,
 				   GEN_VDEV_PARAM_AMPDU,
 				   ampdu, GEN_CMD);
 }
@@ -3890,7 +3894,7 @@ static int hdd_we_set_amsdu(struct hdd_adapter *adapter, int amsdu)
 	else
 		sme_set_amsdu(mac_handle, false);
 
-	errno = wma_cli_set_command(adapter->vdev_id,
+	errno = wma_cli_set_command(adapter->deflink->vdev_id,
 				    GEN_VDEV_PARAM_AMSDU,
 				    amsdu, GEN_CMD);
 	if (errno) {
@@ -3914,7 +3918,8 @@ static int hdd_we_set_green_tx_param(struct hdd_adapter *adapter,
 	int errno;
 
 	hdd_debug("%s %d", id_string, value);
-	errno = wma_cli_set_command(adapter->vdev_id, id, value, GTX_CMD);
+	errno = wma_cli_set_command(adapter->deflink->vdev_id,
+				    id, value, GTX_CMD);
 	if (errno)
 		hdd_err("Failed to set firmware, errno %d", errno);
 
@@ -3993,7 +3998,8 @@ static int hdd_we_packet_power_save(struct hdd_adapter *adapter,
 	}
 
 	hdd_debug("%s %d", id_string, value);
-	errno = wma_cli_set_command(adapter->vdev_id, id, value, PPS_CMD);
+	errno = wma_cli_set_command(adapter->deflink->vdev_id,
+				    id, value, PPS_CMD);
 	if (errno)
 		hdd_err("Failed to set firmware, errno %d", errno);
 
@@ -4081,7 +4087,8 @@ static int hdd_we_set_qpower(struct hdd_adapter *adapter,
 	int errno;
 
 	hdd_debug("%s %d", id_string, value);
-	errno = wma_cli_set_command(adapter->vdev_id, id, value, QPOWER_CMD);
+	errno = wma_cli_set_command(adapter->deflink->vdev_id,
+				    id, value, QPOWER_CMD);
 	if (errno)
 		hdd_err("Failed to set firmware, errno %d", errno);
 
@@ -4137,7 +4144,8 @@ static int hdd_we_set_pdev(struct hdd_adapter *adapter,
 	int errno;
 
 	hdd_debug("%s %d", id_string, value);
-	errno = wma_cli_set_command(adapter->vdev_id, id, value, PDEV_CMD);
+	errno = wma_cli_set_command(adapter->deflink->vdev_id,
+				    id, value, PDEV_CMD);
 	if (errno)
 		hdd_err("Failed to set firmware, errno %d", errno);
 
@@ -4244,7 +4252,8 @@ static int hdd_we_set_vdev(struct hdd_adapter *adapter,
 	int errno;
 
 	hdd_debug("%s %d", id_string, value);
-	errno = wma_cli_set_command(adapter->vdev_id, id, value, VDEV_CMD);
+	errno = wma_cli_set_command(adapter->deflink->vdev_id,
+				    id, value, VDEV_CMD);
 	if (errno)
 		hdd_err("Failed to set firmware, errno %d", errno);
 
@@ -4373,7 +4382,7 @@ static int hdd_we_set_range_ext(struct hdd_adapter *adapter, int value)
 	}
 
 	status = wma_send_multi_pdev_vdev_set_params(MLME_VDEV_SETPARAM,
-						     adapter->vdev_id,
+						     adapter->deflink->vdev_id,
 						     setparam, index);
 	if (QDF_IS_STATUS_ERROR(status))
 		hdd_err("Failed to send vdev set params");
@@ -4390,7 +4399,8 @@ static int hdd_we_set_dbg(struct hdd_adapter *adapter,
 	int errno;
 
 	hdd_debug("%s %d", id_string, value);
-	errno = wma_cli_set_command(adapter->vdev_id, id, value, DBG_CMD);
+	errno = wma_cli_set_command(adapter->deflink->vdev_id,
+				    id, value, DBG_CMD);
 	if (errno)
 		hdd_err("Failed to set firmware, errno %d", errno);
 
@@ -4470,7 +4480,7 @@ static int hdd_we_set_channel(struct hdd_adapter *adapter, int channel)
 	QDF_STATUS status;
 
 	hdd_debug("Set Channel %d Session ID %d mode %d", channel,
-		  adapter->vdev_id, adapter->device_mode);
+		  adapter->deflink->vdev_id, adapter->device_mode);
 
 	if (!hdd_ctx->mac_handle)
 		return -EINVAL;
@@ -4488,7 +4498,7 @@ static int hdd_we_set_channel(struct hdd_adapter *adapter, int channel)
 	ch_freq = wlan_reg_legacy_chan_to_freq(hdd_ctx->pdev,
 					       channel);
 	status = sme_ext_change_freq(hdd_ctx->mac_handle, ch_freq,
-				     adapter->vdev_id);
+				     adapter->deflink->vdev_id);
 	if (status != QDF_STATUS_SUCCESS)
 		hdd_err("Error in change channel status %d", status);
 
@@ -4608,7 +4618,7 @@ static int hdd_we_motion_det_start_stop(struct hdd_adapter *adapter, int value)
 		return -EAGAIN;
 	}
 
-	motion_det.vdev_id = adapter->vdev_id;
+	motion_det.vdev_id = adapter->deflink->vdev_id;
 	motion_det.enable = value;
 
 	if (value) {
@@ -4649,7 +4659,7 @@ static int hdd_we_motion_det_base_line_start_stop(struct hdd_adapter *adapter,
 		return -EAGAIN;
 	}
 
-	motion_det_base_line.vdev_id = adapter->vdev_id;
+	motion_det_base_line.vdev_id = adapter->deflink->vdev_id;
 	motion_det_base_line.enable = value;
 	sme_motion_det_base_line_enable(hdd_ctx->mac_handle,
 					&motion_det_base_line);
@@ -4664,7 +4674,7 @@ int wlan_hdd_set_btcoex_mode(struct hdd_adapter *adapter, int value)
 
 	coex_cfg_params.config_type = WMI_COEX_CONFIG_BTC_MODE;
 	coex_cfg_params.config_arg1 = value;
-	coex_cfg_params.vdev_id     = adapter->vdev_id;
+	coex_cfg_params.vdev_id     = adapter->deflink->vdev_id;
 
 	if (value < cfg_min(CFG_BTC_MODE) || value > cfg_max(CFG_BTC_MODE)) {
 		hdd_err_rl("Invalid value %d", value);
@@ -4685,7 +4695,7 @@ int wlan_hdd_set_btcoex_rssi_threshold(struct hdd_adapter *adapter, int value)
 
 	coex_cfg_params.config_type =  WMI_COEX_CONFIG_BT_LOW_RSSI_THRESHOLD;
 	coex_cfg_params.config_arg1 = value;
-	coex_cfg_params.vdev_id     = adapter->vdev_id;
+	coex_cfg_params.vdev_id     = adapter->deflink->vdev_id;
 
 	if (value < cfg_min(CFG_WLAN_LOW_RSSI_THRESHOLD) ||
 	    value > cfg_max(CFG_WLAN_LOW_RSSI_THRESHOLD)) {
@@ -5076,7 +5086,7 @@ static int __iw_setchar_getnone(struct net_device *dev,
 			callback.timeout = 5000; /* 5 seconds */
 			sme_neighbor_report_request(
 					hdd_ctx->mac_handle,
-					adapter->vdev_id,
+					adapter->deflink->vdev_id,
 					&request,
 					&callback);
 		} else {
@@ -5226,7 +5236,7 @@ static int __iw_setnone_getint(struct net_device *dev,
 	case WE_GET_GTX_HT_MCS:
 	{
 		hdd_debug("GET wmi_vdev_param_gtx_ht_mcs");
-		*value = wma_cli_get_command(adapter->vdev_id,
+		*value = wma_cli_get_command(adapter->deflink->vdev_id,
 					     wmi_vdev_param_gtx_ht_mcs,
 					     GTX_CMD);
 		break;
@@ -5235,7 +5245,7 @@ static int __iw_setnone_getint(struct net_device *dev,
 	case WE_GET_GTX_VHT_MCS:
 	{
 		hdd_debug("GET wmi_vdev_param_gtx_vht_mcs");
-		*value = wma_cli_get_command(adapter->vdev_id,
+		*value = wma_cli_get_command(adapter->deflink->vdev_id,
 					     wmi_vdev_param_gtx_vht_mcs,
 					     GTX_CMD);
 		break;
@@ -5244,7 +5254,7 @@ static int __iw_setnone_getint(struct net_device *dev,
 	case WE_GET_GTX_USRCFG:
 	{
 		hdd_debug("GET wmi_vdev_param_gtx_usr_cfg");
-		*value = wma_cli_get_command(adapter->vdev_id,
+		*value = wma_cli_get_command(adapter->deflink->vdev_id,
 					     wmi_vdev_param_gtx_usr_cfg,
 					     GTX_CMD);
 		break;
@@ -5253,7 +5263,7 @@ static int __iw_setnone_getint(struct net_device *dev,
 	case WE_GET_GTX_THRE:
 	{
 		hdd_debug("GET wmi_vdev_param_gtx_thre");
-		*value = wma_cli_get_command(adapter->vdev_id,
+		*value = wma_cli_get_command(adapter->deflink->vdev_id,
 					     wmi_vdev_param_gtx_thre,
 					     GTX_CMD);
 		break;
@@ -5262,7 +5272,7 @@ static int __iw_setnone_getint(struct net_device *dev,
 	case WE_GET_GTX_MARGIN:
 	{
 		hdd_debug("GET wmi_vdev_param_gtx_margin");
-		*value = wma_cli_get_command(adapter->vdev_id,
+		*value = wma_cli_get_command(adapter->deflink->vdev_id,
 					     wmi_vdev_param_gtx_margin,
 					     GTX_CMD);
 		break;
@@ -5271,7 +5281,7 @@ static int __iw_setnone_getint(struct net_device *dev,
 	case WE_GET_GTX_STEP:
 	{
 		hdd_debug("GET wmi_vdev_param_gtx_step");
-		*value = wma_cli_get_command(adapter->vdev_id,
+		*value = wma_cli_get_command(adapter->deflink->vdev_id,
 					     wmi_vdev_param_gtx_step,
 					     GTX_CMD);
 		break;
@@ -5280,7 +5290,7 @@ static int __iw_setnone_getint(struct net_device *dev,
 	case WE_GET_GTX_MINTPC:
 	{
 		hdd_debug("GET wmi_vdev_param_gtx_mintpc");
-		*value = wma_cli_get_command(adapter->vdev_id,
+		*value = wma_cli_get_command(adapter->deflink->vdev_id,
 					     wmi_vdev_param_gtx_mintpc,
 					     GTX_CMD);
 		break;
@@ -5289,7 +5299,7 @@ static int __iw_setnone_getint(struct net_device *dev,
 	case WE_GET_GTX_BWMASK:
 	{
 		hdd_debug("GET wmi_vdev_param_gtx_bw_mask");
-		*value = wma_cli_get_command(adapter->vdev_id,
+		*value = wma_cli_get_command(adapter->deflink->vdev_id,
 					     wmi_vdev_param_gtx_bw_mask,
 					     GTX_CMD);
 		break;
@@ -5316,7 +5326,7 @@ static int __iw_setnone_getint(struct net_device *dev,
 	case WE_GET_SHORT_GI:
 	{
 		hdd_debug("GET wmi_vdev_param_sgi");
-		*value = wma_cli_get_command(adapter->vdev_id,
+		*value = wma_cli_get_command(adapter->deflink->vdev_id,
 					     wmi_vdev_param_sgi,
 					     VDEV_CMD);
 		break;
@@ -5325,7 +5335,7 @@ static int __iw_setnone_getint(struct net_device *dev,
 	case WE_GET_RTSCTS:
 	{
 		hdd_debug("GET wmi_vdev_param_enable_rtscts");
-		*value = wma_cli_get_command(adapter->vdev_id,
+		*value = wma_cli_get_command(adapter->deflink->vdev_id,
 					     wmi_vdev_param_enable_rtscts,
 					     VDEV_CMD);
 		break;
@@ -5334,7 +5344,7 @@ static int __iw_setnone_getint(struct net_device *dev,
 	case WE_GET_CHWIDTH:
 	{
 		hdd_debug("GET wmi_vdev_param_chwidth");
-		*value = wma_cli_get_command(adapter->vdev_id,
+		*value = wma_cli_get_command(adapter->deflink->vdev_id,
 					     wmi_vdev_param_chwidth,
 					     VDEV_CMD);
 		break;
@@ -5343,7 +5353,7 @@ static int __iw_setnone_getint(struct net_device *dev,
 	case WE_GET_ANI_EN_DIS:
 	{
 		hdd_debug("GET wmi_pdev_param_ani_enable");
-		*value = wma_cli_get_command(adapter->vdev_id,
+		*value = wma_cli_get_command(adapter->deflink->vdev_id,
 					     wmi_pdev_param_ani_enable,
 					     PDEV_CMD);
 		break;
@@ -5352,7 +5362,7 @@ static int __iw_setnone_getint(struct net_device *dev,
 	case WE_GET_ANI_POLL_PERIOD:
 	{
 		hdd_debug("GET wmi_pdev_param_ani_poll_period");
-		*value = wma_cli_get_command(adapter->vdev_id,
+		*value = wma_cli_get_command(adapter->deflink->vdev_id,
 					     wmi_pdev_param_ani_poll_period,
 					     PDEV_CMD);
 		break;
@@ -5361,7 +5371,7 @@ static int __iw_setnone_getint(struct net_device *dev,
 	case WE_GET_ANI_LISTEN_PERIOD:
 	{
 		hdd_debug("GET wmi_pdev_param_ani_listen_period");
-		*value = wma_cli_get_command(adapter->vdev_id,
+		*value = wma_cli_get_command(adapter->deflink->vdev_id,
 					     wmi_pdev_param_ani_listen_period,
 					     PDEV_CMD);
 		break;
@@ -5370,7 +5380,7 @@ static int __iw_setnone_getint(struct net_device *dev,
 	case WE_GET_ANI_OFDM_LEVEL:
 	{
 		hdd_debug("GET wmi_pdev_param_ani_ofdm_level");
-		*value = wma_cli_get_command(adapter->vdev_id,
+		*value = wma_cli_get_command(adapter->deflink->vdev_id,
 					     wmi_pdev_param_ani_ofdm_level,
 					     PDEV_CMD);
 		break;
@@ -5379,7 +5389,7 @@ static int __iw_setnone_getint(struct net_device *dev,
 	case WE_GET_ANI_CCK_LEVEL:
 	{
 		hdd_debug("GET wmi_pdev_param_ani_cck_level");
-		*value = wma_cli_get_command(adapter->vdev_id,
+		*value = wma_cli_get_command(adapter->deflink->vdev_id,
 					     wmi_pdev_param_ani_cck_level,
 					     PDEV_CMD);
 		break;
@@ -5388,7 +5398,7 @@ static int __iw_setnone_getint(struct net_device *dev,
 	case WE_GET_DYNAMIC_BW:
 	{
 		hdd_debug("GET wmi_pdev_param_ani_cck_level");
-		*value = wma_cli_get_command(adapter->vdev_id,
+		*value = wma_cli_get_command(adapter->deflink->vdev_id,
 					     wmi_pdev_param_dynamic_bw,
 					     PDEV_CMD);
 		break;
@@ -5397,7 +5407,7 @@ static int __iw_setnone_getint(struct net_device *dev,
 	case WE_GET_11N_RATE:
 	{
 		hdd_debug("GET wmi_vdev_param_fixed_rate");
-		*value = wma_cli_get_command(adapter->vdev_id,
+		*value = wma_cli_get_command(adapter->deflink->vdev_id,
 					     wmi_vdev_param_fixed_rate,
 					     VDEV_CMD);
 		break;
@@ -5406,7 +5416,7 @@ static int __iw_setnone_getint(struct net_device *dev,
 	case WE_GET_AMPDU:
 	{
 		hdd_debug("GET AMPDU");
-		*value = wma_cli_get_command(adapter->vdev_id,
+		*value = wma_cli_get_command(adapter->deflink->vdev_id,
 					     GEN_VDEV_PARAM_AMPDU,
 					     GEN_CMD);
 		break;
@@ -5415,7 +5425,7 @@ static int __iw_setnone_getint(struct net_device *dev,
 	case WE_GET_AMSDU:
 	{
 		hdd_debug("GET AMSDU");
-		*value = wma_cli_get_command(adapter->vdev_id,
+		*value = wma_cli_get_command(adapter->deflink->vdev_id,
 					     GEN_VDEV_PARAM_AMSDU,
 					     GEN_CMD);
 		break;
@@ -5424,7 +5434,7 @@ static int __iw_setnone_getint(struct net_device *dev,
 	case WE_GET_ROAM_SYNCH_DELAY:
 	{
 		hdd_debug("GET ROAM SYNCH DELAY");
-		*value = wma_cli_get_command(adapter->vdev_id,
+		*value = wma_cli_get_command(adapter->deflink->vdev_id,
 					     GEN_VDEV_ROAM_SYNCH_DELAY,
 					     GEN_CMD);
 		break;
@@ -5433,7 +5443,7 @@ static int __iw_setnone_getint(struct net_device *dev,
 	case WE_GET_TX_CHAINMASK:
 	{
 		hdd_debug("GET wmi_pdev_param_tx_chain_mask");
-		*value = wma_cli_get_command(adapter->vdev_id,
+		*value = wma_cli_get_command(adapter->deflink->vdev_id,
 					     wmi_pdev_param_tx_chain_mask,
 					     PDEV_CMD);
 		break;
@@ -5442,7 +5452,7 @@ static int __iw_setnone_getint(struct net_device *dev,
 	case WE_GET_RX_CHAINMASK:
 	{
 		hdd_debug("GET wmi_pdev_param_rx_chain_mask");
-		*value = wma_cli_get_command(adapter->vdev_id,
+		*value = wma_cli_get_command(adapter->deflink->vdev_id,
 					     wmi_pdev_param_rx_chain_mask,
 					     PDEV_CMD);
 		break;
@@ -5453,7 +5463,7 @@ static int __iw_setnone_getint(struct net_device *dev,
 		uint8_t txpow2g = 0;
 
 		hdd_debug("GET wmi_pdev_param_txpower_limit2g");
-		*value = wma_cli_get_command(adapter->vdev_id,
+		*value = wma_cli_get_command(adapter->deflink->vdev_id,
 					     wmi_pdev_param_txpower_limit2g,
 					     PDEV_CMD);
 		ucfg_mlme_get_current_tx_power_level(hdd_ctx->psoc, &txpow2g);
@@ -5466,7 +5476,7 @@ static int __iw_setnone_getint(struct net_device *dev,
 		uint8_t txpow5g = 0;
 
 		hdd_debug("GET wmi_pdev_param_txpower_limit5g");
-		*value = wma_cli_get_command(adapter->vdev_id,
+		*value = wma_cli_get_command(adapter->deflink->vdev_id,
 					     wmi_pdev_param_txpower_limit5g,
 					     PDEV_CMD);
 		ucfg_mlme_get_current_tx_power_level(hdd_ctx->psoc, &txpow5g);
@@ -5477,7 +5487,7 @@ static int __iw_setnone_getint(struct net_device *dev,
 	case WE_GET_PPS_PAID_MATCH:
 	{
 		hdd_debug("GET WMI_VDEV_PPS_PAID_MATCH");
-		*value = wma_cli_get_command(adapter->vdev_id,
+		*value = wma_cli_get_command(adapter->deflink->vdev_id,
 					     WMI_VDEV_PPS_PAID_MATCH,
 					     PPS_CMD);
 		break;
@@ -5486,7 +5496,7 @@ static int __iw_setnone_getint(struct net_device *dev,
 	case WE_GET_PPS_GID_MATCH:
 	{
 		hdd_debug("GET WMI_VDEV_PPS_GID_MATCH");
-		*value = wma_cli_get_command(adapter->vdev_id,
+		*value = wma_cli_get_command(adapter->deflink->vdev_id,
 					     WMI_VDEV_PPS_GID_MATCH,
 					     PPS_CMD);
 		break;
@@ -5495,7 +5505,7 @@ static int __iw_setnone_getint(struct net_device *dev,
 	case WE_GET_PPS_EARLY_TIM_CLEAR:
 	{
 		hdd_debug("GET WMI_VDEV_PPS_EARLY_TIM_CLEAR");
-		*value = wma_cli_get_command(adapter->vdev_id,
+		*value = wma_cli_get_command(adapter->deflink->vdev_id,
 					     WMI_VDEV_PPS_EARLY_TIM_CLEAR,
 					     PPS_CMD);
 		break;
@@ -5504,7 +5514,7 @@ static int __iw_setnone_getint(struct net_device *dev,
 	case WE_GET_PPS_EARLY_DTIM_CLEAR:
 	{
 		hdd_debug("GET WMI_VDEV_PPS_EARLY_DTIM_CLEAR");
-		*value = wma_cli_get_command(adapter->vdev_id,
+		*value = wma_cli_get_command(adapter->deflink->vdev_id,
 					     WMI_VDEV_PPS_EARLY_DTIM_CLEAR,
 					     PPS_CMD);
 		break;
@@ -5513,7 +5523,7 @@ static int __iw_setnone_getint(struct net_device *dev,
 	case WE_GET_PPS_EOF_PAD_DELIM:
 	{
 		hdd_debug("GET WMI_VDEV_PPS_EOF_PAD_DELIM");
-		*value = wma_cli_get_command(adapter->vdev_id,
+		*value = wma_cli_get_command(adapter->deflink->vdev_id,
 					     WMI_VDEV_PPS_EOF_PAD_DELIM,
 					     PPS_CMD);
 		break;
@@ -5522,7 +5532,7 @@ static int __iw_setnone_getint(struct net_device *dev,
 	case WE_GET_PPS_MACADDR_MISMATCH:
 	{
 		hdd_debug("GET WMI_VDEV_PPS_MACADDR_MISMATCH");
-		*value = wma_cli_get_command(adapter->vdev_id,
+		*value = wma_cli_get_command(adapter->deflink->vdev_id,
 					     WMI_VDEV_PPS_MACADDR_MISMATCH,
 					     PPS_CMD);
 		break;
@@ -5531,7 +5541,7 @@ static int __iw_setnone_getint(struct net_device *dev,
 	case WE_GET_PPS_DELIM_CRC_FAIL:
 	{
 		hdd_debug("GET WMI_VDEV_PPS_DELIM_CRC_FAIL");
-		*value = wma_cli_get_command(adapter->vdev_id,
+		*value = wma_cli_get_command(adapter->deflink->vdev_id,
 					     WMI_VDEV_PPS_DELIM_CRC_FAIL,
 					     PPS_CMD);
 		break;
@@ -5540,7 +5550,7 @@ static int __iw_setnone_getint(struct net_device *dev,
 	case WE_GET_PPS_GID_NSTS_ZERO:
 	{
 		hdd_debug("GET WMI_VDEV_PPS_GID_NSTS_ZERO");
-		*value = wma_cli_get_command(adapter->vdev_id,
+		*value = wma_cli_get_command(adapter->deflink->vdev_id,
 					     WMI_VDEV_PPS_GID_NSTS_ZERO,
 					     PPS_CMD);
 		break;
@@ -5550,7 +5560,7 @@ static int __iw_setnone_getint(struct net_device *dev,
 	{
 
 		hdd_debug("GET WMI_VDEV_PPS_RSSI_CHECK");
-		*value = wma_cli_get_command(adapter->vdev_id,
+		*value = wma_cli_get_command(adapter->deflink->vdev_id,
 					     WMI_VDEV_PPS_RSSI_CHECK,
 					     PPS_CMD);
 		break;
@@ -5559,7 +5569,7 @@ static int __iw_setnone_getint(struct net_device *dev,
 	case WE_GET_QPOWER_MAX_PSPOLL_COUNT:
 	{
 		hdd_debug("WE_GET_QPOWER_MAX_PSPOLL_COUNT");
-		*value = wma_cli_get_command(adapter->vdev_id,
+		*value = wma_cli_get_command(adapter->deflink->vdev_id,
 					     WMI_STA_PS_PARAM_QPOWER_PSPOLL_COUNT,
 					     QPOWER_CMD);
 		break;
@@ -5568,7 +5578,7 @@ static int __iw_setnone_getint(struct net_device *dev,
 	case WE_GET_QPOWER_MAX_TX_BEFORE_WAKE:
 	{
 		hdd_debug("WE_GET_QPOWER_MAX_TX_BEFORE_WAKE");
-		*value = wma_cli_get_command(adapter->vdev_id,
+		*value = wma_cli_get_command(adapter->deflink->vdev_id,
 					     WMI_STA_PS_PARAM_QPOWER_MAX_TX_BEFORE_WAKE,
 					     QPOWER_CMD);
 		break;
@@ -5577,7 +5587,7 @@ static int __iw_setnone_getint(struct net_device *dev,
 	case WE_GET_QPOWER_SPEC_PSPOLL_WAKE_INTERVAL:
 	{
 		hdd_debug("WE_GET_QPOWER_SPEC_PSPOLL_WAKE_INTERVAL");
-		*value = wma_cli_get_command(adapter->vdev_id,
+		*value = wma_cli_get_command(adapter->deflink->vdev_id,
 					     WMI_STA_PS_PARAM_QPOWER_SPEC_PSPOLL_WAKE_INTERVAL,
 					     QPOWER_CMD);
 		break;
@@ -5586,7 +5596,7 @@ static int __iw_setnone_getint(struct net_device *dev,
 	case WE_GET_QPOWER_SPEC_MAX_SPEC_NODATA_PSPOLL:
 	{
 		hdd_debug("WE_GET_QPOWER_MAX_PSPOLL_COUNT");
-		*value = wma_cli_get_command(adapter->vdev_id,
+		*value = wma_cli_get_command(adapter->deflink->vdev_id,
 					     WMI_STA_PS_PARAM_QPOWER_SPEC_MAX_SPEC_NODATA_PSPOLL,
 					     QPOWER_CMD);
 		break;
@@ -5602,13 +5612,13 @@ static int __iw_setnone_getint(struct net_device *dev,
 	}
 	case WE_GET_DCM:
 		hdd_debug("GET wmi_vdev_param_he_dcm");
-		*value = wma_cli_get_command(adapter->vdev_id,
+		*value = wma_cli_get_command(adapter->deflink->vdev_id,
 					     wmi_vdev_param_he_dcm_enable,
 					     VDEV_CMD);
 		break;
 	case WE_GET_RANGE_EXT:
 		hdd_debug("GET wmi_vdev_param_he_range_ext");
-		*value = wma_cli_get_command(adapter->vdev_id,
+		*value = wma_cli_get_command(adapter->deflink->vdev_id,
 					     wmi_vdev_param_he_range_ext,
 					     VDEV_CMD);
 		break;
@@ -5859,7 +5869,8 @@ static int hdd_get_sta_cxn_info(struct hdd_context *hdd_ctx,
 {
 	QDF_STATUS status;
 
-	status = sme_get_sta_cxn_info(hdd_ctx->mac_handle, adapter->vdev_id,
+	status = sme_get_sta_cxn_info(hdd_ctx->mac_handle,
+				      adapter->deflink->vdev_id,
 				      extra, WE_MAX_STR_LEN);
 	if (status != QDF_STATUS_SUCCESS)
 		qdf_scnprintf(extra, WE_MAX_STR_LEN,
@@ -5953,6 +5964,7 @@ static int __iw_get_char_setnone(struct net_device *dev,
 		int buf = 0, len = 0;
 		int adapter_num = 0;
 		int count = 0, check = 1;
+		uint8_t stat_vdev_id;
 
 		struct hdd_station_ctx *sta_ctx = NULL;
 
@@ -6015,7 +6027,7 @@ static int __iw_get_char_setnone(struct net_device *dev,
 			sta_ctx =
 				WLAN_HDD_GET_STATION_CTX_PTR(stat_adapter);
 
-
+			stat_vdev_id = stat_adapter->deflink->vdev_id;
 			buf =
 				scnprintf(extra + len, WE_MAX_STR_LEN - len,
 					  "\n HDD Conn State - %s "
@@ -6023,13 +6035,13 @@ static int __iw_get_char_setnone(struct net_device *dev,
 					  "\n CSR State - %s"
 					  "\n CSR Substate - %s",
 					  hdd_connection_state_string
-						  (sta_ctx->conn_info.conn_state),
+						(sta_ctx->conn_info.conn_state),
 					  mac_trace_getcsr_roam_state
-						  (sme_get_current_roam_state
-							  (mac_handle, stat_adapter->vdev_id)),
+						(sme_get_current_roam_state
+						   (mac_handle, stat_vdev_id)),
 					  mac_trace_getcsr_roam_sub_state
-						  (sme_get_current_roam_sub_state
-							  (mac_handle, stat_adapter->vdev_id))
+						(sme_get_current_roam_sub_state
+						   (mac_handle, stat_vdev_id))
 					  );
 			len += buf;
 			adapter_num++;
@@ -6195,7 +6207,8 @@ static int __iw_get_char_setnone(struct net_device *dev,
 	{
 		struct qdf_mac_addr connected_bssid;
 
-		wlan_mlme_get_bssid_vdev_id(hdd_ctx->pdev, adapter->vdev_id,
+		wlan_mlme_get_bssid_vdev_id(hdd_ctx->pdev,
+					    adapter->deflink->vdev_id,
 					    &connected_bssid);
 		snprintf(extra, WE_MAX_STR_LEN,
 			 "\n BSSID %02X:%02X:%02X:%02X:%02X:%02X"
@@ -6457,7 +6470,8 @@ static int __iw_setnone_getnone(struct net_device *dev,
 	mac_handle = hdd_ctx->mac_handle;
 	switch (sub_cmd) {
 	case WE_GET_FW_PROFILE_DATA:
-		ret = wma_cli_set_command(adapter->vdev_id,
+		ret = wma_cli_set_command(
+				adapter->deflink->vdev_id,
 				WMI_WLAN_PROFILE_GET_PROFILE_DATA_CMDID,
 				0, DBG_CMD);
 		break;
@@ -6466,12 +6480,14 @@ static int __iw_setnone_getnone(struct net_device *dev,
 	{
 		struct hdd_adapter *adapter = WLAN_HDD_GET_PRIV_PTR(dev);
 		qdf_freq_t chan_freq =
-			wlan_get_operation_chan_freq(adapter->vdev);
+			wlan_get_operation_chan_freq(adapter->deflink->vdev);
 		struct qdf_mac_addr target_bssid;
 
-		wlan_mlme_get_bssid_vdev_id(hdd_ctx->pdev, adapter->vdev_id,
+		wlan_mlme_get_bssid_vdev_id(hdd_ctx->pdev,
+					    adapter->deflink->vdev_id,
 					    &target_bssid);
-		ucfg_wlan_cm_roam_invoke(hdd_ctx->pdev, adapter->vdev_id,
+		ucfg_wlan_cm_roam_invoke(hdd_ctx->pdev,
+					 adapter->deflink->vdev_id,
 					 &target_bssid, chan_freq,
 					 CM_ROAMING_HOST);
 		return 0;
@@ -6487,7 +6503,7 @@ static int __iw_setnone_getnone(struct net_device *dev,
 			hdd_err("mac_handle context is NULL");
 			return -EINVAL;
 		}
-		sme_ht40_stop_obss_scan(mac_handle, adapter->vdev_id);
+		sme_ht40_stop_obss_scan(mac_handle, adapter->deflink->vdev_id);
 		break;
 
 	default:
@@ -6737,7 +6753,7 @@ static int __iw_set_var_ints_getnone(struct net_device *dev,
 		if (QDF_GLOBAL_FTM_MODE == hdd_get_conparam())
 			vdev_id = 0;
 		else
-			vdev_id = adapter->vdev_id;
+			vdev_id = adapter->deflink->vdev_id;
 
 		if (vdev_id >= WLAN_MAX_VDEVS) {
 			hdd_err_rl("Invalid vdev id %d", vdev_id);
@@ -6824,7 +6840,7 @@ static int __iw_set_var_ints_getnone(struct net_device *dev,
 
 		if (QDF_STATUS_SUCCESS !=
 			sme_process_mac_pwr_dbg_cmd(mac_handle,
-						    adapter->vdev_id,
+						    adapter->deflink->vdev_id,
 						    &mac_pwr_dbg_args)) {
 			return -EINVAL;
 		}
@@ -6856,7 +6872,8 @@ static int __iw_set_var_ints_getnone(struct net_device *dev,
 					(char *)&sta_ctx->conn_info.bssid;
 			}
 		}
-		ret = cdp_txrx_stats_request(soc, adapter->vdev_id, &req);
+		ret = cdp_txrx_stats_request(soc, adapter->deflink->vdev_id,
+					     &req);
 		break;
 	}
 #ifdef WLAN_FEATURE_MOTION_DETECTION
@@ -6869,7 +6886,7 @@ static int __iw_set_var_ints_getnone(struct net_device *dev,
 			return -EINVAL;
 		}
 
-		motion_det_cfg.vdev_id = adapter->vdev_id;
+		motion_det_cfg.vdev_id = adapter->deflink->vdev_id;
 		motion_det_cfg.time_t1 = apps_args[0];
 		motion_det_cfg.time_t2 = apps_args[1];
 		motion_det_cfg.n1 = apps_args[2];
@@ -6898,7 +6915,7 @@ static int __iw_set_var_ints_getnone(struct net_device *dev,
 			return -EINVAL;
 		}
 
-		motion_det_base_line_cfg.vdev_id = adapter->vdev_id;
+		motion_det_base_line_cfg.vdev_id = adapter->deflink->vdev_id;
 		motion_det_base_line_cfg.bl_time_t = apps_args[0];
 		motion_det_base_line_cfg.bl_packet_gap = apps_args[1];
 		motion_det_base_line_cfg.bl_n = apps_args[2];
@@ -7448,7 +7465,7 @@ static int __iw_set_fties(struct net_device *dev, struct iw_request_info *info,
 	hdd_debug("called with Ie of length = %d", wrqu->data.length);
 
 	/* Pass the received FT IEs to SME */
-	ucfg_cm_set_ft_ies(hdd_ctx->pdev, adapter->vdev_id,
+	ucfg_cm_set_ft_ies(hdd_ctx->pdev, adapter->deflink->vdev_id,
 			   extra, wrqu->data.length);
 	hdd_exit();
 	return 0;
@@ -7590,7 +7607,7 @@ static int __iw_set_host_offload(struct net_device *dev,
 
 	if (QDF_STATUS_SUCCESS !=
 	    sme_set_host_offload(hdd_ctx->mac_handle,
-				 adapter->vdev_id, &offload_request)) {
+				 adapter->deflink->vdev_id, &offload_request)) {
 		hdd_err("Failure to execute host offload request");
 		return -EINVAL;
 	}
@@ -7695,7 +7712,7 @@ static int __iw_set_keepalive_params(struct net_device *dev,
 
 	if (QDF_STATUS_SUCCESS !=
 	    sme_set_keep_alive(hdd_ctx->mac_handle,
-			       adapter->vdev_id, request)) {
+			       adapter->deflink->vdev_id, request)) {
 		hdd_err("Failure to execute Keep Alive");
 		return -EINVAL;
 	}
@@ -7843,7 +7860,7 @@ static int __iw_set_packet_filter_params(struct net_device *dev,
 		hdd_ctx->user_configured_pkt_filter_rules &=
 					~(1 << request->filter_id);
 
-	ret = wlan_hdd_set_filter(hdd_ctx, request, adapter->vdev_id);
+	ret = wlan_hdd_set_filter(hdd_ctx, request, adapter->deflink->vdev_id);
 
 	qdf_mem_free(request);
 	hdd_exit();
@@ -8479,7 +8496,7 @@ static int __iw_set_two_ints_getnone(struct net_device *dev,
 	switch (sub_cmd) {
 	case WE_SET_SMPS_PARAM:
 		hdd_debug("WE_SET_SMPS_PARAM val %d %d", value[1], value[2]);
-		ret = wma_cli_set_command(adapter->vdev_id,
+		ret = wma_cli_set_command(adapter->deflink->vdev_id,
 					  WMI_STA_SMPS_PARAM_CMDID,
 					  value[1] << WMA_SMPS_PARAM_VALUE_S
 					      | value[2],
@@ -8491,14 +8508,16 @@ static int __iw_set_two_ints_getnone(struct net_device *dev,
 	case WE_ENABLE_FW_PROFILE:
 		hdd_err("WE_ENABLE_FW_PROFILE: %d %d",
 		       value[1], value[2]);
-		ret = wma_cli_set2_command(adapter->vdev_id,
-				 WMI_WLAN_PROFILE_ENABLE_PROFILE_ID_CMDID,
-					value[1], value[2], DBG_CMD);
+		ret = wma_cli_set2_command(
+				adapter->deflink->vdev_id,
+				WMI_WLAN_PROFILE_ENABLE_PROFILE_ID_CMDID,
+				value[1], value[2], DBG_CMD);
 		break;
 	case WE_SET_FW_PROFILE_HIST_INTVL:
 		hdd_err("WE_SET_FW_PROFILE_HIST_INTVL: %d %d",
 		       value[1], value[2]);
-		ret = wma_cli_set2_command(adapter->vdev_id,
+		ret = wma_cli_set2_command(
+					adapter->deflink->vdev_id,
 					WMI_WLAN_PROFILE_SET_HIST_INTVL_CMDID,
 					value[1], value[2], DBG_CMD);
 		break;

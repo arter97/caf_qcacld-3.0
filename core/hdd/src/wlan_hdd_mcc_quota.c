@@ -173,7 +173,7 @@ wlan_hdd_set_mcc_fixed_quota(struct hdd_context *hdd_ctx,
 			return -EINVAL;
 		}
 
-		if (wlan_hdd_validate_vdev_id(if_adapter->vdev_id))
+		if (wlan_hdd_validate_vdev_id(if_adapter->deflink->vdev_id))
 			return -EINVAL;
 
 		att_id = QCA_WLAN_VENDOR_ATTR_MCC_QUOTA_CHAN_TIME_PERCENTAGE;
@@ -182,7 +182,7 @@ wlan_hdd_set_mcc_fixed_quota(struct hdd_context *hdd_ctx,
 			return -EINVAL;
 		}
 		mcc_quota.quota = nla_get_u32(quota_entries[att_id]);
-		mcc_quota.vdev_id = if_adapter->vdev_id;
+		mcc_quota.vdev_id = if_adapter->deflink->vdev_id;
 		mcc_quota.op_mode = if_adapter->device_mode;
 
 		entries++;
@@ -256,7 +256,7 @@ static int wlan_hdd_set_mcc_low_latency_quota(
 	if (ll_enable)
 		ll_mode = 1;
 	hdd_debug("set conc ll mode 0x%08x", ll_mode);
-	rc = wma_cli_set_command(adapter->vdev_id,
+	rc = wma_cli_set_command(adapter->deflink->vdev_id,
 				 wmi_pdev_param_set_conc_low_latency_mode,
 				 ll_mode, PDEV_CMD);
 	if (rc)
@@ -325,7 +325,7 @@ int wlan_hdd_apply_user_mcc_quota(struct hdd_adapter *adapter)
 
 	if (quota_val == 0) {
 		hdd_debug("no mcc/quota for mode %d, vdev_id : %u",
-			  adapter->device_mode, adapter->vdev_id);
+			  adapter->device_mode, adapter->deflink->vdev_id);
 		return 0;
 	}
 

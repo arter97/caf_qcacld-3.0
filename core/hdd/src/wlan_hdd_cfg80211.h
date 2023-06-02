@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -190,6 +190,10 @@ extern const struct nla_policy wlan_hdd_wisa_cmd_policy[
 
 #ifndef WLAN_AKM_SUITE_SAE_EXT_KEY
 #define WLAN_AKM_SUITE_SAE_EXT_KEY 0x000FAC18
+#endif
+
+#ifndef WLAN_AKM_SUITE_FT_SAE_EXT_KEY
+#define WLAN_AKM_SUITE_FT_SAE_EXT_KEY 0x000FAC19
 #endif
 
 #ifdef FEATURE_WLAN_TDLS
@@ -1036,6 +1040,48 @@ wlan_hdd_mlo_copy_partner_addr_from_mlie(struct wlan_objmgr_vdev *vdev,
 	return QDF_STATUS_E_NOSUPPORT;
 }
 #endif /* WLAN_FEATURE_11BE_MLO */
+
+/**
+ * wlan_key_get_link_vdev() - get vdev per link id
+ * @adapter: hdd adapter object
+ * @id: reference dbg id
+ * @link_id: link id
+ *
+ * Return: pointer of wlan_objmgr_vdev or NULL if fail
+ */
+struct wlan_objmgr_vdev *wlan_key_get_link_vdev(struct hdd_adapter *adapter,
+						wlan_objmgr_ref_dbgid id,
+						int link_id);
+/**
+ * wlan_key_put_link_vdev() - put link vdev reference
+ * @link_vdev: the pointer to link vdev
+ * @id: reference dbg id
+ *
+ * Return: void
+ */
+void wlan_key_put_link_vdev(struct wlan_objmgr_vdev *link_vdev,
+			    wlan_objmgr_ref_dbgid id);
+
+#if defined(WLAN_FEATURE_11BE_MLO) && defined(WLAN_TID_LINK_MAP_SUPPORT)
+/**
+ * hdd_mlo_dev_t2lm_notify_link_update() - Send update T2LM info event
+ * @vdev: Pointer to vdev
+ * @t2lm: T2LM info
+ *
+ * Send update T2LM info event to userspace
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS hdd_mlo_dev_t2lm_notify_link_update(struct wlan_objmgr_vdev *vdev,
+					       struct wlan_t2lm_info *t2lm);
+#else
+static inline
+QDF_STATUS hdd_mlo_dev_t2lm_notify_link_update(struct wlan_objmgr_vdev *vdev,
+					       struct wlan_t2lm_info *t2lm)
+{
+	return QDF_STATUS_SUCCESS;
+}
+#endif
 
 #if defined(WLAN_FEATURE_11BE_MLO) && \
 	defined(CFG80211_SINGLE_NETDEV_MULTI_LINK_SUPPORT)

@@ -524,7 +524,8 @@ static void lim_set_privacy(struct mac_context *mac_ctx,
 		mac_ctx->mlme_cfg->wep_params.auth_type = eSIR_SHARED_KEY;
 	else if (QDF_HAS_PARAM(akm, WLAN_CRYPTO_KEY_MGMT_FT_SAE) ||
 	    QDF_HAS_PARAM(akm, WLAN_CRYPTO_KEY_MGMT_SAE) ||
-	    QDF_HAS_PARAM(akm, WLAN_CRYPTO_KEY_MGMT_SAE_EXT_KEY))
+	    QDF_HAS_PARAM(akm, WLAN_CRYPTO_KEY_MGMT_SAE_EXT_KEY) ||
+	    QDF_HAS_PARAM(akm, WLAN_CRYPTO_KEY_MGMT_FT_SAE_EXT_KEY))
 		mac_ctx->mlme_cfg->wep_params.auth_type = eSIR_AUTH_TYPE_SAE;
 
 	if (QDF_HAS_PARAM(ucast_cipher, WLAN_CRYPTO_CIPHER_WEP) ||
@@ -1852,6 +1853,13 @@ static void lim_check_oui_and_update_session(struct mac_context *mac_ctx,
 	}
 
 	if (WLAN_REG_IS_24GHZ_CH_FREQ(bss_desc->chan_freq) &&
+		wlan_action_oui_search(mac_ctx->psoc,
+				       &vendor_ap_search_attr,
+				       ACTION_OUI_AUTH_ASSOC_6MBPS_2GHZ)) {
+		session->is_oui_auth_assoc_6mbps_2ghz_enable = true;
+	}
+
+	if (WLAN_REG_IS_24GHZ_CH_FREQ(bss_desc->chan_freq) &&
 	    !mac_ctx->mlme_cfg->vht_caps.vht_cap_info.b24ghz_band &&
 	    session->dot11mode == MLME_DOT11_MODE_11AC) {
 		/* Need to disable VHT operation in 2.4 GHz band */
@@ -2979,9 +2987,7 @@ lim_fill_pe_session(struct mac_context *mac_ctx, struct pe_session *session,
 	struct ps_params *ps_param =
 				&ps_global_info->ps_params[session->vdev_id];
 	uint32_t timeout;
-	uint8_t programmed_country[REG_ALPHA2_LEN + 1];
 	enum reg_6g_ap_type power_type_6g;
-	bool ctry_code_match;
 	struct cm_roam_values_copy temp;
 	uint32_t neighbor_lookup_threshold;
 	uint32_t hi_rssi_scan_rssi_delta;
@@ -3160,8 +3166,6 @@ lim_fill_pe_session(struct mac_context *mac_ctx, struct pe_session *session,
 	session->nwType = bss_desc->nwType;
 	session->enableAmpduPs =
 		mac_ctx->mlme_cfg->ht_caps.enable_ampdu_ps;
-	session->enableHtSmps = mac_ctx->mlme_cfg->ht_caps.enable_smps;
-	session->htSmpsvalue = mac_ctx->mlme_cfg->ht_caps.smps;
 	session->send_smps_action =
 		mac_ctx->roam.configParam.send_smps_action;
 	session->vhtCapability =
@@ -3235,19 +3239,15 @@ lim_fill_pe_session(struct mac_context *mac_ctx, struct pe_session *session,
 	if (wlan_reg_is_6ghz_chan_freq(bss_desc->chan_freq)) {
 		if (!ie_struct->Country.present)
 			pe_debug("Channel is 6G but country IE not present");
-		wlan_reg_read_current_country(mac_ctx->psoc,
-					      programmed_country);
-		status = wlan_reg_get_6g_power_type_for_ctry(
+		status = wlan_reg_get_best_6g_power_type(
 				mac_ctx->psoc, mac_ctx->pdev,
-				ie_struct->Country.country,
-				programmed_country, &power_type_6g,
-				&ctry_code_match, session->ap_power_type);
+				&power_type_6g,
+				session->ap_defined_power_type_6g);
 		if (QDF_IS_STATUS_ERROR(status)) {
 			status = QDF_STATUS_E_NOSUPPORT;
 			goto send;
 		}
-		session->ap_power_type_6g = power_type_6g;
-		session->same_ctry_code = ctry_code_match;
+		session->best_6g_power_type = power_type_6g;
 
 		lim_iterate_triplets(ie_struct->Country);
 
@@ -3602,6 +3602,8 @@ lim_get_rsn_akm(uint32_t akm)
 		return ANI_AKM_TYPE_FILS_SHA384;
 	else if (QDF_HAS_PARAM(akm, WLAN_CRYPTO_KEY_MGMT_FILS_SHA256))
 		return ANI_AKM_TYPE_FILS_SHA256;
+	else if (QDF_HAS_PARAM(akm, WLAN_CRYPTO_KEY_MGMT_FT_SAE_EXT_KEY))
+		return ANI_AKM_TYPE_FT_SAE_EXT_KEY;
 	else if (QDF_HAS_PARAM(akm, WLAN_CRYPTO_KEY_MGMT_FT_SAE))
 		return ANI_AKM_TYPE_FT_SAE;
 	else if (QDF_HAS_PARAM(akm, WLAN_CRYPTO_KEY_MGMT_SAE))
@@ -4339,7 +4341,8 @@ lim_cm_handle_join_req(struct cm_vdev_join_req *req)
 		 pe_session->curr_op_freq, pe_session->ch_width,
 		 pe_session->ch_center_freq_seg0,
 		 pe_session->ch_center_freq_seg1,
-		 pe_session->enableHtSmps, pe_session->htSmpsvalue,
+		 mac_ctx->mlme_cfg->ht_caps.enable_smps,
+		 mac_ctx->mlme_cfg->ht_caps.smps,
 		 pe_session->send_smps_action, pe_session->supported_nss_1x1,
 		 pe_session->vdev_nss, pe_session->nss,
 		 pe_session->htSupportedChannelWidthSet,
@@ -4363,7 +4366,7 @@ lim_cm_handle_join_req(struct cm_vdev_join_req *req)
 	}
 
 	if (!wlan_vdev_mlme_is_mlo_link_vdev(pe_session->vdev))
-		lim_send_mlo_caps_ie(mac_ctx, pe_session,
+		lim_send_mlo_caps_ie(mac_ctx, pe_session->vdev,
 				     QDF_STA_MODE,
 				     pe_session->vdev_id);
 
@@ -4869,13 +4872,11 @@ static void lim_handle_reassoc_req(struct cm_vdev_join_req *req)
 		session_entry->vht_config.su_beam_formee,
 		session_entry->vht_config.su_beam_former);
 
-	session_entry->enableHtSmps = mac_ctx->mlme_cfg->ht_caps.enable_smps;
-	session_entry->htSmpsvalue = mac_ctx->mlme_cfg->ht_caps.smps;
 	session_entry->send_smps_action =
 		mac_ctx->roam.configParam.send_smps_action;
 	pe_debug("enableHtSmps: %d htSmps: %d send action: %d supported nss 1x1: %d",
-		session_entry->enableHtSmps,
-		session_entry->htSmpsvalue,
+		mac_ctx->mlme_cfg->ht_caps.enable_smps,
+		mac_ctx->mlme_cfg->ht_caps.smps,
 		session_entry->send_smps_action,
 		session_entry->supported_nss_1x1);
 	session_entry->lim_join_req = NULL;
@@ -5504,6 +5505,9 @@ uint32_t lim_get_num_pwr_levels(bool is_psd,
 		case CH_WIDTH_160MHZ:
 			num_pwr_levels = 8;
 			break;
+		case CH_WIDTH_320MHZ:
+			num_pwr_levels = 16;
+			break;
 		default:
 			pe_err_rl("Invalid channel width");
 			return 0;
@@ -5521,6 +5525,9 @@ uint32_t lim_get_num_pwr_levels(bool is_psd,
 			break;
 		case CH_WIDTH_160MHZ:
 			num_pwr_levels = 4;
+			break;
+		case CH_WIDTH_320MHZ:
+			num_pwr_levels = 5;
 			break;
 		default:
 			pe_err_rl("Invalid channel width");
@@ -5555,9 +5562,7 @@ uint8_t lim_get_max_tx_power(struct mac_context *mac,
 
 void lim_calculate_tpc(struct mac_context *mac,
 		       struct pe_session *session,
-		       bool is_pwr_constraint_absolute,
-		       uint8_t ap_pwr_type,
-		       bool ctry_code_match)
+		       bool is_pwr_constraint_absolute)
 {
 	bool is_psd_power = false;
 	bool is_tpe_present = false, is_6ghz_freq = false;
@@ -5605,9 +5610,9 @@ void lim_calculate_tpc(struct mac_context *mac,
 		skip_tpe = wlan_mlme_skip_tpe(mac->psoc);
 	} else {
 		is_6ghz_freq = true;
-		/* Power mode calculation for 6G*/
-		ap_power_type_6g = session->ap_power_type;
+		/* Power mode calculation for 6 GHz STA*/
 		if (LIM_IS_STA_ROLE(session)) {
+			ap_power_type_6g = session->best_6g_power_type;
 			wlan_mlme_get_safe_mode_enable(mac->psoc,
 						       &safe_mode_enable);
 			wlan_mlme_is_rf_test_mode_enabled(mac->psoc,
@@ -5616,18 +5621,8 @@ void lim_calculate_tpc(struct mac_context *mac,
 			 * set LPI power if safe mode is enabled OR RF test
 			 * mode is enabled.
 			 */
-			if (rf_test_mode || safe_mode_enable) {
+			if (rf_test_mode || safe_mode_enable)
 				ap_power_type_6g = REG_INDOOR_AP;
-			} else {
-				if (!session->lim_join_req) {
-					if (!ctry_code_match)
-						ap_power_type_6g = ap_pwr_type;
-				} else {
-					if (!session->same_ctry_code)
-						ap_power_type_6g =
-						session->ap_power_type_6g;
-				}
-			}
 		}
 	}
 

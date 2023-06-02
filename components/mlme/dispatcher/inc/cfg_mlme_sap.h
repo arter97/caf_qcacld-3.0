@@ -766,7 +766,7 @@
  */
 #define CFG_DISABLE_SAP_BCN_PROT CFG_INI_BOOL(\
 				"disable_sap_bcn_prot", \
-				"0", \
+				false, \
 				"Disable beacon protection for SAP")
 
 /*
@@ -790,7 +790,7 @@
  */
 #define CFG_SAP_PS_WITH_TWT CFG_INI_BOOL(\
 				"g_sap_ps_with_twt_enable", \
-				"0", \
+				false, \
 				"Enable/Disable SAP power save with twt")
 
 #define CFG_SAP_ALL \

@@ -4886,7 +4886,7 @@ QDF_STATUS sme_vdev_delete(mac_handle_t mac_handle,
 	status = sme_acquire_global_lock(&mac->sme);
 
 	if (QDF_IS_STATUS_SUCCESS(status)) {
-		status = csr_prepare_vdev_delete(mac, vdev_id, false);
+		status = csr_prepare_vdev_delete(mac, vdev);
 		sme_release_global_lock(&mac->sme);
 	}
 
@@ -11804,13 +11804,11 @@ QDF_STATUS sme_soc_set_antenna_mode(mac_handle_t mac_handle,
 /**
  * sme_set_peer_authorized() - call peer authorized callback
  * @peer_addr: peer mac address
- * @auth_cb: auth callback
  * @vdev_id: vdev id
  *
  * Return: QDF Status
  */
 QDF_STATUS sme_set_peer_authorized(uint8_t *peer_addr,
-				   sme_peer_authorized_fp auth_cb,
 				   uint32_t vdev_id)
 {
 	void *wma_handle;
@@ -11819,7 +11817,6 @@ QDF_STATUS sme_set_peer_authorized(uint8_t *peer_addr,
 	if (!wma_handle)
 		return QDF_STATUS_E_FAILURE;
 
-	wma_set_peer_authorized_cb(wma_handle, auth_cb);
 	return wma_set_peer_param(wma_handle, peer_addr,
 				  WMI_HOST_PEER_AUTHORIZE, 1, vdev_id);
 }

@@ -121,6 +121,7 @@
 #include "wlan_tdls_api.h"
 #include "wlan_twt_cfg_ext_api.h"
 #include "wlan_mlo_mgr_sta.h"
+#include "wlan_dp_api.h"
 
 #define WMA_LOG_COMPLETION_TIMER 500 /* 500 msecs */
 #define WMI_TLV_HEADROOM 128
@@ -355,9 +356,9 @@ static void wma_set_feature_set_info(tp_wma_handle wma_handle,
 	struct cds_context *cds_ctx =
 		(struct cds_context *)(wma_handle->cds_context);
 	struct wlan_objmgr_psoc *psoc;
-	struct wlan_scan_features scan_feature_set;
-	struct wlan_twt_features twt_feature_set;
-	struct wlan_mlme_features mlme_feature_set;
+	struct wlan_scan_features scan_feature_set = {0};
+	struct wlan_twt_features twt_feature_set = {0};
+	struct wlan_mlme_features mlme_feature_set = {0};
 	struct wlan_tdls_features tdls_feature_set = {0};
 
 	psoc = wma_handle->psoc;
@@ -3357,6 +3358,25 @@ static void wma_get_service_cap_club_get_sta_in_ll_stats_req(
 }
 #endif /* FEATURE_CLUB_LL_STATS_AND_GET_STATION */
 
+#ifdef WLAN_FEATURE_11BE_MLO
+static void
+wma_update_num_tdls_vdevs_if_11be_mlo(struct wlan_objmgr_psoc *psoc,
+				      target_resource_config *wlan_res_cfg)
+{
+	if (!wlan_tdls_is_fw_11be_mlo_capable(psoc))
+		return;
+
+	wlan_res_cfg->num_tdls_vdevs = WLAN_UMAC_MLO_MAX_VDEVS;
+	wma_debug("update tdls num vdevs %d", wlan_res_cfg->num_tdls_vdevs);
+}
+#else
+static void
+wma_update_num_tdls_vdevs_if_11be_mlo(struct wlan_objmgr_psoc *psoc,
+				      target_resource_config *wlan_res_cfg)
+{
+}
+#endif
+
 /**
  * wma_open() - Allocate wma context and initialize it.
  * @cds_context:  cds context
@@ -3544,6 +3564,7 @@ QDF_STATUS wma_open(struct wlan_objmgr_psoc *psoc,
 	}
 
 	wma_set_default_tgt_config(wma_handle, wlan_res_cfg, cds_cfg);
+	wma_update_num_tdls_vdevs_if_11be_mlo(psoc, wlan_res_cfg);
 
 	qdf_status = wlan_mlme_get_tx_chainmask_cck(psoc, &val);
 	if (qdf_status != QDF_STATUS_SUCCESS) {
@@ -3701,12 +3722,6 @@ QDF_STATUS wma_open(struct wlan_objmgr_psoc *psoc,
 					   wma_oem_data_response_handler,
 					   WMA_RX_SERIALIZER_CTX);
 #endif /* FEATURE_OEM_DATA_SUPPORT */
-
-	/* Register peer change event handler */
-	wmi_unified_register_event_handler(wma_handle->wmi_handle,
-					   wmi_peer_state_event_id,
-					   wma_peer_state_change_event_handler,
-					   WMA_RX_WORK_CTX);
 
 	/* Register beacon tx complete event id. The event is required
 	 * for sending channel switch announcement frames
@@ -5063,6 +5078,31 @@ wma_get_tdls_wideband_support(struct wmi_unified *wmi_handle,
 					     wmi_service_tdls_wideband_support);
 }
 
+#ifdef WLAN_FEATURE_11BE
+/**
+ * wma_get_tdls_mlo_support() - update tgt service with service tdls
+ * be support
+ * @wmi_handle: Unified wmi handle
+ * @cfg: target services
+ *
+ * Return: none
+ */
+static inline void
+wma_get_tdls_mlo_support(struct wmi_unified *wmi_handle,
+			 struct wma_tgt_services *cfg)
+{
+	cfg->en_tdls_mlo_support =
+		wmi_service_enabled(wmi_handle,
+				    wmi_service_tdls_mlo_support);
+}
+#else
+static inline void
+wma_get_tdls_mlo_support(struct wmi_unified *wmi_handle,
+			 struct wma_tgt_services *cfg)
+{
+}
+#endif /* WLAN_FEATURE_11BE */
+
 #ifdef WLAN_FEATURE_11AX
 /**
  * wma_get_tdls_ax_support() - update tgt service with service tdls ax support
@@ -5102,6 +5142,12 @@ wma_get_tdls_6g_support(struct wmi_unified *wmi_handle,
 
 #endif
 #else
+static inline void
+wma_get_tdls_mlo_support(struct wmi_unified *wmi_handle,
+			 struct wma_tgt_services *cfg)
+{
+}
+
 static inline void
 wma_get_tdls_ax_support(struct wmi_unified *wmi_handle,
 			struct wma_tgt_services *cfg)
@@ -5277,6 +5323,7 @@ static inline void wma_update_target_services(struct wmi_unified *wmi_handle,
 
 	wma_get_igmp_offload_enable(wmi_handle, cfg);
 	wma_get_tdls_ax_support(wmi_handle, cfg);
+	wma_get_tdls_mlo_support(wmi_handle, cfg);
 	wma_get_tdls_6g_support(wmi_handle, cfg);
 	wma_get_tdls_wideband_support(wmi_handle, cfg);
 	wma_get_dynamic_vdev_macaddr_support(wmi_handle, cfg);
@@ -7213,6 +7260,8 @@ int wma_rx_service_ready_ext_event(void *handle, uint8_t *event,
 		return -EINVAL;
 
 	wmi_handle = get_wmi_unified_hdl_from_psoc(wma_handle->psoc);
+	if (wmi_validate_handle(wmi_handle))
+		return -EINVAL;
 
 	tgt_hdl = wlan_psoc_get_tgt_if_handle(wma_handle->psoc);
 	if (!tgt_hdl) {
@@ -7254,6 +7303,8 @@ int wma_rx_service_ready_ext_event(void *handle, uint8_t *event,
 	wma_update_hw_mode_config(wma_handle, tgt_hdl);
 
 	target_psoc_set_num_radios(tgt_hdl, 1);
+
+	wlan_dp_update_peer_map_unmap_version(&wlan_res_cfg->peer_map_unmap_version);
 
 	if (wmi_service_enabled(wmi_handle,
 				wmi_service_new_htt_msg_format)) {
@@ -7730,7 +7781,8 @@ static void wma_set_wifi_start_packet_stats(void *wma_handle,
 		ATH_PKTLOG_RX | ATH_PKTLOG_TX |
 		ATH_PKTLOG_TEXT | ATH_PKTLOG_SW_EVENT;
 #elif defined(QCA_WIFI_QCA6390) || defined(QCA_WIFI_QCA6490) || \
-      defined(QCA_WIFI_QCA6750) || defined(QCA_WIFI_KIWI)
+      defined(QCA_WIFI_QCA6750) || defined(QCA_WIFI_KIWI) || \
+      defines(QCA_WIFI_WCN6450)
 	log_state = ATH_PKTLOG_RCFIND | ATH_PKTLOG_RCUPDATE |
 		    ATH_PKTLOG_TX | ATH_PKTLOG_LITE_T2H |
 		    ATH_PKTLOG_SW_EVENT | ATH_PKTLOG_RX;

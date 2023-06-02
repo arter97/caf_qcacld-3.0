@@ -337,9 +337,10 @@ lim_cm_prepare_join_rsp_from_pe_session(struct mac_context *mac_ctx,
 
 	connect_rsp->cm_id = pe_session->cm_id;
 	connect_rsp->vdev_id = pe_session->vdev_id;
-	qdf_mem_copy(connect_rsp->bssid.bytes, pe_session->bssId,
-		     QDF_MAC_ADDR_SIZE);
-
+	qdf_ether_addr_copy(connect_rsp->bssid.bytes, pe_session->bssId);
+	wlan_cm_connect_resp_fill_mld_addr_from_cm_id(pe_session->vdev,
+						      pe_session->cm_id,
+						      connect_rsp);
 	connect_rsp->freq = pe_session->curr_op_freq;
 	connect_rsp->connect_status = connect_status;
 	connect_rsp->reason = reason;
@@ -430,6 +431,9 @@ lim_cm_fill_join_rsp_from_connect_req(struct cm_vdev_join_req *req,
 	connect_rsp->ssid = req->entry->ssid;
 	connect_rsp->is_wps_connection = req->is_wps_connection;
 	connect_rsp->is_osen_connection = req->is_osen_connection;
+	wlan_cm_connect_resp_fill_mld_addr_from_vdev_id(rsp->psoc, req->vdev_id,
+							req->entry,
+							connect_rsp);
 }
 
 static QDF_STATUS lim_cm_flush_connect_rsp(struct scheduler_msg *msg)
@@ -1904,8 +1908,8 @@ void lim_handle_sta_csa_param(struct mac_context *mac_ctx,
 
 	session_entry->htSupportedChannelWidthSet = false;
 	wlan_reg_read_current_country(mac_ctx->psoc, country_code);
-	if (!csa_params->ies_present_flag) {
-		/* no ies, means triggered by host */
+	if (!csa_params->ies_present_flag ||
+	    (csa_params->ies_present_flag & MLME_CSWRAP_IE_EXT_V2_PRESENT)) {
 		pe_debug("new freq: %u, width: %d", csa_params->csa_chan_freq,
 			 csa_params->new_ch_width);
 		ch_params.ch_width = csa_params->new_ch_width;
@@ -2518,9 +2522,10 @@ lim_handle_bss_color_change_ie(struct mac_context *mac_ctx,
 			lim_send_obss_color_collision_cfg(
 				mac_ctx, session,
 				OBSS_COLOR_COLLISION_DETECTION);
+			wma_allow_suspend_after_obss_color_change(
+								session->vdev);
 		}
 		lim_send_bss_color_change_ie_update(mac_ctx, session);
-		wma_allow_suspend_after_obss_color_change(session->vdev);
 	}
 }
 
@@ -2537,7 +2542,8 @@ lim_process_beacon_tx_success_ind(struct mac_context *mac_ctx, uint16_t msgType,
 				  void *event)
 {
 	struct pe_session *session;
-	bool csa_tx_offload;
+	struct wlan_objmgr_vdev *vdev;
+	bool csa_tx_offload, is_sap_go_moved_before_sta = false;
 	tpSirFirstBeaconTxCompleteInd bcn_ind =
 		(tSirFirstBeaconTxCompleteInd *) event;
 
@@ -2547,11 +2553,21 @@ lim_process_beacon_tx_success_ind(struct mac_context *mac_ctx, uint16_t msgType,
 		return;
 	}
 
-	pe_debug("role: %d swIe: %d opIe: %d switch cnt:%d",
+	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(mac_ctx->psoc,
+						    session->vdev_id,
+						    WLAN_LEGACY_MAC_ID);
+	if (vdev) {
+		is_sap_go_moved_before_sta =
+			wlan_vdev_mlme_is_sap_go_move_before_sta(vdev);
+		wlan_vdev_mlme_set_sap_go_move_before_sta(vdev, false);
+		wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_MAC_ID);
+	}
+	pe_debug("role: %d swIe: %d opIe: %d switch cnt:%d Is SAP / GO Moved before STA: %d",
 		 GET_LIM_SYSTEM_ROLE(session),
 		 session->dfsIncludeChanSwIe,
 		 session->gLimOperatingMode.present,
-		 session->gLimChannelSwitch.switchCount);
+		 session->gLimChannelSwitch.switchCount,
+		 is_sap_go_moved_before_sta);
 
 	if (!LIM_IS_AP_ROLE(session))
 		return;
@@ -2560,7 +2576,8 @@ lim_process_beacon_tx_success_ind(struct mac_context *mac_ctx, uint16_t msgType,
 	if (session->dfsIncludeChanSwIe && !csa_tx_offload &&
 	    ((session->gLimChannelSwitch.switchCount ==
 	      mac_ctx->sap.SapDfsInfo.sap_ch_switch_beacon_cnt) ||
-	     (session->gLimChannelSwitch.switchCount == 1)))
+	     (session->gLimChannelSwitch.switchCount == 1) ||
+	     is_sap_go_moved_before_sta))
 		lim_process_ap_ecsa_timeout(session);
 
 

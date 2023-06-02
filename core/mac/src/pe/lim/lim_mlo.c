@@ -1327,6 +1327,22 @@ lim_send_probe_req_frame_mlo(struct mac_context *mac_ctx,
 }
 
 uint16_t
+lim_send_tdls_mgmt_frame_mlo(struct mac_context *mac_ctx,
+			     struct pe_session *session)
+{
+	QDF_STATUS status;
+
+	session->mlo_ie_total_len = 0;
+	qdf_mem_zero(&session->mlo_ie, sizeof(session->mlo_ie));
+	status = populate_dot11f_tdls_mgmt_mlo_ie(mac_ctx, session);
+	if (QDF_IS_STATUS_SUCCESS(status))
+		session->mlo_ie_total_len =
+				lim_caculate_mlo_ie_length(&session->mlo_ie);
+
+	return session->mlo_ie_total_len;
+}
+
+uint16_t
 lim_get_frame_mlo_ie_len(struct pe_session *session)
 {
 	if (session)

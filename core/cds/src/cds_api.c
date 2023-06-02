@@ -145,7 +145,9 @@ static struct ol_if_ops  dp_ol_if_ops = {
     /* TODO: Add any other control path calls required to OL_IF/WMA layer */
 };
 #else
-static struct ol_if_ops  dp_ol_if_ops;
+static struct ol_if_ops  dp_ol_if_ops = {
+	.dp_rx_get_pending = cds_get_rx_thread_pending,
+};
 #endif
 
 static void cds_trigger_recovery_work(void *param);
@@ -251,16 +253,64 @@ static void cds_update_recovery_reason(enum qdf_hang_reason recovery_reason)
 	gp_cds_context->recovery_reason = recovery_reason;
 }
 
+/**
+ * cds_sys_reboot_lock_init() - Create lock for system reboot
+ *
+ * Return: QDF_STATUS_SUCCESS if the lock was created and an error on failure
+ */
+static QDF_STATUS cds_sys_reboot_lock_init(void)
+{
+	return qdf_mutex_create(&gp_cds_context->sys_reboot_lock);
+}
+
+/**
+ * cds_sys_reboot_lock_deinit() - destroy lock for system reboot
+ *
+ * Return: none
+ */
+static void cds_sys_reboot_lock_deinit(void)
+{
+	qdf_mutex_destroy(&gp_cds_context->sys_reboot_lock);
+}
+
+void cds_set_sys_rebooting(void)
+{
+	qdf_mutex_acquire(&gp_cds_context->sys_reboot_lock);
+	cds_set_driver_state(CDS_DRIVER_STATE_SYS_REBOOTING);
+	qdf_mutex_release(&gp_cds_context->sys_reboot_lock);
+}
+
+bool cds_sys_reboot_protect(void)
+{
+	enum cds_driver_state state;
+
+	qdf_mutex_acquire(&gp_cds_context->sys_reboot_lock);
+
+	state = cds_get_driver_state();
+	return __CDS_IS_DRIVER_STATE(state, CDS_DRIVER_STATE_SYS_REBOOTING);
+}
+
+void cds_sys_reboot_unprotect(void)
+{
+	qdf_mutex_release(&gp_cds_context->sys_reboot_lock);
+}
+
 QDF_STATUS cds_init(void)
 {
 	QDF_STATUS status;
 
 	gp_cds_context = &g_cds_context;
 
+	status = cds_sys_reboot_lock_init();
+	if (QDF_IS_STATUS_ERROR(status)) {
+		cds_err("Failed to init sys reboot lock; status:%u", status);
+		goto deinit;
+	}
+
 	status = cds_recovery_work_init();
 	if (QDF_IS_STATUS_ERROR(status)) {
 		cds_err("Failed to init recovery work; status:%u", status);
-		goto deinit;
+		goto destroy_lock;
 	}
 
 	cds_ssr_protect_init();
@@ -281,6 +331,8 @@ QDF_STATUS cds_init(void)
 
 	return QDF_STATUS_SUCCESS;
 
+destroy_lock:
+	cds_sys_reboot_lock_deinit();
 deinit:
 	gp_cds_context = NULL;
 	qdf_mem_zero(&g_cds_context, sizeof(g_cds_context));
@@ -314,6 +366,7 @@ void cds_deinit(void)
 	/* currently, no ssr_protect_deinit */
 
 	cds_recovery_work_deinit();
+	cds_sys_reboot_lock_deinit();
 
 	gp_cds_context = NULL;
 	qdf_mem_zero(&g_cds_context, sizeof(g_cds_context));
@@ -838,6 +891,25 @@ QDF_STATUS cds_open(struct wlan_objmgr_psoc *psoc)
 				goto err_soc_detach;
 			}
 		hdd_ctx->is_wifi3_0_target = true;
+	} else if (hdd_ctx->target_type == TARGET_TYPE_WCN6450) {
+		gp_cds_context->dp_soc =
+			cdp_soc_attach(RHINE_DP,
+				       gp_cds_context->hif_context,
+				       htcInfo.target_psoc,
+				       gp_cds_context->htc_ctx,
+				       gp_cds_context->qdf_ctx,
+				       &dp_ol_if_ops);
+		if (gp_cds_context->dp_soc)
+			if (!cdp_soc_init(gp_cds_context->dp_soc, RHINE_DP,
+					  gp_cds_context->hif_context,
+					  htcInfo.target_psoc,
+					  gp_cds_context->htc_ctx,
+					  gp_cds_context->qdf_ctx,
+					  &dp_ol_if_ops)) {
+				status = QDF_STATUS_E_FAILURE;
+				goto err_soc_detach;
+			}
+		hdd_ctx->is_wifi3_0_target = true;
 	} else {
 		gp_cds_context->dp_soc = cdp_soc_attach(MOB_DRV_LEGACY_DP,
 			gp_cds_context->hif_context, htcInfo.target_psoc,
@@ -968,7 +1040,8 @@ QDF_STATUS cds_dp_open(struct wlan_objmgr_psoc *psoc)
 	    hdd_ctx->target_type == TARGET_TYPE_QCA6750 ||
 	    hdd_ctx->target_type == TARGET_TYPE_KIWI ||
 	    hdd_ctx->target_type == TARGET_TYPE_MANGO ||
-	    hdd_ctx->target_type == TARGET_TYPE_PEACH) {
+	    hdd_ctx->target_type == TARGET_TYPE_PEACH ||
+	    hdd_ctx->target_type == TARGET_TYPE_WCN6450) {
 		qdf_status = cdp_pdev_init(cds_get_context(QDF_MODULE_ID_SOC),
 					   gp_cds_context->htc_ctx,
 					   gp_cds_context->qdf_ctx, 0);
@@ -2013,6 +2086,9 @@ static void cds_trigger_recovery_handler(const char *func, const uint32_t line)
 	if (pld_force_collect_target_dump(qdf->dev))
 		cds_force_assert_target(qdf);
 	cds_set_assert_target_in_progress(false);
+
+	/* Do not wait for firmware down block wmi transactions */
+	wma_wmi_stop();
 
 	/*
 	 * if *wlan* recovery is disabled, once all the required registers are

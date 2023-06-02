@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2015-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -1801,6 +1801,9 @@ static int wlan_hdd_pld_probe(struct device *dev,
 		hdd_err("Invalid bus type %d->%d", pld_bus_type, bus_type);
 		return -EINVAL;
 	}
+	qdf_ssr_driver_dump_register_region("hang_event_data",
+					    g_fw_host_hang_event,
+					    sizeof(g_fw_host_hang_event));
 
 	return hdd_soc_probe(dev, bdev, id, bus_type);
 }
@@ -1817,6 +1820,7 @@ static void wlan_hdd_pld_remove(struct device *dev, enum pld_bus_type bus_type)
 	hdd_enter();
 
 	hdd_soc_remove(dev);
+	qdf_ssr_driver_dump_unregister_region("hang_event_data");
 
 	hdd_exit();
 }
@@ -2175,6 +2179,10 @@ wlan_hdd_pld_uevent(struct device *dev, struct pld_uevent_data *event_data)
 		 */
 		if (event_data->bus_data.etype == PLD_BUS_EVENT_PCIE_LINK_DOWN)
 			host_log_device_status(WLAN_STATUS_BUS_EXCEPTION);
+		break;
+	case PLD_SYS_REBOOT:
+		hdd_info("Received system reboot");
+		cds_set_sys_rebooting();
 		break;
 	default:
 		/* other events intentionally not handled */

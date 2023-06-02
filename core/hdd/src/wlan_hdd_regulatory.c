@@ -952,7 +952,8 @@ int hdd_reg_set_band(struct net_device *dev, uint32_t band_bitmap)
 		return -EINVAL;
 	}
 
-	status = ucfg_cm_set_roam_band_update(hdd_ctx->psoc, adapter->vdev_id);
+	status = ucfg_cm_set_roam_band_update(hdd_ctx->psoc,
+					      adapter->deflink->vdev_id);
 	if (QDF_IS_STATUS_ERROR(status))
 		hdd_err("Failed to send RSO update to fw on set band");
 
@@ -1681,8 +1682,8 @@ static void hdd_country_change_update_sta(struct hdd_context *hdd_ctx)
 				} else {
 					hdd_debug("Remain on current channel but update tx power");
 					wlan_reg_update_tx_power_on_ctry_change(
-							pdev,
-							adapter->vdev_id);
+						    pdev,
+						    adapter->deflink->vdev_id);
 				}
 			}
 			break;
@@ -1739,7 +1740,7 @@ static void hdd_restart_sap_with_new_phymode(struct hdd_context *hdd_ctx,
 	}
 
 	sap_config->chan_freq =
-		wlansap_get_safe_channel_from_pcl_and_acs_range(sap_ctx);
+		wlansap_get_safe_channel_from_pcl_and_acs_range(sap_ctx, NULL);
 
 	sap_config->sap_orig_hw_mode = sap_config->SapHw_mode;
 	sap_config->SapHw_mode = csr_phy_mode;
@@ -1792,7 +1793,7 @@ static void hdd_country_change_update_sap(struct hdd_context *hdd_ctx)
 		switch (adapter->device_mode) {
 		case QDF_P2P_GO_MODE:
 			policy_mgr_check_sap_restart(hdd_ctx->psoc,
-						     adapter->vdev_id);
+						     adapter->deflink->vdev_id);
 			break;
 		case QDF_SAP_MODE:
 			if (!test_bit(SOFTAP_INIT_DONE,
@@ -1800,7 +1801,7 @@ static void hdd_country_change_update_sap(struct hdd_context *hdd_ctx)
 				hdd_info("AP is not started yet");
 				break;
 			}
-			sap_config = &adapter->session.ap.sap_config;
+			sap_config = &adapter->deflink->session.ap.sap_config;
 			reg_phy_mode = csr_convert_to_reg_phy_mode(
 						sap_config->sap_orig_hw_mode,
 						oper_freq);
@@ -1817,12 +1818,12 @@ static void hdd_country_change_update_sap(struct hdd_context *hdd_ctx)
 								 sap_config,
 								 csr_phy_mode);
 			else
-				policy_mgr_check_sap_restart(hdd_ctx->psoc,
-							     adapter->vdev_id);
+				policy_mgr_check_sap_restart(
+						hdd_ctx->psoc,
+						adapter->deflink->vdev_id);
 				hdd_debug("Update tx power due to ctry change");
 				wlan_reg_update_tx_power_on_ctry_change(
-							pdev,
-							adapter->vdev_id);
+					    pdev, adapter->deflink->vdev_id);
 			break;
 		default:
 			break;
