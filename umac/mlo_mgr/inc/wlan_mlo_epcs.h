@@ -49,12 +49,22 @@ enum wlan_epcs_category {
 /**
  * struct ml_pa_partner_link_info - Priority Access ML partner information
  * @link_id: Link ID
+ * @edca_ie_present: EDCA IE present
+ * @muedca_ie_present: MU EDCA IE present
+ * @ven_wme_ie_present: WME IE present
  * @edca: EDCA IE
  * @muedca: MU EDCA IE
+ * @ven_wme_ie_bytes: WME IE
  */
 struct ml_pa_partner_link_info {
 	uint8_t link_id;
-	struct edca_ie edca;
+	uint8_t edca_ie_present:1,
+		muedca_ie_present:1,
+		ven_wme_ie_present:1;
+	union {
+		struct edca_ie edca;
+		uint8_t ven_wme_ie_bytes[WLAN_VENDOR_WME_IE_LEN + 2];
+	};
 	struct muedca_ie muedca;
 };
 
