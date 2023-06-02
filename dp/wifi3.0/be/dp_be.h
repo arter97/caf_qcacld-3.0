@@ -310,6 +310,7 @@ struct dp_ppeds_napi {
  * @num_ppe_vp_entries: Number of PPE VP entries
  * @num_ppe_vp_search_idx_entries: PPEDS VP search idx entries
  * @irq_name: PPEDS VP irq names
+ * @ppeds_stats: PPEDS stats
  * @mlo_enabled: Flag to indicate MLO is enabled or not
  * @mlo_chip_id: MLO chip_id
  * @ml_ctxt: pointer to global ml_context
@@ -351,6 +352,11 @@ struct dp_soc_be {
 	uint8_t num_ppe_vp_search_idx_entries;
 	uint8_t num_ppe_vp_profiles;
 	char irq_name[DP_PPE_INTR_MAX][DP_PPE_INTR_STRNG_LEN];
+	struct {
+		struct {
+			uint64_t desc_alloc_failed;
+		} tx;
+	} ppeds_stats;
 #endif
 #ifdef WLAN_FEATURE_11BE_MLO
 #ifdef WLAN_MLO_MULTI_CHIP

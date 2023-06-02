@@ -2217,6 +2217,7 @@ enum dp_context_type {
  * @ipa_get_wdi_ver: Get WDI version
  * @dp_txrx_ppeds_rings_status:
  * @dp_tx_ppeds_inuse_desc:
+ * @dp_ppeds_clear_stats: Clear ppeds related stats
  * @dp_tx_ppeds_cfg_astidx_cache_mapping:
  * @txrx_soc_ppeds_start:
  * @txrx_soc_ppeds_stop:
@@ -2442,6 +2443,7 @@ struct dp_arch_ops {
 #ifdef WLAN_SUPPORT_PPEDS
 	void (*dp_txrx_ppeds_rings_status)(struct dp_soc *soc);
 	void (*dp_tx_ppeds_inuse_desc)(struct dp_soc *soc);
+	void (*dp_ppeds_clear_stats)(struct dp_soc *soc);
 	void (*dp_tx_ppeds_cfg_astidx_cache_mapping)(struct dp_soc *soc,
 						     struct dp_vdev *vdev,
 						     bool peer_map);
