@@ -10152,6 +10152,18 @@ static inline void dp_srng_clear_ring_usage_wm_stats(struct dp_soc *soc)
 }
 #endif
 
+#ifdef WLAN_SUPPORT_PPEDS
+static void dp_clear_tx_ppeds_stats(struct dp_soc *soc)
+{
+	if (soc->arch_ops.dp_ppeds_clear_stats)
+		soc->arch_ops.dp_ppeds_clear_stats(soc);
+}
+#else
+static void dp_clear_tx_ppeds_stats(struct dp_soc *soc)
+{
+}
+#endif
+
 /**
  * dp_txrx_host_stats_clr() - Reinitialize the txrx stats
  * @vdev: DP_VDEV handle
@@ -10182,6 +10194,8 @@ dp_txrx_host_stats_clr(struct dp_vdev *vdev, struct dp_soc *soc)
 	DP_STATS_CLR(vdev->pdev);
 	DP_STATS_CLR(vdev->pdev->soc);
 	DP_STATS_CLR(vdev);
+
+	dp_clear_tx_ppeds_stats(soc);
 
 	hif_clear_napi_stats(vdev->pdev->soc->hif_handle);
 

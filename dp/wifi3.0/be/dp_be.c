@@ -95,6 +95,16 @@ static void dp_ppeds_inuse_desc(struct dp_soc *soc)
 	DP_PRINT_STATS("PPE-DS Tx Descriptors in Use = %u num_free %u",
 		       be_soc->ppeds_tx_desc.num_allocated,
 		       be_soc->ppeds_tx_desc.num_free);
+
+	DP_PRINT_STATS("PPE-DS Tx desc alloc failed %u",
+		       be_soc->ppeds_stats.tx.desc_alloc_failed);
+}
+
+static void dp_ppeds_clear_stats(struct dp_soc *soc)
+{
+	struct dp_soc_be *be_soc = dp_get_be_soc_from_dp_soc(soc);
+
+	be_soc->ppeds_stats.tx.desc_alloc_failed = 0;
 }
 #endif
 
@@ -3263,6 +3273,7 @@ void dp_initialize_arch_ops_be(struct dp_arch_ops *arch_ops)
 	arch_ops->dp_register_ppeds_interrupts = dp_register_ppeds_interrupts;
 	arch_ops->dp_free_ppeds_interrupts = dp_free_ppeds_interrupts;
 	arch_ops->dp_tx_ppeds_inuse_desc = dp_ppeds_inuse_desc;
+	arch_ops->dp_ppeds_clear_stats = dp_ppeds_clear_stats;
 	arch_ops->dp_tx_ppeds_cfg_astidx_cache_mapping =
 				dp_tx_ppeds_cfg_astidx_cache_mapping;
 #ifdef DP_UMAC_HW_RESET_SUPPORT
