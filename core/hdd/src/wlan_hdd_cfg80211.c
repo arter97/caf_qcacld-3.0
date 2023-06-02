@@ -19818,13 +19818,14 @@ wlan_hdd_update_max_connect_akm(struct wiphy *wiphy)
 
 #ifdef NL80211_EXT_FEATURE_PUNCT_SUPPORT
 /**
- * NL80211_EXT_FEATURE_PUNCT() - set feature flag for puncture
+ * wlan_hdd_set_ext_feature_punct() - set feature flag for puncture
  * @wiphy: wiphy
  *
  * Return: void
  */
 static void wlan_hdd_set_ext_feature_punct(struct wiphy *wiphy)
 {
+	hdd_debug("enable puncture cap");
 	wiphy_ext_feature_set(wiphy,
 			      NL80211_EXT_FEATURE_PUNCT);
 }

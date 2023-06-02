@@ -3283,7 +3283,7 @@ ifeq ($(findstring yes, $(found)), yes)
 ccflags-y += -DCFG80211_LINK_STA_PARAMS_PRESENT
 endif
 
-found = $(shell if grep -qF "NL80211_EXT_FEATURE_PUNCT" $(srctree)/include/net/nl80211.h; then echo "yes" ;else echo "no" ;fi;)
+found = $(shell if grep -qF "NL80211_EXT_FEATURE_PUNCT" $(srctree)/include/uapi/linux/nl80211.h; then echo "yes" ;else echo "no" ;fi;)
 ifeq ($(findstring yes, $(found)), yes)
 ccflags-y += -DNL80211_EXT_FEATURE_PUNCT_SUPPORT
 endif
