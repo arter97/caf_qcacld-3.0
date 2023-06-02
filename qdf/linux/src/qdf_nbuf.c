@@ -1845,16 +1845,34 @@ bool __qdf_nbuf_data_is_ipv4_dhcp_pkt(uint8_t *data)
 }
 qdf_export_symbol(__qdf_nbuf_data_is_ipv4_dhcp_pkt);
 
+/**
+ * qdf_is_eapol_type() - check if packet is EAPOL
+ * @type: Packet type
+ *
+ * This api is to check if frame is EAPOL packet type.
+ *
+ * Return: true if it is EAPOL frame
+ *         false otherwise.
+ */
+#ifdef BIG_ENDIAN_HOST
+static inline bool qdf_is_eapol_type(uint16_t type)
+{
+	return (type == QDF_NBUF_TRAC_EAPOL_ETH_TYPE);
+}
+#else
+static inline bool qdf_is_eapol_type(uint16_t type)
+{
+	return (type == QDF_SWAP_U16(QDF_NBUF_TRAC_EAPOL_ETH_TYPE));
+}
+#endif
+
 bool __qdf_nbuf_data_is_ipv4_eapol_pkt(uint8_t *data)
 {
 	uint16_t ether_type;
 
 	ether_type = __qdf_nbuf_get_ether_type(data);
 
-	if (ether_type == QDF_SWAP_U16(QDF_NBUF_TRAC_EAPOL_ETH_TYPE))
-		return true;
-	else
-		return false;
+	return qdf_is_eapol_type(ether_type);
 }
 qdf_export_symbol(__qdf_nbuf_data_is_ipv4_eapol_pkt);
 
