@@ -1284,6 +1284,24 @@ static QDF_STATUS policy_mgr_pcl_modification_for_p2p_go(
 }
 
 #ifdef WLAN_FEATURE_LL_LT_SAP
+#ifdef WLAN_FEATURE_LL_LT_SAP_6G_SUPPORT
+static bool policy_mgr_is_6G_chan_valid_for_ll_sap(qdf_freq_t freq)
+{
+	if (!wlan_reg_is_6ghz_chan_freq(freq))
+		return true;
+
+	if (wlan_reg_is_6ghz_psc_chan_freq(freq) &&
+	    wlan_reg_is_6ghz_unii5_chan_freq(freq))
+		return true;
+
+	return false;
+}
+#else
+static inline bool policy_mgr_is_6G_chan_valid_for_ll_sap(qdf_freq_t freq)
+{
+	return false;
+}
+#endif
 static QDF_STATUS policy_mgr_pcl_modification_for_ll_lt_sap(
 			struct wlan_objmgr_psoc *psoc,
 			uint32_t *pcl_channels, uint8_t *pcl_weight,
@@ -1304,13 +1322,14 @@ static QDF_STATUS policy_mgr_pcl_modification_for_ll_lt_sap(
 		psoc, pcl_channels, pcl_weight, len, weight_len);
 
 	for (i = 0; i < *len; i++) {
-		/* Remove passive/dfs channel for LL_LT_SAP */
+		/* Remove passive/dfs/6G invalid channel for LL_LT_SAP */
 		if (wlan_reg_is_passive_for_freq(
 					pm_ctx->pdev,
 					pcl_channels[i]) ||
 		    wlan_reg_is_dfs_for_freq(
 					pm_ctx->pdev,
-					pcl_channels[i]))
+					pcl_channels[i]) ||
+		    !policy_mgr_is_6G_chan_valid_for_ll_sap(pcl_channels[i]))
 			continue;
 
 		pcl_list[pcl_len] = pcl_channels[i];
