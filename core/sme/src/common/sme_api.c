@@ -982,6 +982,7 @@ QDF_STATUS sme_update_config(mac_handle_t mac_handle,
 QDF_STATUS sme_update_roam_params(mac_handle_t mac_handle,
 				  uint8_t vdev_id,
 				  struct rso_config_params *src_rso_config,
+				  struct rso_user_config *src_rso_usr_cfg,
 				  int update_param)
 {
 	struct mac_context *mac_ctx = MAC_CONTEXT(mac_handle);
@@ -989,12 +990,27 @@ QDF_STATUS sme_update_roam_params(mac_handle_t mac_handle,
 	uint8_t i;
 	struct wlan_mlme_psoc_ext_obj *mlme_obj;
 	struct rso_config_params *dst_rso_usr_cfg;
+	struct rso_user_config *rso_usr_cfg;
+	struct wlan_objmgr_vdev *vdev;
 
 	mlme_obj = mlme_get_psoc_ext_obj(mac_ctx->psoc);
 	if (!mlme_obj)
 		return QDF_STATUS_E_FAILURE;
 
 	dst_rso_usr_cfg = &mlme_obj->cfg.lfr.rso_user_config;
+
+	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(mac_ctx->psoc, vdev_id,
+						    WLAN_LEGACY_SME_ID);
+	if (!vdev)
+		return QDF_STATUS_E_FAILURE;
+
+	rso_usr_cfg = wlan_cm_get_rso_user_config(vdev);
+
+	if (!rso_usr_cfg) {
+		wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_SME_ID);
+		return QDF_STATUS_E_FAILURE;
+	}
+
 	switch (update_param) {
 	case REASON_ROAM_EXT_SCAN_PARAMS_CHANGED:
 		mac_ctx->mlme_cfg->lfr.rssi_boost_threshold_5g =
@@ -1013,16 +1029,16 @@ QDF_STATUS sme_update_roam_params(mac_handle_t mac_handle,
 		mac_ctx->mlme_cfg->lfr.enable_5g_band_pref = true;
 		break;
 	case REASON_ROAM_SET_SSID_ALLOWED:
-		qdf_mem_zero(&dst_rso_usr_cfg->ssid_allowed_list,
+		qdf_mem_zero(&rso_usr_cfg->ssid_allowed_list,
 			     sizeof(struct wlan_ssid) * MAX_SSID_ALLOWED_LIST);
-		dst_rso_usr_cfg->num_ssid_allowed_list =
-			src_rso_config->num_ssid_allowed_list;
-		for (i = 0; i < dst_rso_usr_cfg->num_ssid_allowed_list; i++) {
-			dst_rso_usr_cfg->ssid_allowed_list[i].length =
-				src_rso_config->ssid_allowed_list[i].length;
-			qdf_mem_copy(dst_rso_usr_cfg->ssid_allowed_list[i].ssid,
-				src_rso_config->ssid_allowed_list[i].ssid,
-				dst_rso_usr_cfg->ssid_allowed_list[i].length);
+		rso_usr_cfg->num_ssid_allowed_list =
+			src_rso_usr_cfg->num_ssid_allowed_list;
+		for (i = 0; i < rso_usr_cfg->num_ssid_allowed_list; i++) {
+			rso_usr_cfg->ssid_allowed_list[i].length =
+				src_rso_usr_cfg->ssid_allowed_list[i].length;
+			qdf_mem_copy(rso_usr_cfg->ssid_allowed_list[i].ssid,
+				     src_rso_usr_cfg->ssid_allowed_list[i].ssid,
+				     rso_usr_cfg->ssid_allowed_list[i].length);
 		}
 		break;
 	case REASON_ROAM_SET_FAVORED_BSSID:
@@ -1051,6 +1067,7 @@ QDF_STATUS sme_update_roam_params(mac_handle_t mac_handle,
 		sme_release_global_lock(&mac_ctx->sme);
 	}
 
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_SME_ID);
 	return 0;
 }
 

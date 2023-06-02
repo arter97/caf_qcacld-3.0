@@ -170,9 +170,11 @@ struct cm_host_roam_start_ind {
 /**
  * struct cm_ext_obj - Connection manager legacy object
  * @rso_cfg: connect info to be used in RSO.
+ * @rso_usr_cfg: roam related userspace RSO configs.
  */
 struct cm_ext_obj {
 	struct rso_config rso_cfg;
+	struct rso_user_config rso_usr_cfg;
 };
 
 #ifdef WLAN_FEATURE_FILS_SK

@@ -5123,7 +5123,8 @@ const struct nla_policy wlan_hdd_set_roam_param_policy[
  */
 static int hdd_set_allow_list(struct hdd_context *hdd_ctx,
 			      struct rso_config_params *rso_config,
-			      struct nlattr **tb, uint8_t vdev_id)
+			      struct nlattr **tb, uint8_t vdev_id,
+			      struct rso_user_config *rso_usr_cfg)
 {
 	int rem, i;
 	uint32_t buf_len = 0, count;
@@ -5173,13 +5174,13 @@ static int hdd_set_allow_list(struct hdd_context *hdd_ctx,
 				continue;
 			}
 
-			ssid = &rso_config->ssid_allowed_list[i];
+			ssid = &rso_usr_cfg->ssid_allowed_list[i];
 			nla_memcpy(ssid->ssid,
 				   tb2[PARAM_LIST_SSID], buf_len - 1);
 			ssid->length = buf_len - 1;
 			hdd_debug("SSID[%d]: " QDF_SSID_FMT ",length = %d", i,
 				  QDF_SSID_REF(ssid->length, ssid->ssid),
-				  rso_config->ssid_allowed_list[i].length);
+				  rso_usr_cfg->ssid_allowed_list[i].length);
 			i++;
 		}
 	}
@@ -5189,10 +5190,10 @@ static int hdd_set_allow_list(struct hdd_context *hdd_ctx,
 		goto fail;
 	}
 
-	rso_config->num_ssid_allowed_list = i;
-	hdd_debug("Num of Allowed SSID %d", rso_config->num_ssid_allowed_list);
+	rso_usr_cfg->num_ssid_allowed_list = i;
+	hdd_debug("Num of Allowed SSID %d", rso_usr_cfg->num_ssid_allowed_list);
 	mac_handle = hdd_ctx->mac_handle;
-	sme_update_roam_params(mac_handle, vdev_id, rso_config,
+	sme_update_roam_params(mac_handle, vdev_id, rso_config, rso_usr_cfg,
 			       REASON_ROAM_SET_SSID_ALLOWED);
 	return 0;
 
@@ -5280,8 +5281,8 @@ static int hdd_set_bssid_prefs(struct hdd_context *hdd_ctx,
 
 	rso_config->num_bssid_favored = i;
 	mac_handle = hdd_ctx->mac_handle;
-	sme_update_roam_params(mac_handle, vdev_id,
-			       rso_config, REASON_ROAM_SET_FAVORED_BSSID);
+	sme_update_roam_params(mac_handle, vdev_id, rso_config, NULL,
+			       REASON_ROAM_SET_FAVORED_BSSID);
 
 	return 0;
 
@@ -5389,8 +5390,8 @@ static int hdd_set_denylist_bssid(struct hdd_context *hdd_ctx,
 	ucfg_dlm_add_userspace_deny_list(hdd_ctx->pdev, deny_list_bssid, j);
 	qdf_mem_free(deny_list_bssid);
 	mac_handle = hdd_ctx->mac_handle;
-	sme_update_roam_params(mac_handle, vdev_id,
-			       rso_config, REASON_ROAM_SET_DENYLIST_BSSID);
+	sme_update_roam_params(mac_handle, vdev_id, rso_config, NULL,
+			       REASON_ROAM_SET_DENYLIST_BSSID);
 
 	return 0;
 fail:
@@ -6631,13 +6632,15 @@ static int hdd_get_roam_control_config(struct hdd_context *hdd_ctx,
  * @data_len: length of @data
  * @vdev_id: vdev id
  * @rso_config: roam params
+ * @rso_usr_config: roam userspace params
  *
  * Return: 0 on success; error number on failure
  */
 static int hdd_set_ext_roam_params(struct hdd_context *hdd_ctx,
 				   const void *data, int data_len,
 				   uint8_t vdev_id,
-				   struct rso_config_params *rso_config)
+				   struct rso_config_params *rso_config,
+				   struct rso_user_config *rso_usr_cfg)
 {
 	uint32_t cmd_type, req_id;
 	struct nlattr *tb[MAX_ROAMING_PARAM + 1];
@@ -6666,7 +6669,8 @@ static int hdd_set_ext_roam_params(struct hdd_context *hdd_ctx,
 	hdd_debug("Req Id: %u Cmd Type: %u", req_id, cmd_type);
 	switch (cmd_type) {
 	case QCA_WLAN_VENDOR_ROAMING_SUBCMD_SSID_WHITE_LIST:
-		ret = hdd_set_allow_list(hdd_ctx, rso_config, tb, vdev_id);
+		ret = hdd_set_allow_list(hdd_ctx, rso_config, tb, vdev_id,
+					 rso_usr_cfg);
 		if (ret)
 			goto fail;
 		break;
@@ -6735,7 +6739,7 @@ static int hdd_set_ext_roam_params(struct hdd_context *hdd_ctx,
 			tb[PARAM_RSSI_TRIGGER]);
 		hdd_debug("Alert RSSI Threshold (%d)",
 			rso_config->alert_rssi_threshold);
-		sme_update_roam_params(mac_handle, vdev_id, rso_config,
+		sme_update_roam_params(mac_handle, vdev_id, rso_config, NULL,
 				       REASON_ROAM_EXT_SCAN_PARAMS_CHANGED);
 		break;
 	case QCA_WLAN_VENDOR_ROAMING_SUBCMD_SET_LAZY_ROAM:
@@ -6748,7 +6752,7 @@ static int hdd_set_ext_roam_params(struct hdd_context *hdd_ctx,
 			tb[PARAM_ROAM_ENABLE]);
 		hdd_debug("Activate Good Rssi Roam (%d)",
 			  rso_config->good_rssi_roam);
-		sme_update_roam_params(mac_handle, vdev_id, rso_config,
+		sme_update_roam_params(mac_handle, vdev_id, rso_config, NULL,
 				       REASON_ROAM_GOOD_RSSI_CHANGED);
 		break;
 	case QCA_WLAN_VENDOR_ROAMING_SUBCMD_SET_BSSID_PREFS:
@@ -6804,6 +6808,8 @@ __wlan_hdd_cfg80211_set_ext_roam_params(struct wiphy *wiphy,
 	struct hdd_adapter *adapter = WLAN_HDD_GET_PRIV_PTR(dev);
 	struct hdd_context *hdd_ctx = wiphy_priv(wiphy);
 	struct rso_config_params *rso_config;
+	struct rso_user_config *rso_usr_cfg = NULL;
+
 	int ret;
 
 	if (QDF_GLOBAL_FTM_MODE == hdd_get_conparam()) {
@@ -6824,9 +6830,16 @@ __wlan_hdd_cfg80211_set_ext_roam_params(struct wiphy *wiphy,
 	if (!rso_config)
 		return -ENOMEM;
 
+	rso_usr_cfg = qdf_mem_malloc(sizeof(*rso_usr_cfg));
+	if (!rso_usr_cfg)
+		return -ENOMEM;
+
 	ret = hdd_set_ext_roam_params(hdd_ctx, data, data_len,
-				      adapter->deflink->vdev_id, rso_config);
+				      adapter->deflink->vdev_id, rso_config,
+				      rso_usr_cfg);
 	qdf_mem_free(rso_config);
+	qdf_mem_free(rso_usr_cfg);
+
 	if (ret)
 		goto fail;
 
