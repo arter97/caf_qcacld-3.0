@@ -1564,6 +1564,7 @@ uint8_t dp_rx_mon_process_tlv_status(struct dp_pdev *pdev,
 				dp_mon_err("Decap type invalid");
 				qdf_assert_always(0);
 			}
+			ppdu_info->rx_hdr_rcvd[user_id] = false;
 			return num_buf_reaped;
 		}
 
