@@ -1115,7 +1115,8 @@ struct wlan_hdd_tx_power {
  * @wapi_info:
  * @sap_stop_bss_work:
  * @tsf: structure containing tsf related information
- * @mc_addr_list:
+ * @mc_addr_list: multicast address list
+ * @mc_list_lock: spin lock for multicast list
  * @addr_filter_pattern:
  * @scan_info:
  * @psb_changed: Flag to ensure PSB is configured through framework
@@ -1263,6 +1264,7 @@ struct hdd_adapter {
 	struct hdd_vdev_tsf tsf;
 #endif
 	struct hdd_multicast_addr_list mc_addr_list;
+	qdf_spinlock_t mc_list_lock;
 	uint8_t addr_filter_pattern;
 
 	struct hdd_scan_info scan_info;
