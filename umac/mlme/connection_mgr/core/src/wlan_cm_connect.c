@@ -2112,11 +2112,19 @@ void cm_fill_vdev_crypto_params(struct cnx_mgr *cm_ctx,
 				   req->crypto.rsn_caps);
 }
 
+static QDF_STATUS
+cm_if_mgr_inform_connect_active(struct wlan_objmgr_vdev *vdev)
+{
+	return if_mgr_deliver_event(vdev, WLAN_IF_MGR_EV_CONNECT_ACTIVE, NULL);
+}
+
 QDF_STATUS cm_connect_active(struct cnx_mgr *cm_ctx, wlan_cm_id *cm_id)
 {
 	struct cm_req *cm_req;
 	QDF_STATUS status;
 	struct wlan_cm_connect_req *req;
+
+	cm_if_mgr_inform_connect_active(cm_ctx->vdev);
 
 	cm_ctx->active_cm_id = *cm_id;
 	cm_req = cm_get_req_by_cm_id(cm_ctx, *cm_id);
