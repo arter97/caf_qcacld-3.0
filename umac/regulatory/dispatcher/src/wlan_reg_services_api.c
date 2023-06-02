@@ -952,6 +952,11 @@ wlan_reg_get_max_txpower_for_6g_tpe(struct wlan_objmgr_pdev *pdev,
 					      reg_client, is_psd,
 					      tx_power);
 }
+
+bool wlan_reg_is_6ghz_unii5_chan_freq(qdf_freq_t freq)
+{
+	return reg_is_6ghz_unii5_chan_freq(freq);
+}
 #endif /* CONFIG_BAND_6GHZ */
 
 uint16_t

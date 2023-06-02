@@ -311,6 +311,16 @@ QDF_STATUS wlan_reg_get_superchan_entry(
 		struct wlan_objmgr_pdev *pdev,
 		enum channel_enum chan_enum,
 		const struct super_chan_info **p_sup_chan_entry);
+/**
+ * wlan_reg_is_6ghz_unii5_chan_freq() - Check if the given 6GHz channel freq
+ * is UNII-5 band or not.
+ * @freq: Channel frequency
+ *
+ * Return: true if given 6GHz channel frequency is UNII-5 band, else false
+ */
+bool wlan_reg_is_6ghz_unii5_chan_freq(qdf_freq_t freq);
+#define WLAN_REG_IS_6GHZ_UNII5_CHAN_FREQ(freq) \
+	wlan_reg_is_6ghz_unii5_chan_freq(freq)
 #else
 
 #define WLAN_REG_IS_6GHZ_CHAN_FREQ(freq) (false)
@@ -389,6 +399,12 @@ static inline
 const char *wlan_reg_get_power_string(enum reg_6g_ap_type power_type)
 {
 	return "INVALID";
+}
+
+#define WLAN_REG_IS_6GHZ_UNII5_CHAN_FREQ(freq) (false)
+static inline bool wlan_reg_is_6ghz_unii5_chan_freq(qdf_freq_t freq)
+{
+	return false;
 }
 #endif /* CONFIG_BAND_6GHZ */
 

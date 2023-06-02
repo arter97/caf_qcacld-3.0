@@ -2788,6 +2788,19 @@ QDF_STATUS reg_get_max_txpower_for_6g_tpe(struct wlan_objmgr_pdev *pdev,
 	return reg_get_max_eirp(pdev, freq, bw, reg_ap, reg_client, tx_power);
 }
 
+#define MIN_UNII_5_BAND_CHANNEL 5935
+#define MAX_UNII_5_BAND_CHANNEL 6415
+bool reg_is_6ghz_unii5_chan_freq(qdf_freq_t freq)
+{
+	if (!REG_IS_6GHZ_FREQ(freq))
+		return false;
+
+	if (freq >= MIN_UNII_5_BAND_CHANNEL && freq <= MAX_UNII_5_BAND_CHANNEL)
+		return true;
+
+	return false;
+}
+
 /**
  * BAND_6G_PRESENT() - Check if REG_BAND_6G is set in the band_mask
  * @band_mask: Bitmask for bands

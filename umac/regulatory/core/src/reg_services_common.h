@@ -675,6 +675,16 @@ uint16_t reg_min_6ghz_chan_freq(void);
  * Return: Maximum 6GHz channel center frequency
  */
 uint16_t reg_max_6ghz_chan_freq(void);
+
+/**
+ * reg_is_6ghz_unii5_chan_freq() - Check if the given 6GHz channel frequency is
+ * uinii5 band frequency or not.
+ * @freq: Channel frequency
+ *
+ * Return: true if given 6GHz channel frequency is uinii5 band frequency
+ * frequency, else false
+ */
+bool reg_is_6ghz_unii5_chan_freq(qdf_freq_t freq);
 #else
 static inline bool reg_is_6ghz_chan_freq(uint16_t freq)
 {
@@ -731,6 +741,12 @@ static inline uint16_t reg_max_6ghz_chan_freq(void)
 {
 	return 0;
 }
+
+static inline bool reg_is_6ghz_unii5_chan_freq(qdf_freq_t freq)
+{
+	return false;
+}
+
 #endif /* CONFIG_BAND_6GHZ */
 
 /**
