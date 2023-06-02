@@ -4957,4 +4957,12 @@ static inline void wlan_hdd_link_speed_update(struct wlan_objmgr_psoc *psoc,
 {}
 #endif
 
+/**
+ * hdd_update_multicast_list() - update the multicast list
+ * @vdev: pointer to VDEV object
+ *
+ * Return: none
+ */
+void hdd_update_multicast_list(struct wlan_objmgr_vdev *vdev);
+
 #endif /* end #if !defined(WLAN_HDD_MAIN_H) */
