@@ -1001,6 +1001,7 @@ struct mgmt_rx_reo_context {
  * wait count of frames already part of the reorder list.
  * @last_delivered_frame: Stores the information about the last frame delivered
  * to the upper layer
+ * @reo_params_copy: Copy of @rx_params->reo_params struture
  */
 struct mgmt_rx_reo_frame_descriptor {
 	enum mgmt_rx_reo_frame_descriptor_type type;
@@ -1025,6 +1026,7 @@ struct mgmt_rx_reo_frame_descriptor {
 	int pkt_ctr_delta;
 	bool reo_required;
 	struct mgmt_rx_reo_frame_info last_delivered_frame;
+	struct mgmt_rx_reo_params reo_params_copy;
 };
 
 /**
