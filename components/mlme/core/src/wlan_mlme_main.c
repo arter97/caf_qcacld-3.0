@@ -2575,7 +2575,7 @@ static void mlme_init_sta_mlo_cfg(struct wlan_objmgr_psoc *psoc,
 	sta->mlo_support_link_num =
 		cfg_get(psoc, CFG_MLO_SUPPORT_LINK_NUM);
 	sta->mlo_support_link_band =
-		cfg_default(CFG_MLO_SUPPORT_LINK_BAND);
+		cfg_get(psoc, CFG_MLO_SUPPORT_LINK_BAND);
 	sta->mlo_max_simultaneous_links =
 		cfg_default(CFG_MLO_MAX_SIMULTANEOUS_LINKS);
 	sta->mlo_prefer_percentage =
@@ -2584,6 +2584,8 @@ static void mlme_init_sta_mlo_cfg(struct wlan_objmgr_psoc *psoc,
 		cfg_default(CFG_MLO_SAME_LINK_MLD_ADDR);
 	sta->mlo_5gl_5gh_mlsr =
 		cfg_default(CFG_MLO_MLO_5GL_5GH_MLSR);
+	mlme_debug("mlo_support_link_num: %d, mlo_support_link_band: 0x%x",
+		   sta->mlo_support_link_num, sta->mlo_support_link_band);
 }
 
 static bool
