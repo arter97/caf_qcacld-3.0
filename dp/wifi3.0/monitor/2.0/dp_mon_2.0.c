@@ -1460,8 +1460,8 @@ struct cdp_mon_ops dp_ops_mon_2_0 = {
 	.get_mon_pdev_rx_stats = dp_pdev_get_rx_mon_stats,
 	.txrx_enable_mon_reap_timer = NULL,
 #ifdef QCA_ENHANCED_STATS_SUPPORT
-	.txrx_enable_enhanced_stats = dp_enable_enhanced_stats_2_0,
-	.txrx_disable_enhanced_stats = dp_disable_enhanced_stats_2_0,
+	.txrx_enable_enhanced_stats = dp_enable_enhanced_stats,
+	.txrx_disable_enhanced_stats = dp_disable_enhanced_stats,
 #endif /* QCA_ENHANCED_STATS_SUPPORT */
 #if defined(ATH_SUPPORT_NAC_RSSI) || defined(ATH_SUPPORT_NAC)
 	.txrx_update_filter_neighbour_peers = dp_lite_mon_config_nac_peer,

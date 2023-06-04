@@ -1829,11 +1829,7 @@ dp_disable_enhanced_stats(struct cdp_soc_t *soc, uint8_t pdev_id)
 						   pdev_id);
 	struct dp_mon_pdev *mon_pdev;
 
-
 	if (!pdev || !pdev->monitor_pdev)
-		return QDF_STATUS_E_FAILURE;
-
-	if (pdev->pdev_deinit)
 		return QDF_STATUS_E_FAILURE;
 
 	mon_pdev = pdev->monitor_pdev;
