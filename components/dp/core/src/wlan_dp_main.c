@@ -922,6 +922,45 @@ void dp_mic_init_work(struct wlan_dp_intf *dp_intf)
 	dp_intf->mic_work.info = NULL;
 }
 
+#ifdef WLAN_FEATURE_11BE_MLO
+/**
+ * dp_intf_get_next_deflink_candidate() - Get a candidate link from the list of
+ *					  links available in the dp interface.
+ * @dp_intf: DP interface handle
+ * @cur_def_link: Handle to current def_link in the DP interface
+ *
+ * Return: Handle of the candidate for next def_link
+ *	   NULL, if there is no other suitable candidate found.
+ */
+static struct wlan_dp_link *
+dp_intf_get_next_deflink_candidate(struct wlan_dp_intf *dp_intf,
+				   struct wlan_dp_link *cur_def_link)
+{
+	struct wlan_dp_link *dp_link, *dp_link_next;
+
+	dp_for_each_link_held_safe(dp_intf, dp_link, dp_link_next) {
+		/*
+		 * TODO - Might not need to check link valid, since dp_link
+		 * is removed from the list during delete.
+		 */
+		if (!is_dp_link_valid(dp_link))
+			continue;
+
+		if (dp_link !=  cur_def_link)
+			return dp_link;
+	}
+
+	return NULL;
+}
+#else
+static struct wlan_dp_link *
+dp_intf_get_next_deflink_candidate(struct wlan_dp_intf *dp_intf,
+				   struct wlan_dp_link *cur_def_link)
+{
+	return NULL;
+}
+#endif
+
 QDF_STATUS
 dp_peer_obj_create_notification(struct wlan_objmgr_peer *peer, void *arg)
 {
@@ -1122,6 +1161,14 @@ dp_vdev_obj_destroy_notification(struct wlan_objmgr_vdev *vdev, void *arg)
 	}
 
 	qdf_mem_zero(&dp_link->conn_info, sizeof(struct wlan_dp_conn_info));
+
+	/*
+	 * If the dp_link which is being destroyed is the default link,
+	 * then find a new link to be made the default link
+	 */
+	if (dp_intf->def_link == dp_link)
+		dp_intf->def_link =
+			dp_intf_get_next_deflink_candidate(dp_intf, dp_link);
 
 	/*
 	 * Change this to link level, since during link switch,
