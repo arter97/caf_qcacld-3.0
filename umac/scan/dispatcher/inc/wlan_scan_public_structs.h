@@ -540,6 +540,7 @@ struct partner_link_info {
  * @self_link_id: Link id of the scan entry
  * @link_info: Array containing partner links information
  * @ml_bss_score: Multi link BSS score
+ * @link_score: MLO link score
  */
 struct ml_info {
 	struct qdf_mac_addr mld_mac_addr;
@@ -547,6 +548,7 @@ struct ml_info {
 	uint8_t self_link_id;
 	struct partner_link_info link_info[MLD_MAX_LINKS - 1];
 	uint16_t ml_bss_score;
+	uint16_t link_score;
 };
 
 /**
