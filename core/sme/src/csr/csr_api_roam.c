@@ -1869,9 +1869,14 @@ void csr_update_session_he_cap(struct mac_context *mac_ctx,
 	 */
 	persona = wlan_vdev_mlme_get_opmode(vdev);
 	if (persona == QDF_SAP_MODE || persona == QDF_P2P_GO_MODE) {
-		he_cap->twt_request = 0;
+		he_cap->twt_request = false;
+		if (!he_cap->twt_responder)
+			he_cap->flex_twt_sched = false;
+
 	} else if (persona == QDF_STA_MODE || persona == QDF_P2P_CLIENT_MODE) {
-		he_cap->twt_responder = 0;
+		he_cap->twt_responder = false;
+		if (!he_cap->twt_request)
+			he_cap->flex_twt_sched = false;
 	}
 
 	if (he_cap->ppet_present) {

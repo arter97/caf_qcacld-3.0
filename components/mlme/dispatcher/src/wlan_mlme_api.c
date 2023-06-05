@@ -847,7 +847,7 @@ QDF_STATUS mlme_update_tgt_he_caps_in_cfg(struct wlan_objmgr_psoc *psoc,
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
 	tDot11fIEhe_cap *he_cap = &wma_cfg->he_cap;
 	struct wlan_mlme_psoc_ext_obj *mlme_obj = mlme_get_psoc_ext_obj(psoc);
-	uint8_t value;
+	uint8_t value, twt_req, twt_resp;
 	uint16_t tx_mcs_map = 0;
 	uint16_t rx_mcs_map = 0;
 	uint8_t nss;
@@ -858,9 +858,13 @@ QDF_STATUS mlme_update_tgt_he_caps_in_cfg(struct wlan_objmgr_psoc *psoc,
 	mlme_obj->cfg.he_caps.dot11_he_cap.present = 1;
 	mlme_obj->cfg.he_caps.dot11_he_cap.htc_he = he_cap->htc_he;
 
-	value = QDF_MIN(he_cap->twt_request,
-			mlme_obj->cfg.he_caps.dot11_he_cap.twt_request);
-	mlme_obj->cfg.he_caps.dot11_he_cap.twt_request = value;
+	twt_req = QDF_MIN(he_cap->twt_request,
+			  mlme_obj->cfg.he_caps.dot11_he_cap.twt_request);
+	mlme_obj->cfg.he_caps.dot11_he_cap.twt_request = twt_req;
+
+	twt_resp = QDF_MIN(he_cap->twt_responder,
+			   mlme_obj->cfg.he_caps.dot11_he_cap.twt_responder);
+	mlme_obj->cfg.he_caps.dot11_he_cap.twt_responder = twt_resp;
 
 	value = QDF_MIN(he_cap->fragmentation,
 			mlme_obj->cfg.he_caps.he_dynamic_fragmentation);
@@ -897,8 +901,16 @@ QDF_STATUS mlme_update_tgt_he_caps_in_cfg(struct wlan_objmgr_psoc *psoc,
 			mlme_obj->cfg.he_caps.dot11_he_cap.broadcast_twt);
 	mlme_obj->cfg.he_caps.dot11_he_cap.broadcast_twt = value;
 
-	mlme_obj->cfg.he_caps.dot11_he_cap.flex_twt_sched =
-			he_cap->flex_twt_sched;
+	/*
+	 * As per 802.11ax spec, Flexible TWT capability can be set
+	 * independent of TWT Requestor/Responder capability.
+	 * But currently we don't have any such usecase and firmware
+	 * does not support it. Hence enabling Flexible TWT only when
+	 * either or both of the TWT Requestor/Responder capability
+	 * is set/enabled.
+	 */
+	value = QDF_MIN(he_cap->flex_twt_sched, (twt_req || twt_resp));
+	mlme_obj->cfg.he_caps.dot11_he_cap.flex_twt_sched = value;
 
 	mlme_obj->cfg.he_caps.dot11_he_cap.ba_32bit_bitmap =
 					he_cap->ba_32bit_bitmap;

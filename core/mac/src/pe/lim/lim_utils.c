@@ -71,6 +71,7 @@
 #include <lim_assoc_utils.h>
 #include "wlan_mlme_ucfg_api.h"
 #include "nan_ucfg_api.h"
+#include "wlan_twt_ucfg_ext_cfg.h"
 #ifdef WLAN_FEATURE_11BE
 #include "wma_eht.h"
 #endif
@@ -7957,7 +7958,7 @@ QDF_STATUS lim_send_he_caps_ie(struct mac_context *mac_ctx,
 				   HE_CAP_80P80_MCS_MAP_LEN;
 	uint8_t num_ppe_th = 0;
 	bool nan_beamforming_supported;
-	bool disable_nan_tx_bf = false;
+	bool disable_nan_tx_bf = false, value = false;
 
 	/* Sending only minimal info(no PPET) to FW now, update if required */
 	qdf_mem_zero(he_caps, he_cap_total_len);
@@ -8000,6 +8001,24 @@ QDF_STATUS lim_send_he_caps_ie(struct mac_context *mac_ctx,
 	if (he_cap->ppet_present)
 		num_ppe_th = lim_set_he_caps_ppet(mac_ctx, he_caps,
 						  CDS_BAND_5GHZ);
+
+	if ((device_mode == QDF_STA_MODE) ||
+	    (device_mode == QDF_P2P_CLIENT_MODE)) {
+		ucfg_twt_cfg_get_requestor(mac_ctx->psoc, &value);
+		if (!value) {
+			he_cap->twt_request = false;
+			he_cap->flex_twt_sched = false;
+		}
+		he_cap->twt_responder = false;
+	} else if ((device_mode == QDF_SAP_MODE) ||
+		    (device_mode == QDF_P2P_GO_MODE)) {
+		ucfg_twt_cfg_get_responder(mac_ctx->psoc, &value);
+		if (!value) {
+			he_cap->twt_responder = false;
+			he_cap->flex_twt_sched = false;
+		}
+		he_cap->twt_request = false;
+	}
 
 	status_5g = lim_send_ie(mac_ctx, vdev_id, DOT11F_EID_HE_CAP,
 			CDS_BAND_5GHZ, &he_caps[2],
