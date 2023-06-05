@@ -531,8 +531,8 @@ wlan_mlo_update_authorize_epcs_mac_addr(struct wlan_objmgr_vdev *vdev,
 	}
 
 	if (found_entry) {
-		epcs_debug("Mac address %s is already authorized",
-			   ether_sprintf(peer_mld_mac));
+		epcs_debug("Mac add "QDF_MAC_ADDR_FMT" is already authorized",
+			   QDF_MAC_ADDR_REF(peer_mld_mac));
 		return QDF_STATUS_E_INVAL;
 	}
 
@@ -546,8 +546,8 @@ wlan_mlo_update_authorize_epcs_mac_addr(struct wlan_objmgr_vdev *vdev,
 		     peer_mld_mac,
 		     QDF_MAC_ADDR_SIZE);
 
-	epcs_debug("EPCS Stored authorize mac addr is %s at index %d",
-		   ether_sprintf(peer_mld_mac), free_index);
+	epcs_debug("EPCS Stored authorize mac addr is"QDF_MAC_ADDR_FMT" at index %d",
+		   QDF_MAC_ADDR_REF(peer_mld_mac), free_index);
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -577,20 +577,20 @@ wlan_mlo_update_deauthorize_epcs_mac_addr(struct wlan_objmgr_vdev *vdev,
 	}
 
 	if (!found_entry) {
-		epcs_debug("Mac address %s not found in authorized database",
-			   ether_sprintf(peer_mld_mac));
+		epcs_debug("Mac addr "QDF_MAC_ADDR_FMT" not found in authorized database",
+			   QDF_MAC_ADDR_REF(peer_mld_mac));
 		return QDF_STATUS_E_INVAL;
 	}
 
 	if (found_entry && !epcs_ctx->authorize_info[i].valid) {
-		epcs_debug("Mac address %s is already deauthorized in database",
-			   ether_sprintf(peer_mld_mac));
+		epcs_debug("Mac addr "QDF_MAC_ADDR_FMT" is already deauthorized in database",
+			   QDF_MAC_ADDR_REF(peer_mld_mac));
 		return QDF_STATUS_E_INVAL;
 	}
 
 	epcs_ctx->authorize_info[i].valid = false;
-	epcs_debug("EPCS Stored authorize mac addr is %s at idx %d is removed",
-		   ether_sprintf(peer_mld_mac), i);
+	epcs_debug("EPCS Stored authorize mac addr is "QDF_MAC_ADDR_FMT" at idx %d is removed",
+		   QDF_MAC_ADDR_REF(peer_mld_mac), i);
 
 	return QDF_STATUS_SUCCESS;
 }
