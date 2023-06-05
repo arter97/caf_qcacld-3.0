@@ -1241,7 +1241,7 @@ static void dp_ppeds_release_rx_desc(ppe_ds_wlan_handle_t *ppeds_handle,
 			if (!rx_bufs_reaped[chip_id][mac_id])
 				continue;
 
-			replenish_soc = dp_rx_replensih_soc_get(soc, chip_id);
+			replenish_soc = dp_rx_replenish_soc_get(soc, chip_id);
 
 			dp_rxdma_srng = &replenish_soc->rx_refill_buf_ring[mac_id];
 			rx_desc_pool = &replenish_soc->rx_desc_buf[mac_id];
