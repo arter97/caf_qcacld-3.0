@@ -8655,6 +8655,7 @@ struct wmi_host_obss_spatial_reuse_set_def_thresh {
  * @frame_type: Frame type to be enabled
  * @frame_inject_period: Periodicity of injector frame transmission in msecs
  * @frame_duration: Frame Duration field in usecs
+ * @frame_bw: Bandwidth of the injected frame
  * @dstmac: Destination address to be used for the frame
  */
 struct wmi_host_injector_frame_params {
@@ -8663,6 +8664,7 @@ struct wmi_host_injector_frame_params {
 	uint32_t frame_type;
 	uint32_t frame_inject_period;
 	uint32_t frame_duration;
+	uint32_t frame_bw;
 	uint8_t dstmac[QDF_MAC_ADDR_SIZE];
 };
 
