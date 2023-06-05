@@ -1711,12 +1711,18 @@ static struct CE_pipe_config target_ce_config_wlan_kiwi[] = {
 
 #ifdef QCA_WIFI_QCN9224
 #define QCN_9224_CE_COUNT 16
+
+#ifdef QCN9224_CE1_INCREASED_SIZE
+#define T2H_CE1_RING_SIZE 1280
+#else
+#define T2H_CE1_RING_SIZE 512
+#endif
+
 static struct CE_attr host_ce_config_wlan_qcn9224[] = {
 	/* host->target HTC control and raw streams */
 	{/*CE0*/ (CE_ATTR_FLAGS), 0, 16, 2048, 0, NULL,},
 	/* target->host HTT + HTC control */
-	{/*CE1*/ (CE_ATTR_FLAGS), 0, 0,  2048,
-		512, NULL,},
+	{/*CE1*/ (CE_ATTR_FLAGS), 0, 0,  2048, T2H_CE1_RING_SIZE, NULL,},
 	/* target->host WMI */
 	{/*CE2*/ (CE_ATTR_FLAGS), 0, 0,  2048,
 		128, NULL,},
