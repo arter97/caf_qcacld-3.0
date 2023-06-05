@@ -4038,32 +4038,25 @@ static void hif_print_hal_shadow_register_cfg(struct pld_wlan_enable_cfg *cfg)
 {
 	int i;
 
-	hif_err("v3: num_config %d", cfg->num_shadow_reg_v3_cfg);
-
-	for (i = 0; i < cfg->num_shadow_reg_v3_cfg; i++) {
-		hif_err("i %d, val %x", i, cfg->shadow_reg_v3_cfg[i].addr);
-	}
+	hif_info("v3: num_config %d", cfg->num_shadow_reg_v3_cfg);
+	for (i = 0; i < cfg->num_shadow_reg_v3_cfg; i++)
+		hif_info("i %d, val %x", i, cfg->shadow_reg_v3_cfg[i].addr);
 }
 
 #elif defined(CONFIG_SHADOW_V2)
 static void hif_print_hal_shadow_register_cfg(struct pld_wlan_enable_cfg *cfg)
 {
 	int i;
-	QDF_TRACE(QDF_MODULE_ID_TXRX, QDF_TRACE_LEVEL_ERROR,
-		  "%s: num_config %d", __func__, cfg->num_shadow_reg_v2_cfg);
 
-	for (i = 0; i < cfg->num_shadow_reg_v2_cfg; i++) {
-		QDF_TRACE(QDF_MODULE_ID_TXRX, QDF_TRACE_LEVEL_INFO,
-		     "%s: i %d, val %x", __func__, i,
-		     cfg->shadow_reg_v2_cfg[i].addr);
-	}
+	hif_info("v2: num_config %d", cfg->num_shadow_reg_v2_cfg);
+	for (i = 0; i < cfg->num_shadow_reg_v2_cfg; i++)
+		hif_info("i %d, val %x", i, cfg->shadow_reg_v2_cfg[i].addr);
 }
 
 #else
 static void hif_print_hal_shadow_register_cfg(struct pld_wlan_enable_cfg *cfg)
 {
-	QDF_TRACE(QDF_MODULE_ID_TXRX, QDF_TRACE_LEVEL_ERROR,
-		  "%s: CONFIG_SHADOW V2/V3 not defined", __func__);
+	hif_info("CONFIG_SHADOW V2/V3 not defined");
 }
 #endif
 
