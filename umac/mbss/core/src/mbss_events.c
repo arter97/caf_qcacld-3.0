@@ -189,3 +189,9 @@ if_mgr_sta_csa_complete(struct wlan_objmgr_vdev *vdev,
 {
 	return QDF_STATUS_SUCCESS;
 }
+
+QDF_STATUS if_mgr_connect_active(struct wlan_objmgr_vdev *vdev,
+				 struct if_mgr_event_data *event_data)
+{
+	return QDF_STATUS_SUCCESS;
+}
