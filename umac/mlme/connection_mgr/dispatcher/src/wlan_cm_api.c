@@ -131,6 +131,22 @@ QDF_STATUS wlan_cm_reassoc_rsp(struct wlan_objmgr_vdev *vdev,
 }
 #endif
 
+void wlan_cm_free_connect_req(struct wlan_cm_connect_req *connect_req)
+{
+	if (!connect_req)
+		return;
+
+	cm_free_connect_req(connect_req);
+}
+
+void wlan_cm_free_connect_resp(struct wlan_cm_connect_resp *connect_rsp)
+{
+	if (!connect_rsp)
+		return;
+
+	cm_free_connect_rsp(connect_rsp);
+}
+
 void wlan_cm_set_max_connect_attempts(struct wlan_objmgr_vdev *vdev,
 				      uint8_t max_connect_attempts)
 {

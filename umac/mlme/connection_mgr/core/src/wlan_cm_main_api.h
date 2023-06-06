@@ -1314,7 +1314,6 @@ bool cm_is_connect_req_reassoc(struct wlan_cm_connect_req *req);
 QDF_STATUS cm_get_rnr(struct wlan_objmgr_vdev *vdev, wlan_cm_id cm_id,
 		      struct reduced_neighbor_report *rnr);
 
-#ifdef CONN_MGR_ADV_FEATURE
 /**
  * cm_free_connect_rsp_ies() - Function to free all connection IEs.
  * @connect_rsp: pointer to connect rsp
@@ -1325,6 +1324,27 @@ QDF_STATUS cm_get_rnr(struct wlan_objmgr_vdev *vdev, wlan_cm_id cm_id,
  */
 void cm_free_connect_rsp_ies(struct wlan_cm_connect_resp *connect_rsp);
 
+/**
+ * cm_free_connect_req() - Function to free up connect request and its sub memory.
+ * @connect_req: pointer to connect req
+ *
+ * Function to free up connect request and its sub memory.
+ *
+ * Return: void
+ */
+void cm_free_connect_req(struct wlan_cm_connect_req *connect_req);
+
+/**
+ * cm_free_connect_rsp() - Function to free up connect response and its sub memory.
+ * @connect_rsp: pointer to connect rsp
+ *
+ * Function to free up connect response and its sub memory.
+ *
+ * Return: void
+ */
+void cm_free_connect_rsp(struct wlan_cm_connect_resp *connect_rsp);
+
+#ifdef CONN_MGR_ADV_FEATURE
 /**
  * cm_store_first_candidate_rsp() - store the connection failure response
  * @cm_ctx: connection manager context
@@ -1368,11 +1388,6 @@ cm_get_first_candidate_rsp(struct cnx_mgr *cm_ctx, wlan_cm_id cm_id,
  */
 void cm_store_n_send_failed_candidate(struct cnx_mgr *cm_ctx, wlan_cm_id cm_id);
 #else
-static inline
-void cm_free_connect_rsp_ies(struct wlan_cm_connect_resp *connect_rsp)
-{
-}
-
 static inline
 void cm_store_first_candidate_rsp(struct cnx_mgr *cm_ctx, wlan_cm_id cm_id,
 				  struct wlan_cm_connect_resp *resp)

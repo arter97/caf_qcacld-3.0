@@ -205,6 +205,22 @@ bool wlan_cm_is_vdev_disconnected(struct wlan_objmgr_vdev *vdev);
  */
 bool wlan_cm_is_vdev_roaming(struct wlan_objmgr_vdev *vdev);
 
+/**
+ * wlan_cm_free_connect_req() - free up connect request and its sub memory
+ * @connect_req: Connect request
+ *
+ * Return: void
+ */
+void wlan_cm_free_connect_req(struct wlan_cm_connect_req *connect_req);
+
+/**
+ * wlan_cm_free_connect_resp() - free up connect response and its sub memory
+ * @connect_rsp: Connect response
+ *
+ * Return: void
+ */
+void wlan_cm_free_connect_resp(struct wlan_cm_connect_resp *connect_rsp);
+
 #ifdef WLAN_FEATURE_ROAM_OFFLOAD
 /**
  * wlan_cm_is_vdev_roam_started() - check if vdev is in roaming state and

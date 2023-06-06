@@ -875,7 +875,6 @@ static void cm_zero_and_free_memory(uint8_t *ptr, uint32_t len)
 	qdf_mem_free(ptr);
 }
 
-#ifdef CONN_MGR_ADV_FEATURE
 #ifdef WLAN_FEATURE_ROAM_OFFLOAD
 /**
  * cm_free_roaming_info() - Function to free all params in roaming info
@@ -962,6 +961,30 @@ void cm_free_connect_rsp_ies(struct wlan_cm_connect_resp *connect_rsp)
 	cm_free_roaming_info(connect_rsp);
 }
 
+static void cm_free_connect_req_param(struct wlan_cm_connect_req *req)
+{
+	cm_zero_and_free_memory(req->assoc_ie.ptr, req->assoc_ie.len);
+	cm_zero_and_free_memory(req->scan_ie.ptr, req->scan_ie.len);
+
+	cm_zero_and_free_memory(req->crypto.wep_keys.key,
+				req->crypto.wep_keys.key_len);
+	cm_zero_and_free_memory(req->crypto.wep_keys.seq,
+				req->crypto.wep_keys.seq_len);
+}
+
+void cm_free_connect_req(struct wlan_cm_connect_req *req)
+{
+	cm_free_connect_req_param(req);
+	cm_zero_and_free_memory((uint8_t *)req, sizeof(*req));
+}
+
+void cm_free_connect_rsp(struct wlan_cm_connect_resp *connect_rsp)
+{
+	cm_free_connect_rsp_ies(connect_rsp);
+	cm_zero_and_free_memory((uint8_t *)connect_rsp, sizeof(*connect_rsp));
+}
+
+#ifdef CONN_MGR_ADV_FEATURE
 /**
  * cm_free_first_connect_rsp() - Function to free all params in connect rsp
  * @req: pointer to connect req struct
@@ -978,8 +1001,7 @@ void cm_free_first_connect_rsp(struct cm_connect_req *req)
 	if (!connect_rsp)
 		return;
 
-	cm_free_connect_rsp_ies(connect_rsp);
-	cm_zero_and_free_memory((uint8_t *)connect_rsp, sizeof(*connect_rsp));
+	cm_free_connect_rsp(connect_rsp);
 }
 #else
 static inline
@@ -997,13 +1019,7 @@ void cm_free_connect_req_mem(struct cm_connect_req *connect_req)
 	if (connect_req->candidate_list)
 		wlan_scan_purge_results(connect_req->candidate_list);
 
-	cm_zero_and_free_memory(req->assoc_ie.ptr, req->assoc_ie.len);
-	cm_zero_and_free_memory(req->scan_ie.ptr, req->scan_ie.len);
-
-	cm_zero_and_free_memory(req->crypto.wep_keys.key,
-				req->crypto.wep_keys.key_len);
-	cm_zero_and_free_memory(req->crypto.wep_keys.seq,
-				req->crypto.wep_keys.seq_len);
+	cm_free_connect_req_param(req);
 
 	cm_free_first_connect_rsp(connect_req);
 
