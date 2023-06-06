@@ -209,7 +209,7 @@
 #include "wlan_epcs_api.h"
 #include "wlan_mlo_epcs_ucfg_api.h"
 #include <wlan_ll_sap_ucfg_api.h>
-
+#include <wlan_mlo_mgr_link_switch.h>
 /*
  * A value of 100 (milliseconds) can be sent to FW.
  * FW would enable Tx beamforming based on this.
@@ -22773,6 +22773,37 @@ add_key:
 	return errno;
 }
 
+static int wlan_add_key_inactive_link(struct hdd_adapter *adapter,
+				      struct wlan_objmgr_vdev *vdev,
+				      int link_id, u8 key_index,
+				      bool pairwise, struct key_params *params)
+{
+	int errno = 0;
+	struct hdd_context *hdd_ctx;
+	struct wlan_crypto_key *crypto_key = NULL;
+	struct mlo_link_info *ml_link_info;
+
+	hdd_ctx = WLAN_HDD_GET_CTX(adapter);
+
+	ml_link_info = mlo_mgr_get_ap_link_by_link_id(vdev, link_id);
+	if (!ml_link_info)
+		return QDF_STATUS_E_FAILURE;
+
+	crypto_key = qdf_mem_malloc(sizeof(*crypto_key));
+	if (!crypto_key)
+		return QDF_STATUS_E_NOMEM;
+
+	wlan_cfg80211_translate_ml_sta_key(
+	key_index,
+	(pairwise ? WLAN_CRYPTO_KEY_TYPE_UNICAST : WLAN_CRYPTO_KEY_TYPE_GROUP),
+	(uint8_t *)ml_link_info->link_addr.bytes, params, crypto_key);
+	errno = wlan_crypto_save_ml_sta_key(hdd_ctx->psoc, key_index,
+					    crypto_key,
+					    &ml_link_info->link_addr,
+					    link_id);
+	return errno;
+}
+
 static int wlan_hdd_add_key_mlo_vdev(mac_handle_t mac_handle,
 				     struct wlan_objmgr_vdev *vdev,
 				     u8 key_index, bool pairwise,
@@ -22844,7 +22875,9 @@ static int wlan_hdd_add_key_mlo_vdev(mac_handle_t mac_handle,
 	link_vdev = wlan_key_get_link_vdev(adapter, WLAN_MLO_MGR_ID, link_id);
 	if (!link_vdev) {
 		hdd_err("couldn't get vdev for link_id :%d", link_id);
-		return -EINVAL;
+		errno = wlan_add_key_inactive_link(adapter, vdev, link_id,
+						   key_index, pairwise, params);
+		return errno;
 	}
 
 	hdd_ctx = WLAN_HDD_GET_CTX(adapter);
