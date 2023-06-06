@@ -345,6 +345,7 @@ struct wlan_channel {
  *                      net dev address for non-ML connection
  * @mldaddr:            MLD address
  * @linkaddr:           Link MAC address
+ * @epcs_enable:        EPCS enable flag
  * @mlo_link_id: link id for mlo connection
  * @mlo_external_sae_auth: MLO external SAE auth
  * @wlan_vdev_mlo_lock: lock to protect the set/clear of
@@ -366,6 +367,7 @@ struct wlan_objmgr_vdev_mlme {
 	uint8_t  mldaddr[QDF_MAC_ADDR_SIZE];
 	uint8_t  linkaddr[QDF_MAC_ADDR_SIZE];
 #ifdef WLAN_FEATURE_11BE_MLO
+	bool epcs_enable;
 	uint8_t  mlo_link_id;
 	bool mlo_external_sae_auth;
 #ifdef WLAN_MLO_USE_SPINLOCK
@@ -1660,6 +1662,23 @@ static inline bool wlan_vdev_mlme_is_mlo_ap(struct wlan_objmgr_vdev *vdev)
 	return (wlan_vdev_mlme_get_opmode(vdev) == QDF_SAP_MODE) &&
 		wlan_vdev_mlme_is_mlo_vdev(vdev);
 }
+
+/**
+ * wlan_vdev_mlme_set_epcs_flag() - Set epcs flag for vdev
+ * @vdev: VDEV object
+ * @flag: True or Flase
+ *
+ * Return: void
+ */
+void wlan_vdev_mlme_set_epcs_flag(struct wlan_objmgr_vdev *vdev, bool flag);
+
+/**
+ * wlan_vdev_mlme_get_epcs_flag() - Get epcs flag for vdev
+ * @vdev: VDEV object
+ *
+ * Return: bool
+ */
+bool wlan_vdev_mlme_get_epcs_flag(struct wlan_objmgr_vdev *vdev);
 
 /**
  * wlan_vdev_mlme_set_mlo_vdev() - Set vdev as an MLO vdev

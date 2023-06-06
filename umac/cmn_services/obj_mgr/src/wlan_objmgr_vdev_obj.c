@@ -1528,6 +1528,26 @@ bool wlan_vdev_mlme_is_mlo_vdev(struct wlan_objmgr_vdev *vdev)
 
 qdf_export_symbol(wlan_vdev_mlme_is_mlo_vdev);
 
+void wlan_vdev_mlme_set_epcs_flag(struct wlan_objmgr_vdev *vdev, bool flag)
+{
+	if (!vdev) {
+		obj_mgr_err("vdev is NULL");
+		return;
+	}
+
+	vdev->vdev_mlme.epcs_enable = flag;
+}
+
+bool wlan_vdev_mlme_get_epcs_flag(struct wlan_objmgr_vdev *vdev)
+{
+	if (!vdev) {
+		obj_mgr_err("vdev is NULL");
+		return false;
+	}
+
+	return vdev->vdev_mlme.epcs_enable;
+}
+
 void wlan_vdev_mlme_set_mlo_vdev(struct wlan_objmgr_vdev *vdev)
 {
 	struct wlan_objmgr_pdev *pdev;
