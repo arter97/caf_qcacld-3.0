@@ -2176,7 +2176,8 @@ struct cdp_tx_completion_ppdu_user {
 	uint16_t phy_tx_time_us;
 	uint32_t mpdu_bytes;
 	uint8_t punc_mode;
-	uint16_t punc_pattern_bitmap;
+	uint32_t punc_pattern_bitmap:16,
+		fixed_rate_used:1;
 	uint32_t msduq_bitmap;
 	uint8_t mprot_type:3,
 		rts_success:1,
