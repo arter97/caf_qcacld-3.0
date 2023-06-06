@@ -41,6 +41,8 @@
 #define CWMAX_MASK 0xf
 #define CWMIN_MASK 0xf
 
+#define WMM_VENDOR_HEADER_LEN 7
+
 /**
  * enum wlan_epcs_evt: EPCS manager events
  * @WLAN_EPCS_EV_ACTION_FRAME_RX_REQ:Handle EPCS request frame received from AP

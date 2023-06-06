@@ -114,17 +114,22 @@ static void epcs_update_mu_ac_value(tSirMacEdcaParamRecord *edca,
 }
 
 static QDF_STATUS
-epcs_update_def_edca_param(struct wlan_objmgr_vdev *vdev,
-			   struct mac_context *mac_ctx,
-			   tSirMacEdcaParamRecord *edca)
+epcs_update_def_edca_param(struct wlan_objmgr_vdev *vdev)
 {
 	int i;
+	struct mac_context *mac_ctx;
+	tSirMacEdcaParamRecord edca[QCA_WLAN_AC_ALL] = {0};
+
+	mac_ctx = cds_get_context(QDF_MODULE_ID_PE);
+	if (!mac_ctx)
+		return QDF_STATUS_E_INVAL;
 
 	for (i = 0; i < QCA_WLAN_AC_ALL; i++) {
 		epcs_update_ac_value(&edca[i], &default_epcs_edca[i]);
 		edca[i].no_ack = mac_ctx->no_ack_policy_cfg[i];
 	}
 
+	mlme_debug("using default edca info");
 	return lim_send_epcs_update_edca_params(vdev, edca, false);
 }
 
@@ -143,8 +148,8 @@ epcs_update_edca_param(struct wlan_objmgr_vdev *vdev,
 
 	if (edca_ie->ie != DOT11F_EID_EDCAPARAMSET ||
 	    edca_ie->len != DOT11F_IE_EDCAPARAMSET_MIN_LEN) {
-		mlme_debug("edca info is not valid or not exist, using def");
-		return epcs_update_def_edca_param(vdev, mac_ctx, edca);
+		mlme_debug("edca info is not valid or not exist");
+		return QDF_STATUS_E_INVAL;
 	}
 
 	ac_record = edca_ie->ac_record;
@@ -152,6 +157,94 @@ epcs_update_edca_param(struct wlan_objmgr_vdev *vdev,
 		epcs_update_ac_value(&edca[i], &ac_record[i]);
 		edca[i].no_ack = mac_ctx->no_ack_policy_cfg[i];
 	}
+
+	return lim_send_epcs_update_edca_params(vdev, edca, false);
+}
+
+static QDF_STATUS
+epcs_update_ven_wmm_param(struct wlan_objmgr_vdev *vdev, uint8_t *ven_wme_ie)
+{
+	struct mac_context *mac_ctx;
+	tDot11fIEWMMParams wmm_para = {0};
+	tSirMacEdcaParamRecord edca[QCA_WLAN_AC_ALL] = {0};
+	uint32_t status;
+
+	mac_ctx = cds_get_context(QDF_MODULE_ID_PE);
+	if (!mac_ctx)
+		return QDF_STATUS_E_INVAL;
+
+	status = dot11f_unpack_ie_wmm_params(mac_ctx,
+					     ven_wme_ie + WMM_VENDOR_HEADER_LEN,
+					     DOT11F_IE_WMMPARAMS_MIN_LEN,
+					     &wmm_para, false);
+	if (status != DOT11F_PARSE_SUCCESS) {
+		mlme_debug("EPCS parsing wmm ie error");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	edca[QCA_WLAN_AC_BE].aci.rsvd = wmm_para.unused1;
+	edca[QCA_WLAN_AC_BE].aci.aci = wmm_para.acbe_aci;
+	edca[QCA_WLAN_AC_BE].aci.acm = wmm_para.acbe_acm;
+	edca[QCA_WLAN_AC_BE].aci.aifsn = wmm_para.acbe_aifsn;
+	edca[QCA_WLAN_AC_BE].cw.max = wmm_para.acbe_acwmax;
+	edca[QCA_WLAN_AC_BE].cw.min = wmm_para.acbe_acwmin;
+	edca[QCA_WLAN_AC_BE].txoplimit = wmm_para.acbe_txoplimit;
+	edca[QCA_WLAN_AC_BE].no_ack =
+				mac_ctx->no_ack_policy_cfg[QCA_WLAN_AC_BE];
+	mlme_debug("WMM BE aci %d, acm %d, aifsn %d, cwmax %d, cwmin %d",
+		   edca[QCA_WLAN_AC_BE].aci.aci,
+		   edca[QCA_WLAN_AC_BE].aci.acm,
+		   edca[QCA_WLAN_AC_BE].aci.aifsn,
+		   edca[QCA_WLAN_AC_BE].cw.max,
+		   edca[QCA_WLAN_AC_BE].cw.min);
+
+	edca[QCA_WLAN_AC_BK].aci.rsvd = wmm_para.unused2;
+	edca[QCA_WLAN_AC_BK].aci.aci = wmm_para.acbk_aci;
+	edca[QCA_WLAN_AC_BK].aci.acm = wmm_para.acbk_acm;
+	edca[QCA_WLAN_AC_BK].aci.aifsn = wmm_para.acbk_aifsn;
+	edca[QCA_WLAN_AC_BK].cw.max = wmm_para.acbk_acwmax;
+	edca[QCA_WLAN_AC_BK].cw.min = wmm_para.acbk_acwmin;
+	edca[QCA_WLAN_AC_BK].txoplimit = wmm_para.acbk_txoplimit;
+	edca[QCA_WLAN_AC_BK].no_ack =
+				mac_ctx->no_ack_policy_cfg[QCA_WLAN_AC_BK];
+	mlme_debug("WMM BK aci %d, acm %d, aifsn %d, cwmax %d, cwmin %d",
+		   edca[QCA_WLAN_AC_BK].aci.aci,
+		   edca[QCA_WLAN_AC_BK].aci.acm,
+		   edca[QCA_WLAN_AC_BK].aci.aifsn,
+		   edca[QCA_WLAN_AC_BK].cw.max,
+		   edca[QCA_WLAN_AC_BK].cw.min);
+
+	edca[QCA_WLAN_AC_VI].aci.rsvd = wmm_para.unused3;
+	edca[QCA_WLAN_AC_VI].aci.aci = wmm_para.acvi_aci;
+	edca[QCA_WLAN_AC_VI].aci.acm = wmm_para.acvi_acm;
+	edca[QCA_WLAN_AC_VI].aci.aifsn = wmm_para.acvi_aifsn;
+	edca[QCA_WLAN_AC_VI].cw.max = wmm_para.acvi_acwmax;
+	edca[QCA_WLAN_AC_VI].cw.min = wmm_para.acvi_acwmin;
+	edca[QCA_WLAN_AC_VI].txoplimit = wmm_para.acvi_txoplimit;
+	edca[QCA_WLAN_AC_VI].no_ack =
+				mac_ctx->no_ack_policy_cfg[QCA_WLAN_AC_VI];
+	mlme_debug("WMM VI aci %d, acm %d, aifsn %d, cwmax %d, cwmin %d",
+		   edca[QCA_WLAN_AC_VI].aci.aci,
+		   edca[QCA_WLAN_AC_VI].aci.acm,
+		   edca[QCA_WLAN_AC_VI].aci.aifsn,
+		   edca[QCA_WLAN_AC_VI].cw.max,
+		   edca[QCA_WLAN_AC_VI].cw.min);
+
+	edca[QCA_WLAN_AC_VO].aci.rsvd = wmm_para.unused4;
+	edca[QCA_WLAN_AC_VO].aci.aci = wmm_para.acvo_aci;
+	edca[QCA_WLAN_AC_VO].aci.acm = wmm_para.acvo_acm;
+	edca[QCA_WLAN_AC_VO].aci.aifsn = wmm_para.acvo_aifsn;
+	edca[QCA_WLAN_AC_VO].cw.max = wmm_para.acvo_acwmax;
+	edca[QCA_WLAN_AC_VO].cw.min = wmm_para.acvo_acwmin;
+	edca[QCA_WLAN_AC_VO].txoplimit = wmm_para.acvo_txoplimit;
+	edca[QCA_WLAN_AC_VO].no_ack =
+				mac_ctx->no_ack_policy_cfg[QCA_WLAN_AC_VO];
+	mlme_debug("WMM VO aci %d, acm %d, aifsn %d, cwmax %d, cwmin %d",
+		   edca[QCA_WLAN_AC_VO].aci.aci,
+		   edca[QCA_WLAN_AC_VO].aci.acm,
+		   edca[QCA_WLAN_AC_VO].aci.aifsn,
+		   edca[QCA_WLAN_AC_VO].cw.max,
+		   edca[QCA_WLAN_AC_VO].cw.min);
 
 	return lim_send_epcs_update_edca_params(vdev, edca, false);
 }
@@ -246,8 +339,16 @@ static QDF_STATUS epcs_handle_rx_req(struct wlan_objmgr_vdev *vdev,
 	for (i = 0; i < edca_info->num_links; i++) {
 		link = &edca_info->link_info[i];
 		link_vdev = mlo_get_vdev_by_link_id(vdev, link->link_id);
-		epcs_update_edca_param(link_vdev, &link->edca);
-		epcs_update_mu_edca_param(link_vdev, &link->muedca);
+		if (link->edca_ie_present)
+			epcs_update_edca_param(link_vdev, &link->edca);
+		else if (link->ven_wme_ie_present)
+			epcs_update_ven_wmm_param(link_vdev,
+						  &link->ven_wme_ie_bytes[0]);
+		else
+			epcs_update_def_edca_param(link_vdev);
+
+		if (link->muedca_ie_present)
+			epcs_update_mu_edca_param(link_vdev, &link->muedca);
 	}
 
 	args.category = ACTION_CATEGORY_PROTECTED_EHT;
@@ -316,8 +417,16 @@ static QDF_STATUS epcs_handle_rx_resp(struct wlan_objmgr_vdev *vdev,
 	for (i = 0; i < edca_info->num_links; i++) {
 		link = &edca_info->link_info[i];
 		link_vdev = mlo_get_vdev_by_link_id(vdev, link->link_id);
-		epcs_update_edca_param(link_vdev, &link->edca);
-		epcs_update_mu_edca_param(link_vdev, &link->muedca);
+		if (link->edca_ie_present)
+			epcs_update_edca_param(link_vdev, &link->edca);
+		else if (link->ven_wme_ie_present)
+			epcs_update_ven_wmm_param(link_vdev,
+						  &link->ven_wme_ie_bytes[0]);
+		else
+			epcs_update_def_edca_param(link_vdev);
+
+		if (link->muedca_ie_present)
+			epcs_update_mu_edca_param(link_vdev, &link->muedca);
 	}
 
 	epcs_info->state = EPCS_ENABLE;
