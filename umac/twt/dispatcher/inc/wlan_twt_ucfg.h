@@ -40,6 +40,14 @@ QDF_STATUS ucfg_twt_cfg_init(struct wlan_objmgr_psoc *psoc);
 QDF_STATUS ucfg_twt_enable_cmd(struct wlan_objmgr_pdev *pdev);
 
 /**
+ * ucfg_twt_disable_cmd) - ucfg API to disable TWT for a pdev
+ * @pdev: pointer to pdev
+ *
+ * Return: QDF_STATUS - Success or Failure
+ */
+QDF_STATUS ucfg_twt_disable_cmd(struct wlan_objmgr_pdev *pdev);
+
+/**
  * ucfg_twt_get_bcast) - ucfg API to get broadcast enable value
  * @psoc: pointer to psoc
  * @val: pointer reference to retrieved value
