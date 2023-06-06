@@ -1198,7 +1198,8 @@ static void cm_update_mlo_mgr_info(struct wlan_objmgr_vdev *vdev,
 	qdf_mem_copy(link_addr.bytes, join_req->entry->bssid.bytes,
 		     QDF_MAC_ADDR_SIZE);
 
-	/* Update the AP self link info */
+	/* Reset Previous info if any and update the AP self link info */
+	mlo_mgr_reset_ap_link_info(vdev);
 	mlo_mgr_update_ap_link_info(vdev, link_id, link_addr.bytes, channel);
 
 	partner_info = &join_req->partner_info;
