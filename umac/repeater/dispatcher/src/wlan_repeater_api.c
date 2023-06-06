@@ -2012,7 +2012,7 @@ wlan_rptr_disconnect_sec_stavap_cb(struct wlan_objmgr_psoc *psoc,
 	pdev_priv = wlan_rptr_get_pdev_priv(pdev);
 	sta_vdev = ext_cb->get_stavap(pdev);
 	wiphy = pdev_ospriv->wiphy;
-	if (wlan_cm_is_vdev_connected(sta_vdev) &&
+	if (sta_vdev && wlan_cm_is_vdev_connected(sta_vdev) &&
 	    !(qca_multi_link_is_primary_radio(wiphy))) {
 		wlan_mlme_cm_stop(sta_vdev, CM_SB_DISCONNECT,
 				  REASON_DISASSOC_NETWORK_LEAVING, NULL);
