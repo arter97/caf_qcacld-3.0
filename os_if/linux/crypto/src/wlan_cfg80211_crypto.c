@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2019-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -33,6 +33,30 @@
 #include "wlan_cfg80211_crypto.h"
 #include <wlan_cfg80211.h>
 #include <wlan_osif_request_manager.h>
+
+void wlan_cfg80211_translate_ml_sta_key(uint8_t key_index,
+					enum wlan_crypto_key_type key_type,
+					const u8 *mac_addr,
+					struct key_params *params,
+					struct wlan_crypto_key *crypto_key)
+{
+	qdf_mem_zero(crypto_key, sizeof(*crypto_key));
+	crypto_key->keylen = params->key_len;
+	crypto_key->keyix = key_index;
+	osif_debug("key_type %d, key_len %d, seq_len %d",
+		   key_type,
+		   params->key_len, params->seq_len);
+	qdf_mem_copy(&crypto_key->keyval[0], params->key, params->key_len);
+	qdf_mem_copy(&crypto_key->keyrsc[0], params->seq, params->seq_len);
+
+	crypto_key->key_type = key_type;
+	crypto_key->cipher_type = osif_nl_to_crypto_cipher_type(params->cipher);
+
+	qdf_mem_copy(&crypto_key->macaddr, mac_addr,
+		     QDF_MAC_ADDR_SIZE);
+	osif_debug("crypto key mac " QDF_MAC_ADDR_FMT,
+		   QDF_MAC_ADDR_REF(crypto_key->macaddr));
+}
 
 void wlan_cfg80211_translate_key(struct wlan_objmgr_vdev *vdev,
 				 uint8_t key_index,
