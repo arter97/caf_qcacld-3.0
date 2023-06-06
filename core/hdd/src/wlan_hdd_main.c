@@ -12214,12 +12214,29 @@ list_destroy:
 	return ret;
 }
 
-void hdd_psoc_idle_timer_start(struct hdd_context *hdd_ctx)
+#ifdef SHUTDOWN_WLAN_IN_SYSTEM_SUSPEND
+static void hdd_idle_timer_in_active(uint32_t timeout_ms)
 {
-	uint32_t timeout_ms = hdd_ctx->config->iface_change_wait_time;
+	/* do nothing because idle shutdown will be called in system
+	 * suspend prepare
+	 */
+}
+#else
+/* ensure idle shutdown can be called/finished once timer started */
+static void hdd_idle_timer_in_active(uint32_t timeout_ms)
+{
 	uint32_t suspend_timeout_ms;
 	enum wake_lock_reason reason =
 		WIFI_POWER_EVENT_WAKELOCK_IFACE_CHANGE_TIMER;
+
+	suspend_timeout_ms = timeout_ms + HDD_PSOC_IDLE_SHUTDOWN_SUSPEND_DELAY;
+	hdd_prevent_suspend_timeout(suspend_timeout_ms, reason);
+}
+#endif
+
+void hdd_psoc_idle_timer_start(struct hdd_context *hdd_ctx)
+{
+	uint32_t timeout_ms = hdd_ctx->config->iface_change_wait_time;
 
 	if (!timeout_ms) {
 		hdd_info("psoc idle timer is disabled");
@@ -12237,8 +12254,7 @@ void hdd_psoc_idle_timer_start(struct hdd_context *hdd_ctx)
 	}
 
 	qdf_delayed_work_start(&hdd_ctx->psoc_idle_timeout_work, timeout_ms);
-	suspend_timeout_ms = timeout_ms + HDD_PSOC_IDLE_SHUTDOWN_SUSPEND_DELAY;
-	hdd_prevent_suspend_timeout(suspend_timeout_ms, reason);
+	hdd_idle_timer_in_active(timeout_ms);
 }
 
 void hdd_psoc_idle_timer_stop(struct hdd_context *hdd_ctx)
