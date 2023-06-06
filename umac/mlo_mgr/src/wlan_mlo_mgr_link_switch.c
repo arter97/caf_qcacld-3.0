@@ -120,7 +120,28 @@ void mlo_mgr_update_link_info_reset(struct wlan_mlo_dev_context *ml_dev)
 	     link_info_iter++) {
 		qdf_mem_zero(&link_info->link_addr, QDF_MAC_ADDR_SIZE);
 		qdf_mem_zero(&link_info->ap_link_addr, QDF_MAC_ADDR_SIZE);
+		qdf_mem_zero(link_info->link_chan_info,
+			     sizeof(*link_info->link_chan_info));
 		link_info->vdev_id = WLAN_INVALID_VDEV_ID;
+		link_info->link_id = WLAN_INVALID_LINK_ID;
+		link_info++;
+	}
+}
+
+void mlo_mgr_reset_ap_link_info(struct wlan_objmgr_vdev *vdev)
+{
+	struct mlo_link_info *link_info;
+	uint8_t link_info_iter;
+
+	if (!vdev || !vdev->mlo_dev_ctx)
+		return;
+
+	link_info = &vdev->mlo_dev_ctx->link_ctx->links_info[0];
+
+	for (link_info_iter = 0; link_info_iter < 3; link_info_iter++) {
+		qdf_mem_zero(&link_info->ap_link_addr, QDF_MAC_ADDR_SIZE);
+		qdf_mem_zero(link_info->link_chan_info,
+			     sizeof(*link_info->link_chan_info));
 		link_info->link_id = WLAN_INVALID_LINK_ID;
 		link_info++;
 	}
