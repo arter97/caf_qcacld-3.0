@@ -106,7 +106,8 @@ bool dfs_is_radar_on_punc_chan(struct wlan_dfs *dfs, struct dfs_channel *chan)
 					     sub_freq_list[i]))
 			radar_punc_bitmap |=  1 << i;
 	}
-	return (radar_punc_bitmap == chan->dfs_ch_punc_pattern);
+	return ((radar_punc_bitmap & chan->dfs_ch_punc_pattern) ==
+		 radar_punc_bitmap);
 }
 #else
 static inline bool
