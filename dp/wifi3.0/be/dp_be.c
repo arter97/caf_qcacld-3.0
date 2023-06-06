@@ -2259,6 +2259,11 @@ static void dp_txrx_set_mlo_mcast_primary_vdev_param_be(
 	if (be_vdev->mcast_primary) {
 		struct cdp_txrx_peer_params_update params = {0};
 
+		dp_mlo_iter_ptnr_vdev(be_soc, be_vdev,
+				      dp_mlo_mcast_reset_pri_mcast,
+				      (void *)&be_vdev->mcast_primary,
+				      DP_MOD_ID_TX_MCAST);
+
 		params.chip_id = be_soc->mlo_chip_id;
 		params.pdev_id = be_vdev->vdev.pdev->pdev_id;
 		params.osif_vdev = be_vdev->vdev.osif_vdev;
