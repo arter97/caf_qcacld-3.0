@@ -1337,6 +1337,7 @@ MLO_MGR_TARGET_IF_DIR := $(WLAN_COMMON_ROOT)/target_if/mlo_mgr
 
 UMAC_MLO_MGR_CLD_DIR := components/umac/mlme/mlo_mgr
 UMAC_MLO_MGR_CLD_INC := -I$(WLAN_ROOT)/$(UMAC_MLO_MGR_CLD_DIR)/inc \
+			-I$(WLAN_ROOT)/$(UMAC_MLO_MGR_CLD_DIR)/dispatcher/inc \
 
 UMAC_MLO_MGR_INC := -I$(WLAN_COMMON_INC)/umac/mlo_mgr/inc \
 		    -I$(WLAN_COMMON_INC)/target_if/mlo_mgr/inc
@@ -1357,6 +1358,9 @@ UMAC_MLO_MGR_OBJS := $(UMAC_MLO_MGR_CMN_DIR)/src/wlan_mlo_mgr_main.o \
 			  $(UMAC_MLO_MGR_CLD_DIR)/src/wlan_mlo_mgr_roam.o \
 			  $(UMAC_MLO_MGR_CLD_DIR)/src/wlan_t2lm_api.o \
 			  $(UMAC_MLO_MGR_CMN_DIR)/src/wlan_mlo_t2lm.o \
+			  $(UMAC_MLO_MGR_CLD_DIR)/src/wlan_epcs_api.o \
+			  $(UMAC_MLO_MGR_CMN_DIR)/src/wlan_mlo_epcs.o \
+			  $(UMAC_MLO_MGR_CLD_DIR)/dispatcher/src/wlan_mlo_epcs_ucfg_api.o \
 
 $(call add-wlan-objs,umac_mlomgr,$(UMAC_MLO_MGR_OBJS))
 endif
