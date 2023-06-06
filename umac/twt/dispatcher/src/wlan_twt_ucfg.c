@@ -34,6 +34,13 @@ QDF_STATUS ucfg_twt_enable_cmd(struct wlan_objmgr_pdev *pdev)
 }
 qdf_export_symbol(ucfg_twt_enable_cmd);
 
+QDF_STATUS ucfg_twt_disable_cmd(struct wlan_objmgr_pdev *pdev)
+{
+
+	return wlan_twt_send_disable_cmd(pdev);
+}
+qdf_export_symbol(ucfg_twt_disable_cmd);
+
 QDF_STATUS
 ucfg_twt_cfg_get_bcast(struct wlan_objmgr_psoc *psoc, bool *val)
 {
