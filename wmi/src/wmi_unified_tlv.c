@@ -723,6 +723,8 @@ static const uint32_t vdev_param_tlv[] = {
 		  VDEV_PARAM_SET_DISABLED_SCHED_MODES),
 	PARAM_MAP(vdev_param_set_sap_ps_with_twt,
 		  VDEV_PARAM_SET_SAP_PS_WITH_TWT),
+	PARAM_MAP(vdev_param_rtt_11az_tb_max_session_expiry,
+		  VDEV_PARAM_RTT_11AZ_TB_MAX_SESSION_EXPIRY),
 };
 #endif
 
