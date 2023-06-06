@@ -5165,4 +5165,21 @@ policy_mgr_get_allowed_tdls_offchannel_freq(struct wlan_objmgr_psoc *psoc,
 					    struct wlan_objmgr_vdev *vdev,
 					    qdf_freq_t *ch_freq);
 #endif /* WLAN_FEATURE_TDLS_CONCURRENCIES */
+
+/**
+ * policy_mgr_is_sap_mode() - Check if mode is SAP mode
+ * @mode: Policy manager concurrency mode
+ *
+ * Return: true if mode is SAP mode else false
+ */
+bool policy_mgr_is_sap_mode(enum policy_mgr_con_mode mode);
+
+/**
+ * policy_mgr_is_beaconing_mode() - Check if mode represents beaconing entity
+ * @mode: Policy manager concurrency mode
+ *
+ * Return: true if mode represents beaconing entity else false
+ */
+bool policy_mgr_is_beaconing_mode(enum policy_mgr_con_mode mode);
+
 #endif /* __WLAN_POLICY_MGR_API_H */

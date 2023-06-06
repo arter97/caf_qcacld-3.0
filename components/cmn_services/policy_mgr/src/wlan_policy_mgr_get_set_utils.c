@@ -10608,3 +10608,21 @@ bool policy_mgr_is_conc_sap_present_on_sta_freq(struct wlan_objmgr_psoc *psoc,
 
 	return sap_go_exists;
 }
+
+bool policy_mgr_is_sap_mode(enum policy_mgr_con_mode mode)
+{
+	if (mode == PM_SAP_MODE || mode == PM_LL_LT_SAP_MODE)
+		return true;
+
+	return false;
+}
+
+bool policy_mgr_is_beaconing_mode(enum policy_mgr_con_mode mode)
+{
+	if (mode == PM_SAP_MODE || mode == PM_LL_LT_SAP_MODE ||
+	    mode == PM_P2P_GO_MODE)
+		return true;
+
+	return false;
+}
+
