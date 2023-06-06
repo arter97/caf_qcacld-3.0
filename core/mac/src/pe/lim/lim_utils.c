@@ -8677,6 +8677,9 @@ void lim_copy_bss_eht_cap(struct pe_session *session)
 
 	qdf_mem_copy(&session->eht_config, &mlme_priv->eht_config,
 		     sizeof(session->eht_config));
+
+	if (!wlan_epcs_get_config(session->vdev))
+		session->eht_config.epcs_pri_access = 0;
 }
 
 void lim_copy_join_req_eht_cap(struct pe_session *session)

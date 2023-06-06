@@ -56,6 +56,7 @@
 #include <utils_mlo.h>
 #endif
 #ifdef WLAN_FEATURE_11BE
+#include "wlan_epcs_api.h"
 #include <wlan_mlo_t2lm.h>
 #endif
 
@@ -9284,6 +9285,9 @@ QDF_STATUS populate_dot11f_eht_caps(struct mac_context *mac_ctx,
 			     sizeof(tDot11fIEeht_cap));
 		return QDF_STATUS_SUCCESS;
 	}
+
+	if (!wlan_epcs_get_config(session->vdev))
+		eht_cap->epcs_pri_access = 0;
 
 	/** TODO: String items needs attention. **/
 	qdf_mem_copy(eht_cap, &session->eht_config, sizeof(*eht_cap));

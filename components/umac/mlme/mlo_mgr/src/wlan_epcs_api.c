@@ -631,5 +631,39 @@ static QDF_STATUS epcs_deliver_cmd(struct wlan_objmgr_vdev *vdev,
 QDF_STATUS wlan_epcs_deliver_cmd(struct wlan_objmgr_vdev *vdev,
 				 enum wlan_epcs_evt event)
 {
+	if (!vdev)
+		return QDF_STATUS_E_FAILURE;
+
+	if (!wlan_vdev_mlme_get_epcs_flag(vdev)) {
+		mlme_info("EPCS has been disabled");
+		return QDF_STATUS_E_FAILURE;
+	}
+
 	return epcs_deliver_cmd(vdev, event);
+}
+
+QDF_STATUS wlan_epcs_set_config(struct wlan_objmgr_vdev *vdev, uint8_t flag)
+{
+	if (!vdev)
+		return QDF_STATUS_E_FAILURE;
+
+	if (flag)
+		wlan_vdev_mlme_set_epcs_flag(vdev, true);
+	else
+		wlan_vdev_mlme_set_epcs_flag(vdev, false);
+
+	return QDF_STATUS_SUCCESS;
+}
+
+bool wlan_epcs_get_config(struct wlan_objmgr_vdev *vdev)
+{
+	bool epcs_flag;
+
+	if (!vdev)
+		return false;
+
+	epcs_flag = wlan_vdev_mlme_get_epcs_flag(vdev);
+	mlme_debug("EPCS %s", epcs_flag ? "Enabled" : "Disabled");
+
+	return epcs_flag;
 }
