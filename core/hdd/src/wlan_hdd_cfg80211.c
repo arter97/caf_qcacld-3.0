@@ -8844,8 +8844,15 @@ static int hdd_config_mpdu_aggregation(struct hdd_adapter *adapter,
 		tb[QCA_WLAN_VENDOR_ATTR_CONFIG_TX_MPDU_AGGREGATION];
 	struct nlattr *rx_attr =
 		tb[QCA_WLAN_VENDOR_ATTR_CONFIG_RX_MPDU_AGGREGATION];
+	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
+	mac_handle_t mac_handle = hdd_ctx->mac_handle;
 	uint8_t tx_size, rx_size;
 	QDF_STATUS status;
+
+	if (!mac_handle) {
+		hdd_err("NULL Mac handle");
+		return -EINVAL;
+	}
 
 	/* nothing to do if neither attribute is present */
 	if (!tx_attr && !rx_attr)
@@ -8866,6 +8873,20 @@ static int hdd_config_mpdu_aggregation(struct hdd_adapter *adapter,
 			tx_size, rx_size);
 
 		return -EINVAL;
+	}
+
+	if (tx_size > 1)
+		sme_set_amsdu(mac_handle, true);
+	else
+		sme_set_amsdu(mac_handle, false);
+
+	hdd_debug("tx size: %d", tx_size);
+	status = wma_cli_set_command(adapter->deflink->vdev_id,
+				     GEN_VDEV_PARAM_AMSDU,
+				     tx_size, GEN_CMD);
+	if (status) {
+		hdd_err("Failed to set AMSDU param to FW, status %d", status);
+		return qdf_status_to_os_return(status);
 	}
 
 	status = wma_set_tx_rx_aggr_size(adapter->deflink->vdev_id,
@@ -12513,6 +12534,10 @@ __wlan_hdd_cfg80211_set_wifi_test_config(struct wiphy *wiphy,
 		else
 			/* Configure ADDBA req buffer size to 64 */
 			set_val = HDD_BA_MODE_64;
+
+		sme_set_ba_opmode(mac_handle, adapter->deflink->vdev_id,
+				  set_val);
+
 		ret_val = wma_cli_set_command(adapter->deflink->vdev_id,
 					      wmi_vdev_param_set_ba_mode,
 					      set_val, VDEV_CMD);
