@@ -6171,9 +6171,9 @@ dp_txrx_host_peer_stats_clr(struct dp_soc *soc,
 {
 	struct dp_txrx_peer *txrx_peer = NULL;
 	struct dp_peer *tgt_peer = NULL;
-	struct cdp_interface_peer_stats peer_stats_intf;
+	struct cdp_interface_peer_stats peer_stats_intf = {0};
 
-	qdf_mem_zero(&peer_stats_intf, sizeof(struct cdp_interface_peer_stats));
+	peer_stats_intf.rx_avg_snr = CDP_INVALID_SNR;
 
 	DP_STATS_CLR(peer);
 	/* Clear monitor peer stats */
