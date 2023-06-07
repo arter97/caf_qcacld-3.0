@@ -1343,7 +1343,7 @@ struct qdf_tso_frag_t {
  * @syn: syn
  * @rst: reset
  * @psh: push
- * @ack: aknowledge
+ * @ack: acknowledge
  * @urg: urg
  * @ece: ece
  * @cwr: cwr

@@ -874,7 +874,7 @@ QDF_STATUS reg_dmn_get_6g_opclasses_and_channels(struct wlan_objmgr_pdev *pdev,
 		op_class_tbl++;
 	}
 
-	/* Calculate total alloction size for the array */
+	/* Calculate total allocation size for the array */
 	total_alloc_size = 0;
 	for (i = 0; i < *num_opclasses; i++)
 		total_alloc_size += l_chansize_lst[i] * sizeof(uint8_t *);

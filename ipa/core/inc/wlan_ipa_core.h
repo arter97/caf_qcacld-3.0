@@ -525,7 +525,7 @@ void wlan_ipa_uc_rt_debug_host_dump(struct wlan_ipa_priv *ipa_ctx);
 
 /**
  * wlan_ipa_uc_rt_debug_destructor() - called by data packet free
- * @nbuff: packet pinter
+ * @nbuff: packet pointer
  *
  * when free data packet, will be invoked by wlan client and will increase
  * free counter

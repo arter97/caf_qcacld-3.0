@@ -311,7 +311,7 @@ struct hal_rx_mon_mpdu_info {
  * @msdu_count:              msdu count
  * @end_of_ppdu:             end of ppdu
  * @link_desc:               msdu link descriptor address
- * @status_buf:              for a PPDU, status buffers can span acrosss
+ * @status_buf:              for a PPDU, status buffers can span across
  *                           multiple buffers, status_buf points to first
  *                           status buffer address of PPDU
  * @drop_ppdu:               flag to indicate current destination

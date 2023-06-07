@@ -430,7 +430,7 @@ struct qca_napi_cpu {
  * @exec_map: bit map of instantiated exec contexts
  * @user_cpu_affin_mask: CPU affinity mask from INI config.
  * @napis:
- * @napi_cpu: cpu info for irq affinty
+ * @napi_cpu: cpu info for irq affinity
  * @lilcl_head:
  * @bigcl_head:
  * @napi_mode: irq affinity & clock voting mode

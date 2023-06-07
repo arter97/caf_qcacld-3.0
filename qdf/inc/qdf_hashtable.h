@@ -72,7 +72,7 @@
 /**
  * qdf_ht_add() - add an entry to a qdf_ht instance
  * @table: a non-pointer qdf_ht instance to add an entry to
- * @entry: pinter to a qdf_ht_entry instance to add to @table
+ * @entry: pointer to a qdf_ht_entry instance to add to @table
  * @key: the key to use for entry insertion and lookup
  *
  * Return: none

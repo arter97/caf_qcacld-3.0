@@ -1279,7 +1279,7 @@ enum qca_wlan_auth_type {
  *  NL80211_ATTR_STA_INFO
  * @QCA_WLAN_VENDOR_ATTR_GET_STATION_INFO_AP_STANDARD_NL80211_ATTR:
  *  Get the standard NL attributes Nested with this attribute.
- *  Ex : Query HT/VHT Capability advertized by the AP.
+ *  Ex : Query HT/VHT Capability advertised by the AP.
  *  NL80211_ATTR_VHT_CAPABILITY / NL80211_ATTR_HT_CAPABILITY
  * @QCA_WLAN_VENDOR_ATTR_GET_STATION_INFO_ROAM_COUNT:
  *  Number of successful Roam attempts before a
@@ -4967,12 +4967,12 @@ enum qca_wlan_vendor_attr_config {
 	 */
 	QCA_WLAN_VENDOR_ATTR_CONFIG_RX_MPDU_AGGREGATION = 9,
 	/*
-	 * 8-bit unsigned value to configure the Non aggregrate/11g sw
+	 * 8-bit unsigned value to configure the Non aggregate/11g sw
 	 * retry threshold (0 disable, 31 max).
 	 */
 	QCA_WLAN_VENDOR_ATTR_CONFIG_NON_AGG_RETRY = 10,
 	/*
-	 * 8-bit unsigned value to configure the aggregrate sw
+	 * 8-bit unsigned value to configure the aggregate sw
 	 * retry threshold (0 disable, 31 max).
 	 */
 	QCA_WLAN_VENDOR_ATTR_CONFIG_AGG_RETRY = 11,
@@ -5866,7 +5866,7 @@ enum qca_wlan_vendor_attr_ndp_params {
 };
 
 /**
- * enum qca_wlan_ndp_sub_cmd - NDP sub comands types for
+ * enum qca_wlan_ndp_sub_cmd - NDP sub commands types for
  * QCA_NL80211_VENDOR_SUBCMD_NDP.
  * @QCA_WLAN_VENDOR_ATTR_NDP_INVALID: invalid value
  * @QCA_WLAN_VENDOR_ATTR_NDP_INTERFACE_CREATE: Command to create a NAN

@@ -105,7 +105,7 @@ struct dp_ipa_uc_rx_hdr {
  * @psoc: control psoc object
  * @pdev_id: pdev id
  *
- * IPA componenet will return the IPA handle based on pdev_id
+ * IPA component will return the IPA handle based on pdev_id
  *
  * Return: IPA handle
  */
