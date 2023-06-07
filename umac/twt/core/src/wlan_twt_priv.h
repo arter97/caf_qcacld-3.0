@@ -91,6 +91,8 @@ struct twt_vdev_priv_obj {
  * @setup_done: setup done
  * @active_cmd: active command
  * @twt_ack_ctx: twt ack context
+ * @wake_dur: TWT wake duration
+ * @wake_interval: TWT wake interval
  */
 struct twt_session {
 	uint8_t dialog_id;
@@ -98,6 +100,8 @@ struct twt_session {
 	bool setup_done;
 	enum wlan_twt_commands active_cmd;
 	void *twt_ack_ctx;
+	uint32_t wake_dur;
+	uint32_t wake_interval;
 };
 
 /**
