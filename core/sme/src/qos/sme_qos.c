@@ -3984,7 +3984,7 @@ static QDF_STATUS sme_qos_process_del_ts_ind(struct mac_context *mac,
 	search_key.key.ac_type = ac;
 	search_key.index = SME_QOS_SEARCH_KEY_INDEX_2;
 	search_key.sessionId = sessionId;
-	/* find all Flows on the perticular AC & delete them, also send HDD
+	/* find all Flows on the particular AC & delete them, also send HDD
 	 * indication through the callback it registered per request
 	 */
 	if (!QDF_IS_STATUS_SUCCESS
@@ -6214,7 +6214,7 @@ static QDF_STATUS sme_qos_modify_fnp(struct mac_context *mac, tListElem *pEntry)
 
 /*
  * sme_qos_del_ts_ind_fnp() - Utility function (pointer) to find all Flows on
- *  the perticular AC & delete them, also send HDD indication through the
+ *  the particular AC & delete them, also send HDD indication through the
  * callback it registered per request
  *
  * mac - Pointer to the global MAC parameter structure.

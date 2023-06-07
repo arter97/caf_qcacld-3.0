@@ -3723,7 +3723,7 @@ struct chip_pwr_save_fail_detected_params {
  */
 #define DEFAULT_SCAN_IE_ID 256
 
- /* MAX_DEFAULT_SCAN_IE_LEN - Maxmimum length of Default Scan IE's */
+ /* MAX_DEFAULT_SCAN_IE_LEN - Maximum length of Default Scan IE's */
 #define MAX_DEFAULT_SCAN_IE_LEN 2048
 
  /* Extended Capabilities IE header(IE Id + IE Length) length */

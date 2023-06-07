@@ -1791,7 +1791,7 @@ bool sme_is_any_session_in_connected_state(mac_handle_t mac_handle);
 QDF_STATUS sme_pdev_set_hw_mode(struct policy_mgr_hw_mode msg);
 
 /**
- * sme_nss_update_request() - Send beacon templete update to FW with new
+ * sme_nss_update_request() - Send beacon template update to FW with new
  * nss value
  * @mac_handle: Handle returned by macOpen
  * @vdev_id: the session id

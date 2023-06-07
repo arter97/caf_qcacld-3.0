@@ -4770,7 +4770,7 @@ int hdd_wlan_start_modules(struct hdd_context *hdd_ctx, bool reinit)
 		/*
 		 * NAN compoenet requires certain operations like, open adapter,
 		 * close adapter, etc. to be initiated by HDD, for those
-		 * register HDD callbacks with UMAC's NAN componenet.
+		 * register HDD callbacks with UMAC's NAN component.
 		 */
 		hdd_nan_register_callbacks(hdd_ctx);
 
@@ -17786,7 +17786,7 @@ exit:
 /**
  * wlan_hdd_state_ctrl_param_release() -  Release callback for /dev/wlan.
  *
- * @inode: struct inode pinter.
+ * @inode: struct inode pointer.
  * @file: struct file pointer.
  *
  * Release callback that would be invoked when the file operations has
@@ -19498,7 +19498,7 @@ static int hdd_update_pmo_config(struct hdd_context *hdd_ctx)
 	 * 0 - Disable both magic pattern match and pattern byte match.
 	 * 1 - Enable magic pattern match on all interfaces.
 	 * 2 - Enable pattern byte match on all interfaces.
-	 * 3 - Enable both magic patter and pattern byte match on
+	 * 3 - Enable both magic pattern and pattern byte match on
 	 *     all interfaces.
 	 */
 	wow_enable = ucfg_pmo_get_wow_enable(hdd_ctx->psoc);

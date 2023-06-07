@@ -1261,12 +1261,12 @@ static QDF_STATUS wma_wow_set_wake_time(WMA_HANDLE wma_handle, uint8_t vdev_id,
 	int ret;
 	tp_wma_handle wma = (tp_wma_handle)wma_handle;
 
-	wma_debug("send timer patter with time: %d and vdev = %d to fw",
-		 time, vdev_id);
+	wma_debug("send timer pattern with time: %d and vdev = %d to fw",
+		  time, vdev_id);
 	ret = wmi_unified_wow_timer_pattern_cmd(wma->wmi_handle, vdev_id,
 						cookie, time);
 	if (ret) {
-		wma_err("Failed to send timer patter to fw");
+		wma_err("Failed to send timer pattern to fw");
 		return QDF_STATUS_E_FAILURE;
 	}
 

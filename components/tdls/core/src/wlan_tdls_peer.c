@@ -491,7 +491,7 @@ tdls_find_first_connected_peer(struct tdls_vdev_priv_obj *vdev_obj)
  * @vdev_obj: TDLS vdev object
  * @peer: TDLS peer
  * @channel: pointer to channel
- * @opclass: pinter to opclass
+ * @opclass: pointer to opclass
  *
  * Function determines the channel and operating class
  *

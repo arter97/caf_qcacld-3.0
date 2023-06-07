@@ -1004,8 +1004,8 @@ static inline int pld_get_driver_load_cnt(struct device *dev)
  * @dev: device
  * @vote: 0 for enable PCIE PC, 1 for disable PCIE PC
  *
- * This is for PCIE power collaps control during suspend/resume.
- * When PCIE power collaps is disabled, WLAN FW can access memory
+ * This is for PCIE power collapse control during suspend/resume.
+ * When PCIE power collapse is disabled, WLAN FW can access memory
  * through PCIE when system is suspended.
  *
  * Return: 0 for success

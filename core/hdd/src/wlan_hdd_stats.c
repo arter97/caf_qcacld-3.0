@@ -6003,7 +6003,7 @@ bool hdd_report_max_rate(struct wlan_hdd_link_info *link_info,
  * hdd_report_actual_rate() - Fill the actual rate stats.
  * @rate_flags: The rate flags computed from rate
  * @my_rate: The rate from fw stats
- * @rate: The station_info struct member strust rate_info to be filled
+ * @rate: The station_info struct member struct rate_info to be filled
  * @mcs_index: The mcs index computed from rate
  * @nss: The NSS from fw stats
  * @dcm: the dcm computed from rate
