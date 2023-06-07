@@ -337,6 +337,8 @@ static const uint32_t vdev_param_non_tlv[] = {
 		WMI_VDEV_PARAM_ENABLE_DISABLE_RTT_RESPONDER_ROLE,
 	[wmi_vdev_param_rtt_11az_tb_max_session_expiry] =
 		WMI_UNAVAILABLE_PARAM,
+	[wmi_vdev_param_rtt_11az_ntb_max_time_bw_meas] =
+		WMI_UNAVAILABLE_PARAM,
 };
 #endif
 
