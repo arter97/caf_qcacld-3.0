@@ -1586,6 +1586,12 @@ struct ol_if_ops {
 					    uint8_t *target_pdev_id);
 	bool (*is_roam_inprogress)(uint32_t vdev_id);
 	enum QDF_GLOBAL_MODE (*get_con_mode)(void);
+#if defined(WLAN_FEATURE_11BE_MLO) && defined(WLAN_MLO_MULTI_CHIP)
+	uint8_t (*peer_get_num_mlo_links)(struct cdp_ctrl_objmgr_psoc *psoc,
+					  uint8_t vdev_id,
+					  uint8_t *peer_macaddr,
+					  bool is_mld_peer);
+#endif
 #ifdef QCA_PEER_MULTIQ_SUPPORT
 	int (*peer_ast_flowid_map)(struct cdp_ctrl_objmgr_psoc *ol_soc_handle,
 				   uint16_t peer_id, uint8_t vdev_id,
