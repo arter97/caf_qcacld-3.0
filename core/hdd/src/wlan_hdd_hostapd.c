@@ -5439,6 +5439,22 @@ QDF_STATUS wlan_hdd_config_acs(struct hdd_context *hdd_ctx,
 				sap_config->acs_cfg.skip_scan_status =
 							eSAP_DO_NEW_ACS_SCAN;
 
+			if (sap_config->acs_cfg.skip_scan_status ==
+			    eSAP_DO_PAR_ACS_SCAN &&
+			    (sap_config->acs_cfg.start_ch_freq >
+			    sap_config->acs_cfg.skip_scan_range1_endch ||
+			    sap_config->acs_cfg.end_ch_freq <
+			    sap_config->acs_cfg.skip_scan_range1_stch) &&
+			    ((!sap_config->acs_cfg.skip_scan_range2_stch &&
+			    !sap_config->acs_cfg.skip_scan_range2_endch) ||
+			    (sap_config->acs_cfg.start_ch_freq >
+			    sap_config->acs_cfg.skip_scan_range2_endch ||
+			    sap_config->acs_cfg.end_ch_freq <
+			    sap_config->acs_cfg.skip_scan_range2_stch))) {
+				hdd_debug("Skip partial scan range1/2 out of ACS");
+				sap_config->acs_cfg.skip_scan_status =
+					eSAP_SKIP_ACS_SCAN;
+			}
 
 			hdd_debug("SecAP ACS Skip=%d, ACS CH RANGE=%d-%d, %d-%d",
 				  sap_config->acs_cfg.skip_scan_status,
