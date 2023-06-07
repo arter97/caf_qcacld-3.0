@@ -895,6 +895,8 @@ mlo_roam_copy_reassoc_rsp(struct wlan_objmgr_vdev *vdev,
 		return QDF_STATUS_E_NULL_VALUE;
 
 	if (sta_ctx) {
+		wlan_cm_free_connect_resp(sta_ctx->copied_reassoc_rsp);
+
 		sta_ctx->copied_reassoc_rsp = qdf_mem_malloc(
 				sizeof(struct wlan_cm_connect_resp));
 		if (!sta_ctx->copied_reassoc_rsp)
@@ -906,8 +908,10 @@ mlo_roam_copy_reassoc_rsp(struct wlan_objmgr_vdev *vdev,
 		sta_ctx->copied_reassoc_rsp->roaming_info = qdf_mem_malloc(
 				sizeof(struct wlan_roam_sync_info));
 
-		if (!sta_ctx->copied_reassoc_rsp->roaming_info)
+		if (!sta_ctx->copied_reassoc_rsp->roaming_info) {
+			qdf_mem_free(sta_ctx->copied_reassoc_rsp);
 			return QDF_STATUS_E_NOMEM;
+		}
 
 		qdf_mem_copy(sta_ctx->copied_reassoc_rsp->roaming_info,
 			     reassoc_rsp->roaming_info,
@@ -921,8 +925,11 @@ mlo_roam_copy_reassoc_rsp(struct wlan_objmgr_vdev *vdev,
 		connect_ies->assoc_rsp.ptr = qdf_mem_malloc(
 				connect_ies->assoc_rsp.len);
 
-		if (!connect_ies->assoc_rsp.ptr)
+		if (!connect_ies->assoc_rsp.ptr) {
+			qdf_mem_free(sta_ctx->copied_reassoc_rsp->roaming_info);
+			qdf_mem_free(sta_ctx->copied_reassoc_rsp);
 			return QDF_STATUS_E_NOMEM;
+		}
 
 		qdf_mem_copy(connect_ies->assoc_rsp.ptr,
 			     reassoc_rsp->connect_ies.assoc_rsp.ptr,
@@ -940,52 +947,6 @@ mlo_roam_copy_reassoc_rsp(struct wlan_objmgr_vdev *vdev,
 	}
 
 	return QDF_STATUS_SUCCESS;
-}
-
-static void
-mlo_roam_free_connect_rsp(struct wlan_cm_connect_resp *rsp)
-{
-	struct wlan_connect_rsp_ies *connect_ie =
-						&rsp->connect_ies;
-
-	if (connect_ie->assoc_req.ptr) {
-		qdf_mem_free(connect_ie->assoc_req.ptr);
-		connect_ie->assoc_req.ptr = NULL;
-	}
-
-	if (connect_ie->bcn_probe_rsp.ptr) {
-		qdf_mem_free(connect_ie->bcn_probe_rsp.ptr);
-		connect_ie->bcn_probe_rsp.ptr = NULL;
-	}
-
-	if (connect_ie->link_bcn_probe_rsp.ptr) {
-		qdf_mem_free(connect_ie->link_bcn_probe_rsp.ptr);
-		connect_ie->link_bcn_probe_rsp.ptr = NULL;
-	}
-
-	if (connect_ie->assoc_rsp.ptr) {
-		qdf_mem_free(connect_ie->assoc_rsp.ptr);
-		connect_ie->assoc_rsp.ptr = NULL;
-	}
-
-	if (connect_ie->fils_ie && connect_ie->fils_ie->fils_pmk) {
-		qdf_mem_zero(connect_ie->fils_ie->fils_pmk,
-			     connect_ie->fils_ie->fils_pmk_len);
-		qdf_mem_free(connect_ie->fils_ie->fils_pmk);
-	}
-
-	if (connect_ie->fils_ie) {
-		qdf_mem_zero(connect_ie->fils_ie, sizeof(*connect_ie->fils_ie));
-		qdf_mem_free(connect_ie->fils_ie);
-	}
-
-	if (rsp->roaming_info) {
-		qdf_mem_free(rsp->roaming_info);
-		rsp->roaming_info = NULL;
-	}
-
-	qdf_mem_zero(rsp, sizeof(*rsp));
-	qdf_mem_free(rsp);
 }
 
 static bool
@@ -1058,7 +1019,7 @@ mlo_roam_validate_req(struct wlan_objmgr_vdev *vdev,
 	      !mlo_roam_is_internal_disconnect(link_vdev)))) {
 		if (sta_ctx) {
 			if (sta_ctx->copied_reassoc_rsp) {
-				mlo_roam_free_connect_rsp(sta_ctx->copied_reassoc_rsp);
+				wlan_cm_free_connect_resp(sta_ctx->copied_reassoc_rsp);
 				sta_ctx->copied_reassoc_rsp = NULL;
 			}
 			copied_conn_req_lock_acquire(sta_ctx);
@@ -1082,7 +1043,7 @@ mlo_roam_validate_req(struct wlan_objmgr_vdev *vdev,
 			 * flushed. Hence, ignore this event
 			 */
 			if (sta_ctx && sta_ctx->copied_reassoc_rsp) {
-				mlo_roam_free_connect_rsp(sta_ctx->copied_reassoc_rsp);
+				wlan_cm_free_connect_resp(sta_ctx->copied_reassoc_rsp);
 				sta_ctx->copied_reassoc_rsp = NULL;
 			}
 			return QDF_STATUS_E_FAILURE;
@@ -1224,7 +1185,7 @@ void mlo_roam_free_copied_reassoc_rsp(struct wlan_objmgr_vdev *vdev)
 	    !sta_ctx->copied_reassoc_rsp->roaming_info)
 		return;
 
-	mlo_roam_free_connect_rsp(sta_ctx->copied_reassoc_rsp);
+	wlan_cm_free_connect_resp(sta_ctx->copied_reassoc_rsp);
 	sta_ctx->copied_reassoc_rsp = NULL;
 }
 
@@ -1250,7 +1211,7 @@ void mlo_roam_connect_complete(struct wlan_objmgr_vdev *vdev)
 	auth_status = sta_ctx->copied_reassoc_rsp->roaming_info->auth_status;
 	if (!mlo_check_connect_req_bmap(vdev) &&
 	    auth_status == ROAM_AUTH_STATUS_CONNECTED) {
-		mlo_roam_free_connect_rsp(sta_ctx->copied_reassoc_rsp);
+		wlan_cm_free_connect_resp(sta_ctx->copied_reassoc_rsp);
 		sta_ctx->copied_reassoc_rsp = NULL;
 	}
 }
@@ -1369,7 +1330,7 @@ err:
 	if (link_vdev)
 		mlo_clear_connect_req_links_bmap(link_vdev);
 	if (sta_ctx && sta_ctx->copied_reassoc_rsp) {
-		mlo_roam_free_connect_rsp(sta_ctx->copied_reassoc_rsp);
+		wlan_cm_free_connect_resp(sta_ctx->copied_reassoc_rsp);
 		sta_ctx->copied_reassoc_rsp = NULL;
 	}
 end:
