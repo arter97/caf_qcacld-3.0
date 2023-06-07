@@ -9253,7 +9253,7 @@ void lim_ieee80211_pack_ehtcap(uint8_t *ie, tDot11fIEeht_cap dot11f_eht_cap,
 
 #ifdef WLAN_SUPPORT_TWT
 static void
-populate_dot11f_twt_eht_cap(struct mac_context *mac,
+populate_dot11f_rtwt_eht_cap(struct mac_context *mac,
 			    tDot11fIEeht_cap *eht_cap)
 {
 	bool restricted_support = false;
@@ -9266,8 +9266,8 @@ populate_dot11f_twt_eht_cap(struct mac_context *mac,
 }
 #else
 static inline void
-populate_dot11f_twt_eht_cap(struct mac_context *mac_ctx,
-			    tDot11fIEhe_cap *eht_cap)
+populate_dot11f_rtwt_eht_cap(struct mac_context *mac,
+			    tDot11fIEeht_cap *eht_cap)
 {
 	eht_cap->restricted_twt = false;
 }
@@ -9290,7 +9290,7 @@ QDF_STATUS populate_dot11f_eht_caps(struct mac_context *mac_ctx,
 	if (session->ch_width != CH_WIDTH_320MHZ)
 		eht_cap->support_320mhz_6ghz = 0;
 
-	populate_dot11f_twt_eht_cap(mac_ctx, eht_cap);
+	populate_dot11f_rtwt_eht_cap(mac_ctx, eht_cap);
 	return QDF_STATUS_SUCCESS;
 }
 
@@ -9309,6 +9309,7 @@ populate_dot11f_eht_caps_by_band(struct mac_context *mac_ctx,
 			     &mac_ctx->eht_cap_5g,
 			     sizeof(tDot11fIEeht_cap));
 
+	populate_dot11f_rtwt_eht_cap(mac_ctx, eht_cap);
 	return QDF_STATUS_SUCCESS;
 }
 
