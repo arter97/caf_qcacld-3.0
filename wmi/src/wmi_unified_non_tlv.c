@@ -335,6 +335,8 @@ static const uint32_t vdev_param_non_tlv[] = {
 	[wmi_vdev_param_sifs_trigger_rate] = WMI_VDEV_PARAM_SIFS_TRIGGER_RATE,
 	[wmi_vdev_param_enable_disable_rtt_responder_role] =
 		WMI_VDEV_PARAM_ENABLE_DISABLE_RTT_RESPONDER_ROLE,
+	[wmi_vdev_param_rtt_11az_tb_max_session_expiry] =
+		WMI_UNAVAILABLE_PARAM,
 };
 #endif
 
