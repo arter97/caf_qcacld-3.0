@@ -24,8 +24,20 @@
  * Enum for SAWF rule operation
  */
 enum {
-	WLAN_CFG80211_SAWF_RULE_ADD,
+	WLAN_CFG80211_SAWF_RULE_ADD = 16,
 	WLAN_CFG80211_SAWF_RULE_DELETE,
+};
+
+/*
+ * Enum for SAWF rule attribute
+ *
+ * @SAWF_RULE_IN_PARAM_DST_MAC: Destination MAC
+ * @SAWF_RULE_IN_PARAM_SRC_MAC: Source MAC
+ */
+enum {
+	SAWF_RULE_IN_PARAM_DST_MAC,
+	SAWF_RULE_IN_PARAM_SRC_MAC,
+	SAWF_RULE_PARAM_MAX,
 };
 
 /*
@@ -33,19 +45,17 @@ enum {
  *
  * @rule_id: Rule id
  * @req_type: Request type
- * @output_tid: TID
- * @classifier_type: Classifier type
  * @service_class_id: Service class ID
- *
+ * @param_bitmap: Bitmap of set rules
  * @dst_mac: Destination MAC address
  * @src_mac: Source MAC address
  */
-struct sawf_rule_config_intf {
+struct wlan_sawf_rule {
 	uint32_t rule_id;
 	uint8_t req_type;
-	uint8_t output_tid;
-	uint8_t classifier_type;
 	uint8_t service_class_id;
+
+	qdf_bitmap(param_bitmap, SAWF_RULE_PARAM_MAX);
 
 	uint8_t dst_mac[QDF_MAC_ADDR_SIZE];
 	uint8_t src_mac[QDF_MAC_ADDR_SIZE];
@@ -62,5 +72,5 @@ struct sawf_rule_config_intf {
  */
 void wlan_cfg80211_sawf_send_rule(struct wiphy *wiphy,
 				  struct wireless_dev *wdev,
-				  struct sawf_rule_config_intf *rule);
+				  struct wlan_sawf_rule *rule);
 #endif /* _WLAN_CFG80211_SAWF_H_ */
