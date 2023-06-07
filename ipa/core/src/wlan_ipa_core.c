@@ -4680,16 +4680,16 @@ static void wlan_ipa_uc_op_cb(struct op_msg_type *op_msg,
 		wlan_ipa_uc_loaded_handler(ipa_ctx);
 		qdf_mutex_release(&ipa_ctx->ipa_lock);
 	} else if (msg->op_code == WLAN_IPA_FILTER_RSV_NOTIFY) {
-		qdf_mutex_acquire(&ipa_ctx->ipa_lock);
 		ipa_info("opt_dp: IPA notify filter resrv response: %d",
 			 msg->rsvd);
+		qdf_mutex_acquire(&ipa_ctx->ipa_lock);
 		qdf_ipa_wdi_opt_dpath_notify_flt_rsvd_per_inst(ipa_ctx->hdl,
 							       msg->rsvd);
 		qdf_mutex_release(&ipa_ctx->ipa_lock);
 	} else if (msg->op_code == WLAN_IPA_FILTER_REL_NOTIFY) {
-		qdf_mutex_acquire(&ipa_ctx->ipa_lock);
 		ipa_info("opt_dp: IPA notify filter rel_response: %d",
 			 msg->rsvd);
+		qdf_mutex_acquire(&ipa_ctx->ipa_lock);
 		qdf_ipa_wdi_opt_dpath_notify_flt_rlsd_per_inst(ipa_ctx->hdl,
 							       msg->rsvd);
 		qdf_mutex_release(&ipa_ctx->ipa_lock);
