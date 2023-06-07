@@ -7027,7 +7027,7 @@ static QDF_STATUS
 wlan_mlme_update_vdev_chwidth_with_notify(struct wlan_objmgr_psoc *psoc,
 					  struct wlan_objmgr_vdev *vdev,
 					  uint8_t vdev_id,
-					  enum phy_ch_width ch_width)
+					  wmi_host_channel_width ch_width)
 {
 	struct vdev_mlme_obj *vdev_mlme;
 	struct vdev_set_params param = {0};
@@ -7293,6 +7293,7 @@ wlan_mlme_send_ch_width_update_with_notify(struct wlan_objmgr_psoc *psoc,
 					   enum phy_ch_width ch_width)
 {
 	QDF_STATUS status;
+	wmi_host_channel_width wmi_chan_width;
 	enum phy_ch_width associated_ch_width;
 	struct wlan_channel *des_chan;
 	struct mlme_legacy_priv *mlme_priv;
@@ -7328,9 +7329,11 @@ wlan_mlme_send_ch_width_update_with_notify(struct wlan_objmgr_psoc *psoc,
 		return status;
 	}
 
+	wmi_chan_width = target_if_phy_ch_width_to_wmi_chan_width(ch_width);
+
 	/* update ch width to fw */
 	status = wlan_mlme_update_vdev_chwidth_with_notify(psoc, vdev, vdev_id,
-							   ch_width);
+							   wmi_chan_width);
 	if (QDF_IS_STATUS_ERROR(status))
 		mlme_err("vdev %d: Failed to update CW:%d to fw, status:%d",
 			 vdev_id, ch_width, status);

@@ -8442,6 +8442,18 @@ const struct nla_policy wlan_hdd_wifi_config_policy[
 	[QCA_WLAN_VENDOR_ATTR_CONFIG_UL_MU_CONFIG] = {.type = NLA_U8},
 	[QCA_WLAN_VENDOR_ATTR_CONFIG_AP_ALLOWED_FREQ_LIST] = {
 		.type = NLA_NESTED},
+	[QCA_WLAN_VENDOR_ATTR_CONFIG_MLO_LINKS] = {
+		.type = NLA_NESTED },
+};
+
+#define WLAN_MAX_LINK_ID 15
+
+static const struct nla_policy bandwidth_mlo_policy[
+			QCA_WLAN_VENDOR_ATTR_CONFIG_MAX + 1] = {
+	[QCA_WLAN_VENDOR_ATTR_CONFIG_CHANNEL_WIDTH] = {
+		.type = NLA_U8 },
+	[QCA_WLAN_VENDOR_ATTR_CONFIG_MLO_LINK_ID] = {
+		.type = NLA_U8 },
 };
 
 static const struct nla_policy
@@ -10860,36 +10872,88 @@ static uint32_t hdd_mac_chwidth_to_bonding_mode(
 }
 
 int hdd_set_mac_chan_width(struct hdd_adapter *adapter,
-			   enum eSirMacHTChannelWidth chwidth)
+			   enum eSirMacHTChannelWidth chwidth,
+			   uint8_t link_id)
 {
 	uint32_t bonding_mode;
 
 	bonding_mode = hdd_mac_chwidth_to_bonding_mode(chwidth);
 
-	return hdd_update_channel_width(adapter, chwidth, bonding_mode);
+	return hdd_update_channel_width(adapter, chwidth,
+					bonding_mode, link_id);
 }
 
 /**
  * hdd_set_channel_width() - set channel width
  * @link_info: Link info pointer in HDD adapter.
- * @attr: nla attr sent by supplicant
+ * @tb: array of pointer to struct nlattr
  *
  * Return: 0 on success, negative errno on failure
  */
 static int hdd_set_channel_width(struct wlan_hdd_link_info *link_info,
-				 const struct nlattr *attr)
+				 struct nlattr *tb[])
 {
-	uint8_t nl80211_chwidth;
-	enum eSirMacHTChannelWidth chwidth;
+	int rem;
+	uint8_t nl80211_chwidth = 0xFF;
+	uint8_t link_id = 0xFF;
+	struct nlattr *tb2[QCA_WLAN_VENDOR_ATTR_CONFIG_MAX + 1];
+	struct nlattr *curr_attr;
+	struct nlattr *chn_bd = NULL;
+	struct nlattr *mlo_link_id;
 
-	nl80211_chwidth = nla_get_u8(attr);
-	chwidth = hdd_nl80211_chwidth_to_chwidth(nl80211_chwidth);
-	if (chwidth < 0) {
+	if (!tb[QCA_WLAN_VENDOR_ATTR_CONFIG_MLO_LINKS])
+		goto skip_mlo;
+
+	nla_for_each_nested(curr_attr,
+			    tb[QCA_WLAN_VENDOR_ATTR_CONFIG_MLO_LINKS], rem) {
+		if (wlan_cfg80211_nla_parse_nested(tb2,
+						QCA_WLAN_VENDOR_ATTR_CONFIG_MAX,
+						   curr_attr,
+						   bandwidth_mlo_policy)){
+			hdd_err_rl("nla_parse failed");
+			return -EINVAL;
+		}
+
+		chn_bd = tb2[QCA_WLAN_VENDOR_ATTR_CONFIG_CHANNEL_WIDTH];
+		mlo_link_id = tb2[QCA_WLAN_VENDOR_ATTR_CONFIG_MLO_LINK_ID];
+
+		if (!chn_bd || !mlo_link_id)
+			return 0;
+
+		nl80211_chwidth = nla_get_u8(chn_bd);
+		if (nl80211_chwidth < eHT_CHANNEL_WIDTH_20MHZ ||
+		    nl80211_chwidth > eHT_MAX_CHANNEL_WIDTH) {
+			hdd_err("Invalid channel width:%u", nl80211_chwidth);
+			return -EINVAL;
+		}
+
+		link_id = nla_get_u8(mlo_link_id);
+		if (link_id > WLAN_MAX_LINK_ID) {
+			hdd_debug("invalid link_id:%u", link_id);
+			return -EINVAL;
+		}
+	}
+
+	if (link_id != 0xFF)
+		goto set_chan_width;
+
+skip_mlo:
+	chn_bd = tb[QCA_WLAN_VENDOR_ATTR_CONFIG_CHANNEL_WIDTH];
+
+	if (!chn_bd)
+		return 0;
+
+	nl80211_chwidth = nla_get_u8(chn_bd);
+
+	if (nl80211_chwidth < eHT_CHANNEL_WIDTH_20MHZ ||
+	    nl80211_chwidth > eHT_MAX_CHANNEL_WIDTH) {
 		hdd_err("Invalid channel width");
 		return -EINVAL;
 	}
 
-	return hdd_set_mac_chan_width(link_info->adapter, chwidth);
+set_chan_width:
+	return hdd_set_mac_chan_width(link_info->adapter,
+				      nl80211_chwidth, link_id);
 }
 
 /**
@@ -11833,8 +11897,6 @@ static const struct independent_setters independent_setters[] = {
 	 hdd_config_tx_stbc},
 	{QCA_WLAN_VENDOR_ATTR_CONFIG_RX_STBC,
 	 hdd_config_rx_stbc},
-	{QCA_WLAN_VENDOR_ATTR_CONFIG_CHANNEL_WIDTH,
-	 hdd_set_channel_width},
 	{QCA_WLAN_VENDOR_ATTR_CONFIG_DYNAMIC_BW,
 	 hdd_set_dynamic_bw},
 	{QCA_WLAN_VENDOR_ATTR_CONFIG_NSS,
@@ -12681,6 +12743,7 @@ static const interdependent_setter_fn interdependent_setters[] = {
 	hdd_process_generic_set_cmd,
 	hdd_config_phy_mode,
 	hdd_config_power,
+	hdd_set_channel_width,
 };
 
 /**
@@ -12981,6 +13044,7 @@ __wlan_hdd_cfg80211_set_wifi_test_config(struct wiphy *wiphy,
 	uint8_t wmm_mode = 0;
 	uint32_t bss_max_idle_period = 0;
 	uint32_t cmd_id;
+	uint8_t link_id = 0xFF;
 	struct keep_alive_req keep_alive_req = {0};
 	struct set_wfatest_params wfa_param = {0};
 	struct wlan_hdd_link_info *link_info = adapter->link_info;
@@ -13695,7 +13759,8 @@ __wlan_hdd_cfg80211_set_wifi_test_config(struct wiphy *wiphy,
 		if (cfg_val)
 			hdd_update_channel_width(
 					adapter, eHT_CHANNEL_WIDTH_20MHZ,
-					WNI_CFG_CHANNEL_BONDING_MODE_DISABLE);
+					WNI_CFG_CHANNEL_BONDING_MODE_DISABLE,
+					link_id);
 	}
 
 	cmd_id = QCA_WLAN_VENDOR_ATTR_WIFI_TEST_CONFIG_ER_SU_PPDU_TYPE;
@@ -13705,7 +13770,8 @@ __wlan_hdd_cfg80211_set_wifi_test_config(struct wiphy *wiphy,
 		if (cfg_val) {
 			hdd_update_channel_width(
 					adapter, eHT_CHANNEL_WIDTH_20MHZ,
-					WNI_CFG_CHANNEL_BONDING_MODE_DISABLE);
+					WNI_CFG_CHANNEL_BONDING_MODE_DISABLE,
+					link_id);
 			hdd_set_tx_stbc(link_info, 0);
 			hdd_set_11ax_rate(adapter, 0x400, NULL);
 			status = wma_cli_set_command(
@@ -13725,6 +13791,7 @@ __wlan_hdd_cfg80211_set_wifi_test_config(struct wiphy *wiphy,
 		} else {
 			hdd_update_channel_width(
 					adapter, eHT_CHANNEL_WIDTH_160MHZ,
+					link_id,
 					WNI_CFG_CHANNEL_BONDING_MODE_ENABLE);
 			hdd_set_tx_stbc(link_info, 1);
 			hdd_set_11ax_rate(adapter, 0xFFFF, NULL);

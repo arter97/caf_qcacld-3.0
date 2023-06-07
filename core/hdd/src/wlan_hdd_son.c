@@ -145,6 +145,7 @@ static int hdd_son_set_chwidth(struct wlan_objmgr_vdev *vdev,
 {
 	enum eSirMacHTChannelWidth chwidth;
 	struct wlan_hdd_link_info *link_info;
+	uint8_t link_id = 0xFF;
 
 	if (!vdev) {
 		hdd_err("null vdev");
@@ -159,7 +160,7 @@ static int hdd_son_set_chwidth(struct wlan_objmgr_vdev *vdev,
 
 	chwidth = hdd_son_chan_width_to_chan_width(son_chwidth);
 
-	return hdd_set_mac_chan_width(link_info->adapter, chwidth);
+	return hdd_set_mac_chan_width(link_info->adapter, chwidth, link_id);
 }
 
 /**

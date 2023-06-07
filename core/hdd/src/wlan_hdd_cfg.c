@@ -2415,7 +2415,7 @@ static QDF_STATUS hdd_update_bss_rate_flags(struct hdd_adapter *adapter,
 
 int hdd_update_channel_width(struct hdd_adapter *adapter,
 			     enum eSirMacHTChannelWidth chwidth,
-			     uint32_t bonding_mode)
+			     uint32_t bonding_mode, uint8_t link_id)
 {
 	struct hdd_context *hdd_ctx;
 	struct sme_config_params *sme_config;
@@ -2436,7 +2436,8 @@ int hdd_update_channel_width(struct hdd_adapter *adapter,
 			  adapter->deflink->vdev_id, ch_width);
 		status =
 		    ucfg_mlme_send_ch_width_update_with_notify(hdd_ctx->psoc,
-					adapter->deflink->vdev_id, ch_width);
+					adapter->deflink->vdev_id, ch_width,
+					link_id);
 		if (QDF_IS_STATUS_ERROR(status))
 			return -EIO;
 		status = hdd_update_bss_rate_flags(adapter, hdd_ctx->psoc,

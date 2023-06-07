@@ -21420,6 +21420,7 @@ uint8_t *hdd_ch_width_str(enum phy_ch_width ch_width)
 int hdd_we_set_ch_width(struct wlan_hdd_link_info *link_info, int ch_width)
 {
 	int i;
+	uint8_t link_id = 0xFF;
 
 	/* updating channel bonding only on 5Ghz */
 	hdd_debug("wmi_vdev_param_chwidth val %d", ch_width);
@@ -21430,7 +21431,8 @@ int hdd_we_set_ch_width(struct wlan_hdd_link_info *link_info, int ch_width)
 			continue;
 
 		return hdd_update_channel_width(link_info->adapter, ch_width,
-						chwidth_info[i].bonding_mode);
+						chwidth_info[i].bonding_mode,
+						link_id);
 	}
 
 	hdd_err("Invalid ch_width %d", ch_width);
