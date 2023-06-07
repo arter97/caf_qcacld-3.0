@@ -1731,6 +1731,23 @@ struct sta_ap_intf_check_work_ctx {
 };
 
 /**
+ * union conc_ext_flag - extended flags for concurrency check
+ *
+ * @mlo: the new connection is MLO
+ * @mlo_link_assoc_connected: the new connection is secondary MLO link and
+ *  the corresponding assoc link is connected
+ * @value: uint32 value for extended flags
+ */
+union conc_ext_flag {
+	struct {
+		uint32_t mlo: 1;
+		uint32_t mlo_link_assoc_connected: 1;
+	};
+
+	uint32_t value;
+};
+
+/**
  * enum indoor_conc_update_type - Indoor concurrency update type
  * @CONNECT: On a new STA connection
  * @DISCONNECT_WITHOUT_CONCURRENCY: On a STA disconnection with no active

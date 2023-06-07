@@ -5554,6 +5554,184 @@ static bool policy_mgr_is_6g_channel_allowed(
 }
 
 #ifdef WLAN_FEATURE_11BE_MLO
+static bool policy_mgr_is_acs_2ghz_only_sap(struct wlan_objmgr_psoc *psoc,
+					    uint8_t sap_vdev_id)
+{
+	struct policy_mgr_psoc_priv_obj *pm_ctx;
+	uint32_t acs_band = QCA_ACS_MODE_IEEE80211ANY;
+
+	pm_ctx = policy_mgr_get_context(psoc);
+	if (!pm_ctx) {
+		policy_mgr_err("Invalid Context");
+		return false;
+	}
+
+	if (pm_ctx->hdd_cbacks.wlan_get_sap_acs_band)
+		pm_ctx->hdd_cbacks.wlan_get_sap_acs_band(psoc,
+							 sap_vdev_id,
+							 &acs_band);
+
+	if (acs_band == QCA_ACS_MODE_IEEE80211B ||
+	    acs_band == QCA_ACS_MODE_IEEE80211G)
+		return true;
+
+	return false;
+}
+
+bool policy_mgr_vdev_is_force_inactive(struct wlan_objmgr_psoc *psoc,
+				       uint8_t vdev_id)
+{
+	bool force_inactive = false;
+	uint8_t conn_index;
+	struct policy_mgr_psoc_priv_obj *pm_ctx;
+
+	pm_ctx = policy_mgr_get_context(psoc);
+	if (!pm_ctx) {
+		policy_mgr_err("Invalid Context");
+		return false;
+	}
+
+	qdf_mutex_acquire(&pm_ctx->qdf_conc_list_lock);
+	/* Get disabled link info as well and keep it at last */
+	for (conn_index = 0; conn_index < MAX_NUMBER_OF_DISABLE_LINK;
+	     conn_index++) {
+		if (pm_disabled_ml_links[conn_index].in_use &&
+		    pm_disabled_ml_links[conn_index].mode == PM_STA_MODE &&
+		    pm_disabled_ml_links[conn_index].vdev_id == vdev_id) {
+			force_inactive = true;
+			break;
+		}
+	}
+	qdf_mutex_release(&pm_ctx->qdf_conc_list_lock);
+
+	return force_inactive;
+}
+
+/* MCC avoidance priority value for different legacy connection type.
+ * Internal macro, not expected used other code.
+ * Bigger value have higher priority.
+ */
+#define PRIORITY_STA	3
+#define PRIORITY_SAP	2
+#define PRIORITY_P2P	1
+#define PRIORITY_OTHER	0
+
+uint8_t
+policy_mgr_get_legacy_conn_info(struct wlan_objmgr_psoc *psoc,
+				uint8_t *vdev_lst,
+				qdf_freq_t *freq_lst,
+				enum policy_mgr_con_mode *mode_lst,
+				uint8_t lst_sz)
+{
+	struct policy_mgr_psoc_priv_obj *pm_ctx;
+	uint8_t conn_index, j = 0, i, k, n;
+	struct wlan_objmgr_vdev *vdev;
+	uint8_t vdev_id;
+	uint8_t has_priority[MAX_NUMBER_OF_CONC_CONNECTIONS];
+
+	pm_ctx = policy_mgr_get_context(psoc);
+	if (!pm_ctx) {
+		policy_mgr_err("Invalid Context");
+		return 0;
+	}
+
+	qdf_mutex_acquire(&pm_ctx->qdf_conc_list_lock);
+	for (conn_index = 0; conn_index < MAX_NUMBER_OF_CONC_CONNECTIONS;
+	     conn_index++) {
+		if (j >= lst_sz)
+			break;
+		if (!pm_conc_connection_list[conn_index].in_use)
+			continue;
+		vdev_id = pm_conc_connection_list[conn_index].vdev_id;
+		vdev = wlan_objmgr_get_vdev_by_id_from_psoc(
+				pm_ctx->psoc, vdev_id, WLAN_POLICY_MGR_ID);
+		if (!vdev) {
+			policy_mgr_err("invalid vdev for id %d", vdev_id);
+			continue;
+		}
+
+		if (wlan_vdev_mlme_is_mlo_vdev(vdev) &&
+		    pm_conc_connection_list[conn_index].mode ==
+							PM_STA_MODE) {
+			wlan_objmgr_vdev_release_ref(vdev, WLAN_POLICY_MGR_ID);
+			continue;
+		}
+		if (pm_conc_connection_list[conn_index].mode !=
+							PM_STA_MODE &&
+		    pm_conc_connection_list[conn_index].mode !=
+							PM_SAP_MODE &&
+		    pm_conc_connection_list[conn_index].mode !=
+							PM_P2P_CLIENT_MODE &&
+		    pm_conc_connection_list[conn_index].mode !=
+							PM_P2P_GO_MODE) {
+			wlan_objmgr_vdev_release_ref(vdev, WLAN_POLICY_MGR_ID);
+			continue;
+		}
+
+		/* Set mcc avoidance priority value. The bigger value
+		 * have higher priority to avoid MCC. In 3 Port concurrency
+		 * case, usually we can only meet the higher priority intf's
+		 * MCC avoidance by force inactive link.
+		 */
+		if (pm_conc_connection_list[conn_index].mode == PM_STA_MODE)
+			has_priority[j] = PRIORITY_STA;
+		else if (pm_conc_connection_list[conn_index].mode ==
+							PM_SAP_MODE &&
+			 policy_mgr_is_acs_2ghz_only_sap(psoc, vdev_id))
+			has_priority[j] = PRIORITY_SAP;
+		else if ((pm_conc_connection_list[conn_index].mode ==
+							PM_P2P_CLIENT_MODE ||
+			  pm_conc_connection_list[conn_index].mode ==
+							PM_P2P_GO_MODE) &&
+			 policy_mgr_is_vdev_high_tput_or_low_latency(
+							psoc, vdev_id))
+			has_priority[j] = PRIORITY_P2P;
+		else
+			has_priority[j] = PRIORITY_OTHER;
+
+		vdev_lst[j] = vdev_id;
+		freq_lst[j] = pm_conc_connection_list[conn_index].freq;
+		mode_lst[j] = pm_conc_connection_list[conn_index].mode;
+		policy_mgr_debug("vdev %d freq %d mode %s pri %d",
+				 vdev_id, freq_lst[j],
+				 device_mode_to_string(mode_lst[j]),
+				 has_priority[j]);
+		j++;
+		wlan_objmgr_vdev_release_ref(vdev, WLAN_POLICY_MGR_ID);
+	}
+	/* sort the list based on priority */
+	for (i = 0; i < j; i++) {
+		uint8_t tmp_vdev_lst;
+		qdf_freq_t tmp_freq_lst;
+		enum policy_mgr_con_mode tmp_mode_lst;
+
+		n = i;
+		for (k = i + 1; k < j; k++) {
+			if (has_priority[n] < has_priority[k])
+				n = k;
+			else if ((has_priority[n] == has_priority[k]) &&
+				 (vdev_lst[n] > vdev_lst[k]))
+				n = k;
+		}
+		if (n == i)
+			continue;
+		tmp_vdev_lst = vdev_lst[i];
+		tmp_freq_lst = freq_lst[i];
+		tmp_mode_lst = mode_lst[i];
+
+		vdev_lst[i] = vdev_lst[n];
+		freq_lst[i] = freq_lst[n];
+		mode_lst[i] = mode_lst[n];
+
+		vdev_lst[n] = tmp_vdev_lst;
+		freq_lst[n] = tmp_freq_lst;
+		mode_lst[n] = tmp_mode_lst;
+	}
+	qdf_mutex_release(&pm_ctx->qdf_conc_list_lock);
+
+	return j;
+}
+
 static void
 policy_mgr_fill_ml_active_link_vdev_bitmap(struct mlo_link_set_active_req *req,
 					   uint8_t *mlo_vdev_lst,
@@ -6731,7 +6909,7 @@ policy_mgr_is_mode_p2p_sap(enum policy_mgr_con_mode mode)
 	       (mode == PM_P2P_GO_MODE);
 }
 
-static bool
+bool
 policy_mgr_is_vdev_high_tput_or_low_latency(struct wlan_objmgr_psoc *psoc,
 					    uint8_t vdev_id)
 {
@@ -6750,31 +6928,7 @@ policy_mgr_is_vdev_high_tput_or_low_latency(struct wlan_objmgr_psoc *psoc,
 	return is_vdev_ll_ht;
 }
 
-static bool policy_mgr_is_acs_2ghz_only_sap(struct wlan_objmgr_psoc *psoc,
-					    uint8_t sap_vdev_id)
-{
-	struct policy_mgr_psoc_priv_obj *pm_ctx;
-	uint32_t acs_band = QCA_ACS_MODE_IEEE80211ANY;
-
-	pm_ctx = policy_mgr_get_context(psoc);
-	if (!pm_ctx) {
-		policy_mgr_err("Invalid Context");
-		return false;
-	}
-
-	if (pm_ctx->hdd_cbacks.wlan_get_sap_acs_band)
-		pm_ctx->hdd_cbacks.wlan_get_sap_acs_band(psoc,
-							 sap_vdev_id,
-							 &acs_band);
-
-	if (acs_band == QCA_ACS_MODE_IEEE80211B ||
-	    acs_band == QCA_ACS_MODE_IEEE80211G)
-		return true;
-
-	return false;
-}
-
-static bool
+bool
 policy_mgr_check_2ghz_only_sap_affected_link(
 			struct wlan_objmgr_psoc *psoc,
 			uint8_t sap_vdev_id,
@@ -6955,27 +7109,49 @@ policy_mgr_get_ml_sta_and_p2p_cli_go_sap_info(
  * @psoc: psoc ctx
  * @ml_freq_lst: ML STA freq list
  * @ml_vdev_lst: ML STA vdev id list
+ * @ml_linkid_lst: ML STA link id list
  * @num_ml_sta: Number of total ML STA links
+ * @affected_linkid_bitmap: link id bitmap which home channels are in MCC
+ * with each other
  *
  * Return: true if ML link in MCC else false
  */
-static bool
+bool
 policy_mgr_is_ml_sta_links_in_mcc(struct wlan_objmgr_psoc *psoc,
 				  qdf_freq_t *ml_freq_lst,
 				  uint8_t *ml_vdev_lst,
-				  uint8_t num_ml_sta)
+				  uint8_t *ml_linkid_lst,
+				  uint8_t num_ml_sta,
+				  uint32_t *affected_linkid_bitmap)
 {
 	uint8_t i, j;
+	uint32_t link_id_bitmap;
 
 	for (i = 0; i < num_ml_sta; i++) {
+		link_id_bitmap = 0;
+		if (ml_linkid_lst)
+			link_id_bitmap = 1 << ml_linkid_lst[i];
 		for (j = i + 1; j < num_ml_sta; j++) {
 			if (ml_freq_lst[i] != ml_freq_lst[j] &&
 			    policy_mgr_2_freq_always_on_same_mac(
 					psoc, ml_freq_lst[i], ml_freq_lst[j])) {
-				policy_mgr_debug("vdev %d and %d are in MCC with freq %d and freq %d",
-						 ml_vdev_lst[i], ml_vdev_lst[j],
-						 ml_freq_lst[i],
-						 ml_freq_lst[j]);
+				if (ml_vdev_lst)
+					policy_mgr_debug("vdev %d and %d are in MCC with freq %d and freq %d",
+							 ml_vdev_lst[i],
+							 ml_vdev_lst[j],
+							 ml_freq_lst[i],
+							 ml_freq_lst[j]);
+				if (ml_linkid_lst) {
+					link_id_bitmap |= 1 << ml_linkid_lst[j];
+					policy_mgr_debug("link %d and %d are in MCC with freq %d and freq %d",
+							 ml_linkid_lst[i],
+							 ml_linkid_lst[j],
+							 ml_freq_lst[i],
+							 ml_freq_lst[j]);
+					if (affected_linkid_bitmap)
+						*affected_linkid_bitmap =
+							link_id_bitmap;
+				}
 				return true;
 			}
 		}
@@ -7022,7 +7198,9 @@ policy_mgr_handle_mcc_ml_sta(struct wlan_objmgr_psoc *psoc,
 	}
 
 	if (!policy_mgr_is_ml_sta_links_in_mcc(psoc, ml_freq_lst,
-					       ml_sta_vdev_lst, num_ml_sta))
+					       ml_sta_vdev_lst, NULL,
+					       num_ml_sta,
+					       NULL))
 		return QDF_STATUS_E_FAILURE;
 
 	/*
@@ -7067,7 +7245,8 @@ policy_mgr_sta_ml_link_enable_allowed(struct wlan_objmgr_psoc *psoc,
 	if (!num_disabled_ml_sta || num_ml_sta < 2)
 		return false;
 	if (policy_mgr_is_ml_sta_links_in_mcc(psoc, ml_freq_lst, ml_vdev_lst,
-					      num_ml_sta))
+					      NULL, num_ml_sta,
+					      NULL))
 		return false;
 	/* Disabled link is at the last index */
 	disabled_link_vdev_id = ml_vdev_lst[num_ml_sta - 1];

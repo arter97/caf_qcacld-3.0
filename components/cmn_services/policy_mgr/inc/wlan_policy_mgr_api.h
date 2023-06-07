@@ -4779,6 +4779,95 @@ bool policy_mgr_is_mlo_sta_disconnected(struct wlan_objmgr_psoc *psoc,
 
 #ifdef WLAN_FEATURE_11BE_MLO
 /*
+ * policy_mgr_is_ml_sta_links_in_mcc() - Check ML links are in MCC or not
+ * @psoc: psoc ctx
+ * @ml_freq_lst: ML STA freq list
+ * @ml_vdev_lst: ML STA vdev id list
+ * @ml_linkid_lst: ML STA link id list
+ * @num_ml_sta: Number of total ML STA links
+ * @affected_linkid_bitmap: link id bitmap which home channels are in MCC
+ * with each other
+ *
+ * Return: true if ML link in MCC else false
+ */
+bool
+policy_mgr_is_ml_sta_links_in_mcc(struct wlan_objmgr_psoc *psoc,
+				  qdf_freq_t *ml_freq_lst,
+				  uint8_t *ml_vdev_lst,
+				  uint8_t *ml_linkid_lst,
+				  uint8_t num_ml_sta,
+				  uint32_t *affected_linkid_bitmap);
+
+/**
+ * policy_mgr_is_vdev_high_tput_or_low_latency() - Check vdev has
+ * high througput or low latency flag
+ * @psoc: PSOC object information
+ * @vdev_id: vdev id
+ *
+ * Return: true if vdev has high throughput or low latency flag
+ */
+bool
+policy_mgr_is_vdev_high_tput_or_low_latency(struct wlan_objmgr_psoc *psoc,
+					    uint8_t vdev_id);
+
+/**
+ * policy_mgr_check_2ghz_only_sap_affected_link() - Check force inactive
+ * link is needed for 2.4 GHz only sap
+ * @psoc: PSOC object information
+ * @sap_vdev_id: sap vdev id
+ * @sap_ch_freq: sap channel frequency
+ * @ml_ch_freq_num: ML STA link num
+ * @ml_freq_lst: ML STA link frequency list
+ *
+ * Return: true if 2.4 GHz only sap present and need to force inactive
+ * ML link
+ */
+bool
+policy_mgr_check_2ghz_only_sap_affected_link(
+			struct wlan_objmgr_psoc *psoc,
+			uint8_t sap_vdev_id,
+			qdf_freq_t sap_ch_freq,
+			uint8_t ml_ch_freq_num,
+			qdf_freq_t *ml_freq_lst);
+
+/**
+ * policy_mgr_vdev_is_force_inactive() - Check force inactive or not
+ * for the vdev id
+ * @psoc: PSOC object information
+ * @vdev_id: vdev id
+ *
+ * Return: true if the vdev is in force inactive
+ */
+bool policy_mgr_vdev_is_force_inactive(struct wlan_objmgr_psoc *psoc,
+				       uint8_t vdev_id);
+
+/**
+ * policy_mgr_get_legacy_conn_info() - Get legacy connection info
+ * @psoc: PSOC object information
+ * @vdev_lst: vdev id list
+ * @freq_lst: channel frequency list
+ * @mode_lst: vdev mode list
+ * @lst_sz: array size of above parameters
+ *
+ * This API will return the legacy STA/SAP/P2P connection info.
+ * If a connection want to avoid MCC with ML STA, that connection
+ * will be put in head of array list. And in 3 Port concurrency
+ * case (ML STA + 2 legacy Connections), usually we can only meet
+ * the high priority connection's MCC avoidance, so this API will
+ * return sorted lists based on the priority. Right now we don't
+ * clear requirement on which legacy interface has higher priority,
+ * here we follow this order: STA, SAP, P2P.
+ *
+ * Return: number of legacy connection count
+ */
+uint8_t
+policy_mgr_get_legacy_conn_info(struct wlan_objmgr_psoc *psoc,
+				uint8_t *vdev_lst,
+				qdf_freq_t *freq_lst,
+				enum policy_mgr_con_mode *mode_lst,
+				uint8_t lst_sz);
+
+/*
  * policy_mgr_get_ml_sta_info_psoc() - Get number of ML STA vdev ids and
  * freq list
  * @pm_ctx: pm_ctx ctx

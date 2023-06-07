@@ -23,6 +23,40 @@
 #include <wlan_mlo_mgr_cmn.h>
 #include <wlan_mlo_mgr_public_structs.h>
 
+/**
+ * enum ml_nlink_change_event_type - Ml link state change trigger event
+ * @ml_nlink_link_switch_start_evt: link switch start
+ * @ml_nlink_link_switch_completion_evt: link switch done
+ * @ml_nlink_roam_sync_start_evt: roam sync start
+ * @ml_nlink_roam_sync_completion_evt: roam sync completion
+ * @ml_nlink_connect_start_evt: STA/CLI connect start
+ * @ml_nlink_connect_completion_evt: STA/CLI connect completion
+ * @ml_nlink_disconnect_start_evt: STA/CLI disconnect start
+ * @ml_nlink_disconnect_completion_evt: STA/CLI disconnect completion
+ * @ml_nlink_ap_started_evt: SAP/GO bss started
+ * @ml_nlink_ap_stopped_evt: SAP/GO bss stopped
+ * @ml_nlink_connection_updated_evt: connection home channel changed
+ */
+enum ml_nlink_change_event_type {
+	ml_nlink_link_switch_start_evt,
+	ml_nlink_link_switch_completion_evt,
+	ml_nlink_roam_sync_start_evt,
+	ml_nlink_roam_sync_completion_evt,
+	ml_nlink_connect_start_evt,
+	ml_nlink_connect_completion_evt,
+	ml_nlink_disconnect_start_evt,
+	ml_nlink_disconnect_completion_evt,
+	ml_nlink_ap_started_evt,
+	ml_nlink_ap_stopped_evt,
+	ml_nlink_connection_updated_evt,
+};
+
+/**
+ * struct ml_nlink_change_event - connection change event data struct
+ */
+struct ml_nlink_change_event {
+};
+
 #ifdef WLAN_FEATURE_11BE_MLO
 static inline const char *force_mode_to_string(uint32_t mode)
 {
@@ -47,6 +81,41 @@ static inline const char *force_mode_to_string(uint32_t mode)
 			 (_force_state)->force_active_num, \
 			 (_force_state)->force_active_num_bitmap, \
 			 ##args);
+
+static inline const char *link_evt_to_string(uint32_t evt)
+{
+	switch (evt) {
+	CASE_RETURN_STRING(ml_nlink_link_switch_start_evt);
+	CASE_RETURN_STRING(ml_nlink_link_switch_completion_evt);
+	CASE_RETURN_STRING(ml_nlink_roam_sync_start_evt);
+	CASE_RETURN_STRING(ml_nlink_roam_sync_completion_evt);
+	CASE_RETURN_STRING(ml_nlink_connect_start_evt);
+	CASE_RETURN_STRING(ml_nlink_connect_completion_evt);
+	CASE_RETURN_STRING(ml_nlink_disconnect_start_evt);
+	CASE_RETURN_STRING(ml_nlink_disconnect_completion_evt);
+	CASE_RETURN_STRING(ml_nlink_ap_started_evt);
+	CASE_RETURN_STRING(ml_nlink_ap_stopped_evt);
+	CASE_RETURN_STRING(ml_nlink_connection_updated_evt);
+	default:
+		return "Unknown";
+	}
+};
+
+/**
+ * ml_nlink_conn_change_notify() - Notify connection state
+ * change to force link module
+ * @psoc: pointer to pdev
+ * @vdev_id: vdev id
+ * @evt: event type
+ * @data: event data
+ *
+ * Return: QDF_STATUS_SUCCESS in the case of success
+ */
+QDF_STATUS
+ml_nlink_conn_change_notify(struct wlan_objmgr_psoc *psoc,
+			    uint8_t vdev_id,
+			    enum ml_nlink_change_event_type evt,
+			    struct ml_nlink_change_event *data);
 
 /**
  * ml_nlink_convert_linkid_bitmap_to_vdev_bitmap() - convert link
@@ -200,5 +269,14 @@ ml_nlink_get_curr_force_state(struct wlan_objmgr_psoc *psoc,
 void
 ml_nlink_clr_force_state(struct wlan_objmgr_psoc *psoc,
 			 struct wlan_objmgr_vdev *vdev);
+#else
+static inline QDF_STATUS
+ml_nlink_conn_change_notify(struct wlan_objmgr_psoc *psoc,
+			    uint8_t vdev_id,
+			    enum ml_nlink_change_event_type evt,
+			    struct ml_nlink_change_event *data)
+{
+	return QDF_STATUS_SUCCESS;
+}
 #endif
 #endif
