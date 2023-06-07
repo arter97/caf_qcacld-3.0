@@ -2954,8 +2954,9 @@ static QDF_STATUS __wlan_ipa_wlan_evt(qdf_netdev_t net_dev, uint8_t device_mode,
 	struct wlan_objmgr_vdev *vdev;
 	bool ipa_wds = false;
 
-	ipa_debug("%s: EVT: %d, MAC: "QDF_MAC_ADDR_FMT", session_id: %u",
-		  net_dev->name, type, QDF_MAC_ADDR_REF(mac_addr), session_id);
+	ipa_debug("%s: EVT: %d, MAC: "QDF_MAC_ADDR_FMT", session_id: %u is_2g_iface %u",
+		  net_dev->name, type, QDF_MAC_ADDR_REF(mac_addr), session_id,
+		  is_2g_iface);
 
 	if (type >= QDF_IPA_WLAN_EVENT_MAX)
 		return QDF_STATUS_E_INVAL;
