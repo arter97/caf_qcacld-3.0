@@ -255,6 +255,8 @@ struct wlan_mlo_peer_context *wlan_mlo_get_mlpeer_by_linkmac(
 	return NULL;
 }
 
+qdf_export_symbol(wlan_mlo_get_mlpeer_by_linkmac);
+
 struct wlan_mlo_peer_context *wlan_mlo_get_mlpeer_by_aid(
 				struct wlan_mlo_dev_context *ml_dev,
 				uint16_t assoc_id)
