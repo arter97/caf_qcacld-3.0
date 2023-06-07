@@ -1292,12 +1292,14 @@ struct cdp_soc_t {
  * @CDP_CONFIG_NAC: Enable nac
  * @CDP_CONFIG_ISOLATION: Enable isolation
  * @CDP_CONFIG_IN_TWT: In TWT session or not
+ * @CDP_CONFIG_MLD_PEER_VDEV: Change MLD peer's vdev
  */
 enum cdp_peer_param_type {
 	CDP_CONFIG_NAWDS,
 	CDP_CONFIG_NAC,
 	CDP_CONFIG_ISOLATION,
 	CDP_CONFIG_IN_TWT,
+	CDP_CONFIG_MLD_PEER_VDEV,
 };
 
 /**
@@ -1463,6 +1465,7 @@ enum cdp_pdev_param_type {
  * @cdp_rx_refill_buf_pool_size: RX refill ring size config
  * @cdp_rxdma_buf_ring_size: RXDMA buf ring size config
  * @mac_addr: vdev mac address
+ * @new_vdev_id: New vdev id to which MLD peer is to be moved
  */
 typedef union cdp_config_param_t {
 	/* peer params */
@@ -1567,6 +1570,7 @@ typedef union cdp_config_param_t {
 	int cdp_rxdma_buf_ring_size;
 
 	uint8_t mac_addr[QDF_MAC_ADDR_SIZE];
+	uint8_t new_vdev_id;
 } cdp_config_param_type;
 
 /**

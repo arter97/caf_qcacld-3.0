@@ -4839,6 +4839,36 @@ QDF_STATUS dp_peer_legacy_setup(struct dp_soc *soc, struct dp_peer *peer)
 }
 
 #ifdef WLAN_FEATURE_11BE_MLO
+static QDF_STATUS dp_mld_peer_change_vdev(struct dp_soc *soc,
+					  struct dp_peer *mld_peer,
+					  uint8_t new_vdev_id)
+{
+	struct dp_vdev *prev_vdev;
+
+	prev_vdev = mld_peer->vdev;
+	/* release the ref to original dp_vdev */
+	dp_vdev_unref_delete(soc, mld_peer->vdev,
+			     DP_MOD_ID_CHILD);
+	/*
+	 * get the ref to new dp_vdev,
+	 * increase dp_vdev ref_cnt
+	 */
+	mld_peer->vdev = dp_vdev_get_ref_by_id(soc, new_vdev_id,
+					       DP_MOD_ID_CHILD);
+	mld_peer->txrx_peer->vdev = mld_peer->vdev;
+
+	dp_info("Change vdev for ML peer " QDF_MAC_ADDR_FMT
+		" old vdev %pK id %d new vdev %pK id %d",
+		QDF_MAC_ADDR_REF(mld_peer->mac_addr.raw),
+		prev_vdev, prev_vdev->vdev_id, mld_peer->vdev, new_vdev_id);
+
+	dp_cfg_event_record_mlo_setup_vdev_update_evt(
+			soc, mld_peer, prev_vdev,
+			mld_peer->vdev);
+
+	return QDF_STATUS_SUCCESS;
+}
+
 QDF_STATUS dp_peer_mlo_setup(
 			struct dp_soc *soc,
 			struct dp_peer *peer,
@@ -4906,32 +4936,18 @@ QDF_STATUS dp_peer_mlo_setup(
 
 		if (setup_info->is_primary_link &&
 		    !setup_info->is_first_link) {
-			struct dp_vdev *prev_vdev;
 			/*
 			 * if first link is not the primary link,
 			 * then need to change mld_peer->vdev as
 			 * primary link dp_vdev is not same one
 			 * during mld peer creation.
 			 */
-			prev_vdev = mld_peer->vdev;
 			dp_info("Primary link is not the first link. vdev: %pK "
 				"vdev_id %d vdev_ref_cnt %d",
 				mld_peer->vdev, vdev_id,
 				qdf_atomic_read(&mld_peer->vdev->ref_cnt));
-			/* release the ref to original dp_vdev */
-			dp_vdev_unref_delete(soc, mld_peer->vdev,
-					     DP_MOD_ID_CHILD);
-			/*
-			 * get the ref to new dp_vdev,
-			 * increase dp_vdev ref_cnt
-			 */
-			mld_peer->vdev = dp_vdev_get_ref_by_id(soc, vdev_id,
-							       DP_MOD_ID_CHILD);
-			mld_peer->txrx_peer->vdev = mld_peer->vdev;
 
-			dp_cfg_event_record_mlo_setup_vdev_update_evt(
-					soc, mld_peer, prev_vdev,
-					mld_peer->vdev);
+			dp_mld_peer_change_vdev(soc, mld_peer, vdev_id);
 
 			params.osif_vdev = (void *)peer->vdev->osif_vdev;
 			params.peer_mac = mld_peer->mac_addr.raw;
@@ -7020,6 +7036,85 @@ static QDF_STATUS dp_set_peer_param(struct cdp_soc_t *cdp_soc,  uint8_t vdev_id,
 
 	return QDF_STATUS_SUCCESS;
 }
+
+#ifdef WLAN_FEATURE_11BE_MLO
+/**
+ * dp_set_mld_peer_param: function to set parameters in MLD peer
+ * @cdp_soc: DP soc handle
+ * @vdev_id: id of vdev handle
+ * @peer_mac: peer mac address
+ * @param: parameter type to be set
+ * @val: value of parameter to be set
+ *
+ * Return: 0 for success. nonzero for failure.
+ */
+static QDF_STATUS dp_set_mld_peer_param(struct cdp_soc_t *cdp_soc,
+					uint8_t vdev_id,
+					uint8_t *peer_mac,
+					enum cdp_peer_param_type param,
+					cdp_config_param_type val)
+{
+	struct dp_soc *soc = cdp_soc_t_to_dp_soc(cdp_soc);
+	struct dp_peer *peer;
+	struct dp_txrx_peer *txrx_peer;
+	QDF_STATUS status = QDF_STATUS_SUCCESS;
+
+	peer = dp_mld_peer_find_hash_find(soc, peer_mac, 0, vdev_id,
+					  DP_MOD_ID_CDP);
+	if (!peer)
+		return QDF_STATUS_E_FAILURE;
+
+	txrx_peer = peer->txrx_peer;
+	if (!txrx_peer) {
+		dp_peer_unref_delete(peer, DP_MOD_ID_CDP);
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	switch (param) {
+	case CDP_CONFIG_MLD_PEER_VDEV:
+		status = dp_mld_peer_change_vdev(soc, peer, val.new_vdev_id);
+		break;
+	default:
+		break;
+	}
+
+	dp_peer_unref_delete(peer, DP_MOD_ID_CDP);
+
+	return status;
+}
+
+/**
+ * dp_set_peer_param_wrapper: wrapper function to set parameters in
+ *			      legacy/link/MLD peer
+ * @cdp_soc: DP soc handle
+ * @vdev_id: id of vdev handle
+ * @peer_mac: peer mac address
+ * @param: parameter type to be set
+ * @val: value of parameter to be set
+ *
+ * Return: 0 for success. nonzero for failure.
+ */
+static QDF_STATUS
+dp_set_peer_param_wrapper(struct cdp_soc_t *cdp_soc,  uint8_t vdev_id,
+			  uint8_t *peer_mac, enum cdp_peer_param_type param,
+			  cdp_config_param_type val)
+{
+	QDF_STATUS status;
+
+	switch (param) {
+	case CDP_CONFIG_MLD_PEER_VDEV:
+		status = dp_set_mld_peer_param(cdp_soc, vdev_id, peer_mac,
+					       param, val);
+		break;
+	default:
+		status = dp_set_peer_param(cdp_soc, vdev_id, peer_mac,
+					   param, val);
+		break;
+	}
+
+	return status;
+}
+#endif
 
 /**
  * dp_get_pdev_param() - function to get parameters from pdev
@@ -11039,7 +11134,11 @@ static struct cdp_ctrl_ops dp_ops_ctrl = {
 	.txrx_wdi_event_unsub = dp_wdi_event_unsub,
 	.txrx_set_pdev_param = dp_set_pdev_param,
 	.txrx_get_pdev_param = dp_get_pdev_param,
+#ifdef WLAN_FEATURE_11BE_MLO
+	.txrx_set_peer_param = dp_set_peer_param_wrapper,
+#else
 	.txrx_set_peer_param = dp_set_peer_param,
+#endif
 	.txrx_get_peer_param = dp_get_peer_param,
 #ifdef VDEV_PEER_PROTOCOL_COUNT
 	.txrx_peer_protocol_cnt = dp_peer_stats_update_protocol_cnt,
