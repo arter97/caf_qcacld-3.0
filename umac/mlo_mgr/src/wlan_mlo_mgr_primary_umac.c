@@ -129,11 +129,11 @@ mld_get_best_primary_umac_w_rssi(struct wlan_mlo_peer_context *ml_peer,
 	bool mld_sta_links[WLAN_OBJMGR_MAX_DEVICES] = {0};
 	bool mld_no_sta[WLAN_OBJMGR_MAX_DEVICES] = {0};
 	struct wlan_objmgr_peer *assoc_peer = NULL;
-	uint8_t prim_link, id;
+	uint8_t prim_link, id, prim_link_hi;
 	uint8_t num_psocs;
 	struct mlpeer_data *tqm_params = NULL;
 	struct wlan_channel *channel;
-	enum phy_ch_width chwidth;
+	enum phy_ch_width sec_hi_bw, hi_bw;
 	uint8_t cong = ML_PRIMARY_TQM_CONGESTION;
 	uint16_t mld_ml_sta_count[WLAN_OBJMGR_MAX_DEVICES] = {0};
 	enum phy_ch_width mld_ch_width[WLAN_OBJMGR_MAX_DEVICES];
@@ -226,30 +226,42 @@ mld_get_best_primary_umac_w_rssi(struct wlan_mlo_peer_context *ml_peer,
 			}
 		}
 	} else if (psoc_w_nosta > 1) {
-		chwidth = CH_WIDTH_INVALID;
+		hi_bw = CH_WIDTH_INVALID;
+		sec_hi_bw = CH_WIDTH_INVALID;
 		for (i = 0; i < WLAN_OBJMGR_MAX_DEVICES; i++) {
 			if (!mld_no_sta[i])
 				continue;
 
-			if (chwidth == CH_WIDTH_INVALID) {
-				prim_link = i;
-				chwidth = mld_ch_width[i];
+			if (hi_bw == CH_WIDTH_INVALID) {
+				prim_link_hi = i;
+				hi_bw = mld_ch_width[i];
 				continue;
 			}
-			/* if bw is 320MHZ mark that link as primary link */
+			/* if bw is 320MHZ mark it as highest ch width */
 			if (mld_ch_width[i] == CH_WIDTH_320MHZ) {
-				prim_link = i;
-				chwidth = mld_ch_width[i];
-				break;
+				prim_link = prim_link_hi;
+				sec_hi_bw = hi_bw;
+				hi_bw = mld_ch_width[i];
+				prim_link_hi = i;
 			}
 			/* If bw is less than or equal to 160 MHZ
 			 * and chwidth is greater than than other link
 			 * Mark this link as primary link
 			 */
-			if ((mld_ch_width[i] <= CH_WIDTH_160MHZ) &&
-			    (chwidth < mld_ch_width[i])) {
-				prim_link = i;
-				chwidth = mld_ch_width[i];
+			if (mld_ch_width[i] <= CH_WIDTH_160MHZ) {
+				if (hi_bw < mld_ch_width[i]) {
+					/* move high bw to second high bw */
+					prim_link = prim_link_hi;
+					sec_hi_bw = hi_bw;
+
+					hi_bw = mld_ch_width[i];
+					prim_link_hi = i;
+				} else if ((sec_hi_bw == CH_WIDTH_INVALID) ||
+					   (sec_hi_bw < mld_ch_width[i])) {
+					/* update sec high bw */
+					sec_hi_bw = mld_ch_width[i];
+					prim_link = i;
+				}
 			}
 		}
 	} else {
