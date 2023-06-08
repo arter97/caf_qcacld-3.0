@@ -298,9 +298,12 @@ target_if_mlo_register_event_handler(struct wlan_objmgr_psoc *psoc)
 			wmi_handle,
 			wmi_mlo_link_disable_request_eventid,
 			target_if_mlo_link_disable_request_event_handler);
-	if (QDF_IS_STATUS_ERROR(status))
-		target_if_err("Couldn't register handler for Link removal WMI event %d",
+	if (QDF_IS_STATUS_ERROR(status)) {
+		target_if_err("Couldn't register handler for link disable request WMI event %d",
 			      status);
+		if (status ==  QDF_STATUS_E_NOSUPPORT)
+			status = QDF_STATUS_SUCCESS;
+	}
 
 	return status;
 }
