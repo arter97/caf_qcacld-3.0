@@ -1474,9 +1474,11 @@ int wma_csa_offload_handler(void *handle, uint8_t *event, uint32_t len)
 	struct csa_offload_params *csa_offload_event;
 	struct ieee80211_extendedchannelswitch_ie *xcsa_ie;
 	struct ieee80211_ie_wide_bw_switch *wb_ie;
-	struct wma_txrx_node *intr = wma->interfaces;
+	struct wlan_objmgr_peer *peer;
+	struct wlan_objmgr_vdev *vdev;
 	QDF_STATUS status;
 	uint8_t tlv_len;
+	struct wlan_channel *chan;
 
 	param_buf = (WMI_CSA_HANDLING_EVENTID_param_tlvs *) event;
 
@@ -1488,20 +1490,31 @@ int wma_csa_offload_handler(void *handle, uint8_t *event, uint32_t len)
 	csa_event = param_buf->fixed_param;
 	WMI_MAC_ADDR_TO_CHAR_ARRAY(&csa_event->i_addr2, &bssid[0]);
 
-	if (wma_find_vdev_id_by_bssid(wma, bssid, &vdev_id)) {
-		wma_err("Invalid bssid received");
+	peer = wlan_objmgr_get_peer_by_mac(wma->psoc,
+					   bssid, WLAN_LEGACY_WMA_ID);
+	if (!peer) {
+		wma_err("Invalid peer");
 		return -EINVAL;
 	}
 
-	csa_offload_event = qdf_mem_malloc(sizeof(*csa_offload_event));
-	if (!csa_offload_event)
+	vdev_id = wlan_vdev_get_id(wlan_peer_get_vdev(peer));
+	wlan_objmgr_peer_release_ref(peer, WLAN_LEGACY_WMA_ID);
+	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(wma->psoc,
+						    vdev_id,
+						    WLAN_LEGACY_WMA_ID);
+	if (!vdev)
 		return -EINVAL;
 
-	if (intr[vdev_id].vdev &&
-	    wlan_cm_is_vdev_roaming(intr[vdev_id].vdev)) {
+	csa_offload_event = qdf_mem_malloc(sizeof(*csa_offload_event));
+	if (!csa_offload_event) {
+		wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_WMA_ID);
+			return -EINVAL;
+	}
+	if (wlan_cm_is_vdev_roaming(vdev)) {
 		wma_err("Roaming in progress for vdev %d, ignore csa event",
 			 vdev_id);
 		qdf_mem_free(csa_offload_event);
+		wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_WMA_ID);
 		return -EINVAL;
 	}
 
@@ -1538,6 +1551,7 @@ int wma_csa_offload_handler(void *handle, uint8_t *event, uint32_t len)
 	} else {
 		wma_err("CSA Event error: No CSA IE present");
 		qdf_mem_free(csa_offload_event);
+		wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_WMA_ID);
 		return -EINVAL;
 	}
 
@@ -1601,7 +1615,15 @@ got_chan:
 		 csa_offload_event->new_ch_freq_seg2,
 		 csa_offload_event->new_op_class);
 
-	cur_chan = cds_freq_to_chan(intr[vdev_id].ch_freq);
+	chan = wlan_vdev_get_active_channel(vdev);
+	if (!chan) {
+		wmi_err("failed to get active channel");
+		wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_WMA_ID);
+		qdf_mem_free(csa_offload_event);
+		return false;
+	}
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_WMA_ID);
+	cur_chan = cds_freq_to_chan(chan->ch_freq);
 	/*
 	 * basic sanity check: requested channel should not be 0
 	 * and equal to home channel
