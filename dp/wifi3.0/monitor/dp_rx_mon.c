@@ -120,16 +120,15 @@ dp_rx_mon_populate_cfr_ppdu_info(struct dp_pdev *pdev,
 	dp_rx_mon_handle_cfr_mu_info(pdev, ppdu_info, cdp_rx_ppdu);
 	rx_user_status = &ppdu_info->rx_user_status[num_users - 1];
 	sw_peer_id = rx_user_status->sw_peer_id;
+	cdp_rx_ppdu->num_users = num_users;
 	peer = dp_peer_get_ref_by_id(soc, sw_peer_id, DP_MOD_ID_RX_PPDU_STATS);
 	if (!peer) {
 		cdp_rx_ppdu->peer_id = HTT_INVALID_PEER;
-		cdp_rx_ppdu->num_users = 0;
 		return;
 	}
 
 	cdp_rx_ppdu->peer_id = peer->peer_id;
 	cdp_rx_ppdu->vdev_id = peer->vdev->vdev_id;
-	cdp_rx_ppdu->num_users = num_users;
 
 	dp_peer_unref_delete(peer, DP_MOD_ID_RX_PPDU_STATS);
 }
