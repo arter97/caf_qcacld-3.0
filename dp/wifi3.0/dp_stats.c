@@ -7979,6 +7979,9 @@ void dp_print_tx_ppeds_stats(struct dp_soc *soc)
 
 	DP_PRINT_STATS("PPE-DS Tx desc fw2wbm_tx_drop %u",
 		       soc->stats.tx.fw2wbm_tx_drop);
+
+	if (soc->arch_ops.dp_txrx_ppeds_rings_stats)
+		soc->arch_ops.dp_txrx_ppeds_rings_stats(soc);
 }
 #else
 void dp_print_tx_ppeds_stats(struct dp_soc *soc)

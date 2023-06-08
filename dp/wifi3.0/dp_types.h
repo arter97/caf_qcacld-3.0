@@ -845,6 +845,7 @@ struct dp_txrx_pool_stats {
  * @cached: is the srng ring memory cached or un-cached memory
  * @irq: irq number of the srng ring
  * @num_entries: number of entries in the srng ring
+ * @stats: Structure to track the ring utilization stats
  * @is_mem_prealloc: Is this srng memory pre-allocated
  * @crit_thresh: Critical threshold for near-full processing of this srng
  * @safe_thresh: Safe threshold for near-full processing of this srng
@@ -860,6 +861,7 @@ struct dp_srng {
 	uint8_t cached;
 	int irq;
 	uint32_t num_entries;
+	struct ring_util_stats stats;
 #ifdef DP_MEM_PRE_ALLOC
 	uint8_t is_mem_prealloc;
 #endif
@@ -2215,6 +2217,8 @@ enum dp_context_type {
  * @dp_tx_ppeds_inuse_desc:
  * @dp_ppeds_clear_stats: Clear ppeds related stats
  * @dp_tx_ppeds_cfg_astidx_cache_mapping:
+ * @dp_txrx_ppeds_rings_stats: Printing the util stats of ring
+ * @dp_txrx_ppeds_clear_rings_stats: Clearing the ring util stats
  * @txrx_soc_ppeds_start:
  * @txrx_soc_ppeds_stop:
  * @dp_register_ppeds_interrupts:
@@ -2444,6 +2448,8 @@ struct dp_arch_ops {
 	void (*dp_tx_ppeds_cfg_astidx_cache_mapping)(struct dp_soc *soc,
 						     struct dp_vdev *vdev,
 						     bool peer_map);
+	void (*dp_txrx_ppeds_rings_stats)(struct dp_soc *soc);
+	void (*dp_txrx_ppeds_clear_rings_stats)(struct dp_soc *soc);
 #endif
 	bool (*ppeds_handle_attached)(struct dp_soc *soc);
 	QDF_STATUS (*txrx_soc_ppeds_start)(struct dp_soc *soc);

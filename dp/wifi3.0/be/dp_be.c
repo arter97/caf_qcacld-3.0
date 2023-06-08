@@ -38,6 +38,16 @@
 #include <ppe_drv_sc.h>
 #endif
 
+#ifdef WLAN_SUPPORT_PPEDS
+static const char *ring_usage_dump[RING_USAGE_MAX] = {
+	"100%",
+	"Greater than 90%",
+	"70 to 90%",
+	"50 to 70%",
+	"Less than 50%"
+};
+#endif
+
 /* Generic AST entry aging timer value */
 #define DP_AST_AGING_TIMER_DEFAULT_MS	5000
 
@@ -107,6 +117,36 @@ static void dp_ppeds_clear_stats(struct dp_soc *soc)
 	struct dp_soc_be *be_soc = dp_get_be_soc_from_dp_soc(soc);
 
 	be_soc->ppeds_stats.tx.desc_alloc_failed = 0;
+}
+
+static void dp_ppeds_rings_stats(struct dp_soc *soc)
+{
+	struct dp_soc_be *be_soc = dp_get_be_soc_from_dp_soc(soc);
+	int i = 0;
+
+	DP_PRINT_STATS("Ring utilization statistics");
+	DP_PRINT_STATS("WBM2SW_RELEASE");
+
+	for (i = 0; i < RING_USAGE_MAX; i++)
+		DP_PRINT_STATS("\t %s utilized %d instances",
+			       ring_usage_dump[i],
+			       be_soc->ppeds_wbm_release_ring.stats.util[i]);
+
+	DP_PRINT_STATS("PPE2TCL");
+
+	for (i = 0; i < RING_USAGE_MAX; i++)
+		DP_PRINT_STATS("\t %s utilized %d instances",
+			       ring_usage_dump[i],
+			       be_soc->ppe2tcl_ring.stats.util[i]);
+}
+
+static void dp_ppeds_clear_rings_stats(struct dp_soc *soc)
+{
+	struct dp_soc_be *be_soc = dp_get_be_soc_from_dp_soc(soc);
+
+	memset(&be_soc->ppeds_wbm_release_ring.stats, 0,
+	       sizeof(struct ring_util_stats));
+	memset(&be_soc->ppe2tcl_ring.stats, 0, sizeof(struct ring_util_stats));
 }
 #endif
 
@@ -2912,6 +2952,8 @@ void dp_initialize_arch_ops_be(struct dp_arch_ops *arch_ops)
 	arch_ops->dp_free_ppeds_interrupts = dp_free_ppeds_interrupts;
 	arch_ops->dp_tx_ppeds_inuse_desc = dp_ppeds_inuse_desc;
 	arch_ops->dp_ppeds_clear_stats = dp_ppeds_clear_stats;
+	arch_ops->dp_txrx_ppeds_rings_stats = dp_ppeds_rings_stats;
+	arch_ops->dp_txrx_ppeds_clear_rings_stats = dp_ppeds_clear_rings_stats;
 	arch_ops->dp_tx_ppeds_cfg_astidx_cache_mapping =
 				dp_tx_ppeds_cfg_astidx_cache_mapping;
 #ifdef DP_UMAC_HW_RESET_SUPPORT
