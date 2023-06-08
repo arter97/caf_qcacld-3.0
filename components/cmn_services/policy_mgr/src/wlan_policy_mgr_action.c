@@ -692,8 +692,10 @@ policy_mgr_get_preferred_dbs_action_table(
 			new_conn_op_mode = pm_ctx->hdd_cbacks.
 					hdd_get_device_mode(vdev_id);
 
-		new_conn_mode = policy_mgr_convert_device_mode_to_qdf_type(
-			new_conn_op_mode);
+		new_conn_mode =
+			policy_mgr_qdf_opmode_to_pm_con_mode(psoc,
+							     new_conn_op_mode,
+							     vdev_id);
 		if (new_conn_mode == PM_MAX_NUM_OF_MODE)
 			policy_mgr_debug("new vdev %d op_mode %d freq %d reason %d: not prioritized",
 					 vdev_id, new_conn_op_mode,
@@ -1497,7 +1499,7 @@ policy_mgr_con_mode_by_vdev_id(struct wlan_objmgr_psoc *psoc,
 	}
 
 	op_mode = wlan_get_opmode_vdev_id(pm_ctx->pdev, vdev_id);
-	return policy_mgr_convert_device_mode_to_qdf_type(op_mode);
+	return policy_mgr_qdf_opmode_to_pm_con_mode(psoc, op_mode, vdev_id);
 }
 
 #ifdef FEATURE_WLAN_MCC_TO_SCC_SWITCH
@@ -2273,6 +2275,7 @@ policy_mgr_handle_sap_plus_go_force_scc(struct wlan_objmgr_psoc *psoc)
 	struct policy_mgr_psoc_priv_obj *pm_ctx;
 	struct sta_ap_intf_check_work_ctx *work_info;
 	struct ch_params ch_params = {0};
+	enum QDF_OPMODE opmode;
 
 	pm_ctx = policy_mgr_get_context(psoc);
 	if (!pm_ctx) {
@@ -2290,8 +2293,9 @@ policy_mgr_handle_sap_plus_go_force_scc(struct wlan_objmgr_psoc *psoc)
 
 	vdev_id = work_info->sap_plus_go_force_scc.initiator_vdev_id;
 	chan_freq = wlan_get_operation_chan_freq_vdev_id(pm_ctx->pdev, vdev_id);
-	vdev_con_mode = policy_mgr_convert_device_mode_to_qdf_type(
-			wlan_get_opmode_vdev_id(pm_ctx->pdev, vdev_id));
+	opmode = wlan_get_opmode_vdev_id(pm_ctx->pdev, vdev_id);
+	vdev_con_mode = policy_mgr_qdf_opmode_to_pm_con_mode(psoc, opmode,
+							     vdev_id);
 
 	existing_vdev_id =
 		policy_mgr_fetch_existing_con_info(
@@ -2385,6 +2389,7 @@ policy_mgr_check_sap_go_force_scc(struct wlan_objmgr_psoc *psoc,
 	uint8_t vdev_id;
 	struct policy_mgr_psoc_priv_obj *pm_ctx;
 	struct sta_ap_intf_check_work_ctx *work_info;
+	enum QDF_OPMODE opmode;
 
 	if (reason_code != CSA_REASON_GO_BSS_STARTED &&
 	    reason_code != CSA_REASON_USER_INITIATED)
@@ -2400,6 +2405,7 @@ policy_mgr_check_sap_go_force_scc(struct wlan_objmgr_psoc *psoc,
 		return QDF_STATUS_E_INVAL;
 	}
 	vdev_id = wlan_vdev_get_id(vdev);
+	opmode = wlan_vdev_mlme_get_opmode(vdev);
 	work_info = pm_ctx->sta_ap_intf_check_work_info;
 	if (!work_info) {
 		policy_mgr_err("invalid work info");
@@ -2407,8 +2413,8 @@ policy_mgr_check_sap_go_force_scc(struct wlan_objmgr_psoc *psoc,
 	}
 
 	chan_freq = wlan_get_operation_chan_freq(vdev);
-	vdev_con_mode = policy_mgr_convert_device_mode_to_qdf_type(
-			wlan_vdev_mlme_get_opmode(vdev));
+	vdev_con_mode = policy_mgr_qdf_opmode_to_pm_con_mode(psoc, opmode,
+							     vdev_id);
 
 	existing_vdev_id =
 		policy_mgr_fetch_existing_con_info(psoc,

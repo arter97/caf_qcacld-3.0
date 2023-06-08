@@ -3373,6 +3373,7 @@ int hdd_softap_set_channel_change(struct net_device *dev, int target_chan_freq,
 	bool capable, is_wps;
 	int32_t keymgmt;
 	struct wlan_hdd_link_info *link_info;
+	enum policy_mgr_con_mode pm_con_mode;
 
 	hdd_ctx = WLAN_HDD_GET_CTX(adapter);
 	ret = wlan_hdd_validate_context(hdd_ctx);
@@ -3502,6 +3503,9 @@ int hdd_softap_set_channel_change(struct net_device *dev, int target_chan_freq,
 	ch_params.ch_width = target_bw;
 	target_bw = wlansap_get_csa_chanwidth_from_phymode(
 			sap_ctx, target_chan_freq, &ch_params);
+	pm_con_mode = policy_mgr_qdf_opmode_to_pm_con_mode(hdd_ctx->psoc,
+							   adapter->device_mode,
+							   link_info->vdev_id);
 	/*
 	 * Do SAP concurrency check to cover channel switch case as following:
 	 * There is already existing SAP+GO combination but due to upper layer
@@ -3514,14 +3518,11 @@ int hdd_softap_set_channel_change(struct net_device *dev, int target_chan_freq,
 	 * SAP2 will end up doing MCC which may not be desirable result. It
 	 * should will be prevented.
 	 */
-	if (!policy_mgr_allow_concurrency_csa(
-				hdd_ctx->psoc,
-				policy_mgr_convert_device_mode_to_qdf_type(
-					adapter->device_mode),
-				target_chan_freq, policy_mgr_get_bw(target_bw),
-				link_info->vdev_id,
-				forced,
-				sap_ctx->csa_reason)) {
+	if (!policy_mgr_allow_concurrency_csa(hdd_ctx->psoc, pm_con_mode,
+					      target_chan_freq,
+					      policy_mgr_get_bw(target_bw),
+					      link_info->vdev_id, forced,
+					      sap_ctx->csa_reason)) {
 		hdd_err("Channel switch failed due to concurrency check failure");
 		qdf_atomic_set(&ap_ctx->ch_switch_in_progress, 0);
 		return -EINVAL;
@@ -4029,7 +4030,7 @@ uint32_t hdd_get_ap_6ghz_capable(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id)
 	struct sap_context *sap_context;
 	struct sap_config *sap_config;
 	uint32_t capable = 0;
-	enum policy_mgr_con_mode conn_mode;
+	enum policy_mgr_con_mode con_mode;
 
 	if (!psoc) {
 		hdd_err("PSOC is NULL");
@@ -4050,10 +4051,11 @@ uint32_t hdd_get_ap_6ghz_capable(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id)
 	}
 
 	ap_adapter = link_info->adapter;
-	conn_mode = policy_mgr_convert_device_mode_to_qdf_type(
-			ap_adapter->device_mode);
-	if ((conn_mode != PM_SAP_MODE && conn_mode != PM_P2P_GO_MODE) ||
-	    !policy_mgr_is_6ghz_conc_mode_supported(psoc, conn_mode)) {
+	con_mode = policy_mgr_qdf_opmode_to_pm_con_mode(psoc,
+							ap_adapter->device_mode,
+							vdev_id);
+	if ((con_mode != PM_SAP_MODE && con_mode != PM_P2P_GO_MODE) ||
+	    !policy_mgr_is_6ghz_conc_mode_supported(psoc, con_mode)) {
 		hdd_err("unexpected device mode %d", ap_adapter->device_mode);
 		wlan_objmgr_vdev_release_ref(vdev, WLAN_HDD_ID_OBJ_MGR);
 		return 0;
@@ -6271,6 +6273,7 @@ int wlan_hdd_cfg80211_start_bss(struct wlan_hdd_link_info *link_info,
 	struct wlan_objmgr_vdev *vdev;
 	uint32_t user_config_freq = 0;
 	struct hdd_ap_ctx *ap_ctx;
+	enum policy_mgr_con_mode pm_con_mode;
 
 	hdd_enter();
 
@@ -6852,12 +6855,14 @@ int wlan_hdd_cfg80211_start_bss(struct wlan_hdd_link_info *link_info,
 		ret = 0;
 		goto free;
 	}
+	pm_con_mode = policy_mgr_qdf_opmode_to_pm_con_mode(hdd_ctx->psoc,
+							   adapter->device_mode,
+							   link_info->vdev_id);
 
 	if (check_for_concurrency) {
 		if (!policy_mgr_allow_concurrency(
 				hdd_ctx->psoc,
-				policy_mgr_convert_device_mode_to_qdf_type(
-					adapter->device_mode),
+				pm_con_mode,
 				config->chan_freq, HW_MODE_20_MHZ,
 				policy_mgr_get_conc_ext_flags(vdev, false),
 				link_info->vdev_id)) {
@@ -7794,8 +7799,10 @@ static int __wlan_hdd_cfg80211_start_ap(struct wiphy *wiphy,
 		return -EINVAL;
 	}
 
-	intf_pm_mode = policy_mgr_convert_device_mode_to_qdf_type(
-							adapter->device_mode);
+	intf_pm_mode =
+		policy_mgr_qdf_opmode_to_pm_con_mode(hdd_ctx->psoc,
+						     adapter->device_mode,
+						     adapter->deflink->vdev_id);
 	status = policy_mgr_is_multi_sap_allowed_on_same_band(
 				hdd_ctx->pdev,
 				intf_pm_mode,

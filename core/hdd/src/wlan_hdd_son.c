@@ -1898,7 +1898,9 @@ static QDF_STATUS hdd_son_init_acs_channels(struct hdd_adapter *adapter,
 	}
 
 	pm_mode =
-	      policy_mgr_convert_device_mode_to_qdf_type(adapter->device_mode);
+	      policy_mgr_qdf_opmode_to_pm_con_mode(hdd_ctx->psoc,
+						   adapter->device_mode,
+						   adapter->deflink->vdev_id);
 	/* convert channel to freq */
 	for (i = 0; i < num_channels; i++) {
 		acs_cfg->freq_list[i] = freq_list[i];

@@ -3980,7 +3980,8 @@ policy_mgr_add_to_disabled_links(struct policy_mgr_psoc_priv_obj *pm_ctx,
 	int i;
 	enum policy_mgr_con_mode pm_mode;
 
-	pm_mode = policy_mgr_convert_device_mode_to_qdf_type(mode);
+	pm_mode = policy_mgr_qdf_opmode_to_pm_con_mode(pm_ctx->psoc, mode,
+						       vdev_id);
 
 	qdf_mutex_acquire(&pm_ctx->qdf_conc_list_lock);
 	for (i = 0; i < MAX_NUMBER_OF_DISABLE_LINK; i++) {
@@ -4869,11 +4870,13 @@ QDF_STATUS policy_mgr_decr_active_session(struct wlan_objmgr_psoc *psoc,
 	}
 
 	qdf_status = policy_mgr_check_conn_with_mode_and_vdev_id(psoc,
-			policy_mgr_convert_device_mode_to_qdf_type(mode),
+			policy_mgr_qdf_opmode_to_pm_con_mode(psoc, mode,
+							     session_id),
 			session_id);
 	if (QDF_IS_STATUS_ERROR(qdf_status)) {
 		policy_mgr_debug("No connection with mode:%d vdev_id:%d",
-			policy_mgr_convert_device_mode_to_qdf_type(mode),
+			policy_mgr_qdf_opmode_to_pm_con_mode(psoc, mode,
+							     session_id),
 			session_id);
 		/*
 		 * In case of disconnect try delete the link from disabled link
@@ -8950,10 +8953,13 @@ struct policy_mgr_conc_connection_info *policy_mgr_get_conn_info(uint32_t *len)
 	return conn_ptr;
 }
 
-enum policy_mgr_con_mode policy_mgr_convert_device_mode_to_qdf_type(
-			enum QDF_OPMODE device_mode)
+enum policy_mgr_con_mode
+policy_mgr_qdf_opmode_to_pm_con_mode(struct wlan_objmgr_psoc *psoc,
+				     enum QDF_OPMODE device_mode,
+				     uint8_t vdev_id)
 {
 	enum policy_mgr_con_mode mode = PM_MAX_NUM_OF_MODE;
+
 	switch (device_mode) {
 	case QDF_STA_MODE:
 		mode = PM_STA_MODE;
@@ -8965,7 +8971,12 @@ enum policy_mgr_con_mode policy_mgr_convert_device_mode_to_qdf_type(
 		mode = PM_P2P_GO_MODE;
 		break;
 	case QDF_SAP_MODE:
-		mode = PM_SAP_MODE;
+#ifdef WLAN_FEATURE_LL_LT_SAP
+		if (policy_mgr_is_vdev_ll_lt_sap(psoc, vdev_id))
+			mode = PM_LL_LT_SAP_MODE;
+		else
+#endif
+			mode = PM_SAP_MODE;
 		break;
 	case QDF_NAN_DISC_MODE:
 		mode = PM_NAN_DISC_MODE;
@@ -11116,8 +11127,8 @@ bool policy_mgr_is_ap_ap_mcc_allow(struct wlan_objmgr_psoc *psoc,
 	*con_vdev_id = vdev_id[i];
 
 	mode = wlan_vdev_mlme_get_opmode(vdev);
-	con_mode = policy_mgr_convert_device_mode_to_qdf_type(mode);
-
+	con_mode = policy_mgr_qdf_opmode_to_pm_con_mode(psoc, mode,
+							wlan_vdev_get_id(vdev));
 	/*
 	 * For 3Vif concurrency we only support SCC in same MAC
 	 * in below combination:

@@ -1939,17 +1939,21 @@ struct policy_mgr_conc_connection_info *policy_mgr_get_conn_info(
 		uint32_t *len);
 
 /**
- * policy_mgr_convert_device_mode_to_qdf_type() - provides the
- * type translation from HDD to policy manager type
+ * policy_mgr_qdf_opmode_to_pm_con_mode() - provides the
+ * type translation from QDF to policy manager type
+ * @psoc: psoc
  * @device_mode: Generic connection mode type
+ * @vdev_id: Vdev id
  *
  *
  * This function provides the type translation
  *
  * Return: policy_mgr_con_mode enum
  */
-enum policy_mgr_con_mode policy_mgr_convert_device_mode_to_qdf_type(
-		enum QDF_OPMODE device_mode);
+enum policy_mgr_con_mode
+policy_mgr_qdf_opmode_to_pm_con_mode(struct wlan_objmgr_psoc *psoc,
+				     enum QDF_OPMODE device_mode,
+				     uint8_t vdev_id);
 
 /**
  * policy_mgr_get_qdf_mode_from_pm - provides the

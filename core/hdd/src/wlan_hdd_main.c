@@ -3834,7 +3834,9 @@ static enum policy_mgr_con_mode wlan_hdd_get_mode_for_non_connected_vdev(
 	}
 
 	adapter = link_info->adapter;
-	mode = policy_mgr_convert_device_mode_to_qdf_type(adapter->device_mode);
+	mode = policy_mgr_qdf_opmode_to_pm_con_mode(psoc,
+						    adapter->device_mode,
+						    vdev_id);
 	return mode;
 }
 
@@ -6810,13 +6812,15 @@ static void hdd_stop_last_active_connection(struct hdd_context *hdd_ctx,
 {
 	enum policy_mgr_con_mode mode;
 	struct wlan_objmgr_psoc *psoc;
+	enum QDF_OPMODE op_mode;
 
 	/* If this is the last active connection check
 	 * and stop the opportunistic timer.
 	 */
 	psoc = wlan_vdev_get_psoc(vdev);
-	mode = policy_mgr_convert_device_mode_to_qdf_type(
-					wlan_vdev_mlme_get_opmode(vdev));
+	op_mode = wlan_vdev_mlme_get_opmode(vdev);
+	mode = policy_mgr_qdf_opmode_to_pm_con_mode(psoc, op_mode,
+						    wlan_vdev_get_id(vdev));
 	if ((policy_mgr_get_connection_count(psoc) == 1 &&
 	     policy_mgr_mode_specific_connection_count(psoc,
 						       mode, NULL) == 1) ||

@@ -4010,7 +4010,7 @@ policy_mgr_get_pref_force_scc_freq(struct wlan_objmgr_psoc *psoc,
 		sbs_ml_sta_present = true;
 
 	op_mode = wlan_get_opmode_vdev_id(pm_ctx->pdev, vdev_id);
-	mode = policy_mgr_convert_device_mode_to_qdf_type(op_mode);
+	mode = policy_mgr_qdf_opmode_to_pm_con_mode(psoc, op_mode, vdev_id);
 
 	qdf_mem_zero(&pcl, sizeof(pcl));
 	status = policy_mgr_get_pcl(psoc, mode, pcl.pcl_list, &pcl.pcl_len,

@@ -4004,7 +4004,9 @@ static int __wlan_hdd_cfg80211_do_acs(struct wiphy *wiphy,
 	hdd_avoid_acs_channels(hdd_ctx, sap_config);
 
 	pm_mode =
-	      policy_mgr_convert_device_mode_to_qdf_type(adapter->device_mode);
+		policy_mgr_qdf_opmode_to_pm_con_mode(hdd_ctx->psoc,
+						     adapter->device_mode,
+						     adapter->deflink->vdev_id);
 
 	/* Remove passive/dfs acs channel for ll sap */
 	hdd_remove_passive_dfs_acs_channel_for_ll_sap(
@@ -8471,11 +8473,11 @@ static int wlan_hdd_handle_restrict_offchan_config(struct hdd_adapter *adapter,
 	if (!vdev)
 		return -EINVAL;
 	if (restrict_offchan == 1) {
-		enum policy_mgr_con_mode pmode =
-		policy_mgr_convert_device_mode_to_qdf_type(dev_mode);
-		uint32_t freq;
-
 		u32 vdev_id = wlan_vdev_get_id(vdev);
+		enum policy_mgr_con_mode pmode =
+		policy_mgr_qdf_opmode_to_pm_con_mode(hdd_ctx->psoc, dev_mode,
+						     vdev_id);
+		uint32_t freq;
 
 		wlan_vdev_obj_lock(vdev);
 		wlan_vdev_mlme_cap_set(vdev, WLAN_VDEV_C_RESTRICT_OFFCHAN);

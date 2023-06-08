@@ -1757,7 +1757,9 @@ static bool lim_is_csa_channel_allowed(struct mac_context *mac_ctx,
 		is_allowed =
 		policy_mgr_allow_concurrency_csa(
 			mac_ctx->psoc, ch_freq2,
-			policy_mgr_convert_device_mode_to_qdf_type(mode),
+			policy_mgr_qdf_opmode_to_pm_con_mode(mac_ctx->psoc,
+							     mode,
+							     session_entry->vdev_id),
 			session_entry->vdev_id,
 			policy_mgr_get_bw(new_ch_width), false,
 			CSA_REASON_UNKNOWN);
