@@ -4787,6 +4787,7 @@ typedef struct {
  * @unsolicited_prb_succ_cnt: Successful unsolicited probe response frames cnt
  * @unsolicited_prb_fail_cnt: Failed unsolictied probe response frames cnt
  * @is_mlo_vdev_active: is the mlo vdev currently active
+ * @vdev_tx_power: Tx power for vdev
  */
 struct wmi_host_vdev_prb_fils_stats {
 	uint32_t vdev_id;
@@ -4795,6 +4796,7 @@ struct wmi_host_vdev_prb_fils_stats {
 	uint32_t unsolicited_prb_succ_cnt;
 	uint32_t unsolicited_prb_fail_cnt;
 	bool is_mlo_vdev_active;
+	uint32_t vdev_tx_power;
 };
 
 /**

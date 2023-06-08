@@ -13878,10 +13878,12 @@ extract_vdev_prb_fils_stats_tlv(wmi_unified_t wmi_handle,
 			ev->unsolicited_prb_fail_cnt;
 		status = extract_mlo_vdev_status_info(param_buf, ev,
 						      vdev_stats);
+		vdev_stats->vdev_tx_power = ev->vdev_tx_power;
 		wmi_debug("vdev: %d, fd_s: %d, fd_f: %d, prb_s: %d, prb_f: %d",
 			 ev->vdev_id, ev->fd_succ_cnt, ev->fd_fail_cnt,
 			 ev->unsolicited_prb_succ_cnt,
 			 ev->unsolicited_prb_fail_cnt);
+		wmi_debug("vdev txpwr: %d", ev->vdev_tx_power);
 	}
 
 	return status;
