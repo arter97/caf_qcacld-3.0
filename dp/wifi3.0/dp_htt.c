@@ -646,13 +646,13 @@ int htt_srng_setup(struct htt_soc *soc, int mac_id,
 			htt_ring_type = HTT_SW_TO_SW_RING;
 #ifdef IPA_OFFLOAD
 		} else if (srng_params.ring_id ==
-		    (HAL_SRNG_WMAC1_SW2RXDMA0_BUF2 +
+		    (HAL_SRNG_WMAC1_SW2RXDMA0_BUF1 +
 		    (lmac_id * HAL_MAX_RINGS_PER_LMAC))) {
 			htt_ring_id = HTT_HOST2_TO_FW_RXBUF_RING;
 			htt_ring_type = HTT_SW_TO_SW_RING;
 #ifdef IPA_WDI3_VLAN_SUPPORT
 		} else if (srng_params.ring_id ==
-		    (HAL_SRNG_WMAC1_SW2RXDMA0_BUF3 +
+		    (HAL_SRNG_WMAC1_SW2RXDMA0_BUF2 +
 		    (lmac_id * HAL_MAX_RINGS_PER_LMAC))) {
 			htt_ring_id = HTT_HOST3_TO_FW_RXBUF_RING;
 			htt_ring_type = HTT_SW_TO_SW_RING;
@@ -666,11 +666,7 @@ int htt_srng_setup(struct htt_soc *soc, int mac_id,
 			htt_ring_type = HTT_SW_TO_HW_RING;
 #endif
 		} else if (srng_params.ring_id ==
-#ifdef IPA_OFFLOAD
-			 (HAL_SRNG_WMAC1_SW2RXDMA0_BUF1 +
-#else
 			 (HAL_SRNG_WMAC1_SW2RXDMA1_BUF +
-#endif
 			(lmac_id * HAL_MAX_RINGS_PER_LMAC))) {
 			htt_ring_id = HTT_RXDMA_HOST_BUF_RING;
 			htt_ring_type = HTT_SW_TO_HW_RING;
