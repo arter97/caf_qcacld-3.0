@@ -179,3 +179,13 @@ QDF_STATUS wmi_extract_ndp_sch_update(wmi_unified_t wmi_handle, uint8_t *data,
 
 	return QDF_STATUS_E_FAILURE;
 }
+
+QDF_STATUS wmi_extract_ndp_host_event(wmi_unified_t wmi_handle, uint8_t *data,
+				      struct nan_datapath_host_event *evt)
+{
+	if (wmi_handle->ops->extract_ndp_host_event)
+		return wmi_handle->ops->extract_ndp_host_event(wmi_handle,
+							       data, evt);
+
+	return QDF_STATUS_E_FAILURE;
+}
