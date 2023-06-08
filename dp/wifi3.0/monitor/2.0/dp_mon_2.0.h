@@ -236,6 +236,8 @@ struct dp_mon_desc_pool {
  * @lite_mon_tx_config: tx litemon config
  * @prev_rxmon_desc: prev destination desc
  * @prev_rxmon_cookie: prev rxmon cookie
+ * @prev_rxmon_pkt_desc: prev packet buff desc
+ * @prev_rxmon_pkt_cookie: prev packet buff desc cookie
  * @ppdu_info_cache: PPDU info cache
  * @total_free_elem: total free element in queue
  * @rx_tlv_logger: Rx TLV logger struct
@@ -263,6 +265,8 @@ struct dp_mon_pdev_be {
 #endif
 	void *prev_rxmon_desc;
 	uint32_t prev_rxmon_cookie;
+	void *prev_rxmon_pkt_desc;
+	uint32_t prev_rxmon_pkt_cookie;
 	qdf_kmem_cache_t ppdu_info_cache;
 	uint32_t total_free_elem;
 #ifdef MONITOR_TLV_RECORDING_ENABLE
