@@ -26995,6 +26995,7 @@ static int __wlan_hdd_cfg80211_get_channel(struct wiphy *wiphy,
 			wlan_key_put_link_vdev(vdev, WLAN_OSIF_ID);
 			return -EBUSY;
 		}
+		sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(link_info);
 	}
 
 	chan_freq = vdev->vdev_mlme.des_chan->ch_freq;
