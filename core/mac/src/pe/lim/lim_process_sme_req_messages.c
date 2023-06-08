@@ -4204,7 +4204,11 @@ static void lim_fill_ml_info(struct cm_vdev_join_req *req,
 		pe_err("Partner link info not present");
 		return;
 	}
+
 	num_links = req->partner_info.num_partner_links;
+	if (num_links > WLAN_UMAC_MLO_MAX_VDEVS)
+		num_links = WLAN_UMAC_MLO_MAX_VDEVS;
+
 	partner_info->num_partner_links = num_links;
 	pe_debug("MLO: num_links:%d", num_links);
 
@@ -4427,7 +4431,7 @@ lim_fill_session_params(struct mac_context *mac_ctx,
 	}
 
 	wlan_psoc_mlme_get_11be_capab(mac_ctx->psoc, &eht_capab);
-	if (eht_capab)
+	if (eht_capab && wlan_vdev_mlme_is_mlo_vdev(session->vdev))
 		lim_fill_ml_info(req, pe_join_req);
 
 	return QDF_STATUS_SUCCESS;
