@@ -9855,9 +9855,9 @@ static uint8_t reg_get_sp_eirp(struct wlan_objmgr_pdev *pdev,
  * Return: Best power mode
  */
 static enum reg_6g_ap_type
-reg_get_best_pwr_mode_from_eirp_list(uint8_t *eirp_list, uint8_t size)
+reg_get_best_pwr_mode_from_eirp_list(int8_t *eirp_list, uint8_t size)
 {
-	uint8_t max = 0, i;
+	int8_t max = 0, i;
 	enum reg_6g_ap_type best_pwr_mode = REG_CURRENT_MAX_AP_TYPE;
 
 	for (i = 0; i < size; i++) {
@@ -9901,7 +9901,7 @@ enum reg_6g_ap_type reg_get_best_pwr_mode(struct wlan_objmgr_pdev *pdev,
 					  uint16_t bw,
 					  uint16_t in_punc_pattern)
 {
-	uint8_t eirp_list[REG_MAX_SUPP_AP_TYPE + 1];
+	int8_t eirp_list[REG_MAX_SUPP_AP_TYPE + 1];
 	enum reg_6g_ap_type ap_pwr_type;
 
 	for (ap_pwr_type = REG_INDOOR_AP; ap_pwr_type <= REG_VERY_LOW_POWER_AP;
