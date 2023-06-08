@@ -2481,7 +2481,9 @@ add_sbs_chlist_to_pcl(struct wlan_objmgr_psoc *psoc,
 			pcl_weights[*index] = WEIGHT_OF_GROUP2_PCL_CHANNELS;
 			(*index)++;
 		}
-	} else if (order == POLICY_MGR_PCL_ORDER_SCC_5G_HIGH_5G_HIGH) {
+	} else if (order == POLICY_MGR_PCL_ORDER_SCC_5G_HIGH_5G_HIGH ||
+		   order ==
+		   POLICY_MGR_PCL_ORDER_SCC_5G_HIGH_5G_HIGH_SCC_5G_LOW) {
 		/* Add 5G high SCC channel*/
 		qdf_mutex_acquire(&pm_ctx->qdf_conc_list_lock);
 		cl = pm_conc_connection_list;
@@ -2525,7 +2527,25 @@ add_sbs_chlist_to_pcl(struct wlan_objmgr_psoc *psoc,
 			pcl_weights[*index] = WEIGHT_OF_GROUP2_PCL_CHANNELS;
 			(*index)++;
 		}
-
+		if (order ==
+		    POLICY_MGR_PCL_ORDER_SCC_5G_HIGH_5G_HIGH_SCC_5G_LOW) {
+			conn_index = 0;
+			/* Add 5G low SCC channel*/
+			qdf_mutex_acquire(&pm_ctx->qdf_conc_list_lock);
+			cl = pm_conc_connection_list;
+			while (PM_CONC_CONNECTION_LIST_VALID_INDEX(conn_index)) {
+				if (!WLAN_REG_IS_24GHZ_CH_FREQ(cl[conn_index].freq) &&
+				    cl[conn_index].freq < sbs_cut_off_freq) {
+					pcl_freqs[*index] = cl[conn_index].freq;
+					pcl_weights[*index] =
+						WEIGHT_OF_GROUP3_PCL_CHANNELS;
+					(*index)++;
+					break;
+				}
+				conn_index++;
+			}
+			qdf_mutex_release(&pm_ctx->qdf_conc_list_lock);
+		}
 	} else {
 		policy_mgr_debug("invalid order");
 		return;
@@ -3659,13 +3679,16 @@ QDF_STATUS policy_mgr_get_channel_list(struct wlan_objmgr_psoc *psoc,
 		status = QDF_STATUS_SUCCESS;
 		break;
 	case PM_SCC_ON_5G_HIGH_5G_HIGH_PLUS_SHARED_2G:
+	case PM_SCC_ON_5G_HIGH_5G_HIGH_SCC_ON_5G_LOW_PLUS_SHARED_2G:
 		add_sbs_chlist_to_pcl(psoc,  pcl_channels,
 				      pcl_weights, pcl_sz,
 				      len,
 				      skip_6ghz_channel,
 				      channel_list_5, chan_index_5,
 				      channel_list_6, chan_index_6,
-				      POLICY_MGR_PCL_ORDER_SCC_5G_HIGH_5G_HIGH,
+				      (pcl == PM_SCC_ON_5G_HIGH_5G_HIGH_PLUS_SHARED_2G) ?
+				      POLICY_MGR_PCL_ORDER_SCC_5G_HIGH_5G_HIGH :
+				      POLICY_MGR_PCL_ORDER_SCC_5G_HIGH_5G_HIGH_SCC_5G_LOW,
 				      &high_5_band_scc_present,
 				      &low_5_band_scc_present);
 		/*
