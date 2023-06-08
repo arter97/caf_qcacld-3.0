@@ -72,7 +72,7 @@ bool qca_fse_add_rule(struct qca_fse_flow_info *fse_info)
 	ol_txrx_soc_handle soc_txrx_handle;
 
 	if (!fse_info->src_dev || !fse_info->dest_dev) {
-		qdf_warn("Unable to find dev for FSE rule push");
+		qdf_debug("Unable to find dev for FSE rule push");
 		return false;
 	}
 
@@ -80,7 +80,7 @@ bool qca_fse_add_rule(struct qca_fse_flow_info *fse_info)
 	 * Return in case of non wlan traffic.
 	 */
 	if (!fse_info->src_dev->ieee80211_ptr && !fse_info->dest_dev->ieee80211_ptr) {
-		qdf_warn("Not a wlan traffic for FSE rule push");
+		qdf_debug("Not a wlan traffic for FSE rule push");
 		return false;
 	}
 
@@ -104,7 +104,7 @@ bool qca_fse_add_rule(struct qca_fse_flow_info *fse_info)
 	}
 
 	if (ret != QDF_STATUS_SUCCESS) {
-		qdf_warn("%p: Failed to add a rule in FSE", fse_info->src_dev);
+		qdf_debug("%p: Failed to add a rule in FSE", fse_info->src_dev);
 		return false;
 	}
 
@@ -145,7 +145,7 @@ bool qca_fse_add_rule(struct qca_fse_flow_info *fse_info)
 					    fse_info->protocol, fse_info->version);
 		}
 
-		qdf_warn("%p: Failed to add a rule in FSE", fse_info->dest_dev);
+		qdf_debug("%p: Failed to add a rule in FSE", fse_info->dest_dev);
 		return false;
 	}
 
@@ -160,7 +160,7 @@ bool qca_fse_delete_rule(struct qca_fse_flow_info *fse_info)
 	QDF_STATUS rv_ret = QDF_STATUS_SUCCESS;
 
 	if (!fse_info->src_dev || !fse_info->dest_dev) {
-		qdf_warn("Unable to find dev for FSE rule delete");
+		qdf_debug("Unable to find dev for FSE rule delete");
 		return false;
 	}
 
@@ -168,7 +168,7 @@ bool qca_fse_delete_rule(struct qca_fse_flow_info *fse_info)
 	 * Return in case of non wlan traffic.
 	 */
 	if (!fse_info->src_dev->ieee80211_ptr && !fse_info->dest_dev->ieee80211_ptr) {
-		qdf_warn("Not a wlan traffic for FSE rule delete");
+		qdf_debug("Not a wlan traffic for FSE rule delete");
 		return false;
 	}
 
