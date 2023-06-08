@@ -527,7 +527,7 @@ int pld_get_audio_wlan_timestamp(struct device *dev,
 				 uint64_t *ts);
 #endif /* FEATURE_WLAN_TIME_SYNC_FTM */
 
-#if IS_ENABLED(CONFIG_CNSS_UTILS)
+#ifdef CNSS_UTILS
 /**
  * pld_set_wlan_unsafe_channel() - Set unsafe channel
  * @dev: device

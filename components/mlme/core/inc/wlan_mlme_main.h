@@ -153,6 +153,7 @@ struct sae_auth_retry {
  * @last_assoc_received_time: last assoc received time
  * @last_disassoc_deauth_received_time: last disassoc/deauth received time
  * @twt_ctx: TWT context
+ * @nss: Peer NSS
  */
 struct peer_mlme_priv_obj {
 	uint8_t last_pn_valid;
@@ -164,6 +165,7 @@ struct peer_mlme_priv_obj {
 #ifdef WLAN_SUPPORT_TWT
 	struct twt_context twt_ctx;
 #endif
+	uint8_t nss;
 };
 
 /**
