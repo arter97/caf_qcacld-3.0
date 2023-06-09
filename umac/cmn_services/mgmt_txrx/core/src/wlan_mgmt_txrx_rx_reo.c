@@ -131,6 +131,48 @@ mgmt_rx_reo_compare_global_timestamps_gte(uint32_t ts1, uint32_t ts2)
 
 #ifdef WLAN_MGMT_RX_REO_ERROR_HANDLING
 /**
+ * check_and_handle_zero_frame_duration() - Check and handle zero duration error
+ * @desc: Pointer to frame descriptor
+ *
+ * API to check for zero duration management frames. Host will be able to
+ * reorder such frames with the limitation that parallel rx detection may fail.
+ * Hence don't drop management frames with zero duration.
+ *
+ * Return: QDF_STATUS
+ */
+static QDF_STATUS
+check_and_handle_zero_frame_duration(struct mgmt_rx_reo_frame_descriptor *desc)
+{
+	struct mgmt_rx_reo_params *reo_params;
+
+	if (!desc) {
+		mgmt_rx_reo_err("Mgmt Rx REO frame descriptor is null");
+		return QDF_STATUS_E_NULL_VALUE;
+	}
+
+	if (!desc->rx_params) {
+		mgmt_rx_reo_err("Mgmt Rx params is null");
+		return QDF_STATUS_E_NULL_VALUE;
+	}
+
+	reo_params = desc->rx_params->reo_params;
+	if (!reo_params) {
+		mgmt_rx_reo_err("Mgmt Rx REO params is NULL");
+		return QDF_STATUS_E_NULL_VALUE;
+	}
+
+	if (desc->type == MGMT_RX_REO_FRAME_DESC_HOST_CONSUMED_FRAME &&
+	    !mgmt_rx_reo_get_duration_us(desc->rx_params)) {
+		mgmt_rx_reo_debug_rl("0 dur: link= %u,valid= %u,ctr= %u,ts= %u",
+				     reo_params->link_id, reo_params->valid,
+				     reo_params->mgmt_pkt_ctr,
+				     reo_params->global_timestamp);
+	}
+
+	return QDF_STATUS_SUCCESS;
+}
+
+/**
  * check_and_handle_invalid_reo_params() - Check and handle invalid reo
  * parameters error
  * @desc: Pointer to frame descriptor
@@ -215,6 +257,49 @@ handle_out_of_order_pkt_ctr(struct mgmt_rx_reo_frame_descriptor *desc,
 	return QDF_STATUS_SUCCESS;
 }
 #else
+/**
+ * check_and_handle_zero_frame_duration() - Check and handle zero duration error
+ * @desc: Pointer to frame descriptor
+ *
+ * API to check for zero duration management frames and assert.
+ *
+ * Return: QDF_STATUS
+ */
+static QDF_STATUS
+check_and_handle_zero_frame_duration(struct mgmt_rx_reo_frame_descriptor *desc)
+{
+	struct mgmt_rx_reo_params *reo_params;
+
+	if (!desc) {
+		mgmt_rx_reo_err("Mgmt Rx REO frame descriptor is null");
+		return QDF_STATUS_E_NULL_VALUE;
+	}
+
+	if (!desc->rx_params) {
+		mgmt_rx_reo_err("Mgmt Rx params is null");
+		return QDF_STATUS_E_NULL_VALUE;
+	}
+
+	reo_params = desc->rx_params->reo_params;
+	if (!reo_params) {
+		mgmt_rx_reo_err("Mgmt Rx REO params is NULL");
+		return QDF_STATUS_E_NULL_VALUE;
+	}
+
+	if (desc->type == MGMT_RX_REO_FRAME_DESC_HOST_CONSUMED_FRAME &&
+	    !mgmt_rx_reo_get_duration_us(desc->rx_params)) {
+		mgmt_rx_reo_err_rl("0 dur: link= %u,valid= %u,ctr= %u,ts= %u",
+				   reo_params->link_id, reo_params->valid,
+				   reo_params->mgmt_pkt_ctr,
+				   reo_params->global_timestamp);
+		qdf_assert_always(0);
+
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	return QDF_STATUS_SUCCESS;
+}
+
 /**
  * check_and_handle_invalid_reo_params() - Check and handle invalid reo
  * parameters error
@@ -4024,6 +4109,7 @@ mgmt_rx_reo_egress_list_init(struct mgmt_rx_reo_egress_list *egress_list)
  * following errors.
  *
  *     1. Invalid management rx reo parameters
+ *     2. Host consumed management frames with zero duration
  *
  * Return: QDF_STATUS
  */
@@ -4040,6 +4126,12 @@ check_frame_sanity(struct mgmt_rx_reo_frame_descriptor *desc)
 	status = check_and_handle_invalid_reo_params(desc);
 	if (QDF_IS_STATUS_ERROR(status)) {
 		mgmt_rx_reo_warn_rl("Drop frame with invalid reo params");
+		return status;
+	}
+
+	status = check_and_handle_zero_frame_duration(desc);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		mgmt_rx_reo_warn_rl("Drop frame with zero duration");
 		return status;
 	}
 
@@ -4195,6 +4287,7 @@ mgmt_rx_reo_debug_print_ingress_frame_stats(struct mgmt_rx_reo_context *reo_ctx)
 	struct reo_ingress_frame_stats *stats;
 	uint8_t link_id;
 	uint8_t desc_type;
+	uint8_t reason;
 	uint8_t list_type;
 	uint64_t ingress_count_per_link[MAX_MLO_LINKS] = {0};
 	uint64_t ingress_count_per_desc_type[MGMT_RX_REO_FRAME_DESC_TYPE_MAX] = {0};
@@ -4211,6 +4304,9 @@ mgmt_rx_reo_debug_print_ingress_frame_stats(struct mgmt_rx_reo_context *reo_ctx)
 	uint64_t error_count_per_link[MAX_MLO_LINKS] = {0};
 	uint64_t error_count_per_desc_type[MGMT_RX_REO_FRAME_DESC_TYPE_MAX] = {0};
 	uint64_t total_error_count = 0;
+	uint64_t drop_count_per_link[MAX_MLO_LINKS] = {0};
+	uint64_t drop_count_per_reason[MGMT_RX_REO_INGRESS_DROP_REASON_MAX] = {0};
+	uint64_t total_drop_count = 0;
 	uint64_t total_missing_count = 0;
 	uint64_t total_queued = 0;
 	uint64_t queued_per_list[MGMT_RX_REO_LIST_TYPE_MAX] = {0};
@@ -4293,6 +4389,23 @@ mgmt_rx_reo_debug_print_ingress_frame_stats(struct mgmt_rx_reo_context *reo_ctx)
 			    stats->zero_wait_count_rx_count[link_id][list_type];
 			immediate_delivery_per_list[list_type] +=
 			    stats->immediate_delivery_count[link_id][list_type];
+		}
+	}
+
+	for (link_id = 0; link_id < MAX_MLO_LINKS; link_id++) {
+		for (reason = 0; reason < MGMT_RX_REO_INGRESS_DROP_REASON_MAX;
+		     reason++) {
+			drop_count_per_link[link_id] +=
+					stats->drop_count[link_id][reason];
+		}
+		total_drop_count += drop_count_per_link[link_id];
+	}
+
+	for (reason = 0; reason < MGMT_RX_REO_INGRESS_DROP_REASON_MAX;
+	     reason++) {
+		for (link_id = 0; link_id < MAX_MLO_LINKS; link_id++) {
+			drop_count_per_reason[reason] +=
+					stats->drop_count[link_id][reason];
 		}
 	}
 
@@ -4396,7 +4509,29 @@ mgmt_rx_reo_debug_print_ingress_frame_stats(struct mgmt_rx_reo_context *reo_ctx)
 			  error_count_per_desc_type[2],
 			  total_error_count);
 
-	mgmt_rx_reo_alert("\t6) Per link stats:");
+	mgmt_rx_reo_alert("\t6) Drop Frame Count:");
+	mgmt_rx_reo_alert("\t--------------------------------------------");
+	mgmt_rx_reo_alert("\t|link/|    |    |    |    |    |    |");
+	mgmt_rx_reo_alert("\t|reas.|   0|   1|   2|   3|   4|   5|");
+	mgmt_rx_reo_alert("\t--------------------------------------------");
+	for (link_id = 0; link_id < MAX_MLO_LINKS; link_id++) {
+		mgmt_rx_reo_alert("\t|%5u|%4llu|%4llu|%4llu|%4llu|%4llu|%4llu|%7llu",
+				  link_id, stats->drop_count[link_id][0],
+				  stats->drop_count[link_id][1],
+				  stats->drop_count[link_id][2],
+				  stats->drop_count[link_id][3],
+				  stats->drop_count[link_id][4],
+				  stats->drop_count[link_id][5],
+				  drop_count_per_link[link_id]);
+		mgmt_rx_reo_alert("\t--------------------------------------------");
+	}
+	mgmt_rx_reo_alert("\t%6s|%4llu|%4llu|%4llu|%4llu|%4llu|%4llu|%7llu\n\n",
+			  "", drop_count_per_reason[0],
+			  drop_count_per_reason[1], drop_count_per_reason[2],
+			  drop_count_per_reason[3], drop_count_per_reason[4],
+			  drop_count_per_reason[5], total_drop_count);
+
+	mgmt_rx_reo_alert("\t7) Per link stats:");
 	mgmt_rx_reo_alert("\t----------------------------");
 	mgmt_rx_reo_alert("\t|link id   | Missing frame |");
 	mgmt_rx_reo_alert("\t|          |     count     |");
@@ -4408,7 +4543,7 @@ mgmt_rx_reo_debug_print_ingress_frame_stats(struct mgmt_rx_reo_context *reo_ctx)
 	}
 	mgmt_rx_reo_alert("\t%11s|%15llu|\n\n", "", total_missing_count);
 
-	mgmt_rx_reo_alert("\t7) Host consumed frames related stats:");
+	mgmt_rx_reo_alert("\t8) Host consumed frames related stats:");
 	mgmt_rx_reo_alert("\tOverall:");
 	mgmt_rx_reo_alert("\t------------------------------------------------");
 	mgmt_rx_reo_alert("\t|link id   |Queued frame |Zero wait |Immediate |");
@@ -4460,7 +4595,7 @@ mgmt_rx_reo_debug_print_ingress_frame_stats(struct mgmt_rx_reo_context *reo_ctx)
 			  zero_wait_count_rx_per_list[1],
 			  immediate_delivery_per_list[1]);
 
-	mgmt_rx_reo_alert("\t8) Misc stats:");
+	mgmt_rx_reo_alert("\t9) Misc stats:");
 	mgmt_rx_reo_alert("\t\tIngress list overflow count = %llu\n\n",
 			  reo_ctx->ingress_list.reo_list.overflow_count);
 
@@ -5009,9 +5144,6 @@ wlan_mgmt_rx_reo_algo_entry(struct wlan_objmgr_pdev *pdev,
 
 	cur_link = mgmt_rx_reo_get_link_id(desc->rx_params);
 	qdf_assert_always(desc->frame_type == IEEE80211_FC0_TYPE_MGT);
-
-	if (desc->type == MGMT_RX_REO_FRAME_DESC_HOST_CONSUMED_FRAME)
-		qdf_assert_always(desc->rx_params->reo_params->duration_us);
 
 	ret = log_ingress_frame_entry(reo_ctx, desc);
 	if (QDF_IS_STATUS_ERROR(ret))
