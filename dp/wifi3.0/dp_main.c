@@ -7542,25 +7542,14 @@ void dp_peer_delete(struct dp_soc *soc,
 #if defined(WLAN_FEATURE_11BE_MLO) && defined(WLAN_MLO_MULTI_CHIP)
 uint8_t dp_mlo_get_num_link_peer(struct dp_soc *soc, struct dp_peer *peer)
 {
-	struct dp_peer *mld_peer = NULL;
-	struct dp_mld_link_peers link_peers_info = {0};
-	uint8_t num_link = 0;
+	if (soc->cdp_soc.ol_ops->peer_get_num_mlo_links)
+		return soc->cdp_soc.ol_ops->peer_get_num_mlo_links(
+				soc->ctrl_psoc,
+				peer->vdev->vdev_id,
+				peer->mac_addr.raw,
+				IS_MLO_DP_MLD_PEER(peer));
 
-	if (IS_MLO_DP_LINK_PEER(peer))
-		mld_peer = DP_GET_MLD_PEER_FROM_PEER(peer);
-
-	if (IS_MLO_DP_MLD_PEER(peer))
-		mld_peer = peer;
-
-	if (!mld_peer)
-		return 0;
-
-	/* get link peers with reference */
-	dp_get_link_peers_ref_from_mld_peer(soc, mld_peer, &link_peers_info,
-					    DP_MOD_ID_CDP);
-	num_link = link_peers_info.num_links;
-	dp_release_link_peers_ref(&link_peers_info, DP_MOD_ID_CDP);
-	return num_link;
+	return 0;
 }
 
 void dp_mlo_peer_delete(struct dp_soc *soc, struct dp_peer *peer, void *arg)
