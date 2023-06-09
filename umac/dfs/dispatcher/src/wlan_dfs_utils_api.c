@@ -813,6 +813,7 @@ static void utils_dfs_get_channel_list(struct wlan_objmgr_pdev *pdev,
 	uint32_t conn_count = 0;
 	enum policy_mgr_con_mode mode;
 	uint8_t vdev_id = WLAN_INVALID_VDEV_ID;
+	enum QDF_OPMODE op_mode;
 
 	psoc = wlan_pdev_get_psoc(pdev);
 	if (!psoc) {
@@ -825,9 +826,10 @@ static void utils_dfs_get_channel_list(struct wlan_objmgr_pdev *pdev,
 	weight_len = QDF_ARRAY_SIZE(weight_list);
 
 	if (vdev) {
-		mode = policy_mgr_convert_device_mode_to_qdf_type(
-				wlan_vdev_mlme_get_opmode(vdev));
 		vdev_id = wlan_vdev_get_id(vdev);
+		op_mode = wlan_vdev_mlme_get_opmode(vdev);
+		mode = policy_mgr_qdf_opmode_to_pm_con_mode(psoc, op_mode,
+							    vdev_id);
 	} else {
 		mode = PM_SAP_MODE;
 	}
