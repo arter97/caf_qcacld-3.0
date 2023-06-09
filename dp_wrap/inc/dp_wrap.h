@@ -15,7 +15,7 @@
  */
 
 #ifndef _DP_WRAP_H_
-#define _DP_WRAP_H__
+#define _DP_WRAP_H_
 
 #if ATH_SUPPORT_WRAP
 #if !WLAN_QWRAP_LEGACY
