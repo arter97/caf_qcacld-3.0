@@ -2653,47 +2653,6 @@ static QDF_STATUS dp_peer_map_attach_be(struct dp_soc *soc)
 	return QDF_STATUS_SUCCESS;
 }
 
-static struct dp_peer *dp_find_peer_by_destmac_be(struct dp_soc *soc,
-						  uint8_t *dest_mac,
-						  uint8_t vdev_id)
-{
-	struct dp_peer *peer = NULL;
-	struct dp_peer *tgt_peer = NULL;
-	struct dp_ast_entry *ast_entry = NULL;
-	uint16_t peer_id;
-
-	qdf_spin_lock_bh(&soc->ast_lock);
-	ast_entry = dp_peer_ast_hash_find_soc(soc, dest_mac);
-	if (!ast_entry) {
-		qdf_spin_unlock_bh(&soc->ast_lock);
-		dp_err("NULL ast entry");
-		return NULL;
-	}
-
-	peer_id = ast_entry->peer_id;
-	qdf_spin_unlock_bh(&soc->ast_lock);
-
-	if (peer_id == HTT_INVALID_PEER)
-		return NULL;
-
-	peer = dp_peer_get_ref_by_id(soc, peer_id, DP_MOD_ID_SAWF);
-	if (!peer) {
-		dp_err("NULL peer for peer_id:%d", peer_id);
-		return NULL;
-	}
-
-	tgt_peer = dp_get_tgt_peer_from_peer(peer);
-
-	/*
-	 * Once tgt_peer is obtained,
-	 * release the ref taken for original peer.
-	 */
-	dp_peer_get_ref(NULL, tgt_peer, DP_MOD_ID_SAWF);
-	dp_peer_unref_delete(peer, DP_MOD_ID_SAWF);
-
-	return tgt_peer;
-}
-
 #ifdef WLAN_FEATURE_11BE_MLO
 #ifdef WLAN_MCAST_MLO
 static inline void
@@ -2935,7 +2894,6 @@ void dp_initialize_arch_ops_be(struct dp_arch_ops *arch_ops)
 					dp_peer_rx_reorder_queue_setup_be;
 	arch_ops->dp_rx_peer_set_link_id = dp_rx_set_link_id_be;
 	arch_ops->txrx_print_peer_stats = dp_print_peer_txrx_stats_be;
-	arch_ops->dp_find_peer_by_destmac = dp_find_peer_by_destmac_be;
 #if defined(DP_UMAC_HW_HARD_RESET) && defined(DP_UMAC_HW_RESET_SUPPORT)
 	arch_ops->dp_bank_reconfig = dp_bank_reconfig_be;
 	arch_ops->dp_reconfig_tx_vdev_mcast_ctrl =

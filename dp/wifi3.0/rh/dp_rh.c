@@ -736,34 +736,6 @@ static QDF_STATUS dp_txrx_set_vdev_param_rh(struct dp_soc *soc,
 	return QDF_STATUS_SUCCESS;
 }
 
-static struct dp_peer *dp_find_peer_by_destmac_rh(struct dp_soc *soc,
-						  uint8_t *dest_mac,
-						  uint8_t vdev_id)
-{
-	struct dp_peer *peer = NULL;
-	struct dp_ast_entry *ast_entry = NULL;
-	uint16_t peer_id;
-
-	qdf_spin_lock_bh(&soc->ast_lock);
-	ast_entry = dp_peer_ast_hash_find_by_vdevid(soc, dest_mac, vdev_id);
-
-	if (!ast_entry) {
-		qdf_spin_unlock_bh(&soc->ast_lock);
-		dp_err("NULL ast entry");
-		return NULL;
-	}
-
-	peer_id = ast_entry->peer_id;
-	qdf_spin_unlock_bh(&soc->ast_lock);
-
-	if (peer_id == HTT_INVALID_PEER)
-		return NULL;
-
-	peer = dp_peer_get_ref_by_id(soc, peer_id,
-				     DP_MOD_ID_SAWF);
-	return peer;
-}
-
 static void dp_get_rx_hash_key_rh(struct dp_soc *soc,
 				  struct cdp_lro_hash_config *lro_hash)
 {
@@ -828,7 +800,6 @@ void dp_initialize_arch_ops_rh(struct dp_arch_ops *arch_ops)
 	arch_ops->txrx_print_peer_stats = dp_print_peer_txrx_stats_rh;
 	arch_ops->dp_peer_rx_reorder_queue_setup =
 					dp_peer_rx_reorder_queue_setup_rh;
-	arch_ops->dp_find_peer_by_destmac = dp_find_peer_by_destmac_rh;
 	arch_ops->peer_get_reo_hash = dp_peer_get_reo_hash_rh;
 	arch_ops->reo_remap_config = dp_reo_remap_config_rh;
 	arch_ops->txrx_peer_setup = dp_peer_setup_rh;

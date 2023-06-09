@@ -2442,7 +2442,7 @@ struct cdp_sawf_ops {
 	(*peer_config_ul)(struct cdp_soc_t *hdl, uint8_t *mac_addr, uint8_t tid,
 			  uint32_t service_interval, uint32_t burst_size,
 			  uint32_t min_tput, uint32_t max_latency,
-			  uint8_t add_or_sub);
+			  uint8_t add_or_sub, uint16_t peer_id);
 	QDF_STATUS
 	(*swaf_peer_sla_configuration)(struct cdp_soc_t *soc,
 				       uint8_t *mac_addr, uint16_t *sla_mask);
@@ -2450,7 +2450,8 @@ struct cdp_sawf_ops {
 	QDF_STATUS
 	(*sawf_peer_flow_count)(struct cdp_soc_t *hdl, uint8_t *mac_addr,
 				uint8_t svc_id, uint8_t direction,
-				uint8_t start_or_stop, uint8_t *peer_mac);
+				uint8_t start_or_stop, uint8_t *peer_mac,
+				uint16_t peer_id);
 #endif
 };
 #endif
