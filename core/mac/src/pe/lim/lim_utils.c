@@ -7749,7 +7749,8 @@ void lim_set_he_caps(struct mac_context *mac, struct pe_session *session,
 	if (band == CDS_BAND_2GHZ)
 		is_band_2g = true;
 
-	populate_dot11f_he_caps_by_band(mac, is_band_2g, &dot11_cap);
+	populate_dot11f_he_caps_by_band(mac, is_band_2g, &dot11_cap,
+					session);
 	lim_log_he_cap(mac, &dot11_cap);
 	ie = wlan_get_ext_ie_ptr_from_ext_id(HE_CAP_OUI_TYPE,
 			HE_CAP_OUI_SIZE, ie_start, num_bytes);
@@ -8934,7 +8935,8 @@ void lim_set_eht_caps(struct mac_context *mac, struct pe_session *session,
 		is_band_2g = true;
 
 	populate_dot11f_eht_caps_by_band(mac, is_band_2g, &dot11_cap);
-	populate_dot11f_he_caps_by_band(mac, is_band_2g, &dot11_he_cap);
+	populate_dot11f_he_caps_by_band(mac, is_band_2g, &dot11_he_cap,
+					session);
 	lim_log_eht_cap(mac, &dot11_cap);
 
 	if (is_band_2g) {
