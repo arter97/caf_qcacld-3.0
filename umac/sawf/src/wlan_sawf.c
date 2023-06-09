@@ -37,6 +37,8 @@
 #include <wlan_mlo_mgr_peer.h>
 #endif
 #include <wlan_telemetry_agent.h>
+#include <target_if_sawf.h>
+#include <wlan_cfg80211_sawf.h>
 
 static struct sawf_ctx *g_wlan_sawf_ctx;
 
@@ -1098,3 +1100,358 @@ uint32_t wlan_service_id_get_total_type_ref_count(uint8_t svc_id)
 }
 
 qdf_export_symbol(wlan_service_id_get_total_type_ref_count);
+
+/**
+ * <---------32 bit SAWF Rule_ID------------->
+ * |  SOC_ID  |  PEER_ID  | TYPE |IDENTIFIER |
+ * |  3 bits  |  16 bits  |2 bits|  11 bits  |
+ * -------------------------------------------
+ */
+#define SAWF_RULE_ID(_psoc_id, _peer_id, _type, _id) \
+	((_psoc_id) << 29 | (_peer_id) << 13 | (_type) << 11 | (_id))
+
+#define SAWF_RULE_IDENTIFIER_MASK 0x7FF
+
+#define SAWF_RULE_IDENTIFIER_FROM_ID(_rule_id) \
+	((_rule_id) & SAWF_RULE_IDENTIFIER_MASK)
+
+#define EPCS_MAGIC_ID 0xee
+#define EPCS_TID      7
+
+/*********************
+ * Target operations *
+ *********************/
+static struct wlan_lmac_if_sawf_tx_ops *
+wlan_psoc_get_sawf_tx_ops(struct wlan_objmgr_psoc *psoc)
+{
+	struct wlan_lmac_if_tx_ops *tx_ops;
+
+	tx_ops = wlan_psoc_get_lmac_if_txops(psoc);
+	if (!tx_ops)
+		return NULL;
+
+	return &tx_ops->sawf_tx_ops;
+}
+
+static void
+wlan_sawf_svc_create_psoc_send(struct wlan_objmgr_psoc *psoc, void *arg,
+			       uint8_t index)
+{
+	struct wlan_lmac_if_sawf_tx_ops *sawf_tx_ops;
+	struct wlan_sawf_svc_class_params *svc;
+	struct wlan_objmgr_pdev *pdev;
+
+	svc = (struct wlan_sawf_svc_class_params *)arg;
+
+	sawf_tx_ops = wlan_psoc_get_sawf_tx_ops(psoc);
+	if (!sawf_tx_ops || !sawf_tx_ops->sawf_svc_create_send)
+		return;
+
+	pdev = wlan_objmgr_get_pdev_by_id(psoc, 0, WLAN_SAWF_ID);
+
+	sawf_tx_ops->sawf_svc_create_send(pdev, svc);
+
+	wlan_objmgr_pdev_release_ref(pdev, WLAN_SAWF_ID);
+}
+
+static void
+wlan_sawf_svc_disable_psoc_send(struct wlan_objmgr_psoc *psoc, void *arg,
+				uint8_t index)
+{
+	struct wlan_lmac_if_sawf_tx_ops *sawf_tx_ops;
+	struct wlan_sawf_svc_class_params *svc;
+	struct wlan_objmgr_pdev *pdev;
+
+	svc = (struct wlan_sawf_svc_class_params *)arg;
+
+	sawf_tx_ops = wlan_psoc_get_sawf_tx_ops(psoc);
+	if (!sawf_tx_ops || !sawf_tx_ops->sawf_svc_disable_send)
+		return;
+
+	pdev = wlan_objmgr_get_pdev_by_id(psoc, 0, WLAN_SAWF_ID);
+
+	sawf_tx_ops->sawf_svc_disable_send(pdev, svc);
+
+	wlan_objmgr_pdev_release_ref(pdev, WLAN_SAWF_ID);
+}
+
+static inline void
+wlan_sawf_send_create_svc_to_target(struct wlan_sawf_svc_class_params *svc)
+{
+	sawf_debug("DL SAWF: send create svc %u to FW", svc->svc_id);
+
+	wlan_objmgr_iterate_psoc_list(wlan_sawf_svc_create_psoc_send, svc,
+				      WLAN_SAWF_ID);
+}
+
+static inline void
+wlan_sawf_send_disable_svc_to_target(struct wlan_sawf_svc_class_params *svc)
+{
+	sawf_debug("DL SAWF: send disable svc %u to FW", svc->svc_id);
+
+	wlan_objmgr_iterate_psoc_list(wlan_sawf_svc_disable_psoc_send, svc,
+				      WLAN_SAWF_ID);
+}
+
+/***************************
+ * WLAN CFG80211 interface *
+ ***************************/
+static void
+wlan_sawf_send_rule_add_req(struct wlan_objmgr_peer *peer,
+			    struct wlan_sawf_rule *rule,
+			    uint32_t rule_id, uint8_t svc_id)
+{
+	struct wlan_objmgr_vdev *vdev;
+	struct vdev_osif_priv *osif_vdev;
+
+	vdev = wlan_peer_get_vdev(peer);
+	osif_vdev  = wlan_vdev_get_ospriv(vdev);
+
+	rule->rule_id = rule_id;
+	rule->req_type = WLAN_CFG80211_SAWF_RULE_ADD;
+	rule->service_class_id = svc_id;
+
+	wlan_cfg80211_sawf_send_rule(osif_vdev->wdev->wiphy, osif_vdev->wdev,
+				     rule);
+}
+
+static void
+wlan_sawf_send_rule_del_req(struct wlan_objmgr_peer *peer, uint32_t rule_id)
+{
+	struct wlan_sawf_rule rule;
+	struct wlan_objmgr_vdev *vdev;
+	struct vdev_osif_priv *osif_vdev;
+
+	vdev = wlan_peer_get_vdev(peer);
+	osif_vdev  = wlan_vdev_get_ospriv(vdev);
+
+	rule.rule_id = rule_id;
+	rule.req_type = WLAN_CFG80211_SAWF_RULE_DELETE;
+
+	wlan_cfg80211_sawf_send_rule(osif_vdev->wdev->wiphy, osif_vdev->wdev,
+				     &rule);
+}
+
+static struct wlan_sawf_svc_class_params *
+wlan_sawf_find_epcs_svc(struct sawf_ctx *sawf_ctx)
+{
+	struct wlan_sawf_svc_class_params *svc;
+	uint8_t svc_idx;
+	int available_svc_idx = -1;
+	bool match_found = false;
+
+	for (svc_idx = 0; svc_idx < SAWF_SVC_CLASS_MAX; svc_idx++) {
+		svc = &sawf_ctx->svc_classes[svc_idx];
+		if (!svc->configured) {
+			if (available_svc_idx < 0)
+				available_svc_idx = svc_idx;
+			continue;
+		}
+
+		if (svc->type_ref_count[WLAN_SAWF_SVC_TYPE_EPCS]) {
+			match_found = true;
+			break;
+		}
+	}
+
+	if (match_found) {
+		svc = &sawf_ctx->svc_classes[svc_idx];
+	} else if (available_svc_idx >= 0) {
+		svc = &sawf_ctx->svc_classes[available_svc_idx];
+		svc->svc_id = available_svc_idx + 1;
+	} else {
+		svc = NULL;
+	}
+
+	return svc;
+}
+
+static uint32_t
+wlan_sawf_generate_rule_id(struct wlan_objmgr_peer *peer,
+			   enum wlan_sawf_svc_type svc_type,
+			   uint16_t identifier)
+{
+	ol_txrx_soc_handle soc_txrx_handle;
+	struct wlan_objmgr_psoc *psoc;
+	struct wlan_objmgr_vdev *vdev;
+	uint32_t rule_id = 0;
+	uint16_t peer_id;
+	uint8_t psoc_id;
+
+	psoc = wlan_peer_get_psoc(peer);
+	soc_txrx_handle = wlan_psoc_get_dp_handle(psoc);
+	vdev = wlan_peer_get_vdev(peer);
+
+	psoc_id = wlan_psoc_get_id(psoc);
+	peer_id = cdp_get_peer_id(soc_txrx_handle, wlan_vdev_get_id(vdev),
+				  wlan_peer_get_macaddr(peer));
+
+	identifier &= SAWF_RULE_IDENTIFIER_MASK;
+
+	rule_id = SAWF_RULE_ID(psoc_id, peer_id, svc_type, identifier);
+
+	sawf_debug("rule_id 0x%x psoc 0x%x peer 0x%x type 0x%x identifier 0x%x",
+		   rule_id, psoc_id, peer_id, svc_type, identifier);
+
+	return rule_id;
+}
+
+QDF_STATUS wlan_sawf_create_epcs_svc(void)
+{
+	struct wlan_sawf_svc_class_params *svc;
+	struct sawf_ctx *sawf_ctx;
+
+	sawf_ctx = wlan_get_sawf_ctx();
+	if (!sawf_ctx) {
+		sawf_err("Invalid sawf ctx");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	svc = wlan_sawf_find_epcs_svc(sawf_ctx);
+	if (!svc) {
+		sawf_err("Unable to find svc for EPCS");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	svc->type_ref_count[WLAN_SAWF_SVC_TYPE_EPCS]++;
+
+	sawf_info("svc id %u configured %u epcs ref %u",
+		  svc->svc_id, svc->configured,
+		  svc->type_ref_count[WLAN_SAWF_SVC_TYPE_EPCS]);
+
+	svc->tid = EPCS_TID;
+
+	if (!svc->configured) {
+		wlan_sawf_send_create_svc_to_target(svc);
+		svc->configured = true;
+	}
+
+	return QDF_STATUS_SUCCESS;
+}
+
+QDF_STATUS wlan_sawf_delete_epcs_svc(void)
+{
+	struct wlan_sawf_svc_class_params *svc;
+	struct sawf_ctx *sawf_ctx;
+	uint8_t svc_id;
+
+	sawf_ctx = wlan_get_sawf_ctx();
+	if (!sawf_ctx) {
+		sawf_err("Invalid sawf ctx");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	svc = wlan_sawf_find_epcs_svc(sawf_ctx);
+	if (!svc) {
+		sawf_err("Unable to find svc for EPCS");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	if (!svc->configured) {
+		sawf_err("EPCS svc is not configured");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	svc_id = svc->svc_id;
+
+	if (svc->type_ref_count[WLAN_SAWF_SVC_TYPE_EPCS])
+		svc->type_ref_count[WLAN_SAWF_SVC_TYPE_EPCS]--;
+
+	sawf_info("svc id %u epcs ref %u", svc_id,
+		  svc->type_ref_count[WLAN_SAWF_SVC_TYPE_EPCS]);
+
+	if (!wlan_service_id_get_total_type_ref_count_nolock(svc_id) &&
+	    !wlan_service_id_get_peer_count_nolock(svc_id)) {
+		wlan_sawf_send_disable_svc_to_target(svc);
+		svc->configured = false;
+	}
+
+	return QDF_STATUS_SUCCESS;
+}
+
+QDF_STATUS wlan_sawf_delete_epcs_rule(struct wlan_objmgr_peer *peer)
+{
+	const uint8_t svc_type = WLAN_SAWF_SVC_TYPE_EPCS;
+	uint32_t rule_id;
+	uint8_t identifier;
+
+	identifier = EPCS_MAGIC_ID;
+
+	rule_id = wlan_sawf_generate_rule_id(peer, svc_type, identifier);
+
+	wlan_sawf_send_rule_del_req(peer, rule_id);
+
+	identifier = EPCS_MAGIC_ID + 1;
+	rule_id = wlan_sawf_generate_rule_id(peer, svc_type, identifier);
+
+	wlan_sawf_send_rule_del_req(peer, rule_id);
+
+	return QDF_STATUS_SUCCESS;
+}
+
+QDF_STATUS wlan_sawf_add_epcs_rule(struct wlan_objmgr_peer *peer)
+{
+	struct wlan_sawf_svc_class_params *svc;
+	struct sawf_ctx *sawf_ctx;
+	uint8_t *mac_addr;
+	struct wlan_sawf_rule rule;
+	uint32_t rule_id;
+	const uint8_t svc_type = WLAN_SAWF_SVC_TYPE_EPCS;
+	uint8_t svc_id;
+	uint8_t identifier;
+
+	sawf_ctx = wlan_get_sawf_ctx();
+	if (!sawf_ctx) {
+		sawf_err("Invalid sawf ctx");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	svc = wlan_sawf_find_epcs_svc(sawf_ctx);
+	if (!svc) {
+		sawf_err("Unable to find svc for EPCS");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	if (!svc->configured) {
+		sawf_err("EPCS svc is not configured");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	svc_id = svc->svc_id;
+
+	mac_addr = peer->macaddr;
+#ifdef WLAN_FEATURE_11BE_MLO
+	if (peer->mlo_peer_ctx)
+		mac_addr = peer->mldaddr;
+#endif
+
+	/*
+	 * Add rule for DL
+	 */
+	identifier = EPCS_MAGIC_ID;
+
+	rule_id = wlan_sawf_generate_rule_id(peer, svc_type, identifier);
+
+	qdf_mem_zero(&rule, sizeof(rule));
+
+	qdf_mem_copy(rule.dst_mac, mac_addr, QDF_MAC_ADDR_SIZE);
+	qdf_set_bit(SAWF_RULE_IN_PARAM_DST_MAC, rule.param_bitmap);
+
+	wlan_sawf_send_rule_add_req(peer, &rule, rule_id, svc_id);
+
+	/*
+	 * Add rule for UL
+	 */
+	identifier = EPCS_MAGIC_ID + 1;
+
+	rule_id = wlan_sawf_generate_rule_id(peer, svc_type, identifier);
+
+	qdf_mem_zero(&rule, sizeof(rule));
+
+	qdf_mem_copy(rule.src_mac, mac_addr, QDF_MAC_ADDR_SIZE);
+	qdf_set_bit(SAWF_RULE_IN_PARAM_SRC_MAC, rule.param_bitmap);
+
+	wlan_sawf_send_rule_add_req(peer, &rule, rule_id, svc_id);
+
+	return QDF_STATUS_SUCCESS;
+}

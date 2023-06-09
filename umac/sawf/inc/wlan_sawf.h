@@ -27,6 +27,7 @@
 #include "qdf_atomic.h"
 #include "qdf_lock.h"
 #include <qdf_types.h>
+#include <wlan_objmgr_peer_obj.h>
 
 #define sawf_alert(params...) \
 	QDF_TRACE_FATAL(QDF_MODULE_ID_SAWF, params)
@@ -666,6 +667,38 @@ uint32_t wlan_service_id_get_total_type_ref_count_nolock(uint8_t svc_id);
  * Return: total ref count
  */
 uint32_t wlan_service_id_get_total_type_ref_count(uint8_t svc_id);
+
+/*
+ * wlan_sawf_create_epcs_svc() - Create service class for EPCS
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS wlan_sawf_create_epcs_svc(void);
+
+/*
+ * wlan_sawf_delete_epcs_svc() - Delete EPCS service class
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS wlan_sawf_delete_epcs_svc(void);
+
+/*
+ * wlan_sawf_delete_epcs_rule() - Delete EPCS rule
+ *
+ * @peer: WLAN Peer object
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS wlan_sawf_delete_epcs_rule(struct wlan_objmgr_peer *peer);
+
+/*
+ * wlan_sawf_add_epcs_rule() - Add rule for EPCS
+ *
+ * @peer: WLAN Peer object
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS wlan_sawf_add_epcs_rule(struct wlan_objmgr_peer *peer);
 
 #ifdef CONFIG_SAWF
 /* wlan_sawf_get_tput_stats() - Get sawf throughput stats
