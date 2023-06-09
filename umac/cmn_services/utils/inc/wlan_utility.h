@@ -974,6 +974,7 @@ uint16_t wlan_util_get_peer_count_for_mode(struct wlan_objmgr_pdev *pdev,
  * @WLAN_MD_DP_SRNG_PPE2TCL: dp_srng type for PPE tx ring
  * @WLAN_MD_DP_SRNG_PPE_RELEASE: dp_srng type for PPE tx com ring
  * @WLAN_MD_DP_SRNG_PPE_WBM2SW_RELEASE: dp_srng type for PPE2TCL tx com ring
+ * @WLAN_MD_DP_SRNG_SW2RXDMA_LINK_RING: dp_srng type for SW2RXDMA link ring
  * @WLAN_MD_MAX: Max value
  */
 enum wlan_minidump_host_data {
@@ -1015,6 +1016,7 @@ enum wlan_minidump_host_data {
 	WLAN_MD_DP_SRNG_PPE2TCL,
 	WLAN_MD_DP_SRNG_PPE_RELEASE,
 	WLAN_MD_DP_SRNG_PPE_WBM2SW_RELEASE,
+	WLAN_MD_DP_SRNG_SW2RXDMA_LINK_RING,
 	WLAN_MD_MAX
 };
 
