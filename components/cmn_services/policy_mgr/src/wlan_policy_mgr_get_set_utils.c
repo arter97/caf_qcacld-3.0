@@ -6020,6 +6020,104 @@ policy_mgr_get_active_vdev_bitmap(struct wlan_objmgr_psoc *psoc)
 }
 
 /**
+ * policy_mgr_mlo_sta_set_link_by_linkid() - wrapper API to call set link
+ * by link id bitmap API
+ * @psoc: psoc object
+ * @vdev: vdev object
+ * @reason: Reason for which link is forced
+ * @mode: Force reason
+ * @link_num: valid for MLO_LINK_FORCE_MODE_ACTIVE_NUM and
+ *  MLO_LINK_FORCE_MODE_INACTIVE_NUM.
+ * @num_mlo_vdev: number of mlo vdev in array mlo_vdev_lst
+ * @mlo_vdev_lst: MLO STA vdev list
+ * @num_mlo_inactive_vdev: number of mlo vdev in array mlo_inactive_vdev_lst
+ * @mlo_inactive_vdev_lst: MLO STA vdev list
+ *
+ * This is internal wrapper of policy_mgr_mlo_sta_set_nlink to convert
+ * vdev based set link to link id based API for being compatible with old code.
+ * New code to use policy_mgr_mlo_sta_set_nlink directly as much as possible.
+ *
+ * Return: QDF_STATUS
+ */
+static QDF_STATUS
+policy_mgr_mlo_sta_set_link_by_linkid(struct wlan_objmgr_psoc *psoc,
+				      struct wlan_objmgr_vdev *vdev,
+				      enum mlo_link_force_reason reason,
+				      enum mlo_link_force_mode mode,
+				      uint8_t link_num,
+				      uint8_t num_mlo_vdev,
+				      uint8_t *mlo_vdev_lst,
+				      uint8_t num_mlo_inactive_vdev,
+				      uint8_t *mlo_inactive_vdev_lst)
+{
+	uint32_t link_bitmap = 0;
+	uint32_t link_bitmap2 = 0;
+	uint32_t assoc_bitmap = 0;
+	uint32_t vdev_bitmap[MLO_VDEV_BITMAP_SZ];
+	uint32_t vdev_bitmap2[MLO_VDEV_BITMAP_SZ];
+	uint8_t i, idx;
+	uint32_t link_control_flags = 0;
+
+	qdf_mem_zero(vdev_bitmap, sizeof(vdev_bitmap));
+	qdf_mem_zero(vdev_bitmap2, sizeof(vdev_bitmap2));
+
+	for (i = 0; i < num_mlo_vdev; i++) {
+		idx = mlo_vdev_lst[i] / 32;
+		if (idx >= MLO_VDEV_BITMAP_SZ)
+			return QDF_STATUS_E_INVAL;
+		vdev_bitmap[idx] |= 1 << (mlo_vdev_lst[i] % 32);
+	}
+
+	for (i = 0; i < num_mlo_inactive_vdev; i++) {
+		idx = mlo_inactive_vdev_lst[i] / 32;
+		if (idx >= MLO_VDEV_BITMAP_SZ)
+			return QDF_STATUS_E_INVAL;
+		vdev_bitmap2[idx] |= 1 << (mlo_inactive_vdev_lst[i] % 32);
+	}
+
+	ml_nlink_convert_vdev_bitmap_to_linkid_bitmap(
+		psoc, vdev, MLO_VDEV_BITMAP_SZ, vdev_bitmap,
+		&link_bitmap, &assoc_bitmap);
+
+	ml_nlink_convert_vdev_bitmap_to_linkid_bitmap(
+		psoc, vdev, MLO_VDEV_BITMAP_SZ, vdev_bitmap2,
+		&link_bitmap2, &assoc_bitmap);
+
+	switch (mode) {
+	case MLO_LINK_FORCE_MODE_ACTIVE:
+		link_control_flags = link_ctrl_f_overwrite_active_bitmap;
+		break;
+	case MLO_LINK_FORCE_MODE_INACTIVE:
+		if (reason != MLO_LINK_FORCE_REASON_LINK_REMOVAL)
+			link_control_flags =
+				link_ctrl_f_overwrite_inactive_bitmap;
+		break;
+	case MLO_LINK_FORCE_MODE_ACTIVE_INACTIVE:
+		if (reason != MLO_LINK_FORCE_REASON_LINK_REMOVAL)
+			link_control_flags =
+				link_ctrl_f_overwrite_active_bitmap |
+				link_ctrl_f_overwrite_inactive_bitmap;
+		break;
+	case MLO_LINK_FORCE_MODE_ACTIVE_NUM:
+		link_control_flags = link_ctrl_f_dynamic_force_link_num;
+		break;
+	case MLO_LINK_FORCE_MODE_INACTIVE_NUM:
+		link_control_flags = link_ctrl_f_dynamic_force_link_num;
+		break;
+	case MLO_LINK_FORCE_MODE_NO_FORCE:
+		link_control_flags = 0;
+		break;
+	default:
+		policy_mgr_err("Invalid force mode: %d", mode);
+		return QDF_STATUS_E_INVAL;
+	}
+
+	return policy_mgr_mlo_sta_set_nlink(psoc, vdev, reason, mode,
+					    link_num, link_bitmap,
+					    link_bitmap2, link_control_flags);
+}
+
+/**
  * policy_mgr_mlo_sta_set_link_ext() - Set links for MLO STA
  * @psoc: psoc object
  * @reason: Reason for which link is forced
@@ -6074,8 +6172,6 @@ policy_mgr_mlo_sta_set_link_ext(struct wlan_objmgr_psoc *psoc,
 		return QDF_STATUS_E_FAILURE;
 	}
 
-	policy_mgr_set_link_in_progress(pm_ctx, true);
-
 	policy_mgr_debug("vdev %d: mode %d num_mlo_vdev %d reason %d",
 			 wlan_vdev_get_id(vdev), mode, num_mlo_vdev, reason);
 
@@ -6107,6 +6203,28 @@ policy_mgr_mlo_sta_set_link_ext(struct wlan_objmgr_psoc *psoc,
 		req->param.num_link_entry = 1;
 		req->param.link_num[0].num_of_link = num_mlo_vdev - 1;
 	}
+
+	if (ml_is_nlink_service_supported(psoc)) {
+		status =
+		policy_mgr_mlo_sta_set_link_by_linkid(psoc, vdev, reason,
+						      mode,
+						      req->param.link_num[0].
+						      num_of_link,
+						      num_mlo_vdev,
+						      mlo_vdev_lst,
+						      num_mlo_inactive_vdev,
+						      mlo_inactive_vdev_lst);
+		qdf_mem_free(req);
+		wlan_objmgr_vdev_release_ref(vdev, WLAN_POLICY_MGR_ID);
+
+		if (status != QDF_STATUS_E_PENDING) {
+			policy_mgr_err("set_link_by_linkid status %d", status);
+			return status;
+		}
+		return QDF_STATUS_SUCCESS;
+	}
+
+	policy_mgr_set_link_in_progress(pm_ctx, true);
 
 	status = mlo_ser_set_link_req(req);
 	if (QDF_IS_STATUS_ERROR(status)) {
@@ -6141,7 +6259,7 @@ policy_mgr_mlo_sta_set_nlink(struct wlan_objmgr_psoc *psoc,
 			     uint32_t link_control_flags)
 {
 	struct mlo_link_set_active_req *req;
-	QDF_STATUS status;
+	QDF_STATUS status = QDF_STATUS_E_FAILURE;
 	struct policy_mgr_psoc_priv_obj *pm_ctx;
 
 	pm_ctx = policy_mgr_get_context(psoc);
@@ -6162,9 +6280,11 @@ policy_mgr_mlo_sta_set_nlink(struct wlan_objmgr_psoc *psoc,
 
 	policy_mgr_set_link_in_progress(pm_ctx, true);
 
-	policy_mgr_debug("vdev %d: mode %d %s reason %d",
+	policy_mgr_debug("vdev %d: mode %d %s reason %d bitmap 0x%x 0x%x ctrl 0x%x",
 			 wlan_vdev_get_id(vdev), mode,
-			 force_mode_to_string(mode), reason);
+			 force_mode_to_string(mode), reason,
+			 link_bitmap, link_bitmap2,
+			 link_control_flags);
 
 	req->ctx.vdev = vdev;
 	req->param.reason = reason;
@@ -8311,8 +8431,6 @@ policy_mgr_process_mlo_sta_dynamic_force_num_link(struct wlan_objmgr_psoc *psoc,
 		return QDF_STATUS_E_FAILURE;
 	}
 
-	policy_mgr_set_link_in_progress(pm_ctx, true);
-
 	policy_mgr_debug("vdev %d: mode %d num_mlo_vdev %d reason %d",
 			 wlan_vdev_get_id(vdev), mode, num_mlo_vdev, reason);
 
@@ -8340,6 +8458,28 @@ policy_mgr_process_mlo_sta_dynamic_force_num_link(struct wlan_objmgr_psoc *psoc,
 	req->param.num_link_entry = 1;
 	req->param.link_num[0].num_of_link = force_active_cnt;
 	req->param.control_flags.dynamic_force_link_num = 1;
+
+	if (ml_is_nlink_service_supported(psoc)) {
+		status =
+		policy_mgr_mlo_sta_set_link_by_linkid(psoc, vdev, reason,
+						      mode,
+						      req->param.link_num[0].
+						      num_of_link,
+						      num_mlo_vdev,
+						      mlo_vdev_lst,
+						      0,
+						      NULL);
+		qdf_mem_free(req);
+		wlan_objmgr_vdev_release_ref(vdev, WLAN_POLICY_MGR_ID);
+
+		if (status != QDF_STATUS_E_PENDING) {
+			policy_mgr_err("set_link_by_linkid status %d", status);
+			return status;
+		}
+		return QDF_STATUS_SUCCESS;
+	}
+
+	policy_mgr_set_link_in_progress(pm_ctx, true);
 
 	status = mlo_ser_set_link_req(req);
 	if (QDF_IS_STATUS_ERROR(status)) {
