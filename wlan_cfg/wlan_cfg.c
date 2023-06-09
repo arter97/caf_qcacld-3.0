@@ -4422,6 +4422,8 @@ wlan_cfg_pdev_attach(struct cdp_ctrl_objmgr_psoc *psoc)
 	wlan_cfg_ctx->rxdma_monitor_desc_ring = cfg_get(psoc,
 					CFG_DP_RXDMA_MONITOR_DESC_RING);
 	wlan_cfg_ctx->num_mac_rings = NUM_RXDMA_RINGS_PER_PDEV;
+	wlan_cfg_ctx->sw2rxdma_link_ring_size = cfg_get(psoc,
+					CFG_DP_SW2RXDMA_LINK_RING);
 
 	return wlan_cfg_ctx;
 }
@@ -4947,6 +4949,14 @@ int wlan_cfg_get_dma_mon_stat_ring_size(struct wlan_cfg_dp_pdev_ctxt *cfg)
 }
 
 qdf_export_symbol(wlan_cfg_get_dma_mon_stat_ring_size);
+
+int
+wlan_cfg_get_dma_sw2rxdma_link_ring_size(struct wlan_cfg_dp_pdev_ctxt *cfg)
+{
+	return cfg->sw2rxdma_link_ring_size;
+}
+
+qdf_export_symbol(wlan_cfg_get_dma_sw2rxdma_link_ring_size);
 
 int
 wlan_cfg_get_dma_mon_desc_ring_size(struct wlan_cfg_dp_pdev_ctxt *cfg)

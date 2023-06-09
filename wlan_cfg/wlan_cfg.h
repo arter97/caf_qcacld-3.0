@@ -564,6 +564,7 @@ struct wlan_cfg_dp_soc_ctxt {
  * @num_mac_rings: Number of mac rings
  * @nss_enabled: 1 - NSS enabled, 0 - NSS disabled
  * @dma_tx_mon_buf_ring_size: Tx monitor BUF Ring size
+ * @sw2rxdma_link_ring_size: SW2RXDMA link ring size
  */
 struct wlan_cfg_dp_pdev_ctxt {
 	int rx_dma_buf_ring_size;
@@ -575,6 +576,7 @@ struct wlan_cfg_dp_pdev_ctxt {
 	int num_mac_rings;
 	int nss_enabled;
 	int dma_tx_mon_buf_ring_size;
+	int sw2rxdma_link_ring_size;
 };
 
 /**
@@ -2405,6 +2407,14 @@ wlan_cfg_get_dp_soc_tx_mon_buf_ring_size(struct wlan_cfg_dp_soc_ctxt *cfg);
  * Return: Size of Rx MON dest ring size
  */
 int wlan_cfg_get_dma_rx_mon_dest_ring_size(struct wlan_cfg_dp_pdev_ctxt *cfg);
+
+/**
+ * wlan_cfg_get_dma_sw2rxdma_link_ring_size() - SW2RXDMA link ring size
+ * @cfg:  Configuration Handle
+ *
+ * Return: Size of SW2RXDMA link ring size
+ */
+int wlan_cfg_get_dma_sw2rxdma_link_ring_size(struct wlan_cfg_dp_pdev_ctxt *cfg);
 
 /**
  * wlan_cfg_get_dma_tx_mon_dest_ring_size() - Tx MON dest ring size
