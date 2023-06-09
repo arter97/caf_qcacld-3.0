@@ -254,7 +254,7 @@ QDF_STATUS dp_rx_flow_send_htt_operation_cmd(struct dp_pdev *pdev,
 QDF_STATUS dp_rx_flow_add_entry(struct dp_pdev *pdev,
 				struct cdp_rx_flow_info *rx_flow_info)
 {
-	struct hal_rx_flow flow = { 0 };
+	struct hal_rx_flow flow = { {0} };
 	struct dp_rx_fse *fse;
 	struct dp_soc *soc = pdev->soc;
 	struct dp_rx_fst *fst;
@@ -357,7 +357,7 @@ QDF_STATUS dp_rx_flow_add_entry(struct dp_pdev *pdev,
 QDF_STATUS dp_rx_flow_delete_entry(struct dp_pdev *pdev,
 				   struct cdp_rx_flow_info *rx_flow_info)
 {
-	struct hal_rx_flow flow = { 0 };
+	struct hal_rx_flow flow = { {0} };
 	struct dp_rx_fse *fse;
 	struct dp_soc *soc = pdev->soc;
 	struct dp_rx_fst *fst;

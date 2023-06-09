@@ -352,7 +352,7 @@ target_if_peer_capture_event(ol_scn_t sc, uint8_t *data, uint32_t datalen)
 	struct pdev_cfr *pdev_cfrobj;
 	struct look_up_table *lut = NULL;
 	struct csi_cfr_header *header = NULL;
-	struct csi_cfr_header header_error = {0};
+	struct csi_cfr_header header_error = { {0} };
 	wmi_cfr_peer_tx_event_param tx_evt_param = {0};
 	qdf_dma_addr_t buf_addr = 0, buf_addr_temp = 0;
 	int status;
