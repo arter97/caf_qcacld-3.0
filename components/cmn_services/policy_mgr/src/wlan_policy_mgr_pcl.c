@@ -994,7 +994,7 @@ policy_mgr_modify_sap_pcl_for_6G_channels(struct wlan_objmgr_psoc *psoc,
 	uint8_t weight_list[NUM_CHANNELS];
 	uint32_t vdev_id = 0, pcl_len = 0, i;
 	struct wlan_objmgr_vdev *vdev;
-	qdf_freq_t sta_gc_freq = 0;
+	qdf_freq_t sta_gc_6ghz_freq = 0;
 	uint32_t ap_pwr_type_6g = 0;
 	bool indoor_ch_support = false;
 
@@ -1009,21 +1009,21 @@ policy_mgr_modify_sap_pcl_for_6G_channels(struct wlan_objmgr_psoc *psoc,
 		return QDF_STATUS_E_FAILURE;
 	}
 
-	if (policy_mgr_mode_specific_connection_count(psoc,
-						      PM_STA_MODE, NULL)) {
-		sta_gc_freq =
-			policy_mgr_mode_specific_get_channel(psoc, PM_STA_MODE);
-		vdev_id = policy_mgr_mode_specific_vdev_id(psoc, PM_STA_MODE);
-	} else if (policy_mgr_mode_specific_connection_count(psoc,
-							     PM_P2P_CLIENT_MODE,
-							     NULL)) {
-		sta_gc_freq = policy_mgr_mode_specific_get_channel(
-						psoc, PM_P2P_CLIENT_MODE);
-		vdev_id = policy_mgr_mode_specific_vdev_id(psoc,
-							   PM_P2P_CLIENT_MODE);
+	qdf_mutex_acquire(&pm_ctx->qdf_conc_list_lock);
+	for (i = 0; i < MAX_NUMBER_OF_CONC_CONNECTIONS; i++) {
+		if ((pm_conc_connection_list[i].mode == PM_STA_MODE ||
+		    pm_conc_connection_list[i].mode == PM_P2P_CLIENT_MODE) &&
+		    pm_conc_connection_list[i].in_use) {
+			if (!WLAN_REG_IS_6GHZ_CHAN_FREQ(pm_conc_connection_list[i].freq))
+				continue;
+			sta_gc_6ghz_freq = pm_conc_connection_list[i].freq;
+			vdev_id = pm_conc_connection_list[i].vdev_id;
+			break;
+		}
 	}
+	qdf_mutex_release(&pm_ctx->qdf_conc_list_lock);
 
-	if (!sta_gc_freq || !WLAN_REG_IS_6GHZ_CHAN_FREQ(sta_gc_freq))
+	if (!sta_gc_6ghz_freq)
 		return QDF_STATUS_SUCCESS;
 
 	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, vdev_id,
