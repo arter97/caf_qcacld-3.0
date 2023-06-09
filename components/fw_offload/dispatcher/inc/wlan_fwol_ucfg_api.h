@@ -220,6 +220,16 @@ QDF_STATUS ucfg_fwol_get_ani_enabled(struct wlan_objmgr_psoc *psoc,
 				     bool *ani_enabled);
 
 /**
+ * ucfg_fwol_get_pcie_config() - Assigns the pcie_config value
+ * @psoc: pointer to the psoc object
+ * @pcie_config: pointer to return pcie_config value
+ *
+ * Return: QDF Status
+ */
+QDF_STATUS ucfg_fwol_get_pcie_config(struct wlan_objmgr_psoc *psoc,
+				     bool *pcie_config);
+
+/**
  * ucfg_get_enable_rts_sifsbursting() - Assigns the enable_rts_sifsbursting
  *                                      value
  * @psoc: pointer to the psoc object
@@ -762,6 +772,20 @@ QDF_STATUS ucfg_fwol_configure_global_params(struct wlan_objmgr_psoc *psoc,
 					     struct wlan_objmgr_pdev *pdev);
 
 /**
+ * ucfg_fwol_set_ilp_config - API to configure Interface Low Power (ILP)
+ * @psoc: pointer to psoc object
+ * @pdev: pointer to pdev object
+ * @enable: enable
+ *
+ * This API is used to enable/disable Interface Low Power (IPL) feature.
+ *
+ * Return: QDF Status
+ */
+QDF_STATUS ucfg_fwol_set_ilp_config(struct wlan_objmgr_psoc *psoc,
+				    struct wlan_objmgr_pdev *pdev,
+				    uint32_t enable);
+
+/**
  * ucfg_fwol_configure_vdev_params - API to configure vdev specific params
  * @psoc: pointer to psoc object
  * @vdev: pointer to vdev object
@@ -864,6 +888,13 @@ ucfg_fwol_get_all_allowlist_params(struct wlan_objmgr_psoc *psoc,
 static inline QDF_STATUS
 ucfg_fwol_get_ani_enabled(struct wlan_objmgr_psoc *psoc,
 			  bool *ani_enabled)
+{
+	return QDF_STATUS_E_FAILURE;
+}
+
+static inline QDF_STATUS
+ucfg_fwol_get_pcie_config(struct wlan_objmgr_psoc *psoc,
+			  bool *pcie_config)
 {
 	return QDF_STATUS_E_FAILURE;
 }

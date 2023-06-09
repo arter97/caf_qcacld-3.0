@@ -290,7 +290,7 @@ void hdd_tx_resume_cb(void *adapter_context, bool tx_resume)
 		return;
 	}
 
-	hdd_sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter);
+	hdd_sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter->deflink);
 
 	/* Resume TX  */
 	if (true == tx_resume) {
@@ -672,7 +672,7 @@ static void __hdd_tx_timeout(struct net_device *dev)
 
 	wlan_hdd_display_adapter_netif_queue_history(adapter);
 
-	vdev = hdd_objmgr_get_vdev_by_user(adapter, WLAN_DP_ID);
+	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink, WLAN_DP_ID);
 	if (vdev) {
 		ucfg_dp_tx_timeout(vdev);
 		hdd_objmgr_put_vdev_by_user(vdev, WLAN_DP_ID);
@@ -1316,7 +1316,7 @@ int hdd_set_mon_rx_cb(struct net_device *dev)
 
 	WLAN_ADDR_COPY(sta_desc.peer_addr.bytes, adapter->mac_addr.bytes);
 
-	vdev = hdd_objmgr_get_vdev_by_user(adapter, WLAN_DP_ID);
+	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink, WLAN_DP_ID);
 	if (!vdev) {
 		hdd_err("failed to get vdev");
 		return -EINVAL;
@@ -1639,9 +1639,10 @@ void wlan_hdd_set_tx_flow_info(void)
 {
 	struct hdd_adapter *adapter, *next_adapter = NULL;
 	struct hdd_station_ctx *sta_ctx;
-	struct hdd_ap_ctx *hdd_ap_ctx;
+	struct hdd_ap_ctx *ap_ctx;
 	struct hdd_hostapd_state *hostapd_state;
-	uint8_t sta_channel = 0, p2p_channel = 0, ap_channel = 0;
+	uint8_t sta_chan = 0, ap_chan = 0;
+	uint32_t chan_freq;
 	struct hdd_context *hdd_ctx;
 	uint8_t target_channel = 0;
 	uint8_t pre_adp_channel = 0;
@@ -1656,45 +1657,27 @@ void wlan_hdd_set_tx_flow_info(void)
 					   dbgid) {
 		switch (adapter->device_mode) {
 		case QDF_STA_MODE:
-			sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter);
-			if (hdd_cm_is_vdev_associated(adapter)) {
-				sta_channel = wlan_reg_freq_to_chan(
-						hdd_ctx->pdev,
-						sta_ctx->conn_info.chan_freq);
-				target_channel = sta_channel;
-			}
-			break;
 		case QDF_P2P_CLIENT_MODE:
-			sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter);
+			sta_ctx =
+				WLAN_HDD_GET_STATION_CTX_PTR(adapter->deflink);
 			if (hdd_cm_is_vdev_associated(adapter)) {
-				p2p_channel = wlan_reg_freq_to_chan(
-					hdd_ctx->pdev,
-					sta_ctx->conn_info.chan_freq);
-				target_channel = p2p_channel;
-			}
-			break;
-		case QDF_P2P_GO_MODE:
-			hdd_ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(adapter);
-			hostapd_state = WLAN_HDD_GET_HOSTAP_STATE_PTR(adapter);
-			if (hostapd_state->bss_state == BSS_START &&
-			    hostapd_state->qdf_status ==
-			    QDF_STATUS_SUCCESS) {
-				p2p_channel = wlan_reg_freq_to_chan(
-					hdd_ctx->pdev,
-					hdd_ap_ctx->operating_chan_freq);
-				target_channel = p2p_channel;
+				chan_freq = sta_ctx->conn_info.chan_freq;
+				sta_chan = wlan_reg_freq_to_chan(hdd_ctx->pdev,
+								 chan_freq);
+				target_channel = sta_chan;
 			}
 			break;
 		case QDF_SAP_MODE:
-			hdd_ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(adapter);
-			hostapd_state = WLAN_HDD_GET_HOSTAP_STATE_PTR(adapter);
+		case QDF_P2P_GO_MODE:
+			ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(adapter->deflink);
+			hostapd_state =
+				WLAN_HDD_GET_HOSTAP_STATE_PTR(adapter->deflink);
 			if (hostapd_state->bss_state == BSS_START &&
-			    hostapd_state->qdf_status ==
-			    QDF_STATUS_SUCCESS) {
-				ap_channel = wlan_reg_freq_to_chan(
-					hdd_ctx->pdev,
-					hdd_ap_ctx->operating_chan_freq);
-				target_channel = ap_channel;
+			    hostapd_state->qdf_status == QDF_STATUS_SUCCESS) {
+				chan_freq = ap_ctx->operating_chan_freq;
+				ap_chan = wlan_reg_freq_to_chan(hdd_ctx->pdev,
+								chan_freq);
+				target_channel = ap_chan;
 			}
 			break;
 		default:

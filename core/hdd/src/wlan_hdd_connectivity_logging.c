@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -1350,9 +1350,6 @@ wlan_hdd_connectivity_fail_event(struct wlan_objmgr_vdev *vdev,
 
 	WLAN_HOST_DIAG_EVENT_DEF(wlan_diag_event, struct wlan_diag_connect);
 
-	if (!rsp->reason)
-		return;
-
 	qdf_mem_zero(&wlan_diag_event, sizeof(struct wlan_diag_connect));
 
 	wlan_diag_event.diag_cmn.vdev_id = wlan_vdev_get_id(vdev);
@@ -1371,87 +1368,5 @@ wlan_hdd_connectivity_fail_event(struct wlan_objmgr_vdev *vdev,
 	wlan_diag_event.reason = rsp->reason;
 
 	WLAN_HOST_DIAG_EVENT_REPORT(&wlan_diag_event, EVENT_WLAN_CONN);
-}
-
-#else
-void wlan_hdd_connectivity_event_connecting(struct hdd_context *hdd_ctx,
-					    struct cfg80211_connect_params *req,
-					    uint8_t vdev_id)
-{
-	struct wlan_log_record *record;
-
-	record = qdf_mem_malloc(sizeof(*record));
-	if (!record)
-		return;
-
-	record->timestamp_us = qdf_get_time_of_the_day_us();
-	record->ktime_us = qdf_ktime_to_us(qdf_ktime_get());
-	record->vdev_id = vdev_id;
-	record->log_subtype = WLAN_CONNECTING;
-
-	record->conn_info.ssid_len = req->ssid_len;
-	if (req->ssid_len > WLAN_SSID_MAX_LEN)
-		record->conn_info.ssid_len = WLAN_SSID_MAX_LEN;
-	qdf_mem_copy(record->conn_info.ssid, req->ssid,
-		     record->conn_info.ssid_len);
-
-	if (req->bssid)
-		qdf_mem_copy(record->bssid.bytes, req->bssid,
-			     QDF_MAC_ADDR_SIZE);
-	else if (req->bssid_hint)
-		qdf_mem_copy(record->conn_info.bssid_hint.bytes,
-			     req->bssid_hint,
-			     QDF_MAC_ADDR_SIZE);
-
-	if (req->channel)
-		record->conn_info.freq = req->channel->center_freq;
-
-	if (req->channel_hint)
-		record->conn_info.freq_hint = req->channel_hint->center_freq;
-
-	record->conn_info.pairwise = req->crypto.ciphers_pairwise[0];
-	record->conn_info.group = req->crypto.cipher_group;
-	record->conn_info.akm = req->crypto.akm_suites[0];
-	record->conn_info.auth_type = req->auth_type;
-	if (hdd_ctx->bt_profile_con)
-		record->conn_info.is_bt_coex_active = true;
-
-	wlan_connectivity_log_enqueue(record);
-
-	qdf_mem_free(record);
-}
-
-void
-wlan_hdd_connectivity_fail_event(struct wlan_objmgr_vdev *vdev,
-				 struct wlan_cm_connect_resp *rsp)
-{
-	uint8_t vdev_id;
-	struct wlan_log_record *log;
-	enum QDF_OPMODE op_mode;
-
-	/* Send the event only for failure reason, else return */
-	if (!rsp->reason)
-		return;
-
-	vdev_id = wlan_vdev_get_id(vdev);
-	op_mode = wlan_vdev_mlme_get_opmode(vdev);
-	if (op_mode != QDF_STA_MODE)
-		return;
-
-	log = qdf_mem_malloc(sizeof(*log));
-	if (!log)
-		return;
-
-	log->timestamp_us = qdf_get_time_of_the_day_us();
-	log->ktime_us = qdf_ktime_to_us(qdf_ktime_get());
-	log->vdev_id = vdev_id;
-	log->log_subtype = WLAN_CONNECTING_FAIL;
-
-	log->bssid = rsp->bssid;
-	log->conn_info.freq = rsp->freq;
-	log->conn_info.conn_status = rsp->reason;
-
-	wlan_connectivity_log_enqueue(log);
-	qdf_mem_free(log);
 }
 #endif

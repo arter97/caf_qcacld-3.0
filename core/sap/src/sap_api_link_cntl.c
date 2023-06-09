@@ -1211,7 +1211,7 @@ QDF_STATUS wlansap_roam_callback(void *ctx,
 	case eCSR_ROAM_SET_CHANNEL_RSP:
 		sap_debug("Received set channel response");
 		ucfg_if_mgr_deliver_event(sap_ctx->vdev,
-					  WLAN_IF_MGR_EV_CSA_COMPLETE,
+					  WLAN_IF_MGR_EV_AP_CSA_COMPLETE,
 					  NULL);
 		break;
 	case eCSR_ROAM_CAC_COMPLETE_IND:
@@ -1669,6 +1669,12 @@ void wlansap_process_chan_info_event(struct sap_context *sap_ctx,
 
 	if (sap_ctx->optimize_acs_chan_selected)
 		return;
+
+	if (!sap_ctx->acs_cfg) {
+		sap_debug("acs_cfg is null");
+		return;
+	}
+
 	/* If chan_info_freq is not preferred band's freq
 	 * do not select it as ACS result.
 	 */

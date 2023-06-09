@@ -39,6 +39,7 @@
 #include <wlan_mlo_mgr_sta.h>
 #endif
 #include "wlan_vdev_mgr_utils_api.h"
+#include "wlan_tdls_api.h"
 
 QDF_STATUS if_mgr_connect_start(struct wlan_objmgr_vdev *vdev,
 				struct if_mgr_event_data *event_data)
@@ -72,7 +73,7 @@ QDF_STATUS if_mgr_connect_start(struct wlan_objmgr_vdev *vdev,
 	op_mode = wlan_vdev_mlme_get_opmode(vdev);
 
 	if (op_mode == QDF_STA_MODE || op_mode == QDF_P2P_CLIENT_MODE)
-		wlan_handle_emlsr_sta_concurrency(vdev, false, true, false);
+		wlan_handle_emlsr_sta_concurrency(psoc, true, false);
 
 	if (op_mode == QDF_P2P_CLIENT_MODE || sap_cnt || sta_cnt) {
 		for (i = 0; i < sta_cnt + sap_cnt; i++) {
@@ -90,6 +91,9 @@ QDF_STATUS if_mgr_connect_start(struct wlan_objmgr_vdev *vdev,
 		if (disable_nan)
 			ucfg_nan_disable_concurrency(psoc);
 	}
+
+	if (op_mode == QDF_P2P_CLIENT_MODE)
+		wlan_tdls_handle_p2p_client_connect(psoc, vdev);
 
 	/*
 	 * STA+NDI concurrency gets preference over NDI+NDI. Disable
@@ -167,7 +171,7 @@ QDF_STATUS if_mgr_connect_complete(struct wlan_objmgr_vdev *vdev,
 	policy_mgr_check_n_start_opportunistic_timer(psoc);
 	if (wlan_vdev_mlme_get_opmode(vdev) == QDF_STA_MODE &&
 	    wlan_vdev_mlme_is_mlo_vdev(vdev))
-		wlan_handle_emlsr_sta_concurrency(vdev, false, false, true);
+		wlan_handle_emlsr_sta_concurrency(psoc, false, true);
 
 	if (!wlan_cm_is_vdev_roaming(vdev))
 		policy_mgr_check_concurrent_intf_and_restart_sap(psoc,
@@ -212,7 +216,7 @@ QDF_STATUS if_mgr_disconnect_complete(struct wlan_objmgr_vdev *vdev,
 
 	if (wlan_vdev_mlme_get_opmode(vdev) == QDF_STA_MODE ||
 	    wlan_vdev_mlme_get_opmode(vdev) == QDF_P2P_CLIENT_MODE)
-		wlan_handle_emlsr_sta_concurrency(vdev, false, false, true);
+		wlan_handle_emlsr_sta_concurrency(psoc, false, true);
 
 	status = if_mgr_enable_roaming_after_p2p_disconnect(pdev, vdev,
 							    RSO_CONNECT_START);
@@ -229,6 +233,26 @@ QDF_STATUS if_mgr_disconnect_complete(struct wlan_objmgr_vdev *vdev,
 		ifmgr_err("Failed to enable roaming on connected sta");
 		return status;
 	}
+
+	return QDF_STATUS_SUCCESS;
+}
+
+QDF_STATUS
+if_mgr_sta_csa_complete(struct wlan_objmgr_vdev *vdev,
+			struct if_mgr_event_data *event_data)
+{
+	struct wlan_objmgr_psoc *psoc;
+	struct wlan_objmgr_pdev *pdev;
+
+	pdev = wlan_vdev_get_pdev(vdev);
+	if (!pdev)
+		return QDF_STATUS_E_FAILURE;
+
+	psoc = wlan_pdev_get_psoc(pdev);
+	if (!psoc)
+		return QDF_STATUS_E_FAILURE;
+
+	wlan_tdls_notify_channel_switch_complete(psoc, wlan_vdev_get_id(vdev));
 
 	return QDF_STATUS_SUCCESS;
 }

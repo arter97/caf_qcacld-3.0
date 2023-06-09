@@ -34,7 +34,7 @@ wlan_hdd_get_bmiss(struct hdd_adapter *adapter)
 	uint8_t peer_mac[QDF_MAC_ADDR_SIZE];
 	int errno;
 
-	hdd_sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter);
+	hdd_sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter->deflink);
 	if (!hdd_sta_ctx) {
 		hdd_debug("hdd_sta_ctx received NULL");
 		return NULL;

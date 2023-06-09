@@ -24,10 +24,10 @@
  */
 
 #include "wlan_tdls_main.h"
-#include "wlan_tdls_cmds_process.h"
 #include "wlan_tdls_peer.h"
 #include "wlan_tdls_ct.h"
 #include "wlan_tdls_mgmt.h"
+#include "wlan_tdls_api.h"
 #include "wlan_tdls_tgt_api.h"
 #include "wlan_policy_mgr_public_struct.h"
 #include "wlan_policy_mgr_api.h"
@@ -36,6 +36,7 @@
 #include "wlan_cm_roam_api.h"
 #include "wlan_cfg80211_tdls.h"
 #include "wlan_nan_api_i.h"
+#include "wlan_mlme_vdev_mgr_interface.h"
 
 /* Global tdls soc pvt object
  * this is useful for some functions which does not receive either vdev or psoc
@@ -55,46 +56,30 @@ static struct tdls_soc_priv_obj *tdls_soc_global;
 static char *tdls_get_cmd_type_str(enum tdls_command_type cmd_type)
 {
 	switch (cmd_type) {
-	case TDLS_CMD_TX_ACTION:
-		return "TDLS_CMD_TX_ACTION";
-	case TDLS_CMD_ADD_STA:
-		return "TDLS_CMD_ADD_STA";
-	case TDLS_CMD_CHANGE_STA:
-		return "TDLS_CMD_CHANGE_STA";
-	case TDLS_CMD_ENABLE_LINK:
-		return "TDLS_CMD_ENABLE_LINK";
-	case TDLS_CMD_DISABLE_LINK:
-		return "TDLS_CMD_DISABLE_LINK";
-	case TDLS_CMD_CONFIG_FORCE_PEER:
-		return "TDLS_CMD_CONFIG_FORCE_PEER";
-	case TDLS_CMD_REMOVE_FORCE_PEER:
-		return "TDLS_CMD_REMOVE_FORCE_PEER";
-	case TDLS_CMD_STATS_UPDATE:
-		return "TDLS_CMD_STATS_UPDATE";
-	case TDLS_CMD_CONFIG_UPDATE:
-		return "TDLS_CMD_CONFIG_UPDATE";
-	case TDLS_CMD_SET_RESPONDER:
-		return "TDLS_CMD_SET_RESPONDER";
-	case TDLS_CMD_SCAN_DONE:
-		return "TDLS_CMD_SCAN_DONE";
-	case TDLS_NOTIFY_STA_CONNECTION:
-		return "TDLS_NOTIFY_STA_CONNECTION";
-	case TDLS_NOTIFY_STA_DISCONNECTION:
-		return "TDLS_NOTIFY_STA_DISCONNECTION";
-	case TDLS_CMD_SET_TDLS_MODE:
-		return "TDLS_CMD_SET_TDLS_MODE";
-	case TDLS_CMD_SESSION_DECREMENT:
-		return "TDLS_CMD_SESSION_DECREMENT";
-	case TDLS_CMD_SESSION_INCREMENT:
-		return "TDLS_CMD_SESSION_INCREMENT";
-	case TDLS_CMD_TEARDOWN_LINKS:
-		return "TDLS_CMD_TEARDOWN_LINKS";
-	case TDLS_NOTIFY_RESET_ADAPTERS:
-		return "TDLS_NOTIFY_RESET_ADAPTERS";
-	case TDLS_CMD_ANTENNA_SWITCH:
-		return "TDLS_CMD_ANTENNA_SWITCH";
-	case TDLS_CMD_START_BSS:
-		return "TDLS_CMD_START_BSS";
+	CASE_RETURN_STRING(TDLS_CMD_TX_ACTION);
+	CASE_RETURN_STRING(TDLS_CMD_ADD_STA);
+	CASE_RETURN_STRING(TDLS_CMD_CHANGE_STA);
+	CASE_RETURN_STRING(TDLS_CMD_ENABLE_LINK);
+	CASE_RETURN_STRING(TDLS_CMD_DISABLE_LINK);
+	CASE_RETURN_STRING(TDLS_CMD_CONFIG_FORCE_PEER);
+	CASE_RETURN_STRING(TDLS_CMD_REMOVE_FORCE_PEER);
+	CASE_RETURN_STRING(TDLS_CMD_STATS_UPDATE);
+	CASE_RETURN_STRING(TDLS_CMD_CONFIG_UPDATE);
+	CASE_RETURN_STRING(TDLS_CMD_SCAN_DONE);
+	CASE_RETURN_STRING(TDLS_CMD_SET_RESPONDER);
+	CASE_RETURN_STRING(TDLS_NOTIFY_STA_CONNECTION);
+	CASE_RETURN_STRING(TDLS_NOTIFY_STA_DISCONNECTION);
+	CASE_RETURN_STRING(TDLS_CMD_SET_TDLS_MODE);
+	CASE_RETURN_STRING(TDLS_CMD_SESSION_INCREMENT);
+	CASE_RETURN_STRING(TDLS_CMD_SESSION_DECREMENT);
+	CASE_RETURN_STRING(TDLS_CMD_TEARDOWN_LINKS);
+	CASE_RETURN_STRING(TDLS_NOTIFY_RESET_ADAPTERS);
+	CASE_RETURN_STRING(TDLS_CMD_ANTENNA_SWITCH);
+	CASE_RETURN_STRING(TDLS_CMD_SET_OFFCHANMODE);
+	CASE_RETURN_STRING(TDLS_CMD_SET_OFFCHANNEL);
+	CASE_RETURN_STRING(TDLS_CMD_SET_SECOFFCHANOFFSET);
+	CASE_RETURN_STRING(TDLS_DELETE_ALL_PEERS_INDICATION);
+	CASE_RETURN_STRING(TDLS_CMD_START_BSS);
 	default:
 		return "Invalid TDLS command";
 	}
@@ -222,7 +207,7 @@ static QDF_STATUS tdls_vdev_init(struct tdls_vdev_priv_obj *vdev_obj)
 	qdf_mc_timer_init(&vdev_obj->peer_update_timer, QDF_TIMER_TYPE_SW,
 			  tdls_ct_handler, soc_obj->soc);
 	qdf_mc_timer_init(&vdev_obj->peer_discovery_timer, QDF_TIMER_TYPE_SW,
-			  tdls_discovery_timeout_peer_cb, soc_obj->soc);
+			  tdls_discovery_timeout_peer_cb, vdev_obj->vdev);
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -645,8 +630,7 @@ QDF_STATUS tdls_process_cmd(struct scheduler_msg *msg)
 		break;
 	case TDLS_CMD_SESSION_DECREMENT:
 		tdls_process_decrement_active_session(msg->bodyptr);
-		/* take decision on connection tracker */
-		fallthrough;
+		break;
 	case TDLS_CMD_SESSION_INCREMENT:
 		tdls_process_policy_mgr_notification(msg->bodyptr);
 		break;
@@ -745,7 +729,8 @@ void tdls_timer_restart(struct wlan_objmgr_vdev *vdev,
  */
 static void tdls_monitor_timers_stop(struct tdls_vdev_priv_obj *tdls_vdev)
 {
-	qdf_mc_timer_stop(&tdls_vdev->peer_discovery_timer);
+	if (!wlan_vdev_mlme_is_mlo_vdev(tdls_vdev->vdev))
+		qdf_mc_timer_stop(&tdls_vdev->peer_discovery_timer);
 }
 
 /**
@@ -828,44 +813,6 @@ QDF_STATUS tdls_get_vdev_objects(struct wlan_objmgr_vdev *vdev,
 		return QDF_STATUS_E_FAILURE;
 
 	return QDF_STATUS_SUCCESS;
-}
-
-QDF_STATUS tdls_set_offchan_mode(struct wlan_objmgr_psoc *psoc,
-				     struct tdls_channel_switch_params *param)
-{
-	QDF_STATUS status;
-
-	/*  wmi_unified_set_tdls_offchan_mode_cmd() will be called directly */
-	status = tgt_tdls_set_offchan_mode(psoc, param);
-
-	if (!QDF_IS_STATUS_SUCCESS(status))
-		status = QDF_STATUS_E_FAILURE;
-
-	return status;
-}
-
-/**
- * tdls_update_fw_tdls_state() - update tdls status info
- * @tdls_soc_obj: TDLS soc object
- * @tdls_info_to_fw: TDLS state info to update in f/w.
- *
- * send message to WMA to set TDLS state in f/w
- *
- * Return: QDF_STATUS.
- */
-static
-QDF_STATUS tdls_update_fw_tdls_state(struct tdls_soc_priv_obj *tdls_soc_obj,
-				     struct tdls_info *tdls_info_to_fw)
-{
-	QDF_STATUS status;
-
-	/*  wmi_unified_update_fw_tdls_state_cmd() will be called directly */
-	status = tgt_tdls_set_fw_state(tdls_soc_obj->soc, tdls_info_to_fw);
-
-	if (!QDF_IS_STATUS_SUCCESS(status))
-		status = QDF_STATUS_E_FAILURE;
-
-	return status;
 }
 
 #ifdef WLAN_FEATURE_11AX
@@ -993,7 +940,8 @@ bool tdls_check_is_tdls_allowed(struct wlan_objmgr_vdev *vdev)
 		goto exit;
 	}
 
-	if (wlan_vdev_mlme_is_mlo_vdev(vdev)) {
+	if (wlan_vdev_mlme_is_mlo_vdev(vdev) &&
+	    !wlan_tdls_is_fw_11be_mlo_capable(tdls_soc_obj->soc)) {
 		tdls_debug("TDLS not supported on MLO vdev");
 		goto exit;
 	}
@@ -1038,8 +986,10 @@ exit:
 bool tdls_is_concurrency_allowed(struct wlan_objmgr_psoc *psoc)
 {
 	if (!wlan_psoc_nif_fw_ext2_cap_get(psoc,
-					   WLAN_TDLS_CONCURRENCIES_SUPPORT))
+					   WLAN_TDLS_CONCURRENCIES_SUPPORT)) {
+		tdls_debug("fw cap is not advertised");
 		return false;
+	}
 
 	if (policy_mgr_get_connection_count_with_mlo(psoc) >
 	    WLAN_TDLS_MAX_CONCURRENT_VDEV_SUPPORTED)
@@ -1075,6 +1025,7 @@ void tdls_set_ct_mode(struct wlan_objmgr_psoc *psoc,
 	struct tdls_vdev_priv_obj *tdls_vdev_obj;
 	uint32_t tdls_feature_flags = 0, sta_count, p2p_count;
 	bool state = false;
+	bool tdls_mlo;
 	QDF_STATUS status;
 
 	if (!tdls_check_is_tdls_allowed(vdev))
@@ -1087,6 +1038,7 @@ void tdls_set_ct_mode(struct wlan_objmgr_psoc *psoc,
 		goto set_state;
 	}
 
+	qdf_atomic_set(&tdls_soc_obj->timer_cnt, 0);
 	tdls_feature_flags = tdls_soc_obj->tdls_configs.tdls_feature_flags;
 	if (TDLS_SUPPORT_DISABLED == tdls_soc_obj->tdls_current_mode ||
 	    TDLS_SUPPORT_SUSPENDED == tdls_soc_obj->tdls_current_mode ||
@@ -1101,7 +1053,8 @@ void tdls_set_ct_mode(struct wlan_objmgr_psoc *psoc,
 		policy_mgr_mode_specific_connection_count(psoc,
 							  PM_P2P_CLIENT_MODE,
 							  NULL);
-	if (sta_count == 1 ||
+	tdls_mlo = wlan_tdls_is_fw_11be_mlo_capable(psoc);
+	if (sta_count == 1 || (sta_count >= 2 && tdls_mlo) ||
 	    (policy_mgr_get_connection_count_with_mlo(psoc) == 1 &&
 	     p2p_count == 1)) {
 		state = true;
@@ -1125,7 +1078,8 @@ set_state:
 	else
 		tdls_implicit_disable(tdls_vdev_obj);
 
-	tdls_debug("enable_tdls_connection_tracker %d current_mode:%d feature_flags:0x%x",
+	tdls_debug("vdev:%d enable_tdls_connection_tracker %d current_mode:%d feature_flags:0x%x",
+		   wlan_vdev_get_id(vdev),
 		   tdls_soc_obj->enable_tdls_connection_tracker,
 		   tdls_soc_obj->tdls_current_mode, tdls_feature_flags);
 }
@@ -1133,33 +1087,45 @@ set_state:
 QDF_STATUS
 tdls_process_policy_mgr_notification(struct wlan_objmgr_psoc *psoc)
 {
-	struct wlan_objmgr_vdev *tdls_obj_vdev;
+	struct wlan_objmgr_vdev *tdls_vdev;
+	struct tdls_vdev_priv_obj *tdls_priv_vdev;
+	struct tdls_soc_priv_obj *tdls_priv_soc;
+	QDF_STATUS status;
 
 	if (!psoc) {
 		tdls_err("psoc: %pK", psoc);
 		return QDF_STATUS_E_NULL_VALUE;
 	}
 
-	tdls_obj_vdev = tdls_get_vdev(psoc, WLAN_TDLS_NB_ID);
-	if (!tdls_obj_vdev) {
+	tdls_vdev = tdls_get_vdev(psoc, WLAN_TDLS_NB_ID);
+	if (!tdls_vdev) {
 		tdls_err("No TDLS vdev");
 		return QDF_STATUS_E_NULL_VALUE;
 	}
 
-	if (!tdls_check_is_tdls_allowed(tdls_obj_vdev)) {
-		tdls_disable_offchan_and_teardown_links(tdls_obj_vdev);
-		wlan_objmgr_vdev_release_ref(tdls_obj_vdev, WLAN_TDLS_NB_ID);
+	status = tdls_get_vdev_objects(tdls_vdev, &tdls_priv_vdev,
+				       &tdls_priv_soc);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		tdls_debug("TDLS vdev objects NULL");
+		wlan_objmgr_vdev_release_ref(tdls_vdev, WLAN_TDLS_NB_ID);
 		return QDF_STATUS_E_NULL_VALUE;
 	}
 
-	tdls_set_tdls_offchannelmode(tdls_obj_vdev, ENABLE_CHANSWITCH);
+	if (!tdls_check_is_tdls_allowed(tdls_vdev)) {
+		tdls_disable_offchan_and_teardown_links(tdls_vdev);
+		tdls_debug("Disable the tdls in FW due to concurrency");
+		wlan_objmgr_vdev_release_ref(tdls_vdev, WLAN_TDLS_NB_ID);
+		return QDF_STATUS_E_NULL_VALUE;
+	}
 
-	tdls_debug("enter ");
-	tdls_set_ct_mode(psoc, tdls_obj_vdev);
+	tdls_debug("vdev:%d enter", wlan_vdev_get_id(tdls_vdev));
 
-	wlan_objmgr_vdev_release_ref(tdls_obj_vdev, WLAN_TDLS_NB_ID);
+	tdls_set_tdls_offchannelmode(tdls_vdev, ENABLE_CHANSWITCH);
+	tdls_set_ct_mode(psoc, tdls_vdev);
 
+	wlan_objmgr_vdev_release_ref(tdls_vdev, WLAN_TDLS_NB_ID);
 	tdls_debug("exit ");
+
 	return QDF_STATUS_SUCCESS;
 }
 
@@ -1170,6 +1136,7 @@ tdls_process_decrement_active_session(struct wlan_objmgr_psoc *psoc)
 	struct tdls_vdev_priv_obj *tdls_priv_vdev;
 	struct wlan_objmgr_vdev *tdls_obj_vdev;
 	uint8_t vdev_id;
+	QDF_STATUS status;
 
 	tdls_debug("Enter");
 	if (!psoc)
@@ -1197,14 +1164,17 @@ tdls_process_decrement_active_session(struct wlan_objmgr_psoc *psoc)
 	 */
 	tdls_debug("Enable TDLS in FW and host as active sta/p2p_cli interface is present");
 	vdev_id = wlan_vdev_get_id(tdls_obj_vdev);
-	if (tdls_get_vdev_objects(tdls_obj_vdev, &tdls_priv_vdev,
-				  &tdls_priv_soc) == QDF_STATUS_SUCCESS) {
-		tdls_send_update_to_fw(tdls_priv_vdev, tdls_priv_soc,
-				       false, false, true, vdev_id);
-		if (tdls_priv_soc->connected_peer_count == 1)
-			tdls_set_tdls_offchannelmode(tdls_obj_vdev,
-						     ENABLE_CHANSWITCH);
-	}
+	status = tdls_get_vdev_objects(tdls_obj_vdev, &tdls_priv_vdev,
+				       &tdls_priv_soc);
+	if (QDF_IS_STATUS_ERROR(status))
+		goto release_ref;
+
+	tdls_send_update_to_fw(tdls_priv_vdev, tdls_priv_soc,
+			       mlme_get_tdls_prohibited(tdls_obj_vdev),
+			       mlme_get_tdls_chan_switch_prohibited(tdls_obj_vdev),
+			       true, vdev_id);
+	if (tdls_priv_soc->connected_peer_count == 1)
+		tdls_set_tdls_offchannelmode(tdls_obj_vdev, ENABLE_CHANSWITCH);
 
 release_ref:
 	wlan_objmgr_vdev_release_ref(tdls_obj_vdev, WLAN_TDLS_NB_ID);
@@ -1271,10 +1241,6 @@ struct wlan_objmgr_vdev *tdls_get_vdev(struct wlan_objmgr_psoc *psoc,
 					  wlan_objmgr_ref_dbgid dbg_id)
 {
 	uint32_t vdev_id;
-
-	if (policy_mgr_get_connection_count_with_mlo(psoc) > 1 &&
-	    !tdls_is_concurrency_allowed(psoc))
-		return NULL;
 
 	vdev_id = policy_mgr_mode_specific_vdev_id(psoc, PM_STA_MODE);
 	if (WLAN_INVALID_VDEV_ID != vdev_id)
@@ -1369,7 +1335,7 @@ void tdls_send_update_to_fw(struct tdls_vdev_priv_obj *tdls_vdev_obj,
 	struct tdls_config_params *threshold_params;
 	uint32_t tdls_feature_flags;
 	QDF_STATUS status;
-	uint8_t set_state_cnt;
+	bool tdls_mlo;
 
 	tdls_feature_flags = tdls_soc_obj->tdls_configs.tdls_feature_flags;
 	if (!TDLS_IS_ENABLED(tdls_feature_flags)) {
@@ -1377,12 +1343,7 @@ void tdls_send_update_to_fw(struct tdls_vdev_priv_obj *tdls_vdev_obj,
 		return;
 	}
 
-	set_state_cnt = tdls_soc_obj->set_state_info.set_state_cnt;
-	if ((set_state_cnt == 0 && !sta_connect_event) ||
-	    (set_state_cnt && sta_connect_event)) {
-		tdls_debug("FW TDLS state is already in requested state");
-		return;
-	}
+	tdls_mlo = wlan_tdls_is_fw_11be_mlo_capable(tdls_soc_obj->soc);
 
 	/* If AP or caller indicated TDLS Prohibited then disable tdls mode */
 	if (sta_connect_event) {
@@ -1433,7 +1394,8 @@ void tdls_send_update_to_fw(struct tdls_vdev_priv_obj *tdls_vdev_obj,
 	 * channel switch
 	 */
 	if (TDLS_IS_OFF_CHANNEL_ENABLED(tdls_feature_flags) &&
-	    !tdls_chan_swit_prohibited)
+	    (!tdls_chan_swit_prohibited) &&
+	    (!wlan_tdls_is_fw_11be_mlo_capable(tdls_soc_obj->soc)))
 		tdls_info_to_fw->tdls_options = ENA_TDLS_OFFCHAN;
 
 	if (TDLS_IS_BUFFER_STA_ENABLED(tdls_feature_flags))
@@ -1459,55 +1421,61 @@ void tdls_send_update_to_fw(struct tdls_vdev_priv_obj *tdls_vdev_obj,
 	tdls_info_to_fw->tdls_discovery_wake_timeout =
 		tdls_soc_obj->tdls_configs.tdls_discovery_wake_timeout;
 
-	/**
-	 * set_state_cnt should always decrement in case of sta disconnection.
-	 * If it is not, then in case where STA disconnection happens due to
-	 * SSR where tdls_update_fw_tdls_state() will return failure,
-	 * tdls count has to be decremented irrepective of success or failure
-	 */
-	if (!sta_connect_event)
-		tdls_soc_obj->set_state_info.set_state_cnt--;
-
-	status = tdls_update_fw_tdls_state(tdls_soc_obj, tdls_info_to_fw);
-	if (QDF_STATUS_SUCCESS != status)
+	status = tgt_tdls_set_fw_state(tdls_soc_obj->soc, tdls_info_to_fw);
+	if (QDF_IS_STATUS_ERROR(status))
 		goto done;
 
 	if (sta_connect_event) {
-		tdls_soc_obj->set_state_info.set_state_cnt++;
 		tdls_soc_obj->set_state_info.vdev_id = session_id;
 	}
 
-	tdls_debug("TDLS Set state cnt %d",
-		tdls_soc_obj->set_state_info.set_state_cnt);
+	tdls_debug("FW tdls state sent for vdev id %d", session_id);
 done:
 	qdf_mem_free(tdls_info_to_fw);
 	return;
 }
 
+void tdls_process_enable_for_vdev(struct wlan_objmgr_vdev *vdev)
+{
+	struct wlan_objmgr_psoc *psoc;
+	struct tdls_vdev_priv_obj *tdls_vdev_obj;
+	struct tdls_soc_priv_obj *tdls_soc_obj;
+	enum QDF_OPMODE opmode;
+	QDF_STATUS status;
+	uint8_t sta_count;
+
+	psoc = wlan_vdev_get_psoc(vdev);
+	if (!psoc)
+		return;
+
+	sta_count = policy_mgr_mode_specific_connection_count(psoc, PM_STA_MODE,
+							      NULL);
+	opmode = wlan_vdev_mlme_get_opmode(vdev);
+	if (opmode == QDF_P2P_CLIENT_MODE && sta_count) {
+		tdls_debug("STA + P2P concurrency. Don't allow TDLS on P2P vdev");
+		return;
+	}
+
+	status = tdls_get_vdev_objects(vdev, &tdls_vdev_obj, &tdls_soc_obj);
+	if (QDF_IS_STATUS_ERROR(status))
+		return;
+
+	tdls_send_update_to_fw(tdls_vdev_obj, tdls_soc_obj,
+			       mlme_get_tdls_prohibited(vdev),
+			       mlme_get_tdls_chan_switch_prohibited(vdev),
+			       true, wlan_vdev_get_id(vdev));
+
+	/* check and set the connection tracker */
+	tdls_set_ct_mode(tdls_soc_obj->soc, vdev);
+}
+
 static QDF_STATUS
 tdls_process_sta_connect(struct tdls_sta_notify_params *notify)
 {
-	struct tdls_vdev_priv_obj *tdls_vdev_obj;
-	struct tdls_soc_priv_obj *tdls_soc_obj;
-	QDF_STATUS status;
-
 	if (!tdls_check_is_tdls_allowed(notify->vdev))
 		return QDF_STATUS_E_NOSUPPORT;
 
-	status = tdls_get_vdev_objects(notify->vdev, &tdls_vdev_obj,
-				       &tdls_soc_obj);
-	if (QDF_IS_STATUS_ERROR(status))
-		return QDF_STATUS_E_INVAL;
-
-	/* Association event */
-	if (!tdls_soc_obj->tdls_disable_in_progress)
-		tdls_send_update_to_fw(tdls_vdev_obj, tdls_soc_obj,
-				       notify->tdls_prohibited,
-				       notify->tdls_chan_swit_prohibited, true,
-				       notify->session_id);
-
-	/* check and set the connection tracker */
-	tdls_set_ct_mode(tdls_soc_obj->soc, notify->vdev);
+	tdls_process_enable_for_vdev(notify->vdev);
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -1539,19 +1507,15 @@ static QDF_STATUS
 tdls_process_sta_disconnect(struct tdls_sta_notify_params *notify)
 {
 	struct tdls_vdev_priv_obj *tdls_vdev_obj;
-	struct tdls_vdev_priv_obj *curr_tdls_vdev;
 	struct tdls_soc_priv_obj *tdls_soc_obj;
-	struct tdls_soc_priv_obj *curr_tdls_soc;
 	struct wlan_objmgr_vdev *temp_vdev = NULL;
 	uint8_t vdev_id;
+	QDF_STATUS status;
 
-
-	QDF_STATUS status = QDF_STATUS_SUCCESS;
-
-	if (QDF_STATUS_SUCCESS != tdls_get_vdev_objects(notify->vdev,
-							&tdls_vdev_obj,
-							&tdls_soc_obj))
-		return QDF_STATUS_E_INVAL;
+	status = tdls_get_vdev_objects(notify->vdev, &tdls_vdev_obj,
+				       &tdls_soc_obj);
+	if (QDF_IS_STATUS_ERROR(status))
+		return status;
 
 	/* if the disconnect comes from user space, we have to delete all the
 	 * tdls peers before sending the set state cmd.
@@ -1559,46 +1523,43 @@ tdls_process_sta_disconnect(struct tdls_sta_notify_params *notify)
 	if (notify->user_disconnect)
 		return tdls_delete_all_tdls_peers(notify->vdev, tdls_soc_obj);
 
-	tdls_debug("Check and update TDLS state");
-
-	curr_tdls_vdev = tdls_vdev_obj;
-	curr_tdls_soc = tdls_soc_obj;
+	tdls_debug("Check and update TDLS state for vdev:%d",
+		   notify->session_id);
 
 	/* Disassociation event */
-	if (!tdls_soc_obj->tdls_disable_in_progress)
-		tdls_send_update_to_fw(tdls_vdev_obj, tdls_soc_obj, false,
-				       false, false, notify->session_id);
+	tdls_send_update_to_fw(tdls_vdev_obj, tdls_soc_obj, false,
+			       false, false, notify->session_id);
 
 	/* If concurrency is not marked, then we have to
 	 * check, whether TDLS could be enabled in the
 	 * system after this disassoc event.
 	 */
-	if (!notify->lfr_roam && !tdls_soc_obj->tdls_disable_in_progress) {
-		temp_vdev = tdls_get_vdev(tdls_soc_obj->soc, WLAN_TDLS_NB_ID);
-		if (temp_vdev) {
-			vdev_id = wlan_vdev_get_id(temp_vdev);
-			status = tdls_get_vdev_objects(temp_vdev,
-						       &tdls_vdev_obj,
-						       &tdls_soc_obj);
-			if (QDF_STATUS_SUCCESS == status) {
-				tdls_send_update_to_fw(tdls_vdev_obj,
-						       tdls_soc_obj,
-						       false,
-						       false,
-						       true,
-						       vdev_id);
-				curr_tdls_vdev = tdls_vdev_obj;
-				curr_tdls_soc = tdls_soc_obj;
-			}
-		}
+	if (notify->lfr_roam)
+		return status;
+
+	temp_vdev = tdls_get_vdev(tdls_soc_obj->soc, WLAN_TDLS_NB_ID);
+	if (!temp_vdev)
+		return status;
+
+	vdev_id = wlan_vdev_get_id(temp_vdev);
+	status = tdls_get_vdev_objects(temp_vdev, &tdls_vdev_obj,
+				       &tdls_soc_obj);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		wlan_objmgr_vdev_release_ref(temp_vdev, WLAN_TDLS_NB_ID);
+		return status;
 	}
 
+	tdls_send_update_to_fw(tdls_vdev_obj, tdls_soc_obj,
+			       mlme_get_tdls_prohibited(temp_vdev),
+			       mlme_get_tdls_chan_switch_prohibited(temp_vdev),
+			       true, vdev_id);
+
 	/* Check and set the connection tracker and implicit timers */
-	if (temp_vdev) {
-		tdls_set_ct_mode(curr_tdls_soc->soc, temp_vdev);
-		wlan_objmgr_vdev_release_ref(temp_vdev,
-					     WLAN_TDLS_NB_ID);
-	}
+	tdls_set_ct_mode(tdls_soc_obj->soc, temp_vdev);
+	wlan_objmgr_vdev_release_ref(temp_vdev, WLAN_TDLS_NB_ID);
+
+	wlan_vdev_mlme_feat_ext2_cap_clear(notify->vdev,
+					   WLAN_VDEV_FEXT2_MLO_STA_TDLS);
 
 	return status;
 }
@@ -1606,14 +1567,36 @@ tdls_process_sta_disconnect(struct tdls_sta_notify_params *notify)
 QDF_STATUS tdls_notify_sta_disconnect(struct tdls_sta_notify_params *notify)
 {
 	QDF_STATUS status;
+	struct wlan_objmgr_vdev *vdev;
+	enum QDF_OPMODE opmode;
+	struct wlan_objmgr_psoc *psoc;
+	uint8_t sta_count;
 
 	if (!notify) {
 		tdls_err("invalid param");
 		return QDF_STATUS_E_INVAL;
 	}
 
-	if (!notify->vdev) {
+	vdev = notify->vdev;
+	if (!vdev) {
 		tdls_err("invalid param");
+		qdf_mem_free(notify);
+		return QDF_STATUS_E_INVAL;
+	}
+
+	psoc = wlan_vdev_get_psoc(vdev);
+	if (!psoc) {
+		wlan_objmgr_vdev_release_ref(notify->vdev, WLAN_TDLS_NB_ID);
+		qdf_mem_free(notify);
+		return QDF_STATUS_E_INVAL;
+	}
+
+	opmode = wlan_vdev_mlme_get_opmode(vdev);
+	sta_count = policy_mgr_mode_specific_connection_count(psoc, PM_STA_MODE,
+							      NULL);
+	if (opmode == QDF_P2P_CLIENT_MODE && sta_count) {
+		tdls_debug("STA + P2P concurrency. No action on P2P vdev");
+		wlan_objmgr_vdev_release_ref(notify->vdev, WLAN_TDLS_NB_ID);
 		qdf_mem_free(notify);
 		return QDF_STATUS_E_INVAL;
 	}
@@ -1700,6 +1683,7 @@ QDF_STATUS tdls_peers_deleted_notification(struct wlan_objmgr_psoc *psoc,
 	return QDF_STATUS_SUCCESS;
 }
 
+static
 QDF_STATUS tdls_delete_all_peers_indication(struct wlan_objmgr_psoc *psoc,
 					    uint8_t vdev_id)
 {
@@ -1712,13 +1696,10 @@ QDF_STATUS tdls_delete_all_peers_indication(struct wlan_objmgr_psoc *psoc,
 	if (!indication)
 		return QDF_STATUS_E_NULL_VALUE;
 
-	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc,
-						    vdev_id,
+	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, vdev_id,
 						    WLAN_TDLS_SB_ID);
-
 	if (!vdev) {
-		tdls_err("vdev not exist for the session id %d",
-			 vdev_id);
+		tdls_err("vdev:%d does not exist", vdev_id);
 		qdf_mem_free(indication);
 		return QDF_STATUS_E_INVAL;
 	}
@@ -1741,6 +1722,40 @@ QDF_STATUS tdls_delete_all_peers_indication(struct wlan_objmgr_psoc *psoc,
 	}
 
 	return QDF_STATUS_SUCCESS;
+}
+
+QDF_STATUS
+tdls_check_and_indicate_delete_all_peers(struct wlan_objmgr_psoc *psoc,
+					 uint8_t vdev_id)
+{
+	struct wlan_objmgr_pdev *pdev;
+	uint32_t pdev_id;
+	enum QDF_OPMODE opmode;
+	uint8_t sta_count =
+		policy_mgr_mode_specific_connection_count(psoc, PM_STA_MODE,
+							  NULL);
+
+	pdev_id = wlan_get_pdev_id_from_vdev_id(psoc, vdev_id, WLAN_TDLS_SB_ID);
+	if (pdev_id == WLAN_INVALID_PDEV_ID) {
+		tdls_debug("Invalid pdev id");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	pdev = wlan_objmgr_get_pdev_by_id(psoc, pdev_id, WLAN_TDLS_SB_ID);
+	if (!pdev) {
+		tdls_debug("pdev is NULL");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	opmode = wlan_get_opmode_from_vdev_id(pdev, vdev_id);
+	wlan_objmgr_pdev_release_ref(pdev, WLAN_TDLS_SB_ID);
+
+	if (opmode == QDF_P2P_CLIENT_MODE && sta_count) {
+		tdls_debug("STA + P2P concurrency. No action on P2P vdev");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	return tdls_delete_all_peers_indication(psoc, vdev_id);
 }
 
 /**

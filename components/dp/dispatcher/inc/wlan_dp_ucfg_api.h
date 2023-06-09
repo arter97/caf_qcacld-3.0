@@ -1340,10 +1340,11 @@ QDF_STATUS ucfg_dp_direct_link_init(struct wlan_objmgr_psoc *psoc);
 /**
  * ucfg_dp_direct_link_deinit() - De-initializes Direct Link datapath
  * @psoc: psoc handle
+ * @is_ssr: true if SSR is in progress else false
  *
  * Return: None
  */
-void ucfg_dp_direct_link_deinit(struct wlan_objmgr_psoc *psoc);
+void ucfg_dp_direct_link_deinit(struct wlan_objmgr_psoc *psoc, bool is_ssr);
 
 /**
  * ucfg_dp_wfds_handle_request_mem_ind() - Process request memory indication
@@ -1400,7 +1401,7 @@ QDF_STATUS ucfg_dp_direct_link_init(struct wlan_objmgr_psoc *psoc)
 }
 
 static inline
-void ucfg_dp_direct_link_deinit(struct wlan_objmgr_psoc *psoc)
+void ucfg_dp_direct_link_deinit(struct wlan_objmgr_psoc *psoc, bool is_ssr)
 {
 }
 
@@ -1433,6 +1434,70 @@ QDF_STATUS ucfg_dp_config_direct_link(struct wlan_objmgr_vdev *vdev,
 	return QDF_STATUS_SUCCESS;
 }
 #endif
+
+/**
+ * ucfg_dp_bus_suspend() - BUS suspend DP handler
+ * @soc: CDP SoC handle
+ * @pdev_id: DP PDEV ID
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS ucfg_dp_bus_suspend(ol_txrx_soc_handle soc, uint8_t pdev_id);
+
+/**
+ * ucfg_dp_bus_resume() - BUS resume DP handler
+ * @soc: CDP SoC handle
+ * @pdev_id: DP PDEV ID
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS ucfg_dp_bus_resume(ol_txrx_soc_handle soc, uint8_t pdev_id);
+
+/**
+ * ucfg_dp_txrx_soc_attach() - Datapath soc attach
+ * @params: SoC attach params
+ * @is_wifi3_0_target: [OUT] Pointer to update if the target is wifi3.0
+ *
+ * Return: SoC handle
+ */
+void *ucfg_dp_txrx_soc_attach(struct dp_txrx_soc_attach_params *params,
+			      bool *is_wifi3_0_target);
+
+/**
+ * ucfg_dp_txrx_soc_detach() - Datapath SoC detach
+ * @soc: DP SoC handle
+ *
+ * Return: None
+ */
+void ucfg_dp_txrx_soc_detach(ol_txrx_soc_handle soc);
+
+/**
+ * ucfg_dp_txrx_attach_target() - DP target attach
+ * @soc: DP SoC handle
+ * @pdev_id: DP pdev id
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS ucfg_dp_txrx_attach_target(ol_txrx_soc_handle soc, uint8_t pdev_id);
+
+/**
+ * ucfg_dp_txrx_pdev_attach() - DP pdev attach
+ * @soc: DP SoC handle
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS ucfg_dp_txrx_pdev_attach(ol_txrx_soc_handle soc);
+
+/**
+ * ucfg_dp_txrx_pdev_detach() - DP pdev detach
+ * @soc: DP SoC handle
+ * @pdev_id: DP pdev id
+ * @force: indicates if force detach is to be done or not
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS ucfg_dp_txrx_pdev_detach(ol_txrx_soc_handle soc, uint8_t pdev_id,
+				    int force);
 
 /**
  * ucfg_dp_txrx_init() - initialize DP TXRX module
@@ -1472,4 +1537,43 @@ QDF_STATUS ucfg_dp_txrx_ext_dump_stats(ol_txrx_soc_handle soc,
 QDF_STATUS ucfg_dp_txrx_set_cpu_mask(ol_txrx_soc_handle soc,
 				     qdf_cpu_mask *new_mask);
 
-#endif /* _WLAN_DP_UCFGi_API_H_ */
+/**
+ * ucfg_dp_get_per_link_peer_stats() - Call to get per link peer stats
+ * @soc: soc handle
+ * @vdev_id: vdev_id of vdev object
+ * @peer_mac: mac address of the peer
+ * @peer_stats: destination buffer
+ * @peer_type: Peer type
+ * @num_link: Number of ML links
+ *
+ * NOTE: For peer_type = CDP_MLD_PEER_TYPE peer_stats should point to
+ *			 buffer of size = (sizeof(*peer_stats) * num_link)
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+ucfg_dp_get_per_link_peer_stats(ol_txrx_soc_handle soc, uint8_t vdev_id,
+				uint8_t *peer_mac,
+				struct cdp_peer_stats *peer_stats,
+				enum cdp_peer_type peer_type,
+				uint8_t num_link);
+
+#ifdef WLAN_FEATURE_LOCAL_PKT_CAPTURE
+/**
+ * ucfg_dp_is_local_pkt_capture_enabled() - Get local packet capture config
+ * @psoc: pointer to psoc object
+ *
+ * Return: true if local packet capture is enabled from ini
+ *         false otherwise
+ */
+bool
+ucfg_dp_is_local_pkt_capture_enabled(struct wlan_objmgr_psoc *psoc);
+#else
+static inline bool
+ucfg_dp_is_local_pkt_capture_enabled(struct wlan_objmgr_psoc *psoc)
+{
+	return false;
+}
+#endif /* WLAN_FEATURE_LOCAL_PKT_CAPTURE */
+
+#endif /* _WLAN_DP_UCFG_API_H_ */

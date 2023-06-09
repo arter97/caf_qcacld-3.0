@@ -226,7 +226,7 @@ static int hdd_get_tsm_stats(struct hdd_adapter *adapter,
 	}
 
 	hdd_ctx = WLAN_HDD_GET_CTX(adapter);
-	hdd_sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter);
+	hdd_sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter->deflink);
 
 	request = osif_request_alloc(&params);
 	if (!request) {
@@ -742,7 +742,7 @@ hdd_sendactionframe(struct hdd_adapter *adapter, const uint8_t *bssid,
 		return -EINVAL;
 	}
 
-	sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter);
+	sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter->deflink);
 	hdd_ctx = WLAN_HDD_GET_CTX(adapter);
 
 	/* if not associated, no need to send action frame */
@@ -766,7 +766,7 @@ hdd_sendactionframe(struct hdd_adapter *adapter, const uint8_t *bssid,
 	chan.center_freq = freq;
 	/* Check if it is specific action frame */
 	if (vendor->category ==
-	    SIR_MAC_ACTION_VENDOR_SPECIFIC_CATEGORY) {
+	    ACTION_CATEGORY_VENDOR_SPECIFIC) {
 		static const uint8_t oui[] = { 0x00, 0x00, 0xf0 };
 
 		if (!qdf_mem_cmp(vendor->Oui, oui, 3)) {
@@ -2226,7 +2226,7 @@ static int wlan_hdd_get_link_status(struct hdd_adapter *adapter)
 		return 0;
 	}
 
-	sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter);
+	sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter->deflink);
 	if (!hdd_cm_is_vdev_associated(adapter)) {
 		/* If not associated, then expected link status return
 		 * value is 0
@@ -4776,7 +4776,7 @@ static int drv_cmd_get_tsm_stats(struct hdd_adapter *adapter,
 		return -EINVAL;
 	}
 
-	sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter);
+	sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter->deflink);
 
 	/* if not associated, return error */
 	if (!hdd_cm_is_vdev_associated(adapter)) {
@@ -6043,7 +6043,7 @@ static inline int drv_cmd_get_antenna_mode(struct hdd_adapter *adapter,
 	uint8_t len = 0;
 	struct wlan_objmgr_vdev *vdev;
 
-	vdev = hdd_objmgr_get_vdev_by_user(adapter, WLAN_OSIF_ID);
+	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink, WLAN_OSIF_ID);
 	if (!vdev) {
 		hdd_err("vdev is NULL");
 		return -EINVAL;
@@ -6408,7 +6408,7 @@ static void disconnect_sta_and_restart_sap(struct hdd_context *hdd_ctx,
 			goto next_adapter;
 		}
 
-		ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(adapter);
+		ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(adapter->deflink);
 		if (check_disable_channels(hdd_ctx, ap_ctx->operating_chan_freq))
 			policy_mgr_check_sap_restart(hdd_ctx->psoc,
 						     adapter->deflink->vdev_id);

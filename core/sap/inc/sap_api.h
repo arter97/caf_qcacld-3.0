@@ -556,6 +556,8 @@ struct sap_config {
 	uint8_t link_id;
 	uint8_t num_link;
 #endif
+	qdf_freq_t last_acs_freq;
+	qdf_time_t last_acs_complete_time;
 };
 
 #ifdef FEATURE_WLAN_AP_AP_ACS_OPTIMIZE
@@ -1548,6 +1550,7 @@ bool wlansap_is_6ghz_included_in_acs_range(struct sap_context *sap_ctx);
  * wlansap_get_safe_channel_from_pcl_and_acs_range() - Get safe channel for SAP
  * restart
  * @sap_ctx: sap context
+ * @ch_width: selected channel bandwdith
  *
  * Get a safe channel to restart SAP. PCL already takes into account the
  * unsafe channels. So, the PCL is validated with the ACS range to provide
@@ -1557,7 +1560,8 @@ bool wlansap_is_6ghz_included_in_acs_range(struct sap_context *sap_ctx);
  * failure, the channel number returned is zero.
  */
 uint32_t
-wlansap_get_safe_channel_from_pcl_and_acs_range(struct sap_context *sap_ctx);
+wlansap_get_safe_channel_from_pcl_and_acs_range(struct sap_context *sap_ctx,
+						enum phy_ch_width *ch_width);
 
 /**
  * wlansap_get_safe_channel_from_pcl_for_sap() - Get safe and active channel
@@ -1899,6 +1903,18 @@ void wlansap_process_chan_info_event(struct sap_context *sap_ctx,
 {
 }
 #endif
+
+/**
+ * wlansap_update_ll_lt_sap_acs_result() - Update acs result of LL_LT_SAP
+ * @sap_ctx: sap context
+ * @last_acs_freq: last acs frequency to be set
+ *
+ * This function is used to update stored acs channel frequency
+ *
+ * Return: None
+ */
+void wlansap_update_ll_lt_sap_acs_result(struct sap_context *sap_ctx,
+					 qdf_freq_t last_acs_freq);
 
 #ifdef __cplusplus
 }

@@ -2394,6 +2394,10 @@ lim_add_sta(struct mac_context *mac_ctx,
 
 	lim_update_sta_eht_capable(mac_ctx, add_sta_params, sta_ds,
 				   session_entry);
+
+	lim_update_tdls_sta_eht_capable(mac_ctx, add_sta_params, sta_ds,
+					session_entry);
+
 	lim_update_sta_mlo_info(session_entry, add_sta_params, sta_ds);
 
 	add_sta_params->maxAmpduDensity = sta_ds->htAMpduDensity;
@@ -2941,9 +2945,9 @@ lim_add_sta_self(struct mac_context *mac, uint8_t updateSta,
 				pe_session->vht_config.mu_beam_formee;
 	pAddStaParams->enableVhtpAid = pe_session->enableVhtpAid;
 	pAddStaParams->enableAmpduPs = pe_session->enableAmpduPs;
-	pAddStaParams->enableHtSmps = (pe_session->enableHtSmps &&
+	pAddStaParams->enableHtSmps = (mac->mlme_cfg->ht_caps.enable_smps &&
 				(!pe_session->supported_nss_1x1));
-	pAddStaParams->htSmpsconfig = pe_session->htSmpsvalue;
+	pAddStaParams->htSmpsconfig = mac->mlme_cfg->ht_caps.smps;
 	pAddStaParams->send_smps_action =
 		pe_session->send_smps_action;
 

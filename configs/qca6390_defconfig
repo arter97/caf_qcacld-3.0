@@ -200,12 +200,6 @@ ifneq ($(CONFIG_MOBILE_ROUTER), y)
 	CONFIG_NDP_SAP_CONCURRENCY_ENABLE := y
 endif
 
-ifneq ($(CONFIG_MOBILE_ROUTER), y)
-	#Flag to enable NAN Data path
-	CONFIG_WLAN_FEATURE_NAN_DATAPATH := y
-	CONFIG_NAN_CONVERGENCE := y
-endif
-
 #Flag to enable Linux QCMBR feature as default feature
 ifeq ($(CONFIG_ROME_IF),usb)
 	CONFIG_LINUX_QCMBR :=y
@@ -385,13 +379,11 @@ ifeq ($(CONFIG_RELAY), y)
 endif
 endif
 
-# Feature flags which are not (currently) configurable via Kconfig
-
 #Whether to build debug version
-BUILD_DEBUG_VERSION := y
+CONFIG_WLAN_DEBUG_VERSION := y
 
 #Enable this flag to build driver in diag version
-BUILD_DIAG_VERSION := y
+CONFIG_WLAN_DIAG_VERSION := y
 
 ifeq ($(CONFIG_SLUB_DEBUG), y)
 	PANIC_ON_BUG := y
@@ -843,6 +835,8 @@ endif
 CONFIG_WLAN_SYSFS_MEM_STATS := y
 
 CONFIG_WLAN_DP_PENDING_MEM_FLUSH := y
+
+CONFIG_WLAN_TRACEPOINTS := y
 
 ifeq ($(CONFIG_CNSS2), m)
 CONFIG_CNSS2_MODULE := y

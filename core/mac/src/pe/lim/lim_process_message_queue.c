@@ -1503,7 +1503,7 @@ QDF_STATUS lim_handle_frame_genby_mbssid(uint8_t *frame, uint32_t frame_len,
 	struct mac_context *mac_ctx;
 	struct pe_session *session;
 	uint8_t sessionid;
-	t_packetmeta meta_data;
+	t_packetmeta meta_data = {0};
 
 	mac_ctx = cds_get_context(QDF_MODULE_ID_PE);
 	if (!mac_ctx) {
@@ -1516,6 +1516,7 @@ QDF_STATUS lim_handle_frame_genby_mbssid(uint8_t *frame, uint32_t frame_len,
 		return QDF_STATUS_E_INVAL;
 
 	meta_data.mpdu_hdr_ptr = frame;
+	meta_data.mpdu_len = frame_len;
 	meta_data.mpdu_data_ptr = frame + sizeof(struct wlan_frame_hdr);
 	meta_data.mpdu_data_len = frame_len - sizeof(struct wlan_frame_hdr);
 

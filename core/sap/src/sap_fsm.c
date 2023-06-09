@@ -3383,11 +3383,6 @@ static QDF_STATUS sap_goto_starting(struct sap_context *sap_ctx,
 			sap_err("rates full, can not add H2E bss membership");
 		}
 	}
-	sap_debug("notify hostapd about chan freq selection: %d",
-		  sap_ctx->chan_freq);
-	sap_signal_hdd_event(sap_ctx, NULL,
-			     eSAP_CHANNEL_CHANGE_EVENT,
-			     (void *)eSAP_STATUS_SUCCESS);
 	sap_dfs_set_current_channel(sap_ctx);
 	/* Reset radar found flag before start sap, the flag will
 	 * be set when radar found in CAC wait.
@@ -3658,7 +3653,8 @@ static qdf_freq_t sap_get_safe_channel_freq(struct sap_context *sap_ctx)
 	freq = wlan_pre_cac_get_freq_before_pre_cac(sap_ctx->vdev);
 	if (!freq)
 		freq = wlansap_get_safe_channel_from_pcl_and_acs_range(
-								sap_ctx);
+								sap_ctx,
+								NULL);
 
 	sap_debug("new selected freq %d as target chan as current freq unsafe %d",
 		  freq, sap_ctx->chan_freq);
@@ -3797,6 +3793,12 @@ static QDF_STATUS sap_fsm_state_starting(struct sap_context *sap_ctx,
 						(void *)eSAP_STATUS_SUCCESS);
 			sap_ctx->is_chan_change_inprogress = false;
 		} else {
+			sap_debug("notify hostapd about chan freq selection: %d",
+				  sap_ctx->chan_freq);
+			qdf_status =
+				sap_signal_hdd_event(sap_ctx, roam_info,
+						     eSAP_CHANNEL_CHANGE_EVENT,
+						     (void *)eSAP_STATUS_SUCCESS);
 			/* Action code for transition */
 			qdf_status = sap_signal_hdd_event(sap_ctx, roam_info,
 					eSAP_START_BSS_EVENT,

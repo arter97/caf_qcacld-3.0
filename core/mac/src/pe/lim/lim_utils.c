@@ -2196,9 +2196,11 @@ void lim_switch_primary_secondary_channel(struct mac_context *mac,
 	mac->lim.gpchangeChannelData = NULL;
 
 	/* Store the new primary and secondary channel in session entries if different */
-	if (pe_session->curr_op_freq != new_channel_freq) {
-		pe_warn("freq: %d --> freq: %d", pe_session->curr_op_freq,
-			new_channel_freq);
+	if (pe_session->curr_op_freq != new_channel_freq ||
+	    pe_session->ch_width != ch_width) {
+		pe_warn("freq: %d[%d] --> freq: %d[%d]",
+			pe_session->curr_op_freq, pe_session->ch_width,
+			new_channel_freq, ch_width);
 		pe_session->curr_op_freq = new_channel_freq;
 	}
 	if (pe_session->htSecondaryChannelOffset !=
@@ -6433,7 +6435,7 @@ QDF_STATUS lim_send_action_frm_tb_ppdu_cfg(struct mac_context *mac_ctx,
 
 	frm = (tDot11fvendor_action_frame *)(data_buf + sizeof(*cfg_msg));
 
-	frm->Category.category = SIR_MAC_ACTION_VENDOR_SPECIFIC_CATEGORY;
+	frm->Category.category = ACTION_CATEGORY_VENDOR_SPECIFIC;
 
 	frm->vendor_oui.oui_data[0] = 0x00;
 	frm->vendor_oui.oui_data[1] = 0xA0;
@@ -7405,6 +7407,12 @@ lim_revise_req_he_cap_per_band(struct mlme_legacy_priv *mlme_priv,
 			he_config->ul_2x996_tone_ru_supp =
 				 mac->he_cap_5g.ul_2x996_tone_ru_supp;
 		}
+		he_config->su_feedback_tone16 =
+					mac->he_cap_5g.su_feedback_tone16;
+		he_config->mu_feedback_tone16 =
+					mac->he_cap_5g.mu_feedback_tone16;
+		he_config->codebook_su = mac->he_cap_5g.codebook_su;
+		he_config->codebook_mu = mac->he_cap_5g.codebook_mu;
 	}
 }
 
@@ -8195,6 +8203,8 @@ void lim_set_mlo_caps(struct mac_context *mac, struct pe_session *session,
 		mlo_ie_info->eml_capab_present = dot11_cap.eml_capab_present;
 		mlo_ie_info->mld_capab_and_op_present = dot11_cap.mld_capab_and_op_present;
 		mlo_ie_info->mld_id_present = dot11_cap.mld_id_present;
+		mlo_ie_info->ext_mld_capab_and_op_present =
+				dot11_cap.ext_mld_capab_and_op_present;
 		mlo_ie_info->reserved_1 = dot11_cap.reserved_1;
 		mlo_ie_info->common_info_length = dot11_cap.common_info_length;
 		qdf_mem_copy(&mlo_ie_info->mld_mac_addr,
@@ -8608,10 +8618,11 @@ static void lim_revise_req_eht_cap_per_mode(struct mlme_legacy_priv *mlme_priv,
 		pe_debug("Disable eht cap for SAP/GO");
 		mlme_priv->eht_config.tx_1024_4096_qam_lt_242_tone_ru = 0;
 		mlme_priv->eht_config.rx_1024_4096_qam_lt_242_tone_ru = 0;
-		mlme_priv->eht_config.non_ofdma_ul_mu_mimo_le_80mhz = 0;
-		mlme_priv->eht_config.non_ofdma_ul_mu_mimo_160mhz = 0;
-		mlme_priv->eht_config.non_ofdma_ul_mu_mimo_320mhz = 0;
 	}
+
+	mlme_priv->eht_config.non_ofdma_ul_mu_mimo_le_80mhz = 0;
+	mlme_priv->eht_config.non_ofdma_ul_mu_mimo_160mhz = 0;
+	mlme_priv->eht_config.non_ofdma_ul_mu_mimo_320mhz = 0;
 }
 
 void lim_copy_bss_eht_cap(struct pe_session *session)
@@ -8644,6 +8655,7 @@ void lim_copy_join_req_eht_cap(struct pe_session *session)
 	if (!mlme_priv)
 		return;
 	lim_revise_req_eht_cap_per_band(mlme_priv, session);
+	lim_revise_req_eht_cap_per_mode(mlme_priv, session);
 	qdf_mem_copy(&session->eht_config, &mlme_priv->eht_config,
 		     sizeof(session->eht_config));
 }
@@ -8772,6 +8784,23 @@ void lim_update_stads_eht_capable(tpDphHashNode sta_ds, tpSirAssocReq assoc_req)
 {
 	sta_ds->mlmStaContext.eht_capable = assoc_req->eht_cap.present;
 }
+
+#ifdef FEATURE_WLAN_TDLS
+#ifdef WLAN_FEATURE_11BE
+void lim_update_tdls_sta_eht_capable(struct mac_context *mac,
+				     tpAddStaParams add_sta_params,
+				     tpDphHashNode sta_ds,
+				     struct pe_session *session_entry)
+{
+	if (sta_ds->staType == STA_ENTRY_TDLS_PEER) {
+		if (!sta_ds->eht_config.present)
+			add_sta_params->eht_capable = 0;
+	}
+
+	pe_debug("tdls eht_capable: %d", add_sta_params->eht_capable);
+}
+#endif
+#endif
 
 void lim_update_sta_eht_capable(struct mac_context *mac,
 				tpAddStaParams add_sta_params,
@@ -8907,6 +8936,10 @@ void lim_set_eht_caps(struct mac_context *mac, struct pe_session *session,
 		eht_cap->eht_trs_support = dot11_cap.eht_trs_support;
 		eht_cap->txop_return_support_txop_share_m2 =
 			dot11_cap.txop_return_support_txop_share_m2;
+		eht_cap->two_bqrs_support =
+			dot11_cap.two_bqrs_support;
+		eht_cap->eht_link_adaptation_support =
+			dot11_cap.eht_link_adaptation_support;
 		eht_cap->support_320mhz_6ghz = dot11_cap.support_320mhz_6ghz;
 		eht_cap->ru_242tone_wt_20mhz = dot11_cap.ru_242tone_wt_20mhz;
 		eht_cap->ndp_4x_eht_ltf_3dot2_us_gi =
@@ -8972,6 +9005,12 @@ void lim_set_eht_caps(struct mac_context *mac, struct pe_session *session,
 			dot11_cap.rx_1k_qam_in_wider_bw_dl_ofdma;
 		eht_cap->rx_4k_qam_in_wider_bw_dl_ofdma =
 			dot11_cap.rx_4k_qam_in_wider_bw_dl_ofdma;
+		eht_cap->limited_cap_support_20mhz =
+			dot11_cap.limited_cap_support_20mhz;
+		eht_cap->triggered_mu_bf_full_bw_fb_and_dl_mumimo =
+			dot11_cap.triggered_mu_bf_full_bw_fb_and_dl_mumimo;
+		eht_cap->mru_support_20mhz =
+			dot11_cap.mru_support_20mhz;
 
 		if ((is_band_2g && !dot11_he_cap.chan_width_0) ||
 			(!is_band_2g && !dot11_he_cap.chan_width_1 &&
@@ -9245,6 +9284,8 @@ void lim_intersect_ap_emlsr_caps(struct mac_context *mac_ctx,
 		 add_bss->staContext.emlsr_trans_timeout);
 }
 
+#define MAX_MSD_OFDM_ED_THRESHOLD 10
+
 void lim_extract_msd_caps(struct mac_context *mac_ctx,
 			  struct pe_session *session,
 			  struct bss_params *add_bss,
@@ -9284,11 +9325,20 @@ void lim_extract_msd_caps(struct mac_context *mac_ctx,
 				assoc_rsp->mlo_ie.mlo_ie.medium_sync_delay_info.medium_sync_duration;
 			add_bss->staContext.msd_caps.med_sync_ofdm_ed_thresh =
 				assoc_rsp->mlo_ie.mlo_ie.medium_sync_delay_info.medium_sync_ofdm_ed_thresh;
+			if (add_bss->staContext.msd_caps.med_sync_ofdm_ed_thresh >
+			    MAX_MSD_OFDM_ED_THRESHOLD)
+				add_bss->staContext.msd_caps.med_sync_ofdm_ed_thresh = 0;
 			add_bss->staContext.msd_caps.med_sync_max_txop_num =
 				assoc_rsp->mlo_ie.mlo_ie.medium_sync_delay_info.medium_sync_max_txop_num;
 		} else {
-			/* Fill MSD params with zeroes if MSD caps are absent */
-			add_bss->staContext.msd_caps.med_sync_duration = 0;
+			/**
+			 * Fill MSD params with default values if MSD caps are
+			 * absent.
+			 * MSD duration = 5484usec / 32 = 171.
+			 * OFDM ED threshold = 0. FW adds -72 to Host value.
+			 * Maximum number of TXOPs = AP value (default = 0).
+			 */
+			add_bss->staContext.msd_caps.med_sync_duration = 171;
 			add_bss->staContext.msd_caps.med_sync_ofdm_ed_thresh = 0;
 			add_bss->staContext.msd_caps.med_sync_max_txop_num = 0;
 		}
@@ -9546,6 +9596,9 @@ enum rateid lim_get_min_session_txrate(struct pe_session *session,
 		return rid;
 
 	lim_get_min_rate(&min_rate, rateset);
+
+	if (session->is_oui_auth_assoc_6mbps_2ghz_enable)
+		min_rate = SIR_MAC_RATE_6;
 
 	switch (min_rate) {
 	case SIR_MAC_RATE_1:
@@ -11078,7 +11131,6 @@ uint8_t lim_get_vht_ch_width(tDot11fIEVHTCaps *vht_cap,
 		else if (offset > 16)
 			ch_width = WNI_CFG_VHT_CHANNEL_WIDTH_80_PLUS_80MHZ;
 	}
-	pe_debug("The VHT Operation channel width is %d", ch_width);
 	return ch_width;
 }
 
@@ -11111,7 +11163,7 @@ lim_set_tpc_power(struct mac_context *mac_ctx, struct pe_session *session)
 	    session->opmode == QDF_P2P_GO_MODE)
 		mlme_obj->reg_tpc_obj.num_pwr_levels = 0;
 
-	lim_calculate_tpc(mac_ctx, session, false, 0, false);
+	lim_calculate_tpc(mac_ctx, session, false);
 
 	tx_ops->set_tpc_power(mac_ctx->psoc, session->vdev_id,
 			      &mlme_obj->reg_tpc_obj);
@@ -11254,7 +11306,7 @@ lim_is_power_change_required_for_sta(struct mac_context *mac_ctx,
 
 	wlan_reg_get_cur_6g_ap_pwr_type(mac_ctx->pdev, &ap_power_type_6g);
 
-	if (sta_session->ap_power_type_6g == REG_INDOOR_AP &&
+	if (sta_session->best_6g_power_type == REG_INDOOR_AP &&
 	    channel_state & CHANNEL_STATE_ENABLE &&
 	    ap_power_type_6g == REG_VERY_LOW_POWER_AP) {
 		pe_debug("Change the power type of STA from LPI to VLP");

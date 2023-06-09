@@ -167,12 +167,6 @@ endif
 #Flag to disable NAN
 CONFIG_QCACLD_FEATURE_NAN := n
 
-ifneq ($(CONFIG_MOBILE_ROUTER), y)
-	#Flag to enable NAN Data path
-	CONFIG_WLAN_FEATURE_NAN_DATAPATH := y
-	CONFIG_NAN_CONVERGENCE := y
-endif
-
 #Flag to enable Linux QCMBR feature as default feature
 ifeq ($(CONFIG_ROME_IF),usb)
 	CONFIG_LINUX_QCMBR :=y
@@ -336,13 +330,11 @@ ifeq ($(CONFIG_DEBUG_FS), y)
        CONFIG_WLAN_POWER_DEBUGFS := y
 endif
 
-# Feature flags which are not (currently) configurable via Kconfig
-
 #Whether to build debug version
-BUILD_DEBUG_VERSION := y
+CONFIG_WLAN_DEBUG_VERSION := y
 
 #Enable this flag to build driver in diag version
-BUILD_DIAG_VERSION := y
+CONFIG_WLAN_DIAG_VERSION := y
 
 ifeq ($(CONFIG_SLUB_DEBUG), y)
 	PANIC_ON_BUG := y

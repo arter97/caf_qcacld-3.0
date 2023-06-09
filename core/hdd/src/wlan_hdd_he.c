@@ -720,7 +720,8 @@ static int __wlan_hdd_cfg80211_sr_operations(struct wiphy *wiphy,
 		return -EPERM;
 	}
 
-	vdev = hdd_objmgr_get_vdev_by_user(adapter, WLAN_HDD_ID_OBJ_MGR);
+	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink,
+					   WLAN_HDD_ID_OBJ_MGR);
 	if (!vdev) {
 		hdd_err("Null VDEV");
 		return -EINVAL;

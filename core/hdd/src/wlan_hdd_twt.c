@@ -226,7 +226,7 @@ static int hdd_twt_configure(struct hdd_adapter *adapter,
 
 	hdd_debug("TWT Operation 0x%x", twt_oper);
 
-	vdev = hdd_objmgr_get_vdev_by_user(adapter, WLAN_TWT_ID);
+	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink, WLAN_TWT_ID);
 	if (!vdev) {
 		hdd_err("vdev is NULL");
 		return -EINVAL;
@@ -600,7 +600,7 @@ int hdd_test_config_twt_setup_session(struct hdd_adapter *adapter,
 		return -EOPNOTSUPP;
 	}
 
-	hdd_sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter);
+	hdd_sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter->deflink);
 	if (!hdd_cm_is_vdev_associated(adapter)) {
 		hdd_err_rl("Invalid state, vdev %d mode %d",
 			   adapter->deflink->vdev_id, adapter->device_mode);
@@ -667,7 +667,7 @@ int hdd_test_config_twt_terminate_session(struct hdd_adapter *adapter,
 		return -EOPNOTSUPP;
 	}
 
-	hdd_sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter);
+	hdd_sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter->deflink);
 	if (!hdd_cm_is_vdev_associated(adapter)) {
 		hdd_err_rl("Invalid state, vdev %d mode %d",
 			   adapter->deflink->vdev_id, adapter->device_mode);
@@ -1173,7 +1173,7 @@ static int hdd_sta_twt_get_session_params(struct hdd_adapter *adapter,
 					  struct nlattr *twt_param_attr)
 {
 	struct hdd_station_ctx *hdd_sta_ctx =
-				WLAN_HDD_GET_STATION_CTX_PTR(adapter);
+				WLAN_HDD_GET_STATION_CTX_PTR(adapter->deflink);
 	struct nlattr *tb[QCA_WLAN_VENDOR_ATTR_TWT_SETUP_MAX + 1];
 	struct wmi_host_twt_session_stats_info
 				params[TWT_PSOC_MAX_SESSIONS] = { {0} };
@@ -2058,7 +2058,7 @@ static int hdd_twt_setup_session(struct hdd_adapter *adapter,
 {
 	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
 	struct hdd_station_ctx *hdd_sta_ctx =
-			WLAN_HDD_GET_STATION_CTX_PTR(adapter);
+			WLAN_HDD_GET_STATION_CTX_PTR(adapter->deflink);
 	struct wmi_twt_add_dialog_param params = {0};
 	struct nlattr *tb2[QCA_WLAN_VENDOR_ATTR_TWT_SETUP_MAX + 1];
 	uint32_t congestion_timeout = 0;
@@ -2391,7 +2391,7 @@ hdd_send_twt_del_all_sessions_to_userspace(struct hdd_adapter *adapter)
 	struct hdd_station_ctx *hdd_sta_ctx = NULL;
 	struct wmi_twt_del_dialog_complete_event_param params;
 
-	hdd_sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter);
+	hdd_sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter->deflink);
 	if (!hdd_cm_is_vdev_associated(adapter)) {
 		hdd_debug("Not associated, vdev %d mode %d",
 			   adapter->deflink->vdev_id, adapter->device_mode);
@@ -2622,7 +2622,7 @@ static int hdd_sta_twt_terminate_session(struct hdd_adapter *adapter,
 	QDF_STATUS status;
 	int id, ret;
 
-	hdd_sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter);
+	hdd_sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter->deflink);
 	if (!hdd_cm_is_vdev_associated(adapter)) {
 		hdd_err_rl("Invalid state, vdev %d mode %d",
 			   adapter->deflink->vdev_id, adapter->device_mode);
@@ -3063,7 +3063,7 @@ static int hdd_twt_pause_session(struct hdd_adapter *adapter,
 				 struct nlattr *twt_param_attr)
 {
 	struct hdd_station_ctx *hdd_sta_ctx =
-		WLAN_HDD_GET_STATION_CTX_PTR(adapter);
+		WLAN_HDD_GET_STATION_CTX_PTR(adapter->deflink);
 	struct nlattr *tb[QCA_WLAN_VENDOR_ATTR_TWT_SETUP_MAX + 1];
 	struct wmi_twt_pause_dialog_cmd_param params = {0};
 	QDF_STATUS status;
@@ -3223,7 +3223,7 @@ static int hdd_twt_nudge_session(struct hdd_adapter *adapter,
 				 struct nlattr *twt_param_attr)
 {
 	struct hdd_station_ctx *hdd_sta_ctx =
-			WLAN_HDD_GET_STATION_CTX_PTR(adapter);
+			WLAN_HDD_GET_STATION_CTX_PTR(adapter->deflink);
 	struct nlattr *tb[QCA_WLAN_VENDOR_ATTR_TWT_NUDGE_MAX + 1];
 	struct wmi_twt_nudge_dialog_cmd_param params = {0};
 	QDF_STATUS status;
@@ -3520,7 +3520,7 @@ hdd_twt_pack_get_capabilities_resp(struct hdd_adapter *adapter)
 {
 	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
 	struct hdd_station_ctx *sta_ctx =
-		WLAN_HDD_GET_STATION_CTX_PTR(adapter);
+		WLAN_HDD_GET_STATION_CTX_PTR(adapter->deflink);
 	struct nlattr *config_attr;
 	struct sk_buff *reply_skb;
 	size_t skb_len = NLMSG_HDRLEN;
@@ -3660,7 +3660,7 @@ static int hdd_twt_resume_session(struct hdd_adapter *adapter,
 				  struct nlattr *twt_param_attr)
 {
 	struct hdd_station_ctx *hdd_sta_ctx =
-			WLAN_HDD_GET_STATION_CTX_PTR(adapter);
+			WLAN_HDD_GET_STATION_CTX_PTR(adapter->deflink);
 	struct nlattr *tb[QCA_WLAN_VENDOR_ATTR_TWT_RESUME_MAX + 1];
 	struct wmi_twt_resume_dialog_cmd_param params = {0};
 	QDF_STATUS status;
@@ -3906,7 +3906,7 @@ static int hdd_twt_clear_session_traffic_stats(struct hdd_adapter *adapter,
 					       struct nlattr *twt_param_attr)
 {
 	struct hdd_station_ctx *hdd_sta_ctx =
-				WLAN_HDD_GET_STATION_CTX_PTR(adapter);
+				WLAN_HDD_GET_STATION_CTX_PTR(adapter->deflink);
 	struct nlattr *tb[QCA_WLAN_VENDOR_ATTR_TWT_STATS_MAX + 1];
 	int ret, id;
 	uint32_t dialog_id;
@@ -4053,7 +4053,7 @@ static int hdd_twt_get_session_traffic_stats(struct hdd_adapter *adapter,
 					     struct nlattr *twt_param_attr)
 {
 	struct hdd_station_ctx *hdd_sta_ctx =
-				WLAN_HDD_GET_STATION_CTX_PTR(adapter);
+				WLAN_HDD_GET_STATION_CTX_PTR(adapter->deflink);
 	struct nlattr *tb[QCA_WLAN_VENDOR_ATTR_TWT_STATS_MAX + 1];
 	int ret, id;
 	QDF_STATUS qdf_status;

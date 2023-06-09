@@ -122,6 +122,7 @@
 #include "wlan_twt_cfg_ext_api.h"
 #include "wlan_mlo_mgr_sta.h"
 #include "wlan_dp_api.h"
+#include "wlan_dp_ucfg_api.h"
 
 #define WMA_LOG_COMPLETION_TIMER 500 /* 500 msecs */
 #define WMI_TLV_HEADROOM 128
@@ -334,13 +335,14 @@ wma_get_concurrency_support(struct wlan_objmgr_psoc *psoc)
  * Version 1 - Base feature version
  * Version 2 - WMI_HOST_VENDOR1_REQ1_VERSION_3_30 updated.
  * Version 3 - min sleep period for TWT and Scheduled PM in FW updated
- * Version4 -  WMI_HOST_VENDOR1_REQ1_VERSION_3_40 updated.
+ * Version 4 -  WMI_HOST_VENDOR1_REQ1_VERSION_3_40 updated.
+ * Version 5 - INI based 11BE support updated
  *
  * Return: None
  */
 static void wma_update_set_feature_version(struct target_feature_set *fs)
 {
-	fs->feature_set_version = 4;
+	fs->feature_set_version = 5;
 }
 
 /**
@@ -356,9 +358,9 @@ static void wma_set_feature_set_info(tp_wma_handle wma_handle,
 	struct cds_context *cds_ctx =
 		(struct cds_context *)(wma_handle->cds_context);
 	struct wlan_objmgr_psoc *psoc;
-	struct wlan_scan_features scan_feature_set;
-	struct wlan_twt_features twt_feature_set;
-	struct wlan_mlme_features mlme_feature_set;
+	struct wlan_scan_features scan_feature_set = {0};
+	struct wlan_twt_features twt_feature_set = {0};
+	struct wlan_mlme_features mlme_feature_set = {0};
 	struct wlan_tdls_features tdls_feature_set = {0};
 
 	psoc = wma_handle->psoc;
@@ -456,9 +458,10 @@ static void wma_set_feature_set_info(tp_wma_handle wma_handle,
 	feature_set->supported_dot11mode = feature_set->wifi_standard;
 	feature_set->sap_wpa3_support = true;
 	feature_set->assurance_disconnect_reason_api = true;
-	feature_set->frame_pcap_log_mgmt = false;
-	feature_set->frame_pcap_log_ctrl = false;
-	feature_set->frame_pcap_log_data = false;
+	feature_set->frame_pcap_log_mgmt =
+				    ucfg_dp_is_local_pkt_capture_enabled(psoc);
+	feature_set->frame_pcap_log_ctrl = feature_set->frame_pcap_log_mgmt;
+	feature_set->frame_pcap_log_data = feature_set->frame_pcap_log_mgmt;
 
 	/*
 	 * This information is hardcoded based on hdd_sta_akm_suites,
@@ -3358,6 +3361,25 @@ static void wma_get_service_cap_club_get_sta_in_ll_stats_req(
 }
 #endif /* FEATURE_CLUB_LL_STATS_AND_GET_STATION */
 
+#ifdef WLAN_FEATURE_11BE_MLO
+static void
+wma_update_num_tdls_vdevs_if_11be_mlo(struct wlan_objmgr_psoc *psoc,
+				      target_resource_config *wlan_res_cfg)
+{
+	if (!wlan_tdls_is_fw_11be_mlo_capable(psoc))
+		return;
+
+	wlan_res_cfg->num_tdls_vdevs = WLAN_UMAC_MLO_MAX_VDEVS;
+	wma_debug("update tdls num vdevs %d", wlan_res_cfg->num_tdls_vdevs);
+}
+#else
+static void
+wma_update_num_tdls_vdevs_if_11be_mlo(struct wlan_objmgr_psoc *psoc,
+				      target_resource_config *wlan_res_cfg)
+{
+}
+#endif
+
 /**
  * wma_open() - Allocate wma context and initialize it.
  * @cds_context:  cds context
@@ -3545,6 +3567,7 @@ QDF_STATUS wma_open(struct wlan_objmgr_psoc *psoc,
 	}
 
 	wma_set_default_tgt_config(wma_handle, wlan_res_cfg, cds_cfg);
+	wma_update_num_tdls_vdevs_if_11be_mlo(psoc, wlan_res_cfg);
 
 	qdf_status = wlan_mlme_get_tx_chainmask_cck(psoc, &val);
 	if (qdf_status != QDF_STATUS_SUCCESS) {
@@ -5058,6 +5081,31 @@ wma_get_tdls_wideband_support(struct wmi_unified *wmi_handle,
 					     wmi_service_tdls_wideband_support);
 }
 
+#ifdef WLAN_FEATURE_11BE
+/**
+ * wma_get_tdls_mlo_support() - update tgt service with service tdls
+ * be support
+ * @wmi_handle: Unified wmi handle
+ * @cfg: target services
+ *
+ * Return: none
+ */
+static inline void
+wma_get_tdls_mlo_support(struct wmi_unified *wmi_handle,
+			 struct wma_tgt_services *cfg)
+{
+	cfg->en_tdls_mlo_support =
+		wmi_service_enabled(wmi_handle,
+				    wmi_service_tdls_mlo_support);
+}
+#else
+static inline void
+wma_get_tdls_mlo_support(struct wmi_unified *wmi_handle,
+			 struct wma_tgt_services *cfg)
+{
+}
+#endif /* WLAN_FEATURE_11BE */
+
 #ifdef WLAN_FEATURE_11AX
 /**
  * wma_get_tdls_ax_support() - update tgt service with service tdls ax support
@@ -5098,6 +5146,12 @@ wma_get_tdls_6g_support(struct wmi_unified *wmi_handle,
 #endif
 #else
 static inline void
+wma_get_tdls_mlo_support(struct wmi_unified *wmi_handle,
+			 struct wma_tgt_services *cfg)
+{
+}
+
+static inline void
 wma_get_tdls_ax_support(struct wmi_unified *wmi_handle,
 			struct wma_tgt_services *cfg)
 {}
@@ -5128,6 +5182,38 @@ static inline void wma_get_dynamic_vdev_macaddr_support(
 {
 }
 #endif
+
+#ifdef WLAN_FEATURE_NAN
+/**
+ * wma_nan_set_pairing_feature() - set feature bit for Secure NAN if max
+ * pairing session has non-zero value.
+ *
+ * Return: none
+ */
+static void wma_nan_set_pairing_feature(void)
+{
+	tp_wma_handle wma_handle = cds_get_context(QDF_MODULE_ID_WMA);
+	struct target_psoc_info *tgt_hdl;
+	struct wlan_objmgr_psoc *psoc;
+
+	if (!wma_handle) {
+		wma_err("wma handle is null");
+		return;
+	}
+
+	psoc = wma_handle->psoc;
+	tgt_hdl = wlan_psoc_get_tgt_if_handle(psoc);
+	if (!tgt_hdl) {
+		wma_err("tgt_hdl is null");
+		return;
+	}
+
+	if (tgt_hdl->info.service_ext2_param.max_nan_pairing_sessions) {
+		wma_set_fw_wlan_feat_caps(SECURE_NAN);
+		wma_debug("Secure NAN is enabled");
+	}
+}
+#endif /* WLAN_FEATURE_NAN */
 
 /**
  * wma_update_target_services() - update target services from wma handle
@@ -5221,6 +5307,7 @@ static inline void wma_update_target_services(struct wmi_unified *wmi_handle,
 #ifdef WLAN_FEATURE_NAN
 	if (wmi_service_enabled(wmi_handle, wmi_service_nan))
 		g_fw_wlan_feat_caps |= (1 << NAN);
+	wma_nan_set_pairing_feature();
 #endif /* WLAN_FEATURE_NAN */
 
 	if (wmi_service_enabled(wmi_handle, wmi_service_rtt))
@@ -5272,6 +5359,7 @@ static inline void wma_update_target_services(struct wmi_unified *wmi_handle,
 
 	wma_get_igmp_offload_enable(wmi_handle, cfg);
 	wma_get_tdls_ax_support(wmi_handle, cfg);
+	wma_get_tdls_mlo_support(wmi_handle, cfg);
 	wma_get_tdls_6g_support(wmi_handle, cfg);
 	wma_get_tdls_wideband_support(wmi_handle, cfg);
 	wma_get_dynamic_vdev_macaddr_support(wmi_handle, cfg);

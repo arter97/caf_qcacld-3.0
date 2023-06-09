@@ -186,6 +186,7 @@ endif
 
 ifeq ($(CONFIG_BERYLLIUM), y)
 	CONFIG_FEATURE_AST := n
+	CONFIG_DP_TX_PACKET_INSPECT_FOR_ILP := y
 endif
 
 ifeq ($(CONFIG_CLD_HL_SDIO_CORE), y)
@@ -272,6 +273,10 @@ ifneq ($(DEVELOPER_DISABLE_BUILD_TIMESTAMP), y)
 ifneq ($(WLAN_DISABLE_BUILD_TAG), y)
 CONFIG_BUILD_TAG := y
 endif
+endif
+
+ifeq ($(CONFIG_ARCH_PINEAPPLE), y)
+CONFIG_NUM_SOC_PERF_CLUSTER := 2
 endif
 
 ifeq ($(CONFIG_ARCH_SDXLEMUR), y)
@@ -502,8 +507,6 @@ ifneq ($(CONFIG_QCA_CLD_WLAN),)
 	ifeq (y,$(findstring y,$(CONFIG_CNSS) $(CONFIG_CNSS_MODULE) $(CONFIG_CNSS2) \
 			$(CONFIG_CNSS2_MODULE) $(CONFIG_ICNSS) $(CONFIG_ICNSS_MODULE) \
 			$(CONFIG_ICNSS2) $(CONFIG_ICNSS2_MODULE)))
-	#Flag to enable Protected Management Frames (11w) feature
-	CONFIG_WLAN_FEATURE_11W := y
 	#Flag to enable LTE CoEx feature
 	CONFIG_QCOM_LTE_COEX := y
 	ifneq ($(CONFIG_MOBILE_ROUTER), y)
@@ -810,13 +813,11 @@ ifeq ($(CONFIG_WLAN_DEBUGFS), y)
        CONFIG_WLAN_FEATURE_MIB_STATS := y
 endif
 
-# Feature flags which are not (currently) configurable via Kconfig
-
 #Whether to build debug version
-BUILD_DEBUG_VERSION := y
+CONFIG_WLAN_DEBUG_VERSION := y
 
 #Enable this flag to build driver in diag version
-BUILD_DIAG_VERSION := y
+CONFIG_WLAN_DIAG_VERSION := y
 
 ifeq ($(CONFIG_SLUB_DEBUG), y)
 	PANIC_ON_BUG := y
@@ -1342,8 +1343,6 @@ ifeq ($(CONFIG_CNSS2_DEBUG), y)
 	CONFIG_ENABLE_QDF_PTR_HASH_DEBUG := y
 	CONFIG_HAL_DEBUG := y
 	CONFIG_ATH_DIAG_EXT_DIRECT := y
-	CONFIG_WLAN_OBJMGR_DEBUG:= y
-	CONFIG_WLAN_OBJMGR_REF_ID_TRACE := y
 endif
 
 	CONFIG_HIF_DEBUG := y
@@ -1366,7 +1365,6 @@ ifeq ($(CONFIG_BERYLLIUM), y)
 		CONFIG_WLAN_FEATURE_DP_MON_STATUS_RING_HISTORY := y
 		CONFIG_DP_TX_COMP_RING_DESC_SANITY_CHECK := y
 		CONFIG_WLAN_FEATURE_DP_CFG_EVENT_HISTORY := y
-		CONFIG_HAL_SRNG_REG_HIS_DEBUG := y
 	endif
 endif
 
@@ -1397,6 +1395,10 @@ ifeq (y,$(filter y,$(CONFIG_LITHIUM) $(CONFIG_BERYLLIUM)))
 	CONFIG_WLAN_TRACEPOINTS := y
 	ENABLE_CE4_COMP_DISABLE_HTT_HTC_MISC_LIST := y
 endif
+
+#Flag to enable ref ID print
+CONFIG_WLAN_OBJMGR_DEBUG:= y
+CONFIG_WLAN_OBJMGR_REF_ID_TRACE := y
 
 #Flag to enable hdd memory dump feature
 CONFIG_FEATURE_MEMDUMP_ENABLE := y
@@ -1531,6 +1533,7 @@ ifneq (, $(filter y, $(CONFIG_ARCH_LAHAINA) $(CONFIG_ARCH_PARROT)))
 CONFIG_WLAN_FEATURE_PKT_CAPTURE := y
 CONFIG_WLAN_FEATURE_PKT_CAPTURE_V2 := y
 CONFIG_DP_RX_UDP_OVER_PEER_ROAM := y
+CONFIG_WLAN_BOOST_CPU_FREQ_IN_ROAM := y
 endif
 endif
 

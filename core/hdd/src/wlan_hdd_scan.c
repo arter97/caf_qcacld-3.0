@@ -518,7 +518,7 @@ static int __wlan_hdd_cfg80211_scan(struct wiphy *wiphy,
 
 	con_sap_adapter = hdd_get_con_sap_adapter(adapter, true);
 	if (con_sap_adapter) {
-		ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(con_sap_adapter);
+		ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(con_sap_adapter->deflink);
 		con_dfs_ch_freq = ap_ctx->sap_config.chan_freq;
 		con_dfs_ch_width = ap_ctx->sap_config.ch_params.ch_width;
 		if (con_dfs_ch_freq == AUTO_CHANNEL_SELECT)
@@ -648,7 +648,7 @@ static int __wlan_hdd_cfg80211_scan(struct wiphy *wiphy,
 		ucfg_nan_disable_concurrency(hdd_ctx->psoc);
 	}
 
-	vdev = hdd_objmgr_get_vdev_by_user(adapter, WLAN_OSIF_SCAN_ID);
+	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink, WLAN_OSIF_SCAN_ID);
 	if (!vdev) {
 		status = -EINVAL;
 		goto error;
@@ -1321,7 +1321,7 @@ static int __wlan_hdd_cfg80211_sched_scan_start(struct wiphy *wiphy,
 		return -EBUSY;
 	}
 
-	vdev = hdd_objmgr_get_vdev_by_user(adapter, WLAN_OSIF_SCAN_ID);
+	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink, WLAN_OSIF_SCAN_ID);
 	if (!vdev)
 		return -EINVAL;
 
@@ -1389,7 +1389,7 @@ int wlan_hdd_sched_scan_stop(struct net_device *dev)
 		return -EINVAL;
 	}
 
-	vdev = hdd_objmgr_get_vdev_by_user(adapter, WLAN_OSIF_SCAN_ID);
+	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink, WLAN_OSIF_SCAN_ID);
 	if (!vdev)
 		return -EINVAL;
 	ret = wlan_cfg80211_sched_scan_stop(vdev);

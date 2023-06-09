@@ -41,6 +41,7 @@
 #include "wlan_dp_txrx.h"
 #include "cdp_txrx_host_stats.h"
 #include "wlan_cm_roam_api.h"
+#include "hif_main.h"
 
 #ifdef FEATURE_BUS_BANDWIDTH_MGR
 /*
@@ -1219,15 +1220,20 @@ static void dp_display_periodic_stats(struct wlan_dp_psoc_context *dp_ctx,
 static inline void dp_pm_qos_update_cpu_mask(qdf_cpu_mask *mask,
 					     bool enable_perf_cluster)
 {
-	qdf_cpumask_set_cpu(0, mask);
-	qdf_cpumask_set_cpu(1, mask);
-	qdf_cpumask_set_cpu(2, mask);
-	qdf_cpumask_set_cpu(3, mask);
+	int package_id;
+	unsigned int cpus;
+	int perf_cpu_cluster = hif_get_perf_cluster_bitmap();
+	int little_cpu_cluster = BIT(CPU_CLUSTER_TYPE_LITTLE);
 
-	if (enable_perf_cluster) {
-		qdf_cpumask_set_cpu(4, mask);
-		qdf_cpumask_set_cpu(5, mask);
-		qdf_cpumask_set_cpu(6, mask);
+	qdf_cpumask_clear(mask);
+	qdf_for_each_online_cpu(cpus) {
+		package_id = qdf_topology_physical_package_id(cpus);
+		if (package_id >= 0 &&
+		    (BIT(package_id) & little_cpu_cluster ||
+		     (enable_perf_cluster &&
+		      BIT(package_id) & perf_cpu_cluster))) {
+			qdf_cpumask_set_cpu(cpus, mask);
+		}
 	}
 }
 

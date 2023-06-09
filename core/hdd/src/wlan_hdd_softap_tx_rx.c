@@ -282,7 +282,7 @@ static void __hdd_softap_tx_timeout(struct net_device *dev)
 
 	wlan_hdd_display_adapter_netif_queue_history(adapter);
 
-	vdev = hdd_objmgr_get_vdev_by_user(adapter, WLAN_DP_ID);
+	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink, WLAN_DP_ID);
 	if (vdev) {
 		ucfg_dp_softap_tx_timeout(vdev);
 		hdd_objmgr_put_vdev_by_user(vdev, WLAN_DP_ID);
@@ -480,10 +480,15 @@ QDF_STATUS hdd_softap_deregister_sta(struct hdd_adapter *adapter,
 	 * If the address is a broadcast address then the CDP layers expects
 	 * the self mac address of the adapter.
 	 */
-	if (QDF_IS_ADDR_BROADCAST(sta->sta_mac.bytes))
+	if (QDF_IS_ADDR_BROADCAST(sta->sta_mac.bytes)) {
 		mac_addr = &adapter->mac_addr;
-	else
-		mac_addr = &sta->sta_mac;
+	} else {
+		if (wlan_vdev_mlme_is_mlo_vdev(adapter->deflink->vdev) &&
+		    !qdf_is_macaddr_zero(&sta->mld_addr))
+			mac_addr = &sta->mld_addr;
+		else
+			mac_addr = &sta->sta_mac;
+	}
 
 	if (ucfg_ipa_is_enabled()) {
 		if (ucfg_ipa_wlan_evt(hdd_ctx->pdev, adapter->dev,
@@ -495,14 +500,14 @@ QDF_STATUS hdd_softap_deregister_sta(struct hdd_adapter *adapter,
 			hdd_debug("WLAN_CLIENT_DISCONNECT event failed");
 	}
 
-	vdev = hdd_objmgr_get_vdev_by_user(adapter, WLAN_DP_ID);
+	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink, WLAN_DP_ID);
 	if (!vdev)
 		return QDF_STATUS_E_INVAL;
 
 	ucfg_dp_del_latency_critical_client(vdev, sta->dot11_mode);
 	hdd_objmgr_put_vdev_by_user(vdev, WLAN_DP_ID);
 
-	ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(adapter);
+	ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(adapter->deflink);
 	if (!QDF_IS_ADDR_BROADCAST(sta->sta_mac.bytes) &&
 	    sta->dot11_mode < QCA_WLAN_802_11_MODE_INVALID)
 		ap_ctx->client_count[sta->dot11_mode]--;
@@ -538,7 +543,7 @@ QDF_STATUS hdd_softap_register_sta(struct hdd_adapter *adapter,
 		dot11mode = hdd_convert_dot11mode_from_phymode(event->chan_info.info);
 	}
 
-	ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(adapter);
+	ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(adapter->deflink);
 
 	/*
 	 * If the address is a broadcast address, then provide the self mac addr
@@ -565,7 +570,7 @@ QDF_STATUS hdd_softap_register_sta(struct hdd_adapter *adapter,
 
 	txrx_desc.is_qos_enabled = wmm_enabled;
 
-	vdev = hdd_objmgr_get_vdev_by_user(adapter, WLAN_DP_ID);
+	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink, WLAN_DP_ID);
 	if (!vdev)
 		return QDF_STATUS_E_INVAL;
 
@@ -666,7 +671,7 @@ QDF_STATUS hdd_softap_register_bc_sta(struct hdd_adapter *adapter,
 	struct qdf_mac_addr broadcast_macaddr = QDF_MAC_ADDR_BCAST_INIT;
 	struct hdd_ap_ctx *ap_ctx;
 	uint8_t sta_id;
-	ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(adapter);
+	ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(adapter->deflink);
 	sta_id = ap_ctx->broadcast_sta_id;
 
 	if (sta_id >= WLAN_MAX_STA_COUNT) {
@@ -777,17 +782,19 @@ static QDF_STATUS hdd_softap_change_per_sta_state(struct hdd_adapter *adapter,
 	hdd_debug("Station " QDF_MAC_ADDR_FMT " changed to state %d",
 		  QDF_MAC_ADDR_REF(mac_addr.bytes), state);
 
-	if (QDF_STATUS_SUCCESS == qdf_status) {
-		sta_info->peer_state = OL_TXRX_PEER_STATE_AUTH;
-		vdev = hdd_objmgr_get_vdev_by_user(adapter, WLAN_OSIF_ID);
-		if (vdev) {
-			p2p_peer_authorized(vdev, sta_mac->bytes);
-			hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
-		} else {
-			hdd_err("vdev is NULL");
-		}
+	if (QDF_IS_STATUS_ERROR(qdf_status))
+		goto put_ref;
+
+	sta_info->peer_state = OL_TXRX_PEER_STATE_AUTH;
+	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink, WLAN_OSIF_ID);
+	if (vdev) {
+		p2p_peer_authorized(vdev, sta_mac->bytes);
+		hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
+	} else {
+		hdd_err("vdev is NULL");
 	}
 
+put_ref:
 	hdd_put_sta_info_ref(&adapter->sta_info_list, &sta_info, true,
 			     STA_INFO_SOFTAP_CHANGE_STA_STATE);
 	hdd_exit();

@@ -150,6 +150,18 @@ wlan_cm_enable_roaming_on_connected_sta(struct wlan_objmgr_pdev *pdev,
 }
 #endif
 
+/**
+ * cm_update_associated_ch_width() - to save channel width in mlme priv obj at
+ * the time of initial connection
+ * @vdev: Pointer to vdev
+ * @is_update: to distinguish whether update is during connection or
+ * disconnection
+ *
+ * Return: none
+ */
+void cm_update_associated_ch_width(struct wlan_objmgr_vdev *vdev,
+				   bool is_update);
+
 #ifdef WLAN_FEATURE_ROAM_OFFLOAD
 #define wlan_is_roam_offload_enabled(lfr) \
 	(lfr.lfr3_roaming_offload)
@@ -713,6 +725,16 @@ static inline QDF_STATUS wlan_cm_host_roam_start(struct scheduler_msg *msg)
 	return QDF_STATUS_SUCCESS;
 }
 #endif
+
+/**
+ * wlan_cm_get_associated_ch_width() - get associated channel width
+ * @psoc: psoc pointer
+ * @vdev_id: vdev id
+ *
+ * Return: enum phy_ch_width
+ */
+enum phy_ch_width
+wlan_cm_get_associated_ch_width(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id);
 
 #ifdef WLAN_FEATURE_ROAM_OFFLOAD
 /**
@@ -1300,6 +1322,20 @@ QDF_STATUS
 wlan_cm_update_offload_ssid_from_candidate(struct wlan_objmgr_pdev *pdev,
 					   uint8_t vdev_id,
 					   struct qdf_mac_addr *ap_bssid);
+
+/**
+ * wlan_cm_add_frame_to_scan_db() - Add the frame to scan db
+ *
+ * @psoc: PSOC pointer
+ * @frame: frame to be added to scan db
+ *
+ * Fetch the channel from frame and add the frame to scan db
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+wlan_cm_add_frame_to_scan_db(struct wlan_objmgr_psoc *psoc,
+			     struct roam_scan_candidate_frame *frame);
 #else
 static inline
 void wlan_cm_roam_activate_pcl_per_vdev(struct wlan_objmgr_psoc *psoc,
@@ -1549,6 +1585,12 @@ wlan_cm_update_offload_ssid_from_candidate(struct wlan_objmgr_pdev *pdev,
 	return QDF_STATUS_SUCCESS;
 }
 
+static inline QDF_STATUS
+wlan_cm_add_frame_to_scan_db(struct wlan_objmgr_psoc *psoc,
+			     struct roam_scan_candidate_frame *frame)
+{
+	return QDF_STATUS_SUCCESS;
+}
 #endif /* WLAN_FEATURE_ROAM_OFFLOAD */
 
 #ifdef WLAN_FEATURE_FIPS

@@ -685,7 +685,7 @@ void wma_tx_abort(uint8_t vdev_id);
  * @channel_freq: channel frequency
  * @rid: rate id
  * @peer_rssi: peer RSSI value
- * @action: TDLS action code
+ * @action: action code
  *
  * This function sends the frame corresponding to the
  * given vdev id.
@@ -700,7 +700,7 @@ QDF_STATUS wma_tx_packet(void *wma_context, void *tx_frame, uint16_t frmLen,
 			 wma_tx_ota_comp_callback tx_frm_ota_comp_cb,
 			 uint8_t tx_flag, uint8_t vdev_id, bool tdls_flag,
 			 uint16_t channel_freq, enum rateid rid,
-			 int8_t peer_rssi, enum tdls_actioncode action);
+			 int8_t peer_rssi, uint16_t action);
 
 /**
  * wma_open() - Allocate wma context and initialize it.

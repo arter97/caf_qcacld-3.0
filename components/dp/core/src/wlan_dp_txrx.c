@@ -304,7 +304,7 @@ dp_tx_rx_collect_connectivity_stats_info(qdf_nbuf_t nbuf, void *context,
 							rx_icmpv4_rsp_count;
 				*pkt_type =
 				DP_CONNECTIVITY_CHECK_SET_ICMPV4;
-				dp_info("ICMPv4 Res packet");
+				dp_info("ICMPv4 resp packet");
 			}
 		} else if (qdf_nbuf_is_ipv4_tcp_pkt(nbuf)) {
 			if (qdf_nbuf_data_is_tcp_syn_ack(nbuf) &&
@@ -324,7 +324,7 @@ dp_tx_rx_collect_connectivity_stats_info(qdf_nbuf_t nbuf, void *context,
 				++dp_intf->dp_stats.dns_stats.
 							rx_dns_rsp_count;
 				*pkt_type = DP_CONNECTIVITY_CHECK_SET_DNS;
-				dp_info("DNS response packet");
+				dp_info("DNS resp packet");
 			}
 		}
 		break;

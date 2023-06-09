@@ -852,9 +852,8 @@ struct wlan_connectivity_log_buf_data {
 #define logging_err(params...) QDF_TRACE_ERROR(QDF_MODULE_ID_QDF, ## params)
 #define logging_info(params...) QDF_TRACE_INFO(QDF_MODULE_ID_QDF, ## params)
 
-#if (defined(WLAN_FEATURE_CONNECTIVITY_LOGGING) || \
-	defined(CONNECTIVITY_DIAG_EVENT)) && \
-	defined(WLAN_FEATURE_ROAM_OFFLOAD)
+#if (defined(CONNECTIVITY_DIAG_EVENT) && \
+	defined(WLAN_FEATURE_ROAM_OFFLOAD))
 /**
  * wlan_print_cached_sae_auth_logs() - Enqueue SAE authentication frame logs
  * @psoc: Global psoc pointer

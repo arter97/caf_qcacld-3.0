@@ -705,7 +705,7 @@ pm_third_connection_pcl_dbs_sbs_2x2_table = {
 	[PM_STA_MODE] = {
 		PM_MAX_PCL_TYPE, PM_MAX_PCL_TYPE, PM_MAX_PCL_TYPE},
 	[PM_SAP_MODE] = {
-		PM_SBS_CH_SCC_CH_5G_24G, PM_SBS_CH, PM_SBS_CH},
+		PM_SBS_CH_2G, PM_SBS_CH, PM_SBS_CH},
 	[PM_P2P_CLIENT_MODE] = {
 		PM_SCC_ON_5_5G_24G, PM_SCC_CH, PM_SCC_CH_24G},
 	[PM_P2P_GO_MODE] = {

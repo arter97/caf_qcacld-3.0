@@ -2279,7 +2279,7 @@ QDF_STATUS wma_tx_packet(void *wma_context, void *tx_frame, uint16_t frmLen,
 			 wma_tx_ota_comp_callback tx_frm_ota_comp_cb,
 			 uint8_t tx_flag, uint8_t vdev_id, bool tdls_flag,
 			 uint16_t channel_freq, enum rateid rid,
-			 int8_t peer_rssi, enum tdls_actioncode action)
+			 int8_t peer_rssi, uint16_t action)
 {
 	tp_wma_handle wma_handle = (tp_wma_handle) (wma_context);
 	int32_t status;
@@ -2698,7 +2698,8 @@ QDF_STATUS wma_tx_packet(void *wma_context, void *tx_frame, uint16_t frmLen,
 	    pFc->subType != SIR_MAC_MGMT_PROBE_REQ &&
 	    pFc->subType != SIR_MAC_MGMT_AUTH &&
 	    pFc->subType != SIR_MAC_MGMT_ASSOC_REQ &&
-	    action != TDLS_DISCOVERY_RESPONSE)
+	    action != (ACTION_CATEGORY_PUBLIC << 8 | TDLS_DISCOVERY_RESPONSE) &&
+	    action != (ACTION_CATEGORY_BACK << 8 | ADDBA_RESPONSE))
 		mgmt_param.mlo_link_agnostic = true;
 
 	if (tx_flag & HAL_USE_INCORRECT_KEY_PMF)

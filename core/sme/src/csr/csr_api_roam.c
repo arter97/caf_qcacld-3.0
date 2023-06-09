@@ -787,10 +787,14 @@ scan_list_sort_error:
 #ifdef QCA_WIFI_EMULATION
 #define SCAN_CHAN_LIST_5G_LEN 6
 #define SCAN_CHAN_LIST_2G_LEN 3
+#define SCAN_CHAN_LIST_6G_LEN 3
 static const uint16_t
 csr_scan_chan_list_5g[SCAN_CHAN_LIST_5G_LEN] = { 5180, 5220, 5260, 5280, 5700, 5745 };
 static const uint16_t
 csr_scan_chan_list_2g[SCAN_CHAN_LIST_2G_LEN] = { 2412, 2437, 2462 };
+static const uint16_t
+csr_scan_chan_list_6g[SCAN_CHAN_LIST_6G_LEN] = { 6055, 6135, 6215 };
+
 static QDF_STATUS csr_emu_chan_req(uint32_t channel)
 {
 	int i;
@@ -803,6 +807,11 @@ static QDF_STATUS csr_emu_chan_req(uint32_t channel)
 	} else if (WLAN_REG_IS_5GHZ_CH_FREQ(channel)) {
 		for (i = 0; i < QDF_ARRAY_SIZE(csr_scan_chan_list_5g); i++) {
 			if (csr_scan_chan_list_5g[i] == channel)
+				return QDF_STATUS_SUCCESS;
+		}
+	} else if (WLAN_REG_IS_6GHZ_CHAN_FREQ(channel)) {
+		for (i = 0; i < QDF_ARRAY_SIZE(csr_scan_chan_list_6g); i++) {
+			if (csr_scan_chan_list_6g[i] == channel)
 				return QDF_STATUS_SUCCESS;
 		}
 	}
@@ -3755,15 +3764,22 @@ static bool csr_is_sae_akm_present(tDot11fIERSN * const rsn_ie)
 static bool csr_is_sae_peer_allowed(struct mac_context *mac_ctx,
 				    struct assoc_ind *assoc_ind,
 				    struct csr_roam_session *session,
-				    tSirMacAddr peer_mac_addr,
 				    tDot11fIERSN *rsn_ie,
 				    enum wlan_status_code *mac_status_code)
 {
 	bool is_allowed = false;
+	uint8_t *peer_mac_addr;
 
 	/* Allow the peer if it's SAE authenticated */
 	if (assoc_ind->is_sae_authenticated)
 		return true;
+
+	/* Use peer MLD address to find PMKID
+	 * if MLD address is valid
+	 */
+	peer_mac_addr = assoc_ind->peer_mld_addr;
+	if (qdf_is_macaddr_zero((struct qdf_mac_addr *)peer_mac_addr))
+		peer_mac_addr = assoc_ind->peerMacAddr;
 
 	/* Allow the peer with valid PMKID */
 	if (!rsn_ie->pmkid_count) {
@@ -4027,7 +4043,6 @@ csr_roam_chk_lnk_assoc_ind(struct mac_context *mac_ctx, tSirSmeRsp *msg_ptr)
 			    (csr_is_sae_akm_present(&rsn_ie) &&
 			     !csr_is_sae_peer_allowed(mac_ctx, pAssocInd,
 						      session,
-						      pAssocInd->peerMacAddr,
 						      &rsn_ie,
 						      &mac_status_code))) {
 				status = QDF_STATUS_E_INVAL;
@@ -6263,7 +6278,7 @@ void csr_get_vdev_type_nss(enum QDF_OPMODE dev_mode, uint8_t *nss_2g,
 	default:
 		*nss_2g = 1;
 		*nss_5g = 1;
-		sme_err("Unknown device mode");
+		sme_err("Unknown device mode: %d", dev_mode);
 		break;
 	}
 	sme_debug("mode - %d: nss_2g - %d, 5g - %d",
@@ -7134,13 +7149,24 @@ QDF_STATUS csr_send_ext_change_freq(struct mac_context *mac_ctx,
 	return status;
 }
 
-QDF_STATUS csr_csa_restart(struct mac_context *mac_ctx, uint8_t session_id)
+QDF_STATUS csr_csa_restart(struct mac_context *mac_ctx, uint8_t vdev_id)
 {
 	QDF_STATUS status;
+	struct wlan_objmgr_vdev *vdev;
 	struct scheduler_msg message = {0};
 
+	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(mac_ctx->psoc, vdev_id,
+						    WLAN_LEGACY_MAC_ID);
+	if (!vdev) {
+		sme_err("VDEV not found for vdev id: %d", vdev_id);
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	if_mgr_deliver_event(vdev, WLAN_IF_MGR_EV_AP_CSA_START, NULL);
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_MAC_ID);
+
 	/* Serialize the req through MC thread */
-	message.bodyval = session_id;
+	message.bodyval = vdev_id;
 	message.type    = eWNI_SME_CSA_RESTART_REQ;
 	status = scheduler_post_message(QDF_MODULE_ID_SME, QDF_MODULE_ID_PE,
 					QDF_MODULE_ID_PE, &message);

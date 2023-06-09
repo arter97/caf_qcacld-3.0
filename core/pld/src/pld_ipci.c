@@ -37,7 +37,7 @@
 #ifdef CONFIG_PLD_IPCI_ICNSS
 
 #define WCN6750_DEVICE_ID 0x6750
-
+#define WCN6450_DEVICE_ID 0x6450
 /**
  * pld_ipci_probe() - Probe function for platform driver
  * @dev: device
@@ -483,7 +483,11 @@ static int pld_ipci_set_thermal_state(struct device *dev,
 
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 10, 0))
 static struct device_info pld_ipci_dev_info[] = {
+#ifdef QCA_WIFI_QCA6750
 	{ "wcn6750", WCN6750_DEVICE_ID },
+#elif defined(QCA_WIFI_WCN6450)
+	{ "wcn6450", WCN6450_DEVICE_ID },
+#endif
 	{ { 0 } }
 };
 #endif

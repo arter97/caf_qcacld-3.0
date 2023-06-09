@@ -35,7 +35,7 @@ hdd_handle_nud_fail_sta(struct hdd_context *hdd_ctx,
 			struct hdd_adapter *adapter)
 {
 	struct reject_ap_info ap_info;
-	struct hdd_station_ctx *sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter);
+	struct hdd_station_ctx *sta_ctx;
 	struct qdf_mac_addr bssid;
 
 	if (hdd_is_roaming_in_progress(hdd_ctx)) {
@@ -45,6 +45,8 @@ hdd_handle_nud_fail_sta(struct hdd_context *hdd_ctx,
 
 	hdd_debug("nud fail detected, try roaming to better BSSID, vdev id: %d",
 		  adapter->deflink->vdev_id);
+
+	sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter->deflink);
 
 	qdf_mem_zero(&ap_info, sizeof(struct reject_ap_info));
 	ap_info.bssid = sta_ctx->conn_info.bssid;

@@ -98,7 +98,7 @@ __hdd_sysfs_dfsnol_store(struct net_device *net_dev,
 	if (!wlan_hdd_validate_modules_state(hdd_ctx))
 		return -EINVAL;
 
-	sap_ctx = WLAN_HDD_GET_SAP_CTX_PTR(adapter);
+	sap_ctx = WLAN_HDD_GET_SAP_CTX_PTR(adapter->deflink);
 	if (!sap_ctx) {
 		hdd_err_rl("Null SAP Context");
 		return -EINVAL;

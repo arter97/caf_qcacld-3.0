@@ -39,6 +39,7 @@
 #include <qdf_net_stats.h>
 #include "wlan_dp_prealloc.h"
 #include "wlan_dp_rx_thread.h"
+#include <cdp_txrx_host_stats.h>
 
 #ifdef FEATURE_DIRECT_LINK
 /**
@@ -2344,7 +2345,7 @@ QDF_STATUS ucfg_dp_direct_link_init(struct wlan_objmgr_psoc *psoc)
 	return dp_direct_link_init(dp_ctx);
 }
 
-void ucfg_dp_direct_link_deinit(struct wlan_objmgr_psoc *psoc)
+void ucfg_dp_direct_link_deinit(struct wlan_objmgr_psoc *psoc, bool is_ssr)
 {
 	struct wlan_dp_psoc_context *dp_ctx = dp_psoc_get_priv(psoc);
 
@@ -2353,7 +2354,7 @@ void ucfg_dp_direct_link_deinit(struct wlan_objmgr_psoc *psoc)
 		return;
 	}
 
-	dp_direct_link_deinit(dp_ctx);
+	dp_direct_link_deinit(dp_ctx, is_ssr);
 }
 
 void
@@ -2394,6 +2395,43 @@ QDF_STATUS ucfg_dp_config_direct_link(struct wlan_objmgr_vdev *vdev,
 }
 #endif
 
+QDF_STATUS ucfg_dp_bus_suspend(ol_txrx_soc_handle soc, uint8_t pdev_id)
+{
+	return __wlan_dp_bus_suspend(soc, pdev_id);
+}
+
+QDF_STATUS ucfg_dp_bus_resume(ol_txrx_soc_handle soc, uint8_t pdev_id)
+{
+	return __wlan_dp_bus_resume(soc, pdev_id);
+}
+
+void *ucfg_dp_txrx_soc_attach(struct dp_txrx_soc_attach_params *params,
+			      bool *is_wifi3_0_target)
+{
+	return wlan_dp_txrx_soc_attach(params, is_wifi3_0_target);
+}
+
+void ucfg_dp_txrx_soc_detach(ol_txrx_soc_handle soc)
+{
+	return wlan_dp_txrx_soc_detach(soc);
+}
+
+QDF_STATUS ucfg_dp_txrx_attach_target(ol_txrx_soc_handle soc, uint8_t pdev_id)
+{
+	return wlan_dp_txrx_attach_target(soc, pdev_id);
+}
+
+QDF_STATUS ucfg_dp_txrx_pdev_attach(ol_txrx_soc_handle soc)
+{
+	return wlan_dp_txrx_pdev_attach(soc);
+}
+
+QDF_STATUS ucfg_dp_txrx_pdev_detach(ol_txrx_soc_handle soc, uint8_t pdev_id,
+				    int force)
+{
+	return wlan_dp_txrx_pdev_detach(soc, pdev_id, force);
+}
+
 QDF_STATUS ucfg_dp_txrx_init(ol_txrx_soc_handle soc, uint8_t pdev_id,
 			     struct dp_txrx_config *config)
 {
@@ -2416,3 +2454,24 @@ QDF_STATUS ucfg_dp_txrx_set_cpu_mask(ol_txrx_soc_handle soc,
 {
 	return dp_txrx_set_cpu_mask(soc, new_mask);
 }
+
+QDF_STATUS
+ucfg_dp_get_per_link_peer_stats(ol_txrx_soc_handle soc, uint8_t vdev_id,
+				uint8_t *peer_mac,
+				struct cdp_peer_stats *peer_stats,
+				enum cdp_peer_type peer_type,
+				uint8_t num_link)
+{
+	return cdp_host_get_per_link_peer_stats(soc, vdev_id, peer_mac,
+						peer_stats, peer_type,
+						num_link);
+}
+
+#ifdef WLAN_FEATURE_LOCAL_PKT_CAPTURE
+bool ucfg_dp_is_local_pkt_capture_enabled(struct wlan_objmgr_psoc *psoc)
+{
+	void *soc = cds_get_context(QDF_MODULE_ID_SOC);
+
+	return cdp_cfg_get(soc, cfg_dp_local_pkt_capture);
+}
+#endif

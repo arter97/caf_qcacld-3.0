@@ -117,6 +117,7 @@ static QDF_STATUS pmo_configure_wow_ap(struct wlan_objmgr_vdev *vdev)
 	QDF_STATUS ret;
 	uint8_t mac_mask[QDF_MAC_ADDR_SIZE];
 	struct pmo_vdev_priv_obj *vdev_ctx;
+	struct qdf_mac_addr bridgeaddr;
 
 	vdev_ctx = pmo_vdev_get_priv(vdev);
 
@@ -133,6 +134,20 @@ static QDF_STATUS pmo_configure_wow_ap(struct wlan_objmgr_vdev *vdev)
 			QDF_MAC_ADDR_SIZE, false);
 	if (ret != QDF_STATUS_SUCCESS) {
 		pmo_err("Failed to add WOW unicast pattern ret %d", ret);
+		return ret;
+	}
+
+	/* Setup Bridge MAC address */
+	pmo_get_vdev_bridge_addr(vdev, &bridgeaddr);
+	if (qdf_is_macaddr_zero(&bridgeaddr))
+		return ret;
+
+	ret = pmo_tgt_send_wow_patterns_to_fw(vdev,
+			pmo_get_and_increment_wow_default_ptrn(vdev_ctx),
+			bridgeaddr.bytes, QDF_MAC_ADDR_SIZE, 0, mac_mask,
+			QDF_MAC_ADDR_SIZE, false);
+	if (ret != QDF_STATUS_SUCCESS) {
+		pmo_err("Failed to add Bridge MAC address");
 		return ret;
 	}
 
@@ -277,10 +292,12 @@ static QDF_STATUS pmo_configure_wow_sta(struct wlan_objmgr_vdev *vdev)
 
 	/*
 	 * when arp offload or ns offloaded is disabled
-	 * from ini file, configure broad cast arp pattern
-	 * to fw, so that host can wake up
+	 * or active offload is disabled from ini file,
+	 * configure broad cast arp pattern to fw, so
+	 * that host can wake up
 	 */
-	if (!vdev_ctx->pmo_psoc_ctx->psoc_cfg.arp_offload_enable) {
+	if (!vdev_ctx->pmo_psoc_ctx->psoc_cfg.arp_offload_enable ||
+	    !vdev_ctx->pmo_psoc_ctx->psoc_cfg.active_mode_offload) {
 		/* Setup all ARP pkt pattern */
 		pmo_debug("ARP offload is disabled in INI enable WoW for ARP");
 		ret = pmo_tgt_send_wow_patterns_to_fw(vdev,
@@ -294,7 +311,8 @@ static QDF_STATUS pmo_configure_wow_sta(struct wlan_objmgr_vdev *vdev)
 		}
 	}
 	/* for NS or NDP offload packets */
-	if (!vdev_ctx->pmo_psoc_ctx->psoc_cfg.ns_offload_enable_static) {
+	if (!vdev_ctx->pmo_psoc_ctx->psoc_cfg.ns_offload_enable_static ||
+	    !vdev_ctx->pmo_psoc_ctx->psoc_cfg.active_mode_offload) {
 		/* Setup all NS pkt pattern */
 		pmo_debug("NS offload is disabled in INI enable WoW for NS");
 		ret = pmo_tgt_send_wow_patterns_to_fw(vdev,

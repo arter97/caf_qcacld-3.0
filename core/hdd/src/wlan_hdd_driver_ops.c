@@ -534,10 +534,30 @@ static int hdd_init_qdf_ctx(struct device *dev, void *bdev,
 	qdf_dev->bus_type = bus_type;
 	qdf_dev->bid = bid;
 
+	qdf_dma_invalid_buf_list_init();
+
 	if (cds_smmu_mem_map_setup(qdf_dev, ucfg_ipa_is_ready()) !=
 		QDF_STATUS_SUCCESS) {
 		hdd_err("cds_smmu_mem_map_setup() failed");
 	}
+
+	return 0;
+}
+
+/**
+ * hdd_deinit_qdf_ctx() - API to Deinitialize global QDF Device structure
+ * @domain: Debug domain
+ *
+ * Return: 0 - success, < 0 - failure
+ */
+int hdd_deinit_qdf_ctx(uint8_t domain)
+{
+	qdf_device_t qdf_dev = cds_get_context(QDF_MODULE_ID_QDF_DEVICE);
+
+	if (!qdf_dev)
+		return -EINVAL;
+
+	qdf_dma_invalid_buf_free(qdf_dev->dev, domain);
 
 	return 0;
 }
@@ -1264,7 +1284,8 @@ static int __wlan_hdd_bus_suspend(struct wow_enable_params wow_params,
 	}
 
 	dp_soc = cds_get_context(QDF_MODULE_ID_SOC);
-	err = qdf_status_to_os_return(cdp_bus_suspend(dp_soc, OL_TXRX_PDEV_ID));
+	err = qdf_status_to_os_return(ucfg_dp_bus_suspend(dp_soc,
+							  OL_TXRX_PDEV_ID));
 	if (err) {
 		hdd_err("Failed cdp bus suspend: %d", err);
 		return err;
@@ -1273,13 +1294,13 @@ static int __wlan_hdd_bus_suspend(struct wow_enable_params wow_params,
 	if (ucfg_ipa_is_tx_pending(hdd_ctx->pdev)) {
 		hdd_err("failed due to pending IPA TX comps");
 		err = -EBUSY;
-		goto resume_cdp;
+		goto resume_dp;
 	}
 
 	err = hif_bus_early_suspend(hif_ctx);
 	if (err) {
 		hdd_err("Failed hif bus early suspend");
-		goto resume_cdp;
+		goto resume_dp;
 	}
 
 	status = ucfg_pmo_psoc_bus_suspend_req(hdd_ctx->psoc,
@@ -1347,8 +1368,8 @@ late_hif_resume:
 	status = hif_bus_late_resume(hif_ctx);
 	QDF_BUG(QDF_IS_STATUS_SUCCESS(status));
 
-resume_cdp:
-	status = cdp_bus_resume(dp_soc, OL_TXRX_PDEV_ID);
+resume_dp:
+	status = ucfg_dp_bus_resume(dp_soc, OL_TXRX_PDEV_ID);
 	QDF_BUG(QDF_IS_STATUS_SUCCESS(status));
 	hif_system_pm_set_state_on(hif_ctx);
 
@@ -1526,7 +1547,7 @@ int wlan_hdd_bus_resume(enum qdf_suspend_type type)
 	}
 
 	dp_soc = cds_get_context(QDF_MODULE_ID_SOC);
-	qdf_status = cdp_bus_resume(dp_soc, OL_TXRX_PDEV_ID);
+	qdf_status = ucfg_dp_bus_resume(dp_soc, OL_TXRX_PDEV_ID);
 	status = qdf_status_to_os_return(qdf_status);
 	if (status) {
 		hdd_err("Failed cdp bus resume");
@@ -2179,6 +2200,10 @@ wlan_hdd_pld_uevent(struct device *dev, struct pld_uevent_data *event_data)
 		 */
 		if (event_data->bus_data.etype == PLD_BUS_EVENT_PCIE_LINK_DOWN)
 			host_log_device_status(WLAN_STATUS_BUS_EXCEPTION);
+		break;
+	case PLD_SYS_REBOOT:
+		hdd_info("Received system reboot");
+		cds_set_sys_rebooting();
 		break;
 	default:
 		/* other events intentionally not handled */

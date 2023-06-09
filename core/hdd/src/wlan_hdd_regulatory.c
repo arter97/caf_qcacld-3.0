@@ -1656,7 +1656,8 @@ static void hdd_country_change_update_sta(struct hdd_context *hdd_ctx)
 			 * continue to next statement
 			 */
 		case QDF_STA_MODE:
-			sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter);
+			sta_ctx =
+				WLAN_HDD_GET_STATION_CTX_PTR(adapter->deflink);
 			new_phy_mode = wlan_reg_get_max_phymode(pdev,
 								REG_PHYMODE_MAX,
 								oper_freq);
@@ -1716,8 +1717,8 @@ static void hdd_restart_sap_with_new_phymode(struct hdd_context *hdd_ctx,
 	struct sap_context *sap_ctx = NULL;
 	QDF_STATUS status;
 
-	hostapd_state = WLAN_HDD_GET_HOSTAP_STATE_PTR(adapter);
-	sap_ctx = WLAN_HDD_GET_SAP_CTX_PTR(adapter);
+	hostapd_state = WLAN_HDD_GET_HOSTAP_STATE_PTR(adapter->deflink);
+	sap_ctx = WLAN_HDD_GET_SAP_CTX_PTR(adapter->deflink);
 
 	if (!test_bit(SOFTAP_BSS_STARTED, &adapter->event_flags)) {
 		sap_config->sap_orig_hw_mode = sap_config->SapHw_mode;
@@ -1740,7 +1741,7 @@ static void hdd_restart_sap_with_new_phymode(struct hdd_context *hdd_ctx,
 	}
 
 	sap_config->chan_freq =
-		wlansap_get_safe_channel_from_pcl_and_acs_range(sap_ctx);
+		wlansap_get_safe_channel_from_pcl_and_acs_range(sap_ctx, NULL);
 
 	sap_config->sap_orig_hw_mode = sap_config->SapHw_mode;
 	sap_config->SapHw_mode = csr_phy_mode;

@@ -292,13 +292,17 @@ out:
 	return QDF_STATUS_SUCCESS;
 }
 
-QDF_STATUS pmo_vdev_ready(struct wlan_objmgr_vdev *vdev)
+QDF_STATUS pmo_vdev_ready(struct wlan_objmgr_vdev *vdev,
+			  struct qdf_mac_addr *bridgeaddr)
 {
 	QDF_STATUS status;
 
 	status = pmo_vdev_get_ref(vdev);
 	if (QDF_IS_STATUS_ERROR(status))
 		return status;
+
+	/* Set Bridge MAC address */
+	pmo_set_vdev_bridge_addr(vdev, bridgeaddr);
 
 	/* Register static configuration with firmware */
 	pmo_register_wow_wakeup_events(vdev);
@@ -493,7 +497,6 @@ QDF_STATUS pmo_suspend_all_components(struct wlan_objmgr_psoc *psoc,
 	pmo_ctx = pmo_get_context();
 	if (!pmo_ctx) {
 		pmo_err("unable to get pmo ctx");
-		QDF_ASSERT(0);
 		status = QDF_STATUS_E_FAILURE;
 		goto exit_with_status;
 	}
@@ -512,7 +515,6 @@ QDF_STATUS pmo_suspend_all_components(struct wlan_objmgr_psoc *psoc,
 		if (QDF_IS_STATUS_ERROR(status)) {
 			pmo_err("component %d failed to suspend; status: %d",
 				i, status);
-			QDF_ASSERT(0);
 			goto suspend_recovery;
 		}
 	}

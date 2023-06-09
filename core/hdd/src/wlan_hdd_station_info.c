@@ -167,7 +167,8 @@ static int hdd_get_sta_congestion(struct hdd_adapter *adapter,
 	struct cca_stats cca_stats;
 	struct wlan_objmgr_vdev *vdev;
 
-	vdev = hdd_objmgr_get_vdev_by_user(adapter, WLAN_OSIF_STATS_ID);
+	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink,
+					   WLAN_OSIF_STATS_ID);
 	if (!vdev) {
 		hdd_err("vdev is NULL");
 		return -EINVAL;
@@ -208,7 +209,7 @@ static int hdd_get_station_assoc_fail(struct hdd_context *hdd_ctx,
 		return -ENOMEM;
 	}
 
-	hdd_sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter);
+	hdd_sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter->deflink);
 
 	if (nla_put_u32(skb, INFO_ASSOC_FAIL_REASON,
 			hdd_sta_ctx->conn_info.assoc_status_code)) {
@@ -409,13 +410,15 @@ static int32_t hdd_add_tx_bitrate(struct sk_buff *skb,
 {
 	struct nlattr *nla_attr;
 	uint32_t bitrate, bitrate_compat;
-	struct hdd_station_ctx *sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter);
+	struct hdd_station_ctx *sta_ctx;
 
 	nla_attr = nla_nest_start(skb, idx);
 	if (!nla_attr) {
 		hdd_err("nla_nest_start failed");
 		goto fail;
 	}
+
+	sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter->deflink);
 
 	/* cfg80211_calculate_bitrate will return 0 for mcs >= 32 */
 	if (hdd_cm_is_vdev_associated(adapter))
@@ -496,7 +499,7 @@ static int32_t hdd_add_sta_info(struct sk_buff *skb,
 	struct nlattr *nla_attr;
 	struct hdd_station_ctx *hdd_sta_ctx;
 
-	hdd_sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter);
+	hdd_sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter->deflink);
 	if (!hdd_sta_ctx) {
 		hdd_err("Invalid sta ctx");
 		goto fail;
@@ -610,7 +613,7 @@ hdd_add_link_standard_info(struct sk_buff *skb,
 	struct nlattr *nla_attr;
 	struct hdd_station_ctx *hdd_sta_ctx;
 
-	hdd_sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter);
+	hdd_sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter->deflink);
 	if (!hdd_sta_ctx) {
 		hdd_err("Invalid sta ctx");
 		goto fail;
@@ -966,7 +969,7 @@ static int hdd_get_station_info(struct hdd_context *hdd_ctx,
 	uint32_t nl_buf_len;
 	struct hdd_station_ctx *hdd_sta_ctx;
 
-	hdd_sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter);
+	hdd_sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter->deflink);
 
 	if (hdd_cm_is_vdev_connected(adapter)) {
 		hdd_err("Station is connected, command is not supported");
@@ -2010,7 +2013,7 @@ hdd_big_data_pack_resp_nlmsg(struct sk_buff *skb,
 {
 	struct hdd_station_ctx *hdd_sta_ctx;
 
-	hdd_sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter);
+	hdd_sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter->deflink);
 	if (!hdd_sta_ctx) {
 		hdd_err("Invalid station context");
 		return -EINVAL;
@@ -2431,7 +2434,7 @@ static int hdd_get_station_info_ex(struct hdd_context *hdd_ctx,
 	bool big_data_fw_support = false;
 	int ret;
 
-	hdd_sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter);
+	hdd_sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter->deflink);
 	ucfg_mc_cp_get_big_data_fw_support(hdd_ctx->psoc, &big_data_fw_support);
 
 	if (hdd_cm_is_disconnected(adapter) &&

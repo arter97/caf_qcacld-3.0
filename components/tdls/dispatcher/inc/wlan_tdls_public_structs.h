@@ -843,6 +843,28 @@ struct hecap_6ghz {
 };
 #endif
 
+#ifdef WLAN_FEATURE_11BE
+/**
+ * struct ehtcapfixed - EHT capabilities fixed data
+ * @mac_cap_info: MAC capabilities
+ * @phy_cap_info: PHY capabilities
+ */
+struct ehtcapfixed {
+	uint8_t mac_cap_info[2];
+	uint8_t phy_cap_info[9];
+};
+
+/**
+ * struct ehtcap - EHT capabilities
+ * @eht_cap_fixed: fixed parts, see &ehtcapfixed
+ * @optional: optional parts
+ */
+struct ehtcap {
+	struct ehtcapfixed eht_cap_fixed;
+	uint8_t optional[];
+} qdf_packed;
+#endif
+
 struct tdls_update_peer_params {
 	uint8_t peer_addr[QDF_MAC_ADDR_SIZE];
 	uint32_t peer_type;
@@ -859,6 +881,11 @@ struct tdls_update_peer_params {
 	uint8_t he_cap_len;
 	struct hecap he_cap;
 	struct hecap_6ghz he_6ghz_cap;
+#endif
+#ifdef WLAN_FEATURE_11BE
+	uint8_t ehtcap_present;
+	uint8_t eht_cap_len;
+	struct ehtcap eht_cap;
 #endif
 	uint8_t uapsd_queues;
 	uint8_t max_sp;
@@ -1149,20 +1176,24 @@ struct tdls_get_all_peers {
  * @vdev: vdev object
  * @chk_frame: This struct used to validate mgmt frame
  * @session_id: session id
+ * @link_id: link id
  * @vdev_id: vdev id
  * @cmd_buf: cmd buffer
  * @len: length of the frame
  * @use_default_ac: access category
+ * @link_active: whether link active command send successfully
  * @tdls_mgmt: tdls management
  */
 struct tdls_action_frame_request {
 	struct wlan_objmgr_vdev *vdev;
 	struct tdls_validate_action_req chk_frame;
 	uint8_t session_id;
+	uint8_t link_id;
 	uint8_t vdev_id;
 	const uint8_t *cmd_buf;
 	uint8_t len;
 	bool use_default_ac;
+	bool link_active;
 	/* Variable length, do not add anything after this */
 	struct tdls_send_mgmt tdls_mgmt;
 };
@@ -1395,6 +1426,9 @@ struct tdls_send_mgmt_request {
  * @he_cap_len: he capability length
  * @he_cap: he capability
  * @he_6ghz_cap: HE 6 GHz capability
+ * @ehtcap_present: eht capability present
+ * @eht_cap_len: eht capability length
+ * @eht_cap: eht capability
  * @uapsd_queues: uapsd queue as sSirMacQosInfoStation
  * @max_sp: maximum service period
  * @is_pmf: is PMF active
@@ -1419,6 +1453,11 @@ struct tdls_add_sta_req {
 	uint8_t he_cap_len;
 	struct hecap he_cap;
 	struct hecap_6ghz he_6ghz_cap;
+#endif
+#ifdef WLAN_FEATURE_11BE
+	uint8_t ehtcap_present;
+	uint8_t eht_cap_len;
+	struct ehtcap eht_cap;
 #endif
 	uint8_t uapsd_queues;
 	uint8_t max_sp;

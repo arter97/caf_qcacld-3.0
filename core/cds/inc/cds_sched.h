@@ -28,7 +28,7 @@
 #include <qdf_event.h>
 #include <i_qdf_types.h>
 #include <linux/wait.h>
-#if defined(WLAN_OPEN_SOURCE) && defined(CONFIG_HAS_WAKELOCK)
+#if defined(CONFIG_HAS_WAKELOCK)
 #include <linux/wakelock.h>
 #endif
 #include <qdf_types.h>
@@ -48,7 +48,7 @@
 #define RX_REFILL_SUSPEND_EVENT        0x002
 #define RX_REFILL_SHUTDOWN_EVENT       0x004
 
-#ifdef QCA_CONFIG_SMP
+#ifdef WLAN_DP_LEGACY_OL_RX_THREAD
 /*
 ** Maximum number of cds messages to be allocated for
 ** OL Rx thread.
@@ -90,7 +90,7 @@ struct cds_ol_rx_pkt {
 **
 */
 typedef struct _cds_sched_context {
-#ifdef QCA_CONFIG_SMP
+#ifdef WLAN_DP_LEGACY_OL_RX_THREAD
 	spinlock_t ol_rx_thread_lock;
 
 	/* OL Rx thread handle */
@@ -218,12 +218,15 @@ struct cds_context {
 	qdf_work_t cds_recovery_work;
 	qdf_workqueue_t *cds_recovery_wq;
 	enum qdf_hang_reason recovery_reason;
+
+	/* To protect bit(CDS_DRIVER_STATE_SYS_REBOOTING) of driver_state */
+	qdf_mutex_t sys_reboot_lock;
 };
 
 /*---------------------------------------------------------------------------
    Function declarations and documentation
    ---------------------------------------------------------------------------*/
-#ifdef QCA_CONFIG_SMP
+#ifdef WLAN_DP_LEGACY_OL_RX_THREAD
 
 /**
  * cds_sched_handle_cpu_hot_plug() - cpu hotplug event handler

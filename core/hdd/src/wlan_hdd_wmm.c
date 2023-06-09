@@ -1540,7 +1540,7 @@ QDF_STATUS hdd_send_dscp_up_map_to_fw(struct hdd_adapter *adapter)
 	struct wlan_objmgr_vdev *vdev;
 	int ret;
 
-	vdev = hdd_objmgr_get_vdev_by_user(adapter, WLAN_FWOL_NB_ID);
+	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink, WLAN_FWOL_NB_ID);
 
 	if (vdev) {
 		/* Send DSCP to TID map table to FW */
