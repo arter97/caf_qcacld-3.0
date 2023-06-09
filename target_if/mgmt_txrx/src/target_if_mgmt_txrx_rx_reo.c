@@ -90,7 +90,7 @@ target_if_mgmt_rx_reo_fw_consumed_event_handler(
 
 	status = mgmt_rx_reo_rx_ops->fw_consumed_event_handler(pdev, &params);
 	if (QDF_IS_STATUS_ERROR(status)) {
-		mgmt_rx_reo_err("FW consumed event handling failed");
+		mgmt_rx_reo_warn_rl("FW consumed event handling failed");
 		wlan_objmgr_pdev_release_ref(pdev, WLAN_MGMT_SB_ID);
 		return -EINVAL;
 	}

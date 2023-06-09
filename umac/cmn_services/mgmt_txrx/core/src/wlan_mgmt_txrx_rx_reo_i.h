@@ -248,6 +248,32 @@ enum mgmt_rx_reo_list_type {
 };
 
 /**
+ * enum mgmt_rx_reo_ingress_drop_reason - Enumeration for management rx reorder
+ * reason code for dropping an incoming management frame
+ * @MGMT_RX_REO_INGRESS_DROP_REASON_INVALID: Invalid ingress drop reason code
+ * @MGMT_RX_REO_INVALID_REO_PARAMS: Invalid reo parameters
+ * @MGMT_RX_REO_OUT_OF_ORDER_PKT_CTR: Packet counter of the current frame is
+ * less than the packet counter of the last frame in the same link
+ * @MGMT_RX_REO_DUPLICATE_PKT_CTR: Packet counter of the current frame is same
+ * as the packet counter of the last frame
+ * @MGMT_RX_REO_ZERO_DURATION: Zero duration for a management frame which is
+ * supposed to be consumed by host
+ * @MGMT_RX_REO_SNAPSHOT_SANITY_FAILURE: Snapshot sanity failure in any of the
+ * links
+ * @MGMT_RX_REO_INGRESS_DROP_REASON_MAX: Maximum value of ingress drop reason
+ * code
+ */
+enum mgmt_rx_reo_ingress_drop_reason {
+	MGMT_RX_REO_INGRESS_DROP_REASON_INVALID = 0,
+	MGMT_RX_REO_INVALID_REO_PARAMS,
+	MGMT_RX_REO_OUT_OF_ORDER_PKT_CTR,
+	MGMT_RX_REO_DUPLICATE_PKT_CTR,
+	MGMT_RX_REO_ZERO_DURATION,
+	MGMT_RX_REO_SNAPSHOT_SANITY_FAILURE,
+	MGMT_RX_REO_INGRESS_DROP_REASON_MAX,
+};
+
+/**
  * enum mgmt_rx_reo_execution_context - Execution contexts related to management
  * Rx reorder
  * @MGMT_RX_REO_CONTEXT_MGMT_RX: Incoming mgmt Rx context
@@ -621,6 +647,8 @@ struct mgmt_rx_reo_sim_context {
  * If reorder is not required, current frame will just be used for updating the
  * wait count of frames already part of the reorder list.
  * @context_id: Context identifier
+ * @drop_reason: Reason for dropping the frame
+ * @drop: Indicates whether the frame has to be dropped
  */
 struct reo_ingress_debug_frame_info {
 	uint8_t link_id;
@@ -653,6 +681,8 @@ struct reo_ingress_debug_frame_info {
 	int cpu_id;
 	bool reo_required;
 	int32_t context_id;
+	enum mgmt_rx_reo_ingress_drop_reason drop_reason;
+	bool drop;
 };
 
 /**
@@ -742,6 +772,7 @@ struct reo_egress_debug_frame_info {
  * @parallel_rx_count: Number of frames which are categorised as parallel rx
  * @missing_count: Number of frames missing. This is calculated based on the
  * packet counter holes.
+ * @drop_count: Number of frames dropped by host.
  */
 struct reo_ingress_frame_stats {
 	uint64_t ingress_count
@@ -760,6 +791,7 @@ struct reo_ingress_frame_stats {
 	uint64_t parallel_rx_count[MAX_MLO_LINKS]
 			    [MGMT_RX_REO_FRAME_DESC_TYPE_MAX];
 	uint64_t missing_count[MAX_MLO_LINKS];
+	uint64_t drop_count[MAX_MLO_LINKS][MGMT_RX_REO_INGRESS_DROP_REASON_MAX];
 };
 
 /**
@@ -1002,6 +1034,8 @@ struct mgmt_rx_reo_context {
  * @last_delivered_frame: Stores the information about the last frame delivered
  * to the upper layer
  * @reo_params_copy: Copy of @rx_params->reo_params struture
+ * @drop_reason: Reason for dropping the frame
+ * @drop: Indicates whether the frame has to be dropped
  */
 struct mgmt_rx_reo_frame_descriptor {
 	enum mgmt_rx_reo_frame_descriptor_type type;
@@ -1027,6 +1061,8 @@ struct mgmt_rx_reo_frame_descriptor {
 	bool reo_required;
 	struct mgmt_rx_reo_frame_info last_delivered_frame;
 	struct mgmt_rx_reo_params reo_params_copy;
+	enum mgmt_rx_reo_ingress_drop_reason drop_reason;
+	bool drop;
 };
 
 /**
