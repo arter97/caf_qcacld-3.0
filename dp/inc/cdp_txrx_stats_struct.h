@@ -118,7 +118,7 @@
 #define CDP_MAX_TX_COMP_PPE_RING (CDP_MAX_TX_COMP_RINGS - 1)
 #define CDP_MAX_RX_WBM_RINGS 1 /* max rx wbm rings */
 
-#define CDP_MAX_TX_TQM_STATUS 9  /* max tx tqm completion status */
+#define CDP_MAX_TX_TQM_STATUS 15  /* max tx tqm completion status */
 #define CDP_MAX_TX_HTT_STATUS 7  /* max tx htt completion status */
 
 #define CDP_DMA_CODE_MAX 14 /* max rxdma error */
