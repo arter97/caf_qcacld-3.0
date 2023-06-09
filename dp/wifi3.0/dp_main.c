@@ -3115,9 +3115,7 @@ static QDF_STATUS dp_rxdma_ring_config(struct dp_soc *soc)
 				dp_get_lmac_id_for_pdev_id(soc,
 							   mac_id,
 							   pdev->pdev_id);
-				QDF_TRACE(QDF_MODULE_ID_TXRX,
-					 QDF_TRACE_LEVEL_ERROR,
-					 FL("mac_id %d"), mac_for_pdev);
+				dp_info("mac_id %d", mac_for_pdev);
 
 				htt_srng_setup(soc->htt_handle, mac_for_pdev,
 					 pdev->rx_mac_buf_ring[mac_id]
