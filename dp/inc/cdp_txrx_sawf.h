@@ -342,6 +342,7 @@ cdp_get_drop_stats(ol_txrx_soc_handle soc, void *arg,
  * @min_tput: Min throughput
  * @max_latency: Max latency
  * @add_or_sub: Add or Sub parameters
+ * @peer_id: peer id
  *
  * Return: QDF_STATUS
  */
@@ -349,7 +350,7 @@ static inline QDF_STATUS
 cdp_sawf_peer_config_ul(ol_txrx_soc_handle soc, uint8_t *mac_addr, uint8_t tid,
 			uint32_t service_interval, uint32_t burst_size,
 			uint32_t min_tput, uint32_t max_latency,
-			uint8_t add_or_sub)
+			uint8_t add_or_sub, uint16_t peer_id)
 {
 	if (!soc || !soc->ops || !soc->ops->sawf_ops ||
 	    !soc->ops->sawf_ops->peer_config_ul) {
@@ -361,7 +362,7 @@ cdp_sawf_peer_config_ul(ol_txrx_soc_handle soc, uint8_t *mac_addr, uint8_t tid,
 	return soc->ops->sawf_ops->peer_config_ul(soc, mac_addr, tid,
 						  service_interval, burst_size,
 						  min_tput, max_latency,
-						  add_or_sub);
+						  add_or_sub, peer_id);
 }
 
 /**
@@ -372,13 +373,15 @@ cdp_sawf_peer_config_ul(ol_txrx_soc_handle soc, uint8_t *mac_addr, uint8_t tid,
  * @direction: Indication of forward or reverse service class match
  * @start_or_stop: Indication of start or stop
  * @peer_mac: Peer MAC address
+ * @peer_id: peer id
  *
  * Return: QDF_STATUS
  */
 static inline QDF_STATUS
 cdp_sawf_peer_flow_count(ol_txrx_soc_handle soc, uint8_t *mac_addr,
 			 uint8_t svc_id, uint8_t direction,
-			 uint8_t start_or_stop, uint8_t *peer_mac)
+			 uint8_t start_or_stop, uint8_t *peer_mac,
+			 uint16_t peer_id)
 {
 	if (!soc || !soc->ops || !soc->ops->sawf_ops ||
 	    !soc->ops->sawf_ops->sawf_peer_flow_count) {
@@ -388,7 +391,8 @@ cdp_sawf_peer_flow_count(ol_txrx_soc_handle soc, uint8_t *mac_addr,
 	}
 
 	return soc->ops->sawf_ops->sawf_peer_flow_count
-		(soc, mac_addr, svc_id, direction, start_or_stop, peer_mac);
+		(soc, mac_addr, svc_id, direction, start_or_stop, peer_mac,
+								peer_id);
 }
 
 /**

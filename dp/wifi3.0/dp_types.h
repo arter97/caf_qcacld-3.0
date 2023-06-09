@@ -2213,7 +2213,6 @@ enum dp_context_type {
  * @dp_rx_fst_ref:
  * @txrx_print_peer_stats:
  * @dp_peer_rx_reorder_queue_setup: Dp peer reorder queue setup
- * @dp_find_peer_by_destmac:
  * @dp_bank_reconfig:
  * @dp_get_soc_by_chip_id: Get soc by chip id
  * @dp_soc_get_num_soc:
@@ -2414,9 +2413,6 @@ struct dp_arch_ops {
 						     struct dp_peer *peer,
 						     int tid,
 						     uint32_t ba_window_size);
-	struct dp_peer *(*dp_find_peer_by_destmac)(struct dp_soc *soc,
-						   uint8_t *dest_mac_addr,
-						   uint8_t vdev_id);
 	void (*dp_bank_reconfig)(struct dp_soc *soc, struct dp_vdev *vdev);
 
 	struct dp_soc * (*dp_get_soc_by_chip_id)(struct dp_soc *soc,
