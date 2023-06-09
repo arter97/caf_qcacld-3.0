@@ -768,6 +768,12 @@ QDF_STATUS ucfg_reg_enable_disable_opclass_chans(struct wlan_objmgr_pdev *pdev,
 						 uint8_t *ieee_chan_list,
 						 uint8_t chan_list_size,
 						 bool global_tbl_lookup);
+
+static inline
+bool ucfg_reg_is_user_country_set_allowed(struct wlan_objmgr_psoc *psoc)
+{
+	return true;
+}
 #else
 static inline QDF_STATUS
 ucfg_reg_enable_disable_opclass_chans(struct wlan_objmgr_pdev *pdev,
@@ -779,6 +785,15 @@ ucfg_reg_enable_disable_opclass_chans(struct wlan_objmgr_pdev *pdev,
 {
 	return QDF_STATUS_E_NOSUPPORT;
 }
+
+/**
+ * ucfg_reg_is_user_country_set_allowed() - Checks whether user country is
+ * allowed to set
+ * @psoc: psoc ptr
+ *
+ * Return: bool
+ */
+bool ucfg_reg_is_user_country_set_allowed(struct wlan_objmgr_psoc *psoc);
 #endif
 
 #endif

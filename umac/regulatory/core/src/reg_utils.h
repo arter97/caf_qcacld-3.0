@@ -207,6 +207,16 @@ bool reg_get_fcc_constraint(struct wlan_objmgr_pdev *pdev, uint32_t freq);
  * Return: True if 6 GHz band set else return flase
  */
 bool reg_is_6ghz_band_set(struct wlan_objmgr_pdev *pdev);
+
+/**
+ * reg_is_user_country_set_allowed() - Checks whether user country is allowed
+ * to set
+ * @psoc: psoc ptr
+ *
+ * Return: bool
+ */
+bool reg_is_user_country_set_allowed(struct wlan_objmgr_psoc *psoc);
+
 /**
  * reg_read_current_country() - Get the current regulatory country
  * @psoc: The physical SoC to get current country from
@@ -501,6 +511,12 @@ bool reg_get_fcc_constraint(struct wlan_objmgr_pdev *pdev, uint32_t freq)
 
 static inline
 bool reg_is_6ghz_band_set(struct wlan_objmgr_pdev *pdev)
+{
+	return true;
+}
+
+static inline
+bool reg_is_user_country_set_allowed(struct wlan_objmgr_psoc *psoc)
 {
 	return true;
 }

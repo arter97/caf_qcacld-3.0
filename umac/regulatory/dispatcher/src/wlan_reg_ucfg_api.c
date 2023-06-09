@@ -171,6 +171,11 @@ QDF_STATUS ucfg_reg_set_keep_6ghz_sta_cli_connection(
 	return reg_set_keep_6ghz_sta_cli_connection(pdev,
 						keep_6ghz_sta_cli_connection);
 }
+
+bool ucfg_reg_is_user_country_set_allowed(struct wlan_objmgr_psoc *psoc)
+{
+	return reg_is_user_country_set_allowed(psoc);
+}
 #endif
 
 QDF_STATUS ucfg_reg_get_default_country(struct wlan_objmgr_psoc *psoc,

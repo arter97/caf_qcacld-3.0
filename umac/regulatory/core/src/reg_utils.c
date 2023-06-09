@@ -966,6 +966,25 @@ bool reg_get_fcc_constraint(struct wlan_objmgr_pdev *pdev, uint32_t freq)
 	return true;
 }
 
+bool reg_is_user_country_set_allowed(struct wlan_objmgr_psoc *psoc)
+{
+	struct wlan_regulatory_psoc_priv_obj *psoc_reg;
+
+	psoc_reg = reg_get_psoc_obj(psoc);
+	if (!IS_VALID_PSOC_REG_OBJ(psoc_reg)) {
+		reg_err("psoc reg component is NULL");
+		return false;
+	}
+
+	if (!psoc_reg->user_ctry_priority &&
+	    psoc_reg->enable_11d_supp_original) {
+		reg_err_rl("country set from userspace is not allowed");
+		return false;
+	}
+
+	return true;
+}
+
 #ifdef CONFIG_BAND_6GHZ
 enum reg_6g_ap_type reg_decide_6g_ap_pwr_type(struct wlan_objmgr_pdev *pdev)
 {
