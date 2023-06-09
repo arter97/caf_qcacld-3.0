@@ -135,12 +135,6 @@ tgt_mgmt_rx_reo_enter_algo_without_buffer(
 		return QDF_STATUS_E_INVAL;
 	}
 
-	if (!reo_params->valid) {
-		mgmt_rx_reo_warn_rl("Invalid MGMT rx REO param for link %u",
-				    link_id);
-		return QDF_STATUS_E_INVAL;
-	}
-
 	ml_grp_id = wlan_get_mlo_grp_id_from_pdev(pdev);
 	if (ml_grp_id > WLAN_MAX_MLO_GROUPS) {
 		mgmt_rx_reo_err("Invalid MLO Group  %d for the pdev",
@@ -341,13 +335,6 @@ QDF_STATUS tgt_mgmt_rx_reo_frame_handler(
 	link_id = wlan_get_mlo_link_id_from_pdev(pdev);
 	if (link_id < 0) {
 		mgmt_rx_reo_err("Invalid link %d for the pdev", link_id);
-		status = QDF_STATUS_E_INVAL;
-		goto cleanup;
-	}
-
-	if (!mgmt_rx_params->reo_params->valid) {
-		mgmt_rx_reo_warn_rl("Invalid MGMT rx REO param for link %u",
-				    link_id);
 		status = QDF_STATUS_E_INVAL;
 		goto cleanup;
 	}
