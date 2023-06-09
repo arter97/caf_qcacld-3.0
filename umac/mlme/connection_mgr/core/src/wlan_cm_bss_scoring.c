@@ -1284,6 +1284,7 @@ cm_calculate_etp_score(struct wlan_objmgr_psoc *psoc,
 	struct etp_params etp_param;
 	int8_t mlo_prefer_percentage = 0;
 	uint32_t score;
+	int32_t mlo_score = 0;
 
 	if (phy_config->he_cap && entry->ie_list.hecap)
 		is_he_intersect = true;
@@ -1341,8 +1342,12 @@ cm_calculate_etp_score(struct wlan_objmgr_psoc *psoc,
 	if (bss_mlo_type == SLO)
 		return score;
 	wlan_mlme_get_mlo_prefer_percentage(psoc, &mlo_prefer_percentage);
-	if (mlo_prefer_percentage)
-		score = score + (score * mlo_prefer_percentage) / 100;
+	if (mlo_prefer_percentage) {
+		mlo_score = score;
+		mlo_score = mlo_score +
+			   (mlo_score * mlo_prefer_percentage) / 100;
+		score = mlo_score;
+	}
 	return score;
 }
 #else
