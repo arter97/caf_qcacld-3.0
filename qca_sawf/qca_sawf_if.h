@@ -50,6 +50,8 @@ uint16_t qca_sawf_get_msdu_queue(struct net_device *netdev,
 /*
  * qca_sawf_config_ul() - Set Uplink QoS parameters
  *
+ * @dst_dev: Destination netdev
+ * @src_dev: Source netdev
  * @dst_mac: Destination MAC address
  * @src_mac: Source MAC address
  * @fw_service_id: Service class ID in forward direction
@@ -58,7 +60,8 @@ uint16_t qca_sawf_get_msdu_queue(struct net_device *netdev,
  *
  * Return: void
  */
-void qca_sawf_config_ul(uint8_t *dst_mac, uint8_t *src_mac,
+void qca_sawf_config_ul(struct net_device *dst_dev, struct net_device *src_dev,
+			uint8_t *dst_mac, uint8_t *src_mac,
 			uint8_t fw_service_id, uint8_t rv_service_id,
 			uint8_t add_or_sub);
 
