@@ -679,6 +679,18 @@ dp_monitor_get_link_desc_pages(struct dp_soc *soc, uint32_t mac_id)
 	return NULL;
 }
 
+static inline struct dp_srng*
+dp_monitor_get_link_desc_ring(struct dp_soc *soc, uint32_t mac_id)
+{
+	return NULL;
+}
+
+static inline uint32_t
+dp_monitor_get_num_link_desc_ring_entries(struct dp_soc *soc)
+{
+	return 0;
+}
+
 static inline uint32_t *
 dp_monitor_get_total_link_descs(struct dp_soc *soc, uint32_t mac_id)
 {

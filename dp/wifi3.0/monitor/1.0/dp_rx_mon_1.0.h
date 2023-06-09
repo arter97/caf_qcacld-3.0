@@ -911,6 +911,7 @@ void *dp_rx_cookie_2_mon_link_desc(struct dp_pdev *pdev,
 	return dp_rx_cookie_2_link_desc_va(pdev->soc, buf_info);
 }
 
+#ifndef WLAN_SOFTUMAC_SUPPORT
 /**
  * dp_rx_monitor_link_desc_return() - Return Link descriptor based on target
  * @pdev: core physical device context
@@ -933,6 +934,17 @@ QDF_STATUS dp_rx_monitor_link_desc_return(struct dp_pdev *pdev,
 	return dp_rx_link_desc_return_by_addr(pdev->soc, p_last_buf_addr_info,
 				      bm_action);
 }
+#else
+static inline
+QDF_STATUS dp_rx_monitor_link_desc_return(struct dp_pdev *pdev,
+					  hal_buff_addrinfo_t
+					  p_last_buf_addr_info,
+					  uint8_t mac_id, uint8_t bm_action)
+{
+	return dp_rx_mon_link_desc_return(pdev, p_last_buf_addr_info,
+					  mac_id);
+}
+#endif
 
 static inline bool dp_is_rxdma_dst_ring_common(struct dp_pdev *pdev)
 {

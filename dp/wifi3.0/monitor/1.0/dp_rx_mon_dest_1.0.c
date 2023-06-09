@@ -105,7 +105,6 @@ QDF_STATUS
 dp_rx_mon_link_desc_return(struct dp_pdev *dp_pdev,
 	hal_buff_addrinfo_t buf_addr_info, int mac_id)
 {
-	struct dp_srng *dp_srng;
 	hal_ring_handle_t hal_ring_hdl;
 	hal_soc_handle_t hal_soc;
 	QDF_STATUS status = QDF_STATUS_E_FAILURE;
@@ -113,8 +112,7 @@ dp_rx_mon_link_desc_return(struct dp_pdev *dp_pdev,
 
 	hal_soc = dp_pdev->soc->hal_soc;
 
-	dp_srng = &dp_pdev->soc->rxdma_mon_desc_ring[mac_id];
-	hal_ring_hdl = dp_srng->hal_srng;
+	hal_ring_hdl = dp_monitor_get_link_desc_ring(dp_pdev->soc, mac_id);
 
 	qdf_assert(hal_ring_hdl);
 
@@ -1186,6 +1184,108 @@ dp_rx_mon_check_n_drop_mpdu(struct dp_pdev *pdev, uint32_t mac_id,
 #endif
 #endif
 
+#ifdef WLAN_SOFTUMAC_SUPPORT
+static void dp_mon_hw_link_desc_bank_free(struct dp_soc *soc, uint32_t mac_id)
+{
+	struct qdf_mem_multi_page_t *pages;
+
+	pages = dp_monitor_get_link_desc_pages(soc, mac_id);
+	if (!pages) {
+		dp_err("can not get mon link desc pages");
+		QDF_ASSERT(0);
+		return;
+	}
+
+	if (pages->dma_pages) {
+		wlan_minidump_remove((void *)
+				     pages->dma_pages->page_v_addr_start,
+				     pages->num_pages * pages->page_size,
+				     soc->ctrl_psoc,
+				     WLAN_MD_DP_SRNG_SW2RXDMA_LINK_RING,
+				     "mon hw_link_desc_bank");
+		dp_desc_multi_pages_mem_free(soc, QDF_DP_HW_LINK_DESC_TYPE,
+					     pages, 0, false);
+	}
+}
+
+static QDF_STATUS
+dp_mon_hw_link_desc_bank_alloc(struct dp_soc *soc, uint32_t mac_id)
+{
+	struct qdf_mem_multi_page_t *pages;
+	uint32_t *total_link_descs, total_mem_size;
+	uint32_t num_entries;
+	uint32_t max_alloc_size = wlan_cfg_max_alloc_size(soc->wlan_cfg_ctx);
+	int link_desc_size = hal_get_link_desc_size(soc->hal_soc);
+	int link_desc_align = hal_get_link_desc_align(soc->hal_soc);
+	uint8_t minidump_str[MINIDUMP_STR_SIZE];
+
+	pages = dp_monitor_get_link_desc_pages(soc, mac_id);
+	if (!pages) {
+		dp_err("can not get mon link desc pages");
+		QDF_ASSERT(0);
+		return QDF_STATUS_E_FAULT;
+	}
+
+	/* If link descriptor banks are allocated, return from here */
+	if (pages->num_pages)
+		return QDF_STATUS_SUCCESS;
+
+	num_entries = dp_monitor_get_num_link_desc_ring_entries(soc, mac_id);
+	total_link_descs = dp_monitor_get_total_link_descs(soc, mac_id);
+	qdf_str_lcopy(minidump_str, "mon_link_desc_bank",
+		      MINIDUMP_STR_SIZE);
+
+	/* Round up to power of 2 */
+	*total_link_descs = 1;
+	while (*total_link_descs < num_entries)
+		*total_link_descs <<= 1;
+
+	dp_init_info("%pK: total_link_descs: %u, link_desc_size: %d",
+		     soc, *total_link_descs, link_desc_size);
+
+	total_mem_size =  *total_link_descs * link_desc_size;
+	total_mem_size += link_desc_align;
+
+	dp_init_info("%pK: total_mem_size: %d", soc, total_mem_size);
+
+	dp_set_max_page_size(pages, max_alloc_size);
+	dp_desc_multi_pages_mem_alloc(soc, QDF_DP_HW_LINK_DESC_TYPE,
+				      pages, link_desc_size,
+				      *total_link_descs, 0, false);
+
+	if (!pages->num_pages) {
+		dp_err("Multi page alloc fail for mon hw link desc pool");
+		return QDF_STATUS_E_FAULT;
+	}
+
+	wlan_minidump_log(pages->dma_pages->page_v_addr_start,
+			  pages->num_pages * pages->page_size,
+			  soc->ctrl_psoc,
+			  WLAN_MD_DP_SRNG_SW2RXDMA_LINK_RING,
+			  "mon hw_link_desc_bank");
+
+	return QDF_STATUS_SUCCESS;
+}
+
+static void
+dp_mon_link_desc_ring_replenish(struct dp_soc *soc, int mac_id)
+{
+	dp_link_desc_ring_replenish(soc, mac_id);
+}
+#else
+static QDF_STATUS
+dp_mon_hw_link_desc_bank_alloc(struct dp_soc *soc, uint32_t mac_id)
+{
+	return QDF_STATUS_SUCCESS;
+}
+
+static void
+dp_mon_hw_link_desc_bank_free(struct dp_soc *soc, uint32_t mac_id) {}
+
+static void
+dp_mon_link_desc_ring_replenish(struct dp_soc *soc, int mac_id) {}
+#endif
+
 static void
 dp_rx_pdev_mon_cmn_desc_pool_free(struct dp_pdev *pdev, int mac_id)
 {
@@ -1194,6 +1294,7 @@ dp_rx_pdev_mon_cmn_desc_pool_free(struct dp_pdev *pdev, int mac_id)
 	int mac_for_pdev = dp_get_lmac_id_for_pdev_id(soc, mac_id, pdev_id);
 
 	dp_rx_pdev_mon_status_desc_pool_free(pdev, mac_for_pdev);
+	dp_mon_hw_link_desc_bank_free(soc, mac_for_pdev);
 	dp_rx_pdev_mon_dest_desc_pool_free(pdev, mac_for_pdev);
 }
 
@@ -1235,6 +1336,7 @@ dp_rx_pdev_mon_cmn_desc_pool_init(struct dp_pdev *pdev, int mac_id)
 
 	mac_for_pdev = dp_get_lmac_id_for_pdev_id(soc, mac_id, pdev->pdev_id);
 	dp_rx_pdev_mon_status_desc_pool_init(pdev, mac_for_pdev);
+	dp_mon_link_desc_ring_replenish(soc, mac_for_pdev);
 
 	dp_rx_pdev_mon_dest_desc_pool_init(pdev, mac_for_pdev);
 }
@@ -1326,12 +1428,23 @@ dp_rx_pdev_mon_cmn_desc_pool_alloc(struct dp_pdev *pdev, int mac_id)
 		goto fail;
 	}
 
+	/* Allocate hw link desc bank for monitor mode for
+	 * SOFTUMAC architecture.
+	 */
+	status = dp_mon_hw_link_desc_bank_alloc(soc, mac_for_pdev);
+	if (!QDF_IS_STATUS_SUCCESS(status)) {
+		dp_err("dp_mon_hw_link_desc_bank_alloc() failed");
+		goto mon_status_dealloc;
+	}
+
 	status = dp_rx_pdev_mon_dest_desc_pool_alloc(pdev, mac_for_pdev);
 	if (!QDF_IS_STATUS_SUCCESS(status))
-		goto mon_status_dealloc;
+		goto link_desc_bank_free;
 
 	return status;
 
+link_desc_bank_free:
+	dp_mon_hw_link_desc_bank_free(soc, mac_for_pdev);
 mon_status_dealloc:
 	dp_rx_pdev_mon_status_desc_pool_free(pdev, mac_for_pdev);
 fail:

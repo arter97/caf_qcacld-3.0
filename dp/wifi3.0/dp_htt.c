@@ -715,6 +715,10 @@ int htt_srng_setup(struct htt_soc *soc, int mac_id,
 		htt_ring_id = HTT_TX_MON_MON2HOST_DEST_RING;
 		htt_ring_type = HTT_HW_TO_SW_RING;
 		break;
+	case SW2RXDMA_LINK_RELEASE:
+		htt_ring_id = HTT_RXDMA_MONITOR_DESC_RING;
+		htt_ring_type = HTT_SW_TO_HW_RING;
+		break;
 
 	default:
 		QDF_TRACE(QDF_MODULE_ID_TXRX, QDF_TRACE_LEVEL_ERROR,

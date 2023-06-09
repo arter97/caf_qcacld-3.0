@@ -2278,6 +2278,7 @@ struct hal_hw_srng_config hw_srng_table_6432[] = {
 		.max_size = HAL_RXDMA_MAX_RING_SIZE_BE,
 		.dmac_cmn_ring = TRUE,
 	},
+	{ /* SW2RXDMA_LINK_RELEASE */ 0},
 };
 
 /**

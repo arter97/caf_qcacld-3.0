@@ -1826,6 +1826,49 @@ dp_monitor_get_link_desc_pages(struct dp_soc *soc, uint32_t mac_id)
 	return &soc->monitor_soc->mon_link_desc_pages[mac_id];
 }
 
+#ifndef WLAN_SOFTUMAC_SUPPORT
+/*
+ * dp_monitor_get_link_desc_ring() - Get link desc ring
+ * @soc: point to soc
+ * @mac_id: mac id
+ *
+ * Return: return point to link desc ring
+ */
+static inline hal_ring_handle_t
+dp_monitor_get_link_desc_ring(struct dp_soc *soc, uint32_t mac_id)
+{
+	return soc->rxdma_mon_desc_ring[mac_id].hal_srng;
+}
+
+static inline uint32_t
+dp_monitor_get_num_link_desc_ring_entries(struct dp_soc *soc, uint32_t mac_id)
+{
+	struct dp_srng *ring;
+
+	ring = &soc->rxdma_mon_desc_ring[mac_id];
+
+	return ring->alloc_size / hal_srng_get_entrysize(soc->hal_soc,
+							 RXDMA_MONITOR_DESC);
+}
+#else
+static inline hal_ring_handle_t
+dp_monitor_get_link_desc_ring(struct dp_soc *soc, uint32_t mac_id)
+{
+	return soc->sw2rxdma_link_ring[mac_id].hal_srng;
+}
+
+static inline uint32_t
+dp_monitor_get_num_link_desc_ring_entries(struct dp_soc *soc, uint32_t mac_id)
+{
+	struct dp_srng *ring;
+
+	ring = &soc->sw2rxdma_link_ring[mac_id];
+
+	return ring->alloc_size / hal_srng_get_entrysize(soc->hal_soc,
+							 SW2RXDMA_LINK_RELEASE);
+}
+#endif
+
 /**
  * dp_monitor_get_total_link_descs() - Get total link descs
  * @soc: point to soc

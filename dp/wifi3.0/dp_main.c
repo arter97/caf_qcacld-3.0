@@ -1696,6 +1696,138 @@ static QDF_STATUS dp_soc_interrupt_attach_wrapper(struct cdp_soc_t *txrx_soc)
 #endif
 #endif
 
+void dp_link_desc_ring_replenish(struct dp_soc *soc, uint32_t mac_id)
+{
+	uint32_t cookie = 0;
+	uint32_t page_idx = 0;
+	struct qdf_mem_multi_page_t *pages;
+	struct qdf_mem_dma_page_t *dma_pages;
+	uint32_t offset = 0;
+	uint32_t count = 0;
+	uint32_t desc_id = 0;
+	void *desc_srng;
+	int link_desc_size = hal_get_link_desc_size(soc->hal_soc);
+	uint32_t *total_link_descs_addr;
+	uint32_t total_link_descs;
+	uint32_t scatter_buf_num;
+	uint32_t num_entries_per_buf = 0;
+	uint32_t rem_entries;
+	uint32_t num_descs_per_page;
+	uint32_t num_scatter_bufs = 0;
+	uint8_t *scatter_buf_ptr;
+	void *desc;
+
+	num_scatter_bufs = soc->num_scatter_bufs;
+
+	if (mac_id == WLAN_INVALID_PDEV_ID) {
+		pages = &soc->link_desc_pages;
+		total_link_descs = soc->total_link_descs;
+		desc_srng = soc->wbm_idle_link_ring.hal_srng;
+	} else {
+		pages = dp_monitor_get_link_desc_pages(soc, mac_id);
+		/* dp_monitor_get_link_desc_pages returns NULL only
+		 * if monitor SOC is  NULL
+		 */
+		if (!pages) {
+			dp_err("can not get link desc pages");
+			QDF_ASSERT(0);
+			return;
+		}
+		total_link_descs_addr =
+				dp_monitor_get_total_link_descs(soc, mac_id);
+		total_link_descs = *total_link_descs_addr;
+		desc_srng = dp_monitor_get_link_desc_ring(soc, mac_id);
+	}
+
+	dma_pages = pages->dma_pages;
+	do {
+		qdf_mem_zero(dma_pages[page_idx].page_v_addr_start,
+			     pages->page_size);
+		page_idx++;
+	} while (page_idx < pages->num_pages);
+
+	if (desc_srng) {
+		hal_srng_access_start_unlocked(soc->hal_soc, desc_srng);
+		page_idx = 0;
+		count = 0;
+		offset = 0;
+		while ((desc = hal_srng_src_get_next(soc->hal_soc,
+						     desc_srng)) &&
+			(count < total_link_descs)) {
+			page_idx = count / pages->num_element_per_page;
+			if (desc_id == pages->num_element_per_page)
+				desc_id = 0;
+
+			offset = count % pages->num_element_per_page;
+			cookie = LINK_DESC_COOKIE(desc_id, page_idx,
+						  soc->link_desc_id_start);
+
+			hal_set_link_desc_addr(soc->hal_soc, desc, cookie,
+					       dma_pages[page_idx].page_p_addr
+					       + (offset * link_desc_size),
+					       soc->idle_link_bm_id);
+			count++;
+			desc_id++;
+		}
+		hal_srng_access_end_unlocked(soc->hal_soc, desc_srng);
+	} else {
+		/* Populate idle list scatter buffers with link descriptor
+		 * pointers
+		 */
+		scatter_buf_num = 0;
+		num_entries_per_buf = hal_idle_scatter_buf_num_entries(
+					soc->hal_soc,
+					soc->wbm_idle_scatter_buf_size);
+
+		scatter_buf_ptr = (uint8_t *)(
+			soc->wbm_idle_scatter_buf_base_vaddr[scatter_buf_num]);
+		rem_entries = num_entries_per_buf;
+		page_idx = 0; count = 0;
+		offset = 0;
+		num_descs_per_page = pages->num_element_per_page;
+
+		while (count < total_link_descs) {
+			page_idx = count / num_descs_per_page;
+			offset = count % num_descs_per_page;
+			if (desc_id == pages->num_element_per_page)
+				desc_id = 0;
+
+			cookie = LINK_DESC_COOKIE(desc_id, page_idx,
+						  soc->link_desc_id_start);
+			hal_set_link_desc_addr(soc->hal_soc,
+					       (void *)scatter_buf_ptr,
+					       cookie,
+					       dma_pages[page_idx].page_p_addr +
+					       (offset * link_desc_size),
+					       soc->idle_link_bm_id);
+			rem_entries--;
+			if (rem_entries) {
+				scatter_buf_ptr += link_desc_size;
+			} else {
+				rem_entries = num_entries_per_buf;
+				scatter_buf_num++;
+				if (scatter_buf_num >= num_scatter_bufs)
+					break;
+				scatter_buf_ptr = (uint8_t *)
+					(soc->wbm_idle_scatter_buf_base_vaddr[
+					 scatter_buf_num]);
+			}
+			count++;
+			desc_id++;
+		}
+		/* Setup link descriptor idle list in HW */
+		hal_setup_link_idle_list(soc->hal_soc,
+			soc->wbm_idle_scatter_buf_base_paddr,
+			soc->wbm_idle_scatter_buf_base_vaddr,
+			num_scatter_bufs, soc->wbm_idle_scatter_buf_size,
+			(uint32_t)(scatter_buf_ptr -
+			(uint8_t *)(soc->wbm_idle_scatter_buf_base_vaddr[
+			scatter_buf_num-1])), total_link_descs);
+	}
+}
+
+qdf_export_symbol(dp_link_desc_ring_replenish);
+
 /**
  * dp_soc_ppeds_stop() - Stop PPE DS processing
  * @soc_handle: DP SOC handle

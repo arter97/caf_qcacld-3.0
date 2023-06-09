@@ -2627,6 +2627,9 @@ struct dp_soc {
 	/* RXDMA monitor status ring. TBD: Check format of this ring */
 	struct dp_srng rxdma_mon_status_ring[MAX_NUM_LMAC_HW];
 
+	/* Ring to handover links to hw in monitor mode for SOFTUMAC arch */
+	struct dp_srng sw2rxdma_link_ring[MAX_NUM_LMAC_HW];
+
 	/* Number of PDEVs */
 	uint8_t pdev_count;
 
@@ -5174,15 +5177,6 @@ void dp_hw_link_desc_pool_banks_free(struct dp_soc *soc, uint32_t mac_id);
  */
 QDF_STATUS dp_hw_link_desc_pool_banks_alloc(struct dp_soc *soc,
 					    uint32_t mac_id);
-
-/**
- * dp_link_desc_ring_replenish() - Replenish hw link desc rings
- * @soc: DP SOC handle
- * @mac_id: mac id
- *
- * Return: None
- */
-void dp_link_desc_ring_replenish(struct dp_soc *soc, uint32_t mac_id);
 #else
 static inline void dp_hw_link_desc_pool_banks_free(struct dp_soc *soc,
 						   uint32_t mac_id)
@@ -5194,12 +5188,16 @@ static inline QDF_STATUS dp_hw_link_desc_pool_banks_alloc(struct dp_soc *soc,
 {
 	return QDF_STATUS_SUCCESS;
 }
-
-static inline void dp_link_desc_ring_replenish(struct dp_soc *soc,
-					       uint32_t mac_id)
-{
-}
 #endif
+
+/**
+ * dp_link_desc_ring_replenish() - Replenish hw link desc rings
+ * @soc: DP SOC handle
+ * @mac_id: mac id
+ *
+ * Return: None
+ */
+void dp_link_desc_ring_replenish(struct dp_soc *soc, uint32_t mac_id);
 
 #ifdef WLAN_FEATURE_RX_PREALLOC_BUFFER_POOL
 void dp_rx_refill_buff_pool_enqueue(struct dp_soc *soc);

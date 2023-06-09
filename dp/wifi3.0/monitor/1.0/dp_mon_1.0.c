@@ -228,6 +228,8 @@ void dp_mon_rings_deinit_1_0(struct dp_pdev *pdev)
 
 		dp_srng_deinit(soc, &soc->rxdma_mon_status_ring[lmac_id],
 			       RXDMA_MONITOR_STATUS, 0);
+		dp_srng_deinit(soc, &soc->sw2rxdma_link_ring[lmac_id],
+			       SW2RXDMA_LINK_RELEASE, 0);
 
 		dp_mon_dest_rings_deinit(pdev, lmac_id);
 	}
@@ -246,10 +248,45 @@ void dp_mon_rings_free_1_0(struct dp_pdev *pdev)
 							 pdev->pdev_id);
 
 		dp_srng_free(soc, &soc->rxdma_mon_status_ring[lmac_id]);
+		dp_srng_free(soc, &soc->sw2rxdma_link_ring[lmac_id]);
 
 		dp_mon_dest_rings_free(pdev, lmac_id);
 	}
 }
+
+#ifdef WLAN_SOFTUMAC_SUPPORT
+static QDF_STATUS
+dp_mon_sw2rxdma_link_ring_alloc(struct dp_pdev *pdev, int lmac_id)
+{
+	struct dp_soc *soc = pdev->soc;
+	struct wlan_cfg_dp_pdev_ctxt *pdev_cfg_ctx = pdev->wlan_cfg_ctx;
+	int entries;
+
+	entries = wlan_cfg_get_dma_sw2rxdma_link_ring_size(pdev_cfg_ctx);
+
+	return dp_srng_alloc(soc, &soc->sw2rxdma_link_ring[lmac_id],
+			     SW2RXDMA_LINK_RELEASE, entries, 0);
+}
+
+static QDF_STATUS
+dp_mon_sw2rxdma_link_ring_init(struct dp_soc *soc, int lmac_id)
+{
+	return dp_srng_init(soc, &soc->sw2rxdma_link_ring[lmac_id],
+			    SW2RXDMA_LINK_RELEASE, 0, lmac_id);
+}
+#else
+static QDF_STATUS
+dp_mon_sw2rxdma_link_ring_alloc(struct dp_pdev *pdev, int lmac_id)
+{
+	return QDF_STATUS_SUCCESS;
+}
+
+static QDF_STATUS
+dp_mon_sw2rxdma_link_ring_init(struct dp_soc *soc, int lmac_id)
+{
+	return QDF_STATUS_SUCCESS;
+}
+#endif
 
 QDF_STATUS dp_mon_rings_init_1_0(struct dp_pdev *pdev)
 {
@@ -266,6 +303,11 @@ QDF_STATUS dp_mon_rings_init_1_0(struct dp_pdev *pdev)
 				 RXDMA_MONITOR_STATUS, 0, lmac_id)) {
 			dp_mon_err("%pK: " RNG_ERR "rxdma_mon_status_ring",
 				   soc);
+			goto fail1;
+		}
+
+		if (dp_mon_sw2rxdma_link_ring_init(soc, lmac_id)) {
+			dp_mon_err("%pK: " RNG_ERR "sw2rxdma_link_ring", soc);
 			goto fail1;
 		}
 
@@ -298,6 +340,11 @@ QDF_STATUS dp_mon_rings_alloc_1_0(struct dp_pdev *pdev)
 				  RXDMA_MONITOR_STATUS, entries, 0)) {
 			dp_mon_err("%pK: " RNG_ERR "rxdma_mon_status_ring",
 				   soc);
+			goto fail1;
+		}
+
+		if (dp_mon_sw2rxdma_link_ring_alloc(pdev, lmac_id)) {
+			dp_mon_err("%pK: " RNG_ERR "sw2rxdma_link_ring", soc);
 			goto fail1;
 		}
 
@@ -730,6 +777,18 @@ QDF_STATUS dp_mon_htt_srng_setup_1_0(struct dp_soc *soc,
 
 	if (status != QDF_STATUS_SUCCESS) {
 		dp_mon_err("Failed to send htt srng setup message for Rxdma mon status ring");
+		return status;
+	}
+
+	if (!soc->sw2rxdma_link_ring[mac_id].hal_srng)
+		return QDF_STATUS_SUCCESS;
+
+	status = htt_srng_setup(soc->htt_handle, mac_for_pdev,
+				soc->sw2rxdma_link_ring[mac_id].hal_srng,
+				SW2RXDMA_LINK_RELEASE);
+
+	if (status != QDF_STATUS_SUCCESS) {
+		dp_mon_err("Failed to send htt srng setup message for sw2rxdma link ring");
 		return status;
 	}
 

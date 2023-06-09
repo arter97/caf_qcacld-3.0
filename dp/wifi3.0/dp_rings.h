@@ -26,6 +26,23 @@
 #include <dp_mon.h>
 #endif
 
+#ifdef WLAN_FEATURE_DP_EVENT_HISTORY
+static inline bool dp_is_mon_mask_valid(struct dp_soc *soc,
+					struct dp_intr *intr_ctx)
+{
+	if (intr_ctx->rx_mon_ring_mask)
+		return true;
+
+	return false;
+}
+#else
+static inline bool dp_is_mon_mask_valid(struct dp_soc *soc,
+					struct dp_intr *intr_ctx)
+{
+	return false;
+}
+#endif
+
 #ifndef QCA_HOST_MODE_WIFI_DISABLED
 
 /**
@@ -651,10 +668,23 @@ static inline QDF_STATUS dp_soc_srng_alloc(struct dp_soc *soc)
 static inline QDF_STATUS dp_soc_attach_poll(struct cdp_soc_t *txrx_soc)
 {
 	struct dp_soc *soc = (struct dp_soc *)txrx_soc;
+	uint32_t lmac_id = 0;
+	int i;
 
 	qdf_mem_set(&soc->mon_intr_id_lmac_map,
 		    sizeof(soc->mon_intr_id_lmac_map), DP_MON_INVALID_LMAC_ID);
 	soc->intr_mode = DP_INTR_POLL;
+
+	for (i = 0; i < wlan_cfg_get_num_contexts(soc->wlan_cfg_ctx); i++) {
+		soc->intr_ctx[i].rx_mon_ring_mask =
+				wlan_cfg_get_rx_mon_ring_mask(soc->wlan_cfg_ctx, i);
+
+		if (dp_is_mon_mask_valid(soc, &soc->intr_ctx[i])) {
+			hif_event_history_init(soc->hif_handle, i);
+			soc->mon_intr_id_lmac_map[lmac_id] = i;
+			lmac_id++;
+		}
+	}
 
 	qdf_timer_init(soc->osdev, &soc->int_timer,
 		       dp_interrupt_timer, (void *)soc,
