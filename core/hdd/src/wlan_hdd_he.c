@@ -594,7 +594,7 @@ static int __wlan_hdd_cfg80211_sr_operations(struct wiphy *wiphy,
 	struct hdd_context *hdd_ctx = wiphy_priv(wiphy);
 	struct hdd_adapter *adapter = WLAN_HDD_GET_PRIV_PTR(wdev->netdev);
 	struct nlattr *tb[QCA_WLAN_VENDOR_ATTR_SR_MAX + 1];
-	struct nlattr *tb2[QCA_WLAN_VENDOR_ATTR_SR_PARAMS_MAX + 1];
+	struct nlattr *tb2[QCA_WLAN_VENDOR_ATTR_SR_PARAMS_MAX + 1] = {0};
 	enum qca_wlan_sr_operation sr_oper;
 	struct nlattr *sr_oper_attr;
 	struct nlattr *sr_param_attr;
