@@ -176,6 +176,11 @@ bool ucfg_reg_is_user_country_set_allowed(struct wlan_objmgr_psoc *psoc)
 {
 	return reg_is_user_country_set_allowed(psoc);
 }
+
+bool ucfg_reg_is_fcc_constraint_set(struct wlan_objmgr_pdev *pdev)
+{
+	return reg_is_fcc_constraint_set(pdev);
+}
 #endif
 
 QDF_STATUS ucfg_reg_get_default_country(struct wlan_objmgr_psoc *psoc,

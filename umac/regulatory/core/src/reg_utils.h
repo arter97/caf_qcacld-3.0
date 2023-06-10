@@ -201,6 +201,14 @@ QDF_STATUS reg_set_fcc_constraint(struct wlan_objmgr_pdev *pdev,
 bool reg_get_fcc_constraint(struct wlan_objmgr_pdev *pdev, uint32_t freq);
 
 /**
+ * reg_is_fcc_constraint_set() - Check if FCC constraint set
+ * @pdev: physical dev to get
+ *
+ * Return: True if FCC constraint is set, else false.
+ */
+bool reg_is_fcc_constraint_set(struct wlan_objmgr_pdev *pdev);
+
+/**
  * reg_is_6ghz_band_set - Check if 6 GHz band set
  * @pdev: Pointer to pdev
  *
@@ -646,5 +654,4 @@ reg_get_6ghz_cli_pwr_type_per_ap_pwr_type(
 				enum reg_6g_ap_type ap_pwr_type,
 				enum supported_6g_pwr_types *cli_pwr_type);
 #endif
-
 #endif

@@ -929,7 +929,6 @@ QDF_STATUS reg_set_fcc_constraint(struct wlan_objmgr_pdev *pdev,
 	struct wlan_regulatory_pdev_priv_obj *pdev_priv_obj;
 	struct wlan_regulatory_psoc_priv_obj *psoc_priv_obj;
 	struct wlan_objmgr_psoc *psoc;
-	QDF_STATUS status;
 
 	pdev_priv_obj = reg_get_pdev_obj(pdev);
 	if (!IS_VALID_PDEV_REG_OBJ(pdev_priv_obj)) {
@@ -959,11 +958,7 @@ QDF_STATUS reg_set_fcc_constraint(struct wlan_objmgr_pdev *pdev,
 	psoc_priv_obj->set_fcc_channel = fcc_constraint;
 	pdev_priv_obj->set_fcc_channel = fcc_constraint;
 
-	reg_compute_pdev_current_chan_list(pdev_priv_obj);
-
-	status = reg_send_scheduler_msg_sb(psoc, pdev);
-
-	return status;
+	return QDF_STATUS_SUCCESS;
 }
 
 bool reg_is_6ghz_band_set(struct wlan_objmgr_pdev *pdev)
@@ -1016,6 +1011,22 @@ bool reg_is_user_country_set_allowed(struct wlan_objmgr_psoc *psoc)
 		reg_err_rl("country set from userspace is not allowed");
 		return false;
 	}
+
+	return true;
+}
+
+bool reg_is_fcc_constraint_set(struct wlan_objmgr_pdev *pdev)
+{
+	struct wlan_regulatory_pdev_priv_obj *pdev_priv_obj;
+
+	pdev_priv_obj = reg_get_pdev_obj(pdev);
+	if (!IS_VALID_PDEV_REG_OBJ(pdev_priv_obj)) {
+		reg_err("pdev reg component is NULL");
+		return false;
+	}
+
+	if (!pdev_priv_obj->set_fcc_channel)
+		return false;
 
 	return true;
 }

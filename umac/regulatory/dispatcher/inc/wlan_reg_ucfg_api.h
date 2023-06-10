@@ -774,6 +774,13 @@ bool ucfg_reg_is_user_country_set_allowed(struct wlan_objmgr_psoc *psoc)
 {
 	return true;
 }
+
+static inline bool
+ucfg_reg_is_fcc_constraint_set(struct wlan_objmgr_pdev *pdev)
+{
+	return false;
+}
+
 #else
 static inline QDF_STATUS
 ucfg_reg_enable_disable_opclass_chans(struct wlan_objmgr_pdev *pdev,
@@ -794,6 +801,13 @@ ucfg_reg_enable_disable_opclass_chans(struct wlan_objmgr_pdev *pdev,
  * Return: bool
  */
 bool ucfg_reg_is_user_country_set_allowed(struct wlan_objmgr_psoc *psoc);
-#endif
 
+/**
+ * ucfg_reg_is_fcc_constraint_set() - Check if fcc constraint is set
+ * @pdev: pointer to pdev
+ *
+ * Return: Return true if fcc constraint is set
+ */
+bool ucfg_reg_is_fcc_constraint_set(struct wlan_objmgr_pdev *pdev);
+#endif
 #endif
