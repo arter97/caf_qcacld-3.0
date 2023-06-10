@@ -7444,6 +7444,181 @@ void policy_mgr_activate_mlo_links(struct wlan_objmgr_psoc *psoc,
 done:
 	wlan_objmgr_vdev_release_ref(vdev, WLAN_POLICY_MGR_ID);
 }
+
+QDF_STATUS
+policy_mgr_update_mlo_links_based_on_linkid(struct wlan_objmgr_psoc *psoc,
+					    uint8_t vdev_id,
+					    uint8_t num_links,
+					    uint8_t *link_id_list,
+					    uint32_t *config_state_list)
+{
+	uint8_t idx, link, active_vdev_cnt = 0, inactive_vdev_cnt = 0;
+	uint16_t ml_vdev_cnt = 0;
+	struct wlan_objmgr_vdev *vdev_lst[WLAN_UMAC_MLO_MAX_VDEVS] = {0};
+	uint8_t active_vdev_lst[WLAN_UMAC_MLO_MAX_VDEVS] = {0};
+	uint8_t inactive_vdev_lst[WLAN_UMAC_MLO_MAX_VDEVS] = {0};
+	struct wlan_objmgr_vdev *vdev;
+	uint8_t link_id, num_links_to_disable = 0, num_matched_linkid = 0;
+	QDF_STATUS status = QDF_STATUS_E_FAILURE;
+	uint8_t num_ml_sta = 0, num_disabled_ml_sta = 0, num_non_ml = 0;
+	uint8_t ml_sta_vdev_lst[MAX_NUMBER_OF_CONC_CONNECTIONS] = {0};
+	qdf_freq_t ml_freq_lst[MAX_NUMBER_OF_CONC_CONNECTIONS] = {0};
+	struct policy_mgr_psoc_priv_obj *pm_ctx;
+
+	for (idx = 0; idx < num_links; idx++) {
+		if (config_state_list[idx] == 0)
+			num_links_to_disable++;
+	}
+
+	if (num_links_to_disable == num_links) {
+		policy_mgr_debug("vdev: %d num_links_to_disable: %d", vdev_id,
+				 num_links_to_disable);
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, vdev_id,
+						    WLAN_POLICY_MGR_ID);
+	if (!vdev) {
+		policy_mgr_err("vdev: %d vdev not found", vdev_id);
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	if (!wlan_cm_is_vdev_connected(vdev)) {
+		policy_mgr_err("vdev: %d is not in connected state", vdev_id);
+		goto release_vdev_ref;
+	}
+
+	if (!wlan_vdev_mlme_is_mlo_vdev(vdev)) {
+		policy_mgr_err("vdev:%d is not mlo vdev", vdev_id);
+		goto release_vdev_ref;
+	}
+
+	pm_ctx = policy_mgr_get_context(psoc);
+	if (!pm_ctx) {
+		policy_mgr_err("Invalid pm context");
+		goto release_vdev_ref;
+	}
+
+	mlo_get_ml_vdev_list(vdev, &ml_vdev_cnt, vdev_lst);
+	for (idx = 0; idx < ml_vdev_cnt; idx++) {
+		link_id = wlan_vdev_get_link_id(vdev_lst[idx]);
+		for (link = 0; link < num_links; link++) {
+			if (link_id_list[link] == link_id) {
+				num_matched_linkid++;
+				policy_mgr_debug("link id:%d match", link_id);
+				if (config_state_list[link]) {
+					active_vdev_lst[active_vdev_cnt] =
+						wlan_vdev_get_id(vdev_lst[idx]);
+					active_vdev_cnt++;
+				} else {
+					inactive_vdev_lst[inactive_vdev_cnt] =
+						wlan_vdev_get_id(vdev_lst[idx]);
+					inactive_vdev_cnt++;
+				}
+			}
+		}
+	}
+
+	policy_mgr_debug("vdev: %d, active links: %d, ml count: %d, active count: %d, inactive count: %d",
+			 vdev_id, num_links, ml_vdev_cnt, active_vdev_cnt,
+			 inactive_vdev_cnt);
+
+	if (num_links != num_matched_linkid) {
+		policy_mgr_debug("invalid link id(s), num_matched_linkid: %d",
+				 num_matched_linkid);
+		goto release_ml_vdev_ref;
+	}
+
+	if (active_vdev_cnt &&
+	    policy_mgr_is_emlsr_sta_concurrency_present(psoc)) {
+		policy_mgr_debug("vdev: %d emlsr sta conn present", vdev_id);
+		if (active_vdev_cnt == 1)
+			status = QDF_STATUS_SUCCESS;
+		goto release_ml_vdev_ref;
+	}
+
+	policy_mgr_get_ml_sta_info(pm_ctx, &num_ml_sta, &num_disabled_ml_sta,
+				   ml_sta_vdev_lst, ml_freq_lst, &num_non_ml,
+				   NULL, NULL);
+	policy_mgr_debug("vdev %d: num_ml_sta %d disabled %d num_non_ml: %d",
+			 vdev_id, num_ml_sta, num_disabled_ml_sta, num_non_ml);
+
+	/*
+	 * No ML STA is present or sinle link ML is present or
+	 * more no.of links are active than supported concurrent connections
+	 */
+	if (!num_ml_sta || num_ml_sta < 2 ||
+	    num_ml_sta > MAX_NUMBER_OF_CONC_CONNECTIONS)
+		goto release_ml_vdev_ref;
+
+	if (!num_disabled_ml_sta) {
+		/*
+		 * both link are already enabled and received set link req to
+		 * enable both again
+		 */
+		if (active_vdev_cnt && !inactive_vdev_cnt) {
+			status = QDF_STATUS_SUCCESS;
+			goto release_ml_vdev_ref;
+		}
+
+		/*
+		 * both link are already enabled and received set link req
+		 * disable one link, disable any
+		 */
+		if (active_vdev_cnt && inactive_vdev_cnt) {
+			status = policy_mgr_mlo_sta_set_link_ext(psoc,
+					MLO_LINK_FORCE_REASON_CONNECT,
+					MLO_LINK_FORCE_MODE_ACTIVE_INACTIVE,
+					active_vdev_cnt, active_vdev_lst,
+					inactive_vdev_cnt, inactive_vdev_lst);
+			goto release_ml_vdev_ref;
+		}
+	} else {
+		/*
+		 * one link is enable and one link is disabled, If disabled
+		 * link can not be allowed to enable then send status failure
+		 * to upper layer.
+		 */
+		if (active_vdev_cnt &&
+		    !policy_mgr_sta_ml_link_enable_allowed(psoc,
+							   num_disabled_ml_sta,
+							   num_ml_sta,
+							   ml_freq_lst,
+							   ml_sta_vdev_lst)) {
+			policy_mgr_debug("vdev %d: link enable not allowed",
+					 vdev_id);
+			goto release_ml_vdev_ref;
+		}
+
+		/*
+		 * If there are both active and inactive vdev count, then
+		 * issue a single WMI with force mode
+		 * MLO_LINK_FORCE_MODE_ACTIVE_INACTIVE, else if there is only
+		 * active vdev count, send single WMI for all active vdevs
+		 * with force mode MLO_LINK_FORCE_MODE_ACTIVE.
+		 */
+		if (active_vdev_cnt && inactive_vdev_cnt)
+			status = policy_mgr_mlo_sta_set_link_ext(psoc,
+					MLO_LINK_FORCE_REASON_CONNECT,
+					MLO_LINK_FORCE_MODE_ACTIVE_INACTIVE,
+					active_vdev_cnt, active_vdev_lst,
+					inactive_vdev_cnt, inactive_vdev_lst);
+		else if (active_vdev_cnt && !inactive_vdev_cnt)
+			status = policy_mgr_mlo_sta_set_link(psoc,
+					MLO_LINK_FORCE_REASON_DISCONNECT,
+					MLO_LINK_FORCE_MODE_ACTIVE,
+					active_vdev_cnt, active_vdev_lst);
+	}
+
+release_ml_vdev_ref:
+	for (idx = 0; idx < ml_vdev_cnt; idx++)
+		mlo_release_vdev_ref(vdev_lst[idx]);
+release_vdev_ref:
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_POLICY_MGR_ID);
+
+	return status;
+}
+
 #else
 static bool
 policy_mgr_allow_sta_concurrency(struct wlan_objmgr_psoc *psoc,

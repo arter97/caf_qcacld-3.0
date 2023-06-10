@@ -391,10 +391,15 @@ __wlan_hdd_cfg80211_process_ml_link_state(struct wiphy *wiphy,
 	struct net_device *dev = wdev->netdev;
 	struct hdd_adapter *adapter = WLAN_HDD_GET_PRIV_PTR(dev);
 	struct wlan_objmgr_vdev *vdev;
+	struct hdd_context *hdd_ctx = NULL;
 
 	hdd_enter_dev(wdev->netdev);
 
 	if (hdd_validate_adapter(adapter))
+		return -EINVAL;
+
+	hdd_ctx = WLAN_HDD_GET_CTX(adapter);
+	if (!hdd_ctx)
 		return -EINVAL;
 
 	if (adapter->device_mode != QDF_STA_MODE)
@@ -405,7 +410,8 @@ __wlan_hdd_cfg80211_process_ml_link_state(struct wiphy *wiphy,
 	if (!vdev)
 		return -EINVAL;
 
-	ret = wlan_handle_mlo_link_state_operation(wiphy, vdev, data, data_len);
+	ret = wlan_handle_mlo_link_state_operation(wiphy, vdev, hdd_ctx,
+						   data, data_len);
 
 	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
 
@@ -635,26 +641,26 @@ free_event:
 
 #define MLD_MAX_SUPPORTED_LINKS 2
 
-int
-wlan_handle_mlo_link_state_operation(struct wiphy *wiphy,
-				     struct wlan_objmgr_vdev *vdev,
-				     const void *data, int data_len)
+int wlan_handle_mlo_link_state_operation(struct wiphy *wiphy,
+					 struct wlan_objmgr_vdev *vdev,
+					 struct hdd_context *hdd_ctx,
+					 const void *data, int data_len)
 {
 	struct nlattr *tb[QCA_WLAN_VENDOR_ATTR_LINK_STATE_MAX + 1];
 	struct nlattr *tb2[QCA_WLAN_VENDOR_ATTR_LINK_STATE_CONFIG_MAX + 1];
 	enum qca_wlan_vendor_link_state_op_types ml_link_op;
 	struct nlattr *link_oper_attr, *mode_attr, *curr_attr, *num_link_attr;
-	int rem_len = 0, rc = 0;
-	uint32_t attr_id, ml_config_state = 0;
-	uint8_t ml_active_num_links = 0, ml_link_control_mode = 0;
-	uint8_t ml_config_link_id = 0, num_links = 0;
+	int rem_len = 0, rc;
+	uint32_t attr_id, ml_config_state;
+	uint8_t ml_active_num_links, ml_link_control_mode;
+	uint8_t ml_config_link_id, num_links = 0;
 	uint8_t vdev_id = vdev->vdev_objmgr.vdev_id;
 	uint8_t link_id_list[MLD_MAX_SUPPORTED_LINKS] = {0};
 	uint32_t config_state_list[MLD_MAX_SUPPORTED_LINKS] = {0};
+	QDF_STATUS status;
 
 	if (wlan_cfg80211_nla_parse(tb, QCA_WLAN_VENDOR_ATTR_LINK_STATE_MAX,
-				    data,
-				    data_len,
+				    data, data_len,
 				    ml_link_state_request_policy)) {
 		hdd_debug("vdev %d: invalid mlo link state attr", vdev_id);
 		return -EINVAL;
@@ -736,7 +742,14 @@ wlan_handle_mlo_link_state_operation(struct wiphy *wiphy,
 			if (num_links >= MLD_MAX_SUPPORTED_LINKS)
 				break;
 		}
-		/* TODO: send link(s) enable/disable command to FW */
+
+		status = policy_mgr_update_mlo_links_based_on_linkid(
+						hdd_ctx->psoc,
+						vdev_id, num_links,
+						link_id_list,
+						config_state_list);
+		if (QDF_IS_STATUS_ERROR(status))
+			return -EINVAL;
 		break;
 	case QCA_WLAN_VENDOR_LINK_STATE_CONTROL_MODE_MIXED:
 		attr_id =
@@ -759,6 +772,8 @@ wlan_handle_mlo_link_state_operation(struct wiphy *wiphy,
 		return -EINVAL;
 	}
 
+	hdd_debug("vdev: %d, processed link state command successfully",
+		  vdev_id);
 	return 0;
 }
 

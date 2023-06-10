@@ -205,6 +205,7 @@ void hdd_mlo_t2lm_unregister_callback(struct wlan_objmgr_vdev *vdev);
  * wlan_handle_mlo_link_state_operation() - mlo link state operation
  * @wiphy: wiphy pointer
  * @vdev: vdev handler
+ * @hdd_ctx: hdd context
  * @data: pointer to incoming NL vendor data
  * @data_len: length of @data
  *
@@ -212,10 +213,10 @@ void hdd_mlo_t2lm_unregister_callback(struct wlan_objmgr_vdev *vdev);
  *
  * Return: 0 on success and error number otherwise.
  */
-int
-wlan_handle_mlo_link_state_operation(struct wiphy *wiphy,
-				     struct wlan_objmgr_vdev *vdev,
-				     const void *data, int data_len);
+int wlan_handle_mlo_link_state_operation(struct wiphy *wiphy,
+					 struct wlan_objmgr_vdev *vdev,
+					 struct hdd_context *hdd_ctx,
+					 const void *data, int data_len);
 
 extern const struct nla_policy
 ml_link_state_request_policy[QCA_WLAN_VENDOR_ATTR_LINK_STATE_MAX + 1];
@@ -322,6 +323,7 @@ void hdd_mlo_t2lm_unregister_callback(struct wlan_objmgr_vdev *vdev)
 static inline int
 wlan_handle_mlo_link_state_operation(struct wiphy *wiphy,
 				     struct wlan_objmgr_vdev *vdev,
+				     struct hdd_context *hdd_ctx,
 				     const void *data, int data_len)
 {
 	return 0;

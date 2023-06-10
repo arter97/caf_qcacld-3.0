@@ -4880,6 +4880,24 @@ void policy_mgr_handle_emlsr_sta_concurrency(struct wlan_objmgr_psoc *psoc,
 void policy_mgr_activate_mlo_links(struct wlan_objmgr_psoc *psoc,
 				   uint8_t session_id, uint8_t num_links,
 				   struct qdf_mac_addr *active_link_addr);
+
+/**
+ * policy_mgr_update_mlo_links_based_on_linkid() - Force active ML links based
+ * on user requested coming via QCA_NL80211_VENDOR_SUBCMD_MLO_LINK_STATE
+ * @psoc: objmgr psoc
+ * @vdev_id: vdev id
+ * @num_links: number of links to be forced active
+ * @link_id_list: link id(s) list coming from user space
+ * @config_state_list: config state list coming from user space
+ *
+ * Return: success if the command gets processed successfully
+ */
+QDF_STATUS
+policy_mgr_update_mlo_links_based_on_linkid(struct wlan_objmgr_psoc *psoc,
+					    uint8_t vdev_id,
+					    uint8_t num_links,
+					    uint8_t *link_id_list,
+					    uint32_t *config_state_list);
 #else
 
 static inline bool policy_mgr_is_mlo_sap_concurrency_allowed(
