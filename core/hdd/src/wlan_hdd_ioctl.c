@@ -6093,10 +6093,76 @@ static int drv_cmd_invalid(struct hdd_adapter *adapter,
 }
 
 /**
+ * hdd_apply_fcc_constraint() - Set FCC constraint
+ * @hdd_ctx: Pointer to hdd context
+ * @fcc_constraint: Fcc constraint flag
+ *
+ * Return: Return 0 incase of success else return error number
+ */
+static int hdd_apply_fcc_constraint(struct hdd_context *hdd_ctx,
+				    bool fcc_constraint)
+{
+	QDF_STATUS status;
+
+	status = ucfg_reg_set_fcc_constraint(hdd_ctx->pdev,
+					     fcc_constraint);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		hdd_err("Failed to update tx power for channels 12/13");
+		return qdf_status_to_os_return(status);
+	}
+
+	status = wlan_reg_recompute_current_chan_list(hdd_ctx->psoc,
+						      hdd_ctx->pdev);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		hdd_err("Failed to update tx power for channels 12/13");
+		return qdf_status_to_os_return(status);
+	}
+
+	return 0;
+}
+
+/**
+ * hdd_apply_fcc_constraint_update_band() - Set FCC constraint and update band
+ * @link_info: Link info pointer in HDD adapter
+ * @hdd_ctx: Pointer to hdd context
+ * @fcc_constraint: FCC constraint flag
+ * @dis_6g_keep_sta_cli_conn: Disable 6 GHz band and keep STA, P2P client
+ *                            connection flag
+ * @band_bitmap: Band bitmap
+ *
+ * Return:  Return 0 incase of success else return error number
+ */
+static int
+hdd_apply_fcc_constraint_update_band(struct wlan_hdd_link_info *link_info,
+				     struct hdd_context *hdd_ctx,
+				     bool fcc_constraint,
+				     bool dis_6g_keep_sta_cli_conn,
+				     uint32_t band_bitmap)
+{
+	QDF_STATUS status;
+
+	status = ucfg_reg_set_fcc_constraint(hdd_ctx->pdev,
+					     fcc_constraint);
+	if (status) {
+		hdd_err("Failed to update tx power for channels 12/13");
+		return qdf_status_to_os_return(status);
+	}
+
+	status = ucfg_reg_set_keep_6ghz_sta_cli_connection(hdd_ctx->pdev,
+						dis_6g_keep_sta_cli_conn);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		hdd_err("Failed to update keep sta cli connection");
+		return qdf_status_to_os_return(status);
+	}
+
+	return hdd_reg_set_band(link_info->adapter->dev, band_bitmap);
+}
+
+/**
  * drv_cmd_set_fcc_channel() - Handle fcc constraint request
  * @link_info: Link info pointer in HDD adapter
  * @hdd_ctx: HDD context
- * @command: command ptr, SET_FCC_CHANNEL 0/-1 is the command
+ * @command: command ptr, SET_FCC_CHANNEL 0/1/2/-1 is the command
  * @command_len: command len
  * @priv_data: private data
  *
@@ -6111,8 +6177,9 @@ static int drv_cmd_set_fcc_channel(struct wlan_hdd_link_info *link_info,
 	QDF_STATUS status_6G = QDF_STATUS_SUCCESS;
 	int8_t input_value;
 	int err;
-	uint32_t band_bitmap = 0;
-	bool rf_test_mode;
+	uint32_t band_bitmap = 0, curr_band_bitmap;
+	bool rf_test_mode, fcc_constraint, dis_6g_keep_sta_cli_conn;
+	bool modify_band = false;
 
 	/*
 	 * This command would be called by user-space when it detects WLAN
@@ -6123,7 +6190,9 @@ static int drv_cmd_set_fcc_channel(struct wlan_hdd_link_info *link_info,
 	 * a) 0 means reduce power as per fcc constraint and disable 6 GHz band
 	 *    but keep existing STA/P2P Client connections intact.
 	 * b) 1 means reduce power as per fcc constraint and enable 6 GHz band.
-	 * c) -1 means remove constraint and enable 6 GHz band.
+	 * c) 2 means reset fcc constraint but disable 6 GHz band but keep
+	 *    existing STA/P2P Client connections intact.
+	 * d) -1 means reset fcc constraint and enable 6 GHz band.
 	 */
 
 	err = kstrtos8(command + command_len + 1, 10, &input_value);
@@ -6134,75 +6203,80 @@ static int drv_cmd_set_fcc_channel(struct wlan_hdd_link_info *link_info,
 
 	hdd_debug("input_value = %d", input_value);
 
-	if (input_value == 0 || input_value == 1) {
-		status = ucfg_reg_set_fcc_constraint(hdd_ctx->pdev, true);
-		if (QDF_IS_STATUS_ERROR(status)) {
-			hdd_err("Failed to reduce tx power for channels 12/13");
-			return qdf_status_to_os_return(status);
-		}
-	} else if (input_value == -1) {
-		status = ucfg_reg_set_fcc_constraint(hdd_ctx->pdev, false);
-		if (QDF_IS_STATUS_ERROR(status)) {
-			hdd_err("Failed to reset tx power for channels 12/13");
-			return qdf_status_to_os_return(status);
-		}
-	} else {
+	switch (input_value) {
+	case -1:
+		fcc_constraint = false;
+		dis_6g_keep_sta_cli_conn = false;
+		break;
+	case 0:
+		fcc_constraint = true;
+		dis_6g_keep_sta_cli_conn = true;
+		break;
+	case 1:
+		fcc_constraint = true;
+		dis_6g_keep_sta_cli_conn = false;
+		break;
+	case 2:
+		fcc_constraint = false;
+		dis_6g_keep_sta_cli_conn = true;
+		break;
+	default:
+		hdd_err("Invalie input value");
 		return -EINVAL;
 	}
 
-	/*
-	 * For input value 1 or -1, 6 GHz band should be re enabled, so
-	 * keep_6ghz_sta_cli_connection flag can be disabled.
-	 */
-	if (input_value == 1 || input_value == -1) {
-		status = ucfg_reg_set_keep_6ghz_sta_cli_connection(
-							hdd_ctx->pdev, false);
-		if (QDF_IS_STATUS_ERROR(status)) {
-			hdd_err("Failed to enable 6 GHz band");
-			return qdf_status_to_os_return(status);
-		}
-	}
-
-	/*
-	 * For input value 0, 6 GHz band is disabled but existing 6 GHz STA
-	 * P2P client connections should be intact.
-	 * If host receives this SET_FCC_CHANNEL 0 twice return from here to
-	 * avoid completely disabling 6 GHz band.
-	 */
-	if (input_value == 0 &&
-	    ucfg_reg_get_keep_6ghz_sta_cli_connection(hdd_ctx->pdev)) {
-		hdd_debug("FCC constraint is already set");
-		status = QDF_STATUS_SUCCESS;
+	status = ucfg_mlme_is_rf_test_mode_enabled(hdd_ctx->psoc,
+						   &rf_test_mode);
+	if (!QDF_IS_STATUS_SUCCESS(status_6G)) {
+		hdd_err("Get rf test mode failed");
 		return qdf_status_to_os_return(status);
 	}
 
-	status_6G = ucfg_mlme_is_rf_test_mode_enabled(hdd_ctx->psoc,
-						      &rf_test_mode);
-	if (!QDF_IS_STATUS_SUCCESS(status_6G)) {
-		hdd_err("Get rf test mode failed");
-		goto send_status;
-	}
-
 	if (!rf_test_mode) {
-		if (!input_value) {
+		status = ucfg_reg_get_band(hdd_ctx->pdev, &curr_band_bitmap);
+		if (!QDF_IS_STATUS_SUCCESS(status)) {
+			hdd_err("failed to get band");
+			return qdf_status_to_os_return(status);
+		}
+
+		if (dis_6g_keep_sta_cli_conn) {
 			band_bitmap |= (BIT(REG_BAND_5G) | BIT(REG_BAND_2G));
-			status = ucfg_reg_set_keep_6ghz_sta_cli_connection(
-							hdd_ctx->pdev, true);
-			if (QDF_IS_STATUS_ERROR(status)) {
-				hdd_err("Failed to disable 6 GHz band");
-				return qdf_status_to_os_return(status);
-			}
 		} else {
 			if (wlan_reg_is_6ghz_supported(hdd_ctx->psoc))
 				band_bitmap = REG_BAND_MASK_ALL;
+			else
+				band_bitmap = curr_band_bitmap;
 		}
-		if (hdd_reg_set_band(link_info->adapter->dev, band_bitmap))
-			status_6G = QDF_STATUS_E_FAILURE;
+
+		hdd_debug("Current band bitmap = %d, set band bitmap = %d",
+			  curr_band_bitmap,
+			  band_bitmap);
+
+		if (band_bitmap != curr_band_bitmap)
+			modify_band = true;
+
+		if (ucfg_reg_is_fcc_constraint_set(hdd_ctx->pdev) ==
+		    fcc_constraint &&
+		    ucfg_reg_get_keep_6ghz_sta_cli_connection(hdd_ctx->pdev) ==
+		    dis_6g_keep_sta_cli_conn) {
+			hdd_debug("Same FCC constraint and band bitmap value");
+			return 0;
+		} else if (modify_band) {
+			return hdd_apply_fcc_constraint_update_band(link_info,
+						hdd_ctx,
+						fcc_constraint,
+						dis_6g_keep_sta_cli_conn,
+						band_bitmap);
+		}
+	} else {
+		if (ucfg_reg_is_fcc_constraint_set(hdd_ctx->pdev) ==
+		    fcc_constraint) {
+			hdd_debug("Same FCC constraint value");
+			return 0;
+		}
 	}
 
-send_status:
-	status = status_6G;
-	return qdf_status_to_os_return(status);
+	return hdd_apply_fcc_constraint(hdd_ctx, fcc_constraint);
 }
 
 /**
