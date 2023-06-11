@@ -695,7 +695,11 @@ int wlan_handle_mlo_link_state_operation(struct wiphy *wiphy,
 
 	switch (ml_link_control_mode) {
 	case QCA_WLAN_VENDOR_LINK_STATE_CONTROL_MODE_DEFAULT:
-		/* TODO: restore mlo link(s) state as per driver */
+		/* clear mlo link(s) settings in fw as per driver */
+		status = policy_mgr_clear_ml_links_settings_in_fw(hdd_ctx->psoc,
+								  vdev_id);
+		if (QDF_IS_STATUS_ERROR(status))
+			return -EINVAL;
 		break;
 	case QCA_WLAN_VENDOR_LINK_STATE_CONTROL_MODE_USER:
 		attr_id = QCA_WLAN_VENDOR_ATTR_LINK_STATE_CONFIG;

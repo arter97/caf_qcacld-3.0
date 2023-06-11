@@ -4867,9 +4867,20 @@ void policy_mgr_handle_emlsr_sta_concurrency(struct wlan_objmgr_psoc *psoc,
 					     bool emlsr_sta_coming_up);
 
 /**
+ * policy_mgr_clear_ml_links_settings_in_fw() - Process
+ * QCA_WLAN_VENDOR_ATTR_LINK_STATE_CONTROL_MODE in default mode
+ * @psoc: objmgr psoc
+ * @vdev_id: vdev_id
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+policy_mgr_clear_ml_links_settings_in_fw(struct wlan_objmgr_psoc *psoc,
+					 uint8_t vdev_id);
+
+/**
  * policy_mgr_activate_mlo_links() - Force active ML links based on user
  * requested link mac address
- *
  * @psoc: objmgr psoc
  * @session_id: session id
  * @num_links: number of links to be forced active

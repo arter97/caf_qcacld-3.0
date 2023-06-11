@@ -7828,6 +7828,108 @@ release_vdev_ref:
 	return status;
 }
 
+QDF_STATUS
+policy_mgr_clear_ml_links_settings_in_fw(struct wlan_objmgr_psoc *psoc,
+					 uint8_t vdev_id)
+{
+	struct wlan_objmgr_vdev *vdev;
+	uint8_t num_ml_sta = 0, num_disabled_ml_sta = 0, num_non_ml = 0;
+	uint8_t ml_sta_vdev_lst[MAX_NUMBER_OF_CONC_CONNECTIONS] = {0};
+	qdf_freq_t ml_freq_lst[MAX_NUMBER_OF_CONC_CONNECTIONS] = {0};
+	struct policy_mgr_psoc_priv_obj *pm_ctx;
+	uint8_t num_link_to_no_force = 0, num_active_ml_sta = 0;
+	QDF_STATUS status = QDF_STATUS_E_FAILURE;
+
+	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, vdev_id,
+						    WLAN_POLICY_MGR_ID);
+	if (!vdev) {
+		policy_mgr_err("vdev: %d vdev not found", vdev_id);
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	if (wlan_vdev_mlme_get_opmode(vdev) != QDF_STA_MODE)
+		goto release_vdev_ref;
+
+	if (!wlan_cm_is_vdev_connected(vdev)) {
+		policy_mgr_err("vdev: %d is not in connected state", vdev_id);
+		goto release_vdev_ref;
+	}
+
+	if (!wlan_vdev_mlme_is_mlo_vdev(vdev)) {
+		policy_mgr_err("vdev: %d is not mlo vdev", vdev_id);
+		goto release_vdev_ref;
+	}
+
+	pm_ctx = policy_mgr_get_context(psoc);
+	if (!pm_ctx) {
+		policy_mgr_err("vdev: %d Invalid Context", vdev_id);
+		goto release_vdev_ref;
+	}
+
+	policy_mgr_get_ml_sta_info(pm_ctx, &num_ml_sta, &num_disabled_ml_sta,
+				   ml_sta_vdev_lst, ml_freq_lst, &num_non_ml,
+				   NULL, NULL);
+	policy_mgr_debug("vdev %d: num_ml_sta %d disabled %d num_non_ml: %d",
+			 vdev_id, num_ml_sta, num_disabled_ml_sta, num_non_ml);
+
+	if (!num_ml_sta || num_ml_sta > MAX_NUMBER_OF_CONC_CONNECTIONS ||
+	    num_disabled_ml_sta > MAX_NUMBER_OF_CONC_CONNECTIONS)
+		goto release_vdev_ref;
+
+	num_active_ml_sta = num_ml_sta;
+	if (num_ml_sta >= num_disabled_ml_sta)
+		num_active_ml_sta = num_ml_sta - num_disabled_ml_sta;
+
+	num_link_to_no_force += num_active_ml_sta;
+
+	/* Link can not be allowed to enable then skip checking further */
+	if (policy_mgr_sta_ml_link_enable_allowed(psoc, num_disabled_ml_sta,
+						  num_ml_sta, ml_freq_lst,
+						  ml_sta_vdev_lst)) {
+		num_link_to_no_force += num_disabled_ml_sta;
+		policy_mgr_debug("Link enable allowed, total num_links: %d",
+				 num_link_to_no_force);
+	}
+
+	if (num_link_to_no_force < 1 ||
+	    num_link_to_no_force > MAX_NUMBER_OF_CONC_CONNECTIONS) {
+		policy_mgr_debug("vdev %d: invalid num_link_to_no_force: %d",
+				 vdev_id, num_link_to_no_force);
+		goto release_vdev_ref;
+	}
+
+	/*
+	 * send WMI_MLO_LINK_SET_ACTIVE_CMDID to clear user mode setting
+	 * configured via QCA_WLAN_VENDOR_ATTR_LINK_STATE_CONTROL_MODE in FW
+	 */
+	status = policy_mgr_mlo_sta_set_link(psoc,
+					MLO_LINK_FORCE_REASON_CONNECT,
+					MLO_LINK_FORCE_MODE_NO_FORCE,
+					num_link_to_no_force,
+					ml_sta_vdev_lst);
+	if (QDF_IS_STATUS_ERROR(status))
+		goto release_vdev_ref;
+	else
+		policy_mgr_debug("clear user mode setting for num_links:%d",
+				 num_link_to_no_force);
+
+	/*
+	 * send WMI_MLO_LINK_SET_ACTIVE_CMDID with value of
+	 * num_link as 0 to clear dynamic mode setting configured
+	 * via vendor attr LINK_STATE_MIXED_MODE_ACTIVE_NUM_LINKS in FW
+	 */
+	status = policy_mgr_process_mlo_sta_dynamic_force_num_link(psoc,
+				MLO_LINK_FORCE_REASON_CONNECT,
+				MLO_LINK_FORCE_MODE_ACTIVE_NUM,
+				num_link_to_no_force, ml_sta_vdev_lst, 0);
+	if (QDF_IS_STATUS_SUCCESS(status))
+		policy_mgr_debug("clear mixed mode setting for num_links:%d",
+				 num_link_to_no_force);
+release_vdev_ref:
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_POLICY_MGR_ID);
+	return status;
+}
+
 #else
 static bool
 policy_mgr_allow_sta_concurrency(struct wlan_objmgr_psoc *psoc,
