@@ -584,7 +584,7 @@ os_if_spectral_netlink_init(struct wlan_objmgr_pdev *pdev)
 	}
 
 	if (wlan_spectral_is_feature_disabled_pdev(pdev)) {
-		osif_err("Spectral feature is disabled");
+		osif_debug("Spectral feature is disabled");
 		return;
 	}
 
