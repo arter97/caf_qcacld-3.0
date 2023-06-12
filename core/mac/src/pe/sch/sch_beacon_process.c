@@ -740,13 +740,13 @@ static void __sch_beacon_process_for_session(struct mac_context *mac_ctx,
 			    session->ap_defined_power_type_6g >
 			    REG_MAX_SUPP_AP_TYPE) {
 				session->ap_defined_power_type_6g =
-							 REG_VERY_LOW_POWER_AP;
-				pe_debug("AP power type is invalid, defaulting to VLP");
+						REG_CURRENT_MAX_AP_TYPE;
+				pe_debug("AP power type is invalid, defaulting to MAX_AP_TYPE");
 			}
 		} else {
-			pe_debug("AP power type is null, defaulting to VLP");
+			pe_debug("AP power type is null, defaulting to MAX_AP_TYPE");
 			session->ap_defined_power_type_6g =
-							REG_VERY_LOW_POWER_AP;
+						REG_CURRENT_MAX_AP_TYPE;
 		}
 
 		status = wlan_reg_get_best_6g_power_type(

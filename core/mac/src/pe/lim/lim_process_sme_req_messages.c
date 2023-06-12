@@ -2682,24 +2682,6 @@ static inline void lim_fill_rssi(struct pe_session *session,
 }
 #endif
 
-static QDF_STATUS lim_check_and_validate_6g_ap(struct mac_context *mac_ctx,
-					       struct bss_description *bss,
-					       tDot11fBeaconIEs *ie)
-{
-	tDot11fIEhe_op *he_op = &ie->he_op;
-
-	if (!wlan_reg_is_6ghz_chan_freq(bss->chan_freq))
-		return QDF_STATUS_SUCCESS;
-
-	if (!he_op->oper_info_6g_present) {
-		pe_err(QDF_MAC_ADDR_FMT" Invalid 6GHZ AP BSS description IE",
-			QDF_MAC_ADDR_REF(bss->bssId));
-		return QDF_STATUS_E_INVAL;
-	}
-
-	return QDF_STATUS_SUCCESS;
-}
-
 #if defined(WLAN_SAE_SINGLE_PMK) && defined(WLAN_FEATURE_ROAM_OFFLOAD)
 /**
  * lim_update_sae_single_pmk_ap_cap() - Function to update sae single pmk ap ie
@@ -3061,12 +3043,6 @@ lim_fill_pe_session(struct mac_context *mac_ctx, struct pe_session *session,
 	else
 		mac_ctx->mlme_cfg->feature_flags.enable_short_slot_time_11g =
 			mac_ctx->mlme_cfg->ht_caps.short_slot_time_enabled;
-
-	status = lim_check_and_validate_6g_ap(mac_ctx, bss_desc, ie_struct);
-	if (QDF_IS_STATUS_ERROR(status)) {
-		status = QDF_STATUS_E_FAILURE;
-		goto send;
-	}
 
 	/*
 	 * Join timeout: if we find a BeaconInterval in the BssDescription,
