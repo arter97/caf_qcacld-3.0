@@ -232,6 +232,18 @@ QDF_STATUS mlo_check_all_pdev_state(struct wlan_objmgr_psoc *psoc,
  */
 void mlo_update_tsf_sync_support(struct wlan_objmgr_psoc *psoc,
 				 bool tsf_sync_enab);
+
+/**
+ * mlo_pdev_derive_bridge_link_pdevs() - API to get the list of pdevs
+ *					 for creating bridge vdevs.
+ *
+ * @pdev: pdev of the mlo group
+ * @pdev_list: list where pdevs for creating bridge vdevs need to be populated
+ *
+ * Return: true if success otherwise false.
+ */
+bool mlo_pdev_derive_bridge_link_pdevs(struct wlan_objmgr_pdev *pdev,
+				       struct wlan_objmgr_pdev **pdev_list);
 #else
 static inline void mlo_setup_init(uint8_t total_grp)
 {

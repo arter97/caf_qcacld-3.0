@@ -120,6 +120,11 @@ enum MLO_SOC_LIST {
 #define MAX_MLO_CHIPS 5
 #define MAX_ADJ_CHIPS 2
 
+/* MLO Bridge link */
+#define MLO_NUM_CHIPS_FOR_BRIDGE_LINK 4
+#define MLO_MAX_BRIDGE_LINKS_PER_MLD 2
+#define MLO_MAX_BRIDGE_LINKS_PER_RADIO 8
+
 /**
  * struct mlo_chip_info: MLO chip info per link
  * @info_valid: If the info here is valid or not
