@@ -99,6 +99,8 @@
 /* no subchannels punctured */
 #define NO_SCHANS_PUNC 0x0000
 
+#define REG_MIN_POWER -128
+
 /**
  * enum dfs_reg - DFS region
  * @DFS_UNINIT_REGION: un-initialized region
