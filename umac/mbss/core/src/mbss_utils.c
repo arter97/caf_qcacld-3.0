@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2021 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -89,13 +90,13 @@ bool mbss_vdev_acs_in_progress(struct wlan_objmgr_vdev *vdev,
 				goto exit;
 			}
 		}
+	} else {
+		data = &mbss_ctx->mbss_acs.data[acs_src];
+		bitmap = data->vdevs_waiting_acs;
+		if (mbss_check_vdev_bit(vdev_id, bitmap))
+			status = true;
 	}
 
-	data = &mbss_ctx->mbss_acs.data[acs_src];
-	bitmap = data->vdevs_waiting_acs;
-
-	if (mbss_check_vdev_bit(vdev_id, bitmap))
-		status = true;
 exit:
 	mbss_unlock(mbss_ctx);
 err:
