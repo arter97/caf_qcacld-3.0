@@ -40,6 +40,82 @@ bool mlo_ap_vdev_attach(struct wlan_objmgr_vdev *vdev,
 			uint8_t link_id,
 			uint16_t vdev_count);
 
+#if defined(WLAN_FEATURE_11BE_MLO) && defined(WLAN_MLO_MULTI_CHIP)
+/**
+ * mlo_ap_get_bridge_vdev_list() - get mlo bridge vdev list
+ * @vdev: vdev pointer
+ * @vdev_count: vdev count
+ * @wlan_bridge_vdev_list: bridge vdev list
+ *
+ * This API gets all partner bridge vdevs.
+ *
+ * It takes references for all vdev's with bit set in the list. Callers
+ * of this API should properly release references before destroying the
+ * list.
+ *
+ * Return: None
+ */
+void mlo_ap_get_bridge_vdev_list(struct wlan_objmgr_vdev *vdev,
+				 uint16_t *vdev_count,
+				 struct wlan_objmgr_vdev **wlan_bridge_vdev_list);
+
+/**
+ * mlo_ap_get_bridge_vdev_count() - get mlo bridge vdev count
+ * @mld_ctx: mld context
+ * @vdev_count: vdev count
+ *
+ * This API gets count of all partner bridge vdevs
+ *
+ * Return: None
+ */
+QDF_STATUS mlo_ap_get_bridge_vdev_count(struct wlan_mlo_dev_context *mld_ctx,
+					uint16_t *vdev_count);
+
+/**
+ * mlo_ap_get_vdev_list_no_flag() - get mlo vdev list
+ * @vdev: vdev pointer
+ * @vdev_count: vdev count
+ * @wlan_vdev_list: vdev list
+ *
+ * This API gets all partner vdev's without checking for WLAN_VDEV_FEXT2_MLO.
+ *
+ * It takes references for all vdev's with bit set in the list. Callers
+ * of this API should properly release references before destroying the
+ * list.
+ *
+ * Return: None
+ */
+void mlo_ap_get_vdev_list_no_flag(struct wlan_objmgr_vdev *vdev,
+				  uint16_t *vdev_count,
+				  struct wlan_objmgr_vdev **wlan_vdev_list);
+#else
+static inline void
+mlo_ap_get_bridge_vdev_list(struct wlan_objmgr_vdev *vdev,
+			    uint16_t *vdev_count,
+			    struct wlan_objmgr_vdev **wlan_bridge_vdev_list)
+{
+}
+
+static inline QDF_STATUS
+mlo_ap_get_bridge_vdev_count(struct wlan_mlo_dev_context *mld_ctx,
+			     uint16_t *vdev_count)
+{
+	if (!vdev_count)
+		return QDF_STATUS_E_NULL_VALUE;
+
+	*vdev_count = 0;
+
+	return QDF_STATUS_SUCCESS;
+}
+
+static inline void
+mlo_ap_get_vdev_list_no_flag(struct wlan_objmgr_vdev *vdev,
+			     uint16_t *vdev_count,
+			     struct wlan_objmgr_vdev **wlan_vdev_list)
+{
+}
+#endif
+
 /**
  * mlo_ap_get_vdev_list() - get mlo vdev list
  * @vdev: vdev pointer

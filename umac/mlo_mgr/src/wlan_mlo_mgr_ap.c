@@ -121,6 +121,99 @@ bool mlo_ap_vdev_attach(struct wlan_objmgr_vdev *vdev,
 }
 #endif
 
+#if defined(WLAN_FEATURE_11BE_MLO) && defined(WLAN_MLO_MULTI_CHIP)
+void mlo_ap_get_bridge_vdev_list(struct wlan_objmgr_vdev *vdev,
+				 uint16_t *vdev_count,
+				 struct wlan_objmgr_vdev **wlan_bridge_vdev_list)
+{
+	struct wlan_mlo_dev_context *dev_ctx;
+	int i;
+	QDF_STATUS status;
+
+	*vdev_count = 0;
+
+	if (!vdev || !vdev->mlo_dev_ctx) {
+		mlo_err("Invalid input");
+		return;
+	}
+
+	dev_ctx = vdev->mlo_dev_ctx;
+
+	mlo_dev_lock_acquire(dev_ctx);
+	*vdev_count = 0;
+	for (i = 0; i < QDF_ARRAY_SIZE(dev_ctx->wlan_bridge_vdev_list); i++) {
+		if (dev_ctx->wlan_bridge_vdev_list[i]) {
+			status = wlan_objmgr_vdev_try_get_ref(
+						dev_ctx->wlan_bridge_vdev_list[i],
+						WLAN_MLO_MGR_ID);
+			if (QDF_IS_STATUS_ERROR(status))
+				break;
+			wlan_bridge_vdev_list[*vdev_count] =
+				dev_ctx->wlan_bridge_vdev_list[i];
+			(*vdev_count) += 1;
+		}
+	}
+	mlo_dev_lock_release(dev_ctx);
+}
+
+QDF_STATUS mlo_ap_get_bridge_vdev_count(struct wlan_mlo_dev_context *mld_ctx,
+					uint16_t *vdev_count)
+{
+	int i;
+
+	*vdev_count = 0;
+
+	if (!mld_ctx) {
+		mlo_err("Invalid input");
+		return QDF_STATUS_E_NULL_VALUE;
+	}
+
+	mlo_dev_lock_acquire(mld_ctx);
+	*vdev_count = 0;
+	for (i = 0; i < QDF_ARRAY_SIZE(mld_ctx->wlan_bridge_vdev_list); i++) {
+		if (mld_ctx->wlan_bridge_vdev_list[i])
+			(*vdev_count) += 1;
+	}
+	mlo_dev_lock_release(mld_ctx);
+
+	return QDF_STATUS_SUCCESS;
+}
+
+void mlo_ap_get_vdev_list_no_flag(struct wlan_objmgr_vdev *vdev,
+				  uint16_t *vdev_count,
+				  struct wlan_objmgr_vdev **wlan_vdev_list)
+{
+	struct wlan_mlo_dev_context *dev_ctx;
+	int i;
+	QDF_STATUS status;
+
+	*vdev_count = 0;
+
+	if (!vdev || !vdev->mlo_dev_ctx) {
+		mlo_err("Invalid input");
+		return;
+	}
+
+	dev_ctx = vdev->mlo_dev_ctx;
+
+	mlo_dev_lock_acquire(dev_ctx);
+	*vdev_count = 0;
+	for (i = 0; i < QDF_ARRAY_SIZE(dev_ctx->wlan_vdev_list); i++) {
+		if (dev_ctx->wlan_vdev_list[i]) {
+			status = wlan_objmgr_vdev_try_get_ref(
+					dev_ctx->wlan_vdev_list[i],
+					WLAN_MLO_MGR_ID);
+			if (QDF_IS_STATUS_ERROR(status))
+				break;
+			wlan_vdev_list[*vdev_count] =
+				dev_ctx->wlan_vdev_list[i];
+			(*vdev_count) += 1;
+		}
+	}
+	mlo_dev_lock_release(dev_ctx);
+}
+#endif
+
 void mlo_peer_get_vdev_list(struct wlan_objmgr_peer *peer,
 			    uint16_t *vdev_count,
 			    struct wlan_objmgr_vdev **wlan_vdev_list)
