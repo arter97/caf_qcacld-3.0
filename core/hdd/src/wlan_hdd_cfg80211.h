@@ -1088,11 +1088,13 @@ void wlan_key_put_link_vdev(struct wlan_objmgr_vdev *link_vdev,
  * hdd_tid_to_link_map() - to get t2lm info
  * @vdev: Pointer to vdev
  * @t2lm: T2LM info
+ * @dev: Pointer to net_device structure
  *
  * Return: QDF_STATUS
  */
 QDF_STATUS hdd_tid_to_link_map(struct wlan_objmgr_vdev *vdev,
-			       struct wlan_t2lm_info *t2lm);
+			       struct wlan_t2lm_info *t2lm,
+			       struct net_device *dev);
 
 /**
  * hdd_mlo_dev_t2lm_notify_link_update() - Send update T2LM info event

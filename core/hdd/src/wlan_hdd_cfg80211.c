@@ -27655,7 +27655,8 @@ wlan_hdd_cfg80211_get_t2lm_mapping_status(struct wiphy *wiphy,
 }
 
 QDF_STATUS hdd_tid_to_link_map(struct wlan_objmgr_vdev *vdev,
-			       struct wlan_t2lm_info *t2lm)
+			       struct wlan_t2lm_info *t2lm,
+			       struct net_device *dev)
 {
 	struct cfg80211_mlo_tid_map map;
 	bool found = false;
@@ -27710,7 +27711,8 @@ static void wlan_hdd_print_vendor_t2lm_info(struct wlan_t2lm_info *t2lm)
 }
 
 QDF_STATUS hdd_tid_to_link_map(struct wlan_objmgr_vdev *vdev,
-			       struct wlan_t2lm_info *t2lm)
+			       struct wlan_t2lm_info *t2lm,
+			       struct net_device *dev)
 {
 	uint8_t ret;
 
@@ -27740,7 +27742,7 @@ QDF_STATUS hdd_mlo_dev_t2lm_notify_link_update(struct wlan_objmgr_vdev *vdev,
 	dev = link_info->adapter->dev;
 	hdd_enter_dev(dev);
 
-	ret = hdd_tid_to_link_map(vdev, t2lm);
+	ret = hdd_tid_to_link_map(vdev, t2lm, dev);
 	if (QDF_IS_STATUS_ERROR(ret)) {
 		hdd_debug("tid to link map change failed ");
 		return QDF_STATUS_E_FAILURE;
