@@ -5300,12 +5300,11 @@ enum qca_wlan_vendor_attr_config {
 	 * state, it should not exceed the negotiated channel width. If it is
 	 * configured when STA is in disconnected state, the configured value
 	 * will take effect for the next immediate connection.
-	 * Possible values are:
-	 *   NL80211_CHAN_WIDTH_20
-	 *   NL80211_CHAN_WIDTH_40
-	 *   NL80211_CHAN_WIDTH_80
-	 *   NL80211_CHAN_WIDTH_80P80
-	 *   NL80211_CHAN_WIDTH_160
+	 * This configuration can be sent inside
+	 * %QCA_WLAN_VENDOR_ATTR_CONFIG_MLO_LINKS to specify the maximum
+	 * supported channel width per-MLO link.
+	 *
+	 * This uses values defined in enum nl80211_chan_width.
 	 */
 	QCA_WLAN_VENDOR_ATTR_CONFIG_CHANNEL_WIDTH = 63,
 
@@ -5631,6 +5630,32 @@ enum qca_wlan_vendor_attr_config {
 	 * Uses enum qca_wlan_emlsr_mode values.
 	 */
 	QCA_WLAN_VENDOR_ATTR_CONFIG_EMLSR_MODE_SWITCH = 93,
+
+	/* 8-bit unsigned value. Optionally specified along with
+	 * %QCA_WLAN_VENDOR_ATTR_CONFIG_CHANNEL_WIDTH when STA is in connected
+	 * state. This configuration is applicable only for the current
+	 * connection. This configuration not allowed in disconnected state.
+	 * This configuration can be sent inside
+	 * %QCA_WLAN_VENDOR_ATTR_CONFIG_MLO_LINKS to specify the maximum
+	 * supported channel width update type per-MLO link.
+	 *
+	 * valid values:
+	 * 0 - The maximum allowed bandwidth change is applicable for both Tx
+	 *	and Rx paths. The driver shall conduct OMI operation as defined
+	 *	in 26.9 (Operating mode indication) or OMN operation as
+	 *	defined in 11.40 (Notification of operating mode
+	 *	changes) in IEEE P802.11-REVme/D2.0 with AP to indicate the
+	 *	change in the maximum allowed operating bandwidth.
+	 * 1 - Limit the change in maximum allowed bandwidth only to Tx path.
+	 *	In this case the driver doesn't need to conduct OMI/OMN
+	 *	operation since %QCA_WLAN_VENDOR_ATTR_CONFIG_CHANNEL_WIDTH is
+	 *	expected to be less than the current connection maximum
+	 *	negotiated bandwidth.
+	 *	For example: Negotiated maximum bandwidth is 160 MHz and the new
+	 *	maximum bandwidth configured is 80 MHz, now the driver limits
+	 *	the maximum bandwidth to 80 MHz only in the Tx path.
+	 */
+	QCA_WLAN_VENDOR_ATTR_CONFIG_CHAN_WIDTH_UPDATE_TYPE = 96,
 
 	/* 8-bit unsigned value to set EPCS (Emergency Preparedness
 	 * Communications Service) feature capability
