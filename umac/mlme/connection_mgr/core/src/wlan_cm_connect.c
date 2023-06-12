@@ -458,10 +458,10 @@ void cm_set_vdev_link_id(struct cnx_mgr *cm_ctx,
 	uint8_t link_id;
 
 	link_id = req->cur_candidate->entry->ml_info.self_link_id;
-	if (cm_ctx->vdev) {
-		mlme_debug("setting link ID to %d", link_id);
-		wlan_vdev_set_link_id(cm_ctx->vdev, link_id);
-	}
+	mlme_debug(CM_PREFIX_FMT "setting link ID to %d",
+		   CM_PREFIX_REF(wlan_vdev_get_id(cm_ctx->vdev), req->cm_id),
+		   link_id);
+	wlan_vdev_set_link_id(cm_ctx->vdev, link_id);
 }
 
 static void cm_update_vdev_mlme_macaddr(struct cnx_mgr *cm_ctx,
@@ -469,6 +469,7 @@ static void cm_update_vdev_mlme_macaddr(struct cnx_mgr *cm_ctx,
 {
 	struct qdf_mac_addr *mac;
 	bool eht_capab;
+	uint8_t vdev_id = wlan_vdev_get_id(cm_ctx->vdev);
 
 	if (wlan_vdev_mlme_get_opmode(cm_ctx->vdev) != QDF_STA_MODE)
 		return;
@@ -488,19 +489,20 @@ static void cm_update_vdev_mlme_macaddr(struct cnx_mgr *cm_ctx,
 					   cm_ctx->vdev->vdev_mlme.linkaddr);
 		wlan_vdev_obj_unlock(cm_ctx->vdev);
 		wlan_vdev_mlme_set_mlo_vdev(cm_ctx->vdev);
-		mlme_debug("set link address for ML connection");
+		mlme_debug(CM_PREFIX_FMT "setting ML link address " QDF_MAC_ADDR_FMT,
+			   CM_PREFIX_REF(vdev_id, req->cm_id),
+			   QDF_MAC_ADDR_REF(mac->bytes));
 	} else {
 		/* Use net_dev address for non-ML connection */
 		if (!qdf_is_macaddr_zero(mac)) {
 			wlan_vdev_obj_lock(cm_ctx->vdev);
 			wlan_vdev_mlme_set_macaddr(cm_ctx->vdev, mac->bytes);
 			wlan_vdev_obj_unlock(cm_ctx->vdev);
-			mlme_debug(QDF_MAC_ADDR_FMT " for non-ML connection",
+			mlme_debug(CM_PREFIX_FMT "setting non-ML address " QDF_MAC_ADDR_FMT,
+				   CM_PREFIX_REF(vdev_id, req->cm_id),
 				   QDF_MAC_ADDR_REF(mac->bytes));
 		}
-
 		wlan_vdev_mlme_clear_mlo_vdev(cm_ctx->vdev);
-		mlme_debug("clear MLO cap for non-ML connection");
 	}
 }
 #else
@@ -1385,11 +1387,13 @@ static QDF_STATUS cm_update_mlo_filter(struct wlan_objmgr_pdev *pdev,
 	psoc = wlan_pdev_get_psoc(pdev);
 	filter->band_bitmap = wlan_mlme_get_sta_mlo_conn_band_bmp(psoc);
 	/* Apply assoc band filter only for assoc link */
-	if (cm_req->req.is_non_assoc_link) {
-		filter->band_bitmap =  filter->band_bitmap |
-				       CFG_MLO_ASSOC_LINK_BAND_MAX;
-	}
-	mlme_debug("band bitmap: 0x%x", filter->band_bitmap);
+	if (cm_req->req.is_non_assoc_link)
+		filter->band_bitmap =
+			filter->band_bitmap | CFG_MLO_ASSOC_LINK_BAND_MAX;
+
+	mlme_debug(CM_PREFIX_FMT "band bitmap: 0x%x",
+		   CM_PREFIX_REF(cm_req->req.vdev_id, cm_req->cm_id),
+		   filter->band_bitmap);
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -1546,7 +1550,7 @@ static void cm_update_candidate_list(struct cnx_mgr *cm_ctx,
 
 	if (qdf_list_peek_front(candidate_list, &cur_node) !=
 					QDF_STATUS_SUCCESS) {
-		mlme_err(CM_PREFIX_FMT"failed to peer front of candidate_list",
+		mlme_err(CM_PREFIX_FMT "failed to peer front of candidate_list",
 			 CM_PREFIX_REF(vdev_id, cm_req->cm_id));
 		goto free_list;
 	}
@@ -1566,7 +1570,7 @@ static void cm_update_candidate_list(struct cnx_mgr *cm_ctx,
 			goto next;
 		status = qdf_list_remove_node(candidate_list, cur_node);
 		if (QDF_IS_STATUS_ERROR(status)) {
-			mlme_err(CM_PREFIX_FMT"failed to remove node for BSS "QDF_MAC_ADDR_FMT" from candidate list",
+			mlme_err(CM_PREFIX_FMT "failed to remove node for " QDF_MAC_ADDR_FMT " from candidate list",
 				 CM_PREFIX_REF(vdev_id, cm_req->cm_id),
 				 QDF_MAC_ADDR_REF(scan_entry->entry->bssid.bytes));
 			goto free_list;
@@ -1576,7 +1580,7 @@ static void cm_update_candidate_list(struct cnx_mgr *cm_ctx,
 					       &scan_entry->node,
 					       &prev_candidate->node);
 		if (QDF_IS_STATUS_ERROR(status)) {
-			mlme_err(CM_PREFIX_FMT"failed to insert node for BSS "QDF_MAC_ADDR_FMT" from candidate list",
+			mlme_err(CM_PREFIX_FMT "failed to insert node for " QDF_MAC_ADDR_FMT " to candidate list",
 				 CM_PREFIX_REF(vdev_id, cm_req->cm_id),
 				 QDF_MAC_ADDR_REF(scan_entry->entry->bssid.bytes));
 			util_scan_free_cache_entry(scan_entry->entry);
@@ -1584,7 +1588,7 @@ static void cm_update_candidate_list(struct cnx_mgr *cm_ctx,
 			goto free_list;
 		}
 		prev_candidate = scan_entry;
-		mlme_debug(CM_PREFIX_FMT"insert new node BSS "QDF_MAC_ADDR_FMT" to existing candidate list",
+		mlme_debug(CM_PREFIX_FMT "insert new node " QDF_MAC_ADDR_FMT " to candidate list",
 			   CM_PREFIX_REF(vdev_id, cm_req->cm_id),
 			   QDF_MAC_ADDR_REF(scan_entry->entry->bssid.bytes));
 next:
@@ -1633,12 +1637,13 @@ cm_handle_connect_req_in_non_init_state(struct cnx_mgr *cm_ctx,
 					struct cm_connect_req *cm_req,
 					enum wlan_cm_sm_state cm_state_substate)
 {
+	uint8_t vdev_id = wlan_vdev_get_id(cm_ctx->vdev);
+
 	if (cm_state_substate != WLAN_CM_S_CONNECTED &&
 	    cm_is_connect_req_reassoc(&cm_req->req)) {
 		cm_req->req.reassoc_in_non_connected = true;
 		mlme_debug(CM_PREFIX_FMT "Reassoc received in %d state",
-			   CM_PREFIX_REF(wlan_vdev_get_id(cm_ctx->vdev),
-					 cm_req->cm_id),
+			   CM_PREFIX_REF(vdev_id, cm_req->cm_id),
 			   cm_state_substate);
 	}
 
@@ -1708,8 +1713,8 @@ cm_handle_connect_req_in_non_init_state(struct cnx_mgr *cm_ctx,
 		 */
 		break;
 	default:
-		mlme_err("Vdev %d Connect req in invalid state %d",
-			 wlan_vdev_get_id(cm_ctx->vdev),
+		mlme_err(CM_PREFIX_FMT "Connect req in invalid state %d",
+			 CM_PREFIX_REF(vdev_id, cm_req->cm_id),
 			 cm_state_substate);
 		return QDF_STATUS_E_FAILURE;
 	};
@@ -2437,7 +2442,8 @@ cm_resume_connect_after_peer_create(struct cnx_mgr *cm_ctx, wlan_cm_id *cm_id)
 	neg_sec_info = &cm_req->connect_req.cur_candidate->entry->neg_sec_info;
 	if (util_scan_entry_is_hidden_ap(req.bss->entry) &&
 	    QDF_HAS_PARAM(neg_sec_info->key_mgmt, WLAN_CRYPTO_KEY_MGMT_OWE)) {
-		mlme_debug("OWE transition candidate has wildcard ssid");
+		mlme_debug(CM_PREFIX_FMT "OWE transition candidate has wildcard ssid",
+			   CM_PREFIX_REF(req.vdev_id, req.cm_id));
 		req.owe_trans_ssid = cm_req->connect_req.req.ssid;
 	}
 
@@ -2512,8 +2518,10 @@ static void cm_update_partner_link_scan_db(struct cnx_mgr *cm_ctx,
 		    cur_bss->ml_info.num_links &&
 		    qdf_is_macaddr_equal(&bss->ml_info.mld_mac_addr,
 					 &cur_bss->ml_info.mld_mac_addr)) {
-			mlme_debug("Inform Partner bssid: " QDF_MAC_ADDR_FMT " to kernel",
-					QDF_MAC_ADDR_REF(bss->bssid.bytes));
+			mlme_debug(CM_PREFIX_FMT "Inform Partner bssid: " QDF_MAC_ADDR_FMT " to kernel",
+				   CM_PREFIX_REF(wlan_vdev_get_id(cm_ctx->vdev),
+						 cm_id),
+				   QDF_MAC_ADDR_REF(bss->bssid.bytes));
 			cm_inform_bcn_probe_handler(cm_ctx, bss, cm_id);
 		}
 		cur_node = next_node;
