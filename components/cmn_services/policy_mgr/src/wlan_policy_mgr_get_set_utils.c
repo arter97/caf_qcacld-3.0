@@ -4338,6 +4338,25 @@ policy_mgr_handle_link_enable_disable_resp(struct wlan_objmgr_vdev *vdev,
 		break;
 	case MLO_LINK_FORCE_MODE_ACTIVE_NUM:
 		/*
+		 * When the host sends a set link command with force link num
+		 * and dynamic flag set, FW may not process it immediately.
+		 * In this case FW buffer the request and sends a response as
+		 * success to the host with VDEV bitmap as zero.
+		 * FW ensures that the number of active links will be equal to
+		 * the link num sent via WMI_MLO_LINK_SET_ACTIVE_CMDID command.
+		 * So the host should also fill the mlo policy_mgr table as per
+		 * request.
+		 */
+		if (req->param.control_flags.dynamic_force_link_num) {
+			policy_mgr_debug("Enable ML vdev(s) as sent in req");
+			for (i = 0; i < req->param.num_vdev_bitmap; i++)
+			       policy_mgr_enable_disable_link_from_vdev_bitmask(
+					psoc,
+					req->param.vdev_bitmap[i], 0, i * 32);
+			break;
+		}
+
+		/*
 		 * MLO_LINK_FORCE_MODE_ACTIVE_NUM return which vdev is active
 		 * So XOR of the requested ML vdev and active vdev bit will give
 		 * the vdev bits to disable
@@ -7616,6 +7635,196 @@ release_ml_vdev_ref:
 release_vdev_ref:
 	wlan_objmgr_vdev_release_ref(vdev, WLAN_POLICY_MGR_ID);
 
+	return status;
+}
+
+/**
+ * policy_mgr_process_mlo_sta_dynamic_force_num_link() - Set links for MLO STA
+ * @psoc: psoc object
+ * @reason: Reason for which link is forced
+ * @mode: Force reason
+ * @num_mlo_vdev: number of mlo vdev
+ * @mlo_vdev_lst: MLO STA vdev list
+ * @force_active_cnt: number of MLO links to operate in active state as per
+ * user req
+ *
+ * User space provides the desired number of MLO links to operate in active
+ * state at any given time. Host validate request as per current concurrency
+ * and send SET LINK requests to FW. FW will choose which MLO links should
+ * operate in the active state.
+ *
+ * Return: QDF_STATUS
+ */
+static QDF_STATUS
+policy_mgr_process_mlo_sta_dynamic_force_num_link(struct wlan_objmgr_psoc *psoc,
+				enum mlo_link_force_reason reason,
+				enum mlo_link_force_mode mode,
+				uint8_t num_mlo_vdev, uint8_t *mlo_vdev_lst,
+				uint8_t force_active_cnt)
+{
+	struct mlo_link_set_active_req *req;
+	QDF_STATUS status;
+	struct policy_mgr_psoc_priv_obj *pm_ctx;
+	struct wlan_objmgr_vdev *vdev;
+
+	if (!num_mlo_vdev) {
+		policy_mgr_err("invalid 0 num_mlo_vdev");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	pm_ctx = policy_mgr_get_context(psoc);
+	if (!pm_ctx) {
+		policy_mgr_err("Invalid Context");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	req = qdf_mem_malloc(sizeof(*req));
+	if (!req)
+		return QDF_STATUS_E_NOMEM;
+
+	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, mlo_vdev_lst[0],
+						    WLAN_POLICY_MGR_ID);
+	if (!vdev) {
+		policy_mgr_err("vdev %d: invalid vdev", mlo_vdev_lst[0]);
+		qdf_mem_free(req);
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	policy_mgr_set_link_in_progress(pm_ctx, true);
+
+	policy_mgr_debug("vdev %d: mode %d num_mlo_vdev %d reason %d",
+			 wlan_vdev_get_id(vdev), mode, num_mlo_vdev, reason);
+
+	/*
+	 * TODO: this API has to be merged with policy_mgr_mlo_sta_set_link_ext
+	 * as part of 3 link FR change as in caller only we have to decide how
+	 * many links to disable/enable for MLO_LINK_FORCE_MODE_ACTIVE_NUM or
+	 * MLO_LINK_FORCE_MODE_INACTIVE_NUM scenario
+	 */
+	req->ctx.vdev = vdev;
+	req->param.reason = reason;
+	req->param.force_mode = mode;
+	req->ctx.set_mlo_link_cb = policy_mgr_handle_link_enable_disable_resp;
+	req->ctx.validate_set_mlo_link_cb =
+		policy_mgr_validate_set_mlo_link_cb;
+	req->ctx.cb_arg = req;
+
+	/* set MLO vdev bit mask */
+	policy_mgr_fill_ml_active_link_vdev_bitmap(req, mlo_vdev_lst,
+						   num_mlo_vdev);
+
+	pm_ctx->active_vdev_bitmap = req->param.vdev_bitmap[0];
+	pm_ctx->inactive_vdev_bitmap = req->param.vdev_bitmap[1];
+
+	req->param.num_link_entry = 1;
+	req->param.link_num[0].num_of_link = force_active_cnt;
+	req->param.control_flags.dynamic_force_link_num = 1;
+
+	status = mlo_ser_set_link_req(req);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		policy_mgr_err("vdev %d: Failed to set link mode %d num_mlo_vdev %d force_active_cnt: %d, reason %d",
+			       wlan_vdev_get_id(vdev), mode, num_mlo_vdev,
+			       force_active_cnt,
+			       reason);
+		qdf_mem_free(req);
+		policy_mgr_set_link_in_progress(pm_ctx, false);
+	}
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_POLICY_MGR_ID);
+	return status;
+}
+
+QDF_STATUS policy_mgr_update_active_mlo_num_links(struct wlan_objmgr_psoc *psoc,
+						  uint8_t vdev_id,
+						  uint8_t force_active_cnt)
+{
+	struct wlan_objmgr_vdev *vdev;
+	uint8_t num_ml_sta = 0, num_disabled_ml_sta = 0, num_non_ml = 0;
+	uint8_t ml_sta_vdev_lst[MAX_NUMBER_OF_CONC_CONNECTIONS] = {0};
+	qdf_freq_t ml_freq_lst[MAX_NUMBER_OF_CONC_CONNECTIONS] = {0};
+	struct policy_mgr_psoc_priv_obj *pm_ctx;
+	QDF_STATUS status = QDF_STATUS_E_FAILURE;
+
+	if (policy_mgr_is_emlsr_sta_concurrency_present(psoc)) {
+		policy_mgr_debug("Concurrency exists, cannot enter EMLSR mode");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, vdev_id,
+						    WLAN_POLICY_MGR_ID);
+	if (!vdev) {
+		policy_mgr_err("vdev_id: %d vdev not found", vdev_id);
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	if (wlan_vdev_mlme_get_opmode(vdev) != QDF_STA_MODE)
+		goto release_vdev_ref;
+
+	if (!wlan_cm_is_vdev_connected(vdev)) {
+		policy_mgr_err("vdev is not in connected state");
+		goto release_vdev_ref;
+	}
+
+	if (!wlan_vdev_mlme_is_mlo_vdev(vdev)) {
+		policy_mgr_err("vdev is not mlo vdev");
+		goto release_vdev_ref;
+	}
+
+	pm_ctx = policy_mgr_get_context(psoc);
+	if (!pm_ctx) {
+		policy_mgr_err("Invalid Context");
+		goto release_vdev_ref;
+	}
+
+	policy_mgr_get_ml_sta_info(pm_ctx, &num_ml_sta, &num_disabled_ml_sta,
+				   ml_sta_vdev_lst, ml_freq_lst, &num_non_ml,
+				   NULL, NULL);
+	policy_mgr_debug("vdev %d: num_ml_sta %d disabled %d num_non_ml: %d",
+			 vdev_id, num_ml_sta, num_disabled_ml_sta, num_non_ml);
+
+	/*
+	 * No ML STA is present or more no.of links are active than supported
+	 * concurrent connections
+	 */
+	if (!num_ml_sta || num_ml_sta > MAX_NUMBER_OF_CONC_CONNECTIONS)
+		goto release_vdev_ref;
+
+	/*
+	 * DUT connected with MLO AP, one link is always active, So if
+	 * request comes to make one link is active, host sends set link command
+	 * with mode MLO_LINK_FORCE_MODE_ACTIVE_NUM, so that FW should restrict
+	 * to only one link and avoid switch from MLSR to MLMR.
+	 */
+	if (force_active_cnt == 1)
+		goto set_link;
+
+	/*
+	 * num_disabled_ml_sta == 0, means 2 link is already active,
+	 * In this case send set link command with num link 2 and mode
+	 * MLO_LINK_FORCE_MODE_ACTIVE_NUM, so that FW should restrict to only
+	 * in MLMR mode (2 link should be active).
+	 */
+	if (force_active_cnt == 2 && num_disabled_ml_sta == 0)
+		goto set_link;
+
+	/* Link can not be allowed to enable then skip checking further */
+	if (!policy_mgr_sta_ml_link_enable_allowed(psoc, num_disabled_ml_sta,
+						   num_ml_sta, ml_freq_lst,
+						   ml_sta_vdev_lst)) {
+		policy_mgr_debug("vdev %d: link enable not allowed", vdev_id);
+		goto release_vdev_ref;
+	}
+
+set_link:
+	status = policy_mgr_process_mlo_sta_dynamic_force_num_link(psoc,
+					     MLO_LINK_FORCE_REASON_CONNECT,
+					     MLO_LINK_FORCE_MODE_ACTIVE_NUM,
+					     num_ml_sta, ml_sta_vdev_lst,
+					     force_active_cnt);
+	if (QDF_IS_STATUS_SUCCESS(status))
+		policy_mgr_debug("vdev %d: link enable allowed", vdev_id);
+
+release_vdev_ref:
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_POLICY_MGR_ID);
 	return status;
 }
 

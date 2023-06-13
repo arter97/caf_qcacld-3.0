@@ -764,7 +764,10 @@ int wlan_handle_mlo_link_state_operation(struct wiphy *wiphy,
 			  ml_active_num_links);
 		if (ml_active_num_links > MLD_MAX_SUPPORTED_LINKS)
 			return -EINVAL;
-		/* TODO: Send num link(s) as per user space request to FW */
+		status = policy_mgr_update_active_mlo_num_links(hdd_ctx->psoc,
+						vdev_id, ml_active_num_links);
+		if (QDF_IS_STATUS_ERROR(status))
+			return -EINVAL;
 		break;
 	default:
 		hdd_debug("vdev %d: invalid ml_link_control_mode: %d", vdev_id,

@@ -4898,6 +4898,19 @@ policy_mgr_update_mlo_links_based_on_linkid(struct wlan_objmgr_psoc *psoc,
 					    uint8_t num_links,
 					    uint8_t *link_id_list,
 					    uint32_t *config_state_list);
+
+/**
+ * policy_mgr_update_active_mlo_num_links() - Force active ML links based
+ * on user requested coming via LINK_STATE_MIXED_MODE_ACTIVE_NUM_LINKS
+ * @psoc: objmgr psoc
+ * @vdev_id: vdev id
+ * @num_links: number of links to be forced active
+ *
+ * Return: success if the command gets processed successfully
+ */
+QDF_STATUS policy_mgr_update_active_mlo_num_links(struct wlan_objmgr_psoc *psoc,
+						  uint8_t vdev_id,
+						  uint8_t num_links);
 #else
 
 static inline bool policy_mgr_is_mlo_sap_concurrency_allowed(
