@@ -129,6 +129,98 @@ mgmt_rx_reo_compare_global_timestamps_gte(uint32_t ts1, uint32_t ts2)
 	return delta <= MGMT_RX_REO_GLOBAL_TS_HALF_RANGE;
 }
 
+#ifdef WLAN_MGMT_RX_REO_ERROR_HANDLING
+/**
+ * check_and_handle_invalid_reo_params() - Check and handle invalid reo
+ * parameters error
+ * @desc: Pointer to frame descriptor
+ *
+ * API to check for invalid reo parameter error. Host won't be able to reorder
+ * this frame and hence drop this frame.
+ *
+ * Return: QDF_STATUS
+ */
+static QDF_STATUS
+check_and_handle_invalid_reo_params(struct mgmt_rx_reo_frame_descriptor *desc)
+{
+	struct mgmt_rx_reo_params *reo_params;
+
+	if (!desc) {
+		mgmt_rx_reo_err("Mgmt Rx REO frame descriptor is null");
+		return QDF_STATUS_E_NULL_VALUE;
+	}
+
+	if (!desc->rx_params) {
+		mgmt_rx_reo_err("Mgmt Rx params is null");
+		return QDF_STATUS_E_NULL_VALUE;
+	}
+
+	reo_params = desc->rx_params->reo_params;
+	if (!reo_params) {
+		mgmt_rx_reo_err("Mgmt Rx REO params is NULL");
+		return QDF_STATUS_E_NULL_VALUE;
+	}
+
+	if (!reo_params->valid) {
+		mgmt_rx_reo_debug_rl("Invalid param: link= %u, ctr= %u, ts= %u",
+				     reo_params->link_id,
+				     reo_params->mgmt_pkt_ctr,
+				     reo_params->global_timestamp);
+		desc->drop = true;
+		desc->drop_reason = MGMT_RX_REO_INVALID_REO_PARAMS;
+
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	return QDF_STATUS_SUCCESS;
+}
+#else
+/**
+ * check_and_handle_invalid_reo_params() - Check and handle invalid reo
+ * parameters error
+ * @desc: Pointer to frame descriptor
+ *
+ * API to check for invalid reo parameter error. Host won't be able to reorder
+ * this frame and hence drop this frame.
+ *
+ * Return: QDF_STATUS
+ */
+static QDF_STATUS
+check_and_handle_invalid_reo_params(struct mgmt_rx_reo_frame_descriptor *desc)
+{
+	struct mgmt_rx_reo_params *reo_params;
+
+	if (!desc) {
+		mgmt_rx_reo_err("Mgmt Rx REO frame descriptor is null");
+		return QDF_STATUS_E_NULL_VALUE;
+	}
+
+	if (!desc->rx_params) {
+		mgmt_rx_reo_err("Mgmt Rx params is null");
+		return QDF_STATUS_E_NULL_VALUE;
+	}
+
+	reo_params = desc->rx_params->reo_params;
+	if (!reo_params) {
+		mgmt_rx_reo_err("Mgmt Rx REO params is NULL");
+		return QDF_STATUS_E_NULL_VALUE;
+	}
+
+	if (!reo_params->valid) {
+		mgmt_rx_reo_err_rl("Invalid params: link= %u, ctr= %u, ts= %u",
+				   reo_params->link_id,
+				   reo_params->mgmt_pkt_ctr,
+				   reo_params->global_timestamp);
+		desc->drop = true;
+		desc->drop_reason = MGMT_RX_REO_INVALID_REO_PARAMS;
+
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	return QDF_STATUS_SUCCESS;
+}
+#endif /* WLAN_MGMT_RX_REO_ERROR_HANDLING */
+
 /**
  * mgmt_rx_reo_is_stale_frame()- API to check whether the given management frame
  * is stale
@@ -3879,6 +3971,36 @@ mgmt_rx_reo_egress_list_init(struct mgmt_rx_reo_egress_list *egress_list)
 }
 
 /**
+ * check_frame_sanity() - Check the sanity of a given management frame
+ * @desc: Pointer to frame descriptor
+ *
+ * API to check the sanity of a given management frame. This API checks for the
+ * following errors.
+ *
+ *     1. Invalid management rx reo parameters
+ *
+ * Return: QDF_STATUS
+ */
+static QDF_STATUS
+check_frame_sanity(struct mgmt_rx_reo_frame_descriptor *desc)
+{
+	QDF_STATUS status;
+
+	if (!desc) {
+		mgmt_rx_reo_err("Frame descriptor is null");
+		return QDF_STATUS_E_NULL_VALUE;
+	}
+
+	status = check_and_handle_invalid_reo_params(desc);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		mgmt_rx_reo_warn_rl("Drop frame with invalid reo params");
+		return status;
+	}
+
+	return QDF_STATUS_SUCCESS;
+}
+
+/**
  * wlan_mgmt_rx_reo_update_host_snapshot() - Update Host snapshot with the MGMT
  * Rx REO parameters.
  * @pdev: pdev extracted from the WMI event
@@ -4877,13 +4999,16 @@ wlan_mgmt_rx_reo_algo_entry(struct wlan_objmgr_pdev *pdev,
 	qdf_spin_lock(&reo_ctx->reo_algo_entry_lock);
 
 	cur_link = mgmt_rx_reo_get_link_id(desc->rx_params);
-	qdf_assert_always(desc->rx_params->reo_params->valid);
 	qdf_assert_always(desc->frame_type == IEEE80211_FC0_TYPE_MGT);
 
 	if (desc->type == MGMT_RX_REO_FRAME_DESC_HOST_CONSUMED_FRAME)
 		qdf_assert_always(desc->rx_params->reo_params->duration_us);
 
 	ret = log_ingress_frame_entry(reo_ctx, desc);
+	if (QDF_IS_STATUS_ERROR(ret))
+		goto failure;
+
+	ret = check_frame_sanity(desc);
 	if (QDF_IS_STATUS_ERROR(ret))
 		goto failure;
 
