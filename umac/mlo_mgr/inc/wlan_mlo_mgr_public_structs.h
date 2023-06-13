@@ -949,6 +949,22 @@ struct mlo_link_num_param {
 	uint32_t home_freq;
 };
 
+/*
+ * struct mlo_control_flags: This structure is used for setting
+ * wmi_mlo_control_flags.
+ * @overwrite_force_active_bitmap: indicate overwrite all earlier force_active
+ * bitmaps
+ * @overwrite_force_inactive_bitmap: indicate overwrite all earlier
+ * force_inactive bitmaps
+ * @dynamic_force_link_num: indicate fw to use force link number instead of
+ * force link bitmaps
+ */
+struct mlo_control_flags {
+	bool overwrite_force_active_bitmap;
+	bool overwrite_force_inactive_bitmap;
+	bool dynamic_force_link_num;
+};
+
 /**
  * struct mlo_link_set_active_param: MLO link set active params
  * @force_mode: operation to take (enum mlo_link_force_mode)
@@ -970,6 +986,7 @@ struct mlo_link_num_param {
  * @inactive_vdev_bitmap: inactive vdev bitmap array
  *  It will be present when force_mode is MLO_LINK_FORCE_MODE_ACTIVE_INACTIVE,
  *  it includes the inactive vdev bitmaps
+ * @control_flags: This structure is used for setting wmi_mlo_control_flags.
  */
 struct mlo_link_set_active_param {
 	uint32_t force_mode;
@@ -980,6 +997,7 @@ struct mlo_link_set_active_param {
 	struct mlo_link_num_param link_num[MLO_LINK_NUM_SZ];
 	uint32_t vdev_bitmap[MLO_VDEV_BITMAP_SZ];
 	uint32_t inactive_vdev_bitmap[MLO_VDEV_BITMAP_SZ];
+	struct mlo_control_flags control_flags;
 };
 
 /**

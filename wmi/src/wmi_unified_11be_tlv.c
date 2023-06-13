@@ -532,6 +532,8 @@ send_mlo_link_set_active_cmd_tlv(wmi_unified_t wmi_handle,
 	buf_ptr += WMI_TLV_HDR_SIZE;
 
 	if (num_link_num_param) {
+		cmd->ctrl_flags.dynamic_force_link_num =
+				param->control_flags.dynamic_force_link_num;
 		link_num_param =
 			(wmi_mlo_set_active_link_number_param *)buf_ptr;
 		tlv_len = WMITLV_GET_STRUCT_TLVLEN
@@ -546,11 +548,12 @@ send_mlo_link_set_active_cmd_tlv(wmi_unified_t wmi_handle,
 				param->link_num[i].vdev_subtype;
 			link_num_param->home_freq =
 				param->link_num[i].home_freq;
-			wmi_debug("entry[%d]: num_of_link %d vdev type %d subtype %d freq %d",
+			wmi_debug("entry[%d]: num_of_link %d vdev type %d subtype %d freq %d, control_flags:%d",
 				  i, link_num_param->num_of_link,
 				  link_num_param->vdev_type,
 				  link_num_param->vdev_subtype,
-				  link_num_param->home_freq);
+				  link_num_param->home_freq,
+				  cmd->ctrl_flags.control_flags);
 			link_num_param++;
 		}
 
