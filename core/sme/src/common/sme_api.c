@@ -15275,6 +15275,24 @@ void sme_set_per_link_ba_mode(mac_handle_t mac_handle, uint8_t val)
 	}
 }
 
+static inline
+void sme_set_mcs_15_tx_rx_disable(uint8_t vdev_id)
+{
+	uint32_t tx_disable[2] = {67, 0};
+	uint32_t rx_disable[3] = {125, 0, 1};
+	QDF_STATUS status;
+
+	sme_debug("Send MCS 15 rx/tx disable to FW");
+
+	status = sme_send_unit_test_cmd(vdev_id, 10, 2, tx_disable);
+	if (status)
+		sme_err("Failed to send MCS 15 tx disable");
+
+	status = sme_send_unit_test_cmd(vdev_id, 67, 3, rx_disable);
+	if (status)
+		sme_err("Failed to send MCS 15 rx disable");
+}
+
 void sme_reset_eht_caps(mac_handle_t mac_handle, uint8_t vdev_id)
 {
 	struct mac_context *mac_ctx = MAC_CONTEXT(mac_handle);
@@ -15310,6 +15328,7 @@ void sme_reset_eht_caps(mac_handle_t mac_handle, uint8_t vdev_id)
 	if (QDF_IS_STATUS_SUCCESS(status))
 		ucfg_mlme_set_bss_color_collision_det_sta(mac_ctx->psoc, val);
 	sme_set_per_link_ba_mode(mac_handle, ba_mode_auto);
+	sme_set_mcs_15_tx_rx_disable(vdev_id);
 }
 
 void sme_update_eht_cap_nss(mac_handle_t mac_handle, uint8_t vdev_id,
