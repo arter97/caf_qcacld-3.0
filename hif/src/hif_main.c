@@ -2886,9 +2886,11 @@ hif_affinity_mgr_init_ce_irq(struct hif_softc *scn, int id, int irq)
 	if (!scn->affinity_mgr_supported)
 		return;
 
-	/* Set CPU Mask to all possible CPUs */
+	/* Set CPU Mask to Silver core */
 	qdf_for_each_possible_cpu(cpus)
-		qdf_cpumask_set_cpu(cpus, &cpu_mask);
+		if (qdf_topology_physical_package_id(cpus) ==
+		    CPU_CLUSTER_TYPE_LITTLE)
+			qdf_cpumask_set_cpu(cpus, &cpu_mask);
 
 	cfg = &scn->ce_irq_cpu_mask[id];
 	qdf_cpumask_copy(&cfg->current_irq_mask, &cpu_mask);
@@ -2910,9 +2912,11 @@ hif_affinity_mgr_init_grp_irq(struct hif_softc *scn, int grp_id,
 	if (!scn->affinity_mgr_supported)
 		return;
 
-	/* Set CPU Mask to all possible CPUs */
+	/* Set CPU Mask to Silver core */
 	qdf_for_each_possible_cpu(cpus)
-		qdf_cpumask_set_cpu(cpus, &cpu_mask);
+		if (qdf_topology_physical_package_id(cpus) ==
+		    CPU_CLUSTER_TYPE_LITTLE)
+			qdf_cpumask_set_cpu(cpus, &cpu_mask);
 
 	cfg = &scn->irq_cpu_mask[grp_id][irq_num];
 	qdf_cpumask_copy(&cfg->current_irq_mask, &cpu_mask);
