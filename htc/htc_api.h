@@ -300,7 +300,7 @@ struct htc_endpoint_credit_dist {
 #define IS_EP_ACTIVE(epDist)  ((epDist)->DistFlags & HTC_EP_ACTIVE)
 #define SET_EP_ACTIVE(epDist) (epDist)->DistFlags |= HTC_EP_ACTIVE
 
-/* credit distribution code that is passed into the distrbution function,
+/* credit distribution code that is passed into the distribution function,
  * there are mandatory and optional codes that must be handled
  */
 enum htc_credit_dist_reason {

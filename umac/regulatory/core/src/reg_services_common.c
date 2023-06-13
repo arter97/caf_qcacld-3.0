@@ -5663,7 +5663,7 @@ static void reg_set_5g_channel_params_for_pwrmode(
 			struct ch_params temp_ch_params = {0};
 
 			temp_ch_params.ch_width = CH_WIDTH_80MHZ;
-			/* Puncturing patter is not needed for 80+80 */
+			/* Puncturing pattern is not needed for 80+80 */
 			reg_set_create_punc_bitmap(&temp_ch_params, false);
 			chan_state2 =
 				reg_get_ch_state_based_on_nol_flag(pdev,

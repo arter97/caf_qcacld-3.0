@@ -436,7 +436,7 @@ extract_infra_cp_stats_tlv(wmi_unified_t wmi_handle, void *evt_buf,
 }
 
 /**
- * prepare_infra_cp_stats_buf() - Allocate and prepate wmi cmd request buffer
+ * prepare_infra_cp_stats_buf() - Allocate and prepare wmi cmd request buffer
  * @wmi_handle: wmi handle
  * @stats_req: Request parameters to be filled in wmi cmd request buffer
  * @req_buf_len: length of the output wmi cmd buffer allocated

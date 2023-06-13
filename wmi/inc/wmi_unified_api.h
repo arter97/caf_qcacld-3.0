@@ -2044,7 +2044,7 @@ QDF_STATUS wmi_unified_send_apf_read_work_memory_cmd(wmi_unified_t wmi,
  * @evt_buf: Pointer to the event buffer
  * @read_mem_evt: pointer to memory to extract event parameters into
  *
- * This function exctracts read mem response event into the given structure ptr
+ * This function extracts read mem response event into the given structure ptr
  *
  * Return: QDF_STATUS_SUCCESS on success and QDF_STATUS_E_FAILURE for failure
  */

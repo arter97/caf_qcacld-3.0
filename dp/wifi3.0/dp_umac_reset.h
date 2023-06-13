@@ -65,7 +65,7 @@ enum umac_reset_action {
 /**
  * enum umac_reset_state - States required by the UMAC reset state machine
  * @UMAC_RESET_STATE_WAIT_FOR_TRIGGER: Waiting for trigger event
- * @UMAC_RESET_STATE_DO_TRIGGER_RECEIVED: Receivd the DO_TRIGGER event
+ * @UMAC_RESET_STATE_DO_TRIGGER_RECEIVED: Received the DO_TRIGGER event
  * @UMAC_RESET_STATE_HOST_TRIGGER_DONE: Host completed handling Trigger event
  * @UMAC_RESET_STATE_WAIT_FOR_DO_PRE_RESET: Waiting for the DO_PRE_RESET event
  * @UMAC_RESET_STATE_DO_PRE_RESET_RECEIVED: Received the DO_PRE_RESET event

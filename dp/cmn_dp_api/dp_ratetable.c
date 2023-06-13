@@ -70,7 +70,7 @@ enum {
 /* The following would span more than one octet
  * when 160MHz BW defined for VHT
  * Also it's important to maintain the ordering of this enum
- * else it would break other rate adapation functions
+ * else it would break other rate adaptation functions
  */
 
 enum DP_CMN_RATECODE_PREAM_TYPE {

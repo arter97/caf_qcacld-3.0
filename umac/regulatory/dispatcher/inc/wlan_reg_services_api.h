@@ -1767,7 +1767,7 @@ uint16_t wlan_reg_find_nearest_puncture_pattern(enum phy_ch_width bw,
 
 #ifdef CONFIG_REG_6G_PWRMODE
 /**
- * wlan_reg_set_channel_params_for_pwrmode() - Sets channel parameteres for
+ * wlan_reg_set_channel_params_for_pwrmode() - Sets channel parameters for
  * given bandwidth
  * @pdev: The physical dev to program country code or regdomain
  * @freq: channel center frequency.

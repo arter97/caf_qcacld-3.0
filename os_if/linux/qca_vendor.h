@@ -731,7 +731,7 @@
  *	the following TDLS discovery response frame transmission on the
  *	configured MLO BSS link and the link id information is cleared in the
  *	driver after the TDLS discovery response frame is successfully
- *	transmitted. This behavior is indepent of the TDLS peer STA connection
+ *	transmitted. This behavior is independent of the TDLS peer STA connection
  *	mode (MLO or non-MLO).
  *
  *	Uses the attributes defined in

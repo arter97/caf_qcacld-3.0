@@ -415,7 +415,7 @@ dp_rx_handle_ppdu_undecoded_metadata(struct dp_soc *soc, struct dp_pdev *pdev,
  * @pdev: pdev structure
  * @ppdu_info: structure for rx ppdu ring
  * @nbuf: QDF nbuf
- * @fcs_ok_mpdu_cnt: fcs passsed mpdu index
+ * @fcs_ok_mpdu_cnt: fcs passed mpdu index
  * @deliver_frame: flag to deliver wdi event
  *
  * Return: QDF_STATUS_SUCCESS - If nbuf to be freed by caller
