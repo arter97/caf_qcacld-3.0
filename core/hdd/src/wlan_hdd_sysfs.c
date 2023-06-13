@@ -80,6 +80,7 @@
 #include <wlan_hdd_sysfs_txrx_stats_console.h>
 #include "wma_api.h"
 #include "wlan_hdd_eht.h"
+#include <wlan_hdd_sysfs_antenna_chainmask.h>
 
 #define MAX_PSOC_ID_SIZE 10
 
@@ -729,6 +730,7 @@ hdd_sysfs_create_sta_adapter_root_obj(struct hdd_adapter *adapter)
 	hdd_sysfs_range_ext_create(adapter);
 	hdd_sysfs_dl_modes_create(adapter);
 	hdd_sysfs_11be_rate_create(adapter);
+	hdd_sysfs_antenna_chainmask_create(adapter);
 }
 
 static void
@@ -757,6 +759,7 @@ hdd_sysfs_destroy_sta_adapter_root_obj(struct hdd_adapter *adapter)
 	hdd_sysfs_crash_inject_destroy(adapter);
 	hdd_sysfs_reassoc_destroy(adapter);
 	hdd_sysfs_destroy_bcn_reception_interface(adapter);
+	hdd_sysfs_antenna_chainmask_destroy(adapter);
 }
 
 static void
@@ -785,6 +788,7 @@ hdd_sysfs_create_sap_adapter_root_obj(struct hdd_adapter *adapter)
 	hdd_sysfs_ipa_create(adapter);
 	hdd_sysfs_dl_modes_create(adapter);
 	hdd_sysfs_11be_rate_create(adapter);
+	hdd_sysfs_antenna_chainmask_create(adapter);
 }
 
 static void
@@ -813,6 +817,7 @@ hdd_sysfs_destroy_sap_adapter_root_obj(struct hdd_adapter *adapter)
 	hdd_sysfs_crash_inject_destroy(adapter);
 	hdd_sysfs_sta_info_interface_destroy(adapter);
 	hdd_sysfs_channel_interface_destroy(adapter);
+	hdd_sysfs_antenna_chainmask_destroy(adapter);
 }
 
 static void

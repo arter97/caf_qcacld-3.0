@@ -1,3 +1,4 @@
+
 # We can build either as part of a standalone Kernel build or as
 # an external module.  Determine which mechanism is being used
 ifeq ($(MODNAME),)
@@ -415,6 +416,9 @@ endif
 endif
 ifeq ($(CONFIG_WLAN_SYSFS_DP_STATS), y)
 HDD_OBJS += $(HDD_SRC_DIR)/wlan_hdd_sysfs_txrx_stats_console.o
+endif
+ifeq ($(CONFIG_WLAN_ANTENNA_CHAINMASK), y)
+HDD_OBJS += $(HDD_SRC_DIR)/wlan_hdd_sysfs_antenna_chainmask.o
 endif
 
 ifeq ($(CONFIG_QCACLD_FEATURE_FW_STATE), y)
@@ -3078,6 +3082,7 @@ cppflags-$(CONFIG_WLAN_SYSFS_FW_MODE_CFG) += -DCONFIG_WLAN_SYSFS_FW_MODE_CFG
 cppflags-$(CONFIG_WLAN_REASSOC) += -DCONFIG_WLAN_REASSOC
 cppflags-$(CONFIG_WLAN_SCAN_DISABLE) += -DCONFIG_WLAN_SCAN_DISABLE
 cppflags-$(CONFIG_WLAN_WOW_ITO) += -DCONFIG_WLAN_WOW_ITO
+cppflags-$(CONFIG_WLAN_ANTENNA_CHAINMASK) += -DCONFIG_WLAN_ANTENNA_CHAINMASK
 cppflags-$(CONFIG_WLAN_WOWL_ADD_PTRN) += -DCONFIG_WLAN_WOWL_ADD_PTRN
 cppflags-$(CONFIG_WLAN_WOWL_DEL_PTRN) += -DCONFIG_WLAN_WOWL_DEL_PTRN
 cppflags-$(CONFIG_WLAN_SYSFS_TX_STBC) += -DCONFIG_WLAN_SYSFS_TX_STBC
