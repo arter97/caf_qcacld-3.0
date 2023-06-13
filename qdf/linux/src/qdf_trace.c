@@ -3306,6 +3306,7 @@ struct category_name_info g_qdf_category_name[MAX_SUPPORTED_CATEGORY] = {
 	[QDF_MODULE_ID_EPCS] = {"EPCS"},
 	[QDF_MODULE_ID_LL_SAP] = {"LL_SAP"},
 	[QDF_MODULE_ID_COHOSTED_BSS] = {"COHOSTED_BSS"},
+	[QDF_MODULE_ID_TELEMETRY_AGENT] = {"TELEMETRY_AGENT"},
 	[QDF_MODULE_ID_ANY] = {"ANY"},
 };
 qdf_export_symbol(g_qdf_category_name);
@@ -3882,6 +3883,7 @@ static void set_default_trace_levels(struct category_info *cinfo)
 		[QDF_MODULE_ID_EPCS] = QDF_TRACE_LEVEL_INFO,
 		[QDF_MODULE_ID_LL_SAP] = QDF_TRACE_LEVEL_NONE,
 		[QDF_MODULE_ID_COHOSTED_BSS] = QDF_TRACE_LEVEL_INFO,
+		[QDF_MODULE_ID_TELEMETRY_AGENT] = QDF_TRACE_LEVEL_ERROR,
 		[QDF_MODULE_ID_ANY] = QDF_TRACE_LEVEL_INFO,
 	};
 

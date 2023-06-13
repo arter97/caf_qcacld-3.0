@@ -465,6 +465,7 @@ typedef bool (*qdf_irqlocked_func_t)(void *);
  * @QDF_MODULE_ID_LL_SAP: LL SAP module ID
  * @QDF_MODULE_ID_ANY: anything
  * @QDF_MODULE_ID_COHOSTED_BSS : Co-hosted BSS module ID
+ * @QDF_MODULE_ID_TELEMETRY_AGENT: Telemetry Agent Module ID
  * @QDF_MODULE_ID_MAX: Max place holder module ID
  *
  * New module ID needs to be added in qdf trace along with this enum.
@@ -634,6 +635,7 @@ typedef enum {
 	QDF_MODULE_ID_EPCS,
 	QDF_MODULE_ID_LL_SAP,
 	QDF_MODULE_ID_COHOSTED_BSS,
+	QDF_MODULE_ID_TELEMETRY_AGENT,
 	QDF_MODULE_ID_ANY,
 	QDF_MODULE_ID_MAX,
 } QDF_MODULE_ID;
