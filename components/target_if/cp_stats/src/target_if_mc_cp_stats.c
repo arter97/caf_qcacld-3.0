@@ -904,6 +904,7 @@ target_if_cp_stats_extract_vdev_extd_stats(struct wmi_unified *wmi_hdl,
 		ev->vdev_extd_stats[i].vdev_id = stats[i].vdev_id;
 		ev->vdev_extd_stats[i].is_mlo_vdev_active =
 						stats[i].is_mlo_vdev_active;
+		ev->vdev_extd_stats[i].vdev_tx_power = stats[i].vdev_tx_power;
 	}
 
 	qdf_mem_free(stats);
@@ -1604,7 +1605,7 @@ static uint32_t get_stats_id(enum stats_req_type type)
 	default:
 		break;
 	case TYPE_CONNECTION_TX_POWER:
-		return WMI_REQUEST_PDEV_STAT;
+		return WMI_REQUEST_PDEV_STAT | WMI_REQUEST_VDEV_EXTD_STAT;
 	case TYPE_CONGESTION_STATS:
 		return WMI_REQUEST_PDEV_STAT | WMI_REQUEST_PDEV_EXTD_STAT;
 	case TYPE_PEER_STATS:
