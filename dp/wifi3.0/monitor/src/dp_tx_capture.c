@@ -2170,18 +2170,6 @@ void dp_process_ppdu_stats_update_failed_bitmap(struct dp_pdev *pdev,
 	num_mpdu = user->num_mpdu;
 
 	/* assumption: number of mpdu will be less than 32 */
-
-	 dp_tx_capture_info("%pK: ppdu_id[%d] ba_seq_no[%d] start_seq_no[%d] mpdu_tried[%d]",
-			    pdev->soc, ppdu_id,
-			    ba_seq_no, start_seq, mpdu_tried);
-
-	for (i = 0; i < size; i++) {
-		dp_tx_capture_info("%pK: ppdu_id[%d] ba_bitmap[%x] enqueue_bitmap[%x]",
-				   pdev->soc, ppdu_id,
-				   user->ba_bitmap[i],
-				   user->enq_bitmap[i]);
-	}
-
 	/* Handle sequence no. wraparound */
 	if (start_seq <= ba_seq_no) {
 		diff = ba_seq_no - start_seq;
