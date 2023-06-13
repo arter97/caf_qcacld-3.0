@@ -2961,4 +2961,14 @@ static inline void target_if_set_reo_shared_qref_feature(struct wlan_objmgr_psoc
 }
 #endif
 
+/**
+ * target_if_wmi_chan_width_to_phy_ch_width() - convert channel width from
+ * wmi_host_channel_width to phy_ch_width
+ *
+ * @ch_width: wmi_host_channel_width
+ *
+ * return: phy_ch_width
+ */
+enum phy_ch_width
+target_if_wmi_chan_width_to_phy_ch_width(wmi_host_channel_width ch_width);
 #endif
