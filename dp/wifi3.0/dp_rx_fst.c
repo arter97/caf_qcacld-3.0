@@ -499,7 +499,7 @@ QDF_STATUS dp_rx_flow_delete_entry(struct dp_pdev *pdev,
 	fse = dp_rx_flow_find_entry_by_tuple(soc->hal_soc, fst,
 					     rx_flow_info, &flow);
 
-	if (!fse) {
+	if (!fse || (fse->is_valid == false)) {
 		dp_err("RX flow delete entry failed");
 		dp_rx_flow_dump_flow_entry(fst, rx_flow_info);
 		return QDF_STATUS_E_INVAL;
