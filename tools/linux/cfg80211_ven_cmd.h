@@ -873,6 +873,9 @@ enum {
 	IEEE80211_PARAM_STR_CONFIG = 810,
 	IEEE80211_PARAM_NSTR_CONFIG = 811,
 	IEEE80211_PARAM_GET_MLO_OPER_MODE = 812,
+#ifdef WLAN_FEATURE_11BE_MLO
+	IEEE80211_PARAM_WLAN_PEER_MESH_OVERRIDE = 813, /* Vendor Flags for WMI Interface */
+#endif
 };
 
 enum {
@@ -2593,6 +2596,12 @@ struct vendor_commands vap_vendor_cmds[] = {
 	{"g_str_config",   IEEE80211_PARAM_STR_CONFIG, GET_PARAM, 0},
 	{"nstr_config",  IEEE80211_PARAM_NSTR_CONFIG, SET_PARAM, 1},
 	{"g_nstr_config",  IEEE80211_PARAM_NSTR_CONFIG, GET_PARAM, 0},
+#ifdef WLAN_FEATURE_11BE_MLO
+	{"set_vendor_peer_mesh_override_flag",
+		IEEE80211_PARAM_WLAN_PEER_MESH_OVERRIDE, SET_PARAM, 1},
+	{"get_vendor_peer_mesh_override_flag",
+		IEEE80211_PARAM_WLAN_PEER_MESH_OVERRIDE, GET_PARAM, 0},
+#endif
 };
 
 struct vendor_commands radio_vendor_cmds[] = {
