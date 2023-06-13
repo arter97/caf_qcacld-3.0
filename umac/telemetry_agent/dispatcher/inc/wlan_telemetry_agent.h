@@ -19,6 +19,21 @@
 #ifdef WLAN_CONFIG_TELEMETRY_AGENT
 #include <telemetry_agent_wifi_driver_if.h>
 
+#define telemetry_agent_alert(format, args...) \
+	QDF_TRACE_FATAL(QDF_MODULE_ID_TELEMETRY_AGENT, format, ## args)
+
+#define telemetry_agent_err(format, args...) \
+	QDF_TRACE_ERROR(QDF_MODULE_ID_TELEMETRY_AGENT, format, ## args)
+
+#define telemetry_agent_warn(format, args...) \
+	QDF_TRACE_WARN(QDF_MODULE_ID_TELEMETRY_AGENT, format, ## args)
+
+#define telemetry_agent_info(format, args...) \
+	QDF_TRACE_INFO(QDF_MODULE_ID_TELEMETRY_AGENT, format, ## args)
+
+#define telemetry_agent_debug(format, args...) \
+	QDF_TRACE_DEBUG(QDF_MODULE_ID_TELEMETRY_AGENT, format, ## args)
+
 void wlan_telemetry_emesh_application_init_deinit_notify
 	(enum agent_notification_event);
 
