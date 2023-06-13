@@ -1282,7 +1282,7 @@ struct wlan_roam_scan_filter_params {
  * @btm_max_attempt_cnt: Maximum attempt for sending BTM query to ESS
  * @btm_sticky_time: Stick time after roaming to new AP by BTM
  * @disassoc_timer_threshold: threshold value till which the firmware can
- * wait before triggering the roam scan after receiving the disassoc iminent
+ * wait before triggering the roam scan after receiving the disassoc imminent
  * @btm_query_bitmask: bitmask to btm query with candidate list
  * @btm_candidate_min_score: Minimum score of the AP to consider it as a
  * candidate if the roam trigger is BTM kickout.

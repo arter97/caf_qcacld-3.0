@@ -7064,7 +7064,7 @@ enum sme_qos_statustype sme_qos_re_request_add_ts(struct mac_context *mac_ctx,
 	case SME_QOS_LINK_UP:
 	default:
 		/* print error msg, */
-		sme_err("ReAdd request in unexpected state = %d",
+		sme_err("Re-Add request in unexpected state = %d",
 			ac_info->curr_state);
 		break;
 	}

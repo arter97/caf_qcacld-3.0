@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2011-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -1386,7 +1386,7 @@ QDF_STATUS sme_rrm_neighbor_report_request(struct mac_context *mac, uint8_t
 }
 
 /**
- * rrm_calculate_neighbor_ap_roam_score() - caclulates roam score
+ * rrm_calculate_neighbor_ap_roam_score() - calculates roam score
  * @mac_ctx:                mac global context
  * @pNeighborReportDesc:    Neighbor BSS Descriptor node for which roam score
  *                          should be calculated

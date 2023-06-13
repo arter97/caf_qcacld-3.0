@@ -5116,10 +5116,11 @@ const struct nla_policy wlan_hdd_set_roam_param_policy[
 
 /**
  * hdd_set_allow_list() - parse allow list
- * @hdd_ctx:        HDD context
+ * @hdd_ctx: HDD context
  * @rso_config: rso config
- * @tb:            list of attributes
- * @vdev_id:    vdev id
+ * @tb: list of attributes
+ * @vdev_id: vdev id
+ * @rso_usr_cfg: roam userspace params
  *
  * Return: 0 on success; error number on failure
  */
@@ -6634,7 +6635,7 @@ static int hdd_get_roam_control_config(struct hdd_context *hdd_ctx,
  * @data_len: length of @data
  * @vdev_id: vdev id
  * @rso_config: roam params
- * @rso_usr_config: roam userspace params
+ * @rso_usr_cfg: roam userspace params
  *
  * Return: 0 on success; error number on failure
  */

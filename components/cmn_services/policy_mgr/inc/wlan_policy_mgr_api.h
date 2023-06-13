@@ -1681,7 +1681,7 @@ policy_mgr_current_connections_update(struct wlan_objmgr_psoc *psoc,
  * When a new connection is about to come up, change hw mode for STA/CLI
  * based upon the scan results and hw type.
  *
- * Return: status ifset HW mode is fail or already taken care of.
+ * Return: status if set HW mode is fail or already taken care of.
  */
 QDF_STATUS
 policy_mgr_change_hw_mode_sta_connect(struct wlan_objmgr_psoc *psoc,

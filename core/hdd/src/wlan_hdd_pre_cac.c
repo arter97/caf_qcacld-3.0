@@ -262,7 +262,7 @@ static int __wlan_hdd_request_pre_cac(struct hdd_context *hdd_ctx,
 	}
 
 	if (!WLAN_REG_IS_24GHZ_CH_FREQ(hdd_ap_ctx->operating_chan_freq)) {
-		hdd_err("pre CAC alllowed only when SAP is in 2.4GHz:%d",
+		hdd_err("pre CAC allowed only when SAP is in 2.4GHz:%d",
 			hdd_ap_ctx->operating_chan_freq);
 		return -EINVAL;
 	}

@@ -674,7 +674,7 @@ QDF_STATUS wma_vdev_create_set_param(struct wlan_objmgr_vdev *vdev);
 /**
  * wma_send_multi_pdev_vdev_set_params - sends dev(vdev/pdev) set params
  * @param_type: enum of type mlme_dev_setparam
- * @dev_id: id of the perticular vdev/pdev
+ * @dev_id: id of the particular vdev/pdev
  * @param: Array of structure dev_set_param with @n_params combined
  * @n_params: number of params that are combined in @param
  *
