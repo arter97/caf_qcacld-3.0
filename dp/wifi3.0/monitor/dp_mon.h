@@ -540,7 +540,8 @@ dp_vdev_set_monitor_mode_rings(struct dp_pdev *pdev,
 #endif
 
 #if defined(WDI_EVENT_ENABLE) &&\
-	(defined(QCA_ENHANCED_STATS_SUPPORT) || !defined(REMOVE_PKT_LOG))
+	(defined(QCA_ENHANCED_STATS_SUPPORT) || !defined(REMOVE_PKT_LOG) ||\
+	 defined(WLAN_FEATURE_PKT_CAPTURE_V2))
 /**
  * dp_ppdu_stats_ind_handler() - PPDU stats msg handler
  * @soc:	 HTT SOC handle
@@ -683,7 +684,8 @@ struct dp_mon_ops {
 					 struct cdp_pdev_tx_capture_stats *sts);
 #endif
 #if defined(WDI_EVENT_ENABLE) &&\
-	(defined(QCA_ENHANCED_STATS_SUPPORT) || !defined(REMOVE_PKT_LOG))
+	(defined(QCA_ENHANCED_STATS_SUPPORT) || !defined(REMOVE_PKT_LOG) ||\
+	 defined(WLAN_FEATURE_PKT_CAPTURE_V2))
 	bool (*mon_ppdu_stats_ind_handler)(struct htt_soc *soc,
 					   uint32_t *msg_word,
 					   qdf_nbuf_t htt_t2h_msg);
@@ -3074,7 +3076,8 @@ dp_monitor_pdev_tx_capture_get_stats(struct dp_soc *soc, struct dp_pdev *pdev,
  * Return: True if buffer should be freed by caller.
  */
 #if defined(WDI_EVENT_ENABLE) &&\
-	(defined(QCA_ENHANCED_STATS_SUPPORT) || !defined(REMOVE_PKT_LOG))
+	(defined(QCA_ENHANCED_STATS_SUPPORT) || !defined(REMOVE_PKT_LOG) ||\
+	 defined(WLAN_FEATURE_PKT_CAPTURE_V2))
 static inline bool dp_monitor_ppdu_stats_ind_handler(struct htt_soc *soc,
 						     uint32_t *msg_word,
 						     qdf_nbuf_t htt_t2h_msg)

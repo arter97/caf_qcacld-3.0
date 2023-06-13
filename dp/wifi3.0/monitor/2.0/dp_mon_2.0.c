@@ -1026,7 +1026,8 @@ QDF_STATUS dp_vdev_set_monitor_mode_buf_rings_tx_2_0(struct dp_pdev *pdev,
 }
 
 #if defined(WDI_EVENT_ENABLE) &&\
-	(defined(QCA_ENHANCED_STATS_SUPPORT) || !defined(REMOVE_PKT_LOG))
+	(defined(QCA_ENHANCED_STATS_SUPPORT) || !defined(REMOVE_PKT_LOG) ||\
+	 defined(WLAN_FEATURE_PKT_CAPTURE_V2))
 static inline
 void dp_mon_ppdu_stats_handler_register(struct dp_mon_soc *mon_soc)
 {
