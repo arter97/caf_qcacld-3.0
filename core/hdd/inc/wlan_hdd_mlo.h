@@ -341,6 +341,13 @@ QDF_STATUS hdd_derive_link_address_from_mld(struct qdf_mac_addr *mld_addr,
 {
 	return QDF_STATUS_E_NOSUPPORT;
 }
+
+static inline
+QDF_STATUS wlan_hdd_send_t2lm_event(struct wlan_objmgr_vdev *vdev,
+				    struct wlan_t2lm_info *t2lm)
+{
+	return QDF_STATUS_E_NOSUPPORT;
+}
 #define FEATURE_ML_LINK_STATE_COMMANDS
 #endif
 #endif
