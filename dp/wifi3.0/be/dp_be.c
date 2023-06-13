@@ -450,6 +450,7 @@ dp_hw_cookie_conversion_attach(struct dp_soc_be *be_soc,
 	return QDF_STATUS_SUCCESS;
 fail_1:
 	qdf_mem_free(cc_ctx->page_desc_base);
+	cc_ctx->page_desc_base = NULL;
 fail_0:
 	dp_desc_multi_pages_mem_free(soc, QDF_DP_HW_CC_SPT_PAGE_TYPE,
 				     &cc_ctx->page_pool, 0, false);
@@ -463,10 +464,13 @@ dp_hw_cookie_conversion_detach(struct dp_soc_be *be_soc,
 {
 	struct dp_soc *soc = DP_SOC_BE_GET_SOC(be_soc);
 
-	qdf_mem_free(cc_ctx->page_desc_base);
 	dp_desc_multi_pages_mem_free(soc, QDF_DP_HW_CC_SPT_PAGE_TYPE,
 				     &cc_ctx->page_pool, 0, false);
-	qdf_spinlock_destroy(&cc_ctx->cc_lock);
+	if (cc_ctx->page_desc_base)
+		qdf_spinlock_destroy(&cc_ctx->cc_lock);
+
+	qdf_mem_free(cc_ctx->page_desc_base);
+	cc_ctx->page_desc_base = NULL;
 
 	return QDF_STATUS_SUCCESS;
 }
