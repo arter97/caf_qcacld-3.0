@@ -3756,6 +3756,34 @@ sir_convert_assoc_resp_frame2_eht_struct(tDot11fAssocResponse *ar,
 
 #ifdef WLAN_FEATURE_11BE_MLO
 static QDF_STATUS
+sir_convert_assoc_resp_to_partner_mlo_struct(struct pe_session *session_entry,
+					     struct mlo_partner_info *partner_info,
+					     struct mlo_partner_info *ml_partner_info)
+{
+	uint16_t i, partner_idx = 0, j, link_id;
+	struct mlo_link_info *link_info;
+
+	link_info = mlo_mgr_get_ap_link(session_entry->vdev);
+	if (!link_info)
+		return QDF_STATUS_E_FAILURE;
+
+	for (i = 1; i < WLAN_MAX_ML_BSS_LINKS; i++) {
+		link_id = link_info[i].link_id;
+		for (j = 0; j < partner_info->num_partner_links; j++) {
+			if (partner_info->partner_link_info[j].link_id == link_id) {
+				ml_partner_info->partner_link_info[partner_idx++] =
+							partner_info->partner_link_info[j];
+				break;
+			}
+		}
+	}
+
+	ml_partner_info->num_partner_links = partner_idx;
+
+	return QDF_STATUS_SUCCESS;
+}
+
+static QDF_STATUS
 sir_convert_assoc_resp_frame2_mlo_struct(struct mac_context *mac,
 					 uint8_t *frame,
 					 uint32_t frame_len,
@@ -3773,6 +3801,7 @@ sir_convert_assoc_resp_frame2_mlo_struct(struct mac_context *mac,
 	uint16_t msd_cap;
 	struct qdf_mac_addr mld_mac_addr;
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
+	struct mlo_partner_info partner_info;
 
 	if (ar->mlo_ie.present) {
 		status = util_find_mlie(frame + WLAN_ASSOC_RSP_IES_OFFSET,
@@ -3782,7 +3811,10 @@ sir_convert_assoc_resp_frame2_mlo_struct(struct mac_context *mac,
 			ml_ie_info = &p_assoc_rsp->mlo_ie.mlo_ie;
 			util_get_bvmlie_persta_partner_info(ml_ie,
 					       ml_ie_total_len,
-					       &session_entry->ml_partner_info);
+					       &partner_info);
+			sir_convert_assoc_resp_to_partner_mlo_struct(session_entry,
+								     &partner_info,
+								     &session_entry->ml_partner_info);
 			if (!wlan_cm_is_roam_sync_in_progress(mac->psoc, session_entry->vdev_id)) {
 				session_entry->ml_partner_info.num_partner_links =
 				QDF_MIN(
