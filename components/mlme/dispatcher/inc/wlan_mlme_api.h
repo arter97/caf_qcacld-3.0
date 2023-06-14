@@ -4332,4 +4332,17 @@ wlan_mlme_is_bcn_prot_disabled_for_sap(struct wlan_objmgr_psoc *psoc);
  */
 uint8_t *
 wlan_mlme_get_src_addr_from_frame(struct element_info *frame);
+
+/**
+ * wlan_mlme_set_ul_mu_config() - set ul mu config
+ *
+ * @psoc: pointer to psoc object
+ * @vdev_id : vdev_id
+ * @ulmu_disable : ulmu_disable value
+ *
+ * Return: QDF Status
+ */
+QDF_STATUS
+wlan_mlme_set_ul_mu_config(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
+			   uint8_t ulmu_disable);
 #endif /* _WLAN_MLME_API_H_ */

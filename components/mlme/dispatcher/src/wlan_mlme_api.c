@@ -6975,3 +6975,153 @@ uint8_t *wlan_mlme_get_src_addr_from_frame(struct element_info *frame)
 
 	return hdr->i_addr2;
 }
+
+/**
+ * set_omi_ch_width() - set OMI ch_bw/eht_ch_bw_ext bit value from channel width
+ * @ch_width: channel width
+ * @omi_data: Pointer to omi_data object
+ *
+ * If the channel width is 20Mhz, 40Mgz, 80Mhz, 160Mhz and 80+80Mhz ch_bw set
+ * to 0, 1, 2, 3 accordingly, if channel width is 320Mhz then eht_ch_bw_ext
+ * set to 1
+ *
+ * Return: QDF_STATUS_SUCCESS on success or QDF_STATUS_E_INVAL on failure
+ */
+static QDF_STATUS
+set_omi_ch_width(enum phy_ch_width ch_width, struct omi_ctrl_tx *omi_data)
+{
+	switch (ch_width) {
+	case CH_WIDTH_20MHZ:
+		omi_data->ch_bw = 0;
+		break;
+	case CH_WIDTH_40MHZ:
+		omi_data->ch_bw = 1;
+		break;
+	case CH_WIDTH_80MHZ:
+		omi_data->ch_bw = 2;
+		break;
+	case CH_WIDTH_160MHZ:
+	case CH_WIDTH_80P80MHZ:
+		omi_data->ch_bw = 3;
+		break;
+	case CH_WIDTH_320MHZ:
+		omi_data->eht_ch_bw_ext = 1;
+		break;
+	default:
+		return QDF_STATUS_E_INVAL;
+	}
+
+	return QDF_STATUS_SUCCESS;
+}
+
+QDF_STATUS
+wlan_mlme_set_ul_mu_config(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
+			   uint8_t ulmu_disable)
+{
+	struct omi_ctrl_tx omi_data = {0};
+	uint32_t param_val = 0;
+	struct wlan_objmgr_pdev *pdev;
+	struct wlan_objmgr_vdev *vdev;
+	enum phy_ch_width ch_width;
+	uint8_t rx_nss, tx_nsts;
+	struct qdf_mac_addr macaddr = {0};
+	enum wlan_phymode peer_phymode;
+	qdf_freq_t op_chan_freq;
+	qdf_freq_t freq_seg_0;
+	QDF_STATUS status = QDF_STATUS_SUCCESS;
+
+	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, vdev_id,
+						    WLAN_MLME_OBJMGR_ID);
+	if (!vdev) {
+		mlme_err("vdev %d: vdev is NULL", vdev_id);
+		return QDF_STATUS_E_INVAL;
+	}
+
+	pdev = wlan_vdev_get_pdev(vdev);
+	if (!pdev) {
+		mlme_err("pdev is NULL");
+		status = QDF_STATUS_E_INVAL;
+		goto err;
+	}
+
+	if (!cm_is_vdevid_connected(pdev, vdev_id)) {
+		mlme_err("STA is not connected, Session_id: %d", vdev_id);
+		status = QDF_STATUS_E_INVAL;
+		goto err;
+	}
+
+	status = wlan_vdev_get_bss_peer_mac(vdev, &macaddr);
+	if (QDF_STATUS_SUCCESS != status) {
+		mlme_err("Failed to get bss peer mac, Err : %d", status);
+		goto err;
+	}
+
+	status = mlme_get_peer_phymode(psoc, macaddr.bytes, &peer_phymode);
+	if (QDF_STATUS_SUCCESS != status) {
+		mlme_err("Failed to get peer phymode, Err : %d", status);
+		goto err;
+	}
+
+	if (!(IS_WLAN_PHYMODE_HE(peer_phymode) ||
+	      IS_WLAN_PHYMODE_EHT(peer_phymode))) {
+		mlme_err("Invalid mode");
+		status = QDF_STATUS_E_INVAL;
+		goto err;
+	}
+
+	status = wlan_mlme_get_sta_rx_nss(psoc, vdev, &rx_nss);
+	if (QDF_STATUS_SUCCESS != status) {
+		mlme_err("Failed to get sta_rx_nss, Err : %d", status);
+		goto err;
+	}
+
+	status = wlan_mlme_get_sta_tx_nss(psoc, vdev, &tx_nsts);
+	if (QDF_STATUS_SUCCESS != status) {
+		mlme_err("Failed to get sta_tx_nss, Err : %d", status);
+		goto err;
+	}
+
+	status = wlan_get_op_chan_freq_info_vdev_id(pdev, vdev_id,
+						    &op_chan_freq,
+						    &freq_seg_0, &ch_width);
+	if (QDF_STATUS_SUCCESS != status) {
+		mlme_err("Failed to get bw, Err : %d", status);
+		goto err;
+	}
+
+	omi_data.omi_in_vht = 0x1;
+	omi_data.omi_in_he = 0x1;
+	omi_data.a_ctrl_id = 0x1;
+
+	status = set_omi_ch_width(ch_width, &omi_data);
+	if (QDF_STATUS_SUCCESS != status) {
+		mlme_err("Failed to set bw, Err : %d", status);
+		goto err;
+	}
+
+	omi_data.rx_nss = rx_nss - 1;
+	omi_data.tx_nsts = tx_nsts - 1;
+	omi_data.ul_mu_dis = ulmu_disable;
+	omi_data.ul_mu_data_dis = 0;
+
+	mlme_debug("OMI: BW %d TxNSTS %d RxNSS %d ULMU %d, OMI_VHT %d, OMI_HE %d",
+		   omi_data.ch_bw, omi_data.tx_nsts, omi_data.rx_nss,
+		   omi_data.ul_mu_dis, omi_data.omi_in_vht, omi_data.omi_in_he);
+	mlme_debug("EHT OMI: BW %d rx nss %d tx nss %d", omi_data.eht_ch_bw_ext,
+		   omi_data.eht_rx_nss_ext, omi_data.eht_tx_nss_ext);
+
+	qdf_mem_copy(&param_val, &omi_data, sizeof(omi_data));
+
+	mlme_debug("param val %08X, bssid:" QDF_MAC_ADDR_FMT, param_val,
+		   QDF_MAC_ADDR_REF(macaddr.bytes));
+
+	status = wlan_util_vdev_peer_set_param_send(vdev, macaddr.bytes,
+						    WMI_PEER_PARAM_XMIT_OMI,
+						    param_val);
+	if (QDF_STATUS_SUCCESS != status)
+		mlme_err("set_peer_param_cmd returned %d", status);
+
+err:
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_OBJMGR_ID);
+	return status;
+}
