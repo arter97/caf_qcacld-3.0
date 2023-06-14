@@ -6938,7 +6938,6 @@ void dp_send_usr_ack_frm_to_stack(struct dp_soc *soc,
 	struct dp_ast_entry *ast_entry;
 	uint32_t peer_id;
 	uint32_t ast_index;
-	uint8_t *ptr_mac_addr;
 	struct cdp_tx_indication_mpdu_info *mpdu_info = NULL;
 
 	mpdu_info = &tx_capture_info.mpdu_info;
@@ -6953,18 +6952,6 @@ void dp_send_usr_ack_frm_to_stack(struct dp_soc *soc,
 
 	if (ast_index >=
 	    wlan_cfg_get_max_ast_idx(soc->wlan_cfg_ctx)) {
-		if (ppdu_info->sw_frame_group_id ==
-		    HAL_MPDU_SW_FRAME_GROUP_CTRL_BAR)
-			return;
-
-		ptr_mac_addr = &ppdu_info->nac_info.mac_addr2[0];
-		if (!dp_peer_or_pdev_tx_cap_enabled(pdev,
-						    NULL, ptr_mac_addr))
-			return;
-
-		if (IEEE80211_IS_ZERO(ppdu_info->nac_info.mac_addr2))
-			return;
-
 		set_mpdu_info(&tx_capture_info,
 			      rx_status, rx_user_status);
 		tx_capture_info.mpdu_nbuf =
