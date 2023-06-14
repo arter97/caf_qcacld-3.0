@@ -2969,11 +2969,32 @@ dp_ipa_set_wdi_hdr_type(qdf_ipa_wdi_hdr_info_t *hdr_info)
 		QDF_IPA_WDI_HDR_INFO_HDR_TYPE(hdr_info) =
 			IPA_HDR_L2_ETHERNET_II;
 }
+
+/**
+ * dp_ipa_setup_meta_data_mask() - Pass meta data mask to IPA
+ * @in: ipa in params
+ *
+ * Pass meta data mask to IPA.
+ *
+ * Return: none
+ */
+static void dp_ipa_setup_meta_data_mask(qdf_ipa_wdi_reg_intf_in_params_t *in)
+{
+	if (ucfg_ipa_is_wds_enabled())
+		QDF_IPA_WDI_REG_INTF_IN_PARAMS_META_DATA_MASK(in) = WLAN_IPA_AST_META_DATA_MASK;
+	else
+		QDF_IPA_WDI_REG_INTF_IN_PARAMS_META_DATA_MASK(in) = WLAN_IPA_META_DATA_MASK;
+}
 #else
 static inline void
 dp_ipa_set_wdi_hdr_type(qdf_ipa_wdi_hdr_info_t *hdr_info)
 {
 	QDF_IPA_WDI_HDR_INFO_HDR_TYPE(hdr_info) = IPA_HDR_L2_ETHERNET_II;
+}
+
+static void dp_ipa_setup_meta_data_mask(qdf_ipa_wdi_reg_intf_in_params_t *in)
+{
+	QDF_IPA_WDI_REG_INTF_IN_PARAMS_META_DATA_MASK(in) = WLAN_IPA_META_DATA_MASK;
 }
 #endif
 
@@ -2994,31 +3015,10 @@ dp_ipa_set_wdi_vlan_hdr_type(qdf_ipa_wdi_hdr_info_t *hdr_info)
 		QDF_IPA_WDI_HDR_INFO_HDR_TYPE(hdr_info) =
 			IPA_HDR_L2_802_1Q;
 }
-
-/**
- * dp_ipa_setup_meta_data_mask() - Pass meta data mask to IPA
- * @in: ipa in params
- *
- * Pass meta data mask to IPA.
- *
- * Return: none
- */
-static void dp_ipa_setup_meta_data_mask(qdf_ipa_wdi_reg_intf_in_params_t *in)
-{
-	if (ucfg_ipa_is_wds_enabled())
-		QDF_IPA_WDI_REG_INTF_IN_PARAMS_META_DATA_MASK(in) = WLAN_IPA_AST_META_DATA_MASK;
-	else
-		QDF_IPA_WDI_REG_INTF_IN_PARAMS_META_DATA_MASK(in) = WLAN_IPA_META_DATA_MASK;
-}
 #else
 static inline void
 dp_ipa_set_wdi_vlan_hdr_type(qdf_ipa_wdi_hdr_info_t *hdr_info)
 { }
-
-static void dp_ipa_setup_meta_data_mask(qdf_ipa_wdi_reg_intf_in_params_t *in)
-{
-	QDF_IPA_WDI_REG_INTF_IN_PARAMS_META_DATA_MASK(in) = WLAN_IPA_META_DATA_MASK;
-}
 #endif
 
 QDF_STATUS dp_ipa_setup_iface(char *ifname, uint8_t *mac_addr,
