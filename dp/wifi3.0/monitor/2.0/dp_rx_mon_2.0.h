@@ -50,6 +50,9 @@
 			    + (DP_RX_MON_TLV_TOTAL_LEN))
 
 #define DP_RX_MON_WQ_THRESHOLD 128
+
+#define DP_RX_MON_MAX_RX_HEADER_LEN 128
+
 /*
  * dp_rx_mon_buffers_alloc() - allocate rx monitor buffers
  * @soc: DP soc handle
