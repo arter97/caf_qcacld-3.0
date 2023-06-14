@@ -136,6 +136,26 @@ QDF_STATUS hdd_cm_get_handoff_param(struct wlan_objmgr_psoc *psoc,
  */
 QDF_STATUS hdd_cm_napi_serialize_control(bool action);
 
+#ifdef WLAN_BOOST_CPU_FREQ_IN_ROAM
+/**
+ * hdd_cm_perfd_set_cpufreq() - API to set CPU min freq
+ * @action: set or reset the CPU freq
+ *
+ * This function sets/resets the CPU min frequency
+ * by sending netlink msg to cnss-daemon, which will
+ * communicate to perf daemon to set/reset CPU freq.
+ *
+ * Return: qdf status
+ */
+QDF_STATUS hdd_cm_perfd_set_cpufreq(bool action);
+#else
+static inline
+QDF_STATUS hdd_cm_perfd_set_cpufreq(bool action)
+{
+	return QDF_STATUS_SUCCESS;
+}
+#endif
+
 #ifdef WLAN_FEATURE_FILS_SK
 /**
  * hdd_cm_save_gtk() - save gtk api
@@ -308,11 +328,11 @@ void hdd_cm_save_connect_status(struct hdd_adapter *adapter,
 
 /**
  * hdd_cm_is_vdev_associated() - Checks if vdev is associated or not
- * @adapter: pointer to the adapter structure
+ * @link_info: pointer to the link info structure
  *
  * Returns: True if vdev is associated else false
  */
-bool hdd_cm_is_vdev_associated(struct hdd_adapter *adapter);
+bool hdd_cm_is_vdev_associated(struct wlan_hdd_link_info *link_info);
 
 /**
  * hdd_cm_is_vdev_connected() - Checks if vdev is connected or not

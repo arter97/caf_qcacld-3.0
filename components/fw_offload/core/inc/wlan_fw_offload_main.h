@@ -221,6 +221,7 @@ struct wlan_fwol_tsf_accuracy_configs {
  * @ie_allowlist_cfg: IE Allowlist related config items
  * @neighbor_report_cfg: 11K neighbor report config
  * @ani_enabled: ANI enable/disable
+ * @pcie_config: to control pcie gen and lane params
  * @enable_rts_sifsbursting: Enable RTS SIFS Bursting
  * @enable_sifs_burst: Enable SIFS burst
  * @max_mpdus_inampdu: Max number of MPDUS
@@ -264,6 +265,7 @@ struct wlan_fwol_cfg {
 	struct wlan_fwol_ie_allowlist ie_allowlist_cfg;
 	struct wlan_fwol_neighbor_report_cfg neighbor_report_cfg;
 	bool ani_enabled;
+	bool pcie_config;
 	bool enable_rts_sifsbursting;
 	uint8_t enable_sifs_burst;
 	uint8_t max_mpdus_inampdu;

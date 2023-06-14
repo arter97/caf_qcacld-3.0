@@ -96,6 +96,10 @@ config WLAN_FEATURE_FIPS
 	bool "Enable FIPS certification feature"
 	default n
 
+config WLAN_FEATURE_LL_LT_SAP
+	bool "Enable Low latency low throughput SAP feature"
+	default n
+
 config WLAN_FEATURE_LPSS
 	bool "Enable the WLAN LPSS feature"
 	default n
@@ -133,6 +137,14 @@ config WLAN_SYNC_TSF
 
 config WLAN_TX_FLOW_CONTROL_V2
 	bool "Enable tx flow control version:2"
+	default n
+
+config QCA_DMA_PADDR_CHECK
+	bool "Enable dma memory addr check"
+	default n
+
+config PADDR_CHECK_ON_3RD_PARTY_PLATFORM
+	bool "Enable data path memory addr check on third-party platforms"
 	default n
 
 endif # QCA_CLD_WLAN

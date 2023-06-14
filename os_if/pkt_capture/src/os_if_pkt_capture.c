@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2016-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -74,7 +74,8 @@ QDF_STATUS os_if_monitor_mode_configure(struct hdd_adapter *adapter,
 	struct nlattr *tb[SET_MONITOR_MODE_CONFIG_MAX + 1];
 	QDF_STATUS status;
 
-	vdev = hdd_objmgr_get_vdev_by_user(adapter, WLAN_PKT_CAPTURE_ID);
+	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink,
+					   WLAN_PKT_CAPTURE_ID);
 	if (!vdev)
 		return QDF_STATUS_E_INVAL;
 

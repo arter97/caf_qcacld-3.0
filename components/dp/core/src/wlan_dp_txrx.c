@@ -304,7 +304,7 @@ dp_tx_rx_collect_connectivity_stats_info(qdf_nbuf_t nbuf, void *context,
 							rx_icmpv4_rsp_count;
 				*pkt_type =
 				DP_CONNECTIVITY_CHECK_SET_ICMPV4;
-				dp_info("ICMPv4 Res packet");
+				dp_info("ICMPv4 resp packet");
 			}
 		} else if (qdf_nbuf_is_ipv4_tcp_pkt(nbuf)) {
 			if (qdf_nbuf_data_is_tcp_syn_ack(nbuf) &&
@@ -324,7 +324,7 @@ dp_tx_rx_collect_connectivity_stats_info(qdf_nbuf_t nbuf, void *context,
 				++dp_intf->dp_stats.dns_stats.
 							rx_dns_rsp_count;
 				*pkt_type = DP_CONNECTIVITY_CHECK_SET_DNS;
-				dp_info("DNS response packet");
+				dp_info("DNS resp packet");
 			}
 		}
 		break;
@@ -679,14 +679,14 @@ dp_start_xmit(struct wlan_dp_intf *dp_intf, qdf_nbuf_t nbuf)
 	/*
 	 * If a transmit function is not registered, drop packet
 	 */
-	if (!dp_intf->tx_fn) {
+	if (!dp_intf->txrx_ops.tx.tx) {
 		dp_err("TX function not registered by the data path");
 		goto drop_pkt_and_release_nbuf;
 	}
 
 	dp_fix_broadcast_eapol(dp_intf, nbuf);
 
-	if (dp_intf->tx_fn(soc, dp_intf->intf_id, nbuf)) {
+	if (dp_intf->txrx_ops.tx.tx(soc, dp_intf->intf_id, nbuf)) {
 		dp_debug_rl("Failed to send packet from adapter %u",
 			    dp_intf->intf_id);
 		goto drop_pkt_and_release_nbuf;
@@ -1357,8 +1357,8 @@ QDF_STATUS dp_rx_pkt_thread_enqueue_cbk(void *intf_ctx,
 		return QDF_STATUS_E_FAILURE;
 
 	if (dp_intf->runtime_disable_rx_thread &&
-	    dp_intf->rx_stack)
-		return dp_intf->rx_stack(dp_intf, nbuf_list);
+	    dp_intf->txrx_ops.rx.rx_stack)
+		return dp_intf->txrx_ops.rx.rx_stack(dp_intf, nbuf_list);
 
 	intf_id = dp_intf->intf_id;
 

@@ -592,11 +592,6 @@ struct hdd_stats {
 	struct hdd_peer_stats peer_stats;
 	struct hdd_pmf_stats hdd_pmf_stats;
 	struct pmf_bcn_protect_stats bcn_protect_stats;
-	qdf_atomic_t is_ll_stats_req_pending;
-
-#ifdef FEATURE_CLUB_LL_STATS_AND_GET_STATION
-	uint32_t sta_stats_cached_timestamp;
-#endif
 };
 
 /**
@@ -992,8 +987,11 @@ enum udp_qos_upgrade {
 	UDP_QOS_UPGRADE_MAX
 };
 
+#define WLAN_HDD_DEFLINK_IDX	0
+
 /**
  * struct wlan_hdd_link_info - Data structure to store the link specific info
+ * @adapter: Reverse pointer to HDD adapter
  * @vdev_id: Unique value to identify VDEV. Equal to WLAN_UMAC_VDEV_ID_MAX
  *           for invalid VDEVs.
  * @vdev_lock: Lock to protect VDEV pointer access.
@@ -1017,8 +1015,12 @@ enum udp_qos_upgrade {
  * @snr: SNR measured from @rssi
  * @rssi_on_disconnect: Rssi at disconnection time in STA mode
  * @rssi_send: Notify RSSI over lpass
+ * @is_mlo_vdev_active: is the mlo vdev currently active
+ * @estimated_linkspeed: estimated link speed
+ * @hdd_stats: HDD statistics
  */
 struct wlan_hdd_link_info {
+	struct hdd_adapter *adapter;
 	uint8_t vdev_id;
 	qdf_spinlock_t vdev_lock;
 	struct wlan_objmgr_vdev *vdev;
@@ -1035,6 +1037,9 @@ struct wlan_hdd_link_info {
 #ifdef WLAN_FEATURE_LPSS
 	bool rssi_send;
 #endif
+	bool is_mlo_vdev_active;
+	uint32_t estimated_linkspeed;
+	struct hdd_stats hdd_stats;
 };
 
 /**
@@ -1069,8 +1074,9 @@ struct wlan_hdd_tx_power {
  * @mac_addr: Current MAC Address for the adapter
  * @mld_addr: MLD address for adapter
  * @event_flags: a bitmap of hdd_adapter_flags
- * @hdd_stats: HDD statistics
- * @estimated_linkspeed: estimated link speed
+ * @active_links: a bitmap of active links in @link_info array
+ * @is_ll_stats_req_pending: atomic variable to check active stats req
+ * @sta_stats_cached_timestamp: last updated stats timestamp
  * @qdf_monitor_mode_vdev_up_event: QDF event for monitor mode vdev up
  * @disconnect_comp_var: completion variable for disconnect callback
  * @linkup_event_var: completion variable for Linkup Event
@@ -1198,10 +1204,13 @@ struct hdd_adapter {
 	struct qdf_mac_addr mac_addr;
 	struct qdf_mac_addr mld_addr;
 	unsigned long event_flags;
+	unsigned long active_links;
 
-	struct hdd_stats hdd_stats;
+	qdf_atomic_t is_ll_stats_req_pending;
 
-	uint32_t estimated_linkspeed;
+#ifdef FEATURE_CLUB_LL_STATS_AND_GET_STATION
+	uint32_t sta_stats_cached_timestamp;
+#endif
 
 #ifdef FEATURE_MONITOR_MODE_SUPPORT
 	qdf_event_t qdf_monitor_mode_vdev_up_event;
@@ -1368,14 +1377,13 @@ struct hdd_adapter {
 	struct wlan_hdd_tx_power tx_power;
 };
 
-#define WLAN_HDD_GET_STATION_CTX_PTR(adapter) \
-		(&(adapter)->deflink->session.station)
-#define WLAN_HDD_GET_AP_CTX_PTR(adapter) (&(adapter)->deflink->session.ap)
+#define WLAN_HDD_GET_STATION_CTX_PTR(link_info) (&(link_info)->session.station)
+#define WLAN_HDD_GET_AP_CTX_PTR(link_info) (&(link_info)->session.ap)
 #define WLAN_HDD_GET_CTX(adapter) ((adapter)->hdd_ctx)
-#define WLAN_HDD_GET_HOSTAP_STATE_PTR(adapter) \
-				(&(adapter)->deflink->session.ap.hostapd_state)
-#define WLAN_HDD_GET_SAP_CTX_PTR(adapter) \
-			((adapter)->deflink->session.ap.sap_context)
+#define WLAN_HDD_GET_HOSTAP_STATE_PTR(link_info) \
+		(&(WLAN_HDD_GET_AP_CTX_PTR((link_info))->hostapd_state))
+#define WLAN_HDD_GET_SAP_CTX_PTR(link_info) \
+		(WLAN_HDD_GET_AP_CTX_PTR((link_info))->sap_context)
 
 #ifdef WLAN_FEATURE_NAN
 #define WLAN_HDD_IS_NDP_ENABLED(hdd_ctx) ((hdd_ctx)->nan_datapath_enabled)
@@ -2567,14 +2575,41 @@ void hdd_validate_next_adapter(struct hdd_adapter **curr,
 	     __hdd_take_ref_and_fetch_next_adapter_safe(hdd_ctx, adapter, \
 							next_adapter, dbgid))
 
+#define __hdd_adapter_deflink_idx(link_idx) (link_idx = WLAN_HDD_DEFLINK_IDX)
+#define __hdd_is_link_idx_valid(link_idx) ((link_idx) < WLAN_MAX_MLD)
+#define __hdd_adapter_next_link_idx(link_idx) ((link_idx)++)
+
 /**
- * wlan_hdd_get_adapter_from_objmgr() - Fetch adapter from objmgr
+ * hdd_adapter_for_each_link_entry() - Link info iterator for all
+ * link_info fields.
+ * @adapter: HDD adapter to iterate each link_info
+ * @link_idx: Variable to save each iterating index
+ *
+ * The function iterates from the start index of link_info array
+ * in @adapter till the end of the link_info array.
+ */
+
+#define hdd_adapter_for_each_link_entry(adapter, link_idx) \
+	for (__hdd_adapter_deflink_idx(link_idx); \
+		__hdd_is_link_idx_valid(link_idx); \
+		__hdd_adapter_next_link_idx(link_idx))
+
+static inline uint8_t
+hdd_adapter_get_index_of_link_info(struct wlan_hdd_link_info *link_info)
+{
+	unsigned long offset = link_info - link_info->adapter->deflink;
+
+	return (offset / sizeof(struct wlan_hdd_link_info));
+}
+
+/**
+ * wlan_hdd_get_link_info_from_objmgr() - Fetch adapter from objmgr
  * @vdev: the vdev whose corresponding adapter has to be fetched
  *
- * Return: the address of the adapter
+ * Return: Address of link info pointer in HDD adapter corresponding to VDEV
  */
-struct hdd_adapter *
-wlan_hdd_get_adapter_from_objmgr(struct wlan_objmgr_vdev *vdev);
+struct wlan_hdd_link_info *
+wlan_hdd_get_link_info_from_objmgr(struct wlan_objmgr_vdev *vdev);
 
 struct hdd_adapter *hdd_open_adapter(struct hdd_context *hdd_ctx,
 				     uint8_t session_type,
@@ -2615,17 +2650,17 @@ QDF_STATUS hdd_reset_all_adapters(struct hdd_context *hdd_ctx);
 QDF_STATUS hdd_start_all_adapters(struct hdd_context *hdd_ctx);
 
 /**
- * hdd_get_adapter_by_vdev() - Return adapter with the given vdev id
+ * hdd_get_link_info_by_vdev() - Return link info with the given vdev id
  * @hdd_ctx: hdd context.
- * @vdev_id: vdev id for the adapter to get.
+ * @vdev_id: vdev id for the link info to get.
  *
- * This function is used to get the adapter with provided vdev id
+ * This function is used to get the link info with provided vdev id
  *
  * Return: adapter pointer if found
  *
  */
-struct hdd_adapter *hdd_get_adapter_by_vdev(struct hdd_context *hdd_ctx,
-					    uint32_t vdev_id);
+struct wlan_hdd_link_info *
+hdd_get_link_info_by_vdev(struct hdd_context *hdd_ctx, uint32_t vdev_id);
 
 /**
  * hdd_adapter_get_by_reference() - Return adapter with the given reference
@@ -3097,6 +3132,25 @@ static inline bool hdd_dynamic_mac_addr_supported(struct hdd_context *hdd_ctx)
 	return false;
 }
 #endif
+
+/**
+ * hdd_adapter_get_link_info_ptr() - To get the pointer of link_info
+ * in adapter.
+ * @adapter: HDD adapter
+ * @link_idx: Index of link_info in @adapter.
+ *
+ * The API returns link_info in @adapter pointed at @link_idx in the array.
+ *
+ * Return: Pointer to wlan_hdd_link_info or NULL.
+ */
+static inline struct wlan_hdd_link_info *
+hdd_adapter_get_link_info_ptr(struct hdd_adapter *adapter, uint8_t link_idx)
+{
+	if (!adapter || (link_idx >= WLAN_MAX_MLD))
+		return NULL;
+
+	return &adapter->link_info[link_idx];
+}
 
 /**
  * hdd_start_vendor_acs(): Start vendor ACS procedure
@@ -3852,7 +3906,7 @@ struct csr_roam_profile *hdd_roam_profile(struct hdd_adapter *adapter)
 {
 	struct hdd_station_ctx *sta_ctx;
 
-	sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter);
+	sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter->deflink);
 
 	return &sta_ctx->roam_profile;
 }
@@ -3997,17 +4051,19 @@ int wlan_hdd_send_mcc_vdev_quota(struct hdd_adapter *adapter, int sval);
 int wlan_hdd_send_mcc_latency(struct hdd_adapter *adapter, int sval);
 
 /**
- * wlan_hdd_get_adapter_from_vdev()- Get adapter from vdev id
+ * wlan_hdd_get_link_info_from_vdev()- Get link info from vdev id
  * and PSOC object data
  * @psoc: Psoc object data
  * @vdev_id: vdev id
  *
- * Get adapter from vdev id and PSOC object data
+ * Get link info from vdev id and PSOC object data
  *
- * Return: adapter pointer
+ * Return: link info pointer
  */
-struct hdd_adapter *wlan_hdd_get_adapter_from_vdev(struct wlan_objmgr_psoc
-					*psoc, uint8_t vdev_id);
+struct wlan_hdd_link_info *
+wlan_hdd_get_link_info_from_vdev(struct wlan_objmgr_psoc *psoc,
+				 uint8_t vdev_id);
+
 /**
  * hdd_unregister_notifiers()- unregister kernel notifiers
  * @hdd_ctx: Hdd Context
@@ -4829,17 +4885,19 @@ void hdd_check_for_net_dev_ref_leak(struct hdd_adapter *adapter);
 /**
  * hdd_dynamic_mac_address_set(): API to set MAC address, when interface
  *                                is up.
- * @hdd_ctx: Pointer to HDD context
  * @adapter: Pointer to hdd_adapter
  * @mac_addr: MAC address to set
+ * @mld_addr: MLD address to set
+ * @update_self_peer: Set to true to update self peer's address
  *
  * This API is used to update the current VDEV MAC address.
  *
  * Return: 0 for success. non zero valure for failure.
  */
-int hdd_dynamic_mac_address_set(struct hdd_context *hdd_ctx,
-				struct hdd_adapter *adapter,
-				struct qdf_mac_addr mac_addr);
+int hdd_dynamic_mac_address_set(struct hdd_adapter *adapter,
+				struct qdf_mac_addr mac_addr,
+				struct qdf_mac_addr mld_addr,
+				bool update_self_peer);
 
 /**
  * hdd_is_dynamic_set_mac_addr_allowed() - API to check dynamic MAC address
@@ -4853,7 +4911,6 @@ bool hdd_is_dynamic_set_mac_addr_allowed(struct hdd_adapter *adapter);
 #if defined(WLAN_FEATURE_11BE_MLO) && defined(CFG80211_11BE_BASIC)
 /**
  * hdd_update_vdev_mac_address() - Update VDEV MAC address dynamically
- * @hdd_ctx: Pointer to HDD context
  * @adapter: Pointer to HDD adapter
  * @mac_addr: MAC address to be updated
  *
@@ -4861,28 +4918,28 @@ bool hdd_is_dynamic_set_mac_addr_allowed(struct hdd_adapter *adapter);
  *
  * Return: 0 for Success. Error code for failure
  */
-int hdd_update_vdev_mac_address(struct hdd_context *hdd_ctx,
-				struct hdd_adapter *adapter,
+int hdd_update_vdev_mac_address(struct hdd_adapter *adapter,
 				struct qdf_mac_addr mac_addr);
 #else
-static inline int hdd_update_vdev_mac_address(struct hdd_context *hdd_ctx,
-					      struct hdd_adapter *adapter,
+static inline int hdd_update_vdev_mac_address(struct hdd_adapter *adapter,
 					      struct qdf_mac_addr mac_addr)
 {
-	return hdd_dynamic_mac_address_set(hdd_ctx, adapter, mac_addr);
+	struct qdf_mac_addr mld_addr = QDF_MAC_ADDR_ZERO_INIT;
+
+	return hdd_dynamic_mac_address_set(adapter, mac_addr, mld_addr, true);
 }
 #endif /* WLAN_FEATURE_11BE_MLO */
 #else
-static inline int hdd_update_vdev_mac_address(struct hdd_context *hdd_ctx,
-					      struct hdd_adapter *adapter,
+static inline int hdd_update_vdev_mac_address(struct hdd_adapter *adapter,
 					      struct qdf_mac_addr mac_addr)
 {
 	return 0;
 }
 
-static inline int hdd_dynamic_mac_address_set(struct hdd_context *hdd_ctx,
-					      struct hdd_adapter *adapter,
-					      struct qdf_mac_addr mac_addr)
+static inline int hdd_dynamic_mac_address_set(struct hdd_adapter *adapter,
+					      struct qdf_mac_addr mac_addr,
+					      struct qdf_mac_addr mld_addr,
+					      bool update_self_peer)
 {
 	return 0;
 }

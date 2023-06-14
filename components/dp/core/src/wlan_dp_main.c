@@ -36,6 +36,8 @@
 #include "init_deinit_lmac.h"
 #include <hif.h>
 #include <htc_api.h>
+#include <cdp_txrx_cmn_reg.h>
+#include <cdp_txrx_bus.h>
 #ifdef FEATURE_DIRECT_LINK
 #include "dp_internal.h"
 #include "cdp_txrx_ctrl.h"
@@ -849,7 +851,8 @@ dp_peer_obj_create_notification(struct wlan_objmgr_peer *peer, void *arg)
 						       sta_info,
 						       QDF_STATUS_SUCCESS);
 	if (QDF_IS_STATUS_ERROR(status)) {
-		dp_err("DP peer attach failed");
+		dp_err("DP peer ("QDF_MAC_ADDR_FMT") attach failed",
+			QDF_MAC_ADDR_REF(peer->macaddr));
 		qdf_mem_free(sta_info);
 		return status;
 	}
@@ -881,7 +884,8 @@ dp_peer_obj_destroy_notification(struct wlan_objmgr_peer *peer, void *arg)
 	status = wlan_objmgr_peer_component_obj_detach(peer, WLAN_COMP_DP,
 						       sta_info);
 	if (QDF_IS_STATUS_ERROR(status))
-		dp_err("DP peer detach failed");
+		dp_err("DP peer ("QDF_MAC_ADDR_FMT") detach failed",
+			QDF_MAC_ADDR_REF(peer->macaddr));
 
 	qdf_mem_free(sta_info);
 
@@ -989,7 +993,7 @@ dp_vdev_obj_destroy_notification(struct wlan_objmgr_vdev *vdev, void *arg)
 			dp_err("eap frm done event destroy failed!!");
 			return status;
 		}
-		dp_intf->tx_fn = NULL;
+		dp_intf->txrx_ops.tx.tx = NULL;
 		dp_intf->sap_tx_block_mask |= DP_TX_FN_CLR;
 	}
 	qdf_mem_zero(&dp_intf->conn_info, sizeof(struct wlan_dp_conn_info));
@@ -1552,6 +1556,145 @@ bool dp_is_data_stall_event_enabled(uint32_t evt)
 	return false;
 }
 
+QDF_STATUS __wlan_dp_runtime_suspend(ol_txrx_soc_handle soc, uint8_t pdev_id)
+{
+	return cdp_runtime_suspend(soc, pdev_id);
+}
+
+QDF_STATUS __wlan_dp_runtime_resume(ol_txrx_soc_handle soc, uint8_t pdev_id)
+{
+	return cdp_runtime_resume(soc, pdev_id);
+}
+
+QDF_STATUS __wlan_dp_bus_suspend(ol_txrx_soc_handle soc, uint8_t pdev_id)
+{
+	return cdp_bus_suspend(soc, pdev_id);
+}
+
+QDF_STATUS __wlan_dp_bus_resume(ol_txrx_soc_handle soc, uint8_t pdev_id)
+{
+	return cdp_bus_resume(soc, pdev_id);
+}
+
+void *wlan_dp_txrx_soc_attach(struct dp_txrx_soc_attach_params *params,
+			      bool *is_wifi3_0_target)
+{
+	void *dp_soc = NULL;
+	struct hif_opaque_softc *hif_context;
+	HTC_HANDLE htc_ctx = cds_get_context(QDF_MODULE_ID_HTC);
+	qdf_device_t qdf_ctx = cds_get_context(QDF_MODULE_ID_QDF_DEVICE);
+
+	hif_context = cds_get_context(QDF_MODULE_ID_HIF);
+
+	if (TARGET_TYPE_QCA6290 == params->target_type ||
+	    TARGET_TYPE_QCA6390 == params->target_type ||
+	    TARGET_TYPE_QCA6490 == params->target_type ||
+	    TARGET_TYPE_QCA6750 == params->target_type) {
+		dp_soc = cdp_soc_attach(LITHIUM_DP, hif_context,
+					params->target_psoc, htc_ctx,
+					qdf_ctx, params->dp_ol_if_ops);
+
+		if (dp_soc)
+			if (!cdp_soc_init(dp_soc, LITHIUM_DP,
+					  hif_context, params->target_psoc,
+					  htc_ctx, qdf_ctx,
+					  params->dp_ol_if_ops))
+				goto err_soc_detach;
+		*is_wifi3_0_target = true;
+	} else if (params->target_type == TARGET_TYPE_KIWI ||
+		   params->target_type == TARGET_TYPE_MANGO ||
+		   params->target_type == TARGET_TYPE_PEACH) {
+		dp_soc = cdp_soc_attach(BERYLLIUM_DP, hif_context,
+					params->target_psoc,
+					htc_ctx, qdf_ctx,
+					params->dp_ol_if_ops);
+		if (dp_soc)
+			if (!cdp_soc_init(dp_soc, BERYLLIUM_DP, hif_context,
+					  params->target_psoc, htc_ctx,
+					  qdf_ctx, params->dp_ol_if_ops))
+				goto err_soc_detach;
+		*is_wifi3_0_target = true;
+	} else if (params->target_type == TARGET_TYPE_WCN6450) {
+		dp_soc =
+			cdp_soc_attach(RHINE_DP, hif_context,
+				       params->target_psoc, htc_ctx,
+				       qdf_ctx, params->dp_ol_if_ops);
+		if (dp_soc)
+			if (!cdp_soc_init(dp_soc, RHINE_DP, hif_context,
+					  params->target_psoc, htc_ctx,
+					  qdf_ctx, params->dp_ol_if_ops))
+				goto err_soc_detach;
+		*is_wifi3_0_target = true;
+	} else {
+		dp_soc = cdp_soc_attach(MOB_DRV_LEGACY_DP, hif_context,
+					params->target_psoc, htc_ctx, qdf_ctx,
+					params->dp_ol_if_ops);
+	}
+
+	return dp_soc;
+
+err_soc_detach:
+	cdp_soc_detach(dp_soc);
+	dp_soc = NULL;
+
+	return dp_soc;
+}
+
+void wlan_dp_txrx_soc_detach(ol_txrx_soc_handle soc)
+{
+	cdp_soc_deinit(soc);
+	cdp_soc_detach(soc);
+}
+
+QDF_STATUS wlan_dp_txrx_attach_target(ol_txrx_soc_handle soc, uint8_t pdev_id)
+{
+	QDF_STATUS qdf_status;
+	int errno;
+
+	qdf_status = cdp_soc_attach_target(soc);
+	if (QDF_IS_STATUS_ERROR(qdf_status)) {
+		dp_err("Failed to attach soc target; status:%d", qdf_status);
+		return qdf_status;
+	}
+
+	errno = cdp_pdev_attach_target(soc, pdev_id);
+	if (errno) {
+		dp_err("Failed to attach pdev target; errno:%d", errno);
+		qdf_status = QDF_STATUS_E_FAILURE;
+		goto err_soc_detach_target;
+	}
+
+	return qdf_status;
+
+err_soc_detach_target:
+	/* NOP */
+	return qdf_status;
+}
+
+QDF_STATUS wlan_dp_txrx_pdev_attach(ol_txrx_soc_handle soc)
+{
+	struct wlan_dp_psoc_context *dp_ctx;
+	struct cdp_pdev_attach_params pdev_params = { 0 };
+
+	dp_ctx =  dp_get_context();
+
+	pdev_params.htc_handle = cds_get_context(QDF_MODULE_ID_HTC);
+	pdev_params.qdf_osdev = cds_get_context(QDF_MODULE_ID_QDF_DEVICE);
+	pdev_params.pdev_id = 0;
+
+	return cdp_pdev_attach(cds_get_context(QDF_MODULE_ID_SOC),
+			       &pdev_params);
+}
+
+QDF_STATUS wlan_dp_txrx_pdev_detach(ol_txrx_soc_handle soc, uint8_t pdev_id,
+				    int force)
+{
+	struct wlan_dp_psoc_context *dp_ctx;
+
+	dp_ctx =  dp_get_context();
+	return cdp_pdev_detach(soc, pdev_id, force);
+}
+
 #ifdef FEATURE_DIRECT_LINK
 /**
  * dp_lpass_h2t_tx_complete() - Copy completion handler for LPASS data
@@ -1708,6 +1851,7 @@ QDF_STATUS dp_direct_link_init(struct wlan_dp_psoc_context *dp_ctx)
 		qdf_mem_free(dp_direct_link_ctx);
 		return status;
 	}
+	qdf_mutex_create(&dp_ctx->dp_direct_link_lock);
 
 	dp_ctx->dp_direct_link_ctx = dp_direct_link_ctx;
 
@@ -1716,15 +1860,23 @@ QDF_STATUS dp_direct_link_init(struct wlan_dp_psoc_context *dp_ctx)
 
 void dp_direct_link_deinit(struct wlan_dp_psoc_context *dp_ctx, bool is_ssr)
 {
+	struct wlan_dp_intf *dp_intf;
+
 	if (!pld_is_direct_link_supported(dp_ctx->qdf_dev->dev))
 		return;
 
 	if (!dp_ctx->dp_direct_link_ctx)
 		return;
 
+	for (dp_get_front_intf_no_lock(dp_ctx, &dp_intf); dp_intf;
+	     dp_get_next_intf_no_lock(dp_ctx, dp_intf, &dp_intf)) {
+		if (dp_intf->device_mode == QDF_SAP_MODE)
+			dp_config_direct_link(dp_intf, false, false);
+	}
+
 	dp_wfds_deinit(dp_ctx->dp_direct_link_ctx, is_ssr);
 	dp_direct_link_refill_ring_deinit(dp_ctx->dp_direct_link_ctx);
-
+	qdf_mutex_destroy(&dp_ctx->dp_direct_link_lock);
 	qdf_mem_free(dp_ctx->dp_direct_link_ctx);
 	dp_ctx->dp_direct_link_ctx = NULL;
 }
@@ -1756,7 +1908,7 @@ QDF_STATUS dp_config_direct_link(struct wlan_dp_intf *dp_intf,
 		return QDF_STATUS_E_EMPTY;
 	}
 
-	qdf_spin_lock(&dp_intf->vdev_lock);
+	qdf_mutex_acquire(&dp_ctx->dp_direct_link_lock);
 	prev_ll = config->low_latency;
 	update_ll = config_direct_link ? enable_low_latency : prev_ll;
 	vote_link = config->config_set ^ config_direct_link;
@@ -1766,7 +1918,6 @@ QDF_STATUS dp_config_direct_link(struct wlan_dp_intf *dp_intf,
 	status = cdp_txrx_set_vdev_param(wlan_psoc_get_dp_handle(dp_ctx->psoc),
 					 dp_intf->intf_id, CDP_VDEV_TX_TO_FW,
 					 vdev_param);
-	qdf_spin_unlock(&dp_intf->vdev_lock);
 
 	if (config_direct_link) {
 		if (vote_link)
@@ -1788,6 +1939,7 @@ QDF_STATUS dp_config_direct_link(struct wlan_dp_intf *dp_intf,
 						htc_get_hif_device(htc_handle));
 		dp_info("Direct link config cleared.");
 	}
+	qdf_mutex_release(&dp_ctx->dp_direct_link_lock);
 
 	return status;
 }

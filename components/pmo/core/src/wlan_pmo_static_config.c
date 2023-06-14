@@ -292,10 +292,12 @@ static QDF_STATUS pmo_configure_wow_sta(struct wlan_objmgr_vdev *vdev)
 
 	/*
 	 * when arp offload or ns offloaded is disabled
-	 * from ini file, configure broad cast arp pattern
-	 * to fw, so that host can wake up
+	 * or active offload is disabled from ini file,
+	 * configure broad cast arp pattern to fw, so
+	 * that host can wake up
 	 */
-	if (!vdev_ctx->pmo_psoc_ctx->psoc_cfg.arp_offload_enable) {
+	if (!vdev_ctx->pmo_psoc_ctx->psoc_cfg.arp_offload_enable ||
+	    !vdev_ctx->pmo_psoc_ctx->psoc_cfg.active_mode_offload) {
 		/* Setup all ARP pkt pattern */
 		pmo_debug("ARP offload is disabled in INI enable WoW for ARP");
 		ret = pmo_tgt_send_wow_patterns_to_fw(vdev,
@@ -309,7 +311,8 @@ static QDF_STATUS pmo_configure_wow_sta(struct wlan_objmgr_vdev *vdev)
 		}
 	}
 	/* for NS or NDP offload packets */
-	if (!vdev_ctx->pmo_psoc_ctx->psoc_cfg.ns_offload_enable_static) {
+	if (!vdev_ctx->pmo_psoc_ctx->psoc_cfg.ns_offload_enable_static ||
+	    !vdev_ctx->pmo_psoc_ctx->psoc_cfg.active_mode_offload) {
 		/* Setup all NS pkt pattern */
 		pmo_debug("NS offload is disabled in INI enable WoW for NS");
 		ret = pmo_tgt_send_wow_patterns_to_fw(vdev,

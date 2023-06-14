@@ -1597,10 +1597,8 @@ static QDF_STATUS lim_process_csa_wbw_ie(struct mac_context *mac_ctx,
 
 	ap_new_ch_width = csa_params->new_ch_width;
 
-	if (!csa_params->new_ch_freq_seg1 && !csa_params->new_ch_freq_seg2) {
-		pe_err("CSA wide BW IE has invalid center freq");
+	if (!csa_params->new_ch_freq_seg1 && !csa_params->new_ch_freq_seg2)
 		return QDF_STATUS_E_INVAL;
-	}
 
 	csa_cent_freq = csa_params->csa_chan_freq;
 	if (wlan_reg_is_6ghz_op_class(mac_ctx->pdev,
@@ -1644,7 +1642,7 @@ static QDF_STATUS lim_process_csa_wbw_ie(struct mac_context *mac_ctx,
 		csa_cent_freq1 = cent_freq1;
 		break;
 	default:
-		pe_err("CSA wide BW IE has wrong ch_width %d", ap_new_ch_width);
+		pe_debug("CSA wide BW IE has ch_width %d", ap_new_ch_width);
 		return QDF_STATUS_E_INVAL;
 	}
 
@@ -1702,19 +1700,18 @@ static QDF_STATUS lim_process_csa_wbw_ie(struct mac_context *mac_ctx,
 	}
 
 	if (ap_new_ch_width > fw_vht_ch_wd) {
-		pe_debug("New BW is not supported, setting BW to %d",
+		pe_debug("New BW is not supported, downgrade BW to %d",
 			 fw_vht_ch_wd);
 		ap_new_ch_width = fw_vht_ch_wd;
-		ch_params.ch_width = ap_new_ch_width;
-		wlan_reg_set_channel_params_for_pwrmode(
-						     mac_ctx->pdev,
-						     csa_params->csa_chan_freq,
-						     0, &ch_params,
-						     REG_CURRENT_PWR_MODE);
-		ap_new_ch_width = ch_params.ch_width;
-		csa_params->new_ch_freq_seg1 = ch_params.center_freq_seg0;
-		csa_params->new_ch_freq_seg2 = ch_params.center_freq_seg1;
 	}
+	ch_params.ch_width = ap_new_ch_width;
+	wlan_reg_set_channel_params_for_pwrmode(mac_ctx->pdev,
+						csa_params->csa_chan_freq,
+						0, &ch_params,
+						REG_CURRENT_PWR_MODE);
+	ap_new_ch_width = ch_params.ch_width;
+	csa_params->new_ch_freq_seg1 = ch_params.center_freq_seg0;
+	csa_params->new_ch_freq_seg2 = ch_params.center_freq_seg1;
 
 	session_entry->gLimChannelSwitch.state =
 		eLIM_CHANNEL_SWITCH_PRIMARY_AND_SECONDARY;
@@ -1723,28 +1720,18 @@ static QDF_STATUS lim_process_csa_wbw_ie(struct mac_context *mac_ctx,
 	chnl_switch_info->newCenterChanFreq0 = csa_params->new_ch_freq_seg1;
 	chnl_switch_info->newCenterChanFreq1 = csa_params->new_ch_freq_seg2;
 
-	if (session_entry->ch_width == ap_new_ch_width)
-		goto prnt_log;
-
-	if (session_entry->ch_width == CH_WIDTH_80MHZ) {
-		chnl_switch_info->newChanWidth = CH_WIDTH_80MHZ;
-		chnl_switch_info->newCenterChanFreq1 = 0;
-	} else {
-		session_entry->ch_width = ap_new_ch_width;
-		chnl_switch_info->newChanWidth = ap_new_ch_width;
-	}
-prnt_log:
-
 	return QDF_STATUS_SUCCESS;
 }
 
 static bool lim_is_csa_channel_allowed(struct mac_context *mac_ctx,
 				       struct pe_session *session_entry,
 				       qdf_freq_t ch_freq1,
-				       uint32_t ch_freq2)
+				       uint32_t ch_freq2,
+				       enum phy_ch_width new_ch_width)
 {
 	bool is_allowed = true;
 	u32 cnx_count = 0;
+	enum QDF_OPMODE mode;
 
 	if (!session_entry->vdev ||
 	    wlan_cm_is_vdev_disconnecting(session_entry->vdev) ||
@@ -1754,10 +1741,19 @@ static bool lim_is_csa_channel_allowed(struct mac_context *mac_ctx,
 		return false;
 	}
 
+	mode = wlan_vdev_mlme_get_opmode(session_entry->vdev);
 	cnx_count = policy_mgr_get_connection_count(mac_ctx->psoc);
 	if ((cnx_count > 1) && !policy_mgr_is_hw_dbs_capable(mac_ctx->psoc) &&
 	    !policy_mgr_is_interband_mcc_supported(mac_ctx->psoc)) {
 		is_allowed = wlan_reg_is_same_band_freqs(ch_freq1, ch_freq2);
+	} else if (cnx_count > 2) {
+		is_allowed =
+		policy_mgr_allow_concurrency_csa(
+			mac_ctx->psoc, ch_freq2,
+			policy_mgr_convert_device_mode_to_qdf_type(mode),
+			session_entry->vdev_id,
+			policy_mgr_get_bw(new_ch_width), false,
+			CSA_REASON_UNKNOWN);
 	}
 
 	return is_allowed;
@@ -1806,6 +1802,34 @@ static void lim_set_chan_sw_puncture(tLimChannelSwitchInfo *lim_ch_switch,
 {
 	lim_ch_switch->puncture_bitmap = ch_param->reg_punc_bitmap;
 }
+
+/**
+ * lim_reset_csa_puncture() - reset puncture of channel switch
+ * @lim_ch_switch: pointer to tLimChannelSwitchInfo
+ *
+ * Return: void
+ */
+static void lim_reset_csa_puncture(tLimChannelSwitchInfo *lim_ch_switch)
+{
+	lim_ch_switch->puncture_bitmap = 0;
+}
+
+/**
+ * lim_is_puncture_same() - Check whether puncture changed
+ * @lim_ch_switch: pointer to tLimChannelSwitchInfo
+ * @session: pe session
+ *
+ * Return: bool, true: puncture changed
+ */
+static bool lim_is_puncture_same(tLimChannelSwitchInfo *lim_ch_switch,
+				 struct pe_session *session)
+{
+	pe_debug("vdevid %d puncture, old: 0x%x, new: 0x%x", session->vdev_id,
+		 session->puncture_bitmap,
+		 lim_ch_switch->puncture_bitmap);
+	return lim_ch_switch->puncture_bitmap == session->puncture_bitmap;
+}
+
 #else
 static void lim_set_csa_chan_param_11be(struct pe_session *session,
 					struct csa_offload_params *csa_param,
@@ -1816,6 +1840,16 @@ static void lim_set_csa_chan_param_11be(struct pe_session *session,
 static void lim_set_chan_sw_puncture(tLimChannelSwitchInfo *lim_ch_switch,
 				     struct ch_params *ch_param)
 {
+}
+
+static void lim_reset_csa_puncture(tLimChannelSwitchInfo *lim_ch_switch)
+{
+}
+
+static bool lim_is_puncture_same(tLimChannelSwitchInfo *lim_ch_switch,
+				 struct pe_session *session)
+{
+	return true;
 }
 #endif
 
@@ -1861,7 +1895,8 @@ void lim_handle_sta_csa_param(struct mac_context *mac_ctx,
 
 	if (!lim_is_csa_channel_allowed(mac_ctx, session_entry,
 					session_entry->curr_op_freq,
-					csa_params->csa_chan_freq)) {
+					csa_params->csa_chan_freq,
+					csa_params->new_ch_width)) {
 		pe_debug("Channel switch is not allowed");
 		goto err;
 	}
@@ -1884,6 +1919,8 @@ void lim_handle_sta_csa_param(struct mac_context *mac_ctx,
 	lim_ch_switch->state =
 		eLIM_CHANNEL_SWITCH_PRIMARY_ONLY;
 	lim_ch_switch->ch_width = CH_WIDTH_20MHZ;
+	lim_reset_csa_puncture(lim_ch_switch);
+
 	lim_ch_switch->sec_ch_offset =
 		session_entry->htSecondaryChannelOffset;
 	lim_ch_switch->ch_center_freq_seg0 = 0;
@@ -2108,17 +2145,17 @@ void lim_handle_sta_csa_param(struct mac_context *mac_ctx,
 			session_entry->htSupportedChannelWidthSet = true;
 		}
 	}
-	pe_debug("new ch %d freq %d width: %d freq0 %d freq1 %d ht width %d",
-		 lim_ch_switch->primaryChannel,
-		 lim_ch_switch->sw_target_freq,
-		 lim_ch_switch->ch_width,
-		 lim_ch_switch->ch_center_freq_seg0,
+	pe_debug("new ch %d: freq %d width: %d freq0 %d freq1 %d ht width %d, current freq %d: bw %d",
+		 lim_ch_switch->primaryChannel, lim_ch_switch->sw_target_freq,
+		 lim_ch_switch->ch_width, lim_ch_switch->ch_center_freq_seg0,
 		 lim_ch_switch->ch_center_freq_seg1,
-		 lim_ch_switch->sec_ch_offset);
+		 lim_ch_switch->sec_ch_offset, session_entry->curr_op_freq,
+		 session_entry->ch_width);
 
 	if (session_entry->curr_op_freq == csa_params->csa_chan_freq &&
-	    session_entry->ch_width == lim_ch_switch->ch_width) {
-		pe_debug("Ignore CSA, no change in ch and bw");
+	    session_entry->ch_width == lim_ch_switch->ch_width &&
+	    lim_is_puncture_same(lim_ch_switch, session_entry)) {
+		pe_debug("Ignore CSA, no change in ch, bw and puncture");
 		goto err;
 	}
 

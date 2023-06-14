@@ -131,20 +131,20 @@ static void hdd_cca_notification_cb(uint8_t vdev_id,
 				    int status)
 {
 	struct hdd_context *hdd_ctx = cds_get_context(QDF_MODULE_ID_HDD);
-	struct hdd_adapter *adapter;
+	struct wlan_hdd_link_info *link_info;
 	struct sk_buff *event;
 
 	if (wlan_hdd_validate_context(hdd_ctx))
 		return;
 
-	adapter = hdd_get_adapter_by_vdev(hdd_ctx, vdev_id);
-	if (!adapter) {
+	link_info = hdd_get_link_info_by_vdev(hdd_ctx, vdev_id);
+	if (!link_info) {
 		hdd_err("Failed to find adapter of vdev %d", vdev_id);
 		return;
 	}
 
 	event = wlan_cfg80211_vendor_event_alloc(
-				hdd_ctx->wiphy, &adapter->wdev,
+				hdd_ctx->wiphy, &link_info->adapter->wdev,
 				get_cca_report_len(),
 				QCA_NL80211_VENDOR_SUBCMD_MEDIUM_ASSESS_INDEX,
 				GFP_KERNEL);
@@ -189,7 +189,7 @@ static int hdd_medium_assess_cca(struct hdd_context *hdd_ctx,
 	QDF_STATUS status;
 	int errno = 0;
 
-	vdev = hdd_objmgr_get_vdev_by_user(adapter, WLAN_DCS_ID);
+	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink, WLAN_DCS_ID);
 	if (!vdev)
 		return -EINVAL;
 
@@ -339,7 +339,7 @@ static void hdd_congestion_notification_report(uint8_t vdev_id,
 					       uint8_t congestion)
 {
 	struct hdd_context *hdd_ctx = cds_get_context(QDF_MODULE_ID_HDD);
-	struct hdd_adapter *adapter;
+	struct wlan_hdd_link_info *link_info;
 	struct sk_buff *event;
 	enum qca_nl80211_vendor_subcmds_index index =
 		QCA_NL80211_VENDOR_SUBCMD_MEDIUM_ASSESS_INDEX;
@@ -347,14 +347,14 @@ static void hdd_congestion_notification_report(uint8_t vdev_id,
 	if (wlan_hdd_validate_context(hdd_ctx))
 		return;
 
-	adapter = hdd_get_adapter_by_vdev(hdd_ctx, vdev_id);
-	if (!adapter) {
+	link_info = hdd_get_link_info_by_vdev(hdd_ctx, vdev_id);
+	if (!link_info) {
 		hdd_err("Failed to find adapter of vdev %d", vdev_id);
 		return;
 	}
 
 	event = wlan_cfg80211_vendor_event_alloc(hdd_ctx->wiphy,
-						 &adapter->wdev,
+						 &link_info->adapter->wdev,
 						 get_congestion_report_len(),
 						 index, GFP_KERNEL);
 	if (!event) {
@@ -432,7 +432,7 @@ static int hdd_medium_assess_congestion_report(struct hdd_context *hdd_ctx,
 		return -EINVAL;
 	}
 
-	vdev = hdd_objmgr_get_vdev_by_user(adapter, WLAN_CP_STATS_ID);
+	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink, WLAN_CP_STATS_ID);
 	if (!vdev)
 		return -EINVAL;
 
@@ -701,7 +701,7 @@ static void hdd_medium_assess_expire_handler(void *arg)
 	struct wlan_objmgr_vdev *vdev;
 	struct request_info info = {0};
 	struct hdd_context *hdd_ctx = cds_get_context(QDF_MODULE_ID_HDD);
-	struct hdd_adapter *adapter;
+	struct wlan_hdd_link_info *link_info;
 	uint8_t vdev_id = INVALID_VDEV_ID, pdev_id;
 	uint8_t index, i;
 
@@ -723,13 +723,13 @@ static void hdd_medium_assess_expire_handler(void *arg)
 	if (vdev_id == INVALID_VDEV_ID)
 		return;
 
-	adapter = hdd_get_adapter_by_vdev(hdd_ctx, vdev_id);
-	if (!adapter) {
+	link_info = hdd_get_link_info_by_vdev(hdd_ctx, vdev_id);
+	if (!link_info) {
 		hdd_err("Failed to find adapter of vdev %d", vdev_id);
 		return;
 	}
 
-	vdev = hdd_objmgr_get_vdev_by_user(adapter, WLAN_CP_STATS_ID);
+	vdev = hdd_objmgr_get_vdev_by_user(link_info, WLAN_CP_STATS_ID);
 	if (!vdev)
 		return;
 

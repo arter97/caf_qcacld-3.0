@@ -2777,7 +2777,8 @@ int hdd_check_private_wext_control(struct hdd_context *hdd_ctx,
 void hdd_wlan_get_stats(struct hdd_adapter *adapter, uint16_t *length,
 			char *buffer, uint16_t buf_len)
 {
-	struct hdd_tx_rx_stats *stats = &adapter->hdd_stats.tx_rx_stats;
+	struct hdd_tx_rx_stats *stats =
+				&adapter->deflink->hdd_stats.tx_rx_stats;
 	struct dp_tx_rx_stats *dp_stats;
 	uint32_t len = 0;
 	uint32_t total_rx_pkt = 0, total_rx_dropped = 0;
@@ -2792,7 +2793,7 @@ void hdd_wlan_get_stats(struct hdd_adapter *adapter, uint16_t *length,
 	struct hdd_context *hdd_ctx = adapter->hdd_ctx;
 	struct wlan_objmgr_vdev *vdev;
 
-	vdev = hdd_objmgr_get_vdev_by_user(adapter, WLAN_DP_ID);
+	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink, WLAN_DP_ID);
 	if (!vdev)
 		return;
 
@@ -3479,13 +3480,14 @@ static int hdd_we_set_wow_data_inactivity_timeout(struct hdd_adapter *adapter,
 static int hdd_we_set_tx_power(struct hdd_adapter *adapter, int value)
 {
 	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
-	struct hdd_station_ctx *sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter);
+	struct hdd_station_ctx *sta_ctx;
 	mac_handle_t mac_handle = hdd_ctx->mac_handle;
 	QDF_STATUS status;
 
 	if (!mac_handle)
 		return -EINVAL;
 
+	sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter->deflink);
 	status = sme_set_tx_power(mac_handle, adapter->deflink->vdev_id,
 				  sta_ctx->conn_info.bssid,
 				  adapter->device_mode, value);
@@ -3499,13 +3501,14 @@ static int hdd_we_set_tx_power(struct hdd_adapter *adapter, int value)
 static int hdd_we_set_max_tx_power(struct hdd_adapter *adapter, int value)
 {
 	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
-	struct hdd_station_ctx *sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter);
+	struct hdd_station_ctx *sta_ctx;
 	mac_handle_t mac_handle = hdd_ctx->mac_handle;
 	QDF_STATUS status;
 
 	if (!mac_handle)
 		return -EINVAL;
 
+	sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter->deflink);
 	status = sme_set_max_tx_power(mac_handle,
 				      sta_ctx->conn_info.bssid,
 				      sta_ctx->conn_info.bssid,
@@ -6025,7 +6028,7 @@ static int __iw_get_char_setnone(struct net_device *dev,
 				break;
 			}
 			sta_ctx =
-				WLAN_HDD_GET_STATION_CTX_PTR(stat_adapter);
+			    WLAN_HDD_GET_STATION_CTX_PTR(stat_adapter->deflink);
 
 			stat_vdev_id = stat_adapter->deflink->vdev_id;
 			buf =
@@ -6220,9 +6223,9 @@ static int __iw_get_char_setnone(struct net_device *dev,
 			 connected_bssid.bytes[3],
 			 connected_bssid.bytes[4],
 			 connected_bssid.bytes[5],
-			 adapter->hdd_stats.hdd_pmf_stats.
+			 adapter->deflink->hdd_stats.hdd_pmf_stats.
 			 num_unprot_disassoc_rx,
-			 adapter->hdd_stats.hdd_pmf_stats.
+			 adapter->deflink->hdd_stats.hdd_pmf_stats.
 			 num_unprot_deauth_rx);
 
 		wrqu->data.length = strlen(extra) + 1;
@@ -6365,7 +6368,7 @@ static int __iw_get_char_setnone(struct net_device *dev,
 		enable_snr_monitoring =
 				ucfg_scan_is_snr_monitor_enabled(hdd_ctx->psoc);
 		if (!enable_snr_monitoring ||
-		    !hdd_cm_is_vdev_associated(adapter)) {
+		    !hdd_cm_is_vdev_associated(adapter->deflink)) {
 			hdd_err("getSNR failed: Enable SNR Monitoring-%d",
 				enable_snr_monitoring);
 			return -ENONET;
@@ -6630,7 +6633,7 @@ static int __iw_set_var_ints_getnone(struct net_device *dev,
 {
 	struct hdd_adapter *adapter = WLAN_HDD_GET_PRIV_PTR(dev);
 	mac_handle_t mac_handle;
-	struct hdd_station_ctx *sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter);
+	struct hdd_station_ctx *sta_ctx;
 	int sub_cmd;
 	int *apps_args = (int *) extra;
 	struct hdd_context *hdd_ctx;
@@ -6652,6 +6655,7 @@ static int __iw_set_var_ints_getnone(struct net_device *dev,
 	mac_handle = hdd_ctx->mac_handle;
 	sub_cmd = wrqu->data.flags;
 	num_args = wrqu->data.length;
+	sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter->deflink);
 
 	hdd_debug("Received length %d", wrqu->data.length);
 
@@ -7112,7 +7116,7 @@ static int __iw_add_tspec(struct net_device *dev, struct iw_request_info *info,
 		return -EPERM;
 
 	/* we must be associated in order to add a tspec */
-	if (!hdd_cm_is_vdev_associated(adapter)) {
+	if (!hdd_cm_is_vdev_associated(adapter->deflink)) {
 		*wmm_status = HDD_WLAN_WMM_STATUS_SETUP_FAILED_BAD_PARAM;
 		return 0;
 	}
@@ -7457,7 +7461,7 @@ static int __iw_set_fties(struct net_device *dev, struct iw_request_info *info,
 		return -EINVAL;
 	}
 	/* Added for debug on reception of Re-assoc Req. */
-	if (!hdd_cm_is_vdev_associated(adapter)) {
+	if (!hdd_cm_is_vdev_associated(adapter->deflink)) {
 		hdd_debug("Called with Ie of length = %d when not associated",
 		       wrqu->data.length);
 		hdd_debug("Should be Re-assoc Req IEs");
@@ -7561,7 +7565,7 @@ static int __iw_set_host_offload(struct net_device *dev,
 	if (0 != ret)
 		return ret;
 
-	if (!hdd_cm_is_vdev_associated(adapter)) {
+	if (!hdd_cm_is_vdev_associated(adapter->deflink)) {
 		hdd_err("dev is not in CONNECTED state, ignore!!!");
 		return -EINVAL;
 	}
@@ -7833,7 +7837,7 @@ static int __iw_set_packet_filter_params(struct net_device *dev,
 		return -ENOTSUPP;
 	}
 
-	if (!hdd_cm_is_vdev_associated(adapter)) {
+	if (!hdd_cm_is_vdev_associated(adapter->deflink)) {
 		hdd_err("Packet filter not supported in disconnected state");
 		return -ENOTSUPP;
 	}
@@ -7928,17 +7932,17 @@ static int __iw_get_statistics(struct net_device *dev,
 	if (0 != ret)
 		return ret;
 
-	sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter);
-	if (!hdd_cm_is_vdev_associated(adapter)) {
+	sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter->deflink);
+	if (!hdd_cm_is_vdev_associated(adapter->deflink)) {
 		wrqu->data.length = 0;
 		return 0;
 	}
 
 	hdd_get_wlan_stats(adapter);
 
-	summary_stats = &(adapter->hdd_stats.summary_stat);
-	class_a_stats = &(adapter->hdd_stats.class_a_stat);
-	class_d_stats = &(adapter->hdd_stats.class_d_stat);
+	summary_stats = &adapter->deflink->hdd_stats.summary_stat;
+	class_a_stats = &adapter->deflink->hdd_stats.class_a_stat;
+	class_d_stats = &adapter->deflink->hdd_stats.class_d_stat;
 
 	p = extra;
 	tlen = 0;

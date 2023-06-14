@@ -176,6 +176,38 @@ ucfg_dp_destroy_intf(struct wlan_objmgr_psoc *psoc,
 	return QDF_STATUS_SUCCESS;
 }
 
+void ucfg_dp_set_cmn_dp_handle(struct wlan_objmgr_psoc *psoc,
+			       ol_txrx_soc_handle soc)
+{
+	struct wlan_dp_psoc_context *dp_ctx;
+	cdp_config_param_type soc_param;
+	QDF_STATUS status;
+
+	dp_ctx = dp_psoc_get_priv(psoc);
+
+	dp_ctx->cdp_soc = soc;
+
+	soc_param.hal_soc_hdl = NULL;
+	status = cdp_txrx_get_psoc_param(dp_ctx->cdp_soc, CDP_TXRX_HAL_SOC_HDL,
+					 &soc_param);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		dp_err("Unable to fetch hal soc handle");
+		return;
+	}
+
+	dp_ctx->hal_soc = soc_param.hal_soc_hdl;
+}
+
+void ucfg_dp_set_hif_handle(struct wlan_objmgr_psoc *psoc,
+			    struct hif_opaque_softc *hif_handle)
+{
+	struct wlan_dp_psoc_context *dp_ctx;
+
+	dp_ctx = dp_psoc_get_priv(psoc);
+
+	dp_ctx->hif_handle = hif_handle;
+}
+
 QDF_STATUS ucfg_dp_init(void)
 {
 	QDF_STATUS status;
@@ -991,7 +1023,6 @@ QDF_STATUS ucfg_dp_sta_register_txrx_ops(struct wlan_objmgr_vdev *vdev)
 		txrx_ops.rx.rx_stack = dp_rx_packet_cbk;
 		txrx_ops.rx.rx_flush = dp_rx_flush_packet_cbk;
 		txrx_ops.rx.rx_gro_flush = dp_rx_thread_gro_flush_ind_cbk;
-		dp_intf->rx_stack = dp_rx_packet_cbk;
 	} else {
 		txrx_ops.rx.rx = dp_rx_packet_cbk;
 		txrx_ops.rx.rx_stack = NULL;
@@ -1016,7 +1047,7 @@ QDF_STATUS ucfg_dp_sta_register_txrx_ops(struct wlan_objmgr_vdev *vdev)
 		return QDF_STATUS_E_FAILURE;
 	}
 
-	dp_intf->tx_fn = txrx_ops.tx.tx;
+	dp_intf->txrx_ops = txrx_ops;
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -1041,7 +1072,6 @@ QDF_STATUS ucfg_dp_tdlsta_register_txrx_ops(struct wlan_objmgr_vdev *vdev)
 		txrx_ops.rx.rx_stack = dp_rx_packet_cbk;
 		txrx_ops.rx.rx_flush = dp_rx_flush_packet_cbk;
 		txrx_ops.rx.rx_gro_flush = dp_rx_thread_gro_flush_ind_cbk;
-		dp_intf->rx_stack = dp_rx_packet_cbk;
 	} else {
 		txrx_ops.rx.rx = dp_rx_packet_cbk;
 		txrx_ops.rx.rx_stack = NULL;
@@ -1066,7 +1096,7 @@ QDF_STATUS ucfg_dp_tdlsta_register_txrx_ops(struct wlan_objmgr_vdev *vdev)
 		return QDF_STATUS_E_FAILURE;
 	}
 
-	dp_intf->tx_fn = txrx_ops.tx.tx;
+	dp_intf->txrx_ops = txrx_ops;
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -1096,7 +1126,7 @@ QDF_STATUS ucfg_dp_ocb_register_txrx_ops(struct wlan_objmgr_vdev *vdev)
 		return QDF_STATUS_E_FAILURE;
 	}
 
-	dp_intf->tx_fn = txrx_ops.tx.tx;
+	dp_intf->txrx_ops = txrx_ops;
 
 	qdf_copy_macaddr(&dp_intf->conn_info.peer_macaddr,
 			 &dp_intf->mac_addr);
@@ -1124,6 +1154,8 @@ QDF_STATUS ucfg_dp_mon_register_txrx_ops(struct wlan_objmgr_vdev *vdev)
 			  (ol_osif_vdev_handle)dp_intf,
 			  &txrx_ops);
 
+	dp_intf->txrx_ops = txrx_ops;
+
 	return QDF_STATUS_SUCCESS;
 }
 #endif
@@ -1148,7 +1180,6 @@ QDF_STATUS ucfg_dp_softap_register_txrx_ops(struct wlan_objmgr_vdev *vdev,
 		txrx_ops->rx.rx_stack = dp_softap_rx_packet_cbk;
 		txrx_ops->rx.rx_flush = dp_rx_flush_packet_cbk;
 		txrx_ops->rx.rx_gro_flush = dp_rx_thread_gro_flush_ind_cbk;
-		dp_intf->rx_stack = dp_softap_rx_packet_cbk;
 	} else {
 		txrx_ops->rx.rx = dp_softap_rx_packet_cbk;
 		txrx_ops->rx.rx_stack = NULL;
@@ -1165,7 +1196,7 @@ QDF_STATUS ucfg_dp_softap_register_txrx_ops(struct wlan_objmgr_vdev *vdev,
 		return QDF_STATUS_E_FAILURE;
 	}
 
-	dp_intf->tx_fn = txrx_ops->tx.tx;
+	dp_intf->txrx_ops = *txrx_ops;
 	dp_intf->sap_tx_block_mask &= ~DP_TX_FN_CLR;
 
 	return QDF_STATUS_SUCCESS;
@@ -2318,6 +2349,21 @@ void ucfg_dp_prealloc_put_consistent_mem_unaligned(void *va_unaligned)
 {
 	dp_prealloc_put_consistent_mem_unaligned(va_unaligned);
 }
+
+void ucfg_dp_prealloc_get_multi_pages(uint32_t desc_type, qdf_size_t elem_size,
+				      uint16_t elem_num,
+				      struct qdf_mem_multi_page_t *pages,
+				      bool cacheable)
+{
+	dp_prealloc_get_multi_pages(desc_type, elem_size, elem_num, pages,
+				    cacheable);
+}
+
+void ucfg_dp_prealloc_put_multi_pages(uint32_t desc_type,
+				      struct qdf_mem_multi_page_t *pages)
+{
+	dp_prealloc_put_multi_pages(desc_type, pages);
+}
 #endif
 
 #if defined(WLAN_SUPPORT_RX_FISA)
@@ -2395,6 +2441,43 @@ QDF_STATUS ucfg_dp_config_direct_link(struct wlan_objmgr_vdev *vdev,
 }
 #endif
 
+QDF_STATUS ucfg_dp_bus_suspend(ol_txrx_soc_handle soc, uint8_t pdev_id)
+{
+	return __wlan_dp_bus_suspend(soc, pdev_id);
+}
+
+QDF_STATUS ucfg_dp_bus_resume(ol_txrx_soc_handle soc, uint8_t pdev_id)
+{
+	return __wlan_dp_bus_resume(soc, pdev_id);
+}
+
+void *ucfg_dp_txrx_soc_attach(struct dp_txrx_soc_attach_params *params,
+			      bool *is_wifi3_0_target)
+{
+	return wlan_dp_txrx_soc_attach(params, is_wifi3_0_target);
+}
+
+void ucfg_dp_txrx_soc_detach(ol_txrx_soc_handle soc)
+{
+	return wlan_dp_txrx_soc_detach(soc);
+}
+
+QDF_STATUS ucfg_dp_txrx_attach_target(ol_txrx_soc_handle soc, uint8_t pdev_id)
+{
+	return wlan_dp_txrx_attach_target(soc, pdev_id);
+}
+
+QDF_STATUS ucfg_dp_txrx_pdev_attach(ol_txrx_soc_handle soc)
+{
+	return wlan_dp_txrx_pdev_attach(soc);
+}
+
+QDF_STATUS ucfg_dp_txrx_pdev_detach(ol_txrx_soc_handle soc, uint8_t pdev_id,
+				    int force)
+{
+	return wlan_dp_txrx_pdev_detach(soc, pdev_id, force);
+}
+
 QDF_STATUS ucfg_dp_txrx_init(ol_txrx_soc_handle soc, uint8_t pdev_id,
 			     struct dp_txrx_config *config)
 {
@@ -2429,3 +2512,12 @@ ucfg_dp_get_per_link_peer_stats(ol_txrx_soc_handle soc, uint8_t vdev_id,
 						peer_stats, peer_type,
 						num_link);
 }
+
+#ifdef WLAN_FEATURE_LOCAL_PKT_CAPTURE
+bool ucfg_dp_is_local_pkt_capture_enabled(struct wlan_objmgr_psoc *psoc)
+{
+	void *soc = cds_get_context(QDF_MODULE_ID_SOC);
+
+	return cdp_cfg_get(soc, cfg_dp_local_pkt_capture);
+}
+#endif

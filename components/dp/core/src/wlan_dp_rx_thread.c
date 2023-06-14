@@ -85,13 +85,14 @@ dp_rx_refill_thread_set_affinity(struct dp_rx_refill_thread *refill_thread)
 	unsigned int cpus;
 	char new_mask_str[10];
 	qdf_cpu_mask new_mask;
+	int perf_cpu_cluster = hif_get_perf_cluster_bitmap();
+	int package_id;
 
 	qdf_cpumask_clear(&new_mask);
 	qdf_for_each_online_cpu(cpus) {
-		if (qdf_topology_physical_package_id(cpus) ==
-		    CPU_CLUSTER_TYPE_PERF) {
+		package_id = qdf_topology_physical_package_id(cpus);
+		if (package_id >= 0 && BIT(package_id) & perf_cpu_cluster)
 			qdf_cpumask_set_cpu(cpus, &new_mask);
-		}
 	}
 
 	qdf_thread_set_cpus_allowed_mask(refill_thread->task, &new_mask);

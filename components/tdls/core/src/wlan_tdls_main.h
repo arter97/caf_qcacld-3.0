@@ -134,17 +134,10 @@ struct tdls_conn_tracker_mac_table {
 };
 
 /**
- * struct tdls_set_state_info - to record set tdls state command, we need to
- * set correct tdls state to firmware:
- * 1. enable tdls in firmware before tdls connection;
- * 2. disable tdls if concurrency happen, before disable tdls, all active peer
- * should be deleted in firmware.
- *
- * @set_state_cnt: tdls set state count
+ * struct tdls_set_state_info - vdev id state info
  * @vdev_id: vdev id of last set state command
  */
 struct tdls_set_state_info {
-	uint8_t set_state_cnt;
 	uint8_t vdev_id;
 };
 

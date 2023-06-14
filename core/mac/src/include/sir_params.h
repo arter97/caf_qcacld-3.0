@@ -86,6 +86,7 @@ typedef enum {
  * RTT - indicate RTT
  * DOT11AX - indicate 11ax
  * DOT11BE - indicate 11be
+ * SECURE_NAN - indicate NAN Pairing protocol
  * WOW - indicate WOW
  * WLAN_ROAM_SCAN_OFFLOAD - indicate Roam scan offload
  * WLAN_PERIODIC_TX_PTRN - indicate WLAN_PERIODIC_TX_PTRN
@@ -116,6 +117,9 @@ enum cap_bitmap {
 	DOT11AX = 13,
 #ifdef WLAN_FEATURE_11BE
 	DOT11BE = 14,
+#endif
+#ifdef WLAN_FEATURE_NAN
+	SECURE_NAN = 15,
 #endif
 	WOW = 22,
 	WLAN_ROAM_SCAN_OFFLOAD = 23,

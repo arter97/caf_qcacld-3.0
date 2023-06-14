@@ -74,26 +74,26 @@ static const struct son_chan_width {
  */
 static uint32_t hdd_son_is_acs_in_progress(struct wlan_objmgr_vdev *vdev)
 {
-	struct hdd_adapter *adapter;
+	struct wlan_hdd_link_info *link_info;
 	bool in_progress = false;
 
 	if (!vdev) {
 		hdd_err("null vdev");
 		return in_progress;
 	}
-	adapter = wlan_hdd_get_adapter_from_objmgr(vdev);
-	if (!adapter) {
+
+	link_info = wlan_hdd_get_link_info_from_objmgr(vdev);
+	if (!link_info) {
 		hdd_err("null adapter");
 		return in_progress;
 	}
 
-	if (!hdd_adapter_is_ap(adapter)) {
-		hdd_err("vdev id %d is not AP", adapter->deflink->vdev_id);
+	if (!hdd_adapter_is_ap(link_info->adapter)) {
+		hdd_err("vdev id %d is not AP", link_info->vdev_id);
 		return in_progress;
 	}
 
-	in_progress =
-		qdf_atomic_read(&adapter->deflink->session.ap.acs_in_progress);
+	in_progress = qdf_atomic_read(&link_info->session.ap.acs_in_progress);
 
 	return in_progress;
 }
@@ -144,21 +144,22 @@ static int hdd_son_set_chwidth(struct wlan_objmgr_vdev *vdev,
 			       enum ieee80211_cwm_width son_chwidth)
 {
 	enum eSirMacHTChannelWidth chwidth;
-	struct hdd_adapter *adapter;
+	struct wlan_hdd_link_info *link_info;
 
 	if (!vdev) {
 		hdd_err("null vdev");
 		return -EINVAL;
 	}
-	adapter = wlan_hdd_get_adapter_from_objmgr(vdev);
-	if (!adapter) {
+
+	link_info = wlan_hdd_get_link_info_from_objmgr(vdev);
+	if (!link_info) {
 		hdd_err("null adapter");
 		return -EINVAL;
 	}
 
 	chwidth = hdd_son_chan_width_to_chan_width(son_chwidth);
 
-	return hdd_set_mac_chan_width(adapter, chwidth);
+	return hdd_set_mac_chan_width(link_info->adapter, chwidth);
 }
 
 /**
@@ -285,19 +286,21 @@ static int hdd_son_set_chan_ext_offset(
 		hdd_err("null vdev");
 		return retval;
 	}
-	adapter = wlan_hdd_get_adapter_from_objmgr(vdev);
-	if (!adapter) {
+
+	link_info = wlan_hdd_get_link_info_from_objmgr(vdev);
+	if (!link_info) {
 		hdd_err("null adapter");
 		return retval;
 	}
-	if (!hdd_adapter_is_ap(adapter)) {
-		hdd_err("vdev id %d is not AP", adapter->deflink->vdev_id);
+
+	if (!hdd_adapter_is_ap(link_info->adapter)) {
+		hdd_err("vdev id %d is not AP", link_info->vdev_id);
 		return retval;
 	}
 
 	retval = 0;
 	chan_type = hdd_son_chan_ext_offset_to_chan_type(son_chan_ext_offset);
-	status = hdd_set_sap_ht2040_mode(adapter, chan_type);
+	status = hdd_set_sap_ht2040_mode(link_info->adapter, chan_type);
 	if (status != QDF_STATUS_SUCCESS) {
 		hdd_err("Cannot set SAP HT20/40 mode!");
 		retval = -EINVAL;
@@ -344,23 +347,25 @@ static enum sec20_chan_offset hdd_son_get_chan_ext_offset(
 {
 	enum eSirMacHTChannelType chan_type;
 	QDF_STATUS status;
-	struct hdd_adapter *adapter;
+	struct wlan_hdd_link_info *link_info;
 
 	if (!vdev) {
 		hdd_err("null vdev");
 		return 0;
 	}
-	adapter = wlan_hdd_get_adapter_from_objmgr(vdev);
-	if (!adapter) {
+
+	link_info = wlan_hdd_get_link_info_from_objmgr(vdev);
+	if (!link_info) {
 		hdd_err("null adapter");
 		return 0;
 	}
-	if (!hdd_adapter_is_ap(adapter)) {
-		hdd_err("vdev id %d is not AP", adapter->deflink->vdev_id);
+
+	if (!hdd_adapter_is_ap(link_info->adapter)) {
+		hdd_err("vdev id %d is not AP", link_info->vdev_id);
 		return 0;
 	}
 
-	status = hdd_get_sap_ht2040_mode(adapter, &chan_type);
+	status = hdd_get_sap_ht2040_mode(link_info->adapter, &chan_type);
 	if (status != QDF_STATUS_SUCCESS) {
 		hdd_err("Cannot set SAP HT20/40 mode!");
 		return 0;
@@ -449,20 +454,21 @@ static int hdd_son_set_bandwidth(struct wlan_objmgr_vdev *vdev,
 	eCsrPhyMode old_phymode;
 	uint8_t supported_band;
 	uint32_t bonding_mode;
-	struct hdd_adapter *adapter;
+	struct wlan_hdd_link_info *link_info;
 	struct hdd_context *hdd_ctx;
 
 	if (!vdev) {
 		hdd_err("null vdev");
 		return -EINVAL;
 	}
-	adapter = wlan_hdd_get_adapter_from_objmgr(vdev);
-	if (!adapter) {
+
+	link_info = wlan_hdd_get_link_info_from_objmgr(vdev);
+	if (!link_info) {
 		hdd_err("null adapter");
 		return -EINVAL;
 	}
 
-	hdd_ctx = WLAN_HDD_GET_CTX(adapter);
+	hdd_ctx = WLAN_HDD_GET_CTX(link_info->adapter);
 	if (!hdd_ctx) {
 		hdd_err("null hdd ctx");
 		return -EINVAL;
@@ -478,8 +484,8 @@ static int hdd_son_set_bandwidth(struct wlan_objmgr_vdev *vdev,
 
 	hdd_son_bandwidth_to_bonding_mode(son_bandwidth, &bonding_mode);
 
-	return hdd_update_phymode(adapter, phymode, supported_band,
-				  bonding_mode);
+	return hdd_update_phymode(link_info->adapter, phymode,
+				  supported_band, bonding_mode);
 }
 
 /**
@@ -553,32 +559,34 @@ static uint32_t hdd_son_get_bandwidth(struct wlan_objmgr_vdev *vdev)
 {
 	enum eSirMacHTChannelWidth chwidth;
 	eCsrPhyMode phymode;
-	struct hdd_adapter *adapter;
 	struct hdd_context *hdd_ctx;
+	struct wlan_hdd_link_info *link_info;
 
 	if (!vdev) {
 		hdd_err("null vdev");
 		return NONHT;
 	}
-	adapter = wlan_hdd_get_adapter_from_objmgr(vdev);
-	if (!adapter) {
+
+	link_info = wlan_hdd_get_link_info_from_objmgr(vdev);
+	if (!link_info) {
 		hdd_err("null adapter");
 		return NONHT;
 	}
 
-	chwidth = wma_cli_get_command(adapter->deflink->vdev_id,
-				      wmi_vdev_param_chwidth,
-				      VDEV_CMD);
+	chwidth = wma_cli_get_command(link_info->vdev_id,
+				      wmi_vdev_param_chwidth, VDEV_CMD);
 
 	if (chwidth < 0) {
 		hdd_err("Failed to get chwidth");
 		return NONHT;
 	}
-	hdd_ctx = WLAN_HDD_GET_CTX(adapter);
+
+	hdd_ctx = WLAN_HDD_GET_CTX(link_info->adapter);
 	if (!hdd_ctx) {
 		hdd_err("null hdd ctx");
 		return -NONHT;
 	}
+
 	phymode = sme_get_phy_mode(hdd_ctx->mac_handle);
 
 	return hdd_phymode_chwidth_to_son_bandwidth(phymode, chwidth);
@@ -622,7 +630,7 @@ static enum reg_wifi_band hdd_son_band_to_band(enum wlan_band_id band)
 static int hdd_son_set_chan(struct wlan_objmgr_vdev *vdev, int chan,
 			    enum wlan_band_id son_band)
 {
-	struct hdd_adapter *adapter;
+	struct wlan_hdd_link_info *link_info;
 	enum reg_wifi_band band = hdd_son_band_to_band(son_band);
 	bool status;
 	qdf_freq_t freq;
@@ -633,13 +641,15 @@ static int hdd_son_set_chan(struct wlan_objmgr_vdev *vdev, int chan,
 		hdd_err("null vdev");
 		return -EINVAL;
 	}
-	adapter = wlan_hdd_get_adapter_from_objmgr(vdev);
-	if (!adapter) {
+
+	link_info = wlan_hdd_get_link_info_from_objmgr(vdev);
+	if (!link_info) {
 		hdd_err("null adapter");
 		return -EINVAL;
 	}
-	if (!hdd_adapter_is_ap(adapter)) {
-		hdd_err("vdev id %d is not AP", adapter->deflink->vdev_id);
+
+	if (!hdd_adapter_is_ap(link_info->adapter)) {
+		hdd_err("vdev id %d is not AP", link_info->vdev_id);
 		return -ENOTSUPP;
 	}
 
@@ -656,17 +666,17 @@ static int hdd_son_set_chan(struct wlan_objmgr_vdev *vdev, int chan,
 	}
 
 	freq = wlan_reg_chan_band_to_freq(pdev, chan, BIT(band));
-	status = policy_mgr_is_sap_allowed_on_dfs_freq(
-					pdev, adapter->deflink->vdev_id, freq);
+	status = policy_mgr_is_sap_allowed_on_dfs_freq(pdev, link_info->vdev_id,
+						       freq);
 	if (!status) {
 		hdd_err("sap_allowed_on_dfs_freq check fails");
 		return -EINVAL;
 	}
-	wlan_hdd_set_sap_csa_reason(psoc, adapter->deflink->vdev_id,
+	wlan_hdd_set_sap_csa_reason(psoc, link_info->vdev_id,
 				    CSA_REASON_USER_INITIATED);
 
-	return hdd_softap_set_channel_change(adapter->dev, freq, CH_WIDTH_MAX,
-					     false);
+	return hdd_softap_set_channel_change(link_info->adapter->dev, freq,
+					     CH_WIDTH_MAX, false);
 }
 
 /**
@@ -679,19 +689,21 @@ static int hdd_son_set_chan(struct wlan_objmgr_vdev *vdev, int chan,
 static int hdd_son_set_country(struct wlan_objmgr_vdev *vdev,
 			       char *country_code)
 {
-	struct hdd_adapter *adapter;
 	struct hdd_context *hdd_ctx;
+	struct wlan_hdd_link_info *link_info;
 
 	if (!vdev) {
 		hdd_err("null vdev");
 		return -EINVAL;
 	}
-	adapter = wlan_hdd_get_adapter_from_objmgr(vdev);
-	if (!adapter) {
+
+	link_info = wlan_hdd_get_link_info_from_objmgr(vdev);
+	if (!link_info) {
 		hdd_err("null adapter");
 		return -EINVAL;
 	}
-	hdd_ctx = WLAN_HDD_GET_CTX(adapter);
+
+	hdd_ctx = WLAN_HDD_GET_CTX(link_info->adapter);
 	if (!hdd_ctx) {
 		hdd_err("null hdd ctx");
 		return -EINVAL;
@@ -711,24 +723,25 @@ static int hdd_son_set_country(struct wlan_objmgr_vdev *vdev,
 static int hdd_son_set_candidate_freq(struct wlan_objmgr_vdev *vdev,
 				      qdf_freq_t freq)
 {
-	struct hdd_adapter *adapter;
+	struct wlan_hdd_link_info *link_info;
 	struct sap_context *sap_ctx;
 
 	if (!vdev) {
 		hdd_err("null vdev");
 		return -EINVAL;
 	}
-	adapter = wlan_hdd_get_adapter_from_objmgr(vdev);
-	if (!adapter) {
+
+	link_info = wlan_hdd_get_link_info_from_objmgr(vdev);
+	if (!link_info) {
 		hdd_err("null adapter");
 		return -EINVAL;
 	}
-	if (!hdd_adapter_is_ap(adapter)) {
-		hdd_err("vdev id %d is not AP", adapter->deflink->vdev_id);
+	if (!hdd_adapter_is_ap(link_info->adapter)) {
+		hdd_err("vdev id %d is not AP", link_info->vdev_id);
 		return -EINVAL;
 	}
 
-	sap_ctx = WLAN_HDD_GET_SAP_CTX_PTR(adapter);
+	sap_ctx = WLAN_HDD_GET_SAP_CTX_PTR(link_info);
 	if (!sap_ctx) {
 		hdd_err("null sap_ctx");
 		return -EINVAL;
@@ -747,7 +760,7 @@ static int hdd_son_set_candidate_freq(struct wlan_objmgr_vdev *vdev,
  */
 static qdf_freq_t hdd_son_get_candidate_freq(struct wlan_objmgr_vdev *vdev)
 {
-	struct hdd_adapter *adapter;
+	struct wlan_hdd_link_info *link_info;
 	struct sap_context *sap_ctx;
 	qdf_freq_t freq = 0;
 
@@ -755,17 +768,18 @@ static qdf_freq_t hdd_son_get_candidate_freq(struct wlan_objmgr_vdev *vdev)
 		hdd_err("null vdev");
 		return freq;
 	}
-	adapter = wlan_hdd_get_adapter_from_objmgr(vdev);
-	if (!adapter) {
+
+	link_info = wlan_hdd_get_link_info_from_objmgr(vdev);
+	if (!link_info) {
 		hdd_err("null adapter");
 		return freq;
 	}
-	if (!hdd_adapter_is_ap(adapter)) {
-		hdd_err("vdev id %d is not AP", adapter->deflink->vdev_id);
+	if (!hdd_adapter_is_ap(link_info->adapter)) {
+		hdd_err("vdev id %d is not AP", link_info->vdev_id);
 		return freq;
 	}
 
-	sap_ctx = WLAN_HDD_GET_SAP_CTX_PTR(adapter);
+	sap_ctx = WLAN_HDD_GET_SAP_CTX_PTR(link_info);
 	if (!sap_ctx) {
 		hdd_err("null sap_ctx");
 		return freq;
@@ -889,7 +903,7 @@ static enum qca_wlan_vendor_phy_mode hdd_son_phy_mode_to_vendor_phy_mode(
 static int hdd_son_set_phymode(struct wlan_objmgr_vdev *vdev,
 			       enum ieee80211_phymode mode)
 {
-	struct hdd_adapter *adapter;
+	struct wlan_hdd_link_info *link_info;
 	enum qca_wlan_vendor_phy_mode vendor_phy_mode;
 	QDF_STATUS status;
 	struct hdd_ap_ctx *hdd_ap_ctx;
@@ -899,20 +913,21 @@ static int hdd_son_set_phymode(struct wlan_objmgr_vdev *vdev,
 		hdd_err("null vdev");
 		return -EINVAL;
 	}
-	adapter = wlan_hdd_get_adapter_from_objmgr(vdev);
-	if (!adapter) {
+
+	link_info = wlan_hdd_get_link_info_from_objmgr(vdev);
+	if (!link_info) {
 		hdd_err("null adapter");
 		return -EINVAL;
 	}
 
-	if (!hdd_adapter_is_ap(adapter)) {
-		hdd_err("vdev id %d is not AP", adapter->deflink->vdev_id);
+	if (!hdd_adapter_is_ap(link_info->adapter)) {
+		hdd_err("vdev id %d is not AP", link_info->vdev_id);
 		return -EINVAL;
 	}
 
 	vendor_phy_mode = hdd_son_phy_mode_to_vendor_phy_mode(mode);
 
-	hdd_ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(adapter);
+	hdd_ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(link_info);
 	sap_config = &hdd_ap_ctx->sap_config;
 	status = wlansap_son_update_sap_config_phymode(vdev, sap_config,
 						       vendor_phy_mode);
@@ -1075,6 +1090,7 @@ static uint32_t hdd_son_per_sta_len(struct hdd_station_info *sta_info)
 static uint32_t hdd_son_get_sta_space(struct wlan_objmgr_vdev *vdev)
 {
 	struct hdd_adapter *adapter;
+	struct wlan_hdd_link_info *link_info;
 	struct hdd_station_info *sta_info, *tmp = NULL;
 	uint32_t space = 0;
 
@@ -1082,12 +1098,14 @@ static uint32_t hdd_son_get_sta_space(struct wlan_objmgr_vdev *vdev)
 		hdd_err("null vdev");
 		return space;
 	}
-	adapter = wlan_hdd_get_adapter_from_objmgr(vdev);
-	if (!adapter) {
+
+	link_info = wlan_hdd_get_link_info_from_objmgr(vdev);
+	if (!link_info) {
 		hdd_err("null adapter");
 		return space;
 	}
 
+	adapter = link_info->adapter;
 	hdd_for_each_sta_ref_safe(adapter->sta_info_list, sta_info, tmp,
 				  STA_INFO_SOFTAP_GET_STA_INFO) {
 		if (!qdf_is_macaddr_broadcast(&sta_info->sta_mac))
@@ -1115,6 +1133,7 @@ static void hdd_son_get_sta_list(struct wlan_objmgr_vdev *vdev,
 				 uint32_t *space)
 {
 	struct hdd_adapter *adapter;
+	struct wlan_hdd_link_info *link_info;
 	struct hdd_station_info *sta_info, *tmp = NULL;
 	uint32_t len;
 	qdf_time_t current_ts;
@@ -1123,12 +1142,14 @@ static void hdd_son_get_sta_list(struct wlan_objmgr_vdev *vdev,
 		hdd_err("null vdev");
 		return;
 	}
-	adapter = wlan_hdd_get_adapter_from_objmgr(vdev);
-	if (!adapter) {
+
+	link_info = wlan_hdd_get_link_info_from_objmgr(vdev);
+	if (!link_info) {
 		hdd_err("null adapter");
 		return;
 	}
 
+	adapter = link_info->adapter;
 	hdd_for_each_sta_ref_safe(adapter->sta_info_list, sta_info, tmp,
 				  STA_INFO_SOFTAP_GET_STA_INFO) {
 		if (!qdf_is_macaddr_broadcast(&sta_info->sta_mac)) {
@@ -1192,35 +1213,37 @@ static void hdd_son_get_sta_list(struct wlan_objmgr_vdev *vdev,
 static QDF_STATUS hdd_son_set_acl_policy(struct wlan_objmgr_vdev *vdev,
 					 ieee80211_acl_cmd son_acl_policy)
 {
-	struct hdd_adapter *adapter;
+	struct wlan_hdd_link_info *link_info;
 	QDF_STATUS status = QDF_STATUS_E_INVAL;
+	struct sap_context *sap_context;
 
 	if (!vdev) {
 		hdd_err("null vdev");
 		return status;
 	}
-	adapter = wlan_hdd_get_adapter_from_objmgr(vdev);
-	if (!adapter) {
+
+	link_info = wlan_hdd_get_link_info_from_objmgr(vdev);
+	if (!link_info) {
 		hdd_err("null adapter");
 		return status;
 	}
 
+	sap_context = WLAN_HDD_GET_SAP_CTX_PTR(link_info);
 	switch (son_acl_policy) {
 	case IEEE80211_MACCMD_POLICY_OPEN:
-		status = wlansap_set_acl_mode(WLAN_HDD_GET_SAP_CTX_PTR(adapter),
-					      eSAP_ALLOW_ALL);
+		status = wlansap_set_acl_mode(sap_context, eSAP_ALLOW_ALL);
 		break;
 	case IEEE80211_MACCMD_POLICY_ALLOW:
-		status = wlansap_set_acl_mode(WLAN_HDD_GET_SAP_CTX_PTR(adapter),
+		status = wlansap_set_acl_mode(sap_context,
 					      eSAP_DENY_UNLESS_ACCEPTED);
 		break;
 	case IEEE80211_MACCMD_POLICY_DENY:
-		status = wlansap_set_acl_mode(WLAN_HDD_GET_SAP_CTX_PTR(adapter),
+		status = wlansap_set_acl_mode(sap_context,
 					      eSAP_ACCEPT_UNLESS_DENIED);
 		break;
 	case IEEE80211_MACCMD_FLUSH:
 	case IEEE80211_MACCMD_DETACH:
-		status = wlansap_clear_acl(WLAN_HDD_GET_SAP_CTX_PTR(adapter));
+		status = wlansap_clear_acl(sap_context);
 		break;
 	default:
 		hdd_err("invalid son acl policy %d", son_acl_policy);
@@ -1268,20 +1291,21 @@ static ieee80211_acl_cmd hdd_acl_policy_to_son_acl_policy(
 static ieee80211_acl_cmd hdd_son_get_acl_policy(struct wlan_objmgr_vdev *vdev)
 {
 	eSapMacAddrACL acl_policy;
-	struct hdd_adapter *adapter;
+	struct wlan_hdd_link_info *link_info;
 	ieee80211_acl_cmd son_acl_policy = IEEE80211_MACCMD_DETACH;
 
 	if (!vdev) {
 		hdd_err("null vdev");
 		return son_acl_policy;
 	}
-	adapter = wlan_hdd_get_adapter_from_objmgr(vdev);
-	if (!adapter) {
+
+	link_info = wlan_hdd_get_link_info_from_objmgr(vdev);
+	if (!link_info) {
 		hdd_err("null adapter");
 		return son_acl_policy;
 	}
 
-	wlansap_get_acl_mode(WLAN_HDD_GET_SAP_CTX_PTR(adapter), &acl_policy);
+	wlansap_get_acl_mode(WLAN_HDD_GET_SAP_CTX_PTR(link_info), &acl_policy);
 
 	son_acl_policy = hdd_acl_policy_to_son_acl_policy(acl_policy);
 
@@ -1301,7 +1325,8 @@ static int hdd_son_add_acl_mac(struct wlan_objmgr_vdev *vdev,
 	eSapACLType list_type;
 	QDF_STATUS qdf_status;
 	eSapMacAddrACL acl_policy;
-	struct hdd_adapter *adapter;
+	struct wlan_hdd_link_info *link_info;
+	struct sap_context *sap_context;
 
 	if (!vdev) {
 		hdd_err("null vdev");
@@ -1311,13 +1336,15 @@ static int hdd_son_add_acl_mac(struct wlan_objmgr_vdev *vdev,
 		hdd_err("null acl_mac");
 		return -EINVAL;
 	}
-	adapter = wlan_hdd_get_adapter_from_objmgr(vdev);
-	if (!adapter) {
+
+	link_info = wlan_hdd_get_link_info_from_objmgr(vdev);
+	if (!link_info) {
 		hdd_err("null adapter");
 		return -EINVAL;
 	}
 
-	wlansap_get_acl_mode(WLAN_HDD_GET_SAP_CTX_PTR(adapter), &acl_policy);
+	sap_context = WLAN_HDD_GET_SAP_CTX_PTR(link_info);
+	wlansap_get_acl_mode(sap_context, &acl_policy);
 
 	if (acl_policy == eSAP_ACCEPT_UNLESS_DENIED) {
 		list_type = SAP_DENY_LIST;
@@ -1327,8 +1354,7 @@ static int hdd_son_add_acl_mac(struct wlan_objmgr_vdev *vdev,
 		hdd_err("Invalid ACL policy %d.", acl_policy);
 		return -EINVAL;
 	}
-	qdf_status = wlansap_modify_acl(WLAN_HDD_GET_SAP_CTX_PTR(adapter),
-					acl_mac->bytes, list_type,
+	qdf_status = wlansap_modify_acl(sap_context, acl_mac->bytes, list_type,
 					ADD_STA_TO_ACL_NO_DEAUTH);
 	if (QDF_IS_STATUS_ERROR(qdf_status)) {
 		hdd_err("Modify ACL failed");
@@ -1351,7 +1377,7 @@ static int hdd_son_del_acl_mac(struct wlan_objmgr_vdev *vdev,
 	eSapACLType list_type;
 	QDF_STATUS qdf_status;
 	eSapMacAddrACL acl_policy;
-	struct hdd_adapter *adapter;
+	struct wlan_hdd_link_info *link_info;
 	struct sap_context *sap_ctx;
 
 	if (!vdev) {
@@ -1362,13 +1388,14 @@ static int hdd_son_del_acl_mac(struct wlan_objmgr_vdev *vdev,
 		hdd_err("null acl_mac");
 		return -EINVAL;
 	}
-	adapter = wlan_hdd_get_adapter_from_objmgr(vdev);
-	if (!adapter) {
+
+	lin_info = wlan_hdd_get_link_info_from_objmgr(vdev);
+	if (!link_info) {
 		hdd_err("null adapter");
 		return -EINVAL;
 	}
 
-	sap_ctx = WLAN_HDD_GET_SAP_CTX_PTR(adapter);
+	sap_ctx = WLAN_HDD_GET_SAP_CTX_PTR(link_info);
 	if (!sap_ctx) {
 		hdd_err("null sap ctx");
 		return -EINVAL;
@@ -1404,35 +1431,37 @@ static int hdd_son_del_acl_mac(struct wlan_objmgr_vdev *vdev,
 static int hdd_son_kickout_mac(struct wlan_objmgr_vdev *vdev,
 			       struct qdf_mac_addr *mac)
 {
-	struct hdd_adapter *adapter;
+	struct wlan_hdd_link_info *link_info;
 
 	if (!vdev) {
 		hdd_err("null vdev");
 		return -EINVAL;
 	}
-	adapter = wlan_hdd_get_adapter_from_objmgr(vdev);
-	if (!adapter) {
+
+	link_info = wlan_hdd_get_link_info_from_objmgr(vdev);
+	if (!link_info) {
 		hdd_err("null adapter");
 		return -EINVAL;
 	}
 
 	if (mac)
-		return wlan_hdd_del_station(adapter, mac->bytes);
+		return wlan_hdd_del_station(link_info->adapter, mac->bytes);
 	else
-		return wlan_hdd_del_station(adapter, NULL);
+		return wlan_hdd_del_station(link_info->adapter, NULL);
 }
 
 static uint8_t hdd_son_get_rx_nss(struct wlan_objmgr_vdev *vdev)
 {
-	struct hdd_adapter *adapter = wlan_hdd_get_adapter_from_objmgr(vdev);
+	struct wlan_hdd_link_info *link_info;
 	uint8_t rx_nss = 0;
 
-	if (!adapter) {
+	link_info = wlan_hdd_get_link_info_from_objmgr(vdev);
+	if (!link_info) {
 		hdd_err("null adapter");
 		return 0;
 	}
-	hdd_get_rx_nss(adapter, &rx_nss);
 
+	hdd_get_rx_nss(link_info->adapter, &rx_nss);
 	return rx_nss;
 }
 
@@ -1440,10 +1469,12 @@ static void hdd_son_deauth_sta(struct wlan_objmgr_vdev *vdev,
 			       uint8_t *peer_mac,
 			       bool ignore_frame)
 {
-	struct hdd_adapter *adapter = wlan_hdd_get_adapter_from_objmgr(vdev);
+	struct wlan_hdd_link_info *link_info;
 	struct csr_del_sta_params param;
+	QDF_STATUS status;
 
-	if (!adapter) {
+	link_info = wlan_hdd_get_link_info_from_objmgr(vdev);
+	if (!link_info) {
 		hdd_err("null adapter");
 		return;
 	}
@@ -1455,7 +1486,8 @@ static void hdd_son_deauth_sta(struct wlan_objmgr_vdev *vdev,
 	hdd_debug("Peer - "QDF_MAC_ADDR_FMT" Ignore Frame - %u",
 		  QDF_FULL_MAC_REF(peer_mac), ignore_frame);
 
-	if (hdd_softap_sta_deauth(adapter, &param) != QDF_STATUS_SUCCESS)
+	status = hdd_softap_sta_deauth(link_info->adapter, &param);
+	if (QDF_STATUS_IS_ERROR(status))
 		hdd_err("Error in deauthenticating peer");
 }
 
@@ -1464,32 +1496,30 @@ static void hdd_son_modify_acl(struct wlan_objmgr_vdev *vdev,
 			       bool allow_auth)
 {
 	QDF_STATUS status;
-	struct hdd_adapter *adapter = wlan_hdd_get_adapter_from_objmgr(vdev);
+	struct sap_context *sap_context;
+	struct wlan_hdd_link_info *link_info;
 
-	if (!adapter) {
+	link_info = wlan_hdd_get_link_info_from_objmgr(vdev);
+	if (!link_info) {
 		hdd_err("null adapter");
 		return;
 	}
+
 	hdd_debug("Peer - " QDF_MAC_ADDR_FMT " Allow Auth - %u",
 		  QDF_MAC_ADDR_REF(peer_mac), allow_auth);
+
+	sap_context = WLAN_HDD_GET_SAP_CTX_PTR(link_info);
 	if (allow_auth) {
-		status = wlansap_modify_acl(WLAN_HDD_GET_SAP_CTX_PTR(adapter),
-					    peer_mac,
-					    SAP_DENY_LIST,
-					    DELETE_STA_FROM_ACL);
-		status = wlansap_modify_acl(WLAN_HDD_GET_SAP_CTX_PTR(adapter),
-					    peer_mac,
-					    SAP_ALLOW_LIST,
-					    ADD_STA_TO_ACL);
+		status = wlansap_modify_acl(sap_context, peer_mac,
+					    SAP_DENY_LIST, DELETE_STA_FROM_ACL);
+		status = wlansap_modify_acl(sap_context, peer_mac,
+					    SAP_ALLOW_LIST, ADD_STA_TO_ACL);
 	} else {
-		status = wlansap_modify_acl(WLAN_HDD_GET_SAP_CTX_PTR(adapter),
-					    peer_mac,
+		status = wlansap_modify_acl(sap_context, peer_mac,
 					    SAP_ALLOW_LIST,
 					    DELETE_STA_FROM_ACL);
-		status = wlansap_modify_acl(WLAN_HDD_GET_SAP_CTX_PTR(adapter),
-					    peer_mac,
-					    SAP_DENY_LIST,
-					    ADD_STA_TO_ACL);
+		status = wlansap_modify_acl(sap_context, peer_mac,
+					    SAP_DENY_LIST, ADD_STA_TO_ACL);
 	}
 }
 
@@ -1499,6 +1529,7 @@ static int hdd_son_send_cfg_event(struct wlan_objmgr_vdev *vdev,
 				  const uint8_t *event_buf)
 {
 	struct hdd_adapter *adapter;
+	struct wlan_hdd_link_info *link_info;
 	uint32_t len;
 	uint32_t idx;
 	struct sk_buff *skb;
@@ -1508,12 +1539,13 @@ static int hdd_son_send_cfg_event(struct wlan_objmgr_vdev *vdev,
 		return -EINVAL;
 	}
 
-	adapter = wlan_hdd_get_adapter_from_objmgr(vdev);
-	if (!adapter) {
+	link_info = wlan_hdd_get_link_info_from_objmgr(vdev);
+	if (!link_info) {
 		hdd_err("null adapter");
 		return -EINVAL;
 	}
 
+	adapter = link_info->adapter;
 	len = nla_total_size(sizeof(event_id)) +
 			nla_total_size(event_len) +
 			NLMSG_HDRLEN;
@@ -1587,7 +1619,7 @@ hdd_son_get_vdev_by_netdev(struct net_device *dev)
 	if (!adapter || (adapter && adapter->delete_in_progress))
 		return NULL;
 
-	vdev = hdd_objmgr_get_vdev_by_user(adapter, WLAN_SON_ID);
+	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink, WLAN_SON_ID);
 	if (!vdev)
 		return NULL;
 
@@ -1910,6 +1942,7 @@ static QDF_STATUS hdd_son_init_acs_channels(struct hdd_adapter *adapter,
 static int hdd_son_start_acs(struct wlan_objmgr_vdev *vdev, uint8_t enable)
 {
 	struct hdd_adapter *adapter;
+	struct wlan_hdd_link_info *link_info;
 	struct sap_config *sap_config;
 	struct hdd_context *hdd_ctx;
 
@@ -1917,11 +1950,14 @@ static int hdd_son_start_acs(struct wlan_objmgr_vdev *vdev, uint8_t enable)
 		hdd_err("ACS Start report with disabled flag");
 		return -EINVAL;
 	}
-	adapter = wlan_hdd_get_adapter_from_objmgr(vdev);
-	if (!adapter) {
+
+	link_info = wlan_hdd_get_link_info_from_objmgr(vdev);
+	if (!link_info) {
 		hdd_err("null adapter");
 		return -EINVAL;
 	}
+
+	adapter = link_info->adapter;
 	if (adapter->device_mode != QDF_SAP_MODE) {
 		hdd_err("Invalid device mode %d", adapter->device_mode);
 		return -EINVAL;
@@ -1931,12 +1967,12 @@ static int hdd_son_start_acs(struct wlan_objmgr_vdev *vdev, uint8_t enable)
 		hdd_err("null hdd_ctx");
 		return -EINVAL;
 	}
-	if (qdf_atomic_read(&adapter->deflink->session.ap.acs_in_progress)) {
+	if (qdf_atomic_read(&link_info->session.ap.acs_in_progress)) {
 		hdd_err("ACS is in-progress");
 		return -EAGAIN;
 	}
 	wlan_hdd_undo_acs(adapter);
-	sap_config = &adapter->deflink->session.ap.sap_config;
+	sap_config = &link_info->session.ap.sap_config;
 	hdd_debug("ACS Config country %s hw_mode %d ACS_BW: %d START_CH: %d END_CH: %d band %d",
 		  hdd_ctx->reg.alpha2, sap_config->acs_cfg.hw_mode,
 		  sap_config->acs_cfg.ch_width,
@@ -1981,13 +2017,17 @@ static int hdd_son_set_acs_channels(struct wlan_objmgr_vdev *vdev,
 	struct ieee80211_chan_def *chans = req->data.user_chanlist.chans;
 	uint16_t nchans = req->data.user_chanlist.n_chan;
 	struct wlan_objmgr_pdev *pdev = wlan_vdev_get_pdev(vdev);
-	struct hdd_adapter *adapter = wlan_hdd_get_adapter_from_objmgr(vdev);
+	struct hdd_adapter *adapter;
+	struct wlan_hdd_link_info *link_info;
 	struct hdd_context *hdd_ctx;
 
-	if (!adapter || !req) {
+	link_info = wlan_hdd_get_link_info_from_objmgr(vdev);
+	if (!link_info || !req) {
 		hdd_err("null adapter or req");
 		return -EINVAL;
 	}
+
+	adapter = link_info->adapter;
 	if (adapter->device_mode != QDF_SAP_MODE) {
 		hdd_err("Invalid device mode %d", adapter->device_mode);
 		return -EINVAL;
@@ -2001,7 +2041,7 @@ static int hdd_son_set_acs_channels(struct wlan_objmgr_vdev *vdev,
 		hdd_err("null hdd_ctx");
 		return -EINVAL;
 	}
-	sap_config = &adapter->deflink->session.ap.sap_config;
+	sap_config = &link_info->session.ap.sap_config;
 	/* initialize with default channels */
 	if (hdd_son_init_acs_channels(adapter, hdd_ctx, &sap_config->acs_cfg)
 						       != QDF_STATUS_SUCCESS) {
@@ -2175,6 +2215,7 @@ static int hdd_son_get_acs_report(struct wlan_objmgr_vdev *vdev,
 				  struct ieee80211_acs_dbg *acs_report)
 {
 	struct hdd_adapter *adapter;
+	struct wlan_hdd_link_info *link_info;
 	uint8_t  acs_entry_id = 0;
 	ACS_LIST_TYPE acs_type = 0;
 	int ret = 0, i = 0;
@@ -2188,12 +2229,15 @@ static int hdd_son_get_acs_report(struct wlan_objmgr_vdev *vdev,
 		ret = -EINVAL;
 		goto end;
 	}
-	adapter = wlan_hdd_get_adapter_from_objmgr(vdev);
-	if (!adapter) {
+
+	link_info = wlan_hdd_get_link_info_from_objmgr(vdev);
+	if (!link_info) {
 		hdd_err("null adapter");
 		ret = -EINVAL;
 		goto end;
 	}
+
+	adapter = link_info->adapter;
 	if (adapter->device_mode != QDF_SAP_MODE) {
 		hdd_err("Invalid device mode %d", adapter->device_mode);
 		ret = -EINVAL;
@@ -2217,8 +2261,8 @@ static int hdd_son_get_acs_report(struct wlan_objmgr_vdev *vdev,
 		ret = -ENOMEM;
 		goto end;
 	}
-	sap_ctx = WLAN_HDD_GET_SAP_CTX_PTR(adapter);
-	acs_cfg = &adapter->deflink->session.ap.sap_config.acs_cfg;
+	sap_ctx = WLAN_HDD_GET_SAP_CTX_PTR(link_info);
+	acs_cfg = &link_info->session.ap.sap_config.acs_cfg;
 	if (!acs_cfg->freq_list &&
 	    (hdd_son_init_acs_channels(adapter, hdd_ctx,
 				       acs_cfg) != QDF_STATUS_SUCCESS)) {
@@ -2366,15 +2410,15 @@ static QDF_STATUS hdd_son_get_node_info_sta(struct wlan_objmgr_vdev *vdev,
 					    uint8_t *mac_addr,
 					    wlan_node_info *node_info)
 {
-	struct hdd_adapter *adapter = wlan_hdd_get_adapter_from_objmgr(vdev);
-	struct hdd_context *hdd_ctx;
+	struct wlan_hdd_link_info *link_info;
 
-	hdd_ctx = adapter->hdd_ctx;
-	if (wlan_hdd_validate_context(hdd_ctx))
+	link_info = wlan_hdd_get_link_info_from_objmgr(vdev);
+	if (!link_info ||
+	    wlan_hdd_validate_context(link_info->adapter->hdd_ctx))
 		return QDF_STATUS_E_FAILURE;
 
-	if (!hdd_cm_is_vdev_associated(adapter)) {
-		hdd_debug_rl("STA adapter not connected");
+	if (!hdd_cm_is_vdev_associated(link_info)) {
+		hdd_debug_rl("STA VDEV not connected");
 		/* Still return success and framework will see default stats */
 		return QDF_STATUS_SUCCESS;
 	}
@@ -2391,11 +2435,19 @@ static QDF_STATUS hdd_son_get_node_info_sap(struct wlan_objmgr_vdev *vdev,
 					    uint8_t *mac_addr,
 					    wlan_node_info *node_info)
 {
-	struct hdd_adapter *adapter = wlan_hdd_get_adapter_from_objmgr(vdev);
+	struct hdd_adapter *adapter;
+	struct wlan_hdd_link_info *link_info;
 	struct hdd_station_info *sta_info;
 	enum wlan_phymode peer_phymode;
 	struct wlan_objmgr_psoc *psoc;
 
+	link_info = wlan_hdd_get_link_info_from_objmgr(vdev);
+	if (!link_info) {
+		hdd_debug("NULL adapter");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	adapter = link_info->adapter;
 	sta_info = hdd_get_sta_info_by_mac(&adapter->sta_info_list, mac_addr,
 					   STA_INFO_SON_GET_DATRATE_INFO);
 	if (!sta_info) {
@@ -2439,8 +2491,16 @@ static QDF_STATUS hdd_son_get_node_info(struct wlan_objmgr_vdev *vdev,
 					uint8_t *mac_addr,
 					wlan_node_info *node_info)
 {
-	struct hdd_adapter *adapter = wlan_hdd_get_adapter_from_objmgr(vdev);
+	struct hdd_adapter *adapter;
+	struct wlan_hdd_link_info *link_info;
 
+	link_info = wlan_hdd_get_link_info_from_objmgr(vdev);
+	if (!link_info) {
+		hdd_debug("NULL adapter");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	adapter = link_info->adapter;
 	if (adapter->device_mode == QDF_STA_MODE)
 		return hdd_son_get_node_info_sta(vdev, mac_addr, node_info);
 	else if (adapter->device_mode == QDF_SAP_MODE)
@@ -2455,15 +2515,17 @@ static QDF_STATUS hdd_son_get_peer_capability(struct wlan_objmgr_vdev *vdev,
 {
 	struct hdd_station_info *sta_info;
 	struct hdd_adapter *adapter;
+	struct wlan_hdd_link_info *link_info;
 	bool b_meas_supported;
 	QDF_STATUS status;
 
-	adapter = wlan_hdd_get_adapter_from_objmgr(vdev);
-	if (!adapter) {
+	link_info = wlan_hdd_get_link_info_from_objmgr(vdev);
+	if (!link_info) {
 		hdd_err("null adapter");
 		return QDF_STATUS_E_FAILURE;
 	}
 
+	adapter = link_info->adapter;
 	sta_info = hdd_get_sta_info_by_mac(&adapter->sta_info_list,
 					   peer->macaddr,
 					   STA_INFO_SOFTAP_GET_STA_INFO);
@@ -2509,14 +2571,16 @@ uint32_t hdd_son_get_peer_max_mcs_idx(struct wlan_objmgr_vdev *vdev,
 {
 	uint32_t ret = 0;
 	struct hdd_station_info *sta_info = NULL;
-	struct hdd_adapter *adapter = NULL;
+	struct hdd_adapter *adapter;
+	struct wlan_hdd_link_info *link_info;
 
-	adapter = wlan_hdd_get_adapter_from_objmgr(vdev);
-	if (!adapter) {
+	link_info = wlan_hdd_get_link_info_from_objmgr(vdev);
+	if (!link_info) {
 		hdd_err("null adapter");
 		return ret;
 	}
 
+	adapter = link_info->adapter;
 	sta_info = hdd_get_sta_info_by_mac(&adapter->sta_info_list,
 					   peer->macaddr,
 					   STA_INFO_SOFTAP_GET_STA_INFO);
@@ -2622,18 +2686,14 @@ int hdd_son_deliver_acs_complete_event(struct hdd_adapter *adapter)
 	int ret = -EINVAL;
 	struct wlan_objmgr_vdev *vdev;
 
-	if (adapter) {
-		vdev = hdd_objmgr_get_vdev_by_user(adapter, WLAN_SON_ID);
-		if (!vdev) {
-			hdd_err("null vdev");
-			return ret;
-		}
-		ret = os_if_son_deliver_ald_event(vdev, NULL,
-						  MLME_EVENT_ACS_COMPLETE,
-						  NULL);
-		hdd_objmgr_put_vdev_by_user(vdev, WLAN_SON_ID);
+	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink, WLAN_SON_ID);
+	if (!vdev) {
+		hdd_err("null vdev");
+		return ret;
 	}
-
+	ret = os_if_son_deliver_ald_event(vdev, NULL, MLME_EVENT_ACS_COMPLETE,
+					  NULL);
+	hdd_objmgr_put_vdev_by_user(vdev, WLAN_SON_ID);
 	return ret;
 }
 
@@ -2644,19 +2704,16 @@ int hdd_son_deliver_cac_status_event(struct hdd_adapter *adapter,
 	struct wlan_objmgr_vdev *vdev;
 	struct son_ald_cac_info cac_info;
 
-	if (adapter) {
-		vdev = hdd_objmgr_get_vdev_by_user(adapter, WLAN_SON_ID);
-		if (!vdev) {
-			hdd_err("null vdev");
-			return ret;
-		}
-		cac_info.freq = freq;
-		cac_info.radar_detected = radar_detected;
-		ret = os_if_son_deliver_ald_event(vdev, NULL,
-						  MLME_EVENT_CAC_STATUS,
-						  &cac_info);
-		hdd_objmgr_put_vdev_by_user(vdev, WLAN_SON_ID);
+	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink, WLAN_SON_ID);
+	if (!vdev) {
+		hdd_err("null vdev");
+		return ret;
 	}
+	cac_info.freq = freq;
+	cac_info.radar_detected = radar_detected;
+	ret = os_if_son_deliver_ald_event(vdev, NULL, MLME_EVENT_CAC_STATUS,
+					  &cac_info);
+	hdd_objmgr_put_vdev_by_user(vdev, WLAN_SON_ID);
 
 	return ret;
 }
@@ -2674,18 +2731,15 @@ int hdd_son_deliver_assoc_disassoc_event(struct hdd_adapter *adapter,
 	memcpy(info.macaddr, &sta_mac.bytes, QDF_MAC_ADDR_SIZE);
 	info.flag = flag;
 	info.reason = reason_code;
-	if (adapter) {
-		vdev = hdd_objmgr_get_vdev_by_user(adapter, WLAN_SON_ID);
-		if (!vdev) {
-			hdd_err("null vdev");
-			return ret;
-		}
-		ret = os_if_son_deliver_ald_event(vdev, NULL,
-						  MLME_EVENT_ASSOC_DISASSOC,
-						  &info);
-		hdd_objmgr_put_vdev_by_user(vdev, WLAN_SON_ID);
-	}
 
+	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink, WLAN_SON_ID);
+	if (!vdev) {
+		hdd_err("null vdev");
+		return ret;
+	}
+	ret = os_if_son_deliver_ald_event(vdev, NULL, MLME_EVENT_ASSOC_DISASSOC,
+					  &info);
+	hdd_objmgr_put_vdev_by_user(vdev, WLAN_SON_ID);
 	return ret;
 }
 
@@ -2701,7 +2755,7 @@ void hdd_son_deliver_peer_authorize_event(struct hdd_adapter *adapter,
 		hdd_err("Non SAP vdev");
 		return;
 	}
-	vdev = hdd_objmgr_get_vdev_by_user(adapter, WLAN_SON_ID);
+	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink, WLAN_SON_ID);
 	if (!vdev) {
 		hdd_err("null vdev");
 		return;
@@ -2742,7 +2796,7 @@ int hdd_son_deliver_chan_change_event(struct hdd_adapter *adapter,
 		hdd_err("null adapter");
 		return ret;
 	}
-	vdev = hdd_objmgr_get_vdev_by_user(adapter, WLAN_SON_ID);
+	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink, WLAN_SON_ID);
 	if (!vdev) {
 		hdd_err("null vdev");
 		return ret;

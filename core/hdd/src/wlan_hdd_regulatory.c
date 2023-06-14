@@ -938,7 +938,15 @@ int hdd_reg_set_band(struct net_device *dev, uint32_t band_bitmap)
 		return -EIO;
 	}
 
-	if (current_band == band_bitmap) {
+	/*
+	 * If SET_FCC_CHANNEL 0 command is received first then 6 GHz band would
+	 * be disabled and band_capability would be set to 3 but existing 6 GHz
+	 * STA and P2P client connections won't be disconnected.
+	 * If set band comes again for 6 GHz band disabled and band_bitmap is
+	 * equal to band_capability, proceed to disable 6 GHz band completely.
+	 */
+	if (current_band == band_bitmap &&
+	    !ucfg_reg_get_keep_6ghz_sta_cli_connection(hdd_ctx->pdev)) {
 		hdd_debug("band is the same so not updating");
 		return 0;
 	}
@@ -1656,7 +1664,8 @@ static void hdd_country_change_update_sta(struct hdd_context *hdd_ctx)
 			 * continue to next statement
 			 */
 		case QDF_STA_MODE:
-			sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter);
+			sta_ctx =
+				WLAN_HDD_GET_STATION_CTX_PTR(adapter->deflink);
 			new_phy_mode = wlan_reg_get_max_phymode(pdev,
 								REG_PHYMODE_MAX,
 								oper_freq);
@@ -1716,8 +1725,8 @@ static void hdd_restart_sap_with_new_phymode(struct hdd_context *hdd_ctx,
 	struct sap_context *sap_ctx = NULL;
 	QDF_STATUS status;
 
-	hostapd_state = WLAN_HDD_GET_HOSTAP_STATE_PTR(adapter);
-	sap_ctx = WLAN_HDD_GET_SAP_CTX_PTR(adapter);
+	hostapd_state = WLAN_HDD_GET_HOSTAP_STATE_PTR(adapter->deflink);
+	sap_ctx = WLAN_HDD_GET_SAP_CTX_PTR(adapter->deflink);
 
 	if (!test_bit(SOFTAP_BSS_STARTED, &adapter->event_flags)) {
 		sap_config->sap_orig_hw_mode = sap_config->SapHw_mode;

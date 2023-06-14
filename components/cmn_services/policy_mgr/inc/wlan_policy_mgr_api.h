@@ -859,7 +859,7 @@ policy_mgr_change_sap_channel_with_csa(struct wlan_objmgr_psoc *psoc,
 				       uint8_t vdev_id, uint32_t ch_freq,
 				       uint32_t ch_width, bool forced)
 {
-
+	return QDF_STATUS_SUCCESS;
 }
 #endif
 
@@ -1215,6 +1215,14 @@ policy_mgr_ml_link_vdev_need_to_be_disabled(struct wlan_objmgr_psoc *psoc,
 					    struct wlan_objmgr_vdev *vdev);
 
 /**
+ * policy_mgr_is_set_link_in_progress() - Check set link in progress or not
+ * @psoc: psoc pointer
+ *
+ * Return: true if set link in progress
+ */
+bool policy_mgr_is_set_link_in_progress(struct wlan_objmgr_psoc *psoc);
+
+/**
  * policy_mgr_wait_for_set_link_update() - Wait for set/clear link response
  * @psoc: psoc pointer
  *
@@ -1250,6 +1258,12 @@ static inline void
 policy_mgr_move_vdev_from_connection_to_disabled_tbl(
 						struct wlan_objmgr_psoc *psoc,
 						uint8_t vdev_id) {}
+
+static inline bool
+policy_mgr_is_set_link_in_progress(struct wlan_objmgr_psoc *psoc)
+{
+	return false;
+}
 
 static inline QDF_STATUS
 policy_mgr_wait_for_set_link_update(struct wlan_objmgr_psoc *psoc)
@@ -2850,6 +2864,16 @@ void policy_mgr_checkn_update_hw_mode_single_mac_mode(
 void policy_mgr_dump_connection_status_info(struct wlan_objmgr_psoc *psoc);
 
 /**
+ * policy_mgr_mode_get_macid_by_vdev_id() - get macid from vdev_id
+ * @psoc: PSOC object information
+ * @vdev_id: vdev id to get PCL
+ *
+ * Return: mac id
+ */
+uint32_t policy_mgr_mode_get_macid_by_vdev_id(struct wlan_objmgr_psoc *psoc,
+					      uint32_t vdev_id);
+
+/**
  * policy_mgr_mode_specific_vdev_id() - provides the
  * vdev id of the pecific mode
  * @psoc: PSOC object information
@@ -4023,18 +4047,18 @@ void policy_mgr_check_and_stop_opportunistic_timer(
 	struct wlan_objmgr_psoc *psoc, uint8_t id);
 
 /**
- * policy_mgr_set_weight_of_dfs_passive_channels_to_zero() - set weight of dfs
- * and passive channels to 0
+ * policy_mgr_set_weight_of_disabled_inactive_channels_to_zero() - set weight
+ * of disabled and inactive channels to 0
  * @psoc: pointer to soc
  * @pcl: preferred channel freq list
  * @len: length of preferred channel list
  * @weight_list: preferred channel weight list
  * @weight_len: length of weight list
- * This function set the weight of dfs and passive channels to 0
+ * This function set the weight of disabled and inactive channels to 0
  *
  * Return: None
  */
-void policy_mgr_set_weight_of_dfs_passive_channels_to_zero(
+void policy_mgr_set_weight_of_disabled_inactive_channels_to_zero(
 		struct wlan_objmgr_psoc *psoc, uint32_t *pcl,
 		uint32_t *len, uint8_t *weight_list, uint32_t weight_len);
 /**
@@ -4964,10 +4988,42 @@ QDF_STATUS policy_mgr_get_sbs_cfg(struct wlan_objmgr_psoc *psoc, bool *sbs);
  * policy_mgr_get_ll_sap_freq()- Function to get ll sap freq if it's present
  * @psoc: PSOC object
  *
- * Return: True if it's LL SAP otherwise false
+ * Based on vdev id ap profile set via vendor command is get and compared with
+ * ll_type_any AP type and return freq for that SAP if profile set is latency
+ * sensitive or throghput sensitive.
+ *
+ * Return: freq if it's LL SAP otherwise 0
  *
  */
 qdf_freq_t policy_mgr_get_ll_sap_freq(struct wlan_objmgr_psoc *psoc);
+
+/**
+ * policy_mgr_get_lt_ll_sap_freq()- Function to get LT LL sap freq if it's
+ * present
+ * @psoc: PSOC object
+ *
+ * Based on vdev id ap profile set via vendor command is get and compared with
+ * lt_ll_type AP type and return freq for that SAP if profile set is latency
+ * sensitive example gaming or losless audio.
+ *
+ * Return: freq if it's LT LL SAP otherwise 0
+ *
+ */
+qdf_freq_t policy_mgr_get_lt_ll_sap_freq(struct wlan_objmgr_psoc *psoc);
+
+/**
+ * policy_mgr_get_ht_ll_sap_freq()- Function to get HT LL sap freq if it's
+ * present
+ * @psoc: PSOC object
+ *
+ * Based on vdev id ap profile set via vendor command is get and compared with
+ * ht_ll_type AP type and return freq for that SAP if profile set is throghput
+ * sensitive.
+ *
+ * Return: freq if it's HT LL SAP otherwise 0
+ *
+ */
+qdf_freq_t policy_mgr_get_ht_ll_sap_freq(struct wlan_objmgr_psoc *psoc);
 
 /**
  * policy_mgr_is_ll_sap_concurrency_valid() - Function to check whether
@@ -4992,9 +5048,9 @@ bool policy_mgr_is_ll_sap_concurrency_valid(struct wlan_objmgr_psoc *psoc,
  * @discon_freq: disconnect frequency
  * @type: enum indoor_conc_update_type
  *
- * Return: None
+ * Return: True if need to compute pdev current channel list
  */
-void
+bool
 policy_mgr_update_indoor_concurrency(struct wlan_objmgr_psoc *psoc,
 				     uint8_t vdev_id,
 				     uint32_t discon_freq,

@@ -170,6 +170,88 @@ void dp_wait_complete_tasks(struct wlan_dp_psoc_context *dp_ctx);
 #define dp_exit() QDF_TRACE_EXIT(QDF_MODULE_ID_DP, "exit")
 
 /**
+ * __wlan_dp_runtime_suspend() - Runtime suspend DP handler
+ * @soc: CDP SoC handle
+ * @pdev_id: DP PDEV ID
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS __wlan_dp_runtime_suspend(ol_txrx_soc_handle soc, uint8_t pdev_id);
+
+/**
+ * __wlan_dp_runtime_resume() - Runtime suspend DP handler
+ * @soc: CDP SoC handle
+ * @pdev_id: DP PDEV ID
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS __wlan_dp_runtime_resume(ol_txrx_soc_handle soc, uint8_t pdev_id);
+
+/**
+ * __wlan_dp_bus_suspend() - BUS suspend DP handler
+ * @soc: CDP SoC handle
+ * @pdev_id: DP PDEV ID
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS __wlan_dp_bus_suspend(ol_txrx_soc_handle soc, uint8_t pdev_id);
+
+/**
+ * __wlan_dp_bus_resume() - BUS resume DP handler
+ * @soc: CDP SoC handle
+ * @pdev_id: DP PDEV ID
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS __wlan_dp_bus_resume(ol_txrx_soc_handle soc, uint8_t pdev_id);
+
+/**
+ * wlan_dp_txrx_soc_attach() - Datapath soc attach
+ * @params: SoC attach params
+ * @is_wifi3_0_target: [OUT] Pointer to update if the target is wifi3.0
+ *
+ * Return: SoC handle
+ */
+void *wlan_dp_txrx_soc_attach(struct dp_txrx_soc_attach_params *params,
+			      bool *is_wifi3_0_target);
+
+/**
+ * wlan_dp_txrx_soc_detach() - Datapath SoC detach
+ * @soc: DP SoC handle
+ *
+ * Return: None
+ */
+void wlan_dp_txrx_soc_detach(ol_txrx_soc_handle soc);
+
+/**
+ * wlan_dp_txrx_attach_target() - DP target attach
+ * @soc: DP SoC handle
+ * @pdev_id: DP pdev id
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS wlan_dp_txrx_attach_target(ol_txrx_soc_handle soc, uint8_t pdev_id);
+
+/**
+ * wlan_dp_txrx_pdev_attach() - DP pdev attach
+ * @soc: DP SoC handle
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS wlan_dp_txrx_pdev_attach(ol_txrx_soc_handle soc);
+
+/**
+ * wlan_dp_txrx_pdev_detach() - DP pdev detach
+ * @soc: DP SoC handle
+ * @pdev_id: DP pdev id
+ * @force: indicates if force detach is to be done or not
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS wlan_dp_txrx_pdev_detach(ol_txrx_soc_handle soc, uint8_t pdev_id,
+				    int force);
+
+/**
  * dp_peer_obj_create_notification(): dp peer create handler
  * @peer: peer which is going to created by objmgr
  * @arg: argument for vdev create handler

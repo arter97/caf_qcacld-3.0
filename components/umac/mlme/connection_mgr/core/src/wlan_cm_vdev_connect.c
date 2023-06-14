@@ -717,8 +717,9 @@ static void cm_print_mlo_info(struct wlan_objmgr_vdev *vdev)
 	if (!peer)
 		return;
 
-	mlme_nofl_debug("self_mld_addr:" QDF_MAC_ADDR_FMT,
-			QDF_MAC_ADDR_REF(mld_addr->bytes));
+	mlme_nofl_debug("self_mld_addr:" QDF_MAC_ADDR_FMT " link_id:%d",
+			QDF_MAC_ADDR_REF(mld_addr->bytes),
+			wlan_vdev_get_link_id(vdev));
 	mlme_nofl_debug("peer_mld_mac:" QDF_MAC_ADDR_FMT,
 			QDF_MAC_ADDR_REF(peer->mldaddr));
 }
@@ -1062,6 +1063,12 @@ QDF_STATUS cm_connect_start_ind(struct wlan_objmgr_vdev *vdev,
 		rso_cfg->orig_sec_info.mcastcipherset =
 					req->crypto.group_cipher;
 		rso_cfg->orig_sec_info.key_mgmt = req->crypto.akm_suites;
+		/*
+		 * reset the roam channel list entries present in the rso
+		 * config which gets stored during connect resp failure in
+		 * wlan_cm_send_connect_rsp
+		 */
+		rso_cfg->tried_candidate_freq_list.num_chan = 0;
 	}
 
 	if (wlan_get_vendor_ie_ptr_from_oui(HS20_OUI_TYPE,
@@ -1115,8 +1122,13 @@ cm_get_ml_partner_info(struct scan_cache_entry *scan_entry,
 	uint8_t mlo_support_link_num;
 	struct wlan_objmgr_psoc *psoc;
 
-	if (!scan_entry->ml_info.num_links)
+	/* If ML IE is not present then return failure*/
+	if (!scan_entry->ie_list.multi_link_bv)
 		return QDF_STATUS_E_FAILURE;
+
+	/* In case of single link ML return success*/
+	if (!scan_entry->ml_info.num_links)
+		return QDF_STATUS_SUCCESS;
 
 	psoc = wlan_objmgr_get_psoc_by_id(0, WLAN_MLME_CM_ID);
 	if (!psoc) {
@@ -1267,6 +1279,24 @@ QDF_STATUS wlan_cm_send_connect_rsp(struct scheduler_msg *msg)
 			wlan_objmgr_peer_release_ref(peer, WLAN_MLME_CM_ID);
 		}
 	}
+
+	/*
+	 * Host creates a ROAM_SCAN_CHAN list with BSSID entries present
+	 * in the scan database. If the connection to an AP fails due to
+	 * Auth/Join/Assoc timeout, Host removes the AP entry from the
+	 * Scan database, assuming it’s not reachable (to avoid
+	 * reconnecting to the AP as it's not responding). Due to this,
+	 * FW does not include the frequency(s), for which the
+	 * connection failed, in roam scan.
+	 * To avoid this, store the frequency(s) of all the candidates
+	 * to which the driver tried connection in the rso config during
+	 * connect resp failure and use the same list to update the roam
+	 * channel list on the top of entries present in scan db.
+	 */
+	if (QDF_IS_STATUS_ERROR(rsp->connect_rsp.connect_status))
+		cm_update_tried_candidate_freq_list(rsp->psoc, vdev,
+						    &rsp->connect_rsp);
+
 	cm_csr_connect_rsp(vdev, rsp);
 	if (rsp->connect_rsp.is_reassoc)
 		status = wlan_cm_reassoc_rsp(vdev, &rsp->connect_rsp);
@@ -1524,14 +1554,19 @@ cm_update_tid_mapping(struct wlan_objmgr_vdev *vdev)
 	if (!vdev || !vdev->mlo_dev_ctx)
 		return QDF_STATUS_E_NULL_VALUE;
 
-	if (!mlo_check_if_all_links_up(vdev))
+	if (!wlan_vdev_mlme_is_mlo_link_vdev(vdev) ||
+	    !mlo_check_if_all_links_up(vdev))
 		return QDF_STATUS_E_FAILURE;
 
-	t2lm_ctx = &vdev->mlo_dev_ctx->t2lm_ctx;
+	t2lm_ctx = &vdev->mlo_dev_ctx->sta_ctx->copied_t2lm_ie_assoc_rsp;
+	if (!t2lm_ctx) {
+		mlme_err("T2LM ctx is NULL");
+		return QDF_STATUS_E_NULL_VALUE;
+	}
+
 	status = wlan_process_bcn_prbrsp_t2lm_ie(vdev, t2lm_ctx, t2lm_ctx->tsf);
 	if (QDF_IS_STATUS_ERROR(status)) {
 		mlme_err("T2LM IE beacon process failed");
-		return status;
 	}
 
 	return status;

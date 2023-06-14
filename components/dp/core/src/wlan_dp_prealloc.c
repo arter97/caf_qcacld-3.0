@@ -31,6 +31,10 @@
 #ifdef WIFI_MONITOR_SUPPORT
 #include <dp_mon.h>
 #endif
+#ifdef WLAN_PKT_CAPTURE_TX_2_0
+#include "mon_ingress_ring.h"
+#include "mon_destination_ring.h"
+#endif
 
 #ifdef DP_MEM_PRE_ALLOC
 
@@ -88,7 +92,7 @@ struct dp_consistent_prealloc {
  * @pages: multi page information storage
  */
 struct dp_multi_page_prealloc {
-	enum dp_desc_type desc_type;
+	enum qdf_dp_desc_type desc_type;
 	qdf_size_t element_size;
 	uint16_t element_num;
 	bool in_use;
@@ -315,6 +319,11 @@ static struct  dp_consistent_prealloc g_dp_consistent_allocs[] = {
 	/* 2 monitor status rings */
 	{RXDMA_MONITOR_STATUS, 0, 0, NULL, NULL, 0, 0},
 	{RXDMA_MONITOR_STATUS, 0, 0, NULL, NULL, 0, 0},
+#ifdef WLAN_PKT_CAPTURE_TX_2_0
+	/* 2 MON2SW Tx monitor rings */
+	{TX_MONITOR_DST, 0, 0, NULL, NULL, 0, 0},
+	{TX_MONITOR_DST, 0, 0, NULL, NULL, 0, 0},
+#endif
 };
 
 /* Number of HW link descriptors needed (rounded to power of 2) */
@@ -335,51 +344,57 @@ static struct  dp_consistent_prealloc g_dp_consistent_allocs[] = {
 #define NON_CACHEABLE 0
 #define CACHEABLE 1
 
+#define DIRECT_LINK_CE_RX_BUF_SIZE  256
+#define DIRECT_LINK_DEFAULT_BUF_SZ  2048
+#define TX_DIRECT_LINK_BUF_NUM      380
+#define TX_DIRECT_LINK_CE_BUF_NUM   8
+#define RX_DIRECT_LINK_CE_BUF_NUM   30
+
 static struct  dp_multi_page_prealloc g_dp_multi_page_allocs[] = {
 	/* 4 TX DESC pools */
-	{DP_TX_DESC_TYPE, TX_DESC_SIZE, 0, 0, CACHEABLE, { 0 } },
-	{DP_TX_DESC_TYPE, TX_DESC_SIZE, 0, 0, CACHEABLE, { 0 } },
-	{DP_TX_DESC_TYPE, TX_DESC_SIZE, 0, 0, CACHEABLE, { 0 } },
-	{DP_TX_DESC_TYPE, TX_DESC_SIZE, 0, 0, CACHEABLE, { 0 } },
+	{QDF_DP_TX_DESC_TYPE, TX_DESC_SIZE, 0, 0, CACHEABLE, { 0 } },
+	{QDF_DP_TX_DESC_TYPE, TX_DESC_SIZE, 0, 0, CACHEABLE, { 0 } },
+	{QDF_DP_TX_DESC_TYPE, TX_DESC_SIZE, 0, 0, CACHEABLE, { 0 } },
+	{QDF_DP_TX_DESC_TYPE, TX_DESC_SIZE, 0, 0, CACHEABLE, { 0 } },
 
 	/* 4 Tx EXT DESC NON Cacheable pools */
-	{DP_TX_EXT_DESC_TYPE, HAL_TX_EXT_DESC_WITH_META_DATA, 0, 0,
+	{QDF_DP_TX_EXT_DESC_TYPE, HAL_TX_EXT_DESC_WITH_META_DATA, 0, 0,
 	 NON_CACHEABLE, { 0 } },
-	{DP_TX_EXT_DESC_TYPE, HAL_TX_EXT_DESC_WITH_META_DATA, 0, 0,
+	{QDF_DP_TX_EXT_DESC_TYPE, HAL_TX_EXT_DESC_WITH_META_DATA, 0, 0,
 	 NON_CACHEABLE, { 0 } },
-	{DP_TX_EXT_DESC_TYPE, HAL_TX_EXT_DESC_WITH_META_DATA, 0, 0,
+	{QDF_DP_TX_EXT_DESC_TYPE, HAL_TX_EXT_DESC_WITH_META_DATA, 0, 0,
 	 NON_CACHEABLE, { 0 } },
-	{DP_TX_EXT_DESC_TYPE, HAL_TX_EXT_DESC_WITH_META_DATA, 0, 0,
+	{QDF_DP_TX_EXT_DESC_TYPE, HAL_TX_EXT_DESC_WITH_META_DATA, 0, 0,
 	 NON_CACHEABLE, { 0 } },
 
 	/* 4 Tx EXT DESC Link Cacheable pools */
-	{DP_TX_EXT_DESC_LINK_TYPE, sizeof(struct dp_tx_ext_desc_elem_s), 0, 0,
-	 CACHEABLE, { 0 } },
-	{DP_TX_EXT_DESC_LINK_TYPE, sizeof(struct dp_tx_ext_desc_elem_s), 0, 0,
-	 CACHEABLE, { 0 } },
-	{DP_TX_EXT_DESC_LINK_TYPE, sizeof(struct dp_tx_ext_desc_elem_s), 0, 0,
-	 CACHEABLE, { 0 } },
-	{DP_TX_EXT_DESC_LINK_TYPE, sizeof(struct dp_tx_ext_desc_elem_s), 0, 0,
-	 CACHEABLE, { 0 } },
+	{QDF_DP_TX_EXT_DESC_LINK_TYPE, sizeof(struct dp_tx_ext_desc_elem_s), 0,
+	 0, CACHEABLE, { 0 } },
+	{QDF_DP_TX_EXT_DESC_LINK_TYPE, sizeof(struct dp_tx_ext_desc_elem_s), 0,
+	 0, CACHEABLE, { 0 } },
+	{QDF_DP_TX_EXT_DESC_LINK_TYPE, sizeof(struct dp_tx_ext_desc_elem_s), 0,
+	 0, CACHEABLE, { 0 } },
+	{QDF_DP_TX_EXT_DESC_LINK_TYPE, sizeof(struct dp_tx_ext_desc_elem_s), 0,
+	 0, CACHEABLE, { 0 } },
 
 	/* 4 TX TSO DESC pools */
-	{DP_TX_TSO_DESC_TYPE, TX_TSO_DESC_SIZE, 0, 0, CACHEABLE, { 0 } },
-	{DP_TX_TSO_DESC_TYPE, TX_TSO_DESC_SIZE, 0, 0, CACHEABLE, { 0 } },
-	{DP_TX_TSO_DESC_TYPE, TX_TSO_DESC_SIZE, 0, 0, CACHEABLE, { 0 } },
-	{DP_TX_TSO_DESC_TYPE, TX_TSO_DESC_SIZE, 0, 0, CACHEABLE, { 0 } },
+	{QDF_DP_TX_TSO_DESC_TYPE, TX_TSO_DESC_SIZE, 0, 0, CACHEABLE, { 0 } },
+	{QDF_DP_TX_TSO_DESC_TYPE, TX_TSO_DESC_SIZE, 0, 0, CACHEABLE, { 0 } },
+	{QDF_DP_TX_TSO_DESC_TYPE, TX_TSO_DESC_SIZE, 0, 0, CACHEABLE, { 0 } },
+	{QDF_DP_TX_TSO_DESC_TYPE, TX_TSO_DESC_SIZE, 0, 0, CACHEABLE, { 0 } },
 
 	/* 4 TX TSO NUM SEG DESC pools */
-	{DP_TX_TSO_NUM_SEG_TYPE, TX_TSO_NUM_SEG_DESC_SIZE, 0, 0,
+	{QDF_DP_TX_TSO_NUM_SEG_TYPE, TX_TSO_NUM_SEG_DESC_SIZE, 0, 0,
 	 CACHEABLE, { 0 } },
-	{DP_TX_TSO_NUM_SEG_TYPE, TX_TSO_NUM_SEG_DESC_SIZE, 0, 0,
+	{QDF_DP_TX_TSO_NUM_SEG_TYPE, TX_TSO_NUM_SEG_DESC_SIZE, 0, 0,
 	 CACHEABLE, { 0 } },
-	{DP_TX_TSO_NUM_SEG_TYPE, TX_TSO_NUM_SEG_DESC_SIZE, 0, 0,
+	{QDF_DP_TX_TSO_NUM_SEG_TYPE, TX_TSO_NUM_SEG_DESC_SIZE, 0, 0,
 	 CACHEABLE, { 0 } },
-	{DP_TX_TSO_NUM_SEG_TYPE, TX_TSO_NUM_SEG_DESC_SIZE, 0, 0,
+	{QDF_DP_TX_TSO_NUM_SEG_TYPE, TX_TSO_NUM_SEG_DESC_SIZE, 0, 0,
 	 CACHEABLE, { 0 } },
 
 	/* DP RX DESCs BUF pools */
-	{DP_RX_DESC_BUF_TYPE, sizeof(union dp_rx_desc_list_elem_t),
+	{QDF_DP_RX_DESC_BUF_TYPE, sizeof(union dp_rx_desc_list_elem_t),
 	 WLAN_CFG_RX_SW_DESC_WEIGHT_SIZE * WLAN_CFG_RXDMA_REFILL_RING_SIZE, 0,
 	 CACHEABLE, { 0 } },
 
@@ -387,18 +402,26 @@ static struct  dp_multi_page_prealloc g_dp_multi_page_allocs[] = {
 	/* no op */
 #else
 	/* 2 DP RX DESCs Status pools */
-	{DP_RX_DESC_STATUS_TYPE, sizeof(union dp_rx_desc_list_elem_t),
+	{QDF_DP_RX_DESC_STATUS_TYPE, sizeof(union dp_rx_desc_list_elem_t),
 	 WLAN_CFG_RXDMA_MONITOR_STATUS_RING_SIZE + 1, 0, CACHEABLE, { 0 } },
-	{DP_RX_DESC_STATUS_TYPE, sizeof(union dp_rx_desc_list_elem_t),
+	{QDF_DP_RX_DESC_STATUS_TYPE, sizeof(union dp_rx_desc_list_elem_t),
 	 WLAN_CFG_RXDMA_MONITOR_STATUS_RING_SIZE + 1, 0, CACHEABLE, { 0 } },
 #endif
 	/* DP HW Link DESCs pools */
-	{DP_HW_LINK_DESC_TYPE, HW_LINK_DESC_SIZE, NUM_HW_LINK_DESCS, 0,
-	NON_CACHEABLE, { 0 } },
+	{QDF_DP_HW_LINK_DESC_TYPE, HW_LINK_DESC_SIZE, NUM_HW_LINK_DESCS, 0,
+	 NON_CACHEABLE, { 0 } },
 #ifdef CONFIG_BERYLLIUM
-	{DP_HW_CC_SPT_PAGE_TYPE, qdf_page_size,
+	{QDF_DP_HW_CC_SPT_PAGE_TYPE, qdf_page_size,
 	 ((DP_TX_RX_DESC_MAX_NUM * sizeof(uint64_t)) / qdf_page_size),
 	 0, NON_CACHEABLE, { 0 } },
+#endif
+#ifdef FEATURE_DIRECT_LINK
+	{QDF_DP_TX_DIRECT_LINK_CE_BUF_TYPE, DIRECT_LINK_DEFAULT_BUF_SZ,
+	 TX_DIRECT_LINK_CE_BUF_NUM, 0, NON_CACHEABLE, { 0 } },
+	{QDF_DP_TX_DIRECT_LINK_BUF_TYPE, DIRECT_LINK_DEFAULT_BUF_SZ,
+	 TX_DIRECT_LINK_BUF_NUM, 0, NON_CACHEABLE, { 0 } },
+	{QDF_DP_RX_DIRECT_LINK_CE_BUF_TYPE, DIRECT_LINK_CE_RX_BUF_SIZE,
+	 RX_DIRECT_LINK_CE_BUF_NUM, 0, NON_CACHEABLE, { 0 } },
 #endif
 };
 
@@ -526,10 +549,53 @@ static inline uint32_t dp_get_tcl_data_srng_entrysize(void)
 {
 	return sizeof(struct tcl_data_cmd);
 }
+
+#ifdef WLAN_PKT_CAPTURE_TX_2_0
+/**
+ * dp_get_tx_mon_mem_size() - Get tx mon ring memory size
+ * @cfg: prealloc config
+ * @ring_type: ring type
+ *
+ * Return: Tx mon ring memory size
+ */
+static inline
+uint32_t dp_get_tx_mon_mem_size(struct wlan_dp_prealloc_cfg *cfg,
+				enum hal_ring_type ring_type)
+{
+	uint32_t mem_size = 0;
+
+	if (!cfg)
+		return mem_size;
+
+	if (ring_type == TX_MONITOR_BUF) {
+		mem_size = (sizeof(struct mon_ingress_ring)) *
+			    cfg->num_tx_mon_buf_ring_entries;
+	} else if (ring_type == TX_MONITOR_DST) {
+		mem_size = (sizeof(struct mon_destination_ring)) *
+			    cfg->num_tx_mon_dst_ring_entries;
+	}
+
+	return mem_size;
+}
+#else
+static inline
+uint32_t dp_get_tx_mon_mem_size(struct wlan_dp_prealloc_cfg *cfg,
+				enum hal_ring_type ring_type)
+{
+	return 0;
+}
+#endif /* WLAN_PKT_CAPTURE_TX_2_0 */
 #else
 static inline uint32_t dp_get_tcl_data_srng_entrysize(void)
 {
 	return (sizeof(struct tlv_32_hdr) + sizeof(struct tcl_data_cmd));
+}
+
+static inline
+uint32_t dp_get_tx_mon_mem_size(struct wlan_dp_prealloc_cfg *cfg,
+				enum hal_ring_type ring_type)
+{
+	return 0;
 }
 #endif
 
@@ -585,6 +651,10 @@ dp_update_mem_size_by_ring_type(struct wlan_dp_prealloc_cfg *cfg,
 		*mem_size = (sizeof(struct wbm_buffer_ring)) *
 			    cfg->num_mon_status_ring_entries;
 		return;
+	case TX_MONITOR_BUF:
+	case TX_MONITOR_DST:
+		*mem_size = dp_get_tx_mon_mem_size(cfg, ring_type);
+		return;
 	default:
 		return;
 	}
@@ -601,17 +671,17 @@ dp_update_mem_size_by_ring_type(struct wlan_dp_prealloc_cfg *cfg,
  */
 static void
 dp_update_num_elements_by_desc_type(struct wlan_dp_prealloc_cfg *cfg,
-				    enum dp_desc_type desc_type,
+				    enum qdf_dp_desc_type desc_type,
 				    uint16_t *num_elements)
 {
 	switch (desc_type) {
-	case DP_TX_DESC_TYPE:
+	case QDF_DP_TX_DESC_TYPE:
 		*num_elements = cfg->num_tx_desc;
 		return;
-	case DP_TX_EXT_DESC_TYPE:
-	case DP_TX_EXT_DESC_LINK_TYPE:
-	case DP_TX_TSO_DESC_TYPE:
-	case DP_TX_TSO_NUM_SEG_TYPE:
+	case QDF_DP_TX_EXT_DESC_TYPE:
+	case QDF_DP_TX_EXT_DESC_LINK_TYPE:
+	case QDF_DP_TX_TSO_DESC_TYPE:
+	case QDF_DP_TX_TSO_NUM_SEG_TYPE:
 		*num_elements = cfg->num_tx_ext_desc;
 		return;
 	default:

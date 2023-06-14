@@ -556,6 +556,8 @@ struct sap_config {
 	uint8_t link_id;
 	uint8_t num_link;
 #endif
+	qdf_freq_t last_acs_freq;
+	qdf_time_t last_acs_complete_time;
 };
 
 #ifdef FEATURE_WLAN_AP_AP_ACS_OPTIMIZE
@@ -1901,6 +1903,18 @@ void wlansap_process_chan_info_event(struct sap_context *sap_ctx,
 {
 }
 #endif
+
+/**
+ * wlansap_update_ll_lt_sap_acs_result() - Update acs result of LL_LT_SAP
+ * @sap_ctx: sap context
+ * @last_acs_freq: last acs frequency to be set
+ *
+ * This function is used to update stored acs channel frequency
+ *
+ * Return: None
+ */
+void wlansap_update_ll_lt_sap_acs_result(struct sap_context *sap_ctx,
+					 qdf_freq_t last_acs_freq);
 
 #ifdef __cplusplus
 }

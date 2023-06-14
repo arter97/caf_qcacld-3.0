@@ -274,6 +274,25 @@ QDF_STATUS wlan_mlme_set_ht_mpdu_density(struct wlan_objmgr_psoc *psoc,
 QDF_STATUS wlan_mlme_get_band_capability(struct wlan_objmgr_psoc *psoc,
 					 uint32_t *band_capability);
 
+#ifdef QCA_MULTIPASS_SUPPORT
+/**
+ * wlan_mlme_peer_config_vlan() - send vlan id to FW for RX path
+ * @vdev: vdev pointer
+ * @mac_addr: mac address of the peer
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+wlan_mlme_peer_config_vlan(struct wlan_objmgr_vdev *vdev,
+			   uint8_t *mac_addr);
+#else
+static inline QDF_STATUS
+wlan_mlme_peer_config_vlan(struct wlan_objmgr_vdev *vdev,
+			   uint8_t *mac_addr)
+{
+	return QDF_STATUS_SUCCESS;
+}
+#endif
 #ifdef MULTI_CLIENT_LL_SUPPORT
 /**
  * wlan_mlme_get_wlm_multi_client_ll_caps() - Get the wlm multi client latency
@@ -1051,13 +1070,34 @@ QDF_STATUS mlme_update_tgt_he_caps_in_cfg(struct wlan_objmgr_psoc *psoc,
 /**
  * wlan_mlme_convert_vht_op_bw_to_phy_ch_width() - convert channel width in VHT
  *                                                 operation IE to phy_ch_width
- * @channel_width: channel width in VHT operation IE. If it is 0, please use HT
- *                 information IE to check whether it is 20MHz or 40MHz.
+ * @channel_width: channel width in VHT operation IE.
+ * @chan_id: channel id
+ * @ccfs0: channel center frequency segment 0
+ * @ccfs0: channel center frequency segment 1
  *
  * Return: phy_ch_width
  */
-enum phy_ch_width wlan_mlme_convert_vht_op_bw_to_phy_ch_width(
-						uint8_t channel_width);
+enum phy_ch_width
+wlan_mlme_convert_vht_op_bw_to_phy_ch_width(uint8_t channel_width,
+					    uint8_t chan_id,
+					    uint8_t ccfs0,
+					    uint8_t ccfs1);
+
+/**
+ * wlan_mlme_convert_he_6ghz_op_bw_to_phy_ch_width() - convert channel width in
+ *                                          he 6ghz peration IE to phy_ch_width
+ * @channel_width: channel width in HE operation IE.
+ * @chan_id: channel id
+ * @ccfs0: channel center frequency segment 0
+ * @ccfs0: channel center frequency segment 1
+ *
+ * Return: phy_ch_width
+ */
+enum phy_ch_width
+wlan_mlme_convert_he_6ghz_op_bw_to_phy_ch_width(uint8_t channel_width,
+						uint8_t chan_id,
+						uint8_t ccfs0,
+						uint8_t ccfs1);
 
 /**
  * wlan_mlme_chan_stats_scan_event_cb() - process connected channel stats

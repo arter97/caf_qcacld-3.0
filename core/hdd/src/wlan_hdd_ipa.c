@@ -185,13 +185,14 @@ void hdd_ipa_send_nbuf_to_network(qdf_nbuf_t nbuf, qdf_netdev_t dev)
 		return;
 	}
 
-	stats = &adapter->hdd_stats.tx_rx_stats;
+	stats = &adapter->deflink->hdd_stats.tx_rx_stats;
 	hdd_ipa_update_rx_mcbc_stats(adapter, nbuf);
 
 	if ((adapter->device_mode == QDF_SAP_MODE) &&
 	    (qdf_nbuf_is_ipv4_dhcp_pkt(nbuf) == true)) {
 		/* Send DHCP Indication to FW */
-		vdev = hdd_objmgr_get_vdev_by_user(adapter, WLAN_DP_ID);
+		vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink,
+						   WLAN_DP_ID);
 		if (vdev) {
 			ucfg_dp_softap_inspect_dhcp_packet(vdev, nbuf, QDF_RX);
 			hdd_objmgr_put_vdev_by_user(vdev, WLAN_DP_ID);
@@ -236,7 +237,8 @@ void hdd_ipa_send_nbuf_to_network(qdf_nbuf_t nbuf, qdf_netdev_t dev)
 		if (adapter->device_mode == QDF_SAP_MODE) {
 			ta_addr = adapter->mac_addr.bytes;
 		} else if (adapter->device_mode == QDF_STA_MODE) {
-			sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter);
+			sta_ctx =
+				WLAN_HDD_GET_STATION_CTX_PTR(adapter->deflink);
 			ta_addr = (u8 *)&sta_ctx->conn_info.peer_macaddr;
 		}
 
@@ -266,8 +268,7 @@ void hdd_ipa_send_nbuf_to_network(qdf_nbuf_t nbuf, qdf_netdev_t dev)
 	 * and also DP internally maintaining vdev ref count
 	 */
 	ucfg_dp_inc_rx_pkt_stats(adapter->deflink->vdev,
-				 len,
-				 delivered);
+				 len, delivered);
 	/*
 	 * Restore PF_WAKE_UP_IDLE flag in the task structure
 	 */

@@ -341,6 +341,7 @@ struct direct_link_info {
  * @vdev: object manager vdev context
  * @vdev_lock: vdev spin lock
  * @dev: netdev reference
+ * @txrx_ops: Interface tx-rx ops
  * @dp_stats: Device TX/RX statistics
  * @is_sta_periodic_stats_enabled: Indicate whether to display sta periodic
  * stats
@@ -393,6 +394,7 @@ struct wlan_dp_intf {
 	struct wlan_objmgr_vdev *vdev;
 	qdf_spinlock_t vdev_lock;
 	qdf_netdev_t dev;
+	struct ol_txrx_ops txrx_ops;
 	struct dp_stats dp_stats;
 #ifdef WLAN_FEATURE_PERIODIC_STA_STATS
 	bool is_sta_periodic_stats_enabled;
@@ -428,8 +430,6 @@ struct wlan_dp_intf {
 	uint8_t gro_flushed[DP_MAX_RX_THREADS];
 
 	bool runtime_disable_rx_thread;
-	ol_txrx_rx_fp rx_stack;
-	ol_txrx_tx_fp tx_fn;
 	struct wlan_dp_conn_info conn_info;
 
 	enum bss_intf_state bss_state;
@@ -472,6 +472,9 @@ struct dp_direct_link_context {
  * @pdev: object manager pdev context
  * @qdf_dev: qdf device
  * @dp_cfg: place holder for DP configuration
+ * @cdp_soc: CDP SoC handle
+ * @hif_handle: HIF handle
+ * @hal_soc: HAL SoC handle
  * @intf_list_lock: DP interfaces list lock
  * @intf_list: DP interfaces list
  * @rps: rps
@@ -515,6 +518,7 @@ struct dp_direct_link_context {
  * @rtpm_tput_policy_ctx: Runtime Tput policy context
  * @txrx_hist: TxRx histogram
  * @bbm_ctx: bus bandwidth manager context
+ * @dp_direct_link_lock: Direct link mutex lock
  * @dp_direct_link_ctx: DP Direct Link context
  * @arp_connectivity_map: ARP connectivity map
  * @rx_wake_lock: rx wake lock
@@ -525,6 +529,9 @@ struct wlan_dp_psoc_context {
 	struct wlan_objmgr_pdev *pdev;
 	qdf_device_t qdf_dev;
 	struct wlan_dp_psoc_cfg dp_cfg;
+	ol_txrx_soc_handle cdp_soc;
+	struct hif_opaque_softc *hif_handle;
+	void *hal_soc;
 
 	qdf_spinlock_t intf_list_lock;
 	qdf_list_t intf_list;
@@ -591,6 +598,7 @@ struct wlan_dp_psoc_context {
 
 	enum RX_OFFLOAD ol_enable;
 #ifdef FEATURE_DIRECT_LINK
+	qdf_mutex_t dp_direct_link_lock;
 	struct dp_direct_link_context *dp_direct_link_ctx;
 #endif
 };

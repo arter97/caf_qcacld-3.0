@@ -119,11 +119,6 @@
 /* SR is disabled if NON_SRG is disallowed and SRG INFO is not present */
 #define SR_DISABLE NON_SRG_PD_SR_DISALLOWED & (~SRG_INFO_PRESENT & 0x0F)
 
-/* Length of RSNXE element ID + length + one octet of capability */
-#define RSNXE_CAP_FOR_SAE_LEN     3
-/* Position of WPA3 capabilities in the RSNX element */
-#define RSNXE_CAP_POS_0           0
-
 typedef union uPmfSaQueryTimerId {
 	struct {
 		uint8_t sessionId;
@@ -187,8 +182,6 @@ uint8_t lim_get_max_tx_power(struct mac_context *mac,
  * lim_calculate_tpc() - Utility to get maximum tx power
  * @mac: mac handle
  * @session: PE Session Entry
- * @is_pwr_constraint_absolute: If local power constraint is an absolute
- * value or an offset value.
  *
  * This function is used to get the maximum possible tx power from the list
  * of tx powers mentioned in @attr.
@@ -196,8 +189,7 @@ uint8_t lim_get_max_tx_power(struct mac_context *mac,
  * Return: None
  */
 void lim_calculate_tpc(struct mac_context *mac,
-		       struct pe_session *session,
-		       bool is_pwr_constraint_absolute);
+		       struct pe_session *session);
 
 /* AID pool management functions */
 
@@ -3239,4 +3231,18 @@ lim_is_power_change_required_for_sta(struct mac_context *mac_ctx,
  */
 void
 lim_update_tx_pwr_on_ctry_change_cb(uint8_t vdev_id);
+
+/*
+ * lim_is_chan_connected_for_mode() - Check if frequency is connected
+ *                                    for given opmode.
+ * @psoc: Pointer to psoc object
+ * @opmode: Vdev opmode
+ * @freq: Frequency
+ *
+ * Return: Return true if frequency is connected for given opmode.
+ */
+bool
+lim_is_chan_connected_for_mode(struct wlan_objmgr_psoc *psoc,
+			       enum QDF_OPMODE opmode,
+			       qdf_freq_t freq);
 #endif /* __LIM_UTILS_H */

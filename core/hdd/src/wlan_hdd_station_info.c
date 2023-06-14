@@ -167,7 +167,8 @@ static int hdd_get_sta_congestion(struct hdd_adapter *adapter,
 	struct cca_stats cca_stats;
 	struct wlan_objmgr_vdev *vdev;
 
-	vdev = hdd_objmgr_get_vdev_by_user(adapter, WLAN_OSIF_STATS_ID);
+	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink,
+					   WLAN_OSIF_STATS_ID);
 	if (!vdev) {
 		hdd_err("vdev is NULL");
 		return -EINVAL;
@@ -208,7 +209,7 @@ static int hdd_get_station_assoc_fail(struct hdd_context *hdd_ctx,
 		return -ENOMEM;
 	}
 
-	hdd_sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter);
+	hdd_sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter->deflink);
 
 	if (nla_put_u32(skb, INFO_ASSOC_FAIL_REASON,
 			hdd_sta_ctx->conn_info.assoc_status_code)) {
@@ -409,7 +410,7 @@ static int32_t hdd_add_tx_bitrate(struct sk_buff *skb,
 {
 	struct nlattr *nla_attr;
 	uint32_t bitrate, bitrate_compat;
-	struct hdd_station_ctx *sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter);
+	struct hdd_station_ctx *sta_ctx;
 
 	nla_attr = nla_nest_start(skb, idx);
 	if (!nla_attr) {
@@ -417,8 +418,10 @@ static int32_t hdd_add_tx_bitrate(struct sk_buff *skb,
 		goto fail;
 	}
 
+	sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter->deflink);
+
 	/* cfg80211_calculate_bitrate will return 0 for mcs >= 32 */
-	if (hdd_cm_is_vdev_associated(adapter))
+	if (hdd_cm_is_vdev_associated(adapter->deflink))
 		bitrate = cfg80211_calculate_bitrate(
 				&sta_ctx->cache_conn_info.max_tx_bitrate);
 	else
@@ -496,7 +499,7 @@ static int32_t hdd_add_sta_info(struct sk_buff *skb,
 	struct nlattr *nla_attr;
 	struct hdd_station_ctx *hdd_sta_ctx;
 
-	hdd_sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter);
+	hdd_sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter->deflink);
 	if (!hdd_sta_ctx) {
 		hdd_err("Invalid sta ctx");
 		goto fail;
@@ -513,7 +516,7 @@ static int32_t hdd_add_sta_info(struct sk_buff *skb,
 		hdd_err("put fail");
 		goto fail;
 	}
-	if (hdd_cm_is_vdev_associated(adapter))
+	if (hdd_cm_is_vdev_associated(adapter->deflink))
 		hdd_get_max_tx_bitrate(hdd_ctx, adapter);
 
 	if (hdd_add_tx_bitrate(skb, adapter, NL80211_STA_INFO_TX_BITRATE)) {
@@ -610,7 +613,7 @@ hdd_add_link_standard_info(struct sk_buff *skb,
 	struct nlattr *nla_attr;
 	struct hdd_station_ctx *hdd_sta_ctx;
 
-	hdd_sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter);
+	hdd_sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter->deflink);
 	if (!hdd_sta_ctx) {
 		hdd_err("Invalid sta ctx");
 		goto fail;
@@ -966,7 +969,7 @@ static int hdd_get_station_info(struct hdd_context *hdd_ctx,
 	uint32_t nl_buf_len;
 	struct hdd_station_ctx *hdd_sta_ctx;
 
-	hdd_sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter);
+	hdd_sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter->deflink);
 
 	if (hdd_cm_is_vdev_connected(adapter)) {
 		hdd_err("Station is connected, command is not supported");
@@ -1915,7 +1918,7 @@ hdd_add_peer_stats_get_len(struct hdd_station_info *stainfo)
 static uint32_t
 hdd_get_pmf_bcn_protect_stats_len(struct hdd_adapter *adapter)
 {
-	if (!adapter->hdd_stats.bcn_protect_stats.pmf_bcn_stats_valid)
+	if (!adapter->deflink->hdd_stats.bcn_protect_stats.pmf_bcn_stats_valid)
 		return 0;
 
 	/* 4 pmf becon protect counters each of 32 bit */
@@ -1943,18 +1946,20 @@ hdd_get_connect_fail_reason_code_len(struct hdd_adapter *adapter)
 static int hdd_add_pmf_bcn_protect_stats(struct sk_buff *skb,
 					 struct hdd_adapter *adapter)
 {
-	if (!adapter->hdd_stats.bcn_protect_stats.pmf_bcn_stats_valid)
+	struct hdd_stats *hdd_stats = &adapter->deflink->hdd_stats;
+
+	if (!hdd_stats->bcn_protect_stats.pmf_bcn_stats_valid)
 		return 0;
 
-	adapter->hdd_stats.bcn_protect_stats.pmf_bcn_stats_valid = 0;
+	hdd_stats->bcn_protect_stats.pmf_bcn_stats_valid = 0;
 	if (nla_put_u32(skb, STA_INFO_BIP_MIC_ERROR_COUNT,
-			adapter->hdd_stats.bcn_protect_stats.igtk_mic_fail_cnt) ||
+			hdd_stats->bcn_protect_stats.igtk_mic_fail_cnt) ||
 	    nla_put_u32(skb, STA_INFO_BIP_REPLAY_COUNT,
-			adapter->hdd_stats.bcn_protect_stats.igtk_replay_cnt) ||
+			hdd_stats->bcn_protect_stats.igtk_replay_cnt) ||
 	    nla_put_u32(skb, STA_INFO_BEACON_MIC_ERROR_COUNT,
-			adapter->hdd_stats.bcn_protect_stats.bcn_mic_fail_cnt) ||
+			hdd_stats->bcn_protect_stats.bcn_mic_fail_cnt) ||
 	    nla_put_u32(skb, STA_INFO_BEACON_REPLAY_COUNT,
-			adapter->hdd_stats.bcn_protect_stats.bcn_replay_cnt)) {
+			hdd_stats->bcn_protect_stats.bcn_replay_cnt)) {
 		hdd_err("put fail");
 		return -EINVAL;
 	}
@@ -2010,7 +2015,7 @@ hdd_big_data_pack_resp_nlmsg(struct sk_buff *skb,
 {
 	struct hdd_station_ctx *hdd_sta_ctx;
 
-	hdd_sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter);
+	hdd_sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter->deflink);
 	if (!hdd_sta_ctx) {
 		hdd_err("Invalid station context");
 		return -EINVAL;
@@ -2431,7 +2436,7 @@ static int hdd_get_station_info_ex(struct hdd_context *hdd_ctx,
 	bool big_data_fw_support = false;
 	int ret;
 
-	hdd_sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter);
+	hdd_sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter->deflink);
 	ucfg_mc_cp_get_big_data_fw_support(hdd_ctx->psoc, &big_data_fw_support);
 
 	if (hdd_cm_is_disconnected(adapter) &&

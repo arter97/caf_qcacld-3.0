@@ -133,15 +133,14 @@ enum hdd_tsf_get_state hdd_tsf_check_conn_state(struct hdd_adapter *adapter)
 	enum hdd_tsf_get_state ret = TSF_RETURN;
 
 	if (adapter->device_mode == QDF_STA_MODE ||
-			adapter->device_mode == QDF_P2P_CLIENT_MODE) {
-		if (!hdd_cm_is_vdev_associated(adapter)) {
+	    adapter->device_mode == QDF_P2P_CLIENT_MODE) {
+		if (!hdd_cm_is_vdev_associated(adapter->deflink)) {
 			hdd_err("failed to cap tsf, not connect with ap");
 			ret = TSF_STA_NOT_CONNECTED_NO_TSF;
 		}
 	} else if ((adapter->device_mode == QDF_SAP_MODE ||
-				adapter->device_mode == QDF_P2P_GO_MODE) &&
-			!(test_bit(SOFTAP_BSS_STARTED,
-					&adapter->event_flags))) {
+		    adapter->device_mode == QDF_P2P_GO_MODE) &&
+		   !(test_bit(SOFTAP_BSS_STARTED, &adapter->event_flags))) {
 		hdd_err("Soft AP / P2p GO not beaconing");
 		ret = TSF_SAP_NOT_STARTED_NO_TSF;
 	}
@@ -1793,8 +1792,8 @@ static ssize_t __hdd_wlan_tsf_show(struct device *dev,
 		return scnprintf(buf, PAGE_SIZE,
 				 "TSF sync is not initialized\n");
 
-	hdd_sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter);
-	if (!hdd_cm_is_vdev_associated(adapter) &&
+	hdd_sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter->deflink);
+	if (!hdd_cm_is_vdev_associated(adapter->deflink) &&
 	    (adapter->device_mode == QDF_STA_MODE ||
 	    adapter->device_mode == QDF_P2P_CLIENT_MODE))
 		return scnprintf(buf, PAGE_SIZE, "NOT connected\n");
@@ -1957,8 +1956,8 @@ static ssize_t __hdd_wlan_tsf_show(struct device *dev,
 		return scnprintf(buf, PAGE_SIZE,
 				 "TSF sync is not initialized\n");
 
-	hdd_sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter);
-	if (!hdd_cm_is_vdev_associated(adapter) &&
+	hdd_sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter->deflink);
+	if (!hdd_cm_is_vdev_associated(adapter->deflink) &&
 	    (adapter->device_mode == QDF_STA_MODE ||
 	    adapter->device_mode == QDF_P2P_CLIENT_MODE))
 		return scnprintf(buf, PAGE_SIZE, "NOT connected\n");
@@ -3020,8 +3019,9 @@ static int hdd_handle_tsf_auto_report(struct hdd_adapter *adapter,
 		return -EINVAL;
 	}
 
-	/* uplink delay feature is only required for STA mode */
-	if (adapter->device_mode != QDF_STA_MODE) {
+	/* uplink delay feature is required for STA and P2P-GC mode */
+	if (adapter->device_mode != QDF_STA_MODE &&
+	    adapter->device_mode != QDF_P2P_CLIENT_MODE) {
 		hdd_debug_rl("tsf_cmd %d not allowed for device mode %d",
 			     tsf_cmd, adapter->device_mode);
 		return -EPERM;
@@ -3085,7 +3085,8 @@ QDF_STATUS hdd_add_uplink_delay(struct hdd_adapter *adapter,
 	QDF_STATUS status;
 	uint32_t ul_delay;
 
-	if (adapter->device_mode != QDF_STA_MODE)
+	if (adapter->device_mode != QDF_STA_MODE &&
+	    adapter->device_mode != QDF_P2P_CLIENT_MODE)
 		return QDF_STATUS_SUCCESS;
 
 	if (qdf_atomic_read(&adapter->tsf.tsf_auto_report)) {
@@ -3134,6 +3135,7 @@ int hdd_get_tsf_cb(void *pcb_cxt, struct stsf *ptsf)
 {
 	struct hdd_context *hddctx;
 	struct hdd_adapter *adapter;
+	struct wlan_hdd_link_info *link_info;
 	int ret;
 	uint64_t tsf_sync_soc_time;
 	QDF_TIMER_STATE capture_req_timer_status;
@@ -3150,13 +3152,13 @@ int hdd_get_tsf_cb(void *pcb_cxt, struct stsf *ptsf)
 	if (0 != ret)
 		return -EINVAL;
 
-	adapter = hdd_get_adapter_by_vdev(hddctx, ptsf->vdev_id);
-
-	if (!adapter) {
+	link_info = hdd_get_link_info_by_vdev(hddctx, ptsf->vdev_id);
+	if (!link_info) {
 		hdd_err("failed to find adapter");
 		return -EINVAL;
 	}
 
+	adapter = link_info->adapter;
 	/* Intercept tsf report and check if it is for uplink delay.
 	 * If yes, return in advance and skip the legacy BSS TSF
 	 * report. Otherwise continue on to the legacy BSS TSF

@@ -393,7 +393,7 @@ wlan_cfg80211_peer_enh_cfr_capture(struct hdd_adapter *adapter,
 		return -EINVAL;
 	}
 
-	vdev = hdd_objmgr_get_vdev_by_user(adapter, WLAN_CFR_ID);
+	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink, WLAN_CFR_ID);
 	if (!vdev) {
 		hdd_err("can't get vdev");
 		return -EINVAL;
@@ -456,7 +456,7 @@ wlan_cfg80211_peer_cfr_capture_cfg_adrastea(struct hdd_adapter *adapter,
 			QCA_WLAN_VENDOR_ATTR_PEER_CFR_ENABLE]);
 	}
 
-	vdev = hdd_objmgr_get_vdev_by_user(adapter, WLAN_CFR_ID);
+	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink, WLAN_CFR_ID);
 	if (!vdev) {
 		hdd_err("can't get vdev");
 		return -EINVAL;
@@ -585,7 +585,7 @@ wlan_cfg80211_peer_cfr_capture_cfg_adrastea(struct hdd_adapter *adapter,
 	if (tb[id])
 		is_start_capture = nla_get_flag(tb[id]);
 
-	vdev = hdd_objmgr_get_vdev_by_user(adapter, WLAN_CFR_ID);
+	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink, WLAN_CFR_ID);
 	if (!vdev) {
 		hdd_err("can't get vdev");
 		return -EINVAL;

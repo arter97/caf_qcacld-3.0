@@ -374,7 +374,7 @@ void hdd_lpass_notify_connect(struct hdd_adapter *adapter)
 		return;
 
 	adapter->deflink->rssi_send = true;
-	sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter);
+	sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter->deflink);
 	wlan_hdd_send_status_pkg(adapter, sta_ctx, 1, 1);
 }
 
@@ -387,7 +387,7 @@ void hdd_lpass_notify_disconnect(struct hdd_adapter *adapter)
 	struct hdd_station_ctx *sta_ctx;
 
 	adapter->deflink->rssi_send = false;
-	sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter);
+	sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter->deflink);
 	wlan_hdd_send_status_pkg(adapter, sta_ctx, 1, 0);
 }
 

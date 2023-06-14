@@ -35,6 +35,7 @@
 #include "htc_api.h"
 #include "wlan_pmo_obj_mgmt_api.h"
 #include <wlan_scan_ucfg_api.h>
+#include <wlan_dp_api.h>
 #include "cds_api.h"
 #include "wlan_pmo_static_config.h"
 #include "wlan_mlme_ucfg_api.h"
@@ -731,10 +732,11 @@ pmo_core_enable_wow_in_fw(struct wlan_objmgr_psoc *psoc,
 	struct pmo_psoc_cfg *psoc_cfg = &psoc_ctx->psoc_cfg;
 	QDF_STATUS status;
 	void *hif_ctx;
+	uint16_t reason_code;
 
 	hif_ctx = pmo_core_psoc_get_hif_handle(psoc);
 	qdf_event_reset(&psoc_ctx->wow.target_suspend);
-	pmo_core_set_wow_nack(psoc_ctx, false);
+	pmo_core_set_wow_nack(psoc_ctx, false, 0);
 	host_credits = pmo_tgt_psoc_get_host_credits(psoc);
 	wmi_pending_cmds = pmo_tgt_psoc_get_pending_cmnds(psoc);
 	pmo_debug("Credits:%d; Pending_Cmds: %d",
@@ -804,7 +806,10 @@ pmo_core_enable_wow_in_fw(struct wlan_objmgr_psoc *psoc,
 			htc_log_link_user_votes();
 		}
 	}
-
+	if (wow_params->is_unit_test) {
+		pmo_info("Unit test WoW, force DRV mode");
+		param.flags |= WMI_WOW_FLAG_ENABLE_DRV_PCIE_L1SS_SLEEP;
+	}
 	if (type == QDF_SYSTEM_SUSPEND) {
 		pmo_info("system suspend wow");
 		param.flags |= WMI_WOW_FLAG_SYSTEM_SUSPEND_WOW;
@@ -851,7 +856,8 @@ pmo_core_enable_wow_in_fw(struct wlan_objmgr_psoc *psoc,
 	}
 
 	if (pmo_core_get_wow_nack(psoc_ctx)) {
-		pmo_err("FW not ready to WOW");
+		reason_code = pmo_core_get_wow_reason_code(psoc_ctx);
+		pmo_err("FW not ready to WOW reason code: %d", reason_code);
 		pmo_tgt_update_target_suspend_flag(psoc, false);
 		status = QDF_STATUS_E_AGAIN;
 		goto out;
@@ -1103,14 +1109,14 @@ QDF_STATUS pmo_core_psoc_bus_runtime_suspend(struct wlan_objmgr_psoc *psoc,
 		goto runtime_failure;
 	}
 
-	status = cdp_runtime_suspend(dp_soc, pdev_id);
+	status = wlan_dp_runtime_suspend(dp_soc, pdev_id);
 	if (status != QDF_STATUS_SUCCESS)
 		goto runtime_failure;
 
 	ret = htc_runtime_suspend(htc_ctx);
 	if (ret) {
 		status = qdf_status_from_os_return(ret);
-		goto cdp_runtime_resume;
+		goto dp_runtime_resume;
 	}
 
 	status = pmo_tgt_psoc_set_runtime_pm_inprogress(psoc, true);
@@ -1203,9 +1209,9 @@ resume_htc:
 	PMO_CORE_PSOC_RUNTIME_PM_QDF_BUG(QDF_STATUS_SUCCESS !=
 		pmo_tgt_psoc_set_runtime_pm_inprogress(psoc, false));
 
-cdp_runtime_resume:
+dp_runtime_resume:
 	PMO_CORE_PSOC_RUNTIME_PM_QDF_BUG(QDF_STATUS_SUCCESS !=
-		cdp_runtime_resume(dp_soc, pdev_id));
+		wlan_dp_runtime_resume(dp_soc, pdev_id));
 
 runtime_failure:
 	hif_process_runtime_suspend_failure();
@@ -1305,7 +1311,7 @@ QDF_STATUS pmo_core_psoc_bus_runtime_resume(struct wlan_objmgr_psoc *psoc,
 		goto fail;
 	}
 
-	status = cdp_runtime_resume(dp_soc, pdev_id);
+	status = wlan_dp_runtime_resume(dp_soc, pdev_id);
 	if (status != QDF_STATUS_SUCCESS)
 		goto fail;
 
@@ -1496,7 +1502,8 @@ out:
 	return status;
 }
 
-void pmo_core_psoc_target_suspend_acknowledge(void *context, bool wow_nack)
+void pmo_core_psoc_target_suspend_acknowledge(void *context, bool wow_nack,
+					      uint16_t reason_code)
 {
 	struct pmo_psoc_priv_obj *psoc_ctx;
 	struct wlan_objmgr_psoc *psoc = (struct wlan_objmgr_psoc *)context;
@@ -1516,7 +1523,7 @@ void pmo_core_psoc_target_suspend_acknowledge(void *context, bool wow_nack)
 
 	psoc_ctx = pmo_psoc_get_priv(psoc);
 
-	pmo_core_set_wow_nack(psoc_ctx, wow_nack);
+	pmo_core_set_wow_nack(psoc_ctx, wow_nack, reason_code);
 	qdf_event_set(&psoc_ctx->wow.target_suspend);
 	if (!pmo_tgt_psoc_get_runtime_pm_in_progress(psoc)) {
 		if (wow_nack)
@@ -1668,6 +1675,7 @@ QDF_STATUS pmo_core_config_listen_interval(struct wlan_objmgr_vdev *vdev,
 
 	pmo_debug("Set Listen Interval %d for vdevId %d", listen_interval,
 			vdev_id);
+	ucfg_mlme_set_sap_listen_interval(psoc, listen_interval);
 	status = pmo_tgt_vdev_update_param_req(vdev,
 					       pmo_vdev_param_listen_interval,
 					       listen_interval);
