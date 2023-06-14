@@ -8240,6 +8240,7 @@ const struct nla_policy wlan_hdd_wifi_config_policy[
 		.type = NLA_NESTED},
 	[QCA_WLAN_VENDOR_ATTR_CONFIG_EMLSR_MODE_SWITCH] = {
 		.type = NLA_U8},
+	[QCA_WLAN_VENDOR_ATTR_CONFIG_UL_MU_CONFIG] = {.type = NLA_U8},
 };
 
 static const struct nla_policy
@@ -10936,6 +10937,53 @@ static int hdd_set_wfc_state(struct wlan_hdd_link_info *link_info,
 
 }
 
+/**
+ * hdd_set_ul_mu_config() - Configure UL MU i.e suspend/enable
+ * @link_info: Link info pointer in HDD adapter
+ * @attr: pointer to nla attr
+ *
+ * Return: 0 on success, negative on failure
+ */
+
+static int hdd_set_ul_mu_config(struct wlan_hdd_link_info *link_info,
+				const struct nlattr *attr)
+{
+	uint8_t ulmu;
+	uint8_t ulmu_disable;
+	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(link_info->adapter);
+	int errno;
+	QDF_STATUS qdf_status;
+
+	errno = wlan_hdd_validate_context(hdd_ctx);
+	if (errno) {
+		hdd_err("Invalid HDD ctx, errno : %d", errno);
+		return errno;
+	}
+
+	ulmu = nla_get_u8(attr);
+	if (ulmu != QCA_UL_MU_SUSPEND && ulmu != QCA_UL_MU_ENABLE) {
+		hdd_err("Invalid ulmu value, ulmu : %d", ulmu);
+		return -EINVAL;
+	}
+
+	hdd_debug("UL MU value : %d", ulmu);
+
+	if (ulmu == QCA_UL_MU_SUSPEND)
+		ulmu_disable = 1;
+	else
+		ulmu_disable = 0;
+
+	qdf_status = ucfg_mlme_set_ul_mu_config(hdd_ctx->psoc,
+						link_info->vdev_id,
+						ulmu_disable);
+	if (QDF_IS_STATUS_ERROR(qdf_status)) {
+		errno = -EINVAL;
+		hdd_err("Failed to set UL MU, errno : %d", errno);
+	}
+
+	return errno;
+}
+
 #ifdef WLAN_FEATURE_11BE_MLO
 static int hdd_test_config_emlsr_mode(struct hdd_context *hdd_ctx,
 				      bool cfg_val)
@@ -11451,6 +11499,8 @@ static const struct independent_setters independent_setters[] = {
 	 hdd_set_link_force_active},
 	{QCA_WLAN_VENDOR_ATTR_CONFIG_EMLSR_MODE_SWITCH,
 	 hdd_set_emlsr_mode},
+	{QCA_WLAN_VENDOR_ATTR_CONFIG_UL_MU_CONFIG,
+	 hdd_set_ul_mu_config},
 };
 
 #ifdef WLAN_FEATURE_ELNA

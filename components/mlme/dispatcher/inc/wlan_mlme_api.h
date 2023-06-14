@@ -4415,4 +4415,17 @@ enum phy_ch_width wlan_mlme_get_max_bw(void);
  */
 QDF_STATUS wlan_mlme_get_sta_ch_width(struct wlan_objmgr_vdev *vdev,
 				      enum phy_ch_width *ch_width);
+
+/**
+ * wlan_mlme_set_ul_mu_config() - set ul mu config
+ *
+ * @psoc: pointer to psoc object
+ * @vdev_id : vdev_id
+ * @ulmu_disable : ulmu_disable value
+ *
+ * Return: QDF Status
+ */
+QDF_STATUS
+wlan_mlme_set_ul_mu_config(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
+			   uint8_t ulmu_disable);
 #endif /* _WLAN_MLME_API_H_ */

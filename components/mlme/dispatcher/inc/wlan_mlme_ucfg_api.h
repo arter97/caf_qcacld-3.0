@@ -5143,4 +5143,22 @@ ucfg_mlme_get_sr_enable_modes(struct wlan_objmgr_psoc *psoc,
 QDF_STATUS
 ucfg_mlme_get_valid_channels(struct wlan_objmgr_psoc *psoc,
 			     uint32_t *ch_freq_list, uint32_t *list_len);
+
+/**
+ * ucfg_mlme_set_ul_mu_config - set ul mu config
+ * @psoc: pointer to psoc object
+ * @vdev_id : vdev ID
+ * @ulmu_disable: ul mu value
+ *
+ * Inline UCFG API to be used by HDD/OSIF callers
+ *
+ * Return: QDF_STATUS_SUCCESS or non-zero on failure
+ */
+static inline
+QDF_STATUS ucfg_mlme_set_ul_mu_config(struct wlan_objmgr_psoc *psoc,
+				      uint8_t vdev_id,
+				      uint8_t ulmu_disable)
+{
+	return wlan_mlme_set_ul_mu_config(psoc, vdev_id, ulmu_disable);
+}
 #endif /* _WLAN_MLME_UCFG_API_H_ */
