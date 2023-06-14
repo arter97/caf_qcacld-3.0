@@ -72,6 +72,7 @@
 #include <spatial_reuse_api.h>
 #include "wlan_psoc_mlme_api.h"
 #include "wma_he.h"
+#include "wlan_mlo_mgr_sta.h"
 #ifdef WLAN_FEATURE_11BE_MLO
 #include <wlan_mlo_mgr_peer.h>
 #endif
