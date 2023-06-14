@@ -194,6 +194,7 @@ void populate_dot_11_f_ext_chann_switch_ann(struct mac_context *mac_ptr,
 	uint32_t sw_target_freq;
 	uint8_t primary_channel;
 	enum phy_ch_width ch_width;
+	uint8_t reg_cc[REG_ALPHA2_LEN + 1];
 
 	ch_width = session_entry->gLimChannelSwitch.ch_width;
 	ch_offset = session_entry->gLimChannelSwitch.sec_ch_offset;
@@ -210,8 +211,9 @@ void populate_dot_11_f_ext_chann_switch_ann(struct mac_context *mac_ptr,
 		session_entry->gLimChannelSwitch.switchCount;
 	dot_11_ptr->present = 1;
 
+	wlan_reg_read_current_country(mac_ptr->psoc, reg_cc);
 	pe_debug("country:%s chan:%d freq %d width:%d reg:%d off:%d",
-		 mac_ptr->scan.countryCodeCurrent,
+		 reg_cc,
 		 session_entry->gLimChannelSwitch.primaryChannel,
 		 sw_target_freq,
 		 session_entry->gLimChannelSwitch.ch_width,
@@ -2078,6 +2080,7 @@ populate_dot11f_supp_channels(struct mac_context *mac,
 	uint8_t *p;
 	struct supported_channels supportedChannels;
 	uint8_t channel, opclass, base_opclass;
+	uint8_t reg_cc[REG_ALPHA2_LEN + 1];
 
 	wlan_add_supported_5Ghz_channels(mac->psoc, mac->pdev,
 					 supportedChannels.channelList,
@@ -2087,16 +2090,17 @@ populate_dot11f_supp_channels(struct mac_context *mac,
 	p = supportedChannels.channelList;
 	pDot11f->num_bands = supportedChannels.numChnl;
 
+	wlan_reg_read_current_country(mac->psoc, reg_cc);
 	for (i = 0U; i < pDot11f->num_bands; i++) {
 		base_opclass = wlan_reg_dmn_get_opclass_from_channel(
-						mac->scan.countryCodeCurrent,
+						reg_cc,
 						p[i], BW20);
 		pDot11f->bands[j][0] = p[i];
 		pDot11f->bands[j][1] = 1;
 		channel = p[i];
 		while (i + 1 < pDot11f->num_bands && (p[i + 1] == channel + 4)) {
 			opclass = wlan_reg_dmn_get_opclass_from_channel(
-						mac->scan.countryCodeCurrent,
+						reg_cc,
 						p[i + 1], BW20);
 			if (base_opclass != opclass)
 				goto skip;
