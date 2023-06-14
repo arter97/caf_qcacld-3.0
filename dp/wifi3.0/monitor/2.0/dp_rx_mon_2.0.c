@@ -1480,6 +1480,7 @@ uint8_t dp_rx_mon_process_tlv_status(struct dp_pdev *pdev,
 	uint8_t mpdu_idx = ppdu_info->mpdu_count[user_id];
 	uint16_t num_frags;
 	uint8_t num_buf_reaped = 0;
+	bool rx_hdr_valid = true;
 	QDF_STATUS status;
 
 	if (!mon_pdev->monitor_configured &&
@@ -1487,8 +1488,23 @@ uint8_t dp_rx_mon_process_tlv_status(struct dp_pdev *pdev,
 		return num_buf_reaped;
 	}
 
+	/* If user id or rx header len is invalid drop this
+	 * mpdu. However we have to honor buffer address TLV
+	 * for this mpdu to free any associated packet buffer
+	 */
+	if (qdf_unlikely(user_id >= HAL_MAX_UL_MU_USERS ||
+			 ppdu_info->hdr_len > DP_RX_MON_MAX_RX_HEADER_LEN))
+		rx_hdr_valid = false;
+
 	switch (tlv_status) {
 	case HAL_TLV_STATUS_HEADER: {
+		if (qdf_unlikely(!rx_hdr_valid)) {
+			dp_mon_debug("rx hdr invalid userid: %d, len: %d ",
+				     user_id, ppdu_info->hdr_len);
+			mon_pdev->rx_mon_stats.rx_hdr_invalid_cnt++;
+			return num_buf_reaped;
+		}
+
 		/* If this is first RX_HEADER for MPDU, allocate skb
 		 * else add frag to already allocated skb
 		 */
@@ -1603,7 +1619,6 @@ uint8_t dp_rx_mon_process_tlv_status(struct dp_pdev *pdev,
 		addr = mon_desc->buf_addr;
 		qdf_assert_always(addr);
 
-		mpdu_info = &ppdu_info->mpdu_info[user_id];
 		if (!mon_desc->unmapped) {
 			qdf_mem_unmap_page(soc->osdev,
 					   (qdf_dma_addr_t)mon_desc->paddr,
@@ -1615,6 +1630,13 @@ uint8_t dp_rx_mon_process_tlv_status(struct dp_pdev *pdev,
 		num_buf_reaped++;
 
 		mon_pdev->rx_mon_stats.pkt_buf_count++;
+
+		/* if rx hdr is not valid free pkt buffer and return */
+		if (qdf_unlikely(!rx_hdr_valid)) {
+			DP_STATS_INC(mon_soc, frag_free, 1);
+			qdf_frag_free(addr);
+			return num_buf_reaped;
+		}
 
 		if (qdf_unlikely(!ppdu_info->rx_hdr_rcvd[user_id])) {
 
@@ -1634,6 +1656,7 @@ uint8_t dp_rx_mon_process_tlv_status(struct dp_pdev *pdev,
 			return num_buf_reaped;
 		}
 
+		mpdu_info = &ppdu_info->mpdu_info[user_id];
 		if (mpdu_info->decap_type == DP_MON_DECAP_FORMAT_INVALID) {
 			/* decap type is invalid, drop the frame */
 			mon_pdev->rx_mon_stats.mpdu_decap_type_invalid++;
@@ -1720,8 +1743,13 @@ uint8_t dp_rx_mon_process_tlv_status(struct dp_pdev *pdev,
 	break;
 	case HAL_TLV_STATUS_MSDU_END:
 	{
-		struct hal_rx_mon_msdu_info *msdu_info = &ppdu_info->msdu[user_id];
+		struct hal_rx_mon_msdu_info *msdu_info;
 		struct hal_rx_mon_msdu_info *last_buf_info;
+
+		if (qdf_unlikely(!rx_hdr_valid))
+			break;
+
+		msdu_info = &ppdu_info->msdu[user_id];
 		/* update msdu metadata at last buffer of msdu in MPDU */
 		if (qdf_unlikely(!ppdu_info->rx_hdr_rcvd[user_id])) {
 			/* reset msdu info for next msdu for same user */
@@ -1767,6 +1795,9 @@ uint8_t dp_rx_mon_process_tlv_status(struct dp_pdev *pdev,
 	{
 		struct hal_rx_mon_mpdu_info *mpdu_info, *mpdu_meta;
 
+		if (qdf_unlikely(!rx_hdr_valid))
+			break;
+
 		if (qdf_unlikely(!ppdu_info->rx_hdr_rcvd[user_id])) {
 			dp_mon_debug(" <%d> nbuf is NULL, return user: %d mpdu_idx: %d", __LINE__, user_id, mpdu_idx);
 			break;
@@ -1785,6 +1816,10 @@ uint8_t dp_rx_mon_process_tlv_status(struct dp_pdev *pdev,
 	case HAL_TLV_STATUS_MPDU_END:
 	{
 		struct hal_rx_mon_mpdu_info *mpdu_info, *mpdu_meta;
+
+		if (qdf_unlikely(!rx_hdr_valid))
+			break;
+
 		mpdu_info = &ppdu_info->mpdu_info[user_id];
 		if (qdf_unlikely(!ppdu_info->rx_hdr_rcvd[user_id])) {
 			/* reset mpdu info for next mpdu for same user */
@@ -2553,6 +2588,8 @@ void dp_mon_rx_print_advanced_stats_2_0(struct dp_soc *soc,
 		       mon_pdev->rx_mon_stats.end_of_ppdu_drop_cnt);
 	DP_PRINT_STATS("tlv_drop_cnt= %d",
 		       mon_pdev->rx_mon_stats.tlv_drop_cnt);
+	DP_PRINT_STATS("rx_hdr_invalid_cnt = %d",
+		       rx_mon_stats->rx_hdr_invalid_cnt);
 }
 #endif
 

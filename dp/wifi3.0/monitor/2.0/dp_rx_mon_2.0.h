@@ -51,6 +51,8 @@
 
 #define DP_RX_MON_WQ_THRESHOLD 128
 
+#define DP_RX_MON_MAX_RX_HEADER_LEN 128
+
 #ifdef WLAN_PKT_CAPTURE_RX_2_0
 QDF_STATUS dp_mon_pdev_ext_init_2_0(struct dp_pdev *pdev);
 QDF_STATUS dp_mon_pdev_ext_deinit_2_0(struct dp_pdev *pdev);
