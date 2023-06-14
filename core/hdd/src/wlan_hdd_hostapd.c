@@ -210,7 +210,9 @@ static const struct index_vht_data_rate_type supported_vht_mcs_rate_nss1[] = {
 	{6,  {2633, 2925}, {1215, 1350}, {585,  650} },
 	{7,  {2925, 3250}, {1350, 1500}, {650,  722} },
 	{8,  {3510, 3900}, {1620, 1800}, {780,  867} },
-	{9,  {3900, 4333}, {1800, 2000}, {780,  867} }
+	{9,  {3900, 4333}, {1800, 2000}, {780,  867} },
+	{10, {4388, 4875}, {2025, 2250}, {975, 1083} },
+	{11, {4875, 5417}, {2250, 2500}, {1083, 1203} }
 };
 
 /*MCS parameters with Nss = 2*/
@@ -225,7 +227,9 @@ static const struct index_vht_data_rate_type supported_vht_mcs_rate_nss2[] = {
 	{6,  {5265, 5850}, {2430, 2700}, {1170, 1300} },
 	{7,  {5850, 6500}, {2700, 3000}, {1300, 1444} },
 	{8,  {7020, 7800}, {3240, 3600}, {1560, 1733} },
-	{9,  {7800, 8667}, {3600, 4000}, {1730, 1920} }
+	{9,  {7800, 8667}, {3600, 4000}, {1730, 1920} },
+	{10, {8775, 9750}, {4050, 4500}, {1950, 2167} },
+	{11, {9750, 10833}, {4500, 5000}, {2167, 2407} }
 };
 
 /* Function definitions */
@@ -862,6 +866,12 @@ static inline bool wlan_hdd_is_chwidth_320mhz(enum phy_ch_width ch_width)
 {
 	return ch_width == CH_WIDTH_320MHZ;
 }
+
+static uint16_t
+wlan_hdd_get_puncture_bitmap(struct hdd_chan_change_params chan_change)
+{
+	return chan_change.chan_params.reg_punc_bitmap;
+}
 #else /* !WLAN_FEATURE_11BE */
 static inline
 void wlan_hdd_set_chandef_320mhz(struct cfg80211_chan_def *chandef,
@@ -878,6 +888,12 @@ static inline bool wlan_hdd_is_chwidth_320mhz(enum phy_ch_width ch_width)
 {
 	return false;
 }
+
+static inline uint16_t
+wlan_hdd_get_puncture_bitmap(struct hdd_chan_change_params chan_change)
+{
+	return 0;
+}
 #endif /* WLAN_FEATURE_11BE */
 
 QDF_STATUS hdd_chan_change_notify(struct hdd_adapter *adapter,
@@ -890,6 +906,7 @@ QDF_STATUS hdd_chan_change_notify(struct hdd_adapter *adapter,
 	enum nl80211_channel_type channel_type;
 	uint32_t freq;
 	mac_handle_t mac_handle = adapter->hdd_ctx->mac_handle;
+	uint16_t puncture_bitmap = 0;
 
 	if (!mac_handle) {
 		hdd_err("mac_handle is NULL");
@@ -960,10 +977,11 @@ QDF_STATUS hdd_chan_change_notify(struct hdd_adapter *adapter,
 				chan_change.chan_params.mhz_freq_seg0;
 	}
 
+	puncture_bitmap = wlan_hdd_get_puncture_bitmap(chan_change);
 	hdd_debug("notify: chan:%d width:%d freq1:%d freq2:%d",
 		  chandef.chan->center_freq, chandef.width,
 		  chandef.center_freq1, chandef.center_freq2);
-	wlan_cfg80211_ch_switch_notify(dev, &chandef, 0);
+	wlan_cfg80211_ch_switch_notify(dev, &chandef, 0, puncture_bitmap);
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -1397,6 +1415,10 @@ static int calcuate_max_phy_rate(int mode, int nss, int ch_width,
 	if (mode == SIR_SME_PHY_MODE_HT) {
 		/* check for HT Mode */
 		maxidx = ht_mcs_idx;
+		if (maxidx > 7) {
+			hdd_err("ht_mcs_idx %d is incorrect", ht_mcs_idx);
+			return maxrate;
+		}
 		if (nss == 1) {
 			supported_mcs_rate = supported_mcs_rate_nss1;
 		} else if (nss == 2) {
@@ -1796,6 +1818,22 @@ static void hdd_hostapd_set_sap_key(struct hdd_adapter *adapter)
 	}
 }
 
+#ifdef WLAN_FEATURE_11BE
+static void
+hdd_fill_channel_change_puncture(struct hdd_chan_change_params *chan_change,
+				 struct ch_params *sap_ch_param)
+{
+	chan_change->chan_params.reg_punc_bitmap =
+			sap_ch_param->reg_punc_bitmap;
+}
+#else
+static void
+hdd_fill_channel_change_puncture(struct hdd_chan_change_params *chan_change,
+				 struct ch_params *sap_ch_param)
+{
+}
+#endif
+
 /**
  * hdd_hostapd_chan_change() - prepare new operation chan info to kernel
  * @adapter: pointre to hdd_adapter
@@ -1851,6 +1889,7 @@ static QDF_STATUS hdd_hostapd_chan_change(struct hdd_adapter *adapter,
 			sap_chan_selected->vht_seg0_center_ch_freq;
 	chan_change.chan_params.mhz_freq_seg1 =
 			sap_chan_selected->vht_seg1_center_ch_freq;
+	hdd_fill_channel_change_puncture(&chan_change, &sap_ch_param);
 
 	return hdd_chan_change_notify(adapter, adapter->dev,
 				      chan_change, legacy_phymode);
@@ -3585,9 +3624,14 @@ const struct net_device_ops net_ops_struct = {
 	.ndo_tx_timeout = hdd_softap_tx_timeout,
 	.ndo_get_stats = hdd_get_stats,
 	.ndo_set_mac_address = hdd_hostapd_set_mac_address,
+#if LINUX_VERSION_CODE < KERNEL_VERSION(5, 15, 0)
 	.ndo_do_ioctl = hdd_ioctl,
+#endif
 	.ndo_change_mtu = hdd_hostapd_change_mtu,
 	.ndo_select_queue = hdd_select_queue,
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 15, 0)
+	.ndo_siocdevprivate = hdd_dev_private_ioctl,
+#endif
 };
 
 #ifdef WLAN_FEATURE_TSF_PTP

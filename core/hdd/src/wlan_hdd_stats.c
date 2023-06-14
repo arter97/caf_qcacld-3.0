@@ -117,7 +117,7 @@ static const struct index_data_rate_type supported_data_rate[] = {
 	{108, {540, 240, 120, 0} }
 };
 /* MCS Based rate table HT MCS parameters with Nss = 1 */
-static struct index_data_rate_type supported_mcs_rate_nss1[] = {
+static const struct index_data_rate_type supported_mcs_rate_nss1[] = {
 /* MCS  L20   L40   S20  S40 */
 	{0, {65, 135, 72, 150} },
 	{1, {130, 270, 144, 300} },
@@ -130,7 +130,7 @@ static struct index_data_rate_type supported_mcs_rate_nss1[] = {
 };
 
 /* HT MCS parameters with Nss = 2 */
-static struct index_data_rate_type supported_mcs_rate_nss2[] = {
+static const struct index_data_rate_type supported_mcs_rate_nss2[] = {
 /* MCS  L20    L40   S20   S40 */
 	{0, {130, 270, 144, 300} },
 	{1, {260, 540, 289, 600} },
@@ -143,7 +143,7 @@ static struct index_data_rate_type supported_mcs_rate_nss2[] = {
 };
 
 /* MCS Based VHT rate table MCS parameters with Nss = 1*/
-static struct index_vht_data_rate_type supported_vht_mcs_rate_nss1[] = {
+static const struct index_vht_data_rate_type supported_vht_mcs_rate_nss1[] = {
 /* MCS  L80    S80     L40   S40    L20   S40*/
 	{0, {293, 325}, {135, 150}, {65, 72} },
 	{1, {585, 650}, {270, 300}, {130, 144} },
@@ -154,11 +154,13 @@ static struct index_vht_data_rate_type supported_vht_mcs_rate_nss1[] = {
 	{6, {2633, 2925}, {1215, 1350}, {585, 650} },
 	{7, {2925, 3250}, {1350, 1500}, {650, 722} },
 	{8, {3510, 3900}, {1620, 1800}, {780, 867} },
-	{9, {3900, 4333}, {1800, 2000}, {780, 867} }
+	{9, {3900, 4333}, {1800, 2000}, {780, 867} },
+	{10, {4388, 4875}, {2025, 2250}, {975, 1083} },
+	{11, {4875, 5417}, {2250, 2500}, {1083, 1203} }
 };
 
 /*MCS parameters with Nss = 2*/
-static struct index_vht_data_rate_type supported_vht_mcs_rate_nss2[] = {
+static const struct index_vht_data_rate_type supported_vht_mcs_rate_nss2[] = {
 /* MCS  L80    S80     L40   S40    L20   S40*/
 	{0, {585, 650}, {270, 300}, {130, 144} },
 	{1, {1170, 1300}, {540, 600}, {260, 289} },
@@ -169,7 +171,9 @@ static struct index_vht_data_rate_type supported_vht_mcs_rate_nss2[] = {
 	{6, {5265, 5850}, {2430, 2700}, {1170, 1300} },
 	{7, {5850, 6500}, {2700, 3000}, {1300, 1444} },
 	{8, {7020, 7800}, {3240, 3600}, {1560, 1733} },
-	{9, {7800, 8667}, {3600, 4000}, {1730, 1920} }
+	{9, {7800, 8667}, {3600, 4000}, {1730, 1920} },
+	{10, {8775, 9750}, {4050, 4500}, {1950, 2167} },
+	{11, {9750, 10833}, {4500, 5000}, {2167, 2407} }
 };
 
 /*array index points to MCS and array value points respective rssi*/
@@ -4673,6 +4677,11 @@ static uint8_t hdd_get_rate_flags_vht(uint32_t rate,
 	struct index_vht_data_rate_type *mcs_rate;
 	uint8_t flags = 0;
 
+	if (mcs >= ARRAY_SIZE(supported_vht_mcs_rate_nss1)) {
+		hdd_err("Invalid mcs index %d", mcs);
+		return flags;
+	}
+
 	mcs_rate = (struct index_vht_data_rate_type *)
 		((nss == 1) ?
 		 &supported_vht_mcs_rate_nss1 :
@@ -4809,7 +4818,7 @@ static void wlan_hdd_fill_rate_info(struct hdd_fw_txrx_stats *txrx_stats,
  * wlan_hdd_get_station_remote() - NL80211_CMD_GET_STATION handler for SoftAP
  * @wiphy: pointer to wiphy
  * @dev: pointer to net_device structure
- * @mac: request peer mac address
+ * @stainfo: request peer station info
  * @sinfo: pointer to station_info struct
  *
  * This function will get remote peer info from fw and fill sinfo struct
@@ -4818,36 +4827,19 @@ static void wlan_hdd_fill_rate_info(struct hdd_fw_txrx_stats *txrx_stats,
  */
 static int wlan_hdd_get_station_remote(struct wiphy *wiphy,
 				       struct net_device *dev,
-				       const u8 *mac,
+				       struct hdd_station_info *stainfo,
 				       struct station_info *sinfo)
 {
 	struct hdd_adapter *adapter = WLAN_HDD_GET_PRIV_PTR(dev);
 	struct hdd_context *hddctx = wiphy_priv(wiphy);
-	struct hdd_station_info *stainfo = NULL;
 	struct stats_event *stats;
 	struct hdd_fw_txrx_stats txrx_stats;
 	int i, status;
 
-	status = wlan_hdd_validate_context(hddctx);
-	if (status != 0)
-		return status;
-
-	hdd_debug("Peer "QDF_MAC_ADDR_FMT, QDF_MAC_ADDR_REF(mac));
-
-	stainfo = hdd_get_sta_info_by_mac(&adapter->sta_info_list, mac,
-					  STA_INFO_WLAN_HDD_GET_STATION_REMOTE);
-	if (!stainfo) {
-		hdd_err("peer "QDF_MAC_ADDR_FMT" not found",
-			QDF_MAC_ADDR_REF(mac));
-		return -EINVAL;
-	}
-
 	stats = wlan_cfg80211_mc_cp_stats_get_peer_stats(adapter->vdev,
-							 mac, &status);
+					stainfo->sta_mac.bytes, &status);
 	if (status || !stats) {
 		wlan_cfg80211_mc_cp_stats_free_stats_event(stats);
-		hdd_put_sta_info_ref(&adapter->sta_info_list, &stainfo, true,
-				     STA_INFO_WLAN_HDD_GET_STATION_REMOTE);
 		hdd_err("fail to get peer info from fw");
 		return -EPERM;
 	}
@@ -4870,8 +4862,6 @@ static int wlan_hdd_get_station_remote(struct wiphy *wiphy,
 	wlan_hdd_fill_rate_info(&txrx_stats, stats->peer_stats_info_ext);
 	wlan_hdd_fill_station_info(hddctx->psoc, sinfo, stainfo, &txrx_stats);
 	wlan_cfg80211_mc_cp_stats_free_stats_event(stats);
-	hdd_put_sta_info_ref(&adapter->sta_info_list, &stainfo, true,
-			     STA_INFO_WLAN_HDD_GET_STATION_REMOTE);
 
 	return status;
 }
@@ -5612,9 +5602,10 @@ static int __wlan_hdd_cfg80211_get_station(struct wiphy *wiphy,
 					   const uint8_t *mac,
 					   struct station_info *sinfo)
 {
-	int status;
+	int errno;
 	struct hdd_adapter *adapter = WLAN_HDD_GET_PRIV_PTR(dev);
 	struct hdd_context *hdd_ctx = wiphy_priv(wiphy);
+	struct hdd_station_info *stainfo;
 	bool get_peer_info_enable;
 	QDF_STATUS qdf_status;
 
@@ -5625,9 +5616,8 @@ static int __wlan_hdd_cfg80211_get_station(struct wiphy *wiphy,
 		return -EINVAL;
 	}
 
-	status = wlan_hdd_validate_context(hdd_ctx);
-	if (status)
-		return status;
+	if (wlan_hdd_validate_context(hdd_ctx))
+		return -EINVAL;
 
 	if (wlan_hdd_validate_vdev_id(adapter->vdev_id))
 		return -EINVAL;
@@ -5637,9 +5627,22 @@ static int __wlan_hdd_cfg80211_get_station(struct wiphy *wiphy,
 		qdf_status = ucfg_mlme_get_sap_get_peer_info(
 				hdd_ctx->psoc, &get_peer_info_enable);
 		if (qdf_status == QDF_STATUS_SUCCESS && get_peer_info_enable) {
-			status = wlan_hdd_get_station_remote(wiphy, dev,
-							     mac, sinfo);
-			if (!status)
+			stainfo = hdd_get_sta_info_by_mac(
+					&adapter->sta_info_list, mac,
+					STA_INFO_WLAN_HDD_CFG80211_GET_STATION);
+			if (!stainfo) {
+				hdd_debug("Peer " QDF_MAC_ADDR_FMT " not found",
+					  QDF_MAC_ADDR_REF(mac));
+				return -EINVAL;
+			}
+
+			errno = wlan_hdd_get_station_remote(wiphy, dev,
+							    stainfo, sinfo);
+			hdd_put_sta_info_ref(&adapter->sta_info_list, &stainfo,
+					     true,
+					STA_INFO_WLAN_HDD_CFG80211_GET_STATION
+					);
+			if (!errno)
 				return 0;
 		}
 		return wlan_hdd_get_sap_stats(adapter, sinfo);
@@ -5736,7 +5739,7 @@ int wlan_hdd_cfg80211_get_station(struct wiphy *wiphy,
  * __wlan_hdd_cfg80211_dump_station() - dump station statistics
  * @wiphy: Pointer to wiphy
  * @dev: Pointer to network device
- * @idx: variable to determine whether to get stats or not
+ * @idx: variable to station index, kernel iterate all stations over idx
  * @mac: Pointer to mac
  * @sinfo: Pointer to station info
  *
@@ -5747,11 +5750,62 @@ static int __wlan_hdd_cfg80211_dump_station(struct wiphy *wiphy,
 				int idx, u8 *mac,
 				struct station_info *sinfo)
 {
+	int errno;
+	struct hdd_adapter *adapter = WLAN_HDD_GET_PRIV_PTR(dev);
+	struct hdd_context *hdd_ctx = wiphy_priv(wiphy);
+	struct hdd_station_info *stainfo;
+	bool get_peer_info_enable;
+	QDF_STATUS qdf_status;
+
 	hdd_debug("idx: %d", idx);
-	if (idx != 0)
-		return -ENOENT;
-	qdf_mem_copy(mac, dev->dev_addr, QDF_MAC_ADDR_SIZE);
-	return __wlan_hdd_cfg80211_get_station(wiphy, dev, mac, sinfo);
+
+	if (QDF_GLOBAL_FTM_MODE == hdd_get_conparam()) {
+		hdd_err("Command not allowed in FTM mode");
+		return -EINVAL;
+	}
+
+	if (wlan_hdd_validate_context(hdd_ctx))
+		return -EINVAL;
+
+	if (wlan_hdd_validate_vdev_id(adapter->vdev_id))
+		return -EINVAL;
+
+	if (adapter->device_mode == QDF_SAP_MODE ||
+	    adapter->device_mode == QDF_P2P_GO_MODE) {
+		qdf_status = ucfg_mlme_get_sap_get_peer_info(
+				hdd_ctx->psoc, &get_peer_info_enable);
+		if (qdf_status == QDF_STATUS_SUCCESS && get_peer_info_enable) {
+			stainfo = hdd_get_sta_info_by_id(
+					&adapter->sta_info_list,
+					idx,
+					STA_INFO_WLAN_HDD_CFG80211_DUMP_STATION
+					);
+			if (!stainfo) {
+				hdd_err("peer idx %d NOT FOUND", idx);
+				return -ENOENT;
+			}
+
+			qdf_mem_copy(mac, &stainfo->sta_mac.bytes,
+				     QDF_MAC_ADDR_SIZE);
+			errno = wlan_hdd_get_station_remote(wiphy, dev,
+							    stainfo, sinfo);
+			hdd_put_sta_info_ref(&adapter->sta_info_list, &stainfo,
+					     true,
+					STA_INFO_WLAN_HDD_CFG80211_DUMP_STATION
+					);
+		} else {
+			errno = -EINVAL;
+			hdd_err("sap get peer info disabled!");
+		}
+	} else {
+		if (idx != 0)
+			return -ENOENT;
+
+		qdf_mem_copy(mac, dev->dev_addr, QDF_MAC_ADDR_SIZE);
+		errno = wlan_hdd_get_sta_stats(wiphy, adapter, mac, sinfo);
+	}
+
+	return errno;
 }
 
 /**

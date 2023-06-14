@@ -7031,7 +7031,8 @@ exit:
 }
 
 #ifdef CONFIG_COMPAT
-static int hdd_driver_compat_ioctl(struct hdd_adapter *adapter, struct ifreq *ifr)
+static int hdd_driver_compat_ioctl(struct hdd_adapter *adapter,
+				   void __user *data)
 {
 	struct {
 		compat_uptr_t buf;
@@ -7045,7 +7046,7 @@ static int hdd_driver_compat_ioctl(struct hdd_adapter *adapter, struct ifreq *if
 	 * Note that adapter and ifr have already been verified by caller,
 	 * and HDD context has also been validated
 	 */
-	if (copy_from_user(&compat_priv_data, ifr->ifr_data,
+	if (copy_from_user(&compat_priv_data, data,
 			   sizeof(compat_priv_data))) {
 		ret = -EFAULT;
 		goto exit;
@@ -7058,14 +7059,15 @@ exit:
 	return ret;
 }
 #else /* CONFIG_COMPAT */
-static int hdd_driver_compat_ioctl(struct hdd_adapter *adapter, struct ifreq *ifr)
+static int hdd_driver_compat_ioctl(struct hdd_adapter *adapter,
+				   void __user *data)
 {
 	/* will never be invoked */
 	return 0;
 }
 #endif /* CONFIG_COMPAT */
 
-static int hdd_driver_ioctl(struct hdd_adapter *adapter, struct ifreq *ifr)
+static int hdd_driver_ioctl(struct hdd_adapter *adapter, void __user *data)
 {
 	struct hdd_priv_data priv_data;
 	int ret = 0;
@@ -7074,7 +7076,7 @@ static int hdd_driver_ioctl(struct hdd_adapter *adapter, struct ifreq *ifr)
 	 * Note that adapter and ifr have already been verified by caller,
 	 * and HDD context has also been validated
 	 */
-	if (copy_from_user(&priv_data, ifr->ifr_data, sizeof(priv_data)))
+	if (copy_from_user(&priv_data, data, sizeof(priv_data)))
 		ret = -EFAULT;
 	else
 		ret = hdd_driver_command(adapter, &priv_data);
@@ -7085,7 +7087,7 @@ static int hdd_driver_ioctl(struct hdd_adapter *adapter, struct ifreq *ifr)
 /**
  * __hdd_ioctl() - ioctl handler for wlan network interfaces
  * @dev: device upon which the ioctl was received
- * @ifr: ioctl request information
+ * @data: pointer to the raw command data in the ioctl request
  * @cmd: ioctl command
  *
  * This function does initial processing of wlan device ioctls.
@@ -7100,7 +7102,7 @@ static int hdd_driver_ioctl(struct hdd_adapter *adapter, struct ifreq *ifr)
  *
  * Return: 0 on success, non-zero on error
  */
-static int __hdd_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
+static int __hdd_ioctl(struct net_device *dev, void __user *data, int cmd)
 {
 	struct hdd_adapter *adapter = WLAN_HDD_GET_PRIV_PTR(dev);
 	struct hdd_context *hdd_ctx;
@@ -7114,7 +7116,7 @@ static int __hdd_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 		goto exit;
 	}
 
-	if ((!ifr) || (!ifr->ifr_data)) {
+	if (!data) {
 		hdd_err("invalid data cmd: %d", cmd);
 		ret = -EINVAL;
 		goto exit;
@@ -7122,7 +7124,7 @@ static int __hdd_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 #if  defined(QCA_WIFI_FTM) && defined(LINUX_QCMBR)
 	if (QDF_GLOBAL_FTM_MODE == hdd_get_conparam()) {
 		if (SIOCIOCTLTX99 == cmd) {
-			ret = wlan_hdd_qcmbr_unified_ioctl(adapter, ifr);
+			ret = wlan_hdd_qcmbr_unified_ioctl(adapter, data);
 			goto exit;
 		}
 	}
@@ -7136,9 +7138,9 @@ static int __hdd_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 	switch (cmd) {
 	case (SIOCDEVPRIVATE + 1):
 		if (in_compat_syscall())
-			ret = hdd_driver_compat_ioctl(adapter, ifr);
+			ret = hdd_driver_compat_ioctl(adapter, data);
 		else
-			ret = hdd_driver_ioctl(adapter, ifr);
+			ret = hdd_driver_ioctl(adapter, data);
 		break;
 	default:
 		hdd_warn("unknown ioctl %d", cmd);
@@ -7150,17 +7152,6 @@ exit:
 	return ret;
 }
 
-/**
- * hdd_ioctl() - ioctl handler (wrapper) for wlan network interfaces
- * @net_dev: device upon which the ioctl was received
- * @ifr: ioctl request information
- * @cmd: ioctl command
- *
- * This function acts as an SSR-protecting wrapper to __hdd_ioctl()
- * which is where the ioctls are really handled.
- *
- * Return: 0 on success, non-zero on error
- */
 int hdd_ioctl(struct net_device *net_dev, struct ifreq *ifr, int cmd)
 {
 	struct osif_vdev_sync *vdev_sync;
@@ -7170,10 +7161,26 @@ int hdd_ioctl(struct net_device *net_dev, struct ifreq *ifr, int cmd)
 	if (errno)
 		return errno;
 
-	errno = __hdd_ioctl(net_dev, ifr, cmd);
+	errno = __hdd_ioctl(net_dev, ifr->ifr_data, cmd);
 
 	osif_vdev_sync_op_stop(vdev_sync);
 
 	return errno;
 }
 
+int hdd_dev_private_ioctl(struct net_device *dev, struct ifreq *ifr,
+			  void __user *data, int cmd)
+{
+	struct osif_vdev_sync *vdev_sync;
+	int errno;
+
+	errno = osif_vdev_sync_op_start(dev, &vdev_sync);
+	if (errno)
+		return errno;
+
+	errno = __hdd_ioctl(dev, data, cmd);
+
+	osif_vdev_sync_op_stop(vdev_sync);
+
+	return errno;
+}

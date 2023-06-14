@@ -153,6 +153,7 @@ struct sae_auth_retry {
  * @last_assoc_received_time: last assoc received time
  * @last_disassoc_deauth_received_time: last disassoc/deauth received time
  * @twt_ctx: TWT context
+ * @nss: Peer NSS
  */
 struct peer_mlme_priv_obj {
 	uint8_t last_pn_valid;
@@ -164,6 +165,7 @@ struct peer_mlme_priv_obj {
 #ifdef WLAN_SUPPORT_TWT
 	struct twt_context twt_ctx;
 #endif
+	uint8_t nss;
 };
 
 /**
@@ -422,6 +424,7 @@ struct wait_for_key_timer {
  *			  requests from some IOT APs
  * @ba_2k_jump_iot_ap: This is set to true if connected to the ba 2k jump IOT AP
  * @is_usr_ps_enabled: Is Power save enabled
+ * @notify_co_located_ap_upt_rnr: Notify co located AP to update RNR or not
  */
 struct mlme_legacy_priv {
 	bool chan_switch_in_progress;
@@ -462,6 +465,7 @@ struct mlme_legacy_priv {
 	qdf_time_t last_delba_sent_time;
 	bool ba_2k_jump_iot_ap;
 	bool is_usr_ps_enabled;
+	bool notify_co_located_ap_upt_rnr;
 };
 
 /**

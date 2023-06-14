@@ -1542,6 +1542,7 @@ bool wlansap_is_6ghz_included_in_acs_range(struct sap_context *sap_ctx);
  * wlansap_get_safe_channel_from_pcl_and_acs_range() - Get safe channel for SAP
  * restart
  * @sap_ctx: sap context
+ * @ch_width: selected channel bandwdith
  *
  * Get a safe channel to restart SAP. PCL already takes into account the
  * unsafe channels. So, the PCL is validated with the ACS range to provide
@@ -1551,7 +1552,8 @@ bool wlansap_is_6ghz_included_in_acs_range(struct sap_context *sap_ctx);
  * failure, the channel number returned is zero.
  */
 uint32_t
-wlansap_get_safe_channel_from_pcl_and_acs_range(struct sap_context *sap_ctx);
+wlansap_get_safe_channel_from_pcl_and_acs_range(struct sap_context *sap_ctx,
+						enum phy_ch_width *ch_width);
 
 /**
  * wlansap_get_safe_channel_from_pcl_for_sap() - Get safe and active channel

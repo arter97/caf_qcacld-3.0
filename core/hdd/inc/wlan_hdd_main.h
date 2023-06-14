@@ -3409,6 +3409,7 @@ void hdd_switch_sap_channel(struct hdd_adapter *adapter, uint8_t channel,
  * hdd_switch_sap_chan_freq() - Move SAP to the given channel
  * @adapter: AP adapter
  * @chan_freq: Channel frequency
+ * @ch_width: channel bandwidth
  * @forced: Force to switch channel, ignore SCC/MCC check
  *
  * Moves the SAP interface by invoking the function which
@@ -3417,7 +3418,9 @@ void hdd_switch_sap_channel(struct hdd_adapter *adapter, uint8_t channel,
  * Return: QDF_STATUS_SUCCESS if successfully
  */
 QDF_STATUS hdd_switch_sap_chan_freq(struct hdd_adapter *adapter,
-				    qdf_freq_t chan_freq, bool forced);
+				    qdf_freq_t chan_freq,
+				    enum phy_ch_width ch_width,
+				    bool forced);
 
 #if defined(FEATURE_WLAN_CH_AVOID)
 void hdd_unsafe_channel_restart_sap(struct hdd_context *hdd_ctx);
