@@ -392,8 +392,7 @@ typedef void (*crypto_add_key_callback)(void *context,
 					struct crypto_add_key_result *result);
 
 /**
- * struct wlan_crypto_comp_priv - crypto component private structure
- * @crypto_params:    crypto params for the peer
+ * struct wlan_crypto_keys - crypto keys structure
  * @key:              key buffers for this peer
  * @igtk_key:         igtk key buffer for this peer
  * @bigtk_key:        bigtk key buffer for this peer
@@ -401,6 +400,22 @@ typedef void (*crypto_add_key_callback)(void *context,
  * @def_tx_keyid:     default key used for this peer
  * @def_igtk_tx_keyid: default igtk key used for this peer
  * @def_bigtk_tx_keyid: default bigtk key used for this peer
+ *
+ */
+struct wlan_crypto_keys {
+	struct wlan_crypto_key *key[WLAN_CRYPTO_MAX_VLANKEYIX];
+	struct wlan_crypto_key *igtk_key[WLAN_CRYPTO_MAXIGTKKEYIDX];
+	struct wlan_crypto_key *bigtk_key[WLAN_CRYPTO_MAXBIGTKKEYIDX];
+	enum wlan_crypto_cipher_type igtk_key_type;
+	uint8_t def_tx_keyid;
+	uint8_t def_igtk_tx_keyid;
+	uint8_t def_bigtk_tx_keyid;
+};
+
+/**
+ * struct wlan_crypto_comp_priv - crypto component private structure
+ * @crypto_params:    crypto params for the peer
+ * @crypto_key: crypto keys structure for the peer
  * @fils_aead_set:    fils params for this peer
  * @add_key_ctx: Opaque context to be used by the caller to associate the
  *  add key request with the response
@@ -409,13 +424,7 @@ typedef void (*crypto_add_key_callback)(void *context,
  */
 struct wlan_crypto_comp_priv {
 	struct wlan_crypto_params crypto_params;
-	struct wlan_crypto_key *key[WLAN_CRYPTO_MAX_VLANKEYIX];
-	struct wlan_crypto_key *igtk_key[WLAN_CRYPTO_MAXIGTKKEYIDX];
-	struct wlan_crypto_key *bigtk_key[WLAN_CRYPTO_MAXBIGTKKEYIDX];
-	enum wlan_crypto_cipher_type igtk_key_type;
-	uint8_t def_tx_keyid;
-	uint8_t def_igtk_tx_keyid;
-	uint8_t def_bigtk_tx_keyid;
+	struct wlan_crypto_keys crypto_key;
 	uint8_t fils_aead_set;
 	void *add_key_ctx;
 	crypto_add_key_callback add_key_cb;

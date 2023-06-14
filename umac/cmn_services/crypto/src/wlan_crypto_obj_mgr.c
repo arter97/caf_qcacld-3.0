@@ -183,29 +183,29 @@ static void wlan_crypto_free_key(struct wlan_crypto_comp_priv *crypto_priv)
 	}
 
 	for (i = 0; i < WLAN_CRYPTO_MAX_VLANKEYIX; i++) {
-		if (crypto_priv->key[i]) {
-			qdf_mem_free(crypto_priv->key[i]);
-			crypto_priv->key[i] = NULL;
+		if (crypto_priv->crypto_key.key[i]) {
+			qdf_mem_free(crypto_priv->crypto_key.key[i]);
+			crypto_priv->crypto_key.key[i] = NULL;
 		}
 	}
 
 	for (i = 0; i < WLAN_CRYPTO_MAXIGTKKEYIDX; i++) {
-		if (crypto_priv->igtk_key[i]) {
-			qdf_mem_free(crypto_priv->igtk_key[i]);
-			crypto_priv->igtk_key[i] = NULL;
+		if (crypto_priv->crypto_key.igtk_key[i]) {
+			qdf_mem_free(crypto_priv->crypto_key.igtk_key[i]);
+			crypto_priv->crypto_key.igtk_key[i] = NULL;
 		}
 	}
 
 	for (i = 0; i < WLAN_CRYPTO_MAXBIGTKKEYIDX; i++) {
-		if (crypto_priv->bigtk_key[i]) {
-			qdf_mem_free(crypto_priv->bigtk_key[i]);
-			crypto_priv->bigtk_key[i] = NULL;
+		if (crypto_priv->crypto_key.bigtk_key[i]) {
+			qdf_mem_free(crypto_priv->crypto_key.bigtk_key[i]);
+			crypto_priv->crypto_key.bigtk_key[i] = NULL;
 		}
 	}
 	/* Reset All key index as well */
-	crypto_priv->def_tx_keyid = 0;
-	crypto_priv->def_igtk_tx_keyid = 0;
-	crypto_priv->def_bigtk_tx_keyid = 0;
+	crypto_priv->crypto_key.def_tx_keyid = 0;
+	crypto_priv->crypto_key.def_igtk_tx_keyid = 0;
+	crypto_priv->crypto_key.def_bigtk_tx_keyid = 0;
 }
 
 #ifdef CRYPTO_SET_KEY_CONVERGED
