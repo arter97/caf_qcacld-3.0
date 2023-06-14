@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2011-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -555,6 +555,8 @@ void lim_update_ch_width_for_p2p_client(struct mac_context *mac,
 {
 	struct ch_params ch_params = {0};
 
+	if (session->dot11mode > MLME_DOT11_MODE_11AC_ONLY)
+		return;
 	/*
 	 * Some IOT AP's/P2P-GO's (e.g. make: Wireless-AC 9560160MHz as P2P GO),
 	 * send beacon with 20mhz and assoc resp with 80mhz and

@@ -740,6 +740,7 @@ void cm_connect_info(struct wlan_objmgr_vdev *vdev, bool connect_success,
 	struct wlan_objmgr_pdev *pdev;
 	struct wlan_objmgr_psoc *psoc;
 	struct wlan_mlme_psoc_ext_obj *mlme_obj;
+	enum phy_ch_width ch_width = CH_WIDTH_20MHZ;
 	WLAN_HOST_DIAG_EVENT_DEF(conn_stats,
 				 struct host_event_wlan_connection_stats);
 
@@ -770,8 +771,8 @@ void cm_connect_info(struct wlan_objmgr_vdev *vdev, bool connect_success,
 
 	des_chan = wlan_vdev_mlme_get_des_chan(vdev);
 
-	conn_stats.chnl_bw =
-		cm_get_diag_ch_width(des_chan->ch_width);
+	wlan_mlme_get_sta_ch_width(vdev, &ch_width);
+	conn_stats.chnl_bw = cm_get_diag_ch_width(ch_width);
 	conn_stats.dot11mode =
 		cm_diag_dot11_mode_from_phy_mode(des_chan->ch_phymode);
 
