@@ -2322,12 +2322,6 @@ void dp_process_ppdu_stats_update_failed_bitmap(struct dp_pdev *pdev,
 	}
 
 	if (extra_ba_mpdus) {
-		dp_tx_capture_info("%pK: ppdu_id:%u ba_size:%u modified_ba_size:%u last_ba_set_bit:%u start_seq: %u\n",
-				   pdev->soc,
-				   ppdu_id,
-				   user->ba_size,
-				   last_ba_seq - user->start_seq + 1,
-				   last_ba_set_bit, user->start_seq);
 		user->ba_size = last_ba_seq - user->start_seq + 1;
 
 		user->last_enq_seq = last_ba_seq;
