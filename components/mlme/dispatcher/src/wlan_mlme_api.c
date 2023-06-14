@@ -1246,6 +1246,29 @@ enum phy_ch_width wlan_mlme_get_max_bw(void)
 }
 #endif
 
+QDF_STATUS wlan_mlme_get_sta_ch_width(struct wlan_objmgr_vdev *vdev,
+				      enum phy_ch_width *ch_width)
+{
+	QDF_STATUS status = QDF_STATUS_E_INVAL;
+	struct wlan_objmgr_peer *peer;
+	enum wlan_phymode phymode;
+	enum QDF_OPMODE op_mode;
+
+	peer = wlan_vdev_get_bsspeer(vdev);
+	op_mode = wlan_vdev_mlme_get_opmode(vdev);
+
+	if (ch_width && peer &&
+	    (op_mode == QDF_STA_MODE ||
+	     op_mode == QDF_P2P_CLIENT_MODE)) {
+		wlan_peer_obj_lock(peer);
+		phymode = wlan_peer_get_phymode(peer);
+		wlan_peer_obj_unlock(peer);
+		*ch_width = wlan_mlme_get_ch_width_from_phymode(phymode);
+	}
+
+	return  status;
+}
+
 #ifdef WLAN_FEATURE_11BE_MLO
 uint8_t wlan_mlme_get_sta_mlo_simultaneous_links(struct wlan_objmgr_psoc *psoc)
 {

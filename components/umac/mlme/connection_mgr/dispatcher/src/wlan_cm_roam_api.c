@@ -134,6 +134,8 @@ cm_update_associated_ch_info(struct wlan_objmgr_vdev *vdev, bool is_update)
 	struct mlme_legacy_priv *mlme_priv;
 	struct wlan_channel *des_chan;
 	struct connect_chan_info *chan_info_orig;
+	enum phy_ch_width ch_width;
+	QDF_STATUS status;
 
 	mlme_priv = wlan_vdev_mlme_get_ext_hdl(vdev);
 	if (!mlme_priv)
@@ -148,7 +150,19 @@ cm_update_associated_ch_info(struct wlan_objmgr_vdev *vdev, bool is_update)
 	des_chan = wlan_vdev_mlme_get_des_chan(vdev);
 	if (!des_chan)
 		return;
-	chan_info_orig->ch_width_orig = des_chan->ch_width;
+
+	/* If operating mode is STA / P2P-CLI then get the channel width
+	 * from phymode. This is due the reason where actual operating
+	 * channel width is configured as part of WMI_PEER_ASSOC_CMDID
+	 * which could be downgraded while the peer associated.
+	 * If there is a failure or operating mode is not STA / P2P-CLI
+	 * then get channel width from wlan_channel.
+	 */
+	status = wlan_mlme_get_sta_ch_width(vdev, &ch_width);
+	if (QDF_IS_STATUS_ERROR(status))
+		chan_info_orig->ch_width_orig = des_chan->ch_width;
+	else
+		chan_info_orig->ch_width_orig = ch_width;
 
 	if (WLAN_REG_IS_24GHZ_CH_FREQ(des_chan->ch_freq) &&
 	    des_chan->ch_width == CH_WIDTH_40MHZ) {

@@ -4456,9 +4456,19 @@ wlan_get_op_chan_freq_info_vdev_id(struct wlan_objmgr_pdev *pdev,
 	if (!chan)
 		goto rel_ref;
 
+	/* If operating mode is STA / P2P-CLI then get the channel width
+	 * from phymode. This is due the reason where actual operating
+	 * channel width is configured as part of WMI_PEER_ASSOC_CMDID
+	 * which could be downgraded while the peer associated.
+	 * If there is a failure or operating mode is not STA / P2P-CLI
+	 * then get channel width from wlan_channel.
+	 */
+	status = wlan_mlme_get_sta_ch_width(vdev, ch_width);
+	if (QDF_IS_STATUS_ERROR(status))
+		*ch_width = chan->ch_width;
+
 	*op_freq = chan->ch_freq;
 	*freq_seg_0 = chan->ch_cfreq1;
-	*ch_width = chan->ch_width;
 	status = QDF_STATUS_SUCCESS;
 
 rel_ref:

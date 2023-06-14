@@ -1073,7 +1073,7 @@ QDF_STATUS mlme_update_tgt_he_caps_in_cfg(struct wlan_objmgr_psoc *psoc,
  * @channel_width: channel width in VHT operation IE.
  * @chan_id: channel id
  * @ccfs0: channel center frequency segment 0
- * @ccfs0: channel center frequency segment 1
+ * @ccfs1: channel center frequency segment 1
  *
  * Return: phy_ch_width
  */
@@ -1089,7 +1089,7 @@ wlan_mlme_convert_vht_op_bw_to_phy_ch_width(uint8_t channel_width,
  * @channel_width: channel width in HE operation IE.
  * @chan_id: channel id
  * @ccfs0: channel center frequency segment 0
- * @ccfs0: channel center frequency segment 1
+ * @ccfs1: channel center frequency segment 1
  *
  * Return: phy_ch_width
  */
@@ -4355,4 +4355,17 @@ wlan_mlme_get_sap_ps_with_twt(struct wlan_objmgr_psoc *psoc);
  *
  */
 enum phy_ch_width wlan_mlme_get_max_bw(void);
+
+/**
+ * wlan_mlme_get_sta_ch_width() - Get current operating
+ * channel width for STA / P2P-CLI mode
+ *
+ * @vdev: STA / P2P-CLI vdev
+ * @ch_width: Returned channel width
+ *
+ * Return: QDF_STATUS_SUCCESS for success otherwise QDF_STATUS_E_INVAL
+ *
+ */
+QDF_STATUS wlan_mlme_get_sta_ch_width(struct wlan_objmgr_vdev *vdev,
+				      enum phy_ch_width *ch_width);
 #endif /* _WLAN_MLME_API_H_ */

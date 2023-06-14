@@ -555,6 +555,8 @@ static void lim_upgrade_ch_width(struct mac_context *mac,
 {
 	struct ch_params ch_params = {0};
 
+	if (session->dot11mode > MLME_DOT11_MODE_11AC_ONLY)
+		return;
 	/*
 	 * Some IOT AP's/P2P-GO's (e.g. make: Wireless-AC 9560160MHz as P2P GO),
 	 * send beacon with 20mhz and assoc resp with 80mhz and
