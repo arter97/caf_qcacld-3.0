@@ -16068,7 +16068,7 @@ static void *dp_soc_init(struct dp_soc *soc, HTC_HANDLE htc_handle,
 	wlan_cfg_fill_interrupt_mask(soc->wlan_cfg_ctx, num_dp_msi,
 				     soc->intr_mode, is_monitor_mode,
 				     ppeds_attached,
-				     soc->features.umac_hw_reset_support);
+				     soc->umac_reset_supported);
 
 	/* initialize WBM_IDLE_LINK ring */
 	if (dp_hw_link_desc_ring_init(soc)) {
@@ -17477,6 +17477,7 @@ static void dp_soc_cfg_init(struct dp_soc *soc)
 		break;
 	case TARGET_TYPE_QCN9224:
 		soc->ast_override_support = 1;
+		soc->umac_reset_supported = true;
 		soc->da_war_enabled = false;
 		wlan_cfg_set_raw_mode_war(soc->wlan_cfg_ctx, false);
 		soc->per_tid_basize_max_tid = 8;
@@ -17493,6 +17494,7 @@ static void dp_soc_cfg_init(struct dp_soc *soc)
 		break;
 	case TARGET_TYPE_QCA5332:
 		soc->ast_override_support = 1;
+		soc->umac_reset_supported = true;
 		soc->da_war_enabled = false;
 		wlan_cfg_set_raw_mode_war(soc->wlan_cfg_ctx, false);
 		soc->per_tid_basize_max_tid = 8;
