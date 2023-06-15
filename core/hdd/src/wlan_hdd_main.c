@@ -1767,6 +1767,21 @@ static bool hdd_dot11Mode_support_11be(enum hdd_dot11_mode dot11Mode)
 }
 #endif
 
+#ifdef WLAN_FEATURE_11BE_MLO
+static void
+hdd_update_mlo_per_link_stats_capability(struct hdd_context *hdd_ctx,
+					 struct wma_tgt_services *cfg)
+{
+	hdd_ctx->is_mlo_per_link_stats_supported =
+				cfg->is_mlo_per_link_stats_supported;
+}
+#else
+static void
+hdd_update_mlo_per_link_stats_capability(struct hdd_context *hdd_ctx,
+					 struct wma_tgt_services *cfg)
+{
+}
+#endif
 
 static void hdd_update_tgt_services(struct hdd_context *hdd_ctx,
 				    struct wma_tgt_services *cfg)
@@ -1867,6 +1882,7 @@ static void hdd_update_tgt_services(struct hdd_context *hdd_ctx,
 	hdd_update_fw_tdls_6g_capability(hdd_ctx, cfg);
 	hdd_update_fw_tdls_wideband_capability(hdd_ctx, cfg);
 	ucfg_psoc_mlme_set_11be_capab(hdd_ctx->psoc, cfg->en_11be);
+	hdd_update_mlo_per_link_stats_capability(hdd_ctx, cfg);
 }
 
 /**

@@ -1921,6 +1921,7 @@ enum wlan_state_ctrl_str_id {
  * @last_pagefault_ssr_time: Time when last recovery was triggered because of
  * @host wakeup from fw with reason as pagefault
  * @bridgeaddr: Bridge MAC address
+ * @is_mlo_per_link_stats_supported: Per link mlo stats is supported or not
  */
 struct hdd_context {
 	struct wlan_objmgr_psoc *psoc;
@@ -2197,6 +2198,9 @@ struct hdd_context {
 #endif
 	qdf_time_t last_pagefault_ssr_time;
 	uint8_t bridgeaddr[QDF_MAC_ADDR_SIZE];
+#ifdef WLAN_FEATURE_11BE_MLO
+	bool is_mlo_per_link_stats_supported;
+#endif
 };
 
 /**

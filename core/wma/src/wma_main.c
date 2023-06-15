@@ -3372,10 +3372,27 @@ wma_update_num_tdls_vdevs_if_11be_mlo(struct wlan_objmgr_psoc *psoc,
 	wlan_res_cfg->num_tdls_vdevs = WLAN_UMAC_MLO_MAX_VDEVS;
 	wma_debug("update tdls num vdevs %d", wlan_res_cfg->num_tdls_vdevs);
 }
+
+static void
+wma_get_service_cap_per_link_mlo_stats(struct wmi_unified *wmi_handle,
+				       struct wma_tgt_services *cfg)
+{
+	cfg->is_mlo_per_link_stats_supported =
+		wmi_service_enabled(wmi_handle,
+				    wmi_service_per_link_stats_support);
+	wma_debug("mlo_per_link stats is %s supported by FW",
+		  cfg->is_mlo_per_link_stats_supported ? "" : "NOT");
+}
 #else
 static void
 wma_update_num_tdls_vdevs_if_11be_mlo(struct wlan_objmgr_psoc *psoc,
 				      target_resource_config *wlan_res_cfg)
+{
+}
+
+static void
+wma_get_service_cap_per_link_mlo_stats(struct wmi_unified *wmi_handle,
+				       struct wma_tgt_services *cfg)
 {
 }
 #endif
@@ -5363,6 +5380,7 @@ static inline void wma_update_target_services(struct wmi_unified *wmi_handle,
 	wma_get_tdls_6g_support(wmi_handle, cfg);
 	wma_get_tdls_wideband_support(wmi_handle, cfg);
 	wma_get_dynamic_vdev_macaddr_support(wmi_handle, cfg);
+	wma_get_service_cap_per_link_mlo_stats(wmi_handle, cfg);
 }
 
 /**
