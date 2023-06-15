@@ -2654,7 +2654,7 @@ lim_mlo_roam_copy_partner_info_to_session(struct pe_session *session,
 					  struct roam_offload_synch_ind *sync_ind)
 {
 	mlo_roam_copy_partner_info(&session->ml_partner_info,
-				   sync_ind, sync_ind->roamed_vdev_id);
+				   sync_ind, sync_ind->roamed_vdev_id, false);
 }
 
 static QDF_STATUS

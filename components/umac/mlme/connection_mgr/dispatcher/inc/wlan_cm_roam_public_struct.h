@@ -2853,9 +2853,9 @@ struct roam_offload_synch_ind {
 	uint8_t is_link_beacon;
 #ifdef WLAN_FEATURE_11BE_MLO
 	uint8_t num_setup_links;
-	struct ml_setup_link_param ml_link[WLAN_UMAC_MLO_MAX_VDEVS];
+	struct ml_setup_link_param ml_link[WLAN_MAX_ML_BSS_LINKS];
 	uint8_t num_ml_key_material;
-	struct ml_key_material_param ml_key[WLAN_UMAC_MLO_MAX_VDEVS];
+	struct ml_key_material_param ml_key[WLAN_MAX_ML_BSS_LINKS];
 #endif
 };
 

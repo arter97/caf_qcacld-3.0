@@ -2227,33 +2227,44 @@ wmi_fill_data_synch_event(struct roam_offload_synch_ind *roam_sync_ind,
 }
 
 #ifdef WLAN_FEATURE_11BE_MLO
+#define STANDBY_VDEV_ID (0xFFFFFFFF)
 static QDF_STATUS
 wmi_fill_roam_mlo_info(wmi_unified_t wmi_handle,
 		       WMI_ROAM_SYNCH_EVENTID_param_tlvs *param_buf,
 		       struct roam_offload_synch_ind *roam_sync_ind)
 {
-	uint8_t i;
+	uint8_t i, mlo_max_allowed_links;
 	wmi_roam_ml_setup_links_param *setup_links;
 	wmi_roam_ml_key_material_param *ml_key_param;
 	struct ml_setup_link_param *link;
 	struct ml_key_material_param *key;
 
+	mlo_max_allowed_links =
+		wlan_mlme_get_sta_mlo_conn_max_num(wmi_handle->soc->wmi_psoc);
 	if (param_buf->num_setup_links_param) {
-		if (param_buf->num_setup_links_param >
-		    WLAN_UMAC_MLO_MAX_VDEVS) {
-			wmi_err("Number of umac mlo vdev entries %d exceeded max vdev supported %d",
+		if (param_buf->num_setup_links_param > mlo_max_allowed_links ||
+		    param_buf->num_setup_links_param > WLAN_MAX_ML_BSS_LINKS) {
+			wmi_err("Number of links %d exceeded max vdev supported %d",
 				param_buf->num_setup_links_param,
-				WLAN_UMAC_MLO_MAX_VDEVS);
+				mlo_max_allowed_links);
 			return QDF_STATUS_E_INVAL;
 		}
+
 		roam_sync_ind->num_setup_links =
-			param_buf->num_setup_links_param;
+				param_buf->num_setup_links_param;
 		setup_links = param_buf->setup_links_param;
 
 		for (i = 0; i < roam_sync_ind->num_setup_links; i++) {
 			link = &roam_sync_ind->ml_link[i];
 			link->link_id = setup_links->link_id;
-			link->vdev_id = setup_links->vdev_id;
+
+			/*
+			 * setup_links->vdev_id == UINT32_MAX for standby link
+			 */
+			link->vdev_id = WLAN_INVALID_VDEV_ID;
+			if (setup_links->vdev_id != STANDBY_VDEV_ID)
+				link->vdev_id = setup_links->vdev_id;
+
 			link->channel = setup_links->channel;
 			link->flags = setup_links->flags;
 
@@ -2270,25 +2281,30 @@ wmi_fill_roam_mlo_info(wmi_unified_t wmi_handle,
 			setup_links++;
 		}
 	}
-	if (param_buf->num_ml_key_material) {
-		roam_sync_ind->num_ml_key_material =
-			param_buf->num_ml_key_material;
-		ml_key_param = param_buf->ml_key_material;
 
-		for (i = 0; i < roam_sync_ind->num_ml_key_material; i++) {
-			key = &roam_sync_ind->ml_key[i];
-			key->link_id = ml_key_param->link_id;
-			key->key_idx = ml_key_param->key_ix;
-			key->key_cipher = ml_key_param->key_cipher;
-			qdf_mem_copy(key->pn, ml_key_param->pn,
-				     WMI_MAX_PN_LEN);
-			qdf_mem_copy(key->key_buff, ml_key_param->key_buff,
-				     WMI_MAX_KEY_LEN);
-			wmi_debug("link_id: %u key_idx: %u key_cipher: %u",
-				  key->link_id, key->key_idx, key->key_cipher);
-			ml_key_param++;
-		}
+	if (!param_buf->num_ml_key_material)
+		return QDF_STATUS_SUCCESS;
+
+	if (param_buf->num_ml_key_material > WLAN_MAX_ML_BSS_LINKS)
+		param_buf->num_ml_key_material = WLAN_MAX_ML_BSS_LINKS;
+
+	roam_sync_ind->num_ml_key_material = param_buf->num_ml_key_material;
+	ml_key_param = param_buf->ml_key_material;
+
+	for (i = 0; i < roam_sync_ind->num_ml_key_material; i++) {
+		key = &roam_sync_ind->ml_key[i];
+		key->link_id = ml_key_param->link_id;
+		key->key_idx = ml_key_param->key_ix;
+		key->key_cipher = ml_key_param->key_cipher;
+		qdf_mem_copy(key->pn, ml_key_param->pn,
+			     WMI_MAX_PN_LEN);
+		qdf_mem_copy(key->key_buff, ml_key_param->key_buff,
+			     WMI_MAX_KEY_LEN);
+		wmi_debug("link_id: %u key_idx: %u key_cipher: %u",
+			  key->link_id, key->key_idx, key->key_cipher);
+		ml_key_param++;
 	}
+
 	return QDF_STATUS_SUCCESS;
 }
 #else

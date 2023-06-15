@@ -427,6 +427,30 @@ cm_fils_update_erp_seq_num(struct wlan_objmgr_vdev *vdev,
 #endif
 
 #ifdef WLAN_FEATURE_11BE_MLO
+static void
+cm_roam_update_mlo_mgr_info(struct wlan_objmgr_vdev *vdev,
+			    struct roam_offload_synch_ind *roam_synch_data)
+{
+	struct wlan_channel channel = {0};
+	struct ml_setup_link_param *ml_link;
+	uint8_t i;
+
+	if (!is_multi_link_roam(roam_synch_data))
+		return;
+
+	for (i = 0; i < roam_synch_data->num_setup_links; i++) {
+		ml_link = &roam_synch_data->ml_link[i];
+
+		channel.ch_freq = ml_link->channel.mhz;
+		channel.ch_cfreq1 = ml_link->channel.band_center_freq1;
+		channel.ch_cfreq1 = ml_link->channel.band_center_freq2;
+
+		mlo_mgr_roam_update_ap_link_info(vdev, ml_link->link_id,
+						 ml_link->link_addr.bytes,
+						 channel);
+	}
+}
+
 static QDF_STATUS
 cm_fill_bssid_freq_info(uint8_t vdev_id,
 			struct roam_offload_synch_ind *roam_synch_data,
@@ -468,9 +492,14 @@ cm_mlo_roam_copy_partner_info(struct wlan_cm_connect_resp *connect_rsp,
 			      struct roam_offload_synch_ind *roam_synch_data)
 {
 	mlo_roam_copy_partner_info(&connect_rsp->ml_parnter_info,
-				   roam_synch_data, WLAN_INVALID_VDEV_ID);
+				   roam_synch_data, WLAN_INVALID_VDEV_ID,
+				   true);
 }
 #else
+static inline void
+cm_roam_update_mlo_mgr_info(struct wlan_objmgr_vdev *vdev,
+			    struct roam_offload_synch_ind *roam_synch_data)
+{}
 static QDF_STATUS
 cm_fill_bssid_freq_info(uint8_t vdev_id,
 			struct roam_offload_synch_ind *roam_synch_data,
@@ -536,7 +565,8 @@ cm_fill_roam_info(struct wlan_objmgr_vdev *vdev,
 
 	rsp->connect_rsp.roaming_info = qdf_mem_malloc(sizeof(*roaming_info));
 	if (!rsp->connect_rsp.roaming_info)
-			return QDF_STATUS_E_NOMEM;
+		return QDF_STATUS_E_NOMEM;
+
 	rsp->connect_rsp.vdev_id = wlan_vdev_get_id(vdev);
 	status = cm_fill_bssid_freq_info(wlan_vdev_get_id(vdev),
 					 roam_synch_data, rsp);
@@ -962,6 +992,8 @@ cm_fw_roam_sync_propagation(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 	}
 	wlan_rec_conn_info(vdev_id, DEBUG_CONN_ROAMING,
 			   roam_synch_data->bssid.bytes, 0, 0);
+
+	cm_roam_update_mlo_mgr_info(vdev, roam_synch_data);
 
 	cm_id = roam_req->cm_id;
 	rsp = qdf_mem_malloc(sizeof(struct cm_vdev_join_rsp));
