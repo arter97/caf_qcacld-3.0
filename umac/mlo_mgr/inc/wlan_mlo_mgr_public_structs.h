@@ -569,6 +569,7 @@ struct wlan_mlo_mld_cap {
  * @mlpeer_msdcap: Medium Sync Delay capability information for ML peer
  * @is_mesh_ml_peer: flag to indicate if ml_peer is MESH configured
  * @mesh_config: eack link peer's MESH configuration
+ * @mlpeer_mldcap: MLD Capability information for ML peer
  */
 struct wlan_mlo_peer_context {
 	qdf_list_node_t peer_node;
@@ -607,6 +608,7 @@ struct wlan_mlo_peer_context {
 	bool is_mesh_ml_peer;
 	struct mlnawds_config mesh_config[MAX_MLO_LINK_PEERS];
 #endif
+	struct wlan_mlo_mld_cap mlpeer_mldcap;
 };
 
 /**
