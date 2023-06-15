@@ -11181,3 +11181,15 @@ bool policy_mgr_is_beaconing_mode(enum policy_mgr_con_mode mode)
 	return false;
 }
 
+bool policy_mgr_get_nan_sap_scc_on_lte_coex_chnl(struct wlan_objmgr_psoc *psoc)
+{
+	struct policy_mgr_psoc_priv_obj *pm_ctx;
+
+	pm_ctx = policy_mgr_get_context(psoc);
+	if (!pm_ctx) {
+		policy_mgr_err("pm_ctx is NULL");
+		return 0;
+	}
+	return pm_ctx->cfg.nan_sap_scc_on_lte_coex_chnl;
+}
+

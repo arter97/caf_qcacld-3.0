@@ -5238,4 +5238,14 @@ bool policy_mgr_is_sap_mode(enum policy_mgr_con_mode mode);
  */
 bool policy_mgr_is_beaconing_mode(enum policy_mgr_con_mode mode);
 
+/**
+ * policy_mgr_get_nan_sap_scc_on_lte_coex_chnl() -Get if NAN + SAP SCC on
+ * lte coex channel is allowed on lte coex channel or not
+ * @psoc: psoc pointer
+ *
+ * Return: cfg value of nan sap scc is allowed or not on lte coex channel
+ */
+
+bool policy_mgr_get_nan_sap_scc_on_lte_coex_chnl(struct wlan_objmgr_psoc *psoc);
+
 #endif /* __WLAN_POLICY_MGR_API_H */
