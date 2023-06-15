@@ -1288,6 +1288,26 @@ QDF_STATUS policy_mgr_wait_for_set_link_update(struct wlan_objmgr_psoc *psoc);
  */
 uint32_t
 policy_mgr_get_active_vdev_bitmap(struct wlan_objmgr_psoc *psoc);
+
+/**
+ * policy_mgr_is_emlsr_sta_concurrency_present() - Check whether eMLSR
+ * concurrency is present or not.
+ * @psoc: PSOC object information
+ *
+ * This API is to check if any other concurrency is present when an eMLSR
+ * STA connection is about to complete(i.e. when first link is connected
+ * and second link is coming up). This helps to let the eMLSR connection
+ * happen but not let firmware enter into eMLSR hw mode by sending
+ * mlo_force_link_inactive=1 in peer_assoc of link when other concurrency is
+ * present.
+ *
+ * Host driver shall disable the one link post connection anyway if concurrency
+ * is present. Once the concurrency is gone, policy_mgr shall evaluate and
+ * re-enable links to let firmware go to eMLSR hw mode.
+ *
+ * Return: true is it's allow otherwise false
+ */
+bool policy_mgr_is_emlsr_sta_concurrency_present(struct wlan_objmgr_psoc *psoc);
 #else
 static inline bool
 policy_mgr_is_ml_vdev_id(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id)
@@ -1334,6 +1354,12 @@ static inline uint32_t
 policy_mgr_get_active_vdev_bitmap(struct wlan_objmgr_psoc *psoc)
 {
 	return 0;
+}
+
+static inline bool
+policy_mgr_is_emlsr_sta_concurrency_present(struct wlan_objmgr_psoc *psoc)
+{
+	return false;
 }
 #endif
 

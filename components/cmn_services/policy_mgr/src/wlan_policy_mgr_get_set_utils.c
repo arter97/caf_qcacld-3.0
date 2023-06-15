@@ -6378,7 +6378,7 @@ void policy_mgr_handle_emlsr_sta_concurrency(struct wlan_objmgr_psoc *psoc,
 					    num_mlo, mlo_vdev_lst);
 }
 
-static bool
+bool
 policy_mgr_is_emlsr_sta_concurrency_present(struct wlan_objmgr_psoc *psoc)
 {
 	uint8_t num_mlo = 0;
