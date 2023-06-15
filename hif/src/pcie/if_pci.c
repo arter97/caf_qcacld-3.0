@@ -2129,7 +2129,7 @@ static int hif_ce_srng_free_irq(struct hif_softc *scn)
 
 		irq = sc->ce_irq_num[ce_id];
 
-		hif_ce_irq_remove_affinity_hint(irq);
+		hif_irq_affinity_remove(irq);
 
 		hif_debug("%s: (ce_id %d, irq %d)", __func__, ce_id, irq);
 
@@ -2156,6 +2156,7 @@ void hif_pci_deconfigure_grp_irq(struct hif_softc *scn)
 							irq,
 							QDF_IRQ_DISABLE_UNLAZY);
 				}
+				hif_irq_affinity_remove(irq);
 				pfrm_free_irq(scn->qdf_dev->dev,
 					      irq, hif_ext_group);
 			}
