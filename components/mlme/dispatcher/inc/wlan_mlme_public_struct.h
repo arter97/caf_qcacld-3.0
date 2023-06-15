@@ -1723,6 +1723,7 @@ enum station_prefer_bw {
  * @usr_scan_probe_unicast_ra:      User config unicast probe req in scan
  * @event_payload:                  Diagnostic event payload
  * @max_li_modulated_dtim_time_ms:  Max modulated DTIM time in ms.
+ * @user_set_link_num:              save link num set by vendor command
  * @mlo_support_link_num:           max number of links that sta mlo supports
  * @mlo_support_link_band:          band bitmap that sta mlo supports
  * @mlo_max_simultaneous_links:     number of simultaneous links
@@ -1757,6 +1758,7 @@ struct wlan_mlme_sta_cfg {
 #endif
 	uint16_t max_li_modulated_dtim_time_ms;
 #ifdef WLAN_FEATURE_11BE_MLO
+	uint8_t user_set_link_num;
 	uint8_t mlo_support_link_num;
 	uint8_t mlo_support_link_band;
 	uint8_t mlo_max_simultaneous_links;

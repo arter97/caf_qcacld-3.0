@@ -14995,6 +14995,7 @@ void sme_set_mlo_max_links(mac_handle_t mac_handle, uint8_t vdev_id,
 		return;
 	}
 	wlan_mlme_set_sta_mlo_conn_max_num(mac_ctx->psoc, val);
+	wlan_mlme_set_user_set_link_num(mac_ctx->psoc, val);
 }
 
 void sme_set_mlo_max_simultaneous_links(mac_handle_t mac_handle,

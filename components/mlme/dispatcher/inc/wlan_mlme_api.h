@@ -3993,6 +3993,32 @@ QDF_STATUS wlan_mlme_set_sta_mlo_conn_max_num(struct wlan_objmgr_psoc *psoc,
 					      uint8_t value);
 
 /**
+ * wlan_mlme_set_user_set_link_num() - set number of links that config by user
+ * @psoc: pointer to psoc object
+ * @value: value to set
+ *
+ * Return: QDF Status
+ */
+QDF_STATUS wlan_mlme_set_user_set_link_num(struct wlan_objmgr_psoc *psoc,
+					   uint8_t value);
+
+/**
+ * wlan_mlme_restore_user_set_link_num() - restore link num when SSR happens
+ * @psoc: pointer to psoc object
+ *
+ * Return: void
+ */
+void wlan_mlme_restore_user_set_link_num(struct wlan_objmgr_psoc *psoc);
+
+/**
+ * wlan_mlme_clear_user_set_link_num() - clear user set link num
+ * @psoc: pointer to psoc object
+ *
+ * Return: void
+ */
+void wlan_mlme_clear_user_set_link_num(struct wlan_objmgr_psoc *psoc);
+
+/**
  * wlan_mlme_get_sta_mlo_conn_band_bmp() - get band bitmap that sta mlo
  *                                         connection can support
  * @psoc: pointer to psoc object
@@ -4031,6 +4057,23 @@ uint8_t wlan_mlme_get_sta_mlo_simultaneous_links(struct wlan_objmgr_psoc *psoc);
 QDF_STATUS wlan_mlme_set_sta_mlo_conn_band_bmp(struct wlan_objmgr_psoc *psoc,
 					       uint8_t value);
 #else
+static inline QDF_STATUS
+wlan_mlme_set_user_set_link_num(struct wlan_objmgr_psoc *psoc,
+				uint8_t value)
+{
+	return QDF_STATUS_SUCCESS;
+}
+
+static inline
+void wlan_mlme_restore_user_set_link_num(struct wlan_objmgr_psoc *psoc)
+{
+}
+
+static inline
+void wlan_mlme_clear_user_set_link_num(struct wlan_objmgr_psoc *psoc)
+{
+}
+
 static inline QDF_STATUS
 wlan_mlme_set_sta_mlo_conn_max_num(struct wlan_objmgr_psoc *psoc,
 				   uint8_t value)
