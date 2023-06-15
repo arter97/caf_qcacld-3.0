@@ -900,6 +900,9 @@ static struct service_to_pipe target_service_to_ce_map_qca5332[] = {
 #ifdef WLAN_DIAG_AND_DBR_OVER_SEPARATE_CE
 	{ WMI_CONTROL_DIAG_SVC, PIPEDIR_IN, 9, },
 	{ WMI_CONTROL_DBR_SVC, PIPEDIR_IN, 9, },
+#else
+	{ WMI_CONTROL_DIAG_SVC, PIPEDIR_IN, 2, },
+	{ WMI_CONTROL_DBR_SVC, PIPEDIR_IN, 2, },
 #endif
 	/* (Additions here) */
 	{ 0, 0, 0, },
@@ -930,8 +933,13 @@ static struct service_to_pipe target_service_to_ce_map_qcn9224[] = {
 	{ WMI_CONTROL_SVC_WMAC1, PIPEDIR_OUT, 7, },
 	{ WMI_CONTROL_SVC_WMAC1, PIPEDIR_IN, 2, },
 	{ PACKET_LOG_SVC, PIPEDIR_IN, 5, },
+#ifdef WLAN_DIAG_AND_DBR_OVER_SEPARATE_CE
 	{ WMI_CONTROL_DIAG_SVC, PIPEDIR_IN, 14, },
 	{ WMI_CONTROL_DBR_SVC, PIPEDIR_IN, 14, },
+#else
+	{ WMI_CONTROL_DIAG_SVC, PIPEDIR_IN, 2, },
+	{ WMI_CONTROL_DBR_SVC, PIPEDIR_IN, 2, },
+#endif
 	/* (Additions here) */
 	{ 0, 0, 0, },
 };
