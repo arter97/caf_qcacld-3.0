@@ -4205,7 +4205,6 @@ bool hdd_is_connection_in_progress(uint8_t *out_vdev_id,
  * Return: None
  */
 void hdd_restart_sap(struct wlan_hdd_link_info *link_info);
-void hdd_check_and_restart_sap_with_non_dfs_acs(void);
 bool hdd_set_connection_in_progress(bool value);
 
 /**

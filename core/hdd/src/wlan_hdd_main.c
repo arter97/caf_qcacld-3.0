@@ -8522,8 +8522,6 @@ struct hdd_adapter *hdd_open_adapter(struct hdd_context *hdd_ctx,
 
 	policy_mgr_set_concurrency_mode(hdd_ctx->psoc, session_type);
 
-	hdd_check_and_restart_sap_with_non_dfs_acs();
-
 	if (QDF_STATUS_SUCCESS != hdd_debugfs_init(adapter))
 		hdd_err("debugfs: Interface %s init failed",
 			netdev_name(adapter->dev));
@@ -20471,68 +20469,6 @@ deinit_mlo:
 end:
 	wlansap_reset_sap_config_add_ie(sap_config, eUPDATE_IE_ALL);
 	mutex_unlock(&hdd_ctx->sap_lock);
-}
-
-/**
- * hdd_check_and_restart_sap_with_non_dfs_acs() - Restart SAP
- * with non dfs acs
- *
- * Restarts SAP in non-DFS ACS mode when STA-AP mode DFS is not supported
- *
- * Return: None
- */
-void hdd_check_and_restart_sap_with_non_dfs_acs(void)
-{
-	struct hdd_adapter *ap_adapter;
-	struct hdd_context *hdd_ctx;
-	struct cds_context *cds_ctx;
-	uint8_t restart_chan;
-	uint32_t restart_freq;
-	struct wlan_hdd_link_info *link_info;
-
-	hdd_ctx = cds_get_context(QDF_MODULE_ID_HDD);
-	if (!hdd_ctx)
-		return;
-
-	cds_ctx = cds_get_context(QDF_MODULE_ID_QDF);
-	if (!cds_ctx)
-		return;
-
-	if (policy_mgr_get_concurrency_mode(hdd_ctx->psoc)
-		!= (QDF_STA_MASK | QDF_SAP_MASK)) {
-		hdd_debug("Concurrency mode is not SAP");
-		return;
-	}
-
-	ap_adapter = hdd_get_adapter(hdd_ctx, QDF_SAP_MODE);
-	if (!ap_adapter)
-		return;
-
-	link_info = ap_adapter->deflink;
-	if (test_bit(SOFTAP_BSS_STARTED, &link_info->link_flags) &&
-	    wlan_reg_is_dfs_for_freq(
-			hdd_ctx->pdev,
-			link_info->session.ap.operating_chan_freq)) {
-		if (policy_mgr_get_dfs_master_dynamic_enabled(
-				hdd_ctx->psoc, link_info->vdev_id))
-			return;
-		hdd_warn("STA-AP Mode DFS not supported, Switch SAP channel to Non DFS");
-
-		restart_freq =
-			wlansap_get_safe_channel_from_pcl_and_acs_range(
-				WLAN_HDD_GET_SAP_CTX_PTR(link_info), NULL);
-
-		restart_chan = wlan_reg_freq_to_chan(hdd_ctx->pdev,
-						     restart_freq);
-		if (!restart_chan ||
-		    wlan_reg_is_dfs_for_freq(hdd_ctx->pdev, restart_freq))
-			restart_chan = SAP_DEFAULT_5GHZ_CHANNEL;
-		wlan_hdd_set_sap_csa_reason(
-					hdd_ctx->psoc,
-					link_info->vdev_id,
-					CSA_REASON_STA_CONNECT_DFS_TO_NON_DFS);
-		hdd_switch_sap_channel(link_info, restart_chan, true);
-	}
 }
 
 /**
