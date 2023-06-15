@@ -1249,7 +1249,7 @@ struct cdp_delay_tid_stats {
  * @bytes: total no of bytes
  */
 struct cdp_pkt_info {
-	uint32_t num;
+	uint64_t num;
 	uint64_t bytes;
 };
 
