@@ -1100,6 +1100,18 @@ QDF_STATUS ucfg_pmo_config_listen_interval(struct wlan_objmgr_vdev *vdev,
 					   uint32_t listen_interval);
 
 /**
+ * ucfg_pmo_get_listen_interval() - function to get listen interval
+ * @vdev: objmgr vdev
+ * @listen_interval: pointer to store listen interval
+ *
+ * This function allows user to get listen interval dynamically
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS ucfg_pmo_get_listen_interval(struct wlan_objmgr_vdev *vdev,
+					uint32_t *listen_interval);
+
+/**
  * ucfg_pmo_config_modulated_dtim() - function to configure modulated dtim
  * @vdev: objmgr vdev handle
  * @mod_dtim: New modulated dtim value passed by user
@@ -2383,4 +2395,24 @@ void ucfg_pmo_notify_system_resume(struct wlan_objmgr_psoc *psoc)
 {
 }
 #endif
+
+/**
+ * ucfg_pmo_set_vdev_bridge_addr() - API to set Bridge mac address
+ * @vdev: objmgr vdev
+ * @bridgeaddr: Bridge mac address
+ *
+ * Return: if success pmo vdev ctx else NULL
+ */
+QDF_STATUS ucfg_pmo_set_vdev_bridge_addr(struct wlan_objmgr_vdev *vdev,
+					 struct qdf_mac_addr *bridgeaddr);
+
+/**
+ * ucfg_pmo_get_vdev_bridge_addr() - API to get Bridge mac address
+ * @vdev: objmgr vdev
+ * @bridgeaddr: Bridge mac address
+ *
+ * Return: if success pmo vdev ctx else NULL
+ */
+QDF_STATUS ucfg_pmo_get_vdev_bridge_addr(struct wlan_objmgr_vdev *vdev,
+					 struct qdf_mac_addr *bridgeaddr);
 #endif /* end  of _WLAN_PMO_UCFG_API_H_ */

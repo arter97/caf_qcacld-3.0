@@ -507,9 +507,44 @@ static void hdd_init_6ghz(struct hdd_context *hdd_ctx)
 
 	hdd_exit();
 }
+
+/**
+ * wlan_hdd_populate_6g_chan_info() - Populate 6 GHz chan info in hdd context
+ * @hdd_ctx: pointer to hdd context
+ * @index: 6 GHz channel beginning index in chan_info of @hdd_ctx
+ *
+ * Return: Number of 6 GHz channels populated
+ */
+static uint32_t
+wlan_hdd_populate_6g_chan_info(struct hdd_context *hdd_ctx, uint32_t index)
+{
+	uint32_t num_6g, i;
+	struct scan_chan_info *chan_info;
+
+	if (!hdd_ctx->wiphy->bands[HDD_NL80211_BAND_6GHZ] ||
+	    !hdd_ctx->wiphy->bands[HDD_NL80211_BAND_6GHZ]->n_channels) {
+		hdd_debug("6GHz channel list not populated to wiphy");
+		return 0;
+	}
+
+	num_6g = QDF_ARRAY_SIZE(hdd_channels_6_ghz);
+	chan_info = hdd_ctx->chan_info;
+
+	for (i = 0; i < num_6g; i++)
+		chan_info[index + i].freq = hdd_channels_6_ghz[i].center_freq;
+
+	return num_6g;
+}
+
 #else
 static void hdd_init_6ghz(struct hdd_context *hdd_ctx)
 {
+}
+
+static inline uint32_t
+wlan_hdd_populate_6g_chan_info(struct hdd_context *hdd_ctx, uint32_t index)
+{
+	return 0;
 }
 #endif
 
@@ -1548,6 +1583,13 @@ static const struct nl80211_vendor_cmd_info wlan_hdd_cfg80211_vendor_events[] = 
 			QCA_NL80211_VENDOR_SUBCMD_STATS_EXT
 	},
 #endif /* WLAN_FEATURE_STATS_EXT */
+	[QCA_NL80211_VENDOR_SUBCMD_CONNECTED_CHANNEL_STATS_INDEX] = {
+		.vendor_id =
+			QCA_NL80211_VENDOR_ID,
+		.subcmd =
+			QCA_NL80211_VENDOR_SUBCMD_CONNECTED_CHANNEL_STATS
+	},
+
 #ifdef FEATURE_WLAN_EXTSCAN
 	[QCA_NL80211_VENDOR_SUBCMD_EXTSCAN_START_INDEX] = {
 		.vendor_id =
@@ -8828,8 +8870,10 @@ static int hdd_config_tx_rx_nss(struct hdd_adapter *adapter,
 	struct nlattr *rx_attr =
 		tb[QCA_WLAN_VENDOR_ATTR_CONFIG_RX_NSS];
 
-	if (!tx_attr && !rx_attr)
-		return 0;
+	if (!tx_attr && !rx_attr) {
+		hdd_err("Missing TX and RX attributes");
+		return -EINVAL;
+	}
 
 	/* if one is present, both must be present */
 	if (!tx_attr || !rx_attr) {
@@ -8846,11 +8890,13 @@ static int hdd_config_tx_rx_nss(struct hdd_adapter *adapter,
 	      (tx_nss == 2 && rx_nss == 2))) {
 		hdd_err("Setting tx_nss %d rx_nss %d not allowed", tx_nss,
 			rx_nss);
-		return 0;
+		return -EINVAL;
 	}
 	status = hdd_update_nss(adapter, tx_nss, rx_nss);
-	if (status != QDF_STATUS_SUCCESS)
+	if (status != QDF_STATUS_SUCCESS) {
 		hdd_debug("Can't set tx_nss %d rx_nss %d", tx_nss, rx_nss);
+		return -EINVAL;
+	}
 
 	return 0;
 }
@@ -11321,6 +11367,50 @@ static int hdd_get_rx_nss_config(struct hdd_adapter *adapter,
 }
 
 /**
+ * hdd_get_listen_interval_config() - Get listen interval from driver
+ * @adapter: Pointer to HDD adapter
+ * @skb: sk buffer to hold nl80211 attributes
+ * @attr: Pointer to struct nlattr
+ *
+ * Return: 0 on success; error number otherwise
+ */
+static int hdd_get_listen_interval_config(struct hdd_adapter *adapter,
+					  struct sk_buff *skb,
+					  const struct nlattr *attr)
+{
+	uint32_t listen_interval = 0;
+	QDF_STATUS status;
+	struct wlan_objmgr_vdev *vdev;
+
+	if (adapter->device_mode != QDF_STA_MODE &&
+	    adapter->device_mode != QDF_P2P_CLIENT_MODE) {
+		hdd_err("Device not in STA / P2P-CLI mode");
+		return -EINVAL;
+	}
+	vdev = hdd_objmgr_get_vdev_by_user(adapter, WLAN_OSIF_ID);
+	if (!vdev) {
+		hdd_err("Failed to get vdev");
+		return -EINVAL;
+	}
+
+	status = ucfg_pmo_get_listen_interval(vdev, &listen_interval);
+	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
+	if (status != QDF_STATUS_SUCCESS) {
+		hdd_err("vdev/vdev ctx NULL for getting listen interval");
+		return -EINVAL;
+	}
+
+	hdd_debug("listen interval %d", listen_interval);
+	if (nla_put_u32(skb, QCA_WLAN_VENDOR_ATTR_CONFIG_LISTEN_INTERVAL,
+			listen_interval)) {
+		hdd_err("nla_put failure");
+		return -EINVAL;
+	}
+
+	return 0;
+}
+
+/**
  * hdd_get_optimized_power_config() - Get the number of spatial streams
  * supported by the adapter
  * @adapter: Pointer to HDD adapter
@@ -11428,6 +11518,9 @@ static const struct config_getters config_getters[] = {
 	 {QCA_WLAN_VENDOR_ATTR_CONFIG_RX_NSS,
 	 sizeof(uint8_t),
 	 hdd_get_rx_nss_config},
+	 {QCA_WLAN_VENDOR_ATTR_CONFIG_LISTEN_INTERVAL,
+	 sizeof(uint32_t),
+	 hdd_get_listen_interval_config},
 };
 
 /**
@@ -18409,6 +18502,18 @@ const struct wiphy_vendor_command hdd_wiphy_vendor_commands[] = {
 		vendor_command_policy(VENDOR_CMD_RAW_DATA, 0)
 	},
 #endif
+
+	{
+		.info.vendor_id = QCA_NL80211_VENDOR_ID,
+		.info.subcmd =
+			QCA_NL80211_VENDOR_SUBCMD_CONNECTED_CHANNEL_STATS,
+		.flags = WIPHY_VENDOR_CMD_NEED_WDEV |
+			 WIPHY_VENDOR_CMD_NEED_NETDEV |
+			 WIPHY_VENDOR_CMD_NEED_RUNNING,
+		.doit = wlan_hdd_cfg80211_connected_chan_stats_req,
+		vendor_command_policy(VENDOR_CMD_RAW_DATA, 0)
+	},
+
 	FEATURE_EXTSCAN_VENDOR_COMMANDS
 
 	FEATURE_LL_STATS_VENDOR_COMMANDS
@@ -19320,6 +19425,24 @@ static void wlan_hdd_set_nan_supported_bands(struct wiphy *wiphy)
 }
 #endif
 
+#if defined(WLAN_FEATURE_NAN) && defined(WLAN_EXT_FEATURE_SECURE_NAN)
+/**
+ * wlan_hdd_set_nan_secure_mode - Populate Secure NAN supported by driver
+ * @wiphy: wiphy
+ *
+ * Return: void
+ */
+static void wlan_hdd_set_nan_secure_mode(struct wiphy *wiphy)
+{
+	if (sme_is_feature_supported_by_fw(SECURE_NAN))
+		wiphy_ext_feature_set(wiphy, NL80211_EXT_FEATURE_SECURE_NAN);
+}
+#else
+static void wlan_hdd_set_nan_secure_mode(struct wiphy *wiphy)
+{
+}
+#endif
+
 /**
  * wlan_hdd_update_akm_suit_info() - Populate akm suits supported by driver
  * @wiphy: wiphy
@@ -19351,6 +19474,25 @@ static void wlan_hdd_update_eapol_over_nl80211_flags(struct wiphy *wiphy)
 }
 #else
 static void wlan_hdd_update_eapol_over_nl80211_flags(struct wiphy *wiphy)
+{
+}
+#endif
+
+#ifdef WLAN_EXT_FEATURE_AUTH_AND_DEAUTH_RANDOM_TA
+/**
+ * wlan_hdd_set_auth_deauth_random_ta_feature_flag() - set feature flag for
+ * random address for auth and deauth frames to the kernel.
+ * @wiphy: wiphy
+ *
+ * Return: void
+ */
+static void wlan_hdd_set_auth_deauth_random_ta_feature_flag(struct wiphy *wiphy)
+{
+	wiphy_ext_feature_set(wiphy,
+			      NL80211_EXT_FEATURE_AUTH_AND_DEAUTH_RANDOM_TA);
+}
+#else
+static void wlan_hdd_set_auth_deauth_random_ta_feature_flag(struct wiphy *wiphy)
 {
 }
 #endif
@@ -19509,6 +19651,8 @@ int wlan_hdd_cfg80211_init(struct device *dev,
 	wlan_hdd_set_nan_supported_bands(wiphy);
 
 	wlan_hdd_update_eapol_over_nl80211_flags(wiphy);
+
+	wlan_hdd_set_auth_deauth_random_ta_feature_flag(wiphy);
 
 	hdd_exit();
 	return 0;
@@ -19910,6 +20054,7 @@ void wlan_hdd_update_wiphy(struct hdd_context *hdd_ctx)
 	wlan_hdd_set_mlo_wiphy_ext_feature(wiphy, hdd_ctx);
 	wlan_hdd_set_ext_kek_kck_support(wiphy);
 	wlan_hdd_set_32bytes_kck_support(wiphy);
+	wlan_hdd_set_nan_secure_mode(wiphy);
 }
 
 /**
@@ -25353,6 +25498,81 @@ static int wlan_hdd_cfg80211_nan_change_conf(struct wiphy *wiphy,
 #endif
 
 /**
+ * wlan_hdd_fill_subband_scan_info - Fill subband channel info
+ * @hdd_ctx: hdd context
+ * @info: struct scan_chan_info
+ * @chan: scan channel info
+ *
+ * update channel info into HDD context on scan done
+ *
+ * Return: None.
+ */
+static void wlan_hdd_fill_subband_scan_info(struct hdd_context *hdd_ctx,
+					    struct scan_chan_info *info,
+					    struct scan_chan_info *chan)
+{
+	uint8_t idx, info_index, freq_info_num;
+	enum phy_ch_width ch_width;
+	const struct bonded_channel_freq *range = NULL;
+	uint32_t start_freq, end_freq;
+
+	ch_width = ucfg_cm_get_associated_ch_width(hdd_ctx->psoc,
+						   info->subband_info.vdev_id);
+	if (ch_width == CH_WIDTH_INVALID) {
+		hdd_debug("vdev %d: Invalid ch width",
+			  info->subband_info.vdev_id);
+		return;
+	}
+
+	if (ch_width == CH_WIDTH_20MHZ) {
+		start_freq = info->freq;
+		end_freq = info->freq;
+	} else {
+		range = wlan_reg_get_bonded_chan_entry(info->freq, ch_width, 0);
+		if (!range) {
+			hdd_err("vdev %d: bonded_chan_array is NULL for freq %d, ch_width %d",
+				info->subband_info.vdev_id, info->freq,
+				ch_width);
+			return;
+		}
+		start_freq = range->start_freq;
+		end_freq = range->end_freq;
+	}
+
+	freq_info_num = info->subband_info.num_chan;
+	info_index = 0;
+
+	hdd_debug("vdev %d: freq :%d bw %d, range [%d-%d], num_freq:%d",
+		  info->subband_info.vdev_id, info->freq, ch_width, start_freq,
+		  end_freq, freq_info_num);
+
+	for (idx = 0; idx < NUM_CHANNELS; idx++) {
+		if (chan[idx].freq == 0)
+			continue;
+
+		if (start_freq > end_freq || info_index >= freq_info_num ||
+		    info_index >= MAX_WIDE_BAND_SCAN_CHAN)
+			break;
+
+		if (chan[idx].freq == start_freq) {
+			/*update channel info as per cca busy info */
+			info->freq = start_freq;
+			info->rx_clear_count =
+			   info->subband_info.cca_busy_subband_info[info_index];
+
+			hdd_update_chan_info(hdd_ctx, &chan[idx], info,
+					     info->cmd_flag);
+
+			hdd_debug("updated info for freq:%u rcc:%d at index:%d",
+				  chan[idx].freq, chan[idx].rx_clear_count,
+				  idx);
+			start_freq += BW_20_MHZ;
+			info_index++;
+		}
+	}
+}
+
+/**
  * wlan_hdd_chan_info_cb() - channel info callback
  * @info: struct scan_chan_info
  *
@@ -25376,6 +25596,12 @@ static void wlan_hdd_chan_info_cb(struct scan_chan_info *info)
 	}
 
 	chan = hdd_ctx->chan_info;
+
+	if (info->subband_info.is_wide_band_scan) {
+		wlan_hdd_fill_subband_scan_info(hdd_ctx, info, chan);
+		return;
+	}
+
 	for (idx = 0; idx < SIR_MAX_NUM_CHANNELS; idx++) {
 		if (chan[idx].freq == info->freq) {
 			hdd_update_chan_info(hdd_ctx, &chan[idx], info,
@@ -25425,20 +25651,17 @@ void wlan_hdd_init_chan_info(struct hdd_context *hdd_ctx)
 	}
 
 	num_5g = QDF_ARRAY_SIZE(hdd_channels_5_ghz);
-	for (; (index - num_2g) < num_5g; index++) {
-		if (wlan_reg_is_dsrc_freq(
-		    hdd_channels_5_ghz[index - num_2g].center_freq))
-			continue;
+	for (; (index - num_2g) < num_5g; index++)
 		hdd_ctx->chan_info[index].freq =
 			hdd_channels_5_ghz[index - num_2g].center_freq;
-	}
 
 	index = num_2g + num_5g;
-	index = wlan_hdd_populate_5dot9_chan_info(hdd_ctx, index);
+	index += wlan_hdd_populate_5dot9_chan_info(hdd_ctx, index);
+	index += wlan_hdd_populate_6g_chan_info(hdd_ctx, index);
+	hdd_debug("Number of channels populated : %d", index);
 
 	mac_handle = hdd_ctx->mac_handle;
-	sme_set_chan_info_callback(mac_handle,
-				   &wlan_hdd_chan_info_cb);
+	sme_set_chan_info_callback(mac_handle, &wlan_hdd_chan_info_cb);
 }
 
 /**
