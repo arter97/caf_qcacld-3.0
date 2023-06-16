@@ -1312,6 +1312,9 @@ static bool policy_mgr_is_6G_chan_valid_for_ll_sap(qdf_freq_t freq)
 #else
 static inline bool policy_mgr_is_6G_chan_valid_for_ll_sap(qdf_freq_t freq)
 {
+	if (!wlan_reg_is_6ghz_chan_freq(freq))
+		return true;
+
 	return false;
 }
 #endif
