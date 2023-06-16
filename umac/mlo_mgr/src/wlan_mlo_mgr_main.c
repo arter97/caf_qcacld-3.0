@@ -40,7 +40,7 @@ static void mlo_global_ctx_deinit(void)
 		return;
 
 	if (qdf_list_empty(&mlo_mgr_ctx->ml_dev_list))
-		mlo_err("ML dev list is not empty");
+		mlo_debug("ML dev list is not empty");
 
 	mlo_setup_deinit();
 	mlo_msgq_free();
