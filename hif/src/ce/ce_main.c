@@ -3532,7 +3532,7 @@ QDF_STATUS hif_post_recv_buffers_for_pipe(struct HIF_CE_pipe_info *pipe_info)
 		hif_record_ce_desc_event(scn, ce_id,
 					 HIF_RX_DESC_PRE_NBUF_ALLOC, NULL, NULL,
 					 0, 0);
-		nbuf = qdf_nbuf_alloc(scn->qdf_dev, buf_sz, 0, 4, false);
+		nbuf = qdf_nbuf_alloc(scn->qdf_dev, buf_sz, 0, 0, false);
 		if (!nbuf) {
 			hif_post_recv_buffers_failure(pipe_info, nbuf,
 					&pipe_info->nbuf_alloc_err_count,

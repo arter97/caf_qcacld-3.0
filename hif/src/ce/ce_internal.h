@@ -170,6 +170,7 @@ struct CE_state {
 	/*Record the state of the copy compl interrupt */
 	int disable_copy_compl_intr;
 
+	/* src_sz_max should be a factor of 4 for alignment during nbuf alloc */
 	unsigned int src_sz_max;
 	struct CE_ring_state *src_ring;
 	struct CE_ring_state *dest_ring;
