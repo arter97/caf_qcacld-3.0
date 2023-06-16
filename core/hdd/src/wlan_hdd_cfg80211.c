@@ -9154,15 +9154,8 @@ static int hdd_config_mpdu_aggregation(struct wlan_hdd_link_info *link_info,
 		tb[QCA_WLAN_VENDOR_ATTR_CONFIG_TX_MPDU_AGGREGATION];
 	struct nlattr *rx_attr =
 		tb[QCA_WLAN_VENDOR_ATTR_CONFIG_RX_MPDU_AGGREGATION];
-	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(link_info->adapter);
-	mac_handle_t mac_handle = hdd_ctx->mac_handle;
 	uint8_t tx_size, rx_size;
 	QDF_STATUS status;
-
-	if (!mac_handle) {
-		hdd_err("NULL Mac handle");
-		return -EINVAL;
-	}
 
 	/* nothing to do if neither attribute is present */
 	if (!tx_attr && !rx_attr)
@@ -9185,20 +9178,6 @@ static int hdd_config_mpdu_aggregation(struct wlan_hdd_link_info *link_info,
 		return -EINVAL;
 	}
 
-	if (tx_size > 1)
-		sme_set_amsdu(mac_handle, true);
-	else
-		sme_set_amsdu(mac_handle, false);
-
-	hdd_debug("tx size: %d", tx_size);
-	status = wma_cli_set_command(link_info->vdev_id,
-				     GEN_VDEV_PARAM_AMSDU,
-				     tx_size, GEN_CMD);
-	if (status) {
-		hdd_err("Failed to set AMSDU param to FW, status %d", status);
-		return qdf_status_to_os_return(status);
-	}
-
 	status = wma_set_tx_rx_aggr_size(link_info->vdev_id,
 					 tx_size, rx_size,
 					 WMI_VDEV_CUSTOM_AGGR_TYPE_AMPDU);
@@ -9214,7 +9193,14 @@ static int hdd_config_msdu_aggregation(struct wlan_hdd_link_info *link_info,
 	struct nlattr *rx_attr =
 		tb[QCA_WLAN_VENDOR_ATTR_CONFIG_RX_MSDU_AGGREGATION];
 	uint8_t tx_size, rx_size;
+	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(link_info->adapter);
+	mac_handle_t mac_handle = hdd_ctx->mac_handle;
 	QDF_STATUS status;
+
+	if (!mac_handle) {
+		hdd_err("NULL Mac handle");
+		return -EINVAL;
+	}
 
 	/* nothing to do if neither attribute is present */
 	if (!tx_attr && !rx_attr)
@@ -9237,10 +9223,19 @@ static int hdd_config_msdu_aggregation(struct wlan_hdd_link_info *link_info,
 		return -EINVAL;
 	}
 
-	status = wma_set_tx_rx_aggr_size(link_info->vdev_id,
-					 tx_size,
-					 rx_size,
-					 WMI_VDEV_CUSTOM_AGGR_TYPE_AMSDU);
+	if (tx_size > 1)
+		sme_set_amsdu(mac_handle, true);
+	else
+		sme_set_amsdu(mac_handle, false);
+
+	hdd_debug("tx size: %d", tx_size);
+	status = wma_cli_set_command(link_info->vdev_id,
+				     GEN_VDEV_PARAM_AMSDU,
+				     tx_size, GEN_CMD);
+	if (status) {
+		hdd_err("Failed to set AMSDU param to FW, status %d", status);
+		return qdf_status_to_os_return(status);
+	}
 
 	return qdf_status_to_os_return(status);
 }

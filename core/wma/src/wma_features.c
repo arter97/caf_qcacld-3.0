@@ -91,6 +91,8 @@
  */
 #define ADDBA_TXAGGR_SIZE_HELIUM 64
 #define ADDBA_TXAGGR_SIZE_LITHIUM 256
+#define ADDBA_TXAGGR_SIZE_512 512
+#define ADDBA_TXAGGR_SIZE_BERYLLIUM 1024
 
 static bool is_wakeup_event_console_logs_enabled = false;
 
@@ -4491,8 +4493,10 @@ QDF_STATUS wma_set_tx_rx_aggr_size(uint8_t vdev_id,
 		cmd->enable_bitmap |= (0x1 << 6);
 	}
 
-	if ((tx_size != ADDBA_TXAGGR_SIZE_LITHIUM) &&
-	    (tx_size > ADDBA_TXAGGR_SIZE_HELIUM)) {
+	if ((tx_size > ADDBA_TXAGGR_SIZE_HELIUM) &&
+	    (tx_size != ADDBA_TXAGGR_SIZE_LITHIUM) &&
+	    (tx_size != ADDBA_TXAGGR_SIZE_512) &&
+	    (tx_size != ADDBA_TXAGGR_SIZE_BERYLLIUM)) {
 		wma_err("Invalid AMPDU Size");
 		return QDF_STATUS_E_INVAL;
 	}
