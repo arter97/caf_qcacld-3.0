@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2016-2021 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -756,6 +757,7 @@ int pld_get_ce_id(struct device *dev, int irq);
 int pld_get_irq(struct device *dev, int ce_id);
 void pld_lock_reg_window(struct device *dev, unsigned long *flags);
 void pld_unlock_reg_window(struct device *dev, unsigned long *flags);
+int pld_get_pci_slot(struct device *dev);
 int pld_power_on(struct device *dev);
 int pld_power_off(struct device *dev);
 int pld_athdiag_read(struct device *dev, uint32_t offset, uint32_t memtype,
