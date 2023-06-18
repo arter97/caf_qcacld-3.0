@@ -129,6 +129,76 @@ mgmt_rx_reo_compare_global_timestamps_gte(uint32_t ts1, uint32_t ts2)
 	return delta <= MGMT_RX_REO_GLOBAL_TS_HALF_RANGE;
 }
 
+#ifdef WLAN_MGMT_RX_REO_ERROR_HANDLING
+/**
+ * handle_out_of_order_pkt_ctr() - Handle management frames with out of order
+ * packet counter values
+ * @desc: Pointer to frame descriptor
+ * @host_ss: Pointer to host snapshot
+ *
+ * API to handle management frames with out of order packet counter values.
+ * This API implements the design choice to drop management frames with packet
+ * counter value less than than or equal to the last management frame received
+ * in the same link.
+ *
+ * Return: QDF_STATUS
+ */
+static QDF_STATUS
+handle_out_of_order_pkt_ctr(struct mgmt_rx_reo_frame_descriptor *desc,
+			    struct mgmt_rx_reo_snapshot_params *host_ss)
+{
+	if (!desc) {
+		mgmt_rx_reo_err("Mgmt Rx REO frame descriptor is null");
+		return QDF_STATUS_E_NULL_VALUE;
+	}
+
+	if (!host_ss) {
+		mgmt_rx_reo_err("Mgmt Rx REO host snapshot is null");
+		return QDF_STATUS_E_NULL_VALUE;
+	}
+
+	mgmt_rx_reo_debug_rl("Cur frame ctr <= last frame ctr for link = %u",
+			     mgmt_rx_reo_get_link_id(desc->rx_params));
+
+	desc->drop = true;
+	if (mgmt_rx_reo_get_pkt_counter(desc->rx_params) ==
+	    host_ss->mgmt_pkt_ctr)
+		desc->drop_reason = MGMT_RX_REO_DUPLICATE_PKT_CTR;
+	else
+		desc->drop_reason = MGMT_RX_REO_OUT_OF_ORDER_PKT_CTR;
+
+	return QDF_STATUS_SUCCESS;
+}
+#else
+/**
+ * handle_out_of_order_pkt_ctr() - Handle management frames with out of order
+ * packet counter values
+ * @desc: Pointer to frame descriptor
+ * @host_ss: Pointer to host snapshot
+ *
+ * API to handle management frames with out of order packet counter values.
+ * This API implements the design choice to assert on reception of management
+ * frames with packet counter value less than than or equal to the last
+ * management frame received in the same link.
+ *
+ * Return: QDF_STATUS
+ */
+static QDF_STATUS
+handle_out_of_order_pkt_ctr(struct mgmt_rx_reo_frame_descriptor *desc,
+			    struct mgmt_rx_reo_snapshot_params *host_ss)
+{
+	if (!desc) {
+		mgmt_rx_reo_err("Mgmt Rx REO frame descriptor is null");
+		return QDF_STATUS_E_NULL_VALUE;
+	}
+
+	mgmt_rx_reo_err_rl("Cur frame ctr <= last frame ctr for link = %u",
+			   mgmt_rx_reo_get_link_id(desc->rx_params));
+
+	return QDF_STATUS_E_FAILURE;
+}
+#endif /* WLAN_MGMT_RX_REO_ERROR_HANDLING */
+
 /**
  * mgmt_rx_reo_is_stale_frame()- API to check whether the given management frame
  * is stale
@@ -3914,14 +3984,19 @@ wlan_mgmt_rx_reo_update_host_snapshot(struct wlan_objmgr_pdev *pdev,
 
 	if (mgmt_rx_reo_compare_pkt_ctrs_gte(host_ss->mgmt_pkt_ctr,
 					     reo_params->mgmt_pkt_ctr)) {
-		mgmt_rx_reo_err("Cur frame ctr > last frame ctr for link = %u",
-				reo_params->link_id);
-		goto failure_debug;
+		QDF_STATUS status;
+
+		status = handle_out_of_order_pkt_ctr(desc, host_ss);
+		if (QDF_IS_STATUS_ERROR(status)) {
+			mgmt_rx_reo_err_rl("Failed to handle out of order pkt");
+			goto failure_debug;
+		}
+
+		mgmt_rx_reo_warn_rl("Drop frame with out of order pkt ctr");
 	}
 
 	pkt_ctr_delta = mgmt_rx_reo_subtract_pkt_ctrs(reo_params->mgmt_pkt_ctr,
 						      host_ss->mgmt_pkt_ctr);
-	qdf_assert_always(pkt_ctr_delta > 0);
 	desc->pkt_ctr_delta = pkt_ctr_delta;
 
 	if (pkt_ctr_delta == 1)
@@ -3932,11 +4007,12 @@ wlan_mgmt_rx_reo_update_host_snapshot(struct wlan_objmgr_pdev *pdev,
 	 * WMI events. So holes in the management packet counter is expected.
 	 * Add a debug print and optional assert to track the holes.
 	 */
-	mgmt_rx_reo_debug("pkt_ctr_delta = %u", pkt_ctr_delta);
-	mgmt_rx_reo_debug("Cur frame valid = %u, pkt_ctr = %u, ts =%u",
+	mgmt_rx_reo_debug("pkt_ctr_delta = %d, link = %u", pkt_ctr_delta,
+			  reo_params->link_id);
+	mgmt_rx_reo_debug("Cur frame valid = %u, pkt_ctr = %u, ts = %u",
 			  reo_params->valid, reo_params->mgmt_pkt_ctr,
 			  reo_params->global_timestamp);
-	mgmt_rx_reo_debug("Last frame valid = %u, pkt_ctr = %u, ts =%u",
+	mgmt_rx_reo_debug("Last frame valid = %u, pkt_ctr = %u, ts = %u",
 			  host_ss->valid, host_ss->mgmt_pkt_ctr,
 			  host_ss->global_timestamp);
 
@@ -3957,10 +4033,10 @@ update_host_ss:
 	return QDF_STATUS_SUCCESS;
 
 failure_debug:
-	mgmt_rx_reo_err("Cur frame valid = %u, pkt_ctr = %u, ts =%u",
+	mgmt_rx_reo_err("Cur Pkt valid = %u, pkt_ctr = %u, ts = %u, link = %u",
 			reo_params->valid, reo_params->mgmt_pkt_ctr,
-			reo_params->global_timestamp);
-	mgmt_rx_reo_err("Last frame vailid = %u, pkt_ctr = %u, ts =%u",
+			reo_params->global_timestamp, reo_params->link_id);
+	mgmt_rx_reo_err("Last Pkt valid = %u, pkt_ctr = %u, ts = %u",
 			host_ss->valid, host_ss->mgmt_pkt_ctr,
 			host_ss->global_timestamp);
 	qdf_assert_always(0);
@@ -4825,6 +4901,9 @@ wlan_mgmt_rx_reo_algo_entry(struct wlan_objmgr_pdev *pdev,
 	/* Update the Host snapshot */
 	ret = wlan_mgmt_rx_reo_update_host_snapshot(pdev, desc);
 	if (QDF_IS_STATUS_ERROR(ret))
+		goto failure;
+
+	if (desc->drop)
 		goto failure;
 
 	/* Compute wait count for this frame/event */
