@@ -978,7 +978,8 @@ dp_rx_ppe_del_flow_entry(struct ppe_drv_fse_rule_info *ppe_flow_info)
 	 * is down in recovery mode. So we check the recovery mode using the netdev
 	 * queue and return if netdev queue is stopped.
 	 */
-	if (netif_queue_stopped(ppe_flow_info->dev))
+	if ((ppe_flow_info->dev->reg_state >= NETREG_UNREGISTERING) ||
+	    (netif_queue_stopped(ppe_flow_info->dev)))
 		return QDF_STATUS_E_FAILURE;
 
 	osdev = ath_netdev_priv(ppe_flow_info->dev);
