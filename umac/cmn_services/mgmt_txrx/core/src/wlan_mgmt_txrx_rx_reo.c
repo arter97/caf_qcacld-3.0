@@ -931,7 +931,7 @@ mgmt_rx_reo_snapshots_check_sanity
 	if (!mac_hw_ss->valid) {
 		if (fw_forwarded_ss->valid || fw_consumed_ss->valid ||
 		    host_ss->valid) {
-			mgmt_rx_reo_err("MAC HW SS is invalid");
+			mgmt_rx_reo_warn_rl("MAC HW SS is invalid");
 			status = QDF_STATUS_E_INVAL;
 			goto fail;
 		}
@@ -941,7 +941,7 @@ mgmt_rx_reo_snapshots_check_sanity
 
 	if (!fw_forwarded_ss->valid && !fw_consumed_ss->valid) {
 		if (host_ss->valid) {
-			mgmt_rx_reo_err("FW forwarded and consumed SS invalid");
+			mgmt_rx_reo_warn_rl("FW fwd and consumed SS invalid");
 			status = QDF_STATUS_E_INVAL;
 			goto fail;
 		}
@@ -953,7 +953,7 @@ mgmt_rx_reo_snapshots_check_sanity
 		if (!mgmt_rx_reo_compare_global_timestamps_gte
 					(mac_hw_ss->global_timestamp,
 					 fw_forwarded_ss->global_timestamp)) {
-			mgmt_rx_reo_err("TS: MAC HW SS < FW forwarded SS");
+			mgmt_rx_reo_warn_rl("TS: MAC HW SS < FW forwarded SS");
 			status = QDF_STATUS_E_INVAL;
 			goto fail;
 		}
@@ -961,7 +961,7 @@ mgmt_rx_reo_snapshots_check_sanity
 		if (!mgmt_rx_reo_compare_pkt_ctrs_gte
 					(mac_hw_ss->mgmt_pkt_ctr,
 					 fw_forwarded_ss->mgmt_pkt_ctr)) {
-			mgmt_rx_reo_err("PKT CTR: MAC HW SS < FW forwarded SS");
+			mgmt_rx_reo_warn_rl("CTR: MAC HW SS < FW forwarded SS");
 			status = QDF_STATUS_E_INVAL;
 			goto fail;
 		}
@@ -971,7 +971,7 @@ mgmt_rx_reo_snapshots_check_sanity
 		if (!mgmt_rx_reo_compare_global_timestamps_gte
 					(mac_hw_ss->global_timestamp,
 					 fw_consumed_ss->global_timestamp)) {
-			mgmt_rx_reo_err("TS: MAC HW SS < FW consumed SS");
+			mgmt_rx_reo_warn_rl("TS: MAC HW SS < FW consumed SS");
 			status = QDF_STATUS_E_INVAL;
 			goto fail;
 		}
@@ -979,7 +979,7 @@ mgmt_rx_reo_snapshots_check_sanity
 		if (!mgmt_rx_reo_compare_pkt_ctrs_gte
 					(mac_hw_ss->mgmt_pkt_ctr,
 					 fw_consumed_ss->mgmt_pkt_ctr)) {
-			mgmt_rx_reo_err("PKT CTR: MAC HW SS < FW consumed SS");
+			mgmt_rx_reo_warn_rl("PKT CTR: HW SS < FW consumed SS");
 			status = QDF_STATUS_E_INVAL;
 			goto fail;
 		}
@@ -989,7 +989,7 @@ mgmt_rx_reo_snapshots_check_sanity
 		if (!mgmt_rx_reo_compare_global_timestamps_gte
 					(mac_hw_ss->global_timestamp,
 					 host_ss->global_timestamp)) {
-			mgmt_rx_reo_err("TS: MAC HW SS < host SS");
+			mgmt_rx_reo_warn_rl("TS: MAC HW SS < host SS");
 			status = QDF_STATUS_E_INVAL;
 			goto fail;
 		}
@@ -997,7 +997,7 @@ mgmt_rx_reo_snapshots_check_sanity
 		if (!mgmt_rx_reo_compare_pkt_ctrs_gte
 					(mac_hw_ss->mgmt_pkt_ctr,
 					 host_ss->mgmt_pkt_ctr)) {
-			mgmt_rx_reo_err("PKT CTR: MAC HW SS < host SS");
+			mgmt_rx_reo_warn_rl("PKT CTR: MAC HW SS < host SS");
 			status = QDF_STATUS_E_INVAL;
 			goto fail;
 		}
@@ -1006,7 +1006,7 @@ mgmt_rx_reo_snapshots_check_sanity
 			if (!mgmt_rx_reo_compare_global_timestamps_gte
 					(fw_forwarded_ss->global_timestamp,
 					 host_ss->global_timestamp)) {
-				mgmt_rx_reo_err("TS: FW forwarded < host SS");
+				mgmt_rx_reo_warn_rl("TS: FW fwded < host SS");
 				status = QDF_STATUS_E_INVAL;
 				goto fail;
 			}
@@ -1014,7 +1014,7 @@ mgmt_rx_reo_snapshots_check_sanity
 			if (!mgmt_rx_reo_compare_pkt_ctrs_gte
 					(fw_forwarded_ss->mgmt_pkt_ctr,
 					 host_ss->mgmt_pkt_ctr)) {
-				mgmt_rx_reo_err("CTR: FW forwarded < host SS");
+				mgmt_rx_reo_warn_rl("CTR: FW fwd < host SS");
 				status = QDF_STATUS_E_INVAL;
 				goto fail;
 			}
@@ -1024,7 +1024,7 @@ mgmt_rx_reo_snapshots_check_sanity
 			if (!mgmt_rx_reo_compare_global_timestamps_gte
 					(fw_consumed_ss->global_timestamp,
 					 host_ss->global_timestamp)) {
-				mgmt_rx_reo_err("TS: FW consumed < host SS");
+				mgmt_rx_reo_warn_rl("TS: FW consumed < host");
 				status = QDF_STATUS_E_INVAL;
 				goto fail;
 			}
@@ -1032,7 +1032,7 @@ mgmt_rx_reo_snapshots_check_sanity
 			if (!mgmt_rx_reo_compare_pkt_ctrs_gte
 					(fw_consumed_ss->mgmt_pkt_ctr,
 					 host_ss->mgmt_pkt_ctr)) {
-				mgmt_rx_reo_err("CTR: FW consumed < host SS");
+				mgmt_rx_reo_warn_rl("CTR: FW consumed < host");
 				status = QDF_STATUS_E_INVAL;
 				goto fail;
 			}
@@ -1045,7 +1045,7 @@ mgmt_rx_reo_snapshots_check_sanity
 			    !mgmt_rx_reo_compare_global_timestamps_gte
 					(fw_forwarded_ss->global_timestamp,
 					 host_ss->global_timestamp)) {
-				mgmt_rx_reo_err("TS: FW consumed/forwarded < host");
+				mgmt_rx_reo_warn_rl("TS:FW consume/fwd < host");
 				status = QDF_STATUS_E_INVAL;
 				goto fail;
 			}
@@ -1056,7 +1056,7 @@ mgmt_rx_reo_snapshots_check_sanity
 			    !mgmt_rx_reo_compare_pkt_ctrs_gte
 					(fw_forwarded_ss->mgmt_pkt_ctr,
 					 host_ss->mgmt_pkt_ctr)) {
-				mgmt_rx_reo_err("CTR: FW consumed/forwarded < host");
+				mgmt_rx_reo_warn_rl("CTR:FW consumed/fwd<host");
 				status = QDF_STATUS_E_INVAL;
 				goto fail;
 			}
@@ -1066,20 +1066,20 @@ mgmt_rx_reo_snapshots_check_sanity
 	return QDF_STATUS_SUCCESS;
 
 fail:
-	mgmt_rx_reo_debug("HW SS: valid = %u, ctr = %u, ts = %u",
-			  mac_hw_ss->valid, mac_hw_ss->mgmt_pkt_ctr,
-			  mac_hw_ss->global_timestamp);
-	mgmt_rx_reo_debug("FW forwarded SS: valid = %u, ctr = %u, ts = %u",
-			  fw_forwarded_ss->valid,
-			  fw_forwarded_ss->mgmt_pkt_ctr,
-			  fw_forwarded_ss->global_timestamp);
-	mgmt_rx_reo_debug("FW consumed SS: valid = %u, ctr = %u, ts = %u",
-			  fw_consumed_ss->valid,
-			  fw_consumed_ss->mgmt_pkt_ctr,
-			  fw_consumed_ss->global_timestamp);
-	mgmt_rx_reo_debug("HOST SS: valid = %u, ctr = %u, ts = %u",
-			  host_ss->valid, host_ss->mgmt_pkt_ctr,
-			  host_ss->global_timestamp);
+	mgmt_rx_reo_warn_rl("HW SS: valid = %u, ctr = %u, ts = %u",
+			    mac_hw_ss->valid, mac_hw_ss->mgmt_pkt_ctr,
+			    mac_hw_ss->global_timestamp);
+	mgmt_rx_reo_warn_rl("FW forwarded SS: valid = %u, ctr = %u, ts = %u",
+			    fw_forwarded_ss->valid,
+			    fw_forwarded_ss->mgmt_pkt_ctr,
+			    fw_forwarded_ss->global_timestamp);
+	mgmt_rx_reo_warn_rl("FW consumed SS: valid = %u, ctr = %u, ts = %u",
+			    fw_consumed_ss->valid,
+			    fw_consumed_ss->mgmt_pkt_ctr,
+			    fw_consumed_ss->global_timestamp);
+	mgmt_rx_reo_warn_rl("HOST SS: valid = %u, ctr = %u, ts = %u",
+			    host_ss->valid, host_ss->mgmt_pkt_ctr,
+			    host_ss->global_timestamp);
 
 	return status;
 }
@@ -1272,8 +1272,8 @@ wlan_mgmt_rx_reo_algo_calculate_wait_count(
 		status = mgmt_rx_reo_snapshots_check_sanity
 			(mac_hw_ss, fw_forwarded_ss, fw_consumed_ss, host_ss);
 		if (QDF_IS_STATUS_ERROR(status)) {
-			mgmt_rx_reo_err_rl("Snapshot sanity for link %u failed",
-					   link);
+			mgmt_rx_reo_warn_rl("Snapshot sanity failure, link %u",
+					    link);
 			return status;
 		}
 

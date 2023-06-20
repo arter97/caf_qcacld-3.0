@@ -136,8 +136,8 @@ tgt_mgmt_rx_reo_enter_algo_without_buffer(
 	}
 
 	if (!reo_params->valid) {
-		mgmt_rx_reo_err_rl("Invalid MGMT rx REO param for link %u",
-				   link_id);
+		mgmt_rx_reo_warn_rl("Invalid MGMT rx REO param for link %u",
+				    link_id);
 		return QDF_STATUS_E_INVAL;
 	}
 
@@ -346,8 +346,8 @@ QDF_STATUS tgt_mgmt_rx_reo_frame_handler(
 	}
 
 	if (!mgmt_rx_params->reo_params->valid) {
-		mgmt_rx_reo_err_rl("Invalid MGMT rx REO param for link %u",
-				   link_id);
+		mgmt_rx_reo_warn_rl("Invalid MGMT rx REO param for link %u",
+				    link_id);
 		status = QDF_STATUS_E_INVAL;
 		goto cleanup;
 	}
