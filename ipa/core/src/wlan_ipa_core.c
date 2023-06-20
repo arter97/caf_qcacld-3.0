@@ -4353,6 +4353,8 @@ QDF_STATUS wlan_ipa_setup(struct wlan_ipa_priv *ipa_ctx,
 	qdf_mutex_create(&ipa_ctx->ipa_lock);
 	qdf_atomic_init(&ipa_ctx->deinit_in_prog);
 
+	cdp_ipa_set_smmu_mapped(ipa_ctx->dp_soc, 0);
+
 	status = wlan_ipa_wdi_setup_rm(ipa_ctx);
 	if (status != QDF_STATUS_SUCCESS)
 		goto fail_setup_rm;
@@ -4765,6 +4767,20 @@ static void wlan_ipa_uc_op_cb(struct op_msg_type *op_msg,
 		qdf_ipa_wdi_opt_dpath_notify_flt_rlsd_per_inst(ipa_ctx->hdl,
 							       msg->rsvd);
 		qdf_mutex_release(&ipa_ctx->ipa_lock);
+	} else if (msg->op_code == WLAN_IPA_SMMU_MAP) {
+		ipa_info("opt_dp: IPA smmu pool map");
+		qdf_mutex_acquire(&ipa_ctx->ipa_lock);
+		cdp_ipa_rx_buf_smmu_pool_mapping(ipa_ctx->dp_soc,
+						 ipa_ctx->dp_pdev_id, true,
+						 __func__, __LINE__);
+		qdf_mutex_release(&ipa_ctx->ipa_lock);
+	} else if (msg->op_code == WLAN_IPA_SMMU_UNMAP) {
+		ipa_info("opt_dp: IPA smmu pool unmap");
+		qdf_mutex_acquire(&ipa_ctx->ipa_lock);
+		cdp_ipa_rx_buf_smmu_pool_mapping(ipa_ctx->dp_soc,
+						 ipa_ctx->dp_pdev_id,
+						 false, __func__, __LINE__);
+		qdf_mutex_release(&ipa_ctx->ipa_lock);
 	} else if (wlan_ipa_uc_op_metering(ipa_ctx, op_msg)) {
 		ipa_err("Invalid message: op_code=%d, reason=%d",
 			msg->op_code, ipa_ctx->stat_req_reason);
@@ -5167,16 +5183,30 @@ void wlan_ipa_flush_pending_vdev_events(struct wlan_ipa_priv *ipa_ctx,
 void wlan_ipa_wdi_opt_dpath_notify_flt_rsvd(bool response)
 {
 	struct wlan_ipa_priv *ipa_ctx = gp_ipa;
-	struct op_msg_type *msg;
+	struct op_msg_type *smmu_msg;
+	struct op_msg_type *notify_msg;
 	struct uc_op_work_struct *uc_op_work;
 
-	msg = qdf_mem_malloc(sizeof(*msg));
-	if (!msg)
+	smmu_msg = qdf_mem_malloc(sizeof(*smmu_msg));
+	if (!smmu_msg)
 		return;
-	msg->op_code = WLAN_IPA_FILTER_RSV_NOTIFY;
-	msg->rsvd = response;
+
+	if (response) {
+		smmu_msg->op_code = WLAN_IPA_SMMU_MAP;
+		uc_op_work = &ipa_ctx->uc_op_work[WLAN_IPA_SMMU_MAP];
+		uc_op_work->msg = smmu_msg;
+		qdf_sched_work(0, &uc_op_work->work);
+		cdp_ipa_set_smmu_mapped(ipa_ctx->dp_soc, 1);
+	}
+
+	notify_msg = qdf_mem_malloc(sizeof(*notify_msg));
+	if (!notify_msg)
+		return;
+
+	notify_msg->op_code = WLAN_IPA_FILTER_RSV_NOTIFY;
+	notify_msg->rsvd = response;
 	uc_op_work = &ipa_ctx->uc_op_work[WLAN_IPA_FILTER_RSV_NOTIFY];
-	uc_op_work->msg = msg;
+	uc_op_work->msg = notify_msg;
 	qdf_sched_work(0, &uc_op_work->work);
 }
 
@@ -5467,10 +5497,14 @@ void wlan_ipa_wdi_opt_dpath_notify_flt_rlsd(int flt0_rslt, int flt1_rslt)
 {
 	struct wifi_dp_flt_setup *dp_flt_params = NULL;
 	struct wlan_ipa_priv *ipa_ctx = gp_ipa;
-	struct op_msg_type *msg;
+	struct wlan_objmgr_pdev *pdev;
+	struct op_msg_type *smmu_msg;
+	struct op_msg_type *notify_msg;
 	struct uc_op_work_struct *uc_op_work;
 	bool result = false;
+	bool val = false;
 
+	pdev = ipa_ctx->pdev;
 	dp_flt_params = &(ipa_ctx->dp_cce_super_rule_flt_param);
 
 	if ((dp_flt_params->flt_addr_params[0].ipa_flt_in_use == true &&
@@ -5484,14 +5518,31 @@ void wlan_ipa_wdi_opt_dpath_notify_flt_rlsd(int flt0_rslt, int flt1_rslt)
 		result = true;
 	}
 
-	msg = qdf_mem_malloc(sizeof(*msg));
-	if (!msg)
+	smmu_msg = qdf_mem_malloc(sizeof(*smmu_msg));
+	if (!smmu_msg)
 		return;
-	msg->op_code = WLAN_IPA_FILTER_REL_NOTIFY;
-	msg->rsvd = result;
+
+	val = cdp_ipa_get_smmu_mapped(ipa_ctx->dp_soc);
+	if (val) {
+		smmu_msg->op_code = WLAN_IPA_SMMU_UNMAP;
+		uc_op_work = &ipa_ctx->uc_op_work[WLAN_IPA_SMMU_UNMAP];
+		uc_op_work->msg = smmu_msg;
+		qdf_sched_work(0, &uc_op_work->work);
+		cdp_ipa_set_smmu_mapped(ipa_ctx->dp_soc, 0);
+	} else {
+		ipa_err("IPA SMMU not mapped!!");
+	}
+
+	notify_msg = qdf_mem_malloc(sizeof(*notify_msg));
+	if (!notify_msg)
+		return;
+
+	notify_msg->op_code = WLAN_IPA_FILTER_REL_NOTIFY;
+	notify_msg->rsvd = result;
 	uc_op_work = &ipa_ctx->uc_op_work[WLAN_IPA_FILTER_REL_NOTIFY];
-	uc_op_work->msg = msg;
+	uc_op_work->msg = notify_msg;
 	qdf_sched_work(0, &uc_op_work->work);
+
 	qdf_wake_lock_release(&ipa_ctx->opt_dp_wake_lock,
 			      WIFI_POWER_EVENT_WAKELOCK_OPT_WIFI_DP);
 	ipa_info("opt_dp: Wakelock released");
