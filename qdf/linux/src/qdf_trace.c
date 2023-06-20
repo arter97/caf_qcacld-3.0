@@ -4061,10 +4061,9 @@ void qdf_log_dump_at_kernel_level(bool enable)
 
 qdf_export_symbol(qdf_log_dump_at_kernel_level);
 
-bool qdf_print_is_category_enabled(unsigned int idx, QDF_MODULE_ID category)
+QDF_TRACE_LEVEL qdf_print_get_category_verbose(unsigned int idx,
+					       QDF_MODULE_ID category)
 {
-	QDF_TRACE_LEVEL verbose_mask;
-
 	/* Check if index passed is valid */
 	if (idx < 0 || idx >= MAX_PRINT_CONFIG_SUPPORTED) {
 		pr_info("%s: Invalid index - %d\n", __func__, idx);
@@ -4083,14 +4082,23 @@ bool qdf_print_is_category_enabled(unsigned int idx, QDF_MODULE_ID category)
 		return false;
 	}
 
-	verbose_mask =
-		print_ctrl_obj[idx].cat_info[category].category_verbose_mask;
+	return print_ctrl_obj[idx].cat_info[category].category_verbose_mask;
+}
+
+qdf_export_symbol(qdf_print_get_category_verbose);
+
+bool qdf_print_is_category_enabled(unsigned int idx, QDF_MODULE_ID category)
+{
+	QDF_TRACE_LEVEL verbose_mask;
+
+	verbose_mask = qdf_print_get_category_verbose(idx, category);
 
 	if (verbose_mask == QDF_TRACE_LEVEL_NONE)
 		return false;
 	else
 		return true;
 }
+
 qdf_export_symbol(qdf_print_is_category_enabled);
 
 bool qdf_print_is_verbose_enabled(unsigned int idx, QDF_MODULE_ID category,

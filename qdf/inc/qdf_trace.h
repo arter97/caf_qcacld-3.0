@@ -1882,6 +1882,18 @@ int qdf_logging_set_flush_timer(uint32_t milliseconds);
 void qdf_logging_flush_logs(void);
 
 /**
+ * qdf_print_get_category_verbose() - Get category verbose information for the
+ *                                    print control object
+ *
+ * @idx: Index of print control object
+ * @category: Category information
+ *
+ * Return: Verbose value for the particular category
+ */
+QDF_TRACE_LEVEL qdf_print_get_category_verbose(unsigned int idx,
+					       QDF_MODULE_ID category);
+
+/**
  * qdf_print_is_category_enabled() - Get category information for the
  *                                   print control object
  *
