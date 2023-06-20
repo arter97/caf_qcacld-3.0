@@ -5305,9 +5305,9 @@ policy_mgr_validate_set_mlo_link_cb(struct wlan_objmgr_psoc *psoc,
  * Interface manager Set links for MLO STA. And it supports to
  * add inactive vdev list.
  *
- * Return: void
+ * Return: QDF_STATUS
  */
-static void
+static QDF_STATUS
 policy_mgr_mlo_sta_set_link_ext(struct wlan_objmgr_psoc *psoc,
 				enum mlo_link_force_reason reason,
 				enum mlo_link_force_mode mode,
@@ -5322,18 +5322,18 @@ policy_mgr_mlo_sta_set_link_ext(struct wlan_objmgr_psoc *psoc,
 
 	if (!num_mlo_vdev) {
 		policy_mgr_err("invalid 0 num_mlo_vdev");
-		return;
+		return QDF_STATUS_E_INVAL;
 	}
 
 	pm_ctx = policy_mgr_get_context(psoc);
 	if (!pm_ctx) {
 		policy_mgr_err("Invalid Context");
-		return;
+		return QDF_STATUS_E_INVAL;
 	}
 
 	req = qdf_mem_malloc(sizeof(*req));
 	if (!req)
-		return;
+		return QDF_STATUS_E_NOMEM;
 
 	/*
 	 * Use one of the ML vdev as, if called from disconnect the caller vdev
@@ -5344,7 +5344,7 @@ policy_mgr_mlo_sta_set_link_ext(struct wlan_objmgr_psoc *psoc,
 	if (!vdev) {
 		policy_mgr_err("vdev %d: invalid vdev", mlo_vdev_lst[0]);
 		qdf_mem_free(req);
-		return;
+		return QDF_STATUS_E_FAILURE;
 	}
 
 	policy_mgr_set_link_in_progress(pm_ctx, true);
@@ -5387,28 +5387,17 @@ policy_mgr_mlo_sta_set_link_ext(struct wlan_objmgr_psoc *psoc,
 		policy_mgr_set_link_in_progress(pm_ctx, false);
 	}
 	wlan_objmgr_vdev_release_ref(vdev, WLAN_POLICY_MGR_ID);
+	return status;
 }
 
-/**
- * policy_mgr_mlo_sta_set_link() - Set links for MLO STA
- * @psoc: psoc object
- * @reason: Reason for which link is forced
- * @mode: Force reason
- * @num_mlo_vdev: number of mlo vdev
- * @mlo_vdev_lst: MLO STA vdev list
- *
- * Interface manager Set links for MLO STA
- *
- * Return: void
- */
-static void
+QDF_STATUS
 policy_mgr_mlo_sta_set_link(struct wlan_objmgr_psoc *psoc,
 			    enum mlo_link_force_reason reason,
 			    enum mlo_link_force_mode mode,
 			    uint8_t num_mlo_vdev, uint8_t *mlo_vdev_lst)
 {
-	policy_mgr_mlo_sta_set_link_ext(psoc, reason, mode, num_mlo_vdev,
-					mlo_vdev_lst, 0, NULL);
+	return policy_mgr_mlo_sta_set_link_ext(psoc, reason, mode, num_mlo_vdev,
+					       mlo_vdev_lst, 0, NULL);
 }
 
 uint32_t
@@ -5774,9 +5763,7 @@ end:
 }
 
 void policy_mgr_handle_emlsr_sta_concurrency(struct wlan_objmgr_psoc *psoc,
-					     struct wlan_objmgr_vdev *vdev,
-					     bool ap_coming_up,
-					     bool sta_coming_up,
+					     bool conc_con_coming_up,
 					     bool emlsr_sta_coming_up)
 {
 	uint8_t num_mlo = 0;
@@ -5787,25 +5774,24 @@ void policy_mgr_handle_emlsr_sta_concurrency(struct wlan_objmgr_psoc *psoc,
 						       &num_mlo);
 
 	if (num_mlo < 2) {
-		policy_mgr_debug("vdev %d ap state %d num mlo sta links %d",
-				 wlan_vdev_get_id(vdev), ap_coming_up, num_mlo);
+		policy_mgr_debug("conc_con_coming_up %d num mlo sta links %d",
+				 conc_con_coming_up, num_mlo);
 		return;
 	}
 
-	policy_mgr_debug("vdev %d num_mlo %d is_mlo_emlsr %d",
-			 wlan_vdev_get_id(vdev), num_mlo, is_mlo_emlsr);
-	policy_mgr_debug("ap state %d legacy sta state %d emlsr sta state %d",
-			 ap_coming_up, sta_coming_up, emlsr_sta_coming_up);
+	policy_mgr_debug("num_mlo %d is_mlo_emlsr %d conc_con_coming_up: %d",
+			 num_mlo, is_mlo_emlsr, conc_con_coming_up);
 
 	if (!is_mlo_emlsr)
 		return;
 
-	if (ap_coming_up || sta_coming_up || (emlsr_sta_coming_up &&
-	    policy_mgr_get_connection_count(psoc) > 2)) {
+	if (conc_con_coming_up ||
+	    (emlsr_sta_coming_up &&
+	     policy_mgr_get_connection_count(psoc) > 2)) {
 		/*
 		 * Force disable one of the links (FW will decide which link) if
-		 * 1) EMLSR STA is present and new SAP/STA connection comes up.
-		 * 2) There is a legacy connection (SAP/P2P) and a STA comes
+		 * 1) EMLSR STA is present and SAP/STA/NAN connection comes up.
+		 * 2) There is a legacy connection (SAP/P2P/NAN) and a STA comes
 		 * up in EMLSR mode.
 		 */
 		policy_mgr_mlo_sta_set_link(psoc, MLO_LINK_FORCE_REASON_CONNECT,
@@ -5814,14 +5800,15 @@ void policy_mgr_handle_emlsr_sta_concurrency(struct wlan_objmgr_psoc *psoc,
 		return;
 	}
 
-	if (!(ap_coming_up || sta_coming_up) && emlsr_sta_coming_up)
+	if (!conc_con_coming_up && emlsr_sta_coming_up)
 		/*
 		 * No force i.e. Re-enable the disabled link if-
-		 * 1) EMLSR STA is present and new SAP/STA connection goes down.
-		 * One of the links was disabled while a new connection came up.
-		 * 2) Legacy connection (SAP/P2P) goes down and if STA is EMLSR
-		 * capable. One of the links was disabled after EMLSR
-		 * association.
+		 * 1) EMLSR STA is present and new SAP/STA/NAN connection goes
+		 *    down. One of the links was disabled while a new connection
+		 *    came up.
+		 * 2) Legacy connection (SAP/P2P/NAN) goes down and if STA is
+		 *    EMLSR capable. One of the links was disabled after EMLSR
+		 *    association.
 		 */
 		policy_mgr_mlo_sta_set_link(psoc,
 					    MLO_LINK_FORCE_REASON_DISCONNECT,
@@ -6639,13 +6626,21 @@ policy_mgr_handle_ml_sta_links_on_vdev_up_csa(struct wlan_objmgr_psoc *psoc,
 }
 
 #define SET_LINK_TIMEOUT 6000
-static void
-policy_mgr_wait_for_set_link_update(struct policy_mgr_psoc_priv_obj *pm_ctx)
+QDF_STATUS policy_mgr_wait_for_set_link_update(struct wlan_objmgr_psoc *psoc)
 {
+	struct policy_mgr_psoc_priv_obj *pm_ctx;
 	QDF_STATUS status;
 
-	if (!policy_mgr_get_link_in_progress(pm_ctx))
-		return;
+	pm_ctx = policy_mgr_get_context(psoc);
+	if (!pm_ctx) {
+		policy_mgr_err("Invalid Context");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	if (!policy_mgr_get_link_in_progress(pm_ctx)) {
+		policy_mgr_err("link is not in progress");
+		return QDF_STATUS_E_FAILURE;
+	}
 
 	status =
 		qdf_wait_for_event_completion(&pm_ctx->set_link_update_done_evt,
@@ -6654,24 +6649,17 @@ policy_mgr_wait_for_set_link_update(struct policy_mgr_psoc_priv_obj *pm_ctx)
 	if (QDF_IS_STATUS_ERROR(status)) {
 		policy_mgr_set_link_in_progress(pm_ctx, false);
 		policy_mgr_err("wait for set_link_in_progress failed");
-		return;
 	}
+
+	return status;
 }
 
 void policy_mgr_handle_ml_sta_link_on_traffic_type_change(
 						struct wlan_objmgr_psoc *psoc,
 						struct wlan_objmgr_vdev *vdev)
 {
-	struct policy_mgr_psoc_priv_obj *pm_ctx;
-
-	pm_ctx = policy_mgr_get_context(psoc);
-	if (!pm_ctx) {
-		policy_mgr_err("Invalid Context");
-		return;
-	}
-
 	/* Check if any set link is already progress and thus wait */
-	policy_mgr_wait_for_set_link_update(pm_ctx);
+	policy_mgr_wait_for_set_link_update(psoc);
 
 	policy_mgr_handle_sap_cli_go_ml_sta_up_csa(psoc, vdev);
 
@@ -6679,7 +6667,7 @@ void policy_mgr_handle_ml_sta_link_on_traffic_type_change(
 	 * Check if traffic type change lead to set link is progress and
 	 * thus wait for it to complete.
 	 */
-	policy_mgr_wait_for_set_link_update(pm_ctx);
+	policy_mgr_wait_for_set_link_update(psoc);
 }
 
 static QDF_STATUS
@@ -7181,6 +7169,14 @@ void policy_mgr_activate_mlo_links(struct wlan_objmgr_psoc *psoc,
 
 	policy_mgr_debug("active vdev cnt: %d, inactive vdev cnt: %d",
 			 active_vdev_cnt, inactive_vdev_cnt);
+
+	if (policy_mgr_is_mlo_in_mode_emlsr(psoc, NULL, NULL) &&
+	    active_vdev_cnt > 1 &&
+	    policy_mgr_get_connection_count(psoc) > ml_vdev_cnt) {
+		policy_mgr_debug("Concurrency exists, cannot enter EMLSR mode");
+		goto done;
+	}
+
 	/*
 	 * Invoke Force active link cmd first, followed by Force inactive link
 	 * cmd. This ensures that there is atleast 1 link active at any given

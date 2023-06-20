@@ -2900,23 +2900,6 @@ ucfg_mlme_set_rf_test_mode_enabled(struct wlan_objmgr_psoc *psoc, bool value)
 }
 
 /**
- * ucfg_mlme_is_relaxed_6ghz_conn_policy_enabled() - Get 6ghz relaxed
- *                                                   connection policy flag
- * @psoc: pointer to psoc object
- * @value: pointer to hold the value of flag
- *
- * Inline UCFG API to be used by HDD/OSIF callers
- *
- * Return: QDF Status
- */
-static inline QDF_STATUS
-ucfg_mlme_is_relaxed_6ghz_conn_policy_enabled(struct wlan_objmgr_psoc *psoc,
-					      bool *value)
-{
-	return wlan_mlme_is_relaxed_6ghz_conn_policy_enabled(psoc, value);
-}
-
-/**
  * ucfg_mlme_is_standard_6ghz_conn_policy_enabled() - Get 6ghz standard
  *                                                    connection policy flag
  * @psoc: pointer to psoc object
@@ -2931,23 +2914,6 @@ ucfg_mlme_is_standard_6ghz_conn_policy_enabled(struct wlan_objmgr_psoc *psoc,
 					       bool *value)
 {
 	return wlan_mlme_is_standard_6ghz_conn_policy_enabled(psoc, value);
-}
-
-/**
- * ucfg_mlme_set_relaxed_6ghz_conn_policy() - Set 6ghz relaxed
- *                                            connection policy flag
- * @psoc: pointer to psoc object
- * @value: Value that needs to be set
- *
- * Inline UCFG API to be used by HDD/OSIF callers
- *
- * Return: QDF Status
- */
-static inline QDF_STATUS
-ucfg_mlme_set_relaxed_6ghz_conn_policy(struct wlan_objmgr_psoc *psoc,
-				       bool value)
-{
-	return wlan_mlme_set_relaxed_6ghz_conn_policy(psoc, value);
 }
 
 /**
@@ -4588,6 +4554,41 @@ ucfg_mlme_set_roam_reason_vsie_status(struct wlan_objmgr_psoc *psoc,
 QDF_STATUS
 ucfg_mlme_set_vdev_traffic_low_latency(struct wlan_objmgr_psoc *psoc,
 				       uint8_t vdev_id, bool set);
+
+/**
+ * ucfg_mlme_send_ch_width_update_with_notify() - Send chwidth with notify
+ * capability of FW
+ * @psoc: pointer to psoc object
+ * @vdev_id: Vdev id
+ * @ch_width: channel width to update
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+ucfg_mlme_send_ch_width_update_with_notify(struct wlan_objmgr_psoc *psoc,
+					   uint8_t vdev_id,
+					   enum phy_ch_width ch_width);
+
+/**
+ * ucfg_mlme_is_chwidth_with_notify_supported() - Get chwidth with notify
+ * capability of FW
+ * @psoc: pointer to psoc object
+ *
+ * Return: true if chwidth with notify feature supported
+ */
+bool
+ucfg_mlme_is_chwidth_with_notify_supported(struct wlan_objmgr_psoc *psoc);
+
+/**
+ * ucfg_mlme_connected_chan_stats_request() - process connected channel stats
+ * request
+ * @psoc: pointer to psoc object
+ * @vdev_id: Vdev id
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS ucfg_mlme_connected_chan_stats_request(struct wlan_objmgr_psoc *psoc,
+						  uint8_t vdev_id);
 
 /**
  * ucfg_mlme_set_vdev_traffic_high_throughput()  - Set/clear vdev high

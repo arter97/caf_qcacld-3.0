@@ -856,9 +856,11 @@ pmo_core_enable_wow_in_fw(struct wlan_objmgr_psoc *psoc,
 		pmo_err("Credits:%d; Pending_Cmds: %d",
 			pmo_tgt_psoc_get_host_credits(psoc),
 			pmo_tgt_psoc_get_pending_cmnds(psoc));
-		pmo_tgt_update_target_suspend_flag(psoc, false);
-		if (!psoc_ctx->wow.target_suspend.force_set)
+		if (!psoc_ctx->wow.target_suspend.force_set) {
+			pmo_tgt_psoc_set_wow_enable_ack_failed(psoc);
 			qdf_trigger_self_recovery(psoc, QDF_SUSPEND_TIMEOUT);
+		}
+		pmo_tgt_update_target_suspend_flag(psoc, false);
 		goto out;
 	}
 
