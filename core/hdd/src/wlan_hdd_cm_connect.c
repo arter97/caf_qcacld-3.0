@@ -504,6 +504,9 @@ static struct hdd_adapter
 		if (adapter->device_mode != QDF_SAP_MODE)
 			goto loop_next;
 
+		if (wlan_hdd_validate_vdev_id(adapter->deflink->vdev_id))
+			goto loop_next;
+
 		/*
 		 * sap is not in started state and also not under doing CAC,
 		 * so it is fine to go ahead with sta.
