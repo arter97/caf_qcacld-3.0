@@ -424,11 +424,12 @@ static int __wlan_hdd_request_pre_cac(struct hdd_context *hdd_ctx,
 	return 0;
 
 stop_close_pre_cac_adapter:
+	pre_cac_adapter->is_virtual_iface = true;
 	hdd_stop_adapter(hdd_ctx, pre_cac_adapter);
 	qdf_mem_free(pre_cac_ap_ctx->beacon);
 	pre_cac_ap_ctx->beacon = NULL;
 close_pre_cac_adapter:
-	hdd_close_adapter(hdd_ctx, pre_cac_adapter, false);
+	hdd_close_adapter(hdd_ctx, pre_cac_adapter, true);
 release_intf_addr_and_return_failure:
 	/*
 	 * Release the interface address as the adapter
