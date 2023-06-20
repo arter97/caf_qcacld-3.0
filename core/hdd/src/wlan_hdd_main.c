@@ -17368,6 +17368,25 @@ static void __hdd_op_unprotect_cb(void *sync, const char *func)
 	__osif_psoc_sync_op_stop(sync, func);
 }
 
+#ifdef WLAN_LOGGING_SOCK_SVC_ENABLE
+/**
+ * hdd_logging_sock_init_svc() - Initialize logging sock
+ *
+ * Return: 0 for success, errno on failure
+ */
+static int
+hdd_logging_sock_init_svc(void)
+{
+	return wlan_logging_sock_init_svc();
+}
+#else
+static inline int
+hdd_logging_sock_init_svc(void)
+{
+	return 0;
+}
+#endif
+
 /**
  * hdd_init() - Initialize Driver
  *
@@ -17391,15 +17410,22 @@ int hdd_init(void)
 
 	wlan_init_bug_report_lock();
 
-#ifdef WLAN_LOGGING_SOCK_SVC_ENABLE
-	wlan_logging_sock_init_svc();
-#endif
+	if (hdd_logging_sock_init_svc()) {
+		hdd_err("logging sock init failed.");
+		goto err;
+	}
 
 	hdd_trace_init();
 	hdd_register_debug_callback();
 	wlan_roam_debug_init();
 
 	return 0;
+
+err:
+	wlan_destroy_bug_report_lock();
+	qdf_op_callbacks_register(NULL, NULL);
+	cds_deinit();
+	return -ENOMEM;
 }
 
 /**
