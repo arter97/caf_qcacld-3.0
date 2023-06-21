@@ -45,6 +45,11 @@ struct hdd_adapter_create_param {
 		 unused:27;
 };
 
+#ifdef WLAN_FEATURE_11BE_MLO
+#define MAX_SIMULTANEOUS_STA_ML_LINKS 1
+#define MAX_NUM_STA_ML_LINKS 3
+#endif
+
 #if defined(WLAN_FEATURE_11BE_MLO) && defined(CFG80211_11BE_BASIC)
 #define hdd_adapter_is_link_adapter(x) ((x)->mlo_adapter_info.is_link_adapter)
 #define hdd_adapter_is_ml_adapter(x)   ((x)->mlo_adapter_info.is_ml_adapter)
@@ -151,6 +156,15 @@ void hdd_adapter_set_ml_adapter(struct hdd_adapter *adapter);
 void hdd_adapter_set_sl_ml_adapter(struct hdd_adapter *adapter);
 
 /**
+ * hdd_adapter_clear_sl_ml_adapter() - Set adapter as sl ml adapter
+ * @adapter: HDD adapter
+ *
+ * This function clears adapter single link ML adapter flag
+ * Return: None
+ */
+void hdd_adapter_clear_sl_ml_adapter(struct hdd_adapter *adapter);
+
+/**
  * hdd_get_ml_adapter() - get an ml adapter
  * @hdd_ctx: HDD context
  *
@@ -206,6 +220,17 @@ extern const struct nla_policy
 ml_link_state_request_policy[QCA_WLAN_VENDOR_ATTR_LINK_STATE_MAX + 1];
 
 /**
+ * wlan_hdd_send_t2lm_event() - Send t2lm info to userspace
+ * @vdev: vdev handler
+ * @t2lm: tid to link mapping info
+ *
+ * This function is called when driver needs to send vendor specific
+ * t2lm info to userspace
+ */
+QDF_STATUS wlan_hdd_send_t2lm_event(struct wlan_objmgr_vdev *vdev,
+				    struct wlan_t2lm_info *t2lm);
+
+/**
  * wlan_hdd_cfg80211_process_ml_link_state() - process ml link state
  * @wiphy: wiphy pointer
  * @wdev: pointer to struct wireless_dev
@@ -219,6 +244,23 @@ ml_link_state_request_policy[QCA_WLAN_VENDOR_ATTR_LINK_STATE_MAX + 1];
 int wlan_hdd_cfg80211_process_ml_link_state(struct wiphy *wiphy,
 					    struct wireless_dev *wdev,
 					    const void *data, int data_len);
+
+/**
+ * hdd_derive_link_address_from_mld() - Function to derive link address from
+ * MLD address which is passed as input argument.
+ * @mld_addr: Input MLD address
+ * @link_addr_list: Start index of array to hold derived MAC addresses
+ * @max_idx: Number of addresses to derive
+ *
+ * The API will generate link addresses from the input MLD address and saves
+ * each link address as an array in @link_addr_list. Caller can request upto
+ * WLAN_MAX_MLD addresses.
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS hdd_derive_link_address_from_mld(struct qdf_mac_addr *mld_addr,
+					    struct qdf_mac_addr *link_addr_list,
+					    uint8_t max_idx);
 #else
 static inline
 QDF_STATUS hdd_wlan_unregister_mlo_interfaces(struct hdd_adapter *adapter,
@@ -246,6 +288,11 @@ hdd_adapter_set_ml_adapter(struct hdd_adapter *adapter)
 
 static inline void
 hdd_adapter_set_sl_ml_adapter(struct hdd_adapter *adapter)
+{
+}
+
+static inline void
+hdd_adapter_clear_sl_ml_adapter(struct hdd_adapter *adapter)
 {
 }
 
@@ -287,6 +334,13 @@ int wlan_hdd_cfg80211_process_ml_link_state(struct wiphy *wiphy,
 	return -ENOTSUPP;
 }
 
+static inline
+QDF_STATUS hdd_derive_link_address_from_mld(struct qdf_mac_addr *mld_addr,
+					    struct qdf_mac_addr *link_addr_list,
+					    uint8_t max_idx)
+{
+	return QDF_STATUS_E_NOSUPPORT;
+}
 #define FEATURE_ML_LINK_STATE_COMMANDS
 #endif
 #endif

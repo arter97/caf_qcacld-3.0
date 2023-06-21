@@ -154,7 +154,7 @@ static void wlan_pmo_runtime_pm_init_cfg(struct wlan_objmgr_psoc *psoc,
 }
 #endif
 
-#if FEATURE_WLAN_RA_FILTERING
+#ifdef FEATURE_WLAN_RA_FILTERING
 static void wlan_pmo_ra_filtering_init_cfg(struct wlan_objmgr_psoc *psoc,
 					   struct pmo_psoc_cfg *psoc_cfg)
 {
@@ -258,7 +258,8 @@ static void wlan_pmo_init_cfg(struct wlan_objmgr_psoc *psoc,
 		cfg_get(psoc, CFG_ENABLE_BUS_SUSPEND_IN_SAP_MODE);
 	psoc_cfg->is_bus_suspend_enabled_in_go_mode =
 		cfg_get(psoc, CFG_ENABLE_BUS_SUSPEND_IN_GO_MODE);
-	if (wlan_ipa_config_is_enabled()) {
+	if (wlan_ipa_config_is_enabled() &&
+	    !ipa_config_is_opt_wifi_dp_enabled()) {
 		pmo_info("ipa is enabled and hence disable sap/go d3 wow");
 		psoc_cfg->is_bus_suspend_enabled_in_sap_mode = 0;
 		psoc_cfg->is_bus_suspend_enabled_in_go_mode = 0;

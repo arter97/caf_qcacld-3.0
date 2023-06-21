@@ -425,6 +425,7 @@ static void lim_send_mlm_assoc_req(struct mac_context *mac_ctx,
 		session_entry, QDF_STATUS_SUCCESS, QDF_STATUS_SUCCESS);
 #endif
 	assoc_req->listenInterval = (uint16_t) val;
+	pe_debug("Listen Interval : %d", assoc_req->listenInterval);
 	/* Update PE session ID */
 	assoc_req->sessionId = session_entry->peSessionId;
 	session_entry->limPrevSmeState = session_entry->limSmeState;
@@ -2402,7 +2403,7 @@ void lim_handle_add_bss_rsp(struct mac_context *mac_ctx,
 			}
 			tx_ops = wlan_reg_get_tx_ops(mac_ctx->psoc);
 
-			lim_calculate_tpc(mac_ctx, session_entry, false);
+			lim_calculate_tpc(mac_ctx, session_entry);
 
 			if (tx_ops->set_tpc_power)
 				tx_ops->set_tpc_power(mac_ctx->psoc,
@@ -3122,7 +3123,7 @@ static void lim_process_switch_channel_join_req(
 			goto error;
 		}
 
-		lim_calculate_tpc(mac_ctx, session_entry, false);
+		lim_calculate_tpc(mac_ctx, session_entry);
 
 		if (tx_ops->set_tpc_power)
 			tx_ops->set_tpc_power(mac_ctx->psoc,

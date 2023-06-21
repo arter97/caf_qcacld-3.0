@@ -2041,10 +2041,13 @@ QDF_STATUS wlansap_channel_change_request(struct sap_context *sap_ctx,
 		  sap_ctx->chan_freq, phy_mode, ch_params->ch_width,
 		  ch_params->sec_ch_offset, ch_params->center_freq_seg0,
 		  ch_params->center_freq_seg1);
-	policy_mgr_update_indoor_concurrency(mac_ctx->psoc,
-					     wlan_vdev_get_id(sap_ctx->vdev),
-					     sap_ctx->freq_before_ch_switch,
-					     DISCONNECT_WITH_CONCURRENCY);
+	if (policy_mgr_update_indoor_concurrency(mac_ctx->psoc,
+						wlan_vdev_get_id(sap_ctx->vdev),
+						sap_ctx->freq_before_ch_switch,
+						DISCONNECT_WITH_CONCURRENCY))
+		wlan_reg_recompute_current_chan_list(mac_ctx->psoc,
+						     mac_ctx->pdev);
+
 	return status;
 }
 
@@ -3321,7 +3324,7 @@ wlansap_select_chan_with_best_bandwidth(struct sap_context *sap_ctx,
 					enum phy_ch_width *selected_ch_width)
 {
 	struct mac_context *mac;
-	struct ch_params ch_params;
+	struct ch_params ch_params = {0};
 	enum phy_ch_width ch_width;
 	uint32_t center_freq, bw_val, bw_start, bw_end;
 	uint16_t i, j;
@@ -3348,8 +3351,18 @@ wlansap_select_chan_with_best_bandwidth(struct sap_context *sap_ctx,
 		return QDF_STATUS_E_INVAL;
 	}
 
-	if (policy_mgr_get_connection_count(mac->psoc) != 1)
+	if (policy_mgr_mode_specific_connection_count(mac->psoc,
+						      PM_STA_MODE,
+						      NULL) ||
+	    policy_mgr_mode_specific_connection_count(mac->psoc,
+						      PM_P2P_CLIENT_MODE,
+						      NULL) ||
+	    policy_mgr_mode_specific_connection_count(mac->psoc,
+						      PM_P2P_GO_MODE,
+						      NULL)) {
+		sap_debug("sta/p2p mode active, skip!");
 		return QDF_STATUS_E_INVAL;
+	}
 
 	pld_get_wlan_unsafe_channel(qdf_ctx->dev, unsafe_chan,
 				    &unsafe_chan_cnt,
@@ -3510,6 +3523,27 @@ wlansap_get_safe_channel(struct sap_context *sap_ctx,
 }
 #else
 /**
+ * wlansap_select_chan_with_best_bandwidth() - Select channel with
+ * max possible band width
+ * @sap_ctx: sap context
+ * @ch_freq_list: candidate channel frequency list
+ * @ch_cnt: count of channel frequency in list
+ * @selected_freq: selected channel frequency
+ * @selected_ch_width: selected channel width
+ *
+ * Return: QDF_STATUS_SUCCESS if better channel selected
+ */
+static inline QDF_STATUS
+wlansap_select_chan_with_best_bandwidth(struct sap_context *sap_ctx,
+					uint32_t *ch_freq_list,
+					uint32_t ch_cnt,
+					uint32_t *selected_freq,
+					enum phy_ch_width *selected_ch_width)
+{
+	return QDF_STATUS_E_NOSUPPORT;
+}
+
+/**
  * wlansap_get_safe_channel() - Get safe channel from current regulatory
  * @sap_ctx: Pointer to SAP context
  * @ch_width: selected channel width
@@ -3535,6 +3569,7 @@ wlansap_get_safe_channel_from_pcl_and_acs_range(struct sap_context *sap_ctx,
 	struct mac_context *mac;
 	struct sir_pcl_list pcl = {0};
 	uint32_t pcl_freqs[NUM_CHANNELS] = {0};
+	uint32_t select_freq;
 	QDF_STATUS status;
 	mac_handle_t mac_handle;
 	uint32_t pcl_len = 0;
@@ -3575,6 +3610,14 @@ wlansap_get_safe_channel_from_pcl_and_acs_range(struct sap_context *sap_ctx,
 			sap_err("failed to filter ch from acs %d", status);
 			return INVALID_CHANNEL_ID;
 		}
+
+		if (wlansap_select_chan_with_best_bandwidth(sap_ctx,
+							    pcl_freqs,
+							    pcl_len,
+							    &select_freq,
+							    ch_width) ==
+		    QDF_STATUS_SUCCESS)
+			return select_freq;
 
 		if (pcl_len) {
 			sap_debug("select %d from valid ch freq list",
@@ -4094,3 +4137,24 @@ void sap_acs_set_puncture_support(struct sap_context *sap_ctx,
 		ch_params->is_create_punc_bitmap = true;
 }
 #endif
+
+void wlansap_update_ll_lt_sap_acs_result(struct sap_context *sap_ctx,
+					 qdf_freq_t last_acs_freq)
+{
+	struct mac_context *mac;
+
+	mac = sap_get_mac_context();
+	if (!mac) {
+		sap_err("Invalid MAC context");
+		return;
+	}
+
+	if (!sap_ctx) {
+		sap_err("Invalid sap context");
+		return;
+	}
+
+	wlansap_set_acs_ch_freq(sap_ctx, last_acs_freq);
+	sap_ctx->acs_cfg->pri_ch_freq = last_acs_freq;
+	sap_ctx->acs_cfg->ht_sec_ch_freq = 0;
+}

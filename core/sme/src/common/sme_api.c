@@ -14706,32 +14706,34 @@ void sme_set_he_bw_cap(mac_handle_t mac_handle, uint8_t vdev_id,
 	mac_ctx->mlme_cfg->he_caps.dot11_he_cap.chan_width_5 = 0;
 	mac_ctx->mlme_cfg->he_caps.dot11_he_cap.chan_width_6 = 0;
 
+	mac_ctx->he_cap_2g.chan_width_0 = 0;
+	mac_ctx->he_cap_2g.chan_width_1 = 0;
+	mac_ctx->he_cap_2g.chan_width_2 = 0;
+	mac_ctx->he_cap_2g.chan_width_3 = 0;
+	mac_ctx->he_cap_2g.chan_width_4 = 0;
+	mac_ctx->he_cap_2g.chan_width_5 = 0;
+	mac_ctx->he_cap_2g.chan_width_6 = 0;
+
+	mac_ctx->he_cap_5g.chan_width_0 = 0;
+	mac_ctx->he_cap_5g.chan_width_1 = 0;
+	mac_ctx->he_cap_5g.chan_width_2 = 0;
+	mac_ctx->he_cap_5g.chan_width_3 = 0;
+	mac_ctx->he_cap_5g.chan_width_4 = 0;
+	mac_ctx->he_cap_5g.chan_width_5 = 0;
+	mac_ctx->he_cap_5g.chan_width_6 = 0;
+
 	switch (chwidth) {
 	case eHT_CHANNEL_WIDTH_20MHZ:
-		qdf_mem_copy(&mac_ctx->he_cap_2g,
-			     &mac_ctx->mlme_cfg->he_caps.dot11_he_cap,
-			     sizeof(tDot11fIEhe_cap));
-		qdf_mem_copy(&mac_ctx->he_cap_5g,
-			     &mac_ctx->mlme_cfg->he_caps.dot11_he_cap,
-			     sizeof(tDot11fIEhe_cap));
 		break;
 	case eHT_CHANNEL_WIDTH_40MHZ:
 		mac_ctx->mlme_cfg->he_caps.dot11_he_cap.chan_width_0 = 1;
-		qdf_mem_copy(&mac_ctx->he_cap_2g,
-			     &mac_ctx->mlme_cfg->he_caps.dot11_he_cap,
-			     sizeof(tDot11fIEhe_cap));
-		mac_ctx->mlme_cfg->he_caps.dot11_he_cap.chan_width_0 = 0;
 		mac_ctx->mlme_cfg->he_caps.dot11_he_cap.chan_width_1 = 1;
-		qdf_mem_copy(&mac_ctx->he_cap_5g,
-			     &mac_ctx->mlme_cfg->he_caps.dot11_he_cap,
-			     sizeof(tDot11fIEhe_cap));
-		mac_ctx->mlme_cfg->he_caps.dot11_he_cap.chan_width_0 = 1;
+		mac_ctx->he_cap_2g.chan_width_0 = 1;
+		mac_ctx->he_cap_5g.chan_width_1 = 1;
 		break;
 	case eHT_CHANNEL_WIDTH_80MHZ:
 		mac_ctx->mlme_cfg->he_caps.dot11_he_cap.chan_width_1 = 1;
-		qdf_mem_copy(&mac_ctx->he_cap_5g,
-			     &mac_ctx->mlme_cfg->he_caps.dot11_he_cap,
-			     sizeof(tDot11fIEhe_cap));
+		mac_ctx->he_cap_5g.chan_width_1 = 1;
 		break;
 	case eHT_CHANNEL_WIDTH_160MHZ:
 	case eHT_CHANNEL_WIDTH_320MHZ:
@@ -14741,11 +14743,16 @@ void sme_set_he_bw_cap(mac_handle_t mac_handle, uint8_t vdev_id,
 		mac_ctx->mlme_cfg->he_caps.dot11_he_cap.rx_he_mcs_map_160) =
 		mac_ctx->mlme_cfg->he_caps.dot11_he_cap.rx_he_mcs_map_lt_80;
 		*((uint16_t *)
+		mac_ctx->he_cap_5g.rx_he_mcs_map_160) =
+		mac_ctx->he_cap_5g.rx_he_mcs_map_lt_80;
+		*((uint16_t *)
 		mac_ctx->mlme_cfg->he_caps.dot11_he_cap.tx_he_mcs_map_160) =
 		mac_ctx->mlme_cfg->he_caps.dot11_he_cap.tx_he_mcs_map_lt_80;
-		qdf_mem_copy(&mac_ctx->he_cap_5g,
-			     &mac_ctx->mlme_cfg->he_caps.dot11_he_cap,
-			     sizeof(tDot11fIEhe_cap));
+		*((uint16_t *)
+		mac_ctx->he_cap_5g.tx_he_mcs_map_160) =
+		mac_ctx->he_cap_5g.tx_he_mcs_map_lt_80;
+		mac_ctx->he_cap_5g.chan_width_1 = 1;
+		mac_ctx->he_cap_5g.chan_width_2 = 1;
 		break;
 	default:
 		sme_debug("Config BW %d not handled", chwidth);
@@ -14789,6 +14796,7 @@ void sme_set_he_testbed_def(mac_handle_t mac_handle, uint8_t vdev_id)
 		return;
 	}
 	sme_debug("set HE testbed defaults");
+	mac_ctx->mlme_cfg->he_caps.dot11_he_cap.htc_he = 0;
 	mac_ctx->mlme_cfg->he_caps.dot11_he_cap.amsdu_in_ampdu = 0;
 	mac_ctx->mlme_cfg->he_caps.dot11_he_cap.twt_request = 0;
 	mac_ctx->mlme_cfg->he_caps.dot11_he_cap.broadcast_twt = 0;
@@ -14985,13 +14993,16 @@ void sme_set_eht_testbed_def(mac_handle_t mac_handle, uint8_t vdev_id)
 	}
 	mlme_eht_cap = &mac_ctx->mlme_cfg->eht_caps.dot11_eht_cap;
 	sme_debug("set EHT caps testbed defaults");
+	mlme_eht_cap->epcs_pri_access = 0;
+	mlme_eht_cap->eht_om_ctl = 0;
+	mlme_eht_cap->triggered_txop_sharing_mode1 = 0;
 	mlme_eht_cap->restricted_twt = 0;
 	mlme_eht_cap->support_320mhz_6ghz = 0;
 	mlme_eht_cap->partial_bw_mu_mimo = 0;
 	mlme_eht_cap->su_beamformer = 0;
 	mlme_eht_cap->su_beamformee = 1;
 	mlme_eht_cap->bfee_ss_le_80mhz = 3;
-	mlme_eht_cap->bfee_ss_160mhz = 3;
+	mlme_eht_cap->bfee_ss_160mhz = 0;
 	mlme_eht_cap->bfee_ss_320mhz = 0;
 	mlme_eht_cap->num_sounding_dim_le_80mhz = 0;
 	mlme_eht_cap->num_sounding_dim_160mhz = 0;
@@ -15019,9 +15030,6 @@ void sme_set_eht_testbed_def(mac_handle_t mac_handle, uint8_t vdev_id)
 	mlme_eht_cap->rx_4k_qam_in_wider_bw_dl_ofdma = 0;
 	mlme_eht_cap->rx_1k_qam_in_wider_bw_dl_ofdma = 0;
 	mlme_eht_cap->tb_sounding_feedback_rl = 0;
-	mlme_eht_cap->non_ofdma_ul_mu_mimo_320mhz = 0;
-	mlme_eht_cap->non_ofdma_ul_mu_mimo_160mhz = 0;
-	mlme_eht_cap->non_ofdma_ul_mu_mimo_le_80mhz = 0;
 	mlme_eht_cap->op_sta_rx_ndp_wider_bw_20mhz = 0;
 	mlme_eht_cap->eht_dup_6ghz = 0;
 	mlme_eht_cap->mcs_15 = 0;
@@ -15066,19 +15074,18 @@ void sme_set_eht_testbed_def(mac_handle_t mac_handle, uint8_t vdev_id)
 	qdf_mem_copy(&mac_ctx->eht_cap_5g, mlme_eht_cap,
 		     sizeof(tDot11fIEeht_cap));
 
-	mac_ctx->eht_cap_5g.bw_20_rx_max_nss_for_mcs_0_to_7 = 0;
-	mac_ctx->eht_cap_5g.bw_20_tx_max_nss_for_mcs_0_to_7 = 0;
-	mac_ctx->eht_cap_5g.bw_20_rx_max_nss_for_mcs_8_and_9 = 0;
-	mac_ctx->eht_cap_5g.bw_20_tx_max_nss_for_mcs_8_and_9 = 0;
 	mac_ctx->usr_eht_testbed_cfg = true;
 	mac_ctx->roam.configParam.channelBondingMode24GHz = 0;
 	wlan_mlme_set_sta_mlo_conn_max_num(mac_ctx->psoc, 1);
+	ucfg_mlme_set_bss_color_collision_det_sta(mac_ctx->psoc, false);
 }
 
 void sme_reset_eht_caps(mac_handle_t mac_handle, uint8_t vdev_id)
 {
 	struct mac_context *mac_ctx = MAC_CONTEXT(mac_handle);
 	struct csr_roam_session *session;
+	bool val;
+	QDF_STATUS status;
 
 	session = CSR_GET_SESSION(mac_ctx, vdev_id);
 
@@ -15102,6 +15109,10 @@ void sme_reset_eht_caps(mac_handle_t mac_handle, uint8_t vdev_id)
 	mac_ctx->roam.configParam.channelBondingMode24GHz = 1;
 	wlan_mlme_set_sta_mlo_conn_band_bmp(mac_ctx->psoc, 0x77);
 	wlan_mlme_set_sta_mlo_conn_max_num(mac_ctx->psoc, 2);
+	status = ucfg_mlme_get_bss_color_collision_det_support(mac_ctx->psoc,
+							       &val);
+	if (QDF_IS_STATUS_SUCCESS(status))
+		ucfg_mlme_set_bss_color_collision_det_sta(mac_ctx->psoc, val);
 }
 
 void sme_update_eht_cap_nss(mac_handle_t mac_handle, uint8_t vdev_id,
@@ -16339,12 +16350,10 @@ bool sme_is_11be_capable(void)
 
 QDF_STATUS sme_send_set_mac_addr(struct qdf_mac_addr mac_addr,
 				 struct qdf_mac_addr mld_addr,
-				 struct wlan_objmgr_vdev *vdev,
-				 bool update_mld_addr)
+				 struct wlan_objmgr_vdev *vdev)
 {
 	enum QDF_OPMODE vdev_opmode;
-	struct qdf_mac_addr vdev_mac_addr = mac_addr;
-	QDF_STATUS qdf_ret_status;
+	QDF_STATUS status;
 	struct vdev_mlme_obj *vdev_mlme;
 
 	if (!vdev) {
@@ -16355,26 +16364,14 @@ QDF_STATUS sme_send_set_mac_addr(struct qdf_mac_addr mac_addr,
 	vdev_opmode = wlan_vdev_mlme_get_opmode(vdev);
 
 	if (vdev_opmode == QDF_P2P_DEVICE_MODE) {
-		qdf_ret_status = wma_p2p_self_peer_remove(vdev);
-		if (QDF_IS_STATUS_ERROR(qdf_ret_status))
-			return qdf_ret_status;
+		status = wma_p2p_self_peer_remove(vdev);
+		if (QDF_IS_STATUS_ERROR(status))
+			return status;
 	}
 
-	if (sme_is_11be_capable() && update_mld_addr) {
-		/* Set new MAC addr as MLD address incase of MLO */
-		mld_addr = mac_addr;
-		if (vdev_opmode == QDF_STA_MODE) {
-			qdf_mem_copy(&vdev_mac_addr,
-				     wlan_vdev_mlme_get_linkaddr(vdev),
-				     sizeof(struct qdf_mac_addr));
-		}
-	}
-
-	qdf_ret_status = wlan_vdev_mlme_send_set_mac_addr(vdev_mac_addr,
-							  mld_addr, vdev);
-
-	if (QDF_IS_STATUS_SUCCESS(qdf_ret_status))
-		return qdf_ret_status;
+	status = wlan_vdev_mlme_send_set_mac_addr(mac_addr, mld_addr, vdev);
+	if (QDF_IS_STATUS_SUCCESS(status))
+		return status;
 
 	/**
 	 * Failed to send set MAC address command to FW. Create P2P self peer
@@ -16387,10 +16384,10 @@ QDF_STATUS sme_send_set_mac_addr(struct qdf_mac_addr mac_addr,
 			return QDF_STATUS_E_INVAL;
 		}
 
-		qdf_ret_status = wma_vdev_self_peer_create(vdev_mlme);
-		if (QDF_IS_STATUS_ERROR(qdf_ret_status)) {
+		status = wma_vdev_self_peer_create(vdev_mlme);
+		if (QDF_IS_STATUS_ERROR(status)) {
 			sme_nofl_err("Failed to create self peer for P2P device mode. Status:%d",
-				     qdf_ret_status);
+				     status);
 			return QDF_STATUS_E_INVAL;
 		}
 	}
@@ -16398,22 +16395,20 @@ QDF_STATUS sme_send_set_mac_addr(struct qdf_mac_addr mac_addr,
 	return QDF_STATUS_E_INVAL;
 }
 
-QDF_STATUS sme_update_vdev_mac_addr(struct wlan_objmgr_psoc *psoc,
+QDF_STATUS sme_update_vdev_mac_addr(struct wlan_objmgr_vdev *vdev,
 				    struct qdf_mac_addr mac_addr,
-				    struct wlan_objmgr_vdev *vdev,
+				    struct qdf_mac_addr mld_addr,
 				    bool update_sta_self_peer,
 				    bool update_mld_addr, int req_status)
 {
 	enum QDF_OPMODE vdev_opmode;
-	uint8_t *old_mac_addr_bytes;
+	uint8_t *old_macaddr, *new_macaddr;
 	QDF_STATUS qdf_ret_status;
 	struct wlan_objmgr_peer *peer;
 	struct vdev_mlme_obj *vdev_mlme;
+	struct wlan_objmgr_psoc *psoc;
 
-	if (!vdev) {
-		sme_err("Invalid VDEV");
-		return QDF_STATUS_E_INVAL;
-	}
+	psoc = wlan_vdev_get_psoc(vdev);
 
 	vdev_opmode = wlan_vdev_mlme_get_opmode(vdev);
 
@@ -16421,17 +16416,20 @@ QDF_STATUS sme_update_vdev_mac_addr(struct wlan_objmgr_psoc *psoc,
 		goto p2p_self_peer_create;
 
 	if (vdev_opmode == QDF_STA_MODE && update_sta_self_peer) {
-		if (sme_is_11be_capable() && update_mld_addr)
-			old_mac_addr_bytes = wlan_vdev_mlme_get_mldaddr(vdev);
-		else
-			old_mac_addr_bytes = wlan_vdev_mlme_get_macaddr(vdev);
+		if (sme_is_11be_capable() && update_mld_addr) {
+			old_macaddr = wlan_vdev_mlme_get_mldaddr(vdev);
+			new_macaddr = mld_addr.bytes;
+		} else {
+			old_macaddr = wlan_vdev_mlme_get_macaddr(vdev);
+			new_macaddr = mac_addr.bytes;
+		}
 
 		/* Update self peer MAC address */
-		peer = wlan_objmgr_get_peer_by_mac(psoc, old_mac_addr_bytes,
+		peer = wlan_objmgr_get_peer_by_mac(psoc, old_macaddr,
 						   WLAN_MLME_NB_ID);
 		if (peer) {
-			qdf_ret_status = wlan_peer_update_macaddr(
-							peer, mac_addr.bytes);
+			qdf_ret_status = wlan_peer_update_macaddr(peer,
+								  new_macaddr);
 			wlan_objmgr_peer_release_ref(peer, WLAN_MLME_NB_ID);
 			if (QDF_IS_STATUS_ERROR(qdf_ret_status)) {
 				sme_nofl_err("Failed to update self peer MAC address. Status:%d",
@@ -16441,7 +16439,7 @@ QDF_STATUS sme_update_vdev_mac_addr(struct wlan_objmgr_psoc *psoc,
 		} else {
 			sme_err("Self peer not found with MAC addr:"
 				QDF_MAC_ADDR_FMT,
-				QDF_MAC_ADDR_REF(old_mac_addr_bytes));
+				QDF_MAC_ADDR_REF(old_macaddr));
 				return QDF_STATUS_E_INVAL;
 		}
 	}
@@ -16452,22 +16450,14 @@ QDF_STATUS sme_update_vdev_mac_addr(struct wlan_objmgr_psoc *psoc,
 			qdf_ret_status = wlan_mlo_mgr_update_mld_addr(
 					    (struct qdf_mac_addr *)
 					       wlan_vdev_mlme_get_mldaddr(vdev),
-					    &mac_addr);
+					    &mld_addr);
 			if (QDF_IS_STATUS_ERROR(qdf_ret_status))
 				return qdf_ret_status;
 		}
-		wlan_vdev_mlme_set_mldaddr(vdev, mac_addr.bytes);
-		/* Currently the design is to use same MAC for
-		 * MLD and Link for SAP so update link and MAC addr.
-		 */
-		if (vdev_opmode == QDF_SAP_MODE) {
-			wlan_vdev_mlme_set_macaddr(vdev, mac_addr.bytes);
-			wlan_vdev_mlme_set_linkaddr(vdev, mac_addr.bytes);
-		}
-	} else {
-		wlan_vdev_mlme_set_macaddr(vdev, mac_addr.bytes);
-		wlan_vdev_mlme_set_linkaddr(vdev, mac_addr.bytes);
+		wlan_vdev_mlme_set_mldaddr(vdev, mld_addr.bytes);
 	}
+	wlan_vdev_mlme_set_macaddr(vdev, mac_addr.bytes);
+	wlan_vdev_mlme_set_linkaddr(vdev, mac_addr.bytes);
 
 p2p_self_peer_create:
 	if (vdev_opmode == QDF_P2P_DEVICE_MODE) {

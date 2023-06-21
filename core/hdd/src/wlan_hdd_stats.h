@@ -593,16 +593,14 @@ int wlan_hdd_get_temperature(struct hdd_adapter *adapter, int *temperature);
 
 /**
  * hdd_get_max_tx_bitrate() - Get the max tx bitrate of the AP
- * @hdd_ctx: hdd context
- * @adapter: hostapd interface
+ * @link_info: pointer to link_info struct in adapter
  *
- * THis function gets the MAX supported rate by AP and cache
+ * This function gets the MAX supported rate by AP and cache
  * it into connection info structure
  *
  * Return: None
  */
-void hdd_get_max_tx_bitrate(struct hdd_context *hdd_ctx,
-			    struct hdd_adapter *adapter);
+void hdd_get_max_tx_bitrate(struct wlan_hdd_link_info *link_info);
 
 #ifdef TX_MULTIQ_PER_AC
 /**
@@ -623,7 +621,7 @@ void wlan_hdd_display_tx_multiq_stats(hdd_cb_handle context, uint8_t vdev_id)
 /**
  * hdd_report_max_rate() - Fill the max rate stats in the station info structure
  * to be sent to the userspace.
- * @adapter: pointer to adapter
+ * @link_info: pointer to link_info struct in adapter
  * @mac_handle: The mac handle
  * @rate: The station_info tx/rx rate to be filled
  * @signal: signal from station_info
@@ -634,7 +632,7 @@ void wlan_hdd_display_tx_multiq_stats(hdd_cb_handle context, uint8_t vdev_id)
  *
  * Return: True if fill is successful
  */
-bool hdd_report_max_rate(struct hdd_adapter *adapter,
+bool hdd_report_max_rate(struct wlan_hdd_link_info *link_info,
 			 mac_handle_t mac_handle,
 			 struct rate_info *rate,
 			 int8_t signal,

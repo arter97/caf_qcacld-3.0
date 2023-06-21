@@ -1455,13 +1455,11 @@ void tdls_disable_offchan_and_teardown_links(
 		tdls_in_progress = true;
 
 	if (!(connected_tdls_peers || tdls_in_progress)) {
-		tdls_debug("No TDLS connected/progress peers to delete");
 		vdev_id = vdev->vdev_objmgr.vdev_id;
-		if (tdls_soc->set_state_info.set_state_cnt > 0) {
-			tdls_debug("Disable the tdls in FW as second interface is coming up");
-			tdls_send_update_to_fw(tdls_vdev, tdls_soc, true,
-					       true, false, vdev_id);
-		}
+		tdls_debug("No TDLS connected/progress peers to delete Disable tdls for vdev id %d, "
+			   "FW as second interface is coming up", vdev_id);
+		tdls_send_update_to_fw(tdls_vdev, tdls_soc, true, true, false,
+				       vdev_id);
 		return;
 	}
 

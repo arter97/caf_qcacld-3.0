@@ -36,9 +36,31 @@
 #include "init_deinit_lmac.h"
 #include <hif.h>
 #include <htc_api.h>
+#include <cdp_txrx_cmn_reg.h>
+#include <cdp_txrx_bus.h>
+#if defined(WLAN_DP_PROFILE_SUPPORT) || defined(FEATURE_DIRECT_LINK)
+#include "cdp_txrx_ctrl.h"
+#endif
 #ifdef FEATURE_DIRECT_LINK
 #include "dp_internal.h"
-#include "cdp_txrx_ctrl.h"
+#endif
+
+#ifdef WLAN_DP_PROFILE_SUPPORT
+/* Memory profile table based on supported caps */
+static struct wlan_dp_memory_profile_ctx wlan_dp_1x1_he80_1kqam[] = {
+	{DP_TX_DESC_NUM_CFG, 1024},
+	{DP_TX_EXT_DESC_NUM_CFG, 1024},
+	{DP_TX_RING_SIZE_CFG, 1024},
+	{DP_TX_COMPL_RING_SIZE_CFG, 1024},
+	{DP_RX_SW_DESC_NUM_CFG, 1024},
+	{DP_REO_DST_RING_SIZE_CFG, 1024},
+	{DP_RXDMA_BUF_RING_SIZE_CFG, 1024},
+	{DP_RXDMA_REFILL_RING_SIZE_CFG, 1024},
+	{DP_RX_REFILL_POOL_NUM_CFG, 1024},
+};
+
+/* Global data structure to save profile info */
+static struct wlan_dp_memory_profile_info g_dp_profile_info;
 #endif
 
 /* Global DP context */
@@ -849,7 +871,8 @@ dp_peer_obj_create_notification(struct wlan_objmgr_peer *peer, void *arg)
 						       sta_info,
 						       QDF_STATUS_SUCCESS);
 	if (QDF_IS_STATUS_ERROR(status)) {
-		dp_err("DP peer attach failed");
+		dp_err("DP peer ("QDF_MAC_ADDR_FMT") attach failed",
+			QDF_MAC_ADDR_REF(peer->macaddr));
 		qdf_mem_free(sta_info);
 		return status;
 	}
@@ -881,7 +904,8 @@ dp_peer_obj_destroy_notification(struct wlan_objmgr_peer *peer, void *arg)
 	status = wlan_objmgr_peer_component_obj_detach(peer, WLAN_COMP_DP,
 						       sta_info);
 	if (QDF_IS_STATUS_ERROR(status))
-		dp_err("DP peer detach failed");
+		dp_err("DP peer ("QDF_MAC_ADDR_FMT") detach failed",
+			QDF_MAC_ADDR_REF(peer->macaddr));
 
 	qdf_mem_free(sta_info);
 
@@ -989,7 +1013,7 @@ dp_vdev_obj_destroy_notification(struct wlan_objmgr_vdev *vdev, void *arg)
 			dp_err("eap frm done event destroy failed!!");
 			return status;
 		}
-		dp_intf->tx_fn = NULL;
+		dp_intf->txrx_ops.tx.tx = NULL;
 		dp_intf->sap_tx_block_mask |= DP_TX_FN_CLR;
 	}
 	qdf_mem_zero(&dp_intf->conn_info, sizeof(struct wlan_dp_conn_info));
@@ -1552,6 +1576,145 @@ bool dp_is_data_stall_event_enabled(uint32_t evt)
 	return false;
 }
 
+QDF_STATUS __wlan_dp_runtime_suspend(ol_txrx_soc_handle soc, uint8_t pdev_id)
+{
+	return cdp_runtime_suspend(soc, pdev_id);
+}
+
+QDF_STATUS __wlan_dp_runtime_resume(ol_txrx_soc_handle soc, uint8_t pdev_id)
+{
+	return cdp_runtime_resume(soc, pdev_id);
+}
+
+QDF_STATUS __wlan_dp_bus_suspend(ol_txrx_soc_handle soc, uint8_t pdev_id)
+{
+	return cdp_bus_suspend(soc, pdev_id);
+}
+
+QDF_STATUS __wlan_dp_bus_resume(ol_txrx_soc_handle soc, uint8_t pdev_id)
+{
+	return cdp_bus_resume(soc, pdev_id);
+}
+
+void *wlan_dp_txrx_soc_attach(struct dp_txrx_soc_attach_params *params,
+			      bool *is_wifi3_0_target)
+{
+	void *dp_soc = NULL;
+	struct hif_opaque_softc *hif_context;
+	HTC_HANDLE htc_ctx = cds_get_context(QDF_MODULE_ID_HTC);
+	qdf_device_t qdf_ctx = cds_get_context(QDF_MODULE_ID_QDF_DEVICE);
+
+	hif_context = cds_get_context(QDF_MODULE_ID_HIF);
+
+	if (TARGET_TYPE_QCA6290 == params->target_type ||
+	    TARGET_TYPE_QCA6390 == params->target_type ||
+	    TARGET_TYPE_QCA6490 == params->target_type ||
+	    TARGET_TYPE_QCA6750 == params->target_type) {
+		dp_soc = cdp_soc_attach(LITHIUM_DP, hif_context,
+					params->target_psoc, htc_ctx,
+					qdf_ctx, params->dp_ol_if_ops);
+
+		if (dp_soc)
+			if (!cdp_soc_init(dp_soc, LITHIUM_DP,
+					  hif_context, params->target_psoc,
+					  htc_ctx, qdf_ctx,
+					  params->dp_ol_if_ops))
+				goto err_soc_detach;
+		*is_wifi3_0_target = true;
+	} else if (params->target_type == TARGET_TYPE_KIWI ||
+		   params->target_type == TARGET_TYPE_MANGO ||
+		   params->target_type == TARGET_TYPE_PEACH) {
+		dp_soc = cdp_soc_attach(BERYLLIUM_DP, hif_context,
+					params->target_psoc,
+					htc_ctx, qdf_ctx,
+					params->dp_ol_if_ops);
+		if (dp_soc)
+			if (!cdp_soc_init(dp_soc, BERYLLIUM_DP, hif_context,
+					  params->target_psoc, htc_ctx,
+					  qdf_ctx, params->dp_ol_if_ops))
+				goto err_soc_detach;
+		*is_wifi3_0_target = true;
+	} else if (params->target_type == TARGET_TYPE_WCN6450) {
+		dp_soc =
+			cdp_soc_attach(RHINE_DP, hif_context,
+				       params->target_psoc, htc_ctx,
+				       qdf_ctx, params->dp_ol_if_ops);
+		if (dp_soc)
+			if (!cdp_soc_init(dp_soc, RHINE_DP, hif_context,
+					  params->target_psoc, htc_ctx,
+					  qdf_ctx, params->dp_ol_if_ops))
+				goto err_soc_detach;
+		*is_wifi3_0_target = true;
+	} else {
+		dp_soc = cdp_soc_attach(MOB_DRV_LEGACY_DP, hif_context,
+					params->target_psoc, htc_ctx, qdf_ctx,
+					params->dp_ol_if_ops);
+	}
+
+	return dp_soc;
+
+err_soc_detach:
+	cdp_soc_detach(dp_soc);
+	dp_soc = NULL;
+
+	return dp_soc;
+}
+
+void wlan_dp_txrx_soc_detach(ol_txrx_soc_handle soc)
+{
+	cdp_soc_deinit(soc);
+	cdp_soc_detach(soc);
+}
+
+QDF_STATUS wlan_dp_txrx_attach_target(ol_txrx_soc_handle soc, uint8_t pdev_id)
+{
+	QDF_STATUS qdf_status;
+	int errno;
+
+	qdf_status = cdp_soc_attach_target(soc);
+	if (QDF_IS_STATUS_ERROR(qdf_status)) {
+		dp_err("Failed to attach soc target; status:%d", qdf_status);
+		return qdf_status;
+	}
+
+	errno = cdp_pdev_attach_target(soc, pdev_id);
+	if (errno) {
+		dp_err("Failed to attach pdev target; errno:%d", errno);
+		qdf_status = QDF_STATUS_E_FAILURE;
+		goto err_soc_detach_target;
+	}
+
+	return qdf_status;
+
+err_soc_detach_target:
+	/* NOP */
+	return qdf_status;
+}
+
+QDF_STATUS wlan_dp_txrx_pdev_attach(ol_txrx_soc_handle soc)
+{
+	struct wlan_dp_psoc_context *dp_ctx;
+	struct cdp_pdev_attach_params pdev_params = { 0 };
+
+	dp_ctx =  dp_get_context();
+
+	pdev_params.htc_handle = cds_get_context(QDF_MODULE_ID_HTC);
+	pdev_params.qdf_osdev = cds_get_context(QDF_MODULE_ID_QDF_DEVICE);
+	pdev_params.pdev_id = 0;
+
+	return cdp_pdev_attach(cds_get_context(QDF_MODULE_ID_SOC),
+			       &pdev_params);
+}
+
+QDF_STATUS wlan_dp_txrx_pdev_detach(ol_txrx_soc_handle soc, uint8_t pdev_id,
+				    int force)
+{
+	struct wlan_dp_psoc_context *dp_ctx;
+
+	dp_ctx =  dp_get_context();
+	return cdp_pdev_detach(soc, pdev_id, force);
+}
+
 #ifdef FEATURE_DIRECT_LINK
 /**
  * dp_lpass_h2t_tx_complete() - Copy completion handler for LPASS data
@@ -1717,11 +1880,19 @@ QDF_STATUS dp_direct_link_init(struct wlan_dp_psoc_context *dp_ctx)
 
 void dp_direct_link_deinit(struct wlan_dp_psoc_context *dp_ctx, bool is_ssr)
 {
+	struct wlan_dp_intf *dp_intf;
+
 	if (!pld_is_direct_link_supported(dp_ctx->qdf_dev->dev))
 		return;
 
 	if (!dp_ctx->dp_direct_link_ctx)
 		return;
+
+	for (dp_get_front_intf_no_lock(dp_ctx, &dp_intf); dp_intf;
+	     dp_get_next_intf_no_lock(dp_ctx, dp_intf, &dp_intf)) {
+		if (dp_intf->device_mode == QDF_SAP_MODE)
+			dp_config_direct_link(dp_intf, false, false);
+	}
 
 	dp_wfds_deinit(dp_ctx->dp_direct_link_ctx, is_ssr);
 	dp_direct_link_refill_ring_deinit(dp_ctx->dp_direct_link_ctx);
@@ -1791,5 +1962,249 @@ QDF_STATUS dp_config_direct_link(struct wlan_dp_intf *dp_intf,
 	qdf_mutex_release(&dp_ctx->dp_direct_link_lock);
 
 	return status;
+}
+#endif
+
+#ifdef WLAN_DP_PROFILE_SUPPORT
+struct wlan_dp_memory_profile_info *
+wlan_dp_get_profile_info(void)
+{
+	return &g_dp_profile_info;
+}
+
+QDF_STATUS wlan_dp_select_profile_cfg(struct wlan_objmgr_psoc *psoc)
+{
+	struct pld_soc_info info = {0};
+	struct pld_wlan_hw_cap_info *hw_cap_info;
+	qdf_device_t qdf_dev;
+	bool apply_profile = false;
+	int ret;
+
+	apply_profile = cfg_get(psoc,
+				CFG_DP_APPLY_MEM_PROFILE);
+	if (!apply_profile)
+		return QDF_STATUS_E_NOSUPPORT;
+
+	qdf_dev = wlan_psoc_get_qdf_dev(psoc);
+	if (!qdf_dev)
+		return QDF_STATUS_E_FAILURE;
+
+	ret = pld_get_soc_info(qdf_dev->dev, &info);
+	if (ret) {
+		dp_err("profile selection failed unable to H.W caps reason:%u",
+		       qdf_status_from_os_return(ret));
+		return qdf_status_from_os_return(ret);
+	}
+
+	hw_cap_info = &info.hw_cap_info;
+	/* Based on supported H.W caps select required memory profile */
+	if (hw_cap_info->nss == PLD_WLAN_HW_CAP_NSS_1x1 &&
+	    hw_cap_info->bw == PLD_WLAN_HW_CHANNEL_BW_80MHZ &&
+	    hw_cap_info->qam == PLD_WLAN_HW_QAM_1K) {
+		g_dp_profile_info.is_selected = true;
+		g_dp_profile_info.ctx = wlan_dp_1x1_he80_1kqam;
+		g_dp_profile_info.size = QDF_ARRAY_SIZE(wlan_dp_1x1_he80_1kqam);
+		dp_info("DP profile selected is 1x1_HE80_1KQAM based");
+	}
+
+	return QDF_STATUS_SUCCESS;
+}
+
+#ifdef WLAN_FEATURE_RX_PREALLOC_BUFFER_POOL
+static void
+wlan_dp_rx_refill_pool_cfg_sync_profile(struct cdp_soc_t *cdp_soc,
+				struct wlan_dp_memory_profile_ctx *profile_ctx)
+{
+	cdp_config_param_type val;
+	QDF_STATUS status;
+	int cur_val;
+
+	status = cdp_txrx_get_psoc_param(cdp_soc, CDP_CFG_RX_REFILL_POOL_NUM,
+					 &val);
+	if (QDF_IS_STATUS_SUCCESS(status) &&
+	    val.cdp_rx_refill_buf_pool_size != profile_ctx->size) {
+		cur_val = val.cdp_rx_refill_buf_pool_size;
+		val.cdp_rx_refill_buf_pool_size = profile_ctx->size;
+		if (cdp_txrx_set_psoc_param(cdp_soc,
+					    CDP_CFG_RX_REFILL_POOL_NUM, val)) {
+			dp_err("unable to sync param type:%u", profile_ctx->param_type);
+			return;
+		}
+		dp_info("current Rx refill pool size:%u synced with profile:%u",
+			cur_val, profile_ctx->size);
+	}
+}
+#else
+static inline void
+wlan_dp_rx_refill_pool_cfg_sync_profile(struct cdp_soc_t *cdp_soc,
+				struct wlan_dp_memory_profile_ctx *profile_ctx)
+{
+}
+#endif
+
+void wlan_dp_soc_cfg_sync_profile(struct cdp_soc_t *cdp_soc)
+{
+	struct wlan_dp_memory_profile_info *profile_info;
+	struct wlan_dp_memory_profile_ctx *profile_ctx;
+	cdp_config_param_type val = {0};
+	QDF_STATUS status;
+	int cur_val, i;
+
+	profile_info = wlan_dp_get_profile_info();
+	if (!profile_info->is_selected)
+		return;
+
+	for (i = 0; i < profile_info->size; i++) {
+		profile_ctx = &profile_info->ctx[i];
+	       qdf_mem_zero(&val, sizeof(cdp_config_param_type));
+
+		switch (profile_ctx->param_type) {
+		case DP_TX_DESC_NUM_CFG:
+			status = cdp_txrx_get_psoc_param(cdp_soc,
+						CDP_CFG_TX_DESC_NUM, &val);
+			if (QDF_IS_STATUS_SUCCESS(status) &&
+			    val.cdp_tx_desc_num != profile_ctx->size) {
+				cur_val = val.cdp_tx_desc_num;
+				val.cdp_tx_desc_num = profile_ctx->size;
+				if (cdp_txrx_set_psoc_param(cdp_soc,
+						CDP_CFG_TX_DESC_NUM, val)) {
+					dp_err("unable to sync param type:%u", profile_ctx->param_type);
+					break;
+				}
+				dp_info("current Tx desc num:%u synced with profile:%u", cur_val, profile_ctx->size);
+			}
+			break;
+		case DP_TX_EXT_DESC_NUM_CFG:
+			status = cdp_txrx_get_psoc_param(cdp_soc,
+						CDP_CFG_TX_EXT_DESC_NUM, &val);
+			if (QDF_IS_STATUS_SUCCESS(status) &&
+			    val.cdp_tx_ext_desc_num != profile_ctx->size) {
+				cur_val = val.cdp_tx_ext_desc_num;
+				val.cdp_tx_ext_desc_num = profile_ctx->size;
+				if (cdp_txrx_set_psoc_param(cdp_soc,
+						CDP_CFG_TX_EXT_DESC_NUM, val)) {
+					dp_err("unable to sync param type:%u", profile_ctx->param_type);
+					break;
+				}
+				dp_info("current Ext Tx desc num:%u synced with profile:%u", cur_val, profile_ctx->size);
+			}
+			break;
+		case DP_TX_RING_SIZE_CFG:
+			status = cdp_txrx_get_psoc_param(cdp_soc,
+						CDP_CFG_TX_RING_SIZE, &val);
+			if (QDF_IS_STATUS_SUCCESS(status) &&
+			    val.cdp_tx_ring_size != profile_ctx->size) {
+				cur_val = val.cdp_tx_ring_size;
+				val.cdp_tx_ring_size = profile_ctx->size;
+				if (cdp_txrx_set_psoc_param(cdp_soc,
+						CDP_CFG_TX_RING_SIZE, val)) {
+					dp_err("unable to sync param type:%u", profile_ctx->param_type);
+					break;
+				}
+				dp_info("current Tx Ring size:%u synced with profile:%u", cur_val, profile_ctx->size);
+			}
+			break;
+		case DP_TX_COMPL_RING_SIZE_CFG:
+			status = cdp_txrx_get_psoc_param(cdp_soc,
+						CDP_CFG_TX_COMPL_RING_SIZE, &val);
+			if (QDF_IS_STATUS_SUCCESS(status) &&
+			    val.cdp_tx_comp_ring_size != profile_ctx->size) {
+				cur_val = val.cdp_tx_comp_ring_size;
+				val.cdp_tx_comp_ring_size = profile_ctx->size;
+				if (cdp_txrx_set_psoc_param(cdp_soc,
+							    CDP_CFG_TX_COMPL_RING_SIZE, val)) {
+					dp_err("unable to sync param type:%u", profile_ctx->param_type);
+					break;
+				}
+				dp_info("current Tx Comp Ring size:%u synced with profile:%u", cur_val, profile_ctx->size);
+			}
+			break;
+		case DP_RX_SW_DESC_NUM_CFG:
+			status = cdp_txrx_get_psoc_param(cdp_soc,
+						CDP_CFG_RX_SW_DESC_NUM, &val);
+			if (QDF_IS_STATUS_SUCCESS(status) &&
+			    val.cdp_rx_sw_desc_num != profile_ctx->size) {
+				cur_val = val.cdp_rx_sw_desc_num;
+				val.cdp_rx_sw_desc_num = profile_ctx->size;
+				if (cdp_txrx_set_psoc_param(cdp_soc,
+							    CDP_CFG_RX_SW_DESC_NUM, val)) {
+					dp_err("unable to sync param type:%u", profile_ctx->param_type);
+					break;
+				}
+				dp_info("current Rx desc num:%u synced with profile:%u", cur_val, profile_ctx->size);
+			}
+			break;
+		case DP_REO_DST_RING_SIZE_CFG:
+			status = cdp_txrx_get_psoc_param(cdp_soc,
+						CDP_CFG_REO_DST_RING_SIZE, &val);
+			if (QDF_IS_STATUS_SUCCESS(status) &&
+			    val.cdp_reo_dst_ring_size != profile_ctx->size) {
+				cur_val = val.cdp_reo_dst_ring_size;
+				val.cdp_reo_dst_ring_size = profile_ctx->size;
+				if (cdp_txrx_set_psoc_param(cdp_soc,
+							    CDP_CFG_REO_DST_RING_SIZE, val)) {
+					dp_err("unable to sync param type:%u", profile_ctx->param_type);
+					break;
+				}
+				dp_info("current Rx Ring size:%u synced with profile:%u", cur_val, profile_ctx->size);
+			}
+			break;
+		case DP_RXDMA_REFILL_RING_SIZE_CFG:
+			status = cdp_txrx_get_psoc_param(cdp_soc,
+						CDP_CFG_RXDMA_REFILL_RING_SIZE, &val);
+			if (QDF_IS_STATUS_SUCCESS(status) &&
+			    val.cdp_rxdma_refill_ring_size != profile_ctx->size) {
+				cur_val = val.cdp_rxdma_refill_ring_size;
+				val.cdp_rxdma_refill_ring_size = profile_ctx->size;
+				if (cdp_txrx_set_psoc_param(cdp_soc,
+							    CDP_CFG_RXDMA_REFILL_RING_SIZE, val)) {
+					dp_err("unable to sync param type:%u", profile_ctx->param_type);
+					break;
+				}
+				dp_info("current RXDMA refill ring size:%u synced with profile:%u", cur_val, profile_ctx->size);
+			}
+		case DP_RX_REFILL_POOL_NUM_CFG:
+			wlan_dp_rx_refill_pool_cfg_sync_profile(cdp_soc,
+								profile_ctx);
+		default:
+			dp_debug("Unknown profile param type:%u", profile_ctx->param_type);
+			break;
+		}
+	}
+}
+
+void wlan_dp_pdev_cfg_sync_profile(struct cdp_soc_t *cdp_soc, uint8_t pdev_id)
+{
+	struct wlan_dp_memory_profile_info *profile_info;
+	struct wlan_dp_memory_profile_ctx *profile_ctx;
+	cdp_config_param_type val = {0};
+	QDF_STATUS status;
+	int cur_val, i;
+
+	profile_info = wlan_dp_get_profile_info();
+	if (!profile_info->is_selected)
+		return;
+
+	for (i = 0; i < profile_info->size; i++) {
+		profile_ctx = &profile_info->ctx[i];
+		if (profile_ctx->param_type == DP_RXDMA_BUF_RING_SIZE_CFG) {
+			status = cdp_txrx_get_pdev_param(cdp_soc, pdev_id,
+					CDP_CONFIG_RXDMA_BUF_RING_SIZE, &val);
+			if (QDF_IS_STATUS_SUCCESS(status) &&
+			    val.cdp_rxdma_buf_ring_size != profile_ctx->size) {
+				cur_val = val.cdp_rxdma_buf_ring_size;
+				val.cdp_rxdma_buf_ring_size = profile_ctx->size;
+				if (cdp_txrx_set_pdev_param(cdp_soc, pdev_id,
+							    CDP_CONFIG_RXDMA_BUF_RING_SIZE, val)) {
+					dp_err("unable to sync param type:%u", profile_ctx->param_type);
+					return;
+				}
+				dp_info("current RXDMA buf ring size:%u synced with profile:%u", cur_val, profile_ctx->size);
+			}
+			return;
+		}
+	}
+
+	dp_err("pdev based config item not found in profile table");
 }
 #endif

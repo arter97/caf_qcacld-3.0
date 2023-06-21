@@ -355,7 +355,7 @@ struct policy_mgr_cfg {
  * @hw_mode: List of HW modes supported
  * @old_hw_mode_index: Old HW mode from hw_mode table
  * @new_hw_mode_index: New HW mode from hw_mode table
- * @dual_mac_cfg: DBS configuration currenctly used by FW for
+ * @dual_mac_cfg: DBS configuration currently used by FW for
  *              scan & connections
  * @radio_comb_num: radio combination number
  * @radio_combinations: radio combination list

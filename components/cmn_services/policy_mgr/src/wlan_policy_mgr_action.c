@@ -414,12 +414,16 @@ QDF_STATUS policy_mgr_update_connection_info(struct wlan_objmgr_psoc *psoc,
 	policy_mgr_handle_ml_sta_links_on_vdev_up_csa(psoc,
 				policy_mgr_get_qdf_mode_from_pm(mode), vdev_id);
 
-	if (policy_mgr_is_conc_sap_present_on_sta_freq(psoc, mode, cur_freq))
-		policy_mgr_update_indoor_concurrency(psoc, vdev_id, 0,
-						     SWITCH_WITH_CONCURRENCY);
-	else
-		policy_mgr_update_indoor_concurrency(psoc, vdev_id, cur_freq,
-						     SWITCH_WITHOUT_CONCURRENCY);
+	if (policy_mgr_is_conc_sap_present_on_sta_freq(psoc, mode, cur_freq) &&
+	    policy_mgr_update_indoor_concurrency(psoc, vdev_id, 0,
+						 SWITCH_WITH_CONCURRENCY))
+		wlan_reg_recompute_current_chan_list(psoc, pm_ctx->pdev);
+	else if (policy_mgr_update_indoor_concurrency(psoc, vdev_id, cur_freq,
+						SWITCH_WITHOUT_CONCURRENCY))
+		wlan_reg_recompute_current_chan_list(psoc, pm_ctx->pdev);
+	else if (wlan_reg_get_keep_6ghz_sta_cli_connection(pm_ctx->pdev))
+		wlan_reg_recompute_current_chan_list(psoc, pm_ctx->pdev);
+
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -1643,9 +1647,12 @@ bool policy_mgr_is_sap_restart_required_after_sta_disconnect(
 	QDF_STATUS status;
 	uint32_t sta_gc_present = 0;
 	qdf_freq_t user_config_freq = 0;
+	tQDF_MCC_TO_SCC_SWITCH_MODE cc_mode =
+				policy_mgr_get_mcc_to_scc_switch_mode(psoc);
 
 	if (intf_ch_freq)
 		*intf_ch_freq = 0;
+
 	pm_ctx = policy_mgr_get_context(psoc);
 	if (!pm_ctx) {
 		policy_mgr_err("Invalid pm context");
@@ -1733,9 +1740,26 @@ bool policy_mgr_is_sap_restart_required_after_sta_disconnect(
 			break;
 		}
 
+		/*
+		 * STA got disconnected & SAP has previously moved to 2.4 GHz
+		 * due to concurrency, then move SAP back to user configured
+		 * frequency.
+		 * if SCC to MCC switch mode is
+		 * QDF_MCC_TO_SCC_SWITCH_WITH_FAVORITE_CHANNEL, the move SAP to
+		 * user configured frequency whenever standalone SAP is
+		 * currently not on the user configured frequency.
+		 * else move the SAP only when SAP is on 2.4 GHz band and user
+		 * configured frequency is on any other bands.
+		 */
 		if (!sta_gc_present && user_config_freq &&
-		    WLAN_REG_IS_24GHZ_CH_FREQ(op_ch_freq_list[i]) &&
-		    WLAN_REG_IS_5GHZ_CH_FREQ(user_config_freq)) {
+		    cc_mode == QDF_MCC_TO_SCC_SWITCH_WITH_FAVORITE_CHANNEL &&
+		    op_ch_freq_list[i] != user_config_freq) {
+			curr_sap_freq = op_ch_freq_list[i];
+			policy_mgr_debug("Move sap to user configured freq: %d",
+					 user_config_freq);
+		} else if (!sta_gc_present && user_config_freq &&
+			   WLAN_REG_IS_24GHZ_CH_FREQ(op_ch_freq_list[i]) &&
+			   !WLAN_REG_IS_24GHZ_CH_FREQ(user_config_freq)) {
 			curr_sap_freq = op_ch_freq_list[i];
 			policy_mgr_debug("Move sap to user configured freq: %d",
 					 user_config_freq);
@@ -2427,6 +2451,13 @@ static void __policy_mgr_check_sta_ap_concurrent_ch_intf(
 				       SAP_CONC_CHECK_DEFER_TIMEOUT_MS);
 		goto end;
 	}
+	if (policy_mgr_is_set_link_in_progress(pm_ctx->psoc)) {
+		policy_mgr_debug("defer sap conc check to a later time due to ml sta set link in progress");
+		qdf_delayed_work_start(&pm_ctx->sta_ap_intf_check_work,
+				       SAP_CONC_CHECK_DEFER_TIMEOUT_MS);
+		goto end;
+	}
+
 	if (pm_ctx->hdd_cbacks.hdd_is_chan_switch_in_progress &&
 	    pm_ctx->hdd_cbacks.hdd_is_chan_switch_in_progress()) {
 		policy_mgr_debug("wait as channel switch is already in progress");
@@ -2855,6 +2886,7 @@ policy_mgr_change_sap_channel_with_csa(struct wlan_objmgr_psoc *psoc,
 {
 	struct policy_mgr_psoc_priv_obj *pm_ctx;
 	struct ch_params ch_params = {0};
+	qdf_freq_t center_freq;
 	QDF_STATUS status;
 
 	pm_ctx = policy_mgr_get_context(psoc);
@@ -2871,8 +2903,13 @@ policy_mgr_change_sap_channel_with_csa(struct wlan_objmgr_psoc *psoc,
 			ch_width = ch_params.ch_width;
 	}
 
+	if (ch_params.mhz_freq_seg1)
+		center_freq = ch_params.mhz_freq_seg1;
+	else
+		center_freq = ch_params.mhz_freq_seg0;
+
 	if (!policy_mgr_check_bw_with_unsafe_chan_freq(psoc,
-						       ch_params.mhz_freq_seg0,
+						       center_freq,
 						       ch_width)) {
 		policy_mgr_info("SAP bw shrink to 20M for unsafe");
 		ch_width = CH_WIDTH_20MHZ;

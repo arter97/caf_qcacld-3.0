@@ -172,7 +172,7 @@ int wlan_cfg80211_tdls_add_peer_mlo(struct hdd_adapter *adapter,
 	bool is_mlo_vdev;
 	int status;
 
-	vdev = hdd_objmgr_get_vdev_by_user(adapter, WLAN_OSIF_TDLS_ID);
+	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink, WLAN_OSIF_TDLS_ID);
 	if (!vdev)
 		return -EINVAL;
 
@@ -334,7 +334,7 @@ tdls_calc_channels_from_staparams(struct wlan_objmgr_vdev *vdev,
 }
 
 #ifdef WLAN_FEATURE_11AX
-#if defined(CFG80211_LINK_STA_PARAMS_PRESENT) && defined(CONFIG_BAND_6GHZ)
+#if defined(WLAN_LINK_STA_PARAMS_PRESENT) && defined(CONFIG_BAND_6GHZ)
 static void
 wlan_cfg80211_tdls_extract_6ghz_params(struct tdls_update_peer_params *req_info,
 				       struct station_parameters *params)
@@ -370,7 +370,7 @@ wlan_cfg80211_tdls_extract_6ghz_params(struct tdls_update_peer_params *req_info,
 }
 #endif
 
-#ifdef CFG80211_LINK_STA_PARAMS_PRESENT
+#ifdef WLAN_LINK_STA_PARAMS_PRESENT
 static void
 wlan_cfg80211_tdls_extract_he_params(struct tdls_update_peer_params *req_info,
 				     struct station_parameters *params,
@@ -426,7 +426,7 @@ wlan_cfg80211_tdls_extract_he_params(struct tdls_update_peer_params *req_info,
 }
 #endif
 #else
-static void
+static inline void
 wlan_cfg80211_tdls_extract_he_params(struct tdls_update_peer_params *req_info,
 				     struct station_parameters *params,
 				     bool tdls_6g_support)
@@ -435,7 +435,7 @@ wlan_cfg80211_tdls_extract_he_params(struct tdls_update_peer_params *req_info,
 #endif
 
 #ifdef WLAN_FEATURE_11BE
-#ifdef CFG80211_LINK_STA_PARAMS_PRESENT
+#ifdef WLAN_LINK_STA_PARAMS_PRESENT
 static void
 wlan_cfg80211_tdls_extract_eht_params(struct tdls_update_peer_params *req_info,
 				      struct station_parameters *params)
@@ -451,7 +451,7 @@ wlan_cfg80211_tdls_extract_eht_params(struct tdls_update_peer_params *req_info,
 		req_info->ehtcap_present = 0;
 	}
 }
-#else
+#elif defined(WLAN_EHT_CAPABILITY_PRESENT)
 static void
 wlan_cfg80211_tdls_extract_eht_params(struct tdls_update_peer_params *req_info,
 				      struct station_parameters *params)
@@ -466,16 +466,22 @@ wlan_cfg80211_tdls_extract_eht_params(struct tdls_update_peer_params *req_info,
 		req_info->ehtcap_present = 0;
 	}
 }
+#else
+static inline void
+wlan_cfg80211_tdls_extract_eht_params(struct tdls_update_peer_params *req_info,
+				      struct station_parameters *params)
+{
+}
 #endif
 #else
-static void
+static inline void
 wlan_cfg80211_tdls_extract_eht_params(struct tdls_update_peer_params *req_info,
 				      struct station_parameters *params)
 {
 }
 #endif
 
-#ifdef CFG80211_LINK_STA_PARAMS_PRESENT
+#ifdef WLAN_LINK_STA_PARAMS_PRESENT
 static void
 wlan_cfg80211_tdls_extract_params(struct wlan_objmgr_vdev *vdev,
 				  struct tdls_update_peer_params *req_info,
@@ -1215,7 +1221,7 @@ wlan_cfg80211_tdls_mgmt_mlo(struct hdd_adapter *adapter, const uint8_t *peer,
 	uint8_t i;
 	int ret;
 
-	vdev = hdd_objmgr_get_vdev_by_user(adapter, WLAN_OSIF_TDLS_ID);
+	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink, WLAN_OSIF_TDLS_ID);
 	if (!vdev)
 		return -EINVAL;
 

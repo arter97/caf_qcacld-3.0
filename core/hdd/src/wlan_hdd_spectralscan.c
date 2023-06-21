@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2017-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -82,7 +82,8 @@ static int __wlan_hdd_cfg80211_spectral_scan_start(struct wiphy *wiphy,
 	if (ret)
 		return ret;
 
-	vdev = hdd_objmgr_get_vdev_by_user(adapter, WLAN_OSIF_SPECTRAL_ID);
+	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink,
+					   WLAN_OSIF_SPECTRAL_ID);
 	if (!vdev) {
 		hdd_err("can't get vdev");
 		return -EINVAL;
@@ -135,7 +136,8 @@ static int __wlan_hdd_cfg80211_spectral_scan_stop(struct wiphy *wiphy,
 	if (ret)
 		return ret;
 
-	vdev = hdd_objmgr_get_vdev_by_user(adapter, WLAN_OSIF_SPECTRAL_ID);
+	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink,
+					   WLAN_OSIF_SPECTRAL_ID);
 	if (!vdev) {
 		hdd_err("can't get vdev");
 		return -EINVAL;
@@ -187,7 +189,8 @@ static int __wlan_hdd_cfg80211_spectral_scan_get_config(
 	if (ret)
 		return ret;
 
-	vdev = hdd_objmgr_get_vdev_by_user(adapter, WLAN_OSIF_SPECTRAL_ID);
+	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink,
+					   WLAN_OSIF_SPECTRAL_ID);
 	if (!vdev) {
 		hdd_err("can't get vdev");
 		return -EINVAL;
@@ -239,7 +242,8 @@ static int __wlan_hdd_cfg80211_spectral_scan_get_diag_stats(
 	if (ret)
 		return ret;
 
-	vdev = hdd_objmgr_get_vdev_by_user(adapter, WLAN_OSIF_SPECTRAL_ID);
+	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink,
+					   WLAN_OSIF_SPECTRAL_ID);
 	if (!vdev) {
 		hdd_err("can't get vdev");
 		return -EINVAL;
@@ -292,7 +296,8 @@ static int __wlan_hdd_cfg80211_spectral_scan_get_cap_info(
 	if (ret)
 		return ret;
 
-	vdev = hdd_objmgr_get_vdev_by_user(adapter, WLAN_OSIF_SPECTRAL_ID);
+	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink,
+					   WLAN_OSIF_SPECTRAL_ID);
 	if (!vdev) {
 		hdd_err("can't get vdev");
 		return -EINVAL;
@@ -345,7 +350,8 @@ static int __wlan_hdd_cfg80211_spectral_scan_get_status(
 	if (ret)
 		return ret;
 
-	vdev = hdd_objmgr_get_vdev_by_user(adapter, WLAN_OSIF_SPECTRAL_ID);
+	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink,
+					   WLAN_OSIF_SPECTRAL_ID);
 	if (!vdev) {
 		hdd_err("can't get vdev");
 		return -EINVAL;
@@ -625,7 +631,7 @@ QDF_STATUS wlan_spectral_update_rx_chainmask(struct hdd_adapter *adapter)
 	uint8_t pdev_id;
 	struct wlan_objmgr_vdev *vdev;
 
-	home_chan_freq = hdd_get_adapter_home_channel(adapter);
+	home_chan_freq = hdd_get_link_info_home_channel(adapter->deflink);
 	pdev_id = wlan_objmgr_pdev_get_pdev_id(adapter->hdd_ctx->pdev);
 	wma_get_rx_chainmask(pdev_id, &chainmask_2g, &chainmask_5g);
 	chainmask = chainmask_5g;
@@ -634,7 +640,8 @@ QDF_STATUS wlan_spectral_update_rx_chainmask(struct hdd_adapter *adapter)
 		chainmask = chainmask_2g;
 
 	hdd_debug("chan freq %d chainmask %d", home_chan_freq, chainmask);
-	vdev = hdd_objmgr_get_vdev_by_user(adapter, WLAN_OSIF_SPECTRAL_ID);
+	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink,
+					   WLAN_OSIF_SPECTRAL_ID);
 	if (!vdev)
 		return QDF_STATUS_E_FAILURE;
 	wlan_vdev_mlme_set_rxchainmask(vdev, chainmask);

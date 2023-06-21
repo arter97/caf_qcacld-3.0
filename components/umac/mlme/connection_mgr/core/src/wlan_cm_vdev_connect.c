@@ -717,8 +717,9 @@ static void cm_print_mlo_info(struct wlan_objmgr_vdev *vdev)
 	if (!peer)
 		return;
 
-	mlme_nofl_debug("self_mld_addr:" QDF_MAC_ADDR_FMT,
-			QDF_MAC_ADDR_REF(mld_addr->bytes));
+	mlme_nofl_debug("self_mld_addr:" QDF_MAC_ADDR_FMT " link_id:%d",
+			QDF_MAC_ADDR_REF(mld_addr->bytes),
+			wlan_vdev_get_link_id(vdev));
 	mlme_nofl_debug("peer_mld_mac:" QDF_MAC_ADDR_FMT,
 			QDF_MAC_ADDR_REF(peer->mldaddr));
 }
@@ -1113,7 +1114,7 @@ QDF_STATUS cm_flush_join_req(struct scheduler_msg *msg)
 }
 
 #ifdef WLAN_FEATURE_11BE_MLO
-static  QDF_STATUS
+QDF_STATUS
 cm_get_ml_partner_info(struct scan_cache_entry *scan_entry,
 		       struct mlo_partner_info *partner_info)
 {
@@ -1121,14 +1122,20 @@ cm_get_ml_partner_info(struct scan_cache_entry *scan_entry,
 	uint8_t mlo_support_link_num;
 	struct wlan_objmgr_psoc *psoc;
 
-	if (!scan_entry->ml_info.num_links)
+	/* If ML IE is not present then return failure*/
+	if (!scan_entry->ie_list.multi_link_bv)
 		return QDF_STATUS_E_FAILURE;
+
+	/* In case of single link ML return success*/
+	if (!scan_entry->ml_info.num_links)
+		return QDF_STATUS_SUCCESS;
 
 	psoc = wlan_objmgr_get_psoc_by_id(0, WLAN_MLME_CM_ID);
 	if (!psoc) {
 		mlme_debug("psoc is NULL");
 		return QDF_STATUS_E_INVAL;
 	}
+
 	mlo_support_link_num = wlan_mlme_get_sta_mlo_conn_max_num(psoc);
 	mlme_debug("sta mlo support link num: %d", mlo_support_link_num);
 
@@ -1146,8 +1153,9 @@ cm_get_ml_partner_info(struct scan_cache_entry *scan_entry,
 			   scan_entry->ml_info.link_info[i].is_valid_link,
 			   QDF_MAC_ADDR_REF(
 			   scan_entry->ml_info.link_info[i].link_addr.bytes));
-		if (j >= mlo_support_link_num - 1)
+		if (mlo_support_link_num && j >= mlo_support_link_num - 1)
 			break;
+
 		if (scan_entry->ml_info.link_info[i].is_valid_link) {
 			partner_info->partner_link_info[j].link_addr =
 				scan_entry->ml_info.link_info[i].link_addr;
@@ -1156,27 +1164,18 @@ cm_get_ml_partner_info(struct scan_cache_entry *scan_entry,
 			partner_info->partner_link_info[j].chan_freq =
 				scan_entry->ml_info.link_info[i].freq;
 			j++;
-		} else {
-			scan_entry->ml_info.link_info[i].is_valid_link = false;
+			continue;
 		}
+
+		scan_entry->ml_info.link_info[i].is_valid_link = false;
 	}
+
 	partner_info->num_partner_links = j;
 	mlme_debug("sta and ap integrate link num: %d", j);
 
 	wlan_objmgr_psoc_release_ref(psoc, WLAN_MLME_CM_ID);
 
 	return QDF_STATUS_SUCCESS;
-}
-
-static void cm_fill_ml_info(struct cm_vdev_join_req *join_req)
-{
-	QDF_STATUS ret;
-
-	ret = cm_get_ml_partner_info(join_req->entry, &join_req->partner_info);
-	if (QDF_IS_STATUS_SUCCESS(ret)) {
-		join_req->assoc_link_id = join_req->entry->ml_info.self_link_id;
-		mlme_debug("Assoc link ID:%d", join_req->assoc_link_id);
-	}
 }
 
 static void cm_copy_join_req_info_from_cm_connect_req(struct cm_vdev_join_req *join_req,
@@ -1187,10 +1186,6 @@ static void cm_copy_join_req_info_from_cm_connect_req(struct cm_vdev_join_req *j
 }
 
 #else
-static void cm_fill_ml_info(struct cm_vdev_join_req *join_req)
-{
-}
-
 static void cm_copy_join_req_info_from_cm_connect_req(struct cm_vdev_join_req *join_req,
 						 struct wlan_cm_vdev_connect_req *req)
 {
@@ -1222,11 +1217,7 @@ cm_copy_join_params(struct wlan_objmgr_vdev *vdev,
 	if (!join_req->entry)
 		return QDF_STATUS_E_NOMEM;
 
-	if (wlan_vdev_mlme_is_mlo_link_vdev(vdev)) {
-		cm_copy_join_req_info_from_cm_connect_req(join_req, req);
-	} else {
-		cm_fill_ml_info(join_req);
-	}
+	cm_copy_join_req_info_from_cm_connect_req(join_req, req);
 
 	if (req->owe_trans_ssid.length)
 		join_req->owe_trans_ssid = req->owe_trans_ssid;
@@ -1548,14 +1539,19 @@ cm_update_tid_mapping(struct wlan_objmgr_vdev *vdev)
 	if (!vdev || !vdev->mlo_dev_ctx)
 		return QDF_STATUS_E_NULL_VALUE;
 
-	if (!mlo_check_if_all_links_up(vdev))
+	if (!wlan_vdev_mlme_is_mlo_link_vdev(vdev) ||
+	    !mlo_check_if_all_links_up(vdev))
 		return QDF_STATUS_E_FAILURE;
 
-	t2lm_ctx = &vdev->mlo_dev_ctx->t2lm_ctx;
+	t2lm_ctx = &vdev->mlo_dev_ctx->sta_ctx->copied_t2lm_ie_assoc_rsp;
+	if (!t2lm_ctx) {
+		mlme_err("T2LM ctx is NULL");
+		return QDF_STATUS_E_NULL_VALUE;
+	}
+
 	status = wlan_process_bcn_prbrsp_t2lm_ie(vdev, t2lm_ctx, t2lm_ctx->tsf);
 	if (QDF_IS_STATUS_ERROR(status)) {
 		mlme_err("T2LM IE beacon process failed");
-		return status;
 	}
 
 	return status;
@@ -1668,7 +1664,7 @@ cm_connect_complete_ind(struct wlan_objmgr_vdev *vdev,
 					     vdev);
 		wlan_p2p_status_connect(vdev);
 		cm_update_tid_mapping(vdev);
-		cm_update_associated_ch_width(vdev, true);
+		cm_update_associated_ch_info(vdev, true);
 	}
 
 	mlo_roam_connect_complete(vdev);

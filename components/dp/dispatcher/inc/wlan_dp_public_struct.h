@@ -293,6 +293,18 @@ struct dp_rsp_stats {
 	uint32_t icmpv4_rsp_recvd;
 };
 
+/**
+ * struct dp_txrx_soc_attach_params - SoC attach params
+ * @dp_ol_if_ops: DP ol_if ops
+ * @target_psoc: target psoc
+ * @target_type: Target type
+ */
+struct dp_txrx_soc_attach_params {
+	struct ol_if_ops *dp_ol_if_ops;
+	void *target_psoc;
+	uint32_t target_type;
+};
+
 struct dp_tx_rx_stats {
 	struct {
 		/* start_xmit stats */

@@ -119,11 +119,6 @@
 /* SR is disabled if NON_SRG is disallowed and SRG INFO is not present */
 #define SR_DISABLE NON_SRG_PD_SR_DISALLOWED & (~SRG_INFO_PRESENT & 0x0F)
 
-/* Length of RSNXE element ID + length + one octet of capability */
-#define RSNXE_CAP_FOR_SAE_LEN     3
-/* Position of WPA3 capabilities in the RSNX element */
-#define RSNXE_CAP_POS_0           0
-
 typedef union uPmfSaQueryTimerId {
 	struct {
 		uint8_t sessionId;
@@ -187,8 +182,6 @@ uint8_t lim_get_max_tx_power(struct mac_context *mac,
  * lim_calculate_tpc() - Utility to get maximum tx power
  * @mac: mac handle
  * @session: PE Session Entry
- * @is_pwr_constraint_absolute: If local power constraint is an absolute
- * value or an offset value.
  *
  * This function is used to get the maximum possible tx power from the list
  * of tx powers mentioned in @attr.
@@ -196,8 +189,7 @@ uint8_t lim_get_max_tx_power(struct mac_context *mac,
  * Return: None
  */
 void lim_calculate_tpc(struct mac_context *mac,
-		       struct pe_session *session,
-		       bool is_pwr_constraint_absolute);
+		       struct pe_session *session);
 
 /* AID pool management functions */
 
@@ -1193,11 +1185,15 @@ QDF_STATUS lim_strip_ie(struct mac_context *mac_ctx,
  * @add_bss: pointer to ADD BSS params
  * @beacon: pointer to beacon
  * @assoc_rsp: pointer to assoc response
+ * @bss_desc: pointer to BSS description
  *
  * Return: None
  */
-void lim_intersect_ap_he_caps(struct pe_session *session, struct bss_params *add_bss,
-		tSchBeaconStruct *pBeaconStruct, tpSirAssocRsp assoc_rsp);
+void lim_intersect_ap_he_caps(struct pe_session *session,
+			      struct bss_params *add_bss,
+			      tSchBeaconStruct *pBeaconStruct,
+			      tpSirAssocRsp assoc_rsp,
+			      struct bss_description *bss_desc);
 
 /**
  * lim_intersect_sta_he_caps() - Intersect STA capability with SAP capability
@@ -1616,8 +1612,10 @@ static inline void lim_update_he_6gop_assoc_resp(
 }
 
 static inline void lim_intersect_ap_he_caps(struct pe_session *session,
-		struct bss_params *add_bss,	tSchBeaconStruct *pBeaconStruct,
-		tpSirAssocRsp assoc_rsp)
+					    struct bss_params *add_bss,
+					    tSchBeaconStruct *pBeaconStruct,
+					    tpSirAssocRsp assoc_rsp,
+					    struct bss_description *bss_desc)
 {
 	return;
 }
@@ -3239,4 +3237,18 @@ lim_is_power_change_required_for_sta(struct mac_context *mac_ctx,
  */
 void
 lim_update_tx_pwr_on_ctry_change_cb(uint8_t vdev_id);
+
+/*
+ * lim_is_chan_connected_for_mode() - Check if frequency is connected
+ *                                    for given opmode.
+ * @psoc: Pointer to psoc object
+ * @opmode: Vdev opmode
+ * @freq: Frequency
+ *
+ * Return: Return true if frequency is connected for given opmode.
+ */
+bool
+lim_is_chan_connected_for_mode(struct wlan_objmgr_psoc *psoc,
+			       enum QDF_OPMODE opmode,
+			       qdf_freq_t freq);
 #endif /* __LIM_UTILS_H */

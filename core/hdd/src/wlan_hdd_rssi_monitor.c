@@ -90,7 +90,7 @@ __wlan_hdd_cfg80211_monitor_rssi(struct wiphy *wiphy,
 	if (ret)
 		return ret;
 
-	if (!hdd_cm_is_vdev_associated(adapter)) {
+	if (!hdd_cm_is_vdev_associated(adapter->deflink)) {
 		hdd_err("Not in Connected state!");
 		return -ENOTSUPP;
 	}

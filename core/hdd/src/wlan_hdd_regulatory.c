@@ -938,7 +938,15 @@ int hdd_reg_set_band(struct net_device *dev, uint32_t band_bitmap)
 		return -EIO;
 	}
 
-	if (current_band == band_bitmap) {
+	/*
+	 * If SET_FCC_CHANNEL 0 command is received first then 6 GHz band would
+	 * be disabled and band_capability would be set to 3 but existing 6 GHz
+	 * STA and P2P client connections won't be disconnected.
+	 * If set band comes again for 6 GHz band disabled and band_bitmap is
+	 * equal to band_capability, proceed to disable 6 GHz band completely.
+	 */
+	if (current_band == band_bitmap &&
+	    !ucfg_reg_get_keep_6ghz_sta_cli_connection(hdd_ctx->pdev)) {
 		hdd_debug("band is the same so not updating");
 		return 0;
 	}
@@ -1588,7 +1596,7 @@ hdd_country_change_bw_check(struct hdd_context *hdd_ctx,
 	ucfg_reg_get_current_chan_list(hdd_ctx->pdev,
 				       cur_chan_list);
 
-	width = hdd_get_adapter_width(adapter);
+	width = hdd_get_link_info_width(adapter->deflink);
 	org_bw = wlan_reg_get_bw_value(width);
 
 	for (i = 0; i < NUM_CHANNELS; i++) {
@@ -1640,7 +1648,7 @@ static void hdd_country_change_update_sta(struct hdd_context *hdd_ctx)
 	hdd_for_each_adapter_dev_held_safe(hdd_ctx, adapter, next_adapter,
 					   dbgid) {
 		width_changed = false;
-		oper_freq = hdd_get_adapter_home_channel(adapter);
+		oper_freq = hdd_get_link_info_home_channel(adapter->deflink);
 		if (oper_freq)
 			freq_changed = wlan_reg_is_disable_for_pwrmode(
 							pdev,
@@ -1656,7 +1664,8 @@ static void hdd_country_change_update_sta(struct hdd_context *hdd_ctx)
 			 * continue to next statement
 			 */
 		case QDF_STA_MODE:
-			sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter);
+			sta_ctx =
+				WLAN_HDD_GET_STATION_CTX_PTR(adapter->deflink);
 			new_phy_mode = wlan_reg_get_max_phymode(pdev,
 								REG_PHYMODE_MAX,
 								oper_freq);
@@ -1668,7 +1677,7 @@ static void hdd_country_change_update_sta(struct hdd_context *hdd_ctx)
 								    adapter,
 								    oper_freq);
 
-			if (hdd_is_vdev_in_conn_state(adapter)) {
+			if (hdd_is_vdev_in_conn_state(adapter->deflink)) {
 				if (phy_changed || freq_changed ||
 				    width_changed) {
 					hdd_debug("changed: phy %d, freq %d, width %d",
@@ -1716,10 +1725,10 @@ static void hdd_restart_sap_with_new_phymode(struct hdd_context *hdd_ctx,
 	struct sap_context *sap_ctx = NULL;
 	QDF_STATUS status;
 
-	hostapd_state = WLAN_HDD_GET_HOSTAP_STATE_PTR(adapter);
-	sap_ctx = WLAN_HDD_GET_SAP_CTX_PTR(adapter);
+	hostapd_state = WLAN_HDD_GET_HOSTAP_STATE_PTR(adapter->deflink);
+	sap_ctx = WLAN_HDD_GET_SAP_CTX_PTR(adapter->deflink);
 
-	if (!test_bit(SOFTAP_BSS_STARTED, &adapter->event_flags)) {
+	if (!test_bit(SOFTAP_BSS_STARTED, &adapter->deflink->link_flags)) {
 		sap_config->sap_orig_hw_mode = sap_config->SapHw_mode;
 		sap_config->SapHw_mode = csr_phy_mode;
 		hdd_err("Can't restart AP because it is not started");
@@ -1788,7 +1797,7 @@ static void hdd_country_change_update_sap(struct hdd_context *hdd_ctx)
 
 	hdd_for_each_adapter_dev_held_safe(hdd_ctx, adapter, next_adapter,
 					   dbgid) {
-		oper_freq = hdd_get_adapter_home_channel(adapter);
+		oper_freq = hdd_get_link_info_home_channel(adapter->deflink);
 
 		switch (adapter->device_mode) {
 		case QDF_P2P_GO_MODE:
@@ -1797,7 +1806,7 @@ static void hdd_country_change_update_sap(struct hdd_context *hdd_ctx)
 			break;
 		case QDF_SAP_MODE:
 			if (!test_bit(SOFTAP_INIT_DONE,
-				      &adapter->event_flags)) {
+				      &adapter->deflink->link_flags)) {
 				hdd_info("AP is not started yet");
 				break;
 			}

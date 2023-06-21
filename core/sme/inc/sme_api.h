@@ -1791,7 +1791,7 @@ bool sme_is_any_session_in_connected_state(mac_handle_t mac_handle);
 QDF_STATUS sme_pdev_set_hw_mode(struct policy_mgr_hw_mode msg);
 
 /**
- * sme_nss_update_request() - Send beacon templete update to FW with new
+ * sme_nss_update_request() - Send beacon template update to FW with new
  * nss value
  * @mac_handle: Handle returned by macOpen
  * @vdev_id: the session id
@@ -3679,9 +3679,6 @@ enum sme_eht_tx_bfee_cap_type {
 };
 
 #ifdef WLAN_FEATURE_11BE
-#define MAX_SIMULTANEOUS_STA_ML_LINKS 1
-#define MAX_NUM_STA_ML_lINKS 3
-
 /**
  * sme_set_eht_testbed_def() - set eht testbed default
  * @mac_handle: Opaque handle to the global MAC context
@@ -4619,7 +4616,6 @@ QDF_STATUS sme_switch_channel(mac_handle_t mac_handle,
  * @mac_addr: VDEV MAC address
  * @mld_addr: VDEV MLD address
  * @vdev: Pointer to object manager VDEV
- * @update_mld_addr: Flag to check whether to update MLD addr or not
  *
  * API to send set MAC address request command to FW
  *
@@ -4627,14 +4623,13 @@ QDF_STATUS sme_switch_channel(mac_handle_t mac_handle,
  */
 QDF_STATUS sme_send_set_mac_addr(struct qdf_mac_addr mac_addr,
 				 struct qdf_mac_addr mld_addr,
-				 struct wlan_objmgr_vdev *vdev,
-				 bool update_mld_addr);
+				 struct wlan_objmgr_vdev *vdev);
 
 /**
  * sme_update_vdev_mac_addr() - Update VDEV MAC address
- * @psoc: Pointer to PSOC structure
+ * @vdev: Objmgr VDEV pointer
  * @mac_addr: VDEV MAC address
- * @vdev: Pointer to object manager VDEV
+ * @mld_addr: VDEV MLD address
  * @update_sta_self_peer: Flag to check self peer MAC address or not.
  * @update_mld_addr: Flag to check if MLD address update needed or not.
  * @req_status: Status of the set MAC address request to the FW
@@ -4645,9 +4640,9 @@ QDF_STATUS sme_send_set_mac_addr(struct qdf_mac_addr mac_addr,
  *
  * Return: QDF_STATUS
  */
-QDF_STATUS sme_update_vdev_mac_addr(struct wlan_objmgr_psoc *psoc,
+QDF_STATUS sme_update_vdev_mac_addr(struct wlan_objmgr_vdev *vdev,
 				    struct qdf_mac_addr mac_addr,
-				    struct wlan_objmgr_vdev *vdev,
+				    struct qdf_mac_addr mld_addr,
 				    bool update_sta_self_peer,
 				    bool update_mld_addr, int req_status);
 #endif

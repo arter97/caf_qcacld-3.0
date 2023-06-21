@@ -1272,8 +1272,6 @@ cm_roam_scan_offload_scan_period(uint8_t vdev_id,
 				cfg_params->roam_scan_inactivity_time;
 	params->roam_inactive_data_packet_count =
 			cfg_params->roam_inactive_data_packet_count;
-	params->roam_scan_period_after_inactivity =
-			cfg_params->roam_scan_period_after_inactivity;
 	params->full_scan_period =
 			cfg_params->full_roam_scan_period;
 	mlme_debug("full_scan_period:%d, empty_scan_refresh_period:%d",
@@ -1794,6 +1792,13 @@ cm_check_band_freq_match(enum band_info band, qdf_freq_t freq)
 		return true;
 
 	if (band == BAND_5G && WLAN_REG_IS_5GHZ_CH_FREQ(freq))
+		return true;
+
+	/*
+	 * Not adding the band check for now as band_info will be soon
+	 * replaced with reg_wifi_band enum
+	 */
+	if (WLAN_REG_IS_6GHZ_CHAN_FREQ(freq))
 		return true;
 
 	return false;
@@ -5126,8 +5131,6 @@ cm_restore_default_roaming_params(struct wlan_mlme_psoc_ext_obj *mlme_obj,
 			mlme_obj->cfg.lfr.roam_scan_inactivity_time;
 	cfg_params->roam_inactive_data_packet_count =
 			mlme_obj->cfg.lfr.roam_inactive_data_packet_count;
-	cfg_params->roam_scan_period_after_inactivity =
-			mlme_obj->cfg.lfr.roam_scan_period_after_inactivity;
 	ucfg_reg_get_band(wlan_vdev_get_pdev(vdev), &current_band);
 	rso_cfg->roam_band_bitmask = current_band;
 }
@@ -6838,6 +6841,11 @@ cm_roam_beacon_loss_disconnect_event(struct wlan_objmgr_psoc *psoc,
 		return QDF_STATUS_E_FAILURE;
 	}
 
+	if (wlan_vdev_mlme_get_opmode(vdev) != QDF_STA_MODE) {
+		wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_CM_ID);
+		return status;
+	}
+
 	qdf_mem_zero(&wlan_diag_event, sizeof(wlan_diag_event));
 
 	populate_diag_cmn(&wlan_diag_event.diag_cmn, vdev_id,
@@ -6866,7 +6874,7 @@ cm_send_rso_stop(struct wlan_objmgr_vdev *vdev)
 	start_timer = cm_roam_offload_enabled(wlan_vdev_get_psoc(vdev));
 
 	cm_roam_state_change(wlan_vdev_get_pdev(vdev), wlan_vdev_get_id(vdev),
-			     WLAN_ROAM_RSO_STOPPED, REASON_DRIVER_DISABLED,
+			     WLAN_ROAM_RSO_STOPPED, REASON_DISCONNECTED,
 			     &send_resp, start_timer);
 	/*
 	 * RSO stop resp is not supported or RSO STOP timer/req failed,

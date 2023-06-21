@@ -68,14 +68,14 @@ static int hdd_sap_get_chan_width(struct hdd_adapter *adapter, int *value)
 	struct hdd_hostapd_state *hostapdstate;
 
 	hdd_enter();
-	hostapdstate = WLAN_HDD_GET_HOSTAP_STATE_PTR(adapter);
+	hostapdstate = WLAN_HDD_GET_HOSTAP_STATE_PTR(adapter->deflink);
 
 	if (hostapdstate->bss_state != BSS_START) {
 		*value = -EINVAL;
 		return -EINVAL;
 	}
 
-	sap_ctx = WLAN_HDD_GET_SAP_CTX_PTR(adapter);
+	sap_ctx = WLAN_HDD_GET_SAP_CTX_PTR(adapter->deflink);
 
 	*value = wlansap_get_chan_width(sap_ctx);
 	hdd_debug("chan_width = %d", *value);
@@ -307,7 +307,7 @@ static QDF_STATUS hdd_print_acl(struct hdd_adapter *adapter)
 	uint16_t listnum;
 	struct sap_context *sap_ctx;
 
-	sap_ctx = WLAN_HDD_GET_SAP_CTX_PTR(adapter);
+	sap_ctx = WLAN_HDD_GET_SAP_CTX_PTR(adapter->deflink);
 	qdf_mem_zero(&maclist[0], sizeof(maclist));
 	if (QDF_STATUS_SUCCESS == wlansap_get_acl_mode(sap_ctx, &acl_mode)) {
 		pr_info("******** ACL MODE *********\n");
@@ -395,7 +395,7 @@ static __iw_softap_setparam(struct net_device *dev,
 
 	case QCSAP_PARAM_CLR_ACL:
 		if (QDF_STATUS_SUCCESS != wlansap_clear_acl(
-		    WLAN_HDD_GET_SAP_CTX_PTR(adapter))) {
+		    WLAN_HDD_GET_SAP_CTX_PTR(adapter->deflink))) {
 			ret = -EIO;
 		}
 		break;
@@ -407,7 +407,7 @@ static __iw_softap_setparam(struct net_device *dev,
 			ret = -EINVAL;
 		} else {
 			wlansap_set_acl_mode(
-				WLAN_HDD_GET_SAP_CTX_PTR(adapter),
+				WLAN_HDD_GET_SAP_CTX_PTR(adapter->deflink),
 				set_value);
 		}
 		break;
@@ -872,13 +872,13 @@ static __iw_softap_setparam(struct net_device *dev,
 		break;
 	case QCASAP_SET_DFS_NOL:
 		wlansap_set_dfs_nol(
-			WLAN_HDD_GET_SAP_CTX_PTR(adapter),
+			WLAN_HDD_GET_SAP_CTX_PTR(adapter->deflink),
 			(eSapDfsNolType) set_value);
 		break;
 
 	case QCASAP_SET_RADAR_CMD:
 	{
-		struct hdd_ap_ctx *ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(adapter);
+		struct hdd_ap_ctx *ap_ctx;
 		struct wlan_objmgr_pdev *pdev;
 		struct radar_found_info radar;
 
@@ -890,6 +890,7 @@ static __iw_softap_setparam(struct net_device *dev,
 			return -EINVAL;
 		}
 
+		ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(adapter->deflink);
 		qdf_mem_zero(&radar, sizeof(radar));
 		if (wlansap_is_channel_in_nol_list(ap_ctx->sap_context,
 						   ap_ctx->operating_chan_freq,
@@ -978,8 +979,8 @@ static __iw_softap_setparam(struct net_device *dev,
 		switch (set_value) {
 		case CDP_HDD_STATS:
 			ucfg_dp_clear_net_dev_stats(adapter->dev);
-			memset(&adapter->hdd_stats, 0,
-					sizeof(adapter->hdd_stats));
+			memset(&adapter->deflink->hdd_stats, 0,
+			       sizeof(adapter->deflink->hdd_stats));
 			break;
 		case CDP_TXRX_HIST_STATS:
 			ucfg_wlan_dp_clear_tx_rx_histogram(hdd_ctx->psoc);
@@ -1465,7 +1466,7 @@ int __iw_softap_modify_acl(struct net_device *dev,
 	       QDF_MAC_ADDR_REF(peer_mac), list_type, cmd);
 
 	qdf_status = wlansap_modify_acl(
-		WLAN_HDD_GET_SAP_CTX_PTR(adapter),
+		WLAN_HDD_GET_SAP_CTX_PTR(adapter->deflink),
 		peer_mac, (eSapACLType) list_type, (eSapACLCmdType) cmd);
 	if (!QDF_IS_STATUS_SUCCESS(qdf_status)) {
 		hdd_err("Modify ACL failed");
@@ -1517,8 +1518,8 @@ static __iw_softap_getchannel(struct net_device *dev,
 		return ret;
 
 	*value = 0;
-	ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(adapter);
-	if (test_bit(SOFTAP_BSS_STARTED, &adapter->event_flags))
+	ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(adapter->deflink);
+	if (test_bit(SOFTAP_BSS_STARTED, &adapter->deflink->link_flags))
 		*value = wlan_reg_freq_to_chan(
 				hdd_ctx->pdev,
 				ap_ctx->operating_chan_freq);
@@ -2110,7 +2111,7 @@ int __iw_get_genie(struct net_device *dev,
 	 * (We previously sent it down in the CSR Roam Profile.)
 	 */
 	status = wlan_sap_getstation_ie_information(
-		WLAN_HDD_GET_SAP_CTX_PTR(adapter),
+		WLAN_HDD_GET_SAP_CTX_PTR(adapter->deflink),
 		&length, genIeBytes);
 	if (status == QDF_STATUS_SUCCESS) {
 		wrqu->data.length = length;
@@ -2170,13 +2171,13 @@ __iw_softap_stopbss(struct net_device *dev,
 	if (0 != ret)
 		return ret;
 
-	if (test_bit(SOFTAP_BSS_STARTED, &adapter->event_flags)) {
+	if (test_bit(SOFTAP_BSS_STARTED, &adapter->deflink->link_flags)) {
 		struct hdd_hostapd_state *hostapd_state =
-			WLAN_HDD_GET_HOSTAP_STATE_PTR(adapter);
+			WLAN_HDD_GET_HOSTAP_STATE_PTR(adapter->deflink);
 
 		qdf_event_reset(&hostapd_state->qdf_stop_bss_event);
 		status = wlansap_stop_bss(
-			WLAN_HDD_GET_SAP_CTX_PTR(adapter));
+			WLAN_HDD_GET_SAP_CTX_PTR(adapter->deflink));
 		if (QDF_IS_STATUS_SUCCESS(status)) {
 			status = qdf_wait_single_event(&hostapd_state->
 					qdf_stop_bss_event,
@@ -2187,7 +2188,7 @@ __iw_softap_stopbss(struct net_device *dev,
 				QDF_ASSERT(0);
 			}
 		}
-		clear_bit(SOFTAP_BSS_STARTED, &adapter->event_flags);
+		clear_bit(SOFTAP_BSS_STARTED, &adapter->deflink->link_flags);
 		policy_mgr_decr_session_set_pcl(hdd_ctx->psoc,
 					     adapter->device_mode,
 					     adapter->deflink->vdev_id);
@@ -2661,7 +2662,8 @@ __iw_get_peer_rssi(struct net_device *dev, struct iw_request_info *info,
 			hdd_err("String to Hex conversion Failed");
 	}
 
-	vdev = hdd_objmgr_get_vdev_by_user(adapter, WLAN_OSIF_STATS_ID);
+	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink,
+					   WLAN_OSIF_STATS_ID);
 	if (!vdev)
 		return -EINVAL;
 

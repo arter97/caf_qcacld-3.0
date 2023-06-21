@@ -2196,9 +2196,11 @@ void lim_switch_primary_secondary_channel(struct mac_context *mac,
 	mac->lim.gpchangeChannelData = NULL;
 
 	/* Store the new primary and secondary channel in session entries if different */
-	if (pe_session->curr_op_freq != new_channel_freq) {
-		pe_warn("freq: %d --> freq: %d", pe_session->curr_op_freq,
-			new_channel_freq);
+	if (pe_session->curr_op_freq != new_channel_freq ||
+	    pe_session->ch_width != ch_width) {
+		pe_warn("freq: %d[%d] --> freq: %d[%d]",
+			pe_session->curr_op_freq, pe_session->ch_width,
+			new_channel_freq, ch_width);
 		pe_session->curr_op_freq = new_channel_freq;
 	}
 	if (pe_session->htSecondaryChannelOffset !=
@@ -6976,12 +6978,6 @@ static void lim_intersect_he_caps(tDot11fIEhe_cap *rcvd_he,
 	else
 		peer_he->tb_ppdu_tx_stbc_gt_80mhz = 0;
 
-	if (session_he->htc_he && peer_he->htc_he)
-		peer_he->htc_he = 1;
-	else
-		peer_he->htc_he = 0;
-	pe_debug("intersected htc he is: %d", peer_he->htc_he);
-
 	/* Tx Doppler is first bit and Rx Doppler is second bit */
 	if (session_he->doppler) {
 		val = 0;
@@ -7042,11 +7038,37 @@ void lim_intersect_sta_he_caps(struct mac_context *mac_ctx,
 			mac_ctx->mlme_cfg->he_caps.he_mcs_12_13_supp_5g;
 }
 
-void lim_intersect_ap_he_caps(struct pe_session *session, struct bss_params *add_bss,
-		tSchBeaconStruct *beacon, tpSirAssocRsp assoc_rsp)
+static bool
+lim_is_vendor_htc_he_ap(struct bss_description *bss_desc)
+{
+	struct action_oui_search_attr vendor_ap_search_attr;
+	uint16_t ie_len;
+
+	ie_len = wlan_get_ielen_from_bss_description(bss_desc);
+
+	vendor_ap_search_attr.ie_data = (uint8_t *)&bss_desc->ieFields[0];
+	vendor_ap_search_attr.ie_length = ie_len;
+
+	return wlan_get_vendor_ie_ptr_from_oui(SIR_MAC_BAD_HTC_HE_VENDOR_OUI1,
+					       SIR_MAC_BAD_HTC_HE_VENDOR_OUI_LEN,
+					       vendor_ap_search_attr.ie_data,
+					       ie_len) &&
+					       wlan_get_vendor_ie_ptr_from_oui(
+					       SIR_MAC_BAD_HTC_HE_VENDOR_OUI2,
+					       SIR_MAC_BAD_HTC_HE_VENDOR_OUI_LEN,
+					       vendor_ap_search_attr.ie_data,
+					       ie_len);
+}
+
+void lim_intersect_ap_he_caps(struct pe_session *session,
+			      struct bss_params *add_bss,
+			      tSchBeaconStruct *beacon,
+			      tpSirAssocRsp assoc_rsp,
+			      struct bss_description *bss_desc)
 {
 	tDot11fIEhe_cap *rcvd_he;
 	tDot11fIEhe_cap *peer_he = &add_bss->staContext.he_config;
+	bool vendor_ap_present = false;
 
 	if (assoc_rsp && assoc_rsp->he_cap.present)
 		rcvd_he = &assoc_rsp->he_cap;
@@ -7054,6 +7076,18 @@ void lim_intersect_ap_he_caps(struct pe_session *session, struct bss_params *add
 		rcvd_he = &beacon->he_cap;
 
 	lim_intersect_he_caps(rcvd_he, peer_he, session);
+	peer_he->htc_he = rcvd_he->htc_he;
+	vendor_ap_present = lim_is_vendor_htc_he_ap(bss_desc);
+	if (vendor_ap_present) {
+		if (session->he_config.htc_he && peer_he->htc_he)
+			peer_he->htc_he = 1;
+		else
+			peer_he->htc_he = 0;
+		pe_debug("intersected htc he is: %d", peer_he->htc_he);
+	}
+
+	pe_debug("HTC HE: self: %d recvd: %d, peer: %d",
+		 session->he_config.htc_he, rcvd_he->htc_he, peer_he->htc_he);
 	add_bss->staContext.he_capable = true;
 }
 
@@ -8616,10 +8650,11 @@ static void lim_revise_req_eht_cap_per_mode(struct mlme_legacy_priv *mlme_priv,
 		pe_debug("Disable eht cap for SAP/GO");
 		mlme_priv->eht_config.tx_1024_4096_qam_lt_242_tone_ru = 0;
 		mlme_priv->eht_config.rx_1024_4096_qam_lt_242_tone_ru = 0;
-		mlme_priv->eht_config.non_ofdma_ul_mu_mimo_le_80mhz = 0;
-		mlme_priv->eht_config.non_ofdma_ul_mu_mimo_160mhz = 0;
-		mlme_priv->eht_config.non_ofdma_ul_mu_mimo_320mhz = 0;
 	}
+
+	mlme_priv->eht_config.non_ofdma_ul_mu_mimo_le_80mhz = 0;
+	mlme_priv->eht_config.non_ofdma_ul_mu_mimo_160mhz = 0;
+	mlme_priv->eht_config.non_ofdma_ul_mu_mimo_320mhz = 0;
 }
 
 void lim_copy_bss_eht_cap(struct pe_session *session)
@@ -8652,6 +8687,7 @@ void lim_copy_join_req_eht_cap(struct pe_session *session)
 	if (!mlme_priv)
 		return;
 	lim_revise_req_eht_cap_per_band(mlme_priv, session);
+	lim_revise_req_eht_cap_per_mode(mlme_priv, session);
 	qdf_mem_copy(&session->eht_config, &mlme_priv->eht_config,
 		     sizeof(session->eht_config));
 }
@@ -11127,7 +11163,6 @@ uint8_t lim_get_vht_ch_width(tDot11fIEVHTCaps *vht_cap,
 		else if (offset > 16)
 			ch_width = WNI_CFG_VHT_CHANNEL_WIDTH_80_PLUS_80MHZ;
 	}
-	pe_debug("The VHT Operation channel width is %d", ch_width);
 	return ch_width;
 }
 
@@ -11160,7 +11195,7 @@ lim_set_tpc_power(struct mac_context *mac_ctx, struct pe_session *session)
 	    session->opmode == QDF_P2P_GO_MODE)
 		mlme_obj->reg_tpc_obj.num_pwr_levels = 0;
 
-	lim_calculate_tpc(mac_ctx, session, false);
+	lim_calculate_tpc(mac_ctx, session);
 
 	tx_ops->set_tpc_power(mac_ctx->psoc, session->vdev_id,
 			      &mlme_obj->reg_tpc_obj);
@@ -11406,4 +11441,41 @@ lim_update_tx_pwr_on_ctry_change_cb(uint8_t vdev_id)
 	}
 
 	lim_set_tpc_power(mac_ctx, session);
+}
+
+bool lim_is_chan_connected_for_mode(struct wlan_objmgr_psoc *psoc,
+				    enum QDF_OPMODE device_mode,
+				    qdf_freq_t chan_freq)
+{
+	struct wlan_channel *des_chan;
+	struct wlan_objmgr_vdev *vdev;
+	uint8_t vdev_id;
+
+	for (vdev_id = 0; vdev_id < WLAN_UMAC_PSOC_MAX_VDEVS; vdev_id++) {
+		vdev =
+		wlan_objmgr_get_vdev_by_id_from_psoc(psoc, vdev_id,
+						     WLAN_LEGACY_MAC_ID);
+		if (!vdev)
+			continue;
+
+		if (vdev->vdev_mlme.vdev_opmode != device_mode)
+			goto next;
+
+		if (!wlan_cm_is_vdev_connected(vdev))
+			goto next;
+
+		des_chan = vdev->vdev_mlme.des_chan;
+		if (!des_chan)
+			goto next;
+
+		if (des_chan->ch_freq != chan_freq)
+			goto next;
+
+		wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_MAC_ID);
+		return true;
+next:
+		wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_MAC_ID);
+	}
+
+	return false;
 }

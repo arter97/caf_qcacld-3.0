@@ -187,7 +187,8 @@ static void hdd_enable_gtk_offload(struct hdd_adapter *adapter)
 	QDF_STATUS status;
 	struct wlan_objmgr_vdev *vdev;
 
-	vdev = hdd_objmgr_get_vdev_by_user(adapter, WLAN_OSIF_POWER_ID);
+	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink,
+					   WLAN_OSIF_POWER_ID);
 	if (!vdev) {
 		hdd_err("vdev is NULL");
 		return;
@@ -248,7 +249,8 @@ hdd_send_igmp_offload_params(struct hdd_adapter *adapter,
 	igmp_req->enable = enable;
 	igmp_req->num_grp_ip_address = count;
 
-	vdev = hdd_objmgr_get_vdev_by_user(adapter, WLAN_OSIF_POWER_ID);
+	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink,
+					   WLAN_OSIF_POWER_ID);
 	if (!vdev) {
 		hdd_err("vdev is NULL");
 		qdf_mem_free(igmp_req);
@@ -279,7 +281,8 @@ static void hdd_enable_igmp_offload(struct hdd_adapter *adapter)
 	QDF_STATUS status;
 	struct wlan_objmgr_vdev *vdev;
 
-	vdev = hdd_objmgr_get_vdev_by_user(adapter, WLAN_OSIF_POWER_ID);
+	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink,
+					   WLAN_OSIF_POWER_ID);
 	if (!vdev) {
 		hdd_err("vdev is NULL");
 		return;
@@ -303,7 +306,8 @@ static void hdd_disable_igmp_offload(struct hdd_adapter *adapter)
 	QDF_STATUS status;
 	struct wlan_objmgr_vdev *vdev;
 
-	vdev = hdd_objmgr_get_vdev_by_user(adapter, WLAN_OSIF_POWER_ID);
+	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink,
+					   WLAN_OSIF_POWER_ID);
 	if (!vdev) {
 		hdd_err("vdev is NULL");
 		return;
@@ -350,7 +354,8 @@ static void hdd_disable_gtk_offload(struct hdd_adapter *adapter)
 	/* Passing as void* as PMO does not know legacy HDD adapter type */
 	gtk_rsp_request.callback_context = (void *)adapter;
 
-	vdev = hdd_objmgr_get_vdev_by_user(adapter, WLAN_OSIF_POWER_ID);
+	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink,
+					   WLAN_OSIF_POWER_ID);
 	if (!vdev) {
 		hdd_err("vdev is NULL");
 		return;
@@ -569,7 +574,8 @@ void hdd_enable_ns_offload(struct hdd_adapter *adapter,
 	ns_req->trigger = trigger;
 	ns_req->count = 0;
 
-	vdev = hdd_objmgr_get_vdev_by_user(adapter, WLAN_OSIF_POWER_ID);
+	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink,
+					   WLAN_OSIF_POWER_ID);
 	if (!vdev) {
 		hdd_err("vdev is NULL");
 		goto free_req;
@@ -650,7 +656,8 @@ void hdd_disable_ns_offload(struct hdd_adapter *adapter,
 		goto out;
 	}
 
-	vdev = hdd_objmgr_get_vdev_by_user(adapter, WLAN_OSIF_POWER_ID);
+	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink,
+					   WLAN_OSIF_POWER_ID);
 	if (!vdev) {
 		hdd_err("vdev is NULL");
 		goto out;
@@ -784,7 +791,8 @@ static void hdd_enable_hw_filter(struct hdd_adapter *adapter)
 
 	hdd_enter();
 
-	vdev = hdd_objmgr_get_vdev_by_user(adapter, WLAN_OSIF_POWER_ID);
+	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink,
+					   WLAN_OSIF_POWER_ID);
 	if (!vdev) {
 		hdd_err("vdev is NULL");
 		return;
@@ -805,7 +813,8 @@ static void hdd_disable_hw_filter(struct hdd_adapter *adapter)
 
 	hdd_enter();
 
-	vdev = hdd_objmgr_get_vdev_by_user(adapter, WLAN_OSIF_POWER_ID);
+	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink,
+					   WLAN_OSIF_POWER_ID);
 	if (!vdev) {
 		hdd_err("vdev is NULL");
 		return;
@@ -826,7 +835,8 @@ static void hdd_enable_action_frame_patterns(struct hdd_adapter *adapter)
 	struct wlan_objmgr_vdev *vdev;
 	hdd_enter();
 
-	vdev = hdd_objmgr_get_vdev_by_user(adapter, WLAN_OSIF_POWER_ID);
+	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink,
+					   WLAN_OSIF_POWER_ID);
 	if (!vdev) {
 		hdd_err("vdev is NULL");
 		return;
@@ -849,7 +859,8 @@ static void hdd_disable_action_frame_patterns(struct hdd_adapter *adapter)
 
 	hdd_enter();
 
-	vdev = hdd_objmgr_get_vdev_by_user(adapter, WLAN_OSIF_POWER_ID);
+	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink,
+					   WLAN_OSIF_POWER_ID);
 	if (!vdev) {
 		hdd_err("vdev is NULL");
 		return;
@@ -871,7 +882,8 @@ void hdd_enable_host_offloads(struct hdd_adapter *adapter,
 
 	hdd_enter();
 
-	vdev = hdd_objmgr_get_vdev_by_user(adapter, WLAN_OSIF_POWER_ID);
+	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink,
+					   WLAN_OSIF_POWER_ID);
 	if (!vdev) {
 		hdd_err("vdev is NULL");
 		goto out;
@@ -913,7 +925,8 @@ void hdd_disable_host_offloads(struct hdd_adapter *adapter,
 
 	hdd_enter();
 
-	vdev = hdd_objmgr_get_vdev_by_user(adapter, WLAN_OSIF_POWER_ID);
+	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink,
+					   WLAN_OSIF_POWER_ID);
 	if (!vdev) {
 		hdd_err("vdev is NULL");
 		goto out;
@@ -1037,7 +1050,7 @@ int hdd_set_grat_arp_keepalive(struct hdd_adapter *adapter)
 		return -EINVAL;
 	}
 
-	sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter);
+	sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter->deflink);
 	if (!sta_ctx) {
 		hdd_err("sta_ctx is null");
 		return -EINVAL;
@@ -1332,7 +1345,8 @@ void hdd_enable_arp_offload(struct hdd_adapter *adapter,
 	if (!arp_req)
 		return;
 
-	vdev = hdd_objmgr_get_vdev_by_user(adapter, WLAN_OSIF_POWER_ID);
+	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink,
+					   WLAN_OSIF_POWER_ID);
 	if (!vdev) {
 		hdd_err("vdev is NULL");
 		goto free_req;
@@ -1495,7 +1509,8 @@ void hdd_enable_icmp_offload(struct hdd_adapter *adapter,
 	if (!pmo_icmp_req)
 		return;
 
-	vdev = hdd_objmgr_get_vdev_by_user(adapter, WLAN_OSIF_POWER_ID);
+	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink,
+					   WLAN_OSIF_POWER_ID);
 	if (!vdev) {
 		hdd_err("vdev is NULL");
 		goto free_req;
@@ -1556,7 +1571,8 @@ void hdd_disable_arp_offload(struct hdd_adapter *adapter,
 		return;
 	}
 
-	vdev = hdd_objmgr_get_vdev_by_user(adapter, WLAN_OSIF_POWER_ID);
+	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink,
+					   WLAN_OSIF_POWER_ID);
 	if (!vdev) {
 		hdd_err("vdev is NULL");
 		return;
@@ -1587,7 +1603,7 @@ void hdd_enable_mc_addr_filtering(struct hdd_adapter *adapter,
 	if (wlan_hdd_validate_context(hdd_ctx))
 		return;
 
-	if (!hdd_cm_is_vdev_associated(adapter))
+	if (!hdd_cm_is_vdev_associated(adapter->deflink))
 		return;
 
 	status = ucfg_pmo_enable_mc_addr_filtering_in_fwr(
@@ -1608,7 +1624,7 @@ void hdd_disable_mc_addr_filtering(struct hdd_adapter *adapter,
 	if (wlan_hdd_validate_context(hdd_ctx))
 		return;
 
-	if (!hdd_cm_is_vdev_associated(adapter))
+	if (!hdd_cm_is_vdev_associated(adapter->deflink))
 		return;
 
 	status = ucfg_pmo_disable_mc_addr_filtering_in_fwr(
@@ -1634,7 +1650,7 @@ void hdd_disable_and_flush_mc_addr_list(struct hdd_adapter *adapter,
 	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
 	QDF_STATUS status;
 
-	if (!hdd_cm_is_vdev_associated(adapter))
+	if (!hdd_cm_is_vdev_associated(adapter->deflink))
 		goto flush_mc_list;
 
 	/* disable mc list first because the mc list is cached in PMO */
@@ -1663,7 +1679,7 @@ flush_mc_list:
 static void hdd_update_conn_state_mask(struct hdd_adapter *adapter,
 				       uint32_t *conn_state_mask)
 {
-	if (hdd_cm_is_vdev_associated(adapter))
+	if (hdd_cm_is_vdev_associated(adapter->deflink))
 		*conn_state_mask |= (1 << adapter->deflink->vdev_id);
 }
 
@@ -1912,16 +1928,18 @@ static void hdd_ssr_restart_sap(struct hdd_context *hdd_ctx)
 
 	hdd_for_each_adapter_dev_held_safe(hdd_ctx, adapter, next_adapter,
 					   NET_DEV_HOLD_SSR_RESTART_SAP) {
-		if (adapter->device_mode == QDF_SAP_MODE) {
-			if (test_bit(SOFTAP_INIT_DONE, &adapter->event_flags)) {
-				hdd_debug(
-				"Restart prev SAP session, event_flags 0x%lx(%s)",
-				adapter->event_flags, (adapter->dev)->name);
-				wlan_hdd_set_twt_responder(hdd_ctx,
-							   adapter);
-				wlan_hdd_start_sap(adapter, true);
-			}
+		if (adapter->device_mode != QDF_SAP_MODE)
+			goto next_adapter;
+
+		if (test_bit(SOFTAP_INIT_DONE, &adapter->deflink->link_flags)) {
+			hdd_debug("Restart prev SAP session, event_flags 0x%lx, link_flags 0x%lx(%s)",
+				  adapter->event_flags,
+				  adapter->deflink->link_flags,
+				  adapter->dev->name);
+			wlan_hdd_set_twt_responder(hdd_ctx, adapter);
+			wlan_hdd_start_sap(adapter, true);
 		}
+next_adapter:
 		hdd_adapter_dev_put_debug(adapter,
 					  NET_DEV_HOLD_SSR_RESTART_SAP);
 	}
@@ -1964,7 +1982,7 @@ QDF_STATUS hdd_wlan_shutdown(void)
 						PACKET_CAPTURE_MODE_DISABLE) {
 		adapter = hdd_get_adapter(hdd_ctx, QDF_MONITOR_MODE);
 		if (adapter) {
-			vdev = hdd_objmgr_get_vdev_by_user(adapter,
+			vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink,
 							   WLAN_OSIF_POWER_ID);
 			if (vdev) {
 				ucfg_pkt_capture_resume_mon_thread(vdev);
@@ -2275,7 +2293,7 @@ int wlan_hdd_set_powersave(struct hdd_adapter *adapter,
 		return -EINVAL;
 	}
 
-	hdd_sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter);
+	hdd_sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter->deflink);
 	if (!hdd_sta_ctx) {
 		hdd_err("hdd_sta_context is NULL");
 		return -EINVAL;
@@ -2402,7 +2420,7 @@ static int __wlan_hdd_cfg80211_resume_wlan(struct wiphy *wiphy)
 						PACKET_CAPTURE_MODE_DISABLE) {
 		adapter = hdd_get_adapter(hdd_ctx, QDF_MONITOR_MODE);
 		if (adapter) {
-			vdev = hdd_objmgr_get_vdev_by_user(adapter,
+			vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink,
 							   WLAN_OSIF_POWER_ID);
 			if (vdev) {
 				ucfg_pkt_capture_resume_mon_thread(vdev);
@@ -2529,6 +2547,7 @@ static int __wlan_hdd_cfg80211_suspend_wlan(struct wiphy *wiphy,
 	enum pmo_suspend_mode mode;
 	int rc;
 	wlan_net_dev_ref_dbgid dbgid = NET_DEV_HOLD_CFG80211_SUSPEND_WLAN;
+	struct hdd_ap_ctx *ap_ctx;
 	struct hdd_hostapd_state *hapd_state;
 	struct csr_del_sta_params params = {
 		.peerMacAddr = QDF_MAC_ADDR_BCAST_INIT,
@@ -2581,11 +2600,11 @@ static int __wlan_hdd_cfg80211_suspend_wlan(struct wiphy *wiphy,
 		}
 
 		if (QDF_SAP_MODE == adapter->device_mode) {
-			if (BSS_START ==
-			    WLAN_HDD_GET_HOSTAP_STATE_PTR(adapter)->bss_state &&
-			    true ==
-			    WLAN_HDD_GET_AP_CTX_PTR(adapter)->
-			    dfs_cac_block_tx) {
+			hapd_state =
+				WLAN_HDD_GET_HOSTAP_STATE_PTR(adapter->deflink);
+			ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(adapter->deflink);
+			if (BSS_START == hapd_state->bss_state &&
+			    true == ap_ctx->dfs_cac_block_tx) {
 				hdd_err("RADAR detection in progress, do not allow suspend");
 				wlan_hdd_inc_suspend_stats(hdd_ctx,
 							   SUSPEND_FAIL_RADAR);
@@ -2607,14 +2626,12 @@ static int __wlan_hdd_cfg80211_suspend_wlan(struct wiphy *wiphy,
 				return -EOPNOTSUPP;
 			} else if (ucfg_pmo_get_disconnect_sap_tdls_in_wow(
 				   hdd_ctx->psoc)) {
-				hapd_state =
-					WLAN_HDD_GET_HOSTAP_STATE_PTR(adapter);
-				if (hapd_state)
-					hdd_softap_deauth_all_sta(adapter,
-								  hapd_state,
-								  &params);
+				hdd_softap_deauth_all_sta(adapter, hapd_state,
+							  &params);
 			}
 		} else if (QDF_P2P_GO_MODE == adapter->device_mode) {
+			hapd_state =
+				WLAN_HDD_GET_HOSTAP_STATE_PTR(adapter->deflink);
 			if (!ucfg_pmo_get_enable_sap_suspend(
 				   hdd_ctx->psoc)) {
 				/* return -EOPNOTSUPP if GO does not support
@@ -2628,17 +2645,13 @@ static int __wlan_hdd_cfg80211_suspend_wlan(struct wiphy *wiphy,
 				return -EOPNOTSUPP;
 			} else if (ucfg_pmo_get_disconnect_sap_tdls_in_wow(
 				   hdd_ctx->psoc)) {
-				hapd_state =
-					WLAN_HDD_GET_HOSTAP_STATE_PTR(adapter);
-				if (hapd_state)
-					hdd_softap_deauth_all_sta(adapter,
-								  hapd_state,
-								  &params);
+				hdd_softap_deauth_all_sta(adapter, hapd_state,
+							  &params);
 			}
 		} else if (QDF_TDLS_MODE == adapter->device_mode &&
 			   ucfg_pmo_get_disconnect_sap_tdls_in_wow(
 							hdd_ctx->psoc)) {
-			vdev = hdd_objmgr_get_vdev_by_user(adapter,
+			vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink,
 							   WLAN_TDLS_NB_ID);
 			if (vdev) {
 				ucfg_tdls_teardown_links_sync(hdd_ctx->psoc,
@@ -2716,7 +2729,7 @@ static int __wlan_hdd_cfg80211_suspend_wlan(struct wiphy *wiphy,
 						PACKET_CAPTURE_MODE_DISABLE) {
 		adapter = hdd_get_adapter(hdd_ctx, QDF_MONITOR_MODE);
 		if (adapter) {
-			vdev = hdd_objmgr_get_vdev_by_user(adapter,
+			vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink,
 							   WLAN_OSIF_POWER_ID);
 			if (!vdev) {
 				hdd_err("vdev is NULL");
@@ -2751,7 +2764,7 @@ resume_dp_thread:
 						PACKET_CAPTURE_MODE_DISABLE) {
 		adapter = hdd_get_adapter(hdd_ctx, QDF_MONITOR_MODE);
 		if (adapter) {
-			vdev = hdd_objmgr_get_vdev_by_user(adapter,
+			vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink,
 							   WLAN_OSIF_POWER_ID);
 			if (vdev) {
 				ucfg_pkt_capture_resume_mon_thread(vdev);
@@ -2907,7 +2920,7 @@ static int wlan_hdd_set_ps(struct wlan_objmgr_psoc *psoc,
 
 	status = wlan_hdd_set_powersave(adapter, allow_power_save, timeout);
 
-	if (!hdd_cm_is_vdev_associated(adapter)) {
+	if (!hdd_cm_is_vdev_associated(adapter->deflink)) {
 		hdd_debug("vdev[%d] mode %d disconnected ignore dhcp protection",
 			  adapter->deflink->vdev_id, adapter->device_mode);
 		return status;
@@ -3020,7 +3033,8 @@ static int __wlan_hdd_cfg80211_set_power_mgmt(struct wiphy *wiphy,
 		return 0;
 	}
 
-	vdev = hdd_objmgr_get_vdev_by_user(adapter, WLAN_OSIF_POWER_ID);
+	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink,
+					   WLAN_OSIF_POWER_ID);
 	if (!vdev) {
 		hdd_info("vdev is NULL");
 		return -EINVAL;
@@ -3124,9 +3138,9 @@ static int __wlan_hdd_cfg80211_set_txpower(struct wiphy *wiphy,
 		qdf_copy_macaddr(&bssid, &adapter->mac_addr);
 	} else {
 		struct hdd_station_ctx *sta_ctx =
-			WLAN_HDD_GET_STATION_CTX_PTR(adapter);
+			WLAN_HDD_GET_STATION_CTX_PTR(adapter->deflink);
 
-		if (hdd_cm_is_vdev_associated(adapter))
+		if (hdd_cm_is_vdev_associated(adapter->deflink))
 			qdf_copy_macaddr(&bssid, &sta_ctx->conn_info.bssid);
 	}
 
@@ -3223,7 +3237,8 @@ static int wlan_hdd_get_tx_power(struct hdd_adapter *adapter, int *dbm)
 	struct wlan_objmgr_vdev *vdev;
 	int ret;
 
-	vdev = hdd_objmgr_get_vdev_by_user(adapter, WLAN_OSIF_POWER_ID);
+	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink,
+					   WLAN_OSIF_POWER_ID);
 	if (!vdev) {
 		hdd_info("vdev is NULL");
 		return -EINVAL;
@@ -3387,14 +3402,15 @@ static int __wlan_hdd_cfg80211_get_txpower(struct wiphy *wiphy,
 			hdd_debug("Roaming is in progress, rej this req");
 			return -EINVAL;
 		}
-		if (!hdd_cm_is_vdev_associated(adapter)) {
+		if (!hdd_cm_is_vdev_associated(adapter->deflink)) {
 			hdd_debug("Not associated");
 			return 0;
 		}
 		break;
 	case QDF_SAP_MODE:
 	case QDF_P2P_GO_MODE:
-		if (!test_bit(SOFTAP_BSS_STARTED, &adapter->event_flags)) {
+		if (!test_bit(SOFTAP_BSS_STARTED,
+			      &adapter->deflink->link_flags)) {
 			hdd_debug("SAP is not started yet");
 			return 0;
 		}
@@ -3409,7 +3425,8 @@ static int __wlan_hdd_cfg80211_get_txpower(struct wiphy *wiphy,
 	if (hdd_ctx->driver_status != DRIVER_MODULES_ENABLED ||
 	    is_rate_limited) {
 		/* Send cached data to upperlayer*/
-		vdev = hdd_objmgr_get_vdev_by_user(adapter, WLAN_OSIF_POWER_ID);
+		vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink,
+						   WLAN_OSIF_POWER_ID);
 		if (!vdev) {
 			hdd_err("vdev is NULL");
 			return -EINVAL;

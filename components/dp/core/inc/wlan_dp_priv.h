@@ -341,6 +341,7 @@ struct direct_link_info {
  * @vdev: object manager vdev context
  * @vdev_lock: vdev spin lock
  * @dev: netdev reference
+ * @txrx_ops: Interface tx-rx ops
  * @dp_stats: Device TX/RX statistics
  * @is_sta_periodic_stats_enabled: Indicate whether to display sta periodic
  * stats
@@ -393,6 +394,7 @@ struct wlan_dp_intf {
 	struct wlan_objmgr_vdev *vdev;
 	qdf_spinlock_t vdev_lock;
 	qdf_netdev_t dev;
+	struct ol_txrx_ops txrx_ops;
 	struct dp_stats dp_stats;
 #ifdef WLAN_FEATURE_PERIODIC_STA_STATS
 	bool is_sta_periodic_stats_enabled;
@@ -428,8 +430,6 @@ struct wlan_dp_intf {
 	uint8_t gro_flushed[DP_MAX_RX_THREADS];
 
 	bool runtime_disable_rx_thread;
-	ol_txrx_rx_fp rx_stack;
-	ol_txrx_tx_fp tx_fn;
 	struct wlan_dp_conn_info conn_info;
 
 	enum bss_intf_state bss_state;
@@ -472,6 +472,9 @@ struct dp_direct_link_context {
  * @pdev: object manager pdev context
  * @qdf_dev: qdf device
  * @dp_cfg: place holder for DP configuration
+ * @cdp_soc: CDP SoC handle
+ * @hif_handle: HIF handle
+ * @hal_soc: HAL SoC handle
  * @intf_list_lock: DP interfaces list lock
  * @intf_list: DP interfaces list
  * @rps: rps
@@ -526,6 +529,9 @@ struct wlan_dp_psoc_context {
 	struct wlan_objmgr_pdev *pdev;
 	qdf_device_t qdf_dev;
 	struct wlan_dp_psoc_cfg dp_cfg;
+	ol_txrx_soc_handle cdp_soc;
+	struct hif_opaque_softc *hif_handle;
+	void *hal_soc;
 
 	qdf_spinlock_t intf_list_lock;
 	qdf_list_t intf_list;
@@ -596,5 +602,53 @@ struct wlan_dp_psoc_context {
 	struct dp_direct_link_context *dp_direct_link_ctx;
 #endif
 };
+
+#ifdef WLAN_DP_PROFILE_SUPPORT
+/**
+ * enum wlan_dp_cfg_param_type - param context type
+ * @DP_TX_DESC_NUM_CFG: Number of TX desc
+ * @DP_TX_EXT_DESC_NUM_CFG: Number of TX ext desc
+ * @DP_TX_RING_SIZE_CFG: TX ring size
+ * @DP_TX_COMPL_RING_SIZE_CFG: TX completion ring size
+ * @DP_RX_SW_DESC_NUM_CFG: Number of RX S.W descriptors
+ * @DP_REO_DST_RING_SIZE_CFG: RX ring size
+ * @DP_RXDMA_BUF_RING_SIZE_CFG: RXDMA BUF ring size
+ * @DP_RXDMA_REFILL_RING_SIZE_CFG: RXDMA refill ring size
+ * @DP_RX_REFILL_POOL_NUM_CFG: Refill buffer pool size
+ */
+enum wlan_dp_cfg_param_type {
+	DP_TX_DESC_NUM_CFG,
+	DP_TX_EXT_DESC_NUM_CFG,
+	DP_TX_RING_SIZE_CFG,
+	DP_TX_COMPL_RING_SIZE_CFG,
+	DP_RX_SW_DESC_NUM_CFG,
+	DP_REO_DST_RING_SIZE_CFG,
+	DP_RXDMA_BUF_RING_SIZE_CFG,
+	DP_RXDMA_REFILL_RING_SIZE_CFG,
+	DP_RX_REFILL_POOL_NUM_CFG,
+};
+
+/**
+ * struct wlan_dp_memory_profile_ctx - element representing DP config param info
+ * @param_type: DP config param type
+ * @size: size/length of the param to be selected
+ */
+struct wlan_dp_memory_profile_ctx {
+	enum wlan_dp_cfg_param_type param_type;
+	uint32_t size;
+};
+
+/**
+ * struct wlan_dp_memory_profile_info - Current memory profile info
+ * @is_selected: profile is selected or not
+ * @ctx: DP memory profile context
+ * @size: size of profile
+ */
+struct wlan_dp_memory_profile_info {
+	bool is_selected;
+	struct wlan_dp_memory_profile_ctx *ctx;
+	int size;
+};
+#endif
 
 #endif /* end  of _WLAN_DP_PRIV_STRUCT_H_ */

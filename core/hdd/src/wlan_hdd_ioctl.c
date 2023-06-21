@@ -226,7 +226,7 @@ static int hdd_get_tsm_stats(struct hdd_adapter *adapter,
 	}
 
 	hdd_ctx = WLAN_HDD_GET_CTX(adapter);
-	hdd_sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter);
+	hdd_sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter->deflink);
 
 	request = osif_request_alloc(&params);
 	if (!request) {
@@ -742,11 +742,11 @@ hdd_sendactionframe(struct hdd_adapter *adapter, const uint8_t *bssid,
 		return -EINVAL;
 	}
 
-	sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter);
+	sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter->deflink);
 	hdd_ctx = WLAN_HDD_GET_CTX(adapter);
 
 	/* if not associated, no need to send action frame */
-	if (!hdd_cm_is_vdev_associated(adapter)) {
+	if (!hdd_cm_is_vdev_associated(adapter->deflink)) {
 		hdd_warn("Not associated");
 		ret = -EINVAL;
 		goto exit;
@@ -2226,8 +2226,8 @@ static int wlan_hdd_get_link_status(struct hdd_adapter *adapter)
 		return 0;
 	}
 
-	sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter);
-	if (!hdd_cm_is_vdev_associated(adapter)) {
+	sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter->deflink);
+	if (!hdd_cm_is_vdev_associated(adapter->deflink)) {
 		/* If not associated, then expected link status return
 		 * value is 0
 		 */
@@ -4420,7 +4420,7 @@ static int drv_cmd_fast_reassoc(struct hdd_adapter *adapter,
 	hdd_ctx = WLAN_HDD_GET_CTX(adapter);
 
 	/* if not associated, no need to proceed with reassoc */
-	if (!hdd_cm_is_vdev_associated(adapter)) {
+	if (!hdd_cm_is_vdev_associated(adapter->deflink)) {
 		hdd_warn("Not associated!");
 		ret = -EINVAL;
 		goto exit;
@@ -4776,10 +4776,10 @@ static int drv_cmd_get_tsm_stats(struct hdd_adapter *adapter,
 		return -EINVAL;
 	}
 
-	sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter);
+	sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter->deflink);
 
 	/* if not associated, return error */
-	if (!hdd_cm_is_vdev_associated(adapter)) {
+	if (!hdd_cm_is_vdev_associated(adapter->deflink)) {
 		hdd_err("Not associated!");
 		ret = -EINVAL;
 		goto exit;
@@ -4920,7 +4920,7 @@ static int drv_cmd_ccx_beacon_req(struct hdd_adapter *adapter,
 		goto exit;
 	}
 
-	if (!hdd_cm_is_vdev_associated(adapter)) {
+	if (!hdd_cm_is_vdev_associated(adapter->deflink)) {
 		hdd_debug("Not associated");
 
 		if (!req.numBcnReqIe)
@@ -5556,7 +5556,7 @@ static int hdd_set_rx_filter(struct hdd_adapter *adapter, bool action,
 	if (((adapter->device_mode == QDF_STA_MODE) ||
 		(adapter->device_mode == QDF_P2P_CLIENT_MODE)) &&
 		adapter->mc_addr_list.mc_cnt &&
-		hdd_cm_is_vdev_associated(adapter)) {
+		hdd_cm_is_vdev_associated(adapter->deflink)) {
 
 
 		filter = qdf_mem_malloc(sizeof(*filter));
@@ -6043,7 +6043,7 @@ static inline int drv_cmd_get_antenna_mode(struct hdd_adapter *adapter,
 	uint8_t len = 0;
 	struct wlan_objmgr_vdev *vdev;
 
-	vdev = hdd_objmgr_get_vdev_by_user(adapter, WLAN_OSIF_ID);
+	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink, WLAN_OSIF_ID);
 	if (!vdev) {
 		hdd_err("vdev is NULL");
 		return -EINVAL;
@@ -6119,7 +6119,6 @@ static int drv_cmd_set_fcc_channel(struct hdd_adapter *adapter,
 	QDF_STATUS status;
 	QDF_STATUS status_6G = QDF_STATUS_SUCCESS;
 	int8_t input_value;
-	bool fcc_constraint;
 	int err;
 	uint32_t band_bitmap = 0;
 	bool rf_test_mode;
@@ -6129,8 +6128,11 @@ static int drv_cmd_set_fcc_channel(struct hdd_adapter *adapter,
 	 * ON after airplane mode is set. When APM is set, WLAN turns off.
 	 * But it can be turned back on. Otherwise; when APM is turned back
 	 * off, WLAN would turn back on. So at that point the command is
-	 * expected to come down. 0 means reduce power as per fcc constraint
-	 * and -1 means remove constraint.
+	 * expected to come down.
+	 * a) 0 means reduce power as per fcc constraint and disable 6 GHz band
+	 *    but keep existing STA/P2P Client connections intact.
+	 * b) 1 means reduce power as per fcc constraint and enable 6 GHz band.
+	 * c) -1 means remove constraint and enable 6 GHz band.
 	 */
 
 	err = kstrtos8(command + command_len + 1, 10, &input_value);
@@ -6139,11 +6141,49 @@ static int drv_cmd_set_fcc_channel(struct hdd_adapter *adapter,
 		return err;
 	}
 
-	fcc_constraint = (input_value == -1) ? false : true;
-	hdd_debug("input_value = %d && fcc_constraint = %u",
-		  input_value, fcc_constraint);
+	hdd_debug("input_value = %d", input_value);
 
-	status = ucfg_reg_set_fcc_constraint(hdd_ctx->pdev, fcc_constraint);
+	if (input_value == 0 || input_value == 1) {
+		status = ucfg_reg_set_fcc_constraint(hdd_ctx->pdev, true);
+		if (QDF_IS_STATUS_ERROR(status)) {
+			hdd_err("Failed to reduce tx power for channels 12/13");
+			return qdf_status_to_os_return(status);
+		}
+	} else if (input_value == -1) {
+		status = ucfg_reg_set_fcc_constraint(hdd_ctx->pdev, false);
+		if (QDF_IS_STATUS_ERROR(status)) {
+			hdd_err("Failed to reset tx power for channels 12/13");
+			return qdf_status_to_os_return(status);
+		}
+	} else {
+		return -EINVAL;
+	}
+
+	/*
+	 * For input value 1 or -1, 6 GHz band should be re enabled, so
+	 * keep_6ghz_sta_cli_connection flag can be disabled.
+	 */
+	if (input_value == 1 || input_value == -1) {
+		status = ucfg_reg_set_keep_6ghz_sta_cli_connection(
+							hdd_ctx->pdev, false);
+		if (QDF_IS_STATUS_ERROR(status)) {
+			hdd_err("Failed to enable 6 GHz band");
+			return qdf_status_to_os_return(status);
+		}
+	}
+
+	/*
+	 * For input value 0, 6 GHz band is disabled but existing 6 GHz STA
+	 * P2P client connections should be intact.
+	 * If host receives this SET_FCC_CHANNEL 0 twice return from here to
+	 * avoid completely disabling 6 GHz band.
+	 */
+	if (input_value == 0 &&
+	    ucfg_reg_get_keep_6ghz_sta_cli_connection(hdd_ctx->pdev)) {
+		hdd_debug("FCC constraint is already set");
+		status = QDF_STATUS_SUCCESS;
+		return qdf_status_to_os_return(status);
+	}
 
 	status_6G = ucfg_mlme_is_rf_test_mode_enabled(hdd_ctx->psoc,
 						      &rf_test_mode);
@@ -6155,6 +6195,12 @@ static int drv_cmd_set_fcc_channel(struct hdd_adapter *adapter,
 	if (!rf_test_mode) {
 		if (!input_value) {
 			band_bitmap |= (BIT(REG_BAND_5G) | BIT(REG_BAND_2G));
+			status = ucfg_reg_set_keep_6ghz_sta_cli_connection(
+							hdd_ctx->pdev, true);
+			if (QDF_IS_STATUS_ERROR(status)) {
+				hdd_err("Failed to disable 6 GHz band");
+				return qdf_status_to_os_return(status);
+			}
 		} else {
 			if (wlan_reg_is_6ghz_supported(hdd_ctx->psoc))
 				band_bitmap = REG_BAND_MASK_ALL;
@@ -6164,12 +6210,7 @@ static int drv_cmd_set_fcc_channel(struct hdd_adapter *adapter,
 	}
 
 send_status:
-	if (QDF_IS_STATUS_ERROR(status))
-		hdd_err("Failed to %s tx power for channels 12/13",
-			fcc_constraint ? "restore" : "reduce");
-	else
-		status = status_6G;
-
+	status = status_6G;
 	return qdf_status_to_os_return(status);
 }
 
@@ -6291,7 +6332,7 @@ static int drv_cmd_set_channel_switch(struct hdd_adapter *adapter,
 		chan_number = wlan_reg_legacy_chan_to_freq(hdd_ctx->pdev,
 							   chan_number);
 
-	status = hdd_softap_set_channel_change(dev, chan_number, width, true);
+	status = hdd_softap_set_channel_change(dev, chan_number, width, false);
 	if (status) {
 		hdd_err("Set channel change fail");
 		return status;
@@ -6408,7 +6449,7 @@ static void disconnect_sta_and_restart_sap(struct hdd_context *hdd_ctx,
 			goto next_adapter;
 		}
 
-		ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(adapter);
+		ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(adapter->deflink);
 		if (check_disable_channels(hdd_ctx, ap_ctx->operating_chan_freq))
 			policy_mgr_check_sap_restart(hdd_ctx->psoc,
 						     adapter->deflink->vdev_id);

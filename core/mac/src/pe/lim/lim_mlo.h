@@ -274,7 +274,7 @@ QDF_STATUS lim_fill_complete_mlo_ie(struct pe_session *session,
 uint16_t lim_caculate_mlo_ie_length(struct wlan_mlo_ie *mlo_ie);
 
 /**
- * lim_send_assoc_req_mgmt_frame_mlo() - Prepare ML IE for assoc req frame
+ * lim_fill_assoc_req_mlo_ie() - Prepare ML IE for assoc req frame
  * @mac_ctx: pointer to mac_context
  * @session: pointer to pe_session
  * @frm: pointer to tDot11fAssocRequest
@@ -282,9 +282,9 @@ uint16_t lim_caculate_mlo_ie_length(struct wlan_mlo_ie *mlo_ie);
  * Return: the actual ML IE length
  */
 uint16_t
-lim_send_assoc_req_mgmt_frame_mlo(struct mac_context *mac_ctx,
-				  struct pe_session *session,
-				  tDot11fAssocRequest *frm);
+lim_fill_assoc_req_mlo_ie(struct mac_context *mac_ctx,
+			  struct pe_session *session,
+			  tDot11fAssocRequest *frm);
 
 /**
  * lim_send_assoc_rsq_mgmt_frame_mlo() - Prepare ML IE for assoc rsq frame
@@ -487,9 +487,9 @@ QDF_STATUS lim_fill_complete_mlo_ie(struct pe_session *session,
 }
 
 static inline uint16_t
-lim_send_assoc_req_mgmt_frame_mlo(struct mac_context *mac_ctx,
-				  struct pe_session *session,
-				  tDot11fAssocRequest *frm)
+lim_fill_assoc_req_mlo_ie(struct mac_context *mac_ctx,
+			  struct pe_session *session,
+			  tDot11fAssocRequest *frm)
 {
 	return 0;
 }
