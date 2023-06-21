@@ -268,6 +268,16 @@ hdd_get_sta_connection_in_progress(struct hdd_context *hdd_ctx);
 void hdd_abort_ongoing_sta_connection(struct hdd_context *hdd_ctx);
 
 /**
+ * hdd_abort_ongoing_sta_sae_connection() - Disconnect the sta for which the
+ * sae connection is in progress.
+ *
+ * @hdd_ctx: hdd context
+ *
+ * Return: none
+ */
+void hdd_abort_ongoing_sta_sae_connection(struct hdd_context *hdd_ctx);
+
+/**
  * hdd_is_any_sta_connected() - check if any sta in connected state
  * @hdd_ctx: hdd context
  *

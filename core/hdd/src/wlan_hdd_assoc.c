@@ -583,6 +583,38 @@ void hdd_abort_ongoing_sta_connection(struct hdd_context *hdd_ctx)
 					     REASON_UNSPEC_FAILURE, false);
 }
 
+void hdd_abort_ongoing_sta_sae_connection(struct hdd_context *hdd_ctx)
+{
+	struct wlan_hdd_link_info *link_info;
+	struct wlan_objmgr_vdev *vdev;
+	int32_t key_mgmt;
+
+	link_info = hdd_get_sta_connection_in_progress(hdd_ctx);
+	if (!link_info)
+		return;
+
+	vdev = hdd_objmgr_get_vdev_by_user(link_info->adapter->deflink,
+					   WLAN_OSIF_ID);
+	if (!vdev)
+		return;
+
+	key_mgmt = wlan_crypto_get_param(vdev, WLAN_CRYPTO_PARAM_KEY_MGMT);
+	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
+
+	if (key_mgmt < 0) {
+		hdd_debug_rl("Invalid key_mgmt: %d", key_mgmt);
+		return;
+	}
+
+	if (QDF_HAS_PARAM(key_mgmt, WLAN_CRYPTO_KEY_MGMT_SAE) ||
+	    QDF_HAS_PARAM(key_mgmt, WLAN_CRYPTO_KEY_MGMT_FT_SAE) ||
+	    QDF_HAS_PARAM(key_mgmt, WLAN_CRYPTO_KEY_MGMT_SAE_EXT_KEY) ||
+	    QDF_HAS_PARAM(key_mgmt, WLAN_CRYPTO_KEY_MGMT_FT_SAE_EXT_KEY))
+		wlan_hdd_cm_issue_disconnect(link_info->adapter->deflink,
+					     REASON_DISASSOC_NETWORK_LEAVING,
+					     false);
+}
+
 QDF_STATUS hdd_get_first_connected_sta_vdev_id(struct hdd_context *hdd_ctx,
 					       uint32_t *vdev_id)
 {
