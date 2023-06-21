@@ -203,16 +203,19 @@ static void dp_tx_update_write_index(struct dp_soc *soc,
 			ce_tx_ring_write_idx_update_wrapper(tx_ep_info->ce_tx_hdl, false);
 			ce_ring_set_event(((struct CE_state *)(tx_ep_info->ce_tx_hdl))->src_ring,
 					  CE_RING_FLUSH_EVENT);
+			ce_ring_inc_flush_cnt(((struct CE_state *)(tx_ep_info->ce_tx_hdl))->src_ring);
 		} else {
 			ce_tx_ring_write_idx_update_wrapper(tx_ep_info->ce_tx_hdl,
 							    true);
 		}
+		hif_rtpm_put(HIF_RTPM_PUT_ASYNC, HIF_RTPM_ID_DP);
 	} else {
 		dp_runtime_get(soc);
 		ce_tx_ring_write_idx_update_wrapper(tx_ep_info->ce_tx_hdl,
 						    false);
 		ce_ring_set_event(((struct CE_state *)(tx_ep_info->ce_tx_hdl))->src_ring,
 				  CE_RING_FLUSH_EVENT);
+		ce_ring_inc_flush_cnt(((struct CE_state *)(tx_ep_info->ce_tx_hdl))->src_ring);
 		qdf_atomic_inc(&soc->tx_pending_rtpm);
 		dp_runtime_put(soc);
 	}
@@ -226,6 +229,7 @@ static void dp_tx_update_write_index(struct dp_soc *soc,
 						    false);
 		ce_ring_set_event(((struct CE_state *)(tx_ep_info->ce_tx_hdl))->src_ring,
 				  CE_RING_FLUSH_EVENT);
+		ce_ring_inc_flush_cnt(((struct CE_state *)(tx_ep_info->ce_tx_hdl))->src_ring);
 	} else {
 		ce_tx_ring_write_idx_update_wrapper(tx_ep_info->ce_tx_hdl,
 						    true);

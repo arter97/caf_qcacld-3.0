@@ -129,6 +129,7 @@ struct CE_ring_state {
 
 	OS_DMA_MEM_CONTEXT(ce_dmacontext); /* OS Specific DMA context */
 
+	uint32_t flush_count;
 	/*ce ring event */
 	unsigned long event;
 	/* last flushed time stamp */
@@ -928,5 +929,10 @@ static inline void ce_ring_set_event(struct CE_ring_state *ring, int event)
 static inline int ce_ring_get_clear_event(struct CE_ring_state *ring, int event)
 {
 	return qdf_atomic_test_and_clear_bit(event, &ring->event);
+}
+
+static inline void ce_ring_inc_flush_cnt(struct CE_ring_state *ring)
+{
+	ring->flush_count++;
 }
 #endif /* __COPY_ENGINE_INTERNAL_H__ */
