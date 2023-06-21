@@ -2963,6 +2963,9 @@ dp_primary_link_migration(struct dp_soc *soc, void *cb_ctxt,
 	uint8_t primary_vdev_id;
 	struct cdp_txrx_peer_params_update params = {0};
 	uint8_t tid;
+	uint8_t is_wds = 0;
+	uint16_t hw_peer_id;
+	uint16_t ast_hash;
 
 	pr_soc = dp_mlo_get_soc_ref_by_chip_id(dp_mlo, pr_peer_info->chip_id);
 	if (!pr_soc) {
@@ -2973,6 +2976,11 @@ dp_primary_link_migration(struct dp_soc *soc, void *cb_ctxt,
 
 	new_primary_peer = pr_soc->peer_id_to_obj_map[
 				pr_peer_info->primary_peer_id];
+	if (!new_primary_peer) {
+		dp_htt_err("New primary peer is NULL");
+		qdf_mem_free(pr_peer_info);
+		return;
+	}
 
 	mld_peer = DP_GET_MLD_PEER_FROM_PEER(new_primary_peer);
 	if (!mld_peer) {
@@ -2982,6 +2990,15 @@ dp_primary_link_migration(struct dp_soc *soc, void *cb_ctxt,
 	}
 
 	new_primary_peer->primary_link = 1;
+
+	hw_peer_id = pr_peer_info->hw_peer_id;
+	ast_hash = pr_peer_info->ast_hash;
+	/* Add ast enteries for new primary peer */
+	if (pr_soc->ast_offload_support && pr_soc->host_ast_db_enable) {
+		dp_peer_host_add_map_ast(pr_soc, mld_peer->peer_id, mld_peer->mac_addr.raw,
+					 hw_peer_id, new_primary_peer->vdev->vdev_id,
+					 ast_hash, is_wds);
+	}
 
 	/*
 	 * Check if reo_qref_table_en is set and if
@@ -3031,8 +3048,7 @@ dp_primary_link_migration(struct dp_soc *soc, void *cb_ctxt,
 }
 
 #ifdef WLAN_SUPPORT_PPEDS
-static QDF_STATUS dp_get_ppe_info_for_vap(struct cdp_soc_t *cdp_soc,
-					  struct dp_soc *mld_soc,
+static QDF_STATUS dp_get_ppe_info_for_vap(struct dp_soc *pr_soc,
 					  struct dp_peer *pr_peer,
 					  uint16_t *src_info)
 {
@@ -3040,6 +3056,7 @@ static QDF_STATUS dp_get_ppe_info_for_vap(struct cdp_soc_t *cdp_soc,
 	struct cdp_ds_vp_params vp_params = {0};
 	struct dp_ppe_vp_profile *ppe_vp_profile;
 	QDF_STATUS qdf_status = QDF_STATUS_SUCCESS;
+	struct cdp_soc_t *cdp_soc = &pr_soc->cdp_soc;
 
 	/*
 	 * Extract the VP profile from the VAP
@@ -3053,7 +3070,7 @@ static QDF_STATUS dp_get_ppe_info_for_vap(struct cdp_soc_t *cdp_soc,
 	 * Check if PPE DS routing is enabled on the associated vap.
 	 */
 	qdf_status = cdp_soc->ol_ops->get_ppeds_profile_info_for_vap(
-							mld_soc->ctrl_psoc,
+							pr_soc->ctrl_psoc,
 							pr_peer->vdev->vdev_id,
 							&vp_params);
 
@@ -3068,7 +3085,7 @@ static QDF_STATUS dp_get_ppe_info_for_vap(struct cdp_soc_t *cdp_soc,
 	if (vp_params.ppe_vp_type != PPE_VP_USER_TYPE_DS)
 		return qdf_status;
 
-	be_soc_mld = dp_get_be_soc_from_dp_soc(mld_soc);
+	be_soc_mld = dp_get_be_soc_from_dp_soc(pr_soc);
 	ppe_vp_profile = &be_soc_mld->ppe_vp_profile[
 				vp_params.ppe_vp_profile_idx];
 	*src_info = ppe_vp_profile->vp_num;
@@ -3076,8 +3093,7 @@ static QDF_STATUS dp_get_ppe_info_for_vap(struct cdp_soc_t *cdp_soc,
 	return qdf_status;
 }
 #else
-static QDF_STATUS dp_get_ppe_info_for_vap(struct cdp_soc_t *cdp_soc,
-					  struct dp_soc *mld_soc,
+static QDF_STATUS dp_get_ppe_info_for_vap(struct dp_soc *pr_soc,
 					  struct dp_peer *pr_peer,
 					  uint16_t *src_info)
 {
@@ -3102,9 +3118,11 @@ QDF_STATUS dp_htt_reo_migration(struct dp_soc *soc, uint16_t peer_id,
 	struct dp_peer *current_pr_peer = NULL;
 	struct dp_peer_info *peer_info;
 	struct dp_vdev_be *be_vdev;
-	struct cdp_soc_t *cdp_soc;
 	uint16_t src_info = 0;
 	QDF_STATUS status;
+	struct dp_ast_entry *ast_entry;
+	uint16_t hw_peer_id;
+	uint16_t ast_hash;
 
 	if (!dp_mlo) {
 		dp_htt_err("Invalid dp_mlo ctxt");
@@ -3146,8 +3164,7 @@ QDF_STATUS dp_htt_reo_migration(struct dp_soc *soc, uint16_t peer_id,
 	}
 
 	mld_soc = mld_peer->vdev->pdev->soc;
-	cdp_soc = &mld_soc->cdp_soc;
-	status = dp_get_ppe_info_for_vap(cdp_soc, mld_soc, pr_peer, &src_info);
+	status = dp_get_ppe_info_for_vap(pr_soc, pr_peer, &src_info);
 	if (status == QDF_STATUS_E_NULL_VALUE) {
 		dp_htt_err("Invalid ppe info for the vdev");
 		return QDF_STATUS_E_FAILURE;
@@ -3160,6 +3177,27 @@ QDF_STATUS dp_htt_reo_migration(struct dp_soc *soc, uint16_t peer_id,
 
 	dp_peer_rx_reo_shared_qaddr_delete(current_pr_soc, mld_peer);
 
+	/* delete ast entry for current primary peer */
+	qdf_spin_lock_bh(&current_pr_soc->ast_lock);
+	ast_entry = dp_peer_ast_hash_find_soc(current_pr_soc, mld_peer->mac_addr.raw);
+	if (!ast_entry) {
+		dp_htt_err("Invalid ast entry");
+		qdf_spin_unlock_bh(&current_pr_soc->ast_lock);
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	hw_peer_id = ast_entry->ast_idx;
+	ast_hash = ast_entry->ast_hash_value;
+	dp_peer_unlink_ast_entry(current_pr_soc, ast_entry, mld_peer);
+
+	if (ast_entry->is_mapped)
+		current_pr_soc->ast_table[ast_entry->ast_idx] = NULL;
+
+	dp_peer_free_ast_entry(current_pr_soc, ast_entry);
+
+	mld_peer->self_ast_entry = NULL;
+	qdf_spin_unlock_bh(&current_pr_soc->ast_lock);
+
 	peer_info = qdf_mem_malloc(sizeof(struct dp_peer_info));
 	if (!peer_info) {
 		dp_htt_err("Malloc failed");
@@ -3168,6 +3206,8 @@ QDF_STATUS dp_htt_reo_migration(struct dp_soc *soc, uint16_t peer_id,
 
 	peer_info->primary_peer_id = peer_id;
 	peer_info->chip_id = chip_id;
+	peer_info->hw_peer_id = hw_peer_id;
+	peer_info->ast_hash = ast_hash;
 
 	qdf_mem_zero(&params, sizeof(params));
 

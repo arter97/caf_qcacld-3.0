@@ -1287,19 +1287,6 @@ void dp_peer_map_ipa_evt(struct dp_soc *soc, struct dp_peer *peer,
 }
 #endif
 
-/**
- * dp_peer_host_add_map_ast() - Add ast entry with HW AST Index
- * @soc: SoC handle
- * @peer_id: peer id from firmware
- * @mac_addr: MAC address of ast node
- * @hw_peer_id: HW AST Index returned by target in peer map event
- * @vdev_id: vdev id for VAP to which the peer belongs to
- * @ast_hash: ast hash value in HW
- * @is_wds: flag to indicate peer map event for WDS ast entry
- *
- * Return: QDF_STATUS code
- */
-static inline
 QDF_STATUS dp_peer_host_add_map_ast(struct dp_soc *soc, uint16_t peer_id,
 				    uint8_t *mac_addr, uint16_t hw_peer_id,
 				    uint8_t vdev_id, uint16_t ast_hash,
