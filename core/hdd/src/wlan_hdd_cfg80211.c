@@ -14762,7 +14762,7 @@ static uint32_t wlan_hdd_populate_weigh_pcl(
 		w_pcl[i].freq = chan_weights->pcl_list[i];
 		w_pcl[i].weight = chan_weights->weight_list[i];
 
-		if (intf_mode == PM_SAP_MODE || intf_mode == PM_P2P_GO_MODE)
+		if (policy_mgr_is_beaconing_mode(intf_mode))
 			w_pcl[i].flag = PCL_CHANNEL_SUPPORT_GO;
 		else
 			w_pcl[i].flag = PCL_CHANNEL_SUPPORT_CLI;
@@ -14797,8 +14797,8 @@ static uint32_t wlan_hdd_populate_weigh_pcl(
 						PCL_CHANNEL_EXCLUDE_IN_GO_NEG;
 					w_pcl[chan_idx].weight = 0;
 				} else {
-					if (intf_mode == PM_SAP_MODE ||
-					    intf_mode == PM_P2P_GO_MODE)
+					if (policy_mgr_is_beaconing_mode(
+								intf_mode))
 						w_pcl[chan_idx].flag =
 						      PCL_CHANNEL_SUPPORT_GO;
 					else

@@ -529,7 +529,7 @@ void policy_mgr_update_conc_list(struct wlan_objmgr_psoc *psoc,
 		pm_ctx->cdp_cbacks.cdp_update_mac_id(psoc, vdev_id, mac);
 
 	/* IPA only cares about STA or SAP mode */
-	if (mode == PM_STA_MODE || mode == PM_SAP_MODE) {
+	if (mode == PM_STA_MODE || policy_mgr_is_sap_mode(mode)) {
 		mcc_mode = policy_mgr_current_concurrency_is_mcc(psoc);
 
 		if (pm_ctx->dp_cbacks.hdd_ipa_set_mcc_mode_cb)
@@ -1166,6 +1166,9 @@ static uint32_t policy_mgr_dump_current_concurrency_one_connection(
 	case PM_NDI_MODE:
 		count = strlcat(cc_mode, "NDI", length);
 		break;
+	case PM_LL_LT_SAP_MODE:
+		count = strlcat(cc_mode, "LT_SAP", length);
+		break;
 	default:
 		policy_mgr_err("unexpected mode %d", mode);
 		break;
@@ -1236,6 +1239,12 @@ static uint32_t policy_mgr_dump_current_concurrency_two_connection(
 		count = policy_mgr_dump_current_concurrency_one_connection(
 				psoc, cc_mode, length);
 		count += strlcat(cc_mode, "+NAN Disc", length);
+		break;
+	case PM_LL_LT_SAP_MODE:
+		count = policy_mgr_dump_current_concurrency_one_connection(
+				psoc, cc_mode, length);
+		count += strlcat(cc_mode, "+LT_SAP",
+					length);
 		break;
 	default:
 		policy_mgr_err("unexpected mode %d", mode);
@@ -1308,6 +1317,13 @@ static uint32_t policy_mgr_dump_current_concurrency_three_connection(
 				psoc, cc_mode, length);
 		count += strlcat(cc_mode, "+NDI",
 					length);
+		break;
+	case PM_LL_LT_SAP_MODE:
+		count = policy_mgr_dump_current_concurrency_two_connection(
+				psoc, cc_mode, length);
+		count += strlcat(cc_mode, "+LT_SAP",
+					length);
+
 		break;
 	default:
 		policy_mgr_err("unexpected mode %d", mode);
@@ -1519,6 +1535,13 @@ static uint32_t policy_mgr_dump_current_concurrency_4_connection(
 		count += strlcat(cc_mode, "+NDI",
 					length);
 		break;
+	case PM_LL_LT_SAP_MODE:
+		count = policy_mgr_dump_current_concurrency_three_connection(
+				psoc, cc_mode, length);
+		count += strlcat(cc_mode, "+LT_SAP",
+					length);
+		break;
+
 	default:
 		policy_mgr_err("unexpected mode %d", mode);
 		break;
@@ -2082,25 +2105,26 @@ uint32_t policy_mgr_get_connection_for_vdev_id(struct wlan_objmgr_psoc *psoc,
 	return conn_index;
 }
 
-/**
- * policy_mgr_get_mode() - Get mode from type and subtype
- * @type: type
- * @subtype: subtype
- *
- * Get the concurrency mode from the type and subtype
- * of the interface
- *
- * Return: policy_mgr_con_mode
- */
-enum policy_mgr_con_mode policy_mgr_get_mode(uint8_t type,
-		uint8_t subtype)
+enum policy_mgr_con_mode policy_mgr_get_mode(struct wlan_objmgr_psoc *psoc,
+					     uint8_t type, uint8_t subtype,
+					     uint32_t vdev_id)
+
 {
 	enum policy_mgr_con_mode mode = PM_MAX_NUM_OF_MODE;
 
 	if (type == WMI_VDEV_TYPE_AP) {
 		switch (subtype) {
 		case 0:
-			mode = PM_SAP_MODE;
+	/*
+	 * This feature flag is added on temporary basis, once LL_LT_SAP is
+	 * enabled, this feature flag will be removed.
+	 */
+#ifdef WLAN_FEATURE_LL_LT_SAP
+			if (policy_mgr_is_vdev_ll_lt_sap(psoc, vdev_id))
+				mode = PM_LL_LT_SAP_MODE;
+			else
+#endif
+				mode = PM_SAP_MODE;
 			break;
 		case WMI_UNIFIED_VDEV_SUBTYPE_P2P_GO:
 			mode = PM_P2P_GO_MODE;
@@ -4409,8 +4433,8 @@ QDF_STATUS policy_mgr_nss_update(struct wlan_objmgr_psoc *psoc,
 		}
 	}
 
-	count = policy_mgr_mode_specific_connection_count(psoc,
-			PM_SAP_MODE, list);
+	count = policy_mgr_get_sap_mode_count(psoc, list);
+
 	for (index = 0; index < count; index++) {
 		qdf_mutex_acquire(&pm_ctx->qdf_conc_list_lock);
 		vdev_id = pm_conc_connection_list[list[index]].vdev_id;

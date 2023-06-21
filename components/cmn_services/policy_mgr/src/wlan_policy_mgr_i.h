@@ -818,8 +818,20 @@ policy_mgr_dump_disabled_ml_links(struct policy_mgr_psoc_priv_obj *pm_ctx) {}
 void policy_mgr_dump_current_concurrency(struct wlan_objmgr_psoc *psoc);
 
 void pm_dbs_opportunistic_timer_handler(void *data);
-enum policy_mgr_con_mode policy_mgr_get_mode(uint8_t type,
-		uint8_t subtype);
+
+/**
+ * policy_mgr_get_mode() - Get policy manager mode
+ * @psoc: psoc handle
+ * @type: WMI vdev type for which policy mgr mode is required
+ * @subtype: Subtype of the vdev type
+ * @vdev_id: Vdev id for which the policy mgr type is required
+ *
+ *
+ * Return: policy_mgr_con_mode
+ */
+enum policy_mgr_con_mode policy_mgr_get_mode(struct wlan_objmgr_psoc *psoc,
+					     uint8_t type, uint8_t subtype,
+					     uint32_t vdev_id);
 
 /**
  * policy_mgr_get_channel_list() - Get channel list based on PCL and mode

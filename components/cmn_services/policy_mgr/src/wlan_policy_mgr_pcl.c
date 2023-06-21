@@ -3479,7 +3479,7 @@ QDF_STATUS policy_mgr_get_valid_chans_from_range(
 	ch_weight_len = *ch_cnt;
 
 	/* check the channel avoidance list for beaconing entities */
-	if (mode == PM_SAP_MODE || mode == PM_P2P_GO_MODE)
+	if (policy_mgr_is_beaconing_mode(mode))
 		policy_mgr_update_with_safe_channel_list(
 			psoc, ch_freq_list, ch_cnt, ch_weight_list,
 			ch_weight_len);
@@ -3930,10 +3930,7 @@ QDF_STATUS policy_mgr_get_valid_chan_weights(struct wlan_objmgr_psoc *psoc,
 		 * vdev is SAP/P2PGO/P2PGC.
 		 */
 		if ((mode == PM_P2P_GO_MODE || mode == PM_P2P_CLIENT_MODE) &&
-		    (policy_mgr_mode_specific_connection_count(
-						psoc, PM_SAP_MODE, NULL) ||
-		     policy_mgr_mode_specific_connection_count(
-						psoc, PM_P2P_GO_MODE, NULL) ||
+		    ((policy_mgr_get_beaconing_mode_count(psoc, NULL)) ||
 		     policy_mgr_mode_specific_connection_count(
 					psoc, PM_P2P_CLIENT_MODE, NULL)))
 			strict_follow_pcl = true;
@@ -4308,8 +4305,7 @@ bool policy_mgr_is_sta_chan_valid_for_connect_and_roam(
 	skip_6g_and_indoor_freq =
 		wlan_scan_cfg_skip_6g_and_indoor_freq(psoc);
 	sap_count =
-		policy_mgr_mode_specific_connection_count(psoc, PM_SAP_MODE,
-							  NULL);
+		policy_mgr_get_sap_mode_count(psoc, NULL);
 	/*
 	 * Do not allow STA to connect/roam on 6Ghz or indoor channel for
 	 * non-dbs hardware if SAP is present and skip_6g_and_indoor_freq_scan

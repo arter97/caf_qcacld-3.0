@@ -3460,6 +3460,7 @@ wlansap_get_safe_channel(struct sap_context *sap_ctx,
 	mac_handle_t mac_handle;
 	uint32_t pcl_len = 0, i;
 	uint32_t selected_freq;
+	enum policy_mgr_con_mode mode;
 
 	if (!sap_ctx) {
 		sap_err("NULL parameter");
@@ -3473,6 +3474,9 @@ wlansap_get_safe_channel(struct sap_context *sap_ctx,
 	}
 	mac_handle = MAC_HANDLE(mac);
 
+	mode = policy_mgr_qdf_opmode_to_pm_con_mode(mac->psoc,
+						    QDF_SAP_MODE,
+						    sap_ctx->vdev_id);
 	/* get the channel list for current domain */
 	status = policy_mgr_get_valid_chans(mac->psoc, pcl_freqs, &pcl_len);
 	if (QDF_IS_STATUS_ERROR(status)) {
@@ -3491,7 +3495,7 @@ wlansap_get_safe_channel(struct sap_context *sap_ctx,
 		status = policy_mgr_get_valid_chans_from_range(mac->psoc,
 							       pcl_freqs,
 							       &pcl_len,
-							       PM_SAP_MODE);
+							       mode);
 		if (QDF_IS_STATUS_ERROR(status) || !pcl_len) {
 			sap_err("failed to get valid channel: %d len %d",
 				status, pcl_len);
@@ -3574,6 +3578,7 @@ wlansap_get_safe_channel_from_pcl_and_acs_range(struct sap_context *sap_ctx,
 	QDF_STATUS status;
 	mac_handle_t mac_handle;
 	uint32_t pcl_len = 0;
+	enum policy_mgr_con_mode mode;
 
 	if (!sap_ctx) {
 		sap_err("NULL parameter");
@@ -3592,8 +3597,11 @@ wlansap_get_safe_channel_from_pcl_and_acs_range(struct sap_context *sap_ctx,
 		return wlansap_get_safe_channel(sap_ctx, ch_width);
 	}
 
+	mode = policy_mgr_qdf_opmode_to_pm_con_mode(mac->psoc, QDF_SAP_MODE,
+						    sap_ctx->vdev_id);
+
 	status =
-		policy_mgr_get_pcl_for_scc_in_same_mode(mac->psoc, PM_SAP_MODE,
+		policy_mgr_get_pcl_for_scc_in_same_mode(mac->psoc, mode,
 							pcl_freqs, &pcl_len,
 							pcl.weight_list,
 							QDF_ARRAY_SIZE(pcl.weight_list),
@@ -3697,6 +3705,7 @@ uint32_t wlansap_get_safe_channel_from_pcl_for_sap(struct sap_context *sap_ctx)
 	uint32_t pcl_freqs[NUM_CHANNELS] = {0};
 	QDF_STATUS status;
 	uint32_t pcl_len = 0;
+	enum policy_mgr_con_mode mode;
 
 	if (!sap_ctx) {
 		sap_err("NULL parameter");
@@ -3714,7 +3723,10 @@ uint32_t wlansap_get_safe_channel_from_pcl_for_sap(struct sap_context *sap_ctx)
 		sap_err("NULL pdev");
 	}
 
-	status = policy_mgr_get_pcl_for_vdev_id(mac->psoc, PM_SAP_MODE,
+	mode = policy_mgr_qdf_opmode_to_pm_con_mode(mac->psoc, QDF_SAP_MODE,
+						    sap_ctx->vdev_id);
+
+	status = policy_mgr_get_pcl_for_vdev_id(mac->psoc, mode,
 						pcl_freqs, &pcl_len,
 						pcl.weight_list,
 						QDF_ARRAY_SIZE(pcl.weight_list),
@@ -3742,6 +3754,9 @@ uint32_t wlansap_get_safe_channel_from_pcl_for_sap(struct sap_context *sap_ctx)
 	} else {
 		sap_debug("pcl length is zero!");
 	}
+
+	if (mode == PM_LL_LT_SAP_MODE)
+		return INVALID_CHANNEL_ID;
 
 	return wlansap_get_2g_first_safe_chan_freq(sap_ctx);
 }
@@ -4043,8 +4058,8 @@ bool wlansap_filter_vendor_unsafe_ch_freq(
 	if (!mac)
 		return false;
 
-	count = policy_mgr_mode_specific_connection_count(mac->psoc,
-							  PM_SAP_MODE, NULL);
+	count = policy_mgr_get_sap_mode_count(mac->psoc, NULL);
+
 	if (count != policy_mgr_get_connection_count(mac->psoc))
 		return false;
 
