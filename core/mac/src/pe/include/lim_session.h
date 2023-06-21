@@ -50,9 +50,6 @@ struct comeback_timer_info {
 /*--------------------------------------------------------------------------
    Preprocessor definitions and constants
    ------------------------------------------------------------------------*/
-/* Maximum Number of WEP KEYS */
-#define MAX_WEP_KEYS 4
-
 #define SCH_PROTECTION_RESET_TIME 4000
 
 /*--------------------------------------------------------------------------
@@ -508,7 +505,7 @@ struct wlan_mlo_ie_info {
  * @vhtCapability:
  * @gLimOperatingMode:
  * @vhtCapabilityPresentInBeacon:
- * @ch_center_freq_seg0: center freq number as advertized OTA
+ * @ch_center_freq_seg0: center freq number as advertised OTA
  * @ch_width:
  * @puncture_bitmap:
  * @ch_center_freq_seg1:
@@ -773,8 +770,6 @@ struct pe_session {
 
 	uint8_t privacy;
 	tAniAuthType authType;
-	tSirKeyMaterial WEPKeyMaterial[MAX_WEP_KEYS];
-
 	tDot11fIEWMMParams wmm_params;
 	tDot11fIERSN gStartBssRSNIe;
 	tDot11fIEWPA gStartBssWPAIe;

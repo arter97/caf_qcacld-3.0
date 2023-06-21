@@ -306,28 +306,6 @@ struct lim_context {
 	/* ////////////////////////////////////     TIMER RELATED END /////////////////////////////////////////// */
 
 	uint8_t gLimCurrentBssUapsd;
-
-	/* */
-	/* Store the BSS Index returned by HAL during */
-	/* WMA_ADD_BSS_RSP here. */
-	/* */
-
-	/* For now: */
-	/* This will be used during WMA_SET_BSSKEY_REQ in */
-	/* order to set the GTK */
-	/* Later: */
-	/* There could be other interfaces needing this info */
-	/* */
-
-	/* */
-	/* Due to the asynchronous nature of the interface */
-	/* between PE <-> HAL, some transient information */
-	/* like this needs to be cached. */
-	/* This is cached upon receipt of eWNI_SME_SETCONTEXT_REQ. */
-	/* This is released while posting LIM_MLM_SETKEYS_CNF */
-	/* */
-	void *gpLimMlmSetKeysReq;
-
 	/* ////////////////////////////////////////     BSS RELATED END /////////////////////////////////////////// */
 
 	/* ////////////////////////////////////////     STATS/COUNTER RELATED START /////////////////////////////////////////// */

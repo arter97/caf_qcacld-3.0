@@ -5638,7 +5638,7 @@ static void wma_send_set_key_rsp(uint8_t vdev_id, bool pairwise,
 			return;
 		key_info_uc->vdev_id = vdev_id;
 		key_info_uc->status = QDF_STATUS_SUCCESS;
-		key_info_uc->key[0].keyLength = crypto_key->keylen;
+		key_info_uc->key_len = crypto_key->keylen;
 		qdf_mem_copy(&key_info_uc->macaddr, &crypto_key->macaddr,
 			     QDF_MAC_ADDR_SIZE);
 		wma_send_msg_high_priority(wma, WMA_SET_STAKEY_RSP,
@@ -5650,7 +5650,7 @@ static void wma_send_set_key_rsp(uint8_t vdev_id, bool pairwise,
 			return;
 		key_info_mc->vdev_id = vdev_id;
 		key_info_mc->status = QDF_STATUS_SUCCESS;
-		key_info_mc->key[0].keyLength = crypto_key->keylen;
+		key_info_mc->key_len = crypto_key->keylen;
 		qdf_mem_copy(&key_info_mc->macaddr, &bcast_mac,
 			     QDF_MAC_ADDR_SIZE);
 		wma_send_msg_high_priority(wma, WMA_SET_BSSKEY_RSP,

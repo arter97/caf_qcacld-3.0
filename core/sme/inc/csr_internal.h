@@ -115,12 +115,6 @@ struct csr_channel {
 	uint32_t channel_freq_list[CFG_VALID_CHANNEL_LIST_LEN];
 };
 
-struct bss_config_param {
-	tSirMacSSid SSID;
-	enum csr_cfgdot11mode uCfgDot11Mode;
-	tSirMacCapabilityInfo BssCap;
-};
-
 struct roam_cmd {
 	enum csr_roam_reason roamReason;
 	tSirMacAddr peerMac;

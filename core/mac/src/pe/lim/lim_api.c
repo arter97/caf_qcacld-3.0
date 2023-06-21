@@ -101,9 +101,6 @@ static void __lim_init_bss_vars(struct mac_context *mac)
 {
 	qdf_mem_zero((void *)mac->lim.gpSession,
 		    sizeof(*mac->lim.gpSession) * mac->lim.maxBssId);
-
-	/* This is for testing purposes only, be default should always be off */
-	mac->lim.gpLimMlmSetKeysReq = NULL;
 }
 
 static void __lim_init_stats_vars(struct mac_context *mac)
@@ -465,13 +462,6 @@ void lim_cleanup(struct mac_context *mac)
 	if (mac->lim.pDialogueTokenTail) {
 		qdf_mem_free(mac->lim.pDialogueTokenTail);
 		mac->lim.pDialogueTokenTail = NULL;
-	}
-
-	if (mac->lim.gpLimMlmSetKeysReq) {
-		qdf_mem_zero(mac->lim.gpLimMlmSetKeysReq,
-			     sizeof(tLimMlmSetKeysReq));
-		qdf_mem_free(mac->lim.gpLimMlmSetKeysReq);
-		mac->lim.gpLimMlmSetKeysReq = NULL;
 	}
 
 	if (mac->lim.gpLimMlmAuthReq) {
