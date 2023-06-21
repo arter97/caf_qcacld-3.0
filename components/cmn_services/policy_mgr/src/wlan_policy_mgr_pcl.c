@@ -3830,7 +3830,8 @@ QDF_STATUS policy_mgr_get_valid_chan_weights(struct wlan_objmgr_psoc *psoc,
 		 */
 		if (mode == PM_STA_MODE) {
 			if (policy_mgr_concurrent_sta_on_different_mac(psoc) &&
-			    !wlan_cm_same_band_sta_allowed(psoc)) {
+			    !wlan_cm_same_band_sta_allowed(psoc) &&
+			    weight->pcl_len) {
 				policy_mgr_debug("sta follow pcl strictly");
 				strict_follow_pcl = true;
 			}
