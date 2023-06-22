@@ -2344,6 +2344,52 @@ dp_rx_validate_rx_callbacks(struct dp_soc *soc,
 	return QDF_STATUS_SUCCESS;
 }
 
+#if defined(WLAN_FEATURE_11BE_MLO) && defined(RAW_PKT_MLD_ADDR_CONVERSION)
+static void dp_rx_raw_pkt_mld_addr_conv(struct dp_soc *soc,
+					struct dp_vdev *vdev,
+					struct dp_txrx_peer *txrx_peer,
+					qdf_nbuf_t nbuf_head)
+{
+	qdf_nbuf_t nbuf, next;
+	struct dp_peer *peer = NULL;
+	struct ieee80211_frame *wh = NULL;
+
+	if (vdev->rx_decap_type == htt_cmn_pkt_type_native_wifi)
+		return;
+
+	peer = dp_peer_get_ref_by_id(soc, txrx_peer->peer_id,
+				     DP_MOD_ID_RX);
+
+	if (!peer)
+		return;
+
+	if (!IS_MLO_DP_MLD_PEER(peer)) {
+		dp_peer_unref_delete(peer, DP_MOD_ID_RX);
+		return;
+	}
+
+	nbuf = nbuf_head;
+	while (nbuf) {
+		next = nbuf->next;
+		wh = (struct ieee80211_frame *)qdf_nbuf_data(nbuf);
+		qdf_mem_copy(wh->i_addr1, vdev->mld_mac_addr.raw,
+			     QDF_MAC_ADDR_SIZE);
+		qdf_mem_copy(wh->i_addr2, peer->mac_addr.raw,
+			     QDF_MAC_ADDR_SIZE);
+		nbuf = next;
+	}
+
+	dp_peer_unref_delete(peer, DP_MOD_ID_RX);
+}
+#else
+static inline
+void dp_rx_raw_pkt_mld_addr_conv(struct dp_soc *soc,
+				 struct dp_vdev *vdev,
+				 struct dp_txrx_peer *txrx_peer,
+				 qdf_nbuf_t nbuf_head)
+{ }
+#endif
+
 QDF_STATUS dp_rx_deliver_to_stack(struct dp_soc *soc,
 				  struct dp_vdev *vdev,
 				  struct dp_txrx_peer *txrx_peer,
@@ -2356,6 +2402,7 @@ QDF_STATUS dp_rx_deliver_to_stack(struct dp_soc *soc,
 
 	if (qdf_unlikely(vdev->rx_decap_type == htt_cmn_pkt_type_raw) ||
 			(vdev->rx_decap_type == htt_cmn_pkt_type_native_wifi)) {
+		dp_rx_raw_pkt_mld_addr_conv(soc, vdev, txrx_peer, nbuf_head);
 		vdev->osif_rsim_rx_decap(vdev->osif_vdev, &nbuf_head,
 					 &nbuf_tail);
 	}
