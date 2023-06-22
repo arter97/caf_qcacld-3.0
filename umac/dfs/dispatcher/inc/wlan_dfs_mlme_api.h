@@ -229,6 +229,15 @@ void dfs_mlme_channel_change_by_precac(struct wlan_objmgr_pdev *pdev);
 void dfs_mlme_nol_timeout_notification(struct wlan_objmgr_pdev *pdev);
 
 /**
+ * dfs_mlme_set_tx_flag() - Set the Vap flag to block Tx on Radar detection.
+ * @pdev:            Pointer to DFS pdev object.
+ * @is_tx_allowed:   Flag value to be set.
+ *                   True indicate data Tx is allowed
+ *                   False indicate data Tx is blocked;
+ */
+void dfs_mlme_set_tx_flag(struct wlan_objmgr_pdev *pdev, bool is_tx_allowed);
+
+/**
  * dfs_mlme_clist_update() - Mark the channel as RADAR.
  * @pdev: Pointer to DFS pdev object.
  * @nollist: Pointer to NOL list.
