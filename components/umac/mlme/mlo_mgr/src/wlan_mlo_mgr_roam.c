@@ -1028,8 +1028,7 @@ mlo_roam_validate_req(struct wlan_objmgr_vdev *vdev,
 			}
 			copied_conn_req_lock_acquire(sta_ctx);
 			if (sta_ctx->copied_conn_req) {
-				mlo_free_connect_ies(sta_ctx->copied_conn_req);
-				qdf_mem_free(sta_ctx->copied_conn_req);
+				wlan_cm_free_connect_req(sta_ctx->copied_conn_req);
 				sta_ctx->copied_conn_req = NULL;
 			}
 			copied_conn_req_lock_release(sta_ctx);
@@ -1144,7 +1143,7 @@ mlo_roam_prepare_and_send_link_connect_req(struct wlan_objmgr_vdev *assoc_vdev,
 		sta_ctx->copied_conn_req = qdf_mem_malloc(
 				sizeof(struct wlan_cm_connect_req));
 	else
-		mlo_free_connect_ies(sta_ctx->copied_conn_req);
+		wlan_cm_free_connect_req_param(sta_ctx->copied_conn_req);
 
 	mlo_debug("MLO_ROAM: storing from roam connect rsp to connect req");
 	if (sta_ctx->copied_conn_req) {
