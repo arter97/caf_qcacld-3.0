@@ -8154,13 +8154,16 @@ QDF_STATUS reg_set_ap_pwr_and_update_chan_list(struct wlan_objmgr_pdev *pdev,
 		return QDF_STATUS_E_INVAL;
 	}
 
-	if (!reg_get_num_rules_of_ap_pwr_type(pdev, ap_pwr_type))
-		return QDF_STATUS_E_FAILURE;
+	if (ap_pwr_type != REG_CURRENT_MAX_AP_TYPE) {
+		if (!reg_get_num_rules_of_ap_pwr_type(pdev, ap_pwr_type))
+			return QDF_STATUS_E_FAILURE;
 
-	status = reg_set_cur_6g_ap_pwr_type(pdev, ap_pwr_type);
-	if (QDF_IS_STATUS_ERROR(status)) {
-		reg_debug("failed to set AP power type to %d", ap_pwr_type);
-		return status;
+		status = reg_set_cur_6g_ap_pwr_type(pdev, ap_pwr_type);
+		if (QDF_IS_STATUS_ERROR(status)) {
+			reg_debug("failed to set AP power type to %d",
+				  ap_pwr_type);
+			return status;
+		}
 	}
 
 	reg_compute_pdev_current_chan_list(pdev_priv_obj);
