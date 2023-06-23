@@ -3294,6 +3294,12 @@ QDF_STATUS (*extract_sap_coex_cap_service_ready_ext2)(
 QDF_STATUS
 (*send_wmi_tdma_schedule_request_cmd)(wmi_unified_t wmi_handle,
 				      struct wlan_tdma_sched_cmd_param *param);
+
+#ifdef WLAN_FEATURE_11BE_MLO
+QDF_STATUS
+(*send_wmi_link_recommendation_cmd)(wmi_unified_t wmi_handle,
+				    struct wlan_link_recmnd_param *param);
+#endif
 #endif
 
 QDF_STATUS
