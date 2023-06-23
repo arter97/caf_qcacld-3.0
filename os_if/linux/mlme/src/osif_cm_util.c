@@ -27,6 +27,7 @@
 #include "wlan_cfg80211.h"
 #include "osif_cm_rsp.h"
 #include "wlan_cfg80211_scan.h"
+#include "wlan_mlo_mgr_sta.h"
 
 enum qca_sta_connect_fail_reason_codes
 osif_cm_mac_to_qca_connect_fail_reason(enum wlan_status_code internal_reason)
@@ -355,7 +356,8 @@ osif_cm_disable_netif_queue(struct wlan_objmgr_vdev *vdev)
 static QDF_STATUS
 osif_link_reconfig_notify_cb(struct wlan_objmgr_vdev *vdev)
 {
-	struct vdev_osif_priv *osif_priv = wlan_vdev_get_ospriv(vdev);
+	struct vdev_osif_priv *osif_priv;
+	struct wlan_objmgr_vdev *assoc_vdev;
 	struct wireless_dev *wdev;
 	uint8_t link_id;
 	uint16_t link_mask;
@@ -366,6 +368,13 @@ osif_link_reconfig_notify_cb(struct wlan_objmgr_vdev *vdev)
 	struct qdf_mac_addr ap_mld_mac;
 	QDF_STATUS status;
 
+	assoc_vdev = ucfg_mlo_get_assoc_link_vdev(vdev);
+	if (!assoc_vdev) {
+		osif_err("Failed to get assoc vdev");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	osif_priv = wlan_vdev_get_ospriv(assoc_vdev);
 	if (!osif_priv) {
 		osif_err("Invalid vdev osif priv");
 		return QDF_STATUS_E_INVAL;
@@ -376,7 +385,7 @@ osif_link_reconfig_notify_cb(struct wlan_objmgr_vdev *vdev)
 		osif_err("wdev is null");
 		return QDF_STATUS_E_INVAL;
 	}
-	pdev = wlan_vdev_get_pdev(vdev);
+	pdev = wlan_vdev_get_pdev(assoc_vdev);
 	if (!pdev) {
 		osif_debug("null pdev");
 		return QDF_STATUS_E_INVAL;
