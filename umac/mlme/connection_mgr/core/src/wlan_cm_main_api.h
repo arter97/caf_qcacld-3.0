@@ -1344,6 +1344,27 @@ void cm_free_connect_req(struct wlan_cm_connect_req *connect_req);
  */
 void cm_free_connect_rsp(struct wlan_cm_connect_resp *connect_rsp);
 
+/**
+ * cm_free_connect_req_param() - Function to free up connect request sub memory.
+ * @req: pointer to connect req
+ *
+ * Function to free up connect request sub memory parameters.
+ *
+ * Return: void
+ */
+void cm_free_connect_req_param(struct wlan_cm_connect_req *req);
+
+/**
+ * cm_free_wep_key_params() - Function to free up connect request wep key params
+ * sub memory
+ * @req: pointer to connect req
+ *
+ * Function to free up connect request wep key params sub memory.
+ *
+ * Return: void
+ */
+void cm_free_wep_key_params(struct wlan_cm_connect_req *req);
+
 #ifdef CONN_MGR_ADV_FEATURE
 /**
  * cm_store_first_candidate_rsp() - store the connection failure response

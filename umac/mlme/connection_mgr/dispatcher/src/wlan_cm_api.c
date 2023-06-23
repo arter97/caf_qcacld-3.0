@@ -147,6 +147,14 @@ void wlan_cm_free_connect_resp(struct wlan_cm_connect_resp *connect_rsp)
 	cm_free_connect_rsp(connect_rsp);
 }
 
+void wlan_cm_free_connect_req_param(struct wlan_cm_connect_req *req)
+{
+	if (!req)
+		return;
+
+	cm_free_connect_req_param(req);
+}
+
 void wlan_cm_set_max_connect_attempts(struct wlan_objmgr_vdev *vdev,
 				      uint8_t max_connect_attempts)
 {

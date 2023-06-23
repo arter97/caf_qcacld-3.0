@@ -961,15 +961,28 @@ void cm_free_connect_rsp_ies(struct wlan_cm_connect_resp *connect_rsp)
 	cm_free_roaming_info(connect_rsp);
 }
 
-static void cm_free_connect_req_param(struct wlan_cm_connect_req *req)
+static void cm_free_connect_req_ies(struct wlan_cm_connect_req *req)
 {
 	cm_zero_and_free_memory(req->assoc_ie.ptr, req->assoc_ie.len);
+	req->assoc_ie.ptr = NULL;
 	cm_zero_and_free_memory(req->scan_ie.ptr, req->scan_ie.len);
+	req->scan_ie.ptr = NULL;
+}
 
+void cm_free_wep_key_params(struct wlan_cm_connect_req *req)
+{
 	cm_zero_and_free_memory(req->crypto.wep_keys.key,
 				req->crypto.wep_keys.key_len);
+	req->crypto.wep_keys.key = NULL;
 	cm_zero_and_free_memory(req->crypto.wep_keys.seq,
 				req->crypto.wep_keys.seq_len);
+	req->crypto.wep_keys.seq = NULL;
+}
+
+void cm_free_connect_req_param(struct wlan_cm_connect_req *req)
+{
+	cm_free_connect_req_ies(req);
+	cm_free_wep_key_params(req);
 }
 
 void cm_free_connect_req(struct wlan_cm_connect_req *req)

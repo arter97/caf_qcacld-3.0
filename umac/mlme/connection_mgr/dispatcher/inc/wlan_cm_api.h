@@ -221,6 +221,14 @@ void wlan_cm_free_connect_req(struct wlan_cm_connect_req *connect_req);
  */
 void wlan_cm_free_connect_resp(struct wlan_cm_connect_resp *connect_rsp);
 
+/**
+ * wlan_cm_free_connect_req_param() - free up connect request sub memory
+ * @req: Connect request
+ *
+ * Return: void
+ */
+void wlan_cm_free_connect_req_param(struct wlan_cm_connect_req *req);
+
 #ifdef WLAN_FEATURE_ROAM_OFFLOAD
 /**
  * wlan_cm_is_vdev_roam_started() - check if vdev is in roaming state and
