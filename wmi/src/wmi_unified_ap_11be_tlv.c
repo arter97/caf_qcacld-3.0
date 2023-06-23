@@ -72,3 +72,55 @@ size_t quiet_mlo_params_size(struct set_bcn_offload_quiet_mode_params *params)
 
 	return quiet_mlo_size;
 }
+
+QDF_STATUS
+send_wmi_link_recommendation_cmd_tlv(
+		wmi_unified_t wmi_handle,
+		struct wlan_link_recmnd_param *param)
+{
+	wmi_mlo_link_recommendation_fixed_param *cmd;
+	wmi_mlo_peer_recommended_links *peer_cmd;
+	wmi_buf_t buf;
+	void *buf_ptr;
+	int32_t len = sizeof(wmi_mlo_link_recommendation_fixed_param) +
+		sizeof(wmi_mlo_peer_recommended_links) + WMI_TLV_HDR_SIZE;
+
+	buf = wmi_buf_alloc(wmi_handle, len);
+	if (!buf) {
+		wmi_err("wmi_buf_alloc failed");
+		return QDF_STATUS_E_NOMEM;
+	}
+
+	buf_ptr = (uint8_t *)wmi_buf_data(buf);
+	cmd = buf_ptr;
+	WMITLV_SET_HDR(
+		&cmd->tlv_header,
+		WMITLV_TAG_STRUC_wmi_mlo_link_recommendation_fixed_param,
+		WMITLV_GET_STRUCT_TLVLEN
+		(wmi_mlo_link_recommendation_fixed_param));
+
+	cmd->vdev_id = param->vdev_id;
+	buf_ptr += sizeof(wmi_mlo_link_recommendation_fixed_param);
+	WMITLV_SET_HDR(
+		buf_ptr, WMITLV_TAG_ARRAY_STRUC,
+		sizeof(wmi_mlo_peer_recommended_links));
+	buf_ptr += sizeof(uint32_t);
+	peer_cmd = (wmi_mlo_peer_recommended_links *)buf_ptr;
+	WMITLV_SET_HDR(&peer_cmd->tlv_header,
+			WMITLV_TAG_STRUC_wmi_mlo_peer_recommended_links,
+			WMITLV_GET_STRUCT_TLVLEN(wmi_mlo_peer_recommended_links));
+
+	peer_cmd->assoc_id = param->assoc_id;
+	peer_cmd->linkid_bitmap = (uint32_t)param->linkid_bitmap;
+	buf_ptr += sizeof(wmi_mlo_peer_recommended_links);
+
+	wmi_mtrace(WMI_MLO_LINK_RECOMMENDATION_CMDID, cmd->vdev_id, 0);
+	if (wmi_unified_cmd_send(wmi_handle, buf, len,
+		WMI_MLO_LINK_RECOMMENDATION_CMDID)) {
+		wmi_err("Send wmi link recommendation cmd failed");
+		wmi_buf_free(buf);
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	return QDF_STATUS_SUCCESS;
+}

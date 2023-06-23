@@ -4611,4 +4611,9 @@ void wmi_ap_attach_tlv(wmi_unified_t wmi_handle)
 #endif
 	ops->send_wmi_tdma_schedule_request_cmd =
 		send_wmi_tdma_schedule_request_cmd_tlv;
+
+#ifdef WLAN_FEATURE_11BE_MLO
+	ops->send_wmi_link_recommendation_cmd =
+		send_wmi_link_recommendation_cmd_tlv;
+#endif
 }
