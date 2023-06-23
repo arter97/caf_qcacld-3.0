@@ -22485,6 +22485,8 @@ static void populate_tlv_service(uint32_t *wmi_service)
 	wmi_service[wmi_service_atf_max_client_512_support] =
 					WMI_SERVICE_ATF_MAX_CLIENT_512_SUPPORT;
 #endif
+	wmi_service[wmi_service_fisa_dynamic_msdu_aggr_size_support] =
+		WMI_SERVICE_FISA_DYNAMIC_MSDU_AGGR_SIZE_SUPPORT;
 }
 
 /**

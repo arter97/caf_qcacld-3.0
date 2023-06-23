@@ -6413,6 +6413,7 @@ typedef enum {
 #ifdef WLAN_ATF_INCREASED_STA
 	wmi_service_atf_max_client_512_support,
 #endif
+	wmi_service_fisa_dynamic_msdu_aggr_size_support,
 	wmi_services_max,
 } wmi_conv_service_ids;
 #define WMI_SERVICE_UNAVAILABLE 0xFFFF
