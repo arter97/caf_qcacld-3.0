@@ -1392,7 +1392,9 @@ wlan_rptr_afc_is_stop_ap_allowed(struct wlan_objmgr_vdev *vdev,
 		if (wlan_reg_is_afc_power_event_received(pdev) &&
 		    !wlan_reg_is_afc_done(pdev, freq)) {
 			/* For standalone AP dont process stop_ap */
-			if (!sta_vdev)
+			if (!sta_vdev &&
+			    ext_cb->vdev_is_6g_txable_chan_available(vdev,
+								     REG_BEST_PWR_MODE))
 				return false;
 		}
 	}
