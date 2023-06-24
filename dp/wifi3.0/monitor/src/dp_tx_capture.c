@@ -1984,8 +1984,7 @@ dp_update_msdu_to_list(struct dp_soc *soc,
 		return QDF_STATUS_E_FAILURE;
 	}
 
-	if ((ts->tid >= DP_MAX_TIDS) ||
-	    (peer->bss_peer && ts->tid == DP_NON_QOS_TID)) {
+	if (ts->tid >= DP_MAX_TIDS) {
 		dp_tx_capture_err("%pK: peer_id %d, tid %d > NON_QOS_TID!",
 				  soc, ts->peer_id, ts->tid);
 		return QDF_STATUS_E_FAILURE;
@@ -2679,8 +2678,7 @@ void dp_peer_tx_wds_addr_add(struct dp_peer *peer, uint8_t *addr4_mac_addr)
  * @peer: Datapath peer
  * @data: ppdu_descriptor
  * @nbuf: 802.11 frame
- * @ether_type: ethernet type
- * @dst_addr: ether destination address
+ * @eh: Pointer to ethernet header
  * @usr_idx: user index
  * @is_amsdu: amsdu flag
  *
@@ -2690,8 +2688,7 @@ static uint32_t dp_tx_update_80211_wds_hdr(struct dp_pdev *pdev,
 					   struct dp_peer *peer,
 					   void *data,
 					   qdf_nbuf_t nbuf,
-					   uint16_t ether_type,
-					   uint8_t *dst_addr,
+					   qdf_ether_header_t *eh,
 					   uint8_t usr_idx,
 					   bool is_amsdu)
 {
@@ -2699,9 +2696,10 @@ static uint32_t dp_tx_update_80211_wds_hdr(struct dp_pdev *pdev,
 	struct cdp_tx_completion_ppdu_user *user;
 	uint32_t mpdu_buf_len, frame_size;
 	uint8_t *ptr_hdr;
-	uint16_t eth_type = qdf_htons(ether_type);
+	uint16_t eth_type = qdf_htons(eh->ether_type);
 	struct ieee80211_qosframe_addr4 *ptr_wh;
 	struct dp_mon_peer *mon_peer = peer->monitor_peer;
+	uint8_t *dst_addr = eh->ether_dhost;
 
 	ppdu_desc = (struct cdp_tx_completion_ppdu *)data;
 	user = &ppdu_desc->user[usr_idx];
@@ -2759,6 +2757,9 @@ static uint32_t dp_tx_update_80211_wds_hdr(struct dp_pdev *pdev,
 	ptr_hdr = (void *)qdf_nbuf_data(nbuf);
 	qdf_mem_copy(ptr_hdr, ptr_wh, frame_size);
 
+	ptr_wh = (struct ieee80211_qosframe_addr4 *)ptr_hdr;
+	qdf_mem_copy(ptr_wh->i_addr1, dst_addr, QDF_MAC_ADDR_SIZE);
+
 	ptr_hdr = ptr_hdr + frame_size;
 
 	/* update LLC */
@@ -2783,8 +2784,7 @@ static uint32_t dp_tx_update_80211_wds_hdr(struct dp_pdev *pdev,
  * @peer: Datapath peer
  * @data: ppdu_descriptor
  * @nbuf: 802.11 frame
- * @ether_type: ethernet type
- * @src_addr: ether shost address
+ * @eh: Pointer to ethernet header
  * @usr_idx: user index
  * @is_amsdu: amsdu flag
  *
@@ -2794,8 +2794,7 @@ static uint32_t dp_tx_update_80211_hdr(struct dp_pdev *pdev,
 				       struct dp_peer *peer,
 				       void *data,
 				       qdf_nbuf_t nbuf,
-				       uint16_t ether_type,
-				       uint8_t *src_addr,
+				       qdf_ether_header_t *eh,
 				       uint8_t usr_idx,
 				       bool is_amsdu)
 {
@@ -2803,7 +2802,9 @@ static uint32_t dp_tx_update_80211_hdr(struct dp_pdev *pdev,
 	struct cdp_tx_completion_ppdu_user *user;
 	uint32_t mpdu_buf_len, frame_size;
 	uint8_t *ptr_hdr;
-	uint16_t eth_type = qdf_htons(ether_type);
+	uint16_t eth_type = qdf_htons(eh->ether_type);
+	uint8_t *src_addr = eh->ether_shost;
+	uint8_t *dst_addr = eh->ether_dhost;
 
 	struct ieee80211_qosframe *ptr_wh;
 	struct dp_mon_peer *mon_peer = peer->monitor_peer;
@@ -2861,6 +2862,9 @@ static uint32_t dp_tx_update_80211_hdr(struct dp_pdev *pdev,
 
 	ptr_hdr = (void *)qdf_nbuf_data(nbuf);
 	qdf_mem_copy(ptr_hdr, ptr_wh, frame_size);
+
+	ptr_wh = (struct ieee80211_qosframe *)ptr_hdr;
+	qdf_mem_copy(ptr_wh->i_addr1, dst_addr, QDF_MAC_ADDR_SIZE);
 
 	if (!is_amsdu) {
 		ptr_hdr = ptr_hdr + frame_size;
@@ -3084,15 +3088,13 @@ dp_tx_mon_restitch_mpdu(struct dp_pdev *pdev, struct dp_peer *peer,
 			      IEEE80211_FC1_DIR_FROMDS)) {
 				dp_tx_update_80211_wds_hdr(pdev, peer,
 							   ppdu_desc, mpdu_nbuf,
-							   ether_type,
-							   eh->ether_dhost,
+							   eh,
 							   usr_idx,
 							   is_amsdu);
 			} else {
 				dp_tx_update_80211_hdr(pdev, peer,
 						       ppdu_desc, mpdu_nbuf,
-						       ether_type,
-						       eh->ether_shost,
+						       eh,
 						       usr_idx,
 						       is_amsdu);
 			}
@@ -3177,36 +3179,40 @@ free_ppdu_desc_mpdu_q:
  * return: status
  */
 static
-uint32_t dp_tx_msdu_dequeue(struct dp_peer *peer, uint32_t ppdu_id,
-			    uint16_t tid, uint32_t num_msdu,
-			    qdf_nbuf_queue_t *head,
-			    qdf_nbuf_queue_t *head_xretries,
-			    uint32_t start_tsf, uint32_t end_tsf)
+QDF_STATUS dp_tx_msdu_dequeue(struct dp_peer *peer, uint32_t ppdu_id,
+			      uint16_t tid, uint32_t num_msdu,
+			      qdf_nbuf_queue_t *head,
+			      qdf_nbuf_queue_t *head_xretries,
+			      uint32_t start_tsf, uint32_t end_tsf)
 {
 	struct dp_tx_tid *tx_tid  = NULL;
 	uint32_t msdu_ppdu_id;
 	qdf_nbuf_t curr_msdu = NULL;
 	struct msdu_completion_info *ptr_msdu_info = NULL;
 	uint32_t wbm_tsf = 0xffff;
-	uint32_t matched = 0;
+	QDF_STATUS matched = QDF_STATUS_E_AGAIN;
 	qdf_nbuf_queue_t temp_defer_q;
 	struct dp_soc *soc = NULL;
 	struct dp_mon_soc *mon_soc = NULL;
+	bool is_mcast = false;
 
 	if (qdf_unlikely(!peer))
-		return 0;
+		return QDF_STATUS_E_INVAL;
+
+	if (peer->bss_peer && tid == DP_NON_QOS_TID)
+		is_mcast = true;
 
 	/* Non-QOS frames are being indicated with TID 0
 	 * in WBM completion path, an hence we should
 	 * TID 0 to reap MSDUs from completion path
 	 */
-	if (qdf_unlikely(tid == DP_NON_QOS_TID))
+	if (qdf_unlikely(tid == DP_NON_QOS_TID) && !is_mcast)
 		tid = 0;
 
 	tx_tid = &peer->monitor_peer->tx_capture.tx_tid[tid];
 
 	if (qdf_unlikely(!tx_tid))
-		return 0;
+		return QDF_STATUS_E_INVAL;
 
 	soc = peer->vdev->pdev->soc;
 	mon_soc = soc->monitor_soc;
@@ -3236,14 +3242,14 @@ uint32_t dp_tx_msdu_dequeue(struct dp_peer *peer, uint32_t ppdu_id,
 	if (qdf_nbuf_is_queue_empty(&tx_tid->defer_msdu_q)) {
 		/* release lock here */
 		qdf_spin_unlock_bh(&tx_tid->tid_lock);
-		return 0;
+		return QDF_STATUS_E_AGAIN;
 	}
 
 	curr_msdu = qdf_nbuf_queue_first(&tx_tid->defer_msdu_q);
 
 	while (curr_msdu) {
 		if (qdf_nbuf_queue_len(head) == num_msdu) {
-			matched = 1;
+			matched = QDF_STATUS_SUCCESS;
 			break;
 		}
 
@@ -3273,7 +3279,7 @@ uint32_t dp_tx_msdu_dequeue(struct dp_peer *peer, uint32_t ppdu_id,
 			/* PPDU being matched is older than MSDU at head of
 			 * completion queue. Return matched=1 to skip PPDU
 			 */
-			matched = 1;
+			matched = QDF_STATUS_SUCCESS;
 			break;
 		}
 
@@ -5862,8 +5868,7 @@ dp_tx_cap_proc_per_ppdu_info(struct dp_pdev *pdev, qdf_nbuf_t nbuf_ppdu,
 	struct dp_peer *peer = NULL;
 	qdf_nbuf_queue_t head_msdu;
 	qdf_nbuf_queue_t head_xretries;
-	uint32_t retries = 0;
-	uint32_t ret = 0;
+	QDF_STATUS ret = 0;
 	uint32_t start_tsf = 0;
 	uint32_t end_tsf = 0;
 	uint32_t bar_start_tsf = 0;
@@ -5934,6 +5939,8 @@ dp_tx_cap_proc_per_ppdu_info(struct dp_pdev *pdev, qdf_nbuf_t nbuf_ppdu,
 		for (usr_idx = 0; usr_idx < num_users;
 		     usr_idx++) {
 			uint32_t ppdu_id;
+			bool is_mcast = false;
+			uint32_t retries = 0;
 
 			peer = NULL;
 			user = &ppdu_desc->user[usr_idx];
@@ -5945,6 +5952,7 @@ dp_tx_cap_proc_per_ppdu_info(struct dp_pdev *pdev, qdf_nbuf_t nbuf_ppdu,
 				goto free_nbuf_dec_ref;
 			}
 
+			is_mcast = user->is_mcast;
 			peer_id = user->peer_id;
 			peer = DP_TX_PEER_GET_REF(pdev, peer_id);
 
@@ -5965,10 +5973,10 @@ dp_tx_cap_proc_per_ppdu_info(struct dp_pdev *pdev, qdf_nbuf_t nbuf_ppdu,
 			 * feature is enabled for this peer
 			 * or globally for all peers
 			 */
-			if (peer->bss_peer ||
+			if ((peer->bss_peer && !is_mcast) ||
 			    !(mon_peer->tx_capture.is_tid_initialized) ||
 			    !dp_peer_or_pdev_tx_cap_enabled(pdev,
-				peer, peer->mac_addr.raw) || user->is_mcast) {
+				peer, peer->mac_addr.raw)) {
 				user->skip = 1;
 				goto free_nbuf_dec_ref;
 			}
@@ -6017,7 +6025,8 @@ dequeue_msdu_again:
 						 start_tsf,
 						 end_tsf);
 
-			if (!ret && (++retries < 2)) {
+			if ((QDF_STATUS_E_AGAIN == ret) &&
+			    (++retries < 2)) {
 				/* wait for wbm to complete */
 				qdf_mdelay(2);
 				goto dequeue_msdu_again;
@@ -6457,6 +6466,9 @@ void dp_tx_ppdu_stats_process(void *context)
 
 				continue;
 			} else {
+				struct cdp_tx_completion_ppdu *ppdu_desc = NULL;
+				ppdu_desc = (struct cdp_tx_completion_ppdu *)qdf_nbuf_data(nbuf_ppdu);
+
 				tx_cap_debugfs_log_ppdu_desc(pdev, nbuf_ppdu);
 
 				/* process ppdu_info on tx capture turned on */
