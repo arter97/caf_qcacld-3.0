@@ -992,6 +992,17 @@ QDF_STATUS wmi_unified_tdma_schedule_send(
 	return QDF_STATUS_E_FAILURE;
 }
 
+#ifdef WLAN_FEATURE_11BE_MLO
+QDF_STATUS wmi_unified_link_recmnd_info_send(
+		wmi_unified_t wmi_handle,
+		struct wlan_link_recmnd_param *param)
+{
+	if (wmi_handle->ops->send_wmi_link_recommendation_cmd)
+		return wmi_handle->ops->send_wmi_link_recommendation_cmd(
+							wmi_handle, param);
+	return QDF_STATUS_E_FAILURE;
+}
+#endif
 #ifdef QCA_STANDALONE_SOUNDING_TRIGGER
 QDF_STATUS wmi_unified_txbf_sounding_trig_info_cmd_send(struct wmi_unified *wmi_handle,
 							struct wmi_txbf_sounding_trig_param *sounding_params)

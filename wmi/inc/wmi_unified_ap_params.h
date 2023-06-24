@@ -255,6 +255,18 @@ struct wlan_tdma_sched_cmd_param {
 };
 
 /**
+ * struct wlan_link_recmnd_param - Link Recommendation update params
+ * @vdev_id: vdev id
+ * @assoc_id: aid (association id) of the station
+ * @linkid_bitmap: link id
+ */
+struct wlan_link_recmnd_param {
+	uint32_t vdev_id;
+	uint32_t assoc_id;
+	uint16_t linkid_bitmap;
+};
+
+/**
  * struct rate2power_table_params - Rate2Power table params
  * @pwr_array: pointer to pwr array
  * @pwr_cmd_len: rate2power command length

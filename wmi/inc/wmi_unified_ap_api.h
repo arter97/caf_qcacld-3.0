@@ -1133,4 +1133,24 @@ QDF_STATUS wmi_extract_standalone_sounding_evt_params(
 QDF_STATUS wmi_unified_tdma_schedule_send(
 		struct wmi_unified *wmi_handle,
 		struct wlan_tdma_sched_cmd_param *param);
+
+#ifdef WLAN_FEATURE_11BE_MLO
+/**
+ * wmi_unified_link_recmnd_info_send() - API to send the link recommendation
+ * @wmi_handle: WMI handle
+ * @param: structure to get link recommendation config
+ *
+ * return: QDF_STATUS
+ */
+QDF_STATUS wmi_unified_link_recmnd_info_send(
+		wmi_unified_t wmi_handle,
+		struct wlan_link_recmnd_param *param);
+#else
+static inline QDF_STATUS wmi_unified_link_recmnd_info_send(
+		wmi_unified_t wmi_handle,
+		struct wlan_link_recmnd_param *param)
+{
+	return QDF_STATUS_SUCCESS;
+}
+#endif
 #endif /* _WMI_UNIFIED_AP_API_H_ */
