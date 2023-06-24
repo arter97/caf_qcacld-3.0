@@ -528,6 +528,13 @@
 #define WLAN_CFG_SAWF_STATS_MAX 0x7
 #endif
 
+#define WLAN_CFG_TX_CAPT_RBM_ID_MIN 0
+#define WLAN_CFG_TX_CAPT_RBM_ID_MAX 3
+#define WLAN_CFG_TX_CAPT_0_RBM_DEFAULT 0
+#define WLAN_CFG_TX_CAPT_1_RBM_DEFAULT 1
+#define WLAN_CFG_TX_CAPT_2_RBM_DEFAULT 2
+#define WLAN_CFG_TX_CAPT_3_RBM_DEFAULT 3
+
 /*
  * <ini>
  * "dp_tx_capt_max_mem_mb"- maximum memory used by Tx capture
@@ -549,6 +556,34 @@
 		WLAN_CFG_TX_CAPT_MAX_MEM_MAX, \
 		WLAN_CFG_TX_CAPT_MAX_MEM_DEFAULT, \
 			CFG_VALUE_OR_DEFAULT, "Max Memory (in MB) used by Tx Capture")
+
+#define CFG_DP_TX_CAPT_RADIO_0_RBM_ID \
+		CFG_INI_UINT("dp_tx_capt_pdev_0_rbm_id", \
+		WLAN_CFG_TX_CAPT_RBM_ID_MIN, \
+		WLAN_CFG_TX_CAPT_RBM_ID_MAX, \
+		WLAN_CFG_TX_CAPT_0_RBM_DEFAULT, \
+		CFG_VALUE_OR_DEFAULT, "RBM_ID used by pdev 0 Tx capture")
+
+#define CFG_DP_TX_CAPT_RADIO_1_RBM_ID \
+		CFG_INI_UINT("dp_tx_capt_pdev_1_rbm_id", \
+		WLAN_CFG_TX_CAPT_RBM_ID_MIN, \
+		WLAN_CFG_TX_CAPT_RBM_ID_MAX, \
+		WLAN_CFG_TX_CAPT_1_RBM_DEFAULT, \
+		CFG_VALUE_OR_DEFAULT, "RBM_ID used by pdev 1 Tx capture")
+
+#define CFG_DP_TX_CAPT_RADIO_2_RBM_ID \
+		CFG_INI_UINT("dp_tx_capt_pdev_2_rbm_id", \
+		WLAN_CFG_TX_CAPT_RBM_ID_MIN, \
+		WLAN_CFG_TX_CAPT_RBM_ID_MAX, \
+		WLAN_CFG_TX_CAPT_2_RBM_DEFAULT, \
+		CFG_VALUE_OR_DEFAULT, "RBM_ID used by pdev 2 Tx capture")
+
+#define CFG_DP_TX_CAPT_RADIO_3_RBM_ID \
+		CFG_INI_UINT("dp_tx_capt_pdev_3_rbm_id", \
+		WLAN_CFG_TX_CAPT_RBM_ID_MIN, \
+		WLAN_CFG_TX_CAPT_RBM_ID_MAX, \
+		WLAN_CFG_TX_CAPT_3_RBM_DEFAULT, \
+		CFG_VALUE_OR_DEFAULT, "RBM_ID used by pdev 3 Tx capture")
 
 /* DP INI Declarations */
 #define CFG_DP_HTT_PACKET_TYPE \
@@ -2089,5 +2124,9 @@
 		CFG_DP_LOCAL_PKT_CAPTURE_CONFIG \
 		CFG(CFG_SPECIAL_FRAME_MSK) \
 		CFG(CFG_DP_SW2RXDMA_LINK_RING) \
+		CFG(CFG_DP_TX_CAPT_RADIO_0_RBM_ID) \
+		CFG(CFG_DP_TX_CAPT_RADIO_1_RBM_ID) \
+		CFG(CFG_DP_TX_CAPT_RADIO_2_RBM_ID) \
+		CFG(CFG_DP_TX_CAPT_RADIO_3_RBM_ID) \
 		CFG_DP_UMAC_RESET_BUFFER_WINDOW_CFG
 #endif /* _CFG_DP_H_ */

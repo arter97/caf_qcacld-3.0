@@ -330,6 +330,7 @@ struct wlan_srng_cfg {
  * @txmon_sw_peer_filtering: TxMON sw peer filtering support
  * @num_rxdma_status_rings_per_pdev: Num RXDMA status rings
  * @tx_capt_max_mem_allowed: Max memory for Tx packet capture
+ * @tx_capt_rbm_id: Return Buffer Manager ID to be used for Tx packet capture
  * @sawf_enabled:  Is SAWF enabled
  * @sawf_stats: SAWF Statistics
  * @mpdu_retry_threshold_1: MPDU retry threshold 1 to increment tx bad count
@@ -532,6 +533,7 @@ struct wlan_cfg_dp_soc_ctxt {
 	uint8_t num_rxdma_status_rings_per_pdev;
 #ifdef WLAN_TX_PKT_CAPTURE_ENH
 	uint32_t tx_capt_max_mem_allowed;
+	uint8_t tx_capt_rbm_id[MAX_PDEV_CNT];
 #endif
 #ifdef CONFIG_SAWF
 	bool sawf_enabled;
@@ -2578,6 +2580,26 @@ static inline int
 wlan_cfg_get_tx_capt_max_mem(struct wlan_cfg_dp_soc_ctxt *cfg)
 {
 	return cfg->tx_capt_max_mem_allowed;
+}
+
+/**
+ * wlan_cfg_get_tx_capt_rbm_id - Get RBM_ID to be used for tx capture feature
+ * @cfg: Configuration Handle
+ * @idx: Pdev_id
+ *
+ * Return: Return Buffer manager id to be used
+ */
+static inline int
+wlan_cfg_get_tx_capt_rbm_id(struct wlan_cfg_dp_soc_ctxt *cfg, uint8_t idx)
+{
+	if (idx >= MAX_PDEV_CNT) {
+		qdf_err("!!! pdev index is greater than expected");
+		qdf_assert(0);
+		/* resetting idx to zero */
+		idx = 0;
+	}
+
+	return cfg->tx_capt_rbm_id[idx];
 }
 #endif /* WLAN_TX_PKT_CAPTURE_ENH */
 

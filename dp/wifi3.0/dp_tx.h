@@ -848,12 +848,26 @@ static inline void dp_tx_get_queue(struct dp_vdev *vdev,
 }
 #endif
 #else
+#ifdef WLAN_TX_PKT_CAPTURE_ENH
+static inline void dp_tx_get_queue(struct dp_vdev *vdev,
+				   qdf_nbuf_t nbuf, struct dp_tx_queue *queue)
+{
+	if (qdf_unlikely(vdev->is_override_rbm_id))
+		queue->ring_id = vdev->rbm_id;
+	else
+		queue->ring_id = qdf_get_cpu();
+
+	queue->desc_pool_id = queue->ring_id;
+}
+#else
 static inline void dp_tx_get_queue(struct dp_vdev *vdev,
 				   qdf_nbuf_t nbuf, struct dp_tx_queue *queue)
 {
 	queue->ring_id = qdf_get_cpu();
 	queue->desc_pool_id = queue->ring_id;
 }
+
+#endif
 #endif
 
 /**

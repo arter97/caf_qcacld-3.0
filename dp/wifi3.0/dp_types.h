@@ -4088,6 +4088,13 @@ struct dp_vdev {
 #endif
 	/* QDF VDEV operating mode  */
 	enum QDF_OPMODE qdf_opmode;
+
+#ifdef WLAN_TX_PKT_CAPTURE_ENH
+	/* TX capture feature to over ride return buffer manager */
+	bool is_override_rbm_id;
+	/* Return buffer manager ID */
+	uint8_t rbm_id;
+#endif
 };
 
 enum {

@@ -3858,8 +3858,30 @@ wlan_soc_vdev_hw_stats_cfg_attach(struct cdp_ctrl_objmgr_psoc *psoc,
 static void wlan_soc_tx_capt_cfg_attach(struct cdp_ctrl_objmgr_psoc *psoc,
 				struct wlan_cfg_dp_soc_ctxt *wlan_cfg_ctx)
 {
+	int i = 0;
+	uint8_t rbm_id = 0;
+
 	wlan_cfg_ctx->tx_capt_max_mem_allowed =
 		cfg_get(psoc, CFG_DP_TX_CAPT_MAX_MEM_MB) * 1024 * 1024;
+
+	for (i = 0; i < MAX_PDEV_CNT; i++) {
+		switch (i) {
+		case 0:
+			rbm_id = cfg_get(psoc, CFG_DP_TX_CAPT_RADIO_0_RBM_ID);
+		break;
+		case 1:
+			rbm_id = cfg_get(psoc, CFG_DP_TX_CAPT_RADIO_1_RBM_ID);
+		break;
+		case 2:
+			rbm_id = cfg_get(psoc, CFG_DP_TX_CAPT_RADIO_2_RBM_ID);
+		break;
+		default:
+			rbm_id = cfg_get(psoc, CFG_DP_TX_CAPT_RADIO_3_RBM_ID);
+		break;
+		}
+
+		wlan_cfg_ctx->tx_capt_rbm_id[i] = rbm_id;
+	}
 }
 #else
 static void wlan_soc_tx_capt_cfg_attach(struct cdp_ctrl_objmgr_psoc *psoc,
