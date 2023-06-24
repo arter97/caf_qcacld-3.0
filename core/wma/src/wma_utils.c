@@ -71,6 +71,7 @@
 #include <wlan_cp_stats_mc_tgt_api.h>
 #include "wma_eht.h"
 #include <target_if_spatial_reuse.h>
+#include "wlan_dp_ucfg_api.h"
 
 /* MCS Based rate table */
 /* HT MCS parameters with Nss = 1 */
@@ -1662,14 +1663,29 @@ static int wma_ll_stats_evt_handler(void *handle, u_int8_t *event,
 	return 0;
 }
 
+#ifdef WLAN_FEATURE_11BE_MLO
+static bool wma_get_mlo_per_link_stats_cap(wmi_unified_t wmi_handle)
+{
+	return wmi_service_enabled(wmi_handle,
+				   wmi_service_per_link_stats_support);
+}
+#else
+static inline bool wma_get_mlo_per_link_stats_cap(wmi_unified_t wmi_handle)
+{
+	return false;
+}
+#endif
+
 /**
  * wma_get_dp_peer_stats() - get host dp peer stats
+ * @wmi_handle: wmi handle
  * @dp_stats: buffer to store stats
  * @peer_mac: peer mac address
  *
  * Return: 0 on success or error code
  */
-static QDF_STATUS wma_get_dp_peer_stats(struct cdp_peer_stats *dp_stats,
+static QDF_STATUS wma_get_dp_peer_stats(wmi_unified_t wmi_handle,
+					struct cdp_peer_stats *dp_stats,
 					uint8_t *peer_mac)
 {
 	void *dp_soc = cds_get_context(QDF_MODULE_ID_SOC);
@@ -1683,7 +1699,13 @@ static QDF_STATUS wma_get_dp_peer_stats(struct cdp_peer_stats *dp_stats,
 		return status;
 	}
 
-	return cdp_host_get_peer_stats(dp_soc, vdev_id, peer_mac, dp_stats);
+	if (!wma_get_mlo_per_link_stats_cap(wmi_handle))
+		return cdp_host_get_peer_stats(dp_soc, vdev_id,
+					       peer_mac, dp_stats);
+
+	return ucfg_dp_get_per_link_peer_stats(dp_soc, vdev_id, peer_mac,
+					       dp_stats, CDP_WILD_PEER_TYPE,
+					       WLAN_MAX_MLD);
 }
 
 /**
@@ -1698,6 +1720,7 @@ static int wma_unified_link_peer_stats_event_handler(void *handle,
 						     uint8_t *cmd_param_info,
 						     uint32_t len)
 {
+	tp_wma_handle wma_handle = (tp_wma_handle)handle;
 	WMI_PEER_LINK_STATS_EVENTID_param_tlvs *param_tlvs;
 	wmi_peer_stats_event_fixed_param *fixed_param;
 	wmi_peer_link_stats *peer_stats, *temp_peer_stats;
@@ -1829,7 +1852,8 @@ static int wma_unified_link_peer_stats_event_handler(void *handle,
 		next_res_offset += peer_info_size;
 
 		peer_mac = (uint8_t *)&peer_stats->peer_mac_address;
-		status = wma_get_dp_peer_stats(dp_stats, peer_mac);
+		status = wma_get_dp_peer_stats(wma_handle->wmi_handle,
+					       dp_stats, peer_mac);
 
 		/* Copy rate stats associated with this peer */
 		for (count = 0; count < peer_stats->num_rates; count++) {

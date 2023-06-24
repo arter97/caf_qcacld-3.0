@@ -619,6 +619,18 @@ struct wlan_hdd_station_stats_info {
 	uint32_t rx_mpdu_count;
 	uint32_t fcs_err_count;
 };
+
+/**
+ * struct wlan_hdd_mlo_iface_stats_info - mlo iface stats info
+ * @link_id: mlo link_id
+ * @freq: frequency of the mlo link
+ * @radio_id: radio id of the mlo link
+ */
+struct wlan_hdd_mlo_iface_stats_info {
+	uint8_t link_id;
+	uint32_t freq;
+	uint32_t radio_id;
+};
 #endif
 
 #define MAX_SUBTYPES_TRACKED	4
@@ -1064,6 +1076,9 @@ enum udp_qos_upgrade {
  * @hdd_stats: HDD statistics
  * @big_data_stats: Big data stats
  * @ll_iface_stats: Link Layer interface stats
+ * @mlo_peer_stats: Pointer to MLO Peer Stats
+ * @num_mlo_peers: Total number of MLO peers
+ * @more_peer_data: more mlo peer data in peer stats
  * @mscs_prev_tx_vo_pkts: count of prev VO AC packets transmitted
  * @mscs_counter: Counter on MSCS action frames sent
  * @link_flags: a bitmap of hdd_link_flags
@@ -1099,6 +1114,9 @@ struct wlan_hdd_link_info {
 #endif
 #if defined(WLAN_FEATURE_11BE_MLO) && defined(CFG80211_11BE_BASIC)
 	struct wifi_interface_stats ll_iface_stats;
+	struct wifi_peer_stat *mlo_peer_stats;
+	uint8_t num_mlo_peers;
+	uint32_t more_peer_data;
 #endif
 
 #ifdef WLAN_FEATURE_MSCS
