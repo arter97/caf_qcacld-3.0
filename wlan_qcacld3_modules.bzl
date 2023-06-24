@@ -2043,7 +2043,7 @@ _conditional_srcs = {
     },
     "CONFIG_AFC_SUPPORT": {
         True: [
-           "core/hdd/src/wlan_hdd_afc.c",
+            "core/hdd/src/wlan_hdd_afc.c",
         ],
     },
     "CONFIG_WLAN_FEATURE_LL_LT_SAP": {
@@ -2058,7 +2058,7 @@ _conditional_srcs = {
 def _define_module_for_target_variant_chipset(target, variant, chipset):
     tvc = "{}_{}_{}".format(target, variant, chipset)
     tv = "{}_{}".format(target, variant)
-    name = "qca_cld_{}".format(tvc)
+    name = "{}_qca_cld_{}".format(tv, chipset)
     hw = _chipset_hw_map[chipset]
     chipset_ipaths = _chipset_header_map[chipset]
     hw_ipaths = _hw_header_map[hw]
