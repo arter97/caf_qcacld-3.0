@@ -4130,6 +4130,13 @@ struct dp_vdev {
 	/* Flag to indicate if to_fw should be set for tx pkts on this vdev */
 	bool to_fw;
 #endif
+
+#ifdef WLAN_TX_PKT_CAPTURE_ENH
+	/* TX capture feature to over ride return buffer manager */
+	bool is_override_rbm_id;
+	/* Return buffer manager ID */
+	uint8_t rbm_id;
+#endif
 };
 
 enum {
