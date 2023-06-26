@@ -3000,4 +3000,36 @@ enum ll_ap_type {
 	LL_AP_TYPE_LT = 1,
 	LL_AP_TYPE_ANY = 2,
 };
+
+/**
+ * struct sap_ch_info - Structure holding all the information required to make
+ * a decision for the best operating channel based on dfs formula.
+ * @chan_freq: Channel frequency found in scanresult
+ * @bss_count: Bss found in scanresult for this channel
+ * @rssi_agr: Max value of rssi among all BSS(es) from scan result
+ * for this channel.
+ * @weight: Weightage of this channel
+ * @weight_copy: copy of the original weight
+ * @valid: Is this a valid center frequency for regulatory domain
+ * @weight_calc_done: Weight calculation done for this channel
+ */
+struct sap_ch_info {
+	uint32_t chan_freq;
+	uint16_t bss_count;
+	int32_t rssi_agr;
+	uint32_t weight;
+	uint32_t weight_copy;
+	bool valid;
+	bool weight_calc_done;
+};
+
+/**
+ * struct sap_sel_ch_info - Wrapper of sap_ch_info structure.
+ * @ch_info: Ptr to the channel information.
+ * @num_ch: Total num of channels.
+ */
+struct sap_sel_ch_info {
+	struct sap_ch_info *ch_info;
+	uint8_t num_ch;
+};
 #endif
