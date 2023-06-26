@@ -3142,7 +3142,7 @@ static bool hdd_max_sta_interface_up_count_reached(struct hdd_adapter *adapter)
 	return false;
 }
 
-#if defined(WLAN_FEATURE_11BE_MLO) && \
+#if (defined(WLAN_FEATURE_11BE_MLO) && defined(CFG80211_11BE_BASIC)) && \
 (defined(CFG80211_IFTYPE_MLO_LINK_SUPPORT) || \
 defined(CFG80211_SINGLE_NETDEV_MULTI_LINK_SUPPORT))
 static int hdd_start_link_adapter(struct hdd_adapter *sta_adapter)
@@ -6046,6 +6046,11 @@ QDF_STATUS hdd_sme_close_session_callback(uint8_t vdev_id)
 		return QDF_STATUS_NOT_INITIALIZED;
 	}
 
+	if (!qdf_atomic_dec_and_test(&adapter->vdev_destroy_pending_count)) {
+		hdd_debug("vdev in use");
+		return QDF_STATUS_SUCCESS;
+	}
+
 	clear_bit(SME_SESSION_OPENED, &adapter->event_flags);
 	qdf_spin_lock_bh(&adapter->vdev_lock);
 	adapter->vdev_id = WLAN_UMAC_VDEV_ID_MAX;
@@ -6176,6 +6181,8 @@ int hdd_vdev_destroy(struct hdd_adapter *adapter)
 	}
 
 	/* block on a completion variable until sme session is closed */
+	qdf_atomic_init(&adapter->vdev_destroy_pending_count);
+	qdf_atomic_set(&adapter->vdev_destroy_pending_count, 2);
 	rc = wait_for_completion_timeout(
 			&adapter->vdev_destroy_event,
 			msecs_to_jiffies(SME_CMD_VDEV_CREATE_DELETE_TIMEOUT));
@@ -10699,6 +10706,7 @@ static void hdd_dp_register_callbacks(struct hdd_context *hdd_ctx)
 	cb_obj.wlan_dp_sta_ndi_connected = wlan_hdd_sta_ndi_connected;
 	cb_obj.dp_any_adapter_connected = hdd_any_adapter_connected;
 	cb_obj.dp_send_svc_nlink_msg = wlan_hdd_send_svc_nlink_msg;
+	cb_obj.dp_send_destroy_ind = wlan_hdd_send_dp_destroy_msg;
 	cb_obj.dp_pld_remove_pm_qos = hdd_pld_remove_pm_qos;
 	cb_obj.dp_pld_request_pm_qos = hdd_pld_request_pm_qos;
 	cb_obj.dp_pktlog_enable_disable = wlan_hdd_pktlog_enable_disable;
@@ -16101,6 +16109,12 @@ void wlan_hdd_send_svc_nlink_msg(int radio, int type, void *data, int len)
 	nl_srv_bcast_svc(skb);
 }
 
+void wlan_hdd_send_dp_destroy_msg(uint8_t vdev_id)
+{
+	hdd_debug("sme_vdev_del_resp,vdev_id:%d", vdev_id);
+	sme_vdev_del_resp(vdev_id);
+}
+
 #ifdef FEATURE_WLAN_AUTO_SHUTDOWN
 void wlan_hdd_auto_shutdown_cb(void)
 {
@@ -17960,8 +17974,8 @@ int hdd_driver_load(void)
 	int errno;
 	bool soft_load;
 
-	pr_err("%s: Loading driver v%s\n", WLAN_MODULE_NAME,
-	       g_wlan_driver_version);
+	pr_info("%s: Loading driver v%s\n", WLAN_MODULE_NAME,
+		g_wlan_driver_version);
 	hdd_place_marker(NULL, "START LOADING", NULL);
 
 	status = hdd_qdf_init();
