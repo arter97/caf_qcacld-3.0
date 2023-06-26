@@ -5864,3 +5864,14 @@ uint32_t wlan_cfg_get_special_frame_cfg(struct wlan_cfg_dp_soc_ctxt *cfg)
 {
 	return  cfg->special_frame_msk;
 }
+
+void wlan_cfg_set_ast_indication_disable(struct wlan_cfg_dp_soc_ctxt *cfg,
+					 bool val)
+{
+	cfg->fw_ast_indication_disable = val;
+}
+
+bool wlan_cfg_get_ast_indication_disable(struct wlan_cfg_dp_soc_ctxt *cfg)
+{
+	return cfg->fw_ast_indication_disable;
+}

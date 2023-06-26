@@ -1470,6 +1470,7 @@ enum cdp_pdev_param_type {
  * @fisa_params.rx_flow_max_search: max FST entries
  * @fisa_params.rx_toeplitz_hash_key: RX hash key
  * @rx_pkt_tlv_size: RX packet TLV size
+ * @cdp_ast_indication_disable: AST indication disable
  */
 typedef union cdp_config_param_t {
 	/* peer params */
@@ -1581,6 +1582,7 @@ typedef union cdp_config_param_t {
 		uint8_t *rx_toeplitz_hash_key;
 	} fisa_params;
 	uint16_t rx_pkt_tlv_size;
+	bool cdp_ast_indication_disable;
 } cdp_config_param_type;
 
 /**
@@ -1750,6 +1752,7 @@ enum cdp_vdev_param_type {
  * @CDP_CFG_RX_REFILL_POOL_NUM: RX refill pool size config param
  * @CDP_CFG_FISA_PARAMS: FISA params
  * @CDP_RX_PKT_TLV_SIZE: RX pkt tlv size
+ * @CDP_CFG_AST_INDICATION_DISABLE: AST indication disable
  */
 enum cdp_psoc_param_type {
 	CDP_ENABLE_RATE_STATS,
@@ -1776,6 +1779,7 @@ enum cdp_psoc_param_type {
 #endif
 	CDP_CFG_FISA_PARAMS,
 	CDP_RX_PKT_TLV_SIZE,
+	CDP_CFG_AST_INDICATION_DISABLE,
 };
 
 #ifdef CONFIG_AP_PLATFORM

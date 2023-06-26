@@ -6765,6 +6765,7 @@ struct target_feature_set {
  * @dp_peer_meta_data_ver: datapath peer meta data version flag
  * @tx_ilp_enable: capability to support TX ILP from host
  * @rf_path: Indicates RF path 0 primary, 1 secondary
+ * @fw_ast_indication_disable: Disable AST indication
  */
 typedef struct {
 	uint32_t num_vdevs;
@@ -6898,6 +6899,7 @@ typedef struct {
 	uint8_t tx_ilp_enable;
 #endif
 	bool rf_path;
+	bool fw_ast_indication_disable;
 } target_resource_config;
 
 /**

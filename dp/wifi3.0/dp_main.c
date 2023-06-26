@@ -8072,6 +8072,10 @@ dp_set_psoc_param(struct cdp_soc_t *cdp_soc,
 						val.cdp_rx_refill_buf_pool_size);
 		break;
 #endif
+	case CDP_CFG_AST_INDICATION_DISABLE:
+		wlan_cfg_set_ast_indication_disable
+			(wlan_cfg_ctx, val.cdp_ast_indication_disable);
+		break;
 	default:
 		break;
 	}
