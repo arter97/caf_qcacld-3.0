@@ -4929,9 +4929,24 @@ QDF_STATUS dp_peer_mlo_setup(
 	struct dp_peer *mld_peer = NULL;
 	struct cdp_txrx_peer_params_update params = {0};
 
-	/* Non-MLO connection, do nothing */
-	if (!setup_info || !setup_info->mld_peer_mac)
+	/* Non-MLO connection */
+	if (!setup_info || !setup_info->mld_peer_mac) {
+		/* To handle downgrade scenarios */
+		if (peer->vdev->opmode == wlan_op_mode_sta) {
+			struct cdp_txrx_peer_params_update params = {0};
+
+			params.chip_id = dp_mlo_get_chip_id(soc);
+			params.pdev_id = peer->vdev->pdev->pdev_id;
+			params.osif_vdev = peer->vdev->osif_vdev;
+
+			dp_wdi_event_handler(
+					WDI_EVENT_STA_PRIMARY_UMAC_UPDATE,
+					soc,
+					(void *)&params, peer->peer_id,
+					WDI_NO_VAL, params.pdev_id);
+		}
 		return QDF_STATUS_SUCCESS;
+	}
 
 	dp_cfg_event_record_peer_setup_evt(soc, DP_CFG_EVENT_MLO_SETUP,
 					   peer, NULL, vdev_id, setup_info);
