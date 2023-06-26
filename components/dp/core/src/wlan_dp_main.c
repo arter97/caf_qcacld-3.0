@@ -623,28 +623,6 @@ static void dp_set_rx_mode_value(struct wlan_dp_psoc_context *dp_ctx)
 		dp_ctx->rps, dp_ctx->dynamic_rps);
 }
 
-#ifdef WLAN_SUPPORT_RX_FISA
-bool wlan_dp_cfg_is_rx_fisa_enabled(struct wlan_dp_psoc_cfg *dp_cfg)
-{
-	return dp_cfg->is_rx_fisa_enabled;
-}
-
-bool wlan_dp_cfg_is_rx_fisa_lru_del_enabled(struct wlan_dp_psoc_cfg *dp_cfg)
-{
-	return dp_cfg->is_rx_fisa_lru_del_enabled;
-}
-#else
-bool wlan_dp_cfg_is_rx_fisa_enabled(struct wlan_dp_psoc_cfg *dp_cfg)
-{
-	return false;
-}
-
-bool wlan_dp_cfg_is_rx_fisa_lru_del_enabled(struct wlan_dp_psoc_cfg *dp_cfg)
-{
-	return false;
-}
-#endif
-
 /**
  * dp_cfg_init() - initialize target specific configuration
  * @ctx: dp context handle
