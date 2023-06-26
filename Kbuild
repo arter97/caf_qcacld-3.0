@@ -3366,6 +3366,7 @@ endif
 
 ifeq ($(CONFIG_RHINE), y)
 ccflags-y += -DCONFIG_RHINE
+ccflags-y += -DDP_OFFLOAD_FRAME_WITH_SW_EXCEPTION
 endif
 
 ccflags-$(CONFIG_TALLOC_DEBUG) += -DWLAN_TALLOC_DEBUG
