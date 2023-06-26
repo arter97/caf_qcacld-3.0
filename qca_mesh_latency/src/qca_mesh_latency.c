@@ -20,6 +20,7 @@
 #include <qdf_trace.h>
 #include <ol_if_athvar.h>
 #include "qca_mscs_if.h"
+#include "qca_mesh_latency_if.h"
 
 extern ol_ath_soc_softc_t *ol_global_soc[GLOBAL_SOC_SIZE];
 
@@ -65,3 +66,16 @@ int qca_mesh_latency_update_peer_parameter(uint8_t *dest_mac,
 }
 
 qdf_export_symbol(qca_mesh_latency_update_peer_parameter);
+
+int qca_mesh_latency_update_peer_parameter_v2(struct qca_mesh_latency_update_peer_param *params)
+{
+	if (!params->dst_dev->ieee80211_ptr)
+		return QDF_STATUS_E_FAILURE;
+
+	return qca_mesh_latency_update_peer_parameter(params->dest_mac,
+			params->service_interval_dl, params->burst_size_dl,
+			params->service_interval_ul, params->burst_size_ul,
+			params->priority, params->add_or_sub);
+}
+
+qdf_export_symbol(qca_mesh_latency_update_peer_parameter_v2);
