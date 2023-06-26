@@ -1425,6 +1425,84 @@ static qdf_nbuf_t dp_fisa_rx_linear_skb(struct dp_vdev *vdev,
 	return NULL;
 }
 
+#ifdef WLAN_FEATURE_11BE
+static inline struct dp_vdev *
+dp_fisa_rx_get_flow_flush_vdev_ref(ol_txrx_soc_handle cdp_soc,
+				   struct dp_fisa_rx_sw_ft *fisa_flow)
+{
+	struct dp_vdev *fisa_flow_head_skb_vdev;
+	uint8_t vdev_id;
+
+	vdev_id = QDF_NBUF_CB_RX_VDEV_ID(fisa_flow->head_skb);
+
+get_new_vdev_ref:
+	fisa_flow_head_skb_vdev = dp_vdev_get_ref_by_id(
+						cdp_soc_t_to_dp_soc(cdp_soc),
+						vdev_id, DP_MOD_ID_RX);
+	if (qdf_unlikely(!fisa_flow_head_skb_vdev)) {
+		qdf_nbuf_free(fisa_flow->head_skb);
+		goto out;
+	}
+
+	if (qdf_unlikely(fisa_flow_head_skb_vdev != fisa_flow->vdev)) {
+		/*
+		 * vdev_id may mismatch in case of MLO link switch.
+		 * Check if the vdevs belong to same MLD,
+		 * if yes, then submit the flow else drop the packets.
+		 */
+		if (qdf_unlikely(qdf_mem_cmp(
+				fisa_flow->vdev->mld_mac_addr.raw,
+				fisa_flow_head_skb_vdev->mld_mac_addr.raw,
+				QDF_MAC_ADDR_SIZE) != 0)) {
+			qdf_nbuf_free(fisa_flow->head_skb);
+			goto out;
+		} else {
+			fisa_flow->same_mld_vdev_mismatch++;
+			/* Continue with aggregation */
+
+			/* Release ref to old vdev */
+			dp_vdev_unref_delete(cdp_soc_t_to_dp_soc(cdp_soc),
+					     fisa_flow_head_skb_vdev,
+					     DP_MOD_ID_RX);
+			/*
+			 * Update vdev_id and let it loop to find this
+			 * vdev by ref.
+			 */
+			vdev_id = fisa_flow->vdev->vdev_id;
+			goto get_new_vdev_ref;
+		}
+	}
+
+out:
+	return fisa_flow_head_skb_vdev;
+}
+#else
+static inline struct dp_vdev *
+dp_fisa_rx_get_flow_flush_vdev_ref(ol_txrx_soc_handle cdp_soc,
+				   struct dp_fisa_rx_sw_ft *fisa_flow)
+{
+	struct dp_vdev *fisa_flow_head_skb_vdev;
+
+	fisa_flow_head_skb_vdev = dp_vdev_get_ref_by_id(
+				cdp_soc_t_to_dp_soc(cdp_soc),
+				QDF_NBUF_CB_RX_VDEV_ID(fisa_flow->head_skb),
+				DP_MOD_ID_RX);
+	if (qdf_unlikely(!fisa_flow_head_skb_vdev ||
+			 (fisa_flow_head_skb_vdev != fisa_flow->vdev))) {
+		qdf_nbuf_free(fisa_flow->head_skb);
+		goto out;
+	}
+
+	return fisa_flow_head_skb_vdev;
+
+out:
+	dp_vdev_unref_delete(cdp_soc_t_to_dp_soc(cdp_soc),
+			     fisa_flow_head_skb_vdev,
+			     DP_MOD_ID_RX);
+	return NULL;
+}
+#endif
+
 /**
  * dp_rx_fisa_flush_udp_flow() - Flush all aggregated nbuf of the udp flow
  * @vdev: handle to dp_vdev
@@ -1519,15 +1597,10 @@ dp_rx_fisa_flush_udp_flow(struct dp_vdev *vdev,
 
 	hex_dump_skb_data(fisa_flow->head_skb, false);
 
-	fisa_flow_vdev = dp_vdev_get_ref_by_id(
-				cdp_soc_t_to_dp_soc(cdp_soc),
-				QDF_NBUF_CB_RX_VDEV_ID(fisa_flow->head_skb),
-				DP_MOD_ID_RX);
-	if (qdf_unlikely(!fisa_flow_vdev ||
-			 (fisa_flow_vdev != fisa_flow->vdev))) {
-		qdf_nbuf_free(fisa_flow->head_skb);
-		goto out;
-	}
+	fisa_flow_vdev = dp_fisa_rx_get_flow_flush_vdev_ref(cdp_soc, fisa_flow);
+	if (!fisa_flow_vdev)
+		goto vdev_ref_get_fail;
+
 	dp_fisa_debug("fisa_flow->curr_aggr %d", fisa_flow->cur_aggr);
 	linear_skb = dp_fisa_rx_linear_skb(vdev, fisa_flow->head_skb, 24000);
 	if (linear_skb) {
@@ -1559,6 +1632,8 @@ out:
 		dp_vdev_unref_delete(cdp_soc_t_to_dp_soc(cdp_soc),
 				     fisa_flow_vdev,
 				     DP_MOD_ID_RX);
+
+vdev_ref_get_fail:
 	fisa_flow->head_skb = NULL;
 	fisa_flow->last_skb = NULL;
 

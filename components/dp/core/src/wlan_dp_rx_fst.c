@@ -145,7 +145,7 @@ static QDF_STATUS dp_rx_dump_fisa_stats(struct wlan_dp_psoc_context *dp_ctx)
 				 tuple_str,
 				 sizeof(tuple_str));
 
-		dp_info("Flow[%d][%s][%s] ring %d msdu-aggr %d flushes %d bytes-agg %llu avg-bytes-aggr %llu",
+		dp_info("Flow[%d][%s][%s] ring %d msdu-aggr %d flushes %d bytes-agg %llu avg-bytes-aggr %llu same_mld_vdev_mismatch %llu",
 			sw_ft_entry->flow_id,
 			sw_ft_entry->is_flow_udp ? "udp" : "tcp",
 			tuple_str,
@@ -154,7 +154,8 @@ static QDF_STATUS dp_rx_dump_fisa_stats(struct wlan_dp_psoc_context *dp_ctx)
 			sw_ft_entry->flush_count,
 			sw_ft_entry->bytes_aggregated,
 			qdf_do_div(sw_ft_entry->bytes_aggregated,
-				   sw_ft_entry->flush_count));
+				   sw_ft_entry->flush_count),
+			sw_ft_entry->same_mld_vdev_mismatch);
 	}
 	return QDF_STATUS_SUCCESS;
 }

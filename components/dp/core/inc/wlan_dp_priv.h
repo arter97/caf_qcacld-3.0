@@ -432,6 +432,7 @@ struct fisa_pkt_hist {
  * @flow_init_ts: FLOW init timestamp
  * @last_accessed_ts: Timestamp when the flow was last accessed
  * @pkt_hist: FISA aggreagtion packets history
+ * @same_mld_vdev_mismatch: Packets flushed after vdev_mismatch on same MLD
  */
 struct dp_fisa_rx_sw_ft {
 	void *hw_fse;
@@ -478,6 +479,7 @@ struct dp_fisa_rx_sw_ft {
 #ifdef WLAN_SUPPORT_RX_FISA_HIST
 	struct fisa_pkt_hist pkt_hist;
 #endif
+	uint64_t same_mld_vdev_mismatch;
 };
 
 #define DP_RX_GET_SW_FT_ENTRY_SIZE sizeof(struct dp_fisa_rx_sw_ft)
