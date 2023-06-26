@@ -1449,6 +1449,7 @@ enum cdp_pdev_param_type {
  * @cdp_skel_enable : Enable/Disable skeleton code for Umac reset debug
  * @cdp_drop_tx_mcast: Enable/Disable tx mcast drop
  * @cdp_vdev_tx_to_fw: Set to_fw bit for all tx packets for the vdev
+ * @cdp_ast_indication_disable: AST indication disable
  */
 typedef union cdp_config_param_t {
 	/* peer params */
@@ -1539,6 +1540,7 @@ typedef union cdp_config_param_t {
 	bool cdp_umac_rst_skel;
 	bool cdp_drop_tx_mcast;
 	bool cdp_vdev_tx_to_fw;
+	bool cdp_ast_indication_disable;
 } cdp_config_param_type;
 
 /**
@@ -1694,6 +1696,7 @@ enum cdp_vdev_param_type {
  * @CDP_UMAC_RST_SKEL_ENABLE: Enable Umac reset skeleton code for debug
  * @CDP_SAWF_STATS: set SAWF stats config
  * @CDP_UMAC_RESET_STATS: UMAC reset stats
+ * @CDP_CFG_AST_INDICATION_DISABLE: AST indication disable
  */
 enum cdp_psoc_param_type {
 	CDP_ENABLE_RATE_STATS,
@@ -1706,6 +1709,7 @@ enum cdp_psoc_param_type {
 	CDP_UMAC_RST_SKEL_ENABLE,
 	CDP_SAWF_STATS,
 	CDP_UMAC_RESET_STATS,
+	CDP_CFG_AST_INDICATION_DISABLE,
 };
 
 #define TXRX_FW_STATS_TXSTATS                     1

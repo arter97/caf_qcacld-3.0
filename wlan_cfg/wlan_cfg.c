@@ -5517,3 +5517,14 @@ wlan_cfg_get_pointer_num_threshold_rx(struct wlan_cfg_dp_soc_ctxt *cfg)
 {
 	return cfg->pointer_num_threshold_rx;
 }
+
+void wlan_cfg_set_ast_indication_disable(struct wlan_cfg_dp_soc_ctxt *cfg,
+					 bool val)
+{
+	cfg->fw_ast_indication_disable = val;
+}
+
+bool wlan_cfg_get_ast_indication_disable(struct wlan_cfg_dp_soc_ctxt *cfg)
+{
+	return cfg->fw_ast_indication_disable;
+}
