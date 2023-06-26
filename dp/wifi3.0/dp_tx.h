@@ -1993,7 +1993,7 @@ static inline uint32_t dp_tx_get_pkt_len(struct dp_tx_desc_s *tx_desc)
 {
 	return tx_desc->frm_type == dp_tx_frm_tso ?
 		tx_desc->msdu_ext_desc->tso_desc->seg.total_len :
-		qdf_nbuf_len(tx_desc->nbuf);
+		tx_desc->length;
 }
 
 #ifdef FEATURE_RUNTIME_PM

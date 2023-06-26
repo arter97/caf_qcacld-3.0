@@ -423,17 +423,15 @@ void ce_flush_tx_ring_write_idx(struct CE_handle *ce_tx_hdl, bool force_flush)
 
 /* Make sure this wrapper is called under ce_index_lock */
 void ce_tx_ring_write_idx_update_wrapper(struct CE_handle *ce_tx_hdl,
-					 bool flush)
+					 int coalesce)
 {
 	struct CE_state *ce_state = (struct CE_state *)ce_tx_hdl;
 	struct CE_ring_state *src_ring = ce_state->src_ring;
 	struct hif_softc *scn = ce_state->scn;
 
-	if (flush)
+	if (!coalesce)
 		CE_SRC_RING_WRITE_IDX_SET(scn, ce_state->ctrl_addr,
 					  src_ring->write_index);
-	else
-		ce_ring_set_event(src_ring, CE_RING_FLUSH_EVENT);
 }
 
 /*

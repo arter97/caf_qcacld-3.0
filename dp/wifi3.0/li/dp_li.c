@@ -722,6 +722,7 @@ void dp_initialize_arch_ops_li(struct dp_arch_ops *arch_ops)
 #if defined(DP_POWER_SAVE) || defined(FEATURE_RUNTIME_PM)
 	arch_ops->dp_update_ring_hptp = dp_update_ring_hptp;
 #endif
+	arch_ops->dp_flush_tx_ring = dp_flush_tcl_ring;
 }
 
 #ifdef QCA_DP_TX_HW_SW_NBUF_DESC_PREFETCH

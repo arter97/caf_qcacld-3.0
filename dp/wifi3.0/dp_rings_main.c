@@ -3904,6 +3904,45 @@ void dp_update_ring_hptp(struct dp_soc *soc, bool force_flush_tx)
 }
 #endif
 
+#ifdef WLAN_DP_FEATURE_SW_LATENCY_MGR
+/*
+ * dp_flush_tcl_ring() - flush TCL ring hp
+ * @pdev: dp pdev
+ * @ring_id: TCL ring id
+ *
+ * Return: 0 on success and error code on failure
+ */
+int dp_flush_tcl_ring(struct dp_pdev *pdev, int ring_id)
+{
+	struct dp_soc *soc = pdev->soc;
+	hal_ring_handle_t hal_ring_hdl =
+			soc->tcl_data_ring[ring_id].hal_srng;
+	int ret;
+
+	ret = hal_srng_try_access_start(soc->hal_soc, hal_ring_hdl);
+	if (ret)
+		return ret;
+
+	ret = hif_rtpm_get(HIF_RTPM_GET_ASYNC, HIF_RTPM_ID_DP);
+	if (ret) {
+		hal_srng_access_end_reap(soc->hal_soc, hal_ring_hdl);
+		hal_srng_set_event(hal_ring_hdl, HAL_SRNG_FLUSH_EVENT);
+		hal_srng_inc_flush_cnt(hal_ring_hdl);
+		return ret;
+	}
+
+	hal_srng_access_end(soc->hal_soc, hal_ring_hdl);
+	hif_rtpm_put(HIF_RTPM_PUT_ASYNC, HIF_RTPM_ID_DP);
+
+	return ret;
+}
+#else
+int dp_flush_tcl_ring(struct dp_pdev *pdev, int ring_id)
+{
+	return QDF_STATUS_SUCCESS;
+}
+#endif
+
 #ifdef WLAN_FEATURE_STATS_EXT
 /* rx hw stats event wait timeout in ms */
 #define DP_REO_STATUS_STATS_TIMEOUT 100

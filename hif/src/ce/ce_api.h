@@ -708,7 +708,7 @@ void ce_engine_service_reg(struct hif_softc *scn, int CE_id);
 void ce_per_engine_service_fast(struct hif_softc *scn, int ce_id);
 
 void ce_tx_ring_write_idx_update_wrapper(struct CE_handle *ce_tx_hdl,
-					 bool flush);
+					int coalesce);
 
 /*
  * ce_ring_flush_write_idx() - CE handler to flush write index

@@ -836,4 +836,5 @@ void dp_initialize_arch_ops_rh(struct dp_arch_ops *arch_ops)
 #if defined(DP_POWER_SAVE) || defined(FEATURE_RUNTIME_PM)
 	arch_ops->dp_update_ring_hptp = dp_update_ring_hptp_rh;
 #endif
+	arch_ops->dp_flush_tx_ring = dp_flush_tx_ring_rh;
 }

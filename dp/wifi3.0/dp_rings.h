@@ -396,6 +396,15 @@ void dp_drain_txrx(struct cdp_soc_t *soc_handle);
 void dp_update_ring_hptp(struct dp_soc *soc, bool force_flush_tx);
 #endif
 
+/*
+ * dp_flush_tcl_ring() - flush TCL ring hp
+ * @pdev: dp pdev
+ * @ring_id: TCL ring id
+ *
+ * Return: 0 on success and error code on failure
+ */
+int dp_flush_tcl_ring(struct dp_pdev *pdev, int ring_id);
+
 #ifdef WLAN_FEATURE_STATS_EXT
 /**
  * dp_request_rx_hw_stats - request rx hardware stats
