@@ -15182,12 +15182,118 @@ fail:
 static int wlan_hdd_cfg80211_set_limit_offchan_param(struct wiphy *wiphy,
 		struct wireless_dev *wdev,
 		const void *data, int data_len)
-
 {
 	int ret = 0;
 
 	cds_ssr_protect(__func__);
 	ret = __wlan_hdd_cfg80211_set_limit_offchan_param(wiphy, wdev, data,
+			data_len);
+	cds_ssr_unprotect(__func__);
+
+	return ret;
+}
+
+static const struct nla_policy
+peer_flush_pending_policy
+	[QCA_WLAN_VENDOR_ATTR_FLUSH_PENDING_MAX + 1] = {
+	[QCA_WLAN_VENDOR_ATTR_PEER_ADDR] = {.type = NLA_BINARY,
+					    .len = QDF_MAC_ADDR_SIZE},
+	[QCA_WLAN_VENDOR_ATTR_AC] = { .type = NLA_U8 },
+};
+
+/**
+ * __wlan_hdd_cfg80211_peer_tid_flush() - flush peer pending packets
+ * @wiphy: Pointer to wireless phy
+ * @wdev: Pointer to wireless device
+ * @data: Pointer to data
+ * @data_len: Length of @data
+ *
+ * This function is used to flush peer pending packets using vendor commands
+ *
+ * Return: 0 on success, negative errno on failure
+ */
+static int
+__wlan_hdd_cfg80211_peer_tid_flush(struct wiphy *wiphy,
+				       struct wireless_dev *wdev,
+				       const void *data, int data_len)
+{
+	struct sme_peer_tid_flush tid_flush;
+	struct net_device *dev = wdev->netdev;
+	struct hdd_adapter *adapter = WLAN_HDD_GET_PRIV_PTR(dev);
+	struct hdd_context *hdd_ctx  = wiphy_priv(wiphy);
+	struct nlattr *tb[QCA_WLAN_VENDOR_ATTR_CONFIG_MAX + 1];
+	int ret;
+
+	ret = wlan_hdd_validate_context(hdd_ctx);
+	if (ret) {
+		hdd_err("failed to set limit off chan params");
+		return ret;
+	}
+
+	if (hdd_get_conparam() == QDF_GLOBAL_FTM_MODE) {
+		hdd_err("Command not allowed in FTM mode");
+		return -EINVAL;
+	}
+
+	if (wlan_cfg80211_nla_parse(tb, QCA_WLAN_VENDOR_ATTR_FLUSH_PENDING_MAX,
+				    data, data_len,
+				    peer_flush_pending_policy)) {
+		hdd_err("Invalid attribute");
+		return -EINVAL;
+	}
+
+	if (!tb[QCA_WLAN_VENDOR_ATTR_PEER_ADDR]) {
+		hdd_err("Attribute peer mac not provided");
+		return -EINVAL;
+	}
+
+	nla_memcpy(tid_flush.peer_addr.bytes,
+		   tb[QCA_WLAN_VENDOR_ATTR_PEER_ADDR], QDF_MAC_ADDR_SIZE);
+
+	if (!tb[QCA_WLAN_VENDOR_ATTR_AC]) {
+		hdd_err("Attribute AC not provided");
+		return -EINVAL;
+	}
+
+	tid_flush.flush_ac = nla_get_u8(tb[QCA_WLAN_VENDOR_ATTR_AC]);
+	hdd_debug("flush ac = %02x", tid_flush.flush_ac & 0x0f);
+
+	tid_flush.vdev_id = adapter->session_id;
+	hdd_debug("vdev_id = %d peer mac address " MAC_ADDRESS_STR,
+		  tid_flush.vdev_id,
+		  MAC_ADDR_ARRAY(tid_flush.peer_addr.bytes));
+
+	ret = sme_peer_tid_flush_pkts(hdd_ctx->mac_handle, &tid_flush);
+
+	if (ret != QDF_STATUS_SUCCESS) {
+		hdd_err("sme_peer_tid_flush_pkts (err=%d)",
+			ret);
+		return -EINVAL;
+	}
+
+	return ret;
+}
+
+/**
+ * wlan_hdd_cfg80211_peer_tid_flush() - flush pending tx packets
+ * @wiphy: Pointer to wireless phy
+ * @wdev: Pointer to wireless device
+ * @data: Pointer to data
+ * @data_len: Length of @data
+ *
+ * Wrapper function of __wlan_hdd_cfg80211_peer_tid_flush()
+ *
+ * Return: 0 on success, negative errno on failure
+ */
+
+static int wlan_hdd_cfg80211_peer_tid_flush(struct wiphy *wiphy,
+					    struct wireless_dev *wdev,
+					    const void *data, int data_len)
+{
+	int ret = 0;
+
+	cds_ssr_protect(__func__);
+	ret = __wlan_hdd_cfg80211_peer_tid_flush(wiphy, wdev, data,
 			data_len);
 	cds_ssr_unprotect(__func__);
 
@@ -16527,6 +16633,16 @@ const struct wiphy_vendor_command hdd_wiphy_vendor_commands[] = {
 	FEATURE_COEX_CONFIG_COMMANDS
 	FEATURE_MPTA_HELPER_COMMANDS
 	FEATURE_HW_CAPABILITY_COMMANDS
+
+	{
+		.info.vendor_id = QCA_NL80211_VENDOR_ID,
+		.info.subcmd = QCA_NL80211_VENDOR_SUBCMD_PEER_FLUSH_PENDING,
+		.flags = WIPHY_VENDOR_CMD_NEED_WDEV |
+			WIPHY_VENDOR_CMD_NEED_NETDEV |
+			WIPHY_VENDOR_CMD_NEED_RUNNING,
+		.doit = wlan_hdd_cfg80211_peer_tid_flush
+	},
+
 };
 
 #if LINUX_VERSION_CODE < KERNEL_VERSION(4, 12, 0)

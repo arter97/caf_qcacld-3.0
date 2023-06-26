@@ -468,6 +468,11 @@ enum ds_mode {
  */
 #define PROBE_REQ_TX_TIME_GAP 20
 
+/*
+ * TID value to flush all AC
+ */
+#define PEER_TID_FLUSH 255
+
 typedef void (*txFailIndCallback)(uint8_t *peer_mac, uint8_t seqNo);
 
 typedef void (*tp_wma_packetdump_cb)(qdf_nbuf_t netbuf,
@@ -2665,5 +2670,15 @@ void wma_force_objmgr_vdev_peer_cleanup(tp_wma_handle wma, uint8_t vdev_id);
 QDF_STATUS wma_send_ani_level_request(tp_wma_handle wma_handle,
 				      uint32_t *freqs, uint8_t num_freqs);
 #endif /* FEATURE_ANI_LEVEL_REQUEST */
+
+/**
+ * wma_peer_tid_flush() - send peer flush cmd command to fw
+ * @wma_handle: wma handle
+ * @tid_flush: the pointer of tid_flush
+ *
+ * Return: QDF status
+ */
+QDF_STATUS wma_peer_tid_flush(tp_wma_handle wma_handle,
+			      struct sme_peer_tid_flush *tid_flush);
 #endif
 

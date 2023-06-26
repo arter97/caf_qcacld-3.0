@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2012-2020 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -9705,7 +9706,7 @@ void sme_set_dot11p_config(tHalHandle hHal, bool enable_dot11p)
  * @timestamp_offset: return for the offset of the timestamp field
  * @time_value_offset: return for the time_value field in the TA IE
  *
- * Return: the length of the buffer.
+ * Return: the length of the buffer on success and error on failure.
  */
 int sme_ocb_gen_timing_advert_frame(tHalHandle hal_handle,
 				    tSirMacAddr self_addr, uint8_t **buf,
@@ -17272,3 +17273,30 @@ sme_set_beacon_latency_event_cb(mac_handle_t mac_handle,
 	return qdf_status;
 }
 #endif
+
+QDF_STATUS sme_peer_tid_flush_pkts(mac_handle_t mac_handle,
+				   struct sme_peer_tid_flush *tid_flush)
+{
+	QDF_STATUS status;
+	struct sAniSirGlobal *mac = MAC_CONTEXT(mac_handle);
+	void *wma_handle = cds_get_context(QDF_MODULE_ID_WMA);
+
+	if (!wma_handle) {
+		sme_err("wma_handle is NULL");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	status = sme_acquire_global_lock(&mac->sme);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		sme_err("Failed to acquire sme lock; status: %d", status);
+		return status;
+	}
+
+	status = wma_peer_tid_flush(wma_handle, tid_flush);
+	sme_release_global_lock(&mac->sme);
+
+	if (!QDF_IS_STATUS_SUCCESS(status))
+		sme_err("Post flush pending data request fail");
+
+	return status;
+}
