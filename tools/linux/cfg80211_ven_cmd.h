@@ -1319,6 +1319,7 @@ enum _ol_ath_param_t {
 	 * the vap resatrt
 	*/
 	OL_ATH_PARAM_SWITCH_RTT_ROLE = 504,
+	OL_ATH_PARAM_PRE_11AX_PACKET_REMOVAL = 505,
 };
 
 #ifdef CONFIG_SUPPORT_LIBROXML
@@ -3384,6 +3385,8 @@ struct vendor_commands radio_vendor_cmds[] = {
 		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_RTT_ENABLE, SET_PARAM, 1},
 	{"switch_rtt_role",
 		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_SWITCH_RTT_ROLE, SET_PARAM, 1},
+	{"pre_11ax_packet_removal",
+		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_PRE_11AX_PACKET_REMOVAL, SET_PARAM, 1},
 };
 #endif
 #endif
