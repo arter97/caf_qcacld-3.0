@@ -1934,6 +1934,8 @@ dp_rx_wbm_err_reap_desc_be(struct dp_intr *int_ctx, struct dp_soc *soc,
 					soc->wbm_sg_param.wbm_sg_desc_msdu_len;
 				process_sg_buf = true;
 			}
+		} else {
+			qdf_nbuf_set_rx_chfrag_cont(nbuf, 0);
 		}
 
 		rx_bufs_reaped[rx_desc->chip_id][rx_desc->pool_id]++;
