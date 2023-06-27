@@ -1345,6 +1345,7 @@ static inline uint8_t *__qdf_nbuf_put_tail(struct sk_buff *skb, size_t size)
 	if (skb_tailroom(skb) < size) {
 		if (unlikely(pskb_expand_head(skb, 0,
 			size - skb_tailroom(skb), GFP_ATOMIC))) {
+			__qdf_nbuf_count_dec(skb);
 			dev_kfree_skb_any(skb);
 			return NULL;
 		}
@@ -1847,6 +1848,7 @@ static inline void __qdf_nbuf_set_pktlen(struct sk_buff *skb, uint32_t len)
 				   "SKB tailroom is lessthan requested length."
 				   " tail-room: %u, len: %u, skb->len: %u",
 				   skb_tailroom(skb), len, skb->len);
+				__qdf_nbuf_count_dec(skb);
 				dev_kfree_skb_any(skb);
 			}
 		}
@@ -2277,6 +2279,7 @@ static inline struct sk_buff *
 __qdf_nbuf_realloc_headroom(struct sk_buff *skb, uint32_t headroom)
 {
 	if (pskb_expand_head(skb, headroom, 0, GFP_ATOMIC)) {
+		__qdf_nbuf_count_dec(skb);
 		dev_kfree_skb_any(skb);
 		skb = NULL;
 	}
@@ -2300,6 +2303,7 @@ __qdf_nbuf_realloc_tailroom(struct sk_buff *skb, uint32_t tailroom)
 	/**
 	 * unlikely path
 	 */
+	__qdf_nbuf_count_dec(skb);
 	dev_kfree_skb_any(skb);
 	return NULL;
 }
@@ -2390,6 +2394,7 @@ __qdf_nbuf_expand(struct sk_buff *skb, uint32_t headroom, uint32_t tailroom)
 	if (likely(!pskb_expand_head(skb, headroom, tailroom, GFP_ATOMIC)))
 		return skb;
 
+	__qdf_nbuf_count_dec(skb);
 	dev_kfree_skb_any(skb);
 	return NULL;
 }
@@ -2406,7 +2411,12 @@ __qdf_nbuf_expand(struct sk_buff *skb, uint32_t headroom, uint32_t tailroom)
 static inline struct sk_buff *
 __qdf_nbuf_copy_expand(struct sk_buff *buf, int headroom, int tailroom)
 {
-	return skb_copy_expand(buf, headroom, tailroom, GFP_ATOMIC);
+	struct sk_buff *copy;
+	copy = skb_copy_expand(buf, headroom, tailroom, GFP_ATOMIC);
+	if (copy)
+		__qdf_nbuf_count_inc(copy);
+
+	return copy;
 }
 
 /**
