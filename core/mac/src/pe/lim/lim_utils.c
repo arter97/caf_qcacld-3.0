@@ -82,6 +82,7 @@
 #include <wlan_vdev_mgr_utils_api.h>
 #include "parser_api.h"
 #include "wlan_mlo_mgr_link_switch.h"
+#include "wlan_epcs_api.h"
 
 /** -------------------------------------------------------------
    \fn lim_delete_dialogue_token_list

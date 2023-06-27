@@ -538,7 +538,6 @@ _fixed_srcs = [
     "core/hdd/src/wlan_hdd_wowl.c",
     "core/mac/src/dph/dph_hash_table.c",
     "core/mac/src/pe/lim/lim_admit_control.c",
-    #"core/mac/src/pe/lim/lim_aid_mgmt.c",
     "core/mac/src/pe/lim/lim_api.c",
     "core/mac/src/pe/lim/lim_assoc_utils.c",
     "core/mac/src/pe/lim/lim_ft.c",
@@ -1534,12 +1533,14 @@ _conditional_srcs = {
             "cmn/umac/mlo_mgr/src/wlan_mlo_mgr_sta.c",
             "cmn/umac/mlo_mgr/src/wlan_mlo_t2lm.c",
             "components/umac/mlme/mlo_mgr/src/wlan_epcs_api.c",
+            "cmn/umac/mlo_mgr/src/wlan_mlo_mgr_link_switch.c",
             "cmn/umac/mlo_mgr/src/wlan_mlo_epcs.c",
             "components/umac/mlme/mlo_mgr/dispatcher/src/wlan_mlo_epcs_ucfg_api.c",
             "cmn/wmi/src/wmi_unified_11be_api.c",
             "cmn/wmi/src/wmi_unified_11be_tlv.c",
             "components/umac/mlme/mlo_mgr/src/wlan_mlo_mgr_roam.c",
             "components/umac/mlme/mlo_mgr/src/wlan_t2lm_api.c",
+            "components/umac/mlme/mlo_mgr/src/wlan_mlo_link_force.c",
         ],
     },
     "CONFIG_WLAN_FEATURE_ACTION_OUI": {
@@ -2049,6 +2050,7 @@ _conditional_srcs = {
     "CONFIG_WLAN_FEATURE_LL_LT_SAP": {
         True: [
            "components/umac/mlme/sap/ll_sap/dispatcher/src/wlan_ll_sap_ucfg_api.c",
+           "components/umac/mlme/sap/ll_sap/core/src/wlan_ll_lt_sap_main.c",
            "components/umac/mlme/sap/ll_sap/core/src/wlan_ll_sap_main.c",
         ],
     },

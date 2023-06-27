@@ -1724,7 +1724,7 @@ lim_update_he_caps_htc(struct pe_session *session,  bool val)
 #endif
 
 #ifdef WLAN_FEATURE_11BE
-static void
+void
 lim_update_eht_caps_mcs(struct mac_context *mac, struct pe_session *session)
 {
 	uint8_t tx_nss = 0;
@@ -1803,7 +1803,7 @@ lim_update_eht_caps_mcs(struct mac_context *mac, struct pe_session *session)
 	}
 }
 #else
-static void
+void
 lim_update_eht_caps_mcs(struct mac_context *mac, struct pe_session *session)
 {
 }
