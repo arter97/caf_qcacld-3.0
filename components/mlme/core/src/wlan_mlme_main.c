@@ -95,7 +95,7 @@ mlme_fill_freq_in_scan_start_request(struct wlan_objmgr_vdev *vdev,
 
 	operation_chan_freq = wlan_get_operation_chan_freq(vdev);
 	associated_ch_width =
-			mlme_priv->connect_info.chan_info_orig.ch_width_orig;
+			mlme_priv->connect_info.assoc_chan_info.assoc_ch_width;
 	if (associated_ch_width == CH_WIDTH_INVALID) {
 		mlme_debug("vdev %d : Invalid associated ch width for freq %d",
 			   req->scan_req.vdev_id, operation_chan_freq);
@@ -119,7 +119,7 @@ mlme_fill_freq_in_scan_start_request(struct wlan_objmgr_vdev *vdev,
 	if (wlan_reg_is_24ghz_ch_freq(operation_chan_freq) &&
 	    associated_ch_width == CH_WIDTH_40MHZ) {
 		sec_2g_freq =
-			mlme_priv->connect_info.chan_info_orig.sec_2g_freq;
+			mlme_priv->connect_info.assoc_chan_info.sec_2g_freq;
 		if (!sec_2g_freq) {
 			mlme_debug("vdev %d : Invalid sec 2g freq for freq: %d",
 				   req->scan_req.vdev_id, operation_chan_freq);
@@ -380,24 +380,27 @@ mlme_update_freq_in_scan_start_req(struct wlan_objmgr_vdev *vdev,
 	uint8_t num_chan;
 	qdf_freq_t op_freq;
 	enum scan_phy_mode phymode = SCAN_PHY_MODE_UNKNOWN;
+	uint8_t vdev_id;
 
+	vdev_id = vdev->vdev_objmgr.vdev_id;
 	op_freq = wlan_get_operation_chan_freq(vdev);
+
+	mlme_debug("vdev %d : fill ch list for op_freq:%d, assoc_ch_width: %d",
+		   vdev_id, op_freq, associated_ch_width);
 
 	if (associated_ch_width == CH_WIDTH_320MHZ) {
 		range = wlan_reg_get_bonded_chan_entry(op_freq,
 						       associated_ch_width, 0);
 		if (!range) {
 			mlme_debug("vdev %d : range is null for freq %d",
-				   req->scan_req.vdev_id,
-				   op_freq);
+				   vdev_id, op_freq);
 			return QDF_STATUS_E_FAILURE;
 		}
 
 		phymode = mlme_get_scan_phy_mode();
 		if (phymode == SCAN_PHY_MODE_UNKNOWN) {
 			mlme_debug("vdev %d : invalid scan phymode for freq %d",
-				   req->scan_req.vdev_id,
-				   op_freq);
+				   vdev_id, op_freq);
 			return QDF_STATUS_E_FAILURE;
 		}
 		num_chan = req->scan_req.chan_list.num_chan;
@@ -409,12 +412,10 @@ mlme_update_freq_in_scan_start_req(struct wlan_objmgr_vdev *vdev,
 		num_chan += 1;
 		req->scan_req.chan_list.num_chan = num_chan;
 	} else {
-		phymode = wlan_scan_get_scan_phy_mode(vdev, op_freq,
-						      req->scan_req.vdev_id);
+		phymode = wlan_scan_get_scan_phy_mode(vdev, op_freq, vdev_id);
 		if (phymode == SCAN_PHY_MODE_UNKNOWN) {
 			mlme_debug("vdev %d : invalid scan phymode for freq %d",
-				   req->scan_req.vdev_id,
-				   op_freq);
+				   vdev_id, op_freq);
 			return QDF_STATUS_E_FAILURE;
 		}
 
@@ -433,21 +434,21 @@ mlme_update_freq_in_scan_start_req(struct wlan_objmgr_vdev *vdev,
  * band scan req for mlo connection
  * @vdev: vdev common object
  * @req: pointer to scan request
- * @associated_ch_width: channel width at the time of initial connection
  *
  * Return: QDF_STATUS
  */
 static QDF_STATUS
 mlme_fill_freq_in_mlo_wide_band_scan_start_req(struct wlan_objmgr_vdev *vdev,
-					struct scan_start_request *req,
-					enum phy_ch_width associated_ch_width)
+					struct scan_start_request *req)
 {
 	struct wlan_mlo_dev_context *mlo_dev_ctx;
 	struct wlan_mlo_sta *sta_ctx = NULL;
-	struct wlan_channel *chan;
 	uint8_t i;
 	QDF_STATUS status;
 	struct wlan_objmgr_vdev *mlo_vdev;
+	struct mlme_legacy_priv *mlme_priv;
+	enum phy_ch_width associated_ch_width = CH_WIDTH_INVALID;
+	struct assoc_channel_info *assoc_chan_info;
 
 	mlo_dev_ctx = vdev->mlo_dev_ctx;
 	if (!mlo_dev_ctx) {
@@ -465,14 +466,22 @@ mlme_fill_freq_in_mlo_wide_band_scan_start_req(struct wlan_objmgr_vdev *vdev,
 		if (!mlo_dev_ctx->wlan_vdev_list[i])
 			continue;
 		if (qdf_test_bit(i, sta_ctx->wlan_connected_links)) {
-			chan = wlan_vdev_get_active_channel(vdev);
-			if (!chan) {
-				mlme_err("vdev %d :failed to get freq info",
-					 req->scan_req.vdev_id);
+			mlo_vdev = mlo_dev_ctx->wlan_vdev_list[i];
+			mlme_priv = wlan_vdev_mlme_get_ext_hdl(mlo_vdev);
+			if (!mlme_priv) {
+				mlme_legacy_err("vdev legacy priv obj is NULL");
 				return QDF_STATUS_E_FAILURE;
 			}
 
-			mlo_vdev = mlo_dev_ctx->wlan_vdev_list[i];
+			assoc_chan_info =
+				&mlme_priv->connect_info.assoc_chan_info;
+			associated_ch_width = assoc_chan_info->assoc_ch_width;
+			if (associated_ch_width == CH_WIDTH_INVALID) {
+				mlme_debug("vdev %d :Invalid assoc ch_width",
+					   req->scan_req.vdev_id);
+				return QDF_STATUS_E_FAILURE;
+			}
+
 			status = mlme_update_freq_in_scan_start_req(mlo_vdev,
 						req, associated_ch_width);
 			if (QDF_IS_STATUS_ERROR(status))
@@ -487,8 +496,7 @@ mlme_fill_freq_in_mlo_wide_band_scan_start_req(struct wlan_objmgr_vdev *vdev,
 #else
 static inline QDF_STATUS
 mlme_fill_freq_in_mlo_wide_band_scan_start_req(struct wlan_objmgr_vdev *vdev,
-					struct scan_start_request *req,
-					enum phy_ch_width associated_ch_width)
+					struct scan_start_request *req)
 {
 	return QDF_STATUS_E_FAILURE;
 }
@@ -514,28 +522,31 @@ mlme_fill_freq_in_wide_scan_start_request(struct wlan_objmgr_vdev *vdev,
 	if (!mlme_priv)
 		return QDF_STATUS_E_FAILURE;
 
+	req->scan_req.chan_list.num_chan = 0;
+
+	if (wlan_vdev_mlme_is_mlo_vdev(vdev)) {
+		status = mlme_fill_freq_in_mlo_wide_band_scan_start_req(vdev,
+						req);
+		if (QDF_IS_STATUS_ERROR(status))
+			return QDF_STATUS_E_FAILURE;
+		goto update_param;
+	}
+
 	associated_ch_width =
-		mlme_priv->connect_info.chan_info_orig.ch_width_orig;
+		mlme_priv->connect_info.assoc_chan_info.assoc_ch_width;
 	if (associated_ch_width == CH_WIDTH_INVALID) {
 		mlme_debug("vdev %d :Invalid associated ch_width",
 			   req->scan_req.vdev_id);
 		return QDF_STATUS_E_FAILURE;
 	}
 
-	req->scan_req.chan_list.num_chan = 0;
-
-	if (wlan_vdev_mlme_is_mlo_vdev(vdev)) {
-		status = mlme_fill_freq_in_mlo_wide_band_scan_start_req(vdev,
-						req, associated_ch_width);
-		if (QDF_IS_STATUS_ERROR(status))
-			return QDF_STATUS_E_FAILURE;
-		goto update_param;
-	}
-
 	status = mlme_update_freq_in_scan_start_req(vdev, req,
 						    associated_ch_width);
 	if (QDF_IS_STATUS_ERROR(status))
 		return QDF_STATUS_E_FAILURE;
+
+	mlme_debug("vdev %d :trigger wide band scan, num freq %d",
+		   req->scan_req.vdev_id, req->scan_req.chan_list.num_chan);
 
 update_param:
 	req->scan_req.dwell_time_passive =
@@ -711,8 +722,9 @@ QDF_STATUS mlme_init_connect_chan_info_config(struct vdev_mlme_obj *vdev_mlme)
 		return QDF_STATUS_E_FAILURE;
 	}
 
-	mlme_priv->connect_info.chan_info_orig.ch_width_orig = CH_WIDTH_INVALID;
-	mlme_priv->connect_info.chan_info_orig.sec_2g_freq = 0;
+	mlme_priv->connect_info.assoc_chan_info.assoc_ch_width =
+							CH_WIDTH_INVALID;
+	mlme_priv->connect_info.assoc_chan_info.sec_2g_freq = 0;
 
 	return QDF_STATUS_SUCCESS;
 }

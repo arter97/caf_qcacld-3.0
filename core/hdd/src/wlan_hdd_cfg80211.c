@@ -26451,6 +26451,39 @@ static int wlan_hdd_cfg80211_nan_change_conf(struct wiphy *wiphy,
 #endif
 
 /**
+ * wlan_hdd_get_ch_width_from_chan_info - get ch_width as per num channel
+ * present in scan event
+ * @info: struct scan_chan_info
+ *
+ * Return: phy_ch_width.
+ */
+static enum phy_ch_width
+wlan_hdd_get_ch_width_from_chan_info(struct scan_chan_info *info)
+{
+	enum phy_ch_width scanned_ch_width;
+
+	switch (info->subband_info.num_chan) {
+	case 1:
+		scanned_ch_width = CH_WIDTH_20MHZ;
+		break;
+	case 2:
+		scanned_ch_width = CH_WIDTH_40MHZ;
+		break;
+	case 4:
+		scanned_ch_width = CH_WIDTH_80MHZ;
+		break;
+	case 8:
+		scanned_ch_width = CH_WIDTH_160MHZ;
+		break;
+	default:
+		scanned_ch_width = CH_WIDTH_INVALID;
+		break;
+	}
+
+	return scanned_ch_width;
+}
+
+/**
  * wlan_hdd_fill_subband_scan_info - Fill subband channel info
  * @hdd_ctx: hdd context
  * @info: struct scan_chan_info
@@ -26465,25 +26498,27 @@ static void wlan_hdd_fill_subband_scan_info(struct hdd_context *hdd_ctx,
 					    struct scan_chan_info *chan)
 {
 	uint8_t idx, info_index, freq_info_num;
-	enum phy_ch_width ch_width;
+	enum phy_ch_width scanned_ch_width;
 	const struct bonded_channel_freq *range = NULL;
 	qdf_freq_t start_freq, end_freq, sec_2g_freq;
 	uint8_t vdev_id = info->subband_info.vdev_id;
-	struct connect_chan_info chan_info_orig;
+	struct assoc_channel_info assoc_chan_info;
 
-	ucfg_cm_get_associated_ch_info(hdd_ctx->psoc, vdev_id, &chan_info_orig);
-	ch_width = chan_info_orig.ch_width_orig;
-	if (ch_width == CH_WIDTH_INVALID) {
-		hdd_debug("vdev %d: Invalid ch width", vdev_id);
+	scanned_ch_width = wlan_hdd_get_ch_width_from_chan_info(info);
+	if (scanned_ch_width == CH_WIDTH_INVALID) {
+		hdd_debug("vdev %d: Invalid scanned_ch_width", vdev_id);
 		return;
 	}
 
-	if (ch_width == CH_WIDTH_20MHZ) {
+	if (scanned_ch_width == CH_WIDTH_20MHZ) {
 		start_freq = info->freq;
 		end_freq = info->freq;
 	} else if (wlan_reg_is_24ghz_ch_freq(info->freq) &&
-		   ch_width == CH_WIDTH_40MHZ) {
-		sec_2g_freq = chan_info_orig.sec_2g_freq;
+		   scanned_ch_width == CH_WIDTH_40MHZ) {
+		ucfg_cm_get_associated_ch_info(hdd_ctx->psoc, vdev_id,
+					       scanned_ch_width,
+					       &assoc_chan_info);
+		sec_2g_freq = assoc_chan_info.sec_2g_freq;
 		if (!sec_2g_freq) {
 			mlme_debug("vdev %d : Invalid sec 2g freq for freq:%d",
 				   info->subband_info.vdev_id, info->freq);
@@ -26492,7 +26527,7 @@ static void wlan_hdd_fill_subband_scan_info(struct hdd_context *hdd_ctx,
 
 		hdd_debug("vdev %d :assoc freq %d sec_2g_freq:%d, bw %d",
 			  info->subband_info.vdev_id, info->freq,
-			  sec_2g_freq, ch_width);
+			  sec_2g_freq, scanned_ch_width);
 		if (info->freq > sec_2g_freq) {
 			start_freq = sec_2g_freq;
 			end_freq = info->freq;
@@ -26501,10 +26536,11 @@ static void wlan_hdd_fill_subband_scan_info(struct hdd_context *hdd_ctx,
 			end_freq = sec_2g_freq;
 		}
 	} else {
-		range = wlan_reg_get_bonded_chan_entry(info->freq, ch_width, 0);
+		range = wlan_reg_get_bonded_chan_entry(info->freq,
+						       scanned_ch_width, 0);
 		if (!range) {
 			hdd_err("vdev %d: bonded_chan_array is NULL for freq %d, ch_width %d",
-				vdev_id, info->freq, ch_width);
+				vdev_id, info->freq, scanned_ch_width);
 			return;
 		}
 		start_freq = range->start_freq;
@@ -26515,7 +26551,7 @@ static void wlan_hdd_fill_subband_scan_info(struct hdd_context *hdd_ctx,
 	info_index = 0;
 
 	hdd_debug("vdev %d: freq :%d bw %d, range [%d-%d], num_freq:%d",
-		  vdev_id, info->freq, ch_width, start_freq,
+		  vdev_id, info->freq, scanned_ch_width, start_freq,
 		  end_freq, freq_info_num);
 
 	for (idx = 0; idx < NUM_CHANNELS; idx++) {

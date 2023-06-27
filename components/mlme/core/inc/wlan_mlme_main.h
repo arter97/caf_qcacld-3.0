@@ -370,12 +370,12 @@ struct ft_context {
 };
 
 /**
- * struct connect_chan_info - store channel info at the time of association
- * @ch_width_orig: channel width at the time of initial connection
+ * struct assoc_channel_info - store channel info at the time of association
+ * @assoc_ch_width: channel width at the time of initial connection
  * @sec_2g_freq: secondary 2 GHz freq
  */
-struct connect_chan_info {
-	enum phy_ch_width ch_width_orig;
+struct assoc_channel_info {
+	enum phy_ch_width assoc_ch_width;
 	qdf_freq_t sec_2g_freq;
 };
 
@@ -398,7 +398,7 @@ struct connect_chan_info {
  * @ese_tspec_info: ese tspec info
  * @ext_cap_ie: Ext CAP IE
  * @assoc_btm_cap: BSS transition management cap used in (re)assoc req
- * @chan_info_orig: store channel info at the time of association
+ * @assoc_chan_info: store channel info at the time of association
  */
 struct mlme_connect_info {
 	uint8_t timing_meas_cap;
@@ -424,7 +424,7 @@ struct mlme_connect_info {
 #endif
 	uint8_t ext_cap_ie[DOT11F_IE_EXTCAP_MAX_LEN + 2];
 	bool assoc_btm_cap;
-	struct connect_chan_info chan_info_orig;
+	struct assoc_channel_info assoc_chan_info;
 };
 
 /** struct wait_for_key_timer - wait for key timer object

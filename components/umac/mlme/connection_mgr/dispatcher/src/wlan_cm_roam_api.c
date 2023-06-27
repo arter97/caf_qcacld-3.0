@@ -133,7 +133,7 @@ cm_update_associated_ch_info(struct wlan_objmgr_vdev *vdev, bool is_update)
 {
 	struct mlme_legacy_priv *mlme_priv;
 	struct wlan_channel *des_chan;
-	struct connect_chan_info *chan_info_orig;
+	struct assoc_channel_info *assoc_chan_info;
 	enum phy_ch_width ch_width;
 	QDF_STATUS status;
 
@@ -141,9 +141,9 @@ cm_update_associated_ch_info(struct wlan_objmgr_vdev *vdev, bool is_update)
 	if (!mlme_priv)
 		return;
 
-	chan_info_orig = &mlme_priv->connect_info.chan_info_orig;
+	assoc_chan_info = &mlme_priv->connect_info.assoc_chan_info;
 	if (!is_update) {
-		chan_info_orig->ch_width_orig = CH_WIDTH_INVALID;
+		assoc_chan_info->assoc_ch_width = CH_WIDTH_INVALID;
 		return;
 	}
 
@@ -160,23 +160,23 @@ cm_update_associated_ch_info(struct wlan_objmgr_vdev *vdev, bool is_update)
 	 */
 	status = wlan_mlme_get_sta_ch_width(vdev, &ch_width);
 	if (QDF_IS_STATUS_ERROR(status))
-		chan_info_orig->ch_width_orig = des_chan->ch_width;
+		assoc_chan_info->assoc_ch_width = des_chan->ch_width;
 	else
-		chan_info_orig->ch_width_orig = ch_width;
+		assoc_chan_info->assoc_ch_width = ch_width;
 
 	if (WLAN_REG_IS_24GHZ_CH_FREQ(des_chan->ch_freq) &&
 	    des_chan->ch_width == CH_WIDTH_40MHZ) {
 		if (des_chan->ch_cfreq1 == des_chan->ch_freq + BW_10_MHZ)
-			chan_info_orig->sec_2g_freq =
+			assoc_chan_info->sec_2g_freq =
 					des_chan->ch_freq + BW_20_MHZ;
 		if (des_chan->ch_cfreq1 == des_chan->ch_freq - BW_10_MHZ)
-			chan_info_orig->sec_2g_freq =
+			assoc_chan_info->sec_2g_freq =
 					des_chan->ch_freq - BW_20_MHZ;
 	}
 
 	mlme_debug("ch width :%d, ch_freq:%d, ch_cfreq1:%d, sec_2g_freq:%d",
-		   chan_info_orig->ch_width_orig, des_chan->ch_freq,
-		   des_chan->ch_cfreq1, chan_info_orig->sec_2g_freq);
+		   assoc_chan_info->assoc_ch_width, des_chan->ch_freq,
+		   des_chan->ch_cfreq1, assoc_chan_info->sec_2g_freq);
 }
 
 char *cm_roam_get_requestor_string(enum wlan_cm_rso_control_requestor requestor)
@@ -2156,35 +2156,114 @@ QDF_STATUS wlan_cm_update_fils_ft(struct wlan_objmgr_psoc *psoc,
 }
 #endif
 
+#ifdef WLAN_FEATURE_11BE_MLO
+static void
+wlan_cm_get_mlo_associated_ch_info(struct wlan_objmgr_vdev *vdev,
+				   enum phy_ch_width scanned_ch_width,
+				   struct assoc_channel_info *assoc_chan_info)
+{
+	struct mlme_legacy_priv *mlme_priv;
+	struct wlan_channel *des_chan;
+	struct wlan_mlo_dev_context *mlo_dev_ctx;
+	struct wlan_mlo_sta *sta_ctx = NULL;
+	uint8_t i;
+	struct wlan_objmgr_vdev *mlo_vdev;
+	struct assoc_channel_info *temp_assoc_chan_info;
+
+	mlo_dev_ctx = vdev->mlo_dev_ctx;
+	if (!mlo_dev_ctx) {
+		mlme_err("vdev %d :mlo_dev_ctx is NULL",
+			 vdev->vdev_objmgr.vdev_id);
+		return;
+	}
+
+	sta_ctx = mlo_dev_ctx->sta_ctx;
+	if (!sta_ctx) {
+		mlme_err("vdev %d :mlo_dev_ctx is NULL",
+			 vdev->vdev_objmgr.vdev_id);
+		return;
+	}
+
+	for (i = 0; i < WLAN_UMAC_MLO_MAX_VDEVS; i++) {
+		if (!mlo_dev_ctx->wlan_vdev_list[i])
+			continue;
+		if (qdf_test_bit(i, sta_ctx->wlan_connected_links)) {
+			mlo_vdev = mlo_dev_ctx->wlan_vdev_list[i];
+			des_chan = wlan_vdev_mlme_get_des_chan(mlo_vdev);
+			if (!des_chan) {
+				mlme_debug("NULL des_chan");
+				return;
+			}
+
+			if (des_chan->ch_width == scanned_ch_width) {
+				mlme_priv =
+					wlan_vdev_mlme_get_ext_hdl(mlo_vdev);
+				if (!mlme_priv) {
+					mlme_legacy_err("mlme_priv is NULL");
+					return;
+				}
+				temp_assoc_chan_info =
+				    &mlme_priv->connect_info.assoc_chan_info;
+				assoc_chan_info->sec_2g_freq =
+					temp_assoc_chan_info->sec_2g_freq;
+				mlme_debug("vdev %d: assoc sec_2g_freq:%d",
+					   mlo_vdev->vdev_objmgr.vdev_id,
+					   assoc_chan_info->sec_2g_freq);
+				break;
+			}
+		}
+	}
+}
+#else
+static void
+wlan_cm_get_mlo_associated_ch_info(struct wlan_objmgr_vdev *vdev,
+				   enum phy_ch_width ch_width,
+				   struct assoc_channel_info *chan_info)
+{
+}
+#endif
+
 void wlan_cm_get_associated_ch_info(struct wlan_objmgr_psoc *psoc,
 				    uint8_t vdev_id,
-				    struct connect_chan_info *chan_info)
+				    enum phy_ch_width scanned_ch_width,
+				    struct assoc_channel_info *assoc_chan_info)
 {
 	struct wlan_objmgr_vdev *vdev;
 	struct mlme_legacy_priv *mlme_priv;
 
-	chan_info->ch_width_orig = CH_WIDTH_INVALID;
-	chan_info->sec_2g_freq = 0;
+	assoc_chan_info->assoc_ch_width = CH_WIDTH_INVALID;
+	assoc_chan_info->sec_2g_freq = 0;
 
 	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, vdev_id,
 						    WLAN_MLME_NB_ID);
-
 	if (!vdev) {
-		mlme_err("vdev%d: vdev object is NULL", vdev_id);
+		mlme_legacy_err("vdev %d: vdev not found", vdev_id);
 		return;
 	}
 
-	mlme_priv = wlan_vdev_mlme_get_ext_hdl(vdev);
-	if (!mlme_priv)
+	if (wlan_vdev_mlme_is_mlo_vdev(vdev)) {
+		mlme_debug("vdev %d: get assoc chan info for mlo connection",
+			   vdev_id);
+		wlan_cm_get_mlo_associated_ch_info(vdev, scanned_ch_width,
+						   assoc_chan_info);
 		goto release;
+	}
 
-	chan_info->ch_width_orig =
-			mlme_priv->connect_info.chan_info_orig.ch_width_orig;
-	chan_info->sec_2g_freq =
-			mlme_priv->connect_info.chan_info_orig.sec_2g_freq;
+	mlme_priv = wlan_vdev_mlme_get_ext_hdl(vdev);
+	if (!mlme_priv) {
+		mlme_legacy_err("mlme_priv is NULL");
+		goto release;
+	}
+
+	assoc_chan_info->assoc_ch_width =
+		mlme_priv->connect_info.assoc_chan_info.assoc_ch_width;
+	assoc_chan_info->sec_2g_freq =
+		mlme_priv->connect_info.assoc_chan_info.sec_2g_freq;
 
 	mlme_debug("vdev %d: associated_ch_width:%d, sec_2g_freq:%d", vdev_id,
-		   chan_info->ch_width_orig, chan_info->sec_2g_freq);
+		   assoc_chan_info->assoc_ch_width,
+		   assoc_chan_info->sec_2g_freq);
+
 release:
 	wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_NB_ID);
 }
