@@ -764,6 +764,7 @@ struct dp_direct_link_context {
  * @fst_in_cmem: Flag indicating if FST is in CMEM or not
  * @fisa_enable: Flag to indicate if FISA is enabled or not
  * @fisa_lru_del_enable: Flag to indicate if LRU flow delete is enabled
+ * @fisa_dynamic_aggr_size_support: Indicate dynamic aggr size programming support
  * @skip_fisa_param: FISA skip params structure
  * @skip_fisa_param.skip_fisa: Flag to skip FISA aggr inside @skip_fisa_param
  * @skip_fisa_param.fisa_force_flush: Force flush inside @skip_fisa_param
@@ -852,6 +853,7 @@ struct wlan_dp_psoc_context {
 	bool fst_in_cmem;
 	uint8_t fisa_enable;
 	uint8_t fisa_lru_del_enable;
+	bool fisa_dynamic_aggr_size_support;
 	/*
 	 * Params used for controlling the fisa aggregation dynamically
 	 */

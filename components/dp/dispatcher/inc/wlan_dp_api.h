@@ -64,4 +64,13 @@ void wlan_dp_print_fisa_rx_stats(enum cdp_fisa_stats_id stats_id);
  * Return: None
  */
 void wlan_dp_set_fst_in_cmem(bool fst_in_cmem);
+
+/**
+ * wlan_dp_set_fisa_dynamic_aggr_size_support - Set flag to indicate dynamic
+ *						MSDU aggregation size programming supported
+ * @dynamic_aggr_size_support: Flag to indicate dynamic aggregation size support
+ *
+ * Return: None
+ */
+void wlan_dp_set_fisa_dynamic_aggr_size_support(bool dynamic_aggr_size_support);
 #endif

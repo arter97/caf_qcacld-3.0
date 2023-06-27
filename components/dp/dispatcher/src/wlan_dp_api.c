@@ -46,3 +46,8 @@ void wlan_dp_set_fst_in_cmem(bool fst_in_cmem)
 {
 	dp_set_fst_in_cmem(fst_in_cmem);
 }
+
+void wlan_dp_set_fisa_dynamic_aggr_size_support(bool dynamic_aggr_size_support)
+{
+	dp_set_fisa_dynamic_aggr_size_support(dynamic_aggr_size_support);
+}

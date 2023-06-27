@@ -2173,3 +2173,10 @@ void dp_resume_fse_cache_flush(struct wlan_dp_psoc_context *dp_ctx)
 
 	dp_info("fse cache flush resumed");
 }
+
+void dp_set_fisa_dynamic_aggr_size_support(bool dynamic_aggr_size_support)
+{
+	struct wlan_dp_psoc_context *dp_ctx = dp_get_context();
+
+	dp_ctx->fisa_dynamic_aggr_size_support = dynamic_aggr_size_support;
+}
