@@ -5105,7 +5105,8 @@ dp_htt_rx_fisa_config(struct dp_pdev *pdev,
 
 	msg_word++;
 	HTT_RX_FISA_CONFIG_FISA_V2_ENABLE_SET(*msg_word, 1);
-	HTT_RX_FISA_CONFIG_FISA_V2_AGGR_LIMIT_SET(*msg_word, 0xf);
+	HTT_RX_FISA_CONFIG_FISA_V2_AGGR_LIMIT_SET(*msg_word,
+	(fisa_config->max_aggr_supported ? fisa_config->max_aggr_supported : 0xf));
 
 	msg_word++;
 	htt_fisa_config->fisa_timeout_threshold = fisa_config->fisa_timeout;

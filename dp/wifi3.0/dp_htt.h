@@ -783,10 +783,12 @@ struct dp_htt_rx_flow_fst_operation {
  * struct dp_htt_rx_fisa_cfg - Rx fisa config
  * @pdev_id: DP Pdev identifier
  * @fisa_timeout: fisa aggregation timeout
+ * @max_aggr_supported: FISA max MSDU aggregation supported
  */
 struct dp_htt_rx_fisa_cfg {
 	uint8_t pdev_id;
 	uint32_t fisa_timeout;
+	uint8_t max_aggr_supported;
 };
 
 /**
