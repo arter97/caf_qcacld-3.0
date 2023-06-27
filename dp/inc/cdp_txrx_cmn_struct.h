@@ -750,6 +750,7 @@ enum wlan_op_subtype {
  * @subtype: subtype of the vdev
  * @qdf_opmode: Operation mode of the vdev
  * @mld_mac_addr: MLD mac addr of the current vdev.
+ * @is_bridge_vap: current vdev is bridge vap or not.
  */
 struct cdp_vdev_info {
 	uint8_t *vdev_mac_addr;
@@ -760,6 +761,9 @@ struct cdp_vdev_info {
 	enum QDF_OPMODE qdf_opmode;
 #ifdef WLAN_FEATURE_11BE_MLO
 	uint8_t *mld_mac_addr;
+#ifdef WLAN_MLO_MULTI_CHIP
+	bool is_bridge_vap;
+#endif
 #endif
 };
 

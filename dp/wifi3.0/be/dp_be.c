@@ -927,7 +927,7 @@ dp_mlo_mcast_deinit(struct dp_soc *soc, struct dp_vdev *vdev)
 
 	be_vdev->seq_num = 0;
 	be_vdev->mcast_primary = false;
-	vdev->mlo_vdev = false;
+	vdev->mlo_vdev = 0;
 }
 
 #else
@@ -946,6 +946,9 @@ static void dp_mlo_init_ptnr_list(struct dp_vdev *vdev)
 	struct dp_vdev_be *be_vdev = dp_get_be_vdev_from_dp_vdev(vdev);
 
 	qdf_mem_set(be_vdev->partner_vdev_list,
+		    WLAN_MAX_MLO_CHIPS * WLAN_MAX_MLO_LINKS_PER_SOC,
+		    CDP_INVALID_VDEV_ID);
+	qdf_mem_set(be_vdev->bridge_vdev_list,
 		    WLAN_MAX_MLO_CHIPS * WLAN_MAX_MLO_LINKS_PER_SOC,
 		    CDP_INVALID_VDEV_ID);
 }
@@ -2413,7 +2416,7 @@ static void dp_txrx_set_mlo_mcast_primary_vdev_param_be(
 						be_vdev->vdev.pdev->soc);
 
 	be_vdev->mcast_primary = val.cdp_vdev_param_mcast_vdev;
-	vdev->mlo_vdev = true;
+	vdev->mlo_vdev = 1;
 
 	if (be_vdev->mcast_primary) {
 		struct cdp_txrx_peer_params_update params = {0};
@@ -2421,7 +2424,8 @@ static void dp_txrx_set_mlo_mcast_primary_vdev_param_be(
 		dp_mlo_iter_ptnr_vdev(be_soc, be_vdev,
 				      dp_mlo_mcast_reset_pri_mcast,
 				      (void *)&be_vdev->mcast_primary,
-				      DP_MOD_ID_TX_MCAST);
+				      DP_MOD_ID_TX_MCAST,
+				      DP_LINK_VDEV_ITER);
 
 		params.chip_id = be_soc->mlo_chip_id;
 		params.pdev_id = be_vdev->vdev.pdev->pdev_id;
@@ -2454,7 +2458,7 @@ static void dp_txrx_set_mlo_mcast_primary_vdev_param_be(
 						be_vdev->vdev.pdev->soc);
 
 	be_vdev->mcast_primary = val.cdp_vdev_param_mcast_vdev;
-	vdev->mlo_vdev = true;
+	vdev->mlo_vdev = 1;
 	hal_tx_vdev_mcast_ctrl_set(vdev->pdev->soc->hal_soc,
 				   vdev->vdev_id,
 				   HAL_TX_MCAST_CTRL_NO_SPECIAL);
@@ -2465,7 +2469,8 @@ static void dp_txrx_set_mlo_mcast_primary_vdev_param_be(
 		dp_mlo_iter_ptnr_vdev(be_soc, be_vdev,
 				      dp_mlo_mcast_reset_pri_mcast,
 				      (void *)&be_vdev->mcast_primary,
-				      DP_MOD_ID_TX_MCAST);
+				      DP_MOD_ID_TX_MCAST,
+				      DP_LINK_VDEV_ITER);
 
 		params.chip_id = be_soc->mlo_chip_id;
 		params.pdev_id = vdev->pdev->pdev_id;
@@ -2486,7 +2491,7 @@ static void dp_txrx_reset_mlo_mcast_primary_vdev_param_be(
 	struct dp_vdev_be *be_vdev = dp_get_be_vdev_from_dp_vdev(vdev);
 
 	be_vdev->mcast_primary = false;
-	vdev->mlo_vdev = false;
+	vdev->mlo_vdev = 0;
 	hal_tx_vdev_mcast_ctrl_set(vdev->pdev->soc->hal_soc,
 				   vdev->vdev_id,
 				   HAL_TX_MCAST_CTRL_FW_EXCEPTION);

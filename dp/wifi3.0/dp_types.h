@@ -200,6 +200,12 @@ typedef void dp_ptnr_soc_iter_func(struct dp_soc *ptnr_soc, void *arg,
 #define DP_MLD_MODE_UNIFIED_BOND    1
 #define DP_MLD_MODE_HYBRID_NONBOND  2
 #define DP_MLD_MODE_MAX             DP_MLD_MODE_HYBRID_NONBOND
+
+#define DP_LINK_VDEV_ITER 1
+#define DP_BRIDGE_VDEV_ITER 2
+#define DP_ALL_VDEV_ITER 3
+#define IS_LINK_VDEV_ITER_REQUIRED(type) (type & DP_LINK_VDEV_ITER)
+#define IS_BRIDGE_VDEV_ITER_REQUIRED(type) (type & DP_BRIDGE_VDEV_ITER)
 #endif
 
 enum rx_pktlog_mode {
@@ -3872,7 +3878,9 @@ struct dp_vdev {
 	/* MLO MAC address corresponding to vdev */
 	union dp_align_mac_addr mld_mac_addr;
 #if defined(WLAN_MLO_MULTI_CHIP) && defined(WLAN_MCAST_MLO)
-	bool mlo_vdev;
+	uint8_t mlo_vdev:1,
+		is_bridge_vdev:1,
+		reserved_1:6;
 #endif
 #endif
 
