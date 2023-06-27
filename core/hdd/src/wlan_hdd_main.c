@@ -5649,8 +5649,6 @@ bool hdd_is_dynamic_set_mac_addr_allowed(struct hdd_adapter *adapter)
 			hdd_info_rl("VDEV is not in disconnected state, set mac address isn't supported");
 			return false;
 		}
-	fallthrough;
-	case QDF_P2P_DEVICE_MODE:
 		return true;
 	case QDF_SAP_MODE:
 		if (test_bit(SOFTAP_BSS_STARTED,
