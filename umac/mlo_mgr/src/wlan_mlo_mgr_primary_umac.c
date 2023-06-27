@@ -756,6 +756,65 @@ void mlo_mlme_ptqm_migrate_timer_cb(void *arg)
 }
 
 /**
+ * mlo_ptqm_list_peek_head() - Returns the head of linked list
+ *
+ * @ptqm_list: Pointer to the list of peer ptqm migrate entries
+ *
+ * API to retrieve the head from the list of peer ptqm migrate entries
+ *
+ * Return: Pointer to peer ptqm migrate entry
+ */
+static
+struct peer_ptqm_migrate_list_entry *mlo_ptqm_list_peek_head(
+					qdf_list_t *ptqm_list)
+{
+	struct peer_ptqm_migrate_list_entry *peer_entry;
+	qdf_list_node_t *peer_node = NULL;
+
+	if (qdf_list_peek_front(ptqm_list, &peer_node) != QDF_STATUS_SUCCESS)
+		return NULL;
+
+	peer_entry = qdf_container_of(peer_node,
+				      struct peer_ptqm_migrate_list_entry,
+				      node);
+
+	return peer_entry;
+}
+
+/**
+ * mlo_get_next_peer_ctx() - Return next peer ptqm entry from the list
+ *
+ * @peer_list:  Pointer to the list of peer ptqm migrate entries
+ * @peer_cur: Pointer to the current peer ptqm entry
+ *
+ * API to retrieve the next node from the list of peer ptqm migrate entries
+ *
+ * Return: Pointer to peer ptqm migrate entry
+ */
+static
+struct peer_ptqm_migrate_list_entry *mlo_get_next_peer_ctx(
+				qdf_list_t *peer_list,
+				struct peer_ptqm_migrate_list_entry *peer_cur)
+{
+	struct peer_ptqm_migrate_list_entry *peer_next;
+	qdf_list_node_t *node = &peer_cur->node;
+	qdf_list_node_t *next_node = NULL;
+
+	/* This API is invoked with lock acquired, do not add log prints */
+	if (!node)
+		return NULL;
+
+	if (qdf_list_peek_next(peer_list, node, &next_node) !=
+						QDF_STATUS_SUCCESS)
+		return NULL;
+
+	peer_next = qdf_container_of(next_node,
+				     struct peer_ptqm_migrate_list_entry,
+				     node);
+	return peer_next;
+}
+
+/**
  * wlan_mlo_send_ptqm_migrate_cmd() - API to send WMI to trigger ptqm migration
  * @vdev: objmgr vdev object
  * @list: peer list to be migrated
@@ -773,7 +832,7 @@ wlan_mlo_send_ptqm_migrate_cmd(struct wlan_objmgr_vdev *vdev,
 	QDF_STATUS status;
 	struct peer_ptqm_migrate_params param = {0};
 	struct peer_ptqm_migrate_entry *peer_list = NULL;
-	struct peer_ptqm_migrate_list_entry *peer_entry, *tmp_entry;
+	struct peer_ptqm_migrate_list_entry *peer_entry, *next_entry;
 	struct wlan_mlo_dev_context *ml_dev = NULL;
 	uint16_t i = 0;
 
@@ -805,8 +864,8 @@ wlan_mlo_send_ptqm_migrate_cmd(struct wlan_objmgr_vdev *vdev,
 
 	peer_list = param.peer_list;
 
-	TAILQ_FOREACH_SAFE(peer_entry, &list->peer_list,
-			   peer_list_elem, tmp_entry) {
+	peer_entry = mlo_ptqm_list_peek_head(&list->peer_list);
+	while (peer_entry) {
 		peer_list[i].ml_peer_id = peer_entry->mlo_peer_id;
 		peer_list[i].hw_link_id = peer_entry->new_hw_link_id;
 
@@ -817,6 +876,9 @@ wlan_mlo_send_ptqm_migrate_cmd(struct wlan_objmgr_vdev *vdev,
 			  i, peer_list[i].ml_peer_id,
 			  peer_list[i].hw_link_id);
 		i++;
+		next_entry = mlo_get_next_peer_ctx(&list->peer_list,
+						   peer_entry);
+		peer_entry = next_entry;
 	}
 
 	status = mlo_tx_ops->peer_ptqm_migrate_send(vdev, &param);
@@ -953,6 +1015,8 @@ wlan_mlo_get_new_ptqm_id(struct wlan_objmgr_vdev *curr_vdev,
 				}
 				*new_hw_link_id = wlan_mlo_get_pdev_hw_link_id(
 							wlan_vdev_get_pdev(wlan_vdev_list[i]));
+				ml_peer->migrate_primary_umac_psoc_id =
+						wlan_vdev_get_psoc_id(wlan_vdev_list[i]);
 				break;
 			}
 		}
@@ -999,17 +1063,21 @@ exit:
 static void wlan_mlo_free_ptqm_migrate_list(
 			struct peer_migrate_ptqm_multi_entries *list)
 {
-	struct peer_ptqm_migrate_list_entry *peer_entry, *tmp_entry;
+	struct peer_ptqm_migrate_list_entry *peer_entry, *next_entry;
 
-	TAILQ_FOREACH_SAFE(peer_entry, &list->peer_list,
-			   peer_list_elem, tmp_entry) {
-		TAILQ_REMOVE(&list->peer_list, peer_entry, peer_list_elem);
+	peer_entry = mlo_ptqm_list_peek_head(&list->peer_list);
+	while (peer_entry) {
 		list->num_entries--;
+		next_entry = mlo_get_next_peer_ctx(&list->peer_list,
+						   peer_entry);
 		if (peer_entry->peer)
 			wlan_objmgr_peer_release_ref(peer_entry->peer,
 						     WLAN_MLME_SB_ID);
+		qdf_list_remove_node(&list->peer_list, &peer_entry->node);
 		qdf_mem_free(peer_entry);
+		peer_entry = next_entry;
 	}
+	qdf_list_destroy(&list->peer_list);
 }
 
 /**
@@ -1025,19 +1093,22 @@ static void wlan_mlo_reset_ptqm_migrate_list(
 			struct wlan_mlo_dev_context *ml_dev,
 			struct peer_migrate_ptqm_multi_entries *list)
 {
-	struct peer_ptqm_migrate_list_entry *peer_entry, *tmp_entry;
+	struct peer_ptqm_migrate_list_entry *peer_entry, *next_entry;
 
 	if (!ml_dev)
 		return;
 
-	TAILQ_FOREACH_SAFE(peer_entry, &list->peer_list,
-			   peer_list_elem, tmp_entry) {
+	peer_entry = mlo_ptqm_list_peek_head(&list->peer_list);
+	while (peer_entry) {
 		if (peer_entry->peer) {
 			qdf_clear_bit(peer_entry->mlo_peer_id, ml_dev->mlo_peer_id_bmap);
 			peer_entry->peer->mlo_peer_ctx->primary_umac_migration_in_progress = false;
 			peer_entry->peer->mlo_peer_ctx->migrate_primary_umac_psoc_id =
 							ML_PRIMARY_UMAC_ID_INVAL;
 		}
+		next_entry = mlo_get_next_peer_ctx(&list->peer_list,
+						   peer_entry);
+		peer_entry = next_entry;
 	}
 }
 
@@ -1107,7 +1178,7 @@ static void wlan_mlo_build_ptqm_migrate_list(struct wlan_objmgr_vdev *vdev,
 	peer_entry->peer = peer;
 	peer_entry->new_hw_link_id = new_hw_link_id;
 	peer_entry->mlo_peer_id = ml_peer->mlo_peer_id;
-	TAILQ_INSERT_TAIL(&list->peer_list, peer_entry, peer_list_elem);
+	qdf_list_insert_back(&list->peer_list, &peer_entry->node);
 	list->num_entries++;
 }
 
@@ -1126,7 +1197,7 @@ static QDF_STATUS wlan_mlo_trigger_link_ptqm_migration(
 	struct peer_migrate_ptqm_multi_entries migrate_list = {0};
 	QDF_STATUS status;
 
-	TAILQ_INIT(&migrate_list.peer_list);
+	qdf_list_create(&migrate_list.peer_list, MAX_MLO_PEER_ID);
 	wlan_objmgr_iterate_peerobj_list(vdev,
 					 wlan_mlo_build_ptqm_migrate_list,
 					 &migrate_list, WLAN_MLME_NB_ID);
@@ -1223,8 +1294,8 @@ QDF_STATUS wlan_mlo_set_ptqm_migration(struct wlan_objmgr_vdev *vdev,
 
 	peer_entry->new_hw_link_id = new_hw_link_id;
 	peer_entry->mlo_peer_id = ml_peer->mlo_peer_id;
-	TAILQ_INIT(&migrate_list.peer_list);
-	TAILQ_INSERT_TAIL(&migrate_list.peer_list, peer_entry, peer_list_elem);
+	qdf_list_create(&migrate_list.peer_list, MAX_MLO_PEER_ID);
+	qdf_list_insert_back(&migrate_list.peer_list, &peer_entry->node);
 	migrate_list.num_entries = 1;
 
 	//trigger WMI
