@@ -6418,6 +6418,10 @@ lim_send_t2lm_action_req_frame(struct wlan_objmgr_vdev *vdev,
 	vdev_id = wlan_vdev_get_id(vdev);
 
 	session = pe_find_session_by_vdev_id(mac_ctx, vdev_id);
+	if (!session) {
+		pe_err("session not found for given vdev_id %d", vdev_id);
+		return QDF_STATUS_E_INVAL;
+	}
 	session_id = session->smeSessionId;
 
 	qdf_mem_zero((uint8_t *)&frm, sizeof(frm));
