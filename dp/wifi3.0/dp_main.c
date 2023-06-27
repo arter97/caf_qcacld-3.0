@@ -7199,11 +7199,38 @@ static inline void dp_vdev_save_mld_addr(struct dp_vdev *vdev,
 		qdf_mem_copy(&vdev->mld_mac_addr.raw[0],
 			     vdev_info->mld_mac_addr, QDF_MAC_ADDR_SIZE);
 }
+
+#ifdef WLAN_MLO_MULTI_CHIP
+static inline void
+dp_vdev_update_bridge_vdev_param(struct dp_vdev *vdev,
+				 struct cdp_vdev_info *vdev_info)
+{
+	if (vdev_info->is_bridge_vap)
+		vdev->is_bridge_vdev = 1;
+
+	dp_info("is_bridge_link = %d vdev id = %d chip id = %d",
+		vdev->is_bridge_vdev, vdev->vdev_id,
+		dp_mlo_get_chip_id(vdev->pdev->soc));
+}
+#else
+static inline void
+dp_vdev_update_bridge_vdev_param(struct dp_vdev *vdev,
+				 struct cdp_vdev_info *vdev_info)
+{
+}
+#endif /* WLAN_MLO_MULTI_CHIP */
+
 #else
 static inline void dp_vdev_save_mld_addr(struct dp_vdev *vdev,
 					 struct cdp_vdev_info *vdev_info)
 {
 
+}
+
+static inline void
+dp_vdev_update_bridge_vdev_param(struct dp_vdev *vdev,
+				 struct cdp_vdev_info *vdev_info)
+{
 }
 #endif
 
@@ -7326,6 +7353,7 @@ static QDF_STATUS dp_vdev_attach_wifi3(struct cdp_soc_t *cdp_soc,
 
 	qdf_mem_copy(&vdev->mac_addr.raw[0], vdev_mac_addr, QDF_MAC_ADDR_SIZE);
 
+	dp_vdev_update_bridge_vdev_param(vdev, vdev_info);
 	dp_vdev_save_mld_addr(vdev, vdev_info);
 
 	/* TODO: Initialize default HTT meta data that will be used in
