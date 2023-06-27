@@ -1046,6 +1046,9 @@ static int __wlan_hdd_cfg80211_get_tdls_capabilities(struct wiphy *wiphy,
 						     int data_len)
 {
 	int status;
+	struct net_device *dev = wdev->netdev;
+	struct hdd_adapter *adapter = WLAN_HDD_GET_PRIV_PTR(dev);
+	struct wlan_objmgr_vdev *vdev;
 	struct hdd_context *hdd_ctx = wiphy_priv(wiphy);
 	struct sk_buff *skb;
 	uint32_t set = 0;
@@ -1055,6 +1058,7 @@ static int __wlan_hdd_cfg80211_get_tdls_capabilities(struct wiphy *wiphy,
 	bool tdls_sleep_sta_enable;
 	bool tdls_buffer_sta;
 	bool tdls_off_channel;
+	bool tdls_fw_wideband_cap;
 
 	hdd_enter_dev(wdev->netdev);
 
@@ -1062,6 +1066,9 @@ static int __wlan_hdd_cfg80211_get_tdls_capabilities(struct wiphy *wiphy,
 		hdd_err("Command not allowed in FTM mode");
 		return -EPERM;
 	}
+
+	if (hdd_validate_adapter(adapter))
+		return -EINVAL;
 
 	status = wlan_hdd_validate_context(hdd_ctx);
 	if (status)
@@ -1092,14 +1099,28 @@ static int __wlan_hdd_cfg80211_get_tdls_capabilities(struct wiphy *wiphy,
 					       &tdls_buffer_sta);
 		cfg_tdls_get_off_channel_enable(hdd_ctx->psoc,
 						&tdls_off_channel);
+		vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink,
+						   WLAN_OSIF_ID);
+		if (!vdev) {
+			hdd_err("Vdev is null return");
+			goto fail;
+		}
+
+		tdls_fw_wideband_cap =
+				wlan_cfg80211_tdls_is_fw_wideband_capable(vdev);
+		hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
+
 		set = set | WIFI_TDLS_SUPPORT;
 		set = set | (tdls_external_control ?
 					WIFI_TDLS_EXTERNAL_CONTROL_SUPPORT : 0);
 		set = set | (tdls_off_channel ?
 					WIFI_TDLS_OFFCHANNEL_SUPPORT : 0);
+		set = set | (tdls_fw_wideband_cap ?
+					WIFI_TDLS_WIDER_BW_SUPPORT : 0);
 		max_num_tdls_sta = cfg_tdls_get_max_peer_count(hdd_ctx->psoc);
 
-		hdd_debug("TDLS Feature supported value %x", set);
+		hdd_debug("TDLS Feature supported value %x tdls_max_peer_count:%d",
+			  set, max_num_tdls_sta);
 		if (nla_put_u32(skb, PARAM_MAX_TDLS_SESSION,
 				max_num_tdls_sta) ||
 		    nla_put_u32(skb, PARAM_TDLS_FEATURE_SUPPORT, set)) {
