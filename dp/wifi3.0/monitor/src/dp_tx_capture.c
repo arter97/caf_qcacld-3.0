@@ -6979,12 +6979,6 @@ void dp_send_usr_ack_frm_to_stack(struct dp_soc *soc,
 	if (!peer)
 		return;
 
-	if (!dp_peer_or_pdev_tx_cap_enabled(pdev, peer,
-					    peer->mac_addr.raw)) {
-		DP_TX_PEER_DEL_REF(peer);
-		return;
-	}
-
 	set_mpdu_info(&tx_capture_info,
 		      rx_status, rx_user_status);
 
