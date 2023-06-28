@@ -8834,6 +8834,22 @@ hdd_monitor_mode_disable_and_delete(struct wlan_hdd_link_info *link_info)
 	sme_delete_mon_session(hdd_ctx->mac_handle, link_info->vdev_id);
 }
 
+static void
+hdd_stop_and_close_pre_cac_adapter(struct hdd_context *hdd_ctx,
+				   struct wlan_objmgr_vdev *vdev)
+{
+	if (!vdev)
+		return;
+
+	if (!ucfg_pre_cac_adapter_is_active(vdev)) {
+		ucfg_pre_cac_stop(hdd_ctx->psoc);
+		hdd_close_pre_cac_adapter(hdd_ctx);
+	} else {
+		if (ucfg_pre_cac_set_status(vdev, false))
+			hdd_err("Failed to set is_pre_cac_on to false");
+	}
+}
+
 QDF_STATUS hdd_stop_adapter_ext(struct hdd_context *hdd_ctx,
 				struct hdd_adapter *adapter)
 {
@@ -8950,14 +8966,7 @@ QDF_STATUS hdd_stop_adapter_ext(struct hdd_context *hdd_ctx,
 		wlansap_reset_sap_config_add_ie(sap_config, eUPDATE_IE_ALL);
 
 		ucfg_ipa_flush(hdd_ctx->pdev);
-
-		if (!ucfg_pre_cac_adapter_is_active(vdev)) {
-			ucfg_pre_cac_stop(hdd_ctx->psoc);
-			hdd_close_pre_cac_adapter(hdd_ctx);
-		} else {
-			if (ucfg_pre_cac_set_status(vdev, false))
-				hdd_err("Failed to set is_pre_cac_on to false");
-		}
+		hdd_stop_and_close_pre_cac_adapter(hdd_ctx, vdev);
 
 		fallthrough;
 
