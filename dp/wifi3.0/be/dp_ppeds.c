@@ -1292,6 +1292,9 @@ static void dp_ppeds_set_tcl_prod_idx(ppe_ds_wlan_handle_t *ppeds_handle,
 	struct dp_srng *ppe2tcl_ring = &soc->ppe2tcl_ring;
 
 	hal_srng_src_set_hp(ppe2tcl_ring->hal_srng, tcl_prod_idx);
+	hal_update_ring_util(dpsoc->hal_soc, ppe2tcl_ring->hal_srng,
+			     PPE2TCL, &soc->ppe2tcl_ring.stats);
+
 	dp_tx_ring_access_end_wrapper(dpsoc, ppe2tcl_ring->hal_srng, 0);
 }
 
