@@ -1372,9 +1372,7 @@ endif
 ########## POWER MANAGEMENT OFFLOADS (PMO) ##########
 PMO_DIR :=	components/pmo
 PMO_INC :=	-I$(WLAN_ROOT)/$(PMO_DIR)/core/inc \
-			-I$(WLAN_ROOT)/$(PMO_DIR)/core/src \
 			-I$(WLAN_ROOT)/$(PMO_DIR)/dispatcher/inc \
-			-I$(WLAN_ROOT)/$(PMO_DIR)/dispatcher/src \
 
 ifeq ($(CONFIG_POWER_MANAGEMENT_OFFLOAD), y)
 PMO_OBJS :=     $(PMO_DIR)/core/src/wlan_pmo_main.o \
@@ -1731,7 +1729,6 @@ $(call add-wlan-objs,wlan_pre_cac,$(WLAN_PRE_CAC_OBJS))
 CLD_TARGET_IF_DIR := components/target_if
 
 CLD_TARGET_IF_INC := -I$(WLAN_ROOT)/$(CLD_TARGET_IF_DIR)/pmo/inc \
-	 -I$(WLAN_ROOT)/$(CLD_TARGET_IF_DIR)/pmo/src
 
 ifeq ($(CONFIG_POWER_MANAGEMENT_OFFLOAD), y)
 CLD_TARGET_IF_OBJ := $(CLD_TARGET_IF_DIR)/pmo/src/target_if_pmo_arp.o \
@@ -1872,7 +1869,6 @@ $(call add-wlan-objs,bmi,$(BMI_OBJS))
 TARGET_IF_DIR := $(WLAN_COMMON_ROOT)/target_if
 
 TARGET_IF_INC := -I$(WLAN_COMMON_INC)/target_if/core/inc \
-		 -I$(WLAN_COMMON_INC)/target_if/core/src \
 		 -I$(WLAN_COMMON_INC)/target_if/init_deinit/inc \
 		 -I$(WLAN_COMMON_INC)/target_if/crypto/inc \
 		 -I$(WLAN_COMMON_INC)/target_if/regulatory/inc \
@@ -1909,7 +1905,6 @@ $(call add-wlan-objs,target_if,$(TARGET_IF_OBJ))
 GLOBAL_LMAC_IF_DIR := $(WLAN_COMMON_ROOT)/global_lmac_if
 
 GLOBAL_LMAC_IF_INC := -I$(WLAN_COMMON_INC)/global_lmac_if/inc \
-                      -I$(WLAN_COMMON_INC)/global_lmac_if/src
 
 GLOBAL_LMAC_IF_OBJ := $(GLOBAL_LMAC_IF_DIR)/src/wlan_global_lmac_if.o
 
@@ -2121,9 +2116,6 @@ ifeq (y,$(filter y,$(CONFIG_LITHIUM) $(CONFIG_BERYLLIUM) $(CONFIG_RHINE)))
 DP_INC := -I$(WLAN_COMMON_INC)/dp/inc \
 	-I$(WLAN_COMMON_INC)/dp/wifi3.0 \
 	-I$(WLAN_COMMON_INC)/target_if/dp/inc \
-	-I$(WLAN_COMMON_INC)/dp/wifi3.0/monitor \
-	-I$(WLAN_COMMON_INC)/dp/wifi3.0/monitor/1.0 \
-	-I$(WLAN_COMMON_INC)/dp/wifi3.0/monitor/2.0 \
 	-I$(WLAN_COMMON_INC)/dp/cmn_dp_api
 
 DP_SRC := $(WLAN_COMMON_ROOT)/dp/wifi3.0
@@ -2147,6 +2139,10 @@ DP_OBJS += $(DP_SRC)/dp_rx_tid.o
 endif
 
 ifeq ($(CONFIG_WIFI_MONITOR_SUPPORT), y)
+DP_INC += -I$(WLAN_COMMON_INC)/dp/wifi3.0/monitor \
+	-I$(WLAN_COMMON_INC)/dp/wifi3.0/monitor/1.0 \
+	-I$(WLAN_COMMON_INC)/dp/wifi3.0/monitor/2.0 \
+
 DP_OBJS += $(DP_SRC)/monitor/dp_mon.o \
 		$(DP_SRC)/monitor/dp_mon_filter.o \
 		$(DP_SRC)/monitor/dp_rx_mon.o \
@@ -2299,13 +2295,11 @@ $(call add-wlan-objs,init_deinit,$(INIT_DEINIT_OBJS))
 
 ############## REGULATORY ###########
 REGULATORY_DIR := umac/regulatory
-REGULATORY_CORE_INC_DIR := $(REGULATORY_DIR)/core/inc
 REGULATORY_CORE_SRC_DIR := $(REGULATORY_DIR)/core/src
 REG_DISPATCHER_INC_DIR := $(REGULATORY_DIR)/dispatcher/inc
 REG_DISPATCHER_SRC_DIR := $(REGULATORY_DIR)/dispatcher/src
 REG_CORE_OBJ_DIR := $(WLAN_COMMON_ROOT)/$(REGULATORY_CORE_SRC_DIR)
 REG_DISPATCHER_OBJ_DIR := $(WLAN_COMMON_ROOT)/$(REG_DISPATCHER_SRC_DIR)
-REGULATORY_INC := -I$(WLAN_COMMON_INC)/$(REGULATORY_CORE_INC_DIR)
 REGULATORY_INC := -I$(WLAN_COMMON_INC)/$(REGULATORY_CORE_SRC_DIR)
 REGULATORY_INC += -I$(WLAN_COMMON_INC)/$(REG_DISPATCHER_INC_DIR)
 REGULATORY_INC += -I$(WLAN_COMMON_INC)/umac/cmn_services/regulatory/inc
