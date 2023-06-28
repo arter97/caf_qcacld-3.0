@@ -206,6 +206,8 @@
 #include "wlan_mlo_mgr_roam.h"
 #include "wlan_hdd_mlo.h"
 #include <wlan_psoc_mlme_ucfg_api.h>
+#include "wlan_epcs_api.h"
+#include "wlan_mlo_epcs_ucfg_api.h"
 #include <wlan_ll_sap_ucfg_api.h>
 
 /*
@@ -8223,6 +8225,10 @@ const struct nla_policy wlan_hdd_wifi_config_policy[
 		.type = NLA_U8},
 	[QCA_WLAN_VENDOR_ATTR_CONFIG_EHT_MLO_MAX_SIMULTANEOUS_LINKS] = {
 		.type = NLA_U8},
+	[QCA_WLAN_VENDOR_ATTR_CONFIG_EPCS_CAPABILITY] = {
+		.type = NLA_U8},
+	[QCA_WLAN_VENDOR_ATTR_CONFIG_EPCS_FUNCTION] = {
+		.type = NLA_U8},
 	[QCA_WLAN_VENDOR_ATTR_CONFIG_EHT_MLO_MAX_NUM_LINKS] = {
 		.type = NLA_U8},
 	[QCA_WLAN_VENDOR_ATTR_CONFIG_EHT_MLO_MODE] = {
@@ -10978,6 +10984,81 @@ hdd_test_config_emlsr_action_mode(struct hdd_adapter *adapter,
 
 	return 0;
 }
+
+/**
+ * hdd_set_epcs_capability() - Set EPCS capability enable or not
+ * @link_info: link info pointer
+ * @attr: pointer to nla attr
+ *
+ * Return: 0 on success, negative on failure
+ */
+static int hdd_set_epcs_capability(struct wlan_hdd_link_info *link_info,
+				   const struct nlattr *attr)
+{
+	uint8_t cfg_val;
+	struct wlan_objmgr_vdev *vdev;
+
+	vdev = hdd_objmgr_get_vdev_by_user(link_info, WLAN_OSIF_ID);
+	if (!vdev)
+		return -EINVAL;
+
+	cfg_val = nla_get_u8(attr);
+	hdd_debug("Configure EPCS capability %s(%d)",
+		  cfg_val ? "Enable" : "Disable", cfg_val);
+	if (cfg_val < WLAN_EPCS_CAP_DISABLED ||
+	    cfg_val > WLAN_EPCS_CAP_ENABLE) {
+		hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
+		return -EINVAL;
+	}
+
+	ucfg_epcs_set_config(vdev, cfg_val);
+	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
+
+	return 0;
+}
+
+/**
+ * hdd_trigger_epcs_function() - Trigger EPCS function to enable or disable
+ * @link_info: link info pointer
+ * @attr: pointer to nla attr
+ *
+ * Return: 0 on success, negative on failure
+ */
+static int hdd_trigger_epcs_function(struct wlan_hdd_link_info *link_info,
+				     const struct nlattr *attr)
+{
+	uint8_t cfg_val;
+	struct wlan_objmgr_vdev *vdev;
+	enum wlan_epcs_evt event;
+	int status = -EINVAL;
+
+	vdev = hdd_objmgr_get_vdev_by_user(link_info, WLAN_OSIF_ID);
+	if (!vdev)
+		return status;
+
+	cfg_val = nla_get_u8(attr);
+	hdd_debug("Trigger EPCS %d", cfg_val);
+
+	switch (cfg_val) {
+	/* enable EPCS function to send request frame */
+	case WLAN_EPCS_FRAME_REQUEST:
+		event = WLAN_EPCS_EV_ACTION_FRAME_TX_REQ;
+		break;
+	/* disable EPCS function to send teardown frame */
+	case WLAN_EPCS_FRAME_TEARDOWN:
+		event = WLAN_EPCS_EV_ACTION_FRAME_TX_TEARDOWN;
+		break;
+	default:
+		goto rel_ref;
+	}
+
+	ucfg_epcs_deliver_cmd(vdev, event);
+	status = 0;
+
+rel_ref:
+	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
+	return status;
+}
 #else
 static inline int
 hdd_test_config_emlsr_mode(struct hdd_context *hdd_ctx, bool cfg_val)
@@ -11208,6 +11289,20 @@ int hdd_set_emlsr_mode(struct wlan_hdd_link_info *link_info,
 {
 	return 0;
 }
+
+static inline int
+hdd_set_epcs_capability(struct wlan_hdd_link_info *link_info,
+			const struct nlattr *attr)
+{
+	return 0;
+}
+
+static inline int
+hdd_trigger_epcs_function(struct wlan_hdd_link_info *link_info,
+			  const struct nlattr *attr)
+{
+	return 0;
+}
 #endif
 
 /**
@@ -11341,6 +11436,10 @@ static const struct independent_setters independent_setters[] = {
 	 hdd_set_wfc_state},
 	{QCA_WLAN_VENDOR_ATTR_CONFIG_EHT_MLO_MAX_SIMULTANEOUS_LINKS,
 	 hdd_set_eht_max_simultaneous_links},
+	{QCA_WLAN_VENDOR_ATTR_CONFIG_EPCS_CAPABILITY,
+	 hdd_set_epcs_capability},
+	{QCA_WLAN_VENDOR_ATTR_CONFIG_EPCS_FUNCTION,
+	 hdd_trigger_epcs_function},
 	{QCA_WLAN_VENDOR_ATTR_CONFIG_EHT_MLO_MAX_NUM_LINKS,
 	 hdd_set_eht_max_num_links},
 	{QCA_WLAN_VENDOR_ATTR_CONFIG_EHT_MLO_MODE,
