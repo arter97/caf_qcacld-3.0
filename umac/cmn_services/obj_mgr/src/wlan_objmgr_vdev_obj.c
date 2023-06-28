@@ -236,6 +236,7 @@ struct wlan_objmgr_vdev *wlan_objmgr_vdev_obj_create(
 		vdev->vdev_objmgr.max_peer_count =
 				wlan_pdev_get_max_peer_count(pdev);
 
+	wlan_vdev_init_skip_pumac_cnt(vdev);
 	if (params->legacy_osif)
 		vdev->vdev_nif.osdev->legacy_osif_priv = params->legacy_osif;
 

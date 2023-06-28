@@ -642,11 +642,14 @@ void mlo_mlme_ptqm_migrate_timer_cb(void *arg);
  * @link_migration: flag to indicate if all peers of vdev need migration
  * or individual peer migration
  * @link_id: link id for new ptqm
+ * @force_mig: allow migration to vdevs which are disabled to be pumac
+ * using primary_umac_skip ini
  *
  * Return: Success if migration is triggered, else failure
  */
 QDF_STATUS wlan_mlo_set_ptqm_migration(struct wlan_objmgr_vdev *vdev,
 				       struct wlan_mlo_peer_context *ml_peer,
 				       bool link_migration,
-				       uint32_t link_id);
+				       uint32_t link_id,
+				       bool force_mig);
 #endif
