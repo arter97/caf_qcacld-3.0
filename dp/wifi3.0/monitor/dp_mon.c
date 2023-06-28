@@ -5890,20 +5890,6 @@ void dp_mon_register_lpc_ops_1_0(struct dp_mon_ops *mon_ops)
 	mon_ops->rx_hdr_length_set = dp_rx_mon_hdr_length_set;
 	dp_mon_register_tx_pkt_enh_ops_1_0(mon_ops);
 }
-
-static void dp_mon_pdev_filter_lpc_init(struct dp_mon_pdev *mon_pdev)
-{
-	if (!mon_pdev)
-		return;
-
-	mon_pdev->mon_filter_mode = MON_FILTER_PASS;
-	mon_pdev->fp_mgmt_filter = FILTER_MGMT_ALL;
-	mon_pdev->fp_ctrl_filter = FILTER_CTRL_ALL;
-	mon_pdev->fp_data_filter = FILTER_DATA_ALL;
-	mon_pdev->mo_mgmt_filter = 0;
-	mon_pdev->mo_ctrl_filter = 0;
-	mon_pdev->mo_data_filter = 0;
-}
 #else
 #if !defined(DISABLE_MON_CONFIG)
 static inline void dp_mon_config_register_ops(struct dp_mon_ops *mon_ops)
@@ -5946,11 +5932,6 @@ void dp_mon_register_lpc_ops_1_0(struct dp_mon_ops *mon_ops)
 
 	mon_ops->rx_hdr_length_set = NULL;
 	dp_mon_register_tx_pkt_enh_ops_1_0(mon_ops);
-}
-
-static void dp_mon_pdev_filter_lpc_init(struct dp_mon_pdev *mon_pdev)
-{
-	dp_mon_pdev_filter_init(mon_pdev);
 }
 #endif
 
@@ -6003,11 +5984,7 @@ QDF_STATUS dp_mon_pdev_init(struct dp_pdev *pdev)
 	mon_pdev->neighbour_peers_added = false;
 	mon_pdev->monitor_configured = false;
 
-	/* Monitor filter init */
-	if (wlan_cfg_get_local_pkt_capture(pdev->soc->wlan_cfg_ctx))
-		dp_mon_pdev_filter_lpc_init(mon_pdev);
-	else
-		dp_mon_pdev_filter_init(mon_pdev);
+	dp_mon_pdev_filter_init(mon_pdev);
 	/*
 	 * initialize ppdu tlv list
 	 */

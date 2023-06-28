@@ -283,6 +283,24 @@ void dp_mon_filter_h2t_setup(struct dp_soc *soc, struct dp_pdev *pdev,
 	dp_mon_filter_show_filter(mon_pdev, 0, filter);
 }
 
+/**
+ * dp_mon_is_lpc_mode() - Check if it's local packets capturing mode
+ * @soc: DP soc context
+ *
+ * Return: true if yes, false if not
+ */
+static inline
+bool dp_mon_is_lpc_mode(struct dp_soc *soc)
+{
+	if (soc->cdp_soc.ol_ops->get_con_mode &&
+	    soc->cdp_soc.ol_ops->get_con_mode() ==
+	    QDF_GLOBAL_MISSION_MODE &&
+	    wlan_cfg_get_local_pkt_capture(soc->wlan_cfg_ctx))
+		return true;
+	else
+		return false;
+}
+
 QDF_STATUS
 dp_mon_ht2_rx_ring_cfg(struct dp_soc *soc,
 		       struct dp_pdev *pdev,
@@ -293,6 +311,12 @@ dp_mon_ht2_rx_ring_cfg(struct dp_soc *soc,
 	int max_mac_rings = wlan_cfg_get_num_mac_rings(pdev->wlan_cfg_ctx);
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
 	uint32_t target_type = hal_get_target_type(soc->hal_soc);
+
+	if (srng_type == DP_MON_FILTER_SRNG_TYPE_RXDMA_BUF &&
+	    dp_mon_is_lpc_mode(soc)) {
+		dp_mon_filter_info("skip rxdma_buf filter cfg for lpc mode");
+		return QDF_STATUS_SUCCESS;
+	}
 
 	/*
 	 * Overwrite the max_mac_rings for the status rings.
@@ -1059,11 +1083,6 @@ QDF_STATUS dp_mon_stop_local_pkt_capture(struct cdp_soc_t *cdp_soc,
 		return status;
 	}
 	qdf_spin_unlock_bh(&mon_pdev->mon_lock);
-
-	mon_pdev->mon_filter_mode = 0;
-	mon_pdev->fp_mgmt_filter = 0;
-	mon_pdev->fp_ctrl_filter = 0;
-	mon_pdev->fp_data_filter = 0;
 
 	qdf_spin_lock_bh(&mon_pdev->mon_lock);
 	dp_mon_filter_reset_tx_mon_mode(pdev);
