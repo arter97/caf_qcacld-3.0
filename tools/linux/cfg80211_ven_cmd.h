@@ -878,6 +878,7 @@ enum {
 #endif
 	IEEE80211_PARAM_RTT_11AZ_TB_MAX_SESSION_EXPIRY = 814,
 	IEEE80211_PARAM_RTT_11AZ_NTB_MAX_TIME_BW_MEAS = 815,
+	IEEE80211_PARAM_RTT_11AZ_NTB_MIN_TIME_BW_MEAS = 816,
 };
 
 enum {
@@ -2613,6 +2614,8 @@ struct vendor_commands vap_vendor_cmds[] = {
 	{"tb_max_sess_expiry", IEEE80211_PARAM_RTT_11AZ_TB_MAX_SESSION_EXPIRY,
 	 SET_PARAM, 1},
 	{"ntb_max_time_bw_meas", IEEE80211_PARAM_RTT_11AZ_NTB_MAX_TIME_BW_MEAS,
+	 SET_PARAM, 1},
+	{"ntb_min_time_bw_meas", IEEE80211_PARAM_RTT_11AZ_NTB_MIN_TIME_BW_MEAS,
 	 SET_PARAM, 1},
 };
 
