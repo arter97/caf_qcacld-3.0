@@ -3191,15 +3191,6 @@ QDF_STATUS dp_htt_reo_migration(struct dp_soc *soc, uint16_t peer_id,
 		return QDF_STATUS_E_FAILURE;
 	}
 
-	current_pr_peer = dp_get_primary_link_peer_by_id(
-						pr_soc,
-						mld_peer->peer_id,
-						DP_MOD_ID_HTT);
-	if (!current_pr_peer || (current_pr_peer == pr_peer)) {
-		dp_htt_err("Invalid peer");
-		return QDF_STATUS_E_FAILURE;
-	}
-
 	be_vdev = dp_get_be_vdev_from_dp_vdev(pr_peer->vdev);
 	if (!be_vdev) {
 		dp_htt_err("Invalid be vdev");
@@ -3213,11 +3204,17 @@ QDF_STATUS dp_htt_reo_migration(struct dp_soc *soc, uint16_t peer_id,
 		return QDF_STATUS_E_FAILURE;
 	}
 
-	current_pr_soc = current_pr_peer->vdev->pdev->soc;
+	current_pr_peer = dp_get_primary_link_peer_by_id(
+						pr_soc,
+						mld_peer->peer_id,
+						DP_MOD_ID_HTT);
 	/* Making existing primary peer as non primary */
-	current_pr_peer->primary_link = 0;
-	dp_peer_unref_delete(current_pr_peer, DP_MOD_ID_HTT);
+	if (current_pr_peer) {
+		current_pr_peer->primary_link = 0;
+		dp_peer_unref_delete(current_pr_peer, DP_MOD_ID_HTT);
+	}
 
+	current_pr_soc = mld_peer->vdev->pdev->soc;
 	dp_peer_rx_reo_shared_qaddr_delete(current_pr_soc, mld_peer);
 
 	/* delete ast entry for current primary peer */
