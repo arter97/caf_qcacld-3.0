@@ -158,6 +158,10 @@ target_if_sawf_update_ul_params(struct wlan_objmgr_pdev *pdev, uint8_t vdev_id,
 	QDF_STATUS status;
 
 	wmi_handle = lmac_get_pdev_wmi_handle(pdev);
+	if (!wmi_handle) {
+		qdf_err("Invalid wmi handle");
+		return QDF_STATUS_E_FAILURE;
+	}
 
 	qdf_mem_zero(&param, sizeof(param));
 
