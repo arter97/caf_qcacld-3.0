@@ -680,6 +680,10 @@ uint16_t csr_check_concurrent_channel_overlap(struct mac_context *mac_ctx,
 			   (session->connectState !=
 			     eCSR_ASSOC_STATE_TYPE_NOT_CONNECTED)) {
 
+			/* Skip overlap check for itself */
+			if (vdev_id == i)
+				continue;
+
 			if (session->ch_switch_in_progress)
 				continue;
 
