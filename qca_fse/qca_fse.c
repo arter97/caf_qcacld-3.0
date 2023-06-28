@@ -27,6 +27,12 @@ struct wlan_objmgr_psoc *qca_fse_get_psoc_from_dev(struct net_device *dev)
 	struct wlan_objmgr_pdev *pdev = NULL;
 	struct wlan_objmgr_vdev *vdev = NULL;
 	osif_dev *osdev;
+#ifdef WLAN_FEATURE_11BE_MLO
+	osif_dev  *os_linkdev = NULL;
+	struct osif_mldev *mldev = NULL;
+	uint8_t primary_chip_id;
+	uint8_t primary_pdev_id;
+#endif
 
 	osdev = ath_netdev_priv(dev);
 	if (!osdev) {
@@ -34,6 +40,20 @@ struct wlan_objmgr_psoc *qca_fse_get_psoc_from_dev(struct net_device *dev)
 		return false;
 	}
 
+#ifdef WLAN_FEATURE_11BE_MLO
+	if (osdev->dev_type == OSIF_NETDEV_TYPE_MLO) {
+		mldev = (struct osif_mldev *)osdev;
+		primary_chip_id = mldev->primary_chip_id;
+		primary_pdev_id = mldev->primary_pdev_id;
+
+		os_linkdev = mldev->link_dev[primary_chip_id][primary_pdev_id];
+		if (!os_linkdev) {
+			qdf_err("%p: No osdev found for ML dev", dev);
+			return false;
+		}
+		osdev = os_linkdev;
+	}
+#endif
 #ifdef QCA_SUPPORT_WDS_EXTENDED
 	if (osdev->dev_type == OSIF_NETDEV_TYPE_WDS_EXT) {
 		osif_peer_dev *osifp;
