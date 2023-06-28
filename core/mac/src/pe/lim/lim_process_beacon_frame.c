@@ -49,6 +49,7 @@
 #ifdef WLAN_FEATURE_11BE_MLO
 #include <cds_ieee80211_common.h>
 #endif
+#include "wlan_t2lm_api.h"
 
 #ifdef WLAN_FEATURE_11BE_MLO
 void lim_process_bcn_prb_rsp_t2lm(struct mac_context *mac_ctx,
@@ -67,20 +68,17 @@ void lim_process_bcn_prb_rsp_t2lm(struct mac_context *mac_ctx,
 	if (!vdev || !wlan_vdev_mlme_is_mlo_vdev(vdev))
 		return;
 
+	if (!wlan_cm_is_vdev_connected(vdev))
+		return;
+
 	if (!mlo_check_if_all_links_up(vdev))
 		return;
 
-	if (bcn_ptr->t2lm_ctx.upcoming_t2lm.t2lm.direction ==
-	    WLAN_T2LM_INVALID_DIRECTION &&
-	    bcn_ptr->t2lm_ctx.established_t2lm.t2lm.direction ==
-	    WLAN_T2LM_INVALID_DIRECTION)
-		return;
-
 	t2lm_ctx = &vdev->mlo_dev_ctx->t2lm_ctx;
+
 	qdf_mem_copy((uint8_t *)&t2lm_ctx->tsf, (uint8_t *)bcn_ptr->timeStamp,
 		     sizeof(uint64_t));
-	wlan_process_bcn_prbrsp_t2lm_ie(vdev, &bcn_ptr->t2lm_ctx,
-					t2lm_ctx->tsf);
+	wlan_update_t2lm_mapping(vdev, &bcn_ptr->t2lm_ctx, t2lm_ctx->tsf);
 }
 
 void lim_process_beacon_mlo(struct mac_context *mac_ctx,
