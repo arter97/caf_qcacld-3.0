@@ -954,11 +954,14 @@ struct cdp_ctrl_ops {
 						     uint32_t *mask,
 						     uint32_t *mask_cont);
 #endif
-	bool (*umac_reset_is_inprogress)(struct cdp_soc_t *psoc);
 #ifdef WLAN_SUPPORT_RX_FISA
 	QDF_STATUS (*txrx_fisa_config)(struct cdp_soc_t *soc, uint8_t pdev_id,
 				       enum cdp_fisa_config_id config_id,
 				       union cdp_fisa_config *cfg);
+#endif
+#ifdef DP_UMAC_HW_RESET_SUPPORT
+	enum cdp_umac_reset_state (*get_umac_reset_in_progress_state)(
+				   struct cdp_soc_t *psoc);
 #endif
 };
 
