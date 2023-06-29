@@ -105,7 +105,7 @@ void tdls_discovery_timeout_peer_cb(void *user_data)
 
 	vdev = (struct wlan_objmgr_vdev *)user_data;
 	tdls_soc = wlan_vdev_get_tdls_soc_obj(vdev);
-	if (wlan_vdev_mlme_is_mlo_vdev(vdev) && tdls_soc &&
+	if (wlan_vdev_mlme_is_mlo_vdev(vdev) &&
 	    qdf_atomic_dec_and_test(&tdls_soc->timer_cnt)) {
 		tdls_process_mlo_cal_tdls_link_score(vdev);
 		select_vdev = tdls_process_mlo_choice_tdls_vdev(vdev);
@@ -124,14 +124,13 @@ void tdls_discovery_timeout_peer_cb(void *user_data)
 				tdls_notice("[TDLS] TDLS Discovery Response,"
 					    "QDF_MAC_ADDR_FMT RSSI[%d]<---OTA",
 					    rx_mgmt->rx_rssi);
-				if (tdls_soc->tdls_rx_cb)
-					tdls_soc->tdls_rx_cb(
-						     tdls_soc->tdls_rx_cb_data,
-						     rx_mgmt);
-
 				tdls_recv_discovery_resp(tdls_vdev, mac);
 				tdls_set_rssi(tdls_vdev->vdev, mac,
 					      rx_mgmt->rx_rssi);
+				if (tdls_soc && tdls_soc->tdls_rx_cb)
+					tdls_soc->tdls_rx_cb(
+						     tdls_soc->tdls_rx_cb_data,
+						     rx_mgmt);
 			}
 
 			qdf_mem_free(tdls_vdev->rx_mgmt);

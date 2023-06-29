@@ -509,9 +509,6 @@ static QDF_STATUS tdls_process_rx_mgmt(
 			    QDF_MAC_ADDR_FMT " RSSI[%d] <--- OTA",
 			    QDF_MAC_ADDR_REF(mac), rx_mgmt->rx_rssi);
 
-		if (tdls_soc_obj->tdls_rx_cb)
-			tdls_soc_obj->tdls_rx_cb(tdls_soc_obj->tdls_rx_cb_data,
-						 rx_mgmt);
 		tdls_debug("discovery resp on vdev %d", wlan_vdev_get_id(vdev));
 		tdls_recv_discovery_resp(tdls_vdev, mac);
 		tdls_set_rssi(tdls_vdev->vdev, mac, rx_mgmt->rx_rssi);
@@ -528,11 +525,14 @@ static QDF_STATUS tdls_process_rx_mgmt(
 			tdls_notice("[TDLS] %s <--- OTA",
 				   tdls_action_frames_type[action_frame_type]);
 		}
-
-		if (tdls_soc_obj->tdls_rx_cb)
-			tdls_soc_obj->tdls_rx_cb(tdls_soc_obj->tdls_rx_cb_data,
-						 rx_mgmt);
 	}
+
+	/* tdls_soc_obj->tdls_rx_cb ==> wlan_cfg80211_tdls_rx_callback() */
+	if (tdls_soc_obj && tdls_soc_obj->tdls_rx_cb)
+		tdls_soc_obj->tdls_rx_cb(tdls_soc_obj->tdls_rx_cb_data,
+					 rx_mgmt);
+	else
+		tdls_debug("rx mgmt, but no valid up layer callback");
 
 	if (tdls_vdev_select && tdls_vdev->rx_mgmt) {
 		qdf_mem_free(tdls_vdev->rx_mgmt);
