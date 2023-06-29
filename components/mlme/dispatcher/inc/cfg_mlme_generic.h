@@ -100,6 +100,29 @@ enum wlan_emlsr_action_mode {
 };
 
 /**
+ * enum wlan_t2lm_negotiation_support - TID-to-link mapping negotiation support
+ * @WLAN_T2LM_DISABLE: T2LM support is disabled
+ * @WLAN_T2LM_SAME_LINK_SET: Mapping of all TIDs to the same link set, both DL
+ * and UL
+ * @WLAN_T2LM_RESERVED: This value is Reserved
+ * @WLAN_T2LM_SAME_DIFF_LINK_SET: Mapping of each TID to the same or different
+ * link set
+ * @WLAN_T2LM_SUPPORT_LAST: last value in enum
+ * @WLAN_T2LM_SUPPORT_MAX: max value supported
+ *
+ * This is used for 'type' values in T2LM support
+ */
+enum wlan_t2lm_negotiation_support {
+	WLAN_T2LM_DISABLE            = 0,
+	WLAN_T2LM_SAME_LINK_SET      = 1,
+	WLAN_T2LM_RESERVED           = 2,
+	WLAN_T2LM_SAME_DIFF_LINK_SET = 3,
+	/* keep this last */
+	WLAN_T2LM_SUPPORT_LAST,
+	WLAN_T2LM_SUPPORT_MAX = WLAN_T2LM_SUPPORT_LAST - 1,
+};
+
+/**
  * enum debug_packet_log_type - Debug packet log type
  * @DEBUG_PKTLOG_TYPE_NONE: Debug packet log is disabled
  * @DEBUG_PKTLOG_TYPE_MGMT: Management frames logging is enabled.

@@ -8495,6 +8495,8 @@ const struct nla_policy wlan_hdd_wifi_config_policy[
 	[QCA_WLAN_VENDOR_ATTR_CONFIG_MLO_LINKS] = {
 		.type = NLA_NESTED },
 	[QCA_WLAN_VENDOR_ATTR_CONFIG_PEER_AMPDU_CNT] = {.type = NLA_U16},
+	[QCA_WLAN_VENDOR_ATTR_CONFIG_TTLM_NEGOTIATION_SUPPORT] = {
+		.type = NLA_U8},
 };
 
 #define WLAN_MAX_LINK_ID 15
@@ -11807,6 +11809,31 @@ hdd_get_cfg_emlsr_mode(enum qca_wlan_eht_mlo_mode qca_wlan_emlsr_mode)
 	}
 }
 
+/**
+ * hdd_get_cfg_t2lm_neg_support_type() - Convert qca wlan TID-to-link mapping
+ * enum to cfg wlan
+ *
+ * @qca_wlan_t2lm_support: qca wlan TID-to-link mapping
+ *
+ * Return: TID-to-link mapping support on success, 0 on failure
+ */
+static enum wlan_t2lm_negotiation_support
+hdd_get_cfg_t2lm_neg_support_type(enum qca_wlan_ttlm_negotiation_support
+				  qca_wlan_t2lm_support)
+{
+	switch (qca_wlan_t2lm_support) {
+	case QCA_WLAN_TTLM_DISABLE:
+		return WLAN_T2LM_DISABLE;
+	case QCA_WLAN_TTLM_SAME_LINK_SET:
+		return WLAN_T2LM_SAME_LINK_SET;
+	case QCA_WLAN_TTLM_SAME_DIFF_LINK_SET:
+		return WLAN_T2LM_SAME_DIFF_LINK_SET;
+	default:
+		hdd_debug("Invalid T2LM negotiation support");
+		return WLAN_T2LM_DISABLE;
+	}
+}
+
 static int hdd_set_emlsr_mode(struct wlan_hdd_link_info *link_info,
 			      const struct nlattr *attr)
 {
@@ -11828,6 +11855,29 @@ static int hdd_set_emlsr_mode(struct wlan_hdd_link_info *link_info,
 
 	return 0;
 }
+
+static int hdd_set_t2lm_negotiation_support(struct wlan_hdd_link_info *link_info,
+					    const struct nlattr *attr)
+{
+	struct hdd_context *hdd_ctx = NULL;
+	uint8_t cfg_val;
+	enum wlan_t2lm_negotiation_support t2lm_support;
+
+	if (!attr)
+		return -EINVAL;
+
+	cfg_val = nla_get_u8(attr);
+
+	t2lm_support = hdd_get_cfg_t2lm_neg_support_type(cfg_val);
+	hdd_debug("T2LM negotiation support: %d", t2lm_support);
+
+	hdd_ctx = WLAN_HDD_GET_CTX(link_info->adapter);
+
+	wlan_mlme_set_t2lm_negotiation_supported(hdd_ctx->psoc,
+						 t2lm_support);
+
+	return 0;
+}
 #else
 static inline int
 hdd_set_link_force_active(struct wlan_hdd_link_info *link_info,
@@ -11839,6 +11889,13 @@ hdd_set_link_force_active(struct wlan_hdd_link_info *link_info,
 static inline
 int hdd_set_emlsr_mode(struct wlan_hdd_link_info *link_info,
 		       const struct nlattr *attr)
+{
+	return 0;
+}
+
+static inline
+int hdd_set_t2lm_negotiation_support(struct wlan_hdd_link_info *link_info,
+				     const struct nlattr *attr)
 {
 	return 0;
 }
@@ -12052,6 +12109,8 @@ static const struct independent_setters independent_setters[] = {
 	 hdd_set_ul_mu_config},
 	{QCA_WLAN_VENDOR_ATTR_CONFIG_AP_ALLOWED_FREQ_LIST,
 	 hdd_set_master_channel_list},
+	{QCA_WLAN_VENDOR_ATTR_CONFIG_TTLM_NEGOTIATION_SUPPORT,
+	 hdd_set_t2lm_negotiation_support},
 };
 
 #ifdef WLAN_FEATURE_ELNA
