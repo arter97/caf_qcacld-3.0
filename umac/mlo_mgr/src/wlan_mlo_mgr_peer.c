@@ -1085,10 +1085,13 @@ wlan_mlo_peer_initialize_epcs_info(struct wlan_mlo_peer_context *ml_peer)
 #if defined(WLAN_FEATURE_11BE_MLO) && defined(WLAN_MLO_MULTI_CHIP)
 struct wlan_objmgr_vdev*
 mlo_get_link_vdev_from_psoc_id(struct wlan_mlo_dev_context *ml_dev,
-			       uint8_t psoc_id)
+			       uint8_t psoc_id, bool get_bridge_vdev)
 {
 	uint8_t i;
+	uint16_t num_bridge_vdev = 0;
+	uint8_t max_vdevs = WLAN_UMAC_MLO_MAX_BRIDGE_VDEVS;
 	struct wlan_objmgr_vdev *link_vdev;
+	QDF_STATUS status;
 
 	if (WLAN_OBJMGR_MAX_DEVICES <= psoc_id)
 		return NULL;
@@ -1096,8 +1099,19 @@ mlo_get_link_vdev_from_psoc_id(struct wlan_mlo_dev_context *ml_dev,
 	if (!ml_dev)
 		return NULL;
 
-	for (i = 0; i < WLAN_UMAC_MLO_MAX_VDEVS; i++) {
-		link_vdev = ml_dev->wlan_vdev_list[i];
+	/* if there are no bridge vdevs available,
+	 * fall back to actual link vdevs
+	 */
+	status = mlo_ap_get_bridge_vdev_count(ml_dev, &num_bridge_vdev);
+	if (!get_bridge_vdev || (status != QDF_STATUS_SUCCESS) ||
+	    !num_bridge_vdev)
+		max_vdevs = WLAN_UMAC_MLO_MAX_VDEVS;
+
+	for (i = 0; i < max_vdevs; i++) {
+		if (max_vdevs == WLAN_UMAC_MLO_MAX_BRIDGE_VDEVS)
+			link_vdev = ml_dev->wlan_bridge_vdev_list[i];
+		else
+			link_vdev = ml_dev->wlan_vdev_list[i];
 		if (!link_vdev)
 			continue;
 		if (psoc_id != wlan_vdev_get_psoc_id(link_vdev))
@@ -1126,7 +1140,7 @@ QDF_STATUS mlo_bridge_peer_create_post(struct wlan_mlo_dev_context *ml_dev,
 	if (psoc_id >= WLAN_OBJMGR_MAX_DEVICES)
 		return QDF_STATUS_SUCCESS;
 
-	vdev_link = mlo_get_link_vdev_from_psoc_id(ml_dev, psoc_id);
+	vdev_link = mlo_get_link_vdev_from_psoc_id(ml_dev, psoc_id, true);
 
 	if (!vdev_link) {
 		mlo_err("VDEV derivation in unsuccessful for %u psoc",
@@ -1164,6 +1178,8 @@ wlan_mlo_get_bridge_peer_psoc_id(struct wlan_objmgr_vdev *vdev,
 	uint8_t psoc_ids[WLAN_NUM_TWO_LINK_PSOC];
 	uint8_t comp_psoc_id, i, is_adjacent;
 	uint8_t bridge_peer_psoc_id = WLAN_OBJMGR_MAX_DEVICES;
+	uint16_t num_bridge_vdev = 0;
+	uint8_t max_vdevs = WLAN_UMAC_MLO_MAX_BRIDGE_VDEVS;
 	QDF_STATUS status;
 
 	if (wlan_vdev_mlme_get_opmode(vdev) != QDF_SAP_MODE)
@@ -1188,10 +1204,24 @@ wlan_mlo_get_bridge_peer_psoc_id(struct wlan_objmgr_vdev *vdev,
 			psoc_ids[0], psoc_ids[1]);
 		return status;
 	}
+
 	if (is_adjacent)
 		return QDF_STATUS_SUCCESS;
-	for (i = 0; i < WLAN_UMAC_MLO_MAX_VDEVS; i++) {
-		ml_vdev = ml_dev->wlan_vdev_list[i];
+
+	/* if there are no bridge vdevs available,
+	 * fall back to actual link vdevs
+	 */
+	status = mlo_ap_get_bridge_vdev_count(ml_dev, &num_bridge_vdev);
+	if ((status != QDF_STATUS_SUCCESS) || !num_bridge_vdev) {
+		mlo_err_rl("Using actual vdev as bridge vdev");
+		max_vdevs = WLAN_UMAC_MLO_MAX_VDEVS;
+	}
+
+	for (i = 0; i < max_vdevs; i++) {
+		if (max_vdevs == WLAN_UMAC_MLO_MAX_BRIDGE_VDEVS)
+			ml_vdev = ml_dev->wlan_bridge_vdev_list[i];
+		else
+			ml_vdev = ml_dev->wlan_vdev_list[i];
 		if (!ml_vdev ||
 		    (wlan_vdev_is_up(ml_vdev) != QDF_STATUS_SUCCESS))
 			continue;
@@ -1236,7 +1266,8 @@ wlan_mlo_get_bridge_peer_psoc_id(struct wlan_objmgr_vdev *vdev,
 			continue;
 
 		link_vdevs[i] = mlo_get_link_vdev_from_psoc_id(ml_dev,
-							       bridge_peer_psoc_id);
+							       bridge_peer_psoc_id,
+							       true);
 		if (!link_vdevs[i])
 			return QDF_STATUS_E_FAILURE;
 

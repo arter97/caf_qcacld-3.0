@@ -643,7 +643,9 @@ QDF_STATUS mlo_check_topology(struct wlan_objmgr_pdev *pdev,
 		if (idx == WLAN_UMAC_MLO_MAX_PSOC_TOPOLOGY) {
 			bridge_umac = mlo_get_central_umac_id(psoc_ids);
 
-			tmp_vdev = mlo_get_link_vdev_from_psoc_id(ml_dev, bridge_umac);
+			tmp_vdev = mlo_get_link_vdev_from_psoc_id(ml_dev,
+								  bridge_umac,
+								  false);
 
 			if (!tmp_vdev)
 				return QDF_STATUS_E_FAILURE;
@@ -668,7 +670,9 @@ QDF_STATUS mlo_check_topology(struct wlan_objmgr_pdev *pdev,
 		if (idx == WLAN_UMAC_MLO_MAX_PSOC_TOPOLOGY &&
 		    (aplinks == (WLAN_UMAC_MLO_MAX_PSOC_TOPOLOGY - 1))) {
 			bridge_umac = mlo_get_central_umac_id(psoc_ids);
-			tmp_vdev = mlo_get_link_vdev_from_psoc_id(ml_dev, bridge_umac);
+			tmp_vdev = mlo_get_link_vdev_from_psoc_id(ml_dev,
+								  bridge_umac,
+								  false);
 
 			if (!tmp_vdev)
 				return QDF_STATUS_E_FAILURE;
