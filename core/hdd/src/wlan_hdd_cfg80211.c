@@ -8299,6 +8299,13 @@ void hdd_send_roam_scan_ch_list_event(struct hdd_context *hdd_ctx,
 #define RX_BLOCKSIZE_WINLIMIT \
 	QCA_WLAN_VENDOR_ATTR_CONFIG_RX_BLOCKSIZE_WINLIMIT
 
+#define CONFIG_CHANNEL_WIDTH \
+	QCA_WLAN_VENDOR_ATTR_CONFIG_CHANNEL_WIDTH
+#define CONFIG_MLO_LINK_ID \
+	QCA_WLAN_VENDOR_ATTR_CONFIG_MLO_LINK_ID
+#define CONFIG_MLO_LINKS \
+	QCA_WLAN_VENDOR_ATTR_CONFIG_MLO_LINKS
+
 const struct nla_policy wlan_hdd_wifi_config_policy[
 			QCA_WLAN_VENDOR_ATTR_CONFIG_MAX + 1] = {
 	[QCA_WLAN_VENDOR_ATTR_CONFIG_PENALIZE_AFTER_NCONS_BEACON_MISS] = {
@@ -12230,6 +12237,89 @@ static int hdd_get_channel_width(struct wlan_hdd_link_info *link_info,
 }
 
 /**
+ * hdd_get_mlo_max_band_info() - Get channel width
+ * @link_info: Link info pointer in HDD adapter
+ * @skb: sk buffer to hold nl80211 attributes
+ * @attr: Pointer to struct nlattr
+ *
+ * Return: 0 on success; error number otherwise
+ */
+static int hdd_get_mlo_max_band_info(struct wlan_hdd_link_info *link_info,
+				     struct sk_buff *skb,
+				     const struct nlattr *attr)
+{
+	enum eSirMacHTChannelWidth chwidth;
+	struct nlattr *mlo_bd = NULL;
+	struct nlattr *mlo_bd_info = NULL;
+	uint32_t i = 0;
+	uint32_t link_id = 0;
+	struct wlan_objmgr_vdev *vdev, *link_vdev;
+	struct wlan_channel *bss_chan;
+
+	chwidth = wma_cli_get_command(link_info->vdev_id,
+				      wmi_vdev_param_chwidth, VDEV_CMD);
+	if (chwidth < 0) {
+		hdd_err("Failed to get chwidth %u", chwidth);
+		return -EINVAL;
+	}
+
+	vdev = hdd_objmgr_get_vdev_by_user(link_info, WLAN_OSIF_ID);
+	if (!vdev)
+		return -EINVAL;
+
+	if (!wlan_vdev_mlme_is_mlo_vdev(vdev)) {
+		bss_chan = wlan_vdev_mlme_get_bss_chan(vdev);
+
+		if (nla_put_u8(skb, CONFIG_CHANNEL_WIDTH,
+			       (uint8_t)bss_chan->ch_width)) {
+			hdd_err("nla_put chn width failure");
+		}
+	} else {
+		mlo_bd_info = nla_nest_start(skb, CONFIG_MLO_LINKS);
+		for (link_id = 0; link_id < WLAN_MAX_LINK_ID; link_id++) {
+			link_vdev = mlo_get_vdev_by_link_id(vdev, link_id);
+			if (!link_vdev)
+				continue;
+
+			mlo_bd = nla_nest_start(skb, i);
+			if (!mlo_bd) {
+				hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
+				mlo_release_vdev_ref(link_vdev);
+				hdd_err("nla_nest_start fail");
+				return -EINVAL;
+			}
+			bss_chan = wlan_vdev_mlme_get_bss_chan(link_vdev);
+			if (!bss_chan) {
+				hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
+				mlo_release_vdev_ref(link_vdev);
+				hdd_err("fail to get bss_chan info");
+				return QDF_STATUS_E_FAILURE;
+			}
+			if (nla_put_u8(skb, CONFIG_MLO_LINK_ID, link_id)) {
+				hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
+				mlo_release_vdev_ref(link_vdev);
+				hdd_err("nla_put failure");
+				return -EINVAL;
+			}
+
+			if (nla_put_u8(skb, CONFIG_CHANNEL_WIDTH,
+				       (uint8_t)bss_chan->ch_width)) {
+				hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
+				mlo_release_vdev_ref(link_vdev);
+				hdd_err("nla_put failure");
+				return -EINVAL;
+			}
+			nla_nest_end(skb, mlo_bd);
+			i++;
+			mlo_release_vdev_ref(link_vdev);
+		}
+		nla_nest_end(skb, mlo_bd_info);
+	}
+	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
+	return 0;
+}
+
+/**
  * hdd_get_dynamic_bw() - Get dynamic bandwidth disabled / enabled
  * @link_info: Link info pointer in HDD adapter
  * @skb: sk buffer to hold nl80211 attributes
@@ -12609,7 +12699,9 @@ static const struct config_getters config_getters[] = {
 	 {QCA_WLAN_VENDOR_ATTR_CONFIG_NUM_RX_CHAINS,
 	 sizeof(uint8_t),
 	 hdd_get_num_rx_chains_config},
-
+	 {QCA_WLAN_VENDOR_ATTR_CONFIG_MLO_LINKS,
+	 WLAN_MAX_ML_BSS_LINKS * sizeof(uint8_t) * 2,
+	 hdd_get_mlo_max_band_info},
 };
 
 /**
