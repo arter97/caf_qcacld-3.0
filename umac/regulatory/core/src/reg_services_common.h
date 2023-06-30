@@ -3064,4 +3064,16 @@ reg_get_num_rules_of_ap_pwr_type(struct wlan_objmgr_pdev *pdev,
  */
 QDF_STATUS reg_process_r2p_table_update_response(struct wlan_objmgr_psoc *psoc,
 						 uint32_t pdev_id);
+
+/**
+ * reg_get_endchan_cen_from_bandstart() - Get the center frequency of the
+ * end channel given the bandstart frequency.
+ * @band_start: Frequency band start in MHz
+ * @bw: Bandwidth in MHz
+ *
+ * Return: End frequency in MHz
+ */
+qdf_freq_t
+reg_get_endchan_cen_from_bandstart(qdf_freq_t band_start,
+				   uint16_t bw);
 #endif

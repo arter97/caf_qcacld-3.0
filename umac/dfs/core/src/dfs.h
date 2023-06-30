@@ -2952,6 +2952,34 @@ void dfs_set_rcsa_flags(struct wlan_dfs *dfs, bool is_rcsa_ie_sent,
 #endif
 
 /**
+ * dfs_get_radar_bitmap_from_nolie() - Read the NOL IE bitmap of the RCSA
+ * frame, puncture the nol infected channels and formulate the radar puncture
+ * bitmap.
+ * @dfs: Pointer to wlan_dfs structure.
+ * @phymode: Phymode of enum wlan_phymode.
+ * @nol_ie_start_freq: NOL IE start frequency
+ * @nol_ie_bitmap: NOL bitmap
+ *
+ * Return: radar puncture bitmap
+ */
+#if defined(WLAN_FEATURE_11BE) && defined(QCA_DFS_BW_PUNCTURE) && \
+	defined(QCA_DFS_RCSA_SUPPORT)
+uint16_t
+dfs_get_radar_bitmap_from_nolie(struct wlan_dfs *dfs,
+				enum wlan_phymode phymode,
+				qdf_freq_t nol_ie_start_freq,
+				uint8_t nol_ie_bitmap);
+#else
+static inline uint16_t
+dfs_get_radar_bitmap_from_nolie(struct wlan_dfs *dfs, enum wlan_phymode phymode,
+				qdf_freq_t nol_ie_start_freq,
+				uint8_t nol_ie_bitmap)
+{
+	return NO_SCHANS_PUNC;
+}
+#endif
+
+/**
  * dfs_get_rcsa_flags() - Get flags that are required for sending RCSA and
  * NOL IE.
  * @dfs: Pointer to wlan_dfs structure.

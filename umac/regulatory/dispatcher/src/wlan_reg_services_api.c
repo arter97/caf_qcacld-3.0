@@ -1973,3 +1973,10 @@ wlan_reg_unregister_is_chan_connected_callback(struct wlan_objmgr_psoc *psoc,
 	reg_unregister_is_chan_connected_callback(psoc,
 					(reg_is_chan_connected_callback)cbk);
 }
+
+qdf_freq_t
+wlan_reg_get_endchan_cen_from_bandstart(qdf_freq_t band_start,
+					uint16_t bw)
+{
+	return reg_get_endchan_cen_from_bandstart(band_start, bw);
+}

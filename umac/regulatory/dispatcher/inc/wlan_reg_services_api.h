@@ -2916,4 +2916,16 @@ wlan_reg_register_is_chan_connected_callback(struct wlan_objmgr_psoc *psoc,
 void
 wlan_reg_unregister_is_chan_connected_callback(struct wlan_objmgr_psoc *psoc,
 					       void *cbk);
+
+/**
+ * wlan_reg_get_endchan_cen_from_bandstart() - Get the end channel frequency
+ * from the band start frequency.
+ * @band_start: Band start frequency in MHz
+ * @bw: Bandwidth in MHz
+ *
+ * Return: End frequency in MHz
+ */
+qdf_freq_t
+wlan_reg_get_endchan_cen_from_bandstart(qdf_freq_t band_start,
+					uint16_t bw);
 #endif
