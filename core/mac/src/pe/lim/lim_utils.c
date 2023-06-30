@@ -8762,7 +8762,7 @@ void lim_update_session_eht_capable(struct mac_context *mac,
 {
 	session->eht_capable = true;
 	pe_debug("eht_capable: %d", session->eht_capable);
-	pe_debug("Draft 2.0 support enabled");
+	pe_debug("Draft 3.0 support enabled");
 }
 
 void lim_add_bss_eht_cfg(struct bss_params *add_bss, struct pe_session *session)
