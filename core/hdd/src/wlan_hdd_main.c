@@ -242,7 +242,6 @@
 #include "wlan_psoc_mlme_ucfg_api.h"
 #include "os_if_qmi.h"
 #include "wlan_qmi_ucfg_api.h"
-#include "ce_api.h"
 #include "wlan_psoc_mlme_ucfg_api.h"
 #include "wlan_ll_sap_ucfg_api.h"
 
@@ -4823,8 +4822,6 @@ int hdd_wlan_start_modules(struct hdd_context *hdd_ctx, bool reinit)
 			hdd_err("Failed to open hif; errno: %d", ret);
 			goto power_down;
 		}
-
-		hif_ce_desc_history_log_register();
 
 		hif_ctx = cds_get_context(QDF_MODULE_ID_HIF);
 		if (!hif_ctx) {
@@ -16213,8 +16210,6 @@ int hdd_wlan_stop_modules(struct hdd_context *hdd_ctx, bool ftm_mode)
 	wlan_connectivity_logging_stop();
 
 	ucfg_ipa_component_config_free();
-
-	hif_ce_desc_history_log_unregister();
 
 	hdd_hif_close(hdd_ctx, hif_ctx);
 
