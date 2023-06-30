@@ -2674,6 +2674,58 @@ ucfg_mlme_get_restart_sap_on_dynamic_nss_chains_cfg(
 }
 
 /**
+ * ucfg_mlme_update_dynamic_nss_chains_support() - API to update
+ * dynamic_nss_chains_support
+ *
+ * @psoc: psoc context
+ * @val: data to be set
+ *
+ * API is used to update dynamic_nss_chains_support flag in wlan_mlme_cfg
+ * to maintain this value in mlme context
+ *
+ * Return: QDF_STATUS_SUCCESS or QDF_STATUS_FAILURE
+ */
+static inline QDF_STATUS
+ucfg_mlme_update_dynamic_nss_chains_support(struct wlan_objmgr_psoc *psoc,
+					    bool val)
+{
+	return wlan_mlme_cfg_set_dynamic_nss_chains_support(psoc, val);
+}
+
+/**
+ * ucfg_mlme_get_sta_tx_nss() - UCFG API to get station tx NSS
+ *
+ * @psoc: psoc context
+ * @vdev: pointer to vdev
+ * @tx_nss : tx_nss out parameter
+ *
+ * Return: QDF_STATUS_SUCCESS or QDF_STATUS_FAILURE
+ */
+static inline QDF_STATUS
+ucfg_mlme_get_sta_tx_nss(struct wlan_objmgr_psoc *psoc,
+			 struct wlan_objmgr_vdev *vdev, uint8_t *tx_nss)
+{
+	return wlan_mlme_get_sta_tx_nss(psoc, vdev, tx_nss);
+}
+
+/**
+ * ucfg_mlme_get_sta_rx_nss() - UCFG API to get station rx NSS
+ *
+ * @psoc: psoc context
+ * @vdev: pointer to vdev
+ * @rx_nss : rx_nss out parameter
+ *
+ * Return: QDF_STATUS_SUCCESS or QDF_STATUS_FAILURE
+ */
+static inline QDF_STATUS
+ucfg_mlme_get_sta_rx_nss(struct wlan_objmgr_psoc *psoc,
+			 struct wlan_objmgr_vdev *vdev,
+			 uint8_t *rx_nss)
+{
+	return wlan_mlme_get_sta_rx_nss(psoc, vdev, rx_nss);
+}
+
+/**
  * ucfg_mlme_get_vht_enable2x2() - Enables/disables VHT Tx/Rx MCS values for 2x2
  * @psoc: psoc context
  * @value: data to be set
