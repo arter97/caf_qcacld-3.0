@@ -2841,6 +2841,11 @@ int hdd_update_tgt_cfg(hdd_handle_t hdd_handle, struct wma_tgt_cfg *cfg)
 			   cfg->dynamic_nss_chains_support, enable_dynamic_cfg);
 	}
 
+	status = ucfg_mlme_update_dynamic_nss_chains_support
+			(hdd_ctx->psoc, hdd_ctx->dynamic_nss_chains_support);
+	if (QDF_IS_STATUS_ERROR(status))
+		hdd_err("unable to set dynamic_nss_chains_support");
+
 	ucfg_mlme_get_fine_time_meas_cap(hdd_ctx->psoc, &fine_time_meas_cap);
 	fine_time_meas_cap &= cfg->fine_time_measurement_cap;
 	status = ucfg_mlme_set_fine_time_meas_cap(hdd_ctx->psoc,

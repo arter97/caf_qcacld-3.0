@@ -2324,6 +2324,37 @@ wlan_mlme_get_restart_sap_on_dynamic_nss_chains_cfg(
 						bool *value);
 
 /**
+ * wlan_mlme_cfg_set_dynamic_nss_chains_support() - API to update
+ * dynamic_nss_chains_support
+ *
+ * @psoc: psoc context
+ * @value: data to be set
+ *
+ * API to update dynamic_nss_chains_support in wlan_mlme_cfg object to
+ * maintain this value in mlme context
+ *
+ * Return: QDF_STATUS_SUCCESS or QDF_STATUS_FAILURE
+ */
+QDF_STATUS
+wlan_mlme_cfg_set_dynamic_nss_chains_support(struct wlan_objmgr_psoc *psoc,
+					     bool value);
+
+/**
+ * wlan_mlme_cfg_get_dynamic_nss_chains_support() - API to get current value of
+ * dynamic_nss_chains_support
+ *
+ * @psoc: psoc context
+ * @value: data to be set
+ *
+ * API to get current value of dynamic_nss_chains_support
+ *
+ * Return: QDF_STATUS_SUCCESS or QDF_STATUS_FAILURE
+ */
+QDF_STATUS
+wlan_mlme_cfg_get_dynamic_nss_chains_support(struct wlan_objmgr_psoc *psoc,
+					     bool *value);
+
+/**
  * wlan_mlme_get_vht_enable2x2() - Enables/disables VHT Tx/Rx MCS values for 2x2
  * @psoc: psoc context
  * @value: data to be set
