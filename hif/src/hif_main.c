@@ -1153,7 +1153,7 @@ static inline void
 hif_affinity_mgr_init(struct hif_softc *scn, struct wlan_objmgr_psoc *psoc)
 {
 	unsigned int cpus;
-	qdf_cpu_mask allowed_mask;
+	qdf_cpu_mask allowed_mask = {0};
 
 	scn->affinity_mgr_supported =
 		(cfg_get(psoc, CFG_IRQ_AFFINE_AUDIO_USE_CASE) &&
@@ -2880,7 +2880,7 @@ void
 hif_affinity_mgr_init_ce_irq(struct hif_softc *scn, int id, int irq)
 {
 	unsigned int cpus;
-	qdf_cpu_mask cpu_mask;
+	qdf_cpu_mask cpu_mask = {0};
 	struct hif_cpu_affinity *cfg = NULL;
 
 	if (!scn->affinity_mgr_supported)
@@ -2906,7 +2906,7 @@ hif_affinity_mgr_init_grp_irq(struct hif_softc *scn, int grp_id,
 			      int irq_num, int irq)
 {
 	unsigned int cpus;
-	qdf_cpu_mask cpu_mask;
+	qdf_cpu_mask cpu_mask = {0};
 	struct hif_cpu_affinity *cfg = NULL;
 
 	if (!scn->affinity_mgr_supported)
