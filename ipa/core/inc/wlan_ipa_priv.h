@@ -76,7 +76,7 @@
 #define WLAN_IPA_MAX_STA_COUNT              41
 #endif
 
-#define WLAN_IPA_RX_PIPE                    WLAN_IPA_MAX_IFACE
+#define WLAN_IPA_RX_PIPE                    (WLAN_IPA_MAX_SYSBAM_PIPE - 1)
 #define WLAN_IPA_ENABLE_MASK                BIT(0)
 #define WLAN_IPA_PRE_FILTER_ENABLE_MASK     BIT(1)
 #define WLAN_IPA_IPV6_ENABLE_MASK           BIT(2)
