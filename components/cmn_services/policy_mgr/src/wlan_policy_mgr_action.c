@@ -1861,7 +1861,6 @@ bool policy_mgr_is_sap_restart_required_after_sta_disconnect(
 	uint8_t num_cxn_del = 0;
 	QDF_STATUS status;
 	uint32_t sta_gc_present = 0;
-	bool go_5g_present = 0;
 	qdf_freq_t user_config_freq = 0;
 	tQDF_MCC_TO_SCC_SWITCH_MODE cc_mode =
 				policy_mgr_get_mcc_to_scc_switch_mode(psoc);
@@ -1890,13 +1889,6 @@ bool policy_mgr_is_sap_restart_required_after_sta_disconnect(
 		cc_count += policy_mgr_get_mode_specific_conn_info(
 					psoc, &op_ch_freq_list[cc_count],
 					&vdev_id[cc_count], PM_P2P_GO_MODE);
-
-	for (i = go_index_start ; i < cc_count; i++) {
-		if (!WLAN_REG_IS_24GHZ_CH_FREQ(op_ch_freq_list[i])) {
-			go_5g_present = true;
-			break;
-		}
-	}
 
 	sta_gc_present =
 		policy_mgr_mode_specific_connection_count(psoc,
@@ -1967,10 +1959,10 @@ bool policy_mgr_is_sap_restart_required_after_sta_disconnect(
 		 * due to concurrency, then move SAP back to user configured
 		 * frequency.
 		 * if SCC to MCC switch mode is
-		 * QDF_MCC_TO_SCC_SWITCH_WITH_FAVORITE_CHANNEL, then move SAP to
-		 * user configured frequency whenever standalone SAP is
+		 * QDF_MCC_TO_SCC_SWITCH_WITH_FAVORITE_CHANNEL, then don't move
+		 * SAP to user configured frequency whenever standalone SAP is
 		 * currently not on the user configured frequency.
-		 * else move the SAP only when SAP is on 2.4 GHz band and user
+		 * Else move the SAP only when SAP is on 2.4 GHz band and user
 		 * configured frequency is on any other bands.
 		 * And for QDF_MCC_TO_SCC_SWITCH_WITH_FAVORITE_CHANNEL, if GO
 		 * is on 5/6 GHz, SAP is not allowed to move back to 5/6 GHz.
@@ -1978,14 +1970,8 @@ bool policy_mgr_is_sap_restart_required_after_sta_disconnect(
 		 * user configured frequency.
 		 */
 		if (!sta_gc_present && user_config_freq &&
-		    cc_mode == QDF_MCC_TO_SCC_SWITCH_WITH_FAVORITE_CHANNEL &&
-		    !wlan_reg_is_same_band_freqs(user_config_freq,
-						 op_ch_freq_list[i])) {
-			if (go_5g_present &&
-			    !WLAN_REG_IS_24GHZ_CH_FREQ(user_config_freq))
-				continue;
-			curr_sap_freq = op_ch_freq_list[i];
-			policy_mgr_debug("Move sap to user configured freq: %d",
+		    cc_mode == QDF_MCC_TO_SCC_SWITCH_WITH_FAVORITE_CHANNEL) {
+			policy_mgr_debug("Don't move sap to user configured freq: %d",
 					 user_config_freq);
 			break;
 		} else if (!sta_gc_present && user_config_freq &&
