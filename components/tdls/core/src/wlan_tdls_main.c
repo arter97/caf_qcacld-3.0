@@ -1393,8 +1393,7 @@ void tdls_send_update_to_fw(struct tdls_vdev_priv_obj *tdls_vdev_obj,
 	 * channel switch
 	 */
 	if (TDLS_IS_OFF_CHANNEL_ENABLED(tdls_feature_flags) &&
-	    (!tdls_chan_swit_prohibited) &&
-	    (!wlan_tdls_is_fw_11be_mlo_capable(tdls_soc_obj->soc)))
+	    (!tdls_chan_swit_prohibited))
 		tdls_info_to_fw->tdls_options = ENA_TDLS_OFFCHAN;
 
 	if (TDLS_IS_BUFFER_STA_ENABLED(tdls_feature_flags))
