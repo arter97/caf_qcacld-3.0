@@ -39,6 +39,7 @@
 #include "wlan_mlme_api.h"
 #include "wlan_mlme_ucfg_api.h"
 #include "target_if.h"
+#include "wlan_cm_api.h"
 
 enum policy_mgr_conc_next_action (*policy_mgr_get_current_pref_hw_mode_ptr)
 	(struct wlan_objmgr_psoc *psoc);
@@ -2439,6 +2440,60 @@ policy_mgr_check_sap_go_force_scc(struct wlan_objmgr_psoc *psoc,
 	return QDF_STATUS_E_PENDING;
 }
 
+/**
+ * policy_mgr_is_any_conn_in_transition() - Check if any STA/CLI
+ * connection is disconnecting or roaming state
+ * @psoc: PSOC object information
+ *
+ * This function will check connection table and find any STA/CLI
+ * in transition state such as disconnecting, or roaming.
+ *
+ * Return: true if there is one STA/CLI in transition state.
+ */
+static bool
+policy_mgr_is_any_conn_in_transition(struct wlan_objmgr_psoc *psoc)
+{
+	struct policy_mgr_psoc_priv_obj *pm_ctx;
+	uint32_t i;
+	struct policy_mgr_conc_connection_info *conn_info;
+	struct wlan_objmgr_vdev *vdev;
+	bool non_connected = false;
+	uint8_t vdev_id;
+
+	pm_ctx = policy_mgr_get_context(psoc);
+	if (!pm_ctx) {
+		policy_mgr_err("Invalid pm context");
+		return false;
+	}
+
+	qdf_mutex_acquire(&pm_ctx->qdf_conc_list_lock);
+	for (i = 0; i < MAX_NUMBER_OF_CONC_CONNECTIONS; i++) {
+		conn_info = &pm_conc_connection_list[i];
+		if (!(conn_info->in_use &&
+		      (conn_info->mode == PM_STA_MODE ||
+		       conn_info->mode == PM_P2P_CLIENT_MODE)))
+			continue;
+		vdev_id = conn_info->vdev_id;
+		vdev = wlan_objmgr_get_vdev_by_id_from_pdev(
+				pm_ctx->pdev, vdev_id, WLAN_POLICY_MGR_ID);
+		if (!vdev) {
+			policy_mgr_err("vdev %d: not found", vdev_id);
+			continue;
+		}
+
+		non_connected = !wlan_cm_is_vdev_connected(vdev);
+		wlan_objmgr_vdev_release_ref(vdev, WLAN_POLICY_MGR_ID);
+		if (non_connected) {
+			policy_mgr_debug("vdev %d: is in transition state",
+					 vdev_id);
+			break;
+		}
+	}
+	qdf_mutex_release(&pm_ctx->qdf_conc_list_lock);
+
+	return non_connected;
+}
+
 static void __policy_mgr_check_sta_ap_concurrent_ch_intf(
 				struct policy_mgr_psoc_priv_obj *pm_ctx)
 {
@@ -2509,6 +2564,15 @@ static void __policy_mgr_check_sta_ap_concurrent_ch_intf(
 		policy_mgr_err("Could not retrieve SAP/GO operating channel&vdevid");
 		goto end;
 	}
+
+	/* When any STA/CLI is transition state, such as roaming or
+	 * disconnecting, skip force scc for this time.
+	 */
+	if (policy_mgr_is_any_conn_in_transition(pm_ctx->psoc)) {
+		policy_mgr_debug("defer sap conc check to a later time due to another sta/cli dicon/roam pending");
+		goto end;
+	}
+
 	if (policy_mgr_is_ap_start_in_progress(pm_ctx->psoc)) {
 		policy_mgr_debug("defer sap conc check to a later time due to another sap/go start pending");
 		qdf_delayed_work_start(&pm_ctx->sta_ap_intf_check_work,
