@@ -1838,8 +1838,8 @@ static void hdd_country_change_update_sap(struct hdd_context *hdd_ctx)
 					policy_mgr_check_sap_restart(
 							hdd_ctx->psoc,
 							link_info->vdev_id);
-					hdd_debug("Update tx power due to ctry change");
-					wlan_reg_update_tx_power_on_ctry_change(
+				hdd_debug("Update tx power due to ctry change");
+				wlan_reg_update_tx_power_on_ctry_change(
 						    pdev, link_info->vdev_id);
 				break;
 			default:
