@@ -1890,6 +1890,7 @@ void ucfg_dp_register_hdd_callbacks(struct wlan_objmgr_psoc *psoc,
 	dp_ctx->dp_ops.dp_any_adapter_connected =
 		cb_obj->dp_any_adapter_connected;
 	dp_ctx->dp_ops.dp_send_svc_nlink_msg = cb_obj->dp_send_svc_nlink_msg;
+	dp_ctx->dp_ops.dp_send_destroy_ind = cb_obj->dp_send_destroy_ind;
 	dp_ctx->dp_ops.dp_pm_qos_update_request =
 		cb_obj->dp_pm_qos_update_request;
 	dp_ctx->dp_ops.dp_pld_remove_pm_qos = cb_obj->dp_pld_remove_pm_qos;
