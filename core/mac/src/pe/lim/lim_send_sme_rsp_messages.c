@@ -1767,12 +1767,14 @@ static QDF_STATUS lim_process_csa_wbw_ie(struct mac_context *mac_ctx,
 static bool lim_is_csa_channel_allowed(struct mac_context *mac_ctx,
 				       struct pe_session *session_entry,
 				       qdf_freq_t ch_freq1,
-				       uint32_t ch_freq2,
-				       enum phy_ch_width new_ch_width)
+				       struct csa_offload_params *csa_params)
 {
 	bool is_allowed = true;
 	u32 cnx_count = 0;
 	enum QDF_OPMODE mode;
+	qdf_freq_t csa_freq = csa_params->csa_chan_freq, sec_ch_2g_freq = 0;
+	enum phy_ch_width new_ch_width = csa_params->new_ch_width;
+	enum channel_state chan_state;
 
 	if (!session_entry->vdev ||
 	    wlan_cm_is_vdev_disconnecting(session_entry->vdev) ||
@@ -1782,15 +1784,39 @@ static bool lim_is_csa_channel_allowed(struct mac_context *mac_ctx,
 		return false;
 	}
 
+	if (WLAN_REG_IS_24GHZ_CH_FREQ(csa_freq) &&
+	    wlan_reg_get_bw_value(new_ch_width) > 20) {
+		if (csa_params->sec_chan_offset == PHY_DOUBLE_CHANNEL_LOW_PRIMARY)
+			sec_ch_2g_freq = csa_freq + HT40_SEC_OFFSET;
+		else if (csa_params->sec_chan_offset == PHY_DOUBLE_CHANNEL_HIGH_PRIMARY)
+			sec_ch_2g_freq = csa_freq - HT40_SEC_OFFSET;
+	}
+
+	chan_state = wlan_reg_get_bonded_channel_state_for_pwrmode(
+						mac_ctx->pdev,
+						csa_freq, new_ch_width,
+						sec_ch_2g_freq,
+						REG_CURRENT_PWR_MODE);
+	if (chan_state == CHANNEL_STATE_INVALID ||
+	    chan_state == CHANNEL_STATE_DISABLE) {
+		pe_err("Invalid csa_freq:%d for provided ch_width:%d. Disconnect",
+		       csa_freq, new_ch_width);
+		lim_tear_down_link_with_ap(mac_ctx,
+					   session_entry->peSessionId,
+					   REASON_CHANNEL_SWITCH_FAILED,
+					   eLIM_HOST_DISASSOC);
+		return false;
+	}
+
 	mode = wlan_vdev_mlme_get_opmode(session_entry->vdev);
 	cnx_count = policy_mgr_get_connection_count(mac_ctx->psoc);
 	if ((cnx_count > 1) && !policy_mgr_is_hw_dbs_capable(mac_ctx->psoc) &&
 	    !policy_mgr_is_interband_mcc_supported(mac_ctx->psoc)) {
-		is_allowed = wlan_reg_is_same_band_freqs(ch_freq1, ch_freq2);
+		is_allowed = wlan_reg_is_same_band_freqs(ch_freq1, csa_freq);
 	} else if (cnx_count > 2) {
 		is_allowed =
 		policy_mgr_allow_concurrency_csa(
-			mac_ctx->psoc, ch_freq2,
+			mac_ctx->psoc, csa_freq,
 			policy_mgr_qdf_opmode_to_pm_con_mode(mac_ctx->psoc,
 							     mode,
 							     session_entry->vdev_id),
@@ -1938,8 +1964,7 @@ void lim_handle_sta_csa_param(struct mac_context *mac_ctx,
 
 	if (!lim_is_csa_channel_allowed(mac_ctx, session_entry,
 					session_entry->curr_op_freq,
-					csa_params->csa_chan_freq,
-					csa_params->new_ch_width)) {
+					csa_params)) {
 		pe_debug("Channel switch is not allowed");
 		goto err;
 	}
