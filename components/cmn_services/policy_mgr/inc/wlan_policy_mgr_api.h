@@ -1879,7 +1879,7 @@ policy_mgr_is_vdev_ll_sap(struct wlan_objmgr_psoc *psoc,
 			  uint32_t vdev_id);
 
 /**
- * policy_mgr_is_vdev_ht_ll_sap() - Check whether given vdev is HT LL SAP or not
+ * policy_mgr_is_vdev_ll_ht_sap() - Check whether given vdev is HT LL SAP or not
  * @psoc: psoc object
  * @vdev_id: vdev id
  *
@@ -1889,7 +1889,7 @@ policy_mgr_is_vdev_ll_sap(struct wlan_objmgr_psoc *psoc,
  * Return: true if it's present otherwise false
  */
 bool
-policy_mgr_is_vdev_ht_ll_sap(struct wlan_objmgr_psoc *psoc,
+policy_mgr_is_vdev_ll_ht_sap(struct wlan_objmgr_psoc *psoc,
 			     uint32_t vdev_id);
 
 /**
