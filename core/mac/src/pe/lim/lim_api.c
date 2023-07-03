@@ -3780,7 +3780,8 @@ lim_add_bcn_probe(struct wlan_objmgr_vdev *vdev, uint8_t *bcn_probe,
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
 
 	vdev_id = wlan_vdev_get_id(vdev);
-	if (!bcn_probe || !len || (len < sizeof(*hdr))) {
+	if (!bcn_probe || !len || (len < sizeof(*hdr)) ||
+	    len > MAX_MGMT_MPDU_LEN) {
 		pe_err("bcn_probe is null or invalid len %d",
 		       len);
 		return QDF_STATUS_E_FAILURE;
