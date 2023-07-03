@@ -22145,16 +22145,16 @@ void wlan_key_put_link_vdev(struct wlan_objmgr_vdev *link_vdev,
  * This function is used to get the key information
  */
 
-static int wlan_hdd_add_key_sap(struct hdd_adapter *adapter,
+static int wlan_hdd_add_key_sap(struct wlan_hdd_link_info *link_info,
 				bool pairwise, u8 key_index,
 				enum wlan_crypto_cipher_type cipher)
 {
 	struct wlan_objmgr_vdev *vdev;
 	int errno = 0;
 	struct hdd_hostapd_state *hostapd_state =
-		WLAN_HDD_GET_HOSTAP_STATE_PTR(adapter->deflink);
+		WLAN_HDD_GET_HOSTAP_STATE_PTR(link_info);
 
-	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink, WLAN_OSIF_ID);
+	vdev = hdd_objmgr_get_vdev_by_user(link_info, WLAN_OSIF_ID);
 	if (!vdev)
 		return -EINVAL;
 
@@ -22176,7 +22176,7 @@ static int wlan_hdd_add_key_sap(struct hdd_adapter *adapter,
 					      WLAN_CRYPTO_KEY_TYPE_GROUP),
 					     key_index, true);
 		if (!errno)
-			wma_update_set_key(adapter->deflink->vdev_id, pairwise,
+			wma_update_set_key(link_info->vdev_id, pairwise,
 					   key_index, cipher);
 	}
 	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
@@ -22185,23 +22185,24 @@ static int wlan_hdd_add_key_sap(struct hdd_adapter *adapter,
 }
 
 static int wlan_hdd_add_key_sta(struct wlan_objmgr_pdev *pdev,
-				struct hdd_adapter *adapter,
+				struct wlan_hdd_link_info *link_info,
 				bool pairwise, u8 key_index, bool *ft_mode)
 {
 	struct wlan_objmgr_vdev *vdev;
 	int errno;
 	QDF_STATUS status;
+	struct hdd_adapter *adapter = link_info->adapter;
 
 	/* The supplicant may attempt to set the PTK once
 	 * pre-authentication is done. Save the key in the
 	 * UMAC and install it after association
 	 */
-	status = ucfg_cm_check_ft_status(pdev, adapter->deflink->vdev_id);
+	status = ucfg_cm_check_ft_status(pdev, link_info->vdev_id);
 	if (status == QDF_STATUS_SUCCESS) {
 		*ft_mode = true;
 		return 0;
 	}
-	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink, WLAN_OSIF_ID);
+	vdev = hdd_objmgr_get_vdev_by_user(link_info, WLAN_OSIF_ID);
 	if (!vdev)
 		return -EINVAL;
 	errno = wlan_cfg80211_crypto_add_key(vdev, (pairwise ?
@@ -22413,10 +22414,10 @@ wlan_hdd_add_vlan(struct wlan_objmgr_vdev *vdev, struct sap_context *sap_ctx,
 #endif
 
 static int wlan_hdd_add_key_vdev(mac_handle_t mac_handle,
-				 struct wlan_objmgr_vdev *vdev,
-				 u8 key_index, bool pairwise,
-				 const u8 *mac_addr, struct key_params *params,
-				 int link_id, struct hdd_adapter *adapter)
+				 struct wlan_objmgr_vdev *vdev, u8 key_index,
+				 bool pairwise, const u8 *mac_addr,
+				 struct key_params *params, int link_id,
+				 struct wlan_hdd_link_info *link_info)
 {
 	QDF_STATUS status;
 	struct wlan_objmgr_peer *peer;
@@ -22429,6 +22430,7 @@ static int wlan_hdd_add_key_vdev(mac_handle_t mac_handle,
 	uint8_t keyidx;
 	struct hdd_ap_ctx *hdd_ap_ctx;
 	struct sap_context *sap_ctx;
+	struct hdd_adapter *adapter = link_info->adapter;
 
 	hdd_ctx = WLAN_HDD_GET_CTX(adapter);
 
@@ -22515,7 +22517,7 @@ done:
 	switch (adapter->device_mode) {
 	case QDF_SAP_MODE:
 	case QDF_P2P_GO_MODE:
-		hdd_ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(adapter->deflink);
+		hdd_ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(link_info);
 		if (hdd_ap_ctx->during_auth_offload) {
 			hdd_err("don't need install key during auth");
 			return -EINVAL;
@@ -22532,14 +22534,14 @@ done:
 				return errno;
 		}
 
-		errno = wlan_hdd_add_key_sap(adapter, pairwise,
+		errno = wlan_hdd_add_key_sap(link_info, pairwise,
 					     keyidx, cipher);
 
 		break;
 	case QDF_STA_MODE:
 	case QDF_P2P_CLIENT_MODE:
 	case QDF_NAN_DISC_MODE:
-		errno = wlan_hdd_add_key_sta(hdd_ctx->pdev, adapter, pairwise,
+		errno = wlan_hdd_add_key_sta(hdd_ctx->pdev, link_info, pairwise,
 					     key_index, &ft_mode);
 		if (ft_mode)
 			return 0;
@@ -22604,7 +22606,7 @@ QDF_STATUS wlan_hdd_send_key_vdev(struct wlan_objmgr_vdev *vdev,
 	cdp_peer_flush_frags(cds_get_context(QDF_MODULE_ID_SOC),
 			     vdev_id, mac_address.bytes);
 
-	errno = wlan_hdd_add_key_sta(hdd_ctx->pdev, link_info->adapter,
+	errno = wlan_hdd_add_key_sta(hdd_ctx->pdev, link_info,
 				     pairwise, key_index, &ft_mode);
 	if (ft_mode)
 		return QDF_STATUS_SUCCESS;
@@ -22764,8 +22766,7 @@ static int wlan_hdd_add_key_all_mlo_vdev(mac_handle_t mac_handle,
 add_key:
 		errno = wlan_hdd_add_key_vdev(mac_handle, link_vdev, key_index,
 					      pairwise, peer_mac.bytes,
-					      params, link_id,
-					      link_info->adapter);
+					      params, link_id, link_info);
 		mlo_release_vdev_ref(link_vdev);
 	}
 
@@ -22823,7 +22824,7 @@ static int wlan_hdd_add_key_mlo_vdev(mac_handle_t mac_handle,
 
 		errno = wlan_hdd_add_key_vdev(mac_handle, link_vdev, key_index,
 					      pairwise, mac_addr, params,
-					      link_id, link_info->adapter);
+					      link_id, link_info);
 		ucfg_tdls_put_tdls_link_vdev(link_vdev, WLAN_OSIF_TDLS_ID);
 
 		return errno;
@@ -22837,7 +22838,7 @@ static int wlan_hdd_add_key_mlo_vdev(mac_handle_t mac_handle,
 			  adapter->deflink->vdev_id);
 		return wlan_hdd_add_key_vdev(mac_handle, vdev, key_index,
 					     pairwise, mac_addr, params,
-					     link_id, adapter);
+					     link_id, adapter->deflink);
 	}
 
 	link_vdev = wlan_key_get_link_vdev(adapter, WLAN_MLO_MGR_ID, link_id);
@@ -22856,7 +22857,7 @@ static int wlan_hdd_add_key_mlo_vdev(mac_handle_t mac_handle,
 
 	errno = wlan_hdd_add_key_vdev(mac_handle, link_vdev, key_index,
 				      pairwise, mac_addr, params,
-				      link_id, link_info->adapter);
+				      link_id, link_info);
 
 release_ref:
 	wlan_key_put_link_vdev(link_vdev, WLAN_MLO_MGR_ID);
@@ -22872,7 +22873,7 @@ static int wlan_hdd_add_key_mlo_vdev(mac_handle_t mac_handle,
 {
 	return wlan_hdd_add_key_vdev(mac_handle, vdev, key_index,
 				     pairwise, mac_addr, params,
-				     link_id, adapter);
+				     link_id, adapter->deflink);
 }
 #else
 static int wlan_hdd_add_key_mlo_vdev(mac_handle_t mac_handle,
@@ -22929,7 +22930,7 @@ static int __wlan_hdd_cfg80211_add_key(struct wiphy *wiphy,
 	if (!wlan_vdev_mlme_is_mlo_vdev(vdev))
 		errno = wlan_hdd_add_key_vdev(mac_handle, vdev, key_index,
 					      pairwise, mac_addr, params,
-					      link_id, adapter);
+					      link_id, adapter->deflink);
 	else
 		errno = wlan_hdd_add_key_mlo_vdev(mac_handle, vdev, key_index,
 						  pairwise, mac_addr, params,
