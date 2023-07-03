@@ -1222,7 +1222,7 @@ static void dp_ppeds_release_rx_desc(ppe_ds_wlan_handle_t *ppeds_handle,
 		if ((i + 1) != count)
 			qdf_prefetch((struct dp_rx_desc *)arr[i + 1].cookie);
 
-		rx_desc = (struct dp_rx_desc *)arr[i].cookie;
+		rx_desc = dp_rx_desc_ppeds_cookie_2_va(soc, arr[i].cookie);
 		if (rx_desc == NULL) {
 			dp_err("Rx descriptor is NULL\n");
 			continue;
