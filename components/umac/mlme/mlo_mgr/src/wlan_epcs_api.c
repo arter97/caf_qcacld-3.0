@@ -339,6 +339,9 @@ static QDF_STATUS epcs_handle_rx_req(struct wlan_objmgr_vdev *vdev,
 	for (i = 0; i < edca_info->num_links; i++) {
 		link = &edca_info->link_info[i];
 		link_vdev = mlo_get_vdev_by_link_id(vdev, link->link_id);
+		if (!link_vdev)
+			continue;
+
 		if (link->edca_ie_present)
 			epcs_update_edca_param(link_vdev, &link->edca);
 		else if (link->ven_wme_ie_present)
@@ -349,6 +352,8 @@ static QDF_STATUS epcs_handle_rx_req(struct wlan_objmgr_vdev *vdev,
 
 		if (link->muedca_ie_present)
 			epcs_update_mu_edca_param(link_vdev, &link->muedca);
+
+		mlo_release_vdev_ref(link_vdev);
 	}
 
 	args.category = ACTION_CATEGORY_PROTECTED_EHT;
@@ -417,6 +422,9 @@ static QDF_STATUS epcs_handle_rx_resp(struct wlan_objmgr_vdev *vdev,
 	for (i = 0; i < edca_info->num_links; i++) {
 		link = &edca_info->link_info[i];
 		link_vdev = mlo_get_vdev_by_link_id(vdev, link->link_id);
+		if (!link_vdev)
+			continue;
+
 		if (link->edca_ie_present)
 			epcs_update_edca_param(link_vdev, &link->edca);
 		else if (link->ven_wme_ie_present)
@@ -427,6 +435,8 @@ static QDF_STATUS epcs_handle_rx_resp(struct wlan_objmgr_vdev *vdev,
 
 		if (link->muedca_ie_present)
 			epcs_update_mu_edca_param(link_vdev, &link->muedca);
+
+		mlo_release_vdev_ref(link_vdev);
 	}
 
 	epcs_info->state = EPCS_ENABLE;
