@@ -2027,6 +2027,10 @@ void dp_update_vdev_stats_on_peer_unmap(struct dp_vdev *vdev,
 					 _srcobj->rx.rcvd_reo[i].num; \
 			_tgtobj->rx.rcvd_reo[i].bytes += \
 					_srcobj->rx.rcvd_reo[i].bytes; \
+			_tgtobj->rx.rcvd.num += \
+					 _srcobj->rx.rcvd_reo[i].num; \
+			_tgtobj->rx.rcvd.bytes += \
+					_srcobj->rx.rcvd_reo[i].bytes; \
 		} \
 		for (i = 0; i < CDP_MAX_LMACS; i++) { \
 			_tgtobj->rx.rx_lmac[i].num += \

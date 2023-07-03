@@ -1684,6 +1684,7 @@ struct cdp_tx_stats {
  * struct cdp_rx_stats - rx Level Stats
  * @to_stack: Total packets sent up the stack
  * @rcvd_reo:  Packets received on the reo ring
+ * @rcvd: Total packets received
  * @rx_lmac: Packets received on which lmac
  * @unicast: Total unicast packets
  * @multicast: Total multicast packets
@@ -1775,6 +1776,7 @@ struct cdp_tx_stats {
 struct cdp_rx_stats {
 	struct cdp_pkt_info to_stack;
 	struct cdp_pkt_info rcvd_reo[CDP_MAX_RX_RINGS];
+	struct cdp_pkt_info rcvd;
 	struct cdp_pkt_info rx_lmac[CDP_MAX_LMACS];
 	struct cdp_pkt_info unicast;
 	struct cdp_pkt_info multicast;
