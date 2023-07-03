@@ -4150,9 +4150,11 @@ release_mhi_wake:
 	if (ret) {
 		hif_err("pld force wake release failure");
 		HIF_STATS_INC(pci_scn, mhi_force_wake_release_failure, 1);
-		return ret;
+		status = ret;
+	} else {
+		HIF_STATS_INC(pci_scn, mhi_force_wake_release_success, 1);
 	}
-	HIF_STATS_INC(pci_scn, mhi_force_wake_release_success, 1);
+
 release_rtpm_ref:
 	/* Release runtime PM force wake */
 	ret = hif_rtpm_put(HIF_RTPM_PUT_ASYNC, HIF_RTPM_ID_FORCE_WAKE);
@@ -4166,7 +4168,7 @@ release_rtpm_ref:
 
 int hif_force_wake_release(struct hif_opaque_softc *hif_handle)
 {
-	int ret;
+	int ret, status;
 	struct hif_softc *scn = (struct hif_softc *)hif_handle;
 	struct hif_pci_softc *pci_scn = HIF_GET_PCI_SOFTC(scn);
 
@@ -4177,19 +4179,19 @@ int hif_force_wake_release(struct hif_opaque_softc *hif_handle)
 	if (ret) {
 		hif_err("pld force wake release failure");
 		HIF_STATS_INC(pci_scn, mhi_force_wake_release_failure, 1);
-		return ret;
+		goto release_rtpm_ref;
 	}
 	HIF_STATS_INC(pci_scn, mhi_force_wake_release_success, 1);
-
-	/* Release runtime PM force wake */
-	ret = hif_rtpm_put(HIF_RTPM_PUT_ASYNC, HIF_RTPM_ID_FORCE_WAKE);
-	if (ret) {
-		hif_err("runtime pm put failure");
-		return ret;
-	}
-
 	HIF_STATS_INC(pci_scn, soc_force_wake_release_success, 1);
-	return 0;
+
+release_rtpm_ref:
+	/* Release runtime PM force wake */
+	status = hif_rtpm_put(HIF_RTPM_PUT_ASYNC, HIF_RTPM_ID_FORCE_WAKE);
+	if (status) {
+		hif_err("runtime pm put failure: %d", status);
+		return status;
+	}
+	return ret;
 }
 
 #else /* DEVICE_FORCE_WAKE_ENABLE */
