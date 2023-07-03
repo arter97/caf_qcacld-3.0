@@ -662,6 +662,52 @@ wlan_mlme_update_cfg_with_tgt_caps(struct wlan_objmgr_psoc *psoc,
 	mlme_obj->cfg.gen.ocv_support = tgt_caps->ocv_support;
 }
 
+void
+wlan_mlme_update_aux_dev_caps(
+		struct wlan_objmgr_psoc *psoc,
+		struct wlan_mlme_aux_dev_caps wlan_mlme_aux_dev_caps[])
+{
+	struct wlan_mlme_psoc_ext_obj *mlme_obj;
+
+	mlme_obj = mlme_get_psoc_ext_obj(psoc);
+	if (!mlme_obj)
+		return;
+
+	qdf_mem_copy(&mlme_obj->cfg.gen.wlan_mlme_aux0_dev_caps[0],
+		     &wlan_mlme_aux_dev_caps[0],
+		     sizeof(mlme_obj->cfg.gen.wlan_mlme_aux0_dev_caps));
+}
+
+bool wlan_mlme_cfg_get_aux_supported_modes(
+			struct wlan_objmgr_psoc *psoc,
+			uint32_t aux_index,
+			enum wlan_mlme_hw_mode_config_type hw_mode_id,
+			uint32_t *supported_modes_bitmap)
+{
+	struct wlan_mlme_psoc_ext_obj *mlme_obj;
+	struct wlan_mlme_aux_dev_caps *wlan_mlme_aux0_dev_caps;
+
+	if (aux_index != 0) {
+		mlme_err("current only support aux0");
+		return false;
+	}
+
+	if (hw_mode_id >= WLAN_MLME_HW_MODE_MAX) {
+		mlme_err("invalid hw mode id %d.", hw_mode_id);
+		return false;
+	}
+
+	mlme_obj = mlme_get_psoc_ext_obj(psoc);
+	if (!mlme_obj) {
+		mlme_err("MLME obj is NULL");
+		return false;
+	}
+	wlan_mlme_aux0_dev_caps = mlme_obj->cfg.gen.wlan_mlme_aux0_dev_caps;
+	*supported_modes_bitmap =
+		wlan_mlme_aux0_dev_caps[hw_mode_id].supported_modes_bitmap;
+	return true;
+}
+
 #ifdef WLAN_FEATURE_11AX
 QDF_STATUS wlan_mlme_cfg_get_he_ul_mumimo(struct wlan_objmgr_psoc *psoc,
 					  uint32_t *value)
