@@ -1185,13 +1185,14 @@ QDF_STATUS __scm_handle_bcn_probe(struct scan_bcn_probe_event *bcn)
 		}
 		/* Do not add invalid channel entry as kernel will reject it */
 		if (scan_obj->drop_bcn_on_invalid_freq &&
-		    wlan_reg_is_disable_for_pwrmode(
-					pdev,
-					scan_entry->channel.chan_freq,
-					REG_BEST_PWR_MODE)) {
-			scm_nofl_debug("Drop frame for invalid freq %d: "QDF_MAC_ADDR_FMT" Seq Num: %d RSSI %d",
+		    !wlan_reg_is_freq_enabled(pdev,
+					      scan_entry->channel.chan_freq,
+					      REG_BEST_PWR_MODE)) {
+			scm_nofl_debug(QDF_MAC_ADDR_FMT ": Drop frame(%d) for invalid freq %d seq %d RSSI %d",
+				       QDF_MAC_ADDR_REF(
+				       scan_entry->bssid.bytes),
+				       bcn->frm_type,
 				       scan_entry->channel.chan_freq,
-				       QDF_MAC_ADDR_REF(scan_entry->bssid.bytes),
 				       scan_entry->seq_num,
 				       scan_entry->rssi_raw);
 			util_scan_free_cache_entry(scan_entry);
