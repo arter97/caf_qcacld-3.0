@@ -82,6 +82,27 @@ QDF_STATUS wlan_dp_set_vdev_direct_link_cfg(struct wlan_objmgr_psoc *psoc,
 }
 #endif
 
+QDF_STATUS ucfg_dp_update_link_mac_addr(struct wlan_objmgr_vdev *vdev,
+					struct qdf_mac_addr *new_mac_addr,
+					bool is_link_switch)
+{
+	struct wlan_dp_psoc_context *dp_ctx;
+	struct wlan_dp_link *dp_link;
+	QDF_STATUS status = QDF_STATUS_SUCCESS;
+
+	dp_ctx = dp_get_context();
+
+	dp_link = dp_get_vdev_priv_obj(vdev);
+	if (!is_dp_link_valid(dp_link)) {
+		dp_err("dp_link from vdev %pK is invalid", vdev);
+		return QDF_STATUS_E_INVAL;
+	}
+
+	qdf_copy_macaddr(&dp_link->mac_addr, new_mac_addr);
+
+	return status;
+}
+
 void ucfg_dp_update_inf_mac(struct wlan_objmgr_psoc *psoc,
 			    struct qdf_mac_addr *cur_mac,
 			    struct qdf_mac_addr *new_mac)

@@ -62,6 +62,20 @@ ucfg_dp_is_disconect_after_roam_fail(struct wlan_objmgr_psoc *psoc)
 #endif
 
 /**
+ * ucfg_dp_update_link_mac_addr() - Update the dp_link mac address, during MLO
+ *				    link switch.
+ * @vdev: Objmgr vdev corresponding to the dp_link
+ * @new_mac_addr: New mac address of the dp_link
+ * @is_link_switch: Flag to indicate if the link mac addr update is as a part
+ *		    of MLO link switch.
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS ucfg_dp_update_link_mac_addr(struct wlan_objmgr_vdev *vdev,
+					struct qdf_mac_addr *new_mac_addr,
+					bool is_link_switch);
+
+/**
  * ucfg_dp_update_inf_mac() - update DP interface MAC address
  * @psoc: psoc handle
  * @cur_mac: Current MAC address
