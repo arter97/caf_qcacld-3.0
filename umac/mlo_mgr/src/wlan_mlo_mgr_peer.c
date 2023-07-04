@@ -2212,12 +2212,14 @@ bool wlan_mlo_partner_peer_delete_is_allowed(struct wlan_objmgr_peer *src_peer)
 		/* Single LINK MLO connection */
 		if (ml_peer->link_peer_cnt == 1)
 			return false;
+
 		/*
-		 * If this link is primary TQM, then delete MLO connection till
-		 * primary umac migration is implemented
+		 * If this link is primary TQM and there is no ongoing migration
+		 * from this link, then issue full disconnect.
 		 */
-		if (wlan_mlo_peer_get_primary_peer_link_id(src_peer) !=
-			wlan_vdev_get_link_id(vdev))
+		if ((wlan_mlo_peer_get_primary_peer_link_id(src_peer) !=
+		    wlan_vdev_get_link_id(vdev)) ||
+		    ml_peer->primary_umac_migration_in_progress)
 			return false;
 	}
 
