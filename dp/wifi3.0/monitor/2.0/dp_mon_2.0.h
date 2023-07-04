@@ -330,21 +330,29 @@ void dp_mon_desc_pool_deinit(struct dp_mon_desc_pool *mon_desc_pool);
 
 /**
  * dp_mon_desc_pool_free()- monitor descriptor pool free
+ * @soc: DP soc handle
  * @mon_desc_pool: mon desc pool
+ * @ctx_type: DP context type
  *
  * Return: None
  *
  */
-void dp_mon_desc_pool_free(struct dp_mon_desc_pool *mon_desc_pool);
+void dp_mon_desc_pool_free(struct dp_soc *soc,
+			   struct dp_mon_desc_pool *mon_desc_pool,
+			   enum dp_ctxt_type ctx_type);
 
 /**
  * dp_mon_desc_pool_alloc() - Monitor descriptor pool alloc
+ * @soc: DP soc handle
+ * @ctx_type: DP context type
  * @pool_size: Pool size
  * @mon_desc_pool: mon desc pool
  *
  * Return: non-zero for failure, zero for success
  */
-QDF_STATUS dp_mon_desc_pool_alloc(uint32_t pool_size,
+QDF_STATUS dp_mon_desc_pool_alloc(struct dp_soc *soc,
+				  enum dp_ctxt_type ctx_type,
+				  uint32_t pool_size,
 				  struct dp_mon_desc_pool *mon_desc_pool);
 
 /**

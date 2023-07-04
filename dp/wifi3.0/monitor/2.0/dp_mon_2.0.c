@@ -173,9 +173,11 @@ void dp_mon_desc_pool_deinit(struct dp_mon_desc_pool *mon_desc_pool)
 	qdf_spinlock_destroy(&mon_desc_pool->lock);
 }
 
-void dp_mon_desc_pool_free(struct dp_mon_desc_pool *mon_desc_pool)
+void dp_mon_desc_pool_free(struct dp_soc *soc,
+			   struct dp_mon_desc_pool *mon_desc_pool,
+			   enum dp_ctxt_type ctx_type)
 {
-	qdf_mem_free(mon_desc_pool->array);
+	dp_context_free_mem(soc, ctx_type, mon_desc_pool->array);
 }
 
 QDF_STATUS dp_vdev_set_monitor_mode_buf_rings_rx_2_0(struct dp_pdev *pdev)
@@ -968,12 +970,17 @@ free_desc:
 	return ret;
 }
 
-QDF_STATUS dp_mon_desc_pool_alloc(uint32_t pool_size,
+QDF_STATUS dp_mon_desc_pool_alloc(struct dp_soc *soc,
+				  enum dp_ctxt_type ctx_type,
+				  uint32_t pool_size,
 				  struct dp_mon_desc_pool *mon_desc_pool)
 {
+	size_t mem_size;
+
 	mon_desc_pool->pool_size = pool_size - 1;
-	mon_desc_pool->array = qdf_mem_malloc((mon_desc_pool->pool_size) *
-				     sizeof(union dp_mon_desc_list_elem_t));
+	mem_size = mon_desc_pool->pool_size *
+			sizeof(union dp_mon_desc_list_elem_t);
+	mon_desc_pool->array = dp_context_alloc_mem(soc, ctx_type, mem_size);
 
 	return QDF_STATUS_SUCCESS;
 }

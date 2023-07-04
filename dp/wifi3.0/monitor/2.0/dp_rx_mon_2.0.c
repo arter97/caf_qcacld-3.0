@@ -2623,7 +2623,8 @@ void dp_rx_mon_buf_desc_pool_free(struct dp_soc *soc)
 	struct dp_mon_soc_be *mon_soc_be = dp_get_be_mon_soc_from_dp_mon_soc(mon_soc);
 
 	if (mon_soc)
-		dp_mon_desc_pool_free(&mon_soc_be->rx_desc_mon);
+		dp_mon_desc_pool_free(soc, &mon_soc_be->rx_desc_mon,
+				      DP_MON_RX_DESC_POOL_TYPE);
 }
 
 void dp_rx_mon_soc_detach_2_0(struct dp_soc *soc, int lmac_id)
@@ -2658,7 +2659,8 @@ dp_rx_mon_buf_desc_pool_alloc(struct dp_soc *soc)
 	rx_mon_desc_pool = &mon_soc_be->rx_desc_mon;
 
 	qdf_print("%s:%d rx mon buf desc pool entries: %d", __func__, __LINE__, entries);
-	return dp_mon_desc_pool_alloc(entries, rx_mon_desc_pool);
+	return dp_mon_desc_pool_alloc(soc, DP_MON_RX_DESC_POOL_TYPE,
+				      entries, rx_mon_desc_pool);
 }
 
 void

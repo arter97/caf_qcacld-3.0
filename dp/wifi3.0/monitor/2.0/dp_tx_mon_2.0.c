@@ -352,7 +352,8 @@ void dp_tx_mon_buf_desc_pool_free(struct dp_soc *soc)
 		dp_get_be_mon_soc_from_dp_mon_soc(mon_soc);
 
 	if (mon_soc_be)
-		dp_mon_desc_pool_free(&mon_soc_be->tx_desc_mon);
+		dp_mon_desc_pool_free(soc, &mon_soc_be->tx_desc_mon,
+				      DP_MON_TX_DESC_POOL_TYPE);
 }
 
 QDF_STATUS dp_tx_mon_soc_init_2_0(struct dp_soc *soc)
@@ -406,7 +407,8 @@ dp_tx_mon_buf_desc_pool_alloc(struct dp_soc *soc)
 	tx_mon_desc_pool = &mon_soc_be->tx_desc_mon;
 
 	qdf_print("%s:%d tx mon buf desc pool entries: %d", __func__, __LINE__, entries);
-	return dp_mon_desc_pool_alloc(entries, tx_mon_desc_pool);
+	return dp_mon_desc_pool_alloc(soc, DP_MON_TX_DESC_POOL_TYPE,
+				      entries, tx_mon_desc_pool);
 }
 
 void
