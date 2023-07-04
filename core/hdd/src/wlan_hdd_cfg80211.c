@@ -210,6 +210,7 @@
 #include "wlan_mlo_epcs_ucfg_api.h"
 #include <wlan_ll_sap_ucfg_api.h>
 #include <wlan_mlo_mgr_link_switch.h>
+#include <wlan_hdd_ll_lt_sap.h>
 /*
  * A value of 100 (milliseconds) can be sent to FW.
  * FW would enable Tx beamforming based on this.
@@ -20452,6 +20453,7 @@ const struct wiphy_vendor_command hdd_wiphy_vendor_commands[] = {
 	FEATURE_COAP_OFFLOAD_COMMANDS
 	FEATURE_ML_LINK_STATE_COMMANDS
 	FEATURE_AFC_VENDOR_COMMANDS
+	FEATURE_LL_LT_SAP_VENDOR_COMMANDS
 };
 
 struct hdd_context *hdd_cfg80211_wiphy_alloc(void)

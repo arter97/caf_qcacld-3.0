@@ -16,6 +16,7 @@
 
 #include "wlan_ll_sap_main.h"
 #include <wlan_objmgr_global_obj.h>
+#include "qca_vendor.h"
 
 static QDF_STATUS ll_sap_psoc_obj_created_notification(struct wlan_objmgr_psoc *psoc, void *arg_list)
 {
@@ -91,4 +92,24 @@ QDF_STATUS ll_sap_deinit(void)
 	}
 
 	return ret;
+}
+
+QDF_STATUS ll_lt_sap_request_for_audio_transport_switch(
+						uint8_t transport_switch_type)
+{
+	/*
+	 * return status as QDF_STATUS_SUCCESS or failure based on the current
+	 * pending requests of the transport switch
+	 */
+	if (transport_switch_type ==
+		QCA_WLAN_AUDIO_TRANSPORT_SWITCH_TYPE_NON_WLAN) {
+		ll_sap_debug("request SWITCH_TYPE_NON_WLAN accepted");
+		return QDF_STATUS_SUCCESS;
+	} else if (transport_switch_type ==
+				QCA_WLAN_AUDIO_TRANSPORT_SWITCH_TYPE_WLAN) {
+		ll_sap_debug("request SWITCH_TYPE_WLAN accepted");
+		return QDF_STATUS_SUCCESS;
+	}
+
+	return QDF_STATUS_E_RESOURCES;
 }

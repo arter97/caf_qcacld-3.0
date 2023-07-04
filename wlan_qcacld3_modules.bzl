@@ -523,6 +523,7 @@ _fixed_srcs = [
     "core/hdd/src/wlan_hdd_hostapd.c",
     "core/hdd/src/wlan_hdd_ioctl.c",
     "core/hdd/src/wlan_hdd_main.c",
+    "core/hdd/src/wlan_hdd_ll_lt_sap.c",
     "core/hdd/src/wlan_hdd_object_manager.c",
     "core/hdd/src/wlan_hdd_oemdata.c",
     "core/hdd/src/wlan_hdd_p2p.c",
