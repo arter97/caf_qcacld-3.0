@@ -5766,13 +5766,16 @@ int hdd_dynamic_mac_address_set(struct wlan_hdd_link_info *link_info,
 status_ret:
 	status = ucfg_vdev_mgr_cdp_vdev_attach(vdev);
 	if (QDF_IS_STATUS_ERROR(status)) {
-		hdd_allow_suspend(
-			WIFI_POWER_EVENT_WAKELOCK_DYN_MAC_ADDR_UPDATE);
-		qdf_runtime_pm_allow_suspend(
-				&hdd_ctx->runtime_context.dyn_mac_addr_update);
 		hdd_err("Failed to attach CDP vdev. status:%d", status);
 		ret = qdf_status_to_os_return(status);
-		goto vdev_ref;
+		goto allow_suspend;
+	} else if (!ret) {
+		status = ucfg_dp_update_link_mac_addr(vdev, &mac_addr, false);
+		if (QDF_IS_STATUS_ERROR(status)) {
+			ret = qdf_status_to_os_return(status);
+			hdd_err("DP link MAC update failed");
+			goto allow_suspend;
+		}
 	}
 	sme_vdev_set_data_tx_callback(vdev);
 
@@ -5780,6 +5783,7 @@ status_ret:
 	ucfg_pmo_del_wow_pattern(vdev);
 	ucfg_pmo_register_wow_default_patterns(vdev);
 
+allow_suspend:
 	hdd_allow_suspend(WIFI_POWER_EVENT_WAKELOCK_DYN_MAC_ADDR_UPDATE);
 	qdf_runtime_pm_allow_suspend(
 			&hdd_ctx->runtime_context.dyn_mac_addr_update);
