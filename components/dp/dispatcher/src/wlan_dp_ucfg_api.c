@@ -40,6 +40,9 @@
 #include "wlan_dp_prealloc.h"
 #include "wlan_dp_rx_thread.h"
 #include <cdp_txrx_host_stats.h>
+#ifdef WLAN_FEATURE_11BE_MLO
+#include "wlan_mlo_mgr_public_api.h"
+#endif
 
 #ifdef FEATURE_DIRECT_LINK
 /**
@@ -82,6 +85,55 @@ QDF_STATUS wlan_dp_set_vdev_direct_link_cfg(struct wlan_objmgr_psoc *psoc,
 }
 #endif
 
+#ifdef WLAN_FEATURE_11BE_MLO
+static inline
+QDF_STATUS wlan_dp_update_vdev_mac_addr(struct wlan_dp_psoc_context *dp_ctx,
+					struct wlan_dp_link *dp_link,
+					struct qdf_mac_addr *new_mac_addr)
+{
+	cdp_config_param_type vdev_param = {0};
+
+	qdf_mem_copy(&vdev_param.mac_addr, new_mac_addr, QDF_MAC_ADDR_SIZE);
+
+	/* CDP API to change the mac address */
+	return cdp_txrx_set_vdev_param(dp_ctx->cdp_soc, dp_link->link_id,
+				       CDP_VDEV_SET_MAC_ADDR, vdev_param);
+}
+
+static QDF_STATUS wlan_dp_register_link_switch_notifier(void)
+{
+	return wlan_mlo_mgr_register_link_switch_notifier(
+					WLAN_COMP_DP,
+					dp_link_switch_notification);
+}
+
+static QDF_STATUS wlan_dp_unregister_link_switch_notifier(void)
+{
+	return wlan_mlo_mgr_unregister_link_switch_notifier(WLAN_COMP_DP);
+}
+#else
+static inline
+QDF_STATUS wlan_dp_update_vdev_mac_addr(struct wlan_dp_psoc_context *dp_ctx,
+					struct wlan_dp_link *dp_link,
+					struct qdf_mac_addr *new_mac_addr)
+{
+	/* Link switch should be done only for 802.11BE */
+	qdf_assert(0);
+	return QDF_STATUS_E_NOSUPPORT;
+}
+
+static inline QDF_STATUS wlan_dp_register_link_switch_notifier(void)
+{
+	return QDF_STATUS_SUCCESS;
+}
+
+static inline QDF_STATUS wlan_dp_unregister_link_switch_notifier(void)
+{
+	return QDF_STATUS_SUCCESS;
+}
+#endif
+
+/** Add sanity for multiple link switches in parallel */
 QDF_STATUS ucfg_dp_update_link_mac_addr(struct wlan_objmgr_vdev *vdev,
 					struct qdf_mac_addr *new_mac_addr,
 					bool is_link_switch)
@@ -99,6 +151,10 @@ QDF_STATUS ucfg_dp_update_link_mac_addr(struct wlan_objmgr_vdev *vdev,
 	}
 
 	qdf_copy_macaddr(&dp_link->mac_addr, new_mac_addr);
+
+	if (is_link_switch)
+		status = wlan_dp_update_vdev_mac_addr(dp_ctx, dp_link,
+						      new_mac_addr);
 
 	return status;
 }
@@ -330,11 +386,25 @@ QDF_STATUS ucfg_dp_init(void)
 		WLAN_COMP_DP,
 		dp_peer_obj_destroy_notification,
 		NULL);
-	if (QDF_IS_STATUS_ERROR(status))
+	if (QDF_IS_STATUS_ERROR(status)) {
 		dp_err("wlan_objmgr_register_peer_destroy_handler failed");
-	else
-		return QDF_STATUS_SUCCESS;
+		goto fail_destroy_peer;
+	}
 
+	status = wlan_dp_register_link_switch_notifier();
+	if (QDF_IS_STATUS_ERROR(status)) {
+		dp_err("wlan_mlomgr_register_link_switch_handler failed");
+		goto fail_link_switch;
+	}
+
+	return QDF_STATUS_SUCCESS;
+
+fail_link_switch:
+	wlan_objmgr_unregister_peer_destroy_handler(
+			WLAN_COMP_DP, dp_peer_obj_destroy_notification,
+			NULL);
+
+fail_destroy_peer:
 	wlan_objmgr_unregister_peer_create_handler(WLAN_COMP_DP,
 					dp_peer_obj_create_notification,
 					NULL);
@@ -377,6 +447,9 @@ QDF_STATUS ucfg_dp_deinit(void)
 	QDF_STATUS status;
 
 	dp_info("DP module dispatcher deinit");
+
+	/* de-register link switch handler */
+	wlan_dp_unregister_link_switch_notifier();
 
 	/* de-register peer delete handler functions. */
 	status = wlan_objmgr_unregister_peer_destroy_handler(

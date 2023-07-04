@@ -328,6 +328,19 @@ QDF_STATUS wlan_dp_txrx_pdev_attach(ol_txrx_soc_handle soc);
 QDF_STATUS wlan_dp_txrx_pdev_detach(ol_txrx_soc_handle soc, uint8_t pdev_id,
 				    int force);
 
+#ifdef WLAN_FEATURE_11BE_MLO
+/**
+ * dp_link_switch_notification() - DP notifier for MLO link switch
+ * @vdev: Objmgr vdev handle
+ * @lswitch_req: Link switch request params
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+dp_link_switch_notification(struct wlan_objmgr_vdev *vdev,
+			    struct wlan_mlo_link_switch_req *lswitch_req);
+#endif
+
 /**
  * dp_peer_obj_create_notification(): dp peer create handler
  * @peer: peer which is going to created by objmgr

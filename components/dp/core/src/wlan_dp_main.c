@@ -44,6 +44,7 @@
 #ifdef FEATURE_DIRECT_LINK
 #include "dp_internal.h"
 #endif
+#include <cdp_txrx_ctrl.h>
 
 #ifdef WLAN_DP_PROFILE_SUPPORT
 /* Memory profile table based on supported caps */
@@ -952,6 +953,127 @@ dp_intf_get_next_deflink_candidate(struct wlan_dp_intf *dp_intf,
 	}
 
 	return NULL;
+}
+
+/**
+ * dp_change_def_link() - Change default link for the dp_intf
+ * @dp_intf: DP interface for which default link is to be changed
+ * @dp_link: link on which link switch notification arrived.
+ * @lswitch_req: Link switch request params
+ *
+ * This API is called only when dp_intf->def_link == dp_link,
+ * and there is a need to change the def_link of the dp_intf,
+ * due to any reason.
+ *
+ * Return: QDF_STATUS
+ */
+static inline QDF_STATUS
+dp_change_def_link(struct wlan_dp_intf *dp_intf,
+		   struct wlan_dp_link *dp_link,
+		   struct wlan_mlo_link_switch_req *lswitch_req)
+{
+	struct wlan_dp_psoc_context *dp_ctx = dp_intf->dp_ctx;
+	struct wlan_dp_link *next_def_link;
+	cdp_config_param_type peer_param = {0};
+	QDF_STATUS status;
+
+	next_def_link = dp_intf_get_next_deflink_candidate(dp_intf, dp_link);
+	if (!is_dp_link_valid(next_def_link)) {
+		/* Unable to get candidate for next def_link */
+		dp_info("Unable to get next def link %pK", next_def_link);
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	/*
+	 * Switch dp_vdev related params
+	 *  - Change vdev of MLD peer.
+	 */
+	dp_info("Peer " QDF_MAC_ADDR_FMT ", change vdev %d -> %d",
+		QDF_MAC_ADDR_REF(lswitch_req->peer_mld_addr.bytes),
+		dp_link->link_id, next_def_link->link_id);
+	peer_param.new_vdev_id = next_def_link->link_id;
+	status = cdp_txrx_set_peer_param(dp_ctx->cdp_soc,
+					 /* Current vdev for remote MLD peer */
+					 dp_link->link_id,
+					 lswitch_req->peer_mld_addr.bytes,
+					 CDP_CONFIG_MLD_PEER_VDEV,
+					 peer_param);
+
+	/*
+	 * DP link switch checks and process is completed successfully.
+	 * Change the def_link to the partner link
+	 */
+	if (QDF_IS_STATUS_SUCCESS(status))
+		dp_intf->def_link = next_def_link;
+
+	return status;
+}
+
+QDF_STATUS
+dp_link_switch_notification(struct wlan_objmgr_vdev *vdev,
+			    struct wlan_mlo_link_switch_req *lswitch_req)
+{
+	/* Add prints to string and print it at last, so we have only 1 print */
+	struct wlan_dp_psoc_context *dp_ctx;
+	struct wlan_dp_intf *dp_intf;
+	struct wlan_dp_link *dp_link;
+	QDF_STATUS status = QDF_STATUS_SUCCESS;
+
+	dp_ctx = dp_get_context();
+
+	dp_link = dp_get_vdev_priv_obj(vdev);
+	if (!is_dp_link_valid(dp_link)) {
+		dp_err("dp_link from vdev %pK is invalid", vdev);
+		return QDF_STATUS_E_INVAL;
+	}
+
+	dp_intf = dp_link->dp_intf;
+	dp_info("Link switch req for dp_link %pK id %d (" QDF_MAC_ADDR_FMT
+		"), dp_intf %pK (" QDF_MAC_ADDR_FMT
+		") cur_def_link %pK id %d device_mode %d num_links %d",
+		dp_link, dp_link->link_id,
+		QDF_MAC_ADDR_REF(dp_link->mac_addr.bytes),
+		dp_intf, QDF_MAC_ADDR_REF(dp_intf->mac_addr.bytes),
+		dp_intf->def_link, dp_intf->def_link->link_id,
+		dp_intf->device_mode, dp_intf->num_links);
+
+	if (dp_intf->device_mode != QDF_STA_MODE) {
+		/* Link switch supported only for STA mode */
+		status = QDF_STATUS_E_INVAL;
+		goto exit;
+	}
+
+	if (dp_intf->num_links == 1) {
+		/* There is only one link, so we cannot switch */
+		status = QDF_STATUS_E_CANCELED;
+		goto exit;
+	}
+
+	if (dp_link != dp_intf->def_link) {
+		/* default link is not being switched, so DP is fine */
+		goto exit;
+	}
+
+	/* Recipe to be done before switching a default link */
+	status = dp_change_def_link(dp_intf, dp_link, lswitch_req);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		/* Failed to switch default link */
+		dp_info("Failed to change def_link for dp_intf %pK", dp_intf);
+		goto exit;
+	}
+
+exit:
+	dp_info("Link switch req %s (ret %d) for dp_link %pK id %d ("
+		QDF_MAC_ADDR_FMT "), dp_intf %pK (" QDF_MAC_ADDR_FMT
+		") cur_def_link %pK id %d device_mode %d num_links %d",
+		QDF_IS_STATUS_ERROR(status) ? "Failed" : "Successful",
+		status, dp_link, dp_link->link_id,
+		QDF_MAC_ADDR_REF(dp_link->mac_addr.bytes),
+		dp_intf, QDF_MAC_ADDR_REF(dp_intf->mac_addr.bytes),
+		dp_intf->def_link, dp_intf->def_link->link_id,
+		dp_intf->device_mode, dp_intf->num_links);
+
+	return status;
 }
 #else
 static struct wlan_dp_link *
