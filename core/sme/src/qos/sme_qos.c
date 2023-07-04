@@ -1642,9 +1642,9 @@ static enum sme_qos_statustype sme_qos_internal_modify_req(struct mac_context *m
 		flow_info->QoSInfo.suspension_interval) &&
 	    (pQoSInfo->surplus_bw_allowance ==
 		flow_info->QoSInfo.surplus_bw_allowance)) {
-		sme_err("the addts parameters are same as last request, dropping the current request");
+		sme_debug("the addts parameters are same as last request, dropping the current request");
 
-		return SME_QOS_STATUS_MODIFY_SETUP_FAILURE_RSP;
+		return SME_QOS_STATUS_MODIFY_SETUP_SUCCESS_APSD_SET_ALREADY;
 	}
 
 	/* check to consider the following flowing scenario.
