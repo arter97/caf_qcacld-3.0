@@ -3593,11 +3593,11 @@ wlansap_get_safe_channel_from_pcl_and_acs_range(struct sap_context *sap_ctx,
 	}
 
 	status =
-		policy_mgr_get_pcl_for_vdev_id(mac->psoc, PM_SAP_MODE,
-					       pcl_freqs, &pcl_len,
-					       pcl.weight_list,
-					       QDF_ARRAY_SIZE(pcl.weight_list),
-					       sap_ctx->sessionId);
+		policy_mgr_get_pcl_for_scc_in_same_mode(mac->psoc, PM_SAP_MODE,
+							pcl_freqs, &pcl_len,
+							pcl.weight_list,
+							QDF_ARRAY_SIZE(pcl.weight_list),
+							sap_ctx->sessionId);
 
 	if (QDF_IS_STATUS_ERROR(status)) {
 		sap_err("Get PCL failed");

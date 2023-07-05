@@ -2913,6 +2913,30 @@ QDF_STATUS policy_mgr_get_pcl_for_vdev_id(struct wlan_objmgr_psoc *psoc,
 					  uint8_t vdev_id);
 
 /**
+ * policy_mgr_get_pcl_for_scc_in_same_mode() - Get PCL for vdev and other
+ * connection in same mode and same frequency
+ * @psoc: PSOC object information
+ * @mode: Connection mode of type 'policy_mgr_con_mode'
+ * @pcl_ch: Pointer to the PCL
+ * @len: Pointer to the length of the PCL
+ * @pcl_weight: Pointer to the weights of the PCL
+ * @weight_len: Max length of the weights list
+ * @vdev_id: vdev id to get PCL
+ *
+ * If need move connections in same mode and same frequency, need get PCL
+ * after remove them from connection list.
+ *
+ * Return: QDF STATUS
+ */
+QDF_STATUS
+policy_mgr_get_pcl_for_scc_in_same_mode(struct wlan_objmgr_psoc *psoc,
+					enum policy_mgr_con_mode mode,
+					uint32_t *pcl_ch, uint32_t *len,
+					uint8_t *pcl_weight,
+					uint32_t weight_len,
+					uint8_t vdev_id);
+
+/**
  * policy_mgr_get_valid_chan_weights() - Get the weightage for
  * all valid channels
  * @psoc: PSOC object information

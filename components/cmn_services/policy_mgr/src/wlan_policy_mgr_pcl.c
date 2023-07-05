@@ -324,6 +324,51 @@ out:
 	return status;
 }
 
+QDF_STATUS
+policy_mgr_get_pcl_for_scc_in_same_mode(struct wlan_objmgr_psoc *psoc,
+					enum policy_mgr_con_mode mode,
+					uint32_t *pcl_ch, uint32_t *len,
+					uint8_t *pcl_weight,
+					uint32_t weight_len,
+					uint8_t vdev_id)
+{
+	struct policy_mgr_psoc_priv_obj *pm_ctx;
+	struct policy_mgr_conc_connection_info
+			info[MAX_NUMBER_OF_CONC_CONNECTIONS] = { {0} };
+	qdf_freq_t vdev_freq;
+	QDF_STATUS status;
+	uint8_t num_del = 0;
+
+	pm_ctx = policy_mgr_get_context(psoc);
+	if (!pm_ctx) {
+		policy_mgr_err("Invalid Context");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	status = policy_mgr_get_chan_by_session_id(psoc, vdev_id, &vdev_freq);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		policy_mgr_err("Fail to get channel by vdev id %d", vdev_id);
+		return status;
+	}
+
+	policy_mgr_debug("get pcl for existing conn:%d vdev id %d",
+			 mode, vdev_id);
+
+	qdf_mutex_acquire(&pm_ctx->qdf_conc_list_lock);
+	policy_mgr_store_and_del_conn_info_by_chan_and_mode(psoc,
+							    vdev_freq,
+							    mode,
+							    info,
+							    &num_del);
+	status = policy_mgr_get_pcl(psoc, mode, pcl_ch, len,
+				    pcl_weight, weight_len, vdev_id);
+	if (num_del > 0)
+		policy_mgr_restore_deleted_conn_info(psoc, info, num_del);
+	qdf_mutex_release(&pm_ctx->qdf_conc_list_lock);
+
+	return status;
+}
+
 void
 polic_mgr_send_pcl_to_fw(struct wlan_objmgr_psoc *psoc,
 			 enum QDF_OPMODE mode)
