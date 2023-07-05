@@ -219,7 +219,7 @@ struct dp_soc_umac_reset_ctx {
 	enum umac_reset_state current_state;
 	uint32_t shmem_exp_magic_num;
 	struct umac_reset_rx_actions rx_actions;
-	enum umac_reset_rx_event pending_action;
+	enum umac_reset_action pending_action;
 	struct dp_intr_bkp *intr_ctx_bkp;
 	qdf_nbuf_t nbuf_list;
 	bool skel_enable;
