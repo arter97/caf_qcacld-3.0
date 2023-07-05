@@ -1547,11 +1547,11 @@ print_advance_sta_data_sawf_tx(struct advance_peer_data_sawftx *data,
 		STATS_PRINT("----TIDX: %d----   ", data->tid);
 		STATS_PRINT("----QUEUE: %d----\n", data->msduq);
 
-		STATS_PRINT("Tx_info_success_num        = %u\n",
+		STATS_PRINT("Tx_info_success_num        = %ju\n",
 			    data->tx[0][0].tx_success.num);
 		STATS_PRINT("Tx_info_success_bytes      = %ju\n",
 			    data->tx[0][0].tx_success.bytes);
-		STATS_PRINT("Tx_info_ingress_num        = %u\n",
+		STATS_PRINT("Tx_info_ingress_num        = %ju\n",
 			    data->tx[0][0].tx_ingress.num);
 		STATS_PRINT("Tx_info_ingress_bytes      = %ju\n",
 			    data->tx[0][0].tx_ingress.bytes);
@@ -1560,7 +1560,7 @@ print_advance_sta_data_sawf_tx(struct advance_peer_data_sawftx *data,
 		STATS_PRINT("Tx_info_ingress_rate       = %u\n",
 			    data->tx[0][0].ingress_rate);
 
-		STATS_PRINT("Tx_info_drop_num           = %u\n",
+		STATS_PRINT("Tx_info_drop_num           = %ju\n",
 			    data->tx[0][0].dropped.fw_rem.num);
 		STATS_PRINT("Tx_info_drop_bytes         = %ju\n",
 			     data->tx[0][0].dropped.fw_rem.bytes);
@@ -1599,11 +1599,11 @@ print_advance_sta_data_sawf_tx(struct advance_peer_data_sawftx *data,
 				sawftx = &data->tx[tidx][queues];
 				STATS_PRINT("----TIDX: %d----   ", tidx);
 				STATS_PRINT("----QUEUE: %d----\n", queues);
-				STATS_PRINT("Tx_info_success_num        = %u\n",
+				STATS_PRINT("Tx_info_success_num        = %ju\n",
 					    sawftx->tx_success.num);
 				STATS_PRINT("Tx_info_success_bytes      = %ju\n",
 					    sawftx->tx_success.bytes);
-				STATS_PRINT("Tx_info_ingress_num        = %u\n",
+				STATS_PRINT("Tx_info_ingress_num        = %ju\n",
 					    sawftx->tx_ingress.num);
 				STATS_PRINT("Tx_info_ingress_bytes      = %ju\n",
 					    sawftx->tx_ingress.bytes);
@@ -1612,7 +1612,7 @@ print_advance_sta_data_sawf_tx(struct advance_peer_data_sawftx *data,
 				STATS_PRINT("Tx_info_ingress_rate       = %u\n",
 					    sawftx->ingress_rate);
 
-				STATS_PRINT("Tx_info_drop_num           = %u\n",
+				STATS_PRINT("Tx_info_drop_num           = %ju\n",
 					    sawftx->dropped.fw_rem.num);
 				STATS_PRINT("Tx_info_drop_bytes         = %ju\n",
 					    sawftx->dropped.fw_rem.bytes);
