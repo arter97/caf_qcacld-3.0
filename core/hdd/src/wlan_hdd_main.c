@@ -2597,8 +2597,7 @@ static void hdd_lpc_enable_powersave(struct hdd_context *hdd_ctx)
 		return;
 	}
 
-	if (sta_adapter->deflink->vdev_id < WLAN_UMAC_VDEV_ID_MAX)
-		wlan_hdd_set_powersave(sta_adapter->deflink, true, 0);
+	wlan_hdd_set_powersave(sta_adapter->deflink, true, 0);
 }
 
 static void hdd_lpc_disable_powersave(struct hdd_context *hdd_ctx)

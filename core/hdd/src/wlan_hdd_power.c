@@ -2192,6 +2192,9 @@ int wlan_hdd_set_powersave(struct wlan_hdd_link_info *link_info,
 		return -EINVAL;
 	}
 
+	if (wlan_hdd_validate_vdev_id(link_info->vdev_id))
+		return -EINVAL;
+
 	sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(link_info);
 
 	status = sme_ps_set_powersave(
