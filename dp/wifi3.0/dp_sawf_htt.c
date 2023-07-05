@@ -44,14 +44,23 @@ dp_htt_sawf_get_host_queue(struct dp_soc *soc, uint32_t *msg_word,
 	hlos_tid = HTT_T2H_SAWF_MSDUQ_INFO_HTT_HLOS_TID_GET(*msg_word);
 	ast_idx = HTT_T2H_SAWF_MSDUQ_INFO_HTT_AST_LIST_IDX_GET(*msg_word);
 
-	qdf_assert_always((hlos_tid >= 0) || (hlos_tid <= DP_SAWF_TID_MAX));
+	if ((hlos_tid <= 0) || (hlos_tid >= DP_SAWF_TID_MAX)) {
+		wlan_cfg_set_sawf_config(soc->wlan_cfg_ctx, 0);
+		qdf_err("Invalid HLOS TID:%u, Disable sawf.", hlos_tid);
+		return QDF_STATUS_E_FAILURE;
+	}
 
 	switch (soc->arch_id) {
 	case CDP_ARCH_TYPE_LI:
+		qdf_info("|AST idx: %d|HLOS TID:%d", ast_idx, hlos_tid);
+		if ((ast_idx != 2) && (ast_idx != 3)) {
+			wlan_cfg_set_sawf_config(soc->wlan_cfg_ctx, 0);
+			qdf_err("Invalid HLOS TID:%u, Disable sawf.", hlos_tid);
+			return QDF_STATUS_E_FAILURE;
+		}
 		*host_queue = DP_SAWF_DEFAULT_Q_MAX +
 			      (ast_idx - 2) * DP_SAWF_TID_MAX + hlos_tid;
-		qdf_info("|AST idx: %d|HLOS TID:%d", ast_idx, hlos_tid);
-		qdf_assert_always((ast_idx == 2) || (ast_idx == 3));
+
 		break;
 	case CDP_ARCH_TYPE_BE:
 		cl_info =
@@ -334,9 +343,10 @@ dp_htt_sawf_def_queues_map_report_conf(struct htt_soc *soc,
 		svc_class_id += 1;
 		qdf_info("peer id %u tid 0x%x svc_class_id %u",
 			 peer_id, tid, svc_class_id);
-		qdf_assert(tid < DP_SAWF_MAX_TIDS);
-		/* update tid report */
-		sawf_ctx->tid_reports[tid].svc_class_id = svc_class_id;
+		if (tid < DP_SAWF_MAX_TIDS) {
+			/* update tid report */
+			sawf_ctx->tid_reports[tid].svc_class_id = svc_class_id;
+		}
 	}
 
 	dp_peer_unref_delete(peer, DP_MOD_ID_HTT);
