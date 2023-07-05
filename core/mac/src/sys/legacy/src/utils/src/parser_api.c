@@ -9296,13 +9296,13 @@ QDF_STATUS populate_dot11f_eht_caps(struct mac_context *mac_ctx,
 		return QDF_STATUS_SUCCESS;
 	}
 
-	if (!wlan_epcs_get_config(session->vdev))
-		eht_cap->epcs_pri_access = 0;
-
 	/** TODO: String items needs attention. **/
 	qdf_mem_copy(eht_cap, &session->eht_config, sizeof(*eht_cap));
 	if (session->ch_width != CH_WIDTH_320MHZ)
 		eht_cap->support_320mhz_6ghz = 0;
+
+	if (!wlan_epcs_get_config(session->vdev))
+		eht_cap->epcs_pri_access = 0;
 
 	populate_dot11f_rtwt_eht_cap(mac_ctx, eht_cap);
 	return QDF_STATUS_SUCCESS;
