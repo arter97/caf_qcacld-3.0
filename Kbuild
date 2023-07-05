@@ -1624,7 +1624,8 @@ MLME_INC += $(LL_SAP_INC)
 
 ifeq ($(CONFIG_WLAN_FEATURE_LL_LT_SAP), y)
 MLME_OBJS += $(LL_SAP_DIR)/dispatcher/src/wlan_ll_sap_ucfg_api.o \
-		$(LL_SAP_DIR)/core/src/wlan_ll_sap_main.o
+		$(LL_SAP_DIR)/core/src/wlan_ll_sap_main.o \
+		$(LL_SAP_DIR)/core/src/wlan_ll_lt_sap_main.o
 endif
 
 $(call add-wlan-objs,mlme,$(MLME_OBJS))

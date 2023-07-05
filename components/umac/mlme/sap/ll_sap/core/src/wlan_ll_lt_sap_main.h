@@ -18,34 +18,16 @@
  * DOC: contains ll_sap_definitions specific to the ll_sap module
  */
 
-#ifndef _WLAN_LL_SAP_MAIN_H_
-#define _WLAN_LL_SAP_MAIN_H_
+#ifndef _WLAN_LL_LT_SAP_MAIN_H_
+#define _WLAN_LL_LT_SAP_MAIN_H_
 
-#include "wlan_objmgr_psoc_obj.h"
-
-#define ll_sap_err(params...) QDF_TRACE_ERROR(QDF_MODULE_ID_LL_SAP, params)
-#define ll_sap_info(params...) QDF_TRACE_INFO(QDF_MODULE_ID_LL_SAP, params)
-#define ll_sap_debug(params...) QDF_TRACE_DEBUG(QDF_MODULE_ID_LL_SAP, params)
-
-#define ll_sap_nofl_err(params...) \
-	QDF_TRACE_ERROR_NO_FL(QDF_MODULE_ID_LL_SAP, params)
-#define ll_sap_nofl_info(params...) \
-	QDF_TRACE_INFO_NO_FL(QDF_MODULE_ID_LL_SAP, params)
-#define ll_sap_nofl_debug(params...) \
-	QDF_TRACE_DEBUG_NO_FL(QDF_MODULE_ID_LL_SAP, params)
+#include <i_qdf_types.h>
 
 /**
- * ll_sap_init() - initializes ll_sap component
+ * ll_lt_sap_is_supported() - Check if ll_lt_sap is supported or not
  *
- * Return: QDF status
+ * Return: True/False
  */
-QDF_STATUS ll_sap_init(void);
-
-/**
- * ll_sap_deinit() - De-initializes ll_sap component
- *
- * Return: QDF status
- */
-QDF_STATUS ll_sap_deinit(void);
+bool ll_lt_sap_is_supported(void);
 
 #endif /* _WLAN_LL_SAP_MAIN_H_ */
