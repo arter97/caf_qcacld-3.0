@@ -855,6 +855,9 @@ enum {
 	IEEE80211_PARAM_GET_MLD_PEER = 797,
 #endif
 	IEEE80211_PARAM_MLD_NETDEV_NAME = 798, /* MLD Intf name */
+#ifdef WLAN_FEATURE_11BE_MLO
+	IEEE80211_PARAM_WLAN_PEER_MESH_OVERRIDE = 813, /* Vendor Flags for WMI Interface */
+#endif
 };
 
 enum {
@@ -2549,6 +2552,12 @@ struct vendor_commands vap_vendor_cmds[] = {
 	{"get_ppevp_type",     IEEE80211_PARAM_PPEVP_TYPE, GET_PARAM, 0},
 #ifdef CONFIG_MLO_SINGLE_DEV
 	{"get_mld_peer",     IEEE80211_PARAM_GET_MLD_PEER, GET_PARAM, 0},
+#endif
+#ifdef WLAN_FEATURE_11BE_MLO
+	{"set_vendor_peer_mesh_override_flag",
+		IEEE80211_PARAM_WLAN_PEER_MESH_OVERRIDE, SET_PARAM, 1},
+	{"get_vendor_peer_mesh_override_flag",
+		IEEE80211_PARAM_WLAN_PEER_MESH_OVERRIDE, GET_PARAM, 0},
 #endif
 };
 
