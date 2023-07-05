@@ -71,6 +71,24 @@ bool mlo_ap_vdev_attach(struct wlan_objmgr_vdev *vdev,
 			 wlan_vdev_get_id(vdev));
 	}
 
+	/* reset the vdev id list */
+	for (i = 0; i < WLAN_UMAC_MLO_MAX_VDEVS; i++)
+		pr_vdev_ids[i] = CDP_INVALID_VDEV_ID;
+
+	/* update the bridge vaps in partner list*/
+	for (i = 0; i < WLAN_UMAC_MLO_MAX_BRIDGE_VDEVS; i++) {
+		if (dev_ctx->wlan_bridge_vdev_list[i])
+			pr_vdev_ids[i] = wlan_vdev_get_id(
+					dev_ctx->wlan_bridge_vdev_list[i]);
+	}
+
+	if (cdp_update_mlo_ptnr_list(
+				wlan_psoc_get_dp_handle(psoc),
+				pr_vdev_ids, WLAN_UMAC_MLO_MAX_VDEVS,
+				wlan_vdev_get_id(vdev)) != QDF_STATUS_SUCCESS) {
+		mlo_debug("Failed to add vdev to partner vdev list, vdev id:%d",
+			  wlan_vdev_get_id(vdev));
+	}
 	return true;
 }
 #else
