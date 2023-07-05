@@ -25,6 +25,9 @@
 #define __QAL_NOTIFIER_H
 
 #include "qdf_types.h"
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 15, 0))
+#include <linux/panic_notifier.h>
+#endif
 
 typedef QDF_STATUS (*qal_panic_notifier)(void *data);
 
