@@ -1576,7 +1576,7 @@ static void hdd_send_association_event(struct net_device *dev,
 		ucfg_tdls_notify_sta_disconnect(adapter->vdev_id, false, false,
 						adapter->vdev);
 	}
-	hdd_ipa_set_tx_flow_info();
+	wlan_hdd_set_tx_flow_info();
 
 	msg = NULL;
 	/* During the WLAN uninitialization,supplicant is stopped before the
@@ -2786,7 +2786,9 @@ hdd_association_completion_handler(struct hdd_adapter *adapter,
 				(u8 *) (roam_info->pbFrames +
 					roam_info->nBeaconLength +
 					roam_info->nAssocReqLength);
-			if (assoc_rsp) {
+			if (assoc_rsp &&
+			    roam_info->nAssocRspLength >
+			    ASSOC_RSP_IES_OFFSET) {
 				/*
 				 * assoc_rsp needs to point to the IEs
 				 */
@@ -2805,7 +2807,9 @@ hdd_association_completion_handler(struct hdd_adapter *adapter,
 			assoc_req = (u8 *) (roam_info->pbFrames +
 					      roam_info->nBeaconLength);
 			if (assoc_req) {
-				if (!ft_carrier_on) {
+				if (!ft_carrier_on &&
+				    roam_info->nAssocReqLength >
+				    ASSOC_REQ_IES_OFFSET) {
 					/*
 					 * assoc_req needs to point to
 					 * the IEs
@@ -3122,7 +3126,9 @@ hdd_association_completion_handler(struct hdd_adapter *adapter,
 					/* Association Request */
 					assoc_req = (u8 *)(roam_info->pbFrames +
 						      roam_info->nBeaconLength);
-					if (assoc_req) {
+					if (assoc_req &&
+					    roam_info->nAssocReqLength >
+					    ASSOC_REQ_IES_OFFSET) {
 						/*
 						 * assoc_req needs to point to
 						 * the IEs
@@ -3141,7 +3147,9 @@ hdd_association_completion_handler(struct hdd_adapter *adapter,
 					    (u8 *)(roam_info->pbFrames +
 						   roam_info->nBeaconLength +
 						   roam_info->nAssocReqLength);
-					if (assoc_rsp) {
+					if (assoc_rsp &&
+					    roam_info->nAssocRspLength >
+					    ASSOC_RSP_IES_OFFSET) {
 						/*
 						 * assoc_rsp needs to point to
 						 * the IEs
