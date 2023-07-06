@@ -129,6 +129,16 @@ QDF_STATUS reg_get_opclass_details(struct wlan_objmgr_pdev *pdev,
 				   enum supported_6g_pwr_types in_6g_pwr_mode);
 
 /**
+ * reg_get_opclass_from_map() - Get opclass from map.
+ * @map: Pointer to pointer to regdmn_ap_cap_opclass_t.
+ * @is_global_op_table_needed: Whether to lookup global op class table.
+ *
+ * Return: QDF_STATUS_SUCCESS if success, else return QDF_STATUS_FAILURE.
+ */
+QDF_STATUS reg_get_opclass_from_map(const struct reg_dmn_op_class_map_t **map,
+				    bool is_global_op_table_needed);
+
+/**
  * reg_get_opclass_for_cur_hwmode() - Get details about the opclasses for
  * the current hwmode.
  * @pdev: Pointer to pdev.
@@ -366,6 +376,13 @@ QDF_STATUS reg_get_opclass_details(struct wlan_objmgr_pdev *pdev,
 				   uint8_t max_supp_op_class,
 				   bool global_tbl_lookup,
 				   enum supported_6g_pwr_types in_6g_pwr_mode)
+{
+	return QDF_STATUS_E_FAILURE;
+}
+
+static inline
+QDF_STATUS reg_get_opclass_from_map(const struct reg_dmn_op_class_map_t **map,
+				    bool is_global_op_table_needed);
 {
 	return QDF_STATUS_E_FAILURE;
 }

@@ -2343,4 +2343,16 @@ QDF_STATUS reg_enable_disable_opclass_chans(struct wlan_objmgr_pdev *pdev,
 	return QDF_STATUS_E_INVAL;
 }
 #endif /* #ifndef CONFIG_REG_CLIENT */
+
+QDF_STATUS reg_get_opclass_from_map(const struct reg_dmn_op_class_map_t **map,
+				    bool is_global_op_table_needed)
+{
+	if (is_global_op_table_needed)
+		*map = global_op_class;
+	else
+		reg_get_op_class_tbl_by_chan_map(map);
+
+	return QDF_STATUS_SUCCESS;
+}
+
 #endif
