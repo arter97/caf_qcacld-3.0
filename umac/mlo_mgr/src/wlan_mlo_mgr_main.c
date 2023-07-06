@@ -18,6 +18,7 @@
 /*
  * DOC: contains MLO manager init/deinit api's
  */
+#include <wlan_mlo_mgr_link_switch.h>
 #include "wlan_cmn.h"
 #include <wlan_objmgr_cmn.h>
 #include <wlan_objmgr_global_obj.h>
@@ -782,6 +783,7 @@ static QDF_STATUS mlo_dev_ctx_init(struct wlan_objmgr_vdev *vdev)
 	mlo_t2lm_ctx_init(ml_dev, vdev);
 	mlo_epcs_ctx_init(ml_dev);
 	mlo_ptqm_migration_init(ml_dev);
+	mlo_mgr_link_switch_init(ml_dev);
 
 	return status;
 }
@@ -895,6 +897,7 @@ static QDF_STATUS mlo_dev_ctx_deinit(struct wlan_objmgr_vdev *vdev)
 			qdf_mem_free(ml_dev->ap_ctx);
 
 		mlo_ptqm_migration_deinit(ml_dev);
+		mlo_mgr_link_switch_deinit(ml_dev);
 		mlo_t2lm_ctx_deinit(vdev);
 		tsf_recalculation_lock_destroy(ml_dev);
 		mlo_dev_lock_destroy(ml_dev);

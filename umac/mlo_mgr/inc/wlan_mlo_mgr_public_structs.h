@@ -56,6 +56,7 @@
 struct mlo_mlme_ext_ops;
 struct vdev_mlme_obj;
 struct wlan_t2lm_context;
+struct mlo_link_switch_context;
 
 /* Max LINK PEER support */
 #define MAX_MLO_LINK_PEERS WLAN_UMAC_MLO_MAX_VDEVS
@@ -486,6 +487,73 @@ struct wlan_mlo_peer_list {
 };
 
 /**
+ * struct mlo_vdev_link_mac_info - VDEV to link address map
+ * @vdev_id: Vdev Id with which this link mac address is associated:
+ * @link_mac_addr: link specific mac address
+ */
+struct mlo_vdev_link_mac_info {
+	uint8_t vdev_id;
+	struct qdf_mac_addr link_mac_addr;
+};
+
+#if defined(UMAC_SUPPORT_MLNAWDS) || defined(MESH_MODE_SUPPORT)
+/**
+ * struct mlnawds_config - MLO NAWDS configuration
+ * @caps: Bandwidth & NSS capabilities to be configured on NAWDS peer
+ * @puncture_bitmap: puncture bitmap to be configured on NAWDS peer
+ * @mac: MAC address of the NAWDS peer to which the caps & puncture bitmap is
+ * to be configured.
+ */
+struct mlnawds_config {
+	uint64_t caps;
+	uint16_t puncture_bitmap;
+	uint8_t  mac[QDF_MAC_ADDR_SIZE];
+};
+#endif
+
+/**
+ * struct mlo_link_info - ML link info
+ * @link_addr: link mac address
+ * @link_id: link index
+ * @is_bridge : Bridge peer or not
+ * @chan_freq: Operating channel frequency
+ * @nawds_config: peer's NAWDS configurarion
+ * @vdev_id: VDEV ID
+ * @mesh_config: peer's MESH configurarion
+ * @link_status_flags: Current status of link
+ * @ap_link_addr: Associated link BSSID
+ * @link_chan_info: Associated link channel info
+ */
+struct mlo_link_info {
+	struct qdf_mac_addr link_addr;
+	uint8_t link_id;
+	bool is_bridge;
+	uint16_t chan_freq;
+#ifdef UMAC_SUPPORT_MLNAWDS
+	struct mlnawds_config nawds_config;
+#endif
+	uint8_t vdev_id;
+#ifdef MESH_MODE_SUPPORT
+	struct mlnawds_config mesh_config;
+#endif
+#ifdef WLAN_FEATURE_11BE_MLO_ADV_FEATURE
+	uint8_t link_status_flags;
+	struct qdf_mac_addr ap_link_addr;
+	struct wlan_channel *link_chan_info;
+#endif
+};
+
+/**
+ * struct wlan_mlo_link_mac_update: VDEV to link MAC address list
+ * @num_mac_update: Number of mac address
+ * @link_mac_info: Each VDEV to link mac address mapping
+ */
+struct wlan_mlo_link_mac_update {
+	int num_mac_update;
+	struct mlo_vdev_link_mac_info link_mac_info[3];
+};
+
+/**
  * struct wlan_mlo_dev_context - MLO device context
  * @node: QDF list node member
  * @mld_id: MLD id
@@ -508,6 +576,7 @@ struct wlan_mlo_peer_list {
  *
  * NB: Not using kernel-doc format since the kernel-doc script doesn't
  *     handle the qdf_bitmap() macro
+ * @link_ctx: link related information
  */
 struct wlan_mlo_dev_context {
 	qdf_list_node_t node;
@@ -534,6 +603,7 @@ struct wlan_mlo_dev_context {
 	qdf_timer_t ptqm_migrate_timer;
 	qdf_bitmap(mlo_peer_id_bmap, MAX_MLO_PEER_ID);
 #endif
+	struct mlo_link_switch_context *link_ctx;
 };
 
 /**
@@ -567,21 +637,6 @@ enum mlo_peer_state {
 	ML_PEER_ASSOC_DONE,
 	ML_PEER_DISCONN_INITIATED,
 };
-
-#if defined(UMAC_SUPPORT_MLNAWDS) || defined(MESH_MODE_SUPPORT)
-/**
- * struct mlnawds_config - MLO NAWDS configuration
- * @caps: Bandwidth & NSS capabilities to be configured on NAWDS peer
- * @puncture_bitmap: puncture bitmap to be configured on NAWDS peer
- * @mac: MAC address of the NAWDS peer to which the caps & puncture bitmap is
- * to be configured.
- */
-struct mlnawds_config {
-	uint64_t caps;
-	uint16_t puncture_bitmap;
-	uint8_t  mac[QDF_MAC_ADDR_SIZE];
-};
-#endif
 
 /**
  * struct mlpeer_auth_params - Deferred Auth params
@@ -753,30 +808,6 @@ struct wlan_mlo_peer_context {
 	struct mlo_nstr_info mlpeer_nstrinfo[WLAN_UMAC_MLO_MAX_VDEVS];
 	uint8_t migrate_primary_umac_psoc_id;
 	bool primary_umac_migration_in_progress;
-};
-
-/**
- * struct mlo_link_info - ML link info
- * @link_addr: link mac address
- * @link_id: link index
- * @is_bridge : Bridge peer or not
- * @chan_freq: Operating channel frequency
- * @nawds_config: peer's NAWDS configurarion
- * @vdev_id: VDEV ID
- * @mesh_config: peer's MESH configurarion
- */
-struct mlo_link_info {
-	struct qdf_mac_addr link_addr;
-	uint8_t link_id;
-	bool is_bridge;
-	uint16_t chan_freq;
-#ifdef UMAC_SUPPORT_MLNAWDS
-	struct mlnawds_config nawds_config;
-#endif
-	uint8_t vdev_id;
-#ifdef MESH_MODE_SUPPORT
-	struct mlnawds_config mesh_config;
-#endif
 };
 
 /**
