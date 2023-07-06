@@ -1232,6 +1232,21 @@ static void lim_process_auth_frame_type2(struct mac_context *mac_ctx,
 		return;
 	}
 
+	if (LIM_IS_STA_ROLE(pe_session) &&
+	    wlan_vdev_mlme_is_mlo_vdev(pe_session->vdev)) {
+		if (!rx_auth_frm_body->is_mlo_ie_present) {
+			pe_err("MLO IE not present in auth frame from peer, abort connection");
+			lim_send_deauth_mgmt_frame(
+				mac_ctx, REASON_UNSPEC_FAILURE,
+				pe_session->bssId, pe_session, false);
+			lim_restore_from_auth_state(mac_ctx,
+						    eSIR_SME_INVALID_PARAMETERS,
+						    REASON_UNSPEC_FAILURE,
+						    pe_session);
+			return;
+		}
+	}
+
 	if (rx_auth_frm_body->authStatusCode ==
 			STATUS_NOT_SUPPORTED_AUTH_ALG) {
 		/*
@@ -2050,21 +2065,6 @@ lim_process_auth_frame(struct mac_context *mac_ctx, uint8_t *rx_pkt_info,
 			rx_auth_frm_body)) {
 		pe_err("Received invalid FILS auth packet");
 		goto free;
-	}
-
-	if (LIM_IS_STA_ROLE(pe_session) &&
-	    wlan_vdev_mlme_is_mlo_vdev(pe_session->vdev)) {
-		if (!rx_auth_frm_body->is_mlo_ie_present) {
-			pe_err("MLO IE not present in auth frame from peer, abort connection");
-			lim_send_deauth_mgmt_frame(
-				mac_ctx, REASON_UNSPEC_FAILURE,
-				pe_session->bssId, pe_session, false);
-			lim_restore_from_auth_state(mac_ctx,
-						    eSIR_SME_INVALID_PARAMETERS,
-						    REASON_UNSPEC_FAILURE,
-						    pe_session);
-			goto free;
-		}
 	}
 
 	/*
