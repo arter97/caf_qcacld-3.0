@@ -159,6 +159,16 @@ struct wlan_objmgr_peer *wlan_mlo_peer_get_assoc_peer(
 					struct wlan_mlo_peer_context *ml_peer);
 
 /**
+ * wlan_mlo_peer_get_bridge_peer() - get bridge peer
+ * @ml_peer: MLO peer
+ *
+ * This function returns bridge peer of MLO peer
+ *
+ * Return: bridge peer, if it is found, otherwise NULL
+ */
+struct wlan_objmgr_peer *wlan_mlo_peer_get_bridge_peer(
+					struct wlan_mlo_peer_context *ml_peer);
+/**
  * mlo_peer_is_assoc_peer() - check whether the peer is assoc peer
  * @ml_peer: MLO peer
  * @peer: Link peer
