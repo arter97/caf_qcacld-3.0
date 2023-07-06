@@ -1606,4 +1606,15 @@ ucfg_dp_is_local_pkt_capture_enabled(struct wlan_objmgr_psoc *psoc)
 }
 #endif /* WLAN_FEATURE_LOCAL_PKT_CAPTURE */
 
+/**
+ * ucfg_dp_get_vdev_stats () - API to get vdev stats
+ * @soc: dp soc object
+ * @vdev_id: Vdev ID of vdev for which stats is requested
+ * @buf: Pointer to buffer in which stats need to be updated
+ *
+ * Return: QDF_STATUS_SUCCESS on success else error code
+ */
+QDF_STATUS ucfg_dp_get_vdev_stats(ol_txrx_soc_handle soc, uint8_t vdev_id,
+				  struct cdp_vdev_stats *buf);
+
 #endif /* _WLAN_DP_UCFG_API_H_ */

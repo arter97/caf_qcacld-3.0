@@ -2523,3 +2523,9 @@ bool ucfg_dp_is_local_pkt_capture_enabled(struct wlan_objmgr_psoc *psoc)
 	return cdp_cfg_get(soc, cfg_dp_local_pkt_capture);
 }
 #endif
+
+QDF_STATUS ucfg_dp_get_vdev_stats(ol_txrx_soc_handle soc, uint8_t vdev_id,
+				  struct cdp_vdev_stats *buf)
+{
+	return cdp_host_get_vdev_stats(soc, vdev_id, buf, true);
+}
