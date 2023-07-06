@@ -6324,6 +6324,9 @@ typedef enum {
 #ifdef WLAN_FEATURE_11BE_MLO
 	wmi_service_mlo_tsf_sync,
 #endif
+#ifdef WLAN_ATF_INCREASED_STA
+	wmi_service_atf_max_client_512_support,
+#endif
 	wmi_services_max,
 } wmi_conv_service_ids;
 #define WMI_SERVICE_UNAVAILABLE 0xFFFF
