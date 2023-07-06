@@ -2679,6 +2679,7 @@ hdd_adapter_get_next_active_link_info(struct hdd_adapter *adapter,
 				      struct wlan_hdd_link_info **link_info)
 {
 	uint8_t link_idx = WLAN_HDD_DEFLINK_IDX;
+	uint8_t link_idx_max;
 
 	if (!link_info || !adapter)
 		return;
@@ -2693,7 +2694,8 @@ hdd_adapter_get_next_active_link_info(struct hdd_adapter *adapter,
 		link_idx = hdd_adapter_get_index_of_link_info(*link_info) + 1;
 
 	*link_info = NULL;
-	while (link_idx < WLAN_MAX_MLD && !(*link_info)) {
+	link_idx_max = QDF_ARRAY_SIZE(adapter->link_info);
+	while (link_idx < link_idx_max && !(*link_info)) {
 		*link_info = hdd_adapter_get_link_info_if_active(adapter,
 								 link_idx);
 		link_idx++;
@@ -2724,7 +2726,8 @@ hdd_adapter_get_next_active_link_info(struct hdd_adapter *adapter,
 		(__link_info = adapter ? &((adapter)->link_info[0]) : NULL)
 
 #define __hdd_is_link_info_idx_valid(adapter, __link_info) \
-		((__link_info - &(adapter)->link_info[0]) < WLAN_MAX_MLD)
+	((__link_info - &(adapter)->link_info[0]) < \
+					QDF_ARRAY_SIZE((adapter)->link_info))
 
 #define __hdd_adapter_next_link_info(link_info)	((link_info)++)
 
@@ -3363,7 +3366,7 @@ static inline bool hdd_dynamic_mac_addr_supported(struct hdd_context *hdd_ctx)
 static inline struct wlan_hdd_link_info *
 hdd_adapter_get_link_info_ptr(struct hdd_adapter *adapter, uint8_t link_idx)
 {
-	if (!adapter || (link_idx >= WLAN_MAX_MLD))
+	if (!adapter || (link_idx >= QDF_ARRAY_SIZE(adapter->link_info)))
 		return NULL;
 
 	return &adapter->link_info[link_idx];
