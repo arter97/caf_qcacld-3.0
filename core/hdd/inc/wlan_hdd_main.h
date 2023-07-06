@@ -1153,6 +1153,7 @@ struct wlan_hdd_tx_power {
  * @mac_addr: Current MAC Address for the adapter
  * @mld_addr: MLD address for adapter
  * @event_flags: a bitmap of hdd_adapter_flags
+ * @curr_link_info_map: Current mapping of link info in adapter array
  * @active_links: a bitmap of active links in @link_info array
  * @num_links_on_create: No of active links set on initial hdd_open_adapter().
  * @is_ll_stats_req_pending: atomic variable to check active stats req
@@ -1282,6 +1283,7 @@ struct hdd_adapter {
 	struct qdf_mac_addr mld_addr;
 #endif
 	unsigned long event_flags;
+	uint8_t curr_link_info_map[WLAN_MAX_ML_BSS_LINKS];
 	unsigned long active_links;
 	uint8_t num_links_on_create;
 
@@ -2757,6 +2759,24 @@ hdd_adapter_get_next_active_link_info(struct hdd_adapter *adapter,
  */
 struct wlan_hdd_link_info *
 wlan_hdd_get_link_info_from_objmgr(struct wlan_objmgr_vdev *vdev);
+
+#if defined(WLAN_FEATURE_11BE_MLO) && defined(CFG80211_11BE_BASIC) && \
+	defined(WLAN_HDD_MULTI_VDEV_SINGLE_NDEV)
+/**
+ * hdd_adapter_disable_all_links() - Reset the links on stop adapter.
+ * @adapter: HDD adapter
+ *
+ * Resets the MAC address in each link info and resets the link info
+ * mapping in adapter array.
+ *
+ * Return: void
+ */
+void hdd_adapter_disable_all_links(struct hdd_adapter *adapter);
+#else
+static inline void hdd_adapter_disable_all_links(struct hdd_adapter *adapter)
+{
+}
+#endif
 
 struct hdd_adapter *hdd_open_adapter(struct hdd_context *hdd_ctx,
 				     uint8_t session_type,
@@ -5240,6 +5260,41 @@ QDF_STATUS hdd_stop_adapter_ext(struct hdd_context *hdd_ctx,
  * released.
  */
 void hdd_check_for_net_dev_ref_leak(struct hdd_adapter *adapter);
+
+#if defined(WLAN_FEATURE_11BE_MLO) && defined(WLAN_HDD_MULTI_VDEV_SINGLE_NDEV)
+
+/**
+ * hdd_link_switch_vdev_mac_addr_update() - API to update OSIF/HDD on VDEV
+ * mac addr update due to link switch.
+ * @ieee_old_link_id: Current  IEEE link ID of VDEV prior to link switch
+ * @ieee_new_link_id: New IEEE link ID of VDEV post link switch
+ * @vdev_id: VDEV undergoing link switch.
+ *
+ * Check if both @ieee_old_link_id and @ieee_new_link_id are part of adapter
+ * corresponding to @vdev_id. Then take necessary actions to support link switch
+ * MAC update and update DP to change link MAC address to new link's address.
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+hdd_link_switch_vdev_mac_addr_update(int32_t ieee_old_link_id,
+				     int32_t ieee_new_link_id, uint8_t vdev_id);
+
+/**
+ * hdd_get_link_info_by_ieee_link_id() - Find link info pointer matching with
+ * IEEE link ID.
+ * @adapter: HDD adapter
+ * @link_id: IEEE link ID to search for.
+ *
+ * Search the station ctx connection info for matching link ID in @adapter and
+ * return the link info pointer on match. The IEEE link ID is updated in station
+ * context during MLO connection and reset on disconnection.
+ *
+ * Return: link info pointer
+ */
+struct wlan_hdd_link_info *
+hdd_get_link_info_by_ieee_link_id(struct hdd_adapter *adapter, int32_t link_id);
+#endif
 
 #ifdef WLAN_FEATURE_DYNAMIC_MAC_ADDR_UPDATE
 /**
