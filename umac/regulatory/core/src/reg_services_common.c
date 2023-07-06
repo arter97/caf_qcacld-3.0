@@ -9799,7 +9799,8 @@ static int8_t reg_get_sp_eirp(struct wlan_objmgr_pdev *pdev,
 static enum reg_6g_ap_type
 reg_get_best_pwr_mode_from_eirp_list(int8_t *eirp_list, uint8_t size)
 {
-	int8_t max = 0, i;
+	int8_t max = 0;
+	uint8_t i;
 	enum reg_6g_ap_type best_pwr_mode = REG_CURRENT_MAX_AP_TYPE;
 
 	for (i = 0; i < size; i++) {
