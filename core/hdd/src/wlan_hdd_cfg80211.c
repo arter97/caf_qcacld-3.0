@@ -21438,17 +21438,19 @@ hdd_adapter_update_mac_on_mode_change(struct hdd_adapter *adapter)
 	struct hdd_adapter *link_adapter;
 	struct hdd_mlo_adapter_info *mlo_adapter_info;
 	struct hdd_context *hdd_ctx = adapter->hdd_ctx;
-	struct qdf_mac_addr link_addr[WLAN_MAX_MLD] = {0};
+	struct qdf_mac_addr link_addr[WLAN_MAX_ML_BSS_LINKS] = {0};
 
 	status = hdd_derive_link_address_from_mld(&adapter->mld_addr,
 						  &link_addr[0],
-						  WLAN_MAX_MLD);
+						  WLAN_MAX_ML_BSS_LINKS);
 	if (QDF_IS_STATUS_ERROR(status))
 		return status;
 
 	mlo_adapter_info = &adapter->mlo_adapter_info;
 	for (i = 0; i < WLAN_MAX_MLD; i++) {
 		link_adapter = mlo_adapter_info->link_adapter[i];
+		qdf_copy_macaddr(&adapter->link_info[i].link_addr,
+				 &link_addr[i]);
 		if (!link_adapter)
 			continue;
 
@@ -21456,6 +21458,7 @@ hdd_adapter_update_mac_on_mode_change(struct hdd_adapter *adapter)
 				       &link_addr[i]);
 		qdf_copy_macaddr(&link_adapter->mac_addr, &link_addr[i]);
 	}
+	qdf_copy_macaddr(&adapter->link_info[i].link_addr, &link_addr[i]);
 
 	return QDF_STATUS_SUCCESS;
 }

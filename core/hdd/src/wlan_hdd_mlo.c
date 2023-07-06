@@ -165,17 +165,20 @@ QDF_STATUS hdd_wlan_unregister_mlo_interfaces(struct hdd_adapter *adapter,
 
 void hdd_wlan_register_mlo_interfaces(struct hdd_context *hdd_ctx)
 {
+	int i = 0;
 	QDF_STATUS status;
 	struct hdd_adapter *ml_adapter;
+	struct wlan_hdd_link_info *link_info;
 	struct hdd_adapter_create_param params = {0};
-	struct qdf_mac_addr link_addr[WLAN_MAX_MLD] = {0};
+	struct qdf_mac_addr link_addr[WLAN_MAX_ML_BSS_LINKS] = {0};
 
 	ml_adapter = hdd_get_ml_adapter(hdd_ctx);
 	if (!ml_adapter)
 		return;
 
 	status = hdd_derive_link_address_from_mld(&ml_adapter->mld_addr,
-						  &link_addr[0], WLAN_MAX_MLD);
+						  &link_addr[0],
+						  WLAN_MAX_ML_BSS_LINKS);
 	if (QDF_IS_STATUS_ERROR(status))
 		return;
 
@@ -193,8 +196,14 @@ void hdd_wlan_register_mlo_interfaces(struct hdd_context *hdd_ctx)
 	/* if target supports MLO create a new dev */
 	status = hdd_open_adapter_no_trans(hdd_ctx, QDF_STA_MODE, "null",
 					   link_addr[1].bytes, &params);
-	if (QDF_IS_STATUS_ERROR(status))
+	if (QDF_IS_STATUS_ERROR(status)) {
 		hdd_err("Failed to register link adapter:%d", status);
+	} else {
+		hdd_adapter_for_each_link_info(ml_adapter, link_info) {
+			qdf_copy_macaddr(&link_info->link_addr,
+					 &link_addr[i++]);
+		}
+	}
 }
 
 void
@@ -270,7 +279,7 @@ QDF_STATUS hdd_derive_link_address_from_mld(struct qdf_mac_addr *mld_addr,
 	struct qdf_mac_addr *link_addr;
 
 	if (!mld_addr || !link_addr_list || !max_idx ||
-	    max_idx > WLAN_MAX_MLD || qdf_is_macaddr_zero(mld_addr)) {
+	    max_idx > WLAN_MAX_ML_BSS_LINKS || qdf_is_macaddr_zero(mld_addr)) {
 		hdd_err("Invalid values");
 		return QDF_STATUS_E_INVAL;
 	}
@@ -308,8 +317,8 @@ int hdd_update_vdev_mac_address(struct hdd_adapter *adapter,
 	QDF_STATUS status;
 	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
 	struct wlan_hdd_link_info *link_info;
-	uint8_t *addr_list[WLAN_MAX_MLD + 2] = {0};
-	struct qdf_mac_addr link_addrs[WLAN_MAX_MLD] = {0};
+	uint8_t *addr_list[WLAN_MAX_ML_BSS_LINKS + 1] = {0};
+	struct qdf_mac_addr link_addrs[WLAN_MAX_ML_BSS_LINKS] = {0};
 
 	/* This API is only called with is ml adapter set for STA mode adapter.
 	 * For SAP mode, hdd_hostapd_set_mac_address() is the entry point for
@@ -325,7 +334,7 @@ int hdd_update_vdev_mac_address(struct hdd_adapter *adapter,
 	}
 
 	status = hdd_derive_link_address_from_mld(&mac_addr, &link_addrs[0],
-						  WLAN_MAX_MLD);
+						  WLAN_MAX_ML_BSS_LINKS);
 
 	if (QDF_IS_STATUS_ERROR(status))
 		return qdf_status_to_os_return(status);
@@ -341,6 +350,10 @@ int hdd_update_vdev_mac_address(struct hdd_adapter *adapter,
 		return qdf_status_to_os_return(status);
 
 	i = 0;
+	hdd_adapter_for_each_link_info(adapter, link_info)
+		qdf_copy_macaddr(&link_info->link_addr, &link_addrs[i++]);
+
+	i = 0;
 	hdd_adapter_for_each_active_link_info(adapter, link_info) {
 		update_self_peer =
 			(link_info == adapter->deflink) ? true : false;
@@ -351,6 +364,8 @@ int hdd_update_vdev_mac_address(struct hdd_adapter *adapter,
 
 		qdf_copy_macaddr(&link_info->link_addr, &link_addrs[i++]);
 	}
+
+	hdd_adapter_update_mlo_mgr_mac_addr(adapter);
 	return ret;
 }
 #else
@@ -363,8 +378,8 @@ int hdd_update_vdev_mac_address(struct hdd_adapter *adapter,
 	struct hdd_adapter *link_adapter;
 	struct hdd_mlo_adapter_info *mlo_adapter_info;
 	struct hdd_context *hdd_ctx = adapter->hdd_ctx;
-	struct qdf_mac_addr link_addrs[WLAN_MAX_MLD] = {0};
 	uint8_t *addr_list[WLAN_MAX_MLD + 1] = {0};
+	struct qdf_mac_addr link_addrs[WLAN_MAX_ML_BSS_LINKS] = {0};
 
 	/* This API is only called with is ml adapter set for STA mode adapter.
 	 * For SAP mode, hdd_hostapd_set_mac_address() is the entry point for
@@ -380,7 +395,7 @@ int hdd_update_vdev_mac_address(struct hdd_adapter *adapter,
 	}
 
 	status = hdd_derive_link_address_from_mld(&mac_addr, &link_addrs[0],
-						  WLAN_MAX_MLD);
+						  WLAN_MAX_ML_BSS_LINKS);
 
 	if (QDF_IS_STATUS_ERROR(status))
 		return qdf_status_to_os_return(status);
@@ -415,7 +430,12 @@ int hdd_update_vdev_mac_address(struct hdd_adapter *adapter,
 		ucfg_dp_update_inf_mac(hdd_ctx->psoc, &link_adapter->mac_addr,
 				       &link_addrs[i]);
 		qdf_copy_macaddr(&link_adapter->mac_addr, &link_addrs[i]);
+		qdf_copy_macaddr(&adapter->link_info[i].link_addr,
+				 &link_addrs[i]);
 	}
+
+	qdf_copy_macaddr(&adapter->link_info[i].link_addr, &link_addrs[i]);
+	hdd_adapter_update_mlo_mgr_mac_addr(adapter);
 
 	return ret;
 }

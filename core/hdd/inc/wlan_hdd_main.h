@@ -1089,9 +1089,7 @@ struct wlan_hdd_link_info {
 	qdf_spinlock_t vdev_lock;
 	struct wlan_objmgr_vdev *vdev;
 	struct completion vdev_destroy_event;
-#ifdef WLAN_HDD_MULTI_VDEV_SINGLE_NDEV
 	struct qdf_mac_addr link_addr;
-#endif
 
 	union {
 		struct hdd_station_ctx station;
@@ -1445,7 +1443,7 @@ struct hdd_adapter {
 	bool is_dbam_configured;
 #endif
 	struct wlan_hdd_link_info *deflink;
-	struct wlan_hdd_link_info link_info[WLAN_MAX_MLD];
+	struct wlan_hdd_link_info link_info[WLAN_MAX_ML_BSS_LINKS];
 	struct wlan_hdd_tx_power tx_power;
 };
 
@@ -2871,6 +2869,17 @@ enum phy_ch_width hdd_get_link_info_width(struct wlan_hdd_link_info *link_info);
 struct hdd_adapter *
 hdd_get_adapter_by_rand_macaddr(struct hdd_context *hdd_ctx,
 				tSirMacAddr mac_addr);
+
+/**
+ * hdd_adapter_update_mlo_mgr_mac_addr() - Update each link address to MLO mgr.
+ * @adapter: HDD adapter
+ *
+ * Update MLO manager with each link address and corresponding VDEV ID.
+ * Only update for ML-STA adapter types.
+ *
+ * Return: void
+ */
+void hdd_adapter_update_mlo_mgr_mac_addr(struct hdd_adapter *adapter);
 
 /**
  * hdd_is_vdev_in_conn_state() - Check whether the vdev is in

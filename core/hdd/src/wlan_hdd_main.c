@@ -246,6 +246,7 @@
 #include "wlan_ll_sap_ucfg_api.h"
 
 #include "os_if_dp_local_pkt_capture.h"
+#include <wlan_mlo_mgr_link_switch.h>
 #include "cdp_txrx_mon.h"
 
 #ifdef MULTI_CLIENT_LL_SUPPORT
@@ -3473,10 +3474,19 @@ static int hdd_start_link_adapter(struct hdd_adapter *sta_adapter)
 			link_adapter->deflink->vdev_id =
 						sta_adapter->deflink->vdev_id;
 			qdf_spin_unlock_bh(&link_adapter->deflink->vdev_lock);
+
+			sta_adapter->link_info[i].vdev_id =
+						sta_adapter->deflink->vdev_id;
 			continue;
 		}
 		ret = hdd_start_station_adapter(link_adapter);
+		if (!ret) {
+			sta_adapter->link_info[i].vdev_id =
+						link_adapter->deflink->vdev_id;
+		}
 	}
+
+	hdd_adapter_update_mlo_mgr_mac_addr(sta_adapter);
 
 	hdd_exit();
 	return ret;
@@ -7736,6 +7746,25 @@ error:
 	return -EINVAL;
 }
 
+void hdd_adapter_update_mlo_mgr_mac_addr(struct hdd_adapter *adapter)
+{
+	int i = 0;
+	struct wlan_hdd_link_info *link_info;
+	struct wlan_mlo_link_mac_update link_mac = {0};
+
+	if (!hdd_adapter_is_ml_adapter(adapter))
+		return;
+
+	hdd_adapter_for_each_link_info(adapter, link_info) {
+		link_mac.link_mac_info[i].vdev_id = link_info->vdev_id;
+		qdf_copy_macaddr(&link_mac.link_mac_info[i++].link_mac_addr,
+				 &link_info->link_addr);
+	}
+
+	link_mac.num_mac_update = i;
+	mlo_mgr_update_link_info_mac_addr(adapter->deflink->vdev, &link_mac);
+}
+
 /**
  * hdd_send_coex_config_params() - Send coex config params to FW
  * @hdd_ctx: HDD context
@@ -8318,7 +8347,8 @@ struct hdd_adapter *hdd_open_adapter(struct hdd_context *hdd_ctx,
 
 	switch (session_type) {
 	case QDF_STA_MODE:
-		if (!hdd_ctx->config->mac_provision) {
+		if (!(hdd_ctx->config->mac_provision ||
+		      params->only_wdev_register)) {
 			hdd_reset_locally_admin_bit(hdd_ctx, mac_addr);
 			/*
 			 * After resetting locally administered bit
@@ -14270,7 +14300,6 @@ int hdd_start_station_adapter(struct hdd_adapter *adapter)
 	hdd_adapter_set_wlm_client_latency_level(adapter);
 
 	hdd_exit();
-
 	return 0;
 
 fail:
