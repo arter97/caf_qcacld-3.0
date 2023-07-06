@@ -1553,6 +1553,7 @@ struct protocol_trace_count {
  * @wme_ac_type_bytes: Wireless Multimedia Type Bytes Count
  * @tx_ucast_total: Total tx unicast count
  * @tx_ucast_success: Total tx unicast success count
+* @fragment_count: Fragment packet count
  */
 struct cdp_tx_stats {
 	struct cdp_pkt_info comp_pkt;
@@ -1678,6 +1679,7 @@ struct cdp_tx_stats {
 	uint64_t wme_ac_type_bytes[WME_AC_MAX];
 	struct cdp_pkt_info tx_ucast_total;
 	struct cdp_pkt_info tx_ucast_success;
+	uint32_t fragment_count;
 };
 
 /**
@@ -1772,6 +1774,8 @@ struct cdp_tx_stats {
  * @inval_link_id_pkt_cnt: Counter to capture Invalid Link Id
  * @wme_ac_type_bytes: Wireless Multimedia type Byte Count
  * @rx_total: Total rx count
+ * @duplicate_count: Duplicate packets count
+ * @fragment_count: Fragment packet count
  */
 struct cdp_rx_stats {
 	struct cdp_pkt_info to_stack;
@@ -1870,6 +1874,8 @@ struct cdp_rx_stats {
 #ifdef IPA_OFFLOAD
 	struct cdp_pkt_info rx_total;
 #endif
+	uint32_t duplicate_count;
+	uint32_t fragment_count;
 };
 
 /**

@@ -1953,6 +1953,26 @@ static bool dp_idle_link_bm_id_check(struct dp_soc *soc, uint8_t rbm,
 }
 #endif
 
+static inline void
+dp_rx_err_dup_frame(struct dp_soc *soc,
+		    struct hal_rx_mpdu_desc_info *mpdu_desc_info)
+{
+	struct dp_txrx_peer *txrx_peer = NULL;
+	dp_txrx_ref_handle txrx_ref_handle = NULL;
+	uint16_t peer_id;
+
+	peer_id =
+		dp_rx_peer_metadata_peer_id_get(soc,
+						mpdu_desc_info->peer_meta_data);
+	txrx_peer = dp_tgt_txrx_peer_get_ref_by_id(soc, peer_id,
+						   &txrx_ref_handle,
+						   DP_MOD_ID_RX_ERR);
+	if (txrx_peer) {
+		DP_STATS_INC(txrx_peer->vdev, rx.duplicate_count, 1);
+		dp_txrx_peer_unref_delete(txrx_ref_handle, DP_MOD_ID_RX_ERR);
+	}
+}
+
 uint32_t
 dp_rx_err_process(struct dp_intr *int_ctx, struct dp_soc *soc,
 		  hal_ring_handle_t hal_ring_hdl, uint32_t quota)
@@ -1980,6 +2000,9 @@ dp_rx_err_process(struct dp_intr *int_ctx, struct dp_soc *soc,
 	bool sw_pn_check_needed;
 	int max_reap_limit = dp_rx_get_loop_pkt_limit(soc);
 	int i, rx_bufs_reaped_total;
+	uint16_t peer_id;
+	struct dp_txrx_peer *txrx_peer = NULL;
+	dp_txrx_ref_handle txrx_ref_handle = NULL;
 
 	/* Debug -- Remove later */
 	qdf_assert(soc && hal_ring_hdl);
@@ -2170,6 +2193,19 @@ dp_rx_err_process(struct dp_intr *int_ctx, struct dp_soc *soc,
 
 			rx_bufs_reaped[mac_id] += count;
 			DP_STATS_INC(soc, rx.rx_frags, 1);
+
+			peer_id = dp_rx_peer_metadata_peer_id_get(soc,
+					mpdu_desc_info.peer_meta_data);
+			txrx_peer =
+				dp_tgt_txrx_peer_get_ref_by_id(soc, peer_id,
+							       &txrx_ref_handle,
+							       DP_MOD_ID_RX_ERR);
+			if (txrx_peer) {
+				DP_STATS_INC(txrx_peer->vdev,
+					     rx.fragment_count, 1);
+				dp_txrx_peer_unref_delete(txrx_ref_handle,
+							  DP_MOD_ID_RX_ERR);
+			}
 			goto next_entry;
 		}
 
@@ -2214,9 +2250,11 @@ process_reo_error_code:
 
 			rx_bufs_reaped[mac_id] += count;
 			break;
+		case HAL_REO_ERR_NON_BA_DUPLICATE:
+			dp_rx_err_dup_frame(soc, &mpdu_desc_info);
+			fallthrough;
 		case HAL_REO_ERR_QUEUE_DESC_INVALID:
 		case HAL_REO_ERR_AMPDU_IN_NON_BA:
-		case HAL_REO_ERR_NON_BA_DUPLICATE:
 		case HAL_REO_ERR_BA_DUPLICATE:
 		case HAL_REO_ERR_BAR_FRAME_NO_BA_SESSION:
 		case HAL_REO_ERR_BAR_FRAME_SN_EQUALS_SSN:
