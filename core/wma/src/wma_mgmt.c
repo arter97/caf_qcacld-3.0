@@ -1374,6 +1374,8 @@ static void wma_set_mlo_capability(tp_wma_handle wma,
 				params->msd_caps.med_sync_ofdm_ed_thresh;
 		req->mlo_params.medium_sync_max_txop_num =
 				params->msd_caps.med_sync_max_txop_num;
+		req->mlo_params.link_switch_in_progress =
+			wlan_vdev_mlme_is_mlo_link_switch_in_progress(vdev);
 	} else {
 		wma_debug("Peer MLO context is NULL");
 		req->mlo_params.mlo_enabled = false;

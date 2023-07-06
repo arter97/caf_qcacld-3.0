@@ -15967,10 +15967,28 @@ static inline QDF_STATUS hdd_register_bcn_cb(struct hdd_context *hdd_ctx)
 static void hdd_v2_flow_pool_map(int vdev_id)
 {
 	QDF_STATUS status;
+	struct hdd_context *hdd_ctx = cds_get_context(QDF_MODULE_ID_HDD);
+	struct wlan_objmgr_vdev *vdev;
+
+	if (!hdd_ctx) {
+		hdd_err("HDD context null");
+		return;
+	}
+
+	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(hdd_ctx->psoc, vdev_id,
+						    WLAN_OSIF_ID);
+	if (!vdev) {
+		hdd_err("Invalid VDEV %d", vdev_id);
+		return;
+	}
+
+	if (wlan_vdev_mlme_is_mlo_link_switch_in_progress(vdev)) {
+		hdd_info("Link switch ongoing, do not invoke flow pool map");
+		goto release_ref;
+	}
 
 	status = cdp_flow_pool_map(cds_get_context(QDF_MODULE_ID_SOC),
-				   OL_TXRX_PDEV_ID,
-				   vdev_id);
+				   OL_TXRX_PDEV_ID, vdev_id);
 	/*
 	 * For Adrastea flow control v2 is based on FW MAP events,
 	 * so this above callback is not implemented.
@@ -15981,6 +15999,9 @@ static void hdd_v2_flow_pool_map(int vdev_id)
 		hdd_err("vdev_id: %d, failed to create flow pool status %d",
 			vdev_id, status);
 	}
+
+release_ref:
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_OSIF_ID);
 }
 
 /**
