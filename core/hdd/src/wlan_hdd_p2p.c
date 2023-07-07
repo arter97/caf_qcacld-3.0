@@ -870,7 +870,7 @@ struct wireless_dev *wlan_hdd_add_virtual_intf(struct wiphy *wiphy,
 }
 #endif
 
-#if defined(WLAN_FEATURE_11BE_MLO) && \
+#if defined(WLAN_FEATURE_11BE_MLO) && defined(CFG80211_11BE_BASIC) && \
 	!defined(WLAN_HDD_MULTI_VDEV_SINGLE_NDEV)
 /**
  * hdd_deinit_mlo_interfaces() - De-initialize link adapters
