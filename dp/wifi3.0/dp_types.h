@@ -335,7 +335,7 @@ enum dp_peer_type {
 	TAILQ_FOREACH((_peer), &(_vdev)->peer_list, peer_list_elem)
 
 #define DP_PEER_ITERATE_ASE_LIST(_peer, _ase, _temp_ase) \
-	TAILQ_FOREACH_SAFE((_ase), &peer->ast_entry_list, ase_list_elem, (_temp_ase))
+	TAILQ_FOREACH_SAFE((_ase), &_peer->ast_entry_list, ase_list_elem, (_temp_ase))
 
 #define DP_MUTEX_TYPE qdf_spinlock_t
 

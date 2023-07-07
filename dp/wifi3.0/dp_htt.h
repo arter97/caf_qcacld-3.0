@@ -1205,10 +1205,14 @@ QDF_STATUS htt_h2t_rx_cce_super_rule_setup(struct htt_soc *htt_soc,
  * struct dp_peer_info - Primary Peer information
  * @primary_peer_id: Primary peer id
  * @chip_id: Chip id of primary peer
+ * @hw_peer_id: ast hash index
+ * @ast_hash: ast hash value
  */
 struct dp_peer_info {
 	uint16_t primary_peer_id;
 	uint8_t chip_id;
+	uint16_t hw_peer_id;
+	uint16_t ast_hash;
 };
 
 /**
