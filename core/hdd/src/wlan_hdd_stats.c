@@ -495,6 +495,30 @@ hdd_get_link_info_by_bssid(struct hdd_context *hdd_ctx, const uint8_t *bssid)
 	return NULL;
 }
 
+#if defined(WLAN_FEATURE_11BE_MLO)
+/**
+ * wlan_hdd_is_per_link_stats_supported - Check if FW supports per link stats
+ * @hdd_ctx: Pointer to hdd context
+ *
+ * Return: true if FW supports, else False
+ */
+static bool
+wlan_hdd_is_per_link_stats_supported(struct hdd_context *hdd_ctx)
+{
+	if (hdd_ctx->is_mlo_per_link_stats_supported)
+		return true;
+
+	hdd_debug("mlo per link stats is not supported by FW");
+	return false;
+}
+#else
+static inline bool
+wlan_hdd_is_per_link_stats_supported(struct hdd_context *hdd_ctx)
+{
+	return false;
+}
+#endif
+
 #ifdef WLAN_FEATURE_LINK_LAYER_STATS
 
 /**
@@ -639,7 +663,7 @@ static bool put_wifi_peer_rates(struct wifi_peer_info *stats,
 	return true;
 }
 
-#if defined(WLAN_FEATURE_11BE_MLO) && defined(CFG80211_11BE_BASIC)
+#if defined(WLAN_FEATURE_11BE_MLO)
 /**
  * wlan_hdd_update_mlo_iface_stats_info() - update mlo per link iface stats info
  * @hdd_ctx: Pointer to hdd_context
@@ -1237,7 +1261,7 @@ static void hdd_link_layer_process_peer_stats(struct hdd_adapter *adapter,
 	wlan_cfg80211_vendor_cmd_reply(skb);
 }
 
-#if defined(WLAN_FEATURE_11BE_MLO) && defined(CFG80211_11BE_BASIC)
+#if defined(WLAN_FEATURE_11BE_MLO)
 /**
  * hdd_cache_ll_iface_stats() - Caches ll_stats received from fw
  * @hdd_ctx: Pointer to hdd_context
@@ -6860,8 +6884,54 @@ static void wlan_hdd_update_rssi(struct wlan_hdd_link_info *link_info,
 	sinfo->filled |= HDD_INFO_SIGNAL;
 }
 
+static void
+wlan_hdd_update_mlo_peer_stats(struct wlan_hdd_link_info *link_info,
+			       struct station_info *sinfo, const uint8_t *mac)
+{
+	ol_txrx_soc_handle soc;
+	uint8_t *peer_mac;
+	struct cdp_peer_stats *peer_stats;
+	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(link_info->adapter);
+
+	if (wlan_hdd_validate_context(hdd_ctx)) {
+		hdd_err("invalid hdd_ctx");
+		return;
+	}
+
+	soc = cds_get_context(QDF_MODULE_ID_SOC);
+	peer_mac = link_info->session.station.conn_info.bssid.bytes;
+
+	if (!qdf_is_macaddr_equal((struct qdf_mac_addr *)peer_mac,
+					(struct qdf_mac_addr *)mac)) {
+		hdd_nofl_debug("Fetching aggregated station stats");
+		return;
+	}
+
+	if (!wlan_hdd_is_per_link_stats_supported(hdd_ctx))
+		return;
+
+	peer_stats = qdf_mem_malloc(sizeof(*peer_stats));
+	if (!peer_stats) {
+		hdd_err("Failed to allocated memory for peer_stats");
+		return;
+	}
+
+	ucfg_dp_get_per_link_peer_stats(soc, link_info->vdev_id,
+					peer_mac, peer_stats,
+					CDP_WILD_PEER_TYPE,
+					WLAN_MAX_MLD);
+
+	sinfo->tx_bytes = peer_stats->tx.tx_success.bytes;
+	sinfo->rx_bytes = peer_stats->rx.rcvd.bytes;
+	sinfo->rx_packets = peer_stats->rx.rcvd.num;
+
+	hdd_nofl_debug("Updated sinfo with per peer stats");
+	qdf_mem_free(peer_stats);
+}
+
 static int wlan_hdd_update_rate_info(struct wlan_hdd_link_info *link_info,
-				     struct station_info *sinfo)
+				     struct station_info *sinfo,
+				     const uint8_t *mac)
 {
 	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(link_info->adapter);
 	struct hdd_station_ctx *sta_ctx;
@@ -7014,6 +7084,7 @@ static int wlan_hdd_update_rate_info(struct wlan_hdd_link_info *link_info,
 	sinfo->tx_bytes = stats.tx_bytes;
 	sinfo->rx_bytes = stats.rx_bytes;
 	sinfo->rx_packets = stats.rx_packets;
+	wlan_hdd_update_mlo_peer_stats(link_info, sinfo, mac);
 
 	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_STATS_ID);
 
@@ -7108,7 +7179,7 @@ static int wlan_hdd_get_sta_stats(struct wlan_hdd_link_info *link_info,
 	 */
 	hdd_lpass_notify_connect(link_info);
 
-	if (wlan_hdd_update_rate_info(link_info, sinfo))
+	if (wlan_hdd_update_rate_info(link_info, sinfo, mac))
 		/* Keep GUI happy */
 		return 0;
 
@@ -7121,24 +7192,7 @@ static int wlan_hdd_get_sta_stats(struct wlan_hdd_link_info *link_info,
 	return 0;
 }
 
-#if defined(WLAN_FEATURE_11BE_MLO) && defined(CFG80211_11BE_BASIC)
-/**
- * wlan_hdd_is_per_link_stats_supported - Check if FW supports per link stats
- * @hdd_ctx: Pointer to hdd context
- *
- * Return: true if FW supports, else False
- */
-static bool
-wlan_hdd_is_per_link_stats_supported(struct hdd_context *hdd_ctx)
-{
-	if (hdd_ctx->is_mlo_per_link_stats_supported) {
-		hdd_debug("mlo per link stats is not supported by FW");
-		return true;
-	}
-
-	return false;
-}
-
+#if defined(WLAN_FEATURE_11BE_MLO)
 /**
  * wlan_hdd_copy_hdd_stats_to_sinfo() - Copy hdd station stats info to sinfo
  * @sinfo: Pointer to kernel station info struct
@@ -7284,12 +7338,6 @@ static int wlan_hdd_get_mlo_sta_stats(struct wlan_hdd_link_info *link_info,
 	return 0;
 }
 #else
-static inline bool
-wlan_hdd_is_per_link_stats_supported(struct hdd_context *hdd_ctx)
-{
-	return false;
-}
-
 static int wlan_hdd_get_mlo_sta_stats(struct wlan_hdd_link_info *link_info,
 				      const uint8_t *mac,
 				      struct station_info *sinfo)

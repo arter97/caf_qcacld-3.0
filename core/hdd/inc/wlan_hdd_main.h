@@ -587,7 +587,7 @@ struct hdd_peer_stats {
 	uint32_t fcs_count;
 };
 
-#if defined(WLAN_FEATURE_11BE_MLO) && defined(CFG80211_11BE_BASIC)
+#if defined(WLAN_FEATURE_11BE_MLO)
 /**
  * struct wlan_hdd_station_stats_info - Station stats info
  * @signal: Signal strength of last received PPDU
