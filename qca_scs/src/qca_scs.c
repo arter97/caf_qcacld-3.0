@@ -70,11 +70,25 @@ bool qca_scs_peer_lookup_n_rule_match(uint32_t rule_id, uint8_t *dst_mac_addr)
 	return cdp_scs_peer_lookup_n_rule_match(soc_txrx_handle, rule_id,
 						dst_mac_addr);
 }
+
+bool qca_scs_peer_lookup_n_rule_match_v2(
+				struct qca_scs_peer_lookup_n_rule_match *params)
+{
+	return qca_scs_peer_lookup_n_rule_match(params->rule_id,
+						params->dst_mac_addr);
+}
 #else
 bool qca_scs_peer_lookup_n_rule_match(uint32_t rule_id, uint8_t *dst_mac_addr)
+{
+	return false;
+}
+
+bool qca_scs_peer_lookup_n_rule_match_v2(
+				struct qca_scs_peer_lookup_n_rule_match *params)
 {
 	return false;
 }
 #endif
 
 qdf_export_symbol(qca_scs_peer_lookup_n_rule_match);
+qdf_export_symbol(qca_scs_peer_lookup_n_rule_match_v2);
