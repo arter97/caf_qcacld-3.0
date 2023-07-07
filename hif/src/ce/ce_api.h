@@ -520,8 +520,7 @@ void war_ce_src_ring_write_idx_set(struct hif_softc *scn,
  * @priority:      TBD
  * @src_nentries:  #entries in source ring - Must be a power of 2
  * @src_sz_max:    Max source send size for this CE. This is also the minimum
- *                 size of a destination buffer. This should be a factor of 4
- *                 for alignment during nbuf alloc.
+ *                 size of a destination buffer
  * @dest_nentries: #entries in destination ring - Must be a power of 2
  * @reserved:      Future Use
  */
