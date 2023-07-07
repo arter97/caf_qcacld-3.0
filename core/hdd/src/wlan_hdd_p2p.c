@@ -940,7 +940,7 @@ struct wireless_dev *wlan_hdd_add_virtual_intf(struct wiphy *wiphy,
 }
 #endif
 
-#if defined(WLAN_FEATURE_11BE_MLO)
+#if defined(WLAN_FEATURE_11BE_MLO) && defined(CFG80211_11BE_BASIC)
 /**
  * hdd_deinit_mlo_interfaces() - De-initialize link adapters
  * @hdd_ctx: Pointer to hdd context
