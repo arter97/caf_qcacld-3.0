@@ -654,6 +654,12 @@ QDF_STATUS wlan_epcs_deliver_cmd(struct wlan_objmgr_vdev *vdev,
 
 QDF_STATUS wlan_epcs_set_config(struct wlan_objmgr_vdev *vdev, uint8_t flag)
 {
+	struct mac_context *mac_ctx;
+
+	mac_ctx = cds_get_context(QDF_MODULE_ID_PE);
+	if (!mac_ctx)
+		return QDF_STATUS_E_INVAL;
+
 	if (!vdev)
 		return QDF_STATUS_E_FAILURE;
 
@@ -662,7 +668,8 @@ QDF_STATUS wlan_epcs_set_config(struct wlan_objmgr_vdev *vdev, uint8_t flag)
 	else
 		wlan_mlme_set_epcs_capability(wlan_vdev_get_psoc(vdev), false);
 
-	return QDF_STATUS_SUCCESS;
+	return lim_send_eht_caps_ie(mac_ctx, NULL, QDF_STA_MODE,
+				    wlan_vdev_get_id(vdev));
 }
 
 bool wlan_epcs_get_config(struct wlan_objmgr_vdev *vdev)

@@ -8689,7 +8689,9 @@ void lim_copy_bss_eht_cap(struct pe_session *session)
 	qdf_mem_copy(&session->eht_config, &mlme_priv->eht_config,
 		     sizeof(session->eht_config));
 
-	if (!wlan_epcs_get_config(session->vdev))
+	if (wlan_epcs_get_config(session->vdev))
+		session->eht_config.epcs_pri_access = 1;
+	else
 		session->eht_config.epcs_pri_access = 0;
 }
 
@@ -8929,7 +8931,8 @@ void lim_log_eht_op(struct mac_context *mac, tDot11fIEeht_op *eht_ops,
 }
 
 void lim_set_eht_caps(struct mac_context *mac, struct pe_session *session,
-		      uint8_t *ie_start, uint32_t num_bytes, uint8_t band)
+		      uint8_t *ie_start, uint32_t num_bytes, uint8_t band,
+		      uint8_t vdev_id)
 {
 	const uint8_t *ie = NULL;
 	uint8_t offset = 0;
@@ -8940,6 +8943,7 @@ void lim_set_eht_caps(struct mac_context *mac, struct pe_session *session,
 	struct wlan_eht_cap_info eht_mcs_cap;
 	bool is_band_2g = false;
 	uint32_t cbm_24ghz;
+	struct wlan_objmgr_vdev *vdev;
 
 	if (band == CDS_BAND_2GHZ)
 		is_band_2g = true;
@@ -8966,7 +8970,16 @@ void lim_set_eht_caps(struct mac_context *mac, struct pe_session *session,
 		/* convert from unpacked to packed structure */
 		eht_cap = (struct wlan_eht_cap_info *)&ie[2 + EHT_CAP_OUI_SIZE];
 
-		eht_cap->epcs_pri_access = dot11_cap.epcs_pri_access;
+		vdev = wlan_objmgr_get_vdev_by_id_from_psoc(mac->psoc, vdev_id,
+							    WLAN_MLME_CM_ID);
+		if (wlan_epcs_get_config(vdev))
+			eht_cap->epcs_pri_access = 1;
+		else
+			eht_cap->epcs_pri_access = 0;
+
+		if (vdev)
+			wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_CM_ID);
+
 		eht_cap->eht_om_ctl = dot11_cap.eht_om_ctl;
 		eht_cap->triggered_txop_sharing_mode1 =
 			dot11_cap.triggered_txop_sharing_mode1;
@@ -9191,7 +9204,7 @@ QDF_STATUS lim_send_eht_caps_ie(struct mac_context *mac_ctx,
 	qdf_mem_copy(&eht_caps_2g[2], EHT_CAP_OUI_TYPE, EHT_CAP_OUI_SIZE);
 
 	lim_set_eht_caps(mac_ctx, session, eht_caps_2g, eht_cap_total_len,
-			 CDS_BAND_2GHZ);
+			 CDS_BAND_2GHZ, vdev_id);
 	status_2g = lim_send_ie(mac_ctx, vdev_id, DOT11F_EID_EHT_CAP,
 				CDS_BAND_2GHZ, &eht_caps_2g[2],
 				eht_caps_2g[1] + 1);
@@ -9202,7 +9215,7 @@ QDF_STATUS lim_send_eht_caps_ie(struct mac_context *mac_ctx,
 	qdf_mem_copy(&eht_caps_5g[2], EHT_CAP_OUI_TYPE, EHT_CAP_OUI_SIZE);
 
 	lim_set_eht_caps(mac_ctx, session, eht_caps_5g, eht_cap_total_len,
-			 CDS_BAND_5GHZ);
+			 CDS_BAND_5GHZ, vdev_id);
 	status_5g = lim_send_ie(mac_ctx, vdev_id, DOT11F_EID_EHT_CAP,
 				CDS_BAND_5GHZ, &eht_caps_5g[2],
 				eht_caps_5g[1] + 1);
