@@ -304,6 +304,9 @@ wlan_cm_roam_cfg_set_value(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 struct rso_config *wlan_cm_get_rso_config_fl(struct wlan_objmgr_vdev *vdev,
 					     const char *func, uint32_t line);
 
+struct rso_user_config *
+wlan_cm_get_rso_user_config_fl(struct wlan_objmgr_vdev *vdev,
+			       const char *func, uint32_t line);
 /**
  * wlan_cm_get_rso_config  - get per vdev RSO config
  * @vdev: vdev pointer
@@ -313,6 +316,14 @@ struct rso_config *wlan_cm_get_rso_config_fl(struct wlan_objmgr_vdev *vdev,
 #define wlan_cm_get_rso_config(vdev) \
 	wlan_cm_get_rso_config_fl(vdev, __func__, __LINE__)
 
+/**
+ * wlan_cm_get_rso_config - get per vdev RSO userspace config
+ * @vdev: vdev pointer
+ *
+ * Return: rso user space config pointer
+ */
+#define wlan_cm_get_rso_user_config(vdev) \
+	wlan_cm_get_rso_user_config_fl(vdev, __func__, __LINE__)
 /**
  * wlan_cm_set_disable_hi_rssi  - set disable hi rssi config
  * @pdev: pdev pointer
@@ -390,11 +401,11 @@ static inline void wlan_cm_ese_populate_additional_ies(
 
 /**
  * wlan_roam_reset_roam_params  - reset_roam params
- * @psoc: vdev pointer
+ * @vdev: vdev pointer
  *
- * Return: QDF_STATUS
+ * Return: void
  */
-void wlan_roam_reset_roam_params(struct wlan_objmgr_psoc *psoc);
+void wlan_roam_reset_roam_params(struct wlan_objmgr_vdev *vdev);
 
 /**
  * wlan_cm_rso_config_init  - initialize RSO config

@@ -434,7 +434,7 @@ static void hdd_start_powersave_timer_on_associated(struct hdd_adapter *adapter)
 		return;
 	ucfg_mlme_get_auto_bmps_timer_value(hdd_ctx->psoc,
 					    &auto_bmps_timer_val);
-	timeout = hdd_cm_is_vdev_roaming(adapter) ?
+	timeout = hdd_cm_is_vdev_roaming(adapter->deflink) ?
 		AUTO_PS_ENTRY_TIMER_DEFAULT_VALUE :
 		(auto_bmps_timer_val * 1000);
 	sme_ps_enable_auto_ps_timer(hdd_ctx->mac_handle,
@@ -552,7 +552,7 @@ struct hdd_adapter *hdd_get_sta_connection_in_progress(
 		if ((QDF_STA_MODE == adapter->device_mode) ||
 		    (QDF_P2P_CLIENT_MODE == adapter->device_mode) ||
 		    (QDF_P2P_DEVICE_MODE == adapter->device_mode)) {
-			if (hdd_cm_is_connecting(adapter)) {
+			if (hdd_cm_is_connecting(adapter->deflink)) {
 				hdd_debug("vdev_id %d: Connection is in progress",
 					  adapter->deflink->vdev_id);
 				hdd_adapter_dev_put_debug(adapter, dbgid);
@@ -592,7 +592,7 @@ bool hdd_is_any_sta_connected(struct hdd_context *hdd_ctx)
 					   dbgid) {
 		if (QDF_STA_MODE == adapter->device_mode ||
 		    QDF_P2P_CLIENT_MODE == adapter->device_mode) {
-			if (hdd_cm_is_vdev_connected(adapter)) {
+			if (hdd_cm_is_vdev_connected(adapter->deflink)) {
 				hdd_adapter_dev_put_debug(adapter, dbgid);
 				if (next_adapter)
 					hdd_adapter_dev_put_debug(next_adapter,
@@ -621,7 +621,7 @@ QDF_STATUS hdd_get_first_connected_sta_vdev_id(struct hdd_context *hdd_ctx,
 					   dbgid) {
 		if (adapter->device_mode == QDF_STA_MODE ||
 		    adapter->device_mode == QDF_P2P_CLIENT_MODE) {
-			if (hdd_cm_is_vdev_connected(adapter)) {
+			if (hdd_cm_is_vdev_connected(adapter->deflink)) {
 				*vdev_id = adapter->deflink->vdev_id;
 				hdd_adapter_dev_put_debug(adapter, dbgid);
 				if (next_adapter)

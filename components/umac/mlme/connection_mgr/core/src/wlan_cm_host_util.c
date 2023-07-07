@@ -40,7 +40,7 @@
  * Return void
  */
 static void
-cm_copy_ssids_from_rso_config_params(struct rso_config_params *rso_usr_cfg,
+cm_copy_ssids_from_rso_config_params(struct rso_user_config *rso_usr_cfg,
 				     struct scan_filter *filter)
 {
 	uint8_t i;
@@ -67,7 +67,7 @@ QDF_STATUS cm_update_advance_roam_scan_filter(
 	struct rso_config *rso_cfg;
 	struct rso_chan_info *chan_lst;
 	struct wlan_mlme_psoc_ext_obj *mlme_obj;
-	struct rso_config_params *rso_usr_cfg;
+	struct rso_user_config *rso_usr_cfg;
 
 	psoc = wlan_vdev_get_psoc(vdev);
 	if (!psoc) {
@@ -79,7 +79,7 @@ QDF_STATUS cm_update_advance_roam_scan_filter(
 	if (!mlme_obj)
 		return QDF_STATUS_E_FAILURE;
 
-	rso_usr_cfg = &mlme_obj->cfg.lfr.rso_user_config;
+	rso_usr_cfg = wlan_cm_get_rso_user_config(vdev);
 
 	mlme_debug("No of Allowed SSID List:%d",
 		   rso_usr_cfg->num_ssid_allowed_list);

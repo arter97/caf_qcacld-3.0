@@ -379,6 +379,8 @@ struct policy_mgr_cfg {
  * @dynamic_dfs_master_disabled: current state of dynamic dfs master
  * @set_link_in_progress: To track if set link is in progress
  * @set_link_update_done_evt: qdf event to synchronize set link
+ * @active_vdev_bitmap: Active vdev id bitmap
+ * @inactive_vdev_bitmap: Inactive vdev id bitmap
  * @restriction_mask:
  */
 struct policy_mgr_psoc_priv_obj {
@@ -427,6 +429,8 @@ struct policy_mgr_psoc_priv_obj {
 	bool set_link_in_progress;
 	qdf_event_t set_link_update_done_evt;
 #endif
+	uint32_t active_vdev_bitmap;
+	uint32_t inactive_vdev_bitmap;
 #ifdef FEATURE_WLAN_CH_AVOID_EXT
 	uint32_t restriction_mask;
 #endif

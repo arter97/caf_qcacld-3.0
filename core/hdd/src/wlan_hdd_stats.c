@@ -888,10 +888,10 @@ bool hdd_get_interface_info(struct hdd_adapter *adapter,
 	     (QDF_P2P_CLIENT_MODE == adapter->device_mode) ||
 	     (QDF_P2P_DEVICE_MODE == adapter->device_mode))) {
 		sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter->deflink);
-		if (hdd_cm_is_disconnected(adapter)) {
+		if (hdd_cm_is_disconnected(adapter->deflink)) {
 			info->state = WIFI_DISCONNECTED;
 		}
-		if (hdd_cm_is_connecting(adapter)) {
+		if (hdd_cm_is_connecting(adapter->deflink)) {
 			hdd_debug("Session ID %d, Connection is in progress",
 				  adapter->deflink->vdev_id);
 			info->state = WIFI_ASSOCIATING;
@@ -2404,7 +2404,7 @@ int wlan_hdd_ll_stats_get(struct hdd_adapter *adapter, uint32_t req_id,
 		return -EPERM;
 	}
 
-	if (hdd_cm_is_vdev_roaming(adapter)) {
+	if (hdd_cm_is_vdev_roaming(adapter->deflink)) {
 		hdd_err("Roaming in progress, cannot process the request");
 		return -EBUSY;
 	}
@@ -2469,7 +2469,7 @@ __wlan_hdd_cfg80211_ll_stats_get(struct wiphy *wiphy,
 		return -EINVAL;
 	}
 
-	if (hdd_cm_is_vdev_roaming(adapter)) {
+	if (hdd_cm_is_vdev_roaming(adapter->deflink)) {
 		hdd_err("Roaming in progress, cannot process the request");
 		return -EBUSY;
 	}
@@ -3963,7 +3963,7 @@ __wlan_hdd_cfg80211_connected_chan_stats_request(struct wiphy *wiphy,
 	enum QDF_OPMODE mode;
 	QDF_STATUS status;
 
-	is_vdev_connected = hdd_cm_is_vdev_connected(adapter);
+	is_vdev_connected = hdd_cm_is_vdev_connected(adapter->deflink);
 	mode = adapter->device_mode;
 
 	if (mode != QDF_STA_MODE || !is_vdev_connected) {
@@ -6069,17 +6069,17 @@ hdd_wlan_fill_per_chain_rssi_stats(struct station_info *sinfo,
 
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 20, 0)) || \
 	defined(CFG80211_RX_FCS_ERROR_REPORTING_SUPPORT)
-static void hdd_fill_fcs_and_mpdu_count(struct hdd_adapter *adapter,
+static void hdd_fill_fcs_and_mpdu_count(struct wlan_hdd_link_info *link_info,
 					struct station_info *sinfo)
 {
-	sinfo->rx_mpdu_count = adapter->deflink->hdd_stats.peer_stats.rx_count;
-	sinfo->fcs_err_count = adapter->deflink->hdd_stats.peer_stats.fcs_count;
+	sinfo->rx_mpdu_count = link_info->hdd_stats.peer_stats.rx_count;
+	sinfo->fcs_err_count = link_info->hdd_stats.peer_stats.fcs_count;
 	hdd_debug("RX mpdu count %d fcs_err_count %d",
 		  sinfo->rx_mpdu_count, sinfo->fcs_err_count);
 	sinfo->filled |= HDD_INFO_FCS_ERROR_COUNT | HDD_INFO_RX_MPDUS;
 }
 #else
-static void hdd_fill_fcs_and_mpdu_count(struct hdd_adapter *adapter,
+static void hdd_fill_fcs_and_mpdu_count(struct wlan_hdd_link_info *link_info,
 					struct station_info *sinfo)
 {
 }
@@ -6541,7 +6541,7 @@ static int wlan_hdd_get_sta_stats(struct hdd_adapter *adapter,
 		return 0;
 	}
 
-	if (hdd_cm_is_vdev_roaming(adapter)) {
+	if (hdd_cm_is_vdev_roaming(adapter->deflink)) {
 		hdd_debug("Roaming is in progress, cannot continue with this request");
 		/*
 		 * supplicant reports very low rssi to upper layer
@@ -6577,7 +6577,7 @@ static int wlan_hdd_get_sta_stats(struct hdd_adapter *adapter,
 		/* Keep GUI happy */
 		return 0;
 
-	hdd_fill_fcs_and_mpdu_count(adapter, sinfo);
+	hdd_fill_fcs_and_mpdu_count(adapter->deflink, sinfo);
 
 	hdd_wlan_fill_per_chain_rssi_stats(sinfo, adapter->deflink);
 
@@ -7034,7 +7034,7 @@ static int __wlan_hdd_cfg80211_dump_survey(struct wiphy *wiphy,
 	if (!ucfg_scan_is_snr_monitor_enabled(hdd_ctx->psoc))
 		return -ENONET;
 
-	if (hdd_cm_is_vdev_roaming(adapter)) {
+	if (hdd_cm_is_vdev_roaming(adapter->deflink)) {
 		hdd_debug("Roaming in progress, hence return");
 		return -ENONET;
 	}
@@ -7127,7 +7127,7 @@ static bool hdd_is_rcpi_applicable(struct hdd_adapter *adapter,
 		if (!hdd_cm_is_vdev_associated(adapter->deflink))
 			return false;
 
-		if (hdd_cm_is_vdev_roaming(adapter)) {
+		if (hdd_cm_is_vdev_roaming(adapter->deflink)) {
 			/* return the cached rcpi, if mac addr matches */
 			hdd_debug("Roaming in progress, return cached RCPI");
 			if (!qdf_mem_cmp(&adapter->rcpi.mac_addr,
@@ -7384,7 +7384,7 @@ QDF_STATUS wlan_hdd_get_rssi(struct hdd_adapter *adapter, int8_t *rssi_value)
 		return QDF_STATUS_SUCCESS;
 	}
 
-	if (hdd_cm_is_vdev_roaming(adapter)) {
+	if (hdd_cm_is_vdev_roaming(adapter->deflink)) {
 		hdd_debug("Roaming in progress, return cached RSSI");
 		*rssi_value = adapter->deflink->rssi;
 		return QDF_STATUS_SUCCESS;

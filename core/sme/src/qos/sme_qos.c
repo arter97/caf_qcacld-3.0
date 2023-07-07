@@ -5849,7 +5849,7 @@ static QDF_STATUS sme_qos_delete_existing_flows(struct mac_context *mac,
 
 	pEntry = csr_ll_peek_head(&sme_qos_cb.flow_list, true);
 	if (!pEntry) {
-		sme_err("Flow List empty, nothing to delete");
+		sme_debug("Flow List empty, nothing to delete");
 		return QDF_STATUS_E_FAILURE;
 	}
 	while (pEntry) {

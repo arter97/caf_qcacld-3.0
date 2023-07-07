@@ -238,10 +238,10 @@ void __hdd_cm_disconnect_handler_post_user_update(struct hdd_adapter *adapter,
 }
 
 #ifdef WLAN_FEATURE_MSCS
-void reset_mscs_params(struct hdd_adapter *adapter)
+void reset_mscs_params(struct wlan_hdd_link_info *link_info)
 {
-	mlme_set_is_mscs_req_sent(adapter->deflink->vdev, false);
-	adapter->deflink->mscs_counter = 0;
+	mlme_set_is_mscs_req_sent(link_info->vdev, false);
+	link_info->mscs_counter = 0;
 }
 #endif
 
@@ -259,7 +259,7 @@ QDF_STATUS wlan_hdd_cm_issue_disconnect(struct hdd_adapter *adapter,
 
 	sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter->deflink);
 	hdd_place_marker(adapter, "TRY TO DISCONNECT", NULL);
-	reset_mscs_params(adapter);
+	reset_mscs_params(adapter->deflink);
 	hdd_conn_set_authenticated(adapter, false);
 	wlan_hdd_netif_queue_control(adapter,
 				     WLAN_STOP_ALL_NETIF_QUEUE_N_CARRIER,

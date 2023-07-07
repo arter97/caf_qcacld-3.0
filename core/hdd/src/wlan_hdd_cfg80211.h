@@ -433,7 +433,16 @@ void wlan_hdd_cfg80211_deregister_frames(struct hdd_adapter *adapter);
 void hdd_reg_notifier(struct wiphy *wiphy,
 				 struct regulatory_request *request);
 
-QDF_STATUS wlan_hdd_validate_operation_channel(struct hdd_adapter *adapter,
+/*
+ * FUNCTION: wlan_hdd_validate_operation_channel
+ * called by wlan_hdd_cfg80211_start_bss() and
+ * wlan_hdd_set_channel()
+ * @hdd_ctx: Global HDD context
+ *
+ * This function validates whether given channel is part of valid
+ * channel list.
+ */
+QDF_STATUS wlan_hdd_validate_operation_channel(struct hdd_context *hdd_ctx,
 					       uint32_t ch_freq);
 
 /**
@@ -1079,11 +1088,13 @@ void wlan_key_put_link_vdev(struct wlan_objmgr_vdev *link_vdev,
  * hdd_tid_to_link_map() - to get t2lm info
  * @vdev: Pointer to vdev
  * @t2lm: T2LM info
+ * @dev: Pointer to net_device structure
  *
  * Return: QDF_STATUS
  */
 QDF_STATUS hdd_tid_to_link_map(struct wlan_objmgr_vdev *vdev,
-			       struct wlan_t2lm_info *t2lm);
+			       struct wlan_t2lm_info *t2lm,
+			       struct net_device *dev);
 
 /**
  * hdd_mlo_dev_t2lm_notify_link_update() - Send update T2LM info event

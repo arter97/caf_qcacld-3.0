@@ -5447,6 +5447,23 @@ policy_mgr_validate_set_mlo_link_cb(struct wlan_objmgr_psoc *psoc,
 							   param->reason);
 }
 
+uint32_t
+policy_mgr_get_active_vdev_bitmap(struct wlan_objmgr_psoc *psoc)
+{
+	struct policy_mgr_psoc_priv_obj *pm_ctx;
+
+	pm_ctx = policy_mgr_get_context(psoc);
+	if (!pm_ctx) {
+		policy_mgr_err("Invalid Context");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	policy_mgr_debug("active link bitmap value: %d",
+			 pm_ctx->active_vdev_bitmap);
+
+	return pm_ctx->active_vdev_bitmap;
+}
+
 /**
  * policy_mgr_mlo_sta_set_link_ext() - Set links for MLO STA
  * @psoc: psoc object
@@ -5518,6 +5535,9 @@ policy_mgr_mlo_sta_set_link_ext(struct wlan_objmgr_psoc *psoc,
 	/* set MLO vdev bit mask for all case */
 	policy_mgr_fill_ml_active_link_vdev_bitmap(req, mlo_vdev_lst,
 						   num_mlo_vdev);
+
+	pm_ctx->active_vdev_bitmap = req->param.vdev_bitmap[0];
+	pm_ctx->inactive_vdev_bitmap = req->param.vdev_bitmap[1];
 
 	if (mode == MLO_LINK_FORCE_MODE_ACTIVE_INACTIVE)
 		policy_mgr_fill_ml_inactive_link_vdev_bitmap(
@@ -10175,30 +10195,53 @@ bool policy_mgr_is_ap_ap_mcc_allow(struct wlan_objmgr_psoc *psoc,
 				   struct wlan_objmgr_pdev *pdev,
 				   struct wlan_objmgr_vdev *vdev,
 				   uint32_t ch_freq,
-				   enum phy_ch_width ch_wdith)
+				   enum phy_ch_width ch_width,
+				   uint8_t *con_vdev_id,
+				   uint32_t *con_freq)
 {
 	enum QDF_OPMODE mode;
 	enum policy_mgr_con_mode con_mode;
-	uint8_t mcc_to_scc_switch;
-	uint32_t num_connections;
-	bool is_dfs_ch = false;
-	struct ch_params ch_params;
 	union conc_ext_flag conc_ext_flags;
+	uint32_t cc_count, i;
+	uint32_t op_freq[MAX_NUMBER_OF_CONC_CONNECTIONS * 2];
+	uint8_t vdev_id[MAX_NUMBER_OF_CONC_CONNECTIONS * 2];
 
 	if (!psoc || !vdev || !pdev) {
 		policy_mgr_debug("psoc or vdev or pdev is NULL");
 		return false;
 	}
+	cc_count = policy_mgr_get_mode_specific_conn_info(psoc,
+							  &op_freq[0],
+							  &vdev_id[0],
+							  PM_SAP_MODE);
+	if (cc_count < MAX_NUMBER_OF_CONC_CONNECTIONS)
+		cc_count = cc_count +
+				policy_mgr_get_mode_specific_conn_info(
+					psoc,
+					&op_freq[cc_count],
+					&vdev_id[cc_count],
+					PM_P2P_GO_MODE);
+	for (i = 0 ; i < cc_count; i++) {
+		if (ch_freq == op_freq[i])
+			break;
+		if (!policy_mgr_is_hw_dbs_capable(psoc))
+			break;
+		if (wlan_reg_is_same_band_freqs(ch_freq, op_freq[i]) &&
+		    !policy_mgr_are_sbs_chan(psoc, ch_freq, op_freq[i]))
+			break;
+	}
+	/* If same band MCC SAP/GO not present, return true,
+	 * no AP to AP channel override
+	 */
+	if (i >= cc_count)
+		return true;
+
+	*con_freq = op_freq[i];
+	*con_vdev_id = vdev_id[i];
 
 	mode = wlan_vdev_mlme_get_opmode(vdev);
 	con_mode = policy_mgr_convert_device_mode_to_qdf_type(mode);
-	qdf_mem_zero(&ch_params, sizeof(ch_params));
-	ch_params.ch_width = ch_wdith;
-	if (WLAN_REG_IS_5GHZ_CH_FREQ(ch_freq) &&
-	    wlan_reg_get_5g_bonded_channel_state_for_pwrmode(
-			pdev, ch_freq, &ch_params,
-			REG_CURRENT_PWR_MODE) == CHANNEL_STATE_DFS)
-		is_dfs_ch = true;
+
 	/*
 	 * For 3Vif concurrency we only support SCC in same MAC
 	 * in below combination:
@@ -10206,30 +10249,22 @@ bool policy_mgr_is_ap_ap_mcc_allow(struct wlan_objmgr_psoc *psoc,
 	 * 3 beaconing entities in SCC.
 	 */
 	conc_ext_flags.value = policy_mgr_get_conc_ext_flags(vdev, false);
-	num_connections = policy_mgr_get_connection_count(psoc);
-	if (num_connections > 1 &&
-	    (mode == QDF_P2P_GO_MODE || mode == QDF_SAP_MODE) &&
-	    !policy_mgr_allow_new_home_channel(psoc, con_mode, ch_freq,
-					       num_connections, is_dfs_ch,
-					       conc_ext_flags.value))
+	if (!policy_mgr_allow_concurrency(
+			psoc, con_mode, ch_freq,
+			policy_mgr_get_bw(ch_width),
+			conc_ext_flags.value,
+			wlan_vdev_get_id(vdev))) {
+		policy_mgr_debug("AP AP mcc not allowed, try to override 2nd SAP/GO chan");
+		return false;
+	}
+	/* For SCC case & bandwdith > 20, the center frequency have to be
+	 * same to avoid target MCC on different center frequency even though
+	 * primary channel are same.
+	 */
+	if (*con_freq == ch_freq && wlan_reg_get_bw_value(ch_width) > 20)
 		return false;
 
-	policy_mgr_get_mcc_scc_switch(psoc, &mcc_to_scc_switch);
-	if (mode == QDF_P2P_GO_MODE &&
-	    policy_mgr_is_p2p_p2p_conc_supported(psoc))
-		return true;
-	if (!policy_mgr_concurrent_beaconing_sessions_running(psoc))
-		return true;
-	if (policy_mgr_dual_beacon_on_single_mac_mcc_capable(psoc))
-		return true;
-	if (!policy_mgr_dual_beacon_on_single_mac_scc_capable(psoc))
-		return true;
-	if ((mcc_to_scc_switch !=
-		QDF_MCC_TO_SCC_SWITCH_FORCE_WITHOUT_DISCONNECTION) &&
-	    (mcc_to_scc_switch != QDF_MCC_TO_SCC_WITH_PREFERRED_BAND))
-		return true;
-
-	return false;
+	return true;
 }
 
 bool policy_mgr_any_other_vdev_on_same_mac_as_freq(

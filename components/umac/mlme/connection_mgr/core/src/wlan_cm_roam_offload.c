@@ -2344,6 +2344,8 @@ cm_roam_scan_filter(struct wlan_objmgr_psoc *psoc,
 	struct roam_scan_filter_params *params;
 	struct wlan_mlme_psoc_ext_obj *mlme_obj;
 	struct rso_config_params *rso_usr_cfg;
+	struct rso_user_config *rso_usr_config;
+	struct wlan_objmgr_vdev *vdev;
 
 	mlme_obj = mlme_get_psoc_ext_obj(psoc);
 	if (!mlme_obj)
@@ -2352,6 +2354,16 @@ cm_roam_scan_filter(struct wlan_objmgr_psoc *psoc,
 	scan_filter_params->reason = reason;
 	params = &scan_filter_params->filter_params;
 	rso_usr_cfg = &mlme_obj->cfg.lfr.rso_user_config;
+
+	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, vdev_id,
+						    WLAN_MLME_CM_ID);
+	if (!vdev)
+		return;
+
+	rso_usr_config = wlan_cm_get_rso_user_config(vdev);
+	if (!rso_usr_config)
+		goto end;
+
 	if (command != ROAM_SCAN_OFFLOAD_STOP) {
 		switch (reason) {
 		case REASON_ROAM_SET_DENYLIST_BSSID:
@@ -2361,7 +2373,7 @@ cm_roam_scan_filter(struct wlan_objmgr_psoc *psoc,
 		case REASON_ROAM_SET_SSID_ALLOWED:
 			op_bitmap |= ROAM_FILTER_OP_BITMAP_WHITE_LIST;
 			num_ssid_allow_list =
-				rso_usr_cfg->num_ssid_allowed_list;
+				rso_usr_config->num_ssid_allowed_list;
 			break;
 		case REASON_ROAM_SET_FAVORED_BSSID:
 			op_bitmap |= ROAM_FILTER_OP_BITMAP_PREFER_BSSID;
@@ -2371,7 +2383,7 @@ cm_roam_scan_filter(struct wlan_objmgr_psoc *psoc,
 		case REASON_CTX_INIT:
 			if (command == ROAM_SCAN_OFFLOAD_START) {
 				num_ssid_allow_list =
-					rso_usr_cfg->num_ssid_allowed_list;
+					rso_usr_config->num_ssid_allowed_list;
 				if (num_ssid_allow_list)
 					op_bitmap |=
 					ROAM_FILTER_OP_BITMAP_WHITE_LIST;
@@ -2394,13 +2406,13 @@ cm_roam_scan_filter(struct wlan_objmgr_psoc *psoc,
 						DRIVER_RSSI_REJECT_TYPE);
 			} else {
 				mlme_debug("Roam Filter need not be sent, no need to fill parameters");
-				return;
+				goto end;
 			}
 			break;
 		default:
 			if (command == ROAM_SCAN_OFFLOAD_START) {
 				num_ssid_allow_list =
-					rso_usr_cfg->num_ssid_allowed_list;
+					rso_usr_config->num_ssid_allowed_list;
 				if (num_ssid_allow_list)
 					op_bitmap |=
 					ROAM_FILTER_OP_BITMAP_WHITE_LIST;
@@ -2411,7 +2423,7 @@ cm_roam_scan_filter(struct wlan_objmgr_psoc *psoc,
 			}
 			if (!op_bitmap) {
 				mlme_debug("Roam Filter need not be sent, no need to fill parameters");
-				return;
+				goto end;
 			}
 			break;
 		}
@@ -2424,7 +2436,7 @@ cm_roam_scan_filter(struct wlan_objmgr_psoc *psoc,
 			    ROAM_FILTER_OP_BITMAP_PREFER_BSSID;
 		if (reason == REASON_ROAM_SET_SSID_ALLOWED)
 			num_ssid_allow_list =
-					rso_usr_cfg->num_ssid_allowed_list;
+					rso_usr_config->num_ssid_allowed_list;
 		num_bssid_preferred_list = rso_usr_cfg->num_bssid_favored;
 	}
 
@@ -2438,10 +2450,10 @@ cm_roam_scan_filter(struct wlan_objmgr_psoc *psoc,
 
 	for (i = 0; i < num_ssid_allow_list; i++) {
 		qdf_mem_copy(params->ssid_allowed_list[i].ssid,
-			     rso_usr_cfg->ssid_allowed_list[i].ssid,
-			     rso_usr_cfg->ssid_allowed_list[i].length);
+			     rso_usr_config->ssid_allowed_list[i].ssid,
+			     rso_usr_config->ssid_allowed_list[i].length);
 		params->ssid_allowed_list[i].length =
-				rso_usr_cfg->ssid_allowed_list[i].length;
+				rso_usr_config->ssid_allowed_list[i].length;
 		mlme_debug("SSID %d: " QDF_SSID_FMT, i,
 			   QDF_SSID_REF(params->ssid_allowed_list[i].length,
 					params->ssid_allowed_list[i].ssid));
@@ -2477,6 +2489,10 @@ cm_roam_scan_filter(struct wlan_objmgr_psoc *psoc,
 			   params->rssi_channel_penalization,
 			   params->num_disallowed_aps);
 	}
+
+end:
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_CM_ID);
+	return;
 }
 
 #ifdef CONFIG_BAND_6GHZ

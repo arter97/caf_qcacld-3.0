@@ -3254,7 +3254,7 @@ int hdd_update_acs_timer_reason(struct hdd_adapter *adapter, uint8_t reason);
 
 /**
  * hdd_switch_sap_channel() - Move SAP to the given channel
- * @adapter: AP adapter
+ * @link_info: Pointer of link_info in adapter
  * @channel: Channel
  * @forced: Force to switch channel, ignore SCC/MCC check
  *
@@ -3263,8 +3263,8 @@ int hdd_update_acs_timer_reason(struct hdd_adapter *adapter, uint8_t reason);
  *
  * Return: QDF_STATUS
  */
-QDF_STATUS hdd_switch_sap_channel(struct hdd_adapter *adapter, uint8_t channel,
-				  bool forced);
+QDF_STATUS hdd_switch_sap_channel(struct wlan_hdd_link_info *link_info,
+				  uint8_t channel, bool forced);
 
 /**
  * hdd_switch_sap_chan_freq() - Move SAP to the given channel

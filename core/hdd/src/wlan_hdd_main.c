@@ -8571,8 +8571,7 @@ QDF_STATUS hdd_stop_adapter_ext(struct hdd_context *hdd_ctx,
 		if (adapter->device_mode == QDF_NDI_MODE ||
 		    ((adapter->device_mode == QDF_STA_MODE ||
 		      adapter->device_mode == QDF_P2P_CLIENT_MODE) &&
-		      !hdd_cm_is_disconnected(adapter))
-		    ) {
+		      !hdd_cm_is_disconnected(adapter->deflink))) {
 			INIT_COMPLETION(adapter->disconnect_comp_var);
 			if (cds_is_driver_recovering())
 				reason = REASON_DEVICE_RECOVERY;
@@ -12049,46 +12048,28 @@ static void hdd_set_thermal_level_cb(hdd_handle_t hdd_handle, u_int8_t level)
 }
 #endif
 
-/**
- * hdd_switch_sap_channel() - Move SAP to the given channel
- * @adapter: AP adapter
- * @channel: Channel
- * @forced: Force to switch channel, ignore SCC/MCC check
- *
- * Moves the SAP interface by invoking the function which
- * executes the callback to perform channel switch using (E)CSA.
- *
- * Return: None
- */
-QDF_STATUS hdd_switch_sap_channel(struct hdd_adapter *adapter, uint8_t channel,
-				  bool forced)
+QDF_STATUS hdd_switch_sap_channel(struct wlan_hdd_link_info *link_info,
+				  uint8_t channel, bool forced)
 {
-	struct hdd_ap_ctx *hdd_ap_ctx;
-	struct hdd_context *hdd_ctx;
+	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(link_info->adapter);
 	mac_handle_t mac_handle;
+	struct sap_config *sap_cfg;
+	qdf_freq_t freq;
 
-	if (!adapter) {
-		hdd_err("invalid adapter");
-		return QDF_STATUS_E_INVAL;
-	}
-
-	hdd_ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(adapter->deflink);
-
-	mac_handle = hdd_adapter_get_mac_handle(adapter);
+	mac_handle = hdd_adapter_get_mac_handle(link_info->adapter);
 	if (!mac_handle) {
 		hdd_err("invalid MAC handle");
 		return QDF_STATUS_E_INVAL;
 	}
 
-	hdd_ctx = WLAN_HDD_GET_CTX(adapter);
+	freq = wlan_reg_legacy_chan_to_freq(hdd_ctx->pdev, channel);
+	sap_cfg = &(WLAN_HDD_GET_AP_CTX_PTR(link_info)->sap_config);
+	hdd_debug("chan:%d width:%d", channel, sap_cfg->ch_width_orig);
 
-	hdd_debug("chan:%d width:%d",
-		channel, hdd_ap_ctx->sap_config.ch_width_orig);
-
-	return policy_mgr_change_sap_channel_with_csa(
-		hdd_ctx->psoc, adapter->deflink->vdev_id,
-		wlan_reg_legacy_chan_to_freq(hdd_ctx->pdev, channel),
-		hdd_ap_ctx->sap_config.ch_width_orig, forced);
+	return policy_mgr_change_sap_channel_with_csa(hdd_ctx->psoc,
+						      link_info->vdev_id, freq,
+						      sap_cfg->ch_width_orig,
+						      forced);
 }
 
 QDF_STATUS hdd_switch_sap_chan_freq(struct hdd_adapter *adapter,
@@ -12489,7 +12470,7 @@ static void hdd_lte_coex_restart_sap(struct hdd_adapter *adapter,
 				    WLAN_SVC_LTE_COEX_IND, NULL, 0);
 	wlan_hdd_set_sap_csa_reason(hdd_ctx->psoc, adapter->deflink->vdev_id,
 				    CSA_REASON_LTE_COEX);
-	hdd_switch_sap_channel(adapter, restart_chan, true);
+	hdd_switch_sap_channel(adapter->deflink, restart_chan, true);
 }
 
 int hdd_clone_local_unsafe_chan(struct hdd_context *hdd_ctx,
@@ -19784,10 +19765,10 @@ static QDF_STATUS hdd_is_connection_in_progress_iterator(
 	     adapter->device_mode == QDF_SAP_MODE))
 		return QDF_STATUS_SUCCESS;
 
-	if (((QDF_STA_MODE == adapter->device_mode)
-		|| (QDF_P2P_CLIENT_MODE == adapter->device_mode)
-		|| (QDF_P2P_DEVICE_MODE == adapter->device_mode))
-		&& hdd_cm_is_connecting(adapter)) {
+	if ((QDF_STA_MODE == adapter->device_mode ||
+	     QDF_P2P_CLIENT_MODE == adapter->device_mode ||
+	     QDF_P2P_DEVICE_MODE == adapter->device_mode) &&
+	    hdd_cm_is_connecting(adapter->deflink)) {
 		hdd_debug("%pK(%d) mode %d Connection is in progress",
 			  WLAN_HDD_GET_STATION_CTX_PTR(adapter->deflink),
 			  adapter->deflink->vdev_id, adapter->device_mode);
@@ -20008,6 +19989,7 @@ void hdd_check_and_restart_sap_with_non_dfs_acs(void)
 	struct cds_context *cds_ctx;
 	uint8_t restart_chan;
 	uint32_t restart_freq;
+	struct wlan_hdd_link_info *link_info;
 
 	hdd_ctx = cds_get_context(QDF_MODULE_ID_HDD);
 	if (!hdd_ctx)
@@ -20024,20 +20006,22 @@ void hdd_check_and_restart_sap_with_non_dfs_acs(void)
 	}
 
 	ap_adapter = hdd_get_adapter(hdd_ctx, QDF_SAP_MODE);
-	if (ap_adapter &&
-	    test_bit(SOFTAP_BSS_STARTED, &ap_adapter->deflink->link_flags) &&
+	if (!ap_adapter)
+		return;
+
+	link_info = ap_adapter->deflink;
+	if (test_bit(SOFTAP_BSS_STARTED, &link_info->link_flags) &&
 	    wlan_reg_is_dfs_for_freq(
 			hdd_ctx->pdev,
-			ap_adapter->deflink->session.ap.operating_chan_freq)) {
+			link_info->session.ap.operating_chan_freq)) {
 		if (policy_mgr_get_dfs_master_dynamic_enabled(
-				hdd_ctx->psoc, ap_adapter->deflink->vdev_id))
+				hdd_ctx->psoc, link_info->vdev_id))
 			return;
 		hdd_warn("STA-AP Mode DFS not supported, Switch SAP channel to Non DFS");
 
 		restart_freq =
 			wlansap_get_safe_channel_from_pcl_and_acs_range(
-				WLAN_HDD_GET_SAP_CTX_PTR(ap_adapter->deflink),
-				NULL);
+				WLAN_HDD_GET_SAP_CTX_PTR(link_info), NULL);
 
 		restart_chan = wlan_reg_freq_to_chan(hdd_ctx->pdev,
 						     restart_freq);
@@ -20046,9 +20030,9 @@ void hdd_check_and_restart_sap_with_non_dfs_acs(void)
 			restart_chan = SAP_DEFAULT_5GHZ_CHANNEL;
 		wlan_hdd_set_sap_csa_reason(
 					hdd_ctx->psoc,
-					ap_adapter->deflink->vdev_id,
+					link_info->vdev_id,
 					CSA_REASON_STA_CONNECT_DFS_TO_NON_DFS);
-		hdd_switch_sap_channel(ap_adapter, restart_chan, true);
+		hdd_switch_sap_channel(link_info, restart_chan, true);
 	}
 }
 

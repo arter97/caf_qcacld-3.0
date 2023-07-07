@@ -3354,7 +3354,7 @@ bool hdd_is_any_sta_connecting(struct hdd_context *hdd_ctx)
 		sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter->deflink);
 		if ((adapter->device_mode == QDF_STA_MODE) ||
 		    (adapter->device_mode == QDF_P2P_CLIENT_MODE)) {
-			if (hdd_cm_is_connecting(adapter)) {
+			if (hdd_cm_is_connecting(adapter->deflink)) {
 				hdd_debug("vdev_id %d: connecting",
 					  adapter->deflink->vdev_id);
 				hdd_adapter_dev_put_debug(adapter, dbgid);
@@ -4571,10 +4571,9 @@ static inline bool wlan_hdd_get_sap_obss(struct wlan_hdd_link_info *link_info)
  *
  * Return: 0 for success non-zero for failure
  */
-int wlan_hdd_set_channel(struct wiphy *wiphy,
-				struct net_device *dev,
-				struct cfg80211_chan_def *chandef,
-				enum nl80211_channel_type channel_type)
+int wlan_hdd_set_channel(struct wiphy *wiphy, struct net_device *dev,
+			 struct cfg80211_chan_def *chandef,
+			 enum nl80211_channel_type channel_type)
 {
 	struct hdd_adapter *adapter = NULL;
 	uint32_t num_ch = 0;
@@ -4636,59 +4635,54 @@ int wlan_hdd_set_channel(struct wiphy *wiphy,
 
 	num_ch = CFG_VALID_CHANNEL_LIST_LEN;
 
-	if (QDF_STATUS_SUCCESS !=  wlan_hdd_validate_operation_channel(
-	    adapter, chandef->chan->center_freq)) {
+	if (QDF_STATUS_SUCCESS !=
+	    wlan_hdd_validate_operation_channel(hdd_ctx,
+						chandef->chan->center_freq)) {
 		hdd_err("Invalid freq: %d", chandef->chan->center_freq);
 		return -EINVAL;
 	}
 
-	if (adapter->device_mode == QDF_SAP_MODE ||
-	    adapter->device_mode == QDF_P2P_GO_MODE) {
-		ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(adapter->deflink);
-		sap_config = &ap_ctx->sap_config;
-		sap_config->chan_freq = chandef->chan->center_freq;
-		sap_config->ch_params.center_freq_seg1 = channel_seg2;
-		sap_config->ch_params.center_freq_seg0 =
+	ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(adapter->deflink);
+	sap_config = &ap_ctx->sap_config;
+	sap_config->chan_freq = chandef->chan->center_freq;
+	sap_config->ch_params.center_freq_seg1 = channel_seg2;
+	sap_config->ch_params.center_freq_seg0 =
 			ieee80211_frequency_to_channel(chandef->center_freq1);
 
-		if (QDF_SAP_MODE == adapter->device_mode) {
-			/* set channel to what hostapd configured */
-			sap_config->chan_freq = chandef->chan->center_freq;
-			sap_config->ch_params.center_freq_seg1 = channel_seg2;
+	if (QDF_SAP_MODE == adapter->device_mode) {
+		/* set channel to what hostapd configured */
+		sap_config->chan_freq = chandef->chan->center_freq;
+		sap_config->ch_params.center_freq_seg1 = channel_seg2;
 
-			sme_config = qdf_mem_malloc(sizeof(*sme_config));
-			if (!sme_config)
-				return -ENOMEM;
+		sme_config = qdf_mem_malloc(sizeof(*sme_config));
+		if (!sme_config)
+			return -ENOMEM;
 
-			sme_get_config_param(mac_handle, sme_config);
-			switch (channel_type) {
-			case NL80211_CHAN_HT20:
-			case NL80211_CHAN_NO_HT:
-				sme_config->csr_config.obssEnabled = false;
-				sap_config->sec_ch_freq = 0;
-				break;
-			case NL80211_CHAN_HT40MINUS:
-				sap_config->sec_ch_freq =
-					sap_config->chan_freq - 20;
-				break;
-			case NL80211_CHAN_HT40PLUS:
-				sap_config->sec_ch_freq =
-					sap_config->chan_freq + 20;
-				break;
-			default:
-				hdd_err("Error!!! Invalid HT20/40 mode !");
-				qdf_mem_free(sme_config);
-				return -EINVAL;
-			}
-			sme_config->csr_config.obssEnabled =
+		sme_get_config_param(mac_handle, sme_config);
+		switch (channel_type) {
+		case NL80211_CHAN_HT20:
+		case NL80211_CHAN_NO_HT:
+			sme_config->csr_config.obssEnabled = false;
+			sap_config->sec_ch_freq = 0;
+			break;
+		case NL80211_CHAN_HT40MINUS:
+			sap_config->sec_ch_freq =
+				sap_config->chan_freq - 20;
+			break;
+		case NL80211_CHAN_HT40PLUS:
+			sap_config->sec_ch_freq =
+				sap_config->chan_freq + 20;
+			break;
+		default:
+			hdd_err("Error!!! Invalid HT20/40 mode !");
+			qdf_mem_free(sme_config);
+			return -EINVAL;
+		}
+		sme_config->csr_config.obssEnabled =
 					wlan_hdd_get_sap_obss(link_info);
 
-			sme_update_config(mac_handle, sme_config);
-			qdf_mem_free(sme_config);
-		}
-	} else {
-		hdd_err("Invalid device mode failed to set valid channel");
-		return -EINVAL;
+		sme_update_config(mac_handle, sme_config);
+		qdf_mem_free(sme_config);
 	}
 
 	return status;
@@ -6014,9 +6008,10 @@ int wlan_hdd_restore_channels(struct hdd_context *hdd_ctx)
 #endif
 
 #ifdef DHCP_SERVER_OFFLOAD
-static void wlan_hdd_set_dhcp_server_offload(struct hdd_adapter *adapter)
+static void
+wlan_hdd_set_dhcp_server_offload(struct wlan_hdd_link_info *link_info)
 {
-	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
+	struct hdd_context *hdd_ctx;
 	struct dhcp_offload_info_params dhcp_srv_info;
 	uint8_t num_entries = 0;
 	uint8_t *srv_ip;
@@ -6026,11 +6021,12 @@ static void wlan_hdd_set_dhcp_server_offload(struct hdd_adapter *adapter)
 	mac_handle_t mac_handle;
 	QDF_STATUS status;
 
+	hdd_ctx = link_info->adapter->hdd_ctx;
 	if (!hdd_ctx->config->dhcp_server_ip.is_dhcp_server_ip_valid)
 		return;
 
 	srv_ip = hdd_ctx->config->dhcp_server_ip.dhcp_server_ip;
-	dhcp_srv_info.vdev_id = adapter->deflink->vdev_id;
+	dhcp_srv_info.vdev_id = link_info->vdev_id;
 	dhcp_srv_info.dhcp_offload_enabled = true;
 
 	status = ucfg_fwol_get_dhcp_max_num_clients(hdd_ctx->psoc,
@@ -6068,18 +6064,17 @@ static void wlan_hdd_set_dhcp_server_offload(struct hdd_adapter *adapter)
 
 /**
  * wlan_hdd_dhcp_offload_enable: Enable DHCP offload
- * @hdd_ctx: HDD context handler
- * @adapter: Adapter pointer
+ * @link_info: Pointer of link_info in adapter
  *
  * Enables the DHCP Offload feature in firmware if it has been configured.
  *
  * Return: None
  */
-static void wlan_hdd_dhcp_offload_enable(struct hdd_context *hdd_ctx,
-					 struct hdd_adapter *adapter)
+static void wlan_hdd_dhcp_offload_enable(struct wlan_hdd_link_info *link_info)
 {
 	bool enable_dhcp_server_offload;
 	QDF_STATUS status;
+	struct hdd_context *hdd_ctx = link_info->adapter->hdd_ctx;
 
 	status = ucfg_fwol_get_enable_dhcp_server_offload(
 						hdd_ctx->psoc,
@@ -6088,11 +6083,11 @@ static void wlan_hdd_dhcp_offload_enable(struct hdd_context *hdd_ctx,
 		return;
 
 	if (enable_dhcp_server_offload)
-		wlan_hdd_set_dhcp_server_offload(adapter);
+		wlan_hdd_set_dhcp_server_offload(link_info);
 }
 #else
-static void wlan_hdd_dhcp_offload_enable(struct hdd_context *hdd_ctx,
-					 struct hdd_adapter *adapter)
+static inline void
+wlan_hdd_dhcp_offload_enable(struct wlan_hdd_link_info *link_info)
 {
 }
 #endif /* DHCP_SERVER_OFFLOAD */
@@ -6433,7 +6428,7 @@ int wlan_hdd_cfg80211_start_bss(struct hdd_adapter *adapter,
 		hdd_ctx->dev_dfs_cac_status = DFS_CAC_NEVER_DONE;
 
 	if (QDF_STATUS_SUCCESS !=
-	    wlan_hdd_validate_operation_channel(adapter, config->chan_freq)) {
+	    wlan_hdd_validate_operation_channel(hdd_ctx, config->chan_freq)) {
 		hdd_err("Invalid Ch_freq: %d", config->chan_freq);
 		ret = -EINVAL;
 		goto error;
@@ -6940,7 +6935,7 @@ int wlan_hdd_cfg80211_start_bss(struct hdd_adapter *adapter,
 		wlan_set_sap_user_config_freq(vdev, user_config_freq);
 	}
 
-	wlan_hdd_dhcp_offload_enable(hdd_ctx, adapter);
+	wlan_hdd_dhcp_offload_enable(adapter->deflink);
 	ucfg_p2p_status_start_bss(vdev);
 
 	/* Check and restart SAP if it is on unsafe channel */
@@ -7363,39 +7358,6 @@ wlan_hdd_get_sap_ch_params(struct hdd_context *hdd_ctx,
 }
 
 /**
- * wlan_hdd_is_same_freq_seg() - Check freq segment is same or not
- * @chandef: channel of new SAP
- * @ch_params: channel parameters of existed SAP
- *
- * If two SAP on same channel, and channel type is NL80211_CHAN_HT40MINUS or
- * NL80211_CHAN_HT40PLUS, or channel offset is PHY_DOUBLE_CHANNEL_HIGH_PRIMARY
- * or PHY_DOUBLE_CHANNEL_LOW_PRIMARY, then check freq segment is same or not.
- *
- * Return: true if freq segment is same
- */
-static bool
-wlan_hdd_is_same_freq_seg(struct cfg80211_chan_def *chandef,
-			  struct ch_params *ch_params)
-{
-	if (!chandef || !ch_params)
-		return false;
-
-	/* they are equal if NL80211_CHAN_NO_HT or NL80211_CHAN_HT20 */
-	if (chandef->center_freq1 == chandef->chan->center_freq)
-		return true;
-
-	if ((ch_params->sec_ch_offset != PHY_DOUBLE_CHANNEL_HIGH_PRIMARY) &&
-	    (ch_params->sec_ch_offset != PHY_DOUBLE_CHANNEL_LOW_PRIMARY))
-		return true;
-
-	if ((chandef->center_freq1 != ch_params->mhz_freq_seg0) ||
-	    (chandef->center_freq2 != ch_params->mhz_freq_seg1))
-		return false;
-
-	return true;
-}
-
-/**
  * wlan_hdd_is_ap_ap_force_scc_override() - force Same band SCC chan override
  * @adapter: SAP adapter pointer
  * @chandef: SAP starting channel
@@ -7412,13 +7374,10 @@ wlan_hdd_is_ap_ap_force_scc_override(struct hdd_adapter *adapter,
 				     struct cfg80211_chan_def *new_chandef)
 {
 	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
-	uint32_t cc_count, i;
-	uint32_t op_freq[MAX_NUMBER_OF_CONC_CONNECTIONS];
-	uint8_t vdev_id[MAX_NUMBER_OF_CONC_CONNECTIONS];
 	struct ch_params ch_params = {0};
 	enum nl80211_channel_type channel_type;
-	uint8_t con_vdev_id;
-	uint32_t con_freq;
+	uint8_t con_vdev_id = WLAN_INVALID_VDEV_ID;
+	uint32_t con_freq = 0;
 	struct ieee80211_channel *ieee_chan;
 	uint32_t freq;
 	QDF_STATUS status;
@@ -7436,7 +7395,8 @@ wlan_hdd_is_ap_ap_force_scc_override(struct hdd_adapter *adapter,
 	}
 	if (policy_mgr_is_ap_ap_mcc_allow(
 			hdd_ctx->psoc, hdd_ctx->pdev, vdev, freq,
-			hdd_map_nl_chan_width(chandef->width))) {
+			hdd_map_nl_chan_width(chandef->width),
+			&con_vdev_id, &con_freq)) {
 		hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
 		return false;
 	}
@@ -7444,39 +7404,8 @@ wlan_hdd_is_ap_ap_force_scc_override(struct hdd_adapter *adapter,
 
 	if (hdd_handle_p2p_go_for_3rd_ap_conc(hdd_ctx->psoc, adapter, freq))
 		return false;
-
-	cc_count = policy_mgr_get_mode_specific_conn_info(hdd_ctx->psoc,
-							  &op_freq[0],
-							  &vdev_id[0],
-							  PM_SAP_MODE);
-	if (cc_count < MAX_NUMBER_OF_CONC_CONNECTIONS)
-		cc_count = cc_count +
-				policy_mgr_get_mode_specific_conn_info(
-					hdd_ctx->psoc,
-					&op_freq[cc_count],
-					&vdev_id[cc_count],
-					PM_P2P_GO_MODE);
-	for (i = 0 ; i < cc_count; i++) {
-		if (freq == op_freq[i]) {
-			status = wlan_hdd_get_sap_ch_params(hdd_ctx,
-							    vdev_id[i],
-							    op_freq[i],
-							    &ch_params);
-			if (QDF_IS_STATUS_SUCCESS(status) &&
-			    (!wlan_hdd_is_same_freq_seg(chandef, &ch_params)))
-				break;
-			continue;
-		}
-		if (!policy_mgr_is_hw_dbs_capable(hdd_ctx->psoc))
-			break;
-		if (wlan_reg_is_same_band_freqs(freq, op_freq[i]) &&
-		    !policy_mgr_are_sbs_chan(hdd_ctx->psoc, freq, op_freq[i]))
-			break;
-	}
-	if (i >= cc_count)
+	if (!con_freq)
 		return false;
-	con_freq = op_freq[i];
-	con_vdev_id = vdev_id[i];
 	ieee_chan = ieee80211_get_channel(hdd_ctx->wiphy,
 					  con_freq);
 	if (!ieee_chan) {

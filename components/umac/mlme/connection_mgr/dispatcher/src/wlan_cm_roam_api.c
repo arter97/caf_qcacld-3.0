@@ -1414,16 +1414,13 @@ wlan_cm_roam_cfg_set_value(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 	return status;
 }
 
-void wlan_roam_reset_roam_params(struct wlan_objmgr_psoc *psoc)
+void wlan_roam_reset_roam_params(struct wlan_objmgr_vdev *vdev)
 {
-	struct wlan_mlme_psoc_ext_obj *mlme_obj;
-	struct rso_config_params *rso_usr_cfg;
+	struct rso_user_config *rso_usr_cfg;
 
-	mlme_obj = mlme_get_psoc_ext_obj(psoc);
-	if (!mlme_obj)
+	rso_usr_cfg = wlan_cm_get_rso_user_config(vdev);
+	if (!rso_usr_cfg)
 		return;
-
-	rso_usr_cfg = &mlme_obj->cfg.lfr.rso_user_config;
 
 	/*
 	 * clear all the allowlist parameters and remaining
@@ -1635,6 +1632,24 @@ struct rso_config *wlan_cm_get_rso_config_fl(struct wlan_objmgr_vdev *vdev,
 		return NULL;
 
 	return &cm_ext_obj->rso_cfg;
+}
+
+struct rso_user_config *
+wlan_cm_get_rso_user_config_fl(struct wlan_objmgr_vdev *vdev,
+			       const char *func, uint32_t line)
+{
+	struct cm_ext_obj *cm_ext_obj;
+	enum QDF_OPMODE op_mode = wlan_vdev_mlme_get_opmode(vdev);
+
+	/* get only for CLI and STA */
+	if (op_mode != QDF_STA_MODE && op_mode != QDF_P2P_CLIENT_MODE)
+		return NULL;
+
+	cm_ext_obj = cm_get_ext_hdl_fl(vdev, func, line);
+	if (!cm_ext_obj)
+		return NULL;
+
+	return &cm_ext_obj->rso_usr_cfg;
 }
 
 QDF_STATUS cm_roam_acquire_lock(struct wlan_objmgr_vdev *vdev)

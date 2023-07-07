@@ -1229,6 +1229,17 @@ bool policy_mgr_is_set_link_in_progress(struct wlan_objmgr_psoc *psoc);
  * Return: QDF_STATUS
  */
 QDF_STATUS policy_mgr_wait_for_set_link_update(struct wlan_objmgr_psoc *psoc);
+
+/**
+ * policy_mgr_get_active_vdev_bitmap() - to get active ML STA vdev bitmap
+ * @psoc: PSOC object information
+ *
+ * This API will fetch the active ML STA vdev bitmap.
+ *
+ * Return: vdev bitmap value
+ */
+uint32_t
+policy_mgr_get_active_vdev_bitmap(struct wlan_objmgr_psoc *psoc);
 #else
 static inline bool
 policy_mgr_is_ml_vdev_id(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id)
@@ -1269,6 +1280,12 @@ static inline QDF_STATUS
 policy_mgr_wait_for_set_link_update(struct wlan_objmgr_psoc *psoc)
 {
 	return QDF_STATUS_E_NOSUPPORT;
+}
+
+static inline uint32_t
+policy_mgr_get_active_vdev_bitmap(struct wlan_objmgr_psoc *psoc)
+{
+	return 0;
 }
 #endif
 
@@ -4978,9 +4995,13 @@ bool policy_mgr_is_sta_chan_valid_for_connect_and_roam(
  * @pdev: pdev object
  * @vdev: vdev object of new SAP or P2P GO
  * @ch_freq: channel frequency of up coming vdev
- * @ch_wdith: channel width
+ * @ch_width: channel width
+ * @con_vdev_id: concurrent SAP/GO vdev id
+ * @con_freq: concurrent SAP/GO home channel.
  *
- * Check if AP AP MCC allow or not when new SAP or P2P GO creating
+ * Check if AP AP MCC allow or not when new SAP or P2P GO creating.
+ * If not allowed, the concurrency SAP/GO vdev and channel will
+ * be returned.
  *
  * Return: True if the target allow AP AP MCC,
  *         False otherwise.
@@ -4989,7 +5010,9 @@ bool policy_mgr_is_ap_ap_mcc_allow(struct wlan_objmgr_psoc *psoc,
 				   struct wlan_objmgr_pdev *pdev,
 				   struct wlan_objmgr_vdev *vdev,
 				   uint32_t ch_freq,
-				   enum phy_ch_width ch_wdith);
+				   enum phy_ch_width ch_width,
+				   uint8_t *con_vdev_id,
+				   uint32_t *con_freq);
 
 /**
  * policy_mgr_any_other_vdev_on_same_mac_as_freq() - Function to check
