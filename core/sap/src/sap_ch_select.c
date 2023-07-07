@@ -274,7 +274,7 @@ sap_check_n_add_overlapped_chnls(struct sap_context *sap_ctx,
 /**
  * sap_process_avoid_ie() - processes the detected Q2Q IE
  * context's avoid_channels_info struct
- * @mac_handle:         opaque handle to the MAC context
+ * @mac_ctx:            pointer to mac_context structure
  * @sap_ctx:            sap context.
  * @scan_result:        scan results for ACS scan.
  * @spect_info:         spectrum weights array to update
@@ -288,7 +288,7 @@ sap_check_n_add_overlapped_chnls(struct sap_context *sap_ctx,
  * Return: void
  */
 static void
-sap_process_avoid_ie(mac_handle_t mac_handle,
+sap_process_avoid_ie(struct mac_context *mac_ctx,
 		     struct sap_context *sap_ctx,
 		     qdf_list_t *scan_list,
 		     struct sap_sel_ch_info *spect_info)
@@ -296,13 +296,11 @@ sap_process_avoid_ie(mac_handle_t mac_handle,
 	const uint8_t *temp_ptr = NULL;
 	uint8_t i = 0;
 	struct sAvoidChannelIE *avoid_ch_ie;
-	struct mac_context *mac_ctx = NULL;
 	struct sap_ch_info *spect_ch = NULL;
 	qdf_list_node_t *cur_lst = NULL, *next_lst = NULL;
 	struct scan_cache_node *cur_node = NULL;
 	uint32_t chan_freq;
 
-	mac_ctx = MAC_CONTEXT(mac_handle);
 	spect_ch = spect_info->ch_info;
 
 	if (scan_list)
@@ -414,7 +412,7 @@ uint32_t sap_select_preferred_channel_from_channel_list(uint32_t best_ch_freq,
  *
  * Return: bool Success or FAIL
  */
-static bool sap_chan_sel_init(mac_handle_t mac_handle,
+static bool sap_chan_sel_init(struct mac_context *mac,
 			      struct sap_sel_ch_info *ch_info_params,
 			      struct sap_context *sap_ctx,
 			      bool ignore_acs_range)
@@ -422,7 +420,6 @@ static bool sap_chan_sel_init(mac_handle_t mac_handle,
 	struct sap_ch_info *ch_info = NULL;
 	uint32_t *ch_list = NULL;
 	uint16_t num_chan = 0;
-	struct mac_context *mac = MAC_CONTEXT(mac_handle);
 	bool include_dfs_ch = true;
 	uint8_t sta_sap_scc_on_dfs_chnl_config_value;
 	bool ch_support_puncture;
@@ -1478,7 +1475,7 @@ static void sap_update_6ghz_max_weight(struct sap_sel_ch_info *ch_info_params,
 /**
  * sap_compute_spect_weight() - Compute spectrum weight
  * @ch_info_params: Pointer to the tSpectInfoParams structure
- * @mac_handle: Opaque handle to the global MAC context
+ * @mac: Pointer to mac_context struucture
  * @pResult: Pointer to tScanResultHandle
  * @sap_ctx: Context of the SAP
  *
@@ -1487,7 +1484,7 @@ static void sap_update_6ghz_max_weight(struct sap_sel_ch_info *ch_info_params,
  * and number of BSS
  */
 static void sap_compute_spect_weight(struct sap_sel_ch_info *ch_info_params,
-				     mac_handle_t mac_handle,
+				     struct mac_context *mac,
 				     qdf_list_t *scan_list,
 				     struct sap_context *sap_ctx)
 {
@@ -1499,7 +1496,6 @@ static void sap_compute_spect_weight(struct sap_sel_ch_info *ch_info_params,
 	uint32_t center_freq0, center_freq1, chan_freq;
 	uint8_t i;
 	bool found;
-	struct mac_context *mac = MAC_CONTEXT(mac_handle);
 	struct sap_ch_info *ch_start = ch_info_params->ch_info;
 	struct sap_ch_info *ch_end = ch_info_params->ch_info +
 		ch_info_params->num_ch;
@@ -2776,6 +2772,45 @@ sap_acs_next_lower_bandwidth(enum phy_ch_width ch_width)
 	return wlan_reg_get_next_lower_bandwidth(ch_width);
 }
 
+static void sap_sort_channel_list(struct mac_context *mac_ctx,
+				  uint8_t vdev_id,
+				  qdf_list_t *ch_list,
+				  struct sap_sel_ch_info *ch_info,
+				  v_REGDOMAIN_t *domain,
+				  uint32_t *operating_band)
+{
+	uint8_t country[CDS_COUNTRY_CODE_LEN + 1];
+	struct sap_context *sap_ctx;
+	enum phy_ch_width cur_bw;
+
+	sap_ctx = mac_ctx->sap.sapCtxList[vdev_id].sap_context;
+	cur_bw = sap_ctx->acs_cfg->ch_width;
+
+	/* Initialize the structure pointed by spect_info */
+	if (!sap_chan_sel_init(mac_ctx, ch_info, sap_ctx, false)) {
+		sap_err("Ch Select initialization failed");
+		return;
+	}
+
+	/* Compute the weight of the entire spectrum in the operating band */
+	sap_compute_spect_weight(ch_info, mac_ctx, ch_list, sap_ctx);
+
+#ifdef FEATURE_AP_MCC_CH_AVOIDANCE
+	/* process avoid channel IE to collect all channels to avoid */
+	sap_process_avoid_ie(mac_ctx, sap_ctx, ch_list, ch_info);
+#endif /* FEATURE_AP_MCC_CH_AVOIDANCE */
+
+	wlan_reg_read_current_country(mac_ctx->psoc, country);
+	wlan_reg_get_domain_from_country_code(domain, country, SOURCE_DRIVER);
+
+	SET_ACS_BAND(*operating_band, sap_ctx);
+
+	/* Sort the ch lst as per the computed weights, lesser weight first. */
+	sap_sort_chl_weight_all(mac_ctx, sap_ctx, ch_info, *operating_band,
+				*domain, &cur_bw);
+	sap_ctx->acs_cfg->ch_width = cur_bw;
+}
+
 uint32_t sap_select_channel(mac_handle_t mac_handle,
 			    struct sap_context *sap_ctx,
 			    qdf_list_t *scan_list)
@@ -2787,38 +2822,15 @@ uint32_t sap_select_channel(mac_handle_t mac_handle,
 	uint32_t best_ch_weight = SAP_ACS_WEIGHT_MAX;
 	uint32_t ht40plus2gendch = 0;
 	v_REGDOMAIN_t domain;
-	uint8_t country[CDS_COUNTRY_CODE_LEN + 1];
 	uint8_t count;
 	uint32_t operating_band = 0;
 	struct mac_context *mac_ctx;
 	uint32_t best_chan_freq = 0;
-	enum phy_ch_width cur_bw = sap_ctx->acs_cfg->ch_width;
 
 	mac_ctx = MAC_CONTEXT(mac_handle);
 
-	/* Initialize the structure pointed by spect_info */
-	if (sap_chan_sel_init(mac_handle, spect_info, sap_ctx, false) != true) {
-		sap_err("Ch Select initialization failed");
-		return SAP_CHANNEL_NOT_SELECTED;
-	}
-
-	/* Compute the weight of the entire spectrum in the operating band */
-	sap_compute_spect_weight(spect_info, mac_handle, scan_list, sap_ctx);
-
-#ifdef FEATURE_AP_MCC_CH_AVOIDANCE
-	/* process avoid channel IE to collect all channels to avoid */
-	sap_process_avoid_ie(mac_handle, sap_ctx, scan_list, spect_info);
-#endif /* FEATURE_AP_MCC_CH_AVOIDANCE */
-
-	wlan_reg_read_current_country(mac_ctx->psoc, country);
-	wlan_reg_get_domain_from_country_code(&domain, country, SOURCE_DRIVER);
-
-	SET_ACS_BAND(operating_band, sap_ctx);
-
-	/* Sort the ch lst as per the computed weights, lesser weight first. */
-	sap_sort_chl_weight_all(mac_ctx, sap_ctx, spect_info, operating_band,
-				domain, &cur_bw);
-	sap_ctx->acs_cfg->ch_width = cur_bw;
+	sap_sort_channel_list(mac_ctx, sap_ctx->vdev_id, scan_list,
+			      spect_info, &domain, &operating_band);
 
 	/*Loop till get the best channel in the given range */
 	for (count = 0; count < spect_info->num_ch; count++) {
