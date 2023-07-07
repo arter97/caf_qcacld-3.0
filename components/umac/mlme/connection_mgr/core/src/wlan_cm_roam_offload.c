@@ -3475,6 +3475,8 @@ cm_roam_stop_req(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 		goto rel_vdev_ref;
 
 	stop_req->btm_config.vdev_id = vdev_id;
+	MLME_SET_BIT(stop_req->btm_config.btm_offload_config,
+		     BTM_OFFLOAD_CONFIG_BIT_0);
 	stop_req->disconnect_params.vdev_id = vdev_id;
 	stop_req->idle_params.vdev_id = vdev_id;
 	stop_req->roam_triggers.vdev_id = vdev_id;

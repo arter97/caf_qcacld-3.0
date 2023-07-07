@@ -2572,6 +2572,7 @@ struct wlan_mlme_wifi_pos_cfg {
 /* Mask to check if BTM offload is enabled/disabled*/
 #define BTM_OFFLOAD_ENABLED_MASK    0x01
 
+#define BTM_OFFLOAD_CONFIG_BIT_0    0
 #define BTM_OFFLOAD_CONFIG_BIT_8    8
 #define BTM_OFFLOAD_CONFIG_BIT_7    7
 
