@@ -289,6 +289,8 @@ struct wlan_srng_cfg {
  *                           pool support
  * @is_rx_refill_buff_pool_enabled: flag to enable/disable RX refill buffer
  *                           pool support
+ * @enable_dp_buf_page_frag_alloc: Flag to control DP allocation from page frag
+ *				   cache.
  * @rx_refill_buff_pool_size: RX refill buffer pool size
  * @rx_pending_high_threshold: threshold of starting pkt drop
  * @rx_pending_low_threshold: threshold of stopping pkt drop
@@ -477,6 +479,7 @@ struct wlan_cfg_dp_soc_ctxt {
 	bool pext_stats_enabled;
 	bool is_rx_buff_pool_enabled;
 	bool is_rx_refill_buff_pool_enabled;
+	bool enable_dp_buf_page_frag_alloc;
 	int rx_refill_buff_pool_size;
 	uint32_t rx_pending_high_threshold;
 	uint32_t rx_pending_low_threshold;
@@ -2000,6 +2003,18 @@ bool wlan_cfg_is_rx_buffer_pool_enabled(struct wlan_cfg_dp_soc_ctxt *cfg);
  * Return: true if enabled, false otherwise.
  */
 bool wlan_cfg_is_rx_refill_buffer_pool_enabled(struct wlan_cfg_dp_soc_ctxt *cfg);
+
+/**
+ * wlan_cfg_is_dp_buf_page_frag_alloc_enable() - Get nbuf allocations from page
+ *						 frags.
+ *
+ * @cfg: soc configuration context
+ *
+ * Return: true if enabled, false otherwise.
+ */
+
+bool
+wlan_cfg_is_dp_buf_page_frag_alloc_enable(struct wlan_cfg_dp_soc_ctxt *cfg);
 
 #ifdef WLAN_FEATURE_RX_PREALLOC_BUFFER_POOL
 /**

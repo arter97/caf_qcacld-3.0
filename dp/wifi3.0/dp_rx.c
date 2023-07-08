@@ -2981,14 +2981,23 @@ static QDF_STATUS
 dp_pdev_nbuf_alloc_and_map(struct dp_soc *dp_soc,
 			   struct dp_rx_nbuf_frag_info *nbuf_frag_info_t,
 			   struct dp_pdev *dp_pdev,
-			   struct rx_desc_pool *rx_desc_pool)
+			   struct rx_desc_pool *rx_desc_pool,
+			   bool dp_buf_page_frag_alloc_enable)
 {
 	QDF_STATUS ret = QDF_STATUS_E_FAILURE;
 
-	(nbuf_frag_info_t->virt_addr).nbuf =
-		qdf_nbuf_alloc(dp_soc->osdev, rx_desc_pool->buf_size,
-			       RX_BUFFER_RESERVATION,
-			       rx_desc_pool->buf_alignment, FALSE);
+	if (dp_buf_page_frag_alloc_enable) {
+		(nbuf_frag_info_t->virt_addr).nbuf =
+			qdf_nbuf_frag_alloc(dp_soc->osdev,
+					    rx_desc_pool->buf_size,
+					    RX_BUFFER_RESERVATION,
+					    rx_desc_pool->buf_alignment, FALSE);
+	} else	{
+		(nbuf_frag_info_t->virt_addr).nbuf =
+			qdf_nbuf_alloc(dp_soc->osdev, rx_desc_pool->buf_size,
+				       RX_BUFFER_RESERVATION,
+				       rx_desc_pool->buf_alignment, FALSE);
+	}
 	if (!((nbuf_frag_info_t->virt_addr).nbuf)) {
 		dp_err("nbuf alloc failed");
 		DP_STATS_INC(dp_pdev, replenish.nbuf_alloc_fail, 1);
@@ -3043,12 +3052,16 @@ dp_pdev_rx_buffers_attach(struct dp_soc *dp_soc, uint32_t mac_id,
 	union dp_rx_desc_list_elem_t *tail = NULL;
 	int sync_hw_ptr = 1;
 	uint32_t num_entries_avail;
+	bool dp_buf_page_frag_alloc_enable;
 
 	if (qdf_unlikely(!dp_pdev)) {
 		dp_rx_err("%pK: pdev is null for mac_id = %d",
 			  dp_soc, mac_id);
 		return QDF_STATUS_E_FAILURE;
 	}
+
+	dp_buf_page_frag_alloc_enable =
+	       wlan_cfg_is_dp_buf_page_frag_alloc_enable(dp_soc->wlan_cfg_ctx);
 
 	if (qdf_unlikely(!rxdma_srng)) {
 		DP_STATS_INC(dp_pdev, replenish.rxdma_err, num_req_buffers);
@@ -3125,7 +3138,8 @@ dp_pdev_rx_buffers_attach(struct dp_soc *dp_soc, uint32_t mac_id,
 			else
 				ret = dp_pdev_nbuf_alloc_and_map(dp_soc,
 						&nf_info[nr_nbuf], dp_pdev,
-						rx_desc_pool);
+						rx_desc_pool,
+						dp_buf_page_frag_alloc_enable);
 			if (QDF_IS_STATUS_ERROR(ret))
 				break;
 

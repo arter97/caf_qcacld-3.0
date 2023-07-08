@@ -4117,6 +4117,8 @@ wlan_cfg_soc_attach(struct cdp_ctrl_objmgr_psoc *psoc)
 			cfg_get(psoc, CFG_DP_RX_BUFF_POOL_ENABLE);
 	wlan_cfg_ctx->is_rx_refill_buff_pool_enabled =
 			cfg_get(psoc, CFG_DP_RX_REFILL_BUFF_POOL_ENABLE);
+	wlan_cfg_ctx->enable_dp_buf_page_frag_alloc =
+			cfg_get(psoc, CFG_DP_BUFS_PAGE_FRAG_ALLOCS);
 	wlan_cfg_ctx->rx_pending_high_threshold =
 			cfg_get(psoc, CFG_DP_RX_PENDING_HL_THRESHOLD);
 	wlan_cfg_ctx->rx_pending_low_threshold =
@@ -4342,6 +4344,8 @@ wlan_cfg_soc_attach(struct cdp_ctrl_objmgr_psoc *psoc)
 			cfg_get(psoc, CFG_DP_RX_BUFF_POOL_ENABLE);
 	wlan_cfg_ctx->is_rx_refill_buff_pool_enabled =
 			cfg_get(psoc, CFG_DP_RX_REFILL_BUFF_POOL_ENABLE);
+	wlan_cfg_ctx->enable_dp_buf_page_frag_alloc =
+			cfg_get(psoc, CFG_DP_BUFS_PAGE_FRAG_ALLOCS);
 #ifdef WLAN_FEATURE_RX_PREALLOC_BUFFER_POOL
 	wlan_cfg_ctx->rx_refill_buff_pool_size =
 		DP_RX_REFILL_BUFF_POOL_SIZE;
@@ -5479,6 +5483,11 @@ bool wlan_cfg_is_peer_link_stats_enabled(struct wlan_cfg_dp_soc_ctxt *cfg)
 }
 
 qdf_export_symbol(wlan_cfg_is_peer_link_stats_enabled);
+
+bool wlan_cfg_is_dp_buf_page_frag_alloc_enable(struct wlan_cfg_dp_soc_ctxt *cfg)
+{
+	return cfg->enable_dp_buf_page_frag_alloc;
+}
 
 #ifdef WLAN_FEATURE_RX_PREALLOC_BUFFER_POOL
 bool wlan_cfg_is_rx_buffer_pool_enabled(struct wlan_cfg_dp_soc_ctxt *cfg)
