@@ -205,6 +205,7 @@ void register_dfs_callbacks(void)
 		mlme_release_radar_mode_switch_lock;
 	tmp_dfs_to_mlme->mlme_mark_dfs =
 		mlme_dfs_mark_dfs;
+	tmp_dfs_to_mlme->mlme_set_tx_flag = mlme_dfs_set_tx_flag;
 	/*
 	 * Register precac auto channel switch feature related callbacks
 	 */

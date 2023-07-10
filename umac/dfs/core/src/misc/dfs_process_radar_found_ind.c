@@ -1093,6 +1093,8 @@ dfs_process_radar_ind_on_home_chan(struct wlan_dfs *dfs,
 		goto exit;
 	}
 
+	dfs_mlme_set_tx_flag(dfs->dfs_pdev_obj, false);
+
 	/*
 	 * If precac is running and the radar found in secondary
 	 * VHT80 mark the channel as radar and add to NOL list.
