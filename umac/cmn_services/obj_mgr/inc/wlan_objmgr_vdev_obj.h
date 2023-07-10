@@ -348,6 +348,7 @@ struct wlan_channel {
  * @epcs_enable:        EPCS enable flag
  * @mlo_link_id: link id for mlo connection
  * @mlo_external_sae_auth: MLO external SAE auth
+ * @user_disable_eht: user disable eht for IOT issues
  * @wlan_vdev_mlo_lock: lock to protect the set/clear of
  * @skip_pumac_cnt: Counter to skip vdev to be selected as pumac
  * WLAN_VDEV_FEXT2_MLO feature flag in vdev MLME
@@ -371,6 +372,7 @@ struct wlan_objmgr_vdev_mlme {
 	bool epcs_enable;
 	uint8_t  mlo_link_id;
 	bool mlo_external_sae_auth;
+	bool user_disable_eht;
 #ifdef WLAN_MLO_USE_SPINLOCK
 	qdf_spinlock_t wlan_vdev_mlo_lock;
 #else
@@ -1685,6 +1687,24 @@ void wlan_vdev_mlme_set_epcs_flag(struct wlan_objmgr_vdev *vdev, bool flag);
 bool wlan_vdev_mlme_get_epcs_flag(struct wlan_objmgr_vdev *vdev);
 
 /**
+ * wlan_vdev_mlme_set_user_dis_eht_flag() - Set user disable eht flag for vdev
+ * @vdev: VDEV object
+ * @flag: True or Flase
+ *
+ * Return: void
+ */
+void wlan_vdev_mlme_set_user_dis_eht_flag(struct wlan_objmgr_vdev *vdev,
+					  bool flag);
+
+/**
+ * wlan_vdev_mlme_get_user_dis_eht_flag() - Get user disable eht flag for vdev
+ * @vdev: VDEV object
+ *
+ * Return: bool
+ */
+bool wlan_vdev_mlme_get_user_dis_eht_flag(struct wlan_objmgr_vdev *vdev);
+
+/**
  * wlan_vdev_mlme_set_mlo_vdev() - Set vdev as an MLO vdev
  * @vdev: VDEV object
  *
@@ -1788,6 +1808,18 @@ bool wlan_vdev_mlme_is_link_sta_vdev(struct wlan_objmgr_vdev *vdev)
 	return false;
 }
 #else
+static inline
+void wlan_vdev_mlme_set_user_dis_eht_flag(struct wlan_objmgr_vdev *vdev,
+					  bool flag)
+{
+}
+
+static inline
+bool wlan_vdev_mlme_get_user_dis_eht_flag(struct wlan_objmgr_vdev *vdev)
+{
+	return false;
+}
+
 static inline
 bool wlan_vdev_mlme_is_mlo_vdev(struct wlan_objmgr_vdev *vdev)
 {
