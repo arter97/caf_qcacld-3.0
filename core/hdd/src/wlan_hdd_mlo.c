@@ -290,7 +290,8 @@ QDF_STATUS hdd_derive_link_address_from_mld(struct qdf_mac_addr *mld_addr,
 
 	link_addr = link_addr_list;
 	last_byte = mld_addr->bytes[5];
-	hdd_debug("MLD addr: " QDF_MAC_ADDR_FMT, QDF_MAC_ADDR_REF(mld_addr));
+	hdd_debug("MLD addr: " QDF_MAC_ADDR_FMT,
+		  QDF_MAC_ADDR_REF(mld_addr->bytes));
 
 	for (idx = 0; idx < max_idx; idx++) {
 		temp_byte = ((last_byte >> 4 & INTF_MACADDR_MASK) + idx) &

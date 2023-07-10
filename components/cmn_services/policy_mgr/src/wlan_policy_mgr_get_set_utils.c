@@ -7919,7 +7919,7 @@ void policy_mgr_activate_mlo_links(struct wlan_objmgr_psoc *psoc,
 				 QDF_MAC_ADDR_REF(link_mac_addr));
 		for (link = 0; link < num_links; link++) {
 			policy_mgr_debug("active addr: " QDF_MAC_ADDR_FMT,
-					 QDF_MAC_ADDR_REF(&active_link_addr[link]));
+			   QDF_MAC_ADDR_REF(&active_link_addr[link].bytes[0]));
 			if (!qdf_mem_cmp(link_mac_addr,
 					 &active_link_addr[link].bytes[0],
 					 QDF_MAC_ADDR_SIZE)) {

@@ -11608,7 +11608,8 @@ QDF_STATUS populate_dot11f_auth_mlo_ie(struct mac_context *mac_ctx,
 	qdf_mem_copy(&mlo_ie->mld_mac_addr, mld_addr, QDF_MAC_ADDR_SIZE);
 	mlo_ie->common_info_length += QDF_MAC_ADDR_SIZE;
 
-	pe_debug("MLD mac addr: " QDF_MAC_ADDR_FMT, mld_addr);
+	pe_debug("MLD mac addr: " QDF_MAC_ADDR_FMT,
+		 QDF_MAC_ADDR_REF(mld_addr->bytes));
 
 	mlo_ie->link_id_info_present = 0;
 	mlo_ie->bss_param_change_cnt_present = 0;
@@ -11902,7 +11903,7 @@ QDF_STATUS populate_dot11f_assoc_req_mlo_ie(struct mac_context *mac_ctx,
 		len_remaining -= QDF_MAC_ADDR_SIZE;
 
 		pe_debug("Sta profile mac: " QDF_MAC_ADDR_FMT,
-			QDF_MAC_ADDR_REF(ml_link_info->link_addr.bytes));
+			 QDF_MAC_ADDR_REF(ml_link_info->link_addr.bytes));
 
 		/* TBD : populate beacon_interval, dtim_info
 		 * nstr_link_pair_present, nstr_bitmap_size

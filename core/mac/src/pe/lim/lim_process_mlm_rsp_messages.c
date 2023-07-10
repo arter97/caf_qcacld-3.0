@@ -2845,7 +2845,7 @@ lim_process_switch_channel_join_mlo_roam(struct pe_session *session_entry,
 		     QDF_MAC_ADDR_SIZE);
 
 	pe_err("sta_link_addr" QDF_MAC_ADDR_FMT,
-	       QDF_MAC_ADDR_REF(&sta_link_addr));
+	       QDF_MAC_ADDR_REF(&sta_link_addr.bytes[0]));
 
 	if (assoc_rsp.len) {
 		struct element_info link_assoc_rsp;

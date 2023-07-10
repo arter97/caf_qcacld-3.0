@@ -4361,7 +4361,7 @@ lim_gen_link_probe_rsp_roam(struct mac_context *mac_ctx,
 						    &ml_probe_link_id);
 	if (QDF_IS_STATUS_ERROR(status)) {
 		pe_debug("Invalid link id for mac_addr: " QDF_MAC_ADDR_FMT,
-			 src_addr);
+			 QDF_MAC_ADDR_REF(src_addr));
 		goto done;
 	}
 	for (idx = 0; idx < roam_sync_ind->num_setup_links; idx++) {

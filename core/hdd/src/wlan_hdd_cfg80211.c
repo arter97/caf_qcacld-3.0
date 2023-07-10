@@ -11272,7 +11272,8 @@ static int hdd_set_link_force_active(struct wlan_hdd_link_info *link_info,
 			qdf_mem_copy(mac_addr_ptr, nla_data(curr_attr),
 				     ETH_ALEN);
 			hdd_debug(QDF_MAC_ADDR_FMT " is link[%d] mac address",
-				  QDF_MAC_ADDR_REF(mac_addr_ptr), num_links);
+				  QDF_MAC_ADDR_REF(mac_addr_ptr->bytes),
+				  num_links);
 			num_links++;
 		}
 		sme_activate_mlo_links(hdd_ctx->mac_handle,
@@ -21840,7 +21841,7 @@ wlan_hdd_set_vlan_id(struct hdd_sta_info_obj *sta_info_list,
 	if (!sta_info) {
 		hdd_err("Failed to find right station MAC: "
 			  QDF_MAC_ADDR_FMT,
-			  QDF_MAC_ADDR_REF(uint8_t *)mac);
+			  QDF_MAC_ADDR_REF(mac));
 		return;
 	}
 
