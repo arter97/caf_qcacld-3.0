@@ -989,4 +989,43 @@ QDF_STATUS utils_dfs_radar_enable(struct wlan_objmgr_pdev *pdev);
  * Return: None.
  */
 void utils_dfs_convert_freq_to_index(qdf_freq_t freq, int8_t *index);
+
+/**
+ * utils_dfs_convert_wlan_phymode_to_chwidth() - Map phymode to
+ * channel width.
+ * @phymode: phymode of type wlan_phymode.
+ *
+ * Return channel width of type phy_ch_width
+ */
+enum phy_ch_width
+utils_dfs_convert_wlan_phymode_to_chwidth(enum wlan_phymode phymode);
+
+/**
+ * utils_dfs_get_radar_bitmap_from_nolie() - Read the NOL IE bitmap of the RCSA
+ * frame, puncture the nol infected channels and formulate the radar puncture
+ * bitmap.
+ * @pdev: Pointer to struct wlan_objmgr_pdev
+ * @phy_mode: Phymode of enum wlan_phymode.
+ * @nol_ie_start_freq: Start frequency of the NOL infected channels
+ * @nol_ie_bitmap : NOL IE bitmap
+ *
+ * Return: Punctured radar bitmap
+ */
+#if defined(WLAN_FEATURE_11BE) && defined(QCA_DFS_BW_EXPAND) && \
+	defined(QCA_DFS_RCSA_SUPPORT)
+uint16_t
+utils_dfs_get_radar_bitmap_from_nolie(struct wlan_objmgr_pdev *pdev,
+				      enum wlan_phymode phy_mode,
+				      qdf_freq_t nol_ie_start_freq,
+				      uint8_t nol_ie_bitmap);
+#else
+static inline uint16_t
+utils_dfs_get_radar_bitmap_from_nolie(struct wlan_objmgr_pdev *pdev,
+				      enum wlan_phymode phy_mode,
+				      qdf_freq_t nol_ie_start_freq,
+				      uint8_t nol_ie_bitmap)
+{
+	return NO_SCHANS_PUNC;
+}
+#endif
 #endif /* _WLAN_DFS_UTILS_API_H_ */
