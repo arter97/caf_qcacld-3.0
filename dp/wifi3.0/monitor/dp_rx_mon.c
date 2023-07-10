@@ -808,7 +808,7 @@ static inline uint8_t dp_get_bw_offset_frm_bw(struct dp_soc *soc,
 }
 #endif
 
-#ifdef WLAN_TELEMETRY_STATS_SUPPORT
+#ifdef WLAN_CONFIG_TELEMETRY_AGENT
 static void
 dp_ppdu_desc_user_rx_time_update(struct dp_pdev *pdev,
 				 struct dp_peer *peer,

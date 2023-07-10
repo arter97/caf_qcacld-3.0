@@ -975,7 +975,7 @@ dp_mon_rx_enable_fpmo(struct dp_soc *soc, uint32_t *msg_word,
 {
 }
 
-#ifdef WLAN_TELEMETRY_STATS_SUPPORT
+#ifdef WLAN_CONFIG_TELEMETRY_AGENT
 static inline
 void dp_monitor_peer_telemetry_stats(struct dp_peer *peer,
 				     struct cdp_peer_telemetry_stats *stats)
@@ -987,7 +987,7 @@ void dp_monitor_peer_deter_stats(struct dp_peer *peer,
 				 struct cdp_peer_telemetry_stats *stats)
 {
 }
-#endif /* WLAN_TELEMETRY_STATS_SUPPORT */
+#endif /* WLAN_CONFIG_TELEMETRY_AGENT */
 #endif /* !WIFI_MONITOR_SUPPORT */
 
 /**
@@ -5031,7 +5031,7 @@ dp_get_rx_hash_key_bytes(struct cdp_lro_hash_config *lro_hash)
 			      LRO_IPV6_SEED_ARR_SZ));
 }
 
-#ifdef WLAN_TELEMETRY_STATS_SUPPORT
+#ifdef WLAN_CONFIG_TELEMETRY_AGENT
 /**
  * dp_get_pdev_telemetry_stats- API to get pdev telemetry stats
  * @soc_hdl: soc handle
@@ -5099,7 +5099,7 @@ dp_get_pdev_deter_stats(struct cdp_soc_t *soc_hdl, uint8_t pdev_id,
 QDF_STATUS
 dp_update_pdev_chan_util_stats(struct cdp_soc_t *soc_hdl, uint8_t pdev_id,
 			       struct cdp_pdev_chan_util_stats *ch_util);
-#endif /* WLAN_TELEMETRY_STATS_SUPPORT */
+#endif /* WLAN_CONFIG_TELEMETRY_AGENT */
 
 #ifdef CONNECTIVITY_PKTLOG
 /**

@@ -1088,7 +1088,7 @@ struct cdp_mon_ops {
 		(struct cdp_soc_t *soc,
 		 struct cdp_rssi_db2dbm_param_dp *params);
 
-#ifdef WLAN_TELEMETRY_STATS_SUPPORT
+#ifdef WLAN_CONFIG_TELEMETRY_AGENT
 	QDF_STATUS (*txrx_update_pdev_mon_telemetry_airtime_stats)
 		(struct cdp_soc_t *soc,
 		 uint8_t pdev_id);
@@ -1309,7 +1309,7 @@ struct cdp_host_stats_ops {
 	QDF_STATUS
 	(*txrx_get_pdev_tid_stats)(struct cdp_soc_t *soc, uint8_t pdev_id,
 				   struct cdp_tid_stats_intf *tid_stats);
-#ifdef WLAN_TELEMETRY_STATS_SUPPORT
+#ifdef WLAN_CONFIG_TELEMETRY_AGENT
 	QDF_STATUS
 		(*txrx_pdev_telemetry_stats)(
 				struct cdp_soc_t *soc,

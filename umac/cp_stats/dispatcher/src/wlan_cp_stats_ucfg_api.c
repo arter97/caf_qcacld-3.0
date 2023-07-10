@@ -43,7 +43,7 @@ ucfg_send_infra_cp_stats_request(struct wlan_objmgr_vdev *vdev,
 }
 #endif /* WLAN_SUPPORT_INFRA_CTRL_PATH_STATS */
 
-#ifdef WLAN_TELEMETRY_STATS_SUPPORT
+#ifdef WLAN_CONFIG_TELEMETRY_AGENT
 QDF_STATUS
 ucfg_send_telemetry_cp_stats_request(struct wlan_objmgr_pdev *pdev,
 				     struct infra_cp_stats_cmd_info *req)

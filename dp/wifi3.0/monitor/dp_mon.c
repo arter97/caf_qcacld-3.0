@@ -2090,7 +2090,7 @@ QDF_STATUS dp_rx_populate_cbf_hdr(struct dp_soc *soc,
 }
 
 #ifdef ATH_SUPPORT_EXT_STAT
-#ifdef WLAN_TELEMETRY_STATS_SUPPORT
+#ifdef WLAN_CONFIG_TELEMETRY_AGENT
 /**
  * dp_pdev_clear_link_airtime_stats() - clear airtime stats for given pdev
  * @pdev: DP PDEV handle
@@ -2796,7 +2796,7 @@ static uint32_t dp_mon_get_ru_width_from_ru_size(uint16_t ru_size)
 }
 #endif
 
-#ifdef WLAN_TELEMETRY_STATS_SUPPORT
+#ifdef WLAN_CONFIG_TELEMETRY_AGENT
 /**
  * dp_pdev_telemetry_stats_update() - Update pdev telemetry stats
  * @pdev: Datapath pdev handle
@@ -4551,7 +4551,7 @@ static void dp_process_ppdu_tag(struct dp_pdev *pdev,
 	}
 }
 
-#ifdef WLAN_TELEMETRY_STATS_SUPPORT
+#ifdef WLAN_CONFIG_TELEMETRY_AGENT
 static inline
 void dp_ppdu_desc_user_airtime_consumption_update(
 			struct dp_peer *peer,
@@ -4576,7 +4576,7 @@ void dp_ppdu_desc_user_airtime_consumption_update(
 { }
 #endif
 
-#if defined(WLAN_ATF_ENABLE) || defined(WLAN_TELEMETRY_STATS_SUPPORT)
+#if defined(WLAN_ATF_ENABLE) || defined(WLAN_CONFIG_TELEMETRY_AGENT)
 static void
 dp_ppdu_desc_user_phy_tx_time_update(struct dp_pdev *pdev,
 				     struct dp_peer *peer,

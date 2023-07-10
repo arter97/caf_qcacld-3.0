@@ -2962,7 +2962,7 @@ struct cdp_soc_stats {
 	} mec;
 };
 
-#ifdef WLAN_TELEMETRY_STATS_SUPPORT
+#ifdef WLAN_CONFIG_TELEMETRY_AGENT
 /**
  * struct cdp_pdev_telemetry_stats- Structure to hold pdev telemetry stats
  * @tx_mpdu_failed: Tx mpdu failed
@@ -3259,7 +3259,7 @@ struct cdp_pdev_stats {
 	} rx_refill_buff_pool;
 
 	uint32_t peer_unauth_rx_pkt_drop;
-#ifdef WLAN_TELEMETRY_STATS_SUPPORT
+#ifdef WLAN_CONFIG_TELEMETRY_AGENT
 	struct cdp_pdev_telemetry_stats telemetry_stats;
 	struct cdp_pdev_deter_stats deter_stats;
 #endif
