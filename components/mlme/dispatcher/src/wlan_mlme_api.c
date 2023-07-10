@@ -1211,6 +1211,28 @@ enum phy_ch_width wlan_mlme_convert_eht_op_bw_to_phy_ch_width(
 	return phy_bw;
 }
 
+bool wlan_mlme_get_epcs_capability(struct wlan_objmgr_psoc *psoc)
+{
+	struct wlan_mlme_psoc_ext_obj *mlme_obj = mlme_get_psoc_ext_obj(psoc);
+
+	if (!mlme_obj)
+		return true;
+
+	return mlme_obj->cfg.sta.epcs_capability;
+}
+
+void wlan_mlme_set_epcs_capability(struct wlan_objmgr_psoc *psoc, bool flag)
+{
+	struct wlan_mlme_psoc_ext_obj *mlme_obj = mlme_get_psoc_ext_obj(psoc);
+
+	if (!mlme_obj)
+		return;
+
+	mlme_debug("set mlme epcs capability from %d to %d",
+		   mlme_obj->cfg.sta.epcs_capability, flag);
+	mlme_obj->cfg.sta.epcs_capability = flag;
+}
+
 bool wlan_mlme_get_usr_disable_sta_eht(struct wlan_objmgr_psoc *psoc)
 {
 	struct wlan_mlme_psoc_ext_obj *mlme_obj = mlme_get_psoc_ext_obj(psoc);

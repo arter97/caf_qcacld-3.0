@@ -1161,6 +1161,23 @@ enum phy_ch_width wlan_mlme_convert_eht_op_bw_to_phy_ch_width(
 						uint8_t channel_width);
 
 /**
+ * wlan_mlme_get_epcs_capability() - Get mlme epcs capability flag
+ * @psoc: psoc object
+ *
+ * Return: true if epcs capability enabled
+ */
+bool wlan_mlme_get_epcs_capability(struct wlan_objmgr_psoc *psoc);
+
+/**
+ * wlan_mlme_set_epcs_capability() - Set mlme epcs capability flag
+ * @psoc: psoc object
+ * @flag: epcs capability flag
+ *
+ * Return: void
+ */
+void wlan_mlme_set_epcs_capability(struct wlan_objmgr_psoc *psoc, bool flag);
+
+/**
  * wlan_mlme_get_usr_disable_sta_eht() - Get user disable sta eht flag
  * @psoc: psoc object
  *
@@ -1178,6 +1195,17 @@ bool wlan_mlme_get_usr_disable_sta_eht(struct wlan_objmgr_psoc *psoc);
 void wlan_mlme_set_usr_disable_sta_eht(struct wlan_objmgr_psoc *psoc,
 				       bool disable);
 #else
+static inline
+bool wlan_mlme_get_epcs_capability(struct wlan_objmgr_psoc *psoc)
+{
+	return false;
+}
+
+static inline
+void wlan_mlme_set_epcs_capability(struct wlan_objmgr_psoc *psoc, bool flag)
+{
+}
+
 static inline
 bool wlan_mlme_get_usr_disable_sta_eht(struct wlan_objmgr_psoc *psoc)
 {
