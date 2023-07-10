@@ -1924,6 +1924,16 @@ void wlansap_process_chan_info_event(struct sap_context *sap_ctx,
 void wlansap_update_ll_lt_sap_acs_result(struct sap_context *sap_ctx,
 					 qdf_freq_t last_acs_freq);
 
+/**
+ * wlansap_update_sap_chan_list() - set channel list of sap
+ * @sap_config: sap config
+ * @freq_list: freq list sent by userspace
+ * @count: valid freq count
+ *
+ * Return: 0 on success, else error number
+ */
+int wlansap_update_sap_chan_list(struct sap_config *sap_config,
+				 qdf_freq_t *freq_list, uint16_t count);
 #ifdef __cplusplus
 }
 #endif

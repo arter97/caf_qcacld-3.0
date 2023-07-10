@@ -8241,6 +8241,8 @@ const struct nla_policy wlan_hdd_wifi_config_policy[
 	[QCA_WLAN_VENDOR_ATTR_CONFIG_EMLSR_MODE_SWITCH] = {
 		.type = NLA_U8},
 	[QCA_WLAN_VENDOR_ATTR_CONFIG_UL_MU_CONFIG] = {.type = NLA_U8},
+	[QCA_WLAN_VENDOR_ATTR_CONFIG_AP_ALLOWED_FREQ_LIST] = {
+		.type = NLA_NESTED},
 };
 
 static const struct nla_policy
@@ -11358,6 +11360,61 @@ hdd_trigger_epcs_function(struct wlan_hdd_link_info *link_info,
 #endif
 
 /**
+ * hdd_set_master_channel_list() - set master channel list from set wifi
+ * attribute
+ * @link_info: hdd link info
+ * @attr: Pointer to struct nlattr
+ *
+ * Return: 0 on success, else error number
+ */
+static int
+hdd_set_master_channel_list(struct wlan_hdd_link_info *link_info,
+			    const struct nlattr *attr)
+{
+	struct sap_config *sap_config;
+	qdf_freq_t freq;
+	uint16_t count = 0;
+	qdf_freq_t *freq_list;
+	struct nlattr *nested_attr;
+	int tmp, ret = 0;
+
+	if (link_info->adapter->device_mode != QDF_SAP_MODE) {
+		hdd_debug("command not received for sap");
+		return -EINVAL;
+	}
+	freq_list = qdf_mem_malloc(NUM_CHANNELS * sizeof(qdf_freq_t));
+	if (!freq_list)
+		return -ENOMEM;
+
+	sap_config = &link_info->adapter->deflink->session.ap.sap_config;
+
+	nla_for_each_nested(nested_attr, attr, tmp) {
+		freq = nla_get_u32(nested_attr);
+		if (!freq) {
+			hdd_err("invalid freq");
+			ret = -EINVAL;
+			goto out;
+		}
+		freq_list[count] = freq;
+		count++;
+		if (count >= NUM_CHANNELS)
+			break;
+	}
+	if (!count) {
+		hdd_err("no valid freq found");
+		ret = -EINVAL;
+		goto out;
+	}
+	ret = wlansap_update_sap_chan_list(sap_config, freq_list, count);
+	if (ret)
+		hdd_err("sap chan list update failure");
+out:
+	qdf_mem_free(freq_list);
+
+	return ret;
+}
+
+/**
  * typedef independent_setter_fn - independent attribute handler
  * @link_info: Link info pointer in HDD adapter
  * @attr: The nl80211 attribute being applied
@@ -11502,6 +11559,8 @@ static const struct independent_setters independent_setters[] = {
 	 hdd_set_emlsr_mode},
 	{QCA_WLAN_VENDOR_ATTR_CONFIG_UL_MU_CONFIG,
 	 hdd_set_ul_mu_config},
+	{QCA_WLAN_VENDOR_ATTR_CONFIG_AP_ALLOWED_FREQ_LIST,
+	 hdd_set_master_channel_list},
 };
 
 #ifdef WLAN_FEATURE_ELNA
