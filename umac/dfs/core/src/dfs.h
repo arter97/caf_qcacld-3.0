@@ -743,9 +743,6 @@ struct dfs_channel {
 	 */
 	uint16_t       dfs_ch_punc_pattern;
 #endif
-#if defined(QCA_DFS_BW_PUNCTURE) && !defined(CONFIG_REG_CLIENT)
-	uint16_t       dfs_internal_radar_pattern;
-#endif
 };
 
 /**
@@ -1032,6 +1029,7 @@ enum dfs_punc_sm_state {
  * @dfs_punc_sm_hdl:       The handle for the state machine.
  * @dfs_punc_sm_cur_state: Current state of the Puncturing State Machine.
  * @dfs_punc_sm_lock:      Puncturing state machine lock.
+ * @dfs_is_unpunctured:    Denotes the SM is unpunctured or not.
  */
 struct dfs_punc_obj {
 	qdf_freq_t punc_low_freq;
@@ -1041,6 +1039,7 @@ struct dfs_punc_obj {
 	struct wlan_sm *dfs_punc_sm_hdl;
 	enum dfs_punc_sm_state dfs_punc_sm_cur_state;
 	qdf_spinlock_t dfs_punc_sm_lock;
+	bool dfs_is_unpunctured;
 };
 
 /**
