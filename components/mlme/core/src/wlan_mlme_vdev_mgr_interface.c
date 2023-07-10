@@ -1233,6 +1233,22 @@ bool wlan_is_vdev_traffic_ll_ht(struct wlan_objmgr_vdev *vdev)
 	return false;
 }
 
+WMI_HOST_WIFI_STANDARD mlme_get_vdev_wifi_std(struct wlan_objmgr_vdev *vdev)
+{
+	struct mlme_legacy_priv *mlme_priv;
+
+	mlme_priv = wlan_vdev_mlme_get_ext_hdl(vdev);
+	if (!mlme_priv) {
+		mlme_legacy_err("vdev legacy private object is NULL");
+		return WMI_HOST_WIFI_STANDARD_7;
+	}
+
+	if (!mlme_priv->is_user_std_set)
+		return WMI_HOST_WIFI_STANDARD_7;
+
+	return mlme_priv->wifi_std;
+}
+
 enum vdev_assoc_type  mlme_get_assoc_type(struct wlan_objmgr_vdev *vdev)
 {
 	struct mlme_legacy_priv *mlme_priv;

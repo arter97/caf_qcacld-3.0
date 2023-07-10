@@ -4679,6 +4679,18 @@ ucfg_mlme_set_roam_reason_vsie_status(struct wlan_objmgr_psoc *psoc,
 #endif
 
 /**
+ * ucfg_mlme_set_vdev_wifi_std()  - Set vdev wifi standard support
+ * @psoc: pointer to psoc object
+ * @vdev_id: Vdev id
+ * @wifi_std: wifi standard version
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+ucfg_mlme_set_vdev_wifi_std(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
+			    WMI_HOST_WIFI_STANDARD wifi_std);
+
+/**
  * ucfg_mlme_set_vdev_traffic_low_latency()  - Set/clear vdev low latency
  * config
  * @psoc: pointer to psoc object

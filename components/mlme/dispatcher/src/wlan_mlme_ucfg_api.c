@@ -416,6 +416,41 @@ release:
 }
 
 QDF_STATUS
+ucfg_mlme_set_vdev_wifi_std(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
+			    WMI_HOST_WIFI_STANDARD wifi_std)
+{
+	struct wlan_objmgr_vdev *vdev;
+	struct mlme_legacy_priv *mlme_priv;
+
+	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, vdev_id,
+						    WLAN_MLME_OBJMGR_ID);
+	if (!vdev) {
+		mlme_legacy_err("vdev %d: vdev not found",
+				vdev_id);
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	mlme_priv = wlan_vdev_mlme_get_ext_hdl(vdev);
+	if (!mlme_priv) {
+		mlme_legacy_err("vdev %d: vmlme_priv is null", vdev_id);
+		wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_OBJMGR_ID);
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	mlme_priv->wifi_std = wifi_std;
+	mlme_priv->is_user_std_set = true;
+
+	if (wifi_std < WMI_HOST_WIFI_STANDARD_7)
+		wlan_vdev_mlme_set_user_dis_eht_flag(vdev, true);
+	else
+		wlan_vdev_mlme_set_user_dis_eht_flag(vdev, false);
+
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_OBJMGR_ID);
+
+	return QDF_STATUS_SUCCESS;
+}
+
+QDF_STATUS
 ucfg_mlme_set_vdev_traffic_low_latency(struct wlan_objmgr_psoc *psoc,
 				       uint8_t vdev_id, bool set)
 {
