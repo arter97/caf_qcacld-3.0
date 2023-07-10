@@ -449,6 +449,7 @@ typedef bool (*qdf_irqlocked_func_t)(void *);
  * @QDF_MODULE_ID_SCS: SCS module ID
  * @QDF_MODULE_ID_COAP: Constrained Application Protocol module ID
  * @QDF_MODULE_ID_QMI: QMI module ID
+ * @QDF_MODULE_ID_EPCS: EPCS module ID
  * @QDF_MODULE_ID_ANY: anything
  * @QDF_MODULE_ID_MAX: Max place holder module ID
  *
@@ -614,6 +615,7 @@ typedef enum {
 	QDF_MODULE_ID_SCS,
 	QDF_MODULE_ID_COAP,
 	QDF_MODULE_ID_QMI,
+	QDF_MODULE_ID_EPCS,
 	QDF_MODULE_ID_ANY,
 	QDF_MODULE_ID_MAX,
 } QDF_MODULE_ID;
