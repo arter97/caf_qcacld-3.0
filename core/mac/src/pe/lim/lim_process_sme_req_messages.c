@@ -1972,6 +1972,54 @@ static void lim_check_oui_and_update_session(struct mac_context *mac_ctx,
 }
 
 static enum mlme_dot11_mode
+lim_get_user_dot11_mode(struct wlan_objmgr_vdev *vdev)
+{
+	WMI_HOST_WIFI_STANDARD wifi_std;
+
+	wifi_std = mlme_get_vdev_wifi_std(vdev);
+
+	switch (wifi_std) {
+	case WMI_HOST_WIFI_STANDARD_4:
+		return MLME_DOT11_MODE_11N;
+	case WMI_HOST_WIFI_STANDARD_5:
+		return MLME_DOT11_MODE_11AC;
+	case WMI_HOST_WIFI_STANDARD_6:
+	case WMI_HOST_WIFI_STANDARD_6E:
+		return MLME_DOT11_MODE_11AX;
+	case WMI_HOST_WIFI_STANDARD_7:
+	default:
+		return MLME_DOT11_MODE_11BE;
+	}
+}
+
+static enum mlme_dot11_mode
+lim_intersect_user_dot11_mode(struct mac_context *mac_ctx,
+			      enum QDF_OPMODE opmode, uint8_t vdev_id,
+			      enum mlme_dot11_mode self_mode)
+{
+	struct wlan_objmgr_vdev *vdev;
+	enum mlme_dot11_mode user_mode;
+
+	switch (opmode) {
+	case QDF_STA_MODE:
+	case QDF_P2P_CLIENT_MODE:
+		break;
+	default:
+		return self_mode;
+	}
+
+	vdev = wlan_objmgr_get_vdev_by_id_from_pdev(mac_ctx->pdev, vdev_id,
+						    WLAN_MLME_OBJMGR_ID);
+	if (!vdev)
+		return self_mode;
+
+	user_mode = lim_get_user_dot11_mode(vdev);
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_OBJMGR_ID);
+
+	return user_mode > self_mode ? self_mode : user_mode;
+}
+
+static enum mlme_dot11_mode
 lim_get_self_dot11_mode(struct mac_context *mac_ctx, enum QDF_OPMODE opmode,
 			uint8_t vdev_id)
 {
@@ -2675,6 +2723,13 @@ lim_fill_dot11_mode(struct mac_context *mac_ctx, struct pe_session *session,
 
 	self_dot11_mode = lim_get_self_dot11_mode(mac_ctx, session->opmode,
 						  session->vdev_id);
+
+	/* if user set dot11 mode by cmd, need to do intersect first */
+	self_dot11_mode =
+		   lim_intersect_user_dot11_mode(mac_ctx, session->opmode,
+						 session->vdev_id,
+						 self_dot11_mode);
+
 	bss_dot11_mode = lim_get_bss_dot11_mode(mac_ctx, bss_desc, ie_struct);
 
 	pe_debug("vdev id %d opmode %d self dot11mode %d bss_dot11 mode %d",
@@ -5306,6 +5361,11 @@ lim_fill_preauth_req_dot11_mode(struct mac_context *mac_ctx,
 
 	self_dot11_mode = lim_get_self_dot11_mode(mac_ctx, QDF_STA_MODE,
 						  vdev_id);
+	/* if user set dot11 mode by cmd, need to do intersect first */
+	self_dot11_mode =
+		   lim_intersect_user_dot11_mode(mac_ctx, QDF_STA_MODE,
+						 vdev_id, self_dot11_mode);
+
 	bss_dot11_mode = lim_get_bss_dot11_mode(mac_ctx, bss_desc, ie_struct);
 
 	status = lim_get_intersected_dot11_mode_sta_ap(mac_ctx, self_dot11_mode,

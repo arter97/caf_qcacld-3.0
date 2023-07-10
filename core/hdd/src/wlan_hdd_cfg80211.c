@@ -8635,6 +8635,54 @@ wlan_hdd_cfg80211_wifi_set_rx_blocksize(struct wlan_hdd_link_info *link_info,
 	return ret_val;
 }
 
+int hdd_set_vdev_phy_mode(struct hdd_adapter *adapter,
+			  enum qca_wlan_vendor_phy_mode vendor_phy_mode)
+{
+	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
+	struct wlan_objmgr_psoc *psoc = hdd_ctx->psoc;
+	struct wlan_hdd_link_info *link_info = adapter->deflink;
+	eCsrPhyMode phymode;
+	WMI_HOST_WIFI_STANDARD std;
+	enum hdd_dot11_mode dot11_mode;
+	uint8_t supported_band;
+	int ret;
+
+	if (hdd_cm_is_vdev_connected(link_info)) {
+		hdd_err("Station is connected, command is not supported");
+		return -EINVAL;
+	}
+
+	adapter->user_phy_mode = vendor_phy_mode;
+
+	ret = hdd_vendor_mode_to_phymode(vendor_phy_mode, &phymode);
+	if (ret)
+		return ret;
+
+	ret = hdd_phymode_to_dot11_mode(phymode, &dot11_mode);
+	if (ret)
+		return ret;
+
+	ret = hdd_vendor_mode_to_band(vendor_phy_mode, &supported_band,
+				      wlan_reg_is_6ghz_supported(psoc));
+	if (ret)
+		return ret;
+
+	std = hdd_get_wifi_standard(hdd_ctx, dot11_mode, supported_band);
+	hdd_debug("wifi_standard %d, vendor_phy_mode %d", std, vendor_phy_mode);
+
+	ret = sme_cli_set_command(link_info->vdev_id,
+				  wmi_vdev_param_wifi_standard_version,
+				  std, VDEV_CMD);
+	if (ret) {
+		hdd_err("Failed to set standard version to fw");
+		return ret;
+	}
+
+	ucfg_mlme_set_vdev_wifi_std(hdd_ctx->psoc, link_info->vdev_id, std);
+
+	return 0;
+}
+
 int hdd_set_phy_mode(struct hdd_adapter *adapter,
 		     enum qca_wlan_vendor_phy_mode vendor_phy_mode)
 {
@@ -8670,18 +8718,33 @@ int hdd_set_phy_mode(struct hdd_adapter *adapter,
 /**
  * hdd_config_phy_mode() - set PHY mode
  * @link_info: Link info pointer in HDD adapter
- * @attr: nla attr sent from userspace
+ * @tb: nla attr sent from userspace
  *
  * Return: 0 on success; error number otherwise
  */
 static int hdd_config_phy_mode(struct wlan_hdd_link_info *link_info,
-			       const struct nlattr *attr)
+			       struct nlattr *tb[])
 {
 	enum qca_wlan_vendor_phy_mode vendor_phy_mode;
+	uint32_t ifindex;
+	struct nlattr *phy_mode_attr = tb[QCA_WLAN_VENDOR_ATTR_CONFIG_PHY_MODE];
+	struct nlattr *ifindex_attr = tb[QCA_WLAN_VENDOR_ATTR_CONFIG_IFINDEX];
 
-	vendor_phy_mode = nla_get_u32(attr);
+	if (!phy_mode_attr)
+		return 0;
 
-	return hdd_set_phy_mode(link_info->adapter, vendor_phy_mode);
+	vendor_phy_mode = nla_get_u32(phy_mode_attr);
+	if (!ifindex_attr)
+		return hdd_set_phy_mode(link_info->adapter, vendor_phy_mode);
+
+	ifindex = nla_get_u32(ifindex_attr);
+	if (ifindex == link_info->adapter->dev->ifindex)
+		return hdd_set_vdev_phy_mode(link_info->adapter,
+					     vendor_phy_mode);
+
+	hdd_err_rl("ifindex %d, expected ifindex %d", ifindex,
+		   link_info->adapter->dev->ifindex);
+	return -EINVAL;
 }
 
 /**
@@ -11512,8 +11575,6 @@ static const struct independent_setters independent_setters[] = {
 	 hdd_config_tx_stbc},
 	{QCA_WLAN_VENDOR_ATTR_CONFIG_RX_STBC,
 	 hdd_config_rx_stbc},
-	{QCA_WLAN_VENDOR_ATTR_CONFIG_PHY_MODE,
-	 hdd_config_phy_mode},
 	{QCA_WLAN_VENDOR_ATTR_CONFIG_CHANNEL_WIDTH,
 	 hdd_set_channel_width},
 	{QCA_WLAN_VENDOR_ATTR_CONFIG_DYNAMIC_BW,
@@ -12281,6 +12342,7 @@ static const interdependent_setter_fn interdependent_setters[] = {
 	hdd_config_ani,
 	hdd_config_tx_rx_nss,
 	hdd_process_generic_set_cmd,
+	hdd_config_phy_mode,
 };
 
 /**
