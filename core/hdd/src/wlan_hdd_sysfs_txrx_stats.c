@@ -94,8 +94,8 @@ __hdd_sysfs_txrx_stats_store(struct net_device *net_dev,
 
 	if (val1 == CDP_TXRX_STATS_28) {
 		if (sta_ctx->conn_info.is_authenticated) {
-			hdd_debug("ap mac addr: %pM",
-				  (void *)&sta_ctx->conn_info.bssid);
+			hdd_debug("ap mac addr:" QDF_MAC_ADDR_FMT,
+				  QDF_MAC_ADDR_REF(&sta_ctx->conn_info.bssid.bytes[0]));
 			req.peer_addr =
 				(char *)&sta_ctx->conn_info.bssid;
 		}

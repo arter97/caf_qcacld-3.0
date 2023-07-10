@@ -1793,6 +1793,7 @@ static ssize_t __hdd_wlan_tsf_show(struct device *dev,
 	struct hdd_context *hdd_ctx;
 	uint64_t tsf_sync_qtime, host_time, reg_qtime, qtime, target_time;
 	ssize_t size;
+	uint8_t *mac;
 
 	struct net_device *net_dev = container_of(dev, struct net_device, dev);
 
@@ -1826,18 +1827,20 @@ static ssize_t __hdd_wlan_tsf_show(struct device *dev,
 
 	if (adapter->device_mode == QDF_STA_MODE ||
 	    adapter->device_mode == QDF_P2P_CLIENT_MODE) {
+		mac = hdd_sta_ctx->conn_info.bssid.bytes;
 		size = scnprintf(buf, PAGE_SIZE,
-				 "%s%llu %llu %pM %llu %llu %llu\n",
+				 "%s%llu %llu " QDF_MAC_ADDR_FMT "%llu %llu %llu\n",
 				 buf, adapter->tsf.last_target_time,
 				 tsf_sync_qtime,
-				 hdd_sta_ctx->conn_info.bssid.bytes,
+				 QDF_MAC_ADDR_REF(mac),
 				 qtime, host_time, target_time);
 	} else {
+		mac = adapter->mac_addr.bytes;
 		size = scnprintf(buf, PAGE_SIZE,
-				 "%s%llu %llu %pM %llu %llu %llu\n",
+				 "%s%llu %llu " QDF_MAC_ADDR_FMT "%llu %llu %llu\n",
 				 buf, adapter->tsf.last_target_time,
 				 tsf_sync_qtime,
-				 adapter->mac_addr.bytes,
+				 QDF_MAC_ADDR_REF(mac),
 				 qtime, host_time, target_time);
 	}
 
@@ -1957,6 +1960,7 @@ static ssize_t __hdd_wlan_tsf_show(struct device *dev,
 	struct hdd_context *hdd_ctx;
 	ssize_t size;
 	uint64_t host_time, target_time;
+	uint8_t *mac;
 
 	struct net_device *net_dev = container_of(dev, struct net_device, dev);
 
@@ -1986,13 +1990,17 @@ static ssize_t __hdd_wlan_tsf_show(struct device *dev,
 	} else {
 		if (adapter->device_mode == QDF_STA_MODE ||
 		    adapter->device_mode == QDF_P2P_CLIENT_MODE) {
-			size = scnprintf(buf, PAGE_SIZE, "%s%llu %llu %pM\n",
+			mac = hdd_sta_ctx->conn_info.bssid.bytes;
+			size = scnprintf(buf, PAGE_SIZE,
+					 "%s%llu %llu " QDF_MAC_ADDR_FMT "\n",
 					 buf, target_time, host_time,
-					 hdd_sta_ctx->conn_info.bssid.bytes);
+					 QDF_MAC_ADDR_REF(mac));
 		} else {
-			size = scnprintf(buf, PAGE_SIZE, "%s%llu %llu %pM\n",
+			mac = adapter->mac_addr.bytes;
+			size = scnprintf(buf, PAGE_SIZE,
+					 "%s%llu %llu " QDF_MAC_ADDR_FMT "\n",
 					 buf, target_time, host_time,
-					 adapter->mac_addr.bytes);
+					 QDF_MAC_ADDR_REF(mac));
 		}
 	}
 
