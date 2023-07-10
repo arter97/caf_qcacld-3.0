@@ -2861,4 +2861,16 @@ wlan_reg_display_super_chan_list(struct wlan_objmgr_pdev *pdev)
 uint8_t
 wlan_reg_get_num_rules_of_ap_pwr_type(struct wlan_objmgr_pdev *pdev,
 				      enum reg_6g_ap_type ap_pwr_type);
+
+/**
+ * wlan_reg_get_endchan_cen_from_bandstart() - Get the end channel frequency
+ * from the band start frequency.
+ * @band_start: Band start frequency in MHz
+ * @bw: Bandwidth in MHz
+ *
+ * Return: End frequency in MHz
+ */
+qdf_freq_t
+wlan_reg_get_endchan_cen_from_bandstart(qdf_freq_t band_start,
+					uint16_t bw);
 #endif

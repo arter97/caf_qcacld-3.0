@@ -1935,3 +1935,10 @@ wlan_reg_modify_indoor_concurrency(struct wlan_objmgr_pdev *pdev,
 		return reg_remove_indoor_concurrency(pdev, vdev_id, freq);
 }
 #endif
+
+qdf_freq_t
+wlan_reg_get_endchan_cen_from_bandstart(qdf_freq_t band_start,
+					uint16_t bw)
+{
+	return reg_get_endchan_cen_from_bandstart(band_start, bw);
+}
