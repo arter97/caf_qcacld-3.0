@@ -5094,8 +5094,18 @@ static int drv_cmd_max_tx_power(struct wlan_hdd_link_info *link_info,
 	hdd_for_each_adapter_dev_held_safe(hdd_ctx, adapter, next_adapter,
 					   dbgid) {
 		/* Assign correct self MAC address */
-		qdf_copy_macaddr(&bssid,
-				 &adapter->mac_addr);
+		if (adapter->device_mode == QDF_SAP_MODE ||
+		    adapter->device_mode == QDF_P2P_GO_MODE) {
+			qdf_copy_macaddr(&bssid, &adapter->mac_addr);
+		} else {
+			struct hdd_station_ctx *sta_ctx =
+				WLAN_HDD_GET_STATION_CTX_PTR(adapter->deflink);
+
+			if (hdd_cm_is_vdev_associated(adapter->deflink))
+				qdf_copy_macaddr(&bssid,
+						 &sta_ctx->conn_info.bssid);
+		}
+
 		qdf_copy_macaddr(&selfmac,
 				 &adapter->mac_addr);
 
