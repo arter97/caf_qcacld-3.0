@@ -1076,9 +1076,6 @@ enum udp_qos_upgrade {
  * @hdd_stats: HDD statistics
  * @big_data_stats: Big data stats
  * @ll_iface_stats: Link Layer interface stats
- * @mlo_peer_stats: Pointer to MLO Peer Stats
- * @num_mlo_peers: Total number of MLO peers
- * @more_peer_data: more mlo peer data in peer stats
  * @mscs_prev_tx_vo_pkts: count of prev VO AC packets transmitted
  * @mscs_counter: Counter on MSCS action frames sent
  * @link_flags: a bitmap of hdd_link_flags
@@ -1112,9 +1109,6 @@ struct wlan_hdd_link_info {
 #endif
 #if defined(WLAN_FEATURE_11BE_MLO) && defined(CFG80211_11BE_BASIC)
 	struct wifi_interface_stats ll_iface_stats;
-	struct wifi_peer_stat *mlo_peer_stats;
-	uint8_t num_mlo_peers;
-	uint32_t more_peer_data;
 #endif
 
 #ifdef WLAN_FEATURE_MSCS
@@ -1980,6 +1974,9 @@ enum wlan_state_ctrl_str_id {
  * @host wakeup from fw with reason as pagefault
  * @bridgeaddr: Bridge MAC address
  * @is_mlo_per_link_stats_supported: Per link mlo stats is supported or not
+ * @mlo_peer_stats: Pointer to MLO Peer Stats
+ * @num_mlo_peers: Total number of MLO peers
+ * @more_peer_data: more mlo peer data in peer stats
  */
 struct hdd_context {
 	struct wlan_objmgr_psoc *psoc;
@@ -2258,6 +2255,9 @@ struct hdd_context {
 	uint8_t bridgeaddr[QDF_MAC_ADDR_SIZE];
 #ifdef WLAN_FEATURE_11BE_MLO
 	bool is_mlo_per_link_stats_supported;
+	struct wifi_peer_stat *mlo_peer_stats;
+	uint8_t num_mlo_peers;
+	uint32_t more_peer_data;
 #endif
 };
 

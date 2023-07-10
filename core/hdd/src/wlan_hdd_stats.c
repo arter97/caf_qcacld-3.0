@@ -452,18 +452,32 @@ int wlan_hdd_qmi_put_suspend(void)
 #endif /* end if of WLAN_FEATURE_WMI_SEND_RECV_QMI */
 
 /*
- * wlan_hdd_is_legacy_adapter() - Check if adapter is legacy or mlo
- * @adapter: Pointer to hdd adapter
+ * wlan_hdd_is_mlo_connection() - Check if connection is legacy or mlo
+ * @link_info: Link info pointer in HDD adapter
  *
- * Return: True if legacy connection, else False
+ * Return: True if MLO connection, else False
  */
-static bool wlan_hdd_is_legacy_adapter(struct hdd_adapter *adapter)
+static bool wlan_hdd_is_mlo_connection(struct wlan_hdd_link_info *link_info)
 {
-	if (hdd_adapter_is_ml_adapter(adapter) ||
-	    hdd_adapter_is_link_adapter(adapter))
-		return false;
+	struct wlan_objmgr_vdev *vdev;
+	bool ret = false;
 
-	return true;
+	if (!link_info) {
+		hdd_err("Invalid link_info");
+		return ret;
+	}
+
+	vdev = hdd_objmgr_get_vdev_by_user(link_info, WLAN_OSIF_STATS_ID);
+	if (!vdev) {
+		hdd_err("invalid vdev");
+		return ret;
+	}
+
+	if (wlan_vdev_mlme_is_mlo_vdev(vdev))
+		ret = true;
+
+	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_STATS_ID);
+	return ret;
 }
 
 static struct wlan_hdd_link_info *
@@ -768,7 +782,7 @@ wlan_hdd_put_mlo_peer_link_id(struct sk_buff *vendor_event,
 
 /**
  * hdd_cache_ll_peer_stats() - Caches mlo peer stats received from fw
- * @link_info: Link info pointer of STA adapter
+ * @hdd_ctx: Pointer to hdd_context
  * @peer_stat: Pointer to stats data
  * @more_data: more data in peer stats
  *
@@ -778,17 +792,22 @@ wlan_hdd_put_mlo_peer_link_id(struct sk_buff *vendor_event,
  * Return: None
  */
 static void
-hdd_cache_ll_peer_stats(struct wlan_hdd_link_info *link_info,
+hdd_cache_ll_peer_stats(struct hdd_context *hdd_ctx,
 			struct wifi_peer_stat *peer_stat,
 			u32 more_data)
 {
 	if (!peer_stat->num_peers)
 		return;
 
-	link_info->mlo_peer_stats = peer_stat;
-	link_info->more_peer_data = more_data;
-	link_info->num_mlo_peers = peer_stat->num_peers;
-	hdd_debug("Copied mlo ll_peer stats into link_info");
+	if (!hdd_ctx) {
+		hdd_err("Invalid hdd_ctx");
+		return;
+	}
+
+	hdd_ctx->mlo_peer_stats = peer_stat;
+	hdd_ctx->more_peer_data = more_data;
+	hdd_ctx->num_mlo_peers = peer_stat->num_peers;
+	hdd_debug("Copied mlo ll_peer stats into hdd_ctx");
 }
 #else
 static inline bool
@@ -799,7 +818,7 @@ wlan_hdd_put_mlo_peer_link_id(struct sk_buff *vendor_event,
 }
 
 static void
-hdd_cache_ll_peer_stats(struct wlan_hdd_link_info *link_info,
+hdd_cache_ll_peer_stats(struct hdd_context *hdd_ctx,
 			struct wifi_peer_stat *peer_stat,
 			u32 more_data)
 {
@@ -829,12 +848,6 @@ static bool put_wifi_peer_info(struct wifi_peer_info *stats,
 			QCA_WLAN_VENDOR_ATTR_LL_STATS_PEER_INFO_NUM_RATES,
 			stats->num_rate)) {
 		hdd_err("QCA_WLAN_VENDOR_ATTR put fail");
-		return false;
-	}
-
-	if (!wlan_hdd_put_mlo_peer_link_id(vendor_event,
-					   &stats->peer_macaddr)) {
-		hdd_err("QCA_WLAN_VENDOR_ATTR_LL_STATS_MLO_LINK_ID fail");
 		return false;
 	}
 
@@ -1177,12 +1190,12 @@ static void hdd_link_layer_process_peer_stats(struct hdd_adapter *adapter,
 	int num_rate;
 
 	status = wlan_hdd_validate_context(hdd_ctx);
-	if (0 != status)
+	if (status)
 		return;
 
-	if (!wlan_hdd_is_legacy_adapter(adapter)) {
-		hdd_cache_ll_peer_stats(adapter->deflink,
-					peer_stat, more_data);
+	if (wlan_hdd_is_mlo_connection(adapter->deflink)) {
+		hdd_cache_ll_peer_stats(hdd_ctx, peer_stat,
+					more_data);
 		return;
 	}
 	hdd_nofl_debug("LL_STATS_PEER_ALL : num_peers %u, more data = %u",
@@ -1449,14 +1462,13 @@ wlan_hdd_update_iface_stats_info(struct wlan_hdd_link_info *link_info,
 
 /**
  * wlan_hdd_send_mlo_ll_peer_stats() - send mlo ll peer stats to userspace
- * @link_info: Pointer to link_info in adapter
+ * @hdd_ctx: Pointer to hdd_context
  *
  * Return: none
  */
 static void
-wlan_hdd_send_mlo_ll_peer_stats(struct wlan_hdd_link_info *link_info)
+wlan_hdd_send_mlo_ll_peer_stats(struct hdd_context *hdd_ctx)
 {
-	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(link_info->adapter);
 	struct sk_buff *skb;
 	uint8_t i, num_rate;
 	struct wifi_peer_stat *peer_stat;
@@ -1468,7 +1480,7 @@ wlan_hdd_send_mlo_ll_peer_stats(struct wlan_hdd_link_info *link_info)
 		return;
 	}
 
-	peer_stat = (struct wifi_peer_stat *)link_info->mlo_peer_stats;
+	peer_stat = (struct wifi_peer_stat *)hdd_ctx->mlo_peer_stats;
 	if (!peer_stat) {
 		hdd_err("Invalid mlo peer stats");
 		return;
@@ -1492,7 +1504,7 @@ wlan_hdd_send_mlo_ll_peer_stats(struct wlan_hdd_link_info *link_info)
 			QCA_NL80211_VENDOR_SUBCMD_LL_STATS_TYPE_PEERS) ||
 	    nla_put_u32(skb,
 			QCA_WLAN_VENDOR_ATTR_LL_STATS_RESULTS_MORE_DATA,
-			link_info->more_peer_data) ||
+			hdd_ctx->more_peer_data) ||
 	    nla_put_u32(skb,
 			QCA_WLAN_VENDOR_ATTR_LL_STATS_IFACE_NUM_PEERS,
 			peer_stat->num_peers)) {
@@ -1519,6 +1531,12 @@ wlan_hdd_send_mlo_ll_peer_stats(struct wlan_hdd_link_info *link_info)
 		}
 
 		num_rate = peer_info->num_rate;
+		if (!wlan_hdd_put_mlo_peer_link_id(skb,
+						   &peer_info->peer_macaddr)) {
+			hdd_err("QCA_WLAN_VENDOR_ATTR_LL_STATS_MLO_LINK_ID fail");
+			return;
+		}
+
 		if (!put_wifi_peer_info(peer_info, skb)) {
 			hdd_err("put_wifi_peer_info fail");
 			wlan_cfg80211_vendor_free_skb(skb);
@@ -1559,7 +1577,7 @@ static void wlan_hdd_send_mlo_ll_iface_stats(struct hdd_adapter *adapter)
 	struct sk_buff *skb;
 	struct wlan_hdd_link_info *link_info;
 
-	if (wlan_hdd_is_legacy_adapter(adapter))
+	if (!wlan_hdd_is_mlo_connection(adapter->deflink))
 		return;
 
 	if (wlan_hdd_validate_context(hdd_ctx)) {
@@ -1589,7 +1607,7 @@ static void wlan_hdd_send_mlo_ll_iface_stats(struct hdd_adapter *adapter)
 	hdd_debug("WMI_MLO_LINK_STATS_IFACE Data");
 
 	rssi = link_info->hdd_stats.summary_stat.rssi;
-	num_peers = link_info->num_mlo_peers;
+	num_peers = hdd_ctx->num_mlo_peers;
 
 	if (!hdd_get_interface_info(link_info, &cumulative_if_stat.info)) {
 		hdd_err("hdd_get_interface_info get fail for ml_adapter");
@@ -1670,7 +1688,7 @@ static void wlan_hdd_send_mlo_ll_iface_stats(struct hdd_adapter *adapter)
 
 	wlan_cfg80211_vendor_cmd_reply(skb);
 	qdf_mem_free(link_if_stat);
-	wlan_hdd_send_mlo_ll_peer_stats(ml_adapter->deflink);
+	wlan_hdd_send_mlo_ll_peer_stats(hdd_ctx);
 	return;
 err:
 	wlan_cfg80211_vendor_free_skb(skb);
@@ -1709,7 +1727,7 @@ hdd_link_layer_process_iface_stats(struct wlan_hdd_link_info *link_info,
 	struct sk_buff *skb;
 	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(link_info->adapter);
 
-	if (!wlan_hdd_is_legacy_adapter(link_info->adapter)) {
+	if (wlan_hdd_is_mlo_connection(link_info)) {
 		hdd_cache_ll_iface_stats(hdd_ctx, if_stat);
 		return;
 	}
@@ -6886,7 +6904,7 @@ static void wlan_hdd_update_rssi(struct wlan_hdd_link_info *link_info,
 
 static void
 wlan_hdd_update_mlo_peer_stats(struct wlan_hdd_link_info *link_info,
-			       struct station_info *sinfo, const uint8_t *mac)
+			       struct station_info *sinfo)
 {
 	ol_txrx_soc_handle soc;
 	uint8_t *peer_mac;
@@ -6900,12 +6918,6 @@ wlan_hdd_update_mlo_peer_stats(struct wlan_hdd_link_info *link_info,
 
 	soc = cds_get_context(QDF_MODULE_ID_SOC);
 	peer_mac = link_info->session.station.conn_info.bssid.bytes;
-
-	if (!qdf_is_macaddr_equal((struct qdf_mac_addr *)peer_mac,
-					(struct qdf_mac_addr *)mac)) {
-		hdd_nofl_debug("Fetching aggregated station stats");
-		return;
-	}
 
 	if (!wlan_hdd_is_per_link_stats_supported(hdd_ctx))
 		return;
@@ -6930,8 +6942,7 @@ wlan_hdd_update_mlo_peer_stats(struct wlan_hdd_link_info *link_info,
 }
 
 static int wlan_hdd_update_rate_info(struct wlan_hdd_link_info *link_info,
-				     struct station_info *sinfo,
-				     const uint8_t *mac)
+				     struct station_info *sinfo)
 {
 	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(link_info->adapter);
 	struct hdd_station_ctx *sta_ctx;
@@ -7084,7 +7095,7 @@ static int wlan_hdd_update_rate_info(struct wlan_hdd_link_info *link_info,
 	sinfo->tx_bytes = stats.tx_bytes;
 	sinfo->rx_bytes = stats.rx_bytes;
 	sinfo->rx_packets = stats.rx_packets;
-	wlan_hdd_update_mlo_peer_stats(link_info, sinfo, mac);
+	wlan_hdd_update_mlo_peer_stats(link_info, sinfo);
 
 	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_STATS_ID);
 
@@ -7179,7 +7190,7 @@ static int wlan_hdd_get_sta_stats(struct wlan_hdd_link_info *link_info,
 	 */
 	hdd_lpass_notify_connect(link_info);
 
-	if (wlan_hdd_update_rate_info(link_info, sinfo, mac))
+	if (wlan_hdd_update_rate_info(link_info, sinfo))
 		/* Keep GUI happy */
 		return 0;
 
@@ -7351,48 +7362,36 @@ static int wlan_hdd_get_mlo_sta_stats(struct wlan_hdd_link_info *link_info,
  * @link_info: Link info pointer of STA adapter
  * @mac: mac address
  *
- * Return: True if requested on mld_mac or FW doesn't support per link stats
- *	   else False
+ * Return: True if req is on mld_mac and FW supports per link stats, else False
  */
 static bool
 wlan_hdd_send_mlo_aggregated_stats(struct wlan_hdd_link_info *link_info,
 				   const uint8_t *mac)
 {
-	struct wlan_objmgr_vdev *vdev;
-	struct hdd_adapter *adapter = link_info->adapter;
-	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
-	bool ret = false;
+	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(link_info->adapter);
+	bool is_mld_req = false;
+	bool per_link_stats_cap = false;
 
-	if (wlan_hdd_is_legacy_adapter(adapter)) {
+	if (!link_info) {
+		hdd_err("Invalid link_info");
+		return false;
+	}
+
+	if (!wlan_hdd_is_mlo_connection(link_info)) {
 		hdd_nofl_debug("Fetching station stats for legacy connection");
 		return false;
 	}
 
-	vdev = hdd_objmgr_get_vdev_by_user(link_info, WLAN_OSIF_STATS_ID);
-	if (!vdev) {
-		hdd_err("invalid vdev");
-		return false;
+	is_mld_req = qdf_is_macaddr_equal(&link_info->adapter->mld_addr,
+					  (struct qdf_mac_addr *)mac);
+	per_link_stats_cap = wlan_hdd_is_per_link_stats_supported(hdd_ctx);
+
+	if (is_mld_req && per_link_stats_cap) {
+		hdd_debug("Fetching Aggregated station stats");
+		return true;
 	}
 
-	if (wlan_vdev_mlme_is_mlo_vdev(vdev)) {
-		if (qdf_is_macaddr_equal(&adapter->mld_addr,
-					 (struct qdf_mac_addr *)mac)) {
-			hdd_nofl_debug("Fetching aggregated station stats");
-			ret = true;
-			goto end;
-		}
-
-		if (!wlan_hdd_is_per_link_stats_supported(hdd_ctx)) {
-			hdd_debug("FW doesn't support per link stats."
-				  " Fetching aggregated station stats");
-			ret = true;
-			goto end;
-		}
-	}
-	hdd_debug("Fetching stats for mlo_vdev_id[%u]", link_info->vdev_id);
-end:
-	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_STATS_ID);
-	return ret;
+	return false;
 }
 
 /**
@@ -7467,8 +7466,11 @@ static int __wlan_hdd_cfg80211_get_station(struct wiphy *wiphy,
 			hdd_err_rl("the bssid is invalid");
 		}
 
-		if (!wlan_hdd_send_mlo_aggregated_stats(link_info, mac))
-			return wlan_hdd_get_sta_stats(link_info, mac, sinfo);
+		if (!wlan_hdd_send_mlo_aggregated_stats(link_info, mac)) {
+			hdd_debug("Sending Assoc Link stats");
+			return wlan_hdd_get_sta_stats(adapter->deflink,
+						      mac, sinfo);
+		}
 
 		return wlan_hdd_get_mlo_sta_stats(link_info, mac, sinfo);
 	}
@@ -7622,10 +7624,12 @@ static int __wlan_hdd_cfg80211_dump_station(struct wiphy *wiphy,
 
 		qdf_mem_copy(mac, dev->dev_addr, QDF_MAC_ADDR_SIZE);
 
-		if (!wlan_hdd_send_mlo_aggregated_stats(adapter->deflink, mac))
+		if (!wlan_hdd_send_mlo_aggregated_stats(adapter->deflink,
+							mac)) {
+			hdd_debug("Sending Assoc Link stats");
 			return wlan_hdd_get_sta_stats(adapter->deflink,
 						      mac, sinfo);
-
+		}
 		errno = wlan_hdd_get_mlo_sta_stats(adapter->deflink,
 						   mac, sinfo);
 	}
