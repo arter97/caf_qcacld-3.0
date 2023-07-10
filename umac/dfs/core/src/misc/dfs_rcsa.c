@@ -25,6 +25,8 @@
 #include <dfs.h>
 #include <dfs_process_radar_found_ind.h>
 #include <wlan_dfs_mlme_api.h>
+#include <wlan_dfs_utils_api.h>
+#include <wlan_reg_services_api.h>
 
 #if defined(QCA_DFS_RCSA_SUPPORT)
 /* dfs_prepare_nol_ie_bitmap: Create a Bitmap from the radar found subchannels
@@ -104,15 +106,164 @@ static void dfs_reset_nol_ie_bitmap(struct wlan_dfs *dfs)
 	dfs->dfs_nol_ie_bitmap = 0;
 }
 
+/**
+ * dfs_get_radar_subchans_from_nol_ie(): Populate the radar frequencies
+ * from the NOL IE received in RCSA.
+ * @dfs: Pointer to struct wlan_dfs
+ * @radar_subchans: Output array of radar sub-channels to be filled.
+ * @nol_ie_start_freq: NOL IE start frequency
+ * @nol_ie_bitmap: NOL IE bitmap
+ *
+ * Return: Number of channels radar infected.
+ */
+static uint8_t
+dfs_get_radar_subchans_from_nol_ie(struct wlan_dfs *dfs,
+				   uint16_t *radar_subchans,
+				   qdf_freq_t nol_ie_start_freq,
+				   uint8_t nol_ie_bitmap)
+{
+	uint8_t num_subchans = 0, i;
+	uint32_t frequency = (uint32_t)nol_ie_start_freq;
+	uint8_t bits = 0x01;
+
+	for (i = 0; i < MAX_20MHZ_SUBCHANS; i++) {
+		if (nol_ie_bitmap & bits) {
+			radar_subchans[num_subchans] = frequency;
+			dfs_debug(dfs, WLAN_DEBUG_DFS_PUNCTURING, "radar_suchan[%u] = %u\n",
+				  num_subchans, radar_subchans[num_subchans]);
+			num_subchans++;
+		}
+		bits <<= 1;
+		frequency += dfs->dfs_nol_ie_bandwidth;
+	}
+	return num_subchans;
+}
+
+#if defined(WLAN_FEATURE_11BE) && defined(QCA_DFS_BW_PUNCTURE) && \
+	defined(QCA_DFS_BW_PUNCTURE)
+/**
+ * dfs_is_freq_radar_infected() - Given a chan_freq, return true if the
+ * freq is part of radar_subchans, else return false.
+ * @chan_freq: Channel frequency in MHz
+ * @radar_subchans: An array of 20 MHz sub-channels that are radar infected
+ *
+ * Return: True if chan_freq is radar infected, false otherwise.
+ */
+static bool
+dfs_is_freq_radar_infected(uint16_t chan_freq, uint16_t *radar_subchans)
+{
+	uint8_t i;
+	bool is_freq_radar = false;
+
+	for (i = 0; i < MAX_20MHZ_SUBCHANS; i++)
+		if (chan_freq == radar_subchans[i]) {
+			is_freq_radar = true;
+			break;
+		}
+
+	return is_freq_radar;
+}
+
+/**
+ * dfs_is_radar_subchans_empty() - Return true if the radar_subchan array
+ * is empty (0 frequencies), false otherwise.
+ * @radar_subchans: An array of radar subchannels.
+ *
+ * Return: True if array is empty, false otherwise.
+ */
+static bool
+dfs_is_radar_subchans_empty(uint16_t *radar_subchans)
+{
+	uint8_t i;
+
+	for (i = 0; i < MAX_20MHZ_SUBCHANS; i++)
+		if (radar_subchans[i])
+			return false;
+
+	return true;
+}
+
+#define SUB_CHAN_BW 20 /* 20 MHZ */
+
+/**
+ * dfs_cal_punc_pat_from_radar_subchans() - Calculate the puncture pattern
+ * from radar subchannels.
+ * @dfs: Pointer to struct wlan_dfs
+ * @phymode: Channel phymode of type wlan_phymode
+ * @radar_subchans: Array of radar sub-channels
+ *
+ * Return: Puncture pattern
+ */
+static uint16_t
+dfs_cal_punc_pat_from_radar_subchans(struct wlan_dfs *dfs,
+				     enum wlan_phymode phymode,
+				     uint16_t *radar_subchans)
+{
+	const struct bonded_channel_freq *bonded_chan_ptr;
+	qdf_freq_t center_320, startchan_cfreq, endchan_cfreq;
+	enum phy_ch_width ch_width = utils_dfs_convert_wlan_phymode_to_chwidth(phymode);
+	uint16_t cur_chan_bw = wlan_reg_get_bw_value(ch_width);
+	uint8_t i = 0;
+	uint16_t radar_punc_bitmap = NO_SCHANS_PUNC;
+
+	center_320 = (ch_width == CH_WIDTH_320MHZ) ?
+		dfs->dfs_curchan->dfs_ch_mhz_freq_seg2 : 0;
+
+	bonded_chan_ptr = wlan_reg_get_bonded_chan_entry(dfs->dfs_curchan->dfs_ch_freq,
+							 ch_width, center_320);
+	if (!bonded_chan_ptr)
+		return radar_punc_bitmap;
+
+	startchan_cfreq = bonded_chan_ptr->start_freq;
+	endchan_cfreq  = wlan_reg_get_endchan_cen_from_bandstart(startchan_cfreq,
+								 cur_chan_bw);
+	while (startchan_cfreq <= endchan_cfreq) {
+		if (dfs_is_freq_radar_infected(startchan_cfreq, radar_subchans))
+			radar_punc_bitmap |= BIT(i);
+
+		startchan_cfreq = startchan_cfreq + SUB_CHAN_BW;
+		i++;
+	}
+	return radar_punc_bitmap;
+}
+
+/**
+ * dfs_get_radar_bitmap_from_nolie() - Translate the NOL IE bitmap of RCSA
+ * to puncture pattern.
+ * @dfs: Pointer to struct wlan_dfs
+ * @phymode: Phymode of type wlan_phymode
+ * @nol_ie_start_freq: NOL IE start freq
+ * @nol_ie_bitmap: NOL bitmap
+ *
+ * Return: Puncture bitmap
+ */
+uint16_t
+dfs_get_radar_bitmap_from_nolie(struct wlan_dfs *dfs, enum wlan_phymode phymode,
+				qdf_freq_t nol_ie_start_freq,
+				uint8_t nol_ie_bitmap)
+{
+	uint16_t radar_subchans[MAX_20MHZ_SUBCHANS] = {};
+	uint16_t radar_punc_bitmap = NO_SCHANS_PUNC;
+
+	dfs_get_radar_subchans_from_nol_ie(dfs, radar_subchans,
+					   nol_ie_start_freq,
+					   nol_ie_bitmap);
+	if (dfs_is_radar_subchans_empty(radar_subchans))
+		return radar_punc_bitmap;
+
+	return dfs_cal_punc_pat_from_radar_subchans(dfs, phymode,
+						    radar_subchans);
+}
+#endif
+
 #ifdef CONFIG_CHAN_FREQ_API
 bool dfs_process_nol_ie_bitmap(struct wlan_dfs *dfs, uint8_t nol_ie_bandwidth,
 			       uint16_t nol_ie_startfreq, uint8_t nol_ie_bitmap)
 {
-	uint8_t num_subchans;
-	uint8_t bits = 0x01;
-	uint16_t radar_subchans[MAX_20MHZ_SUBCHANS];
+	uint16_t radar_subchans[MAX_20MHZ_SUBCHANS] = {};
 	uint16_t nol_freq_list[MAX_20MHZ_SUBCHANS];
 	bool should_nol_ie_be_sent = true;
+	uint8_t num_subchans;
 
 	qdf_mem_zero(radar_subchans, sizeof(radar_subchans));
 	if (!dfs->dfs_use_nol_subchannel_marking) {
@@ -131,19 +282,14 @@ bool dfs_process_nol_ie_bitmap(struct wlan_dfs *dfs, uint8_t nol_ie_bandwidth,
 		/* Add the NOL IE information in DFS structure so that RCSA
 		 * and NOL IE can be sent to uplink if uplink exists.
 		 */
-		uint32_t frequency = (uint32_t)nol_ie_startfreq;
 
 		dfs->dfs_nol_ie_bandwidth = nol_ie_bandwidth;
 		dfs->dfs_nol_ie_startfreq = nol_ie_startfreq;
 		dfs->dfs_nol_ie_bitmap = nol_ie_bitmap;
-		for (num_subchans = 0; num_subchans < MAX_20MHZ_SUBCHANS;
-			num_subchans++) {
-			if (nol_ie_bitmap & bits) {
-				radar_subchans[num_subchans] = frequency;
-			}
-			bits <<= 1;
-			frequency += nol_ie_bandwidth;
-		}
+		num_subchans =
+			dfs_get_radar_subchans_from_nol_ie(dfs, radar_subchans,
+							   nol_ie_startfreq,
+							   nol_ie_bitmap);
 	}
 
 	dfs_radar_add_channel_list_to_nol_for_freq(dfs, radar_subchans,
