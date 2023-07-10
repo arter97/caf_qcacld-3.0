@@ -5075,6 +5075,18 @@ static inline unsigned long wlan_hdd_get_default_pm_qos_cpu_latency(void)
 #endif /* defined(CLD_PM_QOS) || defined(FEATURE_RUNTIME_PM) */
 
 /**
+ * hdd_get_wifi_standard() - Get wifi standard
+ * @hdd_ctx: hdd context pointer
+ * @dot11_mode: hdd dot11 mode
+ * @band_capability: band capability bitmap
+ *
+ * Return: WMI_HOST_WIFI_STANDARD
+ */
+WMI_HOST_WIFI_STANDARD
+hdd_get_wifi_standard(struct hdd_context *hdd_ctx,
+		      enum hdd_dot11_mode dot11_mode, uint32_t band_capability);
+
+/**
  * hdd_is_runtime_pm_enabled - if runtime pm enabled
  * @hdd_ctx: hdd context
  *

@@ -1783,8 +1783,8 @@ hdd_vendor_mode_to_bonding_mode(enum qca_wlan_vendor_phy_mode vendor_phy_mode,
 	return 0;
 }
 
-static int hdd_phymode_to_dot11_mode(eCsrPhyMode phymode,
-				     enum hdd_dot11_mode *dot11_mode)
+int hdd_phymode_to_dot11_mode(eCsrPhyMode phymode,
+			      enum hdd_dot11_mode *dot11_mode)
 {
 	switch (phymode) {
 	case eCSR_DOT11_MODE_AUTO:

@@ -4688,35 +4688,29 @@ static bool hdd_is_11be_supported(struct hdd_context *hdd_ctx)
 }
 #endif
 
-/**
- * hdd_get_wifi_standard() - Get wifi standard
- * @hdd_ctx: hdd context pointer
- * @band_capability: band capability bitmap
- *
- * Return: WMI_HOST_WIFI_STANDARD
- */
-static WMI_HOST_WIFI_STANDARD hdd_get_wifi_standard(struct hdd_context *hdd_ctx,
-						    uint32_t band_capability)
+WMI_HOST_WIFI_STANDARD
+hdd_get_wifi_standard(struct hdd_context *hdd_ctx,
+		      enum hdd_dot11_mode dot11_mode, uint32_t band_capability)
 {
 	WMI_HOST_WIFI_STANDARD wifi_standard = WMI_HOST_WIFI_STANDARD_4;
 
-	if (hdd_ctx->config->dot11Mode == eHDD_DOT11_MODE_AUTO) {
+	if (dot11_mode == eHDD_DOT11_MODE_AUTO) {
 		if (hdd_is_11be_supported(hdd_ctx))
 			wifi_standard = WMI_HOST_WIFI_STANDARD_7;
 		else if (band_capability & BIT(REG_BAND_6G))
 			wifi_standard = WMI_HOST_WIFI_STANDARD_6E;
 		else
 			wifi_standard = WMI_HOST_WIFI_STANDARD_6;
-	} else if (hdd_is_cfg_dot11_mode_11be(hdd_ctx->config->dot11Mode)) {
+	} else if (hdd_is_cfg_dot11_mode_11be(dot11_mode)) {
 		wifi_standard = WMI_HOST_WIFI_STANDARD_7;
-	} else if (hdd_ctx->config->dot11Mode == eHDD_DOT11_MODE_11ax ||
-		   (hdd_ctx->config->dot11Mode == eHDD_DOT11_MODE_11ax_ONLY)) {
+	} else if (dot11_mode == eHDD_DOT11_MODE_11ax ||
+		   (dot11_mode == eHDD_DOT11_MODE_11ax_ONLY)) {
 		if (band_capability & BIT(REG_BAND_6G))
 			wifi_standard = WMI_HOST_WIFI_STANDARD_6E;
 		else
 			wifi_standard = WMI_HOST_WIFI_STANDARD_6;
-	} else if ((hdd_ctx->config->dot11Mode == eHDD_DOT11_MODE_11ac) ||
-		   (hdd_ctx->config->dot11Mode == eHDD_DOT11_MODE_11ac_ONLY)) {
+	} else if ((dot11_mode == eHDD_DOT11_MODE_11ac) ||
+		   (dot11_mode == eHDD_DOT11_MODE_11ac_ONLY)) {
 		wifi_standard = WMI_HOST_WIFI_STANDARD_5;
 	}
 
@@ -4757,8 +4751,9 @@ static void hdd_populate_feature_set_cds_config(struct hdd_context *hdd_ctx)
 		hdd_update_band_cap_from_dot11mode(hdd_ctx, band_capability);
 
 	cds_cfg->cds_feature_set.wifi_standard =
-				hdd_get_wifi_standard(hdd_ctx,
-						      band_capability);
+			  hdd_get_wifi_standard(hdd_ctx,
+						hdd_ctx->config->dot11Mode,
+						band_capability);
 
 	cds_cfg->cds_feature_set.sap_5g_supported =
 					band_capability & BIT(REG_BAND_5G);
@@ -4768,6 +4763,13 @@ static void hdd_populate_feature_set_cds_config(struct hdd_context *hdd_ctx)
 	cds_cfg->cds_feature_set.band_capability = band_capability;
 }
 #else
+WMI_HOST_WIFI_STANDARD
+hdd_get_wifi_standard(struct hdd_context *hdd_ctx,
+		      enum hdd_dot11_mode dot11_mode, uint32_t band_capability)
+{
+	return WMI_HOST_WIFI_STANDARD_5;
+}
+
 static inline void
 hdd_populate_feature_set_cds_config(struct hdd_context *hdd_ctx)
 {
