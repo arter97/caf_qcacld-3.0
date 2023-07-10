@@ -1805,12 +1805,26 @@ qdf_export_symbol(wlan_mlo_peer_get_links_info);
 uint8_t wlan_mlo_peer_get_primary_peer_link_id(struct wlan_objmgr_peer *peer)
 {
 	struct wlan_mlo_peer_context *ml_peer;
+
+	ml_peer = peer->mlo_peer_ctx;
+
+	if (!ml_peer) {
+		mlo_err("ml_peer is null");
+		return WLAN_LINK_ID_INVALID;
+	}
+
+	return wlan_mlo_peer_get_primary_peer_link_id_by_ml_peer(ml_peer);
+}
+
+qdf_export_symbol(wlan_mlo_peer_get_primary_peer_link_id);
+
+uint8_t wlan_mlo_peer_get_primary_peer_link_id_by_ml_peer(
+				struct wlan_mlo_peer_context *ml_peer)
+{
 	struct wlan_mlo_link_peer_entry *peer_entry;
 	struct wlan_objmgr_peer *link_peer;
 	struct wlan_objmgr_vdev *link_vdev;
 	uint8_t i, vdev_link_id;
-
-	ml_peer = peer->mlo_peer_ctx;
 
 	if (!ml_peer) {
 		mlo_err("ml_peer is null");
@@ -1848,7 +1862,7 @@ uint8_t wlan_mlo_peer_get_primary_peer_link_id(struct wlan_objmgr_peer *peer)
 	return WLAN_LINK_ID_INVALID;
 }
 
-qdf_export_symbol(wlan_mlo_peer_get_primary_peer_link_id);
+qdf_export_symbol(wlan_mlo_peer_get_primary_peer_link_id_by_ml_peer);
 
 void wlan_mlo_peer_get_partner_links_info(struct wlan_objmgr_peer *peer,
 					  struct mlo_partner_info *ml_links)
