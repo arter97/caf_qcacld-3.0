@@ -1219,7 +1219,7 @@ wlan_cfg80211_tdls_mgmt_mlo(struct hdd_adapter *adapter, const uint8_t *peer,
 	bool link_id_vdev = false;
 	bool dis_req_more = false;
 	uint8_t i;
-	int ret;
+	int ret = 0;
 
 	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink, WLAN_OSIF_TDLS_ID);
 	if (!vdev)
