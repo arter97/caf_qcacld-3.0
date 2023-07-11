@@ -591,6 +591,7 @@ QDF_STATUS mlo_check_topology(struct wlan_objmgr_pdev *pdev,
 	uint8_t bridge_umac;
 	uint8_t adjacent = -1;
 	uint8_t max_soc;
+	uint8_t link_id;
 	bool is_mlo_vdev;
 
 	if (!ml_dev)
@@ -641,11 +642,13 @@ QDF_STATUS mlo_check_topology(struct wlan_objmgr_pdev *pdev,
 		/* Check if the primary umac and assoc links are same for 3 link sta*/
 		if (idx == WLAN_UMAC_MLO_MAX_PSOC_TOPOLOGY) {
 			bridge_umac = mlo_get_central_umac_id(psoc_ids);
+
 			tmp_vdev = mlo_get_link_vdev_from_psoc_id(ml_dev, bridge_umac);
 
 			if (!tmp_vdev)
 				return QDF_STATUS_E_FAILURE;
 
+			link_id = tmp_vdev->vdev_mlme.mlo_link_id;
 			if (bridge_umac != -1) {
 				if (wlan_vdev_get_psoc_id(vdev) != bridge_umac) {
 					mlo_err("Central LINK %d Force central as primary umac!! ",
@@ -653,6 +656,7 @@ QDF_STATUS mlo_check_topology(struct wlan_objmgr_pdev *pdev,
 					tmp_vdev->vdev_objmgr.mlo_central_vdev = true;
 					ml_dev->bridge_sta_ctx->is_force_central_primary = true;
 					ml_dev->bridge_sta_ctx->bridge_umac_id = bridge_umac;
+					ml_dev->bridge_sta_ctx->bridge_link_id = link_id;
 					wlan_objmgr_vdev_release_ref(tmp_vdev, WLAN_MLO_MGR_ID);
 					return QDF_STATUS_SUCCESS;
 				}
@@ -669,6 +673,7 @@ QDF_STATUS mlo_check_topology(struct wlan_objmgr_pdev *pdev,
 			if (!tmp_vdev)
 				return QDF_STATUS_E_FAILURE;
 
+			link_id = tmp_vdev->vdev_mlme.mlo_link_id;
 			if (bridge_umac != -1) {
 				if (wlan_vdev_get_psoc_id(vdev) != bridge_umac) {
 					is_mlo_vdev = wlan_vdev_mlme_is_mlo_vdev(tmp_vdev);
@@ -682,6 +687,7 @@ QDF_STATUS mlo_check_topology(struct wlan_objmgr_pdev *pdev,
 						ml_dev->bridge_sta_ctx->is_force_central_primary = true;
 						ml_dev->bridge_sta_ctx->bridge_umac_id = bridge_umac;
 						ml_dev->bridge_sta_ctx->bridge_vap_exists = true;
+						ml_dev->bridge_sta_ctx->bridge_link_id = link_id;
 					}
 				}
 			}
