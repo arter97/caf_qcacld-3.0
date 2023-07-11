@@ -346,6 +346,13 @@ QDF_STATUS tdls_vdev_obj_destroy_notification(struct wlan_objmgr_vdev *vdev,
 		return QDF_STATUS_E_FAILURE;
 	}
 
+	if (wlan_vdev_mlme_is_mlo_vdev(vdev)) {
+		if (QDF_TIMER_STATE_STOPPED !=
+		    qdf_mc_timer_get_current_state(
+					&tdls_vdev_obj->peer_discovery_timer))
+			qdf_mc_timer_stop(&tdls_vdev_obj->peer_discovery_timer);
+	}
+
 	qdf_event_destroy(&tdls_vdev_obj->tdls_teardown_comp);
 	tdls_vdev_deinit(tdls_vdev_obj);
 
