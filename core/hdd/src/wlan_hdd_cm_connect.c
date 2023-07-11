@@ -518,11 +518,18 @@ hdd_get_sap_adapter_of_dfs(struct hdd_context *hdd_ctx)
 			    hdd_ctx->dev_dfs_cac_status != DFS_CAC_IN_PROGRESS)
 				continue;
 
+			wlan_objmgr_vdev_get_ref(link_info->vdev,
+						 WLAN_HDD_ID_OBJ_MGR);
 			chan = wlan_vdev_get_active_channel(link_info->vdev);
 			if (!chan) {
 				hdd_debug("Can not get active channel");
+				wlan_objmgr_vdev_release_ref(link_info->vdev,
+							   WLAN_HDD_ID_OBJ_MGR);
 				continue;
 			}
+
+			wlan_objmgr_vdev_release_ref(link_info->vdev,
+						     WLAN_HDD_ID_OBJ_MGR);
 
 			if (!wlan_reg_is_5ghz_ch_freq(chan->ch_freq))
 				continue;
