@@ -1748,8 +1748,6 @@ static QDF_STATUS send_peer_ptqm_migrate_cmd_tlv(
 			wmi_debug("i:%d, ml_peer_id:%d, hw_link_id:%d",
 				  i, entry[i].ml_peer_id, entry[i].hw_link_id);
 		}
-		pending_cnt -= num_entry;
-		param_list += num_entry;
 
 		wmi_mtrace(WMI_MLO_PRIMARY_LINK_PEER_MIGRATION_CMDID,
 			   cmd->vdev_id, 0);
@@ -1757,12 +1755,16 @@ static QDF_STATUS send_peer_ptqm_migrate_cmd_tlv(
 		if (wmi_unified_cmd_send(wmi_handle, buf, len,
 					 WMI_MLO_PRIMARY_LINK_PEER_MIGRATION_CMDID)) {
 			wmi_err("num_entries:%d failed!",
-				param->num_peers);
+				pending_cnt);
 			wmi_buf_free(buf);
+			param->num_peers_failed = pending_cnt;
 			return QDF_STATUS_E_FAILURE;
 		}
 		wmi_debug("num_entries:%d done!",
 			  num_entry);
+
+		pending_cnt -= num_entry;
+		param_list += num_entry;
 	}
 
 	return QDF_STATUS_SUCCESS;
