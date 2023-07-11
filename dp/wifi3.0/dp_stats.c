@@ -6019,16 +6019,66 @@ dp_print_wbm2sw_ring_stats_from_hal(struct dp_pdev *pdev)
 }
 #endif
 
-void
-dp_print_ring_stats(struct dp_pdev *pdev)
+/*
+ * Format is:
+ * [0 18 1728, 1 15 1222, 2 24 1969,...]
+ * 2 character space for [ and ]
+ * 8 reo * 3 white space = 24
+ * 8 char space for reo rings
+ * 8 * 10 (uint32_t max value is 4294967295) = 80
+ * 8 * 20 (uint64_t max value is 18446744073709551615) = 160
+ * 8 commas
+ * 1 for \0
+ * Total of 283
+ */
+#define DP_STATS_STR_LEN 283
+#ifndef WLAN_SOFTUMAC_SUPPORT
+static int
+dp_fill_rx_interrupt_ctx_stats(struct dp_intr *intr_ctx,
+			       char *buf, int buf_len)
 {
-	struct dp_soc *soc = pdev->soc;
-	uint32_t i;
-	int mac_id;
-	int lmac_id;
+	int i;
+	int pos = 0;
 
-	if (hif_rtpm_get(HIF_RTPM_GET_SYNC, HIF_RTPM_ID_DP_RING_STATS))
-		return;
+	if (buf_len <= 0 || !buf) {
+		dp_err("incorrect buf or buf_len(%d)!", buf_len);
+		return pos;
+	}
+
+	for (i = 0; i < MAX_REO_DEST_RINGS; i++) {
+		if (intr_ctx->intr_stats.num_rx_ring_masks[i])
+			pos += qdf_scnprintf(buf + pos,
+					     buf_len - pos,
+					     "reo[%u]:%u ", i,
+					     intr_ctx->intr_stats.num_rx_ring_masks[i]);
+	}
+	return pos;
+}
+
+static int
+dp_fill_tx_interrupt_ctx_stats(struct dp_intr *intr_ctx,
+			       char *buf, int buf_len)
+{	int i;
+	int pos = 0;
+
+	if (buf_len <= 0 || !buf) {
+		dp_err("incorrect buf or buf_len(%d)!", buf_len);
+		return pos;
+	}
+
+	for (i = 0; i < MAX_TCL_DATA_RINGS; i++) {
+		if (intr_ctx->intr_stats.num_tx_ring_masks[i])
+			pos += qdf_scnprintf(buf + pos,
+					     buf_len - pos,
+					     "tx_comps[%u]:%u ", i,
+					     intr_ctx->intr_stats.num_tx_ring_masks[i]);
+	}
+	return pos;
+}
+
+static inline void dp_print_umac_ring_stats(struct dp_pdev *pdev)
+{
+	uint8_t i;
 
 	dp_print_ring_stat_from_hal(pdev->soc,
 				    &pdev->soc->wbm_idle_link_ring,
@@ -6067,6 +6117,363 @@ dp_print_ring_stats(struct dp_pdev *pdev)
 					    &pdev->soc->tcl_data_ring[i],
 					    TCL_DATA);
 	dp_print_wbm2sw_ring_stats_from_hal(pdev);
+}
+
+static inline void dp_print_ce_ring_stats(struct dp_pdev *pdev) {}
+
+static inline void dp_print_tx_ring_stats(struct dp_soc *soc)
+{
+	uint8_t i;
+
+	for (i = 0; i < soc->num_tcl_data_rings; i++) {
+		DP_PRINT_STATS("Enqueue to SW2TCL%u: %u", i + 1,
+			       soc->stats.tx.tcl_enq[i]);
+		DP_PRINT_STATS("TX completions reaped from ring %u: %u",
+			       i, soc->stats.tx.tx_comp[i]);
+	}
+}
+
+static inline void dp_print_rx_ring_stats(struct dp_pdev *pdev)
+{
+	uint8_t dp_stats_str[DP_STATS_STR_LEN] = {'\0'};
+	uint8_t *buf = dp_stats_str;
+	size_t pos = 0;
+	size_t buf_len = DP_STATS_STR_LEN;
+	uint8_t i;
+
+	pos += qdf_scnprintf(buf + pos, buf_len - pos, "%s", "REO/msdus/bytes [");
+	for (i = 0; i < CDP_MAX_RX_RINGS; i++) {
+		if (!pdev->stats.rx.rcvd_reo[i].num)
+			continue;
+
+		pos += qdf_scnprintf(buf + pos, buf_len - pos,
+				     "%d %llu %llu, ",
+				     i, pdev->stats.rx.rcvd_reo[i].num,
+				     pdev->stats.rx.rcvd_reo[i].bytes);
+	}
+	pos += qdf_scnprintf(buf + pos, buf_len - pos, "%s", "]");
+	DP_PRINT_STATS("%s", dp_stats_str);
+}
+
+static inline void
+dp_print_rx_err_stats(struct dp_soc *soc, struct dp_pdev *pdev)
+{
+	uint8_t error_code;
+
+	DP_PRINT_STATS("intra-bss EAPOL drops: %u",
+		       soc->stats.rx.err.intrabss_eapol_drop);
+	DP_PRINT_STATS("mic errors %u",
+		       pdev->stats.rx.err.mic_err);
+	DP_PRINT_STATS("Invalid peer on rx path: %llu",
+		       pdev->soc->stats.rx.err.rx_invalid_peer.num);
+	DP_PRINT_STATS("sw_peer_id invalid %llu",
+		       pdev->soc->stats.rx.err.rx_invalid_peer_id.num);
+	DP_PRINT_STATS("packet_len invalid %llu",
+		       pdev->soc->stats.rx.err.rx_invalid_pkt_len.num);
+	DP_PRINT_STATS("sa or da idx invalid %u",
+		       pdev->soc->stats.rx.err.invalid_sa_da_idx);
+	DP_PRINT_STATS("defrag peer uninit %u",
+		       pdev->soc->stats.rx.err.defrag_peer_uninit);
+	DP_PRINT_STATS("pkts delivered no peer %u",
+		       pdev->soc->stats.rx.err.pkt_delivered_no_peer);
+	DP_PRINT_STATS("RX invalid cookie: %d",
+		       soc->stats.rx.err.invalid_cookie);
+	DP_PRINT_STATS("RX stale cookie: %d",
+		       soc->stats.rx.err.stale_cookie);
+	DP_PRINT_STATS("2k jump delba sent: %u",
+		       pdev->soc->stats.rx.err.rx_2k_jump_delba_sent);
+	DP_PRINT_STATS("2k jump msdu to stack: %u",
+		       pdev->soc->stats.rx.err.rx_2k_jump_to_stack);
+	DP_PRINT_STATS("2k jump msdu drop: %u",
+		       pdev->soc->stats.rx.err.rx_2k_jump_drop);
+	DP_PRINT_STATS("REO err oor msdu to stack %u",
+		       pdev->soc->stats.rx.err.reo_err_oor_to_stack);
+	DP_PRINT_STATS("REO err oor msdu drop: %u",
+		       pdev->soc->stats.rx.err.reo_err_oor_drop);
+	DP_PRINT_STATS("Rx err msdu rejected: %d",
+		       soc->stats.rx.err.rejected);
+	DP_PRINT_STATS("Rx raw frame dropped: %d",
+		       soc->stats.rx.err.raw_frm_drop);
+	DP_PRINT_STATS("Rx stale link desc cookie: %d",
+		       pdev->soc->stats.rx.err.invalid_link_cookie);
+	DP_PRINT_STATS("Rx nbuf sanity fails: %d",
+		       pdev->soc->stats.rx.err.nbuf_sanity_fail);
+	DP_PRINT_STATS("Rx refill duplicate link desc: %d",
+		       pdev->soc->stats.rx.err.dup_refill_link_desc);
+	DP_PRINT_STATS("Rx ipa smmu map duplicate: %d",
+		       pdev->soc->stats.rx.err.ipa_smmu_map_dup);
+	DP_PRINT_STATS("Rx ipa smmu unmap duplicate: %d",
+		       pdev->soc->stats.rx.err.ipa_smmu_unmap_dup);
+	DP_PRINT_STATS("Rx ipa smmu unmap no pipes: %d",
+		       pdev->soc->stats.rx.err.ipa_unmap_no_pipe);
+	DP_PRINT_STATS("PN-in-Dest error frame pn-check fail: %d",
+		       soc->stats.rx.err.pn_in_dest_check_fail);
+
+	DP_PRINT_STATS("Reo Statistics");
+	DP_PRINT_STATS("near_full: %u ", soc->stats.rx.near_full);
+	DP_PRINT_STATS("rbm error: %u msdus",
+		       pdev->soc->stats.rx.err.invalid_rbm);
+	DP_PRINT_STATS("hal ring access fail: %u msdus",
+		       pdev->soc->stats.rx.err.hal_ring_access_fail);
+
+	DP_PRINT_STATS("hal ring access full fail: %u msdus",
+		       pdev->soc->stats.rx.err.hal_ring_access_full_fail);
+
+	for (error_code = 0; error_code < HAL_REO_ERR_MAX;
+	     error_code++) {
+		if (!pdev->soc->stats.rx.err.reo_error[error_code])
+			continue;
+		DP_PRINT_STATS("Reo error number (%u): %u msdus",
+			       error_code,
+			       pdev->soc->stats.rx.err.reo_error[error_code]);
+	}
+}
+
+void dp_print_soc_tx_stats(struct dp_soc *soc)
+{
+	uint8_t desc_pool_id;
+
+	soc->stats.tx.desc_in_use = 0;
+
+	DP_PRINT_STATS("SOC Tx Stats:\n");
+
+	for (desc_pool_id = 0;
+	     desc_pool_id < wlan_cfg_get_num_tx_desc_pool(soc->wlan_cfg_ctx);
+	     desc_pool_id++)
+		soc->stats.tx.desc_in_use +=
+			soc->tx_desc[desc_pool_id].num_allocated;
+
+	DP_PRINT_STATS("Tx Descriptors In Use = %u",
+		       soc->stats.tx.desc_in_use);
+	DP_PRINT_STATS("Tx Invalid peer:");
+	DP_PRINT_STATS("	Packets = %llu",
+		       soc->stats.tx.tx_invalid_peer.num);
+	DP_PRINT_STATS("	Bytes = %llu",
+		       soc->stats.tx.tx_invalid_peer.bytes);
+	DP_PRINT_STATS("Packets dropped due to TCL ring full = %u %u %u %u",
+		       soc->stats.tx.tcl_ring_full[0],
+		       soc->stats.tx.tcl_ring_full[1],
+		       soc->stats.tx.tcl_ring_full[2],
+		       soc->stats.tx.tcl_ring_full[3]);
+	DP_PRINT_STATS("Tx invalid completion release = %u",
+		       soc->stats.tx.invalid_release_source);
+	DP_PRINT_STATS("TX invalid Desc from completion ring = %u",
+		       soc->stats.tx.invalid_tx_comp_desc);
+	DP_PRINT_STATS("Tx comp wbm internal error = %d : [%d %d %d %d]",
+		       soc->stats.tx.wbm_internal_error[WBM_INT_ERROR_ALL],
+		       soc->stats.tx.wbm_internal_error[WBM_INT_ERROR_REO_NULL_BUFFER],
+		       soc->stats.tx.wbm_internal_error[WBM_INT_ERROR_REO_NULL_LINK_DESC],
+		       soc->stats.tx.wbm_internal_error[WBM_INT_ERROR_REO_NULL_MSDU_BUFF],
+		       soc->stats.tx.wbm_internal_error[WBM_INT_ERROR_REO_BUFF_REAPED]);
+	DP_PRINT_STATS("Tx comp non wbm internal error = %d",
+		       soc->stats.tx.non_wbm_internal_err);
+	DP_PRINT_STATS("Tx comp loop pkt limit hit = %d",
+		       soc->stats.tx.tx_comp_loop_pkt_limit_hit);
+	DP_PRINT_STATS("Tx comp HP out of sync2 = %d",
+		       soc->stats.tx.hp_oos2);
+	dp_print_tx_ppeds_stats(soc);
+}
+
+#define DP_INT_CTX_STATS_STRING_LEN 512
+void dp_print_soc_interrupt_stats(struct dp_soc *soc)
+{
+	char *buf;
+	char int_ctx_str[DP_INT_CTX_STATS_STRING_LEN] = {'\0'};
+	int i, pos, buf_len;
+	struct dp_intr_stats *intr_stats;
+
+	buf = int_ctx_str;
+	buf_len = DP_INT_CTX_STATS_STRING_LEN;
+
+	for (i = 0; i < WLAN_CFG_INT_NUM_CONTEXTS; i++) {
+		pos = 0;
+		qdf_mem_zero(int_ctx_str, sizeof(int_ctx_str));
+		intr_stats = &soc->intr_ctx[i].intr_stats;
+
+		if (!intr_stats->num_masks && !intr_stats->num_near_full_masks)
+			continue;
+
+		pos += qdf_scnprintf(buf + pos,
+				     buf_len - pos,
+				     "%2u[%3d] - Total:%u ",
+				     i,
+				     hif_get_int_ctx_irq_num(soc->hif_handle,
+							     i),
+				     intr_stats->num_masks);
+
+		if (soc->intr_ctx[i].tx_ring_mask)
+			pos += dp_fill_tx_interrupt_ctx_stats(&soc->intr_ctx[i],
+							      buf + pos,
+							      buf_len - pos);
+
+		if (soc->intr_ctx[i].rx_ring_mask)
+			pos += dp_fill_rx_interrupt_ctx_stats(&soc->intr_ctx[i],
+							      buf + pos,
+							      buf_len - pos);
+		if (soc->intr_ctx[i].rx_err_ring_mask)
+			pos += qdf_scnprintf(buf + pos,
+					     buf_len - pos,
+					     "reo_err:%u ",
+					     intr_stats->num_rx_err_ring_masks);
+
+		if (soc->intr_ctx[i].rx_wbm_rel_ring_mask)
+			pos += qdf_scnprintf(buf + pos,
+					     buf_len - pos,
+					     "wbm_rx_err:%u ",
+					     intr_stats->num_rx_wbm_rel_ring_masks);
+
+		if (soc->intr_ctx[i].rxdma2host_ring_mask)
+			pos += qdf_scnprintf(buf + pos,
+					     buf_len - pos,
+					     "rxdma2_host_err:%u ",
+					     intr_stats->num_rxdma2host_ring_masks);
+
+		if (soc->intr_ctx[i].rx_near_full_grp_1_mask)
+			pos += qdf_scnprintf(buf + pos,
+					     buf_len - pos,
+					     "rx_near_full_grp_1:%u ",
+					     intr_stats->num_near_full_masks);
+
+		if (soc->intr_ctx[i].rx_near_full_grp_2_mask)
+			pos += qdf_scnprintf(buf + pos,
+					     buf_len - pos,
+					     "rx_near_full_grp_2:%u ",
+					     intr_stats->num_near_full_masks);
+		if (soc->intr_ctx[i].tx_ring_near_full_mask)
+			pos += qdf_scnprintf(buf + pos,
+					     buf_len - pos,
+					     "tx_near_full:%u ",
+					     intr_stats->num_near_full_masks);
+
+		dp_info("%s", int_ctx_str);
+	}
+}
+#else
+static inline void dp_print_umac_ring_stats(struct dp_pdev *pdev) {}
+
+static inline void dp_print_ce_ring_stats(struct dp_pdev *pdev)
+{
+	hif_ce_print_ring_stats(pdev->soc->hif_handle);
+}
+
+static inline void dp_print_tx_ring_stats(struct dp_soc *soc)
+{
+	uint8_t i;
+
+	for (i = 0; i < MAX_TCL_DATA_RINGS; i++) {
+		DP_PRINT_STATS("Enqueue to Tx ring %u: %u", i + 1,
+			       soc->stats.tx.tcl_enq[i]);
+		DP_PRINT_STATS("TX completions reaped from ring %u: %u",
+			       i, soc->stats.tx.tx_comp[i]);
+	}
+}
+
+static inline void dp_print_rx_ring_stats(struct dp_pdev *pdev)
+{
+	uint8_t dp_stats_str[DP_STATS_STR_LEN] = {'\0'};
+	uint8_t *buf = dp_stats_str;
+	size_t pos = 0;
+	size_t buf_len = DP_STATS_STR_LEN;
+	uint8_t i;
+
+	pos += qdf_scnprintf(buf + pos, buf_len - pos, "%s", "RX/msdus/bytes [");
+	for (i = 0; i < CDP_MAX_RX_RINGS; i++) {
+		if (!pdev->stats.rx.rcvd_reo[i].num)
+			continue;
+
+		pos += qdf_scnprintf(buf + pos, buf_len - pos,
+				     "%d %llu %llu, ",
+				     i, pdev->stats.rx.rcvd_reo[i].num,
+				     pdev->stats.rx.rcvd_reo[i].bytes);
+	}
+	pos += qdf_scnprintf(buf + pos, buf_len - pos, "%s", "]");
+	DP_PRINT_STATS("%s", dp_stats_str);
+}
+
+static inline void
+dp_print_rx_err_stats(struct dp_soc *soc, struct dp_pdev *pdev)
+{
+	DP_PRINT_STATS("intra-bss EAPOL drops: %u",
+		       soc->stats.rx.err.intrabss_eapol_drop);
+	DP_PRINT_STATS("mic errors %u",
+		       pdev->stats.rx.err.mic_err);
+	DP_PRINT_STATS("2k jump msdu drop: %u",
+		       pdev->soc->stats.rx.err.rx_2k_jump_drop);
+	DP_PRINT_STATS("REO err oor msdu drop: %u",
+		       pdev->soc->stats.rx.err.reo_err_oor_drop);
+	DP_PRINT_STATS("Invalid peer on rx path: %llu",
+		       pdev->soc->stats.rx.err.rx_invalid_peer.num);
+	DP_PRINT_STATS("sw_peer_id invalid %llu",
+		       pdev->soc->stats.rx.err.rx_invalid_peer_id.num);
+	DP_PRINT_STATS("packet_len invalid %llu",
+		       pdev->soc->stats.rx.err.rx_invalid_pkt_len.num);
+	DP_PRINT_STATS("sa or da idx invalid %u",
+		       pdev->soc->stats.rx.err.invalid_sa_da_idx);
+	DP_PRINT_STATS("defrag peer uninit %u",
+		       pdev->soc->stats.rx.err.defrag_peer_uninit);
+	DP_PRINT_STATS("pkts delivered no peer %u",
+		       pdev->soc->stats.rx.err.pkt_delivered_no_peer);
+	DP_PRINT_STATS("RX invalid cookie: %d",
+		       soc->stats.rx.err.invalid_cookie);
+	DP_PRINT_STATS("RX stale cookie: %d",
+		       soc->stats.rx.err.stale_cookie);
+	DP_PRINT_STATS("Rx err msdu rejected: %d",
+		       soc->stats.rx.err.rejected);
+	DP_PRINT_STATS("Rx raw frame dropped: %d",
+		       soc->stats.rx.err.raw_frm_drop);
+	DP_PRINT_STATS("Rx nbuf sanity fails: %d",
+		       pdev->soc->stats.rx.err.nbuf_sanity_fail);
+	DP_PRINT_STATS("PN-in-Dest error frame pn-check fail: %d",
+		       soc->stats.rx.err.pn_in_dest_check_fail);
+}
+
+void dp_print_soc_tx_stats(struct dp_soc *soc)
+{
+	uint8_t desc_pool_id;
+
+	soc->stats.tx.desc_in_use = 0;
+
+	DP_PRINT_STATS("SOC Tx Stats:\n");
+
+	for (desc_pool_id = 0;
+	     desc_pool_id < wlan_cfg_get_num_tx_desc_pool(soc->wlan_cfg_ctx);
+	     desc_pool_id++)
+		soc->stats.tx.desc_in_use +=
+			soc->tx_desc[desc_pool_id].num_allocated;
+
+	DP_PRINT_STATS("Tx Descriptors In Use = %u",
+		       soc->stats.tx.desc_in_use);
+	DP_PRINT_STATS("Tx Invalid peer:");
+	DP_PRINT_STATS("	Packets = %llu",
+		       soc->stats.tx.tx_invalid_peer.num);
+	DP_PRINT_STATS("	Bytes = %llu",
+		       soc->stats.tx.tx_invalid_peer.bytes);
+	DP_PRINT_STATS("Packets dropped due to Tx ring full = %u",
+		       soc->stats.tx.tcl_ring_full[0]);
+	DP_PRINT_STATS("Tx invalid completion release = %u",
+		       soc->stats.tx.invalid_release_source);
+	DP_PRINT_STATS("TX invalid Desc from completion ring = %u",
+		       soc->stats.tx.invalid_tx_comp_desc);
+	dp_print_tx_ppeds_stats(soc);
+}
+
+/* TODO: print CE intr stats? */
+void dp_print_soc_interrupt_stats(struct dp_soc *soc) {}
+#endif
+
+void
+dp_print_ring_stats(struct dp_pdev *pdev)
+{
+	struct dp_soc *soc = pdev->soc;
+	uint32_t i;
+	int mac_id;
+	int lmac_id;
+
+	if (hif_rtpm_get(HIF_RTPM_GET_SYNC, HIF_RTPM_ID_DP_RING_STATS))
+		return;
+
+	dp_print_ce_ring_stats(pdev);
+	dp_print_umac_ring_stats(pdev);
 
 	if (pdev->soc->features.dmac_cmn_src_rxbuf_ring_enabled) {
 		for (i = 0; i < pdev->soc->num_rx_refill_buf_rings; i++) {
@@ -7275,7 +7682,7 @@ void dp_print_per_ring_stats(struct dp_soc *soc)
 	uint16_t core;
 	uint64_t total_packets;
 
-	DP_PRINT_STATS("Reo packets per ring:");
+	DP_PRINT_STATS("Rx packets per ring:");
 	for (ring = 0; ring < MAX_REO_DEST_RINGS; ring++) {
 		total_packets = 0;
 		DP_PRINT_STATS("Packets on ring %u:", ring);
@@ -7328,19 +7735,6 @@ static void dp_pdev_print_tx_rx_rates(struct dp_pdev *pdev)
 	qdf_mem_free(vdev_array);
 }
 
-/*
- * Format is:
- * [0 18 1728, 1 15 1222, 2 24 1969,...]
- * 2 character space for [ and ]
- * 8 reo * 3 white space = 24
- * 8 char space for reo rings
- * 8 * 10 (uint32_t max value is 4294967295) = 80
- * 8 * 20 (uint64_t max value is 18446744073709551615) = 160
- * 8 commas
- * 1 for \0
- * Total of 283
- */
-#define DP_STATS_STR_LEN 283
 void dp_txrx_path_stats(struct dp_soc *soc)
 {
 	uint8_t error_code;
@@ -7369,12 +7763,8 @@ void dp_txrx_path_stats(struct dp_soc *soc)
 		DP_PRINT_STATS("successfully transmitted: %llu msdus (%llu bytes)",
 			       pdev->stats.tx.tx_success.num,
 			       pdev->stats.tx.tx_success.bytes);
-		for (i = 0; i < soc->num_tcl_data_rings; i++) {
-			DP_PRINT_STATS("Enqueue to SW2TCL%u: %u", i + 1,
-				       soc->stats.tx.tcl_enq[i]);
-			DP_PRINT_STATS("TX completions reaped from ring %u: %u",
-				       i, soc->stats.tx.tx_comp[i]);
-		}
+
+		dp_print_tx_ring_stats(soc);
 
 		DP_PRINT_STATS("Invalid release source: %u",
 			       soc->stats.tx.invalid_release_source);
@@ -7455,19 +7845,7 @@ void dp_txrx_path_stats(struct dp_soc *soc)
 			       pdev->stats.rx.to_stack.num,
 			       pdev->stats.rx.to_stack.bytes);
 
-		pos = 0;
-		pos += qdf_scnprintf(buf + pos, buf_len - pos, "%s", "REO/msdus/bytes [");
-		for (i = 0; i < CDP_MAX_RX_RINGS; i++) {
-			if (!pdev->stats.rx.rcvd_reo[i].num)
-				continue;
-
-			pos += qdf_scnprintf(buf + pos, buf_len - pos,
-					"%d %llu %llu, ",
-					i, pdev->stats.rx.rcvd_reo[i].num,
-					pdev->stats.rx.rcvd_reo[i].bytes);
-		}
-		pos += qdf_scnprintf(buf + pos, buf_len - pos, "%s", "]");
-		DP_PRINT_STATS("%s", dp_stats_str);
+		dp_print_rx_ring_stats(pdev);
 
 		for (i = 0; i < CDP_MAX_LMACS; i++)
 			DP_PRINT_STATS("received on lmac[%d] %llu msdus (%llu bytes)",
@@ -7481,80 +7859,14 @@ void dp_txrx_path_stats(struct dp_soc *soc)
 			       pdev->stats.rx.intra_bss.fail.bytes);
 		DP_PRINT_STATS("intra-bss no mdns fwds %u msdus",
 			       pdev->stats.rx.intra_bss.mdns_no_fwd);
-		DP_PRINT_STATS("intra-bss EAPOL drops: %u",
-			       soc->stats.rx.err.intrabss_eapol_drop);
 
 		DP_PRINT_STATS("raw packets %llu msdus ( %llu bytes)",
 			       pdev->stats.rx.raw.num,
 			       pdev->stats.rx.raw.bytes);
-		DP_PRINT_STATS("mic errors %u",
-			       pdev->stats.rx.err.mic_err);
-		DP_PRINT_STATS("Invalid peer on rx path: %llu",
-			       pdev->soc->stats.rx.err.rx_invalid_peer.num);
-		DP_PRINT_STATS("sw_peer_id invalid %llu",
-			       pdev->soc->stats.rx.err.rx_invalid_peer_id.num);
-		DP_PRINT_STATS("packet_len invalid %llu",
-			       pdev->soc->stats.rx.err.rx_invalid_pkt_len.num);
-		DP_PRINT_STATS("sa or da idx invalid %u",
-			       pdev->soc->stats.rx.err.invalid_sa_da_idx);
-		DP_PRINT_STATS("defrag peer uninit %u",
-			       pdev->soc->stats.rx.err.defrag_peer_uninit);
-		DP_PRINT_STATS("pkts delivered no peer %u",
-			       pdev->soc->stats.rx.err.pkt_delivered_no_peer);
-		DP_PRINT_STATS("RX invalid cookie: %d",
-			       soc->stats.rx.err.invalid_cookie);
-		DP_PRINT_STATS("RX stale cookie: %d",
-			       soc->stats.rx.err.stale_cookie);
-		DP_PRINT_STATS("2k jump delba sent: %u",
-			       pdev->soc->stats.rx.err.rx_2k_jump_delba_sent);
-		DP_PRINT_STATS("2k jump msdu to stack: %u",
-			       pdev->soc->stats.rx.err.rx_2k_jump_to_stack);
-		DP_PRINT_STATS("2k jump msdu drop: %u",
-			       pdev->soc->stats.rx.err.rx_2k_jump_drop);
-		DP_PRINT_STATS("REO err oor msdu to stack %u",
-			       pdev->soc->stats.rx.err.reo_err_oor_to_stack);
-		DP_PRINT_STATS("REO err oor msdu drop: %u",
-			       pdev->soc->stats.rx.err.reo_err_oor_drop);
-		DP_PRINT_STATS("Rx err msdu rejected: %d",
-			       soc->stats.rx.err.rejected);
-		DP_PRINT_STATS("Rx raw frame dropped: %d",
-			       soc->stats.rx.err.raw_frm_drop);
-		DP_PRINT_STATS("Rx stale link desc cookie: %d",
-			       pdev->soc->stats.rx.err.invalid_link_cookie);
-		DP_PRINT_STATS("Rx nbuf sanity fails: %d",
-			       pdev->soc->stats.rx.err.nbuf_sanity_fail);
-		DP_PRINT_STATS("Rx refill duplicate link desc: %d",
-			       pdev->soc->stats.rx.err.dup_refill_link_desc);
-		DP_PRINT_STATS("Rx ipa smmu map duplicate: %d",
-			       pdev->soc->stats.rx.err.ipa_smmu_map_dup);
-		DP_PRINT_STATS("Rx ipa smmu unmap duplicate: %d",
-			       pdev->soc->stats.rx.err.ipa_smmu_unmap_dup);
-		DP_PRINT_STATS("Rx ipa smmu unmap no pipes: %d",
-			       pdev->soc->stats.rx.err.ipa_unmap_no_pipe);
-		DP_PRINT_STATS("PN-in-Dest error frame pn-check fail: %d",
-			       soc->stats.rx.err.pn_in_dest_check_fail);
-
-		DP_PRINT_STATS("Reo Statistics");
-		DP_PRINT_STATS("near_full: %u ", soc->stats.rx.near_full);
-		DP_PRINT_STATS("rbm error: %u msdus",
-			       pdev->soc->stats.rx.err.invalid_rbm);
-		DP_PRINT_STATS("hal ring access fail: %u msdus",
-			       pdev->soc->stats.rx.err.hal_ring_access_fail);
-
-		DP_PRINT_STATS("hal ring access full fail: %u msdus",
-			       pdev->soc->stats.rx.err.hal_ring_access_full_fail);
 
 		DP_PRINT_STATS("Rx BAR frames:%d", soc->stats.rx.bar_frame);
 
-		for (error_code = 0; error_code < HAL_REO_ERR_MAX;
-				error_code++) {
-			if (!pdev->soc->stats.rx.err.reo_error[error_code])
-				continue;
-			DP_PRINT_STATS("Reo error number (%u): %u msdus",
-				       error_code,
-				       pdev->soc->stats.rx.err
-				       .reo_error[error_code]);
-		}
+		dp_print_rx_err_stats(soc, pdev);
 
 		for (error_code = 0; error_code < HAL_RXDMA_ERR_MAX;
 				error_code++) {
@@ -8001,94 +8313,6 @@ void dp_print_global_desc_count(void)
 }
 #endif
 
-void
-dp_print_soc_tx_stats(struct dp_soc *soc)
-{
-	uint8_t desc_pool_id;
-
-	soc->stats.tx.desc_in_use = 0;
-
-	DP_PRINT_STATS("SOC Tx Stats:\n");
-
-	for (desc_pool_id = 0;
-	     desc_pool_id < wlan_cfg_get_num_tx_desc_pool(soc->wlan_cfg_ctx);
-	     desc_pool_id++)
-		soc->stats.tx.desc_in_use +=
-			soc->tx_desc[desc_pool_id].num_allocated;
-
-	DP_PRINT_STATS("Tx Descriptors In Use = %u",
-		       soc->stats.tx.desc_in_use);
-	DP_PRINT_STATS("Tx Invalid peer:");
-	DP_PRINT_STATS("	Packets = %llu",
-		       soc->stats.tx.tx_invalid_peer.num);
-	DP_PRINT_STATS("	Bytes = %llu",
-		       soc->stats.tx.tx_invalid_peer.bytes);
-	DP_PRINT_STATS("Packets dropped due to TCL ring full = %u %u %u %u",
-		       soc->stats.tx.tcl_ring_full[0],
-		       soc->stats.tx.tcl_ring_full[1],
-		       soc->stats.tx.tcl_ring_full[2],
-		       soc->stats.tx.tcl_ring_full[3]);
-	DP_PRINT_STATS("Tx invalid completion release = %u",
-		       soc->stats.tx.invalid_release_source);
-	DP_PRINT_STATS("TX invalid Desc from completion ring = %u",
-		       soc->stats.tx.invalid_tx_comp_desc);
-	DP_PRINT_STATS("Tx comp wbm internal error = %d : [%d %d %d %d]",
-		       soc->stats.tx.wbm_internal_error[WBM_INT_ERROR_ALL],
-		       soc->stats.tx.wbm_internal_error[WBM_INT_ERROR_REO_NULL_BUFFER],
-		       soc->stats.tx.wbm_internal_error[WBM_INT_ERROR_REO_NULL_LINK_DESC],
-		       soc->stats.tx.wbm_internal_error[WBM_INT_ERROR_REO_NULL_MSDU_BUFF],
-		       soc->stats.tx.wbm_internal_error[WBM_INT_ERROR_REO_BUFF_REAPED]);
-	DP_PRINT_STATS("Tx comp non wbm internal error = %d",
-		       soc->stats.tx.non_wbm_internal_err);
-	DP_PRINT_STATS("Tx comp loop pkt limit hit = %d",
-		       soc->stats.tx.tx_comp_loop_pkt_limit_hit);
-	DP_PRINT_STATS("Tx comp HP out of sync2 = %d",
-		       soc->stats.tx.hp_oos2);
-	dp_print_tx_ppeds_stats(soc);
-}
-
-static
-int dp_fill_rx_interrupt_ctx_stats(struct dp_intr *intr_ctx,
-				   char *buf, int buf_len)
-{	int i;
-	int pos = 0;
-
-	if (buf_len <= 0 || !buf) {
-		dp_err("incorrect buf or buf_len(%d)!", buf_len);
-		return pos;
-	}
-
-	for (i = 0; i < MAX_REO_DEST_RINGS; i++) {
-		if (intr_ctx->intr_stats.num_rx_ring_masks[i])
-			pos += qdf_scnprintf(buf + pos,
-					     buf_len - pos,
-					     "reo[%u]:%u ", i,
-					     intr_ctx->intr_stats.num_rx_ring_masks[i]);
-	}
-	return pos;
-}
-
-static
-int dp_fill_tx_interrupt_ctx_stats(struct dp_intr *intr_ctx,
-				   char *buf, int buf_len)
-{	int i;
-	int pos = 0;
-
-	if (buf_len <= 0 || !buf) {
-		dp_err("incorrect buf or buf_len(%d)!", buf_len);
-		return pos;
-	}
-
-	for (i = 0; i < MAX_TCL_DATA_RINGS; i++) {
-		if (intr_ctx->intr_stats.num_tx_ring_masks[i])
-			pos += qdf_scnprintf(buf + pos,
-					     buf_len - pos,
-					     "tx_comps[%u]:%u ", i,
-					     intr_ctx->intr_stats.num_tx_ring_masks[i]);
-	}
-	return pos;
-}
-
 #ifdef WLAN_DP_SRNG_USAGE_WM_TRACKING
 #define DP_SRNG_HIGH_WM_STATS_STRING_LEN 512
 void dp_dump_srng_high_wm_stats(struct dp_soc *soc, uint64_t srng_mask)
@@ -8118,81 +8342,6 @@ void dp_dump_srng_high_wm_stats(struct dp_soc *soc, uint64_t srng_mask)
 	}
 }
 #endif
-
-#define DP_INT_CTX_STATS_STRING_LEN 512
-void dp_print_soc_interrupt_stats(struct dp_soc *soc)
-{
-	char *buf;
-	char int_ctx_str[DP_INT_CTX_STATS_STRING_LEN] = {'\0'};
-	int i, pos, buf_len;
-	struct dp_intr_stats *intr_stats;
-
-	buf = int_ctx_str;
-	buf_len = DP_INT_CTX_STATS_STRING_LEN;
-
-	for (i = 0; i < WLAN_CFG_INT_NUM_CONTEXTS; i++) {
-		pos = 0;
-		qdf_mem_zero(int_ctx_str, sizeof(int_ctx_str));
-		intr_stats = &soc->intr_ctx[i].intr_stats;
-
-		if (!intr_stats->num_masks && !intr_stats->num_near_full_masks)
-			continue;
-
-		pos += qdf_scnprintf(buf + pos,
-				     buf_len - pos,
-				     "%2u[%3d] - Total:%u ",
-				     i,
-				     hif_get_int_ctx_irq_num(soc->hif_handle,
-							     i),
-				     intr_stats->num_masks);
-
-		if (soc->intr_ctx[i].tx_ring_mask)
-			pos += dp_fill_tx_interrupt_ctx_stats(&soc->intr_ctx[i],
-							      buf + pos,
-							      buf_len - pos);
-
-		if (soc->intr_ctx[i].rx_ring_mask)
-			pos += dp_fill_rx_interrupt_ctx_stats(&soc->intr_ctx[i],
-							      buf + pos,
-							      buf_len - pos);
-		if (soc->intr_ctx[i].rx_err_ring_mask)
-			pos += qdf_scnprintf(buf + pos,
-					     buf_len - pos,
-					     "reo_err:%u ",
-					     intr_stats->num_rx_err_ring_masks);
-
-		if (soc->intr_ctx[i].rx_wbm_rel_ring_mask)
-			pos += qdf_scnprintf(buf + pos,
-					     buf_len - pos,
-					     "wbm_rx_err:%u ",
-					     intr_stats->num_rx_wbm_rel_ring_masks);
-
-		if (soc->intr_ctx[i].rxdma2host_ring_mask)
-			pos += qdf_scnprintf(buf + pos,
-					     buf_len - pos,
-					     "rxdma2_host_err:%u ",
-					     intr_stats->num_rxdma2host_ring_masks);
-
-		if (soc->intr_ctx[i].rx_near_full_grp_1_mask)
-			pos += qdf_scnprintf(buf + pos,
-					     buf_len - pos,
-					     "rx_near_full_grp_1:%u ",
-					     intr_stats->num_near_full_masks);
-
-		if (soc->intr_ctx[i].rx_near_full_grp_2_mask)
-			pos += qdf_scnprintf(buf + pos,
-					     buf_len - pos,
-					     "rx_near_full_grp_2:%u ",
-					     intr_stats->num_near_full_masks);
-		if (soc->intr_ctx[i].tx_ring_near_full_mask)
-			pos += qdf_scnprintf(buf + pos,
-					     buf_len - pos,
-					     "tx_near_full:%u ",
-					     intr_stats->num_near_full_masks);
-
-		dp_info("%s", int_ctx_str);
-	}
-}
 
 void
 dp_print_soc_rx_stats(struct dp_soc *soc)

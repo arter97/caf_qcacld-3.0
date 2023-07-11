@@ -2949,4 +2949,5 @@ static inline void hif_print_reg_write_stats(struct hif_opaque_softc *hif_ctx)
 {
 }
 #endif
+void hif_ce_print_ring_stats(struct hif_opaque_softc *hif_ctx);
 #endif /* _HIF_H_ */

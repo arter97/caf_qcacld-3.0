@@ -1645,6 +1645,50 @@ static inline void ce_update_wrt_idx_offset(struct hif_softc *scn,
 	else
 		QDF_BUG(0);
 }
+
+/*
+ * hif_ce_print_ring_stats() - Print ce ring statistics
+ *
+ * @hif_ctx: hif context
+ *
+ * Returns: None
+ */
+void hif_ce_print_ring_stats(struct hif_opaque_softc *hif_ctx)
+{
+	struct hif_softc *scn = HIF_GET_SOFTC(hif_ctx);
+	struct CE_state *ce_state;
+	int i;
+
+	for (i = 0; i < scn->ce_count; i++) {
+		ce_state = scn->ce_id_to_state[i];
+		if (!ce_state)
+			continue;
+
+		if (ce_state->src_ring) {
+			QDF_TRACE(QDF_MODULE_ID_HIF, QDF_TRACE_LEVEL_FATAL,
+				  "ce%d:SW: sw_index %u write_index %u",
+				  ce_state->src_ring->sw_index,
+				  ce_state->src_ring->write_index);
+
+			QDF_TRACE(QDF_MODULE_ID_HIF, QDF_TRACE_LEVEL_FATAL,
+				  "ce%d:HW: read_index %u write_index %u",
+				  CE_SRC_RING_READ_IDX_GET_FROM_REGISTER(scn, ce_state->ctrl_addr),
+				  CE_SRC_RING_WRITE_IDX_GET_FROM_REGISTER(scn, ce_state->ctrl_addr));
+		}
+
+		if (ce_state->dest_ring) {
+			QDF_TRACE(QDF_MODULE_ID_HIF, QDF_TRACE_LEVEL_FATAL,
+				  "ce%d:SW: sw_index %u write_index %u",
+				  ce_state->dest_ring->sw_index,
+				  ce_state->dest_ring->write_index);
+
+			QDF_TRACE(QDF_MODULE_ID_HIF, QDF_TRACE_LEVEL_FATAL,
+				  "ce%d:HW: read_index %u write_index %u",
+				  CE_DEST_RING_READ_IDX_GET_FROM_REGISTER(scn, ce_state->ctrl_addr),
+				  CE_DEST_RING_WRITE_IDX_GET_FROM_REGISTER(scn, ce_state->ctrl_addr));
+		}
+	}
+}
 #endif
 
 /**

@@ -749,7 +749,7 @@ inline void hif_napi_enable_irq(struct hif_opaque_softc *hif, int id)
 	hif_irq_enable(scn, NAPI_ID2PIPE(id));
 }
 
-#ifdef HIF_LATENCY_PROFILE_ENABLE
+#if defined(QCA_WIFI_WCN6450) && defined(HIF_LATENCY_PROFILE_ENABLE)
 /*
  * hif_napi_latency_profile_start() - update the schedule start timestamp
  *
@@ -807,6 +807,42 @@ static void hif_napi_latency_profile_measure(struct qca_napi_info *napi_info)
 	else
 		napi_info->sched_latency_stats[7]++;
 }
+
+static void hif_print_napi_latency_stats(struct qca_napi_info *napii, int ce_id)
+{
+	int i;
+	int64_t cur_tstamp;
+
+	const char time_str[HIF_SCHED_LATENCY_BUCKETS][15] =  {
+		"0-2   ms",
+		"3-10  ms",
+		"11-20 ms",
+		"21-50 ms",
+		"51-100 ms",
+		"101-250 ms",
+		"251-500 ms",
+		"> 500 ms"
+	};
+
+	cur_tstamp = qdf_ktime_to_ms(qdf_ktime_get());
+
+	QDF_TRACE(QDF_MODULE_ID_HIF, QDF_TRACE_LEVEL_INFO_HIGH,
+		  "Current timestamp: %lld", cur_tstamp);
+
+	QDF_TRACE(QDF_MODULE_ID_HIF, QDF_TRACE_LEVEL_INFO_HIGH,
+		  "ce id %d Last serviced timestamp: %lld",
+		  ce_id, napii->tstamp);
+
+	QDF_TRACE(QDF_MODULE_ID_HIF, QDF_TRACE_LEVEL_INFO_HIGH,
+		  "Latency Bucket     | Time elapsed");
+
+	for (i = 0; i < HIF_SCHED_LATENCY_BUCKETS; i++)
+		QDF_TRACE(QDF_MODULE_ID_HIF,
+			  QDF_TRACE_LEVEL_INFO_HIGH,
+			  "%s     |    %lld",
+			  time_str[i],
+			  napii->sched_latency_stats[i]);
+}
 #else
 static inline void
 hif_napi_latency_profile_start(struct hif_softc *scn, int ce_id)
@@ -817,8 +853,14 @@ static inline void
 hif_napi_latency_profile_measure(struct qca_napi_info *napi_info)
 {
 }
+
+static inline void
+hif_print_napi_latency_stats(struct qca_napi_info *napii, int ce_id)
+{
+}
 #endif
 
+#ifdef QCA_WIFI_WCN6450
 #ifdef WLAN_FEATURE_RX_SOFTIRQ_TIME_LIMIT
 /**
  * hif_napi_update_service_start_time() - Update NAPI poll start time
@@ -867,6 +909,137 @@ static void hif_napi_fill_poll_time_histogram(struct qca_napi_info *napi_info)
 		bucket = QCA_NAPI_NUM_BUCKETS - 1;
 
 	++napi_stat->poll_time_buckets[bucket];
+}
+
+/*
+ * hif_get_poll_times_hist_str() - Get HIF poll times histogram string
+ * @stats: NAPI stats to get poll time buckets
+ * @buf: buffer to fill histogram string
+ * @buf_len: length of the buffer
+ *
+ * Return: void
+ */
+static void hif_get_poll_times_hist_str(struct qca_napi_stat *stats, char *buf,
+					uint8_t buf_len)
+{
+	int i;
+	int str_index = 0;
+
+	for (i = 0; i < QCA_NAPI_NUM_BUCKETS; i++)
+		str_index += qdf_scnprintf(buf + str_index, buf_len - str_index,
+					   "%u|", stats->poll_time_buckets[i]);
+}
+
+void hif_print_napi_stats(struct hif_opaque_softc *hif_ctx)
+{
+	struct hif_softc *scn = HIF_GET_SOFTC(hif_ctx);
+	struct qca_napi_info *napii;
+	struct qca_napi_stat *napi_stats;
+	int ce_id, cpu;
+
+	/*
+	 * Max value of uint_32 (poll_time_bucket) = 4294967295
+	 * Thus we need 10 chars + 1 space =11 chars for each bucket value.
+	 * +1 space for '\0'.
+	 */
+	char hist_str[(QCA_NAPI_NUM_BUCKETS * 11) + 1] = {'\0'};
+
+	QDF_TRACE(QDF_MODULE_ID_HIF, QDF_TRACE_LEVEL_INFO_HIGH,
+		  "NAPI[#]CPU[#] |scheds |polls  |comps  |dones  |t-lim  |max(us)|hist(500us buckets)");
+
+	for (ce_id = 0; ce_id < CE_COUNT_MAX; ce_id++) {
+		if (!hif_napi_enabled(hif_ctx, ce_id))
+			continue;
+
+		napii = scn->napi_data.napis[ce_id];
+		if (napii) {
+			for (cpu = 0; cpu < num_possible_cpus(); cpu++) {
+				napi_stats = &napii->stats[cpu];
+
+				 hif_get_poll_times_hist_str(napi_stats,
+							     hist_str,
+							     sizeof(hist_str));
+
+				if (napi_stats->napi_schedules != 0)
+					QDF_TRACE(QDF_MODULE_ID_HIF,
+						  QDF_TRACE_LEVEL_INFO_HIGH,
+						  "NAPI[%d]CPU[%d]: %7u %7u %7u %7u %7u %7llu %s",
+						  ce_id, cpu,
+						  napi_stats->napi_schedules,
+						  napi_stats->napi_polls,
+						  napi_stats->napi_completes,
+						  napi_stats->napi_workdone,
+						  qdf_do_div(napi_stats->napi_max_poll_time, 1000),
+						  hist_str);
+			}
+
+			hif_print_napi_latency_stats(napii, ce_id);
+		}
+	}
+}
+#else
+static inline void
+hif_napi_update_service_start_time(struct qca_napi_info *napi_info)
+{
+}
+
+static inline void
+hif_napi_fill_poll_time_histogram(struct qca_napi_info *napi_info)
+{
+}
+
+void hif_print_napi_stats(struct hif_opaque_softc *hif_ctx)
+{
+	struct hif_softc *scn = HIF_GET_SOFTC(hif_ctx);
+	struct qca_napi_info *napii;
+	struct qca_napi_stat *napi_stats;
+	int ce_id, cpu;
+
+	QDF_TRACE(QDF_MODULE_ID_HIF, QDF_TRACE_LEVEL_FATAL,
+		  "NAPI[#ctx]CPU[#] |schedules |polls |completes |workdone");
+
+	for (ce_id = 0; ce_id < CE_COUNT_MAX; ce_id++) {
+		if (!hif_napi_enabled(hif_ctx, ce_id))
+			continue;
+
+		napii = scn->napi_data.napis[ce_id];
+		if (napii) {
+			for (cpu = 0; cpu < num_possible_cpus(); cpu++) {
+				napi_stats = &napii->stats[cpu];
+
+				if (napi_stats->napi_schedules != 0)
+					QDF_TRACE(QDF_MODULE_ID_HIF,
+						  QDF_TRACE_LEVEL_FATAL,
+						  "NAPI[%2d]CPU[%d]: "
+						  "%7d %7d %7d %7d ",
+						  ce_id, cpu,
+						  napi_stats->napi_schedules,
+						  napi_stats->napi_polls,
+						  napi_stats->napi_completes,
+						  napi_stats->napi_workdone);
+			}
+
+			hif_print_napi_latency_stats(napii, ce_id);
+		}
+	}
+}
+#endif
+
+void hif_clear_napi_stats(struct hif_opaque_softc *hif_ctx)
+{
+	struct hif_softc *scn = HIF_GET_SOFTC(hif_ctx);
+	struct qca_napi_info *napii;
+	int ce_id;
+
+	for (ce_id = 0; ce_id < CE_COUNT_MAX; ce_id++) {
+		if (!hif_napi_enabled(hif_ctx, ce_id))
+			continue;
+
+		napii = scn->napi_data.napis[ce_id];
+		if (napii)
+			qdf_mem_set(napii->sched_latency_stats,
+				    sizeof(napii->sched_latency_stats), 0);
+	}
 }
 #else
 static inline void
