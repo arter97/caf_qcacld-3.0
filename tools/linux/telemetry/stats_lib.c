@@ -64,6 +64,9 @@
 #define STATS_NL80211_CMD_SOCK_ID    DEFAULT_NL80211_CMD_SOCK_ID
 #define STATS_NL80211_EVENT_SOCK_ID  DEFAULT_NL80211_EVENT_SOCK_ID
 
+/* Mld hybrid non-bonding Mode value */
+#define STATS_MLD_MODE_HYBRID_NONBOND  2
+
 #define SET_FLAG(_flg, _mask)              \
 	do {                               \
 		if (!(_flg))               \
@@ -2203,6 +2206,22 @@ static void get_sta_info(struct cfg80211_data *buffer)
 	buffer->length = LIST_STATION_CFG_ALLOC_SIZE;
 }
 
+static uint32_t get_mldev_mode(char *ifname)
+{
+	struct cfg80211_data buffer = {0};
+	uint32_t mldev_mode = 0;
+
+	buffer.data = &mldev_mode;
+	buffer.length = sizeof(mldev_mode);
+	wifi_cfg80211_send_getparam_command(&g_sock_ctx.cfg80211_ctxt,
+					    QCA_NL80211_VENDOR_SUBCMD_WIFI_PARAMS,
+					    OL_SPECIAL_PARAM_SHIFT |
+					    OL_SPECIAL_PARAM_MLO_OPER_MODE,
+					    ifname, (char *)&buffer,
+					    sizeof(uint32_t));
+	return mldev_mode;
+}
+
 static int32_t build_child_sta_list(char *ifname,
 				    struct object_list *parent_obj)
 {
@@ -2703,6 +2722,40 @@ static bool is_feat_valid_for_obj(struct stats_command *cmd)
 	return false;
 }
 
+bool is_valid_mld_args(bool is_mode_hybrid,
+		       bool is_object_sta,
+		       bool is_cmd_recursive,
+		       bool is_mlo,
+		       bool is_request_mld,
+		       bool is_mld_link)
+{
+	if (is_object_sta && is_cmd_recursive) {
+		if (is_request_mld || is_mld_link) {
+			/**
+			 * Consider only MLO clients when
+			 * mode is hybrid and request is
+			 * for MLD or MLD Link
+			 */
+			if (is_mode_hybrid && !is_mlo)
+				return false;
+			else
+				return true;
+		} else {
+			/**
+			 * Consider only legacy clients when
+			 * mode is hybrid and request is for
+			 * legacy interface
+			 */
+			if (is_mode_hybrid && is_mlo)
+				return false;
+			else
+				return true;
+		}
+	}
+
+	return true;
+}
+
 static int32_t send_request_per_object(struct stats_command *user_cmd,
 				       struct object_list *obj_list)
 {
@@ -2713,12 +2766,14 @@ static int32_t send_request_per_object(struct stats_command *user_cmd,
 	int32_t ret = 0;
 	bool is_mld_req = false;
 	bool mld_intf_req_sent = false;
+	uint32_t  mldev_mode = 0;
 
 	if (!obj_list) {
 		STATS_ERR("Invalid Object List\n");
 		return -EINVAL;
 	}
 
+	mldev_mode = get_mldev_mode(obj_list->ifname);
 	/**
 	 * Based on user request find the requested subtree in root_obj.
 	 **/
@@ -2802,10 +2857,17 @@ static int32_t send_request_per_object(struct stats_command *user_cmd,
 							break;
 					}
 				} else {
-					ret = send_nl_command(&cmd, &buffer,
-							      temp_obj->ifname);
-					if (ret < 0)
-						break;
+					if (is_valid_mld_args(mldev_mode == STATS_MLD_MODE_HYBRID_NONBOND,
+							      temp_obj->obj_type == STATS_OBJ_STA,
+							      user_cmd->recursive,
+							      temp_obj->is_mlo,
+							      is_mld_req,
+							      cmd.mld_link)) {
+						ret = send_nl_command(&cmd, &buffer,
+								      temp_obj->ifname);
+						if (ret < 0)
+							break;
+					}
 				}
 			}
 		}
