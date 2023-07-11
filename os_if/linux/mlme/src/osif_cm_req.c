@@ -536,6 +536,7 @@ QDF_STATUS osif_update_mlo_partner_info(
 	uint8_t tot_grp_socs, ml_grp_id;
 	struct wlan_objmgr_pdev *pdev = NULL;
 	struct wlan_objmgr_vdev *vdev_iter;
+	struct wlan_objmgr_psoc *psoc;
 
 	if (!vdev || !connect_req || !req)
 		return status;
@@ -550,6 +551,15 @@ QDF_STATUS osif_update_mlo_partner_info(
 		osif_debug("null pdev");
 		return QDF_STATUS_SUCCESS;
 	}
+	psoc = wlan_pdev_get_psoc(pdev);
+
+	if (!psoc) {
+		osif_debug("null psoc");
+		return QDF_STATUS_SUCCESS;
+	}
+
+	if (!wlan_mlo_get_psoc_capable(psoc))
+		return QDF_STATUS_SUCCESS;
 
 	osif_debug("ML IE search start");
 	if (req->ie_len) {
