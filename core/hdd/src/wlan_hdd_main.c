@@ -14133,7 +14133,7 @@ out:
 
 #ifdef WLAN_HDD_MULTI_VDEV_SINGLE_NDEV
 struct qdf_mac_addr *
-hdd_adapter_get_mac_address(struct wlan_hdd_link_info *link_info)
+hdd_adapter_get_link_mac_addr(struct wlan_hdd_link_info *link_info)
 {
 	struct hdd_adapter *adapter;
 
@@ -14149,7 +14149,7 @@ hdd_adapter_get_mac_address(struct wlan_hdd_link_info *link_info)
 }
 #else
 struct qdf_mac_addr *
-hdd_adapter_get_mac_address(struct wlan_hdd_link_info *link_info)
+hdd_adapter_get_link_mac_addr(struct wlan_hdd_link_info *link_info)
 {
 	if (!link_info)
 		return NULL;

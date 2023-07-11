@@ -3970,6 +3970,24 @@ QDF_STATUS hdd_sme_close_session_callback(uint8_t vdev_id);
 int hdd_register_cb(struct hdd_context *hdd_ctx);
 void hdd_deregister_cb(struct hdd_context *hdd_ctx);
 
+#ifdef WLAN_HDD_MULTI_VDEV_SINGLE_NDEV
+static inline struct qdf_mac_addr *
+hdd_adapter_get_netdev_mac_addr(struct hdd_adapter *adapter)
+{
+	return &adapter->mac_addr;
+}
+#else
+static inline struct qdf_mac_addr *
+hdd_adapter_get_netdev_mac_addr(struct hdd_adapter *adapter)
+{
+	if (hdd_adapter_is_ml_adapter(adapter) ||
+	    hdd_adapter_is_link_adapter(adapter))
+		return &adapter->mld_addr;
+
+	return &adapter->mac_addr;
+}
+#endif
+
 #if defined(WLAN_FEATURE_11BE_MLO) && defined(CFG80211_11BE_BASIC) && \
 	defined(WLAN_HDD_MULTI_VDEV_SINGLE_NDEV)
 /**
@@ -3992,8 +4010,8 @@ QDF_STATUS hdd_adapter_fill_link_address(struct hdd_adapter *adapter)
 #endif
 
 /**
- * hdd_adapter_get_mac_address() - Returns the appropriate MAC address pointer
- * in adapter.
+ * hdd_adapter_get_link_mac_addr() - Returns the appropriate
+ * MAC address pointer in adapter.
  * @link_info: Link info in HDD adapter.
  *
  * If WLAN_HDD_MULTI_VDEV_SINGLE_NDEV flag is enabled, then MAC address pointer
@@ -4011,7 +4029,7 @@ QDF_STATUS hdd_adapter_fill_link_address(struct hdd_adapter *adapter)
  * Return: MAC address pointer based on adapter type.
  */
 struct qdf_mac_addr *
-hdd_adapter_get_mac_address(struct wlan_hdd_link_info *link_info);
+hdd_adapter_get_link_mac_addr(struct wlan_hdd_link_info *link_info);
 
 /**
  * hdd_adapter_check_duplicate_session() - Check for duplicate
