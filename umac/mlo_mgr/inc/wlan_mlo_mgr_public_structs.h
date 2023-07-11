@@ -1246,11 +1246,14 @@ struct peer_ptqm_migrate_entry {
  * struct peer_ptqm_migrate_params - peer ptqm migrate request parameter
  * @vdev_id: vdev id
  * @num_peers: peer count
+ * @num_peers_failed: number of peers for which wmi cmd is failed.
+ * This value is expected to be used only in case failure is returned by WMI
  * @peer_list: list of peers to be migrated
  */
 struct peer_ptqm_migrate_params {
 	uint8_t vdev_id;
 	uint16_t num_peers;
+	uint16_t num_peers_failed;
 	struct peer_ptqm_migrate_entry *peer_list;
 };
 

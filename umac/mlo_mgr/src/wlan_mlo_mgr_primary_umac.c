@@ -818,6 +818,8 @@ struct peer_ptqm_migrate_list_entry *mlo_get_next_peer_ctx(
  * wlan_mlo_send_ptqm_migrate_cmd() - API to send WMI to trigger ptqm migration
  * @vdev: objmgr vdev object
  * @list: peer list to be migrated
+ * @num_peers_failed: number of peers for which wmi cmd is failed.
+ * This value is expected to be used only in case failure is returned by WMI
  *
  * API to send WMI to trigger ptqm migration
  *
@@ -825,7 +827,8 @@ struct peer_ptqm_migrate_list_entry *mlo_get_next_peer_ctx(
  */
 static QDF_STATUS
 wlan_mlo_send_ptqm_migrate_cmd(struct wlan_objmgr_vdev *vdev,
-			       struct peer_migrate_ptqm_multi_entries *list)
+			       struct peer_migrate_ptqm_multi_entries *list,
+			       uint16_t *num_peers_failed)
 {
 	struct wlan_lmac_if_mlo_tx_ops *mlo_tx_ops;
 	struct wlan_objmgr_psoc *psoc;
@@ -884,6 +887,7 @@ wlan_mlo_send_ptqm_migrate_cmd(struct wlan_objmgr_vdev *vdev,
 	status = mlo_tx_ops->peer_ptqm_migrate_send(vdev, &param);
 	if (QDF_IS_STATUS_ERROR(status)) {
 		mlo_err("Failed to send WMI for ptqm migration");
+		*num_peers_failed = param.num_peers_failed;
 		qdf_mem_free(param.peer_list);
 		return QDF_STATUS_E_FAILURE;
 	}
@@ -1084,6 +1088,7 @@ static void wlan_mlo_free_ptqm_migrate_list(
  * wlan_mlo_reset_ptqm_migrate_list() - API to reset peer ptqm migration list
  * @ml_dev: MLO dev context
  * @list: peer ptqm migration list
+ * @num_peers_failed: number of peers for which wmi cmd is failed.
  *
  * API to reset peer ptqm migration list
  *
@@ -1091,15 +1096,27 @@ static void wlan_mlo_free_ptqm_migrate_list(
  */
 static void wlan_mlo_reset_ptqm_migrate_list(
 			struct wlan_mlo_dev_context *ml_dev,
-			struct peer_migrate_ptqm_multi_entries *list)
+			struct peer_migrate_ptqm_multi_entries *list,
+			uint16_t num_peers_failed)
 {
 	struct peer_ptqm_migrate_list_entry *peer_entry, *next_entry;
+	uint16_t count = 0;
 
 	if (!ml_dev)
 		return;
 
 	peer_entry = mlo_ptqm_list_peek_head(&list->peer_list);
 	while (peer_entry) {
+		/* Reset the flags only for entries for which wmi
+		 * command trigger is failed
+		 */
+		if (count < list->num_entries - num_peers_failed) {
+			count++;
+			next_entry = mlo_get_next_peer_ctx(&list->peer_list,
+							   peer_entry);
+			peer_entry = next_entry;
+			continue;
+		}
 		if (peer_entry->peer) {
 			qdf_clear_bit(peer_entry->mlo_peer_id, ml_dev->mlo_peer_id_bmap);
 			peer_entry->peer->mlo_peer_ctx->primary_umac_migration_in_progress = false;
@@ -1196,6 +1213,7 @@ static QDF_STATUS wlan_mlo_trigger_link_ptqm_migration(
 {
 	struct peer_migrate_ptqm_multi_entries migrate_list = {0};
 	QDF_STATUS status;
+	uint16_t num_peers_failed = 0;
 
 	qdf_list_create(&migrate_list.peer_list, MAX_MLO_PEER_ID);
 	wlan_objmgr_iterate_peerobj_list(vdev,
@@ -1208,10 +1226,12 @@ static QDF_STATUS wlan_mlo_trigger_link_ptqm_migration(
 		return QDF_STATUS_SUCCESS;
 	}
 
-	status = wlan_mlo_send_ptqm_migrate_cmd(vdev, &migrate_list);
+	status = wlan_mlo_send_ptqm_migrate_cmd(vdev, &migrate_list,
+						&num_peers_failed);
 	if (QDF_IS_STATUS_ERROR(status))
 		wlan_mlo_reset_ptqm_migrate_list(vdev->mlo_dev_ctx,
-						 &migrate_list);
+						 &migrate_list,
+						 num_peers_failed);
 	wlan_mlo_free_ptqm_migrate_list(&migrate_list);
 	return status;
 }
@@ -1226,6 +1246,7 @@ QDF_STATUS wlan_mlo_set_ptqm_migration(struct wlan_objmgr_vdev *vdev,
 	struct peer_ptqm_migrate_list_entry *peer_entry;
 	struct wlan_objmgr_vdev *curr_vdev = NULL;
 	uint8_t current_primary_link_id = WLAN_LINK_ID_INVALID;
+	uint16_t num_peers_failed = 0;
 	QDF_STATUS status;
 
 	if (!vdev) {
@@ -1299,10 +1320,12 @@ QDF_STATUS wlan_mlo_set_ptqm_migration(struct wlan_objmgr_vdev *vdev,
 	migrate_list.num_entries = 1;
 
 	//trigger WMI
-	status = wlan_mlo_send_ptqm_migrate_cmd(curr_vdev, &migrate_list);
+	status = wlan_mlo_send_ptqm_migrate_cmd(curr_vdev, &migrate_list,
+						&num_peers_failed);
 	if (QDF_IS_STATUS_ERROR(status))
 		wlan_mlo_reset_ptqm_migrate_list(curr_vdev->mlo_dev_ctx,
-						 &migrate_list);
+						 &migrate_list,
+						 num_peers_failed);
 	wlan_mlo_free_ptqm_migrate_list(&migrate_list);
 
 	mlo_release_vdev_ref(curr_vdev);
