@@ -816,16 +816,36 @@ static void scm_req_update_concurrency_params(struct wlan_objmgr_vdev *vdev,
 	}
 }
 
-static inline void scm_update_5g_chlist(struct scan_start_request *req)
+static inline void scm_update_5ghz_6ghz_chlist(struct scan_start_request *req,
+					       qdf_freq_t intf_freq)
 {
+	struct wlan_objmgr_psoc *psoc;
+	struct wlan_objmgr_pdev *pdev;
 	uint32_t i;
 	uint32_t num_scan_channels;
 
+	pdev = wlan_vdev_get_pdev(req->vdev);
+	if (!pdev)
+		return;
+
+	psoc = wlan_pdev_get_psoc(pdev);
+	if (!psoc)
+		return;
+
 	num_scan_channels = 0;
 	for (i = 0; i < req->scan_req.chan_list.num_chan; i++) {
-		if (WLAN_REG_IS_5GHZ_CH_FREQ(
-			req->scan_req.chan_list.chan[i].freq))
-			continue;
+		if (!WLAN_REG_IS_24GHZ_CH_FREQ(
+		    req->scan_req.chan_list.chan[i].freq)) {
+			/*
+			 * If no intf_freq, skip all 5 + 6 GHz freq
+			 * else, skip only freq on same mac as intf_freq
+			 */
+			if (!intf_freq ||
+			    policy_mgr_2_freq_always_on_same_mac(
+					psoc, intf_freq,
+					req->scan_req.chan_list.chan[i].freq))
+				continue;
+		}
 
 		req->scan_req.chan_list.chan[num_scan_channels++] =
 			req->scan_req.chan_list.chan[i];
@@ -906,6 +926,7 @@ static inline void scm_scan_chlist_concurrency_modify(
 	struct wlan_objmgr_pdev *pdev;
 	struct wlan_scan_obj *scan_obj;
 	uint16_t trim;
+	qdf_freq_t dfs_ap_freq;
 
 	pdev = wlan_vdev_get_pdev(vdev);
 	if (!pdev)
@@ -924,13 +945,13 @@ static inline void scm_scan_chlist_concurrency_modify(
 	    !(wlan_vdev_mlme_get_opmode(req->vdev) == QDF_P2P_CLIENT_MODE))
 		return;
 
-	if (policy_mgr_scan_trim_5g_chnls_for_dfs_ap(psoc))
-		scm_update_5g_chlist(req);
+	if (policy_mgr_scan_trim_5g_chnls_for_dfs_ap(psoc, &dfs_ap_freq))
+		scm_update_5ghz_6ghz_chlist(req, dfs_ap_freq);
 
 	if (scan_obj->scan_def.conc_chlist_trim) {
 		trim = policy_mgr_scan_trim_chnls_for_connected_ap(pdev);
 		if (trim & TRIM_CHANNEL_LIST_5G)
-			scm_update_5g_chlist(req);
+			scm_update_5ghz_6ghz_chlist(req, 0);
 		if (trim & TRIM_CHANNEL_LIST_24G)
 			scm_update_24g_chlist(req);
 	}
