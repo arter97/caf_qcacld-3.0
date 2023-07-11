@@ -3868,6 +3868,8 @@ config_txbf_sounding_trig_info_cmd_tlv(wmi_unified_t wmi,
 	WMI_SET_STANDALONE_SOUND_PARAMS_NG(param_cmd->sounding_params, sounding_params->ng);
 	WMI_SET_STANDALONE_SOUND_PARAMS_CB(param_cmd->sounding_params, sounding_params->codebook);
 	WMI_SET_STANDALONE_SOUND_PARAMS_BW(param_cmd->sounding_params, sounding_params->bw);
+	WMI_SET_STANDALONE_SOUND_PARAMS_CQI_TYPE(param_cmd->sounding_params,
+			sounding_params->cqi_triggered_type);
 	param_cmd->num_sounding_repeats = sounding_params->sounding_repeats;
 
 	buf_ptr += sizeof(*param_cmd);
