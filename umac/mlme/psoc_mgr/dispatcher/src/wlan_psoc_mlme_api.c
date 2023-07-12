@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2019-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -43,6 +43,8 @@ wlan_psoc_mlme_get_11be_capab(struct wlan_objmgr_psoc *psoc, bool *val)
 	return QDF_STATUS_SUCCESS;
 }
 
+qdf_export_symbol(wlan_psoc_mlme_get_11be_capab);
+
 QDF_STATUS
 wlan_psoc_mlme_set_11be_capab(struct wlan_objmgr_psoc *psoc, bool val)
 {
@@ -57,6 +59,8 @@ wlan_psoc_mlme_set_11be_capab(struct wlan_objmgr_psoc *psoc, bool val)
 	psoc_mlme->psoc_cfg.phy_config.eht_cap &= val;
 	return QDF_STATUS_SUCCESS;
 }
+
+qdf_export_symbol(wlan_psoc_mlme_set_11be_capab);
 
 struct psoc_mlme_obj *wlan_psoc_mlme_get_cmpt_obj(struct wlan_objmgr_psoc *psoc)
 {
