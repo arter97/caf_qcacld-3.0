@@ -396,11 +396,15 @@ void dp_sawf_config_li(struct dp_soc *soc, uint32_t *hal_tx_desc_cached,
 	if (q_id == DP_SAWF_DEFAULT_Q_INVALID)
 		return;
 
-	dp_sawf_tcl_cmd(fw_metadata, nbuf);
-
 	msdu_info->tid = (q_id & (CDP_DATA_TID_MAX - 1));
 	hal_tx_desc_set_hlos_tid(hal_tx_desc_cached,
 				 (q_id & (CDP_DATA_TID_MAX - 1)));
+
+	if ((q_id >= DP_SAWF_DEFAULT_QUEUE_MIN) &&
+	    (q_id < DP_SAWF_DEFAULT_QUEUE_MAX))
+		return;
+
+	dp_sawf_tcl_cmd(fw_metadata, nbuf);
 
 	/* For SAWF, q_id starts from DP_SAWF_Q_MAX */
 	if (!dp_sawf_get_search_index(soc, nbuf, vdev_id,
