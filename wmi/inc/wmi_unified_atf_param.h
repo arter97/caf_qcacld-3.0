@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2016-2018 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -223,4 +224,61 @@ typedef struct {
 	wmi_host_atf_peer_stats_info token_info_list[1];
 } wmi_host_atf_peer_stats_event;
 
+#ifdef WLAN_ATF_INCREASED_STA
+/**
+ * struct atf_peer_info_v2 - ATF peer info params version 2
+ * @peer_macaddr: peer mac addr
+ * @percentage_peer: percentage of airtime for this peer
+ * @group_index: Group index it belongs to
+ * @explicit_peer_flag: Indicate configured peer as explicit
+ */
+struct atf_peer_info_v2 {
+	struct wmi_macaddr_t peer_macaddr;
+	uint16_t percentage_peer;
+	uint16_t group_index;
+	uint32_t explicit_peer_flag;
+};
+
+/**
+ * struct atf_peer_params_v2 - ATF params for peer details version 2
+ * @num_peers: Number of peers
+ * @pdev_id: Associated pdev ID
+ * @full_update_flag: Flag to denote Partial or full update
+ * @peer_info: Pointer to base ATF peer info holding num_peers
+ */
+struct atf_peer_params_v2 {
+	uint16_t num_peers;
+	uint8_t pdev_id;
+	uint8_t full_update_flag;
+	struct atf_peer_info_v2 *peer_info;
+};
+
+/**
+ * struct atf_group_info_v2 - ATF group info params version 2
+ * @percentage_group: Percentage airtime for group
+ * @implicit_peers: Total number of associated non-configured peers
+ * @explicit_peers: Total number of associated configured peers
+ * @implicit_peer_units: Total airtime units for implicit peers
+ * @atf_group_units_reserved: ATF group information
+ */
+struct atf_group_info_v2 {
+	uint16_t percentage_group;
+	uint16_t implicit_peers;
+	uint16_t explicit_peers;
+	uint16_t implicit_peer_units;
+	uint32_t group_units_reserved;
+};
+
+/**
+ * struct atf_grouping_params_v2 - ATF grouping params version 2
+ * @num_groups: number of groups
+ * @pdev_id: Associated pdev id
+ * @group_info: Group informaition
+ */
+struct atf_grouping_params_v2 {
+	uint8_t num_groups;
+	uint8_t pdev_id;
+	struct atf_group_info_v2 group_info[ATF_ACTIVED_MAX_ATFGROUPS];
+};
+#endif /* WLAN_ATF_INCREASED_STA */
 #endif /* _WMI_UNIFIED_ATF_PARAM_H_ */
