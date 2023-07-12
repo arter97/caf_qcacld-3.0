@@ -1669,6 +1669,10 @@ dp_rx_err_route_hdl(struct dp_soc *soc, qdf_nbuf_t nbuf,
 			DP_PEER_TO_STACK_INCC_PKT(txrx_peer, 1,
 						  qdf_nbuf_len(nbuf),
 						  vdev->pdev->enhanced_stats_en);
+			DP_PEER_PER_PKT_STATS_INC_PKT(txrx_peer,
+						      rx.rx_success, 1,
+						      qdf_nbuf_len(nbuf),
+						      link_id);
 			qdf_nbuf_set_exc_frame(nbuf, 1);
 			qdf_nbuf_set_next(nbuf, NULL);
 

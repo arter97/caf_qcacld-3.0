@@ -4482,6 +4482,7 @@ struct dp_peer_extd_tx_stats {
  * @peer_unauth_rx_pkt_drop: Unauth rx packet drops
  * @policy_check_drop: policy check drops
  * @to_stack_twt: Total packets sent up the stack in TWT session
+ * @rx_success: Total RX success count
  * @protocol_trace_cnt: per-peer protocol counters
  * @mcast_3addr_drop:
  * @rx_total: total rx count
@@ -4519,6 +4520,7 @@ struct dp_peer_per_pkt_rx_stats {
 	uint32_t peer_unauth_rx_pkt_drop;
 	uint32_t policy_check_drop;
 	struct cdp_pkt_info to_stack_twt;
+	struct cdp_pkt_info rx_success;
 #ifdef VDEV_PEER_PROTOCOL_COUNT
 	struct protocol_trace_count protocol_trace_cnt[CDP_TRACE_MAX];
 #endif

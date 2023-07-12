@@ -833,6 +833,11 @@ done:
 		DP_PEER_TO_STACK_INCC_PKT(txrx_peer, 1,
 					  QDF_NBUF_CB_RX_PKT_LEN(nbuf),
 					  enh_flag);
+		DP_PEER_PER_PKT_STATS_INC_PKT(txrx_peer,
+					      rx.rx_success, 1,
+					      QDF_NBUF_CB_RX_PKT_LEN(nbuf),
+					      link_id);
+
 		if (qdf_unlikely(txrx_peer->in_twt))
 			DP_PEER_PER_PKT_STATS_INC_PKT(txrx_peer,
 						      rx.to_stack_twt, 1,
@@ -2299,6 +2304,10 @@ dp_rx_null_q_desc_handle_be(struct dp_soc *soc, qdf_nbuf_t nbuf,
 		qdf_nbuf_set_next(nbuf, NULL);
 		DP_PEER_TO_STACK_INCC_PKT(txrx_peer, 1, qdf_nbuf_len(nbuf),
 					  enh_flag);
+		DP_PEER_PER_PKT_STATS_INC_PKT(txrx_peer,
+					      rx.rx_success, 1,
+					      qdf_nbuf_len(nbuf),
+					      link_id);
 		/*
 		 * Update the protocol tag in SKB based on
 		 * CCE metadata

@@ -1687,6 +1687,7 @@ struct cdp_tx_stats {
  * @nawds_mcast_drop: Total multicast packets
  * @mec_drop: Total MEC packets dropped
  * @ppeds_drop: Total DS packets dropped
+ * @rx_success: Total rx success count
  * @last_rx_ts: last timestamp in jiffies when RX happened
  * @intra_bss: Intra-bss statistics
  * @intra_bss.pkts: Intra BSS packets received
@@ -1778,6 +1779,7 @@ struct cdp_rx_stats {
 	uint32_t nawds_mcast_drop;
 	struct cdp_pkt_info mec_drop;
 	struct cdp_pkt_info ppeds_drop;
+	struct cdp_pkt_info rx_success;
 	unsigned long last_rx_ts;
 	struct {
 		struct cdp_pkt_info pkts;
