@@ -315,9 +315,13 @@ uint8_t *peer_assoc_add_mlo_params(uint8_t *buf_ptr,
 static inline void wmi_copy_chan_info(wmi_channel *dst_chan,
 				      struct wlan_channel *src_chan)
 {
+	WMI_HOST_WLAN_PHY_MODE fw_phy_mode;
+
 	dst_chan->mhz = src_chan->ch_freq;
 	dst_chan->band_center_freq1 = src_chan->ch_cfreq1;
 	dst_chan->band_center_freq2 = src_chan->ch_cfreq2;
+	fw_phy_mode = wmi_host_to_fw_phymode(src_chan->ch_phymode);
+	WMI_SET_CHANNEL_MODE(dst_chan, fw_phy_mode);
 }
 
 static inline void
