@@ -3272,7 +3272,7 @@ void wma_get_fw_phy_mode_for_freq_cb(uint32_t freq, uint32_t chan_width,
 		dot11_mode = MLME_DOT11_MODE_11A;
 
 	host_phy_mode = wma_chan_phy_mode(freq, chan_width, dot11_mode);
-	*phy_mode = wma_host_to_fw_phymode(host_phy_mode);
+	*phy_mode = wmi_host_to_fw_phymode(host_phy_mode);
 }
 
 void wma_get_phy_mode_cb(qdf_freq_t freq, uint32_t chan_width,

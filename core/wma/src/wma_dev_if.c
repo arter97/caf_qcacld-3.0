@@ -1038,7 +1038,7 @@ static void wma_peer_send_phymode(struct wlan_objmgr_vdev *vdev,
 	}
 	wlan_peer_set_phymode(peer, new_phymode);
 
-	fw_phymode = wma_host_to_fw_phymode(new_phymode);
+	fw_phymode = wmi_host_to_fw_phymode(new_phymode);
 	vdev_id = wlan_vdev_get_id(vdev);
 
 	wma_set_peer_param(wma, peer_mac_addr, WMI_HOST_PEER_PHYMODE,

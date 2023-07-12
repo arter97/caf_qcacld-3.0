@@ -1128,109 +1128,7 @@ enum wlan_phymode wma_fw_to_host_phymode(WMI_HOST_WLAN_PHY_MODE phymode)
 	}
 }
 
-#ifdef CONFIG_160MHZ_SUPPORT
-/**
- * wma_host_to_fw_phymode_160() - convert host to fw phymode for 160 mhz
- * @host_phymode: phymode to convert
- *
- * Return: one of the 160 mhz values defined in enum WMI_HOST_WLAN_PHY_MODE;
- *         or WMI_HOST_MODE_UNKNOWN if the input is not a 160 mhz phymode
- */
-static WMI_HOST_WLAN_PHY_MODE
-wma_host_to_fw_phymode_160(enum wlan_phymode host_phymode)
-{
-	switch (host_phymode) {
-	case WLAN_PHYMODE_11AC_VHT80_80:
-		return WMI_HOST_MODE_11AC_VHT80_80;
-	case WLAN_PHYMODE_11AC_VHT160:
-		return WMI_HOST_MODE_11AC_VHT160;
-	default:
-		return WMI_HOST_MODE_UNKNOWN;
-	}
-}
-#else
-static WMI_HOST_WLAN_PHY_MODE
-wma_host_to_fw_phymode_160(enum wlan_phymode host_phymode)
-{
-	return WMI_HOST_MODE_UNKNOWN;
-}
-#endif
-
-#if SUPPORT_11AX
-/**
- * wma_host_to_fw_phymode_11ax() - convert host to fw phymode for 11ax phymode
- * @host_phymode: phymode to convert
- *
- * Return: one of the 11ax values defined in enum WMI_HOST_WLAN_PHY_MODE;
- *         or WMI_HOST_MODE_UNKNOWN if the input is not an 11ax phymode
- */
-static WMI_HOST_WLAN_PHY_MODE
-wma_host_to_fw_phymode_11ax(enum wlan_phymode host_phymode)
-{
-	switch (host_phymode) {
-	case WLAN_PHYMODE_11AXA_HE20:
-		return WMI_HOST_MODE_11AX_HE20;
-	case WLAN_PHYMODE_11AXA_HE40:
-		return WMI_HOST_MODE_11AX_HE40;
-	case WLAN_PHYMODE_11AXA_HE80:
-		return WMI_HOST_MODE_11AX_HE80;
-	case WLAN_PHYMODE_11AXA_HE80_80:
-		return WMI_HOST_MODE_11AX_HE80_80;
-	case WLAN_PHYMODE_11AXA_HE160:
-		return WMI_HOST_MODE_11AX_HE160;
-	case WLAN_PHYMODE_11AXG_HE20:
-		return WMI_HOST_MODE_11AX_HE20_2G;
-	case WLAN_PHYMODE_11AXG_HE40:
-	case WLAN_PHYMODE_11AXG_HE40PLUS:
-	case WLAN_PHYMODE_11AXG_HE40MINUS:
-		return WMI_HOST_MODE_11AX_HE40_2G;
-	case WLAN_PHYMODE_11AXG_HE80:
-		return WMI_HOST_MODE_11AX_HE80_2G;
-	default:
-		return WMI_HOST_MODE_UNKNOWN;
-	}
-}
-#else
-static WMI_HOST_WLAN_PHY_MODE
-wma_host_to_fw_phymode_11ax(enum wlan_phymode host_phymode)
-{
-	return WMI_HOST_MODE_UNKNOWN;
-}
-#endif
-
 #ifdef WLAN_FEATURE_11BE
-/**
- * wma_host_to_fw_phymode_11be() - convert host to fw phymode for 11be phymode
- * @host_phymode: phymode to convert
- *
- * Return: one of the 11be values defined in enum WMI_HOST_WLAN_PHY_MODE;
- *         or WMI_HOST_MODE_UNKNOWN if the input is not an 11be phymode
- */
-static WMI_HOST_WLAN_PHY_MODE
-wma_host_to_fw_phymode_11be(enum wlan_phymode host_phymode)
-{
-	switch (host_phymode) {
-	case WLAN_PHYMODE_11BEA_EHT20:
-		return WMI_HOST_MODE_11BE_EHT20;
-	case WLAN_PHYMODE_11BEA_EHT40:
-		return WMI_HOST_MODE_11BE_EHT40;
-	case WLAN_PHYMODE_11BEA_EHT80:
-		return WMI_HOST_MODE_11BE_EHT80;
-	case WLAN_PHYMODE_11BEA_EHT160:
-		return WMI_HOST_MODE_11BE_EHT160;
-	case WLAN_PHYMODE_11BEA_EHT320:
-		return WMI_HOST_MODE_11BE_EHT320;
-	case WLAN_PHYMODE_11BEG_EHT20:
-		return WMI_HOST_MODE_11BE_EHT20_2G;
-	case WLAN_PHYMODE_11BEG_EHT40:
-	case WLAN_PHYMODE_11BEG_EHT40PLUS:
-	case WLAN_PHYMODE_11BEG_EHT40MINUS:
-		return WMI_HOST_MODE_11BE_EHT40_2G;
-	default:
-		return WMI_HOST_MODE_UNKNOWN;
-	}
-}
-
 static void wma_populate_peer_puncture(struct peer_assoc_params *peer,
 				       struct wlan_channel *des_chan)
 {
@@ -1238,65 +1136,11 @@ static void wma_populate_peer_puncture(struct peer_assoc_params *peer,
 	wma_debug("Peer EHT puncture bitmap %d", peer->puncture_bitmap);
 }
 #else
-static WMI_HOST_WLAN_PHY_MODE
-wma_host_to_fw_phymode_11be(enum wlan_phymode host_phymode)
-{
-	return WMI_HOST_MODE_UNKNOWN;
-}
-
 static void wma_populate_peer_puncture(struct peer_assoc_params *peer,
 				       struct wlan_channel *des_chan)
 {
 }
 #endif
-
-WMI_HOST_WLAN_PHY_MODE wma_host_to_fw_phymode(enum wlan_phymode host_phymode)
-{
-	WMI_HOST_WLAN_PHY_MODE fw_phymode;
-
-	switch (host_phymode) {
-	case WLAN_PHYMODE_11A:
-		return WMI_HOST_MODE_11A;
-	case WLAN_PHYMODE_11G:
-		return WMI_HOST_MODE_11G;
-	case WLAN_PHYMODE_11B:
-		return WMI_HOST_MODE_11B;
-	case WLAN_PHYMODE_11G_ONLY:
-		return WMI_HOST_MODE_11GONLY;
-	case WLAN_PHYMODE_11NA_HT20:
-		return WMI_HOST_MODE_11NA_HT20;
-	case WLAN_PHYMODE_11NG_HT20:
-		return WMI_HOST_MODE_11NG_HT20;
-	case WLAN_PHYMODE_11NA_HT40:
-		return WMI_HOST_MODE_11NA_HT40;
-	case WLAN_PHYMODE_11NG_HT40:
-	case WLAN_PHYMODE_11NG_HT40PLUS:
-	case WLAN_PHYMODE_11NG_HT40MINUS:
-		return WMI_HOST_MODE_11NG_HT40;
-	case WLAN_PHYMODE_11AC_VHT20:
-		return WMI_HOST_MODE_11AC_VHT20;
-	case WLAN_PHYMODE_11AC_VHT40:
-		return WMI_HOST_MODE_11AC_VHT40;
-	case WLAN_PHYMODE_11AC_VHT80:
-		return WMI_HOST_MODE_11AC_VHT80;
-	case WLAN_PHYMODE_11AC_VHT20_2G:
-		return WMI_HOST_MODE_11AC_VHT20_2G;
-	case WLAN_PHYMODE_11AC_VHT40PLUS_2G:
-	case WLAN_PHYMODE_11AC_VHT40MINUS_2G:
-	case WLAN_PHYMODE_11AC_VHT40_2G:
-		return WMI_HOST_MODE_11AC_VHT40_2G;
-	case WLAN_PHYMODE_11AC_VHT80_2G:
-		return WMI_HOST_MODE_11AC_VHT80_2G;
-	default:
-		fw_phymode = wma_host_to_fw_phymode_160(host_phymode);
-		if (fw_phymode != WMI_HOST_MODE_UNKNOWN)
-			return fw_phymode;
-		fw_phymode = wma_host_to_fw_phymode_11ax(host_phymode);
-		if (fw_phymode != WMI_HOST_MODE_UNKNOWN)
-			return fw_phymode;
-		return wma_host_to_fw_phymode_11be(host_phymode);
-	}
-}
 
 void wma_objmgr_set_peer_mlme_nss(tp_wma_handle wma, uint8_t *mac_addr,
 				  uint8_t nss)
@@ -1861,7 +1705,7 @@ QDF_STATUS wma_send_peer_assoc(tp_wma_handle wma,
 	wma_objmgr_set_peer_mlme_nss(wma, cmd->peer_mac, cmd->peer_nss);
 
 	/* Till conversion is not done in WMI we need to fill fw phy mode */
-	cmd->peer_phymode = wma_host_to_fw_phymode(phymode);
+	cmd->peer_phymode = wmi_host_to_fw_phymode(phymode);
 
 	keymgmt = wlan_crypto_get_param(intr->vdev, WLAN_CRYPTO_PARAM_KEY_MGMT);
 	authmode = wlan_crypto_get_param(intr->vdev,
@@ -3035,7 +2879,7 @@ void wma_process_update_opmode(tp_wma_handle wma_handle,
 	wlan_peer_obj_unlock(peer);
 	wlan_objmgr_peer_release_ref(peer, WLAN_LEGACY_WMA_ID);
 
-	fw_phymode = wma_host_to_fw_phymode(peer_phymode);
+	fw_phymode = wmi_host_to_fw_phymode(peer_phymode);
 
 	ch_width = wmi_get_ch_width_from_phy_mode(wma_handle->wmi_handle,
 						  fw_phymode);
@@ -4253,7 +4097,7 @@ wma_update_bss_peer_phy_mode(struct wlan_channel *des_chan,
 
 	wlan_objmgr_peer_release_ref(bss_peer, WLAN_LEGACY_WMA_ID);
 
-	mlme_obj->mgmt.generic.phy_mode = wma_host_to_fw_phymode(new_phymode);
+	mlme_obj->mgmt.generic.phy_mode = wmi_host_to_fw_phymode(new_phymode);
 	des_chan->ch_phymode = new_phymode;
 
 	return QDF_STATUS_SUCCESS;

@@ -423,7 +423,7 @@ void hdd_update_channel_bw_info(struct hdd_context *hdd_ctx,
 		 */
 		phy_mode = WLAN_PHYMODE_AUTO;
 
-	fw_phy_mode = wma_host_to_fw_phymode(phy_mode);
+	fw_phy_mode = wmi_host_to_fw_phymode(phy_mode);
 
 	hdd_debug("chan %d dot11_mode %d ch_width %d sec offset %d freq_seg0 %d phy_mode %d fw_phy_mode %d",
 		  chan_freq, wni_dot11_mode, ch_params.ch_width,

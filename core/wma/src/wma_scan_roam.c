@@ -820,7 +820,7 @@ static void wma_update_phymode_on_roam(tp_wma_handle wma,
 	qdf_mem_copy(bss_chan, des_chan, sizeof(struct wlan_channel));
 
 	/* Till conversion is not done in WMI we need to fill fw phy mode */
-	vdev_mlme->mgmt.generic.phy_mode = wma_host_to_fw_phymode(bss_phymode);
+	vdev_mlme->mgmt.generic.phy_mode = wmi_host_to_fw_phymode(bss_phymode);
 
 	/* update new phymode to peer */
 	wma_objmgr_set_peer_mlme_phymode(wma, bssid->bytes, bss_phymode);
