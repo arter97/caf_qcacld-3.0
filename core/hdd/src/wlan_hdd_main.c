@@ -6717,7 +6717,8 @@ hdd_register_interface(struct hdd_adapter *adapter, bool rtnl_held,
 				return QDF_STATUS_E_FAILURE;
 			}
 		}
-
+		hdd_debug("hdd_register_netdevice(%s) type:%d", dev->name,
+			  adapter->device_mode);
 		ret = hdd_register_netdevice(adapter, dev, params);
 		if (ret) {
 			hdd_err("register_netdevice(%s) failed, err = 0x%x",
@@ -6725,6 +6726,8 @@ hdd_register_interface(struct hdd_adapter *adapter, bool rtnl_held,
 			return QDF_STATUS_E_FAILURE;
 		}
 	} else {
+		hdd_debug("register_netdev(%s) type:%d", dev->name,
+			  adapter->device_mode);
 		ret = register_netdev(dev);
 		if (ret) {
 			hdd_err("register_netdev(%s) failed, err = 0x%x",
@@ -7705,10 +7708,15 @@ static void hdd_cleanup_adapter(struct hdd_context *hdd_ctx,
 	clear_bit(DEVICE_IFACE_OPENED, &adapter->event_flags);
 
 	if (test_bit(NET_DEVICE_REGISTERED, &adapter->event_flags)) {
-		if (rtnl_held)
+		if (rtnl_held) {
+			hdd_debug("hdd_unregister_netdevice(%s) type:%d",
+				  dev->name, adapter->device_mode);
 			hdd_unregister_netdevice(adapter, dev);
-		else
+		} else {
+			hdd_debug("unregister_netdev(%s) type:%d", dev->name,
+				  adapter->device_mode);
 			unregister_netdev(dev);
+		}
 		/*
 		 * Note that the adapter is no longer valid at this point
 		 * since the memory has been reclaimed
