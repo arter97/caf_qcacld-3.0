@@ -643,6 +643,33 @@ static void wlan_mlo_t2lm_handle_mapping_switch_time_expiry(
 }
 
 /**
+ * wlan_vdev_notify_mlo_link_enable_disable() - API to notify link disable or
+ * reenable after expected duration expiry.
+ * @vdev: Pointer to vdev structure
+ * @t2lm_ctx: Pointer to T2LM context
+ *
+ * Return: none
+ */
+static void wlan_vdev_notify_mlo_link_enable_disable(
+		struct wlan_objmgr_vdev *vdev,
+		struct wlan_t2lm_context *t2lm_ctx)
+{
+	struct vdev_mlme_obj *vdev_mlme;
+	vdev_mlme = wlan_vdev_mlme_get_cmpt_obj(vdev);
+	if (!vdev_mlme) {
+	    t2lm_err("null vdev_mlme");
+	    return;
+	}
+	if (vdev_mlme->ops &&
+		vdev_mlme->ops->mlme_vdev_notify_mlo_link_enable_disable) {
+	    t2lm_info("disabled_link_bitmap :0x%x \n",
+		    t2lm_ctx->established_t2lm.disabled_link_bitmap);
+	    vdev_mlme->ops->mlme_vdev_notify_mlo_link_enable_disable(vdev_mlme,
+		    t2lm_ctx->established_t2lm.disabled_link_bitmap);
+	}
+}
+
+/**
  * wlan_mlo_t2lm_handle_expected_duration_expiry() - API to handle the expected
  * duration timer expiry.
  * @t2lm_ctx: Pointer to T2LM context
@@ -734,9 +761,17 @@ QDF_STATUS wlan_mlo_vdev_tid_to_link_map_event(
 	case WLAN_MAP_SWITCH_TIMER_EXPIRED:
 		vdev_mlme->proto.ap.mapping_switch_time = 0;
 		wlan_mlo_t2lm_handle_mapping_switch_time_expiry(t2lm_ctx, vdev);
+
+		/* Notify that the link disable triggered for links indicated
+		 * in disabled_link_bitmap.
+		 */
+		wlan_vdev_notify_mlo_link_enable_disable(vdev, t2lm_ctx);
 		break;
 	case WLAN_EXPECTED_DUR_EXPIRED:
 		wlan_mlo_t2lm_handle_expected_duration_expiry(t2lm_ctx, vdev);
+
+		/* Notify that link expiry indication to link is reenabled.*/
+		wlan_vdev_notify_mlo_link_enable_disable(vdev, t2lm_ctx);
 		break;
 	default:
 		t2lm_err("Invalid status");

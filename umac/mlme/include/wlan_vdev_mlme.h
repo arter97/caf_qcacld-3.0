@@ -717,6 +717,8 @@ enum vdev_start_resp_type {
  * @mlme_vdev_reconfig_timer_complete:  callback to process ml reconfing
  *                                      operation
  * @mlme_vdev_notify_mlo_sync_wait_entry:
+ * @mlme_vdev_notify_mlo_link_enable_disable: callback to get the link enable
+ *                                      disable notification
  */
 struct vdev_mlme_ops {
 	QDF_STATUS (*mlme_vdev_validate_basic_params)(
@@ -803,6 +805,9 @@ struct vdev_mlme_ops {
 				struct vdev_mlme_obj *vdev_mlme);
 	QDF_STATUS (*mlme_vdev_notify_mlo_sync_wait_entry)(
 				struct vdev_mlme_obj *vdev_mlme);
+	QDF_STATUS (*mlme_vdev_notify_mlo_link_enable_disable)(
+				struct vdev_mlme_obj *vdev_mlme,
+				uint16_t disable_link_bitmap);
 };
 
 /**

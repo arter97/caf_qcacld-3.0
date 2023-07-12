@@ -827,6 +827,13 @@ static inline QDF_STATUS wlan_mlo_dev_t2lm_notify_link_update(
 	return QDF_STATUS_SUCCESS;
 }
 
+static void wlan_vdev_notify_mlo_link_enable_disable(
+		struct wlan_objmgr_vdev *vdev,
+		struct wlan_t2lm_context *t2lm_ctx)
+{
+
+}
+
 static inline
 QDF_STATUS wlan_send_tid_to_link_mapping(struct wlan_objmgr_vdev *vdev,
 					 struct wlan_t2lm_info *t2lm)
