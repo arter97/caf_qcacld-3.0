@@ -858,8 +858,9 @@ wlan_mlo_get_new_ptqm_id(struct wlan_objmgr_vdev *curr_vdev,
 	struct wlan_objmgr_vdev *tmp_vdev = NULL;
 	struct wlan_objmgr_vdev *wlan_vdev_list[WLAN_UMAC_MLO_MAX_VDEVS] = { NULL };
 	struct wlan_mlo_link_peer_entry *peer_entry;
+	uint8_t psoc_ids[WLAN_UMAC_MLO_MAX_VDEVS];
 	QDF_STATUS status;
-	uint8_t i = 0, idx = 0;
+	uint8_t i = 0, idx = 0, j = 0;
 
 	if (wlan_vdev_mlme_get_opmode(curr_vdev) == QDF_SAP_MODE &&
 	    QDF_IS_STATUS_ERROR(wlan_mlo_peer_is_assoc_done(ml_peer))) {
@@ -890,6 +891,18 @@ wlan_mlo_get_new_ptqm_id(struct wlan_objmgr_vdev *curr_vdev,
 		if (wlan_peer_get_peer_type(peer_entry->link_peer) ==
 					WLAN_PEER_MLO_BRIDGE)
 			goto exit;
+
+		psoc_ids[j++] = wlan_vdev_get_psoc_id(
+				wlan_peer_get_vdev(peer_entry->link_peer));
+	}
+
+	/* For some 3 link RDPs, there is restriction on primary umac */
+	if (j == 3) {
+		if (mlo_get_central_umac_id(psoc_ids) != -1) {
+			mlo_err("ML peer " QDF_MAC_ADDR_FMT "migration not supported",
+				QDF_MAC_ADDR_REF(ml_peer->peer_mld_addr.bytes));
+			goto exit;
+		}
 	}
 
 	for (i = 0; i < MAX_MLO_LINK_PEERS; i++) {
