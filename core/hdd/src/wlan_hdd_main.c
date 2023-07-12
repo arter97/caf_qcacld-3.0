@@ -3106,7 +3106,7 @@ static int __hdd_mon_open(struct net_device *dev)
 		if ((!test_bit(SME_SESSION_OPENED,
 			       &adapter->deflink->link_flags)) ||
 		    (policy_mgr_is_sta_mon_concurrency(hdd_ctx->psoc))) {
-			ret = hdd_start_adapter(adapter);
+			ret = hdd_start_adapter(adapter, true);
 			if (ret) {
 				hdd_err("Failed to start adapter :%d",
 						adapter->device_mode);
@@ -3540,13 +3540,14 @@ static int hdd_stop_link_adapter(struct hdd_context *hdd_ctx,
 /**
  * hdd_start_adapter() - Wrapper function for device specific adapter
  * @adapter: pointer to HDD adapter
+ * @rtnl_held: true if rtnl lock is taken, otherwise false
  *
  * This function is called to start the device specific adapter for
  * the mode passed in the adapter's device_mode.
  *
  * Return: 0 for success; non-zero for failure
  */
-int hdd_start_adapter(struct hdd_adapter *adapter)
+int hdd_start_adapter(struct hdd_adapter *adapter, bool rtnl_held)
 {
 
 	int ret;
@@ -3577,7 +3578,7 @@ int hdd_start_adapter(struct hdd_adapter *adapter)
 		break;
 	case QDF_P2P_GO_MODE:
 	case QDF_SAP_MODE:
-		ret = hdd_start_ap_adapter(adapter);
+		ret = hdd_start_ap_adapter(adapter, rtnl_held);
 		if (ret)
 			goto err_start_adapter;
 		break;
@@ -5256,7 +5257,7 @@ static int __hdd_open(struct net_device *dev)
 	}
 
 	if (!test_bit(SME_SESSION_OPENED, &link_info->link_flags)) {
-		ret = hdd_start_adapter(adapter);
+		ret = hdd_start_adapter(adapter, true);
 		if (ret) {
 			hdd_err("Failed to start adapter :%d",
 				adapter->device_mode);
@@ -9802,7 +9803,7 @@ static void hdd_delete_sta(struct hdd_adapter *adapter)
 }
 #endif
 
-QDF_STATUS hdd_start_all_adapters(struct hdd_context *hdd_ctx)
+QDF_STATUS hdd_start_all_adapters(struct hdd_context *hdd_ctx, bool rtnl_held)
 {
 	struct hdd_adapter *adapter, *next_adapter = NULL;
 	bool value;
@@ -9877,7 +9878,7 @@ QDF_STATUS hdd_start_all_adapters(struct hdd_context *hdd_ctx)
 			ucfg_mlme_get_sap_internal_restart(hdd_ctx->psoc,
 							   &value);
 			if (value)
-				hdd_start_ap_adapter(adapter);
+				hdd_start_ap_adapter(adapter, rtnl_held);
 
 			break;
 
@@ -10449,8 +10450,9 @@ uint32_t hdd_get_operating_chan_freq(struct hdd_context *hdd_ctx,
 	return oper_chan_freq;
 }
 
-static inline QDF_STATUS hdd_unregister_wext_all_adapters(struct hdd_context *
-							  hdd_ctx)
+static inline QDF_STATUS hdd_unregister_wext_all_adapters(
+		struct hdd_context *hdd_ctx,
+		bool rtnl_held)
 {
 	struct hdd_adapter *adapter, *next_adapter = NULL;
 	wlan_net_dev_ref_dbgid dbgid =
@@ -10465,7 +10467,7 @@ static inline QDF_STATUS hdd_unregister_wext_all_adapters(struct hdd_context *
 		    adapter->device_mode == QDF_P2P_DEVICE_MODE ||
 		    adapter->device_mode == QDF_SAP_MODE ||
 		    adapter->device_mode == QDF_P2P_GO_MODE) {
-			hdd_unregister_wext(adapter->dev);
+			hdd_wext_unregister(adapter->dev, rtnl_held);
 		}
 		hdd_adapter_dev_put_debug(adapter, dbgid);
 	}
@@ -10799,7 +10801,7 @@ void hdd_wlan_exit(struct hdd_context *hdd_ctx)
 	wlan_cfg80211_cleanup_scan_queue(hdd_ctx->pdev, NULL);
 
 	if (hdd_ctx->driver_status != DRIVER_MODULES_CLOSED) {
-		hdd_unregister_wext_all_adapters(hdd_ctx);
+		hdd_unregister_wext_all_adapters(hdd_ctx, false);
 		/*
 		 * Cancel any outstanding scan requests.  We are about to close
 		 * all of our adapters, but an adapter structure is what SME
@@ -14314,11 +14316,10 @@ fail:
 	hdd_adapter_for_each_active_link_info(adapter, link_info)
 		hdd_vdev_destroy(link_info);
 
-	hdd_unregister_wext(adapter->dev);
 	return ret;
 }
 
-int hdd_start_ap_adapter(struct hdd_adapter *adapter)
+int hdd_start_ap_adapter(struct hdd_adapter *adapter, bool rtnl_held)
 {
 	QDF_STATUS status;
 	bool is_ssr = false;
@@ -14384,7 +14385,7 @@ int hdd_start_ap_adapter(struct hdd_adapter *adapter)
 			goto sap_release_ref;
 	}
 
-	status = hdd_init_ap_mode(adapter, is_ssr);
+	status = hdd_init_ap_mode(adapter, is_ssr, rtnl_held);
 	if (QDF_STATUS_SUCCESS != status) {
 		hdd_err("Error Initializing the AP mode: %d", status);
 		ret = qdf_status_to_os_return(status);
@@ -19198,7 +19199,7 @@ static int __hdd_driver_mode_change(struct hdd_context *hdd_ctx,
 			return -EINVAL;
 		}
 
-		errno = hdd_start_adapter(adapter);
+		errno = hdd_start_adapter(adapter, false);
 		if (errno) {
 			hdd_err("Failed to start monitor adapter");
 			return errno;

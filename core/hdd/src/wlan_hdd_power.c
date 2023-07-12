@@ -2135,7 +2135,7 @@ QDF_STATUS hdd_wlan_re_init(void)
 				WLAN_SVC_FW_CRASHED_IND, NULL, 0);
 
 	/* Restart all adapters */
-	hdd_start_all_adapters(hdd_ctx);
+	hdd_start_all_adapters(hdd_ctx, false);
 
 	hdd_init_scan_reject_params(hdd_ctx);
 	hdd_ctx->bt_coex_mode_set = false;

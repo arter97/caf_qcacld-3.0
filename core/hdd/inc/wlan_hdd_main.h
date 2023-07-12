@@ -2792,7 +2792,7 @@ void hdd_close_all_adapters(struct hdd_context *hdd_ctx, bool rtnl_held);
 QDF_STATUS hdd_stop_all_adapters(struct hdd_context *hdd_ctx);
 void hdd_deinit_all_adapters(struct hdd_context *hdd_ctx, bool rtnl_held);
 QDF_STATUS hdd_reset_all_adapters(struct hdd_context *hdd_ctx);
-QDF_STATUS hdd_start_all_adapters(struct hdd_context *hdd_ctx);
+QDF_STATUS hdd_start_all_adapters(struct hdd_context *hdd_ctx, bool rtnl_held);
 
 /**
  * hdd_get_link_info_by_vdev() - Return link info with the given vdev id
@@ -4041,12 +4041,13 @@ int hdd_start_station_adapter(struct hdd_adapter *adapter);
 /**
  * hdd_start_ap_adapter()- Start AP Adapter
  * @adapter: HDD adapter
+ * @rtnl_held: True if rtnl lock is taken, otherwise false
  *
  * This function initializes the adapter for the AP mode.
  *
  * Return: 0 on success errno on failure.
  */
-int hdd_start_ap_adapter(struct hdd_adapter *adapter);
+int hdd_start_ap_adapter(struct hdd_adapter *adapter, bool rtnl_held);
 int hdd_configure_cds(struct hdd_context *hdd_ctx);
 int hdd_set_fw_params(struct hdd_adapter *adapter);
 
@@ -4117,7 +4118,7 @@ void hdd_psoc_idle_timer_stop(struct hdd_context *hdd_ctx);
  */
 int hdd_trigger_psoc_idle_restart(struct hdd_context *hdd_ctx);
 
-int hdd_start_adapter(struct hdd_adapter *adapter);
+int hdd_start_adapter(struct hdd_adapter *adapter, bool rtnl_held);
 void hdd_populate_random_mac_addr(struct hdd_context *hdd_ctx, uint32_t num);
 /**
  * hdd_is_interface_up()- Check if the given interface is up

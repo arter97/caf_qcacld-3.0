@@ -330,7 +330,7 @@ static int __wlan_hdd_request_pre_cac(struct hdd_context *hdd_ctx,
 	 * up comes for this interface from user space and hence starting
 	 * the adapter internally.
 	 */
-	if (hdd_start_adapter(pre_cac_adapter)) {
+	if (hdd_start_adapter(pre_cac_adapter, false)) {
 		hdd_err("error starting the pre cac adapter");
 		goto close_pre_cac_adapter;
 	}

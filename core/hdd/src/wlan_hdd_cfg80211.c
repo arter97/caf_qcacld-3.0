@@ -21654,7 +21654,7 @@ static int __wlan_hdd_cfg80211_change_iface(struct wiphy *wiphy,
 
 	/* restart the adapter if it was up before the change iface request */
 	if (iff_up) {
-		errno = hdd_start_adapter(adapter);
+		errno = hdd_start_adapter(adapter, true);
 		if (errno) {
 			hdd_err("Failed to start adapter");
 			errno = -EINVAL;

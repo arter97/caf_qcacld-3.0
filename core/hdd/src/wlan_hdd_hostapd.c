@@ -497,7 +497,7 @@ static int __hdd_hostapd_open(struct net_device *dev)
 		return ret;
 	}
 
-	ret = hdd_start_adapter(adapter);
+	ret = hdd_start_adapter(adapter, true);
 	if (ret) {
 		hdd_err("Error Initializing the AP mode: %d", ret);
 		return ret;
@@ -4240,7 +4240,9 @@ hdd_indicate_peers_deleted(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id)
 	hdd_sap_indicate_disconnect_for_sta(link_info->adapter);
 }
 
-QDF_STATUS hdd_init_ap_mode(struct hdd_adapter *adapter, bool reinit)
+QDF_STATUS hdd_init_ap_mode(struct hdd_adapter *adapter,
+			    bool reinit,
+			    bool rtnl_held)
 {
 	struct hdd_hostapd_state *phostapdBuf;
 	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
@@ -4373,7 +4375,7 @@ QDF_STATUS hdd_init_ap_mode(struct hdd_adapter *adapter, bool reinit)
 	return status;
 
 error_release_softap_tx_rx:
-	hdd_unregister_wext(adapter->dev);
+	hdd_wext_unregister(adapter->dev, rtnl_held);
 error_deinit_sap_session:
 	hdd_hostapd_deinit_sap_session(adapter->deflink);
 error_release_vdev:
