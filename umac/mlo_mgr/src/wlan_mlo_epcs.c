@@ -29,6 +29,53 @@
 #include <wlan_mlo_epcs.h>
 
 /**
+ * mlo_process_ml_priorityaccess_ie() - API to parse Priority access ML IE
+ * @ml_ie: Pointer to start of ML IE
+ * @ml_ie_len: Length of ML IE
+ * @priority_access_info: pointer to fill multi link priority access information
+ *
+ * Return: QDF_STATUS
+ */
+static QDF_STATUS
+mlo_process_ml_priorityaccess_ie(uint8_t *ml_ie, qdf_size_t ml_ie_len,
+				 struct ml_pa_info *priority_access_info)
+{
+	uint8_t *ml_pa_ie = NULL;
+	qdf_size_t ml_pa_ie_len = 0;
+	QDF_STATUS status;
+
+	if (!ml_ie) {
+		mlo_err("NULL ml_ie");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	if (!priority_access_info) {
+		mlo_err("NULL priority_access_info");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	status = util_find_mlie_by_variant(ml_ie,
+					   ml_ie_len,
+					   &ml_pa_ie,
+					   &ml_pa_ie_len,
+					   WLAN_ML_VARIANT_PRIORITYACCESS);
+
+	if (QDF_IS_STATUS_ERROR(status) || !ml_pa_ie) {
+		mlo_debug("ML IE for reconfig variant not found");
+		return QDF_STATUS_E_INVAL;
+	}
+	epcs_debug("PAV ML IE with length %zu is present", ml_pa_ie_len);
+
+	status = util_get_pav_mlie_link_info(ml_pa_ie, ml_pa_ie_len,
+					     priority_access_info);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		mlo_err("Unable to get sta link info from ML PAV IE");
+		return QDF_STATUS_E_INVAL;
+	}
+	return QDF_STATUS_SUCCESS;
+}
+
+/**
  * wlan_mlo_parse_epcs_request_action_frame() - API to parse EPCS request action
  * frame.
  * @epcs: Pointer to EPCS structure
@@ -43,6 +90,9 @@ wlan_mlo_parse_epcs_request_action_frame(struct wlan_epcs_info *epcs,
 					 uint32_t frm_len)
 {
 	struct epcs_frm *epcs_action_frm;
+	struct ml_pa_info *priority_access_info = &epcs->pa_info;
+	uint8_t *pa_ie;
+	uint16_t pa_ie_len;
 
 	/*
 	 * EPCS request action frame
@@ -65,7 +115,15 @@ wlan_mlo_parse_epcs_request_action_frame(struct wlan_epcs_info *epcs,
 		  epcs_action_frm->protected_eht_action,
 		  epcs_action_frm->dialog_token, frm_len);
 
-	return QDF_STATUS_SUCCESS;
+	if (frm_len > EPCS_REQ_MIN_LENGTH) {
+		pa_ie = (uint8_t *)epcs_action_frm + EPCS_REQ_MIN_LENGTH;
+		pa_ie_len = frm_len - EPCS_REQ_MIN_LENGTH;
+		return mlo_process_ml_priorityaccess_ie(pa_ie,
+							pa_ie_len,
+							priority_access_info);
+	} else {
+		return QDF_STATUS_SUCCESS;
+	}
 }
 
 /**
@@ -83,6 +141,9 @@ wlan_mlo_parse_epcs_response_action_frame(struct wlan_epcs_info *epcs,
 					  uint32_t frm_len)
 {
 	struct epcs_frm *epcs_action_frm;
+	struct ml_pa_info *priority_access_info = &epcs->pa_info;
+	uint8_t *pa_ie;
+	uint16_t pa_ie_len;
 
 	/*
 	 * EPCS response action frame
@@ -109,7 +170,15 @@ wlan_mlo_parse_epcs_response_action_frame(struct wlan_epcs_info *epcs,
 		  epcs_action_frm->resp.status_code[0],
 		  epcs_action_frm->resp.status_code[1], frm_len);
 
-	return QDF_STATUS_SUCCESS;
+	if (frm_len > EPCS_RESP_MIN_LENGTH) {
+		pa_ie = (uint8_t *)epcs_action_frm + EPCS_RESP_MIN_LENGTH;
+		pa_ie_len = frm_len - EPCS_RESP_MIN_LENGTH;
+		return mlo_process_ml_priorityaccess_ie(pa_ie,
+							pa_ie_len,
+							priority_access_info);
+	} else {
+		return QDF_STATUS_SUCCESS;
+	}
 }
 
 /**
