@@ -3940,4 +3940,13 @@ static inline void wmi_coap_attach_tlv(wmi_unified_t wmi_handle)
  * Return: host channel width, enum phy_ch_width
  */
 enum phy_ch_width wmi_map_ch_width(A_UINT32 wmi_width);
+
+/**
+ * wmi_host_to_fw_phymode() - convert host to fw phymode
+ * @host_phymode: phymode to convert
+ *
+ * Return: one of the values defined in enum WMI_HOST_WLAN_PHY_MODE;
+ *         or WMI_HOST_MODE_UNKNOWN if the conversion fails
+ */
+WMI_HOST_WLAN_PHY_MODE wmi_host_to_fw_phymode(enum wlan_phymode host_phymode);
 #endif
