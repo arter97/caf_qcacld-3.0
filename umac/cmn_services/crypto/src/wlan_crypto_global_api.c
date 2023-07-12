@@ -4258,6 +4258,100 @@ QDF_STATUS wlan_crypto_validate_key_params(enum wlan_crypto_cipher_type cipher,
 	return QDF_STATUS_SUCCESS;
 }
 
+#ifdef WLAN_FEATURE_11BE_MLO_ADV_FEATURE
+static bool is_mlo_adv_enable(void)
+{
+	return true;
+}
+#else
+static bool is_mlo_adv_enable(void)
+{
+	return false;
+}
+
+#endif
+
+QDF_STATUS wlan_crypto_save_ml_sta_key(
+				struct wlan_objmgr_psoc *psoc,
+				uint8_t key_index,
+				struct wlan_crypto_key *crypto_key,
+				struct qdf_mac_addr *link_addr, int8_t link_id)
+{
+	struct crypto_psoc_priv_obj *crypto_psoc_obj;
+	int status = QDF_STATUS_SUCCESS;
+
+	crypto_debug("save crypto key index %d link_id %d link addr "
+		     QDF_MAC_ADDR_FMT, key_index, link_id,
+		     QDF_MAC_ADDR_REF(link_addr));
+	if (!is_valid_keyix(key_index)) {
+		crypto_err("Invalid Key index %d", key_index);
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	crypto_psoc_obj = wlan_objmgr_psoc_get_comp_private_obj(
+						psoc,
+						WLAN_UMAC_COMP_CRYPTO);
+	if (!crypto_psoc_obj) {
+		crypto_err("crypto_psoc_obj NULL");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	crypto_key->valid = true;
+
+	status = crypto_add_entry(crypto_psoc_obj,
+				  link_id, (uint8_t *)link_addr,
+				  crypto_key, key_index);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		crypto_err("failed to add crypto entry %d", status);
+		return status;
+	}
+	crypto_key->valid = true;
+	return QDF_STATUS_SUCCESS;
+}
+
+static QDF_STATUS wlan_crypto_save_key_sta(struct wlan_objmgr_vdev *vdev,
+					   uint8_t key_index,
+					   struct wlan_crypto_key *crypto_key)
+{
+	struct wlan_objmgr_psoc *psoc;
+	struct crypto_psoc_priv_obj *crypto_psoc_obj;
+	struct qdf_mac_addr *link_addr;
+	uint8_t link_id = CRYPTO_MAX_LINK_IDX;
+	int status = QDF_STATUS_SUCCESS;
+
+	psoc = wlan_vdev_get_psoc(vdev);
+	crypto_psoc_obj = wlan_objmgr_psoc_get_comp_private_obj(
+			psoc,
+			WLAN_UMAC_COMP_CRYPTO);
+	if (!crypto_psoc_obj) {
+		crypto_err("crypto_psoc_obj NULL");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	if (wlan_vdev_mlme_is_mlo_vdev(vdev))
+		link_id = wlan_vdev_get_link_id(vdev);
+
+	link_addr = (struct qdf_mac_addr *)wlan_vdev_mlme_get_linkaddr(vdev);
+	if (!link_addr) {
+		crypto_err("link_addr NULL");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	crypto_debug("save crypto key index %d link_id %d link addr "
+		     QDF_MAC_ADDR_FMT, key_index, link_id,
+		     QDF_MAC_ADDR_REF(link_addr));
+	status = crypto_add_entry(crypto_psoc_obj,
+				  link_id, (uint8_t *)link_addr,
+				  crypto_key, key_index);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		crypto_err("failed to add crypto entry %d", status);
+		return status;
+	}
+
+	crypto_key->valid = true;
+	return QDF_STATUS_SUCCESS;
+}
+
 QDF_STATUS wlan_crypto_save_key(struct wlan_objmgr_vdev *vdev,
 				uint8_t key_index,
 				struct wlan_crypto_key *crypto_key)
@@ -4271,30 +4365,88 @@ QDF_STATUS wlan_crypto_save_key(struct wlan_objmgr_vdev *vdev,
 		return QDF_STATUS_E_FAILURE;
 	}
 
-	priv_key = &crypto_priv->crypto_key;
-
 	if (!is_valid_keyix(key_index)) {
 		crypto_err("Invalid Key index %d", key_index);
 		return QDF_STATUS_E_FAILURE;
 	}
-	if (key_index < WLAN_CRYPTO_MAXKEYIDX) {
-		priv_key->key[key_index] = crypto_key;
-	} else if (is_igtk(key_index)) {
-		priv_key->igtk_key[key_index - WLAN_CRYPTO_MAXKEYIDX] =
-			crypto_key;
-		priv_key->def_igtk_tx_keyid =
-				key_index - WLAN_CRYPTO_MAXKEYIDX;
-		priv_key->igtk_key_type = crypto_key->cipher_type;
+	if (wlan_vdev_mlme_get_opmode(vdev) == QDF_STA_MODE &&
+	    wlan_vdev_mlme_is_mlo_vdev(vdev) &&
+	    is_mlo_adv_enable()) {
+		wlan_crypto_save_key_sta(vdev, key_index, crypto_key);
 	} else {
-		priv_key->bigtk_key[key_index - WLAN_CRYPTO_MAXKEYIDX
+		priv_key = &crypto_priv->crypto_key;
+		if (key_index < WLAN_CRYPTO_MAXKEYIDX) {
+			priv_key->key[key_index] = crypto_key;
+		} else if (is_igtk(key_index)) {
+			priv_key->igtk_key[key_index - WLAN_CRYPTO_MAXKEYIDX] =
+			crypto_key;
+			priv_key->def_igtk_tx_keyid =
+				key_index - WLAN_CRYPTO_MAXKEYIDX;
+			priv_key->igtk_key_type = crypto_key->cipher_type;
+		} else {
+			priv_key->bigtk_key[key_index - WLAN_CRYPTO_MAXKEYIDX
 				- WLAN_CRYPTO_MAXIGTKKEYIDX] = crypto_key;
-		priv_key->def_bigtk_tx_keyid =
+			priv_key->def_bigtk_tx_keyid =
 				key_index - WLAN_CRYPTO_MAXKEYIDX
 				- WLAN_CRYPTO_MAXIGTKKEYIDX;
+		}
+		crypto_key->valid = true;
 	}
-	crypto_key->valid = true;
-
 	return QDF_STATUS_SUCCESS;
+}
+
+static struct wlan_crypto_key *wlan_crypto_get_ml_key_sta(
+					struct wlan_objmgr_vdev *vdev,
+					uint8_t key_index)
+{
+	struct wlan_objmgr_psoc *psoc;
+	struct crypto_psoc_priv_obj *crypto_psoc_obj;
+	struct qdf_mac_addr *link_addr;
+	struct wlan_crypto_key_entry *key_entry = NULL;
+	uint8_t link_id = CRYPTO_MAX_LINK_IDX;
+
+	crypto_debug("crypto get key index %d", key_index);
+	psoc = wlan_vdev_get_psoc(vdev);
+	if (!psoc) {
+		crypto_err("psoc NULL");
+		return NULL;
+	}
+
+	crypto_psoc_obj = wlan_objmgr_psoc_get_comp_private_obj(
+							psoc,
+							WLAN_UMAC_COMP_CRYPTO);
+	if (!crypto_psoc_obj) {
+		crypto_err("crypto_psoc_obj NULL");
+		return NULL;
+	}
+
+	if (wlan_vdev_mlme_is_mlo_vdev(vdev))
+		link_id = wlan_vdev_get_link_id(vdev);
+
+	link_addr =
+		(struct qdf_mac_addr *)wlan_vdev_mlme_get_linkaddr(vdev);
+	if (!link_addr) {
+		crypto_err("link_addr NULL");
+		return NULL;
+	}
+
+	key_entry = crypto_hash_find_by_linkid_and_macaddr(
+						       crypto_psoc_obj,
+						       link_id,
+						       (uint8_t *)link_addr);
+	if (key_entry) {
+		if (key_index < WLAN_CRYPTO_MAXKEYIDX)
+			return key_entry->keys.key[key_index];
+		else if (is_igtk(key_index))
+			return key_entry->keys.igtk_key[key_index
+						- WLAN_CRYPTO_MAXKEYIDX];
+		else
+			return key_entry->keys.bigtk_key[key_index
+						- WLAN_CRYPTO_MAXKEYIDX
+						- WLAN_CRYPTO_MAXIGTKKEYIDX];
+	}
+
+	return NULL;
 }
 
 struct wlan_crypto_key *wlan_crypto_get_key(struct wlan_objmgr_vdev *vdev,
@@ -4308,21 +4460,29 @@ struct wlan_crypto_key *wlan_crypto_get_key(struct wlan_objmgr_vdev *vdev,
 		crypto_err("crypto_priv NULL");
 		return NULL;
 	}
-
 	priv_key = &crypto_priv->crypto_key;
 
 	if (!is_valid_keyix(key_index)) {
 		crypto_err("Invalid Key index %d", key_index);
 		return NULL;
 	}
-	if (key_index < WLAN_CRYPTO_MAXKEYIDX)
-		return priv_key->key[key_index];
-	else if (is_igtk(key_index))
-		return priv_key->igtk_key[key_index - WLAN_CRYPTO_MAXKEYIDX];
-	else
-		return priv_key->bigtk_key[key_index - WLAN_CRYPTO_MAXKEYIDX
-						- WLAN_CRYPTO_MAXIGTKKEYIDX];
 
+	if (wlan_vdev_mlme_get_opmode(vdev) == QDF_STA_MODE &&
+	    wlan_vdev_mlme_is_mlo_vdev(vdev) &&
+	    is_mlo_adv_enable()) {
+		return wlan_crypto_get_ml_key_sta(vdev, key_index);
+
+	} else {
+		if (key_index < WLAN_CRYPTO_MAXKEYIDX)
+			return priv_key->key[key_index];
+		else if (is_igtk(key_index))
+			return priv_key->igtk_key[key_index
+					- WLAN_CRYPTO_MAXKEYIDX];
+		else
+			return priv_key->bigtk_key[key_index
+					- WLAN_CRYPTO_MAXKEYIDX
+						- WLAN_CRYPTO_MAXIGTKKEYIDX];
+	}
 	return NULL;
 }
 
