@@ -2833,6 +2833,21 @@ struct hdd_adapter *hdd_adapter_get_by_reference(struct hdd_context *hdd_ctx,
  */
 void hdd_adapter_put(struct hdd_adapter *adapter);
 
+/**
+ * hdd_get_link_info_by_link_addr() - Get the link info pointer where
+ * the link address matches.
+ * @hdd_ctx: HDD context pointer
+ * @link_addr: Link address to search
+ *
+ * In the given @adapter search for @link_addr in each entry of link_info
+ * array, and return the matching link_info pointer.
+ *
+ * Return: NULL / Valid link info pointer
+ */
+struct wlan_hdd_link_info *
+hdd_get_link_info_by_link_addr(struct hdd_context *hdd_ctx,
+			       struct qdf_mac_addr *link_addr);
+
 struct hdd_adapter *hdd_get_adapter_by_macaddr(struct hdd_context *hdd_ctx,
 					       tSirMacAddr mac_addr);
 
@@ -4047,6 +4062,15 @@ hdd_adapter_get_link_mac_addr(struct wlan_hdd_link_info *link_info);
  * Return: QDF_STATUS
  */
 QDF_STATUS hdd_adapter_check_duplicate_session(struct hdd_adapter *adapter);
+
+/**
+ * hdd_adapter_reset_station_ctx() - Resets station context with appropriate
+ * initial value.
+ * @adapter: HDD adapter
+ *
+ * Return: void
+ */
+void hdd_adapter_reset_station_ctx(struct hdd_adapter *adapter);
 
 /**
  * hdd_start_station_adapter()- Start the Station Adapter

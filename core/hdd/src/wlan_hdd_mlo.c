@@ -250,6 +250,24 @@ void hdd_adapter_set_ml_adapter(struct hdd_adapter *adapter)
 {
 	adapter->mlo_adapter_info.is_ml_adapter = true;
 }
+
+static struct mlo_osif_ext_ops mlo_osif_ops = {
+	.mlo_mgr_osif_update_bss_info = hdd_cm_save_connected_links_info,
+};
+
+QDF_STATUS hdd_mlo_mgr_register_osif_ops(void)
+{
+	struct mlo_mgr_context *mlo_mgr_ctx = wlan_objmgr_get_mlo_ctx();
+
+	return wlan_mlo_mgr_register_osif_ext_ops(mlo_mgr_ctx, &mlo_osif_ops);
+}
+
+QDF_STATUS hdd_mlo_mgr_unregister_osif_ops(void)
+{
+	struct mlo_mgr_context *mlo_mgr_ctx = wlan_objmgr_get_mlo_ctx();
+
+	return wlan_mlo_mgr_unregister_osif_ext_ops(mlo_mgr_ctx);
+}
 #endif
 
 void hdd_mlo_t2lm_register_callback(struct wlan_objmgr_vdev *vdev)

@@ -10265,6 +10265,35 @@ struct hdd_adapter *hdd_get_adapter_by_macaddr(struct hdd_context *hdd_ctx,
 
 	return NULL;
 }
+
+struct wlan_hdd_link_info *
+hdd_get_link_info_by_link_addr(struct hdd_context *hdd_ctx,
+			       struct qdf_mac_addr *link_addr)
+{
+	struct wlan_hdd_link_info *link_info;
+	struct hdd_adapter *adapter, *next_adapter = NULL;
+	wlan_net_dev_ref_dbgid dbgid = NET_DEV_HOLD_GET_ADAPTER_BY_MACADDR;
+
+	if (!link_addr || qdf_is_macaddr_zero(link_addr))
+		return NULL;
+
+	hdd_for_each_adapter_dev_held_safe(hdd_ctx, adapter, next_adapter,
+					   dbgid) {
+		hdd_adapter_for_each_link_info(adapter, link_info) {
+			if (qdf_is_macaddr_equal(link_addr,
+						 &link_info->link_addr)) {
+				hdd_adapter_dev_put_debug(adapter, dbgid);
+				if (next_adapter)
+					hdd_adapter_dev_put_debug(next_adapter,
+								  dbgid);
+				return link_info;
+			}
+		}
+		hdd_adapter_dev_put_debug(adapter, dbgid);
+	}
+
+	return NULL;
+}
 #else
 struct hdd_adapter *hdd_get_adapter_by_macaddr(struct hdd_context *hdd_ctx,
 					       tSirMacAddr mac_addr)
@@ -10294,6 +10323,13 @@ struct hdd_adapter *hdd_get_adapter_by_macaddr(struct hdd_context *hdd_ctx,
 		hdd_adapter_dev_put_debug(adapter, dbgid);
 	}
 
+	return NULL;
+}
+
+struct wlan_hdd_link_info *
+hdd_get_link_info_by_link_addr(struct hdd_context *hdd_ctx,
+			       struct qdf_mac_addr *link_addr)
+{
 	return NULL;
 }
 #endif
@@ -14197,7 +14233,7 @@ QDF_STATUS hdd_adapter_fill_link_address(struct hdd_adapter *adapter)
 	int i = 0;
 	QDF_STATUS status;
 	enum QDF_OPMODE opmode = adapter->device_mode;
-	struct qdf_mac_addr link_addrs[WLAN_MAX_MLD] = {0};
+	struct qdf_mac_addr link_addrs[WLAN_MAX_ML_BSS_LINKS] = {0};
 	struct wlan_hdd_link_info *link_info;
 
 	if (opmode != QDF_STA_MODE && opmode != QDF_SAP_MODE)
@@ -14214,11 +14250,11 @@ QDF_STATUS hdd_adapter_fill_link_address(struct hdd_adapter *adapter)
 
 	status = hdd_derive_link_address_from_mld(&adapter->mac_addr,
 						  &link_addrs[0],
-						  WLAN_MAX_MLD);
+						  WLAN_MAX_ML_BSS_LINKS);
 	if (QDF_IS_STATUS_ERROR(status))
 		return status;
 
-	hdd_adapter_for_each_active_link_info(adapter, link_info)
+	hdd_adapter_for_each_link_info(adapter, link_info)
 		qdf_copy_macaddr(&link_info->link_addr, &link_addrs[i++]);
 
 	return status;
@@ -14282,6 +14318,14 @@ static void hdd_restore_info_for_ssr(struct hdd_adapter *adapter)
 	}
 }
 
+void hdd_adapter_reset_station_ctx(struct hdd_adapter *adapter)
+{
+	struct wlan_hdd_link_info *link_info;
+
+	hdd_adapter_for_each_link_info(adapter, link_info)
+		hdd_cm_clear_ieee_link_id(link_info);
+}
+
 int hdd_start_station_adapter(struct hdd_adapter *adapter)
 {
 	QDF_STATUS status;
@@ -14325,6 +14369,8 @@ int hdd_start_station_adapter(struct hdd_adapter *adapter)
 			goto fail;
 		}
 	}
+
+	hdd_adapter_reset_station_ctx(adapter);
 
 	hdd_register_wext(adapter->dev);
 	hdd_set_netdev_flags(adapter);
@@ -18672,8 +18718,14 @@ static QDF_STATUS hdd_component_init(void)
 	if (QDF_IS_STATUS_ERROR(status))
 		goto ll_sap_deinit;
 
+	status = hdd_mlo_mgr_register_osif_ops();
+	if (QDF_IS_STATUS_ERROR(status))
+		goto afc_deinit;
+
 	return QDF_STATUS_SUCCESS;
 
+afc_deinit:
+	ucfg_afc_deinit();
 ll_sap_deinit:
 	ucfg_ll_sap_deinit();
 qmi_deinit:
@@ -18728,6 +18780,7 @@ mlme_global_deinit:
 static void hdd_component_deinit(void)
 {
 	/* deinitialize non-converged components */
+	hdd_mlo_mgr_unregister_osif_ops();
 	ucfg_afc_deinit();
 	ucfg_ll_sap_deinit();
 	ucfg_qmi_deinit();
