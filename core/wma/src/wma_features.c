@@ -318,7 +318,7 @@ end:
 
 #ifdef WLAN_FEATURE_TSF
 
-#if defined(WLAN_FEATURE_TSF_UPLINK_DELAY) || defined(QCA_GET_TSF_VIA_REG)
+#if defined(WLAN_FEATURE_TSF_AUTO_REPORT) || defined(QCA_GET_TSF_VIA_REG)
 static inline void
 wma_vdev_tsf_set_mac_id_tsf_id(struct stsf *ptsf, uint32_t mac_id,
 			       uint32_t mac_id_valid, uint32_t tsf_id,
@@ -333,14 +333,14 @@ wma_vdev_tsf_set_mac_id_tsf_id(struct stsf *ptsf, uint32_t mac_id,
 		       ptsf->mac_id, ptsf->mac_id_valid, ptsf->tsf_id,
 		       ptsf->tsf_id_valid);
 }
-#else /* !WLAN_FEATURE_TSF_UPLINK_DELAY || !QCA_GET_TSF_VIA_REG*/
+#else /* !(WLAN_FEATURE_TSF_AUTO_REPORT || QCA_GET_TSF_VIA_REG) */
 static inline void
 wma_vdev_tsf_set_mac_id_tsf_id(struct stsf *ptsf, uint32_t mac_id,
 			       uint32_t mac_id_valid, uint32_t tsf_id,
 			       uint32_t tsf_id_valid)
 {
 }
-#endif /* WLAN_FEATURE_TSF_UPLINK_DELAY || QCA_GET_TSF_VIA_REG*/
+#endif /* WLAN_FEATURE_TSF_AUTO_REPORT || QCA_GET_TSF_VIA_REG */
 
 /**
  * wma_vdev_tsf_handler() - handle tsf event indicated by FW
@@ -515,7 +515,7 @@ QDF_STATUS wma_set_tsf_gpio_pin(WMA_HANDLE handle, uint32_t pin)
 	return QDF_STATUS_SUCCESS;
 }
 
-#ifdef WLAN_FEATURE_TSF_UPLINK_DELAY
+#ifdef WLAN_FEATURE_TSF_AUTO_REPORT
 QDF_STATUS wma_set_tsf_auto_report(WMA_HANDLE handle, uint32_t vdev_id,
 				   uint32_t param_id, bool ena)
 {
@@ -560,7 +560,7 @@ QDF_STATUS wma_set_tsf_auto_report(WMA_HANDLE handle, uint32_t vdev_id,
 
 	return status;
 }
-#endif /* WLAN_FEATURE_TSF_UPLINK_DELAY */
+#endif /* WLAN_FEATURE_TSF_AUTO_REPORT */
 #endif
 
 /**

@@ -4377,6 +4377,7 @@ QDF_STATUS hdd_init_ap_mode(struct hdd_adapter *adapter,
 	/* rcpi info initialization */
 	qdf_mem_zero(&adapter->rcpi, sizeof(adapter->rcpi));
 
+	hdd_tsf_auto_report_init(adapter);
 	hdd_exit();
 
 	return status;

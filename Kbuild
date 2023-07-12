@@ -4119,8 +4119,14 @@ endif
 # Enable feature sync tsf for chips based on Adrastea arch
 ccflags-$(CONFIG_WLAN_SYNC_TSF_PLUS_NOIRQ) += -DWLAN_FEATURE_TSF_PLUS_NOIRQ
 
+ifeq ($(CONFIG_WLAN_TSF_UPLINK_DELAY), y)
 # Enable uplink delay report feature
-ccflags-$(CONFIG_WLAN_TSF_UPLINK_DELAY) += -DWLAN_FEATURE_TSF_UPLINK_DELAY
+ccflags-y += -DWLAN_FEATURE_TSF_UPLINK_DELAY
+CONFIG_WLAN_TSF_AUTO_REPORT := y
+endif
+
+# Enable TSF auto report feature
+ccflags-$(CONFIG_WLAN_TSF_AUTO_REPORT) += -DWLAN_FEATURE_TSF_AUTO_REPORT
 
 ccflags-$(CONFIG_ATH_PROCFS_DIAG_SUPPORT) += -DCONFIG_ATH_PROCFS_DIAG_SUPPORT
 

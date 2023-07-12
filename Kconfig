@@ -1619,8 +1619,13 @@ config WLAN_TRACEPOINTS
 	bool "Enable WLAN_TRACEPOINTS"
 	default n
 
+config WLAN_TSF_AUTO_REPORT
+	bool "Enable WLAN_TSF_AUTO_REPORT"
+	default n
+
 config WLAN_TSF_UPLINK_DELAY
 	bool "Enable WLAN_TSF_UPLINK_DELAY"
+	depends on WLAN_TSF_AUTO_REPORT
 	default n
 
 config WLAN_TWT_CONVERGED

@@ -672,6 +672,7 @@ int hdd_init_nan_data_mode(struct hdd_adapter *adapter)
 
 	hdd_set_netdev_flags(adapter);
 
+	hdd_tsf_auto_report_init(adapter);
 	update_ndi_state(adapter, NAN_DATA_NDI_CREATING_STATE);
 	hdd_objmgr_put_vdev_by_user(vdev, WLAN_DP_ID);
 	return ret_val;

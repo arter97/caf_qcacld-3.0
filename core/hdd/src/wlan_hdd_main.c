@@ -7517,7 +7517,9 @@ QDF_STATUS hdd_init_station_mode(struct wlan_hdd_link_info *link_info)
 			goto error_wmm_init;
 	}
 
+	hdd_tsf_auto_report_init(adapter);
 	hdd_objmgr_put_vdev_by_user(vdev, WLAN_INIT_DEINIT_ID);
+
 	return QDF_STATUS_SUCCESS;
 
 error_wmm_init:
@@ -9682,7 +9684,6 @@ QDF_STATUS hdd_reset_all_adapters(struct hdd_context *hdd_ctx)
 						     WLAN_DATA_FLOW_CONTROL);
 
 			hdd_reset_scan_operation(link_info);
-
 			if (test_bit(WMM_INIT_DONE, &adapter->event_flags)) {
 				hdd_wmm_adapter_close(adapter);
 				clear_bit(WMM_INIT_DONE, &adapter->event_flags);
