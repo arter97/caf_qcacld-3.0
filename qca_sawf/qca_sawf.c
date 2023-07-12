@@ -140,6 +140,25 @@ uint16_t qca_sawf_get_msduq_v2(struct net_device *netdev, uint8_t *peer_mac,
 	return qca_sawf_get_msduq(netdev, peer_mac, service_id);
 }
 
+uint32_t qca_sawf_get_mark_metadata(struct qca_sawf_metadata_param *params)
+{
+	uint16_t queue_id;
+	uint32_t mark_metadata = 0;
+
+	queue_id =  qca_sawf_get_msduq_v2(params->netdev, params->peer_mac,
+					  params->service_id, params->dscp,
+					  params->rule_id,
+					  params->sawf_rule_type);
+
+	if (queue_id != DP_SAWF_PEER_Q_INVALID) {
+		DP_SAWF_METADATA_SET(mark_metadata, params->service_id, queue_id);
+	} else {
+		mark_metadata = DP_SAWF_META_DATA_INVALID;
+	}
+
+	return mark_metadata;
+}
+
 struct psoc_sawf_ul_itr {
 	uint8_t *mac_addr;
 	uint32_t service_interval;
@@ -360,6 +379,7 @@ void qca_sawf_connection_sync(struct qca_sawf_connection_sync_param *params)
 
 #include "qdf_module.h"
 #define DP_SAWF_PEER_Q_INVALID 0xffff
+#define DP_SAWF_META_DATA_INVALID 0xffffffff
 uint16_t qca_sawf_get_msduq(struct net_device *netdev, uint8_t *peer_mac,
 			    uint32_t service_id)
 {
@@ -371,6 +391,14 @@ uint16_t qca_sawf_get_msduq_v2(struct net_device *netdev, uint8_t *peer_mac,
 			       uint32_t rule_id, uint8_t sawf_rule_type)
 {
 	return DP_SAWF_PEER_Q_INVALID;
+}
+
+/* Forward declaration */
+struct qca_sawf_metadata_param;
+
+uint32_t qca_sawf_get_mark_metadata(struct qca_sawf_metadata_param *params)
+{
+	return DP_SAWF_META_DATA_INVALID;
 }
 
 void qca_sawf_config_ul(uint8_t *dst_mac, uint8_t *src_mac,
@@ -394,6 +422,7 @@ uint16_t qca_sawf_get_msdu_queue(struct net_device *netdev,
 
 qdf_export_symbol(qca_sawf_get_msduq);
 qdf_export_symbol(qca_sawf_get_msduq_v2);
+qdf_export_symbol(qca_sawf_get_mark_metadata);
 qdf_export_symbol(qca_sawf_get_msdu_queue);
 qdf_export_symbol(qca_sawf_config_ul);
 qdf_export_symbol(qca_sawf_connection_sync);
