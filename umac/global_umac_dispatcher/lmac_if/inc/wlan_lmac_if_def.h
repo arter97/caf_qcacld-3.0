@@ -676,7 +676,7 @@ struct wlan_lmac_if_p2p_tx_ops {
  * struct wlan_lmac_if_atf_tx_ops - ATF specific tx function pointers
  * @atf_enable_disable:           Set atf peer stats enable/disable
  * @atf_ssid_sched_policy:        Set ssid schedule policy
- * @atf_set:                      Set atf
+ * @atf_send_peer_list:           Send atf list of peers
  * @atf_set_grouping:             Set atf grouping
  * @atf_set_group_ac:             Set atf Group AC
  * @atf_send_peer_request:        Send peer requests
@@ -692,9 +692,9 @@ struct wlan_lmac_if_atf_tx_ops {
 				      uint8_t value);
 	int32_t (*atf_ssid_sched_policy)(struct wlan_objmgr_vdev *vdev,
 					 uint8_t value);
-	int32_t (*atf_set)(struct wlan_objmgr_pdev *pdev,
-			   struct pdev_atf_req *atf_req,
-			   uint8_t atf_tput_based);
+	int32_t (*atf_send_peer_list)(struct wlan_objmgr_pdev *pdev,
+				      struct pdev_atf_req *atf_req,
+				      uint8_t atf_tput_based);
 	int32_t (*atf_set_grouping)(struct wlan_objmgr_pdev *pdev,
 				    struct pdev_atf_ssid_group_req *atf_grp_req,
 				    uint8_t atf_tput_based);
