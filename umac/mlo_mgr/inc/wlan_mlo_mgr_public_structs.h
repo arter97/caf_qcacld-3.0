@@ -397,6 +397,7 @@ struct wlan_mlo_peer_list {
  * @t2lm_ctx: T2LM related information
  * @ptqm_migrate_timer: timer for ptqm migration
  * @mlo_peer_id_bmap: mlo_peer_id bitmap for ptqm migration
+ * @MAX_MLO_PEER_ID: Max mlo peer ID supported
  *
  * NB: Not using kernel-doc format since the kernel-doc script doesn't
  *     handle the qdf_bitmap() macro
@@ -1059,17 +1060,16 @@ struct peer_ptqm_migrate_params {
 
 /**
  * struct peer_ptqm_migrate_list_entry - peer ptqm migrate list
+ * @node: QDF list node member
  * @peer: objmgr peer object
  * @mlo_peer_id: mlo peer id
  * @new_hw_link_id: hw link id of new primary
- * @peer_list_elem: peer ptqm migrate entry list
  */
 struct peer_ptqm_migrate_list_entry {
+	qdf_list_node_t node;
 	struct wlan_objmgr_peer *peer;
 	uint32_t mlo_peer_id;
 	uint8_t new_hw_link_id;
-
-	TAILQ_ENTRY(peer_ptqm_migrate_list_entry) peer_list_elem;
 };
 
 /**
@@ -1077,13 +1077,10 @@ struct peer_ptqm_migrate_list_entry {
  * @num_entries: Number of entries in the peer_list list
  * @peer_list: List to hold the peer entries to be migrated
  *
- * NB: Not using kernel-doc format since the kernel-doc script doesn't
- *     handle the TAILQ_HEAD() macro
  */
 struct peer_migrate_ptqm_multi_entries {
 	uint16_t num_entries;
-
-	TAILQ_HEAD(, peer_ptqm_migrate_list_entry) peer_list;
+	qdf_list_t peer_list;
 };
 
 enum primary_link_peer_migration_evenr_status {
