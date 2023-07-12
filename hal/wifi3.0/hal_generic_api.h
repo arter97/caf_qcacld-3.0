@@ -302,7 +302,7 @@ void hal_srng_src_hw_init_generic(struct hal_soc *hal,
 	if (srng->intr_timer_thres_us) {
 		reg_val |= SRNG_SM(SRNG_SRC_FLD(CONSUMER_INT_SETUP_IX0,
 			INTERRUPT_TIMER_THRESHOLD),
-			srng->intr_timer_thres_us);
+			srng->intr_timer_thres_us >> 3);
 		/* For HK v2 this should be (srng->intr_timer_thres_us >> 3) */
 	}
 
