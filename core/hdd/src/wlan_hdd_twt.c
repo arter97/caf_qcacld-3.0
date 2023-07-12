@@ -41,6 +41,7 @@
 #include <target_if.h>
 #include "wlan_hdd_object_manager.h"
 #include "osif_twt_ext_req.h"
+#include "wlan_mlo_mgr_sta.h"
 #include "wlan_twt_ucfg_ext_api.h"
 #include "wlan_twt_ucfg_ext_cfg.h"
 #include "osif_twt_internal.h"
@@ -3558,14 +3559,20 @@ hdd_twt_pack_get_capabilities_resp(struct hdd_adapter *adapter)
 
 	/*
 	 * Userspace will query the TWT get capabilities before
-	 * issuing a get capabilities request. If the STA is
-	 * connected, then check the "enable_twt_24ghz" ini
-	 * value to advertise the TWT requestor capability.
+	 * issuing a get capabilities request. For legacy connection,
+	 * if the STA is connected, then check the "enable_twt_24ghz"
+	 * ini value to advertise the TWT requestor capability.
+	 * For MLO connection, TWT requestor capabilities are advertised
+	 * irrespective of connected band.
 	 */
-	connected_band = hdd_conn_get_connected_band(adapter->deflink);
-	if (connected_band == BAND_2G &&
-	    !ucfg_mlme_is_24ghz_twt_enabled(hdd_ctx->psoc))
-		is_twt_24ghz_allowed = false;
+	if (!mlo_is_mld_sta(adapter->deflink->vdev)) {
+		connected_band = hdd_conn_get_connected_band(adapter->deflink);
+		if (connected_band == BAND_2G &&
+		    !ucfg_mlme_is_24ghz_twt_enabled(hdd_ctx->psoc))
+			is_twt_24ghz_allowed = false;
+	} else {
+		is_twt_24ghz_allowed = true;
+	}
 
 	/* fill the self_capability bitmap  */
 	ucfg_mlme_get_twt_requestor(hdd_ctx->psoc, &twt_req);
