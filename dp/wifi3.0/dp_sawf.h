@@ -504,6 +504,7 @@ QDF_STATUS dp_sawf_init_telemetry_params(void);
  * @min_tput: min throughput
  * @max_latency: max latency
  * @add_or_sub: Add or Sub
+ * @peer_id: peer id
  *
  * Return: QDF_STATUS
  */
@@ -511,7 +512,8 @@ QDF_STATUS
 dp_sawf_peer_config_ul(struct cdp_soc_t *soc_hdl, uint8_t *mac_addr,
 		       uint8_t tid, uint32_t service_interval,
 		       uint32_t burst_size, uint32_t min_tput,
-		       uint32_t max_latency, uint8_t add_or_sub);
+		       uint32_t max_latency, uint8_t add_or_sub,
+		       uint16_t peer_id);
 
 /**
  * dp_sawf_peer_flow_count - Increment or decrement flow count per MSDU queue
@@ -521,13 +523,15 @@ dp_sawf_peer_config_ul(struct cdp_soc_t *soc_hdl, uint8_t *mac_addr,
  * @direction: Indication of forward and reverse service class match
  * @start_or_stop: Indication of start of stop
  * @peer_mac: Pointer to hold peer MAC address
+ * @peer_id: peer id
  *
  * Return: QDF_STATUS
  */
 QDF_STATUS
 dp_sawf_peer_flow_count(struct cdp_soc_t *soc_hdl, uint8_t *mac_addr,
 			uint8_t svc_id, uint8_t direction,
-			uint8_t start_or_stop, uint8_t *peer_mac);
+			uint8_t start_or_stop, uint8_t *peer_mac,
+			uint16_t peer_id);
 
 /*
  * dp_swaf_peer_sla_configuration() - Get sla configuration for a peer
