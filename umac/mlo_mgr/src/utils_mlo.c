@@ -4849,16 +4849,6 @@ util_parse_pamlie_perstaprofile_stactrl(uint8_t *subelempayload,
 			     WLAN_ML_PAV_LINFO_PERSTAPROF_STACTRL_LINKID_IDX,
 			     WLAN_ML_PAV_LINFO_PERSTAPROF_STACTRL_LINKID_BITS);
 
-	if (subelempayloadlen <
-		(parsed_payload_len +
-			WLAN_ML_PAV_LINFO_STAPROF_MAXSIZE)) {
-		mlo_err_rl("Length of subelement payload %zu octets not sufficient to contain edca params of size %zu octets after parsed payload length of %zu octets.",
-			   subelempayloadlen,
-			   WLAN_ML_PAV_LINFO_STAPROF_MAXSIZE,
-			   parsed_payload_len);
-		return QDF_STATUS_E_PROTO;
-	}
-
 	pa_link_info->edca_ie_present = false;
 	pa_link_info->ven_wme_ie_present = false;
 	pa_link_info->muedca_ie_present = false;
