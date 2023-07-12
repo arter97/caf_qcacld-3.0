@@ -76,6 +76,8 @@
  * @mlme_release_radar_mode_switch_lock: Release lock taken for radar processing
  *                                     over mode switch.
  * @mlme_proc_spoof_success:           Called when FW send spoof success event.
+ * @mlme_set_tx_flag:                  Called when Radar is detected to
+ *                                     indicate stop data traffic.
  */
 struct dfs_to_mlme {
 	QDF_STATUS (*pdev_component_obj_attach)(struct wlan_objmgr_pdev *pdev,
@@ -211,6 +213,8 @@ struct dfs_to_mlme {
 	QDF_STATUS (*mlme_proc_spoof_success)
 			(struct wlan_objmgr_pdev *pdev);
 #endif
+	QDF_STATUS (*mlme_set_tx_flag)(struct wlan_objmgr_pdev *pdev,
+				       bool is_tx_allowed);
 };
 
 extern struct dfs_to_mlme global_dfs_to_mlme;
