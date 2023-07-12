@@ -670,6 +670,24 @@ static inline void mlo_t2lm_ctx_init(struct wlan_mlo_dev_context *ml_dev,
 	wlan_mlo_t2lm_timer_init(vdev);
 }
 
+#ifdef QCA_SUPPORT_PRIMARY_LINK_MIGRATE
+/**
+ * mlo_ptqm_migration_init() - API to initialize ptqm migration timer
+ * @ml_dev: Pointer to ML Dev context
+ *
+ * Return: None
+ */
+static inline void mlo_ptqm_migration_init(struct wlan_mlo_dev_context *ml_dev)
+{
+	qdf_timer_init(NULL, &ml_dev->ptqm_migrate_timer,
+		       mlo_mlme_ptqm_migrate_timer_cb, (void *)(ml_dev),
+		       QDF_TIMER_TYPE_WAKE_APPS);
+}
+#else
+static inline void mlo_ptqm_migration_init(struct wlan_mlo_dev_context *ml_dev)
+{ }
+#endif
+
 static QDF_STATUS mlo_dev_ctx_init(struct wlan_objmgr_vdev *vdev)
 {
 	struct wlan_mlo_dev_context *ml_dev;
@@ -746,9 +764,28 @@ static QDF_STATUS mlo_dev_ctx_init(struct wlan_objmgr_vdev *vdev)
 	ml_link_lock_release(g_mlo_ctx);
 
 	mlo_t2lm_ctx_init(ml_dev, vdev);
+	mlo_ptqm_migration_init(ml_dev);
 
 	return status;
 }
+
+#ifdef QCA_SUPPORT_PRIMARY_LINK_MIGRATE
+/**
+ * mlo_ptqm_migration_deinit() - API to deinitialize ptqm migration timer
+ * @ml_dev: Pointer to ML Dev context
+ *
+ * Return: None
+ */
+static inline void mlo_ptqm_migration_deinit(
+			struct wlan_mlo_dev_context *ml_dev)
+{
+	qdf_timer_free(&ml_dev->ptqm_migrate_timer);
+}
+#else
+static inline void mlo_ptqm_migration_deinit(
+			struct wlan_mlo_dev_context *ml_dev)
+{ }
+#endif
 
 /**
  * mlo_t2lm_ctx_deinit() - API to deinitialize the t2lm context with the default
@@ -837,6 +874,7 @@ static QDF_STATUS mlo_dev_ctx_deinit(struct wlan_objmgr_vdev *vdev)
 		else if (wlan_vdev_mlme_get_opmode(vdev) == QDF_SAP_MODE)
 			qdf_mem_free(ml_dev->ap_ctx);
 
+		mlo_ptqm_migration_deinit(ml_dev);
 		mlo_t2lm_ctx_deinit(vdev);
 		tsf_recalculation_lock_destroy(ml_dev);
 		mlo_dev_lock_destroy(ml_dev);

@@ -1508,6 +1508,7 @@ struct wlan_lmac_if_son_rx_ops {
  * @shmem_local_ops: operations specific to WLAN_MLO_GLOBAL_SHMEM_SUPPORT
  * @send_tid_to_link_mapping: function to send T2LM command to FW
  * @send_link_removal_cmd: function to send MLO link removal command to FW
+ * @peer_ptqm_migrate_send: API to send peer ptqm migration request to FW
  */
 struct wlan_lmac_if_mlo_tx_ops {
 	QDF_STATUS (*register_events)(struct wlan_objmgr_psoc *psoc);
@@ -1522,6 +1523,11 @@ struct wlan_lmac_if_mlo_tx_ops {
 	QDF_STATUS (*send_link_removal_cmd)(
 		struct wlan_objmgr_psoc *psoc,
 		const struct mlo_link_removal_cmd_params *param);
+#ifdef QCA_SUPPORT_PRIMARY_LINK_MIGRATE
+	QDF_STATUS (*peer_ptqm_migrate_send)(
+					struct wlan_objmgr_vdev *vdev,
+					struct peer_ptqm_migrate_params *param);
+#endif /* QCA_SUPPORT_PRIMARY_LINK_MIGRATE */
 };
 
 /**

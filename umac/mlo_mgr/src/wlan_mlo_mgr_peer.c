@@ -714,6 +714,7 @@ static void mlo_peer_free(struct wlan_mlo_peer_context *ml_peer)
 	mlo_debug("ML Peer " QDF_MAC_ADDR_FMT " is freed",
 		  QDF_MAC_ADDR_REF(ml_peer->peer_mld_addr.bytes));
 	mlo_peer_lock_destroy(ml_peer);
+	mlo_ap_ml_ptqm_peerid_free(ml_dev, ml_peer->mlo_peer_id);
 	mlo_ap_ml_peerid_free(ml_peer->mlo_peer_id);
 	mlo_peer_free_aid(ml_dev, ml_peer);
 	mlo_peer_free_primary_umac(ml_dev, ml_peer);

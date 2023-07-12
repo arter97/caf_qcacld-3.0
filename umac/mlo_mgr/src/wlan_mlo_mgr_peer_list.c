@@ -350,6 +350,8 @@ struct wlan_mlo_peer_context *wlan_mlo_get_mlpeer_by_ml_peerid(
 	return NULL;
 }
 
+qdf_export_symbol(wlan_mlo_get_mlpeer_by_ml_peerid);
+
 struct wlan_mlo_peer_context *wlan_mlo_get_mlpeer(
 				struct wlan_mlo_dev_context *ml_dev,
 				struct qdf_mac_addr *ml_addr)
