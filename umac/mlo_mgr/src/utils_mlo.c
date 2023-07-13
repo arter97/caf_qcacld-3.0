@@ -4805,6 +4805,8 @@ util_parse_pamlie_perstaprofile_stactrl(uint8_t *subelempayload,
 {
 	qdf_size_t parsed_payload_len = 0;
 	uint16_t stacontrol;
+	struct ie_header *ie;
+	struct extn_ie_header *extn_ie;
 
 	/* This helper returns the location(s) and where required, the length(s)
 	 * of (sub)field(s) inferable after parsing the STA Control field in the
@@ -4860,18 +4862,108 @@ util_parse_pamlie_perstaprofile_stactrl(uint8_t *subelempayload,
 		return QDF_STATUS_E_PROTO;
 	}
 
-	qdf_mem_copy(&pa_link_info->edca, subelempayload,
-		     sizeof(struct edca_ie));
-	subelempayload += sizeof(struct edca_ie);
-	parsed_payload_len += sizeof(struct edca_ie);
+	pa_link_info->edca_ie_present = false;
+	pa_link_info->ven_wme_ie_present = false;
+	pa_link_info->muedca_ie_present = false;
 
-	qdf_mem_copy(&pa_link_info->muedca, subelempayload,
-		     sizeof(struct muedca_ie));
-	subelempayload += sizeof(struct muedca_ie);
-	parsed_payload_len += sizeof(struct muedca_ie);
+	do {
+		if (subelempayloadlen <
+			(parsed_payload_len +
+			sizeof(struct ie_header))) {
+			mlo_err_rl("Length of subelement payload %zu octets not sufficient to contain min ie length %zu after parsed payload length of %zu octets",
+				   subelempayloadlen,
+				   sizeof(struct ie_header),
+				   parsed_payload_len);
+			return QDF_STATUS_E_PROTO;
+		}
+
+		ie = (struct ie_header *)subelempayload;
+
+		if (subelempayloadlen <
+			(parsed_payload_len +
+			(sizeof(struct ie_header) + ie->ie_len))) {
+			mlo_err_rl("Length of subelement payload %zu octets not sufficient to contain ie length %zu after parsed payload length of %zu octets",
+				   subelempayloadlen,
+				   sizeof(struct ie_header) + ie->ie_len,
+				   parsed_payload_len);
+			return QDF_STATUS_E_PROTO;
+		}
+
+		switch (ie->ie_id) {
+		case WLAN_ELEMID_EDCAPARMS:
+			if (pa_link_info->ven_wme_ie_present) {
+				/* WME parameters already present
+				 * use that one instead of EDCA */
+				break;
+			}
+			if (ie->ie_len == (sizeof(struct edca_ie) -
+			    sizeof(struct ie_header))) {
+				pa_link_info->edca_ie_present = true;
+				qdf_mem_copy(&pa_link_info->edca,
+					     subelempayload,
+					     sizeof(struct edca_ie));
+			} else {
+				epcs_debug("Invalid edca length %d in PAV IE",
+					   ie->ie_len);
+			}
+			break;
+		case WLAN_ELEMID_VENDOR:
+			if (is_wme_param((uint8_t *)ie) &&
+			    (ie->ie_len == WLAN_VENDOR_WME_IE_LEN)) {
+				pa_link_info->ven_wme_ie_present = true;
+				qdf_mem_copy(&pa_link_info->ven_wme_ie_bytes,
+					     subelempayload,
+					     sizeof(WLAN_VENDOR_WME_IE_LEN +
+						    sizeof(struct ie_header)));
+				pa_link_info->edca_ie_present = false;
+			} else {
+				epcs_debug("Unrelated Venfor IE reecived ie_id %d ie_len %d",
+					   ie->ie_id,
+					   ie->ie_len);
+			}
+			break;
+		case WLAN_ELEMID_EXTN_ELEM:
+			extn_ie = (struct extn_ie_header *)ie;
+			switch (extn_ie->ie_extn_id) {
+			case WLAN_EXTN_ELEMID_MUEDCA:
+				if (extn_ie->ie_len == WLAN_MAX_MUEDCA_IE_LEN) {
+					pa_link_info->muedca_ie_present = true;
+					qdf_mem_copy(&pa_link_info->muedca,
+						     subelempayload,
+						     sizeof(struct muedca_ie));
+				} else {
+					epcs_debug("Invalid muedca length %d in PAV IE",
+						   ie->ie_len);
+				}
+				break;
+			default:
+				epcs_debug("Unrelated Extn IE reecived ie_id %d ie_len %d extid %d IN PAV IE",
+					   ie->ie_id,
+					   ie->ie_len,
+					   extn_ie->ie_extn_id);
+				break;
+			}
+			break;
+		default:
+			epcs_debug("Unrelated IE reecived ie_id %d ie_len %d in PAV IE",
+				   ie->ie_id,
+				   ie->ie_len);
+			break;
+		}
+		subelempayload += ie->ie_len + sizeof(struct ie_header);
+		parsed_payload_len += ie->ie_len + sizeof(struct ie_header);
+	} while (parsed_payload_len < subelempayloadlen);
 
 	if (parsed_payload_len != subelempayloadlen)
-		epcs_debug("Error in processing per sta profile of PA ML IE %zu %zu", parsed_payload_len, subelempayloadlen);
+		epcs_debug("Error in processing per sta profile of PA ML IE %zu %zu",
+			   parsed_payload_len,
+			   subelempayloadlen);
+
+	epcs_debug("Link id %d presence of edca %d muedca %d wme %d",
+		   pa_link_info->link_id,
+		   pa_link_info->edca_ie_present,
+		   pa_link_info->muedca_ie_present,
+		   pa_link_info->ven_wme_ie_present);
 
 	return QDF_STATUS_SUCCESS;
 }
