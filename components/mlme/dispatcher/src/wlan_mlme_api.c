@@ -5090,6 +5090,18 @@ wlan_mlme_get_wds_mode(struct wlan_objmgr_psoc *psoc)
 
 	return mlme_obj->cfg.gen.wds_mode;
 }
+
+void wlan_mlme_set_wds_mode(struct wlan_objmgr_psoc *psoc,
+			    enum wlan_wds_mode mode)
+{
+	struct wlan_mlme_psoc_ext_obj *mlme_obj;
+
+	mlme_obj = mlme_get_psoc_ext_obj(psoc);
+	if (!mlme_obj)
+		return;
+	if (mode <= WLAN_WDS_MODE_MAX)
+		mlme_obj->cfg.gen.wds_mode = mode;
+}
 #endif
 
 bool wlan_mlme_is_sta_mon_conc_supported(struct wlan_objmgr_psoc *psoc)

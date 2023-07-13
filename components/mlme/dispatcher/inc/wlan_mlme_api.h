@@ -3235,11 +3235,26 @@ bool wlan_mlme_is_sta_mon_conc_supported(struct wlan_objmgr_psoc *psoc);
  */
 enum wlan_wds_mode
 wlan_mlme_get_wds_mode(struct wlan_objmgr_psoc *psoc);
+
+/**
+ * wlan_mlme_set_wds_mode() - Set wds mode
+ * @psoc: pointer to psoc object
+ * @mode: wds mode to set
+ *
+ * Return: void
+ */
+void wlan_mlme_set_wds_mode(struct wlan_objmgr_psoc *psoc,
+			    enum wlan_wds_mode mode);
 #else
 static inline enum wlan_wds_mode
 wlan_mlme_get_wds_mode(struct wlan_objmgr_psoc *psoc)
 {
 	return WLAN_WDS_MODE_DISABLED;
+}
+
+static inline void wlan_mlme_set_wds_mode(struct wlan_objmgr_psoc *psoc,
+					  enum wlan_wds_mode mode)
+{
 }
 #endif
 

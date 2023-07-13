@@ -290,7 +290,8 @@ static void wma_update_num_peers_tids(t_wma_handle *wma_handle,
 static void wma_set_peer_map_unmap_v2_config(struct wlan_objmgr_psoc *psoc,
 					     target_resource_config *tgt_cfg)
 {
-	tgt_cfg->peer_map_unmap_v2 = cfg_get(psoc, CFG_WDS_MODE) ? true : false;
+	tgt_cfg->peer_map_unmap_v2 =
+		wlan_mlme_get_wds_mode(psoc) ? true : false;
 }
 #else
 static void wma_set_peer_map_unmap_v2_config(struct wlan_objmgr_psoc *psoc,

@@ -417,6 +417,9 @@ endif
 ifeq ($(CONFIG_WLAN_DUMP_IN_PROGRESS), y)
 HDD_OBJS += $(HDD_SRC_DIR)/wlan_hdd_sysfs_dump_in_progress.o
 endif
+ifeq ($(CONFIG_WLAN_SYSFS_WDS_MODE), y)
+HDD_OBJS += $(HDD_SRC_DIR)/wlan_hdd_sysfs_wds_mode.o
+endif
 endif
 
 ifeq ($(CONFIG_QCACLD_FEATURE_FW_STATE), y)
@@ -4143,6 +4146,8 @@ cppflags-$(CONFIG_RX_FISA) += -DWLAN_SUPPORT_RX_FISA
 cppflags-$(CONFIG_RX_FISA_HISTORY) += -DWLAN_SUPPORT_RX_FISA_HIST
 
 cppflags-$(CONFIG_DP_SWLM) += -DWLAN_DP_FEATURE_SW_LATENCY_MGR
+
+cppflags-$(CONFIG_WLAN_SYSFS_WDS_MODE) += -DFEATURE_SYSFS_WDS_MODE
 
 cppflags-$(CONFIG_RX_DEFRAG_DO_NOT_REINJECT) += -DRX_DEFRAG_DO_NOT_REINJECT
 
