@@ -1485,7 +1485,7 @@ static void hdd_son_deauth_sta(struct wlan_objmgr_vdev *vdev,
 	param.reason_code = ignore_frame ? REASON_HOST_TRIGGERED_SILENT_DEAUTH
 					 : REASON_UNSPEC_FAILURE;
 	hdd_debug("Peer - "QDF_MAC_ADDR_FMT" Ignore Frame - %u",
-		  QDF_FULL_MAC_REF(peer_mac), ignore_frame);
+		  QDF_MAC_ADDR_REF(peer_mac), ignore_frame);
 
 	status = hdd_softap_sta_deauth(link_info->adapter, &param);
 	if (QDF_STATUS_IS_ERROR(status))
@@ -2771,8 +2771,8 @@ void hdd_son_deliver_peer_authorize_event(struct hdd_adapter *adapter,
 	}
 	peer = wlan_objmgr_get_peer_by_mac(psoc, peer_mac, WLAN_UMAC_COMP_SON);
 	if (!peer) {
-		hdd_err("No peer object for sta" QDF_FULL_MAC_FMT,
-			QDF_FULL_MAC_REF(peer_mac));
+		hdd_err("No peer object for sta" QDF_MAC_ADDR_FMT,
+			QDF_MAC_ADDR_REF(peer_mac));
 		hdd_objmgr_put_vdev_by_user(vdev, WLAN_SON_ID);
 		return;
 	}
@@ -2780,8 +2780,8 @@ void hdd_son_deliver_peer_authorize_event(struct hdd_adapter *adapter,
 	ret = os_if_son_deliver_ald_event(vdev, peer,
 					  MLME_EVENT_CLIENT_ASSOCIATED, NULL);
 	if (ret)
-		hdd_err("ALD ASSOCIATED Event failed for" QDF_FULL_MAC_FMT,
-			QDF_FULL_MAC_REF(peer_mac));
+		hdd_err("ALD ASSOCIATED Event failed for" QDF_MAC_ADDR_FMT,
+			QDF_MAC_ADDR_REF(peer_mac));
 
 	wlan_objmgr_peer_release_ref(peer, WLAN_UMAC_COMP_SON);
 	hdd_objmgr_put_vdev_by_user(vdev, WLAN_SON_ID);
