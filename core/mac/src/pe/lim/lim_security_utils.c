@@ -93,7 +93,10 @@ lim_is_auth_algo_supported(struct mac_context *mac, tAniAuthType authType,
 	} else {
 
 		if (LIM_IS_AP_ROLE(pe_session)) {
-			if (pe_session->authType == eSIR_AUTO_SWITCH)
+			if (authType == eSIR_SHARED_KEY) {
+				algoEnable = false;
+			} else if ((pe_session->authType == eSIR_SHARED_KEY)
+			    || (pe_session->authType == eSIR_AUTO_SWITCH))
 				algoEnable = true;
 			else
 				algoEnable = false;
@@ -106,6 +109,9 @@ lim_is_auth_algo_supported(struct mac_context *mac, tAniAuthType authType,
 			privacyOptImp = pe_session->privacy;
 		else
 			privacyOptImp = wep_params->is_privacy_enabled;
+
+		qdf_print("%s privacyOptImp=%d algoEnable=%d authType=%d",
+			  __func__, privacyOptImp, algoEnable, authType);
 
 		return algoEnable && privacyOptImp;
 	}
