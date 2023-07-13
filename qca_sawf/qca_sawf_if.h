@@ -17,6 +17,25 @@
 #ifndef _DP_SAWF_H__
 #define _DP_SAWF_H_
 
+/* qca_sawf_metadata_param
+ *
+ * @netdev : Netdevice
+ * @peer_mac : Destination peer mac address
+ * @service_id : Service class id
+ * @dscp : Differentiated Services Code Point
+ * @rule_id : Rule id
+ * @sawf_rule_type: Rule type
+ *
+ */
+struct qca_sawf_metadata_param {
+	struct net_device *netdev;
+	uint8_t *peer_mac;
+	uint32_t service_id;
+	uint32_t dscp;
+	uint32_t rule_id;
+	uint8_t sawf_rule_type;
+};
+
 /*
  * qca_sawf_connection_sync_param
  *
@@ -43,6 +62,8 @@ uint16_t qca_sawf_get_msduq(struct net_device *netdev,
 uint16_t qca_sawf_get_msduq_v2(struct net_device *netdev, uint8_t *peer_mac,
 			       uint32_t service_id, uint32_t dscp,
 			       uint32_t rule_id, uint8_t sawf_rule_type);
+uint32_t qca_sawf_get_mark_metadata(
+		struct qca_sawf_metadata_param *params);
 uint16_t qca_sawf_get_msdu_queue(struct net_device *netdev,
 				 uint8_t *peer_mac, uint32_t service_id,
 				 uint32_t dscp, uint32_t rule_id);
