@@ -29,6 +29,69 @@
 #include <wlan_mlo_epcs.h>
 
 /**
+ * wlan_mlo_is_node_epcs_authorized() - API to check mac address is
+ * EPCS authorized or not
+ * @ml_peer: pointer to mlo context of peer
+ *
+ * Return: QDF_STATUS
+ */
+static QDF_STATUS
+wlan_mlo_is_node_epcs_authorized(struct wlan_mlo_peer_context *ml_peer)
+{
+	struct wlan_mlo_dev_context *mlo_dev_ctx;
+	struct wlan_epcs_context *epcs_ctx;
+	enum QDF_OPMODE opmode;
+	struct wlan_objmgr_vdev *vdev = NULL;
+	int i;
+
+	if (!ml_peer) {
+		epcs_err("ml_peer is null");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	mlo_dev_ctx = ml_peer->ml_dev;
+	if (!mlo_dev_ctx) {
+		epcs_err("mlo dev ctx is null");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	/* Get first valid vdev */
+	for (i = 0; i < WLAN_UMAC_MLO_MAX_VDEVS; i++) {
+		if (!mlo_dev_ctx->wlan_vdev_list[i])
+			continue;
+
+		vdev = mlo_dev_ctx->wlan_vdev_list[i];
+		opmode = wlan_vdev_mlme_get_opmode(vdev);
+		break;
+	}
+
+	if (!vdev) {
+		epcs_err("no valid vdev entry found");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	epcs_debug("ml peer type %d", opmode);
+	if (opmode != QDF_SAP_MODE)
+		return QDF_STATUS_SUCCESS;
+
+	epcs_ctx = &mlo_dev_ctx->epcs_ctx;
+	if (!epcs_ctx) {
+		epcs_err("epcs info is null");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	for (i = 0; i < EPCS_MAX_AUTHORIZE_MAC_ADDR; i++) {
+		if (epcs_ctx->authorize_info[i].valid &&
+		    !qdf_mem_cmp(epcs_ctx->authorize_info[i].peer_mld_mac,
+				 ml_peer->peer_mld_addr.bytes,
+				 QDF_MAC_ADDR_SIZE)) {
+			return QDF_STATUS_SUCCESS;
+		}
+	}
+	return QDF_STATUS_E_INVAL;
+}
+
+/**
  * mlo_process_ml_priorityaccess_ie() - API to parse Priority access ML IE
  * @ml_ie: Pointer to start of ML IE
  * @ml_ie_len: Length of ML IE
@@ -325,7 +388,8 @@ wlan_mlo_peer_rcv_cmd(struct wlan_mlo_peer_context *ml_peer,
 	case EPCS_DOWN:
 		if (epcs->cat == WLAN_EPCS_CATEGORY_REQUEST) {
 		/* check authorization */
-			if (1) {
+			if (wlan_mlo_is_node_epcs_authorized(ml_peer) ==
+			   QDF_STATUS_SUCCESS) {
 				status = QDF_STATUS_SUCCESS;
 				epcs->dialog_token =
 				  ++ml_peer->epcs_info.self_gen_dialog_token;
@@ -399,7 +463,8 @@ wlan_mlo_peer_rcv_action_frame(struct wlan_mlo_peer_context *ml_peer,
 			}
 		} else if (epcs->cat == WLAN_EPCS_CATEGORY_REQUEST) {
 			/* check authorization */
-			if (1) {
+			if (wlan_mlo_is_node_epcs_authorized(ml_peer) ==
+			   QDF_STATUS_SUCCESS) {
 				ml_peer->epcs_info.state = EPCS_ENABLE;
 				status = QDF_STATUS_SUCCESS;
 				*respond = true;
@@ -432,4 +497,100 @@ wlan_mlo_peer_rcv_action_frame(struct wlan_mlo_peer_context *ml_peer,
 		   epcs->dialog_token, epcs->status);
 
 	return status;
+}
+
+QDF_STATUS
+wlan_mlo_update_authorize_epcs_mac_addr(struct wlan_objmgr_vdev *vdev,
+					uint8_t *peer_mld_mac)
+{
+	bool found_entry = false;
+	int free_index = -1;
+	int i = 0;
+	struct wlan_epcs_context *epcs_ctx;
+
+	if (!vdev) {
+		epcs_err("vdev is null");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	epcs_ctx = &vdev->mlo_dev_ctx->epcs_ctx;
+
+	for (i = 0; i < EPCS_MAX_AUTHORIZE_MAC_ADDR; i++) {
+		/* Finding first available slot */
+		if ((!epcs_ctx->authorize_info[i].valid) && (free_index < 0))
+			free_index = i;
+
+		/* Checking for already available valid entry */
+		if (epcs_ctx->authorize_info[i].valid &&
+		    !qdf_mem_cmp(epcs_ctx->authorize_info[i].peer_mld_mac,
+				 peer_mld_mac,
+				 QDF_MAC_ADDR_SIZE)) {
+			found_entry = true;
+			break;
+		}
+	}
+
+	if (found_entry) {
+		epcs_debug("Mac address %s is already authorized",
+			   ether_sprintf(peer_mld_mac));
+		return QDF_STATUS_E_INVAL;
+	}
+
+	if (free_index < 0) {
+		epcs_debug("EPCS authorize database is full");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	epcs_ctx->authorize_info[free_index].valid = true;
+	qdf_mem_copy(epcs_ctx->authorize_info[free_index]. peer_mld_mac,
+		     peer_mld_mac,
+		     QDF_MAC_ADDR_SIZE);
+
+	epcs_debug("EPCS Stored authorize mac addr is %s at index %d",
+		   ether_sprintf(peer_mld_mac), free_index);
+
+	return QDF_STATUS_SUCCESS;
+}
+
+QDF_STATUS
+wlan_mlo_update_deauthorize_epcs_mac_addr(struct wlan_objmgr_vdev *vdev,
+					  uint8_t *peer_mld_mac)
+{
+	int i = 0;
+	struct wlan_epcs_context *epcs_ctx;
+	bool found_entry = false;
+
+	if (!vdev) {
+		epcs_err("vdev is null");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	epcs_ctx = &vdev->mlo_dev_ctx->epcs_ctx;
+
+	for (i = 0; i < EPCS_MAX_AUTHORIZE_MAC_ADDR; i++) {
+		if (!qdf_mem_cmp(epcs_ctx->authorize_info[i].peer_mld_mac,
+				 peer_mld_mac,
+				 QDF_MAC_ADDR_SIZE)) {
+			found_entry = true;
+			break;
+		}
+	}
+
+	if (!found_entry) {
+		epcs_debug("Mac address %s not found in authorized database",
+			   ether_sprintf(peer_mld_mac));
+		return QDF_STATUS_E_INVAL;
+	}
+
+	if (found_entry && !epcs_ctx->authorize_info[i].valid) {
+		epcs_debug("Mac address %s is already deauthorized in database",
+			   ether_sprintf(peer_mld_mac));
+		return QDF_STATUS_E_INVAL;
+	}
+
+	epcs_ctx->authorize_info[i].valid = false;
+	epcs_debug("EPCS Stored authorize mac addr is %s at idx %d is removed",
+		   ether_sprintf(peer_mld_mac), i);
+
+	return QDF_STATUS_SUCCESS;
 }

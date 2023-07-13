@@ -688,6 +688,21 @@ static inline void mlo_ptqm_migration_init(struct wlan_mlo_dev_context *ml_dev)
 { }
 #endif
 
+/**
+ * mlo_epcs_ctx_init() - API to initialize the epcs context with the
+ * default values.
+ * @ml_dev: Pointer to ML Dev context
+ *
+ * Return: None
+ */
+static inline void mlo_epcs_ctx_init(struct wlan_mlo_dev_context *ml_dev)
+{
+	struct wlan_epcs_context *epcs_ctx;
+
+	epcs_ctx = &ml_dev->epcs_ctx;
+	qdf_mem_zero(epcs_ctx, sizeof(struct wlan_epcs_context));
+}
+
 static QDF_STATUS mlo_dev_ctx_init(struct wlan_objmgr_vdev *vdev)
 {
 	struct wlan_mlo_dev_context *ml_dev;
@@ -765,6 +780,7 @@ static QDF_STATUS mlo_dev_ctx_init(struct wlan_objmgr_vdev *vdev)
 
 	mlo_t2lm_ctx_init(ml_dev, vdev);
 	mlo_ptqm_migration_init(ml_dev);
+	mlo_epcs_ctx_init(ml_dev);
 
 	return status;
 }

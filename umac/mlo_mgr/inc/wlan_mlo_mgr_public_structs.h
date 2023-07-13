@@ -401,6 +401,7 @@ struct wlan_mlo_peer_list {
  *
  * NB: Not using kernel-doc format since the kernel-doc script doesn't
  *     handle the qdf_bitmap() macro
+ * @epcs_ctx: EPCS related information
  */
 struct wlan_mlo_dev_context {
 	qdf_list_node_t node;
@@ -426,6 +427,7 @@ struct wlan_mlo_dev_context {
 	qdf_timer_t ptqm_migrate_timer;
 	qdf_bitmap(mlo_peer_id_bmap, MAX_MLO_PEER_ID);
 #endif
+	struct wlan_epcs_context epcs_ctx;
 };
 
 /**
