@@ -273,7 +273,7 @@ qdf_cpumask_equal(const qdf_cpu_mask *src1p, const qdf_cpu_mask *src2p);
 void
 qdf_cpumask_complement(qdf_cpu_mask *dstp, const qdf_cpu_mask *srcp);
 
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 1, 0))
+#ifdef WALT_GET_CPU_TAKEN_SUPPORT
 /**
  * qdf_walt_get_cpus_taken - Get taken CPUs
  *
