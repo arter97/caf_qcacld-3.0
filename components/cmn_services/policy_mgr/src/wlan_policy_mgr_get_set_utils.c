@@ -2178,8 +2178,9 @@ policy_mgr_ml_sta_active_freq(struct wlan_objmgr_psoc *psoc,
 	if (num_ml_sta > MAX_NUMBER_OF_CONC_CONNECTIONS ||
 	    num_disabled_ml_sta > MAX_NUMBER_OF_CONC_CONNECTIONS ||
 	    num_ml_sta <= num_disabled_ml_sta) {
-		policy_mgr_debug("unexpected ml sta num %d %d",
-				 num_ml_sta, num_disabled_ml_sta);
+		if (num_ml_sta || num_disabled_ml_sta)
+			policy_mgr_rl_debug("unexpected ml sta num %d %d",
+					    num_ml_sta, num_disabled_ml_sta);
 		return;
 	}
 	num_active_ml_sta = num_ml_sta;
@@ -11278,14 +11279,17 @@ bool policy_mgr_is_ap_ap_mcc_allow(struct wlan_objmgr_psoc *psoc,
 	enum QDF_OPMODE mode;
 	enum policy_mgr_con_mode con_mode;
 	union conc_ext_flag conc_ext_flags;
-	uint32_t cc_count, i;
+	uint32_t cc_count, i, j, ap_index;
 	uint32_t op_freq[MAX_NUMBER_OF_CONC_CONNECTIONS * 2];
 	uint8_t vdev_id[MAX_NUMBER_OF_CONC_CONNECTIONS * 2];
+	QDF_STATUS status;
+	struct policy_mgr_pcl_list pcl;
 
 	if (!psoc || !vdev || !pdev) {
 		policy_mgr_debug("psoc or vdev or pdev is NULL");
 		return false;
 	}
+
 	cc_count = policy_mgr_get_mode_specific_conn_info(psoc,
 							  &op_freq[0],
 							  &vdev_id[0],
@@ -11297,27 +11301,54 @@ bool policy_mgr_is_ap_ap_mcc_allow(struct wlan_objmgr_psoc *psoc,
 					&op_freq[cc_count],
 					&vdev_id[cc_count],
 					PM_P2P_GO_MODE);
-	for (i = 0 ; i < cc_count; i++) {
-		if (ch_freq == op_freq[i])
+	if (!cc_count)
+		return true;
+
+	mode = wlan_vdev_mlme_get_opmode(vdev);
+	con_mode = policy_mgr_qdf_opmode_to_pm_con_mode(
+				psoc, mode, wlan_vdev_get_id(vdev));
+	qdf_mem_zero(&pcl, sizeof(pcl));
+	status = policy_mgr_get_pcl(psoc, con_mode, pcl.pcl_list, &pcl.pcl_len,
+				    pcl.weight_list,
+				    QDF_ARRAY_SIZE(pcl.weight_list),
+				    wlan_vdev_get_id(vdev));
+	if (!pcl.pcl_len)
+		return true;
+	ap_index = cc_count;
+	for (i = 0 ; i < pcl.pcl_len; i++) {
+		for (j = 0; j < cc_count; j++) {
+			if (op_freq[j] == pcl.pcl_list[i])
+				break;
+		}
+		if (j >= cc_count)
+			continue;
+		if (ch_freq == op_freq[j]) {
+			ap_index = j;
 			break;
-		if (!policy_mgr_is_hw_dbs_capable(psoc))
+		}
+		if (!policy_mgr_is_hw_dbs_capable(psoc)) {
+			ap_index = j;
 			break;
-		if (wlan_reg_is_same_band_freqs(ch_freq, op_freq[i]) &&
-		    !policy_mgr_are_sbs_chan(psoc, ch_freq, op_freq[i]))
+		}
+		if (wlan_reg_is_same_band_freqs(ch_freq, op_freq[j]) &&
+		    !policy_mgr_are_sbs_chan(psoc, ch_freq, op_freq[j])) {
+			ap_index = j;
 			break;
+		}
+		if (wlan_reg_is_same_band_freqs(ch_freq, op_freq[j]) &&
+		    policy_mgr_get_connection_count(psoc) > 2) {
+			ap_index = j;
+			break;
+		}
 	}
 	/* If same band MCC SAP/GO not present, return true,
 	 * no AP to AP channel override
 	 */
-	if (i >= cc_count)
+	if (ap_index >= cc_count)
 		return true;
 
-	*con_freq = op_freq[i];
-	*con_vdev_id = vdev_id[i];
-
-	mode = wlan_vdev_mlme_get_opmode(vdev);
-	con_mode = policy_mgr_qdf_opmode_to_pm_con_mode(psoc, mode,
-							wlan_vdev_get_id(vdev));
+	*con_freq = op_freq[ap_index];
+	*con_vdev_id = vdev_id[ap_index];
 	/*
 	 * For 3Vif concurrency we only support SCC in same MAC
 	 * in below combination:
