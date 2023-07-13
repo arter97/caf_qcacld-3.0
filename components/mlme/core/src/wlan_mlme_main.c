@@ -378,7 +378,7 @@ mlme_update_freq_in_scan_start_req(struct wlan_objmgr_vdev *vdev,
 {
 	const struct bonded_channel_freq *range;
 	uint8_t num_chan;
-	qdf_freq_t op_freq;
+	qdf_freq_t op_freq, center_20_freq, start_freq, end_freq;
 	enum scan_phy_mode phymode = SCAN_PHY_MODE_UNKNOWN;
 	uint8_t vdev_id;
 
@@ -403,11 +403,22 @@ mlme_update_freq_in_scan_start_req(struct wlan_objmgr_vdev *vdev,
 				   vdev_id, op_freq);
 			return QDF_STATUS_E_FAILURE;
 		}
+
+		start_freq = range->start_freq;
+		end_freq = range->end_freq;
+
+		/* fill connected 6 GHz ML link freq in wide band scan list */
+		center_20_freq = start_freq + (7 * BW_20_MHZ);
+		if (op_freq > center_20_freq)
+			end_freq = op_freq;
+		else
+			start_freq = op_freq;
+
 		num_chan = req->scan_req.chan_list.num_chan;
-		req->scan_req.chan_list.chan[num_chan].freq = range->start_freq;
+		req->scan_req.chan_list.chan[num_chan].freq = start_freq;
 		req->scan_req.chan_list.chan[num_chan].phymode = phymode;
 		num_chan += 1;
-		req->scan_req.chan_list.chan[num_chan].freq = range->end_freq;
+		req->scan_req.chan_list.chan[num_chan].freq = end_freq;
 		req->scan_req.chan_list.chan[num_chan].phymode = phymode;
 		num_chan += 1;
 		req->scan_req.chan_list.num_chan = num_chan;
