@@ -67,7 +67,7 @@ target_if_mlo_link_set_active_resp_handler(ol_scn_t scn, uint8_t *data,
 		target_if_err("wmi_handle is null");
 		return -EINVAL;
 	}
-
+	qdf_mem_zero(&resp, sizeof(resp));
 	if (wmi_extract_mlo_link_set_active_resp(wmi_handle, data, &resp) !=
 	    QDF_STATUS_SUCCESS) {
 		target_if_err("Unable to extract mlo link set active resp");
