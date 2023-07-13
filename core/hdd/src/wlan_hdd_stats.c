@@ -5711,7 +5711,21 @@ static void hdd_fill_bw_mcs(struct rate_info *rate_info,
 			    uint8_t nss,
 			    uint8_t rate_info_flag)
 {
-	if (rate_info_flag == RATE_INFO_FLAGS_HE_MCS) {
+	if (rate_info_flag == RATE_INFO_FLAGS_EHT_MCS) {
+		rate_info->nss = nss;
+		rate_info->mcs = mcsidx;
+		rate_info->flags |= RATE_INFO_FLAGS_EHT_MCS;
+		if (rate_flags & TX_RATE_EHT320)
+			rate_info->bw = RATE_INFO_BW_320;
+		else if (rate_flags & TX_RATE_EHT160)
+			rate_info->bw = RATE_INFO_BW_160;
+		else if (rate_flags & TX_RATE_EHT80)
+			rate_info->bw = RATE_INFO_BW_80;
+		else if (rate_flags & TX_RATE_EHT40)
+			rate_info->bw = RATE_INFO_BW_40;
+		else if (rate_flags & TX_RATE_EHT20)
+			rate_info->bw = RATE_INFO_BW_20;
+	} else if (rate_info_flag == RATE_INFO_FLAGS_HE_MCS) {
 		rate_info->nss = nss;
 		rate_info->mcs = mcsidx;
 		rate_info->flags |= RATE_INFO_FLAGS_HE_MCS;
@@ -5814,6 +5828,15 @@ static void hdd_fill_sinfo_rate_info(struct station_info *sinfo,
 		rate_info->legacy = rate;
 	} else {
 		/* must be MCS */
+		if (rate_flags &
+				(TX_RATE_EHT320 |
+				 TX_RATE_EHT160 |
+				 TX_RATE_EHT80 |
+				 TX_RATE_EHT40 |
+				 TX_RATE_EHT20)) {
+			hdd_fill_bw_mcs(rate_info, rate_flags, mcsidx, nss,
+					RATE_INFO_FLAGS_EHT_MCS);
+		}
 		if (rate_flags &
 				(TX_RATE_HE160 |
 				 TX_RATE_HE80 |

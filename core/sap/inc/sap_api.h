@@ -293,6 +293,7 @@ typedef struct sap_StationAssocReassocCompleteEvent_s {
 	uint8_t supported_band;
 	tDot11fIEHTCaps ht_caps;
 	tDot11fIEVHTCaps vht_caps;
+	bool eht_caps_present;
 	tSirMacCapabilityInfo capability_info;
 	bool he_caps_present;
 	struct qdf_mac_addr sta_mld;

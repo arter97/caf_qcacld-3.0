@@ -65,6 +65,7 @@ enum peer_status {
  * struct hdd_conn_flag - connection flags
  * @ht_present: ht element present or not
  * @vht_present: vht element present or not
+ * @eht_present: eht element present or not
  * @hs20_present: hs20 element present or not
  * @ht_op_present: ht operation present or not
  * @vht_op_present: vht operation present or not
@@ -73,10 +74,11 @@ enum peer_status {
 struct hdd_conn_flag {
 	uint8_t ht_present:1;
 	uint8_t vht_present:1;
+	uint8_t eht_present:1;
 	uint8_t hs20_present:1;
 	uint8_t ht_op_present:1;
 	uint8_t vht_op_present:1;
-	uint8_t reserved:3;
+	uint8_t reserved:2;
 };
 
 /*defines for tx_BF_cap_info */

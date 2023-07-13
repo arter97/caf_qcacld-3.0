@@ -132,6 +132,8 @@
 #define HDD_80211_MODE_AC 1
 /* Defines the BIT position of 11ax support mode field of stainfo */
 #define HDD_80211_MODE_AX 2
+/* Defines the BIT position of 11be support mode field of stainfo */
+#define HDD_80211_MODE_BE 4
 
 #define HDD_MAX_CUSTOM_START_EVENT_SIZE 64
 
@@ -1517,6 +1519,8 @@ static void hdd_fill_station_info(struct hdd_adapter *adapter,
 					event->ht_caps.present))
 		is_dot11_mode_abgn = false;
 
+	stainfo->support_mode |=
+				(event->eht_caps_present << HDD_80211_MODE_BE);
 	stainfo->support_mode |= is_dot11_mode_abgn << HDD_80211_MODE_ABGN;
 	/* Initialize DHCP info */
 	stainfo->dhcp_phase = DHCP_PHASE_ACK;

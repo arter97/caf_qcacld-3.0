@@ -260,6 +260,7 @@ typedef struct sLimMlmAssocInd {
 	tDot11fIEHTCaps ht_caps;
 	tDot11fIEVHTCaps vht_caps;
 	bool he_caps_present;
+	bool eht_caps_present;
 	bool is_sae_authenticated;
 #ifdef WLAN_FEATURE_11BE_MLO
 	tSirMacAddr peer_mld_addr;
