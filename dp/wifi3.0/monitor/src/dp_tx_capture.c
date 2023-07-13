@@ -2387,6 +2387,33 @@ dp_soc_is_tx_capture_set_in_pdev(struct dp_soc *soc)
 	return pdev_tx_capture;
 }
 
+/**
+ * dp_pdev_iterate_vdev_config_tx_ring_id() - API to set RBM ID during enqueue
+ * @pdev: DP_PDEV handle
+ * @rbm_override: flag to over ride RBM
+ *
+ * Return: void
+ */
+static void
+dp_pdev_iterate_vdev_config_tx_ring_id(struct dp_pdev *pdev,
+				       bool rbm_override)
+{
+	struct dp_vdev *vdev;
+	uint8_t rbm_id;
+
+	if (!pdev)
+		return;
+
+	rbm_id = wlan_cfg_get_tx_capt_rbm_id(pdev->soc->wlan_cfg_ctx,
+					     pdev->pdev_id);
+	qdf_spin_lock_bh(&pdev->vdev_list_lock);
+	DP_PDEV_ITERATE_VDEV_LIST(pdev, vdev) {
+		vdev->is_override_rbm_id = rbm_override;
+		vdev->rbm_id = rbm_id;
+	}
+	qdf_spin_unlock_bh(&pdev->vdev_list_lock);
+}
+
 /*
  * dp_enh_tx_capture_disable()- API to disable enhanced tx capture
  * @pdev_handle: DP_PDEV handle
@@ -2414,6 +2441,8 @@ dp_enh_tx_capture_disable(struct dp_pdev *pdev)
 
 	dp_pdev_iterate_peer(pdev, dp_peer_free_msdu_q, NULL,
 			     DP_MOD_ID_TX_CAPTURE);
+
+	dp_pdev_iterate_vdev_config_tx_ring_id(pdev, false);
 
 	for (i = 0; i < TXCAP_MAX_TYPE; i++) {
 		for (j = 0; j < TXCAP_MAX_SUBTYPE; j++) {
@@ -2475,6 +2504,8 @@ dp_enh_tx_capture_enable(struct dp_pdev *pdev, uint8_t user_mode)
 		dp_h2t_cfg_stats_msg_send(pdev,
 					  DP_PPDU_STATS_CFG_SNIFFER,
 					  pdev->pdev_id);
+
+	dp_pdev_iterate_vdev_config_tx_ring_id(pdev, true);
 
 	mon_pdev->tx_capture.msdu_threshold_drop = 0;
 	mon_pdev->tx_capture_enabled = user_mode;
