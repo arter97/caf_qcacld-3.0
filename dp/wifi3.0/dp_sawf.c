@@ -586,7 +586,10 @@ static struct dp_peer *dp_find_peer_by_destmac(struct dp_soc *soc,
 		uint8_t *dest_mac,
 		uint8_t vdev_id)
 {
-	if (!soc->ast_offload_support) {
+	bool ast_ind_disable = wlan_cfg_get_ast_indication_disable(
+							soc->wlan_cfg_ctx);
+
+	if ((!soc->ast_offload_support) || (!ast_ind_disable)) {
 		struct dp_ast_entry *ast_entry = NULL;
 		uint16_t peer_id;
 
