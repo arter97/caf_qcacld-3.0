@@ -1255,12 +1255,19 @@ void policy_mgr_move_vdev_from_connection_to_disabled_tbl(
  * disabled during connection.
  * @psoc: psoc
  * @vdev: vdev
+ * @peer_assoc: check peer assoc command
+ *
+ * Check the vdev need to be moved to disabled policy mgr table.
+ * If peer_assoc = false, the API will check the forced inactive link bitmap
+ * as well. Vdev will be disabled if vdev's link id is forced inactive(includes
+ * dynamic inactive)
  *
  * Return: true if STA link is need to be disabled else false.
  */
 bool
 policy_mgr_ml_link_vdev_need_to_be_disabled(struct wlan_objmgr_psoc *psoc,
-					    struct wlan_objmgr_vdev *vdev);
+					    struct wlan_objmgr_vdev *vdev,
+					    bool peer_assoc);
 
 /**
  * policy_mgr_is_set_link_in_progress() - Check set link in progress or not
@@ -1328,7 +1335,8 @@ policy_mgr_move_vdev_from_disabled_to_connection_tbl(
 
 static inline bool
 policy_mgr_ml_link_vdev_need_to_be_disabled(struct wlan_objmgr_psoc *psoc,
-					    struct wlan_objmgr_vdev *vdev)
+					    struct wlan_objmgr_vdev *vdev,
+					    bool peer_assoc)
 {
 	return false;
 }

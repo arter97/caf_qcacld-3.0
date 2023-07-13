@@ -1347,7 +1347,8 @@ static void wma_set_mlo_capability(tp_wma_handle wma,
 		req->mlo_params.mlo_assoc_link =
 					wlan_peer_mlme_is_assoc_peer(peer);
 		WLAN_ADDR_COPY(req->mlo_params.mld_mac, peer->mldaddr);
-		if (policy_mgr_ml_link_vdev_need_to_be_disabled(psoc, vdev) ||
+		if (policy_mgr_ml_link_vdev_need_to_be_disabled(psoc, vdev,
+								true) ||
 		    policy_mgr_is_emlsr_sta_concurrency_present(psoc)) {
 			req->mlo_params.mlo_force_link_inactive = 1;
 			link_id_bitmap = 1 << params->link_id;

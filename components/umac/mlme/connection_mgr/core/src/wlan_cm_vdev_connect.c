@@ -1693,7 +1693,8 @@ cm_connect_complete_ind(struct wlan_objmgr_vdev *vdev,
 			rsp->freq);
 
 	if (QDF_IS_STATUS_SUCCESS(rsp->connect_status)) {
-		if (policy_mgr_ml_link_vdev_need_to_be_disabled(psoc, vdev))
+		if (policy_mgr_ml_link_vdev_need_to_be_disabled(psoc, vdev,
+								false))
 			policy_mgr_move_vdev_from_connection_to_disabled_tbl(
 								psoc, vdev_id);
 		else
