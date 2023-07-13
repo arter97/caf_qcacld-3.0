@@ -252,6 +252,8 @@ static struct log_msg gplog_msg[MAX_LOGMSG_COUNT];
 
 static inline QDF_STATUS allocate_log_msg_buffer(void)
 {
+	qdf_minidump_log(&gwlan_logging, sizeof(gwlan_logging),
+			 "gwlan_logging");
 	qdf_minidump_log(gplog_msg, sizeof(gplog_msg), "wlan_logs");
 	qdf_ssr_driver_dump_register_region("gwlan_logging", &gwlan_logging,
 					    sizeof(gwlan_logging));
@@ -265,6 +267,8 @@ static inline void free_log_msg_buffer(void)
 	qdf_ssr_driver_dump_unregister_region("wlan_logs");
 	qdf_ssr_driver_dump_unregister_region("gwlan_logging");
 	qdf_minidump_remove(gplog_msg, sizeof(gplog_msg), "wlan_logs");
+	qdf_minidump_remove(&gwlan_logging, sizeof(gwlan_logging),
+			    "gwlan_logging");
 }
 #endif
 
