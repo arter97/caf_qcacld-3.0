@@ -2297,18 +2297,6 @@ void dp_process_ppdu_stats_update_failed_bitmap(struct dp_pdev *pdev,
 			mpdu_enq += get_number_of_1s(user->enq_bitmap[i]);
 
 		if (user->mpdu_tried_ucast < mpdu_enq) {
-			for (i = 0; i < size; i++)
-				dp_tx_capture_info("%pK: ppdu_id[%d] ba_bitmap[%x] enqueue_bitmap[%x] failed_bitmap[%x]",
-						   pdev->soc, ppdu_id,
-						   user->ba_bitmap[i],
-						   user->enq_bitmap[i],
-						   user->failed_bitmap[i]);
-
-				dp_tx_capture_info("%pK: last_set_bit:%d mpdu_tried_ucast %d mpdu_enq %d\n",
-						   pdev->soc, last_set_bit,
-						   user->mpdu_tried_ucast,
-						   mpdu_enq);
-
 			user->mpdu_tried_ucast = mpdu_enq;
 		}
 	}
