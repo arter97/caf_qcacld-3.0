@@ -35,10 +35,6 @@
 #include "dfs.h"
 #include <wlan_dfs_tgt_api.h>
 
-#define OCAC_SUCCESS 0
-#define OCAC_RESET 1
-#define OCAC_CANCEL 2
-
 #ifdef WLAN_FEATURE_11BE
 #define TREE_DEPTH_320                    5
 #define TREE_DEPTH_MAX                    TREE_DEPTH_320
@@ -458,11 +454,28 @@ void dfs_prepare_agile_precac_chan(struct wlan_dfs *dfs, bool *is_chan_found);
  * @chwidth : Width of the channel for which OCAC completion is received.
  */
 void dfs_process_ocac_complete(struct wlan_objmgr_pdev *pdev,
-			       uint32_t ocac_status,
+			       enum ocac_status_type ocac_status,
 			       uint32_t center_freq1,
 			       uint32_t center_freq2,
 			       enum phy_ch_width chwidth);
 
+/*
+ * dfs_is_ocac_complete_event_for_cur_agile_chan() - Check if the OCAC
+ * completion event from FW is received for the currently configured agile
+ * channel in host.
+ *
+ * @dfs: Pointer to dfs structure.
+ * @center_freq_mhz1: Center frequency of the band when the precac width is
+ * 20/40/80/160MHz and center frequency of the left 80MHz in case of restricted
+ * 80P80/165MHz.
+ * @center_freq_mhz2: Center frequency of the right 80MHz in case of restricted
+ * 80P80/165MHz. It is zero for other channel widths.
+ * @chwidth: Agile channel width for which the completion event is received.
+ *
+ * return: True if the channel on which OCAC completion event received is same
+ * as currently configured agile channel in host. False otherwise.
+ */
+bool dfs_is_ocac_complete_event_for_cur_agile_chan(struct wlan_dfs *dfs);
 /**
  * dfs_set_agilecac_chan_for_freq() - Find chan freq for agile CAC.
  * @dfs:         Pointer to wlan_dfs structure.
@@ -510,7 +523,7 @@ void dfs_agile_precac_start(struct wlan_dfs *dfs);
  * fields in adfs_param.
  */
 void dfs_start_agile_precac_timer(struct wlan_dfs *dfs,
-				  uint8_t ocac_status,
+				  enum ocac_status_type ocac_status,
 				  struct dfs_agile_cac_params *adfs_param);
 
 /**
@@ -539,11 +552,17 @@ static inline void dfs_prepare_agile_precac_chan(struct wlan_dfs *dfs,
 
 static inline void
 dfs_process_ocac_complete(struct wlan_objmgr_pdev *pdev,
-			  uint32_t ocac_status,
+			  enum ocac_status_type ocac_status,
 			  uint32_t center_freq1,
 			  uint32_t center_freq2,
 			  enum phy_ch_width chwidth)
 {
+}
+
+static inline bool
+dfs_is_ocac_complete_event_for_cur_agile_chan(struct wlan_dfs *dfs)
+{
+	return false;
 }
 
 #ifdef CONFIG_CHAN_FREQ_API
@@ -569,7 +588,7 @@ static inline void dfs_agile_precac_start(struct wlan_dfs *dfs)
 
 static inline void
 dfs_start_agile_precac_timer(struct wlan_dfs *dfs,
-			     uint8_t ocac_status,
+			     enum ocac_status_type ocac_status,
 			     struct dfs_agile_cac_params *adfs_param)
 {
 }
@@ -1144,10 +1163,21 @@ void dfs_start_agile_rcac_timer(struct wlan_dfs *dfs);
  *
  */
 void dfs_stop_agile_rcac_timer(struct wlan_dfs *dfs);
+
+/**
+ * dfs_agile_cleanup_rcac() - Reset parameters of wlan_dfs relatewd to RCAC
+ *
+ * @dfs: Pointer to struct wlan_dfs.
+ */
+void dfs_agile_cleanup_rcac(struct wlan_dfs *dfs);
 #else
 static inline bool dfs_is_agile_rcac_enabled(struct wlan_dfs *dfs)
 {
 	return false;
+}
+
+static inline void dfs_agile_cleanup_rcac(struct wlan_dfs *dfs)
+{
 }
 
 static inline void

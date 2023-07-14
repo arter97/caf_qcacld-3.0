@@ -978,6 +978,23 @@ struct dfs_rcac_params {
 	qdf_freq_t rcac_pri_freq;
 	struct ch_params rcac_ch_params;
 };
+
+/**
+ * struct adfs_completion_params - Agile DFS completion parameters
+ * @ocac_status:   Off channel CAC completion status
+ * @center_freq1:  For 20/40/80/160Mhz, it is the center of the corresponding
+ *                 segment. For 80P80/165MHz, it is the center of the left
+ *                 80MHz.
+ * @center_freq2:  It is valid and non-zero only for 80P80/165MHz. It indicates
+ *                 the Center Frequency of the right 80MHz segment.
+ * @chan_width:    Channel Width
+ */
+struct adfs_completion_params {
+	enum ocac_status_type ocac_status;
+	uint32_t center_freq1;
+	uint32_t center_freq2;
+	uint32_t chan_width;
+};
 #endif
 
 #define DFS_PUNC_SM_SPIN_LOCK(_dfs_obj) \
@@ -1187,6 +1204,7 @@ struct dfs_cacelem {
  * @dfs_pdev_obj:                    DFS pdev object.
  * @dfs_soc_obj:                     DFS soc object.
  * @dfs_psoc_idx:                    DFS psoc index
+ * @adfs_completion_status:          Agile DFS completion parameters object.
  * @dfs_agile_precac_freq_mhz:       Freq in MHZ configured on Agile DFS engine.
  * @dfs_is_offload_enabled:          Set if DFS offload enabled.
  * @dfs_is_bangradar_320_supported:  Set if DFS 320MHZ enabled.
@@ -1370,6 +1388,7 @@ struct wlan_dfs {
 	struct dfs_soc_priv_obj *dfs_soc_obj;
 #if defined(QCA_SUPPORT_AGILE_DFS) || defined(ATH_SUPPORT_ZERO_CAC_DFS)
 	uint8_t dfs_psoc_idx;
+	struct adfs_completion_params adfs_completion_status;
 #endif
 #ifdef CONFIG_CHAN_FREQ_API
 	uint16_t       dfs_agile_precac_freq_mhz;
@@ -1480,7 +1499,7 @@ struct dfs_soc_priv_obj {
 	qdf_hrtimer_data_t    dfs_precac_timer;
 	uint8_t dfs_precac_timer_running;
 	bool precac_state_started;
-	bool ocac_status;
+	enum ocac_status_type ocac_status;
 #endif
 	struct dfsreq_nolinfo *dfs_psoc_nolinfo;
 #ifdef QCA_SUPPORT_ADFS_RCAC
