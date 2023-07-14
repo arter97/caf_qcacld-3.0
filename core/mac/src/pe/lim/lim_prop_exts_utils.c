@@ -781,6 +781,7 @@ void lim_extract_ap_capability(struct mac_context *mac_ctx, uint8_t *p_ie,
 			session->ch_center_freq_seg1 = 0;
 		}
 		session->ch_width = vht_ch_wd + 1;
+		session->ap_ch_width = session->ch_width;
 	}
 
 	if (session->vhtCapability &&

@@ -2580,7 +2580,7 @@ lim_send_assoc_req_mgmt_frame(struct mac_context *mac_ctx,
 		populate_dot11f_vht_caps(mac_ctx, pe_session, &frm->VHTCaps);
 		vht_enabled = true;
 		if (pe_session->gLimOperatingMode.present &&
-		    pe_session->ch_width == CH_WIDTH_20MHZ &&
+		    pe_session->ap_ch_width == CH_WIDTH_20MHZ &&
 		    frm->VHTCaps.present &&
 		    !IS_DOT11_MODE_HE(pe_session->dot11mode)) {
 			populate_dot11f_operating_mode(mac_ctx,

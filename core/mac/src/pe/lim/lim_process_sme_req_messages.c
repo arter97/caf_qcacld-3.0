@@ -3265,6 +3265,7 @@ lim_fill_pe_session(struct mac_context *mac_ctx, struct pe_session *session,
 		session->ch_center_freq_seg0 = 0;
 		session->ch_width = CH_WIDTH_20MHZ;
 	}
+	session->ap_ch_width = session->ch_width;
 
 	if (IS_DOT11_MODE_HE(session->dot11mode)) {
 		lim_update_session_he_capable(mac_ctx, session);

@@ -506,7 +506,8 @@ struct wlan_mlo_ie_info {
  * @gLimOperatingMode:
  * @vhtCapabilityPresentInBeacon:
  * @ch_center_freq_seg0: center freq number as advertised OTA
- * @ch_width:
+ * @ch_width:    Session max channel width
+ * @ap_ch_width: AP advertised channel width
  * @puncture_bitmap:
  * @ch_center_freq_seg1:
  * @enableVhtpAid:
@@ -817,6 +818,7 @@ struct pe_session {
 	uint8_t vhtCapabilityPresentInBeacon;
 	uint8_t ch_center_freq_seg0;
 	enum phy_ch_width ch_width;
+	enum phy_ch_width ap_ch_width;
 #ifdef WLAN_FEATURE_11BE
 	uint16_t puncture_bitmap;
 #endif
