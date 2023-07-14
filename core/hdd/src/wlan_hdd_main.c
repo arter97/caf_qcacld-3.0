@@ -6719,7 +6719,7 @@ static void hdd_vdev_set_ht_vht_ies(mac_handle_t mac_handle,
 }
 
 #if defined(WLAN_FEATURE_11BE_MLO) && defined(CFG80211_11BE_BASIC)
-static void
+static int
 hdd_populate_vdev_create_params(struct hdd_adapter *adapter,
 				struct wlan_vdev_create_params *vdev_params)
 {
@@ -6736,9 +6736,10 @@ hdd_populate_vdev_create_params(struct hdd_adapter *adapter,
 	    adapter->device_mode == QDF_STA_MODE) {
 		link_adapter = hdd_get_assoc_link_adapter(adapter);
 		if (link_adapter) {
-			qdf_mem_copy(vdev_params->macaddr,
-				     link_adapter->mac_addr.bytes,
-				     QDF_MAC_ADDR_SIZE);
+			qdf_ether_addr_copy(vdev_params->macaddr,
+					    link_adapter->mac_addr.bytes);
+		} else {
+			return -EINVAL;
 		}
 	} else {
 		qdf_mem_copy(vdev_params->macaddr, adapter->mac_addr.bytes,
@@ -6754,9 +6755,11 @@ hdd_populate_vdev_create_params(struct hdd_adapter *adapter,
 
 	vdev_params->size_vdev_priv = sizeof(struct vdev_osif_priv);
 	hdd_exit();
+
+	return 0;
 }
 #else
-static void
+static int
 hdd_populate_vdev_create_params(struct hdd_adapter *adapter,
 				struct wlan_vdev_create_params *vdev_params)
 {
@@ -6765,6 +6768,7 @@ hdd_populate_vdev_create_params(struct hdd_adapter *adapter,
 		     adapter->mac_addr.bytes,
 		     QDF_NET_MAC_ADDR_MAX_LEN);
 	vdev_params->size_vdev_priv = sizeof(struct vdev_osif_priv);
+	return 0;
 }
 #endif
 
@@ -6807,7 +6811,9 @@ int hdd_vdev_create(struct hdd_adapter *adapter)
 		return errno;
 	}
 
-	hdd_populate_vdev_create_params(adapter, &vdev_params);
+	errno = hdd_populate_vdev_create_params(adapter, &vdev_params);
+	if (errno)
+		return errno;
 
 	vdev = sme_vdev_create(hdd_ctx->mac_handle, &vdev_params);
 	if (!vdev) {
