@@ -2915,11 +2915,6 @@ sir_convert_probe_frame2_t2lm_struct(tDot11fProbeResponse *pr,
 	struct wlan_t2lm_info t2lm;
 	uint8_t i;
 
-	if (!pr->num_t2lm_ie) {
-		pe_debug("T2LM IEs not present");
-		return status;
-	}
-
 	t2lm_ctx = &bcn_struct->t2lm_ctx;
 	qdf_mem_zero(&t2lm_ctx->established_t2lm.t2lm,
 		     sizeof(struct wlan_t2lm_info));
@@ -2928,6 +2923,11 @@ sir_convert_probe_frame2_t2lm_struct(tDot11fProbeResponse *pr,
 	qdf_mem_zero(&t2lm_ctx->upcoming_t2lm.t2lm,
 		     sizeof(struct wlan_t2lm_info));
 	t2lm_ctx->upcoming_t2lm.t2lm.direction = WLAN_T2LM_INVALID_DIRECTION;
+
+	if (!pr->num_t2lm_ie) {
+		pe_debug("T2LM IEs not present");
+		return status;
+	}
 
 	pe_debug("Number of T2LM IEs in probe rsp %d", pr->num_t2lm_ie);
 	for (i = 0; i < pr->num_t2lm_ie; i++) {
@@ -3862,11 +3862,6 @@ sir_convert_assoc_resp_frame2_t2lm_struct(struct mac_context *mac,
 	struct wlan_t2lm_info t2lm;
 	uint8_t i;
 
-	if (!ar->num_t2lm_ie) {
-		pe_debug("T2LM IEs not present");
-		return status;
-	}
-
 	t2lm_ctx = &p_assoc_rsp->t2lm_ctx;
 	qdf_mem_zero(&t2lm_ctx->established_t2lm.t2lm,
 		     sizeof(struct wlan_t2lm_info));
@@ -3875,6 +3870,11 @@ sir_convert_assoc_resp_frame2_t2lm_struct(struct mac_context *mac,
 	qdf_mem_zero(&t2lm_ctx->upcoming_t2lm.t2lm,
 		     sizeof(struct wlan_t2lm_info));
 	t2lm_ctx->upcoming_t2lm.t2lm.direction = WLAN_T2LM_INVALID_DIRECTION;
+
+	if (!ar->num_t2lm_ie) {
+		pe_debug("T2LM IEs not present");
+		return status;
+	}
 
 	pe_debug("Number of T2LM IEs in assoc resp %d", ar->num_t2lm_ie);
 	for (i = 0; i < ar->num_t2lm_ie; i++) {
@@ -5187,11 +5187,6 @@ sir_convert_beacon_frame2_t2lm_struct(tDot11fBeacon *bcn_frm,
 	struct wlan_t2lm_info t2lm;
 	uint8_t i;
 
-	if (!bcn_frm->num_t2lm_ie) {
-		pe_debug("T2LM IEs not present");
-		return status;
-	}
-
 	t2lm_ctx = &bcn_struct->t2lm_ctx;
 	qdf_mem_zero(&t2lm_ctx->established_t2lm.t2lm,
 		     sizeof(struct wlan_t2lm_info));
@@ -5200,6 +5195,9 @@ sir_convert_beacon_frame2_t2lm_struct(tDot11fBeacon *bcn_frm,
 	qdf_mem_zero(&t2lm_ctx->upcoming_t2lm.t2lm,
 		     sizeof(struct wlan_t2lm_info));
 	t2lm_ctx->upcoming_t2lm.t2lm.direction = WLAN_T2LM_INVALID_DIRECTION;
+
+	if (!bcn_frm->num_t2lm_ie)
+		return status;
 
 	pe_debug("Number of T2LM IEs in beacon %d", bcn_frm->num_t2lm_ie);
 	for (i = 0; i < bcn_frm->num_t2lm_ie; i++) {
