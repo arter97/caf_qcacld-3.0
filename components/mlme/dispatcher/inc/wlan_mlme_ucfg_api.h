@@ -1018,6 +1018,21 @@ ucfg_mlme_get_roaming_triggers(struct wlan_objmgr_psoc *psoc)
 {
 	return wlan_mlme_get_roaming_triggers(psoc);
 }
+
+/**
+ * ucfg_mlme_set_roaming_triggers() - Set roaming triggers bitmap
+ * value
+ * @psoc: pointer to psoc object
+ * @trigger_bitmap: Roaming triggers bitmap to set
+ *
+ * Return: void
+ */
+static inline void
+ucfg_mlme_set_roaming_triggers(struct wlan_objmgr_psoc *psoc,
+			       uint32_t trigger_bitmap)
+{
+	wlan_mlme_set_roaming_triggers(psoc, trigger_bitmap);
+}
 #else
 static inline QDF_STATUS
 ucfg_mlme_get_roam_disable_config(struct wlan_objmgr_psoc *psoc,
@@ -1046,6 +1061,12 @@ static inline uint32_t
 ucfg_mlme_get_roaming_triggers(struct wlan_objmgr_psoc *psoc)
 {
 	return 0xffff;
+}
+
+static inline void
+ucfg_mlme_set_roaming_triggers(struct wlan_objmgr_psoc *psoc,
+			       uint32_t trigger_bitmap)
+{
 }
 #endif
 

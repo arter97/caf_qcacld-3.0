@@ -4329,6 +4329,18 @@ uint32_t wlan_mlme_get_roaming_triggers(struct wlan_objmgr_psoc *psoc)
 	return mlme_obj->cfg.lfr.roam_trigger_bitmap;
 }
 
+void wlan_mlme_set_roaming_triggers(struct wlan_objmgr_psoc *psoc,
+				    uint32_t trigger_bitmap)
+{
+	struct wlan_mlme_psoc_ext_obj *mlme_obj;
+
+	mlme_obj = mlme_get_psoc_ext_obj(psoc);
+	if (!mlme_obj)
+		return;
+
+	mlme_obj->cfg.lfr.roam_trigger_bitmap = trigger_bitmap;
+}
+
 QDF_STATUS
 wlan_mlme_get_roaming_offload(struct wlan_objmgr_psoc *psoc,
 			      bool *val)
