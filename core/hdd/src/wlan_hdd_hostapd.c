@@ -7545,6 +7545,15 @@ static void hdd_update_he_obss_pd(struct hdd_adapter *adapter,
 {
 	struct wlan_objmgr_vdev *vdev;
 	struct ieee80211_he_obss_pd *obss_pd;
+	uint8_t sr_device_modes;
+	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
+
+	ucfg_mlme_get_sr_enable_modes(hdd_ctx->psoc, &sr_device_modes);
+	if (!(sr_device_modes & (1 << adapter->device_mode))) {
+		hdd_debug("SR operation not allowed for mode %d",
+			  adapter->device_mode);
+		return;
+	}
 
 	vdev = hdd_objmgr_get_vdev_by_user(adapter, WLAN_OSIF_ID);
 	if (!vdev)
