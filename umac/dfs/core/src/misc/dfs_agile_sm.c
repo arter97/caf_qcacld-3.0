@@ -334,16 +334,16 @@ static void dfs_abort_agile_rcac(struct wlan_dfs *dfs)
 	struct wlan_objmgr_psoc *psoc;
 	struct wlan_lmac_if_dfs_tx_ops *dfs_tx_ops;
 
-	dfs_stop_agile_rcac_timer(dfs);
 	psoc = wlan_pdev_get_psoc(dfs->dfs_pdev_obj);
 	dfs_tx_ops = wlan_psoc_get_dfs_txops(psoc);
+
+	dfs_stop_agile_rcac_timer(dfs);
 	if (dfs_tx_ops && dfs_tx_ops->dfs_ocac_abort_cmd)
 		dfs_tx_ops->dfs_ocac_abort_cmd(dfs->dfs_pdev_obj);
 
 	qdf_mem_zero(&dfs->dfs_rcac_param, sizeof(struct dfs_rcac_params));
-	dfs->dfs_agile_precac_freq_mhz = 0;
-	dfs->dfs_precac_chwidth = CH_WIDTH_INVALID;
 	dfs->dfs_soc_obj->cur_agile_dfs_index = DFS_PSOC_NO_IDX;
+	dfs_agile_cleanup_rcac(dfs);
 }
 #else
 static inline void dfs_abort_agile_rcac(struct wlan_dfs *dfs)
@@ -505,6 +505,7 @@ static void dfs_agile_state_running_entry(void *ctx)
 
 	/* RCAC */
 	if (dfs_is_agile_rcac_enabled(dfs)) {
+		dfs_soc->ocac_status = OCAC_RESET;
 		dfs_start_agile_rcac_timer(dfs);
 		dfs_start_agile_engine(dfs);
 	}
@@ -589,6 +590,29 @@ static bool dfs_agile_state_running_event(void *ctx,
 		status = true;
 		break;
 	case DFS_AGILE_SM_EV_AGILE_DONE:
+		/* When the FW sends a delayed OCAC completion status, Host
+		 * might have changed the precac channel already before an
+		 * OCAC completion event is received. So the OCAC completion
+		 * status should be validated if it is on the currently
+		 * configured agile channel.
+		 */
+
+		/* Assume the previous agile channel was 64 (20Mhz) and
+		 * current agile channel is 100(20Mhz), if the event from the
+		 * FW is for previously configured agile channel 64(20Mhz)
+		 * then Host ignores the event.
+		 */
+		if (!dfs_is_ocac_complete_event_for_cur_agile_chan(dfs)) {
+			dfs_debug(NULL, WLAN_DEBUG_DFS_ALWAYS,
+				  "OCAC completion event is received on a "
+				  "different channel %d %d that is not the "
+				  "current Agile channel %d",
+				  dfs->adfs_completion_status.center_freq1,
+				  dfs->adfs_completion_status.center_freq2,
+				  dfs->dfs_agile_precac_freq_mhz);
+			return true;
+		}
+
 		if (dfs_is_agile_precac_enabled(dfs)) {
 			if (dfs_soc->ocac_status == OCAC_SUCCESS) {
 				dfs_soc->ocac_status = OCAC_RESET;
@@ -636,8 +660,29 @@ static bool dfs_agile_state_running_event(void *ctx,
 					event_data);
 			}
 		} else if (dfs_is_agile_rcac_enabled(dfs)) {
-			dfs_agile_sm_transition_to(dfs_soc,
-						   DFS_AGILE_S_COMPLETE);
+			if (dfs_soc->ocac_status == OCAC_SUCCESS) {
+				dfs_agile_sm_transition_to(dfs_soc,
+						DFS_AGILE_S_COMPLETE);
+			} else if (dfs_soc->ocac_status == OCAC_CANCEL) {
+				/* OCAC completion with status OCAC_CANCEL
+				 * will be received from FW when rCAC channel
+				 * config fails. Handle this case by clearing
+				 * the status and restarting rCAC
+				 */
+				dfs_soc->ocac_status = OCAC_RESET;
+				dfs_stop_agile_rcac_timer(dfs);
+				dfs_agile_cleanup_rcac(dfs);
+				dfs_agile_sm_transition_to(dfs_soc,
+					DFS_AGILE_S_INIT);
+				dfs_agile_sm_deliver_event(dfs_soc,
+					DFS_AGILE_SM_EV_AGILE_START,
+					event_data_len,
+					event_data);
+			} else {
+				dfs_debug(NULL, WLAN_DEBUG_DFS_ALWAYS,
+					  "Invalid OCAC completion status %d",
+					  dfs_soc->ocac_status);
+			}
 		}
 		status = true;
 		break;
@@ -978,6 +1023,7 @@ dfs_rcac_timeout(qdf_hrtimer_data_t *arg)
 				   dfs_rcac_timer);
 	dfs = dfs_soc_obj->dfs_priv[dfs_soc_obj->cur_agile_dfs_index].dfs;
 
+	dfs_soc_obj->ocac_status = OCAC_SUCCESS;
 	dfs_agile_sm_deliver_evt(dfs_soc_obj,
 				DFS_AGILE_SM_EV_AGILE_DONE,
 				0,
