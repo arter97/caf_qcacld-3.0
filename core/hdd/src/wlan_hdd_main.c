@@ -7189,7 +7189,7 @@ hdd_vdev_configure_opmode_params(struct hdd_context *hdd_ctx,
 
 #if defined(WLAN_FEATURE_11BE_MLO) && defined(CFG80211_11BE_BASIC) && \
 	defined(WLAN_HDD_MULTI_VDEV_SINGLE_NDEV)
-static void
+static int
 hdd_populate_vdev_create_params(struct wlan_hdd_link_info *link_info,
 				struct wlan_vdev_create_params *vdev_params)
 {
@@ -7207,9 +7207,10 @@ hdd_populate_vdev_create_params(struct wlan_hdd_link_info *link_info,
 		qdf_ether_addr_copy(vdev_params->macaddr,
 				    adapter->mac_addr.bytes);
 	}
+	return 0;
 }
 #elif defined(WLAN_FEATURE_11BE_MLO) && defined(CFG80211_11BE_BASIC)
-static void
+static int
 hdd_populate_vdev_create_params(struct wlan_hdd_link_info *link_info,
 				struct wlan_vdev_create_params *vdev_params)
 {
@@ -7229,6 +7230,8 @@ hdd_populate_vdev_create_params(struct wlan_hdd_link_info *link_info,
 		if (link_adapter) {
 			qdf_ether_addr_copy(vdev_params->macaddr,
 					    link_adapter->mac_addr.bytes);
+		} else {
+			return -EINVAL;
 		}
 	} else {
 		qdf_ether_addr_copy(vdev_params->macaddr,
@@ -7244,9 +7247,11 @@ hdd_populate_vdev_create_params(struct wlan_hdd_link_info *link_info,
 
 	vdev_params->size_vdev_priv = sizeof(struct vdev_osif_priv);
 	hdd_exit();
+
+	return 0;
 }
 #else
-static void
+static int
 hdd_populate_vdev_create_params(struct wlan_hdd_link_info *link_info,
 				struct wlan_vdev_create_params *vdev_params)
 {
@@ -7255,6 +7260,7 @@ hdd_populate_vdev_create_params(struct wlan_hdd_link_info *link_info,
 	vdev_params->opmode = adapter->device_mode;
 	qdf_ether_addr_copy(vdev_params->macaddr, adapter->mac_addr.bytes);
 	vdev_params->size_vdev_priv = sizeof(struct vdev_osif_priv);
+	return 0;
 }
 #endif
 
@@ -7272,7 +7278,9 @@ int hdd_vdev_create(struct wlan_hdd_link_info *link_info)
 	/* do vdev create via objmgr */
 	hdd_ctx = WLAN_HDD_GET_CTX(adapter);
 
-	hdd_populate_vdev_create_params(link_info, &vdev_params);
+	errno = hdd_populate_vdev_create_params(link_info, &vdev_params);
+	if (errno)
+		return errno;
 
 	vdev = sme_vdev_create(hdd_ctx->mac_handle, &vdev_params);
 	if (!vdev) {
