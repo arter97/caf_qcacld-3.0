@@ -170,6 +170,88 @@ void dp_wait_complete_tasks(struct wlan_dp_psoc_context *dp_ctx);
 #define dp_exit() QDF_TRACE_EXIT(QDF_MODULE_ID_DP, "exit")
 
 /**
+ * __wlan_dp_runtime_suspend() - Runtime suspend DP handler
+ * @soc: CDP SoC handle
+ * @pdev_id: DP PDEV ID
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS __wlan_dp_runtime_suspend(ol_txrx_soc_handle soc, uint8_t pdev_id);
+
+/**
+ * __wlan_dp_runtime_resume() - Runtime suspend DP handler
+ * @soc: CDP SoC handle
+ * @pdev_id: DP PDEV ID
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS __wlan_dp_runtime_resume(ol_txrx_soc_handle soc, uint8_t pdev_id);
+
+/**
+ * __wlan_dp_bus_suspend() - BUS suspend DP handler
+ * @soc: CDP SoC handle
+ * @pdev_id: DP PDEV ID
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS __wlan_dp_bus_suspend(ol_txrx_soc_handle soc, uint8_t pdev_id);
+
+/**
+ * __wlan_dp_bus_resume() - BUS resume DP handler
+ * @soc: CDP SoC handle
+ * @pdev_id: DP PDEV ID
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS __wlan_dp_bus_resume(ol_txrx_soc_handle soc, uint8_t pdev_id);
+
+/**
+ * wlan_dp_txrx_soc_attach() - Datapath soc attach
+ * @params: SoC attach params
+ * @is_wifi3_0_target: [OUT] Pointer to update if the target is wifi3.0
+ *
+ * Return: SoC handle
+ */
+void *wlan_dp_txrx_soc_attach(struct dp_txrx_soc_attach_params *params,
+			      bool *is_wifi3_0_target);
+
+/**
+ * wlan_dp_txrx_soc_detach() - Datapath SoC detach
+ * @soc: DP SoC handle
+ *
+ * Return: None
+ */
+void wlan_dp_txrx_soc_detach(ol_txrx_soc_handle soc);
+
+/**
+ * wlan_dp_txrx_attach_target() - DP target attach
+ * @soc: DP SoC handle
+ * @pdev_id: DP pdev id
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS wlan_dp_txrx_attach_target(ol_txrx_soc_handle soc, uint8_t pdev_id);
+
+/**
+ * wlan_dp_txrx_pdev_attach() - DP pdev attach
+ * @soc: DP SoC handle
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS wlan_dp_txrx_pdev_attach(ol_txrx_soc_handle soc);
+
+/**
+ * wlan_dp_txrx_pdev_detach() - DP pdev detach
+ * @soc: DP SoC handle
+ * @pdev_id: DP pdev id
+ * @force: indicates if force detach is to be done or not
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS wlan_dp_txrx_pdev_detach(ol_txrx_soc_handle soc, uint8_t pdev_id,
+				    int force);
+
+/**
  * dp_peer_obj_create_notification(): dp peer create handler
  * @peer: peer which is going to created by objmgr
  * @arg: argument for vdev create handler
@@ -726,4 +808,88 @@ __wlan_dp_update_peer_map_unmap_version(uint8_t *version)
 {
 }
 #endif
+
+#ifdef WLAN_DP_PROFILE_SUPPORT
+/**
+ * wlan_dp_get_profile_info() - Get DP memory profile info
+ *
+ * Return: None
+ */
+struct wlan_dp_memory_profile_info *wlan_dp_get_profile_info(void);
+
+/**
+ * wlan_dp_select_profile_cfg() - Select DP profile configuration
+ * @psoc: psoc context
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS wlan_dp_select_profile_cfg(struct wlan_objmgr_psoc *psoc);
+
+/**
+ * wlan_dp_soc_cfg_sync_profile() - Sync DP soc cfg items with profile
+ * @cdp_soc: cdp soc context
+ *
+ * Return: None
+ */
+void wlan_dp_soc_cfg_sync_profile(struct cdp_soc_t *cdp_soc);
+
+/**
+ * wlan_dp_pdev_cfg_sync_profile() - Sync DP pdev cfg items with profile
+ * @cdp_soc: cdp soc context
+ * @pdev_id: pdev id
+ *
+ * Return: QDF_STATUS
+ */
+void wlan_dp_pdev_cfg_sync_profile(struct cdp_soc_t *cdp_soc, uint8_t pdev_id);
+#else
+
+static inline
+QDF_STATUS wlan_dp_select_profile_cfg(struct wlan_objmgr_psoc *psoc)
+{
+	return QDF_STATUS_E_NOSUPPORT;
+}
+#endif
+
+/* DP CFG APIs - START */
+
+#ifdef WLAN_SUPPORT_RX_FISA
+/**
+ * wlan_dp_cfg_is_rx_fisa_enabled() - Get Rx FISA enabled flag
+ * @dp_cfg: soc configuration context
+ *
+ * Return: true if enabled, false otherwise.
+ */
+static inline
+bool wlan_dp_cfg_is_rx_fisa_enabled(struct wlan_dp_psoc_cfg *dp_cfg)
+{
+	return dp_cfg->is_rx_fisa_enabled;
+}
+
+/**
+ * wlan_dp_cfg_is_rx_fisa_lru_del_enabled() - Get Rx FISA LRU del enabled flag
+ * @dp_cfg: soc configuration context
+ *
+ * Return: true if enabled, false otherwise.
+ */
+static inline
+bool wlan_dp_cfg_is_rx_fisa_lru_del_enabled(struct wlan_dp_psoc_cfg *dp_cfg)
+{
+	return dp_cfg->is_rx_fisa_lru_del_enabled;
+}
+#else
+static inline
+bool wlan_dp_cfg_is_rx_fisa_enabled(struct wlan_dp_psoc_cfg *dp_cfg)
+{
+	return false;
+}
+
+static inline
+bool wlan_dp_cfg_is_rx_fisa_lru_del_enabled(struct wlan_dp_psoc_cfg *dp_cfg)
+{
+	return false;
+}
+#endif
+
+
+/* DP CFG APIs - END */
 #endif

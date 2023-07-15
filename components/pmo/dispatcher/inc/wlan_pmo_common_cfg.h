@@ -356,7 +356,7 @@
  * 0 - Disable both magic pattern match and pattern byte match.
  * 1 - Enable magic pattern match on all interfaces.
  * 2 - Enable pattern byte match on all interfaces.
- * 3 - Enable both magic patter and pattern byte match on all interfaces.
+ * 3 - Enable both magic pattern and pattern byte match on all interfaces.
  *
  * Related: None
  *

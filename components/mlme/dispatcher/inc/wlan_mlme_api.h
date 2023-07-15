@@ -274,6 +274,25 @@ QDF_STATUS wlan_mlme_set_ht_mpdu_density(struct wlan_objmgr_psoc *psoc,
 QDF_STATUS wlan_mlme_get_band_capability(struct wlan_objmgr_psoc *psoc,
 					 uint32_t *band_capability);
 
+#ifdef QCA_MULTIPASS_SUPPORT
+/**
+ * wlan_mlme_peer_config_vlan() - send vlan id to FW for RX path
+ * @vdev: vdev pointer
+ * @mac_addr: mac address of the peer
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+wlan_mlme_peer_config_vlan(struct wlan_objmgr_vdev *vdev,
+			   uint8_t *mac_addr);
+#else
+static inline QDF_STATUS
+wlan_mlme_peer_config_vlan(struct wlan_objmgr_vdev *vdev,
+			   uint8_t *mac_addr)
+{
+	return QDF_STATUS_SUCCESS;
+}
+#endif
 #ifdef MULTI_CLIENT_LL_SUPPORT
 /**
  * wlan_mlme_get_wlm_multi_client_ll_caps() - Get the wlm multi client latency
@@ -1051,13 +1070,34 @@ QDF_STATUS mlme_update_tgt_he_caps_in_cfg(struct wlan_objmgr_psoc *psoc,
 /**
  * wlan_mlme_convert_vht_op_bw_to_phy_ch_width() - convert channel width in VHT
  *                                                 operation IE to phy_ch_width
- * @channel_width: channel width in VHT operation IE. If it is 0, please use HT
- *                 information IE to check whether it is 20MHz or 40MHz.
+ * @channel_width: channel width in VHT operation IE.
+ * @chan_id: channel id
+ * @ccfs0: channel center frequency segment 0
+ * @ccfs1: channel center frequency segment 1
  *
  * Return: phy_ch_width
  */
-enum phy_ch_width wlan_mlme_convert_vht_op_bw_to_phy_ch_width(
-						uint8_t channel_width);
+enum phy_ch_width
+wlan_mlme_convert_vht_op_bw_to_phy_ch_width(uint8_t channel_width,
+					    uint8_t chan_id,
+					    uint8_t ccfs0,
+					    uint8_t ccfs1);
+
+/**
+ * wlan_mlme_convert_he_6ghz_op_bw_to_phy_ch_width() - convert channel width in
+ *                                          he 6ghz peration IE to phy_ch_width
+ * @channel_width: channel width in HE operation IE.
+ * @chan_id: channel id
+ * @ccfs0: channel center frequency segment 0
+ * @ccfs1: channel center frequency segment 1
+ *
+ * Return: phy_ch_width
+ */
+enum phy_ch_width
+wlan_mlme_convert_he_6ghz_op_bw_to_phy_ch_width(uint8_t channel_width,
+						uint8_t chan_id,
+						uint8_t ccfs0,
+						uint8_t ccfs1);
 
 /**
  * wlan_mlme_chan_stats_scan_event_cb() - process connected channel stats
@@ -1101,6 +1141,16 @@ QDF_STATUS mlme_update_tgt_eht_caps_in_cfg(struct wlan_objmgr_psoc *psoc,
 					  struct wma_tgt_cfg *cfg);
 
 /**
+ * mlme_update_tgt_mlo_caps_in_cfg() - Update tgt MLO cap in mlme component
+ * @psoc: pointer to psoc object
+ *
+ * This api to be used by callers to update MLO caps in mlme.
+ *
+ * Return: QDF_STATUS_SUCCESS or QDF_STATUS_FAILURE
+ */
+QDF_STATUS mlme_update_tgt_mlo_caps_in_cfg(struct wlan_objmgr_psoc *psoc);
+
+/**
  * wlan_mlme_convert_eht_op_bw_to_phy_ch_width() - convert channel width in eht
  *                                                 operation IE to phy_ch_width
  * @channel_width: channel width in eht operation IE
@@ -1109,6 +1159,23 @@ QDF_STATUS mlme_update_tgt_eht_caps_in_cfg(struct wlan_objmgr_psoc *psoc,
  */
 enum phy_ch_width wlan_mlme_convert_eht_op_bw_to_phy_ch_width(
 						uint8_t channel_width);
+
+/**
+ * wlan_mlme_get_epcs_capability() - Get mlme epcs capability flag
+ * @psoc: psoc object
+ *
+ * Return: true if epcs capability enabled
+ */
+bool wlan_mlme_get_epcs_capability(struct wlan_objmgr_psoc *psoc);
+
+/**
+ * wlan_mlme_set_epcs_capability() - Set mlme epcs capability flag
+ * @psoc: psoc object
+ * @flag: epcs capability flag
+ *
+ * Return: void
+ */
+void wlan_mlme_set_epcs_capability(struct wlan_objmgr_psoc *psoc, bool flag);
 
 /**
  * wlan_mlme_get_usr_disable_sta_eht() - Get user disable sta eht flag
@@ -1128,6 +1195,17 @@ bool wlan_mlme_get_usr_disable_sta_eht(struct wlan_objmgr_psoc *psoc);
 void wlan_mlme_set_usr_disable_sta_eht(struct wlan_objmgr_psoc *psoc,
 				       bool disable);
 #else
+static inline
+bool wlan_mlme_get_epcs_capability(struct wlan_objmgr_psoc *psoc)
+{
+	return false;
+}
+
+static inline
+void wlan_mlme_set_epcs_capability(struct wlan_objmgr_psoc *psoc, bool flag)
+{
+}
+
 static inline
 bool wlan_mlme_get_usr_disable_sta_eht(struct wlan_objmgr_psoc *psoc)
 {
@@ -2284,6 +2362,37 @@ wlan_mlme_get_restart_sap_on_dynamic_nss_chains_cfg(
 						bool *value);
 
 /**
+ * wlan_mlme_cfg_set_dynamic_nss_chains_support() - API to update
+ * dynamic_nss_chains_support
+ *
+ * @psoc: psoc context
+ * @value: data to be set
+ *
+ * API to update dynamic_nss_chains_support in wlan_mlme_cfg object to
+ * maintain this value in mlme context
+ *
+ * Return: QDF_STATUS_SUCCESS or QDF_STATUS_FAILURE
+ */
+QDF_STATUS
+wlan_mlme_cfg_set_dynamic_nss_chains_support(struct wlan_objmgr_psoc *psoc,
+					     bool value);
+
+/**
+ * wlan_mlme_cfg_get_dynamic_nss_chains_support() - API to get current value of
+ * dynamic_nss_chains_support
+ *
+ * @psoc: psoc context
+ * @value: data to be set
+ *
+ * API to get current value of dynamic_nss_chains_support
+ *
+ * Return: QDF_STATUS_SUCCESS or QDF_STATUS_FAILURE
+ */
+QDF_STATUS
+wlan_mlme_cfg_get_dynamic_nss_chains_support(struct wlan_objmgr_psoc *psoc,
+					     bool *value);
+
+/**
  * wlan_mlme_get_vht_enable2x2() - Enables/disables VHT Tx/Rx MCS values for 2x2
  * @psoc: psoc context
  * @value: data to be set
@@ -2620,6 +2729,17 @@ wlan_mlme_get_t2lm_negotiation_supported(struct wlan_objmgr_psoc *psoc);
 QDF_STATUS
 wlan_mlme_set_t2lm_negotiation_supported(struct wlan_objmgr_psoc *psoc,
 					 uint8_t value);
+
+/*
+ * wlan_mlme_get_mlo_prefer_percentage() - get MLO preference percentage
+ * @psoc: pointer to psoc object
+ *
+ * Return: void
+ */
+void
+wlan_mlme_get_mlo_prefer_percentage(
+				struct wlan_objmgr_psoc *psoc,
+				int8_t *mlo_prefer_percentage);
 #else
 static inline QDF_STATUS
 wlan_mlme_get_eht_mode(struct wlan_objmgr_psoc *psoc, enum wlan_eht_mode *value)
@@ -2676,6 +2796,12 @@ wlan_mlme_set_t2lm_negotiation_supported(struct wlan_objmgr_psoc *psoc,
 {
 	return QDF_STATUS_E_NOSUPPORT;
 }
+
+static inline void
+wlan_mlme_get_mlo_prefer_percentage(
+				struct wlan_objmgr_psoc *psoc,
+				int8_t *mlo_prefer_percentage)
+{}
 #endif
 
 /**
@@ -3763,6 +3889,14 @@ QDF_STATUS wlan_mlme_get_phy_max_freq_range(struct wlan_objmgr_psoc *psoc,
 					    uint32_t *low_5ghz_chan,
 					    uint32_t *high_5ghz_chan);
 
+/**
+ * wlan_mlme_is_multipass_sap() -Get multipass sap support
+ * @psoc: psoc pointer
+ *
+ * Return: True, if FW support multipass support.
+ */
+bool wlan_mlme_is_multipass_sap(struct wlan_objmgr_psoc *psoc);
+
 #ifdef FEATURE_WDS
 /**
  * wlan_mlme_get_wds_mode() - Check wds mode supported
@@ -3902,6 +4036,12 @@ wlan_mlme_set_sta_mlo_conn_max_num(struct wlan_objmgr_psoc *psoc,
 				   uint8_t value)
 {
 	return QDF_STATUS_SUCCESS;
+}
+
+static inline uint8_t
+wlan_mlme_get_sta_mlo_conn_max_num(struct wlan_objmgr_psoc *psoc)
+{
+	return 0;
 }
 
 static inline QDF_STATUS
@@ -4280,4 +4420,40 @@ wlan_mlme_get_src_addr_from_frame(struct element_info *frame);
  */
 bool
 wlan_mlme_get_sap_ps_with_twt(struct wlan_objmgr_psoc *psoc);
+
+/**
+ * wlan_mlme_get_max_bw() - Get max supported bandwidth
+ *
+ * Extract max supported bandwidth
+ *
+ * Return: enum phy_ch_width
+ *
+ */
+enum phy_ch_width wlan_mlme_get_max_bw(void);
+
+/**
+ * wlan_mlme_get_sta_ch_width() - Get current operating
+ * channel width for STA / P2P-CLI mode
+ *
+ * @vdev: STA / P2P-CLI vdev
+ * @ch_width: Returned channel width
+ *
+ * Return: QDF_STATUS_SUCCESS for success otherwise QDF_STATUS_E_INVAL
+ *
+ */
+QDF_STATUS wlan_mlme_get_sta_ch_width(struct wlan_objmgr_vdev *vdev,
+				      enum phy_ch_width *ch_width);
+
+/**
+ * wlan_mlme_set_ul_mu_config() - set ul mu config
+ *
+ * @psoc: pointer to psoc object
+ * @vdev_id : vdev_id
+ * @ulmu_disable : ulmu_disable value
+ *
+ * Return: QDF Status
+ */
+QDF_STATUS
+wlan_mlme_set_ul_mu_config(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
+			   uint8_t ulmu_disable);
 #endif /* _WLAN_MLME_API_H_ */

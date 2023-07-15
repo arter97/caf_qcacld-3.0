@@ -370,6 +370,16 @@ struct ft_context {
 };
 
 /**
+ * struct assoc_channel_info - store channel info at the time of association
+ * @assoc_ch_width: channel width at the time of initial connection
+ * @sec_2g_freq: secondary 2 GHz freq
+ */
+struct assoc_channel_info {
+	enum phy_ch_width assoc_ch_width;
+	qdf_freq_t sec_2g_freq;
+};
+
+/**
  * struct mlme_connect_info - mlme connect information
  * @timing_meas_cap: Timing meas cap
  * @chan_info: oem channel info
@@ -388,7 +398,7 @@ struct ft_context {
  * @ese_tspec_info: ese tspec info
  * @ext_cap_ie: Ext CAP IE
  * @assoc_btm_cap: BSS transition management cap used in (re)assoc req
- * @ch_width_orig: channel width at the time of initial connection
+ * @assoc_chan_info: store channel info at the time of association
  */
 struct mlme_connect_info {
 	uint8_t timing_meas_cap;
@@ -414,7 +424,7 @@ struct mlme_connect_info {
 #endif
 	uint8_t ext_cap_ie[DOT11F_IE_EXTCAP_MAX_LEN + 2];
 	bool assoc_btm_cap;
-	enum phy_ch_width ch_width_orig;
+	struct assoc_channel_info assoc_chan_info;
 };
 
 /** struct wait_for_key_timer - wait for key timer object
@@ -853,6 +863,15 @@ struct del_bss_resp {
  * Return: Success or Failure status
  */
 QDF_STATUS mlme_init_rate_config(struct vdev_mlme_obj *vdev_mlme);
+
+/**
+ * mlme_init_connect_chan_info_config() - initialize channel info for a
+ * connection
+ * @vdev_mlme: pointer to vdev mlme object
+ *
+ * Return: Success or Failure status
+ */
+QDF_STATUS mlme_init_connect_chan_info_config(struct vdev_mlme_obj *vdev_mlme);
 
 /**
  * mlme_get_peer_mic_len() - get mic hdr len and mic length for peer
@@ -1654,6 +1673,35 @@ wlan_set_tpc_update_required_for_sta(struct wlan_objmgr_vdev *vdev, bool value)
 	return QDF_STATUS_SUCCESS;
 }
 #endif
+
+/**
+ * wlan_mlme_get_sta_tx_nss() - API to get station tx NSS
+ *
+ * @psoc: psoc context
+ * @vdev: pointer to vdev
+ * @tx_nss : tx_nss out parameter
+ *
+ * Return: QDF_STATUS_SUCCESS or QDF_STATUS_FAILURE
+ */
+QDF_STATUS
+wlan_mlme_get_sta_tx_nss(struct wlan_objmgr_psoc *psoc,
+			 struct wlan_objmgr_vdev *vdev,
+			 uint8_t *tx_nss);
+
+/**
+ * wlan_mlme_get_sta_rx_nss() - API to get station rx NSS
+ *
+ * @psoc: psoc context
+ * @vdev: pointer to vdev
+ * @rx_nss : rx_nss out parameter
+ *
+ * Return: QDF_STATUS_SUCCESS or QDF_STATUS_FAILURE
+ */
+QDF_STATUS
+wlan_mlme_get_sta_rx_nss(struct wlan_objmgr_psoc *psoc,
+			 struct wlan_objmgr_vdev *vdev,
+			 uint8_t *rx_nss);
+
 #ifdef WLAN_FEATURE_ROAM_OFFLOAD
 /**
  * wlan_mlme_defer_pmk_set_in_roaming() - Set the set_key pending status
@@ -1716,4 +1764,31 @@ bool wlan_vdev_is_sae_auth_type(struct wlan_objmgr_vdev *vdev);
  */
 uint16_t wlan_get_rand_from_lst_for_freq(uint16_t *freq_lst,
 					 uint8_t num_chan);
+#if defined WLAN_FEATURE_SR
+/**
+ * mlme_sr_update() - MLME sr update callback
+ * @vdev: vdev object
+ * @enable: true or false
+ *
+ * This function is called to update the SR threshold
+ */
+void mlme_sr_update(struct wlan_objmgr_vdev *vdev, bool enable);
+
+/**
+ * mlme_sr_is_enable: Check whether SR is enabled or not
+ * @vdev: object manager vdev
+ *
+ * Return: True/False
+ */
+int mlme_sr_is_enable(struct wlan_objmgr_vdev *vdev);
+#else
+static inline void mlme_sr_update(struct wlan_objmgr_vdev *vdev, bool enable)
+{
+}
+
+static inline int mlme_sr_is_enable(struct wlan_objmgr_vdev *vdev)
+{
+	return 0;
+}
+#endif /* WLAN_FEATURE_SR */
 #endif

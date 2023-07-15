@@ -207,7 +207,8 @@ static int wlan_cfg80211_set_pasn_key(struct hdd_adapter *adapter,
 	int cipher_len;
 	uint32_t cipher;
 
-	vdev = hdd_objmgr_get_vdev_by_user(adapter, WLAN_WIFI_POS_CORE_ID);
+	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink,
+					   WLAN_WIFI_POS_CORE_ID);
 	if (!vdev) {
 		hdd_err("Key params is NULL");
 		return -EINVAL;
@@ -331,7 +332,6 @@ wlan_hdd_cfg80211_send_set_ltf_keyseed_mlo_vdev(struct hdd_context *hdd_ctx,
 						struct wlan_crypto_ltf_keyseed_data *data,
 						int link_id)
 {
-	struct hdd_adapter *link_adapter;
 	struct wlan_objmgr_vdev *link_vdev;
 	struct wlan_objmgr_peer *peer;
 	uint16_t link, vdev_count = 0;
@@ -339,6 +339,8 @@ wlan_hdd_cfg80211_send_set_ltf_keyseed_mlo_vdev(struct hdd_context *hdd_ctx,
 	struct qdf_mac_addr original_mac;
 	struct wlan_objmgr_vdev *wlan_vdev_list[WLAN_UMAC_MLO_MAX_VDEVS] = {0};
 	QDF_STATUS status;
+	uint8_t vdev_id;
+	struct wlan_hdd_link_info *link_info;
 
 	if (!wlan_vdev_mlme_is_mlo_vdev(vdev))
 		return QDF_STATUS_SUCCESS;
@@ -349,10 +351,10 @@ wlan_hdd_cfg80211_send_set_ltf_keyseed_mlo_vdev(struct hdd_context *hdd_ctx,
 
 	for (link = 0; link < vdev_count; link++) {
 		link_vdev = wlan_vdev_list[link];
+		vdev_id = wlan_vdev_get_id(link_vdev);
 
-		link_adapter = hdd_get_adapter_by_vdev(
-					hdd_ctx, wlan_vdev_get_id(link_vdev));
-		if (!link_adapter) {
+		link_info = hdd_get_link_info_by_vdev(hdd_ctx, vdev_id);
+		if (!link_info) {
 			mlo_release_vdev_ref(link_vdev);
 			continue;
 		}

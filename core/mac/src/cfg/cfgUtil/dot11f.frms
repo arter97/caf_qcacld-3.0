@@ -2751,6 +2751,7 @@ const TLV_TRANSITION_REJECTIONP_ATTR_ID   = 7;
 const TLV_HE_DL_MUMIMO_SUPPP_ATTR_ID      = 8;
 const TLV_HE_MCS_11_12_ATTR_ID            = 9;
 const TLV_EDCA_PIFS_PARAM_ATTR_ID         = 13;
+const TLV_ECSA_TARGET_TSF_INFO_ATTR_ID    = 14;
 
 TLV qcn_version(TLV_VERSION_ATTR_ID) ( 1 : 1 ) LSB
 {
@@ -2806,6 +2807,12 @@ TLV edca_pifs_param_attr (TLV_EDCA_PIFS_PARAM_ATTR_ID) ( 1 : 1 ) LSB
    data[3..4];
 }
 
+TLV ecsa_target_tsf_info_attr (TLV_ECSA_TARGET_TSF_INFO_ATTR_ID) ( 1 : 1 ) LSB
+{
+    twt_ch_sw_mode, 1;
+    target_tsf, 8;
+}
+
 MULTIIE qcn_ie (EID_VENDOR_SPECIFIC) OUI ( 0x8C, 0xFD, 0xF0, 0x01 )
 {
    OPTIONALTLV qcn_version;
@@ -2818,6 +2825,7 @@ MULTIIE qcn_ie (EID_VENDOR_SPECIFIC) OUI ( 0x8C, 0xFD, 0xF0, 0x01 )
    OPTIONALTLV he_dl_mumimo_attr;
    OPTIONALTLV he_mcs13_attr;
    OPTIONALTLV edca_pifs_param_attr;
+   OPTIONALTLV ecsa_target_tsf_info_attr;
 }
 
 IE esp_information (EID_EXTN_ID_ELEMENT) OUI ( 0x0B )
@@ -4837,6 +4845,7 @@ FRAME ext_channel_switch_action_frame
     FF     Action;
     FF     ext_chan_switch_ann_action;
     OPTIE  WiderBWChanSwitchAnn;
+    OPTIE  qcn_ie;
 }
 
 FRAME p2p_oper_chan_change_confirm
@@ -4915,6 +4924,27 @@ FRAME mscs_request_action_frame
     FF     Action;
     FF     DialogToken;
     MANDIE descriptor_element;
+}
+
+FRAME epcs_neg_req
+{
+    FF    Category;
+    FF    Action;
+    FF    DialogToken;
+}
+
+FRAME epcs_neg_rsp
+{
+    FF    Category;
+    FF    Action;
+    FF    DialogToken;
+    FF    Status;
+}
+
+FRAME epcs_teardown
+{
+    FF    Category;
+    FF    Action;
 }
 
 // Local Variables:

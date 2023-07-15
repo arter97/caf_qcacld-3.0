@@ -454,12 +454,12 @@ void lim_process_beacon_eht(struct mac_context *mac_ctx,
 /**
  * lim_process_beacon_eht_op() - process beacon 11be eht op IE
  * @session: pe session
- * @eht_op: pointer to eht op IE
+ * @bcn_ptr: pointer to bcn ptr
  *
  * Return none
  */
 void lim_process_beacon_eht_op(struct pe_session *session,
-			       tDot11fIEeht_op *eht_op);
+			       struct sSirProbeRespBeacon *bcn_ptr);
 #else
 static inline
 void lim_process_beacon_eht(struct mac_context *mac_ctx,
@@ -470,7 +470,7 @@ void lim_process_beacon_eht(struct mac_context *mac_ctx,
 
 static inline
 void lim_process_beacon_eht_op(struct pe_session *session,
-			       tDot11fIEeht_op *eht_op)
+			       struct sSirProbeRespBeacon *bcn_ptr)
 {
 }
 #endif
@@ -1495,6 +1495,66 @@ lim_send_t2lm_action_rsp_frame(struct mac_context *mac_ctx,
 			       struct pe_session *session,
 			       uint8_t token,
 			       enum wlan_t2lm_resp_frm_type status_code);
+
+/**
+ * lim_send_epcs_update_edca_params() - Wrapper for EPCS update edca
+ * @vdev: vdev object
+ * @edca: the pointer of edca parameters
+ * @mu_edca: the flag of mu edca
+ *
+ * Return: 0 for success, non-zero for failure
+ */
+QDF_STATUS
+lim_send_epcs_update_edca_params(struct wlan_objmgr_vdev *vdev,
+				 tSirMacEdcaParamRecord *edca, bool mu_edca);
+
+/**
+ * lim_send_epcs_restore_edca_params() - Restore edca parameters
+ * @vdev: vdev object
+ *
+ * Return: 0 for success, non-zero for failure
+ */
+QDF_STATUS
+lim_send_epcs_restore_edca_params(struct wlan_objmgr_vdev *vdev);
+
+/**
+ * lim_send_epcs_action_rsp_frame() - Send EPCS action response frame
+ * @vdev: vdev object
+ * @peer_mac: peer mac address pointer
+ * @args: the pointer of action frame args
+ *
+ * Return: 0 for success, non-zero for failure
+ */
+QDF_STATUS
+lim_send_epcs_action_rsp_frame(struct wlan_objmgr_vdev *vdev,
+			       uint8_t *peer_mac,
+			       struct wlan_action_frame_args *args);
+
+/**
+ * lim_send_epcs_action_req_frame() - Send EPCS action request frame
+ * @vdev: vdev object
+ * @peer_mac: peer mac address pointer
+ * @args: the pointer of action frame args
+ *
+ * Return: 0 for success, non-zero for failure
+ */
+QDF_STATUS
+lim_send_epcs_action_req_frame(struct wlan_objmgr_vdev *vdev,
+			       uint8_t *peer_mac,
+			       struct wlan_action_frame_args *args);
+
+/**
+ * lim_send_epcs_action_teardown_frame() - Send EPCS action teardown frame
+ * @vdev: vdev object
+ * @peer_mac: peer mac address pointer
+ * @args: the pointer of action frame args
+ *
+ * Return: 0 for success, non-zero for failure
+ */
+QDF_STATUS
+lim_send_epcs_action_teardown_frame(struct wlan_objmgr_vdev *vdev,
+				    uint8_t *peer_mac,
+				    struct wlan_action_frame_args *args);
 #else
 static inline QDF_STATUS
 lim_send_t2lm_action_rsp_frame(struct mac_context *mac_ctx,

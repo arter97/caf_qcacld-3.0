@@ -170,9 +170,11 @@ struct cm_host_roam_start_ind {
 /**
  * struct cm_ext_obj - Connection manager legacy object
  * @rso_cfg: connect info to be used in RSO.
+ * @rso_usr_cfg: roam related userspace RSO configs.
  */
 struct cm_ext_obj {
 	struct rso_config rso_cfg;
+	struct rso_user_config rso_usr_cfg;
 };
 
 #ifdef WLAN_FEATURE_FILS_SK
@@ -749,5 +751,18 @@ cm_send_rso_stop(struct wlan_objmgr_vdev *vdev)
 {
 	return QDF_STATUS_E_NOSUPPORT;
 }
+#endif
+
+#ifdef WLAN_FEATURE_11BE_MLO
+/**
+ * cm_get_ml_partner_info() - Fill ML partner info from scan entry
+ * @scan_entry: Scan entry
+ * @partner_info: Partner info to be filled
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+cm_get_ml_partner_info(struct scan_cache_entry *scan_entry,
+		       struct mlo_partner_info *partner_info);
 #endif
 #endif /* __WLAN_CM_VDEV_API_H__ */

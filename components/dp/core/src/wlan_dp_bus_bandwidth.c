@@ -41,6 +41,7 @@
 #include "wlan_dp_txrx.h"
 #include "cdp_txrx_host_stats.h"
 #include "wlan_cm_roam_api.h"
+#include "hif_main.h"
 
 #ifdef FEATURE_BUS_BANDWIDTH_MGR
 /*
@@ -1219,15 +1220,20 @@ static void dp_display_periodic_stats(struct wlan_dp_psoc_context *dp_ctx,
 static inline void dp_pm_qos_update_cpu_mask(qdf_cpu_mask *mask,
 					     bool enable_perf_cluster)
 {
-	qdf_cpumask_set_cpu(0, mask);
-	qdf_cpumask_set_cpu(1, mask);
-	qdf_cpumask_set_cpu(2, mask);
-	qdf_cpumask_set_cpu(3, mask);
+	int package_id;
+	unsigned int cpus;
+	int perf_cpu_cluster = hif_get_perf_cluster_bitmap();
+	int little_cpu_cluster = BIT(CPU_CLUSTER_TYPE_LITTLE);
 
-	if (enable_perf_cluster) {
-		qdf_cpumask_set_cpu(4, mask);
-		qdf_cpumask_set_cpu(5, mask);
-		qdf_cpumask_set_cpu(6, mask);
+	qdf_cpumask_clear(mask);
+	qdf_for_each_online_cpu(cpus) {
+		package_id = qdf_topology_physical_package_id(cpus);
+		if (package_id >= 0 &&
+		    (BIT(package_id) & little_cpu_cluster ||
+		     (enable_perf_cluster &&
+		      BIT(package_id) & perf_cpu_cluster))) {
+			qdf_cpumask_set_cpu(cpus, mask);
+		}
 	}
 }
 
@@ -1712,6 +1718,8 @@ static void dp_pld_request_bus_bandwidth(struct wlan_dp_psoc_context *dp_ctx,
 					  true : false);
 		dp_periodic_sta_stats_display(dp_ctx);
 	}
+
+	hif_affinity_mgr_set_affinity(hif_ctx);
 }
 
 #ifdef WLAN_FEATURE_DYNAMIC_RX_AGGREGATION
@@ -2133,15 +2141,17 @@ void dp_bus_bw_compute_timer_try_start(struct wlan_objmgr_psoc *psoc)
 static void __dp_bus_bw_compute_timer_stop(struct wlan_objmgr_psoc *psoc)
 {
 	struct wlan_dp_psoc_context *dp_ctx = dp_psoc_get_priv(psoc);
-	hdd_cb_handle ctx = dp_ctx->dp_ops.callback_ctx;
+	hdd_cb_handle ctx;
 	ol_txrx_soc_handle soc = cds_get_context(QDF_MODULE_ID_SOC);
 
 	struct bbm_params param = {0};
-	bool is_any_adapter_conn =
-		dp_ctx->dp_ops.dp_any_adapter_connected(ctx);
+	bool is_any_adapter_conn;
 
 	if (QDF_GLOBAL_FTM_MODE == cds_get_conparam())
 		return;
+
+	ctx = dp_ctx->dp_ops.callback_ctx;
+	is_any_adapter_conn = dp_ctx->dp_ops.dp_any_adapter_connected(ctx);
 
 	if (!qdf_periodic_work_stop_sync(&dp_ctx->bus_bw_work))
 		goto exit;

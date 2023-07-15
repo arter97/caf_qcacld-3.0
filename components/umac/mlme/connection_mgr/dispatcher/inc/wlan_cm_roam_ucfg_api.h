@@ -123,10 +123,13 @@ ucfg_cm_update_session_assoc_ie(struct wlan_objmgr_psoc *psoc,
 	cm_update_session_assoc_ie(psoc, vdev_id, assoc_ie);
 }
 
-static inline enum phy_ch_width
-ucfg_cm_get_associated_ch_width(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id)
+static inline void
+ucfg_cm_get_associated_ch_info(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
+			       enum phy_ch_width scanned_ch_width,
+			       struct assoc_channel_info *assoc_chan_info)
 {
-	return wlan_cm_get_associated_ch_width(psoc, vdev_id);
+	wlan_cm_get_associated_ch_info(psoc, vdev_id, scanned_ch_width,
+				       assoc_chan_info);
 }
 
 #ifdef WLAN_FEATURE_ROAM_OFFLOAD

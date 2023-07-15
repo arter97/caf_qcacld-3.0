@@ -75,7 +75,7 @@ static void wlan_hdd_pre_cac_success(struct hdd_adapter *adapter)
 	}
 
 	pre_cac_ch_width = wlansap_get_chan_width(
-				WLAN_HDD_GET_SAP_CTX_PTR(adapter));
+				WLAN_HDD_GET_SAP_CTX_PTR(adapter->deflink));
 
 	hdd_stop_adapter(hdd_ctx, adapter);
 
@@ -127,6 +127,7 @@ void hdd_close_pre_cac_adapter(struct hdd_context *hdd_ctx)
 	osif_vdev_sync_wait_for_ops(vdev_sync);
 
 	wlan_hdd_release_intf_addr(hdd_ctx, pre_cac_adapter->mac_addr.bytes);
+	pre_cac_adapter->is_virtual_iface = true;
 	hdd_close_adapter(hdd_ctx, pre_cac_adapter, true);
 
 	osif_vdev_sync_trans_stop(vdev_sync);
@@ -215,7 +216,7 @@ static int __wlan_hdd_request_pre_cac(struct hdd_context *hdd_ctx,
 	uint32_t pre_cac_chan_freq = 0;
 	int ret;
 	struct hdd_adapter *ap_adapter, *pre_cac_adapter;
-	struct hdd_ap_ctx *hdd_ap_ctx;
+	struct hdd_ap_ctx *hdd_ap_ctx, *pre_cac_ap_ctx;
 	QDF_STATUS status;
 	struct wiphy *wiphy;
 	struct net_device *dev;
@@ -224,6 +225,7 @@ static int __wlan_hdd_request_pre_cac(struct hdd_context *hdd_ctx,
 	mac_handle_t mac_handle;
 	enum phy_ch_width cac_ch_width;
 	struct hdd_adapter_create_param params = {0};
+	struct wlan_hdd_link_info *pre_cac_link_info, *link_info;
 
 	if (!policy_mgr_is_hw_dbs_capable(hdd_ctx->psoc)) {
 		hdd_debug("Pre CAC is not supported on non-dbs platforms");
@@ -237,6 +239,7 @@ static int __wlan_hdd_request_pre_cac(struct hdd_context *hdd_ctx,
 		hdd_err("pre cac not allowed in concurrency");
 		return -EINVAL;
 	}
+	pre_cac_link_info = pre_cac_adapter->deflink;
 
 	ap_adapter = hdd_get_adapter(hdd_ctx, QDF_SAP_MODE);
 	if (!ap_adapter) {
@@ -244,18 +247,15 @@ static int __wlan_hdd_request_pre_cac(struct hdd_context *hdd_ctx,
 		return -EINVAL;
 	}
 
-	if (qdf_atomic_read(&ap_adapter->ch_switch_in_progress)) {
+	link_info = ap_adapter->deflink;
+	hdd_ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(link_info);
+
+	if (qdf_atomic_read(&hdd_ap_ctx->ch_switch_in_progress)) {
 		hdd_err("pre cac not allowed during CSA");
 		return -EINVAL;
 	}
 
 	mac_handle = hdd_ctx->mac_handle;
-
-	hdd_ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(ap_adapter);
-	if (!hdd_ap_ctx) {
-		hdd_err("SAP context is NULL");
-		return -EINVAL;
-	}
 
 	if (wlan_reg_is_dfs_for_freq(hdd_ctx->pdev,
 				     hdd_ap_ctx->operating_chan_freq)) {
@@ -265,7 +265,7 @@ static int __wlan_hdd_request_pre_cac(struct hdd_context *hdd_ctx,
 	}
 
 	if (!WLAN_REG_IS_24GHZ_CH_FREQ(hdd_ap_ctx->operating_chan_freq)) {
-		hdd_err("pre CAC alllowed only when SAP is in 2.4GHz:%d",
+		hdd_err("pre CAC allowed only when SAP is in 2.4GHz:%d",
 			hdd_ap_ctx->operating_chan_freq);
 		return -EINVAL;
 	}
@@ -319,8 +319,8 @@ static int __wlan_hdd_request_pre_cac(struct hdd_context *hdd_ctx,
 		}
 	}
 
-	sap_clear_global_dfs_param(mac_handle,
-				   WLAN_HDD_GET_SAP_CTX_PTR(pre_cac_adapter));
+	pre_cac_ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(pre_cac_link_info);
+	sap_clear_global_dfs_param(mac_handle, pre_cac_ap_ctx->sap_context);
 
 	/*
 	 * This interface is internally created by the driver. So, no interface
@@ -341,18 +341,15 @@ static int __wlan_hdd_request_pre_cac(struct hdd_context *hdd_ctx,
 	 * other active SAP interface. In regular scenarios, these IEs would
 	 * come from the user space entity
 	 */
-	pre_cac_adapter->deflink->session.ap.beacon = qdf_mem_malloc(
-			sizeof(*ap_adapter->deflink->session.ap.beacon));
-	if (!pre_cac_adapter->deflink->session.ap.beacon)
+	pre_cac_ap_ctx->beacon = qdf_mem_malloc(sizeof(*hdd_ap_ctx->beacon));
+	if (!pre_cac_ap_ctx->beacon)
 		goto stop_close_pre_cac_adapter;
 
-	qdf_mem_copy(pre_cac_adapter->deflink->session.ap.beacon,
-		     ap_adapter->deflink->session.ap.beacon,
-		     sizeof(*pre_cac_adapter->deflink->session.ap.beacon));
-	pre_cac_adapter->deflink->session.ap.sap_config.ch_width_orig =
-		ap_adapter->deflink->session.ap.sap_config.ch_width_orig;
-	pre_cac_adapter->deflink->session.ap.sap_config.authType =
-			ap_adapter->deflink->session.ap.sap_config.authType;
+	qdf_mem_copy(pre_cac_ap_ctx->beacon, hdd_ap_ctx->beacon,
+		     sizeof(*pre_cac_ap_ctx->beacon));
+	pre_cac_ap_ctx->sap_config.authType = hdd_ap_ctx->sap_config.authType;
+	pre_cac_ap_ctx->sap_config.ch_width_orig =
+					hdd_ap_ctx->sap_config.ch_width_orig;
 
 	/* The original premise is that on moving from 2.4GHz to 5GHz, the SAP
 	 * will continue to operate on the same bandwidth as that of the 2.4GHz
@@ -361,23 +358,21 @@ static int __wlan_hdd_request_pre_cac(struct hdd_context *hdd_ctx,
 	 * Hence use max possible supported BW based on phymode configurated
 	 * on SAP.
 	 */
-	cac_ch_width = wlansap_get_max_bw_by_phymode(
-			WLAN_HDD_GET_SAP_CTX_PTR(ap_adapter));
+	cac_ch_width = wlansap_get_max_bw_by_phymode(hdd_ap_ctx->sap_context);
 	if (cac_ch_width > DEFAULT_PRE_CAC_BANDWIDTH)
 		cac_ch_width = DEFAULT_PRE_CAC_BANDWIDTH;
 
 	qdf_mem_zero(&chandef, sizeof(struct cfg80211_chan_def));
-	if (wlan_set_def_pre_cac_chan(hdd_ctx, pre_cac_chan_freq,
-				      &chandef, &channel_type,
-				      &cac_ch_width)) {
+	if (wlan_set_def_pre_cac_chan(hdd_ctx, pre_cac_chan_freq, &chandef,
+				      &channel_type, &cac_ch_width)) {
 		hdd_err("error set pre_cac channel %d", pre_cac_chan_freq);
 		goto close_pre_cac_adapter;
 	}
-	pre_cac_adapter->deflink->session.ap.sap_config.ch_width_orig =
+	pre_cac_ap_ctx->sap_config.ch_width_orig =
 					hdd_map_nl_chan_width(chandef.width);
 
 	hdd_debug("existing ap phymode:%d pre cac ch_width:%d freq:%d",
-		  ap_adapter->deflink->session.ap.sap_config.SapHw_mode,
+		  hdd_ap_ctx->sap_config.SapHw_mode,
 		  cac_ch_width, pre_cac_chan_freq);
 	/*
 	 * Doing update after opening and starting pre-cac adapter will make
@@ -388,7 +383,7 @@ static int __wlan_hdd_request_pre_cac(struct hdd_context *hdd_ctx,
 	 */
 	status = policy_mgr_update_and_wait_for_connection_update(
 					    hdd_ctx->psoc,
-					    ap_adapter->deflink->vdev_id,
+					    link_info->vdev_id,
 					    pre_cac_chan_freq,
 					    POLICY_MGR_UPDATE_REASON_PRE_CAC);
 	if (QDF_IS_STATUS_ERROR(status)) {
@@ -402,8 +397,8 @@ static int __wlan_hdd_request_pre_cac(struct hdd_context *hdd_ctx,
 		goto stop_close_pre_cac_adapter;
 	}
 
-	status = wlan_hdd_cfg80211_start_bss(pre_cac_adapter, NULL,
-					     PRE_CAC_SSID,
+	status = wlan_hdd_cfg80211_start_bss(pre_cac_link_info,
+					     NULL, PRE_CAC_SSID,
 					     qdf_str_len(PRE_CAC_SSID),
 					     NL80211_HIDDEN_SSID_NOT_IN_USE,
 					     false);
@@ -417,26 +412,27 @@ static int __wlan_hdd_request_pre_cac(struct hdd_context *hdd_ctx,
 	 * anywhere, since after the pre cac success/failure, the pre cac
 	 * adapter itself would be removed.
 	 */
-	ret = ucfg_pre_cac_set_status(pre_cac_adapter->deflink->vdev, true);
+	ret = ucfg_pre_cac_set_status(pre_cac_link_info->vdev, true);
 	if (ret != 0) {
 		hdd_err("failed to set pre cac status");
 		goto stop_close_pre_cac_adapter;
 	}
 
-	ucfg_pre_cac_set_freq_before_pre_cac(ap_adapter->deflink->vdev,
+	ucfg_pre_cac_set_freq_before_pre_cac(link_info->vdev,
 					     hdd_ap_ctx->operating_chan_freq);
-	ucfg_pre_cac_set_freq(ap_adapter->deflink->vdev, pre_cac_chan_freq);
-	ucfg_pre_cac_adapter_set(pre_cac_adapter->deflink->vdev, true);
+	ucfg_pre_cac_set_freq(link_info->vdev, pre_cac_chan_freq);
+	ucfg_pre_cac_adapter_set(pre_cac_link_info->vdev, true);
 	*out_adapter = pre_cac_adapter;
 
 	return 0;
 
 stop_close_pre_cac_adapter:
+	pre_cac_adapter->is_virtual_iface = true;
 	hdd_stop_adapter(hdd_ctx, pre_cac_adapter);
-	qdf_mem_free(pre_cac_adapter->deflink->session.ap.beacon);
-	pre_cac_adapter->deflink->session.ap.beacon = NULL;
+	qdf_mem_free(pre_cac_ap_ctx->beacon);
+	pre_cac_ap_ctx->beacon = NULL;
 close_pre_cac_adapter:
-	hdd_close_adapter(hdd_ctx, pre_cac_adapter, false);
+	hdd_close_adapter(hdd_ctx, pre_cac_adapter, true);
 release_intf_addr_and_return_failure:
 	/*
 	 * Release the interface address as the adapter
@@ -519,16 +515,18 @@ wlan_hdd_pre_cac_conditional_freq_switch_ind(struct wlan_objmgr_vdev *vdev,
 	struct wlan_objmgr_psoc *psoc = wlan_vdev_get_psoc(vdev);
 	uint8_t vdev_id = vdev->vdev_objmgr.vdev_id;
 	struct hdd_adapter *adapter;
+	struct wlan_hdd_link_info *link_info;
 	struct hdd_ap_ctx *ap_ctx;
 
-	adapter = wlan_hdd_get_adapter_from_vdev(psoc, vdev_id);
-	if (!adapter) {
-		hdd_err("Invalid adapter");
+	link_info = wlan_hdd_get_link_info_from_vdev(psoc, vdev_id);
+	if (!link_info) {
+		hdd_err("Invalid vdev");
 		return;
 	}
 
+	adapter = link_info->adapter;
 	if (completed) {
-		ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(adapter);
+		ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(link_info);
 		ap_ctx->dfs_cac_block_tx = false;
 		ucfg_ipa_set_dfs_cac_tx(adapter->hdd_ctx->pdev,
 					ap_ctx->dfs_cac_block_tx);
@@ -547,18 +545,18 @@ wlan_hdd_pre_cac_complete(struct wlan_objmgr_psoc *psoc,
 			  uint8_t vdev_id,
 			  QDF_STATUS status)
 {
-	struct hdd_adapter *adapter;
+	struct wlan_hdd_link_info *link_info;
 
-	adapter = wlan_hdd_get_adapter_from_vdev(psoc, vdev_id);
-	if (!adapter) {
-		hdd_err("Invalid adapter vdev %d", vdev_id);
+	link_info = wlan_hdd_get_link_info_from_vdev(psoc, vdev_id);
+	if (!link_info) {
+		hdd_err("Invalid vdev %d", vdev_id);
 		return;
 	}
 
 	if (QDF_IS_STATUS_SUCCESS(status))
-		wlan_hdd_pre_cac_success(adapter);
+		wlan_hdd_pre_cac_success(link_info->adapter);
 	else
-		wlan_hdd_pre_cac_failure(adapter);
+		wlan_hdd_pre_cac_failure(link_info->adapter);
 }
 
 struct osif_pre_cac_legacy_ops pre_cac_legacy_ops = {

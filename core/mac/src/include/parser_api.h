@@ -512,6 +512,7 @@ typedef struct sSirAssocRsp {
 #endif
 #ifdef WLAN_FEATURE_11BE_MLO
 	struct sir_multi_link_ie mlo_ie;
+	struct wlan_t2lm_context t2lm_ctx;
 #endif
 } tSirAssocRsp, *tpSirAssocRsp;
 
@@ -1282,13 +1283,15 @@ QDF_STATUS populate_dot11f_he_caps(struct mac_context *, struct pe_session *,
  * @mac_ctx: Global MAC context
  * @is_2g: is 2G band
  * @eht_cap: pointer to HE capability IE
+ * @session: pointer to pe session
  *
  * Populate the HE capability IE based on band.
  */
 QDF_STATUS
 populate_dot11f_he_caps_by_band(struct mac_context *mac_ctx,
 				bool is_2g,
-				tDot11fIEhe_cap *he_cap);
+				tDot11fIEhe_cap *he_cap,
+				struct pe_session *session);
 
 /**
  * populate_dot11f_he_operation() - populate he operation IE

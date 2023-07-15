@@ -137,6 +137,39 @@ void hdd_put_consistent_mem_unaligned(void *vaddr)
 	ucfg_dp_prealloc_put_consistent_mem_unaligned(vaddr);
 }
 
+/**
+ * hdd_dp_prealloc_get_multi_pages() - gets pre-alloc DP multi-pages memory
+ * @desc_type: descriptor type
+ * @elem_size: single element size
+ * @elem_num: total number of elements should be allocated
+ * @pages: multi page information storage
+ * @cacheable: coherent memory or cacheable memory
+ *
+ * Return: None
+ */
+static
+void hdd_dp_prealloc_get_multi_pages(uint32_t desc_type, qdf_size_t elem_size,
+				     uint16_t elem_num,
+				     struct qdf_mem_multi_page_t *pages,
+				     bool cacheable)
+{
+	ucfg_dp_prealloc_get_multi_pages(desc_type, elem_size, elem_num, pages,
+					 cacheable);
+}
+
+/**
+ * hdd_dp_prealloc_put_multi_pages() - puts back pre-alloc DP multi-pages memory
+ * @desc_type: descriptor type
+ * @pages: multi page information storage
+ *
+ * Return: None
+ */
+static
+void hdd_dp_prealloc_put_multi_pages(uint32_t desc_type,
+				     struct qdf_mem_multi_page_t *pages)
+{
+	ucfg_dp_prealloc_put_multi_pages(desc_type, pages);
+}
 #else
 static
 void *hdd_get_consistent_mem_unaligned(size_t size,
@@ -152,6 +185,20 @@ static
 void hdd_put_consistent_mem_unaligned(void *vaddr)
 {
 	hdd_err_rl("prealloc not support!");
+}
+
+static inline
+void hdd_dp_prealloc_get_multi_pages(uint32_t desc_type, qdf_size_t elem_size,
+				     uint16_t elem_num,
+				     struct qdf_mem_multi_page_t *pages,
+				     bool cacheable)
+{
+}
+
+static inline
+void hdd_dp_prealloc_put_multi_pages(uint32_t desc_type,
+				     struct qdf_mem_multi_page_t *pages)
+{
 }
 #endif
 
@@ -266,6 +313,10 @@ static void hdd_hif_init_driver_state_callbacks(void *data,
 		hdd_get_consistent_mem_unaligned;
 	cbk->prealloc_put_consistent_mem_unaligned =
 		hdd_put_consistent_mem_unaligned;
+	cbk->prealloc_get_multi_pages =
+		hdd_dp_prealloc_get_multi_pages;
+	cbk->prealloc_put_multi_pages =
+		hdd_dp_prealloc_put_multi_pages;
 }
 
 #ifdef HIF_DETECTION_LATENCY_ENABLE
@@ -474,6 +525,7 @@ int hdd_hif_open(struct device *dev, void *bdev, const struct hif_bus_id *bid,
 				cfg_get(hdd_ctx->psoc,
 					CFG_DP_CE_SERVICE_MAX_YIELD_TIME));
 	ucfg_pmo_psoc_set_hif_handle(hdd_ctx->psoc, hif_ctx);
+	ucfg_dp_set_hif_handle(hdd_ctx->psoc, hif_ctx);
 	hif_set_ce_service_max_rx_ind_flush(hif_ctx,
 				cfg_get(hdd_ctx->psoc,
 					CFG_DP_CE_SERVICE_MAX_RX_IND_FLUSH));
@@ -534,10 +586,30 @@ static int hdd_init_qdf_ctx(struct device *dev, void *bdev,
 	qdf_dev->bus_type = bus_type;
 	qdf_dev->bid = bid;
 
+	qdf_dma_invalid_buf_list_init();
+
 	if (cds_smmu_mem_map_setup(qdf_dev, ucfg_ipa_is_ready()) !=
 		QDF_STATUS_SUCCESS) {
 		hdd_err("cds_smmu_mem_map_setup() failed");
 	}
+
+	return 0;
+}
+
+/**
+ * hdd_deinit_qdf_ctx() - API to Deinitialize global QDF Device structure
+ * @domain: Debug domain
+ *
+ * Return: 0 - success, < 0 - failure
+ */
+int hdd_deinit_qdf_ctx(uint8_t domain)
+{
+	qdf_device_t qdf_dev = cds_get_context(QDF_MODULE_ID_QDF_DEVICE);
+
+	if (!qdf_dev)
+		return -EINVAL;
+
+	qdf_dma_invalid_buf_free(qdf_dev->dev, domain);
 
 	return 0;
 }
@@ -1264,7 +1336,8 @@ static int __wlan_hdd_bus_suspend(struct wow_enable_params wow_params,
 	}
 
 	dp_soc = cds_get_context(QDF_MODULE_ID_SOC);
-	err = qdf_status_to_os_return(cdp_bus_suspend(dp_soc, OL_TXRX_PDEV_ID));
+	err = qdf_status_to_os_return(ucfg_dp_bus_suspend(dp_soc,
+							  OL_TXRX_PDEV_ID));
 	if (err) {
 		hdd_err("Failed cdp bus suspend: %d", err);
 		return err;
@@ -1273,13 +1346,13 @@ static int __wlan_hdd_bus_suspend(struct wow_enable_params wow_params,
 	if (ucfg_ipa_is_tx_pending(hdd_ctx->pdev)) {
 		hdd_err("failed due to pending IPA TX comps");
 		err = -EBUSY;
-		goto resume_cdp;
+		goto resume_dp;
 	}
 
 	err = hif_bus_early_suspend(hif_ctx);
 	if (err) {
 		hdd_err("Failed hif bus early suspend");
-		goto resume_cdp;
+		goto resume_dp;
 	}
 
 	status = ucfg_pmo_psoc_bus_suspend_req(hdd_ctx->psoc,
@@ -1347,8 +1420,8 @@ late_hif_resume:
 	status = hif_bus_late_resume(hif_ctx);
 	QDF_BUG(QDF_IS_STATUS_SUCCESS(status));
 
-resume_cdp:
-	status = cdp_bus_resume(dp_soc, OL_TXRX_PDEV_ID);
+resume_dp:
+	status = ucfg_dp_bus_resume(dp_soc, OL_TXRX_PDEV_ID);
 	QDF_BUG(QDF_IS_STATUS_SUCCESS(status));
 	hif_system_pm_set_state_on(hif_ctx);
 
@@ -1526,7 +1599,7 @@ int wlan_hdd_bus_resume(enum qdf_suspend_type type)
 	}
 
 	dp_soc = cds_get_context(QDF_MODULE_ID_SOC);
-	qdf_status = cdp_bus_resume(dp_soc, OL_TXRX_PDEV_ID);
+	qdf_status = ucfg_dp_bus_resume(dp_soc, OL_TXRX_PDEV_ID);
 	status = qdf_status_to_os_return(qdf_status);
 	if (status) {
 		hdd_err("Failed cdp bus resume");

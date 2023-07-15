@@ -185,13 +185,14 @@ void hdd_ipa_send_nbuf_to_network(qdf_nbuf_t nbuf, qdf_netdev_t dev)
 		return;
 	}
 
-	stats = &adapter->hdd_stats.tx_rx_stats;
+	stats = &adapter->deflink->hdd_stats.tx_rx_stats;
 	hdd_ipa_update_rx_mcbc_stats(adapter, nbuf);
 
 	if ((adapter->device_mode == QDF_SAP_MODE) &&
 	    (qdf_nbuf_is_ipv4_dhcp_pkt(nbuf) == true)) {
 		/* Send DHCP Indication to FW */
-		vdev = hdd_objmgr_get_vdev_by_user(adapter, WLAN_DP_ID);
+		vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink,
+						   WLAN_DP_ID);
 		if (vdev) {
 			ucfg_dp_softap_inspect_dhcp_packet(vdev, nbuf, QDF_RX);
 			hdd_objmgr_put_vdev_by_user(vdev, WLAN_DP_ID);
@@ -204,7 +205,8 @@ void hdd_ipa_send_nbuf_to_network(qdf_nbuf_t nbuf, qdf_netdev_t dev)
 
 	ucfg_dp_event_eapol_log(nbuf, QDF_RX);
 	qdf_dp_trace_log_pkt(adapter->deflink->vdev_id,
-			     nbuf, QDF_RX, QDF_TRACE_DEFAULT_PDEV_ID);
+			     nbuf, QDF_RX, QDF_TRACE_DEFAULT_PDEV_ID,
+			     adapter->device_mode);
 	DPTRACE(qdf_dp_trace(nbuf,
 			     QDF_DP_TRACE_RX_HDD_PACKET_PTR_RECORD,
 			     QDF_TRACE_DEFAULT_PDEV_ID,

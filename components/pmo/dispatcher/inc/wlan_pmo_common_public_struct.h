@@ -153,7 +153,7 @@ enum pmo_wow_interface_pause {
  *  byte match.
  * @PMO_WOW_ENABLE_MAGIC_PATTERN: Enable magic pattern match on all interfaces.
  * @PMO_WOW_ENABLE_PATTERN_BYTE: Enable pattern byte match on all interfaces.
- * @PMO_WOW_ENABLE_BOTH: Enable both magic patter and pattern byte match on
+ * @PMO_WOW_ENABLE_BOTH: Enable both magic pattern and pattern byte match on
  *  all interfaces.
  */
 enum pmo_wow_enable_type {
@@ -419,7 +419,7 @@ struct pmo_psoc_cfg {
 	bool ap_arpns_support;
 	bool d0_wow_supported;
 	bool ra_ratelimit_enable;
-#if FEATURE_WLAN_RA_FILTERING
+#ifdef FEATURE_WLAN_RA_FILTERING
 	uint16_t ra_ratelimit_interval;
 #endif
 	bool magic_ptrn_enable;

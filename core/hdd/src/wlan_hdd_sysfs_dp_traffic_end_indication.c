@@ -48,7 +48,7 @@ __hdd_sysfs_dp_traffic_end_indication_show(struct net_device *net_dev,
 	if (!wlan_hdd_validate_modules_state(adapter->hdd_ctx))
 		return -EINVAL;
 
-	vdev = hdd_objmgr_get_vdev_by_user(adapter, WLAN_DP_ID);
+	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink, WLAN_DP_ID);
 	if (!vdev)
 		return -EINVAL;
 
@@ -144,7 +144,7 @@ __hdd_sysfs_dp_traffic_end_indication_store(struct net_device *net_dev,
 		return -EINVAL;
 	}
 
-	vdev = hdd_objmgr_get_vdev_by_user(adapter, WLAN_DP_ID);
+	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink, WLAN_DP_ID);
 	if (!vdev)
 		return -EINVAL;
 

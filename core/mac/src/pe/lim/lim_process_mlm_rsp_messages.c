@@ -46,7 +46,7 @@
 #include "wlan_lmac_if_def.h"
 #include <lim_mlo.h>
 #include "wlan_mlo_mgr_sta.h"
-#include "../../../../qca-wifi-host-cmn/umac/mlo_mgr/inc/utils_mlo.h"
+#include "utils_mlo.h"
 #include "wlan_mlo_mgr_roam.h"
 
 #define MAX_SUPPORTED_PEERS_WEP 16
@@ -425,6 +425,7 @@ static void lim_send_mlm_assoc_req(struct mac_context *mac_ctx,
 		session_entry, QDF_STATUS_SUCCESS, QDF_STATUS_SUCCESS);
 #endif
 	assoc_req->listenInterval = (uint16_t) val;
+	pe_debug("Listen Interval : %d", assoc_req->listenInterval);
 	/* Update PE session ID */
 	assoc_req->sessionId = session_entry->peSessionId;
 	session_entry->limPrevSmeState = session_entry->limSmeState;
@@ -2402,7 +2403,7 @@ void lim_handle_add_bss_rsp(struct mac_context *mac_ctx,
 			}
 			tx_ops = wlan_reg_get_tx_ops(mac_ctx->psoc);
 
-			lim_calculate_tpc(mac_ctx, session_entry, false);
+			lim_calculate_tpc(mac_ctx, session_entry);
 
 			if (tx_ops->set_tpc_power)
 				tx_ops->set_tpc_power(mac_ctx->psoc,
@@ -2528,7 +2529,6 @@ void lim_process_mlm_update_hidden_ssid_rsp(struct mac_context *mac_ctx,
 void lim_process_mlm_set_sta_key_rsp(struct mac_context *mac_ctx,
 	struct scheduler_msg *msg)
 {
-	uint8_t resp_reqd = 1;
 	struct sLimMlmSetKeysCnf mlm_set_key_cnf;
 	uint8_t session_id = 0;
 	uint8_t vdev_id;
@@ -2568,38 +2568,22 @@ void lim_process_mlm_set_sta_key_rsp(struct mac_context *mac_ctx,
 	}
 
 	MTRACE(mac_trace(mac_ctx, TRACE_CODE_MLM_STATE, session_id, mlm_state));
-	pe_debug("PE session ID %d, vdev_id %d", session_id, vdev_id);
 	result_status = set_key_params->status;
-	key_len = set_key_params->key[0].keyLength;
+	key_len = set_key_params->key_len;
+	pe_debug("PE session ID %d, vdev_id %d key_len %d status %d",
+		 session_id, vdev_id, key_len, result_status);
 
 	if (result_status == eSIR_SME_SUCCESS && key_len)
 		mlm_set_key_cnf.key_len_nonzero = true;
 	else
 		mlm_set_key_cnf.key_len_nonzero = false;
 
-	if (resp_reqd) {
-		tpLimMlmSetKeysReq lpLimMlmSetKeysReq =
-			(tpLimMlmSetKeysReq) mac_ctx->lim.gpLimMlmSetKeysReq;
-		/* Prepare and Send LIM_MLM_SETKEYS_CNF */
-		if (lpLimMlmSetKeysReq) {
-			qdf_copy_macaddr(&mlm_set_key_cnf.peer_macaddr,
-					 &lpLimMlmSetKeysReq->peer_macaddr);
-			/*
-			 * Free the buffer cached for the global
-			 * mac_ctx->lim.gpLimMlmSetKeysReq
-			 */
-			qdf_mem_zero(mac_ctx->lim.gpLimMlmSetKeysReq,
-				     sizeof(tpLimMlmSetKeysReq));
-			qdf_mem_free(mac_ctx->lim.gpLimMlmSetKeysReq);
-			mac_ctx->lim.gpLimMlmSetKeysReq = NULL;
-		} else {
-			qdf_copy_macaddr(&mlm_set_key_cnf.peer_macaddr,
-					 &set_key_params->macaddr);
-		}
-		mlm_set_key_cnf.sessionId = session_id;
-		lim_post_sme_message(mac_ctx, LIM_MLM_SETKEYS_CNF,
-			(uint32_t *) &mlm_set_key_cnf);
-	}
+	qdf_copy_macaddr(&mlm_set_key_cnf.peer_macaddr,
+			 &set_key_params->macaddr);
+	mlm_set_key_cnf.sessionId = session_id;
+	lim_post_sme_message(mac_ctx, LIM_MLM_SETKEYS_CNF,
+			     (uint32_t *) &mlm_set_key_cnf);
+
 	qdf_mem_zero(msg->bodyptr, sizeof(*set_key_params));
 	qdf_mem_free(msg->bodyptr);
 	msg->bodyptr = NULL;
@@ -2624,8 +2608,8 @@ void lim_process_mlm_set_bss_key_rsp(struct mac_context *mac_ctx,
 	uint8_t session_id = 0;
 	uint8_t vdev_id;
 	struct pe_session *session_entry;
-	tpLimMlmSetKeysReq set_key_req;
 	uint16_t key_len;
+	tSetBssKeyParams *bss_key;
 
 	SET_LIM_PROCESS_DEFD_MESGS(mac_ctx, true);
 	qdf_mem_zero((void *)&set_key_cnf, sizeof(tLimMlmSetKeysCnf));
@@ -2633,7 +2617,8 @@ void lim_process_mlm_set_bss_key_rsp(struct mac_context *mac_ctx,
 		pe_err("msg bodyptr is null");
 		return;
 	}
-	vdev_id = ((tpSetBssKeyParams) msg->bodyptr)->vdev_id;
+	bss_key = msg->bodyptr;
+	vdev_id = bss_key->vdev_id;
 	session_entry = pe_find_session_by_vdev_id(mac_ctx, vdev_id);
 	if (!session_entry) {
 		pe_err("session does not exist for vdev_id %d", vdev_id);
@@ -2647,16 +2632,8 @@ void lim_process_mlm_set_bss_key_rsp(struct mac_context *mac_ctx,
 	}
 
 	session_id = session_entry->peSessionId;
-	if (eLIM_MLM_WT_SET_BSS_KEY_STATE == session_entry->limMlmState) {
-		result_status =
-			(uint16_t)(((tpSetBssKeyParams)msg->bodyptr)->status);
-		key_len = ((tpSetBssKeyParams)msg->bodyptr)->key[0].keyLength;
-	} else {
-		result_status =
-			(uint16_t)(((tpSetBssKeyParams)msg->bodyptr)->status);
-		key_len = ((tpSetBssKeyParams)msg->bodyptr)->key[0].keyLength;
-	}
-
+	result_status = (uint16_t)bss_key->status;
+	key_len = bss_key->key_len;
 	pe_debug("vdev %d (pe %d) limMlmState %d status %d key_len %d",
 		 vdev_id, session_id, session_entry->limMlmState,
 		 result_status, key_len);
@@ -2669,26 +2646,10 @@ void lim_process_mlm_set_bss_key_rsp(struct mac_context *mac_ctx,
 	MTRACE(mac_trace
 		(mac_ctx, TRACE_CODE_MLM_STATE, session_entry->peSessionId,
 		session_entry->limMlmState));
-	set_key_req =
-		(tpLimMlmSetKeysReq) mac_ctx->lim.gpLimMlmSetKeysReq;
 	set_key_cnf.sessionId = session_id;
 
 	/* Prepare and Send LIM_MLM_SETKEYS_CNF */
-	if (set_key_req) {
-		qdf_copy_macaddr(&set_key_cnf.peer_macaddr,
-				 &set_key_req->peer_macaddr);
-		/*
-		 * Free the buffer cached for the
-		 * global mac_ctx->lim.gpLimMlmSetKeysReq
-		 */
-		qdf_mem_zero(mac_ctx->lim.gpLimMlmSetKeysReq,
-			     sizeof(*set_key_req));
-		qdf_mem_free(mac_ctx->lim.gpLimMlmSetKeysReq);
-		mac_ctx->lim.gpLimMlmSetKeysReq = NULL;
-	} else {
-		qdf_copy_macaddr(&set_key_cnf.peer_macaddr,
-				 &((tpSetBssKeyParams)msg->bodyptr)->macaddr);
-	}
+	qdf_copy_macaddr(&set_key_cnf.peer_macaddr, &bss_key->macaddr);
 	qdf_mem_zero(msg->bodyptr, sizeof(tSetBssKeyParams));
 	qdf_mem_free(msg->bodyptr);
 	msg->bodyptr = NULL;
@@ -3122,7 +3083,7 @@ static void lim_process_switch_channel_join_req(
 			goto error;
 		}
 
-		lim_calculate_tpc(mac_ctx, session_entry, false);
+		lim_calculate_tpc(mac_ctx, session_entry);
 
 		if (tx_ops->set_tpc_power)
 			tx_ops->set_tpc_power(mac_ctx->psoc,

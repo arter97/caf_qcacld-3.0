@@ -680,7 +680,7 @@ QDF_STATUS dp_softap_start_xmit(qdf_nbuf_t nbuf, struct wlan_dp_intf *dp_intf)
 		goto drop_pkt_and_release_skb;
 	}
 
-	if (dp_intf->tx_fn(soc, dp_intf->intf_id, nbuf)) {
+	if (dp_intf->txrx_ops.tx.tx(soc, dp_intf->intf_id, nbuf)) {
 		dp_debug("Failed to send packet to txrx for sta: "
 			 QDF_MAC_ADDR_FMT,
 			 QDF_MAC_ADDR_REF(dest_mac_addr->bytes));
@@ -856,7 +856,8 @@ QDF_STATUS dp_softap_rx_packet_cbk(void *intf_ctx, qdf_nbuf_t rx_buf)
 
 		dp_event_eapol_log(nbuf, QDF_RX);
 		qdf_dp_trace_log_pkt(dp_intf->intf_id,
-				     nbuf, QDF_RX, QDF_TRACE_DEFAULT_PDEV_ID);
+				     nbuf, QDF_RX, QDF_TRACE_DEFAULT_PDEV_ID,
+				     dp_intf->device_mode);
 		DPTRACE(qdf_dp_trace(nbuf,
 				     QDF_DP_TRACE_RX_PACKET_PTR_RECORD,
 				     QDF_TRACE_DEFAULT_PDEV_ID,

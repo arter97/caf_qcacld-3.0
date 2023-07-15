@@ -391,6 +391,7 @@ static void hdd_wmm_inactivity_timer_cb(void *user_data)
 	uint32_t traffic_count = 0;
 	sme_ac_enum_type ac_type;
 	unsigned int cpu;
+	struct hdd_tx_rx_stats *tx_rx_stats;
 
 	if (!qos_context) {
 		hdd_err("invalid user data");
@@ -406,11 +407,11 @@ static void hdd_wmm_inactivity_timer_cb(void *user_data)
 	}
 
 	ac = &adapter->hdd_wmm_status.ac_status[ac_type];
-
+	tx_rx_stats = &adapter->deflink->hdd_stats.tx_rx_stats;
 	/* Get the Tx stats for this AC. */
 	for (cpu = 0; cpu < NUM_CPUS; cpu++)
-		traffic_count += adapter->hdd_stats.tx_rx_stats.per_cpu[cpu].
-					 tx_classified_ac[qos_context->ac_type];
+		traffic_count +=
+		tx_rx_stats->per_cpu[cpu].tx_classified_ac[qos_context->ac_type];
 
 	hdd_warn("WMM inactivity check for AC=%d, count=%u, last=%u",
 		 ac_type, traffic_count, ac->last_traffic_count);
@@ -460,6 +461,7 @@ hdd_wmm_enable_inactivity_timer(struct hdd_wmm_qos_context *qos_context,
 	sme_ac_enum_type ac_type = qos_context->ac_type;
 	struct hdd_wmm_ac_status *ac;
 	unsigned int cpu;
+	struct hdd_tx_rx_stats *tx_rx_stats;
 
 	adapter = qos_context->adapter;
 	ac = &adapter->hdd_wmm_status.ac_status[ac_type];
@@ -489,10 +491,11 @@ hdd_wmm_enable_inactivity_timer(struct hdd_wmm_qos_context *qos_context,
 
 	ac->last_traffic_count = 0;
 	/* Initialize the current tx traffic count on this AC */
-	for (cpu = 0; cpu < NUM_CPUS; cpu++)
+	tx_rx_stats = &adapter->deflink->hdd_stats.tx_rx_stats;
+	for (cpu = 0; cpu < NUM_CPUS; cpu++) {
 		ac->last_traffic_count +=
-			adapter->hdd_stats.tx_rx_stats.per_cpu[cpu].
-					 tx_classified_ac[qos_context->ac_type];
+		tx_rx_stats->per_cpu[cpu].tx_classified_ac[qos_context->ac_type];
+	}
 	qos_context->is_inactivity_timer_running = true;
 	return qdf_status;
 }
@@ -1540,7 +1543,7 @@ QDF_STATUS hdd_send_dscp_up_map_to_fw(struct hdd_adapter *adapter)
 	struct wlan_objmgr_vdev *vdev;
 	int ret;
 
-	vdev = hdd_objmgr_get_vdev_by_user(adapter, WLAN_FWOL_NB_ID);
+	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink, WLAN_FWOL_NB_ID);
 
 	if (vdev) {
 		/* Send DSCP to TID map table to FW */
@@ -2087,7 +2090,8 @@ uint16_t hdd_get_tx_queue_for_ac(struct hdd_adapter *adapter,
 	struct sock *sk = skb->sk;
 	int new_index;
 	int cpu = qdf_get_smp_processor_id();
-	struct hdd_tx_rx_stats *stats = &adapter->hdd_stats.tx_rx_stats;
+	struct hdd_tx_rx_stats *stats =
+				&adapter->deflink->hdd_stats.tx_rx_stats;
 
 	if (qdf_unlikely(ac == HDD_LINUX_AC_HI_PRIO))
 		return TX_GET_QUEUE_IDX(HDD_LINUX_AC_HI_PRIO, 0);
@@ -2221,7 +2225,7 @@ static uint16_t __hdd_wmm_select_queue(struct net_device *dev,
 
 	hdd_update_pkt_priority_with_inspection(skb, up);
 
-	index = hdd_get_queue_index(skb->priority, is_critical);
+	index = hdd_get_queue_index(up, is_critical);
 
 	return hdd_get_tx_queue_for_ac(adapter, skb, index);
 }
@@ -2625,15 +2629,17 @@ bool hdd_wmm_is_acm_allowed(uint8_t vdev_id)
 	struct hdd_adapter *adapter;
 	struct hdd_wmm_ac_status *wmm_ac_status;
 	struct hdd_context *hdd_ctx;
+	struct wlan_hdd_link_info *link_info;
 
 	hdd_ctx = cds_get_context(QDF_MODULE_ID_HDD);
 	if (!hdd_ctx)
 		return false;
 
-	adapter = hdd_get_adapter_by_vdev(hdd_ctx, vdev_id);
-	if (hdd_validate_adapter(adapter))
+	link_info = hdd_get_link_info_by_vdev(hdd_ctx, vdev_id);
+	if (!link_info || hdd_validate_adapter(link_info->adapter))
 		return false;
 
+	adapter = link_info->adapter;
 	wmm_ac_status = adapter->hdd_wmm_status.ac_status;
 
 	if (hdd_wmm_is_active(adapter) &&

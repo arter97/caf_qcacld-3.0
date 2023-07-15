@@ -348,7 +348,7 @@ static ssize_t __wcnss_patterngen_write(struct net_device *net_dev,
 	 */
 	hdd_debug("device mode %d", adapter->device_mode);
 	if ((QDF_STA_MODE == adapter->device_mode) &&
-	    (!hdd_cm_is_vdev_associated(adapter))) {
+	    (!hdd_cm_is_vdev_associated(adapter->deflink))) {
 		hdd_err("Not in Connected state!");
 		goto failure;
 	}

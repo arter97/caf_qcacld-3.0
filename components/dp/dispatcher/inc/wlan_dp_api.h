@@ -21,6 +21,8 @@
 #if !defined(_WLAN_DP_API_H_)
 #define _WLAN_DP_API_H_
 
+#include <cdp_txrx_cmn_struct.h>
+
 /**
  * wlan_dp_update_peer_map_unmap_version() - update peer map unmap version
  * @version: Peer map unmap version pointer to be updated
@@ -28,4 +30,38 @@
  * Return: None
  */
 void wlan_dp_update_peer_map_unmap_version(uint8_t *version);
+
+/**
+ * wlan_dp_runtime_suspend() - Runtime suspend DP handler
+ * @soc: CDP SoC handle
+ * @pdev_id: DP PDEV ID
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS wlan_dp_runtime_suspend(ol_txrx_soc_handle soc, uint8_t pdev_id);
+
+/**
+ * wlan_dp_runtime_resume() - Runtime suspend DP handler
+ * @soc: CDP SoC handle
+ * @pdev_id: DP PDEV ID
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS wlan_dp_runtime_resume(ol_txrx_soc_handle soc, uint8_t pdev_id);
+
+/**
+ * wlan_dp_print_fisa_rx_stats() - Dump fisa stats
+ * @stats_id: ID for the stats to be dumped
+ *
+ * Return: None
+ */
+void wlan_dp_print_fisa_rx_stats(enum cdp_fisa_stats_id stats_id);
+
+/**
+ * wlan_dp_set_fst_in_cmem() - Set flag to indicate FST is in CMEM
+ * @fst_in_cmem: Flag to indicate FST is in CMEM
+ *
+ * Return: None
+ */
+void wlan_dp_set_fst_in_cmem(bool fst_in_cmem);
 #endif

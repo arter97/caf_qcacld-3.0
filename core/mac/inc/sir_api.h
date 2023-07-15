@@ -3723,7 +3723,7 @@ struct chip_pwr_save_fail_detected_params {
  */
 #define DEFAULT_SCAN_IE_ID 256
 
- /* MAX_DEFAULT_SCAN_IE_LEN - Maxmimum length of Default Scan IE's */
+ /* MAX_DEFAULT_SCAN_IE_LEN - Maximum length of Default Scan IE's */
 #define MAX_DEFAULT_SCAN_IE_LEN 2048
 
  /* Extended Capabilities IE header(IE Id + IE Length) length */
@@ -4317,6 +4317,16 @@ struct sme_addba_accept {
 struct sme_sta_inactivity_timeout {
 	uint8_t session_id;
 	uint32_t sta_inactivity_timeout;
+};
+
+/**
+ * struct sme_vdev_pause - Pause vdev for a defined time interval
+ * @session_id: Session id
+ * @vdev_pause_duration: vdev pause duration
+ */
+struct sme_vdev_pause {
+	uint8_t session_id;
+	uint8_t vdev_pause_duration;
 };
 
 /*

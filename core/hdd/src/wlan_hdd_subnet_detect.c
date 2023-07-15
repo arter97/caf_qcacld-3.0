@@ -105,7 +105,7 @@ static int __wlan_hdd_cfg80211_set_gateway_params(struct wiphy *wiphy,
 		return -ENOTSUPP;
 	}
 
-	if (!hdd_cm_is_vdev_associated(adapter)) {
+	if (!hdd_cm_is_vdev_associated(adapter->deflink)) {
 		hdd_debug("Received GW param update in disconnected state!");
 		return -ENOTSUPP;
 	}
@@ -159,7 +159,7 @@ static int __wlan_hdd_cfg80211_set_gateway_params(struct wiphy *wiphy,
 		  req.ipv4_addr, req.ipv4_addr_type,
 		  req.ipv6_addr, req.ipv6_addr_type);
 
-	vdev = hdd_objmgr_get_vdev_by_user(adapter, WLAN_DP_ID);
+	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink, WLAN_DP_ID);
 	if (vdev) {
 		ucfg_dp_nud_set_gateway_addr(vdev, req.gw_mac_addr);
 		hdd_objmgr_put_vdev_by_user(vdev, WLAN_DP_ID);

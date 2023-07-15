@@ -268,7 +268,9 @@ void lim_ft_prepare_add_bss_req(struct mac_context *mac,
 			if (lim_is_session_he_capable(ft_session) &&
 				pBeaconStruct->he_cap.present)
 				lim_intersect_ap_he_caps(ft_session,
-					pAddBssParams, pBeaconStruct, NULL);
+							 pAddBssParams,
+							 pBeaconStruct, NULL,
+							 bssDescription);
 
 			if (lim_is_session_eht_capable(ft_session) &&
 			    pBeaconStruct->eht_cap.present)
@@ -530,7 +532,7 @@ void lim_fill_ft_session(struct mac_context *mac,
 	tSchBeaconStruct *pBeaconStruct;
 	ePhyChanBondState cbEnabledMode;
 	struct vdev_mlme_obj *mlme_obj;
-	bool is_pwr_constraint;
+	bool is_pwr_constraint = false;
 
 	pBeaconStruct = qdf_mem_malloc(sizeof(tSchBeaconStruct));
 	if (!pBeaconStruct)
@@ -722,6 +724,8 @@ void lim_fill_ft_session(struct mac_context *mac,
 		&localPowerConstraint, ft_session, &is_pwr_constraint);
 	if (is_pwr_constraint)
 		localPowerConstraint = regMax - localPowerConstraint;
+
+	mlme_obj->reg_tpc_obj.is_power_constraint_abs = !is_pwr_constraint;
 
 	ft_session->limReassocBssQosCaps =
 		ft_session->limCurrentBssQosCaps;

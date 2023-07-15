@@ -63,6 +63,7 @@ enum wlan_wds_mode {
  * @WLAN_EHT_MODE_SLO: Single-link operation mode
  * @WLAN_EHT_MODE_MLSR: Multi-link Single-Radio mode
  * @WLAN_EHT_MODE_MLMR: Multi-link Multi-Radio mode
+ * @WLAN_EHT_MODE_EMLSR: Enhanced Multi-link Single-Radio mode
  * @WLAN_EHT_MODE_LAST: last value in enum
  * @WLAN_EHT_MODE_MAX: max value supported
  *
@@ -73,9 +74,29 @@ enum wlan_eht_mode {
 	WLAN_EHT_MODE_SLO       = 1,
 	WLAN_EHT_MODE_MLSR      = 2,
 	WLAN_EHT_MODE_MLMR      = 3,
+	WLAN_EHT_MODE_EMLSR     = 4,
 	/* keep this last */
 	WLAN_EHT_MODE_LAST,
 	WLAN_EHT_MODE_MAX = WLAN_EHT_MODE_LAST - 1,
+};
+
+/**
+ * enum wlan_emlsr_action_mode - EMLSR action mode
+ * @WLAN_EMLSR_MODE_DISABLED: EMLSR is disabled
+ * @WLAN_EMLSR_MODE_ENTER: Enter EMLSR operation mode
+ * @WLAN_EMLSR_MODE_EXIT: Exit EMLSR operation mode
+ * @WLAN_EMLSR_MODE_LAST: last value in enum
+ * @WLAN_EMLSR_MODE_MAX: max value supported
+ *
+ * This is used for 'type' values in emlsr_mode
+ */
+enum wlan_emlsr_action_mode {
+	WLAN_EMLSR_MODE_DISABLED = 0,
+	WLAN_EMLSR_MODE_ENTER    = 1,
+	WLAN_EMLSR_MODE_EXIT     = 2,
+	/* keep this last */
+	WLAN_EMLSR_MODE_LAST,
+	WLAN_EMLSR_MODE_MAX = WLAN_EMLSR_MODE_LAST - 1,
 };
 
 /**
@@ -116,6 +137,36 @@ enum t2lm_negotiation_support {
 	T2LM_NEGOTIATION_LAST,
 	/* keep this last */
 	T2LM_NEGOTIATION_MAX = T2LM_NEGOTIATION_LAST - 1,
+};
+
+/**
+ * enum wlan_epcs_capability - EPCS capability
+ * @WLAN_EPCS_CAP_DISABLED: EPCS capability disable
+ * @WLAN_EPCS_CAP_ENABLE: EPCS capability enable
+ * @WLAN_EPCS_CAP_LAST: last value in enum
+ * @WLAN_EPCS_CAP_MAX: max value supported
+ */
+enum wlan_epcs_capability {
+	WLAN_EPCS_CAP_DISABLED  =  0,
+	WLAN_EPCS_CAP_ENABLE  =  1,
+	/* keep this last */
+	WLAN_EPCS_CAP_LAST,
+	WLAN_EPCS_CAP_MAX = WLAN_EPCS_CAP_LAST - 1,
+};
+
+/**
+ * enum wlan_epcs_frame - EPCS frame type
+ * @WLAN_EPCS_FRAME_TEARDOWN: EPCS teardown frame
+ * @WLAN_EPCS_FRAME_REQUEST: EPCS request frame
+ * @WLAN_EPCS_FRAME_LAST: last value in enum
+ * @WLAN_EPCS_FRAME_MAX: max value supported
+ */
+enum wlan_epcs_frame {
+	WLAN_EPCS_FRAME_TEARDOWN  =  0,
+	WLAN_EPCS_FRAME_REQUEST  =  1,
+	/* keep this last */
+	WLAN_EPCS_FRAME_LAST,
+	WLAN_EPCS_FRAME_MAX = WLAN_EPCS_FRAME_LAST - 1,
 };
 
 /*

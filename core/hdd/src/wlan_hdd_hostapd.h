@@ -251,16 +251,14 @@ QDF_STATUS hdd_init_ap_mode(struct hdd_adapter *adapter, bool reinit);
 
 /**
  * hdd_deinit_ap_mode() - to deinit the AP adaptor
- * @hdd_ctx: pointer to hdd_ctx
- * @adapter: SAP/GO adapter
- * @rtnl_held: flag to indicate if RTNL lock needs to be acquired
+ * @link_info: Link info pointer in HDD adapter
  *
  * This API can be called to close the SAP session as well as
  * release the vdev object completely. It also deinitializes necessary
  * SAP adapter related params.
  */
-void hdd_deinit_ap_mode(struct hdd_context *hdd_ctx,
-			struct hdd_adapter *adapter, bool rtnl_held);
+void hdd_deinit_ap_mode(struct wlan_hdd_link_info *link_info);
+
 void hdd_set_ap_ops(struct net_device *dev);
 /**
  * hdd_sap_create_ctx() - Wrapper API to create SAP context
@@ -274,14 +272,14 @@ void hdd_set_ap_ops(struct net_device *dev);
 bool hdd_sap_create_ctx(struct hdd_adapter *adapter);
 /**
  * hdd_sap_destroy_ctx() - Wrapper API to destroy SAP context
- * @adapter: pointer to adapter
+ * @link_info: Pointer of link_info in adapter
  *
  * This wrapper API can be called to destroy the sap context. It will
  * eventually calls SAP API to destroy the sap context
  *
  * Return: true or false based on overall success or failure
  */
-bool hdd_sap_destroy_ctx(struct hdd_adapter *adapter);
+bool hdd_sap_destroy_ctx(struct wlan_hdd_link_info *link_info);
 /**
  * hdd_sap_destroy_ctx_all() - Wrapper API to destroy all SAP context
  * @hdd_ctx: pointer to HDD context
@@ -477,13 +475,13 @@ wlan_hdd_configure_twt_responder(struct hdd_context *hdd_ctx,
 #ifdef WLAN_FEATURE_11BE_MLO
 /**
  * wlan_hdd_mlo_reset() - reset mlo configuration if start bss fails
- * @adapter: Pointer to hostapd adapter
+ * @link_info: Pointer to link_info in hostapd adapter
  *
  * Return: void
  */
-void wlan_hdd_mlo_reset(struct hdd_adapter *adapter);
+void wlan_hdd_mlo_reset(struct wlan_hdd_link_info *link_info);
 #else
-static inline void wlan_hdd_mlo_reset(struct hdd_adapter *adapter)
+static inline void wlan_hdd_mlo_reset(struct wlan_hdd_link_info *link_info)
 {
 }
 #endif /* end WLAN_FEATURE_11BE_MLO */

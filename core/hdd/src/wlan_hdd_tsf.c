@@ -130,21 +130,21 @@ static inline bool hdd_get_th_sync_status(struct hdd_adapter *adapter)
 static
 enum hdd_tsf_get_state hdd_tsf_check_conn_state(struct hdd_adapter *adapter)
 {
+	enum QDF_OPMODE mode;
 	enum hdd_tsf_get_state ret = TSF_RETURN;
 
-	if (adapter->device_mode == QDF_STA_MODE ||
-			adapter->device_mode == QDF_P2P_CLIENT_MODE) {
-		if (!hdd_cm_is_vdev_associated(adapter)) {
-			hdd_err("failed to cap tsf, not connect with ap");
-			ret = TSF_STA_NOT_CONNECTED_NO_TSF;
-		}
-	} else if ((adapter->device_mode == QDF_SAP_MODE ||
-				adapter->device_mode == QDF_P2P_GO_MODE) &&
-			!(test_bit(SOFTAP_BSS_STARTED,
-					&adapter->event_flags))) {
+	mode = adapter->device_mode;
+
+	if (!test_bit(SOFTAP_BSS_STARTED, &adapter->deflink->link_flags) &&
+	    (mode == QDF_SAP_MODE || mode == QDF_P2P_GO_MODE)) {
 		hdd_err("Soft AP / P2p GO not beaconing");
 		ret = TSF_SAP_NOT_STARTED_NO_TSF;
+	} else if (!hdd_cm_is_vdev_associated(adapter->deflink) &&
+		   (mode == QDF_STA_MODE || mode == QDF_P2P_CLIENT_MODE)) {
+		hdd_err("failed to cap tsf, not connect with ap");
+		ret = TSF_STA_NOT_CONNECTED_NO_TSF;
 	}
+
 	return ret;
 }
 
@@ -314,6 +314,17 @@ bool hdd_tsf_is_tsf64_tx_set(struct hdd_context *hdd)
 	if (hdd && QDF_IS_STATUS_SUCCESS(
 	    ucfg_fwol_get_tsf_ptp_options(hdd->psoc, &tsf_ptp_options)))
 		return tsf_ptp_options & CFG_SET_TSF_PTP_OPT_TSF64_TX;
+	else
+		return false;
+}
+
+bool hdd_tsf_is_time_sync_enabled_cfg(struct hdd_context *hdd_ctx)
+{
+	uint32_t tsf_ptp_options;
+
+	if (hdd_ctx && QDF_IS_STATUS_SUCCESS(
+	    ucfg_fwol_get_tsf_ptp_options(hdd_ctx->psoc, &tsf_ptp_options)))
+		return tsf_ptp_options & CFG_SET_TSF_PTP_SYNC_PERIOD;
 	else
 		return false;
 }
@@ -1794,7 +1805,7 @@ static ssize_t __hdd_wlan_tsf_show(struct device *dev,
 				 "TSF sync is not initialized\n");
 
 	hdd_sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter->deflink);
-	if (!hdd_cm_is_vdev_associated(adapter) &&
+	if (!hdd_cm_is_vdev_associated(adapter->deflink) &&
 	    (adapter->device_mode == QDF_STA_MODE ||
 	    adapter->device_mode == QDF_P2P_CLIENT_MODE))
 		return scnprintf(buf, PAGE_SIZE, "NOT connected\n");
@@ -1958,7 +1969,7 @@ static ssize_t __hdd_wlan_tsf_show(struct device *dev,
 				 "TSF sync is not initialized\n");
 
 	hdd_sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter->deflink);
-	if (!hdd_cm_is_vdev_associated(adapter) &&
+	if (!hdd_cm_is_vdev_associated(adapter->deflink) &&
 	    (adapter->device_mode == QDF_STA_MODE ||
 	    adapter->device_mode == QDF_P2P_CLIENT_MODE))
 		return scnprintf(buf, PAGE_SIZE, "NOT connected\n");
@@ -2259,6 +2270,9 @@ static int hdd_handle_tsf_dynamic_start(struct hdd_adapter *adapter,
 
 	tsf->dynamic_tsf_sync_interval = dynamic_tsf_sync_interval;
 	tsf->enable_dynamic_tsf_sync = true;
+	if (hdd_tsf_is_time_sync_enabled_cfg(hdd_ctx))
+		pld_set_tsf_sync_period(hdd_ctx->parent_dev,
+					dynamic_tsf_sync_interval);
 
 	return hdd_start_tsf_sync(adapter);
 }
@@ -2287,6 +2301,9 @@ static int hdd_handle_tsf_dynamic_stop(struct hdd_adapter *adapter)
 
 	adapter->tsf.enable_dynamic_tsf_sync = false;
 	adapter->tsf.dynamic_tsf_sync_interval = 0;
+	if (hdd_tsf_is_time_sync_enabled_cfg(hdd_ctx))
+		pld_reset_tsf_sync_period(hdd_ctx->parent_dev);
+
 	return hdd_stop_tsf_sync(adapter);
 }
 
@@ -3136,6 +3153,7 @@ int hdd_get_tsf_cb(void *pcb_cxt, struct stsf *ptsf)
 {
 	struct hdd_context *hddctx;
 	struct hdd_adapter *adapter;
+	struct wlan_hdd_link_info *link_info;
 	int ret;
 	uint64_t tsf_sync_soc_time;
 	QDF_TIMER_STATE capture_req_timer_status;
@@ -3152,13 +3170,13 @@ int hdd_get_tsf_cb(void *pcb_cxt, struct stsf *ptsf)
 	if (0 != ret)
 		return -EINVAL;
 
-	adapter = hdd_get_adapter_by_vdev(hddctx, ptsf->vdev_id);
-
-	if (!adapter) {
+	link_info = hdd_get_link_info_by_vdev(hddctx, ptsf->vdev_id);
+	if (!link_info) {
 		hdd_err("failed to find adapter");
 		return -EINVAL;
 	}
 
+	adapter = link_info->adapter;
 	/* Intercept tsf report and check if it is for uplink delay.
 	 * If yes, return in advance and skip the legacy BSS TSF
 	 * report. Otherwise continue on to the legacy BSS TSF

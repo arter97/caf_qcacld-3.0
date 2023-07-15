@@ -456,8 +456,8 @@ void lim_mlo_roam_peer_disconn_del(struct wlan_objmgr_vdev *vdev)
 
 	status = wlan_vdev_get_bss_peer_mac(vdev, &bssid);
 	if (QDF_IS_STATUS_ERROR(status)) {
-		pe_err("vdev id %d : failed to get bssid",
-		       wlan_vdev_get_id(vdev));
+		pe_debug("vdev id %d : failed to get bssid",
+			 wlan_vdev_get_id(vdev));
 		return;
 	}
 
@@ -1256,9 +1256,9 @@ QDF_STATUS lim_add_frag_ie_for_sta_profile(uint8_t *data, uint16_t *len)
 }
 
 uint16_t
-lim_send_assoc_req_mgmt_frame_mlo(struct mac_context *mac_ctx,
-				  struct pe_session *session,
-				  tDot11fAssocRequest *frm)
+lim_fill_assoc_req_mlo_ie(struct mac_context *mac_ctx,
+			  struct pe_session *session,
+			  tDot11fAssocRequest *frm)
 {
 	QDF_STATUS status;
 

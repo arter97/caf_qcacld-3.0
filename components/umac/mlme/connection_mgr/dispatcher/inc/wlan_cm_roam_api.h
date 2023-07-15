@@ -151,7 +151,7 @@ wlan_cm_enable_roaming_on_connected_sta(struct wlan_objmgr_pdev *pdev,
 #endif
 
 /**
- * cm_update_associated_ch_width() - to save channel width in mlme priv obj at
+ * cm_update_associated_ch_info() - to save channel info in mlme priv obj at
  * the time of initial connection
  * @vdev: Pointer to vdev
  * @is_update: to distinguish whether update is during connection or
@@ -159,8 +159,8 @@ wlan_cm_enable_roaming_on_connected_sta(struct wlan_objmgr_pdev *pdev,
  *
  * Return: none
  */
-void cm_update_associated_ch_width(struct wlan_objmgr_vdev *vdev,
-				   bool is_update);
+void
+cm_update_associated_ch_info(struct wlan_objmgr_vdev *vdev, bool is_update);
 
 #ifdef WLAN_FEATURE_ROAM_OFFLOAD
 #define wlan_is_roam_offload_enabled(lfr) \
@@ -304,6 +304,9 @@ wlan_cm_roam_cfg_set_value(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 struct rso_config *wlan_cm_get_rso_config_fl(struct wlan_objmgr_vdev *vdev,
 					     const char *func, uint32_t line);
 
+struct rso_user_config *
+wlan_cm_get_rso_user_config_fl(struct wlan_objmgr_vdev *vdev,
+			       const char *func, uint32_t line);
 /**
  * wlan_cm_get_rso_config  - get per vdev RSO config
  * @vdev: vdev pointer
@@ -313,6 +316,14 @@ struct rso_config *wlan_cm_get_rso_config_fl(struct wlan_objmgr_vdev *vdev,
 #define wlan_cm_get_rso_config(vdev) \
 	wlan_cm_get_rso_config_fl(vdev, __func__, __LINE__)
 
+/**
+ * wlan_cm_get_rso_config - get per vdev RSO userspace config
+ * @vdev: vdev pointer
+ *
+ * Return: rso user space config pointer
+ */
+#define wlan_cm_get_rso_user_config(vdev) \
+	wlan_cm_get_rso_user_config_fl(vdev, __func__, __LINE__)
 /**
  * wlan_cm_set_disable_hi_rssi  - set disable hi rssi config
  * @pdev: pdev pointer
@@ -390,11 +401,11 @@ static inline void wlan_cm_ese_populate_additional_ies(
 
 /**
  * wlan_roam_reset_roam_params  - reset_roam params
- * @psoc: vdev pointer
+ * @vdev: vdev pointer
  *
- * Return: QDF_STATUS
+ * Return: void
  */
-void wlan_roam_reset_roam_params(struct wlan_objmgr_psoc *psoc);
+void wlan_roam_reset_roam_params(struct wlan_objmgr_vdev *vdev);
 
 /**
  * wlan_cm_rso_config_init  - initialize RSO config
@@ -727,14 +738,18 @@ static inline QDF_STATUS wlan_cm_host_roam_start(struct scheduler_msg *msg)
 #endif
 
 /**
- * wlan_cm_get_associated_ch_width() - get associated channel width
+ * wlan_cm_get_associated_ch_info() - get associated channel info
  * @psoc: psoc pointer
  * @vdev_id: vdev id
+ * @scanned_ch_width: channel width as per scan response
+ * @assoc_chan_info: channel info to get
  *
- * Return: enum phy_ch_width
+ * Return: none
  */
-enum phy_ch_width
-wlan_cm_get_associated_ch_width(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id);
+void wlan_cm_get_associated_ch_info(struct wlan_objmgr_psoc *psoc,
+				    uint8_t vdev_id,
+				    enum phy_ch_width scanned_ch_width,
+				    struct assoc_channel_info *assoc_chan_info);
 
 #ifdef WLAN_FEATURE_ROAM_OFFLOAD
 /**
@@ -2094,4 +2109,17 @@ wlan_cm_roam_is_mlo_ap(struct wlan_objmgr_vdev *vdev)
 	return false;
 }
 #endif /* WLAN_FEATURE_11BE_MLO && WLAN_FEATURE_ROAM_OFFLOAD */
+
+/**
+ * wlan_update_peer_phy_mode() - update phymode in peer object
+ * @des_chan: wlan_channel pointer contain new ch_freq
+ * @vdev: vdev pointer
+ *
+ * Return: QDF_STATUS_SUCCESS if peer object phymode is set otherwise
+ *         QDF_STATUS_E_INVAL
+ */
+QDF_STATUS
+wlan_update_peer_phy_mode(struct wlan_channel *des_chan,
+			  struct wlan_objmgr_vdev *vdev);
+
 #endif  /* WLAN_CM_ROAM_API_H__ */

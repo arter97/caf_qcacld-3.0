@@ -63,6 +63,14 @@ extern "C" {
 #define       SAP_MAX_NUM_SESSION          5
 #define       SAP_MAX_OBSS_STA_CNT         1    /* max # of OBSS STA */
 #define       SAP_ACS_WEIGHT_MAX           (26664)
+/* ACS will mark non ACS channels(filtered by PCL) or channels not in
+ * ACS scan list to SAP_ACS_WEIGHT_MAX.
+ * But the filtered channel still need a reasonable weight to
+ * calculate the combined weight for ACS bw 40/80/160/320.
+ * Assign SAP_ACS_WEIGHT_ADJUSTABLE to such channels and update it
+ * with reasonable weight after all channels weight are computed.
+ */
+#define       SAP_ACS_WEIGHT_ADJUSTABLE    (SAP_ACS_WEIGHT_MAX - 1)
 
 #define SAP_DEFAULT_24GHZ_CHANNEL     (6)
 #define SAP_DEFAULT_5GHZ_CHANNEL      (40)
@@ -556,6 +564,8 @@ struct sap_config {
 	uint8_t link_id;
 	uint8_t num_link;
 #endif
+	qdf_freq_t last_acs_freq;
+	qdf_time_t last_acs_complete_time;
 };
 
 #ifdef FEATURE_WLAN_AP_AP_ACS_OPTIMIZE
@@ -1901,6 +1911,18 @@ void wlansap_process_chan_info_event(struct sap_context *sap_ctx,
 {
 }
 #endif
+
+/**
+ * wlansap_update_ll_lt_sap_acs_result() - Update acs result of LL_LT_SAP
+ * @sap_ctx: sap context
+ * @last_acs_freq: last acs frequency to be set
+ *
+ * This function is used to update stored acs channel frequency
+ *
+ * Return: None
+ */
+void wlansap_update_ll_lt_sap_acs_result(struct sap_context *sap_ctx,
+					 qdf_freq_t last_acs_freq);
 
 #ifdef __cplusplus
 }

@@ -240,7 +240,6 @@
 
 /* / Protocol defined MAX definitions */
 #define SIR_MAC_MAX_NUMBER_OF_RATES          12
-#define SIR_MAC_MAX_NUM_OF_DEFAULT_KEYS      4
 #define SIR_MAC_KEY_LENGTH                   13 /* WEP Maximum key length size */
 #define SIR_MAC_AUTH_CHALLENGE_LENGTH        253
 #define SIR_MAC_SAP_AUTH_CHALLENGE_LENGTH    128
@@ -1840,4 +1839,10 @@ struct he_6ghz_capability_info {
 #define SIR_MAC_TXSTBC                             1
 #define SIR_MAC_RXSTBC                             1
 
+#define SIR_MAC_RSNX_CAP_MIN_LEN                   1
+#define SIR_MAC_RSNX_CAP_MAX_LEN                  16
+
+#define SIR_MAC_IE_TYPE_OFFSET                     0
+#define SIR_MAC_IE_LEN_OFFSET                      1
+#define SIR_MAC_IE_TYPE_LEN_SIZE                   2
 #endif /* __MAC_PROT_DEFS_H */

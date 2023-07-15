@@ -48,6 +48,7 @@
 #include "wmi_unified_param.h"
 #include "wmi.h"
 #include "wlan_cm_roam_public_struct.h"
+#include "target_if.h"
 
 /* Platform specific configuration for max. no. of fragments */
 #define QCA_OL_11AC_TX_MAX_FRAGS            2
@@ -1703,15 +1704,6 @@ struct wma_ini_config *wma_get_ini_handle(tp_wma_handle wma_handle);
  */
 enum wlan_phymode wma_chan_phy_mode(uint32_t freq, enum phy_ch_width chan_width,
 				    uint8_t dot11_mode);
-
-/**
- * wma_host_to_fw_phymode() - convert host to fw phymode
- * @host_phymode: phymode to convert
- *
- * Return: one of the values defined in enum WMI_HOST_WLAN_PHY_MODE;
- *         or WMI_HOST_MODE_UNKNOWN if the conversion fails
- */
-WMI_HOST_WLAN_PHY_MODE wma_host_to_fw_phymode(enum wlan_phymode host_phymode);
 
 /**
  * wma_fw_to_host_phymode() - convert fw to host phymode

@@ -105,6 +105,9 @@ void tdls_discovery_timeout_peer_cb(void *user_data)
 
 	vdev = (struct wlan_objmgr_vdev *)user_data;
 	tdls_soc = wlan_vdev_get_tdls_soc_obj(vdev);
+	if (!tdls_soc)
+		return;
+
 	if (wlan_vdev_mlme_is_mlo_vdev(vdev) &&
 	    qdf_atomic_dec_and_test(&tdls_soc->timer_cnt)) {
 		tdls_process_mlo_cal_tdls_link_score(vdev);
@@ -144,6 +147,9 @@ void tdls_discovery_timeout_peer_cb(void *user_data)
 	}
 
 	tdls_vdev = wlan_vdev_get_tdls_vdev_obj(vdev);
+	if (!tdls_vdev)
+		return;
+
 	for (i = 0; i < WLAN_TDLS_PEER_LIST_SIZE; i++) {
 		head = &tdls_vdev->peer_list[i];
 		status = qdf_list_peek_front(head, &p_node);
@@ -1253,7 +1259,7 @@ int tdls_set_tdls_offchannelmode(struct wlan_objmgr_vdev *vdev,
 
 	conn_peer = tdls_find_first_connected_peer(tdls_vdev);
 	if (!conn_peer) {
-		tdls_err("No TDLS Connected Peer");
+		tdls_debug("No TDLS Connected Peer");
 		return -EPERM;
 	}
 
@@ -1455,13 +1461,11 @@ void tdls_disable_offchan_and_teardown_links(
 		tdls_in_progress = true;
 
 	if (!(connected_tdls_peers || tdls_in_progress)) {
-		tdls_debug("No TDLS connected/progress peers to delete");
 		vdev_id = vdev->vdev_objmgr.vdev_id;
-		if (tdls_soc->set_state_info.set_state_cnt > 0) {
-			tdls_debug("Disable the tdls in FW as second interface is coming up");
-			tdls_send_update_to_fw(tdls_vdev, tdls_soc, true,
-					       true, false, vdev_id);
-		}
+		tdls_debug("No TDLS connected/progress peers to delete Disable tdls for vdev id %d, "
+			   "FW as second interface is coming up", vdev_id);
+		tdls_send_update_to_fw(tdls_vdev, tdls_soc, true, true, false,
+				       vdev_id);
 		return;
 	}
 

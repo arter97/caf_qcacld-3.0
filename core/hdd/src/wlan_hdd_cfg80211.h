@@ -33,6 +33,7 @@
 #include <wlan_cfg80211_spectral.h>
 
 struct hdd_context;
+struct wlan_hdd_link_info;
 
 #ifdef WLAN_FEATURE_11BE_MLO
 #define EHT_OPMODE_SUPPORTED 2
@@ -432,7 +433,16 @@ void wlan_hdd_cfg80211_deregister_frames(struct hdd_adapter *adapter);
 void hdd_reg_notifier(struct wiphy *wiphy,
 				 struct regulatory_request *request);
 
-QDF_STATUS wlan_hdd_validate_operation_channel(struct hdd_adapter *adapter,
+/*
+ * FUNCTION: wlan_hdd_validate_operation_channel
+ * called by wlan_hdd_cfg80211_start_bss() and
+ * wlan_hdd_set_channel()
+ * @hdd_ctx: Global HDD context
+ *
+ * This function validates whether given channel is part of valid
+ * channel list.
+ */
+QDF_STATUS wlan_hdd_validate_operation_channel(struct hdd_context *hdd_ctx,
 					       uint32_t ch_freq);
 
 /**
@@ -518,7 +528,18 @@ int wlan_hdd_send_avoid_freq_for_dnbs(struct hdd_context *hdd_ctx,
 void wlan_hdd_rso_cmd_status_cb(hdd_handle_t hdd_handle,
 				struct rso_cmd_status *rso_status);
 
-void wlan_hdd_cfg80211_acs_ch_select_evt(struct hdd_adapter *adapter);
+/**
+ * wlan_hdd_cfg80211_acs_ch_select_evt: Callback function for ACS evt
+ * @link_info: Link info pointer in HDD adapter
+ * @store_acs_freq: Store current ACS frequecy flag
+ *
+ * This is a callback function on ACS procedure is completed.
+ * This function send the ACS selected channel information to hostapd
+ *
+ * Return: None
+ */
+void wlan_hdd_cfg80211_acs_ch_select_evt(struct wlan_hdd_link_info *link_info,
+					 bool store_acs_freq);
 
 #ifdef WLAN_CFR_ENABLE
 /*
@@ -564,7 +585,13 @@ void hdd_send_roam_scan_ch_list_event(struct hdd_context *hdd_ctx,
 }
 #endif
 
-int wlan_hdd_cfg80211_update_apies(struct hdd_adapter *adapter);
+/**
+ * wlan_hdd_cfg80211_update_apies() - update ap mode ies
+ * @link_info: Link info pointer in hostapd adapter
+ *
+ * Return: 0 for success non-zero for failure
+ */
+int wlan_hdd_cfg80211_update_apies(struct wlan_hdd_link_info *link_info);
 
 int wlan_hdd_sap_cfg_dfs_override(struct hdd_adapter *adapter);
 
@@ -661,14 +688,15 @@ enum hdd_ba_mode {
 void hdd_set_rate_bw(struct rate_info *info, enum hdd_rate_info_bw hdd_bw);
 
 /*
- * hdd_get_sap_operating_band_by_adapter: Get current adapter operating channel
+ * hdd_get_sap_operating_band_by_link_info: Get operating channel of link info
  * for sap.
- * @adapter: Pointer to adapter
+ * @link_info: Pointer to link_info in adapter
  *
  * Return : Corresponding band for SAP operating channel
  */
 
-uint8_t hdd_get_sap_operating_band_by_adapter(struct hdd_adapter *adapter);
+uint8_t
+hdd_get_sap_operating_band_by_link_info(struct wlan_hdd_link_info *link_info);
 
 /*
  * hdd_get_sap_operating_band:  Get current operating channel
@@ -729,11 +757,11 @@ void wlan_hdd_save_gtk_offload_params(struct hdd_adapter *adapter,
 
 /**
  * wlan_hdd_flush_pmksa_cache() - flush pmksa cache for adapter
- * @adapter: Adapter context
+ * @link_info: link_info pointer in adapter
  *
  * Return: qdf status
  */
-QDF_STATUS wlan_hdd_flush_pmksa_cache(struct hdd_adapter *adapter);
+QDF_STATUS wlan_hdd_flush_pmksa_cache(struct wlan_hdd_link_info *link_info);
 
 /*
  * wlan_hdd_send_mode_change_event() - API to send hw mode change event to
@@ -768,7 +796,7 @@ QDF_STATUS wlan_hdd_send_sta_authorized_event(
 
 /**
  * hdd_set_dynamic_antenna_mode() - set dynamic antenna mode
- * @adapter: Pointer to network adapter
+ * @link_info: Link info pointer in HDD adapter
  * @num_rx_chains: number of chains to be used for receiving data
  * @num_tx_chains: number of chains to be used for transmitting data
  *
@@ -776,9 +804,8 @@ QDF_STATUS wlan_hdd_send_sta_authorized_event(
  *
  * Return: 0 for success
  */
-int hdd_set_dynamic_antenna_mode(struct hdd_adapter *adapter,
-				 uint8_t num_rx_chains,
-				 uint8_t num_tx_chains);
+int hdd_set_dynamic_antenna_mode(struct wlan_hdd_link_info *link_info,
+				 uint8_t num_rx_chains, uint8_t num_tx_chains);
 
 #ifdef MULTI_CLIENT_LL_SUPPORT
 /**
@@ -947,11 +974,11 @@ int hdd_set_mac_chan_width(struct hdd_adapter *adapter,
 
 /**
  * hdd_is_legacy_connection() - Is adapter connection is legacy
- * @adapter: Handle to hdd_adapter
+ * @link_info: Pointer to link_info in hdd_adapter
  *
  * Return: true if connection mode is legacy, false otherwise.
  */
-bool hdd_is_legacy_connection(struct hdd_adapter *adapter);
+bool hdd_is_legacy_connection(struct wlan_hdd_link_info *link_info);
 
 struct hdd_hostapd_state;
 
@@ -1062,7 +1089,19 @@ struct wlan_objmgr_vdev *wlan_key_get_link_vdev(struct hdd_adapter *adapter,
 void wlan_key_put_link_vdev(struct wlan_objmgr_vdev *link_vdev,
 			    wlan_objmgr_ref_dbgid id);
 
-#if defined(WLAN_FEATURE_11BE_MLO) && defined(WLAN_TID_LINK_MAP_SUPPORT)
+#if defined(WLAN_FEATURE_11BE_MLO)
+/**
+ * hdd_tid_to_link_map() - to get t2lm info
+ * @vdev: Pointer to vdev
+ * @t2lm: T2LM info
+ * @dev: Pointer to net_device structure
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS hdd_tid_to_link_map(struct wlan_objmgr_vdev *vdev,
+			       struct wlan_t2lm_info *t2lm,
+			       struct net_device *dev);
+
 /**
  * hdd_mlo_dev_t2lm_notify_link_update() - Send update T2LM info event
  * @vdev: Pointer to vdev

@@ -236,7 +236,7 @@ static int hdd_ocb_register_sta(struct hdd_adapter *adapter)
 	WLAN_ADDR_COPY(sta_desc.peer_addr.bytes, adapter->mac_addr.bytes);
 	sta_desc.is_qos_enabled = 1;
 
-	vdev = hdd_objmgr_get_vdev_by_user(adapter, WLAN_DP_ID);
+	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink, WLAN_DP_ID);
 	if (!vdev)
 		return -EINVAL;
 
@@ -389,7 +389,7 @@ static int hdd_ocb_set_config_req(struct hdd_adapter *adapter,
 	}
 	cookie = osif_request_cookie(request);
 
-	vdev = hdd_objmgr_get_vdev_by_user(adapter, WLAN_OSIF_OCB_ID);
+	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink, WLAN_OSIF_OCB_ID);
 	if (!vdev) {
 		rc = -EINVAL;
 		goto end;
@@ -1049,7 +1049,7 @@ static int __wlan_hdd_cfg80211_ocb_set_utc_time(struct wiphy *wiphy,
 	qdf_mem_copy(utc->time_error, nla_data(time_error_attr),
 		SIZE_UTC_TIME_ERROR);
 
-	vdev = hdd_objmgr_get_vdev_by_user(adapter, WLAN_OSIF_OCB_ID);
+	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink, WLAN_OSIF_OCB_ID);
 	if (!vdev) {
 		rc = -EINVAL;
 		goto out;
@@ -1180,7 +1180,7 @@ __wlan_hdd_cfg80211_ocb_start_timing_advert(struct wiphy *wiphy,
 		goto fail;
 	}
 
-	vdev = hdd_objmgr_get_vdev_by_user(adapter, WLAN_OSIF_OCB_ID);
+	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink, WLAN_OSIF_OCB_ID);
 	if (!vdev) {
 		rc = -EINVAL;
 		goto fail;
@@ -1296,7 +1296,7 @@ __wlan_hdd_cfg80211_ocb_stop_timing_advert(struct wiphy *wiphy,
 	timing_advert->chan_freq = nla_get_u32(
 		tb[QCA_WLAN_VENDOR_ATTR_OCB_STOP_TIMING_ADVERT_CHANNEL_FREQ]);
 
-	vdev = hdd_objmgr_get_vdev_by_user(adapter, WLAN_OSIF_OCB_ID);
+	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink, WLAN_OSIF_OCB_ID);
 	if (!vdev) {
 		rc = -EINVAL;
 		goto fail;
@@ -1478,7 +1478,7 @@ __wlan_hdd_cfg80211_ocb_get_tsf_timer(struct wiphy *wiphy,
 	}
 	cookie = osif_request_cookie(request);
 
-	vdev = hdd_objmgr_get_vdev_by_user(adapter, WLAN_OSIF_OCB_ID);
+	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink, WLAN_OSIF_OCB_ID);
 	if (!vdev) {
 		rc = -EINVAL;
 		goto end;
@@ -1749,7 +1749,7 @@ static int __wlan_hdd_cfg80211_dcc_get_stats(struct wiphy *wiphy,
 	dcc_request.request_array_len = request_array_len;
 	dcc_request.request_array = request_array;
 
-	vdev = hdd_objmgr_get_vdev_by_user(adapter, WLAN_OSIF_OCB_ID);
+	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink, WLAN_OSIF_OCB_ID);
 	if (!vdev) {
 		rc = -EINVAL;
 		goto end;
@@ -1875,7 +1875,7 @@ static int __wlan_hdd_cfg80211_dcc_clear_stats(struct wiphy *wiphy,
 		return -EINVAL;
 	}
 
-	vdev = hdd_objmgr_get_vdev_by_user(adapter, WLAN_OSIF_OCB_ID);
+	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink, WLAN_OSIF_OCB_ID);
 	if (!vdev)
 		return -EINVAL;
 
@@ -2057,7 +2057,7 @@ static int __wlan_hdd_cfg80211_dcc_update_ndl(struct wiphy *wiphy,
 	dcc_request.dcc_ndl_active_state_list_len = ndl_active_state_array_len;
 	dcc_request.dcc_ndl_active_state_list = ndl_active_state_array;
 
-	vdev = hdd_objmgr_get_vdev_by_user(adapter, WLAN_OSIF_OCB_ID);
+	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink, WLAN_OSIF_OCB_ID);
 	if (!vdev) {
 		rc = -EINVAL;
 		goto end;

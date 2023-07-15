@@ -99,7 +99,7 @@ int wlan_hdd_tdls_get_all_peers(struct hdd_adapter *adapter,
 		return len;
 	}
 
-	vdev = hdd_objmgr_get_vdev_by_user(adapter, WLAN_OSIF_TDLS_ID);
+	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink, WLAN_OSIF_TDLS_ID);
 	if (!vdev) {
 		len = scnprintf(buf, buflen, "\nVDEV is NULL\n");
 		return len;
@@ -160,6 +160,13 @@ static const struct nla_policy
 };
 
 const struct nla_policy
+	wlan_hdd_tdls_disc_rsp_policy
+	[QCA_WLAN_VENDOR_ATTR_TDLS_DISC_RSP_EXT_MAX + 1] = {
+		[QCA_WLAN_VENDOR_ATTR_TDLS_DISC_RSP_EXT_TX_LINK] = {
+						.type = NLA_U8},
+};
+
+const struct nla_policy
 	wlan_hdd_tdls_mode_configuration_policy
 	[QCA_WLAN_VENDOR_ATTR_TDLS_CONFIG_MAX + 1] = {
 		[QCA_WLAN_VENDOR_ATTR_TDLS_CONFIG_TRIGGER_MODE] = {
@@ -199,6 +206,55 @@ __wlan_hdd_cfg80211_exttdls_get_status(struct wiphy *wiphy,
 	return 0;
 }
 
+static int
+__wlan_hdd_cfg80211_exttdls_set_link_id(struct wiphy *wiphy,
+					struct wireless_dev *wdev,
+					const void *data,
+					int data_len)
+{
+	struct net_device *dev = wdev->netdev;
+	struct hdd_context *hdd_ctx = wiphy_priv(wiphy);
+	struct hdd_adapter *adapter = WLAN_HDD_GET_PRIV_PTR(dev);
+	struct nlattr *tb[QCA_WLAN_VENDOR_ATTR_TDLS_DISC_RSP_EXT_MAX + 1];
+	int ret;
+	uint32_t link_id;
+
+	hdd_enter_dev(dev);
+
+	if (QDF_GLOBAL_FTM_MODE == hdd_get_conparam()) {
+		hdd_err("Command not allowed in FTM mode");
+		return -EPERM;
+	}
+
+	ret = wlan_hdd_validate_context(hdd_ctx);
+	if (0 != ret)
+		return -EINVAL;
+
+	if (!adapter)
+		return -EINVAL;
+
+	if (wlan_cfg80211_nla_parse(tb,
+				    QCA_WLAN_VENDOR_ATTR_TDLS_DISC_RSP_EXT_MAX,
+				    data, data_len,
+				    wlan_hdd_tdls_disc_rsp_policy)) {
+		hdd_err("Invalid attribute");
+		return -EINVAL;
+	}
+
+	if (!tb[QCA_WLAN_VENDOR_ATTR_TDLS_DISC_RSP_EXT_TX_LINK]) {
+		hdd_err("attr tdls link id failed");
+		return -EINVAL;
+	}
+
+	link_id =
+		nla_get_u8(tb[QCA_WLAN_VENDOR_ATTR_TDLS_DISC_RSP_EXT_TX_LINK]);
+	hdd_debug("TDLS link id %d", link_id);
+
+	ret = cfg_tdls_set_link_id(hdd_ctx->psoc, link_id);
+
+	return ret;
+}
+
 /**
  * __wlan_hdd_cfg80211_configure_tdls_mode() - configure the tdls mode
  * @wiphy: wiphy
@@ -220,6 +276,7 @@ __wlan_hdd_cfg80211_configure_tdls_mode(struct wiphy *wiphy,
 	struct nlattr *tb[QCA_WLAN_VENDOR_ATTR_TDLS_CONFIG_MAX + 1];
 	int ret;
 	uint32_t trigger_mode;
+	struct wlan_objmgr_vdev *vdev;
 
 	hdd_enter_dev(dev);
 
@@ -249,19 +306,16 @@ __wlan_hdd_cfg80211_configure_tdls_mode(struct wiphy *wiphy,
 	trigger_mode = nla_get_u32(tb[QCA_WLAN_VENDOR_ATTR_TDLS_CONFIG_TRIGGER_MODE]);
 	hdd_debug("TDLS trigger mode %d", trigger_mode);
 
-	if (hdd_ctx->tdls_umac_comp_active) {
-		struct wlan_objmgr_vdev *vdev;
+	if (!hdd_ctx->tdls_umac_comp_active)
+		return -EINVAL;
 
-		vdev = hdd_objmgr_get_vdev_by_user(adapter, WLAN_OSIF_TDLS_ID);
-		if (!vdev)
-			return -EINVAL;
-		ret = wlan_cfg80211_tdls_configure_mode(vdev,
-							trigger_mode);
-		hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_TDLS_ID);
-		return ret;
-	}
+	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink, WLAN_OSIF_TDLS_ID);
+	if (!vdev)
+		return -EINVAL;
 
-	return -EINVAL;
+	ret = wlan_cfg80211_tdls_configure_mode(vdev, trigger_mode);
+	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_TDLS_ID);
+	return ret;
 }
 
 /**
@@ -316,6 +370,26 @@ int wlan_hdd_cfg80211_exttdls_get_status(struct wiphy *wiphy,
 
 	errno = __wlan_hdd_cfg80211_exttdls_get_status(wiphy, wdev,
 						       data, data_len);
+
+	osif_vdev_sync_op_stop(vdev_sync);
+
+	return errno;
+}
+
+int wlan_hdd_cfg80211_exttdls_set_link_id(struct wiphy *wiphy,
+					  struct wireless_dev *wdev,
+					  const void *data,
+					  int data_len)
+{
+	int errno;
+	struct osif_vdev_sync *vdev_sync;
+
+	errno = osif_vdev_sync_op_start(wdev->netdev, &vdev_sync);
+	if (errno)
+		return errno;
+
+	errno = __wlan_hdd_cfg80211_exttdls_set_link_id(wiphy, wdev,
+							data, data_len);
 
 	osif_vdev_sync_op_stop(vdev_sync);
 
@@ -424,6 +498,22 @@ int wlan_hdd_cfg80211_exttdls_disable(struct wiphy *wiphy,
 }
 
 #ifdef TDLS_MGMT_VERSION5
+static int wlan_hdd_get_tdls_link_id(struct hdd_context *hdd_ctx, int id)
+{
+	return id;
+}
+#else
+static int wlan_hdd_get_tdls_link_id(struct hdd_context *hdd_ctx, int id)
+{
+	int link_id;
+
+	link_id = cfg_tdls_get_link_id(hdd_ctx->psoc);
+
+	return link_id;
+}
+#endif
+
+#ifdef TDLS_MGMT_VERSION5
 /**
  * __wlan_hdd_cfg80211_tdls_mgmt() - handle management actions on a given peer
  * @wiphy: wiphy
@@ -512,6 +602,7 @@ static int __wlan_hdd_cfg80211_tdls_mgmt(struct wiphy *wiphy,
 	if (hdd_ctx->tdls_umac_comp_active) {
 		int ret;
 
+		link_id = wlan_hdd_get_tdls_link_id(hdd_ctx, link_id);
 		ret = wlan_cfg80211_tdls_mgmt_mlo(adapter, peer,
 						  action_code, dialog_token,
 						  status_code, peer_capability,
@@ -616,11 +707,11 @@ int wlan_hdd_cfg80211_tdls_mgmt(struct wiphy *wiphy,
 }
 
 static bool
-hdd_is_sta_legacy(struct hdd_adapter *adapter)
+hdd_is_sta_legacy(struct wlan_hdd_link_info *link_info)
 {
 	struct hdd_station_ctx *sta_ctx;
 
-	sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter->deflink);
+	sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(link_info);
 	if (!sta_ctx)
 		return false;
 
@@ -637,12 +728,12 @@ hdd_is_sta_legacy(struct hdd_adapter *adapter)
 }
 
 uint16_t
-hdd_get_tdls_connected_peer_count(struct hdd_adapter *adapter)
+hdd_get_tdls_connected_peer_count(struct wlan_hdd_link_info *link_info)
 {
 	struct wlan_objmgr_vdev *vdev;
 	uint16_t peer_count;
 
-	vdev = hdd_objmgr_get_vdev_by_user(adapter, WLAN_OSIF_TDLS_ID);
+	vdev = hdd_objmgr_get_vdev_by_user(link_info, WLAN_OSIF_TDLS_ID);
 
 	peer_count = ucfg_get_tdls_conn_peer_count(vdev);
 	wlan_objmgr_vdev_release_ref(vdev, WLAN_OSIF_TDLS_ID);
@@ -655,7 +746,7 @@ hdd_check_and_set_tdls_conn_params(struct wlan_objmgr_vdev *vdev)
 {
 	uint8_t vdev_id;
 	enum hdd_dot11_mode selfdot11mode;
-	struct hdd_adapter *adapter;
+	struct wlan_hdd_link_info *link_info;
 	struct wlan_objmgr_psoc *psoc;
 	struct hdd_context *hdd_ctx;
 
@@ -663,18 +754,15 @@ hdd_check_and_set_tdls_conn_params(struct wlan_objmgr_vdev *vdev)
 	if (!psoc)
 		return;
 
-	vdev_id = wlan_vdev_get_id(vdev);
-	adapter = wlan_hdd_get_adapter_from_vdev(psoc, vdev_id);
-	if (!adapter)
-		return;
-
 	/*
 	 * Only need to set this if STA link is in legacy mode
 	 */
-	if (!hdd_is_sta_legacy(adapter))
+	vdev_id = wlan_vdev_get_id(vdev);
+	link_info = wlan_hdd_get_link_info_from_vdev(psoc, vdev_id);
+	if (!link_info || !hdd_is_sta_legacy(link_info))
 		return;
 
-	hdd_ctx = WLAN_HDD_GET_CTX(adapter);
+	hdd_ctx = WLAN_HDD_GET_CTX(link_info->adapter);
 	if (!hdd_ctx)
 		return;
 
@@ -694,32 +782,29 @@ hdd_check_and_set_tdls_conn_params(struct wlan_objmgr_vdev *vdev)
 	    selfdot11mode == eHDD_DOT11_MODE_11ac ||
 	    selfdot11mode == eHDD_DOT11_MODE_11n ||
 	    selfdot11mode == eHDD_DOT11_MODE_11n_ONLY)
-		hdd_cm_netif_queue_enable(adapter);
+		hdd_cm_netif_queue_enable(link_info->adapter);
 }
 
 void
 hdd_check_and_set_tdls_disconn_params(struct wlan_objmgr_vdev *vdev)
 {
-	struct hdd_adapter *adapter;
 	uint8_t vdev_id;
 	struct wlan_objmgr_psoc *psoc;
+	struct wlan_hdd_link_info *link_info;
 
 	psoc = wlan_vdev_get_psoc(vdev);
 	if (!psoc)
 		return;
 
-	vdev_id = wlan_vdev_get_id(vdev);
-	adapter = wlan_hdd_get_adapter_from_vdev(psoc, vdev_id);
-	if (!adapter)
-		return;
-
 	/*
 	 * Only need to set this if STA link is in legacy mode
 	 */
-	if (!hdd_is_sta_legacy(adapter))
+	vdev_id = wlan_vdev_get_id(vdev);
+	link_info = wlan_hdd_get_link_info_from_vdev(psoc, vdev_id);
+	if (!link_info || !hdd_is_sta_legacy(link_info))
 		return;
 
-	hdd_cm_netif_queue_enable(adapter);
+	hdd_cm_netif_queue_enable(link_info->adapter);
 }
 
 /**
@@ -741,6 +826,7 @@ static int __wlan_hdd_cfg80211_tdls_oper(struct wiphy *wiphy,
 	struct hdd_context *hdd_ctx = wiphy_priv(wiphy);
 	int status;
 	bool tdls_support;
+	struct wlan_objmgr_vdev *vdev;
 
 	hdd_enter();
 
@@ -773,20 +859,20 @@ static int __wlan_hdd_cfg80211_tdls_oper(struct wiphy *wiphy,
 	if (0 != status)
 		return status;
 
-	if (hdd_ctx->tdls_umac_comp_active) {
-		struct wlan_objmgr_vdev *vdev;
-
-		vdev = hdd_objmgr_get_vdev_by_user(adapter, WLAN_OSIF_TDLS_ID);
-		if (!vdev)
-			return -EINVAL;
-		status = wlan_cfg80211_tdls_oper(vdev, peer, oper);
-		hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_TDLS_ID);
-		hdd_exit();
-		return status;
+	if (!hdd_ctx->tdls_umac_comp_active) {
+		status = -EINVAL;
+		goto exit;
 	}
 
+	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink, WLAN_OSIF_TDLS_ID);
+	if (!vdev)
+		return -EINVAL;
+	status = wlan_cfg80211_tdls_oper(vdev, peer, oper);
+	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_TDLS_ID);
+
+exit:
 	hdd_exit();
-	return -EINVAL;
+	return status;
 }
 
 /**
@@ -831,13 +917,13 @@ int hdd_set_tdls_offchannel(struct hdd_context *hdd_ctx,
 	struct wlan_objmgr_vdev *vdev;
 	QDF_STATUS status = QDF_STATUS_E_FAILURE;
 
-	if (hdd_ctx->tdls_umac_comp_active) {
-		vdev = hdd_objmgr_get_vdev_by_user(adapter, WLAN_OSIF_TDLS_ID);
-		if (vdev) {
-			status = ucfg_set_tdls_offchannel(vdev,
-							  offchannel);
-			hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_TDLS_ID);
-		}
+	if (!hdd_ctx->tdls_umac_comp_active)
+		return qdf_status_to_os_return(status);
+
+	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink, WLAN_OSIF_TDLS_ID);
+	if (vdev) {
+		status = ucfg_set_tdls_offchannel(vdev, offchannel);
+		hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_TDLS_ID);
 	}
 	return qdf_status_to_os_return(status);
 }
@@ -849,13 +935,13 @@ int hdd_set_tdls_secoffchanneloffset(struct hdd_context *hdd_ctx,
 	struct wlan_objmgr_vdev *vdev;
 	QDF_STATUS status = QDF_STATUS_E_FAILURE;
 
-	if (hdd_ctx->tdls_umac_comp_active) {
-		vdev = hdd_objmgr_get_vdev_by_user(adapter, WLAN_OSIF_TDLS_ID);
-		if (vdev) {
-			status = ucfg_set_tdls_secoffchanneloffset(vdev,
-								 offchanoffset);
-			hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_TDLS_ID);
-		}
+	if (!hdd_ctx->tdls_umac_comp_active)
+		return qdf_status_to_os_return(status);
+
+	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink, WLAN_OSIF_TDLS_ID);
+	if (vdev) {
+		status = ucfg_set_tdls_secoffchanneloffset(vdev, offchanoffset);
+		hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_TDLS_ID);
 	}
 	return qdf_status_to_os_return(status);
 }
@@ -879,13 +965,13 @@ int hdd_set_tdls_offchannelmode(struct hdd_context *hdd_ctx,
 		return qdf_status_to_os_return(status);
 	}
 
-	if (hdd_ctx->tdls_umac_comp_active) {
-		vdev = hdd_objmgr_get_vdev_by_user(adapter, WLAN_OSIF_TDLS_ID);
-		if (vdev) {
-			status = ucfg_set_tdls_offchan_mode(vdev,
-							    offchanmode);
-			hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_TDLS_ID);
-		}
+	if (!hdd_ctx->tdls_umac_comp_active)
+		return qdf_status_to_os_return(status);
+
+	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink, WLAN_OSIF_TDLS_ID);
+	if (vdev) {
+		status = ucfg_set_tdls_offchan_mode(vdev, offchanmode);
+		hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_TDLS_ID);
 	}
 	return qdf_status_to_os_return(status);
 }
@@ -918,52 +1004,43 @@ int hdd_set_tdls_scan_type(struct hdd_context *hdd_ctx, int val)
 	return 0;
 }
 
-/**
- * wlan_hdd_tdls_antenna_switch() - Dynamic TDLS antenna  switch 1x1 <-> 2x2
- * antenna mode in standalone station
- * @hdd_ctx: Pointer to hdd context
- * @adapter: Pointer to hdd adapter
- * @mode: enum antenna_mode
- *
- * Return: 0 if success else non zero
- */
-int wlan_hdd_tdls_antenna_switch(struct hdd_context *hdd_ctx,
-				 struct hdd_adapter *adapter,
+int wlan_hdd_tdls_antenna_switch(struct wlan_hdd_link_info *link_info,
 				 uint32_t mode)
 {
-	if (hdd_ctx->tdls_umac_comp_active) {
-		struct wlan_objmgr_vdev *vdev;
-		int ret;
+	int ret;
+	struct wlan_objmgr_vdev *vdev;
 
-		vdev = hdd_objmgr_get_vdev_by_user(adapter, WLAN_OSIF_TDLS_ID);
-		if (!vdev)
-			return -EINVAL;
-		ret = wlan_tdls_antenna_switch(vdev, mode);
-		hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_TDLS_ID);
-		return ret;
-	}
+	if (!link_info->adapter->hdd_ctx->tdls_umac_comp_active)
+		return 0;
 
-	return 0;
+	vdev = hdd_objmgr_get_vdev_by_user(link_info, WLAN_OSIF_TDLS_ID);
+	if (!vdev)
+		return -EINVAL;
+
+	ret = wlan_tdls_antenna_switch(vdev, mode);
+	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_TDLS_ID);
+	return ret;
 }
 
 QDF_STATUS hdd_tdls_register_peer(void *userdata, uint32_t vdev_id,
 				  const uint8_t *mac, uint8_t qos)
 {
-	struct hdd_adapter *adapter;
 	struct hdd_context *hddctx;
+	struct wlan_hdd_link_info *link_info;
 
 	hddctx = userdata;
 	if (!hddctx) {
 		hdd_err("Invalid hddctx");
 		return QDF_STATUS_E_INVAL;
 	}
-	adapter = hdd_get_adapter_by_vdev(hddctx, vdev_id);
-	if (!adapter) {
-		hdd_err("Invalid adapter");
+
+	link_info = hdd_get_link_info_by_vdev(hddctx, vdev_id);
+	if (!link_info) {
+		hdd_err("Invalid vdev");
 		return QDF_STATUS_E_FAILURE;
 	}
 
-	return hdd_roam_register_tdlssta(adapter, mac, qos);
+	return hdd_roam_register_tdlssta(link_info->adapter, mac, qos);
 }
 
 void hdd_init_tdls_config(struct tdls_start_params *tdls_cfg)
