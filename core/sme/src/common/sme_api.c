@@ -14717,6 +14717,20 @@ void sme_set_bss_max_idle_period(mac_handle_t mac_handle, uint16_t cfg_val)
 	mac_ctx->mlme_cfg->sta.bss_max_idle_period = cfg_val;
 }
 
+#ifdef WLAN_FEATURE_11BE
+static void sme_set_eht_mcs_info(struct mac_context *mac_ctx)
+{
+	mac_ctx->eht_cap_2g.bw_le_80_rx_max_nss_for_mcs_0_to_9 = 1;
+	mac_ctx->eht_cap_2g.bw_le_80_tx_max_nss_for_mcs_0_to_9 = 1;
+}
+#else
+#ifdef WLAN_FEATURE_11AX
+static void sme_set_eht_mcs_info(struct mac_context *mac_ctx)
+{
+}
+#endif
+#endif
+
 #ifdef WLAN_FEATURE_11AX
 void sme_set_he_bw_cap(mac_handle_t mac_handle, uint8_t vdev_id,
 		       enum eSirMacHTChannelWidth chwidth)
@@ -14779,6 +14793,7 @@ void sme_set_he_bw_cap(mac_handle_t mac_handle, uint8_t vdev_id,
 		mac_ctx->he_cap_5g.chan_width_1 = 1;
 		fallthrough;
 	case eHT_CHANNEL_WIDTH_40MHZ:
+		sme_set_eht_mcs_info(mac_ctx);
 		mac_ctx->mlme_cfg->he_caps.dot11_he_cap.chan_width_0 = 1;
 		mac_ctx->mlme_cfg->he_caps.dot11_he_cap.chan_width_1 = 1;
 		mac_ctx->he_cap_2g.chan_width_0 = 1;
