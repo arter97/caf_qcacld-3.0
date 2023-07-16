@@ -4344,3 +4344,54 @@ void wlansap_update_ll_lt_sap_acs_result(struct sap_context *sap_ctx,
 	sap_ctx->acs_cfg->pri_ch_freq = last_acs_freq;
 	sap_ctx->acs_cfg->ht_sec_ch_freq = 0;
 }
+
+QDF_STATUS wlansap_sort_channel_list(uint8_t vdev_id, qdf_list_t *list,
+				     struct sap_sel_ch_info *ch_info)
+{
+	struct mac_context *mac_ctx;
+
+	mac_ctx = sap_get_mac_context();
+	if (!mac_ctx) {
+		sap_err("Invalid MAC context");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	sap_sort_channel_list(mac_ctx, vdev_id, list,
+			      ch_info, NULL, NULL);
+
+	return QDF_STATUS_SUCCESS;
+}
+
+void wlansap_get_user_config_acs_ch_list(uint8_t vdev_id,
+					 struct scan_filter *filter)
+{
+	struct mac_context *mac_ctx;
+	struct sap_context *sap_ctx;
+	uint8_t ch_count = 0;
+
+	mac_ctx = sap_get_mac_context();
+	if (!mac_ctx) {
+		sap_err("Invalid MAC context");
+		return;
+	}
+
+	if (vdev_id >= WLAN_UMAC_VDEV_ID_MAX)
+		return;
+
+	sap_ctx = mac_ctx->sap.sapCtxList[vdev_id].sap_context;
+
+	if (!sap_ctx) {
+		sap_err("vdev %d sap_ctx is NULL", vdev_id);
+		return;
+	}
+
+	ch_count = sap_ctx->acs_cfg->master_ch_list_count;
+
+	if (!ch_count || ch_count > NUM_CHANNELS)
+		return;
+
+	filter->num_of_channels = ch_count;
+	qdf_mem_copy(filter->chan_freq_list, sap_ctx->acs_cfg->master_freq_list,
+		     filter->num_of_channels *
+		     sizeof(filter->chan_freq_list[0]));
+}

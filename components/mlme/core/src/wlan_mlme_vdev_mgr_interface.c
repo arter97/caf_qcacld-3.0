@@ -2251,6 +2251,22 @@ static QDF_STATUS ap_mlme_vdev_csa_complete(struct vdev_mlme_obj *vdev_mlme)
 	return QDF_STATUS_SUCCESS;
 }
 
+#ifdef WLAN_FEATURE_LL_LT_SAP
+QDF_STATUS
+wlan_ll_sap_sort_channel_list(uint8_t vdev_id, qdf_list_t *list,
+			      struct sap_sel_ch_info *ch_info)
+{
+	return wlansap_sort_channel_list(vdev_id, list, ch_info);
+}
+#endif
+
+void
+wlan_sap_get_user_config_acs_ch_list(uint8_t vdev_id,
+				     struct scan_filter *filter)
+{
+	wlansap_get_user_config_acs_ch_list(vdev_id, filter);
+}
+
 static struct vdev_mlme_ops sta_mlme_ops = {
 	.mlme_vdev_start_send = sta_mlme_vdev_start_send,
 	.mlme_vdev_restart_send = sta_mlme_vdev_restart_send,
