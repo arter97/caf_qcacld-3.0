@@ -22347,53 +22347,38 @@ static int wlan_hdd_add_key_sta(struct wlan_objmgr_pdev *pdev,
 
 #ifdef WLAN_FEATURE_11BE_MLO
 static void
-wlan_hdd_mlo_link_free_keys(struct hdd_adapter *adapter,
+wlan_hdd_mlo_link_free_keys(struct wlan_objmgr_psoc *psoc,
+			    struct hdd_adapter *adapter,
 			    struct wlan_objmgr_vdev *vdev,
 			    bool pairwise)
 {
+	struct qdf_mac_addr *link_addr;
+	uint8_t link_id;
+
 	if (adapter->device_mode != QDF_STA_MODE)
 		return;
 
 	if (pairwise &&
 	    wlan_vdev_mlme_is_mlo_link_vdev(vdev) &&
 	    mlo_roam_is_auth_status_connected(adapter->hdd_ctx->psoc,
-					      wlan_vdev_get_id(vdev)))
-		wlan_crypto_free_vdev_key(vdev);
-}
-static bool
-wlan_hdd_mlo_set_keys_saved(struct hdd_adapter *adapter,
-			    struct wlan_objmgr_vdev *vdev,
-			    struct qdf_mac_addr *mac_address)
-{
-	if (!adapter)
-		return false;
+					      wlan_vdev_get_id(vdev))) {
+		link_addr =
+		(struct qdf_mac_addr *)wlan_vdev_mlme_get_linkaddr(vdev);
 
-	if (!vdev)
-		return false;
-
-	if ((adapter->device_mode == QDF_STA_MODE) &&
-	    ((!wlan_cm_is_vdev_connected(vdev)) ||
-	     (wlan_vdev_mlme_is_mlo_link_vdev(vdev) &&
-	      mlo_roam_is_auth_status_connected(adapter->hdd_ctx->psoc,
-						wlan_vdev_get_id(vdev))))) {
-		hdd_debug("MLO:Save keys for vdev %d", wlan_vdev_get_id(vdev));
-		mlo_set_keys_saved(vdev, mac_address, true);
-		return true;
+		if (!link_addr) {
+			crypto_err("link_addr NULL");
+			return;
+		}
+		link_id = wlan_vdev_get_link_id(vdev);
+		wlan_crypto_free_key_by_link_id(psoc, link_addr, link_id);
 	}
+}
 
-	return false;
-}
 #else
-static bool
-wlan_hdd_mlo_set_keys_saved(struct hdd_adapter *adapter,
-			    struct wlan_objmgr_vdev *vdev,
-			    struct qdf_mac_addr *mac_address)
-{
-	return false;
-}
 
 static void
-wlan_hdd_mlo_link_free_keys(struct hdd_adapter *adapter,
+wlan_hdd_mlo_link_free_keys(struct wlan_objmgr_psoc *psoc,
+			    struct hdd_adapter *adapter,
 			    struct wlan_objmgr_vdev *vdev,
 			    bool pairwise)
 {
@@ -22540,6 +22525,44 @@ wlan_hdd_add_vlan(struct wlan_objmgr_vdev *vdev, struct sap_context *sap_ctx,
 }
 #endif
 
+#ifdef WLAN_FEATURE_11BE_MLO_ADV_FEATURE
+static void wlan_hdd_mlo_link_add_pairwise_key(struct wlan_objmgr_vdev *vdev,
+					       struct hdd_context *hdd_ctx,
+					       u8 key_index, bool pairwise,
+					       struct key_params *params)
+{
+	struct mlo_link_info *mlo_link_info;
+	uint8_t link_info_iter = 0;
+
+	mlo_link_info = &vdev->mlo_dev_ctx->link_ctx->links_info[0];
+	for (link_info_iter = 0; link_info_iter < WLAN_MAX_ML_BSS_LINKS;
+	     link_info_iter++) {
+		if (qdf_is_macaddr_zero(&mlo_link_info->ap_link_addr) ||
+		    mlo_link_info->link_id == 0xFF)
+			continue;
+			hdd_debug(" Add pairwise key link id  %d ",
+				  mlo_link_info->link_id);
+			wlan_cfg80211_store_link_key(
+				hdd_ctx->psoc, key_index,
+				(pairwise ? WLAN_CRYPTO_KEY_TYPE_UNICAST :
+				WLAN_CRYPTO_KEY_TYPE_GROUP),
+				(uint8_t *)mlo_link_info->ap_link_addr.bytes,
+				params, &mlo_link_info->link_addr,
+				mlo_link_info->link_id);
+			mlo_link_info++;
+	}
+}
+
+#else
+
+static void wlan_hdd_mlo_link_add_pairwise_key(struct wlan_objmgr_vdev *vdev,
+					       struct hdd_context *hdd_ctx,
+					       u8 key_index, bool pairwise,
+					       struct key_params *params)
+{
+}
+#endif
+
 static int wlan_hdd_add_key_vdev(mac_handle_t mac_handle,
 				 struct wlan_objmgr_vdev *vdev, u8 key_index,
 				 bool pairwise, const u8 *mac_addr,
@@ -22551,7 +22574,7 @@ static int wlan_hdd_add_key_vdev(mac_handle_t mac_handle,
 	struct hdd_context *hdd_ctx;
 	struct qdf_mac_addr mac_address;
 	int32_t cipher_cap, ucast_cipher = 0;
-	int errno;
+	int errno = 0;
 	enum wlan_crypto_cipher_type cipher;
 	bool ft_mode = false;
 	uint8_t keyidx;
@@ -22618,16 +22641,20 @@ static int wlan_hdd_add_key_vdev(mac_handle_t mac_handle,
 	}
 
 done:
-	wlan_hdd_mlo_link_free_keys(adapter, vdev, pairwise);
+	wlan_hdd_mlo_link_free_keys(hdd_ctx->psoc, adapter, vdev, pairwise);
+	if (pairwise && adapter->device_mode == QDF_STA_MODE &&
+	    wlan_vdev_mlme_is_mlo_vdev(vdev)) {
+		wlan_hdd_mlo_link_add_pairwise_key(vdev, hdd_ctx, key_index,
+						   pairwise, params);
 
-	errno = wlan_cfg80211_store_key(vdev, key_index,
+	} else {
+		errno = wlan_cfg80211_store_key(
+					vdev, key_index,
 					(pairwise ?
 					WLAN_CRYPTO_KEY_TYPE_UNICAST :
 					WLAN_CRYPTO_KEY_TYPE_GROUP),
 					mac_address.bytes, params);
-
-	if (wlan_hdd_mlo_set_keys_saved(adapter, vdev, &mac_address))
-		return 0;
+	}
 
 	cipher_cap = wlan_crypto_get_param(vdev, WLAN_CRYPTO_PARAM_CIPHER_CAP);
 	if (errno)
@@ -22900,34 +22927,29 @@ add_key:
 	return errno;
 }
 
-static int wlan_add_key_inactive_link(struct hdd_adapter *adapter,
-				      struct wlan_objmgr_vdev *vdev,
-				      int link_id, u8 key_index,
-				      bool pairwise, struct key_params *params)
+static int wlan_add_key_standby_link(struct hdd_adapter *adapter,
+				     struct wlan_objmgr_vdev *vdev,
+				     int link_id, u8 key_index,
+				     bool pairwise, struct key_params *params)
 {
 	int errno = 0;
 	struct hdd_context *hdd_ctx;
-	struct wlan_crypto_key *crypto_key = NULL;
-	struct mlo_link_info *ml_link_info;
+	struct mlo_link_info *mlo_link_info;
 
 	hdd_ctx = WLAN_HDD_GET_CTX(adapter);
 
-	ml_link_info = mlo_mgr_get_ap_link_by_link_id(vdev, link_id);
-	if (!ml_link_info)
+	mlo_link_info = mlo_mgr_get_ap_link_by_link_id(vdev, link_id);
+	if (!mlo_link_info)
 		return QDF_STATUS_E_FAILURE;
 
-	crypto_key = qdf_mem_malloc(sizeof(*crypto_key));
-	if (!crypto_key)
-		return QDF_STATUS_E_NOMEM;
-
-	wlan_cfg80211_translate_ml_sta_key(
-	key_index,
-	(pairwise ? WLAN_CRYPTO_KEY_TYPE_UNICAST : WLAN_CRYPTO_KEY_TYPE_GROUP),
-	(uint8_t *)ml_link_info->link_addr.bytes, params, crypto_key);
-	errno = wlan_crypto_save_ml_sta_key(hdd_ctx->psoc, key_index,
-					    crypto_key,
-					    &ml_link_info->link_addr,
-					    link_id);
+	errno = wlan_cfg80211_store_link_key(
+			hdd_ctx->psoc, key_index,
+			(pairwise ? WLAN_CRYPTO_KEY_TYPE_UNICAST :
+			WLAN_CRYPTO_KEY_TYPE_GROUP),
+			(uint8_t *)mlo_link_info->ap_link_addr.bytes,
+			params,
+			&mlo_link_info->link_addr,
+			link_id);
 	return errno;
 }
 
@@ -23002,8 +23024,8 @@ static int wlan_hdd_add_key_mlo_vdev(mac_handle_t mac_handle,
 	link_vdev = wlan_key_get_link_vdev(adapter, WLAN_MLO_MGR_ID, link_id);
 	if (!link_vdev) {
 		hdd_err("couldn't get vdev for link_id :%d", link_id);
-		errno = wlan_add_key_inactive_link(adapter, vdev, link_id,
-						   key_index, pairwise, params);
+		errno = wlan_add_key_standby_link(adapter, vdev, link_id,
+						  key_index, pairwise, params);
 		return errno;
 	}
 

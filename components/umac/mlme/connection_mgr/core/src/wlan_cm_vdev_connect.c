@@ -1642,12 +1642,6 @@ cm_install_link_vdev_keys(struct wlan_objmgr_vdev *vdev)
 		return;
 	}
 
-	if (!mlo_get_keys_saved(vdev, wlan_peer_get_macaddr(peer))) {
-		mlo_debug("keys are not saved for vdev_id %d", vdev_id);
-		wlan_objmgr_peer_release_ref(peer, WLAN_MLME_CM_ID);
-		return;
-	}
-
 	for (i = 0; i < max_key_index; i++) {
 		crypto_key = wlan_crypto_get_key(vdev, i);
 		if (!crypto_key)
@@ -1659,9 +1653,7 @@ cm_install_link_vdev_keys(struct wlan_objmgr_vdev *vdev)
 		mlme_cm_osif_send_keys(vdev, i, pairwise,
 				       crypto_key->cipher_type);
 	}
-	mlo_set_keys_saved(vdev,
-			   (struct qdf_mac_addr *)wlan_peer_get_macaddr(peer),
-			   false);
+
 	wlan_objmgr_peer_release_ref(peer, WLAN_MLME_CM_ID);
 }
 
