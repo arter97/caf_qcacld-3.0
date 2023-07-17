@@ -14256,6 +14256,21 @@ QDF_STATUS hdd_adapter_check_duplicate_session(struct hdd_adapter *adapter)
 }
 #endif
 
+static void hdd_restore_info_for_ssr(struct hdd_adapter *adapter)
+{
+	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
+
+	if (cds_is_driver_recovering()) {
+		/* ssr happens, recover the info */
+		hdd_set_vdev_phy_mode(adapter, adapter->user_phy_mode);
+		wlan_mlme_restore_user_set_link_num(hdd_ctx->psoc);
+	} else {
+		/* intf down/up happens, reset default info */
+		hdd_set_vdev_phy_mode(adapter, QCA_WLAN_VENDOR_PHY_MODE_AUTO);
+		wlan_mlme_clear_user_set_link_num(hdd_ctx->psoc);
+	}
+}
+
 int hdd_start_station_adapter(struct hdd_adapter *adapter)
 {
 	QDF_STATUS status;
@@ -14315,6 +14330,7 @@ int hdd_start_station_adapter(struct hdd_adapter *adapter)
 		wlan_hdd_init_multi_client_info_table(adapter);
 
 	hdd_adapter_set_wlm_client_latency_level(adapter);
+	hdd_restore_info_for_ssr(adapter);
 
 	hdd_exit();
 	return 0;
