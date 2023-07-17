@@ -633,6 +633,38 @@ int wlan_hdd_cfg80211_exttdls_enable(struct wiphy *wiphy,
 	return errno;
 }
 
+static int wlan_hdd_tdls_disable(struct hdd_context *hdd_ctx,
+				 struct hdd_adapter *adapter)
+{
+	struct wlan_hdd_link_info *link_info;
+	struct wlan_objmgr_vdev *vdev;
+	bool tdls_chan_switch_prohibited;
+
+	hdd_adapter_for_each_active_link_info(adapter, link_info) {
+		vdev = hdd_objmgr_get_vdev_by_user(link_info, WLAN_TDLS_NB_ID);
+		if (!vdev)
+			return -EINVAL;
+
+		tdls_chan_switch_prohibited =
+				ucfg_mlme_get_tdls_chan_switch_prohibited(vdev);
+
+		wlan_tdls_notify_sta_disconnect(wlan_vdev_get_id(vdev),
+						tdls_chan_switch_prohibited,
+						true, vdev);
+
+		ucfg_tdls_set_user_tdls_enable(vdev, false);
+
+		if (!wlan_vdev_mlme_is_mlo_vdev(vdev)) {
+			hdd_objmgr_put_vdev_by_user(vdev, WLAN_TDLS_NB_ID);
+			return 0;
+		}
+
+		hdd_objmgr_put_vdev_by_user(vdev, WLAN_TDLS_NB_ID);
+	}
+
+	return 0;
+}
+
 /**
  * __wlan_hdd_cfg80211_exttdls_disable() - disable an externally controllable
  *                                       TDLS peer
@@ -650,8 +682,30 @@ static int __wlan_hdd_cfg80211_exttdls_disable(struct wiphy *wiphy,
 				      const void *data,
 				      int data_len)
 {
-	/* TODO */
-	return 0;
+	struct net_device *dev = wdev->netdev;
+	struct hdd_adapter *adapter = WLAN_HDD_GET_PRIV_PTR(dev);
+	struct hdd_context *hdd_ctx = wiphy_priv(wiphy);
+	int ret = 0;
+
+	hdd_enter_dev(wdev->netdev);
+	if (QDF_GLOBAL_FTM_MODE == hdd_get_conparam()) {
+		hdd_err("Command not allowed in FTM mode");
+		return -EPERM;
+	}
+
+	if (wlan_hdd_validate_context(hdd_ctx))
+		return -EINVAL;
+
+	if (adapter->device_mode != QDF_STA_MODE &&
+	    adapter->device_mode != QDF_P2P_CLIENT_MODE) {
+		hdd_debug("Failed to get TDLS info due to opmode:%d",
+			  adapter->device_mode);
+		return -EOPNOTSUPP;
+	}
+
+	ret = wlan_hdd_tdls_disable(hdd_ctx, adapter);
+
+	return ret;
 }
 
 /**
