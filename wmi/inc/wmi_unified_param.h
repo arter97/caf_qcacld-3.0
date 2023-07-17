@@ -1217,6 +1217,8 @@ struct wmi_host_tid_to_link_map_resp {
  * @medium_sync_duration: medium sync duration in us
  * @medium_sync_ofdm_ed_thresh: medium sync ofdm threshold in us
  * @medium_sync_max_txop_num: Max number of TXOPs
+ * @max_num_simultaneous_links: Max number of simultaneous links as per
+ *                              MLD Capability for ML peer
  */
 struct peer_assoc_mlo_params {
 	uint32_t mlo_enabled:1,
@@ -1240,6 +1242,7 @@ struct peer_assoc_mlo_params {
 	uint16_t medium_sync_duration;
 	uint16_t medium_sync_ofdm_ed_thresh;
 	uint16_t medium_sync_max_txop_num;
+	uint16_t max_num_simultaneous_links;
 };
 
 /**

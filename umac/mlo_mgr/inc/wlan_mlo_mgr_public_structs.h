@@ -588,6 +588,7 @@ struct wlan_mlo_mld_cap {
  * migration
  * @primary_umac_migration_in_progress: flag to indicate primary umac migration
  * in progress
+ * @mlpeer_mldcap: MLD Capability information for ML peer
  */
 struct wlan_mlo_peer_context {
 	qdf_list_node_t peer_node;
@@ -629,6 +630,7 @@ struct wlan_mlo_peer_context {
 #endif
 	uint8_t migrate_primary_umac_psoc_id;
 	bool primary_umac_migration_in_progress;
+	struct wlan_mlo_mld_cap mlpeer_mldcap;
 };
 
 /**
