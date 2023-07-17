@@ -756,6 +756,8 @@ void wlan_objmgr_mlo_update_primary_info(struct wlan_objmgr_peer *peer);
  * wlan_mld_get_best_primary_umac_w_rssi() - API to get primary umac using rssi
  * @ml_peer: ml peer object
  * @link_vdevs: list of vdevs from which new primary link is to be selected
+ * @allow_all_links: Flag to allow all links to be able to get selected as
+ * primary. This flag will be used to override primary_umac_skip ini
  *
  * API to get primary umac using rssi
  *
@@ -763,5 +765,6 @@ void wlan_objmgr_mlo_update_primary_info(struct wlan_objmgr_peer *peer);
  */
 uint8_t
 wlan_mld_get_best_primary_umac_w_rssi(struct wlan_mlo_peer_context *ml_peer,
-				      struct wlan_objmgr_vdev *link_vdevs[]);
+				      struct wlan_objmgr_vdev *link_vdevs[],
+				      bool allow_all_links);
 #endif
