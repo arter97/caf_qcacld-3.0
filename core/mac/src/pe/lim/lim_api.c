@@ -4297,14 +4297,14 @@ lim_gen_link_probe_rsp_roam(struct mac_context *mac_ctx,
 	}
 
 	if (!probe_rsp->mlo_ie.mlo_ie_present)
-		goto done;
+		goto err1;
 
 	/* Add received ml bcn/probe rsp to scan db */
 	src_addr = wlan_mlme_get_src_addr_from_frame(&frame);
 	if (!src_addr) {
 		pe_err("MLO: Failed to fetch src address");
 		status = QDF_STATUS_E_FAILURE;
-		goto done;
+		goto err1;
 	}
 	freq = mlo_roam_get_link_freq_from_mac_addr(roam_sync_ind,
 						    src_addr);
@@ -4320,7 +4320,7 @@ lim_gen_link_probe_rsp_roam(struct mac_context *mac_ctx,
 	if (!freq) {
 		pe_debug("MLO: Failed to fetch freq");
 		status = QDF_STATUS_E_FAILURE;
-		goto done;
+		goto err1;
 	}
 	lim_add_bcn_probe(session->vdev, frame.ptr, frame.len,
 			  freq, roam_sync_ind->rssi);
@@ -4341,9 +4341,8 @@ lim_gen_link_probe_rsp_roam(struct mac_context *mac_ctx,
 
 	gen_probe_rsp.ptr = qdf_mem_malloc(gen_frame_len);
 	if (!gen_probe_rsp.ptr) {
-		qdf_mem_free(probe_rsp);
 		status = QDF_STATUS_E_NOMEM;
-		goto done;
+		goto err1;
 	}
 
 	/*
@@ -4392,6 +4391,14 @@ lim_gen_link_probe_rsp_roam(struct mac_context *mac_ctx,
 			status = QDF_STATUS_E_FAILURE;
 			goto done;
 		}
+
+		if (gen_probe_rsp.len > gen_frame_len) {
+			pe_err("MLO: gen probe rsp len %u larger than buffer size: %u",
+			       gen_probe_rsp.len, gen_frame_len);
+			status = QDF_STATUS_E_FAILURE;
+			goto done;
+		}
+
 		lim_add_bcn_probe(session->vdev, gen_probe_rsp.ptr,
 				  gen_probe_rsp.len,
 				  mlo_roam_get_link_freq_from_mac_addr(
@@ -4401,6 +4408,7 @@ lim_gen_link_probe_rsp_roam(struct mac_context *mac_ctx,
 
 done:
 	qdf_mem_free(gen_probe_rsp.ptr);
+err1:
 	qdf_mem_free(probe_rsp);
 
 	if (QDF_IS_STATUS_ERROR(status)) {

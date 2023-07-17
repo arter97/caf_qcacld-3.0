@@ -199,9 +199,16 @@ void hdd_cm_update_rssi_snr_by_bssid(struct wlan_hdd_link_info *link_info)
 	struct hdd_station_ctx *sta_ctx;
 	int8_t snr = 0;
 	struct hdd_adapter *adapter = link_info->adapter;
+	mac_handle_t mac_handle;
+
+	mac_handle = hdd_adapter_get_mac_handle(adapter);
+	if (!mac_handle) {
+		hdd_err("mac_handle is NULL");
+		return;
+	}
 
 	sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(link_info);
-	hdd_get_rssi_snr_by_bssid(hdd_adapter_get_mac_handle(adapter),
+	hdd_get_rssi_snr_by_bssid(mac_handle,
 				  sta_ctx->conn_info.bssid.bytes,
 				  &link_info->rssi, &snr);
 
