@@ -432,14 +432,14 @@ cdp_update_pdev_host_stats(ol_txrx_soc_handle soc,
  * @vdev_id: id of the virtual device object
  * @data: pdev stats
  * @stats_id: type of stats
- *
+ * @xmit_type: xmit type, MLO/Legacy
  * Return: QDF_STATUS
  */
 static inline QDF_STATUS
 cdp_update_vdev_host_stats(ol_txrx_soc_handle soc,
 			   uint8_t vdev_id,
 			   void *data,
-			   uint16_t stats_id)
+			   uint16_t stats_id, uint8_t xmit_type)
 {
 	if (!soc || !soc->ops) {
 		dp_cdp_debug("Invalid Instance");
@@ -453,7 +453,8 @@ cdp_update_vdev_host_stats(ol_txrx_soc_handle soc,
 
 	return soc->ops->host_stats_ops->txrx_update_vdev_stats(soc, vdev_id,
 								data,
-								stats_id);
+								stats_id,
+								xmit_type);
 }
 
 /**

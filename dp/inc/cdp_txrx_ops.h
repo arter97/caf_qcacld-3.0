@@ -1266,7 +1266,7 @@ struct cdp_host_stats_ops {
 	QDF_STATUS
 		(*txrx_update_vdev_stats)(struct cdp_soc_t *soc,
 					  uint8_t vdev_id, void *buf,
-					  uint16_t stats_id);
+					  uint16_t stats_id, uint8_t xmit_type);
 	int
 		(*txrx_get_radio_stats)(struct cdp_soc_t *soc, uint8_t pdev_id,
 					void *buf);
