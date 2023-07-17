@@ -3952,7 +3952,8 @@ static void hdd_skip_acs_scan_timer_deinit(struct hdd_context *hdd_ctx) {}
  */
 int hdd_update_country_code(struct hdd_context *hdd_ctx)
 {
-	if (!country_code)
+	if (!country_code ||
+	    !ucfg_reg_is_user_country_set_allowed(hdd_ctx->psoc))
 		return 0;
 
 	return hdd_reg_set_country(hdd_ctx, country_code);
@@ -4343,6 +4344,26 @@ static inline void hdd_qmi_register_callbacks(struct hdd_context *hdd_ctx)
 	os_if_qmi_register_callbacks(hdd_ctx->psoc, &cb_obj);
 }
 
+static int hdd_set_pcie_params(struct hdd_context *hdd_ctx)
+{
+	int vdev_id = 0;
+	int param_id = WMI_PDEV_PARAM_PCIE_CONFIG;
+	bool value;
+	QDF_STATUS status;
+	int vpdev = PDEV_CMD;
+	int ret;
+
+	status = ucfg_fwol_get_pcie_config(hdd_ctx->psoc, &value);
+	if (QDF_IS_STATUS_ERROR(status))
+		return -EINVAL;
+
+	ret = sme_cli_set_command(vdev_id, param_id, (int)value, vpdev);
+	if (ret)
+		hdd_err("WMI_PDEV_PARAM_PCIE_CONFIG failed %d", ret);
+
+	return ret;
+}
+
 int hdd_wlan_start_modules(struct hdd_context *hdd_ctx, bool reinit)
 {
 	int ret = 0;
@@ -4554,6 +4575,9 @@ int hdd_wlan_start_modules(struct hdd_context *hdd_ctx, bool reinit)
 			 * in FW use vdev_id = 0.
 			 */
 			hdd_set_fw_log_params(hdd_ctx, 0);
+			ret = hdd_set_pcie_params(hdd_ctx);
+			if (ret)
+				return ret;
 			ret = -EINVAL;
 			break;
 		}
@@ -14337,6 +14361,11 @@ static int hdd_pre_enable_configure(struct hdd_context *hdd_ctx)
 		hdd_err("failed to send pdev set params");
 		goto out;
 	}
+
+	ret = hdd_set_pcie_params(hdd_ctx);
+	if (ret)
+		goto out;
+
 	/* Configure global firmware params */
 	ret = ucfg_fwol_configure_global_params(hdd_ctx->psoc, hdd_ctx->pdev);
 	if (ret)
@@ -14701,6 +14730,7 @@ static int hdd_features_init(struct hdd_context *hdd_ctx)
 	bool rf_test_mode;
 	bool std_6ghz_conn_policy;
 	uint32_t fw_data_stall_evt;
+	bool disable_vlp_sta_conn_sp_ap;
 
 	hdd_enter();
 
@@ -14806,6 +14836,17 @@ static int hdd_features_init(struct hdd_context *hdd_ctx)
 	}
 	if (std_6ghz_conn_policy)
 		wlan_cm_set_standard_6ghz_conn_policy(hdd_ctx->psoc, true);
+
+	status = ucfg_mlme_is_disable_vlp_sta_conn_to_sp_ap_enabled(
+						hdd_ctx->psoc,
+						&disable_vlp_sta_conn_sp_ap);
+	if (!QDF_IS_STATUS_SUCCESS(status)) {
+		hdd_err("Get disable vlp sta conn to sp flag failed");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	if (disable_vlp_sta_conn_sp_ap)
+		wlan_cm_set_disable_vlp_sta_conn_to_sp_ap(hdd_ctx->psoc, true);
 
 	hdd_thermal_stats_cmd_init(hdd_ctx);
 	sme_set_cal_failure_event_cb(hdd_ctx->mac_handle,

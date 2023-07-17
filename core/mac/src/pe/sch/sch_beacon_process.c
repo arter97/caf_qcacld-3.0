@@ -290,7 +290,7 @@ sch_bcn_process_sta(struct mac_context *mac_ctx,
 		return false;
 	}
 
-	lim_detect_change_in_ap_capabilities(mac_ctx, bcn, session);
+	lim_detect_change_in_ap_capabilities(mac_ctx, bcn, session, true);
 	beaconParams->bss_idx = session->vdev_id;
 	qdf_mem_copy((uint8_t *) &session->lastBeaconTimeStamp,
 			(uint8_t *) bcn->timeStamp, sizeof(uint64_t));
@@ -745,7 +745,8 @@ static void __sch_beacon_process_for_session(struct mac_context *mac_ctx,
 
 		status = wlan_reg_get_best_6g_power_type(
 				mac_ctx->psoc, mac_ctx->pdev, &pwr_type_6g,
-				session->ap_defined_power_type_6g);
+				session->ap_defined_power_type_6g,
+				bcn->chan_freq);
 		if (QDF_IS_STATUS_ERROR(status))
 			return;
 

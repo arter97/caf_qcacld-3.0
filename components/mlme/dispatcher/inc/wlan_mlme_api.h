@@ -274,6 +274,25 @@ QDF_STATUS wlan_mlme_set_ht_mpdu_density(struct wlan_objmgr_psoc *psoc,
 QDF_STATUS wlan_mlme_get_band_capability(struct wlan_objmgr_psoc *psoc,
 					 uint32_t *band_capability);
 
+#ifdef QCA_MULTIPASS_SUPPORT
+/**
+ * wlan_mlme_peer_config_vlan() - send vlan id to FW for RX path
+ * @vdev: vdev pointer
+ * @mac_addr: mac address of the peer
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+wlan_mlme_peer_config_vlan(struct wlan_objmgr_vdev *vdev,
+			   uint8_t *mac_addr);
+#else
+static inline QDF_STATUS
+wlan_mlme_peer_config_vlan(struct wlan_objmgr_vdev *vdev,
+			   uint8_t *mac_addr)
+{
+	return QDF_STATUS_SUCCESS;
+}
+#endif
 #ifdef MULTI_CLIENT_LL_SUPPORT
 /**
  * wlan_mlme_get_wlm_multi_client_ll_caps() - Get the wlm multi client latency
@@ -2478,6 +2497,19 @@ wlan_mlme_set_rf_test_mode_enabled(struct wlan_objmgr_psoc *psoc, bool value);
 
 #ifdef CONFIG_BAND_6GHZ
 /**
+ * wlan_mlme_is_disable_vlp_sta_conn_to_sp_ap_enabled() - Get the disable vlp
+ *                                                       STA conn to SP AP flag
+ * @psoc: psoc context
+ * @value: Enable/Disable value ptr.
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+wlan_mlme_is_disable_vlp_sta_conn_to_sp_ap_enabled(
+						struct wlan_objmgr_psoc *psoc,
+						bool *value);
+
+/**
  * wlan_mlme_is_standard_6ghz_conn_policy_enabled() - Get the 6 GHz standard
  *                                                    connection policy flag
  * @psoc: psoc context
@@ -2490,6 +2522,15 @@ wlan_mlme_is_standard_6ghz_conn_policy_enabled(struct wlan_objmgr_psoc *psoc,
 					       bool *value);
 
 #else
+static inline QDF_STATUS
+wlan_mlme_is_disable_vlp_sta_conn_to_sp_ap_enabled(
+						struct wlan_objmgr_psoc *psoc,
+						bool *value)
+{
+	*value = false;
+	return QDF_STATUS_SUCCESS;
+}
+
 static inline QDF_STATUS
 wlan_mlme_is_standard_6ghz_conn_policy_enabled(struct wlan_objmgr_psoc *psoc,
 					       bool *value)
