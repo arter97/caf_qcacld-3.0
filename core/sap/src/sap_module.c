@@ -1624,8 +1624,7 @@ QDF_STATUS wlansap_set_channel_change_with_csa(struct sap_context *sap_ctx,
 	mac_handle = MAC_HANDLE(mac);
 
 	if (((sap_ctx->acs_cfg && sap_ctx->acs_cfg->acs_mode) ||
-	     !target_psoc_get_sap_coex_fixed_chan_cap(
-			wlan_psoc_get_tgt_if_handle(mac->psoc)) ||
+	     policy_mgr_restrict_sap_on_unsafe_chan(mac->psoc) ||
 	     sap_ctx->csa_reason != CSA_REASON_USER_INITIATED) &&
 	    !policy_mgr_is_sap_freq_allowed(mac->psoc, target_chan_freq)) {
 		sap_err("%u is unsafe channel freq", target_chan_freq);

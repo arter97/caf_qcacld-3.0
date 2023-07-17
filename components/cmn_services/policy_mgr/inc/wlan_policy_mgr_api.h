@@ -3997,6 +3997,23 @@ QDF_STATUS policy_mgr_get_updated_scan_and_fw_mode_config(
 bool policy_mgr_is_safe_channel(struct wlan_objmgr_psoc *psoc,
 				uint32_t ch_freq);
 
+#ifdef FEATURE_WLAN_CH_AVOID_EXT
+/**
+ * policy_mgr_restrict_sap_on_unsafe_chan() - Check if need check unsafe
+ * channel if SAP start on fixed channel.
+ * @psoc: PSOC object information
+ *
+ * Return: true for success, else false
+ */
+bool policy_mgr_restrict_sap_on_unsafe_chan(struct wlan_objmgr_psoc *psoc);
+#else
+static inline bool
+policy_mgr_restrict_sap_on_unsafe_chan(struct wlan_objmgr_psoc *psoc)
+{
+	return false;
+}
+#endif
+
 /**
  * policy_mgr_is_sap_freq_allowed - Check if the channel is allowed for sap
  * @psoc: PSOC object information

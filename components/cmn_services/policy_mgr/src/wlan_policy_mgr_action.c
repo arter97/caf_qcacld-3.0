@@ -1580,6 +1580,22 @@ bool policy_mgr_is_safe_channel(struct wlan_objmgr_psoc *psoc,
 
 	return is_safe;
 }
+
+bool policy_mgr_restrict_sap_on_unsafe_chan(struct wlan_objmgr_psoc *psoc)
+{
+	struct policy_mgr_psoc_priv_obj *pm_ctx;
+	unsigned long restriction_mask;
+
+	pm_ctx = policy_mgr_get_context(psoc);
+	if (!pm_ctx) {
+		policy_mgr_err("Invalid context");
+		return false;
+	}
+
+	restriction_mask =
+		(unsigned long)policy_mgr_get_freq_restriction_mask(pm_ctx);
+	return qdf_test_bit(QDF_SAP_MODE, &restriction_mask);
+}
 #else
 bool policy_mgr_is_safe_channel(struct wlan_objmgr_psoc *psoc,
 				uint32_t ch_freq)
@@ -1730,8 +1746,7 @@ bool policy_mgr_is_sap_restart_required_after_sta_disconnect(
 		}
 
 		if ((is_acs_mode ||
-		     !target_psoc_get_sap_coex_fixed_chan_cap(
-					wlan_psoc_get_tgt_if_handle(psoc))) &&
+		     policy_mgr_restrict_sap_on_unsafe_chan(psoc)) &&
 		    sta_sap_scc_on_lte_coex_chan &&
 		    !policy_mgr_is_safe_channel(psoc, op_ch_freq_list[i]) &&
 		    pm_ctx->last_disconn_sta_freq == op_ch_freq_list[i]) {
