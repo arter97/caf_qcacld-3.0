@@ -469,6 +469,17 @@ struct wlan_objmgr_vdev *ucfg_get_tdls_vdev(struct wlan_objmgr_psoc *psoc,
  */
 bool ucfg_tdls_check_is_tdls_allowed(struct wlan_objmgr_vdev *vdev);
 
+/**
+ * ucfg_tdls_set_user_tdls_enable() - ucfg api to set tdls is enable or not
+ * from userspace
+ * @vdev: vdev object
+ * @is_user_tdls_enable: true if tdls is enabled from userspace
+ *
+ * Return: void
+ */
+void ucfg_tdls_set_user_tdls_enable(struct wlan_objmgr_vdev *vdev,
+				    bool is_user_tdls_enable);
+
 #else
 static inline
 bool ucfg_tdls_link_vdev_is_matching(struct wlan_objmgr_vdev *vdev)
@@ -574,6 +585,12 @@ static inline
 bool ucfg_tdls_check_is_tdls_allowed(struct wlan_objmgr_vdev *vdev)
 {
 	return false;
+}
+
+static inline
+void ucfg_tdls_set_user_tdls_enable(struct wlan_objmgr_vdev *vdev,
+				    bool is_user_tdls_enable)
+{
 }
 
 static inline

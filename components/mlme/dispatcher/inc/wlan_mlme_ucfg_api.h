@@ -296,6 +296,17 @@ bool ucfg_mlme_get_tdls_prohibited(struct wlan_objmgr_vdev *vdev)
 	return mlme_get_tdls_prohibited(vdev);
 }
 
+/**
+ * ucfg_mlme_get_tdls_chan_switch_prohibited() - get tdls chan switch prohibited
+ * @vdev: vdev pointer
+ *
+ * Return: bool
+ */
+static inline
+bool ucfg_mlme_get_tdls_chan_switch_prohibited(struct wlan_objmgr_vdev *vdev)
+{
+	return mlme_get_tdls_chan_switch_prohibited(vdev);
+}
 #ifdef MULTI_CLIENT_LL_SUPPORT
 /**
  * ucfg_mlme_get_wlm_multi_client_ll_caps() - Get multi client latency level

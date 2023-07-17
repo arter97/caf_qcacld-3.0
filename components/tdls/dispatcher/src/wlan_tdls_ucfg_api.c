@@ -289,6 +289,7 @@ static QDF_STATUS tdls_global_init(struct tdls_soc_priv_obj *soc_obj)
 	soc_obj->tdls_nss_transition_mode = TDLS_NSS_TRANSITION_S_UNKNOWN;
 	soc_obj->enable_tdls_connection_tracker = false;
 	soc_obj->tdls_external_peer_count = 0;
+	soc_obj->is_user_tdls_enable = true;
 
 	qdf_spinlock_create(&soc_obj->tdls_ct_spinlock);
 	tdls_wow_init(soc_obj);
@@ -1291,4 +1292,10 @@ struct wlan_objmgr_vdev *ucfg_get_tdls_vdev(struct wlan_objmgr_psoc *psoc,
 bool ucfg_tdls_check_is_tdls_allowed(struct wlan_objmgr_vdev *vdev)
 {
 	return tdls_check_is_tdls_allowed(vdev);
+}
+
+void ucfg_tdls_set_user_tdls_enable(struct wlan_objmgr_vdev *vdev,
+				    bool is_user_tdls_enable)
+{
+	return tdls_set_user_tdls_enable(vdev, is_user_tdls_enable);
 }
