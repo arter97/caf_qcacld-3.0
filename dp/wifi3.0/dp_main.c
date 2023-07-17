@@ -961,6 +961,28 @@ dp_peer_send_wds_disconnect(struct dp_soc *soc, struct dp_peer *peer)
 #endif
 
 /**
+ * dp_peer_check_ast_offload() - check ast offload support is enable or not
+ * @soc: soc handle
+ *
+ * Return: false in case of IPA and true/false in IPQ case
+ *
+ */
+#if defined(IPA_OFFLOAD) && defined(QCA_WIFI_QCN9224)
+static inline bool dp_peer_check_ast_offload(struct dp_soc *soc)
+{
+	return false;
+}
+#else
+static inline bool dp_peer_check_ast_offload(struct dp_soc *soc)
+{
+	if (soc->ast_offload_support)
+		return true;
+
+	return false;
+}
+#endif
+
+/**
  * dp_peer_get_ast_info_by_soc_wifi3() - search the soc AST hash table
  *                                       and return ast entry information
  *                                       of first ast entry found in the
@@ -981,7 +1003,7 @@ static bool dp_peer_get_ast_info_by_soc_wifi3
 	struct dp_soc *soc = (struct dp_soc *)soc_hdl;
 	struct dp_peer *peer = NULL;
 
-	if (soc->ast_offload_support)
+	if (dp_peer_check_ast_offload(soc))
 		return false;
 
 	qdf_spin_lock_bh(&soc->ast_lock);
