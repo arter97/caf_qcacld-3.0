@@ -41,6 +41,8 @@
 #if defined(WLAN_FEATURE_11BE_MLO) && defined(WLAN_MLO_MULTI_CHIP)
 /* Max bridge vdevs supported */
 #define WLAN_UMAC_MLO_MAX_BRIDGE_VDEVS 2
+/* Max number of PSOC taking part in topology decision at a time*/
+#define WLAN_UMAC_MLO_MAX_PSOC_TOPOLOGY 3
 #endif
 
 #include <wlan_mlo_epcs.h>
@@ -396,6 +398,7 @@ struct wlan_mlo_peer_list {
  * @mld_addr: MLO device MAC address
  * @wlan_vdev_list: list of vdevs associated with this MLO connection
  * @wlan_bridge_vdev_list: list of bridge vdevs associated with this MLO
+ * @bridge_sta_ctx: bridge sta context
  * @wlan_vdev_count: number of elements in the vdev list
  * @mlo_peer_list: list peers in this MLO connection
  * @wlan_max_mlo_peer_count: peer count across the links of specific MLO
@@ -421,6 +424,7 @@ struct wlan_mlo_dev_context {
 	struct wlan_objmgr_vdev *wlan_vdev_list[WLAN_UMAC_MLO_MAX_VDEVS];
 #if defined(WLAN_FEATURE_11BE_MLO) && defined(WLAN_MLO_MULTI_CHIP)
 	struct wlan_objmgr_vdev *wlan_bridge_vdev_list[WLAN_UMAC_MLO_MAX_BRIDGE_VDEVS];
+	struct wlan_mlo_bridge_sta *bridge_sta_ctx;
 #endif
 	uint16_t wlan_vdev_count;
 	struct wlan_mlo_peer_list mlo_peer_list;
@@ -442,6 +446,18 @@ struct wlan_mlo_dev_context {
 	qdf_bitmap(mlo_peer_id_bmap, MAX_MLO_PEER_ID);
 #endif
 	struct wlan_epcs_context epcs_ctx;
+};
+
+/**
+ * struct wlan_mlo_bridge_sta - MLO bridge sta context
+ * @bridge_umac_id: umac id for bridge
+ * @is_force_central_primary: Flag to tell if bridge should be primary umac
+ * @bridge_vap_exists: If there is bridge vap
+ */
+struct wlan_mlo_bridge_sta {
+	uint8_t bridge_umac_id;
+	bool is_force_central_primary;
+	bool bridge_vap_exists;
 };
 
 /**

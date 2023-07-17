@@ -538,6 +538,20 @@ struct wlan_mlo_peer_context *wlan_mlo_get_mlpeer_by_mld_mac(
 				struct qdf_mac_addr *mld_mac);
 
 /**
+ * mlo_get_link_vdev_from_psoc_id() - Get link vdev from psoc id
+ * @ml_dev: MLO DEV object
+ * @psoc_id: psoc_id
+ *
+ * API to get vdev using psoc_id
+ *
+ * Return: Pointer to vdev, if it is found
+ *         otherwise, returns NULL
+ */
+struct wlan_objmgr_vdev *mlo_get_link_vdev_from_psoc_id(
+				struct wlan_mlo_dev_context *ml_dev,
+				uint8_t psoc_id);
+
+/**
  * wlan_mlo_get_mlpeer_by_peer_mladdr() - Get ML peer from the list of MLD's
  *                                        using MLD MAC address
  *

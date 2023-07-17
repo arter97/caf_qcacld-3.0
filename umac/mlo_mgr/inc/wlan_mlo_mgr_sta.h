@@ -161,6 +161,28 @@ void ucfg_mlo_mld_clear_mlo_cap(struct wlan_objmgr_vdev *vdev);
  */
 
 int8_t mlo_get_central_umac_id(uint8_t *psoc_ids);
+
+/**
+ * mlo_check_topology() - check topology of the psoc's in STA
+ * @pdev: pdev pointer
+ * @vdev: vdev pointer
+ * @aplinks: Number of active links on ap side
+ *
+ * Return: QDF_STATUS
+ */
+
+QDF_STATUS mlo_check_topology(struct wlan_objmgr_pdev *pdev,
+			      struct wlan_objmgr_vdev *vdev,
+			      uint8_t aplinks);
+
+/**
+ * mlo_get_total_links() - get total links supported by device
+ * @pdev: pdev pointer
+ *
+ * Return: Number of total links supported
+ */
+
+uint8_t mlo_get_total_links(struct wlan_objmgr_pdev *pdev);
 #endif
 
 /**

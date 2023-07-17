@@ -397,6 +397,7 @@ struct wlan_objmgr_vdev_nif {
  *  @wlan_peer_count:    Peer count
  *  @wlan_ml_peer_count: Multilink Peer count
  *  @mlo_bridge_vdev:    Indicates it is bridge VDEV
+ *  @mlo_central_vdev:   Indicates it is central VDEV
  *  @max_peer_count:     Max Peer count
  *  @c_flags:            creation specific flags
  *  @ref_cnt:            Ref count
@@ -414,6 +415,7 @@ struct wlan_objmgr_vdev_objmgr {
 #ifdef WLAN_FEATURE_11BE_MLO
 	qdf_atomic_t wlan_ml_peer_count;
 	bool mlo_bridge_vdev;
+	bool mlo_central_vdev;
 #endif
 	uint16_t max_peer_count;
 	uint32_t c_flags;
