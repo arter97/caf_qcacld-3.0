@@ -296,9 +296,6 @@ static void pld_pcie_uevent(struct pci_dev *pdev, uint32_t status)
 	case CNSS_FW_DOWN:
 		data.uevent = PLD_FW_DOWN;
 		break;
-	case CNSS_SYS_REBOOT:
-		data.uevent = PLD_SYS_REBOOT;
-		break;
 	default:
 		goto out;
 	}
@@ -760,7 +757,9 @@ struct cnss_wlan_driver pld_pcie_ops = {
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 10, 0))
 	.chip_version = CHIP_VERSION,
 #endif
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 5, 0))
 	.set_therm_cdev_state = pld_pcie_set_thermal_state,
+#endif
 };
 
 int pld_pcie_register_driver(void)
