@@ -646,6 +646,31 @@ void lim_strip_he_ies_from_add_ies(struct mac_context *mac_ctx,
 }
 #endif
 
+#ifdef FEATURE_WLAN_WAPI
+
+void lim_strip_wapi_ies_from_add_ies(struct mac_context *mac_ctx,
+				     struct pe_session *session)
+{
+	struct add_ie_params *add_ie = &session->add_ie_params;
+	uint8_t wapiie_buff[DOT11F_IE_WAPIOPAQUE_MAX_LEN + 2];
+	QDF_STATUS status;
+
+	qdf_mem_zero(wapiie_buff, sizeof(wapiie_buff));
+
+	status = lim_strip_ie(mac_ctx, add_ie->probeRespBCNData_buff,
+			      &add_ie->probeRespBCNDataLen,
+			      DOT11F_EID_WAPIOPAQUE, ONE_BYTE,
+			      NULL, 0,
+			      wapiie_buff, DOT11F_IE_WAPIOPAQUE_MAX_LEN);
+	if (status != QDF_STATUS_SUCCESS)
+		pe_debug("Failed to strip WAPI IE status: %d", status);
+}
+#else
+void lim_strip_wapi_ies_from_add_ies(struct mac_context *mac_ctx,
+				     struct pe_session *session)
+{
+}
+#endif
 /**
  * lim_set_ldpc_exception() - to set allow any LDPC exception permitted
  * @mac_ctx: Pointer to mac context
