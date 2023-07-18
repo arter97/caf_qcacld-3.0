@@ -283,7 +283,8 @@ lim_process_probe_req_frame(struct mac_context *mac_ctx, uint8_t *rx_pkt_info,
 	tSirMacAddr dst_mac;
 
 	mac_hdr = WMA_GET_RX_MAC_HEADER(rx_pkt_info);
-	if (LIM_IS_AP_ROLE(session)) {
+	if (LIM_IS_AP_ROLE(session) &&
+	    session->curr_op_freq == WMA_GET_RX_FREQ(rx_pkt_info)) {
 		frame_len = WMA_GET_RX_PAYLOAD_LEN(rx_pkt_info);
 
 		pe_debug("Received Probe Request: %d bytes from "QDF_MAC_ADDR_FMT,
