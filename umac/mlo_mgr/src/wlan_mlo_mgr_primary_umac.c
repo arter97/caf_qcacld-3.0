@@ -360,6 +360,7 @@ void mlo_peer_assign_primary_umac(
 	struct wlan_mlo_link_peer_entry *peer_ent_iter;
 	uint8_t i;
 	uint8_t primary_umac_set = 0;
+	struct mlo_mgr_context *mlo_ctx = wlan_objmgr_get_mlo_ctx();
 
 	/* If MLD is within single SOC, then assoc link becomes
 	 * primary umac
@@ -373,6 +374,13 @@ void mlo_peer_assign_primary_umac(
 			peer_entry->is_primary = false;
 		}
 	} else {
+		if ((wlan_peer_mlme_is_assoc_peer(peer_entry->link_peer)) &&
+		    (ml_peer->max_links > 1) &&
+		    (mlo_ctx->force_non_assoc_prim_umac)) {
+			peer_entry->is_primary = false;
+			return;
+		}
+
 		/* If this peer PSOC is not derived as Primary PSOC,
 		 * mark is_primary as false
 		 */
