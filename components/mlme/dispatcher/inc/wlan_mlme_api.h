@@ -31,6 +31,25 @@
 #define ASSEMBLE_RATECODE_V1(_pream, _nss, _rate) \
 		(((1) << 28) | ((_pream) << 8) | ((_nss) << 5) | (_rate))
 
+/* This macro is used to extract the rate from the rate_code as first four bits
+ * in rate_code represents the rate, next 3 bits represents the nss and
+ * next 2 bits represents preamble.
+ */
+#define RATECODE_V1_RIX_MASK    0xf
+
+/* This macro is used to extract preamble from the rate_code as first 4 bits
+ * in rate_code represents the rate, next 3 bits represents the nss and
+ * next 2 bits represents preamble.
+ */
+#define RATECODE_V1_PREAMBLE_OFFSET (4 + 3)
+
+/* This macro is used to extract NSS from the rate_code as first 4 bits
+ * in rate_code represents the rate, next 3 bits represents the NSS and
+ * next 2 bits represents preamble.
+ */
+#define RATECODE_V1_NSS_OFFSET  0x4
+#define RATECODE_V1_NSS_MASK    0x7
+
 #ifdef FEATURE_SET
 /**
  * wlan_mlme_get_feature_info() - Get mlme features
