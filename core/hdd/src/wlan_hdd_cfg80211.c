@@ -22376,7 +22376,7 @@ wlan_hdd_add_vlan(struct wlan_objmgr_vdev *vdev, struct sap_context *sap_ctx,
 		return -EINVAL;
 	}
 
-	for (i = 0; i < (2 * MAX_VLAN); i += 2) {
+	for (i = 0; i < (MAX_VLAN - 1); i += 2) {
 		if (!vlan_map[i] || !vlan_map[i + 1]) {
 			found = 1;
 			break;
