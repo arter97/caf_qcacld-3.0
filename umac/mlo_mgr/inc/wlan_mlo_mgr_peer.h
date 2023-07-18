@@ -159,6 +159,18 @@ struct wlan_objmgr_peer *wlan_mlo_peer_get_assoc_peer(
 					struct wlan_mlo_peer_context *ml_peer);
 
 /**
+ * wlan_mlo_peer_get_primary_link_vdev() - Get primary link vdev
+ * @ml_peer: MLO peer
+ *
+ * This function iterates through ml_peer to find primary link
+ * and returns VDEV to which primary link is attached.
+ *
+ * Return: Pointer to vdev, if primary link is found else NULL
+ */
+struct wlan_objmgr_vdev *
+wlan_mlo_peer_get_primary_link_vdev(struct wlan_mlo_peer_context *ml_peer);
+
+/**
  * wlan_mlo_peer_get_bridge_peer() - get bridge peer
  * @ml_peer: MLO peer
  *
