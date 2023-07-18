@@ -35,7 +35,6 @@
 #ifdef WLAN_PKT_CAPTURE_TX_2_0
 #include "mon_ingress_ring.h"
 #include "mon_destination_ring.h"
-#include "dp_mon_2.0.h"
 #endif
 
 #ifdef DP_MEM_PRE_ALLOC
@@ -270,9 +269,6 @@ static struct dp_prealloc_context g_dp_context_allocs[] = {
 	{DP_CFG_EVENT_HIST_TYPE,
 	 DP_CFG_EVT_HIST_PER_SLOT_MAX * sizeof(struct dp_cfg_event),
 	 false, false, NULL},
-#endif
-#ifdef WLAN_PKT_CAPTURE_TX_2_0
-	{DP_MON_TX_DESC_POOL_TYPE, 0, false, false, NULL},
 #endif
 };
 
@@ -581,29 +577,10 @@ uint32_t dp_get_tx_mon_mem_size(struct wlan_dp_prealloc_cfg *cfg,
 
 	return mem_size;
 }
-
-/**
- * dp_get_tx_mon_desc_pool_mem_size() - Get tx mon desc pool memory size
- * @cfg: prealloc config
- *
- * Return : TX mon desc pool memory size
- */
-static inline
-uint32_t dp_get_tx_mon_desc_pool_mem_size(struct wlan_dp_prealloc_cfg *cfg)
-{
-	return (sizeof(union dp_mon_desc_list_elem_t)) *
-		cfg->num_tx_mon_buf_ring_entries;
-}
 #else
 static inline
 uint32_t dp_get_tx_mon_mem_size(struct wlan_dp_prealloc_cfg *cfg,
 				enum hal_ring_type ring_type)
-{
-	return 0;
-}
-
-static inline
-uint32_t dp_get_tx_mon_desc_pool_mem_size(struct wlan_dp_prealloc_cfg *cfg)
 {
 	return 0;
 }
@@ -620,36 +597,7 @@ uint32_t dp_get_tx_mon_mem_size(struct wlan_dp_prealloc_cfg *cfg,
 {
 	return 0;
 }
-
-static inline
-uint32_t dp_get_tx_mon_desc_pool_mem_size(struct wlan_dp_prealloc_cfg *cfg)
-{
-	return 0;
-}
 #endif
-
-/**
- * dp_update_mem_size_by_ctx_type() - Update dp context memory size
- *                                    based on context type
- * @cfg: prealloc related cfg params
- * @ctx_type: DP context type
- * @mem_size: memory size to be updated
- *
- * Return: none
- */
-static void
-dp_update_mem_size_by_ctx_type(struct wlan_dp_prealloc_cfg *cfg,
-			       enum dp_ctxt_type ctx_type,
-			       uint32_t *mem_size)
-{
-	switch (ctx_type) {
-	case DP_MON_TX_DESC_POOL_TYPE:
-		*mem_size = dp_get_tx_mon_desc_pool_mem_size(cfg);
-		break;
-	default:
-		return;
-	}
-}
 
 /**
  * dp_update_mem_size_by_ring_type() - Update srng memory size based
@@ -816,8 +764,6 @@ QDF_STATUS dp_prealloc_init(struct cdp_ctrl_objmgr_psoc *ctrl_psoc)
 	/*Context pre-alloc*/
 	for (i = 0; i < QDF_ARRAY_SIZE(g_dp_context_allocs); i++) {
 		cp = &g_dp_context_allocs[i];
-		dp_update_mem_size_by_ctx_type(&cfg, cp->ctxt_type,
-					       &cp->size);
 		cp->addr = qdf_mem_malloc(cp->size);
 
 		if (qdf_unlikely(!cp->addr) && cp->is_critical) {
