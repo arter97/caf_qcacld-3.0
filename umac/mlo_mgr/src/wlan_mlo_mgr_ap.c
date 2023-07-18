@@ -101,6 +101,44 @@ bool mlo_ap_vdev_attach(struct wlan_objmgr_vdev *vdev,
 }
 #endif
 
+void mlo_peer_get_vdev_list(struct wlan_objmgr_peer *peer,
+			    uint16_t *vdev_count,
+			    struct wlan_objmgr_vdev **wlan_vdev_list)
+{
+	struct wlan_mlo_link_peer_entry *peer_entry;
+	struct wlan_objmgr_peer *link_peer;
+	int i;
+	QDF_STATUS status;
+
+	*vdev_count = 0;
+
+	if (!peer) {
+		mlo_err("Invalid input");
+		return;
+	}
+
+	mlo_peer_lock_acquire(peer->mlo_peer_ctx);
+
+	for (i = 0; i < MAX_MLO_LINK_PEERS; i++) {
+		peer_entry = &peer->mlo_peer_ctx->peer_list[i];
+		link_peer = peer_entry->link_peer;
+		if (!link_peer)
+			continue;
+
+		status = wlan_objmgr_vdev_try_get_ref(
+				wlan_peer_get_vdev(link_peer),
+				WLAN_MLO_MGR_ID);
+		if (QDF_IS_STATUS_ERROR(status))
+			break;
+
+		wlan_vdev_list[*vdev_count] =
+				wlan_peer_get_vdev(link_peer);
+		(*vdev_count) += 1;
+	}
+
+	mlo_peer_lock_release(peer->mlo_peer_ctx);
+}
+
 void mlo_ap_get_vdev_list(struct wlan_objmgr_vdev *vdev,
 			  uint16_t *vdev_count,
 			  struct wlan_objmgr_vdev **wlan_vdev_list)
