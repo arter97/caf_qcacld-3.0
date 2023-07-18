@@ -378,6 +378,9 @@ static bool mlo_handle_link_ready(struct wlan_objmgr_vdev *vdev)
 		return false;
 	}
 
+	if (wlan_vdev_is_up(vdev) == QDF_STATUS_SUCCESS)
+		return true;
+
 	mld_ctx = vdev->mlo_dev_ctx;
 	/*
 	 * The last vdev in MLD to receive start response is responsible for
