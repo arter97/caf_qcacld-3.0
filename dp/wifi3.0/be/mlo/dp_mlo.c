@@ -325,13 +325,6 @@ static QDF_STATUS dp_mlo_add_ptnr_vdev(struct dp_vdev *vdev1,
 							CDP_INVALID_VDEV_ID)
 		return QDF_STATUS_SUCCESS;
 
-	if (dp_vdev_get_ref(soc, vdev1, DP_MOD_ID_RX) !=
-	    QDF_STATUS_SUCCESS) {
-		qdf_info("%pK: unable to get vdev reference vdev %pK vdev_id %u",
-			 soc, vdev1, vdev1->vdev_id);
-		return QDF_STATUS_E_FAILURE;
-	}
-
 	vdev2_be->partner_vdev_list[soc_be->mlo_chip_id][pdev_id] =
 						vdev1->vdev_id;
 
@@ -456,14 +449,12 @@ void dp_clr_mlo_ptnr_list(struct dp_soc *soc, struct dp_vdev *vdev)
 			if (!pr_vdev)
 				continue;
 
-			/* release ref and remove self vdev from partner list */
+			/* remove self vdev from partner list */
 			pr_vdev_be = dp_get_be_vdev_from_dp_vdev(pr_vdev);
-			dp_vdev_unref_delete(soc, vdev, DP_MOD_ID_RX);
 			pr_vdev_be->partner_vdev_list[soc_id][pdev_id] =
 				CDP_INVALID_VDEV_ID;
 
-			/* release ref and remove partner vdev from self list */
-			dp_vdev_unref_delete(pr_soc, pr_vdev, DP_MOD_ID_RX);
+			/* remove partner vdev from self list */
 			pr_pdev = pr_vdev->pdev;
 			vdev_be->partner_vdev_list[pr_soc_be->mlo_chip_id][pr_pdev->pdev_id] =
 				CDP_INVALID_VDEV_ID;
