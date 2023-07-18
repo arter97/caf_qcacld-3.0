@@ -1886,12 +1886,14 @@ wlan_cfg_is_tx_per_pkt_vdev_id_check_enabled(struct wlan_cfg_dp_soc_ctxt *cfg);
  * @interrupt_mode: Type of interrupt
  * @is_monitor_mode: is monitor mode enabled
  * @ppeds_attached: is ppeds attached
+ * @umac_reset_support: Umac reset support
  *
  * Return: void
  */
 void wlan_cfg_fill_interrupt_mask(struct wlan_cfg_dp_soc_ctxt *wlan_cfg_ctx,
 				  int num_dp_msi, int interrupt_mode,
-				  bool is_monitor_mode, bool ppeds_attached);
+				  bool is_monitor_mode, bool ppeds_attached,
+				  bool umac_reset_support);
 
 /**
  * wlan_cfg_is_rx_fisa_enabled() - Get Rx FISA enabled flag
