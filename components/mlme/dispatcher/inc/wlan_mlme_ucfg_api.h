@@ -5003,6 +5003,19 @@ ucfg_mlme_get_wds_mode(struct wlan_objmgr_psoc *psoc)
 	return wlan_mlme_get_wds_mode(psoc);
 }
 
+/**
+ * ucfg_mlme_set_wds_mode() - Set the configured WDS mode
+ * @psoc: pointer to psoc object
+ * @mode: wds mode to set
+ *
+ * Return: void
+ */
+static inline void
+ucfg_mlme_set_wds_mode(struct wlan_objmgr_psoc *psoc, uint32_t mode)
+{
+	wlan_mlme_set_wds_mode(psoc, mode);
+}
+
 #ifdef WLAN_FEATURE_SON
 /**
  * ucfg_mlme_get_vdev_max_mcs_idx() - Get max mcs idx of given vdev

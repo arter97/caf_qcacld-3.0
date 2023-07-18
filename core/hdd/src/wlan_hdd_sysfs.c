@@ -92,6 +92,7 @@
 #include <wlan_hdd_sysfs_runtime_pm.h>
 #include <wlan_hdd_sysfs_log_buffer.h>
 #include <wlan_hdd_sysfs_dfsnol.h>
+#include <wlan_hdd_sysfs_wds_mode.h>
 
 #define MAX_PSOC_ID_SIZE 10
 
@@ -957,12 +958,14 @@ void hdd_create_sysfs_files(struct hdd_context *hdd_ctx)
 		hdd_sysfs_dp_pkt_add_ts_create(driver_kobject);
 		hdd_sysfs_runtime_pm_create(driver_kobject);
 		hdd_sysfs_log_buffer_create(driver_kobject);
+		hdd_sysfs_wds_mode_create(driver_kobject);
 	}
 }
 
 void hdd_destroy_sysfs_files(void)
 {
 	if  (QDF_GLOBAL_MISSION_MODE == hdd_get_conparam()) {
+		hdd_sysfs_wds_mode_destroy(driver_kobject);
 		hdd_sysfs_log_buffer_destroy(driver_kobject);
 		hdd_sysfs_runtime_pm_destroy(driver_kobject);
 		hdd_sysfs_dp_pkt_add_ts_destroy(driver_kobject);

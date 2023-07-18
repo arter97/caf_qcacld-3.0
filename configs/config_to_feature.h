@@ -916,6 +916,10 @@
 #define WLAN_SYSFS_EHT_RATE (1)
 #endif
 
+#ifdef CONFIG_WLAN_SYSFS_WDS_MODE
+#define FEATURE_SYSFS_WDS_MODE (1)
+#endif
+
 #ifdef CONFIG_RX_PERFORMANCE
 #define RX_PERFORMANCE (1)
 #endif
