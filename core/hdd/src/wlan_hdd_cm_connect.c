@@ -201,9 +201,15 @@ void hdd_cm_update_rssi_snr_by_bssid(struct wlan_hdd_link_info *link_info)
 	struct hdd_adapter *adapter = link_info->adapter;
 	mac_handle_t mac_handle;
 
+	if (!adapter) {
+		hdd_err_rl("null hdd_adapter pointer");
+		return;
+	}
+
 	mac_handle = hdd_adapter_get_mac_handle(adapter);
+
 	if (!mac_handle) {
-		hdd_err("mac_handle is NULL");
+		hdd_err_rl("null mac_handle pointer");
 		return;
 	}
 

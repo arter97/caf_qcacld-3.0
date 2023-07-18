@@ -628,7 +628,19 @@ out:
 static void hdd_send_mlo_ps_to_fw(struct hdd_adapter *adapter)
 {
 	struct wlan_hdd_link_info *link_info;
-	mac_handle_t mac_handle = hdd_adapter_get_mac_handle(adapter);
+	mac_handle_t mac_handle;
+
+	if (!adapter) {
+		hdd_err_rl("null hdd_adapter pointer");
+		return;
+	}
+
+	mac_handle = hdd_adapter_get_mac_handle(adapter);
+
+	if (!mac_handle) {
+		hdd_err_rl("null mac_handle pointer");
+		return;
+	}
 
 	hdd_adapter_for_each_active_link_info(adapter, link_info)
 		sme_ps_update(mac_handle, link_info->vdev_id);
@@ -639,7 +651,19 @@ static void hdd_send_mlo_ps_to_fw(struct hdd_adapter *adapter)
 	int i;
 	struct hdd_adapter *link_adapter;
 	struct hdd_mlo_adapter_info *mlo_adapter_info;
-	mac_handle_t mac_handle = hdd_adapter_get_mac_handle(adapter);
+	mac_handle_t mac_handle;
+
+	if (!adapter) {
+		hdd_err_rl("null hdd_adapter pointer");
+		return;
+	}
+
+	mac_handle = hdd_adapter_get_mac_handle(adapter);
+
+	if (!mac_handle) {
+		hdd_err_rl("null mac_handle pointer");
+		return;
+	}
 
 	mlo_adapter_info = &adapter->mlo_adapter_info;
 	for (i = 0; i < WLAN_MAX_MLD; i++) {
