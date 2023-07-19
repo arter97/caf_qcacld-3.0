@@ -57,6 +57,7 @@
  * @en_11be: enable 11be
  * @dynamic_vdev_macaddr_support: Dynamic update of vdev MAC addr is
  *                                supported or not
+ * @is_mlo_per_link_stats_supported: Per link mlo stats is supported or not
  */
 struct wma_tgt_services {
 	uint32_t sta_power_save;
@@ -109,6 +110,9 @@ struct wma_tgt_services {
 	bool en_11be;
 #ifdef WLAN_FEATURE_DYNAMIC_MAC_ADDR_UPDATE
 	bool dynamic_vdev_macaddr_support;
+#endif
+#ifdef WLAN_FEATURE_11BE_MLO
+	bool is_mlo_per_link_stats_supported;
 #endif
 };
 

@@ -423,6 +423,54 @@ struct pld_dev_mem_info {
 	u64 size;
 };
 
+/**
+ * enum pld_wlan_hw_nss_info - WLAN HW nss info
+ * @PLD_WLAN_HW_CAP_NSS_UNSPECIFIED: nss info not specified
+ * @PLD_WLAN_HW_CAP_NSS_1x1: supported nss link 1x1
+ * @PLD_WLAN_HW_CAP_NSS_2x2: supported nss link 2x2
+ */
+enum pld_wlan_hw_nss_info {
+	PLD_WLAN_HW_CAP_NSS_UNSPECIFIED,
+	PLD_WLAN_HW_CAP_NSS_1x1,
+	PLD_WLAN_HW_CAP_NSS_2x2
+};
+
+/**
+ * enum pld_wlan_hw_channel_bw_info - WLAN HW channel bw info
+ * @PLD_WLAN_HW_CHANNEL_BW_UNSPECIFIED: bw info not specified
+ * @PLD_WLAN_HW_CHANNEL_BW_80MHZ: supported bw 80MHZ
+ * @PLD_WLAN_HW_CHANNEL_BW_160MHZ: supported bw 160MHZ
+ */
+enum pld_wlan_hw_channel_bw_info  {
+	PLD_WLAN_HW_CHANNEL_BW_UNSPECIFIED,
+	PLD_WLAN_HW_CHANNEL_BW_80MHZ,
+	PLD_WLAN_HW_CHANNEL_BW_160MHZ
+};
+
+/**
+ * enum pld_wlan_hw_qam_info - WLAN HW qam info
+ * @PLD_WLAN_HW_QAM_UNSPECIFIED: QAM info not specified
+ * @PLD_WLAN_HW_QAM_1K: 1K QAM supported
+ * @PLD_WLAN_HW_QAM_4K: 4K QAM supported
+ */
+enum pld_wlan_hw_qam_info  {
+	PLD_WLAN_HW_QAM_UNSPECIFIED,
+	PLD_WLAN_HW_QAM_1K,
+	PLD_WLAN_HW_QAM_4K
+};
+
+/**
+ * struct pld_wlan_hw_cap_info - WLAN HW cap info
+ * @nss: nss info
+ * @bw: bw info
+ * @qam: qam info
+ */
+struct pld_wlan_hw_cap_info {
+	enum pld_wlan_hw_nss_info nss;
+	enum pld_wlan_hw_channel_bw_info bw;
+	enum pld_wlan_hw_qam_info qam;
+};
+
 #define PLD_MAX_TIMESTAMP_LEN 32
 #define PLD_WLFW_MAX_BUILD_ID_LEN 128
 #define PLD_MAX_DEV_MEM_NUM 4
@@ -440,6 +488,7 @@ struct pld_dev_mem_info {
  * @device_version: WLAN device version info
  * @dev_mem_info: WLAN device memory info
  * @fw_build_id: Firmware build identifier
+ * @hw_cap_info: WLAN HW capabilities info
  *
  * pld_soc_info is used to store WLAN SOC information.
  */
@@ -455,6 +504,7 @@ struct pld_soc_info {
 	struct pld_device_version device_version;
 	struct pld_dev_mem_info dev_mem_info[PLD_MAX_DEV_MEM_NUM];
 	char fw_build_id[PLD_WLFW_MAX_BUILD_ID_LEN + 1];
+	struct pld_wlan_hw_cap_info hw_cap_info;
 };
 
 /**
@@ -1004,8 +1054,8 @@ static inline int pld_get_driver_load_cnt(struct device *dev)
  * @dev: device
  * @vote: 0 for enable PCIE PC, 1 for disable PCIE PC
  *
- * This is for PCIE power collaps control during suspend/resume.
- * When PCIE power collaps is disabled, WLAN FW can access memory
+ * This is for PCIE power collapse control during suspend/resume.
+ * When PCIE power collapse is disabled, WLAN FW can access memory
  * through PCIE when system is suspended.
  *
  * Return: 0 for success
@@ -1838,6 +1888,23 @@ const char *pld_bus_width_type_to_str(enum pld_bus_width_type level);
 int pld_get_thermal_state(struct device *dev, unsigned long *thermal_state,
 			  int mon_id);
 
+/**
+ * pld_set_tsf_sync_period() - Set TSF sync period
+ * @dev: device
+ * @val: TSF sync time value
+ *
+ * Return: void
+ */
+void pld_set_tsf_sync_period(struct device *dev, u32 val);
+
+/**
+ * pld_reset_tsf_sync_period() - Reset TSF sync period
+ * @dev: device
+ *
+ * Return: void
+ */
+void pld_reset_tsf_sync_period(struct device *dev);
+
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 19, 0))
 /**
  * pld_is_ipa_offload_disabled() - Check if IPA offload is enabled or not
@@ -1892,6 +1959,43 @@ static inline int pld_nbuf_pre_alloc_free(struct sk_buff *skb)
 	return 0;
 }
 #endif
+
+#ifdef CONFIG_AFC_SUPPORT
+/**
+ * pld_send_buffer_to_afcmem() - Send afc data to afc memory
+ * @dev: The device structure
+ * @afcdb: Pointer to afc data buffer
+ * @len: Length of afc data
+ * @slotid: Slot id of afc memory
+ *
+ * Return: Non-zero code for error; zero for success
+ */
+int pld_send_buffer_to_afcmem(struct device *dev, const uint8_t *afcdb,
+			      uint32_t len, uint8_t slotid);
+
+/**
+ * pld_reset_afcmem() - Reset afc data in afc memory
+ * @dev: The device structure
+ * @slotid: Slot id of afc memory
+ *
+ * Return: Non-zero code for error; zero for success
+ */
+int pld_reset_afcmem(struct device *dev, uint8_t slotid);
+#else
+static inline
+int pld_send_buffer_to_afcmem(struct device *dev, const uint8_t *afcdb,
+			      uint32_t len, uint8_t slotid)
+{
+	return -EINVAL;
+}
+
+static inline
+int pld_reset_afcmem(struct device *dev, uint8_t slotid)
+{
+	return -EINVAL;
+}
+#endif
+
 /**
  * pld_get_bus_type() - Bus type of the device
  * @dev: device

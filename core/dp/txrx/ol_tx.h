@@ -238,10 +238,12 @@ ol_tx_non_std(struct cdp_soc_t *soc_hdl, uint8_t vdev_id,
  * @skb: skb to be traced
  * @msdu_id: msdu_id of the packet
  * @vdev_id: vdev_id of the packet
+ * @op_mode: Vdev Operation mode
  *
  * Return: None
  */
-void ol_tx_trace_pkt(qdf_nbuf_t skb, uint16_t msdu_id, uint8_t vdev_id);
+void ol_tx_trace_pkt(qdf_nbuf_t skb, uint16_t msdu_id, uint8_t vdev_id,
+		     enum QDF_OPMODE op_mode);
 
 void ol_txrx_mgmt_tx_complete(void *ctxt, qdf_nbuf_t netbuf, int err);
 

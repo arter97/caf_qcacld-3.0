@@ -808,4 +808,88 @@ __wlan_dp_update_peer_map_unmap_version(uint8_t *version)
 {
 }
 #endif
+
+#ifdef WLAN_DP_PROFILE_SUPPORT
+/**
+ * wlan_dp_get_profile_info() - Get DP memory profile info
+ *
+ * Return: None
+ */
+struct wlan_dp_memory_profile_info *wlan_dp_get_profile_info(void);
+
+/**
+ * wlan_dp_select_profile_cfg() - Select DP profile configuration
+ * @psoc: psoc context
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS wlan_dp_select_profile_cfg(struct wlan_objmgr_psoc *psoc);
+
+/**
+ * wlan_dp_soc_cfg_sync_profile() - Sync DP soc cfg items with profile
+ * @cdp_soc: cdp soc context
+ *
+ * Return: None
+ */
+void wlan_dp_soc_cfg_sync_profile(struct cdp_soc_t *cdp_soc);
+
+/**
+ * wlan_dp_pdev_cfg_sync_profile() - Sync DP pdev cfg items with profile
+ * @cdp_soc: cdp soc context
+ * @pdev_id: pdev id
+ *
+ * Return: QDF_STATUS
+ */
+void wlan_dp_pdev_cfg_sync_profile(struct cdp_soc_t *cdp_soc, uint8_t pdev_id);
+#else
+
+static inline
+QDF_STATUS wlan_dp_select_profile_cfg(struct wlan_objmgr_psoc *psoc)
+{
+	return QDF_STATUS_E_NOSUPPORT;
+}
+#endif
+
+/* DP CFG APIs - START */
+
+#ifdef WLAN_SUPPORT_RX_FISA
+/**
+ * wlan_dp_cfg_is_rx_fisa_enabled() - Get Rx FISA enabled flag
+ * @dp_cfg: soc configuration context
+ *
+ * Return: true if enabled, false otherwise.
+ */
+static inline
+bool wlan_dp_cfg_is_rx_fisa_enabled(struct wlan_dp_psoc_cfg *dp_cfg)
+{
+	return dp_cfg->is_rx_fisa_enabled;
+}
+
+/**
+ * wlan_dp_cfg_is_rx_fisa_lru_del_enabled() - Get Rx FISA LRU del enabled flag
+ * @dp_cfg: soc configuration context
+ *
+ * Return: true if enabled, false otherwise.
+ */
+static inline
+bool wlan_dp_cfg_is_rx_fisa_lru_del_enabled(struct wlan_dp_psoc_cfg *dp_cfg)
+{
+	return dp_cfg->is_rx_fisa_lru_del_enabled;
+}
+#else
+static inline
+bool wlan_dp_cfg_is_rx_fisa_enabled(struct wlan_dp_psoc_cfg *dp_cfg)
+{
+	return false;
+}
+
+static inline
+bool wlan_dp_cfg_is_rx_fisa_lru_del_enabled(struct wlan_dp_psoc_cfg *dp_cfg)
+{
+	return false;
+}
+#endif
+
+
+/* DP CFG APIs - END */
 #endif

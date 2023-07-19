@@ -403,7 +403,7 @@ wlan_hdd_debugfs_update_filters_info(struct hdd_context *hdd_ctx,
 	}
 
 	hdd_sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter->deflink);
-	if (!hdd_cm_is_vdev_associated(adapter)) {
+	if (!hdd_cm_is_vdev_associated(adapter->deflink)) {
 		ret_val = scnprintf(buf + len, buf_avail_len - len,
 				    "\nSTA is not connected\n");
 		if (ret_val <= 0)

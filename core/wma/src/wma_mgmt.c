@@ -88,6 +88,8 @@
 #endif
 #include "wlan_cm_roam_api.h"
 #include "wlan_cm_api.h"
+#include "wlan_mlo_link_force.h"
+#include <target_if_spatial_reuse.h>
 
 /* Max debug string size for WMM in bytes */
 #define WMA_WMM_DEBUG_STRING_SIZE    512
@@ -1036,11 +1038,21 @@ wma_fw_to_host_phymode_11be(WMI_HOST_WLAN_PHY_MODE phymode)
 	}
 	return WLAN_PHYMODE_AUTO;
 }
+
+static inline bool wma_is_phymode_eht(enum wlan_phymode phymode)
+{
+	return IS_WLAN_PHYMODE_EHT(phymode);
+}
 #else
 static enum wlan_phymode
 wma_fw_to_host_phymode_11be(WMI_HOST_WLAN_PHY_MODE phymode)
 {
 	return WLAN_PHYMODE_AUTO;
+}
+
+static inline bool wma_is_phymode_eht(enum wlan_phymode phymode)
+{
+	return false;
 }
 #endif
 
@@ -1429,6 +1441,7 @@ static void wma_set_mlo_capability(tp_wma_handle wma,
 	uint8_t pdev_id;
 	struct wlan_objmgr_peer *peer;
 	struct wlan_objmgr_psoc *psoc = wma->psoc;
+	uint16_t link_id_bitmap;
 
 	pdev_id = wlan_objmgr_pdev_get_pdev_id(wma->pdev);
 	peer = wlan_objmgr_get_peer(psoc, pdev_id, req->peer_mac,
@@ -1444,12 +1457,19 @@ static void wma_set_mlo_capability(tp_wma_handle wma,
 		req->mlo_params.mlo_assoc_link =
 					wlan_peer_mlme_is_assoc_peer(peer);
 		WLAN_ADDR_COPY(req->mlo_params.mld_mac, peer->mldaddr);
-		if (policy_mgr_ml_link_vdev_need_to_be_disabled(psoc, vdev))
+		if (policy_mgr_ml_link_vdev_need_to_be_disabled(psoc, vdev) ||
+		    policy_mgr_is_emlsr_sta_concurrency_present(psoc)) {
 			req->mlo_params.mlo_force_link_inactive = 1;
-		wma_debug("assoc_link %d" QDF_MAC_ADDR_FMT ", force inactive %d",
+			link_id_bitmap = 1 << params->link_id;
+			ml_nlink_set_curr_force_inactive_state(
+					psoc, vdev, link_id_bitmap, LINK_ADD);
+		}
+		wma_debug("assoc_link %d" QDF_MAC_ADDR_FMT ", force inactive %d link id %d",
 			  req->mlo_params.mlo_assoc_link,
 			  QDF_MAC_ADDR_REF(peer->mldaddr),
-			  req->mlo_params.mlo_force_link_inactive);
+			  req->mlo_params.mlo_force_link_inactive,
+			  params->link_id);
+
 		req->mlo_params.emlsr_support = params->emlsr_support;
 		req->mlo_params.ieee_link_id = params->link_id;
 		if (req->mlo_params.emlsr_support) {
@@ -2533,7 +2553,7 @@ QDF_STATUS wma_set_ap_vdev_up(tp_wma_handle wma, uint8_t vdev_id)
 	wma_set_sap_keepalive(wma, vdev_id);
 	wma_set_vdev_mgmt_rate(wma, vdev_id);
 	wma_vdev_set_he_bss_params(wma, vdev_id, &mlme_obj->proto.he_ops_info);
-	wma_sr_update(wma, vdev_id, true);
+	mlme_sr_update(vdev, true);
 
 	return status;
 }
@@ -4176,3 +4196,65 @@ wma_update_edca_pifs_param(WMA_HANDLE handle,
 	return status;
 }
 #endif
+
+QDF_STATUS
+wma_update_bss_peer_phy_mode(struct wlan_channel *des_chan,
+			     struct wlan_objmgr_vdev *vdev)
+{
+	struct wlan_objmgr_peer *bss_peer;
+	enum wlan_phymode old_peer_phymode, new_phymode;
+	tSirNwType nw_type;
+	struct vdev_mlme_obj *mlme_obj;
+
+	bss_peer = wlan_objmgr_vdev_try_get_bsspeer(vdev, WLAN_LEGACY_WMA_ID);
+	if (!bss_peer) {
+		wma_err("not able to find bss peer for vdev %d",
+			wlan_vdev_get_id(vdev));
+		return QDF_STATUS_E_INVAL;
+	}
+
+	old_peer_phymode = wlan_peer_get_phymode(bss_peer);
+
+	if (WLAN_REG_IS_24GHZ_CH_FREQ(des_chan->ch_freq)) {
+		if (des_chan->ch_phymode == WLAN_PHYMODE_11B ||
+		    old_peer_phymode == WLAN_PHYMODE_11B)
+			nw_type = eSIR_11B_NW_TYPE;
+		else
+			nw_type = eSIR_11G_NW_TYPE;
+	} else {
+		nw_type = eSIR_11A_NW_TYPE;
+	}
+
+	new_phymode = wma_peer_phymode(nw_type, STA_ENTRY_PEER,
+				       IS_WLAN_PHYMODE_HT(old_peer_phymode),
+				       des_chan->ch_width,
+				       IS_WLAN_PHYMODE_VHT(old_peer_phymode),
+				       IS_WLAN_PHYMODE_HE(old_peer_phymode),
+				       wma_is_phymode_eht(old_peer_phymode));
+
+	if (new_phymode == old_peer_phymode) {
+		wma_debug("Ignore update, old %d and new %d phymode are same, vdev_id : %d",
+			  old_peer_phymode, new_phymode,
+			  wlan_vdev_get_id(vdev));
+		wlan_objmgr_peer_release_ref(bss_peer, WLAN_LEGACY_WMA_ID);
+		return QDF_STATUS_SUCCESS;
+	}
+
+	mlme_obj = wlan_vdev_mlme_get_cmpt_obj(vdev);
+	if (!mlme_obj) {
+		wma_err("not able to get mlme_obj");
+		wlan_objmgr_peer_release_ref(bss_peer, WLAN_LEGACY_WMA_ID);
+		return QDF_STATUS_E_INVAL;
+	}
+
+	wlan_peer_obj_lock(bss_peer);
+	wlan_peer_set_phymode(bss_peer, new_phymode);
+	wlan_peer_obj_unlock(bss_peer);
+
+	wlan_objmgr_peer_release_ref(bss_peer, WLAN_LEGACY_WMA_ID);
+
+	mlme_obj->mgmt.generic.phy_mode = wma_host_to_fw_phymode(new_phymode);
+	des_chan->ch_phymode = new_phymode;
+
+	return QDF_STATUS_SUCCESS;
+}

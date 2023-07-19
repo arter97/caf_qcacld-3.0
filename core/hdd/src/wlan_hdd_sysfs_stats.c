@@ -38,7 +38,8 @@ static int stats_id = -1;
 static void hdd_sysfs_get_stats(struct hdd_adapter *adapter, ssize_t *length,
 				char *buffer, size_t buf_len)
 {
-	struct hdd_tx_rx_stats *stats = &adapter->hdd_stats.tx_rx_stats;
+	struct hdd_tx_rx_stats *stats =
+				&adapter->deflink->hdd_stats.tx_rx_stats;
 	struct dp_tx_rx_stats *dp_stats;
 	uint32_t len = 0;
 	uint32_t total_rx_pkt = 0, total_rx_dropped = 0;

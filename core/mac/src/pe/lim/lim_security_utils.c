@@ -760,25 +760,3 @@ lim_decrypt_auth_frame(struct mac_context *mac, uint8_t *pKey, uint8_t *pEncrBod
 
 	return QDF_STATUS_SUCCESS;
 } /****** end lim_decrypt_auth_frame() ******/
-
-/**
- * lim_post_sme_set_keys_cnf
- *
- * A utility API to send MLM_SETKEYS_CNF to SME
- */
-void lim_post_sme_set_keys_cnf(struct mac_context *mac,
-			       tLimMlmSetKeysReq *pMlmSetKeysReq,
-			       tLimMlmSetKeysCnf *mlmSetKeysCnf)
-{
-	/* Prepare and Send LIM_MLM_SETKEYS_CNF */
-	qdf_copy_macaddr(&mlmSetKeysCnf->peer_macaddr,
-			 &pMlmSetKeysReq->peer_macaddr);
-
-	/* Free up buffer allocated for mlmSetKeysReq */
-	qdf_mem_zero(pMlmSetKeysReq, sizeof(tLimMlmSetKeysReq));
-	qdf_mem_free(pMlmSetKeysReq);
-	mac->lim.gpLimMlmSetKeysReq = NULL;
-
-	lim_post_sme_message(mac,
-			     LIM_MLM_SETKEYS_CNF, (uint32_t *) mlmSetKeysCnf);
-}

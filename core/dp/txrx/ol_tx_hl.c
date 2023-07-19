@@ -518,7 +518,8 @@ ol_tx_hl_base(
 		/* OL_TXRX_PROT_AN_LOG(pdev->prot_an_tx_sent, msdu);*/
 
 		qdf_dp_trace_log_pkt(vdev->vdev_id, msdu, QDF_TX,
-				     QDF_TRACE_DEFAULT_PDEV_ID);
+				     QDF_TRACE_DEFAULT_PDEV_ID,
+				     vdev->qdf_opmode);
 		DPTRACE(qdf_dp_trace_data_pkt(msdu, QDF_TRACE_DEFAULT_PDEV_ID,
 					      QDF_DP_TRACE_TX_PACKET_RECORD,
 					      tx_desc->id, QDF_TX));

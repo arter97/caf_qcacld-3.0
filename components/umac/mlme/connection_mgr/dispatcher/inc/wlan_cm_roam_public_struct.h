@@ -315,7 +315,6 @@ struct rso_chan_info {
  * @roam_scan_n_probes:
  * @roam_scan_inactivity_time:
  * @roam_inactive_data_packet_count:
- * @roam_scan_period_after_inactivity:
  */
 struct rso_cfg_params {
 	uint32_t neighbor_scan_period;
@@ -346,7 +345,6 @@ struct rso_cfg_params {
 	uint8_t roam_scan_n_probes;
 	uint32_t roam_scan_inactivity_time;
 	uint32_t roam_inactive_data_packet_count;
-	uint32_t roam_scan_period_after_inactivity;
 };
 
 /**
@@ -629,6 +627,19 @@ struct rso_config {
 };
 
 /**
+ * struct rso_user_config - userspace configured RSO related
+ * configs.
+ * @num_ssid_allowed_list: The number of SSID profiles that are
+ * in the allowlist. When roaming, we consider the BSSID's with
+ * this SSID also for roaming apart from the connected ones
+ * @ssid_allowed_list: Allowlist SSIDs
+ */
+struct rso_user_config {
+	uint8_t num_ssid_allowed_list;
+	struct wlan_ssid ssid_allowed_list[MAX_SSID_ALLOWED_LIST];
+};
+
+/**
  * enum sta_roam_policy_dfs_mode - state of DFS mode for STA ROME policy
  * @STA_ROAM_POLICY_NONE: DFS mode attribute is not valid
  * @STA_ROAM_POLICY_DFS_ENABLED:  DFS mode is enabled
@@ -659,11 +670,6 @@ struct rso_roam_policy_params {
 
 /**
  * struct rso_config_params - global RSO params
- * @num_ssid_allowed_list: The number of SSID profiles that are
- *                         in the Allowlist. When roaming, we
- *                         consider the BSSID's with this SSID
- *                         also for roaming apart from the connected one's
- * @ssid_allowed_list: Allowlist SSID's
  * @num_bssid_favored: Number of BSSID's which have a preference over others
  * @bssid_favored: Favorable BSSID's
  * @bssid_favored_factor: RSSI to be added to this BSSID to prefer it
@@ -683,8 +689,6 @@ struct rso_roam_policy_params {
  * @neighbor_report_offload: neighbor report offload params
  */
 struct rso_config_params {
-	uint8_t num_ssid_allowed_list;
-	struct wlan_ssid ssid_allowed_list[MAX_SSID_ALLOWED_LIST];
 	uint8_t num_bssid_favored;
 	struct qdf_mac_addr bssid_favored[MAX_BSSID_FAVORED];
 	uint8_t bssid_favored_factor[MAX_BSSID_FAVORED];
@@ -1278,7 +1282,7 @@ struct wlan_roam_scan_filter_params {
  * @btm_max_attempt_cnt: Maximum attempt for sending BTM query to ESS
  * @btm_sticky_time: Stick time after roaming to new AP by BTM
  * @disassoc_timer_threshold: threshold value till which the firmware can
- * wait before triggering the roam scan after receiving the disassoc iminent
+ * wait before triggering the roam scan after receiving the disassoc imminent
  * @btm_query_bitmask: bitmask to btm query with candidate list
  * @btm_candidate_min_score: Minimum score of the AP to consider it as a
  * candidate if the roam trigger is BTM kickout.
@@ -1866,8 +1870,6 @@ struct wlan_roam_reason_vsie_enable {
  * device is considered to be inactive
  * @roam_inactive_data_packet_count: Maximum allowed data packets count during
  * roam_scan_inactivity_time.
- * @roam_scan_period_after_inactivity: Roam scan period in ms after device is
- * in inactive state.
  * @full_scan_period: Full scan period is the idle period in seconds
  * between two successive full channel roam scans.
  */
@@ -1878,7 +1880,6 @@ struct wlan_roam_scan_period_params {
 	uint32_t scan_age;
 	uint32_t roam_scan_inactivity_time;
 	uint32_t roam_inactive_data_packet_count;
-	uint32_t roam_scan_period_after_inactivity;
 	uint32_t full_scan_period;
 };
 

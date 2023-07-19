@@ -311,16 +311,14 @@ typedef struct {
 
 /**
  * struct tSetStaKeyParams - set key params
- * @staIdx: station id
  * @encType: encryption type
  * @defWEPIdx: Default WEP key, valid only for static WEP, must between 0 and 3
- * @key: valid only for non-static WEP encyrptions
  * @singleTidRc: 1=Single TID based Replay Count, 0=Per TID based RC
- * @smesessionId: sme session id
+ * @vdev_id: vdev_id
  * @peerMacAddr: peer mac address
  * @status: status
- * @sendRsp: send response
  * @macaddr: MAC address of the peer
+ * @key_len: key len
  *
  * This is used by PE to configure the key information on a given station.
  * When the secType is WEP40 or WEP104, the defWEPIdx is used to locate
@@ -330,34 +328,14 @@ typedef struct {
 typedef struct {
 	tAniEdType encType;
 	uint8_t defWEPIdx;
-	tSirKeys key[SIR_MAC_MAX_NUM_OF_DEFAULT_KEYS];
 	uint8_t singleTidRc;
 	uint8_t vdev_id;
 	struct qdf_mac_addr peer_macaddr;
 	QDF_STATUS status;
 	uint8_t sendRsp;
 	struct qdf_mac_addr macaddr;
+	uint16_t key_len;
 } tSetStaKeyParams, *tpSetStaKeyParams;
-
-/**
- * struct sLimMlmSetKeysReq - set key request parameters
- * @peerMacAddr: peer mac address
- * @sessionId: PE session id
- * @vdev_id: vdev id
- * @aid: association id
- * @edType: Encryption/Decryption type
- * @numKeys: number of keys
- * @key: key data
- */
-typedef struct sLimMlmSetKeysReq {
-	struct qdf_mac_addr peer_macaddr;
-	uint8_t sessionId;      /* Added For BT-AMP Support */
-	uint8_t vdev_id;   /* Added for drivers based on wmi interface */
-	uint16_t aid;
-	tAniEdType edType;      /* Encryption/Decryption type */
-	uint8_t numKeys;
-	tSirKeys key[SIR_MAC_MAX_NUM_OF_DEFAULT_KEYS];
-} tLimMlmSetKeysReq, *tpLimMlmSetKeysReq;
 
 /**
  * struct bss_params - parameters required for add bss params
@@ -530,22 +508,16 @@ typedef struct sSendProbeRespParams {
 
 /**
  * struct tSetBssKeyParams - BSS key parameters
- * @encType: encryption Type
- * @numKeys: number of keys
- * @key: key data
- * @singleTidRc: 1=Single TID based Replay Count, 0=Per TID based RC
  * @vdev_id: vdev id id
  * @status: return status of command
  * @macaddr: MAC address of the peer
+ * @key_len: key len
  */
 typedef struct {
-	tAniEdType encType;
-	uint8_t numKeys;
-	tSirKeys key[SIR_MAC_MAX_NUM_OF_DEFAULT_KEYS];
-	uint8_t singleTidRc;
 	uint8_t vdev_id;
 	QDF_STATUS status;
 	struct qdf_mac_addr macaddr;
+	uint16_t key_len;
 } tSetBssKeyParams, *tpSetBssKeyParams;
 
 /**

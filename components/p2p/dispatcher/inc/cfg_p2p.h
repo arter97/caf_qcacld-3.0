@@ -144,7 +144,7 @@
  */
 #define CFG_P2P_GO_ON_5GHZ_INDOOR_CHANNEL CFG_INI_BOOL(\
 					"p2p_go_on_5ghz_indoor_chan", \
-					"0", \
+					0, \
 					"Allow P2P GO on 5 GHz indoor channels")
 
 #define CFG_P2P_ALL \

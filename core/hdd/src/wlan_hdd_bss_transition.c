@@ -147,7 +147,7 @@ __wlan_hdd_cfg80211_fetch_bss_transition_status(struct wiphy *wiphy,
 
 	hdd_sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter->deflink);
 	if (adapter->device_mode != QDF_STA_MODE ||
-	    !hdd_cm_is_vdev_associated(adapter)) {
+	    !hdd_cm_is_vdev_associated(adapter->deflink)) {
 		hdd_err("Command is either not invoked for STA mode (device mode: %d) or STA is not associated (Connection state: %d)",
 			adapter->device_mode, hdd_sta_ctx->conn_info.conn_state);
 		return -EINVAL;

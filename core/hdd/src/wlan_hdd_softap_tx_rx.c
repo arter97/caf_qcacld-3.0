@@ -102,6 +102,9 @@ void hdd_softap_tx_resume_timer_expired_handler(void *adapter_context)
 static void
 hdd_softap_tx_resume_false(struct hdd_adapter *adapter, bool tx_resume)
 {
+	QDF_STATUS status;
+	qdf_mc_timer_t *fc_timer;
+
 	if (true == tx_resume)
 		return;
 
@@ -109,19 +112,17 @@ hdd_softap_tx_resume_false(struct hdd_adapter *adapter, bool tx_resume)
 	wlan_hdd_netif_queue_control(adapter, WLAN_STOP_ALL_NETIF_QUEUE,
 				     WLAN_DATA_FLOW_CONTROL);
 
-	if (QDF_TIMER_STATE_STOPPED ==
-			qdf_mc_timer_get_current_state(&adapter->
-						       tx_flow_control_timer)) {
-		QDF_STATUS status;
+	fc_timer = &adapter->tx_flow_control_timer;
+	if (QDF_TIMER_STATE_STOPPED != qdf_mc_timer_get_current_state(fc_timer))
+		return;
 
-		status = qdf_mc_timer_start(&adapter->tx_flow_control_timer,
-				WLAN_SAP_HDD_TX_FLOW_CONTROL_OS_Q_BLOCK_TIME);
+	status = qdf_mc_timer_start(fc_timer,
+				    WLAN_SAP_HDD_TX_FLOW_CONTROL_OS_Q_BLOCK_TIME);
 
-		if (!QDF_IS_STATUS_SUCCESS(status))
-			hdd_err("Failed to start tx_flow_control_timer");
-		else
-			adapter->hdd_stats.tx_rx_stats.txflow_timer_cnt++;
-	}
+	if (QDF_IS_STATUS_ERROR(status))
+		hdd_err("Failed to start tx_flow_control_timer");
+	else
+		adapter->deflink->hdd_stats.tx_rx_stats.txflow_timer_cnt++;
 }
 
 void hdd_softap_tx_resume_cb(void *adapter_context, bool tx_resume)
@@ -203,7 +204,8 @@ static void __hdd_softap_hard_start_xmit(struct sk_buff *skb,
 	sme_ac_enum_type ac = SME_AC_BE;
 	struct hdd_adapter *adapter = (struct hdd_adapter *)netdev_priv(dev);
 	struct hdd_context *hdd_ctx = adapter->hdd_ctx;
-	struct hdd_tx_rx_stats *stats = &adapter->hdd_stats.tx_rx_stats;
+	struct hdd_tx_rx_stats *stats =
+				&adapter->deflink->hdd_stats.tx_rx_stats;
 	int cpu = qdf_get_smp_processor_id();
 	QDF_STATUS status;
 
@@ -519,14 +521,14 @@ QDF_STATUS hdd_softap_deregister_sta(struct hdd_adapter *adapter,
 	return QDF_STATUS_SUCCESS;
 }
 
-QDF_STATUS hdd_softap_register_sta(struct hdd_adapter *adapter,
-				   bool auth_required,
-				   bool privacy_required,
+QDF_STATUS hdd_softap_register_sta(struct wlan_hdd_link_info *link_info,
+				   bool auth_required, bool privacy_required,
 				   struct qdf_mac_addr *sta_mac,
 				   tSap_StationAssocReassocCompleteEvent *event)
 {
 	QDF_STATUS qdf_status = QDF_STATUS_E_FAILURE;
 	struct ol_txrx_desc_type txrx_desc = {0};
+	struct hdd_adapter *adapter = link_info->adapter;
 	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
 	struct ol_txrx_ops txrx_ops;
 	void *soc = cds_get_context(QDF_MODULE_ID_SOC);
@@ -543,7 +545,7 @@ QDF_STATUS hdd_softap_register_sta(struct hdd_adapter *adapter,
 		dot11mode = hdd_convert_dot11mode_from_phymode(event->chan_info.info);
 	}
 
-	ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(adapter->deflink);
+	ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(link_info);
 
 	/*
 	 * If the address is a broadcast address, then provide the self mac addr
@@ -570,7 +572,7 @@ QDF_STATUS hdd_softap_register_sta(struct hdd_adapter *adapter,
 
 	txrx_desc.is_qos_enabled = wmm_enabled;
 
-	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink, WLAN_DP_ID);
+	vdev = hdd_objmgr_get_vdev_by_user(link_info, WLAN_DP_ID);
 	if (!vdev)
 		return QDF_STATUS_E_INVAL;
 
@@ -657,29 +659,23 @@ QDF_STATUS hdd_softap_register_sta(struct hdd_adapter *adapter,
 	return qdf_status;
 }
 
-/**
- * hdd_softap_register_bc_sta() - Register the SoftAP broadcast STA
- * @adapter: pointer to adapter context
- * @privacy_required: should 802.11 privacy bit be set?
- *
- * Return: QDF_STATUS_SUCCESS on success, QDF_STATUS_E_** on error
- */
-QDF_STATUS hdd_softap_register_bc_sta(struct hdd_adapter *adapter,
-				      bool privacy_required)
+QDF_STATUS
+hdd_softap_register_bc_sta(struct wlan_hdd_link_info *link_info,
+			   bool privacy_required)
 {
 	QDF_STATUS qdf_status = QDF_STATUS_E_FAILURE;
 	struct qdf_mac_addr broadcast_macaddr = QDF_MAC_ADDR_BCAST_INIT;
 	struct hdd_ap_ctx *ap_ctx;
 	uint8_t sta_id;
-	ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(adapter->deflink);
-	sta_id = ap_ctx->broadcast_sta_id;
 
+	ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(link_info);
+	sta_id = ap_ctx->broadcast_sta_id;
 	if (sta_id >= WLAN_MAX_STA_COUNT) {
 		hdd_err("Error: Invalid sta_id: %u", sta_id);
 		return qdf_status;
 	}
 
-	qdf_status = hdd_softap_register_sta(adapter, false,
+	qdf_status = hdd_softap_register_sta(link_info, false,
 					     privacy_required,
 					     &broadcast_macaddr, NULL);
 

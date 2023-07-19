@@ -195,6 +195,7 @@ static void send_oem_reg_rsp_nlink_msg(void)
 	uint8_t *vdev_id;
 	struct hdd_adapter *adapter, *next_adapter = NULL;
 	wlan_net_dev_ref_dbgid dbgid = NET_DEV_HOLD_SEND_OEM_REG_RSP_NLINK_MSG;
+	struct wlan_hdd_link_info *link_info;
 
 	/* OEM msg is always to a specific process & cannot be a broadcast */
 	if (p_hdd_ctx->oem_pid == 0) {
@@ -227,14 +228,15 @@ static void send_oem_reg_rsp_nlink_msg(void)
 	/* Iterate through each adapter and fill device mode and vdev id */
 	hdd_for_each_adapter_dev_held_safe(p_hdd_ctx, adapter, next_adapter,
 					   dbgid) {
-		device_mode = buf++;
-		vdev_id = buf++;
-		*device_mode = adapter->device_mode;
-		*vdev_id = adapter->deflink->vdev_id;
-		(*num_interfaces)++;
-		hdd_debug("num_interfaces: %d, device_mode: %d, vdev_id: %d",
-			  *num_interfaces, *device_mode,
-			  *vdev_id);
+		hdd_adapter_for_each_active_link_info(adapter, link_info) {
+			device_mode = buf++;
+			vdev_id = buf++;
+			*device_mode = adapter->device_mode;
+			*vdev_id = link_info->vdev_id;
+			(*num_interfaces)++;
+			hdd_debug("num_interfaces: %d, device_mode: %d, vdev_id: %d",
+				  *num_interfaces, *device_mode, *vdev_id);
+		}
 		hdd_adapter_dev_put_debug(adapter, dbgid);
 	}
 
@@ -1176,7 +1178,7 @@ void hdd_oem_event_async_cb(const struct oem_data *oem_event_data)
 	uint32_t len;
 	int ret;
 	struct hdd_context *hdd_ctx = cds_get_context(QDF_MODULE_ID_HDD);
-	struct hdd_adapter *adapter;
+	struct wlan_hdd_link_info *link_info;
 	struct wireless_dev *wdev = NULL;
 
 	hdd_enter();
@@ -1189,9 +1191,9 @@ void hdd_oem_event_async_cb(const struct oem_data *oem_event_data)
 		return;
 	}
 
-	adapter = hdd_get_adapter_by_vdev(hdd_ctx, oem_event_data->vdev_id);
-	if (adapter)
-		wdev = &(adapter->wdev);
+	link_info = hdd_get_link_info_by_vdev(hdd_ctx, oem_event_data->vdev_id);
+	if (link_info)
+		wdev = &link_info->adapter->wdev;
 
 	len = nla_total_size(oem_event_data->data_len) + NLMSG_HDRLEN;
 	vendor_event = wlan_cfg80211_vendor_event_alloc(
@@ -1224,8 +1226,8 @@ void hdd_oem_event_handler_cb(const struct oem_data *oem_event_data,
 	int ret;
 	struct oem_data *oem_data;
 	struct hdd_context *hdd_ctx = cds_get_context(QDF_MODULE_ID_HDD);
-	struct hdd_adapter *hdd_adapter = hdd_get_adapter_by_vdev(hdd_ctx,
-								  vdev_id);
+	struct wlan_hdd_link_info *link_info;
+	struct hdd_adapter *hdd_adapter;
 	struct wireless_dev *wdev = NULL;
 
 	hdd_enter();
@@ -1234,14 +1236,16 @@ void hdd_oem_event_handler_cb(const struct oem_data *oem_event_data,
 	if (ret)
 		return;
 
-	if (hdd_validate_adapter(hdd_adapter))
-		return;
-
 	if (!oem_event_data || !(oem_event_data->data)) {
 		hdd_err("Invalid oem event data");
 		return;
 	}
 
+	link_info = hdd_get_link_info_by_vdev(hdd_ctx, vdev_id);
+	if (!link_info || hdd_validate_adapter(link_info->adapter))
+		return;
+
+	hdd_adapter = link_info->adapter;
 	if (hdd_adapter->response_expected) {
 		request = osif_request_get(hdd_adapter->cookie);
 		if (!request) {
@@ -1259,7 +1263,7 @@ void hdd_oem_event_handler_cb(const struct oem_data *oem_event_data,
 
 		qdf_mem_copy(oem_data->data, oem_event_data->data,
 			     oem_data->data_len);
-		oem_data->vdev_id = hdd_adapter->deflink->vdev_id;
+		oem_data->vdev_id = link_info->vdev_id;
 		osif_request_complete(request);
 		osif_request_put(request);
 	} else {

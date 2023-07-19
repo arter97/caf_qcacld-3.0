@@ -1034,8 +1034,7 @@ void tdls_set_ct_mode(struct wlan_objmgr_psoc *psoc,
 	status = tdls_get_vdev_objects(vdev, &tdls_vdev_obj, &tdls_soc_obj);
 	if (QDF_IS_STATUS_ERROR(status)) {
 		tdls_err("Failed to get TDLS objects");
-		state = false;
-		goto set_state;
+		return;
 	}
 
 	qdf_atomic_set(&tdls_soc_obj->timer_cnt, 0);
@@ -1093,13 +1092,13 @@ tdls_process_policy_mgr_notification(struct wlan_objmgr_psoc *psoc)
 	QDF_STATUS status;
 
 	if (!psoc) {
-		tdls_err("psoc: %pK", psoc);
+		tdls_err("psoc is NULL");
 		return QDF_STATUS_E_NULL_VALUE;
 	}
 
 	tdls_vdev = tdls_get_vdev(psoc, WLAN_TDLS_NB_ID);
 	if (!tdls_vdev) {
-		tdls_err("No TDLS vdev");
+		tdls_debug("No TDLS vdev");
 		return QDF_STATUS_E_NULL_VALUE;
 	}
 
@@ -1394,8 +1393,7 @@ void tdls_send_update_to_fw(struct tdls_vdev_priv_obj *tdls_vdev_obj,
 	 * channel switch
 	 */
 	if (TDLS_IS_OFF_CHANNEL_ENABLED(tdls_feature_flags) &&
-	    (!tdls_chan_swit_prohibited) &&
-	    (!wlan_tdls_is_fw_11be_mlo_capable(tdls_soc_obj->soc)))
+	    (!tdls_chan_swit_prohibited))
 		tdls_info_to_fw->tdls_options = ENA_TDLS_OFFCHAN;
 
 	if (TDLS_IS_BUFFER_STA_ENABLED(tdls_feature_flags))

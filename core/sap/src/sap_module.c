@@ -2041,10 +2041,13 @@ QDF_STATUS wlansap_channel_change_request(struct sap_context *sap_ctx,
 		  sap_ctx->chan_freq, phy_mode, ch_params->ch_width,
 		  ch_params->sec_ch_offset, ch_params->center_freq_seg0,
 		  ch_params->center_freq_seg1);
-	policy_mgr_update_indoor_concurrency(mac_ctx->psoc,
-					     wlan_vdev_get_id(sap_ctx->vdev),
-					     sap_ctx->freq_before_ch_switch,
-					     DISCONNECT_WITH_CONCURRENCY);
+	if (policy_mgr_update_indoor_concurrency(mac_ctx->psoc,
+						wlan_vdev_get_id(sap_ctx->vdev),
+						sap_ctx->freq_before_ch_switch,
+						DISCONNECT_WITH_CONCURRENCY))
+		wlan_reg_recompute_current_chan_list(mac_ctx->psoc,
+						     mac_ctx->pdev);
+
 	return status;
 }
 
@@ -2951,9 +2954,10 @@ wlansap_get_max_bw_by_phymode(struct sap_context *sap_ctx)
 			ch_width = CH_WIDTH_160MHZ;
 		else
 			ch_width = CH_WIDTH_80MHZ;
-
-		ch_width = QDF_MAX(
-				wlansap_get_target_eht_phy_ch_width(),
+		if (CSR_IS_DOT11_PHY_MODE_11BE(sap_ctx->phyMode) ||
+		    CSR_IS_DOT11_PHY_MODE_11BE_ONLY(sap_ctx->phyMode))
+			ch_width =
+			QDF_MAX(wlansap_get_target_eht_phy_ch_width(),
 				ch_width);
 	} else if (sap_ctx->phyMode == eCSR_DOT11_MODE_11n ||
 		   sap_ctx->phyMode == eCSR_DOT11_MODE_11n_ONLY) {
@@ -3589,11 +3593,11 @@ wlansap_get_safe_channel_from_pcl_and_acs_range(struct sap_context *sap_ctx,
 	}
 
 	status =
-		policy_mgr_get_pcl_for_vdev_id(mac->psoc, PM_SAP_MODE,
-					       pcl_freqs, &pcl_len,
-					       pcl.weight_list,
-					       QDF_ARRAY_SIZE(pcl.weight_list),
-					       sap_ctx->sessionId);
+		policy_mgr_get_pcl_for_scc_in_same_mode(mac->psoc, PM_SAP_MODE,
+							pcl_freqs, &pcl_len,
+							pcl.weight_list,
+							QDF_ARRAY_SIZE(pcl.weight_list),
+							sap_ctx->sessionId);
 
 	if (QDF_IS_STATUS_ERROR(status)) {
 		sap_err("Get PCL failed");

@@ -1000,35 +1000,16 @@ static QDF_STATUS nan_handle_schedule_update(
 }
 
 /**
- * nan_handle_host_update() - Updates Host about NAN Datapath status
+ * nan_handle_host_update() - extract the vdev from host event
  * @evt: Event data received from firmware
  * @vdev: pointer to vdev
  *
- * Return: status of operation
+ * Return: none
  */
-static QDF_STATUS nan_handle_host_update(struct nan_datapath_host_event *evt,
+static void nan_handle_host_update(struct nan_datapath_host_event *evt,
 					 struct wlan_objmgr_vdev **vdev)
 {
-	struct wlan_objmgr_psoc *psoc;
-	struct nan_psoc_priv_obj *psoc_nan_obj;
-
 	*vdev = evt->vdev;
-	psoc = wlan_vdev_get_psoc(evt->vdev);
-	if (!psoc) {
-		nan_err("psoc is NULL");
-		return QDF_STATUS_E_NULL_VALUE;
-	}
-
-	psoc_nan_obj = nan_get_psoc_priv_obj(psoc);
-	if (!psoc_nan_obj) {
-		nan_err("psoc_nan_obj is NULL");
-		return QDF_STATUS_E_NULL_VALUE;
-	}
-
-	psoc_nan_obj->cb_obj.os_if_ndp_event_handler(psoc, evt->vdev,
-						     NDP_HOST_UPDATE, evt);
-
-	return QDF_STATUS_SUCCESS;
 }
 
 QDF_STATUS nan_discovery_event_handler(struct scheduler_msg *msg)
@@ -1232,11 +1213,41 @@ void nan_handle_emlsr_concurrency(struct wlan_objmgr_psoc *psoc,
 	}
 }
 
+bool nan_is_sta_sta_concurrency_present(struct wlan_objmgr_psoc *psoc)
+{
+	uint32_t sta_cnt;
+
+	sta_cnt = policy_mgr_mode_specific_connection_count(psoc, PM_STA_MODE,
+							    NULL);
+	/* Allow if STA is not in connected state */
+	if (!sta_cnt)
+		return false;
+
+	/*
+	 * sta > 2 : (STA + STA + STA) or (ML STA + STA) or (ML STA + ML STA),
+	 * STA concurrency will be present.
+	 *
+	 * ML STA: Although both links would be treated as separate STAs
+	 * (sta cnt = 2) from policy mgr perspective, but it is not considered
+	 * as STA concurrency
+	 */
+	if (sta_cnt > 2 ||
+	    (sta_cnt == 2 && policy_mgr_is_non_ml_sta_present(psoc)))
+		return true;
+
+	return false;
+}
+
 QDF_STATUS nan_discovery_pre_enable(struct wlan_objmgr_pdev *pdev,
 				    uint32_t nan_ch_freq)
 {
 	QDF_STATUS status = QDF_STATUS_E_INVAL;
 	struct wlan_objmgr_psoc *psoc = wlan_pdev_get_psoc(pdev);
+
+	if (!psoc) {
+		nan_err("psoc is null");
+		return QDF_STATUS_E_INVAL;
+	}
 
 	status = nan_set_discovery_state(psoc, NAN_DISC_ENABLE_IN_PROGRESS);
 
@@ -1251,6 +1262,16 @@ QDF_STATUS nan_discovery_pre_enable(struct wlan_objmgr_pdev *pdev,
 						      nan_ch_freq)) {
 		nan_debug("NAN not enabled due to concurrency constraints");
 		status = QDF_STATUS_E_INVAL;
+		goto pre_enable_failure;
+	}
+
+	/*
+	 * Reject STA+STA in below case
+	 * Non-ML STA: STA+STA+NAN concurrency is not supported
+	 */
+	if (nan_is_sta_sta_concurrency_present(psoc)) {
+		nan_err("STA+STA+NAN concurrency is not allowed");
+		status = QDF_STATUS_E_FAILURE;
 		goto pre_enable_failure;
 	}
 

@@ -70,6 +70,7 @@ static void get_local_power_constraint_probe_response(
 /**
  * get_ese_version_ie_probe_response() - extracts ESE version IE
  * from probe response
+ * @mac_ctx: MAC context
  * @beacon_struct: beacon structure
  * @session: A pointer to session entry.
  *
@@ -121,7 +122,7 @@ static void lim_extract_he_op(struct pe_session *session,
 		return;
 	if (!session->he_op.oper_info_6g_present) {
 		pe_debug("6GHz op not present in 6G beacon");
-		session->ap_defined_power_type_6g = REG_VERY_LOW_POWER_AP;
+		session->ap_defined_power_type_6g = REG_CURRENT_MAX_AP_TYPE;
 		return;
 	}
 	session->ch_width = session->he_op.oper_info_6g.info.ch_width;
@@ -133,8 +134,8 @@ static void lim_extract_he_op(struct pe_session *session,
 		session->he_op.oper_info_6g.info.reg_info;
 	if (session->ap_defined_power_type_6g < REG_INDOOR_AP ||
 	    session->ap_defined_power_type_6g > REG_MAX_SUPP_AP_TYPE) {
-		session->ap_defined_power_type_6g = REG_VERY_LOW_POWER_AP;
-		pe_debug("AP power type invalid, defaulting to VLP");
+		session->ap_defined_power_type_6g = REG_CURRENT_MAX_AP_TYPE;
+		pe_debug("AP power type invalid, defaulting to MAX_AP_TYPE");
 	}
 
 	pe_debug("6G op info: ch_wd %d cntr_freq_seg0 %d cntr_freq_seg1 %d",
@@ -548,13 +549,14 @@ static void lim_check_peer_ldpc_and_update(struct pe_session *session,
 {}
 #endif
 
-static
-void lim_update_ch_width_for_p2p_client(struct mac_context *mac,
-					struct pe_session *session,
-					uint32_t ch_freq)
+static void lim_upgrade_ch_width(struct mac_context *mac,
+				 struct pe_session *session,
+				 uint32_t ch_freq)
 {
 	struct ch_params ch_params = {0};
 
+	if (session->dot11mode > MLME_DOT11_MODE_11AC_ONLY)
+		return;
 	/*
 	 * Some IOT AP's/P2P-GO's (e.g. make: Wireless-AC 9560160MHz as P2P GO),
 	 * send beacon with 20mhz and assoc resp with 80mhz and
@@ -564,12 +566,13 @@ void lim_update_ch_width_for_p2p_client(struct mac_context *mac,
 	 * Start the vdev with max supported ch_width in order to support this.
 	 * It'll be downgraded to appropriate ch_width or the same would be
 	 * continued based on assoc resp.
-	 * Restricting this check for p2p client and 5G only and this may be
-	 * extended to STA based on wider testing results with multiple AP's.
-	 * Limit it to 80MHz as 80+80 is channel specific and 160MHz is not
-	 * supported in p2p.
+	 * For P2P-CLI, BW limited to 80MHz as 80+80 is channel specific and
+	 * 160MHz is not supported.
 	 */
-	ch_params.ch_width = CH_WIDTH_80MHZ;
+	if (session->opmode == QDF_P2P_CLIENT_MODE)
+		ch_params.ch_width = CH_WIDTH_80MHZ;
+	else
+		ch_params.ch_width = wlan_mlme_get_max_bw();
 
 	wlan_reg_set_channel_params_for_pwrmode(mac->pdev, ch_freq, 0,
 						&ch_params,
@@ -583,9 +586,10 @@ void lim_update_ch_width_for_p2p_client(struct mac_context *mac,
 	session->ch_width = ch_params.ch_width;
 	session->ch_center_freq_seg0 = ch_params.center_freq_seg0;
 	session->ch_center_freq_seg1 = ch_params.center_freq_seg1;
-	pe_debug("Start P2P_CLI in ch freq %d max supported ch_width: %u cbmode: %u seg0: %u, seg1: %u",
-		 ch_freq, ch_params.ch_width, ch_params.sec_ch_offset,
-		 session->ch_center_freq_seg0, session->ch_center_freq_seg1);
+	pe_debug("Start mode %d ch freq %d max supported ch_width: %u cbmode: %u seg0: %u, seg1: %u",
+		 session->opmode, ch_freq, ch_params.ch_width,
+		 ch_params.sec_ch_offset, session->ch_center_freq_seg0,
+		 session->ch_center_freq_seg1);
 }
 
 void lim_extract_ap_capability(struct mac_context *mac_ctx, uint8_t *p_ie,
@@ -660,11 +664,9 @@ void lim_extract_ap_capability(struct mac_context *mac_ctx, uint8_t *p_ie,
 		if (!mac_ctx->mlme_cfg->vht_caps.vht_cap_info.enable_txbf_20mhz)
 			session->vht_config.su_beam_formee = 0;
 
-		if (session->opmode == QDF_P2P_CLIENT_MODE &&
-		    !wlan_reg_is_24ghz_ch_freq(beacon_struct->chan_freq))
-			lim_update_ch_width_for_p2p_client(
-					mac_ctx, session,
-					beacon_struct->chan_freq);
+		if (!wlan_reg_is_24ghz_ch_freq(beacon_struct->chan_freq))
+			lim_upgrade_ch_width(mac_ctx, session,
+					     beacon_struct->chan_freq);
 
 	} else if (session->vhtCapabilityPresentInBeacon &&
 			vht_op->chanWidth) {
@@ -884,6 +886,7 @@ void lim_extract_ap_capability(struct mac_context *mac_ctx, uint8_t *p_ie,
  * This routing provides the translation of Airgo Enum to HT enum for determining
  * secondary channel offset.
  * Airgo Enum is required for backward compatibility purposes.
+ * @aniCBMode: Phy Channel bond state
  *
  *
  ***NOTE:

@@ -255,8 +255,7 @@ void hdd_cfg_print_global_config(struct hdd_context *hdd_ctx);
 
 /**
  * hdd_update_nss() - Update the number of spatial streams supported.
- *
- * @adapter: the pointer to adapter
+ * @link_info: Link info pointer in HDD adapter
  * @tx_nss: the number of Tx spatial streams to be updated
  * @rx_nss: the number of Rx spatial streams to be updated
  *
@@ -266,8 +265,8 @@ void hdd_cfg_print_global_config(struct hdd_context *hdd_ctx);
  * Return: QDF_STATUS_SUCCESS if nss is correctly updated,
  *              otherwise QDF_STATUS_E_FAILURE would be returned
  */
-QDF_STATUS hdd_update_nss(struct hdd_adapter *adapter, uint8_t tx_nss,
-			  uint8_t rx_nss);
+QDF_STATUS hdd_update_nss(struct wlan_hdd_link_info *link_info,
+			  uint8_t tx_nss, uint8_t rx_nss);
 
 /**
  * hdd_get_nss() - Get the number of spatial streams supported by the adapter
@@ -284,8 +283,7 @@ QDF_STATUS hdd_get_nss(struct hdd_adapter *adapter, uint8_t *nss);
 
 /**
  * hdd_get_tx_nss() - Get the number of spatial streams supported by the adapter
- *
- * @adapter: the pointer to adapter
+ * @link_info: Link info pointer in HDD adapter
  * @tx_nss: the number Tx of spatial streams supported by the adapter
  *
  * This function is used to get the number of Tx spatial streams supported by
@@ -293,12 +291,12 @@ QDF_STATUS hdd_get_nss(struct hdd_adapter *adapter, uint8_t *nss);
  *
  * Return: QDF_STATUS
  */
-QDF_STATUS hdd_get_tx_nss(struct hdd_adapter *adapter, uint8_t *tx_nss);
+QDF_STATUS hdd_get_tx_nss(struct wlan_hdd_link_info *link_info,
+			  uint8_t *tx_nss);
 
 /**
  * hdd_get_rx_nss() - Get the number of spatial streams supported by the adapter
- *
- * @adapter: the pointer to adapter
+ * @link_info: Link info pointer in HDD adapter
  * @rx_nss: the number Rx of spatial streams supported by the adapter
  *
  * This function is used to get the number of Rx spatial streams supported by
@@ -306,7 +304,8 @@ QDF_STATUS hdd_get_tx_nss(struct hdd_adapter *adapter, uint8_t *tx_nss);
  *
  * Return: QDF_STATUS
  */
-QDF_STATUS hdd_get_rx_nss(struct hdd_adapter *adapter, uint8_t *rx_nss);
+QDF_STATUS hdd_get_rx_nss(struct wlan_hdd_link_info *link_info,
+			  uint8_t *rx_nss);
 
 
 /**
@@ -408,12 +407,12 @@ int hdd_get_ldpc(struct hdd_adapter *adapter, int *value);
 
 /**
  * hdd_set_ldpc() - Set adapter LDPC
- * @adapter: adapter being modified
+ * @link_info: Link info pointer in adapter
  * @value: new LDPC value
  *
  * Return: 0 on success, negative errno on failure
  */
-int hdd_set_ldpc(struct hdd_adapter *adapter, int value);
+int hdd_set_ldpc(struct wlan_hdd_link_info *link_info, int value);
 
 /**
  * hdd_get_tx_stbc() - Get adapter TX STBC
@@ -426,12 +425,12 @@ int hdd_get_tx_stbc(struct hdd_adapter *adapter, int *value);
 
 /**
  * hdd_set_tx_stbc() - Set adapter TX STBC
- * @adapter: adapter being modified
+ * @link_info: Link info pointer in HDD adapter
  * @value: new TX STBC value
  *
  * Return: 0 on success, negative errno on failure
  */
-int hdd_set_tx_stbc(struct hdd_adapter *adapter, int value);
+int hdd_set_tx_stbc(struct wlan_hdd_link_info *link_info, int value);
 
 /**
  * hdd_get_rx_stbc() - Get adapter RX STBC
@@ -444,12 +443,12 @@ int hdd_get_rx_stbc(struct hdd_adapter *adapter, int *value);
 
 /**
  * hdd_set_rx_stbc() - Set adapter RX STBC
- * @adapter: adapter being modified
+ * @link_info: Link info pointer in HDD adapter
  * @value: new RX STBC value
  *
  * Return: 0 on success, negative errno on failure
  */
-int hdd_set_rx_stbc(struct hdd_adapter *adapter, int value);
+int hdd_set_rx_stbc(struct wlan_hdd_link_info *link_info, int value);
 
 /**
  * hdd_update_channel_width() - Update adapter channel width settings

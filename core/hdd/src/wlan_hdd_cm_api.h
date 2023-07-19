@@ -46,7 +46,7 @@ int wlan_hdd_cm_connect(struct wiphy *wiphy,
 
 /**
  * wlan_hdd_cm_issue_disconnect() - initiate disconnect from osif
- * @adapter: Pointer to adapter
+ * @link_info: Link info pointer in HDD adapter
  * @reason: Disconnect reason code
  * @sync: true if wait for disconnect to complete is required. for the
  *        supplicant initiated disconnect or during vdev delete/change interface
@@ -56,9 +56,9 @@ int wlan_hdd_cm_connect(struct wiphy *wiphy,
  *
  * Return: QDF_STATUS
  */
-QDF_STATUS wlan_hdd_cm_issue_disconnect(struct hdd_adapter *adapter,
-					enum wlan_reason_code reason,
-					bool sync);
+QDF_STATUS
+wlan_hdd_cm_issue_disconnect(struct wlan_hdd_link_info *link_info,
+			     enum wlan_reason_code reason, bool sync);
 
 /**
  * wlan_hdd_cm_disconnect() - cfg80211 disconnect api
@@ -217,16 +217,16 @@ QDF_STATUS hdd_cm_cckm_preauth_complete(struct wlan_objmgr_vdev *vdev,
 #ifdef WLAN_FEATURE_MSCS
 /**
  * reset_mscs_params() - Reset mscs parameters
- * @adapter: pointer to adapter structure
+ * @link_info: pointer to link_info struct in adapter
  *
  * Reset mscs parameters whils disconnection
  *
  * Return: None
  */
-void reset_mscs_params(struct hdd_adapter *adapter);
+void reset_mscs_params(struct wlan_hdd_link_info *link_info);
 #else
 static inline
-void reset_mscs_params(struct hdd_adapter *adapter)
+void reset_mscs_params(struct wlan_hdd_link_info *link_info)
 {
 	return;
 }
@@ -234,22 +234,23 @@ void reset_mscs_params(struct hdd_adapter *adapter)
 
 /**
  * hdd_handle_disassociation_event() - Handle disassociation event
- * @adapter: Pointer to adapter
+ * @link_info: Link info pointer in HDD adapter
  * @peer_macaddr: Pointer to peer mac address
  *
  * Return: None
  */
-void hdd_handle_disassociation_event(struct hdd_adapter *adapter,
+void hdd_handle_disassociation_event(struct wlan_hdd_link_info *link_info,
 				     struct qdf_mac_addr *peer_macaddr);
 
 /**
  * __hdd_cm_disconnect_handler_pre_user_update() - Handle disconnect indication
  * before updating to user space
- * @adapter: Pointer to adapter
+ * @link_info: Link info pointer in HDD adapter
  *
  * Return: None
  */
-void __hdd_cm_disconnect_handler_pre_user_update(struct hdd_adapter *adapter);
+void
+__hdd_cm_disconnect_handler_pre_user_update(struct wlan_hdd_link_info *link_info);
 
 /**
  * __hdd_cm_disconnect_handler_post_user_update() - Handle disconnect indication
@@ -265,23 +266,23 @@ __hdd_cm_disconnect_handler_post_user_update(struct hdd_adapter *adapter,
 
 /**
  * hdd_cm_set_peer_authenticate() - set peer as authenticated
- * @adapter: pointer to adapter
+ * @link_info: Link info pointer in HDD adapter
  * @bssid: bssid of the connection
  * @is_auth_required: is upper layer authenticatoin required
  *
  * Return: QDF_STATUS enumeration
  */
-void hdd_cm_set_peer_authenticate(struct hdd_adapter *adapter,
+void hdd_cm_set_peer_authenticate(struct wlan_hdd_link_info *link_info,
 				  struct qdf_mac_addr *bssid,
 				  bool is_auth_required);
 
 /**
  * hdd_cm_update_rssi_snr_by_bssid() - update rsi and snr into adapter
- * @adapter: Pointer to adapter
+ * @link_info: Link info pointer in HDD adapter
  *
  * Return: None
  */
-void hdd_cm_update_rssi_snr_by_bssid(struct hdd_adapter *adapter);
+void hdd_cm_update_rssi_snr_by_bssid(struct wlan_hdd_link_info *link_info);
 
 /**
  *  hdd_cm_handle_assoc_event() - Send disassociation indication to oem
@@ -318,53 +319,53 @@ void hdd_cm_clear_pmf_stats(struct hdd_adapter *adapter);
 
 /**
  * hdd_cm_save_connect_status() - Save connect status
- * @adapter: pointer to the adapter structure
+ * @link_info: Link info pointer in HDD adapter
  * @reason_code: IEE80211 wlan status code
  *
  * Returns: None
  */
-void hdd_cm_save_connect_status(struct hdd_adapter *adapter,
+void hdd_cm_save_connect_status(struct wlan_hdd_link_info *link_info,
 				uint32_t reason_code);
 
 /**
  * hdd_cm_is_vdev_associated() - Checks if vdev is associated or not
- * @adapter: pointer to the adapter structure
+ * @link_info: pointer to the link info structure
  *
  * Returns: True if vdev is associated else false
  */
-bool hdd_cm_is_vdev_associated(struct hdd_adapter *adapter);
+bool hdd_cm_is_vdev_associated(struct wlan_hdd_link_info *link_info);
 
 /**
  * hdd_cm_is_vdev_connected() - Checks if vdev is connected or not
- * @adapter: pointer to the adapter structure
+ * @link_info: pointer to the link_info structure
  *
  * Returns: True if vdev is connected else false
  */
-bool hdd_cm_is_vdev_connected(struct hdd_adapter *adapter);
+bool hdd_cm_is_vdev_connected(struct wlan_hdd_link_info *link_info);
 
 /**
  * hdd_cm_is_connecting() - Function to check connection in progress
- * @adapter: pointer to the adapter structure
+ * @link_info: pointer to the link_info structure
  *
  * Return: true if connecting, false otherwise
  */
-bool hdd_cm_is_connecting(struct hdd_adapter *adapter);
+bool hdd_cm_is_connecting(struct wlan_hdd_link_info *link_info);
 
 /**
  * hdd_cm_is_disconnected() - Function to check if vdev is disconnected or not
- * @adapter: pointer to the adapter structure
+ * @link_info: pointer to the link_info structure
  *
  * Return: true if disconnected, false otherwise
  */
-bool hdd_cm_is_disconnected(struct hdd_adapter *adapter);
+bool hdd_cm_is_disconnected(struct wlan_hdd_link_info *link_info);
 
 /**
  * hdd_cm_is_vdev_roaming() - Function to check roaming in progress
- * @adapter: pointer to the adapter structure
+ * @link_info: pointer to the link_info structure
  *
  * Return: true if roaming, false otherwise
  */
-bool hdd_cm_is_vdev_roaming(struct hdd_adapter *adapter);
+bool hdd_cm_is_vdev_roaming(struct wlan_hdd_link_info *link_info);
 
 /**
  * hdd_cm_get_scan_ie_params() - to get scan ie params

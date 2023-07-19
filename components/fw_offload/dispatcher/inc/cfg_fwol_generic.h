@@ -591,6 +591,7 @@
  * CFG_SET_TSF_PTP_OPT_RAW                   (0x4)
  * CFG_SET_TSF_DBG_FS                        (0x8)
  * CFG_SET_TSF_PTP_OPT_TSF64_TX              (0x10)
+ * CFG_SET_TSF_PTP_SYNC_PERIOD               (0x20)
  *
  * Related: None
  *
@@ -603,12 +604,13 @@
 #define CFG_SET_TSF_PTP_OPT_RAW                   (0x4)
 #define CFG_SET_TSF_DBG_FS                        (0x8)
 #define CFG_SET_TSF_PTP_OPT_TSF64_TX              (0x10)
+#define CFG_SET_TSF_PTP_SYNC_PERIOD               (0x20)
 
 #define CFG_SET_TSF_PTP_OPT CFG_INI_UINT( \
 		"gtsf_ptp_options", \
 		0, \
 		0xff, \
-		0xf, \
+		0x2f, \
 		CFG_VALUE_OR_DEFAULT, \
 		"TSF Plus feature options")
 
@@ -933,12 +935,14 @@
  * <ini>
  * pcie_config - Ini to control pcie gen and lane params
  * @Min: 0
- * @Max: 1
+ * @Max: 3
  * @Default: 0
  *
  * This ini is used to control to pcie gen and lane params
  * 0 - FW controlled
  * 1 - Force PCIe Gen and lane to max supported value
+ * 2 - Configure PCIE Gen and Lane based on MCS and BW
+ * 3 - Configure PCIE Gen and Lane based on TXRX tput using traffic monitor
  *
  * Related: g_enable_pci_gen
  *
@@ -951,7 +955,7 @@
 #define CFG_PCIE_CONFIG CFG_INI_UINT( \
 				"pcie_config", \
 				0, \
-				1, \
+				3, \
 				0, \
 				CFG_VALUE_OR_DEFAULT, \
 				"to control pcie gen and lane")

@@ -481,7 +481,7 @@ static void lim_copy_ml_partner_info(struct cm_vdev_join_rsp *rsp,
 	int i;
 	struct mlo_partner_info *partner_info;
 	struct mlo_partner_info *rsp_partner_info;
-	uint8_t chan, op_class, link_id;
+	uint8_t chan = 0, op_class, link_id;
 
 	partner_info = &pe_session->ml_partner_info;
 	rsp_partner_info = &rsp->connect_rsp.ml_parnter_info;
@@ -495,9 +495,16 @@ static void lim_copy_ml_partner_info(struct cm_vdev_join_rsp *rsp,
 			&rsp_partner_info->partner_link_info[i].link_addr,
 			&partner_info->partner_link_info[i].link_addr);
 
-		wlan_get_chan_by_link_id_from_rnr(pe_session->vdev,
-						  pe_session->cm_id,
-						  link_id, &chan, &op_class);
+		wlan_get_chan_by_bssid_from_rnr(
+			pe_session->vdev,
+			pe_session->cm_id,
+			&partner_info->partner_link_info[i].link_addr,
+			&chan, &op_class);
+		if (!chan)
+			wlan_get_chan_by_link_id_from_rnr(
+						pe_session->vdev,
+						pe_session->cm_id,
+						link_id, &chan, &op_class);
 		if (chan) {
 			rsp_partner_info->partner_link_info[i].chan_freq =
 				wlan_reg_chan_opclass_to_freq_auto(chan,
@@ -1750,7 +1757,9 @@ static bool lim_is_csa_channel_allowed(struct mac_context *mac_ctx,
 		is_allowed =
 		policy_mgr_allow_concurrency_csa(
 			mac_ctx->psoc, ch_freq2,
-			policy_mgr_convert_device_mode_to_qdf_type(mode),
+			policy_mgr_qdf_opmode_to_pm_con_mode(mac_ctx->psoc,
+							     mode,
+							     session_entry->vdev_id),
 			session_entry->vdev_id,
 			policy_mgr_get_bw(new_ch_width), false,
 			CSA_REASON_UNKNOWN);
@@ -1804,6 +1813,17 @@ static void lim_set_chan_sw_puncture(tLimChannelSwitchInfo *lim_ch_switch,
 }
 
 /**
+ * lim_reset_csa_puncture() - reset puncture of channel switch
+ * @lim_ch_switch: pointer to tLimChannelSwitchInfo
+ *
+ * Return: void
+ */
+static void lim_reset_csa_puncture(tLimChannelSwitchInfo *lim_ch_switch)
+{
+	lim_ch_switch->puncture_bitmap = 0;
+}
+
+/**
  * lim_is_puncture_same() - Check whether puncture changed
  * @lim_ch_switch: pointer to tLimChannelSwitchInfo
  * @session: pe session
@@ -1813,6 +1833,9 @@ static void lim_set_chan_sw_puncture(tLimChannelSwitchInfo *lim_ch_switch,
 static bool lim_is_puncture_same(tLimChannelSwitchInfo *lim_ch_switch,
 				 struct pe_session *session)
 {
+	pe_debug("vdevid %d puncture, old: 0x%x, new: 0x%x", session->vdev_id,
+		 session->puncture_bitmap,
+		 lim_ch_switch->puncture_bitmap);
 	return lim_ch_switch->puncture_bitmap == session->puncture_bitmap;
 }
 
@@ -1825,6 +1848,10 @@ static void lim_set_csa_chan_param_11be(struct pe_session *session,
 
 static void lim_set_chan_sw_puncture(tLimChannelSwitchInfo *lim_ch_switch,
 				     struct ch_params *ch_param)
+{
+}
+
+static void lim_reset_csa_puncture(tLimChannelSwitchInfo *lim_ch_switch)
 {
 }
 
@@ -1901,6 +1928,8 @@ void lim_handle_sta_csa_param(struct mac_context *mac_ctx,
 	lim_ch_switch->state =
 		eLIM_CHANNEL_SWITCH_PRIMARY_ONLY;
 	lim_ch_switch->ch_width = CH_WIDTH_20MHZ;
+	lim_reset_csa_puncture(lim_ch_switch);
+
 	lim_ch_switch->sec_ch_offset =
 		session_entry->htSecondaryChannelOffset;
 	lim_ch_switch->ch_center_freq_seg0 = 0;

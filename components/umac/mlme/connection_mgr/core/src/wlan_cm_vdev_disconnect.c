@@ -138,10 +138,10 @@ cm_handle_disconnect_req(struct wlan_objmgr_vdev *vdev,
 		return QDF_STATUS_E_NOMEM;
 
 	cm_csr_handle_diconnect_req(vdev, req);
-	wlan_roam_reset_roam_params(psoc);
+	wlan_roam_reset_roam_params(vdev);
 	cm_roam_restore_default_config(pdev, vdev_id);
 	opmode = wlan_vdev_mlme_get_opmode(vdev);
-	if (opmode == QDF_STA_MODE)
+	if (opmode == QDF_STA_MODE && !wlan_vdev_mlme_is_link_sta_vdev(vdev))
 		wlan_cm_roam_state_change(pdev, vdev_id,
 					  WLAN_ROAM_DEINIT,
 					  REASON_DISCONNECTED);

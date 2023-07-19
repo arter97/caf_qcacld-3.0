@@ -87,6 +87,7 @@
 #include <qdf_nbuf.h>
 #include "wlan_dp_ucfg_api.h"
 #include "wlan_dp_prealloc.h"
+#include "wlan_dp_api.h"
 #include "qdf_ipa.h"
 
 /* Preprocessor Definitions and Constants */
@@ -142,6 +143,7 @@ static struct ol_if_ops  dp_ol_if_ops = {
 #endif
 	.dp_get_tx_inqueue = dp_get_tx_inqueue,
 	.dp_send_unit_test_cmd = wma_form_unit_test_cmd_and_send,
+	.dp_print_fisa_stats = wlan_dp_print_fisa_rx_stats,
     /* TODO: Add any other control path calls required to OL_IF/WMA layer */
 };
 #else
@@ -863,6 +865,7 @@ QDF_STATUS cds_open(struct wlan_objmgr_psoc *psoc)
 	}
 
 	wlan_psoc_set_dp_handle(psoc, gp_cds_context->dp_soc);
+	ucfg_dp_set_cmn_dp_handle(psoc, gp_cds_context->dp_soc);
 	ucfg_pmo_psoc_update_dp_handle(psoc, gp_cds_context->dp_soc);
 	ucfg_ocb_update_dp_handle(psoc, gp_cds_context->dp_soc);
 

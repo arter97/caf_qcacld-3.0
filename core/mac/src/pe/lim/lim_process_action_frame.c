@@ -55,6 +55,7 @@
 #include "wlan_p2p_cfg_api.h"
 #include "son_api.h"
 #include "wlan_t2lm_api.h"
+#include "wlan_epcs_api.h"
 #include "wlan_mlo_mgr_public_structs.h"
 
 #define SA_QUERY_REQ_MIN_LEN \
@@ -248,7 +249,7 @@ static void __lim_process_operating_mode_action_frame(struct mac_context *mac_ct
 	uint32_t status;
 	tpDphHashNode sta_ptr;
 	uint16_t aid;
-	uint8_t ch_bw = 0;
+	enum phy_ch_width ch_bw = 0;
 
 	mac_hdr = WMA_GET_RX_MAC_HEADER(rx_pkt_info);
 	body_ptr = WMA_GET_RX_MPDU_DATA(rx_pkt_info);
@@ -2150,7 +2151,7 @@ void lim_process_action_frame(struct mac_context *mac_ctx,
 		}
 		break;
 	case ACTION_CATEGORY_PROTECTED_EHT:
-		pe_debug("EHT T2LM action category: %d action: %d",
+		pe_debug("EHT T2LM/EPCS action category: %d action: %d",
 			 action_hdr->category, action_hdr->actionID);
 		mac_hdr = WMA_GET_RX_MAC_HEADER(rx_pkt_info);
 		body_ptr = WMA_GET_RX_MPDU_DATA(rx_pkt_info);
@@ -2194,8 +2195,26 @@ void lim_process_action_frame(struct mac_context *mac_ctx,
 					WLAN_T2LM_EV_ACTION_FRAME_RX_TEARDOWN,
 					(void *)body_ptr, NULL);
 			break;
+		case EHT_EPCS_REQUEST:
+			wlan_epcs_deliver_event(
+					session->vdev, peer,
+					WLAN_EPCS_EV_ACTION_FRAME_RX_REQ,
+					(void *)body_ptr, frame_len);
+			break;
+		case EHT_EPCS_RESPONSE:
+			wlan_epcs_deliver_event(
+					session->vdev, peer,
+					WLAN_EPCS_EV_ACTION_FRAME_RX_RESP,
+					(void *)body_ptr, frame_len);
+			break;
+		case EHT_EPCS_TEARDOWN:
+			wlan_epcs_deliver_event(
+					session->vdev, peer,
+					WLAN_EPCS_EV_ACTION_FRAME_RX_TEARDOWN,
+					(void *)body_ptr, frame_len);
+			break;
 		default:
-			pe_err("Unhandled T2LM action frame");
+			pe_err("Unhandled T2LM/EPCS action frame");
 			break;
 		}
 		break;

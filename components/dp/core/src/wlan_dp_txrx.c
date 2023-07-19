@@ -57,11 +57,9 @@ uint32_t wlan_dp_intf_get_pkt_type_bitmap_value(void *intf_ctx)
 }
 
 #if defined(WLAN_SUPPORT_RX_FISA)
-void dp_rx_skip_fisa(struct cdp_soc_t *cdp_soc, uint32_t value)
+void dp_rx_skip_fisa(struct wlan_dp_psoc_context *dp_ctx, uint32_t value)
 {
-	struct dp_soc *soc = (struct dp_soc *)cdp_soc;
-
-	qdf_atomic_set(&soc->skip_fisa_param.skip_fisa, !value);
+	qdf_atomic_set(&dp_ctx->skip_fisa_param.skip_fisa, !value);
 }
 #endif
 
@@ -679,14 +677,14 @@ dp_start_xmit(struct wlan_dp_intf *dp_intf, qdf_nbuf_t nbuf)
 	/*
 	 * If a transmit function is not registered, drop packet
 	 */
-	if (!dp_intf->tx_fn) {
+	if (!dp_intf->txrx_ops.tx.tx) {
 		dp_err("TX function not registered by the data path");
 		goto drop_pkt_and_release_nbuf;
 	}
 
 	dp_fix_broadcast_eapol(dp_intf, nbuf);
 
-	if (dp_intf->tx_fn(soc, dp_intf->intf_id, nbuf)) {
+	if (dp_intf->txrx_ops.tx.tx(soc, dp_intf->intf_id, nbuf)) {
 		dp_debug_rl("Failed to send packet from adapter %u",
 			    dp_intf->intf_id);
 		goto drop_pkt_and_release_nbuf;
@@ -1357,8 +1355,8 @@ QDF_STATUS dp_rx_pkt_thread_enqueue_cbk(void *intf_ctx,
 		return QDF_STATUS_E_FAILURE;
 
 	if (dp_intf->runtime_disable_rx_thread &&
-	    dp_intf->rx_stack)
-		return dp_intf->rx_stack(dp_intf, nbuf_list);
+	    dp_intf->txrx_ops.rx.rx_stack)
+		return dp_intf->txrx_ops.rx.rx_stack(dp_intf, nbuf_list);
 
 	intf_id = dp_intf->intf_id;
 
@@ -1581,7 +1579,7 @@ QDF_STATUS dp_rx_flush_packet_cbk(void *dp_intf_context, uint8_t intf_id)
 	qdf_atomic_inc(&dp_intf->num_active_task);
 
 	/* do fisa flush for this vdev */
-	if (dp_ctx->dp_cfg.fisa_enable)
+	if (wlan_dp_cfg_is_rx_fisa_enabled(&dp_ctx->dp_cfg))
 		wlan_dp_rx_fisa_flush_by_vdev_id((struct dp_soc *)soc, intf_id);
 
 	if (dp_ctx->enable_dp_rx_threads)
@@ -1596,8 +1594,9 @@ QDF_STATUS dp_rx_flush_packet_cbk(void *dp_intf_context, uint8_t intf_id)
 QDF_STATUS wlan_dp_rx_fisa_cbk(void *dp_soc,
 			       void *dp_vdev, qdf_nbuf_t nbuf_list)
 {
-	return dp_fisa_rx((struct dp_soc *)dp_soc, (struct dp_vdev *)dp_vdev,
-			  nbuf_list);
+	struct wlan_dp_psoc_context *dp_ctx = dp_get_context();
+
+	return dp_fisa_rx(dp_ctx, dp_vdev, nbuf_list);
 }
 
 QDF_STATUS wlan_dp_rx_fisa_flush_by_ctx_id(void *dp_soc, int ring_num)
@@ -1710,7 +1709,8 @@ QDF_STATUS dp_rx_packet_cbk(void *dp_intf_context,
 
 		dp_event_eapol_log(nbuf, QDF_RX);
 		qdf_dp_trace_log_pkt(dp_intf->intf_id, nbuf, QDF_RX,
-				     QDF_TRACE_DEFAULT_PDEV_ID);
+				     QDF_TRACE_DEFAULT_PDEV_ID,
+				     dp_intf->device_mode);
 
 		DPTRACE(qdf_dp_trace(nbuf,
 				     QDF_DP_TRACE_RX_PACKET_PTR_RECORD,

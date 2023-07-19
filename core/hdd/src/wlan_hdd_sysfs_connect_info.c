@@ -315,7 +315,7 @@ static ssize_t wlan_hdd_connect_info(struct hdd_adapter *adapter, uint8_t *buf,
 	int ret_val;
 
 	hdd_sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter->deflink);
-	if (!hdd_cm_is_vdev_associated(adapter)) {
+	if (!hdd_cm_is_vdev_associated(adapter->deflink)) {
 		ret_val = scnprintf(buf, buf_avail_len,
 				    "\nSTA is not connected\n");
 		if (ret_val >= 0)
@@ -334,7 +334,7 @@ static ssize_t wlan_hdd_connect_info(struct hdd_adapter *adapter, uint8_t *buf,
 		return buf_avail_len;
 	}
 
-	if (hdd_cm_is_vdev_roaming(adapter)) {
+	if (hdd_cm_is_vdev_roaming(adapter->deflink)) {
 		ret_val = scnprintf(buf + length, buf_avail_len - length,
 				    "Roaming is in progress");
 		if (ret_val <= 0)

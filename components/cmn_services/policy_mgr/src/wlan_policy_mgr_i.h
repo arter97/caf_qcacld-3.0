@@ -355,7 +355,7 @@ struct policy_mgr_cfg {
  * @hw_mode: List of HW modes supported
  * @old_hw_mode_index: Old HW mode from hw_mode table
  * @new_hw_mode_index: New HW mode from hw_mode table
- * @dual_mac_cfg: DBS configuration currenctly used by FW for
+ * @dual_mac_cfg: DBS configuration currently used by FW for
  *              scan & connections
  * @radio_comb_num: radio combination number
  * @radio_combinations: radio combination list
@@ -379,6 +379,8 @@ struct policy_mgr_cfg {
  * @dynamic_dfs_master_disabled: current state of dynamic dfs master
  * @set_link_in_progress: To track if set link is in progress
  * @set_link_update_done_evt: qdf event to synchronize set link
+ * @active_vdev_bitmap: Active vdev id bitmap
+ * @inactive_vdev_bitmap: Inactive vdev id bitmap
  * @restriction_mask:
  */
 struct policy_mgr_psoc_priv_obj {
@@ -427,6 +429,8 @@ struct policy_mgr_psoc_priv_obj {
 	bool set_link_in_progress;
 	qdf_event_t set_link_update_done_evt;
 #endif
+	uint32_t active_vdev_bitmap;
+	uint32_t inactive_vdev_bitmap;
 #ifdef FEATURE_WLAN_CH_AVOID_EXT
 	uint32_t restriction_mask;
 #endif
@@ -1082,6 +1086,7 @@ QDF_STATUS policy_mgr_nss_update(struct wlan_objmgr_psoc *psoc,
  * @ch_freq: channel frequency on which new connection is coming up
  * @bw: Bandwidth requested by the connection (optional)
  * @ext_flags: extended flags for concurrency check (union conc_ext_flag)
+ * @pcl: Optional PCL for new connection
  *
  * When a new connection is about to come up check if current
  * concurrency combination including the new connection is
@@ -1094,7 +1099,8 @@ bool policy_mgr_is_concurrency_allowed(struct wlan_objmgr_psoc *psoc,
 				       enum policy_mgr_con_mode mode,
 				       uint32_t ch_freq,
 				       enum hw_mode_bandwidth bw,
-				       uint32_t ext_flags);
+				       uint32_t ext_flags,
+				       struct policy_mgr_pcl_list *pcl);
 
 /**
  * policy_mgr_can_2ghz_share_low_high_5ghz_sbs() - if SBS mode is dynamic where
@@ -1127,6 +1133,22 @@ policy_mgr_sbs_24_shared_with_high_5(struct policy_mgr_psoc_priv_obj *pm_ctx);
  */
 bool
 policy_mgr_sbs_24_shared_with_low_5(struct policy_mgr_psoc_priv_obj *pm_ctx);
+
+/**
+ * policy_mgr_2_freq_same_mac_in_dbs() - to check provided frequencies are
+ * in dbs freq range or not
+ *
+ * @pm_ctx: policy mgr psoc priv object
+ * @freq_1: first frequency
+ * @freq_2: second frequency
+ *
+ * This API is used to check provided frequencies are in dbs freq range or not
+ *
+ * Return: true/false.
+ */
+bool
+policy_mgr_2_freq_same_mac_in_dbs(struct policy_mgr_psoc_priv_obj *pm_ctx,
+				  qdf_freq_t freq_1, qdf_freq_t freq_2);
 
 /**
  * policy_mgr_2_freq_same_mac_in_sbs() - to check provided frequencies are

@@ -1253,7 +1253,7 @@ int tdls_set_tdls_offchannelmode(struct wlan_objmgr_vdev *vdev,
 
 	conn_peer = tdls_find_first_connected_peer(tdls_vdev);
 	if (!conn_peer) {
-		tdls_err("No TDLS Connected Peer");
+		tdls_debug("No TDLS Connected Peer");
 		return -EPERM;
 	}
 

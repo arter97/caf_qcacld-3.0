@@ -105,7 +105,7 @@ static int __wlan_hdd_cfg80211_set_gateway_params(struct wiphy *wiphy,
 		return -ENOTSUPP;
 	}
 
-	if (!hdd_cm_is_vdev_associated(adapter)) {
+	if (!hdd_cm_is_vdev_associated(adapter->deflink)) {
 		hdd_debug("Received GW param update in disconnected state!");
 		return -ENOTSUPP;
 	}
