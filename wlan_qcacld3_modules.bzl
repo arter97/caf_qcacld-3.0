@@ -4,15 +4,20 @@ load("//msm-kernel:target_variants.bzl", "get_all_variants")
 
 _target_chipset_map = {
     "pineapple": [
-        "kiwi-v2",
+	"kiwi-v2",
     ],
 }
 
 _chipset_hw_map = {
     "kiwi-v2": "BERYLLIUM",
+    "peach": "BERYLLIUM",
 }
 
 _chipset_header_map = {
+    "peach": [
+        "api/hw/peach/v1",
+        "cmn/hal/wifi3.0/kiwi",
+    ],
     "kiwi-v2": [
         "api/hw/kiwi/v2",
         "cmn/hal/wifi3.0/kiwi",
@@ -2212,9 +2217,26 @@ def _define_module_for_target_variant_chipset(target, variant, chipset):
         ],
     )
 
+def define_dist(target, variant, chipsets):
+    tv = "{}_{}".format(target, variant)
+    dataList = []
+    for c in chipsets:
+        tvc = "{}_{}_{}".format(target, variant, c)
+        name = "{}_qca_cld_{}".format(tv, c)
+        dataList.append(":{}".format(name))
+        copy_to_dist_dir(
+            name = "{}_modules_dist".format(tvc),
+            data =  [":{}".format(name)],
+            dist_dir = "out/target/product/{}/dlkm/lib/modules/".format(target),
+            flat = True,
+            wipe_dist_dir = False,
+            allow_duplicate_filenames = False,
+            mode_overrides = {"**/*": "644"},
+            log = "info",
+        )
     copy_to_dist_dir(
-        name = "{}_modules_dist".format(tvc),
-        data = [":{}".format(name)],
+        name = "{}_all_modules_dist".format(tv),
+        data = dataList,
         dist_dir = "out/target/product/{}/dlkm/lib/modules/".format(target),
         flat = True,
         wipe_dist_dir = False,
@@ -2229,3 +2251,4 @@ def define_modules():
         if chipsets:
             for c in chipsets:
                 _define_module_for_target_variant_chipset(t, v, c)
+            define_dist(t, v, chipsets)

@@ -107,6 +107,10 @@ config CNSS_KIWI_V2
 	bool "Enable CNSS_KIWI_V2"
 	default n
 
+config CNSS_PEACH
+	bool "Enable CNSS_PEACH"
+	default n
+
 config CNSS_UTILS_MODULE
 	bool "Enable CNSS_UTILS_MODULE"
 	default n
@@ -1869,6 +1873,23 @@ config FEATURE_WLAN_CH_AVOID_EXT
 
 config WLAN_TRACE_HIDE_MAC_ADDRESS_DISABLE
 	bool "enable CONFIG_WLAN_TRACE_HIDE_MAC_ADDRESS_DISABLE"
+config 4_BYTES_TLV_TAG
+	bool "enable 4_BYTES_TLV_TAG"
+	default n
+
+config QCA_WIFI_EMULATION
+	bool "enable CONFIG_QCA_WIFI_EMULATION"
+	default n
+
+config QDF_TIMER_MULTIPLIER_FRAC
+	int "set QDF_TIMER_MULTIPLIER_FRAC"
+
+config QDF_TIMER_MULTIPLIER_FRAC_ENABLE
+	bool "enable QDF_TIMER_MULTIPLIER_FRAC_ENABLE"
+	default n
+
+config QCA_WIFI_PEACH
+	bool "enable QCA_WIFI_PEACH"
 	default n
 
 config BCN_RATECODE_ENABLE
