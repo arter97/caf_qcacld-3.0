@@ -149,6 +149,10 @@ HDD_OBJS += $(HDD_SRC_DIR)/wlan_hdd_wext.o \
 	    $(HDD_SRC_DIR)/wlan_hdd_hostapd_wext.o
 endif
 
+ifeq ($(CONFIG_AFC_SUPPORT), y)
+HDD_OBJS += $(HDD_SRC_DIR)/wlan_hdd_afc.o
+endif
+
 ifeq ($(CONFIG_DCS), y)
 HDD_OBJS += $(HDD_SRC_DIR)/wlan_hdd_dcs.o
 endif
@@ -1355,21 +1359,21 @@ UMAC_MLO_MGR_OBJS := $(UMAC_MLO_MGR_CMN_DIR)/src/wlan_mlo_mgr_main.o \
 			  $(UMAC_MLO_MGR_CMN_DIR)/src/wlan_mlo_mgr_msgq.o \
 			  $(UMAC_MLO_MGR_CMN_DIR)/src/wlan_mlo_mgr_primary_umac.o \
 			  $(MLO_MGR_TARGET_IF_DIR)/src/target_if_mlo_mgr.o \
+			  $(UMAC_MLO_MGR_CLD_DIR)/src/wlan_mlo_link_force.o \
 			  $(UMAC_MLO_MGR_CLD_DIR)/src/wlan_mlo_mgr_roam.o \
 			  $(UMAC_MLO_MGR_CLD_DIR)/src/wlan_t2lm_api.o \
 			  $(UMAC_MLO_MGR_CMN_DIR)/src/wlan_mlo_t2lm.o \
 			  $(UMAC_MLO_MGR_CLD_DIR)/src/wlan_epcs_api.o \
 			  $(UMAC_MLO_MGR_CMN_DIR)/src/wlan_mlo_epcs.o \
 			  $(UMAC_MLO_MGR_CLD_DIR)/dispatcher/src/wlan_mlo_epcs_ucfg_api.o \
+			  $(UMAC_MLO_MGR_CMN_DIR)/src/wlan_mlo_mgr_link_switch.o \
 
 $(call add-wlan-objs,umac_mlomgr,$(UMAC_MLO_MGR_OBJS))
 endif
 ########## POWER MANAGEMENT OFFLOADS (PMO) ##########
 PMO_DIR :=	components/pmo
 PMO_INC :=	-I$(WLAN_ROOT)/$(PMO_DIR)/core/inc \
-			-I$(WLAN_ROOT)/$(PMO_DIR)/core/src \
 			-I$(WLAN_ROOT)/$(PMO_DIR)/dispatcher/inc \
-			-I$(WLAN_ROOT)/$(PMO_DIR)/dispatcher/src \
 
 ifeq ($(CONFIG_POWER_MANAGEMENT_OFFLOAD), y)
 PMO_OBJS :=     $(PMO_DIR)/core/src/wlan_pmo_main.o \
@@ -1620,7 +1624,8 @@ MLME_INC += $(LL_SAP_INC)
 
 ifeq ($(CONFIG_WLAN_FEATURE_LL_LT_SAP), y)
 MLME_OBJS += $(LL_SAP_DIR)/dispatcher/src/wlan_ll_sap_ucfg_api.o \
-		$(LL_SAP_DIR)/core/src/wlan_ll_sap_main.o
+		$(LL_SAP_DIR)/core/src/wlan_ll_sap_main.o \
+		$(LL_SAP_DIR)/core/src/wlan_ll_lt_sap_main.o
 endif
 
 $(call add-wlan-objs,mlme,$(MLME_OBJS))
@@ -1709,6 +1714,7 @@ $(call add-wlan-objs,ftm_time_sync,$(FTM_TIME_SYNC_OBJS))
 WLAN_PRE_CAC_DIR := components/pre_cac
 PRE_CAC_OSIF_DIR := os_if/pre_cac
 WLAN_PRE_CAC_INC := -I$(WLAN_ROOT)/$(WLAN_PRE_CAC_DIR)/dispatcher/inc \
+		  -I$(WLAN_ROOT)/$(WLAN_PRE_CAC_DIR)/core/src \
 		  -I$(WLAN_ROOT)/$(PRE_CAC_OSIF_DIR)/inc
 
 ifeq ($(CONFIG_FEATURE_WLAN_PRE_CAC), y)
@@ -1725,7 +1731,6 @@ $(call add-wlan-objs,wlan_pre_cac,$(WLAN_PRE_CAC_OBJS))
 CLD_TARGET_IF_DIR := components/target_if
 
 CLD_TARGET_IF_INC := -I$(WLAN_ROOT)/$(CLD_TARGET_IF_DIR)/pmo/inc \
-	 -I$(WLAN_ROOT)/$(CLD_TARGET_IF_DIR)/pmo/src
 
 ifeq ($(CONFIG_POWER_MANAGEMENT_OFFLOAD), y)
 CLD_TARGET_IF_OBJ := $(CLD_TARGET_IF_DIR)/pmo/src/target_if_pmo_arp.o \
@@ -1827,6 +1832,7 @@ TDLS_OS_IF_SRC := os_if/tdls/src
 TDLS_TARGET_IF_INC := components/target_if/tdls/inc
 TDLS_TARGET_IF_SRC := components/target_if/tdls/src
 TDLS_INC := -I$(WLAN_ROOT)/$(TDLS_DIR)/dispatcher/inc \
+	    -I$(WLAN_ROOT)/$(TDLS_DIR)/core/src \
 	    -I$(WLAN_ROOT)/$(TDLS_OS_IF_INC) \
 	    -I$(WLAN_ROOT)/$(TDLS_TARGET_IF_INC)
 
@@ -1865,7 +1871,6 @@ $(call add-wlan-objs,bmi,$(BMI_OBJS))
 TARGET_IF_DIR := $(WLAN_COMMON_ROOT)/target_if
 
 TARGET_IF_INC := -I$(WLAN_COMMON_INC)/target_if/core/inc \
-		 -I$(WLAN_COMMON_INC)/target_if/core/src \
 		 -I$(WLAN_COMMON_INC)/target_if/init_deinit/inc \
 		 -I$(WLAN_COMMON_INC)/target_if/crypto/inc \
 		 -I$(WLAN_COMMON_INC)/target_if/regulatory/inc \
@@ -1902,7 +1907,6 @@ $(call add-wlan-objs,target_if,$(TARGET_IF_OBJ))
 GLOBAL_LMAC_IF_DIR := $(WLAN_COMMON_ROOT)/global_lmac_if
 
 GLOBAL_LMAC_IF_INC := -I$(WLAN_COMMON_INC)/global_lmac_if/inc \
-                      -I$(WLAN_COMMON_INC)/global_lmac_if/src
 
 GLOBAL_LMAC_IF_OBJ := $(GLOBAL_LMAC_IF_DIR)/src/wlan_global_lmac_if.o
 
@@ -2114,9 +2118,6 @@ ifeq (y,$(filter y,$(CONFIG_LITHIUM) $(CONFIG_BERYLLIUM) $(CONFIG_RHINE)))
 DP_INC := -I$(WLAN_COMMON_INC)/dp/inc \
 	-I$(WLAN_COMMON_INC)/dp/wifi3.0 \
 	-I$(WLAN_COMMON_INC)/target_if/dp/inc \
-	-I$(WLAN_COMMON_INC)/dp/wifi3.0/monitor \
-	-I$(WLAN_COMMON_INC)/dp/wifi3.0/monitor/1.0 \
-	-I$(WLAN_COMMON_INC)/dp/wifi3.0/monitor/2.0 \
 	-I$(WLAN_COMMON_INC)/dp/cmn_dp_api
 
 DP_SRC := $(WLAN_COMMON_ROOT)/dp/wifi3.0
@@ -2140,6 +2141,10 @@ DP_OBJS += $(DP_SRC)/dp_rx_tid.o
 endif
 
 ifeq ($(CONFIG_WIFI_MONITOR_SUPPORT), y)
+DP_INC += -I$(WLAN_COMMON_INC)/dp/wifi3.0/monitor \
+	-I$(WLAN_COMMON_INC)/dp/wifi3.0/monitor/1.0 \
+	-I$(WLAN_COMMON_INC)/dp/wifi3.0/monitor/2.0 \
+
 DP_OBJS += $(DP_SRC)/monitor/dp_mon.o \
 		$(DP_SRC)/monitor/dp_mon_filter.o \
 		$(DP_SRC)/monitor/dp_rx_mon.o \
@@ -2292,13 +2297,11 @@ $(call add-wlan-objs,init_deinit,$(INIT_DEINIT_OBJS))
 
 ############## REGULATORY ###########
 REGULATORY_DIR := umac/regulatory
-REGULATORY_CORE_INC_DIR := $(REGULATORY_DIR)/core/inc
 REGULATORY_CORE_SRC_DIR := $(REGULATORY_DIR)/core/src
 REG_DISPATCHER_INC_DIR := $(REGULATORY_DIR)/dispatcher/inc
 REG_DISPATCHER_SRC_DIR := $(REGULATORY_DIR)/dispatcher/src
 REG_CORE_OBJ_DIR := $(WLAN_COMMON_ROOT)/$(REGULATORY_CORE_SRC_DIR)
 REG_DISPATCHER_OBJ_DIR := $(WLAN_COMMON_ROOT)/$(REG_DISPATCHER_SRC_DIR)
-REGULATORY_INC := -I$(WLAN_COMMON_INC)/$(REGULATORY_CORE_INC_DIR)
 REGULATORY_INC := -I$(WLAN_COMMON_INC)/$(REGULATORY_CORE_SRC_DIR)
 REGULATORY_INC += -I$(WLAN_COMMON_INC)/$(REG_DISPATCHER_INC_DIR)
 REGULATORY_INC += -I$(WLAN_COMMON_INC)/umac/cmn_services/regulatory/inc
@@ -2484,6 +2487,23 @@ DCS_OBJS := $(DCS_TGT_IF_SRC)/target_if_dcs.o \
 endif
 
 $(call add-wlan-objs,dcs,$(DCS_OBJS))
+
+####### AFC ######
+AFC_CMN_OSIF_SRC  := $(WLAN_COMMON_ROOT)/os_if/linux/afc/src
+AFC_CMN_CORE_SRC  := $(WLAN_COMMON_ROOT)/umac/afc/core/src
+AFC_CMN_DISP_SRC  := $(WLAN_COMMON_ROOT)/umac/afc/dispatcher/src
+
+AFC_CMN_OSIF_INC  := -I$(WLAN_COMMON_INC)/os_if/linux/afc/inc
+AFC_CMN_DISP_INC  := -I$(WLAN_COMMON_INC)/umac/afc/dispatcher/inc
+AFC_CMN_CORE_INC  := -I$(WLAN_COMMON_INC)/umac/afc/core/inc
+
+ifeq ($(CONFIG_AFC_SUPPORT), y)
+AFC_OBJS := $(AFC_CMN_OSIF_SRC)/wlan_cfg80211_afc.o \
+	    $(AFC_CMN_CORE_SRC)/wlan_afc_main.o \
+	    $(AFC_CMN_DISP_SRC)/wlan_afc_ucfg_api.o
+endif
+
+$(call add-wlan-objs,afc,$(AFC_OBJS))
 
 ###### INTEROP ISSUES AP ########
 INTEROP_ISSUES_AP_OS_IF_SRC      := os_if/interop_issues_ap/src
@@ -3180,6 +3200,10 @@ INCS +=		$(TWT_CONV_INCS)
 ################ Dynamic ACS ####################
 INCS +=		$(DCS_TGT_IF_INC)
 INCS +=		$(DCS_DISP_INC)
+################ AFC #################
+INCS +=		$(AFC_CMN_OSIF_INC)
+INCS +=		$(AFC_CMN_DISP_INC)
+INCS +=		$(AFC_CMN_CORE_INC)
 ################ INTEROP ISSUES AP ################
 INCS +=		$(INTEROP_ISSUES_AP_OS_IF_INC)
 INCS +=		$(INTEROP_ISSUES_AP_TGT_INC)
@@ -3424,6 +3448,7 @@ endif
 ccflags-$(CONFIG_DP_MULTIPASS_SUPPORT) += -DQCA_MULTIPASS_SUPPORT
 ccflags-$(CONFIG_DP_MULTIPASS_SUPPORT) += -DWLAN_REPEATER_NOT_SUPPORTED
 ccflags-$(CONFIG_DP_MULTIPASS_SUPPORT) += -DQCA_SUPPORT_PEER_ISOLATION
+ccflags-$(CONFIG_WLAN_DP_PROFILE_SUPPORT) += -DWLAN_DP_PROFILE_SUPPORT
 
 ifdef CONFIG_WLAN_TWT_SAP_STA_COUNT
 WLAN_TWT_SAP_STA_COUNT ?= 32
@@ -4147,6 +4172,7 @@ ccflags-$(CONFIG_QCA_WIFI_WCN6450) += -DWLAN_40BIT_ADDRESSING_SUPPORT
 ccflags-$(CONFIG_QCA_WIFI_WCN6450) += -DWLAN_64BIT_DATA_SUPPORT
 ccflags-$(CONFIG_CE_LEGACY_MSI_SUPPORT) += -DCE_LEGACY_MSI_SUPPORT
 ccflags-$(CONFIG_HIF_HAL_REG_ACCESS_SUPPORT) += -DHIF_HAL_REG_ACCESS_SUPPORT
+ccflags-$(CONFIG_FEATURE_HIF_DELAYED_REG_WRITE) += -DFEATURE_HIF_DELAYED_REG_WRITE
 ccflags-$(CONFIG_CNSS_KIWI_V2) += -DQCA_WIFI_KIWI_V2
 ccflags-$(CONFIG_CNSS_MANGO) += -DQCA_WIFI_MANGO
 ccflags-$(CONFIG_CNSS_PEACH) += -DQCA_WIFI_PEACH
@@ -4183,6 +4209,7 @@ ccflags-$(CONFIG_QCA_SUPPORT_TX_MIN_RATES_FOR_SPECIAL_FRAMES) += -DQCA_SUPPORT_T
 ccflags-$(CONFIG_QCA_GET_TSF_VIA_REG) += -DQCA_GET_TSF_VIA_REG
 ccflags-$(CONFIG_DP_TX_COMP_RING_DESC_SANITY_CHECK) += -DDP_TX_COMP_RING_DESC_SANITY_CHECK
 ccflags-$(CONFIG_HAL_SRNG_REG_HIS_DEBUG) += -DHAL_SRNG_REG_HIS_DEBUG
+ccflags-$(CONFIG_DP_MLO_LINK_STATS_SUPPORT) += -DDP_MLO_LINK_STATS_SUPPORT
 
 ccflags-$(CONFIG_RX_HASH_DEBUG) += -DRX_HASH_DEBUG
 ccflags-$(CONFIG_DP_PKT_STATS_PER_LMAC) += -DDP_PKT_STATS_PER_LMAC
@@ -4199,7 +4226,7 @@ ccflags-$(CONFIG_WLAN_TX_FLOW_CONTROL_V2) += -DQCA_AC_BASED_FLOW_CONTROL
 ccflags-$(CONFIG_FEATURE_NO_DBS_INTRABAND_MCC_SUPPORT) += -DFEATURE_NO_DBS_INTRABAND_MCC_SUPPORT
 ccflags-$(CONFIG_HAL_DISABLE_NON_BA_2K_JUMP_ERROR) += -DHAL_DISABLE_NON_BA_2K_JUMP_ERROR
 ccflags-$(CONFIG_ENABLE_HAL_SOC_STATS) += -DENABLE_HAL_SOC_STATS
-ccflags-$(CONFIG_ENABLE_HAL_REG_WR_HISTORY) += -DCONFIG_ENABLE_HAL_REG_WR_HISTORY
+ccflags-$(CONFIG_ENABLE_HAL_REG_WR_HISTORY) += -DENABLE_HAL_REG_WR_HISTORY
 ccflags-$(CONFIG_DP_RX_DESC_COOKIE_INVALIDATE) += -DDP_RX_DESC_COOKIE_INVALIDATE
 ccflags-$(CONFIG_MON_ENABLE_DROP_FOR_MAC) += -DMON_ENABLE_DROP_FOR_MAC
 ccflags-$(CONFIG_MON_ENABLE_DROP_FOR_NON_MON_PMAC) += -DMON_ENABLE_DROP_FOR_NON_MON_PMAC
@@ -4576,6 +4603,20 @@ else
 CONFIG_WLAN_MAX_MLD ?= 1
 endif
 ccflags-y += -DWLAN_MAX_MLD=$(CONFIG_WLAN_MAX_MLD)
+
+ifdef CONFIG_WLAN_FEATURE_11BE_MLO
+CONFIG_WLAN_MAX_ML_DEFAULT_LINK ?= 2
+else
+CONFIG_WLAN_MAX_ML_DEFAULT_LINK  ?= 1
+endif
+ccflags-y += -DWLAN_MAX_ML_DEFAULT_LINK=$(CONFIG_WLAN_MAX_ML_DEFAULT_LINK)
+
+ifdef CONFIG_WLAN_FEATURE_11BE_MLO
+CONFIG_WLAN_MAX_ML_BSS_LINKS ?= 3
+else
+CONFIG_WLAN_MAX_ML_BSS_LINKS ?= 1
+endif
+ccflags-y += -DWLAN_MAX_ML_BSS_LINKS=$(CONFIG_WLAN_MAX_ML_BSS_LINKS)
 
 #Maximum pending commands for a vdev is calculated in vdev create handler
 #by WLAN_SER_MAX_PENDING_CMDS/WLAN_SER_MAX_VDEVS. For SAP case, we will need

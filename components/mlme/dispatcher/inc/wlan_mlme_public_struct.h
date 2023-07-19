@@ -1727,6 +1727,7 @@ enum station_prefer_bw {
  * @mlo_support_link_band:          band bitmap that sta mlo supports
  * @mlo_max_simultaneous_links:     number of simultaneous links
  * @mlo_prefer_percentage:          percentage to boost/reduce mlo scoring
+ * @epcs_capability:                epcs capability enable or disable flag
  * @usr_disable_eht:                user disable the eht for STA
  */
 struct wlan_mlme_sta_cfg {
@@ -1762,6 +1763,7 @@ struct wlan_mlme_sta_cfg {
 	int8_t mlo_prefer_percentage;
 #endif
 #ifdef WLAN_FEATURE_11BE
+	bool epcs_capability;
 	bool usr_disable_eht;
 #endif
 };
@@ -2735,6 +2737,8 @@ struct wlan_mlme_iot {
  * @connection_roaming_ini_flag: To indicate whether connection_roaming related
  * ini file is present or not.
  * @eml_cap: EML capability subfield present in ML IE common info
+ * @dynamic_nss_chains_support : intersection of host and fw capability of
+ *				 dynamic NSS chain support
  */
 struct wlan_mlme_cfg {
 	struct wlan_mlme_chainmask chainmask_cfg;
@@ -2785,6 +2789,7 @@ struct wlan_mlme_cfg {
 	struct wlan_mlme_iot iot;
 	bool connection_roaming_ini_flag;
 	struct wlan_mlme_eml_cap eml_cap;
+	bool dynamic_nss_chains_support;
 };
 
 /**

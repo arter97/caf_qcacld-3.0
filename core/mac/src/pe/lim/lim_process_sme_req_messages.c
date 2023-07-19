@@ -72,6 +72,7 @@
 #include <spatial_reuse_api.h>
 #include "wlan_psoc_mlme_api.h"
 #include "wma_he.h"
+#include "wlan_mlo_mgr_sta.h"
 #ifdef WLAN_FEATURE_11BE_MLO
 #include <wlan_mlo_mgr_peer.h>
 #endif
@@ -1701,6 +1702,80 @@ lim_update_he_caps_htc(struct pe_session *session,  bool val)
 static void
 lim_update_eht_caps_mcs(struct mac_context *mac, struct pe_session *session)
 {
+	uint8_t tx_nss = 0;
+	uint8_t rx_nss = 0;
+	struct wlan_objmgr_vdev *vdev = session->vdev;
+	struct mlme_legacy_priv *mlme_priv;
+	struct wlan_mlme_cfg *mlme_cfg = mac->mlme_cfg;
+	tDot11fIEeht_cap *dot11_eht_cap;
+	tDot11fIEeht_cap *eht_config;
+
+	mlme_priv = wlan_vdev_mlme_get_ext_hdl(vdev);
+	if (!mlme_priv)
+		return;
+
+	eht_config = &mlme_priv->eht_config;
+	dot11_eht_cap = &mlme_cfg->eht_caps.dot11_eht_cap;
+
+	if (session->nss == 1) {
+		tx_nss = 1;
+		rx_nss = 1;
+	} else {
+		tx_nss = dot11_eht_cap->bw_20_tx_max_nss_for_mcs_0_to_7;
+		rx_nss = dot11_eht_cap->bw_20_rx_max_nss_for_mcs_0_to_7;
+	}
+
+	if (!tx_nss || tx_nss > 2 || !rx_nss || rx_nss > 2) {
+		pe_err("invalid Nss values tx_nss: %u rx_nss: %u",
+		       tx_nss, rx_nss);
+		return;
+	}
+
+	pe_debug("tx_nss: %u rx_nss: %u", tx_nss, rx_nss);
+
+	eht_config->bw_20_rx_max_nss_for_mcs_0_to_7 = rx_nss;
+	eht_config->bw_20_tx_max_nss_for_mcs_0_to_7 = tx_nss;
+	eht_config->bw_20_rx_max_nss_for_mcs_8_and_9 = rx_nss;
+	eht_config->bw_20_tx_max_nss_for_mcs_8_and_9 = tx_nss;
+	if (dot11_eht_cap->bw_20_rx_max_nss_for_mcs_10_and_11) {
+		eht_config->bw_20_rx_max_nss_for_mcs_10_and_11 = rx_nss;
+		eht_config->bw_20_tx_max_nss_for_mcs_10_and_11 = tx_nss;
+	}
+	if (dot11_eht_cap->bw_20_rx_max_nss_for_mcs_12_and_13) {
+		eht_config->bw_20_rx_max_nss_for_mcs_12_and_13 = rx_nss;
+		eht_config->bw_20_tx_max_nss_for_mcs_12_and_13 = tx_nss;
+	}
+	eht_config->bw_le_80_rx_max_nss_for_mcs_0_to_9 = rx_nss;
+	eht_config->bw_le_80_tx_max_nss_for_mcs_0_to_9 = tx_nss;
+	if (dot11_eht_cap->bw_le_80_rx_max_nss_for_mcs_10_and_11) {
+		eht_config->bw_le_80_rx_max_nss_for_mcs_10_and_11 = rx_nss;
+		eht_config->bw_le_80_tx_max_nss_for_mcs_10_and_11 = tx_nss;
+	}
+	if (dot11_eht_cap->bw_le_80_rx_max_nss_for_mcs_12_and_13) {
+		eht_config->bw_le_80_rx_max_nss_for_mcs_12_and_13 = rx_nss;
+		eht_config->bw_le_80_tx_max_nss_for_mcs_12_and_13 = tx_nss;
+	}
+	eht_config->bw_160_rx_max_nss_for_mcs_0_to_9 = rx_nss;
+	eht_config->bw_160_tx_max_nss_for_mcs_0_to_9 = tx_nss;
+	if (dot11_eht_cap->bw_160_rx_max_nss_for_mcs_10_and_11) {
+		eht_config->bw_160_rx_max_nss_for_mcs_10_and_11 = rx_nss;
+		eht_config->bw_160_tx_max_nss_for_mcs_10_and_11 = tx_nss;
+	}
+	if (dot11_eht_cap->bw_160_rx_max_nss_for_mcs_12_and_13) {
+		eht_config->bw_160_rx_max_nss_for_mcs_12_and_13 = rx_nss;
+		eht_config->bw_160_tx_max_nss_for_mcs_12_and_13 = tx_nss;
+	}
+	eht_config->bw_320_rx_max_nss_for_mcs_0_to_9 = rx_nss;
+	eht_config->bw_320_tx_max_nss_for_mcs_0_to_9 = tx_nss;
+
+	if (dot11_eht_cap->bw_320_rx_max_nss_for_mcs_10_and_11) {
+		eht_config->bw_320_rx_max_nss_for_mcs_10_and_11 = rx_nss;
+		eht_config->bw_320_tx_max_nss_for_mcs_10_and_11 = tx_nss;
+	}
+	if (dot11_eht_cap->bw_320_rx_max_nss_for_mcs_12_and_13) {
+		eht_config->bw_320_rx_max_nss_for_mcs_12_and_13 = rx_nss;
+		eht_config->bw_320_tx_max_nss_for_mcs_12_and_13 = tx_nss;
+	}
 }
 #else
 static void
@@ -2681,24 +2756,6 @@ static inline void lim_fill_rssi(struct pe_session *session,
 }
 #endif
 
-static QDF_STATUS lim_check_and_validate_6g_ap(struct mac_context *mac_ctx,
-					       struct bss_description *bss,
-					       tDot11fBeaconIEs *ie)
-{
-	tDot11fIEhe_op *he_op = &ie->he_op;
-
-	if (!wlan_reg_is_6ghz_chan_freq(bss->chan_freq))
-		return QDF_STATUS_SUCCESS;
-
-	if (!he_op->oper_info_6g_present) {
-		pe_err(QDF_MAC_ADDR_FMT" Invalid 6GHZ AP BSS description IE",
-			QDF_MAC_ADDR_REF(bss->bssId));
-		return QDF_STATUS_E_INVAL;
-	}
-
-	return QDF_STATUS_SUCCESS;
-}
-
 #if defined(WLAN_SAE_SINGLE_PMK) && defined(WLAN_FEATURE_ROAM_OFFLOAD)
 /**
  * lim_update_sae_single_pmk_ap_cap() - Function to update sae single pmk ap ie
@@ -2966,6 +3023,19 @@ static void lim_update_qos(struct mac_context *mac_ctx,
 		 session->limWmeEnabled);
 }
 
+static void lim_reset_self_ocv_caps(struct pe_session *session)
+{
+	uint16_t self_rsn_cap;
+
+	self_rsn_cap = wlan_crypto_get_param(session->vdev,
+					     WLAN_CRYPTO_PARAM_RSN_CAP);
+	if (self_rsn_cap == -1)
+		return;
+
+	pe_debug("self RSN cap: %d", self_rsn_cap);
+	self_rsn_cap &= ~WLAN_CRYPTO_RSN_CAP_OCV_SUPPORTED;
+}
+
 QDF_STATUS
 lim_fill_pe_session(struct mac_context *mac_ctx, struct pe_session *session,
 		    struct bss_description *bss_desc)
@@ -3060,12 +3130,6 @@ lim_fill_pe_session(struct mac_context *mac_ctx, struct pe_session *session,
 	else
 		mac_ctx->mlme_cfg->feature_flags.enable_short_slot_time_11g =
 			mac_ctx->mlme_cfg->ht_caps.short_slot_time_enabled;
-
-	status = lim_check_and_validate_6g_ap(mac_ctx, bss_desc, ie_struct);
-	if (QDF_IS_STATUS_ERROR(status)) {
-		status = QDF_STATUS_E_FAILURE;
-		goto send;
-	}
 
 	/*
 	 * Join timeout: if we find a BeaconInterval in the BssDescription,
@@ -3209,6 +3273,7 @@ lim_fill_pe_session(struct mac_context *mac_ctx, struct pe_session *session,
 
 	if (IS_DOT11_MODE_EHT(session->dot11mode)) {
 		lim_update_session_eht_capable(mac_ctx, session);
+		lim_reset_self_ocv_caps(session);
 		lim_copy_join_req_eht_cap(session);
 	}
 

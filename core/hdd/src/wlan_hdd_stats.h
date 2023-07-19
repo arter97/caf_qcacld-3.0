@@ -33,8 +33,6 @@
 #endif
 
 #define INVALID_MCS_IDX 255
-#define MAX_HT_MCS_IDX 8
-#define MAX_VHT_MCS_IDX 10
 
 #define DATA_RATE_11AC_MCS_MASK    0x03
 
@@ -205,24 +203,24 @@ int wlan_hdd_cfg80211_ll_stats_ext_set_param(struct wiphy *wiphy,
 					     int data_len);
 /**
  * hdd_get_interface_info() - get interface info
- * @adapter: Pointer to device adapter
+ * @link_info: Link info pointer in HDD adapter
  * @info: Pointer to interface info
  *
  * Return: bool
  */
-bool hdd_get_interface_info(struct hdd_adapter *adapter,
+bool hdd_get_interface_info(struct wlan_hdd_link_info *link_info,
 			    struct wifi_interface_info *info);
 
 /**
  * wlan_hdd_ll_stats_get() - Get Link Layer statistics from FW
- * @adapter: Pointer to device adapter
+ * @link_info: Link info pointer in HDD adapter
  * @req_id: request id
  * @req_mask: bitmask used by FW for the request
  *
  * Return: 0 on success and error code otherwise
  */
-int wlan_hdd_ll_stats_get(struct hdd_adapter *adapter, uint32_t req_id,
-			  uint32_t req_mask);
+int wlan_hdd_ll_stats_get(struct wlan_hdd_link_info *link_info,
+			  uint32_t req_id, uint32_t req_mask);
 
 /**
  * wlan_hdd_cfg80211_link_layer_stats_callback() - This function is called
@@ -283,8 +281,8 @@ wlan_hdd_cfg80211_ll_stats_ext_set_param(struct wiphy *wiphy,
 }
 
 static inline int
-wlan_hdd_ll_stats_get(struct hdd_adapter *adapter, uint32_t req_id,
-		      uint32_t req_mask)
+wlan_hdd_ll_stats_get(struct wlan_hdd_link_info *link_info,
+		      uint32_t req_id, uint32_t req_mask)
 {
 	return -EINVAL;
 }
@@ -453,25 +451,26 @@ QDF_STATUS wlan_hdd_get_mib_stats(struct hdd_adapter *adapter);
 
 /**
  * wlan_hdd_get_rssi() - Get the current RSSI
- * @adapter: adapter upon which the measurement is requested
+ * @link_info: Link info pointer in HDD adapter
  * @rssi_value: pointer to where the RSSI should be returned
  *
  * Return: QDF_STATUS_SUCCESS on success, QDF_STATUS_E_** on error
  */
-QDF_STATUS wlan_hdd_get_rssi(struct hdd_adapter *adapter, int8_t *rssi_value);
+QDF_STATUS wlan_hdd_get_rssi(struct wlan_hdd_link_info *link_info,
+			     int8_t *rssi_value);
 
 /**
  * wlan_hdd_get_snr() - Get the current SNR
- * @adapter: adapter upon which the measurement is requested
+ * @link_info: Link info pointer in HDD adapter
  * @snr: pointer to where the SNR should be returned
  *
  * Return: QDF_STATUS_SUCCESS on success, QDF_STATUS_E_** on error
  */
-QDF_STATUS wlan_hdd_get_snr(struct hdd_adapter *adapter, int8_t *snr);
+QDF_STATUS wlan_hdd_get_snr(struct wlan_hdd_link_info *link_info, int8_t *snr);
 
 /**
  * wlan_hdd_get_linkspeed_for_peermac() - Get link speed for a peer
- * @adapter: adapter upon which the peer is active
+ * @link_info: Link info pointer in adapter
  * @mac_address: MAC address of the peer
  * @linkspeed: pointer to memory where returned link speed is to be placed
  *
@@ -480,13 +479,13 @@ QDF_STATUS wlan_hdd_get_snr(struct hdd_adapter *adapter, int8_t *snr);
  *
  * Return: 0 if linkspeed data is available, negative errno otherwise
  */
-int wlan_hdd_get_linkspeed_for_peermac(struct hdd_adapter *adapter,
+int wlan_hdd_get_linkspeed_for_peermac(struct wlan_hdd_link_info *link_info,
 				       struct qdf_mac_addr *mac_address,
 				       uint32_t *linkspeed);
 
 /**
  * wlan_hdd_get_link_speed() - get link speed
- * @adapter:     pointer to the adapter
+ * @link_info: Link info pointer in HDD adapter
  * @link_speed:   pointer to link speed
  *
  * This function fetches per bssid link speed.
@@ -495,12 +494,13 @@ int wlan_hdd_get_linkspeed_for_peermac(struct hdd_adapter *adapter,
  *         if not associated, link speed of 0 is returned.
  *         On error, error number will be returned.
  */
-int wlan_hdd_get_link_speed(struct hdd_adapter *adapter, uint32_t *link_speed);
+int wlan_hdd_get_link_speed(struct wlan_hdd_link_info *link_info,
+			    uint32_t *link_speed);
 
 #ifdef FEATURE_RX_LINKSPEED_ROAM_TRIGGER
 /**
  * wlan_hdd_get_peer_rx_rate_stats() - STA gets rx rate stats
- * @adapter: adapter upon which the measurement is requested
+ * @link_info: Link info pointer in HDD adapter
  *
  * STA gets rx rate stats through using the existed API
  * cdp_host_get_peer_stats. The reason that we make this
@@ -509,22 +509,21 @@ int wlan_hdd_get_link_speed(struct hdd_adapter *adapter, uint32_t *link_speed);
  *
  * Return: void
  */
-void
-wlan_hdd_get_peer_rx_rate_stats(struct hdd_adapter *adapter);
+void wlan_hdd_get_peer_rx_rate_stats(struct wlan_hdd_link_info *link_info);
 #else
 static inline void
-wlan_hdd_get_peer_rx_rate_stats(struct hdd_adapter *adapter)
+wlan_hdd_get_peer_rx_rate_stats(struct wlan_hdd_link_info *link_info)
 {
 }
 #endif
 
 /**
  * wlan_hdd_get_station_stats() - Get station statistics
- * @adapter: adapter for which statistics are desired
+ * @link_info: Link info pointer in HDD adapter.
  *
  * Return: status of operation
  */
-int wlan_hdd_get_station_stats(struct hdd_adapter *adapter);
+int wlan_hdd_get_station_stats(struct wlan_hdd_link_info *link_info);
 
 int wlan_hdd_qmi_get_sync_resume(void);
 int wlan_hdd_qmi_put_suspend(void);
@@ -532,11 +531,11 @@ int wlan_hdd_qmi_put_suspend(void);
 #ifdef WLAN_FEATURE_BIG_DATA_STATS
 /**
  * wlan_hdd_get_big_data_station_stats() - Get big data station statistics
- * @adapter: adapter for which statistics are desired
+ * @link_info: Link info pointer in HDD adapter
  *
  * Return: status of operation
  */
-int wlan_hdd_get_big_data_station_stats(struct hdd_adapter *adapter);
+int wlan_hdd_get_big_data_station_stats(struct wlan_hdd_link_info *link_info);
 
 /**
  * wlan_cfg80211_mc_cp_get_big_data_stats() - API to get big data
@@ -560,8 +559,8 @@ wlan_cfg80211_mc_cp_get_big_data_stats(struct wlan_objmgr_vdev *vdev,
 void wlan_cfg80211_mc_cp_stats_free_big_data_stats_event(
 					struct big_data_stats_event *info);
 #else
-static inline int wlan_hdd_get_big_data_station_stats(
-						struct hdd_adapter *adapter)
+static inline int
+wlan_hdd_get_big_data_station_stats(struct wlan_hdd_link_info *link_info)
 {
 	return 0;
 }

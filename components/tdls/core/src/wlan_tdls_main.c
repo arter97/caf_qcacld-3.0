@@ -346,6 +346,13 @@ QDF_STATUS tdls_vdev_obj_destroy_notification(struct wlan_objmgr_vdev *vdev,
 		return QDF_STATUS_E_FAILURE;
 	}
 
+	if (wlan_vdev_mlme_is_mlo_vdev(vdev)) {
+		if (QDF_TIMER_STATE_STOPPED !=
+		    qdf_mc_timer_get_current_state(
+					&tdls_vdev_obj->peer_discovery_timer))
+			qdf_mc_timer_stop(&tdls_vdev_obj->peer_discovery_timer);
+	}
+
 	qdf_event_destroy(&tdls_vdev_obj->tdls_teardown_comp);
 	tdls_vdev_deinit(tdls_vdev_obj);
 
@@ -1393,8 +1400,7 @@ void tdls_send_update_to_fw(struct tdls_vdev_priv_obj *tdls_vdev_obj,
 	 * channel switch
 	 */
 	if (TDLS_IS_OFF_CHANNEL_ENABLED(tdls_feature_flags) &&
-	    (!tdls_chan_swit_prohibited) &&
-	    (!wlan_tdls_is_fw_11be_mlo_capable(tdls_soc_obj->soc)))
+	    (!tdls_chan_swit_prohibited))
 		tdls_info_to_fw->tdls_options = ENA_TDLS_OFFCHAN;
 
 	if (TDLS_IS_BUFFER_STA_ENABLED(tdls_feature_flags))

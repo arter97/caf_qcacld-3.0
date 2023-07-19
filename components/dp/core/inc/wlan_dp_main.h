@@ -849,4 +849,47 @@ QDF_STATUS wlan_dp_select_profile_cfg(struct wlan_objmgr_psoc *psoc)
 	return QDF_STATUS_E_NOSUPPORT;
 }
 #endif
+
+/* DP CFG APIs - START */
+
+#ifdef WLAN_SUPPORT_RX_FISA
+/**
+ * wlan_dp_cfg_is_rx_fisa_enabled() - Get Rx FISA enabled flag
+ * @dp_cfg: soc configuration context
+ *
+ * Return: true if enabled, false otherwise.
+ */
+static inline
+bool wlan_dp_cfg_is_rx_fisa_enabled(struct wlan_dp_psoc_cfg *dp_cfg)
+{
+	return dp_cfg->is_rx_fisa_enabled;
+}
+
+/**
+ * wlan_dp_cfg_is_rx_fisa_lru_del_enabled() - Get Rx FISA LRU del enabled flag
+ * @dp_cfg: soc configuration context
+ *
+ * Return: true if enabled, false otherwise.
+ */
+static inline
+bool wlan_dp_cfg_is_rx_fisa_lru_del_enabled(struct wlan_dp_psoc_cfg *dp_cfg)
+{
+	return dp_cfg->is_rx_fisa_lru_del_enabled;
+}
+#else
+static inline
+bool wlan_dp_cfg_is_rx_fisa_enabled(struct wlan_dp_psoc_cfg *dp_cfg)
+{
+	return false;
+}
+
+static inline
+bool wlan_dp_cfg_is_rx_fisa_lru_del_enabled(struct wlan_dp_psoc_cfg *dp_cfg)
+{
+	return false;
+}
+#endif
+
+
+/* DP CFG APIs - END */
 #endif

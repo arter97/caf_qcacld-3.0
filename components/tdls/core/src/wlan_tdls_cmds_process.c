@@ -2482,7 +2482,8 @@ QDF_STATUS tdls_process_antenna_switch(struct tdls_antenna_switch_request *req)
 
 	vdev_id = wlan_vdev_get_id(vdev);
 	opmode = wlan_vdev_mlme_get_opmode(vdev);
-	mode = policy_mgr_convert_device_mode_to_qdf_type(opmode);
+	mode = policy_mgr_qdf_opmode_to_pm_con_mode(wlan_vdev_get_psoc(vdev),
+						    opmode, vdev_id);
 	freq = policy_mgr_get_channel(soc_obj->soc,
 				      mode,
 				      &vdev_id);

@@ -908,6 +908,7 @@ static int hdd_son_set_phymode(struct wlan_objmgr_vdev *vdev,
 	QDF_STATUS status;
 	struct hdd_ap_ctx *hdd_ap_ctx;
 	struct sap_config *sap_config;
+	struct wlan_hdd_link_info *link_info;
 
 	if (!vdev) {
 		hdd_err("null vdev");
@@ -916,7 +917,7 @@ static int hdd_son_set_phymode(struct wlan_objmgr_vdev *vdev,
 
 	link_info = wlan_hdd_get_link_info_from_objmgr(vdev);
 	if (!link_info) {
-		hdd_err("null adapter");
+		hdd_err("Invalid VDEV %d", wlan_vdev_get_id(vdev));
 		return -EINVAL;
 	}
 
@@ -936,7 +937,7 @@ static int hdd_son_set_phymode(struct wlan_objmgr_vdev *vdev,
 		return -EINVAL;
 	}
 
-	hdd_restart_sap(adapter);
+	hdd_restart_sap(link_info);
 
 	return 0;
 }
@@ -1897,7 +1898,9 @@ static QDF_STATUS hdd_son_init_acs_channels(struct hdd_adapter *adapter,
 	}
 
 	pm_mode =
-	      policy_mgr_convert_device_mode_to_qdf_type(adapter->device_mode);
+	      policy_mgr_qdf_opmode_to_pm_con_mode(hdd_ctx->psoc,
+						   adapter->device_mode,
+						   adapter->deflink->vdev_id);
 	/* convert channel to freq */
 	for (i = 0; i < num_channels; i++) {
 		acs_cfg->freq_list[i] = freq_list[i];
@@ -1953,7 +1956,7 @@ static int hdd_son_start_acs(struct wlan_objmgr_vdev *vdev, uint8_t enable)
 
 	link_info = wlan_hdd_get_link_info_from_objmgr(vdev);
 	if (!link_info) {
-		hdd_err("null adapter");
+		hdd_err("Invalid VDEV %d", wlan_vdev_get_id(vdev));
 		return -EINVAL;
 	}
 
@@ -1971,7 +1974,7 @@ static int hdd_son_start_acs(struct wlan_objmgr_vdev *vdev, uint8_t enable)
 		hdd_err("ACS is in-progress");
 		return -EAGAIN;
 	}
-	wlan_hdd_undo_acs(adapter);
+	wlan_hdd_undo_acs(link_info);
 	sap_config = &link_info->session.ap.sap_config;
 	hdd_debug("ACS Config country %s hw_mode %d ACS_BW: %d START_CH: %d END_CH: %d band %d",
 		  hdd_ctx->reg.alpha2, sap_config->acs_cfg.hw_mode,
@@ -1980,7 +1983,7 @@ static int hdd_son_start_acs(struct wlan_objmgr_vdev *vdev, uint8_t enable)
 		  sap_config->acs_cfg.end_ch_freq, sap_config->acs_cfg.band);
 	sap_dump_acs_channel(&sap_config->acs_cfg);
 
-	wlan_hdd_cfg80211_start_acs(adapter);
+	wlan_hdd_cfg80211_start_acs(link_info);
 
 	return 0;
 }

@@ -56,6 +56,7 @@
 #include <utils_mlo.h>
 #endif
 #ifdef WLAN_FEATURE_11BE
+#include "wlan_epcs_api.h"
 #include <wlan_mlo_t2lm.h>
 #endif
 
@@ -193,6 +194,7 @@ void populate_dot_11_f_ext_chann_switch_ann(struct mac_context *mac_ptr,
 	uint32_t sw_target_freq;
 	uint8_t primary_channel;
 	enum phy_ch_width ch_width;
+	uint8_t reg_cc[REG_ALPHA2_LEN + 1];
 
 	ch_width = session_entry->gLimChannelSwitch.ch_width;
 	ch_offset = session_entry->gLimChannelSwitch.sec_ch_offset;
@@ -209,8 +211,9 @@ void populate_dot_11_f_ext_chann_switch_ann(struct mac_context *mac_ptr,
 		session_entry->gLimChannelSwitch.switchCount;
 	dot_11_ptr->present = 1;
 
+	wlan_reg_read_current_country(mac_ptr->psoc, reg_cc);
 	pe_debug("country:%s chan:%d freq %d width:%d reg:%d off:%d",
-		 mac_ptr->scan.countryCodeCurrent,
+		 reg_cc,
 		 session_entry->gLimChannelSwitch.primaryChannel,
 		 sw_target_freq,
 		 session_entry->gLimChannelSwitch.ch_width,
@@ -2077,6 +2080,7 @@ populate_dot11f_supp_channels(struct mac_context *mac,
 	uint8_t *p;
 	struct supported_channels supportedChannels;
 	uint8_t channel, opclass, base_opclass;
+	uint8_t reg_cc[REG_ALPHA2_LEN + 1];
 
 	wlan_add_supported_5Ghz_channels(mac->psoc, mac->pdev,
 					 supportedChannels.channelList,
@@ -2086,16 +2090,17 @@ populate_dot11f_supp_channels(struct mac_context *mac,
 	p = supportedChannels.channelList;
 	pDot11f->num_bands = supportedChannels.numChnl;
 
+	wlan_reg_read_current_country(mac->psoc, reg_cc);
 	for (i = 0U; i < pDot11f->num_bands; i++) {
 		base_opclass = wlan_reg_dmn_get_opclass_from_channel(
-						mac->scan.countryCodeCurrent,
+						reg_cc,
 						p[i], BW20);
 		pDot11f->bands[j][0] = p[i];
 		pDot11f->bands[j][1] = 1;
 		channel = p[i];
 		while (i + 1 < pDot11f->num_bands && (p[i + 1] == channel + 4)) {
 			opclass = wlan_reg_dmn_get_opclass_from_channel(
-						mac->scan.countryCodeCurrent,
+						reg_cc,
 						p[i + 1], BW20);
 			if (base_opclass != opclass)
 				goto skip;
@@ -7327,23 +7332,25 @@ populate_dot11f_twt_he_cap(struct mac_context *mac,
 			   struct pe_session *session,
 			   tDot11fIEhe_cap *he_cap)
 {
-	bool bcast_requestor =
-		mac->mlme_cfg->twt_cfg.is_bcast_requestor_enabled &&
-		!mac->mlme_cfg->twt_cfg.disable_btwt_usr_cfg;
-	bool bcast_responder =
-		mac->mlme_cfg->twt_cfg.is_bcast_responder_enabled;
+	bool twt_requestor = false;
+	bool twt_responder = false;
+	bool bcast_requestor = false;
+	bool bcast_responder = false;
+
+	wlan_twt_get_bcast_requestor_cfg(mac->psoc, &bcast_requestor);
+	bcast_requestor = bcast_requestor &&
+			  !mac->mlme_cfg->twt_cfg.disable_btwt_usr_cfg;
+	wlan_twt_get_bcast_responder_cfg(mac->psoc, &bcast_responder);
+	wlan_twt_get_requestor_cfg(mac->psoc, &twt_requestor);
+	wlan_twt_get_responder_cfg(mac->psoc, &twt_responder);
 
 	he_cap->broadcast_twt = 0;
-	if (session->opmode == QDF_STA_MODE &&
-	    !twt_get_requestor_flag(mac)) {
-		/* Set twt_request as 0 if any SCC/MCC concurrency exist */
-		he_cap->twt_request = 0;
-		return;
-	} else if (session->opmode == QDF_SAP_MODE &&
-		   !twt_get_responder_flag(mac)) {
-		/** Set twt_responder as 0 if any SCC/MCC concurrency exist */
-		he_cap->twt_responder = 0;
-		return;
+	if (session->opmode == QDF_STA_MODE ||
+	    session->opmode == QDF_SAP_MODE) {
+		he_cap->twt_request =
+			twt_requestor && twt_get_requestor_flag(mac);
+		he_cap->twt_responder =
+			twt_responder && twt_get_responder_flag(mac);
 	}
 
 	if (session->opmode == QDF_STA_MODE) {
@@ -7422,12 +7429,16 @@ QDF_STATUS populate_dot11f_he_caps(struct mac_context *mac_ctx, struct pe_sessio
 QDF_STATUS
 populate_dot11f_he_caps_by_band(struct mac_context *mac_ctx,
 				bool is_2g,
-				tDot11fIEhe_cap *he_cap)
+				tDot11fIEhe_cap *he_cap,
+				struct pe_session *session)
 {
 	if (is_2g)
 		qdf_mem_copy(he_cap, &mac_ctx->he_cap_2g, sizeof(*he_cap));
 	else
 		qdf_mem_copy(he_cap, &mac_ctx->he_cap_5g, sizeof(*he_cap));
+
+	if (session)
+		populate_dot11f_twt_he_cap(mac_ctx, session, he_cap);
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -9253,7 +9264,7 @@ void lim_ieee80211_pack_ehtcap(uint8_t *ie, tDot11fIEeht_cap dot11f_eht_cap,
 
 #ifdef WLAN_SUPPORT_TWT
 static void
-populate_dot11f_twt_eht_cap(struct mac_context *mac,
+populate_dot11f_rtwt_eht_cap(struct mac_context *mac,
 			    tDot11fIEeht_cap *eht_cap)
 {
 	bool restricted_support = false;
@@ -9266,8 +9277,8 @@ populate_dot11f_twt_eht_cap(struct mac_context *mac,
 }
 #else
 static inline void
-populate_dot11f_twt_eht_cap(struct mac_context *mac_ctx,
-			    tDot11fIEhe_cap *eht_cap)
+populate_dot11f_rtwt_eht_cap(struct mac_context *mac,
+			    tDot11fIEeht_cap *eht_cap)
 {
 	eht_cap->restricted_twt = false;
 }
@@ -9290,7 +9301,12 @@ QDF_STATUS populate_dot11f_eht_caps(struct mac_context *mac_ctx,
 	if (session->ch_width != CH_WIDTH_320MHZ)
 		eht_cap->support_320mhz_6ghz = 0;
 
-	populate_dot11f_twt_eht_cap(mac_ctx, eht_cap);
+	if (wlan_epcs_get_config(session->vdev))
+		eht_cap->epcs_pri_access = 1;
+	else
+		eht_cap->epcs_pri_access = 0;
+
+	populate_dot11f_rtwt_eht_cap(mac_ctx, eht_cap);
 	return QDF_STATUS_SUCCESS;
 }
 
@@ -9309,6 +9325,7 @@ populate_dot11f_eht_caps_by_band(struct mac_context *mac_ctx,
 			     &mac_ctx->eht_cap_5g,
 			     sizeof(tDot11fIEeht_cap));
 
+	populate_dot11f_rtwt_eht_cap(mac_ctx, eht_cap);
 	return QDF_STATUS_SUCCESS;
 }
 
@@ -9697,6 +9714,9 @@ QDF_STATUS populate_dot11f_assoc_rsp_mlo_ie(struct mac_context *mac_ctx,
 	mlo_ie->num_data = p_ml_ie - mlo_ie->data;
 
 	assoc_req = session->parsedAssocReq[sta->assocId];
+	if (!assoc_req)
+		goto no_partner;
+
 	for (link = 0; link < assoc_req->mlo_info.num_partner_links; link++) {
 		lle_mode = 0;
 		sta_pro = &mlo_ie->sta_profile[num_sta_pro];
@@ -10226,6 +10246,8 @@ QDF_STATUS populate_dot11f_assoc_rsp_mlo_ie(struct mac_context *mac_ctx,
 		lim_mlo_release_vdev_ref(link_session->vdev);
 		num_sta_pro++;
 	}
+
+no_partner:
 	mlo_ie->num_sta_profile = num_sta_pro;
 	mlo_ie->mld_capab_and_op_info.max_simultaneous_link_num = num_sta_pro;
 	return QDF_STATUS_SUCCESS;
@@ -12045,7 +12067,8 @@ QDF_STATUS populate_dot11f_assoc_req_mlo_ie(struct mac_context *mac_ctx,
 						DOT11F_EID_VHTCAPS;
 		}
 
-		populate_dot11f_he_caps_by_band(mac_ctx, is_2g, &he_caps);
+		populate_dot11f_he_caps_by_band(mac_ctx, is_2g, &he_caps,
+						pe_session);
 		if (he_caps.ppet_present) {
 			value = WNI_CFG_HE_PPET_LEN;
 			if (!is_2g)

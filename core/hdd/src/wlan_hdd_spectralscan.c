@@ -88,10 +88,10 @@ static int __wlan_hdd_cfg80211_spectral_scan_start(struct wiphy *wiphy,
 		hdd_err("can't get vdev");
 		return -EINVAL;
 	}
-	wlan_spectral_update_rx_chainmask(adapter);
-	ret = wlan_cfg80211_spectral_scan_config_and_start(
-						wiphy, hdd_ctx->pdev,
-						vdev, data, data_len);
+	wlan_spectral_update_rx_chainmask(adapter->deflink);
+	ret = wlan_cfg80211_spectral_scan_config_and_start(wiphy, hdd_ctx->pdev,
+							   vdev, data,
+							   data_len);
 	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_SPECTRAL_ID);
 	hdd_exit();
 
@@ -622,7 +622,8 @@ void spectral_scan_deactivate_service(void)
 	deregister_cld_cmd_cb(WLAN_NL_MSG_SPECTRAL_SCAN);
 }
 
-QDF_STATUS wlan_spectral_update_rx_chainmask(struct hdd_adapter *adapter)
+QDF_STATUS
+wlan_spectral_update_rx_chainmask(struct wlan_hdd_link_info *link_info)
 {
 	uint32_t chainmask_2g = 0;
 	uint32_t chainmask_5g = 0;
@@ -630,9 +631,10 @@ QDF_STATUS wlan_spectral_update_rx_chainmask(struct hdd_adapter *adapter)
 	qdf_freq_t home_chan_freq;
 	uint8_t pdev_id;
 	struct wlan_objmgr_vdev *vdev;
+	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(link_info->adapter);
 
-	home_chan_freq = hdd_get_link_info_home_channel(adapter->deflink);
-	pdev_id = wlan_objmgr_pdev_get_pdev_id(adapter->hdd_ctx->pdev);
+	home_chan_freq = hdd_get_link_info_home_channel(link_info);
+	pdev_id = wlan_objmgr_pdev_get_pdev_id(hdd_ctx->pdev);
 	wma_get_rx_chainmask(pdev_id, &chainmask_2g, &chainmask_5g);
 	chainmask = chainmask_5g;
 
@@ -640,10 +642,10 @@ QDF_STATUS wlan_spectral_update_rx_chainmask(struct hdd_adapter *adapter)
 		chainmask = chainmask_2g;
 
 	hdd_debug("chan freq %d chainmask %d", home_chan_freq, chainmask);
-	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink,
-					   WLAN_OSIF_SPECTRAL_ID);
+	vdev = hdd_objmgr_get_vdev_by_user(link_info, WLAN_OSIF_SPECTRAL_ID);
 	if (!vdev)
 		return QDF_STATUS_E_FAILURE;
+
 	wlan_vdev_mlme_set_rxchainmask(vdev, chainmask);
 	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_SPECTRAL_ID);
 

@@ -901,9 +901,9 @@ target_if_cp_stats_extract_vdev_extd_stats(struct wmi_unified *wmi_hdl,
 			qdf_mem_free(stats);
 			goto end;
 		}
-		ev->vdev_extd_stats[i].vdev_id = stats[i].vdev_id;
+		ev->vdev_extd_stats[i].vdev_id = stats[0].vdev_id;
 		ev->vdev_extd_stats[i].is_mlo_vdev_active =
-						stats[i].is_mlo_vdev_active;
+						stats[0].is_mlo_vdev_active;
 	}
 
 	qdf_mem_free(stats);

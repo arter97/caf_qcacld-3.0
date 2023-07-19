@@ -1175,6 +1175,25 @@ QDF_STATUS mlme_update_tgt_eht_caps_in_cfg(struct wlan_objmgr_psoc *psoc,
 	return QDF_STATUS_SUCCESS;
 }
 
+QDF_STATUS mlme_update_tgt_mlo_caps_in_cfg(struct wlan_objmgr_psoc *psoc)
+{
+	struct target_psoc_info *tgt_hdl;
+	QDF_STATUS status;
+	uint16_t value;
+
+	tgt_hdl = wlan_psoc_get_tgt_if_handle(psoc);
+	if (!tgt_hdl) {
+		mlme_debug("target psoc info is NULL");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	value = target_if_res_cfg_get_num_max_mlo_link(tgt_hdl);
+	status = wlan_mlme_set_sta_mlo_conn_max_num(psoc, value);
+	mlme_debug("Max ML link supported: %d", value);
+
+	return status;
+}
+
 enum phy_ch_width wlan_mlme_convert_eht_op_bw_to_phy_ch_width(
 						uint8_t channel_width)
 {
@@ -1190,6 +1209,28 @@ enum phy_ch_width wlan_mlme_convert_eht_op_bw_to_phy_ch_width(
 		phy_bw = CH_WIDTH_40MHZ;
 
 	return phy_bw;
+}
+
+bool wlan_mlme_get_epcs_capability(struct wlan_objmgr_psoc *psoc)
+{
+	struct wlan_mlme_psoc_ext_obj *mlme_obj = mlme_get_psoc_ext_obj(psoc);
+
+	if (!mlme_obj)
+		return true;
+
+	return mlme_obj->cfg.sta.epcs_capability;
+}
+
+void wlan_mlme_set_epcs_capability(struct wlan_objmgr_psoc *psoc, bool flag)
+{
+	struct wlan_mlme_psoc_ext_obj *mlme_obj = mlme_get_psoc_ext_obj(psoc);
+
+	if (!mlme_obj)
+		return;
+
+	mlme_debug("set mlme epcs capability from %d to %d",
+		   mlme_obj->cfg.sta.epcs_capability, flag);
+	mlme_obj->cfg.sta.epcs_capability = flag;
 }
 
 bool wlan_mlme_get_usr_disable_sta_eht(struct wlan_objmgr_psoc *psoc)
@@ -1245,6 +1286,29 @@ enum phy_ch_width wlan_mlme_get_max_bw(void)
 		return CH_WIDTH_40MHZ;
 }
 #endif
+
+QDF_STATUS wlan_mlme_get_sta_ch_width(struct wlan_objmgr_vdev *vdev,
+				      enum phy_ch_width *ch_width)
+{
+	QDF_STATUS status = QDF_STATUS_E_INVAL;
+	struct wlan_objmgr_peer *peer;
+	enum wlan_phymode phymode;
+	enum QDF_OPMODE op_mode;
+
+	peer = wlan_vdev_get_bsspeer(vdev);
+	op_mode = wlan_vdev_mlme_get_opmode(vdev);
+
+	if (ch_width && peer &&
+	    (op_mode == QDF_STA_MODE ||
+	     op_mode == QDF_P2P_CLIENT_MODE)) {
+		wlan_peer_obj_lock(peer);
+		phymode = wlan_peer_get_phymode(peer);
+		wlan_peer_obj_unlock(peer);
+		*ch_width = wlan_mlme_get_ch_width_from_phymode(phymode);
+	}
+
+	return  status;
+}
 
 #ifdef WLAN_FEATURE_11BE_MLO
 uint8_t wlan_mlme_get_sta_mlo_simultaneous_links(struct wlan_objmgr_psoc *psoc)
@@ -4064,6 +4128,36 @@ wlan_mlme_get_restart_sap_on_dynamic_nss_chains_cfg(
 }
 
 QDF_STATUS
+wlan_mlme_cfg_get_dynamic_nss_chains_support(struct wlan_objmgr_psoc *psoc,
+					     bool *value)
+{
+	struct wlan_mlme_psoc_ext_obj *mlme_obj;
+
+	mlme_obj = mlme_get_psoc_ext_obj(psoc);
+	if (!mlme_obj)
+		return QDF_STATUS_E_FAILURE;
+
+	*value = mlme_obj->cfg.dynamic_nss_chains_support;
+
+	return QDF_STATUS_SUCCESS;
+}
+
+QDF_STATUS
+wlan_mlme_cfg_set_dynamic_nss_chains_support(struct wlan_objmgr_psoc *psoc,
+					     bool value)
+{
+	struct wlan_mlme_psoc_ext_obj *mlme_obj;
+
+	mlme_obj = mlme_get_psoc_ext_obj(psoc);
+	if (!mlme_obj)
+		return QDF_STATUS_E_FAILURE;
+
+	mlme_obj->cfg.dynamic_nss_chains_support = value;
+
+	return QDF_STATUS_SUCCESS;
+}
+
+QDF_STATUS
 wlan_mlme_get_vht_enable2x2(struct wlan_objmgr_psoc *psoc, bool *value)
 {
 	struct wlan_mlme_psoc_ext_obj *mlme_obj;
@@ -6863,7 +6957,7 @@ wlan_mlme_send_ch_width_update_with_notify(struct wlan_objmgr_psoc *psoc,
 	}
 
 	associated_ch_width =
-		mlme_priv->connect_info.chan_info_orig.ch_width_orig;
+		mlme_priv->connect_info.assoc_chan_info.assoc_ch_width;
 	if (associated_ch_width == CH_WIDTH_INVALID ||
 	    ch_width > associated_ch_width) {
 		mlme_debug("vdev %d: Invalid new chwidth:%d, assoc ch_width:%d",
@@ -7026,4 +7120,152 @@ wlan_mlme_get_sap_ps_with_twt(struct wlan_objmgr_psoc *psoc)
 		return cfg_default(CFG_SAP_PS_WITH_TWT);
 
 	return mlme_obj->cfg.sap_cfg.sap_ps_with_twt_enable;
+}
+
+/**
+ * set_omi_ch_width() - set OMI ch_bw/eht_ch_bw_ext bit value from channel width
+ * @ch_width: channel width
+ * @omi_data: Pointer to omi_data object
+ *
+ * If the channel width is 20Mhz, 40Mhz, 80Mhz, 160Mhz and 80+80Mhz ch_bw set
+ * to 0, 1, 2, 3 accordingly, if channel width is 320Mhz then eht_ch_bw_ext
+ * set to 1
+ *
+ * Return: QDF_STATUS_SUCCESS on success or QDF_STATUS_E_INVAL on failure
+ */
+static QDF_STATUS
+set_omi_ch_width(enum phy_ch_width ch_width, struct omi_ctrl_tx *omi_data)
+{
+	switch (ch_width) {
+	case CH_WIDTH_20MHZ:
+		omi_data->ch_bw = 0;
+		break;
+	case CH_WIDTH_40MHZ:
+		omi_data->ch_bw = 1;
+		break;
+	case CH_WIDTH_80MHZ:
+		omi_data->ch_bw = 2;
+		break;
+	case CH_WIDTH_160MHZ:
+	case CH_WIDTH_80P80MHZ:
+		omi_data->ch_bw = 3;
+		break;
+	case CH_WIDTH_320MHZ:
+		omi_data->eht_ch_bw_ext = 1;
+		break;
+	default:
+		return QDF_STATUS_E_INVAL;
+	}
+
+	return QDF_STATUS_SUCCESS;
+}
+
+QDF_STATUS
+wlan_mlme_set_ul_mu_config(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
+			   uint8_t ulmu_disable)
+{
+	struct omi_ctrl_tx omi_data = {0};
+	uint32_t param_val = 0;
+	struct wlan_objmgr_pdev *pdev;
+	struct wlan_objmgr_vdev *vdev;
+	enum phy_ch_width ch_width;
+	uint8_t rx_nss, tx_nsts;
+	struct qdf_mac_addr macaddr = {0};
+	enum wlan_phymode peer_phymode;
+	qdf_freq_t op_chan_freq;
+	qdf_freq_t freq_seg_0;
+	QDF_STATUS status = QDF_STATUS_SUCCESS;
+
+	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, vdev_id,
+						    WLAN_MLME_OBJMGR_ID);
+	if (!vdev) {
+		mlme_err("vdev %d: vdev is NULL", vdev_id);
+		return QDF_STATUS_E_INVAL;
+	}
+
+	pdev = wlan_vdev_get_pdev(vdev);
+	if (!pdev) {
+		mlme_err("pdev is NULL");
+		status = QDF_STATUS_E_INVAL;
+		goto err;
+	}
+
+	if (!cm_is_vdevid_connected(pdev, vdev_id)) {
+		mlme_err("STA is not connected, Session_id: %d", vdev_id);
+		status = QDF_STATUS_E_INVAL;
+		goto err;
+	}
+
+	status = wlan_vdev_get_bss_peer_mac(vdev, &macaddr);
+	if (QDF_STATUS_SUCCESS != status) {
+		mlme_err("Failed to get bss peer mac, Err : %d", status);
+		goto err;
+	}
+
+	status = mlme_get_peer_phymode(psoc, macaddr.bytes, &peer_phymode);
+	if (QDF_STATUS_SUCCESS != status) {
+		mlme_err("Failed to get peer phymode, Err : %d", status);
+		goto err;
+	}
+
+	if (!(IS_WLAN_PHYMODE_HE(peer_phymode) ||
+	      IS_WLAN_PHYMODE_EHT(peer_phymode))) {
+		mlme_err("Invalid mode");
+		status = QDF_STATUS_E_INVAL;
+		goto err;
+	}
+
+	status = wlan_mlme_get_sta_rx_nss(psoc, vdev, &rx_nss);
+	if (QDF_STATUS_SUCCESS != status) {
+		mlme_err("Failed to get sta_rx_nss, Err : %d", status);
+		goto err;
+	}
+
+	status = wlan_mlme_get_sta_tx_nss(psoc, vdev, &tx_nsts);
+	if (QDF_STATUS_SUCCESS != status) {
+		mlme_err("Failed to get sta_tx_nss, Err : %d", status);
+		goto err;
+	}
+
+	status = wlan_get_op_chan_freq_info_vdev_id(pdev, vdev_id,
+						    &op_chan_freq,
+						    &freq_seg_0, &ch_width);
+	if (QDF_STATUS_SUCCESS != status) {
+		mlme_err("Failed to get bw, Err : %d", status);
+		goto err;
+	}
+
+	omi_data.omi_in_vht = 0x1;
+	omi_data.omi_in_he = 0x1;
+	omi_data.a_ctrl_id = 0x1;
+
+	status = set_omi_ch_width(ch_width, &omi_data);
+	if (QDF_STATUS_SUCCESS != status) {
+		mlme_err("Failed to set bw, Err : %d", status);
+		goto err;
+	}
+
+	omi_data.rx_nss = rx_nss - 1;
+	omi_data.tx_nsts = tx_nsts - 1;
+	omi_data.ul_mu_dis = ulmu_disable;
+	omi_data.ul_mu_data_dis = 0;
+
+	qdf_mem_copy(&param_val, &omi_data, sizeof(omi_data));
+
+	mlme_debug("OMI: BW %d TxNSTS %d RxNSS %d ULMU %d OMI_VHT %d OMI_HE %d, EHT OMI: BW %d RxNSS %d TxNSS %d, param val: %08X, bssid:" QDF_MAC_ADDR_FMT,
+		   omi_data.ch_bw, omi_data.tx_nsts, omi_data.rx_nss,
+		   omi_data.ul_mu_dis, omi_data.omi_in_vht, omi_data.omi_in_he,
+		   omi_data.eht_ch_bw_ext, omi_data.eht_rx_nss_ext,
+		   omi_data.eht_tx_nss_ext, param_val,
+		   QDF_MAC_ADDR_REF(macaddr.bytes));
+
+	status = wlan_util_vdev_peer_set_param_send(vdev, macaddr.bytes,
+						    WMI_PEER_PARAM_XMIT_OMI,
+						    param_val);
+	if (QDF_STATUS_SUCCESS != status)
+		mlme_err("set_peer_param_cmd returned %d", status);
+
+err:
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_OBJMGR_ID);
+	return status;
 }

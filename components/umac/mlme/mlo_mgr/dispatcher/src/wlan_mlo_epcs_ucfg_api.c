@@ -27,3 +27,8 @@ QDF_STATUS ucfg_epcs_deliver_cmd(struct wlan_objmgr_vdev *vdev,
 {
 	return wlan_epcs_deliver_cmd(vdev, event);
 }
+
+QDF_STATUS ucfg_epcs_set_config(struct wlan_objmgr_vdev *vdev, uint8_t flag)
+{
+	return wlan_epcs_set_config(vdev, flag);
+}

@@ -82,6 +82,28 @@ QDF_STATUS wlan_epcs_deliver_event(struct wlan_objmgr_vdev *vdev,
 				   void *event_data, uint32_t len);
 
 /**
+ * wlan_epcs_set_config() - Set EPCS enable flag
+ * @vdev: vdev pointer
+ * @flag: EPCS flag
+ *
+ * This api will be called from os_if layers, to set EPCS flag
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS wlan_epcs_set_config(struct wlan_objmgr_vdev *vdev,
+				uint8_t flag);
+
+/**
+ * wlan_epcs_get_config() - Get EPCS config
+ * @vdev: vdev pointer
+ *
+ * This api will be called from other module
+ *
+ * Return: bool
+ */
+bool wlan_epcs_get_config(struct wlan_objmgr_vdev *vdev);
+
+/**
  * wlan_epcs_deliver_cmd() - Handler to deliver EPCS command
  * @vdev: vdev pointer
  * @event: EPCS event
@@ -100,6 +122,17 @@ QDF_STATUS wlan_epcs_deliver_event(struct wlan_objmgr_vdev *vdev,
 				   void *event_data, uint32_t len)
 {
 	return QDF_STATUS_E_NOSUPPORT;
+}
+
+static inline QDF_STATUS
+wlan_epcs_set_config(struct wlan_objmgr_vdev *vdev, uint8_t flag)
+{
+	return QDF_STATUS_E_NOSUPPORT;
+}
+
+static inline bool wlan_epcs_get_config(struct wlan_objmgr_vdev *vdev)
+{
+	return false;
 }
 
 static inline

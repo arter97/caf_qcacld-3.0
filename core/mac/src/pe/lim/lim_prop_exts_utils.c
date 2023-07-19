@@ -122,7 +122,7 @@ static void lim_extract_he_op(struct pe_session *session,
 		return;
 	if (!session->he_op.oper_info_6g_present) {
 		pe_debug("6GHz op not present in 6G beacon");
-		session->ap_defined_power_type_6g = REG_VERY_LOW_POWER_AP;
+		session->ap_defined_power_type_6g = REG_CURRENT_MAX_AP_TYPE;
 		return;
 	}
 	session->ch_width = session->he_op.oper_info_6g.info.ch_width;
@@ -134,8 +134,8 @@ static void lim_extract_he_op(struct pe_session *session,
 		session->he_op.oper_info_6g.info.reg_info;
 	if (session->ap_defined_power_type_6g < REG_INDOOR_AP ||
 	    session->ap_defined_power_type_6g > REG_MAX_SUPP_AP_TYPE) {
-		session->ap_defined_power_type_6g = REG_VERY_LOW_POWER_AP;
-		pe_debug("AP power type invalid, defaulting to VLP");
+		session->ap_defined_power_type_6g = REG_CURRENT_MAX_AP_TYPE;
+		pe_debug("AP power type invalid, defaulting to MAX_AP_TYPE");
 	}
 
 	pe_debug("6G op info: ch_wd %d cntr_freq_seg0 %d cntr_freq_seg1 %d",
@@ -555,6 +555,8 @@ static void lim_upgrade_ch_width(struct mac_context *mac,
 {
 	struct ch_params ch_params = {0};
 
+	if (session->dot11mode > MLME_DOT11_MODE_11AC_ONLY)
+		return;
 	/*
 	 * Some IOT AP's/P2P-GO's (e.g. make: Wireless-AC 9560160MHz as P2P GO),
 	 * send beacon with 20mhz and assoc resp with 80mhz and

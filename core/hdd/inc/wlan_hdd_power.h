@@ -246,10 +246,10 @@ void hdd_disable_host_offloads(struct hdd_adapter *adapter,
 			       enum pmo_offload_trigger trigger);
 
 /**
- * hdd_set_grat_arp_keepalive() - Enable grat APR keepalive
+ * hdd_set_grat_arp_keepalive() - Enable gratuitous ARP keepalive
  * @adapter: the HDD adapter to configure
  *
- * This configures gratuitous APR keepalive based on the adapter's current
+ * This configures gratuitous ARP keepalive based on the adapter's current
  * connection information, specifically IPv4 address and BSSID
  *
  * return: zero for success, non-zero for failure
@@ -524,13 +524,13 @@ void hdd_wlan_suspend_resume_event(uint8_t state) {}
 
 /**
  * wlan_hdd_set_powersave() - Set powersave mode
- * @adapter: adapter upon which the request was received
+ * @link_info: Link inof pointer in HDD adapter
  * @allow_power_save: is wlan allowed to go into power save mode
  * @timeout: timeout period in ms
  *
  * Return: 0 on success, non-zero on any error
  */
-int wlan_hdd_set_powersave(struct hdd_adapter *adapter,
+int wlan_hdd_set_powersave(struct wlan_hdd_link_info *link_info,
 			   bool allow_power_save, uint32_t timeout);
 
 /**

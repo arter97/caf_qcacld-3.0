@@ -741,13 +741,15 @@ static inline QDF_STATUS wlan_cm_host_roam_start(struct scheduler_msg *msg)
  * wlan_cm_get_associated_ch_info() - get associated channel info
  * @psoc: psoc pointer
  * @vdev_id: vdev id
- * @chan_info: channel info to get
+ * @scanned_ch_width: channel width as per scan response
+ * @assoc_chan_info: channel info to get
  *
  * Return: none
  */
 void wlan_cm_get_associated_ch_info(struct wlan_objmgr_psoc *psoc,
 				    uint8_t vdev_id,
-				    struct connect_chan_info *chan_info);
+				    enum phy_ch_width scanned_ch_width,
+				    struct assoc_channel_info *assoc_chan_info);
 
 #ifdef WLAN_FEATURE_ROAM_OFFLOAD
 /**

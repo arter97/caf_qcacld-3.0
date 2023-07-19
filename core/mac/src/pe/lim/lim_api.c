@@ -101,9 +101,6 @@ static void __lim_init_bss_vars(struct mac_context *mac)
 {
 	qdf_mem_zero((void *)mac->lim.gpSession,
 		    sizeof(*mac->lim.gpSession) * mac->lim.maxBssId);
-
-	/* This is for testing purposes only, be default should always be off */
-	mac->lim.gpLimMlmSetKeysReq = NULL;
 }
 
 static void __lim_init_stats_vars(struct mac_context *mac)
@@ -465,13 +462,6 @@ void lim_cleanup(struct mac_context *mac)
 	if (mac->lim.pDialogueTokenTail) {
 		qdf_mem_free(mac->lim.pDialogueTokenTail);
 		mac->lim.pDialogueTokenTail = NULL;
-	}
-
-	if (mac->lim.gpLimMlmSetKeysReq) {
-		qdf_mem_zero(mac->lim.gpLimMlmSetKeysReq,
-			     sizeof(tLimMlmSetKeysReq));
-		qdf_mem_free(mac->lim.gpLimMlmSetKeysReq);
-		mac->lim.gpLimMlmSetKeysReq = NULL;
 	}
 
 	if (mac->lim.gpLimMlmAuthReq) {
@@ -3758,7 +3748,8 @@ lim_add_bcn_probe(struct wlan_objmgr_vdev *vdev, uint8_t *bcn_probe,
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
 
 	vdev_id = wlan_vdev_get_id(vdev);
-	if (!bcn_probe || !len || (len < sizeof(*hdr))) {
+	if (!bcn_probe || !len || (len < sizeof(*hdr)) ||
+	    len > MAX_MGMT_MPDU_LEN) {
 		pe_err("bcn_probe is null or invalid len %d",
 		       len);
 		return QDF_STATUS_E_FAILURE;

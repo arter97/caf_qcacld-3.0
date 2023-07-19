@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -58,12 +58,12 @@ uint32_t wlan_dp_intf_get_pkt_type_bitmap_value(void *intf_ctx);
 #if defined(WLAN_SUPPORT_RX_FISA)
 /**
  * dp_rx_skip_fisa() - Set flags to skip fisa aggregation
- * @cdp_soc: core txrx main context
+ * @dp_ctx: DP component handle
  * @value: allow or skip fisa
  *
  * Return: None
  */
-void dp_rx_skip_fisa(struct cdp_soc_t *cdp_soc, uint32_t value);
+void dp_rx_skip_fisa(struct wlan_dp_psoc_context *dp_ctx, uint32_t value);
 #endif
 
 /**

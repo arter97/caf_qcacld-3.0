@@ -83,7 +83,7 @@ static QDF_STATUS hdd_dcs_switch_chan_cb(struct wlan_objmgr_vdev *vdev,
 
 	link_info = wlan_hdd_get_link_info_from_objmgr(vdev);
 	if (!link_info) {
-		hdd_err("Invalid adapter");
+		hdd_err("Invalid vdev %d", wlan_vdev_get_id(vdev));
 		return QDF_STATUS_E_INVAL;
 	}
 
@@ -102,7 +102,7 @@ static QDF_STATUS hdd_dcs_switch_chan_cb(struct wlan_objmgr_vdev *vdev,
 				return QDF_STATUS_E_INVAL;
 
 			hdd_dcs_add_bssid_to_reject_list(pdev, bssid);
-			wlan_hdd_cm_issue_disconnect(adapter,
+			wlan_hdd_cm_issue_disconnect(link_info,
 						     REASON_UNSPEC_FAILURE,
 						     true);
 			return QDF_STATUS_SUCCESS;
@@ -116,8 +116,7 @@ static QDF_STATUS hdd_dcs_switch_chan_cb(struct wlan_objmgr_vdev *vdev,
 					    tgt_freq, tgt_width);
 		break;
 	case QDF_SAP_MODE:
-		if (!test_bit(SOFTAP_BSS_STARTED,
-			      &adapter->deflink->link_flags))
+		if (!test_bit(SOFTAP_BSS_STARTED, &link_info->link_flags))
 			return QDF_STATUS_E_INVAL;
 
 		/* stop sap if got invalid freq or width */
@@ -307,7 +306,7 @@ static void hdd_dcs_cb(struct wlan_objmgr_psoc *psoc, uint8_t mac_id,
 			if (QDF_IS_STATUS_SUCCESS(status))
 				return;
 		}
-		wlan_hdd_cfg80211_start_acs(link_info->adapter);
+		wlan_hdd_cfg80211_start_acs(link_info);
 		return;
 	}
 }

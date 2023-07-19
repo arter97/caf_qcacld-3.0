@@ -42,6 +42,7 @@
 #include "wlan_psoc_mlme_api.h"
 #include "wlan_t2lm_api.h"
 #include "wlan_mlo_t2lm.h"
+#include "wlan_mlo_link_force.h"
 
 #ifdef WLAN_FEATURE_FILS_SK
 void cm_update_hlp_info(struct wlan_objmgr_vdev *vdev,
@@ -741,6 +742,7 @@ void cm_connect_info(struct wlan_objmgr_vdev *vdev, bool connect_success,
 	struct wlan_objmgr_pdev *pdev;
 	struct wlan_objmgr_psoc *psoc;
 	struct wlan_mlme_psoc_ext_obj *mlme_obj;
+	enum phy_ch_width ch_width = CH_WIDTH_20MHZ;
 	WLAN_HOST_DIAG_EVENT_DEF(conn_stats,
 				 struct host_event_wlan_connection_stats);
 
@@ -771,8 +773,8 @@ void cm_connect_info(struct wlan_objmgr_vdev *vdev, bool connect_success,
 
 	des_chan = wlan_vdev_mlme_get_des_chan(vdev);
 
-	conn_stats.chnl_bw =
-		cm_get_diag_ch_width(des_chan->ch_width);
+	wlan_mlme_get_sta_ch_width(vdev, &ch_width);
+	conn_stats.chnl_bw = cm_get_diag_ch_width(ch_width);
 	conn_stats.dot11mode =
 		cm_diag_dot11_mode_from_phy_mode(des_chan->ch_phymode);
 
@@ -1080,6 +1082,9 @@ QDF_STATUS cm_connect_start_ind(struct wlan_objmgr_vdev *vdev,
 					   wlan_vdev_get_id(vdev),
 					   HS_20_AP, &src_cfg);
 	}
+	ml_nlink_conn_change_notify(
+		psoc, wlan_vdev_get_id(vdev),
+		ml_nlink_connect_start_evt, NULL);
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -1526,9 +1531,9 @@ static void cm_process_connect_complete(struct wlan_objmgr_psoc *psoc,
 	    QDF_HAS_PARAM(ucast_cipher, WLAN_CRYPTO_CIPHER_WEP_104) ||
 	    QDF_HAS_PARAM(ucast_cipher, WLAN_CRYPTO_CIPHER_WEP))) {
 		cm_csr_set_ss_none(vdev_id);
-		if (wlan_vdev_mlme_is_mlo_link_vdev(vdev))
+		if (wlan_vdev_mlme_is_mlo_vdev(vdev))
 			mlo_enable_rso(pdev, vdev, rsp);
-		else if (!wlan_vdev_mlme_is_mlo_vdev(vdev))
+		else
 			cm_roam_start_init_on_connect(pdev, vdev_id);
 	} else {
 		if (rsp->is_wps_connection)
@@ -1668,7 +1673,9 @@ cm_connect_complete_ind(struct wlan_objmgr_vdev *vdev,
 								psoc, vdev_id);
 		else
 			policy_mgr_incr_active_session(psoc, op_mode, vdev_id);
-
+		ml_nlink_conn_change_notify(
+			psoc, vdev_id,
+			ml_nlink_connect_completion_evt, NULL);
 		cm_process_connect_complete(psoc, pdev, vdev, rsp);
 		cm_install_link_vdev_keys(vdev);
 		wlan_tdls_notify_sta_connect(vdev_id,

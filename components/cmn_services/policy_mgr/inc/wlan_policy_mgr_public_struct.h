@@ -117,6 +117,25 @@ enum sap_csa_reason_code {
 	CSA_REASON_SAP_FIX_CH_CONC_WITH_GO
 };
 
+/*
+ * enum link_control_flags: This enum is used for setting
+ * mlo_control_flags by api policy_mgr_mlo_sta_set_nlink.
+ * @link_ctrl_f_overwrite_active_bitmap: indicate overwrite all earlier
+ * force_active bitmaps. Used with MLO_LINK_FORCE_MODE_ACTIVE or
+ * MLO_LINK_FORCE_MODE_ACTIVE_INACTIVE
+ * @link_ctrl_f_overwrite_inactive_bitmap: indicate overwrite all earlier
+ * force_inactive bitmaps. Used with MLO_LINK_FORCE_MODE_INACTIVE or
+ * MLO_LINK_FORCE_MODE_ACTIVE_INACTIVE.
+ * @link_ctrl_f_dynamic_force_link_num: indicate fw to use force link number
+ * instead of force link bitmaps. Used with MLO_LINK_FORCE_MODE_ACTIVE_NUM.
+ * MLO_LINK_FORCE_MODE_INACTIVE_NUM, MLO_LINK_FORCE_MODE_NO_FORCE.
+ */
+enum link_control_flags {
+	link_ctrl_f_overwrite_active_bitmap =   1 << 0,
+	link_ctrl_f_overwrite_inactive_bitmap = 1 << 1,
+	link_ctrl_f_dynamic_force_link_num =    1 << 2,
+};
+
 /**
  * enum hw_mode_ss_config - Possible spatial stream configuration
  * @HW_MODE_SS_0x0: Unused Tx and Rx of MAC
@@ -236,6 +255,9 @@ enum policy_mgr_pcl_group_id {
  * 5G low band i.e 5G freq < sbs cutoff freq
  * @POLICY_MGR_PCL_ORDER_SCC_5G_HIGH_5G_HIGH: 5G High SCC frequency followed by
  * 5G High band i.e 5G freq > sbs cutoff freq
+ * @POLICY_MGR_PCL_ORDER_SCC_5G_HIGH_5G_HIGH_SCC_5G_LOW: 5 GHz High SCC
+ * frequency followed by 5G High band i.e 5G freq > sbs cutoff freq, add 5 GHz
+ * Low SCC frequency
  *
  * Order in which the PCL is requested
  */
@@ -247,6 +269,7 @@ enum policy_mgr_pcl_channel_order {
 	POLICY_MGR_PCL_ORDER_5G,
 	POLICY_MGR_PCL_ORDER_SCC_5G_LOW_5G_LOW,
 	POLICY_MGR_PCL_ORDER_SCC_5G_HIGH_5G_HIGH,
+	POLICY_MGR_PCL_ORDER_SCC_5G_HIGH_5G_HIGH_SCC_5G_LOW,
 };
 
 /**
@@ -407,6 +430,10 @@ enum policy_mgr_mac_use {
  * 5 GHz high frequencies, add 2.4 GHZ if its shared with 5GHz high
  * @PM_SBS_CH_MCC_CH: SBS channels followed by MCC channels
  * @PM_SBS_5G_MCC_24G: SBS channels, 5G MCC channels and 2.4GHz channels
+ * @PM_SCC_ON_5G_HIGH_5G_HIGH_SCC_ON_5G_LOW_PLUS_SHARED_2G: 5GHZ high SCC
+ * channel followed by 5 GHz high frequencies and 5 GHz low SCC channel,
+ * add 2.4 GHZ if its shared with 5GHz high
+ *
  * @PM_MAX_PCL_TYPE: Max place holder
  *
  * These are generic IDs that identify the various roles
@@ -450,6 +477,7 @@ enum policy_mgr_pcl_type {
 	PM_SBS_CH_2G,
 	PM_SCC_ON_5G_LOW_5G_LOW_PLUS_SHARED_2G,
 	PM_SCC_ON_5G_HIGH_5G_HIGH_PLUS_SHARED_2G,
+	PM_SCC_ON_5G_HIGH_5G_HIGH_SCC_ON_5G_LOW_PLUS_SHARED_2G,
 
 	PM_SBS_CH_MCC_CH,
 	PM_SBS_5G_MCC_24G,
@@ -1700,6 +1728,23 @@ struct sta_ap_intf_check_work_ctx {
 	struct go_plus_go_force_scc go_plus_go_force_scc;
 	struct sap_plus_go_force_scc sap_plus_go_force_scc;
 	uint8_t nan_force_scc_in_progress;
+};
+
+/**
+ * union conc_ext_flag - extended flags for concurrency check
+ *
+ * @mlo: the new connection is MLO
+ * @mlo_link_assoc_connected: the new connection is secondary MLO link and
+ *  the corresponding assoc link is connected
+ * @value: uint32 value for extended flags
+ */
+union conc_ext_flag {
+	struct {
+		uint32_t mlo: 1;
+		uint32_t mlo_link_assoc_connected: 1;
+	};
+
+	uint32_t value;
 };
 
 /**

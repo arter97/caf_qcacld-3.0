@@ -453,23 +453,6 @@ struct policy_mgr_mac_ss_bw_info {
 	bool support_6ghz_band;
 };
 
-/**
- * union conc_ext_flag - extended flags for concurrency check
- *
- * @mlo: the new connection is MLO
- * @mlo_link_assoc_connected: the new connection is secondary MLO link and
- *  the corresponding assoc link is connected
- * @value: uint32 value for extended flags
- */
-union conc_ext_flag {
-	struct {
-		uint32_t mlo: 1;
-		uint32_t mlo_link_assoc_connected: 1;
-	};
-
-	uint32_t value;
-};
-
 #ifdef WLAN_FEATURE_SR
 /**
  * policy_mgr_get_same_mac_conc_sr_status() - Function returns value of INI
@@ -1086,6 +1069,7 @@ QDF_STATUS policy_mgr_nss_update(struct wlan_objmgr_psoc *psoc,
  * @ch_freq: channel frequency on which new connection is coming up
  * @bw: Bandwidth requested by the connection (optional)
  * @ext_flags: extended flags for concurrency check (union conc_ext_flag)
+ * @pcl: Optional PCL for new connection
  *
  * When a new connection is about to come up check if current
  * concurrency combination including the new connection is
@@ -1098,7 +1082,8 @@ bool policy_mgr_is_concurrency_allowed(struct wlan_objmgr_psoc *psoc,
 				       enum policy_mgr_con_mode mode,
 				       uint32_t ch_freq,
 				       enum hw_mode_bandwidth bw,
-				       uint32_t ext_flags);
+				       uint32_t ext_flags,
+				       struct policy_mgr_pcl_list *pcl);
 
 /**
  * policy_mgr_can_2ghz_share_low_high_5ghz_sbs() - if SBS mode is dynamic where
@@ -1131,6 +1116,22 @@ policy_mgr_sbs_24_shared_with_high_5(struct policy_mgr_psoc_priv_obj *pm_ctx);
  */
 bool
 policy_mgr_sbs_24_shared_with_low_5(struct policy_mgr_psoc_priv_obj *pm_ctx);
+
+/**
+ * policy_mgr_2_freq_same_mac_in_dbs() - to check provided frequencies are
+ * in dbs freq range or not
+ *
+ * @pm_ctx: policy mgr psoc priv object
+ * @freq_1: first frequency
+ * @freq_2: second frequency
+ *
+ * This API is used to check provided frequencies are in dbs freq range or not
+ *
+ * Return: true/false.
+ */
+bool
+policy_mgr_2_freq_same_mac_in_dbs(struct policy_mgr_psoc_priv_obj *pm_ctx,
+				  qdf_freq_t freq_1, qdf_freq_t freq_2);
 
 /**
  * policy_mgr_2_freq_same_mac_in_sbs() - to check provided frequencies are

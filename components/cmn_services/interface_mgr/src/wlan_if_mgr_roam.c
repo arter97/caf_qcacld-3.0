@@ -879,7 +879,8 @@ QDF_STATUS if_mgr_validate_candidate(struct wlan_objmgr_vdev *vdev,
 	 * If concurrency enabled take the concurrent connected channel first.
 	 * Valid multichannel concurrent sessions exempted
 	 */
-	mode = policy_mgr_convert_device_mode_to_qdf_type(op_mode);
+	mode = policy_mgr_qdf_opmode_to_pm_con_mode(psoc, op_mode,
+						    wlan_vdev_get_id(vdev));
 
 	/* If concurrency is not allowed select next bss */
 	conc_ext_flags = if_mgr_get_conc_ext_flags(vdev, candidate_info);
@@ -890,7 +891,8 @@ QDF_STATUS if_mgr_validate_candidate(struct wlan_objmgr_vdev *vdev,
 	 */
 	if (!wlan_vdev_mlme_is_mlo_link_vdev(vdev) &&
 	    !policy_mgr_is_concurrency_allowed(psoc, mode, chan_freq,
-					  HW_MODE_20_MHZ, conc_ext_flags)) {
+					       HW_MODE_20_MHZ, conc_ext_flags,
+					       NULL)) {
 		ifmgr_info("Concurrency not allowed for this channel freq %d bssid "QDF_MAC_ADDR_FMT", selecting next",
 			   chan_freq,
 			   QDF_MAC_ADDR_REF(bssid_arg.peer_addr.bytes));

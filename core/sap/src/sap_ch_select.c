@@ -525,8 +525,14 @@ static bool sap_chan_sel_init(mac_handle_t mac_handle,
 		if (!ignore_acs_range &&
 		    !wlansap_is_channel_present_in_acs_list(
 		    *pChans, sap_ctx->acs_cfg->freq_list,
-		    sap_ctx->acs_cfg->ch_list_count))
+		    sap_ctx->acs_cfg->ch_list_count)) {
+			if (wlansap_is_channel_present_in_acs_list(
+					pSpectCh->chan_freq,
+					sap_ctx->acs_cfg->master_freq_list,
+					sap_ctx->acs_cfg->master_ch_list_count))
+				pSpectCh->weight = SAP_ACS_WEIGHT_ADJUSTABLE;
 			continue;
+		}
 
 		pSpectCh->valid = true;
 		if (!ch_support_puncture)
@@ -1423,6 +1429,48 @@ sap_normalize_channel_weight_with_factors(struct mac_context *mac,
 }
 
 /**
+ * sap_update_6ghz_max_weight() - Update 6 GHz channel max weight
+ * @pspectinfo_params: Pointer to the tSpectInfoParams structure
+ * @max_valid_weight: max valid weight on 6 GHz channels
+ *
+ * If ACS frequency list includes 6 GHz channels, the user prefers
+ * to start SAP on 6 GHz as much as possible. The acs logic in
+ * sap_chan_sel_init will mark channel weight to Max weight value
+ * of SAP_ACS_WEIGHT_MAX if channel is no in ACS channel list(filtered
+ * by PCL).
+ * In ACS bw 160 case, sometime the combined weight of 8 channels
+ * on 6 GHz(some of them have weight SAP_ACS_WEIGHT_MAX)
+ * may higher than 5 GHz channels and finally select 5 GHz channel.
+ * This API is to update the 6 GHz weight to max valid weight in
+ * 6 GHz instead of value SAP_ACS_WEIGHT_MAX. All those channels have
+ * special weight value SAP_ACS_WEIGHT_ADJUSTABLE which is assigned
+ * sap_chan_sel_init.
+ *
+ * Return: void
+ */
+static void sap_update_6ghz_max_weight(tSapChSelSpectInfo *pspectinfo_params,
+				       uint32_t max_valid_weight)
+{
+	uint8_t chn_num;
+	tSapSpectChInfo *pspect_ch;
+
+	sap_debug("max_valid_weight_on_6ghz_channels %d",
+		  max_valid_weight);
+	if (!max_valid_weight)
+		return;
+	for (chn_num = 0; chn_num < pspectinfo_params->numSpectChans;
+	     chn_num++) {
+		pspect_ch = &pspectinfo_params->pSpectCh[chn_num];
+		if (!wlan_reg_is_6ghz_chan_freq(pspect_ch->chan_freq))
+			continue;
+		if (pspect_ch->weight == SAP_ACS_WEIGHT_ADJUSTABLE) {
+			pspect_ch->weight = max_valid_weight;
+			pspect_ch->weight_copy = pspect_ch->weight;
+		}
+	}
+}
+
+/**
  * sap_compute_spect_weight() - Compute spectrum weight
  * @pSpectInfoParams: Pointer to the tSpectInfoParams structure
  * @mac_handle: Opaque handle to the global MAC context
@@ -1453,6 +1501,7 @@ static void sap_compute_spect_weight(tSapChSelSpectInfo *pSpectInfoParams,
 	qdf_list_node_t *cur_lst = NULL, *next_lst = NULL;
 	struct scan_cache_node *cur_node = NULL;
 	uint32_t rssi_bss_weight = 0, chan_status_weight = 0, power_weight = 0;
+	uint32_t max_valid_weight_6ghz = 0;
 
 	sap_debug("Computing spectral weight");
 
@@ -1526,7 +1575,8 @@ static void sap_compute_spect_weight(tSapChSelSpectInfo *pSpectInfoParams,
 		if (rssi < SOFTAP_MIN_RSSI)
 			rssi = SOFTAP_MIN_RSSI;
 
-		if (pSpectCh->weight == SAP_ACS_WEIGHT_MAX) {
+		if (pSpectCh->weight == SAP_ACS_WEIGHT_MAX ||
+		    pSpectCh->weight == SAP_ACS_WEIGHT_ADJUSTABLE) {
 			pSpectCh->weight_copy = pSpectCh->weight;
 			goto debug_info;
 		}
@@ -1567,7 +1617,13 @@ static void sap_compute_spect_weight(tSapChSelSpectInfo *pSpectInfoParams,
 					(rssi_bss_weight + chan_status_weight
 					+ power_weight);
 		} else {
-			pSpectCh->weight = SAP_ACS_WEIGHT_MAX;
+			if (wlansap_is_channel_present_in_acs_list(
+					pSpectCh->chan_freq,
+					sap_ctx->acs_cfg->master_freq_list,
+					sap_ctx->acs_cfg->master_ch_list_count))
+				pSpectCh->weight = SAP_ACS_WEIGHT_ADJUSTABLE;
+			else
+				pSpectCh->weight = SAP_ACS_WEIGHT_MAX;
 			pSpectCh->rssiAgr = SOFTAP_MIN_RSSI;
 			rssi = SOFTAP_MIN_RSSI;
 			pSpectCh->bssCount = SOFTAP_MIN_COUNT;
@@ -1580,6 +1636,11 @@ static void sap_compute_spect_weight(tSapChSelSpectInfo *pSpectInfoParams,
 		pSpectCh->weight_copy = pSpectCh->weight;
 
 debug_info:
+		if (wlan_reg_is_6ghz_chan_freq(pSpectCh->chan_freq) &&
+		    pSpectCh->weight < SAP_ACS_WEIGHT_ADJUSTABLE &&
+		    max_valid_weight_6ghz < pSpectCh->weight)
+			max_valid_weight_6ghz = pSpectCh->weight;
+
 		sap_debug("freq %d valid %d weight %d(%d,%d,%d) rssi %d bss %d",
 			  pSpectCh->chan_freq, pSpectCh->valid,
 			  pSpectCh->weight, rssi_bss_weight,
@@ -1588,6 +1649,8 @@ debug_info:
 
 		pSpectCh++;
 	}
+	sap_update_6ghz_max_weight(pSpectInfoParams,
+				   max_valid_weight_6ghz);
 	sap_clear_channel_status(mac);
 }
 
@@ -1720,6 +1783,7 @@ sap_sort_chl_weight_80_mhz(struct mac_context *mac_ctx,
 	uint32_t combined_weight;
 	uint32_t min_ch_weight;
 	uint32_t valid_chans = 0;
+	bool has_valid;
 
 	pSpectInfo = pSpectInfoParams->pSpectCh;
 
@@ -1802,6 +1866,7 @@ sap_sort_chl_weight_80_mhz(struct mac_context *mac_ctx,
 
 		min_ch_weight = pSpectInfo[j].weight;
 		minIdx = 0;
+		has_valid = false;
 
 		for (i = 0; i < 4; i++) {
 			if (min_ch_weight > pSpectInfo[j + i].weight) {
@@ -1810,18 +1875,20 @@ sap_sort_chl_weight_80_mhz(struct mac_context *mac_ctx,
 			}
 			pSpectInfo[j + i].weight = SAP_ACS_WEIGHT_MAX * 4;
 			pSpectInfo[j + i].weight_calc_done = true;
+			if (pSpectInfo[j + i].valid)
+				has_valid = true;
 		}
 		sap_override_6ghz_psc_minidx(mac_ctx, &pSpectInfo[j], 4,
 					     &minIdx);
 
 		pSpectInfo[j + minIdx].weight = combined_weight;
+		if (has_valid)
+			valid_chans++;
 
-		valid_chans++;
-
-		sap_debug("best freq = %d for 80mhz center freq %d combined weight = %d",
+		sap_debug("best freq = %d for 80mhz center freq %d combined weight = %d valid %d cnt %d",
 			  pSpectInfo[j + minIdx].chan_freq,
 			  acs_ch_params.mhz_freq_seg0,
-			  combined_weight);
+			  combined_weight, has_valid, valid_chans);
 	}
 
 	if (!valid_chans) {
@@ -1852,11 +1919,12 @@ sap_sort_chl_weight_160_mhz(struct mac_context *mac_ctx,
 	uint8_t i, j;
 	tSapSpectChInfo *pSpectInfo;
 	uint8_t minIdx;
-	struct ch_params acs_ch_params;
+	struct ch_params acs_ch_params = {0};
 	int8_t center_freq_diff;
 	uint32_t combined_weight;
 	uint32_t min_ch_weight;
 	uint32_t valid_chans = 0;
+	bool has_valid;
 
 	pSpectInfo = pSpectInfoParams->pSpectCh;
 
@@ -1975,6 +2043,7 @@ sap_sort_chl_weight_160_mhz(struct mac_context *mac_ctx,
 
 		min_ch_weight = pSpectInfo[j].weight;
 		minIdx = 0;
+		has_valid = false;
 
 		for (i = 0; i < 8; i++) {
 			if (min_ch_weight > pSpectInfo[j + i].weight) {
@@ -1983,18 +2052,21 @@ sap_sort_chl_weight_160_mhz(struct mac_context *mac_ctx,
 			}
 			pSpectInfo[j + i].weight = SAP_ACS_WEIGHT_MAX * 8;
 			pSpectInfo[j + i].weight_calc_done = true;
+			if (pSpectInfo[j + i].valid)
+				has_valid = true;
+
 		}
 		sap_override_6ghz_psc_minidx(mac_ctx, &pSpectInfo[j], 8,
 					     &minIdx);
 
 		pSpectInfo[j + minIdx].weight = combined_weight;
+		if (has_valid)
+			valid_chans++;
 
-		valid_chans++;
-
-		sap_debug("best freq = %d for 160mhz center freq %d combined weight = %d",
+		sap_debug("best freq = %d for 160mhz center freq %d combined weight = %d valid %d cnt %d",
 			  pSpectInfo[j + minIdx].chan_freq,
 			  acs_ch_params.mhz_freq_seg1,
-			  combined_weight);
+			  combined_weight, has_valid, valid_chans);
 	}
 
 	if (!valid_chans) {
@@ -2027,10 +2099,10 @@ sap_sort_chl_weight_320_mhz(struct mac_context *mac_ctx,
 	tSapSpectChInfo *pSpectInfo;
 	uint8_t minIdx;
 	struct ch_params acs_ch_params = {0};
-	int32_t center_freq_diff;
 	uint32_t combined_weight;
 	uint32_t min_ch_weight;
 	uint32_t valid_chans = 0;
+	bool has_valid;
 
 	pSpectInfo = pSpectInfoParams->pSpectCh;
 
@@ -2054,19 +2126,12 @@ sap_sort_chl_weight_320_mhz(struct mac_context *mac_ctx,
 			continue;
 		}
 
-		center_freq_diff = acs_ch_params.mhz_freq_seg1 -
-				   pSpectInfo[j].chan_freq;
-
-		/* This channel frequency does not have all channels */
-		if (center_freq_diff != 150) {
+		/* no other freq left for 320 Mhz operation in spectrum */
+		if (j + 15 > pSpectInfoParams->numSpectChans) {
 			pSpectInfo[j].weight = SAP_ACS_WEIGHT_MAX * 16;
 			pSpectInfo[j].weight_calc_done = true;
 			continue;
 		}
-
-		/* no other freq left for 320 Mhz operation in spectrum */
-		if (j + 15 > pSpectInfoParams->numSpectChans)
-			continue;
 
 		/* Check whether all frequencies are present for 160 Mhz */
 
@@ -2220,7 +2285,7 @@ sap_sort_chl_weight_320_mhz(struct mac_context *mac_ctx,
 
 		min_ch_weight = pSpectInfo[j].weight;
 		minIdx = 0;
-
+		has_valid = false;
 		for (i = 0; i < 16; i++) {
 			if (min_ch_weight > pSpectInfo[j + i].weight) {
 				min_ch_weight = pSpectInfo[j + i].weight;
@@ -2228,18 +2293,21 @@ sap_sort_chl_weight_320_mhz(struct mac_context *mac_ctx,
 			}
 			pSpectInfo[j + i].weight = SAP_ACS_WEIGHT_MAX * 16;
 			pSpectInfo[j + i].weight_calc_done = true;
+			if (pSpectInfo[j + i].valid)
+				has_valid = true;
 		}
 		sap_override_6ghz_psc_minidx(mac_ctx, &pSpectInfo[j], 16,
 					     &minIdx);
 
 		pSpectInfo[j + minIdx].weight = combined_weight;
+		if (has_valid)
+			valid_chans++;
 
-		valid_chans++;
-
-		sap_debug("best freq = %d for 320mhz center freq %d combined weight = %d",
+		sap_debug("best freq = %d for 320mhz center freq %d combined weight = %d valid %d cnt %d",
 			  pSpectInfo[j + minIdx].chan_freq,
 			  acs_ch_params.mhz_freq_seg1,
-			  combined_weight);
+			  combined_weight,
+			  has_valid, valid_chans);
 	}
 
 	if (!valid_chans) {
@@ -2469,7 +2537,8 @@ sap_sort_chl_weight_40_mhz(struct mac_context *mac_ctx,
 	int8_t center_freq_diff;
 	uint32_t combined_weight;
 	uint32_t min_ch_weight;
-	 uint32_t valid_chans = 0;
+	uint32_t valid_chans = 0;
+	bool has_valid;
 
 	pSpectInfo = pSpectInfoParams->pSpectCh;
 
@@ -2537,6 +2606,7 @@ sap_sort_chl_weight_40_mhz(struct mac_context *mac_ctx,
 
 		min_ch_weight = pSpectInfo[j].weight;
 		minIdx = 0;
+		has_valid = false;
 
 		for (i = 0; i < 2; i++) {
 			if (min_ch_weight > pSpectInfo[j + i].weight) {
@@ -2545,18 +2615,20 @@ sap_sort_chl_weight_40_mhz(struct mac_context *mac_ctx,
 			}
 			pSpectInfo[j + i].weight = SAP_ACS_WEIGHT_MAX * 2;
 			pSpectInfo[j + i].weight_calc_done = true;
+			if (pSpectInfo[j + i].valid)
+				has_valid = true;
 		}
 		sap_override_6ghz_psc_minidx(mac_ctx, &pSpectInfo[j], 2,
 					     &minIdx);
 
 		pSpectInfo[j + minIdx].weight = combined_weight;
+		if (has_valid)
+			valid_chans++;
 
-		valid_chans++;
-
-		sap_debug("best freq = %d for 40mhz center freq %d combined weight = %d",
+		sap_debug("best freq = %d for 40mhz center freq %d combined weight = %d valid %d cnt %d",
 			  pSpectInfo[j + minIdx].chan_freq,
 			  acs_ch_params.mhz_freq_seg0,
-			  combined_weight);
+			  combined_weight, has_valid, valid_chans);
 	}
 
 	if (!valid_chans) {

@@ -241,8 +241,7 @@ enum {
   Function declarations and documentation
   ------------------------------------------------------------------------*/
 QDF_STATUS sme_open(mac_handle_t mac_handle);
-QDF_STATUS sme_init_chan_list(mac_handle_t mac_handle, uint8_t *alpha2,
-		enum country_src cc_src);
+QDF_STATUS sme_init_chan_list(mac_handle_t mac_handle, enum country_src cc_src);
 QDF_STATUS sme_close(mac_handle_t mac_handle);
 QDF_STATUS sme_start(mac_handle_t mac_handle);
 
@@ -1333,6 +1332,13 @@ QDF_STATUS sme_update_add_ie(mac_handle_t mac_handle,
 		tSirUpdateIE *pUpdateIE, eUpdateIEsType updateType);
 QDF_STATUS sme_update_connect_debug(mac_handle_t mac_handle,
 				    uint32_t set_value);
+
+/**
+ * sme_bss_type_to_string() - converts bss type to string.
+ * @bss_type: bss type enum
+ *
+ * Return: printable string for bss type
+ */
 const char *sme_bss_type_to_string(const uint8_t bss_type);
 QDF_STATUS sme_ap_disable_intra_bss_fwd(mac_handle_t mac_handle,
 					uint8_t sessionId,
@@ -4480,14 +4486,15 @@ QDF_STATUS sme_get_full_roam_scan_period(mac_handle_t mac_handle,
 /**
  * sme_check_for_duplicate_session() - check for duplicate session
  * @mac_handle: Opaque handle to the MAC context
- * @peer_addr: Peer device mac address
+ * @mac_list: List of mac address of peers.
  *
  * Check for duplicate mac address is available on other vdev.
+ * The list pointed by @mac_list has to be NULL terminated.
  *
  * Return: QDF_STATUS
  */
 QDF_STATUS sme_check_for_duplicate_session(mac_handle_t mac_handle,
-					   uint8_t *peer_addr);
+					   uint8_t **mac_list);
 #ifdef FEATURE_ANI_LEVEL_REQUEST
 /*
  * sme_get_ani_level() -

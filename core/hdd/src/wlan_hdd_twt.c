@@ -138,7 +138,7 @@ void wlan_hdd_twt_deinit(struct hdd_context *hdd_ctx)
 }
 
 void
-hdd_send_twt_del_all_sessions_to_userspace(struct hdd_adapter *adapter)
+hdd_send_twt_del_all_sessions_to_userspace(struct wlan_hdd_link_info *link_info)
 {
 }
 
@@ -2387,16 +2387,17 @@ hdd_twt_del_dialog_comp_cb(struct wlan_objmgr_psoc *psoc,
 }
 
 void
-hdd_send_twt_del_all_sessions_to_userspace(struct hdd_adapter *adapter)
+hdd_send_twt_del_all_sessions_to_userspace(struct wlan_hdd_link_info *link_info)
 {
+	struct hdd_adapter *adapter = link_info->adapter;
 	struct wlan_objmgr_psoc *psoc = adapter->hdd_ctx->psoc;
 	struct hdd_station_ctx *hdd_sta_ctx = NULL;
 	struct wmi_twt_del_dialog_complete_event_param params;
 
-	hdd_sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter->deflink);
-	if (!hdd_cm_is_vdev_associated(adapter->deflink)) {
+	hdd_sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(link_info);
+	if (!hdd_cm_is_vdev_associated(link_info)) {
 		hdd_debug("Not associated, vdev %d mode %d",
-			   adapter->deflink->vdev_id, adapter->device_mode);
+			   link_info->vdev_id, adapter->device_mode);
 		return;
 	}
 
@@ -2404,13 +2405,13 @@ hdd_send_twt_del_all_sessions_to_userspace(struct hdd_adapter *adapter)
 					 &hdd_sta_ctx->conn_info.bssid,
 					 TWT_ALL_SESSIONS_DIALOG_ID)) {
 		hdd_debug("No active TWT sessions, vdev_id: %d dialog_id: %d",
-			  adapter->deflink->vdev_id,
+			  link_info->vdev_id,
 			  TWT_ALL_SESSIONS_DIALOG_ID);
 		return;
 	}
 
 	qdf_mem_zero(&params, sizeof(params));
-	params.vdev_id = adapter->deflink->vdev_id;
+	params.vdev_id = link_info->vdev_id;
 	params.dialog_id = TWT_ALL_SESSIONS_DIALOG_ID;
 	params.status = WMI_HOST_DEL_TWT_STATUS_UNKNOWN_ERROR;
 	qdf_mem_copy(params.peer_macaddr, hdd_sta_ctx->conn_info.bssid.bytes,
@@ -3561,7 +3562,7 @@ hdd_twt_pack_get_capabilities_resp(struct hdd_adapter *adapter)
 	 * connected, then check the "enable_twt_24ghz" ini
 	 * value to advertise the TWT requestor capability.
 	 */
-	connected_band = hdd_conn_get_connected_band(adapter);
+	connected_band = hdd_conn_get_connected_band(adapter->deflink);
 	if (connected_band == BAND_2G &&
 	    !ucfg_mlme_is_24ghz_twt_enabled(hdd_ctx->psoc))
 		is_twt_24ghz_allowed = false;

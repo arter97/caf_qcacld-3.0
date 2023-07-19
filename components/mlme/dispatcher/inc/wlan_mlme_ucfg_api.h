@@ -2674,6 +2674,58 @@ ucfg_mlme_get_restart_sap_on_dynamic_nss_chains_cfg(
 }
 
 /**
+ * ucfg_mlme_update_dynamic_nss_chains_support() - API to update
+ * dynamic_nss_chains_support
+ *
+ * @psoc: psoc context
+ * @val: data to be set
+ *
+ * API is used to update dynamic_nss_chains_support flag in wlan_mlme_cfg
+ * to maintain this value in mlme context
+ *
+ * Return: QDF_STATUS_SUCCESS or QDF_STATUS_FAILURE
+ */
+static inline QDF_STATUS
+ucfg_mlme_update_dynamic_nss_chains_support(struct wlan_objmgr_psoc *psoc,
+					    bool val)
+{
+	return wlan_mlme_cfg_set_dynamic_nss_chains_support(psoc, val);
+}
+
+/**
+ * ucfg_mlme_get_sta_tx_nss() - UCFG API to get station tx NSS
+ *
+ * @psoc: psoc context
+ * @vdev: pointer to vdev
+ * @tx_nss : tx_nss out parameter
+ *
+ * Return: QDF_STATUS_SUCCESS or QDF_STATUS_FAILURE
+ */
+static inline QDF_STATUS
+ucfg_mlme_get_sta_tx_nss(struct wlan_objmgr_psoc *psoc,
+			 struct wlan_objmgr_vdev *vdev, uint8_t *tx_nss)
+{
+	return wlan_mlme_get_sta_tx_nss(psoc, vdev, tx_nss);
+}
+
+/**
+ * ucfg_mlme_get_sta_rx_nss() - UCFG API to get station rx NSS
+ *
+ * @psoc: psoc context
+ * @vdev: pointer to vdev
+ * @rx_nss : rx_nss out parameter
+ *
+ * Return: QDF_STATUS_SUCCESS or QDF_STATUS_FAILURE
+ */
+static inline QDF_STATUS
+ucfg_mlme_get_sta_rx_nss(struct wlan_objmgr_psoc *psoc,
+			 struct wlan_objmgr_vdev *vdev,
+			 uint8_t *rx_nss)
+{
+	return wlan_mlme_get_sta_rx_nss(psoc, vdev, rx_nss);
+}
+
+/**
  * ucfg_mlme_get_vht_enable2x2() - Enables/disables VHT Tx/Rx MCS values for 2x2
  * @psoc: psoc context
  * @value: data to be set
@@ -3671,6 +3723,12 @@ ucfg_mlme_update_tgt_eht_cap(struct wlan_objmgr_psoc *psoc,
 	return mlme_update_tgt_eht_caps_in_cfg(psoc, cfg);
 }
 
+static inline QDF_STATUS
+ucfg_mlme_update_tgt_mlo_cap(struct wlan_objmgr_psoc *psoc)
+{
+	return mlme_update_tgt_mlo_caps_in_cfg(psoc);
+}
+
 /**
  * ucfg_mlme_get_usr_disable_sta_eht() - Get user disable sta eht flag
  * @psoc: psoc object
@@ -3697,6 +3755,12 @@ void ucfg_mlme_set_usr_disable_sta_eht(struct wlan_objmgr_psoc *psoc,
 	wlan_mlme_set_usr_disable_sta_eht(psoc, disable);
 }
 #else
+static inline QDF_STATUS
+ucfg_mlme_update_tgt_mlo_cap(struct wlan_objmgr_psoc *psoc)
+{
+	return QDF_STATUS_SUCCESS;
+}
+
 static inline
 bool ucfg_mlme_get_usr_disable_sta_eht(struct wlan_objmgr_psoc *psoc)
 {
@@ -5079,4 +5143,22 @@ ucfg_mlme_get_sr_enable_modes(struct wlan_objmgr_psoc *psoc,
 QDF_STATUS
 ucfg_mlme_get_valid_channels(struct wlan_objmgr_psoc *psoc,
 			     uint32_t *ch_freq_list, uint32_t *list_len);
+
+/**
+ * ucfg_mlme_set_ul_mu_config - set ul mu config
+ * @psoc: pointer to psoc object
+ * @vdev_id : vdev ID
+ * @ulmu_disable: ul mu value
+ *
+ * Inline UCFG API to be used by HDD/OSIF callers
+ *
+ * Return: QDF_STATUS_SUCCESS or non-zero on failure
+ */
+static inline
+QDF_STATUS ucfg_mlme_set_ul_mu_config(struct wlan_objmgr_psoc *psoc,
+				      uint8_t vdev_id,
+				      uint8_t ulmu_disable)
+{
+	return wlan_mlme_set_ul_mu_config(psoc, vdev_id, ulmu_disable);
+}
 #endif /* _WLAN_MLME_UCFG_API_H_ */

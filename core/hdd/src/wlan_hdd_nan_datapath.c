@@ -92,14 +92,10 @@ static int hdd_close_ndi(struct hdd_adapter *adapter)
 				     WLAN_STOP_ALL_NETIF_QUEUE_N_CARRIER,
 				     WLAN_CONTROL_PATH);
 
-	cancel_work_sync(&adapter->ipv4_notifier_work);
-	hdd_deregister_hl_netdev_fc_timer(adapter);
-	hdd_deregister_tx_flow_control(adapter);
+	hdd_cancel_ip_notifier_work(adapter);
+	hdd_adapter_deregister_fc(adapter);
 
-#ifdef WLAN_NS_OFFLOAD
-	cancel_work_sync(&adapter->ipv6_notifier_work);
-#endif
-	errno = hdd_vdev_destroy(adapter);
+	errno = hdd_vdev_destroy(adapter->deflink);
 	if (errno)
 		hdd_err("failed to destroy vdev: %d", errno);
 
@@ -123,36 +119,40 @@ static int hdd_close_ndi(struct hdd_adapter *adapter)
 static bool hdd_is_ndp_allowed(struct hdd_context *hdd_ctx)
 {
 	struct hdd_adapter *adapter, *next_adapter = NULL;
-	struct hdd_station_ctx *sta_ctx;
 	wlan_net_dev_ref_dbgid dbgid = NET_DEV_HOLD_IS_NDP_ALLOWED;
+	struct wlan_hdd_link_info *link_info;
 
 	hdd_for_each_adapter_dev_held_safe(hdd_ctx, adapter, next_adapter,
 					   dbgid) {
-		switch (adapter->device_mode) {
-		case QDF_P2P_GO_MODE:
-			if (test_bit(SOFTAP_BSS_STARTED,
-				     &adapter->deflink->link_flags)) {
-				hdd_adapter_dev_put_debug(adapter, dbgid);
-				if (next_adapter)
-					hdd_adapter_dev_put_debug(next_adapter,
+		hdd_adapter_for_each_active_link_info(adapter, link_info) {
+			switch (adapter->device_mode) {
+			case QDF_P2P_GO_MODE:
+				if (test_bit(SOFTAP_BSS_STARTED,
+					     &link_info->link_flags)) {
+					hdd_adapter_dev_put_debug(adapter,
 								  dbgid);
-				return false;
-			}
-			break;
-		case QDF_P2P_CLIENT_MODE:
-			sta_ctx =
-				WLAN_HDD_GET_STATION_CTX_PTR(adapter->deflink);
-			if (hdd_cm_is_vdev_associated(adapter->deflink) ||
-			    hdd_cm_is_connecting(adapter->deflink)) {
-				hdd_adapter_dev_put_debug(adapter, dbgid);
-				if (next_adapter)
-					hdd_adapter_dev_put_debug(next_adapter,
+					if (next_adapter)
+						hdd_adapter_dev_put_debug(
+								next_adapter,
+								dbgid);
+					return false;
+				}
+				break;
+			case QDF_P2P_CLIENT_MODE:
+				if (hdd_cm_is_vdev_associated(link_info) ||
+				    hdd_cm_is_connecting(link_info)) {
+					hdd_adapter_dev_put_debug(adapter,
 								  dbgid);
-				return false;
+					if (next_adapter)
+						hdd_adapter_dev_put_debug(
+								next_adapter,
+								dbgid);
+					return false;
+				}
+				break;
+			default:
+				break;
 			}
-			break;
-		default:
-			break;
 		}
 		hdd_adapter_dev_put_debug(adapter, dbgid);
 	}
@@ -163,37 +163,41 @@ static bool hdd_is_ndp_allowed(struct hdd_context *hdd_ctx)
 static bool hdd_is_ndp_allowed(struct hdd_context *hdd_ctx)
 {
 	struct hdd_adapter *adapter, *next_adapter = NULL;
-	struct hdd_station_ctx *sta_ctx;
 	wlan_net_dev_ref_dbgid dbgid = NET_DEV_HOLD_IS_NDP_ALLOWED;
+	struct wlan_hdd_link_info *link_info;
 
 	hdd_for_each_adapter_dev_held_safe(hdd_ctx, adapter, next_adapter,
 					   dbgid) {
-		switch (adapter->device_mode) {
-		case QDF_P2P_GO_MODE:
-		case QDF_SAP_MODE:
-			if (test_bit(SOFTAP_BSS_STARTED,
-				     &adapter->deflink->link_flags)) {
-				hdd_adapter_dev_put_debug(adapter, dbgid);
-				if (next_adapter)
-					hdd_adapter_dev_put_debug(next_adapter,
+		hdd_adapter_for_each_active_link_info(adapter, link_info) {
+			switch (adapter->device_mode) {
+			case QDF_P2P_GO_MODE:
+			case QDF_SAP_MODE:
+				if (test_bit(SOFTAP_BSS_STARTED,
+					     &link_info->link_flags)) {
+					hdd_adapter_dev_put_debug(adapter,
 								  dbgid);
-				return false;
-			}
-			break;
-		case QDF_P2P_CLIENT_MODE:
-			sta_ctx =
-				WLAN_HDD_GET_STATION_CTX_PTR(adapter->deflink);
-			if (hdd_cm_is_vdev_associated(adapter->deflink) ||
-			    hdd_cm_is_connecting(adapter->deflink)) {
-				hdd_adapter_dev_put_debug(adapter, dbgid);
-				if (next_adapter)
-					hdd_adapter_dev_put_debug(next_adapter,
+					if (next_adapter)
+						hdd_adapter_dev_put_debug(
+								next_adapter,
+								dbgid);
+					return false;
+				}
+				break;
+			case QDF_P2P_CLIENT_MODE:
+				if (hdd_cm_is_vdev_associated(link_info) ||
+				    hdd_cm_is_connecting(link_info)) {
+					hdd_adapter_dev_put_debug(adapter,
 								  dbgid);
-				return false;
+					if (next_adapter)
+						hdd_adapter_dev_put_debug(
+								next_adapter,
+								dbgid);
+					return false;
+				}
+				break;
+			default:
+				break;
 			}
-			break;
-		default:
-			break;
 		}
 		hdd_adapter_dev_put_debug(adapter, dbgid);
 	}
@@ -438,7 +442,7 @@ static int hdd_get_random_nan_mac_addr(struct hdd_context *hdd_ctx,
 	return -EINVAL;
 }
 
-void hdd_ndp_event_handler(struct hdd_adapter *adapter,
+void hdd_ndp_event_handler(struct wlan_hdd_link_info *link_info,
 			   struct csr_roam_info *roam_info,
 			   eRoamCmdStatus roam_status,
 			   eCsrRoamResult roam_result)
@@ -447,7 +451,7 @@ void hdd_ndp_event_handler(struct hdd_adapter *adapter,
 	struct wlan_objmgr_psoc *psoc;
 	struct wlan_objmgr_vdev *vdev;
 
-	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink, WLAN_OSIF_NAN_ID);
+	vdev = hdd_objmgr_get_vdev_by_user(link_info, WLAN_OSIF_NAN_ID);
 	if (!vdev) {
 		hdd_err("vdev is NULL");
 		return;
@@ -462,18 +466,16 @@ void hdd_ndp_event_handler(struct hdd_adapter *adapter,
 					NAN_DATAPATH_RSP_STATUS_SUCCESS);
 			hdd_debug("posting ndi create status: %d (%s) to umac",
 				  success, success ? "Success" : "Failure");
-			os_if_nan_post_ndi_create_rsp(
-					psoc, adapter->deflink->vdev_id,
-					success);
+			os_if_nan_post_ndi_create_rsp(psoc, link_info->vdev_id,
+						      success);
 			return;
 		case eCSR_ROAM_RESULT_NDI_DELETE_RSP:
 			success = (roam_info->ndp.ndi_create_params.status ==
 					NAN_DATAPATH_RSP_STATUS_SUCCESS);
 			hdd_debug("posting ndi delete status: %d (%s) to umac",
 				  success, success ? "Success" : "Failure");
-			os_if_nan_post_ndi_delete_rsp(
-					psoc, adapter->deflink->vdev_id,
-					success);
+			os_if_nan_post_ndi_delete_rsp(psoc, link_info->vdev_id,
+						      success);
 			return;
 		default:
 			hdd_err("in correct roam_result: %d", roam_result);
@@ -577,7 +579,19 @@ int hdd_init_nan_data_mode(struct hdd_adapter *adapter)
 	struct wlan_objmgr_vdev *vdev;
 	uint16_t rts_profile = 0;
 
-	ret_val = hdd_vdev_create(adapter);
+	status = hdd_adapter_fill_link_address(adapter);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		hdd_debug("Link address derive failed");
+		return qdf_status_to_os_return(status);
+	}
+
+	status = hdd_adapter_check_duplicate_session(adapter);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		hdd_err("Duplicate session is existing with same mac address");
+		return qdf_status_to_os_return(status);
+	}
+
+	ret_val = hdd_vdev_create(adapter->deflink);
 	if (ret_val) {
 		hdd_err("failed to create vdev: %d", ret_val);
 		return ret_val;
@@ -594,7 +608,7 @@ int hdd_init_nan_data_mode(struct hdd_adapter *adapter)
 	sme_set_vdev_ies_per_band(mac_handle, adapter->deflink->vdev_id,
 				  adapter->device_mode);
 
-	hdd_roam_profile_init(adapter);
+	hdd_roam_profile_init(adapter->deflink);
 	hdd_register_wext(wlan_dev);
 
 	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink, WLAN_DP_ID);
@@ -646,7 +660,7 @@ error_wmm_init:
 
 wext_unregister:
 	hdd_wext_unregister(wlan_dev, true);
-	QDF_BUG(!hdd_vdev_destroy(adapter));
+	QDF_BUG(!hdd_vdev_destroy(adapter->deflink));
 
 	return ret_val;
 }
@@ -913,8 +927,9 @@ int hdd_ndi_delete(uint8_t vdev_id, const char *iface_name,
  * wmi_vdev_param_ndp_keepalive_timeout
  */
 
-void hdd_ndi_drv_ndi_create_rsp_handler(uint8_t vdev_id,
-				struct nan_datapath_inf_create_rsp *ndi_rsp)
+void
+hdd_ndi_drv_ndi_create_rsp_handler(uint8_t vdev_id,
+				   struct nan_datapath_inf_create_rsp *ndi_rsp)
 {
 	struct hdd_context *hdd_ctx;
 	struct hdd_adapter *adapter;
@@ -1001,7 +1016,8 @@ void hdd_ndi_drv_ndi_create_rsp_handler(uint8_t vdev_id,
 
 	hdd_save_peer(sta_ctx, &bc_mac_addr);
 	qdf_copy_macaddr(&roam_info->bssid, &bc_mac_addr);
-	hdd_roam_register_sta(adapter, &roam_info->bssid,
+	hdd_roam_register_sta(link_info,
+			      &roam_info->bssid,
 			      roam_info->fAuthRequired);
 
 error:
@@ -1102,7 +1118,8 @@ static void hdd_send_obss_scan_req(struct hdd_context *hdd_ctx, bool val)
 }
 
 int hdd_ndp_new_peer_handler(uint8_t vdev_id, uint16_t sta_id,
-			struct qdf_mac_addr *peer_mac_addr, bool first_peer)
+			     struct qdf_mac_addr *peer_mac_addr,
+			     bool first_peer)
 {
 	struct hdd_context *hdd_ctx;
 	struct hdd_adapter *adapter;
@@ -1136,7 +1153,7 @@ int hdd_ndp_new_peer_handler(uint8_t vdev_id, uint16_t sta_id,
 	qdf_copy_macaddr(&roam_info->bssid, peer_mac_addr);
 
 	/* this function is called for each new peer */
-	hdd_roam_register_sta(adapter, &roam_info->bssid,
+	hdd_roam_register_sta(link_info, &roam_info->bssid,
 			      roam_info->fAuthRequired);
 
 	if (!first_peer)
@@ -1175,13 +1192,14 @@ mem_free:
 	return 0;
 }
 
-void hdd_cleanup_ndi(struct hdd_context *hdd_ctx,
-		     struct hdd_adapter *adapter)
+void hdd_cleanup_ndi(struct wlan_hdd_link_info *link_info)
 {
 	struct hdd_station_ctx *sta_ctx;
 	struct wlan_objmgr_vdev *vdev;
+	struct hdd_adapter *adapter = link_info->adapter;
+	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
 
-	sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter->deflink);
+	sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(link_info);
 	if (sta_ctx->conn_info.conn_state != eConnectionState_NdiConnected) {
 		hdd_debug("NDI has no NDPs");
 		return;
@@ -1193,7 +1211,7 @@ void hdd_cleanup_ndi(struct hdd_context *hdd_ctx,
 	wlan_hdd_netif_queue_control(adapter,
 				     WLAN_STOP_ALL_NETIF_QUEUE_N_CARRIER,
 				     WLAN_CONTROL_PATH);
-	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink, WLAN_DP_ID);
+	vdev = hdd_objmgr_get_vdev_by_user(link_info, WLAN_DP_ID);
 	if (vdev) {
 		ucfg_dp_bus_bw_compute_reset_prev_txrx_stats(vdev);
 		hdd_objmgr_put_vdev_by_user(vdev, WLAN_DP_ID);
@@ -1235,12 +1253,12 @@ void hdd_ndp_peer_departed_handler(uint8_t vdev_id, uint16_t sta_id,
 
 	hdd_delete_peer(sta_ctx, peer_mac_addr);
 
+	ucfg_nan_clear_peer_mc_list(hdd_ctx->psoc, link_info->vdev,
+				    peer_mac_addr);
+
 	if (last_peer) {
 		hdd_debug("No more ndp peers.");
-		ucfg_nan_clear_peer_mc_list(hdd_ctx->psoc,
-					    link_info->vdev,
-					    peer_mac_addr);
-		hdd_cleanup_ndi(hdd_ctx, adapter);
+		hdd_cleanup_ndi(link_info);
 		qdf_event_set(&adapter->peer_cleanup_done);
 		/*
 		 * This is called only for last peer. So, no.of NDP sessions

@@ -852,8 +852,7 @@ QDF_STATUS sme_open(mac_handle_t mac_handle)
 /*
  * sme_init_chan_list, triggers channel setup based on country code.
  */
-QDF_STATUS sme_init_chan_list(mac_handle_t mac_handle, uint8_t *alpha2,
-			      enum country_src cc_src)
+QDF_STATUS sme_init_chan_list(mac_handle_t mac_handle, enum country_src cc_src)
 {
 	struct mac_context *pmac = MAC_CONTEXT(mac_handle);
 
@@ -862,7 +861,7 @@ QDF_STATUS sme_init_chan_list(mac_handle_t mac_handle, uint8_t *alpha2,
 		pmac->mlme_cfg->gen.enabled_11d = false;
 	}
 
-	return csr_init_chan_list(pmac, alpha2);
+	return csr_init_chan_list(pmac);
 }
 
 /*
@@ -11946,7 +11945,9 @@ void sme_get_opclass(mac_handle_t mac_handle, uint8_t channel,
 		     uint8_t bw_offset, uint8_t *opclass)
 {
 	struct mac_context *mac_ctx = MAC_CONTEXT(mac_handle);
+	uint8_t reg_cc[REG_ALPHA2_LEN + 1];
 
+	wlan_reg_read_current_country(mac_ctx->psoc, reg_cc);
 	/* redgm opclass table contains opclass for 40MHz low primary,
 	 * 40MHz high primary and 20MHz. No support for 80MHz yet. So
 	 * first we will check if bit for 40MHz is set and if so find
@@ -11956,21 +11957,17 @@ void sme_get_opclass(mac_handle_t mac_handle, uint8_t channel,
 	 */
 	if (bw_offset & (1 << BW_40_OFFSET_BIT)) {
 		*opclass = wlan_reg_dmn_get_opclass_from_channel(
-				mac_ctx->scan.countryCodeCurrent,
-				channel, BW40_LOW_PRIMARY);
+				reg_cc, channel, BW40_LOW_PRIMARY);
 		if (!(*opclass)) {
 			*opclass = wlan_reg_dmn_get_opclass_from_channel(
-					mac_ctx->scan.countryCodeCurrent,
-					channel, BW40_HIGH_PRIMARY);
+					reg_cc, channel, BW40_HIGH_PRIMARY);
 		}
 	} else if (bw_offset & (1 << BW_20_OFFSET_BIT)) {
 		*opclass = wlan_reg_dmn_get_opclass_from_channel(
-				mac_ctx->scan.countryCodeCurrent,
-				channel, BW20);
+				reg_cc, channel, BW20);
 	} else {
 		*opclass = wlan_reg_dmn_get_opclass_from_channel(
-				mac_ctx->scan.countryCodeCurrent,
-				channel, BWALL);
+				reg_cc, channel, BWALL);
 	}
 }
 #endif
@@ -14758,18 +14755,6 @@ void sme_set_he_bw_cap(mac_handle_t mac_handle, uint8_t vdev_id,
 	mac_ctx->he_cap_5g.chan_width_6 = 0;
 
 	switch (chwidth) {
-	case eHT_CHANNEL_WIDTH_20MHZ:
-		break;
-	case eHT_CHANNEL_WIDTH_40MHZ:
-		mac_ctx->mlme_cfg->he_caps.dot11_he_cap.chan_width_0 = 1;
-		mac_ctx->mlme_cfg->he_caps.dot11_he_cap.chan_width_1 = 1;
-		mac_ctx->he_cap_2g.chan_width_0 = 1;
-		mac_ctx->he_cap_5g.chan_width_1 = 1;
-		break;
-	case eHT_CHANNEL_WIDTH_80MHZ:
-		mac_ctx->mlme_cfg->he_caps.dot11_he_cap.chan_width_1 = 1;
-		mac_ctx->he_cap_5g.chan_width_1 = 1;
-		break;
 	case eHT_CHANNEL_WIDTH_160MHZ:
 	case eHT_CHANNEL_WIDTH_320MHZ:
 		mac_ctx->mlme_cfg->he_caps.dot11_he_cap.chan_width_1 = 1;
@@ -14788,6 +14773,18 @@ void sme_set_he_bw_cap(mac_handle_t mac_handle, uint8_t vdev_id,
 		mac_ctx->he_cap_5g.tx_he_mcs_map_lt_80;
 		mac_ctx->he_cap_5g.chan_width_1 = 1;
 		mac_ctx->he_cap_5g.chan_width_2 = 1;
+		fallthrough;
+	case eHT_CHANNEL_WIDTH_80MHZ:
+		mac_ctx->mlme_cfg->he_caps.dot11_he_cap.chan_width_1 = 1;
+		mac_ctx->he_cap_5g.chan_width_1 = 1;
+		fallthrough;
+	case eHT_CHANNEL_WIDTH_40MHZ:
+		mac_ctx->mlme_cfg->he_caps.dot11_he_cap.chan_width_0 = 1;
+		mac_ctx->mlme_cfg->he_caps.dot11_he_cap.chan_width_1 = 1;
+		mac_ctx->he_cap_2g.chan_width_0 = 1;
+		mac_ctx->he_cap_5g.chan_width_1 = 1;
+		fallthrough;
+	case eHT_CHANNEL_WIDTH_20MHZ:
 		break;
 	default:
 		sme_debug("Config BW %d not handled", chwidth);
@@ -16234,25 +16231,29 @@ sme_get_full_roam_scan_period(mac_handle_t mac_handle, uint8_t vdev_id,
 }
 
 QDF_STATUS sme_check_for_duplicate_session(mac_handle_t mac_handle,
-					   uint8_t *peer_addr)
+					   uint8_t **mac_list)
 {
-	QDF_STATUS status = QDF_STATUS_E_INVAL;
+	QDF_STATUS status = QDF_STATUS_SUCCESS;
 	bool peer_exist = false;
 	void *soc = cds_get_context(QDF_MODULE_ID_SOC);
 	struct mac_context *mac_ctx = MAC_CONTEXT(mac_handle);
+	uint8_t **peer_addr = mac_list;
 
 	if (!soc)
 		return QDF_STATUS_E_INVAL;
 
 	if (QDF_STATUS_SUCCESS != sme_acquire_global_lock(&mac_ctx->sme))
-		return status;
+		return QDF_STATUS_E_INVAL;
 
-	peer_exist = cdp_find_peer_exist(soc, OL_TXRX_PDEV_ID, peer_addr);
-	if (peer_exist) {
-		sme_err("Peer exists with same MAC");
-		status = QDF_STATUS_E_EXISTS;
-	} else {
-		status = QDF_STATUS_SUCCESS;
+	while (*peer_addr) {
+		peer_exist = cdp_find_peer_exist(soc, OL_TXRX_PDEV_ID,
+						 *peer_addr);
+		if (peer_exist) {
+			sme_err("Peer exists with same MAC");
+			status = QDF_STATUS_E_EXISTS;
+			break;
+		}
+		peer_addr++;
 	}
 	sme_release_global_lock(&mac_ctx->sme);
 

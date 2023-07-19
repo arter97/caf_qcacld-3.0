@@ -648,137 +648,6 @@ QDF_STATUS wma_process_dhcp_ind(WMA_HANDLE handle,
 					    &peer_set_param_fp);
 }
 
-#ifdef WLAN_FEATURE_SR
-
-static void wma_sr_send_pd_threshold(tp_wma_handle wma,
-				     uint8_t vdev_id,
-				     uint32_t val)
-{
-	struct vdev_set_params vparam;
-	wmi_unified_t wmi_handle = wma->wmi_handle;
-	bool sr_supported =
-		wmi_service_enabled(wmi_handle,
-				    wmi_service_srg_srp_spatial_reuse_support);
-
-	if (sr_supported) {
-		vparam.vdev_id = vdev_id;
-		vparam.param_id = wmi_vdev_param_set_cmd_obss_pd_threshold;
-		vparam.param_value = val;
-		wmi_unified_vdev_set_param_send(wmi_handle, &vparam);
-	} else {
-		wma_debug("Target doesn't support SR operations");
-	}
-}
-
-static void wma_sr_handle_conc(tp_wma_handle wma,
-			       struct wlan_objmgr_vdev *vdev,
-			       struct wlan_objmgr_vdev *conc_vdev,
-			       bool en_sr_curr_vdev)
-{
-	uint32_t val = 0;
-	uint8_t sr_ctrl;
-	uint8_t conc_vdev_id = wlan_vdev_get_id(conc_vdev);
-
-	if (en_sr_curr_vdev) {
-		wlan_vdev_mlme_set_sr_disable_due_conc(vdev, true);
-		wlan_vdev_mlme_set_sr_disable_due_conc(conc_vdev, true);
-		if (!wlan_vdev_mlme_get_he_spr_enabled(conc_vdev))
-			return;
-
-		wma_sr_send_pd_threshold(wma, conc_vdev_id, val);
-		wlan_spatial_reuse_osif_event(conc_vdev,
-					      SR_OPERATION_SUSPEND,
-					      SR_REASON_CODE_CONCURRENCY);
-	} else if (wlan_vdev_mlme_is_sr_disable_due_conc(conc_vdev)) {
-		wlan_vdev_mlme_set_sr_disable_due_conc(conc_vdev, false);
-		if (!wlan_vdev_mlme_get_he_spr_enabled(conc_vdev))
-			return;
-
-		sr_ctrl = wlan_vdev_mlme_get_sr_ctrl(conc_vdev);
-		if ((!(sr_ctrl & NON_SRG_PD_SR_DISALLOWED) &&
-		     (sr_ctrl & NON_SRG_OFFSET_PRESENT)) ||
-		    (sr_ctrl & SRG_INFO_PRESENT)) {
-			wlan_mlme_update_sr_data(conc_vdev, &val, 0, 0, true);
-			wma_sr_send_pd_threshold(wma, conc_vdev_id, val);
-			wlan_spatial_reuse_osif_event(conc_vdev,
-						      SR_OPERATION_RESUME,
-						      SR_REASON_CODE_CONCURRENCY);
-		} else {
-			wma_debug("SR Disabled in SR Control");
-		}
-	}
-}
-
-QDF_STATUS wma_sr_update(tp_wma_handle wma, uint8_t vdev_id, bool enable)
-{
-	uint32_t val = 0;
-	uint8_t mac_id;
-	uint32_t conc_vdev_id;
-	struct wlan_objmgr_vdev *vdev, *conc_vdev;
-	uint8_t sr_ctrl;
-	QDF_STATUS status = QDF_STATUS_SUCCESS;
-
-	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(wma->psoc, vdev_id,
-						    WLAN_LEGACY_WMA_ID);
-	if (!vdev) {
-		wma_err("Can't get vdev by vdev_id:%d", vdev_id);
-		return QDF_STATUS_E_INVAL;
-	}
-	policy_mgr_get_mac_id_by_session_id(wma->psoc, vdev_id, &mac_id);
-	conc_vdev_id = policy_mgr_get_conc_vdev_on_same_mac(wma->psoc, vdev_id,
-							    mac_id);
-	if (conc_vdev_id != WLAN_INVALID_VDEV_ID &&
-	    !policy_mgr_sr_same_mac_conc_enabled(wma->psoc)) {
-		/*
-		 * Single MAC concurrency is not supoprted for SR,
-		 * Disable SR if it is enable on other VDEV and enable
-		 * it back once the once the concurrent vdev is down.
-		 */
-		wma_debug("SR with concurrency is not allowed");
-		conc_vdev =
-		wlan_objmgr_get_vdev_by_id_from_psoc(wma->psoc, conc_vdev_id,
-						     WLAN_LEGACY_WMA_ID);
-		if (!conc_vdev) {
-			wma_err("Can't get vdev by vdev_id:%d", conc_vdev_id);
-		} else {
-			wma_sr_handle_conc(wma, vdev, conc_vdev, enable);
-			wlan_objmgr_vdev_release_ref(conc_vdev,
-						     WLAN_LEGACY_WMA_ID);
-			goto release_ref;
-		}
-	}
-
-	if (!wlan_vdev_mlme_get_he_spr_enabled(vdev)) {
-		wma_debug("Spatial Reuse disabled for vdev_id: %u", vdev_id);
-		status = QDF_STATUS_E_NOSUPPORT;
-		goto release_ref;
-	}
-
-	sr_ctrl = wlan_vdev_mlme_get_sr_ctrl(vdev);
-	wma_debug("SR Control: %x", sr_ctrl);
-	if ((!(sr_ctrl & NON_SRG_PD_SR_DISALLOWED) &&
-	     (sr_ctrl & NON_SRG_OFFSET_PRESENT)) ||
-	    (sr_ctrl & SRG_INFO_PRESENT)) {
-		if (enable) {
-			wlan_mlme_update_sr_data(vdev, &val, 0, 0, true);
-		} else {
-			/* VDEV down, disable SR */
-			wlan_vdev_mlme_set_sr_ctrl(vdev, 0);
-			wlan_vdev_mlme_set_non_srg_pd_offset(vdev, 0);
-		}
-
-		wma_debug("SR param val: %x, Enable: %x", val, enable);
-		wma_sr_send_pd_threshold(wma, vdev_id, val);
-	} else {
-		wma_debug("Spatial reuse is disabled in ctrl");
-	}
-
-release_ref:
-	wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_WMA_ID);
-	return status;
-}
-#endif
-
 #if defined(WLAN_FEATURE_11BE)
 static enum wlan_phymode
 wma_eht_chan_phy_mode(uint32_t freq, uint8_t dot11_mode, uint16_t bw_val,
@@ -1464,9 +1333,11 @@ int wma_csa_offload_handler(void *handle, uint8_t *event, uint32_t len)
 	struct csa_offload_params *csa_offload_event;
 	struct ieee80211_extendedchannelswitch_ie *xcsa_ie;
 	struct ieee80211_ie_wide_bw_switch *wb_ie;
-	struct wma_txrx_node *intr = wma->interfaces;
+	struct wlan_objmgr_peer *peer;
+	struct wlan_objmgr_vdev *vdev;
 	QDF_STATUS status;
 	uint8_t tlv_len;
+	struct wlan_channel *chan;
 
 	param_buf = (WMI_CSA_HANDLING_EVENTID_param_tlvs *) event;
 
@@ -1478,20 +1349,31 @@ int wma_csa_offload_handler(void *handle, uint8_t *event, uint32_t len)
 	csa_event = param_buf->fixed_param;
 	WMI_MAC_ADDR_TO_CHAR_ARRAY(&csa_event->i_addr2, &bssid[0]);
 
-	if (wma_find_vdev_id_by_bssid(wma, bssid, &vdev_id)) {
-		wma_err("Invalid bssid received");
+	peer = wlan_objmgr_get_peer_by_mac(wma->psoc,
+					   bssid, WLAN_LEGACY_WMA_ID);
+	if (!peer) {
+		wma_err("Invalid peer");
 		return -EINVAL;
 	}
 
-	csa_offload_event = qdf_mem_malloc(sizeof(*csa_offload_event));
-	if (!csa_offload_event)
+	vdev_id = wlan_vdev_get_id(wlan_peer_get_vdev(peer));
+	wlan_objmgr_peer_release_ref(peer, WLAN_LEGACY_WMA_ID);
+	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(wma->psoc,
+						    vdev_id,
+						    WLAN_LEGACY_WMA_ID);
+	if (!vdev)
 		return -EINVAL;
 
-	if (intr[vdev_id].vdev &&
-	    wlan_cm_is_vdev_roaming(intr[vdev_id].vdev)) {
+	csa_offload_event = qdf_mem_malloc(sizeof(*csa_offload_event));
+	if (!csa_offload_event) {
+		wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_WMA_ID);
+			return -EINVAL;
+	}
+	if (wlan_cm_is_vdev_roaming(vdev)) {
 		wma_err("Roaming in progress for vdev %d, ignore csa event",
 			 vdev_id);
 		qdf_mem_free(csa_offload_event);
+		wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_WMA_ID);
 		return -EINVAL;
 	}
 
@@ -1528,6 +1410,7 @@ int wma_csa_offload_handler(void *handle, uint8_t *event, uint32_t len)
 	} else {
 		wma_err("CSA Event error: No CSA IE present");
 		qdf_mem_free(csa_offload_event);
+		wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_WMA_ID);
 		return -EINVAL;
 	}
 
@@ -1591,7 +1474,15 @@ got_chan:
 		 csa_offload_event->new_ch_freq_seg2,
 		 csa_offload_event->new_op_class);
 
-	cur_chan = cds_freq_to_chan(intr[vdev_id].ch_freq);
+	chan = wlan_vdev_get_active_channel(vdev);
+	if (!chan) {
+		wmi_err("failed to get active channel");
+		wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_WMA_ID);
+		qdf_mem_free(csa_offload_event);
+		return false;
+	}
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_WMA_ID);
+	cur_chan = cds_freq_to_chan(chan->ch_freq);
 	/*
 	 * basic sanity check: requested channel should not be 0
 	 * and equal to home channel
@@ -5747,7 +5638,7 @@ static void wma_send_set_key_rsp(uint8_t vdev_id, bool pairwise,
 			return;
 		key_info_uc->vdev_id = vdev_id;
 		key_info_uc->status = QDF_STATUS_SUCCESS;
-		key_info_uc->key[0].keyLength = crypto_key->keylen;
+		key_info_uc->key_len = crypto_key->keylen;
 		qdf_mem_copy(&key_info_uc->macaddr, &crypto_key->macaddr,
 			     QDF_MAC_ADDR_SIZE);
 		wma_send_msg_high_priority(wma, WMA_SET_STAKEY_RSP,
@@ -5759,7 +5650,7 @@ static void wma_send_set_key_rsp(uint8_t vdev_id, bool pairwise,
 			return;
 		key_info_mc->vdev_id = vdev_id;
 		key_info_mc->status = QDF_STATUS_SUCCESS;
-		key_info_mc->key[0].keyLength = crypto_key->keylen;
+		key_info_mc->key_len = crypto_key->keylen;
 		qdf_mem_copy(&key_info_mc->macaddr, &bcast_mac,
 			     QDF_MAC_ADDR_SIZE);
 		wma_send_msg_high_priority(wma, WMA_SET_BSSKEY_RSP,

@@ -1029,8 +1029,8 @@ QDF_STATUS ucfg_dp_sta_register_txrx_ops(struct wlan_objmgr_vdev *vdev)
 		txrx_ops.rx.rx_flush = NULL;
 	}
 
-	if (dp_intf->dp_ctx->dp_cfg.fisa_enable &&
-		(dp_intf->device_mode != QDF_MONITOR_MODE)) {
+	if (wlan_dp_cfg_is_rx_fisa_enabled(&dp_intf->dp_ctx->dp_cfg) &&
+	    dp_intf->device_mode != QDF_MONITOR_MODE) {
 		dp_debug("FISA feature enabled");
 		dp_rx_register_fisa_ops(&txrx_ops);
 	}
@@ -1077,7 +1077,8 @@ QDF_STATUS ucfg_dp_tdlsta_register_txrx_ops(struct wlan_objmgr_vdev *vdev)
 		txrx_ops.rx.rx_stack = NULL;
 		txrx_ops.rx.rx_flush = NULL;
 	}
-	if (dp_intf->dp_ctx->dp_cfg.fisa_enable &&
+
+	if (wlan_dp_cfg_is_rx_fisa_enabled(&dp_intf->dp_ctx->dp_cfg) &&
 	    dp_intf->device_mode != QDF_MONITOR_MODE) {
 		dp_debug("FISA feature enabled");
 		dp_rx_register_fisa_ops(&txrx_ops);
@@ -2370,12 +2371,12 @@ void ucfg_dp_prealloc_put_multi_pages(uint32_t desc_type,
 #if defined(WLAN_SUPPORT_RX_FISA)
 void ucfg_dp_rx_skip_fisa(uint32_t value)
 {
-	void *dp_soc;
+	struct wlan_dp_psoc_context *dp_ctx;
 
-	dp_soc = cds_get_context(QDF_MODULE_ID_SOC);
+	dp_ctx = dp_get_context();
 
-	if (dp_soc)
-		dp_rx_skip_fisa(dp_soc, value);
+	if (dp_ctx)
+		dp_rx_skip_fisa(dp_ctx, value);
 }
 #endif
 
@@ -2522,3 +2523,9 @@ bool ucfg_dp_is_local_pkt_capture_enabled(struct wlan_objmgr_psoc *psoc)
 	return cdp_cfg_get(soc, cfg_dp_local_pkt_capture);
 }
 #endif
+
+QDF_STATUS ucfg_dp_get_vdev_stats(ol_txrx_soc_handle soc, uint8_t vdev_id,
+				  struct cdp_vdev_stats *buf)
+{
+	return cdp_host_get_vdev_stats(soc, vdev_id, buf, true);
+}

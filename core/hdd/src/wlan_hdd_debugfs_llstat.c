@@ -39,8 +39,8 @@ static struct ll_stats_buf ll_stats;
 
 static DEFINE_MUTEX(llstats_mutex);
 
-void hdd_debugfs_process_iface_stats(struct hdd_adapter *adapter,
-		void *data, uint32_t num_peers)
+void hdd_debugfs_process_iface_stats(struct wlan_hdd_link_info *link_info,
+				     void *data, uint32_t num_peers)
 {
 	struct wifi_interface_stats *iface_stat;
 	struct wifi_interface_info *iface_info;
@@ -68,7 +68,7 @@ void hdd_debugfs_process_iface_stats(struct hdd_adapter *adapter,
 	len = scnprintf(buffer, DEBUGFS_LLSTATS_BUF_SIZE - ll_stats.len,
 			"\n\n===LL_STATS_IFACE: num_peers: %d===", num_peers);
 
-	if (false == hdd_get_interface_info(adapter, &iface_stat->info)) {
+	if (!hdd_get_interface_info(link_info, &iface_stat->info)) {
 		mutex_unlock(&llstats_mutex);
 		hdd_err("hdd_get_interface_info get fail");
 		return;
@@ -476,7 +476,8 @@ static int __wlan_hdd_open_ll_stats_debugfs(struct net_device *net_dev)
 	if (errno)
 		return errno;
 
-	errno = wlan_hdd_ll_stats_get(adapter, DEBUGFS_LLSTATS_REQID,
+	errno = wlan_hdd_ll_stats_get(adapter->deflink,
+				      DEBUGFS_LLSTATS_REQID,
 				      DEBUGFS_LLSTATS_REQMASK);
 	if (errno)
 		goto free_buf;

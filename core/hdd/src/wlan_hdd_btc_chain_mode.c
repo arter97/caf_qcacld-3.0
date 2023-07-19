@@ -109,12 +109,12 @@ wlan_hdd_btc_chain_mode_handler(struct wlan_objmgr_vdev *vdev)
 	switch (adapter->device_mode) {
 	case QDF_STA_MODE:
 	case QDF_P2P_CLIENT_MODE:
-		wlan_hdd_cm_issue_disconnect(adapter,
+		wlan_hdd_cm_issue_disconnect(link_info,
 					     REASON_PREV_AUTH_NOT_VALID, false);
 		break;
 	case QDF_SAP_MODE:
 	case QDF_P2P_GO_MODE:
-		hdd_restart_sap(adapter);
+		hdd_restart_sap(link_info);
 		break;
 	default:
 		break;

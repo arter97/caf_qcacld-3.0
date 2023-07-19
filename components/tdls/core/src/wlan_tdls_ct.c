@@ -105,6 +105,9 @@ void tdls_discovery_timeout_peer_cb(void *user_data)
 
 	vdev = (struct wlan_objmgr_vdev *)user_data;
 	tdls_soc = wlan_vdev_get_tdls_soc_obj(vdev);
+	if (!tdls_soc)
+		return;
+
 	if (wlan_vdev_mlme_is_mlo_vdev(vdev) &&
 	    qdf_atomic_dec_and_test(&tdls_soc->timer_cnt)) {
 		tdls_process_mlo_cal_tdls_link_score(vdev);
@@ -144,6 +147,9 @@ void tdls_discovery_timeout_peer_cb(void *user_data)
 	}
 
 	tdls_vdev = wlan_vdev_get_tdls_vdev_obj(vdev);
+	if (!tdls_vdev)
+		return;
+
 	for (i = 0; i < WLAN_TDLS_PEER_LIST_SIZE; i++) {
 		head = &tdls_vdev->peer_list[i];
 		status = qdf_list_peek_front(head, &p_node);

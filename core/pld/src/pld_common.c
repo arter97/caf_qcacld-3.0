@@ -2671,6 +2671,46 @@ int pld_get_wlan_unsafe_channel_sap(
 }
 #endif
 
+void pld_set_tsf_sync_period(struct device *dev, u32 val)
+{
+	switch (pld_get_bus_type(dev)) {
+	case PLD_BUS_TYPE_PCIE:
+		pld_pcie_set_tsf_sync_period(dev, val);
+		break;
+	case PLD_BUS_TYPE_PCIE_FW_SIM:
+	case PLD_BUS_TYPE_IPCI_FW_SIM:
+	case PLD_BUS_TYPE_SNOC_FW_SIM:
+	case PLD_BUS_TYPE_SNOC:
+	case PLD_BUS_TYPE_IPCI:
+	case PLD_BUS_TYPE_SDIO:
+	case PLD_BUS_TYPE_USB:
+		break;
+	default:
+		pr_err("Invalid device type\n");
+		break;
+	}
+}
+
+void pld_reset_tsf_sync_period(struct device *dev)
+{
+	switch (pld_get_bus_type(dev)) {
+	case PLD_BUS_TYPE_PCIE:
+		pld_pcie_reset_tsf_sync_period(dev);
+		break;
+	case PLD_BUS_TYPE_PCIE_FW_SIM:
+	case PLD_BUS_TYPE_IPCI_FW_SIM:
+	case PLD_BUS_TYPE_SNOC_FW_SIM:
+	case PLD_BUS_TYPE_SNOC:
+	case PLD_BUS_TYPE_IPCI:
+	case PLD_BUS_TYPE_SDIO:
+	case PLD_BUS_TYPE_USB:
+		break;
+	default:
+		pr_err("Invalid device type\n");
+		break;
+	}
+}
+
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 19, 0))
 int pld_is_ipa_offload_disabled(struct device *dev)
 {
@@ -2744,6 +2784,19 @@ bool pld_is_one_msi(struct device *dev)
 
 	return ret;
 }
+
+#ifdef CONFIG_AFC_SUPPORT
+int pld_send_buffer_to_afcmem(struct device *dev, const uint8_t *afcdb,
+			      uint32_t len, uint8_t slotid)
+{
+	return cnss_send_buffer_to_afcmem(dev, afcdb, len, slotid);
+}
+
+int pld_reset_afcmem(struct device *dev, uint8_t slotid)
+{
+	return cnss_reset_afcmem(dev, slotid);
+}
+#endif
 
 #ifdef FEATURE_DIRECT_LINK
 int pld_audio_smmu_map(struct device *dev, phys_addr_t paddr, dma_addr_t iova,

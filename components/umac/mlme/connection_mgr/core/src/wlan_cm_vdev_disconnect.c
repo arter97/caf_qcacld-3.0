@@ -35,6 +35,7 @@
 #include <wlan_mlo_mgr_sta.h>
 #include "wlan_mlo_mgr_roam.h"
 #include "wlan_t2lm_api.h"
+#include "wlan_mlo_link_force.h"
 
 static void cm_abort_connect_request_timers(struct wlan_objmgr_vdev *vdev)
 {
@@ -74,6 +75,9 @@ QDF_STATUS cm_disconnect_start_ind(struct wlan_objmgr_vdev *vdev,
 		return QDF_STATUS_E_INVAL;
 	}
 	mlo_sta_stop_reconfig_timer(vdev);
+	ml_nlink_conn_change_notify(
+		psoc, wlan_vdev_get_id(vdev),
+		ml_nlink_disconnect_start_evt, NULL);
 	if (cm_csr_is_ss_wait_for_key(req->vdev_id)) {
 		mlme_debug("Stop Wait for key timer");
 		cm_stop_wait_for_key_timer(psoc, req->vdev_id);
@@ -141,7 +145,7 @@ cm_handle_disconnect_req(struct wlan_objmgr_vdev *vdev,
 	wlan_roam_reset_roam_params(vdev);
 	cm_roam_restore_default_config(pdev, vdev_id);
 	opmode = wlan_vdev_mlme_get_opmode(vdev);
-	if (opmode == QDF_STA_MODE)
+	if (opmode == QDF_STA_MODE && !wlan_vdev_mlme_is_link_sta_vdev(vdev))
 		wlan_cm_roam_state_change(pdev, vdev_id,
 					  WLAN_ROAM_DEINIT,
 					  REASON_DISCONNECTED);
@@ -252,6 +256,9 @@ cm_disconnect_complete_ind(struct wlan_objmgr_vdev *vdev,
 	wlan_tdls_notify_sta_disconnect(vdev_id, false, false, vdev);
 	policy_mgr_decr_session_set_pcl(psoc, op_mode, vdev_id);
 	wlan_clear_mlo_sta_link_removed_flag(vdev);
+	ml_nlink_conn_change_notify(
+		psoc, vdev_id, ml_nlink_disconnect_completion_evt,
+		NULL);
 
 	return QDF_STATUS_SUCCESS;
 }

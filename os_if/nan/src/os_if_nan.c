@@ -633,7 +633,7 @@ static int os_if_nan_parse_security_params(struct nlattr **tb,
 			struct ndp_service_name *service_name)
 {
 	if (!ncs_sk_type || !pmk || !passphrase || !service_name) {
-		osif_err("out buffers for one ore more parameters is null");
+		osif_err("out buffers for one or more parameters is null");
 		return -EINVAL;
 	}
 
@@ -1254,7 +1254,7 @@ static void os_if_ndp_initiator_rsp_handler(struct wlan_objmgr_vdev *vdev,
 		QCA_NL80211_VENDOR_SUBCMD_NDP_INDEX;
 
 	if (!rsp) {
-		osif_err("Invalid NDP Initator response");
+		osif_err("Invalid NDP Initiator response");
 		return;
 	}
 
@@ -1684,7 +1684,7 @@ os_if_ndp_confirm_ind_handler(struct wlan_objmgr_vdev *vdev,
 		QCA_NL80211_VENDOR_SUBCMD_NDP_INDEX;
 
 	if (!ndp_confirm) {
-		osif_err("Invalid NDP Initator response");
+		osif_err("Invalid NDP Initiator response");
 		return;
 	}
 
