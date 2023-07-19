@@ -4911,6 +4911,7 @@ void policy_mgr_handle_link_removal_on_vdev(struct wlan_objmgr_vdev *vdev);
  *                                               concurrency combination
  * @psoc: PSOC object information
  * @is_new_vdev_mlo: Is new vdev a mlo device or not
+ * @new_vdev_id: new vdev id which need concurrency check
  *
  * When a new connection is about to come up check if current
  * concurrency combination including the new connection is
@@ -4919,7 +4920,8 @@ void policy_mgr_handle_link_removal_on_vdev(struct wlan_objmgr_vdev *vdev);
  * Return: True if concurrency is supported, otherwise false.
  */
 bool policy_mgr_is_mlo_sap_concurrency_allowed(struct wlan_objmgr_psoc *psoc,
-					       bool is_new_vdev_mlo);
+					       bool is_new_vdev_mlo,
+					       uint8_t new_vdev_id);
 
 /**
  * policy_mgr_get_conc_ext_flags() - get extended flags for concurrency check
@@ -5118,7 +5120,8 @@ QDF_STATUS policy_mgr_update_active_mlo_num_links(struct wlan_objmgr_psoc *psoc,
 
 static inline bool policy_mgr_is_mlo_sap_concurrency_allowed(
 			struct wlan_objmgr_psoc *psoc,
-			bool is_new_vdev_mlo)
+			bool is_new_vdev_mlo,
+			uint8_t new_vdev_id)
 {
 	return true;
 }

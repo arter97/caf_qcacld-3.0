@@ -6219,7 +6219,8 @@ next:
 
 bool
 policy_mgr_is_mlo_sap_concurrency_allowed(struct wlan_objmgr_psoc *psoc,
-					  bool is_new_vdev_mlo)
+					  bool is_new_vdev_mlo,
+					  uint8_t new_vdev_id)
 {
 	struct policy_mgr_psoc_priv_obj *pm_ctx;
 	uint32_t conn_index;
@@ -6241,6 +6242,8 @@ policy_mgr_is_mlo_sap_concurrency_allowed(struct wlan_objmgr_psoc *psoc,
 			continue;
 
 		vdev_id = pm_conc_connection_list[conn_index].vdev_id;
+		if (vdev_id == new_vdev_id)
+			continue;
 		vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, vdev_id,
 							    WLAN_POLICY_MGR_ID);
 		if (!vdev) {

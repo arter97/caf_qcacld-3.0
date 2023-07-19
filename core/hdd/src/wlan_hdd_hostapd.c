@@ -6145,7 +6145,8 @@ static QDF_STATUS wlan_hdd_mlo_update(struct wlan_hdd_link_info *link_info)
 
 	is_ml_ap = wlan_vdev_mlme_is_mlo_ap(link_info->vdev);
 	if (!policy_mgr_is_mlo_sap_concurrency_allowed(hdd_ctx->psoc,
-						       is_ml_ap)) {
+						       is_ml_ap,
+						       wlan_vdev_get_id(link_info->vdev))) {
 		hdd_err("MLO SAP concurrency check fails");
 		return QDF_STATUS_E_INVAL;
 	}

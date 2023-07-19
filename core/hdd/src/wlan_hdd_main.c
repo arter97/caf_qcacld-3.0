@@ -17702,7 +17702,8 @@ static QDF_STATUS wlan_hdd_mlo_sap_reinit(struct wlan_hdd_link_info *link_info)
 	}
 
 	if (!policy_mgr_is_mlo_sap_concurrency_allowed(hdd_ctx->psoc,
-						       config->mlo_sap)) {
+						       config->mlo_sap,
+						       wlan_vdev_get_id(link_info->vdev))) {
 		hdd_err("MLO SAP concurrency check fails");
 		return QDF_STATUS_E_INVAL;
 	}
