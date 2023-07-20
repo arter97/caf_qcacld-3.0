@@ -1960,6 +1960,14 @@ QDF_STATUS wlansap_sort_channel_list(uint8_t vdev_id, qdf_list_t *list,
 				     struct sap_sel_ch_info *ch_info);
 
 /**
+ * wlansap_free_chan_info() - API to free allocated memory
+ * @ch_param: Pointer to sap_sel_ch_info structure
+ *
+ * Return: None
+ */
+void wlansap_free_chan_info(struct sap_sel_ch_info *ch_param);
+
+/**
  * wlansap_get_user_config_acs_ch_list() - Get user config ACS channel list
  * @vdev_id: Vdev Id
  * @filter: Filter to apply to get scan result

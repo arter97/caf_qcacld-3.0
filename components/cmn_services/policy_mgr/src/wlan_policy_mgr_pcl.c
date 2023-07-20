@@ -4803,3 +4803,57 @@ policy_mgr_get_pcl_channel_for_ll_sap_concurrency(
 	return QDF_STATUS_SUCCESS;
 }
 #endif
+
+#ifdef WLAN_FEATURE_LL_LT_SAP
+QDF_STATUS policy_mgr_get_pcl_ch_list_for_ll_sap(
+					struct wlan_objmgr_psoc *psoc,
+					struct policy_mgr_pcl_list *pcl,
+					uint8_t vdev_id,
+					struct connection_info *info,
+					uint8_t *connection_count)
+{
+	struct policy_mgr_psoc_priv_obj *pm_ctx;
+	uint8_t num_cxn_del = 0;
+	struct policy_mgr_conc_connection_info pm_info = {0};
+	QDF_STATUS status;
+
+	pm_ctx = policy_mgr_get_context(psoc);
+	if (!pm_ctx)
+		return QDF_STATUS_E_FAILURE;
+
+	qdf_mutex_acquire(&pm_ctx->qdf_conc_list_lock);
+
+	/*
+	 * Scenario: Standalone XPAN is present and CSA happens on
+	 * LL_LT_SAP interface.
+	 * During CSA, it will check the PCL list to get the new freq.
+	 * Since there is already LL_LT_SAP interface entry in PCL index.
+	 * It will lead to LL_LT_SAP + LL_LT_SAP concurrencies. To avoid
+	 * that, delete the existing connection entry from PCL index,
+	 * get the PCL list and restore it back.
+	 */
+	policy_mgr_store_and_del_conn_info_by_vdev_id(psoc, vdev_id,
+						      &pm_info, &num_cxn_del);
+
+	status = policy_mgr_get_pcl(psoc, PM_LL_LT_SAP_MODE, pcl->pcl_list,
+				    &pcl->pcl_len, pcl->weight_list,
+				    QDF_ARRAY_SIZE(pcl->weight_list),
+				    vdev_id);
+
+	/*
+	 * Get existing connection info before updating LL_LT_SAP freq list
+	 * This will help to avoid updation of SCC channel in LL_LT_SAP
+	 * freq list.
+	 */
+	*connection_count = policy_mgr_get_connection_info(psoc, info);
+
+	/* Restore the connection entry */
+	if (num_cxn_del > 0)
+		policy_mgr_restore_deleted_conn_info(psoc, &pm_info,
+						     num_cxn_del);
+
+	qdf_mutex_release(&pm_ctx->qdf_conc_list_lock);
+
+	return status;
+}
+#endif

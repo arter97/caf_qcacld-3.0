@@ -1673,6 +1673,9 @@ qdf_freq_t policy_mgr_get_sbs_cut_off_freq(struct wlan_objmgr_psoc *psoc)
 		return 0;
 	}
 
+	if (!policy_mgr_is_hw_sbs_capable(psoc))
+		return 0;
+
 	if (pm_ctx->hw_mode.sbs_lower_band_end_freq)
 		return pm_ctx->hw_mode.sbs_lower_band_end_freq;
 	/*
@@ -12099,6 +12102,7 @@ qdf_freq_t policy_mgr_get_lt_ll_sap_freq(struct wlan_objmgr_psoc *psoc)
 	return _policy_mgr_get_ll_sap_freq(psoc, LL_AP_TYPE_LT);
 }
 
+#ifndef WLAN_FEATURE_LL_LT_SAP
 bool policy_mgr_is_ll_sap_concurrency_valid(struct wlan_objmgr_psoc *psoc,
 					    qdf_freq_t freq,
 					    enum policy_mgr_con_mode mode)
@@ -12127,6 +12131,7 @@ bool policy_mgr_is_ll_sap_concurrency_valid(struct wlan_objmgr_psoc *psoc,
 
 	return true;
 }
+#endif
 
 bool
 policy_mgr_update_indoor_concurrency(struct wlan_objmgr_psoc *psoc,

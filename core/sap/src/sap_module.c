@@ -4373,6 +4373,11 @@ QDF_STATUS wlansap_sort_channel_list(uint8_t vdev_id, qdf_list_t *list,
 	return QDF_STATUS_SUCCESS;
 }
 
+void wlansap_free_chan_info(struct sap_sel_ch_info *ch_param)
+{
+	sap_chan_sel_exit(ch_param);
+}
+
 void wlansap_get_user_config_acs_ch_list(uint8_t vdev_id,
 					 struct scan_filter *filter)
 {

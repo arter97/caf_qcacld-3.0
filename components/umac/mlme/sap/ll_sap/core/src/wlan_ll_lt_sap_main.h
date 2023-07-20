@@ -36,18 +36,17 @@
 bool ll_lt_sap_is_supported(void);
 
 /**
- * ll_lt_sap_get_sorted_user_config_acs_ch_list() - API to get sorted user
- * configured channel list
+ * ll_lt_sap_get_freq_list() - API to get frequency list for LL_LT_SAP
  * @psoc: Pointer to psoc object
+ * @freq_list: Pointer to wlan_ll_lt_sap_freq_list structure
  * @vdev_id: Vdev Id
- * @ch_info: Pointer to ch_info
  *
  * Return: QDF_STATUS
  */
-QDF_STATUS ll_lt_sap_get_sorted_user_config_acs_ch_list(
-					struct wlan_objmgr_psoc *psoc,
-					uint8_t vdev_id,
-					struct sap_sel_ch_info *ch_info);
+QDF_STATUS ll_lt_sap_get_freq_list(struct wlan_objmgr_psoc *psoc,
+				   struct wlan_ll_lt_sap_freq_list *freq_list,
+				   uint8_t vdev_id);
+
 /*
  * ll_lt_sap_init() - Initialize ll_lt_sap infrastructure
  * @vdev: Pointer to vdev

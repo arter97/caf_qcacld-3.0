@@ -1655,27 +1655,7 @@ debug_info:
 	sap_clear_channel_status(mac);
 }
 
-/*==========================================================================
-   FUNCTION    sap_chan_sel_exit
-
-   DESCRIPTION
-    Exit function for free out the allocated memory, to be called
-    at the end of the dfsSelectChannel function
-
-   DEPENDENCIES
-    NA.
-
-   PARAMETERS
-
-    IN
-    ch_info_params       : Pointer to the tSapChSelSpectInfo structure
-
-   RETURN VALUE
-    void     : NULL
-
-   SIDE EFFECTS
-   ============================================================================*/
-static void sap_chan_sel_exit(struct sap_sel_ch_info *ch_info_params)
+void sap_chan_sel_exit(struct sap_sel_ch_info *ch_info_params)
 {
 	/* Free all the allocated memory */
 	qdf_mem_free(ch_info_params->ch_info);

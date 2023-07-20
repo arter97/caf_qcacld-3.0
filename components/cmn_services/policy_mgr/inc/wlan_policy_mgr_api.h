@@ -5376,6 +5376,7 @@ qdf_freq_t policy_mgr_get_lt_ll_sap_freq(struct wlan_objmgr_psoc *psoc);
  */
 qdf_freq_t policy_mgr_get_ht_ll_sap_freq(struct wlan_objmgr_psoc *psoc);
 
+#ifndef WLAN_FEATURE_LL_LT_SAP
 /**
  * policy_mgr_is_ll_sap_concurrency_valid() - Function to check whether
  * low latency SAP + STA/SAP/GC/GO concurrency allowed or not
@@ -5389,7 +5390,15 @@ qdf_freq_t policy_mgr_get_ht_ll_sap_freq(struct wlan_objmgr_psoc *psoc);
 bool policy_mgr_is_ll_sap_concurrency_valid(struct wlan_objmgr_psoc *psoc,
 					    qdf_freq_t freq,
 					    enum policy_mgr_con_mode mode);
-
+#else
+static inline
+bool policy_mgr_is_ll_sap_concurrency_valid(struct wlan_objmgr_psoc *psoc,
+					    qdf_freq_t freq,
+					    enum policy_mgr_con_mode mode)
+{
+	return true;
+}
+#endif
 /**
  * policy_mgr_update_indoor_concurrency() - Function to update the indoor
  * concurrency related regulatory changes
@@ -5649,4 +5658,23 @@ void
 policy_mgr_sap_on_non_psc_channel(struct wlan_objmgr_psoc *psoc,
 				  qdf_freq_t *intf_ch_freq,
 				  uint8_t sap_vdev_id);
+
+#ifdef WLAN_FEATURE_LL_LT_SAP
+/**
+ * policy_mgr_get_pcl_ch_list_for_ll_sap() - Get PCL channel list for LL_LT_SAP
+ * @psoc: psoc object
+ * @pcl: pcl list
+ * @vdev_id: vdev id
+ * @info: pointer to connection_info structure
+ * @connection_count: total number of existing connection present
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS policy_mgr_get_pcl_ch_list_for_ll_sap(
+					struct wlan_objmgr_psoc *psoc,
+					struct policy_mgr_pcl_list *pcl,
+					uint8_t vdev_id,
+					struct connection_info *info,
+					uint8_t *connection_count);
+#endif
 #endif /* __WLAN_POLICY_MGR_API_H */

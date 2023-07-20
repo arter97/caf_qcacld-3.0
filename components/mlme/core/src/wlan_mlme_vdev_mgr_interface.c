@@ -2288,6 +2288,24 @@ wlan_ll_sap_sort_channel_list(uint8_t vdev_id, qdf_list_t *list,
 {
 	return wlansap_sort_channel_list(vdev_id, list, ch_info);
 }
+
+void wlan_ll_sap_free_chan_info(struct sap_sel_ch_info *ch_param)
+{
+	return wlansap_free_chan_info(ch_param);
+}
+
+bool wlan_ll_sap_freq_present_in_pcl(struct policy_mgr_pcl_list *pcl,
+				     qdf_freq_t freq)
+{
+	uint8_t i;
+
+	for (i = 0; i < pcl->pcl_len; i++) {
+		if (pcl->pcl_list[i] == freq)
+			return true;
+	}
+
+	return false;
+}
 #endif
 
 void

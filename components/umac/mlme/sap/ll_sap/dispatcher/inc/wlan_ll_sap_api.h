@@ -16,7 +16,7 @@
 
 /**
  * DOC: contains ll_lt_sap API definitions specific to the bearer
- * switch functionalities
+ * switch, channel selection functionalities
  */
 
 #ifndef _WLAN_LL_LT_SAP_API_H_
@@ -24,6 +24,7 @@
 
 #include <wlan_cmn.h>
 #include <wlan_objmgr_vdev_obj.h>
+#include "wlan_objmgr_psoc_obj.h"
 #include "wlan_ll_sap_public_structs.h"
 #include "wlan_cm_public_struct.h"
 
@@ -77,8 +78,19 @@ QDF_STATUS wlan_ll_sap_switch_bearer_on_sta_connect_complete(
 						struct wlan_objmgr_psoc *psoc,
 						uint8_t vdev_id);
 
+/**
+ * wlan_ll_lt_sap_get_freq_list() - Get frequency list for LL_LT_SAP
+ * @psoc: Pointer to psoc object
+ * @freq_list: Pointer to wlan_ll_lt_sap_freq_list structure
+ * @vdev_id: Vdev Id
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS wlan_ll_lt_sap_get_freq_list(
+				struct wlan_objmgr_psoc *psoc,
+				struct wlan_ll_lt_sap_freq_list *freq_list,
+				uint8_t vdev_id);
 #else
-
 static inline wlan_bs_req_id
 wlan_ll_lt_sap_bearer_switch_get_id(struct wlan_objmgr_vdev *vdev)
 {
@@ -108,6 +120,15 @@ wlan_ll_sap_switch_bearer_on_sta_connect_complete(struct wlan_objmgr_psoc *psoc,
 						  uint8_t vdev_id)
 {
 	return QDF_STATUS_SUCCESS;
+}
+
+static inline
+QDF_STATUS wlan_ll_lt_sap_get_freq_list(
+				struct wlan_objmgr_psoc *psoc,
+				struct wlan_ll_lt_sap_freq_list *freq_list,
+				uint8_t vdev_id)
+{
+	return QDF_STATUS_E_FAILURE;
 }
 #endif /* WLAN_FEATURE_LL_LT_SAP */
 #endif /* _WLAN_LL_LT_SAP_API_H_ */

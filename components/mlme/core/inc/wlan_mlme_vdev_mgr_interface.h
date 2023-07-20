@@ -586,6 +586,25 @@ wlan_handle_emlsr_sta_concurrency(struct wlan_objmgr_psoc *psoc,
 QDF_STATUS
 wlan_ll_sap_sort_channel_list(uint8_t vdev_id, qdf_list_t *list,
 			      struct sap_sel_ch_info *ch_info);
+
+/**
+ * wlan_ll_sap_free_chan_info() - API to free allocated memory
+ * @ch_param: pointer to sap_sel_ch_info structure
+ *
+ * Return: None
+ */
+void wlan_ll_sap_free_chan_info(struct sap_sel_ch_info *ch_param);
+
+/**
+ * wlan_ll_sap_freq_present_in_pcl() - API to check whether given
+ * frequency is present in PCL or not
+ * @pcl: pcl list
+ * @freq: Frequency to check in PCL list
+ *
+ * Return: True/False
+ */
+bool wlan_ll_sap_freq_present_in_pcl(struct policy_mgr_pcl_list *pcl,
+				     qdf_freq_t freq);
 #endif
 
 /**

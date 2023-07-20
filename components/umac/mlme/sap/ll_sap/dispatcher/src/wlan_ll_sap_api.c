@@ -153,3 +153,11 @@ QDF_STATUS wlan_ll_sap_switch_bearer_on_sta_connect_complete(
 
 	return QDF_STATUS_SUCCESS;
 }
+
+QDF_STATUS wlan_ll_lt_sap_get_freq_list(
+				struct wlan_objmgr_psoc *psoc,
+				struct wlan_ll_lt_sap_freq_list *freq_list,
+				uint8_t vdev_id)
+{
+	return ll_lt_sap_get_freq_list(psoc, freq_list, vdev_id);
+}
