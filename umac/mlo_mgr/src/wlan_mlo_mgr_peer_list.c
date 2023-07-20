@@ -459,6 +459,12 @@ QDF_STATUS mlo_dev_mlpeer_list_init(struct wlan_mlo_dev_context *ml_dev)
 				WLAN_UMAC_PSOC_MAX_PEERS +
 				WLAN_MAX_PSOC_TEMP_PEERS);
 
+	if (ml_dev->ap_ctx) {
+		qdf_spinlock_create(&ml_dev->ap_ctx->assoc_list.list_lock);
+		qdf_list_create(&ml_dev->ap_ctx->assoc_list.peer_list,
+				WLAN_UMAC_PSOC_MAX_PEERS);
+	}
+
 	return QDF_STATUS_SUCCESS;
 }
 
@@ -467,11 +473,15 @@ QDF_STATUS mlo_dev_mlpeer_list_deinit(struct wlan_mlo_dev_context *ml_dev)
 	uint16_t i;
 	struct wlan_mlo_peer_list *mlo_peer_list;
 
-	/* deinit the lock */
+	if (ml_dev->ap_ctx) {
+		qdf_list_destroy(&ml_dev->ap_ctx->assoc_list.peer_list);
+		qdf_spinlock_destroy(&ml_dev->ap_ctx->assoc_list.list_lock);
+	}
+
 	mlo_peer_list = &ml_dev->mlo_peer_list;
-	ml_peerlist_lock_destroy(mlo_peer_list);
 	for (i = 0; i < WLAN_PEER_HASHSIZE; i++)
 		qdf_list_destroy(&mlo_peer_list->peer_hash[i]);
 
+	ml_peerlist_lock_destroy(mlo_peer_list);
 	return QDF_STATUS_SUCCESS;
 }

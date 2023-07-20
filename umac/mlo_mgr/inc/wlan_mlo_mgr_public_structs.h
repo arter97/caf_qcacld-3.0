@@ -356,6 +356,16 @@ struct mlo_sta_quiet_status {
 	bool valid_status;
 };
 
+/**
+ * struct wlan_mlo_sta_assoc_pending_list - MLO sta assoc pending list entry
+ * @peer_list: MLO peer list
+ * @list_lock: lock to access members of structure
+ */
+struct wlan_mlo_sta_assoc_pending_list {
+	qdf_list_t peer_list;
+	qdf_spinlock_t list_lock;
+};
+
 /*
  * struct wlan_mlo_sta - MLO sta additional info
  * @wlan_connect_req_links: list of vdevs selected for connection with the MLAP
@@ -404,6 +414,7 @@ struct wlan_mlo_sta {
  * @mlo_ap_lock: lock to sync VDEV SM event
  * @mlo_vdev_quiet_bmap: Bitmap of vdevs for which quiet ie needs to enabled
  * @mlo_vdev_up_bmap: Bitmap of vdevs for which sync complete can be dispatched
+ * @assoc_list: MLO sta assoc pending list entry (for FT-over-DS)
  *
  * NB: not using kernel-doc format since the kernel-doc script doesn't
  *     handle the qdf_bitmap() macro
@@ -418,6 +429,7 @@ struct wlan_mlo_ap {
 #endif
 	qdf_bitmap(mlo_vdev_quiet_bmap, WLAN_UMAC_MLO_MAX_VDEVS);
 	qdf_bitmap(mlo_vdev_up_bmap, WLAN_UMAC_MLO_MAX_VDEVS);
+	struct wlan_mlo_sta_assoc_pending_list assoc_list;
 };
 
 /**
@@ -1230,4 +1242,16 @@ struct peer_entry_ptqm_migrate_event_params {
 	enum primary_link_peer_migration_evenr_status status;
 };
 #endif /* QCA_SUPPORT_PRIMARY_LINK_MIGRATE */
+
+/**
+ * struct wlan_mlo_sta_entry - MLO sta entry
+ * @mac_node: QDF list mac_node member
+ * @peer_mld_addr: MLO peer MAC address
+ */
+
+struct wlan_mlo_sta_entry {
+	qdf_list_node_t mac_node;
+	struct qdf_mac_addr peer_mld_addr;
+};
+
 #endif

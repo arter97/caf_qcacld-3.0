@@ -881,4 +881,41 @@ QDF_STATUS wlan_mlo_peer_wsi_link_add(struct wlan_mlo_peer_context *ml_peer);
  * Return: SUCCESS, if peer details deleted from WSI link stats
  */
 QDF_STATUS wlan_mlo_peer_wsi_link_delete(struct wlan_mlo_peer_context *ml_peer);
+
+/**
+ * wlan_mlo_ap_vdev_add_assoc_entry() - Add mlo ap vdev assoc entry
+ * @vdev: vdev object
+ * @mld_addr: MLD mac address
+ *
+ * API to add mlo ap vdev in assoc list
+ *
+ * Return: void
+ */
+void wlan_mlo_ap_vdev_add_assoc_entry(struct wlan_objmgr_vdev *vdev,
+				      struct qdf_mac_addr *mld_addr);
+
+/**
+ * wlan_mlo_ap_vdev_del_assoc_entry() - Delete mlo ap vdev assoc entry
+ * @vdev: vdev object
+ * @mld_addr: MLD mac address
+ *
+ * API to delete mlo ap vdev in assoc list
+ *
+ * Return: void
+ */
+void wlan_mlo_ap_vdev_del_assoc_entry(struct wlan_objmgr_vdev *vdev,
+				      struct qdf_mac_addr *mld_addr);
+
+/**
+ * wlan_mlo_ap_vdev_find_assoc_entry() - Find mlo ap vdev assoc entry
+ * @vdev: vdev object
+ * @mld_addr: MLD mac address
+ *
+ * API to find mlo ap vdev in assoc list
+ *
+ * Return: sta entry
+ */
+struct wlan_mlo_sta_entry *
+wlan_mlo_ap_vdev_find_assoc_entry(struct wlan_objmgr_vdev *vdev,
+				  struct qdf_mac_addr *mld_addr);
 #endif
