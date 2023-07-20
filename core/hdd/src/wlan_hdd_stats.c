@@ -1123,13 +1123,13 @@ static bool put_wifi_iface_stats(struct wifi_interface_stats *if_stat,
 	    nla_put_u32(vendor_event,
 			QCA_WLAN_VENDOR_ATTR_LL_STATS_IFACE_MGMT_ACTION_TX,
 			link_stats->mgmt_action_tx) ||
-	    nla_put_s32(vendor_event,
+	    nla_put_u32(vendor_event,
 			QCA_WLAN_VENDOR_ATTR_LL_STATS_IFACE_RSSI_MGMT,
 			link_stats->rssi_mgmt) ||
-	    nla_put_s32(vendor_event,
+	    nla_put_u32(vendor_event,
 			QCA_WLAN_VENDOR_ATTR_LL_STATS_IFACE_RSSI_DATA,
 			link_stats->rssi_data) ||
-	    nla_put_s32(vendor_event,
+	    nla_put_u32(vendor_event,
 			QCA_WLAN_VENDOR_ATTR_LL_STATS_IFACE_RSSI_ACK,
 			link_stats->rssi_ack) ||
 	    nla_put_u32(vendor_event,
