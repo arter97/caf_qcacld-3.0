@@ -3173,9 +3173,13 @@ static int wlan_hdd_send_ll_stats_req(struct wlan_hdd_link_info *link_info,
 		qdf_spin_unlock(&priv->ll_stats_lock);
 	}
 	qdf_list_destroy(&priv->ll_stats_q);
-	wlan_hdd_send_mlo_ll_iface_stats(adapter);
-	wlan_hdd_send_mlo_ll_peer_stats(hdd_ctx,
+
+	if (req->reqId != DEBUGFS_LLSTATS_REQID) {
+		wlan_hdd_send_mlo_ll_iface_stats(adapter);
+		wlan_hdd_send_mlo_ll_peer_stats(hdd_ctx,
 					(struct wifi_peer_stat *)mlo_stats);
+	}
+
 	qdf_mem_free(mlo_stats);
 exit:
 	qdf_atomic_set(&adapter->is_ll_stats_req_pending, 0);
