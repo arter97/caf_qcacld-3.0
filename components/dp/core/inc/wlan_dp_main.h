@@ -475,7 +475,7 @@ dp_add_latency_critical_client(struct wlan_objmgr_vdev *vdev,
 			       enum qca_wlan_802_11_mode phymode)
 {
 	struct wlan_dp_link *dp_link = dp_get_vdev_priv_obj(vdev);
-	struct wlan_dp_intf *dp_intf = dp_link->dp_intf;
+	struct wlan_dp_intf *dp_intf;
 
 	if (!dp_link) {
 		dp_err("No dp_link for objmgr vdev %pK", vdev);
@@ -521,7 +521,7 @@ dp_del_latency_critical_client(struct wlan_objmgr_vdev *vdev,
 			       enum qca_wlan_802_11_mode phymode)
 {
 	struct wlan_dp_link *dp_link = dp_get_vdev_priv_obj(vdev);
-	struct wlan_dp_intf *dp_intf = dp_link->dp_intf;
+	struct wlan_dp_intf *dp_intf;
 
 	if (!dp_link) {
 		dp_err("No dp_link for objmgr vdev %pK", vdev);
