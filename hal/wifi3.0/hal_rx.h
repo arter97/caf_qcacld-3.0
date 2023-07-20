@@ -1559,28 +1559,100 @@ enum hal_rx_wbm_rxdma_push_reason {
 	HAL_RX_WBM_RXDMA_PSH_RSN_FLUSH,
 };
 
-static inline void hal_rx_dump_mpdu_start_tlv(struct rx_mpdu_start *mpdu_start,
-					      uint8_t dbg_level,
-					      struct hal_soc *hal)
-{
-
-	hal->ops->hal_rx_dump_mpdu_start_tlv(mpdu_start, dbg_level);
-}
-
 /**
  * hal_rx_dump_msdu_end_tlv() - dump RX msdu_end TLV in structured
  *			        human readable format.
  * @hal_soc: HAL soc
- * @msdu_end: pointer the msdu_end TLV in pkt.
+ * @pkt_tlvs: pointer the pkt_tlvs.
  * @dbg_level: log level.
  *
  * Return: void
  */
 static inline void hal_rx_dump_msdu_end_tlv(struct hal_soc *hal_soc,
-					    struct rx_msdu_end *msdu_end,
+					    void *pkt_tlvs,
 					    uint8_t dbg_level)
 {
-	hal_soc->ops->hal_rx_dump_msdu_end_tlv(msdu_end, dbg_level);
+	hal_soc->ops->hal_rx_dump_msdu_end_tlv(pkt_tlvs, dbg_level);
+}
+
+/**
+ * hal_rx_dump_rx_attention_tlv() - dump RX rx_attention TLV in structured
+ *				    human readable format.
+ * @hal_soc: HAL soc
+ * @pkt_tlvs: pointer the pkt_tlvs.
+ * @dbg_level: log level.
+ *
+ * Return: void
+ */
+static inline void hal_rx_dump_rx_attention_tlv(struct hal_soc *hal_soc,
+						void *pkt_tlvs,
+						uint8_t dbg_level)
+{
+	hal_soc->ops->hal_rx_dump_rx_attention_tlv(pkt_tlvs, dbg_level);
+}
+
+/**
+ * hal_rx_dump_msdu_start_tlv: dump RX msdu_start TLV in structured
+ *			       human readable format.
+ * @hal_soc: HAL soc
+ * @pkt_tlvs: pointer the pkt_tlvs.
+ * @dbg_level: log level.
+ *
+ * Return: void
+ */
+static inline void hal_rx_dump_msdu_start_tlv(struct hal_soc *hal_soc,
+					      void *pkt_tlvs,
+					      uint8_t dbg_level)
+{
+	hal_soc->ops->hal_rx_dump_msdu_start_tlv(pkt_tlvs, dbg_level);
+}
+
+/**
+ * hal_rx_dump_mpdu_start_tlv: dump RX mpdu_start TLV in structured
+ *			       human readable format.
+ * @hal_soc: HAL soc
+ * @pkt_tlvs: pointer the pkt_tlvs.
+ * @dbg_level: log level.
+ *
+ * Return: void
+ */
+static inline void hal_rx_dump_mpdu_start_tlv(struct hal_soc *hal_soc,
+					      void *pkt_tlvs,
+					      uint8_t dbg_level)
+{
+	hal_soc->ops->hal_rx_dump_mpdu_start_tlv(pkt_tlvs, dbg_level);
+}
+
+/**
+ * hal_rx_dump_mpdu_end_tlv: dump RX mpdu_end TLV in structured
+ *			     human readable format.
+ * @hal_soc: HAL soc
+ * @pkt_tlvs: pointer the pkt_tlvs.
+ * @dbg_level: log level.
+ *
+ * Return: void
+ */
+static inline void hal_rx_dump_mpdu_end_tlv(struct hal_soc *hal_soc,
+					    void *pkt_tlvs,
+					    uint8_t dbg_level)
+{
+	hal_soc->ops->hal_rx_dump_mpdu_end_tlv(pkt_tlvs, dbg_level);
+}
+
+/**
+ * hal_rx_dump_pkt_hdr_tlv: dump RX pkt_hdr TLV in structured
+ *			    human readable format.
+ * @hal_soc: HAL soc
+ * @pkt_tlvs: pointer the pkt_tlvs.
+ * @dbg_level: log level.
+ *
+ * Return: void
+ */
+static inline void hal_rx_dump_pkt_hdr_tlv(struct hal_soc *hal_soc,
+					   void *pkt_tlvs,
+					   uint8_t dbg_level)
+{
+	hal_soc->ops->hal_rx_dump_pkt_hdr_tlv(pkt_tlvs, dbg_level);
 }
 
 /**
@@ -1753,22 +1825,6 @@ uint32_t hal_rx_msdu_start_nss_get(hal_soc_handle_t hal_soc_hdl, uint8_t *buf)
 	struct hal_soc *hal_soc = (struct hal_soc *)hal_soc_hdl;
 
 	return hal_soc->ops->hal_rx_msdu_start_nss_get(buf);
-}
-
-/**
- * hal_rx_dump_msdu_start_tlv() - dump RX msdu_start TLV in structured
- *			          human readable format.
- * @hal_soc: HAL SOC
- * @msdu_start: pointer the msdu_start TLV in pkt.
- * @dbg_level: log level.
- *
- * Return: void
- */
-static inline void hal_rx_dump_msdu_start_tlv(struct hal_soc *hal_soc,
-					      struct rx_msdu_start *msdu_start,
-					      uint8_t dbg_level)
-{
-	hal_soc->ops->hal_rx_dump_msdu_start_tlv(msdu_start, dbg_level);
 }
 
 /**

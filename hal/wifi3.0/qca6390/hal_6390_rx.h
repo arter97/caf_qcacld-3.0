@@ -473,15 +473,17 @@ void hal_rx_proc_phyrx_other_receive_info_tlv_6390(void *rx_tlv_hdr,
 
 /**
  * hal_rx_dump_msdu_start_tlv_6390() - dump RX msdu_start TLV in structured
- *                                     human readable format.
- * @msdustart: pointer the msdu_start TLV in pkt.
+ *			               human readable format.
+ * @pkttlvs: pointer to the pkttlvs.
  * @dbg_level: log level.
  *
  * Return: void
  */
-static void hal_rx_dump_msdu_start_tlv_6390(void *msdustart, uint8_t dbg_level)
+static void hal_rx_dump_msdu_start_tlv_6390(void *pkttlvs, uint8_t dbg_level)
 {
-	struct rx_msdu_start *msdu_start = (struct rx_msdu_start *)msdustart;
+	struct rx_pkt_tlvs *pkt_tlvs = (struct rx_pkt_tlvs *)pkttlvs;
+	struct rx_msdu_start *msdu_start =
+					&pkt_tlvs->msdu_start_tlv.rx_msdu_start;
 
 	hal_verbose_debug(
 			  "rx_msdu_start tlv (1/2) - "
@@ -550,16 +552,17 @@ static void hal_rx_dump_msdu_start_tlv_6390(void *msdustart, uint8_t dbg_level)
 
 /**
  * hal_rx_dump_msdu_end_tlv_6390() - dump RX msdu_end TLV in structured
- *                                   human readable format.
- * @msduend: pointer the msdu_end TLV in pkt.
+ *			             human readable format.
+ * @pkttlvs: pointer to the pkttlvs.
  * @dbg_level: log level.
  *
  * Return: void
  */
-static void hal_rx_dump_msdu_end_tlv_6390(void *msduend,
+static void hal_rx_dump_msdu_end_tlv_6390(void *pkttlvs,
 					  uint8_t dbg_level)
 {
-	struct rx_msdu_end *msdu_end = (struct rx_msdu_end *)msduend;
+	struct rx_pkt_tlvs *pkt_tlvs = (struct rx_pkt_tlvs *)pkttlvs;
+	struct rx_msdu_end *msdu_end = &pkt_tlvs->msdu_end_tlv.rx_msdu_end;
 
 	__QDF_TRACE_RL(dbg_level, QDF_MODULE_ID_DP,
 		       "rx_msdu_end tlv (1/2) - "

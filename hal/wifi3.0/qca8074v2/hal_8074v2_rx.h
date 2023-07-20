@@ -607,16 +607,18 @@ void hal_rx_get_rtt_info_8074v2(void *rx_tlv,
 
 /**
  * hal_rx_dump_msdu_start_tlv_8074v2() - dump RX msdu_start TLV in structured
- *                                       human readable format.
- * @msdustart: pointer the msdu_start TLV in pkt.
+ *			               human readable format.
+ * @pkttlvs: pointer to the pkttlvs.
  * @dbg_level: log level.
  *
  * Return: void
  */
-static void hal_rx_dump_msdu_start_tlv_8074v2(void *msdustart,
-					    uint8_t dbg_level)
+static void hal_rx_dump_msdu_start_tlv_8074v2(void *pkttlvs,
+					      uint8_t dbg_level)
 {
-	struct rx_msdu_start *msdu_start = (struct rx_msdu_start *)msdustart;
+	struct rx_pkt_tlvs *pkt_tlvs = (struct rx_pkt_tlvs *)pkttlvs;
+	struct rx_msdu_start *msdu_start =
+					&pkt_tlvs->msdu_start_tlv.rx_msdu_start;
 
 	QDF_TRACE(QDF_MODULE_ID_DP, dbg_level,
 			"rx_msdu_start tlv - "
@@ -682,16 +684,17 @@ static void hal_rx_dump_msdu_start_tlv_8074v2(void *msdustart,
 
 /**
  * hal_rx_dump_msdu_end_tlv_8074v2() - dump RX msdu_end TLV in structured
- *                                     human readable format.
- * @msduend: pointer the msdu_end TLV in pkt.
+ *			             human readable format.
+ * @pkttlvs: pointer to the pkttlvs.
  * @dbg_level: log level.
  *
  * Return: void
  */
-static void hal_rx_dump_msdu_end_tlv_8074v2(void *msduend,
-					  uint8_t dbg_level)
+static void hal_rx_dump_msdu_end_tlv_8074v2(void *pkttlvs,
+					    uint8_t dbg_level)
 {
-	struct rx_msdu_end *msdu_end = (struct rx_msdu_end *)msduend;
+	struct rx_pkt_tlvs *pkt_tlvs = (struct rx_pkt_tlvs *)pkttlvs;
+	struct rx_msdu_end *msdu_end = &pkt_tlvs->msdu_end_tlv.rx_msdu_end;
 
 	QDF_TRACE(QDF_MODULE_ID_DP, dbg_level,
 			"rx_msdu_end tlv - "
