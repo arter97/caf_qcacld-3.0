@@ -1659,17 +1659,19 @@ QDF_STATUS dp_mlo_umac_reset_stats_print(struct dp_soc *soc)
 	return QDF_STATUS_SUCCESS;
 }
 
-bool dp_umac_reset_is_inprogress(struct cdp_soc_t *psoc)
+enum cdp_umac_reset_state
+dp_get_umac_reset_in_progress_state(struct cdp_soc_t *psoc)
 {
 	struct dp_soc_umac_reset_ctx *umac_reset_ctx;
 	struct dp_soc *soc = (struct dp_soc *)psoc;
 	struct dp_soc_mlo_umac_reset_ctx *grp_umac_reset_ctx;
 	struct dp_soc_be *be_soc = NULL;
 	struct dp_mlo_ctxt *mlo_ctx = NULL;
+	enum cdp_umac_reset_state umac_reset_is_inprogress;
 
 	if (!soc) {
 		dp_umac_reset_err("DP SOC is null");
-		return false;
+		return CDP_UMAC_RESET_INVALID_STATE;
 	}
 
 	umac_reset_ctx = &soc->umac_reset_ctx;
@@ -1680,11 +1682,28 @@ bool dp_umac_reset_is_inprogress(struct cdp_soc_t *psoc)
 
 	if (mlo_ctx) {
 		grp_umac_reset_ctx = &mlo_ctx->grp_umac_reset_ctx;
-		return grp_umac_reset_ctx->umac_reset_in_progress;
+		umac_reset_is_inprogress =
+			grp_umac_reset_ctx->umac_reset_in_progress;
 	} else {
-		return (umac_reset_ctx->current_state !=
-				UMAC_RESET_STATE_WAIT_FOR_TRIGGER);
+		umac_reset_is_inprogress = (umac_reset_ctx->current_state !=
+					    UMAC_RESET_STATE_WAIT_FOR_TRIGGER);
 	}
+
+	if (umac_reset_is_inprogress)
+		return CDP_UMAC_RESET_IN_PROGRESS;
+
+	/* Check if the umac reset was in progress during the buffer
+	 * window.
+	 */
+	umac_reset_is_inprogress =
+		((qdf_get_log_timestamp_usecs() -
+		  umac_reset_ctx->ts.post_reset_complete_done) <=
+		 (wlan_cfg_get_umac_reset_buffer_window_ms(soc->wlan_cfg_ctx) *
+		  1000));
+
+	return (umac_reset_is_inprogress ?
+			CDP_UMAC_RESET_IN_PROGRESS_DURING_BUFFER_WINDOW :
+			CDP_UMAC_RESET_NOT_IN_PROGRESS);
 }
 #endif
 

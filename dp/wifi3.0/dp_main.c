@@ -14610,7 +14610,9 @@ static struct cdp_ctrl_ops dp_ops_ctrl = {
 	.txrx_get_pdev_phyrx_error_mask = dp_get_pdev_phyrx_error_mask,
 #endif
 	.txrx_peer_flush_frags = dp_peer_flush_frags,
-	.umac_reset_is_inprogress = dp_umac_reset_is_inprogress,
+#ifdef DP_UMAC_HW_RESET_SUPPORT
+	.get_umac_reset_in_progress_state = dp_get_umac_reset_in_progress_state,
+#endif
 };
 
 static struct cdp_me_ops dp_ops_me = {

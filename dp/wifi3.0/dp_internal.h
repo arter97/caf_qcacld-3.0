@@ -2935,12 +2935,14 @@ QDF_STATUS dp_mlo_umac_reset_stats_print(struct dp_soc *soc)
 QDF_STATUS dp_umac_reset_notify_asserted_soc(struct dp_soc *soc);
 
 /**
- * dp_umac_reset_is_inprogress() - Check if umac reset is in progress
+ * dp_get_umac_reset_in_progress_state() - API to check umac reset in progress
+ * state
  * @psoc: dp soc handle
  *
- * Return: true if umac reset is in progress, else false.
+ * Return: umac reset state
  */
-bool dp_umac_reset_is_inprogress(struct cdp_soc_t *psoc);
+enum cdp_umac_reset_state
+dp_get_umac_reset_in_progress_state(struct cdp_soc_t *psoc);
 #else
 static inline
 QDF_STATUS dp_umac_reset_notify_asserted_soc(struct dp_soc *soc)
@@ -2948,10 +2950,10 @@ QDF_STATUS dp_umac_reset_notify_asserted_soc(struct dp_soc *soc)
 	return QDF_STATUS_SUCCESS;
 }
 
-static inline
-bool dp_umac_reset_is_inprogress(struct cdp_soc_t *psoc)
+static inline enum cdp_umac_reset_state
+dp_get_umac_reset_in_progress_state(struct cdp_soc_t *psoc)
 {
-	return false;
+	return CDP_UMAC_RESET_NOT_IN_PROGRESS;
 }
 #endif
 

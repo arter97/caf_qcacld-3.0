@@ -338,6 +338,9 @@ struct wlan_srng_cfg {
  * @pointer_timer_threshold_rx: RX REO2SW ring pointer update timer threshold
  * @pointer_num_threshold_rx: RX REO2SW ring pointer update entries threshold
  * @rx_rr: rx round robin enable / disable
+ * @umac_reset_buffer_window: Buffer time to check if umac reset was in progress
+ *                            during this window, configured time is in
+ *                            milliseconds.
  */
 struct wlan_cfg_dp_soc_ctxt {
 	int num_int_ctxts;
@@ -538,6 +541,9 @@ struct wlan_cfg_dp_soc_ctxt {
 	uint8_t pointer_num_threshold_rx;
 #ifdef WLAN_SUPPORT_RX_FLOW_TAG
 	bool rx_rr;
+#endif
+#ifdef DP_UMAC_HW_RESET_SUPPORT
+	uint32_t umac_reset_buffer_window;
 #endif
 };
 
@@ -2498,4 +2504,20 @@ wlan_cfg_get_pointer_timer_threshold_rx(struct wlan_cfg_dp_soc_ctxt *cfg);
 uint8_t
 wlan_cfg_get_pointer_num_threshold_rx(struct wlan_cfg_dp_soc_ctxt *cfg);
 
+#ifdef DP_UMAC_HW_RESET_SUPPORT
+/**
+ * wlan_cfg_get_umac_reset_buffer_window_ms() - Get umac reset buffer window
+ * @cfg: soc configuration context
+ *
+ * Return: Umac reset buffer window in milliseconds
+ */
+uint32_t
+wlan_cfg_get_umac_reset_buffer_window_ms(struct wlan_cfg_dp_soc_ctxt *cfg);
+#else
+static inline uint32_t
+wlan_cfg_get_umac_reset_buffer_window_ms(struct wlan_cfg_dp_soc_ctxt *cfg)
+{
+	return 0;
+}
+#endif /* DP_UMAC_HW_RESET_SUPPORT */
 #endif /*__WLAN_CFG_H*/
