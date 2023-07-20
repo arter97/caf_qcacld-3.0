@@ -321,12 +321,21 @@ static QDF_STATUS dp_mlo_add_ptnr_vdev(struct dp_vdev *vdev1,
 	struct dp_vdev_be *vdev2_be = dp_get_be_vdev_from_dp_vdev(vdev2);
 
 	/* return when valid entry  exists */
-	if (vdev2_be->partner_vdev_list[soc_be->mlo_chip_id][pdev_id] !=
+	if (vdev1->is_bridge_vdev) {
+		if (vdev2_be->bridge_vdev_list[soc_be->mlo_chip_id][pdev_id] !=
 							CDP_INVALID_VDEV_ID)
-		return QDF_STATUS_SUCCESS;
+			return QDF_STATUS_SUCCESS;
 
-	vdev2_be->partner_vdev_list[soc_be->mlo_chip_id][pdev_id] =
+		vdev2_be->bridge_vdev_list[soc_be->mlo_chip_id][pdev_id] =
 						vdev1->vdev_id;
+	} else {
+		if (vdev2_be->partner_vdev_list[soc_be->mlo_chip_id][pdev_id] !=
+							CDP_INVALID_VDEV_ID)
+			return QDF_STATUS_SUCCESS;
+
+		vdev2_be->partner_vdev_list[soc_be->mlo_chip_id][pdev_id] =
+						vdev1->vdev_id;
+	}
 
 	mlo_debug("Add vdev%d to vdev%d list, mlo_chip_id = %d pdev_id = %d\n",
 		  vdev1->vdev_id, vdev2->vdev_id, soc_be->mlo_chip_id, pdev_id);
@@ -451,13 +460,58 @@ void dp_clr_mlo_ptnr_list(struct dp_soc *soc, struct dp_vdev *vdev)
 
 			/* remove self vdev from partner list */
 			pr_vdev_be = dp_get_be_vdev_from_dp_vdev(pr_vdev);
-			pr_vdev_be->partner_vdev_list[soc_id][pdev_id] =
-				CDP_INVALID_VDEV_ID;
+			if (vdev->is_bridge_vdev)
+				pr_vdev_be->bridge_vdev_list[soc_id][pdev_id] =
+					CDP_INVALID_VDEV_ID;
+			else
+				pr_vdev_be->partner_vdev_list[soc_id][pdev_id] =
+					CDP_INVALID_VDEV_ID;
 
 			/* remove partner vdev from self list */
 			pr_pdev = pr_vdev->pdev;
 			vdev_be->partner_vdev_list[pr_soc_be->mlo_chip_id][pr_pdev->pdev_id] =
 				CDP_INVALID_VDEV_ID;
+
+			dp_vdev_unref_delete(pr_soc, pr_vdev, DP_MOD_ID_RX);
+		}
+	}
+
+	for (i = 0; i < WLAN_MAX_MLO_CHIPS; i++) {
+		for (j = 0; j < WLAN_MAX_MLO_LINKS_PER_SOC; j++) {
+			struct dp_vdev *pr_vdev = NULL;
+			struct dp_soc *pr_soc = NULL;
+			struct dp_soc_be *pr_soc_be = NULL;
+			struct dp_pdev *pr_pdev = NULL;
+			struct dp_vdev_be *pr_vdev_be = NULL;
+
+			if (vdev_be->bridge_vdev_list[i][j] ==
+			    CDP_INVALID_VDEV_ID)
+				continue;
+
+			pr_soc = dp_mlo_get_soc_ref_by_chip_id(dp_mlo, i);
+			if (!pr_soc)
+				continue;
+			pr_soc_be = dp_get_be_soc_from_dp_soc(pr_soc);
+			pr_vdev = dp_vdev_get_ref_by_id(
+						pr_soc,
+						vdev_be->bridge_vdev_list[i][j],
+						DP_MOD_ID_RX);
+			if (!pr_vdev)
+				continue;
+
+			/* remove self vdev from partner list */
+			pr_vdev_be = dp_get_be_vdev_from_dp_vdev(pr_vdev);
+			if (vdev->is_bridge_vdev)
+				pr_vdev_be->bridge_vdev_list[soc_id][pdev_id] =
+					CDP_INVALID_VDEV_ID;
+			else
+				pr_vdev_be->partner_vdev_list[soc_id][pdev_id] =
+					CDP_INVALID_VDEV_ID;
+
+			/* remove partner vdev from self list */
+			pr_pdev = pr_vdev->pdev;
+			vdev_be->bridge_vdev_list[pr_soc_be->mlo_chip_id][pr_pdev->pdev_id] =
+					CDP_INVALID_VDEV_ID;
 
 			dp_vdev_unref_delete(pr_soc, pr_vdev, DP_MOD_ID_RX);
 		}
@@ -810,7 +864,8 @@ static QDF_STATUS dp_mlo_get_mld_vdev_stats(struct cdp_soc_t *soc_hdl,
 		dp_mlo_iter_ptnr_vdev(be_soc, vdev_be,
 				      dp_mlo_aggr_ptnr_iface_stats_mlo_links,
 				      buf,
-				      DP_MOD_ID_GENERIC_STATS);
+				      DP_MOD_ID_GENERIC_STATS,
+				      DP_ALL_VDEV_ITER);
 	} else {
 		dp_aggregate_interface_stats(vdev, buf);
 
@@ -820,7 +875,8 @@ static QDF_STATUS dp_mlo_get_mld_vdev_stats(struct cdp_soc_t *soc_hdl,
 		/* Aggregate stats from partner vdevs */
 		dp_mlo_iter_ptnr_vdev(be_soc, vdev_be,
 				      dp_mlo_aggr_ptnr_iface_stats, buf,
-				      DP_MOD_ID_GENERIC_STATS);
+				      DP_MOD_ID_GENERIC_STATS,
+				      DP_ALL_VDEV_ITER);
 	}
 
 complete:
@@ -1141,13 +1197,20 @@ void dp_mlo_iter_ptnr_vdev(struct dp_soc_be *be_soc,
 			   struct dp_vdev_be *be_vdev,
 			   dp_ptnr_vdev_iter_func func,
 			   void *arg,
-			   enum dp_mod_id mod_id)
+			   enum dp_mod_id mod_id,
+			   uint8_t type)
 {
 	int i = 0;
 	int j = 0;
 	struct dp_mlo_ctxt *dp_mlo = be_soc->ml_ctxt;
 
-	for (i = 0; i < WLAN_MAX_MLO_CHIPS ; i++) {
+	if (type < DP_LINK_VDEV_ITER || type > DP_ALL_VDEV_ITER) {
+		dp_err("invalid iterate type");
+		return;
+	}
+
+	for (i = 0; (i < WLAN_MAX_MLO_CHIPS) &&
+	     IS_LINK_VDEV_ITER_REQUIRED(type); i++) {
 		struct dp_soc *ptnr_soc =
 				dp_mlo_get_soc_ref_by_chip_id(dp_mlo, i);
 
@@ -1165,6 +1228,29 @@ void dp_mlo_iter_ptnr_vdev(struct dp_soc_be *be_soc,
 			(*func)(be_vdev, ptnr_vdev, arg);
 			dp_vdev_unref_delete(ptnr_vdev->pdev->soc,
 					     ptnr_vdev,
+					     mod_id);
+		}
+	}
+
+	for (i = 0; (i < WLAN_MAX_MLO_CHIPS) &&
+	     IS_BRIDGE_VDEV_ITER_REQUIRED(type); i++) {
+		struct dp_soc *ptnr_soc =
+				dp_mlo_get_soc_ref_by_chip_id(dp_mlo, i);
+
+		if (!ptnr_soc)
+			continue;
+		for (j = 0 ; j < WLAN_MAX_MLO_LINKS_PER_SOC ; j++) {
+			struct dp_vdev *bridge_vdev;
+
+			bridge_vdev = dp_vdev_get_ref_by_id(
+					ptnr_soc,
+					be_vdev->bridge_vdev_list[i][j],
+					mod_id);
+			if (!bridge_vdev)
+				continue;
+			(*func)(be_vdev, bridge_vdev, arg);
+			dp_vdev_unref_delete(bridge_vdev->pdev->soc,
+					     bridge_vdev,
 					     mod_id);
 		}
 	}
