@@ -370,13 +370,17 @@ util_parse_bvmlie_perstaprofile_stactrl(uint8_t *subelempayload,
 					struct qdf_mac_addr *macaddr,
 					bool is_staprof_reqd,
 					uint8_t **staprof,
-					qdf_size_t *staprof_len)
+					qdf_size_t *staprof_len,
+					struct mlo_nstr_info *nstr_info,
+					bool *is_nstrlp_present)
 {
 	qdf_size_t parsed_payload_len = 0;
 	uint16_t stacontrol;
 	uint8_t completeprofile;
 	uint8_t nstrlppresent;
 	enum wlan_ml_bv_linfo_perstaprof_stactrl_nstrbmsz nstrbmsz;
+	qdf_size_t nstrlpoffset = 0;
+	uint8_t link_id;
 
 	/* This helper returns the location(s) and where required, the length(s)
 	 * of (sub)field(s) inferable after parsing the STA Control field in the
@@ -416,11 +420,11 @@ util_parse_bvmlie_perstaprofile_stactrl(uint8_t *subelempayload,
 	stacontrol = le16toh(stacontrol);
 	parsed_payload_len += WLAN_ML_BV_LINFO_PERSTAPROF_STACTRL_SIZE;
 
-	if (linkid) {
-		*linkid = QDF_GET_BITS(stacontrol,
-				       WLAN_ML_BV_LINFO_PERSTAPROF_STACTRL_LINKID_IDX,
-				       WLAN_ML_BV_LINFO_PERSTAPROF_STACTRL_LINKID_BITS);
-	}
+	link_id = QDF_GET_BITS(stacontrol,
+			       WLAN_ML_BV_LINFO_PERSTAPROF_STACTRL_LINKID_IDX,
+			       WLAN_ML_BV_LINFO_PERSTAPROF_STACTRL_LINKID_BITS);
+	if (linkid)
+		*linkid = link_id;
 
 	/* Check if this a complete profile */
 	completeprofile = QDF_GET_BITS(stacontrol,
@@ -556,6 +560,7 @@ util_parse_bvmlie_perstaprofile_stactrl(uint8_t *subelempayload,
 			     WLAN_ML_BV_LINFO_PERSTAPROF_STACTRL_NSTRLINKPRP_BITS);
 
 	if (completeprofile && nstrlppresent) {
+		nstrlpoffset = parsed_payload_len;
 		/* Check NTSR Bitmap Size bit */
 		nstrbmsz =
 			QDF_GET_BITS(stacontrol,
@@ -589,6 +594,20 @@ util_parse_bvmlie_perstaprofile_stactrl(uint8_t *subelempayload,
 			 */
 			mlo_err_rl("Invalid NSTR Bitmap size %u", nstrbmsz);
 			return QDF_STATUS_E_PROTO;
+		}
+		if (nstr_info) {
+			nstr_info->nstr_lp_present = nstrlppresent;
+			nstr_info->nstr_bmp_size = nstrbmsz;
+			*is_nstrlp_present = true;
+			nstr_info->link_id = link_id;
+
+			if (nstrbmsz == WLAN_ML_BV_LINFO_PERSTAPROF_STACTRL_NSTRBMSZ_1_OCTET) {
+				nstr_info->nstr_lp_bitmap =
+					*(uint8_t *)(subelempayload + nstrlpoffset);
+			} else if (nstrbmsz == WLAN_ML_BV_LINFO_PERSTAPROF_STACTRL_NSTRBMSZ_2_OCTETS) {
+				nstr_info->nstr_lp_bitmap =
+					qdf_le16_to_cpu(*(uint16_t *)(subelempayload + nstrlpoffset));
+			}
 		}
 	}
 
@@ -757,6 +776,7 @@ QDF_STATUS util_parse_partner_info_from_linkinfo(uint8_t *linkinfo,
 {
 	uint8_t linkid;
 	struct qdf_mac_addr macaddr;
+	struct mlo_nstr_info nstr_info = {0};
 	bool is_macaddr_valid;
 	uint8_t *linkinfo_currpos;
 	qdf_size_t linkinfo_remlen;
@@ -766,6 +786,7 @@ QDF_STATUS util_parse_partner_info_from_linkinfo(uint8_t *linkinfo,
 	qdf_size_t subelemseqpayloadlen;
 	qdf_size_t defragpayload_len;
 	QDF_STATUS ret;
+	bool is_nstrlp_present = false;
 
 	/* This helper function parses partner info from the per-STA profiles
 	 * present (if any) in the Link Info field in the payload of a Multi
@@ -883,9 +904,24 @@ QDF_STATUS util_parse_partner_info_from_linkinfo(uint8_t *linkinfo,
 								      &macaddr,
 								      false,
 								      NULL,
-								      NULL);
+								      NULL,
+								      &nstr_info,
+								      &is_nstrlp_present);
 			if (QDF_IS_STATUS_ERROR(ret)) {
 				return ret;
+			}
+
+			if (is_nstrlp_present) {
+				if (partner_info->num_nstr_info_links >=
+					QDF_ARRAY_SIZE(partner_info->nstr_info)) {
+					mlo_err_rl("Insufficient size %zu of array for nstr link info",
+						   QDF_ARRAY_SIZE(partner_info->nstr_info));
+					return QDF_STATUS_E_NOMEM;
+				}
+				qdf_mem_copy(&partner_info->nstr_info[partner_info->num_nstr_info_links],
+					     &nstr_info, sizeof(nstr_info));
+				partner_info->num_nstr_info_links++;
+				is_nstrlp_present = false;
 			}
 
 			if (is_macaddr_valid) {
@@ -1754,6 +1790,8 @@ util_find_bvmlie_persta_prof_for_linkid(uint8_t req_link_id,
 								      &macaddr,
 								      false,
 								      NULL,
+								      NULL,
+								      NULL,
 								      NULL);
 			if (QDF_IS_STATUS_ERROR(ret))
 				return ret;
@@ -2179,7 +2217,9 @@ QDF_STATUS util_gen_link_reqrsp_cmn(uint8_t *frame, qdf_size_t frame_len,
 						      &reportedmacaddr,
 						      true,
 						      &sta_prof_currpos,
-						      &sta_prof_remlen);
+						      &sta_prof_remlen,
+						      NULL,
+						      NULL);
 	if (QDF_IS_STATUS_ERROR(ret)) {
 		qdf_mem_free(mlieseqpayload_copy);
 		return ret;

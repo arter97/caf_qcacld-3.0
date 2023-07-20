@@ -557,6 +557,20 @@ struct wlan_mlo_mld_cap {
 };
 
 /**
+ * struct mlo_nstr_info - MLO NSTR capability info
+ * @link_id: Lind Id
+ * @nstr_lp_present: Flag for NSTR link pair presence
+ * @nstr_bmp_size: NSTR Bitmap Size
+ * @nstr_lp_bitmap: NSTR link pair bitmap of link_id
+ */
+struct mlo_nstr_info {
+	uint8_t link_id;
+	bool nstr_lp_present;
+	uint8_t nstr_bmp_size;
+	uint16_t nstr_lp_bitmap;
+};
+
+/**
  * struct wlan_mlo_peer_context - MLO peer context
  *
  * @peer_node:     peer list node for ml_dev qdf list
@@ -589,6 +603,7 @@ struct wlan_mlo_mld_cap {
  * @primary_umac_migration_in_progress: flag to indicate primary umac migration
  * in progress
  * @mlpeer_mldcap: MLD Capability information for ML peer
+ * @mlpeer_nstrinfo: NSTR Capability info
  */
 struct wlan_mlo_peer_context {
 	qdf_list_node_t peer_node;
@@ -631,6 +646,7 @@ struct wlan_mlo_peer_context {
 	uint8_t migrate_primary_umac_psoc_id;
 	bool primary_umac_migration_in_progress;
 	struct wlan_mlo_mld_cap mlpeer_mldcap;
+	struct mlo_nstr_info mlpeer_nstrinfo[WLAN_UMAC_MLO_MAX_VDEVS];
 };
 
 /**
@@ -662,12 +678,16 @@ struct mlo_link_info {
  * @num_partner_links: no. of partner links
  * @partner_link_info: per partner link info
  * @t2lm_enable_val: enum wlan_t2lm_enable
+ * @nstr_info: NSTR Capability info
+ * @num_nstr_info_links: No. of links for which NSTR info is present
  */
 struct mlo_partner_info {
 	uint8_t num_partner_links;
 	struct mlo_link_info partner_link_info[WLAN_UMAC_MLO_MAX_VDEVS];
 #ifdef WLAN_FEATURE_11BE
 	enum wlan_t2lm_enable t2lm_enable_val;
+	struct mlo_nstr_info nstr_info[WLAN_UMAC_MLO_MAX_VDEVS];
+	uint8_t num_nstr_info_links;
 #endif
 };
 
