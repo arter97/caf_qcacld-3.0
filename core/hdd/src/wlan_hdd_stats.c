@@ -758,6 +758,9 @@ wlan_hdd_put_mlo_peer_link_id(struct sk_buff *vendor_event,
 	struct wlan_hdd_link_info *link_info;
 	struct wlan_hdd_mlo_iface_stats_info info = {0};
 
+	if (wlan_hdd_validate_context(hdd_ctx))
+		return false;
+
 	link_info = hdd_get_link_info_by_bssid(hdd_ctx,
 					       (const uint8_t *)bssid->bytes);
 	if (!link_info) {
