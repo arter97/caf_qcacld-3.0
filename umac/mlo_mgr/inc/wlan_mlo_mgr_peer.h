@@ -714,4 +714,41 @@ QDF_STATUS wlan_mlo_validate_reassocreq(struct wlan_mlo_peer_context *ml_peer);
  */
 void wlan_objmgr_mlo_update_primary_info(struct wlan_objmgr_peer *peer);
 #endif
+
+/**
+ * wlan_mlo_ap_vdev_add_assoc_entry() - Add mlo ap vdev assoc entry
+ * @vdev: vdev object
+ * @mld_addr: MLD mac address
+ *
+ * API to add mlo ap vdev in assoc list
+ *
+ * Return: void
+ */
+void wlan_mlo_ap_vdev_add_assoc_entry(struct wlan_objmgr_vdev *vdev,
+				      struct qdf_mac_addr *mld_addr);
+
+/**
+ * wlan_mlo_ap_vdev_add_assoc_entry() - Delete mlo ap vdev assoc entry
+ * @vdev: vdev object
+ * @mld_addr: MLD mac address
+ *
+ * API to delete mlo ap vdev in assoc list
+ *
+ * Return: void
+ */
+void wlan_mlo_ap_vdev_del_assoc_entry(struct wlan_objmgr_vdev *vdev,
+				      struct qdf_mac_addr *mld_addr);
+
+/**
+ * wlan_mlo_ap_vdev_add_assoc_entry() - Find mlo ap vdev assoc entry
+ * @vdev: vdev object
+ * @mld_addr: MLD mac address
+ *
+ * API to find mlo ap vdev in assoc list
+ *
+ * Return: void
+ */
+struct wlan_mlo_sta_entry *
+wlan_mlo_ap_vdev_find_assoc_entry(struct wlan_objmgr_vdev *vdev,
+				  struct qdf_mac_addr *mld_addr);
 #endif

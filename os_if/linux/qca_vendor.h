@@ -11339,6 +11339,7 @@ enum qca_wlan_vendor_attr_add_sta_node_params {
 	 * defined in enum nl80211_auth_type.
 	 */
 	QCA_WLAN_VENDOR_ATTR_ADD_STA_NODE_AUTH_ALGO = 2,
+	QCA_WLAN_VENDOR_ATTR_ADD_STA_NODE_IS_ML = 3,
 
 	/* keep last */
 	QCA_WLAN_VENDOR_ATTR_ADD_STA_NODE_PARAM_AFTER_LAST,
