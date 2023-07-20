@@ -4799,11 +4799,6 @@ int wlan_cfg_get_int_timer_threshold_other(struct wlan_cfg_dp_soc_ctxt *cfg)
 	return cfg->int_timer_threshold_other;
 }
 
-int wlan_cfg_get_int_timer_threshold_mon(struct wlan_cfg_dp_soc_ctxt *cfg)
-{
-	return cfg->int_timer_threshold_mon;
-}
-
 int wlan_cfg_get_p2p_checksum_offload(struct wlan_cfg_dp_soc_ctxt *cfg)
 {
 	return cfg->p2p_tcp_udp_checksumoffload;
