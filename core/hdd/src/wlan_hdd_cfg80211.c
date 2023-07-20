@@ -3741,6 +3741,27 @@ wlan_hdd_ll_lt_sap_get_valid_last_acs_freq(struct hdd_adapter *adapter)
 }
 
 /**
+ * hdd_remove_6ghz_freq_from_acs_list(): Removed 6 GHz frequecies from ACS list
+ * @org_freq_list: ACS frequecny list
+ * @org_ch_list_count: Number of frequencies in ACS list
+ *
+ * Return: None
+ */
+static void hdd_remove_6ghz_freq_from_acs_list(uint32_t *org_freq_list,
+					       uint8_t *org_ch_list_count)
+{
+	uint16_t i, ch_list_count = 0;
+
+	hdd_debug("Remove 6 GHz channels from ACS list");
+	for (i = 0; i < *org_ch_list_count; i++) {
+		if (wlan_reg_is_6ghz_chan_freq(org_freq_list[i]))
+			continue;
+		org_freq_list[ch_list_count++] = org_freq_list[i];
+	}
+	*org_ch_list_count = ch_list_count;
+}
+
+/**
  * __wlan_hdd_cfg80211_do_acs(): CFG80211 handler function for DO_ACS Vendor CMD
  * @wiphy:  Linux wiphy struct pointer
  * @wdev:   Linux wireless device struct pointer
@@ -4041,6 +4062,12 @@ static int __wlan_hdd_cfg80211_do_acs(struct wiphy *wiphy,
 
 	ll_lt_sap = policy_mgr_is_vdev_ll_lt_sap(hdd_ctx->psoc,
 						 link_info->vdev_id);
+
+	if (wlan_reg_get_keep_6ghz_sta_cli_connection(hdd_ctx->pdev))
+		hdd_remove_6ghz_freq_from_acs_list(
+					sap_config->acs_cfg.freq_list,
+					&sap_config->acs_cfg.ch_list_count);
+
 	if ((is_external_acs_policy &&
 	    policy_mgr_is_force_scc(hdd_ctx->psoc) &&
 	    policy_mgr_get_connection_count(hdd_ctx->psoc)) || ll_lt_sap) {
