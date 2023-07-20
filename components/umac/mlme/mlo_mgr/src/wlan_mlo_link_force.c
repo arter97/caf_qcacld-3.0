@@ -428,13 +428,15 @@ bool ml_is_nlink_service_supported(struct wlan_objmgr_psoc *psoc)
 }
 
 /* Exclude AP removed link */
-#define NLINK_EXCLUDE_REMOVED_LINK	0x01
+#define NLINK_EXCLUDE_REMOVED_LINK      0x01
 /* Include AP removed link only, can't work with other flags */
 #define NLINK_INCLUDE_REMOVED_LINK_ONLY 0x02
 /* Exclude QUITE link */
-#define NLINK_EXCLUDE_QUIET_LINK	0x04
+#define NLINK_EXCLUDE_QUIET_LINK        0x04
 /* Exclude standby link information */
-#define NLINK_EXCLUDE_STANDBY_LINK	0x08
+#define NLINK_EXCLUDE_STANDBY_LINK      0x08
+/* Dump link information */
+#define NLINK_DUMP_LINK                 0x10
 
 static void
 ml_nlink_get_standby_link_info(struct wlan_objmgr_psoc *psoc,
@@ -500,12 +502,12 @@ ml_nlink_get_standby_link_info(struct wlan_objmgr_psoc *psoc,
 			ml_vdev_lst[*ml_num_link] = WLAN_INVALID_VDEV_ID;
 			ml_linkid_lst[*ml_num_link] = link_info->link_id;
 			*ml_link_bitmap |= 1 << link_info->link_id;
-
-			mlo_debug("vdev %d link %d freq %d bitmap 0x%x flag 0x%x",
-				  ml_vdev_lst[*ml_num_link],
-				  ml_linkid_lst[*ml_num_link],
-				  ml_freq_lst[*ml_num_link],
-				  *ml_link_bitmap, flag);
+			if (flag & NLINK_DUMP_LINK)
+				mlo_debug("vdev %d link %d freq %d bitmap 0x%x flag 0x%x",
+					  ml_vdev_lst[*ml_num_link],
+					  ml_linkid_lst[*ml_num_link],
+					  ml_freq_lst[*ml_num_link],
+					  *ml_link_bitmap, flag);
 			(*ml_num_link)++;
 		}
 
@@ -615,10 +617,11 @@ static void ml_nlink_get_link_info(struct wlan_objmgr_psoc *psoc,
 		ml_vdev_lst[num_link] = vdev_id;
 		ml_linkid_lst[num_link] = link_id;
 		link_bitmap |= 1 << link_id;
-
-		mlo_debug("vdev %d link %d freq %d bitmap 0x%x flag 0x%x",
-			  ml_vdev_lst[num_link], ml_linkid_lst[num_link],
-			  ml_freq_lst[num_link], link_bitmap, flag);
+		if (flag & NLINK_DUMP_LINK)
+			mlo_debug("vdev %d link %d freq %d bitmap 0x%x flag 0x%x",
+				  ml_vdev_lst[num_link],
+				  ml_linkid_lst[num_link],
+				  ml_freq_lst[num_link], link_bitmap, flag);
 		num_link++;
 	}
 	/* Add standby link only if mlo sta is connected */
@@ -716,7 +719,8 @@ ml_nlink_handle_mcc_links(struct wlan_objmgr_psoc *psoc,
 	uint8_t ml_linkid_lst[MAX_NUMBER_OF_CONC_CONNECTIONS];
 	struct ml_link_info ml_link_info[MAX_NUMBER_OF_CONC_CONNECTIONS];
 
-	ml_nlink_get_link_info(psoc, vdev, NLINK_INCLUDE_REMOVED_LINK_ONLY,
+	ml_nlink_get_link_info(psoc, vdev, NLINK_INCLUDE_REMOVED_LINK_ONLY |
+						NLINK_DUMP_LINK,
 			       QDF_ARRAY_SIZE(ml_linkid_lst),
 			       ml_link_info, ml_freq_lst, ml_vdev_lst,
 			       ml_linkid_lst, &ml_num_link,
@@ -727,7 +731,8 @@ ml_nlink_handle_mcc_links(struct wlan_objmgr_psoc *psoc,
 		mlo_debug("AP removed link 0x%x", force_inactive_link_bitmap);
 	}
 
-	ml_nlink_get_link_info(psoc, vdev, NLINK_EXCLUDE_REMOVED_LINK,
+	ml_nlink_get_link_info(psoc, vdev, NLINK_EXCLUDE_REMOVED_LINK |
+						NLINK_DUMP_LINK,
 			       QDF_ARRAY_SIZE(ml_linkid_lst),
 			       ml_link_info, ml_freq_lst, ml_vdev_lst,
 			       ml_linkid_lst, &ml_num_link,
@@ -1683,7 +1688,9 @@ ml_nlink_update_force_inactive(struct wlan_objmgr_psoc *psoc,
 				MLO_LINK_FORCE_MODE_INACTIVE,
 				0,
 				new->force_inactive_bitmap,
-				0, link_ctrl_f_overwrite_inactive_bitmap);
+				0,
+				link_ctrl_f_overwrite_inactive_bitmap |
+				link_ctrl_f_post_re_evaluate);
 	}
 
 end:
@@ -1709,7 +1716,8 @@ ml_nlink_update_force_inactive_num(struct wlan_objmgr_psoc *psoc,
 					new->force_inactive_num,
 					new->force_inactive_num_bitmap,
 					0,
-					link_ctrl_f_dynamic_force_link_num);
+					link_ctrl_f_dynamic_force_link_num |
+					link_ctrl_f_post_re_evaluate);
 	}
 
 	return status;
@@ -1785,6 +1793,12 @@ static QDF_STATUS ml_nlink_state_change(struct wlan_objmgr_psoc *psoc,
 		goto end;
 	if (!mlo_check_if_all_links_up(vdev))
 		goto end;
+	if (mlo_mgr_is_link_switch_in_progress(vdev) &&
+	    evt != ml_nlink_connect_completion_evt) {
+		mlo_debug("mlo vdev %d link switch in progress!",
+			  wlan_vdev_get_id(vdev));
+		goto end;
+	}
 
 	ml_nlink_get_curr_force_state(psoc, vdev, &curr_force_state);
 

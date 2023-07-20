@@ -4714,6 +4714,7 @@ policy_mgr_handle_link_enable_disable_resp(struct wlan_objmgr_vdev *vdev,
 	struct mlo_link_set_active_req *req = arg;
 	struct wlan_objmgr_psoc *psoc;
 	struct policy_mgr_psoc_priv_obj *pm_ctx;
+	QDF_STATUS status = QDF_STATUS_SUCCESS;
 
 	psoc = wlan_vdev_get_psoc(vdev);
 	if (!psoc) {
@@ -4776,10 +4777,17 @@ policy_mgr_handle_link_enable_disable_resp(struct wlan_objmgr_vdev *vdev,
 
 complete_evnt:
 	policy_mgr_set_link_in_progress(pm_ctx, false);
+	if (ml_is_nlink_service_supported(psoc) &&
+	    req && resp && !resp->status &&
+	    req->param.control_flags.post_re_evaluate)
+		status = ml_nlink_conn_change_notify(
+			psoc, wlan_vdev_get_id(vdev),
+			ml_nlink_connection_updated_evt, NULL);
 	qdf_mutex_release(&pm_ctx->qdf_conc_list_lock);
 
 	/* reschedule force scc workqueue after link state changes */
-	if (req && resp && !resp->status)
+	if (req && resp && !resp->status &&
+	    status == QDF_STATUS_SUCCESS)
 		policy_mgr_check_concurrent_intf_and_restart_sap(psoc, false);
 }
 #else
@@ -6300,6 +6308,8 @@ policy_mgr_mlo_sta_set_nlink(struct wlan_objmgr_psoc *psoc,
 									true;
 	if (link_control_flags & link_ctrl_f_dynamic_force_link_num)
 		req->param.control_flags.dynamic_force_link_num = true;
+	if (link_control_flags & link_ctrl_f_post_re_evaluate)
+		req->param.control_flags.post_re_evaluate = true;
 
 	status =
 	wlan_vdev_get_bss_peer_mld_mac(vdev,

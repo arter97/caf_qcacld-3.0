@@ -1086,9 +1086,10 @@ QDF_STATUS cm_connect_start_ind(struct wlan_objmgr_vdev *vdev,
 					   wlan_vdev_get_id(vdev),
 					   HS_20_AP, &src_cfg);
 	}
-	ml_nlink_conn_change_notify(
-		psoc, wlan_vdev_get_id(vdev),
-		ml_nlink_connect_start_evt, NULL);
+	if (req->source != CM_MLO_LINK_SWITCH_CONNECT)
+		ml_nlink_conn_change_notify(
+			psoc, wlan_vdev_get_id(vdev),
+			ml_nlink_connect_start_evt, NULL);
 
 	return QDF_STATUS_SUCCESS;
 }
