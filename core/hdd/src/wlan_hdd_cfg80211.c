@@ -22506,6 +22506,7 @@ wlan_hdd_add_vlan(struct wlan_objmgr_vdev *vdev, struct sap_context *sap_ctx,
 	ol_txrx_soc_handle soc_txrx_handle;
 	uint16_t *vlan_map = sap_ctx->vlan_map;
 	uint8_t found = 0;
+	bool keyindex_valid;
 	int i = 0;
 
 	psoc = wlan_vdev_get_psoc(vdev);
@@ -22514,7 +22515,7 @@ wlan_hdd_add_vlan(struct wlan_objmgr_vdev *vdev, struct sap_context *sap_ctx,
 		return -EINVAL;
 	}
 
-	for (i = 0; i < (MAX_VLAN - 1); i += 2) {
+	for (i = 0; i < (MAX_VLAN * 2); i += 2) {
 		if (!vlan_map[i] || !vlan_map[i + 1]) {
 			found = 1;
 			break;
@@ -22527,7 +22528,9 @@ wlan_hdd_add_vlan(struct wlan_objmgr_vdev *vdev, struct sap_context *sap_ctx,
 		}
 	}
 
-	if (found) {
+	keyindex_valid = (i + key_index - 1) < (2 * MAX_VLAN) ? true : false;
+
+	if (found && keyindex_valid) {
 		soc_txrx_handle = wlan_psoc_get_dp_handle(psoc);
 		vlan_map[i + key_index - 1] = params->vlan_id;
 		wlan_hdd_set_vlan_groupkey(soc_txrx_handle,
