@@ -5655,6 +5655,10 @@ typedef enum {
 		   PDEV_PARAM_SET_DISABLED_SCHED_MODES),
 	PDEV_PARAM(pdev_param_set_conc_low_latency_mode,
 		   PDEV_PARAM_SET_CONC_LOW_LATENCY_MODE),
+	PDEV_PARAM(pdev_param_probe_resp_retry_limit,
+		   PDEV_PARAM_PROBE_RESP_RETRY_LIMIT),
+	PDEV_PARAM(pdev_param_cts_timeout, PDEV_PARAM_CTS_TIMEOUT),
+	PDEV_PARAM(pdev_param_slot_time, PDEV_PARAM_SLOT_TIME),
 	pdev_param_max,
 } wmi_conv_pdev_params_id;
 
