@@ -26,6 +26,7 @@
 #include "wlan_mlo_mgr_roam.h"
 #include "wlan_mlme_main.h"
 #include "wlan_mlo_mgr_link_switch.h"
+#include "target_if.h"
 
 void
 ml_nlink_convert_linkid_bitmap_to_vdev_bitmap(
@@ -424,8 +425,16 @@ ml_nlink_get_affect_ml_sta(struct wlan_objmgr_psoc *psoc)
 
 bool ml_is_nlink_service_supported(struct wlan_objmgr_psoc *psoc)
 {
-	/*todo: check WMI_SERVICE_N_LINK_MLO_SUPPORT service bit */
-	return false;
+	struct wmi_unified *wmi_handle;
+
+	wmi_handle = get_wmi_unified_hdl_from_psoc(psoc);
+	if (!wmi_handle) {
+		mlo_err("Invalid WMI handle");
+		return false;
+	}
+	return wmi_service_enabled(
+			wmi_handle,
+			wmi_service_n_link_mlo_support);
 }
 
 /* Exclude AP removed link */
