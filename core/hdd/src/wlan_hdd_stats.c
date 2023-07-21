@@ -710,20 +710,32 @@ wlan_hdd_update_mlo_iface_stats_info(struct hdd_context *hdd_ctx,
 /**
  * wlan_hdd_put_mlo_link_iface_info() - Send per mlo link info to framework
  * @hdd_ctx: Pointer to hdd_context
+ * @if_stat: Pointer to wifi_interface_stats
  * @skb: Pointer to data buffer
- * @vdev_id: vdev_id of the mlo link
  *
  * Return: True on success, False on failure
  */
 static bool
 wlan_hdd_put_mlo_link_iface_info(struct hdd_context *hdd_ctx,
-				 struct sk_buff *skb, uint8_t vdev_id)
+				 struct wifi_interface_stats *if_stat,
+				 struct sk_buff *skb)
 {
 	struct wlan_hdd_mlo_iface_stats_info info = {0};
 
-	if (wlan_hdd_update_mlo_iface_stats_info(hdd_ctx, &info, vdev_id)) {
+	if (!if_stat) {
+		hdd_err("invalid wifi interface stats");
+		return false;
+	}
+
+	if (wlan_hdd_update_mlo_iface_stats_info(hdd_ctx, &info,
+						 if_stat->vdev_id)) {
 		hdd_err("Unable to get mlo link iface info for vdev_id[%u]",
-			vdev_id);
+			if_stat->vdev_id);
+		return false;
+	}
+
+	if (if_stat->info.state != WIFI_ASSOCIATED) {
+		hdd_debug_rl("vdev_id[%u] is not associated", if_stat->vdev_id);
 		return false;
 	}
 
@@ -1601,8 +1613,8 @@ static void wlan_hdd_send_mlo_ll_iface_stats(struct hdd_adapter *adapter)
 	struct hdd_mlo_adapter_info *mlo_adapter_info;
 	struct hdd_adapter *link_adapter, *ml_adapter;
 	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
-	u32 num_peers;
-	uint8_t i;
+	u32 num_peers, per_link_peers;
+	uint8_t i, j = 0;
 	int8_t rssi;
 	struct wifi_interface_stats cumulative_if_stat = {0};
 	struct wifi_interface_stats *link_if_stat;
@@ -1626,6 +1638,9 @@ static void wlan_hdd_send_mlo_ll_iface_stats(struct hdd_adapter *adapter)
 		ml_adapter = hdd_adapter_get_mlo_adapter_from_link(adapter);
 
 	link_info = ml_adapter->deflink;
+	rssi = link_info->rssi;
+	num_peers = hdd_ctx->num_mlo_peers;
+
 	skb = wlan_cfg80211_vendor_cmd_alloc_reply_skb(hdd_ctx->wiphy,
 						       LL_STATS_EVENT_BUF_SIZE);
 
@@ -1634,16 +1649,13 @@ static void wlan_hdd_send_mlo_ll_iface_stats(struct hdd_adapter *adapter)
 		return;
 	}
 
-	link_if_stat = qdf_mem_malloc(sizeof(*link_if_stat) * WLAN_MAX_MLD);
+	link_if_stat = qdf_mem_malloc(sizeof(*link_if_stat) * num_peers);
 	if (!link_if_stat) {
 		hdd_err("failed to allocate memory for link iface stat");
 		goto err;
 	}
 
 	hdd_debug("WMI_MLO_LINK_STATS_IFACE Data");
-
-	rssi = link_info->hdd_stats.summary_stat.rssi;
-	num_peers = hdd_ctx->num_mlo_peers;
 
 	if (!hdd_get_interface_info(link_info, &cumulative_if_stat.info)) {
 		hdd_err("hdd_get_interface_info get fail for ml_adapter");
@@ -1661,16 +1673,23 @@ static void wlan_hdd_send_mlo_ll_iface_stats(struct hdd_adapter *adapter)
 			continue;
 
 		link_info = link_adapter->deflink;
+		if (!hdd_cm_is_vdev_associated(link_info)) {
+			hdd_debug_rl("vdev_id[%u] is not associated\n",
+				     link_info->vdev_id);
+			continue;
+		}
 
 		if (hdd_adapter_is_associated_with_ml_adapter(link_adapter)) {
 			if (wlan_hdd_get_iface_stats(ml_adapter->deflink,
-						     &link_if_stat[i]))
+						     &link_if_stat[j]))
 				goto err;
+			j++;
 			continue;
 		}
 
 		if (wlan_hdd_get_iface_stats(link_info, &link_if_stat[i]))
 			goto err;
+		j++;
 
 		if (rssi <= link_info->rssi) {
 			rssi = link_info->rssi;
@@ -1700,20 +1719,22 @@ static void wlan_hdd_send_mlo_ll_iface_stats(struct hdd_adapter *adapter)
 		goto err;
 	}
 
-	for (i = 0; i < WLAN_MAX_MLD; i++) {
+	for (i = 0; i < num_peers; i++) {
 		ml_iface_stats = nla_nest_start(skb, i);
 		if (!ml_iface_stats) {
 			hdd_err("per link mlo iface stats failed");
 			goto err;
 		}
 
-		num_peers = link_info->ll_iface_stats.link_stats.num_peers;
+		per_link_peers =
+			link_info->ll_iface_stats.link_stats.num_peers;
 
-		if (!wlan_hdd_put_mlo_link_iface_info(hdd_ctx, skb,
-						      link_if_stat[i].vdev_id))
+		if (!wlan_hdd_put_mlo_link_iface_info(hdd_ctx,
+						      &link_if_stat[i], skb))
 			goto err;
 
-		if (!put_wifi_iface_stats(&link_if_stat[i], num_peers, skb)) {
+		if (!put_wifi_iface_stats(&link_if_stat[i],
+					  per_link_peers, skb)) {
 			hdd_err("put_wifi_iface_stats failed for link[%u]", i);
 			goto err;
 		}
@@ -1733,7 +1754,7 @@ err:
 static void wlan_hdd_send_mlo_ll_iface_stats(struct hdd_adapter *adapter)
 {
 	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
-	u32 num_peers;
+	u32 num_peers, per_link_peers;
 	uint8_t i = 0;
 	int8_t rssi = WLAN_INVALID_PER_CHAIN_RSSI;
 	struct wifi_interface_stats cumulative_if_stat = {0};
@@ -1761,7 +1782,10 @@ static void wlan_hdd_send_mlo_ll_iface_stats(struct hdd_adapter *adapter)
 		return;
 	}
 
-	link_if_stat = qdf_mem_malloc(sizeof(*link_if_stat) * WLAN_MAX_MLD);
+	link_info = adapter->deflink;
+	num_peers = hdd_ctx->num_mlo_peers;
+
+	link_if_stat = qdf_mem_malloc(sizeof(*link_if_stat) * num_peers);
 	if (!link_if_stat) {
 		hdd_err("failed to allocate memory for link iface stat");
 		goto err;
@@ -1769,13 +1793,18 @@ static void wlan_hdd_send_mlo_ll_iface_stats(struct hdd_adapter *adapter)
 
 	hdd_debug("WMI_MLO_LINK_STATS_IFACE Data");
 
-	link_info = adapter->deflink;
 	if (!hdd_get_interface_info(link_info, &cumulative_if_stat.info)) {
 		hdd_err("hdd_get_interface_info get fail for ml_adapter");
 		goto err;
 	}
 
 	hdd_adapter_for_each_active_link_info(adapter, link_info) {
+		if (!hdd_cm_is_vdev_associated(link_info)) {
+			hdd_debug_rl("vdev_id[%u] is Not associated",
+				     link_info->vdev_id);
+			continue;
+		}
+
 		if (rssi <= link_info->rssi) {
 			rssi = link_info->rssi;
 			update_stats = true;
@@ -1798,7 +1827,6 @@ static void wlan_hdd_send_mlo_ll_iface_stats(struct hdd_adapter *adapter)
 	if (QDF_IS_STATUS_ERROR(status))
 		hdd_err_rl("Update mld_mac failed for mlo iface stats");
 
-	num_peers = hdd_ctx->num_mlo_peers;
 	if (!put_wifi_iface_stats(&cumulative_if_stat, num_peers, skb)) {
 		hdd_err("put_wifi_iface_stats fail");
 		goto err;
@@ -1812,21 +1840,22 @@ static void wlan_hdd_send_mlo_ll_iface_stats(struct hdd_adapter *adapter)
 		goto err;
 	}
 
-	for (i = 0; i < WLAN_MAX_MLD; i++) {
+	for (i = 0; i < num_peers; i++) {
 		ml_iface_stats = nla_nest_start(skb, i);
 		if (!ml_iface_stats) {
 			hdd_err("per link mlo iface stats failed");
 			goto err;
 		}
 
-		num_peers =
+		per_link_peers =
 			adapter->deflink->ll_iface_stats.link_stats.num_peers;
 
-		if (!wlan_hdd_put_mlo_link_iface_info(hdd_ctx, skb,
-						      link_if_stat[i].vdev_id))
+		if (!wlan_hdd_put_mlo_link_iface_info(hdd_ctx,
+						      &link_if_stat[i], skb))
 			goto err;
 
-		if (!put_wifi_iface_stats(&link_if_stat[i], num_peers, skb)) {
+		if (!put_wifi_iface_stats(&link_if_stat[i],
+					  per_link_peers, skb)) {
 			hdd_err("put_wifi_iface_stats failed for link[%u]", i);
 			goto err;
 		}
