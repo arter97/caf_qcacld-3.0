@@ -123,6 +123,8 @@
  * @u.tx.ext_cb_ptr: extended cb pointer
  * @u.tx.fctx: ctx to handle special pkts defined by ftype
  * @u.tx.ftype: ftype
+ * @u.tx.xmit_type: xmit type of packet (MLD/Legacy)
+ * @u.tx.reserved: unused
  * @u.tx.vdev_id: vdev_id
  * @u.tx.len: len
  * @u.tx.flags:
@@ -287,7 +289,9 @@ struct qdf_nbuf_cb {
 		struct {
 			void *ext_cb_ptr;
 			void *fctx;
-			uint8_t ftype;
+			uint8_t ftype:4,
+				xmit_type:1,
+				reserved:3;
 			uint8_t vdev_id;
 			uint16_t len;
 			union {
@@ -355,6 +359,9 @@ QDF_COMPILE_TIME_ASSERT(qdf_nbuf_cb_size,
 
 #define QDF_NBUF_CB_RX_FTYPE(skb) \
 	(((struct qdf_nbuf_cb *)((skb)->cb))->u.rx.ftype)
+
+#define QDF_NBUF_CB_PKT_XMIT_TYPE(skb) \
+	(((struct qdf_nbuf_cb *)((skb)->cb))->u.tx.xmit_type)
 
 #define QDF_NBUF_CB_RX_CHFRAG_START(skb) \
 	(((struct qdf_nbuf_cb *) \

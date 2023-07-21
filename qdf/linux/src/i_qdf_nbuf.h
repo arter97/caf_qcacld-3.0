@@ -187,8 +187,16 @@ typedef void (*qdf_nbuf_free_t)(__qdf_nbuf_t);
 		QDF_NBUF_CB_TX_FTYPE((skb)) = (type); \
 	} while (0)
 
+#define __qdf_nbuf_set_vdev_xmit_type(skb, type) \
+	do { \
+		QDF_NBUF_CB_PKT_XMIT_TYPE((skb)) = (type); \
+	} while (0)
+
 #define __qdf_nbuf_get_tx_ftype(skb) \
 		 QDF_NBUF_CB_TX_FTYPE((skb))
+
+#define __qdf_nbuf_get_vdev_xmit_type(skb) \
+		 QDF_NBUF_CB_PKT_XMIT_TYPE((skb))
 
 
 #define __qdf_nbuf_set_rx_ftype(skb, type) \

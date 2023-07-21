@@ -1648,7 +1648,26 @@ qdf_nbuf_set_rx_ftype(qdf_nbuf_t buf, enum cb_ftype type)
 	__qdf_nbuf_set_rx_ftype(buf, type);
 }
 
+#if defined(CONFIG_NBUF_AP_PLATFORM)
+static inline void qdf_nbuf_set_vdev_xmit_type(qdf_nbuf_t buf, uint8_t type)
+{
+	__qdf_nbuf_set_vdev_xmit_type(buf, type);
+}
 
+static inline uint8_t qdf_nbuf_get_vdev_xmit_type(qdf_nbuf_t buf)
+{
+	return __qdf_nbuf_get_vdev_xmit_type(buf);
+}
+#else
+static inline void qdf_nbuf_set_vdev_xmit_type(qdf_nbuf_t buf, uint8_t type)
+{
+}
+
+static inline uint8_t qdf_nbuf_get_vdev_xmit_type(qdf_nbuf_t buf)
+{
+	return 0;
+}
+#endif
 
 static inline uint8_t
 qdf_nbuf_get_vdev_ctx(qdf_nbuf_t buf)
