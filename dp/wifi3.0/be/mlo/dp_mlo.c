@@ -73,6 +73,7 @@ dp_mlo_ctxt_attach_wifi3(struct cdp_ctrl_mlo_mgr *ctrl_ctxt)
 
 	qdf_spinlock_create(&mlo_ctxt->ml_soc_list_lock);
 	qdf_spinlock_create(&mlo_ctxt->grp_umac_reset_ctx.grp_ctx_lock);
+	dp_mlo_dev_ctxt_list_attach(mlo_ctxt);
 	return dp_mlo_ctx_to_cdp(mlo_ctxt);
 }
 
@@ -91,6 +92,7 @@ static void dp_mlo_ctxt_detach_wifi3(struct cdp_mlo_ctxt *cdp_ml_ctxt)
 
 	qdf_spinlock_destroy(&mlo_ctxt->grp_umac_reset_ctx.grp_ctx_lock);
 	qdf_spinlock_destroy(&mlo_ctxt->ml_soc_list_lock);
+	dp_mlo_dev_ctxt_list_detach(mlo_ctxt);
 	dp_mlo_peer_find_hash_detach_be(mlo_ctxt);
 	qdf_mem_free(mlo_ctxt);
 }
