@@ -4097,6 +4097,10 @@ static void dp_peer_rx_tids_init(struct dp_peer *peer)
 
 void dp_peer_rx_init(struct dp_pdev *pdev, struct dp_peer *peer)
 {
+	struct dp_soc *soc = peer->vdev->pdev->soc;
+	struct dp_txrx_peer *txrx_peer = peer->txrx_peer;
+	struct dp_vdev *vdev = peer->vdev;
+
 	dp_peer_rx_tids_init(peer);
 
 	peer->active_ba_session_cnt = 0;
@@ -4110,7 +4114,15 @@ void dp_peer_rx_init(struct dp_pdev *pdev, struct dp_peer *peer)
 	 * Other queues will be setup on receiving first packet, which will cause
 	 * NULL REO queue error
 	 */
-	dp_rx_tid_setup_wifi3(peer, 0, 1, 0);
+	if (qdf_unlikely(vdev->mesh_vdev) ||
+	    qdf_unlikely(txrx_peer->nawds_enabled))
+		dp_rx_tid_setup_wifi3(
+				peer, 0,
+				hal_get_rx_max_ba_window(soc->hal_soc, 0),
+				0);
+	else
+		dp_rx_tid_setup_wifi3(peer, 0, 1, 0);
+
 
 	/*
 	 * Setup the rest of TID's to handle LFR
