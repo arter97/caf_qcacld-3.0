@@ -1541,7 +1541,7 @@ static void dp_sawf_dump_tx_stats(struct sawf_tx_stats *tx_stats)
 	dp_sawf_print_stats("tx_success: num = %u bytes = %lu",
 		       tx_stats->tx_success.num,
 		       tx_stats->tx_success.bytes);
-	dp_sawf_print_stats("tx_ingress: num = %u bytes = %lu",
+	dp_sawf_print_stats("tx_ingress: num = %u bytes = %llu",
 			    tx_stats->tx_ingress.num,
 			    tx_stats->tx_ingress.bytes);
 	dp_sawf_print_stats("dropped: fw_rem num = %u bytes = %lu",
