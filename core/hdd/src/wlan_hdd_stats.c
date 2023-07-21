@@ -7370,6 +7370,7 @@ static int wlan_hdd_get_sta_stats(struct wlan_hdd_link_info *link_info,
 }
 
 #if defined(WLAN_FEATURE_11BE_MLO)
+#define WLAN_INVALID_RSSI_VALUE -128
 /**
  * wlan_hdd_copy_hdd_stats_to_sinfo() - Copy hdd station stats info to sinfo
  * @sinfo: Pointer to kernel station info struct
@@ -7446,15 +7447,8 @@ wlan_hdd_update_mlo_sinfo(struct wlan_hdd_link_info *link_info,
 		return;
 	}
 
-	if (!hdd_adapter_is_link_adapter(link_info->adapter))
-		/* Send Assoc Link's Signal and Rates to userspace */
-		wlan_hdd_update_mlo_rate_info(hdd_sinfo, sinfo);
-
-	/* If Partner link RSSI is better then update
-	 * Partner Link's Signal and Rates to userspace
-	 */
-	if (hdd_adapter_is_link_adapter(link_info->adapter) &&
-	    sinfo->signal > hdd_sinfo->signal) {
+	/* Update the rate info for link with best RSSI */
+	if (sinfo->signal > hdd_sinfo->signal) {
 		hdd_nofl_debug("Updating rates for vdev_id[%d]",
 			       link_info->vdev_id);
 		wlan_hdd_update_mlo_rate_info(hdd_sinfo, sinfo);
@@ -7491,6 +7485,9 @@ static int wlan_hdd_get_mlo_sta_stats(struct hdd_adapter *adapter,
 	struct wlan_hdd_station_stats_info hdd_sinfo = {0};
 	uint8_t i;
 
+	/* Initialize the signal value to a default RSSI of -128dBm */
+	hdd_sinfo.signal = WLAN_INVALID_RSSI_VALUE;
+
 	ml_adapter = adapter;
 	if (hdd_adapter_is_link_adapter(ml_adapter))
 		ml_adapter = hdd_adapter_get_mlo_adapter_from_link(adapter);
@@ -7521,6 +7518,9 @@ static int wlan_hdd_get_mlo_sta_stats(struct hdd_adapter *adapter,
 {
 	struct wlan_hdd_link_info *link_info;
 	struct wlan_hdd_station_stats_info hdd_sinfo = {0};
+
+	/* Initialize the signal value to a default RSSI of -128dBm */
+	hdd_sinfo.signal = WLAN_INVALID_RSSI_VALUE;
 
 	hdd_adapter_for_each_active_link_info(adapter, link_info) {
 		wlan_hdd_get_sta_stats(link_info, mac, sinfo);
@@ -7654,7 +7654,7 @@ static int __wlan_hdd_cfg80211_get_station(struct wiphy *wiphy,
 
 		if (!wlan_hdd_send_mlo_aggregated_stats(link_info, mac)) {
 			hdd_debug("Sending Assoc Link stats");
-			return wlan_hdd_get_sta_stats(adapter->deflink,
+			return wlan_hdd_get_sta_stats(link_info,
 						      mac, sinfo);
 		}
 
