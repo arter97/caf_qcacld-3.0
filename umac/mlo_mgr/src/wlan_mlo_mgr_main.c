@@ -30,6 +30,7 @@
 #include "wlan_mlo_mgr_msgq.h"
 #include <target_if_mlo_mgr.h>
 #include <wlan_mlo_t2lm.h>
+#include "cdp_txrx_cmn.h"
 
 static void mlo_global_ctx_deinit(void)
 {
@@ -791,6 +792,7 @@ static QDF_STATUS mlo_dev_ctx_init(struct wlan_objmgr_vdev *vdev)
 	struct qdf_mac_addr *mld_addr;
 	struct mlo_mgr_context *g_mlo_ctx = wlan_objmgr_get_mlo_ctx();
 	uint8_t id = 0;
+	struct wlan_objmgr_psoc *psoc = NULL;
 
 	if (wlan_vdev_mlme_is_mlo_bridge_vdev(vdev)) {
 		status = mlo_add_to_bridge_vdev_list(vdev);
@@ -801,6 +803,12 @@ static QDF_STATUS mlo_dev_ctx_init(struct wlan_objmgr_vdev *vdev)
 
 	mld_addr = (struct qdf_mac_addr *)wlan_vdev_mlme_get_mldaddr(vdev);
 	ml_dev = wlan_mlo_get_mld_ctx_by_mldaddr(mld_addr);
+	psoc = wlan_vdev_get_psoc(vdev);
+
+	if (!psoc) {
+		mlo_err("Failed to get psoc");
+		return QDF_STATUS_E_FAILURE;
+	}
 
 	if (ml_dev) {
 		if (mlo_dev_config_check(ml_dev, vdev) != QDF_STATUS_SUCCESS)
@@ -869,6 +877,25 @@ static QDF_STATUS mlo_dev_ctx_init(struct wlan_objmgr_vdev *vdev)
 		}
 	}
 
+	/* Create DP MLO Device Context */
+	if (cdp_mlo_dev_ctxt_create(wlan_psoc_get_dp_handle(psoc),
+				    (uint8_t *)mld_addr) !=
+				    QDF_STATUS_SUCCESS) {
+		tsf_recalculation_lock_destroy(ml_dev);
+		if (wlan_vdev_mlme_get_opmode(vdev) == QDF_STA_MODE) {
+			qdf_mem_free(ml_dev->sta_ctx);
+#if defined(WLAN_FEATURE_11BE_MLO) && defined(WLAN_MLO_MULTI_CHIP)
+			qdf_mem_free(ml_dev->bridge_sta_ctx);
+#endif
+		} else if (wlan_vdev_mlme_get_opmode(vdev) == QDF_SAP_MODE) {
+			mlo_ap_ctx_deinit(ml_dev);
+		}
+		mlo_dev_lock_destroy(ml_dev);
+		qdf_mem_free(ml_dev);
+		mlo_err("Failed to create DP MLO Dev ctxt");
+		return QDF_STATUS_E_NOMEM;
+	}
+
 	mlo_dev_mlpeer_list_init(ml_dev);
 
 	ml_link_lock_acquire(g_mlo_ctx);
@@ -933,9 +960,17 @@ static QDF_STATUS mlo_dev_ctx_deinit(struct wlan_objmgr_vdev *vdev)
 	struct mlo_mgr_context *g_mlo_ctx = wlan_objmgr_get_mlo_ctx();
 	uint8_t id = 0;
 	struct wlan_cm_connect_req *connect_req;
+	struct wlan_objmgr_psoc *psoc = NULL;
 
 	mld_addr = (struct qdf_mac_addr *)wlan_vdev_mlme_get_mldaddr(vdev);
 	ml_dev = wlan_mlo_get_mld_ctx_by_mldaddr(mld_addr);
+	psoc = wlan_vdev_get_psoc(vdev);
+
+	if (!psoc) {
+		mlo_err("Failed to get psoc");
+		return QDF_STATUS_E_FAILURE;
+	}
+
 	if (!ml_dev) {
 		mlo_err("Failed to get MLD dev context by mld addr "QDF_MAC_ADDR_FMT,
 			QDF_MAC_ADDR_REF(mld_addr->bytes));
@@ -1014,6 +1049,15 @@ static QDF_STATUS mlo_dev_ctx_deinit(struct wlan_objmgr_vdev *vdev)
 		mlo_ptqm_migration_deinit(ml_dev);
 		mlo_t2lm_ctx_deinit(vdev);
 		mlo_epcs_ctx_deinit(ml_dev);
+
+		/* Destroy DP MLO Device Context */
+		if (cdp_mlo_dev_ctxt_destroy(wlan_psoc_get_dp_handle(psoc),
+					     (uint8_t *)mld_addr) !=
+					     QDF_STATUS_SUCCESS) {
+			mlo_err("Failed to destroy DP MLO Dev ctxt");
+			QDF_BUG(0);
+		}
+
 		tsf_recalculation_lock_destroy(ml_dev);
 		mlo_dev_lock_destroy(ml_dev);
 		qdf_mem_free(ml_dev);
