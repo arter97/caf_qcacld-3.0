@@ -3122,4 +3122,18 @@ struct cdp_txrx_peer_params_update {
 	uint8_t	pdev_id;
 };
 
+/**
+ * enum cdp_umac_reset_state - umac reset in progress state
+ * @CDP_UMAC_RESET_NOT_IN_PROGRESS: Umac reset is not in progress
+ * @CDP_UMAC_RESET_IN_PROGRESS: Umac reset is in progress
+ * @CDP_UMAC_RESET_IN_PROGRESS_DURING_BUFFER_WINDOW: Umac reset was in progress
+ *                                                   during this buffer window.
+ * @CDP_UMAC_RESET_INVALID_STATE: Umac reset invalid state
+ */
+enum cdp_umac_reset_state {
+	CDP_UMAC_RESET_NOT_IN_PROGRESS,
+	CDP_UMAC_RESET_IN_PROGRESS,
+	CDP_UMAC_RESET_IN_PROGRESS_DURING_BUFFER_WINDOW,
+	CDP_UMAC_RESET_INVALID_STATE
+};
 #endif
