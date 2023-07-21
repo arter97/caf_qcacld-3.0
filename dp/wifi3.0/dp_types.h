@@ -198,6 +198,19 @@ typedef void dp_ptnr_soc_iter_func(struct dp_soc *ptnr_soc, void *arg,
 #define DP_VDEV_ITERATE_SKIP_SELF 0
 #endif
 
+/**
+ * enum dp_pkt_xmit_type - The type of ingress stats are being referred
+ *
+ * @DP_XMIT_LINK: Packet ingress-ed on Link
+ * @DP_XMIT_MLD: Packet ingress-ed on MLD
+ * @DP_XMIT_TOTAL: Packets ingress-ed on MLD and LINK
+ */
+enum dp_pkt_xmit_type {
+	DP_XMIT_LINK,
+	DP_XMIT_MLD,
+	DP_XMIT_TOTAL,
+};
+
 enum rx_pktlog_mode {
 	DP_RX_PKTLOG_DISABLED = 0,
 	DP_RX_PKTLOG_FULL,
@@ -2472,8 +2485,7 @@ struct dp_arch_ops {
 					       uint8_t link_id);
 	void (*dp_get_vdev_stats_for_unmap_peer)(
 					struct dp_vdev *vdev,
-					struct dp_peer *peer,
-					struct cdp_vdev_stats **vdev_stats);
+					struct dp_peer *peer);
 	QDF_STATUS (*dp_get_interface_stats)(struct cdp_soc_t *soc_hdl,
 					     uint8_t vdev_id,
 					     void *buf,
@@ -3731,6 +3743,27 @@ struct dp_peer;
 #define WLAN_ROAM_PEER_AUTH_STATUS_AUTHENTICATED 0x2
 #endif
 
+/**
+ * struct dp_vdev_stats - vdev stats structure for dp vdev
+ * @tx_i: ingress tx stats, contains legacy and MLO ingress tx stats
+ * @rx_i: ingress rx stats
+ * @tx: cdp tx stats
+ * @rx: cdp rx stats
+ * @tso_stats: tso stats
+ * @tid_tx_stats: tid tx stats
+ */
+struct dp_vdev_stats {
+	struct cdp_tx_ingress_stats tx_i[DP_INGRESS_STATS_MAX_SIZE];
+	struct cdp_rx_ingress_stats rx_i;
+	struct cdp_tx_stats tx;
+	struct cdp_rx_stats rx;
+	struct cdp_tso_stats tso_stats;
+#ifdef HW_TX_DELAY_STATS_ENABLE
+	struct cdp_tid_tx_stats tid_tx_stats[CDP_MAX_TX_COMP_RINGS]
+					    [CDP_MAX_DATA_TIDS];
+#endif
+};
+
 /* VDEV structure for data path state */
 struct dp_vdev {
 	/* OS device abstraction */
@@ -3931,7 +3964,7 @@ struct dp_vdev {
 	uint64_t prev_rx_deliver_tstamp;
 
 	/* VDEV Stats */
-	struct cdp_vdev_stats stats;
+	struct dp_vdev_stats stats;
 
 	/* Is this a proxySTA VAP */
 	uint8_t proxysta_vdev : 1, /* Is this a proxySTA VAP */

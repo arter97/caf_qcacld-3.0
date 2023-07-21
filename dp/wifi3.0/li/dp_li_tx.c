@@ -240,7 +240,9 @@ void dp_tx_process_htt_completion_li(struct dp_soc *soc,
 	}
 	case HTT_TX_FW2WBM_TX_STATUS_VDEVID_MISMATCH:
 	{
-		DP_STATS_INC(vdev, tx_i.dropped.fail_per_pkt_vdev_id_check, 1);
+		DP_STATS_INC(vdev,
+			     tx_i[DP_XMIT_LINK].dropped.fail_per_pkt_vdev_id_check,
+			     1);
 		goto release_tx_desc;
 	}
 	default:
@@ -529,7 +531,8 @@ dp_tx_hw_enqueue_li(struct dp_soc *soc, struct dp_vdev *vdev,
 			  "%s %d : HAL RING Access Failed -- %pK",
 			 __func__, __LINE__, hal_ring_hdl);
 		DP_STATS_INC(soc, tx.tcl_ring_full[ring_id], 1);
-		DP_STATS_INC(vdev, tx_i.dropped.enqueue_fail, 1);
+		DP_STATS_INC(vdev, tx_i[DP_XMIT_LINK].dropped.enqueue_fail,
+			     1);
 		dp_sawf_tx_enqueue_fail_peer_stats(soc, tx_desc);
 		return status;
 	}
@@ -542,7 +545,8 @@ dp_tx_hw_enqueue_li(struct dp_soc *soc, struct dp_vdev *vdev,
 	if (qdf_unlikely(!hal_tx_desc)) {
 		dp_verbose_debug("TCL ring full ring_id:%d", ring_id);
 		DP_STATS_INC(soc, tx.tcl_ring_full[ring_id], 1);
-		DP_STATS_INC(vdev, tx_i.dropped.enqueue_fail, 1);
+		DP_STATS_INC(vdev, tx_i[DP_XMIT_LINK].dropped.enqueue_fail,
+			     1);
 		dp_sawf_tx_enqueue_fail_peer_stats(soc, tx_desc);
 		goto ring_access_fail;
 	}
@@ -552,7 +556,8 @@ dp_tx_hw_enqueue_li(struct dp_soc *soc, struct dp_vdev *vdev,
 	hal_tx_desc_sync(hal_tx_desc_cached, hal_tx_desc);
 	coalesce = dp_tx_attempt_coalescing(soc, vdev, tx_desc, tid,
 					    msdu_info, ring_id);
-	DP_STATS_INC_PKT(vdev, tx_i.processed, 1, tx_desc->length);
+	DP_STATS_INC_PKT(vdev, tx_i[DP_XMIT_LINK].processed, 1,
+			 tx_desc->length);
 	DP_STATS_INC(soc, tx.tcl_enq[ring_id], 1);
 	dp_tx_update_stats(soc, tx_desc, ring_id);
 	status = QDF_STATUS_SUCCESS;
