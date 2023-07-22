@@ -1278,7 +1278,7 @@ QDF_STATUS ucfg_dp_register_pkt_capture_callbacks(struct wlan_objmgr_vdev *vdev)
 QDF_STATUS ucfg_dp_start_xmit(qdf_nbuf_t nbuf, struct wlan_objmgr_vdev *vdev)
 {
 	struct wlan_dp_intf *dp_intf;
-	struct wlan_dp_link *dp_link;
+	struct wlan_dp_link *dp_link, *tx_dp_link;
 	QDF_STATUS status;
 
 	dp_link = dp_get_vdev_priv_obj(vdev);
@@ -1288,8 +1288,19 @@ QDF_STATUS ucfg_dp_start_xmit(qdf_nbuf_t nbuf, struct wlan_objmgr_vdev *vdev)
 	}
 
 	dp_intf = dp_link->dp_intf;
+
+	/*
+	 * UMAC may queue TX on any vdev of the interface, but it may not be
+	 * in sync with the def_link for DP, hence ignore the vdev from
+	 * UMAC and select the tx_dp_link in DP.
+	 *
+	 * Since one link is already present in the dp_intf and validated above,
+	 * the def_link is not expected to be NULL. Hence there is no need
+	 * to validate tx_dp_link again.
+	 */
+	tx_dp_link = dp_intf->def_link;
 	qdf_atomic_inc(&dp_intf->num_active_task);
-	status = dp_start_xmit(dp_link, nbuf);
+	status = dp_start_xmit(tx_dp_link, nbuf);
 	qdf_atomic_dec(&dp_intf->num_active_task);
 
 	return status;
