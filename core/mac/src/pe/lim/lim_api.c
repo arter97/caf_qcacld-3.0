@@ -4439,6 +4439,7 @@ lim_process_cu_for_probe_rsp(struct mac_context *mac_ctx,
 	uint8_t bpcc, aui;
 	bool cu_flag = false;
 	const uint8_t *rnr;
+	bool msd_cap_found = false;
 	QDF_STATUS status = QDF_STATUS_E_INVAL;
 
 	vdev = session->vdev;
@@ -4457,6 +4458,13 @@ lim_process_cu_for_probe_rsp(struct mac_context *mac_ctx,
 	if (QDF_IS_STATUS_ERROR(status)) {
 		pe_err("Mlo ie not found in Probe response");
 		return status;
+	}
+
+	util_get_bvmlie_msd_cap(ml_ie, ml_ie_total_len, &msd_cap_found,
+				NULL);
+	if (msd_cap_found) {
+		wlan_vdev_mlme_cap_clear(vdev, WLAN_VDEV_C_EMLSR_CAP);
+		pe_debug("EMLSR not supported with D2.0 AP");
 	}
 
 	status = util_get_bvmlie_persta_partner_info(ml_ie,
