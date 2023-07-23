@@ -1362,7 +1362,7 @@ QDF_STATUS dp_rx_pkt_thread_enqueue_cbk(void *link_ctx,
 	dp_intf = dp_link->dp_intf;
 	if (dp_intf->runtime_disable_rx_thread &&
 	    dp_intf->txrx_ops.rx.rx_stack)
-		return dp_intf->txrx_ops.rx.rx_stack(dp_intf, nbuf_list);
+		return dp_intf->txrx_ops.rx.rx_stack(dp_link, nbuf_list);
 
 	link_id = dp_link->link_id;
 
