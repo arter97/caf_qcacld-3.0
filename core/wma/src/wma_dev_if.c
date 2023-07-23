@@ -5612,7 +5612,7 @@ void wma_add_sta(tp_wma_handle wma, tpAddStaParams add_sta)
 		wma_add_sta_req_ap_mode(wma, add_sta);
 		break;
 	case BSS_OPERATIONAL_MODE_NDI:
-		wma_add_sta_ndi_mode(wma, add_sta);
+		status = wma_add_sta_ndi_mode(wma, add_sta);
 		break;
 	}
 
