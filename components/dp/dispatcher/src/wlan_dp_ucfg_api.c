@@ -126,11 +126,6 @@ void ucfg_dp_update_inf_mac(struct wlan_objmgr_psoc *psoc,
 
 	qdf_copy_macaddr(&dp_intf->mac_addr, new_mac);
 
-	/*
-	 * TODO - Expectation here is that
-	 * vdevs will be deleted and created for MLD addr change
-	 * Hence, set the direct link config for all its links
-	 */
 	wlan_dp_set_vdev_direct_link_cfg(psoc, dp_intf);
 }
 
@@ -195,15 +190,8 @@ ucfg_dp_destroy_intf(struct wlan_objmgr_psoc *psoc,
 		return QDF_STATUS_E_FAILURE;
 	}
 
-	/*
-	 * TODO - dp_intf is destroyed, so such config is no longer
-	 * required.
-	 * Check and confirm this theory and remove this call
-	 */
-	/*
 	if (dp_intf->device_mode == QDF_SAP_MODE)
 		dp_config_direct_link(dp_intf, false, false);
-	*/
 
 	dp_periodic_sta_stats_mutex_destroy(dp_intf);
 	dp_nud_deinit_tracking(dp_intf);

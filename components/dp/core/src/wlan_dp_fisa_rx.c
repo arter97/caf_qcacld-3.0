@@ -788,7 +788,6 @@ static void dp_fisa_rx_fst_update(struct dp_rx_fst *fisa_hdl,
 	struct cdp_rx_flow_tuple_info *rx_flow_tuple_info;
 	uint32_t skid_count = 0, max_skid_length;
 	struct dp_fisa_rx_sw_ft *sw_ft_entry;
-	/* TODO - Make this better */
 	struct wlan_dp_psoc_context *dp_ctx = dp_get_context();
 	struct wlan_dp_psoc_cfg *dp_cfg = &dp_ctx->dp_cfg;
 	bool is_fst_updated = false;

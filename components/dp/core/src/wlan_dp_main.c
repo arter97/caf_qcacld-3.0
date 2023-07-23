@@ -940,8 +940,9 @@ dp_intf_get_next_deflink_candidate(struct wlan_dp_intf *dp_intf,
 
 	dp_for_each_link_held_safe(dp_intf, dp_link, dp_link_next) {
 		/*
-		 * TODO - Might not need to check link valid, since dp_link
-		 * is removed from the list during delete.
+		 * dp_link is removed from the list when its deleted.
+		 * But check if its valid or not. Additional check to make
+		 * sure that the next deflink is valid.
 		 */
 		if (!is_dp_link_valid(dp_link))
 			continue;

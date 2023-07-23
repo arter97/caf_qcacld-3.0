@@ -223,8 +223,7 @@ int dp_post_dhcp_ind(struct wlan_dp_link *dp_link, uint8_t *mac_addr,
 	dp_info("Post DHCP indication,sta_mac=" QDF_MAC_ADDR_FMT
 		 " ,  start=%u", QDF_MAC_ADDR_REF(mac_addr), dhcp_start);
 
-	/* TODO - Should we just check is_dp_link_valid(dp_link) */
-	if (!dp_link) {
+	if (!is_dp_link_valid(dp_link)) {
 		dp_err("NULL DP link");
 		return QDF_STATUS_E_INVAL;
 	}

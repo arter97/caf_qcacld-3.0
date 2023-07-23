@@ -1084,7 +1084,6 @@ static void wlan_dp_display_txrx_stats(struct wlan_dp_psoc_context *dp_ctx)
 		if (!dp_intf->num_links)
 			continue;
 
-		/* TODO - Print opmode and see if vdev_id can be printed */
 		dp_info("dp_intf: " QDF_MAC_ADDR_FMT,
 			QDF_MAC_ADDR_REF(dp_intf->mac_addr.bytes));
 		for (i = 0; i < NUM_CPUS; i++) {

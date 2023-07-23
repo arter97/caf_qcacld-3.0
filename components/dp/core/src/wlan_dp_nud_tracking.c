@@ -166,7 +166,6 @@ static void dp_nud_stats_info(struct wlan_dp_intf *dp_intf)
 
 	cb->os_if_dp_nud_stats_info(vdev);
 
-	/* TODO - Again this is also adapter based so pass dev */
 	pause_map = cb->dp_get_pause_map(cb->callback_ctx,
 					 dp_intf->dev);
 	dp_info("Current pause_map value %x", pause_map);
@@ -285,10 +284,6 @@ static void dp_nud_failure_work(void *data)
 		return;
 	}
 
-	/*
-	 * TODO - The handler is totally adapter based,
-	 * so just dev should be fine
-	 */
 	dp_ctx->dp_ops.dp_nud_failure_work(dp_ctx->dp_ops.callback_ctx,
 					   dp_intf->dev);
 }
@@ -395,7 +390,13 @@ static void dp_nud_filter_netevent(struct qdf_mac_addr *netdev_addr,
 		return;
 	}
 
-	vdev = dp_objmgr_get_vdev_by_user(dp_intf->def_link, WLAN_DP_ID);
+	/*
+	 * NUD is used for STATION mode only, where all the MLO links
+	 * are assumed to be connected. Hence use the deflink here to check
+	 * if the interface is connected.
+	 */
+	dp_link = dp_intf->def_link;
+	vdev = dp_objmgr_get_vdev_by_user(dp_link, WLAN_DP_ID);
 	if (!vdev)
 		return;
 
@@ -405,11 +406,7 @@ static void dp_nud_filter_netevent(struct qdf_mac_addr *netdev_addr,
 		return;
 	}
 	dp_objmgr_put_vdev_by_user(vdev, WLAN_DP_ID);
-	dp_link = dp_intf->def_link;
-	/*
-	 * TODO - For now using deflink, have some analysis
-	 * (I think this should be fine)
-	 */
+
 	if (!dp_link->conn_info.is_authenticated) {
 		dp_info("client " QDF_MAC_ADDR_FMT
 			" is in the middle of WPS/EAPOL exchange.",
