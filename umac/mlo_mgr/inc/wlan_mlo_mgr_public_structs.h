@@ -38,6 +38,11 @@
 #define WLAN_UMAC_MLO_MAX_VDEVS 2
 #endif
 
+#if defined(WLAN_FEATURE_11BE_MLO) && defined(WLAN_MLO_MULTI_CHIP)
+/* Max bridge vdevs supported */
+#define WLAN_UMAC_MLO_MAX_BRIDGE_VDEVS 2
+#endif
+
 #include <wlan_mlo_epcs.h>
 
 /* MAX instances of ML devices */
@@ -385,6 +390,7 @@ struct wlan_mlo_peer_list {
  * @mld_id: MLD id
  * @mld_addr: MLO device MAC address
  * @wlan_vdev_list: list of vdevs associated with this MLO connection
+ * @wlan_bridge_vdev_list: list of bridge vdevs associated with this MLO
  * @wlan_vdev_count: number of elements in the vdev list
  * @mlo_peer_list: list peers in this MLO connection
  * @wlan_max_mlo_peer_count: peer count across the links of specific MLO
@@ -408,6 +414,9 @@ struct wlan_mlo_dev_context {
 	uint8_t mld_id;
 	struct qdf_mac_addr mld_addr;
 	struct wlan_objmgr_vdev *wlan_vdev_list[WLAN_UMAC_MLO_MAX_VDEVS];
+#if defined(WLAN_FEATURE_11BE_MLO) && defined(WLAN_MLO_MULTI_CHIP)
+	struct wlan_objmgr_vdev *wlan_bridge_vdev_list[WLAN_UMAC_MLO_MAX_BRIDGE_VDEVS];
+#endif
 	uint16_t wlan_vdev_count;
 	struct wlan_mlo_peer_list mlo_peer_list;
 	uint16_t wlan_max_mlo_peer_count;
