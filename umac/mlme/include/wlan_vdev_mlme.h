@@ -51,6 +51,7 @@ struct cnx_mgr;
 #define WLAN_VDEV_MLME_SUBTYPE_MESH 0x5
 #define WLAN_VDEV_MLME_SUBTYPE_MESH_11S   0x6
 #define WLAN_VDEV_MLME_SUBTYPE_SMART_MONITOR 0x7
+#define WLAN_VDEV_MLME_SUBTYPE_MLO_BRIDGE 0x8
 
 /* vdev control flags (per bits) */
 #define WLAN_VDEV_MLME_FLAGS_NON_MBSSID_AP      0x00000001
