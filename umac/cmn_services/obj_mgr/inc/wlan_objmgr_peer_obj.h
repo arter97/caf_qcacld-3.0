@@ -190,6 +190,7 @@ struct wlan_objmgr_peer_objmgr {
  * @peer_lock:        Lock for access/update peer contents
  * @mlo_peer_ctx:     Reference to MLO Peer context
  * @mldaddr:          Peer MLD MAC address
+ * @mlo_bridge_peer:  Indicates bridge peer
  * @peer_flags:        QCN flag and 4 address mode flag
  */
 struct wlan_objmgr_peer {
@@ -210,6 +211,7 @@ struct wlan_objmgr_peer {
 	struct wlan_mlo_peer_context *mlo_peer_ctx;
 	uint8_t mldaddr[QDF_MAC_ADDR_SIZE];
 	u_int32_t peer_flags;
+	bool mlo_bridge_peer;
 #endif
 };
 

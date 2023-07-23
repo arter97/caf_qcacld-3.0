@@ -852,6 +852,7 @@ struct peer_set_params {
  * @peer_type: peer type
  * @vdev_id: vdev id
  * @mlo_enabled: Indicates MLO is enabled
+ * @mlo_bridge_peer: Indicates bridge peer
  */
 struct peer_create_params {
 	const uint8_t *peer_addr;
@@ -859,6 +860,7 @@ struct peer_create_params {
 	uint32_t vdev_id;
 #ifdef WLAN_FEATURE_11BE_MLO
 	bool mlo_enabled;
+	bool mlo_bridge_peer;
 #endif
 };
 
@@ -1208,6 +1210,7 @@ struct wmi_host_tid_to_link_map_resp {
  * @nstr_bitmap_present: indicate if NSTR bitmap is present
  * @nstr_bitmap_size: Indicates size of NSTR bitmap,
  *                    as per the 802.11be specification
+ * @mlo_bridge_peer: indicate if it is bridge peer
  * @unused: spare bits
  * @mld_mac: MLD mac address
  * @logical_link_index: Unique index for links of the mlo. Starts with Zero
@@ -1236,7 +1239,8 @@ struct peer_assoc_mlo_params {
 		 msd_cap_support:1,
 		 nstr_bitmap_present:1,
 		 nstr_bitmap_size:1,
-		 unused:21;
+		 mlo_bridge_peer:1,
+		 unused:20;
 	uint8_t mld_mac[QDF_MAC_ADDR_SIZE];
 	uint32_t logical_link_index;
 	uint32_t ml_peer_id;
@@ -1266,6 +1270,7 @@ struct peer_assoc_mlo_params {
  * @emlsr_support: indicate if eMLSR supported
  * @emlmr_support: indicate if eMLMR supported
  * @msd_cap_support: indicate if MSD supported
+ * @mlo_bridge_peer: indicate if peer is bridge peer
  * @unused: spare bits
  * @logical_link_index: Unique index for links of the mlo. Starts with Zero
  */
@@ -1281,7 +1286,8 @@ struct ml_partner_info {
 		 emlsr_support:1,
 		 emlmr_support:1,
 		 msd_cap_support:1,
-		 unused:23;
+		 mlo_bridge_peer:1,
+		 unused:22;
 	uint32_t logical_link_index;
 };
 
