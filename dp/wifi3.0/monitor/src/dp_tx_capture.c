@@ -146,6 +146,59 @@
 				     _pdev_id_);			\
 	}
 
+static char *ieee80211_frame_type_name[256];
+
+static void init_ieee80211_frame_type_name(void)
+{
+	int i;
+
+	for (i = 0; i < 256; i++)
+		ieee80211_frame_type_name[i] = "INVALID";
+
+	ieee80211_frame_type_name[0] = "Assoc-Req";
+	ieee80211_frame_type_name[0x10] = "Assoc-Resp";
+	ieee80211_frame_type_name[0x20] = "ReAssoc-Req";
+	ieee80211_frame_type_name[0x30] = "ReAssoc-Resp";
+	ieee80211_frame_type_name[0x40] = "Probe-Req";
+	ieee80211_frame_type_name[0x50] = "Probe-Resp";
+	ieee80211_frame_type_name[0x60] = "Timing-Adv";
+	ieee80211_frame_type_name[0x80] = "Beacon";
+	ieee80211_frame_type_name[0x90] = "ATIM";
+	ieee80211_frame_type_name[0xa0] = "Disassoc";
+	ieee80211_frame_type_name[0xb0] = "AUTH";
+	ieee80211_frame_type_name[0xc0] = "DeAuth";
+	ieee80211_frame_type_name[0xd0] = "Action";
+	ieee80211_frame_type_name[0xe0] = "Action-noACK";
+	ieee80211_frame_type_name[0x08] = "Data";
+	ieee80211_frame_type_name[0x18] = "Data+CF-ACK";
+	ieee80211_frame_type_name[0x28] = "Data+CF-Poll";
+	ieee80211_frame_type_name[0x38] = "Data+CF-ACK+CF-Poll ";
+	ieee80211_frame_type_name[0x48] = "Null";
+	ieee80211_frame_type_name[0x58] = "CF-ACK";
+	ieee80211_frame_type_name[0x68] = "CF-Poll";
+	ieee80211_frame_type_name[0x78] = "CF-ACK+CF-Poll";
+	ieee80211_frame_type_name[0x88] = "QoS Data";
+	ieee80211_frame_type_name[0x98] = "QoS Data+CF-CK ";
+	ieee80211_frame_type_name[0xa8] = "QoS Data+CF-Poll ";
+	ieee80211_frame_type_name[0xb8] = "QoS Data+CF-ACK+CF-Poll";
+	ieee80211_frame_type_name[0xc8] = "QoS Null";
+	ieee80211_frame_type_name[0xe8] = "Qos CF-Poll";
+	ieee80211_frame_type_name[0xf8] = "QoS CF-ACK+CF-Poll ";
+	ieee80211_frame_type_name[0x24] = "Trigger";
+	ieee80211_frame_type_name[0x44] = "BF Rep Poll";
+	ieee80211_frame_type_name[0x54] = "VHT NDPA";
+	ieee80211_frame_type_name[0x64] = "Ctrl Ext";
+	ieee80211_frame_type_name[0x74] = "Ctrl Wrap";
+	ieee80211_frame_type_name[0x84] = "BAR";
+	ieee80211_frame_type_name[0x94] = "BA";
+	ieee80211_frame_type_name[0xa4] = "PS-poll";
+	ieee80211_frame_type_name[0xb4] = "RTS";
+	ieee80211_frame_type_name[0xc4] = "CTS";
+	ieee80211_frame_type_name[0xd4] = "ACK";
+	ieee80211_frame_type_name[0xe4] = "CF-End";
+	ieee80211_frame_type_name[0xf4] = "CF-End+CF-ACK";
+}
+
 static inline bool dp_tx_capt_mem_check(struct dp_pdev *pdev, int buf_size)
 {
 	struct dp_mon_soc *mon_soc = pdev->soc->monitor_soc;
@@ -618,9 +671,12 @@ void dp_print_pdev_tx_capture_stats_1_0(struct dp_pdev *pdev)
 	for (i = 0; i < TXCAP_MAX_TYPE; i++) {
 		for (j = 0; j < TXCAP_MAX_SUBTYPE; j++) {
 			if (ptr_tx_cap->ctl_mgmt_q[i][j].qlen)
-				DP_PRINT_STATS(" ctl_mgmt_q[%d][%d] = queue_len[%d]",
-					       i, j,
-					       ptr_tx_cap->ctl_mgmt_q[i][j].qlen);
+				DP_PRINT_STATS("ctl_mgmt_q[0x%x] (%s) = queue_len[%d]",
+					       (i << 2) | (j << 4),
+					       ieee80211_frame_type_name
+						[((i << 2) | (j << 4)) & 0xFF],
+					       ptr_tx_cap->
+							ctl_mgmt_q[i][j].qlen);
 		}
 	}
 	DP_PRINT_STATS(" mgmt control retry queue stats:");
@@ -1678,6 +1734,7 @@ void dp_tx_ppdu_stats_attach_1_0(struct dp_pdev *pdev)
 
 	tx_capture = &mon_pdev->tx_capture;
 	ptr_log_info = &tx_capture->log_info;
+	init_ieee80211_frame_type_name();
 
 	/* Work queue setup for HTT stats and tx capture handling */
 	qdf_create_work(0, &mon_pdev->tx_capture.ppdu_stats_work,
