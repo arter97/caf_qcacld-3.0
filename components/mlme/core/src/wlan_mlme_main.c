@@ -2511,7 +2511,7 @@ wlan_get_vdev_link_removed_flag(struct wlan_objmgr_vdev *vdev)
 		return false;
 
 	link_id = wlan_vdev_get_link_id(vdev);
-	link_info = mlo_mgr_get_ap_link_by_link_id(vdev, link_id);
+	link_info = mlo_mgr_get_ap_link_by_link_id(vdev->mlo_dev_ctx, link_id);
 	if (link_info)
 		is_mlo_link_removed =
 			!!qdf_atomic_test_bit(LS_F_AP_REMOVAL_BIT,
@@ -2559,7 +2559,7 @@ wlan_set_vdev_link_removed_flag(struct wlan_objmgr_vdev *vdev, bool removed)
 	}
 
 	link_id = wlan_vdev_get_link_id(vdev);
-	link_info = mlo_mgr_get_ap_link_by_link_id(vdev, link_id);
+	link_info = mlo_mgr_get_ap_link_by_link_id(vdev->mlo_dev_ctx, link_id);
 	if (!link_info) {
 		mlme_legacy_err("link info null, id %d", link_id);
 		return QDF_STATUS_E_INVAL;

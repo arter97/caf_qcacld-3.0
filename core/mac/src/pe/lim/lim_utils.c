@@ -9351,7 +9351,8 @@ void lim_extract_ml_info(struct pe_session *session,
 
 	ml_link->vdev_id = wlan_vdev_get_id(session->vdev);
 	ml_link->link_id = wlan_vdev_get_link_id(session->vdev);
-	link_info = mlo_mgr_get_ap_link_by_link_id(session->vdev,
+
+	link_info = mlo_mgr_get_ap_link_by_link_id(session->vdev->mlo_dev_ctx,
 						   ml_link->link_id);
 	if (!link_info)
 		return;
@@ -9368,8 +9369,9 @@ void lim_extract_ml_info(struct pe_session *session,
 
 	for (i = 0; i < ml_partner_info->num_partner_links; i++) {
 		link_id = ml_partner_info->partner_link_info[i].link_id;
-		link_info = mlo_mgr_get_ap_link_by_link_id(session->vdev,
-							   link_id);
+		link_info = mlo_mgr_get_ap_link_by_link_id(
+					session->vdev->mlo_dev_ctx,
+					link_id);
 		if (!link_info)
 			continue;
 

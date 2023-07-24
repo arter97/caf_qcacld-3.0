@@ -12091,8 +12091,9 @@ QDF_STATUS populate_dot11f_assoc_req_mlo_ie(struct mac_context *mac_ctx,
 		p_sta_prof = sta_prof->data;
 		len_remaining = sizeof(sta_prof->data);
 		ml_link_info =
-			mlo_mgr_get_ap_link_by_link_id(pe_session->vdev,
-						       link_info->link_id);
+			mlo_mgr_get_ap_link_by_link_id(
+					pe_session->vdev->mlo_dev_ctx,
+					link_info->link_id);
 		if (!ml_link_info)
 			continue;
 
