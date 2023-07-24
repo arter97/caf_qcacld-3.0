@@ -4248,7 +4248,8 @@ cm_roam_stats_event_handler(struct wlan_objmgr_psoc *psoc,
 			    ROAM_TRIGGER_REASON_BTM) {
 				cm_roam_handle_btm_stats(psoc, stats_info, i,
 							 &rem_tlv);
-				continue;
+				if (!stats_info->trigger[i].common_roam)
+					continue;
 			}
 
 			cm_roam_stats_print_trigger_info(
