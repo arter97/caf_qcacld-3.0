@@ -1287,3 +1287,8 @@ struct wlan_objmgr_vdev *ucfg_get_tdls_vdev(struct wlan_objmgr_psoc *psoc,
 {
 	return tdls_get_vdev(psoc, dbg_id);
 }
+
+bool ucfg_tdls_check_is_tdls_allowed(struct wlan_objmgr_vdev *vdev)
+{
+	return tdls_check_is_tdls_allowed(vdev);
+}

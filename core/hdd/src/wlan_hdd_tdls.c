@@ -189,6 +189,70 @@ const struct nla_policy
 						.type = NLA_S32},
 };
 
+static bool wlan_hdd_is_tdls_allowed(struct hdd_context *hdd_ctx,
+				     struct wlan_objmgr_vdev *vdev)
+{
+	bool tdls_support;
+
+	if ((cfg_tdls_get_support_enable(hdd_ctx->psoc, &tdls_support) ==
+		QDF_STATUS_SUCCESS) && !tdls_support) {
+		hdd_debug("TDLS feature not Enabled or Not supported in FW");
+		return false;
+	}
+
+	if (!wlan_cm_is_vdev_connected(vdev)) {
+		hdd_debug("Failed due to Not associated");
+		return false;
+	}
+
+	if (wlan_cm_roaming_in_progress(hdd_ctx->pdev,
+					wlan_vdev_get_id(vdev))) {
+		hdd_debug("Failed due to Roaming is in progress");
+		return false;
+	}
+
+	if (!ucfg_tdls_check_is_tdls_allowed(vdev)) {
+		hdd_debug("TDLS is not allowed");
+		return false;
+	}
+
+	if (ucfg_mlme_get_tdls_prohibited(vdev)) {
+		hdd_debug("TDLS is prohobited by AP");
+		return false;
+	}
+
+	return true;
+}
+
+static bool wlan_hdd_get_tdls_allowed(struct hdd_context *hdd_ctx,
+				      struct hdd_adapter *adapter)
+{
+	struct wlan_hdd_link_info *link_info;
+	struct wlan_objmgr_vdev *vdev;
+	bool is_tdls_avail = false;
+
+	hdd_adapter_for_each_active_link_info(adapter, link_info) {
+		vdev = hdd_objmgr_get_vdev_by_user(link_info, WLAN_TDLS_NB_ID);
+		if (!vdev)
+			return false;
+
+		is_tdls_avail = wlan_hdd_is_tdls_allowed(hdd_ctx, vdev);
+
+		/* Return is_tdls_avail for non-MLO case */
+		if (!wlan_vdev_mlme_is_mlo_vdev(vdev)) {
+			hdd_objmgr_put_vdev_by_user(vdev, WLAN_TDLS_NB_ID);
+			return is_tdls_avail;
+		}
+
+		hdd_objmgr_put_vdev_by_user(vdev, WLAN_TDLS_NB_ID);
+
+		if (is_tdls_avail)
+			return is_tdls_avail;
+	}
+
+	return false;
+}
+
 /**
  * __wlan_hdd_cfg80211_exttdls_get_status() - handle get status cfg80211 command
  * @wiphy: wiphy
@@ -202,8 +266,74 @@ __wlan_hdd_cfg80211_exttdls_get_status(struct wiphy *wiphy,
 					 const void *data,
 					 int data_len)
 {
-	/* TODO */
-	return 0;
+	struct net_device *dev = wdev->netdev;
+	struct hdd_adapter *adapter = WLAN_HDD_GET_PRIV_PTR(dev);
+	struct hdd_context *hdd_ctx = wiphy_priv(wiphy);
+	struct sk_buff *skb;
+	uint32_t connected_peer_count = 0;
+	int status;
+	bool is_tdls_avail = true;
+	int ret = 0;
+	int attr;
+
+	hdd_enter_dev(wdev->netdev);
+	if (QDF_GLOBAL_FTM_MODE == hdd_get_conparam()) {
+		hdd_err("Command not allowed in FTM mode");
+		return -EPERM;
+	}
+
+	status = wlan_hdd_validate_context(hdd_ctx);
+	if (status)
+		return -EINVAL;
+
+	skb = wlan_cfg80211_vendor_cmd_alloc_reply_skb(wiphy,
+						sizeof(u32) + sizeof(bool) +
+						NLMSG_HDRLEN);
+
+	if (!skb) {
+		hdd_err("wlan_cfg80211_vendor_cmd_alloc_reply_skb failed");
+		return -ENOMEM;
+	}
+
+	if (adapter->device_mode != QDF_STA_MODE &&
+	    adapter->device_mode != QDF_P2P_CLIENT_MODE) {
+		hdd_debug("Failed to get TDLS info due to opmode:%d",
+			  adapter->device_mode);
+		ret = -EOPNOTSUPP;
+		goto fail;
+	}
+
+	connected_peer_count = cfg_tdls_get_connected_peer_count(hdd_ctx->psoc);
+	is_tdls_avail = wlan_hdd_get_tdls_allowed(hdd_ctx, adapter);
+
+	if (connected_peer_count >=
+			cfg_tdls_get_max_peer_count(hdd_ctx->psoc)) {
+		hdd_debug("Failed due to max no. of connected peer:%d reached",
+			  connected_peer_count);
+		is_tdls_avail = false;
+	}
+
+	hdd_debug("Send TDLS_available: %d, no. of connected peer:%d to userspace",
+		  is_tdls_avail, connected_peer_count);
+
+	attr = QCA_WLAN_VENDOR_ATTR_TDLS_GET_STATUS_NUM_SESSIONS;
+	if (nla_put_u32(skb, attr, connected_peer_count)) {
+		hdd_err("nla put fail");
+		ret = -EINVAL;
+		goto fail;
+	}
+
+	attr = QCA_WLAN_VENDOR_ATTR_TDLS_GET_STATUS_AVAILABLE;
+	if (is_tdls_avail && nla_put_flag(skb, attr)) {
+		hdd_err("nla put fail");
+		ret = -EINVAL;
+		goto fail;
+	}
+
+	return wlan_cfg80211_vendor_cmd_reply(skb);
+fail:
+	wlan_cfg80211_vendor_free_skb(skb);
+	return ret;
 }
 
 static int

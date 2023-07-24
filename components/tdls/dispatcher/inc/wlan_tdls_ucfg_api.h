@@ -459,6 +459,16 @@ uint16_t ucfg_get_tdls_conn_peer_count(struct wlan_objmgr_vdev *vdev);
 struct wlan_objmgr_vdev *ucfg_get_tdls_vdev(struct wlan_objmgr_psoc *psoc,
 					    wlan_objmgr_ref_dbgid dbg_id);
 
+/**
+ * ucfg_tdls_check_is_tdls_allowed() - Ucfg api to check is tdls allowed or not
+ * @vdev: vdev object
+ *
+ * Function determines the whether TDLS allowed in the system
+ *
+ * Return: true or false
+ */
+bool ucfg_tdls_check_is_tdls_allowed(struct wlan_objmgr_vdev *vdev);
+
 #else
 static inline
 bool ucfg_tdls_link_vdev_is_matching(struct wlan_objmgr_vdev *vdev)
@@ -558,6 +568,12 @@ struct wlan_objmgr_vdev *ucfg_get_tdls_vdev(struct wlan_objmgr_psoc *psoc,
 					    wlan_objmgr_ref_dbgid dbg_id)
 {
 	return NULL;
+}
+
+static inline
+bool ucfg_tdls_check_is_tdls_allowed(struct wlan_objmgr_vdev *vdev)
+{
+	return false;
 }
 
 static inline

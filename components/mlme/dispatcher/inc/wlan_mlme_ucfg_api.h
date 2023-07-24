@@ -30,6 +30,7 @@
 #include <wlan_mlme_api.h>
 #include <wlan_mlme_main.h>
 #include "wma_tgt_cfg.h"
+#include "wlan_mlme_vdev_mgr_interface.h"
 
 /**
  * ucfg_mlme_init() - initialize mlme_ctx context.
@@ -280,6 +281,19 @@ ucfg_mlme_peer_config_vlan(struct wlan_objmgr_vdev *vdev,
 			   uint8_t *macaddr)
 {
 	return wlan_mlme_peer_config_vlan(vdev, macaddr);
+}
+
+/**
+ * ucfg_mlme_get_tdls_prohibited() - get if TDLS prohibited is advertised by
+ * the connected AP.
+ * @vdev: vdev pointer
+ *
+ * Return: bool
+ */
+static inline
+bool ucfg_mlme_get_tdls_prohibited(struct wlan_objmgr_vdev *vdev)
+{
+	return mlme_get_tdls_prohibited(vdev);
 }
 
 #ifdef MULTI_CLIENT_LL_SUPPORT

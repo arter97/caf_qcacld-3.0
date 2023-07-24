@@ -413,3 +413,17 @@ cfg_tdls_get_max_peer_count(struct wlan_objmgr_psoc *psoc)
 
 	return soc_obj->max_num_tdls_sta;
 }
+
+uint16_t
+cfg_tdls_get_connected_peer_count(struct wlan_objmgr_psoc *psoc)
+{
+	struct tdls_soc_priv_obj *soc_obj;
+
+	soc_obj = wlan_psoc_get_tdls_soc_obj(psoc);
+	if (!soc_obj) {
+		tdls_err("tdls soc null");
+		return 0;
+	}
+
+	return soc_obj->connected_peer_count;
+}
