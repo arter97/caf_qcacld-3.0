@@ -3243,7 +3243,7 @@ int wlan_hdd_ll_stats_get(struct wlan_hdd_link_info *link_info,
 	}
 
 	if (hdd_cm_is_vdev_roaming(link_info)) {
-		hdd_err("Roaming in progress, cannot process the request");
+		hdd_debug("Roaming in progress, cannot process the request");
 		return -EBUSY;
 	}
 
@@ -3309,7 +3309,7 @@ __wlan_hdd_cfg80211_ll_stats_get(struct wiphy *wiphy,
 	}
 
 	if (hdd_cm_is_vdev_roaming(link_info)) {
-		hdd_err("Roaming in progress, cannot process the request");
+		hdd_debug("Roaming in progress, cannot process the request");
 		return -EBUSY;
 	}
 
@@ -7378,8 +7378,8 @@ static int wlan_hdd_get_sta_stats(struct wlan_hdd_link_info *link_info,
 		return 0;
 	}
 
-	if (hdd_cm_is_vdev_roaming(link_info)) {
-		hdd_debug("Roaming is in progress, cannot continue with this request");
+	if (hdd_is_roam_sync_in_progress(hdd_ctx, link_info->vdev_id)) {
+		hdd_debug("Roam sync is in progress, cannot continue with this request");
 		/*
 		 * supplicant reports very low rssi to upper layer
 		 * and handover happens to cellular.
