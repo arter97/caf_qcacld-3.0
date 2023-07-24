@@ -931,12 +931,30 @@ wlan_mlo_get_new_ptqm_id(struct wlan_objmgr_vdev *curr_vdev,
 	struct wlan_mlo_link_peer_entry *peer_entry;
 	uint8_t psoc_ids[WLAN_UMAC_MLO_MAX_VDEVS];
 	struct wlan_objmgr_vdev *link_vdev = NULL;
+	struct wlan_objmgr_peer *curr_peer = NULL;
 	QDF_STATUS status;
 	uint8_t i = 0, idx = 0, j = 0, tmp_cnt = 0;
 
+	for (i = 0; i < MAX_MLO_LINK_PEERS; i++) {
+		peer_entry = &ml_peer->peer_list[i];
+		if (!peer_entry || !peer_entry->link_peer)
+			continue;
+
+		if (peer_entry->is_primary) {
+			curr_peer = peer_entry->link_peer;
+			break;
+		}
+	}
+
+	if (!curr_peer) {
+		mlo_err("ML peer " QDF_MAC_ADDR_FMT " current primary link not found",
+			QDF_MAC_ADDR_REF(ml_peer->peer_mld_addr.bytes));
+		return QDF_STATUS_E_INVAL;
+	}
+
 	if (wlan_vdev_mlme_get_opmode(curr_vdev) == QDF_SAP_MODE &&
-	    QDF_IS_STATUS_ERROR(wlan_mlo_peer_is_assoc_done(ml_peer))) {
-		mlo_err("ML peer " QDF_MAC_ADDR_FMT " is not associated",
+	    wlan_peer_mlme_get_state(curr_peer) != WLAN_CONNECTED_STATE) {
+		mlo_err("ML peer " QDF_MAC_ADDR_FMT " is not authorized",
 			QDF_MAC_ADDR_REF(ml_peer->peer_mld_addr.bytes));
 		return QDF_STATUS_E_INVAL;
 	}
