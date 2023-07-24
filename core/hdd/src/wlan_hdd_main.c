@@ -14338,6 +14338,7 @@ int hdd_start_station_adapter(struct hdd_adapter *adapter)
 		wlan_hdd_init_multi_client_info_table(adapter);
 
 	hdd_adapter_set_wlm_client_latency_level(adapter);
+	hdd_adapter_update_mlo_mgr_mac_addr(adapter);
 	hdd_restore_info_for_ssr(adapter);
 
 	hdd_exit();
