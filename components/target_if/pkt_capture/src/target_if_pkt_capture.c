@@ -175,6 +175,11 @@ target_if_register_mgmt_data_offload_event(struct wlan_objmgr_psoc *psoc)
 	}
 	wmi_handle = get_wmi_unified_hdl_from_psoc(psoc);
 
+	if (!wmi_handle) {
+		pkt_capture_err("wmi_handle is NULL");
+		return QDF_STATUS_E_FAILURE;
+	}
+
 	if (ucfg_pkt_capture_get_mode(psoc) &&
 	    wmi_service_enabled(wmi_handle,
 				wmi_service_packet_capture_support)) {
