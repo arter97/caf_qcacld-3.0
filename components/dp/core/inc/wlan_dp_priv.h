@@ -415,6 +415,7 @@ struct fisa_pkt_hist {
  * @rx_flow_tuple_info: RX tuple information
  * @napi_id: NAPI ID (REO ID) on which the flow is being received
  * @vdev: VDEV handle corresponding to the FLOW
+ * @dp_intf: DP interface handle corresponding to the flow
  * @bytes_aggregated: Number of bytes currently aggregated
  * @flush_count: Number of Flow flushes done
  * @aggr_count: Aggregation count
@@ -457,6 +458,7 @@ struct dp_fisa_rx_sw_ft {
 	struct cdp_rx_flow_tuple_info rx_flow_tuple_info;
 	uint8_t napi_id;
 	struct dp_vdev *vdev;
+	struct wlan_dp_intf *dp_intf;
 	uint64_t bytes_aggregated;
 	uint32_t flush_count;
 	uint32_t aggr_count;
@@ -605,6 +607,10 @@ struct dp_rx_fst {
  * @sap_tx_block_mask: SAP TX block mask
  * @gro_disallowed: GRO disallowed flag
  * @gro_flushed: GRO flushed flag
+ * @fisa_disallowed: Flag to indicate fisa aggregation not to be done for a
+ *		     particular rx_context
+ * @fisa_force_flushed: Flag to indicate FISA flow has been flushed for a
+ *			particular rx_context
  * @runtime_disable_rx_thread: Runtime Rx thread flag
  * @rx_stack: function pointer Rx packet handover
  * @tx_fn: function pointer to send Tx packet
@@ -663,6 +669,14 @@ struct wlan_dp_intf {
 
 	qdf_atomic_t gro_disallowed;
 	uint8_t gro_flushed[DP_MAX_RX_THREADS];
+
+#ifdef WLAN_SUPPORT_RX_FISA
+	/*
+	 * Params used for controlling the fisa aggregation dynamically
+	 */
+	uint8_t fisa_disallowed[MAX_REO_DEST_RINGS];
+	uint8_t fisa_force_flushed[MAX_REO_DEST_RINGS];
+#endif
 
 	bool runtime_disable_rx_thread;
 

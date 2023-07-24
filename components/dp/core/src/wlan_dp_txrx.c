@@ -1401,9 +1401,9 @@ QDF_STATUS wlan_dp_rx_deliver_to_stack(struct wlan_dp_intf *dp_intf,
 
 #if defined(WLAN_SUPPORT_RX_FISA)
 /**
- * wlan_dp_set_fisa_disallowed_for_vdev() - Set fisa disallowed bit for a vdev
+ * wlan_dp_set_fisa_disallowed_for_intf() - Set fisa disallowed bit for an intf
  * @soc: DP soc handle
- * @vdev_id: Vdev id
+ * @dp_intf: DP interface handle
  * @rx_ctx_id: rx context id
  * @val: Enable or disable
  *
@@ -1412,16 +1412,16 @@ QDF_STATUS wlan_dp_rx_deliver_to_stack(struct wlan_dp_intf *dp_intf,
  * Return: None
  */
 static inline
-void wlan_dp_set_fisa_disallowed_for_vdev(ol_txrx_soc_handle soc,
-					  uint8_t vdev_id,
+void wlan_dp_set_fisa_disallowed_for_intf(ol_txrx_soc_handle soc,
+					  struct wlan_dp_intf *dp_intf,
 					  uint8_t rx_ctx_id, uint8_t val)
 {
-	dp_set_fisa_disallowed_for_vdev(soc, vdev_id, rx_ctx_id, val);
+	dp_intf->fisa_disallowed[rx_ctx_id] = val;
 }
 #else
 static inline
-void wlan_dp_set_fisa_disallowed_for_vdev(ol_txrx_soc_handle soc,
-					  uint8_t vdev_id,
+void wlan_dp_set_fisa_disallowed_for_intf(ol_txrx_soc_handle soc,
+					  struct wlan_dp_intf *dp_intf,
 					  uint8_t rx_ctx_id, uint8_t val)
 {
 }
@@ -1448,22 +1448,14 @@ QDF_STATUS wlan_dp_rx_deliver_to_stack(struct wlan_dp_intf *dp_intf,
 	if (gro_disallowed == 0 &&
 	    dp_intf->gro_flushed[rx_ctx_id] != 0) {
 		if (qdf_likely(soc))
-			/* TODO - Temp WAR to use def_link, till FISA is moved
-			 * to dp_intf
-			 */
-			wlan_dp_set_fisa_disallowed_for_vdev(
-					soc, dp_intf->def_link->link_id,
-					rx_ctx_id, 0);
+			wlan_dp_set_fisa_disallowed_for_intf(soc, dp_intf,
+							     rx_ctx_id, 0);
 		dp_intf->gro_flushed[rx_ctx_id] = 0;
 	} else if (gro_disallowed &&
 		   dp_intf->gro_flushed[rx_ctx_id] == 0) {
 		if (qdf_likely(soc))
-			/* TODO - Temp WAR to use def_link, till FISA is moved
-			 * to dp_intf
-			 */
-			wlan_dp_set_fisa_disallowed_for_vdev(
-					soc, dp_intf->def_link->link_id,
-					rx_ctx_id, 1);
+			wlan_dp_set_fisa_disallowed_for_intf(soc, dp_intf,
+							     rx_ctx_id, 1);
 	}
 
 	if (nbuf_receive_offload_ok && dp_ctx->receive_offload_cb &&

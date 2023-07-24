@@ -431,6 +431,16 @@ dp_rx_fisa_setup_cmem_fse(struct dp_rx_fst *fisa_hdl, uint32_t hashed_flow_idx,
 					  &flow);
 }
 
+static inline
+struct wlan_dp_intf *dp_fisa_rx_get_dp_intf_for_vdev(struct dp_vdev *vdev)
+{
+	struct wlan_dp_link *dp_link =
+				(struct wlan_dp_link *)vdev->osif_vdev;
+
+	/* dp_link cannot be invalid if vdev is present */
+	return dp_link->dp_intf;
+}
+
 /**
  * dp_rx_fisa_update_sw_ft_entry() - Helper function to update few SW FT entry
  * @sw_ft_entry: Pointer to softerware flow table entry
@@ -450,6 +460,7 @@ static void dp_rx_fisa_update_sw_ft_entry(struct dp_fisa_rx_sw_ft *sw_ft_entry,
 	sw_ft_entry->flow_hash = flow_hash;
 	sw_ft_entry->flow_id = flow_id;
 	sw_ft_entry->vdev = vdev;
+	sw_ft_entry->dp_intf = dp_fisa_rx_get_dp_intf_for_vdev(vdev);
 	sw_ft_entry->dp_ctx = dp_ctx;
 }
 
@@ -578,6 +589,8 @@ dp_rx_fisa_add_ft_entry(struct dp_vdev *vdev,
 		if (is_same_flow(&sw_ft_entry->rx_flow_tuple_info,
 				 &rx_flow_tuple_info)) {
 			sw_ft_entry->vdev = vdev;
+			sw_ft_entry->dp_intf =
+					dp_fisa_rx_get_dp_intf_for_vdev(vdev);
 			dp_fisa_debug("It is same flow fse entry idx %d",
 				      hashed_flow_idx);
 			/* Incoming flow tuple matches with existing
@@ -1086,6 +1099,7 @@ dp_fisa_rx_get_sw_ft_entry(struct dp_rx_fst *fisa_hdl, qdf_nbuf_t nbuf,
 
 	if (!fisa_hdl->flow_deletion_supported) {
 		sw_ft_entry->vdev = vdev;
+		sw_ft_entry->dp_intf = dp_fisa_rx_get_dp_intf_for_vdev(vdev);
 		return sw_ft_entry;
 	}
 
@@ -1099,6 +1113,7 @@ dp_fisa_rx_get_sw_ft_entry(struct dp_rx_fst *fisa_hdl, qdf_nbuf_t nbuf,
 		return NULL;
 
 	sw_ft_entry->vdev = vdev;
+	sw_ft_entry->dp_intf = dp_fisa_rx_get_dp_intf_for_vdev(vdev);
 	return sw_ft_entry;
 }
 
@@ -1963,17 +1978,15 @@ static bool dp_is_nbuf_bypass_fisa(qdf_nbuf_t nbuf)
 }
 
 /**
- * dp_rx_fisa_flush_by_vdev_ctx_id() - Flush fisa aggregates per vdev and rx
- *  context id
- * @soc: core txrx main context
- * @vdev: Handle DP vdev
+ * dp_rx_fisa_flush_by_intf_ctx_id() - Flush fisa aggregates per dp_interface
+ *				       and rx context id
+ * @dp_intf: DP interface handle
  * @rx_ctx_id: Rx context id
  *
  * Return: Success on flushing the flows for the vdev and rx ctx id
  */
 static
-QDF_STATUS dp_rx_fisa_flush_by_vdev_ctx_id(struct dp_soc *soc,
-					   struct dp_vdev *vdev,
+QDF_STATUS dp_rx_fisa_flush_by_intf_ctx_id(struct wlan_dp_intf *dp_intf,
 					   uint8_t rx_ctx_id)
 {
 	struct wlan_dp_psoc_context *dp_ctx = dp_get_context();
@@ -1986,10 +1999,10 @@ QDF_STATUS dp_rx_fisa_flush_by_vdev_ctx_id(struct dp_soc *soc,
 	dp_rx_fisa_acquire_ft_lock(fisa_hdl, rx_ctx_id);
 	for (i = 0; i < ft_size; i++) {
 		if (sw_ft_entry[i].is_populated &&
-		    vdev == sw_ft_entry[i].vdev &&
+		    dp_intf == sw_ft_entry[i].dp_intf &&
 		    sw_ft_entry[i].napi_id == rx_ctx_id) {
-			dp_fisa_debug("flushing %d %pk vdev %pK napi id:%d", i,
-				      &sw_ft_entry[i], vdev, rx_ctx_id);
+			dp_fisa_debug("flushing %d %pk dp_intf %pK napi id:%d",
+				      i, &sw_ft_entry[i], dp_intf, rx_ctx_id);
 			dp_rx_fisa_flush_flow_wrap(&sw_ft_entry[i]);
 		}
 	}
@@ -2010,15 +2023,18 @@ static bool dp_fisa_disallowed_for_vdev(struct dp_soc *soc,
 					struct dp_vdev *vdev,
 					uint8_t rx_ctx_id)
 {
-	if (!vdev->fisa_disallowed[rx_ctx_id]) {
-		if (vdev->fisa_force_flushed[rx_ctx_id])
-			vdev->fisa_force_flushed[rx_ctx_id] = 0;
+	struct wlan_dp_intf *dp_intf;
+
+	dp_intf = dp_fisa_rx_get_dp_intf_for_vdev(vdev);
+	if (!dp_intf->fisa_disallowed[rx_ctx_id]) {
+		if (dp_intf->fisa_force_flushed[rx_ctx_id])
+			dp_intf->fisa_force_flushed[rx_ctx_id] = 0;
 		return false;
 	}
 
-	if (!vdev->fisa_force_flushed[rx_ctx_id]) {
-		dp_rx_fisa_flush_by_vdev_ctx_id(soc, vdev, rx_ctx_id);
-		vdev->fisa_force_flushed[rx_ctx_id] = 1;
+	if (!dp_intf->fisa_force_flushed[rx_ctx_id]) {
+		dp_rx_fisa_flush_by_intf_ctx_id(dp_intf, rx_ctx_id);
+		dp_intf->fisa_force_flushed[rx_ctx_id] = 1;
 	}
 
 	return true;
@@ -2205,20 +2221,6 @@ QDF_STATUS dp_rx_fisa_flush_by_vdev_id(struct dp_soc *soc, uint8_t vdev_id)
 	dp_vdev_unref_delete(soc, vdev, DP_MOD_ID_RX);
 
 	return QDF_STATUS_SUCCESS;
-}
-
-void dp_set_fisa_disallowed_for_vdev(struct cdp_soc_t *cdp_soc, uint8_t vdev_id,
-				     uint8_t rx_ctx_id, uint8_t val)
-{
-	struct dp_soc *soc = (struct dp_soc *)cdp_soc;
-	struct dp_vdev *vdev;
-
-	vdev = dp_vdev_get_ref_by_id(soc, vdev_id, DP_MOD_ID_RX);
-	if (qdf_unlikely(!vdev))
-		return;
-
-	vdev->fisa_disallowed[rx_ctx_id] = val;
-	dp_vdev_unref_delete(soc, vdev, DP_MOD_ID_RX);
 }
 
 void dp_suspend_fse_cache_flush(struct wlan_dp_psoc_context *dp_ctx)

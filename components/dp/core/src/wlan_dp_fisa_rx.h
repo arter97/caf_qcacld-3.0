@@ -128,18 +128,6 @@ QDF_STATUS dp_rx_fisa_flush_by_ctx_id(struct dp_soc *soc, int napi_id);
 QDF_STATUS dp_rx_fisa_flush_by_vdev_id(struct dp_soc *soc, uint8_t vdev_id);
 
 /**
- * dp_set_fisa_disallowed_for_vdev() - Set fisa disallowed flag for vdev
- * @cdp_soc: core txrx main context
- * @vdev_id: Vdev id
- * @rx_ctx_id: rx context id
- * @val: value to be set
- *
- * Return: None
- */
-void dp_set_fisa_disallowed_for_vdev(struct cdp_soc_t *cdp_soc, uint8_t vdev_id,
-				     uint8_t rx_ctx_id, uint8_t val);
-
-/**
  * dp_fisa_rx_fst_update_work() - Work functions for FST updates
  * @arg: argument passed to the work function
  *
