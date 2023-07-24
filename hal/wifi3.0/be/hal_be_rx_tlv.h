@@ -384,6 +384,9 @@ struct rx_msdu_end_tlv {
 struct rx_pkt_tlvs {
 	struct rx_msdu_end_tlv   msdu_end_tlv;		/*  80 bytes */
 	struct rx_mpdu_start_tlv mpdu_start_tlv;	/*  48 bytes */
+#ifndef NO_RX_PKT_HDR_TLV
+	struct rx_pkt_hdr_tlv	pkt_hdr_tlv;		/* 128 bytes */
+#endif
 };
 
 #define HAL_RX_MSDU_END(_rx_pkt_tlv)		\

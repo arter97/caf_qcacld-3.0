@@ -1498,6 +1498,7 @@ dp_rxdma_ring_sel_cfg_be(struct dp_soc *soc)
 		htt_tlv_filter.rx_header_offset,
 		htt_tlv_filter.rx_packet_offset);
 
+	dp_rxdma_ring_wmask_cfg_be(soc, &htt_tlv_filter);
 	for (i = 0; i < MAX_PDEV_CNT; i++) {
 		struct dp_pdev *pdev = soc->pdev_list[i];
 
