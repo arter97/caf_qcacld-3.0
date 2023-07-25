@@ -28,6 +28,9 @@
 #include <wlan_cmn.h>
 #include "sme_api.h"
 
+#define ASSEMBLE_RATECODE_V1(_pream, _nss, _rate) \
+		(((1) << 28) | ((_pream) << 8) | ((_nss) << 5) | (_rate))
+
 #ifdef FEATURE_SET
 /**
  * wlan_mlme_get_feature_info() - Get mlme features
@@ -4588,4 +4591,19 @@ QDF_STATUS wlan_mlme_get_sta_ch_width(struct wlan_objmgr_vdev *vdev,
 QDF_STATUS
 wlan_mlme_set_ul_mu_config(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 			   uint8_t ulmu_disable);
+
+/**
+ * wlan_mlme_assemble_rate_code() - assemble rate code to be sent to FW
+ *
+ * @preamble: rate preamble
+ * @nss: number of spatial streams
+ * @rate: rate index
+ *
+ * Rate code assembling is different for targets which are 11ax capable.
+ * Check for the target support and assemble the rate code accordingly.
+ *
+ * Return: assembled rate code
+ */
+uint32_t
+wlan_mlme_assemble_rate_code(uint8_t preamble, uint8_t nss, uint8_t rate);
 #endif /* _WLAN_MLME_API_H_ */
