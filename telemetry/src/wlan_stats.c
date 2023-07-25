@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -811,7 +811,8 @@ get_failed:
 static QDF_STATUS get_basic_vdev_data(struct wlan_objmgr_psoc *psoc,
 				      struct wlan_objmgr_vdev *vdev,
 				      struct unified_stats *stats,
-				      uint32_t feat, bool mld_req)
+				      uint32_t feat, bool mld_req,
+				      bool mld_link)
 {
 	struct cdp_vdev_stats *vdev_stats = NULL;
 	QDF_STATUS ret = QDF_STATUS_SUCCESS;
@@ -828,15 +829,20 @@ static QDF_STATUS get_basic_vdev_data(struct wlan_objmgr_psoc *psoc,
 	}
 
 #ifdef CONFIG_MLO_SINGLE_DEV
-	if (mld_req)
+	if (mld_link)
 		ret = cdp_mlo_get_mld_vdev_stats(wlan_psoc_get_dp_handle(psoc),
 						 wlan_vdev_get_id(vdev),
-						 vdev_stats);
+						 vdev_stats, true);
+	else if (mld_req)
+		ret = cdp_mlo_get_mld_vdev_stats(wlan_psoc_get_dp_handle(psoc),
+						 wlan_vdev_get_id(vdev),
+						 vdev_stats, false);
 	else
 #endif
-		ret = cdp_host_get_vdev_stats(wlan_psoc_get_dp_handle(psoc),
-					      wlan_vdev_get_id(vdev),
-					      vdev_stats, true);
+		ret = cdp_host_get_interface_stats(
+						wlan_psoc_get_dp_handle(psoc),
+						wlan_vdev_get_id(vdev),
+						vdev_stats);
 
 	if (ret != QDF_STATUS_SUCCESS) {
 		qdf_err("Unable to get Vdev Stats!");
@@ -2722,7 +2728,8 @@ static QDF_STATUS get_advance_vdev_ctrl_rx(struct unified_stats *stats,
 static QDF_STATUS get_advance_vdev_data(struct wlan_objmgr_psoc *psoc,
 					struct wlan_objmgr_vdev *vdev,
 					struct unified_stats *stats,
-					uint32_t feat, bool mld_req)
+					uint32_t feat, bool mld_req,
+					bool mld_link)
 {
 	struct cdp_vdev_stats *vdev_stats = NULL;
 	QDF_STATUS ret = QDF_STATUS_SUCCESS;
@@ -2739,15 +2746,20 @@ static QDF_STATUS get_advance_vdev_data(struct wlan_objmgr_psoc *psoc,
 	}
 
 #ifdef CONFIG_MLO_SINGLE_DEV
-	if (mld_req)
+	if (mld_link)
 		ret = cdp_mlo_get_mld_vdev_stats(wlan_psoc_get_dp_handle(psoc),
 						 wlan_vdev_get_id(vdev),
-						 vdev_stats);
+						 vdev_stats, true);
+	else if (mld_req)
+		ret = cdp_mlo_get_mld_vdev_stats(wlan_psoc_get_dp_handle(psoc),
+						 wlan_vdev_get_id(vdev),
+						 vdev_stats, false);
 	else
 #endif
-		ret = cdp_host_get_vdev_stats(wlan_psoc_get_dp_handle(psoc),
-					      wlan_vdev_get_id(vdev),
-					      vdev_stats, true);
+		ret = cdp_host_get_interface_stats(
+						wlan_psoc_get_dp_handle(psoc),
+						wlan_vdev_get_id(vdev),
+						vdev_stats);
 
 	if (ret != QDF_STATUS_SUCCESS) {
 		qdf_err("Unable to get Vdev Stats!");
@@ -4055,6 +4067,24 @@ get_pdev_tx_capture_stats(void *dp_soc_handle, uint8_t pdev_id,
 }
 #endif /* WLAN_TX_PKT_CAPTURE_ENH */
 
+#ifdef WLAN_CONFIG_TELEMETRY_AGENT
+static QDF_STATUS get_peer_deter_stats(
+				ol_txrx_soc_handle soc,
+				uint8_t vdev_id,
+				uint8_t *addr,
+				struct cdp_peer_deter_stats *deter)
+{
+	return cdp_get_peer_deter_stats(soc, vdev_id,
+					addr, deter);
+}
+static QDF_STATUS get_pdev_deter_stats(
+				ol_txrx_soc_handle soc,
+				uint8_t pdev_id,
+				struct cdp_pdev_deter_stats *deter)
+{
+	return cdp_get_pdev_deter_stats(soc, pdev_id, deter);
+}
+
 static QDF_STATUS
 get_debug_peer_deter_stats(struct unified_stats *stats,
 			   struct cdp_peer_deter_stats *deter)
@@ -4086,6 +4116,31 @@ get_debug_peer_deter_stats(struct unified_stats *stats,
 
 	return QDF_STATUS_SUCCESS;
 }
+#else
+static QDF_STATUS get_peer_deter_stats(
+				ol_txrx_soc_handle soc,
+				uint8_t vdev_id,
+				uint8_t *addr,
+				struct cdp_peer_deter_stats *deter)
+{
+	return QDF_STATUS_E_FAILURE;
+}
+
+static QDF_STATUS get_pdev_deter_stats(
+				ol_txrx_soc_handle soc,
+				uint8_t pdev_id,
+				struct cdp_pdev_deter_stats *stats)
+{
+	return QDF_STATUS_E_FAILURE;
+}
+
+static QDF_STATUS
+get_debug_peer_deter_stats(struct unified_stats *stats,
+			   struct cdp_peer_deter_stats *deter)
+{
+	return QDF_STATUS_E_FAILURE;
+}
+#endif
 
 static QDF_STATUS get_debug_peer_data(struct wlan_objmgr_psoc *psoc,
 				      struct wlan_objmgr_vdev *vdev,
@@ -4165,8 +4220,8 @@ static QDF_STATUS get_debug_peer_data(struct wlan_objmgr_psoc *psoc,
 			ret = QDF_STATUS_E_NOMEM;
 			goto get_failed;
 		}
-		ret = cdp_get_peer_deter_stats(dp_soc, vdev_id,
-					       peer_mac, deter);
+		ret = get_peer_deter_stats(dp_soc, vdev_id,
+					   peer_mac, deter);
 		if (ret == QDF_STATUS_SUCCESS)
 			ret = get_debug_peer_deter_stats(stats, deter);
 		if (ret != QDF_STATUS_SUCCESS)
@@ -4537,7 +4592,8 @@ static QDF_STATUS get_debug_vdev_data_tso(struct unified_stats *stats,
 static QDF_STATUS get_debug_vdev_data(struct wlan_objmgr_psoc *psoc,
 				      struct wlan_objmgr_vdev *vdev,
 				      struct unified_stats *stats,
-				      uint32_t feat, bool mld_req)
+				      uint32_t feat, bool mld_req,
+				      bool mld_link)
 {
 	struct cdp_vdev_stats *vdev_stats = NULL;
 	QDF_STATUS ret = QDF_STATUS_SUCCESS;
@@ -4554,15 +4610,20 @@ static QDF_STATUS get_debug_vdev_data(struct wlan_objmgr_psoc *psoc,
 	}
 
 #ifdef CONFIG_MLO_SINGLE_DEV
-	if (mld_req)
+	if (mld_link)
 		ret = cdp_mlo_get_mld_vdev_stats(wlan_psoc_get_dp_handle(psoc),
 						 wlan_vdev_get_id(vdev),
-						 vdev_stats);
+						 vdev_stats, true);
+	else if (mld_req)
+		ret = cdp_mlo_get_mld_vdev_stats(wlan_psoc_get_dp_handle(psoc),
+						 wlan_vdev_get_id(vdev),
+						 vdev_stats, false);
 	else
 #endif
-		ret = cdp_host_get_vdev_stats(wlan_psoc_get_dp_handle(psoc),
-					      wlan_vdev_get_id(vdev),
-					      vdev_stats, true);
+		ret = cdp_host_get_interface_stats(
+						wlan_psoc_get_dp_handle(psoc),
+						wlan_vdev_get_id(vdev),
+						vdev_stats);
 
 	if (ret != QDF_STATUS_SUCCESS) {
 		qdf_err("Unable to get Vdev Stats!");
@@ -5284,6 +5345,7 @@ static QDF_STATUS get_debug_pdev_ctrl_link(struct unified_stats *stats,
 	return QDF_STATUS_SUCCESS;
 }
 
+#ifdef WLAN_CONFIG_TELEMETRY_AGENT
 static QDF_STATUS
 get_debug_pdev_deter_stats(struct unified_stats *stats,
 			   struct cdp_pdev_deter_stats *deter)
@@ -5338,6 +5400,14 @@ get_debug_pdev_deter_stats(struct unified_stats *stats,
 
 	return QDF_STATUS_SUCCESS;
 }
+#else
+static QDF_STATUS
+get_debug_pdev_deter_stats(struct unified_stats *stats,
+			   struct cdp_pdev_deter_stats *deter)
+{
+	return QDF_STATUS_E_FAILURE;
+}
+#endif
 
 static void aggregate_debug_pdev_ctrl_tx(struct debug_pdev_ctrl_tx *tx,
 					 struct vdev_ic_cp_stats *cp_stats)
@@ -5530,7 +5600,7 @@ static QDF_STATUS get_debug_pdev_data(struct wlan_objmgr_psoc *psoc,
 			ret = QDF_STATUS_E_NOMEM;
 			goto get_failed;
 		}
-		ret = cdp_get_pdev_deter_stats(dp_soc, pdev_id, deter);
+		ret = get_pdev_deter_stats(dp_soc, pdev_id, deter);
 		if (ret == QDF_STATUS_SUCCESS)
 			ret = get_debug_pdev_deter_stats(stats, deter);
 		if (ret != QDF_STATUS_SUCCESS)
@@ -5917,25 +5987,31 @@ QDF_STATUS wlan_stats_get_vdev_stats(struct wlan_objmgr_psoc *psoc,
 	switch (cfg->lvl) {
 	case STATS_LVL_BASIC:
 		if (cfg->type == STATS_TYPE_DATA)
-			ret = get_basic_vdev_data(psoc, vdev, stats, cfg->feat, cfg->mld_req);
+			ret = get_basic_vdev_data(psoc, vdev, stats, cfg->feat,
+						  cfg->mld_req, cfg->mld_link);
 		else
-			ret = get_basic_vdev_ctrl(vdev, stats, cfg->feat, cfg->mld_req);
+			ret = get_basic_vdev_ctrl(vdev, stats, cfg->feat,
+						  cfg->mld_req);
 		break;
 #if WLAN_ADVANCE_TELEMETRY
 	case STATS_LVL_ADVANCE:
 		if (cfg->type == STATS_TYPE_DATA)
 			ret = get_advance_vdev_data(psoc, vdev,
-						    stats, cfg->feat, cfg->mld_req);
+						    stats, cfg->feat, cfg->mld_req,
+						    cfg->mld_link);
 		else
-			ret = get_advance_vdev_ctrl(vdev, stats, cfg->feat, cfg->mld_req);
+			ret = get_advance_vdev_ctrl(vdev, stats, cfg->feat,
+						    cfg->mld_req);
 		break;
 #endif /* WLAN_ADVANCE_TELEMETRY */
 #if WLAN_DEBUG_TELEMETRY
 	case STATS_LVL_DEBUG:
 		if (cfg->type == STATS_TYPE_DATA)
-			ret = get_debug_vdev_data(psoc, vdev, stats, cfg->feat, cfg->mld_req);
+			ret = get_debug_vdev_data(psoc, vdev, stats, cfg->feat,
+						  cfg->mld_req, cfg->mld_link);
 		else
-			ret = get_debug_vdev_ctrl(vdev, stats, cfg->feat, cfg->mld_req);
+			ret = get_debug_vdev_ctrl(vdev, stats, cfg->feat,
+						  cfg->mld_req);
 		break;
 #endif /* WLAN_DEBUG_TELEMETRY */
 	default:

@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -485,7 +485,7 @@ const char *mu_reception_mode[STATS_IF_TXRX_TYPE_MU_MAX] = {
 };
 #endif /* WLAN_DEBUG_TELEMETRY */
 
-static const char *opt_string = "BADarvsdcf:i:m:t:RIh?";
+static const char *opt_string = "BADarvsdcf:i:m:t:RIMh?";
 
 static const struct option long_opts[] = {
 	{ "basic", no_argument, NULL, 'B' },
@@ -503,6 +503,7 @@ static const struct option long_opts[] = {
 	{ "serviceid", required_argument, NULL, 't' },
 	{ "recursive", no_argument, NULL, 'R' },
 	{ "ipa", no_argument, NULL, 'I' },
+	{ "mldlink", no_argument, NULL, 'M' },
 	{ "help", no_argument, NULL, 'h' },
 	{ NULL, no_argument, NULL, 0 },
 };
@@ -567,7 +568,7 @@ static void display_help(void)
 {
 	STATS_PRINT("\nwifitelemetry : Displays Statistics of Access Point\n");
 	STATS_PRINT("\nUsage:\n"
-		    "Process Mode: wifitelemetry [Level] [Object] [StatsType] [FeatureName] [[-i interface_name] | [-m StationMACAddress]] [-R] [-I] [-h | ?]\n"
+		    "Process Mode: wifitelemetry [Level] [Object] [StatsType] [FeatureName] [[-i interface_name] | [-m StationMACAddress]] [-R] [-I] [-M] [-h | ?]\n"
 		    "Daemon Mode: wifitelemetry async\n"
 		    "    Note: User must run wifitelemetry in background. Excecute another instance in process mode to trigger stats request.\n"
 		    "\n"
@@ -619,6 +620,7 @@ static void display_help(void)
 		    "OTHER OPTIONS:\n"
 		    "    -R or --recursive:  Recursive display\n"
 		    "    -I or --ipa is required to get Tx and Rx stats in IPA architecture\n"
+		    "    -M or --mldlink indicates to get link stats for MLD\n"
 		    "    -h or --help:       Usage display\n");
 }
 
@@ -1545,11 +1547,11 @@ print_advance_sta_data_sawf_tx(struct advance_peer_data_sawftx *data,
 		STATS_PRINT("----TIDX: %d----   ", data->tid);
 		STATS_PRINT("----QUEUE: %d----\n", data->msduq);
 
-		STATS_PRINT("Tx_info_success_num        = %u\n",
+		STATS_PRINT("Tx_info_success_num        = %ju\n",
 			    data->tx[0][0].tx_success.num);
 		STATS_PRINT("Tx_info_success_bytes      = %ju\n",
 			    data->tx[0][0].tx_success.bytes);
-		STATS_PRINT("Tx_info_ingress_num        = %u\n",
+		STATS_PRINT("Tx_info_ingress_num        = %ju\n",
 			    data->tx[0][0].tx_ingress.num);
 		STATS_PRINT("Tx_info_ingress_bytes      = %ju\n",
 			    data->tx[0][0].tx_ingress.bytes);
@@ -1558,7 +1560,7 @@ print_advance_sta_data_sawf_tx(struct advance_peer_data_sawftx *data,
 		STATS_PRINT("Tx_info_ingress_rate       = %u\n",
 			    data->tx[0][0].ingress_rate);
 
-		STATS_PRINT("Tx_info_drop_num           = %u\n",
+		STATS_PRINT("Tx_info_drop_num           = %ju\n",
 			    data->tx[0][0].dropped.fw_rem.num);
 		STATS_PRINT("Tx_info_drop_bytes         = %ju\n",
 			     data->tx[0][0].dropped.fw_rem.bytes);
@@ -1597,11 +1599,11 @@ print_advance_sta_data_sawf_tx(struct advance_peer_data_sawftx *data,
 				sawftx = &data->tx[tidx][queues];
 				STATS_PRINT("----TIDX: %d----   ", tidx);
 				STATS_PRINT("----QUEUE: %d----\n", queues);
-				STATS_PRINT("Tx_info_success_num        = %u\n",
+				STATS_PRINT("Tx_info_success_num        = %ju\n",
 					    sawftx->tx_success.num);
 				STATS_PRINT("Tx_info_success_bytes      = %ju\n",
 					    sawftx->tx_success.bytes);
-				STATS_PRINT("Tx_info_ingress_num        = %u\n",
+				STATS_PRINT("Tx_info_ingress_num        = %ju\n",
 					    sawftx->tx_ingress.num);
 				STATS_PRINT("Tx_info_ingress_bytes      = %ju\n",
 					    sawftx->tx_ingress.bytes);
@@ -1610,7 +1612,7 @@ print_advance_sta_data_sawf_tx(struct advance_peer_data_sawftx *data,
 				STATS_PRINT("Tx_info_ingress_rate       = %u\n",
 					    sawftx->ingress_rate);
 
-				STATS_PRINT("Tx_info_drop_num           = %u\n",
+				STATS_PRINT("Tx_info_drop_num           = %ju\n",
 					    sawftx->dropped.fw_rem.num);
 				STATS_PRINT("Tx_info_drop_bytes         = %ju\n",
 					    sawftx->dropped.fw_rem.bytes);
@@ -3859,6 +3861,7 @@ int main(int argc, char *argv[])
 	u_int8_t is_serviceid_set = 0;
 	u_int8_t is_option_selected = 0;
 	u_int8_t is_ipa_stats_set = 0;
+	bool is_mld_link = false;
 	bool recursion_temp = false;
 	char feat_flags[128] = {'\0'};
 	char ifname_temp[IFNAME_LEN] = {'\0'};
@@ -4030,6 +4033,9 @@ int main(int argc, char *argv[])
 			is_type_set = 1;
 			is_option_selected = 1;
 			break;
+		case 'M':
+			is_mld_link = true;
+			break;
 		case 'h':
 		case '?':
 			display_help();
@@ -4063,6 +4069,7 @@ int main(int argc, char *argv[])
 	cmd.feat_flag = feat_temp;
 	cmd.recursive = recursion_temp;
 	cmd.serviceid = servid_temp;
+	cmd.mld_link = is_mld_link;
 
 	strlcpy(cmd.if_name, ifname_temp, IFNAME_LEN);
 

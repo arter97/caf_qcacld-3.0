@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2016-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -27,6 +27,7 @@
 #include "dp_tx_desc.h"
 #include "dp_internal.h"
 #include "dp_txrx_me.h"
+#include <dp_me.h>
 #include <dp_peer.h>
 #define MAX_ME_BUF_CHUNK 1424
 #define ME_US_TO_SEC(_x) ((_x) / (1000 * 1000))
@@ -204,9 +205,17 @@ dp_tx_me_free_descriptor(struct cdp_soc_t *soc, uint8_t pdev_id)
 QDF_STATUS
 dp_tx_prepare_send_me(struct dp_vdev *vdev, qdf_nbuf_t nbuf)
 {
+	uint32_t flag = 0;
+#if defined(WLAN_FEATURE_11BE_MLO) && defined(WLAN_MLO_MULTI_CHIP)
+	if ((DP_MLD_MODE_HYBRID_NONBOND == vdev->pdev->soc->mld_mode_ap) &&
+	    (wlan_op_mode_ap == vdev->opmode) &&
+	    (CB_FTYPE_MLO_MCAST == qdf_nbuf_get_tx_ftype(nbuf)))
+		flag = DP_ME_MCTBL_MLD_VDEV;
+#endif
+
 	if (dp_me_mcast_convert((struct cdp_soc_t *)(vdev->pdev->soc),
 				vdev->vdev_id, vdev->pdev->pdev_id,
-				nbuf) > 0)
+				nbuf, flag) > 0)
 		return QDF_STATUS_SUCCESS;
 
 	return QDF_STATUS_E_FAILURE;

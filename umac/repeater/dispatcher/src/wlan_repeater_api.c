@@ -38,9 +38,6 @@
 #include <wlan_pdev_mlme.h>
 #define IE_CONTENT_SIZE 1
 #include <ieee80211_api.h>
-#if QCA_AIRTIME_FAIRNESS
-#include <wlan_atf_utils_api.h>
-#endif
 
 extern bool
 wlan_rptr_is_psta_vdev(struct wlan_objmgr_vdev *vdev);
@@ -1111,9 +1108,7 @@ wlan_rptr_conn_up_dbdc_process(struct wlan_objmgr_vdev *vdev,
 	u8 disconnect_rptr_clients = 0;
 	struct iterate_info iterate_msg;
 #endif
-#if QCA_AIRTIME_FAIRNESS
-	struct ieee80211vap *vap = wlan_vdev_get_vap(vdev);
-#endif
+	osif_dev *osdev;
 
 	g_priv = wlan_rptr_get_global_ctx();
 	ext_cb = &g_priv->ext_cbacks;
@@ -1130,15 +1125,11 @@ wlan_rptr_conn_up_dbdc_process(struct wlan_objmgr_vdev *vdev,
 	RPTR_GLOBAL_LOCK(&g_priv->rptr_global_lock);
 	g_priv->num_stavaps_up++;
 	RPTR_LOGI("Number of STA VAPs connected:%d", g_priv->num_stavaps_up);
-#if QCA_AIRTIME_FAIRNESS
-	/* Trigger peer join leave for atf peer nodes */
-	if (vap && vap->iv_bss)
-		wlan_atf_peer_join_leave(vap->iv_bss->peer_obj, 1);
-#endif
 	RPTR_GLOBAL_UNLOCK(&g_priv->rptr_global_lock);
 
+	osdev = ath_netdev_priv(dev);
 	if (wiphy && dev)
-		qca_multi_link_add_station_vap(wiphy, dev, wlan_vdev_mlme_get_mldaddr(vdev));
+		qca_multi_link_add_station_vap(wiphy, dev, osif_get_mld_netdev(osdev), wlan_vdev_mlme_get_mldaddr(vdev));
 
 	qca_multi_link_append_num_sta(true);
 
@@ -1214,9 +1205,6 @@ wlan_rptr_conn_down_dbdc_process(struct wlan_objmgr_vdev *vdev,
 	struct wlan_rptr_pdev_priv *pdev_priv = NULL;
 	bool max_priority_stavap_disconnected = 0;
 	struct dbdc_flags flags;
-#if QCA_AIRTIME_FAIRNESS
-	struct ieee80211vap *vap = wlan_vdev_get_vap(vdev);
-#endif
 
 	g_priv = wlan_rptr_get_global_ctx();
 	ext_cb = &g_priv->ext_cbacks;
@@ -1234,12 +1222,6 @@ wlan_rptr_conn_down_dbdc_process(struct wlan_objmgr_vdev *vdev,
 	RPTR_GLOBAL_LOCK(&g_priv->rptr_global_lock);
 	g_priv->num_stavaps_up--;
 	RPTR_GLOBAL_UNLOCK(&g_priv->rptr_global_lock);
-
-#if QCA_AIRTIME_FAIRNESS
-	/* Trigger peer join leave for atf peers */
-	if (vap && vap->iv_bss)
-		wlan_atf_peer_join_leave(vap->iv_bss->peer_obj, 0);
-#endif
 
 	if (wiphy && dev)
 		qca_multi_link_remove_station_vap(wiphy);
@@ -1288,6 +1270,7 @@ wlan_rptr_vdev_s_ssid_check_cb(struct wlan_objmgr_psoc *psoc,
 {
 	struct wlan_objmgr_vdev *vdev = NULL;
 	struct s_ssid_info *s_ssid_msg = NULL;
+	enum QDF_OPMODE vdev_mode, ssid_msg_vdev_mode;
 
 	vdev = (struct wlan_objmgr_vdev *)obj;
 	if (!vdev) {
@@ -1295,15 +1278,23 @@ wlan_rptr_vdev_s_ssid_check_cb(struct wlan_objmgr_psoc *psoc,
 		return;
 	}
 
+	/*No same ssid checks for Proxy STAs*/
+	if (wlan_rptr_is_psta_vdev(vdev))
+		return;
+
 	s_ssid_msg = ((struct s_ssid_info *)arg);
 
-	if (wlan_vdev_mlme_get_opmode(vdev) != wlan_vdev_mlme_get_opmode(
-							s_ssid_msg->vdev)) {
+	vdev_mode = wlan_vdev_mlme_get_opmode(vdev);
+	ssid_msg_vdev_mode = wlan_vdev_mlme_get_opmode(s_ssid_msg->vdev);
+
+	/* Do same ssid check only if vdev_mode and ssid_msg_vdev_mode
+	 * are not the same and they're SAP or STA, not any other mode */
+	if (((vdev_mode == QDF_STA_MODE) &&
+			(ssid_msg_vdev_mode == QDF_SAP_MODE)) ||
+			((vdev_mode == QDF_SAP_MODE) &&
+			 (ssid_msg_vdev_mode == QDF_STA_MODE))) {
 		struct wlan_rptr_global_priv *g_priv = wlan_rptr_get_global_ctx();
 		struct rptr_ext_cbacks *ext_cb = &g_priv->ext_cbacks;
-
-		if (wlan_rptr_is_psta_vdev(vdev))
-			return;
 
 		if (ext_cb->dessired_ssid_found(vdev, s_ssid_msg->ssid, s_ssid_msg->ssid_len)) {
 			s_ssid_msg->ssid_match = 1;
@@ -2009,7 +2000,7 @@ wlan_rptr_disconnect_sec_stavap_cb(struct wlan_objmgr_psoc *psoc,
 	pdev_priv = wlan_rptr_get_pdev_priv(pdev);
 	sta_vdev = ext_cb->get_stavap(pdev);
 	wiphy = pdev_ospriv->wiphy;
-	if (wlan_cm_is_vdev_connected(sta_vdev) &&
+	if (sta_vdev && wlan_cm_is_vdev_connected(sta_vdev) &&
 	    !(qca_multi_link_is_primary_radio(wiphy))) {
 		wlan_mlme_cm_stop(sta_vdev, CM_SB_DISCONNECT,
 				  REASON_DISASSOC_NETWORK_LEAVING, NULL);

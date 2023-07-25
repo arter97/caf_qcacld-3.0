@@ -4068,6 +4068,58 @@ QDF_STATUS send_soc_tqm_reset_enable_disable_cmd_tlv(wmi_unified_t wmi_handle,
 	return QDF_STATUS_SUCCESS;
 }
 
+static QDF_STATUS
+send_set_peer_disable_mode(struct wmi_unified *wmi_handle, uint8_t *peer_mac,
+			   uint8_t pdev_id,
+			   uint32_t disabled_modes)
+{
+	wmi_buf_t buf;
+	uint32_t len;
+	wmi_peer_sched_mode_disable_fixed_param *cmd;
+	wmi_per_peer_sched_mode_disable *peer_disabled_mode;
+	uint8_t *buf_ptr = 0;
+	uint8_t num_peer = 1;
+	QDF_STATUS retval;
+
+	len = sizeof(wmi_peer_sched_mode_disable_fixed_param) +
+		WMI_TLV_HDR_SIZE +
+		num_peer * sizeof(wmi_per_peer_sched_mode_disable);
+	buf = wmi_buf_alloc(wmi_handle, len);
+	if (!buf)
+		return QDF_STATUS_E_NOMEM;
+
+	buf_ptr = (uint8_t *)wmi_buf_data(buf);
+	cmd = (wmi_peer_sched_mode_disable_fixed_param *)buf_ptr;
+	WMITLV_SET_HDR(&cmd->tlv_header,
+		       WMITLV_TAG_STRUC_wmi_peer_sched_mode_disable_fixed_param,
+		       WMITLV_GET_STRUCT_TLVLEN(
+		       wmi_peer_sched_mode_disable_fixed_param));
+	cmd->pdev_id = pdev_id;
+	buf_ptr += sizeof(*cmd);
+	WMITLV_SET_HDR(buf_ptr, WMITLV_TAG_ARRAY_STRUC,
+		       sizeof(wmi_per_peer_sched_mode_disable) * num_peer);
+	buf_ptr += WMI_TLV_HDR_SIZE;
+	peer_disabled_mode = (wmi_per_peer_sched_mode_disable *)buf_ptr;
+	WMITLV_SET_HDR(&peer_disabled_mode->tlv_header,
+		       WMITLV_TAG_STRUC_wmi_per_peer_sched_mode_disable,
+		       WMITLV_GET_STRUCT_TLVLEN(
+		       wmi_per_peer_sched_mode_disable));
+	WMI_CHAR_ARRAY_TO_MAC_ADDR(peer_mac, &peer_disabled_mode->peer_macaddr);
+	peer_disabled_mode->disabled_sched_modes = disabled_modes;
+	wmi_mtrace(WMI_PEER_SCHED_MODE_DISABLE_CMDID, NO_SESSION, 0);
+
+	retval = wmi_unified_cmd_send(wmi_handle, buf, len,
+				      WMI_PEER_SCHED_MODE_DISABLE_CMDID);
+
+	if (QDF_IS_STATUS_ERROR(retval)) {
+		wmi_err("WMI Failed");
+		wmi_buf_free(buf);
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	return retval;
+}
+
 #ifdef CONFIG_SAWF_DEF_QUEUES
 static QDF_STATUS
 send_set_rate_upper_cap_cmd_tlv(struct wmi_unified *wmi_handle, uint8_t pdev_id,
@@ -4171,6 +4223,7 @@ send_set_nss_probe_intvl_cmd_tlv(struct wmi_unified *wmi_handle,
 }
 
 #define SAWF_CONFIG_PARAM_MAX 0xFFFFFFFF
+#define SAWF_MAX_MIN_THROUGHPUT (10 * 1024 * 1024)
 
 static uint32_t sawf_tid_infer(wmi_sawf_svc_class_cfg_cmd_fixed_param *p_cmd)
 {
@@ -4317,6 +4370,23 @@ QDF_STATUS send_sawf_create_cmd_tlv(wmi_unified_t wmi_handle,
 		tid = sawf_tid_infer(cmd);
 		cmd->tid = tid;
 		param->tid = tid;
+	}
+
+	if (param->min_thruput_rate !=
+	    WMI_SAWF_SVC_CLASS_PARAM_DEFAULT_MIN_THRUPUT) {
+		uint32_t min_tput;
+
+		/*
+		 * Do 1.5 * min_tput to get FW value. First multiply by 3 and
+		 * then divide by 2 to get the desired multiplication
+		 */
+		min_tput = 3 * param->min_thruput_rate;
+		min_tput = qdf_do_div(min_tput, 2);
+
+		if (min_tput > SAWF_MAX_MIN_THROUGHPUT)
+			min_tput = SAWF_MAX_MIN_THROUGHPUT;
+
+		cmd->min_thruput_kbps = min_tput;
 	}
 
 	wmi_debug("Service class params - ID:%u, min_thruput_rate:%u, "
@@ -4522,6 +4592,7 @@ void wmi_ap_attach_tlv(wmi_unified_t wmi_handle)
 	ops->send_vdev_set_intra_bss_cmd = send_vdev_set_intra_bss_cmd_tlv;
 	ops->send_soc_tqm_reset_enable_disable_cmd =
 				send_soc_tqm_reset_enable_disable_cmd_tlv;
+	ops->send_set_peer_disable_mode = send_set_peer_disable_mode;
 #ifdef CONFIG_SAWF_DEF_QUEUES
 	ops->send_set_rate_upper_cap_cmd = send_set_rate_upper_cap_cmd_tlv;
 	ops->send_set_rate_retry_mcs_drop_cmd =
@@ -4540,4 +4611,9 @@ void wmi_ap_attach_tlv(wmi_unified_t wmi_handle)
 #endif
 	ops->send_wmi_tdma_schedule_request_cmd =
 		send_wmi_tdma_schedule_request_cmd_tlv;
+
+#ifdef WLAN_FEATURE_11BE_MLO
+	ops->send_wmi_link_recommendation_cmd =
+		send_wmi_link_recommendation_cmd_tlv;
+#endif
 }

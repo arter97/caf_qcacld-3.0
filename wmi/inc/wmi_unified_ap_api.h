@@ -1020,6 +1020,20 @@ QDF_STATUS
 wmi_unified_soc_tqm_reset_enable_disable_cmd(wmi_unified_t wmi_handle,
 					     uint32_t enable);
 
+/**
+ * wmi_unified_set_peer_disable_mode() - set peer disabled modes
+ * @wmi_handle: wmi handle
+ * @peer_mac: peer mac address
+ * @pdev_id: pdev id
+ * @disabled_modes: disabled modes
+ *
+ * Return: QDF_STATUS_SUCCESS for success or error code
+ */
+QDF_STATUS
+wmi_unified_set_peer_disable_mode(wmi_unified_t wmi_handle,
+				  uint8_t *peer_mac,
+				  uint8_t pdev_id,
+				  uint32_t disabled_modes);
 #ifdef CONFIG_SAWF_DEF_QUEUES
 /**
  * wmi_unified_set_rate_upper_cap_cmd_send() - set rate upper cap cmd
@@ -1119,4 +1133,24 @@ QDF_STATUS wmi_extract_standalone_sounding_evt_params(
 QDF_STATUS wmi_unified_tdma_schedule_send(
 		struct wmi_unified *wmi_handle,
 		struct wlan_tdma_sched_cmd_param *param);
+
+#ifdef WLAN_FEATURE_11BE_MLO
+/**
+ * wmi_unified_link_recmnd_info_send() - API to send the link recommendation
+ * @wmi_handle: WMI handle
+ * @param: structure to get link recommendation config
+ *
+ * return: QDF_STATUS
+ */
+QDF_STATUS wmi_unified_link_recmnd_info_send(
+		wmi_unified_t wmi_handle,
+		struct wlan_link_recmnd_param *param);
+#else
+static inline QDF_STATUS wmi_unified_link_recmnd_info_send(
+		wmi_unified_t wmi_handle,
+		struct wlan_link_recmnd_param *param)
+{
+	return QDF_STATUS_SUCCESS;
+}
+#endif
 #endif /* _WMI_UNIFIED_AP_API_H_ */

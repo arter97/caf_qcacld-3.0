@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
 
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -1660,9 +1660,8 @@ dp_lite_mon_add_meta_header_to_headroom(struct dp_pdev_be *be_pdev,
 					     qdf_nbuf_data(mpdu_nbuf),
 					     pull_bytes);
 			}
-			/* add debug nbuf to extend list */
-			qdf_nbuf_append_ext_list(mpdu_nbuf, tmp_nbuf,
-						 qdf_nbuf_len(tmp_nbuf));
+			/* add debug nbuf to mpdu nbuf */
+			dp_rx_mon_append_nbuf(mpdu_nbuf, tmp_nbuf);
 		}
 	}
 

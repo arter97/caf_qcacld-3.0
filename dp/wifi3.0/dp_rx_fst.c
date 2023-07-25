@@ -391,6 +391,20 @@ QDF_STATUS dp_rx_flow_add_entry(struct dp_pdev *pdev,
 		flow.reo_destination_indication = pdev->reo_dest;
 	}
 
+	/**
+	 * If Round Robin flow to core distribution is enabled,
+	 * select reo_destination_indication in a round robin
+	 * fashion for all the incoming flows.
+	 */
+	if (wlan_cfg_is_rx_rr_enabled(soc->wlan_cfg_ctx)) {
+		flow.reo_destination_indication = fst->ring_id;
+		fst->ring_id += 1;
+		fst->ring_id = fst->ring_id % 4;
+
+		if (!fst->ring_id)
+			fst->ring_id = 1;
+	}
+
 	flow.reo_destination_handler = HAL_RX_FSE_REO_DEST_FT;
 	flow.fse_metadata = rx_flow_info->fse_metadata;
 	dp_rx_update_ppe_fse_fields(&flow, rx_flow_info);
@@ -419,8 +433,11 @@ QDF_STATUS dp_rx_flow_add_entry(struct dp_pdev *pdev,
 			if (chip_id >= soc->arch_ops.dp_soc_get_num_soc(soc))
 				return QDF_STATUS_SUCCESS;
 
-			partner_soc = soc->arch_ops.dp_rx_replenish_soc_get(soc,
-								    chip_id);
+			partner_soc =
+			soc->arch_ops.dp_get_soc_by_chip_id(soc, chip_id);
+
+			if (!partner_soc)
+			    continue;
 
 			/**
 			 * unlike LI, BE SOC has only one DMAC so there is
@@ -482,7 +499,7 @@ QDF_STATUS dp_rx_flow_delete_entry(struct dp_pdev *pdev,
 	fse = dp_rx_flow_find_entry_by_tuple(soc->hal_soc, fst,
 					     rx_flow_info, &flow);
 
-	if (!fse) {
+	if (!fse || (fse->is_valid == false)) {
 		dp_err("RX flow delete entry failed");
 		dp_rx_flow_dump_flow_entry(fst, rx_flow_info);
 		return QDF_STATUS_E_INVAL;
@@ -507,8 +524,11 @@ QDF_STATUS dp_rx_flow_delete_entry(struct dp_pdev *pdev,
 			if (chip_id >= soc->arch_ops.dp_soc_get_num_soc(soc))
 				return QDF_STATUS_SUCCESS;
 
-			partner_soc = soc->arch_ops.dp_rx_replenish_soc_get(soc,
-								    chip_id);
+			partner_soc =
+			soc->arch_ops.dp_get_soc_by_chip_id(soc, chip_id);
+
+			if (!partner_soc)
+			    continue;
 
 			/**
 			 * unlike LI, BE SOC has only one DMAC so there is
@@ -688,6 +708,8 @@ QDF_STATUS dp_rx_fst_attach(struct dp_soc *soc, struct dp_pdev *pdev)
 	}
 
 	qdf_mem_set(fst, 0, sizeof(struct dp_rx_fst));
+
+	fst->ring_id = 1;
 
 	fst->max_skid_length = wlan_cfg_rx_fst_get_max_search(cfg);
 	fst->max_entries = wlan_cfg_get_rx_flow_search_table_size(cfg);

@@ -43,6 +43,17 @@ uint8_t *bcn_offload_quiet_add_ml_partner_links(
  * Return: size of ML params in Quiet WMI command
  */
 size_t quiet_mlo_params_size(struct set_bcn_offload_quiet_mode_params *params);
+
+/**
+ * send_wmi_link_recommendation_cmd_tlv() - send link recommendation config command to fw
+ * @wmi_handle: WMI handle
+ * @param: structure to get link recommendation config
+ *
+ * return: QDF_STATUS
+ */
+QDF_STATUS send_wmi_link_recommendation_cmd_tlv(
+		wmi_unified_t wmi_handle,
+		struct wlan_link_recmnd_param *param);
 #else
 static uint8_t *bcn_offload_quiet_add_ml_partner_links(
 		uint8_t *buf_ptr,

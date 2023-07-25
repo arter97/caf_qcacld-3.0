@@ -61,12 +61,9 @@ dp_mon_ring_config(struct dp_soc *soc, struct dp_pdev *pdev,
 {
 	int lmac_id;
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
-	struct dp_mon_ops *mon_ops = dp_mon_ops_get(soc);
 
 	lmac_id = dp_get_lmac_id_for_pdev_id(soc, 0, mac_for_pdev);
-	if (mon_ops && mon_ops->mon_pdev_htt_srng_setup)
-		status = mon_ops->mon_pdev_htt_srng_setup(soc, pdev,
-						     lmac_id, mac_for_pdev);
+	status = dp_monitor_htt_srng_setup(soc, pdev, lmac_id, mac_for_pdev);
 
 	return status;
 }
@@ -138,17 +135,8 @@ int monitor_mod_init(void)
 			continue;
 		}
 
-		if (mon_ops->mon_soc_attach) {
-			if (mon_ops->mon_soc_attach(soc)) {
-				dp_mon_err("%pK: monitor soc attach failed", soc);
-			}
-		}
-
-		if (mon_ops->mon_soc_init) {
-			if (mon_ops->mon_soc_init(soc)) {
-				dp_mon_err("%pK: monitor soc init failed", soc);
-			}
-		}
+		dp_monitor_soc_attach(soc);
+		dp_monitor_soc_init(soc);
 
 		status = dp_mon_soc_ring_config(soc);
 		if (status != QDF_STATUS_SUCCESS) {
@@ -281,11 +269,8 @@ void monitor_mod_exit(void)
 
 		mon_ops = dp_mon_ops_get(soc);
 
-		if (mon_ops && mon_ops->mon_soc_deinit)
-			mon_ops->mon_soc_deinit(soc);
-
-		if (mon_ops && mon_ops->mon_soc_detach)
-			mon_ops->mon_soc_detach(soc);
+		dp_monitor_soc_deinit(soc);
+		dp_monitor_soc_detach(soc);
 
 		dp_mon_ops_free(soc);
 

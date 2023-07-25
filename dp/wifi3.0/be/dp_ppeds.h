@@ -254,6 +254,14 @@ void dp_tx_ppeds_cfg_astidx_cache_mapping(struct dp_soc *soc,
 
 #ifdef DP_UMAC_HW_RESET_SUPPORT
 /**
+ * dp_ppeds_handle_attached() - Check if ppeds handle attached
+ * @be_soc: BE SoC
+ *
+ * Return: true if ppeds handle attached else false.
+ */
+bool dp_ppeds_handle_attached(struct dp_soc *soc);
+
+/**
  * dp_ppeds_interrupt_stop_be() - Stop all the PPEDS interrupts
  * @be_soc: BE SoC
  * @enable: enable/disable bit

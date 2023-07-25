@@ -240,6 +240,16 @@ void wlan_rptr_pdev_clear_feat_cap(struct wlan_objmgr_pdev *pdev,
 				   uint32_t cap);
 
 /**
+ * wlan_rptr_is_psta_vdev() - checks if vdev is a PSTA or not
+ * @vdev: vdev object
+ *
+ * api to check if vdev is PSTA or not
+ *
+ * return: 1 if PSTA else 0
+ */
+bool wlan_rptr_is_psta_vdev(struct wlan_objmgr_vdev *vdev);
+
+/**
  * wlan_rptr_pdev_is_feat_cap_set() - get feature caps
  * @vdev: pdev object
  * @cap: capabilities to be checked

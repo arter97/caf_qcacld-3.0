@@ -625,10 +625,8 @@ static void dp_ppeds_enable_txcomp_irq(struct dp_soc_be *be_soc)
 {
 	struct dp_soc *soc = DP_SOC_BE_GET_SOC(be_soc);
 
-	if (!dp_check_umac_reset_in_progress(soc)) {
-		dp_ppeds_enable_irq(&be_soc->soc,
-				    &be_soc->ppeds_wbm_release_ring);
-	}
+	dp_ppeds_enable_irq(&be_soc->soc,
+			    &be_soc->ppeds_wbm_release_ring);
 
 	if (soc->notify_fw_callback)
 		soc->notify_fw_callback(soc);
@@ -643,6 +641,7 @@ static void dp_ppeds_tx_desc_reset(void *ctxt, void *elem, void *elem_list)
 
 	if (tx_desc->nbuf) {
 		nbuf = tx_desc->nbuf;
+		__dp_tx_outstanding_dec(soc);
 		dp_ppeds_tx_desc_free_nolock(soc, tx_desc);
 
 		if (nbuf) {
@@ -781,7 +780,7 @@ dp_ppeds_tx_desc_pool_alloc(struct dp_soc *soc, uint16_t num_elem)
 
 	desc_size =  qdf_get_pwr2(sizeof(struct dp_tx_desc_s));
 	tx_desc_pool = &be_soc->ppeds_tx_desc;
-	dp_desc_multi_pages_mem_alloc(soc, DP_TX_PPEDS_DESC_TYPE,
+	dp_desc_multi_pages_mem_alloc(soc, QDF_DP_TX_PPEDS_DESC_TYPE,
 				      &tx_desc_pool->desc_pages,
 				      desc_size, num_elem,
 				      0, true);
@@ -809,7 +808,7 @@ static void dp_ppeds_tx_desc_pool_free(struct dp_soc *soc)
 	tx_desc_pool = &be_soc->ppeds_tx_desc;
 
 	if (tx_desc_pool->desc_pages.num_pages)
-		dp_desc_multi_pages_mem_free(soc, DP_TX_PPEDS_DESC_TYPE,
+		dp_desc_multi_pages_mem_free(soc, QDF_DP_TX_PPEDS_DESC_TYPE,
 					     &tx_desc_pool->desc_pages, 0,
 					     true);
 }
@@ -936,6 +935,7 @@ void dp_ppeds_tx_desc_clean_up(void *ctxt, void *elem, void *elem_list)
 
 	if (tx_desc->nbuf) {
 		qdf_nbuf_free(tx_desc->nbuf);
+		__dp_tx_outstanding_dec(soc);
 		dp_ppeds_tx_desc_free_nolock(soc, tx_desc);
 	}
 }
@@ -1000,6 +1000,25 @@ static void dp_ppeds_tx_desc_pool_deinit(struct dp_soc *soc)
 }
 
 /**
+ * dp_tx_borrow_tx_desc() - API to borrow tx descs from regular pool
+ * @be_soc: SoC
+ *
+ * Borrow Tx descs from regular pool when DS Tx desc pool is empty
+ *
+ * Return: tx descriptor
+ */
+static inline
+struct dp_tx_desc_s *dp_tx_borrow_tx_desc(struct dp_soc *soc)
+{
+	struct dp_tx_desc_s *tx_desc = dp_tx_desc_alloc(soc, qdf_get_cpu());
+
+	if (tx_desc)
+		tx_desc->flags = 0;
+
+	return tx_desc;
+}
+
+/**
  * dp_ppeds_tx_desc_alloc() - PPE DS tx desc alloc
  * @be_soc: SoC
  *
@@ -1017,6 +1036,7 @@ struct dp_tx_desc_s *dp_ppeds_tx_desc_alloc(struct dp_soc_be *be_soc)
 
 	if (pool->hotlist) {
 		tx_desc = pool->hotlist;
+		tx_desc->flags = 0;
 		pool->hotlist = pool->hotlist->next;
 		pool->hot_list_len--;
 		if (pool->hot_list_len)
@@ -1024,26 +1044,41 @@ struct dp_tx_desc_s *dp_ppeds_tx_desc_alloc(struct dp_soc_be *be_soc)
 		else
 			dp_tx_prefetch_desc(pool->freelist);
 	} else {
+		if (__dp_tx_limit_check(&be_soc->soc)) {
+			TX_DESC_LOCK_UNLOCK(&pool->lock);
+			goto failed;
+		}
+
 		tx_desc = pool->freelist;
 
 		/* Pool is exhausted */
 		if (!tx_desc) {
-			TX_DESC_LOCK_UNLOCK(&pool->lock);
-			return NULL;
-		}
 
-		pool->freelist = pool->freelist->next;
-		dp_tx_prefetch_desc(pool->freelist);
-		pool->num_allocated++;
-		pool->num_free--;
+			/* Try to borrow from regular tx desc pools */
+			tx_desc = dp_tx_borrow_tx_desc(&be_soc->soc);
+			if (!tx_desc) {
+				TX_DESC_LOCK_UNLOCK(&pool->lock);
+				goto failed;
+			}
+		} else {
+			tx_desc->flags = 0;
+			pool->freelist = pool->freelist->next;
+			dp_tx_prefetch_desc(pool->freelist);
+			pool->num_allocated++;
+			pool->num_free--;
+		}
+		__dp_tx_outstanding_inc(&be_soc->soc);
 	}
 
-	tx_desc->flags = DP_TX_DESC_FLAG_ALLOCATED;
+	tx_desc->flags |= DP_TX_DESC_FLAG_ALLOCATED;
 	tx_desc->flags |= DP_TX_DESC_FLAG_PPEDS;
 
 	TX_DESC_LOCK_UNLOCK(&pool->lock);
 
 	return tx_desc;
+failed:
+	be_soc->ppeds_stats.tx.desc_alloc_failed++;
+	return NULL;
 }
 
 /**
@@ -1070,6 +1105,8 @@ qdf_nbuf_t dp_ppeds_tx_desc_free(struct dp_soc *soc, struct dp_tx_desc_s *tx_des
 		pool->hotlist = tx_desc;
 		pool->hot_list_len++;
 	} else {
+		__dp_tx_outstanding_dec(soc);
+
 		nbuf = tx_desc->nbuf;
 		tx_desc->nbuf = NULL;
 		tx_desc->flags = 0;
@@ -1107,16 +1144,7 @@ uint32_t dp_ppeds_get_batched_tx_desc(ppe_ds_wlan_handle_t *ppeds_handle,
 	struct dp_tx_desc_s *tx_desc;
 	struct dp_soc *soc = *((struct dp_soc **)ppe_ds_wlan_priv(ppeds_handle));
 	struct dp_soc_be *be_soc = dp_get_be_soc_from_dp_soc(soc);
-	struct dp_ppeds_tx_desc_pool_s *pool = &be_soc->ppeds_tx_desc;
 	qdf_dma_addr_t paddr;
-
-	/*
-	 * If the tx desc pool is empty, we need to return.
-	 */
-	if (!pool->freelist && !pool->hotlist) {
-		dp_err("ran out of txdesc");
-		return 0;
-	}
 
 	for (i = 0; i < num_buff_req; i++) {
 		qdf_nbuf_t nbuf = NULL;
@@ -1216,7 +1244,7 @@ static void dp_ppeds_release_rx_desc(ppe_ds_wlan_handle_t *ppeds_handle,
 			if (!rx_bufs_reaped[chip_id][mac_id])
 				continue;
 
-			replenish_soc = dp_rx_replensih_soc_get(soc, chip_id);
+			replenish_soc = dp_rx_replenish_soc_get(soc, chip_id);
 
 			dp_rxdma_srng = &replenish_soc->rx_refill_buf_ring[mac_id];
 			rx_desc_pool = &replenish_soc->rx_desc_buf[mac_id];
@@ -1264,6 +1292,9 @@ static void dp_ppeds_set_tcl_prod_idx(ppe_ds_wlan_handle_t *ppeds_handle,
 	struct dp_srng *ppe2tcl_ring = &soc->ppe2tcl_ring;
 
 	hal_srng_src_set_hp(ppe2tcl_ring->hal_srng, tcl_prod_idx);
+	hal_update_ring_util(dpsoc->hal_soc, ppe2tcl_ring->hal_srng,
+			     PPE2TCL, &soc->ppe2tcl_ring.stats);
+
 	dp_tx_ring_access_end_wrapper(dpsoc, ppe2tcl_ring->hal_srng, 0);
 }
 
@@ -1984,6 +2015,7 @@ bool dp_ppeds_target_supported(int target_type)
 	 */
 	switch (target_type) {
 	case TARGET_TYPE_QCN9224:
+	case TARGET_TYPE_QCN6432:
 		return true;
 
 	default:
@@ -2124,6 +2156,22 @@ void dp_ppeds_detach_soc_be(struct dp_soc_be *be_soc)
 
 #ifdef DP_UMAC_HW_RESET_SUPPORT
 /**
+ * dp_ppeds_handle_attached() - Check if ppeds handle attached
+ * @be_soc: BE SoC
+ *
+ * Return: true if ppeds handle attached else false.
+ */
+bool dp_ppeds_handle_attached(struct dp_soc *soc)
+{
+	struct dp_soc_be *be_soc = dp_get_be_soc_from_dp_soc(soc);
+
+	if (be_soc->ppeds_handle)
+		return true;
+
+	return false;
+}
+
+/**
  * dp_ppeds_interrupt_start_be() - Start all the PPEDS interrupts
  * @be_soc: BE SoC
  *
@@ -2139,7 +2187,6 @@ void dp_ppeds_interrupt_start_be(struct dp_soc *soc)
 	dp_ppeds_enable_irq(&be_soc->soc,
 			    &be_soc->ppeds_wbm_release_ring);
 
-	dp_ppeds_enable_irq(&be_soc->soc, &be_soc->ppe2tcl_ring);
 	dp_ppeds_enable_irq(&be_soc->soc, &be_soc->reo2ppe_ring);
 }
 
@@ -2160,7 +2207,6 @@ void dp_ppeds_interrupt_stop_be(struct dp_soc *soc)
 	dp_ppeds_disable_irq(&be_soc->soc,
 			     &be_soc->ppeds_wbm_release_ring);
 
-	dp_ppeds_disable_irq(&be_soc->soc, &be_soc->ppe2tcl_ring);
 	dp_ppeds_disable_irq(&be_soc->soc, &be_soc->reo2ppe_ring);
 }
 
@@ -2264,7 +2310,7 @@ QDF_STATUS dp_ppeds_attach_soc_be(struct dp_soc_be *be_soc)
 
 	qdf_status =
 		dp_hw_cookie_conversion_attach(be_soc, &be_soc->ppeds_tx_cc_ctx,
-					       num_elem, DP_TX_PPEDS_DESC_TYPE,
+					       num_elem, QDF_DP_TX_PPEDS_DESC_TYPE,
 					       DP_TX_PPEDS_POOL_ID);
 	if (!QDF_IS_STATUS_SUCCESS(qdf_status))
 		goto fail1;

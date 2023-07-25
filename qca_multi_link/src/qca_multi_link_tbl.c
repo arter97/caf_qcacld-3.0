@@ -67,7 +67,12 @@ int qca_multi_link_tbl_get_eth_entries(struct net_device *net_dev,
 				       search_fdb->key.addr.addr, 6);
 #endif
 				qfdb->qal_fdb_dev = ndev;
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 1, 0)
+				qfdb->qal_fdb_is_local =
+				    test_bit(BR_FDB_LOCAL, &search_fdb->flags);
+#else
 				qfdb->qal_fdb_is_local =  search_fdb->is_local;
+#endif
 				num_of_entries++;
 				qfdb += 1;
 				buff_size -= fdb_entry_size;
@@ -111,7 +116,11 @@ struct net_device *qca_multi_link_tbl_find_sta_or_ap(struct net_device *net_dev,
 		hlist_for_each_entry_rcu(search_fdb, &p->br->fdb_list,
 					 fdb_node) {
 #endif
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 1, 0)
+			if (!test_bit(BR_FDB_LOCAL, &search_fdb->flags))
+#else
 			if (!search_fdb->is_local)
+#endif
 				continue;
 
 			if ((!search_fdb->dst) || (!search_fdb->dst->dev)) {
@@ -139,7 +148,9 @@ qdf_export_symbol(qca_multi_link_tbl_find_sta_or_ap);
 QDF_STATUS qca_multi_link_tbl_add_or_refresh_entry(struct net_device *net_dev, uint8_t *addr,
 							qca_multi_link_entry_type_t entry_type)
 {
+#if LINUX_VERSION_CODE < KERNEL_VERSION(6, 1, 0)
 	int status;
+#endif
 	uint16_t state = NUD_NONE;
 
 	if (entry_type == QCA_MULTI_LINK_ENTRY_USER_ADDED) {
@@ -150,10 +161,12 @@ QDF_STATUS qca_multi_link_tbl_add_or_refresh_entry(struct net_device *net_dev, u
 		state = NUD_NOARP;
 	}
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(6, 1, 0)
 	status = br_fdb_add_or_refresh_by_netdev(net_dev, addr, 0, state);
 	if (status < 0) {
 		return QDF_STATUS_E_FAILURE;
 	}
+#endif
 	return QDF_STATUS_SUCCESS;
 }
 qdf_export_symbol(qca_multi_link_tbl_add_or_refresh_entry);
@@ -168,7 +181,11 @@ QDF_STATUS qca_multi_link_tbl_delete_entry(struct net_device *net_dev, uint8_t *
 		return QDF_STATUS_E_FAILURE;
 	}
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 1, 0)
+	if (test_bit(BR_FDB_LOCAL, &fdb_entry->flags)) {
+#else
 	if (fdb_entry->is_local) {
+#endif
 		return QDF_STATUS_SUCCESS;
 	}
 
@@ -194,12 +211,16 @@ QDF_STATUS qca_multi_link_tbl_has_entry(struct net_device *net_dev,
 	struct net_bridge_port *fdb_port = NULL;
 	struct net_device *fdb_dev = NULL;
 
-	if (!qca_ml_entry)
+	if (!qca_ml_entry) {
+		qdf_err("qca_ml_entry is null for ifname:%s with mac:%pM\n", net_dev->name, addr);
 		return QDF_STATUS_E_FAILURE;
+	}
 
 	fdb_entry = qal_bridge_fdb_has_entry(net_dev, addr, vlan_id);
-	if (!fdb_entry)
+	if (!fdb_entry) {
+		qdf_err("fdb_entry is null for ifname:%s with mac:%pM\n", net_dev->name, addr);
 		return QDF_STATUS_E_FAILURE;
+	}
 
 	fdb_port = fdb_entry->dst;
 	if (!fdb_port) {
@@ -215,7 +236,12 @@ QDF_STATUS qca_multi_link_tbl_has_entry(struct net_device *net_dev,
 
 	qca_ml_entry->qal_fdb_ieee80211_ptr = fdb_dev->ieee80211_ptr;
 	qca_ml_entry->qal_fdb_dev = fdb_dev;
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 1, 0)
+	qca_ml_entry->qal_fdb_is_local =
+		test_bit(BR_FDB_LOCAL, &fdb_entry->flags);
+#else
 	qca_ml_entry->qal_fdb_is_local = fdb_entry->is_local;
+#endif
 	return QDF_STATUS_SUCCESS;
 }
 

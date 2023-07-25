@@ -92,6 +92,16 @@ int qca_mscs_peer_lookup_n_get_priority(uint8_t *src_mac, uint8_t *dst_mac, stru
 
 qdf_export_symbol(qca_mscs_peer_lookup_n_get_priority);
 
+int qca_mscs_peer_lookup_n_get_priority_v2(
+				    struct qca_mscs_get_priority_param *params)
+{
+	return qca_mscs_peer_lookup_n_get_priority(params->src_mac,
+						   params->dst_mac,
+						   params->skb);
+}
+
+qdf_export_symbol(qca_mscs_peer_lookup_n_get_priority_v2);
+
 /**
  * qca_mscs_module_init() - Initialize the MSCS module
  * @soc - Pointer to soc getting attached

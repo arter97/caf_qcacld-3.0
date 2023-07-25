@@ -517,4 +517,17 @@ wlan_reg_get_max_reg_eirp_from_list(struct wlan_objmgr_pdev *pdev,
 	return QDF_STATUS_E_NOSUPPORT;
 }
 #endif
+
+/**
+ * wlan_quick_reg_set_ap_pwr_and_update_chan_list() - Set the AP power mode and
+ * recompute the current channel list based on the new AP power mode.
+ *
+ * @pdev: Pointer to pdev.
+ * @ap_pwr_type: The AP power type to update to.
+ *
+ * Return: QDF_STATUS.
+ */
+QDF_STATUS
+wlan_quick_reg_set_ap_pwr_and_update_chan_list(struct wlan_objmgr_pdev *pdev,
+					       enum reg_6g_ap_type ap_pwr_type);
 #endif /* __WLAN_REG_CHANNEL_API_H */

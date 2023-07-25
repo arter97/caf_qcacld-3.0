@@ -28,4 +28,14 @@
  */
 QDF_STATUS wlan_twt_send_enable_cmd(struct wlan_objmgr_pdev *pdev);
 
+/**
+ * wlan_twt_send_disable_cmd() - Disable TWT for a pdev
+ * @psoc: Pointer to pdev
+ *
+ * This function sends a WMI command to disable TWT
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS wlan_twt_send_disable_cmd(struct wlan_objmgr_pdev *pdev);
+
 #endif

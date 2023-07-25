@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -63,6 +63,9 @@
 /* NL80211 command and event socket IDs */
 #define STATS_NL80211_CMD_SOCK_ID    DEFAULT_NL80211_CMD_SOCK_ID
 #define STATS_NL80211_EVENT_SOCK_ID  DEFAULT_NL80211_EVENT_SOCK_ID
+
+/* Mld hybrid non-bonding Mode value */
+#define STATS_MLD_MODE_HYBRID_NONBOND  2
 
 #define SET_FLAG(_flg, _mask)              \
 	do {                               \
@@ -596,6 +599,11 @@ static int is_valid_cmd(struct stats_command *cmd)
 			STATS_ERR("VAP Interface name invalid.\n");
 			return -EINVAL;
 		}
+		if (libstats_is_ifname_valid(cmd->if_name, STATS_OBJ_MLD) &&
+		    cmd->mld_link) {
+			STATS_ERR("Invalid mld_link stats command.\n");
+			return -EINVAL;
+		}
 		if (sta_mac[0])
 			STATS_WARN("Ignore STA MAC address input for VAP\n");
 		break;
@@ -639,6 +647,11 @@ static int32_t prepare_request(struct nl_msg *nlmsg, struct stats_command *cmd)
 	if (nla_put_u64(nlmsg, QCA_WLAN_VENDOR_ATTR_TELEMETRIC_FEATURE_FLAG,
 			cmd->feat_flag)) {
 		STATS_ERR("failed to put feature flag\n");
+		return -EIO;
+	}
+	if (cmd->mld_link &&
+	    nla_put_flag(nlmsg, QCA_WLAN_VENDOR_ATTR_TELEMETRIC_MLD_LINK)) {
+		STATS_ERR("failed to put mld link flag\n");
 		return -EIO;
 	}
 	if (cmd->obj == STATS_OBJ_STA) {
@@ -2193,20 +2206,20 @@ static void get_sta_info(struct cfg80211_data *buffer)
 	buffer->length = LIST_STATION_CFG_ALLOC_SIZE;
 }
 
-static uint32_t get_interface_opmode(char *ifname)
+static uint32_t get_mldev_mode(char *ifname)
 {
 	struct cfg80211_data buffer = {0};
-	uint32_t opmode = 0;
+	uint32_t mldev_mode = 0;
 
-	buffer.data = &opmode;
-	buffer.length = sizeof(uint32_t);
+	buffer.data = &mldev_mode;
+	buffer.length = sizeof(mldev_mode);
 	wifi_cfg80211_send_getparam_command(&g_sock_ctx.cfg80211_ctxt,
 					    QCA_NL80211_VENDOR_SUBCMD_WIFI_PARAMS,
-					    IEEE80211_PARAM_GET_OPMODE,
+					    OL_SPECIAL_PARAM_SHIFT |
+					    OL_SPECIAL_PARAM_MLO_OPER_MODE,
 					    ifname, (char *)&buffer,
 					    sizeof(uint32_t));
-
-	return opmode;
+	return mldev_mode;
 }
 
 static int32_t build_child_sta_list(char *ifname,
@@ -2709,6 +2722,40 @@ static bool is_feat_valid_for_obj(struct stats_command *cmd)
 	return false;
 }
 
+bool is_valid_mld_args(bool is_mode_hybrid,
+		       bool is_object_sta,
+		       bool is_cmd_recursive,
+		       bool is_mlo,
+		       bool is_request_mld,
+		       bool is_mld_link)
+{
+	if (is_object_sta && is_cmd_recursive) {
+		if (is_request_mld || is_mld_link) {
+			/**
+			 * Consider only MLO clients when
+			 * mode is hybrid and request is
+			 * for MLD or MLD Link
+			 */
+			if (is_mode_hybrid && !is_mlo)
+				return false;
+			else
+				return true;
+		} else {
+			/**
+			 * Consider only legacy clients when
+			 * mode is hybrid and request is for
+			 * legacy interface
+			 */
+			if (is_mode_hybrid && is_mlo)
+				return false;
+			else
+				return true;
+		}
+	}
+
+	return true;
+}
+
 static int32_t send_request_per_object(struct stats_command *user_cmd,
 				       struct object_list *obj_list)
 {
@@ -2719,12 +2766,14 @@ static int32_t send_request_per_object(struct stats_command *user_cmd,
 	int32_t ret = 0;
 	bool is_mld_req = false;
 	bool mld_intf_req_sent = false;
+	uint32_t  mldev_mode = 0;
 
 	if (!obj_list) {
 		STATS_ERR("Invalid Object List\n");
 		return -EINVAL;
 	}
 
+	mldev_mode = get_mldev_mode(obj_list->ifname);
 	/**
 	 * Based on user request find the requested subtree in root_obj.
 	 **/
@@ -2732,11 +2781,6 @@ static int32_t send_request_per_object(struct stats_command *user_cmd,
 	if (!root_obj) {
 		STATS_ERR("No object found for %d obj type\n", user_cmd->obj);
 		return -EPERM;
-	}
-
-	if (is_mld_req && get_interface_opmode(root_obj->ifname) != IEEE80211_M_HOSTAP) {
-		STATS_ERR("MLD Interface stats not supported in Non-AP mode\n");
-		return -EINVAL;
 	}
 
 	temp_obj = root_obj;
@@ -2750,8 +2794,14 @@ static int32_t send_request_per_object(struct stats_command *user_cmd,
 		return -EINVAL;
 	}
 
+	if (user_cmd->mld_link && !temp_obj->is_mld_slave) {
+		STATS_ERR("Link not part of MLD \n");
+		return -EINVAL;
+	}
+
 	memcpy(&cmd, user_cmd, sizeof(struct stats_command));
 	cmd.recursive = user_cmd->recursive;
+	cmd.mld_link = user_cmd->mld_link;
 	memset(&buffer, 0, sizeof(struct cfg80211_data));
 	buffer.data = &cmd;
 	buffer.length = sizeof(struct stats_command);
@@ -2793,16 +2843,31 @@ static int32_t send_request_per_object(struct stats_command *user_cmd,
 					 * user
 					 */
 					if (user_cmd->recursive) {
+						/**
+						 * For recursive calls, we
+						 * need ML related stats for
+						 * that particular interface,
+						 * hence we are issuing the
+						 * command with mld_link as true
+						 */
+						cmd.mld_link = true;
 						ret = send_nl_command(&cmd, &buffer,
 								      temp_obj->ifname);
 						if (ret < 0)
 							break;
 					}
 				} else {
-					ret = send_nl_command(&cmd, &buffer,
-							      temp_obj->ifname);
-					if (ret < 0)
-						break;
+					if (is_valid_mld_args(mldev_mode == STATS_MLD_MODE_HYBRID_NONBOND,
+							      temp_obj->obj_type == STATS_OBJ_STA,
+							      user_cmd->recursive,
+							      temp_obj->is_mlo,
+							      is_mld_req,
+							      cmd.mld_link)) {
+						ret = send_nl_command(&cmd, &buffer,
+								      temp_obj->ifname);
+						if (ret < 0)
+							break;
+					}
 				}
 			}
 		}

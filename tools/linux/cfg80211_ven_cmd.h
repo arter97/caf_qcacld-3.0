@@ -786,7 +786,7 @@ enum {
 	IEEE80211_PARAM_MBSS_GROUP                 = 749,
 	IEEE80211_PARAM_DISC_FRM_CLEAR_USR_OVERRIDE = 750,  /* Discovery frame override with OOB */
 #ifdef WLAN_FEATURE_11BE
-	IEEE80211_PARAM_NSEP_PRIORITY_ACCESS       = 751, /* EHT NSEP Priority access support */
+	IEEE80211_PARAM_EPCS_PRIORITY_ACCESS       = 751, /* EHT EPCS Priority access support */
 	IEEE80211_PARAM_OM_CONTROL                 = 752, /* EHT OM control support */
 	IEEE80211_PARAM_TRIGGERED_TXOP_SHARING     = 753, /* EHT triggered TX op sharing support */
 	IEEE80211_PARAM_EHT_NDP_4X_EHT_LTF_AND_320NSGI          = 754, /* NDP With 4x EHT-LTF And 3.2 usGI */
@@ -872,6 +872,13 @@ enum {
 	IEEE80211_PARAM_EMLSR_CONFIG = 809,
 	IEEE80211_PARAM_STR_CONFIG = 810,
 	IEEE80211_PARAM_NSTR_CONFIG = 811,
+	IEEE80211_PARAM_GET_MLO_OPER_MODE = 812,
+#ifdef WLAN_FEATURE_11BE_MLO
+	IEEE80211_PARAM_WLAN_PEER_MESH_OVERRIDE = 813, /* Vendor Flags for WMI Interface */
+#endif
+	IEEE80211_PARAM_RTT_11AZ_TB_MAX_SESSION_EXPIRY = 814,
+	IEEE80211_PARAM_RTT_11AZ_NTB_MAX_TIME_BW_MEAS = 815,
+	IEEE80211_PARAM_RTT_11AZ_NTB_MIN_TIME_BW_MEAS = 816,
 };
 
 enum {
@@ -907,7 +914,8 @@ enum {
 	OL_SPECIAL_PARAM_SET_TX_LATENCY,
 	OL_SPECIAL_PARAM_SET_TX_LATENCY_PKTLOG,
 	OL_SPECIAL_PARAM_SET_V3_TID,
-	OL_SPECIAL_PARAM_SET_TX_DROP_THRESHOLD
+	OL_SPECIAL_PARAM_SET_TX_DROP_THRESHOLD,
+	OL_SPECIAL_PARAM_MLO_OPER_MODE,
 };
 
 enum _ol_ath_param_t {
@@ -1464,6 +1472,15 @@ enum _ol_ath_param_t {
 	OL_ATH_PARAM_MLD_SUPPORT = 527,
 	OL_ATH_PARAM_MAX_MLD_SUPPORTED = 528,
 	OL_ATH_PARAM_MAX_ML_LINK_SUPPORTED = 529,
+#ifdef QCA_R2P_UPDATE_ENABLED
+	OL_ATH_PARAM_R2P_HCHAN_RESTORE = 530,
+#endif
+	OL_ATH_PARAM_PROBE_RESP_RETRY_LIMIT = 531,
+	OL_ATH_PARAM_CTS_TIMEOUT = 532,
+	OL_ATH_PARAM_SLOT_TIME = 533,
+#ifdef WLAN_FEATURE_11BE_MLO
+	OL_ATH_PARAM_FORCE_NON_ASSOC_PRIMARY_UMAC = 534,
+#endif
 };
 
 #ifdef CONFIG_SUPPORT_VENCMDTABLE
@@ -2487,8 +2504,8 @@ struct vendor_commands vap_vendor_cmds[] = {
 	{"g_spl_vap_scan",      IEEE80211_PARAM_SPL_VAP_SCAN, GET_PARAM, 0},
 	{"discfrm_6g_clear_usr_override", IEEE80211_PARAM_DISC_FRM_CLEAR_USR_OVERRIDE, SET_PARAM, 1},
 #ifdef WLAN_FEATURE_11BE
-	{"set_eht_nsep_pri_access",   IEEE80211_PARAM_NSEP_PRIORITY_ACCESS, SET_PARAM, 1},
-	{"get_eht_nsep_pri_access",   IEEE80211_PARAM_NSEP_PRIORITY_ACCESS, GET_PARAM, 0},
+	{"set_eht_epcs_pri_access",   IEEE80211_PARAM_EPCS_PRIORITY_ACCESS, SET_PARAM, 1},
+	{"get_eht_epcs_pri_access",   IEEE80211_PARAM_EPCS_PRIORITY_ACCESS, GET_PARAM, 0},
 	{"set_eht_om_ctrl",           IEEE80211_PARAM_OM_CONTROL, SET_PARAM, 1},
 	{"get_eht_om_ctrl",           IEEE80211_PARAM_OM_CONTROL, GET_PARAM, 0},
 	{"set_eht_trig_txop_sharing", IEEE80211_PARAM_TRIGGERED_TXOP_SHARING, SET_PARAM, 1},
@@ -2589,6 +2606,18 @@ struct vendor_commands vap_vendor_cmds[] = {
 	{"g_str_config",   IEEE80211_PARAM_STR_CONFIG, GET_PARAM, 0},
 	{"nstr_config",  IEEE80211_PARAM_NSTR_CONFIG, SET_PARAM, 1},
 	{"g_nstr_config",  IEEE80211_PARAM_NSTR_CONFIG, GET_PARAM, 0},
+#ifdef WLAN_FEATURE_11BE_MLO
+	{"set_vendor_peer_mesh_override_flag",
+		IEEE80211_PARAM_WLAN_PEER_MESH_OVERRIDE, SET_PARAM, 1},
+	{"get_vendor_peer_mesh_override_flag",
+		IEEE80211_PARAM_WLAN_PEER_MESH_OVERRIDE, GET_PARAM, 0},
+#endif
+	{"tb_max_sess_expiry", IEEE80211_PARAM_RTT_11AZ_TB_MAX_SESSION_EXPIRY,
+	 SET_PARAM, 1},
+	{"ntb_max_time_bw_meas", IEEE80211_PARAM_RTT_11AZ_NTB_MAX_TIME_BW_MEAS,
+	 SET_PARAM, 1},
+	{"ntb_min_time_bw_meas", IEEE80211_PARAM_RTT_11AZ_NTB_MIN_TIME_BW_MEAS,
+	 SET_PARAM, 1},
 };
 
 struct vendor_commands radio_vendor_cmds[] = {
@@ -3177,6 +3206,18 @@ struct vendor_commands radio_vendor_cmds[] = {
 		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_MGMT_PDEV_STATS_TIMER, SET_PARAM, 1},
 	{"g_p_stats_tmr",
 		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_MGMT_PDEV_STATS_TIMER, GET_PARAM, 0},
+	{"presp_ret_lim",
+		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_PROBE_RESP_RETRY_LIMIT, SET_PARAM, 1},
+	{"g_presp_ret_lim",
+		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_PROBE_RESP_RETRY_LIMIT, GET_PARAM, 0},
+	{"cts_timeout",
+		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_CTS_TIMEOUT, SET_PARAM, 1},
+	{"g_cts_timeout",
+		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_CTS_TIMEOUT, GET_PARAM, 0},
+	{"slot_time",
+		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_SLOT_TIME, SET_PARAM, 1},
+	{"g_slot_time",
+		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_SLOT_TIME, GET_PARAM, 0},
 	{"acktimeout",
 		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_TXACKTIMEOUT, SET_PARAM, 1},
 	{"get_acktimeout",
@@ -3708,6 +3749,12 @@ struct vendor_commands radio_vendor_cmds[] = {
 	{"mlo_forced_umac_soc",
 		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_FORCE_PRIMARY_UMAC_SOC_ID,
 		SET_PARAM, 1},
+	{"g_non_assoc_prim_umac_mode",
+		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_FORCE_NON_ASSOC_PRIMARY_UMAC,
+		GET_PARAM, 0},
+	{"non_assoc_prim_umac_mode",
+		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_FORCE_NON_ASSOC_PRIMARY_UMAC,
+		SET_PARAM, 1},
 #endif
 	{"ipaucstats",
 		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_IPA_UC_STATS, SET_PARAM, 1},
@@ -3848,6 +3895,10 @@ struct vendor_commands radio_vendor_cmds[] = {
 	{"g_max_ml_link_capability",
 		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_MAX_ML_LINK_SUPPORTED,
 		GET_PARAM, 0},
+#ifdef QCA_R2P_UPDATE_ENABLED
+	{"hchan_r2p_restore_en",
+		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_R2P_HCHAN_RESTORE, SET_PARAM, 1},
+#endif
 };
 #endif
 
